@@ -8,7 +8,7 @@ write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, cast([]u8)str);
 }
 
-read_entire_file :: proc(name: string) -> ([]u8, bool) {
+read_entire_file :: proc(name: string) -> (data: []u8, success: bool) {
 	fd, err := open(name, O_RDONLY, 0);
 	if err != 0 {
 		return nil, false;
@@ -37,7 +37,7 @@ read_entire_file :: proc(name: string) -> ([]u8, bool) {
 	return data[0..bytes_read], true;
 }
 
-write_entire_file :: proc(name: string, data: []u8) -> bool {
+write_entire_file :: proc(name: string, data: []u8) -> (sucess: bool) {
 	fd, err := open(name, O_WRONLY, 0);
 	if err != 0 {
 		return false;

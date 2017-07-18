@@ -305,7 +305,7 @@ resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_AL
 
 copy :: proc(dst, src: $T/[]$E) -> int #cc_contextless {
 	n := max(0, min(len(dst), len(src)));
-	if n > 0 do __mem_copy(&dst[0], &src[0], n*size_of(T));
+	if n > 0 do __mem_copy(&dst[0], &src[0], n*size_of(E));
 	return n;
 }
 
@@ -670,6 +670,7 @@ __string_decode_rune :: proc(s: string) -> (rune, int) #cc_contextless #inline {
 
 
 __mem_set :: proc(data: rawptr, value: i32, len: int) -> rawptr #cc_contextless {
+	if data == nil do return nil;
 	when size_of(rawptr) == 8 {
 		foreign __llvm_core llvm_memset :: proc(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) #link_name "llvm.memset.p0i8.i64" ---;
 	} else {
@@ -682,6 +683,7 @@ __mem_zero :: proc(data: rawptr, len: int) -> rawptr #cc_contextless {
 	return __mem_set(data, 0, len);
 }
 __mem_copy :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
+	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memmove
 	when size_of(rawptr) == 8 {
 		foreign __llvm_core llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memmove.p0i8.p0i8.i64" ---;
@@ -692,6 +694,7 @@ __mem_copy :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
 	return dst;
 }
 __mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
+	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memcpy
 	when size_of(rawptr) == 8 {
 		foreign __llvm_core llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i64" ---;
