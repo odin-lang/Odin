@@ -236,10 +236,10 @@ type_info_base_without_enum :: proc(info: ^TypeInfo) -> ^TypeInfo {
 
 
 foreign __llvm_core {
-	assume             :: proc(cond: bool) #link_name "llvm.assume"           ---;
-	__debug_trap       :: proc()           #link_name "llvm.debugtrap"        ---;
-	__trap             :: proc()           #link_name "llvm.trap"             ---;
-	read_cycle_counter :: proc() -> u64    #link_name "llvm.readcyclecounter" ---;
+	assume             :: proc(cond: bool) #cc_c #link_name "llvm.assume"           ---;
+	__debug_trap       :: proc()           #cc_c #link_name "llvm.debugtrap"        ---;
+	__trap             :: proc()           #cc_c #link_name "llvm.trap"             ---;
+	read_cycle_counter :: proc() -> u64    #cc_c #link_name "llvm.readcyclecounter" ---;
 }
 
 

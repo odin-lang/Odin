@@ -3391,6 +3391,10 @@ AstNode *parse_results(AstFile *f) {
 		return nullptr;
 	}
 
+	isize prev_level = f->expr_level;
+	defer (f->expr_level = prev_level);
+	// f->expr_level = -1;
+
 	if (f->curr_token.kind != Token_OpenParen) {
 		CommentGroup empty_group = {};
 		Token begin_token = f->curr_token;
@@ -3790,10 +3794,13 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 AstNode *parse_type_or_ident(AstFile *f) {
 #if 1
 	bool prev_allow_type = f->allow_type;
+	isize prev_expr_level = f->expr_level;
+	defer (f->allow_type = prev_allow_type);
+	defer (f->expr_level = prev_expr_level);
 	f->allow_type = true;
+	f->expr_level = -1;
 	AstNode *operand = parse_operand(f, true);
 	AstNode *type = parse_atom_expr(f, operand, true);
-	f->allow_type = prev_allow_type;
 	return type;
 #else
 	switch (f->curr_token.kind) {
