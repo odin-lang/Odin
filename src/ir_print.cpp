@@ -292,7 +292,8 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 
 		ir_fprintf(f, "{[0 x <%lld x i8>], ", align);
 		ir_fprintf(f, "[%lld x i8], ", block_size);
-		ir_fprintf(f, "i%lld}", word_bits);
+		ir_print_type(f, m, t_type_info_ptr);
+		ir_fprintf(f, "}");
 	#else
 		i64 block_size = total_size - build_context.word_size;
 		ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8], i%lld}", align, block_size, word_bits);

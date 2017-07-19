@@ -866,7 +866,15 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		}
 
 	case Union:
-		write_string(fi.buf, "(union)");
+		data := cast(^u8)v.data;
+		tipp := cast(^^TypeInfo)(data + info.tag_offset);
+		if data == nil || tipp == nil {
+			write_string(fi.buf, "(union)");
+		} else {
+			ti := tipp^;
+			fmt_arg(fi, any{data, ti}, verb);
+		}
+
 
 	case RawUnion:
 		write_string(fi.buf, "(raw_union)");

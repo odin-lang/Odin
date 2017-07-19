@@ -123,7 +123,7 @@ struct TypeRecord {
 		i32      variant_count;                           \
 		AstNode *node;                                    \
 		Scope *  scope;                                   \
-		Entity * union__tag;                              \
+		Entity * union__type_info;                        \
 		i64      variant_block_size;                      \
 		i64      custom_align;                            \
 	})                                                    \
@@ -1596,11 +1596,18 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		}
 
 	} else if (type->kind == Type_Union) {
-		if (field_name == "__tag") {
-			Entity *e = type->Union.union__tag;
+		if (field_name == "__type_info") {
+			Entity *e = type->Union.union__type_info;
+			if (e == nullptr) {
+				Entity *__type_info = make_entity_field(a, nullptr, make_token_ident(str_lit("__type_info")), t_type_info_ptr, false, -1);
+				type->Union.union__type_info = __type_info;
+				e = __type_info;
+			}
+
 			GB_ASSERT(e != nullptr);
 			selection_add_index(&sel, -1); // HACK(bill): Leaky memory
 			sel.entity = e;
+
 			return sel;
 		}
 	} else if (type->kind == Type_Record) {
@@ -2067,9 +2074,9 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		}
 
 		i64 max = 0;
+		i64 field_size = 0;
 		isize variant_count = t->Union.variant_count;
 
-		i64 field_size = max;
 
 		for (isize i = 1; i < variant_count; i++) {
 			Type *variant_type = t->Union.variants[i];

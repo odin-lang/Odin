@@ -1326,10 +1326,6 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 	array_add(&variants, t_invalid);
 
 	union_type->Union.scope               = c->context.scope;
-	{
-		Entity *__tag = make_entity_field(c->allocator, nullptr, make_token_ident(str_lit("__tag")), t_int, false, -1);
-		union_type->Union.union__tag = __tag;
-	}
 
 	for_array(i, ut->variants) {
 		AstNode *node = ut->variants[i];
@@ -1353,7 +1349,10 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 					}
 				}
 			}
-			if (ok) array_add(&variants, t);
+			if (ok) {
+				add_type_info_type(c, t);
+				array_add(&variants, t);
+			}
 		}
 	}
 
@@ -2044,8 +2043,10 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 						success = false;
 						type = t_invalid;
 					}
-					if (is_type_polymorphic_struct(type)) {
-						error(o.expr, "Cannot pass polymorphic struct as a parameter");
+					if (is_type_polymorphic(type)) {
+						gbString str = type_to_string(type);
+						error(o.expr, "Cannot pass polymorphic type as a parameter, got `%s`", str);
+						gb_string_free(str);
 						success = false;
 						type = t_invalid;
 					}
@@ -3072,6 +3073,15 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_end;
 
 	case_ast_node(ce, CallExpr, e);
+		Operand o = {};
+		check_expr_or_type(c, &o, e);
+		if (o.mode == Addressing_Type) {
+			*type = o.type;
+			return true;
+		}
+	case_end;
+
+	case_ast_node(te, TernaryExpr, e);
 		Operand o = {};
 		check_expr_or_type(c, &o, e);
 		if (o.mode == Addressing_Type) {
@@ -4289,6 +4299,90 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 			return;
 		}
 	} break;
+
+	case Type_Union:
+	{
+		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+		defer (gb_temp_arena_memory_end(tmp));
+		i32 count = t->Union.variant_count;
+		i64 *scores = gb_alloc_array(c->tmp_allocator, i64, count);
+		i32 success_count = 0;
+		i32 first_success_index = -1;
+		for (i32 i = 1; i < count; i++) {
+			Type *vt = t->Union.variants[i];
+			i64 score = 0;
+			if (check_is_assignable_to_with_score(c, operand, vt, &score)) {
+				scores[i] = score;
+				success_count += 1;
+				if (first_success_index < 0) {
+					first_success_index = i;
+				}
+			}
+		}
+
+		gbString type_str = type_to_string(target_type);
+		defer (gb_string_free(type_str));
+
+		if (success_count == 1) {
+			operand->mode = Addressing_Value;
+			operand->type = t->Union.variants[first_success_index];
+			target_type = t->Union.variants[first_success_index];
+			break;
+		} else if (success_count > 1) {
+			GB_ASSERT(first_success_index >= 0);
+			operand->mode = Addressing_Invalid;
+			convert_untyped_error(c, operand, target_type);
+
+			gb_printf_err("Ambiguous type conversion to `%s`, which variant did you mean:\n\t", type_str);
+			i32 j = 0;
+			for (i32 i = first_success_index; i < count; i++) {
+				if (scores[i] == 0) continue;
+				if (j > 0 && success_count > 2) gb_printf_err(", ");
+				if (j == success_count-1) {
+					if (success_count == 2) {
+						gb_printf_err(" or ");
+					} else {
+						gb_printf_err(" or ");
+					}
+				}
+				gbString str = type_to_string(t->Union.variants[i]);
+				gb_printf_err("`%s`", str);
+				gb_string_free(str);
+				j++;
+			}
+			gb_printf_err("\n\n");
+
+			return;
+		} else if (is_type_untyped_undef(operand->type) && type_has_undef(target_type)) {
+			target_type = t_untyped_undef;
+		} else if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
+			operand->mode = Addressing_Invalid;
+			convert_untyped_error(c, operand, target_type);
+			if (count > 1) {
+				gb_printf_err("`%s` is a union which only excepts the following types:\n", type_str);
+				gb_printf_err("\t");
+				for (i32 i = 1; i < count; i++) {
+					Type *v = t->Union.variants[i];
+					if (i > 1 && count > 3) gb_printf_err(", ");
+					if (i == count-1) {
+						if (count == 3) {
+							gb_printf_err(" or ");
+						} else {
+							gb_printf_err("or ");
+						}
+					}
+					gbString str = type_to_string(v);
+					gb_printf_err("`%s`", str);
+					gb_string_free(str);
+				}
+				gb_printf_err("\n\n");
+
+			}
+			return;
+		}
+
+	}
+	/* fallthrough */
 
 
 	default:
@@ -6894,16 +6988,6 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 }
 
 
-ExprKind Ov(Checker *c, Operand *operand, AstNode *call) {
-	GB_ASSERT(call->kind == AstNode_MacroCallExpr);
-	ast_node(mce, MacroCallExpr, call);
-
-	error(call, "Macro call expressions are not yet supported");
-	operand->mode = Addressing_Invalid;
-	operand->expr = call;
-	return Expr_Stmt;
-}
-
 void check_expr_with_type_hint(Checker *c, Operand *o, AstNode *e, Type *t) {
 	check_expr_base(c, o, e, t);
 	check_not_tuple(c, o);
@@ -7139,10 +7223,10 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		Operand x = {Addressing_Invalid};
 		Operand y = {Addressing_Invalid};
-		check_expr_with_type_hint(c, &x, te->x, type_hint);
+		check_expr_or_type(c, &x, te->x, type_hint);
 
 		if (te->y != nullptr) {
-			check_expr_with_type_hint(c, &y, te->y, type_hint);
+			check_expr_or_type(c, &y, te->y, type_hint);
 		} else {
 			error(node, "A ternary expression must have an else clause");
 			return kind;
@@ -7151,6 +7235,19 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		if (x.type == nullptr || x.type == t_invalid ||
 		    y.type == nullptr || y.type == t_invalid) {
 			return kind;
+		}
+
+		if (x.mode == Addressing_Type && y.mode == Addressing_Type &&
+		    cond.mode == Addressing_Constant && is_type_boolean(cond.type)) {
+			o->mode = Addressing_Type;
+			if (cond.value.value_bool) {
+				o->type = x.type;
+				o->expr = x.expr;
+			} else {
+				o->type = y.type;
+				o->expr = y.expr;
+			}
+			return Expr_Expr;
 		}
 
 		convert_to_typed(c, &x, y.type, 0);
@@ -7218,7 +7315,18 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			return kind;
 		}
 
+
 		Type *t = base_type(type);
+		if (is_type_polymorphic(t)) {
+			gbString str = type_to_string(type);
+			error(node, "Cannot use a polymorphic type for a compound literal, got `%s`", str);
+			o->expr = node;
+			o->type = type;
+			gb_string_free(str);
+			return kind;
+		}
+
+
 		switch (t->kind) {
 		case Type_Record: {
 			if (is_type_union(t)) {
@@ -7909,7 +8017,8 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 	case_end;
 
 	case_ast_node(ce, MacroCallExpr, node);
-		return Ov(c, o, node);
+		error(node, "Macro calls are not yet supported");
+		return kind;
 	case_end;
 
 	case_ast_node(de, DerefExpr, node);

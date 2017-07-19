@@ -82,7 +82,8 @@ TypeInfo :: struct #ordered {
 	Struct       :: Record;
 	RawUnion     :: Record;
 	Union :: struct #ordered {
-		variants: []^TypeInfo;
+		variants:   []^TypeInfo;
+		tag_offset: int;
 	};
 	Enum :: struct #ordered {
 		base:   ^TypeInfo;
