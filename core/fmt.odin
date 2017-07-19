@@ -183,8 +183,8 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		write_string(buf, info.name);
 	case Integer:
 		match {
-		case ti == type_info(int):  write_string(buf, "int");
-		case ti == type_info(uint): write_string(buf, "uint");
+		case ti == type_info_of(int):  write_string(buf, "int");
+		case ti == type_info_of(uint): write_string(buf, "uint");
 		case:
 			write_string(buf, info.signed ? "i" : "u");
 			write_int(buf, i64(8*ti.size), 10);
@@ -648,6 +648,70 @@ fmt_pointer :: proc(fi: ^FmtInfo, p: rawptr, verb: rune) {
 	_fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
 }
 
+enum_value_to_string :: proc(v: any) -> (string, bool) {
+	v.type_info = type_info_base(v.type_info);
+
+	using TypeInfo;
+	match e in v.type_info.variant {
+	case: return "", false;
+	case Enum:
+		get_str :: proc(i: $T, e: Enum) -> (string, bool) {
+			if types.is_string(e.base) {
+				for val, idx in e.values {
+					if v, ok := val.(T); ok && v == i {
+						return e.names[idx], true;
+					}
+				}
+			} else if len(e.values) == 0 {
+				return "", true;
+			} else {
+				for val, idx in e.values {
+					if v, ok := val.(T); ok && v == i {
+						return e.names[idx], true;
+					}
+				}
+			}
+			return "", false;
+		}
+
+		a := any{v.data, type_info_base(e.base)};
+		match v in a {
+		case rune: return get_str(v, e);
+		case i8:   return get_str(v, e);
+		case i16:  return get_str(v, e);
+		case i32:  return get_str(v, e);
+		case i64:  return get_str(v, e);
+		case i128: return get_str(v, e);
+		case int:  return get_str(v, e);
+		case u8:   return get_str(v, e);
+		case u16:  return get_str(v, e);
+		case u32:  return get_str(v, e);
+		case u64:  return get_str(v, e);
+		case u128: return get_str(v, e);
+		case uint: return get_str(v, e);
+
+		case f32:  return get_str(v, e);
+		case f64:  return get_str(v, e);
+		}
+	}
+
+	return "", false;
+}
+
+string_to_enum_value :: proc(T: type, s: string) -> (T, bool) {
+	ti := type_info_base(type_info_of(T));
+	if e, ok := ti.variant.(TypeInfo.Enum); ok {
+		for str, idx in e.names {
+			if s == str {
+				// NOTE(bill): Unsafe cast
+				ptr := cast(^T)&e.values[idx];
+				return ptr^, true;
+			}
+		}
+	}
+	return T{}, false;
+}
+
 fmt_enum :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 	if v.type_info == nil || v.data == nil {
 		write_string(fi.buf, "<nil>");
@@ -656,64 +720,16 @@ fmt_enum :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 
 	using TypeInfo;
 	match e in v.type_info.variant {
-	case:
-		fmt_bad_verb(fi, verb);
-		return;
+	case: fmt_bad_verb(fi, verb);
 	case Enum:
 		match verb {
+		case: fmt_bad_verb(fi, verb);
 		case 'd', 'f':
 			fmt_arg(fi, any{v.data, type_info_base(e.base)}, verb);
 		case 's', 'v':
-			i:  i128;
-			f:  f64;
-			ok: bool;
-			a := any{v.data, type_info_base(e.base)};
-			match v in a {
-			case rune:  i = i128(v);
-			case i8:   i = i128(v);
-			case i16:  i = i128(v);
-			case i32:  i = i128(v);
-			case i64:  i = i128(v);
-			case i128: i = i128(v);
-			case int:  i = i128(v);
-			case u8:   i = i128(v);
-			case u16:  i = i128(v);
-			case u32:  i = i128(v);
-			case u64:  i = i128(v);
-			case u128: i = i128(v);
-			case uint: i = i128(v);
-
-			case f32:  f = f64(v); i = i128(transmute(i64, f));
-			case f64:  f = f64(v); i = i128(transmute(i64, f));
-			}
-
-			if types.is_string(e.base) {
-				for val, idx in e.values {
-					if val.i == i {
-						write_string(fi.buf, e.names[idx]);
-						ok = true;
-						break;
-					}
-				}
-			} else if len(e.values) == 0 {
-				write_string(fi.buf, "");
-				ok = true;
-			} else {
-				for val, idx in e.values {
-					if val.i == i {
-						write_string(fi.buf, e.names[idx]);
-						ok = true;
-						break;
-					}
-				}
-			}
-
-			if !ok {
-				write_string(fi.buf, "!%(BAD ENUM VALUE)");
-			}
-		case:
-			fmt_bad_verb(fi, verb);
-			return;
+			str, ok := enum_value_to_string(v);
+			if !ok do str = "!%(BAD ENUM VALUE)";
+			write_string(fi.buf, str);
 		}
 	}
 }
@@ -762,7 +778,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 	case String:     fmt_arg(fi, v, verb);
 
 	case Pointer:
-		if v.type_info == type_info(^TypeInfo) {
+		if v.type_info == type_info_of(^TypeInfo) {
 			write_type(fi.buf, (cast(^^TypeInfo)v.data)^);
 		} else {
 			fmt_pointer(fi, (cast(^rawptr)v.data)^, verb);

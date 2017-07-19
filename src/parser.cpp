@@ -2217,6 +2217,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	case Token_size_of:
 	case Token_align_of:
 	case Token_offset_of:
+	case Token_type_info_of:
 		return parse_call_expr(f, ast_implicit(f, advance_token(f)));
 
 

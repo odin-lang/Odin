@@ -3866,7 +3866,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		return ir_emit_source_code_location(proc, procedure, pos);
 	} break;
 
-	case BuiltinProc_type_info: {
+	case BuiltinProc_type_info_of: {
 		Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
 		return ir_type_info(proc, t);
 	} break;
@@ -4793,7 +4793,17 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		AstNode *p = unparen_expr(ce->proc);
 		if (proc_mode == Addressing_Builtin) {
 			Entity *e = entity_of_ident(proc->module->info, p);
-			BuiltinProcId id = cast(BuiltinProcId)(e != nullptr ? e->Builtin.id : BuiltinProc_DIRECTIVE);
+			BuiltinProcId id = BuiltinProc_Invalid;
+			if (e != nullptr) {
+				id = cast(BuiltinProcId)e->Builtin.id;
+			} else {
+				id = BuiltinProc_DIRECTIVE;
+				if (ce->proc->kind == AstNode_Implicit) {
+					ast_node(i, Implicit, ce->proc);
+					GB_ASSERT(i->kind == Token_type_info_of);
+					id = BuiltinProc_type_info_of;
+				}
+			}
 			return ir_build_builtin_proc(proc, expr, tv, id);
 		}
 
@@ -8106,24 +8116,19 @@ void ir_gen_tree(irGen *s) {
 							                                         str_lit("__$enum_values"), cast(i64)entry_index);
 
 							bool is_value_int = is_type_integer(t->Enum.base_type);
+							if (!is_value_int) {
+								GB_ASSERT(is_type_float(t->Enum.base_type));
+							}
 
 							for (isize i = 0; i < count; i++) {
 								irValue *name_ep  = ir_emit_array_epi(proc, name_array, i);
 								irValue *value_ep = ir_emit_array_epi(proc, value_array, i);
 
 								ExactValue value = fields[i]->Constant.value;
+								irValue *v = ir_value_constant(a, t->Enum.base_type, value);
 
-								if (is_value_int) {
-									value_ep = ir_emit_conv(proc, value_ep, t_i128_ptr);
-									ir_emit_store(proc, value_ep, ir_value_constant(a, t_i128, value));
-								} else {
-									GB_ASSERT(is_type_float(t->Enum.base_type));
-									f64 f = value.value_float;
-									value_ep = ir_emit_conv(proc, value_ep, t_f64_ptr);
-									ir_emit_store(proc, value_ep, ir_const_f64(a, f));
-								}
-
-								ir_emit_store(proc, name_ep, ir_const_string(a, fields[i]->token.string));
+								ir_emit_store(proc, value_ep, ir_emit_conv(proc, v, t_type_info_enum_value));
+								ir_emit_store(proc, name_ep,  ir_const_string(a, fields[i]->token.string));
 							}
 
 							irValue *v_count = ir_const_int(a, count);

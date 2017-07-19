@@ -40,7 +40,7 @@ enum BuiltinProcId {
 	BuiltinProc_align_of,
 	BuiltinProc_offset_of,
 	BuiltinProc_type_of,
-	BuiltinProc_type_info,
+	BuiltinProc_type_info_of,
 
 	BuiltinProc_compile_assert,
 
@@ -86,7 +86,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("align_of"),         1, false, Expr_Expr},
 	{STR_LIT("offset_of"),        2, false, Expr_Expr},
 	{STR_LIT("type_of"),          1, false, Expr_Expr},
-	{STR_LIT("type_info"),        1, false, Expr_Expr},
+	{STR_LIT("type_info_of"),     1, false, Expr_Expr},
 
 	{STR_LIT("compile_assert"),   1, false, Expr_Expr},
 
@@ -521,14 +521,15 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 		if (found) {
 			Entity *e = *found;
 			if (gone_thru_proc) {
-				// if (e->kind == Entity_Label) {
-					// continue;
-				// }
-				// if (e->kind == Entity_Variable &&
-				    // !e->scope->is_file &&
-				    // !e->scope->is_global) {
-					// continue;
-				// }
+				// IMPORTANT TODO(bill): Is this correct?!
+				if (e->kind == Entity_Label) {
+					continue;
+				}
+				if (e->kind == Entity_Variable &&
+				    !e->scope->is_file &&
+				    !e->scope->is_global) {
+					continue;
+				}
 			}
 
 			if (entity_) *entity_ = e;

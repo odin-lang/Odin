@@ -4835,7 +4835,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	case BuiltinProc_size_of:
 	case BuiltinProc_align_of:
 	case BuiltinProc_offset_of:
-	case BuiltinProc_type_info:
+	case BuiltinProc_type_info_of:
 	case BuiltinProc_transmute:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
@@ -5295,10 +5295,10 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		break;
 
 
-	case BuiltinProc_type_info: {
-		// proc type_info(Type) -> ^Type_Info
+	case BuiltinProc_type_info_of: {
+		// proc type_info_of(Type) -> ^Type_Info
 		if (c->context.scope->is_global) {
-			compiler_error("`type_info` Cannot be declared within a #shared_global_scope due to how the internals of the compiler works");
+			compiler_error("`type_info_of` Cannot be declared within a #shared_global_scope due to how the internals of the compiler works");
 		}
 
 		// NOTE(bill): The type information may not be setup yet
@@ -5311,7 +5311,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		Type *t = o.type;
 		if (t == nullptr || t == t_invalid || is_type_polymorphic(operand->type)) {
-			error(ce->args[0], "Invalid argument for `type_info`");
+			error(ce->args[0], "Invalid argument for `type_info_of`");
 			return false;
 		}
 		t = default_type(t);
@@ -7109,6 +7109,10 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		case Token_type_of:
 			o->mode       = Addressing_Builtin;
 			o->builtin_id = BuiltinProc_type_of;
+			break;
+		case Token_type_info_of:
+			o->mode       = Addressing_Builtin;
+			o->builtin_id = BuiltinProc_type_info_of;
 			break;
 
 		default:

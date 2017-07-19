@@ -20,7 +20,7 @@ import (
 
 
 
-// IMPORTANT NOTE(bill): `type_info` cannot be used within a
+// IMPORTANT NOTE(bill): `type_info_of` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
 // This could change at a later date if the all these data structures are
 // implemented within the compiler rather than in this "preload" file
@@ -38,10 +38,12 @@ CallingConvention :: enum {
 // The compiler relies upon this _exact_ order
 TypeInfo :: struct #ordered {
 // Core Types
-	EnumValue :: struct #raw_union {
-		f: f64;
-		i: i128;
-	}
+	EnumValue :: union {
+		rune,
+		i8, i16, i32, i64, i128, int,
+		u8, u16, u32, u64, u128, uint,
+		f32, f64,
+	};
 	Record :: struct #ordered {
 		types:        []^TypeInfo;
 		names:        []string;
@@ -416,7 +418,7 @@ __get_map_header :: proc(m: ^$T/map[$K]$V) -> __MapHeader #cc_contextless {
 		value: V;
 	}
 
-	_, is_string := type_info_base(type_info(K)).variant.(TypeInfo.String);
+	_, is_string := type_info_base(type_info_of(K)).variant.(TypeInfo.String);
 	header.is_key_string = is_string;
 	header.entry_size    = size_of(Entry);
 	header.entry_align   = align_of(Entry);
@@ -427,7 +429,7 @@ __get_map_header :: proc(m: ^$T/map[$K]$V) -> __MapHeader #cc_contextless {
 
 __get_map_key :: proc(key: $K) -> __MapKey #cc_contextless {
 	map_key: __MapKey;
-	ti := type_info_base_without_enum(type_info(K));
+	ti := type_info_base_without_enum(type_info_of(K));
 	match _ in ti {
 	case TypeInfo.Integer:
 		match 8*size_of(key) {
