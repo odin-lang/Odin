@@ -3017,11 +3017,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		Type *elem = check_type(c, vt->elem);
 		Type *be = base_type(elem);
 		i64 count = check_array_or_map_count(c, vt->count, false);
-		if (!c->context.allow_polymorphic_types && is_type_polymorphic(base_type(elem))) {
-			gbString str = type_to_string(elem);
-			error(vt->elem, "Invalid use of a polymorphic type `%s` as an dynamic array element type", str);
-			gb_string_free(str);
-		} else if (is_type_vector(be) || (!is_type_boolean(be) && !is_type_numeric(be) && !is_type_polymorphic(base_type(elem)))) {
+		if (is_type_vector(be) || (!is_type_boolean(be) && !is_type_numeric(be) && be->kind != Type_Generic)) {
 			gbString err_str = type_to_string(elem);
 			error(vt->elem, "Vector element type must be numerical or a boolean, got `%s`", err_str);
 			gb_string_free(err_str);
