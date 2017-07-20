@@ -315,7 +315,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 			check_expr(c, &op_c, se->expr);
 			if (op_c.mode == Addressing_MapIndex) {
 				gbString str = expr_to_string(lhs.expr);
-				error(lhs.expr, "Cannot assign to record field `%s` in map", str);
+				error(lhs.expr, "Cannot assign to struct field `%s` in map", str);
 				gb_string_free(str);
 				return nullptr;
 			}
@@ -472,8 +472,8 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 	switch (e->kind) {
 	case Entity_TypeName: {
 		Type *t = base_type(e->type);
-		if (t->kind == Type_Record) {
-			Scope *s = t->Record.scope;
+		if (t->kind == Type_Struct) {
+			Scope *s = t->Struct.scope;
 			if (s != nullptr) {
 				for_array(i, s->elements.entries) {
 					Entity *f = s->elements.entries[i].value;
@@ -502,7 +502,7 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 				f->using_parent = e;
 			}
 		} else {
-			error(us->token, "`using` can be only applied to record type entities");
+			error(us->token, "`using` can be only applied to struct type entities");
 		}
 	} break;
 
@@ -531,7 +531,7 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 		Type *t = base_type(type_deref(e->type));
 		if (is_type_struct(t) || is_type_raw_union(t) || is_type_union(t)) {
 			// TODO(bill): Make it work for unions too
-			Scope *found = scope_of_node(&c->info, t->Record.node);
+			Scope *found = scope_of_node(&c->info, t->Struct.node);
 			for_array(i, found->elements.entries) {
 				Entity *f = found->elements.entries[i].value;
 				if (f->kind == Entity_Variable) {
@@ -1803,7 +1803,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				Type *t = base_type(type_deref(e->type));
 
 				if (is_type_struct(t) || is_type_raw_union(t)) {
-					Scope *scope = scope_of_node(&c->info, t->Record.node);
+					Scope *scope = scope_of_node(&c->info, t->Struct.node);
 					for_array(i, scope->elements.entries) {
 						Entity *f = scope->elements.entries[i].value;
 						if (f->kind == Entity_Variable) {

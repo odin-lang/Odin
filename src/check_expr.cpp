@@ -125,8 +125,8 @@ bool check_is_assignable_to_using_subtype(Type *src, Type *dst) {
 		return false;
 	}
 
-	for (isize i = 0; i < src->Record.field_count; i++) {
-		Entity *f = src->Record.fields[i];
+	for (isize i = 0; i < src->Struct.field_count; i++) {
+		Entity *f = src->Struct.fields[i];
 		if (f->kind != Entity_Variable || (f->flags&EntityFlag_Using) == 0) {
 			continue;
 		}
@@ -732,9 +732,9 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 		str = expr_to_string(node);
 	}
 
-	if (t->kind == Type_Record) {
-		for (isize i = 0; i < t->Record.field_count; i++) {
-			Entity *f = t->Record.fields[i];
+	if (t->kind == Type_Struct) {
+		for (isize i = 0; i < t->Struct.field_count; i++) {
+			Entity *f = t->Struct.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
 			String name = f->token.string;
 			HashKey key = hash_string(name);
@@ -760,7 +760,7 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 }
 
 
-void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields, Map<Entity *> *entity_map, AstNode *record_node, String context, bool allow_default_values) {
+void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields, Map<Entity *> *entity_map, AstNode *struct_node, String context, bool allow_default_values) {
 	GB_ASSERT(fields != nullptr);
 	if (decl->kind == AstNode_WhenStmt) {
 		ast_node(ws, WhenStmt, decl);
@@ -778,18 +778,18 @@ void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 		    operand.value.value_bool) {
 			for_array(i, ws->body->BlockStmt.stmts) {
 				AstNode *stmt = ws->body->BlockStmt.stmts[i];
-				check_record_field_decl(c, stmt, fields, entity_map, record_node, context, allow_default_values);
+				check_struct_field_decl(c, stmt, fields, entity_map, struct_node, context, allow_default_values);
 			}
 		} else if (ws->else_stmt) {
 			switch (ws->else_stmt->kind) {
 			case AstNode_BlockStmt:
 				for_array(i, ws->else_stmt->BlockStmt.stmts) {
 					AstNode *stmt = ws->else_stmt->BlockStmt.stmts[i];
-					check_record_field_decl(c, stmt, fields, entity_map, record_node, context, allow_default_values);
+					check_struct_field_decl(c, stmt, fields, entity_map, struct_node, context, allow_default_values);
 				}
 				break;
 			case AstNode_WhenStmt:
-				check_record_field_decl(c, ws->else_stmt, fields, entity_map, record_node, context, allow_default_values);
+				check_struct_field_decl(c, ws->else_stmt, fields, entity_map, struct_node, context, allow_default_values);
 				break;
 			default:
 				error(ws->else_stmt, "Invalid `else` statement in `when` statement");
@@ -959,7 +959,7 @@ void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 			}
 		}
 
-		populate_using_entity_map(c, record_node, type, entity_map);
+		populate_using_entity_map(c, struct_node, type, entity_map);
 	}
 }
 
@@ -997,7 +997,7 @@ Array<Entity *> check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 	}
 
 	for_array(decl_index, decls) {
-		check_record_field_decl(c, decls[decl_index], &fields, &entity_map, node, context, context == "struct");
+		check_struct_field_decl(c, decls[decl_index], &fields, &entity_map, node, context, context == "struct");
 	}
 
 
@@ -1042,7 +1042,7 @@ GB_COMPARE_PROC(cmp_reorder_struct_fields) {
 	return diff < 0 ? -1 : diff > 0;
 }
 
-Entity *make_names_field_for_record(Checker *c, Scope *scope) {
+Entity *make_names_field_for_struct(Checker *c, Scope *scope) {
 	Entity *e = make_entity_field(c->allocator, scope,
 		make_token_ident(str_lit("names")), t_string_slice, false, 0);
 	e->Variable.is_immutable = true;
@@ -1065,10 +1065,10 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 		case_end;
 		}
 	}
-	struct_type->Record.names = make_names_field_for_record(c, c->context.scope);
+	struct_type->Struct.names = make_names_field_for_struct(c, c->context.scope);
 
 	if (st->is_raw_union) {
-		struct_type->Record.is_raw_union = true;
+		struct_type->Struct.is_raw_union = true;
 		context = str_lit("struct #raw_union");
 	}
 
@@ -1120,7 +1120,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 						if (false && !is_type_polymorphic_struct(specialization)) {
 							gbString str = type_to_string(specialization);
 							defer (gb_string_free(str));
-							error(s, "Expected a polymorphic record, got %s", str);
+							error(s, "Expected a polymorphic struct, got %s", str);
 							specialization = nullptr;
 						}
 					}
@@ -1225,29 +1225,29 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 		fields = check_fields(c, node, st->fields, min_field_count, context);
 	}
 
-	struct_type->Record.scope               = c->context.scope;
-	struct_type->Record.is_packed           = st->is_packed;
-	struct_type->Record.is_ordered          = st->is_ordered;
-	struct_type->Record.fields              = fields.data;
-	struct_type->Record.fields_in_src_order = fields.data;
-	struct_type->Record.field_count         = fields.count;
-	struct_type->Record.polymorphic_params  = polymorphic_params;
-	struct_type->Record.is_polymorphic      = is_polymorphic;
-	struct_type->Record.is_poly_specialized = is_poly_specialized;
+	struct_type->Struct.scope               = c->context.scope;
+	struct_type->Struct.is_packed           = st->is_packed;
+	struct_type->Struct.is_ordered          = st->is_ordered;
+	struct_type->Struct.fields              = fields.data;
+	struct_type->Struct.fields_in_src_order = fields.data;
+	struct_type->Struct.field_count         = fields.count;
+	struct_type->Struct.polymorphic_params  = polymorphic_params;
+	struct_type->Struct.is_polymorphic      = is_polymorphic;
+	struct_type->Struct.is_poly_specialized = is_poly_specialized;
 
 
-	if (!struct_type->Record.is_raw_union) {
+	if (!struct_type->Struct.is_raw_union) {
 		type_set_offsets(c->allocator, struct_type);
 
 		if (!struct_type->failure && !st->is_packed && !st->is_ordered) {
 			struct_type->failure = false;
-			struct_type->Record.are_offsets_set = false;
-			struct_type->Record.offsets = nullptr;
+			struct_type->Struct.are_offsets_set = false;
+			struct_type->Struct.offsets = nullptr;
 			// NOTE(bill): Reorder fields for reduced size/performance
 
 			Entity **reordered_fields = gb_alloc_array(c->allocator, Entity *, fields.count);
 			for (isize i = 0; i < fields.count; i++) {
-				reordered_fields[i] = struct_type->Record.fields_in_src_order[i];
+				reordered_fields[i] = struct_type->Struct.fields_in_src_order[i];
 			}
 
 			// NOTE(bill): Hacky thing
@@ -1260,7 +1260,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 				reordered_fields[i]->Variable.field_index = i;
 			}
 
-			struct_type->Record.fields = reordered_fields;
+			struct_type->Struct.fields = reordered_fields;
 		}
 
 		type_set_offsets(c->allocator, struct_type);
@@ -1296,7 +1296,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 				if (custom_align < align) {
 					warning(st->align, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
 				}
-				struct_type->Record.custom_align = custom_align;
+				struct_type->Struct.custom_align = custom_align;
 				return;
 			}
 		}
@@ -1370,13 +1370,13 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 // 		}
 // 	}
 
-// 	union_type->Record.names = make_names_field_for_record(c, c->context.scope);
+// 	union_type->Struct.names = make_names_field_for_struct(c, c->context.scope);
 
 // 	auto fields = check_fields(c, node, ut->fields, min_field_count, str_lit("raw_union"));
 
-// 	union_type->Record.scope       = c->context.scope;
-// 	union_type->Record.fields      = fields.data;
-// 	union_type->Record.field_count = fields.count;
+// 	union_type->Struct.scope       = c->context.scope;
+// 	union_type->Struct.fields      = fields.data;
+// 	union_type->Struct.field_count = fields.count;
 // }
 
 
@@ -1513,7 +1513,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	enum_type->Enum.max_value = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("max_value")), constant_type, max_value);
 
-	enum_type->Enum.names = make_names_field_for_record(c, c->context.scope);
+	enum_type->Enum.names = make_names_field_for_struct(c, c->context.scope);
 }
 
 
@@ -1639,17 +1639,17 @@ bool check_type_specialization_to(Checker *c, Type *specialization, Type *type, 
 		return false;
 	}
 	// gb_printf_err("#1 %s %s\n", type_to_string(type), type_to_string(specialization));
-	if (t->kind == Type_Record) {
-		if (t->Record.polymorphic_parent == specialization) {
+	if (t->kind == Type_Struct) {
+		if (t->Struct.polymorphic_parent == specialization) {
 			return true;
 		}
 
-		if (t->Record.polymorphic_parent == s->Record.polymorphic_parent) {
-			GB_ASSERT(s->Record.polymorphic_params != nullptr);
-			GB_ASSERT(t->Record.polymorphic_params != nullptr);
+		if (t->Struct.polymorphic_parent == s->Struct.polymorphic_parent) {
+			GB_ASSERT(s->Struct.polymorphic_params != nullptr);
+			GB_ASSERT(t->Struct.polymorphic_params != nullptr);
 
-			TypeTuple *s_tuple = &s->Record.polymorphic_params->Tuple;
-			TypeTuple *t_tuple = &t->Record.polymorphic_params->Tuple;
+			TypeTuple *s_tuple = &s->Struct.polymorphic_params->Tuple;
+			TypeTuple *t_tuple = &t->Struct.polymorphic_params->Tuple;
 			GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
 			for_array(i, s_tuple->variables) {
 				Entity *s_e = s_tuple->variables[i];
@@ -1756,8 +1756,8 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 		}
 		return false;
 
-	case Type_Record:
-		if (source->kind == Type_Record) {
+	case Type_Struct:
+		if (source->kind == Type_Struct) {
 			// return check_is_assignable_to(c, &o, poly);
 		}
 		return false;
@@ -2269,7 +2269,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		case Type_Array:
 		case Type_Vector:
 		// Could be in C too
-		case Type_Record: {
+		case Type_Struct: {
 			i64 align = type_align_of(a, original_type);
 			i64 size  = type_size_of(a, original_type);
 			switch (8*size) {
@@ -2308,7 +2308,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		case Type_Array:
 		case Type_Vector:
 		// Could be in C too
-		case Type_Record: {
+		case Type_Struct: {
 			i64 align = type_align_of(a, original_type);
 			i64 size  = type_size_of(a, original_type);
 			if (8*size > 16) {
@@ -2774,9 +2774,9 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 
 		check_close_scope(c);
 
-		entry_type->Record.fields              = fields;
-		entry_type->Record.fields_in_src_order = fields;
-		entry_type->Record.field_count         = field_count;
+		entry_type->Struct.fields              = fields;
+		entry_type->Struct.fields_in_src_order = fields;
+		entry_type->Struct.field_count         = field_count;
 
 		type_set_offsets(a, entry_type);
 		type->Map.entry_type = entry_type;
@@ -2805,9 +2805,9 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 
 		check_close_scope(c);
 
-		generated_struct_type->Record.fields              = fields;
-		generated_struct_type->Record.fields_in_src_order = fields;
-		generated_struct_type->Record.field_count         = field_count;
+		generated_struct_type->Struct.fields              = fields;
+		generated_struct_type->Struct.fields_in_src_order = fields;
+		generated_struct_type->Struct.field_count         = field_count;
 
 		type_set_offsets(a, generated_struct_type);
 		type->Map.generated_struct_type = generated_struct_type;
@@ -2869,7 +2869,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			specific = check_type(c, s);
 			if (false && !is_type_polymorphic_struct(specific)) {
 				gbString str = type_to_string(specific);
-				error(s, "Expected a polymorphic record, got %s", str);
+				error(s, "Expected a polymorphic struct, got %s", str);
 				gb_string_free(str);
 				specific = nullptr;
 			}
@@ -3005,7 +3005,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		check_open_scope(c, e);
 		check_struct_type(c, *type, e, nullptr);
 		check_close_scope(c);
-		(*type)->Record.node = e;
+		(*type)->Struct.node = e;
 		return true;
 	case_end;
 
@@ -3025,7 +3025,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		check_open_scope(c, e);
 		check_raw_union_type(c, *type, e);
 		check_close_scope(c);
-		(*type)->Record.node = e;
+		(*type)->Struct.node = e;
 		return true;
 	case_end;
  */
@@ -3687,8 +3687,8 @@ String check_down_cast_name(Type *dst_, Type *src_) {
 	Type *src = type_deref(src_);
 	Type *dst_s = base_type(dst);
 	GB_ASSERT(is_type_struct(dst_s) || is_type_raw_union(dst_s));
-	for (isize i = 0; i < dst_s->Record.field_count; i++) {
-		Entity *f = dst_s->Record.fields[i];
+	for (isize i = 0; i < dst_s->Struct.field_count; i++) {
+		Entity *f = dst_s->Struct.fields[i];
 		GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 		if (f->flags & EntityFlag_Using) {
 			if (are_types_identical(f->type, src_)) {
@@ -4683,7 +4683,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 			i64 max_count = 0;
 			switch (type->kind) {
-			case Type_Record: max_count = type->Record.field_count;   break;
+			case Type_Struct: max_count = type->Struct.field_count;   break;
 			case Type_Tuple:  max_count = type->Tuple.variables.count; break;
 			}
 
@@ -5582,10 +5582,10 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		gbAllocator a = c->allocator;
 
 		Type *tuple = make_type_tuple(a);
-		i32 variable_count = type->Record.field_count;
+		i32 variable_count = type->Struct.field_count;
 		array_init_count(&tuple->Tuple.variables, a, variable_count);
 		// TODO(bill): Should I copy each of the entities or is this good enough?
-		gb_memcopy_array(tuple->Tuple.variables.data, type->Record.fields_in_src_order, variable_count);
+		gb_memcopy_array(tuple->Tuple.variables.data, type->Struct.fields_in_src_order, variable_count);
 
 		operand->type = tuple;
 		operand->mode = Addressing_Value;
@@ -6529,12 +6529,12 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 
 Entity *find_using_index_expr(Type *t) {
 	t = base_type(t);
-	if (t->kind != Type_Record) {
+	if (t->kind != Type_Struct) {
 		return nullptr;
 	}
 
-	for (isize i = 0; i < t->Record.field_count; i++) {
-		Entity *f = t->Record.fields[i];
+	for (isize i = 0; i < t->Struct.field_count; i++) {
+		Entity *f = t->Struct.fields[i];
 		if (f->kind == Entity_Variable &&
 		    (f->flags & EntityFlag_Field) != 0 &&
 		    (f->flags & EntityFlag_Using) != 0) {
@@ -6550,7 +6550,7 @@ Entity *find_using_index_expr(Type *t) {
 	return nullptr;
 }
 
-isize lookup_polymorphic_struct_parameter(TypeRecord *st, String parameter_name) {
+isize lookup_polymorphic_struct_parameter(TypeStruct *st, String parameter_name) {
 	if (!st->is_polymorphic) return -1;
 
 	TypeTuple *params = &st->polymorphic_params->Tuple;
@@ -6573,8 +6573,8 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 
 	Type *original_type = operand->type;
 	Type *struct_type = base_type(operand->type);
-	GB_ASSERT(struct_type->kind == Type_Record);
-	TypeRecord *st = &struct_type->Record;
+	GB_ASSERT(struct_type->kind == Type_Struct);
+	TypeStruct *st = &struct_type->Struct;
 	GB_ASSERT(st->is_polymorphic);
 
 	bool show_error = true;
@@ -6736,7 +6736,7 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 			for_array(i, *found_gen_types) {
 				Entity *e = (*found_gen_types)[i];
 				Type *t = base_type(e->type);
-				TypeTuple *tuple = &t->Record.polymorphic_params->Tuple;
+				TypeTuple *tuple = &t->Struct.polymorphic_params->Tuple;
 				bool ok = true;
 				GB_ASSERT(param_count == tuple->variables.count);
 				for (isize j = 0; j < param_count; j++) {
@@ -6778,8 +6778,8 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 		check_open_scope(c, node);
 		check_struct_type(c, struct_type, node, &ordered_operands);
 		check_close_scope(c);
-		struct_type->Record.node = node;
-		struct_type->Record.polymorphic_parent = original_type;
+		struct_type->Struct.node = node;
+		struct_type->Struct.polymorphic_parent = original_type;
 
 		Entity *e = nullptr;
 
@@ -6799,7 +6799,7 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 
 		named_type->Named.type_name = e;
 
-		if (!struct_type->Record.is_polymorphic) {
+		if (!struct_type->Struct.is_polymorphic) {
 			if (found_gen_types) {
 				array_add(found_gen_types, e);
 			} else {
@@ -7321,7 +7321,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 
 		switch (t->kind) {
-		case Type_Record: {
+		case Type_Struct: {
 			if (is_type_union(t)) {
 				is_constant = false;
 			}
@@ -7338,10 +7338,10 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			}
 
 			{ // Checker values
-				isize field_count = t->Record.field_count;
-				isize min_field_count = t->Record.field_count;
+				isize field_count = t->Struct.field_count;
+				isize min_field_count = t->Struct.field_count;
 				for (isize i = min_field_count-1; i >= 0; i--) {
-					Entity *e = t->Record.fields_in_src_order[i];
+					Entity *e = t->Struct.fields_in_src_order[i];
 					GB_ASSERT(e->kind == Entity_Variable);
 					if (e->Variable.default_is_nil) {
 						min_field_count--;
@@ -7389,7 +7389,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 							continue;
 						}
 
-						Entity *field = t->Record.fields[sel.index[0]];
+						Entity *field = t->Struct.fields[sel.index[0]];
 						add_entity_use(c, fv->field, field);
 
 						if (fields_visited[sel.index[0]]) {
@@ -7412,8 +7412,8 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					}
 				} else {
 					bool all_fields_are_blank = true;
-					for (isize i = 0; i < t->Record.field_count; i++) {
-						Entity *field = t->Record.fields_in_src_order[i];
+					for (isize i = 0; i < t->Struct.field_count; i++) {
+						Entity *field = t->Struct.fields_in_src_order[i];
 						if (!is_blank_ident(field->token)) {
 							all_fields_are_blank = false;
 							break;
@@ -7431,7 +7431,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 							break;
 						}
 
-						Entity *field = t->Record.fields_in_src_order[index];
+						Entity *field = t->Struct.fields_in_src_order[index];
 						if (!all_fields_are_blank && is_blank_ident(field->token)) {
 							// NOTE(bill): Ignore blank identifiers
 							continue;
@@ -7847,7 +7847,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			valid = false;
 		}
 
-		if (!valid && t->kind == Type_Record) {
+		if (!valid && t->kind == Type_Struct) {
 			Entity *found = find_using_index_expr(t);
 			if (found != nullptr) {
 				valid = check_set_index_data(o, found->type, is_type_pointer(found->type), &max_count);
@@ -8133,7 +8133,7 @@ void check_expr_or_type(Checker *c, Operand *o, AstNode *e, Type *type_hint) {
 
 gbString write_expr_to_string(gbString str, AstNode *node);
 
-gbString write_record_fields_to_string(gbString str, Array<AstNode *> params) {
+gbString write_struct_fields_to_string(gbString str, Array<AstNode *> params) {
 	for_array(i, params) {
 		if (i > 0) {
 			str = gb_string_appendc(str, ", ");
@@ -8469,21 +8469,21 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		if (st->is_ordered)   str = gb_string_appendc(str, "#ordered ");
 		if (st->is_raw_union) str = gb_string_appendc(str, "#raw_union ");
 		str = gb_string_appendc(str, "{");
-		str = write_record_fields_to_string(str, st->fields);
+		str = write_struct_fields_to_string(str, st->fields);
 		str = gb_string_appendc(str, "}");
 	case_end;
 
 	// case_ast_node(st, RawUnionType, node);
 	// 	str = gb_string_appendc(str, "raw_union ");
 	// 	str = gb_string_appendc(str, "{");
-	// 	str = write_record_fields_to_string(str, st->fields);
+	// 	str = write_struct_fields_to_string(str, st->fields);
 	// 	str = gb_string_appendc(str, "}");
 	// case_end;
 
 	case_ast_node(st, UnionType, node);
 		str = gb_string_appendc(str, "union ");
 		str = gb_string_appendc(str, "{");
-		str = write_record_fields_to_string(str, st->variants);
+		str = write_struct_fields_to_string(str, st->variants);
 		str = gb_string_appendc(str, "}");
 	case_end;
 

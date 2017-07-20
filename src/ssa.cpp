@@ -651,13 +651,13 @@ bool can_ssa_type(Type *t) {
 	case Type_Union:
 		return false;
 
-	case Type_Record:
-		if (!t->Record.is_raw_union) {
-			if (t->Record.field_count > SSA_MAX_STRUCT_FIELD_COUNT) {
+	case Type_Struct:
+		if (!t->Struct.is_raw_union) {
+			if (t->Struct.field_count > SSA_MAX_STRUCT_FIELD_COUNT) {
 				return false;
 			}
-			for (isize i = 0; i < t->Record.field_count; i++) {
-				if (!can_ssa_type(t->Record.fields[i]->type)) {
+			for (isize i = 0; i < t->Struct.field_count; i++) {
+				if (!can_ssa_type(t->Struct.fields[i]->type)) {
 					return false;
 				}
 			}
@@ -810,9 +810,9 @@ ssaValue *ssa_emit_ptr_index(ssaProc *p, ssaValue *s, i64 index) {
 	Type *result_type = nullptr;
 
 	if (is_type_struct(t)) {
-		GB_ASSERT(t->Record.field_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
-		result_type = make_type_pointer(a, t->Record.fields[index]->type);
+		GB_ASSERT(t->Struct.field_count > 0);
+		GB_ASSERT(gb_is_between(index, 0, t->Struct.field_count-1));
+		result_type = make_type_pointer(a, t->Struct.fields[index]->type);
 	} else if (is_type_tuple(t)) {
 		GB_ASSERT(t->Tuple.variables.count > 0);
 		GB_ASSERT(gb_is_between(index, 0, t->Tuple.variables.count-1));
@@ -843,8 +843,8 @@ ssaValue *ssa_emit_ptr_index(ssaProc *p, ssaValue *s, i64 index) {
 	} else if (is_type_dynamic_map(t)) {
 		Type *gst = t->Map.generated_struct_type;
 		switch (index) {
-		case 0: result_type = make_type_pointer(a, gst->Record.fields[0]->type); break;
-		case 1: result_type = make_type_pointer(a, gst->Record.fields[1]->type); break;
+		case 0: result_type = make_type_pointer(a, gst->Struct.fields[0]->type); break;
+		case 1: result_type = make_type_pointer(a, gst->Struct.fields[1]->type); break;
 		}
 	}else {
 		GB_PANIC("TODO(bill): ssa_emit_ptr_index type: %s, %d", type_to_string(s->type), index);
@@ -868,14 +868,14 @@ ssaValue *ssa_emit_value_index(ssaProc *p, ssaValue *s, i64 index) {
 	Type *result_type = nullptr;
 
 	if (is_type_struct(t)) {
-		GB_ASSERT(t->Record.field_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
-		result_type = t->Record.fields[index]->type;
+		GB_ASSERT(t->Struct.field_count > 0);
+		GB_ASSERT(gb_is_between(index, 0, t->Struct.field_count-1));
+		result_type = t->Struct.fields[index]->type;
 	} else if (is_type_union(t)) {
 		type_set_offsets(a, t);
-		GB_ASSERT(t->Record.field_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
-		result_type = t->Record.fields[index]->type;
+		GB_ASSERT(t->Struct.field_count > 0);
+		GB_ASSERT(gb_is_between(index, 0, t->Struct.field_count-1));
+		result_type = t->Struct.fields[index]->type;
 	} else if (is_type_tuple(t)) {
 		GB_ASSERT(t->Tuple.variables.count > 0);
 		result_type = t->Tuple.variables[index]->type;
@@ -905,8 +905,8 @@ ssaValue *ssa_emit_value_index(ssaProc *p, ssaValue *s, i64 index) {
 	} else if (is_type_dynamic_map(t)) {
 		Type *gst = t->Map.generated_struct_type;
 		switch (index) {
-		case 0: result_type = gst->Record.fields[0]->type; break;
-		case 1: result_type = gst->Record.fields[1]->type; break;
+		case 0: result_type = gst->Struct.fields[0]->type; break;
+		case 1: result_type = gst->Struct.fields[1]->type; break;
 		}
 	} else {
 		GB_PANIC("TODO(bill): struct_ev type: %s, %d", type_to_string(s->type), index);
@@ -932,10 +932,10 @@ ssaValue *ssa_emit_deep_field_ptr_index(ssaProc *p, ssaValue *e, Selection sel) 
 
 
 		if (is_type_raw_union(type)) {
-			type = type->Record.fields[index]->type;
+			type = type->Struct.fields[index]->type;
 			e = ssa_emit_conv(p, e, make_type_pointer(p->allocator, type));
-		} else if (type->kind == Type_Record) {
-			type = type->Record.fields[index]->type;
+		} else if (type->kind == Type_Struct) {
+			type = type->Struct.fields[index]->type;
 			e = ssa_emit_ptr_index(p, e, index);
 		} else if (type->kind == Type_Tuple) {
 			type = type->Tuple.variables[index]->type;
@@ -1003,7 +1003,7 @@ ssaValue *ssa_emit_deep_field_value_index(ssaProc *p, ssaValue *e, Selection sel
 
 		if (is_type_raw_union(type)) {
 			GB_PANIC("TODO(bill): IS THIS EVEN CORRECT?");
-			type = type->Record.fields[index]->type;
+			type = type->Struct.fields[index]->type;
 			e = ssa_emit_conv(p, e, type);
 		} else if (type->kind == Type_Map) {
 			e = ssa_emit_value_index(p, e, 1);
@@ -1072,9 +1072,9 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 				// 	if (is_type_enum(type)) {
 				// 		ssaValue *enum_info = ssa_emit_conv(p, ti_ptr, t_type_info_enum_ptr);
 				// 		names_ptr = ssa_emit_ptr_index(p, enum_info, 1);
-				// 	} else if (type->kind == Type_Record) {
-				// 		ssaValue *record_info = ssa_emit_conv(p, ti_ptr, t_type_info_record_ptr);
-				// 		names_ptr = ssa_emit_ptr_index(p, record_info, 1);
+				// 	} else if (type->kind == Type_Struct) {
+				// 		ssaValue *struct_info = ssa_emit_conv(p, ti_ptr, t_type_info_struct_ptr);
+				// 		names_ptr = ssa_emit_ptr_index(p, struct_info, 1);
 				// 	}
 				// 	return ssa_addr(names_ptr);
 				// } else {
@@ -1658,7 +1658,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 			default: GB_PANIC("Unknown float size");
 			}
 		}
-		// IMPORTANT TODO(bill): Do constant record/array literals correctly
+		// IMPORTANT TODO(bill): Do constant struct/array literals correctly
 		return ssa_const_nil(p, tv.type);
 	}
 

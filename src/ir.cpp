@@ -661,10 +661,10 @@ bool ir_type_has_default_values(Type *t) {
 	case Type_Array:
 		return ir_type_has_default_values(t->Array.elem);
 
-	case Type_Record:
-		if (!t->Record.is_raw_union) {
-			for (isize i = 0; i < t->Record.field_count; i++) {
-				Entity *f = t->Record.fields_in_src_order[i];
+	case Type_Struct:
+		if (!t->Struct.is_raw_union) {
+			for (isize i = 0; i < t->Struct.field_count; i++) {
+				Entity *f = t->Struct.fields_in_src_order[i];
 				if (f->kind != Entity_Variable) continue;
 				if (f->Variable.default_is_nil) {
 					// NOTE(bill): This is technically zero
@@ -2375,9 +2375,9 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 	Type *result_type = nullptr;
 
 	if (is_type_struct(t)) {
-		GB_ASSERT(t->Record.field_count > 0);
-		GB_ASSERT_MSG(gb_is_between(index, 0, t->Record.field_count-1), "0..%d..%d", index, t->Record.field_count);
-		result_type = make_type_pointer(a, t->Record.fields[index]->type);
+		GB_ASSERT(t->Struct.field_count > 0);
+		GB_ASSERT_MSG(gb_is_between(index, 0, t->Struct.field_count-1), "0..%d..%d", index, t->Struct.field_count);
+		result_type = make_type_pointer(a, t->Struct.fields[index]->type);
 	} else if (is_type_union(t)) {
 		GB_ASSERT(index == -1);
 		return ir_emit_union_tag_ptr(proc, s);
@@ -2416,8 +2416,8 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 	} else if (is_type_dynamic_map(t)) {
 		Type *gst = t->Map.generated_struct_type;
 		switch (index) {
-		case 0: result_type = make_type_pointer(a, gst->Record.fields[0]->type); break;
-		case 1: result_type = make_type_pointer(a, gst->Record.fields[1]->type); break;
+		case 0: result_type = make_type_pointer(a, gst->Struct.fields[0]->type); break;
+		case 1: result_type = make_type_pointer(a, gst->Struct.fields[1]->type); break;
 		}
 	}else {
 		GB_PANIC("TODO(bill): struct_gep type: %s, %d", type_to_string(ir_type(s)), index);
@@ -2437,9 +2437,9 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 	Type *result_type = nullptr;
 
 	if (is_type_struct(t)) {
-		GB_ASSERT(t->Record.field_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
-		result_type = t->Record.fields[index]->type;
+		GB_ASSERT(t->Struct.field_count > 0);
+		GB_ASSERT(gb_is_between(index, 0, t->Struct.field_count-1));
+		result_type = t->Struct.fields[index]->type;
 	} else if (is_type_union(t)) {
 		GB_ASSERT(index == -1);
 		return ir_emit_union_tag_value(proc, s);
@@ -2478,8 +2478,8 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 	} else if (is_type_dynamic_map(t)) {
 		Type *gst = t->Map.generated_struct_type;
 		switch (index) {
-		case 0: result_type = gst->Record.fields[0]->type; break;
-		case 1: result_type = gst->Record.fields[1]->type; break;
+		case 0: result_type = gst->Struct.fields[0]->type; break;
+		case 1: result_type = gst->Struct.fields[1]->type; break;
 		}
 	} else {
 		GB_PANIC("TODO(bill): struct_ev type: %s, %d", type_to_string(ir_type(s)), index);
@@ -2506,14 +2506,14 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 
 
 		if (is_type_raw_union(type)) {
-			type = type->Record.fields[index]->type;
+			type = type->Struct.fields[index]->type;
 			e = ir_emit_conv(proc, e, make_type_pointer(proc->module->allocator, type));
 		} else if (type->kind == Type_Union) {
 			GB_ASSERT(index == -1);
 			type = t_type_info_ptr;
 			e = ir_emit_struct_ep(proc, e, index);
-		} else if (type->kind == Type_Record) {
-			type = type->Record.fields[index]->type;
+		} else if (type->kind == Type_Struct) {
+			type = type->Struct.fields[index]->type;
 			e = ir_emit_struct_ep(proc, e, index);
 		} else if (type->kind == Type_Tuple) {
 			type = type->Tuple.variables[index]->type;
@@ -2577,7 +2577,7 @@ irValue *ir_emit_deep_field_ev(irProcedure *proc, irValue *e, Selection sel) {
 
 		if (is_type_raw_union(type)) {
 			GB_PANIC("TODO(bill): IS THIS EVEN CORRECT?");
-			type = type->Record.fields[index]->type;
+			type = type->Struct.fields[index]->type;
 			e = ir_emit_conv(proc, e, type);
 		} else if (type->kind == Type_Map) {
 			e = ir_emit_struct_ev(proc, e, 1);
@@ -2755,8 +2755,8 @@ String ir_lookup_subtype_polymorphic_field(CheckerInfo *info, Type *dst, Type *s
 	// bool dst_is_ptr = dst != prev_dst;
 
 	GB_ASSERT(is_type_struct(src) || is_type_union(src));
-	for (isize i = 0; i < src->Record.field_count; i++) {
-		Entity *f = src->Record.fields[i];
+	for (isize i = 0; i < src->Struct.field_count; i++) {
+		Entity *f = src->Struct.fields[i];
 		if (f->kind == Entity_Variable && f->flags & EntityFlag_Using) {
 			if (are_types_identical(dst, f->type)) {
 				return f->token.string;
@@ -3141,7 +3141,7 @@ bool ir_is_type_aggregate(Type *t) {
 	case Type_Vector:
 	case Type_Array:
 	case Type_Slice:
-	case Type_Record:
+	case Type_Struct:
 	case Type_Tuple:
 	case Type_DynamicArray:
 	case Type_Map:
@@ -3226,8 +3226,8 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 
 		irValue *tag = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, value));
 		irValue *dst_tag = nullptr;
-		for (isize i = 1; i < src->Record.variant_count; i++) {
-			Type *vt = src->Record.variants[i];
+		for (isize i = 1; i < src->Struct.variant_count; i++) {
+			Type *vt = src->Struct.variants[i];
 			if (are_types_identical(vt, dst)) {
 				dst_tag = ir_const_int(a, i);
 				break;
@@ -3261,8 +3261,8 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 
 		irValue *tag = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, value_));
 		irValue *dst_tag = nullptr;
-		for (isize i = 1; i < src->Record.variant_count; i++) {
-			Type *vt = src->Record.variants[i];
+		for (isize i = 1; i < src->Struct.variant_count; i++) {
+			Type *vt = src->Struct.variants[i];
 			if (are_types_identical(vt, dst)) {
 				dst_tag = ir_const_int(a, i);
 				break;
@@ -3682,9 +3682,9 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 
 	bool is_poly = is_type_polymorphic(bt);
 	if (!is_poly) {
-		if (bt->kind == Type_Record &&
-		    bt->Record.is_polymorphic &&
-		    !bt->Record.is_poly_specialized) {
+		if (bt->kind == Type_Struct &&
+		    bt->Struct.is_polymorphic &&
+		    !bt->Struct.is_poly_specialized) {
 			is_poly = true;
 		}
 	}
@@ -3708,14 +3708,14 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	if (is_type_union(e->type)) {
 		Type *bt = base_type(e->type);
 		// NOTE(bill): Zeroth entry is null (for `match type` stmts)
-		for (isize j = 1; j < bt->Record.variant_count; j++) {
-			ir_mangle_add_sub_type_name(m, bt->Record.variants[j], name);
+		for (isize j = 1; j < bt->Struct.variant_count; j++) {
+			ir_mangle_add_sub_type_name(m, bt->Struct.variants[j], name);
 		}
 	}
 	#endif
 
-	if (bt->kind == Type_Record) {
-		Scope *s = bt->Record.scope;
+	if (bt->kind == Type_Struct) {
+		Scope *s = bt->Struct.scope;
 		if (s != nullptr) {
 			for_array(i, s->elements.entries) {
 				Entity *e = s->elements.entries[i].value;
@@ -3939,9 +3939,9 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		i32 variant_index = 0;
 		if (is_type_struct(type)) {
 			Type *st = base_type(type);
-			if (st->Record.variant_parent != nullptr) {
-				allocation_type = st->Record.variant_parent;
-				variant_index = st->Record.variant_index;
+			if (st->Struct.variant_parent != nullptr) {
+				allocation_type = st->Struct.variant_parent;
+				variant_index = st->Struct.variant_index;
 				GB_ASSERT(allocation_type != nullptr);
 			}
 		}
@@ -4433,12 +4433,12 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		irValue *s = ir_build_expr(proc, ce->args[0]);
 		Type *t = base_type(ir_type(s));
 
-		GB_ASSERT(t->kind == Type_Record);
+		GB_ASSERT(t->kind == Type_Struct);
 		GB_ASSERT(is_type_tuple(tv.type));
 
 		irValue *tuple = ir_add_local_generated(proc, tv.type);
-		for (isize src_index = 0; src_index < t->Record.field_count; src_index++) {
-			Entity *field = t->Record.fields_in_src_order[src_index];
+		for (isize src_index = 0; src_index < t->Struct.field_count; src_index++) {
+			Entity *field = t->Struct.fields_in_src_order[src_index];
 			i32 field_index = field->Variable.field_index;
 			irValue *f = ir_emit_struct_ev(proc, s, field_index);
 			irValue *ep = ir_emit_struct_ep(proc, tuple, src_index);
@@ -5126,9 +5126,9 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 					if (is_type_enum(type)) {
 						irValue *enum_info = ir_emit_conv(proc, ti_ptr, t_type_info_enum_ptr);
 						names_ptr = ir_emit_struct_ep(proc, enum_info, 3);
-					} else if (type->kind == Type_Record) {
-						irValue *record_info = ir_emit_conv(proc, ti_ptr, t_type_info_struct_ptr);
-						names_ptr = ir_emit_struct_ep(proc, record_info, 3);
+					} else if (type->kind == Type_Struct) {
+						irValue *struct_info = ir_emit_conv(proc, ti_ptr, t_type_info_struct_ptr);
+						names_ptr = ir_emit_struct_ep(proc, struct_info, 3);
 					}
 					return ir_addr(names_ptr);
 				} else {
@@ -5497,12 +5497,12 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			}
 		} break;
 
-		case Type_Record: {
+		case Type_Struct: {
 			// TODO(bill): "constant" unions are not initialized constantly at the moment.
 			// NOTE(bill): This is due to the layout of the unions when printed to LLVM-IR
 			bool is_union = is_type_union(bt);
 			GB_ASSERT(is_type_struct(bt) || is_type_union(bt));
-			TypeRecord *st = &bt->Record;
+			TypeStruct *st = &bt->Struct;
 			if (cl->elems.count > 0) {
 				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
 				for_array(field_index, cl->elems) {
@@ -5822,8 +5822,8 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 			bool polymorphic_struct = false;
 			if (e->type != nullptr && e->kind == Entity_TypeName) {
 				Type *bt = base_type(e->type);
-				if (bt->kind == Type_Record) {
-					polymorphic_struct = bt->Record.is_polymorphic;
+				if (bt->kind == Type_Struct) {
+					polymorphic_struct = bt->Struct.is_polymorphic;
 				}
 			}
 
@@ -6626,7 +6626,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			Type *enum_ptr = make_type_pointer(a, t);
 			t = base_type(t);
 			Type *core_elem = core_type(t);
-			i64 enum_count = t->Record.field_count;
+			i64 enum_count = t->Struct.field_count;
 			irValue *max_count = ir_const_int(a, enum_count);
 
 			irValue *eti = ir_emit_union_cast(proc, ir_type_info(proc, t), t_type_info_enum_ptr, pos);
@@ -7340,8 +7340,8 @@ void ir_init_module(irModule *m, Checker *c) {
 				case Type_Union:
 					count += t->Union.variants.count;
 					break;
-				case Type_Record:
-					count += t->Record.field_count;
+				case Type_Struct:
+					count += t->Struct.field_count;
 					break;
 				case Type_Tuple:
 					count += t->Tuple.variables.count;
@@ -7580,8 +7580,8 @@ void ir_gen_tree(irGen *s) {
 		bool polymorphic_struct = false;
 		if (e->type != nullptr && e->kind == Entity_TypeName) {
 			Type *bt = base_type(e->type);
-			if (bt->kind == Type_Record) {
-				polymorphic_struct = bt->Record.is_polymorphic;
+			if (bt->kind == Type_Struct) {
+				polymorphic_struct = bt->Struct.is_polymorphic;
 			}
 		}
 
@@ -8169,22 +8169,22 @@ void ir_gen_tree(irGen *s) {
 
 				} break;
 
-				case Type_Record: {
+				case Type_Struct: {
 					ir_emit_comment(proc, str_lit("TypeInfoStruct"));
 					tag = ir_emit_conv(proc, variant_ptr, t_type_info_struct_ptr);
 
 					{
-						irValue *is_packed       = ir_const_bool(a, t->Record.is_packed);
-						irValue *is_ordered      = ir_const_bool(a, t->Record.is_ordered);
-						irValue *is_raw_union    = ir_const_bool(a, t->Record.is_raw_union);
-						irValue *is_custom_align = ir_const_bool(a, t->Record.custom_align != 0);
+						irValue *is_packed       = ir_const_bool(a, t->Struct.is_packed);
+						irValue *is_ordered      = ir_const_bool(a, t->Struct.is_ordered);
+						irValue *is_raw_union    = ir_const_bool(a, t->Struct.is_raw_union);
+						irValue *is_custom_align = ir_const_bool(a, t->Struct.custom_align != 0);
 						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 4), is_packed);
 						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 5), is_ordered);
 						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 6), is_raw_union);
 						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 7), is_custom_align);
 					}
 
-					i32 count = t->Record.field_count;
+					i32 count = t->Struct.field_count;
 
 					irValue *memory_types   = ir_type_info_member_types_offset  (proc, count);
 					irValue *memory_names   = ir_type_info_member_names_offset  (proc, count);
@@ -8194,11 +8194,11 @@ void ir_gen_tree(irGen *s) {
 					type_set_offsets(a, t); // NOTE(bill): Just incase the offsets have not been set yet
 					for (isize source_index = 0; source_index < count; source_index++) {
 						// TODO(bill): Order fields in source order not layout order
-						Entity *f = t->Record.fields_in_src_order[source_index];
+						Entity *f = t->Struct.fields_in_src_order[source_index];
 						irValue *tip = ir_get_type_info_ptr(proc, f->type);
 						i64 foffset = 0;
-						if (!t->Record.is_raw_union) {
-							foffset = t->Record.offsets[f->Variable.field_index];
+						if (!t->Struct.is_raw_union) {
+							foffset = t->Struct.offsets[f->Variable.field_index];
 						}
 						GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 

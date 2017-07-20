@@ -299,8 +299,8 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	#endif
 	} return;
 
-	case Type_Record: {
-		if (t->Record.is_raw_union) {
+	case Type_Struct: {
+		if (t->Struct.is_raw_union) {
 			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
 			// LLVM takes the first element's alignment as the entire alignment (like C)
 			i64 size_of_union  = type_size_of(heap_allocator(), t);
@@ -308,24 +308,24 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align_of_union, size_of_union);
 			return;
 		} else {
-			if (t->Record.is_packed) {
+			if (t->Struct.is_packed) {
 				ir_fprintf(f, "<");
 			}
 			ir_fprintf(f, "{");
-			if (t->Record.custom_align > 0) {
-				ir_fprintf(f, "[0 x <%lld x i8>]", t->Record.custom_align);
-				if (t->Record.field_count > 0) {
+			if (t->Struct.custom_align > 0) {
+				ir_fprintf(f, "[0 x <%lld x i8>]", t->Struct.custom_align);
+				if (t->Struct.field_count > 0) {
 					ir_fprintf(f, ", ");
 				}
 			}
-			for (isize i = 0; i < t->Record.field_count; i++) {
+			for (isize i = 0; i < t->Struct.field_count; i++) {
 				if (i > 0) {
 					ir_fprintf(f, ", ");
 				}
-				ir_print_type(f, m, t->Record.fields[i]->type);
+				ir_print_type(f, m, t->Struct.fields[i]->type);
 			}
 			ir_fprintf(f, "}");
-			if (t->Record.is_packed) {
+			if (t->Struct.is_packed) {
 				ir_fprintf(f, ">");
 			}
 			return;
@@ -585,7 +585,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			}
 
 
-			isize value_count = type->Record.field_count;
+			isize value_count = type->Struct.field_count;
 			ExactValue *values = gb_alloc_array(m->tmp_allocator, ExactValue, value_count);
 			bool *visited = gb_alloc_array(m->tmp_allocator, bool, value_count);
 
@@ -600,14 +600,14 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 						GB_ASSERT(tav.mode != Addressing_Invalid);
 
 						Selection sel = lookup_field(m->allocator, type, name, false);
-						Entity *f = type->Record.fields[sel.index[0]];
+						Entity *f = type->Struct.fields[sel.index[0]];
 
 						values[f->Variable.field_index] = tav.value;
 						visited[f->Variable.field_index] = true;
 					}
 				} else {
 					for_array(i, cl->elems) {
-						Entity *f = type->Record.fields_in_src_order[i];
+						Entity *f = type->Struct.fields_in_src_order[i];
 						TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
 						ExactValue val = {};
 						if (tav.mode != Addressing_Invalid) {
@@ -621,7 +621,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 			for (isize i = 0; i < value_count; i++) {
 				if (visited[i]) continue;
-				Entity *f = type->Record.fields[i];
+				Entity *f = type->Struct.fields[i];
 				ExactValue v = {};
 				if (!f->Variable.default_is_nil) {
 					v = f->Variable.default_value;
@@ -631,10 +631,10 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 
 
-			if (type->Record.is_packed) ir_fprintf(f, "<");
+			if (type->Struct.is_packed) ir_fprintf(f, "<");
 			ir_fprintf(f, "{");
-			if (type->Record.custom_align > 0) {
-				ir_fprintf(f, "[0 x <%lld x i8>] zeroinitializer", cast(i64)type->Record.custom_align);
+			if (type->Struct.custom_align > 0) {
+				ir_fprintf(f, "[0 x <%lld x i8>] zeroinitializer", cast(i64)type->Struct.custom_align);
 				if (value_count > 0) {
 					ir_fprintf(f, ", ");
 				}
@@ -643,7 +643,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 			for (isize i = 0; i < value_count; i++) {
 				if (i > 0) ir_fprintf(f, ", ");
-				Entity *e = type->Record.fields[i];
+				Entity *e = type->Struct.fields[i];
 
 				if (!visited[i] && e->Variable.default_is_undef) {
 					ir_print_type(f, m, e->type);
@@ -655,7 +655,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 
 			ir_fprintf(f, "}");
-			if (type->Record.is_packed) ir_fprintf(f, ">");
+			if (type->Struct.is_packed) ir_fprintf(f, ">");
 
 			gb_temp_arena_memory_end(tmp);
 		} else {
@@ -670,11 +670,11 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_fprintf(f, "zeroinitializer");
 		} else {
 			if (is_type_struct(type)) {
-				i32 value_count = type->Record.field_count;
-				if (type->Record.is_packed) ir_fprintf(f, "<");
+				i32 value_count = type->Struct.field_count;
+				if (type->Struct.is_packed) ir_fprintf(f, "<");
 				ir_fprintf(f, "{");
-				if (type->Record.custom_align > 0) {
-					ir_fprintf(f, "[0 x <%lld x i8>] zeroinitializer", cast(i64)type->Record.custom_align);
+				if (type->Struct.custom_align > 0) {
+					ir_fprintf(f, "[0 x <%lld x i8>] zeroinitializer", cast(i64)type->Struct.custom_align);
 					if (value_count > 0) {
 						ir_fprintf(f, ", ");
 					}
@@ -682,7 +682,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 				for (isize i = 0; i < value_count; i++) {
 					if (i > 0) ir_fprintf(f, ", ");
-					Entity *e = type->Record.fields[i];
+					Entity *e = type->Struct.fields[i];
 					if (e->Variable.default_is_undef) {
 						ir_print_type(f, m, e->type);
 						ir_fprintf(f, " undef");
@@ -696,7 +696,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				}
 
 				ir_fprintf(f, "}");
-				if (type->Record.is_packed) ir_fprintf(f, ">");
+				if (type->Struct.is_packed) ir_fprintf(f, ">");
 
 			} else if (is_type_array(type)) {
 				i64 count = type->Array.count;
@@ -941,7 +941,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		i32 index = instr->StructElementPtr.elem_index;
 		Type *st = base_type(type_deref(et));
 		if (is_type_struct(st)) {
-			if (st->Record.custom_align > 0) {
+			if (st->Struct.custom_align > 0) {
 				index += 1;
 			}
 		} else if (is_type_union(st)) {
@@ -1011,7 +1011,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		i32 index = instr->StructExtractValue.index;
 		Type *st = base_type(et);
 		if (is_type_struct(st)) {
-			if (st->Record.custom_align > 0) {
+			if (st->Struct.custom_align > 0) {
 				index += 1;
 			}
 		} else if (is_type_union(st)) {

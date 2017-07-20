@@ -235,7 +235,7 @@ struct Scope {
 	bool             is_global;
 	bool             is_file;
 	bool             is_init;
-	bool             is_record;
+	bool             is_struct;
 	bool             has_been_imported; // This is only applicable to file scopes
 	AstFile *        file;
 };
@@ -472,7 +472,7 @@ void check_open_scope(Checker *c, AstNode *node) {
 	case AstNode_StructType:
 	case AstNode_EnumType:
 	case AstNode_UnionType:
-		scope->is_record = true;
+		scope->is_struct = true;
 		break;
 	}
 	c->context.scope = scope;
@@ -1174,9 +1174,9 @@ void add_type_info_type(Checker *c, Type *t) {
 		}
 		break;
 
-	case Type_Record: {
-		for (isize i = 0; i < bt->Record.field_count; i++) {
-			Entity *f = bt->Record.fields[i];
+	case Type_Struct: {
+		for (isize i = 0; i < bt->Struct.field_count; i++) {
+			Entity *f = bt->Struct.fields[i];
 			add_type_info_type(c, f->type);
 		}
 	} break;
@@ -1319,7 +1319,7 @@ Entity *find_core_entity(Checker *c, String name) {
 	return e;
 }
 
-Entity *find_sub_core_entity(TypeRecord *parent, String name) {
+Entity *find_sub_core_entity(TypeStruct *parent, String name) {
 	GB_ASSERT(parent->scope->parent->is_global);
 	Entity *e = current_scope_lookup_entity(parent->scope, name);
 	if (e == nullptr) {
@@ -1339,16 +1339,16 @@ void init_preload(Checker *c) {
 		t_type_info = type_info_entity->type;
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
 		GB_ASSERT(is_type_struct(type_info_entity->type));
-		TypeRecord *record = &base_type(type_info_entity->type)->Record;
+		TypeStruct *tis = &base_type(type_info_entity->type)->Struct;
 
-		Entity *type_info_enum_value = find_sub_core_entity(record, str_lit("EnumValue"));
+		Entity *type_info_enum_value = find_sub_core_entity(tis, str_lit("EnumValue"));
 
 		t_type_info_enum_value = type_info_enum_value->type;
 		t_type_info_enum_value_ptr = make_type_pointer(c->allocator, t_type_info_enum_value);
 
-		GB_ASSERT(record->field_count == 3);
+		GB_ASSERT(tis->field_count == 3);
 
-		Entity *type_info_variant = record->fields_in_src_order[2];
+		Entity *type_info_variant = tis->fields_in_src_order[2];
 		Type *tiv_type = type_info_variant->type;
 		GB_ASSERT(is_type_union(tiv_type));
 		TypeUnion *tiv = &tiv_type->Union;
@@ -1741,8 +1741,8 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 						d->type_expr = init;
 						d->init_expr = init;
 					} else if (init->kind == AstNode_ProcLit) {
-						if (c->context.scope->is_record) {
-							error(name, "Procedure declarations are not allowed within a record");
+						if (c->context.scope->is_struct) {
+							error(name, "Procedure declarations are not allowed within a struct");
 							continue;
 						}
 						ast_node(pl, ProcLit, init);

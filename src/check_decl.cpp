@@ -698,7 +698,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 			String name = e->token.string;
 			Type *t = base_type(type_deref(e->type));
 			if (is_type_struct(t) || is_type_raw_union(t)) {
-				Scope *scope = scope_of_node(&c->info, t->Record.node);
+				Scope *scope = scope_of_node(&c->info, t->Struct.node);
 				GB_ASSERT(scope != nullptr);
 				for_array(i, scope->elements.entries) {
 					Entity *f = scope->elements.entries[i].value;

@@ -2156,7 +2156,7 @@ Array<AstNode *> parse_rhs_expr_list    (AstFile *f);
 AstNode *        parse_simple_stmt      (AstFile *f, StmtAllowFlag flags);
 AstNode *        parse_type             (AstFile *f);
 AstNode *        parse_call_expr        (AstFile *f, AstNode *operand);
-AstNode *        parse_record_field_list(AstFile *f, isize *name_count_);
+AstNode *        parse_struct_field_list(AstFile *f, isize *name_count_);
 AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_type_token);
 
 
@@ -2477,7 +2477,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
 
 		isize    name_count = 0;
-		AstNode *fields = parse_record_field_list(f, &name_count);
+		AstNode *fields = parse_struct_field_list(f, &name_count);
 		Token    close  = expect_token(f, Token_CloseBrace);
 
 		Array<AstNode *> decls = {};
@@ -3632,7 +3632,7 @@ bool parse_expect_struct_separator(AstFile *f, AstNode *param) {
 }
 
 
-AstNode *parse_record_field_list(AstFile *f, isize *name_count_) {
+AstNode *parse_struct_field_list(AstFile *f, isize *name_count_) {
 	CommentGroup docs = f->lead_comment;
 	Token start_token = f->curr_token;
 
@@ -3949,7 +3949,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
 
 		isize    name_count = 0;
-		AstNode *fields = parse_record_field_list(f, &name_count);
+		AstNode *fields = parse_struct_field_list(f, &name_count);
 		Token    close  = expect_token(f, Token_CloseBrace);
 
 		Array<AstNode *> decls = {};
@@ -3992,7 +3992,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		Token open = expect_token_after(f, Token_OpenBrace, "raw_union");
 
 		isize    decl_count = 0;
-		AstNode *fields     = parse_record_field_list(f, &decl_count);
+		AstNode *fields     = parse_struct_field_list(f, &decl_count);
 		Token    close      = expect_token(f, Token_CloseBrace);
 
 		Array<AstNode *> decls = {};
