@@ -686,7 +686,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	GB_ASSERT(type->kind == Type_Proc);
 	if (type->Proc.param_count > 0) {
 		TypeTuple *params = &type->Proc.params->Tuple;
-		for (isize i = 0; i < params->variable_count; i++) {
+		for_array(i, params->variables) {
 			Entity *e = params->variables[i];
 			if (e->kind != Entity_Variable) {
 				continue;

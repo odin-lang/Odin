@@ -639,10 +639,10 @@ bool can_ssa_type(Type *t) {
 	case Type_Map:
 		return false;
 	case Type_Tuple:
-		if (t->Tuple.variable_count > SSA_MAX_STRUCT_FIELD_COUNT) {
+		if (t->Tuple.variables.count > SSA_MAX_STRUCT_FIELD_COUNT) {
 			return false;
 		}
-		for (isize i = 0; i < t->Tuple.variable_count; i++) {
+		for_array(i, t->Tuple.variables) {
 			if (!can_ssa_type(t->Tuple.variables[i]->type)) {
 				return false;
 			}
@@ -813,14 +813,9 @@ ssaValue *ssa_emit_ptr_index(ssaProc *p, ssaValue *s, i64 index) {
 		GB_ASSERT(t->Record.field_count > 0);
 		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
 		result_type = make_type_pointer(a, t->Record.fields[index]->type);
-	} else if (is_type_union(t)) {
-		type_set_offsets(a, t);
-		GB_ASSERT(t->Record.field_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
-		result_type = make_type_pointer(a, t->Record.fields[index]->type);
 	} else if (is_type_tuple(t)) {
-		GB_ASSERT(t->Tuple.variable_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Tuple.variable_count-1));
+		GB_ASSERT(t->Tuple.variables.count > 0);
+		GB_ASSERT(gb_is_between(index, 0, t->Tuple.variables.count-1));
 		result_type = make_type_pointer(a, t->Tuple.variables[index]->type);
 	} else if (is_type_slice(t)) {
 		switch (index) {
@@ -882,8 +877,7 @@ ssaValue *ssa_emit_value_index(ssaProc *p, ssaValue *s, i64 index) {
 		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
 		result_type = t->Record.fields[index]->type;
 	} else if (is_type_tuple(t)) {
-		GB_ASSERT(t->Tuple.variable_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Tuple.variable_count-1));
+		GB_ASSERT(t->Tuple.variables.count > 0);
 		result_type = t->Tuple.variables[index]->type;
 	} else if (is_type_slice(t)) {
 		switch (index) {
@@ -2015,7 +2009,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 					Type *t = base_type(init->type);
 					// TODO(bill): refactor for code reuse as this is repeated a bit
 					if (t->kind == Type_Tuple) {
-						for (isize i = 0; i < t->Tuple.variable_count; i++) {
+						for_array(i, t->Tuple.variables) {
 							Entity *e = t->Tuple.variables[i];
 							ssaValue *v = ssa_emit_value_index(p, init, i);
 							array_add(&inits, v);

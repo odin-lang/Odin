@@ -274,8 +274,9 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 
 	case Struct:
 		write_string(buf, "struct ");
-		if info.packed  do write_string(buf, "#packed ");
-		if info.ordered do write_string(buf, "#ordered ");
+		if info.is_packed    do write_string(buf, "#packed ");
+		if info.is_ordered   do write_string(buf, "#ordered ");
+		if info.is_raw_union do write_string(buf, "#raw_union ");
 		if info.custom_align {
 			write_string(buf, "#align ");
 			write_int(buf, i64(ti.align), 10);
@@ -298,16 +299,6 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		}
 		write_string(buf, "}");
 
-	case RawUnion:
-		write_string(buf, "raw_union {");
-		for name, i in info.names {
-			if i > 0 do write_string(buf, ", ");
-			write_string(buf, name);
-			write_string(buf, ": ");
-			write_type(buf, info.types[i]);
-		}
-		write_string(buf, "}");
-
 	case Enum:
 		write_string(buf, "enum ");
 		write_type(buf, info.base);
@@ -317,6 +308,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 			write_string(buf, name);
 		}
 		write_string(buf, "}");
+
 	case BitField:
 		write_string(buf, "bit_field ");
 		if ti.align != 1 {
@@ -864,6 +856,11 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 
 
 	case Struct:
+		if info.is_raw_union {
+			write_string(fi.buf, "(raw_union)");
+			return;
+		}
+
 		write_byte(fi.buf, '{');
 		defer write_byte(fi.buf, '}');
 
@@ -890,10 +887,6 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			ti := tipp^;
 			fmt_arg(fi, any{data, ti}, verb);
 		}
-
-
-	case RawUnion:
-		write_string(fi.buf, "(raw_union)");
 
 	case Enum:
 		fmt_enum(fi, v, verb);

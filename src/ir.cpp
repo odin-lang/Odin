@@ -617,7 +617,7 @@ Type *ir_instr_type(irInstr *instr) {
 	case irInstr_Call: {
 		Type *pt = base_type(instr->Call.type);
 		if (pt != nullptr) {
-			if (pt->kind == Type_Tuple && pt->Tuple.variable_count == 1) {
+			if (pt->kind == Type_Tuple && pt->Tuple.variables.count == 1) {
 				return pt->Tuple.variables[0]->type;
 			}
 			return pt;
@@ -2382,8 +2382,7 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		GB_ASSERT(index == -1);
 		return ir_emit_union_tag_ptr(proc, s);
 	} else if (is_type_tuple(t)) {
-		GB_ASSERT(t->Tuple.variable_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Tuple.variable_count-1));
+		GB_ASSERT(t->Tuple.variables.count > 0);
 		result_type = make_type_pointer(a, t->Tuple.variables[index]->type);
 	} else if (is_type_complex(t)) {
 		Type *ft = base_complex_elem_type(t);
@@ -2445,8 +2444,7 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 		GB_ASSERT(index == -1);
 		return ir_emit_union_tag_value(proc, s);
 	} else if (is_type_tuple(t)) {
-		GB_ASSERT(t->Tuple.variable_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Tuple.variable_count-1));
+		GB_ASSERT(t->Tuple.variables.count > 0);
 		result_type = t->Tuple.variables[index]->type;
 	} else if (is_type_complex(t)) {
 		Type *ft = base_complex_elem_type(t);
@@ -2960,7 +2958,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	}
 
 	if (is_type_union(dst)) {
-		for (isize i = 1; i < dst->Union.variant_count; i++) {
+		for_array(i, dst->Union.variants) {
 			Type *vt = dst->Union.variants[i];
 			if (are_types_identical(vt, src_type)) {
 				ir_emit_comment(proc, str_lit("union - child to parent"));
@@ -4861,7 +4859,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			AstNode *a = ce->args[i];
 			Type *at = base_type(type_of_expr(proc->module->info, a));
 			if (at->kind == Type_Tuple) {
-				arg_count += at->Tuple.variable_count;
+				arg_count += at->Tuple.variables.count;
 			} else {
 				arg_count++;
 			}
@@ -4882,7 +4880,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 				irValue *a = ir_build_expr(proc, arg);
 				Type *at = ir_type(a);
 				if (at->kind == Type_Tuple) {
-					for (isize i = 0; i < at->Tuple.variable_count; i++) {
+					for_array(i, at->Tuple.variables) {
 						Entity *e = at->Tuple.variables[i];
 						irValue *v = ir_emit_struct_ev(proc, a, i);
 						args[arg_index++] = v;
@@ -5129,7 +5127,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 						irValue *enum_info = ir_emit_conv(proc, ti_ptr, t_type_info_enum_ptr);
 						names_ptr = ir_emit_struct_ep(proc, enum_info, 3);
 					} else if (type->kind == Type_Record) {
-						irValue *record_info = ir_emit_conv(proc, ti_ptr, t_type_info_record_ptr);
+						irValue *record_info = ir_emit_conv(proc, ti_ptr, t_type_info_struct_ptr);
 						names_ptr = ir_emit_struct_ep(proc, record_info, 3);
 					}
 					return ir_addr(names_ptr);
@@ -6266,7 +6264,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					irValue *init = ir_build_expr(proc, vd->values[i]);
 					Type *t = ir_type(init);
 					if (t->kind == Type_Tuple) {
-						for (isize i = 0; i < t->Tuple.variable_count; i++) {
+						for_array(i, t->Tuple.variables) {
 							Entity *e = t->Tuple.variables[i];
 							irValue *v = ir_emit_struct_ev(proc, init, i);
 							array_add(&inits, v);
@@ -6331,7 +6329,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					Type *t = ir_type(init);
 					// TODO(bill): refactor for code reuse as this is repeated a bit
 					if (t->kind == Type_Tuple) {
-						for (isize i = 0; i < t->Tuple.variable_count; i++) {
+						for_array(i, t->Tuple.variables) {
 							Entity *e = t->Tuple.variables[i];
 							irValue *v = ir_emit_struct_ev(proc, init, i);
 							array_add(&inits, v);
@@ -6463,7 +6461,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				irValue *res = ir_build_expr(proc, rs->results[res_index]);
 				Type *t = ir_type(res);
 				if (t->kind == Type_Tuple) {
-					for (isize i = 0; i < t->Tuple.variable_count; i++) {
+					for_array(i, t->Tuple.variables) {
 						Entity *e = t->Tuple.variables[i];
 						irValue *v = ir_emit_struct_ev(proc, res, i);
 						array_add(&results, v);
@@ -6934,7 +6932,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					irValue *variant_tag = nullptr;
 					Type *ut = base_type(type_deref(parent_type));
 					GB_ASSERT(ut->kind == Type_Union);
-					for (isize variant_index = 1; variant_index < ut->Union.variant_count; variant_index++) {
+					for_array(variant_index, ut->Union.variants) {
 						Type *vt = ut->Union.variants[variant_index];
 						if (are_types_identical(vt, bt)) {
 							variant_tag = ir_type_info(proc, vt);
@@ -7154,7 +7152,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 		isize q_index = 0;
 
 		TypeTuple *params = &proc->type->Proc.params->Tuple;
-		for (isize i = 0; i < params->variable_count; i++) {
+		for_array(i, params->variables) {
 			ast_node(fl, FieldList, pt->params);
 			GB_ASSERT(fl->list.count > 0);
 			GB_ASSERT(fl->list[0]->kind == AstNode_Field);
@@ -7340,13 +7338,13 @@ void ir_init_module(irModule *m, Checker *c) {
 
 				switch (t->kind) {
 				case Type_Union:
-					count += t->Union.variant_count;
+					count += t->Union.variants.count;
 					break;
 				case Type_Record:
 					count += t->Record.field_count;
 					break;
 				case Type_Tuple:
-					count += t->Tuple.variable_count;
+					count += t->Tuple.variables.count;
 					break;
 				}
 			}
@@ -7718,11 +7716,8 @@ void ir_gen_tree(irGen *s) {
 
 		Scope *proc_scope = gb_alloc_item(a, Scope);
 
-		proc_params->Tuple.variables = gb_alloc_array(a, Entity *, 3);
-		proc_params->Tuple.variable_count = 3;
-
-		proc_results->Tuple.variables = gb_alloc_array(a, Entity *, 1);
-		proc_results->Tuple.variable_count = 1;
+		array_init_count(&proc_params->Tuple.variables, a, 3);
+		array_init_count(&proc_results->Tuple.variables, a, 1);
 
 		proc_params->Tuple.variables[0] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false, false);
 		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, make_token_ident(str_lit("reason")), t_i32, false, false);
@@ -8078,10 +8073,10 @@ void ir_gen_tree(irGen *s) {
 					ir_emit_comment(proc, str_lit("TypeInfoTuple"));
 					tag = ir_emit_conv(proc, variant_ptr, t_type_info_tuple_ptr);
 
-					irValue *memory_types = ir_type_info_member_types_offset(proc, t->Tuple.variable_count);
-					irValue *memory_names = ir_type_info_member_names_offset(proc, t->Tuple.variable_count);
+					irValue *memory_types = ir_type_info_member_types_offset(proc, t->Tuple.variables.count);
+					irValue *memory_names = ir_type_info_member_names_offset(proc, t->Tuple.variables.count);
 
-					for (isize i = 0; i < t->Tuple.variable_count; i++) {
+					for_array(i, t->Tuple.variables) {
 						// NOTE(bill): offset is not used for tuples
 						Entity *f = t->Tuple.variables[i];
 
@@ -8095,7 +8090,7 @@ void ir_gen_tree(irGen *s) {
 						}
 					}
 
-					irValue *count = ir_const_int(a, t->Tuple.variable_count);
+					irValue *count = ir_const_int(a, t->Tuple.variables.count);
 					ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types, count, count);
 					ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names, count, count);
 				} break;
@@ -8152,12 +8147,12 @@ void ir_gen_tree(irGen *s) {
 						irValue *variant_types  = ir_emit_struct_ep(proc, tag, 0);
 						irValue *tag_offset_ptr = ir_emit_struct_ep(proc, tag, 1);
 
-						isize variant_count = gb_max(0, t->Union.variant_count-1);
+						isize variant_count = gb_max(0, t->Union.variants.count);
 						irValue *memory_types = ir_type_info_member_types_offset(proc, variant_count);
 
 						// NOTE(bill): Zeroth is nil so ignore it
 						for (isize variant_index = 0; variant_index < variant_count; variant_index++) {
-							Type *vt = t->Union.variants[variant_index+1]; // Skip zeroth
+							Type *vt = t->Union.variants[variant_index];
 							irValue *tip = ir_get_type_info_ptr(proc, vt);
 
 							irValue *index     = ir_const_int(a, variant_index);
@@ -8175,77 +8170,57 @@ void ir_gen_tree(irGen *s) {
 				} break;
 
 				case Type_Record: {
-					if (t->Record.is_raw_union) {
-						ir_emit_comment(proc, str_lit("TypeInfoRawUnion"));
-						tag = ir_emit_conv(proc, variant_ptr, t_type_info_raw_union_ptr);
+					ir_emit_comment(proc, str_lit("TypeInfoStruct"));
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_struct_ptr);
 
-						irValue *memory_types   = ir_type_info_member_types_offset(proc, t->Record.field_count);
-						irValue *memory_names   = ir_type_info_member_names_offset(proc, t->Record.field_count);
-						irValue *memory_offsets = ir_type_info_member_offsets_offset(proc, t->Record.field_count);
-
-						for (isize i = 0; i < t->Record.field_count; i++) {
-							Entity *f = t->Record.fields[i];
-							irValue *index     = ir_const_int(a, i);
-							irValue *type_info = ir_emit_ptr_offset(proc, memory_types, index);
-							// NOTE(bill): Offsets are always 0
-
-							ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
-							if (f->token.string.len > 0) {
-								irValue *name = ir_emit_ptr_offset(proc, memory_names, index);
-								ir_emit_store(proc, name, ir_const_string(a, f->token.string));
-							}
-						}
-
-						irValue *count = ir_const_int(a, t->Record.field_count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   count, count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   count, count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, count, count);
-					} else {
-						ir_emit_comment(proc, str_lit("TypeInfoStruct"));
-						tag = ir_emit_conv(proc, variant_ptr, t_type_info_struct_ptr);
-
-						{
-							irValue *packed       = ir_const_bool(a, t->Record.is_packed);
-							irValue *ordered      = ir_const_bool(a, t->Record.is_ordered);
-							irValue *custom_align = ir_const_bool(a, t->Record.custom_align != 0);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 4), packed);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 5), ordered);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 6), custom_align);
-						}
-
-						irValue *memory_types   = ir_type_info_member_types_offset(proc, t->Record.field_count);
-						irValue *memory_names   = ir_type_info_member_names_offset(proc, t->Record.field_count);
-						irValue *memory_offsets = ir_type_info_member_offsets_offset(proc, t->Record.field_count);
-						irValue *memory_usings  = ir_type_info_member_usings_offset(proc, t->Record.field_count);
-
-						type_set_offsets(a, t); // NOTE(bill): Just incase the offsets have not been set yet
-						for (isize source_index = 0; source_index < t->Record.field_count; source_index++) {
-							// TODO(bill): Order fields in source order not layout order
-							Entity *f = t->Record.fields_in_src_order[source_index];
-							irValue *tip = ir_get_type_info_ptr(proc, f->type);
-							i64 foffset = t->Record.offsets[f->Variable.field_index];
-							GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
-
-							irValue *index     = ir_const_int(a, source_index);
-							irValue *type_info = ir_emit_ptr_offset(proc, memory_types,   index);
-							irValue *offset    = ir_emit_ptr_offset(proc, memory_offsets, index);
-							irValue *is_using  = ir_emit_ptr_offset(proc, memory_usings, index);
-
-							ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
-							if (f->token.string.len > 0) {
-								irValue *name = ir_emit_ptr_offset(proc, memory_names,   index);
-								ir_emit_store(proc, name, ir_const_string(a, f->token.string));
-							}
-							ir_emit_store(proc, offset, ir_const_int(a, foffset));
-							ir_emit_store(proc, is_using, ir_const_bool(a, (f->flags&EntityFlag_Using) != 0));
-						}
-
-						irValue *count = ir_const_int(a, t->Record.field_count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   count, count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   count, count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, count, count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 3), memory_usings,  count, count);
+					{
+						irValue *is_packed       = ir_const_bool(a, t->Record.is_packed);
+						irValue *is_ordered      = ir_const_bool(a, t->Record.is_ordered);
+						irValue *is_raw_union    = ir_const_bool(a, t->Record.is_raw_union);
+						irValue *is_custom_align = ir_const_bool(a, t->Record.custom_align != 0);
+						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 4), is_packed);
+						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 5), is_ordered);
+						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 6), is_raw_union);
+						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 7), is_custom_align);
 					}
+
+					i32 count = t->Record.field_count;
+
+					irValue *memory_types   = ir_type_info_member_types_offset  (proc, count);
+					irValue *memory_names   = ir_type_info_member_names_offset  (proc, count);
+					irValue *memory_offsets = ir_type_info_member_offsets_offset(proc, count);
+					irValue *memory_usings  = ir_type_info_member_usings_offset (proc, count);
+
+					type_set_offsets(a, t); // NOTE(bill): Just incase the offsets have not been set yet
+					for (isize source_index = 0; source_index < count; source_index++) {
+						// TODO(bill): Order fields in source order not layout order
+						Entity *f = t->Record.fields_in_src_order[source_index];
+						irValue *tip = ir_get_type_info_ptr(proc, f->type);
+						i64 foffset = 0;
+						if (!t->Record.is_raw_union) {
+							foffset = t->Record.offsets[f->Variable.field_index];
+						}
+						GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
+
+						irValue *index     = ir_const_int(a, source_index);
+						irValue *type_info = ir_emit_ptr_offset(proc, memory_types,   index);
+						irValue *offset    = ir_emit_ptr_offset(proc, memory_offsets, index);
+						irValue *is_using  = ir_emit_ptr_offset(proc, memory_usings, index);
+
+						ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
+						if (f->token.string.len > 0) {
+							irValue *name = ir_emit_ptr_offset(proc, memory_names,   index);
+							ir_emit_store(proc, name, ir_const_string(a, f->token.string));
+						}
+						ir_emit_store(proc, offset, ir_const_int(a, foffset));
+						ir_emit_store(proc, is_using, ir_const_bool(a, (f->flags&EntityFlag_Using) != 0));
+					}
+
+					irValue *cv = ir_const_int(a, count);
+					ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   cv, cv);
+					ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   cv, cv);
+					ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, cv, cv);
+					ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 3), memory_usings,  cv, cv);
 				} break;
 				case Type_Map: {
 					ir_emit_comment(proc, str_lit("TypeInfoMap"));

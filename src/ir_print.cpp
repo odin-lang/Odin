@@ -155,12 +155,11 @@ void ir_print_proc_results(irFileBuffer *f, irModule *m, Type *t) {
 		Type *rt = t->Proc.abi_compat_result_type;
 		if (!is_type_tuple(rt)) {
 			ir_print_type(f, m, rt);
-		} else if (rt->Tuple.variable_count == 1) {
+		} else if (rt->Tuple.variables.count == 1) {
 			ir_print_type(f, m, rt->Tuple.variables[0]->type);
 		} else {
-			isize count = rt->Tuple.variable_count;
 			ir_fprintf(f, "{");
-			for (isize i = 0; i < count; i++) {
+			for_array(i, rt->Tuple.variables) {
 				Entity *e = rt->Tuple.variables[i];
 				if (i > 0) {
 					ir_fprintf(f, ", ");
@@ -344,15 +343,13 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		}
 		return;
 	case Type_Tuple:
-		if (t->Tuple.variable_count == 1) {
+		if (t->Tuple.variables.count == 1) {
 			ir_print_type(f, m, t->Tuple.variables[0]->type);
 		} else {
 			ir_fprintf(f, "{");
 			isize index = 0;
-			for (isize i = 0; i < t->Tuple.variable_count; i++) {
-				if (index > 0) {
-					ir_fprintf(f, ", ");
-				}
+			for_array(i, t->Tuple.variables) {
+				if (index > 0) ir_fprintf(f, ", ");
 				Entity *e = t->Tuple.variables[i];
 				if (e->kind == Entity_Variable) {
 					ir_print_type(f, m, e->type);
@@ -1352,7 +1349,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			TypeTuple *params = &proc_type->Proc.params->Tuple;
 			if (proc_type->Proc.c_vararg) {
 				isize i = 0;
-				for (; i < params->variable_count-1; i++) {
+				for (; i < params->variables.count-1; i++) {
 					Entity *e = params->variables[i];
 					GB_ASSERT(e != nullptr);
 					if (e->kind != Entity_Variable) continue;
@@ -1380,9 +1377,8 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					param_index++;
 				}
 			} else {
-				GB_ASSERT(call->arg_count == params->variable_count);
-				isize param_count = params->variable_count;
-				for (isize i = 0; i < param_count; i++) {
+				GB_ASSERT(call->arg_count == params->variables.count);
+				for_array(i, params->variables) {
 					Entity *e = params->variables[i];
 					GB_ASSERT(e != nullptr);
 					if (e->kind != Entity_Variable) continue;
@@ -1645,7 +1641,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 			if (e->kind != Entity_Variable) continue;
 			if (param_index > 0) ir_fprintf(f, ", ");
 
-			if (i+1 == params->variable_count && proc_type->c_vararg) {
+			if (i+1 == params->variables.count && proc_type->c_vararg) {
 				ir_fprintf(f, " ...");
 			} else {
 				ir_print_type(f, m, abi_type);

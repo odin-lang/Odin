@@ -519,7 +519,7 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 	}
 
 	if (is_type_union(dst)) {
-		for (isize i = 0; i < dst->Union.variant_count; i++) {
+		for_array(i, dst->Union.variants) {
 			Type *vt = dst->Union.variants[i];
 			if (are_types_identical(vt, s)) {
 				return 1;
@@ -851,8 +851,7 @@ void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 			} else {
 				if (o.mode == Addressing_Value && o.type->kind == Type_Tuple) {
 					// NOTE(bill): Tuples are not first class thus never named
-					isize count = o.type->Tuple.variable_count;
-					for (isize index = 0; index < count; index++) {
+					for_array(index, o.type->Tuple.variables) {
 						Operand single = {Addressing_Value};
 						single.type    = o.type->Tuple.variables[index]->type;
 						single.expr    = v;
@@ -1200,9 +1199,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 
 			if (entities.count > 0) {
 				Type *tuple = make_type_tuple(c->allocator);
-				tuple->Tuple.variables = entities.data;
-				tuple->Tuple.variable_count = entities.count;
-
+				tuple->Tuple.variables = entities;
 				polymorphic_params = tuple;
 			}
 		}
@@ -1314,7 +1311,7 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
-	isize variant_count = ut->variants.count+1;
+	isize variant_count = ut->variants.count;
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -1323,9 +1320,8 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 
 	Array<Type *> variants = {};
 	array_init(&variants, c->allocator, variant_count);
-	array_add(&variants, t_invalid);
 
-	union_type->Union.scope               = c->context.scope;
+	union_type->Union.scope = c->context.scope;
 
 	for_array(i, ut->variants) {
 		AstNode *node = ut->variants[i];
@@ -1356,8 +1352,7 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 		}
 	}
 
-	union_type->Union.variants      = variants.data;
-	union_type->Union.variant_count = variants.count;
+	union_type->Union.variants = variants;
 }
 
 // void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
@@ -1655,8 +1650,8 @@ bool check_type_specialization_to(Checker *c, Type *specialization, Type *type, 
 
 			TypeTuple *s_tuple = &s->Record.polymorphic_params->Tuple;
 			TypeTuple *t_tuple = &t->Record.polymorphic_params->Tuple;
-			GB_ASSERT(t_tuple->variable_count == s_tuple->variable_count);
-			for (isize i = 0; i < s_tuple->variable_count; i++) {
+			GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
+			for_array(i, s_tuple->variables) {
 				Entity *s_e = s_tuple->variables[i];
 				Entity *t_e = t_tuple->variables[i];
 				Type *st = s_e->type;
@@ -1748,10 +1743,10 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 		if (source->kind == Type_Union) {
 			TypeUnion *x = &poly->Union;
 			TypeUnion *y = &source->Union;
-			if (x->variant_count != y->variant_count) {
+			if (x->variants.count != y->variants.count) {
 				return false;
 			}
-			for (isize i = 1; i < x->variant_count; i++) {
+			for_array(i, x->variants) {
 				Type *a = x->variants[i];
 				Type *b = y->variants[i];
 				bool ok = is_polymorphic_type_assignable(c, a, b, false, modify_type);
@@ -1887,8 +1882,8 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 
 	bool is_variadic = false;
 	bool is_c_vararg = false;
-	Entity **variables = gb_alloc_array(c->allocator, Entity *, variable_count);
-	isize variable_index = 0;
+	Array<Entity *> variables = {};
+	array_init(&variables, c->allocator, variable_count);
 	for_array(i, params) {
 		AstNode *param = params[i];
 		if (param->kind != AstNode_Field) {
@@ -2033,7 +2028,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			Entity *param = nullptr;
 			if (is_type_param) {
 				if (operands != nullptr) {
-					Operand o = (*operands)[variable_index];
+					Operand o = (*operands)[variables.count];
 					if (o.mode == Addressing_Type) {
 						type = o.type;
 					} else {
@@ -2067,7 +2062,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				param->TypeName.is_type_alias = true;
 			} else {
 				if (operands != nullptr && is_type_polymorphic_type) {
-					Operand op = (*operands)[variable_index];
+					Operand op = (*operands)[variables.count];
 					type = determine_type_from_polymorphic(c, type, op);
 					if (type == t_invalid) {
 						success = false;
@@ -2093,11 +2088,10 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			}
 
 			add_entity(c, scope, name, param);
-			variables[variable_index++] = param;
+			array_add(&variables, param);
 		}
 	}
 
-	variable_count = variable_index;
 
 	if (is_variadic) {
 		GB_ASSERT(params.count > 0);
@@ -2113,7 +2107,6 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 
 	Type *tuple = make_type_tuple(c->allocator);
 	tuple->Tuple.variables = variables;
-	tuple->Tuple.variable_count = variable_count;
 
 	if (success_) *success_ = success;
 	if (is_variadic_) *is_variadic_ = is_variadic;
@@ -2142,8 +2135,8 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 		}
 	}
 
-	Entity **variables = gb_alloc_array(c->allocator, Entity *, variable_count);
-	isize variable_index = 0;
+	Array<Entity *> variables = {};
+	array_init(&variables, c->allocator, variable_count);
 	for_array(i, results) {
 		ast_node(field, Field, results[i]);
 		AstNode *default_value = unparen_expr(field->default_value);
@@ -2197,7 +2190,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 			Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
 			param->Variable.default_value = value;
 			param->Variable.default_is_nil = default_is_nil;
-			variables[variable_index++] = param;
+			array_add(&variables, param);
 		} else {
 			for_array(j, field->names) {
 				Token token = ast_node_token(results[i]);
@@ -2216,17 +2209,17 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 				Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
 				param->Variable.default_value = value;
 				param->Variable.default_is_nil = default_is_nil;
-				variables[variable_index++] = param;
+				array_add(&variables, param);
 			}
 		}
 	}
 
-	for (isize i = 0; i < variable_index; i++) {
+	for_array(i, variables) {
 		String x = variables[i]->token.string;
 		if (x.len == 0 || is_blank_ident(x)) {
 			continue;
 		}
-		for (isize j = i+1; j < variable_index; j++) {
+		for (isize j = i+1; j < variables.count; j++) {
 			String y = variables[j]->token.string;
 			if (y.len == 0 || is_blank_ident(y)) {
 				continue;
@@ -2238,7 +2231,6 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 	}
 
 	tuple->Tuple.variables = variables;
-	tuple->Tuple.variable_count = variable_index;
 
 	return tuple;
 }
@@ -2335,7 +2327,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 Type *reduce_tuple_to_single_type(Type *original_type) {
 	if (original_type != nullptr) {
 		Type *t = core_type(original_type);
-		if (t->kind == Type_Tuple && t->Tuple.variable_count == 1) {
+		if (t->kind == Type_Tuple && t->Tuple.variables.count == 1) {
 			return t->Tuple.variables[0]->type;
 		}
 	}
@@ -2384,9 +2376,10 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 
 	if (new_type != original_type) {
 		Type *tuple = make_type_tuple(a);
-		tuple->Tuple.variable_count = 1;
-		tuple->Tuple.variables = gb_alloc_array(a, Entity *, 1);
-		tuple->Tuple.variables[0] = make_entity_param(a, original_type->Tuple.variables[0]->scope, empty_token, new_type, false, false);
+		Array<Entity *> variables = {};
+		array_init(&variables, a, 1);
+		array_add(&variables, make_entity_param(a, original_type->Tuple.variables[0]->scope, empty_token, new_type, false, false));
+		tuple->Tuple.variables = variables;
 		new_type = tuple;
 	}
 
@@ -2437,8 +2430,8 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 
 	isize param_count = 0;
 	isize result_count = 0;
-	if (params)  param_count  = params ->Tuple.variable_count;
-	if (results) result_count = results->Tuple.variable_count;
+	if (params)  param_count  = params ->Tuple.variables.count;
+	if (results) result_count = results->Tuple.variables.count;
 
 	type->Proc.node               = proc_type_node;
 	type->Proc.scope              = c->context.scope;
@@ -2719,10 +2712,9 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 Type *make_optional_ok_type(gbAllocator a, Type *value) {
 	bool typed = true;
 	Type *t = make_type_tuple(a);
-	t->Tuple.variables = gb_alloc_array(a, Entity *, 2);
-	t->Tuple.variable_count = 2;
-	t->Tuple.variables[0] = make_entity_field(a, nullptr, blank_token, value,  false, 0);
-	t->Tuple.variables[1] = make_entity_field(a, nullptr, blank_token, typed ? t_bool : t_untyped_bool, false, 1);
+	array_init(&t->Tuple.variables, a, 2);
+	array_add (&t->Tuple.variables, make_entity_field(a, nullptr, blank_token, value,  false, 0));
+	array_add (&t->Tuple.variables, make_entity_field(a, nullptr, blank_token, typed ? t_bool : t_untyped_bool, false, 1));
 	return t;
 }
 
@@ -4304,11 +4296,11 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 	{
 		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 		defer (gb_temp_arena_memory_end(tmp));
-		i32 count = t->Union.variant_count;
+		isize count = t->Union.variants.count;
 		i64 *scores = gb_alloc_array(c->tmp_allocator, i64, count);
 		i32 success_count = 0;
 		i32 first_success_index = -1;
-		for (i32 i = 1; i < count; i++) {
+		for_array(i, t->Union.variants) {
 			Type *vt = t->Union.variants[i];
 			i64 score = 0;
 			if (check_is_assignable_to_with_score(c, operand, vt, &score)) {
@@ -4358,14 +4350,14 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 		} else if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
 			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
-			if (count > 1) {
+			if (count > 0) {
 				gb_printf_err("`%s` is a union which only excepts the following types:\n", type_str);
 				gb_printf_err("\t");
-				for (i32 i = 1; i < count; i++) {
+				for (i32 i = 0; i < count; i++) {
 					Type *v = t->Union.variants[i];
-					if (i > 1 && count > 3) gb_printf_err(", ");
+					if (i > 0 && count > 2) gb_printf_err(", ");
 					if (i == count-1) {
-						if (count == 3) {
+						if (count == 2) {
 							gb_printf_err(" or ");
 						} else {
 							gb_printf_err("or ");
@@ -4692,7 +4684,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			i64 max_count = 0;
 			switch (type->kind) {
 			case Type_Record: max_count = type->Record.field_count;   break;
-			case Type_Tuple:  max_count = type->Tuple.variable_count; break;
+			case Type_Tuple:  max_count = type->Tuple.variables.count; break;
 			}
 
 			if (index >= max_count) {
@@ -5591,11 +5583,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		Type *tuple = make_type_tuple(a);
 		i32 variable_count = type->Record.field_count;
-		tuple->Tuple.variables = gb_alloc_array(a, Entity *, variable_count);
-		tuple->Tuple.variable_count = variable_count;
-
+		array_init_count(&tuple->Tuple.variables, a, variable_count);
 		// TODO(bill): Should I copy each of the entities or is this good enough?
-		gb_memcopy_array(tuple->Tuple.variables, type->Record.fields_in_src_order, variable_count);
+		gb_memcopy_array(tuple->Tuple.variables.data, type->Record.fields_in_src_order, variable_count);
 
 		operand->type = tuple;
 		operand->mode = Addressing_Value;
@@ -5957,7 +5947,7 @@ bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operand
 			}
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
-			for (isize j = 0; j < tuple->variable_count; j++) {
+			for_array(j, tuple->variables) {
 				o.type = tuple->variables[j]->type;
 				array_add(operands, o);
 			}
@@ -5988,7 +5978,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	if (pt->params != nullptr) {
 		param_tuple = &pt->params->Tuple;
 
-		param_count = param_tuple->variable_count;
+		param_count = param_tuple->variables.count;
 		if (variadic) {
 			param_count--;
 		}
@@ -6069,7 +6059,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			TypeProc *pt = &final_proc_type->Proc;
 
 			GB_ASSERT(pt->params != nullptr);
-			Entity **sig_params = pt->params->Tuple.variables;
+			auto sig_params = pt->params->Tuple.variables;
 			isize operand_index = 0;
 			isize max_operand_count = gb_min(param_count, operands.count);
 			for (; operand_index < max_operand_count; operand_index++) {
@@ -6564,8 +6554,7 @@ isize lookup_polymorphic_struct_parameter(TypeRecord *st, String parameter_name)
 	if (!st->is_polymorphic) return -1;
 
 	TypeTuple *params = &st->polymorphic_params->Tuple;
-	isize param_count = params->variable_count;
-	for (isize i = 0; i < param_count; i++) {
+	for_array(i, params->variables) {
 		Entity *e = params->variables[i];
 		String name = e->token.string;
 		if (is_blank_ident(name)) {
@@ -6617,7 +6606,7 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 	CallArgumentError err = CallArgumentError_None;
 
 	TypeTuple *tuple = &st->polymorphic_params->Tuple;
-	isize param_count = tuple->variable_count;
+	isize param_count = tuple->variables.count;
 
 	Array<Operand> ordered_operands = operands;
 	if (named_fields) {
@@ -6749,7 +6738,7 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 				Type *t = base_type(e->type);
 				TypeTuple *tuple = &t->Record.polymorphic_params->Tuple;
 				bool ok = true;
-				GB_ASSERT(param_count == tuple->variable_count);
+				GB_ASSERT(param_count == tuple->variables.count);
 				for (isize j = 0; j < param_count; j++) {
 					Entity *p = tuple->variables[j];
 					Operand o = ordered_operands[j];
@@ -6968,7 +6957,7 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		operand->mode = Addressing_NoValue;
 	} else {
 		GB_ASSERT(is_type_tuple(result_type));
-		switch (result_type->Tuple.variable_count) {
+		switch (result_type->Tuple.variables.count) {
 		case 0:
 			operand->mode = Addressing_NoValue;
 			break;
@@ -7736,7 +7725,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		if (is_type_union(src)) {
 			bool ok = false;
-			for (isize i = 1; i < bsrc->Union.variant_count; i++) {
+			for_array(i, bsrc->Union.variants) {
 				Type *vt = bsrc->Union.variants[i];
 				if (are_types_identical(vt, dst)) {
 					ok = true;
@@ -8120,7 +8109,7 @@ void check_not_tuple(Checker *c, Operand *o) {
 	if (o->mode == Addressing_Value) {
 		// NOTE(bill): Tuples are not first class thus never named
 		if (o->type->kind == Type_Tuple) {
-			isize count = o->type->Tuple.variable_count;
+			isize count = o->type->Tuple.variables.count;
 			GB_ASSERT(count != 1);
 			error(o->expr,
 			      "%td-valued tuple found where single value expected", count);
@@ -8190,6 +8179,10 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_ast_node(bd, BasicDirective, node);
 		str = gb_string_appendc(str, "#");
 		str = gb_string_append_length(str, &bd->name[0], bd->name.len);
+	case_end;
+
+	case_ast_node(ud, Undef, node);
+		str = gb_string_appendc(str, "---");
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);

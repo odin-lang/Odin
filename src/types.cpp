@@ -119,8 +119,7 @@ struct TypeRecord {
 		Entity * max_value;                               \
 	})                                                    \
 	TYPE_KIND(Union, struct {                             \
-		Type **  variants;                                \
-		i32      variant_count;                           \
+		Array<Type *> variants;                           \
 		AstNode *node;                                    \
 		Scope *  scope;                                   \
 		Entity * union__type_info;                        \
@@ -133,8 +132,7 @@ struct TypeRecord {
 		Entity *type_name; /* Entity_TypeName */          \
 	})                                                    \
 	TYPE_KIND(Tuple, struct {                             \
-		Entity **variables; /* Entity_Variable */         \
-		i32      variable_count;                          \
+		Array<Entity *> variables; /* Entity_Variable */  \
 		bool     are_offsets_set;                         \
 		i64 *    offsets;                                 \
 	})                                                    \
@@ -330,10 +328,8 @@ gb_global Type *t_string_slice = nullptr;
 
 // Type generated for the "preload" file
 gb_global Type *t_type_info                   = nullptr;
-gb_global Type *t_type_info_record            = nullptr;
 gb_global Type *t_type_info_enum_value        = nullptr;
 gb_global Type *t_type_info_ptr               = nullptr;
-gb_global Type *t_type_info_record_ptr        = nullptr;
 gb_global Type *t_type_info_enum_value_ptr    = nullptr;
 
 gb_global Type *t_type_info_named             = nullptr;
@@ -352,7 +348,6 @@ gb_global Type *t_type_info_slice             = nullptr;
 gb_global Type *t_type_info_vector            = nullptr;
 gb_global Type *t_type_info_tuple             = nullptr;
 gb_global Type *t_type_info_struct            = nullptr;
-gb_global Type *t_type_info_raw_union         = nullptr;
 gb_global Type *t_type_info_union             = nullptr;
 gb_global Type *t_type_info_enum              = nullptr;
 gb_global Type *t_type_info_map               = nullptr;
@@ -375,7 +370,6 @@ gb_global Type *t_type_info_slice_ptr         = nullptr;
 gb_global Type *t_type_info_vector_ptr        = nullptr;
 gb_global Type *t_type_info_tuple_ptr         = nullptr;
 gb_global Type *t_type_info_struct_ptr        = nullptr;
-gb_global Type *t_type_info_raw_union_ptr     = nullptr;
 gb_global Type *t_type_info_union_ptr         = nullptr;
 gb_global Type *t_type_info_enum_ptr          = nullptr;
 gb_global Type *t_type_info_map_ptr           = nullptr;
@@ -951,7 +945,7 @@ bool is_type_polymorphic(Type *t) {
 		return is_type_polymorphic(t->Slice.elem);
 
 	case Type_Tuple:
-		for (isize i = 0; i < t->Tuple.variable_count; i++) {
+		for_array(i, t->Tuple.variables) {
 			if (is_type_polymorphic(t->Tuple.variables[i]->type)) {
 				return true;
 			}
@@ -983,7 +977,7 @@ bool is_type_polymorphic(Type *t) {
 		}
 		break;
 	case Type_Union:
-		for (isize i = 1; i < t->Union.variant_count; i++) {
+		for_array(i, t->Union.variants) {
 		    if (is_type_polymorphic(t->Union.variants[i])) {
 		    	return true;
 		    }
@@ -1125,10 +1119,10 @@ bool are_types_identical(Type *x, Type *y) {
 
 	case Type_Union:
 		if (y->kind == Type_Union) {
-			if (x->Union.variant_count == y->Union.variant_count &&
+			if (x->Union.variants.count == y->Union.variants.count &&
 			    x->Union.custom_align == y->Union.custom_align) {
 				// NOTE(bill): zeroth variant is nullptr
-				for (isize i = 1; i < x->Union.variant_count; i++) {
+				for_array(i, x->Union.variants) {
 					if (!are_types_identical(x->Union.variants[i], y->Union.variants[i])) {
 						return false;
 					}
@@ -1180,8 +1174,8 @@ bool are_types_identical(Type *x, Type *y) {
 
 	case Type_Tuple:
 		if (y->kind == Type_Tuple) {
-			if (x->Tuple.variable_count == y->Tuple.variable_count) {
-				for (isize i = 0; i < x->Tuple.variable_count; i++) {
+			if (x->Tuple.variables.count == y->Tuple.variables.count) {
+				for_array(i, x->Tuple.variables) {
 					Entity *xe = x->Tuple.variables[i];
 					Entity *ye = y->Tuple.variables[i];
 					if (xe->kind != ye->kind || !are_types_identical(xe->type, ye->type)) {
@@ -1299,7 +1293,7 @@ bool is_type_cte_safe(Type *type) {
 	}
 
 	case Type_Tuple: {
-		for (isize i = 0; i < type->Tuple.variable_count; i++) {
+		for_array(i, type->Tuple.variables) {
 			Entity *v = type->Tuple.variables[i];
 			if (!is_type_cte_safe(v->type)) {
 				return false;
@@ -1411,9 +1405,9 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 
 	i64 max_count = 0;
 	switch (type->kind) {
-	case Type_Record:   max_count = type->Record.field_count;   break;
-	case Type_Tuple:    max_count = type->Tuple.variable_count; break;
-	case Type_BitField: max_count = type->BitField.field_count; break;
+	case Type_Record:   max_count = type->Record.field_count;    break;
+	case Type_Tuple:    max_count = type->Tuple.variables.count; break;
+	case Type_BitField: max_count = type->BitField.field_count;  break;
 	}
 
 	if (index >= max_count) {
@@ -1813,7 +1807,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 	case Type_Tuple: {
 		i64 max = 1;
-		for (isize i = 0; i < t->Tuple.variable_count; i++) {
+		for_array(i, t->Tuple.variables) {
 			i64 align = type_align_of_internal(allocator, t->Tuple.variables[i]->type, path);
 			if (max < align) {
 				max = align;
@@ -1834,8 +1828,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 	case Type_Union: {
 		i64 max = build_context.word_size;
-		// NOTE(bill): field zero is null
-		for (isize i = 1; i < t->Union.variant_count; i++) {
+		for_array(i, t->Union.variants) {
 			Type *variant = t->Union.variants[i];
 			type_path_push(path, variant);
 			if (path->failure) {
@@ -1944,7 +1937,7 @@ bool type_set_offsets(gbAllocator allocator, Type *t) {
 	} else if (is_type_tuple(t)) {
 		if (!t->Tuple.are_offsets_set) {
 			t->Record.are_offsets_being_processed = true;
-			t->Tuple.offsets = type_set_offsets_of(allocator, t->Tuple.variables, t->Tuple.variable_count, false, false);
+			t->Tuple.offsets = type_set_offsets_of(allocator, t->Tuple.variables.data, t->Tuple.variables.count, false, false);
 			t->Tuple.are_offsets_set = true;
 			return true;
 		}
@@ -2054,7 +2047,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 	case Type_Tuple: {
 		i64 count, align, size;
-		count = t->Tuple.variable_count;
+		count = t->Tuple.variables.count;
 		if (count == 0) {
 			return 0;
 		}
@@ -2075,10 +2068,8 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 		i64 max = 0;
 		i64 field_size = 0;
-		isize variant_count = t->Union.variant_count;
 
-
-		for (isize i = 1; i < variant_count; i++) {
+		for_array(i, t->Union.variants) {
 			Type *variant_type = t->Union.variants[i];
 			i64 size = type_size_of_internal(allocator, variant_type, path);
 			if (max < size) {
@@ -2158,7 +2149,7 @@ i64 type_offset_of(gbAllocator allocator, Type *t, i32 index) {
 		}
 	} else if (t->kind == Type_Tuple) {
 		type_set_offsets(allocator, t);
-		if (gb_is_between(index, 0, t->Tuple.variable_count-1)) {
+		if (gb_is_between(index, 0, t->Tuple.variables.count-1)) {
 			return t->Tuple.offsets[index];
 		}
 	}  else if (t->kind == Type_Basic) {
@@ -2309,9 +2300,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_Union:
 		str = gb_string_appendc(str, "union{");
-		for (isize i = 1; i < type->Union.variant_count; i++) {
+		for_array(i, type->Union.variants) {
 			Type *t = type->Union.variants[i];
-			if (i > 1) str = gb_string_appendc(str, ", ");
+			if (i > 0) str = gb_string_appendc(str, ", ");
 			str = write_type_to_string(str, t);
 		}
 		str = gb_string_appendc(str, "}");
@@ -2374,8 +2365,8 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_Tuple:
-		if (type->Tuple.variable_count > 0) {
-			for (isize i = 0; i < type->Tuple.variable_count; i++) {
+		if (type->Tuple.variables.count > 0) {
+			for_array(i, type->Tuple.variables) {
 				Entity *var = type->Tuple.variables[i];
 				if (var != nullptr) {
 					if (i > 0) {

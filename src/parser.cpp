@@ -2291,34 +2291,37 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		Token token = expect_token(f, Token_proc);
 		String link_name = {};
 		AstNode *type = parse_proc_type(f, token, &link_name);
+
+		if (f->allow_type && f->expr_level < 0) {
+			return type;
+		}
+
 		u64 tags = type->ProcType.tags;
 
 		if (allow_token(f, Token_Undef)) {
 			return ast_proc_lit(f, type, nullptr, tags, link_name);
-		} else if (!f->allow_type || f->expr_level >= 0) {
-			if (f->curr_token.kind == Token_OpenBrace) {
-				if ((tags & ProcTag_foreign) != 0) {
-					syntax_error(token, "A procedure tagged as `#foreign` cannot have a body");
-				}
-				AstNode *curr_proc = f->curr_proc;
-				AstNode *body = nullptr;
-				f->curr_proc = type;
-				body = parse_body(f);
-				f->curr_proc = curr_proc;
-
-				return ast_proc_lit(f, type, body, tags, link_name);
-			} else if (allow_token(f, Token_do)) {
-				if ((tags & ProcTag_foreign) != 0) {
-					syntax_error(token, "A procedure tagged as `#foreign` cannot have a body");
-				}
-				AstNode *curr_proc = f->curr_proc;
-				AstNode *body = nullptr;
-				f->curr_proc = type;
-				body = convert_stmt_to_body(f, parse_stmt(f));
-				f->curr_proc = curr_proc;
-
-				return ast_proc_lit(f, type, body, tags, link_name);
+		} else if (f->curr_token.kind == Token_OpenBrace) {
+			if ((tags & ProcTag_foreign) != 0) {
+				syntax_error(token, "A procedure tagged as `#foreign` cannot have a body");
 			}
+			AstNode *curr_proc = f->curr_proc;
+			AstNode *body = nullptr;
+			f->curr_proc = type;
+			body = parse_body(f);
+			f->curr_proc = curr_proc;
+
+			return ast_proc_lit(f, type, body, tags, link_name);
+		} else if (allow_token(f, Token_do)) {
+			if ((tags & ProcTag_foreign) != 0) {
+				syntax_error(token, "A procedure tagged as `#foreign` cannot have a body");
+			}
+			AstNode *curr_proc = f->curr_proc;
+			AstNode *body = nullptr;
+			f->curr_proc = type;
+			body = convert_stmt_to_body(f, parse_stmt(f));
+			f->curr_proc = curr_proc;
+
+			return ast_proc_lit(f, type, body, tags, link_name);
 		}
 
 		if ((tags & ProcTag_foreign) != 0) {

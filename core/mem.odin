@@ -245,8 +245,6 @@ align_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 		return type_info.align;
 	case Union:
 		return type_info.align;
-	case RawUnion:
-		return type_info.align;
 	case Enum:
 		return align_of_type_info(info.base);
 	case Map:
@@ -304,8 +302,6 @@ size_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 	case Struct:
 		return type_info.size;
 	case Union:
-		return type_info.size;
-	case RawUnion:
 		return type_info.size;
 	case Enum:
 		return size_of_type_info(info.base);

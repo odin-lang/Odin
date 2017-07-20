@@ -44,15 +44,6 @@ TypeInfo :: struct #ordered {
 		u8, u16, u32, u64, u128, uint,
 		f32, f64,
 	};
-	Record :: struct #ordered {
-		types:        []^TypeInfo;
-		names:        []string;
-		offsets:      []int;  // offsets may not be used in tuples
-		usings:       []bool; // usings may not be used in tuples
-		packed:       bool;
-		ordered:      bool;
-		custom_align: bool;
-	}
 
 // Variant Types
 	Named   :: struct #ordered {name: string; base: ^TypeInfo};
@@ -80,9 +71,20 @@ TypeInfo :: struct #ordered {
 	DynamicArray :: struct #ordered {elem: ^TypeInfo; elem_size: int};
 	Slice        :: struct #ordered {elem: ^TypeInfo; elem_size: int};
 	Vector       :: struct #ordered {elem: ^TypeInfo; elem_size, count: int};
-	Tuple        :: Record; // Only really used for procedures
-	Struct       :: Record;
-	RawUnion     :: Record;
+	Tuple :: struct #ordered { // Only really used for procedures
+		types:        []^TypeInfo;
+		names:        []string;
+	};
+	Struct :: struct #ordered {
+		types:        []^TypeInfo;
+		names:        []string;
+		offsets:      []int;  // offsets may not be used in tuples
+		usings:       []bool; // usings may not be used in tuples
+		is_packed:    bool;
+		is_ordered:   bool;
+		is_raw_union: bool;
+		custom_align: bool;
+	};
 	Union :: struct #ordered {
 		variants:   []^TypeInfo;
 		tag_offset: int;
@@ -126,7 +128,6 @@ TypeInfo :: struct #ordered {
 		Vector,
 		Tuple,
 		Struct,
-		RawUnion,
 		Union,
 		Enum,
 		Map,

@@ -83,17 +83,17 @@ is_tuple :: proc(info: ^TypeInfo) -> bool {
 }
 is_struct :: proc(info: ^TypeInfo) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Struct);
-	return ok;
+	s, ok := type_info_base(info).variant.(TypeInfo.Struct);
+	return ok && !s.is_raw_union;
+}
+is_raw_union :: proc(info: ^TypeInfo) -> bool {
+	if info == nil do return false;
+	s, ok := type_info_base(info).variant.(TypeInfo.Struct);
+	return ok && s.is_raw_union;
 }
 is_union :: proc(info: ^TypeInfo) -> bool {
 	if info == nil do return false;
 	_, ok := type_info_base(info).variant.(TypeInfo.Union);
-	return ok;
-}
-is_raw_union :: proc(info: ^TypeInfo) -> bool {
-	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.RawUnion);
 	return ok;
 }
 is_enum :: proc(info: ^TypeInfo) -> bool {

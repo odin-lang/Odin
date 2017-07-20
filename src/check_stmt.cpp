@@ -817,7 +817,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		TypeProc *pt = &proc_type->Proc;
 		isize result_count = 0;
 		if (pt->results) {
-			result_count = proc_type->Proc.results->Tuple.variable_count;
+			result_count = proc_type->Proc.results->Tuple.variables.count;
 		}
 
 
@@ -1474,7 +1474,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					if (match_type_kind == MatchType_Union) {
 						GB_ASSERT(is_type_union(bt));
 						bool tag_type_found = false;
-						for (isize i = 0; i < bt->Union.variant_count; i++) {
+						for_array(i, bt->Union.variants) {
 							Type *vt = bt->Union.variants[i];
 							if (are_types_identical(vt, y.type)) {
 								tag_type_found = true;

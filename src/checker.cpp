@@ -1169,7 +1169,7 @@ void add_type_info_type(Checker *c, Type *t) {
 
 	case Type_Union:
 		add_type_info_type(c, t_int);
-		for (isize i = 0; i < bt->Union.variant_count; i++) {
+		for_array(i, bt->Union.variants) {
 			add_type_info_type(c, bt->Union.variants[i]);
 		}
 		break;
@@ -1188,7 +1188,7 @@ void add_type_info_type(Checker *c, Type *t) {
 	} break;
 
 	case Type_Tuple:
-		for (isize i = 0; i < bt->Tuple.variable_count; i++) {
+		for_array(i, bt->Tuple.variables) {
 			Entity *var = bt->Tuple.variables[i];
 			add_type_info_type(c, var->type);
 		}
@@ -1341,12 +1341,8 @@ void init_preload(Checker *c) {
 		GB_ASSERT(is_type_struct(type_info_entity->type));
 		TypeRecord *record = &base_type(type_info_entity->type)->Record;
 
-		Entity *type_info_record     = find_sub_core_entity(record, str_lit("Record"));
 		Entity *type_info_enum_value = find_sub_core_entity(record, str_lit("EnumValue"));
 
-
-		t_type_info_record = type_info_record->type;
-		t_type_info_record_ptr = make_type_pointer(c->allocator, t_type_info_record);
 		t_type_info_enum_value = type_info_enum_value->type;
 		t_type_info_enum_value_ptr = make_type_pointer(c->allocator, t_type_info_enum_value);
 
@@ -1357,30 +1353,29 @@ void init_preload(Checker *c) {
 		GB_ASSERT(is_type_union(tiv_type));
 		TypeUnion *tiv = &tiv_type->Union;
 
-		if (tiv->variant_count != 22) {
+		if (tiv->variants.count != 20) {
 			compiler_error("Invalid `TypeInfo` layout");
 		}
-		t_type_info_named         = tiv->variants[ 1];
-		t_type_info_integer       = tiv->variants[ 2];
-		t_type_info_rune          = tiv->variants[ 3];
-		t_type_info_float         = tiv->variants[ 4];
-		t_type_info_complex       = tiv->variants[ 5];
-		t_type_info_string        = tiv->variants[ 6];
-		t_type_info_boolean       = tiv->variants[ 7];
-		t_type_info_any           = tiv->variants[ 8];
-		t_type_info_pointer       = tiv->variants[ 9];
-		t_type_info_procedure     = tiv->variants[10];
-		t_type_info_array         = tiv->variants[11];
-		t_type_info_dynamic_array = tiv->variants[12];
-		t_type_info_slice         = tiv->variants[13];
-		t_type_info_vector        = tiv->variants[14];
-		t_type_info_tuple         = tiv->variants[15];
-		t_type_info_struct        = tiv->variants[16];
-		t_type_info_raw_union     = tiv->variants[17];
-		t_type_info_union         = tiv->variants[18];
-		t_type_info_enum          = tiv->variants[19];
-		t_type_info_map           = tiv->variants[20];
-		t_type_info_bit_field     = tiv->variants[21];
+		t_type_info_named         = tiv->variants[ 0];
+		t_type_info_integer       = tiv->variants[ 1];
+		t_type_info_rune          = tiv->variants[ 2];
+		t_type_info_float         = tiv->variants[ 3];
+		t_type_info_complex       = tiv->variants[ 4];
+		t_type_info_string        = tiv->variants[ 5];
+		t_type_info_boolean       = tiv->variants[ 6];
+		t_type_info_any           = tiv->variants[ 7];
+		t_type_info_pointer       = tiv->variants[ 8];
+		t_type_info_procedure     = tiv->variants[ 9];
+		t_type_info_array         = tiv->variants[10];
+		t_type_info_dynamic_array = tiv->variants[11];
+		t_type_info_slice         = tiv->variants[12];
+		t_type_info_vector        = tiv->variants[13];
+		t_type_info_tuple         = tiv->variants[14];
+		t_type_info_struct        = tiv->variants[15];
+		t_type_info_union         = tiv->variants[16];
+		t_type_info_enum          = tiv->variants[17];
+		t_type_info_map           = tiv->variants[18];
+		t_type_info_bit_field     = tiv->variants[19];
 
 		t_type_info_named_ptr         = make_type_pointer(c->allocator, t_type_info_named);
 		t_type_info_integer_ptr       = make_type_pointer(c->allocator, t_type_info_integer);
@@ -1398,7 +1393,6 @@ void init_preload(Checker *c) {
 		t_type_info_vector_ptr        = make_type_pointer(c->allocator, t_type_info_vector);
 		t_type_info_tuple_ptr         = make_type_pointer(c->allocator, t_type_info_tuple);
 		t_type_info_struct_ptr        = make_type_pointer(c->allocator, t_type_info_struct);
-		t_type_info_raw_union_ptr     = make_type_pointer(c->allocator, t_type_info_raw_union);
 		t_type_info_union_ptr         = make_type_pointer(c->allocator, t_type_info_union);
 		t_type_info_enum_ptr          = make_type_pointer(c->allocator, t_type_info_enum);
 		t_type_info_map_ptr           = make_type_pointer(c->allocator, t_type_info_map);
