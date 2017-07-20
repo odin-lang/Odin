@@ -125,7 +125,7 @@ bool check_is_assignable_to_using_subtype(Type *src, Type *dst) {
 		return false;
 	}
 
-	for (isize i = 0; i < src->Struct.field_count; i++) {
+	for_array(i, src->Struct.fields) {
 		Entity *f = src->Struct.fields[i];
 		if (f->kind != Entity_Variable || (f->flags&EntityFlag_Using) == 0) {
 			continue;
@@ -733,7 +733,7 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 	}
 
 	if (t->kind == Type_Struct) {
-		for (isize i = 0; i < t->Struct.field_count; i++) {
+		for_array(i, t->Struct.fields) {
 			Entity *f = t->Struct.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
 			String name = f->token.string;
@@ -1228,9 +1228,8 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 	struct_type->Struct.scope               = c->context.scope;
 	struct_type->Struct.is_packed           = st->is_packed;
 	struct_type->Struct.is_ordered          = st->is_ordered;
-	struct_type->Struct.fields              = fields.data;
-	struct_type->Struct.fields_in_src_order = fields.data;
-	struct_type->Struct.field_count         = fields.count;
+	struct_type->Struct.fields              = fields;
+	struct_type->Struct.fields_in_src_order = fields;
 	struct_type->Struct.polymorphic_params  = polymorphic_params;
 	struct_type->Struct.is_polymorphic      = is_polymorphic;
 	struct_type->Struct.is_poly_specialized = is_poly_specialized;
@@ -1245,8 +1244,9 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 			struct_type->Struct.offsets = nullptr;
 			// NOTE(bill): Reorder fields for reduced size/performance
 
-			Entity **reordered_fields = gb_alloc_array(c->allocator, Entity *, fields.count);
-			for (isize i = 0; i < fields.count; i++) {
+			Array<Entity *> reordered_fields = {};
+			array_init_count(&reordered_fields, c->allocator, fields.count);
+			for_array(i, fields) {
 				reordered_fields[i] = struct_type->Struct.fields_in_src_order[i];
 			}
 
@@ -1254,9 +1254,9 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 			// TODO(bill): Probably make an inline sorting procedure rather than use global variables
 			__checker_allocator = c->allocator;
 			// NOTE(bill): compound literal order must match source not layout
-			gb_sort_array(reordered_fields, fields.count, cmp_reorder_struct_fields);
+			gb_sort_array(reordered_fields.data, fields.count, cmp_reorder_struct_fields);
 
-			for (isize i = 0; i < fields.count; i++) {
+			for_array(i, fields) {
 				reordered_fields[i]->Variable.field_index = i;
 			}
 
@@ -2767,16 +2767,16 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 		check_open_scope(c, dummy_node);
 
 		isize field_count = 3;
-		Entity **fields = gb_alloc_array(a, Entity *, field_count);
-		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("key")),   t_map_key, false, 0);
-		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("next")),  t_int,     false, 1);
-		fields[2] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("value")), value,     false, 2);
+		Array<Entity *> fields = {};
+		array_init(&fields, a, 3);
+		array_add(&fields, make_entity_field(a, c->context.scope, make_token_ident(str_lit("key")),   t_map_key, false, 0));
+		array_add(&fields, make_entity_field(a, c->context.scope, make_token_ident(str_lit("next")),  t_int,     false, 1));
+		array_add(&fields, make_entity_field(a, c->context.scope, make_token_ident(str_lit("value")), value,     false, 2));
 
 		check_close_scope(c);
 
 		entry_type->Struct.fields              = fields;
 		entry_type->Struct.fields_in_src_order = fields;
-		entry_type->Struct.field_count         = field_count;
 
 		type_set_offsets(a, entry_type);
 		type->Map.entry_type = entry_type;
@@ -2798,16 +2798,15 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 		Type *hashes_type  = make_type_dynamic_array(a, t_int);
 		Type *entries_type = make_type_dynamic_array(a, type->Map.entry_type);
 
-		isize field_count = 2;
-		Entity **fields = gb_alloc_array(a, Entity *, field_count);
-		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0);
-		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("entries")), entries_type, false, 1);
+		Array<Entity *> fields = {};
+		array_init(&fields, a, 2);
+		array_add(&fields, make_entity_field(a, c->context.scope, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0));
+		array_add(&fields, make_entity_field(a, c->context.scope, make_token_ident(str_lit("entries")), entries_type, false, 1));
 
 		check_close_scope(c);
 
 		generated_struct_type->Struct.fields              = fields;
 		generated_struct_type->Struct.fields_in_src_order = fields;
-		generated_struct_type->Struct.field_count         = field_count;
 
 		type_set_offsets(a, generated_struct_type);
 		type->Map.generated_struct_type = generated_struct_type;
@@ -3686,8 +3685,8 @@ String check_down_cast_name(Type *dst_, Type *src_) {
 	Type *dst = type_deref(dst_);
 	Type *src = type_deref(src_);
 	Type *dst_s = base_type(dst);
-	GB_ASSERT(is_type_struct(dst_s) || is_type_raw_union(dst_s));
-	for (isize i = 0; i < dst_s->Struct.field_count; i++) {
+	GB_ASSERT(dst_s->kind == Type_Struct);
+	for_array(i, dst_s->Struct.fields) {
 		Entity *f = dst_s->Struct.fields[i];
 		GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 		if (f->flags & EntityFlag_Using) {
@@ -4683,7 +4682,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 			i64 max_count = 0;
 			switch (type->kind) {
-			case Type_Struct: max_count = type->Struct.field_count;   break;
+			case Type_Struct: max_count = type->Struct.fields.count;   break;
 			case Type_Tuple:  max_count = type->Tuple.variables.count; break;
 			}
 
@@ -5582,10 +5581,10 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		gbAllocator a = c->allocator;
 
 		Type *tuple = make_type_tuple(a);
-		i32 variable_count = type->Struct.field_count;
+		i32 variable_count = type->Struct.fields.count;
 		array_init_count(&tuple->Tuple.variables, a, variable_count);
 		// TODO(bill): Should I copy each of the entities or is this good enough?
-		gb_memcopy_array(tuple->Tuple.variables.data, type->Struct.fields_in_src_order, variable_count);
+		gb_memcopy_array(tuple->Tuple.variables.data, type->Struct.fields_in_src_order.data, variable_count);
 
 		operand->type = tuple;
 		operand->mode = Addressing_Value;
@@ -6533,7 +6532,7 @@ Entity *find_using_index_expr(Type *t) {
 		return nullptr;
 	}
 
-	for (isize i = 0; i < t->Struct.field_count; i++) {
+	for_array(i, t->Struct.fields) {
 		Entity *f = t->Struct.fields[i];
 		if (f->kind == Entity_Variable &&
 		    (f->flags & EntityFlag_Field) != 0 &&
@@ -7338,8 +7337,8 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			}
 
 			{ // Checker values
-				isize field_count = t->Struct.field_count;
-				isize min_field_count = t->Struct.field_count;
+				isize field_count = t->Struct.fields.count;
+				isize min_field_count = t->Struct.fields.count;
 				for (isize i = min_field_count-1; i >= 0; i--) {
 					Entity *e = t->Struct.fields_in_src_order[i];
 					GB_ASSERT(e->kind == Entity_Variable);
@@ -7412,7 +7411,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					}
 				} else {
 					bool all_fields_are_blank = true;
-					for (isize i = 0; i < t->Struct.field_count; i++) {
+					for_array(i, t->Struct.fields_in_src_order) {
 						Entity *field = t->Struct.fields_in_src_order[i];
 						if (!is_blank_ident(field->token)) {
 							all_fields_are_blank = false;

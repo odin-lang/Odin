@@ -653,10 +653,10 @@ bool can_ssa_type(Type *t) {
 
 	case Type_Struct:
 		if (!t->Struct.is_raw_union) {
-			if (t->Struct.field_count > SSA_MAX_STRUCT_FIELD_COUNT) {
+			if (t->Struct.fields.count > SSA_MAX_STRUCT_FIELD_COUNT) {
 				return false;
 			}
-			for (isize i = 0; i < t->Struct.field_count; i++) {
+			for_array(i, t->Struct.fields) {
 				if (!can_ssa_type(t->Struct.fields[i]->type)) {
 					return false;
 				}
@@ -810,8 +810,7 @@ ssaValue *ssa_emit_ptr_index(ssaProc *p, ssaValue *s, i64 index) {
 	Type *result_type = nullptr;
 
 	if (is_type_struct(t)) {
-		GB_ASSERT(t->Struct.field_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Struct.field_count-1));
+		GB_ASSERT(t->Struct.fields.count > 0);
 		result_type = make_type_pointer(a, t->Struct.fields[index]->type);
 	} else if (is_type_tuple(t)) {
 		GB_ASSERT(t->Tuple.variables.count > 0);
@@ -868,13 +867,11 @@ ssaValue *ssa_emit_value_index(ssaProc *p, ssaValue *s, i64 index) {
 	Type *result_type = nullptr;
 
 	if (is_type_struct(t)) {
-		GB_ASSERT(t->Struct.field_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Struct.field_count-1));
+		GB_ASSERT(t->Struct.fields.count > 0);
 		result_type = t->Struct.fields[index]->type;
 	} else if (is_type_union(t)) {
 		type_set_offsets(a, t);
-		GB_ASSERT(t->Struct.field_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Struct.field_count-1));
+		GB_ASSERT(t->Struct.fields.count > 0);
 		result_type = t->Struct.fields[index]->type;
 	} else if (is_type_tuple(t)) {
 		GB_ASSERT(t->Tuple.variables.count > 0);
@@ -1658,7 +1655,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 			default: GB_PANIC("Unknown float size");
 			}
 		}
-		// IMPORTANT TODO(bill): Do constant struct/array literals correctly
+		// IMPORTANT TODO(bill): Do constant str/array literals correctly
 		return ssa_const_nil(p, tv.type);
 	}
 

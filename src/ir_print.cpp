@@ -314,11 +314,11 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 			ir_fprintf(f, "{");
 			if (t->Struct.custom_align > 0) {
 				ir_fprintf(f, "[0 x <%lld x i8>]", t->Struct.custom_align);
-				if (t->Struct.field_count > 0) {
+				if (t->Struct.fields.count > 0) {
 					ir_fprintf(f, ", ");
 				}
 			}
-			for (isize i = 0; i < t->Struct.field_count; i++) {
+			for_array(i, t->Struct.fields) {
 				if (i > 0) {
 					ir_fprintf(f, ", ");
 				}
@@ -585,7 +585,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			}
 
 
-			isize value_count = type->Struct.field_count;
+			isize value_count = type->Struct.fields.count;
 			ExactValue *values = gb_alloc_array(m->tmp_allocator, ExactValue, value_count);
 			bool *visited = gb_alloc_array(m->tmp_allocator, bool, value_count);
 
@@ -670,7 +670,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_fprintf(f, "zeroinitializer");
 		} else {
 			if (is_type_struct(type)) {
-				i32 value_count = type->Struct.field_count;
+				i32 value_count = type->Struct.fields.count;
 				if (type->Struct.is_packed) ir_fprintf(f, "<");
 				ir_fprintf(f, "{");
 				if (type->Struct.custom_align > 0) {

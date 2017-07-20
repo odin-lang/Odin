@@ -1175,7 +1175,7 @@ void add_type_info_type(Checker *c, Type *t) {
 		break;
 
 	case Type_Struct: {
-		for (isize i = 0; i < bt->Struct.field_count; i++) {
+		for_array(i, bt->Struct.fields) {
 			Entity *f = bt->Struct.fields[i];
 			add_type_info_type(c, f->type);
 		}
@@ -1346,7 +1346,7 @@ void init_preload(Checker *c) {
 		t_type_info_enum_value = type_info_enum_value->type;
 		t_type_info_enum_value_ptr = make_type_pointer(c->allocator, t_type_info_enum_value);
 
-		GB_ASSERT(tis->field_count == 3);
+		GB_ASSERT(tis->fields.count == 3);
 
 		Entity *type_info_variant = tis->fields_in_src_order[2];
 		Type *tiv_type = type_info_variant->type;
