@@ -427,8 +427,9 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		AstNode *        align;               \
 	}) \
 	AST_NODE_KIND(UnionType, "union type", struct { \
-		Token            token;       \
-		Array<AstNode *> variants;    \
+		Token            token;    \
+		Array<AstNode *> variants; \
+		AstNode *        align;    \
 	}) \
 	AST_NODE_KIND(EnumType, "enum type", struct { \
 		Token            token; \
@@ -1460,10 +1461,11 @@ AstNode *ast_struct_type(AstFile *f, Token token, Array<AstNode *> fields, isize
 }
 
 
-AstNode *ast_union_type(AstFile *f, Token token, Array<AstNode *> variants) {
+AstNode *ast_union_type(AstFile *f, Token token, Array<AstNode *> variants, AstNode *align) {
 	AstNode *result = make_ast_node(f, AstNode_UnionType);
-	result->UnionType.token = token;
-	result->UnionType.variants = variants;
+	result->UnionType.token        = token;
+	result->UnionType.variants     = variants;
+	result->UnionType.align = align;
 	return result;
 }
 
@@ -2496,9 +2498,22 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		Token open = expect_token_after(f, Token_OpenBrace, "union");
 		Array<AstNode *> variants = make_ast_node_array(f);
 		isize total_decl_name_count = 0;
+		AstNode *align = nullptr;
 
 		CommentGroup docs = f->lead_comment;
 		Token start_token = f->curr_token;
+
+		while (allow_token(f, Token_Hash)) {
+			Token tag = expect_token_after(f, Token_Ident, "#");
+			 if (tag.string == "align") {
+				if (align) {
+					syntax_error(tag, "Duplicate union tag `#%.*s`", LIT(tag.string));
+				}
+				align = parse_expr(f, true);
+			} else {
+				syntax_error(tag, "Invalid union tag `#%.*s`", LIT(tag.string));
+			}
+		}
 
 
 		while (f->curr_token.kind != Token_CloseBrace &&
@@ -2514,7 +2529,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 		Token close = expect_token(f, Token_CloseBrace);
 
-		return ast_union_type(f, token, variants);
+		return ast_union_type(f, token, variants, align);
 	} break;
 
 	case Token_enum: {
@@ -3009,15 +3024,13 @@ AstNode *parse_gen_decl(AstFile *f, Token token, ParseSpecFunc *func) {
 	if (f->curr_token.kind == Token_OpenParen) {
 		specs = make_ast_node_array(f);
 		open = expect_token(f, Token_OpenParen);
-		bool require_semicolon_after_paren = false;
 		while (f->curr_token.kind != Token_CloseParen &&
 		       f->curr_token.kind != Token_EOF) {
 			AstNode *spec = func(f, docs, token);
 			array_add(&specs, spec);
 		}
 		close = expect_token(f, Token_CloseParen);
-		if (require_semicolon_after_paren ||
-		    f->curr_token.pos.line == close.pos.line ||
+		if (f->curr_token.pos.line == close.pos.line ||
 		    open.pos.line == close.pos.line) {
 			expect_semicolon(f, nullptr);
 		}

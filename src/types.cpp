@@ -74,16 +74,16 @@ struct TypeStruct {
 	AstNode *node;
 	Scope *  scope;
 
-	i64 *    offsets; // == fields.count
-	bool     are_offsets_set;
-	bool     are_offsets_being_processed;
-	bool     is_packed;
-	bool     is_ordered;
-	bool     is_raw_union;
-	bool     is_polymorphic;
-	bool     is_poly_specialized;
-	Type *   polymorphic_params; // Type_Tuple
-	Type *   polymorphic_parent;
+	Array<i64> offsets;
+	bool       are_offsets_set;
+	bool       are_offsets_being_processed;
+	bool       is_packed;
+	bool       is_ordered;
+	bool       is_raw_union;
+	bool       is_polymorphic;
+	bool       is_poly_specialized;
+	Type *     polymorphic_params; // Type_Tuple
+	Type *     polymorphic_parent;
 
 	i64      custom_align; // NOTE(bill): Only used in structs at the moment
 	Entity * names;
@@ -128,8 +128,8 @@ struct TypeStruct {
 	})                                                    \
 	TYPE_KIND(Tuple, struct {                             \
 		Array<Entity *> variables; /* Entity_Variable */  \
-		bool     are_offsets_set;                         \
-		i64 *    offsets;                                 \
+		Array<i64>      offsets;                          \
+		bool            are_offsets_set;                  \
 	})                                                    \
 	TYPE_KIND(Proc, struct {                              \
 		AstNode *node;                                    \
@@ -1831,6 +1831,9 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		if (t->Union.variants.count == 0) {
 			return 1;
 		}
+		if (t->Union.custom_align > 0) {
+			return gb_clamp(t->Union.custom_align, 1, build_context.max_align);
+		}
 		i64 max = build_context.word_size;
 		for_array(i, t->Union.variants) {
 			Type *variant = t->Union.variants[i];
@@ -1848,6 +1851,9 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	} break;
 
 	case Type_Struct: {
+		if (t->Struct.custom_align > 0) {
+			return gb_clamp(t->Struct.custom_align, 1, build_context.max_align);
+		}
 		if (t->Struct.is_raw_union) {
 			i64 max = 1;
 			for_array(i, t->Struct.fields) {
@@ -1863,29 +1869,24 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 				}
 			}
 			return max;
-		} else {
-			if (t->Struct.custom_align > 0) {
-				return gb_clamp(t->Struct.custom_align, 1, build_context.max_align);
+		} else if (t->Struct.fields.count > 0) {
+			i64 max = 1;
+			if (t->Struct.is_packed) {
+				max = build_context.word_size;
 			}
-			if (t->Struct.fields.count > 0) {
-				i64 max = 1;
-				if (t->Struct.is_packed) {
-					max = build_context.word_size;
+			for_array(i, t->Struct.fields) {
+				Type *field_type = t->Struct.fields[i]->type;
+				type_path_push(path, field_type);
+				if (path->failure) {
+					return FAILURE_ALIGNMENT;
 				}
-				for_array(i, t->Struct.fields) {
-					Type *field_type = t->Struct.fields[i]->type;
-					type_path_push(path, field_type);
-					if (path->failure) {
-						return FAILURE_ALIGNMENT;
-					}
-					i64 align = type_align_of_internal(allocator, field_type, path);
-					type_path_pop(path);
-					if (max < align) {
-						max = align;
-					}
+				i64 align = type_align_of_internal(allocator, field_type, path);
+				type_path_pop(path);
+				if (max < align) {
+					max = align;
 				}
-				return max;
 			}
+			return max;
 		}
 	} break;
 
@@ -1904,8 +1905,9 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	return gb_clamp(next_pow2(type_size_of_internal(allocator, t, path)), 1, build_context.word_size);
 }
 
-i64 *type_set_offsets_of(gbAllocator allocator, Array<Entity *> fields, bool is_packed, bool is_raw_union) {
-	i64 *offsets = gb_alloc_array(allocator, i64, fields.count);
+Array<i64> type_set_offsets_of(gbAllocator allocator, Array<Entity *> fields, bool is_packed, bool is_raw_union) {
+	Array<i64> offsets = {};
+	array_init_count(&offsets, allocator, fields.count);
 	i64 curr_offset = 0;
 	if (is_raw_union) {
 		for_array(i, fields) {
@@ -2120,7 +2122,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			if (path->failure) {
 				return FAILURE_SIZE;
 			}
-			if (t->Struct.are_offsets_being_processed && t->Struct.offsets == nullptr) {
+			if (t->Struct.are_offsets_being_processed && t->Struct.offsets.data == nullptr) {
 				type_path_print_illegal_cycle(path, path->path.count-1);
 				return FAILURE_SIZE;
 			}

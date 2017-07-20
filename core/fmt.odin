@@ -7,6 +7,7 @@ import (
 	"raw.odin";
 )
 
+
 _BUFFER_SIZE :: 1<<12;
 
 StringBuffer :: union {
@@ -747,6 +748,11 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		case Struct:
 			if verb != 'v' {
 				fmt_bad_verb(fi, verb);
+				return;
+			}
+			if b.is_raw_union {
+				write_string(fi.buf, info.name);
+				write_string(fi.buf, "{}");
 				return;
 			}
 			write_string(fi.buf, info.name);

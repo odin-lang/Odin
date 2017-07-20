@@ -1250,12 +1250,12 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 		if (!struct_type->failure && !st->is_packed && !st->is_ordered) {
 			struct_type->failure = false;
 			struct_type->Struct.are_offsets_set = false;
-			struct_type->Struct.offsets = nullptr;
+			gb_zero_item(&struct_type->Struct.offsets);
 			// NOTE(bill): Reorder fields for reduced size/performance
 
 			Array<Entity *> reordered_fields = {};
 			array_init_count(&reordered_fields, c->allocator, fields.count);
-			for_array(i, fields) {
+			for_array(i, reordered_fields) {
 				reordered_fields[i] = struct_type->Struct.fields_in_src_order[i];
 			}
 
@@ -1338,10 +1338,10 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 		if (t != nullptr && t != t_invalid) {
 			bool ok = true;
 			t = default_type(t);
-			if (is_type_untyped(t)) {
+			if (is_type_untyped(t) || is_type_empty_union(t)) {
 				ok = false;
 				gbString str = type_to_string(t);
-				error(node, "Invalid type in union `%s`", str);
+				error(node, "Invalid variant type in union `%s`", str);
 				gb_string_free(str);
 			} else {
 				for_array(j, variants) {
@@ -1362,6 +1362,44 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 	}
 
 	union_type->Union.variants = variants;
+
+	if (ut->align != nullptr) {
+		Operand o = {};
+		check_expr(c, &o, ut->align);
+		if (o.mode != Addressing_Constant) {
+			if (o.mode != Addressing_Invalid) {
+				error(ut->align, "#align must be a constant");
+			}
+			return;
+		}
+
+		Type *type = base_type(o.type);
+		if (is_type_untyped(type) || is_type_integer(type)) {
+			if (o.value.kind == ExactValue_Integer) {
+				i64 align = i128_to_i64(o.value.value_integer);
+				if (align < 1 || !gb_is_power_of_two(align)) {
+					error(ut->align, "#align must be a power of 2, got %lld", align);
+					return;
+				}
+
+				// NOTE(bill): Success!!!
+				i64 custom_align = gb_clamp(align, 1, build_context.max_align);
+				if (custom_align < align) {
+					warning(ut->align, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
+				}
+				if (variants.count == 0) {
+					error(ut->align, "An empty union cannot have a custom alignment");
+				} else {
+					union_type->Union.custom_align = custom_align;
+				}
+				return;
+			}
+		}
+
+		error(ut->align, "#align must be an integer");
+		return;
+	}
+
 }
 
 // void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
@@ -1653,9 +1691,9 @@ bool check_type_specialization_to(Checker *c, Type *specialization, Type *type, 
 			return true;
 		}
 
-		if (t->Struct.polymorphic_parent == s->Struct.polymorphic_parent) {
-			GB_ASSERT(s->Struct.polymorphic_params != nullptr);
-			GB_ASSERT(t->Struct.polymorphic_params != nullptr);
+		if (t->Struct.polymorphic_parent == s->Struct.polymorphic_parent &&
+		    s->Struct.polymorphic_params != nullptr &&
+		    t->Struct.polymorphic_params != nullptr) {
 
 			TypeTuple *s_tuple = &s->Struct.polymorphic_params->Tuple;
 			TypeTuple *t_tuple = &t->Struct.polymorphic_params->Tuple;

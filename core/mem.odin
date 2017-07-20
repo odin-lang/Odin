@@ -73,17 +73,17 @@ AllocationHeader :: struct {
 
 allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: int) {
 	header.size = size;
-	ptr := cast(^int)(header+1);
-	n := cast(^int)data - ptr;
+	ptr := cast(^uint)(header+1);
+	n := cast(^uint)data - ptr;
 
 	for i in 0..n {
-		(ptr+i)^ = -1;
+		(ptr+i)^ = ~uint(0);
 	}
 }
 allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 	if data == nil do return nil;
-	p := cast(^int)data;
-	for (p-1)^ == -1 do p = (p-1);
+	p := cast(^uint)data;
+	for (p-1)^ == ~uint(0) do p = (p-1);
 	return cast(^AllocationHeader)(p-1);
 }
 
