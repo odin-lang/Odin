@@ -10,12 +10,16 @@ struct Array {
 	isize       capacity;
 
 	T &operator[](isize index) {
-		GB_ASSERT_MSG(0 <= index && index < count, "Index %td is out of bounds ranges 0..<%td", index, count);
+		#if !defined(NO_ARRAY_BOUNDS_CHECK)
+			GB_ASSERT_MSG(0 <= index && index < count, "Index %td is out of bounds ranges 0..<%td", index, count);
+		#endif
 		return data[index];
 	}
 
 	T const &operator[](isize index) const {
-		GB_ASSERT_MSG(0 <= index && index < count, "Index %td is out of bounds ranges 0..<%td", index, count);
+		#if !defined(NO_ARRAY_BOUNDS_CHECK)
+			GB_ASSERT_MSG(0 <= index && index < count, "Index %td is out of bounds ranges 0..<%td", index, count);
+		#endif
 		return data[index];
 	}
 };

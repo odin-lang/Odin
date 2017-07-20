@@ -149,8 +149,7 @@ bool check_is_assignable_to_using_subtype(Type *src, Type *dst) {
 }
 
 bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Type *type,
-                                            Array<Operand> *param_operands, PolyProcData *poly_proc_data,
-                                            bool check_later) {
+                                            Array<Operand> *param_operands, PolyProcData *poly_proc_data) {
 	///////////////////////////////////////////////////////////////////////////////
 	//                                                                           //
 	// TODO CLEANUP(bill): This procedure is very messy and hacky. Clean this!!! //
@@ -223,7 +222,6 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 
 
 
-
 	CheckerContext prev_context = c->context;
 	defer (c->context = prev_context);
 
@@ -238,6 +236,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 		// c->context.no_polymorphic_errors = false;
 	}
 
+
 	bool generate_type_again = c->context.no_polymorphic_errors;
 
 	auto *pt = &src->Proc;
@@ -250,6 +249,8 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	if (!success) {
 		return false;
 	}
+
+
 
 	auto *found_gen_procs = map_get(&c->info.gen_procs, hash_pointer(base_entity->identifier));
 	if (found_gen_procs) {
@@ -269,7 +270,6 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 
 	if (generate_type_again) {
 		// LEAK TODO(bill): This is technically a memory leak as it has to generate the type twice
-
 		bool prev_no_polymorphic_errors = c->context.no_polymorphic_errors;
 		defer (c->context.no_polymorphic_errors = prev_no_polymorphic_errors);
 		c->context.no_polymorphic_errors = false;
@@ -282,6 +282,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 		if (!success) {
 			return false;
 		}
+
 
 		if (found_gen_procs) {
 			auto procs = *found_gen_procs;
@@ -298,9 +299,10 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 		}
 	}
 
+
 	AstNode *proc_lit = clone_ast_node(a, old_decl->proc_lit);
 	ast_node(pl, ProcLit, proc_lit);
-	// NOTE(bill): Associate the scope declared above with this procedure declaration's type
+	// NOTE(bill): Associate the scope declared above withinth this procedure declaration's type
 	add_scope(c, pl->type, final_proc_type->Proc.scope);
 	final_proc_type->Proc.is_poly_specialized = true;
 	final_proc_type->Proc.is_polymorphic = true;
@@ -350,16 +352,13 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 
 	GB_ASSERT(entity != nullptr);
 
-
 	if (poly_proc_data) {
 		poly_proc_data->gen_entity = entity;
 		poly_proc_data->proc_info  = proc_info;
 	}
 
-	if (check_later) {
-		// NOTE(bill): Check the newly generated procedure body
-		check_procedure_later(c, proc_info);
-	}
+	// NOTE(bill): Check the newly generated procedure body
+	check_procedure_later(c, proc_info);
 
 	return true;
 }
@@ -368,11 +367,11 @@ bool check_polymorphic_procedure_assignment(Checker *c, Operand *operand, Type *
 	if (operand->expr == NULL) return false;
 	Entity *base_entity = entity_of_ident(&c->info, operand->expr);
 	if (base_entity == nullptr) return false;
-	return find_or_generate_polymorphic_procedure(c, base_entity, type, nullptr, poly_proc_data, true);
+	return find_or_generate_polymorphic_procedure(c, base_entity, type, nullptr, poly_proc_data);
 }
 
 bool find_or_generate_polymorphic_procedure_from_parameters(Checker *c, Entity *base_entity, Array<Operand> *operands, PolyProcData *poly_proc_data) {
-	return find_or_generate_polymorphic_procedure(c, base_entity, nullptr, operands, poly_proc_data, false);
+	return find_or_generate_polymorphic_procedure(c, base_entity, nullptr, operands, poly_proc_data);
 }
 
 bool check_type_specialization_to(Checker *c, Type *specialization, Type *type, bool compound, bool modify_type);
@@ -828,6 +827,16 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 		error(vd->names[0], "Expected a type for this field");
 		type = t_invalid;
 	}
+
+	if (is_type_empty_union(type)) {
+		error(vd->names[0], "An empty union cannot be used as a field type in %.*s", LIT(context));
+		type = t_invalid;
+	}
+	if (!c->context.allow_polymorphic_types && is_type_polymorphic(base_type(type))) {
+		error(vd->names[0], "Invalid use of a polymorphic type in %.*s", LIT(context));
+		type = t_invalid;
+	}
+
 
 	Array<Operand> default_values = {};
 	defer (array_free(&default_values));
@@ -1836,7 +1845,7 @@ Type *determine_type_from_polymorphic(Checker *c, Type *poly_type, Operand opera
 }
 
 
-Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_, bool *success_, Array<Operand> *operands) {
+Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_, bool *success_, isize *specialization_count_, Array<Operand> *operands) {
 	if (_params == nullptr) {
 		return nullptr;
 	}
@@ -2006,6 +2015,12 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			}
 			type = t_invalid;
 		}
+		if (is_type_empty_union(type)) {
+			gbString str = type_to_string(type);
+			error(params[i], "Invalid use of an empty union `%s`", str);
+			gb_string_free(str);
+			type = t_invalid;
+		}
 
 
 		if (p->flags&FieldFlag_c_vararg) {
@@ -2046,6 +2061,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 						type = t_invalid;
 					}
 					bool modify_type = !c->context.no_polymorphic_errors;
+
 					if (specialization != nullptr && !check_type_specialization_to(c, specialization, type, false, modify_type)) {
 						if (!c->context.no_polymorphic_errors) {
 							gbString t = type_to_string(type);
@@ -2105,10 +2121,25 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		}
 	}
 
+	isize specialization_count = 0;
+	if (scope != nullptr) {
+		for_array(i, scope->elements.entries) {
+			Entity *e = scope->elements.entries[i].value;
+			if (e->kind == Type_Named) {
+				Type *t = e->type;
+				if (t->kind == Type_Generic &&
+				    t->Generic.specialized != nullptr) {
+					specialization_count += 1;
+				}
+			}
+		}
+	}
+
 	Type *tuple = make_type_tuple(c->allocator);
 	tuple->Tuple.variables = variables;
 
 	if (success_) *success_ = success;
+	if (specialization_count_) *specialization_count_ = specialization_count;
 	if (is_variadic_) *is_variadic_ = is_variadic;
 
 	return tuple;
@@ -2425,7 +2456,8 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 
 	bool variadic = false;
 	bool success = true;
-	Type *params  = check_get_params(c, c->context.scope, pt->params, &variadic, &success, operands);
+	isize specialization_count = 0;
+	Type *params  = check_get_params(c, c->context.scope, pt->params, &variadic, &success, &specialization_count, operands);
 	Type *results = check_get_results(c, c->context.scope, pt->results);
 
 	isize param_count = 0;
@@ -2433,15 +2465,16 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 	if (params)  param_count  = params ->Tuple.variables.count;
 	if (results) result_count = results->Tuple.variables.count;
 
-	type->Proc.node               = proc_type_node;
-	type->Proc.scope              = c->context.scope;
-	type->Proc.params             = params;
-	type->Proc.param_count        = param_count;
-	type->Proc.results            = results;
-	type->Proc.result_count       = result_count;
-	type->Proc.variadic           = variadic;
-	type->Proc.calling_convention = pt->calling_convention;
-	type->Proc.is_polymorphic     = pt->generic;
+	type->Proc.node                 = proc_type_node;
+	type->Proc.scope                = c->context.scope;
+	type->Proc.params               = params;
+	type->Proc.param_count          = param_count;
+	type->Proc.results              = results;
+	type->Proc.result_count         = result_count;
+	type->Proc.variadic             = variadic;
+	type->Proc.calling_convention   = pt->calling_convention;
+	type->Proc.is_polymorphic       = pt->generic;
+	type->Proc.specialization_count = specialization_count;
 
 	if (param_count > 0) {
 		Entity *end = params->Tuple.variables[param_count-1];
@@ -2886,6 +2919,10 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			e->TypeName.is_type_alias = true;
 			add_entity(c, ps, ident, e);
 			add_entity(c, s, ident, e);
+		} else {
+			error(ident, "Invalid use of a polymorphic type `$%.*s`", LIT(token.string));
+			*type = t_invalid;
+			return false;
 		}
 		*type = t;
 		return true;
@@ -2945,25 +2982,19 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 				error(at->count, "... can only be used in conjuction with compound literals");
 				count = 0;
 			}
-#if 0
-			i64 esz = type_size_of(c->allocator, elem);
-			if (esz == 0) {
+			if (is_type_empty_union(elem)) {
 				gbString str = type_to_string(elem);
-				error(at->elem, "Zero sized element type `%s` is not allowed", str);
+				error(at->elem, "An empty union `%s` is not allowed as an array element type", str);
 				gb_string_free(str);
 			}
-#endif
 			*type = make_type_array(c->allocator, elem, count);
 		} else {
 			Type *elem = check_type(c, at->elem);
-#if 0
-			i64 esz = type_size_of(c->allocator, elem);
-			if (esz == 0) {
+			if (is_type_empty_union(elem)) {
 				gbString str = type_to_string(elem);
-				error(at->elem, "Zero sized element type `%s` is not allowed", str);
+				error(at->elem, "An empty union `%s` is not allowed as an slice element type", str);
 				gb_string_free(str);
 			}
-#endif
 			*type = make_type_slice(c->allocator, elem);
 		}
 		return true;
@@ -2971,14 +3002,11 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 
 	case_ast_node(dat, DynamicArrayType, e);
 		Type *elem = check_type(c, dat->elem);
-		i64 esz = type_size_of(c->allocator, elem);
-#if 0
-		if (esz == 0) {
+		if (is_type_empty_union(elem)) {
 			gbString str = type_to_string(elem);
-			error(dat->elem, "Zero sized element type `%s` is not allowed", str);
+			error(dat->elem, "An empty union `%s` is not allowed as an dynamic array element type", str);
 			gb_string_free(str);
 		}
-#endif
 		*type = make_type_dynamic_array(c->allocator, elem);
 		return true;
 	case_end;
@@ -2989,7 +3017,11 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		Type *elem = check_type(c, vt->elem);
 		Type *be = base_type(elem);
 		i64 count = check_array_or_map_count(c, vt->count, false);
-		if (is_type_vector(be) || (!is_type_boolean(be) && !is_type_numeric(be) && be->kind != Type_Generic)) {
+		if (!c->context.allow_polymorphic_types && is_type_polymorphic(base_type(elem))) {
+			gbString str = type_to_string(elem);
+			error(vt->elem, "Invalid use of a polymorphic type `%s` as an dynamic array element type", str);
+			gb_string_free(str);
+		} else if (is_type_vector(be) || (!is_type_boolean(be) && !is_type_numeric(be) && !is_type_polymorphic(base_type(elem)))) {
 			gbString err_str = type_to_string(elem);
 			error(vt->elem, "Vector element type must be numerical or a boolean, got `%s`", err_str);
 			gb_string_free(err_str);
@@ -3018,16 +3050,6 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		return true;
 	case_end;
 
-/* 	case_ast_node(rut, RawUnionType, e);
-		*type = make_type_raw_union(c->allocator);
-		set_base_type(named_type, *type);
-		check_open_scope(c, e);
-		check_raw_union_type(c, *type, e);
-		check_close_scope(c);
-		(*type)->Struct.node = e;
-		return true;
-	case_end;
- */
 	case_ast_node(et, EnumType, e);
 		*type = make_type_enum(c->allocator);
 		set_base_type(named_type, *type);
@@ -4815,7 +4837,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	bool vari_expand = (ce->ellipsis.pos.line != 0);
 	// if (vari_expand && id != BuiltinProc_append) {
-		// error(ce->ellipsis, "Invalid use of `..` with built-in procedure `append`");
+		// error(ce->ellipsis, "Invalid use of `...` with built-in procedure `append`");
 		// return false;
 	// }
 
@@ -5914,6 +5936,7 @@ int valid_proc_and_score_cmp(void const *a, void const *b) {
 	return sj < si ? -1 : sj > si;
 }
 
+
 bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operands, Array<AstNode *> rhs, bool allow_ok) {
 	bool optional_ok = false;
 	for_array(i, rhs) {
@@ -6009,14 +6032,14 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	if (vari_expand && !variadic) {
 		if (show_error) {
 			error(ce->ellipsis,
-			      "Cannot use `..` in call to a non-variadic procedure: `%.*s`",
+			      "Cannot use `...` in call to a non-variadic procedure: `%.*s`",
 			      LIT(ce->proc->Ident.token.string));
 		}
 		err = CallArgumentError_NonVariadicExpand;
 	} else if (vari_expand && pt->c_vararg) {
 		if (show_error) {
 			error(ce->ellipsis,
-			      "Cannot use `..` in call to a `#c_vararg` variadic procedure: `%.*s`",
+			      "Cannot use `...` in call to a `#c_vararg` variadic procedure: `%.*s`",
 			      LIT(ce->proc->Ident.token.string));
 		}
 		err = CallArgumentError_NonVariadicExpand;
@@ -6110,7 +6133,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 						t = slice;
 						if (operand_index != param_count) {
 							if (show_error) {
-								error(o.expr, "`..` in a variadic procedure can only have one variadic argument at the end");
+								error(o.expr, "`...` in a variadic procedure can only have one variadic argument at the end");
 							}
 							if (data) {
 								data->score = score;
@@ -6129,15 +6152,6 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					}
 					score += s;
 				}
-			}
-
-			if (gen_entity != nullptr && gen_entity->token.string == "append" && err != CallArgumentError_None) {
-				gb_printf_err("append %s with score %lld %d\n", type_to_string(final_proc_type), score, err);
-			}
-
-			if (err == CallArgumentError_None && poly_proc_data.proc_info.decl != nullptr) {
-				// NOTE(bill): Check the newly generated procedure body
-				check_procedure_later(c, poly_proc_data.proc_info);
 			}
 		}
 	}
@@ -6281,9 +6295,6 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 		PolyProcData poly_proc_data = {};
 		if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &ordered_operands, &poly_proc_data)) {
 			gen_entity = poly_proc_data.gen_entity;
-			if (poly_proc_data.proc_info.decl != nullptr) {
-				check_procedure_later(c, poly_proc_data.proc_info);
-			}
 			Type *gept = base_type(gen_entity->type);
 			GB_ASSERT(is_type_proc(gept));
 			pt = &gept->Proc;
@@ -6354,7 +6365,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 
 		bool vari_expand = (ce->ellipsis.pos.line != 0);
 		if (vari_expand) {
-			// error(ce->ellipsis, "Invalid use of `..` with `field = value` call`");
+			// error(ce->ellipsis, "Invalid use of `...` with `field = value` call`");
 		}
 
 	} else {
@@ -6594,7 +6605,7 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 
 		bool vari_expand = (ce->ellipsis.pos.line != 0);
 		if (vari_expand) {
-			error(ce->ellipsis, "Invalid use of `..` in a polymorphic type call`");
+			error(ce->ellipsis, "Invalid use of `...` in a polymorphic type call`");
 		}
 
 	} else {
@@ -7735,9 +7746,13 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			if (!ok) {
 				gbString expr_str = expr_to_string(o->expr);
 				gbString dst_type_str = type_to_string(t);
-				error(o->expr, "Cannot type assert `%s` to `%s` as it is not a variant of that union", expr_str, dst_type_str);
-				gb_string_free(dst_type_str);
-				gb_string_free(expr_str);
+				defer (gb_string_free(expr_str));
+				defer (gb_string_free(dst_type_str));
+				if (bsrc->Union.variants.count == 0) {
+					error(o->expr, "Cannot type assert `%s` to `%s` as this is an empty union", expr_str, dst_type_str);
+				} else {
+					error(o->expr, "Cannot type assert `%s` to `%s` as it is not a variant of that union", expr_str, dst_type_str);
+				}
 				o->mode = Addressing_Invalid;
 				o->expr = node;
 				return kind;
@@ -8021,7 +8036,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			return kind;
 		} else {
 			Type *t = base_type(o->type);
-			if (t->kind == Type_Pointer) {
+			if (t->kind == Type_Pointer && !is_type_empty_union(t->Pointer.elem)) {
 				if (o->mode != Addressing_Immutable) {
 					o->mode = Addressing_Variable;
 				}
@@ -8315,7 +8330,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		if (at->count != nullptr &&
 		    at->count->kind == AstNode_UnaryExpr &&
 		    at->count->UnaryExpr.op.kind == Token_Ellipsis) {
-			str = gb_string_appendc(str, "..");
+			str = gb_string_appendc(str, "...");
 		} else {
 			str = write_expr_to_string(str, at->count);
 		}

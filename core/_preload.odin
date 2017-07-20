@@ -314,7 +314,6 @@ copy :: proc(dst, src: $T/[]$E) -> int #cc_contextless {
 }
 
 
-
 append :: proc(array: ^$T/[]$E, args: ...E) -> int #cc_contextless {
 	if array == nil do return 0;
 
@@ -352,6 +351,19 @@ append :: proc(array: ^$T/[dynamic]$E, args: ...E) -> int {
 		assert(data != nil);
 		__mem_copy(data + a.len, &args[0], size_of(E) * arg_len);
 		a.len += arg_len;
+	}
+	return len(array);
+}
+
+append :: proc(array: ^$T/[]u8, args: ...string) -> int {
+	for arg in args {
+		append(array, ...cast([]u8)arg);
+	}
+	return len(array);
+}
+append :: proc(array: ^$T/[dynamic]u8, args: ...string) -> int {
+	for arg in args {
+		append(array, ...cast([]u8)arg);
 	}
 	return len(array);
 }

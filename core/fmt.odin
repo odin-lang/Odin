@@ -186,7 +186,8 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		case ti == type_info_of(int):  write_string(buf, "int");
 		case ti == type_info_of(uint): write_string(buf, "uint");
 		case:
-			write_string(buf, info.signed ? "i" : "u");
+			if info.signed do write_byte(buf, 'i');
+			else           do write_byte(buf, 'u');
 			write_int(buf, i64(8*ti.size), 10);
 		}
 	case Rune:
@@ -424,7 +425,9 @@ fmt_bad_verb :: proc(using fi: ^FmtInfo, verb: rune) {
 fmt_bool :: proc(using fi: ^FmtInfo, b: bool, verb: rune) {
 	match verb {
 	case 't', 'v':
-		write_string(buf, b ? "true" : "false");
+		s := "false";
+		if b do s = "true";
+		write_string(buf, s);
 	case:
 		fmt_bad_verb(fi, verb);
 	}
@@ -434,7 +437,8 @@ fmt_bool :: proc(using fi: ^FmtInfo, b: bool, verb: rune) {
 fmt_write_padding :: proc(fi: ^FmtInfo, width: int) {
 	if width <= 0 do return;
 
-	pad_byte: u8 = fi.space ? ' ' : '0';
+	pad_byte: u8 = '0';
+	if fi.space do pad_byte = ' ';
 
 	for _ in 0..width {
 		write_byte(fi.buf, pad_byte);
@@ -569,7 +573,8 @@ fmt_float :: proc(fi: ^FmtInfo, v: f64, bit_size: int, verb: rune) {
 	// case 'f', 'F', 'v':
 
 	case 'f', 'F', 'v':
-		prec: int = fi.prec_set ? fi.prec : 3;
+		prec: int = 3;
+		if fi.prec_set do prec = fi.prec;
 		buf: [386]u8;
 
 		str := strconv.append_float(buf[1..1], v, 'f', prec, bit_size);
@@ -617,7 +622,9 @@ fmt_string :: proc(fi: ^FmtInfo, s: string, verb: rune) {
 
 		for i in 0..len(s) {
 			if i > 0 && space do write_byte(fi.buf, ' ');
-			_fmt_int(fi, u128(s[i]), 16, false, 8, verb == 'x' ? __DIGITS_LOWER : __DIGITS_UPPER);
+			char_set := __DIGITS_UPPER;
+			if verb == 'x' do char_set = __DIGITS_LOWER;
+			_fmt_int(fi, u128(s[i]), 16, false, 8, char_set);
 		}
 
 	case:

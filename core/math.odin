@@ -54,8 +54,8 @@ unlerp :: proc(a, b, x: f32) -> (t: f32) do return (x-a)/(b-a);
 unlerp :: proc(a, b, x: f64) -> (t: f64) do return (x-a)/(b-a);
 
 
-sign :: proc(x: f32) -> f32 do return x >= 0 ? +1 : -1;
-sign :: proc(x: f64) -> f64 do return x >= 0 ? +1 : -1;
+sign :: proc(x: f32) -> f32 { if x >= 0 do return +1; return -1; }
+sign :: proc(x: f64) -> f64 { if x >= 0 do return +1; return -1; }
 
 
 
@@ -75,14 +75,14 @@ copy_sign :: proc(x, y: f64) -> f64 {
 	return transmute(f64, ix);
 }
 
-round :: proc(x: f32) -> f32 do return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5);
-round :: proc(x: f64) -> f64 do return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5);
+round :: proc(x: f32) -> f32 { if x >= 0 do return floor(x + 0.5); return ceil(x - 0.5); }
+round :: proc(x: f64) -> f64 { if x >= 0 do return floor(x + 0.5); return ceil(x - 0.5); }
 
-floor :: proc(x: f32) -> f32 do return x >= 0 ? f32(i64(x)) : f32(i64(x-0.5)); // TODO: Get accurate versions
-floor :: proc(x: f64) -> f64 do return x >= 0 ? f64(i64(x)) : f64(i64(x-0.5)); // TODO: Get accurate versions
+floor :: proc(x: f32) -> f32 { if x >= 0 do f32(i64(x)) return f32(i64(x-0.5)); } // TODO: Get accurate versions
+floor :: proc(x: f64) -> f64 { if x >= 0 do f64(i64(x)) return f64(i64(x-0.5)); } // TODO: Get accurate versions
 
-ceil :: proc(x: f32) -> f32 do return x <  0 ? f32(i64(x)) : f32(i64(x+1)); // TODO: Get accurate versions
-ceil :: proc(x: f64) -> f64 do return x <  0 ? f64(i64(x)) : f64(i64(x+1)); // TODO: Get accurate versions
+ceil :: proc(x: f32) -> f32 { if x <  0 do f32(i64(x)) return f32(i64(x+1));  }// TODO: Get accurate versions
+ceil :: proc(x: f64) -> f64 { if x <  0 do f64(i64(x)) return f64(i64(x+1));  }// TODO: Get accurate versions
 
 remainder :: proc(x, y: f32) -> f32 do return x - round(x/y) * y;
 remainder :: proc(x, y: f64) -> f64 do return x - round(x/y) * y;
@@ -133,17 +133,20 @@ norm :: proc(v: $T/[vector 4]$E) -> T do return v / mag(v);
 
 norm0 :: proc(v: $T/[vector 2]$E) -> T {
 	m := mag(v);
-	return m == 0 ? 0 : v/m;
+	if m == 0 do return 0;
+	return v/m;
 }
 
 norm0 :: proc(v: $T/[vector 3]$E) -> T {
 	m := mag(v);
-	return m == 0 ? 0 : v/m;
+	if m == 0 do return 0;
+	return v/m;
 }
 
 norm0 :: proc(v: $T/[vector 4]$E) -> T {
 	m := mag(v);
-	return m == 0 ? 0 : v/m;
+	if m == 0 do return 0;
+	return v/m;
 }
 
 

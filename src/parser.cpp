@@ -633,7 +633,8 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_BasicDirective: break;
 
 	case AstNode_PolyType:
-		n->PolyType.type = clone_ast_node(a, n->PolyType.type);
+		n->PolyType.type           = clone_ast_node(a, n->PolyType.type);
+		n->PolyType.specialization = clone_ast_node(a, n->PolyType.specialization);
 		break;
 	case AstNode_Ellipsis:
 		n->Ellipsis.expr = clone_ast_node(a, n->Ellipsis.expr);
@@ -833,6 +834,7 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		break;
 
 	case AstNode_TypeType:
+		n->TypeType.specialization = clone_ast_node(a, n->TypeType.specialization);
 		break;
 	case AstNode_HelperType:
 		n->HelperType.type = clone_ast_node(a, n->HelperType.type);

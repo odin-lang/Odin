@@ -67,7 +67,8 @@ parse_i128 :: proc(s: string) -> i128 {
 		value += v;
 	}
 
-	return neg ? -value : value;
+	if neg do return -value;
+	return value;
 }
 
 parse_u128 :: proc(s: string) -> u128 {
@@ -91,19 +92,15 @@ parse_u128 :: proc(s: string) -> u128 {
 
 	value: u128;
 	for r in s {
-		if r == '_' {
-			continue;
-		}
-
+		if r == '_' do continue;
 		v := u128(_digit_value(r));
-		if v >= base {
-			break;
-		}
+		if v >= base do break;
 		value *= base;
 		value += u128(v);
 	}
 
-	return neg ? -value : value;
+	if neg do return -value;
+	return value;
 }
 
 
@@ -127,6 +124,7 @@ parse_f64 :: proc(s: string) -> f64 {
 	for ; i < len(s); i += 1 {
 		r := rune(s[i]);
 		if r == '_' do continue;
+
 		v := _digit_value(r);
 		if v >= 10 do break;
 		value *= 10;
@@ -139,13 +137,10 @@ parse_f64 :: proc(s: string) -> f64 {
 
 		for ; i < len(s); i += 1 {
 			r := rune(s[i]);
-			if r == '_' {
-				continue;
-			}
+			if r == '_' do continue;
+
 			v := _digit_value(r);
-			if v >= 10 {
-				break;
-			}
+			if v >= 10 do break;
 			value += f64(v)/pow10;
 			pow10 *= 10;
 		}
@@ -165,13 +160,10 @@ parse_f64 :: proc(s: string) -> f64 {
 		exp: u32 = 0;
 		for ; i < len(s); i += 1 {
 			r := rune(s[i]);
-			if r == '_' {
-				continue;
-			}
+			if r == '_' do continue;
+
 			d := u32(_digit_value(r));
-			if d >= 10 {
-				break;
-			}
+			if d >= 10 do break;
 			exp = exp * 10 + d;
 		}
 		if exp > 308 { exp = 308; }
@@ -181,13 +173,17 @@ parse_f64 :: proc(s: string) -> f64 {
 		for exp >   0 { scale *=   10; exp -=  1; }
 	}
 
-	return sign * (frac ? (value/scale) : (value*scale));
+	if frac do return sign * (value/scale);
+	return sign * (value*scale);
 }
 
 
 append_bool :: proc(buf: []u8, b: bool) -> string {
-	s := b ? "true" : "false";
-	append(&buf, ...cast([]u8)s);
+	if b {
+		append(&buf, "true");
+	} else {
+		append(&buf, "false");
+	}
 	return string(buf);
 }
 

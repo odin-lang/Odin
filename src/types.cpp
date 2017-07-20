@@ -146,6 +146,7 @@ struct TypeStruct {
 		bool     c_vararg;                                \
 		bool     is_polymorphic;                          \
 		bool     is_poly_specialized;                     \
+		isize    specialization_count;                    \
 		ProcCallingConvention calling_convention;         \
 	})                                                    \
 	TYPE_KIND(Map, struct {                               \
@@ -872,6 +873,11 @@ bool is_type_untyped_undef(Type *t) {
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_UntypedUndef);
 }
 
+
+bool is_type_empty_union(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_Union && t->Union.variants.count == 0;
+}
 
 
 bool is_type_valid_for_keys(Type *t) {
@@ -1822,6 +1828,9 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		return type_align_of_internal(allocator, t->Enum.base_type, path);
 
 	case Type_Union: {
+		if (t->Union.variants.count == 0) {
+			return 1;
+		}
 		i64 max = build_context.word_size;
 		for_array(i, t->Union.variants) {
 			Type *variant = t->Union.variants[i];
@@ -2056,6 +2065,9 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		return type_size_of_internal(allocator, t->Enum.base_type, path);
 
 	case Type_Union: {
+		if (t->Union.variants.count == 0) {
+			return 0;
+		}
 		i64 align = type_align_of_internal(allocator, t, path);
 		if (path->failure) {
 			return FAILURE_SIZE;
@@ -2294,7 +2306,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_Union:
-		str = gb_string_appendc(str, "union{");
+		str = gb_string_appendc(str, "union {");
 		for_array(i, type->Union.variants) {
 			Type *t = type->Union.variants[i];
 			if (i > 0) str = gb_string_appendc(str, ", ");
@@ -2304,40 +2316,22 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_Struct: {
-		if (type->Struct.is_raw_union) {
-			str = gb_string_appendc(str, "raw_union{");
-			for_array(i, type->Struct.fields) {
-				Entity *f = type->Struct.fields[i];
-				GB_ASSERT(f->kind == Entity_Variable);
-				if (i > 0) {
-					str = gb_string_appendc(str, ", ");
-				}
-				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
-				str = gb_string_appendc(str, ": ");
-				str = write_type_to_string(str, f->type);
-			}
-			str = gb_string_appendc(str, "}");
-		} else {
 			str = gb_string_appendc(str, "struct");
-			if (type->Struct.is_packed) {
-				str = gb_string_appendc(str, " #packed");
+		if (type->Struct.is_packed)    str = gb_string_appendc(str, " #packed");
+		if (type->Struct.is_ordered)   str = gb_string_appendc(str, " #ordered");
+		if (type->Struct.is_raw_union) str = gb_string_appendc(str, " #raw_union");
+		str = gb_string_appendc(str, " {");
+		for_array(i, type->Struct.fields) {
+			Entity *f = type->Struct.fields[i];
+			GB_ASSERT(f->kind == Entity_Variable);
+			if (i > 0) {
+				str = gb_string_appendc(str, ", ");
 			}
-			if (type->Struct.is_ordered) {
-				str = gb_string_appendc(str, " #ordered");
-			}
-			str = gb_string_appendc(str, " {");
-			for_array(i, type->Struct.fields) {
-				Entity *f = type->Struct.fields[i];
-				GB_ASSERT(f->kind == Entity_Variable);
-				if (i > 0) {
-					str = gb_string_appendc(str, ", ");
-				}
-				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
-				str = gb_string_appendc(str, ": ");
-				str = write_type_to_string(str, f->type);
-			}
-			str = gb_string_appendc(str, "}");
+			str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
+			str = gb_string_appendc(str, ": ");
+			str = write_type_to_string(str, f->type);
 		}
+		str = gb_string_appendc(str, "}");
 	} break;
 
 	case Type_Map: {
@@ -2373,7 +2367,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 						}
 						if (var->flags&EntityFlag_Ellipsis) {
 							Type *slice = base_type(var->type);
-							str = gb_string_appendc(str, "..");
+							str = gb_string_appendc(str, "...");
 							GB_ASSERT(var->type->kind == Type_Slice);
 							str = write_type_to_string(str, slice->Slice.elem);
 						} else {

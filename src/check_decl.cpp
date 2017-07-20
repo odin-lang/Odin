@@ -65,6 +65,12 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 			error(e->token, "Invalid use of a polymorphic type `%s` in %.*s", str, LIT(context_name));
 			e->type = t_invalid;
 			return nullptr;
+		} else if (is_type_empty_union(t)) {
+			gbString str = type_to_string(t);
+			defer (gb_string_free(str));
+			error(e->token, "An empty union `%s` cannot be instantiated in %.*s", str, LIT(context_name));
+			e->type = t_invalid;
+			return nullptr;
 		}
 		if (is_type_bit_field_value(t)) {
 			t = default_bit_field_value_type(t);
@@ -558,11 +564,18 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	if (type_expr != nullptr) {
 		e->type = check_type(c, type_expr);
 	}
-	if (e->type != nullptr && is_type_polymorphic(base_type(e->type))) {
-		gbString str = type_to_string(e->type);
-		defer (gb_string_free(str));
-		error(e->token, "Invalid use of a polymorphic type `%s` in %.*s", str, LIT(context_name));
-		e->type = t_invalid;
+	if (e->type != nullptr) {
+		if (is_type_polymorphic(base_type(e->type))) {
+			gbString str = type_to_string(e->type);
+			defer (gb_string_free(str));
+			error(e->token, "Invalid use of a polymorphic type `%s` in %.*s", str, LIT(context_name));
+			e->type = t_invalid;
+		} else if (is_type_empty_union(e->type)) {
+			gbString str = type_to_string(e->type);
+			defer (gb_string_free(str));
+			error(e->token, "An empty union `%s` cannot be instantiated in %.*s", str, LIT(context_name));
+			e->type = t_invalid;
+		}
 	}
 
 

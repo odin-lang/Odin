@@ -185,7 +185,7 @@ struct DeclInfo {
 
 	AstNode *         type_expr;
 	AstNode *         init_expr;
-	AstNode *         proc_lit; // AstNode_ProcLit
+	AstNode *         proc_lit;      // AstNode_ProcLit
 	Type *            gen_proc_type; // Precalculated
 
 	Map<bool>         deps; // Key: Entity *

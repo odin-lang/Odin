@@ -98,6 +98,7 @@ struct Entity {
 		} Variable;
 		struct {
 			bool is_type_alias;
+			Type *type_parameter_specialization;
 		} TypeName;
 		struct {
 			OverloadKind overload_kind;

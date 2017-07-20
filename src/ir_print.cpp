@@ -282,21 +282,20 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		return;
 
 	case Type_Union: {
-		// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
-		// LLVM takes the first element's alignment as the entire alignment (like C)
-		i64 align = type_align_of(heap_allocator(), t);
-		i64 total_size = type_size_of(heap_allocator(), t);
-	#if 1
-		i64 block_size =  t->Union.variant_block_size;
+		if (t->Union.variants.count == 0) {
+			ir_fprintf(f, "%%..opaque");
+		} else {
+			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
+			// LLVM takes the first element's alignment as the entire alignment (like C)
+			i64 align = type_align_of(heap_allocator(), t);
+			i64 total_size = type_size_of(heap_allocator(), t);
+			i64 block_size =  t->Union.variant_block_size;
 
-		ir_fprintf(f, "{[0 x <%lld x i8>], ", align);
-		ir_fprintf(f, "[%lld x i8], ", block_size);
-		ir_print_type(f, m, t_type_info_ptr);
-		ir_fprintf(f, "}");
-	#else
-		i64 block_size = total_size - build_context.word_size;
-		ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8], i%lld}", align, block_size, word_bits);
-	#endif
+			ir_fprintf(f, "{[0 x <%lld x i8>], ", align);
+			ir_fprintf(f, "[%lld x i8], ", block_size);
+			ir_print_type(f, m, t_type_info_ptr);
+			ir_fprintf(f, "}");
+		}
 	} return;
 
 	case Type_Struct: {
@@ -1733,6 +1732,8 @@ void print_llvm_ir(irGen *ir) {
 	irFileBuffer buf = {}, *f = &buf;
 	ir_file_buffer_init(f, &ir->output_file);
 
+	ir_print_encoded_local(f, str_lit("..opaque"));
+	ir_fprintf(f, " = type opaque;\n");
 	ir_print_encoded_local(f, str_lit("..string"));
 	ir_fprintf(f, " = type {i8*, ");
 	ir_print_type(f, m, t_int);
