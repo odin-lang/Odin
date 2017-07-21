@@ -2254,17 +2254,17 @@ gbString write_type_to_string(gbString str, Type *type) {
 			str = gb_string_appendc(str, "type");
 		} else {
 			String name = type->Generic.name;
-			str = gb_string_appendc(str, "$");
+			str = gb_string_append_rune(str, '$');
 			str = gb_string_append_length(str, name.text, name.len);
 			if (type->Generic.specialized != nullptr) {
-				str = gb_string_appendc(str, "/");
+				str = gb_string_append_rune(str, '/');
 				str = write_type_to_string(str, type->Generic.specialized);
 			}
 		}
 		break;
 
 	case Type_Pointer:
-		str = gb_string_appendc(str, "^");
+		str = gb_string_append_rune(str, '^');
 		str = write_type_to_string(str, type->Pointer.elem);
 		break;
 
@@ -2304,7 +2304,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 			str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
 			// str = gb_string_appendc(str, " = ");
 		}
-		str = gb_string_appendc(str, "}");
+		str = gb_string_append_rune(str, '}');
 		break;
 
 	case Type_Union:
@@ -2314,7 +2314,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 			if (i > 0) str = gb_string_appendc(str, ", ");
 			str = write_type_to_string(str, t);
 		}
-		str = gb_string_appendc(str, "}");
+		str = gb_string_append_rune(str, '}');
 		break;
 
 	case Type_Struct: {
@@ -2333,16 +2333,16 @@ gbString write_type_to_string(gbString str, Type *type) {
 			str = gb_string_appendc(str, ": ");
 			str = write_type_to_string(str, f->type);
 		}
-		str = gb_string_appendc(str, "}");
+		str = gb_string_append_rune(str, '}');
 	} break;
 
 	case Type_Map: {
 		str = gb_string_appendc(str, "map[");
 		if (type->Map.count > 0) {
-			str = gb_string_appendc(str, gb_bprintf("%d, ", cast(int)type->Map.count));
+			str = gb_string_append_fmt(str, "%d, ", cast(int)type->Map.count);
 		}
 		str = write_type_to_string(str, type->Map.key);
-		str = gb_string_appendc(str, "]");
+		str = gb_string_append_rune(str, ']');
 		str = write_type_to_string(str, type->Map.value);
 	} break;
 
@@ -2418,27 +2418,27 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_BitField:
 		str = gb_string_appendc(str, "bit_field ");
 		if (type->BitField.custom_align != 0) {
-			str = gb_string_appendc(str, gb_bprintf("#align %d ", cast(int)type->BitField.custom_align));
+			str = gb_string_append_fmt(str, "#align %d ", cast(int)type->BitField.custom_align);
 		}
-		str = gb_string_appendc(str, "{");
+		str = gb_string_append_rune(str, '{');
 
 		for (isize i = 0; i < type->BitField.field_count; i++) {
 			Entity *f = type->BitField.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
 			GB_ASSERT(f->type != nullptr && f->type->kind == Type_BitFieldValue);
-			str = gb_string_appendc(str, "{");
+			str = gb_string_append_rune(str, '{');
 			if (i > 0) {
 				str = gb_string_appendc(str, ", ");
 			}
 			str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
-			str = gb_string_appendc(str, " : ");
-			str = gb_string_appendc(str, gb_bprintf("%lld", cast(long long)f->type->BitFieldValue.bits));
+			str = gb_string_appendc(str, ": ");
+			str = gb_string_append_fmt(str, "%lld", cast(long long)f->type->BitFieldValue.bits);
 		}
-		str = gb_string_appendc(str, "}");
+		str = gb_string_append_rune(str, '}');
 		break;
 
 	case Type_BitFieldValue:
-		str = gb_string_appendc(str, gb_bprintf("(bit field value with %d bits)", cast(int)type->BitFieldValue.bits));
+		str = gb_string_append_fmt(str, "(bit field value with %d bits)", cast(int)type->BitFieldValue.bits);
 		break;
 	}
 

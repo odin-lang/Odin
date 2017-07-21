@@ -2618,6 +2618,8 @@ bool is_literal_type(AstNode *node) {
 	case AstNode_ArrayType:
 	case AstNode_VectorType:
 	case AstNode_StructType:
+	case AstNode_UnionType:
+	case AstNode_EnumType:
 	case AstNode_DynamicArrayType:
 	case AstNode_MapType:
 	case AstNode_CallExpr:

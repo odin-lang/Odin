@@ -26,6 +26,7 @@ FmtInfo :: struct {
 
 	width:     int;
 	prec:      int;
+	indent:    int;
 
 	reordered:      bool;
 	good_arg_index: bool;
@@ -757,8 +758,24 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			}
 			write_string(fi.buf, info.name);
 			write_byte(fi.buf, '{');
+			defer write_byte(fi.buf, '}');
+
+			hash   := fi.hash;   defer fi.hash = hash;
+			indent := fi.indent; defer fi.indent -= 1;
+
+			fi.hash = false;
+			fi.indent += 1;
+
+			if hash	do write_byte(fi.buf, '\n');
+
 			for _, i in b.names {
-				if i > 0 do write_string(fi.buf, ", ");
+				if !hash && i > 0 do write_string(fi.buf, ", ");
+				if hash {
+					for in 0..fi.indent {
+						write_byte(fi.buf, '\t');
+					}
+				}
+
 				write_string(fi.buf, b.names[i]);
 				write_string(fi.buf, " = ");
 
@@ -768,8 +785,9 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 					data := cast(^u8)v.data + b.offsets[i];
 					fmt_arg(fi, any{rawptr(data), t}, 'v');
 				}
+
+				if hash do write_string(fi.buf, ",\n");
 			}
-			write_byte(fi.buf, '}');
 
 		case:
 			fmt_value(fi, any{v.data, info.base}, verb);
@@ -877,8 +895,21 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		write_byte(fi.buf, '{');
 		defer write_byte(fi.buf, '}');
 
+		hash   := fi.hash;   defer fi.hash = hash;
+		indent := fi.indent; defer fi.indent -= 1;
+
+		fi.hash = false;
+		fi.indent += 1;
+
+		if hash	do write_byte(fi.buf, '\n');
+
 		for _, i in info.names {
-			if i > 0 do write_string(fi.buf, ", ");
+			if !hash && i > 0 do write_string(fi.buf, ", ");
+			if hash {
+				for in 0..fi.indent {
+					write_byte(fi.buf, '\t');
+				}
+			}
 
 			write_string(fi.buf, info.names[i]);
 			write_string(fi.buf, " = ");
@@ -889,6 +920,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 				data := cast(^u8)v.data + info.offsets[i];
 				fmt_arg(fi, any{rawptr(data), t}, 'v');
 			}
+			if hash do write_string(fi.buf, ",\n");
 		}
 
 	case Union:

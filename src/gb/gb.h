@@ -1,4 +1,4 @@
-/* gb.h - v0.28  - Ginger Bill's C Helper Library - public domain
+/* gb.h - v0.29  - Ginger Bill's C Helper Library - public domain
                  - no warranty implied; use at your own risk
 
 	This is a single header file with a bunch of useful stuff
@@ -58,6 +58,7 @@ TODOS
 	- More date & time functions
 
 VERSION HISTORY
+	0.29  - Add extras for gbString
 	0.28  - Handle UCS2 correctly in Win32 part
 	0.27  - OSX fixes and Linux gbAffinity
 	0.26d - Minor changes to how gbFile works
@@ -1521,6 +1522,8 @@ GB_DEF void     gb_string_clear          (gbString str);
 GB_DEF gbString gb_string_append         (gbString str, gbString const other);
 GB_DEF gbString gb_string_append_length  (gbString str, void const *other, isize num_bytes);
 GB_DEF gbString gb_string_appendc        (gbString str, char const *other);
+GB_DEF gbString gb_string_append_rune    (gbString str, Rune r);
+GB_DEF gbString gb_string_append_fmt     (gbString str, char const *fmt, ...);
 GB_DEF gbString gb_string_set            (gbString str, char const *cstr);
 GB_DEF gbString gb_string_make_space_for (gbString str, isize add_len);
 GB_DEF isize    gb_string_allocation_size(gbString const str);
@@ -6572,6 +6575,26 @@ gbString gb_string_append_length(gbString str, void const *other, isize other_le
 gb_inline gbString gb_string_appendc(gbString str, char const *other) {
 	return gb_string_append_length(str, other, gb_strlen(other));
 }
+
+gbString gb_string_append_rune(gbString str, Rune r) {
+	if (r >= 0) {
+		u8 buf[8] = {0};
+		isize len = gb_utf8_encode_rune(buf, r);
+		return gb_string_append_length(str, buf, len);
+	}
+	return str;
+}
+
+gbString gb_string_append_fmt(gbString str, char const *fmt, ...) {
+	isize res;
+	char buf[4096] = {0};
+	va_list va;
+	va_start(va, fmt);
+	res = gb_snprintf_va(str, gb_count_of(buf)-1, fmt, va);
+	va_end(va);
+	return gb_string_append_length(str, buf, res);
+}
+
 
 
 gbString gb_string_set(gbString str, char const *cstr) {

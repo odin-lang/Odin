@@ -828,15 +828,16 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 		type = t_invalid;
 	}
 
-	if (is_type_empty_union(type)) {
-		error(vd->names[0], "An empty union cannot be used as a field type in %.*s", LIT(context));
-		type = t_invalid;
+	if (type != nullptr) {
+		if (is_type_empty_union(type)) {
+			error(vd->names[0], "An empty union cannot be used as a field type in %.*s", LIT(context));
+			type = t_invalid;
+		}
+		if (!c->context.allow_polymorphic_types && is_type_polymorphic(base_type(type))) {
+			error(vd->names[0], "Invalid use of a polymorphic type in %.*s", LIT(context));
+			type = t_invalid;
+		}
 	}
-	if (!c->context.allow_polymorphic_types && is_type_polymorphic(base_type(type))) {
-		error(vd->names[0], "Invalid use of a polymorphic type in %.*s", LIT(context));
-		type = t_invalid;
-	}
-
 
 	Array<Operand> default_values = {};
 	defer (array_free(&default_values));
@@ -896,7 +897,7 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 				e->Variable.default_is_undef = true;
 			} else if (b.mode != Addressing_Constant) {
 				error(b.expr, "Default field value must be a constant");
-			} else if (is_type_any(e->type)) {
+			} else if (is_type_any(e->type) || is_type_union(e->type)) {
 				gbString str = type_to_string(e->type);
 				error(b.expr, "A struct field of type `%s` cannot have a default value", str);
 				gb_string_free(str);
@@ -905,10 +906,10 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 			}
 
 			name_field_index++;
-		} else {
-			GB_ASSERT(type != nullptr);
 		}
 
+		GB_ASSERT(e->type != nullptr);
+		GB_ASSERT(is_type_typed(e->type));
 
 		if (is_blank_ident(name_token)) {
 			array_add(fields, e);
@@ -8191,11 +8192,16 @@ gbString write_struct_fields_to_string(gbString str, Array<AstNode *> params) {
 	return str;
 }
 
-gbString string_append_token(gbString str, Token token) {
-	if (token.string.len > 0) {
-		return gb_string_append_length(str, &token.string[0], token.string.len);
+gbString string_append_string(gbString str, String string) {
+	if (string.len > 0) {
+		return gb_string_append_length(str, &string[0], string.len);
 	}
 	return str;
+}
+
+
+gbString string_append_token(gbString str, Token token) {
+	return string_append_string(str, token.string);
 }
 
 
@@ -8225,8 +8231,8 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(bd, BasicDirective, node);
-		str = gb_string_appendc(str, "#");
-		str = gb_string_append_length(str, &bd->name[0], bd->name.len);
+		str = gb_string_append_rune(str, '#');
+		str = string_append_string(str, bd->name);
 	case_end;
 
 	case_ast_node(ud, Undef, node);
@@ -8239,19 +8245,17 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(cl, CompoundLit, node);
 		str = write_expr_to_string(str, cl->type);
-		str = gb_string_appendc(str, "{");
+		str = gb_string_append_rune(str, '{');
 		for_array(i, cl->elems) {
-			if (i > 0) {
-				str = gb_string_appendc(str, ", ");
-			}
+			if (i > 0) str = gb_string_appendc(str, ", ");
 			str = write_expr_to_string(str, cl->elems[i]);
 		}
-		str = gb_string_appendc(str, "}");
+		str = gb_string_append_rune(str, '}');
 	case_end;
 
 
 	case_ast_node(te, TagExpr, node);
-		str = gb_string_appendc(str, "#");
+		str = gb_string_append_rune(str, '#');
 		str = string_append_token(str, te->name);
 		str = write_expr_to_string(str, te->expr);
 	case_end;
@@ -8263,14 +8267,14 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(de, DerefExpr, node);
 		str = write_expr_to_string(str, de->expr);
-		str = gb_string_appendc(str, "^");
+		str = gb_string_append_rune(str, '^');
 	case_end;
 
 	case_ast_node(be, BinaryExpr, node);
 		str = write_expr_to_string(str, be->left);
-		str = gb_string_appendc(str, " ");
+		str = gb_string_append_rune(str, ' ');
 		str = string_append_token(str, be->op);
-		str = gb_string_appendc(str, " ");
+		str = gb_string_append_rune(str, ' ');
 		str = write_expr_to_string(str, be->right);
 	case_end;
 
@@ -8284,14 +8288,14 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 
 	case_ast_node(pe, ParenExpr, node);
-		str = gb_string_appendc(str, "(");
+		str = gb_string_append_rune(str, '(');
 		str = write_expr_to_string(str, pe->expr);
-		str = gb_string_appendc(str, ")");
+		str = gb_string_append_rune(str, ')');
 	case_end;
 
 	case_ast_node(se, SelectorExpr, node);
 		str = write_expr_to_string(str, se->expr);
-		str = gb_string_appendc(str, ".");
+		str = gb_string_append_rune(str, '.');
 		str = write_expr_to_string(str, se->selector);
 	case_end;
 
@@ -8299,25 +8303,25 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, ta->expr);
 		str = gb_string_appendc(str, ".(");
 		str = write_expr_to_string(str, ta->type);
-		str = gb_string_appendc(str, ")");
+		str = gb_string_append_rune(str, ')');
 	case_end;
 		case_ast_node(tc, TypeCast, node);
 		str = gb_string_appendc(str, "cast(");
 		str = write_expr_to_string(str, tc->type);
-		str = gb_string_appendc(str, ")");
+		str = gb_string_append_rune(str, ')');
 		str = write_expr_to_string(str, tc->expr);
 	case_end;
 
 	case_ast_node(ie, IndexExpr, node);
 		str = write_expr_to_string(str, ie->expr);
-		str = gb_string_appendc(str, "[");
+		str = gb_string_append_rune(str, '[');
 		str = write_expr_to_string(str, ie->index);
-		str = gb_string_appendc(str, "]");
+		str = gb_string_append_rune(str, ']');
 	case_end;
 
 	case_ast_node(se, SliceExpr, node);
 		str = write_expr_to_string(str, se->expr);
-		str = gb_string_appendc(str, "[");
+		str = gb_string_append_rune(str, '[');
 		str = write_expr_to_string(str, se->low);
 		str = gb_string_appendc(str, "..");
 		str = write_expr_to_string(str, se->high);
@@ -8325,11 +8329,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			str = gb_string_appendc(str, "..");
 			str = write_expr_to_string(str, se->max);
 		}
-		str = gb_string_appendc(str, "]");
+		str = gb_string_append_rune(str, ']');
 	case_end;
 
 	case_ast_node(e, Ellipsis, node);
-		str = gb_string_appendc(str, "..");
+		str = gb_string_appendc(str, "...");
 		str = write_expr_to_string(str, e->expr);
 	case_end;
 
@@ -8346,21 +8350,21 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 
 	case_ast_node(pt, PolyType, node);
-		str = gb_string_appendc(str, "$");
+		str = gb_string_append_rune(str, '$');
 		str = write_expr_to_string(str, pt->type);
 		if (pt->specialization != nullptr) {
-			str = gb_string_appendc(str, "/");
+			str = gb_string_append_rune(str, '/');
 			str = write_expr_to_string(str, pt->specialization);
 		}
 	case_end;
 
 	case_ast_node(pt, PointerType, node);
-		str = gb_string_appendc(str, "^");
+		str = gb_string_append_rune(str, '^');
 		str = write_expr_to_string(str, pt->type);
 	case_end;
 
 	case_ast_node(at, ArrayType, node);
-		str = gb_string_appendc(str, "[");
+		str = gb_string_append_rune(str, '[');
 		if (at->count != nullptr &&
 		    at->count->kind == AstNode_UnaryExpr &&
 		    at->count->UnaryExpr.op.kind == Token_Ellipsis) {
@@ -8368,7 +8372,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		} else {
 			str = write_expr_to_string(str, at->count);
 		}
-		str = gb_string_appendc(str, "]");
+		str = gb_string_append_rune(str, ']');
 		str = write_expr_to_string(str, at->elem);
 	case_end;
 
@@ -8380,14 +8384,14 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_ast_node(vt, VectorType, node);
 		str = gb_string_appendc(str, "[vector ");
 		str = write_expr_to_string(str, vt->count);
-		str = gb_string_appendc(str, "]");
+		str = gb_string_append_rune(str, ']');
 		str = write_expr_to_string(str, vt->elem);
 	case_end;
 
 	case_ast_node(mt, MapType, node);
 		str = gb_string_appendc(str, "map[");
 		str = write_expr_to_string(str, mt->key);
-		str = gb_string_appendc(str, "]");
+		str = gb_string_append_rune(str, ']');
 		str = write_expr_to_string(str, mt->value);
 	case_end;
 
@@ -8404,24 +8408,22 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 		for_array(i, f->names) {
 			AstNode *name = f->names[i];
-			if (i > 0) {
-				str = gb_string_appendc(str, ", ");
-			}
+			if (i > 0) str = gb_string_appendc(str, ", ");
 			str = write_expr_to_string(str, name);
 		}
 		if (f->names.count > 0) {
 			if (f->type == nullptr && f->default_value != nullptr) {
-				str = gb_string_appendc(str, " ");
+				str = gb_string_append_rune(str, ' ');
 			}
 			str = gb_string_appendc(str, ":");
 		}
 		if (f->type != nullptr) {
-			str = gb_string_appendc(str, " ");
+			str = gb_string_append_rune(str, ' ');
 			str = write_expr_to_string(str, f->type);
 		}
 		if (f->default_value != nullptr) {
 			if (f->type != nullptr) {
-				str = gb_string_appendc(str, " ");
+				str = gb_string_append_rune(str, ' ');
 			}
 			str = gb_string_appendc(str, "= ");
 			str = write_expr_to_string(str, f->default_value);
@@ -8448,9 +8450,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		}
 
 		for_array(i, f->list) {
-			if (i > 0) {
-				str = gb_string_appendc(str, ", ");
-			}
+			if (i > 0) str = gb_string_appendc(str, ", ");
 			if (has_name) {
 				str = write_expr_to_string(str, f->list[i]);
 			} else {
@@ -8473,9 +8473,9 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(f, UnionField, node);
 		str = write_expr_to_string(str, f->name);
-		str = gb_string_appendc(str, "{");
+		str = gb_string_append_rune(str, '{');
 		str = write_expr_to_string(str, f->list);
-		str = gb_string_appendc(str, "}");
+		str = gb_string_append_rune(str, '}');
 	case_end;
 
 	case_ast_node(ce, CallExpr, node);
@@ -8516,39 +8516,39 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		if (st->is_packed)    str = gb_string_appendc(str, "#packed ");
 		if (st->is_ordered)   str = gb_string_appendc(str, "#ordered ");
 		if (st->is_raw_union) str = gb_string_appendc(str, "#raw_union ");
-		str = gb_string_appendc(str, "{");
+		str = gb_string_append_rune(str, '{');
 		str = write_struct_fields_to_string(str, st->fields);
-		str = gb_string_appendc(str, "}");
+		str = gb_string_append_rune(str, '}');
 	case_end;
 
 	// case_ast_node(st, RawUnionType, node);
 	// 	str = gb_string_appendc(str, "raw_union ");
-	// 	str = gb_string_appendc(str, "{");
+	// 	str = gb_string_append_rune(str, '{');
 	// 	str = write_struct_fields_to_string(str, st->fields);
-	// 	str = gb_string_appendc(str, "}");
+	// 	str = gb_string_append_rune(str, '}');
 	// case_end;
 
 	case_ast_node(st, UnionType, node);
 		str = gb_string_appendc(str, "union ");
-		str = gb_string_appendc(str, "{");
+		str = gb_string_append_rune(str, '{');
 		str = write_struct_fields_to_string(str, st->variants);
-		str = gb_string_appendc(str, "}");
+		str = gb_string_append_rune(str, '}');
 	case_end;
 
 	case_ast_node(et, EnumType, node);
 		str = gb_string_appendc(str, "enum ");
 		if (et->base_type != nullptr) {
 			str = write_expr_to_string(str, et->base_type);
-			str = gb_string_appendc(str, " ");
+			str = gb_string_append_rune(str, ' ');
 		}
-		str = gb_string_appendc(str, "{");
+		str = gb_string_append_rune(str, '{');
 		for_array(i, et->fields) {
 			if (i > 0) {
 				str = gb_string_appendc(str, ", ");
 			}
 			str = write_expr_to_string(str, et->fields[i]);
 		}
-		str = gb_string_appendc(str, "}");
+		str = gb_string_append_rune(str, '}');
 	case_end;
 	}
 

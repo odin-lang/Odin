@@ -20,7 +20,7 @@ read_entire_file :: proc(name: string) -> (data: []u8, success: bool) {
 		return nil, false;
 	}
 
-	if length == 0 {
+	if length <= 0 {
 		return nil, true;
 	}
 
