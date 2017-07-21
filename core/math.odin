@@ -78,11 +78,11 @@ copy_sign :: proc(x, y: f64) -> f64 {
 round :: proc(x: f32) -> f32 { if x >= 0 do return floor(x + 0.5); return ceil(x - 0.5); }
 round :: proc(x: f64) -> f64 { if x >= 0 do return floor(x + 0.5); return ceil(x - 0.5); }
 
-floor :: proc(x: f32) -> f32 { if x >= 0 do f32(i64(x)) return f32(i64(x-0.5)); } // TODO: Get accurate versions
-floor :: proc(x: f64) -> f64 { if x >= 0 do f64(i64(x)) return f64(i64(x-0.5)); } // TODO: Get accurate versions
+floor :: proc(x: f32) -> f32 { if x >= 0 do f32(i64(x)); return f32(i64(x-0.5)); } // TODO: Get accurate versions
+floor :: proc(x: f64) -> f64 { if x >= 0 do f64(i64(x)); return f64(i64(x-0.5)); } // TODO: Get accurate versions
 
-ceil :: proc(x: f32) -> f32 { if x <  0 do f32(i64(x)) return f32(i64(x+1));  }// TODO: Get accurate versions
-ceil :: proc(x: f64) -> f64 { if x <  0 do f64(i64(x)) return f64(i64(x+1));  }// TODO: Get accurate versions
+ceil :: proc(x: f32) -> f32 { if x <  0 do f32(i64(x)); return f32(i64(x+1));  }// TODO: Get accurate versions
+ceil :: proc(x: f64) -> f64 { if x <  0 do f64(i64(x)); return f64(i64(x+1));  }// TODO: Get accurate versions
 
 remainder :: proc(x, y: f32) -> f32 do return x - round(x/y) * y;
 remainder :: proc(x, y: f64) -> f64 do return x - round(x/y) * y;
