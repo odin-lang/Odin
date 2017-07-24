@@ -4630,10 +4630,10 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 			bool implicit_is_found = is_entity_implicitly_imported(e, entity);
 			bool is_not_exported = !is_entity_exported(entity);
-			if (!implicit_is_found) {
-				is_not_exported = false;
-			} else if (entity->kind == Entity_ImportName) {
+			if (entity->kind == Entity_ImportName) {
 				is_not_exported = true;
+			} else if (!implicit_is_found) {
+				is_not_exported = false;
 			}
 
 			if (is_not_exported) {
