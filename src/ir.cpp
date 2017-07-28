@@ -6370,9 +6370,8 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 	case_ast_node(ds, DeferStmt, node);
 		ir_emit_comment(proc, str_lit("DeferStmt"));
 		isize scope_index = proc->scope_index;
-		if (ds->stmt->kind == AstNode_BlockStmt) {
-			scope_index--;
-		}
+		// TODO(bill): What was the original rationale behind this line?
+		// if (ds->stmt->kind == AstNode_BlockStmt) scope_index--;
 		ir_add_defer_node(proc, scope_index, ds->stmt);
 	case_end;
 

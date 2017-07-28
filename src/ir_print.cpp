@@ -246,10 +246,14 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		case Basic_any:    ir_fprintf(f, "%%..any");                  return;
 		}
 		break;
-	case Type_Pointer:
-		ir_print_type(f, m, t->Pointer.elem);
-		ir_fprintf(f, "*");
-		return;
+	case Type_Pointer: {
+		if (!is_type_named(t->Pointer.elem) && is_type_empty_struct(t->Pointer.elem)) {
+			ir_print_type(f, m, t_rawptr);
+		} else {
+			ir_print_type(f, m, t->Pointer.elem);
+			ir_fprintf(f, "*");
+		}
+	} return;
 	case Type_Array:
 		ir_fprintf(f, "[%lld x ", t->Array.count);
 		ir_print_type(f, m, t->Array.elem);

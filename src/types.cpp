@@ -878,6 +878,10 @@ bool is_type_empty_union(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Union && t->Union.variants.count == 0;
 }
+bool is_type_empty_struct(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_Struct && !t->Struct.is_raw_union && t->Struct.fields.count == 0;
+}
 
 
 bool is_type_valid_for_keys(Type *t) {

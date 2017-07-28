@@ -3250,12 +3250,22 @@ AstNode *parse_value_decl(AstFile *f, Array<AstNode *> names, CommentGroup docs)
 	Array<AstNode *> values = {};
 
 	Token colon = expect_token_after(f, Token_Colon, "identifier list");
-	type = parse_type_attempt(f);
+	if (f->curr_token.kind == Token_type) {
+		type = ast_type_type(f, advance_token(f), nullptr);
+		is_mutable = false;
+	} else {
+		type = parse_type_attempt(f);
+	}
 
 	if (f->curr_token.kind == Token_Eq ||
 	    f->curr_token.kind == Token_Colon) {
-		Token sep = advance_token(f);
-		is_mutable = sep.kind != Token_Colon;
+		Token sep = {};
+		if (!is_mutable) {
+			sep = expect_token_after(f, Token_Colon, "type");
+		} else {
+			sep = advance_token(f);
+			is_mutable = sep.kind != Token_Colon;
+		}
 		values = parse_rhs_expr_list(f);
 		if (values.count > names.count) {
 			syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
