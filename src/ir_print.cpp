@@ -183,10 +183,9 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 	ir_fprintf(f, " (");
 	if (t->Proc.return_by_pointer) {
 		ir_print_type(f, m, reduce_tuple_to_single_type(t->Proc.results));
-		ir_fprintf(f, "* sret noalias ");
-		if (param_count > 0) {
-			ir_fprintf(f, ", ");
-		}
+		// ir_fprintf(f, "* sret noalias ");
+		ir_fprintf(f, "* noalias ");
+		if (param_count > 0) ir_fprintf(f, ", ");
 	}
 	isize param_index = 0;
 	for (isize i = 0; i < param_count; i++) {
@@ -247,10 +246,14 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		case Basic_any:    ir_fprintf(f, "%%..any");                  return;
 		}
 		break;
-	case Type_Pointer:
-		ir_print_type(f, m, t->Pointer.elem);
-		ir_fprintf(f, "*");
-		return;
+	case Type_Pointer: {
+		if (!is_type_named(t->Pointer.elem) && is_type_empty_struct(t->Pointer.elem)) {
+			ir_print_type(f, m, t_rawptr);
+		} else {
+			ir_print_type(f, m, t->Pointer.elem);
+			ir_fprintf(f, "*");
+		}
+	} return;
 	case Type_Array:
 		ir_fprintf(f, "[%lld x ", t->Array.count);
 		ir_print_type(f, m, t->Array.elem);
@@ -333,12 +336,16 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 
 
 	case Type_Named:
-		if (is_type_struct(t) || is_type_union(t)) {
+		switch (base_type(t)->kind) {
+		case Type_Struct:
+		case Type_Union: {
 			String *name = map_get(&m->entity_names, hash_pointer(t->Named.type_name));
 			GB_ASSERT_MSG(name != nullptr, "%.*s %p", LIT(t->Named.name), t->Named.type_name);
 			ir_print_encoded_local(f, *name);
-		} else {
+		} break;
+		default:
 			ir_print_type(f, m, base_type(t));
+			break;
 		}
 		return;
 	case Type_Tuple:
@@ -1718,9 +1725,6 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 void ir_print_type_name(irFileBuffer *f, irModule *m, irValue *v) {
 	GB_ASSERT(v->kind == irValue_TypeName);
 	Type *bt = base_type(ir_type(v));
-	if (!is_type_struct(bt) && !is_type_union(bt)) {
-		return;
-	}
 	ir_print_encoded_local(f, v->TypeName.name);
 	ir_fprintf(f, " = type ");
 	ir_print_type(f, m, base_type(v->TypeName.type));

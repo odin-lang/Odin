@@ -1734,7 +1734,8 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
 					Entity *e = nullptr;
 
-					if (is_ast_node_type(init)) {
+					if (is_ast_node_type(init) ||
+						(vd->type != nullptr && vd->type->kind == AstNode_TypeType)) {
 						e = make_entity_type_name(c->allocator, d->scope, token, nullptr);
 						if (vd->type != nullptr) {
 							error(name, "A type declaration cannot have an type parameter");
