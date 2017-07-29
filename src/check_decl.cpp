@@ -231,6 +231,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 		} break;
 
 	// NOTE(bill): Check to see if the expression it to be aliases
+	#if 1
 		case Addressing_Builtin:
 			if (e->type != nullptr) {
 				error(type_expr, "A constant alias of a built-in procedure may not have a type initializer");
@@ -245,8 +246,9 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 			e->Alias.base = operand.overload_entities[0];
 			e->type = t_invalid;
 			return;
+	#endif
 		}
-
+	#if 1
 		if (entity != nullptr) {
 			switch (entity->kind) {
 			case Entity_Alias:
@@ -276,6 +278,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 				return;
 			}
 		}
+	#endif
 	}
 
 	if (init != nullptr) {

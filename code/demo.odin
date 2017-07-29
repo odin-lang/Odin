@@ -17,14 +17,10 @@ prefix_table := [...]string{
 };
 
 worker_proc :: proc(t: ^thread.Thread) -> int {
-	do_work :: proc(iteration: int, index: int) {
-		fmt.printf("`%s`: iteration %d\n", prefix_table[index], iteration);
-		win32.sleep(1);
-	}
-
 	for iteration in 1...5 {
-		fmt.printf("Thread %d is on iteration %d\n", t.user_index, iteration);
-		do_work(iteration, t.user_index);
+		fmt.printf("Th/read %d is on iteration %d\n", t.user_index, iteration);
+		fmt.printf("`%s`: iteration %d\n", prefix_table[t.user_index], iteration);
+		win32.sleep(1);
 	}
 	return 0;
 }
@@ -56,3 +52,4 @@ main :: proc() {
 		}
 	}
 }
+
