@@ -2790,6 +2790,38 @@ Type *make_optional_ok_type(gbAllocator a, Type *value) {
 	return t;
 }
 
+void generate_map_struct_type(gbAllocator a, Type *type) {
+	GB_ASSERT(type->kind == Type_Map);
+	if (type->Map.generated_struct_type != NULL) return;
+
+	Type *generated_struct_type = make_type_struct(a);
+
+	/*
+	struct {
+		hashes:  [dynamic]int;
+		entries; [dynamic]EntryType;
+	}
+	*/
+	AstNode *dummy_node = gb_alloc_item(a, AstNode);
+	dummy_node->kind = AstNode_Invalid;
+	Scope *s = make_scope(universal_scope, a);
+
+	Type *hashes_type  = make_type_dynamic_array(a, t_int);
+	Type *entries_type = make_type_dynamic_array(a, type->Map.entry_type);
+
+	Array<Entity *> fields = {};
+	array_init(&fields, a, 2);
+	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0));
+	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("entries")), entries_type, false, 1));
+
+
+	generated_struct_type->Struct.fields              = fields;
+	generated_struct_type->Struct.fields_in_src_order = fields;
+
+	type_set_offsets(a, generated_struct_type);
+	type->Map.generated_struct_type = generated_struct_type;
+}
+
 void check_map_type(Checker *c, Type *type, AstNode *node) {
 	GB_ASSERT(type->kind == Type_Map);
 	ast_node(mt, MapType, node);
@@ -2854,35 +2886,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 		type->Map.entry_type = entry_type;
 	}
 
-	{
-		Type *generated_struct_type = make_type_struct(a);
-
-		/*
-		struct {
-			hashes:  [dynamic]int,
-			entries; [dynamic]Entry_Type,
-		}
-		*/
-		AstNode *dummy_node = gb_alloc_item(a, AstNode);
-		dummy_node->kind = AstNode_Invalid;
-		check_open_scope(c, dummy_node);
-
-		Type *hashes_type  = make_type_dynamic_array(a, t_int);
-		Type *entries_type = make_type_dynamic_array(a, type->Map.entry_type);
-
-		Array<Entity *> fields = {};
-		array_init(&fields, a, 2);
-		array_add(&fields, make_entity_field(a, c->context.scope, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0));
-		array_add(&fields, make_entity_field(a, c->context.scope, make_token_ident(str_lit("entries")), entries_type, false, 1));
-
-		check_close_scope(c);
-
-		generated_struct_type->Struct.fields              = fields;
-		generated_struct_type->Struct.fields_in_src_order = fields;
-
-		type_set_offsets(a, generated_struct_type);
-		type->Map.generated_struct_type = generated_struct_type;
-	}
+	generate_map_struct_type(a, type);
 
 	type->Map.lookup_result_type = make_optional_ok_type(a, value);
 
@@ -3021,19 +3025,9 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 				error(at->count, "... can only be used in conjuction with compound literals");
 				count = 0;
 			}
-			if (is_type_empty_union(elem)) {
-				gbString str = type_to_string(elem);
-				error(at->elem, "An empty union `%s` is not allowed as an array element type", str);
-				gb_string_free(str);
-			}
 			*type = make_type_array(c->allocator, elem, count);
 		} else {
 			Type *elem = check_type(c, at->elem);
-			if (is_type_empty_union(elem)) {
-				gbString str = type_to_string(elem);
-				error(at->elem, "An empty union `%s` is not allowed as an slice element type", str);
-				gb_string_free(str);
-			}
 			*type = make_type_slice(c->allocator, elem);
 		}
 		return true;
@@ -3041,11 +3035,6 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 
 	case_ast_node(dat, DynamicArrayType, e);
 		Type *elem = check_type(c, dat->elem);
-		if (is_type_empty_union(elem)) {
-			gbString str = type_to_string(elem);
-			error(dat->elem, "An empty union `%s` is not allowed as an dynamic array element type", str);
-			gb_string_free(str);
-		}
 		*type = make_type_dynamic_array(c->allocator, elem);
 		return true;
 	case_end;
@@ -3408,7 +3397,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		}
 
 		return false;
-	}else if (is_type_pointer(type)) {
+	} else if (is_type_pointer(type)) {
 		if (in_value.kind == ExactValue_Pointer) {
 			return true;
 		}
@@ -3441,7 +3430,7 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 				} else {
 					str = i128_to_string(i, buf, gb_size_of(buf));
 				}
-				error(o->expr, "`%s = %.*s` overflows `%s`", a, str, b);
+				error(o->expr, "`%s = %.*s` overflows `%s`", a, LIT(str), b);
 			}
 		} else {
 			error(o->expr, "Cannot convert `%s` to `%s`", a, b);

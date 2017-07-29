@@ -1733,7 +1733,7 @@ void print_llvm_ir(irGen *ir) {
 	ir_file_buffer_init(f, &ir->output_file);
 
 	ir_print_encoded_local(f, str_lit("..opaque"));
-	ir_fprintf(f, " = type opaque;\n");
+	ir_fprintf(f, " = type {};\n");
 	ir_print_encoded_local(f, str_lit("..string"));
 	ir_fprintf(f, " = type {i8*, ");
 	ir_print_type(f, m, t_int);

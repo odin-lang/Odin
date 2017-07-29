@@ -150,12 +150,12 @@ struct TypeStruct {
 		ProcCallingConvention calling_convention;         \
 	})                                                    \
 	TYPE_KIND(Map, struct {                               \
-		i64   count; /* 0 if dynamic */                   \
-		Type *key;                                        \
-		Type *value;                                      \
-		Type *entry_type;                                 \
-		Type *generated_struct_type;                      \
-		Type *lookup_result_type;                         \
+		i64    count; /* 0 if dynamic */                  \
+		Type * key;                                       \
+		Type * value;                                     \
+		Type * entry_type;                                \
+		Type * generated_struct_type;                     \
+		Type * lookup_result_type;                        \
 	})                                                    \
 	TYPE_KIND(BitFieldValue, struct { u32 bits; })        \
 	TYPE_KIND(BitField, struct {                          \
@@ -386,10 +386,11 @@ gb_global Type *t_map_header                  = nullptr;
 
 
 
-i64     type_size_of   (gbAllocator allocator, Type *t);
-i64     type_align_of  (gbAllocator allocator, Type *t);
-i64     type_offset_of (gbAllocator allocator, Type *t, i32 index);
-gbString type_to_string(Type *type);
+i64      type_size_of            (gbAllocator allocator, Type *t);
+i64      type_align_of           (gbAllocator allocator, Type *t);
+i64      type_offset_of          (gbAllocator allocator, Type *t, i32 index);
+gbString type_to_string          (Type *type);
+void     generate_map_struct_type(gbAllocator a, Type *type);
 
 
 
@@ -582,6 +583,8 @@ Type *make_type_bit_field(gbAllocator a) {
 	Type *t = alloc_type(a, Type_BitField);
 	return t;
 }
+
+
 
 
 
@@ -1819,6 +1822,8 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 	case Type_Map: {
 		if (t->Map.count == 0) { // Dynamic
+			// return build_context.word_size;
+			generate_map_struct_type(allocator, t);
 			return type_align_of_internal(allocator, t->Map.generated_struct_type, path);
 		}
 		GB_PANIC("TODO(bill): Fixed map alignment");
@@ -2000,10 +2005,6 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		return alignment*(count-1) + size;
 	} break;
 
-	case Type_DynamicArray:
-		// data + len + cap + allocator(procedure+data)
-		return 3*build_context.word_size + 2*build_context.word_size;
-
 	case Type_Vector: {
 #if 0
 		i64 count, bit_size, total_size_in_bits, total_size;
@@ -2044,8 +2045,15 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	case Type_Slice: // ptr + count
 		return 3 * build_context.word_size;
 
+	case Type_DynamicArray:
+		// data + len + cap + allocator(procedure+data)
+		return 3*build_context.word_size + 2*build_context.word_size;
+
 	case Type_Map: {
 		if (t->Map.count == 0) { // Dynamic
+			// i64 da = 3*build_context.word_size + 2*build_context.word_size;
+			// return 2 * da;
+			generate_map_struct_type(allocator, t);
 			return type_size_of_internal(allocator, t->Map.generated_struct_type, path);
 		}
 		GB_PANIC("TODO(bill): Fixed map size");

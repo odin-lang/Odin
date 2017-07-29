@@ -1182,6 +1182,7 @@ void add_type_info_type(Checker *c, Type *t) {
 	} break;
 
 	case Type_Map: {
+		generate_map_struct_type(c->allocator, bt);
 		add_type_info_type(c, bt->Map.key);
 		add_type_info_type(c, bt->Map.value);
 		add_type_info_type(c, bt->Map.generated_struct_type);
