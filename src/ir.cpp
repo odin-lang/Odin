@@ -2411,7 +2411,8 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		case 2: result_type = t_int_ptr;                                      break;
 		case 3: result_type = t_allocator_ptr;                                break;
 		}
-	} else if (is_type_dynamic_map(t)) {
+	} else if (is_type_map(t)) {
+		generate_map_internal_types(a, t);
 		Type *gst = t->Map.generated_struct_type;
 		switch (index) {
 		case 0: result_type = make_type_pointer(a, gst->Struct.fields[0]->type); break;
@@ -2471,7 +2472,8 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 		case 2: result_type = t_int;                                      break;
 		case 3: result_type = t_allocator;                                break;
 		}
-	} else if (is_type_dynamic_map(t)) {
+	} else if (is_type_map(t)) {
+		generate_map_internal_types(a, t);
 		Type *gst = t->Map.generated_struct_type;
 		switch (index) {
 		case 0: result_type = gst->Struct.fields[0]->type; break;
@@ -3888,7 +3890,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			return ir_slice_count(proc, v);
 		} else if (is_type_dynamic_array(t)) {
 			return ir_dynamic_array_count(proc, v);
-		} else if (is_type_dynamic_map(t)) {
+		} else if (is_type_map(t)) {
 			ir_emit_comment(proc, str_lit("len: map"));
 			irValue *entries = ir_emit_struct_ev(proc, v, 1);
 			return ir_dynamic_array_count(proc, entries);
@@ -3999,7 +4001,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			irValue *slice = ir_add_local_generated(proc, type);
 			ir_fill_slice(proc, slice, ptr, count, capacity);
 			return ir_emit_load(proc, slice);
-		} else if (is_type_dynamic_map(type)) {
+		} else if (is_type_map(type)) {
 			irValue *int_16 = ir_const_int(a, 16);
 			irValue *cap = int_16;
 			if (ce->args.count == 2) {
@@ -4068,7 +4070,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			args[0] = da_allocator;
 			args[1] = ptr;
 			return ir_emit_global_call(proc, "free_ptr_with_allocator", args, 2);
-		} else if (is_type_dynamic_map(type)) {
+		} else if (is_type_map(type)) {
 			irValue *map = ir_build_expr(proc, node);
 			irValue *map_ptr = ir_address_from_load_or_generate_local(proc, map);
 
@@ -4148,7 +4150,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			args[2] = elem_align;
 			args[3] = capacity;
 			return ir_emit_global_call(proc, "__dynamic_array_reserve", args, 4);
-		} else if (is_type_dynamic_map(type)) {
+		} else if (is_type_map(type)) {
 			irValue **args = gb_alloc_array(a, irValue *, 2);
 			args[0] = ir_gen_map_header(proc, ptr, type);
 			args[1] = capacity;
@@ -4171,7 +4173,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		if (is_type_dynamic_array(t)) {
 			irValue *count_ptr = ir_emit_struct_ep(proc, ptr, 1);
 			ir_emit_store(proc, count_ptr, v_zero);
-		} else if (is_type_dynamic_map(t)) {
+		} else if (is_type_map(t)) {
 			irValue *ha = ir_emit_struct_ep(proc, ptr, 0);
 			irValue *ea = ir_emit_struct_ep(proc, ptr, 1);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, ha, 1), v_zero);
@@ -4301,7 +4303,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		irValue *map = ir_build_expr(proc, ce->args[0]);
 		irValue *key = ir_build_expr(proc, ce->args[1]);
 		Type *map_type = ir_type(map);
-		GB_ASSERT(is_type_dynamic_map(map_type));
+		GB_ASSERT(is_type_map(map_type));
 		Type *key_type = base_type(map_type)->Map.key;
 
 		irValue *addr = ir_address_from_load_or_generate_local(proc, map);
@@ -8220,6 +8222,7 @@ void ir_gen_tree(irGen *s) {
 				case Type_Map: {
 					ir_emit_comment(proc, str_lit("TypeInfoMap"));
 					tag = ir_emit_conv(proc, variant_ptr, t_type_info_map_ptr);
+					generate_map_internal_types(a, t);
 
 					irValue *key              = ir_emit_struct_ep(proc, tag, 0);
 					irValue *value            = ir_emit_struct_ep(proc, tag, 1);
@@ -8229,15 +8232,14 @@ void ir_gen_tree(irGen *s) {
 					ir_emit_store(proc, key,              ir_get_type_info_ptr(proc, t->Map.key));
 					ir_emit_store(proc, value,            ir_get_type_info_ptr(proc, t->Map.value));
 					ir_emit_store(proc, generated_struct, ir_get_type_info_ptr(proc, t->Map.generated_struct_type));
-					ir_emit_store(proc, count,            ir_const_int(a, t->Map.count));
 				} break;
 
 				case Type_BitField: {
 					ir_emit_comment(proc, str_lit("TypeInfoBitField"));
 					tag = ir_emit_conv(proc, variant_ptr, t_type_info_map_ptr);
-					// names:   []string,
-					// bits:    []u32,
-					// offsets: []u32,
+					// names:   []string;
+					// bits:    []u32;
+					// offsets: []u32;
 					isize count = t->BitField.field_count;
 					if (count > 0) {
 						Entity **fields = t->BitField.fields;

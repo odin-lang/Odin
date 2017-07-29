@@ -371,6 +371,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	} return;
 
 	case Type_Map: {
+		generate_map_internal_types(m->allocator, t);
 		GB_ASSERT(t->Map.generated_struct_type != nullptr);
 		ir_print_type(f, m, t->Map.generated_struct_type);
 	} break;

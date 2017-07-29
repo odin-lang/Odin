@@ -2733,7 +2733,7 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 	return e;
 }
 
-i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
+i64 check_array_count(Checker *c, AstNode *e) {
 	if (e == nullptr) {
 		return 0;
 	}
@@ -2746,11 +2746,7 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 	check_expr(c, &o, e);
 	if (o.mode != Addressing_Constant) {
 		if (o.mode != Addressing_Invalid) {
-			if (is_map) {
-				error(e, "Fixed map count must be a constant");
-			} else {
-				error(e, "Array count must be a constant");
-			}
+			error(e, "Array count must be a constant");
 		}
 		return 0;
 	}
@@ -2758,26 +2754,15 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		if (o.value.kind == ExactValue_Integer) {
 			i64 count = i128_to_i64(o.value.value_integer);
-			if (is_map) {
-				if (count > 0) {
-					return count;
-				}
-				error(e, "Invalid fixed map count");
-			} else {
-				if (count >= 0) {
-					return count;
-				}
-				error(e, "Invalid negative array count %lld", cast(long long)count);
+			if (count >= 0) {
+				return count;
 			}
+			error(e, "Invalid negative array count %lld", cast(long long)count);
 			return 0;
 		}
 	}
 
-	if (is_map) {
-		error(e, "Fixed map count must be an integer");
-	} else {
-		error(e, "Array count must be an integer");
-	}
+	error(e, "Array count must be an integer");
 	return 0;
 }
 
@@ -2801,10 +2786,10 @@ void generate_map_entry_type(gbAllocator a, Type *type) {
 
 	/*
 	struct {
-		hash:  Map_Key,
-		next:  int,
-		key:   Key_Type,
-		value: Value_Type,
+		hash:  __MapKey;
+		next:  int;
+		key:   Key;
+		value: Value;
 	}
 	*/
 	AstNode *dummy_node = gb_alloc_item(a, AstNode);
@@ -2819,6 +2804,7 @@ void generate_map_entry_type(gbAllocator a, Type *type) {
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("value")), type->Map.value, false, 2));
 
 
+	entry_type->Struct.is_ordered          = true;
 	entry_type->Struct.fields              = fields;
 	entry_type->Struct.fields_in_src_order = fields;
 
@@ -2828,8 +2814,8 @@ void generate_map_entry_type(gbAllocator a, Type *type) {
 
 void generate_map_internal_types(gbAllocator a, Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
-	if (type->Map.generated_struct_type != nullptr) return;
 	generate_map_entry_type(a, type);
+	if (type->Map.generated_struct_type != nullptr) return;
 	Type *key   = type->Map.key;
 	Type *value = type->Map.value;
 	GB_ASSERT(key != nullptr);
@@ -2840,7 +2826,7 @@ void generate_map_internal_types(gbAllocator a, Type *type) {
 	/*
 	struct {
 		hashes:  [dynamic]int;
-		entries; [dynamic]EntryType;
+		entries: [dynamic]EntryType;
 	}
 	*/
 	AstNode *dummy_node = gb_alloc_item(a, AstNode);
@@ -2856,7 +2842,7 @@ void generate_map_internal_types(gbAllocator a, Type *type) {
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0));
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("entries")), entries_type, false, 1));
 
-
+	generated_struct_type->Struct.is_ordered          = true;
 	generated_struct_type->Struct.fields              = fields;
 	generated_struct_type->Struct.fields_in_src_order = fields;
 
@@ -2869,7 +2855,6 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 	GB_ASSERT(type->kind == Type_Map);
 	ast_node(mt, MapType, node);
 
-	i64 count   = check_array_or_map_count(c, mt->count, true);
 	Type *key   = check_type(c, mt->key);
 	Type *value = check_type(c, mt->value);
 
@@ -2883,12 +2868,6 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 		}
 	}
 
-	if (count > 0) {
-		count = 0;
-		error(node, "Fixed map types are not yet implemented");
-	}
-
-	type->Map.count = count;
 	type->Map.key   = key;
 	type->Map.value = value;
 
@@ -3026,7 +3005,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_ast_node(at, ArrayType, e);
 		if (at->count != nullptr) {
 			Type *elem = check_type(c, at->elem, nullptr);
-			i64 count = check_array_or_map_count(c, at->count, false);
+			i64 count = check_array_count(c, at->count);
 			if (count < 0) {
 				error(at->count, "... can only be used in conjuction with compound literals");
 				count = 0;
@@ -3050,7 +3029,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_ast_node(vt, VectorType, e);
 		Type *elem = check_type(c, vt->elem);
 		Type *be = base_type(elem);
-		i64 count = check_array_or_map_count(c, vt->count, false);
+		i64 count = check_array_count(c, vt->count);
 		if (is_type_vector(be) || (!is_type_boolean(be) && !is_type_numeric(be) && be->kind != Type_Generic)) {
 			gbString err_str = type_to_string(elem);
 			error(vt->elem, "Vector element type must be numerical or a boolean, got `%s`", err_str);
@@ -5048,7 +5027,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (is_type_slice(type)) {
 			min_args = 2;
 			max_args = 3;
-		} else if (is_type_dynamic_map(type)) {
+		} else if (is_type_map(type)) {
 			min_args = 1;
 			max_args = 2;
 		} else if (is_type_dynamic_array(type)) {

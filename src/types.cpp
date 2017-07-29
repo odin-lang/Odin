@@ -150,7 +150,6 @@ struct TypeStruct {
 		ProcCallingConvention calling_convention;         \
 	})                                                    \
 	TYPE_KIND(Map, struct {                               \
-		i64    count; /* 0 if dynamic */                  \
 		Type * key;                                       \
 		Type * value;                                     \
 		Type * entry_type;                                \
@@ -386,10 +385,10 @@ gb_global Type *t_map_header                  = nullptr;
 
 
 
-i64      type_size_of            (gbAllocator allocator, Type *t);
-i64      type_align_of           (gbAllocator allocator, Type *t);
-i64      type_offset_of          (gbAllocator allocator, Type *t, i32 index);
-gbString type_to_string          (Type *type);
+i64      type_size_of               (gbAllocator allocator, Type *t);
+i64      type_align_of              (gbAllocator allocator, Type *t);
+i64      type_offset_of             (gbAllocator allocator, Type *t, i32 index);
+gbString type_to_string             (Type *type);
 void     generate_map_internal_types(gbAllocator a, Type *type);
 
 
@@ -567,7 +566,6 @@ Type *make_type_map(gbAllocator a, i64 count, Type *key, Type *value) {
 	if (key != nullptr) {
 		GB_ASSERT(is_type_valid_for_keys(key));
 	}
-	t->Map.count = count;
 	t->Map.key   = key;
 	t->Map.value = value;
 	return t;
@@ -850,14 +848,6 @@ bool is_type_bit_field_value(Type *t) {
 bool is_type_map(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Map;
-}
-
-bool is_type_fixed_map(Type *t) {
-	t = base_type(t);
-	return t->kind == Type_Map && t->Map.count > 0;
-}
-bool is_type_dynamic_map(Type *t) {
-	t = base_type(t);	return t->kind == Type_Map && t->Map.count == 0;
 }
 
 
@@ -1207,8 +1197,7 @@ bool are_types_identical(Type *x, Type *y) {
 
 	case Type_Map:
 		if (y->kind == Type_Map) {
-			return x->Map.count == y->Map.count &&
-			       are_types_identical(x->Map.key,   y->Map.key) &&
+			return are_types_identical(x->Map.key,   y->Map.key) &&
 			       are_types_identical(x->Map.value, y->Map.value);
 		}
 		break;
@@ -1824,14 +1813,9 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		return max;
 	} break;
 
-	case Type_Map: {
-		if (t->Map.count == 0) { // Dynamic
-			// return build_context.word_size;
-			generate_map_internal_types(allocator, t);
-			return type_align_of_internal(allocator, t->Map.generated_struct_type, path);
-		}
-		GB_PANIC("TODO(bill): Fixed map alignment");
-	} break;
+	case Type_Map:
+		generate_map_internal_types(allocator, t);
+		return type_align_of_internal(allocator, t->Map.generated_struct_type, path);
 
 	case Type_Enum:
 		return type_align_of_internal(allocator, t->Enum.base_type, path);
@@ -2053,15 +2037,9 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		// data + len + cap + allocator(procedure+data)
 		return 3*build_context.word_size + 2*build_context.word_size;
 
-	case Type_Map: {
-		if (t->Map.count == 0) { // Dynamic
-			// i64 da = 3*build_context.word_size + 2*build_context.word_size;
-			// return 2 * da;
-			generate_map_internal_types(allocator, t);
-			return type_size_of_internal(allocator, t->Map.generated_struct_type, path);
-		}
-		GB_PANIC("TODO(bill): Fixed map size");
-	}
+	case Type_Map:
+		generate_map_internal_types(allocator, t);
+		return type_size_of_internal(allocator, t->Map.generated_struct_type, path);
 
 	case Type_Tuple: {
 		i64 count, align, size;
@@ -2350,9 +2328,6 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_Map: {
 		str = gb_string_appendc(str, "map[");
-		if (type->Map.count > 0) {
-			str = gb_string_append_fmt(str, "%d, ", cast(int)type->Map.count);
-		}
 		str = write_type_to_string(str, type->Map.key);
 		str = gb_string_append_rune(str, ']');
 		str = write_type_to_string(str, type->Map.value);

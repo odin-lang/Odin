@@ -98,7 +98,6 @@ TypeInfo :: struct #ordered {
 		key:              ^TypeInfo;
 		value:            ^TypeInfo;
 		generated_struct: ^TypeInfo;
-		count:            int; // == 0 if dynamic
 	};
 	BitField :: struct #ordered {
 		names:   []string;

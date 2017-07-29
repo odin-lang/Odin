@@ -1486,10 +1486,9 @@ AstNode *ast_bit_field_type(AstFile *f, Token token, Array<AstNode *> fields, As
 	return result;
 }
 
-AstNode *ast_map_type(AstFile *f, Token token, AstNode *count, AstNode *key, AstNode *value) {
+AstNode *ast_map_type(AstFile *f, Token token, AstNode *key, AstNode *value) {
 	AstNode *result = make_ast_node(f, AstNode_MapType);
 	result->MapType.token = token;
-	result->MapType.count = count;
 	result->MapType.key   = key;
 	result->MapType.value = value;
 	return result;
@@ -2399,29 +2398,25 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_map: {
 		Token token = expect_token(f, Token_map);
-		AstNode *count = nullptr;
 		AstNode *key   = nullptr;
 		AstNode *value = nullptr;
+		Token open, close;
 
-		Token open  = expect_token_after(f, Token_OpenBracket, "map");
-		key = parse_expr(f, true);
-		if (allow_token(f, Token_Comma)) {
-			count = key;
-			key = parse_type(f);
-		}
-		Token close = expect_token(f, Token_CloseBracket);
+		open  = expect_token_after(f, Token_OpenBracket, "map");
+		key   = parse_expr(f, true);
+		close = expect_token(f, Token_CloseBracket);
 		value = parse_type(f);
 
-		return ast_map_type(f, token, count, key, value);
+		return ast_map_type(f, token, key, value);
 	} break;
 
 	case Token_struct: {
-		Token token = expect_token(f, Token_struct);
+		Token    token = expect_token(f, Token_struct);
 		AstNode *polymorphic_params = nullptr;
-		bool is_packed    = false;
-		bool is_ordered   = false;
-		bool is_raw_union = false;
-		AstNode *align = nullptr;
+		bool     is_packed          = false;
+		bool     is_ordered         = false;
+		bool     is_raw_union       = false;
+		AstNode *align              = nullptr;
 
 		if (allow_token(f, Token_OpenParen)) {
 			isize param_count = 0;

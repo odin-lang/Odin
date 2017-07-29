@@ -839,7 +839,7 @@ ssaValue *ssa_emit_ptr_index(ssaProc *p, ssaValue *s, i64 index) {
 		case 2: result_type = t_int_ptr;                                      break;
 		case 3: result_type = t_allocator_ptr;                                break;
 		}
-	} else if (is_type_dynamic_map(t)) {
+	} else if (is_type_map(t)) {
 		Type *gst = t->Map.generated_struct_type;
 		switch (index) {
 		case 0: result_type = make_type_pointer(a, gst->Struct.fields[0]->type); break;
@@ -899,7 +899,7 @@ ssaValue *ssa_emit_value_index(ssaProc *p, ssaValue *s, i64 index) {
 		case 2: result_type = t_int;                                      break;
 		case 3: result_type = t_allocator;                                break;
 		}
-	} else if (is_type_dynamic_map(t)) {
+	} else if (is_type_map(t)) {
 		Type *gst = t->Map.generated_struct_type;
 		switch (index) {
 		case 0: result_type = gst->Struct.fields[0]->type; break;
