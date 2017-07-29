@@ -4362,99 +4362,93 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 	} break;
 
 	case Type_Union:
-	{
-		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-		defer (gb_temp_arena_memory_end(tmp));
-		isize count = t->Union.variants.count;
-		i64 *scores = gb_alloc_array(c->tmp_allocator, i64, count);
-		i32 success_count = 0;
-		i32 first_success_index = -1;
-		for_array(i, t->Union.variants) {
-			Type *vt = t->Union.variants[i];
-			i64 score = 0;
-			if (check_is_assignable_to_with_score(c, operand, vt, &score)) {
-				scores[i] = score;
-				success_count += 1;
-				if (first_success_index < 0) {
-					first_success_index = i;
-				}
-			}
-		}
-
-		gbString type_str = type_to_string(target_type);
-		defer (gb_string_free(type_str));
-
-		if (success_count == 1) {
-			operand->mode = Addressing_Value;
-			operand->type = t->Union.variants[first_success_index];
-			target_type = t->Union.variants[first_success_index];
-			break;
-		} else if (success_count > 1) {
-			GB_ASSERT(first_success_index >= 0);
-			operand->mode = Addressing_Invalid;
-			convert_untyped_error(c, operand, target_type);
-
-			gb_printf_err("Ambiguous type conversion to `%s`, which variant did you mean:\n\t", type_str);
-			i32 j = 0;
-			for (i32 i = first_success_index; i < count; i++) {
-				if (scores[i] == 0) continue;
-				if (j > 0 && success_count > 2) gb_printf_err(", ");
-				if (j == success_count-1) {
-					if (success_count == 2) {
-						gb_printf_err(" or ");
-					} else {
-						gb_printf_err(" or ");
+		if (!is_operand_nil(*operand) && !is_operand_undef(*operand)) {
+			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+			defer (gb_temp_arena_memory_end(tmp));
+			isize count = t->Union.variants.count;
+			i64 *scores = gb_alloc_array(c->tmp_allocator, i64, count);
+			i32 success_count = 0;
+			i32 first_success_index = -1;
+			for_array(i, t->Union.variants) {
+				Type *vt = t->Union.variants[i];
+				i64 score = 0;
+				if (check_is_assignable_to_with_score(c, operand, vt, &score)) {
+					scores[i] = score;
+					success_count += 1;
+					if (first_success_index < 0) {
+						first_success_index = i;
 					}
 				}
-				gbString str = type_to_string(t->Union.variants[i]);
-				gb_printf_err("`%s`", str);
-				gb_string_free(str);
-				j++;
 			}
-			gb_printf_err("\n\n");
 
-			return;
-		} else if (is_type_untyped_undef(operand->type) && type_has_undef(target_type)) {
-			target_type = t_untyped_undef;
-		} else if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
-			operand->mode = Addressing_Invalid;
-			convert_untyped_error(c, operand, target_type);
-			if (count > 0) {
-				gb_printf_err("`%s` is a union which only excepts the following types:\n", type_str);
-				gb_printf_err("\t");
-				for (i32 i = 0; i < count; i++) {
-					Type *v = t->Union.variants[i];
-					if (i > 0 && count > 2) gb_printf_err(", ");
-					if (i == count-1) {
-						if (count == 2) {
-							gb_printf_err(" or ");
-						} else {
-							gb_printf_err("or ");
-						}
+			gbString type_str = type_to_string(target_type);
+			defer (gb_string_free(type_str));
+
+			if (success_count == 1) {
+				operand->mode = Addressing_Value;
+				operand->type = t->Union.variants[first_success_index];
+				target_type = t->Union.variants[first_success_index];
+				break;
+			} else if (success_count > 1) {
+				GB_ASSERT(first_success_index >= 0);
+				operand->mode = Addressing_Invalid;
+				convert_untyped_error(c, operand, target_type);
+
+				gb_printf_err("Ambiguous type conversion to `%s`, which variant did you mean:\n\t", type_str);
+				i32 j = 0;
+				for (i32 i = first_success_index; i < count; i++) {
+					if (scores[i] == 0) continue;
+					if (j > 0 && success_count > 2) gb_printf_err(", ");
+					if (j == success_count-1) {
+						if (success_count == 2) gb_printf_err(" ");
+						gb_printf_err("or ");
 					}
-					gbString str = type_to_string(v);
+					gbString str = type_to_string(t->Union.variants[i]);
 					gb_printf_err("`%s`", str);
 					gb_string_free(str);
+					j++;
 				}
 				gb_printf_err("\n\n");
 
-			}
-			return;
-		}
+				return;
+			} else if (is_type_untyped_undef(operand->type) && type_has_undef(target_type)) {
+				target_type = t_untyped_undef;
+			} else if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
+				operand->mode = Addressing_Invalid;
+				convert_untyped_error(c, operand, target_type);
+				if (count > 0) {
+					gb_printf_err("`%s` is a union which only excepts the following types:\n", type_str);
+					gb_printf_err("\t");
+					for (i32 i = 0; i < count; i++) {
+						Type *v = t->Union.variants[i];
+						if (i > 0 && count > 2) gb_printf_err(", ");
+						if (i == count-1) {
+							if (count == 2) gb_printf_err(" ");
+							gb_printf_err("or ");
+						}
+						gbString str = type_to_string(v);
+						gb_printf_err("`%s`", str);
+						gb_string_free(str);
+					}
+					gb_printf_err("\n\n");
 
-	}
-	/* fallthrough */
+				}
+				return;
+			}
+		}
+		/* fallthrough */
 
 
 	default:
 		if (is_type_untyped_undef(operand->type) && type_has_undef(target_type)) {
 			target_type = t_untyped_undef;
-		} else if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
+		} else if (is_type_untyped_nil(operand->type) && type_has_nil(target_type)) {
+			target_type = t_untyped_nil;
+		} else {
 			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
 			return;
 		}
-		target_type = t_untyped_nil;
 		break;
 	}
 
