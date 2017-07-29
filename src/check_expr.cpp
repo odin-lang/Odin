@@ -364,7 +364,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 }
 
 bool check_polymorphic_procedure_assignment(Checker *c, Operand *operand, Type *type, PolyProcData *poly_proc_data) {
-	if (operand->expr == NULL) return false;
+	if (operand->expr == nullptr) return false;
 	Entity *base_entity = entity_of_ident(&c->info, operand->expr);
 	if (base_entity == nullptr) return false;
 	return find_or_generate_polymorphic_procedure(c, base_entity, type, nullptr, poly_proc_data);
@@ -1356,7 +1356,6 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 				}
 			}
 			if (ok) {
-				add_type_info_type(c, t);
 				array_add(&variants, t);
 			}
 		}
@@ -1400,6 +1399,7 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 		error(ut->align, "#align must be an integer");
 		return;
 	}
+
 
 }
 
@@ -2790,9 +2790,50 @@ Type *make_optional_ok_type(gbAllocator a, Type *value) {
 	return t;
 }
 
-void generate_map_struct_type(gbAllocator a, Type *type) {
+void generate_map_entry_type(gbAllocator a, Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
-	if (type->Map.generated_struct_type != NULL) return;
+	if (type->Map.entry_type != nullptr) return;
+
+	// NOTE(bill): The preload types may have not been set yet
+	GB_ASSERT(t_map_key != nullptr);
+
+	Type *entry_type = make_type_struct(a);
+
+	/*
+	struct {
+		hash:  Map_Key,
+		next:  int,
+		key:   Key_Type,
+		value: Value_Type,
+	}
+	*/
+	AstNode *dummy_node = gb_alloc_item(a, AstNode);
+	dummy_node->kind = AstNode_Invalid;
+	Scope *s = make_scope(universal_scope, a);
+
+	isize field_count = 3;
+	Array<Entity *> fields = {};
+	array_init(&fields, a, 3);
+	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("key")),   t_map_key,       false, 0));
+	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("next")),  t_int,           false, 1));
+	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("value")), type->Map.value, false, 2));
+
+
+	entry_type->Struct.fields              = fields;
+	entry_type->Struct.fields_in_src_order = fields;
+
+	// type_set_offsets(a, entry_type);
+	type->Map.entry_type = entry_type;
+}
+
+void generate_map_internal_types(gbAllocator a, Type *type) {
+	GB_ASSERT(type->kind == Type_Map);
+	if (type->Map.generated_struct_type != nullptr) return;
+	generate_map_entry_type(a, type);
+	Type *key   = type->Map.key;
+	Type *value = type->Map.value;
+	GB_ASSERT(key != nullptr);
+	GB_ASSERT(value != nullptr);
 
 	Type *generated_struct_type = make_type_struct(a);
 
@@ -2809,6 +2850,7 @@ void generate_map_struct_type(gbAllocator a, Type *type) {
 	Type *hashes_type  = make_type_dynamic_array(a, t_int);
 	Type *entries_type = make_type_dynamic_array(a, type->Map.entry_type);
 
+
 	Array<Entity *> fields = {};
 	array_init(&fields, a, 2);
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0));
@@ -2820,6 +2862,7 @@ void generate_map_struct_type(gbAllocator a, Type *type) {
 
 	type_set_offsets(a, generated_struct_type);
 	type->Map.generated_struct_type = generated_struct_type;
+	type->Map.lookup_result_type = make_optional_ok_type(a, value);
 }
 
 void check_map_type(Checker *c, Type *type, AstNode *node) {
@@ -2832,7 +2875,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 
 	if (!is_type_valid_for_keys(key)) {
 		if (is_type_boolean(key)) {
-			error(node, "A boolean cannot be used as a key for a map");
+			error(node, "A boolean cannot be used as a key for a map, use an array instead for this case");
 		} else {
 			gbString str = type_to_string(key);
 			error(node, "Invalid type of a key for a map, got `%s`", str);
@@ -2849,46 +2892,9 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 	type->Map.key   = key;
 	type->Map.value = value;
 
-	gbAllocator a = c->allocator;
 
-	{
-		// NOTE(bill): The preload types may have not been set yet
-		init_preload(c);
-		GB_ASSERT(t_map_key != nullptr);
-
-		Type *entry_type = make_type_struct(a);
-
-		/*
-		struct {
-			hash:  Map_Key,
-			next:  int,
-			key:   Key_Type,
-			value: Value_Type,
-		}
-		*/
-		AstNode *dummy_node = gb_alloc_item(a, AstNode);
-		dummy_node->kind = AstNode_Invalid;
-		check_open_scope(c, dummy_node);
-
-		isize field_count = 3;
-		Array<Entity *> fields = {};
-		array_init(&fields, a, 3);
-		array_add(&fields, make_entity_field(a, c->context.scope, make_token_ident(str_lit("key")),   t_map_key, false, 0));
-		array_add(&fields, make_entity_field(a, c->context.scope, make_token_ident(str_lit("next")),  t_int,     false, 1));
-		array_add(&fields, make_entity_field(a, c->context.scope, make_token_ident(str_lit("value")), value,     false, 2));
-
-		check_close_scope(c);
-
-		entry_type->Struct.fields              = fields;
-		entry_type->Struct.fields_in_src_order = fields;
-
-		type_set_offsets(a, entry_type);
-		type->Map.entry_type = entry_type;
-	}
-
-	generate_map_struct_type(a, type);
-
-	type->Map.lookup_result_type = make_optional_ok_type(a, value);
+	init_preload(c);
+	generate_map_internal_types(c->allocator, type);
 
 	// error(node, "`map` types are not yet implemented");
 }
@@ -3244,13 +3250,25 @@ bool check_binary_op(Checker *c, Operand *o, Token op) {
 		}
 		break;
 
-	case Token_Add:
 	case Token_Mul:
 	case Token_Quo:
 	case Token_AddEq:
 	case Token_MulEq:
 	case Token_QuoEq:
 		if (!is_type_numeric(type)) {
+			error(op, "Operator `%.*s` is only allowed with numeric expressions", LIT(op.string));
+			return false;
+		}
+		break;
+
+	case Token_Add:
+		if (is_type_string(type)) {
+			if (o->mode == Addressing_Constant) {
+				return true;
+			}
+			error(op, "String concatenation is only allowed with constant strings");
+			return false;
+		} else if (!is_type_numeric(type)) {
 			error(op, "Operator `%.*s` is only allowed with numeric expressions", LIT(op.string));
 			return false;
 		}
@@ -4140,13 +4158,19 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		if (op.kind == Token_Quo && is_type_integer(type)) {
 			op.kind = Token_QuoEq; // NOTE(bill): Hack to get division of integers
 		}
+
 		x->value = exact_binary_operator_value(op.kind, a, b);
+
 		if (is_type_typed(type)) {
 			if (node != nullptr) {
 				x->expr = node;
 			}
 			check_is_expressible(c, x, type);
 		}
+		return;
+	} else if (is_type_string(x->type)) {
+		error(node, "String concatenation is only allowed with constant strings");
+		x->mode = Addressing_Invalid;
 		return;
 	}
 
@@ -6478,7 +6502,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 				if (t == t_invalid) continue;
 				GB_ASSERT(t->kind == Type_Proc);
 				gbString pt;
-				if (t->Proc.node != NULL) {
+				if (t->Proc.node != nullptr) {
 					pt = expr_to_string(t->Proc.node);
 				} else {
 					pt = type_to_string(t);
@@ -6508,7 +6532,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 				TokenPos pos = proc->token.pos;
 				Type *t = base_type(proc->type); GB_ASSERT(t->kind == Type_Proc);
 				gbString pt;
-				if (t->Proc.node != NULL) {
+				if (t->Proc.node != nullptr) {
 					pt = expr_to_string(t->Proc.node);
 				} else {
 					pt = type_to_string(t);
@@ -7748,7 +7772,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			o->expr = node;
 			return kind;
 		}
-
 
 		bool src_is_ptr = is_type_pointer(o->type);
 		Type *src = type_deref(o->type);

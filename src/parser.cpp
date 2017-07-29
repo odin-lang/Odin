@@ -2231,10 +2231,9 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			// NOTE(bill): Allow neighbouring string literals to be merge together to
 			// become one big string
 			String s = f->curr_token.string;
-			Array<u8> data;
-			array_init(&data, heap_allocator(), token.string.len+s.len);
+			Array<u8> data = {};
+			array_init_count(&data, heap_allocator(), token.string.len+s.len);
 			gb_memmove(data.data, token.string.text, token.string.len);
-			data.count += token.string.len;
 
 			while (f->curr_token.kind == Token_String) {
 				String s = f->curr_token.string;

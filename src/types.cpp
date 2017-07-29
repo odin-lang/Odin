@@ -390,7 +390,7 @@ i64      type_size_of            (gbAllocator allocator, Type *t);
 i64      type_align_of           (gbAllocator allocator, Type *t);
 i64      type_offset_of          (gbAllocator allocator, Type *t, i32 index);
 gbString type_to_string          (Type *type);
-void     generate_map_struct_type(gbAllocator a, Type *type);
+void     generate_map_internal_types(gbAllocator a, Type *type);
 
 
 
@@ -1827,7 +1827,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	case Type_Map: {
 		if (t->Map.count == 0) { // Dynamic
 			// return build_context.word_size;
-			generate_map_struct_type(allocator, t);
+			generate_map_internal_types(allocator, t);
 			return type_align_of_internal(allocator, t->Map.generated_struct_type, path);
 		}
 		GB_PANIC("TODO(bill): Fixed map alignment");
@@ -2057,7 +2057,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		if (t->Map.count == 0) { // Dynamic
 			// i64 da = 3*build_context.word_size + 2*build_context.word_size;
 			// return 2 * da;
-			generate_map_struct_type(allocator, t);
+			generate_map_internal_types(allocator, t);
 			return type_size_of_internal(allocator, t->Map.generated_struct_type, path);
 		}
 		GB_PANIC("TODO(bill): Fixed map size");

@@ -565,13 +565,23 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		}
 		return exact_value_complex(real, imag);
 	} break;
+
+	case ExactValue_String: {
+		if (op != Token_Add) goto error;
+
+		// NOTE(bill): How do you minimize this over allocation?
+		String sx = x.value_string;
+		String sy = y.value_string;
+		isize len = sx.len+sy.len;
+		u8 *data = gb_alloc_array(heap_allocator(), u8, len);
+		gb_memmove(data,        sx.text, sx.len);
+		gb_memmove(data+sx.len, sy.text, sy.len);
+		return exact_value_string(make_string(data, len));
+	} break;
 	}
 
-error:
-	;		// MSVC accepts this??? apparently you cannot declare variables immediately after labels...
-	ExactValue error_value = {};
-	// gb_printf_err("Invalid binary operation: %s\n", token_kind_to_string(op));
-	return error_value;
+error:; // NOTE(bill): MSVC accepts this??? apparently you cannot declare variables immediately after labels...
+	return empty_exact_value;
 }
 
 gb_inline ExactValue exact_value_add(ExactValue x, ExactValue y) { return exact_binary_operator_value(Token_Add, x, y); }
