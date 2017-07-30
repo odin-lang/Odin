@@ -160,11 +160,10 @@ Allocator :: struct #ordered {
 
 
 Context :: struct #ordered {
+	allocator:  Allocator;
 	thread_id:  int;
 
-	allocator:  Allocator;
-
-	user_data:  rawptr;
+	user_data:  any;
 	user_index: int;
 
 	derived:    any; // May be used for derived data types
@@ -173,9 +172,9 @@ Context :: struct #ordered {
 DEFAULT_ALIGNMENT :: align_of([vector 4]f32);
 
 SourceCodeLocation :: struct #ordered {
-	fully_pathed_filename: string;
-	line, column:          i64;
-	procedure:             string;
+	file_path:    string;
+	line, column: i64;
+	procedure:    string;
 }
 
 
@@ -371,7 +370,7 @@ pop :: proc(array: ^$T/[]$E) -> E #cc_contextless {
 	if array == nil do return E{};
 	assert(len(array) > 0);
 	res := array[len(array)-1];
-	(cast(^raw.Slice)array).len -= 1;
+	(^raw.Slice)(array).len -= 1;
 	return res;
 }
 
@@ -379,7 +378,7 @@ pop :: proc(array: ^$T/[dynamic]$E) -> E #cc_contextless {
 	if array == nil do return E{};
 	assert(len(array) > 0);
 	res := array[len(array)-1];
-	(cast(^raw.DynamicArray)array).len -= 1;
+	(^raw.DynamicArray)(array).len -= 1;
 	return res;
 }
 
@@ -445,25 +444,25 @@ __get_map_key :: proc(key: $K) -> __MapKey #cc_contextless {
 	match _ in ti {
 	case TypeInfo.Integer:
 		match 8*size_of(key) {
-		case   8: map_key.hash = u128((cast(  ^u8)&key)^);
-		case  16: map_key.hash = u128((cast( ^u16)&key)^);
-		case  32: map_key.hash = u128((cast( ^u32)&key)^);
-		case  64: map_key.hash = u128((cast( ^u64)&key)^);
-		case 128: map_key.hash = u128((cast(^u128)&key)^);
+		case   8: map_key.hash = u128((  ^u8)(&key)^);
+		case  16: map_key.hash = u128(( ^u16)(&key)^);
+		case  32: map_key.hash = u128(( ^u32)(&key)^);
+		case  64: map_key.hash = u128(( ^u64)(&key)^);
+		case 128: map_key.hash = u128((^u128)(&key)^);
 		case: panic("Unhandled integer size");
 		}
 	case TypeInfo.Rune:
 		map_key.hash = u128((cast(^rune)&key)^);
 	case TypeInfo.Pointer:
-		map_key.hash = u128(uint((cast(^rawptr)&key)^));
+		map_key.hash = u128(uint((^rawptr)(&key)^));
 	case TypeInfo.Float:
 		match 8*size_of(key) {
-		case 32: map_key.hash = u128((cast(^u32)&key)^);
-		case 64: map_key.hash = u128((cast(^u64)&key)^);
+		case 32: map_key.hash = u128((^u32)(&key)^);
+		case 64: map_key.hash = u128((^u64)(&key)^);
 		case: panic("Unhandled float size");
 		}
 	case TypeInfo.String:
-		str := (cast(^string)&key)^;
+		str := (^string)(&key)^;
 		map_key.hash = __default_hash_string(str);
 		map_key.str  = str;
 	case:
@@ -494,9 +493,9 @@ new_clone :: proc(data: $T) -> ^T #inline {
 }
 
 free :: proc(ptr:   rawptr)         do free_ptr(ptr);
-free :: proc(str:   $T/string)      do free_ptr((cast(^raw.String)&str).data);
-free :: proc(array: $T/[dynamic]$E) do free_ptr((cast(^raw.DynamicArray)&array).data);
-free :: proc(slice: $T/[]$E)        do free_ptr((cast(^raw.Slice)&slice).data);
+free :: proc(str:   $T/string)      do free_ptr((^raw.String      )(&str).data);
+free :: proc(array: $T/[dynamic]$E) do free_ptr((^raw.DynamicArray)(&array).data);
+free :: proc(slice: $T/[]$E)        do free_ptr((^raw.Slice       )(&slice).data);
 free :: proc(m:     $T/map[$K]$V) {
 	raw := cast(^raw.DynamicMap)&m;
 	free(raw.hashes);
@@ -508,14 +507,14 @@ free :: proc(m:     $T/map[$K]$V) {
 /*
 make :: proc(T: type/[]$E, len: int, using location := #caller_location) -> T {
 	cap := len;
-	__slice_expr_error(fully_pathed_filename, int(line), int(column), 0, len, cap);
+	__slice_expr_error(file_path, int(line), int(column), 0, len, cap);
 	data := cast(^E)alloc(len * size_of(E), align_of(E));
 	for i in 0..len do (data+i)^ = E{};
 	s := raw.Slice{data = data, len = len, cap = len};
 	return (cast(^T)&s)^;
 }
 make :: proc(T: type/[]$E, len, cap: int, using location := #caller_location) -> T {
-	__slice_expr_error(fully_pathed_filename, int(line), int(column), 0, len, cap);
+	__slice_expr_error(file_path, int(line), int(column), 0, len, cap);
 	data := cast(^E)alloc(len * size_of(E), align_of(E));
 	for i in 0..len do (data+i)^ = E{};
 	s := raw.Slice{data = data, len = len, cap = len};
@@ -523,14 +522,14 @@ make :: proc(T: type/[]$E, len, cap: int, using location := #caller_location) ->
 }
 make :: proc(T: type/[dynamic]$E, len: int = 8, using location := #caller_location) -> T {
 	cap := len;
-	__slice_expr_error(fully_pathed_filename, int(line), int(column), 0, len, cap);
+	__slice_expr_error(file_path, int(line), int(column), 0, len, cap);
 	data := cast(^E)alloc(cap * size_of(E), align_of(E));
 	for i in 0..len do (data+i)^ = E{};
 	s := raw.DynamicArray{data = data, len = len, cap = cap, allocator = context.allocator};
 	return (cast(^T)&s)^;
 }
 make :: proc(T: type/[dynamic]$E, len, cap: int, using location := #caller_location) -> T {
-	__slice_expr_error(fully_pathed_filename, int(line), int(column), 0, len, cap);
+	__slice_expr_error(file_path, int(line), int(column), 0, len, cap);
 	data := cast(^E)alloc(cap * size_of(E), align_of(E));
 	for i in 0..len do (data+i)^ = E{};
 	s := raw.DynamicArray{data = data, len = len, cap = cap, allocator = context.allocator};
@@ -604,9 +603,9 @@ default_allocator :: proc() -> Allocator {
 assert :: proc(condition: bool, message := "", using location := #caller_location) -> bool #cc_contextless {
 	if !condition {
 		if len(message) > 0 {
-			fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion: %s\n", fully_pathed_filename, line, column, message);
+			fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion: %s\n", file_path, line, column, message);
 		} else {
-			fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion\n", fully_pathed_filename, line, column);
+			fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion\n", file_path, line, column);
 		}
 		__debug_trap();
 	}
@@ -615,9 +614,9 @@ assert :: proc(condition: bool, message := "", using location := #caller_locatio
 
 panic :: proc(message := "", using location := #caller_location) #cc_contextless {
 	if len(message) > 0 {
-		fmt.fprintf(os.stderr, "%s(%d:%d) Panic: %s\n", fully_pathed_filename, line, column, message);
+		fmt.fprintf(os.stderr, "%s(%d:%d) Panic: %s\n", file_path, line, column, message);
 	} else {
-		fmt.fprintf(os.stderr, "%s(%d:%d) Panic\n", fully_pathed_filename, line, column);
+		fmt.fprintf(os.stderr, "%s(%d:%d) Panic\n", file_path, line, column);
 	}
 	__debug_trap();
 }
@@ -683,6 +682,15 @@ __string_decode_rune :: proc(s: string) -> (rune, int) #cc_contextless #inline {
 	return utf8.decode_rune(s);
 }
 
+__bounds_check_error_loc :: proc(using loc := #caller_location, index, count: int) #cc_contextless {
+	__bounds_check_error(file_path, int(line), int(column), index, count);
+}
+__slice_expr_error_loc :: proc(using loc := #caller_location, low, high, max: int) #cc_contextless {
+	__slice_expr_error(file_path, int(line), int(column), low, high, max);
+}
+__substring_expr_error_loc :: proc(using loc := #caller_location, low, high: int) #cc_contextless {
+	__substring_expr_error(file_path, int(line), int(column), low, high);
+}
 
 __mem_set :: proc(data: rawptr, value: i32, len: int) -> rawptr #cc_contextless {
 	if data == nil do return nil;

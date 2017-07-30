@@ -319,14 +319,12 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 		if (is_type_integer(x) && is_type_integer(y)) {
 			GB_ASSERT(x->kind == Type_Basic);
 			GB_ASSERT(y->kind == Type_Basic);
-			if (x->Basic.size == y->Basic.size) {
-				continue;
-			}
+			i64 sx = type_size_of(heap_allocator(), x);
+			i64 sy = type_size_of(heap_allocator(), y);
+			if (sx == sy) continue;
 		}
 
-		if (!are_types_identical(x, y)) {
-			return false;
-		}
+		if (!are_types_identical(x, y)) return false;
 	}
 	for (isize i = 0; i < a->result_count; i++) {
 		Type *x = base_type(a->results->Tuple.variables[i]->type);
@@ -338,9 +336,9 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 		if (is_type_integer(x) && is_type_integer(y)) {
 			GB_ASSERT(x->kind == Type_Basic);
 			GB_ASSERT(y->kind == Type_Basic);
-			if (x->Basic.size == y->Basic.size) {
-				continue;
-			}
+			i64 sx = type_size_of(heap_allocator(), x);
+			i64 sy = type_size_of(heap_allocator(), y);
+			if (sx == sy) continue;
 		}
 
 		if (!are_types_identical(x, y)) {

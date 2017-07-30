@@ -226,10 +226,10 @@ generic_ftoa :: proc(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 
 	flt: ^FloatInfo;
 	match bit_size {
 	case 32:
-		bits = u64(transmute(u32, f32(val)));
+		bits = u64(transmute(u32)f32(val));
 		flt = &_f32_info;
 	case 64:
-		bits = transmute(u64, val);
+		bits = transmute(u64)val;
 		flt = &_f64_info;
 	case:
 		panic("strconv: invalid bit_size");

@@ -275,7 +275,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	case Type_DynamicArray:
 		ir_fprintf(f, "{");
 		ir_print_type(f, m, t->DynamicArray.elem);
-		ir_fprintf(f, "*, i%lld, i%lld,", word_bits, word_bits);
+		ir_fprintf(f, "*, i%lld, i%lld, ", word_bits, word_bits);
 		ir_print_type(f, m, t_allocator);
 		ir_fprintf(f, "}");
 		return;
@@ -523,7 +523,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				if (!has_defaults) {
 					ir_fprintf(f, "zeroinitializer");
 				} else {
-					ir_print_compound_element(f, m, empty_exact_value, type);
+					ir_print_exact_value(f, m, empty_exact_value, type);
 				}
 				break;
 			}
@@ -881,9 +881,6 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	case irInstr_Store: {
 		Type *type = type_deref(ir_type(instr->Store.address));
 		ir_fprintf(f, "store ");
-		if (instr->Store.atomic) {
-			ir_fprintf(f, "atomic ");
-		}
 		ir_print_type(f, m, type);
 		ir_fprintf(f, " ");
 		ir_print_value(f, m, instr->Store.value, type);
@@ -891,29 +888,17 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, type);
 		ir_fprintf(f, "* ");
 		ir_print_value(f, m, instr->Store.address, type);
-		if (instr->Store.atomic) {
-			// TODO(bill): Do ordering
-			ir_fprintf(f, " unordered");
-			ir_fprintf(f, ", align %lld\n", type_align_of(m->allocator, type));
-		}
 		ir_fprintf(f, "\n");
 	} break;
 
 	case irInstr_Load: {
 		Type *type = instr->Load.type;
 		ir_fprintf(f, "%%%d = load ", value->index);
-		// if (is_type_atomic(type)) {
-			// ir_fprintf(f, "atomic ");
-		// }
 		ir_print_type(f, m, type);
 		ir_fprintf(f, ", ");
 		ir_print_type(f, m, type);
 		ir_fprintf(f, "* ");
 		ir_print_value(f, m, instr->Load.address, type);
-		// if (is_type_atomic(type)) {
-			// TODO(bill): Do ordering
-			// ir_fprintf(f, " unordered");
-		// }
 		ir_fprintf(f, ", align %lld\n", type_align_of(m->allocator, type));
 	} break;
 
@@ -1409,7 +1394,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			if (param_index > 0) ir_fprintf(f, ", ");
 
 			ir_print_type(f, m, t_context_ptr);
-			ir_fprintf(f, " noalias nonnull");
+			ir_fprintf(f, " noalias nonnull ");
 			ir_print_value(f, m, call->context_ptr, t_context_ptr);
 		}
 		ir_fprintf(f, ")\n");
@@ -1568,26 +1553,27 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	#endif
 
 	case irInstr_DebugDeclare: {
-		/* irInstrDebugDeclare *dd = &instr->DebugDeclare;
+		irInstrDebugDeclare *dd = &instr->DebugDeclare;
 		Type *vt = ir_type(dd->value);
 		irDebugInfo *di = dd->debug_info;
 		Entity *e = dd->entity;
 		String name = e->token.string;
 		TokenPos pos = e->token.pos;
 		// gb_printf("debug_declare %.*s\n", LIT(dd->entity->token.string));
+		ir_fprintf(f, "; ");
 		ir_fprintf(f, "call void @llvm.dbg.declare(");
 		ir_fprintf(f, "metadata ");
 		ir_print_type(f, m, vt);
 		ir_fprintf(f, " ");
 		ir_print_value(f, m, dd->value, vt);
 		ir_fprintf(f, ", metadata !DILocalVariable(name: \"");
-		ir_print_escape_string(f, name, false);
+		ir_print_escape_string(f, name, false, false);
 		ir_fprintf(f, "\", scope: !%d, line: %td)", di->id, pos.line);
 		ir_fprintf(f, ", metadata !DIExpression()");
 		ir_fprintf(f, ")");
 		ir_fprintf(f, ", !dbg !DILocation(line: %td, column: %td, scope: !%d)", pos.line, pos.column, di->id);
 
-		ir_fprintf(f, "\n"); */
+		ir_fprintf(f, "\n");
 	} break;
 	}
 }

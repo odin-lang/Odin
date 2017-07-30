@@ -5,7 +5,7 @@ import win32 "sys/windows.odin";
 Thread :: struct {
 	using specific:   OsSpecific;
 	procedure:        Proc;
-	data:             rawptr;
+	data:             any;
 	user_index:       int;
 
 	init_context:     Context;

@@ -61,8 +61,6 @@ enum BuiltinProcId {
 	BuiltinProc_abs,
 	BuiltinProc_clamp,
 
-	BuiltinProc_transmute,
-
 	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
 
 	BuiltinProc_COUNT,
@@ -106,8 +104,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("max"),              2, false, Expr_Expr},
 	{STR_LIT("abs"),              1, false, Expr_Expr},
 	{STR_LIT("clamp"),            3, false, Expr_Expr},
-
-	{STR_LIT("transmute"),        2, false, Expr_Expr},
 
 	{STR_LIT(""),                 0, true,  Expr_Expr}, // DIRECTIVE
 };
@@ -2172,33 +2168,37 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 		scope->has_been_imported = true;
 
 		if (id->import_name.string == ".") {
-			// NOTE(bill): Add imported entities to this file's scope
-			for_array(elem_index, scope->elements.entries) {
-				Entity *e = scope->elements.entries[elem_index].value;
-				if (e->scope == parent_scope) {
-					continue;
-				}
-
-
-				if (!is_entity_kind_exported(e->kind)) {
-					continue;
-				}
-				if (id->is_import) {
-					if (is_entity_exported(e)) {
-						// TODO(bill): Should these entities be imported but cause an error when used?
-						bool ok = add_entity(c, parent_scope, e->identifier, e);
-						if (ok) {
-							map_set(&parent_scope->implicit, hash_entity(e), true);
-						}
+			if (parent_scope->is_global) {
+				error(id->import_name, "#shared_global_scope imports cannot use .");
+			} else {
+				// NOTE(bill): Add imported entities to this file's scope
+				for_array(elem_index, scope->elements.entries) {
+					Entity *e = scope->elements.entries[elem_index].value;
+					if (e->scope == parent_scope) {
+						continue;
 					}
-				} else {
-					add_entity(c, parent_scope, e->identifier, e);
+
+
+					if (!is_entity_kind_exported(e->kind)) {
+						continue;
+					}
+					if (id->is_import) {
+						if (is_entity_exported(e)) {
+							// TODO(bill): Should these entities be imported but cause an error when used?
+							bool ok = add_entity(c, parent_scope, e->identifier, e);
+							if (ok) {
+								map_set(&parent_scope->implicit, hash_entity(e), true);
+							}
+						}
+					} else {
+						add_entity(c, parent_scope, e->identifier, e);
+					}
 				}
 			}
 		} else {
 			String import_name = path_to_entity_name(id->import_name.string, id->fullpath);
 			if (is_blank_ident(import_name)) {
-				error(token, "File name, %.*s, cannot be as an import name as it is not a valid identifier", LIT(id->import_name.string));
+				error(token, "File name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
 			} else {
 				GB_ASSERT(id->import_name.pos.line != 0);
 				id->import_name.string = import_name;

@@ -2121,6 +2121,10 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					type = determine_type_from_polymorphic(c, type, op);
 					if (type == t_invalid) {
 						success = false;
+					} else if (!c->context.no_polymorphic_errors) {
+						// NOTE(bill): The type should be determined now and thus, no need to determine the type any more
+						is_type_polymorphic_type = false;
+						// is_type_polymorphic_type = is_type_polymorphic(base_type(type));
 					}
 				}
 
@@ -3959,6 +3963,43 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 	x->type = type;
 }
 
+bool check_transmute(Checker *c, AstNode *node, Operand *o, Type *t) {
+	if (o->mode == Addressing_Constant) {
+		gbString expr_str = expr_to_string(o->expr);
+		error(o->expr, "Cannot transmute a constant expression: `%s`", expr_str);
+		gb_string_free(expr_str);
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return false;
+	}
+
+	if (is_type_untyped(o->type)) {
+		gbString expr_str = expr_to_string(o->expr);
+		error(o->expr, "Cannot transmute untyped expression: `%s`", expr_str);
+		gb_string_free(expr_str);
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return false;
+	}
+
+	i64 srcz = type_size_of(c->allocator, o->type);
+	i64 dstz = type_size_of(c->allocator, t);
+	if (srcz != dstz) {
+		gbString expr_str = expr_to_string(o->expr);
+		gbString type_str = type_to_string(t);
+		error(o->expr, "Cannot transmute `%s` to `%s`, %lld vs %lld bytes", expr_str, type_str, srcz, dstz);
+		gb_string_free(type_str);
+		gb_string_free(expr_str);
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return false;
+	}
+
+	o->mode = Addressing_Value;
+	o->type = t;
+	return true;
+}
+
 bool check_binary_vector_expr(Checker *c, Token op, Operand *x, Operand *y) {
 	if (is_type_vector(x->type) && !is_type_vector(y->type)) {
 		if (check_is_assignable_to(c, y, x->type)) {
@@ -4870,7 +4911,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	case BuiltinProc_align_of:
 	case BuiltinProc_offset_of:
 	case BuiltinProc_type_info_of:
-	case BuiltinProc_transmute:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 	default:
@@ -5891,6 +5931,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 	} break;
 
+	#if 0
 	case BuiltinProc_transmute: {
 		Operand op = {};
 		check_expr_or_type(c, &op, ce->args[0]);
@@ -5940,6 +5981,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		o->mode = Addressing_Value;
 		o->type = t;
 	} break;
+	#endif
 	}
 
 	return true;
@@ -7814,7 +7856,18 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		Type *type = o->type;
 		check_expr_base(c, o, tc->expr, type);
 		if (o->mode != Addressing_Invalid) {
-			check_cast(c, o, type);
+			switch (tc->token.kind) {
+			case Token_transmute:
+				check_transmute(c, node, o, type);
+				break;
+			case Token_cast:
+				check_cast(c, o, type);
+				break;
+			default:
+				error(node, "Invalid AST: Invalid casting expression");
+				o->mode = Addressing_Invalid;
+				break;
+			}
 		}
 		return Expr_Expr;
 	case_end;

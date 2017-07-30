@@ -2141,7 +2141,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 i64 type_offset_of(gbAllocator allocator, Type *t, i32 index) {
 	t = base_type(t);
-	if (t->kind == Type_Struct && !t->Struct.is_raw_union) {
+	if (t->kind == Type_Struct) {
 		type_set_offsets(allocator, t);
 		if (gb_is_between(index, 0, t->Struct.fields.count-1)) {
 			return t->Struct.offsets[index];
@@ -2155,7 +2155,7 @@ i64 type_offset_of(gbAllocator allocator, Type *t, i32 index) {
 		if (t->Basic.kind == Basic_string) {
 			switch (index) {
 			case 0: return 0;                       // data
-			case 1: return build_context.word_size; // count
+			case 1: return build_context.word_size; // len
 			}
 		} else if (t->Basic.kind == Basic_any) {
 			switch (index) {
@@ -2166,15 +2166,20 @@ i64 type_offset_of(gbAllocator allocator, Type *t, i32 index) {
 	} else if (t->kind == Type_Slice) {
 		switch (index) {
 		case 0: return 0;                         // data
-		case 1: return 1*build_context.word_size; // count
-		case 2: return 2*build_context.word_size; // capacity
+		case 1: return 1*build_context.word_size; // len
+		case 2: return 2*build_context.word_size; // cap
 		}
 	} else if (t->kind == Type_DynamicArray) {
 		switch (index) {
 		case 0: return 0;                         // data
-		case 1: return 1*build_context.word_size; // count
-		case 2: return 2*build_context.word_size; // capacity
+		case 1: return 1*build_context.word_size; // len
+		case 2: return 2*build_context.word_size; // cap
 		case 3: return 3*build_context.word_size; // allocator
+		}
+	} else if (t->kind == Type_Union) {
+		i64 s = type_size_of(allocator, t);
+		switch (index) {
+		case -1: return align_formula(t->Union.variant_block_size, build_context.word_size); // __type_info
 		}
 	}
 	return 0;

@@ -60,19 +60,19 @@ sign :: proc(x: f64) -> f64 { if x >= 0 do return +1; return -1; }
 
 
 copy_sign :: proc(x, y: f32) -> f32 {
-	ix := transmute(u32, x);
-	iy := transmute(u32, y);
+	ix := transmute(u32)x;
+	iy := transmute(u32)y;
 	ix &= 0x7fff_ffff;
 	ix |= iy & 0x8000_0000;
-	return transmute(f32, ix);
+	return transmute(f32)ix;
 }
 
 copy_sign :: proc(x, y: f64) -> f64 {
-	ix := transmute(u64, x);
-	iy := transmute(u64, y);
+	ix := transmute(u64)x;
+	iy := transmute(u64)y;
 	ix &= 0x7fff_ffff_ffff_ff;
 	ix |= iy & 0x8000_0000_0000_0000;
-	return transmute(f64, ix);
+	return transmute(f64)ix;
 }
 
 round :: proc(x: f32) -> f32 { if x >= 0 do return floor(x + 0.5); return ceil(x - 0.5); }

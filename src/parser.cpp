@@ -2850,6 +2850,13 @@ AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 		Token close = expect_token(f, Token_CloseParen);
 		return ast_type_cast(f, token, type, parse_unary_expr(f, lhs));
 	} break;
+	case Token_transmute: {
+		Token token = expect_token(f, Token_transmute);
+		Token open  = expect_token_after(f, Token_OpenParen, "transmute");
+		AstNode *type = parse_type(f);
+		Token close = expect_token(f, Token_CloseParen);
+		return ast_type_cast(f, token, type, parse_unary_expr(f, lhs));
+	} break;
 	}
 
 	AstNode *operand = parse_operand(f, lhs);

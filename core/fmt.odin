@@ -149,8 +149,7 @@ aprintf :: proc(fmt: string, args: ...any) -> string {
 }
 
 
-// bprint* procedures return a string that was allocated with the current context
-// They must be freed accordingly
+// bprint* procedures return a string using a buffer from an array
 bprint :: proc(buf: []u8, args: ...any) -> string {
 	sb := StringBuffer(buf[..0..len(buf)]);
 	return sbprint(&sb, ...args);

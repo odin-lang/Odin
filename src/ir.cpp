@@ -2435,52 +2435,69 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 	Type *t = base_type(ir_type(s));
 	Type *result_type = nullptr;
 
-	if (is_type_struct(t)) {
+	switch (t->kind) {
+	case Type_Basic:
+		switch (t->Basic.kind) {
+		case Basic_string:
+			switch (index) {
+			case 0: result_type = t_u8_ptr; break;
+			case 1: result_type = t_int;    break;
+			}
+			break;
+		case Basic_any:
+			switch (index) {
+			case 0: result_type = t_rawptr;        break;
+			case 1: result_type = t_type_info_ptr; break;
+			}
+			break;
+		case Basic_complex64: case Basic_complex128:
+		{
+			Type *ft = base_complex_elem_type(t);
+			switch (index) {
+			case 0: result_type = ft; break;
+			case 1: result_type = ft; break;
+			}
+		} break;
+		}
+		break;
+	case Type_Struct:
 		result_type = t->Struct.fields[index]->type;
-	} else if (is_type_union(t)) {
+		break;
+	case Type_Union:
 		GB_ASSERT(index == -1);
 		return ir_emit_union_tag_value(proc, s);
-	} else if (is_type_tuple(t)) {
+	case Type_Tuple:
 		GB_ASSERT(t->Tuple.variables.count > 0);
 		result_type = t->Tuple.variables[index]->type;
-	} else if (is_type_complex(t)) {
-		Type *ft = base_complex_elem_type(t);
-		switch (index) {
-		case 0: result_type = ft; break;
-		case 1: result_type = ft; break;
-		}
-	} else if (is_type_slice(t)) {
+		break;
+	case Type_Slice:
 		switch (index) {
 		case 0: result_type = make_type_pointer(a, t->Slice.elem); break;
 		case 1: result_type = t_int; break;
 		case 2: result_type = t_int; break;
 		}
-	} else if (is_type_string(t)) {
-		switch (index) {
-		case 0: result_type = t_u8_ptr; break;
-		case 1: result_type = t_int;    break;
-		}
-	} else if (is_type_any(t)) {
-		switch (index) {
-		case 0: result_type = t_rawptr;        break;
-		case 1: result_type = t_type_info_ptr; break;
-		}
-	} else if (is_type_dynamic_array(t)) {
+		break;
+	case Type_DynamicArray:
 		switch (index) {
 		case 0: result_type = make_type_pointer(a, t->DynamicArray.elem); break;
 		case 1: result_type = t_int;                                      break;
 		case 2: result_type = t_int;                                      break;
 		case 3: result_type = t_allocator;                                break;
 		}
-	} else if (is_type_map(t)) {
+		break;
+
+	case Type_Map: {
 		generate_map_internal_types(a, t);
 		Type *gst = t->Map.generated_struct_type;
 		switch (index) {
 		case 0: result_type = gst->Struct.fields[0]->type; break;
 		case 1: result_type = gst->Struct.fields[1]->type; break;
 		}
-	} else {
+	} break;
+
+	default:
 		GB_PANIC("TODO(bill): struct_ev type: %s, %d", type_to_string(ir_type(s)), index);
+		break;
 	}
 
 	GB_ASSERT(result_type != nullptr);
@@ -2492,6 +2509,7 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 	GB_ASSERT(sel.index.count > 0);
 	Type *type = type_deref(ir_type(e));
+	gbAllocator a = proc->module->allocator;
 
 	for_array(i, sel.index) {
 		i32 index = cast(i32)sel.index[i];
@@ -2502,21 +2520,23 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 		}
 		type = core_type(type);
 
-
 		if (is_type_raw_union(type)) {
 			type = type->Struct.fields[index]->type;
-			e = ir_emit_conv(proc, e, make_type_pointer(proc->module->allocator, type));
+			e = ir_emit_conv(proc, e, make_type_pointer(a, type));
 		} else if (type->kind == Type_Union) {
 			GB_ASSERT(index == -1);
 			type = t_type_info_ptr;
 			e = ir_emit_struct_ep(proc, e, index);
 		} else if (type->kind == Type_Struct) {
 			type = type->Struct.fields[index]->type;
-			e = ir_emit_struct_ep(proc, e, index);
+			if (type->Struct.is_raw_union) {
+			} else {
+				e = ir_emit_struct_ep(proc, e, index);
+			}
 		} else if (type->kind == Type_Tuple) {
 			type = type->Tuple.variables[index]->type;
 			e = ir_emit_struct_ep(proc, e, index);
-		}else if (type->kind == Type_Basic) {
+		} else if (type->kind == Type_Basic) {
 			switch (type->Basic.kind) {
 			case Basic_any: {
 				if (index == 0) {
@@ -3867,11 +3887,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		return ir_type_info(proc, t);
 	} break;
 
-	case BuiltinProc_transmute: {
-		irValue *x = ir_build_expr(proc, ce->args[1]);
-		return ir_emit_transmute(proc, x, tv.type);
-	}
-
 	case BuiltinProc_len: {
 		irValue *v = ir_build_expr(proc, ce->args[0]);
 		Type *t = base_type(ir_type(v));
@@ -4694,7 +4709,13 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 	case_ast_node(tc, TypeCast, expr);
 		irValue *e = ir_build_expr(proc, tc->expr);
-		return ir_emit_conv(proc, e, tv.type);
+		switch (tc->token.kind) {
+		case Token_cast:
+			return ir_emit_conv(proc, e, tv.type);
+		case Token_transmute:
+			return ir_emit_transmute(proc, e, tv.type);
+		}
+		GB_PANIC("Invalid AST TypeCast");
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, expr);

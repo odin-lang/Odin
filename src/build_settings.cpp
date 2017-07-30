@@ -160,6 +160,7 @@ String odin_root_dir(void) {
 	}
 
 	array_init_count(&path_buf, heap_allocator(), 300);
+	defer (array_free(&path_buf));
 
 	len = 0;
 	for (;;) {
@@ -179,7 +180,10 @@ String odin_root_dir(void) {
 
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
 	text = gb_alloc_array(string_buffer_allocator, u8, len + 1);
+
 	gb_memmove(text, &path_buf[0], len);
 
 	path = make_string(text, len);
@@ -193,10 +197,6 @@ String odin_root_dir(void) {
 
 	global_module_path = path;
 	global_module_path_set = true;
-
-	gb_temp_arena_memory_end(tmp);
-
-	array_free(&path_buf);
 
 	return path;
 }
@@ -267,7 +267,7 @@ String get_fullpath_core(gbAllocator a, String path) {
 }
 
 
-String const ODIN_VERSION = str_lit("0.6.0-dev");
+String const ODIN_VERSION = str_lit("0.6.0");
 
 void init_build_context(void) {
 	BuildContext *bc = &build_context;

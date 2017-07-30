@@ -5,17 +5,16 @@ __multi3 :: proc(a, b: u128) -> u128 #cc_c #link_name "__multi3" {
 	lower_mask :: u128(~u64(0) >> bits_in_dword_2);
 
 
-	when ODIN_ENDIAN == "bit" {
-		TWords :: struct #raw_union {
-			all: u128;
-			using _: struct {lo, hi: u64;};
+	TWords :: struct #raw_union {
+		all: u128;
+		using _: struct {
+			when ODIN_ENDIAN == "big" {
+				lo, hi: u64;
+			} else {
+				hi, lo: u64;
+			}
 		};
-	} else {
-		TWords :: struct #raw_union {
-			all: u128;
-			using _: struct {hi, lo: u64;};
-		};
-	}
+	};
 
 	r: TWords;
 	t: u64;
@@ -63,13 +62,13 @@ __i128_quo_mod :: proc(a, b: i128, rem: ^i128) -> (quo: i128) #cc_c #link_name "
 	b = (a~s) - s;
 
 	uquo: u128;
-	urem := __u128_quo_mod(transmute(u128, a), transmute(u128, b), &uquo);
-	iquo := transmute(i128, uquo);
-	irem := transmute(i128, urem);
+	urem := __u128_quo_mod(transmute(u128)a, transmute(u128)b, &uquo);
+	iquo := transmute(i128)uquo;
+	irem := transmute(i128)urem;
 
 	iquo = (iquo~s) - s;
 	irem = (irem~s) - s;
-	if rem != nil { rem^ = irem; }
+	if rem != nil do rem^ = irem;
 	return iquo;
 }
 
@@ -78,7 +77,7 @@ __u128_quo_mod :: proc(a, b: u128, rem: ^u128) -> (quo: u128) #cc_c #link_name "
 	alo, ahi := u64(a), u64(a>>64);
 	blo, bhi := u64(b), u64(b>>64);
 	if b == 0 {
-		if rem != nil { rem^ = 0; }
+		if rem != nil do rem^ = 0;
 		return u128(alo/blo);
 	}
 
