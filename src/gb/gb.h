@@ -1,4 +1,4 @@
-/* gb.h - v0.29  - Ginger Bill's C Helper Library - public domain
+/* gb.h - v0.30  - Ginger Bill's C Helper Library - public domain
                  - no warranty implied; use at your own risk
 
 	This is a single header file with a bunch of useful stuff
@@ -58,6 +58,7 @@ TODOS
 	- More date & time functions
 
 VERSION HISTORY
+	0.30  - Changes to gbThread (and gbMutex on Windows)
 	0.29  - Add extras for gbString
 	0.28  - Handle UCS2 correctly in Win32 part
 	0.27  - OSX fixes and Linux gbAffinity

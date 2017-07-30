@@ -1073,6 +1073,9 @@ void add_type_info_type(Checker *c, Type *t) {
 	if (is_type_untyped(t)) {
 		return; // Could be nil
 	}
+	if (is_type_polymorphic(base_type(t))) {
+		return;
+	}
 
 	if (map_get(&c->info.type_info_map, hash_type(t)) != nullptr) {
 		// Types have already been added
@@ -1165,12 +1168,19 @@ void add_type_info_type(Checker *c, Type *t) {
 
 	case Type_Union:
 		add_type_info_type(c, t_int);
+		add_type_info_type(c, t_type_info_ptr);
 		for_array(i, bt->Union.variants) {
 			add_type_info_type(c, bt->Union.variants[i]);
 		}
 		break;
 
 	case Type_Struct: {
+		if (bt->Struct.scope != nullptr) {
+			for_array(i, bt->Struct.scope->elements.entries) {
+				Entity *e = bt->Struct.scope->elements.entries[i].value;
+				add_type_info_type(c, e->type);
+			}
+		}
 		for_array(i, bt->Struct.fields) {
 			Entity *f = bt->Struct.fields[i];
 			add_type_info_type(c, f->type);
@@ -2391,7 +2401,7 @@ void check_parsed_files(Checker *c) {
 				// i64 size  = type_size_of(c->sizes, c->allocator, e->type);
 				i64 align = type_align_of(c->allocator, e->type);
 				if (align > 0) {
-					// add_type_info_type(c, e->type);
+					add_type_info_type(c, e->type);
 				}
 			}
 		}
