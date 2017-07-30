@@ -3262,7 +3262,7 @@ AstNode *parse_value_decl(AstFile *f, Array<AstNode *> names, CommentGroup docs)
 	AstNode *type = nullptr;
 	Array<AstNode *> values = {};
 
-	Token colon = expect_token_after(f, Token_Colon, "identifier list");
+	expect_token_after(f, Token_Colon, "identifier list");
 	if (f->curr_token.kind == Token_type) {
 		type = ast_type_type(f, advance_token(f), nullptr);
 		is_mutable = false;
@@ -3378,7 +3378,7 @@ AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 			switch (next) {
 			case Token_for:
 			case Token_match: {
-				advance_token(f);
+				expect_token_after(f, Token_Colon, "identifier list");
 				AstNode *name = lhs[0];
 				AstNode *label = ast_label_decl(f, ast_node_token(name), name);
 				AstNode *stmt = parse_stmt(f);
@@ -5092,7 +5092,7 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 	p->init_fullpath = init_fullpath;
 
 
-#if 1
+#if USE_THREADED_PARSER
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	if (thread_count > 1) {
 		Array<gbThread> worker_threads = {};

@@ -31,6 +31,18 @@ struct PolyProcData {
 	ProcedureInfo proc_info;
 };
 
+struct ValidIndexAndScore {
+	isize index;
+	i64   score;
+};
+
+int valid_index_and_score_cmp(void const *a, void const *b) {
+	i64 si = (cast(ValidIndexAndScore const *)a)->score;
+	i64 sj = (cast(ValidIndexAndScore const *)b)->score;
+	return sj < si ? -1 : sj > si;
+}
+
+
 
 
 #define CALL_ARGUMENT_CHECKER(name) CallArgumentError name(Checker *c, AstNode *call, Type *proc_type, Entity *entity, Array<Operand> operands, CallArgumentErrorMode show_error_mode, CallArgumentData *data)
@@ -4386,44 +4398,61 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 			defer (gb_temp_arena_memory_end(tmp));
 			isize count = t->Union.variants.count;
-			i64 *scores = gb_alloc_array(c->tmp_allocator, i64, count);
-			i32 success_count = 0;
+			ValidIndexAndScore *valids = gb_alloc_array(c->tmp_allocator, ValidIndexAndScore, count);
+			i32 valid_count = 0;
 			i32 first_success_index = -1;
 			for_array(i, t->Union.variants) {
 				Type *vt = t->Union.variants[i];
 				i64 score = 0;
 				if (check_is_assignable_to_with_score(c, operand, vt, &score)) {
-					scores[i] = score;
-					success_count += 1;
+					valids[valid_count].index = i;
+					valids[valid_count].score = score;
+					valid_count += 1;
 					if (first_success_index < 0) {
 						first_success_index = i;
 					}
 				}
 			}
 
+			if (valid_count > 1) {
+				gb_sort_array(valids, valid_count, valid_index_and_score_cmp);
+				i64 best_score = valids[0].score;
+				Type *best_type = t->Union.variants[valids[0].index];
+				for (isize i = 1; i < valid_count; i++) {
+					auto v = valids[i];
+					Type *vt = t->Union.variants[v.index];
+					if (best_score > v.score) {
+						valid_count = i;
+						break;
+					}
+					best_score = v.score;
+				}
+				first_success_index = valids[0].index;
+			}
+
 			gbString type_str = type_to_string(target_type);
 			defer (gb_string_free(type_str));
 
-			if (success_count == 1) {
+			if (valid_count == 1) {
 				operand->mode = Addressing_Value;
 				operand->type = t->Union.variants[first_success_index];
 				target_type = t->Union.variants[first_success_index];
 				break;
-			} else if (success_count > 1) {
+			} else if (valid_count > 1) {
 				GB_ASSERT(first_success_index >= 0);
 				operand->mode = Addressing_Invalid;
 				convert_untyped_error(c, operand, target_type);
 
 				gb_printf_err("Ambiguous type conversion to `%s`, which variant did you mean:\n\t", type_str);
 				i32 j = 0;
-				for (i32 i = first_success_index; i < count; i++) {
-					if (scores[i] == 0) continue;
-					if (j > 0 && success_count > 2) gb_printf_err(", ");
-					if (j == success_count-1) {
-						if (success_count == 2) gb_printf_err(" ");
+				for (i32 i = 0; i < valid_count; i++) {
+					ValidIndexAndScore valid = valids[i];
+					if (j > 0 && valid_count > 2) gb_printf_err(", ");
+					if (j == valid_count-1) {
+						if (valid_count == 2) gb_printf_err(" ");
 						gb_printf_err("or ");
 					}
-					gbString str = type_to_string(t->Union.variants[i]);
+					gbString str = type_to_string(t->Union.variants[valid.index]);
 					gb_printf_err("`%s`", str);
 					gb_string_free(str);
 					j++;
@@ -5988,16 +6017,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 }
 
 
-struct ValidProcAndScore {
-	isize index;
-	i64   score;
-};
 
-int valid_proc_and_score_cmp(void const *a, void const *b) {
-	i64 si = (cast(ValidProcAndScore const *)a)->score;
-	i64 sj = (cast(ValidProcAndScore const *)b)->score;
-	return sj < si ? -1 : sj > si;
-}
 
 
 bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operands, Array<AstNode *> rhs, bool allow_ok) {
@@ -6439,10 +6459,10 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 	if (operand->mode == Addressing_Overload) {
 		GB_ASSERT(operand->overload_entities != nullptr &&
 		          operand->overload_count > 0);
-		isize              overload_count = operand->overload_count;
-		Entity **          procs          = operand->overload_entities;
-		ValidProcAndScore *valids         = gb_alloc_array(heap_allocator(), ValidProcAndScore, overload_count);
-		isize              valid_count    = 0;
+		isize               overload_count = operand->overload_count;
+		Entity **           procs          = operand->overload_entities;
+		ValidIndexAndScore *valids         = gb_alloc_array(heap_allocator(), ValidIndexAndScore, overload_count);
+		isize               valid_count    = 0;
 
 		defer (gb_free(heap_allocator(), procs));
 		defer (gb_free(heap_allocator(), valids));
@@ -6478,7 +6498,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 		}
 
 		if (valid_count > 1) {
-			gb_sort_array(valids, valid_count, valid_proc_and_score_cmp);
+			gb_sort_array(valids, valid_count, valid_index_and_score_cmp);
 			i64 best_score = valids[0].score;
 			Entity *best_entity = procs[valids[0].index];
 			for (isize i = 1; i < valid_count; i++) {

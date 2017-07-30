@@ -1,4 +1,5 @@
 #define USE_CUSTOM_BACKEND 0
+#define USE_THREADED_PARSER 1
 // #define NO_ARRAY_BOUNDS_CHECK
 
 #include "common.cpp"

@@ -711,8 +711,11 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 			bool is_immutable = e->Variable.is_immutable;
 			String name = e->token.string;
 			Type *t = base_type(type_deref(e->type));
-			if (is_type_struct(t) || is_type_raw_union(t)) {
-				Scope *scope = scope_of_node(&c->info, t->Struct.node);
+			if (t->kind == Type_Struct) {
+				Scope *scope = t->Struct.scope;
+				if (scope == nullptr) {
+					scope = scope_of_node(&c->info, t->Struct.node);
+				}
 				GB_ASSERT(scope != nullptr);
 				for_array(i, scope->elements.entries) {
 					Entity *f = scope->elements.entries[i].value;
@@ -727,7 +730,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 					}
 				}
 			} else {
-				error(e->token, "`using` can only be applied to variables of type struct or raw_union");
+				error(e->token, "`using` can only be applied to variables of type struct");
 				break;
 			}
 		}
@@ -748,7 +751,6 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 		}
 	}
 	pop_procedure(c);
-
 
 	check_scope_usage(c, c->context.scope);
 

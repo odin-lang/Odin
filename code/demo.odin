@@ -66,6 +66,7 @@ general_stuff :: proc() {
 		}
 		f := Foo{137, true};
 		x, b := expand_to_tuple(f);
+		fmt.println(f);
 		fmt.println(x, b);
 		fmt.println(expand_to_tuple(f));
 	}
@@ -371,7 +372,7 @@ parametric_polymorphism :: proc() {
 		return t;
 	}
 
-	copy :: proc(dst, src: []$T) -> int {
+	copy_slice :: proc(dst, src: []$T) -> int {
 		n := min(len(dst), len(src));
 		if n > 0 {
 			mem.copy(&dst[0], &src[0], n*size_of(T));
@@ -553,7 +554,7 @@ threading_example :: proc() {
 			for iteration in 1...5 {
 				fmt.printf("Thread %d is on iteration %d\n", t.user_index, iteration);
 				fmt.printf("`%s`: iteration %d\n", prefix_table[t.user_index], iteration);
-				win32.sleep(1);
+				// win32.sleep(1);
 			}
 			return 0;
 		}
@@ -588,15 +589,13 @@ threading_example :: proc() {
 
 
 main :: proc() {
-when false {
-	if true {
-		fmt.println("\ngeneral_stuff:");              general_stuff();
-		fmt.println("\nnested_struct_declarations:"); nested_struct_declarations();
-		fmt.println("\ndefault_struct_values:");      default_struct_values();
-		fmt.println("\nunion_type:");                 union_type();
-		fmt.println("\nparametric_polymorphism:");    parametric_polymorphism();
+	when true {
+		fmt.println("\n# general_stuff");              general_stuff();
+		fmt.println("\n# nested_struct_declarations"); nested_struct_declarations();
+		fmt.println("\n# default_struct_values");      default_struct_values();
+		fmt.println("\n# union_type");                 union_type();
+		fmt.println("\n# parametric_polymorphism");    parametric_polymorphism();
+		fmt.println("\n# threading_example");          threading_example();
 	}
-	fmt.println("\nthreading_example:");           threading_example();
-}
 }
 
