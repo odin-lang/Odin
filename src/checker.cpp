@@ -2279,6 +2279,8 @@ void check_parsed_files(Checker *c) {
 		scope->file      = f;
 		if (f->tokenizer.fullpath == c->parser->init_fullpath) {
 			scope->is_init = true;
+		} else if (f->file_kind == ImportedFile_Init) {
+			scope->is_init = true;
 		}
 
 		if (scope->is_global) {

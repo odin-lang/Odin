@@ -20,6 +20,21 @@ struct CommentGroup {
 };
 
 
+enum ImportedFileKind {
+	ImportedFile_Normal,
+	ImportedFile_Shared,
+	ImportedFile_Init,
+};
+
+struct ImportedFile {
+	ImportedFileKind kind;
+	String           path;
+	String           rel_path;
+	TokenPos         pos; // import
+	isize            index;
+};
+
+
 struct AstFile {
 	i32            id;
 	gbArena        arena;
@@ -38,6 +53,7 @@ struct AstFile {
 	bool           allow_type;
 
 	Array<AstNode *> decls;
+	ImportedFileKind file_kind;
 	bool             is_global_scope;
 
 	AstNode *      curr_proc;
@@ -58,16 +74,12 @@ struct AstFile {
 	TokenPos fix_prev_pos;
 };
 
-struct ImportedFile {
-	String   path;
-	String   rel_path;
-	TokenPos pos; // import
-};
 
 struct Parser {
 	String              init_fullpath;
 	Array<AstFile>      files;
 	Array<ImportedFile> imports;
+	isize               curr_import_index;
 	gbAtomic32          import_index;
 	isize               total_token_count;
 	isize               total_line_count;
@@ -4748,18 +4760,19 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 	}
 	TokenizerInitError err = init_tokenizer(&f->tokenizer, fullpath);
 	if (err == TokenizerInit_None) {
-		array_init(&f->tokens, heap_allocator());
-		{
-			for (;;) {
-				Token token = tokenizer_get_token(&f->tokenizer);
-				if (token.kind == Token_Invalid) {
-					return ParseFile_InvalidToken;
-				}
-				array_add(&f->tokens, token);
+		isize file_size = f->tokenizer.end - f->tokenizer.start;
+		isize init_token_cap = gb_max(next_pow2(file_size/2), 16);
+		array_init(&f->tokens, heap_allocator(), gb_max(init_token_cap, 16));
 
-				if (token.kind == Token_EOF) {
-					break;
-				}
+		for (;;) {
+			Token token = tokenizer_get_token(&f->tokenizer);
+			if (token.kind == Token_Invalid) {
+				return ParseFile_InvalidToken;
+			}
+			array_add(&f->tokens, token);
+
+			if (token.kind == Token_EOF) {
+				break;
 			}
 		}
 
@@ -4821,7 +4834,6 @@ void destroy_parser(Parser *p) {
 
 // NOTE(bill): Returns true if it's added
 bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
-
 	gb_mutex_lock(&p->mutex);
 	defer (gb_mutex_unlock(&p->mutex));
 
@@ -4839,10 +4851,12 @@ bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) 
 		}
 	}
 
-	ImportedFile item;
-	item.path = path;
+	ImportedFile item = {};
+	item.kind     = ImportedFile_Normal;
+	item.path     = path;
 	item.rel_path = rel_path;
-	item.pos = pos;
+	item.pos      = pos;
+	item.index    = p->imports.count;
 	array_add(&p->imports, item);
 
 
@@ -4979,80 +4993,168 @@ void parse_file(Parser *p, AstFile *f) {
 
 
 
+ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
+	String import_path = imported_file.path;
+	String import_rel_path = imported_file.rel_path;
+	TokenPos pos = imported_file.pos;
+	AstFile file = {};
+	file.file_kind = imported_file.kind;
+	if (file.file_kind == ImportedFile_Shared) {
+		file.is_global_scope = true;
+	}
+
+	ParseFileError err = init_ast_file(&file, import_path);
+
+	if (err != ParseFile_None) {
+		if (err == ParseFile_EmptyFile) {
+			if (import_path == p->init_fullpath) {
+				gb_printf_err("Initial file is empty - %.*s\n", LIT(p->init_fullpath));
+				gb_exit(1);
+			}
+			return ParseFile_None;
+		}
+
+		if (pos.line != 0) {
+			gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
+		}
+		gb_printf_err("Failed to parse file: %.*s\n\t", LIT(import_rel_path));
+		switch (err) {
+		case ParseFile_WrongExtension:
+			gb_printf_err("Invalid file extension: File must have the extension `.odin`");
+			break;
+		case ParseFile_InvalidFile:
+			gb_printf_err("Invalid file or cannot be found");
+			break;
+		case ParseFile_Permission:
+			gb_printf_err("File permissions problem");
+			break;
+		case ParseFile_NotFound:
+			gb_printf_err("File cannot be found (`%.*s`)", LIT(import_path));
+			break;
+		case ParseFile_InvalidToken:
+			gb_printf_err("Invalid token found in file");
+			break;
+		}
+		gb_printf_err("\n");
+		return err;
+	}
+	parse_file(p, &file);
+
+	{
+		gb_mutex_lock(&p->mutex);
+		file.id = imported_file.index;
+		array_add(&p->files, file);
+		p->total_line_count += file.tokenizer.line_count;
+		gb_mutex_unlock(&p->mutex);
+	}
+
+
+	return ParseFile_None;
+}
+
+GB_THREAD_PROC(parse_worker_file_proc) {
+	if (thread == nullptr) return 0;
+	auto *p = cast(Parser *)thread->user_data;
+	isize index = thread->user_index;
+	ImportedFile imported_file = p->imports[index];
+	ParseFileError err = parse_import(p, imported_file);
+	return cast(isize)err;
+}
+
+
+struct ParserThreadWork {
+	Parser *parser;
+	isize   import_index;
+};
+
 ParseFileError parse_files(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
 
 	char *fullpath_str = gb_path_get_full_name(heap_allocator(), cast(char *)&init_filename[0]);
 	String init_fullpath = string_trim_whitespace(make_string_c(fullpath_str));
 	TokenPos init_pos = {};
-	ImportedFile init_imported_file = {init_fullpath, init_fullpath, init_pos};
+	ImportedFile init_imported_file = {ImportedFile_Init, init_fullpath, init_fullpath, init_pos};
 
+	isize shared_file_count = 0;
 	if (!build_context.generate_docs) {
 		String s = get_fullpath_core(heap_allocator(), str_lit("_preload.odin"));
-		ImportedFile runtime_file = {s, s, init_pos};
+		ImportedFile runtime_file = {ImportedFile_Shared, s, s, init_pos};
 		array_add(&p->imports, runtime_file);
+		shared_file_count++;
 	}
 	if (!build_context.generate_docs) {
 		String s = get_fullpath_core(heap_allocator(), str_lit("_soft_numbers.odin"));
-		ImportedFile runtime_file = {s, s, init_pos};
+		ImportedFile runtime_file = {ImportedFile_Shared, s, s, init_pos};
 		array_add(&p->imports, runtime_file);
+		shared_file_count++;
 	}
-
 	array_add(&p->imports, init_imported_file);
 	p->init_fullpath = init_fullpath;
 
-	for_array(i, p->imports) {
-		ImportedFile imported_file = p->imports[i];
-		String import_path = imported_file.path;
-		String import_rel_path = imported_file.rel_path;
-		TokenPos pos = imported_file.pos;
-		AstFile file = {};
 
-		ParseFileError err = init_ast_file(&file, import_path);
+#if 1
+	isize thread_count = gb_max(build_context.thread_count, 1);
+	if (thread_count > 1) {
+		Array<gbThread> worker_threads = {};
+		array_init_count(&worker_threads, heap_allocator(), thread_count);
+		defer (array_free(&worker_threads));
 
-		if (err != ParseFile_None) {
-			if (err == ParseFile_EmptyFile) {
-				if (import_path == init_fullpath) {
-					gb_printf_err("Initial file is empty - %.*s\n", LIT(init_fullpath));
-					gb_exit(1);
-				}
-				return ParseFile_None;
-			}
-
-			if (pos.line != 0) {
-				gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
-			}
-			gb_printf_err("Failed to parse file: %.*s\n\t", LIT(import_rel_path));
-			switch (err) {
-			case ParseFile_WrongExtension:
-				gb_printf_err("Invalid file extension: File must have the extension `.odin`");
-				break;
-			case ParseFile_InvalidFile:
-				gb_printf_err("Invalid file or cannot be found");
-				break;
-			case ParseFile_Permission:
-				gb_printf_err("File permissions problem");
-				break;
-			case ParseFile_NotFound:
-				gb_printf_err("File cannot be found (`%.*s`)", LIT(import_path));
-				break;
-			case ParseFile_InvalidToken:
-				gb_printf_err("Invalid token found in file");
-				break;
-			}
-			gb_printf_err("\n");
-			return err;
+		for_array(i, p->imports) {
+			gbThread *t = &worker_threads[i];
+			gb_thread_init(t);
 		}
-		parse_file(p, &file);
 
-		{
-			gb_mutex_lock(&p->mutex);
-			file.id = p->files.count;
-			array_add(&p->files, file);
-			p->total_line_count += file.tokenizer.line_count;
-			gb_mutex_unlock(&p->mutex);
+		// NOTE(bill): Make sure that these are in parsed in this order
+		for (isize i = 0; i < shared_file_count; i++) {
+			ParseFileError err = parse_import(p, p->imports[i]);
+			if (err != ParseFile_None) {
+				return err;
+			}
+			p->curr_import_index++;
+		}
+
+		for (;;) {
+			bool are_any_alive = false;
+			for_array(i, worker_threads) {
+				gbThread *t = &worker_threads[i];
+				if (gb_thread_is_running(t)) {
+					are_any_alive = true;
+				} else if (p->curr_import_index < p->imports.count) {
+					if (t->return_value != 0) {
+						for_array(i, worker_threads) {
+							gb_thread_destory(&worker_threads[i]);
+						}
+						return cast(ParseFileError)t->return_value;
+					}
+					t->user_index = p->curr_import_index++;
+					gb_thread_start(t, parse_worker_file_proc, p);
+					are_any_alive = true;
+				}
+			}
+			if (!are_any_alive && p->curr_import_index >= p->imports.count) {
+				break;
+			}
+		}
+
+		for_array(i, worker_threads) {
+			gb_thread_destory(&worker_threads[i]);
+		}
+	} else {
+		for_array(i, p->imports) {
+			ParseFileError err = parse_import(p, p->imports[i]);
+			if (err != ParseFile_None) {
+				return err;
+			}
 		}
 	}
+#else
+	for_array(i, p->imports) {
+		ParseFileError err = parse_import(p, p->imports[i]);
+		if (err != ParseFile_None) {
+			return err;
+		}
+	}
+#endif
 
 	for_array(i, p->files) {
 		p->total_token_count += p->files[i].tokens.count;

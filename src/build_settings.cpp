@@ -19,6 +19,9 @@ struct BuildContext {
 	bool   generate_docs;
 	i32    optimization_level;
 	bool   show_timings;
+
+	gbAffinity affinity;
+	isize      thread_count;
 };
 
 
@@ -205,18 +208,22 @@ String odin_root_dir(void) {
 
 #if defined(GB_SYSTEM_WINDOWS)
 String path_to_fullpath(gbAllocator a, String s) {
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-	String16 string16 = string_to_string16(string_buffer_allocator, s);
-	String result = {0};
+	String result = {};
+	gb_mutex_lock(&string_buffer_mutex);
+	{
+		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+		String16 string16 = string_to_string16(string_buffer_allocator, s);
 
-	DWORD len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
-	if (len != 0) {
-		wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
-		GetFullPathNameW(&string16[0], len, text, nullptr);
-		text[len] = 0;
-		result = string16_to_string(a, make_string16(text, len));
+		DWORD len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
+		if (len != 0) {
+			wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
+			GetFullPathNameW(&string16[0], len, text, nullptr);
+			text[len] = 0;
+			result = string16_to_string(a, make_string16(text, len));
+		}
+		gb_temp_arena_memory_end(tmp);
 	}
-	gb_temp_arena_memory_end(tmp);
+	gb_mutex_unlock(&string_buffer_mutex);
 	return result;
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
@@ -271,6 +278,12 @@ String const ODIN_VERSION = str_lit("0.6.0");
 
 void init_build_context(void) {
 	BuildContext *bc = &build_context;
+
+	gb_affinity_init(&bc->affinity);
+	if (bc->thread_count == 0) {
+		bc->thread_count = gb_max(bc->affinity.thread_count, 1);
+	}
+
 	bc->ODIN_VENDOR  = str_lit("odin");
 	bc->ODIN_VERSION = ODIN_VERSION;
 	bc->ODIN_ROOT    = odin_root_dir();

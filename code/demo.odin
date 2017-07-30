@@ -338,7 +338,7 @@ union_type :: proc() {
 
 parametric_polymorphism :: proc() {
 	print_value :: proc(value: $T) {
-		fmt.printf("print_value: %v %v\n", value, value);
+		fmt.printf("print_value: %T %v\n", value, value);
 	}
 
 	v1: int    = 1;
@@ -496,10 +496,12 @@ parametric_polymorphism :: proc() {
 			return -1;
 		}
 
-		get_hash :: proc(s: string) -> u32 { // djb2
-			hash: u32 = 0x1505;
-			for i in 0..len(s) do hash = (hash<<5) + hash + u32(s[i]);
-			return hash;
+		get_hash :: proc(s: string) -> u32 { // fnv32a
+			h: u32 = 0x811c9dc5;
+			for i in 0..len(s) {
+				h = (h ~ u32(s[i])) * 0x01000193;
+			}
+			return h;
 		}
 
 
@@ -586,6 +588,7 @@ threading_example :: proc() {
 
 
 main :: proc() {
+when false {
 	if true {
 		fmt.println("\ngeneral_stuff:");              general_stuff();
 		fmt.println("\nnested_struct_declarations:"); nested_struct_declarations();
@@ -594,5 +597,6 @@ main :: proc() {
 		fmt.println("\nparametric_polymorphism:");    parametric_polymorphism();
 	}
 	fmt.println("\nthreading_example:");           threading_example();
+}
 }
 

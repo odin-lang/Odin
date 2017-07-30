@@ -957,7 +957,7 @@ gb_mutex_init(&m);
 
 
 
-#define GB_THREAD_PROC(name) void name(void *data)
+#define GB_THREAD_PROC(name) isize name(struct gbThread *thread)
 typedef GB_THREAD_PROC(gbThreadProc);
 
 typedef struct gbThread {
@@ -968,7 +968,9 @@ typedef struct gbThread {
 #endif
 
 	gbThreadProc *proc;
-	void *        data;
+	void *        user_data;
+	isize         user_index;
+	isize         return_value;
 
 	gbSemaphore   semaphore;
 	isize         stack_size;
@@ -4672,22 +4674,32 @@ void gb_thread_destory(gbThread *t) {
 
 gb_inline void gb__thread_run(gbThread *t) {
 	gb_semaphore_release(&t->semaphore);
-	t->proc(t->data);
+	t->return_value = t->proc(t);
 }
 
 #if defined(GB_SYSTEM_WINDOWS)
-	gb_inline DWORD __stdcall gb__thread_proc(void *arg) { gb__thread_run(cast(gbThread *)arg); return 0; }
+	gb_inline DWORD __stdcall gb__thread_proc(void *arg) {
+		gbThread *t = cast(gbThread *)arg;
+		gb__thread_run(t);
+		t->is_running = false;
+		return 0;
+	}
 #else
-	gb_inline void *          gb__thread_proc(void *arg) { gb__thread_run(cast(gbThread *)arg); return NULL; }
+	gb_inline void *          gb__thread_proc(void *arg) {
+		gbThread *t = cast(gbThread *)arg;
+		gb__thread_run(t);
+		t->is_running = false;
+		return NULL;
+	}
 #endif
 
-gb_inline void gb_thread_start(gbThread *t, gbThreadProc *proc, void *data) { gb_thread_start_with_stack(t, proc, data, 0); }
+gb_inline void gb_thread_start(gbThread *t, gbThreadProc *proc, void *user_data) { gb_thread_start_with_stack(t, proc, user_data, 0); }
 
-gb_inline void gb_thread_start_with_stack(gbThread *t, gbThreadProc *proc, void *data, isize stack_size) {
+gb_inline void gb_thread_start_with_stack(gbThread *t, gbThreadProc *proc, void *user_data, isize stack_size) {
 	GB_ASSERT(!t->is_running);
 	GB_ASSERT(proc != NULL);
 	t->proc = proc;
-	t->data = data;
+	t->user_data = user_data;
 	t->stack_size = stack_size;
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -4698,8 +4710,9 @@ gb_inline void gb_thread_start_with_stack(gbThread *t, gbThreadProc *proc, void 
 		pthread_attr_t attr;
 		pthread_attr_init(&attr);
 		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-		if (stack_size != 0)
+		if (stack_size != 0) {
 			pthread_attr_setstacksize(&attr, stack_size);
+		}
 		pthread_create(&t->posix_handle, &attr, gb__thread_proc, t);
 		pthread_attr_destroy(&attr);
 	}
@@ -5401,7 +5414,8 @@ gb_inline gbTempArenaMemory gb_temp_arena_memory_begin(gbArena *arena) {
 }
 
 gb_inline void gb_temp_arena_memory_end(gbTempArenaMemory tmp) {
-	GB_ASSERT(tmp.arena->total_allocated >= tmp.original_count);
+	GB_ASSERT_MSG(tmp.arena->total_allocated >= tmp.original_count,
+	              "%td >= %td", tmp.arena->total_allocated, tmp.original_count);
 	GB_ASSERT(tmp.arena->temp_count > 0);
 	tmp.arena->total_allocated = tmp.original_count;
 	tmp.arena->temp_count--;

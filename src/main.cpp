@@ -172,6 +172,7 @@ enum BuildFlagKind {
 
 	BuildFlag_OptimizationLevel,
 	BuildFlag_ShowTimings,
+	BuildFlag_ThreadCount,
 
 	BuildFlag_COUNT,
 };
@@ -202,9 +203,9 @@ void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, Bu
 bool parse_build_flags(Array<String> args) {
 	Array<BuildFlag> build_flags = {};
 	array_init(&build_flags, heap_allocator(), BuildFlag_COUNT);
-	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"), BuildFlagParam_Integer);
-	add_flag(&build_flags, BuildFlag_ShowTimings, str_lit("show-timings"), BuildFlagParam_None);
-
+	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),          BuildFlagParam_Integer);
+	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"), BuildFlagParam_Integer);
 
 
 	Array<String> flag_args = args;
@@ -291,27 +292,64 @@ bool parse_build_flags(Array<String> args) {
 						}
 					}
 					if (ok) {
-						switch (bf.kind) {
-						case BuildFlag_OptimizationLevel:
-							if (value.kind == ExactValue_Integer) {
-								build_context.optimization_level = cast(i32)i128_to_i64(value.value_integer);
-							} else {
+						switch (bf.param_kind) {
+						case BuildFlagParam_None:
+							if (value.kind != ExactValue_Invalid) {
+								gb_printf_err("%.*s expected no value, got %.*s", LIT(name), LIT(param));
+								bad_flags = true;
+								ok = false;
+							}
+							break;
+						case BuildFlagParam_Boolean:
+							if (value.kind != ExactValue_Bool) {
+								gb_printf_err("%.*s expected a boolean, got %.*s", LIT(name), LIT(param));
+								bad_flags = true;
+								ok = false;
+							}
+							break;
+						case BuildFlagParam_Integer:
+							if (value.kind != ExactValue_Integer) {
 								gb_printf_err("%.*s expected an integer, got %.*s", LIT(name), LIT(param));
 								bad_flags = true;
 								ok = false;
 							}
 							break;
-						case BuildFlag_ShowTimings:
-							if (value.kind == ExactValue_Invalid) {
-								build_context.show_timings = true;
-							} else {
-								gb_printf_err("%.*s expected no value, got %.*s", LIT(name), LIT(param));
+						case BuildFlagParam_Float:
+							if (value.kind != ExactValue_Float) {
+								gb_printf_err("%.*s expected a floating pointer number, got %.*s", LIT(name), LIT(param));
+								bad_flags = true;
+								ok = false;
+							}
+							break;
+						case BuildFlagParam_String:
+							if (value.kind != ExactValue_String) {
+								gb_printf_err("%.*s expected a string, got %.*s", LIT(name), LIT(param));
 								bad_flags = true;
 								ok = false;
 							}
 							break;
 						}
 
+						if (ok) switch (bf.kind) {
+						case BuildFlag_OptimizationLevel:
+							GB_ASSERT(value.kind == ExactValue_Integer);
+							build_context.optimization_level = cast(i32)i128_to_i64(value.value_integer);
+							break;
+						case BuildFlag_ShowTimings:
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.show_timings = true;
+							break;
+						case BuildFlag_ThreadCount: {
+							GB_ASSERT(value.kind == ExactValue_Integer);
+							isize count = cast(isize)i128_to_i64(value.value_integer);
+							if (count <= 0) {
+								gb_printf_err("%.*s expected a positive non-zero number, got %.*s", LIT(name), LIT(param));
+								build_context.thread_count = 0;
+							} else {
+								build_context.thread_count = count;
+							}
+						} break;
+						}
 					}
 
 

@@ -1,10 +1,12 @@
-gb_global gbArena string_buffer_arena = {};
+gb_global gbArena     string_buffer_arena = {};
 gb_global gbAllocator string_buffer_allocator = {};
+gb_global gbMutex     string_buffer_mutex = {};
 
 void init_string_buffer_memory(void) {
 	// NOTE(bill): This should be enough memory for file systems
 	gb_arena_init_from_allocator(&string_buffer_arena, heap_allocator(), gb_megabytes(1));
 	string_buffer_allocator = gb_arena_allocator(&string_buffer_arena);
+	gb_mutex_init(&string_buffer_mutex);
 }
 
 
@@ -104,9 +106,8 @@ gb_inline bool str_eq_ignore_case(String a, String b) {
 	return false;
 }
 
-int string_compare(String x, String y) {
-	if (!(x.len == y.len &&
-	      x.text == y.text)) {
+int string_compare(String const &x, String const &y) {
+	if (x.len != y.len || x.text != y.text) {
 		isize n, fast, offset, curr_block;
 		isize *la, *lb;
 		isize pos;
@@ -148,26 +149,34 @@ GB_COMPARE_PROC(string_cmp_proc) {
 	return string_compare(x, y);
 }
 
-gb_inline bool str_eq(String a, String b) { return a.len == b.len ? gb_memcompare(a.text, b.text, a.len) == 0 : false; }
-gb_inline bool str_ne(String a, String b) { return !str_eq(a, b);                }
-gb_inline bool str_lt(String a, String b) { return string_compare(a, b) < 0;     }
-gb_inline bool str_gt(String a, String b) { return string_compare(a, b) > 0;     }
-gb_inline bool str_le(String a, String b) { return string_compare(a, b) <= 0;    }
-gb_inline bool str_ge(String a, String b) { return string_compare(a, b) >= 0;    }
+gb_inline bool str_eq(String const &a, String const &b) {
+	if (a.len != b.len) return false;
+	for (isize i = 0; i < a.len; i++) {
+		if (a.text[i] != b.text[i]) {
+			return false;
+		}
+	}
+	return true;
+}
+gb_inline bool str_ne(String const &a, String const &b) { return !str_eq(a, b);                }
+gb_inline bool str_lt(String const &a, String const &b) { return string_compare(a, b) < 0;     }
+gb_inline bool str_gt(String const &a, String const &b) { return string_compare(a, b) > 0;     }
+gb_inline bool str_le(String const &a, String const &b) { return string_compare(a, b) <= 0;    }
+gb_inline bool str_ge(String const &a, String const &b) { return string_compare(a, b) >= 0;    }
 
-bool operator == (String a, String b) { return str_eq(a, b); }
-bool operator != (String a, String b) { return str_ne(a, b); }
-bool operator <  (String a, String b) { return str_lt(a, b); }
-bool operator >  (String a, String b) { return str_gt(a, b); }
-bool operator <= (String a, String b) { return str_le(a, b); }
-bool operator >= (String a, String b) { return str_ge(a, b); }
+gb_inline bool operator == (String const &a, String const &b) { return str_eq(a, b); }
+gb_inline bool operator != (String const &a, String const &b) { return str_ne(a, b); }
+gb_inline bool operator <  (String const &a, String const &b) { return str_lt(a, b); }
+gb_inline bool operator >  (String const &a, String const &b) { return str_gt(a, b); }
+gb_inline bool operator <= (String const &a, String const &b) { return str_le(a, b); }
+gb_inline bool operator >= (String const &a, String const &b) { return str_ge(a, b); }
 
-template <isize N> bool operator == (String a, char const (&b)[N]) { return str_eq(a, make_string(cast(u8 *)b, N-1)); }
-template <isize N> bool operator != (String a, char const (&b)[N]) { return str_ne(a, make_string(cast(u8 *)b, N-1)); }
-template <isize N> bool operator <  (String a, char const (&b)[N]) { return str_lt(a, make_string(cast(u8 *)b, N-1)); }
-template <isize N> bool operator >  (String a, char const (&b)[N]) { return str_gt(a, make_string(cast(u8 *)b, N-1)); }
-template <isize N> bool operator <= (String a, char const (&b)[N]) { return str_le(a, make_string(cast(u8 *)b, N-1)); }
-template <isize N> bool operator >= (String a, char const (&b)[N]) { return str_ge(a, make_string(cast(u8 *)b, N-1)); }
+template <isize N> bool operator == (String const &a, char const (&b)[N]) { return str_eq(a, make_string(cast(u8 *)b, N-1)); }
+template <isize N> bool operator != (String const &a, char const (&b)[N]) { return str_ne(a, make_string(cast(u8 *)b, N-1)); }
+template <isize N> bool operator <  (String const &a, char const (&b)[N]) { return str_lt(a, make_string(cast(u8 *)b, N-1)); }
+template <isize N> bool operator >  (String const &a, char const (&b)[N]) { return str_gt(a, make_string(cast(u8 *)b, N-1)); }
+template <isize N> bool operator <= (String const &a, char const (&b)[N]) { return str_le(a, make_string(cast(u8 *)b, N-1)); }
+template <isize N> bool operator >= (String const &a, char const (&b)[N]) { return str_ge(a, make_string(cast(u8 *)b, N-1)); }
 
 
 
