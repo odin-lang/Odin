@@ -8248,7 +8248,6 @@ void ir_gen_tree(irGen *s) {
 					irValue *key              = ir_emit_struct_ep(proc, tag, 0);
 					irValue *value            = ir_emit_struct_ep(proc, tag, 1);
 					irValue *generated_struct = ir_emit_struct_ep(proc, tag, 2);
-					irValue *count            = ir_emit_struct_ep(proc, tag, 3);
 
 					ir_emit_store(proc, key,              ir_get_type_info_ptr(proc, t->Map.key));
 					ir_emit_store(proc, value,            ir_get_type_info_ptr(proc, t->Map.value));
