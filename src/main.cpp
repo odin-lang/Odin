@@ -413,13 +413,25 @@ void show_timings(Checker *c, Timings *t) {
 void remove_temp_files(String output_base) {
 	if (build_context.keep_temp_files) return;
 
-	gb_file_delete(gb_bprintf("%.*s.ll", LIT(output_base)));
-	gb_file_delete(gb_bprintf("%.*s.bc", LIT(output_base)));
+	Array<u8> data = {};
+	array_init_count(&data, heap_allocator(), output_base.len + 10);
+	defer (array_free(&data));
+
+	isize n = output_base.len;
+	gb_memcopy(data.data, output_base.text, n);
+#define EXT_DELETE(s) do {                         \
+		gb_memcopy(data.data+n, s, gb_size_of(s)); \
+		gb_file_delete(cast(char *)data.data);     \
+	} while (0)
+	EXT_DELETE(".ll");
+	EXT_DELETE(".bc");
 #if defined(GB_SYSTEM_WINDOWS)
-	gb_file_delete(gb_bprintf("%.*s.obj", LIT(output_base)));
+	EXT_DELETE(".obj");
 #else
-	gb_file_delete(gb_bprintf("%.*s.o", LIT(output_base)));
+	EXT_DELETE(".o");
 #endif
+
+#undef EXT_DELETE
 }
 
 int main(int arg_count, char **arg_ptr) {
