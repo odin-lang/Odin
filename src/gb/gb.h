@@ -4671,15 +4671,15 @@ gb_inline void gb_mutex_unlock(gbMutex *m) {
 	i32 recursion;
 	i32 thread_id = cast(i32)gb_thread_current_id();
 
-	GB_ASSERT(thread_id == gb_atomic32_load(&m->owner));
-
 	recursion = --m->recursion;
-	if (recursion == 0)
+	if (recursion == 0) {
 		gb_atomic32_store(&m->owner, thread_id);
+	}
 
 	if (gb_atomic32_fetch_add(&m->counter, -1) > 1) {
-		if (recursion == 0)
+		if (recursion == 0) {
 			gb_semaphore_release(&m->semaphore);
+		}
 	}
 #endif
 }
