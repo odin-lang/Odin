@@ -985,7 +985,7 @@ typedef struct gbThread {
 } gbThread;
 
 GB_DEF void gb_thread_init            (gbThread *t);
-GB_DEF void gb_thread_destory         (gbThread *t);
+GB_DEF void gb_thread_destroy         (gbThread *t);
 GB_DEF void gb_thread_start           (gbThread *t, gbThreadProc *proc, void *data);
 GB_DEF void gb_thread_start_with_stack(gbThread *t, gbThreadProc *proc, void *data, isize stack_size);
 GB_DEF void gb_thread_join            (gbThread *t);
@@ -4698,7 +4698,7 @@ void gb_thread_init(gbThread *t) {
 	gb_semaphore_init(&t->semaphore);
 }
 
-void gb_thread_destory(gbThread *t) {
+void gb_thread_destroy(gbThread *t) {
 	if (t->is_running) gb_thread_join(t);
 	gb_semaphore_destroy(&t->semaphore);
 }
@@ -7472,13 +7472,13 @@ u64 gb_murmur64_seed(void const *data_, isize len, u64 seed) {
 			if (w_len_) *w_len_ = w_len;
 			return NULL;
 		}
-		w_len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, len, NULL, 0);
+		w_len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, cast(int)len, NULL, 0);
 		if (w_len == 0) {
 			if (w_len_) *w_len_ = w_len;
 			return NULL;
 		}
 		w_text = gb_alloc_array(a, wchar_t, w_len+1);
-		w_len1 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, len, w_text, w_len);
+		w_len1 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, cast(int)len, w_text, cast(int)w_len);
 		if (w_len1 == 0) {
 			gb_free(a, w_text);
 			if (w_len_) *w_len_ = 0;
@@ -8126,17 +8126,17 @@ char *gb_path_get_full_name(gbAllocator a, char const *path) {
 		return NULL;
 	}
 	w_fullpath = gb_alloc_array(gb_heap_allocator(), wchar_t, w_len+1);
-	GetFullPathNameW(w_path, w_len, w_fullpath, NULL);
+	GetFullPathNameW(w_path, cast(int)w_len, w_fullpath, NULL);
 	w_fullpath[w_len] = 0;
 	gb_free(gb_heap_allocator(), w_path);
 
-	new_len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w_fullpath, w_len, NULL, 0, NULL, NULL);
+	new_len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w_fullpath, cast(int)w_len, NULL, 0, NULL, NULL);
 	if (new_len == 0) {
 		gb_free(gb_heap_allocator(), w_fullpath);
 		return NULL;
 	}
 	new_path = gb_alloc_array(a, char, new_len+1);
-	new_len1 = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w_fullpath, w_len, new_path, new_len, NULL, NULL);
+	new_len1 = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w_fullpath, cast(int)w_len, new_path, cast(int)new_len, NULL, NULL);
 	if (new_len1 == 0) {
 		gb_free(gb_heap_allocator(), w_fullpath);
 		gb_free(a, new_path);

@@ -108,13 +108,13 @@ S_ISUID :: 0004000; // Set user id on execution
 S_ISGID :: 0002000; // Set group id on execution
 S_ISVTX :: 0001000; // Directory restrcted delete
 
-S_ISLNK  :: proc(m: u32) -> bool #inline  {return (m & S_IFMT) == S_IFLNK; }
-S_ISREG  :: proc(m: u32) -> bool #inline  {return (m & S_IFMT) == S_IFREG; }
-S_ISDIR  :: proc(m: u32) -> bool #inline  {return (m & S_IFMT) == S_IFDIR; }
-S_ISCHR  :: proc(m: u32) -> bool #inline  {return (m & S_IFMT) == S_IFCHR; }
-S_ISBLK  :: proc(m: u32) -> bool #inline  {return (m & S_IFMT) == S_IFBLK; }
-S_ISFIFO :: proc(m: u32) -> bool #inline  {return (m & S_IFMT) == S_IFIFO; }
-S_ISSOCK :: proc(m: u32) -> bool #inline  {return (m & S_IFMT) == S_IFSOCK;}
+S_ISLNK  :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFLNK;
+S_ISREG  :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFREG;
+S_ISDIR  :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFDIR;
+S_ISCHR  :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFCHR;
+S_ISBLK  :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFBLK;
+S_ISFIFO :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFIFO;
+S_ISSOCK :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFSOCK;
 
 R_OK :: 4; // Test for read permission
 W_OK :: 2; // Test for write permission
@@ -122,28 +122,28 @@ X_OK :: 1; // Test for execute permission
 F_OK :: 0; // Test for file existance
 
 foreign libc {
-	unix_open    :: proc(path: ^u8, mode: int) -> Handle                              #link_name "open"    ---;
-	unix_close   :: proc(handle: Handle)                                              #link_name "close"   ---;
-	unix_read    :: proc(handle: Handle, buffer: rawptr, count: int) -> int   #link_name "read"    ---;
-	unix_write   :: proc(handle: Handle, buffer: rawptr, count: int) -> int   #link_name "write"   ---;
-	unix_lseek   :: proc(fs: Handle, offset: int, whence: int) -> int #link_name "lseek"   ---;
-	unix_gettid  :: proc() -> u64                                                     #link_name "gettid"  ---;
-	unix_stat    :: proc(path: ^u8, stat: ^Stat) -> int                               #link_name "stat"    ---;
-	unix_access  :: proc(path: ^u8, mask: int) -> int                                 #link_name "access"  ---;
+	unix_open    :: proc(path: ^u8, mode: int) -> Handle                    #link_name "open"    ---;
+	unix_close   :: proc(handle: Handle)                                    #link_name "close"   ---;
+	unix_read    :: proc(handle: Handle, buffer: rawptr, count: int) -> int #link_name "read"    ---;
+	unix_write   :: proc(handle: Handle, buffer: rawptr, count: int) -> int #link_name "write"   ---;
+	unix_lseek   :: proc(fs: Handle, offset: int, whence: int) -> int       #link_name "lseek"   ---;
+	unix_gettid  :: proc() -> u64                                           #link_name "gettid"  ---;
+	unix_stat    :: proc(path: ^u8, stat: ^Stat) -> int                     #link_name "stat"    ---;
+	unix_access  :: proc(path: ^u8, mask: int) -> int                       #link_name "access"  ---;
 
-	unix_malloc  :: proc(size: int) -> rawptr                                         #link_name "malloc"  ---;
-	unix_free    :: proc(ptr: rawptr)                                                 #link_name "free"    ---;
-	unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr                            #link_name "realloc" ---;
-	unix_getenv  :: proc(^u8) -> ^u8                                                  #link_name "getenv"  ---;
+	unix_malloc  :: proc(size: int) -> rawptr                               #link_name "malloc"  ---;
+	unix_free    :: proc(ptr: rawptr)                                       #link_name "free"    ---;
+	unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr                  #link_name "realloc" ---;
+	unix_getenv  :: proc(^u8) -> ^u8                                        #link_name "getenv"  ---;
 
-	unix_exit    :: proc(status: int)                                                 #link_name "exit"    ---;
+	unix_exit    :: proc(status: int)                                       #link_name "exit"    ---;
 }
 
 foreign dl {
-	unix_dlopen  :: proc(filename: ^u8, flags: int) -> rawptr                         #link_name "dlopen"  ---;
-	unix_dlsym   :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)              #link_name "dlsym"   ---;
-	unix_dlclose :: proc(handle: rawptr) -> int                                       #link_name "dlclose" ---;
-	unix_dlerror :: proc() -> ^u8                                                     #link_name "dlerror" ---;
+	unix_dlopen  :: proc(filename: ^u8, flags: int) -> rawptr               #link_name "dlopen"  ---;
+	unix_dlsym   :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)    #link_name "dlsym"   ---;
+	unix_dlclose :: proc(handle: rawptr) -> int                             #link_name "dlclose" ---;
+	unix_dlerror :: proc() -> ^u8                                           #link_name "dlerror" ---;
 }
 
 // TODO(zangent): Change this to just `open` when Bill fixes overloading.
@@ -187,10 +187,10 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	return bytes_read, 0;
 }
 
-seek :: proc(fd: Handle, offset: int, whence: int) -> (int, Errno) {
+seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	assert(fd != -1);
 
-	final_offset := unix_lseek(fd, offset, whence);
+	final_offset := i64(unix_lseek(fd, offset, whence));
 	if(final_offset == -1) {
 		return 0, 1;
 	}
@@ -201,7 +201,7 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 	prev, _   := seek(fd, 0, SEEK_CUR);
 	size, err := seek(fd, 0, SEEK_END);
 	seek(fd, prev, SEEK_SET);
-	return size, err;
+	return i64(size), err;
 }
 
 

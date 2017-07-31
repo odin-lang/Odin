@@ -542,7 +542,7 @@ int main(int arg_count, char **arg_ptr) {
 
 	String output_name = ir_gen.output_name;
 	String output_base = ir_gen.output_base;
-	int base_name_len = output_base.len;
+	int base_name_len = cast(int)output_base.len;
 
 	build_context.optimization_level = gb_clamp(build_context.optimization_level, 0, 3);
 

@@ -504,19 +504,19 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		i128 b = y.value_integer;
 		i128 c = I128_ZERO;
 		switch (op) {
-		case Token_Add:    c = a + b;               break;
-		case Token_Sub:    c = a - b;               break;
-		case Token_Mul:    c = a * b;               break;
+		case Token_Add:    c = a + b;                        break;
+		case Token_Sub:    c = a - b;                        break;
+		case Token_Mul:    c = a * b;                        break;
 		case Token_Quo:    return exact_value_float(fmod(i128_to_f64(a), i128_to_f64(b)));
-		case Token_QuoEq:  c = a / b;               break; // NOTE(bill): Integer division
-		case Token_Mod:    c = a % b;               break;
-		case Token_ModMod: c = ((a % b) + b) % b;   break;
-		case Token_And:    c = a & b;               break;
-		case Token_Or:     c = a | b;               break;
-		case Token_Xor:    c = a ^ b;               break;
-		case Token_AndNot: c = i128_and_not(a, b);  break;
-		case Token_Shl:    c = a << i128_to_u64(b); break;
-		case Token_Shr:    c = a >> i128_to_u64(b); break;
+		case Token_QuoEq:  c = a / b;                        break; // NOTE(bill): Integer division
+		case Token_Mod:    c = a % b;                        break;
+		case Token_ModMod: c = ((a % b) + b) % b;            break;
+		case Token_And:    c = a & b;                        break;
+		case Token_Or:     c = a | b;                        break;
+		case Token_Xor:    c = a ^ b;                        break;
+		case Token_AndNot: c = i128_and_not(a, b);           break;
+		case Token_Shl:    c = a << cast(u32)i128_to_u64(b); break;
+		case Token_Shr:    c = a >> cast(u32)i128_to_u64(b); break;
 		default: goto error;
 		}
 

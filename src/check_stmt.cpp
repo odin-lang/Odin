@@ -4,7 +4,7 @@ void check_stmt_list(Checker *c, Array<AstNode *> stmts, u32 flags) {
 	}
 
 	if (flags&Stmt_CheckScopeDecls) {
-		check_scope_decls(c, stmts, 1.2*stmts.count);
+		check_scope_decls(c, stmts, cast(isize)(1.2*stmts.count));
 	}
 
 	bool ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
@@ -265,9 +265,9 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 					u128 u = *cast(u128 *)&i;
 					u128 umax = U128_NEG_ONE;
 					if (lhs_bits < 128) {
-						umax = u128_sub(u128_shl(U128_ONE, lhs_bits), U128_ONE);
+						umax = u128_sub(u128_shl(U128_ONE, cast(u32)lhs_bits), U128_ONE);
 					}
-					i128 imax = i128_shl(I128_ONE, lhs_bits-1ll);
+					i128 imax = i128_shl(I128_ONE, cast(u32)lhs_bits-1);
 
 					bool ok = false;
 					ok = !(u128_lt(u, U128_ZERO) || u128_gt(u, umax));

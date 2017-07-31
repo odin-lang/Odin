@@ -267,7 +267,7 @@ struct DelayedDecl {
 };
 
 struct CheckerFileNode {
-	i32        id;
+	isize      id;
 	Array<i32> wheres;
 	Array<i32> whats;
 	i32        score; // Higher the score, the better

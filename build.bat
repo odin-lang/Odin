@@ -17,10 +17,13 @@ if %release_mode% EQU 0 ( rem Debug
 set compiler_warnings= ^
 	-W4 -WX ^
 	-wd4100 -wd4101 -wd4127 -wd4189 ^
-	-wd4201 -wd4204 -wd4244 ^
-	-wd4306 ^
-	-wd4456 -wd4457 -wd4480 ^
-	-wd4505 -wd4512 -wd4550
+	-wd4201 ^
+	-wd4512
+	rem -wd4100 -wd4101 -wd4127 -wd4189 ^
+	rem -wd4201 -wd4204 -wd4244 ^
+	rem -wd4306 ^
+	rem -wd4456 -wd4457 -wd4480 ^
+	rem -wd4505 -wd4512 -wd4550
 
 set compiler_includes=
 set libs= ^
@@ -37,7 +40,6 @@ if %release_mode% EQU 0 ( rem Debug
 
 set compiler_settings=%compiler_includes% %compiler_flags% %compiler_warnings%
 set linker_settings=%libs% %linker_flags%
-
 
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL

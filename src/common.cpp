@@ -199,7 +199,19 @@ gbAllocator pool_allocator(Pool *pool) {
 
 
 
-
+i32 next_pow2(i32 n) {
+	if (n <= 0) {
+		return 0;
+	}
+	n--;
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	n++;
+	return n;
+}
 i64 next_pow2(i64 n) {
 	if (n <= 0) {
 		return 0;
@@ -215,6 +227,17 @@ i64 next_pow2(i64 n) {
 	return n;
 }
 
+i32 prev_pow2(i32 n) {
+	if (n <= 0) {
+		return 0;
+	}
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	return n - (n >> 1);
+}
 i64 prev_pow2(i64 n) {
 	if (n <= 0) {
 		return 0;
@@ -310,7 +333,7 @@ f64 gb_sqrt(f64 x) {
 wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
 	u32 i, j;
 
-	u32 len = string16_len(cmd_line);
+	u32 len = cast(u32)string16_len(cmd_line);
 	i = ((len+2)/2)*gb_size_of(void *) + gb_size_of(void *);
 
 	wchar_t **argv = cast(wchar_t **)GlobalAlloc(GMEM_FIXED, i + (len+2)*gb_size_of(wchar_t));

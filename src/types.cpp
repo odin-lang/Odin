@@ -551,9 +551,9 @@ Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_coun
 
 	t->Proc.scope        = scope;
 	t->Proc.params       = params;
-	t->Proc.param_count  = param_count;
+	t->Proc.param_count  = cast(i32)param_count;
 	t->Proc.results      = results;
-	t->Proc.result_count = result_count;
+	t->Proc.result_count = cast(i32)result_count;
 	t->Proc.variadic     = variadic;
 	t->Proc.calling_convention = calling_convention;
 	return t;
@@ -1400,7 +1400,7 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 	GB_ASSERT(is_type_struct(type) || is_type_union(type) || is_type_tuple(type));
 	type = base_type(type);
 
-	i64 max_count = 0;
+	isize max_count = 0;
 	switch (type->kind) {
 	case Type_Struct:   max_count = type->Struct.fields.count;   break;
 	case Type_Tuple:    max_count = type->Tuple.variables.count; break;
@@ -1419,7 +1419,7 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 				if (f->Variable.field_src_index == index) {
 					Array<i32> sel_array = {0};
 					array_init_count(&sel_array, a, 1);
-					sel_array[0] = i;
+					sel_array[0] = cast(i32)i;
 					return make_selection(f, sel_array, false);
 				}
 			}
@@ -1431,7 +1431,7 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 			if (i == index) {
 				Array<i32> sel_array = {0};
 				array_init_count(&sel_array, a, 1);
-				sel_array[0] = i;
+				sel_array[0] = cast(i32)i;
 				return make_selection(f, sel_array, false);
 			}
 		}
@@ -2192,7 +2192,7 @@ i64 type_offset_of_from_selection(gbAllocator allocator, Type *type, Selection s
 	Type *t = type;
 	i64 offset = 0;
 	for_array(i, sel.index) {
-		isize index = sel.index[i];
+		i32 index = sel.index[i];
 		t = base_type(t);
 		offset += type_offset_of(allocator, t, index);
 		if (t->kind == Type_Struct && !t->Struct.is_raw_union) {

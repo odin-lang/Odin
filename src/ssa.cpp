@@ -1640,18 +1640,18 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 
 			i64 s = 8*type_size_of(p->allocator, t);
 			switch (s) {
-			case 8:  return ssa_const_i8 (p, tv.type, i128_to_i64(tv.value.value_integer));
-			case 16: return ssa_const_i16(p, tv.type, i128_to_i64(tv.value.value_integer));
-			case 32: return ssa_const_i32(p, tv.type, i128_to_i64(tv.value.value_integer));
-			case 64: return ssa_const_i64(p, tv.type, i128_to_i64(tv.value.value_integer));
+			case 8:  return ssa_const_i8 (p, tv.type, cast (i8)i128_to_i64(tv.value.value_integer));
+			case 16: return ssa_const_i16(p, tv.type, cast(i16)i128_to_i64(tv.value.value_integer));
+			case 32: return ssa_const_i32(p, tv.type, cast(i32)i128_to_i64(tv.value.value_integer));
+			case 64: return ssa_const_i64(p, tv.type, cast(i64)i128_to_i64(tv.value.value_integer));
 			default: GB_PANIC("Unknown integer size");
 			}
 		} else if (is_type_float(t)) {
 			GB_ASSERT(tv.value.kind == ExactValue_Float);
 			i64 s = 8*type_size_of(p->allocator, t);
 			switch (s) {
-			case 32: return ssa_const_f32(p, tv.type, tv.value.value_float);
-			case 64: return ssa_const_f64(p, tv.type, tv.value.value_float);
+			case 32: return ssa_const_f32(p, tv.type, cast(f32)tv.value.value_float);
+			case 64: return ssa_const_f64(p, tv.type, cast(f64)tv.value.value_float);
 			default: GB_PANIC("Unknown float size");
 			}
 		}

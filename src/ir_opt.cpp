@@ -172,7 +172,7 @@ void ir_remove_dead_blocks(irProcedure *proc) {
 			continue;
 		}
 		// NOTE(bill): Swap order
-		b->index = j;
+		b->index = cast(i32)j;
 		proc->blocks[j++] = b;
 	}
 	proc->blocks.count = j;
@@ -373,7 +373,7 @@ void ir_opt_build_dom_tree(irProcedure *proc) {
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
 
-	isize n = proc->blocks.count;
+	i32 n = cast(i32)proc->blocks.count;
 	irBlock **buf = gb_alloc_array(proc->module->tmp_allocator, irBlock *, 5*n);
 
 	irLTState lt = {0};

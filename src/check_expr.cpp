@@ -494,7 +494,7 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		Type *bfv = base_type(operand->type);
 		i32 bits = bfv->BitFieldValue.bits;
 		i32 size = next_pow2((bits+7)/8);
-		i32 dst_size = type_size_of(c->allocator, type);
+		i32 dst_size = cast(i32)type_size_of(c->allocator, type);
 		i32 diff = gb_abs(dst_size - size);
 		// TODO(bill): figure out a decent rule here
 		return 1;
@@ -1279,7 +1279,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 			gb_sort_array(reordered_fields.data, fields.count, cmp_reorder_struct_fields);
 
 			for_array(i, fields) {
-				reordered_fields[i]->Variable.field_index = i;
+				reordered_fields[i]->Variable.field_index = cast(i32)i;
 			}
 
 			struct_type->Struct.fields = reordered_fields;
@@ -1564,7 +1564,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 
 
 	enum_type->Enum.fields      = fields.data;
-	enum_type->Enum.field_count = fields.count;
+	enum_type->Enum.field_count = cast(i32)fields.count;
 
 	enum_type->Enum.count = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("count")), t_int, exact_value_i64(fields.count));
@@ -1622,7 +1622,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 			continue;
 		}
 
-		Type *value_type = make_type_bit_field_value(c->allocator, bits);
+		Type *value_type = make_type_bit_field_value(c->allocator, cast(i32)bits);
 		Entity *e = make_entity_variable(c->allocator, bit_field_type->BitField.scope, ident->Ident.token, value_type, false);
 		e->identifier = ident;
 		e->flags |= EntityFlag_BitFieldValue;
@@ -1638,16 +1638,16 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 
 			fields [field_count] = e;
 			offsets[field_count] = curr_offset;
-			sizes  [field_count] = bits;
+			sizes  [field_count] = cast(i32)bits;
 			field_count++;
 
-			curr_offset += bits;
+			curr_offset += cast(i32)bits;
 		}
 	}
 	GB_ASSERT(field_count <= bft->fields.count);
 
 	bit_field_type->BitField.fields      = fields;
-	bit_field_type->BitField.field_count = field_count;
+	bit_field_type->BitField.field_count = cast(i32)field_count;
 	bit_field_type->BitField.sizes       = sizes;
 	bit_field_type->BitField.offsets     = offsets;
 
@@ -2180,7 +2180,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 	if (scope != nullptr) {
 		for_array(i, scope->elements.entries) {
 			Entity *e = scope->elements.entries[i].value;
-			if (e->kind == Type_Named) {
+			if (e->kind == Entity_TypeName) {
 				Type *t = e->type;
 				if (t->kind == Type_Generic &&
 				    t->Generic.specialized != nullptr) {
@@ -2523,9 +2523,9 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 	type->Proc.node                 = proc_type_node;
 	type->Proc.scope                = c->context.scope;
 	type->Proc.params               = params;
-	type->Proc.param_count          = param_count;
+	type->Proc.param_count          = cast(i32)param_count;
 	type->Proc.results              = results;
-	type->Proc.result_count         = result_count;
+	type->Proc.result_count         = cast(i32)result_count;
 	type->Proc.variadic             = variadic;
 	type->Proc.calling_convention   = pt->calling_convention;
 	type->Proc.is_polymorphic       = pt->generic;
@@ -3341,12 +3341,12 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		i64 s = 8*type_size_of(c->allocator, type);
 		u128 umax = U128_NEG_ONE;
 		if (s < 128) {
-			umax = u128_sub(u128_shl(U128_ONE, s), U128_ONE);
+			umax = u128_sub(u128_shl(U128_ONE, cast(u32)s), U128_ONE);
 		} else {
 			// IMPORTANT TODO(bill): I NEED A PROPER BIG NUMBER LIBRARY THAT CAN SUPPORT 128 bit floats
 			s = 128;
 		}
-		i128 imax = i128_shl(I128_ONE, s-1ll);
+		i128 imax = i128_shl(I128_ONE, cast(u32)s-1);
 
 		switch (type->Basic.kind) {
 		case Basic_rune:
@@ -4399,8 +4399,8 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 			defer (gb_temp_arena_memory_end(tmp));
 			isize count = t->Union.variants.count;
 			ValidIndexAndScore *valids = gb_alloc_array(c->tmp_allocator, ValidIndexAndScore, count);
-			i32 valid_count = 0;
-			i32 first_success_index = -1;
+			isize valid_count = 0;
+			isize first_success_index = -1;
 			for_array(i, t->Union.variants) {
 				Type *vt = t->Union.variants[i];
 				i64 score = 0;
@@ -5693,7 +5693,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		gbAllocator a = c->allocator;
 
 		Type *tuple = make_type_tuple(a);
-		i32 variable_count = type->Struct.fields.count;
+		isize variable_count = type->Struct.fields.count;
 		array_init_count(&tuple->Tuple.variables, a, variable_count);
 		// TODO(bill): Should I copy each of the entities or is this good enough?
 		gb_memcopy_array(tuple->Tuple.variables.data, type->Struct.fields_in_src_order.data, variable_count);

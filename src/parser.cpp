@@ -36,7 +36,7 @@ struct ImportedFile {
 
 
 struct AstFile {
-	i32            id;
+	isize          id;
 	gbArena        arena;
 	Tokenizer      tokenizer;
 	Array<Token>   tokens;
@@ -1574,7 +1574,7 @@ AstNode *ast_foreign_library_spec(AstFile *f, Token filepath, Token library_name
 
 
 bool next_token0(AstFile *f) {
-	Token prev = f->curr_token;
+	// Token prev = f->curr_token;
 	if (f->curr_token_index+1 < f->tokens.count) {
 		f->curr_token = f->tokens[++f->curr_token_index];
 		return true;
@@ -1675,10 +1675,9 @@ TokenKind look_ahead_token_kind(AstFile *f, isize amount) {
 Token expect_token(AstFile *f, TokenKind kind) {
 	Token prev = f->curr_token;
 	if (prev.kind != kind) {
+		String c = token_strings[kind];
 		String p = token_strings[prev.kind];
-		syntax_error(f->curr_token, "Expected `%.*s`, got `%.*s`",
-		             LIT(token_strings[kind]),
-		             LIT(token_strings[prev.kind]));
+		syntax_error(f->curr_token, "Expected `%.*s`, got `%.*s`", LIT(c), LIT(p));
 		if (prev.kind == Token_EOF) {
 			gb_exit(1);
 		}
@@ -5122,7 +5121,7 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 				} else if (p->curr_import_index < p->imports.count) {
 					if (t->return_value != 0) {
 						for_array(i, worker_threads) {
-							gb_thread_destory(&worker_threads[i]);
+							gb_thread_destroy(&worker_threads[i]);
 						}
 						return cast(ParseFileError)t->return_value;
 					}
@@ -5137,7 +5136,7 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 		}
 
 		for_array(i, worker_threads) {
-			gb_thread_destory(&worker_threads[i]);
+			gb_thread_destroy(&worker_threads[i]);
 		}
 	} else {
 		for_array(i, p->imports) {

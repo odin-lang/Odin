@@ -57,7 +57,7 @@ String odin_root_dir(void) {
 
 	len = 0;
 	for (;;) {
-		len = GetModuleFileNameW(nullptr, &path_buf[0], path_buf.count);
+		len = GetModuleFileNameW(nullptr, &path_buf[0], cast(int)path_buf.count);
 		if (len == 0) {
 			return make_string(nullptr, 0);
 		}
@@ -73,7 +73,7 @@ String odin_root_dir(void) {
 
 	text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
 
-	GetModuleFileNameW(nullptr, text, len);
+	GetModuleFileNameW(nullptr, text, cast(int)len);
 	path = string16_to_string(heap_allocator(), make_string16(text, len));
 
 	for (i = path.len-1; i >= 0; i--) {

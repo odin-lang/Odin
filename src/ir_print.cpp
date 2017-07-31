@@ -686,7 +686,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_write_string(f, "zeroinitializer");
 		} else {
 			if (is_type_struct(type)) {
-				i32 value_count = type->Struct.fields.count;
+				i32 value_count = cast(i32)type->Struct.fields.count;
 				if (type->Struct.is_packed) ir_write_byte(f, '<');
 				ir_write_byte(f, '{');
 				if (type->Struct.custom_align > 0) {

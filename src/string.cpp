@@ -196,7 +196,6 @@ gb_inline bool str_has_prefix(String s, String prefix) {
 gb_inline isize string_extension_position(String str) {
 	isize dot_pos = -1;
 	isize i = str.len;
-	bool seen_dot = false;
 	while (i --> 0) {
 		if (str[i] == GB_PATH_SEPARATOR)
 			break;
@@ -317,14 +316,14 @@ String16 string_to_string16(gbAllocator a, String s) {
 		return make_string16(nullptr, 0);
 	}
 
-	len = convert_multibyte_to_widechar(cast(char *)s.text, s.len, nullptr, 0);
+	len = convert_multibyte_to_widechar(cast(char *)s.text, cast(int)s.len, nullptr, 0);
 	if (len == 0) {
 		return make_string16(nullptr, 0);
 	}
 
 	text = gb_alloc_array(a, wchar_t, len+1);
 
-	len1 = convert_multibyte_to_widechar(cast(char *)s.text, s.len, text, len);
+	len1 = convert_multibyte_to_widechar(cast(char *)s.text, cast(int)s.len, text, cast(int)len);
 	if (len1 == 0) {
 		gb_free(a, text);
 		return make_string16(nullptr, 0);
@@ -343,7 +342,7 @@ String string16_to_string(gbAllocator a, String16 s) {
 		return make_string(nullptr, 0);
 	}
 
-	len = convert_widechar_to_multibyte(s.text, s.len, nullptr, 0);
+	len = convert_widechar_to_multibyte(s.text, cast(int)s.len, nullptr, 0);
 	if (len == 0) {
 		return make_string(nullptr, 0);
 	}
@@ -351,7 +350,7 @@ String string16_to_string(gbAllocator a, String16 s) {
 
 	text = gb_alloc_array(a, u8, len+1);
 
-	len1 = convert_widechar_to_multibyte(s.text, s.len, cast(char *)text, len);
+	len1 = convert_widechar_to_multibyte(s.text, cast(int)s.len, cast(char *)text, cast(int)len);
 	if (len1 == 0) {
 		gb_free(a, text);
 		return make_string(nullptr, 0);
