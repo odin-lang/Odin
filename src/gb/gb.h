@@ -2056,6 +2056,7 @@ GB_DEF b32        gb_file_exists         (char const *filepath);
 GB_DEF gbFileTime gb_file_last_write_time(char const *filepath);
 GB_DEF b32        gb_file_copy           (char const *existing_filename, char const *new_filename, b32 fail_if_exists);
 GB_DEF b32        gb_file_move           (char const *existing_filename, char const *new_filename);
+GB_DEF b32        gb_file_delete         (char const *filename);
 
 
 #ifndef GB_PATH_SEPARATOR
@@ -7977,6 +7978,19 @@ gb_inline b32 gb_file_move(char const *existing_filename, char const *new_filena
 	return result;
 }
 
+b32 gb_file_delete(char const *filename) {
+	wchar_t *w_filename = NULL;
+	gbAllocator a = gb_heap_allocator();
+	b32 result = false;
+	w_filename = gb__alloc_utf8_to_ucs2(a, filename, NULL);
+	if (w_filename == NULL) {
+		return false;
+	}
+	result = DeleteFileW(w_filename);
+	gb_free(a, w_filename);
+	return result;
+}
+
 
 
 #else
@@ -8021,6 +8035,11 @@ gb_inline b32 gb_file_move(char const *existing_filename, char const *new_filena
 	}
 	return false;
 }
+
+b32 gb_file_delete(char const *filename) {
+	return unlink(filename) != -1;
+}
+
 
 #endif
 

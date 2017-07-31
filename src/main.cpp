@@ -174,6 +174,7 @@ enum BuildFlagKind {
 	BuildFlag_OptimizationLevel,
 	BuildFlag_ShowTimings,
 	BuildFlag_ThreadCount,
+	BuildFlag_KeepTempFiles,
 
 	BuildFlag_COUNT,
 };
@@ -204,9 +205,10 @@ void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, Bu
 bool parse_build_flags(Array<String> args) {
 	Array<BuildFlag> build_flags = {};
 	array_init(&build_flags, heap_allocator(), BuildFlag_COUNT);
-	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),          BuildFlagParam_Integer);
-	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"), BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"), BuildFlagParam_Integer);
+	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),             BuildFlagParam_Integer);
+	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),    BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),    BuildFlagParam_Integer);
+	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"), BuildFlagParam_None);
 
 
 	Array<String> flag_args = args;
@@ -350,6 +352,10 @@ bool parse_build_flags(Array<String> args) {
 								build_context.thread_count = count;
 							}
 						} break;
+						case BuildFlag_KeepTempFiles:
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.keep_temp_files = true;
+							break;
 						}
 					}
 
@@ -402,6 +408,18 @@ void show_timings(Checker *c, Timings *t) {
 		gb_printf("us/Token     - %.3f\n", 1.0e6*total_time/cast(f64)tokens);
 		gb_printf("\n");
 	}
+}
+
+void remove_temp_files(String output_base) {
+	if (build_context.keep_temp_files) return;
+
+	gb_file_delete(gb_bprintf("%.*s.ll", LIT(output_base)));
+	gb_file_delete(gb_bprintf("%.*s.bc", LIT(output_base)));
+#if defined(GB_SYSTEM_WINDOWS)
+	gb_file_delete(gb_bprintf("%.*s.obj", LIT(output_base)));
+#else
+	gb_file_delete(gb_bprintf("%.*s.o", LIT(output_base)));
+#endif
 }
 
 int main(int arg_count, char **arg_ptr) {
@@ -642,6 +660,7 @@ int main(int arg_count, char **arg_ptr) {
 			show_timings(&checker, &timings);
 		}
 
+		remove_temp_files(output_base);
 
 		if (run_output) {
 			system_exec_command_line_app("odin run", false, "%.*s.exe", LIT(output_base));
@@ -747,6 +766,8 @@ int main(int arg_count, char **arg_ptr) {
 		if (build_context.show_timings) {
 			show_timings(&checker, &timings);
 		}
+
+		remove_temp_files(output_base);
 
 		if (run_output) {
 			system_exec_command_line_app("odin run", false, "%.*s", LIT(output_base));

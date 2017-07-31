@@ -19,6 +19,7 @@ struct BuildContext {
 	bool   generate_docs;
 	i32    optimization_level;
 	bool   show_timings;
+	bool   keep_temp_files;
 
 	gbAffinity affinity;
 	isize      thread_count;
