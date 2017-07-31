@@ -419,19 +419,19 @@ void remove_temp_files(String output_base) {
 
 	isize n = output_base.len;
 	gb_memcopy(data.data, output_base.text, n);
-#define EXT_DELETE(s) do {                         \
+#define EXT_REMOVE(s) do {                         \
 		gb_memcopy(data.data+n, s, gb_size_of(s)); \
-		gb_file_delete(cast(char *)data.data);     \
+		gb_file_remove(cast(char *)data.data);     \
 	} while (0)
-	EXT_DELETE(".ll");
-	EXT_DELETE(".bc");
+	EXT_REMOVE(".ll");
+	EXT_REMOVE(".bc");
 #if defined(GB_SYSTEM_WINDOWS)
-	EXT_DELETE(".obj");
+	EXT_REMOVE(".obj");
 #else
-	EXT_DELETE(".o");
+	EXT_REMOVE(".o");
 #endif
 
-#undef EXT_DELETE
+#undef EXT_REMOVE
 }
 
 int main(int arg_count, char **arg_ptr) {
