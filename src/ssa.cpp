@@ -2556,7 +2556,7 @@ String ssa_mangle_name(ssaModule *m, String path, Entity *e) {
 		cast(char *)new_name, max_len,
 		"%.*s-%u.%.*s",
 		cast(int)base_len, base,
-		file->id,
+		cast(u32)file->id,
 		LIT(name));
 	if (is_overloaded) {
 		char *str = cast(char *)new_name + new_name_len-1;
