@@ -283,7 +283,7 @@ String get_fullpath_core(gbAllocator a, String path) {
 }
 
 
-String const ODIN_VERSION = str_lit("0.6.1");
+String const ODIN_VERSION = str_lit("0.6.1a");
 
 void init_build_context(void) {
 	BuildContext *bc = &build_context;
