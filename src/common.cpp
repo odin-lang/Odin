@@ -12,9 +12,78 @@
 
 #include <math.h>
 
+GB_ALLOCATOR_PROC(heap_allocator_proc);
 
 gbAllocator heap_allocator(void) {
-	return gb_heap_allocator();
+	gbAllocator a;
+	a.proc = heap_allocator_proc;
+	a.data = NULL;
+	return a;
+}
+
+
+GB_ALLOCATOR_PROC(heap_allocator_proc) {
+	void *ptr = NULL;
+	gb_unused(allocator_data);
+	gb_unused(old_size);
+// TODO(bill): Throughly test!
+	switch (type) {
+#if defined(GB_COMPILER_MSVC)
+	case gbAllocation_Alloc:
+		ptr = _aligned_malloc(size, alignment);
+		if (flags & gbAllocatorFlag_ClearToZero)
+			gb_zero_size(ptr, size);
+		break;
+	case gbAllocation_Free:
+		_aligned_free(old_memory);
+		break;
+	case gbAllocation_Resize:
+		ptr = _aligned_realloc(old_memory, size, alignment);
+		break;
+
+#elif defined(GB_SYSTEM_LINUX)
+	// TODO(bill): *nix version that's decent
+	case gbAllocation_Alloc: {
+		ptr = aligned_alloc(alignment, size);
+		// ptr = malloc(size+alignment);
+
+		if (flags & gbAllocatorFlag_ClearToZero) {
+			gb_zero_size(ptr, size);
+		}
+	} break;
+
+	case gbAllocation_Free: {
+		free(old_memory);
+	} break;
+
+	case gbAllocation_Resize: {
+		// ptr = realloc(old_memory, size);
+		ptr = gb_default_resize_align(heap_allocator(), old_memory, old_size, size, alignment);
+	} break;
+#else
+	// TODO(bill): *nix version that's decent
+	case gbAllocation_Alloc: {
+		posix_memalign(&ptr, alignment, size);
+
+		if (flags & gbAllocatorFlag_ClearToZero) {
+			gb_zero_size(ptr, size);
+		}
+	} break;
+
+	case gbAllocation_Free: {
+		free(old_memory);
+	} break;
+
+	case gbAllocation_Resize: {
+		ptr = gb_default_resize_align(heap_allocator(), old_memory, old_size, size, alignment);
+	} break;
+#endif
+
+	case gbAllocation_FreeAll:
+		break;
+	}
+
+	return ptr;
 }
 
 #include "unicode.cpp"

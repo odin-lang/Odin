@@ -5090,7 +5090,8 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 	p->init_fullpath = init_fullpath;
 
 
-#if USE_THREADED_PARSER
+	// IMPORTANT TODO(bill): Figure out why this doesn't work on *nix sometimes
+#if USE_THREADED_PARSER && defined(GB_SYSTEM_WINDOWS)
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	if (thread_count > 1) {
 		Array<gbThread> worker_threads = {};
