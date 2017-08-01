@@ -79,8 +79,6 @@ struct Parser {
 	String              init_fullpath;
 	Array<AstFile>      files;
 	Array<ImportedFile> imports;
-	isize               curr_import_index;
-	gbAtomic32          import_index;
 	isize               total_token_count;
 	isize               total_line_count;
 	gbMutex             file_add_mutex;
@@ -4921,7 +4919,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 					String collection_name = {};
 					String oirignal_string = id->relpath.string;
 					String file_str = id->relpath.string;
-					gbAllocator allocator = heap_allocator(); // TODO(bill): Change this allocator
+					gbAllocator a = heap_allocator(); // TODO(bill): Change this allocator
 					String import_file = {};
 					String rel_path = {};
 
@@ -4936,15 +4934,13 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 						continue;
 					}
 
-
-
 					gb_mutex_lock(&p->file_decl_mutex);
 					defer (gb_mutex_unlock(&p->file_decl_mutex));
 
-					rel_path = get_fullpath_relative(allocator, base_dir, file_str);
+					rel_path = get_fullpath_relative(a, base_dir, file_str);
 					import_file = rel_path;
 					if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
-						String abs_path = get_fullpath_core(allocator, file_str);
+						String abs_path = get_fullpath_core(a, file_str);
 						if (gb_file_exists(cast(char *)abs_path.text)) {
 							import_file = abs_path;
 						}
@@ -5105,6 +5101,7 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 			gbThread *t = &worker_threads[i];
 			gb_thread_init(t);
 		}
+		isize curr_import_index = 0;
 
 		// NOTE(bill): Make sure that these are in parsed in this order
 		for (isize i = 0; i < shared_file_count; i++) {
@@ -5112,7 +5109,7 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 			if (err != ParseFile_None) {
 				return err;
 			}
-			p->curr_import_index++;
+			curr_import_index++;
 		}
 
 		for (;;) {
@@ -5121,19 +5118,20 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 				gbThread *t = &worker_threads[i];
 				if (gb_thread_is_running(t)) {
 					are_any_alive = true;
-				} else if (p->curr_import_index < p->imports.count) {
-					if (t->return_value != 0) {
+				} else if (curr_import_index < p->imports.count) {
+					auto err = cast(ParseFileError)t->return_value;
+					if (err != ParseFile_None) {
 						for_array(i, worker_threads) {
 							gb_thread_destroy(&worker_threads[i]);
 						}
-						return cast(ParseFileError)t->return_value;
+						return err;
 					}
-					t->user_index = p->curr_import_index++;
+					t->user_index = curr_import_index++;
 					gb_thread_start(t, parse_worker_file_proc, p);
 					are_any_alive = true;
 				}
 			}
-			if (!are_any_alive && p->curr_import_index >= p->imports.count) {
+			if (!are_any_alive && curr_import_index >= p->imports.count) {
 				break;
 			}
 		}

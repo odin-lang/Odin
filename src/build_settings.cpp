@@ -69,8 +69,11 @@ String odin_root_dir(void) {
 	}
 	len += 1; // NOTE(bill): It needs an extra 1 for some reason
 
+	gb_mutex_lock(&string_buffer_mutex);
+	defer (gb_mutex_unlock(&string_buffer_mutex));
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	defer (gb_temp_arena_memory_end(tmp));
 
 	text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
 
@@ -88,7 +91,6 @@ String odin_root_dir(void) {
 	global_module_path = path;
 	global_module_path_set = true;
 
-	gb_temp_arena_memory_end(tmp);
 
 	array_free(&path_buf);
 
@@ -124,8 +126,12 @@ String odin_root_dir(void) {
 		}
 	}
 
+	gb_mutex_lock(&string_buffer_mutex);
+	defer (gb_mutex_unlock(&string_buffer_mutex));
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
 	text = gb_alloc_array(string_buffer_allocator, u8, len + 1);
 	gb_memmove(text, &path_buf[0], len);
 
@@ -141,7 +147,6 @@ String odin_root_dir(void) {
 	global_module_path = path;
 	global_module_path_set = true;
 
-	gb_temp_arena_memory_end(tmp);
 
 	// array_free(&path_buf);
 
@@ -182,6 +187,8 @@ String odin_root_dir(void) {
 		array_resize(&path_buf, 2*path_buf.count + 300);
 	}
 
+	gb_mutex_lock(&string_buffer_mutex);
+	defer (gb_mutex_unlock(&string_buffer_mutex));
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -211,27 +218,28 @@ String odin_root_dir(void) {
 String path_to_fullpath(gbAllocator a, String s) {
 	String result = {};
 	gb_mutex_lock(&string_buffer_mutex);
-	{
-		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-		String16 string16 = string_to_string16(string_buffer_allocator, s);
+	defer (gb_mutex_unlock(&string_buffer_mutex));
 
-		DWORD len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
-		if (len != 0) {
-			wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
-			GetFullPathNameW(&string16[0], len, text, nullptr);
-			text[len] = 0;
-			result = string16_to_string(a, make_string16(text, len));
-		}
-		gb_temp_arena_memory_end(tmp);
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	String16 string16 = string_to_string16(string_buffer_allocator, s);
+
+	DWORD len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
+	if (len != 0) {
+		wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
+		GetFullPathNameW(&string16[0], len, text, nullptr);
+		text[len] = 0;
+		result = string16_to_string(a, make_string16(text, len));
 	}
-	gb_mutex_unlock(&string_buffer_mutex);
+	gb_temp_arena_memory_end(tmp);
 	return result;
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
 String path_to_fullpath(gbAllocator a, String s) {
-	char *p = realpath(cast(char *)&s[0], 0);
+	char *p;
+	gb_mutex_lock(&string_buffer_mutex);
+	p = realpath(cast(char *)s.data, 0);
+	gb_mutex_unlock(&string_buffer_mutex);
 	if(p == nullptr) return make_string_c("");
-
 	return make_string_c(p);
 }
 #else
