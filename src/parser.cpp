@@ -83,7 +83,8 @@ struct Parser {
 	gbAtomic32          import_index;
 	isize               total_token_count;
 	isize               total_line_count;
-	gbMutex             mutex;
+	gbMutex             file_add_mutex;
+	gbMutex             file_decl_mutex;
 };
 
 enum ProcTag {
@@ -4812,7 +4813,8 @@ void destroy_ast_file(AstFile *f) {
 bool init_parser(Parser *p) {
 	array_init(&p->files, heap_allocator());
 	array_init(&p->imports, heap_allocator());
-	gb_mutex_init(&p->mutex);
+	gb_mutex_init(&p->file_add_mutex);
+	gb_mutex_init(&p->file_decl_mutex);
 	return true;
 }
 
@@ -4828,14 +4830,12 @@ void destroy_parser(Parser *p) {
 #endif
 	array_free(&p->files);
 	array_free(&p->imports);
-	gb_mutex_destroy(&p->mutex);
+	gb_mutex_destroy(&p->file_add_mutex);
+	gb_mutex_destroy(&p->file_decl_mutex);
 }
 
 // NOTE(bill): Returns true if it's added
 bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
-	gb_mutex_lock(&p->mutex);
-	defer (gb_mutex_unlock(&p->mutex));
-
 	if (build_context.generate_docs) {
 		return false;
 	}
@@ -4923,6 +4923,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 					String file_str = id->relpath.string;
 					gbAllocator allocator = heap_allocator(); // TODO(bill): Change this allocator
 					String import_file = {};
+					String rel_path = {};
 
 					if (!is_import_path_valid(file_str)) {
 						if (id->is_import) {
@@ -4936,7 +4937,11 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 					}
 
 
-					String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
+
+					gb_mutex_lock(&p->file_decl_mutex);
+					defer (gb_mutex_unlock(&p->file_decl_mutex));
+
+					rel_path = get_fullpath_relative(allocator, base_dir, file_str);
 					import_file = rel_path;
 					if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
 						String abs_path = get_fullpath_core(allocator, file_str);
@@ -5039,13 +5044,11 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 	}
 	parse_file(p, &file);
 
-	{
-		gb_mutex_lock(&p->mutex);
-		file.id = imported_file.index;
-		array_add(&p->files, file);
-		p->total_line_count += file.tokenizer.line_count;
-		gb_mutex_unlock(&p->mutex);
-	}
+	gb_mutex_lock(&p->file_add_mutex);
+	file.id = imported_file.index;
+	array_add(&p->files, file);
+	p->total_line_count += file.tokenizer.line_count;
+	gb_mutex_unlock(&p->file_add_mutex);
 
 
 	return ParseFile_None;

@@ -930,19 +930,13 @@ GB_DEF void gb_semaphore_wait   (gbSemaphore *s);
 
 
 // Mutex
-// TODO(bill): Should this be replaced with a CRITICAL_SECTION on win32 or is the better?
+typedef struct gbMutex {
 #if defined(GB_SYSTEM_WINDOWS)
-typedef struct gbMutex {
 	CRITICAL_SECTION win32_critical_section;
-} gbMutex;
 #else
-typedef struct gbMutex {
-	gbSemaphore semaphore;
-	gbAtomic32  counter;
-	gbAtomic32  owner;
-	i32         recursion;
-} gbMutex;
+	pthread_mutex_t pthread_mutex;
 #endif
+} gbMutex;
 
 GB_DEF void gb_mutex_init    (gbMutex *m);
 GB_DEF void gb_mutex_destroy (gbMutex *m);
@@ -4608,12 +4602,7 @@ gb_inline void gb_mutex_init(gbMutex *m) {
 #if defined(GB_SYSTEM_WINDOWS)
 	InitializeCriticalSection(&m->win32_critical_section);
 #else
-// NOTE(bill): THIS IS FUCKING AWESOME THAT THIS "MUTEX" IS FAST AND RECURSIVE TOO!
-// NOTE(bill): WHO THE FUCK NEEDS A NORMAL MUTEX NOW?!?!?!?!
-	gb_atomic32_store(&m->counter, 0);
-	gb_atomic32_store(&m->owner, gb_thread_current_id());
-	gb_semaphore_init(&m->semaphore);
-	m->recursion = 0;
+	pthread_mutex_init(&m->pthread_mutex, NULL);
 #endif
 }
 
@@ -4621,7 +4610,7 @@ gb_inline void gb_mutex_destroy(gbMutex *m) {
 #if defined(GB_SYSTEM_WINDOWS)
 	DeleteCriticalSection(&m->win32_critical_section);
 #else
-	gb_semaphore_destroy(&m->semaphore);
+	pthread_mutex_destroy(&m->pthread_mutex);
 #endif
 }
 
@@ -4629,15 +4618,7 @@ gb_inline void gb_mutex_lock(gbMutex *m) {
 #if defined(GB_SYSTEM_WINDOWS)
 	EnterCriticalSection(&m->win32_critical_section);
 #else
-	i32 thread_id = cast(i32)gb_thread_current_id();
-	if (gb_atomic32_fetch_add(&m->counter, 1) > 0) {
-		if (thread_id != gb_atomic32_load(&m->owner)) {
-			gb_semaphore_wait(&m->semaphore);
-		}
-	}
-
-	gb_atomic32_store(&m->owner, thread_id);
-	m->recursion++;
+	pthread_mutex_lock(&m->pthread_mutex);
 #endif
 }
 
@@ -4645,22 +4626,7 @@ gb_inline b32 gb_mutex_try_lock(gbMutex *m) {
 #if defined(GB_SYSTEM_WINDOWS)
 	return TryEnterCriticalSection(&m->win32_critical_section) != 0;
 #else
-	i32 thread_id = cast(i32)gb_thread_current_id();
-	if (gb_atomic32_load(&m->owner) == thread_id) {
-		gb_atomic32_fetch_add(&m->counter, 1);
-	} else {
-		i32 expected = 0;
-		if (gb_atomic32_load(&m->counter) != 0) {
-			return false;
-		}
-		if (!gb_atomic32_compare_exchange(&m->counter, expected, 1)) {
-			return false;
-		}
-		gb_atomic32_store(&m->owner, thread_id);
-	}
-
-	m->recursion++;
-	return true;
+	return pthread_mutex_trylock(&m->pthread_mutex) == 0;
 #endif
 }
 
@@ -4668,19 +4634,7 @@ gb_inline void gb_mutex_unlock(gbMutex *m) {
 #if defined(GB_SYSTEM_WINDOWS)
 	LeaveCriticalSection(&m->win32_critical_section);
 #else
-	i32 recursion;
-	i32 thread_id = cast(i32)gb_thread_current_id();
-
-	recursion = --m->recursion;
-	if (recursion == 0) {
-		gb_atomic32_store(&m->owner, thread_id);
-	}
-
-	if (gb_atomic32_fetch_add(&m->counter, -1) > 1) {
-		if (recursion == 0) {
-			gb_semaphore_release(&m->semaphore);
-		}
-	}
+	pthread_mutex_unlock(&m->pthread_mutex);
 #endif
 }
 
