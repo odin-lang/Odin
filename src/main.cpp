@@ -1,6 +1,8 @@
 #define USE_CUSTOM_BACKEND 0
-#define USE_THREADED_PARSER 1
 // #define NO_ARRAY_BOUNDS_CHECK
+#if !defined(USE_THREADED_PARSER)
+#define USE_THREADED_PARSER 0
+#endif
 
 #include "common.cpp"
 #include "timings.cpp"

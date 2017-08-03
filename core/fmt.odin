@@ -10,12 +10,12 @@ import (
 
 _BUFFER_SIZE :: 1<<12;
 
-StringBuffer :: union {
+String_Buffer :: union {
 	[]u8,
 	[dynamic]u8,
 }
 
-FmtInfo :: struct {
+Fmt_Info :: struct {
 	minus:     bool;
 	plus:      bool;
 	space:     bool;
@@ -31,47 +31,47 @@ FmtInfo :: struct {
 	reordered:      bool;
 	good_arg_index: bool;
 
-	buf: ^StringBuffer;
+	buf: ^String_Buffer;
 	arg: any; // Temporary
 }
 
 
 
-string_buffer_data :: proc(buf: ^StringBuffer) -> []u8 {
+string_buffer_data :: proc(buf: ^String_Buffer) -> []u8 {
 	match b in buf {
 	case []u8:        return b[..];
 	case [dynamic]u8: return b[..];
 	}
 	return nil;
 }
-string_buffer_data :: proc(buf: StringBuffer) -> []u8 {
+string_buffer_data :: proc(buf: String_Buffer) -> []u8 {
 	match b in buf {
 	case []u8:        return b[..];
 	case [dynamic]u8: return b[..];
 	}
 	return nil;
 }
-to_string :: proc(buf: StringBuffer) -> string {
+to_string :: proc(buf: String_Buffer) -> string {
 	return string(string_buffer_data(buf));
 }
 
 
-write_string :: proc(buf: ^StringBuffer, s: string) {
+write_string :: proc(buf: ^String_Buffer, s: string) {
 	write_bytes(buf, cast([]u8)s);
 }
-write_bytes :: proc(buf: ^StringBuffer, data: []u8) {
+write_bytes :: proc(buf: ^String_Buffer, data: []u8) {
 	match b in buf {
 	case []u8:        append(b, ...data);
 	case [dynamic]u8: append(b, ...data);
 	}
 }
-write_byte :: proc(buf: ^StringBuffer, data: u8) {
+write_byte :: proc(buf: ^String_Buffer, data: u8) {
 	match b in buf {
 	case []u8:        append(b, data);
 	case [dynamic]u8: append(b, data);
 	}
 }
-write_rune :: proc(buf: ^StringBuffer, r: rune) {
+write_rune :: proc(buf: ^String_Buffer, r: rune) {
 	if r < utf8.RUNE_SELF {
 		write_byte(buf, u8(r));
 		return;
@@ -81,12 +81,12 @@ write_rune :: proc(buf: ^StringBuffer, r: rune) {
 	write_bytes(buf, b[..n]);
 }
 
-write_int :: proc(buf: ^StringBuffer, i: i128, base: int) {
+write_int :: proc(buf: ^String_Buffer, i: i128, base: int) {
 	b: [129]u8;
 	s := strconv.append_bits(b[..0], u128(i), base, true, 128, strconv.digits, 0);
 	write_string(buf, s);
 }
-write_int :: proc(buf: ^StringBuffer, i: i64, base: int) {
+write_int :: proc(buf: ^String_Buffer, i: i64, base: int) {
 	b: [129]u8;
 	s := strconv.append_bits(b[..0], u128(i), base, true, 64, strconv.digits, 0);
 	write_string(buf, s);
@@ -96,7 +96,7 @@ write_int :: proc(buf: ^StringBuffer, i: i64, base: int) {
 
 fprint :: proc(fd: os.Handle, args: ...any) -> int {
 	data: [_BUFFER_SIZE]u8;
-	buf := StringBuffer(data[..0]);
+	buf := String_Buffer(data[..0]);
 	sbprint(&buf, ...args);
 	res := string_buffer_data(buf);
 	os.write(fd, res);
@@ -105,7 +105,7 @@ fprint :: proc(fd: os.Handle, args: ...any) -> int {
 
 fprintln :: proc(fd: os.Handle, args: ...any) -> int {
 	data: [_BUFFER_SIZE]u8;
-	buf := StringBuffer(data[..0]);
+	buf := String_Buffer(data[..0]);
 	sbprintln(&buf, ...args);
 	res := string_buffer_data(buf);
 	os.write(fd, res);
@@ -113,7 +113,7 @@ fprintln :: proc(fd: os.Handle, args: ...any) -> int {
 }
 fprintf :: proc(fd: os.Handle, fmt: string, args: ...any) -> int {
 	data: [_BUFFER_SIZE]u8;
-	buf := StringBuffer(data[..0]);
+	buf := String_Buffer(data[..0]);
 	sbprintf(&buf, fmt, ...args);
 	res := string_buffer_data(buf);
 	os.write(fd, res);
@@ -133,17 +133,17 @@ printf_err  :: proc(fmt: string, args: ...any) -> int { return fprintf(os.stderr
 // aprint* procedures return a string that was allocated with the current context
 // They must be freed accordingly
 aprint :: proc(args: ...any) -> string {
-	buf := StringBuffer(make([dynamic]u8));
+	buf := String_Buffer(make([dynamic]u8));
 	sbprint(&buf, ...args);
 	return to_string(buf);
 }
 aprintln :: proc(args: ...any) -> string {
-	buf := StringBuffer(make([dynamic]u8));
+	buf := String_Buffer(make([dynamic]u8));
 	sbprintln(&buf, ...args);
 	return to_string(buf);
 }
 aprintf :: proc(fmt: string, args: ...any) -> string {
-	buf := StringBuffer(make([dynamic]u8));
+	buf := String_Buffer(make([dynamic]u8));
 	sbprintf(&buf, fmt, ...args);
 	return to_string(buf);
 }
@@ -151,15 +151,15 @@ aprintf :: proc(fmt: string, args: ...any) -> string {
 
 // bprint* procedures return a string using a buffer from an array
 bprint :: proc(buf: []u8, args: ...any) -> string {
-	sb := StringBuffer(buf[..0..len(buf)]);
+	sb := String_Buffer(buf[..0..len(buf)]);
 	return sbprint(&sb, ...args);
 }
 bprintln :: proc(buf: []u8, args: ...any) -> string {
-	sb := StringBuffer(buf[..0..len(buf)]);
+	sb := String_Buffer(buf[..0..len(buf)]);
 	return sbprintln(&sb, ...args);
 }
 bprintf :: proc(buf: []u8, fmt: string, args: ...any) -> string {
-	sb := StringBuffer(buf[..0..len(buf)]);
+	sb := String_Buffer(buf[..0..len(buf)]);
 	return sbprintf(&sb, fmt, ...args);
 }
 
@@ -168,17 +168,17 @@ bprintf :: proc(buf: []u8, fmt: string, args: ...any) -> string {
 
 
 
-fprint_type :: proc(fd: os.Handle, info: ^TypeInfo) {
+fprint_type :: proc(fd: os.Handle, info: ^Type_Info) {
 	data: [_BUFFER_SIZE]u8;
-	buf := StringBuffer(data[..0]);
+	buf := String_Buffer(data[..0]);
 	write_type(&buf, info);
 	os.write(fd, string_buffer_data(buf));
 }
 
-write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
+write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 	if ti == nil do return;
 
-	using TypeInfo;
+	using Type_Info;
 	match info in ti.variant {
 	case Named:
 		write_string(buf, info.name);
@@ -252,11 +252,11 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 
 	case Array:
 		write_string(buf, "[");
-		fi := FmtInfo{buf = buf};
+		fi := Fmt_Info{buf = buf};
 		write_int(buf, i64(info.count), 10);
 		write_string(buf, "]");
 		write_type(buf, info.elem);
-	case DynamicArray:
+	case Dynamic_Array:
 		write_string(buf, "[dynamic]");
 		write_type(buf, info.elem);
 	case Slice:
@@ -311,7 +311,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		}
 		write_string(buf, "}");
 
-	case BitField:
+	case Bit_Field:
 		write_string(buf, "bit_field ");
 		if ti.align != 1 {
 			write_string(buf, "#align ");
@@ -352,7 +352,7 @@ _parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: boo
 	return result, offset+i, i != 0;
 }
 
-_arg_number :: proc(fi: ^FmtInfo, arg_index: int, format: string, offset, arg_count: int) -> (index, offset: int, ok: bool) {
+_arg_number :: proc(fi: ^Fmt_Info, arg_index: int, format: string, offset, arg_count: int) -> (index, offset: int, ok: bool) {
 	parse_arg_number :: proc(format: string) -> (int, int, bool) {
 		if len(format) < 3 do return 0, 1, false;
 
@@ -408,7 +408,7 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 }
 
 
-fmt_bad_verb :: proc(using fi: ^FmtInfo, verb: rune) {
+fmt_bad_verb :: proc(using fi: ^Fmt_Info, verb: rune) {
 	assert(verb != 'v');
 	write_string(buf, "%!");
 	write_rune(buf, verb);
@@ -423,7 +423,7 @@ fmt_bad_verb :: proc(using fi: ^FmtInfo, verb: rune) {
 	write_byte(buf, ')');
 }
 
-fmt_bool :: proc(using fi: ^FmtInfo, b: bool, verb: rune) {
+fmt_bool :: proc(using fi: ^Fmt_Info, b: bool, verb: rune) {
 	match verb {
 	case 't', 'v':
 		s := "false";
@@ -435,7 +435,7 @@ fmt_bool :: proc(using fi: ^FmtInfo, b: bool, verb: rune) {
 }
 
 
-fmt_write_padding :: proc(fi: ^FmtInfo, width: int) {
+fmt_write_padding :: proc(fi: ^Fmt_Info, width: int) {
 	if width <= 0 do return;
 
 	pad_byte: u8 = '0';
@@ -446,7 +446,7 @@ fmt_write_padding :: proc(fi: ^FmtInfo, width: int) {
 	}
 }
 
-_fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
+_fmt_int :: proc(fi: ^Fmt_Info, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
 	_, neg := strconv.is_integer_negative(u128(u), is_signed, bit_size);
 
 	BUF_SIZE :: 256;
@@ -486,10 +486,10 @@ _fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: in
 	buf: [256]u8;
 	start := 0;
 
-	flags: strconv.IntFlag;
-	if fi.hash && !fi.zero do flags |= strconv.IntFlag.Prefix;
-	if fi.plus             do flags |= strconv.IntFlag.Plus;
-	if fi.space            do flags |= strconv.IntFlag.Space;
+	flags: strconv.Int_Flag;
+	if fi.hash && !fi.zero do flags |= strconv.Int_Flag.Prefix;
+	if fi.plus             do flags |= strconv.Int_Flag.Plus;
+	if fi.space            do flags |= strconv.Int_Flag.Space;
 	s := strconv.append_bits(buf[start..start], u128(u), base, is_signed, bit_size, digits, flags);
 
 	if fi.hash && fi.zero {
@@ -517,7 +517,7 @@ _fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: in
 __DIGITS_LOWER := "0123456789abcdefx";
 __DIGITS_UPPER := "0123456789ABCDEFX";
 
-fmt_rune :: proc(fi: ^FmtInfo, r: rune, verb: rune) {
+fmt_rune :: proc(fi: ^Fmt_Info, r: rune, verb: rune) {
 	match verb {
 	case 'c', 'r', 'v':
 		write_rune(fi.buf, r);
@@ -526,7 +526,7 @@ fmt_rune :: proc(fi: ^FmtInfo, r: rune, verb: rune) {
 	}
 }
 
-fmt_int :: proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: rune) {
+fmt_int :: proc(fi: ^Fmt_Info, u: u128, is_signed: bool, bit_size: int, verb: rune) {
 	match verb {
 	case 'v': _fmt_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
 	case 'b': _fmt_int(fi, u,  2, is_signed, bit_size, __DIGITS_LOWER);
@@ -551,7 +551,7 @@ fmt_int :: proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: run
 	}
 }
 
-_pad :: proc(fi: ^FmtInfo, s: string) {
+_pad :: proc(fi: ^Fmt_Info, s: string) {
 	if !fi.width_set {
 		write_string(fi.buf, s);
 		return;
@@ -568,7 +568,7 @@ _pad :: proc(fi: ^FmtInfo, s: string) {
 	}
 }
 
-fmt_float :: proc(fi: ^FmtInfo, v: f64, bit_size: int, verb: rune) {
+fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 	match verb {
 	// case 'e', 'E', 'f', 'F', 'g', 'G', 'v':
 	// case 'f', 'F', 'v':
@@ -611,7 +611,7 @@ fmt_float :: proc(fi: ^FmtInfo, v: f64, bit_size: int, verb: rune) {
 		fmt_bad_verb(fi, verb);
 	}
 }
-fmt_string :: proc(fi: ^FmtInfo, s: string, verb: rune) {
+fmt_string :: proc(fi: ^Fmt_Info, s: string, verb: rune) {
 	match verb {
 	case 's', 'v':
 		write_string(fi.buf, s);
@@ -633,7 +633,7 @@ fmt_string :: proc(fi: ^FmtInfo, s: string, verb: rune) {
 	}
 }
 
-fmt_pointer :: proc(fi: ^FmtInfo, p: rawptr, verb: rune) {
+fmt_pointer :: proc(fi: ^Fmt_Info, p: rawptr, verb: rune) {
 	match verb {
 	case 'p', 'v':
 		// Okay
@@ -651,7 +651,7 @@ fmt_pointer :: proc(fi: ^FmtInfo, p: rawptr, verb: rune) {
 enum_value_to_string :: proc(v: any) -> (string, bool) {
 	v.type_info = type_info_base(v.type_info);
 
-	using TypeInfo;
+	using Type_Info;
 	match e in v.type_info.variant {
 	case: return "", false;
 	case Enum:
@@ -700,7 +700,7 @@ enum_value_to_string :: proc(v: any) -> (string, bool) {
 
 string_to_enum_value :: proc(T: type, s: string) -> (T, bool) {
 	ti := type_info_base(type_info_of(T));
-	if e, ok := ti.variant.(TypeInfo.Enum); ok {
+	if e, ok := ti.variant.(Type_Info.Enum); ok {
 		for str, idx in e.names {
 			if s == str {
 				// NOTE(bill): Unsafe cast
@@ -712,13 +712,13 @@ string_to_enum_value :: proc(T: type, s: string) -> (T, bool) {
 	return T{}, false;
 }
 
-fmt_enum :: proc(fi: ^FmtInfo, v: any, verb: rune) {
+fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	if v.type_info == nil || v.data == nil {
 		write_string(fi.buf, "<nil>");
 		return;
 	}
 
-	using TypeInfo;
+	using Type_Info;
 	match e in v.type_info.variant {
 	case: fmt_bad_verb(fi, verb);
 	case Enum:
@@ -735,13 +735,13 @@ fmt_enum :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 }
 
 
-fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
+fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	if v.data == nil || v.type_info == nil {
 		write_string(fi.buf, "<nil>");
 		return;
 	}
 
-	using TypeInfo;
+	using Type_Info;
 	match info in v.type_info.variant {
 	case Named:
 		match b in info.base.variant {
@@ -800,8 +800,8 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 	case String:     fmt_arg(fi, v, verb);
 
 	case Pointer:
-		if v.type_info == type_info_of(^TypeInfo) {
-			write_type(fi.buf, (cast(^^TypeInfo)v.data)^);
+		if v.type_info == type_info_of(^Type_Info) {
+			write_type(fi.buf, (cast(^^Type_Info)v.data)^);
 		} else {
 			fmt_pointer(fi, (cast(^rawptr)v.data)^, verb);
 		}
@@ -816,10 +816,10 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
 		}
 
-	case DynamicArray:
+	case Dynamic_Array:
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
-		array := cast(^raw.DynamicArray)v.data;
+		array := cast(^raw.Dynamic_Array)v.data;
 		for i in 0..array.len {
 			if i > 0 do write_string(fi.buf, ", ");
 
@@ -858,9 +858,9 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		write_string(fi.buf, "map[");
 		defer write_byte(fi.buf, ']');
 
-		entries    := &((cast(^raw.DynamicMap)v.data).entries);
+		entries    := &((cast(^raw.Map)v.data).entries);
 		gs         := type_info_base(info.generated_struct).variant.(Struct);
-		ed         := type_info_base(gs.types[1]).variant.(DynamicArray);
+		ed         := type_info_base(gs.types[1]).variant.(Dynamic_Array);
 		entry_type := ed.elem.variant.(Struct);
 		entry_size := ed.elem_size;
 
@@ -868,12 +868,12 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			if i > 0 do write_string(fi.buf, ", ");
 
 			data := cast(^u8)entries.data + i*entry_size;
-			header := cast(^__MapEntryHeader)data;
+			header := cast(^__Map_Entry_Header)data;
 
 			if types.is_string(info.key) {
 				write_string(fi.buf, header.key.str);
 			} else {
-				fi := FmtInfo{buf = fi.buf};
+				fi := Fmt_Info{buf = fi.buf};
 				fmt_arg(&fi, any{rawptr(&header.key.hash), info.key}, 'v');
 			}
 
@@ -924,7 +924,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 
 	case Union:
 		data := cast(^u8)v.data;
-		tipp := cast(^^TypeInfo)(data + info.tag_offset);
+		tipp := cast(^^Type_Info)(data + info.tag_offset);
 		if data == nil || tipp == nil {
 			write_string(fi.buf, "(union)");
 		} else {
@@ -942,7 +942,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 	}
 }
 
-fmt_complex :: proc(fi: ^FmtInfo, c: complex128, bits: int, verb: rune) {
+fmt_complex :: proc(fi: ^Fmt_Info, c: complex128, bits: int, verb: rune) {
 	match verb {
 	case 'f', 'F', 'v':
 		r, i := real(c), imag(c);
@@ -963,11 +963,11 @@ _u128_to_lo_hi :: proc(a: u128) -> (lo, hi: u64) { return u64(a), u64(a>>64); }
 _i128_to_lo_hi :: proc(a: u128) -> (lo: u64 hi: i64) { return u64(a), i64(a>>64); }
 
 
-do_foo :: proc(fi: ^FmtInfo, f: f64) {
+do_foo :: proc(fi: ^Fmt_Info, f: f64) {
 	fmt_string(fi, "Hellope$%!", 'v');
 }
 
-fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
+fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	if arg == nil {
 		write_string(fi.buf, "<nil>");
 		return;
@@ -977,7 +977,7 @@ fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
 	if verb == 'T' {
 		ti := arg.type_info;
 		match a in arg {
-		case ^TypeInfo: ti = a;
+		case ^Type_Info: ti = a;
 		}
 		write_type(fi.buf, ti);
 		return;
@@ -1022,8 +1022,8 @@ fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
 
 
 
-sbprint :: proc(buf: ^StringBuffer, args: ...any) -> string {
-	fi: FmtInfo;
+sbprint :: proc(buf: ^String_Buffer, args: ...any) -> string {
+	fi: Fmt_Info;
 	prev_string := false;
 
 	fi.buf = buf;
@@ -1039,8 +1039,8 @@ sbprint :: proc(buf: ^StringBuffer, args: ...any) -> string {
 	return to_string(buf^);
 }
 
-sbprintln :: proc(buf: ^StringBuffer, args: ...any) -> string {
-	fi: FmtInfo;
+sbprintln :: proc(buf: ^String_Buffer, args: ...any) -> string {
+	fi: Fmt_Info;
 	fi.buf = buf;
 
 	for arg, i in args {
@@ -1052,15 +1052,15 @@ sbprintln :: proc(buf: ^StringBuffer, args: ...any) -> string {
 	return to_string(buf^);
 }
 
-sbprintf :: proc(b: ^StringBuffer, fmt: string, args: ...any) -> string {
-	fi: FmtInfo;
+sbprintf :: proc(b: ^String_Buffer, fmt: string, args: ...any) -> string {
+	fi: Fmt_Info;
 	arg_index: int = 0;
 	end := len(fmt);
 	was_prev_index := false;
 
 
 	for i := 0; i < end; /**/ {
-		fi = FmtInfo{buf = b, good_arg_index = true};
+		fi = Fmt_Info{buf = b, good_arg_index = true};
 
 		prev_i := i;
 		for i < end && fmt[i] != '%' {

@@ -20,7 +20,7 @@ Hmonitor  :: Handle;
 Wparam    :: uint;
 Lparam    :: int;
 Lresult   :: int;
-WndProc   :: proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
+Wnd_Proc  :: proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
 
 Bool :: i32;
 FALSE: Bool : 0;
@@ -30,9 +30,9 @@ Point :: struct #ordered {
 	x, y: i32;
 }
 
-WndClassExA :: struct #ordered {
+Wnd_Class_Ex_A :: struct #ordered {
 	size, style:           u32;
-	wnd_proc:              WndProc;
+	wnd_proc:              Wnd_Proc;
 	cls_extra, wnd_extra:  i32;
 	instance:              Hinstance;
 	icon:                  Hicon;
@@ -68,7 +68,7 @@ Systemtime :: struct #ordered {
 	hour, minute, second, millisecond: u16;
 }
 
-ByHandleFileInformation :: struct #ordered {
+By_Handle_File_Information :: struct #ordered {
 	file_attributes:      u32;
 	creation_time,
 	last_access_time,
@@ -81,7 +81,7 @@ ByHandleFileInformation :: struct #ordered {
 	file_index_low:       u32;
 }
 
-FileAttributeData :: struct #ordered {
+File_Attribute_Data :: struct #ordered {
 	file_attributes:  u32;
 	creation_time,
 	last_access_time,
@@ -90,7 +90,7 @@ FileAttributeData :: struct #ordered {
 	file_size_low:    u32;
 }
 
-FindData :: struct #ordered {
+Find_Data :: struct #ordered{
     file_attributes:     u32;
     creation_time:       Filetime;
     last_access_time:    Filetime;
@@ -103,7 +103,7 @@ FindData :: struct #ordered {
     alternate_file_name: [14]u8;
 }
 
-SecurityAttributes :: struct #ordered {
+Security_Attributes :: struct #ordered {
 	length:              u32;
 	security_descriptor: rawptr;
 	inherit_handle:      Bool;
@@ -111,7 +111,7 @@ SecurityAttributes :: struct #ordered {
 
 
 
-PixelFormatDescriptor :: struct #ordered {
+Pixel_Format_Descriptor :: struct #ordered {
 	size,
 	version,
 	flags: u32;
@@ -142,8 +142,8 @@ PixelFormatDescriptor :: struct #ordered {
 	damage_mask: u32;
 }
 
-CriticalSection :: struct #ordered {
-	debug_info:      ^CriticalSectionDebug;
+Critical_Section :: struct #ordered {
+	debug_info:      ^Critical_Section_Debug;
 
 	lock_count:      i32;
 	recursion_count: i32;
@@ -152,11 +152,11 @@ CriticalSection :: struct #ordered {
 	spin_count:      ^u32;
 }
 
-CriticalSectionDebug :: struct #ordered {
+Critical_Section_Debug :: struct #ordered {
 	typ:                           u16;
 	creator_back_trace_index:      u16;
-	critical_section:              ^CriticalSection;
-	process_locks_list:            ^ListEntry;
+	critical_section:              ^Critical_Section;
+	process_locks_list:            ^List_Entry;
 	entry_count:                   u32;
 	contention_count:              u32;
 	flags:                         u32;
@@ -164,7 +164,7 @@ CriticalSectionDebug :: struct #ordered {
 	spare_word:                    u16;
 }
 
-ListEntry :: struct #ordered {flink, blink: ^ListEntry};
+List_Entry :: struct #ordered {flink, blink: ^List_Entry};
 
 
 
@@ -328,15 +328,15 @@ foreign kernel32 {
 	get_file_size_ex               :: proc(file_handle: Handle, file_size: ^i64) -> Bool                                       #cc_std #link_name "GetFileSizeEx"                ---;
 	get_file_attributes_a          :: proc(filename: ^u8) -> u32                                                               #cc_std #link_name "GetFileAttributesA"           ---;
 	get_file_attributes_ex_a       :: proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool    #cc_std #link_name "GetFileAttributesExA"         ---;
-	get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^ByHandleFileInformation) -> Bool                   #cc_std #link_name "GetFileInformationByHandle"   ---;
+	get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool                #cc_std #link_name "GetFileInformationByHandle"   ---;
 
 	get_file_type    :: proc(file_handle: Handle) -> u32                                                                       #cc_std #link_name "GetFileType"                  ---;
 	set_file_pointer :: proc(file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #cc_std #link_name "SetFilePointer"               ---;
 
 	set_handle_information :: proc(obj: Handle, mask, flags: u32) -> Bool                                                      #cc_std #link_name "SetHandleInformation"         ---;
 
-	find_first_file_a :: proc(file_name : ^u8, data : ^FindData) -> Handle                                                     #cc_std #link_name "FindFirstFileA"               ---;
-	find_next_file_a  :: proc(file : Handle, data : ^FindData) -> Bool                                                         #cc_std #link_name "FindNextFileA"                ---;
+	find_first_file_a :: proc(file_name : ^u8, data : ^Find_Data) -> Handle                                                    #cc_std #link_name "FindFirstFileA"               ---;
+	find_next_file_a  :: proc(file : Handle, data : ^Find_Data) -> Bool                                                        #cc_std #link_name "FindNextFileA"                ---;
 	find_close        :: proc(file : Handle) -> Bool                                                                           #cc_std #link_name "FindClose"                    ---;
 
 
@@ -346,7 +346,7 @@ foreign kernel32 {
 	get_process_heap :: proc() -> Handle                                                                                       #cc_std #link_name "GetProcessHeap"               ---;
 
 
-	create_semaphore_a     :: proc(attributes: ^SecurityAttributes, initial_count, maximum_count: i32, name: ^u8) -> Handle    #cc_std #link_name "CreateSemaphoreA"             ---;
+	create_semaphore_a     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^u8) -> Handle   #cc_std #link_name "CreateSemaphoreA"             ---;
 	release_semaphore      :: proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool                        #cc_std #link_name "ReleaseSemaphore"             ---;
 	wait_for_single_object :: proc(handle: Handle, milliseconds: u32) -> u32                                                   #cc_std #link_name "WaitForSingleObject"          ---;
 
@@ -368,22 +368,22 @@ foreign kernel32 {
 	write_barrier      :: proc()                                                                                               #cc_std #link_name "WriteBarrier"                 ---;
 	read_barrier       :: proc()                                                                                               #cc_std #link_name "ReadBarrier"                  ---;
 
-	create_thread        :: proc(thread_attributes: ^SecurityAttributes, stack_size: int, start_routine: rawptr,
+	create_thread        :: proc(thread_attributes: ^Security_Attributes, stack_size: int, start_routine: rawptr,
 	                             parameter: rawptr, creation_flags: u32, thread_id: ^u32) -> Handle                            #cc_std #link_name "CreateThread"                 ---;
 	resume_thread        :: proc(thread: Handle) -> u32                                                                        #cc_std #link_name "ResumeThread"                 ---;
 	get_thread_priority  :: proc(thread: Handle) -> i32                                                                        #cc_std #link_name "GetThreadPriority"            ---;
 	set_thread_priority  :: proc(thread: Handle, priority: i32) -> Bool                                                        #cc_std #link_name "SetThreadPriority"            ---;
 	get_exit_code_thread :: proc(thread: Handle, exit_code: ^u32) -> Bool                                                      #cc_std #link_name "GetExitCodeThread"            ---;
 
-	initialize_critical_section                :: proc(critical_section: ^CriticalSection)                                     #cc_std #link_name "InitializeCriticalSection"             ---;
-	initialize_critical_section_and_spin_count :: proc(critical_section: ^CriticalSection, spin_count: u32)                    #cc_std #link_name "InitializeCriticalSectionAndSpinCount" ---;
-	delete_critical_section                    :: proc(critical_section: ^CriticalSection)                                     #cc_std #link_name "DeleteCriticalSection"                 ---;
-	set_critical_section_spin_count            :: proc(critical_section: ^CriticalSection, spin_count: u32) -> u32             #cc_std #link_name "SetCriticalSectionSpinCount"           ---;
-	try_enter_critical_section                 :: proc(critical_section: ^CriticalSection) -> Bool                             #cc_std #link_name "TryEnterCriticalSection"               ---;
-	enter_critical_section                     :: proc(critical_section: ^CriticalSection)                                     #cc_std #link_name "EnterCriticalSection"                  ---;
-	leave_critical_section                     :: proc(critical_section: ^CriticalSection)                                     #cc_std #link_name "LeaveCriticalSection"                  ---;
+	initialize_critical_section                :: proc(critical_section: ^Critical_Section)                                    #cc_std #link_name "InitializeCriticalSection"             ---;
+	initialize_critical_section_and_spin_count :: proc(critical_section: ^Critical_Section, spin_count: u32)                   #cc_std #link_name "InitializeCriticalSectionAndSpinCount" ---;
+	delete_critical_section                    :: proc(critical_section: ^Critical_Section)                                    #cc_std #link_name "DeleteCriticalSection"                 ---;
+	set_critical_section_spin_count            :: proc(critical_section: ^Critical_Section, spin_count: u32) -> u32            #cc_std #link_name "SetCriticalSectionSpinCount"           ---;
+	try_enter_critical_section                 :: proc(critical_section: ^Critical_Section) -> Bool                            #cc_std #link_name "TryEnterCriticalSection"               ---;
+	enter_critical_section                     :: proc(critical_section: ^Critical_Section)                                    #cc_std #link_name "EnterCriticalSection"                  ---;
+	leave_critical_section                     :: proc(critical_section: ^Critical_Section)                                    #cc_std #link_name "LeaveCriticalSection"                  ---;
 
-	create_event_a :: proc(event_attributes: ^SecurityAttributes, manual_reset, initial_state: Bool, name: ^u8) -> Handle      #cc_std #link_name "CreateEventA"                 ---;
+	create_event_a :: proc(event_attributes: ^Security_Attributes, manual_reset, initial_state: Bool, name: ^u8) -> Handle     #cc_std #link_name "CreateEventA"                 ---;
 
 	load_library_a   :: proc(c_str: ^u8) -> Hmodule                                                                            #cc_std #link_name "LoadLibraryA"                 ---;
 	free_library     :: proc(h: Hmodule)                                                                                       #cc_std #link_name "FreeLibrary"                  ---;
@@ -398,7 +398,7 @@ foreign user32 {
 	screen_to_client    :: proc(h: Hwnd, p: ^Point) -> i32                                                      #cc_std #link_name "ScreenToClient"      ---;
 	post_quit_message   :: proc(exit_code: i32)                                                                 #cc_std #link_name "PostQuitMessage"     ---;
 	set_window_text_a   :: proc(hwnd: Hwnd, c_string: ^u8) -> Bool                                              #cc_std #link_name "SetWindowTextA"      ---;
-	register_class_ex_a :: proc(wc: ^WndClassExA) -> i16                                                        #cc_std #link_name "RegisterClassExA"    ---;
+	register_class_ex_a :: proc(wc: ^Wnd_Class_Ex_A) -> i16                                                     #cc_std #link_name "RegisterClassExA"    ---;
 
 	create_window_ex_a  :: proc(ex_style: u32,
 	                            class_name, title: ^u8,
@@ -424,15 +424,15 @@ foreign user32 {
 	get_active_window     :: proc() -> Hwnd                                                                     #cc_std #link_name "GetActiveWindow"     ---;
 
 	destroy_window        :: proc(wnd: Hwnd) -> Bool                                                            #cc_std #link_name "DestroyWindow"       ---;
-	describe_pixel_format :: proc(dc: Hdc, pixel_format: i32, bytes : u32, pfd: ^PixelFormatDescriptor) -> i32  #cc_std #link_name "DescribePixelFormat" ---;
+	describe_pixel_format :: proc(dc: Hdc, pixel_format: i32, bytes: u32, pfd: ^Pixel_Format_Descriptor) -> i32 #cc_std #link_name "DescribePixelFormat" ---;
 
-	get_monitor_info_a    :: proc(monitor: Hmonitor, mi: ^MonitorInfo) -> Bool                                  #cc_std #link_name "GetMonitorInfoA"     ---;
+	get_monitor_info_a    :: proc(monitor: Hmonitor, mi: ^Monitor_Info) -> Bool                                 #cc_std #link_name "GetMonitor_InfoA"     ---;
 	monitor_from_window   :: proc(wnd: Hwnd, flags : u32) -> Hmonitor                                           #cc_std #link_name "MonitorFromWindow"   ---;
 
 	set_window_pos        :: proc(wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32)        #cc_std #link_name "SetWindowPos"        ---;
 
-	get_window_placement  :: proc(wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                                   #cc_std #link_name "GetWindowPlacement"  ---;
-	set_window_placement  :: proc(wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                                   #cc_std #link_name "SetWindowPlacement"  ---;
+	get_window_placement  :: proc(wnd: Hwnd, wndpl: ^Window_Placement) -> Bool                                  #cc_std #link_name "GetWindowPlacement"  ---;
+	set_window_placement  :: proc(wnd: Hwnd, wndpl: ^Window_Placement) -> Bool                                  #cc_std #link_name "SetWindowPlacement"  ---;
 	get_window_rect       :: proc(wnd: Hwnd, rect: ^Rect) -> Bool                                               #cc_std #link_name "GetWindowRect"       ---;
 
 	get_window_long_ptr_a :: proc(wnd: Hwnd, index: i32) -> i64                                                 #cc_std #link_name "GetWindowLongPtrA"   ---;
@@ -452,18 +452,18 @@ foreign user32 {
 }
 
 foreign gdi32 {
-	get_stock_object :: proc(fn_object: i32) -> Hgdiobj                                           #cc_std #link_name "GetStockObject"    ---;
+	get_stock_object :: proc(fn_object: i32) -> Hgdiobj                                                         #cc_std #link_name "GetStockObject"    ---;
 
 	stretch_dibits   :: proc(hdc: Hdc,
 	                        x_dst, y_dst, width_dst, height_dst: i32,
 	                        x_src, y_src, width_src, header_src: i32,
 	                        bits: rawptr, bits_info: ^BitmapInfo,
 	                        usage: u32,
-	                        rop: u32) -> i32                                                      #cc_std #link_name "StretchDIBits"     ---;
+	                        rop: u32) -> i32                                                                    #cc_std #link_name "StretchDIBits"     ---;
 
-	set_pixel_format    :: proc(hdc: Hdc, pixel_format: i32, pfd: ^PixelFormatDescriptor) -> Bool #cc_std #link_name "SetPixelFormat"    ---;
-	choose_pixel_format :: proc(hdc: Hdc, pfd: ^PixelFormatDescriptor) -> i32                     #cc_std #link_name "ChoosePixelFormat" ---;
-	swap_buffers        :: proc(hdc: Hdc) -> Bool                                                 #cc_std #link_name "SwapBuffers"       ---;
+	set_pixel_format    :: proc(hdc: Hdc, pixel_format: i32, pfd: ^Pixel_Format_Descriptor) -> Bool             #cc_std #link_name "SetPixelFormat"    ---;
+	choose_pixel_format :: proc(hdc: Hdc, pfd: ^Pixel_Format_Descriptor) -> i32                                 #cc_std #link_name "ChoosePixelFormat" ---;
+	swap_buffers        :: proc(hdc: Hdc) -> Bool                                                               #cc_std #link_name "SwapBuffers"       ---;
 
 }
 
@@ -488,7 +488,7 @@ HIWORD :: proc(lParam: Lparam) -> u16 { return u16((u32(lParam) >> 16) & 0xffff)
 LOWORD :: proc(wParam: Wparam) -> u16 { return u16(wParam); }
 LOWORD :: proc(lParam: Lparam) -> u16 { return u16(lParam); }
 
-is_key_down :: proc(key: KeyCode) -> bool #inline { return get_async_key_state(i32(key)) < 0; }
+is_key_down :: proc(key: Key_Code) -> bool #inline { return get_async_key_state(i32(key)) < 0; }
 
 
 
@@ -545,14 +545,14 @@ FILE_TYPE_CHAR :: 0x0002;
 FILE_TYPE_PIPE :: 0x0003;
 
 
-MonitorInfo :: struct #ordered {
+Monitor_Info :: struct #ordered {
 	size:      u32;
 	monitor:   Rect;
 	work:      Rect;
 	flags:     u32;
 }
 
-WindowPlacement :: struct #ordered {
+Window_Placement :: struct #ordered {
 	length:     u32;
 	flags:      u32;
 	show_cmd:   u32;
@@ -561,7 +561,7 @@ WindowPlacement :: struct #ordered {
 	normal_pos: Rect;
 }
 
-BitmapInfoHeader :: struct #ordered {
+Bitmap_Info_Header :: struct #ordered {
 	size:              u32;
 	width, height:     i32;
 	planes, bit_count: i16;
@@ -573,15 +573,15 @@ BitmapInfoHeader :: struct #ordered {
 	clr_important:     u32;
 }
 BitmapInfo :: struct #ordered {
-	using header: BitmapInfoHeader;
-	colors:       [1]RgbQuad;
+	using header: Bitmap_Info_Header;
+	colors:       [1]Rgb_Quad;
 }
 
 
-RgbQuad :: struct #ordered { blue, green, red, reserved: u8 }
+Rgb_Quad :: struct #ordered {blue, green, red, reserved: u8}
 
 
-KeyCode :: enum i32 {
+Key_Code :: enum i32 {
 	Lbutton    = 0x01,
 	Rbutton    = 0x02,
 	Cancel     = 0x03,

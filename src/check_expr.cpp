@@ -8136,7 +8136,9 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				o->type = t->Pointer.elem;
  			} else {
  				gbString str = expr_to_string(o->expr);
- 				error(o->expr, "Cannot dereference `%s`", str);
+ 				gbString typ = type_to_string(o->type);
+ 				error(o->expr, "Cannot dereference `%s` of type `%s`", str, typ);
+ 				gb_string_free(typ);
  				gb_string_free(str);
  				o->mode = Addressing_Invalid;
  				o->expr = node;

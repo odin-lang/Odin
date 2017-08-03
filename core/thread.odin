@@ -3,7 +3,7 @@ _ :: compile_assert(ODIN_OS == "windows");
 import win32 "sys/windows.odin";
 
 Thread :: struct {
-	using specific:   OsSpecific;
+	using specific:   Os_Specific;
 	procedure:        Proc;
 	data:             any;
 	user_index:       int;
@@ -12,7 +12,7 @@ Thread :: struct {
 	use_init_context: bool;
 
 	Proc :: #type proc(^Thread) -> int;
-	OsSpecific :: struct {
+	Os_Specific :: struct {
 		win32_thread:    win32.Handle;
 		win32_thread_id: u32;
 	}

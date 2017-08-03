@@ -1341,14 +1341,14 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type);
 
 void init_preload(Checker *c) {
 	if (t_type_info == nullptr) {
-		Entity *type_info_entity = find_core_entity(c, str_lit("TypeInfo"));
+		Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
 
 		t_type_info = type_info_entity->type;
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
 		GB_ASSERT(is_type_struct(type_info_entity->type));
 		TypeStruct *tis = &base_type(type_info_entity->type)->Struct;
 
-		Entity *type_info_enum_value = find_sub_core_entity(tis, str_lit("EnumValue"));
+		Entity *type_info_enum_value = find_sub_core_entity(tis, str_lit("Enum_Value"));
 
 		t_type_info_enum_value = type_info_enum_value->type;
 		t_type_info_enum_value_ptr = make_type_pointer(c->allocator, t_type_info_enum_value);
@@ -1361,7 +1361,7 @@ void init_preload(Checker *c) {
 		TypeUnion *tiv = &tiv_type->Union;
 
 		if (tiv->variants.count != 20) {
-			compiler_error("Invalid `TypeInfo` layout");
+			compiler_error("Invalid `Type_Info` layout");
 		}
 		t_type_info_named         = tiv->variants[ 0];
 		t_type_info_integer       = tiv->variants[ 1];
@@ -1420,18 +1420,18 @@ void init_preload(Checker *c) {
 	}
 
 	if (t_source_code_location == nullptr) {
-		Entity *e = find_core_entity(c, str_lit("SourceCodeLocation"));
+		Entity *e = find_core_entity(c, str_lit("Source_Code_Location"));
 		t_source_code_location = e->type;
 		t_source_code_location_ptr = make_type_pointer(c->allocator, t_allocator);
 	}
 
 	if (t_map_key == nullptr) {
-		Entity *e = find_core_entity(c, str_lit("__MapKey"));
+		Entity *e = find_core_entity(c, str_lit("__Map_Key"));
 		t_map_key = e->type;
 	}
 
 	if (t_map_header == nullptr) {
-		Entity *e = find_core_entity(c, str_lit("__MapHeader"));
+		Entity *e = find_core_entity(c, str_lit("__Map_Header"));
 		t_map_header = e->type;
 	}
 

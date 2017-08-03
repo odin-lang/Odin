@@ -194,7 +194,7 @@ end_arena_temp_memory :: proc(using tmp: ArenaTempMemory) {
 
 
 
-align_of_type_info :: proc(type_info: ^TypeInfo) -> int {
+align_of_type_info :: proc(type_info: ^Type_Info) -> int {
 	prev_pow2 :: proc(n: i64) -> i64 {
 		if n <= 0 do return 0;
 		n |= n >> 1;
@@ -208,7 +208,7 @@ align_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 
 	WORD_SIZE :: size_of(int);
 	MAX_ALIGN :: size_of([vector 64]f64); // TODO(bill): Should these constants be builtin constants?
-	using TypeInfo;
+	using Type_Info;
 	match info in type_info.variant {
 	case Named:
 		return align_of_type_info(info.base);
@@ -230,7 +230,7 @@ align_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 		return WORD_SIZE;
 	case Array:
 		return align_of_type_info(info.elem);
-	case DynamicArray:
+	case Dynamic_Array:
 		return WORD_SIZE;
 	case Slice:
 		return WORD_SIZE;
@@ -259,9 +259,9 @@ align_formula :: proc(size, align: int) -> int {
 	return result - result%align;
 }
 
-size_of_type_info :: proc(type_info: ^TypeInfo) -> int {
+size_of_type_info :: proc(type_info: ^Type_Info) -> int {
 	WORD_SIZE :: size_of(int);
-	using TypeInfo;
+	using Type_Info;
 	match info in type_info.variant {
 	case Named:
 		return size_of_type_info(info.base);
@@ -288,7 +288,7 @@ size_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 		align     := align_of_type_info(info.elem);
 		alignment := align_formula(size, align);
 		return alignment*(count-1) + size;
-	case DynamicArray:
+	case Dynamic_Array:
 		return size_of(rawptr) + 2*size_of(int) + size_of(Allocator);
 	case Slice:
 		return 2*WORD_SIZE;
