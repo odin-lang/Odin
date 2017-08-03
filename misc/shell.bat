@@ -14,7 +14,11 @@ IF EXIST "C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\VC\Au
             IF EXIST "C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\vcvarsall.bat" (
                 CALL "C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\vcvarsall.bat" x64 1> NUL
             ) ELSE (
-                ECHO Could not find "vcvarsall.bat". Ensure your have the VC++ compiler installed.
+                IF EXIST "C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\vcvarsall.bat" (
+                    CALL "C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\vcvarsall.bat" x64 1> NUL
+                ) ELSE (
+                    ECHO Could not find "vcvarsall.bat". Ensure your have the VC++ compiler installed.
+                )
             )
         )
     )
