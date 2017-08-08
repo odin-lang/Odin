@@ -2523,16 +2523,13 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 		if (is_type_raw_union(type)) {
 			type = type->Struct.fields[index]->type;
 			e = ir_emit_conv(proc, e, make_type_pointer(a, type));
+		} else if (is_type_struct(type)) {
+			type = type->Struct.fields[index]->type;
+			e = ir_emit_struct_ep(proc, e, index);
 		} else if (type->kind == Type_Union) {
 			GB_ASSERT(index == -1);
 			type = t_type_info_ptr;
 			e = ir_emit_struct_ep(proc, e, index);
-		} else if (type->kind == Type_Struct) {
-			type = type->Struct.fields[index]->type;
-			if (type->Struct.is_raw_union) {
-			} else {
-				e = ir_emit_struct_ep(proc, e, index);
-			}
 		} else if (type->kind == Type_Tuple) {
 			type = type->Tuple.variables[index]->type;
 			e = ir_emit_struct_ep(proc, e, index);
@@ -5159,6 +5156,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			Selection sel = lookup_field(proc->module->allocator, type, selector, false);
 			GB_ASSERT(sel.entity != nullptr);
 
+
 			if (sel.entity->type->kind == Type_BitFieldValue) {
 				irAddr addr = ir_build_addr(proc, se->expr);
 				Type *bft = type_deref(ir_addr_type(addr));
@@ -5180,6 +5178,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 				return ir_addr(a);
 			}
 		} else {
+			// NOTE(bill): x.0
 			Type *type = type_deref(type_of_expr(proc->module->info, se->expr));
 			Type *selector_type = base_type(type_of_expr(proc->module->info, se->selector));
 			GB_ASSERT_MSG(is_type_integer(selector_type), "%s", type_to_string(selector_type));

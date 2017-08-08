@@ -7,7 +7,7 @@ import (
 	"raw.odin";
 )
 // Naming Conventions:
-// In general, PascalCase for types and snake_case for values
+// In general, Ada_Case for types and snake_case for values
 //
 // Import Name:        snake_case (but prefer single word)
 // Types:              Ada_Case
