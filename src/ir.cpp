@@ -3603,7 +3603,7 @@ String ir_mangle_name(irGen *s, String path, Entity *e) {
 			cast(char *)new_name, max_len,
 			"_%.*s-%u.%.*s",
 			cast(int)base_len, base,
-			file->id,
+			cast(u32)file->id,
 			LIT(name));
 	} else {
 		new_name_len = gb_snprintf(
