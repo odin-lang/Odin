@@ -74,8 +74,8 @@ __i128_quo_mod :: proc(a, b: i128, rem: ^i128) -> (quo: i128) #cc_c #link_name "
 
 
 __u128_quo_mod :: proc(a, b: u128, rem: ^u128) -> (quo: u128) #cc_c #link_name "__udivmodti4" {
-	alo, ahi := u64(a), u64(a>>64);
-	blo, bhi := u64(b), u64(b>>64);
+	alo := u64(a);
+	blo := u64(b);
 	if b == 0 {
 		if rem != nil do rem^ = 0;
 		return u128(alo/blo);

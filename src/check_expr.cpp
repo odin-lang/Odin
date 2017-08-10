@@ -1329,7 +1329,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 
 
 }
-void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *node) {
+void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
@@ -1577,7 +1577,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 }
 
 
-void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, AstNode *node) {
+void check_bit_field_type(Checker *c, Type *bit_field_type, AstNode *node) {
 	ast_node(bft, BitFieldType, node);
 	GB_ASSERT(is_type_bit_field(bit_field_type));
 
@@ -3069,7 +3069,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		*type = make_type_union(c->allocator);
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
-		check_union_type(c, named_type, *type, e);
+		check_union_type(c, *type, e);
 		check_close_scope(c);
 		(*type)->Union.node = e;
 		return true;
@@ -3089,7 +3089,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		*type = make_type_bit_field(c->allocator);
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
-		check_bit_field_type(c, *type, named_type, e);
+		check_bit_field_type(c, *type, e);
 		check_close_scope(c);
 		return true;
 	case_end;
@@ -3150,13 +3150,13 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 		type = t_invalid;
 	}
 
-	if (type->kind == Type_Named) {
-		if (type->Named.base == nullptr) {
-			gbString name = type_to_string(type);
-			error(e, "Invalid type definition of %s", name);
-			gb_string_free(name);
-			type->Named.base = t_invalid;
-		}
+	if (type->kind == Type_Named &&
+	    type->Named.base == nullptr) {
+		// IMPORTANT TODO(bill): Is this a serious error?!
+		#if 0
+		error(e, "Invalid type definition of `%.*s`", LIT(type->Named.name));
+		#endif
+		type->Named.base = t_invalid;
 	}
 
 	#if 0
