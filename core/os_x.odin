@@ -190,7 +190,7 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	assert(fd != -1);
 
-	final_offset := i64(unix_lseek(fd, offset, whence));
+	final_offset := i64(unix_lseek(fd, int(offset), whence));
 	if(final_offset == -1) {
 		return 0, 1;
 	}
