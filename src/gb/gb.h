@@ -7991,7 +7991,7 @@ gb_inline b32 gb_file_move(char const *existing_filename, char const *new_filena
 
 b32 gb_file_remove(char const *filename) {
 #if defined(GB_SYSTEM_OSX)
-	return unlink(existing_filename) != -1;
+	return unlink(filename) != -1;
 #else
 	return remove(filename) == 0;
 #endif
