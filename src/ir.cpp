@@ -7065,7 +7065,9 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		array_add(&proc->context_stack, next);
 		defer (array_pop(&proc->context_stack));
 
-		irValue *gep = ir_emit_struct_ep(proc, next, 1);
+		// TODO(bill): is this too leaky?
+		Selection sel = lookup_field(proc->module->allocator, t_context, str_lit("allocator"), false);
+		irValue *gep = ir_emit_deep_field_gep(proc, next, sel);
 		ir_emit_store(proc, gep, ir_build_expr(proc, pa->expr));
 
 		ir_build_stmt(proc, pa->body);
