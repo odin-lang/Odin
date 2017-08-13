@@ -95,7 +95,6 @@ allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 
 Arena :: struct {
 	backing:    Allocator;
-	offset:     int;
 	memory:     []u8;
 	temp_count: int;
 }
@@ -117,7 +116,7 @@ init_arena_from_memory :: proc(using a: ^Arena, data: []u8) {
 
 init_arena_from_context :: proc(using a: ^Arena, size: int) {
 	backing = context.allocator;
-	memory = make([]u8, size);
+	memory = make([]u8, 0, size);
 	temp_count = 0;
 }
 
@@ -126,7 +125,6 @@ destroy_arena :: proc(using a: ^Arena) {
 		push_allocator backing {
 			free(memory);
 			memory = nil;
-			offset = 0;
 		}
 	}
 }
@@ -148,15 +146,15 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 	case Alloc:
 		total_size := size + alignment;
 
-		if arena.offset + total_size > len(arena.memory) {
+		if len(arena.memory) + total_size > cap(arena.memory) {
 			fmt.fprintln(os.stderr, "Arena out of memory");
 			return nil;
 		}
 
-		#no_bounds_check end := &arena.memory[arena.offset];
+		#no_bounds_check end := &arena.memory[len(arena.memory)];
 
 		ptr := align_forward(end, alignment);
-		arena.offset += total_size;
+		(cast(^raw.Slice)&arena).len += total_size;
 		return zero(ptr, size);
 
 	case Free:
@@ -164,7 +162,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 		// Use ArenaTempMemory if you want to free a block
 
 	case FreeAll:
-		arena.offset = 0;
+		(cast(^raw.Slice)&arena).len = 0;
 
 	case Resize:
 		return default_resize_align(old_memory, old_size, size, alignment);
