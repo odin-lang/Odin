@@ -7984,15 +7984,17 @@ gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filena
 
 gb_inline b32 gb_file_move(char const *existing_filename, char const *new_filename) {
 	if (link(existing_filename, new_filename) == 0) {
-		if (unlink(existing_filename) != -1) {
-			return true;
-		}
+		return unlink(existing_filename) != -1;
 	}
 	return false;
 }
 
 b32 gb_file_remove(char const *filename) {
+#if defined(GB_SYSTEM_OSX)
+	return unlink(filename) != -1;
+#else
 	return remove(filename) == 0;
+#endif
 }
 
 

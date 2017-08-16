@@ -28,9 +28,9 @@ RUNE3_MAX :: 1<<16 - 1;
 LOCB :: 0b1000_0000;
 HICB :: 0b1011_1111;
 
-AcceptRange :: struct { lo, hi: u8 }
+Accept_Range :: struct {lo, hi: u8};
 
-accept_ranges := [5]AcceptRange{
+accept_ranges := [5]Accept_Range{
 	{0x80, 0xbf},
 	{0xa0, 0xbf},
 	{0x80, 0x9f},

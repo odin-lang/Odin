@@ -1,6 +1,6 @@
 Any :: struct #ordered {
 	data:      rawptr;
-	type_info: ^TypeInfo;
+	type_info: ^Type_Info;
 };
 
 String :: struct #ordered {
@@ -14,15 +14,15 @@ Slice :: struct #ordered {
 	cap:  int;
 };
 
-DynamicArray :: struct #ordered {
+Dynamic_Array :: struct #ordered {
 	data:      rawptr;
 	len:       int;
 	cap:       int;
 	allocator: Allocator;
 };
 
-DynamicMap :: struct #ordered {
+Map :: struct #ordered {
 	hashes:  [dynamic]int;
-	entries: DynamicArray;
+	entries: Dynamic_Array;
 };
 

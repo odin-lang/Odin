@@ -95,48 +95,48 @@ void i128_divide (i128 num, i128 den, i128 *quo, i128 *rem);
 i128 i128_quo    (i128 a, i128 b);
 i128 i128_mod    (i128 a, i128 b);
 
-bool operator==(u128 a, u128 b) { return u128_eq(a, b); }
-bool operator!=(u128 a, u128 b) { return u128_ne(a, b); }
-bool operator< (u128 a, u128 b) { return u128_lt(a, b); }
-bool operator> (u128 a, u128 b) { return u128_gt(a, b); }
-bool operator<=(u128 a, u128 b) { return u128_le(a, b); }
-bool operator>=(u128 a, u128 b) { return u128_ge(a, b); }
+bool operator==(u128 const &a, u128 const &b) { return u128_eq(a, b); }
+bool operator!=(u128 const &a, u128 const &b) { return u128_ne(a, b); }
+bool operator< (u128 const &a, u128 const &b) { return u128_lt(a, b); }
+bool operator> (u128 const &a, u128 const &b) { return u128_gt(a, b); }
+bool operator<=(u128 const &a, u128 const &b) { return u128_le(a, b); }
+bool operator>=(u128 const &a, u128 const &b) { return u128_ge(a, b); }
 
-u128 operator+(u128 a, u128 b) { return u128_add(a, b); }
-u128 operator-(u128 a, u128 b) { return u128_sub(a, b); }
-u128 operator*(u128 a, u128 b) { return u128_mul(a, b); }
-u128 operator/(u128 a, u128 b) { return u128_quo(a, b); }
-u128 operator%(u128 a, u128 b) { return u128_mod(a, b); }
-u128 operator&(u128 a, u128 b) { return u128_and(a, b); }
-u128 operator|(u128 a, u128 b) { return u128_or (a, b); }
-u128 operator^(u128 a, u128 b) { return u128_xor(a, b); }
-u128 operator~(u128 a)         { return u128_not(a); }
-u128 operator+(u128 a)         { return a; }
-u128 operator-(u128 a)         { return u128_neg(a); }
-u128 operator<<(u128 a, u32 b) { return u128_shl(a, b); }
-u128 operator>>(u128 a, u32 b) { return u128_shr(a, b); }
+u128 operator+ (u128 const &a, u128 const &b) { return u128_add(a, b); }
+u128 operator- (u128 const &a, u128 const &b) { return u128_sub(a, b); }
+u128 operator* (u128 const &a, u128 const &b) { return u128_mul(a, b); }
+u128 operator/ (u128 const &a, u128 const &b) { return u128_quo(a, b); }
+u128 operator% (u128 const &a, u128 const &b) { return u128_mod(a, b); }
+u128 operator& (u128 const &a, u128 const &b) { return u128_and(a, b); }
+u128 operator| (u128 const &a, u128 const &b) { return u128_or (a, b); }
+u128 operator^ (u128 const &a, u128 const &b) { return u128_xor(a, b); }
+u128 operator~ (u128 const &a)                { return u128_not(a); }
+u128 operator+ (u128 const &a)                { return a; }
+u128 operator- (u128 const &a)                { return u128_neg(a); }
+u128 operator<<(u128 const &a, u32 const &b)  { return u128_shl(a, b); }
+u128 operator>>(u128 const &a, u32 const &b)  { return u128_shr(a, b); }
 
 
-bool operator==(i128 a, i128 b) { return i128_eq(a, b); }
-bool operator!=(i128 a, i128 b) { return i128_ne(a, b); }
-bool operator< (i128 a, i128 b) { return i128_lt(a, b); }
-bool operator> (i128 a, i128 b) { return i128_gt(a, b); }
-bool operator<=(i128 a, i128 b) { return i128_le(a, b); }
-bool operator>=(i128 a, i128 b) { return i128_ge(a, b); }
+bool operator==(i128 const &a, i128 const &b) { return i128_eq(a, b); }
+bool operator!=(i128 const &a, i128 const &b) { return i128_ne(a, b); }
+bool operator< (i128 const &a, i128 const &b) { return i128_lt(a, b); }
+bool operator> (i128 const &a, i128 const &b) { return i128_gt(a, b); }
+bool operator<=(i128 const &a, i128 const &b) { return i128_le(a, b); }
+bool operator>=(i128 const &a, i128 const &b) { return i128_ge(a, b); }
 
-i128 operator+(i128 a, i128 b) { return i128_add(a, b); }
-i128 operator-(i128 a, i128 b) { return i128_sub(a, b); }
-i128 operator*(i128 a, i128 b) { return i128_mul(a, b); }
-i128 operator/(i128 a, i128 b) { return i128_quo(a, b); }
-i128 operator%(i128 a, i128 b) { return i128_mod(a, b); }
-i128 operator&(i128 a, i128 b) { return i128_and(a, b); }
-i128 operator|(i128 a, i128 b) { return i128_or (a, b); }
-i128 operator^(i128 a, i128 b) { return i128_xor(a, b); }
-i128 operator~(i128 a)         { return i128_not(a); }
-i128 operator+(i128 a)         { return a; }
-i128 operator-(i128 a)         { return i128_neg(a); }
-i128 operator<<(i128 a, u32 b) { return i128_shl(a, b); }
-i128 operator>>(i128 a, u32 b) { return i128_shr(a, b); }
+i128 operator+ (i128 const &a, i128 const &b) { return i128_add(a, b); }
+i128 operator- (i128 const &a, i128 const &b) { return i128_sub(a, b); }
+i128 operator* (i128 const &a, i128 const &b) { return i128_mul(a, b); }
+i128 operator/ (i128 const &a, i128 const &b) { return i128_quo(a, b); }
+i128 operator% (i128 const &a, i128 const &b) { return i128_mod(a, b); }
+i128 operator& (i128 const &a, i128 const &b) { return i128_and(a, b); }
+i128 operator| (i128 const &a, i128 const &b) { return i128_or (a, b); }
+i128 operator^ (i128 const &a, i128 const &b) { return i128_xor(a, b); }
+i128 operator~ (i128 const &a)                { return i128_not(a); }
+i128 operator+ (i128 const &a)                { return a; }
+i128 operator- (i128 const &a)                { return i128_neg(a); }
+i128 operator<<(i128 const &a, u32 b)         { return i128_shl(a, b); }
+i128 operator>>(i128 const &a, u32 b)         { return i128_shr(a, b); }
 
 ////////////////////////////////////////////////////////////////
 
@@ -482,36 +482,37 @@ u128 u128_mul(u128 a, u128 b) {
 	return res;
 }
 
-bool u128_hibit(u128 *d) { return (d->hi & BIT128_U64_HIGHBIT) != 0; }
+bool u128_hibit(u128 const &d) { return (d.hi & BIT128_U64_HIGHBIT) != 0; }
+bool i128_hibit(i128 const &d) { return d.hi < 0; }
 
-void u128_divide(u128 num, u128 den, u128 *quo, u128 *rem) {
-	if (u128_eq(den, U128_ZERO)) {
-		if (quo) *quo = u128_from_u64(num.lo/den.lo);
+void u128_divide(u128 a, u128 b, u128 *quo, u128 *rem) {
+	if (u128_eq(b, U128_ZERO)) {
+		if (quo) *quo = u128_from_u64(a.lo/b.lo);
 		if (rem) *rem = U128_ZERO;
-	} else {
-		u128 n = num;
-		u128 d = den;
-		u128 x = U128_ONE;
-		u128 r = U128_ZERO;
-
-		while (u128_ge(n, d) && !u128_hibit(&d)) {
-			x = u128_shl(x, 1);
-			d = u128_shl(d, 1);
-		}
-
-		while (u128_ne(x, U128_ZERO)) {
-			if (u128_ge(n, d)) {
-				n = u128_sub(n, d);
-				r = u128_or(r, x);
-			}
-
-			x = u128_shr(x, 1);
-			d = u128_shr(d, 1);
-		}
-
-		if (quo) *quo = r;
-		if (rem) *rem = n;
+		return;
 	}
+	u128 r = a;
+	u128 d = b;
+	u128 x = U128_ONE;
+	u128 q = U128_ZERO;
+
+	while (u128_ge(r, d) && !u128_hibit(d)) {
+		x = u128_shl(x, 1);
+		d = u128_shl(d, 1);
+	}
+
+	while (u128_ne(x, U128_ZERO)) {
+		if (u128_ge(r, d)) {
+			r = u128_sub(r, d);
+			q = u128_or(q, x);
+		}
+
+		x = u128_shr(x, 1);
+		d = u128_shr(d, 1);
+	}
+
+	if (quo) *quo = q;
+	if (rem) *rem = r;
 }
 
 u128 u128_quo(u128 a, u128 b) {
@@ -668,50 +669,62 @@ i128 i128_mul(i128 a, i128 b) {
 	return res;
 }
 
-void i128_divide(i128 a, i128 b, i128 *quo, i128 *rem) {
-	// TODO(bill): Which one is correct?!
-#if 1
-	i128 s = i128_shr(b, 127);
-	b = i128_sub(i128_xor(b, s), s);
-	s = i128_shr(a, 127);
-	b = i128_sub(i128_xor(a, s), s);
-
-	u128 n, r = {0};
-	u128_divide(*cast(u128 *)&a, *cast(u128 *)&b, &n, &r);
-	i128 ni = *cast(i128 *)&n;
-	i128 ri = *cast(i128 *)&r;
-
-	if (quo) *quo = i128_sub(i128_xor(ni, s), s);
-	if (rem) *rem = i128_sub(i128_xor(ri, s), s);
-#else
-	if (i128_eq(b, I128_ZERO)) {
-		if (quo) *quo = i128_from_u64(a.lo/b.lo);
-		if (rem) *rem = I128_ZERO;
+void i128_divide(i128 a, i128 b, i128 *quo_, i128 *rem_) {
+	// TODO(bill): Optimize this i128 division calculation
+	i128 iquo = {0};
+	i128 irem = {0};
+	if (a.hi == 0 && b.hi == 0) {
+		u64 q = a.lo / b.lo;
+		u64 r = a.lo % b.lo;
+		iquo = i128_from_u64(q);
+		irem = i128_from_u64(r);
+	} else if ((~a.hi) == 0 && (~b.hi) == 0) {
+		i64 x = i128_to_i64(a);
+		i64 y = i128_to_i64(b);
+		i64 q = x / y;
+		i64 r = x % y;
+		iquo = i128_from_i64(q);
+		irem = i128_from_i64(r);
+	} else if (a.hi > 0 || b.hi > 0) {
+		u128 q, r = {0};
+		u128_divide(*cast(u128 *)&a, *cast(u128 *)&b, &q, &r);
+		iquo = *cast(i128 *)&q;
+		irem = *cast(i128 *)&r;
+	} else if (i128_eq(b, I128_ZERO)) {
+		iquo = i128_from_u64(a.lo/b.lo);
 	} else {
-		i128 n = a;
-		i128 d = b;
-		i128 x = I128_ONE;
-		i128 r = I128_ZERO;
-
-		while (i128_ge(n, d) && ((i128_shr(d, 128-1).lo&1) == 0)) {
-			x = i128_shl(x, 1);
-			d = i128_shl(d, 1);
+		i32 rem_sign = 1;
+		i32 quo_sign = 1;
+		if (i128_lt(a, I128_ZERO)) {
+			a = i128_neg(a);
+			rem_sign = -1;
 		}
+		if (i128_lt(b, I128_ZERO)) {
+			b = i128_neg(b);
+			quo_sign = -1;
+		}
+		quo_sign *= rem_sign;
 
-		while (i128_ne(x, I128_ZERO)) {
-			if (i128_ge(n, d)) {
-				n = i128_sub(n, d);
-				r = i128_or(r, x);
+		iquo = a;
+
+		for (isize i = 0; i < 128; i++) {
+			irem = i128_shl(irem, 1);
+			if (i128_lt(iquo, I128_ZERO)) {
+				irem.lo |= 1;
 			}
-
-			x = i128_shr(x, 1);
-			d = i128_shr(d, 1);
+			iquo = i128_shl(iquo, 1);
+			if (i128_ge(irem, b)) {
+				irem = i128_sub(irem, b);
+				iquo = i128_add(iquo, I128_ONE);
+			}
 		}
 
-		if (quo) *quo = r;
-		if (rem) *rem = n;
+		if (quo_sign < 0) iquo = i128_neg(iquo);
+		if (rem_sign < 0) irem = i128_neg(irem);
 	}
-#endif
+
+	if (quo_) *quo_ = iquo;
+	if (rem_) *rem_ = irem;
 }
 
 i128 i128_quo(i128 a, i128 b) {

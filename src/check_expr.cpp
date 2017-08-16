@@ -1072,6 +1072,40 @@ Entity *make_names_field_for_struct(Checker *c, Scope *scope) {
 	return e;
 }
 
+bool check_custom_align(Checker *c, AstNode *node, i64 *align_) {
+	GB_ASSERT(align_ != nullptr);
+	Operand o = {};
+	check_expr(c, &o, node);
+	if (o.mode != Addressing_Constant) {
+		if (o.mode != Addressing_Invalid) {
+			error(node, "#align must be a constant");
+		}
+		return false;
+	}
+
+	Type *type = base_type(o.type);
+	if (is_type_untyped(type) || is_type_integer(type)) {
+		if (o.value.kind == ExactValue_Integer) {
+			i64 align = i128_to_i64(o.value.value_integer);
+			if (align < 1 || !gb_is_power_of_two(align)) {
+				error(node, "#align must be a power of 2, got %lld", align);
+				return false;
+			}
+
+			// NOTE(bill): Success!!!
+			i64 custom_align = gb_clamp(align, 1, build_context.max_align);
+			if (custom_align < align) {
+				warning(node, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
+			}
+			*align_ = custom_align;
+			return true;
+		}
+	}
+
+	error(node, "#align must be an integer");
+	return false;
+}
+
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Operand> *poly_operands) {
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
@@ -1294,42 +1328,13 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 			syntax_error(st->align, "`#align` cannot be applied with `#packed`");
 			return;
 		}
-
-		Operand o = {};
-		check_expr(c, &o, st->align);
-		if (o.mode != Addressing_Constant) {
-			if (o.mode != Addressing_Invalid) {
-				error(st->align, "#align must be a constant");
-			}
-			return;
+		i64 custom_align = 1;
+		if (check_custom_align(c, st->align, &custom_align)) {
+			struct_type->Struct.custom_align = custom_align;
 		}
-
-		Type *type = base_type(o.type);
-		if (is_type_untyped(type) || is_type_integer(type)) {
-			if (o.value.kind == ExactValue_Integer) {
-				i64 align = i128_to_i64(o.value.value_integer);
-				if (align < 1 || !gb_is_power_of_two(align)) {
-					error(st->align, "#align must be a power of 2, got %lld", align);
-					return;
-				}
-
-				// NOTE(bill): Success!!!
-				i64 custom_align = gb_clamp(align, 1, build_context.max_align);
-				if (custom_align < align) {
-					warning(st->align, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
-				}
-				struct_type->Struct.custom_align = custom_align;
-				return;
-			}
-		}
-
-		error(st->align, "#align must be an integer");
-		return;
 	}
-
-
 }
-void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *node) {
+void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
@@ -1376,43 +1381,15 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 	union_type->Union.variants = variants;
 
 	if (ut->align != nullptr) {
-		Operand o = {};
-		check_expr(c, &o, ut->align);
-		if (o.mode != Addressing_Constant) {
-			if (o.mode != Addressing_Invalid) {
-				error(ut->align, "#align must be a constant");
-			}
-			return;
-		}
-
-		Type *type = base_type(o.type);
-		if (is_type_untyped(type) || is_type_integer(type)) {
-			if (o.value.kind == ExactValue_Integer) {
-				i64 align = i128_to_i64(o.value.value_integer);
-				if (align < 1 || !gb_is_power_of_two(align)) {
-					error(ut->align, "#align must be a power of 2, got %lld", align);
-					return;
-				}
-
-				// NOTE(bill): Success!!!
-				i64 custom_align = gb_clamp(align, 1, build_context.max_align);
-				if (custom_align < align) {
-					warning(ut->align, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
-				}
-				if (variants.count == 0) {
-					error(ut->align, "An empty union cannot have a custom alignment");
-				} else {
-					union_type->Union.custom_align = custom_align;
-				}
-				return;
+		i64 custom_align = 1;
+		if (check_custom_align(c, ut->align, &custom_align)) {
+			if (variants.count == 0) {
+				error(ut->align, "An empty union cannot have a custom alignment");
+			} else {
+				union_type->Union.custom_align = custom_align;
 			}
 		}
-
-		error(ut->align, "#align must be an integer");
-		return;
 	}
-
-
 }
 
 // void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
@@ -1577,7 +1554,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 }
 
 
-void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, AstNode *node) {
+void check_bit_field_type(Checker *c, Type *bit_field_type, AstNode *node) {
 	ast_node(bft, BitFieldType, node);
 	GB_ASSERT(is_type_bit_field(bit_field_type));
 
@@ -1653,36 +1630,10 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 
 
 	if (bft->align != nullptr) {
-		Operand o = {};
-		check_expr(c, &o, bft->align);
-		if (o.mode != Addressing_Constant) {
-			if (o.mode != Addressing_Invalid) {
-				error(bft->align, "#align must be a constant");
-			}
-			return;
+		i64 custom_align = 1;
+		if (check_custom_align(c, bft->align, &custom_align)) {
+			bit_field_type->BitField.custom_align = custom_align;
 		}
-
-		Type *type = base_type(o.type);
-		if (is_type_untyped(type) || is_type_integer(type)) {
-			if (o.value.kind == ExactValue_Integer) {
-				i64 align = i128_to_i64(o.value.value_integer);
-				if (align < 1 || !gb_is_power_of_two(align)) {
-					error(bft->align, "#align must be a power of 2, got %lld", align);
-					return;
-				}
-
-				// NOTE(bill): Success!!!
-				i64 custom_align = gb_clamp(align, 1, build_context.max_align);
-				if (custom_align < align) {
-					warning(bft->align, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
-				}
-				bit_field_type->BitField.custom_align = custom_align;
-				return;
-			}
-		}
-
-		error(bft->align, "#align must be an integer");
-		return;
 	}
 }
 
@@ -3069,7 +3020,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		*type = make_type_union(c->allocator);
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
-		check_union_type(c, named_type, *type, e);
+		check_union_type(c, *type, e);
 		check_close_scope(c);
 		(*type)->Union.node = e;
 		return true;
@@ -3089,7 +3040,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		*type = make_type_bit_field(c->allocator);
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
-		check_bit_field_type(c, *type, named_type, e);
+		check_bit_field_type(c, *type, e);
 		check_close_scope(c);
 		return true;
 	case_end;
@@ -3150,13 +3101,13 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 		type = t_invalid;
 	}
 
-	if (type->kind == Type_Named) {
-		if (type->Named.base == nullptr) {
-			gbString name = type_to_string(type);
-			error(e, "Invalid type definition of %s", name);
-			gb_string_free(name);
-			type->Named.base = t_invalid;
-		}
+	if (type->kind == Type_Named &&
+	    type->Named.base == nullptr) {
+		// IMPORTANT TODO(bill): Is this a serious error?!
+		#if 0
+		error(e, "Invalid type definition of `%.*s`", LIT(type->Named.name));
+		#endif
+		type->Named.base = t_invalid;
 	}
 
 	#if 0
@@ -8136,7 +8087,9 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				o->type = t->Pointer.elem;
  			} else {
  				gbString str = expr_to_string(o->expr);
- 				error(o->expr, "Cannot dereference `%s`", str);
+ 				gbString typ = type_to_string(o->type);
+ 				error(o->expr, "Cannot dereference `%s` of type `%s`", str, typ);
+ 				gb_string_free(typ);
  				gb_string_free(str);
  				o->mode = Addressing_Invalid;
  				o->expr = node;

@@ -1073,6 +1073,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					goto skip_expr;
 				}
 			} else if (operand.mode != Addressing_Invalid) {
+				bool is_ptr = is_type_pointer(operand.type);
 				Type *t = base_type(type_deref(operand.type));
 				switch (t->kind) {
 				case Type_Basic:
@@ -1138,7 +1139,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					found = current_scope_lookup_entity(c->context.scope, str);
 				}
 				if (found == nullptr) {
-					entity = make_entity_variable(c->allocator, c->context.scope, token, type, true);
+					bool is_immutable = true;
+					entity = make_entity_variable(c->allocator, c->context.scope, token, type, is_immutable);
 					add_entity_definition(&c->info, name, entity);
 				} else {
 					TokenPos pos = found->token.pos;

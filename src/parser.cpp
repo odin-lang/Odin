@@ -4759,7 +4759,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 	TokenizerInitError err = init_tokenizer(&f->tokenizer, fullpath);
 	if (err == TokenizerInit_None) {
 		isize file_size = f->tokenizer.end - f->tokenizer.start;
-		isize init_token_cap = gb_max(next_pow2(file_size/2), 16);
+		isize init_token_cap = cast(isize)gb_max(next_pow2(cast(i64)(file_size/2ll)), 16);
 		array_init(&f->tokens, heap_allocator(), gb_max(init_token_cap, 16));
 
 		for (;;) {

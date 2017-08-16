@@ -2,7 +2,7 @@ import win32 "sys/windows.odin";
 import "mem.odin";
 
 Handle   :: int;
-FileTime :: u64;
+File_Time :: u64;
 
 
 INVALID_HANDLE: Handle : -1;
@@ -75,8 +75,8 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 	}
 
 	share_mode := u32(win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE);
-	sa: ^win32.SecurityAttributes = nil;
-	sa_inherit := win32.SecurityAttributes{length = size_of(win32.SecurityAttributes), inherit_handle = 1};
+	sa: ^win32.Security_Attributes = nil;
+	sa_inherit := win32.Security_Attributes{length = size_of(win32.Security_Attributes), inherit_handle = 1};
 	if mode&O_CLOEXEC == 0 {
 		sa = &sa_inherit;
 	}
@@ -202,17 +202,17 @@ get_std_handle :: proc(h: int) -> Handle {
 
 
 
-last_write_time :: proc(fd: Handle) -> FileTime {
-	file_info: win32.ByHandleFileInformation;
+last_write_time :: proc(fd: Handle) -> File_Time {
+	file_info: win32.By_Handle_File_Information;
 	win32.get_file_information_by_handle(win32.Handle(fd), &file_info);
-	lo := FileTime(file_info.last_write_time.lo);
-	hi := FileTime(file_info.last_write_time.hi);
+	lo := File_Time(file_info.last_write_time.lo);
+	hi := File_Time(file_info.last_write_time.hi);
 	return lo | hi << 32;
 }
 
-last_write_time_by_name :: proc(name: string) -> FileTime {
+last_write_time_by_name :: proc(name: string) -> File_Time {
 	last_write_time: win32.Filetime;
-	data: win32.FileAttributeData;
+	data: win32.File_Attribute_Data;
 	buf: [1024]u8;
 
 	assert(len(buf) > len(name));
@@ -223,8 +223,8 @@ last_write_time_by_name :: proc(name: string) -> FileTime {
 		last_write_time = data.last_write_time;
 	}
 
-	l := FileTime(last_write_time.lo);
-	h := FileTime(last_write_time.hi);
+	l := File_Time(last_write_time.lo);
+	h := File_Time(last_write_time.hi);
 	return l | h << 32;
 }
 
@@ -284,7 +284,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 				j += 1;
 			case 0xd800 <= str[j] && str[j] < 0xdc00:
 				if i+4 > len do return "";
-				c := rune((str[j] - 0xd800) << 10) + rune((str[j+1]) - 0xdc00) + 0x10000;
+			c := rune((str[j] - 0xd800) << 10) + rune((str[j+1]) - 0xdc00) + 0x10000;
 				buf[i] = u8(0xf0 +  (c >> 18));         i += 1;
 				buf[i] = u8(0x80 + ((c >> 12) & 0x3f)); i += 1;
 				buf[i] = u8(0x80 + ((c >>  6) & 0x3f)); i += 1;

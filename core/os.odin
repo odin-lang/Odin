@@ -38,7 +38,7 @@ read_entire_file :: proc(name: string) -> (data: []u8, success: bool) {
 }
 
 write_entire_file :: proc(name: string, data: []u8) -> (sucess: bool) {
-	fd, err := open(name, O_WRONLY, 0);
+	fd, err := open(name, O_WRONLY|O_CREAT, 0);
 	if err != 0 {
 		return false;
 	}

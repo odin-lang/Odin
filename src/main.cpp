@@ -1,6 +1,8 @@
 #define USE_CUSTOM_BACKEND 0
-#define USE_THREADED_PARSER 1
 // #define NO_ARRAY_BOUNDS_CHECK
+#if !defined(USE_THREADED_PARSER)
+#define USE_THREADED_PARSER 0
+#endif
 
 #include "common.cpp"
 #include "timings.cpp"
@@ -449,7 +451,6 @@ int main(int arg_count, char **arg_ptr) {
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
 
-
 #if 1
 
 	String init_filename = {};
@@ -653,7 +654,7 @@ int main(int arg_count, char **arg_ptr) {
 		}
 
 		exit_code = system_exec_command_line_app("msvc-link", true,
-			"link \"%.*s\".obj -OUT:\"%.*s.%s\" %s "
+			"link \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 			"/defaultlib:libcmt "
 			// "/nodefaultlib "
 			"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
@@ -755,7 +756,7 @@ int main(int arg_count, char **arg_ptr) {
 		#endif
 
 		exit_code = system_exec_command_line_app("ld-link", true,
-			"%s \"%.*s\".o -o \"%.*s%s\" %s "
+			"%s \"%.*s.o\" -o \"%.*s%s\" %s "
 			"-lc -lm "
 			" %.*s "
 			" %s "

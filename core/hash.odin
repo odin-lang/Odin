@@ -1,5 +1,15 @@
 import "mem.odin";
 
+adler32 :: proc(data: []u8) -> u32 {
+	ADLER_CONST :: 65521;
+	a, b: u32 = 1, 0;
+	for x in data {
+		a = (a + u32(x)) % ADLER_CONST;
+		b = (b + a) % ADLER_CONST;
+	}
+	return (b << 16) | a;
+}
+
 crc32 :: proc(data: []u8) -> u32 {
 	result := ~u32(0);
 	for b in data {

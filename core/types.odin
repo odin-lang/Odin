@@ -1,103 +1,103 @@
-is_signed :: proc(info: ^TypeInfo) -> bool {
+is_signed :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
 	match i in type_info_base(info).variant {
-	case TypeInfo.Integer: return i.signed;
-	case TypeInfo.Float:   return true;
+	case Type_Info.Integer: return i.signed;
+	case Type_Info.Float:   return true;
 	}
 	return false;
 }
-is_integer :: proc(info: ^TypeInfo) -> bool {
+is_integer :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Integer);
+	_, ok := type_info_base(info).variant.(Type_Info.Integer);
 	return ok;
 }
-is_rune :: proc(info: ^TypeInfo) -> bool {
+is_rune :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Rune);
+	_, ok := type_info_base(info).variant.(Type_Info.Rune);
 	return ok;
 }
-is_float :: proc(info: ^TypeInfo) -> bool {
+is_float :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Float);
+	_, ok := type_info_base(info).variant.(Type_Info.Float);
 	return ok;
 }
-is_complex :: proc(info: ^TypeInfo) -> bool {
+is_complex :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Complex);
+	_, ok := type_info_base(info).variant.(Type_Info.Complex);
 	return ok;
 }
-is_any :: proc(info: ^TypeInfo) -> bool {
+is_any :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Any);
+	_, ok := type_info_base(info).variant.(Type_Info.Any);
 	return ok;
 }
-is_string :: proc(info: ^TypeInfo) -> bool {
+is_string :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.String);
+	_, ok := type_info_base(info).variant.(Type_Info.String);
 	return ok;
 }
-is_boolean :: proc(info: ^TypeInfo) -> bool {
+is_boolean :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Boolean);
+	_, ok := type_info_base(info).variant.(Type_Info.Boolean);
 	return ok;
 }
-is_pointer :: proc(info: ^TypeInfo) -> bool {
+is_pointer :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Pointer);
+	_, ok := type_info_base(info).variant.(Type_Info.Pointer);
 	return ok;
 }
-is_procedure :: proc(info: ^TypeInfo) -> bool {
+is_procedure :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Procedure);
+	_, ok := type_info_base(info).variant.(Type_Info.Procedure);
 	return ok;
 }
-is_array :: proc(info: ^TypeInfo) -> bool {
+is_array :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Array);
+	_, ok := type_info_base(info).variant.(Type_Info.Array);
 	return ok;
 }
-is_dynamic_array :: proc(info: ^TypeInfo) -> bool {
+is_dynamic_array :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.DynamicArray);
+	_, ok := type_info_base(info).variant.(Type_Info.Dynamic_Array);
 	return ok;
 }
-is_dynamic_map :: proc(info: ^TypeInfo) -> bool {
+is_dynamic_map :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Map);
+	_, ok := type_info_base(info).variant.(Type_Info.Map);
 	return ok;
 }
-is_slice :: proc(info: ^TypeInfo) -> bool {
+is_slice :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Slice);
+	_, ok := type_info_base(info).variant.(Type_Info.Slice);
 	return ok;
 }
-is_vector :: proc(info: ^TypeInfo) -> bool {
+is_vector :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Vector);
+	_, ok := type_info_base(info).variant.(Type_Info.Vector);
 	return ok;
 }
-is_tuple :: proc(info: ^TypeInfo) -> bool {
+is_tuple :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Tuple);
+	_, ok := type_info_base(info).variant.(Type_Info.Tuple);
 	return ok;
 }
-is_struct :: proc(info: ^TypeInfo) -> bool {
+is_struct :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	s, ok := type_info_base(info).variant.(TypeInfo.Struct);
+	s, ok := type_info_base(info).variant.(Type_Info.Struct);
 	return ok && !s.is_raw_union;
 }
-is_raw_union :: proc(info: ^TypeInfo) -> bool {
+is_raw_union :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	s, ok := type_info_base(info).variant.(TypeInfo.Struct);
+	s, ok := type_info_base(info).variant.(Type_Info.Struct);
 	return ok && s.is_raw_union;
 }
-is_union :: proc(info: ^TypeInfo) -> bool {
+is_union :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Union);
+	_, ok := type_info_base(info).variant.(Type_Info.Union);
 	return ok;
 }
-is_enum :: proc(info: ^TypeInfo) -> bool {
+is_enum :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(TypeInfo.Enum);
+	_, ok := type_info_base(info).variant.(Type_Info.Enum);
 	return ok;
 }

@@ -17,7 +17,7 @@ Mutex :: struct {
 */
 
 Mutex :: struct {
-	_critical_section: win32.CriticalSection;
+	_critical_section: win32.Critical_Section;
 }
 
 current_thread_id :: proc() -> i32 {

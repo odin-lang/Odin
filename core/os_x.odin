@@ -6,7 +6,7 @@ foreign_system_library (
 import "strings.odin";
 
 Handle      :: i32;
-FileTime    :: u64;
+File_Time    :: u64;
 Errno       :: int;
 
 
@@ -46,7 +46,7 @@ RTLD_FIRST    :: 0x100;
 
 args: [dynamic]string;
 
-_FileTime :: struct #ordered {
+_File_Time :: struct #ordered {
 	seconds: i64;
 	nanoseconds: i64;
 }
@@ -60,10 +60,10 @@ Stat :: struct #ordered {
 	gid:           u32; // Group ID of the file's group
 	rdev:          i32; // Device ID, if device
 
-	last_access:   FileTime; // Time of last access
-	modified:      FileTime; // Time of last modification
-	status_change: FileTime; // Time of last status change
-	created:       FileTime; // Time of creation
+	last_access:   File_Time; // Time of last access
+	modified:      File_Time; // Time of last modification
+	status_change: File_Time; // Time of last status change
+	created:       File_Time; // Time of creation
 
 	size:          i64;  // Size of the file, in bytes
 	blocks:        i64;  // Number of blocks allocated for the file
@@ -190,7 +190,7 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	assert(fd != -1);
 
-	final_offset := i64(unix_lseek(fd, offset, whence));
+	final_offset := i64(unix_lseek(fd, int(offset), whence));
 	if(final_offset == -1) {
 		return 0, 1;
 	}
@@ -212,8 +212,8 @@ stdout: Handle = 1; // get_std_handle(win32.STD_OUTPUT_HANDLE);
 stderr: Handle = 2; // get_std_handle(win32.STD_ERROR_HANDLE);
 
 /* TODO(zangent): Implement these!
-last_write_time :: proc(fd: Handle) -> FileTime {}
-last_write_time_by_name :: proc(name: string) -> FileTime {}
+last_write_time :: proc(fd: Handle) -> File_Time {}
+last_write_time_by_name :: proc(name: string) -> File_Time {}
 */
 
 stat :: proc(path: string) -> (Stat, bool) #inline {

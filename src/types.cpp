@@ -1864,20 +1864,19 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			return max;
 		} else if (t->Struct.fields.count > 0) {
 			i64 max = 1;
-			if (t->Struct.is_packed) {
-				max = build_context.word_size;
-			}
+			// NOTE(bill): Check the fields to check for cyclic definitions
 			for_array(i, t->Struct.fields) {
 				Type *field_type = t->Struct.fields[i]->type;
 				type_path_push(path, field_type);
-				if (path->failure) {
-					return FAILURE_ALIGNMENT;
-				}
+				if (path->failure) return FAILURE_ALIGNMENT;
 				i64 align = type_align_of_internal(allocator, field_type, path);
 				type_path_pop(path);
 				if (max < align) {
 					max = align;
 				}
+			}
+			if (t->Struct.is_packed) {
+				return 1;
 			}
 			return max;
 		}

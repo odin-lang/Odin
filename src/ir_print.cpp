@@ -293,7 +293,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 
 	case Type_Union: {
 		if (t->Union.variants.count == 0) {
-			ir_write_string(f, "%%..opaque");
+			ir_print_encoded_local(f, str_lit("..opaque"));
 		} else {
 			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
 			// LLVM takes the first element's alignment as the entire alignment (like C)
@@ -1723,10 +1723,41 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 
 void ir_print_type_name(irFileBuffer *f, irModule *m, irValue *v) {
 	GB_ASSERT(v->kind == irValue_TypeName);
-	Type *bt = base_type(ir_type(v));
+	Type *t = base_type(v->TypeName.type);
 	ir_print_encoded_local(f, v->TypeName.name);
 	ir_write_string(f, str_lit(" = type "));
-	ir_print_type(f, m, base_type(v->TypeName.type));
+
+
+	switch (t->kind) {
+	case Type_Union:
+		if (t->Union.variants.count == 0) {
+			ir_write_string(f, str_lit("{}"));
+		} else {
+			ir_print_type(f, m, t);
+		}
+		break;
+	case Type_Struct:
+		if (t->Struct.fields.count == 0) {
+			if (t->Struct.is_packed) {
+				ir_write_byte(f, '<');
+			}
+			ir_write_byte(f, '{');
+			if (t->Struct.custom_align > 0) {
+				ir_fprintf(f, "[0 x <%lld x i8>]", t->Struct.custom_align);
+			}
+			ir_write_byte(f, '}');
+			if (t->Struct.is_packed) {
+				ir_write_byte(f, '>');
+			}
+		} else {
+			ir_print_type(f, m, t);
+		}
+		break;
+	default:
+		ir_print_type(f, m, t);
+		break;
+	}
+
 	ir_write_byte(f, '\n');
 }
 
