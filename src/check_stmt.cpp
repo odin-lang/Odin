@@ -1757,7 +1757,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 		}
 
-		check_arity_match(c, vd);
+		check_arity_match(c, vd, false);
 		check_init_variables(c, entities, entity_count, vd->values, str_lit("variable declaration"));
 
 		for (isize i = 0; i < entity_count; i++) {

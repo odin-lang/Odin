@@ -825,7 +825,7 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 		is_using = false;
 	}
 
-	bool arity_ok = check_arity_match(c, vd);
+	bool arity_ok = check_arity_match(c, vd, false);
 
 	if (vd->values.count > 0 && !allow_default_values) {
 		error(vd->values[0], "Default values are not allowed within a %.*s", LIT(context));
@@ -5996,7 +5996,7 @@ void check_unpack_arguments(Checker *c, Entity **lhs, isize lhs_count, Array<Ope
 		Operand o = {};
 
 		if (lhs != nullptr && tuple_index < lhs_count) {
-			// NOTE(bill): override DeclInfo for dependency control
+			// NOTE(bill): override DeclInfo for dependency
 			DeclInfo *decl = decl_info_of_entity(&c->info, lhs[tuple_index]);
 			if (decl) c->context.decl = decl;
 		}

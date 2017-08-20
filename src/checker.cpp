@@ -1604,7 +1604,7 @@ void init_preload(Checker *c) {
 
 
 
-bool check_arity_match(Checker *c, AstNodeValueDecl *vd);
+bool check_arity_match(Checker *c, AstNodeValueDecl *vd, bool is_global);
 void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_scope);
 void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, bool is_file_scope);
 
@@ -1726,7 +1726,7 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 
 
 
-bool check_arity_match(Checker *c, AstNodeValueDecl *vd) {
+bool check_arity_match(Checker *c, AstNodeValueDecl *vd, bool is_global) {
 	isize lhs = vd->names.count;
 	isize rhs = vd->values.count;
 
@@ -1745,12 +1745,18 @@ bool check_arity_match(Checker *c, AstNodeValueDecl *vd) {
 			error(vd->names[0], "Extra initial expression");
 		}
 		return false;
-	} else if (lhs > rhs && rhs != 1) {
-		AstNode *n = vd->names[rhs];
-		gbString str = expr_to_string(n);
-		error(n, "Missing expression for `%s`", str);
-		gb_string_free(str);
-		return false;
+	} else if (lhs > rhs) {
+		if (!is_global && rhs != 1) {
+			AstNode *n = vd->names[rhs];
+			gbString str = expr_to_string(n);
+			error(n, "Missing expression for `%s`", str);
+			gb_string_free(str);
+			return false;
+		} else if (is_global) {
+			AstNode *n = vd->values[rhs-1];
+			error(n, "Expected %td expressions on the right hand side, got %td", lhs, rhs);
+			return false;
+		}
 	}
 
 	return true;
@@ -1884,11 +1890,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					di->entity_count = entity_count;
 				}
 
-				if (vd->values.count > 0 && entity_count != vd->values.count) {
-					error(decl, "Variable declarations in the global scope can only declare 1 variable at a time");
-				}
-
-				check_arity_match(c, vd);
+				check_arity_match(c, vd, true);
 			} else {
 				for_array(i, vd->names) {
 					AstNode *name = vd->names[i];
@@ -1952,7 +1954,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					add_entity_and_decl_info(c, name, e, d);
 				}
 
-				check_arity_match(c, vd);
+				check_arity_match(c, vd, true);
 			}
 		case_end;
 
