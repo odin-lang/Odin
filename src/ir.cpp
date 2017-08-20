@@ -19,7 +19,7 @@ struct irModule {
 	String layout;
 	// String triple;
 
-	Map<Entity *>         min_dep_map;   // Key: Entity *
+	PtrSet<Entity *>      min_dep_map;
 	Map<irValue *>        values;        // Key: Entity *
 	Map<irValue *>        members;       // Key: String
 	Map<String>           entity_names;  // Key: Entity * of the typename
@@ -5783,7 +5783,7 @@ irValue *ir_build_cond(irProcedure *proc, AstNode *cond, irBlock *true_block, ir
 void ir_build_poly_proc(irProcedure *proc, AstNodeProcLit *pd, Entity *e) {
 	GB_ASSERT(pd->body != nullptr);
 
-	if (is_entity_in_dependency_map(&proc->module->min_dep_map, e) == false) {
+	if (ptr_set_exists(&proc->module->min_dep_map, e) == false) {
 		// NOTE(bill): Nothing depends upon it so doesn't need to be built
 		return;
 	}
@@ -5845,7 +5845,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 				}
 			}
 
-			if (!polymorphic_struct && map_get(&proc->module->min_dep_map, hash_pointer(e)) == nullptr) {
+			if (!polymorphic_struct && !ptr_set_exists(&proc->module->min_dep_map, e)) {
 				continue;
 			}
 
@@ -5874,7 +5874,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 					auto procs = *found;
 					for_array(i, procs) {
 						Entity *e = procs[i];
-						if (map_get(&proc->module->min_dep_map, hash_pointer(e)) == nullptr) {
+						if (!ptr_set_exists(&proc->module->min_dep_map, e)) {
 							continue;
 						}
 						DeclInfo *d = decl_info_of_entity(info, e);
@@ -7545,7 +7545,7 @@ void ir_gen_tree(irGen *s) {
 	}
 
 	isize global_variable_max_count = 0;
-	Entity *entry_point = nullptr;
+	Entity *entry_point = info->entry_point;
 	bool has_dll_main = false;
 	bool has_win_main = false;
 
@@ -7557,7 +7557,8 @@ void ir_gen_tree(irGen *s) {
 			global_variable_max_count++;
 		} else if (e->kind == Entity_Procedure && !e->scope->is_global) {
 			if (e->scope->is_init && name == "main") {
-				entry_point = e;
+				GB_ASSERT(e == entry_point);
+				// entry_point = e;
 			}
 			if ((e->Procedure.tags & ProcTag_export) != 0 ||
 			    (e->Procedure.link_name.len > 0) ||
@@ -7582,7 +7583,63 @@ void ir_gen_tree(irGen *s) {
 	array_init(&global_variables, m->tmp_allocator, global_variable_max_count);
 
 	m->entry_point_entity = entry_point;
-	m->min_dep_map = generate_minimum_dependency_map(info, entry_point);
+	m->min_dep_map = info->minimum_dependency_map;
+
+	for_array(i, info->variable_init_order) {
+		DeclInfo *d = info->variable_init_order[i];
+
+		for (isize j = 0; j < d->entity_count; j++) {
+			Entity *e = d->entities[j];
+
+			if (!e->scope->is_file) {
+				continue;
+			}
+
+			if (!ptr_set_exists(&m->min_dep_map, e)) {
+				continue;
+			}
+			DeclInfo *decl = decl_info_of_entity(info, e);
+			if (decl == nullptr) {
+				continue;
+			}
+
+			String name = e->token.string;
+			String original_name = name;
+			if (!e->scope->is_global) {
+				name = ir_mangle_name(s, e->token.pos.file, e);
+			}
+			map_set(&m->entity_names, hash_entity(e), name);
+
+			irValue *g = ir_value_global(a, e, nullptr);
+			g->Global.name = name;
+			g->Global.is_thread_local = e->Variable.is_thread_local;
+
+
+			irGlobalVariable var = {};
+			var.var = g;
+			var.decl = decl;
+
+			if (decl->init_expr != nullptr) {
+				if (is_type_any(e->type)) {
+				} else {
+					TypeAndValue tav = type_and_value_of_expr(info, decl->init_expr);
+					if (tav.mode != Addressing_Invalid) {
+						if (tav.value.kind != ExactValue_Invalid) {
+							ExactValue v = tav.value;
+							g->Global.value = ir_add_module_constant(m, tav.type, v);
+						}
+					}
+				}
+			}
+
+			// if (g->Global.value == nullptr) {
+				array_add(&global_variables, var);
+			// }
+
+			ir_module_add_value(m, e, g);
+			map_set(&m->members, hash_string(name), g);
+		}
+	}
 
 	for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
@@ -7595,6 +7652,10 @@ void ir_gen_tree(irGen *s) {
 			continue;
 		}
 
+		if (e->kind == Entity_Variable) {
+			// NOTE(bill): Handled above as it requires a specific load order
+			continue;
+		}
 
 		bool polymorphic_struct = false;
 		if (e->type != nullptr && e->kind == Entity_TypeName) {
@@ -7604,7 +7665,7 @@ void ir_gen_tree(irGen *s) {
 			}
 		}
 
-		if (!polymorphic_struct && map_get(&m->min_dep_map, hash_entity(e)) == nullptr) {
+		if (!polymorphic_struct && !ptr_set_exists(&m->min_dep_map, e)) {
 			// NOTE(bill): Nothing depends upon it so doesn't need to be built
 			continue;
 		}
@@ -7622,7 +7683,6 @@ void ir_gen_tree(irGen *s) {
 		} else if (check_is_entity_overloaded(e)) {
 			name = ir_mangle_name(s, e->token.pos.file, e);
 		}
-
 		map_set(&m->entity_names, hash_entity(e), name);
 
 		switch (e->kind) {
@@ -7630,39 +7690,6 @@ void ir_gen_tree(irGen *s) {
 			GB_ASSERT(e->type->kind == Type_Named);
 			ir_gen_global_type_name(m, e, name);
 			break;
-
-		case Entity_Variable: {
-			irValue *g = ir_value_global(a, e, nullptr);
-			g->Global.name = name;
-			g->Global.is_thread_local = e->Variable.is_thread_local;
-
-			irGlobalVariable var = {};
-			var.var = g;
-			var.decl = decl;
-
-			if (decl->init_expr != nullptr) {
-				if (is_type_any(e->type)) {
-
-				} else {
-					TypeAndValue tav = type_and_value_of_expr(info, decl->init_expr);
-					if (tav.mode != Addressing_Invalid) {
-						if (tav.value.kind != ExactValue_Invalid) {
-							ExactValue v = tav.value;
-							// if (v.kind != ExactValue_String) {
-								g->Global.value = ir_add_module_constant(m, tav.type, v);
-							// }
-						}
-					}
-				}
-			}
-
-			if (g->Global.value == nullptr) {
-				array_add(&global_variables, var);
-			}
-
-			ir_module_add_value(m, e, g);
-			map_set(&m->members, hash_string(name), g);
-		} break;
 
 		case Entity_Procedure: {
 			ast_node(pl, ProcLit, decl->proc_lit);
@@ -7863,52 +7890,7 @@ void ir_gen_tree(irGen *s) {
 			ir_emit_global_call(proc, "__init_context", args, 1);
 		}
 
-		// TODO(bill): Should do a dependency graph do check which order to initialize them in?
-		for_array(i, global_variables) {
-			irGlobalVariable *var = &global_variables[i];
-			if (var->decl->init_expr != nullptr) {
-				var->init = ir_build_expr(proc, var->decl->init_expr);
-			}
-		}
 
-		// NOTE(bill): Initialize constants first
-		for_array(i, global_variables) {
-			irGlobalVariable *var = &global_variables[i];
-			if (var->init != nullptr && var->init->kind == irValue_Constant) {
-				Type *t = type_deref(ir_type(var->var));
-				if (is_type_any(t)) {
-					// NOTE(bill): Edge case for `any` type
-					Type *var_type = default_type(ir_type(var->init));
-					irValue *g = ir_add_global_generated(proc->module, var_type, var->init);
-					irValue *data = ir_emit_struct_ep(proc, var->var, 0);
-					irValue *ti   = ir_emit_struct_ep(proc, var->var, 1);
-					ir_emit_store(proc, data, ir_emit_conv(proc, g, t_rawptr));
-					ir_emit_store(proc, ti,   ir_type_info(proc, var_type));
-				} else {
-					ir_emit_store(proc, var->var, var->init);
-				}
-			}
-		}
-
-		for_array(i, global_variables) {
-			irGlobalVariable *var = &global_variables[i];
-			if (var->init != nullptr && var->init->kind != irValue_Constant) {
-				Type *t = type_deref(ir_type(var->var));
-				if (is_type_any(t)) {
-					// NOTE(bill): Edge case for `any` type
-					Type *var_type = default_type(ir_type(var->init));
-					irValue *g = ir_add_global_generated(proc->module, var_type, var->init);
-					ir_emit_store(proc, g, var->init);
-
-					irValue *data = ir_emit_struct_ep(proc, var->var, 0);
-					irValue *ti   = ir_emit_struct_ep(proc, var->var, 1);
-					ir_emit_store(proc, data, ir_emit_conv(proc, g, t_rawptr));
-					ir_emit_store(proc, ti,   ir_type_info(proc, var_type));
-				} else {
-					ir_emit_store(proc, var->var, var->init);
-				}
-			}
-		}
 
 		{ // NOTE(bill): Setup type_info data
 			CheckerInfo *info = proc->module->info;
@@ -8308,6 +8290,31 @@ void ir_gen_tree(irGen *s) {
 					ir_emit_store(proc, ptr, ti);
 				} else {
 					GB_PANIC("Unhandled TypeInfo type: %s", type_to_string(t));
+				}
+			}
+		}
+
+		for_array(i, global_variables) {
+			irGlobalVariable *var = &global_variables[i];
+			if (var->decl->init_expr != nullptr)  {
+				var->init = ir_build_expr(proc, var->decl->init_expr);
+			}
+
+			if (var->init != nullptr) {
+				Type *t = type_deref(ir_type(var->var));
+
+				if (is_type_any(t)) {
+					// NOTE(bill): Edge case for `any` type
+					Type *var_type = default_type(ir_type(var->init));
+					irValue *g = ir_add_global_generated(proc->module, var_type, var->init);
+					ir_emit_store(proc, g, var->init);
+
+					irValue *data = ir_emit_struct_ep(proc, var->var, 0);
+					irValue *ti   = ir_emit_struct_ep(proc, var->var, 1);
+					ir_emit_store(proc, data, ir_emit_conv(proc, g, t_rawptr));
+					ir_emit_store(proc, ti,   ir_type_info(proc, var_type));
+				} else {
+					ir_emit_store(proc, var->var, var->init);
 				}
 			}
 		}

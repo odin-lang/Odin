@@ -5086,10 +5086,11 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 		array_add(&p->imports, runtime_file);
 		shared_file_count++;
 	}
+
 	array_add(&p->imports, init_imported_file);
 	p->init_fullpath = init_fullpath;
 
-
+/*
 	// IMPORTANT TODO(bill): Figure out why this doesn't work on *nix sometimes
 #if USE_THREADED_PARSER && defined(GB_SYSTEM_WINDOWS)
 	isize thread_count = gb_max(build_context.thread_count, 1);
@@ -5148,14 +5149,15 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 			}
 		}
 	}
-#else
-	for_array(i, p->imports) {
-		ParseFileError err = parse_import(p, p->imports[i]);
+#else */
+	isize import_index = 0;
+	for (; import_index < p->imports.count; import_index++) {
+		ParseFileError err = parse_import(p, p->imports[import_index]);
 		if (err != ParseFile_None) {
 			return err;
 		}
 	}
-#endif
+// #endif
 
 	for_array(i, p->files) {
 		p->total_token_count += p->files[i].tokens.count;

@@ -692,7 +692,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			// an extra allocation
 			Array<Operand> operands = {};
 			array_init(&operands, c->tmp_allocator, 2 * lhs_count);
-			check_unpack_arguments(c, lhs_count, &operands, as->rhs, true);
+			check_unpack_arguments(c, nullptr, lhs_count, &operands, as->rhs, true);
 
 			isize rhs_count = operands.count;
 			for_array(i, operands) {
@@ -849,7 +849,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 		} else {
 			array_init(&operands, heap_allocator(), 2*rs->results.count);
-			check_unpack_arguments(c, -1, &operands, rs->results, false);
+			check_unpack_arguments(c, nullptr, -1, &operands, rs->results, false);
 		}
 
 

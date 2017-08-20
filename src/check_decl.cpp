@@ -102,7 +102,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, Array<AstNo
 	// an extra allocation
 	Array<Operand> operands = {};
 	array_init(&operands, c->tmp_allocator, 2*lhs_count);
-	check_unpack_arguments(c, lhs_count, &operands, inits, true);
+	check_unpack_arguments(c, lhs, lhs_count, &operands, inits, true);
 
 	isize rhs_count = operands.count;
 	for_array(i, operands) {
@@ -113,7 +113,13 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, Array<AstNo
 
 	isize max = gb_min(lhs_count, rhs_count);
 	for (isize i = 0; i < max; i++) {
-		check_init_variable(c, lhs[i], &operands[i], context_name);
+		Entity *e = lhs[i];
+		DeclInfo *d = decl_info_of_entity(&c->info, e);
+		Operand *o = &operands[i];
+		check_init_variable(c, e, o, context_name);
+		if (d != nullptr) {
+			d->init_expr = o->expr;
+		}
 	}
 	if (rhs_count > 0 && lhs_count != rhs_count) {
 		error(lhs[0]->token, "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
@@ -550,7 +556,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 }
 
-void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, AstNode *init_expr) {
+void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, Array<AstNode *> init_expr_list) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Variable);
 
@@ -581,7 +587,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 
 
 	if (e->Variable.is_foreign) {
-		if (init_expr != nullptr) {
+		if (init_expr_list.count > 0) {
 			error(e->token, "A foreign variable declaration cannot have a default value");
 		}
 		init_entity_foreign_library(c, e);
@@ -606,18 +612,11 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		}
 	}
 
-	if (init_expr == nullptr) {
+	if (init_expr_list.count == 0) {
 		if (type_expr == nullptr) {
 			e->type = t_invalid;
 		}
 		return;
-	}
-
-	if (entities == nullptr || entity_count == 1) {
-		GB_ASSERT(entities == nullptr || entities[0] == e);
-		Operand operand = {};
-		check_expr(c, &operand, init_expr);
-		check_init_variable(c, e, &operand, context_name);
 	}
 
 	if (type_expr != nullptr) {
@@ -626,11 +625,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		}
 	}
 
-
-	Array<AstNode *> inits;
-	array_init(&inits, c->allocator, 1);
-	array_add(&inits, init_expr);
-	check_init_variables(c, entities, entity_count, inits, context_name);
+	check_init_variables(c, entities, entity_count, init_expr_list, context_name);
 }
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
@@ -657,7 +652,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 
 	switch (e->kind) {
 	case Entity_Variable:
-		check_var_decl(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);
+		check_var_decl(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr_list);
 		break;
 	case Entity_Constant:
 		check_const_decl(c, e, d->type_expr, d->init_expr, named_type);
@@ -757,9 +752,8 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	if (decl->parent != nullptr) {
 		// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 		for_array(i, decl->deps.entries) {
-			HashKey key = decl->deps.entries[i].key;
-			Entity *e = cast(Entity *)key.ptr;
-			map_set(&decl->parent->deps, key, true);
+			Entity *e = decl->deps.entries[i].ptr;
+			ptr_set_add(&decl->parent->deps, e);
 		}
 	}
 }

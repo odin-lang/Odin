@@ -5968,19 +5968,44 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 }
 
 
+isize add_dependencies_from_unpacking(Checker *c, Entity **lhs, isize lhs_count, isize tuple_index, isize tuple_count) {
+	if (lhs != nullptr) {
+		for (isize j = 0; tuple_index < lhs_count && j < tuple_count; j++) {
+			Entity *e = lhs[tuple_index + j];
+			DeclInfo *decl = decl_info_of_entity(&c->info, e);
+			if (decl != nullptr) {
+				c->context.decl = decl; // will be reset by the `defer` any way
+				for_array(k, decl->deps.entries) {
+					Entity *dep = decl->deps.entries[k].ptr;
+					add_declaration_dependency(c, dep); // TODO(bill): Should this be here?
+				}
+			}
+		}
+	}
+	return tuple_count;
+}
 
 
-
-bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operands, Array<AstNode *> rhs, bool allow_ok) {
+void check_unpack_arguments(Checker *c, Entity **lhs, isize lhs_count, Array<Operand> *operands, Array<AstNode *> rhs, bool allow_ok, bool *optional_ok_ = nullptr) {
 	bool optional_ok = false;
+	isize tuple_index = 0;
 	for_array(i, rhs) {
+		CheckerContext prev_context = c->context;
+		defer (c->context = prev_context);
+
 		Operand o = {};
+
+		if (lhs != nullptr && tuple_index < lhs_count) {
+			// NOTE(bill): override DeclInfo for dependency control
+			DeclInfo *decl = decl_info_of_entity(&c->info, lhs[tuple_index]);
+			if (decl) c->context.decl = decl;
+		}
+
 		check_expr_base(c, &o, rhs[i], nullptr);
 		if (o.mode == Addressing_NoValue) {
 			error_operand_no_value(&o);
 			o.mode = Addressing_Invalid;
 		}
-		// check_multi_expr(c, &o, rhs[i]);
 
 
 		if (o.type == nullptr || o.type->kind != Type_Tuple) {
@@ -5998,8 +6023,10 @@ bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operand
 				array_add(operands, ok);
 
 				optional_ok = true;
+				tuple_index += add_dependencies_from_unpacking(c, lhs, lhs_count, tuple_index, 2);
 			} else {
 				array_add(operands, o);
+				tuple_index += 1;
 			}
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
@@ -6007,10 +6034,13 @@ bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operand
 				o.type = tuple->variables[j]->type;
 				array_add(operands, o);
 			}
+
+			isize count = tuple->variables.count;
+			tuple_index += add_dependencies_from_unpacking(c, lhs, lhs_count, tuple_index, count);
 		}
 	}
 
-	return optional_ok;
+	if (optional_ok_) *optional_ok_ = optional_ok;
 }
 
 
@@ -6404,7 +6434,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 
 	} else {
 		array_init(&operands, heap_allocator(), 2*ce->args.count);
-		check_unpack_arguments(c, -1, &operands, ce->args, false);
+		check_unpack_arguments(c, nullptr, -1, &operands, ce->args, false);
 	}
 
 	if (operand->mode == Addressing_Overload) {
@@ -6644,7 +6674,7 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 
 	} else {
 		array_init(&operands, heap_allocator(), 2*ce->args.count);
-		check_unpack_arguments(c, -1, &operands, ce->args, false);
+		check_unpack_arguments(c, nullptr, -1, &operands, ce->args, false);
 	}
 
 	CallArgumentError err = CallArgumentError_None;

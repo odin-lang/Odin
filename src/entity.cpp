@@ -78,6 +78,8 @@ struct Entity {
 	Entity *   using_parent;
 	AstNode *  using_expr;
 
+	isize      order_in_src;
+
 	union {
 		struct {
 			ExactValue value;

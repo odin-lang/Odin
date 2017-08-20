@@ -181,10 +181,11 @@ struct DeclInfo {
 
 	AstNode *         type_expr;
 	AstNode *         init_expr;
+	Array<AstNode *>  init_expr_list;
 	AstNode *         proc_lit;      // AstNode_ProcLit
 	Type *            gen_proc_type; // Precalculated
 
-	Map<bool>         deps; // Key: Entity *
+	PtrSet<Entity *>  deps;
 	Array<BlockLabel> labels;
 };
 
@@ -273,6 +274,69 @@ struct CheckerFileNode {
 	i32        score; // Higher the score, the better
 };
 
+struct GraphNode;
+typedef PtrSet<GraphNode *> GraphNodeSet;
+
+void graph_node_set_destroy(GraphNodeSet *s) {
+	if (s->hashes.data != nullptr) {
+		ptr_set_destroy(s);
+	}
+}
+
+void graph_node_set_add(GraphNodeSet *s, GraphNode *n) {
+	if (s->hashes.data == nullptr) {
+		ptr_set_init(s, heap_allocator());
+	}
+	ptr_set_add(s, n);
+}
+
+bool graph_node_set_exists(GraphNodeSet *s, GraphNode *n) {
+	return ptr_set_exists(s, n);
+}
+
+void graph_node_set_remove(GraphNodeSet *s, GraphNode *n) {
+	ptr_set_remove(s, n);
+}
+
+
+struct GraphNode {
+	Entity *     entity; // Procedure, Variable, Constant
+	GraphNodeSet pred;
+	GraphNodeSet succ;
+	isize        index; // Index in array/queue
+	isize        dep_count;
+};
+
+
+void graph_node_destroy(GraphNode *n, gbAllocator a) {
+	graph_node_set_destroy(&n->pred);
+	graph_node_set_destroy(&n->succ);
+	gb_free(a, n);
+}
+
+
+int graph_node_cmp(GraphNode **data, isize i, isize j) {
+	GraphNode *x = data[i];
+	GraphNode *y = data[j];
+	isize a = x->entity->order_in_src;
+	isize b = y->entity->order_in_src;
+	if (x->dep_count < y->dep_count) return -1;
+	if (x->dep_count > y->dep_count) return +1;
+	return a < b ? -1 : b > a;
+}
+
+void graph_node_swap(GraphNode **data, isize i, isize j) {
+	GraphNode *x = data[i];
+	GraphNode *y = data[j];
+	data[i] = y;
+	data[j] = x;
+	x->index = j;
+	y->index = i;
+}
+
+
+
+
 struct CheckerContext {
 	Scope *    file_scope;
 	Scope *    scope;
@@ -303,8 +367,15 @@ struct CheckerInfo {
 	Map<DeclInfo *>       entities;        // Key: Entity *
 	Map<Entity *>         foreigns;        // Key: String
 	Map<AstFile *>        files;           // Key: String (full path)
+	Array<DeclInfo *>     variable_init_order;
+
+
 	Map<isize>            type_info_map;   // Key: Type *
 	isize                 type_info_count;
+
+	Entity *              entry_point;
+	PtrSet<Entity *>      minimum_dependency_map;
+
 };
 
 struct Checker {
@@ -372,8 +443,8 @@ void add_implicit_entity(Checker *c, AstNode *node, Entity *e);
 void init_declaration_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	d->parent = parent;
 	d->scope  = scope;
-	map_init(&d->deps, heap_allocator());
-	array_init(&d->labels,  heap_allocator());
+	ptr_set_init(&d->deps,                heap_allocator());
+	array_init  (&d->labels,              heap_allocator());
 }
 
 DeclInfo *make_declaration_info(gbAllocator a, Scope *scope, DeclInfo *parent) {
@@ -383,7 +454,8 @@ DeclInfo *make_declaration_info(gbAllocator a, Scope *scope, DeclInfo *parent) {
 }
 
 void destroy_declaration_info(DeclInfo *d) {
-	map_destroy(&d->deps);
+	ptr_set_destroy(&d->deps);
+	array_free(&d->labels);
 }
 
 bool decl_info_has_init(DeclInfo *d) {
@@ -626,7 +698,7 @@ void check_scope_usage(Checker *c, Scope *scope) {
 
 
 void add_dependency(DeclInfo *d, Entity *e) {
-	map_set(&d->deps, hash_entity(e), cast(bool)true);
+	ptr_set_add(&d->deps, e);
 }
 
 void add_declaration_dependency(Checker *c, Entity *e) {
@@ -634,10 +706,8 @@ void add_declaration_dependency(Checker *c, Entity *e) {
 		return;
 	}
 	if (c->context.decl != nullptr) {
-		DeclInfo **found = map_get(&c->info.entities, hash_entity(e));
-		if (found) {
-			add_dependency(c->context.decl, e);
-		}
+		DeclInfo *decl = decl_info_of_entity(&c->info, e);
+		if (decl) add_dependency(c->context.decl, e);
 	}
 }
 
@@ -744,8 +814,9 @@ void init_checker_info(CheckerInfo *i) {
 	map_init(&i->gen_types,     a);
 	map_init(&i->type_info_map, a);
 	map_init(&i->files,         a);
-	i->type_info_count = 0;
+	array_init(&i->variable_init_order, a);
 
+	i->type_info_count = 0;
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -761,6 +832,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->gen_types);
 	map_destroy(&i->type_info_map);
 	map_destroy(&i->files);
+	array_free(&i->variable_init_order);
 }
 
 
@@ -1049,6 +1121,7 @@ void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclIn
 	if (e->scope != nullptr) add_entity(c, e->scope, identifier, e);
 	add_entity_definition(&c->info, identifier, e);
 	map_set(&c->info.entities, hash_entity(e), d);
+	e->order_in_src = c->info.entities.entries.count;
 }
 
 
@@ -1253,7 +1326,7 @@ void add_curr_ast_file(Checker *c, AstFile *file) {
 }
 
 
-void add_dependency_to_map(Map<Entity *> *map, CheckerInfo *info, Entity *entity) {
+void add_dependency_to_map(PtrSet<Entity *> *map, CheckerInfo *info, Entity *entity) {
 	if (entity == nullptr) {
 		return;
 	}
@@ -1265,26 +1338,23 @@ void add_dependency_to_map(Map<Entity *> *map, CheckerInfo *info, Entity *entity
 		}
 	}
 
-	if (map_get(map, hash_entity(entity)) != nullptr) {
+	if (ptr_set_exists(map, entity)) {
 		return;
 	}
-	map_set(map, hash_entity(entity), entity);
 
-
+	ptr_set_add(map, entity);
 	DeclInfo *decl = decl_info_of_entity(info, entity);
-	if (decl == nullptr) {
-		return;
-	}
-
-	for_array(i, decl->deps.entries) {
-		Entity *e = cast(Entity *)decl->deps.entries[i].key.ptr;
-		add_dependency_to_map(map, info, e);
+	if (decl != nullptr) {
+		for_array(i, decl->deps.entries) {
+			Entity *e = decl->deps.entries[i].ptr;
+			add_dependency_to_map(map, info, e);
+		}
 	}
 }
 
-Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
-	Map<Entity *> map = {}; // Key: Entity *
-	map_init(&map, heap_allocator());
+PtrSet<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
+	PtrSet<Entity *> map = {}; // Key: Entity *
+	ptr_set_init(&map, heap_allocator());
 
 	for_array(i, info->definitions.entries) {
 		Entity *e = info->definitions.entries[i].value;
@@ -1309,8 +1379,101 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 	return map;
 }
 
-bool is_entity_in_dependency_map(Map<Entity *> *map, Entity *e) {
-	return map_get(map, hash_entity(e)) != nullptr;
+bool is_entity_a_dependency(Entity *e) {
+	if (e == nullptr) return false;
+	switch (e->kind) {
+	case Entity_Procedure:
+	case Entity_Variable:
+	case Entity_Constant:
+		return true;
+	}
+	return false;
+}
+
+Array<GraphNode *> generate_dependency_graph(CheckerInfo *info) {
+	gbAllocator a = heap_allocator();
+
+	Map<GraphNode *> M = {}; // Key: Entity *
+	map_init(&M, a);
+	defer (map_destroy(&M));
+	for_array(i, info->entities.entries) {
+		auto *entry = &info->entities.entries[i];
+		Entity *  e = cast(Entity *)entry->key.ptr;
+		DeclInfo *d = entry->value;
+		if (is_entity_a_dependency(e)) {
+			GraphNode *n = gb_alloc_item(a, GraphNode);
+			n->entity = e;
+			map_set(&M, hash_pointer(e), n);
+		}
+	}
+
+
+	// Calculate edges for graph M
+	for_array(i, M.entries) {
+		Entity *   e = cast(Entity *)M.entries[i].key.ptr;
+		GraphNode *n = M.entries[i].value;
+
+		DeclInfo *decl = decl_info_of_entity(info, e);
+		if (decl != nullptr) {
+			for_array(j, decl->deps.entries) {
+				auto entry = decl->deps.entries[j];
+				Entity *dep = entry.ptr;
+				if (dep && is_entity_a_dependency(dep)) {
+					GraphNode **m_ = map_get(&M, hash_pointer(dep));
+					if (m_ != nullptr) {
+						GraphNode *m = *m_;
+						graph_node_set_add(&n->succ, m);
+						graph_node_set_add(&m->pred, n);
+					}
+				}
+			}
+		}
+	}
+
+	Array<GraphNode *> G = {};
+	array_init(&G, a);
+
+	for_array(i, M.entries) {
+		auto *entry = &M.entries[i];
+		Entity *   e = cast(Entity *)entry->key.ptr;
+		GraphNode *n = entry->value;
+
+		if (e->kind == Entity_Procedure) {
+			// Connect each pred `p` of `n` with each succ `s` and frop
+			// the procedure node
+			for_array(j, n->pred.entries) {
+				GraphNode *p = cast(GraphNode *)n->pred.entries[j].ptr;
+
+				// Ignore self-cycles
+				if (p != n) {
+					// Each succ `s` of `n` becomes a succ of `p`, and
+					// each pred `p` of `n` becomes a pred of `s`
+					for_array(k, n->succ.entries) {
+						GraphNode *s = n->succ.entries[k].ptr;
+						// Ignore self-cycles
+						if (s != n) {
+							graph_node_set_add(&p->succ, s);
+							graph_node_set_add(&s->pred, p);
+							// Remove edge to `n`
+							graph_node_set_remove(&s->pred, n);
+						}
+					}
+					// Remove edge to `n`
+					graph_node_set_remove(&p->succ, n);
+				}
+			}
+		} else {
+			array_add(&G, n);
+		}
+	}
+
+	for_array(i, G) {
+		GraphNode *n = G[i];
+		n->index = i;
+		n->dep_count = n->succ.entries.count;
+	}
+
+	return G;
 }
 
 
@@ -1668,12 +1831,14 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					di->entities = entities;
 					di->type_expr = vd->type;
 					di->init_expr = vd->values[0];
+					di->init_expr_list = vd->values;
 
 
 					if (vd->flags & VarDeclFlag_thread_local) {
 						error(decl, "#thread_local variable declarations cannot have initialization values");
 					}
 				}
+
 
 
 				for_array(i, vd->names) {
@@ -1705,7 +1870,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					entities[entity_count++] = e;
 
 					DeclInfo *d = di;
-					if (d == nullptr) {
+					if (d == nullptr || i > 0) {
 						AstNode *init_expr = value;
 						d = make_declaration_info(heap_allocator(), e->scope, c->context.decl);
 						d->type_expr = vd->type;
@@ -1717,6 +1882,10 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 
 				if (di != nullptr) {
 					di->entity_count = entity_count;
+				}
+
+				if (vd->values.count > 0 && entity_count != vd->values.count) {
+					error(decl, "Variable declarations in the global scope can only declare 1 variable at a time");
 				}
 
 				check_arity_match(c, vd);
@@ -2271,6 +2440,134 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 	}
 }
 
+Array<Entity *> find_entity_path(Map<DeclInfo *> *map, Entity *start, Entity *end, Map<Entity *> *visited = nullptr) {
+	Map<Entity *> visited_ = {};
+	bool made_visited = false;
+	if (visited == nullptr) {
+		made_visited = true;
+		map_init(&visited_, heap_allocator());
+		visited = &visited_;
+	}
+	defer (if (made_visited) {
+		map_destroy(&visited_);
+	});
+
+	Array<Entity *> empty_path = {};
+
+	HashKey key = hash_pointer(start);
+
+	if (map_get(visited, key) != nullptr) {
+		return empty_path;
+	}
+	map_set(visited, key, start);
+
+	DeclInfo **found = map_get(map, key);
+	if (found) {
+		DeclInfo *decl = *found;
+		for_array(i, decl->deps.entries) {
+			Entity *dep = decl->deps.entries[i].ptr;
+			if (dep == end) {
+				Array<Entity *> path = {};
+				array_init(&path, heap_allocator());
+				array_add(&path, dep);
+				return path;
+			}
+			Array<Entity *> next_path = find_entity_path(map, dep, end, visited);
+			if (next_path.count > 0) {
+				array_add(&next_path, dep);
+				return next_path;
+			}
+		}
+	}
+	return empty_path;
+}
+
+
+void calculate_variable_init_order(Checker *c) {
+	CheckerInfo *info = &c->info;
+	auto *m = &info->entities;
+
+	Array<GraphNode *> dep_graph = generate_dependency_graph(info);
+	defer ({
+		for_array(i, dep_graph) {
+			graph_node_destroy(dep_graph[i], heap_allocator());
+		}
+		array_free(&dep_graph);
+	});
+
+	// NOTE(bill): Priority queue
+	auto pq = priority_queue_create(dep_graph, graph_node_cmp, graph_node_swap);
+
+	PtrSet<DeclInfo *> emitted = {};
+	ptr_set_init(&emitted, heap_allocator());
+	defer (ptr_set_destroy(&emitted));
+
+	while (pq.queue.count > 0) {
+		GraphNode *n = priority_queue_pop(&pq);
+		Entity *e = n->entity;
+
+		if (n->dep_count > 0) {
+			// TODO(bill): print out the cyclic initialization order
+			auto path = find_entity_path(m, e, e);
+			defer (array_free(&path));
+
+			if (path.count > 0) {
+				Entity *e = path[0];
+				error(e->token, "Cyclic initialization of `%.*s`", LIT(e->token.string));
+				for (isize i = path.count-1; i >= 0; i--) {
+					error(e->token, "\t`%.*s` refers to", LIT(e->token.string));
+					e = path[i];
+				}
+				error(e->token, "\t`%.*s`", LIT(e->token.string));
+			}
+		}
+
+		for_array(i, n->pred.entries) {
+			GraphNode *p = n->pred.entries[i].ptr;
+			p->dep_count -= 1;
+			priority_queue_fix(&pq, p->index);
+		}
+
+		if (e == nullptr || e->kind != Entity_Variable) {
+			continue;
+		}
+		DeclInfo *d = decl_info_of_entity(info, e);
+
+		// if (!decl_info_has_init(d)) {
+		// 	continue;
+		// }
+
+		if (ptr_set_exists(&emitted, d)) {
+			continue;
+		}
+		ptr_set_add(&emitted, d);
+
+		// TODO(bill): add to init order
+
+		if (d->entities == nullptr) {
+			d->entities = gb_alloc_array(c->allocator, Entity *, 1);
+			d->entities[0] = e;
+			d->entity_count = 1;
+		}
+		array_add(&info->variable_init_order, d);
+	}
+
+	if (false) {
+		gb_printf("Variable Initialization Order:\n");
+		for_array(i, info->variable_init_order) {
+			DeclInfo *d = info->variable_init_order[i];
+			for (isize j = 0; j < d->entity_count; j++) {
+				Entity *e = d->entities[j];
+				if (j == 0) gb_printf("\t");
+				if (j > 0) gb_printf(", ");
+				gb_printf("`%.*s` %td", LIT(e->token.string), e->order_in_src);
+			}
+			gb_printf("\n");
+		}
+		gb_printf("\n");
+	}
+}
+
 
 void check_parsed_files(Checker *c) {
 	Map<Scope *> file_scopes; // Key: String (fullpath)
@@ -2354,6 +2651,25 @@ void check_parsed_files(Checker *c) {
 
 		check_proc_body(c, pi->token, pi->decl, pi->type, pi->body);
 	}
+
+	{
+		for_array(i, c->info.entities.entries) {
+			auto *entry = &c->info.entities.entries[i];
+			Entity *e = cast(Entity *)entry->key.ptr;
+			String name = e->token.string;
+			if (e->kind == Entity_Procedure && !e->scope->is_global) {
+				if (e->scope->is_init && name == "main") {
+					c->info.entry_point = e;
+					break;
+				}
+			}
+		}
+		c->info.minimum_dependency_map = generate_minimum_dependency_map(&c->info, c->info.entry_point);
+	}
+
+	// Calculate initialization order of global variables
+	calculate_variable_init_order(c);
+
 
 	// Add untyped expression values
 	for_array(i, c->info.untyped.entries) {

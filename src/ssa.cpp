@@ -159,7 +159,7 @@ struct ssaModule {
 	gbAllocator        tmp_allocator;
 	gbArena            tmp_arena;
 
-	Map<Entity *>      min_dep_map; // Key: Entity *
+	PtrSet<Entity *>   min_dep_map;
 	Map<ssaValue *>    values;      // Key: Entity *
 	// List of registers for the specific architecture
 	Array<ssaRegister> registers;
@@ -2464,7 +2464,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 			continue;
 		}
 
-		if (map_get(&m.min_dep_map, hash_pointer(e)) == nullptr) {
+		if (!ptr_set_exists(&m.min_dep_map, e)) {
 			// NOTE(bill): Nothing depends upon it so doesn't need to be built
 			continue;
 		}
