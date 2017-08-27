@@ -825,7 +825,7 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 		is_using = false;
 	}
 
-	bool arity_ok = check_arity_match(c, vd, false);
+	bool arity_ok = check_arity_match(c, vd);
 
 	if (vd->values.count > 0 && !allow_default_values) {
 		error(vd->values[0], "Default values are not allowed within a %.*s", LIT(context));

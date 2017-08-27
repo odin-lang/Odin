@@ -4946,6 +4946,8 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 						}
 					}
 
+					import_file = string_trim_whitespace(import_file);
+
 					id->fullpath = import_file;
 					try_add_import_path(p, import_file, file_str, ast_node_token(node).pos);
 				}

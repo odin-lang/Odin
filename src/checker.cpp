@@ -227,7 +227,8 @@ struct Scope {
 	Map<bool>        implicit; // Key: Entity *
 
 	Array<Scope *>   shared;
-	Array<Scope *>   imported;
+	PtrSet<Scope *>  import_succ;
+	PtrSet<Scope *>  imported;
 	bool             is_proc;
 	bool             is_global;
 	bool             is_file;
@@ -246,7 +247,8 @@ void scope_reset(Scope *scope) {
 	map_clear  (&scope->elements);
 	map_clear  (&scope->implicit);
 	array_clear(&scope->shared);
-	array_clear(&scope->imported);
+	ptr_set_clear(&scope->import_succ);
+	ptr_set_clear(&scope->imported);
 }
 
 i32 is_scope_an_ancestor(Scope *parent, Scope *child) {
@@ -267,57 +269,50 @@ struct DelayedDecl {
 	AstNode *decl;
 };
 
-struct CheckerFileNode {
-	isize      id;
-	Array<i32> wheres;
-	Array<i32> whats;
-	i32        score; // Higher the score, the better
-};
+struct EntityGraphNode;
+typedef PtrSet<EntityGraphNode *> EntityGraphNodeSet;
 
-struct GraphNode;
-typedef PtrSet<GraphNode *> GraphNodeSet;
-
-void graph_node_set_destroy(GraphNodeSet *s) {
+void entity_graph_node_set_destroy(EntityGraphNodeSet *s) {
 	if (s->hashes.data != nullptr) {
 		ptr_set_destroy(s);
 	}
 }
 
-void graph_node_set_add(GraphNodeSet *s, GraphNode *n) {
+void entity_graph_node_set_add(EntityGraphNodeSet *s, EntityGraphNode *n) {
 	if (s->hashes.data == nullptr) {
 		ptr_set_init(s, heap_allocator());
 	}
 	ptr_set_add(s, n);
 }
 
-bool graph_node_set_exists(GraphNodeSet *s, GraphNode *n) {
+bool entity_graph_node_set_exists(EntityGraphNodeSet *s, EntityGraphNode *n) {
 	return ptr_set_exists(s, n);
 }
 
-void graph_node_set_remove(GraphNodeSet *s, GraphNode *n) {
+void entity_graph_node_set_remove(EntityGraphNodeSet *s, EntityGraphNode *n) {
 	ptr_set_remove(s, n);
 }
 
 
-struct GraphNode {
+struct EntityGraphNode {
 	Entity *     entity; // Procedure, Variable, Constant
-	GraphNodeSet pred;
-	GraphNodeSet succ;
+	EntityGraphNodeSet pred;
+	EntityGraphNodeSet succ;
 	isize        index; // Index in array/queue
 	isize        dep_count;
 };
 
 
-void graph_node_destroy(GraphNode *n, gbAllocator a) {
-	graph_node_set_destroy(&n->pred);
-	graph_node_set_destroy(&n->succ);
+void entity_graph_node_destroy(EntityGraphNode *n, gbAllocator a) {
+	entity_graph_node_set_destroy(&n->pred);
+	entity_graph_node_set_destroy(&n->succ);
 	gb_free(a, n);
 }
 
 
-int graph_node_cmp(GraphNode **data, isize i, isize j) {
-	GraphNode *x = data[i];
-	GraphNode *y = data[j];
+int entity_graph_node_cmp(EntityGraphNode **data, isize i, isize j) {
+	EntityGraphNode *x = data[i];
+	EntityGraphNode *y = data[j];
 	isize a = x->entity->order_in_src;
 	isize b = y->entity->order_in_src;
 	if (x->dep_count < y->dep_count) return -1;
@@ -325,15 +320,14 @@ int graph_node_cmp(GraphNode **data, isize i, isize j) {
 	return a < b ? -1 : b > a;
 }
 
-void graph_node_swap(GraphNode **data, isize i, isize j) {
-	GraphNode *x = data[i];
-	GraphNode *y = data[j];
+void entity_graph_node_swap(EntityGraphNode **data, isize i, isize j) {
+	EntityGraphNode *x = data[i];
+	EntityGraphNode *y = data[j];
 	data[i] = y;
 	data[j] = x;
 	x->index = j;
 	y->index = i;
 }
-
 
 
 
@@ -388,7 +382,6 @@ struct Checker {
 	Map<ProcedureInfo>         procs; // Key: DeclInfo *
 	Array<DelayedDecl>         delayed_imports;
 	Array<DelayedDecl>         delayed_foreign_libraries;
-	Array<CheckerFileNode>     file_nodes;
 
 	Pool                       pool;
 	gbAllocator                allocator;
@@ -485,7 +478,8 @@ Scope *make_scope(Scope *parent, gbAllocator allocator) {
 	map_init(&s->elements,   heap_allocator());
 	map_init(&s->implicit,   heap_allocator());
 	array_init(&s->shared,   heap_allocator());
-	array_init(&s->imported, heap_allocator());
+	ptr_set_init(&s->imported, heap_allocator());
+	ptr_set_init(&s->import_succ, heap_allocator());
 
 	if (parent != nullptr && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
@@ -512,7 +506,8 @@ void destroy_scope(Scope *scope) {
 	map_destroy(&scope->elements);
 	map_destroy(&scope->implicit);
 	array_free(&scope->shared);
-	array_free(&scope->imported);
+	ptr_set_destroy(&scope->imported);
+	ptr_set_destroy(&scope->import_succ);
 
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
 }
@@ -851,16 +846,6 @@ void init_checker(Checker *c, Parser *parser) {
 	map_init(&c->procs, a);
 	array_init(&c->delayed_imports, a);
 	array_init(&c->delayed_foreign_libraries, a);
-	array_init(&c->file_nodes, a);
-
-	for_array(i, parser->files) {
-		AstFile *file = &parser->files[i];
-		CheckerFileNode node = {};
-		node.id = file->id;
-		array_init(&node.whats,  a);
-		array_init(&node.wheres, a);
-		array_add(&c->file_nodes, node);
-	}
 
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
@@ -890,7 +875,6 @@ void destroy_checker(Checker *c) {
 	map_destroy(&c->procs);
 	array_free(&c->delayed_imports);
 	array_free(&c->delayed_foreign_libraries);
-	array_free(&c->file_nodes);
 
 	pool_destroy(&c->pool);
 	gb_arena_free(&c->tmp_arena);
@@ -1390,10 +1374,10 @@ bool is_entity_a_dependency(Entity *e) {
 	return false;
 }
 
-Array<GraphNode *> generate_dependency_graph(CheckerInfo *info) {
+Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 	gbAllocator a = heap_allocator();
 
-	Map<GraphNode *> M = {}; // Key: Entity *
+	Map<EntityGraphNode *> M = {}; // Key: Entity *
 	map_init(&M, a);
 	defer (map_destroy(&M));
 	for_array(i, info->entities.entries) {
@@ -1401,7 +1385,7 @@ Array<GraphNode *> generate_dependency_graph(CheckerInfo *info) {
 		Entity *  e = cast(Entity *)entry->key.ptr;
 		DeclInfo *d = entry->value;
 		if (is_entity_a_dependency(e)) {
-			GraphNode *n = gb_alloc_item(a, GraphNode);
+			EntityGraphNode *n = gb_alloc_item(a, EntityGraphNode);
 			n->entity = e;
 			map_set(&M, hash_pointer(e), n);
 		}
@@ -1411,7 +1395,7 @@ Array<GraphNode *> generate_dependency_graph(CheckerInfo *info) {
 	// Calculate edges for graph M
 	for_array(i, M.entries) {
 		Entity *   e = cast(Entity *)M.entries[i].key.ptr;
-		GraphNode *n = M.entries[i].value;
+		EntityGraphNode *n = M.entries[i].value;
 
 		DeclInfo *decl = decl_info_of_entity(info, e);
 		if (decl != nullptr) {
@@ -1419,47 +1403,47 @@ Array<GraphNode *> generate_dependency_graph(CheckerInfo *info) {
 				auto entry = decl->deps.entries[j];
 				Entity *dep = entry.ptr;
 				if (dep && is_entity_a_dependency(dep)) {
-					GraphNode **m_ = map_get(&M, hash_pointer(dep));
+					EntityGraphNode **m_ = map_get(&M, hash_pointer(dep));
 					if (m_ != nullptr) {
-						GraphNode *m = *m_;
-						graph_node_set_add(&n->succ, m);
-						graph_node_set_add(&m->pred, n);
+						EntityGraphNode *m = *m_;
+						entity_graph_node_set_add(&n->succ, m);
+						entity_graph_node_set_add(&m->pred, n);
 					}
 				}
 			}
 		}
 	}
 
-	Array<GraphNode *> G = {};
+	Array<EntityGraphNode *> G = {};
 	array_init(&G, a);
 
 	for_array(i, M.entries) {
 		auto *entry = &M.entries[i];
 		Entity *   e = cast(Entity *)entry->key.ptr;
-		GraphNode *n = entry->value;
+		EntityGraphNode *n = entry->value;
 
 		if (e->kind == Entity_Procedure) {
-			// Connect each pred `p` of `n` with each succ `s` and frop
+			// Connect each pred `p` of `n` with each succ `s` and from
 			// the procedure node
 			for_array(j, n->pred.entries) {
-				GraphNode *p = cast(GraphNode *)n->pred.entries[j].ptr;
+				EntityGraphNode *p = cast(EntityGraphNode *)n->pred.entries[j].ptr;
 
 				// Ignore self-cycles
 				if (p != n) {
 					// Each succ `s` of `n` becomes a succ of `p`, and
 					// each pred `p` of `n` becomes a pred of `s`
 					for_array(k, n->succ.entries) {
-						GraphNode *s = n->succ.entries[k].ptr;
+						EntityGraphNode *s = n->succ.entries[k].ptr;
 						// Ignore self-cycles
 						if (s != n) {
-							graph_node_set_add(&p->succ, s);
-							graph_node_set_add(&s->pred, p);
+							entity_graph_node_set_add(&p->succ, s);
+							entity_graph_node_set_add(&s->pred, p);
 							// Remove edge to `n`
-							graph_node_set_remove(&s->pred, n);
+							entity_graph_node_set_remove(&s->pred, n);
 						}
 					}
 					// Remove edge to `n`
-					graph_node_set_remove(&p->succ, n);
+					entity_graph_node_set_remove(&p->succ, n);
 				}
 			}
 		} else {
@@ -1468,7 +1452,7 @@ Array<GraphNode *> generate_dependency_graph(CheckerInfo *info) {
 	}
 
 	for_array(i, G) {
-		GraphNode *n = G[i];
+		EntityGraphNode *n = G[i];
 		n->index = i;
 		n->dep_count = n->succ.entries.count;
 	}
@@ -1604,7 +1588,7 @@ void init_preload(Checker *c) {
 
 
 
-bool check_arity_match(Checker *c, AstNodeValueDecl *vd, bool is_global);
+bool check_arity_match(Checker *c, AstNodeValueDecl *vd, bool is_global = false);
 void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_scope);
 void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, bool is_file_scope);
 
@@ -2188,207 +2172,370 @@ String path_to_entity_name(String name, String fullpath) {
 	}
 }
 
-void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
-#if 0
-	// TODO(bill): Dependency ordering for imports
-	{
-		Array_i32 shared_global_file_ids = {};
-		array_init_reserve(&shared_global_file_ids, heap_allocator(), c->file_nodes.count);
-		for_array(i, c->file_nodes) {
-			CheckerFileNode *node = &c->file_nodes[i];
-			AstFile *f = &c->parser->files[node->id];
-			GB_ASSERT(f->id == node->id);
-			if (f->scope->is_global) {
-				array_add(&shared_global_file_ids, f->id);
-			}
-		}
 
-		for_array(i, c->file_nodes) {
-			CheckerFileNode *node = &c->file_nodes[i];
-			AstFile *f = &c->parser->files[node->id];
-			if (!f->scope->is_global) {
-				for_array(j, shared_global_file_ids) {
-					array_add(&node->whats, shared_global_file_ids[j]);
-				}
-			}
-		}
 
-		array_free(&shared_global_file_ids);
+
+
+struct ImportGraphNode;
+typedef PtrSet<ImportGraphNode *> ImportGraphNodeSet;
+
+void import_graph_node_set_destroy(ImportGraphNodeSet *s) {
+	if (s->hashes.data != nullptr) {
+		ptr_set_destroy(s);
+	}
+}
+
+void import_graph_node_set_add(ImportGraphNodeSet *s, ImportGraphNode *n) {
+	if (s->hashes.data == nullptr) {
+		ptr_set_init(s, heap_allocator());
+	}
+	ptr_set_add(s, n);
+}
+
+bool import_graph_node_set_exists(ImportGraphNodeSet *s, ImportGraphNode *n) {
+	return ptr_set_exists(s, n);
+}
+
+void import_graph_node_set_remove(ImportGraphNodeSet *s, ImportGraphNode *n) {
+	ptr_set_remove(s, n);
+}
+
+struct ImportGraphNode {
+	Scope *            scope;
+	Array<AstNode *>   specs;
+	String             path;
+	isize              file_id;
+	ImportGraphNodeSet pred;
+	ImportGraphNodeSet succ;
+	isize              index; // Index in array/queue
+	isize              dep_count;
+};
+
+ImportGraphNode *import_graph_node_create(gbAllocator a, Scope *scope) {
+	ImportGraphNode *n = gb_alloc_item(a, ImportGraphNode);
+	n->scope   = scope;
+	n->path    = scope->file->tokenizer.fullpath;
+	n->file_id = scope->file->id;
+	array_init(&n->specs, heap_allocator());
+	return n;
+}
+
+
+void import_graph_node_destroy(ImportGraphNode *n, gbAllocator a) {
+	import_graph_node_set_destroy(&n->pred);
+	import_graph_node_set_destroy(&n->succ);
+	gb_free(a, n);
+}
+
+
+int import_graph_node_cmp(ImportGraphNode **data, isize i, isize j) {
+	ImportGraphNode *x = data[i];
+	ImportGraphNode *y = data[j];
+	GB_ASSERT(x != y);
+
+	GB_ASSERT(x->scope != y->scope);
+
+	bool xg = x->scope->is_global;
+	bool yg = y->scope->is_global;
+	if (xg != yg) return xg ? -1 : +1;
+	if (x->dep_count < y->dep_count) return -1;
+	if (x->dep_count > y->dep_count) return +1;
+	return 0;
+}
+
+void import_graph_node_swap(ImportGraphNode **data, isize i, isize j) {
+	ImportGraphNode *x = data[i];
+	ImportGraphNode *y = data[j];
+	data[i] = y;
+	data[j] = x;
+	x->index = j;
+	y->index = i;
+}
+
+GB_COMPARE_PROC(ast_node_cmp) {
+	AstNode *x = *cast(AstNode **)a;
+	AstNode *y = *cast(AstNode **)b;
+	Token i = ast_node_token(x);
+	Token j = ast_node_token(y);
+	return token_pos_cmp(i.pos, j.pos);
+}
+
+
+Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c, Map<Scope *> *file_scopes) {
+	gbAllocator a = heap_allocator();
+
+	Map<ImportGraphNode *> M = {}; // Key: Scope *
+	map_init(&M, a);
+	defer (map_destroy(&M));
+
+	for_array(i, c->parser->files) {
+		Scope *scope = c->parser->files[i].scope;
+
+		ImportGraphNode *n = import_graph_node_create(heap_allocator(), scope);
+		map_set(&M, hash_pointer(scope), n);
 	}
 
+
+	// Calculate edges for graph M
 	for_array(i, c->delayed_imports) {
-		Scope *parent_scope = c->delayed_imports[i].parent;
+		Scope *parent = c->delayed_imports[i].parent;
 		AstNode *decl = c->delayed_imports[i].decl;
-		ast_node(id, ImportDecl, decl);
-		Token token = id->relpath;
+		GB_ASSERT(parent->is_file);
 
-		GB_ASSERT(parent_scope->is_file);
-
-		if (!parent_scope->has_been_imported) {
-			continue;
-		}
-
-		HashKey key = hash_string(id->fullpath);
-		Scope **found = map_get(file_scopes, key);
-		if (found == nullptr) {
-			for_array(scope_index, file_scopes->entries) {
-				Scope *scope = file_scopes->entries[scope_index].value;
-				gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
-			}
-			gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
-			GB_PANIC("Unable to find scope for file: %.*s", LIT(id->fullpath));
-		}
-		Scope *scope = *found;
-
-		if (scope->is_global) {
-			continue;
-		}
-
-		i32 parent_id = parent_scope->file->id;
-		i32 child_id  = scope->file->id;
-
-		// TODO(bill): Very slow
-		CheckerFileNode *parent_node = &c->file_nodes[parent_id];
-		bool add_child = true;
-		for_array(j, parent_node->whats) {
-			if (parent_node->whats[j] == child_id) {
-				add_child = false;
-				break;
-			}
-		}
-		if (add_child) {
-			array_add(&parent_node->whats, child_id);
-		}
-
-		CheckerFileNode *child_node  = &c->file_nodes[child_id];
-		bool add_parent = true;
-		for_array(j, parent_node->wheres) {
-			if (parent_node->wheres[j] == parent_id) {
-				add_parent = false;
-				break;
-			}
-		}
-		if (add_parent) {
-			array_add(&child_node->wheres, parent_id);
-		}
-	}
-
-	for_array(i, c->file_nodes) {
-		CheckerFileNode *node = &c->file_nodes[i];
-		AstFile *f = &c->parser->files[node->id];
-		gb_printf_err("File %d %.*s", node->id, LIT(f->tokenizer.fullpath));
-		gb_printf_err("\n  wheres:");
-		for_array(j, node->wheres) {
-			gb_printf_err(" %d", node->wheres[j]);
-		}
-		gb_printf_err("\n  whats:");
-		for_array(j, node->whats) {
-			gb_printf_err(" %d", node->whats[j]);
-		}
-		gb_printf_err("\n");
-	}
-#endif
-
-	for_array(i, c->delayed_imports) {
-		Scope *parent_scope = c->delayed_imports[i].parent;
-		AstNode *decl = c->delayed_imports[i].decl;
 		ast_node(id, ImportSpec, decl);
-		Token token = id->relpath;
 
-		GB_ASSERT(parent_scope->is_file);
-
-		if (!parent_scope->has_been_imported) {
-			continue;
-		}
-
-		HashKey key = hash_string(id->fullpath);
+		String path = id->fullpath;
+		HashKey key = hash_string(path);
 		Scope **found = map_get(file_scopes, key);
 		if (found == nullptr) {
 			for_array(scope_index, file_scopes->entries) {
 				Scope *scope = file_scopes->entries[scope_index].value;
 				gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
 			}
+			Token token = ast_node_token(decl);
 			gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
-			GB_PANIC("Unable to find scope for file: %.*s", LIT(id->fullpath));
+			GB_PANIC("Unable to find scope for file: %.*s", LIT(path));
 		}
 		Scope *scope = *found;
+		GB_ASSERT(scope != nullptr);
 
-		if (scope->is_global) {
-			error(token, "Importing a #shared_global_scope is disallowed and unnecessary");
+		ImportGraphNode *m = nullptr;
+		ImportGraphNode *n  = nullptr;
+
+		ImportGraphNode **found_node = map_get(&M, hash_pointer(parent));
+		GB_ASSERT(found_node != nullptr);
+		m = *found_node;
+
+		found_node = map_get(&M, hash_pointer(scope));
+		GB_ASSERT(found_node != nullptr);
+		n = *found_node;
+
+		array_add(&m->specs, decl);
+
+		bool is_dot_or_load = id->import_name.string == ".";
+		if (is_dot_or_load) {
+			import_graph_node_set_add(&n->pred, m);
+			import_graph_node_set_add(&m->succ, n);
+			ptr_set_add(&m->scope->imported, n->scope);
+		}
+	}
+
+	Array<ImportGraphNode *> G = {};
+	array_init(&G, a);
+
+	for_array(i, M.entries) {
+		auto *entry = &M.entries[i];
+		ImportGraphNode *n = entry->value;
+		gb_sort_array(n->specs.data, n->specs.count, ast_node_cmp);
+		array_add(&G, n);
+	}
+
+	for_array(i, G) {
+		ImportGraphNode *n = G[i];
+		n->index = i;
+		n->dep_count = n->succ.entries.count;
+	}
+
+	return G;
+}
+
+
+Array<Scope *> find_import_path(Map<Scope *> *map, Scope *start, Scope *end, PtrSet<Scope *> *visited = nullptr) {
+	PtrSet<Scope *> visited_ = {};
+	bool made_visited = false;
+	if (visited == nullptr) {
+		made_visited = true;
+		ptr_set_init(&visited_, heap_allocator());
+		visited = &visited_;
+	}
+	defer (if (made_visited) {
+		ptr_set_destroy(&visited_);
+	});
+
+	Array<Scope *> empty_path = {};
+
+	if (ptr_set_exists(visited, start)) {
+		return empty_path;
+	}
+	ptr_set_add(visited, start);
+
+	String path = start->file->tokenizer.fullpath;
+	HashKey key = hash_string(path);
+	Scope **found = map_get(map, key);
+	if (found) {
+		Scope *scope = *found;
+		for_array(i, scope->imported.entries) {
+			Scope *dep = scope->imported.entries[i].ptr;
+			if (dep == end) {
+				Array<Scope *> path = {};
+				array_init(&path, heap_allocator());
+				array_add(&path, dep);
+				return path;
+			}
+			Array<Scope *> next_path = find_import_path(map, dep, end, visited);
+			if (next_path.count > 0) {
+				array_add(&next_path, dep);
+				return next_path;
+			}
+		}
+	}
+	return empty_path;
+}
+
+void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
+	Array<ImportGraphNode *> dep_graph = generate_import_dependency_graph(c, file_scopes);
+	defer ({
+		for_array(i, dep_graph) {
+			import_graph_node_destroy(dep_graph[i], heap_allocator());
+		}
+		array_free(&dep_graph);
+	});
+
+	// NOTE(bill): Priority queue
+	auto pq = priority_queue_create(dep_graph, import_graph_node_cmp, import_graph_node_swap);
+
+	PtrSet<Scope *> emitted = {};
+	ptr_set_init(&emitted, heap_allocator());
+	defer (ptr_set_destroy(&emitted));
+
+	Array<ImportGraphNode *> file_order = {};
+	array_init(&file_order, heap_allocator());
+	defer (array_free(&file_order));
+
+	while (pq.queue.count > 0) {
+		ImportGraphNode *n = priority_queue_pop(&pq);
+
+		Scope *s = n->scope;
+
+		if (n->dep_count > 0) {
+			auto path = find_import_path(file_scopes, s, s);
+			defer (array_free(&path));
+
+			if (path.count > 0) {
+				auto const mt = [](Scope *s) -> Token {
+					Token token = {};
+					token.pos = token_pos(s->file->tokenizer.fullpath, 1, 1);
+					token.string = remove_directory_from_path(s->file->tokenizer.fullpath);
+					return token;
+				};
+
+				Scope *s = path[0];
+				Token token = mt(s);
+				error(token, "Cyclic importation of `%.*s`", LIT(token.string));
+				for (isize i = path.count-1; i >= 0; i--) {
+					token = mt(s);
+					error(token, "\t`%.*s` refers to", LIT(token.string));
+					s = path[i];
+				}
+				token = mt(s);
+				error(token, "\t`%.*s`", LIT(token.string));
+			}
+
+		}
+
+		for_array(i, n->pred.entries) {
+			ImportGraphNode *p = n->pred.entries[i].ptr;
+			p->dep_count -= 1;
+			priority_queue_fix(&pq, p->index);
+		}
+
+		if (s == nullptr) {
 			continue;
 		}
+		if (ptr_set_exists(&emitted, s)) {
+			continue;
+		}
+		ptr_set_add(&emitted, s);
 
-		if (id->cond != nullptr) {
-			Operand operand = {Addressing_Invalid};
-			check_expr(c, &operand, id->cond);
-			if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
-				error(id->cond, "Non-constant boolean `when` condition");
+		array_add(&file_order, n);
+	}
+
+	for_array(file_index, file_order) {
+		ImportGraphNode *node = file_order[file_index];
+		Scope *parent_scope = node->scope;
+		for_array(i, node->specs) {
+			AstNode *spec = node->specs[i];
+			ast_node(id, ImportSpec, spec);
+			Token token = id->relpath;
+
+			GB_ASSERT(parent_scope->is_file);
+
+			HashKey key = hash_string(id->fullpath);
+			Scope **found = map_get(file_scopes, key);
+			if (found == nullptr) {
+				for_array(scope_index, file_scopes->entries) {
+					Scope *scope = file_scopes->entries[scope_index].value;
+					gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
+				}
+				gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
+				GB_PANIC("Unable to find scope for file: %.*s", LIT(id->fullpath));
+			}
+			Scope *scope = *found;
+
+			if (scope->is_global) {
+				error(token, "Importing a #shared_global_scope is disallowed and unnecessary");
 				continue;
 			}
-			if (operand.value.kind == ExactValue_Bool &&
-			    operand.value.value_bool == false) {
-				continue;
-			}
-		}
 
-		bool previously_added = false;
-		for_array(import_index, parent_scope->imported) {
-			Scope *prev = parent_scope->imported[import_index];
-			if (prev == scope) {
-				previously_added = true;
-				break;
-			}
-		}
-
-		if (!previously_added) {
-			array_add(&parent_scope->imported, scope);
-		} else {
-			warning(token, "Multiple import of the same file within this scope");
-		}
-
-		scope->has_been_imported = true;
-
-		if (id->import_name.string == ".") {
-			if (parent_scope->is_global) {
-				error(id->import_name, "#shared_global_scope imports cannot use .");
-			} else {
-				// NOTE(bill): Add imported entities to this file's scope
-				for_array(elem_index, scope->elements.entries) {
-					Entity *e = scope->elements.entries[elem_index].value;
-					if (e->scope == parent_scope) {
-						continue;
-					}
-
-
-					if (!is_entity_kind_exported(e->kind)) {
-						continue;
-					}
-					if (id->is_import) {
-						if (is_entity_exported(e)) {
-							// TODO(bill): Should these entities be imported but cause an error when used?
-							bool ok = add_entity(c, parent_scope, e->identifier, e);
-							if (ok) {
-								map_set(&parent_scope->implicit, hash_entity(e), true);
-							}
-						}
-					} else {
-						add_entity(c, parent_scope, e->identifier, e);
-					}
+			if (id->cond != nullptr) {
+				Operand operand = {Addressing_Invalid};
+				check_expr(c, &operand, id->cond);
+				if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
+					error(id->cond, "Non-constant boolean `when` condition");
+					continue;
+				}
+				if (operand.value.kind == ExactValue_Bool &&
+				    operand.value.value_bool == false) {
+					continue;
 				}
 			}
-		} else {
-			String import_name = path_to_entity_name(id->import_name.string, id->fullpath);
-			if (is_blank_ident(import_name)) {
-				error(token, "File name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+
+			if (ptr_set_add(&parent_scope->imported, scope)) {
+				// warning(token, "Multiple import of the same file within this scope");
+			}
+
+			scope->has_been_imported = true;
+
+			if (id->import_name.string == ".") {
+				if (parent_scope->is_global) {
+					error(id->import_name, "#shared_global_scope imports cannot use .");
+				} else {
+					// NOTE(bill): Add imported entities to this file's scope
+					for_array(elem_index, scope->elements.entries) {
+						Entity *e = scope->elements.entries[elem_index].value;
+						if (e->scope == parent_scope) {
+							continue;
+						}
+
+						if (!is_entity_kind_exported(e->kind)) {
+							continue;
+						}
+						if (id->is_import) {
+							if (is_entity_exported(e)) {
+								// TODO(bill): Should these entities be imported but cause an error when used?
+								bool ok = add_entity(c, parent_scope, e->identifier, e);
+								if (ok) {
+									map_set(&parent_scope->implicit, hash_entity(e), true);
+								}
+							}
+						} else {
+							add_entity(c, parent_scope, e->identifier, e);
+						}
+					}
+				}
 			} else {
-				GB_ASSERT(id->import_name.pos.line != 0);
-				id->import_name.string = import_name;
-				Entity *e = make_entity_import_name(c->allocator, parent_scope, id->import_name, t_invalid,
-				                                    id->fullpath, id->import_name.string,
-				                                    scope);
+				String import_name = path_to_entity_name(id->import_name.string, id->fullpath);
+				if (is_blank_ident(import_name)) {
+					error(token, "File name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+				} else {
+					GB_ASSERT(id->import_name.pos.line != 0);
+					id->import_name.string = import_name;
+					Entity *e = make_entity_import_name(c->allocator, parent_scope, id->import_name, t_invalid,
+					                                    id->fullpath, id->import_name.string,
+					                                    scope);
 
-
-				add_entity(c, parent_scope, nullptr, e);
+					add_entity(c, parent_scope, nullptr, e);
+				}
 			}
 		}
 	}
@@ -2485,31 +2632,30 @@ Array<Entity *> find_entity_path(Map<DeclInfo *> *map, Entity *start, Entity *en
 }
 
 
-void calculate_variable_init_order(Checker *c) {
+void calculate_global_init_order(Checker *c) {
 	CheckerInfo *info = &c->info;
 	auto *m = &info->entities;
 
-	Array<GraphNode *> dep_graph = generate_dependency_graph(info);
+	Array<EntityGraphNode *> dep_graph = generate_entity_dependency_graph(info);
 	defer ({
 		for_array(i, dep_graph) {
-			graph_node_destroy(dep_graph[i], heap_allocator());
+			entity_graph_node_destroy(dep_graph[i], heap_allocator());
 		}
 		array_free(&dep_graph);
 	});
 
 	// NOTE(bill): Priority queue
-	auto pq = priority_queue_create(dep_graph, graph_node_cmp, graph_node_swap);
+	auto pq = priority_queue_create(dep_graph, entity_graph_node_cmp, entity_graph_node_swap);
 
 	PtrSet<DeclInfo *> emitted = {};
 	ptr_set_init(&emitted, heap_allocator());
 	defer (ptr_set_destroy(&emitted));
 
 	while (pq.queue.count > 0) {
-		GraphNode *n = priority_queue_pop(&pq);
+		EntityGraphNode *n = priority_queue_pop(&pq);
 		Entity *e = n->entity;
 
 		if (n->dep_count > 0) {
-			// TODO(bill): print out the cyclic initialization order
 			auto path = find_entity_path(m, e, e);
 			defer (array_free(&path));
 
@@ -2525,7 +2671,7 @@ void calculate_variable_init_order(Checker *c) {
 		}
 
 		for_array(i, n->pred.entries) {
-			GraphNode *p = n->pred.entries[i].ptr;
+			EntityGraphNode *p = n->pred.entries[i].ptr;
 			p->dep_count -= 1;
 			priority_queue_fix(&pq, p->index);
 		}
@@ -2535,16 +2681,10 @@ void calculate_variable_init_order(Checker *c) {
 		}
 		DeclInfo *d = decl_info_of_entity(info, e);
 
-		// if (!decl_info_has_init(d)) {
-		// 	continue;
-		// }
-
 		if (ptr_set_exists(&emitted, d)) {
 			continue;
 		}
 		ptr_set_add(&emitted, d);
-
-		// TODO(bill): add to init order
 
 		if (d->entities == nullptr) {
 			d->entities = gb_alloc_array(c->allocator, Entity *, 1);
@@ -2670,7 +2810,7 @@ void check_parsed_files(Checker *c) {
 	}
 
 	// Calculate initialization order of global variables
-	calculate_variable_init_order(c);
+	calculate_global_init_order(c);
 
 
 	// Add untyped expression values

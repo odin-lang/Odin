@@ -149,6 +149,11 @@ struct TokenPos {
 	isize  column;
 };
 
+TokenPos token_pos(String file, isize line, isize column) {
+	TokenPos pos = {file, line, column};
+	return pos;
+}
+
 i32 token_pos_cmp(TokenPos a, TokenPos b) {
 	if (a.line == b.line) {
 		if (a.column == b.column) {

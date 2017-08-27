@@ -213,6 +213,10 @@ String string_trim_whitespace(String str) {
 		str.len--;
 	}
 
+	while (str.len > 0 && str[str.len-1] == 0) {
+		str.len--;
+	}
+
 	while (str.len > 0 && rune_is_whitespace(str[0])) {
 		str.text++;
 		str.len--;
@@ -267,6 +271,17 @@ String filename_from_path(String s) {
 	return make_string(nullptr, 0);
 }
 
+String remove_directory_from_path(String s) {
+	isize len = 0;
+	for (isize i = s.len-1; i >= 0; i--) {
+		if (s[i] == '/' ||
+		    s[i] == '\\') {
+			break;
+		}
+		len += 1;
+	}
+	return substring(s, s.len-len, s.len);
+}
 
 
 
