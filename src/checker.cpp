@@ -1953,42 +1953,29 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 			array_add(&c->delayed_imports, di);
 		case_end;
 
-		case_ast_node(gd, GenDecl, decl);
-			for_array(i, gd->specs) {
-				AstNode *spec = gd->specs[i];
-				switch (gd->token.kind) {
-				case Token_foreign_library:
-				case Token_foreign_system_library:  {
-					ast_node(fl, ForeignLibrarySpec, spec);
-					if (!c->context.scope->is_file) {
-						if (fl->is_system) {
-							error(spec, "foreign_system_library declarations are only allowed in the file scope");
-						} else {
-							error(spec, "foreign_library declarations are only allowed in the file scope");
-						}
-						// NOTE(bill): _Should_ be caught by the parser
-						// TODO(bill): Better error handling if it isn't
-						continue;
-					}
+		case_ast_node(fl, ForeignLibraryDecl, decl);
+			if (!c->context.scope->is_file) {
+				error(decl, "%.*s declarations are only allowed in the file scope", LIT(fl->token.string));
+				// NOTE(bill): _Should_ be caught by the parser
+				// TODO(bill): Better error handling if it isn't
+				continue;
+			}
 
-					if (fl->cond != nullptr) {
-						Operand operand = {Addressing_Invalid};
-						check_expr(c, &operand, fl->cond);
-						if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
-							error(fl->cond, "Non-constant boolean `when` condition");
-							continue;
-						}
-						if (operand.value.kind == ExactValue_Bool &&
-							!operand.value.value_bool) {
-							continue;
-						}
-					}
-
-					DelayedDecl di = {c->context.scope, spec};
-					array_add(&c->delayed_foreign_libraries, di);
-				} break;
+			if (fl->cond != nullptr) {
+				Operand operand = {Addressing_Invalid};
+				check_expr(c, &operand, fl->cond);
+				if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
+					error(fl->cond, "Non-constant boolean `when` condition");
+					continue;
+				}
+				if (operand.value.kind == ExactValue_Bool &&
+					!operand.value.value_bool) {
+					continue;
 				}
 			}
+
+			DelayedDecl di = {c->context.scope, decl};
+			array_add(&c->delayed_foreign_libraries, di);
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
@@ -2533,13 +2520,13 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 
 	for_array(i, c->delayed_foreign_libraries) {
 		Scope *parent_scope = c->delayed_foreign_libraries[i].parent;
-		AstNode *spec = c->delayed_foreign_libraries[i].decl;
-		ast_node(fl, ForeignLibrarySpec, spec);
+		AstNode *decl = c->delayed_foreign_libraries[i].decl;
+		ast_node(fl, ForeignLibraryDecl, decl);
 
 		String file_str = fl->filepath.string;
 		String base_dir = fl->base_dir;
 
-		if (!fl->is_system) {
+		if (fl->token.kind == Token_foreign_library) {
 			gbAllocator a = heap_allocator(); // TODO(bill): Change this allocator
 
 			String rel_path = get_fullpath_relative(a, base_dir, file_str);
@@ -2569,7 +2556,7 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 
 		String library_name = path_to_entity_name(fl->library_name.string, file_str);
 		if (is_blank_ident(library_name)) {
-			error(spec, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
+			error(decl, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
 		} else {
 			GB_ASSERT(fl->library_name.pos.line != 0);
 			fl->library_name.string = library_name;

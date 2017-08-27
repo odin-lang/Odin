@@ -6227,9 +6227,9 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 	case_ast_node(us, UsingStmt, node);
 		for_array(i, us->list) {
 			AstNode *decl = unparen_expr(us->list[i]);
-			if (decl->kind == AstNode_GenDecl) {
-				ir_build_stmt(proc, decl);
-			}
+			// if (decl->kind == AstNode_GenDecl) {
+				// ir_build_stmt(proc, decl);
+			// }
 		}
 	case_end;
 

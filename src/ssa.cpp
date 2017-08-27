@@ -1935,12 +1935,6 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 	case_end;
 
 	case_ast_node(us, UsingStmt, node);
-		for_array(i, us->list) {
-			AstNode *decl = unparen_expr(us->list[i]);
-			if (decl->kind == AstNode_GenDecl) {
-				ssa_build_stmt(p, decl);
-			}
-		}
 	case_end;
 
 	case_ast_node(ws, WhenStmt, node);

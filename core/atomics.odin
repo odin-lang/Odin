@@ -2,7 +2,7 @@
 // Inline vs external file?
 
 import win32 "sys/windows.odin" when ODIN_OS == "windows";
-_ := compile_assert(ODIN_ARCH == "amd64"); // TODO(bill): x86 version
+_ :: compile_assert(ODIN_ARCH == "amd64"); // TODO(bill): x86 version
 
 
 yield_thread :: proc() { win32.mm_pause(); }

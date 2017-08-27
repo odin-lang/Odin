@@ -90,28 +90,6 @@ void print_proc_decl(AstNodeProcDecl *pd) {
 }
 #endif
 void print_declaration(AstNode *decl) {
-	switch (decl->kind) {
-	case_ast_node(gd, GenDecl, decl);
-		for_array(spec_index, gd->specs) {
-			AstNode *spec = gd->specs[spec_index];
-			switch(gd->token.kind) {
-			case Token_import:
-				break;
-			case Token_foreign_library:
-			case Token_foreign_system_library:
-				break;
-			}
-		}
-	case_end;
-
-	// case_ast_node(pd, ProcDecl, decl);
-	// 	print_proc_decl(pd);
-	// case_end;
-
-	case_ast_node(fb, ForeignBlockDecl, decl);
-		// TODO(bill)
-	case_end;
-	}
 }
 
 void generate_documentation(Parser *parser) {

@@ -1,7 +1,5 @@
-foreign_system_library (
-	dl   "dl";
-	libc "c";
-)
+foreign_system_library dl   "dl";
+foreign_system_library libc "c";
 
 import "strings.odin";
 

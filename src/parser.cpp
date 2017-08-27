@@ -335,14 +335,6 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token token; \
 		AstNode *name; \
 	}) \
-	AST_NODE_KIND(GenDecl, "generic declaration", struct { \
-		Token            token; \
-		Token            open;  \
-		Token            close; \
-		Array<AstNode *> specs; \
-		u64              flags; \
-		CommentGroup docs; \
-	}) \
 	AST_NODE_KIND(ValueDecl, "value declaration", struct { \
 		Array<AstNode *> names;      \
 		AstNode *        type;       \
@@ -362,12 +354,12 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
-	AST_NODE_KIND(ForeignLibrarySpec, "foreign library specification", struct { \
+	AST_NODE_KIND(ForeignLibraryDecl, "foreign library declaration", struct { \
+		Token    token;         \
 		Token    filepath;      \
 		Token    library_name;  \
 		String   base_dir;      \
 		AstNode *cond;          \
-		bool     is_system;     \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -578,12 +570,11 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_PushContext:   return node->PushContext.token;
 
 	case AstNode_BadDecl:            return node->BadDecl.begin;
-	case AstNode_ForeignLibrarySpec: return node->ForeignLibrarySpec.filepath;
 	case AstNode_Label:              return node->Label.token;
 
-	case AstNode_GenDecl:            return node->GenDecl.token;
 	case AstNode_ValueDecl:          return ast_node_token(node->ValueDecl.names[0]);
 	case AstNode_ImportDecl:         return node->ImportDecl.token;
+	case AstNode_ForeignLibraryDecl: return node->ForeignLibraryDecl.token;
 
 	case AstNode_ForeignBlockDecl:   return node->ForeignBlockDecl.token;
 
@@ -822,16 +813,13 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_Label:
 		n->Label.name = clone_ast_node(a, n->Label.name);
 		break;
-	case AstNode_GenDecl:
-		n->GenDecl.specs = clone_ast_node_array(a, n->GenDecl.specs);
-		break;
 	case AstNode_ValueDecl:
 		n->ValueDecl.names  = clone_ast_node_array(a, n->ValueDecl.names);
 		n->ValueDecl.type   = clone_ast_node(a, n->ValueDecl.type);
 		n->ValueDecl.values = clone_ast_node_array(a, n->ValueDecl.values);
 		break;
-	case AstNode_ForeignLibrarySpec:
-		n->ForeignLibrarySpec.cond = clone_ast_node(a, n->ForeignLibrarySpec.cond);
+	case AstNode_ForeignLibraryDecl:
+		n->ForeignLibraryDecl.cond = clone_ast_node(a, n->ForeignLibraryDecl.cond);
 		break;
 
 	case AstNode_Field:
@@ -1526,16 +1514,6 @@ AstNode *ast_label_decl(AstFile *f, Token token, AstNode *name) {
 	return result;
 }
 
-AstNode *ast_gen_decl(AstFile *f, Token token, Token open, Token close, Array<AstNode *> specs, CommentGroup docs) {
-	AstNode *result = make_ast_node(f, AstNode_GenDecl);
-	result->GenDecl.token = token;
-	result->GenDecl.open  = open;
-	result->GenDecl.close = close;
-	result->GenDecl.specs = specs;
-	result->GenDecl.docs = docs;
-	return result;
-}
-
 AstNode *ast_value_decl(AstFile *f, Array<AstNode *> names, AstNode *type, Array<AstNode *> values, bool is_mutable,
                         CommentGroup docs, CommentGroup comment) {
 	AstNode *result = make_ast_node(f, AstNode_ValueDecl);
@@ -1561,15 +1539,15 @@ AstNode *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, 
 	return result;
 }
 
-AstNode *ast_foreign_library_spec(AstFile *f, Token filepath, Token library_name, AstNode *cond, bool is_system,
+AstNode *ast_foreign_library_decl(AstFile *f, Token token, Token filepath, Token library_name, AstNode *cond,
                                   CommentGroup docs, CommentGroup comment) {
-	AstNode *result = make_ast_node(f, AstNode_ForeignLibrarySpec);
-	result->ForeignLibrarySpec.filepath     = filepath;
-	result->ForeignLibrarySpec.library_name = library_name;
-	result->ForeignLibrarySpec.cond         = cond;
-	result->ForeignLibrarySpec.is_system    = is_system;
-	result->ForeignLibrarySpec.docs         = docs;
-	result->ForeignLibrarySpec.comment      = comment;
+	AstNode *result = make_ast_node(f, AstNode_ForeignLibraryDecl);
+	result->ForeignLibraryDecl.token        = token;
+	result->ForeignLibraryDecl.filepath     = filepath;
+	result->ForeignLibraryDecl.library_name = library_name;
+	result->ForeignLibraryDecl.cond         = cond;
+	result->ForeignLibraryDecl.docs         = docs;
+	result->ForeignLibraryDecl.comment      = comment;
 	return result;
 }
 
@@ -1853,15 +1831,6 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 		}
 		break;
 
-	case AstNode_GenDecl:
-		if (s->GenDecl.close.pos.line != 0) {
-			return true;
-		}
-		if (s->GenDecl.specs.count == 1) {
-			return is_semicolon_optional_for_node(f, s->GenDecl.specs[0]);
-		}
-		break;
-
 	case AstNode_ForeignBlockDecl:
 		if (s->ForeignBlockDecl.close.pos.line != 0) {
 			return true;
@@ -1898,18 +1867,6 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 			return;
 		}
 		String node_string = ast_node_strings[s->kind];
-		if (s->kind == AstNode_GenDecl) {
-			switch (s->GenDecl.token.kind) {
-			case Token_import:
-				node_string = str_lit("import declaration");
-				break;
-			case Token_foreign_library:
-			case Token_foreign_system_library:
-				node_string = str_lit("foreign library declaration");
-				break;
-			}
-		}
-
 		syntax_error(prev_token, "Expected `;` after %.*s, got %.*s",
 		             LIT(node_string), LIT(token_strings[prev_token.kind]));
 	} else {
@@ -3025,165 +2982,6 @@ AstNode *parse_type(AstFile *f) {
 	return type;
 }
 
-#define PARSE_SPEC_FUNC(name) AstNode *name(AstFile *f, CommentGroup docs, Token token)
-typedef PARSE_SPEC_FUNC(ParseSpecFunc);
-
-AstNode *parse_gen_decl(AstFile *f, Token token, ParseSpecFunc *func) {
-	Array<AstNode *> specs = {};
-	Token open = {};
-	Token close = {};
-
-	CommentGroup docs = f->lead_comment;
-
-	if (f->curr_token.kind == Token_OpenParen) {
-		specs = make_ast_node_array(f);
-		open = expect_token(f, Token_OpenParen);
-		while (f->curr_token.kind != Token_CloseParen &&
-		       f->curr_token.kind != Token_EOF) {
-			AstNode *spec = func(f, docs, token);
-			array_add(&specs, spec);
-		}
-		close = expect_token(f, Token_CloseParen);
-		if (f->curr_token.pos.line == close.pos.line ||
-		    open.pos.line == close.pos.line) {
-			expect_semicolon(f, nullptr);
-		}
-	} else {
-		specs = make_ast_node_array(f, 1);
-		AstNode *spec = func(f, docs, token);
-		array_add(&specs, spec);
-	}
-
-	if (specs.count == 0) {
-		syntax_error(token, "Empty %.*s declaration list", LIT(token_strings[token.kind]));
-	}
-
-	return ast_gen_decl(f, token, open, close, specs, docs);
-}
-
-// PARSE_SPEC_FUNC(parse_import_spec) {
-// 	AstNode *spec = nullptr;
-// 	if (token.kind == Token_import) {
-// 		AstNode *cond = nullptr;
-// 		Token import_name = {};
-
-// 		switch (f->curr_token.kind) {
-// 		case Token_Period:
-// 			import_name = advance_token(f);
-// 			import_name.kind = Token_Ident;
-// 			break;
-// 		case Token_Ident:
-// 			import_name = advance_token(f);
-// 			break;
-// 		default:
-// 			import_name.pos = f->curr_token.pos;
-// 			break;
-// 		}
-
-// 		if (is_blank_ident(import_name)) {
-// 			syntax_error(import_name, "Illegal import name: `_`");
-// 		}
-
-// 		Token file_path = expect_token_after(f, Token_String, "import");
-// 		if (allow_token(f, Token_when)) {
-// 			cond = parse_expr(f, false);
-// 		}
-
-// 		expect_semicolon(f, nullptr);
-// 		if (f->curr_proc != nullptr) {
-// 			syntax_error(import_name, "You cannot use `import` within a procedure. This must be done at the file scope");
-// 			spec = ast_bad_decl(f, import_name, file_path);
-// 		} else {
-// 			spec = ast_import_decl(f, true, file_path, import_name, cond, docs, f->line_comment);
-// 		}
-// 	} else {
-// 		AstNode *cond = nullptr;
-// 		Token file_path = expect_token_after(f, Token_String, "import_load");
-// 		Token import_name = file_path;
-// 		import_name.string = str_lit(".");
-
-// 		if (allow_token(f, Token_when)) {
-// 			cond = parse_expr(f, false);
-// 		}
-
-// 		expect_semicolon(f, nullptr);
-// 		if (f->curr_proc != nullptr) {
-// 			syntax_error(import_name, "You cannot use `import_load` within a procedure. This must be done at the file scope");
-// 			spec = ast_bad_decl(f, import_name, file_path);
-// 		} else {
-// 			spec = ast_import_decl(f, false, file_path, import_name, cond, docs, f->line_comment);
-// 		}
-// 	}
-// 	return spec;
-// }
-
-PARSE_SPEC_FUNC(parse_foreign_library_spec) {
-	AstNode *spec = nullptr;
-	if (token.kind == Token_foreign_system_library) {
-		AstNode *cond = nullptr;
-		Token lib_name = {};
-
-		switch (f->curr_token.kind) {
-		case Token_Ident:
-			lib_name = advance_token(f);
-			break;
-		default:
-			lib_name.pos = f->curr_token.pos;
-			break;
-		}
-		if (is_blank_ident(lib_name)) {
-			syntax_error(lib_name, "Illegal foreign_library name: `_`");
-		}
-		Token file_path = expect_token(f, Token_String);
-
-		if (allow_token(f, Token_when)) {
-			cond = parse_expr(f, false);
-		}
-
-		expect_semicolon(f, nullptr);
-
-		if (f->curr_proc == nullptr) {
-			spec = ast_foreign_library_spec(f, file_path, lib_name, cond, true, docs, f->line_comment);
-		} else {
-			syntax_error(lib_name, "You cannot use foreign_system_library within a procedure. This must be done at the file scope");
-			spec = ast_bad_decl(f, lib_name, file_path);
-		}
-	} else {
-		AstNode *cond = nullptr;
-		Token lib_name = {};
-
-		switch (f->curr_token.kind) {
-		case Token_Ident:
-			lib_name = advance_token(f);
-			break;
-		default:
-			lib_name.pos = f->curr_token.pos;
-			break;
-		}
-
-		if (is_blank_ident(lib_name)) {
-			syntax_error(lib_name, "Illegal foreign_library name: `_`");
-		}
-		Token file_path = expect_token(f, Token_String);
-
-		if (allow_token(f, Token_when)) {
-			cond = parse_expr(f, false);
-		}
-
-		expect_semicolon(f, nullptr);
-
-		if (f->curr_proc == nullptr) {
-			spec = ast_foreign_library_spec(f, file_path, lib_name, cond, false, docs, f->line_comment);
-		} else {
-			syntax_error(lib_name, "You cannot use foreign_library within a procedure. This must be done at the file scope");
-			spec = ast_bad_decl(f, lib_name, file_path);
-		}
-	}
-	return spec;
-}
-
-AstNode *parse_decl(AstFile *f);
-
 void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
 	AstNode *decl = parse_stmt(f);
 	switch (decl->kind) {
@@ -3203,55 +3001,35 @@ void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
 	}
 }
 
-AstNode *parse_decl(AstFile *f) {
-	ParseSpecFunc *func = nullptr;
-	switch (f->curr_token.kind) {
-	// case Token_import:
-		// func = parse_import_spec;
-		// break;
+AstNode *parse_foreign_block(AstFile *f) {
+	CommentGroup docs = f->lead_comment;
+	Token token = expect_token(f, Token_foreign);
+	AstNode *foreign_library = parse_ident(f);
+	Token open = {};
+	Token close = {};
+	Array<AstNode *> decls = make_ast_node_array(f);
 
-	case Token_foreign_library:
-	case Token_foreign_system_library:
-		func = parse_foreign_library_spec;
-		break;
+	bool prev_in_foreign_block = f->in_foreign_block;
+	defer (f->in_foreign_block = prev_in_foreign_block);
+	f->in_foreign_block = true;
 
-	case Token_foreign: {
-		CommentGroup docs = f->lead_comment;
-		Token token = expect_token(f, Token_foreign);
-		AstNode *foreign_library = parse_ident(f);
-		Token open = {};
-		Token close = {};
-		Array<AstNode *> decls = make_ast_node_array(f);
+	if (f->curr_token.kind != Token_OpenBrace) {
+		parse_foreign_block_decl(f, &decls);
+	} else {
+		open = expect_token(f, Token_OpenBrace);
 
-		bool prev_in_foreign_block = f->in_foreign_block;
-		defer (f->in_foreign_block = prev_in_foreign_block);
-		f->in_foreign_block = true;
-
-		if (f->curr_token.kind != Token_OpenBrace) {
+		while (f->curr_token.kind != Token_CloseBrace &&
+		       f->curr_token.kind != Token_EOF) {
 			parse_foreign_block_decl(f, &decls);
-		} else {
-			open = expect_token(f, Token_OpenBrace);
-
-			while (f->curr_token.kind != Token_CloseBrace &&
-			       f->curr_token.kind != Token_EOF) {
-				parse_foreign_block_decl(f, &decls);
-			}
-
-			close = expect_token(f, Token_CloseBrace);
 		}
 
-		return ast_foreign_block_decl(f, token, foreign_library, open, close, decls, docs);
-	} break;
-
-	default: {
-		Token tok = f->curr_token;
-		fix_advance_to_next_stmt(f);
-		syntax_error(tok, "Expected a declaration got %.*s", LIT(token_strings[tok.kind]));
-		return ast_bad_decl(f, tok, f->curr_token);
-	}
+		close = expect_token(f, Token_CloseBrace);
 	}
 
-	return parse_gen_decl(f, advance_token(f), func);
+
+	AstNode *decl = ast_foreign_block_decl(f, token, foreign_library, open, close, decls, docs);
+	expect_semicolon(f, decl);
+	return decl;
 }
 
 AstNode *parse_value_decl(AstFile *f, Array<AstNode *> names, CommentGroup docs) {
@@ -4565,6 +4343,50 @@ AstNode *parse_import_decl(AstFile *f, bool is_using) {
 	return ast_import_decl(f, token, is_using, file_path, import_name, cond, docs, f->line_comment);
 }
 
+AstNode *parse_foreign_decl(AstFile *f) {
+	CommentGroup docs = f->lead_comment;
+	Token token = {};
+	switch (f->curr_token.kind) {
+	case Token_foreign_library:
+	case Token_foreign_system_library:
+		token = advance_token(f);
+		break;
+	default:
+		token = advance_token(f);
+		syntax_error(token, "Expected either foreign_library or foreign_system_library, got `%.*s`", LIT(token.string));
+		return ast_bad_decl(f, token, token);
+	}
+
+	AstNode *cond = nullptr;
+	Token lib_name = {};
+
+	switch (f->curr_token.kind) {
+	case Token_Ident:
+		lib_name = advance_token(f);
+		break;
+	default:
+		lib_name.pos = f->curr_token.pos;
+		break;
+	}
+	if (is_blank_ident(lib_name)) {
+		syntax_error(lib_name, "Illegal foreign_library name: `_`");
+	}
+	Token file_path = expect_token(f, Token_String);
+
+	if (allow_token(f, Token_when)) {
+		cond = parse_expr(f, false);
+	}
+
+	expect_semicolon(f, nullptr);
+
+	if (f->curr_proc != nullptr) {
+		syntax_error(lib_name, "You cannot use foreign_system_library within a procedure. This must be done at the file scope");
+		return ast_bad_decl(f, lib_name, file_path);
+	}
+
+	return ast_foreign_library_decl(f, token, file_path, lib_name, cond, docs, f->line_comment);
+}
+
 
 AstNode *parse_stmt(AstFile *f) {
 	AstNode *s = nullptr;
@@ -4592,11 +4414,11 @@ AstNode *parse_stmt(AstFile *f) {
 
 
 	case Token_foreign:
+		return parse_foreign_block(f);
+
 	case Token_foreign_library:
 	case Token_foreign_system_library:
-		s = parse_decl(f);
-		expect_semicolon(f, s);
-		return s;
+		return parse_foreign_decl(f);
 
 	case Token_import:
 		return parse_import_decl(f, false);
@@ -4979,28 +4801,15 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 
 			id->fullpath = import_file;
 			try_add_import_path(p, import_file, file_str, ast_node_token(node).pos);
-		} else if (node->kind == AstNode_GenDecl) {
-			ast_node(gd, GenDecl, node);
-			if (gd->token.kind == Token_foreign_library ||
-			           gd->token.kind == Token_foreign_system_library) {
-				for_array(spec_index, gd->specs) {
-					AstNode *spec = gd->specs[spec_index];
-					ast_node(fl, ForeignLibrarySpec, spec);
-					String file_str = fl->filepath.string;
-
-					if (!is_import_path_valid(file_str)) {
-						if (fl->is_system) {
-							syntax_error(node, "Invalid `foreign_system_library` path");
-						} else {
-							syntax_error(node, "Invalid `foreign_library` path");
-						}
-						// NOTE(bill): It's a naughty name
-						gd->specs[spec_index] = ast_bad_decl(f, fl->filepath, fl->filepath);
-						continue;
-					}
-
-					fl->base_dir = base_dir;
-				}
+		} else if (node->kind == AstNode_ForeignLibraryDecl) {
+			ast_node(fl, ForeignLibraryDecl, node);
+			String file_str = fl->filepath.string;
+			if (!is_import_path_valid(file_str)) {
+				syntax_error(node, "Invalid `%.*s` path", LIT(fl->token.string));
+				// NOTE(bill): It's a naughty name
+				decls[i] = ast_bad_decl(f, fl->filepath, fl->filepath);
+			} else {
+				fl->base_dir = base_dir;
 			}
 		}
 	}
