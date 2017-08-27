@@ -354,6 +354,14 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
+	AST_NODE_KIND(ExportDecl, "export declaration", struct { \
+		Token    token;         \
+		Token    relpath;       \
+		String   fullpath;      \
+		AstNode *cond;          \
+		CommentGroup docs;      \
+		CommentGroup comment;   \
+	}) \
 	AST_NODE_KIND(ForeignLibraryDecl, "foreign library declaration", struct { \
 		Token    token;         \
 		Token    filepath;      \
@@ -574,6 +582,7 @@ Token ast_node_token(AstNode *node) {
 
 	case AstNode_ValueDecl:          return ast_node_token(node->ValueDecl.names[0]);
 	case AstNode_ImportDecl:         return node->ImportDecl.token;
+	case AstNode_ExportDecl:         return node->ExportDecl.token;
 	case AstNode_ForeignLibraryDecl: return node->ForeignLibraryDecl.token;
 
 	case AstNode_ForeignBlockDecl:   return node->ForeignBlockDecl.token;
@@ -1536,6 +1545,17 @@ AstNode *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, 
 	result->ImportDecl.cond        = cond;
 	result->ImportDecl.docs        = docs;
 	result->ImportDecl.comment     = comment;
+	return result;
+}
+
+AstNode *ast_export_decl(AstFile *f, Token token, Token relpath, AstNode *cond,
+                         CommentGroup docs, CommentGroup comment) {
+	AstNode *result = make_ast_node(f, AstNode_ExportDecl);
+	result->ExportDecl.token       = token;
+	result->ExportDecl.relpath     = relpath;
+	result->ExportDecl.cond        = cond;
+	result->ExportDecl.docs        = docs;
+	result->ExportDecl.comment     = comment;
 	return result;
 }
 
@@ -4315,12 +4335,6 @@ AstNode *parse_import_decl(AstFile *f, bool is_using) {
 	case Token_Ident:
 		import_name = advance_token(f);
 		break;
-	case Token_Period:
-		import_name = advance_token(f);
-		import_name.kind = Token_Ident;
-		if (is_using) break;
-		syntax_error(import_name, "`import .` is not allowed. Did you mean `using import`?");
-		/* fallthrough */
 	default:
 		import_name.pos = f->curr_token.pos;
 		break;
@@ -4341,6 +4355,23 @@ AstNode *parse_import_decl(AstFile *f, bool is_using) {
 		return ast_bad_decl(f, import_name, file_path);
 	}
 	return ast_import_decl(f, token, is_using, file_path, import_name, cond, docs, f->line_comment);
+}
+
+AstNode *parse_export_decl(AstFile *f) {
+	CommentGroup docs = f->lead_comment;
+	Token token = expect_token(f, Token_export);
+	AstNode *cond = nullptr;
+
+	Token file_path = expect_token_after(f, Token_String, "export");
+	if (allow_token(f, Token_when)) {
+		cond = parse_expr(f, false);
+	}
+	expect_semicolon(f, nullptr);
+	if (f->curr_proc != nullptr) {
+		syntax_error(token, "You cannot use `export` within a procedure. This must be done at the file scope");
+		return ast_bad_decl(f, token, file_path);
+	}
+	return ast_export_decl(f, token, file_path, cond, docs, f->line_comment);
 }
 
 AstNode *parse_foreign_decl(AstFile *f) {
@@ -4422,6 +4453,10 @@ AstNode *parse_stmt(AstFile *f) {
 
 	case Token_import:
 		return parse_import_decl(f, false);
+
+	case Token_export:
+		return parse_export_decl(f);
+
 
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);
@@ -4801,6 +4836,38 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 
 			id->fullpath = import_file;
 			try_add_import_path(p, import_file, file_str, ast_node_token(node).pos);
+		} else if (node->kind == AstNode_ExportDecl) {
+			ast_node(ed, ExportDecl, node);
+			String collection_name = {};
+			String oirignal_string = ed->relpath.string;
+			String file_str = ed->relpath.string;
+			gbAllocator a = heap_allocator(); // TODO(bill): Change this allocator
+			String export_path = {};
+			String rel_path = {};
+
+			if (!is_import_path_valid(file_str)) {
+				syntax_error(node, "Invalid export path: `%.*s`", LIT(file_str));
+				// NOTE(bill): It's a naughty name
+				decls[i] = ast_bad_decl(f, ed->relpath, ed->relpath);
+				continue;
+			}
+
+			gb_mutex_lock(&p->file_decl_mutex);
+			defer (gb_mutex_unlock(&p->file_decl_mutex));
+
+			rel_path = get_fullpath_relative(a, base_dir, file_str);
+			export_path = rel_path;
+			if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
+				String abs_path = get_fullpath_core(a, file_str);
+				if (gb_file_exists(cast(char *)abs_path.text)) {
+					export_path = abs_path;
+				}
+			}
+
+			export_path = string_trim_whitespace(export_path);
+
+			ed->fullpath = export_path;
+			try_add_import_path(p, export_path, file_str, ast_node_token(node).pos);
 		} else if (node->kind == AstNode_ForeignLibraryDecl) {
 			ast_node(fl, ForeignLibraryDecl, node);
 			String file_str = fl->filepath.string;
