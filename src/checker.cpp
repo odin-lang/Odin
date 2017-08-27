@@ -2251,9 +2251,8 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c, Map<Scope 
 		AstNode *decl = c->delayed_imports[i].decl;
 		GB_ASSERT(parent->is_file);
 
-		if (decl->kind == AstNode_ImportDecl) {
-			ast_node(id, ImportDecl, decl);
-
+		switch (decl->kind) {
+		case_ast_node(id, ImportDecl, decl);
 			String path = id->fullpath;
 			HashKey key = hash_string(path);
 			Scope **found = map_get(file_scopes, key);
@@ -2287,9 +2286,9 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c, Map<Scope 
 				import_graph_node_set_add(&m->succ, n);
 				ptr_set_add(&m->scope->imported, n->scope);
 			}
-		} else if (decl->kind == AstNode_ExportDecl) {
-			ast_node(ed, ExportDecl, decl);
+		case_end;
 
+		case_ast_node(ed, ExportDecl, decl);
 			String path = ed->fullpath;
 			HashKey key = hash_string(path);
 			Scope **found = map_get(file_scopes, key);
@@ -2321,6 +2320,7 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c, Map<Scope 
 			import_graph_node_set_add(&n->pred, m);
 			import_graph_node_set_add(&m->succ, n);
 			ptr_set_add(&m->scope->imported, n->scope);
+		case_end;
 		}
 	}
 
@@ -2461,8 +2461,8 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 		for_array(i, node->decls) {
 			AstNode *decl = node->decls[i];
 
-			if (decl->kind == AstNode_ImportDecl) {
-				ast_node(id, ImportDecl, decl);
+			switch (decl->kind) {
+			case_ast_node(id, ImportDecl, decl);
 				Token token = id->relpath;
 
 				GB_ASSERT(parent_scope->is_file);
@@ -2497,8 +2497,10 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 					}
 				}
 
-				if (ptr_set_add(&parent_scope->imported, scope)) {
-					// warning(token, "Multiple import of the same file within this scope");
+				if (ptr_set_exists(&parent_scope->imported, scope)) {
+					// error(token, "Multiple import of the same file within this scope");
+				} else {
+					ptr_set_add(&parent_scope->imported, scope);
 				}
 
 				scope->has_been_imported = true;
@@ -2515,14 +2517,10 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 							if (!is_entity_kind_exported(e->kind)) {
 								continue;
 							}
-							if (id->import_name.string == ".") {
-								add_entity(c, parent_scope, e->identifier, e);
-							} else {
-								if (is_entity_exported(e)) {
-									// TODO(bill): Should these entities be imported but cause an error when used?
-									bool ok = add_entity(c, parent_scope, e->identifier, e);
-									if (ok) map_set(&parent_scope->implicit, hash_entity(e), true);
-								}
+							if (is_entity_exported(e)) {
+								// TODO(bill): Should these entities be imported but cause an error when used?
+								bool ok = add_entity(c, parent_scope, e->identifier, e);
+								if (ok) map_set(&parent_scope->implicit, hash_entity(e), true);
 							}
 						}
 					}
@@ -2540,8 +2538,9 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 						add_entity(c, parent_scope, nullptr, e);
 					}
 				}
-			} else if (decl->kind == AstNode_ExportDecl) {
-				ast_node(ed, ExportDecl, decl);
+			case_end;
+
+			case_ast_node(ed, ExportDecl, decl);
 				Token token = ed->relpath;
 
 				GB_ASSERT(parent_scope->is_file);
@@ -2576,8 +2575,10 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 					}
 				}
 
-				if (ptr_set_add(&parent_scope->imported, scope)) {
-					// warning(token, "Multiple import of the same file within this scope");
+				if (ptr_set_exists(&parent_scope->imported, scope)) {
+					// error(token, "Multiple import of the same file within this scope");
+				} else {
+					ptr_set_add(&parent_scope->imported, scope);
 				}
 
 				scope->has_been_imported = true;
@@ -2594,6 +2595,7 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 						}
 					}
 				}
+			case_end;
 			}
 		}
 	}
