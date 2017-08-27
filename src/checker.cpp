@@ -1942,27 +1942,21 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 			}
 		case_end;
 
+		case_ast_node(id, ImportDecl, decl);
+			if (!c->context.scope->is_file) {
+				error(decl, "import declarations are only allowed in the file scope");
+				// NOTE(bill): _Should_ be caught by the parser
+				// TODO(bill): Better error handling if it isn't
+				continue;
+			}
+			DelayedDecl di = {c->context.scope, decl};
+			array_add(&c->delayed_imports, di);
+		case_end;
+
 		case_ast_node(gd, GenDecl, decl);
 			for_array(i, gd->specs) {
 				AstNode *spec = gd->specs[i];
 				switch (gd->token.kind) {
-				case Token_import:
-				case Token_import_load: {
-					ast_node(ts, ImportSpec, spec);
-					if (!c->context.scope->is_file) {
-						if (ts->is_import) {
-							error(decl, "import declarations are only allowed in the file scope");
-						} else {
-							error(decl, "import_load declarations are only allowed in the file scope");
-						}
-						// NOTE(bill): _Should_ be caught by the parser
-						// TODO(bill): Better error handling if it isn't
-						continue;
-					}
-					DelayedDecl di = {c->context.scope, spec};
-					array_add(&c->delayed_imports, di);
-				} break;
-
 				case Token_foreign_library:
 				case Token_foreign_system_library:  {
 					ast_node(fl, ForeignLibrarySpec, spec);
@@ -2202,7 +2196,7 @@ void import_graph_node_set_remove(ImportGraphNodeSet *s, ImportGraphNode *n) {
 
 struct ImportGraphNode {
 	Scope *            scope;
-	Array<AstNode *>   specs;
+	Array<AstNode *>   decls; // AstNodeImportDecl *
 	String             path;
 	isize              file_id;
 	ImportGraphNodeSet pred;
@@ -2216,7 +2210,7 @@ ImportGraphNode *import_graph_node_create(gbAllocator a, Scope *scope) {
 	n->scope   = scope;
 	n->path    = scope->file->tokenizer.fullpath;
 	n->file_id = scope->file->id;
-	array_init(&n->specs, heap_allocator());
+	array_init(&n->decls, heap_allocator());
 	return n;
 }
 
@@ -2224,6 +2218,7 @@ ImportGraphNode *import_graph_node_create(gbAllocator a, Scope *scope) {
 void import_graph_node_destroy(ImportGraphNode *n, gbAllocator a) {
 	import_graph_node_set_destroy(&n->pred);
 	import_graph_node_set_destroy(&n->succ);
+	array_free(&n->decls);
 	gb_free(a, n);
 }
 
@@ -2282,7 +2277,7 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c, Map<Scope 
 		AstNode *decl = c->delayed_imports[i].decl;
 		GB_ASSERT(parent->is_file);
 
-		ast_node(id, ImportSpec, decl);
+		ast_node(id, ImportDecl, decl);
 
 		String path = id->fullpath;
 		HashKey key = hash_string(path);
@@ -2310,10 +2305,9 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c, Map<Scope 
 		GB_ASSERT(found_node != nullptr);
 		n = *found_node;
 
-		array_add(&m->specs, decl);
+		array_add(&m->decls, decl);
 
-		bool is_dot_or_load = id->import_name.string == ".";
-		if (is_dot_or_load) {
+		if (id->is_using) {
 			import_graph_node_set_add(&n->pred, m);
 			import_graph_node_set_add(&m->succ, n);
 			ptr_set_add(&m->scope->imported, n->scope);
@@ -2326,7 +2320,7 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c, Map<Scope 
 	for_array(i, M.entries) {
 		auto *entry = &M.entries[i];
 		ImportGraphNode *n = entry->value;
-		gb_sort_array(n->specs.data, n->specs.count, ast_node_cmp);
+		gb_sort_array(n->decls.data, n->decls.count, ast_node_cmp);
 		array_add(&G, n);
 	}
 
@@ -2340,7 +2334,7 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c, Map<Scope 
 }
 
 
-Array<Scope *> find_import_path(Map<Scope *> *map, Scope *start, Scope *end, PtrSet<Scope *> *visited = nullptr) {
+Array<Scope *> find_import_path(Map<Scope *> *file_scopes, Scope *start, Scope *end, PtrSet<Scope *> *visited = nullptr) {
 	PtrSet<Scope *> visited_ = {};
 	bool made_visited = false;
 	if (visited == nullptr) {
@@ -2361,7 +2355,7 @@ Array<Scope *> find_import_path(Map<Scope *> *map, Scope *start, Scope *end, Ptr
 
 	String path = start->file->tokenizer.fullpath;
 	HashKey key = hash_string(path);
-	Scope **found = map_get(map, key);
+	Scope **found = map_get(file_scopes, key);
 	if (found) {
 		Scope *scope = *found;
 		for_array(i, scope->imported.entries) {
@@ -2372,7 +2366,7 @@ Array<Scope *> find_import_path(Map<Scope *> *map, Scope *start, Scope *end, Ptr
 				array_add(&path, dep);
 				return path;
 			}
-			Array<Scope *> next_path = find_import_path(map, dep, end, visited);
+			Array<Scope *> next_path = find_import_path(file_scopes, dep, end, visited);
 			if (next_path.count > 0) {
 				array_add(&next_path, dep);
 				return next_path;
@@ -2412,6 +2406,7 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 			defer (array_free(&path));
 
 			if (path.count > 0) {
+				// TODO(bill): This needs better TokenPos finding
 				auto const mt = [](Scope *s) -> Token {
 					Token token = {};
 					token.pos = token_pos(s->file->tokenizer.fullpath, 1, 1);
@@ -2453,9 +2448,9 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 	for_array(file_index, file_order) {
 		ImportGraphNode *node = file_order[file_index];
 		Scope *parent_scope = node->scope;
-		for_array(i, node->specs) {
-			AstNode *spec = node->specs[i];
-			ast_node(id, ImportSpec, spec);
+		for_array(i, node->decls) {
+			AstNode *decl = node->decls[i];
+			ast_node(id, ImportDecl, decl);
 			Token token = id->relpath;
 
 			GB_ASSERT(parent_scope->is_file);
@@ -2496,34 +2491,30 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 
 			scope->has_been_imported = true;
 
-			if (id->import_name.string == ".") {
+			if (id->is_using) {
 				if (parent_scope->is_global) {
-					error(id->import_name, "#shared_global_scope imports cannot use .");
+					error(id->import_name, "#shared_global_scope imports cannot use using");
 				} else {
 					// NOTE(bill): Add imported entities to this file's scope
 					for_array(elem_index, scope->elements.entries) {
 						Entity *e = scope->elements.entries[elem_index].value;
-						if (e->scope == parent_scope) {
-							continue;
-						}
+						if (e->scope == parent_scope) continue;
 
 						if (!is_entity_kind_exported(e->kind)) {
 							continue;
 						}
-						if (id->is_import) {
+						if (id->import_name.string == ".") {
+							add_entity(c, parent_scope, e->identifier, e);
+						} else {
 							if (is_entity_exported(e)) {
 								// TODO(bill): Should these entities be imported but cause an error when used?
 								bool ok = add_entity(c, parent_scope, e->identifier, e);
-								if (ok) {
-									map_set(&parent_scope->implicit, hash_entity(e), true);
-								}
+								if (ok) map_set(&parent_scope->implicit, hash_entity(e), true);
 							}
-						} else {
-							add_entity(c, parent_scope, e->identifier, e);
 						}
 					}
 				}
-			} else {
+			} else if (id->import_name.string != ".") {
 				String import_name = path_to_entity_name(id->import_name.string, id->fullpath);
 				if (is_blank_ident(import_name)) {
 					error(token, "File name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));

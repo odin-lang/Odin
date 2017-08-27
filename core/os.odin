@@ -1,8 +1,6 @@
-import_load (
-	"os_windows.odin" when ODIN_OS == "windows";
-	"os_x.odin"       when ODIN_OS == "osx";
-	"os_linux.odin"   when ODIN_OS == "linux";
-)
+using import . "os_windows.odin" when ODIN_OS == "windows";
+using import . "os_x.odin"       when ODIN_OS == "osx";
+using import . "os_linux.odin"   when ODIN_OS == "linux";
 
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, cast([]u8)str);

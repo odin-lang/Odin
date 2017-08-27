@@ -1,11 +1,10 @@
 #shared_global_scope;
 
-import (
-	"os.odin";
-	"fmt.odin"; // TODO(bill): Remove the need for `fmt` here
-	"utf8.odin";
-	"raw.odin";
-)
+import "os.odin";
+import "fmt.odin"; // TODO(bill): Remove the need for `fmt` here
+import "utf8.odin";
+import "raw.odin";
+
 // Naming Conventions:
 // In general, Ada_Case for types and snake_case for values
 //

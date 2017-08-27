@@ -457,7 +457,7 @@ foreign gdi32 {
 	stretch_dibits   :: proc(hdc: Hdc,
 	                        x_dst, y_dst, width_dst, height_dst: i32,
 	                        x_src, y_src, width_src, header_src: i32,
-	                        bits: rawptr, bits_info: ^BitmapInfo,
+	                        bits: rawptr, bits_info: ^Bitmap_Info,
 	                        usage: u32,
 	                        rop: u32) -> i32                                                                    #cc_std #link_name "StretchDIBits"     ---;
 
@@ -572,7 +572,7 @@ Bitmap_Info_Header :: struct #ordered {
 	clr_used:          u32;
 	clr_important:     u32;
 }
-BitmapInfo :: struct #ordered {
+Bitmap_Info :: struct #ordered {
 	using header: Bitmap_Info_Header;
 	colors:       [1]Rgb_Quad;
 }

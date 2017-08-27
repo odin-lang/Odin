@@ -1,7 +1,5 @@
-import (
-	"atomics.odin";
-	"os.odin";
-)
+import "atomics.odin";
+import "os.odin";
 
 Semaphore :: struct {
 	// _handle: win32.Handle;

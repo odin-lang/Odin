@@ -96,7 +96,6 @@ void print_declaration(AstNode *decl) {
 			AstNode *spec = gd->specs[spec_index];
 			switch(gd->token.kind) {
 			case Token_import:
-			case Token_import_load:
 				break;
 			case Token_foreign_library:
 			case Token_foreign_system_library:
