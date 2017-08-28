@@ -1045,7 +1045,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_write_string(f, " 0, ");
 		ir_print_type(f, m, t_i32);
 	#if 1
-		ir_fprintf(f, " %d", 2);
+		ir_fprintf(f, " 2");
 	#else
 		ir_fprintf(f, " %d", 2);
 	#endif
@@ -1064,11 +1064,10 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_value(f, m, instr->UnionTagValue.address, et);
 		ir_write_byte(f, ',');
 	#if 1
-		ir_fprintf(f, " %d", 2);
+		ir_fprintf(f, " 2");
 	#else
 		ir_fprintf(f, " %d", 2);
 	#endif
-		ir_fprintf(f, ", %d", 2);
 		ir_write_string(f, " ; UnionTagValue");
 		ir_write_byte(f, '\n');
 	} break;

@@ -174,7 +174,10 @@ fprint_type :: proc(fd: os.Handle, info: ^Type_Info) {
 }
 
 write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
-	if ti == nil do return;
+	if ti == nil {
+		write_string(buf, "nil");
+		return;
+	}
 
 	using Type_Info;
 	match info in ti.variant {
@@ -324,7 +327,6 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 			write_int(buf, i64(info.bits[i]), 10);
 		}
 		write_string(buf, "}");
-
 	}
 }
 
