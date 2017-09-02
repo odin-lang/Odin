@@ -8241,7 +8241,7 @@ void ir_gen_tree(irGen *s) {
 
 				case Type_BitField: {
 					ir_emit_comment(proc, str_lit("TypeInfoBitField"));
-					tag = ir_emit_conv(proc, variant_ptr, t_type_info_map_ptr);
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_bit_field_ptr);
 					// names:   []string;
 					// bits:    []u32;
 					// offsets: []u32;
@@ -8249,8 +8249,8 @@ void ir_gen_tree(irGen *s) {
 					if (count > 0) {
 						Entity **fields = t->BitField.fields;
 						irValue *name_array   = ir_generate_array(m, t_string, count, str_lit("__$bit_field_names"),   cast(i64)entry_index);
-						irValue *bit_array    = ir_generate_array(m, t_u32,    count, str_lit("__$bit_field_bits"),    cast(i64)entry_index);
-						irValue *offset_array = ir_generate_array(m, t_u32,    count, str_lit("__$bit_field_offsets"), cast(i64)entry_index);
+						irValue *bit_array    = ir_generate_array(m, t_i32,    count, str_lit("__$bit_field_bits"),    cast(i64)entry_index);
+						irValue *offset_array = ir_generate_array(m, t_i32,    count, str_lit("__$bit_field_offsets"), cast(i64)entry_index);
 
 						for (isize i = 0; i < count; i++) {
 							Entity *f = fields[i];
@@ -8261,22 +8261,22 @@ void ir_gen_tree(irGen *s) {
 							irValue *offset_ep = ir_emit_array_epi(proc, offset_array, cast(i32)i);
 
 							ir_emit_store(proc, name_ep, ir_const_string(a, f->token.string));
-							ir_emit_store(proc, bit_ep, ir_const_u32(a, f->type->BitFieldValue.bits));
-							ir_emit_store(proc, offset_ep, ir_const_u32(a, t->BitField.offsets[i]));
+							ir_emit_store(proc, bit_ep, ir_const_i32(a, f->type->BitFieldValue.bits));
+							ir_emit_store(proc, offset_ep, ir_const_i32(a, t->BitField.offsets[i]));
 
 						}
 
 						irValue *v_count = ir_const_int(a, count);
 
-						irValue *names = ir_emit_struct_ep(proc, tag, 1);
+						irValue *names = ir_emit_struct_ep(proc, tag, 0);
 						irValue *name_array_elem = ir_array_elem(proc, name_array);
 						ir_fill_slice(proc, names, name_array_elem, v_count, v_count);
 
-						irValue *bits = ir_emit_struct_ep(proc, tag, 2);
+						irValue *bits = ir_emit_struct_ep(proc, tag, 1);
 						irValue *bit_array_elem = ir_array_elem(proc, bit_array);
 						ir_fill_slice(proc, bits, bit_array_elem, v_count, v_count);
 
-						irValue *offsets = ir_emit_struct_ep(proc, tag, 3);
+						irValue *offsets = ir_emit_struct_ep(proc, tag, 2);
 						irValue *offset_array_elem = ir_array_elem(proc, offset_array);
 						ir_fill_slice(proc, offsets, offset_array_elem, v_count, v_count);
 					}
