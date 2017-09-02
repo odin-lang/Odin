@@ -3178,17 +3178,21 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 
 	Type *src = base_type(src_type);
 	Type *dst = base_type(t);
-#if 0
-	if (are_types_identical(t, src_type)) {
-		return value;
-	}
-#endif
+
 	irModule *m = proc->module;
 
 	i64 sz = type_size_of(m->allocator, src);
 	i64 dz = type_size_of(m->allocator, dst);
 
 	GB_ASSERT_MSG(sz == dz, "Invalid transmute conversion: `%s` to `%s`", type_to_string(src_type), type_to_string(t));
+
+	// NOTE(bill): Casting between an integer and a pointer cannot be done through a bitcast
+	if (is_type_int_or_uint(src) && is_type_pointer(dst)) {
+		return ir_emit_int_to_ptr(proc, value, t);
+	}
+	if (is_type_pointer(src) && is_type_int_or_uint(dst)) {
+		return ir_emit_ptr_to_int(proc, value, t);
+	}
 
 	if (ir_is_type_aggregate(src) || ir_is_type_aggregate(dst)) {
 		irValue *s = ir_address_from_load_or_generate_local(proc, value);
@@ -3197,7 +3201,6 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 	}
 
 	// TODO(bill): Actually figure out what the conversion needs to be correctly 'cause LLVM
-
 	return ir_emit_bitcast(proc, value, dst);
 }
 
@@ -3463,7 +3466,7 @@ irValue *ir_emit_logical_binary_expr(irProcedure *proc, AstNode *expr) {
 
 	return ir_emit_load(proc, result);
 #else
-	irBlock *rhs = ir_new_block(proc, nullptr, "logical.cmp.rhs");
+	irBlock *rhs  = ir_new_block(proc, nullptr, "logical.cmp.rhs");
 	irBlock *done = ir_new_block(proc, nullptr, "logical.cmp.done");
 
 	Type *type = type_of_expr(proc->module->info, expr);
@@ -3705,12 +3708,11 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	}
 	if (is_poly) {
 		auto found = map_get(&m->info->gen_types, hash_pointer(e->type));
-		if (found == nullptr) {
-			return;
-		}
-		for_array(i, *found) {
-			Entity *e = (*found)[i];
-			ir_mangle_add_sub_type_name(m, e, name);
+		if (found != nullptr) {
+			for_array(i, *found) {
+				Entity *e = (*found)[i];
+				ir_mangle_add_sub_type_name(m, e, name);
+			}
 		}
 		return;
 	}
