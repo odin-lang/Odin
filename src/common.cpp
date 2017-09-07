@@ -480,11 +480,11 @@ wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
 #else
 	bool path_is_directory(String path) {
 		gbAllocator a = heap_allocator();
-		String copy = copy_string(a, path);
-		defer (gb_free(a, copy.text));
+		char *copy = cast(char *)copy_string(a, path).text;
+		defer (gb_free(a, copy));
 
 		struct stat s;
-		if (stat(copy.text, &s) == 0) {
+		if (stat(copy, &s) == 0) {
 			return (s.st_mode & S_IFDIR) != 0;
 		}
 		return false;
