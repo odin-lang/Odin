@@ -16,11 +16,11 @@ struct String {
 	isize len;
 
 	u8 &operator[](isize i) {
-		GB_ASSERT(0 <= i && i < len);
+		GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
 		return text[i];
 	}
 	u8 const &operator[](isize i) const {
-		GB_ASSERT(0 <= i && i < len);
+		GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
 		return text[i];
 	}
 };
@@ -38,11 +38,11 @@ struct String16 {
 	wchar_t *text;
 	isize    len;
 	wchar_t &operator[](isize i) {
-		GB_ASSERT(0 <= i && i < len);
+		GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
 		return text[i];
 	}
 	wchar_t const &operator[](isize i) const {
-		GB_ASSERT(0 <= i && i < len);
+		GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
 		return text[i];
 	}
 };
@@ -284,6 +284,21 @@ String remove_directory_from_path(String s) {
 }
 
 
+String concatenate_strings(gbAllocator a, String x, String y) {
+	isize len = x.len+y.len;
+	u8 *data = gb_alloc_array(a, u8, len+1);
+	gb_memmove(data,       x.text, x.len);
+	gb_memmove(data+x.len, y.text, y.len);
+	data[len] = 0;
+	return make_string(data, len);
+}
+
+String copy_string(gbAllocator a, String s) {
+	u8 *data = gb_alloc_array(a, u8, s.len+1);
+	gb_memmove(data, s.text, s.len);
+	data[s.len] = 0;
+	return make_string(data, s.len);
+}
 
 
 

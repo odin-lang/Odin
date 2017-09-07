@@ -4796,6 +4796,54 @@ bool is_import_path_valid(String path) {
 	return false;
 }
 
+bool determine_path_from_string(Parser *p, AstNode *node, String base_dir, String original_string, String *path) {
+	GB_ASSERT(path != nullptr);
+
+	gbAllocator a = heap_allocator();
+	String collection_name = {};
+
+	isize colon_pos = -1;
+	for (isize j = 0; j < original_string.len; j++) {
+		if (original_string[j] == ':') {
+			colon_pos = j;
+			break;
+		}
+	}
+
+	String file_str = {};
+	if (colon_pos == 0) {
+		syntax_error(node, "Expected a collection name");
+		return false;
+	}
+
+	if (original_string.len > 0 && colon_pos > 0) {
+		collection_name = substring(original_string, 0, colon_pos);
+		file_str = substring(original_string, colon_pos+1, original_string.len);
+	} else {
+		file_str = original_string;
+	}
+
+	if (!is_import_path_valid(file_str)) {
+		syntax_error(node, "Invalid import path: `%.*s`", LIT(file_str));
+		return false;
+	}
+
+	gb_mutex_lock(&p->file_decl_mutex);
+	defer (gb_mutex_unlock(&p->file_decl_mutex));
+
+	if (collection_name.len > 0) {
+		if (!find_library_collection_path(collection_name, &base_dir)) {
+			// NOTE(bill): It's a naughty name
+			syntax_error(node, "Unknown library colleciton: `%.*s`", LIT(base_dir));
+			return false;
+		}
+	}
+	String fullpath = string_trim_whitespace(get_fullpath_relative(a, base_dir, file_str));
+	*path = fullpath;
+
+	return true;
+}
+
 void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNode *> decls) {
 	for_array(i, decls) {
 		AstNode *node = decls[i];
@@ -4803,73 +4851,38 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 		    node->kind != AstNode_BadStmt &&
 		    node->kind != AstNode_EmptyStmt) {
 			// NOTE(bill): Sanity check
-			syntax_error(node, "Only declarations are allowed at file scope %.*s", LIT(ast_node_strings[node->kind]));
+			syntax_error(node, "Only declarations are allowed at file scope, got %.*s", LIT(ast_node_strings[node->kind]));
 		} else if (node->kind == AstNode_ImportDecl) {
 			ast_node(id, ImportDecl, node);
-			String collection_name = {};
-			String oirignal_string = id->relpath.string;
-			String file_str = id->relpath.string;
-			gbAllocator a = heap_allocator(); // TODO(bill): Change this allocator
-			String import_file = {};
-			String rel_path = {};
 
-			if (!is_import_path_valid(file_str)) {
-				syntax_error(node, "Invalid import path: `%.*s`", LIT(file_str));
-				// NOTE(bill): It's a naughty name
+			String original_string = id->relpath.string;
+			String import_path = {};
+			bool ok = determine_path_from_string(p, node, base_dir, original_string, &import_path);
+			if (!ok) {
 				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
 				continue;
 			}
 
-			gb_mutex_lock(&p->file_decl_mutex);
-			defer (gb_mutex_unlock(&p->file_decl_mutex));
-
-			rel_path = get_fullpath_relative(a, base_dir, file_str);
-			import_file = rel_path;
-			if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
-				String abs_path = get_fullpath_core(a, file_str);
-				if (gb_file_exists(cast(char *)abs_path.text)) {
-					import_file = abs_path;
-				}
-			}
-
-			import_file = string_trim_whitespace(import_file);
-
-			id->fullpath = import_file;
-			try_add_import_path(p, import_file, file_str, ast_node_token(node).pos);
+			id->fullpath = import_path;
+			try_add_import_path(p, import_path, original_string, ast_node_token(node).pos);
 		} else if (node->kind == AstNode_ExportDecl) {
 			ast_node(ed, ExportDecl, node);
-			String collection_name = {};
-			String oirignal_string = ed->relpath.string;
-			String file_str = ed->relpath.string;
-			gbAllocator a = heap_allocator(); // TODO(bill): Change this allocator
-			String export_path = {};
-			String rel_path = {};
 
-			if (!is_import_path_valid(file_str)) {
-				syntax_error(node, "Invalid export path: `%.*s`", LIT(file_str));
-				// NOTE(bill): It's a naughty name
+			String original_string = ed->relpath.string;
+			String export_path = {};
+			bool ok = determine_path_from_string(p, node, base_dir, original_string, &export_path);
+			if (!ok) {
 				decls[i] = ast_bad_decl(f, ed->relpath, ed->relpath);
 				continue;
-			}
-
-			gb_mutex_lock(&p->file_decl_mutex);
-			defer (gb_mutex_unlock(&p->file_decl_mutex));
-
-			rel_path = get_fullpath_relative(a, base_dir, file_str);
-			export_path = rel_path;
-			if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
-				String abs_path = get_fullpath_core(a, file_str);
-				if (gb_file_exists(cast(char *)abs_path.text)) {
-					export_path = abs_path;
-				}
 			}
 
 			export_path = string_trim_whitespace(export_path);
 
 			ed->fullpath = export_path;
-			try_add_import_path(p, export_path, file_str, ast_node_token(node).pos);
+			try_add_import_path(p, export_path, original_string, ast_node_token(node).pos);
 		} else if (node->kind == AstNode_ForeignLibraryDecl) {
 			ast_node(fl, ForeignLibraryDecl, node);
+
 			String file_str = fl->filepath.string;
 			if (!is_import_path_valid(file_str)) {
 				syntax_error(node, "Invalid `%.*s` path", LIT(fl->token.string));

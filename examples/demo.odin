@@ -1,21 +1,21 @@
-import "fmt.odin";
-import "strconv.odin";
-import "mem.odin";
-import "thread.odin"            when ODIN_OS == "windows";
-import win32 "sys/windows.odin" when ODIN_OS == "windows";
-import "atomics.odin";
-import "bits.odin";
-import "hash.odin";
-import "math.odin";
-import "opengl.odin";
-import "os.odin";
-import "raw.odin";
-import "sort.odin";
-import "strings.odin";
-import "sync.odin";
-import "types.odin";
-import "utf8.odin";
-import "utf16.odin";
+import "core:fmt.odin";
+import "core:strconv.odin";
+import "core:mem.odin";
+import "core:thread.odin"            when ODIN_OS == "windows";
+import win32 "core:sys/windows.odin" when ODIN_OS == "windows";
+import "core:atomics.odin";
+import "core:bits.odin";
+import "core:hash.odin";
+import "core:math.odin";
+import "core:opengl.odin";
+import "core:os.odin";
+import "core:raw.odin";
+import "core:sort.odin";
+import "core:strings.odin";
+import "core:sync.odin";
+import "core:types.odin";
+import "core:utf8.odin";
+import "core:utf16.odin";
 
 general_stuff :: proc() {
 	{ // `do` for inline statmes rather than block

@@ -177,6 +177,7 @@ enum BuildFlagKind {
 	BuildFlag_ShowTimings,
 	BuildFlag_ThreadCount,
 	BuildFlag_KeepTempFiles,
+	BuildFlag_Collection,
 
 	BuildFlag_COUNT,
 };
@@ -204,6 +205,36 @@ void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, Bu
 	array_add(build_flags, flag);
 }
 
+bool string_is_valid_identifier(String str) {
+	if (str.len <= 0) return false;
+
+	isize rune_count = 0;
+
+	isize w = 0;
+	isize offset = 0;
+	while (offset < str.len) {
+		Rune r = 0;
+		w = gb_utf8_decode(str.text, str.len, &r);
+		if (r == GB_RUNE_INVALID) {
+			return false;
+		}
+
+		if (rune_count == 0) {
+			if (!rune_is_letter(r)) {
+				return false;
+			}
+		} else {
+			if (!rune_is_letter(r) && !rune_is_digit(r)) {
+				return false;
+			}
+		}
+		rune_count += 1;
+		offset += w;
+	}
+
+	return true;
+}
+
 bool parse_build_flags(Array<String> args) {
 	Array<BuildFlag> build_flags = {};
 	array_init(&build_flags, heap_allocator(), BuildFlag_COUNT);
@@ -211,6 +242,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),    BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),    BuildFlagParam_Integer);
 	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),      BuildFlagParam_String);
 
 
 	Array<String> flag_args = args;
@@ -358,6 +390,68 @@ bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.keep_temp_files = true;
 							break;
+
+						case BuildFlag_Collection: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String str = value.value_string;
+							isize eq_pos = -1;
+							for (isize i = 0; i < str.len; i++) {
+								if (str[i] == '=') {
+									eq_pos = i;
+									break;
+								}
+							}
+							if (eq_pos < 0) {
+								gb_printf_err("Expected `name=path`, got `%.*s`\n", LIT(param));
+								ok = false;
+								bad_flags = true;
+								break;
+							}
+							String name = substring(str, 0, eq_pos);
+							String path = substring(str, eq_pos+1, str.len);
+							if (name.len == 0 || path.len == 0) {
+								gb_printf_err("Expected `name=path`, got `%.*s`\n", LIT(param));
+								ok = false;
+								bad_flags = true;
+								break;
+							}
+
+							if (!string_is_valid_identifier(name)) {
+								gb_printf_err("Library collection name `%.*s` must be a valid identifier\n", LIT(name));
+								ok = false;
+								bad_flags = true;
+								break;
+							}
+
+							if (name == "_") {
+								gb_printf_err("Library collection name cannot be an underscore\n");
+								ok = false;
+								bad_flags = true;
+								break;
+							}
+
+							String prev_path = {};
+							bool found = find_library_collection_path(name, &prev_path);
+							if (found) {
+								gb_printf_err("Library collection `%.*s` already exists with path `%.*s`\n", LIT(name), LIT(prev_path));
+								ok = false;
+								bad_flags = true;
+								break;
+							}
+
+							gbAllocator a = heap_allocator();
+							String fullpath = path_to_fullpath(a, path);
+							if (!path_is_directory(fullpath)) {
+								gb_printf_err("Library collection `%.*s` path must be a directory, got `%.*s`\n", LIT(name), LIT(fullpath));
+								gb_free(a, fullpath.text);
+								ok = false;
+								bad_flags = true;
+								break;
+							}
+
+							add_library_collection(name, path);
+
+						} break;
 						}
 					}
 
@@ -448,6 +542,10 @@ int main(int arg_count, char **arg_ptr) {
 	init_string_buffer_memory();
 	init_scratch_memory(gb_megabytes(10));
 	init_global_error_collector();
+
+	array_init(&library_collections, heap_allocator());
+	add_library_collection(str_lit("core"),   get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("core")));
+	add_library_collection(str_lit("shared"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared")));
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
 

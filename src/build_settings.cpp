@@ -29,7 +29,28 @@ struct BuildContext {
 gb_global BuildContext build_context = {0};
 
 
+struct LibraryCollections {
+	String name;
+	String path;
+};
 
+gb_global Array<LibraryCollections> library_collections = {0};
+
+void add_library_collection(String name, String path) {
+	// TODO(bill): Check the path is valid and a directory
+	LibraryCollections lc = {name, string_trim_whitespace(path)};
+	array_add(&library_collections, lc);
+}
+
+bool find_library_collection_path(String name, String *path) {
+	for_array(i, library_collections) {
+		if (library_collections[i].name == name) {
+			if (path) *path = library_collections[i].path;
+			return true;
+		}
+	}
+	return false;
+}
 
 
 // TODO(bill): OS dependent versions for the BuildContext
@@ -248,38 +269,39 @@ String path_to_fullpath(gbAllocator a, String s) {
 
 
 String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
-	String res = {0};
-	isize str_len = base_dir.len+path.len;
-
-	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
+	u8 *str = gb_alloc_array(heap_allocator(), u8, base_dir.len+1+path.len+1);
+	defer (gb_free(heap_allocator(), str));
 
 	isize i = 0;
-	gb_memmove(str+i, &base_dir[0], base_dir.len); i += base_dir.len;
-	gb_memmove(str+i, &path[0], path.len);
-	str[str_len] = '\0';
-	res = path_to_fullpath(a, make_string(str, str_len));
-	gb_free(heap_allocator(), str);
-	return res;
+	gb_memmove(str+i, base_dir.text, base_dir.len); i += base_dir.len;
+	gb_memmove(str+i, "/", 1);                      i += 1;
+	gb_memmove(str+i, path.text,     path.len);     i += path.len;
+	str[i] = 0;
+
+	String res = make_string(str, i);
+	res = string_trim_whitespace(res);
+	return path_to_fullpath(a, res);
 }
+
 
 String get_fullpath_core(gbAllocator a, String path) {
 	String module_dir = odin_root_dir();
-	String res = {0};
 
-	char core[] = "core/";
-	isize core_len = gb_size_of(core)-1;
+	String core = str_lit("core/");
 
-	isize str_len = module_dir.len + core_len + path.len;
+	isize str_len = module_dir.len + core.len + path.len;
 	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
+	defer (gb_free(heap_allocator(), str));
 
-	gb_memmove(str, &module_dir[0], module_dir.len);
-	gb_memmove(str+module_dir.len, core, core_len);
-	gb_memmove(str+module_dir.len+core_len, &path[0], path.len);
-	str[str_len] = '\0';
+	isize i = 0;
+	gb_memmove(str+i, module_dir.text, module_dir.len); i += module_dir.len;
+	gb_memmove(str+i, core.text, core.len);             i += core.len;
+	gb_memmove(str+i, path.text, path.len);             i += path.len;
+	str[i] = 0;
 
-	res = path_to_fullpath(a, make_string(str, str_len));
-	gb_free(heap_allocator(), str);
-	return res;
+	String res = make_string(str, i);
+	res = string_trim_whitespace(res);
+	return path_to_fullpath(a, res);
 }
 
 

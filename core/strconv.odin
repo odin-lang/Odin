@@ -1,4 +1,4 @@
-using import "decimal.odin";
+using import "core:decimal.odin";
 
 Int_Flag :: enum {
 	Prefix = 1<<0,

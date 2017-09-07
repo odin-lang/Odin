@@ -1,9 +1,9 @@
 #shared_global_scope;
 
-import "os.odin";
-import "fmt.odin"; // TODO(bill): Remove the need for `fmt` here
-import "utf8.odin";
-import "raw.odin";
+import "core:os.odin";
+import "core:fmt.odin"; // TODO(bill): Remove the need for `fmt` here
+import "core:utf8.odin";
+import "core:raw.odin";
 
 // Naming Conventions:
 // In general, Ada_Case for types and snake_case for values
@@ -619,8 +619,6 @@ panic :: proc(message := "", using location := #caller_location) #cc_contextless
 	}
 	__debug_trap();
 }
-
-
 
 
 __string_eq :: proc(a, b: string) -> bool #cc_contextless {

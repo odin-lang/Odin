@@ -1,6 +1,6 @@
-import "fmt.odin";
-import "os.odin";
-import "raw.odin";
+import "core:fmt.odin";
+import "core:os.odin";
+import "core:raw.odin";
 
 foreign __llvm_core {
 	swap :: proc(b: u16) -> u16 #link_name "llvm.bswap.i16" ---;

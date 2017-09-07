@@ -1,5 +1,5 @@
-import win32 "sys/windows.odin";
-import "mem.odin";
+import win32 "core:sys/windows.odin";
+import "core:mem.odin";
 
 Handle   :: int;
 File_Time :: u64;

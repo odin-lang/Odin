@@ -1,7 +1,7 @@
 foreign_system_library dl   "dl";
 foreign_system_library libc "c";
 
-import "strings.odin";
+import "core:strings.odin";
 
 Handle   :: i32;
 File_Time :: u64;

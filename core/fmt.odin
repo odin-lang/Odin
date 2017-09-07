@@ -1,9 +1,9 @@
-import "os.odin";
-import "mem.odin";
-import "utf8.odin";
-import "types.odin";
-import "strconv.odin";
-import "raw.odin";
+import "core:os.odin";
+import "core:mem.odin";
+import "core:utf8.odin";
+import "core:types.odin";
+import "core:strconv.odin";
+import "core:raw.odin";
 
 
 _BUFFER_SIZE :: 1<<12;

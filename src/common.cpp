@@ -463,3 +463,31 @@ wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
 }
 
 #endif
+
+
+#if defined(GB_SYSTEM_WINDOWS)
+	bool path_is_directory(String path) {
+		gbAllocator a = heap_allocator();
+		String16 wstr = string_to_string16(a, path);
+		defer (gb_free(a, wstr.text));
+
+		i32 attribs = GetFileAttributesW(wstr.text);
+		if (attribs < 0) return false;
+
+		return (attribs & FILE_ATTRIBUTE_DIRECTORY) != 0;
+	}
+
+#else
+	bool path_is_directory(String path) {
+		gbAllocator a = heap_allocator();
+		String copy = copy_string(a, path);
+		defer (gb_free(a, copy.text));
+
+		struct stat s;
+		if (stat(copy.text, &s) == 0) {
+			return (s.st_mode & S_IFDIR) != 0;
+		}
+		return false;
+	}
+#endif
+

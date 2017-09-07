@@ -1,4 +1,4 @@
-import "mem.odin";
+import "core:mem.odin";
 
 adler32 :: proc(data: []u8) -> u32 {
 	ADLER_CONST :: 65521;
