@@ -8316,7 +8316,7 @@ void ir_gen_tree(irGen *s) {
 					ir_emit_store(proc, data, ir_emit_conv(proc, g, t_rawptr));
 					ir_emit_store(proc, ti,   ir_type_info(proc, var_type));
 				} else {
-					ir_emit_store(proc, var->var, var->init);
+					ir_emit_store(proc, var->var, ir_emit_conv(proc, var->init, t));
 				}
 			}
 		}
