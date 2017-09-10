@@ -77,7 +77,7 @@ struct AstFile {
 
 struct Parser {
 	String              init_fullpath;
-	Array<AstFile>      files;
+	Array<AstFile *>    files;
 	Array<ImportedFile> imports;
 	isize               total_token_count;
 	isize               total_line_count;
@@ -351,6 +351,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		String   fullpath;      \
 		Token    import_name;   \
 		AstNode *cond;          \
+		AstFile *parent;        \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -359,6 +360,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token    relpath;       \
 		String   fullpath;      \
 		AstNode *cond;          \
+		AstFile *parent;        \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -368,6 +370,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token    library_name;  \
 		String   base_dir;      \
 		AstNode *cond;          \
+		AstFile *parent;        \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -483,6 +486,7 @@ String const ast_node_strings[] = {
 struct AstNode {
 	AstNodeKind kind;
 	u32         stmt_state_flags;
+	AstFile *   file;
 	union {
 #define AST_NODE_KIND(_kind_name_, name, ...) GB_JOIN2(AstNode, _kind_name_) _kind_name_;
 	AST_NODE_KINDS
@@ -937,6 +941,7 @@ AstNode *make_ast_node(AstFile *f, AstNodeKind kind) {
 	}
 	AstNode *node = gb_alloc_item(gb_arena_allocator(arena), AstNode);
 	node->kind = kind;
+	node->file = f;
 	return node;
 }
 
@@ -1543,6 +1548,7 @@ AstNode *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, 
 	result->ImportDecl.relpath     = relpath;
 	result->ImportDecl.import_name = import_name;
 	result->ImportDecl.cond        = cond;
+	result->ImportDecl.parent      = f;
 	result->ImportDecl.docs        = docs;
 	result->ImportDecl.comment     = comment;
 	return result;
@@ -1554,6 +1560,7 @@ AstNode *ast_export_decl(AstFile *f, Token token, Token relpath, AstNode *cond,
 	result->ExportDecl.token       = token;
 	result->ExportDecl.relpath     = relpath;
 	result->ExportDecl.cond        = cond;
+	result->ExportDecl.parent      = f;
 	result->ExportDecl.docs        = docs;
 	result->ExportDecl.comment     = comment;
 	return result;
@@ -1566,6 +1573,7 @@ AstNode *ast_foreign_library_decl(AstFile *f, Token token, Token filepath, Token
 	result->ForeignLibraryDecl.filepath     = filepath;
 	result->ForeignLibraryDecl.library_name = library_name;
 	result->ForeignLibraryDecl.cond         = cond;
+	result->ForeignLibraryDecl.parent       = f;
 	result->ForeignLibraryDecl.docs         = docs;
 	result->ForeignLibraryDecl.comment      = comment;
 	return result;
@@ -4714,7 +4722,7 @@ bool init_parser(Parser *p) {
 void destroy_parser(Parser *p) {
 	// TODO(bill): Fix memory leak
 	for_array(i, p->files) {
-		destroy_ast_file(&p->files[i]);
+		destroy_ast_file(p->files[i]);
 	}
 #if 0
 	for_array(i, p->imports) {
@@ -4918,13 +4926,13 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 	String import_path = imported_file.path;
 	String import_rel_path = imported_file.rel_path;
 	TokenPos pos = imported_file.pos;
-	AstFile file = {};
-	file.file_kind = imported_file.kind;
-	if (file.file_kind == ImportedFile_Shared) {
-		file.is_global_scope = true;
+	AstFile *file = gb_alloc_item(heap_allocator(), AstFile);
+	file->file_kind = imported_file.kind;
+	if (file->file_kind == ImportedFile_Shared) {
+		file->is_global_scope = true;
 	}
 
-	ParseFileError err = init_ast_file(&file, import_path);
+	ParseFileError err = init_ast_file(file, import_path);
 
 	if (err != ParseFile_None) {
 		if (err == ParseFile_EmptyFile) {
@@ -4959,12 +4967,12 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 		gb_printf_err("\n");
 		return err;
 	}
-	parse_file(p, &file);
+	parse_file(p, file);
 
 	gb_mutex_lock(&p->file_add_mutex);
-	file.id = imported_file.index;
+	file->id = imported_file.index;
 	array_add(&p->files, file);
-	p->total_line_count += file.tokenizer.line_count;
+	p->total_line_count += file->tokenizer.line_count;
 	gb_mutex_unlock(&p->file_add_mutex);
 
 
@@ -5081,7 +5089,7 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 // #endif
 
 	for_array(i, p->files) {
-		p->total_token_count += p->files[i].tokens.count;
+		p->total_token_count += p->files[i]->tokens.count;
 	}
 
 

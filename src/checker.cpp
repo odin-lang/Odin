@@ -472,7 +472,7 @@ bool decl_info_has_init(DeclInfo *d) {
 
 
 
-Scope *make_scope(Scope *parent, gbAllocator allocator) {
+Scope *create_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
 	map_init(&s->elements,   heap_allocator());
@@ -484,6 +484,32 @@ Scope *make_scope(Scope *parent, gbAllocator allocator) {
 	if (parent != nullptr && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
 	}
+	return s;
+}
+
+Scope *create_scope_from_file(Checker *c, AstFile *f) {
+	GB_ASSERT(f != nullptr);
+
+	Scope *s = create_scope(c->global_scope, c->allocator);
+
+	s->file = f;
+	f->scope = s;
+	s->is_file   = true;
+
+	if (f->tokenizer.fullpath == c->parser->init_fullpath) {
+		s->is_init = true;
+	} else {
+		s->is_init   = f->file_kind == ImportedFile_Init;
+	}
+
+	s->is_global = f->is_global_scope;
+	if (s->is_global) array_add(&c->global_scope->shared, s);
+
+
+	if (s->is_init || s->is_global) {
+		s->has_been_imported = true;
+	}
+
 	return s;
 }
 
@@ -526,7 +552,7 @@ void check_open_scope(Checker *c, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_Invalid ||
 	          is_ast_node_stmt(node) ||
 	          is_ast_node_type(node));
-	Scope *scope = make_scope(c->context.scope, c->allocator);
+	Scope *scope = create_scope(c->context.scope, c->allocator);
 	add_scope(c, node, scope);
 	switch (node->kind) {
 	case AstNode_ProcType:
@@ -737,7 +763,7 @@ void init_universal_scope(void) {
 	BuildContext *bc = &build_context;
 	// NOTE(bill): No need to free these
 	gbAllocator a = heap_allocator();
-	universal_scope = make_scope(nullptr, a);
+	universal_scope = create_scope(nullptr, a);
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
@@ -851,7 +877,7 @@ void init_checker(Checker *c, Parser *parser) {
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
 	isize total_token_count = 0;
 	for_array(i, c->parser->files) {
-		AstFile *f = &c->parser->files[i];
+		AstFile *f = c->parser->files[i];
 		total_token_count += f->tokens.count;
 	}
 	isize arena_size = 2 * item_size * total_token_count;
@@ -864,7 +890,7 @@ void init_checker(Checker *c, Parser *parser) {
 	// c->allocator     = gb_arena_allocator(&c->arena);
 	c->tmp_allocator = gb_arena_allocator(&c->tmp_arena);
 
-	c->global_scope = make_scope(universal_scope, c->allocator);
+	c->global_scope = create_scope(universal_scope, c->allocator);
 	c->context.scope = c->global_scope;
 }
 
@@ -2238,7 +2264,7 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c, Map<Scope 
 	defer (map_destroy(&M));
 
 	for_array(i, c->parser->files) {
-		Scope *scope = c->parser->files[i].scope;
+		Scope *scope = c->parser->files[i]->scope;
 
 		ImportGraphNode *n = import_graph_node_create(heap_allocator(), scope);
 		map_set(&M, hash_pointer(scope), n);
@@ -2287,6 +2313,7 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c, Map<Scope 
 				ptr_set_add(&m->scope->imported, n->scope);
 			}
 		case_end;
+
 
 		case_ast_node(ed, ExportDecl, decl);
 			String path = ed->fullpath;
@@ -2457,16 +2484,15 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 
 	for_array(file_index, file_order) {
 		ImportGraphNode *node = file_order[file_index];
-		Scope *parent_scope = node->scope;
 		for_array(i, node->decls) {
 			AstNode *decl = node->decls[i];
+			Scope *parent_scope = decl->file->scope;
+			GB_ASSERT(parent_scope->is_file);
 
 			switch (decl->kind) {
 			case_ast_node(id, ImportDecl, decl);
+
 				Token token = id->relpath;
-
-				GB_ASSERT(parent_scope->is_file);
-
 				HashKey key = hash_string(id->fullpath);
 				Scope **found = map_get(file_scopes, key);
 				if (found == nullptr) {
@@ -2542,9 +2568,6 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 
 			case_ast_node(ed, ExportDecl, decl);
 				Token token = ed->relpath;
-
-				GB_ASSERT(parent_scope->is_file);
-
 				HashKey key = hash_string(ed->fullpath);
 				Scope **found = map_get(file_scopes, key);
 				if (found == nullptr) {
@@ -2601,9 +2624,12 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 	}
 
 	for_array(i, c->delayed_foreign_libraries) {
-		Scope *parent_scope = c->delayed_foreign_libraries[i].parent;
 		AstNode *decl = c->delayed_foreign_libraries[i].decl;
 		ast_node(fl, ForeignLibraryDecl, decl);
+
+		// Scope *parent_scope = c->delayed_foreign_libraries[i].parent;
+		Scope *parent_scope = fl->parent->scope;
+		GB_ASSERT(parent_scope->is_file);
 
 		String file_str = fl->filepath.string;
 		String base_dir = fl->base_dir;
@@ -2634,7 +2660,6 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 				continue;
 			}
 		}
-
 
 		String library_name = path_to_entity_name(fl->library_name.string, file_str);
 		if (is_blank_ident(library_name)) {
@@ -2780,27 +2805,9 @@ void check_parsed_files(Checker *c) {
 
 	// Map full filepaths to Scopes
 	for_array(i, c->parser->files) {
-		AstFile *f = &c->parser->files[i];
-		Scope *scope = nullptr;
-		scope = make_scope(c->global_scope, c->allocator);
-		scope->is_global = f->is_global_scope;
-		scope->is_file   = true;
-		scope->file      = f;
-		if (f->tokenizer.fullpath == c->parser->init_fullpath) {
-			scope->is_init = true;
-		} else if (f->file_kind == ImportedFile_Init) {
-			scope->is_init = true;
-		}
+		AstFile *f = c->parser->files[i];
+		Scope *scope = create_scope_from_file(c, f);
 
-		if (scope->is_global) {
-			array_add(&c->global_scope->shared, scope);
-		}
-
-		if (scope->is_init || scope->is_global) {
-			scope->has_been_imported = true;
-		}
-
-		f->scope = scope;
 		f->decl_info = make_declaration_info(c->allocator, f->scope, c->context.decl);
 		HashKey key = hash_string(f->tokenizer.fullpath);
 		map_set(&file_scopes, key, scope);
@@ -2809,7 +2816,7 @@ void check_parsed_files(Checker *c) {
 
 	// Collect Entities
 	for_array(i, c->parser->files) {
-		AstFile *f = &c->parser->files[i];
+		AstFile *f = c->parser->files[i];
 		CheckerContext prev_context = c->context;
 		add_curr_ast_file(c, f);
 		check_collect_entities(c, f->decls, true);

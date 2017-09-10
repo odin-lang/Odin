@@ -96,7 +96,7 @@ void error_operand_no_value(Operand *o) {
 
 void check_scope_decls(Checker *c, Array<AstNode *> nodes, isize reserve_size) {
 	Scope *s = c->context.scope;
-	GB_ASSERT(!s->is_file);
+	GB_ASSERT(s->file == nullptr);
 
 	check_collect_entities(c, nodes, false);
 
@@ -237,7 +237,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	CheckerContext prev_context = c->context;
 	defer (c->context = prev_context);
 
-	Scope *scope = make_scope(base_entity->scope, a);
+	Scope *scope = create_scope(base_entity->scope, a);
 	scope->is_proc = true;
 	c->context.scope = scope;
 	c->context.allow_polymorphic_types = true;
@@ -2761,7 +2761,7 @@ void generate_map_entry_type(gbAllocator a, Type *type) {
 	*/
 	AstNode *dummy_node = gb_alloc_item(a, AstNode);
 	dummy_node->kind = AstNode_Invalid;
-	Scope *s = make_scope(universal_scope, a);
+	Scope *s = create_scope(universal_scope, a);
 
 	isize field_count = 3;
 	Array<Entity *> fields = {};
@@ -2798,7 +2798,7 @@ void generate_map_internal_types(gbAllocator a, Type *type) {
 	*/
 	AstNode *dummy_node = gb_alloc_item(a, AstNode);
 	dummy_node->kind = AstNode_Invalid;
-	Scope *s = make_scope(universal_scope, a);
+	Scope *s = create_scope(universal_scope, a);
 
 	Type *hashes_type  = make_type_dynamic_array(a, t_int);
 	Type *entries_type = make_type_dynamic_array(a, type->Map.entry_type);
@@ -4538,7 +4538,7 @@ bool check_is_field_exported(Checker *c, Entity *field) {
 	if (file_scope == nullptr) {
 		return true;
 	}
-	while (!file_scope->is_file) {
+	while (file_scope->file == nullptr) {
 		file_scope = file_scope->parent;
 	}
 	if (!is_entity_exported(field) && file_scope != c->context.file_scope) {

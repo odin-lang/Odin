@@ -434,7 +434,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 
 
-	if (d->scope->is_file && e->token.string == "main") {
+	if (d->scope->file != nullptr && e->token.string == "main") {
 		if (pt->param_count != 0 ||
 		    pt->result_count != 0) {
 			gbString str = type_to_string(proc_type);

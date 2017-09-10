@@ -301,6 +301,8 @@ bool parse_build_flags(Array<String> args) {
 								value = exact_value_bool(true);
 							} else if (param == "TRUE") {
 								value = exact_value_bool(true);
+							} else if (param == "True") {
+								value = exact_value_bool(true);
 							} else if (param == "1") {
 								value = exact_value_bool(true);
 							} else if (param == "f") {
@@ -310,6 +312,8 @@ bool parse_build_flags(Array<String> args) {
 							} else if (param == "false") {
 								value = exact_value_bool(false);
 							} else if (param == "FALSE") {
+								value = exact_value_bool(false);
+							} else if (param == "False") {
 								value = exact_value_bool(false);
 							} else if (param == "0") {
 								value = exact_value_bool(false);
@@ -403,7 +407,6 @@ bool parse_build_flags(Array<String> args) {
 							}
 							if (eq_pos < 0) {
 								gb_printf_err("Expected `name=path`, got `%.*s`\n", LIT(param));
-								ok = false;
 								bad_flags = true;
 								break;
 							}
@@ -411,21 +414,18 @@ bool parse_build_flags(Array<String> args) {
 							String path = substring(str, eq_pos+1, str.len);
 							if (name.len == 0 || path.len == 0) {
 								gb_printf_err("Expected `name=path`, got `%.*s`\n", LIT(param));
-								ok = false;
 								bad_flags = true;
 								break;
 							}
 
 							if (!string_is_valid_identifier(name)) {
 								gb_printf_err("Library collection name `%.*s` must be a valid identifier\n", LIT(name));
-								ok = false;
 								bad_flags = true;
 								break;
 							}
 
 							if (name == "_") {
 								gb_printf_err("Library collection name cannot be an underscore\n");
-								ok = false;
 								bad_flags = true;
 								break;
 							}
@@ -434,7 +434,6 @@ bool parse_build_flags(Array<String> args) {
 							bool found = find_library_collection_path(name, &prev_path);
 							if (found) {
 								gb_printf_err("Library collection `%.*s` already exists with path `%.*s`\n", LIT(name), LIT(prev_path));
-								ok = false;
 								bad_flags = true;
 								break;
 							}
@@ -444,13 +443,14 @@ bool parse_build_flags(Array<String> args) {
 							if (!path_is_directory(fullpath)) {
 								gb_printf_err("Library collection `%.*s` path must be a directory, got `%.*s`\n", LIT(name), LIT(fullpath));
 								gb_free(a, fullpath.text);
-								ok = false;
 								bad_flags = true;
 								break;
 							}
 
 							add_library_collection(name, path);
 
+							// NOTE(bill): Allow for multiple library collections
+							continue;
 						} break;
 						}
 					}
@@ -544,8 +544,8 @@ int main(int arg_count, char **arg_ptr) {
 	init_global_error_collector();
 
 	array_init(&library_collections, heap_allocator());
-	add_library_collection(str_lit("core"),   get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("core")));
-	add_library_collection(str_lit("shared"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared")));
+	// NOTE(bill): `core` cannot be (re)defined by the user
+	add_library_collection(str_lit("core"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("core")));
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
 
@@ -595,6 +595,13 @@ int main(int arg_count, char **arg_ptr) {
 
 	if (!parse_build_flags(args)) {
 		return 1;
+	}
+
+
+	// NOTE(bill): add `shared` directory if it is not already set
+	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
+		add_library_collection(str_lit("shared"),
+		                       get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared")));
 	}
 
 
