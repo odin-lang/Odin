@@ -1,4 +1,4 @@
-foreign_system_library "opengl32.lib" when ODIN_OS == "windows";
+when ODIN_OS == "windows" do foreign_system_library "opengl32.lib";
 using import "core:sys/windows.odin";
 
 

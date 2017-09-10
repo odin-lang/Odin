@@ -98,7 +98,7 @@ void check_scope_decls(Checker *c, Array<AstNode *> nodes, isize reserve_size) {
 	Scope *s = c->context.scope;
 	GB_ASSERT(s->file == nullptr);
 
-	check_collect_entities(c, nodes, false);
+	check_collect_entities(c, nodes);
 
 	for_array(i, s->elements.entries) {
 		Entity *e = s->elements.entries[i].value;
@@ -995,14 +995,14 @@ Array<Entity *> check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 	array_init(&fields, heap_allocator(), init_field_capacity);
 
 	Map<Entity *> entity_map = {};
-	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*init_field_capacity);
+	map_init(&entity_map, c->tmp_allocator, 2*init_field_capacity);
 
 
 	if (node != nullptr) {
 		GB_ASSERT(node->kind != AstNode_UnionType);
 	}
 
-	check_collect_entities(c, decls, false);
+	check_collect_entities(c, decls);
 	for_array(i, c->context.scope->elements.entries) {
 		Entity *e = c->context.scope->elements.entries[i].value;
 		DeclInfo *d = nullptr;
@@ -1442,7 +1442,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	enum_type->Enum.base_type = base_type;
 
 	Map<Entity *> entity_map = {}; // Key: String
-	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*(et->fields.count));
+	map_init(&entity_map, c->tmp_allocator, 2*(et->fields.count));
 
 	Array<Entity *> fields = {};
 	array_init(&fields, c->allocator, et->fields.count);
@@ -1562,7 +1562,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, AstNode *node) {
 	defer (gb_temp_arena_memory_end(tmp));
 
 	Map<Entity *> entity_map = {}; // Key: String
-	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*(bft->fields.count));
+	map_init(&entity_map, c->tmp_allocator, 2*(bft->fields.count));
 
 	isize field_count = 0;
 	Entity **fields  = gb_alloc_array(c->allocator, Entity *, bft->fields.count);

@@ -1,8 +1,6 @@
 import "core:fmt.odin";
 import "core:strconv.odin";
 import "core:mem.odin";
-import "core:thread.odin"            when ODIN_OS == "windows";
-import win32 "core:sys/windows.odin" when ODIN_OS == "windows";
 import "core:atomics.odin";
 import "core:bits.odin";
 import "core:hash.odin";
@@ -16,6 +14,11 @@ import "core:sync.odin";
 import "core:types.odin";
 import "core:utf8.odin";
 import "core:utf16.odin";
+
+when ODIN_OS == "windows" {
+	import "core:thread.odin";
+	import win32 "core:sys/windows.odin";
+}
 
 general_stuff :: proc() {
 	{ // `do` for inline statmes rather than block

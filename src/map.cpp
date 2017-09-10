@@ -101,8 +101,7 @@ struct Map {
 };
 
 
-template <typename T> void map_init             (Map<T> *h, gbAllocator a);
-template <typename T> void map_init_with_reserve(Map<T> *h, gbAllocator a, isize capacity);
+template <typename T> void map_init             (Map<T> *h, gbAllocator a, isize capacity = 16);
 template <typename T> void map_destroy          (Map<T> *h);
 template <typename T> T *  map_get              (Map<T> *h, HashKey key);
 template <typename T> void map_set              (Map<T> *h, HashKey key, T const &value);
@@ -123,13 +122,7 @@ template <typename T> void  multi_map_remove_all(Map<T> *h, HashKey key);
 
 
 template <typename T>
-gb_inline void map_init(Map<T> *h, gbAllocator a) {
-	array_init(&h->hashes,  a);
-	array_init(&h->entries, a);
-}
-
-template <typename T>
-gb_inline void map_init_with_reserve(Map<T> *h, gbAllocator a, isize capacity) {
+gb_inline void map_init(Map<T> *h, gbAllocator a, isize capacity) {
 	array_init(&h->hashes,  a, capacity);
 	array_init(&h->entries, a, capacity);
 }

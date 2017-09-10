@@ -36,30 +36,30 @@ struct ImportedFile {
 
 
 struct AstFile {
-	isize          id;
-	gbArena        arena;
-	Tokenizer      tokenizer;
-	Array<Token>   tokens;
-	isize          curr_token_index;
-	Token          curr_token;
-	Token          prev_token; // previous non-comment
+	isize               id;
+	gbArena             arena;
+	Tokenizer           tokenizer;
+	Array<Token>        tokens;
+	isize               curr_token_index;
+	Token               curr_token;
+	Token               prev_token; // previous non-comment
 
 	// >= 0: In Expression
 	// <  0: In Control Clause
 	// NOTE(bill): Used to prevent type literals in control clauses
-	isize          expr_level;
-	bool           allow_range; // NOTE(bill): Ranges are only allowed in certain cases
-	bool           in_foreign_block;
-	bool           allow_type;
+	isize               expr_level;
+	bool                allow_range; // NOTE(bill): Ranges are only allowed in certain cases
+	bool                in_foreign_block;
+	bool                allow_type;
 
-	Array<AstNode *> decls;
-	ImportedFileKind file_kind;
-	bool             is_global_scope;
+	Array<AstNode *>    decls;
+	ImportedFileKind    file_kind;
+	bool                is_global_scope;
 
-	AstNode *      curr_proc;
-	isize          scope_level;
-	Scope *        scope;       // NOTE(bill): Created in checker
-	DeclInfo *     decl_info;   // NOTE(bill): Created in checker
+	AstNode *           curr_proc;
+	isize               scope_level;
+	Scope *             scope;       // NOTE(bill): Created in checker
+	DeclInfo *          decl_info;   // NOTE(bill): Created in checker
 
 
 	CommentGroup        lead_comment; // Comment (block) before the decl
@@ -68,7 +68,6 @@ struct AstFile {
 	Array<CommentGroup> comments;     // All the comments!
 
 
-	// TODO(bill): Error recovery
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;
 	TokenPos fix_prev_pos;
@@ -350,8 +349,6 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token    relpath;       \
 		String   fullpath;      \
 		Token    import_name;   \
-		AstNode *cond;          \
-		AstFile *parent;        \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -359,8 +356,6 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token    token;         \
 		Token    relpath;       \
 		String   fullpath;      \
-		AstNode *cond;          \
-		AstFile *parent;        \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -369,8 +364,6 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token    filepath;      \
 		Token    library_name;  \
 		String   base_dir;      \
-		AstNode *cond;          \
-		AstFile *parent;        \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -830,9 +823,6 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		n->ValueDecl.names  = clone_ast_node_array(a, n->ValueDecl.names);
 		n->ValueDecl.type   = clone_ast_node(a, n->ValueDecl.type);
 		n->ValueDecl.values = clone_ast_node_array(a, n->ValueDecl.values);
-		break;
-	case AstNode_ForeignLibraryDecl:
-		n->ForeignLibraryDecl.cond = clone_ast_node(a, n->ForeignLibraryDecl.cond);
 		break;
 
 	case AstNode_Field:
@@ -1547,8 +1537,6 @@ AstNode *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, 
 	result->ImportDecl.is_using    = is_using;
 	result->ImportDecl.relpath     = relpath;
 	result->ImportDecl.import_name = import_name;
-	result->ImportDecl.cond        = cond;
-	result->ImportDecl.parent      = f;
 	result->ImportDecl.docs        = docs;
 	result->ImportDecl.comment     = comment;
 	return result;
@@ -1559,8 +1547,6 @@ AstNode *ast_export_decl(AstFile *f, Token token, Token relpath, AstNode *cond,
 	AstNode *result = make_ast_node(f, AstNode_ExportDecl);
 	result->ExportDecl.token       = token;
 	result->ExportDecl.relpath     = relpath;
-	result->ExportDecl.cond        = cond;
-	result->ExportDecl.parent      = f;
 	result->ExportDecl.docs        = docs;
 	result->ExportDecl.comment     = comment;
 	return result;
@@ -1572,8 +1558,6 @@ AstNode *ast_foreign_library_decl(AstFile *f, Token token, Token filepath, Token
 	result->ForeignLibraryDecl.token        = token;
 	result->ForeignLibraryDecl.filepath     = filepath;
 	result->ForeignLibraryDecl.library_name = library_name;
-	result->ForeignLibraryDecl.cond         = cond;
-	result->ForeignLibraryDecl.parent       = f;
 	result->ForeignLibraryDecl.docs         = docs;
 	result->ForeignLibraryDecl.comment      = comment;
 	return result;
@@ -1765,7 +1749,6 @@ bool is_blank_ident(AstNode *node) {
 
 // NOTE(bill): Go to next statement to prevent numerous error messages popping up
 void fix_advance_to_next_stmt(AstFile *f) {
-	// TODO(bill): fix_advance_to_next_stmt
 #if 1
 	for (;;) {
 		Token t = f->curr_token;
@@ -1999,9 +1982,9 @@ void check_proc_add_tag(AstFile *f, AstNode *tag_expr, u64 *tags, ProcTag tag, S
 }
 
 bool is_foreign_name_valid(String name) {
-	// TODO(bill): is_foreign_name_valid
-	if (name.len == 0)
+	if (name.len == 0) {
 		return false;
+	}
 	isize offset = 0;
 	while (offset < name.len) {
 		Rune rune;
@@ -2047,7 +2030,6 @@ bool is_foreign_name_valid(String name) {
 }
 
 void parse_proc_tags(AstFile *f, u64 *tags, String *link_name, ProcCallingConvention *calling_convention) {
-	// TODO(bill): Add this to procedure literals too
 	GB_ASSERT(tags         != nullptr);
 	GB_ASSERT(link_name    != nullptr);
 
@@ -2067,7 +2049,6 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *link_name, ProcCallingConven
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_link_name, tag_name);
 			if (f->curr_token.kind == Token_String) {
 				*link_name = f->curr_token.string;
-				// TODO(bill): Check if valid string
 				if (!is_foreign_name_valid(*link_name)) {
 					syntax_error(tag_expr, "Invalid alternative link procedure name `%.*s`", LIT(*link_name));
 				}
@@ -4852,12 +4833,35 @@ bool determine_path_from_string(Parser *p, AstNode *node, String base_dir, Strin
 	return true;
 }
 
+
+void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNode *> decls);
+
+void parse_setup_file_when_stmt(Parser *p, AstFile *f, String base_dir, AstNodeWhenStmt *ws) {
+	if (ws->body != nullptr) {
+		auto stmts = ws->body->BlockStmt.stmts;
+		parse_setup_file_decls(p, f, base_dir, stmts);
+	}
+
+	if (ws->else_stmt != nullptr) {
+		switch (ws->else_stmt->kind) {
+		case AstNode_BlockStmt: {
+			auto stmts = ws->else_stmt->BlockStmt.stmts;
+			parse_setup_file_decls(p, f, base_dir, stmts);
+		} break;
+		case AstNode_WhenStmt:
+			parse_setup_file_when_stmt(p, f, base_dir, &ws->else_stmt->WhenStmt);
+			break;
+		}
+	}
+}
+
 void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNode *> decls) {
 	for_array(i, decls) {
 		AstNode *node = decls[i];
 		if (!is_ast_node_decl(node) &&
 		    node->kind != AstNode_BadStmt &&
-		    node->kind != AstNode_EmptyStmt) {
+		    node->kind != AstNode_EmptyStmt &&
+		    node->kind != AstNode_WhenStmt) {
 			// NOTE(bill): Sanity check
 			syntax_error(node, "Only declarations are allowed at file scope, got %.*s", LIT(ast_node_strings[node->kind]));
 		} else if (node->kind == AstNode_ImportDecl) {
@@ -4899,6 +4903,9 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 			} else {
 				fl->base_dir = base_dir;
 			}
+		} else if (node->kind == AstNode_WhenStmt) {
+			ast_node(ws, WhenStmt, node);
+			parse_setup_file_when_stmt(p, f, base_dir, ws);
 		}
 	}
 }
