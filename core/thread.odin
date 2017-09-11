@@ -1,6 +1,8 @@
 _ :: compile_assert(ODIN_OS == "windows");
 
-import win32 "core:sys/windows.odin";
+when ODIN_OS == "windows" {
+	import win32 "core:sys/windows.odin";
+}
 
 Thread :: struct {
 	using specific:   Os_Specific;

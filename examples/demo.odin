@@ -20,6 +20,7 @@ when ODIN_OS == "windows" {
 	import win32 "core:sys/windows.odin";
 }
 
+
 general_stuff :: proc() {
 	{ // `do` for inline statmes rather than block
 		foo :: proc() do fmt.println("Foo!");

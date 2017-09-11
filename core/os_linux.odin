@@ -3,9 +3,9 @@ foreign_system_library libc "c";
 
 import "core:strings.odin";
 
-Handle   :: i32;
+Handle    :: i32;
 File_Time :: u64;
-Errno    :: i32;
+Errno     :: i32;
 
 
 O_RDONLY   :: 0x00000;

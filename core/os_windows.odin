@@ -1,7 +1,7 @@
 import win32 "core:sys/windows.odin";
 import "core:mem.odin";
 
-Handle   :: int;
+Handle    :: int;
 File_Time :: u64;
 
 

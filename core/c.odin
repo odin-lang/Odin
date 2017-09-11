@@ -13,17 +13,21 @@ c_ushort         :: i16;
 c_int            :: i32;
 c_uint           :: u32;
 
-c_long  :: ODIN_OS == "windows" ?
-	i32 :
-	(size_of(int) == 4) ?
-		i32 :
-		i64;
+when ODIN_OS == "windows" {
+	c_long :: i32;
+} else when size_of(int) == 4 {
+	c_long :: i32;
+} else {
+	c_long :: i64;
+}
 
-c_ulong :: ODIN_OS == "windows" ?
-	u32 :
-	(size_of(int) == 4) ?
-		u32 :
-		u64;
+when ODIN_OS == "windows" {
+	c_long :: u32;
+} else when size_of(uint) == 4 {
+	c_long :: u32;
+} else {
+	c_long :: u64;
+}
 
 c_longlong       :: i64;
 c_ulonglong      :: u64;

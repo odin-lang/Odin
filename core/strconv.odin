@@ -7,23 +7,23 @@ Int_Flag :: enum {
 }
 
 
-parse_bool :: proc(s: string) -> (result: bool, ok: bool) {
+parse_bool :: proc(s: string) -> (result: bool = false, ok: bool) {
 	match s {
 	case "1", "t", "T", "true", "TRUE", "True":
 		return true, true;
 	case "0", "f", "F", "false", "FALSE", "False":
 		return false, true;
 	}
-	return false, false;
+	return ok = false;
 }
 
 _digit_value :: proc(r: rune) -> int {
 	ri := int(r);
 	v: int = 16;
 	match r {
-	case '0'..'9': v = ri-'0';
-	case 'a'..'z': v = ri-'a'+10;
-	case 'A'..'Z': v = ri-'A'+10;
+	case '0'...'9': v = ri-'0';
+	case 'a'...'z': v = ri-'a'+10;
+	case 'A'...'Z': v = ri-'A'+10;
 	}
 	return v;
 }
@@ -131,7 +131,7 @@ parse_f64 :: proc(s: string) -> f64 {
 		value += f64(v);
 	}
 
-	if s[i] == '.' {
+	if i < len(s) && s[i] == '.' {
 		pow10: f64 = 10;
 		i += 1;
 
@@ -149,28 +149,30 @@ parse_f64 :: proc(s: string) -> f64 {
 	frac := false;
 	scale: f64 = 1;
 
-	if s[i] == 'e' || s[i] == 'E' {
+	if i < len(s) && (s[i] == 'e' || s[i] == 'E') {
 		i += 1;
 
-		match s[i] {
-		case '-': i += 1; frac = true;
-		case '+': i += 1;
+		if i < len(s) {
+			match s[i] {
+			case '-': i += 1; frac = true;
+			case '+': i += 1;
+			}
+
+			exp: u32 = 0;
+			for ; i < len(s); i += 1 {
+				r := rune(s[i]);
+				if r == '_' do continue;
+
+				d := u32(_digit_value(r));
+				if d >= 10 do break;
+				exp = exp * 10 + d;
+			}
+			if exp > 308 { exp = 308; }
+
+			for exp >= 50 { scale *= 1e50; exp -= 50; }
+			for exp >=  8 { scale *=  1e8; exp -=  8; }
+			for exp >   0 { scale *=   10; exp -=  1; }
 		}
-
-		exp: u32 = 0;
-		for ; i < len(s); i += 1 {
-			r := rune(s[i]);
-			if r == '_' do continue;
-
-			d := u32(_digit_value(r));
-			if d >= 10 do break;
-			exp = exp * 10 + d;
-		}
-		if exp > 308 { exp = 308; }
-
-		for exp >= 50 { scale *= 1e50; exp -= 50; }
-		for exp >=  8 { scale *=  1e8; exp -=  8; }
-		for exp >   0 { scale *=   10; exp -=  1; }
 	}
 
 	if frac do return sign * (value/scale);
@@ -179,11 +181,8 @@ parse_f64 :: proc(s: string) -> f64 {
 
 
 append_bool :: proc(buf: []u8, b: bool) -> string {
-	if b {
-		append(&buf, "true");
-	} else {
-		append(&buf, "false");
-	}
+	if b do append(&buf, "true");
+	else do append(&buf, "false");
 	return string(buf);
 }
 
@@ -193,7 +192,7 @@ append_uint :: proc(buf: []u8, u: u64, base: int) -> string {
 append_int :: proc(buf: []u8, i: i64, base: int) -> string {
 	return append_bits(buf, u128(i), base, true, 8*size_of(int), digits, 0);
 }
-itoa :: proc(buf: []u8, i: int) -> string { return append_int(buf, i64(i), 10); }
+itoa :: proc(buf: []u8, i: int) -> string do return append_int(buf, i64(i), 10);
 
 append_float :: proc(buf: []u8, f: f64, fmt: u8, prec, bit_size: int) -> string {
 	return string(generic_ftoa(buf, f, fmt, prec, bit_size));
@@ -389,15 +388,15 @@ round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^FloatInfo) {
 		ok_round_down := l != m || inclusive && i+1 == lower.count;
 		ok_round_up   := m != u && (inclusive || m+1 < u || i+1 < upper.count);
 
-		if (ok_round_down && ok_round_up) {
+		if ok_round_down && ok_round_up {
 			round(d, i+1);
 			return;
 		}
-		if (ok_round_down) {
+		if ok_round_down {
 			round_down(d, i+1);
 			return;
 		}
-		if (ok_round_up) {
+		if ok_round_up {
 			round_up(d, i+1);
 			return;
 		}
@@ -416,28 +415,23 @@ is_integer_negative :: proc(u: u128, is_signed: bool, bit_size: int) -> (unsigne
 		case 8:
 			i := i8(u);
 			neg = i < 0;
-			if neg { i = -i; }
-			u = u128(i);
+			u = u128(abs(i));
 		case 16:
 			i := i16(u);
 			neg = i < 0;
-			if neg { i = -i; }
-			u = u128(i);
+			u = u128(abs(i));
 		case 32:
 			i := i32(u);
 			neg = i < 0;
-			if neg { i = -i; }
-			u = u128(i);
+			u = u128(abs(i));
 		case 64:
 			i := i64(u);
 			neg = i < 0;
-			if neg { i = -i; }
-			u = u128(i);
+			u = u128(abs(i));
 		case 128:
 			i := i128(u);
 			neg = i < 0;
-			if neg { i = -i; }
-			u = u128(i);
+			u = u128(abs(i));
 		case:
 			panic("is_integer_negative: Unknown integer size");
 		}

@@ -264,11 +264,6 @@ i32 is_scope_an_ancestor(Scope *parent, Scope *child) {
 }
 
 
-struct DelayedDecl {
-	Scope *  parent;
-	AstNode *decl;
-};
-
 struct EntityGraphNode;
 typedef PtrSet<EntityGraphNode *> EntityGraphNodeSet;
 
@@ -1617,7 +1612,7 @@ void init_preload(Checker *c) {
 bool check_arity_match(Checker *c, AstNodeValueDecl *vd, bool is_global = false);
 void check_collect_entities(Checker *c, Array<AstNode *> nodes);
 void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws);
-void check_delayed_file_import_entities(Checker *c, AstNode *decl);
+void check_delayed_file_import_entity(Checker *c, AstNode *decl);
 
 bool check_is_entity_overloaded(Entity *e) {
 	if (e->kind != Entity_Procedure) {
@@ -1966,7 +1961,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 				continue;
 			}
 			if (c->context.allow_file_when_statement) {
-				check_delayed_file_import_entities(c, decl);
+				check_delayed_file_import_entity(c, decl);
 			}
 		case_end;
 
@@ -1978,7 +1973,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 				continue;
 			}
 			if (c->context.allow_file_when_statement) {
-				check_delayed_file_import_entities(c, decl);
+				check_delayed_file_import_entity(c, decl);
 			}
 		case_end;
 
@@ -1990,7 +1985,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 				continue;
 			}
 			if (c->context.allow_file_when_statement) {
-				check_delayed_file_import_entities(c, decl);
+				check_delayed_file_import_entity(c, decl);
 			}
 		case_end;
 
@@ -2410,7 +2405,7 @@ Array<Scope *> find_import_path(Map<Scope *> *file_scopes, Scope *start, Scope *
 	return empty_path;
 }
 
-void check_delayed_file_import_entities(Checker *c, AstNode *decl) {
+void check_delayed_file_import_entity(Checker *c, AstNode *decl) {
 	GB_ASSERT(c->context.allow_file_when_statement);
 
 	Scope *parent_scope = c->context.scope;
@@ -2636,7 +2631,7 @@ void check_import_entities(Checker *c) {
 		c->context.allow_file_when_statement = true;
 
 		for_array(i, f->decls) {
-			check_delayed_file_import_entities(c, f->decls[i]);
+			check_delayed_file_import_entity(c, f->decls[i]);
 		}
 	}
 }
