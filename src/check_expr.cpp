@@ -1886,11 +1886,6 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 	}
 
 
-	if (operands != nullptr) {
-		GB_ASSERT_MSG(operands->count >= min_variable_count, "%td vs %td", operands->count, variable_count);
-	}
-
-
 	bool is_variadic = false;
 	bool is_c_vararg = false;
 	Array<Entity *> variables = {};
@@ -1949,13 +1944,13 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				if (specialization == t_invalid){
 					specialization = nullptr;
 				}
-				if (specialization) {
-					if (!is_type_polymorphic(specialization)) {
-						gbString str = type_to_string(specialization);
-						error(tt->specialization, "Type specialization requires a polymorphic type, got %s", str);
-						gb_string_free(str);
-					}
-				}
+				// if (specialization) {
+				// 	if (!is_type_polymorphic(specialization)) {
+				// 		gbString str = type_to_string(specialization);
+				// 		error(tt->specialization, "Type specialization requires a polymorphic type, got %s", str);
+				// 		gb_string_free(str);
+				// 	}
+				// }
 
 				if (operands != nullptr) {
 					detemine_type_from_operand = true;

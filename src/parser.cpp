@@ -20,8 +20,8 @@ struct CommentGroup {
 };
 
 
-enum ImportedFileKind
-{	ImportedFile_Normal,
+enum ImportedFileKind {
+	ImportedFile_Normal,
 	ImportedFile_Shared,
 	ImportedFile_Init,
 };
@@ -1749,7 +1749,6 @@ bool is_blank_ident(AstNode *node) {
 
 // NOTE(bill): Go to next statement to prevent numerous error messages popping up
 void fix_advance_to_next_stmt(AstFile *f) {
-#if 1
 	for (;;) {
 		Token t = f->curr_token;
 		switch (t.kind) {
@@ -1762,6 +1761,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_foreign_system_library:
 
 		case Token_if:
+		case Token_for:
 		case Token_when:
 		case Token_return:
 		case Token_match:
@@ -1780,12 +1780,12 @@ void fix_advance_to_next_stmt(AstFile *f) {
 
 		case Token_Hash:
 		{
-			if (token_pos_eq(t.pos, f->fix_prev_pos) &&
+			if (t.pos == f->fix_prev_pos &&
 			    f->fix_count < PARSER_MAX_FIX_COUNT) {
 				f->fix_count++;
 				return;
 			}
-			if (token_pos_cmp(f->fix_prev_pos, t.pos) < 0) {
+			if (f->fix_prev_pos < t.pos) {
 				f->fix_prev_pos = t.pos;
 				f->fix_count = 0; // NOTE(bill): Reset
 				return;
@@ -1795,7 +1795,6 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		}
 		advance_token(f);
 	}
-#endif
 }
 
 Token expect_closing(AstFile *f, TokenKind kind, String context) {
@@ -4586,7 +4585,7 @@ AstNode *parse_stmt(AstFile *f) {
 		}
 
 		if (tag == "include") {
-			syntax_error(token, "#include is not a valid import declaration kind. Use import_load instead");
+			syntax_error(token, "#include is not a valid import declaration kind. Did you mean `import`?");
 			s = ast_bad_stmt(f, token, f->curr_token);
 		} else {
 			syntax_error(token, "Unknown tag directive used: `%.*s`", LIT(tag));
@@ -4641,48 +4640,48 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 		return ParseFile_WrongExtension;
 	}
 	TokenizerInitError err = init_tokenizer(&f->tokenizer, fullpath);
-	if (err == TokenizerInit_None) {
-		isize file_size = f->tokenizer.end - f->tokenizer.start;
-		isize init_token_cap = cast(isize)gb_max(next_pow2(cast(i64)(file_size/2ll)), 16);
-		array_init(&f->tokens, heap_allocator(), gb_max(init_token_cap, 16));
-
-		for (;;) {
-			Token token = tokenizer_get_token(&f->tokenizer);
-			if (token.kind == Token_Invalid) {
-				return ParseFile_InvalidToken;
-			}
-			array_add(&f->tokens, token);
-
-			if (token.kind == Token_EOF) {
-				break;
-			}
+	if (err != TokenizerInit_None) {
+		switch (err) {
+		case TokenizerInit_NotExists:
+			return ParseFile_NotFound;
+		case TokenizerInit_Permission:
+			return ParseFile_Permission;
+		case TokenizerInit_Empty:
+			return ParseFile_EmptyFile;
 		}
 
-		f->curr_token_index = 0;
-		f->prev_token = f->tokens[f->curr_token_index];
-		f->curr_token = f->tokens[f->curr_token_index];
-
-		// NOTE(bill): Is this big enough or too small?
-		isize arena_size = gb_size_of(AstNode);
-		arena_size *= 2*f->tokens.count;
-		gb_arena_init_from_allocator(&f->arena, heap_allocator(), arena_size);
-		array_init(&f->comments, heap_allocator());
-
-		f->curr_proc = nullptr;
-
-		return ParseFile_None;
+		return ParseFile_InvalidFile;
 	}
 
-	switch (err) {
-	case TokenizerInit_NotExists:
-		return ParseFile_NotFound;
-	case TokenizerInit_Permission:
-		return ParseFile_Permission;
-	case TokenizerInit_Empty:
-		return ParseFile_EmptyFile;
+	isize file_size = f->tokenizer.end - f->tokenizer.start;
+	isize init_token_cap = cast(isize)gb_max(next_pow2(cast(i64)(file_size/2ll)), 16);
+	array_init(&f->tokens, heap_allocator(), gb_max(init_token_cap, 16));
+
+	for (;;) {
+		Token token = tokenizer_get_token(&f->tokenizer);
+		if (token.kind == Token_Invalid) {
+			return ParseFile_InvalidToken;
+		}
+		array_add(&f->tokens, token);
+
+		if (token.kind == Token_EOF) {
+			break;
+		}
 	}
 
-	return ParseFile_InvalidFile;
+	f->curr_token_index = 0;
+	f->prev_token = f->tokens[f->curr_token_index];
+	f->curr_token = f->tokens[f->curr_token_index];
+
+	// NOTE(bill): Is this big enough or too small?
+	isize arena_size = gb_size_of(AstNode);
+	arena_size *= 2*f->tokens.count;
+	gb_arena_init_from_allocator(&f->arena, heap_allocator(), arena_size);
+	array_init(&f->comments, heap_allocator());
+
+	f->curr_proc = nullptr;
+
+	return ParseFile_None;
 }
 
 void destroy_ast_file(AstFile *f) {

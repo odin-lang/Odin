@@ -1074,11 +1074,11 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 	String name = entity->token.string;
 	if (!is_blank_ident(name)) {
 		Entity *ie = scope_insert_entity(scope, entity);
-		if (ie) {
+		if (ie != nullptr) {
 			TokenPos pos = ie->token.pos;
 			Entity *up = ie->using_parent;
 			if (up != nullptr) {
-				if (token_pos_eq(pos, up->token.pos)) {
+				if (pos == up->token.pos) {
 					// NOTE(bill): Error should have been handled already
 					return false;
 				}
@@ -1089,7 +1089,7 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 				      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
 				return false;
 			} else {
-				if (token_pos_eq(pos, entity->token.pos)) {
+				if (pos == entity->token.pos) {
 					// NOTE(bill): Error should have been handled already
 					return false;
 				}

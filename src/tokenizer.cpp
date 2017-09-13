@@ -154,7 +154,7 @@ TokenPos token_pos(String file, isize line, isize column) {
 	return pos;
 }
 
-i32 token_pos_cmp(TokenPos a, TokenPos b) {
+i32 token_pos_cmp(TokenPos const &a, TokenPos const &b) {
 	if (a.line == b.line) {
 		if (a.column == b.column) {
 			isize min_len = gb_min(a.file.len, b.file.len);
@@ -162,13 +162,15 @@ i32 token_pos_cmp(TokenPos a, TokenPos b) {
 		}
 		return (a.column < b.column) ? -1 : +1;
 	}
-
 	return (a.line < b.line) ? -1 : +1;
 }
 
-bool token_pos_eq(TokenPos a, TokenPos b) {
-	return token_pos_cmp(a, b) == 0;
-}
+bool operator==(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) == 0; }
+bool operator!=(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) != 0; }
+bool operator< (TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) <  0; }
+bool operator<=(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) <= 0; }
+bool operator> (TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) >  0; }
+bool operator>=(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) >= 0; }
 
 struct Token {
 	TokenKind kind;
@@ -202,7 +204,7 @@ void warning_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.warning_count++;
 	// NOTE(bill): Duplicate error, skip it
-	if (!token_pos_eq(global_error_collector.prev, token.pos)) {
+	if (global_error_collector.prev != token.pos) {
 		global_error_collector.prev = token.pos;
 		gb_printf_err("%.*s(%td:%td) Warning: %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
@@ -216,7 +218,7 @@ void error_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
-	if (!token_pos_eq(global_error_collector.prev, token.pos)) {
+	if (global_error_collector.prev != token.pos) {
 		global_error_collector.prev = token.pos;
 		gb_printf_err("%.*s(%td:%td) %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
@@ -232,7 +234,7 @@ void syntax_error_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
-	if (!token_pos_eq(global_error_collector.prev, token.pos)) {
+	if (global_error_collector.prev != token.pos) {
 		global_error_collector.prev = token.pos;
 		gb_printf_err("%.*s(%td:%td) Syntax Error: %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
@@ -248,7 +250,7 @@ void syntax_warning_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.warning_count++;
 	// NOTE(bill): Duplicate error, skip it
-	if (!token_pos_eq(global_error_collector.prev, token.pos)) {
+	if (global_error_collector.prev != token.pos) {
 		global_error_collector.prev = token.pos;
 		gb_printf_err("%.*s(%td:%td) Syntax Warning: %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
