@@ -21,4 +21,4 @@ fi
 
 ${compiler} src/main.cpp ${warnings_to_disable} ${libraries} ${other_args} -o odin
 
-./odin run code/demo.odin
+./odin run examples/demo.odin -opt=0 -collection=foo=./core

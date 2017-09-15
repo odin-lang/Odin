@@ -1038,3 +1038,27 @@ __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
 		m.hashes[last.hash_index] = fr.entry_index;
 	}
 }
+
+when ODIN_OS == "linux" || ODIN_OS == "osx" {
+	import "core:strings.odin";
+	__set_arguments :: proc(argc: int, argv: rawptr) #cc_contextless {
+		// raw.String is the closest match for the array type.
+
+		fmt.println(argc);
+
+		if(argc > 0) {
+			os.args = make([]string, argc);
+
+			strs := cast(^^u8)argv;
+
+			for i in 0..argc {
+				os.args[i] = strings.to_odin_string((strs+i)^);
+			}
+		}
+
+		//arr: raw.String;
+		//arr.data = cast(^u8)argv;
+		//arr.len = argc;
+		//os.args = (cast(^([]string)) &arr)^;
+	}
+}

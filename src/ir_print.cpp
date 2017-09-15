@@ -859,6 +859,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_write_string(f, "call void ");
 		ir_print_encoded_global(f, str_lit(IR_STARTUP_RUNTIME_PROC_NAME), false);
 		ir_write_string(f, "()\n");
+		#ifndef GB_SYSTEM_WINDOWS
+		ir_write_string(f, "call void @__set_arguments(i64 %argc, %..rawptr %argv)\n");
+		#endif
 	} break;
 
 	case irInstr_Comment:
@@ -1616,12 +1619,6 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	ir_print_proc_results(f, m, proc->type);
 	ir_write_byte(f, ' ');
 
-// #ifndef GB_SYSTEM_WINDOWS
-#if 0
-	if(uses_args)
-		ir_write_string(f, "@.nix_argpatch_main");
-	else
-#endif
 	ir_print_encoded_global(f, proc->name, ir_print_is_proc_global(m, proc));
 
 	ir_write_byte(f, '(');

@@ -1,4 +1,4 @@
-when ODIN_OS == "windows" do export "core:os_windows.odin";
+//when ODIN_OS == "windows" do export "core:os_windows.odin";
 when ODIN_OS == "osx"     do export "core:os_x.odin";
 when ODIN_OS == "linux"   do export "core:os_linux.odin";
 
