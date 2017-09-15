@@ -860,7 +860,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_encoded_global(f, str_lit(IR_STARTUP_RUNTIME_PROC_NAME), false);
 		ir_write_string(f, "()\n");
 		#ifndef GB_SYSTEM_WINDOWS
-		ir_write_string(f, "call void @__set_arguments(i64 %argc, %..rawptr %argv)\n");
+		ir_write_string(f, "call void ");
+		ir_print_encoded_global(f, str_lit(IR_SET_NIX_ARGUMENTS_PROC_NAME), false);
+		ir_write_string(f, "(i64 %argc, %..rawptr %argv)\n");
 		#endif
 	} break;
 

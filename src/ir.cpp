@@ -137,12 +137,13 @@ struct irProcedure {
 	i32                   block_count;
 };
 
-#define IR_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"
-#define IR_TYPE_INFO_DATA_NAME       "__$type_info_data"
-#define IR_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"
-#define IR_TYPE_INFO_NAMES_NAME      "__$type_info_names_data"
-#define IR_TYPE_INFO_OFFSETS_NAME    "__$type_info_offsets_data"
-#define IR_TYPE_INFO_USINGS_NAME     "__$type_info_usings_data"
+#define IR_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
+#define IR_SET_NIX_ARGUMENTS_PROC_NAME "__set_arguments_nix"
+#define IR_TYPE_INFO_DATA_NAME         "__$type_info_data"
+#define IR_TYPE_INFO_TYPES_NAME        "__$type_info_types_data"
+#define IR_TYPE_INFO_NAMES_NAME        "__$type_info_names_data"
+#define IR_TYPE_INFO_OFFSETS_NAME      "__$type_info_offsets_data"
+#define IR_TYPE_INFO_USINGS_NAME       "__$type_info_usings_data"
 
 
 #define IR_INSTR_KINDS \

@@ -1040,11 +1040,11 @@ __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
 }
 
 when ODIN_OS == "linux" || ODIN_OS == "osx" {
-	import "core:strings.odin";
-	__set_arguments :: proc(argc: int, argv: rawptr) #cc_contextless {
-		// raw.String is the closest match for the array type.
 
-		fmt.println(argc);
+	import "core:strings.odin";
+
+	// This isn't the _most_ graceful approach, but it works.
+	__set_arguments_nix :: proc(argc: int, argv: rawptr) #cc_contextless #link_name "__$set_arguments_nix" {
 
 		if(argc > 0) {
 			os.args = make([]string, argc);
@@ -1055,10 +1055,5 @@ when ODIN_OS == "linux" || ODIN_OS == "osx" {
 				os.args[i] = strings.to_odin_string((strs+i)^);
 			}
 		}
-
-		//arr: raw.String;
-		//arr.data = cast(^u8)argv;
-		//arr.len = argc;
-		//os.args = (cast(^([]string)) &arr)^;
 	}
 }
