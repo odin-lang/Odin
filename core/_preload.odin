@@ -1044,7 +1044,7 @@ when ODIN_OS == "linux" || ODIN_OS == "osx" {
 	import "core:strings.odin";
 
 	// This isn't the _most_ graceful approach, but it works.
-	__set_arguments_nix :: proc(argc: int, argv: rawptr) #cc_contextless #link_name "__$set_arguments_nix" {
+	__set_arguments_nix :: proc(argc: int, argv: rawptr) #cc_contextless {
 
 		if(argc > 0) {
 			os.args = make([]string, argc);
