@@ -227,6 +227,7 @@ struct Scope {
 	Map<bool>        implicit; // Key: Entity *
 
 	Array<Scope *>   shared;
+	Array<AstNode *> delayed_file_decls;
 	PtrSet<Scope *>  import_succ;
 	PtrSet<Scope *>  imported;
 	bool             is_proc;
@@ -337,7 +338,7 @@ struct CheckerContext {
 	DeclInfo * curr_proc_decl;
 	AstNode *  curr_foreign_library;
 
-	bool       allow_file_when_statement;
+	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;
 	bool       no_polymorphic_errors;
 	Scope *    polymorphic_scope;
@@ -388,6 +389,9 @@ struct Checker {
 
 	Array<Type *>              proc_stack;
 	bool                       done_preload;
+
+	PtrSet<AstFile *>          checked_files;
+
 };
 
 
@@ -487,6 +491,8 @@ Scope *create_scope_from_file(Checker *c, AstFile *f) {
 
 	Scope *s = create_scope(c->global_scope, c->allocator);
 
+	array_init(&s->delayed_file_decls, heap_allocator());
+
 	s->file = f;
 	f->scope = s;
 	s->is_file   = true;
@@ -494,7 +500,7 @@ Scope *create_scope_from_file(Checker *c, AstFile *f) {
 	if (f->tokenizer.fullpath == c->parser->init_fullpath) {
 		s->is_init = true;
 	} else {
-		s->is_init   = f->file_kind == ImportedFile_Init;
+		s->is_init = f->file_kind == ImportedFile_Init;
 	}
 
 	s->is_global = f->is_global_scope;
@@ -527,6 +533,7 @@ void destroy_scope(Scope *scope) {
 	map_destroy(&scope->elements);
 	map_destroy(&scope->implicit);
 	array_free(&scope->shared);
+	array_free(&scope->delayed_file_decls);
 	ptr_set_destroy(&scope->imported);
 	ptr_set_destroy(&scope->import_succ);
 
@@ -887,6 +894,7 @@ void init_checker(Checker *c, Parser *parser) {
 	c->context.scope = c->global_scope;
 
 	map_init(&c->file_scopes, heap_allocator());
+	ptr_set_init(&c->checked_files, heap_allocator());
 }
 
 void destroy_checker(Checker *c) {
@@ -899,7 +907,7 @@ void destroy_checker(Checker *c) {
 	gb_arena_free(&c->tmp_arena);
 
 	map_destroy(&c->file_scopes);
-	// gb_arena_free(&c->arena);
+	ptr_set_destroy(&c->checked_files);
 }
 
 
@@ -1476,6 +1484,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		EntityGraphNode *n = G[i];
 		n->index = i;
 		n->dep_count = n->succ.entries.count;
+		GB_ASSERT(n->dep_count >= 0);
 	}
 
 	return G;
@@ -1770,18 +1779,23 @@ bool check_arity_match(Checker *c, AstNodeValueDecl *vd, bool is_global) {
 
 void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 	Operand operand = {Addressing_Invalid};
-	check_expr(c, &operand, ws->cond);
-	if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-		error(ws->cond, "Non-boolean condition in `when` statement");
+	if (!ws->is_cond_determined) {
+		check_expr(c, &operand, ws->cond);
+		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+			error(ws->cond, "Non-boolean condition in `when` statement");
+		}
+		if (operand.mode != Addressing_Constant) {
+			error(ws->cond, "Non-constant condition in `when` statement");
+		}
+
+		ws->is_cond_determined = true;
+		ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
 	}
-	if (operand.mode != Addressing_Constant) {
-		error(ws->cond, "Non-constant condition in `when` statement");
-	}
+
 	if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
 		error(ws->cond, "Invalid body for `when` statement");
 	} else {
-		if (operand.value.kind == ExactValue_Bool &&
-		    operand.value.value_bool) {
+		if (ws->determined_cond) {
 			check_collect_entities(c, ws->body->BlockStmt.stmts);
 		} else if (ws->else_stmt) {
 			switch (ws->else_stmt->kind) {
@@ -1797,6 +1811,166 @@ void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 			}
 		}
 	}
+}
+
+void check_collect_value_decl(Checker *c, AstNode *decl) {
+	ast_node(vd, ValueDecl, decl);
+
+	if (vd->been_handled) return;
+	vd->been_handled = true;
+
+	if (vd->is_mutable) {
+		if (!c->context.scope->is_file) {
+			// NOTE(bill): local scope -> handle later and in order
+			return;
+		}
+
+		// NOTE(bill): You need to store the entity information here unline a constant declaration
+		isize entity_cap = vd->names.count;
+		isize entity_count = 0;
+		Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_cap);
+		DeclInfo *di = nullptr;
+		if (vd->values.count > 0) {
+			di = make_declaration_info(heap_allocator(), c->context.scope, c->context.decl);
+			di->entities = entities;
+			di->type_expr = vd->type;
+			di->init_expr = vd->values[0];
+			di->init_expr_list = vd->values;
+
+
+			if (vd->flags & VarDeclFlag_thread_local) {
+				error(decl, "#thread_local variable declarations cannot have initialization values");
+			}
+		}
+
+
+
+		for_array(i, vd->names) {
+			AstNode *name = vd->names[i];
+			AstNode *value = nullptr;
+			if (i < vd->values.count) {
+				value = vd->values[i];
+			}
+			if (name->kind != AstNode_Ident) {
+				error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+				continue;
+			}
+			Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident.token, nullptr, false);
+			e->Variable.is_thread_local = (vd->flags & VarDeclFlag_thread_local) != 0;
+			e->identifier = name;
+
+			if (vd->flags & VarDeclFlag_using) {
+				vd->flags &= ~VarDeclFlag_using; // NOTE(bill): This error will be only caught once
+				error(name, "`using` is not allowed at the file scope");
+			}
+
+			AstNode *fl = c->context.curr_foreign_library;
+			if (fl != nullptr) {
+				GB_ASSERT(fl->kind == AstNode_Ident);
+				e->Variable.is_foreign = true;
+				e->Variable.foreign_library_ident = fl;
+			}
+
+			entities[entity_count++] = e;
+
+			DeclInfo *d = di;
+			if (d == nullptr || i > 0) {
+				AstNode *init_expr = value;
+				d = make_declaration_info(heap_allocator(), e->scope, c->context.decl);
+				d->type_expr = vd->type;
+				d->init_expr = init_expr;
+			}
+
+			add_entity_and_decl_info(c, name, e, d);
+		}
+
+		if (di != nullptr) {
+			di->entity_count = entity_count;
+		}
+
+		check_arity_match(c, vd, true);
+	} else {
+		for_array(i, vd->names) {
+			AstNode *name = vd->names[i];
+			if (name->kind != AstNode_Ident) {
+				error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+				continue;
+			}
+
+			AstNode *init = unparen_expr(vd->values[i]);
+			if (init == nullptr) {
+				error(name, "Expected a value for this constant value declaration");
+				continue;
+			}
+
+			Token token = name->Ident.token;
+
+			AstNode *fl = c->context.curr_foreign_library;
+			DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
+			Entity *e = nullptr;
+
+			if (is_ast_node_type(init) ||
+				(vd->type != nullptr && vd->type->kind == AstNode_TypeType)) {
+				e = make_entity_type_name(c->allocator, d->scope, token, nullptr);
+				if (vd->type != nullptr) {
+					error(name, "A type declaration cannot have an type parameter");
+				}
+				d->type_expr = init;
+				d->init_expr = init;
+			} else if (init->kind == AstNode_ProcLit) {
+				if (c->context.scope->is_struct) {
+					error(name, "Procedure declarations are not allowed within a struct");
+					continue;
+				}
+				ast_node(pl, ProcLit, init);
+				e = make_entity_procedure(c->allocator, d->scope, token, nullptr, pl->tags);
+				if (fl != nullptr) {
+					GB_ASSERT(fl->kind == AstNode_Ident);
+					e->Procedure.foreign_library_ident = fl;
+					pl->tags |= ProcTag_foreign;
+				}
+				d->proc_lit = init;
+				d->type_expr = pl->type;
+			} else {
+				e = make_entity_constant(c->allocator, d->scope, token, nullptr, empty_exact_value);
+				d->type_expr = vd->type;
+				d->init_expr = init;
+			}
+			e->identifier = name;
+
+			if (fl != nullptr && e->kind != Entity_Procedure) {
+				AstNodeKind kind = init->kind;
+				error(name, "Only procedures and variables are allowed to be in a foreign block, got %.*s", LIT(ast_node_strings[kind]));
+				if (kind == AstNode_ProcType) {
+					gb_printf_err("\tDid you forget to append `---` to the procedure?\n");
+				}
+				// continue;
+			}
+
+			add_entity_and_decl_info(c, name, e, d);
+		}
+
+		check_arity_match(c, vd, true);
+	}
+}
+
+void check_add_foreign_block_decl(Checker *c, AstNode *decl) {
+	ast_node(fb, ForeignBlockDecl, decl);
+
+	if (fb->been_handled) return;
+	fb->been_handled = true;
+
+	AstNode *foreign_library = fb->foreign_library;
+	if (foreign_library->kind != AstNode_Ident) {
+		error(foreign_library, "foreign library name must be an identifier");
+		foreign_library = nullptr;
+	}
+
+	CheckerContext prev_context = c->context;
+	c->context.curr_foreign_library = foreign_library;
+	c->context.collect_delayed_decls = true;
+	check_collect_entities(c, fb->decls);
+	c->context = prev_context;
 }
 
 // NOTE(bill): If file_scopes == nullptr, this will act like a local scope
@@ -1816,141 +1990,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 		case_end;
 
 		case_ast_node(vd, ValueDecl, decl);
-			if (vd->is_mutable) {
-				if (!c->context.scope->is_file) {
-					// NOTE(bill): local scope -> handle later and in order
-					break;
-				}
-
-				// NOTE(bill): You need to store the entity information here unline a constant declaration
-				isize entity_cap = vd->names.count;
-				isize entity_count = 0;
-				Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_cap);
-				DeclInfo *di = nullptr;
-				if (vd->values.count > 0) {
-					di = make_declaration_info(heap_allocator(), c->context.scope, c->context.decl);
-					di->entities = entities;
-					di->type_expr = vd->type;
-					di->init_expr = vd->values[0];
-					di->init_expr_list = vd->values;
-
-
-					if (vd->flags & VarDeclFlag_thread_local) {
-						error(decl, "#thread_local variable declarations cannot have initialization values");
-					}
-				}
-
-
-
-				for_array(i, vd->names) {
-					AstNode *name = vd->names[i];
-					AstNode *value = nullptr;
-					if (i < vd->values.count) {
-						value = vd->values[i];
-					}
-					if (name->kind != AstNode_Ident) {
-						error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-						continue;
-					}
-					Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident.token, nullptr, false);
-					e->Variable.is_thread_local = (vd->flags & VarDeclFlag_thread_local) != 0;
-					e->identifier = name;
-
-					if (vd->flags & VarDeclFlag_using) {
-						vd->flags &= ~VarDeclFlag_using; // NOTE(bill): This error will be only caught once
-						error(name, "`using` is not allowed at the file scope");
-					}
-
-					AstNode *fl = c->context.curr_foreign_library;
-					if (fl != nullptr) {
-						GB_ASSERT(fl->kind == AstNode_Ident);
-						e->Variable.is_foreign = true;
-						e->Variable.foreign_library_ident = fl;
-					}
-
-					entities[entity_count++] = e;
-
-					DeclInfo *d = di;
-					if (d == nullptr || i > 0) {
-						AstNode *init_expr = value;
-						d = make_declaration_info(heap_allocator(), e->scope, c->context.decl);
-						d->type_expr = vd->type;
-						d->init_expr = init_expr;
-					}
-
-					add_entity_and_decl_info(c, name, e, d);
-				}
-
-				if (di != nullptr) {
-					di->entity_count = entity_count;
-				}
-
-				check_arity_match(c, vd, true);
-			} else {
-				for_array(i, vd->names) {
-					AstNode *name = vd->names[i];
-					if (name->kind != AstNode_Ident) {
-						error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-						continue;
-					}
-
-					AstNode *init = unparen_expr(vd->values[i]);
-					if (init == nullptr) {
-						error(name, "Expected a value for this constant value declaration");
-						continue;
-					}
-
-					Token token = name->Ident.token;
-
-					AstNode *fl = c->context.curr_foreign_library;
-					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
-					Entity *e = nullptr;
-
-					if (is_ast_node_type(init) ||
-						(vd->type != nullptr && vd->type->kind == AstNode_TypeType)) {
-						e = make_entity_type_name(c->allocator, d->scope, token, nullptr);
-						if (vd->type != nullptr) {
-							error(name, "A type declaration cannot have an type parameter");
-						}
-						d->type_expr = init;
-						d->init_expr = init;
-					} else if (init->kind == AstNode_ProcLit) {
-						if (c->context.scope->is_struct) {
-							error(name, "Procedure declarations are not allowed within a struct");
-							continue;
-						}
-						ast_node(pl, ProcLit, init);
-						e = make_entity_procedure(c->allocator, d->scope, token, nullptr, pl->tags);
-						if (fl != nullptr) {
-							GB_ASSERT(fl->kind == AstNode_Ident);
-							e->Procedure.foreign_library_ident = fl;
-							pl->tags |= ProcTag_foreign;
-						}
-						d->proc_lit = init;
-						d->type_expr = pl->type;
-					} else {
-						e = make_entity_constant(c->allocator, d->scope, token, nullptr, empty_exact_value);
-						d->type_expr = vd->type;
-						d->init_expr = init;
-					}
-					e->identifier = name;
-
-					if (fl != nullptr && e->kind != Entity_Procedure) {
-						AstNodeKind kind = init->kind;
-						error(name, "Only procedures and variables are allowed to be in a foreign block, got %.*s", LIT(ast_node_strings[kind]));
-						if (kind == AstNode_ProcType) {
-							gb_printf_err("\tDid you forget to append `---` to the procedure?\n");
-						}
-						// continue;
-					}
-
-
-
-					add_entity_and_decl_info(c, name, e, d);
-				}
-
-				check_arity_match(c, vd, true);
-			}
+			check_collect_value_decl(c, decl);
 		case_end;
 
 		case_ast_node(id, ImportDecl, decl);
@@ -1960,7 +2000,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
-			if (c->context.allow_file_when_statement) {
+			if (c->context.collect_delayed_decls) {
 				check_delayed_file_import_entity(c, decl);
 			}
 		case_end;
@@ -1972,7 +2012,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
-			if (c->context.allow_file_when_statement) {
+			if (c->context.collect_delayed_decls) {
 				check_delayed_file_import_entity(c, decl);
 			}
 		case_end;
@@ -1984,22 +2024,13 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
-			if (c->context.allow_file_when_statement) {
+			if (c->context.collect_delayed_decls) {
 				check_delayed_file_import_entity(c, decl);
 			}
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
-			AstNode *foreign_library = fb->foreign_library;
-			if (foreign_library->kind != AstNode_Ident) {
-				error(foreign_library, "foreign library name must be an identifier");
-				foreign_library = nullptr;
-			}
-
-			CheckerContext prev_context = c->context;
-			c->context.curr_foreign_library = foreign_library;
-			check_collect_entities(c, fb->decls);
-			c->context = prev_context;
+			check_add_foreign_block_decl(c, decl);
 		case_end;
 
 		default:
@@ -2012,12 +2043,12 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 
 	// NOTE(bill): `when` stmts need to be handled after the other as the condition may refer to something
 	// declared after this stmt in source
-	if (!c->context.scope->is_file || c->context.allow_file_when_statement) {
+	if (!c->context.scope->is_file || c->context.collect_delayed_decls) {
 		for_array(i, nodes) {
 			AstNode *node = nodes[i];
 			switch (node->kind) {
 			case_ast_node(ws, WhenStmt, node);
-					check_collect_entities_from_when_stmt(c, ws);
+				check_collect_entities_from_when_stmt(c, ws);
 			case_end;
 			}
 		}
@@ -2028,6 +2059,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 void check_all_global_entities(Checker *c) {
 	Scope *prev_file = nullptr;
 
+	bool processing_preload = true;
 	for_array(i, c->info.entities.entries) {
 		auto *entry = &c->info.entities.entries[i];
 		Entity *e = cast(Entity *)entry->key.ptr;
@@ -2036,13 +2068,16 @@ void check_all_global_entities(Checker *c) {
 		if (d->scope != e->scope) {
 			continue;
 		}
-		add_curr_ast_file(c, d->scope->file);
 
 		if (!d->scope->has_been_imported) {
 			// NOTE(bill): All of these unchecked entities could mean a lot of unused allocations
 			// TODO(bill): Should this be worried about?
 			continue;
 		}
+
+
+		AstFile *file = d->scope->file;
+		add_curr_ast_file(c, file);
 
 		if (e->token.string == "main") {
 			if (e->kind != Entity_Procedure) {
@@ -2063,7 +2098,11 @@ void check_all_global_entities(Checker *c) {
 		c->context = prev_context;
 
 
-		if (d->scope->is_init && !c->done_preload) {
+		if (!d->scope->is_global) {
+			processing_preload = false;
+		}
+
+		if (!processing_preload) {
 			init_preload(c);
 		}
 	}
@@ -2247,22 +2286,25 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 		Scope *scope = *found;
 		GB_ASSERT(scope != nullptr);
 
-		ImportGraphNode *m = nullptr;
-		ImportGraphNode *n  = nullptr;
 
-		ImportGraphNode **found_node = map_get(M, hash_pointer(parent_file_scope));
-		GB_ASSERT(found_node != nullptr);
-		m = *found_node;
+		ImportGraphNode **found_node = nullptr;
+		ImportGraphNode *m = nullptr;
+		ImportGraphNode *n = nullptr;
 
 		found_node = map_get(M, hash_pointer(scope));
 		GB_ASSERT(found_node != nullptr);
+		m = *found_node;
+
+		found_node = map_get(M, hash_pointer(parent_file_scope));
+		GB_ASSERT(found_node != nullptr);
 		n = *found_node;
 
+		// TODO(bill): How should the edges be attched for `import`?
 		if (id->is_using) {
-			import_graph_node_set_add(&n->pred, m);
-			import_graph_node_set_add(&m->succ, n);
-			ptr_set_add(&m->scope->imported, n->scope);
 		}
+		import_graph_node_set_add(&n->succ, m);
+		import_graph_node_set_add(&m->pred, n);
+		ptr_set_add(&m->scope->imported, n->scope);
 	case_end;
 
 
@@ -2282,19 +2324,20 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 		Scope *scope = *found;
 		GB_ASSERT(scope != nullptr);
 
+		ImportGraphNode **found_node = nullptr;
 		ImportGraphNode *m = nullptr;
-		ImportGraphNode *n  = nullptr;
-
-		ImportGraphNode **found_node = map_get(M, hash_pointer(parent_file_scope));
-		GB_ASSERT(found_node != nullptr);
-		m = *found_node;
+		ImportGraphNode *n = nullptr;
 
 		found_node = map_get(M, hash_pointer(scope));
 		GB_ASSERT(found_node != nullptr);
+		m = *found_node;
+
+		found_node = map_get(M, hash_pointer(parent_file_scope));
+		GB_ASSERT(found_node != nullptr);
 		n = *found_node;
 
-		import_graph_node_set_add(&n->pred, m);
-		import_graph_node_set_add(&m->succ, n);
+		import_graph_node_set_add(&n->succ, m);
+		import_graph_node_set_add(&m->pred, n);
 		ptr_set_add(&m->scope->imported, n->scope);
 	case_end;
 
@@ -2357,6 +2400,7 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
 		ImportGraphNode *n = G[i];
 		n->index = i;
 		n->dep_count = n->succ.entries.count;
+		GB_ASSERT(n->dep_count >= 0);
 	}
 
 	return G;
@@ -2405,8 +2449,234 @@ Array<Scope *> find_import_path(Map<Scope *> *file_scopes, Scope *start, Scope *
 	return empty_path;
 }
 
+void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
+	if (id->been_handled) return;
+	id->been_handled = true;
+
+	Scope *parent_scope = c->context.scope;
+	GB_ASSERT(parent_scope->is_file);
+
+	Token token = id->relpath;
+	HashKey key = hash_string(id->fullpath);
+	Scope **found = map_get(&c->file_scopes, key);
+	if (found == nullptr) {
+		for_array(scope_index, c->file_scopes.entries) {
+			Scope *scope = c->file_scopes.entries[scope_index].value;
+			gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
+		}
+		gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
+		GB_PANIC("Unable to find scope for file: %.*s", LIT(id->fullpath));
+	}
+	Scope *scope = *found;
+
+	if (scope->is_global) {
+		error(token, "Importing a #shared_global_scope is disallowed and unnecessary");
+		return;
+	}
+
+	if (ptr_set_exists(&parent_scope->imported, scope)) {
+		// error(token, "Multiple import of the same file within this scope");
+	} else {
+		ptr_set_add(&parent_scope->imported, scope);
+	}
+
+	if (id->is_using) {
+		if (parent_scope->is_global) {
+			error(id->import_name, "#shared_global_scope imports cannot use using");
+			return;
+		}
+		// NOTE(bill): Add imported entities to this file's scope
+		for_array(elem_index, scope->elements.entries) {
+			Entity *e = scope->elements.entries[elem_index].value;
+			if (e->scope == parent_scope) return;
+
+			if (!is_entity_kind_exported(e->kind)) {
+				return;
+			}
+			if (is_entity_exported(e)) {
+				// TODO(bill): Should these entities be imported but cause an error when used?
+				bool ok = add_entity(c, parent_scope, e->identifier, e);
+				if (ok) map_set(&parent_scope->implicit, hash_entity(e), true);
+			}
+		}
+	} else {
+		String import_name = path_to_entity_name(id->import_name.string, id->fullpath);
+		if (is_blank_ident(import_name)) {
+			error(token, "File name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+		} else {
+			GB_ASSERT(id->import_name.pos.line != 0);
+			id->import_name.string = import_name;
+			Entity *e = make_entity_import_name(c->allocator, parent_scope, id->import_name, t_invalid,
+			                                    id->fullpath, id->import_name.string,
+			                                    scope);
+
+			add_entity(c, parent_scope, nullptr, e);
+		}
+	}
+	ptr_set_add(&c->checked_files, scope->file);
+	scope->has_been_imported = true;
+}
+
+void check_add_export_decl(Checker *c, AstNodeExportDecl *ed) {
+	if (ed->been_handled) return;
+	ed->been_handled = true;
+
+	Scope *parent_scope = c->context.scope;
+	GB_ASSERT(parent_scope->is_file);
+
+	Token token = ed->relpath;
+	HashKey key = hash_string(ed->fullpath);
+	Scope **found = map_get(&c->file_scopes, key);
+	if (found == nullptr) {
+		for_array(scope_index, c->file_scopes.entries) {
+			Scope *scope = c->file_scopes.entries[scope_index].value;
+			gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
+		}
+		gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
+		GB_PANIC("Unable to find scope for file: %.*s", LIT(ed->fullpath));
+	}
+	Scope *scope = *found;
+
+	if (scope->is_global) {
+		error(token, "Exporting a #shared_global_scope is disallowed and unnecessary");
+		return;
+	}
+
+
+	if (parent_scope->is_global) {
+		error(ed->token, "`export` cannot be used on #shared_global_scope");
+		return;
+	}
+
+	if (ptr_set_exists(&parent_scope->imported, scope)) {
+		// error(token, "Multiple import of the same file within this scope");
+	} else {
+		ptr_set_add(&parent_scope->imported, scope);
+	}
+
+	// NOTE(bill): Add imported entities to this file's scope
+	for_array(elem_index, scope->elements.entries) {
+		Entity *e = scope->elements.entries[elem_index].value;
+		if (e->scope == parent_scope) return;
+
+		if (is_entity_kind_exported(e->kind)) {
+			add_entity(c, parent_scope, e->identifier, e);
+		}
+	}
+
+	ptr_set_add(&c->checked_files, scope->file);
+	scope->has_been_imported = true;
+}
+
+void check_add_foreign_library_decl(Checker *c, AstNode *decl) {
+	ast_node(fl, ForeignLibraryDecl, decl);
+
+	if (fl->been_handled) return;
+	fl->been_handled = true;
+
+	Scope *parent_scope = c->context.scope;
+	GB_ASSERT(parent_scope->is_file);
+
+	String file_str = fl->filepath.string;
+	String base_dir = fl->base_dir;
+
+	if (fl->token.kind == Token_foreign_library) {
+		gbAllocator a = heap_allocator(); // TODO(bill): Change this allocator
+
+		String rel_path = get_fullpath_relative(a, base_dir, file_str);
+		String import_file = rel_path;
+		if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
+			String abs_path = get_fullpath_core(a, file_str);
+			if (gb_file_exists(cast(char *)abs_path.text)) {
+				import_file = abs_path;
+			}
+		}
+		file_str = import_file;
+	}
+
+	String library_name = path_to_entity_name(fl->library_name.string, file_str);
+	if (is_blank_ident(library_name)) {
+		error(fl->token, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
+	} else {
+		GB_ASSERT(fl->library_name.pos.line != 0);
+		fl->library_name.string = library_name;
+		Entity *e = make_entity_library_name(c->allocator, parent_scope, fl->library_name, t_invalid,
+		                                     file_str, library_name);
+		add_entity(c, parent_scope, nullptr, e);
+	}
+}
+
+
+bool collect_checked_files_from_import_decl_list(Checker *c, Array<AstNode *> decls) {
+	bool new_files = false;
+	for_array(i, decls) {
+		AstNode *decl = decls[i];
+		switch (decl->kind) {
+		case_ast_node(id, ImportDecl, decl);
+			HashKey key = hash_string(id->fullpath);
+			Scope **found = map_get(&c->file_scopes, key);
+			if (found == nullptr) continue;
+			Scope *s = *found;
+			if (!ptr_set_exists(&c->checked_files, s->file)) {
+				new_files = true;
+				ptr_set_add(&c->checked_files, s->file);
+			}
+		case_end;
+
+		case_ast_node(ed, ExportDecl, decl);
+			HashKey key = hash_string(ed->fullpath);
+			Scope **found = map_get(&c->file_scopes, key);
+			if (found == nullptr) continue;
+			Scope *s = *found;
+			if (!ptr_set_exists(&c->checked_files, s->file)) {
+				new_files = true;
+				ptr_set_add(&c->checked_files, s->file);
+			}
+		case_end;
+		}
+	}
+	return new_files;
+}
+
+
+bool collect_checked_files_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
+	Operand operand = {Addressing_Invalid};
+	if (!ws->is_cond_determined) {
+		check_expr(c, &operand, ws->cond);
+		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+			error(ws->cond, "Non-boolean condition in `when` statement");
+		}
+		if (operand.mode != Addressing_Constant) {
+			error(ws->cond, "Non-constant condition in `when` statement");
+		}
+
+		ws->is_cond_determined = true;
+		ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
+	}
+
+	if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
+		error(ws->cond, "Invalid body for `when` statement");
+	} else {
+		if (ws->determined_cond) {
+			return collect_checked_files_from_import_decl_list(c, ws->body->BlockStmt.stmts);
+		} else if (ws->else_stmt) {
+			switch (ws->else_stmt->kind) {
+			case AstNode_BlockStmt:
+				return collect_checked_files_from_import_decl_list(c, ws->else_stmt->BlockStmt.stmts);
+			case AstNode_WhenStmt:
+				return collect_checked_files_from_when_stmt(c, &ws->else_stmt->WhenStmt);
+			default:
+				error(ws->else_stmt, "Invalid `else` statement in `when` statement");
+				break;
+			}
+		}
+	}
+
+	return false;
+}
+
 void check_delayed_file_import_entity(Checker *c, AstNode *decl) {
-	GB_ASSERT(c->context.allow_file_when_statement);
+	GB_ASSERT(c->context.collect_delayed_decls);
 
 	Scope *parent_scope = c->context.scope;
 	GB_ASSERT(parent_scope->is_file);
@@ -2417,138 +2687,114 @@ void check_delayed_file_import_entity(Checker *c, AstNode *decl) {
 	case_end;
 
 	case_ast_node(id, ImportDecl, decl);
-		Token token = id->relpath;
-		HashKey key = hash_string(id->fullpath);
-		Scope **found = map_get(&c->file_scopes, key);
-		if (found == nullptr) {
-			for_array(scope_index, c->file_scopes.entries) {
-				Scope *scope = c->file_scopes.entries[scope_index].value;
-				gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
-			}
-			gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
-			GB_PANIC("Unable to find scope for file: %.*s", LIT(id->fullpath));
-		}
-		Scope *scope = *found;
-
-		if (scope->is_global) {
-			error(token, "Importing a #shared_global_scope is disallowed and unnecessary");
-			return;
-		}
-
-		if (ptr_set_exists(&parent_scope->imported, scope)) {
-			// error(token, "Multiple import of the same file within this scope");
-		} else {
-			ptr_set_add(&parent_scope->imported, scope);
-		}
-
-		scope->has_been_imported = true;
-
-		if (id->is_using) {
-			if (parent_scope->is_global) {
-				error(id->import_name, "#shared_global_scope imports cannot use using");
-			} else {
-				// NOTE(bill): Add imported entities to this file's scope
-				for_array(elem_index, scope->elements.entries) {
-					Entity *e = scope->elements.entries[elem_index].value;
-					if (e->scope == parent_scope) return;
-
-					if (!is_entity_kind_exported(e->kind)) {
-						return;
-					}
-					if (is_entity_exported(e)) {
-						// TODO(bill): Should these entities be imported but cause an error when used?
-						bool ok = add_entity(c, parent_scope, e->identifier, e);
-						if (ok) map_set(&parent_scope->implicit, hash_entity(e), true);
-					}
-				}
-			}
-		} else {
-			String import_name = path_to_entity_name(id->import_name.string, id->fullpath);
-			if (is_blank_ident(import_name)) {
-				error(token, "File name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
-			} else {
-				GB_ASSERT(id->import_name.pos.line != 0);
-				id->import_name.string = import_name;
-				Entity *e = make_entity_import_name(c->allocator, parent_scope, id->import_name, t_invalid,
-				                                    id->fullpath, id->import_name.string,
-				                                    scope);
-
-				add_entity(c, parent_scope, nullptr, e);
-			}
-		}
+		check_add_import_decl(c, id);
 	case_end;
 
 	case_ast_node(ed, ExportDecl, decl);
-		Token token = ed->relpath;
-		HashKey key = hash_string(ed->fullpath);
-		Scope **found = map_get(&c->file_scopes, key);
-		if (found == nullptr) {
-			for_array(scope_index, c->file_scopes.entries) {
-				Scope *scope = c->file_scopes.entries[scope_index].value;
-				gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
-			}
-			gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
-			GB_PANIC("Unable to find scope for file: %.*s", LIT(ed->fullpath));
-		}
-		Scope *scope = *found;
-
-		if (scope->is_global) {
-			error(token, "Exporting a #shared_global_scope is disallowed and unnecessary");
-			return;
-		}
-
-		if (ptr_set_exists(&parent_scope->imported, scope)) {
-			// error(token, "Multiple import of the same file within this scope");
-		} else {
-			ptr_set_add(&parent_scope->imported, scope);
-		}
-
-		scope->has_been_imported = true;
-		if (parent_scope->is_global) {
-			error(decl, "`export` cannot be used on #shared_global_scope");
-		} else {
-			// NOTE(bill): Add imported entities to this file's scope
-			for_array(elem_index, scope->elements.entries) {
-				Entity *e = scope->elements.entries[elem_index].value;
-				if (e->scope == parent_scope) return;
-
-				if (is_entity_kind_exported(e->kind)) {
-					add_entity(c, parent_scope, e->identifier, e);
-				}
-			}
-		}
+		check_add_export_decl(c, ed);
 	case_end;
 
 	case_ast_node(fl, ForeignLibraryDecl, decl);
-		String file_str = fl->filepath.string;
-		String base_dir = fl->base_dir;
-
-		if (fl->token.kind == Token_foreign_library) {
-			gbAllocator a = heap_allocator(); // TODO(bill): Change this allocator
-
-			String rel_path = get_fullpath_relative(a, base_dir, file_str);
-			String import_file = rel_path;
-			if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
-				String abs_path = get_fullpath_core(a, file_str);
-				if (gb_file_exists(cast(char *)abs_path.text)) {
-					import_file = abs_path;
-				}
-			}
-			file_str = import_file;
-		}
-
-		String library_name = path_to_entity_name(fl->library_name.string, file_str);
-		if (is_blank_ident(library_name)) {
-			error(decl, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
-		} else {
-			GB_ASSERT(fl->library_name.pos.line != 0);
-			fl->library_name.string = library_name;
-			Entity *e = make_entity_library_name(c->allocator, parent_scope, fl->library_name, t_invalid,
-			                                     file_str, library_name);
-			add_entity(c, parent_scope, nullptr, e);
-		}
+		check_add_foreign_library_decl(c, decl);
 	case_end;
 	}
+}
+
+
+// NOTE(bill): Returns true if a new file is present
+bool collect_file_decls(Checker *c, Array<AstNode *> decls);
+bool collect_file_decls_from_when_stmt(Checker *c, AstNodeWhenStmt *ws);
+
+bool collect_file_decls_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
+	Operand operand = {Addressing_Invalid};
+	if (!ws->is_cond_determined) {
+		check_expr(c, &operand, ws->cond);
+		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+			error(ws->cond, "Non-boolean condition in `when` statement");
+		}
+		if (operand.mode != Addressing_Constant) {
+			error(ws->cond, "Non-constant condition in `when` statement");
+		}
+
+		ws->is_cond_determined = true;
+		ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
+	}
+
+	if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
+		error(ws->cond, "Invalid body for `when` statement");
+	} else {
+		if (ws->determined_cond) {
+			return collect_file_decls(c, ws->body->BlockStmt.stmts);
+		} else if (ws->else_stmt) {
+			switch (ws->else_stmt->kind) {
+			case AstNode_BlockStmt:
+				return collect_file_decls(c, ws->else_stmt->BlockStmt.stmts);
+			case AstNode_WhenStmt:
+				return collect_file_decls_from_when_stmt(c, &ws->else_stmt->WhenStmt);
+			default:
+				error(ws->else_stmt, "Invalid `else` statement in `when` statement");
+				break;
+			}
+		}
+	}
+
+	return false;
+}
+
+bool collect_file_decls(Checker *c, Array<AstNode *> decls) {
+	for_array(i, decls) {
+		Scope *parent_scope = c->context.scope;
+		GB_ASSERT(parent_scope->is_file);
+
+		AstNode *decl = decls[i];
+		switch (decl->kind) {
+		case_ast_node(vd, ValueDecl, decl);
+			check_collect_value_decl(c, decl);
+		case_end;
+
+		case_ast_node(id, ImportDecl, decl);
+			check_add_import_decl(c, id);
+		case_end;
+
+		case_ast_node(ed, ExportDecl, decl);
+			check_add_export_decl(c, ed);
+		case_end;
+
+		case_ast_node(fl, ForeignLibraryDecl, decl);
+			check_add_foreign_library_decl(c, decl);
+		case_end;
+
+		case_ast_node(fb, ForeignBlockDecl, decl);
+			check_add_foreign_block_decl(c, decl);
+		case_end;
+
+		case_ast_node(ws, WhenStmt, decl);
+			if (ws->is_cond_determined) {
+				CheckerContext prev_context = c->context;
+				defer (c->context = prev_context);
+				c->context.collect_delayed_decls = true;
+
+				if (collect_file_decls_from_when_stmt(c, ws)) {
+					return true;
+				}
+			} else {
+				if (collect_checked_files_from_when_stmt(c, ws)) {
+					return true;
+				}
+
+				CheckerContext prev_context = c->context;
+				defer (c->context = prev_context);
+				c->context.collect_delayed_decls = true;
+
+				if (collect_file_decls_from_when_stmt(c, ws)) {
+					return true;
+				}
+			}
+		case_end;
+		}
+	}
+
+	return false;
 }
 
 void check_import_entities(Checker *c) {
@@ -2605,7 +2851,7 @@ void check_import_entities(Checker *c) {
 
 		for_array(i, n->pred.entries) {
 			ImportGraphNode *p = n->pred.entries[i].ptr;
-			p->dep_count -= 1;
+			p->dep_count = gb_max(p->dep_count-1, 0);
 			priority_queue_fix(&pq, p->index);
 		}
 
@@ -2620,20 +2866,52 @@ void check_import_entities(Checker *c) {
 		array_add(&file_order, n);
 	}
 
+	for_array(file_index, c->parser->files) {
+		AstFile *f = c->parser->files[file_index];
+		Scope *s = f->scope;
+		if (s->is_init || s->is_global) {
+			ptr_set_add(&c->checked_files, f);
+		}
+	}
+
+	for (;;) {
+		bool new_files = false;
+		for_array(file_index, c->parser->files) {
+			AstFile *f = c->parser->files[file_index];
+
+			if (!ptr_set_exists(&c->checked_files, f)) {
+				continue;
+			}
+
+			new_files |= collect_checked_files_from_import_decl_list(c, f->decls);
+		}
+		if (new_files) break;
+	}
+
 	for_array(file_index, file_order) {
 		ImportGraphNode *node = file_order[file_index];
 		AstFile *f = node->scope->file;
 
+		if (!ptr_set_exists(&c->checked_files, f)) {
+			continue;
+		}
+
+		// gb_printf_err("%.*s\n", LIT(f->fullpath));
+
 		CheckerContext prev_context = c->context;
 		defer (c->context = prev_context);
+		c->context.collect_delayed_decls = true;
 		add_curr_ast_file(c, f);
 
-		c->context.allow_file_when_statement = true;
-
-		for_array(i, f->decls) {
-			check_delayed_file_import_entity(c, f->decls[i]);
+		bool new_files = collect_file_decls(c, f->decls);
+		if (new_files) {
+			file_index = 0;
+			continue;
 		}
 	}
+
+	// gb_printf_err("End here!\n");
+	// gb_exit(1);
 }
 
 Array<Entity *> find_entity_path(Map<DeclInfo *> *map, Entity *start, Entity *end, Map<Entity *> *visited = nullptr) {
@@ -2782,7 +3060,6 @@ void check_parsed_files(Checker *c) {
 	}
 
 	check_import_entities(c);
-
 	check_all_global_entities(c);
 	init_preload(c); // NOTE(bill): This could be setup previously through the use of `type_info(_of_val)`
 

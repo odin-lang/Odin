@@ -22,11 +22,11 @@ when ODIN_OS == "windows" {
 }
 
 when ODIN_OS == "windows" {
-	c_long :: u32;
+	c_ulong :: u32;
 } else when size_of(uint) == 4 {
-	c_long :: u32;
+	c_ulong :: u32;
 } else {
-	c_long :: u64;
+	c_ulong :: u64;
 }
 
 c_longlong       :: i64;
