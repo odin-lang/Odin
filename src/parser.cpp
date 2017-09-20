@@ -37,6 +37,7 @@ struct ImportedFile {
 
 struct AstFile {
 	isize               id;
+	String              fullpath;
 	gbArena             arena;
 	Tokenizer           tokenizer;
 	Array<Token>        tokens;
@@ -51,6 +52,7 @@ struct AstFile {
 	bool                allow_range; // NOTE(bill): Ranges are only allowed in certain cases
 	bool                in_foreign_block;
 	bool                allow_type;
+	isize               when_level;
 
 	Array<AstNode *>    decls;
 	ImportedFileKind    file_kind;
@@ -249,6 +251,8 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 		AstNode *cond; \
 		AstNode *body; \
 		AstNode *else_stmt; \
+		bool is_cond_determined; \
+		bool determined_cond; \
 	}) \
 	AST_NODE_KIND(ReturnStmt, "return statement", struct { \
 		Token token; \
@@ -328,27 +332,30 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		AstNode *        foreign_library; \
 		Token            open, close;     \
 		Array<AstNode *> decls;           \
-		CommentGroup docs;      \
+		bool             been_handled;    \
+		CommentGroup     docs;            \
 	}) \
 	AST_NODE_KIND(Label, "label", struct { 	\
 		Token token; \
 		AstNode *name; \
 	}) \
 	AST_NODE_KIND(ValueDecl, "value declaration", struct { \
-		Array<AstNode *> names;      \
-		AstNode *        type;       \
-		Array<AstNode *> values;     \
-		u64              flags;      \
-		bool             is_mutable; \
-		CommentGroup     docs;       \
-		CommentGroup     comment;    \
+		Array<AstNode *> names;        \
+		AstNode *        type;         \
+		Array<AstNode *> values;       \
+		u64              flags;        \
+		bool             is_mutable;   \
+		bool             been_handled; \
+		CommentGroup     docs;         \
+		CommentGroup     comment;      \
 	}) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		Token    token;         \
-		bool     is_using;      \
 		Token    relpath;       \
 		String   fullpath;      \
 		Token    import_name;   \
+		bool     is_using;      \
+		bool     been_handled;  \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -356,6 +363,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token    token;         \
 		Token    relpath;       \
 		String   fullpath;      \
+		bool     been_handled;  \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -364,6 +372,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token    filepath;      \
 		Token    library_name;  \
 		String   base_dir;      \
+		bool     been_handled;  \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -3993,7 +4002,10 @@ AstNode *parse_when_stmt(AstFile *f) {
 	AstNode *else_stmt = nullptr;
 
 	isize prev_level = f->expr_level;
+	isize when_level = f->when_level;
+	defer (f->when_level = when_level);
 	f->expr_level = -1;
+	f->when_level += 1;
 
 	cond = parse_expr(f, false);
 
@@ -4027,6 +4039,11 @@ AstNode *parse_when_stmt(AstFile *f) {
 			break;
 		}
 	}
+
+	// if (f->curr_proc == nullptr && f->when_level > 1) {
+	// 	syntax_error(token, "Nested when statements are not currently supported at the file scope");
+	// 	return ast_bad_stmt(f, token, f->curr_token);
+	// }
 
 	return ast_when_stmt(f, token, cond, body, else_stmt);
 }
@@ -4635,11 +4652,11 @@ Array<AstNode *> parse_stmt_list(AstFile *f) {
 
 
 ParseFileError init_ast_file(AstFile *f, String fullpath) {
-	fullpath = string_trim_whitespace(fullpath); // Just in case
-	if (!string_has_extension(fullpath, str_lit("odin"))) {
+	f->fullpath = string_trim_whitespace(fullpath); // Just in case
+	if (!string_has_extension(f->fullpath, str_lit("odin"))) {
 		return ParseFile_WrongExtension;
 	}
-	TokenizerInitError err = init_tokenizer(&f->tokenizer, fullpath);
+	TokenizerInitError err = init_tokenizer(&f->tokenizer, f->fullpath);
 	if (err != TokenizerInit_None) {
 		switch (err) {
 		case TokenizerInit_NotExists:

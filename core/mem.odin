@@ -1,5 +1,3 @@
-import "core:fmt.odin";
-import "core:os.odin";
 import "core:raw.odin";
 
 foreign __llvm_core {
@@ -146,7 +144,6 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 		total_size := size + alignment;
 
 		if len(arena.memory) + total_size > cap(arena.memory) {
-			fmt.fprintln(os.stderr, "Arena out of memory");
 			return nil;
 		}
 
