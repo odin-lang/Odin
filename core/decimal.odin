@@ -57,7 +57,7 @@ trim :: proc(a: ^Decimal) {
 
 
 assign :: proc(a: ^Decimal, i: u64) {
-	buf: [32]u8;
+	buf: [64]u8;
 	n := 0;
 	for i > 0 {
 		j := i/10;
@@ -68,10 +68,9 @@ assign :: proc(a: ^Decimal, i: u64) {
 	}
 
 	a.count = 0;
-	for n >= 0 {
+	for n -= 1; n >= 0; n -= 1 {
 		a.digits[a.count] = buf[n];
 		a.count += 1;
-		n -= 1;
 	}
 	a.decimal_point = a.count;
 	trim(a);
