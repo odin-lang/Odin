@@ -440,7 +440,7 @@ __get_map_header :: proc(m: ^$T/map[$K]$V) -> __Map_Header #cc_contextless {
 __get_map_key :: proc(key: $K) -> __Map_Key #cc_contextless {
 	map_key: __Map_Key;
 	ti := type_info_base_without_enum(type_info_of(K));
-	match _ in ti {
+	match _ in ti.variant {
 	case Type_Info.Integer:
 		match 8*size_of(key) {
 		case   8: map_key.hash = u128((  ^u8)(&key)^);
