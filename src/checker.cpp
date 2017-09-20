@@ -431,6 +431,10 @@ void add_implicit_entity(Checker *c, AstNode *node, Entity *e);
 void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d);
 void add_implicit_entity(Checker *c, AstNode *node, Entity *e);
 
+void check_add_import_decl(Checker *c, AstNodeImportDecl *id);
+void check_add_export_decl(Checker *c, AstNodeExportDecl *ed);
+void check_add_foreign_library_decl(Checker *c, AstNode *decl);
+
 
 void init_declaration_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	d->parent = parent;
@@ -2001,11 +2005,11 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 				continue;
 			}
 			if (c->context.collect_delayed_decls) {
-				check_delayed_file_import_entity(c, decl);
+				check_add_import_decl(c, id);
 			}
 		case_end;
 
-		case_ast_node(id, ExportDecl, decl);
+		case_ast_node(ed, ExportDecl, decl);
 			if (!c->context.scope->is_file) {
 				error(decl, "export declarations are only allowed in the file scope");
 				// NOTE(bill): _Should_ be caught by the parser
@@ -2013,7 +2017,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 				continue;
 			}
 			if (c->context.collect_delayed_decls) {
-				check_delayed_file_import_entity(c, decl);
+				check_add_export_decl(c, ed);
 			}
 		case_end;
 
@@ -2024,9 +2028,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
-			if (c->context.collect_delayed_decls) {
-				check_delayed_file_import_entity(c, decl);
-			}
+			check_add_foreign_library_decl(c, decl);
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
@@ -2676,8 +2678,6 @@ bool collect_checked_files_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 }
 
 void check_delayed_file_import_entity(Checker *c, AstNode *decl) {
-	GB_ASSERT(c->context.collect_delayed_decls);
-
 	Scope *parent_scope = c->context.scope;
 	GB_ASSERT(parent_scope->is_file);
 
@@ -2742,10 +2742,14 @@ bool collect_file_decls_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 }
 
 bool collect_file_decls(Checker *c, Array<AstNode *> decls) {
-	for_array(i, decls) {
-		Scope *parent_scope = c->context.scope;
-		GB_ASSERT(parent_scope->is_file);
+	Scope *parent_scope = c->context.scope;
+	GB_ASSERT(parent_scope->is_file);
 
+	if (collect_checked_files_from_import_decl_list(c, decls)) {
+		return true;
+	}
+
+	for_array(i, decls) {
 		AstNode *decl = decls[i];
 		switch (decl->kind) {
 		case_ast_node(vd, ValueDecl, decl);
@@ -2769,7 +2773,11 @@ bool collect_file_decls(Checker *c, Array<AstNode *> decls) {
 		case_end;
 
 		case_ast_node(ws, WhenStmt, decl);
-			if (ws->is_cond_determined) {
+			if (!ws->is_cond_determined) {
+				if (collect_checked_files_from_when_stmt(c, ws)) {
+					return true;
+				}
+
 				CheckerContext prev_context = c->context;
 				defer (c->context = prev_context);
 				c->context.collect_delayed_decls = true;
@@ -2778,9 +2786,6 @@ bool collect_file_decls(Checker *c, Array<AstNode *> decls) {
 					return true;
 				}
 			} else {
-				if (collect_checked_files_from_when_stmt(c, ws)) {
-					return true;
-				}
 
 				CheckerContext prev_context = c->context;
 				defer (c->context = prev_context);
@@ -2851,7 +2856,8 @@ void check_import_entities(Checker *c) {
 
 		for_array(i, n->pred.entries) {
 			ImportGraphNode *p = n->pred.entries[i].ptr;
-			p->dep_count = gb_max(p->dep_count-1, 0);
+			// p->dep_count = gb_max(p->dep_count-1, 0);
+			p->dep_count -= 1;
 			priority_queue_fix(&pq, p->index);
 		}
 
@@ -2874,29 +2880,38 @@ void check_import_entities(Checker *c) {
 		}
 	}
 
+	// for_array(file_index, file_order) {
+	// 	ImportGraphNode *node = file_order[file_index];
+	// 	AstFile *f = node->scope->file;
+	// 	gb_printf_err("---   %.*s\n", LIT(f->fullpath));
+	// }
+
 	for (;;) {
 		bool new_files = false;
-		for_array(file_index, c->parser->files) {
-			AstFile *f = c->parser->files[file_index];
+		for_array(file_index, file_order) {
+			ImportGraphNode *node = file_order[file_index];
+			AstFile *f = node->scope->file;
 
 			if (!ptr_set_exists(&c->checked_files, f)) {
 				continue;
 			}
+
+			CheckerContext prev_context = c->context;
+			defer (c->context = prev_context);
+			add_curr_ast_file(c, f);
 
 			new_files |= collect_checked_files_from_import_decl_list(c, f->decls);
 		}
 		if (new_files) break;
 	}
 
-	for_array(file_index, file_order) {
+	for (isize file_index = 0; file_index < file_order.count; file_index += 1) {
 		ImportGraphNode *node = file_order[file_index];
 		AstFile *f = node->scope->file;
 
 		if (!ptr_set_exists(&c->checked_files, f)) {
 			continue;
 		}
-
-		// gb_printf_err("%.*s\n", LIT(f->fullpath));
 
 		CheckerContext prev_context = c->context;
 		defer (c->context = prev_context);
@@ -2905,7 +2920,8 @@ void check_import_entities(Checker *c) {
 
 		bool new_files = collect_file_decls(c, f->decls);
 		if (new_files) {
-			file_index = 0;
+			// TODO(bill): Only start from the lowest new file
+			file_index = -1;
 			continue;
 		}
 	}
