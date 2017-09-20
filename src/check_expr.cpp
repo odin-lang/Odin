@@ -3324,7 +3324,6 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		}
 		if (out_value) *out_value = v;
 
-
 		switch (type->Basic.kind) {
 		// case Basic_f16:
 		case Basic_f32:
@@ -3333,6 +3332,8 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 
 		case Basic_UntypedFloat:
 			return true;
+
+		default: GB_PANIC("Compiler error: Unknown float type!"); break;
 		}
 	} else if (is_type_complex(type)) {
 		ExactValue v = exact_value_to_complex(in_value);
@@ -3353,6 +3354,8 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		} break;
 		case Basic_UntypedComplex:
 			return true;
+
+		default: GB_PANIC("Compiler error: Unknown complex type!"); break;
 		}
 
 		return false;

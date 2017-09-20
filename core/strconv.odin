@@ -300,7 +300,7 @@ format_digits :: proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, 
 		// integer, padded with zeros when needed
 		if digs.decimal_point > 0 {
 			m := min(digs.count, digs.decimal_point);
-			append(&buf, ...digs.digits[..m]);
+			append(&buf, ...digs.digits[0..m]);
 			for ; m < digs.decimal_point; m += 1 {
 				append(&buf, '0');
 			}
@@ -320,7 +320,6 @@ format_digits :: proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, 
 				append(&buf, c);
 			}
 		}
-
 		return buf;
 
 	case 'e', 'E':
