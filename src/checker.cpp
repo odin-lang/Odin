@@ -2849,7 +2849,7 @@ void check_import_entities(Checker *c) {
 					gb_printf_err("\t`%.*s` refers to", LIT(token.string));
 					s = path[i];
 				}
-				gb_printf_err("\t`%.*s`", LIT(token.string));
+				gb_printf_err("\t`%.*s`\n", LIT(token.string));
 			}
 
 		}
