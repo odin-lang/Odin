@@ -1917,7 +1917,12 @@ AstNode *parse_ident(AstFile *f) {
 
 AstNode *parse_tag_expr(AstFile *f, AstNode *expression) {
 	Token token = expect_token(f, Token_Hash);
-	Token name  = expect_token(f, Token_Ident);
+	Token name = {};
+	if (f->curr_token.kind == Token_export) {
+		name = expect_token(f, Token_export);
+	} else {
+		name = expect_token(f, Token_Ident);
+	}
 	return ast_tag_expr(f, token, name, expression);
 }
 
