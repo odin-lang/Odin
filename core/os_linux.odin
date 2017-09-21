@@ -40,9 +40,9 @@ RTLD_GLOBAL       :: 0x100;
 args := _alloc_command_line_arguments();
 
 _File_Time :: struct #ordered {
-	seconds:     i64;
-	nanoseconds: i32;
-	reserved:    i32;
+	seconds:     i64,
+	nanoseconds: i32,
+	reserved:    i32,
 }
 
 // Translated from
@@ -50,27 +50,27 @@ _File_Time :: struct #ordered {
 // Validity is not guaranteed.
 
 Stat :: struct #ordered {
-	device_id:     u64; // ID of device containing file
-	serial:        u64; // File serial number
-	nlink:         u32; // Number of hard links
-	mode:          u32; // Mode of the file
-	uid:           u32; // User ID of the file's owner
-	gid:           u32; // Group ID of the file's group
-	_padding:      i32; // 32 bits of padding
-	rdev:          u64; // Device ID, if device
-	size:          i64; // Size of the file, in bytes
-	block_size:    i64; // Optimal bllocksize for I/O
-	blocks:        i64; // Number of 512-byte blocks allocated
+	device_id:     u64, // ID of device containing file
+	serial:        u64, // File serial number
+	nlink:         u32, // Number of hard links
+	mode:          u32, // Mode of the file
+	uid:           u32, // User ID of the file's owner
+	gid:           u32, // Group ID of the file's group
+	_padding:      i32, // 32 bits of padding
+	rdev:          u64, // Device ID, if device
+	size:          i64, // Size of the file, in bytes
+	block_size:    i64, // Optimal bllocksize for I/O
+	blocks:        i64, // Number of 512-byte blocks allocated
 
-	last_access:   _File_Time; // Time of last access
-	modified:      _File_Time; // Time of last modification
-	status_change: _File_Time; // Time of last status change
+	last_access:   _File_Time, // Time of last access
+	modified:      _File_Time, // Time of last modification
+	status_change: _File_Time, // Time of last status change
 
 	_reserve1,
 	_reserve2,
-	_reserve3:     i64;
-	serial_numbe:  u64; // File serial number...? Maybe.
-	_reserve4:     i64;
+	_reserve3:     i64,
+	serial_numbe:  u64, // File serial number...? Maybe.
+	_reserve4:     i64,
 };
 
 // File type

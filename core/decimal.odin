@@ -3,10 +3,10 @@
 // NOTE: This is only for floating point printing and nothing else
 
 Decimal :: struct {
-	digits:        [384]u8; // big-endian digits
-	count:         int;
-	decimal_point: int;
-	neg, trunc:    bool;
+	digits:        [384]u8, // big-endian digits
+	count:         int,
+	decimal_point: int,
+	neg, trunc:    bool,
 }
 
 decimal_to_string :: proc(buf: []u8, a: ^Decimal) -> string {

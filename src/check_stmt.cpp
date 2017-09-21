@@ -472,24 +472,7 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 	switch (e->kind) {
 	case Entity_TypeName: {
 		Type *t = base_type(e->type);
-		if (t->kind == Type_Struct) {
-			Scope *s = t->Struct.scope;
-			if (s != nullptr) {
-				for_array(i, s->elements.entries) {
-					Entity *f = s->elements.entries[i].value;
-					if (f->kind != Entity_Variable) {
-						Entity *found = scope_insert_entity(c->context.scope, f);
-						if (found != nullptr) {
-							gbString expr_str = expr_to_string(expr);
-							error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
-							gb_string_free(expr_str);
-							return false;
-						}
-						f->using_parent = e;
-					}
-				}
-			}
-		} else if (t->kind == Type_Enum) {
+		if (t->kind == Type_Enum) {
 			for (isize i = 0; i < t->Enum.field_count; i++) {
 				Entity *f = t->Enum.fields[i];
 				Entity *found = scope_insert_entity(c->context.scope, f);
@@ -502,7 +485,7 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 				f->using_parent = e;
 			}
 		} else {
-			error(us->token, "`using` can be only applied to struct type entities");
+			error(us->token, "`using` can be only applied to enum type entities");
 		}
 	} break;
 

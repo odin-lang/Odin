@@ -202,16 +202,16 @@ append_float :: proc(buf: []u8, f: f64, fmt: u8, prec, bit_size: int) -> string 
 
 
 DecimalSlice :: struct {
-	digits:        []u8;
-	count:         int;
-	decimal_point: int;
-	neg:           bool;
+	digits:        []u8,
+	count:         int,
+	decimal_point: int,
+	neg:           bool,
 }
 
 FloatInfo :: struct {
-	mantbits: uint;
-	expbits:  uint;
-	bias:     int;
+	mantbits: uint,
+	expbits:  uint,
+	bias:     int,
 }
 
 

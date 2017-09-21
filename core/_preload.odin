@@ -35,102 +35,103 @@ Calling_Convention :: enum {
 }
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
-Type_Info :: struct #ordered {
-// Core Types
-	Enum_Value :: union {
-		rune,
-		i8, i16, i32, i64, i128, int,
-		u8, u16, u32, u64, u128, uint,
-		f32, f64,
-	};
+
+Type_Info_Enum_Value :: union {
+	rune,
+	i8, i16, i32, i64, i128, int,
+	u8, u16, u32, u64, u128, uint,
+	f32, f64,
+};
+
 
 // Variant Types
-	Named   :: struct #ordered {name: string; base: ^Type_Info};
-	Integer :: struct #ordered {signed: bool};
-	Rune    :: struct{};
-	Float   :: struct{};
-	Complex :: struct{};
-	String  :: struct{};
-	Boolean :: struct{};
-	Any     :: struct{};
-	Pointer :: struct #ordered {
-		elem: ^Type_Info; // nil -> rawptr
-	};
-	Procedure :: struct #ordered {
-		params:     ^Type_Info; // Type_Info.Tuple
-		results:    ^Type_Info; // Type_Info.Tuple
-		variadic:   bool;
-		convention: Calling_Convention;
-	};
-	Array :: struct #ordered {
-		elem:      ^Type_Info;
-		elem_size: int;
-		count:     int;
-	};
-	Dynamic_Array :: struct #ordered {elem: ^Type_Info; elem_size: int};
-	Slice         :: struct #ordered {elem: ^Type_Info; elem_size: int};
-	Vector        :: struct #ordered {elem: ^Type_Info; elem_size, count: int};
-	Tuple :: struct #ordered { // Only really used for procedures
-		types:        []^Type_Info;
-		names:        []string;
-	};
-	Struct :: struct #ordered {
-		types:        []^Type_Info;
-		names:        []string;
-		offsets:      []int;  // offsets may not be used in tuples
-		usings:       []bool; // usings may not be used in tuples
-		is_packed:    bool;
-		is_ordered:   bool;
-		is_raw_union: bool;
-		custom_align: bool;
-	};
-	Union :: struct #ordered {
-		variants:   []^Type_Info;
-		tag_offset: int;
-	};
-	Enum :: struct #ordered {
-		base:   ^Type_Info;
-		names:  []string;
-		values: []Enum_Value;
-	};
-	Map :: struct #ordered {
-		key:              ^Type_Info;
-		value:            ^Type_Info;
-		generated_struct: ^Type_Info;
-	};
-	Bit_Field :: struct #ordered {
-		names:   []string;
-		bits:    []i32;
-		offsets: []i32;
-	};
+Type_Info_Named   :: struct #ordered {name: string, base: ^Type_Info};
+Type_Info_Integer :: struct #ordered {signed: bool};
+Type_Info_Rune    :: struct{};
+Type_Info_Float   :: struct{};
+Type_Info_Complex :: struct{};
+Type_Info_String  :: struct{};
+Type_Info_Boolean :: struct{};
+Type_Info_Any     :: struct{};
+Type_Info_Pointer :: struct #ordered {
+	elem: ^Type_Info // nil -> rawptr
+};
+Type_Info_Procedure :: struct #ordered {
+	params:     ^Type_Info, // Type_Info_Tuple
+	results:    ^Type_Info, // Type_Info_Tuple
+	variadic:   bool,
+	convention: Calling_Convention,
+};
+Type_Info_Array :: struct #ordered {
+	elem:      ^Type_Info,
+	elem_size: int,
+	count:     int,
+};
+Type_Info_Dynamic_Array :: struct #ordered {elem: ^Type_Info, elem_size: int};
+Type_Info_Slice         :: struct #ordered {elem: ^Type_Info, elem_size: int};
+Type_Info_Vector        :: struct #ordered {elem: ^Type_Info, elem_size, count: int};
+Type_Info_Tuple :: struct #ordered { // Only really used for procedures
+	types:        []^Type_Info,
+	names:        []string,
+};
+Type_Info_Struct :: struct #ordered {
+	types:        []^Type_Info,
+	names:        []string,
+	offsets:      []int,  // offsets may not be used in tuples
+	usings:       []bool, // usings may not be used in tuples
+	is_packed:    bool,
+	is_ordered:   bool,
+	is_raw_union: bool,
+	custom_align: bool,
+};
+Type_Info_Union :: struct #ordered {
+	variants:   []^Type_Info,
+	tag_offset: int,
+};
+Type_Info_Enum :: struct #ordered {
+	base:   ^Type_Info,
+	names:  []string,
+	values: []Type_Info_Enum_Value,
+};
+Type_Info_Map :: struct #ordered {
+	key:              ^Type_Info,
+	value:            ^Type_Info,
+	generated_struct: ^Type_Info,
+};
+Type_Info_Bit_Field :: struct #ordered {
+	names:   []string,
+	bits:    []i32,
+	offsets: []i32,
+};
 
 
+Type_Info :: struct #ordered {
 // Fields
-	size:  int;
-	align: int;
+	size:  int,
+	align: int,
 
 	variant: union {
-		Named,
-		Integer,
-		Rune,
-		Float,
-		Complex,
-		String,
-		Boolean,
-		Any,
-		Pointer,
-		Procedure,
-		Array,
-		Dynamic_Array,
-		Slice,
-		Vector,
-		Tuple,
-		Struct,
-		Union,
-		Enum,
-		Map,
-		Bit_Field,
-	};
+		Type_Info_Named,
+		Type_Info_Integer,
+		Type_Info_Rune,
+		Type_Info_Float,
+		Type_Info_Complex,
+		Type_Info_String,
+		Type_Info_Boolean,
+		Type_Info_Any,
+		Type_Info_Pointer,
+		Type_Info_Procedure,
+		Type_Info_Array,
+		Type_Info_Dynamic_Array,
+		Type_Info_Slice,
+		Type_Info_Vector,
+		Type_Info_Tuple,
+		Type_Info_Struct,
+		Type_Info_Union,
+		Type_Info_Enum,
+		Type_Info_Map,
+		Type_Info_Bit_Field,
+	},
 }
 
 // NOTE(bill): only the ones that are needed (not all types)
@@ -142,69 +143,72 @@ __argc__: i32;
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 
-Allocator :: struct #ordered {
-	Mode :: enum u8 {
-		Alloc,
-		Free,
-		FreeAll,
-		Resize,
-	}
-	Proc :: #type proc(allocator_data: rawptr, mode: Mode,
-	                   size, alignment: int,
-	                   old_memory: rawptr, old_size: int, flags: u64 = 0) -> rawptr;
+Allocator_Mode :: enum u8 {
+	Alloc,
+	Free,
+	FreeAll,
+	Resize,
+}
 
-	procedure: Proc;
-	data:      rawptr;
+
+Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
+	                         size, alignment: int,
+	                         old_memory: rawptr, old_size: int, flags: u64 = 0) -> rawptr;
+
+
+Allocator :: struct #ordered {
+	procedure: Allocator_Proc,
+	data:      rawptr,
 }
 
 
 Context :: struct #ordered {
-	allocator:  Allocator;
-	thread_id:  int;
+	allocator:  Allocator,
+	thread_id:  int,
 
-	user_data:  any;
-	user_index: int;
+	user_data:  any,
+	user_index: int,
 
-	derived:    any; // May be used for derived data types
+	derived:    any, // May be used for derived data types
 }
 
 DEFAULT_ALIGNMENT :: align_of([vector 4]f32);
 
 Source_Code_Location :: struct #ordered {
-	file_path:    string;
-	line, column: i64;
-	procedure:    string;
+	file_path:    string,
+	line, column: i64,
+	procedure:    string,
 }
 
 
 __INITIAL_MAP_CAP :: 16;
 
 __Map_Key :: struct #ordered {
-	hash: u128;
-	str:  string;
+	hash: u128,
+	str:  string,
 }
 
 __Map_Find_Result :: struct #ordered {
-	hash_index:  int;
-	entry_prev:  int;
-	entry_index: int;
+	hash_index:  int,
+	entry_prev:  int,
+	entry_index: int,
 }
 
 __Map_Entry_Header :: struct #ordered {
-	key:  __Map_Key;
-	next: int;
+	key:  __Map_Key,
+	next: int,
 /*
-	value: Value_Type;
+	value: Value_Type,
 */
 }
 
 __Map_Header :: struct #ordered {
-	m:             ^raw.Map;
-	is_key_string: bool;
-	entry_size:    int;
-	entry_align:   int;
-	value_offset:  int;
-	value_size:    int;
+	m:             ^raw.Map,
+	is_key_string: bool,
+	entry_size:    int,
+	entry_align:   int,
+	value_offset:  int,
+	value_size:    int,
 }
 
 
@@ -214,7 +218,7 @@ type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 
 	base := info;
 	match i in base.variant {
-	case Type_Info.Named: base = i.base;
+	case Type_Info_Named: base = i.base;
 	}
 	return base;
 }
@@ -225,8 +229,8 @@ type_info_base_without_enum :: proc(info: ^Type_Info) -> ^Type_Info {
 
 	base := info;
 	match i in base.variant {
-	case Type_Info.Named: base = i.base;
-	case Type_Info.Enum:  base = i.base;
+	case Type_Info_Named: base = i.base;
+	case Type_Info_Enum:  base = i.base;
 	}
 	return base;
 }
@@ -281,26 +285,26 @@ __check_context :: proc() {
 
 alloc :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr #inline {
 	a := context.allocator;
-	return a.procedure(a.data, Allocator.Mode.Alloc, size, alignment, nil, 0, 0);
+	return a.procedure(a.data, Allocator_Mode.Alloc, size, alignment, nil, 0, 0);
 }
 
 free_ptr_with_allocator :: proc(a: Allocator, ptr: rawptr) #inline {
 	if ptr == nil do return;
 	if a.procedure == nil do return;
-	a.procedure(a.data, Allocator.Mode.Free, 0, 0, ptr, 0, 0);
+	a.procedure(a.data, Allocator_Mode.Free, 0, 0, ptr, 0, 0);
 }
 
 free_ptr :: proc(ptr: rawptr) #inline do free_ptr_with_allocator(context.allocator, ptr);
 
 free_all :: proc() #inline {
 	a := context.allocator;
-	a.procedure(a.data, Allocator.Mode.FreeAll, 0, 0, nil, 0, 0);
+	a.procedure(a.data, Allocator_Mode.FreeAll, 0, 0, nil, 0, 0);
 }
 
 
 resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr #inline {
 	a := context.allocator;
-	return a.procedure(a.data, Allocator.Mode.Resize, new_size, alignment, ptr, old_size, 0);
+	return a.procedure(a.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, 0);
 }
 
 
@@ -411,7 +415,7 @@ reserve :: proc(array: ^$T/[dynamic]$E, capacity: int) -> bool {
 	new_size  := capacity * size_of(E);
 	allocator := a.allocator;
 
-	new_data := allocator.procedure(allocator.data, Allocator.Mode.Resize, new_size, align_of(E), a.data, old_size, 0);
+	new_data := allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, align_of(E), a.data, old_size, 0);
 	if new_data == nil do return false;
 
 	a.data = new_data;
@@ -423,12 +427,12 @@ reserve :: proc(array: ^$T/[dynamic]$E, capacity: int) -> bool {
 __get_map_header :: proc(m: ^$T/map[$K]$V) -> __Map_Header #cc_contextless {
 	header := __Map_Header{m = cast(^raw.Map)m};
 	Entry :: struct {
-		key:   __Map_Key;
-		next:  int;
-		value: V;
+		key:   __Map_Key,
+		next:  int,
+		value: V,
 	}
 
-	_, is_string := type_info_base(type_info_of(K)).variant.(Type_Info.String);
+	_, is_string := type_info_base(type_info_of(K)).variant.(Type_Info_String);
 	header.is_key_string = is_string;
 	header.entry_size    = size_of(Entry);
 	header.entry_align   = align_of(Entry);
@@ -441,7 +445,7 @@ __get_map_key :: proc(key: $K) -> __Map_Key #cc_contextless {
 	map_key: __Map_Key;
 	ti := type_info_base_without_enum(type_info_of(K));
 	match _ in ti.variant {
-	case Type_Info.Integer:
+	case Type_Info_Integer:
 		match 8*size_of(key) {
 		case   8: map_key.hash = u128((  ^u8)(&key)^);
 		case  16: map_key.hash = u128(( ^u16)(&key)^);
@@ -450,17 +454,17 @@ __get_map_key :: proc(key: $K) -> __Map_Key #cc_contextless {
 		case 128: map_key.hash = u128((^u128)(&key)^);
 		case: panic("Unhandled integer size");
 		}
-	case Type_Info.Rune:
+	case Type_Info_Rune:
 		map_key.hash = u128((cast(^rune)&key)^);
-	case Type_Info.Pointer:
+	case Type_Info_Pointer:
 		map_key.hash = u128(uint((^rawptr)(&key)^));
-	case Type_Info.Float:
+	case Type_Info_Float:
 		match 8*size_of(key) {
 		case 32: map_key.hash = u128((^u32)(&key)^);
 		case 64: map_key.hash = u128((^u64)(&key)^);
 		case: panic("Unhandled float size");
 		}
-	case Type_Info.String:
+	case Type_Info_String:
 		str := (^string)(&key)^;
 		map_key.hash = __default_hash_string(str);
 		map_key.str  = str;
@@ -566,10 +570,10 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 }
 
 
-default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
-                            size, alignment: int,
-                            old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
-	using Allocator.Mode;
+default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
+                               size, alignment: int,
+                               old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
+	using Allocator_Mode;
 
 	match mode {
 	case Alloc:
@@ -788,7 +792,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	new_size  := cap * elem_size;
 	allocator := array.allocator;
 
-	new_data := allocator.procedure(allocator.data, Allocator.Mode.Resize, new_size, elem_align, array.data, old_size, 0);
+	new_data := allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, elem_align, array.data, old_size, 0);
 	if new_data == nil do return false;
 
 	array.data = new_data;

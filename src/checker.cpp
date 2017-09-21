@@ -1595,16 +1595,16 @@ Entity *find_core_entity(Checker *c, String name) {
 	return e;
 }
 
-Entity *find_sub_core_entity(TypeStruct *parent, String name) {
-	GB_ASSERT(parent->scope->parent->is_global);
-	Entity *e = current_scope_lookup_entity(parent->scope, name);
+Type *find_core_type(Checker *c, String name) {
+	Entity *e = current_scope_lookup_entity(c->global_scope, name);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for `%.*s`\n"
 		               "Is `_preload.odin` missing from the `core` directory relative to odin.exe?", LIT(name));
 		// NOTE(bill): This will exit the program as it's cannot continue without it!
 	}
-	return e;
+	return e->type;
 }
+
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type);
 
@@ -1617,7 +1617,7 @@ void init_preload(Checker *c) {
 		GB_ASSERT(is_type_struct(type_info_entity->type));
 		TypeStruct *tis = &base_type(type_info_entity->type)->Struct;
 
-		Entity *type_info_enum_value = find_sub_core_entity(tis, str_lit("Enum_Value"));
+		Entity *type_info_enum_value = find_core_entity(c, str_lit("Type_Info_Enum_Value"));
 
 		t_type_info_enum_value = type_info_enum_value->type;
 		t_type_info_enum_value_ptr = make_type_pointer(c->allocator, t_type_info_enum_value);
@@ -1627,31 +1627,27 @@ void init_preload(Checker *c) {
 		Entity *type_info_variant = tis->fields_in_src_order[2];
 		Type *tiv_type = type_info_variant->type;
 		GB_ASSERT(is_type_union(tiv_type));
-		TypeUnion *tiv = &tiv_type->Union;
 
-		if (tiv->variants.count != 20) {
-			compiler_error("Invalid `Type_Info` layout");
-		}
-		t_type_info_named         = tiv->variants[ 0];
-		t_type_info_integer       = tiv->variants[ 1];
-		t_type_info_rune          = tiv->variants[ 2];
-		t_type_info_float         = tiv->variants[ 3];
-		t_type_info_complex       = tiv->variants[ 4];
-		t_type_info_string        = tiv->variants[ 5];
-		t_type_info_boolean       = tiv->variants[ 6];
-		t_type_info_any           = tiv->variants[ 7];
-		t_type_info_pointer       = tiv->variants[ 8];
-		t_type_info_procedure     = tiv->variants[ 9];
-		t_type_info_array         = tiv->variants[10];
-		t_type_info_dynamic_array = tiv->variants[11];
-		t_type_info_slice         = tiv->variants[12];
-		t_type_info_vector        = tiv->variants[13];
-		t_type_info_tuple         = tiv->variants[14];
-		t_type_info_struct        = tiv->variants[15];
-		t_type_info_union         = tiv->variants[16];
-		t_type_info_enum          = tiv->variants[17];
-		t_type_info_map           = tiv->variants[18];
-		t_type_info_bit_field     = tiv->variants[19];
+		t_type_info_named         = find_core_type(c, str_lit("Type_Info_Named"));
+		t_type_info_integer       = find_core_type(c, str_lit("Type_Info_Integer"));
+		t_type_info_rune          = find_core_type(c, str_lit("Type_Info_Rune"));
+		t_type_info_float         = find_core_type(c, str_lit("Type_Info_Float"));
+		t_type_info_complex       = find_core_type(c, str_lit("Type_Info_Complex"));
+		t_type_info_string        = find_core_type(c, str_lit("Type_Info_String"));
+		t_type_info_boolean       = find_core_type(c, str_lit("Type_Info_Boolean"));
+		t_type_info_any           = find_core_type(c, str_lit("Type_Info_Any"));
+		t_type_info_pointer       = find_core_type(c, str_lit("Type_Info_Pointer"));
+		t_type_info_procedure     = find_core_type(c, str_lit("Type_Info_Procedure"));
+		t_type_info_array         = find_core_type(c, str_lit("Type_Info_Array"));
+		t_type_info_dynamic_array = find_core_type(c, str_lit("Type_Info_Dynamic_Array"));
+		t_type_info_slice         = find_core_type(c, str_lit("Type_Info_Slice"));
+		t_type_info_vector        = find_core_type(c, str_lit("Type_Info_Vector"));
+		t_type_info_tuple         = find_core_type(c, str_lit("Type_Info_Tuple"));
+		t_type_info_struct        = find_core_type(c, str_lit("Type_Info_Struct"));
+		t_type_info_union         = find_core_type(c, str_lit("Type_Info_Union"));
+		t_type_info_enum          = find_core_type(c, str_lit("Type_Info_Enum"));
+		t_type_info_map           = find_core_type(c, str_lit("Type_Info_Map"));
+		t_type_info_bit_field     = find_core_type(c, str_lit("Type_Info_Bit_Field"));
 
 		t_type_info_named_ptr         = make_type_pointer(c->allocator, t_type_info_named);
 		t_type_info_integer_ptr       = make_type_pointer(c->allocator, t_type_info_integer);

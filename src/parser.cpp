@@ -130,6 +130,7 @@ enum FieldFlag {
 	FieldFlag_c_vararg  = 1<<3,
 
 	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg,
+	FieldFlag_Struct    = FieldFlag_using,
 };
 
 enum StmtAllowFlag {
@@ -3478,6 +3479,11 @@ AstNode *parse_struct_field_list(AstFile *f, isize *name_count_) {
 
 	isize total_name_count = 0;
 
+	AstNode *params = parse_field_list(f, &total_name_count, FieldFlag_Struct, Token_CloseBrace, true, false);
+	if (name_count_) *name_count_ = total_name_count;
+	return params;
+
+#if 0
 	while (f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
 		AstNode *decl = parse_stmt(f);
@@ -3508,6 +3514,7 @@ AstNode *parse_struct_field_list(AstFile *f, isize *name_count_) {
 
 	if (name_count_) *name_count_ = total_name_count;
 	return ast_field_list(f, start_token, decls);
+#endif
 }
 
 AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_type_token) {
