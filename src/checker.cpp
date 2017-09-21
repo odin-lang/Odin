@@ -327,6 +327,90 @@ void entity_graph_node_swap(EntityGraphNode **data, isize i, isize j) {
 
 
 
+struct ImportGraphNode;
+typedef PtrSet<ImportGraphNode *> ImportGraphNodeSet;
+
+void import_graph_node_set_destroy(ImportGraphNodeSet *s) {
+	if (s->hashes.data != nullptr) {
+		ptr_set_destroy(s);
+	}
+}
+
+void import_graph_node_set_add(ImportGraphNodeSet *s, ImportGraphNode *n) {
+	if (s->hashes.data == nullptr) {
+		ptr_set_init(s, heap_allocator());
+	}
+	ptr_set_add(s, n);
+}
+
+bool import_graph_node_set_exists(ImportGraphNodeSet *s, ImportGraphNode *n) {
+	return ptr_set_exists(s, n);
+}
+
+void import_graph_node_set_remove(ImportGraphNodeSet *s, ImportGraphNode *n) {
+	ptr_set_remove(s, n);
+}
+
+struct ImportGraphNode {
+	Scope *            scope;
+	String             path;
+	isize              file_id;
+	ImportGraphNodeSet pred;
+	ImportGraphNodeSet succ;
+	isize              index; // Index in array/queue
+	isize              dep_count;
+};
+
+ImportGraphNode *import_graph_node_create(gbAllocator a, Scope *scope) {
+	ImportGraphNode *n = gb_alloc_item(a, ImportGraphNode);
+	n->scope   = scope;
+	n->path    = scope->file->tokenizer.fullpath;
+	n->file_id = scope->file->id;
+	return n;
+}
+
+
+void import_graph_node_destroy(ImportGraphNode *n, gbAllocator a) {
+	import_graph_node_set_destroy(&n->pred);
+	import_graph_node_set_destroy(&n->succ);
+	gb_free(a, n);
+}
+
+
+int import_graph_node_cmp(ImportGraphNode **data, isize i, isize j) {
+	ImportGraphNode *x = data[i];
+	ImportGraphNode *y = data[j];
+	GB_ASSERT(x != y);
+
+	GB_ASSERT(x->scope != y->scope);
+
+	bool xg = x->scope->is_global;
+	bool yg = y->scope->is_global;
+	if (xg != yg) return xg ? -1 : +1;
+	if (x->dep_count < y->dep_count) return -1;
+	if (x->dep_count > y->dep_count) return +1;
+	return 0;
+}
+
+void import_graph_node_swap(ImportGraphNode **data, isize i, isize j) {
+	ImportGraphNode *x = data[i];
+	ImportGraphNode *y = data[j];
+	data[i] = y;
+	data[j] = x;
+	x->index = j;
+	y->index = i;
+}
+
+GB_COMPARE_PROC(ast_node_cmp) {
+	AstNode *x = *cast(AstNode **)a;
+	AstNode *y = *cast(AstNode **)b;
+	Token i = ast_node_token(x);
+	Token j = ast_node_token(y);
+	return token_pos_cmp(i.pos, j.pos);
+}
+
+
+
 struct CheckerContext {
 	Scope *    file_scope;
 	Scope *    scope;
@@ -378,6 +462,7 @@ struct Checker {
 	// NOTE(bill): Procedures to check
 	Map<ProcedureInfo>         procs; // Key: DeclInfo *
 	Map<Scope *>               file_scopes; // Key: String (fullpath)
+	Array<ImportGraphNode *>   file_order;
 
 	Pool                       pool;
 	gbAllocator                allocator;
@@ -430,6 +515,10 @@ void add_entity_use(Checker *c, AstNode *identifier, Entity *entity);
 void add_implicit_entity(Checker *c, AstNode *node, Entity *e);
 void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d);
 void add_implicit_entity(Checker *c, AstNode *node, Entity *e);
+
+void check_add_import_decl(Checker *c, AstNodeImportDecl *id);
+void check_add_export_decl(Checker *c, AstNodeExportDecl *ed);
+void check_add_foreign_library_decl(Checker *c, AstNode *decl);
 
 
 void init_declaration_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
@@ -895,6 +984,8 @@ void init_checker(Checker *c, Parser *parser) {
 
 	map_init(&c->file_scopes, heap_allocator());
 	ptr_set_init(&c->checked_files, heap_allocator());
+
+	array_init(&c->file_order, heap_allocator(), c->parser->files.count);
 }
 
 void destroy_checker(Checker *c) {
@@ -908,6 +999,7 @@ void destroy_checker(Checker *c) {
 
 	map_destroy(&c->file_scopes);
 	ptr_set_destroy(&c->checked_files);
+	array_free(&c->file_order);
 }
 
 
@@ -2001,11 +2093,11 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 				continue;
 			}
 			if (c->context.collect_delayed_decls) {
-				check_delayed_file_import_entity(c, decl);
+				check_add_import_decl(c, id);
 			}
 		case_end;
 
-		case_ast_node(id, ExportDecl, decl);
+		case_ast_node(ed, ExportDecl, decl);
 			if (!c->context.scope->is_file) {
 				error(decl, "export declarations are only allowed in the file scope");
 				// NOTE(bill): _Should_ be caught by the parser
@@ -2013,7 +2105,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 				continue;
 			}
 			if (c->context.collect_delayed_decls) {
-				check_delayed_file_import_entity(c, decl);
+				check_add_export_decl(c, ed);
 			}
 		case_end;
 
@@ -2024,9 +2116,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
-			if (c->context.collect_delayed_decls) {
-				check_delayed_file_import_entity(c, decl);
-			}
+			check_add_foreign_library_decl(c, decl);
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
@@ -2182,88 +2272,6 @@ String path_to_entity_name(String name, String fullpath) {
 
 
 
-
-struct ImportGraphNode;
-typedef PtrSet<ImportGraphNode *> ImportGraphNodeSet;
-
-void import_graph_node_set_destroy(ImportGraphNodeSet *s) {
-	if (s->hashes.data != nullptr) {
-		ptr_set_destroy(s);
-	}
-}
-
-void import_graph_node_set_add(ImportGraphNodeSet *s, ImportGraphNode *n) {
-	if (s->hashes.data == nullptr) {
-		ptr_set_init(s, heap_allocator());
-	}
-	ptr_set_add(s, n);
-}
-
-bool import_graph_node_set_exists(ImportGraphNodeSet *s, ImportGraphNode *n) {
-	return ptr_set_exists(s, n);
-}
-
-void import_graph_node_set_remove(ImportGraphNodeSet *s, ImportGraphNode *n) {
-	ptr_set_remove(s, n);
-}
-
-struct ImportGraphNode {
-	Scope *            scope;
-	String             path;
-	isize              file_id;
-	ImportGraphNodeSet pred;
-	ImportGraphNodeSet succ;
-	isize              index; // Index in array/queue
-	isize              dep_count;
-};
-
-ImportGraphNode *import_graph_node_create(gbAllocator a, Scope *scope) {
-	ImportGraphNode *n = gb_alloc_item(a, ImportGraphNode);
-	n->scope   = scope;
-	n->path    = scope->file->tokenizer.fullpath;
-	n->file_id = scope->file->id;
-	return n;
-}
-
-
-void import_graph_node_destroy(ImportGraphNode *n, gbAllocator a) {
-	import_graph_node_set_destroy(&n->pred);
-	import_graph_node_set_destroy(&n->succ);
-	gb_free(a, n);
-}
-
-
-int import_graph_node_cmp(ImportGraphNode **data, isize i, isize j) {
-	ImportGraphNode *x = data[i];
-	ImportGraphNode *y = data[j];
-	GB_ASSERT(x != y);
-
-	GB_ASSERT(x->scope != y->scope);
-
-	bool xg = x->scope->is_global;
-	bool yg = y->scope->is_global;
-	if (xg != yg) return xg ? -1 : +1;
-	if (x->dep_count < y->dep_count) return -1;
-	if (x->dep_count > y->dep_count) return +1;
-	return 0;
-}
-
-void import_graph_node_swap(ImportGraphNode **data, isize i, isize j) {
-	ImportGraphNode *x = data[i];
-	ImportGraphNode *y = data[j];
-	data[i] = y;
-	data[j] = x;
-	x->index = j;
-	y->index = i;
-}
-
-GB_COMPARE_PROC(ast_node_cmp) {
-	AstNode *x = *cast(AstNode **)a;
-	AstNode *y = *cast(AstNode **)b;
-	Token i = ast_node_token(x);
-	Token j = ast_node_token(y);
-	return token_pos_cmp(i.pos, j.pos);
-}
 
 
 void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *> *M) {
@@ -2676,8 +2684,6 @@ bool collect_checked_files_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 }
 
 void check_delayed_file_import_entity(Checker *c, AstNode *decl) {
-	GB_ASSERT(c->context.collect_delayed_decls);
-
 	Scope *parent_scope = c->context.scope;
 	GB_ASSERT(parent_scope->is_file);
 
@@ -2742,10 +2748,14 @@ bool collect_file_decls_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 }
 
 bool collect_file_decls(Checker *c, Array<AstNode *> decls) {
-	for_array(i, decls) {
-		Scope *parent_scope = c->context.scope;
-		GB_ASSERT(parent_scope->is_file);
+	Scope *parent_scope = c->context.scope;
+	GB_ASSERT(parent_scope->is_file);
 
+	if (collect_checked_files_from_import_decl_list(c, decls)) {
+		return true;
+	}
+
+	for_array(i, decls) {
 		AstNode *decl = decls[i];
 		switch (decl->kind) {
 		case_ast_node(vd, ValueDecl, decl);
@@ -2769,7 +2779,11 @@ bool collect_file_decls(Checker *c, Array<AstNode *> decls) {
 		case_end;
 
 		case_ast_node(ws, WhenStmt, decl);
-			if (ws->is_cond_determined) {
+			if (!ws->is_cond_determined) {
+				if (collect_checked_files_from_when_stmt(c, ws)) {
+					return true;
+				}
+
 				CheckerContext prev_context = c->context;
 				defer (c->context = prev_context);
 				c->context.collect_delayed_decls = true;
@@ -2778,9 +2792,6 @@ bool collect_file_decls(Checker *c, Array<AstNode *> decls) {
 					return true;
 				}
 			} else {
-				if (collect_checked_files_from_when_stmt(c, ws)) {
-					return true;
-				}
 
 				CheckerContext prev_context = c->context;
 				defer (c->context = prev_context);
@@ -2813,10 +2824,6 @@ void check_import_entities(Checker *c) {
 	ptr_set_init(&emitted, heap_allocator());
 	defer (ptr_set_destroy(&emitted));
 
-	Array<ImportGraphNode *> file_order = {};
-	array_init(&file_order, heap_allocator());
-	defer (array_free(&file_order));
-
 	while (pq.queue.count > 0) {
 		ImportGraphNode *n = priority_queue_pop(&pq);
 
@@ -2839,19 +2846,18 @@ void check_import_entities(Checker *c) {
 				Token token = mt(s);
 				error(token, "Cyclic importation of `%.*s`", LIT(token.string));
 				for (isize i = path.count-1; i >= 0; i--) {
-					token = mt(s);
-					error(token, "\t`%.*s` refers to", LIT(token.string));
+					gb_printf_err("\t`%.*s` refers to", LIT(token.string));
 					s = path[i];
 				}
-				token = mt(s);
-				error(token, "\t`%.*s`", LIT(token.string));
+				gb_printf_err("\t`%.*s`", LIT(token.string));
 			}
 
 		}
 
 		for_array(i, n->pred.entries) {
 			ImportGraphNode *p = n->pred.entries[i].ptr;
-			p->dep_count = gb_max(p->dep_count-1, 0);
+			// p->dep_count = gb_max(p->dep_count-1, 0);
+			p->dep_count -= 1;
 			priority_queue_fix(&pq, p->index);
 		}
 
@@ -2863,7 +2869,7 @@ void check_import_entities(Checker *c) {
 		}
 		ptr_set_add(&emitted, s);
 
-		array_add(&file_order, n);
+		array_add(&c->file_order, n);
 	}
 
 	for_array(file_index, c->parser->files) {
@@ -2874,29 +2880,38 @@ void check_import_entities(Checker *c) {
 		}
 	}
 
+	// for_array(file_index, c->file_order) {
+	// 	ImportGraphNode *node = c->file_order[file_index];
+	// 	AstFile *f = node->scope->file;
+	// 	gb_printf_err("---   %.*s\n", LIT(f->fullpath));
+	// }
+
 	for (;;) {
 		bool new_files = false;
-		for_array(file_index, c->parser->files) {
-			AstFile *f = c->parser->files[file_index];
+		for_array(file_index, c->file_order) {
+			ImportGraphNode *node = c->file_order[file_index];
+			AstFile *f = node->scope->file;
 
 			if (!ptr_set_exists(&c->checked_files, f)) {
 				continue;
 			}
+
+			CheckerContext prev_context = c->context;
+			defer (c->context = prev_context);
+			add_curr_ast_file(c, f);
 
 			new_files |= collect_checked_files_from_import_decl_list(c, f->decls);
 		}
 		if (new_files) break;
 	}
 
-	for_array(file_index, file_order) {
-		ImportGraphNode *node = file_order[file_index];
+	for (isize file_index = 0; file_index < c->file_order.count; file_index += 1) {
+		ImportGraphNode *node = c->file_order[file_index];
 		AstFile *f = node->scope->file;
 
 		if (!ptr_set_exists(&c->checked_files, f)) {
 			continue;
 		}
-
-		// gb_printf_err("%.*s\n", LIT(f->fullpath));
 
 		CheckerContext prev_context = c->context;
 		defer (c->context = prev_context);
@@ -2905,7 +2920,8 @@ void check_import_entities(Checker *c) {
 
 		bool new_files = collect_file_decls(c, f->decls);
 		if (new_files) {
-			file_index = 0;
+			// TODO(bill): Only start from the lowest new file
+			file_index = -1;
 			continue;
 		}
 	}
