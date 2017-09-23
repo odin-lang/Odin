@@ -2838,14 +2838,18 @@ void check_import_entities(Checker *c) {
 					return token;
 				};
 
-				Scope *s = path[0];
-				Token token = mt(s);
-				error(token, "Cyclic importation of `%.*s`", LIT(token.string));
-				for (isize i = path.count-1; i >= 0; i--) {
-					gb_printf_err("\t`%.*s` refers to", LIT(token.string));
-					s = path[i];
+
+				if (path.count > 0) {
+					Scope *s = path[path.count-1];
+					Token token = mt(s);
+					error(token, "Cyclic importation of `%.*s`", LIT(token.string));
+					for (isize i = 0; i < path.count; i++) {
+						gb_printf_err("\t`%.*s` refers to\n", LIT(token.string));
+						s = path[i];
+						token = mt(s);
+					}
+					gb_printf_err("\t`%.*s`\n", LIT(token.string));
 				}
-				gb_printf_err("\t`%.*s`", LIT(token.string));
 			}
 
 		}
