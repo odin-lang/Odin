@@ -32,6 +32,10 @@ void check_stmt_list(Checker *c, Array<AstNode *> stmts, u32 flags) {
 			case AstNode_ReturnStmt:
 				error(n, "Statements after this `return` are never executed");
 				break;
+
+			case AstNode_BranchStmt:
+				error(n, "Statements after this `%.*s` are never executed", LIT(n->BranchStmt.token.string));
+				break;
 			}
 		}
 
