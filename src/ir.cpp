@@ -4761,6 +4761,16 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 		case Token_CmpAnd:
 		case Token_CmpOr:
+			if (is_type_vector(type)) {
+				TokenKind op = {};
+				switch (be->op.kind) {
+				case Token_CmpAnd: op = Token_And; break;
+				case Token_CmpOr:  op = Token_Or;  break;
+				}
+				irValue *right = ir_build_expr(proc, be->right);
+				return ir_emit_arith(proc, op, left, right, type);
+			}
+
 			return ir_emit_logical_binary_expr(proc, expr);
 
 		default:
