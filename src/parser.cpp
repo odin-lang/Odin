@@ -4663,7 +4663,7 @@ Array<AstNode *> parse_stmt_list(AstFile *f) {
 }
 
 
-ParseFileError init_ast_file(AstFile *f, String fullpath) {
+ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	f->fullpath = string_trim_whitespace(fullpath); // Just in case
 	if (!string_has_extension(f->fullpath, str_lit("odin"))) {
 		return ParseFile_WrongExtension;
@@ -4689,6 +4689,8 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 	for (;;) {
 		Token token = tokenizer_get_token(&f->tokenizer);
 		if (token.kind == Token_Invalid) {
+			err_pos->line = token.pos.line;
+			err_pos->column = token.pos.column;
 			return ParseFile_InvalidToken;
 		}
 		array_add(&f->tokens, token);
@@ -4967,7 +4969,8 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 		file->is_global_scope = true;
 	}
 
-	ParseFileError err = init_ast_file(file, import_path);
+	TokenPos err_pos = {0};
+	ParseFileError err = init_ast_file(file, import_path, &err_pos);
 
 	if (err != ParseFile_None) {
 		if (err == ParseFile_EmptyFile) {
@@ -4996,7 +4999,7 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 			gb_printf_err("File cannot be found (`%.*s`)", LIT(import_path));
 			break;
 		case ParseFile_InvalidToken:
-			gb_printf_err("Invalid token found in file");
+			gb_printf_err("Invalid token found in file at (%td:%td)", err_pos.line, err_pos.column);
 			break;
 		}
 		gb_printf_err("\n");
