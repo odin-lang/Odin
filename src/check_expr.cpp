@@ -87,7 +87,12 @@ void error_operand_not_expression(Operand *o) {
 void error_operand_no_value(Operand *o) {
 	if (o->mode == Addressing_NoValue) {
 		gbString err = expr_to_string(o->expr);
-		error(o->expr, "`%s` used as value", err);
+		AstNode *x = unparen_expr(o->expr);
+		if (x->kind == AstNode_CallExpr) {
+			error(o->expr, "`%s` call does not return a value and cannot be used as a value", err);
+		} else {
+			error(o->expr, "`%s` used as a value", err);
+		}
 		gb_string_free(err);
 		o->mode = Addressing_Invalid;
 	}
