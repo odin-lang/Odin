@@ -750,7 +750,7 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 			String name = f->token.string;
 			HashKey key = hash_string(name);
 			Entity **found = map_get(entity_map, key);
-			if (found != nullptr) {
+			if (found != nullptr && name != "_") {
 				Entity *e = *found;
 				// TODO(bill): Better type error
 				if (str != nullptr) {
