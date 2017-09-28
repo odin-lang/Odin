@@ -202,16 +202,16 @@ append_float :: proc(buf: []u8, f: f64, fmt: u8, prec, bit_size: int) -> string 
 
 
 DecimalSlice :: struct {
-	digits:        []u8;
-	count:         int;
-	decimal_point: int;
-	neg:           bool;
+	digits:        []u8,
+	count:         int,
+	decimal_point: int,
+	neg:           bool,
 }
 
 FloatInfo :: struct {
-	mantbits: uint;
-	expbits:  uint;
-	bias:     int;
+	mantbits: uint,
+	expbits:  uint,
+	bias:     int,
 }
 
 
@@ -300,7 +300,7 @@ format_digits :: proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, 
 		// integer, padded with zeros when needed
 		if digs.decimal_point > 0 {
 			m := min(digs.count, digs.decimal_point);
-			append(&buf, ...digs.digits[..m]);
+			append(&buf, ...digs.digits[0..m]);
 			for ; m < digs.decimal_point; m += 1 {
 				append(&buf, '0');
 			}
@@ -320,7 +320,6 @@ format_digits :: proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, 
 				append(&buf, c);
 			}
 		}
-
 		return buf;
 
 	case 'e', 'E':

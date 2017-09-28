@@ -2,20 +2,20 @@ when ODIN_OS == "windows" do import win32 "core:sys/windows.odin";
 import "core:atomics.odin";
 
 Semaphore :: struct {
-	_handle: win32.Handle;
+	_handle: win32.Handle,
 }
 
 /*
 Mutex :: struct {
-	_semaphore: Semaphore;
-	_counter:   i32;
-	_owner:     i32;
-	_recursion: i32;
+	_semaphore: Semaphore,
+	_counter:   i32,
+	_owner:     i32,
+	_recursion: i32,
 }
 */
 
 Mutex :: struct {
-	_critical_section: win32.Critical_Section;
+	_critical_section: win32.Critical_Section,
 }
 
 current_thread_id :: proc() -> i32 {

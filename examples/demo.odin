@@ -1,25 +1,24 @@
 import "core:fmt.odin";
 import "core:strconv.odin";
 import "core:mem.odin";
-import "core:atomics.odin";
 import "core:bits.odin";
 import "core:hash.odin";
 import "core:math.odin";
-import "core:opengl.odin";
 import "core:os.odin";
 import "core:raw.odin";
 import "core:sort.odin";
 import "core:strings.odin";
-import "core:sync.odin";
 import "core:types.odin";
-import "core:utf8.odin";
 import "core:utf16.odin";
+import "core:utf8.odin";
+// import "core:sync.odin";
 
 when ODIN_OS == "windows" {
+	import "core:atomics.odin";
+	import "core:opengl.odin";
 	import "core:thread.odin";
 	import win32 "core:sys/windows.odin";
 }
-
 
 general_stuff :: proc() {
 	{ // `do` for inline statmes rather than block
@@ -59,8 +58,8 @@ general_stuff :: proc() {
 
 	{ // `expand_to_tuple` built-in procedure
 		Foo :: struct {
-			x: int;
-			b: bool;
+			x: int,
+			b: bool,
 		}
 		f := Foo{137, true};
 		x, b := expand_to_tuple(f);
@@ -78,31 +77,12 @@ general_stuff :: proc() {
 	}
 }
 
-nested_struct_declarations :: proc() {
-	{
-		FooInteger :: int;
-		Foo :: struct {
-			i: FooInteger;
-		};
-		f := Foo{FooInteger(137)};
-	}
-	{
-		Foo :: struct {
-			Integer :: int;
-
-			i: Integer;
-		}
-		f := Foo{Foo.Integer(137)};
-
-	}
-}
-
 default_struct_values :: proc() {
 	{
 		Vector3 :: struct {
-			x: f32;
-			y: f32;
-			z: f32;
+			x: f32,
+			y: f32,
+			z: f32,
 		}
 		v: Vector3;
 		fmt.println(v);
@@ -110,9 +90,9 @@ default_struct_values :: proc() {
 	{
 		// Default values must be constants
 		Vector3 :: struct {
-			x: f32 = 1;
-			y: f32 = 4;
-			z: f32 = 9;
+			x: f32 = 1,
+			y: f32 = 4,
+			z: f32 = 9,
 		}
 		v: Vector3;
 		fmt.println(v);
@@ -130,9 +110,9 @@ default_struct_values :: proc() {
 
 	{
 		Vector3 :: struct {
-			x := 1.0;
-			y := 4.0;
-			z := 9.0;
+			x := 1.0,
+			y := 4.0,
+			z := 9.0,
 		}
 		stack_default: Vector3;
 		stack_literal := Vector3{};
@@ -198,13 +178,8 @@ union_type :: proc() {
 		}
 	}
 
-	Vector3 :: struct {
-		x, y, z: f32;
-	};
-	Quaternion :: struct {
-		x, y, z: f32;
-		w: f32 = 1;
-	};
+	Vector3 :: struct {x, y, z: f32};
+	Quaternion :: struct {x, y, z: f32, w: f32 = 1};
 
 	// More realistic examples
 	{
@@ -215,23 +190,23 @@ union_type :: proc() {
 		// an example of this for a basic game Entity.
 
 		Entity :: struct {
-			id:          u64;
-			name:        string;
-			position:    Vector3;
-			orientation: Quaternion;
+			id:          u64,
+			name:        string,
+			position:    Vector3,
+			orientation: Quaternion,
 
-			derived: any;
+			derived: any,
 		}
 
 		Frog :: struct {
-			using entity: Entity;
-			jump_height:  f32;
+			using entity: Entity,
+			jump_height:  f32,
 		}
 
 		Monster :: struct {
-			using entity: Entity;
-			is_robot:     bool;
-			is_zombie:    bool;
+			using entity: Entity,
+			is_robot:     bool,
+			is_zombie:    bool,
 		}
 
 		// See `parametric_polymorphism` procedure for details
@@ -259,23 +234,23 @@ union_type :: proc() {
 		// basic game Entity but using an union.
 
 		Entity :: struct {
-			id:          u64;
-			name:        string;
-			position:    Vector3;
-			orientation: Quaternion;
+			id:          u64,
+			name:        string,
+			position:    Vector3,
+			orientation: Quaternion,
 
-			derived: union {Frog, Monster};
+			derived: union {Frog, Monster},
 		}
 
 		Frog :: struct {
-			using entity: ^Entity;
-			jump_height:  f32;
+			using entity: ^Entity,
+			jump_height:  f32,
 		}
 
 		Monster :: struct {
-			using entity: ^Entity;
-			is_robot:     bool;
-			is_zombie:    bool;
+			using entity: ^Entity,
+			is_robot:     bool,
+			is_zombie:    bool,
 		}
 
 		// See `parametric_polymorphism` procedure for details
@@ -387,18 +362,17 @@ parametric_polymorphism :: proc() {
 
 
 	{ // Polymorphic Types and Type Specialization
+		Table_Slot :: struct(Key, Value: type) {
+			occupied: bool,
+			hash:     u32,
+			key:      Key,
+			value:    Value,
+		}
+		TABLE_SIZE_MIN :: 32;
 		Table :: struct(Key, Value: type) {
-			Slot :: struct {
-				occupied: bool;
-				hash:     u32;
-				key:      Key;
-				value:    Value;
-			}
-			SIZE_MIN :: 32;
-
-			count:           int;
-			allocator:       Allocator;
-			slots:           []Slot;
+			count:     int,
+			allocator: Allocator,
+			slots:     []Table_Slot(Key, Value),
 		}
 
 		// Only allow types that are specializations of a (polymorphic) slice
@@ -413,7 +387,7 @@ parametric_polymorphism :: proc() {
 			if table.allocator.procedure != nil do c.allocator = table.allocator;
 
 			push_context c {
-				table.slots = make_slice([]T.Slot, max(capacity, T.SIZE_MIN));
+				table.slots = make_slice(type_of(table.slots), max(capacity, TABLE_SIZE_MIN));
 			}
 		}
 
@@ -424,7 +398,7 @@ parametric_polymorphism :: proc() {
 			push_context c {
 				old_slots := table.slots;
 
-				cap := max(2*cap(table.slots), T.SIZE_MIN);
+				cap := max(2*cap(table.slots), TABLE_SIZE_MIN);
 				allocate(table, cap);
 
 				for s in old_slots do if s.occupied {
@@ -585,10 +559,10 @@ threading_example :: proc() {
 	}
 }
 
+
 main :: proc() {
 	when false {
 		fmt.println("\n# general_stuff");              general_stuff();
-		fmt.println("\n# nested_struct_declarations"); nested_struct_declarations();
 		fmt.println("\n# default_struct_values");      default_struct_values();
 		fmt.println("\n# union_type");                 union_type();
 		fmt.println("\n# parametric_polymorphism");    parametric_polymorphism();

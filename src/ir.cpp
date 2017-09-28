@@ -4762,6 +4762,16 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 		case Token_CmpAnd:
 		case Token_CmpOr:
+			if (is_type_vector(type)) {
+				TokenKind op = {};
+				switch (be->op.kind) {
+				case Token_CmpAnd: op = Token_And; break;
+				case Token_CmpOr:  op = Token_Or;  break;
+				}
+				irValue *right = ir_build_expr(proc, be->right);
+				return ir_emit_arith(proc, op, left, right, type);
+			}
+
 			return ir_emit_logical_binary_expr(proc, expr);
 
 		default:
@@ -7168,32 +7178,53 @@ void ir_begin_procedure_body(irProcedure *proc) {
 		proc->return_ptr = param;
 	}
 
+	GB_ASSERT(proc->type != nullptr);
+
 	if (proc->type->Proc.params != nullptr) {
-		ast_node(pt, ProcType, proc->type_expr);
-		isize param_index = 0;
-		isize q_index = 0;
-
 		TypeTuple *params = &proc->type->Proc.params->Tuple;
-		for_array(i, params->variables) {
-			ast_node(fl, FieldList, pt->params);
-			GB_ASSERT(fl->list.count > 0);
-			GB_ASSERT(fl->list[0]->kind == AstNode_Field);
-			if (q_index == fl->list[param_index]->Field.names.count) {
-				q_index = 0;
-				param_index++;
-			}
-			ast_node(field, Field, fl->list[param_index]);
-			AstNode *name = field->names[q_index++];
+		if (proc->type_expr != nullptr) {
+			ast_node(pt, ProcType, proc->type_expr);
+			isize param_index = 0;
+			isize q_index = 0;
 
-			Entity *e = params->variables[i];
-			if (e->kind != Entity_Variable) {
-				continue;
-			}
+			for_array(i, params->variables) {
+				ast_node(fl, FieldList, pt->params);
+				GB_ASSERT(fl->list.count > 0);
+				GB_ASSERT(fl->list[0]->kind == AstNode_Field);
+				if (q_index == fl->list[param_index]->Field.names.count) {
+					q_index = 0;
+					param_index++;
+				}
+				ast_node(field, Field, fl->list[param_index]);
+				AstNode *name = field->names[q_index++];
 
-			Type *abi_type = proc->type->Proc.abi_compat_params[i];
-			if (e->token.string != "" && !is_blank_ident(e->token)) {
-				irValue *param = ir_add_param(proc, e, name, abi_type);
-				array_add(&proc->params, param);
+				Entity *e = params->variables[i];
+				if (e->kind != Entity_Variable) {
+					continue;
+				}
+
+				Type *abi_type = proc->type->Proc.abi_compat_params[i];
+				if (e->token.string != "" && !is_blank_ident(e->token)) {
+					irValue *param = ir_add_param(proc, e, name, abi_type);
+					array_add(&proc->params, param);
+				}
+			}
+		} else {
+			Type **abi_types = proc->type->Proc.abi_compat_params;
+
+			for_array(i, params->variables) {
+				Entity *e = params->variables[i];
+				if (e->kind != Entity_Variable) {
+					continue;
+				}
+				Type *abi_type = e->type;
+				if (abi_types != nullptr) {
+					abi_type = proc->type->Proc.abi_compat_params[i];
+				}
+				if (e->token.string != "" && !is_blank_ident(e->token)) {
+					irValue *param = ir_add_param(proc, e, nullptr, abi_type);
+					array_add(&proc->params, param);
+				}
 			}
 		}
 	}
@@ -7826,12 +7857,20 @@ void ir_gen_tree(irGen *s) {
 		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, make_token_ident(str_lit("reason")), t_i32, false, false);
 		proc_params->Tuple.variables[2] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false, false);
 
+
 		proc_results->Tuple.variables[0] = make_entity_param(a, proc_scope, empty_token, t_i32, false, false);
 
 
 		Type *proc_type = make_type_proc(a, proc_scope,
 		                                 proc_params, 3,
 		                                 proc_results, 1, false, ProcCC_Std);
+
+		// TODO(bill): make this more robust
+		proc_type->Proc.abi_compat_params = gb_alloc_array(a, Type *, proc_params->Tuple.variables.count);
+		for_array(i, proc_params->Tuple.variables) {
+			proc_type->Proc.abi_compat_params[i] = proc_params->Tuple.variables[i]->type;
+		}
+		proc_type->Proc.abi_compat_result_type = proc_results->Tuple.variables[0]->type;
 
 		AstNode *body = gb_alloc_item(a, AstNode);
 		Entity *e = make_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);

@@ -4,24 +4,25 @@ when ODIN_OS == "windows" {
 	import win32 "core:sys/windows.odin";
 }
 
+Thread_Proc :: #type proc(^Thread) -> int;
+
+Thread_Os_Specific :: struct {
+	win32_thread:    win32.Handle,
+	win32_thread_id: u32,
+}
+
 Thread :: struct {
-	using specific:   Os_Specific;
-	procedure:        Proc;
-	data:             any;
-	user_index:       int;
+	using specific:   Thread_Os_Specific,
+	procedure:        Thread_Proc,
+	data:             any,
+	user_index:       int,
 
-	init_context:     Context;
-	use_init_context: bool;
-
-	Proc :: #type proc(^Thread) -> int;
-	Os_Specific :: struct {
-		win32_thread:    win32.Handle;
-		win32_thread_id: u32;
-	}
+	init_context:     Context,
+	use_init_context: bool,
 }
 
 
-create :: proc(procedure: Thread.Proc) -> ^Thread {
+create :: proc(procedure: Thread_Proc) -> ^Thread {
 	win32_thread_id: u32;
 
 	__windows_thread_entry_proc :: proc(data: rawptr) -> i32 #cc_c {

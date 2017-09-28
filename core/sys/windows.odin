@@ -27,86 +27,86 @@ FALSE: Bool : 0;
 TRUE:  Bool : 1;
 
 Point :: struct #ordered {
-	x, y: i32;
+	x, y: i32,
 }
 
 Wnd_Class_Ex_A :: struct #ordered {
-	size, style:           u32;
-	wnd_proc:              Wnd_Proc;
-	cls_extra, wnd_extra:  i32;
-	instance:              Hinstance;
-	icon:                  Hicon;
-	cursor:                Hcursor;
-	background:            Hbrush;
-	menu_name, class_name: ^u8;
-	sm:                    Hicon;
+	size, style:           u32,
+	wnd_proc:              Wnd_Proc,
+	cls_extra, wnd_extra:  i32,
+	instance:              Hinstance,
+	icon:                  Hicon,
+	cursor:                Hcursor,
+	background:            Hbrush,
+	menu_name, class_name: ^u8,
+	sm:                    Hicon,
 }
 
 Msg :: struct #ordered {
-	hwnd:    Hwnd;
-	message: u32;
-	wparam:  Wparam;
-	lparam:  Lparam;
-	time:    u32;
-	pt:      Point;
+	hwnd:    Hwnd,
+	message: u32,
+	wparam:  Wparam,
+	lparam:  Lparam,
+	time:    u32,
+	pt:      Point,
 }
 
 Rect :: struct #ordered {
-	left:   i32;
-	top:    i32;
-	right:  i32;
-	bottom: i32;
+	left:   i32,
+	top:    i32,
+	right:  i32,
+	bottom: i32,
 }
 
 Filetime :: struct #ordered {
-	lo, hi: u32;
+	lo, hi: u32,
 }
 
 Systemtime :: struct #ordered {
-	year, month: u16;
-	day_of_week, day: u16;
-	hour, minute, second, millisecond: u16;
+	year, month: u16,
+	day_of_week, day: u16,
+	hour, minute, second, millisecond: u16,
 }
 
 By_Handle_File_Information :: struct #ordered {
-	file_attributes:      u32;
+	file_attributes:      u32,
 	creation_time,
 	last_access_time,
-	last_write_time:      Filetime;
+	last_write_time:      Filetime,
 	volume_serial_number,
 	file_size_high,
 	file_size_low,
 	number_of_links,
 	file_index_high,
-	file_index_low:       u32;
+	file_index_low:       u32,
 }
 
 File_Attribute_Data :: struct #ordered {
-	file_attributes:  u32;
+	file_attributes:  u32,
 	creation_time,
 	last_access_time,
-	last_write_time:  Filetime;
+	last_write_time:  Filetime,
 	file_size_high,
-	file_size_low:    u32;
+	file_size_low:    u32,
 }
 
 Find_Data :: struct #ordered{
-    file_attributes:     u32;
-    creation_time:       Filetime;
-    last_access_time:    Filetime;
-    last_write_time:     Filetime;
-    file_size_high:      u32;
-    file_size_low:       u32;
-    reserved0:           u32;
-    reserved1:           u32;
-    file_name:           [MAX_PATH]u8;
-    alternate_file_name: [14]u8;
+    file_attributes:     u32,
+    creation_time:       Filetime,
+    last_access_time:    Filetime,
+    last_write_time:     Filetime,
+    file_size_high:      u32,
+    file_size_low:       u32,
+    reserved0:           u32,
+    reserved1:           u32,
+    file_name:           [MAX_PATH]u8,
+    alternate_file_name: [14]u8,
 }
 
 Security_Attributes :: struct #ordered {
-	length:              u32;
-	security_descriptor: rawptr;
-	inherit_handle:      Bool;
+	length:              u32,
+	security_descriptor: rawptr,
+	inherit_handle:      Bool,
 }
 
 
@@ -114,7 +114,7 @@ Security_Attributes :: struct #ordered {
 Pixel_Format_Descriptor :: struct #ordered {
 	size,
 	version,
-	flags: u32;
+	flags: u32,
 
 	pixel_type,
 	color_bits,
@@ -135,33 +135,33 @@ Pixel_Format_Descriptor :: struct #ordered {
 	stencil_bits,
 	aux_buffers,
 	layer_type,
-	reserved: u8;
+	reserved: u8,
 
 	layer_mask,
 	visible_mask,
-	damage_mask: u32;
+	damage_mask: u32,
 }
 
 Critical_Section :: struct #ordered {
-	debug_info:      ^Critical_Section_Debug;
+	debug_info:      ^Critical_Section_Debug,
 
-	lock_count:      i32;
-	recursion_count: i32;
-	owning_thread:   Handle;
-	lock_semaphore:  Handle;
-	spin_count:      ^u32;
+	lock_count:      i32,
+	recursion_count: i32,
+	owning_thread:   Handle,
+	lock_semaphore:  Handle,
+	spin_count:      ^u32,
 }
 
 Critical_Section_Debug :: struct #ordered {
-	typ:                           u16;
-	creator_back_trace_index:      u16;
-	critical_section:              ^Critical_Section;
-	process_locks_list:            ^List_Entry;
-	entry_count:                   u32;
-	contention_count:              u32;
-	flags:                         u32;
-	creator_back_trace_index_high: u16;
-	spare_word:                    u16;
+	typ:                           u16,
+	creator_back_trace_index:      u16,
+	critical_section:              ^Critical_Section,
+	process_locks_list:            ^List_Entry,
+	entry_count:                   u32,
+	contention_count:              u32,
+	flags:                         u32,
+	creator_back_trace_index_high: u16,
+	spare_word:                    u16,
 }
 
 List_Entry :: struct #ordered {flink, blink: ^List_Entry};
@@ -546,35 +546,35 @@ FILE_TYPE_PIPE :: 0x0003;
 
 
 Monitor_Info :: struct #ordered {
-	size:      u32;
-	monitor:   Rect;
-	work:      Rect;
-	flags:     u32;
+	size:      u32,
+	monitor:   Rect,
+	work:      Rect,
+	flags:     u32,
 }
 
 Window_Placement :: struct #ordered {
-	length:     u32;
-	flags:      u32;
-	show_cmd:   u32;
-	min_pos:    Point;
-	max_pos:    Point;
-	normal_pos: Rect;
+	length:     u32,
+	flags:      u32,
+	show_cmd:   u32,
+	min_pos:    Point,
+	max_pos:    Point,
+	normal_pos: Rect,
 }
 
 Bitmap_Info_Header :: struct #ordered {
-	size:              u32;
-	width, height:     i32;
-	planes, bit_count: i16;
-	compression:       u32;
-	size_image:        u32;
-	x_pels_per_meter:  i32;
-	y_pels_per_meter:  i32;
-	clr_used:          u32;
-	clr_important:     u32;
+	size:              u32,
+	width, height:     i32,
+	planes, bit_count: i16,
+	compression:       u32,
+	size_image:        u32,
+	x_pels_per_meter:  i32,
+	y_pels_per_meter:  i32,
+	clr_used:          u32,
+	clr_important:     u32,
 }
 Bitmap_Info :: struct #ordered {
-	using header: Bitmap_Info_Header;
-	colors:       [1]Rgb_Quad;
+	using header: Bitmap_Info_Header,
+	colors:       [1]Rgb_Quad,
 }
 
 

@@ -87,7 +87,12 @@ void error_operand_not_expression(Operand *o) {
 void error_operand_no_value(Operand *o) {
 	if (o->mode == Addressing_NoValue) {
 		gbString err = expr_to_string(o->expr);
-		error(o->expr, "`%s` used as value", err);
+		AstNode *x = unparen_expr(o->expr);
+		if (x->kind == AstNode_CallExpr) {
+			error(o->expr, "`%s` call does not return a value and cannot be used as a value", err);
+		} else {
+			error(o->expr, "`%s` used as a value", err);
+		}
 		gb_string_free(err);
 		o->mode = Addressing_Invalid;
 	}
@@ -750,7 +755,7 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 			String name = f->token.string;
 			HashKey key = hash_string(name);
 			Entity **found = map_get(entity_map, key);
-			if (found != nullptr) {
+			if (found != nullptr && name != "_") {
 				Entity *e = *found;
 				// TODO(bill): Better type error
 				if (str != nullptr) {
@@ -986,8 +991,8 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 }
 
 // Returns filled field_count
-Array<Entity *> check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
-                             isize init_field_capacity, String context) {
+Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> params,
+                                    isize init_field_capacity, String context) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 	defer (gb_temp_arena_memory_end(tmp));
 
@@ -998,29 +1003,151 @@ Array<Entity *> check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 	map_init(&entity_map, c->tmp_allocator, 2*init_field_capacity);
 
 
-	if (node != nullptr) {
-		GB_ASSERT(node->kind != AstNode_UnionType);
-	}
+	GB_ASSERT(node->kind == AstNode_StructType);
 
-	check_collect_entities(c, decls);
-	for_array(i, c->context.scope->elements.entries) {
-		Entity *e = c->context.scope->elements.entries[i].value;
-		DeclInfo *d = nullptr;
-		switch (e->kind) {
-		default: continue;
-		case Entity_Constant:
-		case Entity_TypeName:
-			d = decl_info_of_entity(&c->info, e);
-			if (d != nullptr) {
-				check_entity_decl(c, e, d, nullptr);
-			}
-			break;
+	isize variable_count = 0;
+	for_array(i, params) {
+		AstNode *field = params[i];
+		if (ast_node_expect(field, AstNode_Field)) {
+			ast_node(f, Field, field);
+			variable_count += gb_max(f->names.count, 1);
 		}
 	}
 
-	for_array(decl_index, decls) {
-		check_struct_field_decl(c, decls[decl_index], &fields, &entity_map, node, context, context == "struct");
+	i32 field_src_index = 0;
+	for_array(i, params) {
+		AstNode *param = params[i];
+		if (param->kind != AstNode_Field) {
+			continue;
+		}
+		ast_node(p, Field, param);
+		AstNode *type_expr = p->type;
+		Type *type = nullptr;
+		AstNode *default_value = unparen_expr(p->default_value);
+		ExactValue value = {};
+		bool default_is_nil = false;
+		bool detemine_type_from_operand = false;
+
+
+		if (type_expr == nullptr) {
+			Operand o = {};
+			check_expr_or_type(c, &o, default_value);
+			if (is_operand_nil(o)) {
+				default_is_nil = true;
+			} else if (o.mode != Addressing_Constant) {
+				error(default_value, "Default parameter must be a constant");
+			} else {
+				value = o.value;
+			}
+
+			type = default_type(o.type);
+		} else {
+			type = check_type(c, type_expr);
+
+			if (default_value != nullptr) {
+				Operand o = {};
+				check_expr_with_type_hint(c, &o, default_value, type);
+
+				if (is_operand_nil(o)) {
+					default_is_nil = true;
+				} else if (o.mode != Addressing_Constant) {
+					error(default_value, "Default parameter must be a constant");
+				} else {
+					value = o.value;
+				}
+
+				check_is_assignable_to(c, &o, type);
+			}
+
+			if (is_type_polymorphic(type)) {
+				type = nullptr;
+			}
+		}
+		if (type == nullptr) {
+			error(params[i], "Invalid parameter type");
+			type = t_invalid;
+		}
+		if (is_type_untyped(type)) {
+			if (is_type_untyped_undef(type)) {
+				error(params[i], "Cannot determine parameter type from ---");
+			} else {
+				error(params[i], "Cannot determine parameter type from a nil");
+			}
+			type = t_invalid;
+		}
+		if (is_type_empty_union(type)) {
+			gbString str = type_to_string(type);
+			error(params[i], "Invalid use of an empty union `%s`", str);
+			gb_string_free(str);
+			type = t_invalid;
+		}
+
+		bool is_using = (p->flags&FieldFlag_using) != 0;
+
+		for_array(j, p->names) {
+			AstNode *name = p->names[j];
+			if (!ast_node_expect(name, AstNode_Ident)) {
+				continue;
+			}
+
+			Token name_token = name->Ident.token;
+
+			Entity *field = nullptr;
+			field = make_entity_field(c->allocator, c->context.scope, name_token, type, is_using, field_src_index);
+			field->Variable.default_value = value;
+			field->Variable.default_is_nil = default_is_nil;
+
+			add_entity(c, c->context.scope, name, field);
+			array_add(&fields, field);
+
+			field_src_index += 1;
+		}
+
+		Entity *using_index_expr = nullptr;
+
+		if (is_using && p->names.count > 0) {
+			Type *first_type = fields[fields.count-1]->type;
+			Type *t = base_type(type_deref(first_type));
+
+			if (!is_type_struct(t) && !is_type_raw_union(t) && !is_type_bit_field(t) &&
+			    p->names.count >= 1 &&
+			    p->names[0]->kind == AstNode_Ident) {
+				Token name_token = p->names[0]->Ident.token;
+				if (is_type_indexable(t)) {
+					bool ok = true;
+					for_array(emi, entity_map.entries) {
+						Entity *e = entity_map.entries[emi].value;
+						if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
+							if (is_type_indexable(e->type)) {
+								if (e->identifier != p->names[0]) {
+									ok = false;
+									using_index_expr = e;
+									break;
+								}
+							}
+						}
+					}
+					if (ok) {
+						using_index_expr = fields[fields.count-1];
+					} else {
+						fields[fields.count-1]->flags &= ~EntityFlag_Using;
+						error(name_token, "Previous `using` for an index expression `%.*s`", LIT(name_token.string));
+					}
+				} else {
+					gbString type_str = type_to_string(first_type);
+					error(name_token, "`using` cannot be applied to the field `%.*s` of type `%s`", LIT(name_token.string), type_str);
+					gb_string_free(type_str);
+					continue;
+				}
+			}
+
+			populate_using_entity_map(c, node, type, &entity_map);
+		}
 	}
+
+	// for_array(decl_index, params) {
+		// check_struct_field_decl(c, params[decl_index], &fields, &entity_map, node, context, context == "struct");
+	// }
 
 
 	return fields;
@@ -1278,7 +1405,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 	Array<Entity *> fields = {};
 
 	if (!is_polymorphic) {
-		fields = check_fields(c, node, st->fields, min_field_count, context);
+		fields = check_struct_fields(c, node, st->fields, min_field_count, context);
 	}
 
 	struct_type->Struct.scope               = c->context.scope;
@@ -1391,31 +1518,6 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 		}
 	}
 }
-
-// void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
-// 	GB_ASSERT(node->kind == AstNode_RawUnionType);
-// 	GB_ASSERT(is_type_raw_union(union_type));
-// 	ast_node(ut, RawUnionType, node);
-
-// 	isize min_field_count = 0;
-// 	for_array(i, ut->fields) {
-// 		AstNode *field = ut->fields[i];
-// 		switch (field->kind) {
-// 		case_ast_node(f, ValueDecl, field);
-// 			min_field_count += f->names.count;
-// 		case_end;
-// 		}
-// 	}
-
-// 	union_type->Struct.names = make_names_field_for_struct(c, c->context.scope);
-
-// 	auto fields = check_fields(c, node, ut->fields, min_field_count, str_lit("raw_union"));
-
-// 	union_type->Struct.scope       = c->context.scope;
-// 	union_type->Struct.fields      = fields.data;
-// 	union_type->Struct.field_count = fields.count;
-// }
-
 
 void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *node) {
 	ast_node(et, EnumType, node);
@@ -3324,7 +3426,6 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		}
 		if (out_value) *out_value = v;
 
-
 		switch (type->Basic.kind) {
 		// case Basic_f16:
 		case Basic_f32:
@@ -3333,6 +3434,8 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 
 		case Basic_UntypedFloat:
 			return true;
+
+		default: GB_PANIC("Compiler error: Unknown float type!"); break;
 		}
 	} else if (is_type_complex(type)) {
 		ExactValue v = exact_value_to_complex(in_value);
@@ -3353,6 +3456,8 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		} break;
 		case Basic_UntypedComplex:
 			return true;
+
+		default: GB_PANIC("Compiler error: Unknown complex type!"); break;
 		}
 
 		return false;

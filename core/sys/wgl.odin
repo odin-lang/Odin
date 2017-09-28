@@ -14,40 +14,40 @@ Hglrc     :: Handle;
 Color_Ref :: u32;
 
 Layer_Plane_Descriptor :: struct {
-	size:             u16;
-	version:          u16;
-	flags:            u32;
-	pixel_type:       u8;
-	color_bits:       u8;
-	red_bits:         u8;
-	red_shift:        u8;
-	green_bits:       u8;
-	green_shift:      u8;
-	blue_bits:        u8;
-	blue_shift:       u8;
-	alpha_bits:       u8;
-	alpha_shift:      u8;
-	accum_bits:       u8;
-	accum_red_bits:   u8;
-	accum_green_bits: u8;
-	accum_blue_bits:  u8;
-	accum_alpha_bits: u8;
-	depth_bits:       u8;
-	stencil_bits:     u8;
-	aux_buffers:      u8;
-	layer_type:       u8;
-	reserved:         u8;
-	transparent:      Color_Ref;
+	size:             u16,
+	version:          u16,
+	flags:            u32,
+	pixel_type:       u8,
+	color_bits:       u8,
+	red_bits:         u8,
+	red_shift:        u8,
+	green_bits:       u8,
+	green_shift:      u8,
+	blue_bits:        u8,
+	blue_shift:       u8,
+	alpha_bits:       u8,
+	alpha_shift:      u8,
+	accum_bits:       u8,
+	accum_red_bits:   u8,
+	accum_green_bits: u8,
+	accum_blue_bits:  u8,
+	accum_alpha_bits: u8,
+	depth_bits:       u8,
+	stencil_bits:     u8,
+	aux_buffers:      u8,
+	layer_type:       u8,
+	reserved:         u8,
+	transparent:      Color_Ref,
 }
 
 Point_Float :: struct {x, y: f32};
 
 Glyph_Metrics_Float :: struct {
-	black_box_x:  f32;
-	black_box_y:  f32;
-	glyph_origin: Point_Float;
-	cell_inc_x:   f32;
-	cell_inc_y:   f32;
+	black_box_x:  f32,
+	black_box_y:  f32,
+	glyph_origin: Point_Float,
+	cell_inc_x:   f32,
+	cell_inc_y:   f32,
 }
 
 Create_Context_Attribs_ARB_Type :: #type proc(hdc: Hdc, h_share_context: rawptr, attribList: ^i32) -> Hglrc;

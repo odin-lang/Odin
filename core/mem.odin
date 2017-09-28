@@ -1,5 +1,3 @@
-import "core:fmt.odin";
-import "core:os.odin";
 import "core:raw.odin";
 
 foreign __llvm_core {
@@ -66,9 +64,7 @@ align_forward :: proc(ptr: rawptr, align: int) -> rawptr {
 
 
 
-AllocationHeader :: struct {
-	size: int;
-}
+AllocationHeader :: struct {size: int};
 
 allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: int) {
 	header.size = size;
@@ -93,14 +89,14 @@ allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 // Custom allocators
 
 Arena :: struct {
-	backing:    Allocator;
-	memory:     []u8;
-	temp_count: int;
+	backing:    Allocator,
+	memory:     []u8,
+	temp_count: int,
 }
 
 ArenaTempMemory :: struct {
-	arena:          ^Arena;
-	original_count: int;
+	arena:          ^Arena,
+	original_count: int,
 }
 
 
@@ -135,10 +131,10 @@ arena_allocator :: proc(arena: ^Arena) -> Allocator {
 	};
 }
 
-arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
+arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
-	using Allocator.Mode;
+	using Allocator_Mode;
 	arena := cast(^Arena)allocator_data;
 
 	match mode {
@@ -146,7 +142,6 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 		total_size := size + alignment;
 
 		if len(arena.memory) + total_size > cap(arena.memory) {
-			fmt.fprintln(os.stderr, "Arena out of memory");
 			return nil;
 		}
 
@@ -205,46 +200,45 @@ align_of_type_info :: proc(type_info: ^Type_Info) -> int {
 
 	WORD_SIZE :: size_of(int);
 	MAX_ALIGN :: size_of([vector 64]f64); // TODO(bill): Should these constants be builtin constants?
-	using Type_Info;
 	match info in type_info.variant {
-	case Named:
+	case Type_Info_Named:
 		return align_of_type_info(info.base);
-	case Integer:
+	case Type_Info_Integer:
 		return type_info.align;
-	case Rune:
+	case Type_Info_Rune:
 		return type_info.align;
-	case Float:
+	case Type_Info_Float:
 		return type_info.align;
-	case String:
+	case Type_Info_String:
 		return WORD_SIZE;
-	case Boolean:
+	case Type_Info_Boolean:
 		return 1;
-	case Any:
+	case Type_Info_Any:
 		return WORD_SIZE;
-	case Pointer:
+	case Type_Info_Pointer:
 		return WORD_SIZE;
-	case Procedure:
+	case Type_Info_Procedure:
 		return WORD_SIZE;
-	case Array:
+	case Type_Info_Array:
 		return align_of_type_info(info.elem);
-	case Dynamic_Array:
+	case Type_Info_Dynamic_Array:
 		return WORD_SIZE;
-	case Slice:
+	case Type_Info_Slice:
 		return WORD_SIZE;
-	case Vector:
+	case Type_Info_Vector:
 		size  := size_of_type_info(info.elem);
 		count := int(max(prev_pow2(i64(info.count)), 1));
 		total := size * count;
 		return clamp(total, 1, MAX_ALIGN);
-	case Tuple:
+	case Type_Info_Tuple:
 		return type_info.align;
-	case Struct:
+	case Type_Info_Struct:
 		return type_info.align;
-	case Union:
+	case Type_Info_Union:
 		return type_info.align;
-	case Enum:
+	case Type_Info_Enum:
 		return align_of_type_info(info.base);
-	case Map:
+	case Type_Info_Map:
 		return align_of_type_info(info.generated_struct);
 	}
 
@@ -258,51 +252,50 @@ align_formula :: proc(size, align: int) -> int {
 
 size_of_type_info :: proc(type_info: ^Type_Info) -> int {
 	WORD_SIZE :: size_of(int);
-	using Type_Info;
 	match info in type_info.variant {
-	case Named:
+	case Type_Info_Named:
 		return size_of_type_info(info.base);
-	case Integer:
+	case Type_Info_Integer:
 		return type_info.size;
-	case Rune:
+	case Type_Info_Rune:
 		return type_info.size;
-	case Float:
+	case Type_Info_Float:
 		return type_info.size;
-	case String:
+	case Type_Info_String:
 		return 2*WORD_SIZE;
-	case Boolean:
+	case Type_Info_Boolean:
 		return 1;
-	case Any:
+	case Type_Info_Any:
 		return 2*WORD_SIZE;
-	case Pointer:
+	case Type_Info_Pointer:
 		return WORD_SIZE;
-	case Procedure:
+	case Type_Info_Procedure:
 		return WORD_SIZE;
-	case Array:
+	case Type_Info_Array:
 		count := info.count;
 		if count == 0 do return 0;
 		size      := size_of_type_info(info.elem);
 		align     := align_of_type_info(info.elem);
 		alignment := align_formula(size, align);
 		return alignment*(count-1) + size;
-	case Dynamic_Array:
+	case Type_Info_Dynamic_Array:
 		return size_of(rawptr) + 2*size_of(int) + size_of(Allocator);
-	case Slice:
+	case Type_Info_Slice:
 		return 2*WORD_SIZE;
-	case Vector:
+	case Type_Info_Vector:
 		count := info.count;
 		if count == 0 do return 0;
 		size      := size_of_type_info(info.elem);
 		align     := align_of_type_info(info.elem);
 		alignment := align_formula(size, align);
 		return alignment*(count-1) + size;
-	case Struct:
+	case Type_Info_Struct:
 		return type_info.size;
-	case Union:
+	case Type_Info_Union:
 		return type_info.size;
-	case Enum:
+	case Type_Info_Enum:
 		return size_of_type_info(info.base);
-	case Map:
+	case Type_Info_Map:
 		return size_of_type_info(info.generated_struct);
 	}
 

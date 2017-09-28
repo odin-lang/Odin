@@ -151,6 +151,8 @@ void ir_print_encoded_global(irFileBuffer *f, String name, bool remove_prefix) {
 }
 
 void ir_print_type(irFileBuffer *f, irModule *m, Type *t);
+void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hint);
+
 
 void ir_print_proc_results(irFileBuffer *f, irModule *m, Type *t) {
 	GB_ASSERT(is_type_proc(t));
@@ -522,7 +524,10 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 	case ExactValue_Compound: {
 		type = base_type(type);
-		if (is_type_array(type)) {
+		if (is_type_slice(type)) {
+			irValue *s = ir_add_module_constant(m, type, value);
+			ir_print_value(f, m, s, type);
+		} else if (is_type_array(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
 
 			Type *elem_type = type->Array.elem;

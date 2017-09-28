@@ -45,32 +45,32 @@ RTLD_FIRST    :: 0x100;
 args: []string;
 
 _File_Time :: struct #ordered {
-	seconds: i64;
-	nanoseconds: i64;
+	seconds: i64,
+	nanoseconds: i64,
 }
 
 Stat :: struct #ordered {
-	device_id:     i32; // ID of device containing file
-	mode:          u16; // Mode of the file
-	nlink:         u16; // Number of hard links
-	serial:        u64; // File serial number
-	uid:           u32; // User ID of the file's owner
-	gid:           u32; // Group ID of the file's group
-	rdev:          i32; // Device ID, if device
+	device_id:     i32, // ID of device containing file
+	mode:          u16, // Mode of the file
+	nlink:         u16, // Number of hard links
+	serial:        u64, // File serial number
+	uid:           u32, // User ID of the file's owner
+	gid:           u32, // Group ID of the file's group
+	rdev:          i32, // Device ID, if device
 
-	last_access:   File_Time; // Time of last access
-	modified:      File_Time; // Time of last modification
-	status_change: File_Time; // Time of last status change
-	created:       File_Time; // Time of creation
+	last_access:   File_Time, // Time of last access
+	modified:      File_Time, // Time of last modification
+	status_change: File_Time, // Time of last status change
+	created:       File_Time, // Time of creation
 
-	size:          i64;  // Size of the file, in bytes
-	blocks:        i64;  // Number of blocks allocated for the file
-	block_size:    i32;  // Optimal blocksize for I/O
-	flags:         u32;  // User-defined flags for the file
-	gen_num:       u32;  // File generation number ...?
-	_spare:        i32;  // RESERVED
+	size:          i64,  // Size of the file, in bytes
+	blocks:        i64,  // Number of blocks allocated for the file
+	block_size:    i32,  // Optimal blocksize for I/O
+	flags:         u32,  // User-defined flags for the file
+	gen_num:       u32,  // File generation number ...?
+	_spare:        i32,  // RESERVED
 	_reserve1,
-	_reserve2:     i64;  // RESERVED
+	_reserve2:     i64,  // RESERVED
 };
 
 // File type

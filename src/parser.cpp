@@ -37,6 +37,7 @@ struct ImportedFile {
 
 struct AstFile {
 	isize               id;
+	String              fullpath;
 	gbArena             arena;
 	Tokenizer           tokenizer;
 	Array<Token>        tokens;
@@ -51,6 +52,7 @@ struct AstFile {
 	bool                allow_range; // NOTE(bill): Ranges are only allowed in certain cases
 	bool                in_foreign_block;
 	bool                allow_type;
+	isize               when_level;
 
 	Array<AstNode *>    decls;
 	ImportedFileKind    file_kind;
@@ -128,6 +130,7 @@ enum FieldFlag {
 	FieldFlag_c_vararg  = 1<<3,
 
 	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg,
+	FieldFlag_Struct    = FieldFlag_using,
 };
 
 enum StmtAllowFlag {
@@ -249,6 +252,8 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 		AstNode *cond; \
 		AstNode *body; \
 		AstNode *else_stmt; \
+		bool is_cond_determined; \
+		bool determined_cond; \
 	}) \
 	AST_NODE_KIND(ReturnStmt, "return statement", struct { \
 		Token token; \
@@ -328,27 +333,30 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		AstNode *        foreign_library; \
 		Token            open, close;     \
 		Array<AstNode *> decls;           \
-		CommentGroup docs;      \
+		bool             been_handled;    \
+		CommentGroup     docs;            \
 	}) \
 	AST_NODE_KIND(Label, "label", struct { 	\
 		Token token; \
 		AstNode *name; \
 	}) \
 	AST_NODE_KIND(ValueDecl, "value declaration", struct { \
-		Array<AstNode *> names;      \
-		AstNode *        type;       \
-		Array<AstNode *> values;     \
-		u64              flags;      \
-		bool             is_mutable; \
-		CommentGroup     docs;       \
-		CommentGroup     comment;    \
+		Array<AstNode *> names;        \
+		AstNode *        type;         \
+		Array<AstNode *> values;       \
+		u64              flags;        \
+		bool             is_mutable;   \
+		bool             been_handled; \
+		CommentGroup     docs;         \
+		CommentGroup     comment;      \
 	}) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		Token    token;         \
-		bool     is_using;      \
 		Token    relpath;       \
 		String   fullpath;      \
 		Token    import_name;   \
+		bool     is_using;      \
+		bool     been_handled;  \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -356,6 +364,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token    token;         \
 		Token    relpath;       \
 		String   fullpath;      \
+		bool     been_handled;  \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -364,6 +373,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token    filepath;      \
 		Token    library_name;  \
 		String   base_dir;      \
+		bool     been_handled;  \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -1908,7 +1918,12 @@ AstNode *parse_ident(AstFile *f) {
 
 AstNode *parse_tag_expr(AstFile *f, AstNode *expression) {
 	Token token = expect_token(f, Token_Hash);
-	Token name  = expect_token(f, Token_Ident);
+	Token name = {};
+	if (f->curr_token.kind == Token_export) {
+		name = expect_token(f, Token_export);
+	} else {
+		name = expect_token(f, Token_Ident);
+	}
 	return ast_tag_expr(f, token, name, expression);
 }
 
@@ -3464,6 +3479,11 @@ AstNode *parse_struct_field_list(AstFile *f, isize *name_count_) {
 
 	isize total_name_count = 0;
 
+	AstNode *params = parse_field_list(f, &total_name_count, FieldFlag_Struct, Token_CloseBrace, true, false);
+	if (name_count_) *name_count_ = total_name_count;
+	return params;
+
+#if 0
 	while (f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
 		AstNode *decl = parse_stmt(f);
@@ -3494,6 +3514,7 @@ AstNode *parse_struct_field_list(AstFile *f, isize *name_count_) {
 
 	if (name_count_) *name_count_ = total_name_count;
 	return ast_field_list(f, start_token, decls);
+#endif
 }
 
 AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_type_token) {
@@ -3993,7 +4014,10 @@ AstNode *parse_when_stmt(AstFile *f) {
 	AstNode *else_stmt = nullptr;
 
 	isize prev_level = f->expr_level;
+	isize when_level = f->when_level;
+	defer (f->when_level = when_level);
 	f->expr_level = -1;
+	f->when_level += 1;
 
 	cond = parse_expr(f, false);
 
@@ -4027,6 +4051,11 @@ AstNode *parse_when_stmt(AstFile *f) {
 			break;
 		}
 	}
+
+	// if (f->curr_proc == nullptr && f->when_level > 1) {
+	// 	syntax_error(token, "Nested when statements are not currently supported at the file scope");
+	// 	return ast_bad_stmt(f, token, f->curr_token);
+	// }
 
 	return ast_when_stmt(f, token, cond, body, else_stmt);
 }
@@ -4634,12 +4663,12 @@ Array<AstNode *> parse_stmt_list(AstFile *f) {
 }
 
 
-ParseFileError init_ast_file(AstFile *f, String fullpath) {
-	fullpath = string_trim_whitespace(fullpath); // Just in case
-	if (!string_has_extension(fullpath, str_lit("odin"))) {
+ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
+	f->fullpath = string_trim_whitespace(fullpath); // Just in case
+	if (!string_has_extension(f->fullpath, str_lit("odin"))) {
 		return ParseFile_WrongExtension;
 	}
-	TokenizerInitError err = init_tokenizer(&f->tokenizer, fullpath);
+	TokenizerInitError err = init_tokenizer(&f->tokenizer, f->fullpath);
 	if (err != TokenizerInit_None) {
 		switch (err) {
 		case TokenizerInit_NotExists:
@@ -4660,6 +4689,8 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 	for (;;) {
 		Token token = tokenizer_get_token(&f->tokenizer);
 		if (token.kind == Token_Invalid) {
+			err_pos->line = token.pos.line;
+			err_pos->column = token.pos.column;
 			return ParseFile_InvalidToken;
 		}
 		array_add(&f->tokens, token);
@@ -4938,7 +4969,8 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 		file->is_global_scope = true;
 	}
 
-	ParseFileError err = init_ast_file(file, import_path);
+	TokenPos err_pos = {0};
+	ParseFileError err = init_ast_file(file, import_path, &err_pos);
 
 	if (err != ParseFile_None) {
 		if (err == ParseFile_EmptyFile) {
@@ -4967,7 +4999,7 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 			gb_printf_err("File cannot be found (`%.*s`)", LIT(import_path));
 			break;
 		case ParseFile_InvalidToken:
-			gb_printf_err("Invalid token found in file");
+			gb_printf_err("Invalid token found in file at (%td:%td)", err_pos.line, err_pos.column);
 			break;
 		}
 		gb_printf_err("\n");
