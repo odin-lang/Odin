@@ -5077,7 +5077,7 @@ irValue *ir_get_using_variable(irProcedure *proc, Entity *e) {
 }
 
 bool ir_is_elem_const(irModule *m, AstNode *elem, Type *elem_type) {
-	if (base_type(elem_type) == t_any) {
+	if (!elem_type_can_be_constant(elem_type)) {
 		return false;
 	}
 	if (elem->kind == AstNode_FieldValue) {
@@ -5592,6 +5592,27 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			}
 		} break;
 
+		case Type_Map: {
+			if (cl->elems.count == 0) {
+				break;
+			}
+			gbAllocator a = proc->module->allocator;
+			{
+				irValue **args = gb_alloc_array(a, irValue *, 2);
+				args[0] = ir_gen_map_header(proc, v, type);
+				args[1] = ir_const_int(a, 2*cl->elems.count);
+				ir_emit_global_call(proc, "__dynamic_map_reserve", args, 2);
+			}
+			for_array(field_index, cl->elems) {
+				AstNode *elem = cl->elems[field_index];
+				ast_node(fv, FieldValue, elem);
+
+				irValue *key   = ir_build_expr(proc, fv->field);
+				irValue *value = ir_build_expr(proc, fv->value);
+				ir_insert_dynamic_map_key_and_value(proc, v, type, key, value);
+			}
+		} break;
+
 		case Type_DynamicArray: {
 			if (cl->elems.count == 0) {
 				break;
@@ -5627,27 +5648,6 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 				args[3] = ir_emit_conv(proc, items, t_rawptr);
 				args[4] = ir_const_int(a, item_count);
 				ir_emit_global_call(proc, "__dynamic_array_append", args, 5);
-			}
-		} break;
-
-		case Type_Map: {
-			if (cl->elems.count == 0) {
-				break;
-			}
-			gbAllocator a = proc->module->allocator;
-			{
-				irValue **args = gb_alloc_array(a, irValue *, 2);
-				args[0] = ir_gen_map_header(proc, v, type);
-				args[1] = ir_const_int(a, 2*cl->elems.count);
-				ir_emit_global_call(proc, "__dynamic_map_reserve", args, 2);
-			}
-			for_array(field_index, cl->elems) {
-				AstNode *elem = cl->elems[field_index];
-				ast_node(fv, FieldValue, elem);
-
-				irValue *key   = ir_build_expr(proc, fv->field);
-				irValue *value = ir_build_expr(proc, fv->value);
-				ir_insert_dynamic_map_key_and_value(proc, v, type, key, value);
 			}
 		} break;
 

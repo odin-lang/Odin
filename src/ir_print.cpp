@@ -399,7 +399,7 @@ void ir_print_compound_element(irFileBuffer *f, irModule *m, ExactValue v, Type 
 	ir_print_type(f, m, elem_type);
 	ir_write_byte(f, ' ');
 
-	if (v.kind == ExactValue_Invalid || base_type(elem_type) == t_any) {
+	if (v.kind == ExactValue_Invalid || !elem_type_can_be_constant(elem_type)) {
 		if (ir_type_has_default_values(elem_type)) {
 			ir_print_exact_value(f, m, v, elem_type);
 		} else {

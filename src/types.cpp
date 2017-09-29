@@ -1037,6 +1037,13 @@ bool type_has_nil(Type *t) {
 	return false;
 }
 
+bool elem_type_can_be_constant(Type *t) {
+	if (is_type_any(t) || is_type_union(t)) {
+		return false;
+	}
+	return true;
+}
+
 
 bool is_type_comparable(Type *t) {
 	t = base_type(t);

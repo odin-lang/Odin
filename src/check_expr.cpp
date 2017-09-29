@@ -7677,7 +7677,8 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			isize index = 0;
 			isize elem_count = cl->elems.count;
 
-			if (is_type_any(base_type(elem_type))) {
+			Type *bet = base_type(elem_type);
+			if (!elem_type_can_be_constant(bet)) {
 				is_constant = false;
 			}
 
