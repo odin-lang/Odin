@@ -1,9 +1,9 @@
-import win32 "sys/windows.odin" when ODIN_OS == "windows";
-import wgl "sys/wgl.odin" when ODIN_OS == "windows";
-import "fmt.odin";
-import "math.odin";
-import "os.odin";
-import gl "opengl.odin";
+import win32 "core:sys/windows.odin" when ODIN_OS == "windows";
+import wgl "core:sys/wgl.odin" when ODIN_OS == "windows";
+import "core:fmt.odin";
+import "core:math.odin";
+import "core:os.odin";
+import gl "core:opengl.odin";
 
 TWO_HEARTS :: '💕';
 
@@ -32,12 +32,12 @@ to_c_string :: proc(s: string) -> []u8 {
 
 
 Window :: struct {
-	width, height:      int;
-	wc:                 win32.Wnd_Class_Ex_A;
-	dc:                 win32.Hdc;
-	hwnd:               win32.Hwnd;
-	opengl_context, rc: wgl.Hglrc;
-	c_title:            []u8;
+	width, height:      int,
+	wc:                 win32.Wnd_Class_Ex_A,
+	dc:                 win32.Hdc,
+	hwnd:               win32.Hwnd,
+	opengl_context, rc: wgl.Hglrc,
+	c_title:            []u8,
 }
 
 make_window :: proc(title: string, msg, height: int, window_proc: win32.Wnd_Proc) -> (Window, bool) {

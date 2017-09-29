@@ -1,7 +1,7 @@
-import win32 "sys/windows.odin";
-import "fmt.odin";
-import "os.odin";
-import "mem.odin";
+import win32 "core:sys/windows.odin";
+import "core:fmt.odin";
+import "core:os.odin";
+import "core:mem.odin";
 
 
 CANVAS_WIDTH  :: 128;
@@ -25,13 +25,13 @@ DRAW_LIST_RESERVE :: 128;
 MAX_KEYS :: 256;
 
 Core :: struct {
-	stack:   ^Bank;
-	storage: ^Bank;
+	stack:   ^Bank,
+	storage: ^Bank,
 
-	running:       bool;
-	key_modifiers: u32;
-	key_states:    [MAX_KEYS]u8;
-	key_deltas:    [MAX_KEYS]u8;
+	running:       bool,
+	key_modifiers: u32,
+	key_states:    [MAX_KEYS]u8,
+	key_deltas:    [MAX_KEYS]u8,
 
 	perf_frame,
 	perf_frame_inner,
@@ -39,66 +39,66 @@ Core :: struct {
 	perf_audio,
 	perf_blit,
 	perf_blit_cvt,
-	perf_blit_gdi: Perf_Span;
+	perf_blit_gdi: Perf_Span,
 
-	frame: i64;
+	frame: i64,
 
-	canvas:    Canvas;
-	draw_list: ^Draw_List;
+	canvas:    Canvas,
+	draw_list: ^Draw_List,
 }
 
 Perf_Span :: struct {
-	stamp: f64;
-	delta: f32;
+	stamp: f64,
+	delta: f32,
 }
 
 Bank :: struct {
-	memory: []u8;
-	cursor: int;
+	memory: []u8,
+	cursor: int,
 }
 
 Bank_State :: struct {
-	state: Bank;
-	bank: ^Bank;
+	state: Bank,
+	bank: ^Bank,
 }
 
 
 Color :: struct #raw_union {
-	using channels: struct{a, b, g, r: u8};
-	rgba: u32;
+	using channels: struct{a, b, g, r: u8},
+	rgba: u32,
 }
 
 Palette :: struct {
-	colors: [256]Color;
-	colors_count: u8;
+	colors: [256]Color,
+	colors_count: u8,
 }
 
 
 Rect :: struct #raw_union {
-	using minmax: struct {min_x, min_y, max_x, max_y: int};
-	using pos: struct {left, top, right, bottom: int};
-	e: [4]int;
+	using minmax: struct {min_x, min_y, max_x, max_y: int},
+	using pos: struct {left, top, right, bottom: int},
+	e: [4]int,
 }
 
 Bitmap :: struct {
-	pixels: []u8;
-	width:  int;
-	height: int;
+	pixels: []u8,
+	width:  int,
+	height: int,
 }
 
 Font :: struct {
-	using bitmap: Bitmap;
-	char_width:   int;
-	char_height:  int;
+	using bitmap: Bitmap,
+	char_width:   int,
+	char_height:  int,
 }
 
 Canvas :: struct {
-	using bitmap: ^Bitmap;
-	palette:      Palette;
-	translate_x:  int;
-	translate_y:  int;
-	clip:         Rect;
-	font:         ^Font;
+	using bitmap: ^Bitmap,
+	palette:      Palette,
+	translate_x:  int,
+	translate_y:  int,
+	clip:         Rect,
+	font:         ^Font,
 }
 
 DrawFlag :: enum {
@@ -110,7 +110,7 @@ DrawFlag :: enum {
 
 Draw_Item :: struct {}
 Draw_List :: struct {
-	items: []Draw_Item;
+	items: []Draw_Item,
 }
 
 Key :: enum {

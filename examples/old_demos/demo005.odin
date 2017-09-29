@@ -1,13 +1,13 @@
-#import "fmt.odin";
-#import "utf8.odin";
-// #import "atomic.odin";
-// #import "hash.odin";
-// #import "math.odin";
-// #import "mem.odin";
-// #import "opengl.odin";
-// #import "os.odin";
-// #import "sync.odin";
-// #import win32 "sys/windows.odin";
+import "core:fmt.odin";
+import "core:utf8.odin";
+// import "core:atomic.odin";
+// import "core:hash.odin";
+// import "core:math.odin";
+// import "core:mem.odin";
+// import "core:opengl.odin";
+// import "core:os.odin";
+// import "core:sync.odin";
+// import win32 "core:sys/windows.odin";
 
 main :: proc() {
 	// syntax();
@@ -43,7 +43,7 @@ syntax :: proc() {
 	Thing2 :: struct {x: f32, y: int, z: ^[]int};
 
 	// Slice interals are now just a `ptr+len+cap`
-	slice: []int; compile_assert(size_of_val(slice) == 3*size_of(int));
+	slice: []int; compile_assert(size_of(slice) == 3*size_of(int));
 
 	// Helper type - Help the reader understand what it is quicker
 	My_Int  :: #type int;
@@ -90,22 +90,17 @@ Prefix_Type :: struct {x: int, y: f32, z: rawptr};
 
 prefixes :: proc() {
 	using var: Prefix_Type;
-	immutable const := Prefix_Type{1, 2, nil};
 	var.x = 123;
 	x = 123;
-	// const.x = 123; // const is immutable
 
 
-
-	foo :: proc(using immutable pt: Prefix_Type, immutable int_ptr: ^int) {
-		// int_ptr = nil; // Not valid
-		// int_ptr^ = 123; // Not valid
+	foo :: proc(using pt: Prefix_Type) {
 	}
 
 
 
 	// Same as C99's `restrict`
-	bar :: proc(no_alias a, b: ^int) {
+	bar :: proc(#no_alias a, b: ^int) {
 		// Assumes a never equals b so it can perform optimizations with that fact
 	}
 
@@ -138,14 +133,18 @@ when_statements :: proc() {
 	foreign_procedures();
 }
 
-#foreign_system_library win32_user "user32.lib" when ODIN_OS == "windows";
+when ODIN_OS == "windows" {
+	foreign_system_library win32_user "user32.lib";
+}
 // NOTE: This is done on purpose for two reasons:
 // * Makes it clear where the platform specific stuff is
 // * Removes the need to solve the travelling salesman problem when importing files :P
 
 foreign_procedures :: proc() {
-	ShowWindow  :: proc(hwnd: rawptr, cmd_show: i32) -> i32 #foreign win32_user;
-	show_window :: proc(hwnd: rawptr, cmd_show: i32) -> i32 #foreign win32_user "ShowWindow";
+	foreign win32_user {
+		ShowWindow  :: proc(hwnd: rawptr, cmd_show: i32) -> i32 ---;
+		show_window :: proc(hwnd: rawptr, cmd_show: i32) -> i32 #link_name "ShowWindow" ---;
+	}
 	// NOTE: If that library doesn't get used, it doesn't get linked with
 	// NOTE: There is not link checking yet to see if that procedure does come from that library
 
@@ -203,14 +202,14 @@ loops :: proc() {
 		fmt.println(val, idx);
 	}
 
-	primes := [..]int{2, 3, 5, 7, 11, 13, 17, 19};
+	primes := [...]int{2, 3, 5, 7, 11, 13, 17, 19};
 
 	for p in primes {
 		fmt.println(p);
 	}
 
 	// Pointers to arrays, slices, or strings are allowed
-	for _ in ^primes {
+	for _ in &primes {
 		// ignore the value and just iterate across it
 	}
 
@@ -219,7 +218,7 @@ loops :: proc() {
 	name := "你好，世界";
 	fmt.println(name);
 	for r in name {
-		compile_assert(type_of_val(r) == rune);
+		compile_assert(type_of(r) == rune);
 		fmt.printf("%r\n", r);
 	}
 
@@ -270,8 +269,8 @@ procedure_overloading :: proc() {
 	a: i32 = 123;
 	b: f32;
 	c: rawptr;
-	fmt.println(foo(^a));
-	foo(^b);
+	fmt.println(foo(&a));
+	foo(&b);
 	foo(c);
 	// foo(nil); // nil could go to numerous types thus the ambiguity
 

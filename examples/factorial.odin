@@ -1,4 +1,4 @@
-import "fmt.odin";
+import "core:fmt.odin";
 
 main :: proc() {
 	recursive_factorial :: proc(i: u64) -> u64 {

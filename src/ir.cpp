@@ -853,9 +853,18 @@ String ir_get_global_name(irModule *m, irValue *v) {
 	String *found = map_get(&m->entity_names, hash_entity(e));
 	if (found != nullptr) {
 		name = *found;
+	} else {
+		GB_ASSERT(name.len > 0);
 	}
 	return name;
 }
+
+void ir_add_entity_name(irModule *m, Entity *e, String name) {
+	GB_ASSERT(name.len > 0);
+	map_set(&m->entity_names, hash_entity(e), name);
+}
+
+
 
 
 
@@ -1153,14 +1162,21 @@ irValue *ir_generate_array(irModule *m, Type *elem_type, i64 count, String prefi
 	gbAllocator a = m->allocator;
 	Token token = {Token_Ident};
 	isize name_len = prefix.len + 10;
-	token.string.text = gb_alloc_array(a, u8, name_len);
-	token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
-	                               "%.*s-%llx", LIT(prefix), cast(unsigned long long)id)-1;
-	Entity *e = make_entity_variable(a, nullptr, token, make_type_array(a, elem_type, count), false);
+
+	char *text = gb_alloc_array(a, char, name_len);
+	gb_snprintf(text, name_len,
+	            "%.*s-%llx", LIT(prefix), cast(unsigned long long)id);
+
+	String s = make_string_c(text);
+
+	Entity *e = make_entity_variable(a, nullptr,
+	                                 make_token_ident(s),
+	                                 make_type_array(a, elem_type, count),
+	                                 false);
 	irValue *value = ir_value_global(a, e, nullptr);
 	value->Global.is_private = true;
 	ir_module_add_value(m, e, value);
-	map_set(&m->members, hash_string(token.string), value);
+	map_set(&m->members, hash_string(s), value);
 	return value;
 }
 
@@ -3436,6 +3452,7 @@ irValue *ir_type_info(irProcedure *proc, Type *type) {
 	type = default_type(type);
 
 	i32 entry_index = cast(i32)type_info_index(info, type);
+	GB_ASSERT(entry_index >= 0);
 
 	// gb_printf_err("%d %s\n", entry_index, type_to_string(type));
 
@@ -3639,7 +3656,8 @@ void ir_mangle_add_sub_type_name(irModule *m, Entity *field, String parent) {
 	                                 "%.*s.%.*s", LIT(parent), LIT(cn));
 
 	String child = {text, new_name_len-1};
-	map_set(&m->entity_names, hash_entity(field), child);
+	GB_ASSERT(child.len > 0);
+	ir_add_entity_name(m, field, child);
 	ir_gen_global_type_name(m, field, child);
 }
 
@@ -5148,15 +5166,16 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 				String name = e->token.string;
 				if (name == "names") {
 					irValue *ti_ptr = ir_type_info(proc, type);
+					irValue *variant = ir_emit_struct_ep(proc, ti_ptr, 2);
 
 					irValue *names_ptr = nullptr;
 
 					if (is_type_enum(type)) {
-						irValue *enum_info = ir_emit_conv(proc, ti_ptr, t_type_info_enum_ptr);
-						names_ptr = ir_emit_struct_ep(proc, enum_info, 3);
+						irValue *enum_info = ir_emit_conv(proc, variant, t_type_info_enum_ptr);
+						names_ptr = ir_emit_struct_ep(proc, enum_info, 1);
 					} else if (type->kind == Type_Struct) {
-						irValue *struct_info = ir_emit_conv(proc, ti_ptr, t_type_info_struct_ptr);
-						names_ptr = ir_emit_struct_ep(proc, struct_info, 3);
+						irValue *struct_info = ir_emit_conv(proc, variant, t_type_info_struct_ptr);
+						names_ptr = ir_emit_struct_ep(proc, struct_info, 1);
 					}
 					return ir_addr(names_ptr);
 				} else {
@@ -7641,7 +7660,7 @@ void ir_gen_tree(irGen *s) {
 			if (!e->scope->is_global) {
 				name = ir_mangle_name(s, e->token.pos.file, e);
 			}
-			map_set(&m->entity_names, hash_entity(e), name);
+			ir_add_entity_name(m, e, name);
 
 			irValue *g = ir_value_global(a, e, nullptr);
 			g->Global.name = name;
@@ -7716,7 +7735,7 @@ void ir_gen_tree(irGen *s) {
 		} else if (check_is_entity_overloaded(e)) {
 			name = ir_mangle_name(s, e->token.pos.file, e);
 		}
-		map_set(&m->entity_names, hash_entity(e), name);
+		ir_add_entity_name(m, e, name);
 
 		switch (e->kind) {
 		case Entity_TypeName:

@@ -4823,6 +4823,9 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		if (entity != nullptr && (entity->flags&EntityFlag_TypeField)) {
 			add_type_info_type(c, operand->type);
 		}
+		if (is_type_enum(operand->type)) {
+			add_type_info_type(c, operand->type);
+		}
 	}
 	if (entity == nullptr && selector->kind == AstNode_BasicLit) {
 		if (is_type_struct(operand->type) || is_type_tuple(operand->type)) {

@@ -393,7 +393,6 @@ struct TypeAndToken {
 };
 
 void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
-	flags &= ~Stmt_CheckScopeDecls;
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, ws->cond);
 	if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {

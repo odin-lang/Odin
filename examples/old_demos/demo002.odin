@@ -1,7 +1,8 @@
 // Demo 002
-#load "fmt.odin";
-#load "math.odin";
-// #load "game.odin"
+export "core:fmt.odin";
+export "core:math.odin";
+export "core:mem.odin";
+// export "game.odin"
 
 #thread_local tls_int: int;
 
@@ -94,11 +95,9 @@ enumerations :: proc() {
 }
 
 variadic_procedures :: proc() {
-	print_ints :: proc(args: ..int) {
+	print_ints :: proc(args: ...int) {
 		for arg, i in args {
-			if i > 0 {
-				print(", ");
-			}
+			if i > 0 do print(", ");
 			print(arg);
 		}
 	}
@@ -107,13 +106,11 @@ variadic_procedures :: proc() {
 	print_ints(1); nl();
 	print_ints(1, 2, 3); nl();
 
-	print_prefix_f32s :: proc(prefix: string, args: ..f32) {
+	print_prefix_f32s :: proc(prefix: string, args: ...f32) {
 		print(prefix);
 		print(": ");
 		for arg, i in args {
-			if i > 0 {
-				print(", ");
-			}
+			if i > 0 do print(", ");
 			print(arg);
 		}
 	}
@@ -147,13 +144,7 @@ new_builtins :: proc() {
 
 		// Q: Should this be `free` rather than `free` and should I overload it for slices too?
 
-		{
-			prev_context := context;
-			defer __context = prev_context;
-			// Q: Should I add a `push_context` feature to the language?
-
-			__context.allocator = default_allocator();
-
+		push_allocator default_allocator() {
 			a := new(int);
 			defer free(a);
 
@@ -164,7 +155,7 @@ new_builtins :: proc() {
 
 	{
 		a: int = 123;
-		b: type_of_val(a) = 321;
+		b: type_of(a) = 321;
 
 		// NOTE(bill): This matches the current naming scheme
 		// size_of
@@ -205,7 +196,7 @@ new_builtins :: proc() {
 
 		a: [16]int;
 		a[1] = 1;
-		b := ^a;
+		b := &a;
 		// Auto pointer deref
 		// consistent with record members
 		assert(b[1] == 1);
@@ -255,7 +246,7 @@ match_statement :: proc() {
 			print("5!\n");
 			fallthrough; // explicit fallthrough
 
-		default:
+		case:
 			print("default!\n");
 		}
 
@@ -267,7 +258,7 @@ match_statement :: proc() {
 			// break by default
 		case TAU:
 			print("τ!\n");
-		default:
+		case:
 			print("default!\n");
 		}
 
@@ -279,7 +270,7 @@ match_statement :: proc() {
 			// break by default
 		case "Goodbye":
 			print("farewell\n");
-		default:
+		case:
 			print("???\n");
 		}
 
@@ -302,7 +293,7 @@ match_statement :: proc() {
 			print("dozens\n");
 		case a >= 100 && a < 1000:
 			print("hundreds\n");
-		default:
+		case:
 			print("a fuck ton\n");
 		}
 
@@ -332,11 +323,9 @@ match_statement :: proc() {
 
 Vector3 :: struct {x, y, z: f32}
 
-print_floats :: proc(args: ..f32) {
+print_floats :: proc(args: ...f32) {
 	for arg, i in args {
-		if i > 0 {
-			print(", ");
-		}
+		if i > 0 do print(", ");
 		print(arg);
 	}
 	println();
@@ -355,7 +344,7 @@ namespacing :: proc() {
 			Thing :: #type struct {
 				y: int,
 				test: bool,
-			}
+			};
 
 			b: Thing; // Uses this scope's Thing
 			b.test = true;
@@ -473,10 +462,10 @@ namespacing :: proc() {
 		}
 
 		e := Entity{position = Vector3{1, 2, 3}};
-		print_pos_1(^e);
-		print_pos_2(^e);
-		print_pos_3(^e);
-		print_pos_4(^e);
+		print_pos_1(&e);
+		print_pos_2(&e);
+		print_pos_3(&e);
+		print_pos_4(&e);
 
 		// This is similar to C++'s `this` pointer that is implicit and only available in methods
 	}
@@ -574,20 +563,20 @@ subtyping :: proc() {
 		entity_count := 0;
 
 		next_entity :: proc(entities: []Entity, entity_count: ^int) -> ^Entity {
-			e := ^entities[entity_count^];
-			entity_count^++;
+			e := &entities[entity_count^];
+			entity_count^ += 1;
 			return e;
 		}
 
 		f: Frog;
-		f.entity = next_entity(entities[..], ^entity_count);
+		f.entity = next_entity(entities[..], &entity_count);
 		f.position = Vector3{3, 4, 6};
 
 		using f.position;
 		print_floats(x, y, z);
 	}
 
-	{
+	/*{
 		// Down casting
 
 		Entity :: struct {
@@ -609,7 +598,7 @@ subtyping :: proc() {
 
 		// NOTE(bill): `down_cast` is unsafe and there are not check are compile time or run time
 		// Q: Should I completely remove `down_cast` as I added it in about 30 minutes
-	}
+	}*/
 
 	{
 		// Multiple "inheritance"/subclassing
@@ -630,7 +619,7 @@ subtyping :: proc() {
 
 tagged_unions :: proc() {
 	{
-		EntityKind :: enum {
+		Entity_Kind :: enum {
 			INVALID,
 			FROG,
 			GIRAFFE,
@@ -638,8 +627,8 @@ tagged_unions :: proc() {
 		}
 
 		Entity :: struct {
-			kind: EntityKind
-			using data: raw_union {
+			kind: Entity_Kind
+			using data: struct #raw_union {
 				frog: struct {
 					jump_height: f32,
 					colour: u32,
@@ -657,33 +646,31 @@ tagged_unions :: proc() {
 		}
 
 		e: Entity;
-		e.kind = EntityKind.FROG;
+		e.kind = Entity_Kind.FROG;
 		e.frog.jump_height = 12;
 
-		f: type_of_val(e.frog);
+		f: type_of(e.frog);
 
 		// But this is very unsafe and extremely cumbersome to write
 		// In C++, I use macros to alleviate this but it's not a solution
 	}
 
 	{
-		Entity :: union {
-			Frog{
-				jump_height: f32,
-				colour: u32,
-			},
-			Giraffe{
-				neck_length: f32,
-				spot_count: int,
-			},
-			Helicopter{
-				blade_count: int,
-				weight: f32,
-				pilot_name: string,
-			},
+		Frog :: struct {
+			jump_height: f32,
+			colour: u32,
 		}
+		Giraffe :: struct {
+			neck_length: f32,
+			spot_count: int,
+		}
+		Helicopter :: struct {
+			blade_count: int,
+			weight: f32,
+			pilot_name: string,
+		}
+		Entity :: union {Frog, Giraffe, Helicopter};
 
-		using Entity;
 		f1: Frog = Frog{12, 0xff9900};
 		f2: Entity = Frog{12, 0xff9900}; // Implicit cast
 		f3 := cast(Entity)Frog{12, 0xff9900}; // Explicit cast
@@ -703,7 +690,7 @@ tagged_unions :: proc() {
 		// Requires a pointer to the union
 		// `x` will be a pointer to type of the case
 
-		match x in ^f {
+		match x in &f {
 		case Frog:
 			print("Frog!\n");
 			print(x.jump_height); nl();
@@ -713,7 +700,7 @@ tagged_unions :: proc() {
 			print("Giraffe!\n");
 		case Helicopter:
 			print("ROFLCOPTER!\n");
-		default:
+		case:
 			print("invalid entity\n");
 		}
 
@@ -755,11 +742,11 @@ tagged_unions :: proc() {
 		AstNode    :: struct {};
 		ExactValue :: struct {};
 
-		EntityKind :: enum {
+		Entity_Kind :: enum {
 			Invalid,
 			Constant,
 			Variable,
-			UsingVariable,
+			Using_Variable,
 			TypeName,
 			Procedure,
 			Builtin,
@@ -769,14 +756,14 @@ tagged_unions :: proc() {
 		Guid :: i64;
 		Entity :: struct {
 
-			kind: EntityKind,
+			kind: Entity_Kind,
 			guid: Guid,
 
 			scope: ^Scope,
 			token: Token,
 			type_: ^Type,
 
-			using data: raw_union {
+			using data: struct #raw_union {
 				Constant: struct {
 					value: ExactValue,
 				},
@@ -786,7 +773,7 @@ tagged_unions :: proc() {
 					is_field:  bool, // Is struct field
 					anonymous: bool, // Variable is an anonymous
 				},
-				UsingVariable: struct {
+				Using_Variable: struct {
 				},
 				TypeName: struct {
 				},
@@ -813,44 +800,44 @@ tagged_unions :: proc() {
 
 		Guid :: i64;
 		Entity_Base :: struct {
-
 		}
 
-		Entity :: union {
+
+		Constant :: struct {
+			value: ExactValue,
+		}
+		Variable :: struct {
+			visited:   bool, // Cycle detection
+			used:      bool, // Variable is used
+			is_field:  bool, // Is struct field
+			anonymous: bool, // Variable is an anonymous
+		}
+		Using_Variable :: struct {
+		}
+		TypeName :: struct {
+		}
+		Procedure :: struct {
+			used: bool,
+		}
+		Builtin :: struct {
+			id: int,
+		}
+
+		Entity :: struct {
 			guid: Guid,
 
 			scope: ^Scope,
 			token: Token,
 			type_: ^Type,
 
-			Constant{
-				value: ExactValue,
-			},
-			Variable{
-				visited:   bool, // Cycle detection
-				used:      bool, // Variable is used
-				is_field:  bool, // Is struct field
-				anonymous: bool, // Variable is an anonymous
-			},
-			UsingVariable{
-			},
-			TypeName{
-			},
-			Procedure{
-				used: bool,
-			},
-			Builtin{
-				id: int,
-			},
+			variant: union {Constant, Variable, Using_Variable, TypeName, Procedure, Builtin},
 		}
 
-		using Entity;
-
-		e: Entity;
-
-		e = Variable{
-			used = true,
-			anonymous = false,
+		e := Entity{
+			variant = Variable{
+				used = true,
+				anonymous = false,
+			},
 		};
 
 
@@ -863,13 +850,13 @@ tagged_unions :: proc() {
 	{
 		// `Raw` unions still have uses, especially for mathematic types
 
-		Vector2 :: raw_union {
+		Vector2 :: struct #raw_union {
 			using xy_: struct { x, y: f32 },
 			e: [2]f32,
 			v: [vector 2]f32,
 		}
 
-		Vector3 :: raw_union {
+		Vector3 :: struct #raw_union {
 			using xyz_: struct { x, y, z: f32 },
 			xy: Vector2,
 			e: [3]f32,

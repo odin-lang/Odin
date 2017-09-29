@@ -1,9 +1,9 @@
-#import "fmt.odin";
-#import "os.odin";
-#import "mem.odin";
-// #import "http_test.odin" as ht;
-// #import "game.odin" as game;
-// #import "punity.odin" as pn;
+import "core:fmt.odin";
+import "core:os.odin";
+import "core:mem.odin";
+// import "http_test.odin" as ht;
+// import "game.odin" as game;
+// import "punity.odin" as pn;
 
 main :: proc() {
 	struct_padding();
@@ -160,21 +160,21 @@ type_introspection :: proc() {
 		info: ^Type_Info;
 		x: int;
 
-		info = type_info(int); // by type
-		info = type_info_of_val(x); // by value
+		info = type_info_of(int); // by type
+		info = type_info_of(x);   // by value
 		// See: runtime.odin
 
-		match i in info {
-		case Type_Info.Integer:
+		match i in info.variant {
+		case Type_Info_Integer:
 			fmt.println("integer!");
-		case Type_Info.Float:
+		case Type_Info_Float:
 			fmt.println("float!");
-		default:
+		case:
 			fmt.println("potato!");
 		}
 
 		// Unsafe cast
-		integer_info := cast(^Type_Info.Integer)cast(rawptr)info;
+		integer_info := cast(^Type_Info_Integer)cast(rawptr)info;
 	}
 
 	{
@@ -185,9 +185,9 @@ type_introspection :: proc() {
 		v2: Vector3;
 		v3: Vector3;
 
-		t1 := type_info_of_val(v1);
-		t2 := type_info_of_val(v2);
-		t3 := type_info_of_val(v3);
+		t1 := type_info_of(v1);
+		t2 := type_info_of(v2);
+		t3 := type_info_of(v3);
 
 		fmt.println();
 		fmt.print("Type of v1 is:\n\t", t1);
@@ -262,12 +262,12 @@ crazy_introspection :: proc() {
 			TOMATO,
 		}
 
-		fruit_ti := type_info(Fruit);
-		name := (union_cast(^Type_Info.Named)fruit_ti).name; // Unsafe casts
-		info, _ := union_cast(^Type_Info.Enum)type_info_base(fruit_ti); // Unsafe casts
+		fruit_ti := type_info_of(Fruit);
+		name := fruit_ti.variant.(Type_Info_Named).name;
+		info, _ := type_info_base(fruit_ti).variant.(Type_Info_Enum);
 
 		fmt.printf("%s :: enum %T {\n", name, info.base);
-		for i := 0; i < len(info.values); i++ {
+		for _, i in info.values {
 			fmt.printf("\t%s\t= %v,\n", info.names[i], info.values[i]);
 		}
 		fmt.printf("}\n");
