@@ -267,6 +267,9 @@ dlerror :: proc() -> string {
 
 
 _alloc_command_line_arguments :: proc() -> []string {
-	// TODO(bill):
-	return nil;
+	args := make([]string, __argc__);
+	for i in 0..__argc__ {
+		args[i] = strings.to_odin_string((__argv__+i)^);
+	}
+	return args;
 }

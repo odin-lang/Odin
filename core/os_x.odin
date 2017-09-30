@@ -42,7 +42,8 @@ RTLD_NOLOAD   :: 0x10;
 RTLD_FIRST    :: 0x100;
 
 
-args: [dynamic]string;
+// "Argv" arguments converted to Odin strings
+args := _alloc_command_line_arguments();
 
 _File_Time :: struct #ordered {
 	seconds: i64,
@@ -278,4 +279,13 @@ dlclose :: proc(handle: rawptr) -> bool #inline {
 }
 dlerror :: proc() -> string {
 	return strings.to_odin_string(unix_dlerror());
+}
+
+
+_alloc_command_line_arguments :: proc() -> []string {
+	args := make([]string, __argc__);
+	for i in 0..__argc__ {
+		args[i] = strings.to_odin_string((__argv__+i)^);
+	}
+	return args;
 }

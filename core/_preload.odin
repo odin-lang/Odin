@@ -138,8 +138,8 @@ Type_Info :: struct #ordered {
 // This will be set by the compiler
 __type_table: []Type_Info;
 
-__argv__: ^^u8;
 __argc__: i32;
+__argv__: ^^u8;
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 

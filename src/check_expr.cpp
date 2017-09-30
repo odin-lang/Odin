@@ -1233,7 +1233,82 @@ bool check_custom_align(Checker *c, AstNode *node, i64 *align_) {
 	return false;
 }
 
-void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Operand> *poly_operands) {
+
+Entity *find_polymorphic_struct_entity(Checker *c, Type *original_type, isize param_count, Array<Operand> ordered_operands) {
+	auto *found_gen_types = map_get(&c->info.gen_types, hash_pointer(original_type));
+
+	if (found_gen_types != nullptr) {
+		for_array(i, *found_gen_types) {
+			Entity *e = (*found_gen_types)[i];
+			Type *t = base_type(e->type);
+			TypeTuple *tuple = &t->Struct.polymorphic_params->Tuple;
+			bool ok = true;
+			GB_ASSERT(param_count == tuple->variables.count);
+			for (isize j = 0; j < param_count; j++) {
+				Entity *p = tuple->variables[j];
+				Operand o = ordered_operands[j];
+				if (p->kind == Entity_TypeName) {
+					if (is_type_polymorphic(o.type)) {
+						// NOTE(bill): Do not add polymorphic version to the gen_types
+						ok = false;
+					}
+					if (!are_types_identical(o.type, p->type)) {
+						ok = false;
+					}
+				} else if (p->kind == Entity_Constant) {
+					if (!are_types_identical(o.type, p->type)) {
+						ok = false;
+					}
+					if (!compare_exact_values(Token_CmpEq, o.value, p->Constant.value)) {
+						ok = false;
+					}
+				} else {
+					GB_PANIC("Unknown entity kind");
+				}
+			}
+			if (ok) {
+				return e;
+			}
+		}
+	}
+	return nullptr;
+}
+
+
+void add_polymorphic_struct_entity(Checker *c, AstNode *node, Type *original_type, Type *named_type) {
+	GB_ASSERT(is_type_named(named_type));
+	gbAllocator a = heap_allocator();
+
+	Entity *e = nullptr;
+	{
+		Token token = ast_node_token(node);
+		token.kind = Token_String;
+		token.string = named_type->Named.name;
+
+		AstNode *node = gb_alloc_item(a, AstNode);
+		node->kind = AstNode_Ident;
+		node->Ident.token = token;
+
+		e = make_entity_type_name(a, c->context.scope, token, named_type);
+		add_entity(c, c->context.scope, node, e);
+		add_entity_use(c, node, e);
+	}
+
+	named_type->Named.type_name = e;
+
+
+	auto *found_gen_types = map_get(&c->info.gen_types, hash_pointer(original_type));
+	if (found_gen_types) {
+		array_add(found_gen_types, e);
+	} else {
+		Array<Entity *> array = {};
+		array_init(&array, heap_allocator());
+		array_add(&array, e);
+		map_set(&c->info.gen_types, hash_pointer(original_type), array);
+	}
+}
+
+void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Operand> *poly_operands, Type *named_type = nullptr) {
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
@@ -1402,20 +1477,21 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 		}
 	}
 
+	struct_type->Struct.scope               = c->context.scope;
+	struct_type->Struct.is_packed           = st->is_packed;
+	struct_type->Struct.is_ordered          = st->is_ordered;
+	struct_type->Struct.polymorphic_params  = polymorphic_params;
+	struct_type->Struct.is_polymorphic      = is_polymorphic;
+	struct_type->Struct.is_poly_specialized = is_poly_specialized;
+
 	Array<Entity *> fields = {};
 
 	if (!is_polymorphic) {
 		fields = check_struct_fields(c, node, st->fields, min_field_count, context);
 	}
 
-	struct_type->Struct.scope               = c->context.scope;
-	struct_type->Struct.is_packed           = st->is_packed;
-	struct_type->Struct.is_ordered          = st->is_ordered;
 	struct_type->Struct.fields              = fields;
 	struct_type->Struct.fields_in_src_order = fields;
-	struct_type->Struct.polymorphic_params  = polymorphic_params;
-	struct_type->Struct.is_polymorphic      = is_polymorphic;
-	struct_type->Struct.is_poly_specialized = is_poly_specialized;
 
 
 	if (!struct_type->Struct.is_raw_union) {
@@ -3107,7 +3183,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		*type = make_type_struct(c->allocator);
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
-		check_struct_type(c, *type, e, nullptr);
+		check_struct_type(c, *type, e, nullptr, named_type);
 		check_close_scope(c);
 		(*type)->Struct.node = e;
 		return true;
@@ -6907,85 +6983,27 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 		// TODO(bill): Check for previous types
 		gbAllocator a = c->allocator;
 
-		auto *found_gen_types = map_get(&c->info.gen_types, hash_pointer(original_type));
-
-		if (found_gen_types != nullptr) {
-			for_array(i, *found_gen_types) {
-				Entity *e = (*found_gen_types)[i];
-				Type *t = base_type(e->type);
-				TypeTuple *tuple = &t->Struct.polymorphic_params->Tuple;
-				bool ok = true;
-				GB_ASSERT(param_count == tuple->variables.count);
-				for (isize j = 0; j < param_count; j++) {
-					Entity *p = tuple->variables[j];
-					Operand o = ordered_operands[j];
-					if (p->kind == Entity_TypeName) {
-						if (is_type_polymorphic(o.type)) {
-							// NOTE(bill): Do not add polymorphic version to the gen_types
-							ok = false;
-						}
-						if (!are_types_identical(o.type, p->type)) {
-							ok = false;
-						}
-					} else if (p->kind == Entity_Constant) {
-						if (!are_types_identical(o.type, p->type)) {
-							ok = false;
-						}
-						if (!compare_exact_values(Token_CmpEq, o.value, p->Constant.value)) {
-							ok = false;
-						}
-					} else {
-						GB_PANIC("Unknown entity kind");
-					}
-				}
-				if (ok) {
-					operand->mode = Addressing_Type;
-					operand->type = e->type;
-					return err;
-				}
-			}
+		Entity *found_entity = find_polymorphic_struct_entity(c, original_type, param_count, ordered_operands);
+		if (found_entity) {
+			operand->mode = Addressing_Type;
+			operand->type = found_entity->type;
+			return err;
 		}
 
 		String generated_name = make_string_c(expr_to_string(call));
 
 		Type *named_type = make_type_named(a, generated_name, nullptr, nullptr);
-		Type *struct_type = make_type_struct(a);
 		AstNode *node = clone_ast_node(a, st->node);
-		set_base_type(named_type, struct_type);
-		check_open_scope(c, node);
-		check_struct_type(c, struct_type, node, &ordered_operands);
-		check_close_scope(c);
+		Type *struct_type = make_type_struct(a);
 		struct_type->Struct.node = node;
 		struct_type->Struct.polymorphic_parent = original_type;
+		set_base_type(named_type, struct_type);
 
-		Entity *e = nullptr;
+		check_open_scope(c, node);
+		check_struct_type(c, struct_type, node, &ordered_operands, named_type);
+		check_close_scope(c);
 
-		{
-			Token token = ast_node_token(node);
-			token.kind = Token_String;
-			token.string = generated_name;
-
-			AstNode *node = gb_alloc_item(a, AstNode);
-			node->kind = AstNode_Ident;
-			node->Ident.token = token;
-
-			e = make_entity_type_name(a, st->scope->parent, token, named_type);
-			add_entity(c, st->scope->parent, node, e);
-			add_entity_use(c, node, e);
-		}
-
-		named_type->Named.type_name = e;
-
-		if (!struct_type->Struct.is_polymorphic) {
-			if (found_gen_types) {
-				array_add(found_gen_types, e);
-			} else {
-				Array<Entity *> array = {};
-				array_init(&array, heap_allocator());
-				array_add(&array, e);
-				map_set(&c->info.gen_types, hash_pointer(original_type), array);
-			}
-		}
+		add_polymorphic_struct_entity(c, node, original_type, named_type);
 
 		operand->mode = Addressing_Type;
 		operand->type = named_type;

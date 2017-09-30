@@ -7276,11 +7276,11 @@ void ir_end_procedure_body(irProcedure *proc) {
 
 
 void ir_insert_code_before_proc(irProcedure* proc, irProcedure *parent) {
-	if (parent == nullptr) {
-		if (proc->name == "main") {
-			ir_emit_startup_runtime(proc);
-		}
-	}
+	// if (parent == nullptr) {
+		// if (proc->name == "main") {
+			// ir_emit_startup_runtime(proc);
+		// }
+	// }
 }
 
 void ir_build_proc(irValue *value, irProcedure *parent) {
@@ -7728,7 +7728,7 @@ void ir_gen_tree(irGen *s) {
 			if (e->kind == Entity_Procedure && (e->Procedure.tags & ProcTag_export) != 0) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
-			} else if (scope->is_init && e->kind == Entity_Procedure && name == "main") {
+			// } else if (scope->is_init && e->kind == Entity_Procedure && name == "main") {
 			} else {
 				name = ir_mangle_name(s, e->token.pos.file, e);
 			}
@@ -7807,7 +7807,7 @@ void ir_gen_tree(irGen *s) {
 
 #if defined(GB_SYSTEM_WINDOWS)
 	if (build_context.is_dll && !has_dll_main) {
-		// proc DllMain(inst: rawptr, reason: u32, reserved: rawptr) -> i32
+		// DllMain :: proc(inst: rawptr, reason: u32, reserved: rawptr) -> i32
 		String name = str_lit("DllMain");
 		Type *proc_params = make_type_tuple(a);
 		Type *proc_results = make_type_tuple(a);
@@ -7840,7 +7840,7 @@ void ir_gen_tree(irGen *s) {
 		Entity *e = make_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
 
-		map_set(&m->values, hash_pointer(e), p);
+		map_set(&m->values, hash_entity(e), p);
 		map_set(&m->members, hash_string(name), p);
 
 		irProcedure *proc = &p->Proc;
@@ -7860,12 +7860,10 @@ void ir_gen_tree(irGen *s) {
 		ir_start_block(proc, then);
 
 		{
-			String main_name = str_lit("main");
-			irValue **found = map_get(&m->members, hash_string(main_name));
+			irValue **found = map_get(&m->values, hash_entity(entry_point));
+			ir_emit(proc, ir_alloc_instr(proc, irInstr_StartupRuntime));
 			if (found != nullptr) {
 				ir_emit_call(proc, *found, nullptr, 0);
-			} else {
-				ir_emit(proc, ir_alloc_instr(proc, irInstr_StartupRuntime));
 			}
 		}
 
@@ -7878,6 +7876,73 @@ void ir_gen_tree(irGen *s) {
 		ir_end_procedure_body(proc);
 	}
 #endif
+	if (!(build_context.is_dll && !has_dll_main)) {
+		// main :: proc(argc: i32, argv: ^^u8) -> i32
+		String name = str_lit("main");
+		Type *proc_params = make_type_tuple(a);
+		Type *proc_results = make_type_tuple(a);
+
+		Scope *proc_scope = gb_alloc_item(a, Scope);
+
+		array_init_count(&proc_params->Tuple.variables, a, 2);
+		array_init_count(&proc_results->Tuple.variables, a, 1);
+
+		Type *char_ptr_ptr = make_type_pointer(a, make_type_pointer(a, t_u8));
+		proc_params->Tuple.variables[0] = make_entity_param(a, proc_scope, make_token_ident(str_lit("argc")), t_i32, false, false);
+		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, make_token_ident(str_lit("argv")), char_ptr_ptr, false, false);
+
+
+		proc_results->Tuple.variables[0] = make_entity_param(a, proc_scope, empty_token, t_i32, false, false);
+
+
+		Type *proc_type = make_type_proc(a, proc_scope,
+		                                 proc_params, 2,
+		                                 proc_results, 1, false, ProcCC_C);
+
+		// TODO(bill): make this more robust
+		proc_type->Proc.abi_compat_params = gb_alloc_array(a, Type *, proc_params->Tuple.variables.count);
+		for_array(i, proc_params->Tuple.variables) {
+			proc_type->Proc.abi_compat_params[i] = proc_params->Tuple.variables[i]->type;
+		}
+		proc_type->Proc.abi_compat_result_type = proc_results->Tuple.variables[0]->type;
+
+		AstNode *body = gb_alloc_item(a, AstNode);
+		Entity *e = make_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
+		irValue *p = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
+
+		map_set(&m->values, hash_entity(e), p);
+		map_set(&m->members, hash_string(name), p);
+
+		irProcedure *proc = &p->Proc;
+		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
+		e->Procedure.link_name = name;
+
+		ir_begin_procedure_body(proc);
+
+		// NOTE(bill): https://msdn.microsoft.com/en-us/library/windows/desktop/ms682583(v=vs.85).aspx
+		// DLL_PROCESS_ATTACH == 1
+
+		irValue *argc = ir_emit_load(proc, *map_get(&proc->module->values, hash_entity(proc_params->Tuple.variables[0])));
+		irValue *argv = ir_emit_load(proc, *map_get(&proc->module->values, hash_entity(proc_params->Tuple.variables[1])));
+
+		irValue *global_argc = ir_find_global_variable(proc, str_lit("__argc__"));
+		irValue *global_argv = ir_find_global_variable(proc, str_lit("__argv__"));
+
+		ir_emit_store(proc, global_argc, argc);
+		ir_emit_store(proc, global_argv, argv);
+
+		ir_emit(proc, ir_alloc_instr(proc, irInstr_StartupRuntime));
+		{
+			irValue **found = map_get(&proc->module->values, hash_entity(entry_point));
+			if (found != nullptr) {
+				ir_emit_call(proc, *found, nullptr, 0);
+			}
+		}
+
+		ir_emit_return(proc, v_zero32);
+		ir_end_procedure_body(proc);
+	}
+
 #if 0 && defined(GB_SYSTEM_WINDOWS)
 	if (!m->build_context->is_dll && !has_win_main) {
 		// proc WinMain(inst, prev: rawptr, cmd_line: ^byte, cmd_show: i32) -> i32
@@ -7911,7 +7976,7 @@ void ir_gen_tree(irGen *s) {
 
 		m->entry_point_entity = e;
 
-		map_set(&m->values, hash_pointer(e), p);
+		map_set(&m->values, hash_entity(e), p);
 		map_set(&m->members, hash_string(name), p);
 
 		irProcedure *proc = &p->Proc;
@@ -7935,7 +8000,7 @@ void ir_gen_tree(irGen *s) {
 		Entity *e = make_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
 
-		map_set(&m->values, hash_pointer(e), p);
+		map_set(&m->values, hash_entity(e), p);
 		map_set(&m->members, hash_string(name), p);
 
 
