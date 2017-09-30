@@ -525,6 +525,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 				      "\tat %.*s(%td:%td)",
 				      LIT(name), LIT(pos.file), pos.line, pos.column);
 			}
+		} else if (name == "main") {
+			error(d->proc_lit, "The link name `main` is reserved for internal use");
 		} else {
 			map_set(fp, key, e);
 		}
@@ -549,6 +551,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 				      "Non unique linking name for procedure `%.*s`\n"
 				      "\tother at %.*s(%td:%td)",
 				      LIT(name), LIT(pos.file), pos.line, pos.column);
+			} else if (name == "main") {
+				error(d->proc_lit, "The link name `main` is reserved for internal use");
 			} else {
 				map_set(fp, key, e);
 			}
