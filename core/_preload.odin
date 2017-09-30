@@ -1042,3 +1042,22 @@ __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
 		m.hashes[last.hash_index] = fr.entry_index;
 	}
 }
+
+when ODIN_OS == "linux" || ODIN_OS == "osx" {
+
+	import "core:strings.odin";
+
+	// This isn't the _most_ graceful approach, but it works.
+	__set_arguments_nix :: proc(argc: int, argv: rawptr) #cc_contextless {
+
+		if(argc > 0) {
+			os.args = make([]string, argc);
+
+			strs := cast(^^u8)argv;
+
+			for i in 0..argc {
+				os.args[i] = strings.to_odin_string((strs+i)^);
+			}
+		}
+	}
+}

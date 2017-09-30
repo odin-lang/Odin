@@ -137,12 +137,13 @@ struct irProcedure {
 	i32                   block_count;
 };
 
-#define IR_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"
-#define IR_TYPE_INFO_DATA_NAME       "__$type_info_data"
-#define IR_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"
-#define IR_TYPE_INFO_NAMES_NAME      "__$type_info_names_data"
-#define IR_TYPE_INFO_OFFSETS_NAME    "__$type_info_offsets_data"
-#define IR_TYPE_INFO_USINGS_NAME     "__$type_info_usings_data"
+#define IR_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
+#define IR_SET_NIX_ARGUMENTS_PROC_NAME "__set_arguments_nix"
+#define IR_TYPE_INFO_DATA_NAME         "__$type_info_data"
+#define IR_TYPE_INFO_TYPES_NAME        "__$type_info_types_data"
+#define IR_TYPE_INFO_NAMES_NAME        "__$type_info_names_data"
+#define IR_TYPE_INFO_OFFSETS_NAME      "__$type_info_offsets_data"
+#define IR_TYPE_INFO_USINGS_NAME       "__$type_info_usings_data"
 
 
 #define IR_INSTR_KINDS \
@@ -7729,6 +7730,60 @@ void ir_gen_tree(irGen *s) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
 			} else if (scope->is_init && e->kind == Entity_Procedure && name == "main") {
+
+				// Add launch arguments on *nix
+
+				#ifndef GB_SYSTEM_WINDOWS
+
+					// Allocate arguments block.
+					e->type->Proc.params = make_type_tuple(s->module.allocator);
+					Array<Entity *> args = {};
+					array_init(&args, s->module.allocator, 2);
+
+					e->type->Proc.param_count = 2;
+
+					e->type->Proc.abi_compat_params = gb_alloc_array(s->module.allocator, Type *, 2);
+					int arg_id = 0;
+
+					AstFile* ast_file = e->type->Proc.node->file;
+
+					// Create the appropriate entities and nodes to insert arguments into the "main" proc.
+					#define __NIX_ARGGEN(name, type_id, type_name) { \
+						/* Create entity and token */ \
+						Token tok = {Token_Ident, STR_LIT(name), ast_node_token(e->type->Proc.node).pos}; \
+						Entity* arg_ent = make_entity_param(s->module.allocator, e->type->Proc.scope, tok, type_id, false, true); \
+						array_add<Entity*>(&args, arg_ent); \
+						/* Alias the node data from the existing proc */ \
+						ast_node(pt, ProcType, e->type->Proc.node); \
+						ast_node(fl, FieldList, pt->params); \
+						/* Create AST nodes */ \
+						AstNode* name_node = ast_ident(ast_file, tok); \
+						Array<AstNode*> names = {}; \
+						array_init(&names, s->module.allocator, 1); \
+						array_add<AstNode*>(&names, name_node); \
+						Token type_tok = {Token_Ident, STR_LIT(type_name), ast_node_token(e->type->Proc.node).pos}; \
+						AstNode* type_node = ast_ident(ast_file, type_tok); \
+						AstNode* field = ast_field(ast_file, names, type_node, nullptr, 0, {}, {}); \
+						array_add(&fl->list, field); \
+						Type *new_type = type_to_abi_compat_param_type(s->module.allocator, type_id); \
+						e->type->Proc.abi_compat_params[arg_id] = new_type; \
+						arg_id++; \
+					}
+
+
+					__NIX_ARGGEN("argc", t_int, "int");
+					// Technically, it's a ^u8, not just a u8, but the AST part doesn't matter too much.
+					__NIX_ARGGEN("argv", t_rawptr, "rawptr");
+
+					#undef __NIX_ARGGEN
+
+					e->type->Proc.params->Tuple.variables = args;
+
+					ast_node(pl, ProcLit, decl->proc_lit);
+					ast_node(body, BlockStmt, pl->body);
+
+				#endif
+
 			} else {
 				name = ir_mangle_name(s, e->token.pos.file, e);
 			}

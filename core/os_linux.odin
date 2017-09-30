@@ -37,7 +37,7 @@ RTLD_BINDING_MASK :: 0x3;
 RTLD_GLOBAL       :: 0x100;
 
 // "Argv" arguments converted to Odin strings
-args := _alloc_command_line_arguments();
+args: []string;
 
 _File_Time :: struct #ordered {
 	seconds:     i64,
@@ -263,10 +263,4 @@ dlclose :: proc(handle: rawptr) -> bool #inline {
 }
 dlerror :: proc() -> string {
 	return strings.to_odin_string(_unix_dlerror());
-}
-
-
-_alloc_command_line_arguments :: proc() -> []string {
-	// TODO(bill):
-	return nil;
 }

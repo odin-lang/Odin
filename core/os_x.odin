@@ -42,7 +42,7 @@ RTLD_NOLOAD   :: 0x10;
 RTLD_FIRST    :: 0x100;
 
 
-args: [dynamic]string;
+args: []string;
 
 _File_Time :: struct #ordered {
 	seconds: i64,
