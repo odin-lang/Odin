@@ -721,18 +721,16 @@ __mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #cc_con
 	when size_of(rawptr) == 8 {
 		foreign __llvm_core llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i64" ---;
 	} else {
-		foreign __llvm_core llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i32";
+		foreign __llvm_core llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i32" ---;
 	}
 	llvm_memcpy(dst, src, len, 1, false);
 	return dst;
 }
 
 __mem_compare :: proc(a, b: ^u8, n: int) -> int #cc_contextless {
-	for i in 0..n {
-		switch {
-		case (a+i)^ < (b+i)^: return -1;
-		case (a+i)^ > (b+i)^: return +1;
-		}
+	for i in 0..n do switch {
+	case (a+i)^ < (b+i)^: return -1;
+	case (a+i)^ > (b+i)^: return +1;
 	}
 	return 0;
 }

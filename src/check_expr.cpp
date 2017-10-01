@@ -1035,7 +1035,12 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 			if (is_operand_nil(o)) {
 				default_is_nil = true;
 			} else if (o.mode != Addressing_Constant) {
-				error(default_value, "Default parameter must be a constant");
+				if (default_value->kind == AstNode_ProcLit) {
+					value = exact_value_procedure(default_value);
+					// error(default_value, "A procedure literal as a default param is not yet supported");
+				} else {
+					error(default_value, "Default parameter must be a constant");
+				}
 			} else {
 				value = o.value;
 			}
@@ -1329,10 +1334,10 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 		context = str_lit("struct #raw_union");
 	}
 
-	Type *polymorphic_params = nullptr;
-	bool is_polymorphic = false;
-	bool can_check_fields = true;
-	bool is_poly_specialized = false;
+	Type *polymorphic_params     = nullptr;
+	bool is_polymorphic          = false;
+	bool can_check_fields        = true;
+	bool is_poly_specialized     = false;
 
 	if (st->polymorphic_params != nullptr) {
 		ast_node(field_list, FieldList, st->polymorphic_params);
@@ -1481,12 +1486,12 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 		}
 	}
 
-	struct_type->Struct.scope               = c->context.scope;
-	struct_type->Struct.is_packed           = st->is_packed;
-	struct_type->Struct.is_ordered          = st->is_ordered;
-	struct_type->Struct.polymorphic_params  = polymorphic_params;
-	struct_type->Struct.is_polymorphic      = is_polymorphic;
-	struct_type->Struct.is_poly_specialized = is_poly_specialized;
+	struct_type->Struct.scope                   = c->context.scope;
+	struct_type->Struct.is_packed               = st->is_packed;
+	struct_type->Struct.is_ordered              = st->is_ordered;
+	struct_type->Struct.polymorphic_params      = polymorphic_params;
+	struct_type->Struct.is_polymorphic          = is_polymorphic;
+	struct_type->Struct.is_poly_specialized     = is_poly_specialized;
 
 	Array<Entity *> fields = {};
 
@@ -1496,6 +1501,16 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 
 	struct_type->Struct.fields              = fields;
 	struct_type->Struct.fields_in_src_order = fields;
+
+	for_array(i, fields) {
+		Entity *f = fields[i];
+		if (f->kind == Entity_Variable) {
+			if (f->Variable.default_value.kind == ExactValue_Procedure) {
+				struct_type->Struct.has_proc_default_values = true;
+				break;
+			}
+		}
+	}
 
 
 	if (!struct_type->Struct.is_raw_union) {

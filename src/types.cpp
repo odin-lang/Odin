@@ -82,6 +82,7 @@ struct TypeStruct {
 	bool       is_raw_union;
 	bool       is_polymorphic;
 	bool       is_poly_specialized;
+	bool       has_proc_default_values;
 	Type *     polymorphic_params; // Type_Tuple
 	Type *     polymorphic_parent;
 

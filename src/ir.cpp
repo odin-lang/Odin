@@ -20,10 +20,12 @@ struct irModule {
 	// String triple;
 
 	PtrSet<Entity *>      min_dep_set;
-	Map<irValue *>        values;        // Key: Entity *
-	Map<irValue *>        members;       // Key: String
-	Map<String>           entity_names;  // Key: Entity * of the typename
-	Map<irDebugInfo *>    debug_info;    // Key: Unique pointer
+	Map<irValue *>        values;              // Key: Entity *
+	Map<irValue *>        members;             // Key: String
+	Map<String>           entity_names;        // Key: Entity * of the typename
+	Map<irDebugInfo *>    debug_info;          // Key: Unique pointer
+	Map<irValue *>        anonymous_proc_lits; // Key: AstNode *
+
 	i32                   global_string_index;
 	i32                   global_array_index; // For ConstantSlice
 	i32                   global_generated_index;
@@ -3720,6 +3722,38 @@ void ir_pop_target_list(irProcedure *proc) {
 }
 
 
+
+irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, AstNode *expr, irProcedure *proc = nullptr) {
+	ast_node(pl, ProcLit, expr);
+
+	// NOTE(bill): Generate a new name
+	// parent$count
+	isize name_len = prefix_name.len + 1 + 8 + 1;
+	u8 *name_text = gb_alloc_array(m->allocator, u8, name_len);
+	i32 name_id = cast(i32)m->anonymous_proc_lits.entries.count;
+
+	name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$anon-%d", LIT(prefix_name), name_id);
+	String name = make_string(name_text, name_len-1);
+
+	Type *type = type_of_expr(m->info, expr);
+	irValue *value = ir_value_procedure(m->allocator,
+	                                    m, nullptr, type, pl->type, pl->body, name);
+
+	value->Proc.tags = pl->tags;
+	value->Proc.parent = proc;
+
+	array_add(&m->procs_to_generate, value);
+	if (proc != nullptr) {
+		array_add(&proc->children, &value->Proc);
+	} else {
+		map_set(&m->members, hash_string(name), value);
+	}
+
+	map_set(&m->anonymous_proc_lits, hash_pointer(expr), value);
+
+	return value;
+}
+
 void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	if (e->type == nullptr) return;
 
@@ -3759,13 +3793,29 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	}
 	#endif
 
+	// if (bt->kind == Type_Struct) {
+	// 	Scope *s = bt->Struct.scope;
+	// 	if (s != nullptr) {
+	// 		for_array(i, s->elements.entries) {
+	// 			Entity *e = s->elements.entries[i].value;
+	// 			if (e->kind == Entity_TypeName) {
+	// 				ir_mangle_add_sub_type_name(m, e, name);
+	// 			}
+	// 		}
+	// 	}
+	// }
+
 	if (bt->kind == Type_Struct) {
-		Scope *s = bt->Struct.scope;
-		if (s != nullptr) {
-			for_array(i, s->elements.entries) {
-				Entity *e = s->elements.entries[i].value;
-				if (e->kind == Entity_TypeName) {
-					ir_mangle_add_sub_type_name(m, e, name);
+		if (bt->Struct.has_proc_default_values) {
+			for_array(i, bt->Struct.fields) {
+				Entity *f = bt->Struct.fields[i];
+				if (f->kind == Entity_Variable) {
+					if (f->Variable.default_value.kind == ExactValue_Procedure) {
+						AstNode *expr = f->Variable.default_value.value_procedure;
+						GB_ASSERT(expr != nullptr);
+						GB_ASSERT(expr->kind == AstNode_ProcLit);
+						ir_gen_anonymous_proc_lit(m, e->token.string, expr);
+					}
 				}
 			}
 		}
@@ -4563,7 +4613,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 	return nullptr;
 }
 
-
 irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	expr = unparen_expr(expr);
 
@@ -4832,24 +4881,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(pl, ProcLit, expr);
-		// NOTE(bill): Generate a new name
-		// parent$count
-		isize name_len = proc->name.len + 1 + 8 + 1;
-		u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%d", LIT(proc->name), cast(i32)proc->children.count);
-		String name = make_string(name_text, name_len-1);
-
-		Type *type = type_of_expr(proc->module->info, expr);
-		irValue *value = ir_value_procedure(proc->module->allocator,
-		                                           proc->module, nullptr, type, pl->type, pl->body, name);
-
-		value->Proc.tags = pl->tags;
-		value->Proc.parent = proc;
-
-		array_add(&proc->children, &value->Proc);
-		array_add(&proc->module->procs_to_generate, value);
-
-		return value;
+		return ir_gen_anonymous_proc_lit(proc->module, proc->name, expr, proc);
 	case_end;
 
 
@@ -7424,6 +7456,7 @@ void ir_init_module(irModule *m, Checker *c) {
 	map_init(&m->members,                 heap_allocator());
 	map_init(&m->debug_info,              heap_allocator());
 	map_init(&m->entity_names,            heap_allocator());
+	map_init(&m->anonymous_proc_lits,     heap_allocator());
 	array_init(&m->procs,                 heap_allocator());
 	array_init(&m->procs_to_generate,     heap_allocator());
 	array_init(&m->foreign_library_paths, heap_allocator());
@@ -7532,6 +7565,7 @@ void ir_destroy_module(irModule *m) {
 	map_destroy(&m->values);
 	map_destroy(&m->members);
 	map_destroy(&m->entity_names);
+	map_destroy(&m->anonymous_proc_lits);
 	map_destroy(&m->debug_info);
 	map_destroy(&m->const_strings);
 	array_free(&m->procs);
@@ -8535,7 +8569,9 @@ void ir_gen_tree(irGen *s) {
 
 
 	for_array(i, m->procs_to_generate) {
-		ir_build_proc(m->procs_to_generate[i], m->procs_to_generate[i]->Proc.parent);
+		irValue *p = m->procs_to_generate[i];
+		gb_printf_err("%.*s\n", LIT(p->Proc.name));
+		ir_build_proc(p, p->Proc.parent);
 	}
 
 	// Number debug info

@@ -22,6 +22,7 @@ enum ExactValueKind {
 	ExactValue_Complex,
 	ExactValue_Pointer,
 	ExactValue_Compound, // TODO(bill): Is this good enough?
+	ExactValue_Procedure, // TODO(bill): Is this good enough?
 	ExactValue_Type,
 
 	ExactValue_Count,
@@ -37,6 +38,7 @@ struct ExactValue {
 		i64           value_pointer;
 		Complex128    value_complex;
 		AstNode *     value_compound;
+		AstNode *     value_procedure;
 		Type *        value_type;
 	};
 };
@@ -106,6 +108,12 @@ ExactValue exact_value_pointer(i64 ptr) {
 ExactValue exact_value_type(Type *type) {
 	ExactValue result = {ExactValue_Type};
 	result.value_type = type;
+	return result;
+}
+
+ExactValue exact_value_procedure(AstNode *node) {
+	ExactValue result = {ExactValue_Procedure};
+	result.value_procedure = node;
 	return result;
 }
 
