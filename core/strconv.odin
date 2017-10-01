@@ -1,4 +1,4 @@
-using import "core:decimal.odin";
+using import "core:decimal.odin"
 
 Int_Flag :: enum {
 	Prefix = 1<<0,
@@ -8,7 +8,7 @@ Int_Flag :: enum {
 
 
 parse_bool :: proc(s: string) -> (result: bool = false, ok: bool) {
-	match s {
+	switch s {
 	case "1", "t", "T", "true", "TRUE", "True":
 		return true, true;
 	case "0", "f", "F", "false", "FALSE", "False":
@@ -20,7 +20,7 @@ parse_bool :: proc(s: string) -> (result: bool = false, ok: bool) {
 _digit_value :: proc(r: rune) -> int {
 	ri := int(r);
 	v: int = 16;
-	match r {
+	switch r {
 	case '0'...'9': v = ri-'0';
 	case 'a'...'z': v = ri-'a'+10;
 	case 'A'...'Z': v = ri-'A'+10;
@@ -31,7 +31,7 @@ _digit_value :: proc(r: rune) -> int {
 parse_i128 :: proc(s: string) -> i128 {
 	neg := false;
 	if len(s) > 1 {
-		match s[0] {
+		switch s[0] {
 		case '-':
 			neg = true;
 			s = s[1..];
@@ -43,7 +43,7 @@ parse_i128 :: proc(s: string) -> i128 {
 
 	base: i128 = 10;
 	if len(s) > 2 && s[0] == '0' {
-		match s[1] {
+		switch s[1] {
 		case 'b': base =  2;  s = s[2..];
 		case 'o': base =  8;  s = s[2..];
 		case 'd': base = 10;  s = s[2..];
@@ -80,7 +80,7 @@ parse_u128 :: proc(s: string) -> u128 {
 
 	base := u128(10);
 	if len(s) > 2 && s[0] == '0' {
-		match s[1] {
+		switch s[1] {
 		case 'b': base =  2;  s = s[2..];
 		case 'o': base =  8;  s = s[2..];
 		case 'd': base = 10;  s = s[2..];
@@ -115,7 +115,7 @@ parse_f64 :: proc(s: string) -> f64 {
 	i := 0;
 
 	sign: f64 = 1;
-	match s[i] {
+	switch s[i] {
 	case '-': i += 1; sign = -1;
 	case '+': i += 1;
 	}
@@ -153,7 +153,7 @@ parse_f64 :: proc(s: string) -> f64 {
 		i += 1;
 
 		if i < len(s) {
-			match s[i] {
+			switch s[i] {
 			case '-': i += 1; frac = true;
 			case '+': i += 1;
 			}
@@ -223,7 +223,7 @@ _f64_info := FloatInfo{52, 11, -1023};
 generic_ftoa :: proc(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 {
 	bits: u64;
 	flt: ^FloatInfo;
-	match bit_size {
+	switch bit_size {
 	case 32:
 		bits = u64(transmute(u32)f32(val));
 		flt = &_f32_info;
@@ -238,7 +238,7 @@ generic_ftoa :: proc(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 
 	exp  := int(bits>>flt.mantbits) & (1<<flt.expbits - 1);
 	mant := bits & (u64(1) << flt.mantbits - 1);
 
-	match exp {
+	switch exp {
 	case 1<<flt.expbits - 1:
 		s: string;
 		if mant != 0 {
@@ -269,13 +269,13 @@ generic_ftoa :: proc(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 
 	if shortest {
 		round_shortest(d, mant, exp, flt);
 		digs = DecimalSlice{digits = d.digits[..], count = d.count, decimal_point = d.decimal_point};
-		match fmt {
+		switch fmt {
 		case 'e', 'E': prec = digs.count-1;
 		case 'f', 'F': prec = max(digs.count-digs.decimal_point, 0);
 		case 'g', 'G': prec = digs.count;
 		}
 	} else {
-		match fmt {
+		switch fmt {
 		case 'e', 'E': round(d, prec+1);
 		case 'f', 'F': round(d, d.decimal_point+prec);
 		case 'g', 'G':
@@ -293,7 +293,7 @@ generic_ftoa :: proc(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 
 
 
 format_digits :: proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, prec: int, fmt: u8) -> []u8 {
-	match fmt {
+	switch fmt {
 	case 'f', 'F':
 		append(&buf, neg ? '-' : '+');
 
@@ -410,7 +410,7 @@ digits := "0123456789abcdefghijklmnopqrstuvwxyz";
 is_integer_negative :: proc(u: u128, is_signed: bool, bit_size: int) -> (unsigned: u128, neg: bool) {
 	neg := false;
 	if is_signed {
-		match bit_size {
+		switch bit_size {
 		case 8:
 			i := i8(u);
 			neg = i < 0;
@@ -456,7 +456,7 @@ append_bits :: proc(buf: []u8, u: u128, base: int, is_signed: bool, bit_size: in
 
 	if flags&Int_Flag.Prefix != 0 {
 		ok := true;
-		match base {
+		switch base {
 		case  2: i-=1; a[i] = 'b';
 		case  8: i-=1; a[i] = 'o';
 		case 10: i-=1; a[i] = 'd';

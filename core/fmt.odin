@@ -1,9 +1,9 @@
-import "core:os.odin";
-import "core:mem.odin";
-import "core:utf8.odin";
-import "core:types.odin";
-import "core:strconv.odin";
-import "core:raw.odin";
+import "core:os.odin"
+import "core:mem.odin"
+import "core:utf8.odin"
+import "core:types.odin"
+import "core:strconv.odin"
+import "core:raw.odin"
 
 
 _BUFFER_SIZE :: 1<<12;
@@ -36,14 +36,14 @@ Fmt_Info :: struct {
 
 
 string_buffer_data :: proc(buf: ^String_Buffer) -> []u8 {
-	match b in buf {
+	switch b in buf {
 	case []u8:        return b[..];
 	case [dynamic]u8: return b[..];
 	}
 	return nil;
 }
 string_buffer_data :: proc(buf: String_Buffer) -> []u8 {
-	match b in buf {
+	switch b in buf {
 	case []u8:        return b[..];
 	case [dynamic]u8: return b[..];
 	}
@@ -58,13 +58,13 @@ write_string :: proc(buf: ^String_Buffer, s: string) {
 	write_bytes(buf, cast([]u8)s);
 }
 write_bytes :: proc(buf: ^String_Buffer, data: []u8) {
-	match b in buf {
+	switch b in buf {
 	case []u8:        append(b, ...data);
 	case [dynamic]u8: append(b, ...data);
 	}
 }
 write_byte :: proc(buf: ^String_Buffer, data: u8) {
-	match b in buf {
+	switch b in buf {
 	case []u8:        append(b, data);
 	case [dynamic]u8: append(b, data);
 	}
@@ -179,11 +179,11 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 		return;
 	}
 
-	match info in ti.variant {
+	switch info in ti.variant {
 	case Type_Info_Named:
 		write_string(buf, info.name);
 	case Type_Info_Integer:
-		match {
+		switch {
 		case ti == type_info_of(int):  write_string(buf, "int");
 		case ti == type_info_of(uint): write_string(buf, "uint");
 		case:
@@ -194,13 +194,13 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 	case Type_Info_Rune:
 		write_string(buf, "rune");
 	case Type_Info_Float:
-		match ti.size {
+		switch ti.size {
 		case 2: write_string(buf, "f16");
 		case 4: write_string(buf, "f32");
 		case 8: write_string(buf, "f64");
 		}
 	case Type_Info_Complex:
-		match ti.size {
+		switch ti.size {
 		case 4:  write_string(buf, "complex32");
 		case 8:  write_string(buf, "complex64");
 		case 16: write_string(buf, "complex128");
@@ -388,7 +388,7 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 	if arg_index < len(args) {
 		arg := args[arg_index];
 		arg.type_info = type_info_base(arg.type_info);
-		match i in arg {
+		switch i in arg {
 		case int:  num = i;
 		case i8:   num = int(i);
 		case i16:  num = int(i);
@@ -423,7 +423,7 @@ fmt_bad_verb :: proc(using fi: ^Fmt_Info, verb: rune) {
 }
 
 fmt_bool :: proc(using fi: ^Fmt_Info, b: bool, verb: rune) {
-	match verb {
+	switch verb {
 	case 't', 'v':
 		s := "false";
 		if b do s = "true";
@@ -475,7 +475,7 @@ _fmt_int :: proc(fi: ^Fmt_Info, u: u128, base: int, is_signed: bool, bit_size: i
 		}
 	}
 
-	match base {
+	switch base {
 	case 2, 8, 10, 12, 16:
 		break;
 	case:
@@ -493,7 +493,7 @@ _fmt_int :: proc(fi: ^Fmt_Info, u: u128, base: int, is_signed: bool, bit_size: i
 
 	if fi.hash && fi.zero {
 		c: u8;
-		match base {
+		switch base {
 		case 2:  c = 'b';
 		case 8:  c = 'o';
 		case 10: c = 'd';
@@ -517,7 +517,7 @@ __DIGITS_LOWER := "0123456789abcdefx";
 __DIGITS_UPPER := "0123456789ABCDEFX";
 
 fmt_rune :: proc(fi: ^Fmt_Info, r: rune, verb: rune) {
-	match verb {
+	switch verb {
 	case 'c', 'r', 'v':
 		write_rune(fi.buf, r);
 	case:
@@ -526,7 +526,7 @@ fmt_rune :: proc(fi: ^Fmt_Info, r: rune, verb: rune) {
 }
 
 fmt_int :: proc(fi: ^Fmt_Info, u: u128, is_signed: bool, bit_size: int, verb: rune) {
-	match verb {
+	switch verb {
 	case 'v': _fmt_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
 	case 'b': _fmt_int(fi, u,  2, is_signed, bit_size, __DIGITS_LOWER);
 	case 'o': _fmt_int(fi, u,  8, is_signed, bit_size, __DIGITS_LOWER);
@@ -568,7 +568,7 @@ _pad :: proc(fi: ^Fmt_Info, s: string) {
 }
 
 fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
-	match verb {
+	switch verb {
 	// case 'e', 'E', 'f', 'F', 'g', 'G', 'v':
 	// case 'f', 'F', 'v':
 
@@ -611,7 +611,7 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 	}
 }
 fmt_string :: proc(fi: ^Fmt_Info, s: string, verb: rune) {
-	match verb {
+	switch verb {
 	case 's', 'v':
 		write_string(fi.buf, s);
 
@@ -633,7 +633,7 @@ fmt_string :: proc(fi: ^Fmt_Info, s: string, verb: rune) {
 }
 
 fmt_pointer :: proc(fi: ^Fmt_Info, p: rawptr, verb: rune) {
-	match verb {
+	switch verb {
 	case 'p', 'v':
 		// Okay
 	case:
@@ -650,7 +650,7 @@ fmt_pointer :: proc(fi: ^Fmt_Info, p: rawptr, verb: rune) {
 enum_value_to_string :: proc(v: any) -> (string, bool) {
 	v.type_info = type_info_base(v.type_info);
 
-	match e in v.type_info.variant {
+	switch e in v.type_info.variant {
 	case: return "", false;
 	case Type_Info_Enum:
 		get_str :: proc(i: $T, e: Type_Info_Enum) -> (string, bool) {
@@ -673,7 +673,7 @@ enum_value_to_string :: proc(v: any) -> (string, bool) {
 		}
 
 		a := any{v.data, type_info_base(e.base)};
-		match v in a {
+		switch v in a {
 		case rune: return get_str(v, e);
 		case i8:   return get_str(v, e);
 		case i16:  return get_str(v, e);
@@ -716,10 +716,10 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		return;
 	}
 
-	match e in v.type_info.variant {
+	switch e in v.type_info.variant {
 	case: fmt_bad_verb(fi, verb);
 	case Type_Info_Enum:
-		match verb {
+		switch verb {
 		case: fmt_bad_verb(fi, verb);
 		case 'd', 'f':
 			fmt_arg(fi, any{v.data, type_info_base(e.base)}, verb);
@@ -738,9 +738,9 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		return;
 	}
 
-	match info in v.type_info.variant {
+	switch info in v.type_info.variant {
 	case Type_Info_Named:
-		match b in info.base.variant {
+		switch b in info.base.variant {
 		case Type_Info_Struct:
 			if verb != 'v' {
 				fmt_bad_verb(fi, verb);
@@ -939,7 +939,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 }
 
 fmt_complex :: proc(fi: ^Fmt_Info, c: complex128, bits: int, verb: rune) {
-	match verb {
+	switch verb {
 	case 'f', 'F', 'v':
 		r, i := real(c), imag(c);
 		fmt_float(fi, r, bits/2, verb);
@@ -972,7 +972,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 
 	if verb == 'T' {
 		ti := arg.type_info;
-		match a in arg {
+		switch a in arg {
 		case ^Type_Info: ti = a;
 		}
 		write_type(fi.buf, ti);
@@ -982,7 +982,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 
 	base_arg := arg;
 	base_arg.type_info = type_info_base(base_arg.type_info);
-	match a in base_arg {
+	switch a in base_arg {
 	case any:           fmt_arg(fi,  a, verb);
 	case bool:          fmt_bool(fi, a, verb);
 	case rune:          fmt_rune(fi, a, verb);
@@ -1073,7 +1073,7 @@ sbprintf :: proc(b: ^String_Buffer, fmt: string, args: ...any) -> string {
 		i += 1;
 
 		prefix_loop: for ; i < end; i += 1 {
-			match fmt[i] {
+			switch fmt[i] {
 			case '+':
 				fi.plus = true;
 			case '-':

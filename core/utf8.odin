@@ -254,7 +254,7 @@ rune_count :: proc(s: []u8) -> int {
 
 
 rune_size :: proc(r: rune) -> int {
-	match {
+	switch {
 	case r < 0:          return -1;
 	case r <= 1<<7  - 1: return 1;
 	case r <= 1<<11 - 1: return 2;

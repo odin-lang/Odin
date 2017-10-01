@@ -2469,7 +2469,8 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 			if (sz > 8 && build_context.word_size < 8) {
 				new_type = make_type_pointer(a, original_type);
 			}
-		} break;
+			break;
+		}
 		case Type_Pointer: break;
 		case Type_Proc:    break; // NOTE(bill): Just a pointer
 
@@ -2495,7 +2496,9 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 				new_type = make_type_pointer(a, original_type);
 				break;
 			}
-		} break;
+
+			break;
+		}
 		}
 	} else if (build_context.ODIN_OS == "linux" ||
 	           build_context.ODIN_OS == "osx") {
@@ -2508,7 +2511,9 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 			if (sz > 8 && build_context.word_size < 8) {
 				new_type = make_type_pointer(a, original_type);
 			}
-		} break;
+
+			break;
+		}
 		case Type_Pointer: break;
 		case Type_Proc:    break; // NOTE(bill): Just a pointer
 
@@ -2528,7 +2533,9 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 			if (8*size > 16) {
 				new_type = make_type_pointer(a, original_type);
 			}
-		} break;
+
+			break;
+		}
 		}
 	} else {
 		// IMPORTANT TODO(bill): figure out the ABI settings for Linux, OSX etc. for
@@ -2579,7 +2586,9 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 			case 64: new_type = t_u64; break;
 #endif
 			}
-		} break;
+
+			break;
+		}
 		}
 	} else if (build_context.ODIN_OS == "linux") {
 
@@ -3031,26 +3040,29 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 
 	switch (e->kind) {
 	case_ast_node(i, Ident, e);
+
 		Operand o = {};
 		check_ident(c, &o, e, named_type, nullptr, false);
 
+		gbString err_str;
 		switch (o.mode) {
 		case Addressing_Invalid:
 			break;
-		case Addressing_Type: {
+		case Addressing_Type:
 			*type = o.type;
 			return true;
-		} break;
-		case Addressing_NoValue: {
-			gbString err_str = expr_to_string(e);
+
+		case Addressing_NoValue:
+			err_str = expr_to_string(e);
 			error(e, "`%s` used as a type", err_str);
 			gb_string_free(err_str);
-		} break;
-		default: {
-			gbString err_str = expr_to_string(e);
+			break;
+
+		default:
+			err_str = expr_to_string(e);
 			error(e, "`%s` used as a type when not a type", err_str);
 			gb_string_free(err_str);
-		} break;
+			break;
 		}
 	case_end;
 
@@ -3104,6 +3116,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		Operand o = {};
 		check_selector(c, &o, e, nullptr);
 
+		gbString err_str;
 		switch (o.mode) {
 		case Addressing_Invalid:
 			break;
@@ -3111,16 +3124,16 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			GB_ASSERT(o.type != nullptr);
 			*type = o.type;
 			return true;
-		case Addressing_NoValue: {
-			gbString err_str = expr_to_string(e);
+		case Addressing_NoValue:
+			err_str = expr_to_string(e);
 			error(e, "`%s` used as a type", err_str);
 			gb_string_free(err_str);
-		} break;
-		default: {
-			gbString err_str = expr_to_string(e);
+			break;
+		default:
+			err_str = expr_to_string(e);
 			error(e, "`%s` is not a type", err_str);
 			gb_string_free(err_str);
-		} break;
+			break;
 		}
 	case_end;
 
@@ -3533,7 +3546,8 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 				if (out_value) *out_value = exact_binary_operator_value(Token_Add, real, exact_value_make_imag(imag));
 				return true;
 			}
-		} break;
+			break;
+		}
 		case Basic_UntypedComplex:
 			return true;
 
@@ -3724,9 +3738,9 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 		case Token_Lt:
 		case Token_Gt:
 		case Token_LtEq:
-		case Token_GtEq: {
+		case Token_GtEq:
 			defined = is_type_ordered(x->type);
-		} break;
+			break;
 		}
 
 		if (!defined) {
@@ -4176,7 +4190,9 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			if (xt) error_operand_not_expression(x);
 			if (yt) error_operand_not_expression(y);
 		}
-	} break;
+
+		break;
+	}
 
 	default:
 		check_expr(c, x, be->left);
@@ -4522,7 +4538,9 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 			convert_untyped_error(c, operand, target_type);
 			return;
 		}
-	} break;
+
+		break;
+	}
 
 	case Type_Union:
 		if (!is_operand_nil(*operand) && !is_operand_undef(*operand)) {
@@ -5112,7 +5130,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->type = t_source_code_location;
 		operand->mode = Addressing_Value;
-	} break;
+
+		break;
+	}
 
 	case BuiltinProc_len:
 	case BuiltinProc_cap: {
@@ -5159,7 +5179,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode  = mode;
 		operand->value = value;
 		operand->type  = type;
-	} break;
+
+		break;
+	}
 
 	#if 0
 	case BuiltinProc_new: {
@@ -5173,7 +5195,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		operand->mode = Addressing_Value;
 		operand->type = make_type_pointer(c->allocator, type);
-	} break;
+
+		break;
+	}
 	#endif
 	#if 0
 	case BuiltinProc_new_slice: {
@@ -5212,7 +5236,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->mode = Addressing_Value;
 		operand->type = make_type_slice(c->allocator, type);
-	} break;
+
+		break;
+	}
 	#endif
 	case BuiltinProc_make: {
 		// proc make(Type, len: int) -> Type
@@ -5268,7 +5294,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->mode = Addressing_Value;
 		operand->type = type;
-	} break;
+
+		break;
+	}
 
 	#if 0
 	case BuiltinProc_free: {
@@ -5299,7 +5327,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 
 		operand->mode = Addressing_NoValue;
-	} break;
+
+		break;
+	}
 	#endif
 
 
@@ -5329,7 +5359,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->type = nullptr;
 		operand->mode = Addressing_NoValue;
-	} break;
+
+		break;
+	}
 	#endif
 	#if 0
 	case BuiltinProc_clear: {
@@ -5345,7 +5377,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->type = nullptr;
 		operand->mode = Addressing_NoValue;
-	} break;
+
+		break;
+	}
 	#endif
 	#if 0
 	case BuiltinProc_append: {
@@ -5394,7 +5428,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		operand->mode = Addressing_Value;
 		operand->type = t_int;
-	} break;
+
+		break;
+	}
 	#endif
 	#if 0
 	case BuiltinProc_delete: {
@@ -5426,7 +5462,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_NoValue;
-	} break;
+
+		break;
+	}
 	#endif
 
 
@@ -5447,7 +5485,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_Constant;
 		operand->value = exact_value_i64(type_size_of(c->allocator, t));
 		operand->type = t_untyped_integer;
-	} break;
+
+		break;
+	}
 
 	case BuiltinProc_align_of: {
 		// proc align_of(Type or expr) -> untyped int
@@ -5466,7 +5506,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_Constant;
 		operand->value = exact_value_i64(type_align_of(c->allocator, t));
 		operand->type = t_untyped_integer;
-	} break;
+
+		break;
+	}
 
 
 	case BuiltinProc_offset_of: {
@@ -5511,7 +5553,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_Constant;
 		operand->value = exact_value_i64(type_offset_of_from_selection(c->allocator, type, sel));
 		operand->type  = t_untyped_integer;
-	} break;
+
+		break;
+	}
 
 
 	case BuiltinProc_type_of:
@@ -5557,7 +5601,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->mode = Addressing_Value;
 		operand->type = t_type_info_ptr;
-	} break;
+
+		break;
+	}
 
 	case BuiltinProc_compile_assert:
 		// proc compile_assert(cond: bool) -> bool
@@ -5630,7 +5676,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *elem_type = vector_type->Vector.elem;
 		operand->type = make_type_vector(c->allocator, elem_type, arg_count);
 		operand->mode = Addressing_Value;
-	} break;
+
+		break;
+	}
 
 	case BuiltinProc_complex: {
 		// proc complex(real, imag: float_type) -> complex_type
@@ -5689,7 +5737,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		case Basic_UntypedFloat: operand->type = t_untyped_complex; break;
 		default: GB_PANIC("Invalid type"); break;
 		}
-	} break;
+
+		break;
+	}
 
 	case BuiltinProc_real:
 	case BuiltinProc_imag: {
@@ -5733,7 +5783,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		case Basic_UntypedComplex:    x->type = t_untyped_float; break;
 		default: GB_PANIC("Invalid type"); break;
 		}
-	} break;
+
+		break;
+	}
 
 	case BuiltinProc_conj: {
 		// proc conj(x: type) -> type
@@ -5755,7 +5807,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 
-	} break;
+
+break;
+	}
 
 	#if 0
 	case BuiltinProc_slice_ptr: {
@@ -5799,7 +5853,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		operand->type = make_type_slice(c->allocator, ptr_type->Pointer.elem);
 		operand->mode = Addressing_Value;
-	} break;
+
+		break;
+	}
 
 	case BuiltinProc_slice_to_bytes: {
 		// proc slice_to_bytes(a: []T) -> []u8
@@ -5813,7 +5869,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->type = t_u8_slice;
 		operand->mode = Addressing_Value;
-	} break;
+
+		break;
+	}
 	#endif
 	case BuiltinProc_expand_to_tuple: {
 		Type *type = base_type(operand->type);
@@ -5834,7 +5892,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->type = tuple;
 		operand->mode = Addressing_Value;
-	} break;
+
+		break;
+	}
 
 	case BuiltinProc_min: {
 		// proc min(a, b: ordered) -> ordered
@@ -5900,7 +5960,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			}
 		}
 
-	} break;
+
+break;
+	}
 
 	case BuiltinProc_max: {
 		// proc min(a, b: ordered) -> ordered
@@ -5968,7 +6030,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			}
 		}
 
-	} break;
+
+break;
+	}
 
 	case BuiltinProc_abs: {
 		// proc abs(n: numeric) -> numeric
@@ -5991,7 +6055,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 				f64 r = operand->value.value_complex.real;
 				f64 i = operand->value.value_complex.imag;
 				operand->value = exact_value_float(gb_sqrt(r*r + i*i));
-			} break;
+
+				break;
+			}
 			default:
 				GB_PANIC("Invalid numeric constant");
 				break;
@@ -6004,7 +6070,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			operand->type = base_complex_elem_type(operand->type);
 		}
 		GB_ASSERT(!is_type_complex(operand->type));
-	} break;
+
+		break;
+	}
 
 	case BuiltinProc_clamp: {
 		// proc clamp(a, min, max: ordered) -> ordered
@@ -6092,7 +6160,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 				return false;
 			}
 		}
-	} break;
+
+		break;
+	}
 
 	#if 0
 	case BuiltinProc_transmute: {
@@ -6143,7 +6213,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		o->mode = Addressing_Value;
 		o->type = t;
-	} break;
+
+		break;
+	}
 	#endif
 	}
 
@@ -7103,7 +7175,9 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 				if (operand->mode != Addressing_Invalid) {
 					check_cast(c, operand, t);
 				}
-			} break;
+
+				break;
+			}
 			}
 		}
 		return Expr_Expr;
@@ -7330,7 +7404,9 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			switch (r) {
 			case 'i': t = t_untyped_complex; break;
 			}
-		} break;
+
+			break;
+		}
 		default:            GB_PANIC("Unknown literal"); break;
 		}
 		o->mode  = Addressing_Constant;
@@ -7663,7 +7739,8 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					}
 				}
 			}
-		} break;
+			break;
+		}
 
 		case Type_Slice:
 		case Type_Array:
@@ -7740,7 +7817,9 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			if (t->kind == Type_Array && is_to_be_determined_array_count) {
 				t->Array.count = max;
 			}
-		} break;
+
+			break;
+		}
 
 		case Type_Basic: {
 			if (!is_type_any(t)) {
@@ -7819,7 +7898,9 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					}
 				}
 			}
-		} break;
+
+			break;
+		}
 
 		case Type_Map: {
 			if (cl->elems.count == 0) {
@@ -7844,7 +7925,9 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					check_assignment(c, o, t->Map.value, str_lit("map literal"));
 				}
 			}
-		} break;
+
+			break;
+		}
 
 		default: {
 			if (cl->elems.count == 0) {
@@ -7855,7 +7938,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			error(node, "Invalid compound literal type `%s`", str);
 			gb_string_free(str);
 			return kind;
-		} break;
+		}
 		}
 
 		if (is_constant) {

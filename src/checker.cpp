@@ -448,8 +448,9 @@ struct CheckerInfo {
 	Map<isize>            type_info_map;   // Key: Type *
 	isize                 type_info_count;
 
+	Scope *               init_scope;
 	Entity *              entry_point;
-	PtrSet<Entity *>      minimum_dependency_map;
+	PtrSet<Entity *>      minimum_dependency_set;
 
 };
 
@@ -1293,7 +1294,7 @@ void add_type_info_type(Checker *c, Type *t) {
 	add_type_info_type(c, bt);
 
 	switch (bt->kind) {
-	case Type_Basic: {
+	case Type_Basic:
 		switch (bt->Basic.kind) {
 		case Basic_string:
 			add_type_info_type(c, t_u8_ptr);
@@ -1313,7 +1314,7 @@ void add_type_info_type(Checker *c, Type *t) {
 			add_type_info_type(c, t_f64);
 			break;
 		}
-	} break;
+		break;
 
 	case Type_Pointer:
 		add_type_info_type(c, bt->Pointer.elem);
@@ -1352,7 +1353,7 @@ void add_type_info_type(Checker *c, Type *t) {
 		}
 		break;
 
-	case Type_Struct: {
+	case Type_Struct:
 		if (bt->Struct.scope != nullptr) {
 			for_array(i, bt->Struct.scope->elements.entries) {
 				Entity *e = bt->Struct.scope->elements.entries[i].value;
@@ -1363,14 +1364,14 @@ void add_type_info_type(Checker *c, Type *t) {
 			Entity *f = bt->Struct.fields[i];
 			add_type_info_type(c, f->type);
 		}
-	} break;
+		break;
 
-	case Type_Map: {
+	case Type_Map:
 		generate_map_internal_types(c->allocator, bt);
 		add_type_info_type(c, bt->Map.key);
 		add_type_info_type(c, bt->Map.value);
 		add_type_info_type(c, bt->Map.generated_struct_type);
-	} break;
+		break;
 
 	case Type_Tuple:
 		for_array(i, bt->Tuple.variables) {
@@ -1457,7 +1458,7 @@ void add_dependency_to_map(PtrSet<Entity *> *map, CheckerInfo *info, Entity *ent
 	}
 }
 
-PtrSet<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
+PtrSet<Entity *> generate_minimum_dependency_set(CheckerInfo *info, Entity *start) {
 	PtrSet<Entity *> map = {}; // Key: Entity *
 	ptr_set_init(&map, heap_allocator());
 
@@ -2360,7 +2361,9 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 				for_array(i, stmts) {
 					add_import_dependency_node(c, stmts[i], M);
 				}
-			} break;
+
+				break;
+			}
 			case AstNode_WhenStmt:
 				add_import_dependency_node(c, ws->else_stmt, M);
 				break;
@@ -2839,17 +2842,15 @@ void check_import_entities(Checker *c) {
 				};
 
 
-				if (path.count > 0) {
-					Scope *s = path[path.count-1];
-					Token token = mt(s);
-					error(token, "Cyclic importation of `%.*s`", LIT(token.string));
-					for (isize i = 0; i < path.count; i++) {
-						gb_printf_err("\t`%.*s` refers to\n", LIT(token.string));
-						s = path[i];
-						token = mt(s);
-					}
-					gb_printf_err("\t`%.*s`\n", LIT(token.string));
+				Scope *s = path[path.count-1];
+				Token token = mt(s);
+				error(token, "Cyclic importation of `%.*s`", LIT(token.string));
+				for (isize i = 0; i < path.count; i++) {
+					gb_printf_err("\t`%.*s` refers to\n", LIT(token.string));
+					s = path[i];
+					token = mt(s);
 				}
+				gb_printf_err("\t`%.*s`\n", LIT(token.string));
 			}
 
 		}
@@ -3059,11 +3060,14 @@ void check_parsed_files(Checker *c) {
 	for_array(i, c->parser->files) {
 		AstFile *f = c->parser->files[i];
 		Scope *scope = create_scope_from_file(c, f);
-
 		f->decl_info = make_declaration_info(c->allocator, f->scope, c->context.decl);
 		HashKey key = hash_string(f->tokenizer.fullpath);
 		map_set(&c->file_scopes, key, scope);
 		map_set(&c->info.files, key, f);
+
+		if (scope->is_init) {
+			c->info.init_scope = scope;
+		}
 	}
 
 	// Collect Entities
@@ -3077,7 +3081,7 @@ void check_parsed_files(Checker *c) {
 
 	check_import_entities(c);
 	check_all_global_entities(c);
-	init_preload(c); // NOTE(bill): This could be setup previously through the use of `type_info(_of_val)`
+	init_preload(c); // NOTE(bill): This could be setup previously through the use of `type_info_of`
 
 	// Check procedure bodies
 	// NOTE(bill): Nested procedures bodies will be added to this "queue"
@@ -3112,24 +3116,11 @@ void check_parsed_files(Checker *c) {
 		check_proc_body(c, pi->token, pi->decl, pi->type, pi->body);
 	}
 
-	{
-		for_array(i, c->info.entities.entries) {
-			auto *entry = &c->info.entities.entries[i];
-			Entity *e = cast(Entity *)entry->key.ptr;
-			String name = e->token.string;
-			if (e->kind == Entity_Procedure && !e->scope->is_global) {
-				if (e->scope->is_init && name == "main") {
-					c->info.entry_point = e;
-					break;
-				}
-			}
-		}
-		c->info.minimum_dependency_map = generate_minimum_dependency_map(&c->info, c->info.entry_point);
-	}
+	c->info.minimum_dependency_set = generate_minimum_dependency_set(&c->info, c->info.entry_point);
+
 
 	// Calculate initialization order of global variables
 	calculate_global_init_order(c);
-
 
 	// Add untyped expression values
 	for_array(i, c->info.untyped.entries) {
@@ -3148,8 +3139,6 @@ void check_parsed_files(Checker *c) {
 	// TODO(bill): Check for unused imports (and remove) or even warn/err
 	// TODO(bill): Any other checks?
 
-
-#if 1
 	// Add "Basic" type information
 	for (isize i = 0; i < gb_count_of(basic_types)-1; i++) {
 		Type *t = &basic_types[i];
@@ -3158,53 +3147,34 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
-	/*
-	for (isize i = 0; i < gb_count_of(basic_type_aliases)-1; i++) {
-		Type *t = &basic_type_aliases[i];
-		if (t->Basic.size > 0) {
-			add_type_info_type(c, t);
-		}
-	}
-	*/
-#endif
-
-
 	// NOTE(bill): Check for illegal cyclic type declarations
 	for_array(i, c->info.definitions.entries) {
 		Entity *e = c->info.definitions.entries[i].value;
-		if (e->kind == Entity_TypeName) {
-			if (e->type != nullptr) {
-				// i64 size  = type_size_of(c->sizes, c->allocator, e->type);
-				i64 align = type_align_of(c->allocator, e->type);
-				if (align > 0) {
-					add_type_info_type(c, e->type);
-				}
+		if (e->kind == Entity_TypeName && e->type != nullptr) {
+			// i64 size  = type_size_of(c->sizes, c->allocator, e->type);
+			i64 align = type_align_of(c->allocator, e->type);
+			if (align > 0) {
+				add_type_info_type(c, e->type);
 			}
 		}
 	}
 
-	// gb_printf_err("Count: %td\n", c->info.type_info_count++);
-
 	if (!build_context.is_dll) {
-		for_array(i, c->file_scopes.entries) {
-			Scope *s = c->file_scopes.entries[i].value;
-			if (s->is_init) {
-				Entity *e = current_scope_lookup_entity(s, str_lit("main"));
-				if (e == nullptr) {
-					Token token = {};
-					if (s->file->tokens.count > 0) {
-						token = s->file->tokens[0];
-					} else {
-						token.pos.file = s->file->tokenizer.fullpath;
-						token.pos.line = 1;
-						token.pos.column = 1;
-					}
-
-					error(token, "Undefined entry point procedure `main`");
-				}
-
-				break;
+		Scope *s = c->info.init_scope;
+		GB_ASSERT(s != nullptr);
+		GB_ASSERT(s->is_init);
+		Entity *e = current_scope_lookup_entity(s, str_lit("main"));
+		if (e == nullptr) {
+			Token token = {};
+			if (s->file->tokens.count > 0) {
+				token = s->file->tokens[0];
+			} else {
+				token.pos.file   = s->file->tokenizer.fullpath;
+				token.pos.line   = 1;
+				token.pos.column = 1;
 			}
+
+			error(token, "Undefined entry point procedure `main`");
 		}
 	}
 }

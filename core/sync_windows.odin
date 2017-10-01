@@ -1,5 +1,7 @@
-when ODIN_OS == "windows" do import win32 "core:sys/windows.odin";
-import "core:atomics.odin";
+when ODIN_OS == "windows" {
+	import win32 "core:sys/windows.odin";
+}
+import "core:atomics.odin"
 
 Semaphore :: struct {
 	_handle: win32.Handle,

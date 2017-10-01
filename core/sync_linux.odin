@@ -1,5 +1,5 @@
-import "core:atomics.odin";
-import "core:os.odin";
+import "core:atomics.odin"
+import "core:os.odin"
 
 Semaphore :: struct {
 	// _handle: win32.Handle,

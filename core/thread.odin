@@ -1,7 +1,7 @@
 _ :: compile_assert(ODIN_OS == "windows");
 
 when ODIN_OS == "windows" {
-	import win32 "core:sys/windows.odin";
+	import win32 "core:sys/windows.odin"
 }
 
 Thread_Proc :: #type proc(^Thread) -> int;

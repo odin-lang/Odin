@@ -50,16 +50,19 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 		if (flags & gbAllocatorFlag_ClearToZero) {
 			gb_zero_size(ptr, size);
 		}
-	} break;
+		break;
+	}
 
 	case gbAllocation_Free: {
 		free(old_memory);
-	} break;
+		break;
+	}
 
 	case gbAllocation_Resize: {
 		// ptr = realloc(old_memory, size);
 		ptr = gb_default_resize_align(heap_allocator(), old_memory, old_size, size, alignment);
-	} break;
+		break;
+	}
 #else
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
@@ -68,15 +71,18 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 		if (flags & gbAllocatorFlag_ClearToZero) {
 			gb_zero_size(ptr, size);
 		}
-	} break;
+		break;
+	}
 
 	case gbAllocation_Free: {
 		free(old_memory);
-	} break;
+		break;
+	}
 
 	case gbAllocation_Resize: {
 		ptr = gb_default_resize_align(heap_allocator(), old_memory, old_size, size, alignment);
-	} break;
+		break;
+	}
 #endif
 
 	case gbAllocation_FreeAll:

@@ -234,7 +234,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 			d->type_expr = d->init_expr;
 			check_type_decl(c, e, d->type_expr, named_type);
 			return;
-		} break;
+		}
 
 	// NOTE(bill): Check to see if the expression it to be aliases
 	#if 1
@@ -446,6 +446,13 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			error(e->token, "Procedure `main` cannot have a custom calling convention");
 		}
 		pt->calling_convention = ProcCC_Contextless;
+		if (d->scope->is_init) {
+			if (c->info.entry_point != nullptr) {
+				error(e->token, "Redeclaration of the entry pointer procedure `main`");
+			} else {
+				c->info.entry_point = e;
+			}
+		}
 	}
 
 	if (is_inline && is_no_inline) {

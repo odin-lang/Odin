@@ -187,7 +187,7 @@ merge_sort :: proc(array: $A/[]$T) {
 
 
 compare_ints :: proc(a, b: int) -> int {
-	match delta := a - b; {
+	switch delta := a - b; {
 	case delta < 0: return -1;
 	case delta > 0: return +1;
 	}
@@ -195,14 +195,14 @@ compare_ints :: proc(a, b: int) -> int {
 }
 
 compare_f32s :: proc(a, b: f32) -> int {
-	match delta := a - b; {
+	switch delta := a - b; {
 	case delta < 0: return -1;
 	case delta > 0: return +1;
 	}
 	return 0;
 }
 compare_f64s :: proc(a, b: f64) -> int {
-	match delta := a - b; {
+	switch delta := a - b; {
 	case delta < 0: return -1;
 	case delta > 0: return +1;
 	}

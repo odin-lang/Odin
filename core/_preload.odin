@@ -1,9 +1,9 @@
-#shared_global_scope;
+#shared_global_scope
 
-import "core:os.odin";
-import "core:fmt.odin"; // TODO(bill): Remove the need for `fmt` here
-import "core:utf8.odin";
-import "core:raw.odin";
+import "core:os.odin"
+import "core:fmt.odin" // TODO(bill): Remove the need for `fmt` here
+import "core:utf8.odin"
+import "core:raw.odin"
 
 // Naming Conventions:
 // In general, Ada_Case for types and snake_case for values
@@ -42,7 +42,6 @@ Type_Info_Enum_Value :: union {
 	u8, u16, u32, u64, u128, uint,
 	f32, f64,
 };
-
 
 // Variant Types
 Type_Info_Named   :: struct #ordered {name: string, base: ^Type_Info};
@@ -106,7 +105,6 @@ Type_Info_Bit_Field :: struct #ordered {
 
 
 Type_Info :: struct #ordered {
-// Fields
 	size:  int,
 	align: int,
 
@@ -217,7 +215,7 @@ type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 	if info == nil do return nil;
 
 	base := info;
-	match i in base.variant {
+	switch i in base.variant {
 	case Type_Info_Named: base = i.base;
 	}
 	return base;
@@ -228,7 +226,7 @@ type_info_base_without_enum :: proc(info: ^Type_Info) -> ^Type_Info {
 	if info == nil do return nil;
 
 	base := info;
-	match i in base.variant {
+	switch i in base.variant {
 	case Type_Info_Named: base = i.base;
 	case Type_Info_Enum:  base = i.base;
 	}
@@ -444,9 +442,9 @@ __get_map_header :: proc(m: ^$T/map[$K]$V) -> __Map_Header #cc_contextless {
 __get_map_key :: proc(key: $K) -> __Map_Key #cc_contextless {
 	map_key: __Map_Key;
 	ti := type_info_base_without_enum(type_info_of(K));
-	match _ in ti.variant {
+	switch _ in ti.variant {
 	case Type_Info_Integer:
-		match 8*size_of(key) {
+		switch 8*size_of(key) {
 		case   8: map_key.hash = u128((  ^u8)(&key)^);
 		case  16: map_key.hash = u128(( ^u16)(&key)^);
 		case  32: map_key.hash = u128(( ^u32)(&key)^);
@@ -459,7 +457,7 @@ __get_map_key :: proc(key: $K) -> __Map_Key #cc_contextless {
 	case Type_Info_Pointer:
 		map_key.hash = u128(uint((^rawptr)(&key)^));
 	case Type_Info_Float:
-		match 8*size_of(key) {
+		switch 8*size_of(key) {
 		case 32: map_key.hash = u128((^u32)(&key)^);
 		case 64: map_key.hash = u128((^u64)(&key)^);
 		case: panic("Unhandled float size");
@@ -575,7 +573,7 @@ default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
 	using Allocator_Mode;
 
-	match mode {
+	switch mode {
 	case Alloc:
 		return os.heap_alloc(size);
 
@@ -626,7 +624,7 @@ panic :: proc(message := "", using location := #caller_location) #cc_contextless
 
 
 __string_eq :: proc(a, b: string) -> bool #cc_contextless {
-	match {
+	switch {
 	case len(a) != len(b): return false;
 	case len(a) == 0:      return true;
 	case &a[0] == &b[0]:   return true;
@@ -731,7 +729,7 @@ __mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #cc_con
 
 __mem_compare :: proc(a, b: ^u8, n: int) -> int #cc_contextless {
 	for i in 0..n {
-		match {
+		switch {
 		case (a+i)^ < (b+i)^: return -1;
 		case (a+i)^ > (b+i)^: return +1;
 		}

@@ -2138,12 +2138,12 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 		GB_PANIC("TODO: RangeStmt");
 	case_end;
 
-	case_ast_node(rs, MatchStmt, node);
-		GB_PANIC("TODO: MatchStmt");
+	case_ast_node(rs, SwitchStmt, node);
+		GB_PANIC("TODO: SwitchStmt");
 	case_end;
 
-	case_ast_node(rs, TypeMatchStmt, node);
-		GB_PANIC("TODO: TypeMatchStmt");
+	case_ast_node(rs, TypeSwitchStmt, node);
+		GB_PANIC("TODO: TypeSwitchStmt");
 	case_end;
 
 	case_ast_node(bs, BranchStmt, node);
@@ -2445,7 +2445,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 
 
 	m.entry_point_entity = entry_point;
-	m.min_dep_map = generate_minimum_dependency_map(info, entry_point);
+	m.min_dep_map = generate_minimum_dependency_set(info, entry_point);
 
 	for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];

@@ -281,14 +281,14 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 		Array<AstNode *> list;  \
 		Array<AstNode *> stmts; \
 	}) \
-	AST_NODE_KIND(MatchStmt, "match statement", struct { \
+	AST_NODE_KIND(SwitchStmt, "switch statement", struct { \
 		Token token;   \
 		AstNode *label; \
 		AstNode *init; \
 		AstNode *tag;  \
 		AstNode *body; \
 	}) \
-	AST_NODE_KIND(TypeMatchStmt, "type match statement", struct { \
+	AST_NODE_KIND(TypeSwitchStmt, "type switch statement", struct { \
 		Token    token; \
 		AstNode *label; \
 		AstNode *tag;   \
@@ -575,8 +575,8 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_ForStmt:       return node->ForStmt.token;
 	case AstNode_RangeStmt:     return node->RangeStmt.token;
 	case AstNode_CaseClause:    return node->CaseClause.token;
-	case AstNode_MatchStmt:     return node->MatchStmt.token;
-	case AstNode_TypeMatchStmt: return node->TypeMatchStmt.token;
+	case AstNode_SwitchStmt:     return node->SwitchStmt.token;
+	case AstNode_TypeSwitchStmt: return node->TypeSwitchStmt.token;
 	case AstNode_DeferStmt:     return node->DeferStmt.token;
 	case AstNode_BranchStmt:    return node->BranchStmt.token;
 	case AstNode_UsingStmt:     return node->UsingStmt.token;
@@ -783,16 +783,16 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		n->CaseClause.list  = clone_ast_node_array(a, n->CaseClause.list);
 		n->CaseClause.stmts = clone_ast_node_array(a, n->CaseClause.stmts);
 		break;
-	case AstNode_MatchStmt:
-		n->MatchStmt.label = clone_ast_node(a, n->MatchStmt.label);
-		n->MatchStmt.init  = clone_ast_node(a, n->MatchStmt.init);
-		n->MatchStmt.tag   = clone_ast_node(a, n->MatchStmt.tag);
-		n->MatchStmt.body  = clone_ast_node(a, n->MatchStmt.body);
+	case AstNode_SwitchStmt:
+		n->SwitchStmt.label = clone_ast_node(a, n->SwitchStmt.label);
+		n->SwitchStmt.init  = clone_ast_node(a, n->SwitchStmt.init);
+		n->SwitchStmt.tag   = clone_ast_node(a, n->SwitchStmt.tag);
+		n->SwitchStmt.body  = clone_ast_node(a, n->SwitchStmt.body);
 		break;
-	case AstNode_TypeMatchStmt:
-		n->TypeMatchStmt.label = clone_ast_node(a, n->TypeMatchStmt.label);
-		n->TypeMatchStmt.tag   = clone_ast_node(a, n->TypeMatchStmt.tag);
-		n->TypeMatchStmt.body  = clone_ast_node(a, n->TypeMatchStmt.body);
+	case AstNode_TypeSwitchStmt:
+		n->TypeSwitchStmt.label = clone_ast_node(a, n->TypeSwitchStmt.label);
+		n->TypeSwitchStmt.tag   = clone_ast_node(a, n->TypeSwitchStmt.tag);
+		n->TypeSwitchStmt.body  = clone_ast_node(a, n->TypeSwitchStmt.body);
 		break;
 	case AstNode_DeferStmt:
 		n->DeferStmt.stmt = clone_ast_node(a, n->DeferStmt.stmt);
@@ -1266,20 +1266,20 @@ AstNode *ast_range_stmt(AstFile *f, Token token, AstNode *value, AstNode *index,
 }
 
 AstNode *ast_match_stmt(AstFile *f, Token token, AstNode *init, AstNode *tag, AstNode *body) {
-	AstNode *result = make_ast_node(f, AstNode_MatchStmt);
-	result->MatchStmt.token = token;
-	result->MatchStmt.init  = init;
-	result->MatchStmt.tag   = tag;
-	result->MatchStmt.body  = body;
+	AstNode *result = make_ast_node(f, AstNode_SwitchStmt);
+	result->SwitchStmt.token = token;
+	result->SwitchStmt.init  = init;
+	result->SwitchStmt.tag   = tag;
+	result->SwitchStmt.body  = body;
 	return result;
 }
 
 
 AstNode *ast_type_match_stmt(AstFile *f, Token token, AstNode *tag, AstNode *body) {
-	AstNode *result = make_ast_node(f, AstNode_TypeMatchStmt);
-	result->TypeMatchStmt.token = token;
-	result->TypeMatchStmt.tag   = tag;
-	result->TypeMatchStmt.body  = body;
+	AstNode *result = make_ast_node(f, AstNode_TypeSwitchStmt);
+	result->TypeSwitchStmt.token = token;
+	result->TypeSwitchStmt.tag   = tag;
+	result->TypeSwitchStmt.body  = body;
 	return result;
 }
 
@@ -1774,7 +1774,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_for:
 		case Token_when:
 		case Token_return:
-		case Token_match:
+		case Token_switch:
 		case Token_defer:
 		case Token_asm:
 		case Token_using:
@@ -1823,12 +1823,15 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 	}
 
 	switch (s->kind) {
+	case AstNode_EmptyStmt:
+		return true;
+
 	case AstNode_IfStmt:
 	case AstNode_WhenStmt:
 	case AstNode_ForStmt:
 	case AstNode_RangeStmt:
-	case AstNode_MatchStmt:
-	case AstNode_TypeMatchStmt:
+	case AstNode_SwitchStmt:
+	case AstNode_TypeSwitchStmt:
 		return true;
 
 	case AstNode_PointerType:
@@ -1841,6 +1844,11 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 		return true;
 	case AstNode_ProcLit:
 		return s->ProcLit.body != nullptr;
+
+	case AstNode_ImportDecl:
+	case AstNode_ExportDecl:
+	case AstNode_ForeignLibraryDecl:
+		return true;
 
 	case AstNode_ValueDecl:
 		if (s->ValueDecl.is_mutable) {
@@ -3176,7 +3184,7 @@ AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 			TokenKind next = look_ahead_token_kind(f, 1);
 			switch (next) {
 			case Token_for:
-			case Token_match: {
+			case Token_switch: {
 				expect_token_after(f, Token_Colon, "identifier list");
 				AstNode *name = lhs[0];
 				AstNode *label = ast_label_decl(f, ast_node_token(name), name);
@@ -3185,8 +3193,8 @@ AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 				switch (stmt->kind) {
 				_SET_LABEL(ForStmt, label);
 				_SET_LABEL(RangeStmt, label);
-				_SET_LABEL(MatchStmt, label);
-				_SET_LABEL(TypeMatchStmt, label);
+				_SET_LABEL(SwitchStmt, label);
+				_SET_LABEL(TypeSwitchStmt, label);
 				default:
 					syntax_error(token, "Labels can only be applied to a loop or match statement");
 					break;
@@ -4238,7 +4246,7 @@ AstNode *parse_match_stmt(AstFile *f) {
 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 
-	Token token = expect_token(f, Token_match);
+	Token token = expect_token(f, Token_switch);
 	AstNode *init = nullptr;
 	AstNode *tag  = nullptr;
 	AstNode *body = nullptr;
@@ -4366,12 +4374,15 @@ AstNode *parse_import_decl(AstFile *f, bool is_using) {
 		cond = parse_expr(f, false);
 	}
 
-	expect_semicolon(f, nullptr);
+	AstNode *s = nullptr;
 	if (f->curr_proc != nullptr) {
 		syntax_error(import_name, "You cannot use `import` within a procedure. This must be done at the file scope");
-		return ast_bad_decl(f, import_name, file_path);
+		s = ast_bad_decl(f, import_name, file_path);
+	} else {
+		s = ast_import_decl(f, token, is_using, file_path, import_name, cond, docs, f->line_comment);
 	}
-	return ast_import_decl(f, token, is_using, file_path, import_name, cond, docs, f->line_comment);
+	expect_semicolon(f, s);
+	return s;
 }
 
 AstNode *parse_export_decl(AstFile *f) {
@@ -4383,12 +4394,16 @@ AstNode *parse_export_decl(AstFile *f) {
 	if (allow_token(f, Token_when)) {
 		cond = parse_expr(f, false);
 	}
-	expect_semicolon(f, nullptr);
+
+	AstNode *s = nullptr;
 	if (f->curr_proc != nullptr) {
 		syntax_error(token, "You cannot use `export` within a procedure. This must be done at the file scope");
-		return ast_bad_decl(f, token, file_path);
+		s = ast_bad_decl(f, token, file_path);
+	} else {
+		s = ast_export_decl(f, token, file_path, cond, docs, f->line_comment);
 	}
-	return ast_export_decl(f, token, file_path, cond, docs, f->line_comment);
+	expect_semicolon(f, s);
+	return s;
 }
 
 AstNode *parse_foreign_decl(AstFile *f) {
@@ -4425,14 +4440,16 @@ AstNode *parse_foreign_decl(AstFile *f) {
 		cond = parse_expr(f, false);
 	}
 
-	expect_semicolon(f, nullptr);
 
+	AstNode *s = nullptr;
 	if (f->curr_proc != nullptr) {
 		syntax_error(lib_name, "You cannot use foreign_system_library within a procedure. This must be done at the file scope");
-		return ast_bad_decl(f, lib_name, file_path);
+		s = ast_bad_decl(f, lib_name, file_path);
+	} else {
+		s = ast_foreign_library_decl(f, token, file_path, lib_name, cond, docs, f->line_comment);
 	}
-
-	return ast_foreign_library_decl(f, token, file_path, lib_name, cond, docs, f->line_comment);
+	expect_semicolon(f, s);
+	return s;
 }
 
 
@@ -4478,7 +4495,7 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);
 	case Token_for:    return parse_for_stmt(f);
-	case Token_match:  return parse_match_stmt(f);
+	case Token_switch:  return parse_match_stmt(f);
 	case Token_defer:  return parse_defer_stmt(f);
 	case Token_asm:    return parse_asm_stmt(f);
 	case Token_return: return parse_return_stmt(f);

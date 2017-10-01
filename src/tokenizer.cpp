@@ -94,7 +94,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_if,                     "if"),                     \
 	TOKEN_KIND(Token_else,                   "else"),                   \
 	TOKEN_KIND(Token_for,                    "for"),                    \
-	TOKEN_KIND(Token_match,                  "match"),                  \
+	TOKEN_KIND(Token_switch,                 "switch"),                 \
 	TOKEN_KIND(Token_in,                     "in"),                     \
 	TOKEN_KIND(Token_do,                     "do"),                     \
 	TOKEN_KIND(Token_case,                   "case"),                   \

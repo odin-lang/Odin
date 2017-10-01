@@ -270,7 +270,8 @@ ExactValue exact_value_to_integer(ExactValue v) {
 		if (f == v.value_float) {
 			return exact_value_i128(i);
 		}
-	} break;
+		break;
+	}
 
 	case ExactValue_Pointer:
 		return exact_value_i64(cast(i64)cast(intptr)v.value_pointer);
@@ -352,7 +353,8 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 		case ExactValue_Complex:
 			return v;
 		}
-	} break;
+		break;
+	}
 
 	case Token_Sub:	{
 		switch (v.kind) {
@@ -374,7 +376,8 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 			return exact_value_complex(-real, -imag);
 		}
 		}
-	} break;
+		break;
+	}
 
 	case Token_Xor: {
 		i128 i = I128_ZERO;
@@ -396,7 +399,8 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 		}
 
 		return exact_value_i128(i);
-	} break;
+		break;
+	}
 
 	case Token_Not: {
 		switch (v.kind) {
@@ -404,7 +408,8 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 		case ExactValue_Bool:
 			return exact_value_bool(!v.value_bool);
 		}
-	} break;
+		break;
+	}
 	}
 
 failure:
@@ -521,7 +526,8 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		}
 
 		return exact_value_i128(c);
-	} break;
+		break;
+	}
 
 	case ExactValue_Float: {
 		f64 a = x.value_float;
@@ -533,7 +539,8 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		case Token_Quo: return exact_value_float(a / b);
 		default: goto error;
 		}
-	} break;
+		break;
+	}
 
 	case ExactValue_Complex: {
 		y = exact_value_to_complex(y);
@@ -560,11 +567,13 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 			f64 s = c*c + d*d;
 			real = (a*c + b*d)/s;
 			imag = (b*c - a*d)/s;
-		} break;
+			break;
+		}
 		default: goto error;
 		}
 		return exact_value_complex(real, imag);
-	} break;
+		break;
+	}
 
 	case ExactValue_String: {
 		if (op != Token_Add) goto error;
@@ -577,7 +586,8 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		gb_memmove(data,        sx.text, sx.len);
 		gb_memmove(data+sx.len, sy.text, sy.len);
 		return exact_value_string(make_string(data, len));
-	} break;
+		break;
+	}
 	}
 
 error:; // NOTE(bill): MSVC accepts this??? apparently you cannot declare variables immediately after labels...
@@ -620,7 +630,8 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 		case Token_Gt:    return a >  b;
 		case Token_GtEq:  return a >= b;
 		}
-	} break;
+		break;
+	}
 
 	case ExactValue_Float: {
 		f64 a = x.value_float;
@@ -633,7 +644,8 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 		case Token_Gt:    return cmp_f64(a, b) >  0;
 		case Token_GtEq:  return cmp_f64(a, b) >= 0;
 		}
-	} break;
+		break;
+	}
 
 	case ExactValue_Complex: {
 		f64 a = x.value_complex.real;
@@ -644,7 +656,8 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 		case Token_CmpEq: return cmp_f64(a, c) == 0 && cmp_f64(b, d) == 0;
 		case Token_NotEq: return cmp_f64(a, c) != 0 || cmp_f64(b, d) != 0;
 		}
-	} break;
+		break;
+	}
 
 	case ExactValue_String: {
 		String a = x.value_string;
@@ -658,7 +671,8 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 		case Token_Gt:    return a >  b;
 		case Token_GtEq:  return a >= b;
 		}
-	} break;
+		break;
+	}
 
 	case ExactValue_Type:
 		switch (op) {

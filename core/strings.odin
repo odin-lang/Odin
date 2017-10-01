@@ -1,4 +1,4 @@
-import "core:mem.odin";
+import "core:mem.odin"
 
 new_string :: proc(s: string) -> string {
 	c := make([]u8, len(s)+1);

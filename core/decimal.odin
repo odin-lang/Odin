@@ -171,7 +171,7 @@ shift :: proc(a: ^Decimal, k: int) {
 	uint_size :: 8*size_of(uint);
 	max_shift :: uint_size-4;
 
-	match {
+	switch {
 	case a.count == 0:
 		// no need to update
 	case k > 0:

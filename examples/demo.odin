@@ -150,7 +150,7 @@ union_type :: proc() {
 
 		val = nil;
 
-		match v in val {
+		switch v in val {
 		case int:  fmt.println("int",  v);
 		case bool: fmt.println("bool", v);
 		case:      fmt.println("nil");
@@ -171,7 +171,7 @@ union_type :: proc() {
 
 		val = nil;
 
-		match v in val {
+		switch v in val {
 		case int:  fmt.println("int",  v);
 		case bool: fmt.println("bool", v);
 		case:      fmt.println("nil");
@@ -218,7 +218,7 @@ union_type :: proc() {
 
 		entity := new_entity(Monster);
 
-		match e in entity.derived {
+		switch e in entity.derived {
 		case Frog:
 			fmt.println("Ribbit");
 		case Monster:
@@ -262,7 +262,7 @@ union_type :: proc() {
 
 		entity := new_entity(Monster);
 
-		match e in entity.derived {
+		switch e in entity.derived {
 		case Frog:
 			fmt.println("Ribbit");
 		case Monster:

@@ -2,7 +2,7 @@
 // Inline vs external file?
 
 when ODIN_OS == "windows" {
-	import win32 "core:sys/windows.odin";
+	import win32 "core:sys/windows.odin"
 }
 _ :: compile_assert(ODIN_ARCH == "amd64"); // TODO(bill): x86 version
 

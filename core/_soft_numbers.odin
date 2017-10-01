@@ -1,4 +1,4 @@
-#shared_global_scope;
+#shared_global_scope
 
 __multi3 :: proc(a, b: u128) -> u128 #cc_c #link_name "__multi3" {
 	bits_in_dword_2 :: size_of(i64) * 4;

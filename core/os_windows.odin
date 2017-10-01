@@ -1,5 +1,5 @@
-import win32 "core:sys/windows.odin";
-import "core:mem.odin";
+import win32 "core:sys/windows.odin"
+import "core:mem.odin"
 
 Handle    :: int;
 File_Time :: u64;
@@ -60,7 +60,7 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 	if len(path) == 0 do return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
 
 	access: u32;
-	match mode & (O_RDONLY|O_WRONLY|O_RDWR) {
+	switch mode & (O_RDONLY|O_WRONLY|O_RDWR) {
 	case O_RDONLY: access = win32.FILE_GENERIC_READ;
 	case O_WRONLY: access = win32.FILE_GENERIC_WRITE;
 	case O_RDWR:   access = win32.FILE_GENERIC_READ | win32.FILE_GENERIC_WRITE;
@@ -82,7 +82,7 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 	}
 
 	create_mode: u32;
-	match {
+	switch {
 	case mode&(O_CREAT|O_EXCL) == (O_CREAT | O_EXCL):
 		create_mode = win32.CREATE_NEW;
 	case mode&(O_CREAT|O_TRUNC) == (O_CREAT | O_TRUNC):
@@ -156,7 +156,7 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	w: u32;
-	match whence {
+	switch whence {
 	case 0: w = win32.FILE_BEGIN;
 	case 1: w = win32.FILE_CURRENT;
 	case 2: w = win32.FILE_END;
@@ -272,7 +272,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 
 		i, j := 0, 0;
 		for str[j] != 0 {
-			match {
+			switch {
 			case str[j] < 0x80:
 				if i+1 > len do return "";
 				buf[i] = u8(str[j]); i += 1;

@@ -1,6 +1,6 @@
 is_signed :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	match i in type_info_base(info).variant {
+	switch i in type_info_base(info).variant {
 	case Type_Info_Integer: return i.signed;
 	case Type_Info_Float:   return true;
 	}

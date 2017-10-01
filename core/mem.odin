@@ -1,4 +1,4 @@
-import "core:raw.odin";
+import "core:raw.odin"
 
 foreign __llvm_core {
 	swap :: proc(b: u16) -> u16 #link_name "llvm.bswap.i16" ---;
@@ -137,7 +137,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	using Allocator_Mode;
 	arena := cast(^Arena)allocator_data;
 
-	match mode {
+	switch mode {
 	case Alloc:
 		total_size := size + alignment;
 
@@ -200,7 +200,7 @@ align_of_type_info :: proc(type_info: ^Type_Info) -> int {
 
 	WORD_SIZE :: size_of(int);
 	MAX_ALIGN :: size_of([vector 64]f64); // TODO(bill): Should these constants be builtin constants?
-	match info in type_info.variant {
+	switch info in type_info.variant {
 	case Type_Info_Named:
 		return align_of_type_info(info.base);
 	case Type_Info_Integer:
@@ -252,7 +252,7 @@ align_formula :: proc(size, align: int) -> int {
 
 size_of_type_info :: proc(type_info: ^Type_Info) -> int {
 	WORD_SIZE :: size_of(int);
-	match info in type_info.variant {
+	switch info in type_info.variant {
 	case Type_Info_Named:
 		return size_of_type_info(info.base);
 	case Type_Info_Integer:

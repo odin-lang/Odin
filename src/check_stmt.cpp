@@ -138,10 +138,10 @@ bool check_is_terminating(AstNode *node) {
 		return false;
 	case_end;
 
-	case_ast_node(ms, MatchStmt, node);
+	case_ast_node(ss, SwitchStmt, node);
 		bool has_default = false;
-		for_array(i, ms->body->BlockStmt.stmts) {
-			AstNode *clause = ms->body->BlockStmt.stmts[i];
+		for_array(i, ss->body->BlockStmt.stmts) {
+			AstNode *clause = ss->body->BlockStmt.stmts[i];
 			ast_node(cc, CaseClause, clause);
 			if (cc->list.count == 0) {
 				has_default = true;
@@ -154,10 +154,10 @@ bool check_is_terminating(AstNode *node) {
 		return has_default;
 	case_end;
 
-	case_ast_node(ms, TypeMatchStmt, node);
+	case_ast_node(ss, TypeSwitchStmt, node);
 		bool has_default = false;
-		for_array(i, ms->body->BlockStmt.stmts) {
-			AstNode *clause = ms->body->BlockStmt.stmts[i];
+		for_array(i, ss->body->BlockStmt.stmts) {
+			AstNode *clause = ss->body->BlockStmt.stmts[i];
 			ast_node(cc, CaseClause, clause);
 			if (cc->list.count == 0) {
 				has_default = true;
@@ -309,7 +309,9 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 				}
 			}
 		}
-	} break;
+
+		break;
+	}
 
 	default: {
 		if (lhs.expr->kind == AstNode_SelectorExpr) {
@@ -332,7 +334,9 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 			error(lhs.expr, "Cannot assign to `%s`", str);
 		}
 		gb_string_free(str);
-	} break;
+
+		break;
+	}
 	}
 
 	check_assignment(c, rhs, assignment_type, str_lit("assignment"));
@@ -490,7 +494,9 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 		} else {
 			error(us->token, "`using` can be only applied to enum type entities");
 		}
-	} break;
+
+		break;
+	}
 
 	case Entity_ImportName: {
 		Scope *scope = e->ImportName.scope;
@@ -511,7 +517,9 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 				return false;
 			}
 		}
-	} break;
+
+		break;
+	}
 
 	case Entity_Variable: {
 		Type *t = base_type(type_deref(e->type));
@@ -538,7 +546,9 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 			error(us->token, "`using` can only be applied to variables of type struct or raw_union");
 			return false;
 		}
-	} break;
+
+		break;
+	}
 
 	case Entity_Constant:
 		error(us->token, "`using` cannot be applied to a constant");
@@ -583,7 +593,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			gbString str = type_to_string(operand.type);
 			error(node, "`%s` is not an expression", str);
 			gb_string_free(str);
-		} break;
+
+			break;
+		}
 		case Addressing_NoValue:
 			return;
 		default: {
@@ -605,7 +617,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			gbString expr_str = expr_to_string(operand.expr);
 			error(node, "Expression is not used: `%s`", expr_str);
 			gb_string_free(expr_str);
-		} break;
+
+			break;
+		}
 		}
 	case_end;
 
@@ -695,7 +709,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				error(as->lhs[0], "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 			}
 
-		} break;
+
+			break;
+		}
 
 		default: {
 			// a += 1; // Single-sided
@@ -723,7 +739,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 			// NOTE(bill): Only use the first one will be used
 			check_assignment_variable(c, &operand, as->lhs[0]);
-		} break;
+
+			break;
+		}
 		}
 	case_end;
 
@@ -1161,18 +1179,18 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		check_close_scope(c);
 	case_end;
 
-	case_ast_node(ms, MatchStmt, node);
+	case_ast_node(ss, SwitchStmt, node);
 		Operand x = {};
 
 		mod_flags |= Stmt_BreakAllowed;
 		check_open_scope(c, node);
-		check_label(c, ms->label); // TODO(bill): What should the label's "scope" be?
+		check_label(c, ss->label); // TODO(bill): What should the label's "scope" be?
 
-		if (ms->init != nullptr) {
-			check_stmt(c, ms->init, 0);
+		if (ss->init != nullptr) {
+			check_stmt(c, ss->init, 0);
 		}
-		if (ms->tag != nullptr) {
-			check_expr(c, &x, ms->tag);
+		if (ss->tag != nullptr) {
+			check_expr(c, &x, ss->tag);
 			check_assignment(c, &x, nullptr, str_lit("match expression"));
 		} else {
 			x.mode  = Addressing_Constant;
@@ -1180,7 +1198,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			x.value = exact_value_bool(true);
 
 			Token token  = {};
-			token.pos    = ast_node_token(ms->body).pos;
+			token.pos    = ast_node_token(ss->body).pos;
 			token.string = str_lit("true");
 			x.expr       = ast_ident(c->curr_ast_file, token);
 		}
@@ -1194,7 +1212,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		// NOTE(bill): Check for multiple defaults
 		AstNode *first_default = nullptr;
-		ast_node(bs, BlockStmt, ms->body);
+		ast_node(bs, BlockStmt, ss->body);
 		for_array(i, bs->stmts) {
 			AstNode *stmt = bs->stmts[i];
 			AstNode *default_stmt = nullptr;
@@ -1365,22 +1383,22 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		check_close_scope(c);
 	case_end;
 
-	case_ast_node(ms, TypeMatchStmt, node);
+	case_ast_node(ss, TypeSwitchStmt, node);
 		Operand x = {};
 
 		mod_flags |= Stmt_BreakAllowed;
 		check_open_scope(c, node);
-		check_label(c, ms->label); // TODO(bill): What should the label's "scope" be?
+		check_label(c, ss->label); // TODO(bill): What should the label's "scope" be?
 
 		MatchTypeKind match_type_kind = MatchType_Invalid;
 
-		if (ms->tag->kind != AstNode_AssignStmt) {
-			error(ms->tag, "Expected an `in` assignment for this type match statement");
+		if (ss->tag->kind != AstNode_AssignStmt) {
+			error(ss->tag, "Expected an `in` assignment for this type match statement");
 			break;
 		}
 
-		ast_node(as, AssignStmt, ms->tag);
-		Token as_token = ast_node_token(ms->tag);
+		ast_node(as, AssignStmt, ss->tag);
+		Token as_token = ast_node_token(ss->tag);
 		if (as->lhs.count != 1) {
 			syntax_error(as_token, "Expected 1 name before `in`");
 			break;
@@ -1406,7 +1424,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		// NOTE(bill): Check for multiple defaults
 		AstNode *first_default = nullptr;
-		ast_node(bs, BlockStmt, ms->body);
+		ast_node(bs, BlockStmt, ss->body);
 		for_array(i, bs->stmts) {
 			AstNode *stmt = bs->stmts[i];
 			AstNode *default_stmt = nullptr;

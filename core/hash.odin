@@ -1,4 +1,4 @@
-import "core:mem.odin";
+import "core:mem.odin"
 
 adler32 :: proc(data: []u8) -> u32 {
 	ADLER_CONST :: 65521;
@@ -80,7 +80,7 @@ murmur32 :: proc(data: []u8) -> u32 {
 
 	tail := data[nblocks*4 ..];
 	k1: u32;
-	match len(tail)&3 {
+	switch len(tail)&3 {
 	case 3:
 		k1 ~= u32(tail[2]) << 16;
 		fallthrough;
@@ -127,7 +127,7 @@ murmur64 :: proc(data: []u8) -> u64 {
 			h *= m;
 		}
 
-		match len(data)&7 {
+		switch len(data)&7 {
 		case 7: h ~= u64(data[6]) << 48; fallthrough;
 		case 6: h ~= u64(data[5]) << 40; fallthrough;
 		case 5: h ~= u64(data[4]) << 32; fallthrough;
@@ -186,7 +186,7 @@ murmur64 :: proc(data: []u8) -> u64 {
 
 		// TODO(bill): Fix this
 		#no_bounds_check data8 := slice_to_bytes(data32[i..])[..3];
-		match len {
+		switch len {
 		case 3:
 			h2 ~= u32(data8[2]) << 16;
 			fallthrough;
