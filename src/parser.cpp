@@ -722,7 +722,7 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_TernaryExpr:
 		n->TernaryExpr.cond = clone_ast_node(a, n->TernaryExpr.cond);
 		n->TernaryExpr.x    = clone_ast_node(a, n->TernaryExpr.x);
-		n->TernaryExpr.y    = clone_ast_node(a, n->TernaryExpr.cond);
+		n->TernaryExpr.y    = clone_ast_node(a, n->TernaryExpr.y);
 		break;
 	case AstNode_TypeAssertion:
 		n->TypeAssertion.expr = clone_ast_node(a, n->TypeAssertion.expr);
