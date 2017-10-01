@@ -348,9 +348,15 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		switch (base_type(t)->kind) {
 		case Type_Struct:
 		case Type_Union: {
-			String *name = map_get(&m->entity_names, hash_pointer(t->Named.type_name));
-			GB_ASSERT_MSG(name != nullptr, "%.*s %p", LIT(t->Named.name), t->Named.type_name);
-			ir_print_encoded_local(f, *name);
+			GB_ASSERT(t->Named.type_name != nullptr);
+			String *found = map_get(&m->entity_names, hash_entity(t->Named.type_name));
+			if (found) {
+				ir_print_encoded_local(f, *found);
+			} else {
+				// TODO(bill): Is this correct behaviour?!
+				ir_print_type(f, m, base_type(t));
+				// GB_ASSERT_MSG(found != nullptr, "%.*s %p", LIT(t->Named.name), t->Named.type_name);
+			}
 		} break;
 		default:
 			ir_print_type(f, m, base_type(t));

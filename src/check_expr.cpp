@@ -1275,9 +1275,10 @@ Entity *find_polymorphic_struct_entity(Checker *c, Type *original_type, isize pa
 }
 
 
-void add_polymorphic_struct_entity(Checker *c, AstNode *node, Type *original_type, Type *named_type) {
+void add_polymorphic_struct_entity(Checker *c, AstNode *node, Type *named_type, Type *original_type) {
 	GB_ASSERT(is_type_named(named_type));
 	gbAllocator a = heap_allocator();
+	Scope *s = c->context.scope->parent;
 
 	Entity *e = nullptr;
 	{
@@ -1289,13 +1290,11 @@ void add_polymorphic_struct_entity(Checker *c, AstNode *node, Type *original_typ
 		node->kind = AstNode_Ident;
 		node->Ident.token = token;
 
-		e = make_entity_type_name(a, c->context.scope, token, named_type);
-		add_entity(c, c->context.scope, node, e);
+		e = make_entity_type_name(a, s, token, named_type);
 		add_entity_use(c, node, e);
 	}
 
 	named_type->Named.type_name = e;
-
 
 	auto *found_gen_types = map_get(&c->info.gen_types, hash_pointer(original_type));
 	if (found_gen_types) {
@@ -1308,7 +1307,7 @@ void add_polymorphic_struct_entity(Checker *c, AstNode *node, Type *original_typ
 	}
 }
 
-void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Operand> *poly_operands, Type *named_type = nullptr) {
+void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Operand> *poly_operands, Type *named_type = nullptr, Type *original_type_for_poly = nullptr) {
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
@@ -1460,6 +1459,11 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 				tuple->Tuple.variables = entities;
 				polymorphic_params = tuple;
 			}
+		}
+
+		if (original_type_for_poly != nullptr) {
+			GB_ASSERT(named_type != nullptr);
+			add_polymorphic_struct_entity(c, node, named_type, original_type_for_poly);
 		}
 	}
 
@@ -7000,10 +7004,8 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 		set_base_type(named_type, struct_type);
 
 		check_open_scope(c, node);
-		check_struct_type(c, struct_type, node, &ordered_operands, named_type);
+		check_struct_type(c, struct_type, node, &ordered_operands, named_type, original_type);
 		check_close_scope(c);
-
-		add_polymorphic_struct_entity(c, node, original_type, named_type);
 
 		operand->mode = Addressing_Type;
 		operand->type = named_type;
