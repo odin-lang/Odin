@@ -3301,6 +3301,11 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		check_struct_type(c, *type, e, nullptr, named_type);
 		check_close_scope(c);
 		(*type)->Struct.node = e;
+
+		if (named_type == nullptr && (*type)->Struct.has_proc_default_values) {
+			error(e, "Anonymous structs cannot have procedures as default values");
+		}
+
 		return true;
 	case_end;
 
