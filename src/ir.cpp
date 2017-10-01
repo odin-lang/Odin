@@ -7422,6 +7422,22 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 
 		proc->module->stmt_state_flags = prev_stmt_state_flags;
 	}
+
+
+	if (proc->type->Proc.has_proc_default_values) {
+		auto *p = &proc->type->Proc;
+		for_array(i, p->params->Tuple.variables) {
+			Entity *f = p->params->Tuple.variables[i];
+			if (f->kind == Entity_Variable && f->Variable.default_value.kind == ExactValue_Procedure) {
+				AstNode *expr = f->Variable.default_value.value_procedure;
+				GB_ASSERT(expr != nullptr);
+				if (expr->kind == AstNode_ProcLit) {
+					ir_gen_anonymous_proc_lit(proc->module, proc->name, expr, proc);
+				}
+			}
+		}
+	}
+
 }
 
 

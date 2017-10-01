@@ -139,14 +139,15 @@ struct TypeStruct {
 		Type *   results; /* Type_Tuple */                \
 		i32      param_count;                             \
 		i32      result_count;                            \
-		bool     return_by_pointer;                       \
 		Type **  abi_compat_params;                       \
 		Type *   abi_compat_result_type;                  \
+		bool     return_by_pointer;                       \
 		bool     variadic;                                \
 		bool     require_results;                         \
 		bool     c_vararg;                                \
 		bool     is_polymorphic;                          \
 		bool     is_poly_specialized;                     \
+		bool     has_proc_default_values;                 \
 		isize    specialization_count;                    \
 		ProcCallingConvention calling_convention;         \
 	})                                                    \

@@ -1071,7 +1071,26 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 				if (is_operand_nil(o)) {
 					default_is_nil = true;
 				} else if (o.mode != Addressing_Constant) {
-					error(default_value, "Default parameter must be a constant");
+					if (default_value->kind == AstNode_ProcLit) {
+						value = exact_value_procedure(default_value);
+					} else {
+						Entity *e = nullptr;
+						if (o.mode == Addressing_Value && is_type_proc(o.type)) {
+							Operand x = {};
+							if (default_value->kind == AstNode_Ident) {
+								e = check_ident(c, &x, default_value, nullptr, nullptr, false);
+							} else if (default_value->kind == AstNode_SelectorExpr) {
+								e = check_selector(c, &x, default_value, nullptr);
+							}
+						}
+
+						if (e != nullptr && e->kind == Entity_Procedure) {
+							value = exact_value_procedure(e->identifier);
+							add_entity_use(c, e->identifier, e);
+						} else {
+							error(default_value, "Default parameter must be a constant");
+						}
+					}
 				} else {
 					value = o.value;
 				}
@@ -2132,7 +2151,26 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				if (is_operand_nil(o)) {
 					default_is_nil = true;
 				} else if (o.mode != Addressing_Constant) {
-					error(default_value, "Default parameter must be a constant");
+					if (default_value->kind == AstNode_ProcLit) {
+						value = exact_value_procedure(default_value);
+					} else {
+						Entity *e = nullptr;
+						if (o.mode == Addressing_Value && is_type_proc(o.type)) {
+							Operand x = {};
+							if (default_value->kind == AstNode_Ident) {
+								e = check_ident(c, &x, default_value, nullptr, nullptr, false);
+							} else if (default_value->kind == AstNode_SelectorExpr) {
+								e = check_selector(c, &x, default_value, nullptr);
+							}
+						}
+
+						if (e != nullptr && e->kind == Entity_Procedure) {
+							value = exact_value_procedure(e->identifier);
+							add_entity_use(c, e->identifier, e);
+						} else {
+							error(default_value, "Default parameter must be a constant");
+						}
+					}
 				} else {
 					value = o.value;
 				}
@@ -2201,7 +2239,26 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 						if (is_operand_nil(o)) {
 							default_is_nil = true;
 						} else if (o.mode != Addressing_Constant) {
-							error(default_value, "Default parameter must be a constant");
+							if (default_value->kind == AstNode_ProcLit) {
+								value = exact_value_procedure(default_value);
+							} else {
+								Entity *e = nullptr;
+								if (o.mode == Addressing_Value && is_type_proc(o.type)) {
+									Operand x = {};
+									if (default_value->kind == AstNode_Ident) {
+										e = check_ident(c, &x, default_value, nullptr, nullptr, false);
+									} else if (default_value->kind == AstNode_SelectorExpr) {
+										e = check_selector(c, &x, default_value, nullptr);
+									}
+								}
+
+								if (e != nullptr && e->kind == Entity_Procedure) {
+									value = exact_value_procedure(e->identifier);
+									add_entity_use(c, e->identifier, e);
+								} else {
+									error(default_value, "Default parameter must be a constant");
+								}
+							}
 						} else {
 							value = o.value;
 						}
@@ -2682,10 +2739,21 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 	Type *params  = check_get_params(c, c->context.scope, pt->params, &variadic, &success, &specialization_count, operands);
 	Type *results = check_get_results(c, c->context.scope, pt->results);
 
+
 	isize param_count = 0;
 	isize result_count = 0;
 	if (params)  param_count  = params ->Tuple.variables.count;
 	if (results) result_count = results->Tuple.variables.count;
+
+	if (param_count > 0) {
+		for_array(i, params->Tuple.variables) {
+			Entity *param = params->Tuple.variables[i];
+			if (param->kind == Entity_Variable && param->Variable.default_value.kind == ExactValue_Procedure) {
+				type->Proc.has_proc_default_values = true;
+				break;
+			}
+		}
+	}
 
 	type->Proc.node                 = proc_type_node;
 	type->Proc.scope                = c->context.scope;
