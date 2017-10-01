@@ -58,6 +58,7 @@ void     check_expr_with_type_hint      (Checker *c, Operand *o, AstNode *e, Typ
 Type *   check_type                     (Checker *c, AstNode *expression, Type *named_type = nullptr);
 void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def);
 Entity * check_selector                 (Checker *c, Operand *operand, AstNode *node, Type *type_hint);
+Entity * check_ident                    (Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name);
 void     check_not_tuple                (Checker *c, Operand *operand);
 void     convert_to_typed               (Checker *c, Operand *operand, Type *target_type, i32 level);
 gbString expr_to_string                 (AstNode *expression);
@@ -1037,9 +1038,23 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 			} else if (o.mode != Addressing_Constant) {
 				if (default_value->kind == AstNode_ProcLit) {
 					value = exact_value_procedure(default_value);
-					// error(default_value, "A procedure literal as a default param is not yet supported");
 				} else {
-					error(default_value, "Default parameter must be a constant");
+					Entity *e = nullptr;
+					if (o.mode == Addressing_Value && is_type_proc(o.type)) {
+						Operand x = {};
+						if (default_value->kind == AstNode_Ident) {
+							e = check_ident(c, &x, default_value, nullptr, nullptr, false);
+						} else if (default_value->kind == AstNode_SelectorExpr) {
+							e = check_selector(c, &x, default_value, nullptr);
+						}
+					}
+
+					if (e != nullptr && e->kind == Entity_Procedure) {
+						value = exact_value_procedure(e->identifier);
+						add_entity_use(c, e->identifier, e);
+					} else {
+						error(default_value, "Default parameter must be a constant");
+					}
 				}
 			} else {
 				value = o.value;

@@ -3813,8 +3813,9 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 					if (f->Variable.default_value.kind == ExactValue_Procedure) {
 						AstNode *expr = f->Variable.default_value.value_procedure;
 						GB_ASSERT(expr != nullptr);
-						GB_ASSERT(expr->kind == AstNode_ProcLit);
-						ir_gen_anonymous_proc_lit(m, e->token.string, expr);
+						if (expr->kind == AstNode_ProcLit) {
+							ir_gen_anonymous_proc_lit(m, e->token.string, expr);
+						}
 					}
 				}
 			}
@@ -8570,7 +8571,6 @@ void ir_gen_tree(irGen *s) {
 
 	for_array(i, m->procs_to_generate) {
 		irValue *p = m->procs_to_generate[i];
-		gb_printf_err("%.*s\n", LIT(p->Proc.name));
 		ir_build_proc(p, p->Proc.parent);
 	}
 

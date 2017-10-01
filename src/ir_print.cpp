@@ -701,10 +701,18 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	}
 
 	case ExactValue_Procedure: {
+		irValue **found = nullptr;
 		AstNode *expr = value.value_procedure;
 		GB_ASSERT(expr != nullptr);
-		GB_ASSERT(expr->kind == AstNode_ProcLit);
-		irValue **found = map_get(&m->anonymous_proc_lits, hash_pointer(expr));
+
+		if (expr->kind == AstNode_ProcLit) {
+			found = map_get(&m->anonymous_proc_lits, hash_pointer(expr));
+		} else {
+			GB_ASSERT(expr->kind == AstNode_Ident);
+			Entity *e = entity_of_ident(m->info, expr);
+			GB_ASSERT(e != nullptr);
+			found = map_get(&m->values, hash_entity(e));
+		}
 		GB_ASSERT(found != nullptr);
 		irValue *val = *found;
 		ir_print_value(f, m, val, type);
