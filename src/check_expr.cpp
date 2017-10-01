@@ -993,7 +993,7 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 
 // Returns filled field_count
 Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> params,
-                                    isize init_field_capacity, String context) {
+                                    isize init_field_capacity, Type *named_type, String context) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 	defer (gb_temp_arena_memory_end(tmp));
 
@@ -1037,7 +1037,11 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 				default_is_nil = true;
 			} else if (o.mode != Addressing_Constant) {
 				if (default_value->kind == AstNode_ProcLit) {
-					value = exact_value_procedure(default_value);
+					if (named_type != nullptr) {
+						value = exact_value_procedure(default_value);
+					} else {
+						error(default_value, "A procedure literal cannot be a default value in an anonymous structure");
+					}
 				} else {
 					Entity *e = nullptr;
 					if (o.mode == Addressing_Value && is_type_proc(o.type)) {
@@ -1072,7 +1076,11 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 					default_is_nil = true;
 				} else if (o.mode != Addressing_Constant) {
 					if (default_value->kind == AstNode_ProcLit) {
-						value = exact_value_procedure(default_value);
+						if (named_type != nullptr) {
+							value = exact_value_procedure(default_value);
+						} else {
+							error(default_value, "A procedure literal cannot be a default value in an anonymous structure");
+						}
 					} else {
 						Entity *e = nullptr;
 						if (o.mode == Addressing_Value && is_type_proc(o.type)) {
@@ -1530,7 +1538,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 	Array<Entity *> fields = {};
 
 	if (!is_polymorphic) {
-		fields = check_struct_fields(c, node, st->fields, min_field_count, context);
+		fields = check_struct_fields(c, node, st->fields, min_field_count, named_type, context);
 	}
 
 	struct_type->Struct.fields              = fields;
@@ -3301,11 +3309,6 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		check_struct_type(c, *type, e, nullptr, named_type);
 		check_close_scope(c);
 		(*type)->Struct.node = e;
-
-		if (named_type == nullptr && (*type)->Struct.has_proc_default_values) {
-			error(e, "Anonymous structs cannot have procedures as default values");
-		}
-
 		return true;
 	case_end;
 
