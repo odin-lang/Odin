@@ -2,6 +2,7 @@ foreign_system_library dl   "dl"
 foreign_system_library libc "c"
 
 import "core:strings.odin"
+import "core:mem.odin"
 
 Handle    :: i32;
 File_Time :: u64;
@@ -131,6 +132,7 @@ foreign libc {
 	_unix_access  :: proc(path: ^u8, mask: int) -> i32                 #link_name "access"  ---;
 
 	_unix_malloc  :: proc(size: int) -> rawptr                         #link_name "malloc"  ---;
+	_unix_calloc  :: proc(num, size: int) -> rawptr                    #link_name "calloc"  ---;
 	_unix_free    :: proc(ptr: rawptr)                                 #link_name "free"    ---;
 	_unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr            #link_name "realloc" ---;
 	_unix_getenv  :: proc(^u8) -> ^u8                                  #link_name "getenv"  ---;
@@ -214,7 +216,7 @@ access :: proc(path: string, mask: int) -> bool #inline {
 
 heap_alloc :: proc(size: int) -> rawptr {
 	assert(size > 0);
-	return _unix_malloc(size);
+	return _unix_calloc(1, size);
 }
 
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {

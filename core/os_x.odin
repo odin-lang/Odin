@@ -2,6 +2,7 @@ foreign_system_library dl   "dl"
 foreign_system_library libc "c"
 
 import "core:strings.odin"
+import "core:mem.odin"
 
 Handle    :: i32;
 File_Time :: u64;
@@ -121,35 +122,36 @@ X_OK :: 1; // Test for execute permission
 F_OK :: 0; // Test for file existance
 
 foreign libc {
-	unix_open    :: proc(path: ^u8, mode: int) -> Handle                    #link_name "open"    ---;
-	unix_close   :: proc(handle: Handle)                                    #link_name "close"   ---;
-	unix_read    :: proc(handle: Handle, buffer: rawptr, count: int) -> int #link_name "read"    ---;
-	unix_write   :: proc(handle: Handle, buffer: rawptr, count: int) -> int #link_name "write"   ---;
-	unix_lseek   :: proc(fs: Handle, offset: int, whence: int) -> int       #link_name "lseek"   ---;
-	unix_gettid  :: proc() -> u64                                           #link_name "gettid"  ---;
-	unix_stat    :: proc(path: ^u8, stat: ^Stat) -> int                     #link_name "stat"    ---;
-	unix_access  :: proc(path: ^u8, mask: int) -> int                       #link_name "access"  ---;
+	_unix_open    :: proc(path: ^u8, mode: int) -> Handle                    #link_name "open"    ---;
+	_unix_close   :: proc(handle: Handle)                                    #link_name "close"   ---;
+	_unix_read    :: proc(handle: Handle, buffer: rawptr, count: int) -> int #link_name "read"    ---;
+	_unix_write   :: proc(handle: Handle, buffer: rawptr, count: int) -> int #link_name "write"   ---;
+	_unix_lseek   :: proc(fs: Handle, offset: int, whence: int) -> int       #link_name "lseek"   ---;
+	_unix_gettid  :: proc() -> u64                                           #link_name "gettid"  ---;
+	_unix_stat    :: proc(path: ^u8, stat: ^Stat) -> int                     #link_name "stat"    ---;
+	_unix_access  :: proc(path: ^u8, mask: int) -> int                       #link_name "access"  ---;
 
-	unix_malloc  :: proc(size: int) -> rawptr                               #link_name "malloc"  ---;
-	unix_free    :: proc(ptr: rawptr)                                       #link_name "free"    ---;
-	unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr                  #link_name "realloc" ---;
-	unix_getenv  :: proc(^u8) -> ^u8                                        #link_name "getenv"  ---;
+	_unix_malloc  :: proc(size: int) -> rawptr                               #link_name "malloc"  ---;
+	_unix_calloc  :: proc(num, size: int) -> rawptr                          #link_name "calloc"  ---;
+	_unix_free    :: proc(ptr: rawptr)                                       #link_name "free"    ---;
+	_unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr                  #link_name "realloc" ---;
+	_unix_getenv  :: proc(^u8) -> ^u8                                        #link_name "getenv"  ---;
 
-	unix_exit    :: proc(status: int)                                       #link_name "exit"    ---;
+	_unix_exit    :: proc(status: int)                                       #link_name "exit"    ---;
 }
 
 foreign dl {
-	unix_dlopen  :: proc(filename: ^u8, flags: int) -> rawptr               #link_name "dlopen"  ---;
-	unix_dlsym   :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)    #link_name "dlsym"   ---;
-	unix_dlclose :: proc(handle: rawptr) -> int                             #link_name "dlclose" ---;
-	unix_dlerror :: proc() -> ^u8                                           #link_name "dlerror" ---;
+	_unix_dlopen  :: proc(filename: ^u8, flags: int) -> rawptr               #link_name "dlopen"  ---;
+	_unix_dlsym   :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)    #link_name "dlsym"   ---;
+	_unix_dlclose :: proc(handle: rawptr) -> int                             #link_name "dlclose" ---;
+	_unix_dlerror :: proc() -> ^u8                                           #link_name "dlerror" ---;
 }
 
 // TODO(zangent): Change this to just `open` when Bill fixes overloading.
 open_simple :: proc(path: string, mode: int) -> (Handle, Errno) {
 
 	cstr := strings.new_c_string(path);
-	handle := unix_open(cstr, mode);
+	handle := _unix_open(cstr, mode);
 	free(cstr);
 	if(handle == -1) {
 		return 0, 1;
@@ -163,13 +165,13 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 }
 
 close :: proc(fd: Handle) {
-	unix_close(fd);
+	_unix_close(fd);
 }
 
 write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	assert(fd != -1);
 
-	bytes_written := unix_write(fd, &data[0], len(data));
+	bytes_written := _unix_write(fd, &data[0], len(data));
 	if(bytes_written == -1) {
 		return 0, 1;
 	}
@@ -179,7 +181,7 @@ write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	assert(fd != -1);
 
-	bytes_read := unix_read(fd, &data[0], len(data));
+	bytes_read := _unix_read(fd, &data[0], len(data));
 	if(bytes_read == -1) {
 		return 0, 1;
 	}
@@ -189,7 +191,7 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	assert(fd != -1);
 
-	final_offset := i64(unix_lseek(fd, int(offset), whence));
+	final_offset := i64(_unix_lseek(fd, int(offset), whence));
 	if(final_offset == -1) {
 		return 0, 1;
 	}
@@ -219,30 +221,30 @@ stat :: proc(path: string) -> (Stat, bool) #inline {
 	s: Stat;
 	cstr := strings.new_c_string(path);
 	defer free(cstr);
-	ret_int := unix_stat(cstr, &s);
+	ret_int := _unix_stat(cstr, &s);
 	return s, ret_int==0;
 }
 
 access :: proc(path: string, mask: int) -> bool #inline {
 	cstr := strings.new_c_string(path);
 	defer free(cstr);
-	return unix_access(cstr, mask) == 0;
+	return _unix_access(cstr, mask) == 0;
 }
 
 heap_alloc :: proc(size: int) -> rawptr #inline {
 	assert(size > 0);
-	return unix_malloc(size);
+	return __unix_calloc(1, size);
 }
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr #inline {
-	return unix_realloc(ptr, new_size);
+	return _unix_realloc(ptr, new_size);
 }
 heap_free :: proc(ptr: rawptr) #inline {
-	unix_free(ptr);
+	_unix_free(ptr);
 }
 
 getenv :: proc(name: string) -> (string, bool) {
 	path_str := strings.new_c_string(name);
-	cstr: ^u8 = unix_getenv(path_str);
+	cstr: ^u8 = _unix_getenv(path_str);
 	free(path_str);
 	if(cstr == nil) {
 		return "", false;
@@ -251,34 +253,34 @@ getenv :: proc(name: string) -> (string, bool) {
 }
 
 exit :: proc(code: int) #inline {
-	unix_exit(code);
+	_unix_exit(code);
 }
 
 
 current_thread_id :: proc() -> int {
-	// return cast(int) unix_gettid();
+	// return cast(int) _unix_gettid();
 	return 0;
 }
 
 dlopen :: proc(filename: string, flags: int) -> rawptr #inline {
 	cstr := strings.new_c_string(filename);
-	handle := unix_dlopen(cstr, flags);
+	handle := _unix_dlopen(cstr, flags);
 	free(cstr);
 	return handle;
 }
 dlsym :: proc(handle: rawptr, symbol: string) -> (proc() #cc_c) #inline {
 	assert(handle != nil);
 	cstr := strings.new_c_string(symbol);
-	proc_handle := unix_dlsym(handle, cstr);
+	proc_handle := _unix_dlsym(handle, cstr);
 	free(cstr);
 	return proc_handle;
 }
 dlclose :: proc(handle: rawptr) -> bool #inline {
 	assert(handle != nil);
-	return unix_dlclose(handle) == 0;
+	return _unix_dlclose(handle) == 0;
 }
 dlerror :: proc() -> string {
-	return strings.to_odin_string(unix_dlerror());
+	return strings.to_odin_string(_unix_dlerror());
 }
 
 
