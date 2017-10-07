@@ -228,8 +228,8 @@ struct Scope {
 
 	Array<Scope *>   shared;
 	Array<AstNode *> delayed_file_decls;
-	PtrSet<Scope *>  import_succ;
 	PtrSet<Scope *>  imported;
+	PtrSet<Scope *>  exported; // NOTE(bhall): Contains `using import` too
 	bool             is_proc;
 	bool             is_global;
 	bool             is_file;
@@ -248,7 +248,6 @@ void scope_reset(Scope *scope) {
 	map_clear  (&scope->elements);
 	map_clear  (&scope->implicit);
 	array_clear(&scope->shared);
-	ptr_set_clear(&scope->import_succ);
 	ptr_set_clear(&scope->imported);
 }
 
@@ -387,6 +386,7 @@ int import_graph_node_cmp(ImportGraphNode **data, isize i, isize j) {
 	bool xg = x->scope->is_global;
 	bool yg = y->scope->is_global;
 	if (xg != yg) return xg ? -1 : +1;
+	if (xg && yg) return x->file_id < y->file_id ? -1 : +1;
 	if (x->dep_count < y->dep_count) return -1;
 	if (x->dep_count > y->dep_count) return +1;
 	return 0;
@@ -564,11 +564,11 @@ bool decl_info_has_init(DeclInfo *d) {
 Scope *create_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
-	map_init(&s->elements,   heap_allocator());
-	map_init(&s->implicit,   heap_allocator());
-	array_init(&s->shared,   heap_allocator());
+	map_init(&s->elements,     heap_allocator());
+	map_init(&s->implicit,     heap_allocator());
+	array_init(&s->shared,     heap_allocator());
 	ptr_set_init(&s->imported, heap_allocator());
-	ptr_set_init(&s->import_succ, heap_allocator());
+	ptr_set_init(&s->exported, heap_allocator());
 
 	if (parent != nullptr && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
@@ -625,7 +625,6 @@ void destroy_scope(Scope *scope) {
 	array_free(&scope->shared);
 	array_free(&scope->delayed_file_decls);
 	ptr_set_destroy(&scope->imported);
-	ptr_set_destroy(&scope->import_succ);
 
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
 }
@@ -2305,11 +2304,12 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 		n = *found_node;
 
 		// TODO(bill): How should the edges be attched for `import`?
-		if (id->is_using) {
-		}
 		import_graph_node_set_add(&n->succ, m);
 		import_graph_node_set_add(&m->pred, n);
 		ptr_set_add(&m->scope->imported, n->scope);
+		if (id->is_using) {
+			ptr_set_add(&m->scope->exported, n->scope);
+		}
 	case_end;
 
 
@@ -2343,7 +2343,7 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 
 		import_graph_node_set_add(&n->succ, m);
 		import_graph_node_set_add(&m->pred, n);
-		ptr_set_add(&m->scope->imported, n->scope);
+		ptr_set_add(&m->scope->exported, n->scope);
 	case_end;
 
 	case_ast_node(ws, WhenStmt, decl);
@@ -2413,7 +2413,6 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
 	return G;
 }
 
-
 Array<Scope *> find_import_path(Map<Scope *> *file_scopes, Scope *start, Scope *end, PtrSet<Scope *> *visited = nullptr) {
 	PtrSet<Scope *> visited_ = {};
 	bool made_visited = false;
@@ -2438,8 +2437,8 @@ Array<Scope *> find_import_path(Map<Scope *> *file_scopes, Scope *start, Scope *
 	Scope **found = map_get(file_scopes, key);
 	if (found) {
 		Scope *scope = *found;
-		for_array(i, scope->imported.entries) {
-			Scope *dep = scope->imported.entries[i].ptr;
+		for_array(i, scope->exported.entries) {
+			Scope *dep = scope->exported.entries[i].ptr;
 			if (dep == end) {
 				Array<Scope *> path = {};
 				array_init(&path, heap_allocator());
@@ -2450,6 +2449,17 @@ Array<Scope *> find_import_path(Map<Scope *> *file_scopes, Scope *start, Scope *
 			if (next_path.count > 0) {
 				array_add(&next_path, dep);
 				return next_path;
+			}
+		}
+
+		// NOTE(bill): Disallow importing of the same file
+		for_array(i, scope->imported.entries) {
+			Scope *dep = scope->imported.entries[i].ptr;
+			if (dep == start) {
+				Array<Scope *> path = {};
+				array_init(&path, heap_allocator());
+				array_add(&path, dep);
+				return path;
 			}
 		}
 	}
@@ -2487,6 +2497,19 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 		ptr_set_add(&parent_scope->imported, scope);
 	}
 
+	String import_name = path_to_entity_name(id->import_name.string, id->fullpath);
+	if (is_blank_ident(import_name)) {
+		error(token, "File name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+	} else {
+		GB_ASSERT(id->import_name.pos.line != 0);
+		id->import_name.string = import_name;
+		Entity *e = make_entity_import_name(c->allocator, parent_scope, id->import_name, t_invalid,
+		                                    id->fullpath, id->import_name.string,
+		                                    scope);
+
+		add_entity(c, parent_scope, nullptr, e);
+	}
+
 	if (id->is_using) {
 		if (parent_scope->is_global) {
 			error(id->import_name, "#shared_global_scope imports cannot use using");
@@ -2505,19 +2528,6 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 				bool ok = add_entity(c, parent_scope, e->identifier, e);
 				if (ok) map_set(&parent_scope->implicit, hash_entity(e), true);
 			}
-		}
-	} else {
-		String import_name = path_to_entity_name(id->import_name.string, id->fullpath);
-		if (is_blank_ident(import_name)) {
-			error(token, "File name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
-		} else {
-			GB_ASSERT(id->import_name.pos.line != 0);
-			id->import_name.string = import_name;
-			Entity *e = make_entity_import_name(c->allocator, parent_scope, id->import_name, t_invalid,
-			                                    id->fullpath, id->import_name.string,
-			                                    scope);
-
-			add_entity(c, parent_scope, nullptr, e);
 		}
 	}
 	ptr_set_add(&c->checked_files, scope->file);
@@ -2832,16 +2842,19 @@ void check_import_entities(Checker *c) {
 			auto path = find_import_path(&c->file_scopes, s, s);
 			defer (array_free(&path));
 
-			if (path.count > 0) {
-				// TODO(bill): This needs better TokenPos finding
-				auto const mt = [](Scope *s) -> Token {
-					Token token = {};
-					token.pos = token_pos(s->file->tokenizer.fullpath, 1, 1);
-					token.string = remove_directory_from_path(s->file->tokenizer.fullpath);
-					return token;
-				};
+			// TODO(bill): This needs better TokenPos finding
+			auto const mt = [](Scope *s) -> Token {
+				Token token = {};
+				token.pos = token_pos(s->file->tokenizer.fullpath, 1, 1);
+				token.string = remove_directory_from_path(s->file->tokenizer.fullpath);
+				return token;
+			};
 
-
+			if (path.count == 1) {
+				Scope *s = path[0];
+				Token token = mt(s);
+				error(token, "Self importation of `%.*s`", LIT(token.string));
+			} else if (path.count > 0) {
 				Scope *s = path[path.count-1];
 				Token token = mt(s);
 				error(token, "Cyclic importation of `%.*s`", LIT(token.string));
@@ -2884,7 +2897,7 @@ void check_import_entities(Checker *c) {
 	// for_array(file_index, c->file_order) {
 	// 	ImportGraphNode *node = c->file_order[file_index];
 	// 	AstFile *f = node->scope->file;
-	// 	gb_printf_err("---   %.*s\n", LIT(f->fullpath));
+	// 	gb_printf_err("---   %.*s -> %td\n", LIT(f->fullpath), node->succ.entries.count);
 	// }
 
 	for (;;) {
