@@ -305,7 +305,8 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 
 			ir_fprintf(f, "{[0 x <%lld x i8>], ", align);
 			ir_fprintf(f, "[%lld x i8], ", block_size);
-			ir_print_type(f, m, t_type_info_ptr);
+			// ir_print_type(f, m, t_type_info_ptr);
+			ir_print_type(f, m, union_tag_type(t));
 			ir_write_byte(f, '}');
 		}
 	} return;

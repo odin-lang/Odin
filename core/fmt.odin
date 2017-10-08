@@ -920,11 +920,28 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 	case Type_Info_Union:
 		data := cast(^u8)v.data;
-		tipp := cast(^^Type_Info)(data + info.tag_offset);
-		if data == nil || tipp == nil {
+		tag_ptr := rawptr(data + info.tag_offset);
+		tag_any := any{tag_ptr, info.tag_type};
+
+		tag: i64 = -1;
+		switch i in tag_any {
+		case u8:   tag = i64(i);
+		case i8:   tag = i64(i);
+		case u16:  tag = i64(i);
+		case i16:  tag = i64(i);
+		case u32:  tag = i64(i);
+		case i32:  tag = i64(i);
+		case u64:  tag = i64(i);
+		case i64:  tag = i64(i);
+		case u128: tag = i64(i);
+		case i128: tag = i64(i);
+		case: panic("Invalid union tag type");
+		}
+
+		if data == nil || tag < 0 {
 			write_string(fi.buf, "(union)");
 		} else {
-			ti := tipp^;
+			ti := info.variants[tag-1];
 			fmt_arg(fi, any{data, ti}, verb);
 		}
 
@@ -1007,9 +1024,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	case u64:     fmt_int(fi, u128(a), false, 64, verb);
 	case u128:    fmt_int(fi, u128(a), false, 128, verb);
 
-
 	case string:  fmt_string(fi, a, verb);
-
 
 	case:         fmt_value(fi, arg, verb);
 	}

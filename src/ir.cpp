@@ -966,7 +966,9 @@ irValue *ir_instr_union_tag_ptr(irProcedure *p, irValue *address) {
 	irValue *v = ir_alloc_instr(p, irInstr_UnionTagPtr);
 	irInstr *i = &v->Instr;
 	i->UnionTagPtr.address = address;
-	i->UnionTagPtr.type = make_type_pointer(p->module->allocator, t_type_info_ptr);
+	// i->UnionTagPtr.type = make_type_pointer(p->module->allocator, t_type_info_ptr);
+	Type *u = type_deref(ir_type(address));
+	i->UnionTagPtr.type = make_type_pointer(p->module->allocator, union_tag_type(u));
 	return v;
 }
 
@@ -974,7 +976,10 @@ irValue *ir_instr_union_tag_value(irProcedure *p, irValue *address) {
 	irValue *v = ir_alloc_instr(p, irInstr_UnionTagValue);
 	irInstr *i = &v->Instr;
 	i->UnionTagValue.address = address;
-	i->UnionTagValue.type = t_type_info_ptr;
+	// i->UnionTagValue.type = t_type_info_ptr;
+	// i->UnionTagValue.type = t_int;
+	Type *u = type_deref(ir_type(address));
+	i->UnionTagPtr.type = union_tag_type(u);
 	return v;
 }
 
@@ -2236,10 +2241,6 @@ irValue *ir_emit_union_tag_ptr(irProcedure *proc, irValue *u) {
 	GB_ASSERT_MSG(is_type_pointer(t) &&
 	              is_type_union(type_deref(t)), "%s", type_to_string(t));
 	irValue *tag_ptr = ir_emit(proc, ir_instr_union_tag_ptr(proc, u));
-	Type *tpt = ir_type(tag_ptr);
-	GB_ASSERT(is_type_pointer(tpt));
-	tpt = base_type(type_deref(tpt));
-	GB_ASSERT(tpt == t_type_info_ptr);
 	return tag_ptr;
 }
 
@@ -2784,6 +2785,10 @@ irValue *ir_find_or_add_entity_string(irModule *m, String str) {
 }
 
 
+irValue *ir_const_union_tag(gbAllocator a, Type *u, Type *v) {
+	return ir_value_constant(a, union_tag_type(u), exact_value_i64(union_variant_index(u, v)));
+}
+
 
 String ir_lookup_subtype_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
 	Type *prev_src = src;
@@ -3011,7 +3016,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 				ir_emit_store(proc, underlying, value);
 
 				irValue *tag_ptr = ir_emit_union_tag_ptr(proc, parent);
-				ir_emit_store(proc, tag_ptr, ir_type_info(proc, vt));
+				ir_emit_store(proc, tag_ptr, ir_const_union_tag(a, t, src_type));
 
 				return ir_emit_load(proc, parent);
 			}
@@ -3233,6 +3238,7 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 }
 
 
+
 irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, TokenPos pos) {
 	gbAllocator a = proc->module->allocator;
 
@@ -3248,77 +3254,6 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 
 	irValue *v = ir_add_local_generated(proc, tuple);
 
-	#if 0
-	if (is_ptr) {
-		Type *src = base_type(type_deref(src_type));
-		Type *src_ptr = src_type;
-		GB_ASSERT(is_type_union(src));
-		Type *dst_ptr = tuple->Tuple.variables[0]->type;
-		Type *dst = type_deref(dst_ptr);
-
-		irValue *tag = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, value));
-		irValue *dst_tag = nullptr;
-		for (isize i = 1; i < src->Struct.variant_count; i++) {
-			Type *vt = src->Struct.variants[i];
-			if (are_types_identical(vt, dst)) {
-				dst_tag = ir_const_int(a, i);
-				break;
-			}
-		}
-		GB_ASSERT(dst_tag != nullptr);
-
-		irBlock *ok_block = ir_new_block(proc, nullptr, "union_cast.ok");
-		irBlock *end_block = ir_new_block(proc, nullptr, "union_cast.end");
-		irValue *cond = ir_emit_comp(proc, Token_CmpEq, tag, dst_tag);
-		ir_emit_if(proc, cond, ok_block, end_block);
-		ir_start_block(proc, ok_block);
-
-		irValue *gep0 = ir_emit_struct_ep(proc, v, 0);
-		irValue *gep1 = ir_emit_struct_ep(proc, v, 1);
-
-		irValue *data = ir_emit_conv(proc, value, dst_ptr);
-		ir_emit_store(proc, gep0, data);
-		ir_emit_store(proc, gep1, v_true);
-
-		ir_emit_jump(proc, end_block);
-		ir_start_block(proc, end_block);
-
-	} else {
-		Type *src = base_type(src_type);
-		GB_ASSERT(is_type_union(src));
-		Type *dst = tuple->Tuple.variables[0]->type;
-		Type *dst_ptr = make_type_pointer(a, dst);
-
-		irValue *value_ = ir_address_from_load_or_generate_local(proc, value);
-
-		irValue *tag = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, value_));
-		irValue *dst_tag = nullptr;
-		for (isize i = 1; i < src->Struct.variant_count; i++) {
-			Type *vt = src->Struct.variants[i];
-			if (are_types_identical(vt, dst)) {
-				dst_tag = ir_const_int(a, i);
-				break;
-			}
-		}
-		GB_ASSERT(dst_tag != nullptr);
-
-		irBlock *ok_block = ir_new_block(proc, nullptr, "union_cast.ok");
-		irBlock *end_block = ir_new_block(proc, nullptr, "union_cast.end");
-		irValue *cond = ir_emit_comp(proc, Token_CmpEq, tag, dst_tag);
-		ir_emit_if(proc, cond, ok_block, end_block);
-		ir_start_block(proc, ok_block);
-
-		irValue *gep0 = ir_emit_struct_ep(proc, v, 0);
-		irValue *gep1 = ir_emit_struct_ep(proc, v, 1);
-
-		irValue *data = ir_emit_load(proc, ir_emit_conv(proc, value_, ir_type(gep0)));
-		ir_emit_store(proc, gep0, data);
-		ir_emit_store(proc, gep1, v_true);
-
-		ir_emit_jump(proc, end_block);
-		ir_start_block(proc, end_block);
-	}
-	#else
 	if (is_ptr) {
 		value = ir_emit_load(proc, value);
 	}
@@ -3326,10 +3261,11 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 	GB_ASSERT(is_type_union(src));
 	Type *dst = tuple->Tuple.variables[0]->type;
 
-	irValue *value_ = ir_address_from_load_or_generate_local(proc, value);
 
-	irValue *tag = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, value_));
-	irValue *dst_tag = ir_type_info(proc, dst);
+	irValue *value_  = ir_address_from_load_or_generate_local(proc, value);
+	irValue *tag     = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, value_));
+	irValue *dst_tag = ir_const_union_tag(a, src, dst);
+
 
 	irBlock *ok_block = ir_new_block(proc, nullptr, "union_cast.ok");
 	irBlock *end_block = ir_new_block(proc, nullptr, "union_cast.end");
@@ -3346,7 +3282,7 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 
 	ir_emit_jump(proc, end_block);
 	ir_start_block(proc, end_block);
-	#endif
+
 	if (!is_tuple) {
 		// NOTE(bill): Panic on invalid conversion
 		Type *dst_type = tuple->Tuple.variables[0]->type;
@@ -7073,18 +7009,8 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				case_type = type_of_expr(proc->module->info, cc->list[type_index]);
 				irValue *cond = nullptr;
 				if (match_type_kind == MatchType_Union) {
-					Type *bt = type_deref(case_type);
-					irValue *variant_tag = nullptr;
 					Type *ut = base_type(type_deref(parent_type));
-					GB_ASSERT(ut->kind == Type_Union);
-					for_array(variant_index, ut->Union.variants) {
-						Type *vt = ut->Union.variants[variant_index];
-						if (are_types_identical(vt, bt)) {
-							variant_tag = ir_type_info(proc, vt);
-							break;
-						}
-					}
-					GB_ASSERT(variant_tag != nullptr);
+					irValue *variant_tag = ir_const_union_tag(proc->module->allocator, ut, case_type);
 					cond = ir_emit_comp(proc, Token_CmpEq, tag_index, variant_tag);
 				} else if (match_type_kind == MatchType_Any) {
 					irValue *any_ti  = ir_emit_load(proc, ir_emit_struct_ep(proc, parent_ptr, 1));
@@ -8414,6 +8340,7 @@ void ir_gen_tree(irGen *s) {
 					{
 						irValue *variant_types  = ir_emit_struct_ep(proc, tag, 0);
 						irValue *tag_offset_ptr = ir_emit_struct_ep(proc, tag, 1);
+						irValue *tag_type_ptr   = ir_emit_struct_ep(proc, tag, 2);
 
 						isize variant_count = gb_max(0, t->Union.variants.count);
 						irValue *memory_types = ir_type_info_member_types_offset(proc, variant_count);
@@ -8431,8 +8358,10 @@ void ir_gen_tree(irGen *s) {
 						irValue *count = ir_const_int(a, variant_count);
 						ir_fill_slice(proc, variant_types, memory_types, count, count);
 
-						i64 tag_offset = align_formula(t->Union.variant_block_size, build_context.word_size);
+						i64 tag_size  = union_tag_size(t);
+						i64 tag_offset = align_formula(t->Union.variant_block_size, tag_size);
 						ir_emit_store(proc, tag_offset_ptr, ir_const_int(a, tag_offset));
+						ir_emit_store(proc, tag_type_ptr,   ir_type_info(proc, union_tag_type(t)));
 					}
 
 					break;
@@ -8556,11 +8485,12 @@ void ir_gen_tree(irGen *s) {
 				if (tag != nullptr) {
 					Type *tag_type = type_deref(ir_type(tag));
 					GB_ASSERT(is_type_named(tag_type));
-					irValue *ti = ir_type_info(proc, tag_type);
+					Type *variant_type = type_deref(ir_type(variant_ptr));
+					irValue *tag = ir_const_union_tag(a, variant_type, tag_type);
 					irValue *ptr = ir_emit_union_tag_ptr(proc, variant_ptr);
-					ir_emit_store(proc, ptr, ti);
+					ir_emit_store(proc, ptr, tag);
 				} else {
-					GB_PANIC("Unhandled TypeInfo type: %s", type_to_string(t));
+					GB_PANIC("Unhandled Type_Info variant: %s", type_to_string(t));
 				}
 			}
 		}

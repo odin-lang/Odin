@@ -118,7 +118,6 @@ struct TypeStruct {
 		Array<Type *> variants;                           \
 		AstNode *node;                                    \
 		Scope *  scope;                                   \
-		Entity * union__type_info;                        \
 		i64      variant_block_size;                      \
 		i64      custom_align;                            \
 	})                                                    \
@@ -1335,6 +1334,42 @@ bool is_type_cte_safe(Type *type) {
 	return false;
 }
 
+i64 union_variant_index(Type *u, Type *v) {
+	u = base_type(u);
+	GB_ASSERT(u->kind == Type_Union);
+
+	for_array(i, u->Union.variants) {
+		Type *vt = u->Union.variants[i];
+		if (are_types_identical(v, vt)) {
+			return cast(i64)(i+1);
+		}
+	}
+	return 0;
+}
+
+i64 union_tag_size(Type *u) {
+	u = base_type(u);
+	GB_ASSERT(u->kind == Type_Union);
+	u64 cl2 = ceil_log2(cast(u64)u->Union.variants.count);
+	i64 s = (next_pow2(cast(i64)cl2) + 7)/8;
+	return gb_clamp(s, 1, build_context.word_size);
+}
+
+Type *union_tag_type(Type *u) {
+	i64 s = union_tag_size(u);
+	switch (s) {
+	case  1: return  t_u8;
+	case  2: return  t_u16;
+	case  4: return  t_u32;
+	case  8: return  t_u64;
+	case 16: return t_u128;
+	}
+	GB_PANIC("Invalid union_tag_size");
+	return t_int;
+}
+
+
+
 enum ProcTypeOverloadKind {
 	ProcOverload_Identical, // The types are identical
 
@@ -1614,20 +1649,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		}
 
 	} else if (type->kind == Type_Union) {
-		if (field_name == "__type_info") {
-			Entity *e = type->Union.union__type_info;
-			if (e == nullptr) {
-				Entity *__type_info = make_entity_field(a, nullptr, make_token_ident(str_lit("__type_info")), t_type_info_ptr, false, -1);
-				type->Union.union__type_info = __type_info;
-				e = __type_info;
-			}
 
-			GB_ASSERT(e != nullptr);
-			selection_add_index(&sel, -1); // HACK(bill): Leaky memory
-			sel.entity = e;
-
-			return sel;
-		}
 	} else if (type->kind == Type_Struct) {
 		for_array(i, type->Struct.fields) {
 			Entity *f = type->Struct.fields[i];
@@ -1854,7 +1876,9 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		if (t->Union.custom_align > 0) {
 			return gb_clamp(t->Union.custom_align, 1, build_context.max_align);
 		}
-		i64 max = build_context.word_size;
+
+
+		i64 max = union_tag_size(t);
 		for_array(i, t->Union.variants) {
 			Type *variant = t->Union.variants[i];
 			type_path_push(path, variant);

@@ -304,6 +304,68 @@ i64 next_pow2(i64 n) {
 	return n;
 }
 
+i32 bit_set_count(u32 x) {
+	x -= ((x >> 1) & 0x55555555);
+	x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
+	x = (((x >> 4) + x) & 0x0f0f0f0f);
+	x += (x >> 8);
+	x += (x >> 16);
+
+	return cast(i32)(x & 0x0000003f);
+}
+
+i64 bit_set_count(u64 x) {
+	u32 a = *(cast(u32 *)&x);
+	u32 b = *(cast(u32 *)&x + 1);
+	return bit_set_count(a) + bit_set_count(b);
+}
+
+u32 floor_log2(u32 x) {
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	return cast(u32)(bit_set_count(x) - 1);
+}
+
+u64 floor_log2(u64 x) {
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	x |= x >> 32;
+	return cast(u64)(bit_set_count(x) - 1);
+}
+
+
+u32 ceil_log2(u32 x) {
+	i32 y = cast(i32)(x & (x-1));
+	y |= -y;
+	y >>= 32-1;
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	return cast(u32)(bit_set_count(x) - 1 - y);
+}
+
+u64 ceil_log2(u64 x) {
+	i64 y = cast(i64)(x & (x-1));
+	y |= -y;
+	y >>= 64-1;
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	x |= x >> 32;
+	return cast(u64)(bit_set_count(x) - 1 - y);
+}
+
+
 i32 prev_pow2(i32 n) {
 	if (n <= 0) {
 		return 0;

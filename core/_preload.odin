@@ -86,6 +86,7 @@ Type_Info_Struct :: struct #ordered {
 Type_Info_Union :: struct #ordered {
 	variants:   []^Type_Info,
 	tag_offset: int,
+	tag_type:   ^Type_Info,
 };
 Type_Info_Enum :: struct #ordered {
 	base:   ^Type_Info,

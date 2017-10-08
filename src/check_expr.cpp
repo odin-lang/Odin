@@ -6472,12 +6472,6 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_append_rune(str, '}');
 	case_end;
 
-	// case_ast_node(st, RawUnionType, node);
-	// 	str = gb_string_appendc(str, "raw_union ");
-	// 	str = gb_string_append_rune(str, '{');
-	// 	str = write_struct_fields_to_string(str, st->fields);
-	// 	str = gb_string_append_rune(str, '}');
-	// case_end;
 
 	case_ast_node(st, UnionType, node);
 		str = gb_string_appendc(str, "union ");
