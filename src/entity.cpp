@@ -2,7 +2,6 @@ struct Scope;
 struct Checker;
 struct Type;
 struct DeclInfo;
-// typedef enum BuiltinProcId BuiltinProcId;
 
 
 #define ENTITY_KINDS \
@@ -51,15 +50,9 @@ enum EntityFlag {
 
 // Zero value means the overloading process is not yet done
 enum OverloadKind {
-	Overload_Unknown,
-	Overload_No,
-	Overload_Yes,
-};
-
-enum EntityAliasKind {
-	EntityAlias_Invalid,
-	EntityAlias_Type,
-	EntityAlias_Entity,
+	Overload_Unknown = 0,
+	Overload_No      = 1,
+	Overload_Yes     = 2,
 };
 
 
@@ -99,7 +92,7 @@ struct Entity {
 			String     link_name;
 		} Variable;
 		struct {
-			bool is_type_alias;
+			bool  is_type_alias;
 			Type *type_parameter_specialization;
 		} TypeName;
 		struct {
@@ -129,7 +122,7 @@ struct Entity {
 		} LibraryName;
 		i32 Nil;
 		struct {
-			String name;
+			String   name;
 			AstNode *node;
 		} Label;
 	};
@@ -268,8 +261,7 @@ Entity *make_entity_library_name(gbAllocator a, Scope *scope, Token token, Type 
 
 
 Entity *make_entity_nil(gbAllocator a, String name, Type *type) {
-	Token token = make_token_ident(name);
-	Entity *entity = alloc_entity(a, Entity_Nil, nullptr, token, type);
+	Entity *entity = alloc_entity(a, Entity_Nil, nullptr, make_token_ident(name), type);
 	return entity;
 }
 

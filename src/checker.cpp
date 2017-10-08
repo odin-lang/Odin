@@ -1826,6 +1826,7 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 
 
 #include "check_expr.cpp"
+#include "check_type.cpp"
 #include "check_decl.cpp"
 #include "check_stmt.cpp"
 

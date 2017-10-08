@@ -3232,20 +3232,6 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 	return ir_emit_bitcast(proc, value, dst);
 }
 
-irValue *ir_emit_down_cast(irProcedure *proc, irValue *value, Type *t) {
-	GB_ASSERT(is_type_pointer(ir_type(value)));
-	gbAllocator allocator = proc->module->allocator;
-
-	String field_name = check_down_cast_name(t, type_deref(ir_type(value)));
-	GB_ASSERT(field_name.len > 0);
-	Selection sel = lookup_field(proc->module->allocator, t, field_name, false);
-	irValue *bytes = ir_emit_conv(proc, value, t_u8_ptr);
-
-	i64 offset_ = type_offset_of_from_selection(allocator, type_deref(t), sel);
-	irValue *offset = ir_const_int(allocator, -offset_);
-	irValue *head = ir_emit_ptr_offset(proc, bytes, offset);
-	return ir_emit_conv(proc, head, t);
-}
 
 irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, TokenPos pos) {
 	gbAllocator a = proc->module->allocator;
