@@ -57,6 +57,8 @@ struct AstFile {
 	Array<AstNode *>    decls;
 	ImportedFileKind    file_kind;
 	bool                is_global_scope;
+	Array<AstNode *>    imports_and_exports; // `import` `using import` `export`
+
 
 	AstNode *           curr_proc;
 	isize               scope_level;
@@ -351,6 +353,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		CommentGroup     comment;      \
 	}) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
+		AstFile *file;          \
 		Token    token;         \
 		Token    relpath;       \
 		String   fullpath;      \
@@ -361,6 +364,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		CommentGroup comment;   \
 	}) \
 	AST_NODE_KIND(ExportDecl, "export declaration", struct { \
+		AstFile *file;          \
 		Token    token;         \
 		Token    relpath;       \
 		String   fullpath;      \
@@ -1265,7 +1269,7 @@ AstNode *ast_range_stmt(AstFile *f, Token token, AstNode *value, AstNode *index,
 	return result;
 }
 
-AstNode *ast_match_stmt(AstFile *f, Token token, AstNode *init, AstNode *tag, AstNode *body) {
+AstNode *ast_switch_stmt(AstFile *f, Token token, AstNode *init, AstNode *tag, AstNode *body) {
 	AstNode *result = make_ast_node(f, AstNode_SwitchStmt);
 	result->SwitchStmt.token = token;
 	result->SwitchStmt.init  = init;
@@ -1275,7 +1279,7 @@ AstNode *ast_match_stmt(AstFile *f, Token token, AstNode *init, AstNode *tag, As
 }
 
 
-AstNode *ast_type_match_stmt(AstFile *f, Token token, AstNode *tag, AstNode *body) {
+AstNode *ast_type_switch_stmt(AstFile *f, Token token, AstNode *tag, AstNode *body) {
 	AstNode *result = make_ast_node(f, AstNode_TypeSwitchStmt);
 	result->TypeSwitchStmt.token = token;
 	result->TypeSwitchStmt.tag   = tag;
@@ -4240,7 +4244,7 @@ AstNode *parse_case_clause(AstFile *f, bool is_type) {
 }
 
 
-AstNode *parse_match_stmt(AstFile *f) {
+AstNode *parse_switch_stmt(AstFile *f) {
 	if (f->curr_proc == nullptr) {
 		syntax_error(f->curr_token, "You cannot use a match statement in the file scope");
 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
@@ -4293,9 +4297,9 @@ AstNode *parse_match_stmt(AstFile *f) {
 
 	if (!is_type_match) {
 		tag = convert_stmt_to_expr(f, tag, str_lit("match expression"));
-		return ast_match_stmt(f, token, init, tag, body);
+		return ast_switch_stmt(f, token, init, tag, body);
 	} else {
-		return ast_type_match_stmt(f, token, tag, body);
+		return ast_type_switch_stmt(f, token, tag, body);
 	}
 }
 
@@ -4380,6 +4384,7 @@ AstNode *parse_import_decl(AstFile *f, bool is_using) {
 		s = ast_bad_decl(f, import_name, file_path);
 	} else {
 		s = ast_import_decl(f, token, is_using, file_path, import_name, cond, docs, f->line_comment);
+		array_add(&f->imports_and_exports, s);
 	}
 	expect_semicolon(f, s);
 	return s;
@@ -4401,6 +4406,7 @@ AstNode *parse_export_decl(AstFile *f) {
 		s = ast_bad_decl(f, token, file_path);
 	} else {
 		s = ast_export_decl(f, token, file_path, cond, docs, f->line_comment);
+		array_add(&f->imports_and_exports, s);
 	}
 	expect_semicolon(f, s);
 	return s;
@@ -4495,10 +4501,10 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);
 	case Token_for:    return parse_for_stmt(f);
-	case Token_switch:  return parse_match_stmt(f);
+	case Token_switch: return parse_switch_stmt(f);
 	case Token_defer:  return parse_defer_stmt(f);
-	case Token_asm:    return parse_asm_stmt(f);
 	case Token_return: return parse_return_stmt(f);
+	case Token_asm:    return parse_asm_stmt(f);
 
 	case Token_break:
 	case Token_continue:
@@ -4726,6 +4732,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	arena_size *= 2*f->tokens.count;
 	gb_arena_init_from_allocator(&f->arena, heap_allocator(), arena_size);
 	array_init(&f->comments, heap_allocator());
+	array_init(&f->imports_and_exports, heap_allocator());
 
 	f->curr_proc = nullptr;
 
@@ -4735,6 +4742,8 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 void destroy_ast_file(AstFile *f) {
 	gb_arena_free(&f->arena);
 	array_free(&f->tokens);
+	array_free(&f->comments);
+	array_free(&f->imports_and_exports);
 	gb_free(heap_allocator(), f->tokenizer.fullpath.text);
 	destroy_tokenizer(&f->tokenizer);
 }

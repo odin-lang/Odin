@@ -1120,6 +1120,24 @@ bool are_types_identical(Type *x, Type *y) {
 		}
 		break;
 
+	case Type_BitField:
+		if (y->kind == Type_BitField) {
+			if (x->BitField.field_count == y->BitField.field_count &&
+			    x->BitField.custom_align == y->BitField.custom_align) {
+				for (i32 i = 0; i < x->BitField.field_count; i++) {
+					if (x->BitField.offsets[i] != y->BitField.offsets[i]) {
+						return false;
+					}
+					if (x->BitField.sizes[i] != y->BitField.sizes[i]) {
+						return false;
+					}
+				}
+
+				return true;
+			}
+		}
+		break;
+
 
 	case Type_Enum:
 		return x == y; // NOTE(bill): All enums are unique

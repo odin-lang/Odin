@@ -249,6 +249,7 @@ void scope_reset(Scope *scope) {
 	map_clear  (&scope->implicit);
 	array_clear(&scope->shared);
 	ptr_set_clear(&scope->imported);
+	ptr_set_clear(&scope->exported);
 }
 
 i32 is_scope_an_ancestor(Scope *parent, Scope *child) {
@@ -625,6 +626,7 @@ void destroy_scope(Scope *scope) {
 	array_free(&scope->shared);
 	array_free(&scope->delayed_file_decls);
 	ptr_set_destroy(&scope->imported);
+	ptr_set_destroy(&scope->exported);
 
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
 }
@@ -2290,6 +2292,7 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 		Scope *scope = *found;
 		GB_ASSERT(scope != nullptr);
 
+		id->file = scope->file;
 
 		ImportGraphNode **found_node = nullptr;
 		ImportGraphNode *m = nullptr;
@@ -2328,6 +2331,7 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 		}
 		Scope *scope = *found;
 		GB_ASSERT(scope != nullptr);
+		ed->file = scope->file;
 
 		ImportGraphNode **found_node = nullptr;
 		ImportGraphNode *m = nullptr;
@@ -2413,53 +2417,50 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
 	return G;
 }
 
-Array<Scope *> find_import_path(Map<Scope *> *file_scopes, Scope *start, Scope *end, PtrSet<Scope *> *visited = nullptr) {
-	PtrSet<Scope *> visited_ = {};
-	bool made_visited = false;
-	if (visited == nullptr) {
-		made_visited = true;
-		ptr_set_init(&visited_, heap_allocator());
-		visited = &visited_;
-	}
-	defer (if (made_visited) {
-		ptr_set_destroy(&visited_);
-	});
+struct ImportPathItem {
+	Scope *  scope;
+	AstNode *decl;
+};
 
-	Array<Scope *> empty_path = {};
+Array<ImportPathItem> find_import_path(Checker *c, Scope *start, Scope *end, PtrSet<Scope *> *visited) {
+	Array<ImportPathItem> empty_path = {};
 
 	if (ptr_set_exists(visited, start)) {
 		return empty_path;
 	}
 	ptr_set_add(visited, start);
 
+
 	String path = start->file->tokenizer.fullpath;
 	HashKey key = hash_string(path);
-	Scope **found = map_get(file_scopes, key);
+	Scope **found = map_get(&c->file_scopes, key);
 	if (found) {
-		Scope *scope = *found;
-		for_array(i, scope->exported.entries) {
-			Scope *dep = scope->exported.entries[i].ptr;
-			if (dep == end) {
-				Array<Scope *> path = {};
-				array_init(&path, heap_allocator());
-				array_add(&path, dep);
-				return path;
-			}
-			Array<Scope *> next_path = find_import_path(file_scopes, dep, end, visited);
-			if (next_path.count > 0) {
-				array_add(&next_path, dep);
-				return next_path;
-			}
-		}
+		AstFile *f = (*found)->file;
+		GB_ASSERT(f != nullptr);
 
-		// NOTE(bill): Disallow importing of the same file
-		for_array(i, scope->imported.entries) {
-			Scope *dep = scope->imported.entries[i].ptr;
-			if (dep == start) {
-				Array<Scope *> path = {};
+		for_array(i, f->imports_and_exports) {
+			Scope *s = nullptr;
+			AstNode *decl = f->imports_and_exports[i];
+			if (decl->kind == AstNode_ExportDecl) {
+				s = decl->ExportDecl.file->scope;
+			} else if (decl->kind == AstNode_ImportDecl && decl->ImportDecl.is_using) {
+				s = decl->ImportDecl.file->scope;
+			} else {
+				continue;
+			}
+			GB_ASSERT(s != nullptr);
+
+			ImportPathItem item = {s, decl};
+			if (s == end) {
+				Array<ImportPathItem> path = {};
 				array_init(&path, heap_allocator());
-				array_add(&path, dep);
+				array_add(&path, item);
 				return path;
+			}
+			Array<ImportPathItem> next_path = find_import_path(c, s, end, visited);
+			if (next_path.count > 0) {
+				array_add(&next_path, item);
+				return next_path;
 			}
 		}
 	}
@@ -2839,31 +2840,33 @@ void check_import_entities(Checker *c) {
 		Scope *s = n->scope;
 
 		if (n->dep_count > 0) {
-			auto path = find_import_path(&c->file_scopes, s, s);
+			PtrSet<Scope *> visited = {};
+			ptr_set_init(&visited, heap_allocator());
+			defer (ptr_set_destroy(&visited));
+
+			auto path = find_import_path(c, s, s, &visited);
 			defer (array_free(&path));
 
 			// TODO(bill): This needs better TokenPos finding
-			auto const mt = [](Scope *s) -> Token {
-				Token token = {};
-				token.pos = token_pos(s->file->tokenizer.fullpath, 1, 1);
-				token.string = remove_directory_from_path(s->file->tokenizer.fullpath);
-				return token;
+			auto const fn = [](ImportPathItem item) -> String {
+				Scope *s = item.scope;
+				return remove_directory_from_path(s->file->tokenizer.fullpath);
 			};
 
 			if (path.count == 1) {
-				Scope *s = path[0];
-				Token token = mt(s);
-				error(token, "Self importation of `%.*s`", LIT(token.string));
+				ImportPathItem item = path[0];
+				String filename = fn(item);
+				error(item.decl, "Self importation of `%.*s`", LIT(filename));
 			} else if (path.count > 0) {
-				Scope *s = path[path.count-1];
-				Token token = mt(s);
-				error(token, "Cyclic importation of `%.*s`", LIT(token.string));
+				ImportPathItem item = path[path.count-1];
+				String filename = fn(item);
+				error(item.decl, "Cyclic importation of `%.*s`", LIT(filename));
 				for (isize i = 0; i < path.count; i++) {
-					gb_printf_err("\t`%.*s` refers to\n", LIT(token.string));
-					s = path[i];
-					token = mt(s);
+					error(item.decl, "`%.*s` refers to", LIT(filename));
+					item = path[i];
+					filename = fn(item);
 				}
-				gb_printf_err("\t`%.*s`\n", LIT(token.string));
+				error(item.decl, "`%.*s`", LIT(filename));
 			}
 
 		}

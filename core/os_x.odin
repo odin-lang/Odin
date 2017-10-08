@@ -233,7 +233,7 @@ access :: proc(path: string, mask: int) -> bool #inline {
 
 heap_alloc :: proc(size: int) -> rawptr #inline {
 	assert(size > 0);
-	return __unix_calloc(1, size);
+	return _unix_calloc(1, size);
 }
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr #inline {
 	return _unix_realloc(ptr, new_size);
