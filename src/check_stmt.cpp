@@ -482,6 +482,8 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 		if (t->kind == Type_Enum) {
 			for (isize i = 0; i < t->Enum.field_count; i++) {
 				Entity *f = t->Enum.fields[i];
+				if (!is_entity_exported(f)) continue;
+
 				Entity *found = scope_insert_entity(c->context.scope, f);
 				if (found != nullptr) {
 					gbString expr_str = expr_to_string(expr);
@@ -502,6 +504,8 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 		Scope *scope = e->ImportName.scope;
 		for_array(i, scope->elements.entries) {
 			Entity *decl = scope->elements.entries[i].value;
+			if (!is_entity_exported(decl)) continue;
+
 			Entity *found = scope_insert_entity(c->context.scope, decl);
 			if (found != nullptr) {
 				gbString expr_str = expr_to_string(expr);

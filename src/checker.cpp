@@ -2521,9 +2521,6 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 			Entity *e = scope->elements.entries[elem_index].value;
 			if (e->scope == parent_scope) return;
 
-			if (!is_entity_kind_exported(e->kind)) {
-				return;
-			}
 			if (is_entity_exported(e)) {
 				// TODO(bill): Should these entities be imported but cause an error when used?
 				bool ok = add_entity(c, parent_scope, e->identifier, e);
