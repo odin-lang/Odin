@@ -1877,7 +1877,6 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			return gb_clamp(t->Union.custom_align, 1, build_context.max_align);
 		}
 
-
 		i64 max = union_tag_size(t);
 		for_array(i, t->Union.variants) {
 			Type *variant = t->Union.variants[i];
@@ -2126,12 +2125,13 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			}
 		}
 
-		// NOTE(bill): Align to int
-		i64 size = align_formula(max, build_context.word_size);
+		// NOTE(bill): Align to tag
+		i64 tag_size = union_tag_size(t);
+		i64 size = align_formula(max, tag_size);
 		// NOTE(bill): Calculate the padding between the common fields and the tag
 		t->Union.variant_block_size = size - field_size;
 
-		size += type_size_of(allocator, t_int);
+		size += tag_size;
 		size = align_formula(size, align);
 		return size;
 	} break;
