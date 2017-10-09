@@ -2017,6 +2017,30 @@ irValue *ir_addr_load(irProcedure *proc, irAddr addr) {
 	return ir_emit_load(proc, addr.addr);
 }
 
+irValue *ir_addr_get_ptr(irProcedure *proc, irAddr addr) {
+	if (addr.addr == nullptr) {
+		GB_PANIC("Illegal addr -> nullptr");
+		return nullptr;
+	}
+
+	switch (addr.kind) {
+	case irAddr_Map:
+	case irAddr_BitField: {
+		irValue *v = ir_addr_load(proc, addr);
+		return ir_address_from_load_or_generate_local(proc, v);
+	}
+	}
+
+	return addr.addr;
+}
+
+irValue *ir_build_addr_ptr(irProcedure *proc, AstNode *expr) {
+	irAddr addr = ir_build_addr(proc, expr);
+	return ir_addr_get_ptr(proc, addr);
+}
+
+
+
 irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index);
 irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index);
 
@@ -4169,7 +4193,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		ir_emit_comment(proc, str_lit("reserve"));
 		gbAllocator a = proc->module->allocator;
 
-		irValue *ptr = ir_build_addr(proc, ce->args[0]).addr;
+		irValue *ptr = ir_build_addr_ptr(proc, ce->args[0]);
 		Type *type = ir_type(ptr);
 		GB_ASSERT(is_type_pointer(type));
 		type = base_type(type_deref(type));
@@ -4367,7 +4391,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		if (index_count == 0) {
 			return ir_addr_load(proc, vector_addr);
 		}
-		irValue *src = vector_addr.addr;
+		irValue *src = ir_addr_get_ptr(proc, vector_addr);
 		irValue *dst = ir_add_local_generated(proc, tv.type);
 
 		for (i32 i = 1; i < ce->args.count; i++) {
@@ -4761,7 +4785,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
 		case Token_And:
-			return ir_emit_ptr_offset(proc, ir_build_addr(proc, ue->expr).addr, v_zero); // Make a copy of the pointer
+			return ir_emit_ptr_offset(proc, ir_build_addr_ptr(proc, ue->expr), v_zero); // Make a copy of the pointer
 		default:
 			return ir_emit_unary_arith(proc, ue->op.kind, ir_build_expr(proc, ue->expr), tv.type);
 		}
@@ -5076,7 +5100,7 @@ irValue *ir_get_using_variable(irProcedure *proc, Entity *e) {
 		v = *pv;
 	} else {
 		GB_ASSERT_MSG(e->using_expr != nullptr, "%.*s", LIT(name));
-		v = ir_build_addr(proc, e->using_expr).addr;
+		v = ir_build_addr_ptr(proc, e->using_expr);
 	}
 	GB_ASSERT(v != nullptr);
 	GB_ASSERT(parent->type == type_deref(ir_type(v)));
@@ -5201,17 +5225,17 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 				if (sel.index.count == 1) {
 					GB_ASSERT(is_type_bit_field(bft));
 					i32 index = sel.index[0];
-					return ir_addr_bit_field(addr.addr, index);
+					return ir_addr_bit_field(ir_addr_get_ptr(proc, addr), index);
 				} else {
 					Selection s = sel;
 					s.index.count--;
 					i32 index = s.index[s.index.count-1];
-					irValue *a = addr.addr;
+					irValue *a = ir_addr_get_ptr(proc, addr);
 					a = ir_emit_deep_field_gep(proc, a, s);
 					return ir_addr_bit_field(a, index);
 				}
 			} else {
-				irValue *a = ir_build_addr(proc, se->expr).addr;
+				irValue *a = ir_build_addr_ptr(proc, se->expr);
 				a = ir_emit_deep_field_gep(proc, a, sel);
 				return ir_addr(a);
 			}
@@ -5226,7 +5250,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			Selection sel = lookup_field_from_index(proc->module->allocator, type, index);
 			GB_ASSERT(sel.entity != nullptr);
 
-			irValue *a = ir_build_addr(proc, se->expr).addr;
+			irValue *a = ir_build_addr_ptr(proc, se->expr);
 			a = ir_emit_deep_field_gep(proc, a, sel);
 			return ir_addr(a);
 		}
@@ -5275,8 +5299,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		t = base_type(type_deref(t));
 
 		if (is_type_map(t)) {
-			irAddr map_addr = ir_build_addr(proc, ie->expr);
-			irValue *map_val = map_addr.addr;
+			irValue *map_val = ir_build_addr_ptr(proc, ie->expr);
 			irValue *key = ir_build_expr(proc, ie->index);
 			key = ir_emit_conv(proc, key, t->Map.key);
 
@@ -5290,7 +5313,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			Entity *using_field = find_using_index_expr(t);
 			if (using_field != nullptr) {
 				Selection sel = lookup_field(a, t, using_field->token.string, false);
-				irValue *e = ir_build_addr(proc, ie->expr).addr;
+				irValue *e = ir_build_addr_ptr(proc, ie->expr);
 				using_addr = ir_emit_deep_field_gep(proc, e, sel);
 
 				t = using_field->type;
@@ -5304,7 +5327,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			if (using_addr != nullptr) {
 				vector = using_addr;
 			} else {
-				vector = ir_build_addr(proc, ie->expr).addr;
+				vector = ir_build_addr_ptr(proc, ie->expr);
 				if (deref) {
 					vector = ir_emit_load(proc, vector);
 				}
@@ -5322,7 +5345,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			if (using_addr != nullptr) {
 				array = using_addr;
 			} else {
-				array = ir_build_addr(proc, ie->expr).addr;
+				array = ir_build_addr_ptr(proc, ie->expr);
 				if (deref) {
 					array = ir_emit_load(proc, array);
 				}
@@ -5419,7 +5442,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			max = ir_emit_arith(proc, Token_Add, max, v_one, t_int);
 		}
 
-		irValue *addr = ir_build_addr(proc, se->expr).addr;
+		irValue *addr = ir_build_addr_ptr(proc, se->expr);
 		irValue *base = ir_emit_load(proc, addr);
 		Type *type = base_type(ir_type(base));
 
@@ -6746,7 +6769,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			switch (et->kind) {
 			case Type_Map: {
 				irAddr addr = ir_build_addr(proc, rs->expr);
-				irValue *map = addr.addr;
+				irValue *map = ir_addr_get_ptr(proc, addr);
 				if (is_type_pointer(type_deref(ir_addr_type(addr)))) {
 					map = ir_addr_load(proc, addr);
 				}
@@ -6757,7 +6780,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			}
 			case Type_Array: {
 				irValue *count_ptr = nullptr;
-				irValue *array = ir_build_addr(proc, rs->expr).addr;
+				irValue *array = ir_build_addr_ptr(proc, rs->expr);
 				if (is_type_pointer(type_deref(ir_type(array)))) {
 					array = ir_emit_load(proc, array);
 				}
@@ -6768,7 +6791,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			}
 			case Type_Vector: {
 				irValue *count_ptr = nullptr;
-				irValue *vector = ir_build_addr(proc, rs->expr).addr;
+				irValue *vector = ir_build_addr_ptr(proc, rs->expr);
 				if (is_type_pointer(type_deref(ir_type(vector)))) {
 					vector = ir_emit_load(proc, vector);
 				}
@@ -6779,7 +6802,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			}
 			case Type_DynamicArray: {
 				irValue *count_ptr = nullptr;
-				irValue *array = ir_build_addr(proc, rs->expr).addr;
+				irValue *array = ir_build_addr_ptr(proc, rs->expr);
 				if (is_type_pointer(type_deref(ir_type(array)))) {
 					array = ir_emit_load(proc, array);
 				}
