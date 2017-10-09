@@ -1544,7 +1544,7 @@ AstNode *ast_value_decl(AstFile *f, Array<AstNode *> names, AstNode *type, Array
 	return result;
 }
 
-AstNode *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, Token import_name, AstNode *cond,
+AstNode *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, Token import_name,
                          CommentGroup docs, CommentGroup comment) {
 	AstNode *result = make_ast_node(f, AstNode_ImportDecl);
 	result->ImportDecl.token       = token;
@@ -1556,7 +1556,7 @@ AstNode *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, 
 	return result;
 }
 
-AstNode *ast_export_decl(AstFile *f, Token token, Token relpath, AstNode *cond,
+AstNode *ast_export_decl(AstFile *f, Token token, Token relpath,
                          CommentGroup docs, CommentGroup comment) {
 	AstNode *result = make_ast_node(f, AstNode_ExportDecl);
 	result->ExportDecl.token       = token;
@@ -1566,7 +1566,7 @@ AstNode *ast_export_decl(AstFile *f, Token token, Token relpath, AstNode *cond,
 	return result;
 }
 
-AstNode *ast_foreign_library_decl(AstFile *f, Token token, Token filepath, Token library_name, AstNode *cond,
+AstNode *ast_foreign_library_decl(AstFile *f, Token token, Token filepath, Token library_name,
                                   CommentGroup docs, CommentGroup comment) {
 	AstNode *result = make_ast_node(f, AstNode_ForeignLibraryDecl);
 	result->ForeignLibraryDecl.token        = token;
@@ -4357,7 +4357,6 @@ AstNode *parse_asm_stmt(AstFile *f) {
 AstNode *parse_import_decl(AstFile *f, bool is_using) {
 	CommentGroup docs = f->lead_comment;
 	Token token = expect_token(f, Token_import);
-	AstNode *cond = nullptr;
 	Token import_name = {};
 
 	switch (f->curr_token.kind) {
@@ -4374,16 +4373,13 @@ AstNode *parse_import_decl(AstFile *f, bool is_using) {
 	}
 
 	Token file_path = expect_token_after(f, Token_String, "import");
-	if (allow_token(f, Token_when)) {
-		cond = parse_expr(f, false);
-	}
 
 	AstNode *s = nullptr;
 	if (f->curr_proc != nullptr) {
 		syntax_error(import_name, "You cannot use `import` within a procedure. This must be done at the file scope");
 		s = ast_bad_decl(f, import_name, file_path);
 	} else {
-		s = ast_import_decl(f, token, is_using, file_path, import_name, cond, docs, f->line_comment);
+		s = ast_import_decl(f, token, is_using, file_path, import_name, docs, f->line_comment);
 		array_add(&f->imports_and_exports, s);
 	}
 	expect_semicolon(f, s);
@@ -4393,19 +4389,13 @@ AstNode *parse_import_decl(AstFile *f, bool is_using) {
 AstNode *parse_export_decl(AstFile *f) {
 	CommentGroup docs = f->lead_comment;
 	Token token = expect_token(f, Token_export);
-	AstNode *cond = nullptr;
-
 	Token file_path = expect_token_after(f, Token_String, "export");
-	if (allow_token(f, Token_when)) {
-		cond = parse_expr(f, false);
-	}
-
 	AstNode *s = nullptr;
 	if (f->curr_proc != nullptr) {
 		syntax_error(token, "You cannot use `export` within a procedure. This must be done at the file scope");
 		s = ast_bad_decl(f, token, file_path);
 	} else {
-		s = ast_export_decl(f, token, file_path, cond, docs, f->line_comment);
+		s = ast_export_decl(f, token, file_path, docs, f->line_comment);
 		array_add(&f->imports_and_exports, s);
 	}
 	expect_semicolon(f, s);
@@ -4426,7 +4416,6 @@ AstNode *parse_foreign_decl(AstFile *f) {
 		return ast_bad_decl(f, token, token);
 	}
 
-	AstNode *cond = nullptr;
 	Token lib_name = {};
 
 	switch (f->curr_token.kind) {
@@ -4441,18 +4430,12 @@ AstNode *parse_foreign_decl(AstFile *f) {
 		syntax_error(lib_name, "Illegal foreign_library name: `_`");
 	}
 	Token file_path = expect_token(f, Token_String);
-
-	if (allow_token(f, Token_when)) {
-		cond = parse_expr(f, false);
-	}
-
-
 	AstNode *s = nullptr;
 	if (f->curr_proc != nullptr) {
 		syntax_error(lib_name, "You cannot use foreign_system_library within a procedure. This must be done at the file scope");
 		s = ast_bad_decl(f, lib_name, file_path);
 	} else {
-		s = ast_foreign_library_decl(f, token, file_path, lib_name, cond, docs, f->line_comment);
+		s = ast_foreign_library_decl(f, token, file_path, lib_name, docs, f->line_comment);
 	}
 	expect_semicolon(f, s);
 	return s;
