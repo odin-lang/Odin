@@ -5,10 +5,10 @@ c_bool           :: bool;
 c_char           :: u8;
 
 c_schar          :: i8;
-c_uchar          :: i8;
+c_uchar          :: u8;
 
 c_short          :: i16;
-c_ushort         :: i16;
+c_ushort         :: u16;
 
 c_int            :: i32;
 c_uint           :: u32;
