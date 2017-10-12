@@ -7133,19 +7133,23 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 
 	case_ast_node(pa, PushAllocator, node);
-		ir_emit_comment(proc, str_lit("PushAllocator"));
+		ir_emit_comment(proc, str_lit("push_allocator"));
+		irValue *new_allocator = ir_build_expr(proc, pa->expr);
+
 		ir_open_scope(proc);
 
 		irValue *prev = ir_find_or_generate_context_ptr(proc);
 		irValue *next = ir_add_local_generated(proc, t_context);
 		ir_emit_store(proc, next, ir_emit_load(proc, prev));
+
+		Selection sel = lookup_field(proc->module->allocator, t_context, str_lit("allocator"), false);
+		irValue *gep = ir_emit_deep_field_gep(proc, next, sel);
+		ir_emit_store(proc, gep, new_allocator);
+
 		array_add(&proc->context_stack, next);
 		defer (array_pop(&proc->context_stack));
 
 		// TODO(bill): is this too leaky?
-		Selection sel = lookup_field(proc->module->allocator, t_context, str_lit("allocator"), false);
-		irValue *gep = ir_emit_deep_field_gep(proc, next, sel);
-		ir_emit_store(proc, gep, ir_build_expr(proc, pa->expr));
 
 		ir_build_stmt(proc, pa->body);
 
@@ -7154,15 +7158,17 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 
 	case_ast_node(pc, PushContext, node);
-		ir_emit_comment(proc, str_lit("PushContext"));
+		ir_emit_comment(proc, str_lit("push_context"));
+		irValue *new_context = ir_build_expr(proc, pc->expr);
+
 		ir_open_scope(proc);
 
 		irValue *prev = ir_find_or_generate_context_ptr(proc);
 		irValue *next = ir_add_local_generated(proc, t_context);
+		ir_emit_store(proc, next, new_context);
+
 		array_add(&proc->context_stack, next);
 		defer (array_pop(&proc->context_stack));
-
-		ir_emit_store(proc, next, ir_build_expr(proc, pc->expr));
 
 		ir_build_stmt(proc, pc->body);
 
