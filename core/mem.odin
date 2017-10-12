@@ -131,11 +131,14 @@ arena_allocator :: proc(arena: ^Arena) -> Allocator {
 	};
 }
 
+import "core:fmt.odin";
+
 arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
 	using Allocator_Mode;
 	arena := cast(^Arena)allocator_data;
+
 
 	switch mode {
 	case Alloc:
@@ -148,7 +151,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		#no_bounds_check end := &arena.memory[len(arena.memory)];
 
 		ptr := align_forward(end, alignment);
-		(cast(^raw.Slice)&arena).len += total_size;
+		(^raw.Slice)(&arena.memory).len += total_size;
 		return zero(ptr, size);
 
 	case Free:
@@ -156,7 +159,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		// Use ArenaTempMemory if you want to free a block
 
 	case FreeAll:
-		(cast(^raw.Slice)&arena).len = 0;
+		(^raw.Slice)(&arena.memory).len = 0;
 
 	case Resize:
 		return default_resize_align(old_memory, old_size, size, alignment);
