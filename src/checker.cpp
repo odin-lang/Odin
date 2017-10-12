@@ -787,8 +787,6 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	}
 
 	if (prev != nullptr && entity->kind == Entity_Procedure) {
-		// if (s->is_global) return prev;
-
 		multi_map_insert(&s->elements, key, entity);
 	} else {
 		map_set(&s->elements, key, entity);
@@ -2520,10 +2518,16 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 		// NOTE(bill): Add imported entities to this file's scope
 		for_array(elem_index, scope->elements.entries) {
 			Entity *e = scope->elements.entries[elem_index].value;
-			if (e->scope == parent_scope) return;
+			if (e->scope == parent_scope) continue;
 
-			if (is_entity_exported(e)) {
-				// TODO(bill): Should these entities be imported but cause an error when used?
+			if (e->token.string == "get_proc_address") {
+				// gb_printf_err("%.*s %.*s get_proc_address\n", LIT(scope->file->fullpath), LIT(parent_scope->file->fullpath));
+			}
+
+			bool implicit_is_found = map_get(&scope->implicit, hash_entity(e)) != nullptr;
+			if (is_entity_exported(e) && !implicit_is_found) {
+				Entity *prev = scope_lookup_entity(parent_scope, e->token.string);
+				// if (prev) gb_printf_err("%.*s\n", LIT(prev->token.string));
 				bool ok = add_entity(c, parent_scope, e->identifier, e);
 				if (ok) map_set(&parent_scope->implicit, hash_entity(e), true);
 			}
@@ -2558,7 +2562,6 @@ void check_add_export_decl(Checker *c, AstNodeExportDecl *ed) {
 		return;
 	}
 
-
 	if (parent_scope->is_global) {
 		error(ed->token, "`export` cannot be used on #shared_global_scope");
 		return;
@@ -2573,7 +2576,7 @@ void check_add_export_decl(Checker *c, AstNodeExportDecl *ed) {
 	// NOTE(bill): Add imported entities to this file's scope
 	for_array(elem_index, scope->elements.entries) {
 		Entity *e = scope->elements.entries[elem_index].value;
-		if (e->scope == parent_scope) return;
+		if (e->scope == parent_scope) continue;
 
 		if (is_entity_kind_exported(e->kind)) {
 			add_entity(c, parent_scope, e->identifier, e);

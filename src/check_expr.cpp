@@ -2540,18 +2540,10 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			bool is_not_exported = !is_entity_exported(entity);
 			if (entity->kind == Entity_ImportName) {
 				is_not_exported = true;
-			} else if (!implicit_is_found) {
-				is_not_exported = false;
+			} else if (implicit_is_found) {
+				is_not_exported = !is_overloaded;
 			}
 
-			if (is_not_exported) {
-				gbString sel_str = expr_to_string(selector);
-				error(op_expr, "`%s` is not exported by `%.*s`", sel_str, LIT(import_name));
-				gb_string_free(sel_str);
-				operand->mode = Addressing_Invalid;
-				operand->expr = node;
-				return nullptr;
-			}
 
 			if (is_overloaded) {
 				HashKey key = hash_string(entity_name);
@@ -2567,7 +2559,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 					}
 
 					// NOTE(bill): Check to see if it's imported
-					if (map_get(&import_scope->implicit, hash_entity(procs[i]))) {
+					if (is_entity_implicitly_imported(e, procs[i])) {
 						gb_swap(Entity *, procs[i], procs[overload_count-1]);
 						overload_count--;
 						i--; // NOTE(bill): Counteract the post event
@@ -2586,14 +2578,27 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 					}
 				}
 
-				if (overload_count > 0 && !skip) {
-					operand->mode              = Addressing_Overload;
-					operand->type              = t_invalid;
-					operand->expr              = node;
-					operand->overload_count    = overload_count;
-					operand->overload_entities = procs;
-					return procs[0];
+				if (!skip) {
+					if (overload_count > 0) {
+						operand->mode              = Addressing_Overload;
+						operand->type              = t_invalid;
+						operand->expr              = node;
+						operand->overload_count    = overload_count;
+						operand->overload_entities = procs;
+						return procs[0];
+					} else {
+						is_not_exported = true;
+					}
 				}
+			}
+
+			if (is_not_exported) {
+				gbString sel_str = expr_to_string(selector);
+				error(op_expr, "`%s` is not exported by `%.*s`", sel_str, LIT(import_name));
+				gb_string_free(sel_str);
+				operand->mode = Addressing_Invalid;
+				operand->expr = node;
+				return nullptr;
 			}
 		}
 	}
