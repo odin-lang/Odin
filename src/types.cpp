@@ -3,6 +3,7 @@ struct AstNode;
 
 enum BasicKind {
 	Basic_Invalid,
+
 	Basic_bool,
 	Basic_i8,
 	Basic_u8,

@@ -405,7 +405,7 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 	if (operand->mode == Addressing_Invalid ||
 	    type == t_invalid) {
-		return 0;
+		return -1;
 	}
 
 	if (operand->mode == Addressing_Builtin) {
@@ -1192,8 +1192,9 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 	}
 
 	type = core_type(type);
-
-	if (is_type_boolean(type)) {
+	if (type == t_invalid) {
+		return false;
+	} else if (is_type_boolean(type)) {
 		return in_value.kind == ExactValue_Bool;
 	} else if (is_type_string(type)) {
 		return in_value.kind == ExactValue_String;
@@ -1485,8 +1486,17 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 			gb_string_free(type_string);
 		}
 	} else {
-		gbString xt = type_to_string(x->type);
-		gbString yt = type_to_string(y->type);
+		gbString xt, yt;
+		if (x->mode == Addressing_Overload) {
+			xt = gb_string_make(heap_allocator(), "overloaded procedure");
+		} else {
+			xt = type_to_string(x->type);
+		}
+		if (y->mode == Addressing_Overload) {
+			yt = gb_string_make(heap_allocator(), "overloaded procedure");
+		} else {
+			yt = type_to_string(y->type);
+		}
 		err_str = gb_string_make(c->tmp_allocator,
 		                         gb_bprintf("mismatched types `%s` and `%s`", xt, yt));
 		gb_string_free(yt);
