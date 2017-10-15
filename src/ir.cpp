@@ -664,19 +664,20 @@ bool ir_type_has_default_values(Type *t) {
 		return ir_type_has_default_values(t->Array.elem);
 
 	case Type_Struct:
-		if (!t->Struct.is_raw_union) {
-			for_array(i, t->Struct.fields) {
-				Entity *f = t->Struct.fields_in_src_order[i];
-				if (f->kind != Entity_Variable) continue;
-				if (f->Variable.default_is_nil) {
-					// NOTE(bill): This is technically zero
-					continue;
-				} else if (f->Variable.default_value.kind != ExactValue_Invalid) {
-					return true;
-				} else if (f->Variable.default_is_undef) {
-					return true;
-				}
+		if (t->Struct.is_raw_union) return false;
+		for_array(i, t->Struct.fields) {
+			Entity *f = t->Struct.fields_in_src_order[i];
+			if (f->kind != Entity_Variable) continue;
+			if (f->Variable.default_is_nil) {
+				// NOTE(bill): This is technically zero
+				continue;
+			} else if (f->Variable.default_value.kind != ExactValue_Invalid) {
+				return true;
+			} else if (f->Variable.default_is_undef) {
+				return true;
 			}
+			bool sub = ir_type_has_default_values(f->type);
+			if (sub) return true;
 		}
 		break;
 	}
