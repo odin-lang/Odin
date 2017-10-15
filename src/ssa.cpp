@@ -2431,7 +2431,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 			if (e->scope->is_init && name == "main") {
 				entry_point = e;
 			}
-			if ((e->flags & EntityFlag_ForeignExport) != 0 ||
+			if (e->Procedure.is_export ||
 			    (e->Procedure.link_name.len > 0) ||
 			    (e->scope->is_file && e->Procedure.link_name.len > 0)) {
 				if (!has_dll_main && name == "DllMain") {
@@ -2464,7 +2464,8 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 		}
 
 		if (!scope->is_global) {
-			if (e->kind == Entity_Procedure && (e->flags & EntityFlag_ForeignExport) != 0) {
+			if (e->kind == Entity_Procedure && e->Procedure.is_export) {
+			} else if (e->kind == Entity_Variable && e->Variable.is_export) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
 			} else if (scope->is_init && e->kind == Entity_Procedure && name == "main") {

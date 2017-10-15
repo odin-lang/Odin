@@ -1482,12 +1482,16 @@ PtrSet<Entity *> generate_minimum_dependency_set(CheckerInfo *info, Entity *star
 				add_dependency_to_map(&map, info, e);
 			}
 		} else if (e->kind == Entity_Procedure) {
+			if (e->Procedure.is_export) {
+				add_dependency_to_map(&map, info, e);
+			}
 			if (e->Procedure.is_foreign) {
 				add_dependency_to_map(&map, info, e->Procedure.foreign_library);
 			}
-		}
-		if (e->flags & EntityFlag_ForeignExport) {
-			add_dependency_to_map(&map, info, e);
+		} else if (e->kind == Entity_Variable) {
+			if (e->Variable.is_export) {
+				add_dependency_to_map(&map, info, e);
+			}
 		}
 	}
 
@@ -1971,7 +1975,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 				e->Variable.is_foreign = true;
 				e->Variable.foreign_library_ident = fl;
 			} else if (c->context.in_foreign_export) {
-				e->flags |= EntityFlag_ForeignExport;
+				e->Variable.is_export = true;
 			}
 
 			entities[entity_count++] = e;
@@ -2032,7 +2036,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 					e->Procedure.foreign_library_ident = fl;
 					e->Procedure.is_foreign = true;
 				} else if (c->context.in_foreign_export) {
-					e->flags |= EntityFlag_ForeignExport;
+					e->Procedure.is_export = true;
 				}
 				d->proc_lit = init;
 				d->type_expr = pl->type;

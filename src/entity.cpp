@@ -45,8 +45,6 @@ enum EntityFlag {
 	EntityFlag_BitFieldValue = 1<<11,
 
 	EntityFlag_CVarArg       = 1<<20,
-
-	EntityFlag_ForeignExport = 1<<23,
 };
 
 // Zero value means the overloading process is not yet done
@@ -88,6 +86,7 @@ struct Entity {
 			bool       is_immutable;
 			bool       is_thread_local;
 			bool       is_foreign;
+			bool       is_export;
 			Entity *   foreign_library;
 			AstNode *  foreign_library_ident;
 			String     link_name;
@@ -100,6 +99,7 @@ struct Entity {
 			OverloadKind overload_kind;
 			String       link_name;
 			u64          tags;
+			bool         is_export;
 			bool         is_foreign;
 			Entity *     foreign_library;
 			AstNode *    foreign_library_ident;

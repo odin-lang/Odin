@@ -7353,12 +7353,8 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 		String filename = e->token.pos.file;
 		AstFile *f = ast_file_of_filename(info, filename);
 
-		if (e->flags & EntityFlag_ForeignExport) {
-			proc->is_export = true;
-		}
-		if (e->Procedure.is_foreign) {
-			proc->is_foreign = true;
-		}
+		proc->is_export = e->Procedure.is_export;
+		proc->is_foreign = e->Procedure.is_foreign;
 
 		irDebugInfo *di_file = nullptr;
 
@@ -8120,7 +8116,7 @@ void ir_gen_tree(irGen *s) {
 				GB_ASSERT(e == entry_point);
 				// entry_point = e;
 			}
-			if ((e->flags & EntityFlag_ForeignExport) != 0 ||
+			if (e->Procedure.is_export ||
 			    (e->Procedure.link_name.len > 0) ||
 			    (e->scope->is_file && e->Procedure.link_name.len > 0)) {
 				if (!has_dll_main && name == "DllMain") {
@@ -8165,7 +8161,7 @@ void ir_gen_tree(irGen *s) {
 
 
 			bool is_foreign = e->Variable.is_foreign;
-			bool is_export = (e->flags & EntityFlag_ForeignExport) != 0;
+			bool is_export  = e->Variable.is_export;
 
 			String name = e->token.string;
 			String original_name = name;
@@ -8252,7 +8248,7 @@ void ir_gen_tree(irGen *s) {
 		String original_name = name;
 
 		if (!scope->is_global || polymorphic_struct || is_type_polymorphic(e->type)) {
-			if (e->kind == Entity_Procedure && (e->flags & EntityFlag_ForeignExport) != 0) {
+			if (e->kind == Entity_Procedure && e->Procedure.is_export) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
 			// } else if (scope->is_init && e->kind == Entity_Procedure && name == "main") {

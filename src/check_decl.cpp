@@ -426,7 +426,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	TypeProc *pt = &proc_type->Proc;
 
 	bool is_foreign         = e->Procedure.is_foreign;
-	bool is_export          = (e->flags & EntityFlag_ForeignExport) != 0;
+	bool is_export          = e->Procedure.is_export;
 	bool is_link_name       = (pl->tags & ProcTag_link_name) != 0;
 	bool is_inline          = (pl->tags & ProcTag_inline)    != 0;
 	bool is_no_inline       = (pl->tags & ProcTag_no_inline) != 0;
@@ -489,7 +489,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pl->body, pl->tags);
 		}
 	} else if (!is_foreign) {
-		if (e->flags & EntityFlag_ForeignExport) {
+		if (e->Procedure.is_export) {
 			error(e->token, "Foreign export procedures must have a body");
 		} else {
 			error(e->token, "Only a foreign procedure cannot have a body");
@@ -606,7 +606,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		}
 		init_entity_foreign_library(c, e);
 	}
-	if (e->Variable.is_foreign || (e->flags & EntityFlag_ForeignExport) != 0) {
+	if (e->Variable.is_foreign || e->Variable.is_export) {
 		String name = e->token.string;
 		auto *fp = &c->info.foreigns;
 		HashKey key = hash_string(name);
