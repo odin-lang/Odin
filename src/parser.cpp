@@ -373,13 +373,15 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		CommentGroup comment;   \
 	}) \
 	AST_NODE_KIND(ForeignLibraryDecl, "foreign library declaration", struct { \
-		Token    token;         \
-		Token    filepath;      \
-		Token    library_name;  \
-		String   base_dir;      \
-		bool     been_handled;  \
-		CommentGroup docs;      \
-		CommentGroup comment;   \
+		Token    token;           \
+		Token    filepath;        \
+		Token    library_name;    \
+		String   base_dir;        \
+		String   collection_name; \
+		String   fullpath;        \
+		bool     been_handled;    \
+		CommentGroup docs;        \
+		CommentGroup comment;     \
 	}) \
 AST_NODE_KIND(_DeclEnd,   "", i32) \
 	AST_NODE_KIND(Field, "field", struct { \
@@ -1772,7 +1774,6 @@ void fix_advance_to_next_stmt(AstFile *f) {
 
 		case Token_foreign:
 		case Token_foreign_library:
-		case Token_foreign_system_library:
 
 		case Token_if:
 		case Token_for:
@@ -4406,13 +4407,15 @@ AstNode *parse_foreign_decl(AstFile *f) {
 	CommentGroup docs = f->lead_comment;
 	Token token = {};
 	switch (f->curr_token.kind) {
+	case Token_foreign:
+		return parse_foreign_block(f);
+
 	case Token_foreign_library:
-	case Token_foreign_system_library:
 		token = advance_token(f);
 		break;
 	default:
 		token = advance_token(f);
-		syntax_error(token, "Expected either foreign_library or foreign_system_library, got `%.*s`", LIT(token.string));
+		syntax_error(token, "Expected either foreign or foreign_library, got `%.*s`", LIT(token.string));
 		return ast_bad_decl(f, token, token);
 	}
 
@@ -4432,7 +4435,7 @@ AstNode *parse_foreign_decl(AstFile *f) {
 	Token file_path = expect_token(f, Token_String);
 	AstNode *s = nullptr;
 	if (f->curr_proc != nullptr) {
-		syntax_error(lib_name, "You cannot use foreign_system_library within a procedure. This must be done at the file scope");
+		syntax_error(lib_name, "You cannot use foreign_library within a procedure. This must be done at the file scope");
 		s = ast_bad_decl(f, lib_name, file_path);
 	} else {
 		s = ast_foreign_library_decl(f, token, file_path, lib_name, docs, f->line_comment);
@@ -4468,10 +4471,7 @@ AstNode *parse_stmt(AstFile *f) {
 
 
 	case Token_foreign:
-		return parse_foreign_block(f);
-
 	case Token_foreign_library:
-	case Token_foreign_system_library:
 		return parse_foreign_decl(f);
 
 	case Token_import:
@@ -4859,10 +4859,23 @@ bool determine_path_from_string(Parser *p, AstNode *node, String base_dir, Strin
 	gb_mutex_lock(&p->file_decl_mutex);
 	defer (gb_mutex_unlock(&p->file_decl_mutex));
 
+
+	if (node->kind == AstNode_ForeignLibraryDecl) {
+		node->ForeignLibraryDecl.collection_name = collection_name;
+	}
+
 	if (collection_name.len > 0) {
-		if (!find_library_collection_path(collection_name, &base_dir)) {
+		if (collection_name == "system") {
+			if (node->kind != AstNode_ForeignLibraryDecl) {
+				syntax_error(node, "The library collection `system` is restrict for `foreign_library`");
+				return false;
+			} else {
+				*path = file_str;
+				return true;
+			}
+		} else if (!find_library_collection_path(collection_name, &base_dir)) {
 			// NOTE(bill): It's a naughty name
-			syntax_error(node, "Unknown library colleciton: `%.*s`", LIT(base_dir));
+			syntax_error(node, "Unknown library collection: `%.*s`", LIT(collection_name));
 			return false;
 		}
 	}
@@ -4935,13 +4948,19 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 			ast_node(fl, ForeignLibraryDecl, node);
 
 			String file_str = fl->filepath.string;
-			if (!is_import_path_valid(file_str)) {
-				syntax_error(node, "Invalid `%.*s` path", LIT(fl->token.string));
-				// NOTE(bill): It's a naughty name
-				decls[i] = ast_bad_decl(f, fl->filepath, fl->filepath);
-			} else {
-				fl->base_dir = base_dir;
+			fl->base_dir = base_dir;
+			fl->fullpath = file_str;
+
+			if (fl->token.kind == Token_foreign_library) {
+				String foreign_path = {};
+				bool ok = determine_path_from_string(p, node, base_dir, file_str, &foreign_path);
+				if (!ok) {
+					decls[i] = ast_bad_decl(f, fl->filepath, fl->filepath);
+					continue;
+				}
+				fl->fullpath = foreign_path;
 			}
+
 		} else if (node->kind == AstNode_WhenStmt) {
 			ast_node(ws, WhenStmt, node);
 			parse_setup_file_when_stmt(p, f, base_dir, ws);

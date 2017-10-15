@@ -1,5 +1,5 @@
-foreign_system_library dl   "dl"
-foreign_system_library libc "c"
+foreign_library dl   "system:dl"
+foreign_library libc "system:c"
 
 import "core:strings.odin"
 import "core:mem.odin"

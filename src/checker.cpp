@@ -1213,6 +1213,9 @@ void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
 	if (identifier->kind != AstNode_Ident) {
 		return;
 	}
+	if (entity == nullptr) {
+		return;
+	}
 	if (entity->identifier == nullptr) {
 		entity->identifier = identifier;
 	}
@@ -2604,33 +2607,37 @@ void check_add_foreign_library_decl(Checker *c, AstNode *decl) {
 	Scope *parent_scope = c->context.scope;
 	GB_ASSERT(parent_scope->is_file);
 
-	String file_str = fl->filepath.string;
-	String base_dir = fl->base_dir;
-
-	if (fl->token.kind == Token_foreign_library) {
-		gbAllocator a = heap_allocator(); // TODO(bill): Change this allocator
-
-		String rel_path = get_fullpath_relative(a, base_dir, file_str);
-		String import_file = rel_path;
-		if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
-			String abs_path = get_fullpath_core(a, file_str);
-			if (gb_file_exists(cast(char *)abs_path.text)) {
-				import_file = abs_path;
-			}
-		}
-		file_str = import_file;
-	}
-
-	String library_name = path_to_entity_name(fl->library_name.string, file_str);
+	String fullpath = fl->fullpath;
+	String library_name = path_to_entity_name(fl->library_name.string, fullpath);
 	if (is_blank_ident(library_name)) {
 		error(fl->token, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
-	} else {
-		GB_ASSERT(fl->library_name.pos.line != 0);
-		fl->library_name.string = library_name;
-		Entity *e = make_entity_library_name(c->allocator, parent_scope, fl->library_name, t_invalid,
-		                                     file_str, library_name);
-		add_entity(c, parent_scope, nullptr, e);
+		return;
 	}
+
+	if (fl->collection_name != "system") {
+		char *c_str = gb_alloc_array(heap_allocator(), char, fullpath.len+1);
+		defer (gb_free(heap_allocator(), c_str));
+		gb_memcopy(c_str, fullpath.text, fullpath.len);
+		c_str[fullpath.len] = '\0';
+
+		gbFile f = {};
+		gbFileError file_err = gb_file_open(&f, c_str);
+
+		switch (file_err) {
+		case gbFileError_Invalid:
+			error(decl, "Invalid file or cannot be found (`%.*s`)", LIT(fullpath));
+			return;
+		case gbFileError_NotExists:
+			error(decl, "File cannot be found (`%.*s`)", LIT(fullpath));
+			return;
+		}
+	}
+
+	GB_ASSERT(fl->library_name.pos.line != 0);
+	fl->library_name.string = library_name;
+	Entity *e = make_entity_library_name(c->allocator, parent_scope, fl->library_name, t_invalid,
+	                                     fl->fullpath, library_name);
+	add_entity(c, parent_scope, nullptr, e);
 }
 
 

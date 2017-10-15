@@ -430,6 +430,12 @@ bool parse_build_flags(Array<String> args) {
 								break;
 							}
 
+							if (name == "system") {
+								gb_printf_err("Library collection name `system` is reserved\n");
+								bad_flags = true;
+								break;
+							}
+
 							String prev_path = {};
 							bool found = find_library_collection_path(name, &prev_path);
 							if (found) {

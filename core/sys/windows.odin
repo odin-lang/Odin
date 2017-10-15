@@ -1,9 +1,9 @@
 when ODIN_OS == "windows" {
-	foreign_system_library "kernel32.lib"
-	foreign_system_library "user32.lib"
-	foreign_system_library "gdi32.lib"
-	foreign_system_library "winmm.lib"
-	foreign_system_library "shell32.lib"
+	foreign_library "system:kernel32.lib"
+	foreign_library "system:user32.lib"
+	foreign_library "system:gdi32.lib"
+	foreign_library "system:winmm.lib"
+	foreign_library "system:shell32.lib"
 }
 
 Handle    :: rawptr;
