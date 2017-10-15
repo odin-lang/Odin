@@ -356,8 +356,9 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 				ir_print_encoded_local(f, *found);
 			} else {
 				// TODO(bill): Is this correct behaviour?!
+				GB_ASSERT_MSG(found != nullptr, "%.*s %p", LIT(t->Named.name), t->Named.type_name);
+				// gb_printf_err("%.*s %p\n", LIT(t->Named.name), t->Named.type_name);
 				ir_print_type(f, m, base_type(t));
-				// GB_ASSERT_MSG(found != nullptr, "%.*s %p", LIT(t->Named.name), t->Named.type_name);
 			}
 			break;
 		}
@@ -1795,6 +1796,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 void ir_print_type_name(irFileBuffer *f, irModule *m, irValue *v) {
 	GB_ASSERT(v->kind == irValue_TypeName);
 	Type *t = base_type(v->TypeName.type);
+
 	ir_print_encoded_local(f, v->TypeName.name);
 	ir_write_string(f, str_lit(" = type "));
 

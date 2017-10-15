@@ -4867,8 +4867,10 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 					AstNode *s = ident->SelectorExpr.selector;
 					ident = s;
 				}
-				add_entity_use(c, ident, entity_of_ident(&c->info, ident));
-				add_type_and_value(&c->info, call, Addressing_Type, operand->type, empty_exact_value);
+				Type *ot = operand->type; GB_ASSERT(ot->kind == Type_Named);
+				Entity *e = ot->Named.type_name;
+				add_entity_use(c, ident, e);
+				add_type_and_value(&c->info, call, Addressing_Type, ot, empty_exact_value);
 			} else {
 				operand->mode = Addressing_Invalid;
 				operand->type = t_invalid;

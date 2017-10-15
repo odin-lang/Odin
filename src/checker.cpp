@@ -818,8 +818,8 @@ void add_declaration_dependency(Checker *c, Entity *e) {
 		return;
 	}
 	if (c->context.decl != nullptr) {
-		DeclInfo *decl = decl_info_of_entity(&c->info, e);
-		if (decl) add_dependency(c->context.decl, e);
+		// DeclInfo *decl = decl_info_of_entity(&c->info, e);
+		add_dependency(c->context.decl, e);
 	}
 }
 
@@ -1213,6 +1213,9 @@ void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
 	if (identifier->kind != AstNode_Ident) {
 		return;
 	}
+	if (entity->identifier == nullptr) {
+		entity->identifier = identifier;
+	}
 	HashKey key = hash_node(identifier);
 	map_set(&c->info.uses, key, entity);
 	add_declaration_dependency(c, entity); // TODO(bill): Should this be here?
@@ -1435,10 +1438,14 @@ void add_dependency_to_map(PtrSet<Entity *> *map, CheckerInfo *info, Entity *ent
 	if (entity == nullptr) {
 		return;
 	}
+
+	String name = entity->token.string;
+
 	if (entity->type != nullptr &&
 	    is_type_polymorphic(entity->type)) {
+
 		DeclInfo *decl = decl_info_of_entity(info, entity);
-		if (decl->gen_proc_type == nullptr) {
+		if (decl != nullptr && decl->gen_proc_type == nullptr) {
 			return;
 		}
 	}
@@ -1446,6 +1453,7 @@ void add_dependency_to_map(PtrSet<Entity *> *map, CheckerInfo *info, Entity *ent
 	if (ptr_set_exists(map, entity)) {
 		return;
 	}
+
 
 	ptr_set_add(map, entity);
 	DeclInfo *decl = decl_info_of_entity(info, entity);
