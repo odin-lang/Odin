@@ -423,6 +423,7 @@ struct CheckerContext {
 	DeclInfo * curr_proc_decl;
 	AstNode *  curr_foreign_library;
 
+	bool       in_foreign_export;
 	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;
 	bool       no_polymorphic_errors;
@@ -1481,12 +1482,12 @@ PtrSet<Entity *> generate_minimum_dependency_set(CheckerInfo *info, Entity *star
 				add_dependency_to_map(&map, info, e);
 			}
 		} else if (e->kind == Entity_Procedure) {
-			if ((e->Procedure.tags & ProcTag_export) != 0) {
-				add_dependency_to_map(&map, info, e);
-			}
 			if (e->Procedure.is_foreign) {
 				add_dependency_to_map(&map, info, e->Procedure.foreign_library);
 			}
+		}
+		if (e->flags & EntityFlag_ForeignExport) {
+			add_dependency_to_map(&map, info, e);
 		}
 	}
 
@@ -1969,6 +1970,8 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 				GB_ASSERT(fl->kind == AstNode_Ident);
 				e->Variable.is_foreign = true;
 				e->Variable.foreign_library_ident = fl;
+			} else if (c->context.in_foreign_export) {
+				e->flags |= EntityFlag_ForeignExport;
 			}
 
 			entities[entity_count++] = e;
@@ -2027,7 +2030,9 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 				if (fl != nullptr) {
 					GB_ASSERT(fl->kind == AstNode_Ident);
 					e->Procedure.foreign_library_ident = fl;
-					pl->tags |= ProcTag_foreign;
+					e->Procedure.is_foreign = true;
+				} else if (c->context.in_foreign_export) {
+					e->flags |= EntityFlag_ForeignExport;
 				}
 				d->proc_lit = init;
 				d->type_expr = pl->type;
@@ -2038,13 +2043,14 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 			}
 			e->identifier = name;
 
-			if (fl != nullptr && e->kind != Entity_Procedure) {
-				AstNodeKind kind = init->kind;
-				error(name, "Only procedures and variables are allowed to be in a foreign block, got %.*s", LIT(ast_node_strings[kind]));
-				if (kind == AstNode_ProcType) {
-					gb_printf_err("\tDid you forget to append `---` to the procedure?\n");
+			if (e->kind != Entity_Procedure) {
+				if (fl != nullptr || c->context.in_foreign_export) {
+					AstNodeKind kind = init->kind;
+					error(name, "Only procedures and variables are allowed to be in a foreign block, got %.*s", LIT(ast_node_strings[kind]));
+					if (kind == AstNode_ProcType) {
+						gb_printf_err("\tDid you forget to append `---` to the procedure?\n");
+					}
 				}
-				// continue;
 			}
 
 			add_entity_and_decl_info(c, name, e, d);
@@ -2061,13 +2067,18 @@ void check_add_foreign_block_decl(Checker *c, AstNode *decl) {
 	fb->been_handled = true;
 
 	AstNode *foreign_library = fb->foreign_library;
-	if (foreign_library->kind != AstNode_Ident) {
-		error(foreign_library, "foreign library name must be an identifier");
-		foreign_library = nullptr;
-	}
+
 
 	CheckerContext prev_context = c->context;
-	c->context.curr_foreign_library = foreign_library;
+	if (foreign_library->kind == AstNode_Ident) {
+		c->context.curr_foreign_library = foreign_library;
+	} else if (foreign_library->kind == AstNode_Implicit && foreign_library->Implicit.kind == Token_export) {
+		c->context.in_foreign_export = true;
+	} else {
+		error(foreign_library, "Foreign block name must be an identifier or `export`");
+		c->context.curr_foreign_library = nullptr;
+	}
+
 	c->context.collect_delayed_decls = true;
 	check_collect_entities(c, fb->decls);
 	c->context = prev_context;

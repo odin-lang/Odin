@@ -46,6 +46,7 @@ enum EntityFlag {
 
 	EntityFlag_CVarArg       = 1<<20,
 
+	EntityFlag_ForeignExport = 1<<23,
 };
 
 // Zero value means the overloading process is not yet done

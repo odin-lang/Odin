@@ -801,7 +801,7 @@ bool ir_print_is_proc_global(irModule *m, irProcedure *proc) {
 		    return true;
 		}
 	}
-	return (proc->tags & (ProcTag_foreign|ProcTag_export)) != 0;
+	return proc->is_foreign || proc->is_export;
 }
 
 void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hint) {
@@ -1673,8 +1673,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 		ir_write_byte(f, '\n');
 		ir_write_string(f, "define ");
 		if (build_context.is_dll) {
-			// if (proc->tags & (ProcTag_export|ProcTag_dll_export)) {
-			if (proc->tags & (ProcTag_export)) {
+			if (proc->is_export) {
 				ir_write_string(f, "dllexport ");
 			}
 		}
@@ -1923,6 +1922,11 @@ void print_llvm_ir(irGen *ir) {
 		ir_write_string(f, str_lit(" = "));
 		if (g->is_foreign) {
 			ir_write_string(f, str_lit("external "));
+		}
+		if (build_context.is_dll) {
+			if (g->is_export) {
+				ir_write_string(f, str_lit("dllexport "));
+			}
 		}
 		if (g->is_thread_local) {
 			ir_write_string(f, str_lit("thread_local "));

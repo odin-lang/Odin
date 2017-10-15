@@ -117,6 +117,8 @@ struct irProcedure {
 	AstNode *             type_expr;
 	AstNode *             body;
 	u64                   tags;
+	bool                  is_foreign;
+	bool                  is_export;
 
 	irValue *             return_ptr;
 	Array<irValue *>      params;
@@ -357,6 +359,7 @@ struct irValueGlobal {
 	irValue *     value;
 	Array<irValue *>  referrers;
 	bool          is_constant;
+	bool          is_export;
 	bool          is_private;
 	bool          is_thread_local;
 	bool          is_foreign;
@@ -5976,7 +5979,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 				ir_module_add_value(proc->module, e, value);
 				ir_build_proc(value, proc);
 
-				if (value->Proc.tags & ProcTag_foreign) {
+				if (value->Proc.is_foreign || value->Proc.is_export) {
 					HashKey key = hash_string(name);
 					irValue **prev_value = map_get(&proc->module->members, key);
 					if (prev_value == nullptr) {
@@ -7349,6 +7352,14 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 		Entity *e = proc->entity;
 		String filename = e->token.pos.file;
 		AstFile *f = ast_file_of_filename(info, filename);
+
+		if (e->flags & EntityFlag_ForeignExport) {
+			proc->is_export = true;
+		}
+		if (e->Procedure.is_foreign) {
+			proc->is_foreign = true;
+		}
+
 		irDebugInfo *di_file = nullptr;
 
 		irDebugInfo **di_file_found = map_get(&m->debug_info, hash_ast_file(f));
@@ -8109,7 +8120,7 @@ void ir_gen_tree(irGen *s) {
 				GB_ASSERT(e == entry_point);
 				// entry_point = e;
 			}
-			if ((e->Procedure.tags & ProcTag_export) != 0 ||
+			if ((e->flags & EntityFlag_ForeignExport) != 0 ||
 			    (e->Procedure.link_name.len > 0) ||
 			    (e->scope->is_file && e->Procedure.link_name.len > 0)) {
 				if (!has_dll_main && name == "DllMain") {
@@ -8162,11 +8173,13 @@ void ir_gen_tree(irGen *s) {
 			irValue *g = ir_value_global(a, e, nullptr);
 			g->Global.name = name;
 			g->Global.is_thread_local = e->Variable.is_thread_local;
-
+			g->Global.is_export = (e->flags & EntityFlag_ForeignExport) != 0;
+			g->Global.is_foreign = e->Variable.is_foreign;
 
 			irGlobalVariable var = {};
 			var.var = g;
 			var.decl = decl;
+
 
 			if (e->type->kind == Type_Struct && e->type->Struct.has_proc_default_values) {
 				for_array(i, e->type->Struct.fields) {
@@ -8235,7 +8248,7 @@ void ir_gen_tree(irGen *s) {
 		String original_name = name;
 
 		if (!scope->is_global || polymorphic_struct || is_type_polymorphic(e->type)) {
-			if (e->kind == Entity_Procedure && (e->Procedure.tags & ProcTag_export) != 0) {
+			if (e->kind == Entity_Procedure && (e->flags & EntityFlag_ForeignExport) != 0) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
 			// } else if (scope->is_init && e->kind == Entity_Procedure && name == "main") {

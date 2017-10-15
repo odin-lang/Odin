@@ -425,9 +425,9 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 	TypeProc *pt = &proc_type->Proc;
 
-	bool is_foreign         = (pl->tags & ProcTag_foreign)   != 0;
+	bool is_foreign         = e->Procedure.is_foreign;
+	bool is_export          = (e->flags & EntityFlag_ForeignExport) != 0;
 	bool is_link_name       = (pl->tags & ProcTag_link_name) != 0;
-	bool is_export          = (pl->tags & ProcTag_export)    != 0;
 	bool is_inline          = (pl->tags & ProcTag_inline)    != 0;
 	bool is_no_inline       = (pl->tags & ProcTag_no_inline) != 0;
 	bool is_require_results = (pl->tags & ProcTag_require_results) != 0;
@@ -489,7 +489,11 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pl->body, pl->tags);
 		}
 	} else if (!is_foreign) {
-		error(e->token, "Only a foreign procedure cannot have a body");
+		if (e->flags & EntityFlag_ForeignExport) {
+			error(e->token, "Foreign export procedures must have a body");
+		} else {
+			error(e->token, "Only a foreign procedure cannot have a body");
+		}
 	}
 
 	if (pt->result_count == 0 && is_require_results) {

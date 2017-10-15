@@ -95,11 +95,9 @@ enum ProcTag {
 
 	ProcTag_require_results = 1<<4,
 
-	ProcTag_foreign         = 1<<10,
-	ProcTag_export          = 1<<11,
-	ProcTag_link_name       = 1<<12,
-	ProcTag_inline          = 1<<13,
-	ProcTag_no_inline       = 1<<14,
+	ProcTag_link_name       = 1<<11,
+	ProcTag_inline          = 1<<12,
+	ProcTag_no_inline       = 1<<13,
 
 	// ProcTag_dll_import      = 1<<15,
 	// ProcTag_dll_export      = 1<<16,
@@ -1933,12 +1931,7 @@ AstNode *parse_ident(AstFile *f) {
 
 AstNode *parse_tag_expr(AstFile *f, AstNode *expression) {
 	Token token = expect_token(f, Token_Hash);
-	Token name = {};
-	if (f->curr_token.kind == Token_export) {
-		name = expect_token(f, Token_export);
-	} else {
-		name = expect_token(f, Token_Ident);
-	}
+	Token name = expect_token(f, Token_Ident);
 	return ast_tag_expr(f, token, name, expression);
 }
 
@@ -2088,7 +2081,6 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *link_name, ProcCallingConven
 			}
 		}
 		ELSE_IF_ADD_TAG(require_results)
-		ELSE_IF_ADD_TAG(export)
 		ELSE_IF_ADD_TAG(bounds_check)
 		ELSE_IF_ADD_TAG(no_bounds_check)
 		ELSE_IF_ADD_TAG(inline)
@@ -2131,7 +2123,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *link_name, ProcCallingConven
 	}
 
 	if (cc == ProcCC_Invalid) {
-		if ((*tags) & ProcTag_foreign || f->in_foreign_block) {
+		if (f->in_foreign_block) {
 			cc = ProcCC_C;
 		} else {
 			cc = ProcCC_Odin;
@@ -2142,20 +2134,12 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *link_name, ProcCallingConven
 		*calling_convention = cc;
 	}
 
-	if ((*tags & ProcTag_foreign) && (*tags & ProcTag_export)) {
-		syntax_error(f->curr_token, "A foreign procedure cannot have #export");
-	}
-
 	if ((*tags & ProcTag_inline) && (*tags & ProcTag_no_inline)) {
 		syntax_error(f->curr_token, "You cannot apply both #inline and #no_inline to a procedure");
 	}
 
 	if ((*tags & ProcTag_bounds_check) && (*tags & ProcTag_no_bounds_check)) {
 		syntax_error(f->curr_token, "You cannot apply both #bounds_check and #no_bounds_check to a procedure");
-	}
-
-	if (((*tags & ProcTag_bounds_check) || (*tags & ProcTag_no_bounds_check)) && (*tags & ProcTag_foreign)) {
-		syntax_error(f->curr_token, "You cannot apply both #bounds_check or #no_bounds_check to a procedure without a body");
 	}
 }
 
@@ -2309,9 +2293,6 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		if (allow_token(f, Token_Undef)) {
 			return ast_proc_lit(f, type, nullptr, tags, link_name);
 		} else if (f->curr_token.kind == Token_OpenBrace) {
-			if ((tags & ProcTag_foreign) != 0) {
-				syntax_error(token, "A procedure tagged as `#foreign` cannot have a body");
-			}
 			AstNode *curr_proc = f->curr_proc;
 			AstNode *body = nullptr;
 			f->curr_proc = type;
@@ -2320,9 +2301,6 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 			return ast_proc_lit(f, type, body, tags, link_name);
 		} else if (allow_token(f, Token_do)) {
-			if ((tags & ProcTag_foreign) != 0) {
-				syntax_error(token, "A procedure tagged as `#foreign` cannot have a body");
-			}
 			AstNode *curr_proc = f->curr_proc;
 			AstNode *body = nullptr;
 			f->curr_proc = type;
@@ -2332,9 +2310,6 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			return ast_proc_lit(f, type, body, tags, link_name);
 		}
 
-		if ((tags & ProcTag_foreign) != 0) {
-			return ast_proc_lit(f, type, nullptr, tags, link_name);
-		}
 		if (tags != 0) {
 			// syntax_error(token, "A procedure type cannot have tags");
 		}
@@ -3041,7 +3016,12 @@ void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
 
 AstNode *parse_foreign_block(AstFile *f, Token token) {
 	CommentGroup docs = f->lead_comment;
-	AstNode *foreign_library = parse_ident(f);
+	AstNode *foreign_library = nullptr;
+	if (f->curr_token.kind == Token_export) {
+		foreign_library = ast_implicit(f, expect_token(f, Token_export));
+	} else {
+		foreign_library = parse_ident(f);
+	}
 	Token open = {};
 	Token close = {};
 	Array<AstNode *> decls = make_ast_node_array(f);
@@ -3062,7 +3042,6 @@ AstNode *parse_foreign_block(AstFile *f, Token token) {
 
 		close = expect_token(f, Token_CloseBrace);
 	}
-
 
 	AstNode *decl = ast_foreign_block_decl(f, token, foreign_library, open, close, decls, docs);
 	expect_semicolon(f, decl);
@@ -4409,6 +4388,7 @@ AstNode *parse_foreign_decl(AstFile *f) {
 	Token token = expect_token(f, Token_foreign);
 
 	switch (f->curr_token.kind) {
+	case Token_export:
 	case Token_Ident:
 		return parse_foreign_block(f, token);
 
