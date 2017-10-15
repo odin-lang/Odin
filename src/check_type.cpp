@@ -1475,7 +1475,8 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				param = make_entity_type_name(c->allocator, scope, name->Ident.token, type);
 				param->TypeName.is_type_alias = true;
 			} else {
-				if (operands != nullptr && is_type_polymorphic_type) {
+				if (operands != nullptr && is_type_polymorphic_type &&
+				    operands->count > variables.count) {
 					Operand op = (*operands)[variables.count];
 					type = determine_type_from_polymorphic(c, type, op);
 					if (type == t_invalid) {
