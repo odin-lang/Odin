@@ -514,7 +514,6 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 		init_entity_foreign_library(c, e);
 
-
 		auto *fp = &c->info.foreigns;
 		HashKey key = hash_string(name);
 		Entity **found = map_get(fp, key);
@@ -606,7 +605,8 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 			error(e->token, "A foreign variable declaration cannot have a default value");
 		}
 		init_entity_foreign_library(c, e);
-
+	}
+	if (e->Variable.is_foreign || (e->flags & EntityFlag_ForeignExport) != 0) {
 		String name = e->token.string;
 		auto *fp = &c->info.foreigns;
 		HashKey key = hash_string(name);

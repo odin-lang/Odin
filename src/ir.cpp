@@ -8163,9 +8163,13 @@ void ir_gen_tree(irGen *s) {
 				continue;
 			}
 
+
+			bool is_foreign = e->Variable.is_foreign;
+			bool is_export = (e->flags & EntityFlag_ForeignExport) != 0;
+
 			String name = e->token.string;
 			String original_name = name;
-			if (!e->scope->is_global) {
+			if (!e->scope->is_global && !(is_foreign || is_export)) {
 				name = ir_mangle_name(s, e->token.pos.file, e);
 			}
 			ir_add_entity_name(m, e, name);
@@ -8173,8 +8177,8 @@ void ir_gen_tree(irGen *s) {
 			irValue *g = ir_value_global(a, e, nullptr);
 			g->Global.name = name;
 			g->Global.is_thread_local = e->Variable.is_thread_local;
-			g->Global.is_export = (e->flags & EntityFlag_ForeignExport) != 0;
-			g->Global.is_foreign = e->Variable.is_foreign;
+			g->Global.is_foreign = is_foreign;
+			g->Global.is_export  = is_export;
 
 			irGlobalVariable var = {};
 			var.var = g;
