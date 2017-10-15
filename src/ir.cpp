@@ -5457,7 +5457,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		Type *type = base_type(ir_type(base));
 
 		if (is_type_pointer(type)) {
-			type = type_deref(type);
+			type = base_type(type_deref(type));
 			addr = base;
 			base = ir_emit_load(proc, base);
 		}
