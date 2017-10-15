@@ -87,7 +87,6 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_import,                 "import"),                 \
 	TOKEN_KIND(Token_export,                 "export"),                 \
 	TOKEN_KIND(Token_foreign,                "foreign"),                \
-	TOKEN_KIND(Token_foreign_library,        "foreign_library"),        \
 	TOKEN_KIND(Token_type,                   "type"),                   \
 	TOKEN_KIND(Token_when,                   "when"),                   \
 	TOKEN_KIND(Token_if,                     "if"),                     \

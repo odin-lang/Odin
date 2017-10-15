@@ -1,5 +1,5 @@
 when ODIN_OS == "windows" {
-	foreign_library "system:opengl32.lib"
+	foreign import "system:opengl32.lib"
 }
 using import "core:sys/windows.odin"
 

@@ -1,9 +1,9 @@
 when ODIN_OS == "windows" {
-	foreign_library lib "system:opengl32.lib"
+	foreign import lib "system:opengl32.lib"
 	import win32 "core:sys/windows.odin"
 	import "core:sys/wgl.odin"
 } else when ODIN_OS == "linux" {
-	foreign_library lib "system:gl"
+	foreign import lib "system:gl"
 }
 
 export "core:opengl_constants.odin"

@@ -520,7 +520,7 @@ void add_implicit_entity(Checker *c, AstNode *node, Entity *e);
 
 void check_add_import_decl(Checker *c, AstNodeImportDecl *id);
 void check_add_export_decl(Checker *c, AstNodeExportDecl *ed);
-void check_add_foreign_library_decl(Checker *c, AstNode *decl);
+void check_add_foreign_import_decl(Checker *c, AstNode *decl);
 
 
 void init_declaration_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
@@ -2117,14 +2117,14 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 			}
 		case_end;
 
-		case_ast_node(fl, ForeignLibraryDecl, decl);
+		case_ast_node(fl, ForeignImportDecl, decl);
 			if (!c->context.scope->is_file) {
 				error(decl, "%.*s declarations are only allowed in the file scope", LIT(fl->token.string));
 				// NOTE(bill): _Should_ be caught by the parser
 				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
-			check_add_foreign_library_decl(c, decl);
+			check_add_foreign_import_decl(c, decl);
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
@@ -2598,8 +2598,8 @@ void check_add_export_decl(Checker *c, AstNodeExportDecl *ed) {
 	scope->has_been_imported = true;
 }
 
-void check_add_foreign_library_decl(Checker *c, AstNode *decl) {
-	ast_node(fl, ForeignLibraryDecl, decl);
+void check_add_foreign_import_decl(Checker *c, AstNode *decl) {
+	ast_node(fl, ForeignImportDecl, decl);
 
 	if (fl->been_handled) return;
 	fl->been_handled = true;
@@ -2726,8 +2726,8 @@ void check_delayed_file_import_entity(Checker *c, AstNode *decl) {
 		check_add_export_decl(c, ed);
 	case_end;
 
-	case_ast_node(fl, ForeignLibraryDecl, decl);
-		check_add_foreign_library_decl(c, decl);
+	case_ast_node(fl, ForeignImportDecl, decl);
+		check_add_foreign_import_decl(c, decl);
 	case_end;
 	}
 }
@@ -2796,8 +2796,8 @@ bool collect_file_decls(Checker *c, Array<AstNode *> decls) {
 			check_add_export_decl(c, ed);
 		case_end;
 
-		case_ast_node(fl, ForeignLibraryDecl, decl);
-			check_add_foreign_library_decl(c, decl);
+		case_ast_node(fl, ForeignImportDecl, decl);
+			check_add_foreign_import_decl(c, decl);
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);

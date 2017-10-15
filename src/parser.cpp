@@ -372,7 +372,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
-	AST_NODE_KIND(ForeignLibraryDecl, "foreign library declaration", struct { \
+	AST_NODE_KIND(ForeignImportDecl, "foreign import declaration", struct { \
 		Token    token;           \
 		Token    filepath;        \
 		Token    library_name;    \
@@ -596,7 +596,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_ValueDecl:          return ast_node_token(node->ValueDecl.names[0]);
 	case AstNode_ImportDecl:         return node->ImportDecl.token;
 	case AstNode_ExportDecl:         return node->ExportDecl.token;
-	case AstNode_ForeignLibraryDecl: return node->ForeignLibraryDecl.token;
+	case AstNode_ForeignImportDecl:  return node->ForeignImportDecl.token;
 
 	case AstNode_ForeignBlockDecl:   return node->ForeignBlockDecl.token;
 
@@ -1568,14 +1568,14 @@ AstNode *ast_export_decl(AstFile *f, Token token, Token relpath,
 	return result;
 }
 
-AstNode *ast_foreign_library_decl(AstFile *f, Token token, Token filepath, Token library_name,
-                                  CommentGroup docs, CommentGroup comment) {
-	AstNode *result = make_ast_node(f, AstNode_ForeignLibraryDecl);
-	result->ForeignLibraryDecl.token        = token;
-	result->ForeignLibraryDecl.filepath     = filepath;
-	result->ForeignLibraryDecl.library_name = library_name;
-	result->ForeignLibraryDecl.docs         = docs;
-	result->ForeignLibraryDecl.comment      = comment;
+AstNode *ast_foreign_import_decl(AstFile *f, Token token, Token filepath, Token library_name,
+                                 CommentGroup docs, CommentGroup comment) {
+	AstNode *result = make_ast_node(f, AstNode_ForeignImportDecl);
+	result->ForeignImportDecl.token        = token;
+	result->ForeignImportDecl.filepath     = filepath;
+	result->ForeignImportDecl.library_name = library_name;
+	result->ForeignImportDecl.docs         = docs;
+	result->ForeignImportDecl.comment      = comment;
 	return result;
 }
 
@@ -1772,8 +1772,10 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_Semicolon:
 			return;
 
+
 		case Token_foreign:
-		case Token_foreign_library:
+		case Token_import:
+		case Token_export:
 
 		case Token_if:
 		case Token_for:
@@ -1852,7 +1854,7 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 
 	case AstNode_ImportDecl:
 	case AstNode_ExportDecl:
-	case AstNode_ForeignLibraryDecl:
+	case AstNode_ForeignImportDecl:
 		return true;
 
 	case AstNode_ValueDecl:
@@ -3037,9 +3039,8 @@ void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
 	}
 }
 
-AstNode *parse_foreign_block(AstFile *f) {
+AstNode *parse_foreign_block(AstFile *f, Token token) {
 	CommentGroup docs = f->lead_comment;
-	Token token = expect_token(f, Token_foreign);
 	AstNode *foreign_library = parse_ident(f);
 	Token open = {};
 	Token close = {};
@@ -4405,43 +4406,41 @@ AstNode *parse_export_decl(AstFile *f) {
 
 AstNode *parse_foreign_decl(AstFile *f) {
 	CommentGroup docs = f->lead_comment;
-	Token token = {};
-	switch (f->curr_token.kind) {
-	case Token_foreign:
-		return parse_foreign_block(f);
-
-	case Token_foreign_library:
-		token = advance_token(f);
-		break;
-	default:
-		token = advance_token(f);
-		syntax_error(token, "Expected either foreign or foreign_library, got `%.*s`", LIT(token.string));
-		return ast_bad_decl(f, token, token);
-	}
-
-	Token lib_name = {};
+	Token token = expect_token(f, Token_foreign);
 
 	switch (f->curr_token.kind) {
 	case Token_Ident:
-		lib_name = advance_token(f);
-		break;
-	default:
-		lib_name.pos = f->curr_token.pos;
-		break;
+		return parse_foreign_block(f, token);
+
+	case Token_import: {
+		Token import_token = expect_token(f, Token_import);
+		Token lib_name = {};
+		switch (f->curr_token.kind) {
+		case Token_Ident:
+			lib_name = advance_token(f);
+			break;
+		default:
+			lib_name.pos = token.pos;
+			break;
+		}
+		if (is_blank_ident(lib_name)) {
+			syntax_error(lib_name, "Illegal foreign_library name: `_`");
+		}
+		Token file_path = expect_token(f, Token_String);
+		AstNode *s = nullptr;
+		if (f->curr_proc != nullptr) {
+			syntax_error(lib_name, "You cannot use foreign_library within a procedure. This must be done at the file scope");
+			s = ast_bad_decl(f, lib_name, file_path);
+		} else {
+			s = ast_foreign_import_decl(f, token, file_path, lib_name, docs, f->line_comment);
+		}
+		expect_semicolon(f, s);
+		return s;
 	}
-	if (is_blank_ident(lib_name)) {
-		syntax_error(lib_name, "Illegal foreign_library name: `_`");
 	}
-	Token file_path = expect_token(f, Token_String);
-	AstNode *s = nullptr;
-	if (f->curr_proc != nullptr) {
-		syntax_error(lib_name, "You cannot use foreign_library within a procedure. This must be done at the file scope");
-		s = ast_bad_decl(f, lib_name, file_path);
-	} else {
-		s = ast_foreign_library_decl(f, token, file_path, lib_name, docs, f->line_comment);
-	}
-	expect_semicolon(f, s);
-	return s;
+
+	syntax_error(token, "Invalid foreign declaration");
+	return ast_bad_decl(f, token, f->curr_token);
 }
 
 
@@ -4471,7 +4470,6 @@ AstNode *parse_stmt(AstFile *f) {
 
 
 	case Token_foreign:
-	case Token_foreign_library:
 		return parse_foreign_decl(f);
 
 	case Token_import:
@@ -4860,13 +4858,13 @@ bool determine_path_from_string(Parser *p, AstNode *node, String base_dir, Strin
 	defer (gb_mutex_unlock(&p->file_decl_mutex));
 
 
-	if (node->kind == AstNode_ForeignLibraryDecl) {
-		node->ForeignLibraryDecl.collection_name = collection_name;
+	if (node->kind == AstNode_ForeignImportDecl) {
+		node->ForeignImportDecl.collection_name = collection_name;
 	}
 
 	if (collection_name.len > 0) {
 		if (collection_name == "system") {
-			if (node->kind != AstNode_ForeignLibraryDecl) {
+			if (node->kind != AstNode_ForeignImportDecl) {
 				syntax_error(node, "The library collection `system` is restrict for `foreign_library`");
 				return false;
 			} else {
@@ -4944,14 +4942,14 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 
 			ed->fullpath = export_path;
 			try_add_import_path(p, export_path, original_string, ast_node_token(node).pos);
-		} else if (node->kind == AstNode_ForeignLibraryDecl) {
-			ast_node(fl, ForeignLibraryDecl, node);
+		} else if (node->kind == AstNode_ForeignImportDecl) {
+			ast_node(fl, ForeignImportDecl, node);
 
 			String file_str = fl->filepath.string;
 			fl->base_dir = base_dir;
 			fl->fullpath = file_str;
 
-			if (fl->token.kind == Token_foreign_library) {
+			if (fl->collection_name != "system") {
 				String foreign_path = {};
 				bool ok = determine_path_from_string(p, node, base_dir, file_str, &foreign_path);
 				if (!ok) {
