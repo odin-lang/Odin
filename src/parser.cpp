@@ -4655,20 +4655,30 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	TokenizerInitError err = init_tokenizer(&f->tokenizer, f->fullpath);
 	if (err != TokenizerInit_None) {
 		switch (err) {
+		case TokenizerInit_Empty:
+			break;
 		case TokenizerInit_NotExists:
 			return ParseFile_NotFound;
 		case TokenizerInit_Permission:
 			return ParseFile_Permission;
-		case TokenizerInit_Empty:
-			return ParseFile_EmptyFile;
+		default:
+			return ParseFile_InvalidFile;
 		}
 
-		return ParseFile_InvalidFile;
 	}
 
 	isize file_size = f->tokenizer.end - f->tokenizer.start;
 	isize init_token_cap = cast(isize)gb_max(next_pow2(cast(i64)(file_size/2ll)), 16);
 	array_init(&f->tokens, heap_allocator(), gb_max(init_token_cap, 16));
+
+	if (err == TokenizerInit_Empty) {
+		Token token = {Token_EOF};
+		token.pos.file = fullpath;
+		token.pos.line = 1;
+		token.pos.column = 1;
+		array_add(&f->tokens, token);
+		return ParseFile_None;
+	}
 
 	for (;;) {
 		Token token = tokenizer_get_token(&f->tokenizer);
@@ -4947,6 +4957,13 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 }
 
 void parse_file(Parser *p, AstFile *f) {
+	if (f->tokens.count == 0) {
+		return;
+	}
+	if (f->tokens.count > 0 && f->tokens[0].kind == Token_EOF) {
+		return;
+	}
+
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = filepath;
 	for (isize i = filepath.len-1; i >= 0; i--) {
@@ -4984,7 +5001,7 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 				gb_printf_err("Initial file is empty - %.*s\n", LIT(p->init_fullpath));
 				gb_exit(1);
 			}
-			return ParseFile_None;
+			goto skip;
 		}
 
 		if (pos.line != 0) {
@@ -5007,10 +5024,16 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 		case ParseFile_InvalidToken:
 			gb_printf_err("Invalid token found in file at (%td:%td)", err_pos.line, err_pos.column);
 			break;
+		case ParseFile_EmptyFile:
+			gb_printf_err("File contains no tokens");
+			break;
 		}
 		gb_printf_err("\n");
 		return err;
 	}
+
+
+skip:
 	parse_file(p, file);
 
 	gb_mutex_lock(&p->file_add_mutex);
@@ -5018,7 +5041,6 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 	array_add(&p->files, file);
 	p->total_line_count += file->tokenizer.line_count;
 	gb_mutex_unlock(&p->file_add_mutex);
-
 
 	return ParseFile_None;
 }

@@ -433,18 +433,22 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 	TokenizerInitError err = TokenizerInit_None;
 
 	char *c_str = gb_alloc_array(heap_allocator(), char, fullpath.len+1);
+	defer (gb_free(heap_allocator(), c_str));
+
 	gb_memcopy(c_str, fullpath.text, fullpath.len);
 	c_str[fullpath.len] = '\0';
 
 	// TODO(bill): Memory map rather than copy contents
 	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);
 	gb_zero_item(t);
+
+	t->fullpath = fullpath;
+	t->line_count = 1;
+
 	if (fc.data != nullptr) {
 		t->start = cast(u8 *)fc.data;
 		t->line = t->read_curr = t->curr = t->start;
 		t->end = t->start + fc.size;
-		t->fullpath = fullpath;
-		t->line_count = 1;
 
 		advance_to_next_rune(t);
 		if (t->curr_rune == GB_RUNE_BOM) {
@@ -455,6 +459,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 	} else {
 		gbFile f = {};
 		gbFileError file_err = gb_file_open(&f, c_str);
+		defer (gb_file_close(&f));
 
 		switch (file_err) {
 		case gbFileError_Invalid:    err = TokenizerInit_Invalid;    break;
@@ -465,11 +470,8 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 		if (err == TokenizerInit_None && gb_file_size(&f) == 0) {
 			err = TokenizerInit_Empty;
 		}
-
-		gb_file_close(&f);
 	}
 
-	gb_free(heap_allocator(), c_str);
 	return err;
 }
 
