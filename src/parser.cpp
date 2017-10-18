@@ -4349,7 +4349,7 @@ AstNode *parse_import_decl(AstFile *f, bool is_using) {
 		break;
 	}
 
-	if (is_blank_ident(import_name)) {
+	if (!is_using && is_blank_ident(import_name)) {
 		syntax_error(import_name, "Illegal import name: `_`");
 	}
 

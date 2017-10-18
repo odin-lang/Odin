@@ -2525,7 +2525,11 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 
 	String import_name = path_to_entity_name(id->import_name.string, id->fullpath);
 	if (is_blank_ident(import_name)) {
-		error(token, "File name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+		if (id->is_using) {
+			// TODO(bill): Should this be a warning?
+		} else {
+			error(token, "File name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+		}
 	} else {
 		GB_ASSERT(id->import_name.pos.line != 0);
 		id->import_name.string = import_name;
