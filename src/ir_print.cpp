@@ -423,6 +423,7 @@ void ir_print_compound_element(irFileBuffer *f, irModule *m, ExactValue v, Type 
 }
 
 void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *type) {
+	Type *original_type = type;
 	type = core_type(type);
 	value = convert_exact_value_for_type(value, type);
 
@@ -612,6 +613,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_write_string(f, "]}");
 		} else if (is_type_struct(type)) {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
+			defer (gb_temp_arena_memory_end(tmp));
 
 			ast_node(cl, CompoundLit, value.value_compound);
 
@@ -621,6 +623,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				break;
 			}
 
+			String tstr = make_string_c(type_to_string(original_type));
 
 			isize value_count = type->Struct.fields.count;
 			ExactValue *values = gb_alloc_array(m->tmp_allocator, ExactValue, value_count);
@@ -650,7 +653,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 						if (tav.mode != Addressing_Invalid) {
 							val = tav.value;
 						}
-						values[f->Variable.field_index] = val;
+						values[f->Variable.field_index]  = val;
 						visited[f->Variable.field_index] = true;
 					}
 				}
@@ -693,8 +696,6 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 			ir_write_byte(f, '}');
 			if (type->Struct.is_packed) ir_write_byte(f, '>');
-
-			gb_temp_arena_memory_end(tmp);
 		} else {
 			ir_write_string(f, "zeroinitializer");
 		}

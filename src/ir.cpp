@@ -1346,19 +1346,20 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, AstNode *expr, bool zero_ini
 	return instr;
 }
 
-irValue *ir_add_local_for_identifier(irProcedure *proc, AstNode *name, bool zero_initialized) {
-	Entity *e = entity_of_ident(proc->module->info, name);
+irValue *ir_add_local_for_identifier(irProcedure *proc, AstNode *ident, bool zero_initialized) {
+	Entity *e = entity_of_ident(proc->module->info, ident);
 	if (e != nullptr) {
-		ir_emit_comment(proc, e->token.string);
+		String name = e->token.string;
+		ir_emit_comment(proc, name);
 		if (e->kind == Entity_Variable &&
 		    e->Variable.is_foreign) {
-			HashKey key = hash_string(e->token.string);
+			HashKey key = hash_string(name);
 			irValue **prev_value = map_get(&proc->module->members, key);
 			if (prev_value == nullptr) {
 				// NOTE(bill): Don't do mutliple declarations in the IR
 				irValue *g = ir_value_global(proc->module->allocator, e, nullptr);
 
-				g->Global.name = e->token.string;
+				g->Global.name = name;
 				g->Global.is_foreign = true;
 				ir_module_add_value(proc->module, e, g);
 				map_set(&proc->module->members, key, g);
@@ -1367,12 +1368,12 @@ irValue *ir_add_local_for_identifier(irProcedure *proc, AstNode *name, bool zero
 				return *prev_value;
 			}
 		}
-		return ir_add_local(proc, e, name, zero_initialized);
+		return ir_add_local(proc, e, ident, zero_initialized);
 	}
 	return nullptr;
 }
 
-irValue *ir_add_local_generated(irProcedure *proc, Type *type) {
+irValue *ir_add_local_generated(irProcedure *proc, Type *type, bool zero_initialized = true) {
 	GB_ASSERT(type != nullptr);
 
 	Scope *scope = nullptr;
@@ -1383,7 +1384,7 @@ irValue *ir_add_local_generated(irProcedure *proc, Type *type) {
 	                                 scope,
 	                                 empty_token,
 	                                 type, false);
-	return ir_add_local(proc, e, nullptr, true);
+	return ir_add_local(proc, e, nullptr, zero_initialized);
 }
 
 
@@ -3267,7 +3268,7 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 
 
 
-irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, TokenPos pos) {
+irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, TokenPos pos, bool do_conversion_check=true) {
 	gbAllocator a = proc->module->allocator;
 
 	Type *src_type = ir_type(value);
@@ -3286,7 +3287,7 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 		value = ir_emit_load(proc, value);
 	}
 	Type *src = base_type(type_deref(src_type));
-	GB_ASSERT(is_type_union(src));
+	GB_ASSERT_MSG(is_type_union(src), "%s", type_to_string(src_type));
 	Type *dst = tuple->Tuple.variables[0]->type;
 
 
@@ -3312,20 +3313,22 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 	ir_start_block(proc, end_block);
 
 	if (!is_tuple) {
-		// NOTE(bill): Panic on invalid conversion
-		Type *dst_type = tuple->Tuple.variables[0]->type;
+		if (do_conversion_check) {
+			// NOTE(bill): Panic on invalid conversion
+			Type *dst_type = tuple->Tuple.variables[0]->type;
 
-		irValue *ok = ir_emit_load(proc, ir_emit_struct_ep(proc, v, 1));
-		irValue **args = gb_alloc_array(a, irValue *, 6);
-		args[0] = ok;
+			irValue *ok = ir_emit_load(proc, ir_emit_struct_ep(proc, v, 1));
+			irValue **args = gb_alloc_array(a, irValue *, 6);
+			args[0] = ok;
 
-		args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
-		args[2] = ir_const_int(a, pos.line);
-		args[3] = ir_const_int(a, pos.column);
+			args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
+			args[2] = ir_const_int(a, pos.line);
+			args[3] = ir_const_int(a, pos.column);
 
-		args[4] = ir_type_info(proc, src_type);
-		args[5] = ir_type_info(proc, dst_type);
-		ir_emit_global_call(proc, "__type_assertion_check", args, 6);
+			args[4] = ir_type_info(proc, src_type);
+			args[5] = ir_type_info(proc, dst_type);
+			ir_emit_global_call(proc, "__type_assertion_check", args, 6);
+		}
 
 		return ir_emit_load(proc, ir_emit_struct_ep(proc, v, 0));
 	}
@@ -5556,7 +5559,8 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		ir_emit_comment(proc, str_lit("CompoundLit"));
 		Type *type = type_of_expr(proc->module->info, expr);
 		Type *bt = base_type(type);
-		irValue *v = ir_add_local_generated(proc, type);
+
+		irValue *v = ir_add_local_generated(proc, type, true);
 
 		Type *et = nullptr;
 		switch (bt->kind) {
@@ -5594,10 +5598,11 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		}
 
 		case Type_Struct: {
-			// TODO(bill): "constant" unions are not initialized constantly at the moment.
+
+			// TODO(bill): "constant" `#raw_union`s are not initialized constantly at the moment.
 			// NOTE(bill): This is due to the layout of the unions when printed to LLVM-IR
-			bool is_union = is_type_union(bt);
-			GB_ASSERT(is_type_struct(bt) || is_type_union(bt));
+			bool is_raw_union = is_type_raw_union(bt);
+			GB_ASSERT(is_type_struct(bt) || is_raw_union);
 			TypeStruct *st = &bt->Struct;
 			if (cl->elems.count > 0) {
 				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
@@ -5623,8 +5628,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 					field = st->fields[index];
 					Type *ft = field->type;
-					if (!is_union && !is_type_union(ft) &&
-					    ir_is_elem_const(proc->module, elem, ft)) {
+					if (!is_raw_union && ir_is_elem_const(proc->module, elem, ft)) {
 						continue;
 					}
 
@@ -6730,13 +6734,14 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			Type *enum_ptr = make_type_pointer(a, t);
 			t = base_type(t);
 			Type *core_elem = core_type(t);
-			i64 enum_count = t->Struct.fields.count;
+			i64 enum_count = t->Enum.field_count;
 			irValue *max_count = ir_const_int(a, enum_count);
 
-			irValue *eti = ir_emit_union_cast(proc, ir_type_info(proc, t), t_type_info_enum_ptr, pos);
-			irValue *values = ir_emit_load(proc, ir_emit_struct_ep(proc, eti, 4));
+			irValue *ti          = ir_type_info(proc, t);
+			irValue *variant     = ir_emit_struct_ep(proc, ti, 2);
+			irValue *eti_ptr     = ir_emit_conv(proc, variant, t_type_info_enum_ptr);
+			irValue *values      = ir_emit_load(proc, ir_emit_struct_ep(proc, eti_ptr, 2));
 			irValue *values_data = ir_slice_elem(proc, values);
-
 
 			irValue *offset_ = ir_add_local_generated(proc, t_int);
 			ir_emit_store(proc, offset_, v_zero);
