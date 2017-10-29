@@ -2852,19 +2852,19 @@ String ir_lookup_subtype_polymorphic_field(CheckerInfo *info, Type *dst, Type *s
 }
 
 
-irValue *ir_emit_ptr_to_int(irProcedure *proc, irValue *value, Type *t, bool allow_type_type = false) {
+irValue *ir_emit_ptr_to_uintptr(irProcedure *proc, irValue *value, Type *t, bool allow_type_type = false) {
 	Type *vt = core_type(ir_type(value));
 	GB_ASSERT(is_type_pointer(vt));
 	if (allow_type_type) {
-		GB_ASSERT(is_type_int_or_uint(core_type(t)));
+		GB_ASSERT(is_type_uintptr(core_type(t)));
 	} else {
-		GB_ASSERT(is_type_int_or_uint(core_type(t)));
+		GB_ASSERT(is_type_uintptr(core_type(t)));
 	}
 	return ir_emit(proc, ir_instr_conv(proc, irConv_ptrtoint, value, vt, t));
 }
-irValue *ir_emit_int_to_ptr(irProcedure *proc, irValue *value, Type *t) {
+irValue *ir_emit_uintptr_to_ptr(irProcedure *proc, irValue *value, Type *t) {
 	Type *vt = core_type(ir_type(value));
-	GB_ASSERT(is_type_int_or_uint(vt));
+	GB_ASSERT(is_type_uintptr(vt));
 	GB_ASSERT(is_type_pointer(core_type(t)));
 	return ir_emit(proc, ir_instr_conv(proc, irConv_inttoptr, value, vt, t));
 }
@@ -3028,11 +3028,11 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	}
 
 	// Pointer <-> int
-	if (is_type_pointer(src) && is_type_int_or_uint(dst)) {
-		return ir_emit_ptr_to_int(proc, value, t);
+	if (is_type_pointer(src) && is_type_uintptr(dst)) {
+		return ir_emit_ptr_to_uintptr(proc, value, t);
 	}
-	if (is_type_int_or_uint(src) && is_type_pointer(dst)) {
-		return ir_emit_int_to_ptr(proc, value, t);
+	if (is_type_uintptr(src) && is_type_pointer(dst)) {
+		return ir_emit_uintptr_to_ptr(proc, value, t);
 	}
 
 	if (is_type_union(dst)) {
@@ -3250,11 +3250,11 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 	GB_ASSERT_MSG(sz == dz, "Invalid transmute conversion: `%s` to `%s`", type_to_string(src_type), type_to_string(t));
 
 	// NOTE(bill): Casting between an integer and a pointer cannot be done through a bitcast
-	if (is_type_int_or_uint(src) && is_type_pointer(dst)) {
-		return ir_emit_int_to_ptr(proc, value, t);
+	if (is_type_uintptr(src) && is_type_pointer(dst)) {
+		return ir_emit_uintptr_to_ptr(proc, value, t);
 	}
-	if (is_type_pointer(src) && is_type_int_or_uint(dst)) {
-		return ir_emit_ptr_to_int(proc, value, t);
+	if (is_type_pointer(src) && is_type_uintptr(dst)) {
+		return ir_emit_ptr_to_uintptr(proc, value, t);
 	}
 
 	if (ir_is_type_aggregate(src) || ir_is_type_aggregate(dst)) {
@@ -5886,8 +5886,8 @@ void ir_build_poly_proc(irProcedure *proc, AstNodeProcLit *pd, Entity *e) {
 	// parent.name-guid
 	String original_name = e->token.string;
 	String pd_name = original_name;
-	if (pd->link_name.len > 0) {
-		pd_name = pd->link_name;
+	if (e->Procedure.link_name.len > 0) {
+		pd_name = e->Procedure.link_name;
 	}
 
 	isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
@@ -5978,8 +5978,8 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 				// FFI - Foreign function interace
 				String original_name = e->token.string;
 				String name = original_name;
-				if (pl->link_name.len > 0) {
-					name = pl->link_name;
+				if (e->Procedure.link_name.len > 0) {
+					name = e->Procedure.link_name;
 				}
 
 				irValue *value = ir_value_procedure(proc->module->allocator,
@@ -7749,7 +7749,8 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			case Basic_i128:
 			case Basic_u128:
 			case Basic_int:
-			case Basic_uint: {
+			case Basic_uint:
+			case Basic_uintptr: {
 				tag = ir_emit_conv(proc, variant_ptr, t_type_info_integer_ptr);
 				irValue *is_signed = ir_const_bool(a, (t->Basic.flags & BasicFlag_Unsigned) == 0);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), is_signed);
@@ -8286,8 +8287,8 @@ void ir_gen_tree(irGen *s) {
 				name = e->token.string; // NOTE(bill): Don't use the mangled name
 				ir_add_foreign_library_path(m, e->Procedure.foreign_library);
 			}
-			if (pl->link_name.len > 0) {
-				name = pl->link_name;
+			if (e->Procedure.link_name.len > 0) {
+				name = e->Procedure.link_name;
 			}
 
 			AstNode *type_expr = pl->type;

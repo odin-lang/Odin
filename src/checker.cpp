@@ -182,6 +182,7 @@ struct DeclInfo {
 	AstNode *         type_expr;
 	AstNode *         init_expr;
 	Array<AstNode *>  init_expr_list;
+	Array<AstNode *>  attributes;
 	AstNode *         proc_lit;      // AstNode_ProcLit
 	Type *            gen_proc_type; // Precalculated
 
@@ -1720,11 +1721,14 @@ void init_preload(Checker *c) {
 	{
 		String _global = str_lit("_global");
 
-		Entity *e = make_entity_import_name(c->allocator, c->global_scope->parent, make_token_ident(_global), t_invalid,
-		                                    str_lit(""), _global,
-		                                    c->global_scope);
+		Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
+		Scope *preload_scope = type_info_entity->scope;
 
-		add_entity(c, c->global_scope, nullptr, e);
+		Entity *e = make_entity_import_name(c->allocator, preload_scope, make_token_ident(_global), t_invalid,
+		                                    str_lit(""), _global,
+		                                    preload_scope);
+
+		add_entity(c, universal_scope, nullptr, e);
 	}
 
 	c->done_preload = true;
@@ -1999,6 +2003,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 				d->type_expr = vd->type;
 				d->init_expr = init_expr;
 			}
+			d->attributes = vd->attributes;
 
 			add_entity_and_decl_info(c, name, e, d);
 		}
@@ -2027,6 +2032,8 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 			AstNode *fl = c->context.curr_foreign_library;
 			DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
 			Entity *e = nullptr;
+
+			d->attributes = vd->attributes;
 
 			if (is_ast_node_type(init) ||
 				(vd->type != nullptr && vd->type->kind == AstNode_TypeType)) {
@@ -2068,6 +2075,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 					}
 				}
 			}
+
 
 			add_entity_and_decl_info(c, name, e, d);
 		}

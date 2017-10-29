@@ -331,7 +331,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 
 
 _parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: bool) {
-	is_digit :: proc(r: rune) -> bool #inline {
+	is_digit :: inline proc(r: rune) -> bool{
 		return '0' <= r && r <= '9';
 	}
 
@@ -640,7 +640,7 @@ fmt_pointer :: proc(fi: ^Fmt_Info, p: rawptr, verb: rune) {
 		fmt_bad_verb(fi, verb);
 		return;
 	}
-	u := u128(uint(p));
+	u := u128(uintptr(p));
 	if !fi.hash || verb == 'v' {
 		write_string(fi.buf, "0x");
 	}

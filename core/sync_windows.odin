@@ -36,7 +36,9 @@ semaphore_post :: proc(s: ^Semaphore, count: int) {
 	win32.release_semaphore(s._handle, i32(count), nil);
 }
 
-semaphore_release :: proc(s: ^Semaphore) #inline { semaphore_post(s, 1); }
+semaphore_release :: inline proc(s: ^Semaphore) {
+	semaphore_post(s, 1);
+}
 
 semaphore_wait :: proc(s: ^Semaphore) {
 	win32.wait_for_single_object(s._handle, win32.INFINITE);

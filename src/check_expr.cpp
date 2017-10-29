@@ -1238,6 +1238,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		case Basic_u64:
 		case Basic_u128:
 		case Basic_uint:
+		case Basic_uintptr:
 			return !(u128_lt(u, U128_ZERO) || u128_gt(u, umax));
 
 		case Basic_UntypedInteger:
@@ -1759,10 +1760,10 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	}
 
 	// (u)int <-> rawptr
-	if (is_type_int_or_uint(src) && is_type_rawptr(dst)) {
+	if (is_type_uintptr(src) && is_type_rawptr(dst)) {
 		return true;
 	}
-	if (is_type_rawptr(src) && is_type_int_or_uint(dst)) {
+	if (is_type_rawptr(src) && is_type_uintptr(dst)) {
 		return true;
 	}
 
@@ -2520,7 +2521,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			bool is_declared = entity != nullptr;
 			if (is_declared) {
 				if (entity->kind == Entity_Builtin) {
-					// NOTE(bill): Builtin's are in the universe scope which is part of every scopes hierarchy
+					// NOTE(bill): Builtin's are in the universal scope which is part of every scopes hierarchy
 					// This means that we should just ignore the found result through it
 					is_declared = false;
 				} else if (entity->scope->is_global && !import_scope->is_global) {

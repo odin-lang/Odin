@@ -28,6 +28,7 @@ enum BasicKind {
 
 	Basic_int,
 	Basic_uint,
+	Basic_uintptr,
 	Basic_rawptr,
 	Basic_string, // ^u8 + int
 	Basic_any,    // ^Type_Info + rawptr
@@ -254,6 +255,7 @@ gb_global Type basic_types[] = {
 
 	{Type_Basic, {Basic_int,               BasicFlag_Integer,                         -1, STR_LIT("int")}},
 	{Type_Basic, {Basic_uint,              BasicFlag_Integer | BasicFlag_Unsigned,    -1, STR_LIT("uint")}},
+	{Type_Basic, {Basic_uintptr,           BasicFlag_Integer | BasicFlag_Unsigned,    -1, STR_LIT("uintptr")}},
 
 	{Type_Basic, {Basic_rawptr,            BasicFlag_Pointer,                         -1, STR_LIT("rawptr")}},
 	{Type_Basic, {Basic_string,            BasicFlag_String,                          -1, STR_LIT("string")}},
@@ -299,6 +301,7 @@ gb_global Type *t_complex128      = &basic_types[Basic_complex128];
 
 gb_global Type *t_int             = &basic_types[Basic_int];
 gb_global Type *t_uint            = &basic_types[Basic_uint];
+gb_global Type *t_uintptr         = &basic_types[Basic_uintptr];
 
 gb_global Type *t_rawptr          = &basic_types[Basic_rawptr];
 gb_global Type *t_string          = &basic_types[Basic_string];
@@ -745,9 +748,9 @@ bool is_type_tuple(Type *t) {
 }
 
 
-bool is_type_int_or_uint(Type *t) {
+bool is_type_uintptr(Type *t) {
 	if (t->kind == Type_Basic) {
-		return (t->Basic.kind == Basic_int) || (t->Basic.kind == Basic_uint);
+		return (t->Basic.kind == Basic_uintptr);
 	}
 	return false;
 }
@@ -1813,7 +1816,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		case Basic_string: return build_context.word_size;
 		case Basic_any:    return build_context.word_size;
 
-		case Basic_int: case Basic_uint: case Basic_rawptr:
+		case Basic_int: case Basic_uint: case Basic_uintptr: case Basic_rawptr:
 			return build_context.word_size;
 
 		case Basic_complex64: case Basic_complex128:
@@ -2023,7 +2026,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		case Basic_string: return 2*build_context.word_size;
 		case Basic_any:    return 2*build_context.word_size;
 
-		case Basic_int: case Basic_uint: case Basic_rawptr:
+		case Basic_int: case Basic_uint: case Basic_uintptr: case Basic_rawptr:
 			return build_context.word_size;
 		}
 	} break;

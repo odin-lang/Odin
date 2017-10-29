@@ -187,8 +187,13 @@ AstNode *remove_type_alias(AstNode *node) {
 
 void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, bool is_alias) {
 	GB_ASSERT(e->type == nullptr);
-	AstNode *te = remove_type_alias(type_expr);
 
+	DeclInfo *decl = decl_info_of_entity(&c->info, e);
+	if (decl != nullptr && decl->attributes.count > 0) {
+		error(decl->attributes[0], "Attributes are not allowed on type declarations");
+	}
+
+	AstNode *te = remove_type_alias(type_expr);
 	e->type = t_invalid;
 	String name = e->token.string;
 	Type *named = make_type_named(c->allocator, name, nullptr, e);
@@ -203,8 +208,11 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, bool 
 	if (is_alias) {
 		if (is_type_named(bt)) {
 			e->type = bt;
+			e->TypeName.is_type_alias = true;
 		} else {
-			warning(type_expr, "Type declaration will not be an alias type");
+			gbString str = type_to_string(bt);
+			error(type_expr, "Type alias declaration with a non-named type `%s`", str);
+			gb_string_free(str);
 		}
 	}
 }
@@ -318,6 +326,12 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 		gbString str = expr_to_string(init);
 		error(e->token, "Invalid declaration type `%s`", str);
 		gb_string_free(str);
+	}
+
+
+	DeclInfo *decl = decl_info_of_entity(&c->info, e);
+	if (decl != nullptr && decl->attributes.count > 0) {
+		error(decl->attributes[0], "Attributes are not allowed on constant value declarations");
 	}
 }
 
@@ -436,8 +450,6 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	defer (check_close_scope(c));
 
 
-
-
 	auto prev_context = c->context;
 	c->context.allow_polymorphic_types = true;
 	check_procedure_type(c, proc_type, pl->type);
@@ -447,10 +459,64 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 	bool is_foreign         = e->Procedure.is_foreign;
 	bool is_export          = e->Procedure.is_export;
-	bool is_link_name       = (pl->tags & ProcTag_link_name) != 0;
 	bool is_inline          = (pl->tags & ProcTag_inline)    != 0;
 	bool is_no_inline       = (pl->tags & ProcTag_no_inline) != 0;
 	bool is_require_results = (pl->tags & ProcTag_require_results) != 0;
+
+	String link_name = {};
+
+
+	if (d != nullptr && d->attributes.count > 0) {
+		for_array(i, d->attributes) {
+			AstNode *attr = d->attributes[i];
+			if (attr->kind != AstNode_Attribute) continue;
+			for_array(j, attr->Attribute.elems) {
+				AstNode *elem = attr->Attribute.elems[j];
+				String name = {};
+				AstNode *value = nullptr;
+
+				switch (elem->kind) {
+				case_ast_node(i, Ident, elem);
+					name = i->token.string;
+				case_end;
+				case_ast_node(fv, FieldValue, elem);
+					GB_ASSERT(fv->field->kind == AstNode_Ident);
+					name = fv->field->Ident.token.string;
+					value = fv->value;
+				case_end;
+				default:
+					error(elem, "Invalid attribute element");
+					continue;
+				}
+
+				ExactValue ev = {};
+				if (value != nullptr) {
+					Operand op = {};
+					check_expr(c, &op, value);
+					if (op.mode != Addressing_Constant) {
+						error(value, "An attribute element must be constant");
+					} else {
+						ev = op.value;
+					}
+				}
+
+				if (name == "link_name") {
+					if (link_name.len > 0) {
+						error(elem, "Previous declaration of `link_name`");
+					}
+					if (ev.kind == ExactValue_String) {
+						link_name = ev.value_string;
+					} else {
+						error(elem, "Expected a string value for `link_name`");
+					}
+				} else {
+					error(elem, "Unknown attribute element name `%.*s`", LIT(name));
+				}
+			}
+		}
+	}
+
+
 
 
 
@@ -526,8 +592,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 	if (is_foreign) {
 		String name = e->token.string;
-		if (pl->link_name.len > 0) {
-			name = pl->link_name;
+		if (link_name.len > 0) {
+			name = link_name;
 		}
 		e->Procedure.is_foreign = true;
 		e->Procedure.link_name = name;
@@ -562,11 +628,11 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		}
 	} else {
 		String name = e->token.string;
-		if (is_link_name) {
-			name = pl->link_name;
+		if (link_name.len > 0) {
+			name = link_name;
 		}
 
-		if (is_link_name || is_export) {
+		if (link_name.len > 0 || is_export) {
 			auto *fp = &c->info.foreigns;
 
 			e->Procedure.link_name = name;
@@ -599,6 +665,11 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		return;
 	}
 	e->flags |= EntityFlag_Visited;
+
+	DeclInfo *decl = decl_info_of_entity(&c->info, e);
+	if (decl != nullptr && decl->attributes.count > 0) {
+		error(decl->attributes[0], "Attributes are not allowed on variable declarations, yet");
+	}
 
 	String context_name = str_lit("variable declaration");
 
@@ -692,9 +763,11 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 	case Entity_Constant:
 		check_const_decl(c, e, d->type_expr, d->init_expr, named_type);
 		break;
-	case Entity_TypeName:
-		check_type_decl(c, e, d->type_expr, named_type, d->type_expr->kind == AstNode_AliasType);
+	case Entity_TypeName: {
+		bool is_alias = unparen_expr(d->type_expr)->kind == AstNode_AliasType;
+		check_type_decl(c, e, d->type_expr, named_type, is_alias);
 		break;
+	}
 	case Entity_Procedure:
 		check_proc_decl(c, e, d);
 		break;

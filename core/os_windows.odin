@@ -1,11 +1,11 @@
 import win32 "core:sys/windows.odin"
 import "core:mem.odin"
 
-Handle    :: int;
+Handle    :: uintptr;
 File_Time :: u64;
 
 
-INVALID_HANDLE: Handle : -1;
+INVALID_HANDLE :: ~Handle(0);
 
 
 

@@ -28,31 +28,34 @@ Mat4 :: [4][4]f32;
 Complex :: complex64;
 
 foreign __llvm_core {
-	sqrt    :: proc(x: f32) -> f32        #link_name "llvm.sqrt.f32" ---;
-	sqrt    :: proc(x: f64) -> f64        #link_name "llvm.sqrt.f64" ---;
+	@(link_name="llvm.sqrt.f32")
+	sqrt :: proc(x: f32) -> f32 ---;
+	@(link_name="llvm.sqrt.f64")
+	sqrt :: proc(x: f64) -> f64 ---;
 
-	sin     :: proc(θ: f32) -> f32        #link_name "llvm.sin.f32" ---;
-	sin     :: proc(θ: f64) -> f64        #link_name "llvm.sin.f64" ---;
+	@(link_name="llvm.sin.f32")
+	sin :: proc(θ: f32) -> f32 ---;
+	@(link_name="llvm.sin.f64")
+	sin :: proc(θ: f64) -> f64 ---;
 
-	cos     :: proc(θ: f32) -> f32        #link_name "llvm.cos.f32" ---;
-	cos     :: proc(θ: f64) -> f64        #link_name "llvm.cos.f64" ---;
+	@(link_name="llvm.cos.f32")
+	cos :: proc(θ: f32) -> f32 ---;
+	@(link_name="llvm.cos.f64")
+	cos :: proc(θ: f64) -> f64 ---;
 
-	// asin     :: proc(x: f32) -> f32       #link_name "llvm.asin.f32" ---;
-	// asin     :: proc(x: f64) -> f64       #link_name "llvm.asin.f64" ---;
+	@(link_name="llvm.pow.f32")
+	pow :: proc(x, power: f32) -> f32 ---;
+	@(link_name="llvm.pow.f64")
+	pow :: proc(x, power: f64) -> f64 ---;
 
-	// acos     :: proc(x: f32) -> f32       #link_name "llvm.acos.f32" ---;
-	// acos     :: proc(x: f64) -> f64       #link_name "llvm.acos.f64" ---;
-
-
-	pow     :: proc(x, power: f32) -> f32 #link_name "llvm.pow.f32" ---;
-	pow     :: proc(x, power: f64) -> f64 #link_name "llvm.pow.f64" ---;
-
-	fmuladd :: proc(a, b, c: f32) -> f32  #link_name "llvm.fmuladd.f32" ---;
-	fmuladd :: proc(a, b, c: f64) -> f64  #link_name "llvm.fmuladd.f64" ---;
+	@(link_name="llvm.fmuladd.f32")
+	fmuladd :: proc(a, b, c: f32) -> f32 ---;
+	@(link_name="llvm.fmuladd.f64")
+	fmuladd :: proc(a, b, c: f64) -> f64 ---;
 }
 
-tan    :: proc(θ: f32) -> f32 #inline do return sin(θ)/cos(θ);
-tan    :: proc(θ: f64) -> f64 #inline do return sin(θ)/cos(θ);
+tan    :: proc(θ: f32) -> f32 do return sin(θ)/cos(θ);
+tan    :: proc(θ: f64) -> f64 do return sin(θ)/cos(θ);
 
 lerp   :: proc(a, b: $T, t: $E) -> (x: T) do return a*(1-t) + b*t;
 

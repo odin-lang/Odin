@@ -17,8 +17,6 @@ import "core:raw.odin"
 // Constant Variables: SCREAMING_SNAKE_CASE
 
 
-
-
 // IMPORTANT NOTE(bill): `type_info_of` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
 // This could change at a later date if the all these data structures are
@@ -237,15 +235,22 @@ type_info_base_without_enum :: proc(info: ^Type_Info) -> ^Type_Info {
 
 
 foreign __llvm_core {
-	assume             :: proc(cond: bool) #cc_c #link_name "llvm.assume"           ---;
-	__debug_trap       :: proc()           #cc_c #link_name "llvm.debugtrap"        ---;
-	__trap             :: proc()           #cc_c #link_name "llvm.trap"             ---;
-	read_cycle_counter :: proc() -> u64    #cc_c #link_name "llvm.readcyclecounter" ---;
+	@(link_name="llvm.assume")
+	assume :: proc(cond: bool) #cc_c ---;
+
+	@(link_name="llvm.debugtrap")
+	__debug_trap :: proc() #cc_c ---;
+
+	@(link_name="llvm.trap")
+	__trap :: proc() #cc_c ---;
+
+	@(link_name="llvm.readcyclecounter")
+	read_cycle_counter :: proc() -> u64 #cc_c ---;
 }
 
 
 
-make_source_code_location :: proc(file: string, line, column: i64, procedure: string) -> Source_Code_Location #cc_contextless #inline {
+make_source_code_location :: inline proc(file: string, line, column: i64, procedure: string) -> Source_Code_Location #cc_contextless {
 	return Source_Code_Location{file, line, column, procedure};
 }
 
@@ -282,32 +287,32 @@ __check_context :: proc() {
 }
 */
 
-alloc :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr #inline {
+alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr {
 	a := context.allocator;
 	return a.procedure(a.data, Allocator_Mode.Alloc, size, alignment, nil, 0, 0);
 }
 
-free_ptr_with_allocator :: proc(a: Allocator, ptr: rawptr) #inline {
+free_ptr_with_allocator :: inline proc(a: Allocator, ptr: rawptr) {
 	if ptr == nil do return;
 	if a.procedure == nil do return;
 	a.procedure(a.data, Allocator_Mode.Free, 0, 0, ptr, 0, 0);
 }
 
-free_ptr :: proc(ptr: rawptr) #inline do free_ptr_with_allocator(context.allocator, ptr);
+free_ptr :: inline proc(ptr: rawptr) do free_ptr_with_allocator(context.allocator, ptr);
 
-free_all :: proc() #inline {
+free_all :: inline proc() {
 	a := context.allocator;
 	a.procedure(a.data, Allocator_Mode.FreeAll, 0, 0, nil, 0, 0);
 }
 
 
-resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr #inline {
+resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr {
 	a := context.allocator;
 	return a.procedure(a.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, 0);
 }
 
 
-copy :: proc(dst, src: $T/[]$E) -> int #cc_contextless {
+copy :: proc(dst, src: $T/[]$E) -> int {
 	n := max(0, min(len(dst), len(src)));
 	if n > 0 do __mem_copy(&dst[0], &src[0], n*size_of(E));
 	return n;
@@ -384,13 +389,13 @@ pop :: proc(array: ^$T/[dynamic]$E) -> E #cc_contextless {
 	return res;
 }
 
-clear :: proc(slice: ^$T/[]$E) #cc_contextless #inline {
+clear :: inline proc(slice: ^$T/[]$E) #cc_contextless {
 	if slice != nil do (cast(^raw.Slice)slice).len = 0;
 }
-clear :: proc(array: ^$T/[dynamic]$E) #cc_contextless #inline {
+clear :: inline proc(array: ^$T/[dynamic]$E) #cc_contextless {
 	if array != nil do (cast(^raw.Dynamic_Array)array).len = 0;
 }
-clear :: proc(m: ^$T/map[$K]$V) #cc_contextless #inline {
+clear :: inline proc(m: ^$T/map[$K]$V) #cc_contextless {
 	if m == nil do return;
 	raw_map := cast(^raw.Map)m;
 	hashes  := cast(^raw.Dynamic_Array)&raw_map.hashes;
@@ -483,12 +488,12 @@ delete :: proc(m: ^$T/map[$K]$V, key: K) {
 
 
 
-new  :: proc(T: type) -> ^T #inline {
+new  :: inline proc(T: type) -> ^T {
 	ptr := cast(^T)alloc(size_of(T), align_of(T));
 	ptr^ = T{};
 	return ptr;
 }
-new_clone :: proc(data: $T) -> ^T #inline {
+new_clone :: inline proc(data: $T) -> ^T {
 	ptr := cast(^T)alloc(size_of(T), align_of(T));
 	ptr^ = data;
 	return ptr;
@@ -637,18 +642,18 @@ __string_cmp :: proc(a, b: string) -> int #cc_contextless {
 	return __mem_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
-__string_ne :: proc(a, b: string) -> bool #cc_contextless #inline { return !__string_eq(a, b); }
-__string_lt :: proc(a, b: string) -> bool #cc_contextless #inline { return __string_cmp(a, b) < 0; }
-__string_gt :: proc(a, b: string) -> bool #cc_contextless #inline { return __string_cmp(a, b) > 0; }
-__string_le :: proc(a, b: string) -> bool #cc_contextless #inline { return __string_cmp(a, b) <= 0; }
-__string_ge :: proc(a, b: string) -> bool #cc_contextless #inline { return __string_cmp(a, b) >= 0; }
+__string_ne :: inline proc(a, b: string) -> bool #cc_contextless { return !__string_eq(a, b); }
+__string_lt :: inline proc(a, b: string) -> bool #cc_contextless { return __string_cmp(a, b) < 0; }
+__string_gt :: inline proc(a, b: string) -> bool #cc_contextless { return __string_cmp(a, b) > 0; }
+__string_le :: inline proc(a, b: string) -> bool #cc_contextless { return __string_cmp(a, b) <= 0; }
+__string_ge :: inline proc(a, b: string) -> bool #cc_contextless { return __string_cmp(a, b) >= 0; }
 
 
-__complex64_eq :: proc (a, b: complex64)  -> bool #cc_contextless #inline { return real(a) == real(b) && imag(a) == imag(b); }
-__complex64_ne :: proc (a, b: complex64)  -> bool #cc_contextless #inline { return real(a) != real(b) || imag(a) != imag(b); }
+__complex64_eq :: inline proc (a, b: complex64)  -> bool #cc_contextless { return real(a) == real(b) && imag(a) == imag(b); }
+__complex64_ne :: inline proc (a, b: complex64)  -> bool #cc_contextless { return real(a) != real(b) || imag(a) != imag(b); }
 
-__complex128_eq :: proc(a, b: complex128) -> bool #cc_contextless #inline { return real(a) == real(b) && imag(a) == imag(b); }
-__complex128_ne :: proc(a, b: complex128) -> bool #cc_contextless #inline { return real(a) != real(b) || imag(a) != imag(b); }
+__complex128_eq :: inline proc(a, b: complex128) -> bool #cc_contextless { return real(a) == real(b) && imag(a) == imag(b); }
+__complex128_ne :: inline proc(a, b: complex128) -> bool #cc_contextless { return real(a) != real(b) || imag(a) != imag(b); }
 
 
 __bounds_check_error :: proc(file: string, line, column: int, index, count: int) #cc_contextless {
@@ -678,7 +683,7 @@ __type_assertion_check :: proc(ok: bool, file: string, line, column: int, from, 
 	__debug_trap();
 }
 
-__string_decode_rune :: proc(s: string) -> (rune, int) #cc_contextless #inline {
+__string_decode_rune :: inline proc(s: string) -> (rune, int) #cc_contextless {
 	return utf8.decode_rune(s);
 }
 
@@ -694,10 +699,14 @@ __substring_expr_error_loc :: proc(using loc := #caller_location, low, high: int
 
 __mem_set :: proc(data: rawptr, value: i32, len: int) -> rawptr #cc_contextless {
 	if data == nil do return nil;
-	when size_of(rawptr) == 8 {
-		foreign __llvm_core llvm_memset :: proc(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) #link_name "llvm.memset.p0i8.i64" ---;
-	} else {
-		foreign __llvm_core llvm_memset :: proc(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) #link_name "llvm.memset.p0i8.i32" ---;
+	foreign __llvm_core {
+		when size_of(rawptr) == 8 {
+			@(link_name="llvm.memset.p0i8.i64")
+			llvm_memset :: proc(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) ---;
+		} else {
+			@(link_name="llvm.memset.p0i8.i32")
+			llvm_memset :: proc(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) ---;
+		}
 	}
 	llvm_memset(data, u8(value), len, 1, false);
 	return data;
@@ -708,10 +717,14 @@ __mem_zero :: proc(data: rawptr, len: int) -> rawptr #cc_contextless {
 __mem_copy :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memmove
-	when size_of(rawptr) == 8 {
-		foreign __llvm_core llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memmove.p0i8.p0i8.i64" ---;
-	} else {
-		foreign __llvm_core llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memmove.p0i8.p0i8.i32" ---;
+	foreign __llvm_core {
+		when size_of(rawptr) == 8 {
+			@(link_name="llvm.memmove.p0i8.p0i8.i64")
+			llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+		} else {
+			@(link_name="llvm.memmove.p0i8.p0i8.i32")
+			llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+		}
 	}
 	llvm_memmove(dst, src, len, 1, false);
 	return dst;
@@ -719,10 +732,14 @@ __mem_copy :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
 __mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memcpy
-	when size_of(rawptr) == 8 {
-		foreign __llvm_core llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i64" ---;
-	} else {
-		foreign __llvm_core llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i32" ---;
+	foreign __llvm_core {
+		when size_of(rawptr) == 8 {
+			@(link_name="llvm.memcpy.p0i8.p0i8.i64")
+	 		llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+		} else {
+			@(link_name="llvm.memcpy.p0i8.p0i8.i32")
+	 		llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+		}
 	}
 	llvm_memcpy(dst, src, len, 1, false);
 	return dst;
@@ -737,26 +754,26 @@ __mem_compare :: proc(a, b: ^u8, n: int) -> int #cc_contextless {
 }
 
 foreign __llvm_core {
-	__sqrt_f32 :: proc(x: f32) -> f32        #link_name "llvm.sqrt.f32" ---;
-	__sqrt_f64 :: proc(x: f64) -> f64        #link_name "llvm.sqrt.f64" ---;
+	@(link_name="llvm.sqrt.f32") __sqrt_f32 :: proc(x: f32) -> f32 ---;
+	@(link_name="llvm.sqrt.f64") __sqrt_f64 :: proc(x: f64) -> f64 ---;
 
-	__sin_f32  :: proc(θ: f32) -> f32        #link_name "llvm.sin.f32" ---;
-	__sin_f64  :: proc(θ: f64) -> f64        #link_name "llvm.sin.f64" ---;
+	@(link_name="llvm.sin.f32") __sin_f32  :: proc(θ: f32) -> f32 ---;
+	@(link_name="llvm.sin.f64") __sin_f64  :: proc(θ: f64) -> f64 ---;
 
-	__cos_f32  :: proc(θ: f32) -> f32        #link_name "llvm.cos.f32" ---;
-	__cos_f64  :: proc(θ: f64) -> f64        #link_name "llvm.cos.f64" ---;
+	@(link_name="llvm.cos.f32") __cos_f32  :: proc(θ: f32) -> f32 ---;
+	@(link_name="llvm.cos.f64") __cos_f64  :: proc(θ: f64) -> f64 ---;
 
-	__pow_f32  :: proc(x, power: f32) -> f32 #link_name "llvm.pow.f32" ---;
-	__pow_f64  :: proc(x, power: f64) -> f64 #link_name "llvm.pow.f64" ---;
+	@(link_name="llvm.pow.f32") __pow_f32  :: proc(x, power: f32) -> f32 ---;
+	@(link_name="llvm.pow.f64") __pow_f64  :: proc(x, power: f64) -> f64 ---;
 
-	fmuladd32  :: proc(a, b, c: f32) -> f32 #link_name "llvm.fmuladd.f32" ---;
-	fmuladd64  :: proc(a, b, c: f64) -> f64 #link_name "llvm.fmuladd.f64" ---;
+	@(link_name="llvm.fmuladd.f32") fmuladd32  :: proc(a, b, c: f32) -> f32 ---;
+	@(link_name="llvm.fmuladd.f64") fmuladd64  :: proc(a, b, c: f64) -> f64 ---;
 }
-__abs_complex64 :: proc(x: complex64) -> f32 #inline #cc_contextless {
+__abs_complex64 :: inline proc(x: complex64) -> f32 #cc_contextless {
 	r, i := real(x), imag(x);
 	return __sqrt_f32(r*r + i*i);
 }
-__abs_complex128 :: proc(x: complex128) -> f64 #inline #cc_contextless {
+__abs_complex128 :: inline proc(x: complex128) -> f64 #cc_contextless {
 	r, i := real(x), imag(x);
 	return __sqrt_f64(r*r + i*i);
 }
@@ -971,7 +988,7 @@ __dynamic_map_grow :: proc(using h: __Map_Header) {
 	__dynamic_map_rehash(h, new_count);
 }
 
-__dynamic_map_full :: proc(using h: __Map_Header) -> bool #inline {
+__dynamic_map_full :: inline proc(using h: __Map_Header) -> bool {
 	return int(0.75 * f64(len(m.hashes))) <= m.entries.cap;
 }
 

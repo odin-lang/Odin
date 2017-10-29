@@ -28,7 +28,7 @@ semaphore_post :: proc(s: ^Semaphore, count: int) {
 	// win32.ReleaseSemaphore(s._handle, cast(i32)count, nil);
 }
 
-semaphore_release :: proc(s: ^Semaphore) #inline {
+semaphore_release :: inline proc(s: ^Semaphore) {
 	semaphore_post(s, 1);
 }
 

@@ -245,14 +245,15 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		case Basic_f64:    ir_write_string(f, "double");               return;
 
 		// case Basic_complex32:  ir_write_string(f, "%%..complex32"); return;
-		case Basic_complex64:  ir_write_string(f, "%..complex64");    return;
-		case Basic_complex128: ir_write_string(f, "%..complex128");   return;
+		case Basic_complex64:  ir_write_string(f, "%..complex64");     return;
+		case Basic_complex128: ir_write_string(f, "%..complex128");    return;
 
-		case Basic_rawptr: ir_write_string(f, "%..rawptr");           return;
-		case Basic_string: ir_write_string(f, "%..string");           return;
-		case Basic_uint:   ir_fprintf(f, "i%lld", word_bits);          return;
-		case Basic_int:    ir_fprintf(f, "i%lld", word_bits);          return;
-		case Basic_any:    ir_write_string(f, "%..any");              return;
+		case Basic_rawptr:  ir_write_string(f, "%..rawptr");           return;
+		case Basic_string:  ir_write_string(f, "%..string");           return;
+		case Basic_uint:    ir_fprintf(f, "i%lld", word_bits);         return;
+		case Basic_int:     ir_fprintf(f, "i%lld", word_bits);         return;
+		case Basic_uintptr: ir_fprintf(f, "i%lld", word_bits);         return;
+		case Basic_any:     ir_write_string(f, "%..any");              return;
 		}
 		break;
 	case Type_Pointer: {

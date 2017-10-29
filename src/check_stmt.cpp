@@ -206,7 +206,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 
 	check_expr(c, &lhs, lhs_node);
 	if (lhs.mode == Addressing_Invalid ||
-	    lhs.type == t_invalid) {
+	    (lhs.type == t_invalid && lhs.mode != Addressing_Overload)) {
 		return nullptr;
 	}
 

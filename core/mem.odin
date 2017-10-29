@@ -1,9 +1,9 @@
 import "core:raw.odin"
 
 foreign __llvm_core {
-	swap :: proc(b: u16) -> u16 #link_name "llvm.bswap.i16" ---;
-	swap :: proc(b: u32) -> u32 #link_name "llvm.bswap.i32" ---;
-	swap :: proc(b: u64) -> u64 #link_name "llvm.bswap.i64" ---;
+	@(link_name = "llvm.bswap.i16") swap :: proc(b: u16) -> u16  ---;
+	@(link_name = "llvm.bswap.i32") swap :: proc(b: u32) -> u32  ---;
+	@(link_name = "llvm.bswap.i64") swap :: proc(b: u64) -> u64  ---;
 }
 
 set :: proc(data: rawptr, value: i32, len: int) -> rawptr #cc_contextless {
@@ -42,21 +42,21 @@ slice_to_bytes :: proc(slice: []$T) -> []u8 #cc_contextless {
 }
 
 
-kilobytes :: proc(x: int) -> int #inline #cc_contextless { return          (x) * 1024; }
-megabytes :: proc(x: int) -> int #inline #cc_contextless { return kilobytes(x) * 1024; }
-gigabytes :: proc(x: int) -> int #inline #cc_contextless { return megabytes(x) * 1024; }
-terabytes :: proc(x: int) -> int #inline #cc_contextless { return gigabytes(x) * 1024; }
+kilobytes :: inline proc(x: int) -> int #cc_contextless do return          (x) * 1024;
+megabytes :: inline proc(x: int) -> int #cc_contextless do return kilobytes(x) * 1024;
+gigabytes :: inline proc(x: int) -> int #cc_contextless do return megabytes(x) * 1024;
+terabytes :: inline proc(x: int) -> int #cc_contextless do return gigabytes(x) * 1024;
 
-is_power_of_two :: proc(x: int) -> bool {
+is_power_of_two :: proc(x: uintptr) -> bool {
 	if x <= 0 do return false;
 	return (x & (x-1)) == 0;
 }
 
-align_forward :: proc(ptr: rawptr, align: int) -> rawptr {
+align_forward :: proc(ptr: rawptr, align: uintptr) -> rawptr {
 	assert(is_power_of_two(align));
 
-	a := uint(align);
-	p := uint(ptr);
+	a := uintptr(align);
+	p := uintptr(ptr);
 	modulo := p & (a-1);
 	if modulo != 0 do p += a - modulo;
 	return rawptr(p);
@@ -150,7 +150,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 		#no_bounds_check end := &arena.memory[len(arena.memory)];
 
-		ptr := align_forward(end, alignment);
+		ptr := align_forward(end, uintptr(alignment));
 		(^raw.Slice)(&arena.memory).len += total_size;
 		return zero(ptr, size);
 

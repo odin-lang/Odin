@@ -108,13 +108,13 @@ S_ISUID :: 0004000; // Set user id on execution
 S_ISGID :: 0002000; // Set group id on execution
 S_ISVTX :: 0001000; // Directory restrcted delete
 
-S_ISLNK  :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFLNK;
-S_ISREG  :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFREG;
-S_ISDIR  :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFDIR;
-S_ISCHR  :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFCHR;
-S_ISBLK  :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFBLK;
-S_ISFIFO :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFIFO;
-S_ISSOCK :: proc(m: u32) -> bool #inline do return (m & S_IFMT) == S_IFSOCK;
+S_ISLNK  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFLNK;
+S_ISREG  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFREG;
+S_ISDIR  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFDIR;
+S_ISCHR  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFCHR;
+S_ISBLK  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFBLK;
+S_ISFIFO :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFIFO;
+S_ISSOCK :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFSOCK;
 
 R_OK :: 4; // Test for read permission
 W_OK :: 2; // Test for write permission
@@ -122,29 +122,29 @@ X_OK :: 1; // Test for execute permission
 F_OK :: 0; // Test for file existance
 
 foreign libc {
-	_unix_open    :: proc(path: ^u8, mode: int) -> Handle                    #link_name "open"    ---;
-	_unix_close   :: proc(handle: Handle)                                    #link_name "close"   ---;
-	_unix_read    :: proc(handle: Handle, buffer: rawptr, count: int) -> int #link_name "read"    ---;
-	_unix_write   :: proc(handle: Handle, buffer: rawptr, count: int) -> int #link_name "write"   ---;
-	_unix_lseek   :: proc(fs: Handle, offset: int, whence: int) -> int       #link_name "lseek"   ---;
-	_unix_gettid  :: proc() -> u64                                           #link_name "gettid"  ---;
-	_unix_stat    :: proc(path: ^u8, stat: ^Stat) -> int                     #link_name "stat"    ---;
-	_unix_access  :: proc(path: ^u8, mask: int) -> int                       #link_name "access"  ---;
+	@(link_name="open")    _unix_open    :: proc(path: ^u8, mode: int) -> Handle ---;
+	@(link_name="close")   _unix_close   :: proc(handle: Handle) ---;
+	@(link_name="read")    _unix_read    :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---;
+	@(link_name="write")   _unix_write   :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---;
+	@(link_name="lseek")   _unix_lseek   :: proc(fs: Handle, offset: int, whence: int) -> int ---;
+	@(link_name="gettid")  _unix_gettid  :: proc() -> u64 ---;
+	@(link_name="stat")    _unix_stat    :: proc(path: ^u8, stat: ^Stat) -> int ---;
+	@(link_name="access")  _unix_access  :: proc(path: ^u8, mask: int) -> int ---;
 
-	_unix_malloc  :: proc(size: int) -> rawptr                               #link_name "malloc"  ---;
-	_unix_calloc  :: proc(num, size: int) -> rawptr                          #link_name "calloc"  ---;
-	_unix_free    :: proc(ptr: rawptr)                                       #link_name "free"    ---;
-	_unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr                  #link_name "realloc" ---;
-	_unix_getenv  :: proc(^u8) -> ^u8                                        #link_name "getenv"  ---;
+	@(link_name="malloc")  _unix_malloc  :: proc(size: int) -> rawptr ---;
+	@(link_name="calloc")  _unix_calloc  :: proc(num, size: int) -> rawptr ---;
+	@(link_name="free")    _unix_free    :: proc(ptr: rawptr) ---;
+	@(link_name="realloc") _unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr ---;
+	@(link_name="getenv")  _unix_getenv  :: proc(^u8) -> ^u8 ---;
 
-	_unix_exit    :: proc(status: int)                                       #link_name "exit"    ---;
+	@(link_name="exit")    _unix_exit    :: proc(status: int) ---;
 }
 
 foreign dl {
-	_unix_dlopen  :: proc(filename: ^u8, flags: int) -> rawptr               #link_name "dlopen"  ---;
-	_unix_dlsym   :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)    #link_name "dlsym"   ---;
-	_unix_dlclose :: proc(handle: rawptr) -> int                             #link_name "dlclose" ---;
-	_unix_dlerror :: proc() -> ^u8                                           #link_name "dlerror" ---;
+	@(link_name="dlopen")  _unix_dlopen  :: proc(filename: ^u8, flags: int) -> rawptr ---;
+	@(link_name="dlsym")   _unix_dlsym   :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c) ---;
+	@(link_name="dlclose") _unix_dlclose :: proc(handle: rawptr) -> int ---;
+	@(link_name="dlerror") _unix_dlerror :: proc() -> ^u8 ---;
 }
 
 // TODO(zangent): Change this to just `open` when Bill fixes overloading.
@@ -217,7 +217,7 @@ last_write_time :: proc(fd: Handle) -> File_Time {}
 last_write_time_by_name :: proc(name: string) -> File_Time {}
 */
 
-stat :: proc(path: string) -> (Stat, bool) #inline {
+stat :: inline proc(path: string) -> (Stat, bool) {
 	s: Stat;
 	cstr := strings.new_c_string(path);
 	defer free(cstr);
@@ -225,20 +225,20 @@ stat :: proc(path: string) -> (Stat, bool) #inline {
 	return s, ret_int==0;
 }
 
-access :: proc(path: string, mask: int) -> bool #inline {
+access :: inline proc(path: string, mask: int) -> bool {
 	cstr := strings.new_c_string(path);
 	defer free(cstr);
 	return _unix_access(cstr, mask) == 0;
 }
 
-heap_alloc :: proc(size: int) -> rawptr #inline {
+heap_alloc :: inline proc(size: int) -> rawptr {
 	assert(size > 0);
 	return _unix_calloc(1, size);
 }
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr #inline {
+heap_resize :: inline proc(ptr: rawptr, new_size: int) -> rawptr {
 	return _unix_realloc(ptr, new_size);
 }
-heap_free :: proc(ptr: rawptr) #inline {
+heap_free :: inline proc(ptr: rawptr) {
 	_unix_free(ptr);
 }
 
@@ -252,7 +252,7 @@ getenv :: proc(name: string) -> (string, bool) {
 	return strings.to_odin_string(cstr), true;
 }
 
-exit :: proc(code: int) #inline {
+exit :: inline proc(code: int) {
 	_unix_exit(code);
 }
 
@@ -262,20 +262,20 @@ current_thread_id :: proc() -> int {
 	return 0;
 }
 
-dlopen :: proc(filename: string, flags: int) -> rawptr #inline {
+dlopen :: inline proc(filename: string, flags: int) -> rawptr {
 	cstr := strings.new_c_string(filename);
 	handle := _unix_dlopen(cstr, flags);
 	free(cstr);
 	return handle;
 }
-dlsym :: proc(handle: rawptr, symbol: string) -> (proc() #cc_c) #inline {
+dlsym :: inline proc(handle: rawptr, symbol: string) -> (proc() #cc_c) {
 	assert(handle != nil);
 	cstr := strings.new_c_string(symbol);
 	proc_handle := _unix_dlsym(handle, cstr);
 	free(cstr);
 	return proc_handle;
 }
-dlclose :: proc(handle: rawptr) -> bool #inline {
+dlclose :: inline proc(handle: rawptr) -> bool {
 	assert(handle != nil);
 	return _unix_dlclose(handle) == 0;
 }

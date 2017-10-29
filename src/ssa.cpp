@@ -2490,8 +2490,8 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 			if (e->Procedure.is_foreign) {
 				name = e->token.string; // NOTE(bill): Don't use the mangled name
 			}
-			if (pl->link_name.len > 0) {
-				name = pl->link_name;
+			if (e->Procedure.link_name.len > 0) {
+				name = e->Procedure.link_name;
 			}
 
 			if (e == entry_point) {
