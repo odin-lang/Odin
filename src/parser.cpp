@@ -2098,6 +2098,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, ProcCallingConvention *calling_conve
 	GB_ASSERT(tags != nullptr);
 
 	ProcCallingConvention cc = ProcCC_Invalid;
+	if (calling_convention) cc = *calling_convention;
 
 	while (f->curr_token.kind == Token_Hash) {
 		AstNode *tag_expr = parse_tag_expr(f, nullptr);
@@ -3299,13 +3300,40 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token) {
 	AstNode *params = nullptr;
 	AstNode *results = nullptr;
 
+	ProcCallingConvention cc = ProcCC_Invalid;
+	if (f->curr_token.kind == Token_String) {
+		Token token = expect_token(f, Token_String);
+		String conv = token.string;
+		if (conv == "odin") {
+			cc = ProcCC_Odin;
+		} else if (conv == "contextless") {
+			cc = ProcCC_Contextless;
+		} else if (conv == "cdecl" || conv == "c") {
+			cc = ProcCC_C;
+		} else if (conv == "stdcall" || conv == "std") {
+			cc = ProcCC_Std;
+		} else if (conv == "fastcall" || conv == "fast") {
+			cc = ProcCC_Fast;
+		} else {
+			syntax_error(token, "Unknown procedure tag #%.*s\n", LIT(conv));
+		}
+
+		if (cc == ProcCC_Invalid) {
+			if (f->in_foreign_block) {
+				cc = ProcCC_C;
+			} else {
+				cc = ProcCC_Odin;
+			}
+		}
+	}
+
+
 	expect_token(f, Token_OpenParen);
 	params = parse_field_list(f, nullptr, FieldFlag_Signature, Token_CloseParen, true, true);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	results = parse_results(f);
 
 	u64 tags = 0;
-	ProcCallingConvention cc = ProcCC_Invalid;
 	parse_proc_tags(f, &tags, &cc);
 
 	bool is_generic = false;

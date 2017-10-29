@@ -25,7 +25,7 @@ Thread :: struct {
 create :: proc(procedure: Thread_Proc) -> ^Thread {
 	win32_thread_id: u32;
 
-	__windows_thread_entry_proc :: proc(data: rawptr) -> i32 #cc_c {
+	__windows_thread_entry_proc :: proc "c" (data: rawptr) -> i32 {
 		if data	== nil do return 0;
 
 		t := cast(^Thread)data;

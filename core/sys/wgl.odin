@@ -52,10 +52,10 @@ Glyph_Metrics_Float :: struct {
 	cell_inc_y:   f32,
 }
 
-Create_Context_Attribs_ARB_Type :: #type proc(hdc: Hdc, h_share_context: rawptr, attribList: ^i32) -> Hglrc;
-Choose_Pixel_Format_ARB_Type    :: #type proc(hdc: Hdc, attrib_i_list: ^i32, attrib_f_list: ^f32, max_formats: u32, formats: ^i32, num_formats : ^u32) -> Bool #cc_c;
-Swap_Interval_EXT_Type          :: #type proc(interval: i32) -> bool #cc_c;
-Get_Extensions_String_ARB_Type  :: #type proc(Hdc) -> ^u8 #cc_c;
+Create_Context_Attribs_ARB_Type :: #type proc "c" (hdc: Hdc, h_share_context: rawptr, attribList: ^i32) -> Hglrc;
+Choose_Pixel_Format_ARB_Type    :: #type proc "c" (hdc: Hdc, attrib_i_list: ^i32, attrib_f_list: ^f32, max_formats: u32, formats: ^i32, num_formats : ^u32) -> Bool;
+Swap_Interval_EXT_Type          :: #type proc "c" (interval: i32) -> bool;
+Get_Extensions_String_ARB_Type  :: #type proc "c" (Hdc) -> ^u8;
 
 // Procedures
 	create_context_attribs_arb: Create_Context_Attribs_ARB_Type;

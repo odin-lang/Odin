@@ -8264,7 +8264,6 @@ void ir_gen_tree(irGen *s) {
 			if (e->kind == Entity_Procedure && e->Procedure.is_export) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
-			// } else if (scope->is_init && e->kind == Entity_Procedure && name == "main") {
 			} else {
 				name = ir_mangle_name(s, e->token.pos.file, e);
 			}

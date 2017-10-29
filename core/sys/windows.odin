@@ -22,7 +22,7 @@ HKL       :: Handle;
 Wparam    :: uint;
 Lparam    :: int;
 Lresult   :: int;
-Wnd_Proc  :: #type proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
+Wnd_Proc  :: #type proc "c" (Hwnd, u32, Wparam, Lparam) -> Lresult;
 
 Long_Ptr :: int;
 
@@ -433,217 +433,220 @@ GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1;
 
 
 foreign kernel32 {
-	@(link_name="GetLastError")              get_last_error              :: proc() -> i32 #cc_std ---;
-	@(link_name="ExitProcess")               exit_process                :: proc(exit_code: u32) #cc_std ---;
-	@(link_name="GetModuleHandleA")          get_module_handle_a         :: proc(module_name: ^u8) -> Hinstance #cc_std ---;
-	@(link_name="GetModuleHandleW")          get_module_handle_w         :: proc(module_name: ^u16) -> Hinstance #cc_std ---;
-	@(link_name="Sleep")                     sleep                       :: proc(ms: i32) -> i32 #cc_std ---;
-	@(link_name="QueryPerformanceFrequency") query_performance_frequency :: proc(result: ^i64) -> i32 #cc_std ---;
-	@(link_name="QueryPerformanceCounter")   query_performance_counter   :: proc(result: ^i64) -> i32 #cc_std ---;
-	@(link_name="OutputDebugStringA")        output_debug_string_a       :: proc(c_str: ^u8) #cc_std ---;
+	@(link_name="GetLastError")              get_last_error              :: proc "std" () -> i32 ---;
+	@(link_name="ExitProcess")               exit_process                :: proc "std" (exit_code: u32) ---;
+	@(link_name="GetModuleHandleA")          get_module_handle_a         :: proc "std" (module_name: ^u8) -> Hinstance ---;
+	@(link_name="GetModuleHandleW")          get_module_handle_w         :: proc "std" (module_name: ^u16) -> Hinstance ---;
+	@(link_name="Sleep")                     sleep                       :: proc "std" (ms: i32) -> i32 ---;
+	@(link_name="QueryPerformanceFrequency") query_performance_frequency :: proc "std" (result: ^i64) -> i32 ---;
+	@(link_name="QueryPerformanceCounter")   query_performance_counter   :: proc "std" (result: ^i64) -> i32 ---;
+	@(link_name="OutputDebugStringA")        output_debug_string_a       :: proc "std" (c_str: ^u8) ---;
 
-	@(link_name="GetCommandLineA")    get_command_line_a    :: proc() -> ^u8 #cc_std ---;
-	@(link_name="GetCommandLineW")    get_command_line_w    :: proc() -> ^u16 #cc_std ---;
-	@(link_name="GetSystemMetrics")   get_system_metrics    :: proc(index: i32) -> i32 #cc_std ---;
-	@(link_name="GetCurrentThreadId") get_current_thread_id :: proc() -> u32 #cc_std ---;
+	@(link_name="GetCommandLineA")    get_command_line_a    :: proc "std" () -> ^u8 ---;
+	@(link_name="GetCommandLineW")    get_command_line_w    :: proc "std" () -> ^u16 ---;
+	@(link_name="GetSystemMetrics")   get_system_metrics    :: proc "std" (index: i32) -> i32 ---;
+	@(link_name="GetCurrentThreadId") get_current_thread_id :: proc "std" () -> u32 ---;
 
-	@(link_name="GetSystemTimeAsFileTime") get_system_time_as_file_time :: proc(system_time_as_file_time: ^Filetime) #cc_std ---;
-	@(link_name="FileTimeToLocalFileTime") file_time_to_local_file_time :: proc(file_time: ^Filetime, local_file_time: ^Filetime) -> Bool #cc_std ---;
-	@(link_name="FileTimeToSystemTime")    file_time_to_system_time     :: proc(file_time: ^Filetime, system_time: ^Systemtime) -> Bool #cc_std ---;
-	@(link_name="SystemTimeToFileTime")    system_time_to_file_time     :: proc(system_time: ^Systemtime, file_time: ^Filetime) -> Bool #cc_std ---;
+	@(link_name="GetSystemTimeAsFileTime") get_system_time_as_file_time :: proc "std" (system_time_as_file_time: ^Filetime) ---;
+	@(link_name="FileTimeToLocalFileTime") file_time_to_local_file_time :: proc "std" (file_time: ^Filetime, local_file_time: ^Filetime) -> Bool ---;
+	@(link_name="FileTimeToSystemTime")    file_time_to_system_time     :: proc "std" (file_time: ^Filetime, system_time: ^Systemtime) -> Bool ---;
+	@(link_name="SystemTimeToFileTime")    system_time_to_file_time     :: proc "std" (system_time: ^Systemtime, file_time: ^Filetime) -> Bool ---;
 
-	@(link_name="CloseHandle")  close_handle   :: proc(h: Handle) -> i32 #cc_std ---;
-	@(link_name="GetStdHandle") get_std_handle :: proc(h: i32) -> Handle #cc_std ---;
+	@(link_name="CloseHandle")  close_handle   :: proc "std" (h: Handle) -> i32 ---;
+	@(link_name="GetStdHandle") get_std_handle :: proc "std" (h: i32) -> Handle ---;
 
 	@(link_name="CreateFileA")
-	create_file_a :: proc(filename: ^u8, desired_access, share_mode: u32,
-	                      security: rawptr,
-	                      creation, flags_and_attribs: u32, template_file: Handle) -> Handle #cc_std ---;
+	create_file_a :: proc "std" (filename: ^u8, desired_access, share_module: u32,
+	                             security: rawptr,
+	                             creation, flags_and_attribs: u32, template_file: Handle) -> Handle ---;
 
-	@(link_name="ReadFile")  read_file  :: proc(h: Handle, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> Bool #cc_std ---;
-	@(link_name="WriteFile") write_file :: proc(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool #cc_std ---;
+	@(link_name="ReadFile")  read_file  :: proc "std" (h: Handle, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> Bool ---;
+	@(link_name="WriteFile") write_file :: proc "std" (h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool ---;
 
-	@(link_name="GetFileSizeEx")              get_file_size_ex               :: proc(file_handle: Handle, file_size: ^i64) -> Bool #cc_std ---;
-	@(link_name="GetFileAttributesA")         get_file_attributes_a          :: proc(filename: ^u8) -> u32 #cc_std ---;
-	@(link_name="GetFileAttributesExA")       get_file_attributes_ex_a       :: proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool #cc_std ---;
-	@(link_name="GetFileInformationByHandle") get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool #cc_std ---;
+	@(link_name="GetFileSizeEx")              get_file_size_ex               :: proc "std" (file_handle: Handle, file_size: ^i64) -> Bool ---;
+	@(link_name="GetFileAttributesA")         get_file_attributes_a          :: proc "std" (filename: ^u8) -> u32 ---;
+	@(link_name="GetFileAttributesExA")       get_file_attributes_ex_a       :: proc "std" (filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool ---;
+	@(link_name="GetFileInformationByHandle") get_file_information_by_handle :: proc "std" (file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool ---;
 
-	@(link_name="GetFileType")    get_file_type    :: proc(file_handle: Handle) -> u32 #cc_std ---;
-	@(link_name="SetFilePointer") set_file_pointer :: proc(file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #cc_std ---;
+	@(link_name="GetFileType")    get_file_type    :: proc "std" (file_handle: Handle) -> u32 ---;
+	@(link_name="SetFilePointer") set_file_pointer :: proc "std" (file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 ---;
 
-	@(link_name="SetHandleInformation") set_handle_information :: proc(obj: Handle, mask, flags: u32) -> Bool #cc_std ---;
+	@(link_name="SetHandleInformation") set_handle_information :: proc "std" (obj: Handle, mask, flags: u32) -> Bool ---;
 
-	@(link_name="FindFirstFileA") find_first_file_a :: proc(file_name : ^u8, data : ^Find_Data) -> Handle #cc_std ---;
-	@(link_name="FindNextFileA")  find_next_file_a  :: proc(file : Handle, data : ^Find_Data) -> Bool #cc_std ---;
-	@(link_name="FindClose")      find_close        :: proc(file : Handle) -> Bool #cc_std ---;
-
-
-	@(link_name="HeapAlloc")      heap_alloc       :: proc(h: Handle, flags: u32, bytes: int) -> rawptr #cc_std ---;
-	@(link_name="HeapReAlloc")    heap_realloc     :: proc(h: Handle, flags: u32, memory: rawptr, bytes: int) -> rawptr #cc_std ---;
-	@(link_name="HeapFree")       heap_free        :: proc(h: Handle, flags: u32, memory: rawptr) -> Bool #cc_std ---;
-	@(link_name="GetProcessHeap") get_process_heap :: proc() -> Handle #cc_std ---;
+	@(link_name="FindFirstFileA") find_first_file_a :: proc "std" (file_name : ^u8, data : ^Find_Data) -> Handle ---;
+	@(link_name="FindNextFileA")  find_next_file_a  :: proc "std" (file : Handle, data : ^Find_Data) -> Bool ---;
+	@(link_name="FindClose")      find_close        :: proc "std" (file : Handle) -> Bool ---;
 
 
-	@(link_name="CreateSemaphoreA")    create_semaphore_a     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^u8) -> Handle #cc_std ---;
-	@(link_name="ReleaseSemaphore")    release_semaphore      :: proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool #cc_std ---;
-	@(link_name="WaitForSingleObject") wait_for_single_object :: proc(handle: Handle, milliseconds: u32) -> u32 #cc_std ---;
+	@(link_name="HeapAlloc")      heap_alloc       :: proc "std" (h: Handle, flags: u32, bytes: int) -> rawptr ---;
+	@(link_name="HeapReAlloc")    heap_realloc     :: proc "std" (h: Handle, flags: u32, memory: rawptr, bytes: int) -> rawptr ---;
+	@(link_name="HeapFree")       heap_free        :: proc "std" (h: Handle, flags: u32, memory: rawptr) -> Bool ---;
+	@(link_name="GetProcessHeap") get_process_heap :: proc "std" () -> Handle ---;
 
 
-	@(link_name="InterlockedCompareExchange") interlocked_compare_exchange :: proc(dst: ^i32, exchange, comparand: i32) -> i32 #cc_c ---;
-	@(link_name="InterlockedExchange")        interlocked_exchange         :: proc(dst: ^i32, desired: i32) -> i32 #cc_c ---;
-	@(link_name="InterlockedExchangeAdd")     interlocked_exchange_add     :: proc(dst: ^i32, desired: i32) -> i32 #cc_c ---;
-	@(link_name="InterlockedAnd")             interlocked_and              :: proc(dst: ^i32, desired: i32) -> i32 #cc_c ---;
-	@(link_name="InterlockedOr")              interlocked_or               :: proc(dst: ^i32, desired: i32) -> i32 #cc_c ---;
+	@(link_name="CreateSemaphoreA")    create_semaphore_a     :: proc "std" (attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^u8) -> Handle ---;
+	@(link_name="ReleaseSemaphore")    release_semaphore      :: proc "std" (semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool ---;
+	@(link_name="WaitForSingleObject") wait_for_single_object :: proc "std" (handle: Handle, milliseconds: u32) -> u32 ---;
+}
 
-	@(link_name="InterlockedCompareExchange64") interlocked_compare_exchange64 :: proc(dst: ^i64, exchange, comparand: i64) -> i64 #cc_c ---;
-	@(link_name="InterlockedExchange64")        interlocked_exchange64         :: proc(dst: ^i64, desired: i64) -> i64 #cc_c ---;
-	@(link_name="InterlockedExchangeAdd64")     interlocked_exchange_add64     :: proc(dst: ^i64, desired: i64) -> i64 #cc_c ---;
-	@(link_name="InterlockedAnd64")             interlocked_and64              :: proc(dst: ^i64, desired: i64) -> i64 #cc_c ---;
-	@(link_name="InterlockedOr64")              interlocked_or64               :: proc(dst: ^i64, desired: i64) -> i64 #cc_c ---;
+foreign kernel32 {
+	@(link_name="InterlockedCompareExchange") interlocked_compare_exchange :: proc "c" (dst: ^i32, exchange, comparand: i32) -> i32 ---;
+	@(link_name="InterlockedExchange")        interlocked_exchange         :: proc "c" (dst: ^i32, desired: i32) -> i32 ---;
+	@(link_name="InterlockedExchangeAdd")     interlocked_exchange_add     :: proc "c" (dst: ^i32, desired: i32) -> i32 ---;
+	@(link_name="InterlockedAnd")             interlocked_and              :: proc "c" (dst: ^i32, desired: i32) -> i32 ---;
+	@(link_name="InterlockedOr")              interlocked_or               :: proc "c" (dst: ^i32, desired: i32) -> i32 ---;
 
-	@(link_name="_mm_pause")        mm_pause           :: proc() #cc_std ---;
-	@(link_name="ReadWriteBarrier") read_write_barrier :: proc() #cc_std ---;
-	@(link_name="WriteBarrier")     write_barrier      :: proc() #cc_std ---;
-	@(link_name="ReadBarrier")      read_barrier       :: proc() #cc_std ---;
+	@(link_name="InterlockedCompareExchange64") interlocked_compare_exchange64 :: proc "c" (dst: ^i64, exchange, comparand: i64) -> i64 ---;
+	@(link_name="InterlockedExchange64")        interlocked_exchange64         :: proc "c" (dst: ^i64, desired: i64) -> i64 ---;
+	@(link_name="InterlockedExchangeAdd64")     interlocked_exchange_add64     :: proc "c" (dst: ^i64, desired: i64) -> i64 ---;
+	@(link_name="InterlockedAnd64")             interlocked_and64              :: proc "c" (dst: ^i64, desired: i64) -> i64 ---;
+	@(link_name="InterlockedOr64")              interlocked_or64               :: proc "c" (dst: ^i64, desired: i64) -> i64 ---;
+}
+
+foreign kernel32 {
+	@(link_name="_mm_pause")        mm_pause           :: proc "std" () ---;
+	@(link_name="ReadWriteBarrier") read_write_barrier :: proc "std" () ---;
+	@(link_name="WriteBarrier")     write_barrier      :: proc "std" () ---;
+	@(link_name="ReadBarrier")      read_barrier       :: proc "std" () ---;
 
 	@(link_name="CreateThread")
-	create_thread :: proc(thread_attributes: ^Security_Attributes, stack_size: int, start_routine: rawptr,
-	                      parameter: rawptr, creation_flags: u32, thread_id: ^u32) -> Handle #cc_std ---;
-	@(link_name="ResumeThread")      resume_thread        :: proc(thread: Handle) -> u32 #cc_std ---;
-	@(link_name="GetThreadPriority") get_thread_priority  :: proc(thread: Handle) -> i32 #cc_std ---;
-	@(link_name="SetThreadPriority") set_thread_priority  :: proc(thread: Handle, priority: i32) -> Bool #cc_std ---;
-	@(link_name="GetExitCodeThread") get_exit_code_thread :: proc(thread: Handle, exit_code: ^u32) -> Bool #cc_std ---;
+	create_thread :: proc "std" (thread_attributes: ^Security_Attributes, stack_size: int, start_routine: rawptr,
+	                             parameter: rawptr, creation_flags: u32, thread_id: ^u32) -> Handle ---;
+	@(link_name="ResumeThread")      resume_thread        :: proc "std" (thread: Handle) -> u32 ---;
+	@(link_name="GetThreadPriority") get_thread_priority  :: proc "std" (thread: Handle) -> i32 ---;
+	@(link_name="SetThreadPriority") set_thread_priority  :: proc "std" (thread: Handle, priority: i32) -> Bool ---;
+	@(link_name="GetExitCodeThread") get_exit_code_thread :: proc "std" (thread: Handle, exit_code: ^u32) -> Bool ---;
 
-	@(link_name="InitializeCriticalSection")             initialize_critical_section                :: proc(critical_section: ^Critical_Section) #cc_std ---;
-	@(link_name="InitializeCriticalSectionAndSpinCount") initialize_critical_section_and_spin_count :: proc(critical_section: ^Critical_Section, spin_count: u32) #cc_std ---;
-	@(link_name="DeleteCriticalSection")                 delete_critical_section                    :: proc(critical_section: ^Critical_Section) #cc_std ---;
-	@(link_name="SetCriticalSectionSpinCount")           set_critical_section_spin_count            :: proc(critical_section: ^Critical_Section, spin_count: u32) -> u32 #cc_std ---;
-	@(link_name="TryEnterCriticalSection")               try_enter_critical_section                 :: proc(critical_section: ^Critical_Section) -> Bool #cc_std ---;
-	@(link_name="EnterCriticalSection")                  enter_critical_section                     :: proc(critical_section: ^Critical_Section) #cc_std ---;
-	@(link_name="LeaveCriticalSection")                  leave_critical_section                     :: proc(critical_section: ^Critical_Section) #cc_std ---;
+	@(link_name="InitializeCriticalSection")             initialize_critical_section                :: proc "std" (critical_section: ^Critical_Section) ---;
+	@(link_name="InitializeCriticalSectionAndSpinCount") initialize_critical_section_and_spin_count :: proc "std" (critical_section: ^Critical_Section, spin_count: u32) ---;
+	@(link_name="DeleteCriticalSection")                 delete_critical_section                    :: proc "std" (critical_section: ^Critical_Section) ---;
+	@(link_name="SetCriticalSectionSpinCount")           set_critical_section_spin_count            :: proc "std" (critical_section: ^Critical_Section, spin_count: u32) -> u32 ---;
+	@(link_name="TryEnterCriticalSection")               try_enter_critical_section                 :: proc "std" (critical_section: ^Critical_Section) -> Bool ---;
+	@(link_name="EnterCriticalSection")                  enter_critical_section                     :: proc "std" (critical_section: ^Critical_Section) ---;
+	@(link_name="LeaveCriticalSection")                  leave_critical_section                     :: proc "std" (critical_section: ^Critical_Section) ---;
 
-	@(link_name="CreateEventA") create_event_a :: proc(event_attributes: ^Security_Attributes, manual_reset, initial_state: Bool, name: ^u8) -> Handle #cc_std ---;
+	@(link_name="CreateEventA") create_event_a :: proc "std" (event_attributes: ^Security_Attributes, manual_reset, initial_state: Bool, name: ^u8) -> Handle ---;
 
-	@(link_name="LoadLibraryA")   load_library_a   :: proc(c_str: ^u8)  -> Hmodule #cc_std ---;
-	@(link_name="LoadLibraryW")   load_library_a   :: proc(c_str: ^u16) -> Hmodule #cc_std ---;
-	@(link_name="FreeLibrary")    free_library     :: proc(h: Hmodule) #cc_std ---;
-	@(link_name="GetProcAddress") get_proc_address :: proc(h: Hmodule, c_str: ^u8) -> rawptr #cc_std ---;
+	@(link_name="LoadLibraryA")   load_library_a   :: proc "std" (c_str: ^u8)  -> Hmodule ---;
+	@(link_name="LoadLibraryW")   load_library_a   :: proc "std" (c_str: ^u16) -> Hmodule ---;
+	@(link_name="FreeLibrary")    free_library     :: proc "std" (h: Hmodule) ---;
+	@(link_name="GetProcAddress") get_proc_address :: proc "std" (h: Hmodule, c_str: ^u8) -> rawptr ---;
 
 }
 
 foreign user32 {
-	@(link_name="GetDesktopWindow") get_desktop_window  :: proc() -> Hwnd #cc_std ---;
-	@(link_name="ShowCursor")       show_cursor         :: proc(show : Bool) #cc_std ---;
-	@(link_name="GetCursorPos")     get_cursor_pos      :: proc(p: ^Point) -> Bool #cc_std ---;
-	@(link_name="SetCursorPos")     set_cursor_pos      :: proc(x, y: i32) -> Bool #cc_std ---;
-	@(link_name="ScreenToClient")   screen_to_client    :: proc(h: Hwnd, p: ^Point) -> Bool #cc_std ---;
-	@(link_name="ClientToScreen")   client_to_screen    :: proc(h: Hwnd, p: ^Point) -> Bool #cc_std ---;
-	@(link_name="PostQuitMessage")  post_quit_message   :: proc(exit_code: i32) #cc_std ---;
-	@(link_name="SetWindowTextA")   set_window_text_a   :: proc(hwnd: Hwnd, c_string: ^u8) -> Bool #cc_std ---;
-	@(link_name="RegisterClassExA") register_class_ex_a :: proc(wc: ^Wnd_Class_Ex_A) -> i16 #cc_std ---;
-	@(link_name="RegisterClassExW") register_class_ex_w :: proc(wc: ^Wnd_Class_Ex_W) -> i16 #cc_std ---;
+	@(link_name="GetDesktopWindow") get_desktop_window  :: proc "std" () -> Hwnd ---;
+	@(link_name="ShowCursor")       show_cursor         :: proc "std" (show : Bool) ---;
+	@(link_name="GetCursorPos")     get_cursor_pos      :: proc "std" (p: ^Point) -> Bool ---;
+	@(link_name="SetCursorPos")     set_cursor_pos      :: proc "std" (x, y: i32) -> Bool ---;
+	@(link_name="ScreenToClient")   screen_to_client    :: proc "std" (h: Hwnd, p: ^Point) -> Bool ---;
+	@(link_name="ClientToScreen")   client_to_screen    :: proc "std" (h: Hwnd, p: ^Point) -> Bool ---;
+	@(link_name="PostQuitMessage")  post_quit_message   :: proc "std" (exit_code: i32) ---;
+	@(link_name="SetWindowTextA")   set_window_text_a   :: proc "std" (hwnd: Hwnd, c_string: ^u8) -> Bool ---;
+	@(link_name="RegisterClassExA") register_class_ex_a :: proc "std" (wc: ^Wnd_Class_Ex_A) -> i16 ---;
+	@(link_name="RegisterClassExW") register_class_ex_w :: proc "std" (wc: ^Wnd_Class_Ex_W) -> i16 ---;
 
 	@(link_name="CreateWindowExA")
-	create_window_ex_a :: proc(ex_style: u32,
-	                           class_name, title: ^u8,
-	                           style: u32,
-	                           x, y, w, h: i32,
-	                           parent: Hwnd, menu: Hmenu, instance: Hinstance,
-	                           param: rawptr) -> Hwnd #cc_std ---;
+	create_window_ex_a :: proc "std" (ex_style: u32,
+	                                  class_name, title: ^u8,
+	                                  style: u32,
+	                                  x, y, w, h: i32,
+	                                  parent: Hwnd, menu: Hmenu, instance: Hinstance,
+	                                  param: rawptr) -> Hwnd ---;
 
 	@(link_name="CreateWindowExW")
-	create_window_ex_w :: proc(ex_style: u32,
-	                           class_name, title: ^u16,
-	                           style: u32,
-	                           x, y, w, h: i32,
-	                           parent: Hwnd, menu: Hmenu, instance: Hinstance,
-	                           param: rawptr) -> Hwnd #cc_std ---;
+	create_window_ex_w :: proc "std" (ex_style: u32,
+	                                  class_name, title: ^u16,
+	                                  style: u32,
+	                                  x, y, w, h: i32,
+	                                  parent: Hwnd, menu: Hmenu, instance: Hinstance,
+	                                  param: rawptr) -> Hwnd ---;
 
-	@(link_name="ShowWindow")       show_window        :: proc(hwnd: Hwnd, cmd_show: i32) -> Bool #cc_std ---;
-	@(link_name="TranslateMessage") translate_message  :: proc(msg: ^Msg) -> Bool #cc_std ---;
-	@(link_name="DispatchMessageA") dispatch_message_a :: proc(msg: ^Msg) -> Lresult #cc_std ---;
-	@(link_name="DispatchMessageW") dispatch_message_w :: proc(msg: ^Msg) -> Lresult #cc_std ---;
-	@(link_name="UpdateWindow")     update_window      :: proc(hwnd: Hwnd) -> Bool #cc_std ---;
-	@(link_name="GetMessageA")      get_message_a      :: proc(msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max : u32) -> Bool #cc_std ---;
-	@(link_name="GetMessageW")      get_message_w      :: proc(msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max : u32) -> Bool #cc_std ---;
+	@(link_name="ShowWindow")       show_window        :: proc "std" (hwnd: Hwnd, cmd_show: i32) -> Bool ---;
+	@(link_name="TranslateMessage") translate_message  :: proc "std" (msg: ^Msg) -> Bool ---;
+	@(link_name="DispatchMessageA") dispatch_message_a :: proc "std" (msg: ^Msg) -> Lresult ---;
+	@(link_name="DispatchMessageW") dispatch_message_w :: proc "std" (msg: ^Msg) -> Lresult ---;
+	@(link_name="UpdateWindow")     update_window      :: proc "std" (hwnd: Hwnd) -> Bool ---;
+	@(link_name="GetMessageA")      get_message_a      :: proc "std" (msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max : u32) -> Bool ---;
+	@(link_name="GetMessageW")      get_message_w      :: proc "std" (msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max : u32) -> Bool ---;
 
-	@(link_name="PeekMessageA") peek_message_a     :: proc(msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool #cc_std ---;
-	@(link_name="PeekMessageW") peek_message_w     :: proc(msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool #cc_std ---;
-
-
-	@(link_name="PostMessageA") post_message :: proc(hwnd: Hwnd, msg, wparam, lparam : u32) -> Bool #cc_std ---;
-
-	@(link_name="DefWindowProcA") def_window_proc_a :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult #cc_std ---;
-
-	@(link_name="AdjustWindowRect") adjust_window_rect :: proc(rect: ^Rect, style: u32, menu: Bool) -> Bool #cc_std ---;
-	@(link_name="GetActiveWindow")  get_active_window  :: proc() -> Hwnd #cc_std ---;
-
-	@(link_name="DestroyWindow")       destroy_window        :: proc(wnd: Hwnd) -> Bool #cc_std ---;
-	@(link_name="DescribePixelFormat") describe_pixel_format :: proc(dc: Hdc, pixel_format: i32, bytes: u32, pfd: ^Pixel_Format_Descriptor) -> i32 #cc_std ---;
-
-	@(link_name="GetMonitor_InfoA")  get_monitor_info_a  :: proc(monitor: Hmonitor, mi: ^Monitor_Info) -> Bool #cc_std ---;
-	@(link_name="MonitorFromWindow") monitor_from_window :: proc(wnd: Hwnd, flags : u32) -> Hmonitor #cc_std ---;
-
-	@(link_name="SetWindowPos") set_window_pos        :: proc(wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32) #cc_std ---;
-
-	@(link_name="GetWindowPlacement") get_window_placement  :: proc(wnd: Hwnd, wndpl: ^Window_Placement) -> Bool #cc_std ---;
-	@(link_name="SetWindowPlacement") set_window_placement  :: proc(wnd: Hwnd, wndpl: ^Window_Placement) -> Bool #cc_std ---;
-	@(link_name="GetWindowRect")      get_window_rect       :: proc(wnd: Hwnd, rect: ^Rect) -> Bool #cc_std ---;
-
-	@(link_name="GetWindowLongPtrA") get_window_long_ptr_a :: proc(wnd: Hwnd, index: i32) -> Long_Ptr #cc_std ---;
-	@(link_name="SetWindowLongPtrA") set_window_long_ptr_a :: proc(wnd: Hwnd, index: i32, new: Long_Ptr) -> Long_Ptr #cc_std ---;
-	@(link_name="GetWindowLongPtrW") get_window_long_ptr_w :: proc(wnd: Hwnd, index: i32) -> Long_Ptr #cc_std ---;
-	@(link_name="SetWindowLongPtrW") set_window_long_ptr_w :: proc(wnd: Hwnd, index: i32, new: Long_Ptr) -> Long_Ptr #cc_std ---;
-
-	@(link_name="GetWindowText") get_window_text :: proc(wnd: Hwnd, str: ^u8, maxCount: i32) -> i32 #cc_std ---;
-
-	@(link_name="GetClientRect") get_client_rect :: proc(hwnd: Hwnd, rect: ^Rect) -> Bool #cc_std ---;
-
-	@(link_name="GetDC")     get_dc     :: proc(h: Hwnd) -> Hdc #cc_std ---;
-	@(link_name="ReleaseDC") release_dc :: proc(wnd: Hwnd, hdc: Hdc) -> i32 #cc_std ---;
-
-	@(link_name="MapVirtualKeyA") map_virtual_key_a :: proc(scancode : u32, map_type : u32) -> u32 #cc_std ---;
-	@(link_name="MapVirtualKeyW") map_virtual_key_w :: proc(scancode : u32, map_type : u32) -> u32 #cc_std ---;
-
-	@(link_name="GetKeyState")      get_key_state       :: proc(v_key: i32) -> i16 #cc_std ---;
-	@(link_name="GetAsyncKeyState") get_async_key_state :: proc(v_key: i32) -> i16 #cc_std ---;
-
-	@(link_name="SetForegroundWindow") set_foreground_window :: proc(h: Hwnd) -> Bool #cc_std ---;
-	@(link_name="SetFocus")            set_focus             :: proc(h: Hwnd) -> Hwnd #cc_std ---;
+	@(link_name="PeekMessageA") peek_message_a :: proc "std" (msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool ---;
+	@(link_name="PeekMessageW") peek_message_w :: proc "std" (msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool ---;
 
 
+	@(link_name="PostMessageA") post_message :: proc "std" (hwnd: Hwnd, msg, wparam, lparam : u32) -> Bool ---;
 
-	@(link_name="RegisterRawInputDevices") register_raw_input_devices :: proc(raw_input_device: ^Raw_Input_Device, num_devices, size: u32) -> Bool #cc_std ---;
+	@(link_name="DefWindowProcA") def_window_proc_a :: proc "std" (hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult ---;
 
-	@(link_name="GetRawInputData") get_raw_input_data         :: proc(raw_input: Hrawinput, command: u32, data: rawptr, size: ^u32, size_header: u32) -> u32 #cc_std ---;
+	@(link_name="AdjustWindowRect") adjust_window_rect :: proc "std" (rect: ^Rect, style: u32, menu: Bool) -> Bool ---;
+	@(link_name="GetActiveWindow")  get_active_window  :: proc "std" () -> Hwnd ---;
 
-	@(link_name="MapVirtualKeyExW") map_virtual_key_ex_w       :: proc(code, map_type: u32, hkl: HKL) #cc_std ---;
-	@(link_name="MapVirtualKeyExA") map_virtual_key_ex_a       :: proc(code, map_type: u32, hkl: HKL) #cc_std ---;
+	@(link_name="DestroyWindow")       destroy_window        :: proc "std" (wnd: Hwnd) -> Bool ---;
+	@(link_name="DescribePixelFormat") describe_pixel_format :: proc "std" (dc: Hdc, pixel_format: i32, bytes: u32, pfd: ^Pixel_Format_Descriptor) -> i32 ---;
+
+	@(link_name="GetMonitor_InfoA")  get_monitor_info_a  :: proc "std" (monitor: Hmonitor, mi: ^Monitor_Info) -> Bool ---;
+	@(link_name="MonitorFromWindow") monitor_from_window :: proc "std" (wnd: Hwnd, flags : u32) -> Hmonitor ---;
+
+	@(link_name="SetWindowPos") set_window_pos        :: proc "std" (wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32) ---;
+
+	@(link_name="GetWindowPlacement") get_window_placement  :: proc "std" (wnd: Hwnd, wndpl: ^Window_Placement) -> Bool ---;
+	@(link_name="SetWindowPlacement") set_window_placement  :: proc "std" (wnd: Hwnd, wndpl: ^Window_Placement) -> Bool ---;
+	@(link_name="GetWindowRect")      get_window_rect       :: proc "std" (wnd: Hwnd, rect: ^Rect) -> Bool ---;
+
+	@(link_name="GetWindowLongPtrA") get_window_long_ptr_a :: proc "std" (wnd: Hwnd, index: i32) -> Long_Ptr ---;
+	@(link_name="SetWindowLongPtrA") set_window_long_ptr_a :: proc "std" (wnd: Hwnd, index: i32, new: Long_Ptr) -> Long_Ptr ---;
+	@(link_name="GetWindowLongPtrW") get_window_long_ptr_w :: proc "std" (wnd: Hwnd, index: i32) -> Long_Ptr ---;
+	@(link_name="SetWindowLongPtrW") set_window_long_ptr_w :: proc "std" (wnd: Hwnd, index: i32, new: Long_Ptr) -> Long_Ptr ---;
+
+	@(link_name="GetWindowText") get_window_text :: proc "std" (wnd: Hwnd, str: ^u8, maxCount: i32) -> i32 ---;
+
+	@(link_name="GetClientRect") get_client_rect :: proc "std" (hwnd: Hwnd, rect: ^Rect) -> Bool ---;
+
+	@(link_name="GetDC")     get_dc     :: proc "std" (h: Hwnd) -> Hdc ---;
+	@(link_name="ReleaseDC") release_dc :: proc "std" (wnd: Hwnd, hdc: Hdc) -> i32 ---;
+
+	@(link_name="MapVirtualKeyA") map_virtual_key_a :: proc "std" (scancode : u32, map_type : u32) -> u32 ---;
+	@(link_name="MapVirtualKeyW") map_virtual_key_w :: proc "std" (scancode : u32, map_type : u32) -> u32 ---;
+
+	@(link_name="GetKeyState")      get_key_state       :: proc "std" (v_key: i32) -> i16 ---;
+	@(link_name="GetAsyncKeyState") get_async_key_state :: proc "std" (v_key: i32) -> i16 ---;
+
+	@(link_name="SetForegroundWindow") set_foreground_window :: proc "std" (h: Hwnd) -> Bool ---;
+	@(link_name="SetFocus")            set_focus             :: proc "std" (h: Hwnd) -> Hwnd ---;
+
+
+
+	@(link_name="RegisterRawInputDevices") register_raw_input_devices :: proc "std" (raw_input_device: ^Raw_Input_Device, num_devices, size: u32) -> Bool ---;
+
+	@(link_name="GetRawInputData") get_raw_input_data         :: proc "std" (raw_input: Hrawinput, command: u32, data: rawptr, size: ^u32, size_header: u32) -> u32 ---;
+
+	@(link_name="MapVirtualKeyExW") map_virtual_key_ex_w       :: proc "std" (code, map_type: u32, hkl: HKL) ---;
+	@(link_name="MapVirtualKeyExA") map_virtual_key_ex_a       :: proc "std" (code, map_type: u32, hkl: HKL) ---;
 }
 
 foreign gdi32 {
-	@(link_name="GetStockObject") get_stock_object :: proc(fn_object: i32) -> Hgdiobj #cc_std ---;
+	@(link_name="GetStockObject") get_stock_object :: proc "std" (fn_object: i32) -> Hgdiobj ---;
 
 	@(link_name="StretchDIBits")
-	stretch_dibits :: proc(hdc: Hdc,
-	                       x_dst, y_dst, width_dst, height_dst: i32,
-	                       x_src, y_src, width_src, header_src: i32,
-	                       bits: rawptr, bits_info: ^Bitmap_Info,
-	                       usage: u32,
-	                       rop: u32) -> i32 #cc_std ---;
+	stretch_dibits :: proc "std" (hdc: Hdc,
+	                              x_dst, y_dst, width_dst, height_dst: i32,
+	                              x_src, y_src, width_src, header_src: i32,
+	                              bits: rawptr, bits_info: ^Bitmap_Info,
+	                              usage: u32,
+	                              rop: u32) -> i32 ---;
 
-	@(link_name="SetPixelFormat")    set_pixel_format    :: proc(hdc: Hdc, pixel_format: i32, pfd: ^Pixel_Format_Descriptor) -> Bool #cc_std ---;
-	@(link_name="ChoosePixelFormat") choose_pixel_format :: proc(hdc: Hdc, pfd: ^Pixel_Format_Descriptor) -> i32 #cc_std ---;
-	@(link_name="SwapBuffers")       swap_buffers        :: proc(hdc: Hdc) -> Bool #cc_std ---;
+	@(link_name="SetPixelFormat")    set_pixel_format    :: proc "std" (hdc: Hdc, pixel_format: i32, pfd: ^Pixel_Format_Descriptor) -> Bool ---;
+	@(link_name="ChoosePixelFormat") choose_pixel_format :: proc "std" (hdc: Hdc, pfd: ^Pixel_Format_Descriptor) -> i32 ---;
+	@(link_name="SwapBuffers")       swap_buffers        :: proc "std" (hdc: Hdc) -> Bool ---;
 
 }
 
 foreign shell32 {
-	@(link_name="CommandLineToArgvW") command_line_to_argv_w :: proc(cmd_list: ^u16, num_args: ^i32) -> ^^u16 #cc_std ---;
+	@(link_name="CommandLineToArgvW") command_line_to_argv_w :: proc "std" (cmd_list: ^u16, num_args: ^i32) -> ^^u16 ---;
 }
 
 foreign winmm {
-	@(link_name="timeGetTime") time_get_time :: proc() -> u32 #cc_std ---;
+	@(link_name="timeGetTime") time_get_time :: proc "std" () -> u32 ---;
 }
 
 

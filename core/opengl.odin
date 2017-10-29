@@ -57,65 +57,65 @@ get_proc_address :: proc(name: string) -> rawptr {
 }
 
 // Procedures
-	GenBuffers:               proc(count: i32, buffers: ^u32) #cc_c;
-	GenVertexArrays:          proc(count: i32, buffers: ^u32) #cc_c;
-	GenSamplers:              proc(count: i32, buffers: ^u32) #cc_c;
-	DeleteBuffers:            proc(count: i32, buffers: ^u32) #cc_c;
-	BindBuffer:               proc(target: i32, buffer: u32) #cc_c;
-	BindVertexArray:          proc(buffer: u32) #cc_c;
-	DeleteVertexArrays:       proc(count: i32, arrays: ^u32) #cc_c;
-	BindSampler:              proc(position: i32, sampler: u32) #cc_c;
-	BufferData:               proc(target: i32, size: int, data: rawptr, usage: i32) #cc_c;
-	BufferSubData:            proc(target: i32, offset, size: int, data: rawptr) #cc_c;
+	GenBuffers:               proc "c" (count: i32, buffers: ^u32);
+	GenVertexArrays:          proc "c" (count: i32, buffers: ^u32);
+	GenSamplers:              proc "c" (count: i32, buffers: ^u32);
+	DeleteBuffers:            proc "c" (count: i32, buffers: ^u32);
+	BindBuffer:               proc "c" (target: i32, buffer: u32);
+	BindVertexArray:          proc "c" (buffer: u32);
+	DeleteVertexArrays:       proc "c" (count: i32, arrays: ^u32);
+	BindSampler:              proc "c" (position: i32, sampler: u32);
+	BufferData:               proc "c" (target: i32, size: int, data: rawptr, usage: i32);
+	BufferSubData:            proc "c" (target: i32, offset, size: int, data: rawptr);
 
-	DrawArrays:               proc(mode, first: i32, count: u32) #cc_c;
-	DrawElements:             proc(mode: i32, count: u32, type_: i32, indices: rawptr) #cc_c;
+	DrawArrays:               proc "c" (mode, first: i32, count: u32);
+	DrawElements:             proc "c" (mode: i32, count: u32, type_: i32, indices: rawptr);
 
-	MapBuffer:                proc(target, access: i32) -> rawptr #cc_c;
-	UnmapBuffer:              proc(target: i32) #cc_c;
+	MapBuffer:                proc "c" (target, access: i32) -> rawptr;
+	UnmapBuffer:              proc "c" (target: i32);
 
-	VertexAttribPointer:      proc(index: u32, size, type_: i32, normalized: i32, stride: u32, pointer: rawptr) #cc_c;
-	EnableVertexAttribArray:  proc(index: u32) #cc_c;
+	VertexAttribPointer:      proc "c" (index: u32, size, type_: i32, normalized: i32, stride: u32, pointer: rawptr);
+	EnableVertexAttribArray:  proc "c" (index: u32);
 
-	CreateShader:             proc(shader_type: i32) -> u32 #cc_c;
-	ShaderSource:             proc(shader: u32, count: u32, str: ^^u8, length: ^i32) #cc_c;
-	CompileShader:            proc(shader: u32) #cc_c;
-	CreateProgram:            proc() -> u32 #cc_c;
-	AttachShader:             proc(program, shader: u32) #cc_c;
-	DetachShader:             proc(program, shader: u32) #cc_c;
-	DeleteShader:             proc(shader:  u32) #cc_c;
-	LinkProgram:              proc(program: u32) #cc_c;
-	UseProgram:               proc(program: u32) #cc_c;
-	DeleteProgram:            proc(program: u32) #cc_c;
-
-
-	GetShaderiv:              proc(shader:  u32, pname: i32, params: ^i32) #cc_c;
-	GetProgramiv:             proc(program: u32, pname: i32, params: ^i32) #cc_c;
-	GetShaderInfoLog:         proc(shader:  u32, max_length: u32, length: ^u32, info_long: ^u8) #cc_c;
-	GetProgramInfoLog:        proc(program: u32, max_length: u32, length: ^u32, info_long: ^u8) #cc_c;
-
-	ActiveTexture:            proc(texture: i32) #cc_c;
-	GenerateMipmap:           proc(target:  i32) #cc_c;
-
-	SamplerParameteri:        proc(sampler: u32, pname: i32, param: i32) #cc_c;
-	SamplerParameterf:        proc(sampler: u32, pname: i32, param: f32) #cc_c;
-	SamplerParameteriv:       proc(sampler: u32, pname: i32, params: ^i32) #cc_c;
-	SamplerParameterfv:       proc(sampler: u32, pname: i32, params: ^f32) #cc_c;
-	SamplerParameterIiv:      proc(sampler: u32, pname: i32, params: ^i32) #cc_c;
-	SamplerParameterIuiv:     proc(sampler: u32, pname: i32, params: ^u32) #cc_c;
+	CreateShader:             proc "c" (shader_type: i32) -> u32;
+	ShaderSource:             proc "c" (shader: u32, count: u32, str: ^^u8, length: ^i32);
+	CompileShader:            proc "c" (shader: u32);
+	CreateProgram:            proc "c" () -> u32;
+	AttachShader:             proc "c" (program, shader: u32);
+	DetachShader:             proc "c" (program, shader: u32);
+	DeleteShader:             proc "c" (shader:  u32);
+	LinkProgram:              proc "c" (program: u32);
+	UseProgram:               proc "c" (program: u32);
+	DeleteProgram:            proc "c" (program: u32);
 
 
-	Uniform1i:                proc(loc: i32, v0: i32) #cc_c;
-	Uniform2i:                proc(loc: i32, v0, v1: i32) #cc_c;
-	Uniform3i:                proc(loc: i32, v0, v1, v2: i32) #cc_c;
-	Uniform4i:                proc(loc: i32, v0, v1, v2, v3: i32) #cc_c;
-	Uniform1f:                proc(loc: i32, v0: f32) #cc_c;
-	Uniform2f:                proc(loc: i32, v0, v1: f32) #cc_c;
-	Uniform3f:                proc(loc: i32, v0, v1, v2: f32) #cc_c;
-	Uniform4f:                proc(loc: i32, v0, v1, v2, v3: f32) #cc_c;
-	UniformMatrix4fv:         proc(loc: i32, count: u32, transpose: i32, value: ^f32) #cc_c;
+	GetShaderiv:              proc "c" (shader:  u32, pname: i32, params: ^i32);
+	GetProgramiv:             proc "c" (program: u32, pname: i32, params: ^i32);
+	GetShaderInfoLog:         proc "c" (shader:  u32, max_length: u32, length: ^u32, info_long: ^u8);
+	GetProgramInfoLog:        proc "c" (program: u32, max_length: u32, length: ^u32, info_long: ^u8);
 
-	GetUniformLocation:       proc(program: u32, name: ^u8) -> i32 #cc_c;
+	ActiveTexture:            proc "c" (texture: i32);
+	GenerateMipmap:           proc "c" (target:  i32);
+
+	SamplerParameteri:        proc "c" (sampler: u32, pname: i32, param: i32);
+	SamplerParameterf:        proc "c" (sampler: u32, pname: i32, param: f32);
+	SamplerParameteriv:       proc "c" (sampler: u32, pname: i32, params: ^i32);
+	SamplerParameterfv:       proc "c" (sampler: u32, pname: i32, params: ^f32);
+	SamplerParameterIiv:      proc "c" (sampler: u32, pname: i32, params: ^i32);
+	SamplerParameterIuiv:     proc "c" (sampler: u32, pname: i32, params: ^u32);
+
+
+	Uniform1i:                proc "c" (loc: i32, v0: i32);
+	Uniform2i:                proc "c" (loc: i32, v0, v1: i32);
+	Uniform3i:                proc "c" (loc: i32, v0, v1, v2: i32);
+	Uniform4i:                proc "c" (loc: i32, v0, v1, v2, v3: i32);
+	Uniform1f:                proc "c" (loc: i32, v0: f32);
+	Uniform2f:                proc "c" (loc: i32, v0, v1: f32);
+	Uniform3f:                proc "c" (loc: i32, v0, v1, v2: f32);
+	Uniform4f:                proc "c" (loc: i32, v0, v1, v2, v3: f32);
+	UniformMatrix4fv:         proc "c" (loc: i32, count: u32, transpose: i32, value: ^f32);
+
+	GetUniformLocation:       proc "c" (program: u32, name: ^u8) -> i32;
 
 
 init :: proc() {

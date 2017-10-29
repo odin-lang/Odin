@@ -6,35 +6,35 @@ foreign __llvm_core {
 	@(link_name = "llvm.bswap.i64") swap :: proc(b: u64) -> u64  ---;
 }
 
-set :: proc(data: rawptr, value: i32, len: int) -> rawptr #cc_contextless {
+set :: proc "contextless" (data: rawptr, value: i32, len: int) -> rawptr {
 	return __mem_set(data, value, len);
 }
-zero :: proc(data: rawptr, len: int) -> rawptr #cc_contextless {
+zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	return __mem_zero(data, len);
 }
-copy :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
+copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	return __mem_copy(dst, src, len);
 }
-copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
+copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	return __mem_copy_non_overlapping(dst, src, len);
 }
-compare :: proc(a, b: []u8) -> int #cc_contextless {
+compare :: proc "contextless" (a, b: []u8) -> int {
 	return __mem_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
 
-slice_ptr :: proc(ptr: ^$T, len: int) -> []T #cc_contextless {
+slice_ptr :: proc "contextless" (ptr: ^$T, len: int) -> []T {
 	assert(len >= 0);
 	slice := raw.Slice{data = ptr, len = len, cap = len};
 	return (cast(^[]T)&slice)^;
 }
-slice_ptr :: proc(ptr: ^$T, len, cap: int) -> []T #cc_contextless {
+slice_ptr :: proc "contextless" (ptr: ^$T, len, cap: int) -> []T {
 	assert(0 <= len && len <= cap);
 	slice := raw.Slice{data = ptr, len = len, cap = cap};
 	return (cast(^[]T)&slice)^;
 }
 
-slice_to_bytes :: proc(slice: []$T) -> []u8 #cc_contextless {
+slice_to_bytes :: proc "contextless" (slice: []$T) -> []u8 {
 	s := cast(^raw.Slice)&slice;
 	s.len *= size_of(T);
 	s.cap *= size_of(T);
@@ -42,10 +42,10 @@ slice_to_bytes :: proc(slice: []$T) -> []u8 #cc_contextless {
 }
 
 
-kilobytes :: inline proc(x: int) -> int #cc_contextless do return          (x) * 1024;
-megabytes :: inline proc(x: int) -> int #cc_contextless do return kilobytes(x) * 1024;
-gigabytes :: inline proc(x: int) -> int #cc_contextless do return megabytes(x) * 1024;
-terabytes :: inline proc(x: int) -> int #cc_contextless do return gigabytes(x) * 1024;
+kilobytes :: inline proc "contextless" (x: int) -> int do return          (x) * 1024;
+megabytes :: inline proc "contextless" (x: int) -> int do return kilobytes(x) * 1024;
+gigabytes :: inline proc "contextless" (x: int) -> int do return megabytes(x) * 1024;
+terabytes :: inline proc "contextless" (x: int) -> int do return gigabytes(x) * 1024;
 
 is_power_of_two :: proc(x: uintptr) -> bool {
 	if x <= 0 do return false;

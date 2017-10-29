@@ -142,7 +142,7 @@ foreign libc {
 
 foreign dl {
 	@(link_name="dlopen")  _unix_dlopen  :: proc(filename: ^u8, flags: int) -> rawptr ---;
-	@(link_name="dlsym")   _unix_dlsym   :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c) ---;
+	@(link_name="dlsym")   _unix_dlsym   :: proc(handle: rawptr, symbol: ^u8) -> rawptr ---;
 	@(link_name="dlclose") _unix_dlclose :: proc(handle: rawptr) -> int ---;
 	@(link_name="dlerror") _unix_dlerror :: proc() -> ^u8 ---;
 }

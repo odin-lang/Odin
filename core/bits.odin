@@ -22,16 +22,16 @@ I32_MAX  ::  i32(0x7fff_ffff);
 I64_MAX  ::  i64(0x7fff_ffff_ffff_ffff);
 I128_MAX :: i128(0x7fff_ffff_ffff_ffff_ffff_ffff_ffff_ffff);
 
-count_ones :: proc(i:   u8) ->   u8 { foreign __llvm_core @(link_name="llvm.ctpop.i8")   __llvm_ctpop :: proc(u8)   ->   u8 ---;  return __llvm_ctpop(i); }
-count_ones :: proc(i:   i8) ->   i8 { foreign __llvm_core @(link_name="llvm.ctpop.i8")   __llvm_ctpop :: proc(i8)   ->   i8 ---;  return __llvm_ctpop(i); }
+count_ones :: proc(i:   u8) ->   u8 { foreign __llvm_core @(link_name="llvm.ctpop.i8")   __llvm_ctpop :: proc(u8)   ->   u8 ---; return __llvm_ctpop(i); }
+count_ones :: proc(i:   i8) ->   i8 { foreign __llvm_core @(link_name="llvm.ctpop.i8")   __llvm_ctpop :: proc(i8)   ->   i8 ---; return __llvm_ctpop(i); }
 count_ones :: proc(i:  u16) ->  u16 { foreign __llvm_core @(link_name="llvm.ctpop.i16")  __llvm_ctpop :: proc(u16)  ->  u16 ---; return __llvm_ctpop(i); }
 count_ones :: proc(i:  i16) ->  i16 { foreign __llvm_core @(link_name="llvm.ctpop.i16")  __llvm_ctpop :: proc(i16)  ->  i16 ---; return __llvm_ctpop(i); }
 count_ones :: proc(i:  u32) ->  u32 { foreign __llvm_core @(link_name="llvm.ctpop.i32")  __llvm_ctpop :: proc(u32)  ->  u32 ---; return __llvm_ctpop(i); }
 count_ones :: proc(i:  i32) ->  i32 { foreign __llvm_core @(link_name="llvm.ctpop.i32")  __llvm_ctpop :: proc(i32)  ->  i32 ---; return __llvm_ctpop(i); }
 count_ones :: proc(i:  u64) ->  u64 { foreign __llvm_core @(link_name="llvm.ctpop.i64")  __llvm_ctpop :: proc(u64)  ->  u64 ---; return __llvm_ctpop(i); }
 count_ones :: proc(i:  i64) ->  i64 { foreign __llvm_core @(link_name="llvm.ctpop.i64")  __llvm_ctpop :: proc(i64)  ->  i64 ---; return __llvm_ctpop(i); }
-count_ones :: proc(i: u128) -> u128 { foreign __llvm_core @(link_name="llvm.ctpop.i128") __llvm_ctpop :: proc(u128) -> u128 ---;return __llvm_ctpop(i); }
-count_ones :: proc(i: i128) -> i128 { foreign __llvm_core @(link_name="llvm.ctpop.i128") __llvm_ctpop :: proc(i128) -> i128 ---;return __llvm_ctpop(i); }
+count_ones :: proc(i: u128) -> u128 { foreign __llvm_core @(link_name="llvm.ctpop.i128") __llvm_ctpop :: proc(u128) -> u128 ---; return __llvm_ctpop(i); }
+count_ones :: proc(i: i128) -> i128 { foreign __llvm_core @(link_name="llvm.ctpop.i128") __llvm_ctpop :: proc(i128) -> i128 ---; return __llvm_ctpop(i); }
 count_ones :: proc(i: uint) -> uint { when size_of(uint) == size_of(u32) { return uint(count_ones(u32(i))); } else { return uint(count_ones(u64(i))); } }
 count_ones :: proc(i:  int) ->  int { when size_of(int)  == size_of(i32) { return int(count_ones(i32(i)));  } else { return int(count_ones(i64(i))); } }
 

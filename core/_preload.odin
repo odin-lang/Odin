@@ -236,28 +236,28 @@ type_info_base_without_enum :: proc(info: ^Type_Info) -> ^Type_Info {
 
 foreign __llvm_core {
 	@(link_name="llvm.assume")
-	assume :: proc(cond: bool) #cc_c ---;
+	assume :: proc "c" (cond: bool) ---;
 
 	@(link_name="llvm.debugtrap")
-	__debug_trap :: proc() #cc_c ---;
+	__debug_trap :: proc "c" () ---;
 
 	@(link_name="llvm.trap")
-	__trap :: proc() #cc_c ---;
+	__trap :: proc "c" () ---;
 
 	@(link_name="llvm.readcyclecounter")
-	read_cycle_counter :: proc() -> u64 #cc_c ---;
+	read_cycle_counter :: proc "c" () -> u64 ---;
 }
 
 
 
-make_source_code_location :: inline proc(file: string, line, column: i64, procedure: string) -> Source_Code_Location #cc_contextless {
+make_source_code_location :: inline proc "contextless" (file: string, line, column: i64, procedure: string) -> Source_Code_Location {
 	return Source_Code_Location{file, line, column, procedure};
 }
 
 
 
 
-__init_context_from_ptr :: proc(c: ^Context, other: ^Context) #cc_contextless {
+__init_context_from_ptr :: proc "contextless" (c: ^Context, other: ^Context) {
 	if c == nil do return;
 	c^ = other^;
 
@@ -269,7 +269,7 @@ __init_context_from_ptr :: proc(c: ^Context, other: ^Context) #cc_contextless {
 	}
 }
 
-__init_context :: proc(c: ^Context) #cc_contextless {
+__init_context :: proc "contextless" (c: ^Context) {
 	if c == nil do return;
 
 	if c.allocator.procedure == nil {
@@ -319,7 +319,7 @@ copy :: proc(dst, src: $T/[]$E) -> int {
 }
 
 
-append :: proc(array: ^$T/[]$E, args: ...E) -> int #cc_contextless {
+append :: proc "contextless" (array: ^$T/[]$E, args: ...E) -> int {
 	if array == nil do return 0;
 
 	arg_len := len(args);
@@ -373,7 +373,7 @@ append :: proc(array: ^$T/[dynamic]u8, args: ...string) -> int {
 	return len(array);
 }
 
-pop :: proc(array: ^$T/[]$E) -> E #cc_contextless {
+pop :: proc "contextless" (array: ^$T/[]$E) -> E {
 	if array == nil do return E{};
 	assert(len(array) > 0);
 	res := array[len(array)-1];
@@ -381,7 +381,7 @@ pop :: proc(array: ^$T/[]$E) -> E #cc_contextless {
 	return res;
 }
 
-pop :: proc(array: ^$T/[dynamic]$E) -> E #cc_contextless {
+pop :: proc "contextless" (array: ^$T/[dynamic]$E) -> E {
 	if array == nil do return E{};
 	assert(len(array) > 0);
 	res := array[len(array)-1];
@@ -389,13 +389,13 @@ pop :: proc(array: ^$T/[dynamic]$E) -> E #cc_contextless {
 	return res;
 }
 
-clear :: inline proc(slice: ^$T/[]$E) #cc_contextless {
+clear :: inline proc "contextless" (slice: ^$T/[]$E) {
 	if slice != nil do (cast(^raw.Slice)slice).len = 0;
 }
-clear :: inline proc(array: ^$T/[dynamic]$E) #cc_contextless {
+clear :: inline proc "contextless" (array: ^$T/[dynamic]$E) {
 	if array != nil do (cast(^raw.Dynamic_Array)array).len = 0;
 }
-clear :: inline proc(m: ^$T/map[$K]$V) #cc_contextless {
+clear :: inline proc "contextless" (m: ^$T/map[$K]$V) {
 	if m == nil do return;
 	raw_map := cast(^raw.Map)m;
 	hashes  := cast(^raw.Dynamic_Array)&raw_map.hashes;
@@ -428,7 +428,7 @@ reserve :: proc(array: ^$T/[dynamic]$E, capacity: int) -> bool {
 }
 
 
-__get_map_header :: proc(m: ^$T/map[$K]$V) -> __Map_Header #cc_contextless {
+__get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> __Map_Header {
 	header := __Map_Header{m = cast(^raw.Map)m};
 	Entry :: struct {
 		key:   __Map_Key,
@@ -445,7 +445,7 @@ __get_map_header :: proc(m: ^$T/map[$K]$V) -> __Map_Header #cc_contextless {
 	return header;
 }
 
-__get_map_key :: proc(key: $K) -> __Map_Key #cc_contextless {
+__get_map_key :: proc "contextless" (key: $K) -> __Map_Key {
 	map_key: __Map_Key;
 	ti := type_info_base_without_enum(type_info_of(K));
 	switch _ in ti.variant {
@@ -607,7 +607,7 @@ default_allocator :: proc() -> Allocator {
 }
 
 
-assert :: proc(condition: bool, message := "", using location := #caller_location) -> bool #cc_contextless {
+assert :: proc "contextless" (condition: bool, message := "", using location := #caller_location) -> bool {
 	if !condition {
 		if len(message) > 0 {
 			fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion: %s\n", file_path, line, column, message);
@@ -619,7 +619,7 @@ assert :: proc(condition: bool, message := "", using location := #caller_locatio
 	return condition;
 }
 
-panic :: proc(message := "", using location := #caller_location) #cc_contextless {
+panic :: proc "contextless" (message := "", using location := #caller_location) {
 	if len(message) > 0 {
 		fmt.fprintf(os.stderr, "%s(%d:%d) Panic: %s\n", file_path, line, column, message);
 	} else {
@@ -629,7 +629,7 @@ panic :: proc(message := "", using location := #caller_location) #cc_contextless
 }
 
 
-__string_eq :: proc(a, b: string) -> bool #cc_contextless {
+__string_eq :: proc "contextless" (a, b: string) -> bool {
 	switch {
 	case len(a) != len(b): return false;
 	case len(a) == 0:      return true;
@@ -638,66 +638,66 @@ __string_eq :: proc(a, b: string) -> bool #cc_contextless {
 	return __string_cmp(a, b) == 0;
 }
 
-__string_cmp :: proc(a, b: string) -> int #cc_contextless {
+__string_cmp :: proc "contextless" (a, b: string) -> int {
 	return __mem_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
-__string_ne :: inline proc(a, b: string) -> bool #cc_contextless { return !__string_eq(a, b); }
-__string_lt :: inline proc(a, b: string) -> bool #cc_contextless { return __string_cmp(a, b) < 0; }
-__string_gt :: inline proc(a, b: string) -> bool #cc_contextless { return __string_cmp(a, b) > 0; }
-__string_le :: inline proc(a, b: string) -> bool #cc_contextless { return __string_cmp(a, b) <= 0; }
-__string_ge :: inline proc(a, b: string) -> bool #cc_contextless { return __string_cmp(a, b) >= 0; }
+__string_ne :: inline proc "contextless" (a, b: string) -> bool { return !__string_eq(a, b); }
+__string_lt :: inline proc "contextless" (a, b: string) -> bool { return __string_cmp(a, b) < 0; }
+__string_gt :: inline proc "contextless" (a, b: string) -> bool { return __string_cmp(a, b) > 0; }
+__string_le :: inline proc "contextless" (a, b: string) -> bool { return __string_cmp(a, b) <= 0; }
+__string_ge :: inline proc "contextless" (a, b: string) -> bool { return __string_cmp(a, b) >= 0; }
 
 
-__complex64_eq :: inline proc (a, b: complex64)  -> bool #cc_contextless { return real(a) == real(b) && imag(a) == imag(b); }
-__complex64_ne :: inline proc (a, b: complex64)  -> bool #cc_contextless { return real(a) != real(b) || imag(a) != imag(b); }
+__complex64_eq :: inline proc "contextless"  (a, b: complex64)  -> bool { return real(a) == real(b) && imag(a) == imag(b); }
+__complex64_ne :: inline proc "contextless"  (a, b: complex64)  -> bool { return real(a) != real(b) || imag(a) != imag(b); }
 
-__complex128_eq :: inline proc(a, b: complex128) -> bool #cc_contextless { return real(a) == real(b) && imag(a) == imag(b); }
-__complex128_ne :: inline proc(a, b: complex128) -> bool #cc_contextless { return real(a) != real(b) || imag(a) != imag(b); }
+__complex128_eq :: inline proc "contextless" (a, b: complex128) -> bool { return real(a) == real(b) && imag(a) == imag(b); }
+__complex128_ne :: inline proc "contextless" (a, b: complex128) -> bool { return real(a) != real(b) || imag(a) != imag(b); }
 
 
-__bounds_check_error :: proc(file: string, line, column: int, index, count: int) #cc_contextless {
+__bounds_check_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
 	if 0 <= index && index < count do return;
 	fmt.fprintf(os.stderr, "%s(%d:%d) Index %d is out of bounds range 0..%d\n",
 	            file, line, column, index, count);
 	__debug_trap();
 }
 
-__slice_expr_error :: proc(file: string, line, column: int, low, high, max: int) #cc_contextless {
+__slice_expr_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
 	if 0 <= low && low <= high && high <= max do return;
 	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: [%d..%d..%d]\n",
 	            file, line, column, low, high, max);
 	__debug_trap();
 }
 
-__substring_expr_error :: proc(file: string, line, column: int, low, high: int) #cc_contextless {
+__substring_expr_error :: proc "contextless" (file: string, line, column: int, low, high: int) {
 	if 0 <= low && low <= high do return;
 	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: [%d..%d]\n",
 	            file, line, column, low, high);
 	__debug_trap();
 }
-__type_assertion_check :: proc(ok: bool, file: string, line, column: int, from, to: ^Type_Info) #cc_contextless {
+__type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: ^Type_Info) {
 	if ok do return;
 	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid type_assertion from %T to %T\n",
 	            file, line, column, from, to);
 	__debug_trap();
 }
 
-__string_decode_rune :: inline proc(s: string) -> (rune, int) #cc_contextless {
+__string_decode_rune :: inline proc "contextless" (s: string) -> (rune, int) {
 	return utf8.decode_rune(s);
 }
 
-__bounds_check_error_loc :: proc(using loc := #caller_location, index, count: int) #cc_contextless {
+__bounds_check_error_loc :: proc "contextless" (using loc := #caller_location, index, count: int) {
 	__bounds_check_error(file_path, int(line), int(column), index, count);
 }
-__slice_expr_error_loc :: proc(using loc := #caller_location, low, high, max: int) #cc_contextless {
+__slice_expr_error_loc :: proc "contextless" (using loc := #caller_location, low, high, max: int) {
 	__slice_expr_error(file_path, int(line), int(column), low, high, max);
 }
-__substring_expr_error_loc :: proc(using loc := #caller_location, low, high: int) #cc_contextless {
+__substring_expr_error_loc :: proc "contextless" (using loc := #caller_location, low, high: int) {
 	__substring_expr_error(file_path, int(line), int(column), low, high);
 }
 
-__mem_set :: proc(data: rawptr, value: i32, len: int) -> rawptr #cc_contextless {
+__mem_set :: proc "contextless" (data: rawptr, value: i32, len: int) -> rawptr {
 	if data == nil do return nil;
 	foreign __llvm_core {
 		when size_of(rawptr) == 8 {
@@ -711,10 +711,10 @@ __mem_set :: proc(data: rawptr, value: i32, len: int) -> rawptr #cc_contextless 
 	llvm_memset(data, u8(value), len, 1, false);
 	return data;
 }
-__mem_zero :: proc(data: rawptr, len: int) -> rawptr #cc_contextless {
+__mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	return __mem_set(data, 0, len);
 }
-__mem_copy :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
+__mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memmove
 	foreign __llvm_core {
@@ -729,7 +729,7 @@ __mem_copy :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
 	llvm_memmove(dst, src, len, 1, false);
 	return dst;
 }
-__mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
+__mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memcpy
 	foreign __llvm_core {
@@ -745,7 +745,7 @@ __mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #cc_con
 	return dst;
 }
 
-__mem_compare :: proc(a, b: ^u8, n: int) -> int #cc_contextless {
+__mem_compare :: proc "contextless" (a, b: ^u8, n: int) -> int {
 	for i in 0..n do switch {
 	case (a+i)^ < (b+i)^: return -1;
 	case (a+i)^ > (b+i)^: return +1;
@@ -769,11 +769,11 @@ foreign __llvm_core {
 	@(link_name="llvm.fmuladd.f32") fmuladd32  :: proc(a, b, c: f32) -> f32 ---;
 	@(link_name="llvm.fmuladd.f64") fmuladd64  :: proc(a, b, c: f64) -> f64 ---;
 }
-__abs_complex64 :: inline proc(x: complex64) -> f32 #cc_contextless {
+__abs_complex64 :: inline proc "contextless" (x: complex64) -> f32 {
 	r, i := real(x), imag(x);
 	return __sqrt_f32(r*r + i*i);
 }
-__abs_complex128 :: inline proc(x: complex128) -> f64 #cc_contextless {
+__abs_complex128 :: inline proc "contextless" (x: complex128) -> f64 {
 	r, i := real(x), imag(x);
 	return __sqrt_f64(r*r + i*i);
 }
