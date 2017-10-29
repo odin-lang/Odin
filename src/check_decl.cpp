@@ -467,6 +467,10 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 
 	if (d != nullptr && d->attributes.count > 0) {
+		StringSet set = {};
+		string_set_init(&set, heap_allocator());
+		defer (string_set_destroy(&set));
+
 		for_array(i, d->attributes) {
 			AstNode *attr = d->attributes[i];
 			if (attr->kind != AstNode_Attribute) continue;
@@ -500,14 +504,17 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 					}
 				}
 
+				if (string_set_exists(&set, name)) {
+					error(elem, "Previous declaration of `%.*s`", LIT(name));
+				} else {
+					string_set_add(&set, name);
+				}
+
 				if (name == "link_name") {
-					if (link_name.len > 0) {
-						error(elem, "Previous declaration of `link_name`");
-					}
 					if (ev.kind == ExactValue_String) {
 						link_name = ev.value_string;
 					} else {
-						error(elem, "Expected a string value for `link_name`");
+						error(elem, "Expected a string value for `%.*s`", LIT(name));
 					}
 				} else {
 					error(elem, "Unknown attribute element name `%.*s`", LIT(name));

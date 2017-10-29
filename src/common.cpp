@@ -114,6 +114,7 @@ u128 fnv128a(void const *data, isize len) {
 
 #include "map.cpp"
 #include "ptr_set.cpp"
+#include "string_set.cpp"
 #include "priority_queue.cpp"
 
 

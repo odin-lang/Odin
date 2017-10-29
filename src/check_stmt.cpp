@@ -1670,7 +1670,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		CheckerContext prev_context = c->context;
 		if (ok) {
 			c->context.curr_foreign_library = foreign_library;
+			c->context.default_foreign_cc = ProcCC_C;
 		}
+
+		check_foreign_block_decl_attributes(c, fb);
 
 		for_array(i, fb->decls) {
 			AstNode *decl = fb->decls[i];

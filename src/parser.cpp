@@ -110,6 +110,8 @@ enum ProcCallingConvention {
 	ProcCC_C           = 3,
 	ProcCC_Std         = 4,
 	ProcCC_Fast        = 5,
+
+	ProcCC_ForeignBlockDefault = -1,
 };
 
 enum VarDeclFlag {
@@ -332,6 +334,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		AstNode *        foreign_library; \
 		Token            open, close;     \
 		Array<AstNode *> decls;           \
+		Array<AstNode *> attributes;      \
 		bool             been_handled;    \
 		CommentGroup     docs;            \
 	}) \
@@ -842,6 +845,7 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_ForeignBlockDecl:
 		n->ForeignBlockDecl.foreign_library = clone_ast_node(a, n->ForeignBlockDecl.foreign_library);
 		n->ForeignBlockDecl.decls           = clone_ast_node_array(a, n->ForeignBlockDecl.decls);
+		n->ForeignBlockDecl.attributes      = clone_ast_node_array(a, n->ForeignBlockDecl.attributes);
 		break;
 	case AstNode_Label:
 		n->Label.name = clone_ast_node(a, n->Label.name);
@@ -1548,6 +1552,8 @@ AstNode *ast_foreign_block_decl(AstFile *f, Token token, AstNode *foreign_librar
 	result->ForeignBlockDecl.close           = close;
 	result->ForeignBlockDecl.decls           = decls;
 	result->ForeignBlockDecl.docs            = docs;
+
+	result->ForeignBlockDecl.attributes.allocator = heap_allocator();
 	return result;
 }
 
@@ -3247,6 +3253,22 @@ AstNode *parse_results(AstFile *f) {
 	return list;
 }
 
+
+ProcCallingConvention string_to_calling_convention(String s) {
+	if (s == "odin") {
+		return ProcCC_Odin;
+	} else if (s == "contextless") {
+		return ProcCC_Contextless;
+	} else if (s == "cdecl" || s == "c") {
+		return ProcCC_C;
+	} else if (s == "stdcall" || s == "std") {
+		return ProcCC_Std;
+	} else if (s == "fastcall" || s == "fast") {
+		return ProcCC_Fast;
+	}
+	return ProcCC_Invalid;
+}
+
 AstNode *parse_proc_type(AstFile *f, Token proc_token) {
 	AstNode *params = nullptr;
 	AstNode *results = nullptr;
@@ -3254,24 +3276,16 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token) {
 	ProcCallingConvention cc = ProcCC_Invalid;
 	if (f->curr_token.kind == Token_String) {
 		Token token = expect_token(f, Token_String);
-		String conv = token.string;
-		if (conv == "odin") {
-			cc = ProcCC_Odin;
-		} else if (conv == "contextless") {
-			cc = ProcCC_Contextless;
-		} else if (conv == "cdecl" || conv == "c") {
-			cc = ProcCC_C;
-		} else if (conv == "stdcall" || conv == "std") {
-			cc = ProcCC_Std;
-		} else if (conv == "fastcall" || conv == "fast") {
-			cc = ProcCC_Fast;
+		auto c = string_to_calling_convention(token.string);
+		if (c == ProcCC_Invalid) {
+			syntax_error(token, "Unknown procedure calling convention: `%.*s`\n", LIT(token.string));
 		} else {
-			syntax_error(token, "Unknown procedure tag #%.*s\n", LIT(conv));
+			cc = c;
 		}
 	}
 	if (cc == ProcCC_Invalid) {
 		if (f->in_foreign_block) {
-			cc = ProcCC_C;
+			cc = ProcCC_ForeignBlockDefault;
 		} else {
 			cc = ProcCC_Odin;
 		}
@@ -4578,7 +4592,6 @@ AstNode *parse_stmt(AstFile *f) {
 		f->expr_level++;
 		if (f->curr_token.kind != Token_CloseParen) {
 			elems = make_ast_node_array(f);
-
 			while (f->curr_token.kind != Token_CloseParen &&
 			       f->curr_token.kind != Token_EOF) {
 				AstNode *elem = parse_ident(f);
@@ -4601,12 +4614,15 @@ AstNode *parse_stmt(AstFile *f) {
 		AstNode *attribute = ast_attribute(f, token, open, close, elems);
 
 		AstNode *decl = parse_stmt(f);
-		if (decl->kind != AstNode_ValueDecl) {
-			syntax_error(decl, "Expected a value declaration after an attribute, got %.*s", LIT(ast_node_strings[decl->kind]));
+		if (decl->kind == AstNode_ValueDecl) {
+			array_add(&decl->ValueDecl.attributes, attribute);
+		} else if (decl->kind == AstNode_ForeignBlockDecl) {
+			array_add(&decl->ForeignBlockDecl.attributes, attribute);
+		} else {
+			syntax_error(decl, "Expected a value or foreign declaration after an attribute, got %.*s", LIT(ast_node_strings[decl->kind]));
 			return ast_bad_stmt(f, token, f->curr_token);
 		}
 
-		array_add(&decl->ValueDecl.attributes, attribute);
 		return decl;
 	}
 

@@ -423,6 +423,7 @@ struct CheckerContext {
 	Type *     type_hint;
 	DeclInfo * curr_proc_decl;
 	AstNode *  curr_foreign_library;
+	ProcCallingConvention default_foreign_cc;
 
 	bool       in_foreign_export;
 	bool       collect_delayed_decls;
@@ -1854,11 +1855,77 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 	gb_temp_arena_memory_end(tmp);
 }
 
+void check_foreign_block_decl_attributes(Checker *c, AstNodeForeignBlockDecl *fb);
 
 #include "check_expr.cpp"
 #include "check_type.cpp"
 #include "check_decl.cpp"
 #include "check_stmt.cpp"
+
+
+void check_foreign_block_decl_attributes(Checker *c, AstNodeForeignBlockDecl *fb) {
+	if (fb->attributes.count == 0) return;
+	StringSet set = {};
+	string_set_init(&set, heap_allocator());
+	defer (string_set_destroy(&set));
+
+	for_array(i, fb->attributes) {
+		AstNode *attr = fb->attributes[i];
+		if (attr->kind != AstNode_Attribute) continue;
+		for_array(j, attr->Attribute.elems) {
+			AstNode *elem = attr->Attribute.elems[j];
+			String name = {};
+			AstNode *value = nullptr;
+
+			switch (elem->kind) {
+			case_ast_node(i, Ident, elem);
+				name = i->token.string;
+			case_end;
+			case_ast_node(fv, FieldValue, elem);
+				GB_ASSERT(fv->field->kind == AstNode_Ident);
+				name = fv->field->Ident.token.string;
+				value = fv->value;
+			case_end;
+			default:
+				error(elem, "Invalid attribute element");
+				continue;
+			}
+
+			ExactValue ev = {};
+			if (value != nullptr) {
+				Operand op = {};
+				check_expr(c, &op, value);
+				if (op.mode != Addressing_Constant) {
+					error(value, "An attribute element must be constant");
+				} else {
+					ev = op.value;
+				}
+			}
+
+			if (string_set_exists(&set, name)) {
+				error(elem, "Previous declaration of `%.*s`", LIT(name));
+				continue;
+			} else {
+				string_set_add(&set, name);
+			}
+
+			if (name == "default_calling_convention") {
+				if (ev.kind == ExactValue_String) {
+					auto cc = string_to_calling_convention(ev.value_string);
+					if (cc == ProcCC_Invalid) {
+						error(elem, "Unknown procedure calling convention: `%.*s`\n", LIT(ev.value_string));
+					} else {
+						c->context.default_foreign_cc = cc;
+					}
+				} else {
+					error(elem, "Expected a string value for `%.*s`", LIT(name));
+				}
+			} else {
+				error(elem, "Unknown attribute element name `%.*s`", LIT(name));
+			}
+		}
+	}
+}
 
 
 
@@ -1990,6 +2057,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 				GB_ASSERT(fl->kind == AstNode_Ident);
 				e->Variable.is_foreign = true;
 				e->Variable.foreign_library_ident = fl;
+
 			} else if (c->context.in_foreign_export) {
 				e->Variable.is_export = true;
 			}
@@ -2054,6 +2122,18 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 					GB_ASSERT(fl->kind == AstNode_Ident);
 					e->Procedure.foreign_library_ident = fl;
 					e->Procedure.is_foreign = true;
+
+					GB_ASSERT(pl->type->kind == AstNode_ProcType);
+					auto cc = pl->type->ProcType.calling_convention;
+					if (cc == ProcCC_ForeignBlockDefault) {
+						cc = ProcCC_C;
+						if (c->context.default_foreign_cc > 0) {
+							cc = c->context.default_foreign_cc;
+						}
+					}
+					GB_ASSERT(cc != ProcCC_Invalid);
+					pl->type->ProcType.calling_convention = cc;
+
 				} else if (c->context.in_foreign_export) {
 					e->Procedure.is_export = true;
 				}
@@ -2102,6 +2182,8 @@ void check_add_foreign_block_decl(Checker *c, AstNode *decl) {
 		error(foreign_library, "Foreign block name must be an identifier or `export`");
 		c->context.curr_foreign_library = nullptr;
 	}
+
+	check_foreign_block_decl_attributes(c, fb);
 
 	c->context.collect_delayed_decls = true;
 	check_collect_entities(c, fb->decls);
