@@ -156,6 +156,7 @@ bool is_entity_exported(Entity *e) {
 	return name[0] != '_';
 }
 
+
 gb_global u64 global_entity_id = 0;
 
 Entity *alloc_entity(gbAllocator a, EntityKind kind, Scope *scope, Token token, Type *type) {

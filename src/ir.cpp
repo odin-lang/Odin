@@ -119,6 +119,7 @@ struct irProcedure {
 	u64                   tags;
 	bool                  is_foreign;
 	bool                  is_export;
+	bool                  is_entry_point;
 
 	irValue *             return_ptr;
 	Array<irValue *>      params;
@@ -3743,6 +3744,12 @@ void ir_check_type_and_gen_for_proc_lit(irModule *m, String prefix_name, Type *t
 void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	if (e->type == nullptr) return;
 
+	if (e->kind == Entity_TypeName && e->type->kind == Type_Named) {
+		if (e != e->type->Named.type_name) {
+			// NOTE(bill): Is alias
+			return;
+		}
+	}
 
 	Type *bt = base_type(e->type);
 
@@ -8267,7 +8274,6 @@ void ir_gen_tree(irGen *s) {
 
 		switch (e->kind) {
 		case Entity_TypeName:
-			GB_ASSERT(e->type->kind == Type_Named);
 			ir_gen_global_type_name(m, e, name);
 			break;
 
@@ -8374,6 +8380,7 @@ void ir_gen_tree(irGen *s) {
 
 		irProcedure *proc = &p->Proc;
 		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
+		proc->is_entry_point = true;
 		e->Procedure.link_name = name;
 
 		ir_begin_procedure_body(proc);
@@ -8444,6 +8451,7 @@ void ir_gen_tree(irGen *s) {
 
 		irProcedure *proc = &p->Proc;
 		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
+		proc->is_entry_point = true;
 		e->Procedure.link_name = name;
 
 		ir_begin_procedure_body(proc);

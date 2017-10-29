@@ -12,7 +12,7 @@ Errno     :: i32;
 O_RDONLY   :: 0x00000;
 O_WRONLY   :: 0x00001;
 O_RDWR     :: 0x00002;
-O_CREAT    :: 0x00040;
+O_CREATE   :: 0x00040;
 O_EXCL     :: 0x00080;
 O_NOCTTY   :: 0x00100;
 O_TRUNC    :: 0x00200;

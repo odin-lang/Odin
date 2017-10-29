@@ -37,6 +37,13 @@ foreign __llvm_core {
 	cos     :: proc(θ: f32) -> f32        #link_name "llvm.cos.f32" ---;
 	cos     :: proc(θ: f64) -> f64        #link_name "llvm.cos.f64" ---;
 
+	// asin     :: proc(x: f32) -> f32       #link_name "llvm.asin.f32" ---;
+	// asin     :: proc(x: f64) -> f64       #link_name "llvm.asin.f64" ---;
+
+	// acos     :: proc(x: f32) -> f32       #link_name "llvm.acos.f32" ---;
+	// acos     :: proc(x: f64) -> f64       #link_name "llvm.acos.f64" ---;
+
+
 	pow     :: proc(x, power: f32) -> f32 #link_name "llvm.pow.f32" ---;
 	pow     :: proc(x, power: f64) -> f64 #link_name "llvm.pow.f64" ---;
 
@@ -47,9 +54,8 @@ foreign __llvm_core {
 tan    :: proc(θ: f32) -> f32 #inline do return sin(θ)/cos(θ);
 tan    :: proc(θ: f64) -> f64 #inline do return sin(θ)/cos(θ);
 
+lerp   :: proc(a, b: $T, t: $E) -> (x: T) do return a*(1-t) + b*t;
 
-lerp   :: proc(a, b, t: f32) -> (x: f32) do return a*(1-t) + b*t;
-lerp   :: proc(a, b, t: f64) -> (x: f64) do return a*(1-t) + b*t;
 unlerp :: proc(a, b, x: f32) -> (t: f32) do return (x-a)/(b-a);
 unlerp :: proc(a, b, x: f64) -> (t: f64) do return (x-a)/(b-a);
 

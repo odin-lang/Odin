@@ -2,6 +2,8 @@ when ODIN_OS == "windows" do export "core:os_windows.odin";
 when ODIN_OS == "osx"     do export "core:os_x.odin";
 when ODIN_OS == "linux"   do export "core:os_linux.odin";
 
+import "mem.odin";
+
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, cast([]u8)str);
 }
@@ -35,8 +37,8 @@ read_entire_file :: proc(name: string) -> (data: []u8, success: bool) {
 	return data[0..bytes_read], true;
 }
 
-write_entire_file :: proc(name: string, data: []u8) -> (sucess: bool) {
-	fd, err := open(name, O_WRONLY|O_CREAT, 0);
+write_entire_file :: proc(name: string, data: []u8) -> (success: bool) {
+	fd, err := open(name, O_WRONLY|O_CREATE, 0);
 	if err != 0 {
 		return false;
 	}
@@ -44,4 +46,12 @@ write_entire_file :: proc(name: string, data: []u8) -> (sucess: bool) {
 
 	bytes_written, write_err := write(fd, data);
 	return write_err != 0;
+}
+
+write :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
+	return write(fd, mem.slice_ptr(cast(^u8)data, len));
+}
+
+read :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
+	return read(fd, mem.slice_ptr(cast(^u8)data, len));
 }

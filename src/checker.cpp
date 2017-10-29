@@ -1716,7 +1716,19 @@ void init_preload(Checker *c) {
 		t_map_header = e->type;
 	}
 
+
+	{
+		String _global = str_lit("_global");
+
+		Entity *e = make_entity_import_name(c->allocator, c->global_scope->parent, make_token_ident(_global), t_invalid,
+		                                    str_lit(""), _global,
+		                                    c->global_scope);
+
+		add_entity(c, c->global_scope, nullptr, e);
+	}
+
 	c->done_preload = true;
+
 }
 
 

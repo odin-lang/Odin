@@ -17,10 +17,14 @@ Hbrush    :: Handle;
 Hgdiobj   :: Handle;
 Hmodule   :: Handle;
 Hmonitor  :: Handle;
+Hrawinput :: Handle;
+HKL       :: Handle;
 Wparam    :: uint;
 Lparam    :: int;
 Lresult   :: int;
 Wnd_Proc  :: proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
+
+Long_Ptr :: int;
 
 Bool :: i32;
 FALSE: Bool : 0;
@@ -41,6 +45,19 @@ Wnd_Class_Ex_A :: struct #ordered {
 	menu_name, class_name: ^u8,
 	sm:                    Hicon,
 }
+
+Wnd_Class_Ex_W :: struct #ordered {
+	size, style:           u32,
+	wnd_proc:              Wnd_Proc,
+	cls_extra, wnd_extra:  i32,
+	instance:              Hinstance,
+	icon:                  Hicon,
+	cursor:                Hcursor,
+	background:            Hbrush,
+	menu_name, class_name: ^u16,
+	sm:                    Hicon,
+}
+
 
 Msg :: struct #ordered {
 	hwnd:    Hwnd,
@@ -167,6 +184,59 @@ Critical_Section_Debug :: struct #ordered {
 List_Entry :: struct #ordered {flink, blink: ^List_Entry};
 
 
+Raw_Input_Device :: struct #ordered {
+	usage_page: u16,
+	usage:      u16,
+	flags:      u32,
+	wnd_target: Hwnd,
+}
+
+Raw_Input_Header :: struct #ordered {
+	kind:   u32,
+	size:   u32,
+	device: Handle,
+	wparam: Wparam,
+}
+
+Raw_HID :: struct #ordered {
+	size_hid: u32,
+	count:    u32,
+	raw_data: [1]u8,
+}
+
+Raw_Keyboard :: struct #ordered {
+	make_code:         u16,
+	flags:             u16,
+	reserved:          u16,
+	vkey:              u16,
+	message:           u32,
+	extra_information: u32,
+}
+
+Raw_Mouse :: struct #ordered {
+	flags: u16,
+	using data: struct #raw_union {
+		buttons: u32,
+		using _: struct #ordered {
+			button_flags: u16,
+			button_data:  u16,
+		},
+	},
+	raw_buttons:       u32,
+	last_x:            i32,
+	last_y:            i32,
+	extra_information: u32,
+}
+
+Raw_Input :: struct #ordered {
+	using header: Raw_Input_Header,
+	data: struct #raw_union {
+		mouse:    Raw_Mouse,
+		keyboard: Raw_Keyboard,
+		hid:      Raw_HID,
+	},
+}
+
 
 MAPVK_VK_TO_VSC    :: 0;
 MAPVK_VSC_TO_VK    :: 1;
@@ -199,26 +269,30 @@ WS_BORDER           :: 0x00800000;
 WS_CAPTION          :: 0x00C00000;
 WS_VISIBLE          :: 0x10000000;
 WS_POPUP            :: 0x80000000;
+WS_MAXIMIZE         :: 0x01000000;
+WS_MINIMIZE         :: 0x20000000;
 WS_OVERLAPPEDWINDOW :: WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
 WS_POPUPWINDOW      :: WS_POPUP | WS_BORDER | WS_SYSMENU;
 
-WM_DESTROY           :: 0x0002;
-WM_SIZE	             :: 0x0005;
-WM_CLOSE             :: 0x0010;
+WM_ACTIVATE          :: 0x0006;
 WM_ACTIVATEAPP       :: 0x001C;
-WM_QUIT              :: 0x0012;
+WM_CHAR              :: 0x0102;
+WM_CLOSE             :: 0x0010;
+WM_CREATE            :: 0x0001;
+WM_DESTROY           :: 0x0002;
+WM_INPUT             :: 0x00ff;
 WM_KEYDOWN           :: 0x0100;
 WM_KEYUP             :: 0x0101;
+WM_KILLFOCUS         :: 0x0008;
+WM_QUIT              :: 0x0012;
+WM_SETCURSOR         :: 0x0020;
+WM_SETFOCUS          :: 0x0007;
+WM_SIZE	             :: 0x0005;
 WM_SIZING            :: 0x0214;
 WM_SYSKEYDOWN        :: 0x0104;
 WM_SYSKEYUP          :: 0x0105;
-WM_WINDOWPOSCHANGED  :: 0x0047;
-WM_SETCURSOR         :: 0x0020;
-WM_CHAR              :: 0x0102;
-WM_ACTIVATE          :: 0x0006;
-WM_SETFOCUS          :: 0x0007;
-WM_KILLFOCUS         :: 0x0008;
 WM_USER              :: 0x0400;
+WM_WINDOWPOSCHANGED  :: 0x0047;
 
 WM_MOUSEWHEEL    :: 0x020A;
 WM_MOUSEMOVE     :: 0x0200;
@@ -248,7 +322,12 @@ COLOR_BACKGROUND :: Hbrush(int(1));
 INVALID_SET_FILE_POINTER :: ~u32(0);
 HEAP_ZERO_MEMORY         :: 0x00000008;
 INFINITE                 :: 0xffffffff;
+GWL_EXSTYLE              :: -20;
+GWLP_HINSTANCE           :: -6;
+GWLP_ID                  :: -12;
 GWL_STYLE                :: -16;
+GWLP_USERDATA            :: -21;
+GWLP_WNDPROC             :: -4;
 Hwnd_TOP                 :: Hwnd(uint(0));
 
 BI_RGB         :: 0;
@@ -267,7 +346,62 @@ SWP_NOSIZE        :: 0x0001;
 SWP_NOMOVE        :: 0x0002;
 
 
+// Raw Input
 
+
+RID_HEADER :: 0x10000005;
+RID_INPUT  :: 0x10000003;
+
+
+RIDEV_APPKEYS      :: 0x00000400;
+RIDEV_CAPTUREMOUSE :: 0x00000200;
+RIDEV_DEVNOTIFY    :: 0x00002000;
+RIDEV_EXCLUDE      :: 0x00000010;
+RIDEV_EXINPUTSINK  :: 0x00001000;
+RIDEV_INPUTSINK    :: 0x00000100;
+RIDEV_NOHOTKEYS    :: 0x00000200;
+RIDEV_NOLEGACY     :: 0x00000030;
+RIDEV_PAGEONLY     :: 0x00000020;
+RIDEV_REMOVE       :: 0x00000001;
+
+
+RIM_TYPEMOUSE    :: 0;
+RIM_TYPEKEYBOARD :: 1;
+RIM_TYPEHID      :: 2;
+
+
+MOUSE_ATTRIBUTES_CHANGED :: 0x04;
+MOUSE_MOVE_RELATIVE      :: 0;
+MOUSE_MOVE_ABSOLUTE      :: 1;
+MOUSE_VIRTUAL_DESKTOP    :: 0x02;
+
+
+
+RI_MOUSE_BUTTON_1_DOWN      :: 0x0001;
+RI_MOUSE_BUTTON_1_UP        :: 0x0002;
+RI_MOUSE_BUTTON_2_DOWN      :: 0x0004;
+RI_MOUSE_BUTTON_2_UP        :: 0x0008;
+RI_MOUSE_BUTTON_3_DOWN      :: 0x0010;
+RI_MOUSE_BUTTON_3_UP        :: 0x0020;
+RI_MOUSE_BUTTON_4_DOWN      :: 0x0040;
+RI_MOUSE_BUTTON_4_UP        :: 0x0080;
+RI_MOUSE_BUTTON_5_DOWN      :: 0x0100;
+RI_MOUSE_BUTTON_5_UP        :: 0x0200;
+RI_MOUSE_LEFT_BUTTON_DOWN   :: 0x0001;
+RI_MOUSE_LEFT_BUTTON_UP     :: 0x0002;
+RI_MOUSE_MIDDLE_BUTTON_DOWN :: 0x0010;
+RI_MOUSE_MIDDLE_BUTTON_UP   :: 0x0020;
+RI_MOUSE_RIGHT_BUTTON_DOWN  :: 0x0004;
+RI_MOUSE_RIGHT_BUTTON_UP    :: 0x0008;
+RI_MOUSE_WHEEL              :: 0x0400;
+
+
+RI_KEY_MAKE            :: 0x00;
+RI_KEY_BREAK           :: 0x01;
+RI_KEY_E0              :: 0x02;
+RI_KEY_E1              :: 0x04;
+RI_KEY_TERMSRV_SET_LED :: 0x08;
+RI_KEY_TERMSRV_SHADOW  :: 0x10;
 
 // Windows OpenGL
 
@@ -302,6 +436,7 @@ foreign kernel32 {
 	get_last_error              :: proc() -> i32                                                                               #cc_std #link_name "GetLastError"                 ---;
 	exit_process                :: proc(exit_code: u32)                                                                        #cc_std #link_name "ExitProcess"                  ---;
 	get_module_handle_a         :: proc(module_name: ^u8) -> Hinstance                                                         #cc_std #link_name "GetModuleHandleA"             ---;
+	get_module_handle_w         :: proc(module_name: ^u16) -> Hinstance                                                        #cc_std #link_name "GetModuleHandleW"             ---;
 	sleep                       :: proc(ms: i32) -> i32                                                                        #cc_std #link_name "Sleep"                        ---;
 	query_performance_frequency :: proc(result: ^i64) -> i32                                                                   #cc_std #link_name "QueryPerformanceFrequency"    ---;
 	query_performance_counter   :: proc(result: ^i64) -> i32                                                                   #cc_std #link_name "QueryPerformanceCounter"      ---;
@@ -394,11 +529,14 @@ foreign kernel32 {
 foreign user32 {
 	get_desktop_window  :: proc() -> Hwnd                                                                       #cc_std #link_name "GetDesktopWindow"    ---;
 	show_cursor         :: proc(show : Bool)                                                                    #cc_std #link_name "ShowCursor"          ---;
-	get_cursor_pos      :: proc(p: ^Point) -> i32                                                               #cc_std #link_name "GetCursorPos"        ---;
-	screen_to_client    :: proc(h: Hwnd, p: ^Point) -> i32                                                      #cc_std #link_name "ScreenToClient"      ---;
+	get_cursor_pos      :: proc(p: ^Point) -> Bool                                                              #cc_std #link_name "GetCursorPos"        ---;
+	set_cursor_pos      :: proc(x, y: i32) -> Bool                                                              #cc_std #link_name "SetCursorPos"        ---;
+	screen_to_client    :: proc(h: Hwnd, p: ^Point) -> Bool                                                     #cc_std #link_name "ScreenToClient"      ---;
+	client_to_screen    :: proc(h: Hwnd, p: ^Point) -> Bool                                                     #cc_std #link_name "ClientToScreen"      ---;
 	post_quit_message   :: proc(exit_code: i32)                                                                 #cc_std #link_name "PostQuitMessage"     ---;
 	set_window_text_a   :: proc(hwnd: Hwnd, c_string: ^u8) -> Bool                                              #cc_std #link_name "SetWindowTextA"      ---;
 	register_class_ex_a :: proc(wc: ^Wnd_Class_Ex_A) -> i16                                                     #cc_std #link_name "RegisterClassExA"    ---;
+	register_class_ex_w :: proc(wc: ^Wnd_Class_Ex_W) -> i16                                                     #cc_std #link_name "RegisterClassExW"    ---;
 
 	create_window_ex_a  :: proc(ex_style: u32,
 	                            class_name, title: ^u8,
@@ -407,13 +545,24 @@ foreign user32 {
 	                            parent: Hwnd, menu: Hmenu, instance: Hinstance,
 	                            param: rawptr) -> Hwnd                                                          #cc_std #link_name "CreateWindowExA"     ---;
 
+	create_window_ex_w  :: proc(ex_style: u32,
+	                            class_name, title: ^u16,
+	                            style: u32,
+	                            x, y, w, h: i32,
+	                            parent: Hwnd, menu: Hmenu, instance: Hinstance,
+	                            param: rawptr) -> Hwnd                                                          #cc_std #link_name "CreateWindowExW"     ---;
+
 	show_window        :: proc(hwnd: Hwnd, cmd_show: i32) -> Bool                                               #cc_std #link_name "ShowWindow"          ---;
 	translate_message  :: proc(msg: ^Msg) -> Bool                                                               #cc_std #link_name "TranslateMessage"    ---;
 	dispatch_message_a :: proc(msg: ^Msg) -> Lresult                                                            #cc_std #link_name "DispatchMessageA"    ---;
+	dispatch_message_w :: proc(msg: ^Msg) -> Lresult                                                            #cc_std #link_name "DispatchMessageW"    ---;
 	update_window      :: proc(hwnd: Hwnd) -> Bool                                                              #cc_std #link_name "UpdateWindow"        ---;
 	get_message_a      :: proc(msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max : u32) -> Bool             #cc_std #link_name "GetMessageA"         ---;
+	get_message_w      :: proc(msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max : u32) -> Bool             #cc_std #link_name "GetMessageW"         ---;
 	peek_message_a     :: proc(msg: ^Msg, hwnd: Hwnd,
-		                       msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool                         #cc_std #link_name "PeekMessageA"        ---;
+	                           msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool                         #cc_std #link_name "PeekMessageA"        ---;
+	peek_message_w     :: proc(msg: ^Msg, hwnd: Hwnd,
+	                           msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool                         #cc_std #link_name "PeekMessageW"        ---;
 
 
 	post_message          :: proc(hwnd: Hwnd, msg, wparam, lparam : u32) -> Bool                                #cc_std #link_name "PostMessageA"        ---;
@@ -435,8 +584,10 @@ foreign user32 {
 	set_window_placement  :: proc(wnd: Hwnd, wndpl: ^Window_Placement) -> Bool                                  #cc_std #link_name "SetWindowPlacement"  ---;
 	get_window_rect       :: proc(wnd: Hwnd, rect: ^Rect) -> Bool                                               #cc_std #link_name "GetWindowRect"       ---;
 
-	get_window_long_ptr_a :: proc(wnd: Hwnd, index: i32) -> i64                                                 #cc_std #link_name "GetWindowLongPtrA"   ---;
-	set_window_long_ptr_a :: proc(wnd: Hwnd, index: i32, new: i64) -> i64                                       #cc_std #link_name "SetWindowLongPtrA"   ---;
+	get_window_long_ptr_a :: proc(wnd: Hwnd, index: i32) -> Long_Ptr                                            #cc_std #link_name "GetWindowLongPtrA"   ---;
+	set_window_long_ptr_a :: proc(wnd: Hwnd, index: i32, new: Long_Ptr) -> Long_Ptr                             #cc_std #link_name "SetWindowLongPtrA"   ---;
+	get_window_long_ptr_w :: proc(wnd: Hwnd, index: i32) -> Long_Ptr                                            #cc_std #link_name "GetWindowLongPtrW"   ---;
+	set_window_long_ptr_w :: proc(wnd: Hwnd, index: i32, new: Long_Ptr) -> Long_Ptr                             #cc_std #link_name "SetWindowLongPtrW"   ---;
 
 	get_window_text       :: proc(wnd: Hwnd, str: ^u8, maxCount: i32) -> i32                                    #cc_std #link_name "GetWindowText"       ---;
 
@@ -445,10 +596,23 @@ foreign user32 {
 	get_dc                :: proc(h: Hwnd) -> Hdc                                                               #cc_std #link_name "GetDC"               ---;
 	release_dc            :: proc(wnd: Hwnd, hdc: Hdc) -> i32                                                   #cc_std #link_name "ReleaseDC"           ---;
 
-	map_virtual_key       :: proc(scancode : u32, map_type : u32) -> u32                                        #cc_std #link_name "MapVirtualKeyA"      ---;
+	map_virtual_key_a     :: proc(scancode : u32, map_type : u32) -> u32                                        #cc_std #link_name "MapVirtualKeyA"      ---;
+	map_virtual_key_w     :: proc(scancode : u32, map_type : u32) -> u32                                        #cc_std #link_name "MapVirtualKeyW"      ---;
 
 	get_key_state         :: proc(v_key: i32) -> i16                                                            #cc_std #link_name "GetKeyState"         ---;
 	get_async_key_state   :: proc(v_key: i32) -> i16                                                            #cc_std #link_name "GetAsyncKeyState"    ---;
+
+	set_foreground_window :: proc(h: Hwnd) -> Bool                                                              #cc_std #link_name "SetForegroundWindow" ---;
+	set_focus             :: proc(h: Hwnd) -> Hwnd                                                              #cc_std #link_name "SetFocus"            ---;
+
+
+
+	register_raw_input_devices :: proc(raw_input_device: ^Raw_Input_Device, num_devices, size: u32) -> Bool #cc_std #link_name "RegisterRawInputDevices" ---;
+
+	get_raw_input_data         :: proc(raw_input: Hrawinput, command: u32, data: rawptr, size: ^u32, size_header: u32) -> u32 #cc_std #link_name "GetRawInputData" ---;
+
+	map_virtual_key_ex_w       :: proc(code, map_type: u32, hkl: HKL) #cc_std #link_name "MapVirtualKeyExW" ---;
+	map_virtual_key_ex_a       :: proc(code, map_type: u32, hkl: HKL) #cc_std #link_name "MapVirtualKeyExA" ---;
 }
 
 foreign gdi32 {
@@ -489,7 +653,6 @@ LOWORD :: proc(wParam: Wparam) -> u16 { return u16(wParam); }
 LOWORD :: proc(lParam: Lparam) -> u16 { return u16(lParam); }
 
 is_key_down :: proc(key: Key_Code) -> bool #inline { return get_async_key_state(i32(key)) < 0; }
-
 
 
 
@@ -582,10 +745,14 @@ Rgb_Quad :: struct #ordered {blue, green, red, reserved: u8}
 
 
 Key_Code :: enum i32 {
+	Unknown    = 0x00,
+
 	Lbutton    = 0x01,
 	Rbutton    = 0x02,
 	Cancel     = 0x03,
 	Mbutton    = 0x04,
+	Xbutton1   = 0x05,
+	Xbutton2   = 0x06,
 	Back       = 0x08,
 	Tab        = 0x09,
 	Clear      = 0x0C,

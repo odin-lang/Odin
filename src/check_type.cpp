@@ -2131,6 +2131,12 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		return check_type_internal(c, ht->type, type, named_type);
 	case_end;
 
+	case_ast_node(at, AliasType, e);
+		error(e, "Invalid use of `#alias`");
+		// NOTE(bill): Treat it as a HelperType to remove errors
+		return check_type_internal(c, at->type, type, named_type);
+	case_end;
+
 	case_ast_node(pt, PolyType, e);
 		AstNode *ident = pt->type;
 		if (ident->kind != AstNode_Ident) {

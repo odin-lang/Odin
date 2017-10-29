@@ -14,9 +14,9 @@ new_c_string :: proc(s: string) -> ^u8 {
 	return &c[0];
 }
 
-to_odin_string :: proc(c: ^u8) -> string {
-	if c == nil do return "";
-	len := 0;
-	for (c+len)^ != 0 do len+=1;
-	return string(mem.slice_ptr(c, len));
+to_odin_string :: proc(str: ^u8) -> string {
+	if str == nil do return "";
+	end := str;
+	for end^ != 0 do end+=1;
+	return string(mem.slice_ptr(str, end-str));
 }

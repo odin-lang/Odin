@@ -57,7 +57,7 @@ ExprKind check_expr_base                (Checker *c, Operand *operand, AstNode *
 void     check_expr_with_type_hint      (Checker *c, Operand *o, AstNode *e, Type *t);
 Type *   check_type                     (Checker *c, AstNode *expression, Type *named_type = nullptr);
 Type *   make_optional_ok_type(gbAllocator a, Type *value);
-void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def);
+void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def, bool alias);
 Entity * check_selector                 (Checker *c, Operand *operand, AstNode *node, Type *type_hint);
 Entity * check_ident                    (Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name);
 Entity * find_polymorphic_struct_entity(Checker *c, Type *original_type, isize param_count, Array<Operand> ordered_operands);
@@ -1421,6 +1421,14 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 		if (is_type_unsigned(type)) {
 			precision = cast(i32)(8 * type_size_of(c->allocator, type));
 		}
+		if (op.kind == Token_Xor && is_type_untyped(type)) {
+			gbString err_str = expr_to_string(node);
+			error(op, "Bitwise not cannot be applied to untyped constants `%s`", err_str);
+			gb_string_free(err_str);
+			o->mode = Addressing_Invalid;
+			return;
+		}
+
 		o->value = exact_unary_operator_value(op.kind, o->value, precision);
 
 		if (is_type_typed(type)) {
@@ -5353,7 +5361,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					for_array(i, cl->elems) {
 						AstNode *elem = cl->elems[i];
 						if (elem->kind != AstNode_FieldValue) {
-							error(elem, "Mixture of `field = value` and value elements in a structure literal is not allowed");
+							error(elem, "Mixture of `field = value` and value elements in a literal is not allowed");
 							continue;
 						}
 						ast_node(fv, FieldValue, elem);
@@ -5416,7 +5424,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					for_array(index, cl->elems) {
 						AstNode *elem = cl->elems[index];
 						if (elem->kind == AstNode_FieldValue) {
-							error(elem, "Mixture of `field = value` and value elements in a structure literal is not allowed");
+							error(elem, "Mixture of `field = value` and value elements in a literal is not allowed");
 							continue;
 						}
 						if (index >= field_count) {
@@ -6313,6 +6321,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(ht, HelperType, node);
 		str = gb_string_appendc(str, "#type ");
+		str = write_expr_to_string(str, ht->type);
+	case_end;
+
+	case_ast_node(ht, AliasType, node);
+		str = gb_string_appendc(str, "#alias ");
 		str = write_expr_to_string(str, ht->type);
 	case_end;
 

@@ -7954,7 +7954,7 @@ gbFileTime gb_file_last_write_time(char const *filepath) {
 	time_t result = 0;
 	struct stat file_stat;
 
-	if (stat(filepath, &file_stat)) {
+	if (stat(filepath, &file_stat) == 0) {
 		result = file_stat.st_mtime;
 	}
 

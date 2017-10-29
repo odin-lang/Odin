@@ -1678,6 +1678,9 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 				ir_write_string(f, "dllexport ");
 			}
 		}
+		// if (!proc->is_export && !proc->is_foreign && !proc->is_entry_point) {
+			// ir_write_string(f, "internal ");
+		// }
 	}
 
 	TypeProc *proc_type = &proc->type->Proc;

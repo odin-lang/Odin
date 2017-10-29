@@ -407,6 +407,10 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		Token token; \
 		AstNode *type; \
 	}) \
+	AST_NODE_KIND(AliasType, "alias type", struct { \
+		Token token; \
+		AstNode *type; \
+	}) \
 	AST_NODE_KIND(PolyType, "polymorphic type", struct { \
 		Token    token; \
 		AstNode *type;  \
@@ -611,6 +615,7 @@ Token ast_node_token(AstNode *node) {
 
 	case AstNode_TypeType:         return node->TypeType.token;
 	case AstNode_HelperType:       return node->HelperType.token;
+	case AstNode_AliasType:        return node->AliasType.token;
 	case AstNode_PolyType:         return node->PolyType.token;
 	case AstNode_ProcType:         return node->ProcType.token;
 	case AstNode_PointerType:      return node->PointerType.token;
@@ -856,6 +861,9 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		break;
 	case AstNode_HelperType:
 		n->HelperType.type = clone_ast_node(a, n->HelperType.type);
+		break;
+	case AstNode_AliasType:
+		n->AliasType.type = clone_ast_node(a, n->AliasType.type);
 		break;
 	case AstNode_ProcType:
 		n->ProcType.params  = clone_ast_node(a, n->ProcType.params);
@@ -1408,6 +1416,13 @@ AstNode *ast_helper_type(AstFile *f, Token token, AstNode *type) {
 	AstNode *result = make_ast_node(f, AstNode_HelperType);
 	result->HelperType.token = token;
 	result->HelperType.type  = type;
+	return result;
+}
+
+AstNode *ast_alias_type(AstFile *f, Token token, AstNode *type) {
+	AstNode *result = make_ast_node(f, AstNode_AliasType);
+	result->AliasType.token = token;
+	result->AliasType.type  = type;
 	return result;
 }
 
@@ -2256,8 +2271,10 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		if (allow_token(f, Token_type)) {
 			return ast_helper_type(f, token, parse_type(f));
 		}
-		Token name  = expect_token(f, Token_Ident);
-		if (name.string == "run") {
+		Token name = expect_token(f, Token_Ident);
+		if (name.string == "alias") {
+			return ast_alias_type(f, token, parse_type(f));
+		} else if (name.string == "run") {
 			AstNode *expr = parse_expr(f, false);
 			operand = ast_run_expr(f, token, name, expr);
 			if (unparen_expr(expr)->kind != AstNode_CallExpr) {

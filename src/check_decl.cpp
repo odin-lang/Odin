@@ -170,8 +170,26 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	e->Constant.value = operand->value;
 }
 
-void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
+AstNode *remove_type_alias(AstNode *node) {
+	for (;;) {
+		if (node == nullptr) {
+			return nullptr;
+		}
+		if (node->kind == AstNode_ParenExpr) {
+			node = node->ParenExpr.expr;
+		} else if (node->kind == AstNode_AliasType) {
+			node = node->AliasType.type;
+		} else {
+			return node;
+		}
+	}
+}
+
+void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, bool is_alias) {
 	GB_ASSERT(e->type == nullptr);
+	AstNode *te = remove_type_alias(type_expr);
+
+	e->type = t_invalid;
 	String name = e->token.string;
 	Type *named = make_type_named(c->allocator, name, nullptr, e);
 	named->Named.type_name = e;
@@ -180,12 +198,14 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
 	}
 	e->type = named;
 
-	// gb_printf_err("%.*s %p\n", LIT(e->token.string), e);
-
-	Type *bt = check_type(c, type_expr, named);
+	Type *bt = check_type(c, te, named);
 	named->Named.base = base_type(bt);
-	if (named->Named.base == t_invalid) {
-		// gb_printf("check_type_decl: %s\n", type_to_string(named));
+	if (is_alias) {
+		if (is_type_named(bt)) {
+			e->type = bt;
+		} else {
+			warning(type_expr, "Type declaration will not be an alias type");
+		}
 	}
 }
 
@@ -232,7 +252,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 				error(e->token, "A type declaration cannot have an type parameter");
 			}
 			d->type_expr = d->init_expr;
-			check_type_decl(c, e, d->type_expr, named_type);
+			check_type_decl(c, e, d->type_expr, named_type, false);
 			return;
 		}
 
@@ -673,7 +693,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 		check_const_decl(c, e, d->type_expr, d->init_expr, named_type);
 		break;
 	case Entity_TypeName:
-		check_type_decl(c, e, d->type_expr, named_type);
+		check_type_decl(c, e, d->type_expr, named_type, d->type_expr->kind == AstNode_AliasType);
 		break;
 	case Entity_Procedure:
 		check_proc_decl(c, e, d);

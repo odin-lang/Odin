@@ -12,7 +12,7 @@ INVALID_HANDLE: Handle : -1;
 O_RDONLY   :: 0x00000;
 O_WRONLY   :: 0x00001;
 O_RDWR     :: 0x00002;
-O_CREAT    :: 0x00040;
+O_CREATE   :: 0x00040;
 O_EXCL     :: 0x00080;
 O_NOCTTY   :: 0x00100;
 O_TRUNC    :: 0x00200;
@@ -66,7 +66,7 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 	case O_RDWR:   access = win32.FILE_GENERIC_READ | win32.FILE_GENERIC_WRITE;
 	}
 
-	if mode&O_CREAT != 0 {
+	if mode&O_CREATE != 0 {
 		access |= win32.FILE_GENERIC_WRITE;
 	}
 	if mode&O_APPEND != 0 {
@@ -83,11 +83,11 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 
 	create_mode: u32;
 	switch {
-	case mode&(O_CREAT|O_EXCL) == (O_CREAT | O_EXCL):
+	case mode&(O_CREATE|O_EXCL) == (O_CREATE | O_EXCL):
 		create_mode = win32.CREATE_NEW;
-	case mode&(O_CREAT|O_TRUNC) == (O_CREAT | O_TRUNC):
+	case mode&(O_CREATE|O_TRUNC) == (O_CREATE | O_TRUNC):
 		create_mode = win32.CREATE_ALWAYS;
-	case mode&O_CREAT == O_CREAT:
+	case mode&O_CREATE == O_CREATE:
 		create_mode = win32.OPEN_ALWAYS;
 	case mode&O_TRUNC == O_TRUNC:
 		create_mode = win32.TRUNCATE_EXISTING;

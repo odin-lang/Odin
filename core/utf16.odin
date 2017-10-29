@@ -1,3 +1,5 @@
+import "utf8.odin"
+
 REPLACEMENT_CHAR :: '\uFFFD';
 MAX_RUNE         :: '\U0010FFFF';
 
@@ -27,7 +29,7 @@ encode_surrogate_pair :: proc(r: rune) -> (r1, r2: rune) {
 	return _surr1 + (r>>10)&0x3ff, _surr2 + r&0x3ff;
 }
 
-encode :: proc(d: []u16, s: []rune) {
+encode :: proc(d: []u16, s: []rune) -> int {
 	n := len(s);
 	for r in s do if r >= _surr_self do n += 1;
 
@@ -51,4 +53,33 @@ encode :: proc(d: []u16, s: []rune) {
 			n += 1;
 		}
 	}
+	return n;
+}
+
+
+encode :: proc(d: []u16, s: string) -> int {
+	n := utf8.rune_count(s);
+	for r in s do if r >= _surr_self do n += 1;
+
+	max_n := min(len(d), n);
+	n = 0;
+
+	for r in s {
+		switch r {
+		case 0.._surr1, _surr3.._surr_self:
+			d[n] = u16(r);
+			n += 1;
+
+		case _surr_self..MAX_RUNE:
+			r1, r2 := encode_surrogate_pair(r);
+			d[n]    = u16(r1);
+			d[n+1]  = u16(r2);
+			n += 2;
+
+		case:
+			d[n] = u16(REPLACEMENT_CHAR);
+			n += 1;
+		}
+	}
+	return n;
 }
