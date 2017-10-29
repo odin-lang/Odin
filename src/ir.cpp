@@ -2195,8 +2195,8 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 			Type *ptr_type = base_type(t_left);
 			GB_ASSERT(!is_type_rawptr(ptr_type));
 			irValue *elem_size = ir_const_int(m->allocator, type_size_of(m->allocator, ptr_type->Pointer.elem));
-			irValue *x = ir_emit_conv(proc, left, type);
-			irValue *y = ir_emit_conv(proc, right, type);
+			irValue *x = ir_emit_conv(proc, ir_emit_conv(proc, left, t_uintptr), type);
+			irValue *y = ir_emit_conv(proc, ir_emit_conv(proc, right, t_uintptr), type);
 			irValue *diff = ir_emit_arith(proc, op, x, y, type);
 			return ir_emit_arith(proc, Token_Quo, diff, elem_size, type);
 		}
@@ -3027,7 +3027,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return ir_emit(proc, ir_instr_conv(proc, kind, value, src_type, t));
 	}
 
-	// Pointer <-> int
+	// Pointer <-> uintptr
 	if (is_type_pointer(src) && is_type_uintptr(dst)) {
 		return ir_emit_ptr_to_uintptr(proc, value, t);
 	}
@@ -3183,6 +3183,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 		return ir_emit_load(proc, result);
 	}
+
 
 
 	gb_printf_err("ir_emit_conv: src -> dst\n");

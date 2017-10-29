@@ -2094,11 +2094,8 @@ bool is_foreign_name_valid(String name) {
 	return true;
 }
 
-void parse_proc_tags(AstFile *f, u64 *tags, ProcCallingConvention *calling_convention) {
+void parse_proc_tags(AstFile *f, u64 *tags) {
 	GB_ASSERT(tags != nullptr);
-
-	ProcCallingConvention cc = ProcCC_Invalid;
-	if (calling_convention) cc = *calling_convention;
 
 	while (f->curr_token.kind == Token_Hash) {
 		AstNode *tag_expr = parse_tag_expr(f, nullptr);
@@ -2114,57 +2111,11 @@ void parse_proc_tags(AstFile *f, u64 *tags, ProcCallingConvention *calling_conve
 		ELSE_IF_ADD_TAG(require_results)
 		ELSE_IF_ADD_TAG(bounds_check)
 		ELSE_IF_ADD_TAG(no_bounds_check)
-		else if (tag_name == "cc_odin") {
-			if (cc == ProcCC_Invalid) {
-				cc = ProcCC_Odin;
-			} else {
-				syntax_error(tag_expr, "Multiple calling conventions for procedure type");
-			}
-		} else if (tag_name == "cc_contextless") {
-			if (cc == ProcCC_Invalid) {
-				cc = ProcCC_Contextless;
-			} else {
-				syntax_error(tag_expr, "Multiple calling conventions for procedure type");
-			}
-		} else if (tag_name == "cc_c") {
-			if (cc == ProcCC_Invalid) {
-				cc = ProcCC_C;
-			} else {
-				syntax_error(tag_expr, "Multiple calling conventions for procedure type");
-			}
-		} else if (tag_name == "cc_std") {
-			if (cc == ProcCC_Invalid) {
-				cc = ProcCC_Std;
-			} else {
-				syntax_error(tag_expr, "Multiple calling conventions for procedure type");
-			}
-		} else if (tag_name == "cc_fast") {
-			if (cc == ProcCC_Invalid) {
-				cc = ProcCC_Fast;
-			} else {
-				syntax_error(tag_expr, "Multiple calling conventions for procedure type");
-			}
-		} else {
-			syntax_error(tag_expr, "Unknown procedure tag #%.*s\n", LIT(tag_name));
+		else {
+			syntax_error(tag_expr, "Unknown procedure type tag #%.*s", LIT(tag_name));
 		}
 
 		#undef ELSE_IF_ADD_TAG
-	}
-
-	if (cc == ProcCC_Invalid) {
-		if (f->in_foreign_block) {
-			cc = ProcCC_C;
-		} else {
-			cc = ProcCC_Odin;
-		}
-	}
-
-	if (calling_convention) {
-		*calling_convention = cc;
-	}
-
-	if ((*tags & ProcTag_inline) && (*tags & ProcTag_no_inline)) {
-		syntax_error(f->curr_token, "You cannot apply both #inline and #no_inline to a procedure");
 	}
 
 	if ((*tags & ProcTag_bounds_check) && (*tags & ProcTag_no_bounds_check)) {
@@ -2358,7 +2309,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		}
 
 		if (tags != 0) {
-			// syntax_error(token, "A procedure type cannot have tags");
+			syntax_error(token, "A procedure type cannot have tags");
 		}
 
 		return type;
@@ -3317,13 +3268,12 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token) {
 		} else {
 			syntax_error(token, "Unknown procedure tag #%.*s\n", LIT(conv));
 		}
-
-		if (cc == ProcCC_Invalid) {
-			if (f->in_foreign_block) {
-				cc = ProcCC_C;
-			} else {
-				cc = ProcCC_Odin;
-			}
+	}
+	if (cc == ProcCC_Invalid) {
+		if (f->in_foreign_block) {
+			cc = ProcCC_C;
+		} else {
+			cc = ProcCC_Odin;
 		}
 	}
 
@@ -3334,7 +3284,7 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token) {
 	results = parse_results(f);
 
 	u64 tags = 0;
-	parse_proc_tags(f, &tags, &cc);
+	parse_proc_tags(f, &tags);
 
 	bool is_generic = false;
 

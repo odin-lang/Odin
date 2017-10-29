@@ -3239,7 +3239,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 
 	case BuiltinProc_offset_of: {
-		// proc offset_of(Type, field) -> untyped int
+		// proc offset_of(Type, field) -> uintptr
 		Operand op = {};
 		Type *bt = check_type(c, ce->args[0]);
 		Type *type = base_type(bt);
@@ -3279,7 +3279,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->mode = Addressing_Constant;
 		operand->value = exact_value_i64(type_offset_of_from_selection(c->allocator, type, sel));
-		operand->type  = t_untyped_integer;
+		operand->type  = t_uintptr;
 
 		break;
 	}

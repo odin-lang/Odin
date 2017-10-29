@@ -268,7 +268,7 @@ dlopen :: inline proc(filename: string, flags: int) -> rawptr {
 	free(cstr);
 	return handle;
 }
-dlsym :: inline proc(handle: rawptr, symbol: string) -> (proc() #cc_c) {
+dlsym :: inline proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil);
 	cstr := strings.new_c_string(symbol);
 	proc_handle := _unix_dlsym(handle, cstr);
