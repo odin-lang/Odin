@@ -117,6 +117,7 @@ struct irProcedure {
 	AstNode *             type_expr;
 	AstNode *             body;
 	u64                   tags;
+	ProcInlining          inlining;
 	bool                  is_foreign;
 	bool                  is_export;
 	bool                  is_entry_point;
@@ -3695,6 +3696,7 @@ irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, AstNode *exp
 	                                    m, nullptr, type, pl->type, pl->body, name);
 
 	value->Proc.tags = pl->tags;
+	value->Proc.inlining = pl->inlining;
 	value->Proc.parent = proc;
 
 	array_add(&m->procs_to_generate, value);
@@ -5902,6 +5904,7 @@ void ir_build_poly_proc(irProcedure *proc, AstNodeProcLit *pd, Entity *e) {
 	                                    proc->module, e, e->type, pd->type, pd->body, name);
 
 	value->Proc.tags = pd->tags;
+	value->Proc.inlining = pd->inlining;
 	value->Proc.parent = proc;
 
 	ir_module_add_value(proc->module, e, value);
@@ -5987,6 +5990,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 				                                    proc->module, e, e->type, pl->type, pl->body, name);
 
 				value->Proc.tags = pl->tags;
+				value->Proc.inlining = pl->inlining;
 
 				ir_module_add_value(proc->module, e, value);
 				ir_build_proc(value, proc);
@@ -8295,6 +8299,7 @@ void ir_gen_tree(irGen *s) {
 
 			irValue *p = ir_value_procedure(a, m, e, e->type, type_expr, body, name);
 			p->Proc.tags = pl->tags;
+			p->Proc.inlining = pl->inlining;
 
 			ir_module_add_value(m, e, p);
 			HashKey hash_name = hash_string(name);
@@ -8363,7 +8368,7 @@ void ir_gen_tree(irGen *s) {
 
 		Type *proc_type = make_type_proc(a, proc_scope,
 		                                 proc_params, 3,
-		                                 proc_results, 1, false, ProcCC_Std);
+		                                 proc_results, 1, false, ProcCC_StdCall);
 
 		// TODO(bill): make this more robust
 		proc_type->Proc.abi_compat_params = gb_alloc_array(a, Type *, proc_params->Tuple.variables.count);
@@ -8380,7 +8385,7 @@ void ir_gen_tree(irGen *s) {
 		map_set(&m->members, hash_string(name), p);
 
 		irProcedure *proc = &p->Proc;
-		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
+		proc->inlining = ProcInlining_no_inline; // TODO(bill): is no_inline a good idea?
 		proc->is_entry_point = true;
 		e->Procedure.link_name = name;
 
@@ -8434,7 +8439,7 @@ void ir_gen_tree(irGen *s) {
 
 		Type *proc_type = make_type_proc(a, proc_scope,
 		                                 proc_params, 2,
-		                                 proc_results, 1, false, ProcCC_C);
+		                                 proc_results, 1, false, ProcCC_CDecl);
 
 		// TODO(bill): make this more robust
 		proc_type->Proc.abi_compat_params = gb_alloc_array(a, Type *, proc_params->Tuple.variables.count);
@@ -8451,7 +8456,7 @@ void ir_gen_tree(irGen *s) {
 		map_set(&m->members, hash_string(name), p);
 
 		irProcedure *proc = &p->Proc;
-		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
+		proc->inlining = ProcInlining_no_inline; // TODO(bill): is no_inline a good idea?
 		proc->is_entry_point = true;
 		e->Procedure.link_name = name;
 
@@ -8543,7 +8548,7 @@ void ir_gen_tree(irGen *s) {
 
 
 		irProcedure *proc = &p->Proc;
-		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
+		proc->inlining = ProcInlining_no_inline; // TODO(bill): is no_inline a good idea?
 
 		ir_begin_procedure_body(proc);
 

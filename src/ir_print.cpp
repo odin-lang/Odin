@@ -882,9 +882,9 @@ void ir_print_calling_convention(irFileBuffer *f, irModule *m, ProcCallingConven
 	switch (cc) {
 	case ProcCC_Odin:        ir_write_string(f, "");       break;
 	case ProcCC_Contextless: ir_write_string(f, "");       break;
-	case ProcCC_C:           ir_write_string(f, "ccc ");   break;
-	case ProcCC_Std:         ir_write_string(f, "cc 64 "); break;
-	case ProcCC_Fast:        ir_write_string(f, "cc 65 "); break;
+	case ProcCC_CDecl:       ir_write_string(f, "ccc ");   break;
+	case ProcCC_StdCall:     ir_write_string(f, "cc 64 "); break;
+	case ProcCC_FastCall:    ir_write_string(f, "cc 65 "); break;
 	default: GB_PANIC("unknown calling convention: %d", cc);
 	}
 }
@@ -1751,13 +1751,14 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 
 	ir_write_string(f, ") ");
 
-	if (proc->tags & ProcTag_inline) {
-		ir_write_string(f, "alwaysinline ");
-	}
-	if (proc->tags & ProcTag_no_inline) {
+	switch (proc->inlining) {
+	case ProcInlining_no_inline:
 		ir_write_string(f, "noinline ");
+		break;
+	case ProcInlining_inline:
+		ir_write_string(f, "alwaysinline ");
+		break;
 	}
-
 
 	if (proc->entity != nullptr) {
 		if (proc->body != nullptr) {

@@ -1890,7 +1890,7 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 
 	ProcCallingConvention cc = pt->calling_convention;
 	if (cc == ProcCC_ForeignBlockDefault) {
-		cc = ProcCC_C;
+		cc = ProcCC_CDecl;
 		if (c->context.default_foreign_cc > 0) {
 			cc = c->context.default_foreign_cc;
 		}
@@ -1911,14 +1911,10 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 	if (param_count > 0) {
 		Entity *end = params->Tuple.variables[param_count-1];
 		if (end->flags&EntityFlag_CVarArg) {
-			if (cc == ProcCC_Odin) {
-				error(end->token, "Odin calling convention does not support #c_vararg");
-			} else if (cc == ProcCC_Contextless) {
-				error(end->token, "Odin's contextless calling convention does not support #c_vararg");
-			} else if (cc == ProcCC_Fast) {
-				error(end->token, "Fast calling convention does not support #c_vararg");
-			} else {
+			if (cc == ProcCC_StdCall || cc == ProcCC_CDecl) {
 				type->Proc.c_vararg = true;
+			} else {
+				error(end->token, "Calling convention does not support #c_vararg");
 			}
 		}
 	}

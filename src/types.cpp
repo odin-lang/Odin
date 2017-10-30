@@ -2436,7 +2436,31 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_Proc:
-		str = gb_string_appendc(str, "proc(");
+		str = gb_string_appendc(str, "proc");
+
+		switch (type->Proc.calling_convention) {
+		case ProcCC_Odin:
+			break;
+		case ProcCC_Contextless:
+			str = gb_string_appendc(str, " \"contextless\" ");
+			break;
+		case ProcCC_CDecl:
+			str = gb_string_appendc(str, " \"cdecl\" ");
+			break;
+		case ProcCC_StdCall:
+			str = gb_string_appendc(str, " \"stdcall\" ");
+			break;
+		case ProcCC_FastCall:
+			str = gb_string_appendc(str, " \"fastcall\" ");
+			break;
+		// case ProcCC_VectorCall:
+		// 	str = gb_string_appendc(str, " \"vectorcall\" ");
+		// 	break;
+		// case ProcCC_ClrCall:
+		// 	str = gb_string_appendc(str, " \"clrcall\" ");
+		// 	break;
+		}
+		str = gb_string_appendc(str, "(");
 		if (type->Proc.params) {
 			str = write_type_to_string(str, type->Proc.params);
 		}
@@ -2444,20 +2468,6 @@ gbString write_type_to_string(gbString str, Type *type) {
 		if (type->Proc.results) {
 			str = gb_string_appendc(str, " -> ");
 			str = write_type_to_string(str, type->Proc.results);
-		}
-		switch (type->Proc.calling_convention) {
-		case ProcCC_Odin:
-			// str = gb_string_appendc(str, " #cc_odin");
-			break;
-		case ProcCC_C:
-			str = gb_string_appendc(str, " #cc_c");
-			break;
-		case ProcCC_Std:
-			str = gb_string_appendc(str, " #cc_std");
-			break;
-		case ProcCC_Fast:
-			str = gb_string_appendc(str, " #cc_fast");
-			break;
 		}
 		break;
 

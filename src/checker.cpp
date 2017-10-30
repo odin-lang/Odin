@@ -2126,7 +2126,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 					GB_ASSERT(pl->type->kind == AstNode_ProcType);
 					auto cc = pl->type->ProcType.calling_convention;
 					if (cc == ProcCC_ForeignBlockDefault) {
-						cc = ProcCC_C;
+						cc = ProcCC_CDecl;
 						if (c->context.default_foreign_cc > 0) {
 							cc = c->context.default_foreign_cc;
 						}

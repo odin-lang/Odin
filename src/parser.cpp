@@ -88,28 +88,29 @@ struct Parser {
 	gbMutex             file_decl_mutex;
 };
 
+enum ProcInlining {
+	ProcInlining_none = 0,
+	ProcInlining_inline = 1,
+	ProcInlining_no_inline = 2,
+};
+
 enum ProcTag {
 	ProcTag_bounds_check    = 1<<0,
 	ProcTag_no_bounds_check = 1<<1,
-
-
 	ProcTag_require_results = 1<<4,
-
-	ProcTag_link_name       = 1<<11,
-	ProcTag_inline          = 1<<12,
-	ProcTag_no_inline       = 1<<13,
-
-	// ProcTag_dll_import      = 1<<15,
-	// ProcTag_dll_export      = 1<<16,
 };
 
 enum ProcCallingConvention {
-	ProcCC_Invalid     = 0,
-	ProcCC_Odin        = 1,
-	ProcCC_Contextless = 2,
-	ProcCC_C           = 3,
-	ProcCC_Std         = 4,
-	ProcCC_Fast        = 5,
+	ProcCC_Invalid = 0,
+	ProcCC_Odin,
+	ProcCC_Contextless,
+	ProcCC_CDecl,
+	ProcCC_StdCall,
+	ProcCC_FastCall,
+
+	// TODO(bill): Add extra calling conventions
+	// ProcCC_VectorCall,
+	// ProcCC_ClrCall,
 
 	ProcCC_ForeignBlockDefault = -1,
 };
@@ -172,6 +173,7 @@ Array<AstNode *> make_ast_node_array(AstFile *f, isize init_capacity = 8) {
 		AstNode *type; \
 		AstNode *body; \
 		u64      tags; \
+		ProcInlining inlining; \
 	}) \
 	AST_NODE_KIND(CompoundLit, "compound literal", struct { \
 		AstNode *type; \
@@ -2275,11 +2277,20 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			syntax_error(expr, "%.*s must be followed by a procedure literal, got %.*s", LIT(token.string), LIT(ast_node_strings[expr->kind]));
 			return ast_bad_expr(f, token, f->curr_token);
 		}
+		ProcInlining pi = ProcInlining_none;
 		if (token.kind == Token_inline) {
-			expr->ProcLit.tags |= ProcTag_inline;
+			pi = ProcInlining_inline;
 		} else if (token.kind == Token_no_inline) {
-			expr->ProcLit.tags |= ProcTag_no_inline;
+			pi = ProcInlining_no_inline;
 		}
+		if (pi != ProcInlining_none) {
+			if (expr->ProcLit.inlining != ProcInlining_none &&
+			    expr->ProcLit.inlining != pi) {
+				syntax_error(expr, "You cannot apply both `inline` and `no_inline` to a procedure literal");
+			}
+			expr->ProcLit.inlining = pi;
+		}
+
 		return expr;
 	} break;
 
@@ -3255,17 +3266,14 @@ AstNode *parse_results(AstFile *f) {
 
 
 ProcCallingConvention string_to_calling_convention(String s) {
-	if (s == "odin") {
-		return ProcCC_Odin;
-	} else if (s == "contextless") {
-		return ProcCC_Contextless;
-	} else if (s == "cdecl" || s == "c") {
-		return ProcCC_C;
-	} else if (s == "stdcall" || s == "std") {
-		return ProcCC_Std;
-	} else if (s == "fastcall" || s == "fast") {
-		return ProcCC_Fast;
-	}
+	if (s == "odin")        return ProcCC_Odin;
+	if (s == "contextless") return ProcCC_Contextless;
+	if (s == "cdecl")       return ProcCC_CDecl;
+	if (s == "c")           return ProcCC_CDecl;
+	if (s == "stdcall")     return ProcCC_StdCall;
+	if (s == "std")         return ProcCC_StdCall;
+	if (s == "fastcall")    return ProcCC_FastCall;
+	if (s == "fast")        return ProcCC_FastCall;
 	return ProcCC_Invalid;
 }
 
