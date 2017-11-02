@@ -438,10 +438,10 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> __Map_Header {
 
 	_, is_string := type_info_base(type_info_of(K)).variant.(Type_Info_String);
 	header.is_key_string = is_string;
-	header.entry_size    = size_of(Entry);
-	header.entry_align   = align_of(Entry);
-	header.value_offset  = offset_of(Entry, value);
-	header.value_size    = size_of(V);
+	header.entry_size    = int(size_of(Entry));
+	header.entry_align   = int(align_of(Entry));
+	header.value_offset  = int(offset_of(Entry, value));
+	header.value_size    = int(size_of(V));
 	return header;
 }
 
@@ -461,7 +461,7 @@ __get_map_key :: proc "contextless" (key: $K) -> __Map_Key {
 	case Type_Info_Rune:
 		map_key.hash = u128((cast(^rune)&key)^);
 	case Type_Info_Pointer:
-		map_key.hash = u128(uint((^rawptr)(&key)^));
+		map_key.hash = u128(uintptr((^rawptr)(&key)^));
 	case Type_Info_Float:
 		switch 8*size_of(key) {
 		case 32: map_key.hash = u128((^u32)(&key)^);

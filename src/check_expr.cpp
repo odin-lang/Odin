@@ -1759,11 +1759,11 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 		return true;
 	}
 
-	// (u)int <-> rawptr
-	if (is_type_uintptr(src) && is_type_rawptr(dst)) {
+	// (u)int <-> pointer
+	if (is_type_uintptr(src) && is_type_pointer(dst)) {
 		return true;
 	}
-	if (is_type_rawptr(src) && is_type_uintptr(dst)) {
+	if (is_type_pointer(src) && is_type_uintptr(dst)) {
 		return true;
 	}
 
