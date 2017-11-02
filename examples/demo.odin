@@ -561,12 +561,16 @@ threading_example :: proc() {
 
 
 main :: proc() {
-	when false {
+	
+    when false {
 		fmt.println("\n# general_stuff");              general_stuff();
 		fmt.println("\n# default_struct_values");      default_struct_values();
 		fmt.println("\n# union_type");                 union_type();
 		fmt.println("\n# parametric_polymorphism");    parametric_polymorphism();
 		fmt.println("\n# threading_example");          threading_example();
 	}
+    
+    fmt.println("\nOdin seems to be working.  Go forth and code!");
+    
 }
 
