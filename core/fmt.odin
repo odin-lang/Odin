@@ -938,7 +938,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		case: panic("Invalid union tag type");
 		}
 
-		if data == nil || tag < 0 {
+		if data == nil || tag <= 0 {
 			write_string(fi.buf, "(union)");
 		} else {
 			ti := info.variants[tag-1];
