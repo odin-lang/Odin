@@ -84,7 +84,7 @@ struct Entity {
 			bool       default_is_undef;
 			bool       default_is_location;
 			bool       is_immutable;
-			bool       is_thread_local;
+			String     thread_local_model;
 			bool       is_foreign;
 			bool       is_export;
 			Entity *   foreign_library;

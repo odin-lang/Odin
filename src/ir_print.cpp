@@ -1934,8 +1934,14 @@ void print_llvm_ir(irGen *ir) {
 				ir_write_string(f, str_lit("dllexport "));
 			}
 		}
-		if (g->is_thread_local) {
-			ir_write_string(f, str_lit("thread_local "));
+		if (g->thread_local_model.len > 0) {
+			String model = g->thread_local_model;
+			if (model == "default") {
+				ir_write_string(f, str_lit("thread_local "));
+			} else {
+				ir_fprintf(f, "thread_local(%.*s) ", LIT(model));
+
+			}
 		}
 
 		if (g->is_private) {

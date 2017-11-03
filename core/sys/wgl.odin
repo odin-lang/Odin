@@ -64,7 +64,6 @@ Get_Extensions_String_ARB_Type  :: #type proc "c" (Hdc) -> ^u8;
 	get_extensions_string_arb:  Get_Extensions_String_ARB_Type;
 
 
-
 foreign opengl32 {
 	@(link_name="wglCreateContext")
 	create_context :: proc(hdc: Hdc) -> Hglrc ---;

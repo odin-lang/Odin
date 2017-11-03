@@ -363,7 +363,7 @@ struct irValueGlobal {
 	bool          is_constant;
 	bool          is_export;
 	bool          is_private;
-	bool          is_thread_local;
+	String        thread_local_model;
 	bool          is_foreign;
 	bool          is_unnamed_addr;
 };
@@ -8191,7 +8191,7 @@ void ir_gen_tree(irGen *s) {
 
 			irValue *g = ir_value_global(a, e, nullptr);
 			g->Global.name = name;
-			g->Global.is_thread_local = e->Variable.is_thread_local;
+			g->Global.thread_local_model = e->Variable.thread_local_model;
 			g->Global.is_foreign = is_foreign;
 			g->Global.is_export  = is_export;
 

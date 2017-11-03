@@ -761,16 +761,23 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 						error(elem, "Expected a string value for `%.*s`", LIT(name));
 					}
 				} else if (name == "thread_local") {
-					if (ev.kind == ExactValue_Invalid) {
-						if (!e->scope->is_file) {
-							error(elem, "Only a variable at file scope can be thread local");
-						} else if (init_expr_list.count > 0) {
-							error(elem, "A thread local variable declaration cannot have initialization values");
+					if (!e->scope->is_file) {
+						error(elem, "Only a variable at file scope can be thread local");
+					} else if (init_expr_list.count > 0) {
+						error(elem, "A thread local variable declaration cannot have initialization values");
+					} else if (ev.kind == ExactValue_Invalid) {
+						e->Variable.thread_local_model = str_lit("default");
+					} else if (ev.kind == ExactValue_String) {
+						String model = ev.value_string;
+						if (model == "localdynamic" ||
+						    model == "initialexec" ||
+						    model == "localexec") {
+							e->Variable.thread_local_model = model;
 						} else {
-							e->Variable.is_thread_local = true;
+							error(elem, "Invalid thread local model `%.*s`", LIT(model));
 						}
 					} else {
-						error(elem, "Expected no value for `%.*s`", LIT(name));
+						error(elem, "Expected either no value or a string for `%.*s`", LIT(name));
 					}
 				} else if (name == "link_prefix") {
 					if (ev.kind == ExactValue_String) {
