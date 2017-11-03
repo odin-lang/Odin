@@ -115,10 +115,6 @@ enum ProcCallingConvention {
 	ProcCC_ForeignBlockDefault = -1,
 };
 
-enum VarDeclFlag {
-	VarDeclFlag_using = 1<<0,
-};
-
 enum StmtStateFlag {
 	StmtStateFlag_bounds_check    = 1<<0,
 	StmtStateFlag_no_bounds_check = 1<<1,
@@ -347,7 +343,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Array<AstNode *> names;        \
 		AstNode *        type;         \
 		Array<AstNode *> values;       \
-		u64              flags;        \
+		bool             is_using;     \
 		bool             is_mutable;   \
 		bool             been_handled; \
 		Array<AstNode *> attributes;   \
@@ -3517,39 +3513,6 @@ AstNode *parse_struct_field_list(AstFile *f, isize *name_count_) {
 	AstNode *params = parse_field_list(f, &total_name_count, FieldFlag_Struct, Token_CloseBrace, true, false);
 	if (name_count_) *name_count_ = total_name_count;
 	return params;
-
-#if 0
-	while (f->curr_token.kind != Token_CloseBrace &&
-	       f->curr_token.kind != Token_EOF) {
-		AstNode *decl = parse_stmt(f);
-		switch (decl->kind) {
-		case AstNode_EmptyStmt:
-		case AstNode_BadStmt:
-		case AstNode_BadDecl:
-			break;
-
-		case_ast_node(vd, ValueDecl, decl);
-			if (vd->flags&VarDeclFlag_thread_local) {
-				vd->flags &= ~VarDeclFlag_thread_local;
-				syntax_error(decl, "Field values cannot be #thread_local");
-			}
-			array_add(&decls, decl);
-			total_name_count += vd->names.count;
-		case_end;
-
-		case AstNode_WhenStmt:
-			array_add(&decls, decl);
-			break;
-
-		default:
-			syntax_error(decl, "Expected a value declaration, got %.*s", LIT(ast_node_strings[decl->kind]));
-			break;
-		}
-	}
-
-	if (name_count_) *name_count_ = total_name_count;
-	return ast_field_list(f, start_token, decls);
-#endif
 }
 
 AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_type_token) {
@@ -4549,7 +4512,7 @@ AstNode *parse_stmt(AstFile *f) {
 				syntax_error(token, "`using` may only be applied to variable declarations");
 				return decl;
 			}
-			decl->ValueDecl.flags |= VarDeclFlag_using;
+			decl->ValueDecl.is_using = true;
 			return decl;
 		}
 

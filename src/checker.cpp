@@ -411,7 +411,12 @@ GB_COMPARE_PROC(ast_node_cmp) {
 	return token_pos_cmp(i.pos, j.pos);
 }
 
-
+struct ForeignContext {
+	AstNode *             curr_library;
+	ProcCallingConvention default_cc;
+	String                link_prefix;
+	bool                  in_export;
+};
 
 struct CheckerContext {
 	Scope *    file_scope;
@@ -422,11 +427,8 @@ struct CheckerContext {
 	String     proc_name;
 	Type *     type_hint;
 	DeclInfo * curr_proc_decl;
-	AstNode *  curr_foreign_library;
-	ProcCallingConvention default_foreign_cc;
-	String                foreign_link_prefix;
+	ForeignContext foreign_context;
 
-	bool       in_foreign_export;
 	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;
 	bool       no_polymorphic_errors;
@@ -1916,7 +1918,7 @@ void check_foreign_block_decl_attributes(Checker *c, AstNodeForeignBlockDecl *fb
 					if (cc == ProcCC_Invalid) {
 						error(elem, "Unknown procedure calling convention: `%.*s`\n", LIT(ev.value_string));
 					} else {
-						c->context.default_foreign_cc = cc;
+						c->context.foreign_context.default_cc = cc;
 					}
 				} else {
 					error(elem, "Expected a string value for `%.*s`", LIT(name));
@@ -1927,7 +1929,7 @@ void check_foreign_block_decl_attributes(Checker *c, AstNodeForeignBlockDecl *fb
 					if (!is_foreign_name_valid(link_prefix)) {
 						error(elem, "Invalid link prefix: `%.*s`\n", LIT(link_prefix));
 					} else {
-						c->context.foreign_link_prefix = link_prefix;
+						c->context.foreign_context.link_prefix = link_prefix;
 					}
 				} else {
 					error(elem, "Expected a string value for `%.*s`", LIT(name));
@@ -2053,20 +2055,20 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 			Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident.token, nullptr, false);
 			e->identifier = name;
 
-			if (vd->flags & VarDeclFlag_using) {
-				vd->flags &= ~VarDeclFlag_using; // NOTE(bill): This error will be only caught once
+			if (vd->is_using) {
+				vd->is_using = false; // NOTE(bill): This error will be only caught once
 				error(name, "`using` is not allowed at the file scope");
 			}
 
-			AstNode *fl = c->context.curr_foreign_library;
+			AstNode *fl = c->context.foreign_context.curr_library;
 			if (fl != nullptr) {
 				GB_ASSERT(fl->kind == AstNode_Ident);
 				e->Variable.is_foreign = true;
 				e->Variable.foreign_library_ident = fl;
 
-				e->Variable.link_prefix = c->context.foreign_link_prefix;
+				e->Variable.link_prefix = c->context.foreign_context.link_prefix;
 
-			} else if (c->context.in_foreign_export) {
+			} else if (c->context.foreign_context.in_export) {
 				e->Variable.is_export = true;
 			}
 
@@ -2105,7 +2107,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 
 			Token token = name->Ident.token;
 
-			AstNode *fl = c->context.curr_foreign_library;
+			AstNode *fl = c->context.foreign_context.curr_library;
 			DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
 			Entity *e = nullptr;
 
@@ -2135,16 +2137,16 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 					auto cc = pl->type->ProcType.calling_convention;
 					if (cc == ProcCC_ForeignBlockDefault) {
 						cc = ProcCC_CDecl;
-						if (c->context.default_foreign_cc > 0) {
-							cc = c->context.default_foreign_cc;
+						if (c->context.foreign_context.default_cc > 0) {
+							cc = c->context.foreign_context.default_cc;
 						}
 					}
-					e->Procedure.link_prefix = c->context.foreign_link_prefix;
+					e->Procedure.link_prefix = c->context.foreign_context.link_prefix;
 
 					GB_ASSERT(cc != ProcCC_Invalid);
 					pl->type->ProcType.calling_convention = cc;
 
-				} else if (c->context.in_foreign_export) {
+				} else if (c->context.foreign_context.in_export) {
 					e->Procedure.is_export = true;
 				}
 				d->proc_lit = init;
@@ -2157,7 +2159,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 			e->identifier = name;
 
 			if (e->kind != Entity_Procedure) {
-				if (fl != nullptr || c->context.in_foreign_export) {
+				if (fl != nullptr || c->context.foreign_context.in_export) {
 					AstNodeKind kind = init->kind;
 					error(name, "Only procedures and variables are allowed to be in a foreign block, got %.*s", LIT(ast_node_strings[kind]));
 					if (kind == AstNode_ProcType) {
@@ -2182,15 +2184,14 @@ void check_add_foreign_block_decl(Checker *c, AstNode *decl) {
 
 	AstNode *foreign_library = fb->foreign_library;
 
-
 	CheckerContext prev_context = c->context;
 	if (foreign_library->kind == AstNode_Ident) {
-		c->context.curr_foreign_library = foreign_library;
+		c->context.foreign_context.curr_library = foreign_library;
 	} else if (foreign_library->kind == AstNode_Implicit && foreign_library->Implicit.kind == Token_export) {
-		c->context.in_foreign_export = true;
+		c->context.foreign_context.in_export = true;
 	} else {
 		error(foreign_library, "Foreign block name must be an identifier or `export`");
-		c->context.curr_foreign_library = nullptr;
+		c->context.foreign_context.curr_library = nullptr;
 	}
 
 	check_foreign_block_decl_attributes(c, fb);

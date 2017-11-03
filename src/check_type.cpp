@@ -82,7 +82,7 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 
 	if (!vd->is_mutable) return;
 
-	bool is_using = (vd->flags&VarDeclFlag_using) != 0;
+	bool is_using = vd->is_using;
 
 	if (is_using && vd->names.count > 1) {
 		error(vd->names[0], "Cannot apply `using` to more than one of the same type");
@@ -1891,8 +1891,8 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 	ProcCallingConvention cc = pt->calling_convention;
 	if (cc == ProcCC_ForeignBlockDefault) {
 		cc = ProcCC_CDecl;
-		if (c->context.default_foreign_cc > 0) {
-			cc = c->context.default_foreign_cc;
+		if (c->context.foreign_context.default_cc > 0) {
+			cc = c->context.foreign_context.default_cc;
 		}
 	}
 	GB_ASSERT(cc > 0);

@@ -1669,8 +1669,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		CheckerContext prev_context = c->context;
 		if (ok) {
-			c->context.curr_foreign_library = foreign_library;
-			c->context.default_foreign_cc = ProcCC_CDecl;
+			c->context.foreign_context.curr_library = foreign_library;
+			c->context.foreign_context.default_cc = ProcCC_CDecl;
 		}
 
 		check_foreign_block_decl_attributes(c, fb);
@@ -1763,7 +1763,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					entity = make_entity_variable(c->allocator, c->context.scope, token, nullptr, false);
 					entity->identifier = name;
 
-					AstNode *fl = c->context.curr_foreign_library;
+					AstNode *fl = c->context.foreign_context.curr_library;
 					if (fl != nullptr) {
 						GB_ASSERT(fl->kind == AstNode_Ident);
 						entity->Variable.is_foreign = true;
@@ -1850,7 +1850,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			add_entity(c, c->context.scope, e->identifier, e);
 		}
 
-		if ((vd->flags & VarDeclFlag_using) != 0) {
+		if (vd->is_using != 0) {
 			Token token = ast_node_token(node);
 			if (vd->type != nullptr && entity_count > 1) {
 				error(token, "`using` can only be applied to one variable of the same type");
