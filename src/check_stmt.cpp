@@ -1692,9 +1692,58 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		Entity **entities = gb_alloc_array(c->allocator, Entity *, vd->names.count);
 		isize entity_count = 0;
 
-		if (vd->flags & VarDeclFlag_thread_local) {
-			vd->flags &= ~VarDeclFlag_thread_local;
-			error(node, "`thread_local` may only be applied to a variable declaration");
+		if (vd->attributes.count > 0) {
+			StringSet set = {};
+			string_set_init(&set, heap_allocator());
+			defer (string_set_destroy(&set));
+
+			for_array(i, vd->attributes) {
+				AstNode *attr = vd->attributes[i];
+				if (attr->kind != AstNode_Attribute) continue;
+				for_array(j, attr->Attribute.elems) {
+					AstNode *elem = attr->Attribute.elems[j];
+					String name = {};
+					AstNode *value = nullptr;
+
+					switch (elem->kind) {
+					case_ast_node(i, Ident, elem);
+						name = i->token.string;
+					case_end;
+					case_ast_node(fv, FieldValue, elem);
+						GB_ASSERT(fv->field->kind == AstNode_Ident);
+						name = fv->field->Ident.token.string;
+						value = fv->value;
+					case_end;
+					default:
+						error(elem, "Invalid attribute element");
+						continue;
+					}
+
+					ExactValue ev = {};
+					if (value != nullptr) {
+						Operand op = {};
+						check_expr(c, &op, value);
+						if (op.mode != Addressing_Constant) {
+							error(value, "An attribute element must be constant");
+						} else {
+							ev = op.value;
+						}
+					}
+
+					if (string_set_exists(&set, name)) {
+						error(elem, "Previous declaration of `%.*s`", LIT(name));
+						continue;
+					} else {
+						string_set_add(&set, name);
+					}
+
+					if (name == "thread_local") {
+						error(elem, "Variable within a procedure cannot be thread local");
+					} else {
+						error(elem, "Unknown attribute element name `%.*s`", LIT(name));
+					}
+				}
+			}
 		}
 
 		for_array(i, vd->names) {

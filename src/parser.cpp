@@ -116,8 +116,7 @@ enum ProcCallingConvention {
 };
 
 enum VarDeclFlag {
-	VarDeclFlag_using            = 1<<0,
-	VarDeclFlag_thread_local     = 1<<1,
+	VarDeclFlag_using = 1<<0,
 };
 
 enum StmtStateFlag {
@@ -4650,22 +4649,6 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			expect_semicolon(f, s);
 			return s;
-		} else if (tag == "thread_local") {
-			AstNode *s = parse_stmt(f);
-
-			if (s->kind == AstNode_ValueDecl) {
-				if (!s->ValueDecl.is_mutable) {
-					syntax_error(token, "`thread_local` may only be applied to variable declarations");
-				}
-				if (f->curr_proc != nullptr) {
-					syntax_error(token, "`thread_local` is only allowed at the file scope");
-				} else {
-					s->ValueDecl.flags |= VarDeclFlag_thread_local;
-				}
-				return s;
-			}
-			syntax_error(token, "`thread_local` may only be applied to a variable declaration");
-			return ast_bad_stmt(f, token, f->curr_token);
 		} else if (tag == "bounds_check") {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_bounds_check;

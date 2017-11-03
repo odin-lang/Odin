@@ -424,6 +424,7 @@ struct CheckerContext {
 	DeclInfo * curr_proc_decl;
 	AstNode *  curr_foreign_library;
 	ProcCallingConvention default_foreign_cc;
+	String                foreign_link_prefix;
 
 	bool       in_foreign_export;
 	bool       collect_delayed_decls;
@@ -1920,6 +1921,17 @@ void check_foreign_block_decl_attributes(Checker *c, AstNodeForeignBlockDecl *fb
 				} else {
 					error(elem, "Expected a string value for `%.*s`", LIT(name));
 				}
+			} else if (name == "link_prefix") {
+				if (ev.kind == ExactValue_String) {
+					String link_prefix = ev.value_string;
+					if (!is_foreign_name_valid(link_prefix)) {
+						error(elem, "Invalid link prefix: `%.*s`\n", LIT(link_prefix));
+					} else {
+						c->context.foreign_link_prefix = link_prefix;
+					}
+				} else {
+					error(elem, "Expected a string value for `%.*s`", LIT(name));
+				}
 			} else {
 				error(elem, "Unknown attribute element name `%.*s`", LIT(name));
 			}
@@ -2024,11 +2036,6 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 			di->type_expr = vd->type;
 			di->init_expr = vd->values[0];
 			di->init_expr_list = vd->values;
-
-
-			if (vd->flags & VarDeclFlag_thread_local) {
-				error(decl, "#thread_local variable declarations cannot have initialization values");
-			}
 		}
 
 
@@ -2044,7 +2051,6 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 				continue;
 			}
 			Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident.token, nullptr, false);
-			e->Variable.is_thread_local = (vd->flags & VarDeclFlag_thread_local) != 0;
 			e->identifier = name;
 
 			if (vd->flags & VarDeclFlag_using) {
@@ -2057,6 +2063,8 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 				GB_ASSERT(fl->kind == AstNode_Ident);
 				e->Variable.is_foreign = true;
 				e->Variable.foreign_library_ident = fl;
+
+				e->Variable.link_prefix = c->context.foreign_link_prefix;
 
 			} else if (c->context.in_foreign_export) {
 				e->Variable.is_export = true;
@@ -2131,6 +2139,8 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 							cc = c->context.default_foreign_cc;
 						}
 					}
+					e->Procedure.link_prefix = c->context.foreign_link_prefix;
+
 					GB_ASSERT(cc != ProcCC_Invalid);
 					pl->type->ProcType.calling_convention = cc;
 

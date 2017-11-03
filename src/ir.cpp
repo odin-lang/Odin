@@ -8176,14 +8176,15 @@ void ir_gen_tree(irGen *s) {
 			if (decl == nullptr) {
 				continue;
 			}
+			GB_ASSERT(e->kind == Entity_Variable);
 
 
 			bool is_foreign = e->Variable.is_foreign;
 			bool is_export  = e->Variable.is_export;
+			bool no_name_mangle = e->scope->is_global || e->Variable.link_name.len > 0 || is_foreign || is_export;
 
 			String name = e->token.string;
-			String original_name = name;
-			if (!e->scope->is_global && !(is_foreign || is_export)) {
+			if (!no_name_mangle) {
 				name = ir_mangle_name(s, e->token.pos.file, e);
 			}
 			ir_add_entity_name(m, e, name);

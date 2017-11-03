@@ -90,6 +90,7 @@ struct Entity {
 			Entity *   foreign_library;
 			AstNode *  foreign_library_ident;
 			String     link_name;
+			String     link_prefix;
 		} Variable;
 		struct {
 			bool  is_type_alias;
@@ -98,6 +99,7 @@ struct Entity {
 		struct {
 			OverloadKind overload_kind;
 			String       link_name;
+			String       link_prefix;
 			u64          tags;
 			bool         is_export;
 			bool         is_foreign;

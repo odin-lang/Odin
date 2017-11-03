@@ -429,6 +429,23 @@ void init_entity_foreign_library(Checker *c, Entity *e) {
 	}
 }
 
+String handle_link_name(Checker *c, Token token, String link_name, String link_prefix, bool link_prefix_overridden) {
+	if (link_prefix.len > 0) {
+		if (link_name.len > 0 && !link_prefix_overridden) {
+			error(token, "`link_name` and `link_prefix` cannot be used together");
+		} else {
+			isize len = link_prefix.len + token.string.len;
+			u8 *name = gb_alloc_array(c->allocator, u8, len+1);
+			gb_memmove(name, &link_prefix[0], link_prefix.len);
+			gb_memmove(name+link_prefix.len, &token.string[0], token.string.len);
+			name[len] = 0;
+
+			link_name = make_string(name, len);
+		}
+	}
+	return link_name;
+}
+
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == nullptr);
 	if (d->proc_lit->kind != AstNode_ProcLit) {
@@ -462,6 +479,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	bool is_require_results = (pl->tags & ProcTag_require_results) != 0;
 
 	String link_name = {};
+	String link_prefix = e->Procedure.link_prefix;
+	bool link_prefix_overridden = false;
 
 
 	if (d != nullptr && d->attributes.count > 0) {
@@ -517,6 +536,18 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 					} else {
 						error(elem, "Expected a string value for `%.*s`", LIT(name));
 					}
+				} else if (name == "link_prefix") {
+					if (ev.kind == ExactValue_String) {
+						if (link_prefix.len > 0) {
+							link_prefix_overridden = true;
+						}
+						link_prefix = ev.value_string;
+						if (!is_foreign_name_valid(link_prefix)) {
+							error(elem, "Invalid link prefix: %.*s", LIT(link_prefix));
+						}
+					} else {
+						error(elem, "Expected a string value for `%.*s`", LIT(name));
+					}
 				} else {
 					error(elem, "Unknown attribute element name `%.*s`", LIT(name));
 				}
@@ -525,8 +556,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 
-
-
+	link_name = handle_link_name(c, e->token, link_name, link_prefix, link_prefix_overridden);
 
 	if (d->scope->file != nullptr && e->token.string == "main") {
 		if (pt->param_count != 0 ||
@@ -671,7 +701,9 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	e->flags |= EntityFlag_Visited;
 
 
+	String link_prefix = e->Variable.link_prefix;
 	String link_name = {};
+	bool link_prefix_overridden = false;
 
 	DeclInfo *decl = decl_info_of_entity(&c->info, e);
 	if (decl != nullptr && decl->attributes.count > 0) {
@@ -728,12 +760,39 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 					} else {
 						error(elem, "Expected a string value for `%.*s`", LIT(name));
 					}
+				} else if (name == "thread_local") {
+					if (ev.kind == ExactValue_Invalid) {
+						if (!e->scope->is_file) {
+							error(elem, "Only a variable at file scope can be thread local");
+						} else if (init_expr_list.count > 0) {
+							error(elem, "A thread local variable declaration cannot have initialization values");
+						} else {
+							e->Variable.is_thread_local = true;
+						}
+					} else {
+						error(elem, "Expected no value for `%.*s`", LIT(name));
+					}
+				} else if (name == "link_prefix") {
+					if (ev.kind == ExactValue_String) {
+						if (link_prefix.len > 0) {
+							link_prefix_overridden = true;
+						}
+						link_prefix = ev.value_string;
+						if (!is_foreign_name_valid(link_prefix)) {
+							error(elem, "Invalid link prefix: %.*s", LIT(link_prefix));
+						}
+					} else {
+						error(elem, "Expected a string value for `%.*s`", LIT(name));
+					}
 				} else {
 					error(elem, "Unknown attribute element name `%.*s`", LIT(name));
 				}
 			}
 		}
 	}
+
+	link_name = handle_link_name(c, e->token, link_name, link_prefix, link_prefix_overridden);
+
 
 	String context_name = str_lit("variable declaration");
 
