@@ -1863,17 +1863,21 @@ struct AttributeContext {
 	String  link_name;
 	String  link_prefix;
 	bool    link_prefix_overridden;
-	Entity *entity;
 	isize   init_expr_list_count;
+	String  thread_local_model;
 };
+
+AttributeContext make_attribute_context(String link_prefix) {
+	AttributeContext ac = {};
+	ac.link_prefix = link_prefix;
+	return ac;
+}
 
 #define DECL_ATTRIBUTE_PROC(_name) bool _name(Checker *c, AstNode *elem, String name, ExactValue value, AttributeContext *ac)
 typedef DECL_ATTRIBUTE_PROC(DeclAttributeProc);
 
 
 void check_decl_attributes(Checker *c, Array<AstNode *> attributes, DeclAttributeProc *proc, AttributeContext *ac);
-
-
 
 DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 	if (name == "default_calling_convention") {
@@ -1905,8 +1909,6 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 	return false;
 }
 
-
-
 DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 	if (name == "link_name") {
 		if (value.kind == ExactValue_String) {
@@ -1936,11 +1938,7 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 }
 
 DECL_ATTRIBUTE_PROC(var_decl_attribute) {
-	GB_ASSERT(ac->entity != nullptr);
-	Entity *e = ac->entity;
-	GB_ASSERT(e->kind == Entity_Variable);
-
-	if (!e->scope->is_file) {
+	if (c->context.curr_proc_decl != nullptr) {
 		error(elem, "Only a variable at file scope can have a `%.*s`", LIT(name));
 		return true;
 	}
@@ -1971,14 +1969,16 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 	} else if (name == "thread_local") {
 		if (ac->init_expr_list_count > 0) {
 			error(elem, "A thread local variable declaration cannot have initialization values");
+		} else if (c->context.foreign_context.curr_library || c->context.foreign_context.in_export) {
+			error(elem, "A foreign block variable cannot be thread local");
 		} else if (value.kind == ExactValue_Invalid) {
-			e->Variable.thread_local_model = str_lit("default");
+			ac->thread_local_model = str_lit("default");
 		} else if (value.kind == ExactValue_String) {
 			String model = value.value_string;
 			if (model == "localdynamic" ||
 			    model == "initialexec" ||
 			    model == "localexec") {
-				e->Variable.thread_local_model = model;
+				ac->thread_local_model = model;
 			} else {
 				error(elem, "Invalid thread local model `%.*s`", LIT(model));
 			}
@@ -1989,6 +1989,7 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 	}
 	return false;
 }
+
 
 
 

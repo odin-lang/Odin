@@ -1661,14 +1661,12 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(fb, ForeignBlockDecl, node);
 		AstNode *foreign_library = fb->foreign_library;
-		bool ok = true;
+		CheckerContext prev_context = c->context;
+		defer (c->context = prev_context);
+
 		if (foreign_library->kind != AstNode_Ident) {
 			error(foreign_library, "foreign library name must be an identifier");
-			ok = false;
-		}
-
-		CheckerContext prev_context = c->context;
-		if (ok) {
+		} else {
 			c->context.foreign_context.curr_library = foreign_library;
 			c->context.foreign_context.default_cc = ProcCC_CDecl;
 		}
@@ -1681,8 +1679,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				check_stmt(c, decl, flags);
 			}
 		}
-
-		c->context = prev_context;
 	case_end;
 
 	case_ast_node(vd, ValueDecl, node);
@@ -1691,7 +1687,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 		Entity **entities = gb_alloc_array(c->allocator, Entity *, vd->names.count);
 		isize entity_count = 0;
-
 
 		for_array(i, vd->names) {
 			AstNode *name = vd->names[i];
@@ -1750,6 +1745,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 		}
 
+
+		// TODO NOTE(bill): This technically checks things multple times
+		AttributeContext ac = make_attribute_context(c->context.foreign_context.link_prefix);
+		check_decl_attributes(c, vd->attributes, var_decl_attribute, &ac);
+
 		for (isize i = 0; i < entity_count; i++) {
 			Entity *e = entities[i];
 			GB_ASSERT(e != nullptr);
@@ -1762,11 +1762,12 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			if (e->type == nullptr) {
 				e->type = init_type;
 			}
+			ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix, ac.link_prefix_overridden);
+			e->Variable.thread_local_model = ac.thread_local_model;
 
-
-			AttributeContext ac = {};
-			ac.entity = e;
-			check_decl_attributes(c, vd->attributes, var_decl_attribute, &ac);
+			if (ac.link_name.len > 0) {
+				e->Variable.link_name = ac.link_name;
+			}
 		}
 
 		check_arity_match(c, vd);
@@ -1778,9 +1779,17 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				if (vd->values.count > 0) {
 					error(e->token, "A foreign variable declaration cannot have a default value");
 				}
-				init_entity_foreign_library(c, e);
 
 				String name = e->token.string;
+				if (e->Variable.link_name.len > 0) {
+					name = e->Variable.link_name;
+				}
+
+				if (vd->values.count > 0) {
+					error(e->token, "A foreign variable declaration cannot have a default value");
+				}
+				init_entity_foreign_library(c, e);
+
 				auto *fp = &c->info.foreigns;
 				HashKey key = hash_string(name);
 				Entity **found = map_get(fp, key);

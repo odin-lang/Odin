@@ -478,8 +478,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	bool is_export          = e->Procedure.is_export;
 	bool is_require_results = (pl->tags & ProcTag_require_results) != 0;
 
-	AttributeContext ac = {};
-	ac.link_prefix = e->Procedure.link_prefix;
+	AttributeContext ac = make_attribute_context(e->Procedure.link_prefix);
 
 	if (d != nullptr) {
 		check_decl_attributes(c, d->attributes, proc_decl_attribute, &ac);
@@ -552,12 +551,14 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		pt->require_results = is_require_results;
 	}
 
-
+	if (ac.link_name.len > 0) {
+		e->Procedure.link_name = ac.link_name;
+	}
 
 	if (is_foreign) {
 		String name = e->token.string;
-		if (ac.link_name.len > 0) {
-			name = ac.link_name;
+		if (e->Procedure.link_name.len > 0) {
+			name = e->Procedure.link_name;
 		}
 		e->Procedure.is_foreign = true;
 		e->Procedure.link_name = name;
@@ -592,15 +593,11 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		}
 	} else {
 		String name = e->token.string;
-		if (ac.link_name.len > 0) {
-			name = ac.link_name;
+		if (e->Procedure.link_name.len > 0) {
+			name = e->Procedure.link_name;
 		}
-
-		if (ac.link_name.len > 0 || is_export) {
+		if (e->Procedure.link_name.len > 0 || is_export) {
 			auto *fp = &c->info.foreigns;
-
-			e->Procedure.link_name = name;
-
 			HashKey key = hash_string(name);
 			Entity **found = map_get(fp, key);
 			if (found) {
@@ -630,9 +627,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	}
 	e->flags |= EntityFlag_Visited;
 
-	AttributeContext ac = {};
-	ac.entity = e;
-	ac.link_prefix = e->Variable.link_prefix;
+	AttributeContext ac = make_attribute_context(e->Variable.link_prefix);
 	ac.init_expr_list_count = init_expr_list.count;
 
 	DeclInfo *decl = decl_info_of_entity(&c->info, e);
@@ -641,7 +636,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	}
 
 	ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix, ac.link_prefix_overridden);
-
+	e->Variable.thread_local_model = ac.thread_local_model;
 
 	String context_name = str_lit("variable declaration");
 
