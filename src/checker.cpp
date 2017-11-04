@@ -1858,7 +1858,139 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 	gb_temp_arena_memory_end(tmp);
 }
 
-void check_foreign_block_decl_attributes(Checker *c, AstNodeForeignBlockDecl *fb);
+
+struct AttributeContext {
+	String  link_name;
+	String  link_prefix;
+	bool    link_prefix_overridden;
+	Entity *entity;
+	isize   init_expr_list_count;
+};
+
+#define DECL_ATTRIBUTE_PROC(_name) bool _name(Checker *c, AstNode *elem, String name, ExactValue value, AttributeContext *ac)
+typedef DECL_ATTRIBUTE_PROC(DeclAttributeProc);
+
+
+void check_decl_attributes(Checker *c, Array<AstNode *> attributes, DeclAttributeProc *proc, AttributeContext *ac);
+
+
+
+DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
+	if (name == "default_calling_convention") {
+		if (value.kind == ExactValue_String) {
+			auto cc = string_to_calling_convention(value.value_string);
+			if (cc == ProcCC_Invalid) {
+				error(elem, "Unknown procedure calling convention: `%.*s`\n", LIT(value.value_string));
+			} else {
+				c->context.foreign_context.default_cc = cc;
+			}
+		} else {
+			error(elem, "Expected a string value for `%.*s`", LIT(name));
+		}
+		return true;
+	} else if (name == "link_prefix") {
+		if (value.kind == ExactValue_String) {
+			String link_prefix = value.value_string;
+			if (!is_foreign_name_valid(link_prefix)) {
+				error(elem, "Invalid link prefix: `%.*s`\n", LIT(link_prefix));
+			} else {
+				c->context.foreign_context.link_prefix = link_prefix;
+			}
+		} else {
+			error(elem, "Expected a string value for `%.*s`", LIT(name));
+		}
+		return true;
+	}
+
+	return false;
+}
+
+
+
+DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
+	if (name == "link_name") {
+		if (value.kind == ExactValue_String) {
+			ac->link_name = value.value_string;
+			if (!is_foreign_name_valid(ac->link_name)) {
+				error(elem, "Invalid link name: %.*s", LIT(ac->link_name));
+			}
+		} else {
+			error(elem, "Expected a string value for `%.*s`", LIT(name));
+		}
+		return true;
+	} else if (name == "link_prefix") {
+		if (value.kind == ExactValue_String) {
+			if (ac->link_prefix.len > 0) {
+				ac->link_prefix_overridden = true;
+			}
+			ac->link_prefix = value.value_string;
+			if (!is_foreign_name_valid(ac->link_prefix)) {
+				error(elem, "Invalid link prefix: %.*s", LIT(ac->link_prefix));
+			}
+		} else {
+			error(elem, "Expected a string value for `%.*s`", LIT(name));
+		}
+		return true;
+	}
+	return false;
+}
+
+DECL_ATTRIBUTE_PROC(var_decl_attribute) {
+	GB_ASSERT(ac->entity != nullptr);
+	Entity *e = ac->entity;
+	GB_ASSERT(e->kind == Entity_Variable);
+
+	if (!e->scope->is_file) {
+		error(elem, "Only a variable at file scope can have a `%.*s`", LIT(name));
+		return true;
+	}
+
+	if (name == "link_name") {
+		if (value.kind == ExactValue_String) {
+			ac->link_name = value.value_string;
+			if (!is_foreign_name_valid(ac->link_name)) {
+				error(elem, "Invalid link name: %.*s", LIT(ac->link_name));
+			}
+		} else {
+			error(elem, "Expected a string value for `%.*s`", LIT(name));
+		}
+		return true;
+	} else if (name == "link_prefix") {
+		if (value.kind == ExactValue_String) {
+			if (ac->link_prefix.len > 0) {
+				ac->link_prefix_overridden = true;
+			}
+			ac->link_prefix = value.value_string;
+			if (!is_foreign_name_valid(ac->link_prefix)) {
+				error(elem, "Invalid link prefix: %.*s", LIT(ac->link_prefix));
+			}
+		} else {
+			error(elem, "Expected a string value for `%.*s`", LIT(name));
+		}
+		return true;
+	} else if (name == "thread_local") {
+		if (ac->init_expr_list_count > 0) {
+			error(elem, "A thread local variable declaration cannot have initialization values");
+		} else if (value.kind == ExactValue_Invalid) {
+			e->Variable.thread_local_model = str_lit("default");
+		} else if (value.kind == ExactValue_String) {
+			String model = value.value_string;
+			if (model == "localdynamic" ||
+			    model == "initialexec" ||
+			    model == "localexec") {
+				e->Variable.thread_local_model = model;
+			} else {
+				error(elem, "Invalid thread local model `%.*s`", LIT(model));
+			}
+		} else {
+			error(elem, "Expected either no value or a string for `%.*s`", LIT(name));
+		}
+		return true;
+	}
+	return false;
+}
+
+
 
 #include "check_expr.cpp"
 #include "check_type.cpp"
@@ -1866,14 +1998,15 @@ void check_foreign_block_decl_attributes(Checker *c, AstNodeForeignBlockDecl *fb
 #include "check_stmt.cpp"
 
 
-void check_foreign_block_decl_attributes(Checker *c, AstNodeForeignBlockDecl *fb) {
-	if (fb->attributes.count == 0) return;
+
+void check_decl_attributes(Checker *c, Array<AstNode *> attributes, DeclAttributeProc *proc, AttributeContext *ac) {
+	if (attributes.count == 0) return;
 	StringSet set = {};
 	string_set_init(&set, heap_allocator());
 	defer (string_set_destroy(&set));
 
-	for_array(i, fb->attributes) {
-		AstNode *attr = fb->attributes[i];
+	for_array(i, attributes) {
+		AstNode *attr = attributes[i];
 		if (attr->kind != AstNode_Attribute) continue;
 		for_array(j, attr->Attribute.elems) {
 			AstNode *elem = attr->Attribute.elems[j];
@@ -1912,35 +2045,12 @@ void check_foreign_block_decl_attributes(Checker *c, AstNodeForeignBlockDecl *fb
 				string_set_add(&set, name);
 			}
 
-			if (name == "default_calling_convention") {
-				if (ev.kind == ExactValue_String) {
-					auto cc = string_to_calling_convention(ev.value_string);
-					if (cc == ProcCC_Invalid) {
-						error(elem, "Unknown procedure calling convention: `%.*s`\n", LIT(ev.value_string));
-					} else {
-						c->context.foreign_context.default_cc = cc;
-					}
-				} else {
-					error(elem, "Expected a string value for `%.*s`", LIT(name));
-				}
-			} else if (name == "link_prefix") {
-				if (ev.kind == ExactValue_String) {
-					String link_prefix = ev.value_string;
-					if (!is_foreign_name_valid(link_prefix)) {
-						error(elem, "Invalid link prefix: `%.*s`\n", LIT(link_prefix));
-					} else {
-						c->context.foreign_context.link_prefix = link_prefix;
-					}
-				} else {
-					error(elem, "Expected a string value for `%.*s`", LIT(name));
-				}
-			} else {
+			if (!proc(c, elem, name, ev, ac)) {
 				error(elem, "Unknown attribute element name `%.*s`", LIT(name));
 			}
 		}
 	}
 }
-
 
 
 bool check_arity_match(Checker *c, AstNodeValueDecl *vd, bool is_global) {
@@ -2194,7 +2304,7 @@ void check_add_foreign_block_decl(Checker *c, AstNode *decl) {
 		c->context.foreign_context.curr_library = nullptr;
 	}
 
-	check_foreign_block_decl_attributes(c, fb);
+	check_decl_attributes(c, fb->attributes, foreign_block_decl_attribute, nullptr);
 
 	c->context.collect_delayed_decls = true;
 	check_collect_entities(c, fb->decls);

@@ -478,85 +478,15 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	bool is_export          = e->Procedure.is_export;
 	bool is_require_results = (pl->tags & ProcTag_require_results) != 0;
 
-	String link_name = {};
-	String link_prefix = e->Procedure.link_prefix;
-	bool link_prefix_overridden = false;
+	AttributeContext ac = {};
+	ac.link_prefix = e->Procedure.link_prefix;
 
-
-	if (d != nullptr && d->attributes.count > 0) {
-		StringSet set = {};
-		string_set_init(&set, heap_allocator());
-		defer (string_set_destroy(&set));
-
-		for_array(i, d->attributes) {
-			AstNode *attr = d->attributes[i];
-			if (attr->kind != AstNode_Attribute) continue;
-			for_array(j, attr->Attribute.elems) {
-				AstNode *elem = attr->Attribute.elems[j];
-				String name = {};
-				AstNode *value = nullptr;
-
-				switch (elem->kind) {
-				case_ast_node(i, Ident, elem);
-					name = i->token.string;
-				case_end;
-				case_ast_node(fv, FieldValue, elem);
-					GB_ASSERT(fv->field->kind == AstNode_Ident);
-					name = fv->field->Ident.token.string;
-					value = fv->value;
-				case_end;
-				default:
-					error(elem, "Invalid attribute element");
-					continue;
-				}
-
-				ExactValue ev = {};
-				if (value != nullptr) {
-					Operand op = {};
-					check_expr(c, &op, value);
-					if (op.mode != Addressing_Constant) {
-						error(value, "An attribute element must be constant");
-					} else {
-						ev = op.value;
-					}
-				}
-
-				if (string_set_exists(&set, name)) {
-					error(elem, "Previous declaration of `%.*s`", LIT(name));
-				} else {
-					string_set_add(&set, name);
-				}
-
-				if (name == "link_name") {
-					if (ev.kind == ExactValue_String) {
-						link_name = ev.value_string;
-						if (!is_foreign_name_valid(link_name)) {
-							error(elem, "Invalid link name: %.*s", LIT(link_name));
-						}
-					} else {
-						error(elem, "Expected a string value for `%.*s`", LIT(name));
-					}
-				} else if (name == "link_prefix") {
-					if (ev.kind == ExactValue_String) {
-						if (link_prefix.len > 0) {
-							link_prefix_overridden = true;
-						}
-						link_prefix = ev.value_string;
-						if (!is_foreign_name_valid(link_prefix)) {
-							error(elem, "Invalid link prefix: %.*s", LIT(link_prefix));
-						}
-					} else {
-						error(elem, "Expected a string value for `%.*s`", LIT(name));
-					}
-				} else {
-					error(elem, "Unknown attribute element name `%.*s`", LIT(name));
-				}
-			}
-		}
+	if (d != nullptr) {
+		check_decl_attributes(c, d->attributes, proc_decl_attribute, &ac);
 	}
 
 
-	link_name = handle_link_name(c, e->token, link_name, link_prefix, link_prefix_overridden);
+	ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix, ac.link_prefix_overridden);
 
 	if (d->scope->file != nullptr && e->token.string == "main") {
 		if (pt->param_count != 0 ||
@@ -626,8 +556,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 	if (is_foreign) {
 		String name = e->token.string;
-		if (link_name.len > 0) {
-			name = link_name;
+		if (ac.link_name.len > 0) {
+			name = ac.link_name;
 		}
 		e->Procedure.is_foreign = true;
 		e->Procedure.link_name = name;
@@ -662,11 +592,11 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		}
 	} else {
 		String name = e->token.string;
-		if (link_name.len > 0) {
-			name = link_name;
+		if (ac.link_name.len > 0) {
+			name = ac.link_name;
 		}
 
-		if (link_name.len > 0 || is_export) {
+		if (ac.link_name.len > 0 || is_export) {
 			auto *fp = &c->info.foreigns;
 
 			e->Procedure.link_name = name;
@@ -700,105 +630,17 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	}
 	e->flags |= EntityFlag_Visited;
 
-
-	String link_prefix = e->Variable.link_prefix;
-	String link_name = {};
-	bool link_prefix_overridden = false;
+	AttributeContext ac = {};
+	ac.entity = e;
+	ac.link_prefix = e->Variable.link_prefix;
+	ac.init_expr_list_count = init_expr_list.count;
 
 	DeclInfo *decl = decl_info_of_entity(&c->info, e);
-	if (decl != nullptr && decl->attributes.count > 0) {
-		StringSet set = {};
-		string_set_init(&set, heap_allocator());
-		defer (string_set_destroy(&set));
-
-		for_array(i, decl->attributes) {
-			AstNode *attr = decl->attributes[i];
-			if (attr->kind != AstNode_Attribute) continue;
-			for_array(j, attr->Attribute.elems) {
-				AstNode *elem = attr->Attribute.elems[j];
-				String name = {};
-				AstNode *value = nullptr;
-
-				switch (elem->kind) {
-				case_ast_node(i, Ident, elem);
-					name = i->token.string;
-				case_end;
-				case_ast_node(fv, FieldValue, elem);
-					GB_ASSERT(fv->field->kind == AstNode_Ident);
-					name = fv->field->Ident.token.string;
-					value = fv->value;
-				case_end;
-				default:
-					error(elem, "Invalid attribute element");
-					continue;
-				}
-
-				ExactValue ev = {};
-				if (value != nullptr) {
-					Operand op = {};
-					check_expr(c, &op, value);
-					if (op.mode != Addressing_Constant) {
-						error(value, "An attribute element must be constant");
-					} else {
-						ev = op.value;
-					}
-				}
-
-				if (string_set_exists(&set, name)) {
-					error(elem, "Previous declaration of `%.*s`", LIT(name));
-					continue;
-				} else {
-					string_set_add(&set, name);
-				}
-
-				if (name == "link_name") {
-					if (ev.kind == ExactValue_String) {
-						link_name = ev.value_string;
-						if (!is_foreign_name_valid(link_name)) {
-							error(elem, "Invalid link name: %.*s", LIT(link_name));
-						}
-					} else {
-						error(elem, "Expected a string value for `%.*s`", LIT(name));
-					}
-				} else if (name == "thread_local") {
-					if (!e->scope->is_file) {
-						error(elem, "Only a variable at file scope can be thread local");
-					} else if (init_expr_list.count > 0) {
-						error(elem, "A thread local variable declaration cannot have initialization values");
-					} else if (ev.kind == ExactValue_Invalid) {
-						e->Variable.thread_local_model = str_lit("default");
-					} else if (ev.kind == ExactValue_String) {
-						String model = ev.value_string;
-						if (model == "localdynamic" ||
-						    model == "initialexec" ||
-						    model == "localexec") {
-							e->Variable.thread_local_model = model;
-						} else {
-							error(elem, "Invalid thread local model `%.*s`", LIT(model));
-						}
-					} else {
-						error(elem, "Expected either no value or a string for `%.*s`", LIT(name));
-					}
-				} else if (name == "link_prefix") {
-					if (ev.kind == ExactValue_String) {
-						if (link_prefix.len > 0) {
-							link_prefix_overridden = true;
-						}
-						link_prefix = ev.value_string;
-						if (!is_foreign_name_valid(link_prefix)) {
-							error(elem, "Invalid link prefix: %.*s", LIT(link_prefix));
-						}
-					} else {
-						error(elem, "Expected a string value for `%.*s`", LIT(name));
-					}
-				} else {
-					error(elem, "Unknown attribute element name `%.*s`", LIT(name));
-				}
-			}
-		}
+	if (decl != nullptr) {
+		check_decl_attributes(c, decl->attributes, var_decl_attribute, &ac);
 	}
 
-	link_name = handle_link_name(c, e->token, link_name, link_prefix, link_prefix_overridden);
+	ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix, ac.link_prefix_overridden);
 
 
 	String context_name = str_lit("variable declaration");
@@ -827,14 +669,14 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		}
 		init_entity_foreign_library(c, e);
 	}
-	if (link_name.len > 0) {
-		e->Variable.link_name = link_name;
+	if (ac.link_name.len > 0) {
+		e->Variable.link_name = ac.link_name;
 	}
 
 	if (e->Variable.is_foreign || e->Variable.is_export) {
 		String name = e->token.string;
-		if (link_name.len > 0) {
-			name = link_name;
+		if (e->Variable.link_name.len > 0) {
+			name = e->Variable.link_name;
 		}
 		auto *fp = &c->info.foreigns;
 		HashKey key = hash_string(name);
