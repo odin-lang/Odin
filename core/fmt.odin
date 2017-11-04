@@ -184,8 +184,9 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 		write_string(buf, info.name);
 	case Type_Info_Integer:
 		switch {
-		case ti == type_info_of(int):  write_string(buf, "int");
-		case ti == type_info_of(uint): write_string(buf, "uint");
+		case ti == type_info_of(int):     write_string(buf, "int");
+		case ti == type_info_of(uint):    write_string(buf, "uint");
+		case ti == type_info_of(uintptr): write_string(buf, "uintptr");
 		case:
 			if info.signed do write_byte(buf, 'i');
 			else           do write_byte(buf, 'u');
@@ -674,19 +675,20 @@ enum_value_to_string :: proc(v: any) -> (string, bool) {
 
 		a := any{v.data, type_info_base(e.base)};
 		switch v in a {
-		case rune: return get_str(v, e);
-		case i8:   return get_str(v, e);
-		case i16:  return get_str(v, e);
-		case i32:  return get_str(v, e);
-		case i64:  return get_str(v, e);
-		case i128: return get_str(v, e);
-		case int:  return get_str(v, e);
-		case u8:   return get_str(v, e);
-		case u16:  return get_str(v, e);
-		case u32:  return get_str(v, e);
-		case u64:  return get_str(v, e);
-		case u128: return get_str(v, e);
-		case uint: return get_str(v, e);
+		case rune:    return get_str(v, e);
+		case i8:      return get_str(v, e);
+		case i16:     return get_str(v, e);
+		case i32:     return get_str(v, e);
+		case i64:     return get_str(v, e);
+		case i128:    return get_str(v, e);
+		case int:     return get_str(v, e);
+		case u8:      return get_str(v, e);
+		case u16:     return get_str(v, e);
+		case u32:     return get_str(v, e);
+		case u64:     return get_str(v, e);
+		case u128:    return get_str(v, e);
+		case uint:    return get_str(v, e);
+		case uintptr: return get_str(v, e);
 
 		case f32:  return get_str(v, e);
 		case f64:  return get_str(v, e);
@@ -1016,6 +1018,8 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	case i32:     fmt_int(fi, u128(a), true,  32, verb);
 	case i64:     fmt_int(fi, u128(a), true,  64, verb);
 	case i128:    fmt_int(fi, u128(a), true, 128, verb);
+
+	case uintptr: fmt_int(fi, u128(a), false, 8*size_of(uintptr), verb);
 
 	case uint:    fmt_int(fi, u128(a), false, 8*size_of(uint), verb);
 	case u8:      fmt_int(fi, u128(a), false, 8, verb);

@@ -10,32 +10,33 @@ export "core:opengl_constants.odin"
 
 _ := compile_assert(ODIN_OS != "osx");
 
+@(default_calling_convention="c", link_prefix="gl")
 foreign lib {
-	@(link_name="glClear")          Clear          :: proc(mask: u32) ---;
-	@(link_name="glClearColor")     ClearColor     :: proc(r, g, b, a: f32) ---;
-	@(link_name="glBegin")          Begin          :: proc(mode: i32) ---;
-	@(link_name="glEnd")            End            :: proc() ---;
-	@(link_name="glFinish")         Finish         :: proc() ---;
-	@(link_name="glBlendFunc")      BlendFunc      :: proc(sfactor, dfactor: i32) ---;
-	@(link_name="glEnable")         Enable         :: proc(cap: i32) ---;
-	@(link_name="glDisable")        Disable        :: proc(cap: i32) ---;
-	@(link_name="glGenTextures")    GenTextures    :: proc(count: i32, result: ^u32) ---;
-	@(link_name="glDeleteTextures") DeleteTextures :: proc(count: i32, result: ^u32) ---;
-	@(link_name="glTexParameteri")  TexParameteri  :: proc(target, pname, param: i32) ---;
-	@(link_name="glTexParameterf")  TexParameterf  :: proc(target: i32, pname: i32, param: f32) ---;
-	@(link_name="glBindTexture")    BindTexture    :: proc(target: i32, texture: u32) ---;
-	@(link_name="glLoadIdentity")   LoadIdentity   :: proc() ---;
-	@(link_name="glViewport")       Viewport       :: proc(x, y, width, height: i32) ---;
-	@(link_name="glOrtho")          Ortho          :: proc(left, right, bottom, top, near, far: f64) ---;
-	@(link_name="glColor3f")        Color3f        :: proc(r, g, b: f32) ---;
-	@(link_name="glVertex3f")       Vertex3f       :: proc(x, y, z: f32) ---;
-	@(link_name="glGetError")       GetError       :: proc() -> i32 ---;
-	@(link_name="glGetString")      GetString      :: proc(name: i32) -> ^u8 ---;
-	@(link_name="glGetIntegerv")    GetIntegerv    :: proc(name: i32, v: ^i32) ---;
-	@(link_name="glTexCoord2f")     TexCoord2f     :: proc(x, y: f32) ---;
-	@(link_name="glTexImage2D")     TexImage2D     :: proc(target, level, internal_format,
-	                                                       width, height, border,
-	                                                       format, type_: i32, pixels: rawptr) ---;
+	Clear          :: proc(mask: u32) ---;
+	ClearColor     :: proc(r, g, b, a: f32) ---;
+	Begin          :: proc(mode: i32) ---;
+	End            :: proc() ---;
+	Finish         :: proc() ---;
+	BlendFunc      :: proc(sfactor, dfactor: i32) ---;
+	Enable         :: proc(cap: i32) ---;
+	Disable        :: proc(cap: i32) ---;
+	GenTextures    :: proc(count: i32, result: ^u32) ---;
+	DeleteTextures :: proc(count: i32, result: ^u32) ---;
+	TexParameteri  :: proc(target, pname, param: i32) ---;
+	TexParameterf  :: proc(target: i32, pname: i32, param: f32) ---;
+	BindTexture    :: proc(target: i32, texture: u32) ---;
+	LoadIdentity   :: proc() ---;
+	Viewport       :: proc(x, y, width, height: i32) ---;
+	Ortho          :: proc(left, right, bottom, top, near, far: f64) ---;
+	Color3f        :: proc(r, g, b: f32) ---;
+	Vertex3f       :: proc(x, y, z: f32) ---;
+	GetError       :: proc() -> i32 ---;
+	GetString      :: proc(name: i32) -> ^u8 ---;
+	GetIntegerv    :: proc(name: i32, v: ^i32) ---;
+	TexCoord2f     :: proc(x, y: f32) ---;
+	TexImage2D     :: proc(target, level, internal_format: i32,
+	                       width, height, border: i32,
+	                       format, type_: i32, pixels: rawptr) ---;
 }
 
 

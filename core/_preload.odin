@@ -38,6 +38,7 @@ Type_Info_Enum_Value :: union {
 	rune,
 	i8, i16, i32, i64, i128, int,
 	u8, u16, u32, u64, u128, uint,
+	uintptr,
 	f32, f64,
 };
 
@@ -687,13 +688,13 @@ __string_decode_rune :: inline proc "contextless" (s: string) -> (rune, int) {
 	return utf8.decode_rune(s);
 }
 
-__bounds_check_error_loc :: proc "contextless" (using loc := #caller_location, index, count: int) {
+__bounds_check_error_loc :: inline proc "contextless" (using loc := #caller_location, index, count: int) {
 	__bounds_check_error(file_path, int(line), int(column), index, count);
 }
-__slice_expr_error_loc :: proc "contextless" (using loc := #caller_location, low, high, max: int) {
+__slice_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, low, high, max: int) {
 	__slice_expr_error(file_path, int(line), int(column), low, high, max);
 }
-__substring_expr_error_loc :: proc "contextless" (using loc := #caller_location, low, high: int) {
+__substring_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, low, high: int) {
 	__substring_expr_error(file_path, int(line), int(column), low, high);
 }
 

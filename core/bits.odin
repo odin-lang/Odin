@@ -4,23 +4,24 @@ U32_MIN  ::  u32(0);
 U64_MIN  ::  u64(0);
 U128_MIN :: u128(0);
 
-I8_MIN   ::   i8(-0x80);
-I16_MIN  ::  i16(-0x8000);
-I32_MIN  ::  i32(-0x8000_0000);
-I64_MIN  ::  i64(-0x8000_0000_0000_0000);
-I128_MIN :: i128(-0x8000_0000_0000_0000_0000_0000_0000_0000);
-
 U8_MAX   ::   ~u8(0);
 U16_MAX  ::  ~u16(0);
 U32_MAX  ::  ~u32(0);
 U64_MAX  ::  ~u64(0);
 U128_MAX :: ~u128(0);
 
-I8_MAX   ::   i8(0x7f);
-I16_MAX  ::  i16(0x7fff);
-I32_MAX  ::  i32(0x7fff_ffff);
-I64_MAX  ::  i64(0x7fff_ffff_ffff_ffff);
-I128_MAX :: i128(0x7fff_ffff_ffff_ffff_ffff_ffff_ffff_ffff);
+I8_MIN   ::   i8(  ~u8(0) >> 1);
+I16_MIN  ::  i16( ~u16(0) >> 1);
+I32_MIN  ::  i32( ~u32(0) >> 1);
+I64_MIN  ::  i64( ~u64(0) >> 1);
+I128_MIN :: i128(~u128(0) >> 1);
+
+I8_MAX   ::   -I8_MIN - 1;
+I16_MAX  ::  -I16_MIN - 1;
+I32_MAX  ::  -I32_MIN - 1;
+I64_MAX  ::  -I64_MIN - 1;
+I128_MAX :: -I128_MIN - 1;
+
 
 count_ones :: proc(i:   u8) ->   u8 { foreign __llvm_core @(link_name="llvm.ctpop.i8")   __llvm_ctpop :: proc(u8)   ->   u8 ---; return __llvm_ctpop(i); }
 count_ones :: proc(i:   i8) ->   i8 { foreign __llvm_core @(link_name="llvm.ctpop.i8")   __llvm_ctpop :: proc(i8)   ->   i8 ---; return __llvm_ctpop(i); }

@@ -25,11 +25,7 @@ Thread :: struct {
 create :: proc(procedure: Thread_Proc) -> ^Thread {
 	win32_thread_id: u32;
 
-	__windows_thread_entry_proc :: proc "c" (data: rawptr) -> i32 {
-		if data	== nil do return 0;
-
-		t := cast(^Thread)data;
-
+	__windows_thread_entry_proc :: proc "c" (t: ^Thread) -> i32 {
 		c := context;
 		if t.use_init_context {
 			c = t.init_context;
@@ -40,11 +36,11 @@ create :: proc(procedure: Thread_Proc) -> ^Thread {
 			exit = t.procedure(t);
 		}
 
-		return cast(i32)exit;
+		return i32(exit);
 	}
 
 
-	win32_thread_proc := cast(rawptr)__windows_thread_entry_proc;
+	win32_thread_proc := rawptr(__windows_thread_entry_proc);
 	thread := new(Thread);
 
 	win32_thread := win32.create_thread(nil, 0, win32_thread_proc, thread, win32.CREATE_SUSPENDED, &win32_thread_id);

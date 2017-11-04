@@ -376,12 +376,12 @@ enum irParamPasskind {
 };
 
 struct irValueParam {
-	irParamPasskind kind;
-	irProcedure *   parent;
-	Entity *        entity;
-	Type *          type;
-	Type *          original_type;
-	Array<irValue *>    referrers;
+	irParamPasskind  kind;
+	irProcedure *    parent;
+	Entity *         entity;
+	Type *           type;
+	Type *           original_type;
+	Array<irValue *> referrers;
 };
 
 struct irValue {

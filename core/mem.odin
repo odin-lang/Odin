@@ -1,9 +1,9 @@
 import "core:raw.odin"
 
 foreign __llvm_core {
-	@(link_name = "llvm.bswap.i16") swap :: proc(b: u16) -> u16  ---;
-	@(link_name = "llvm.bswap.i32") swap :: proc(b: u32) -> u32  ---;
-	@(link_name = "llvm.bswap.i64") swap :: proc(b: u64) -> u64  ---;
+	@(link_name = "llvm.bswap.i16") swap :: proc(b: u16) -> u16 ---;
+	@(link_name = "llvm.bswap.i32") swap :: proc(b: u32) -> u32 ---;
+	@(link_name = "llvm.bswap.i64") swap :: proc(b: u64) -> u64 ---;
 }
 
 set :: proc "contextless" (data: rawptr, value: i32, len: int) -> rawptr {

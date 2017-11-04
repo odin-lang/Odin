@@ -1,7 +1,7 @@
 when ODIN_OS == "windows" {
 	foreign import "system:opengl32.lib"
+	using import "core:sys/windows.odin"
 }
-using import "core:sys/windows.odin"
 
 
 CONTEXT_MAJOR_VERSION_ARB             :: 0x2091;

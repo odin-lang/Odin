@@ -27,6 +27,7 @@ Mat4 :: [4][4]f32;
 
 Complex :: complex64;
 
+@(default_calling_convention="c")
 foreign __llvm_core {
 	@(link_name="llvm.sqrt.f32")
 	sqrt :: proc(x: f32) -> f32 ---;
@@ -54,8 +55,8 @@ foreign __llvm_core {
 	fmuladd :: proc(a, b, c: f64) -> f64 ---;
 }
 
-tan    :: proc(θ: f32) -> f32 do return sin(θ)/cos(θ);
-tan    :: proc(θ: f64) -> f64 do return sin(θ)/cos(θ);
+tan :: proc "c" (θ: f32) -> f32 do return sin(θ)/cos(θ);
+tan :: proc "c" (θ: f64) -> f64 do return sin(θ)/cos(θ);
 
 lerp   :: proc(a, b: $T, t: $E) -> (x: T) do return a*(1-t) + b*t;
 
