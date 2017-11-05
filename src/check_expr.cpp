@@ -569,6 +569,15 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		}
 	}
 
+#if defined(ALLOW_ARRAY_PROGRAMMING)
+	if (is_type_array(dst)) {
+		Type *elem = base_array_type(dst);
+		i64 distance = check_distance_between_types(c, operand, elem);
+		if (distance >= 0) {
+			return distance + 6;
+		}
+	}
+#endif
 
 	if (is_type_any(dst)) {
 		if (!is_type_polymorphic(src)) {
@@ -1879,8 +1888,15 @@ bool check_transmute(Checker *c, AstNode *node, Operand *o, Type *t) {
 	return true;
 }
 
-bool check_binary_vector_expr(Checker *c, Token op, Operand *x, Operand *y) {
+bool check_binary_array_vector_expr(Checker *c, Token op, Operand *x, Operand *y) {
 	if (is_type_vector(x->type) && !is_type_vector(y->type)) {
+		if (check_is_assignable_to(c, y, x->type)) {
+			if (check_binary_op(c, x, op)) {
+				return true;
+			}
+		}
+	}
+	if (is_type_array(x->type) && !is_type_array(y->type)) {
 		if (check_is_assignable_to(c, y, x->type)) {
 			if (check_binary_op(c, x, op)) {
 				return true;
@@ -1954,7 +1970,6 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		}
 	}
 
-
 	convert_to_typed(c, x, y->type, 0);
 	if (x->mode == Addressing_Invalid) {
 		return;
@@ -1965,18 +1980,19 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		return;
 	}
 
+
+
 	if (token_is_comparison(op.kind)) {
 		check_comparison(c, x, y, op.kind);
 		return;
 	}
 
-
-	if (check_binary_vector_expr(c, op, x, y)) {
+	if (check_binary_array_vector_expr(c, op, x, y)) {
 		x->mode = Addressing_Value;
 		x->type = x->type;
 		return;
 	}
-	if (check_binary_vector_expr(c, op, y, x)) {
+	if (check_binary_array_vector_expr(c, op, y, x)) {
 		x->mode = Addressing_Value;
 		x->type = y->type;
 		return;
@@ -2263,6 +2279,21 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 
 		break;
 	}
+
+#if defined(ALLOW_ARRAY_PROGRAMMING)
+	case Type_Array: {
+		Type *elem = base_array_type(t);
+		if (check_is_assignable_to(c, operand, elem)) {
+			operand->mode = Addressing_Value;
+		} else {
+			operand->mode = Addressing_Invalid;
+			convert_untyped_error(c, operand, target_type);
+			return;
+		}
+
+		break;
+	}
+#endif
 
 	case Type_Union:
 		if (!is_operand_nil(*operand) && !is_operand_undef(*operand)) {
@@ -3352,20 +3383,32 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		break;
 
 	case BuiltinProc_swizzle: {
-		// proc swizzle(v: {N}T, T..) -> {M}T
-		Type *vector_type = base_type(operand->type);
-		if (!is_type_vector(vector_type)) {
+		// proc swizzle(v: [N]T, ...int) -> [M]T
+		// proc swizzle(v: [vector N]T, ...int) -> [vector M]T
+		Type *type = base_type(operand->type);
+		if (!is_type_vector(type) && !is_type_array(type)) {
 			gbString type_str = type_to_string(operand->type);
 			error(call,
-			      "You can only `swizzle` a vector, got `%s`",
+			      "You can only `swizzle` a vector or array, got `%s`",
 			      type_str);
 			gb_string_free(type_str);
 			return false;
 		}
 
-		isize max_count = vector_type->Vector.count;
+		Type *elem_type = nullptr;
+		i64 max_count = 0;
+		if (is_type_vector(type)) {
+			max_count = type->Vector.count;
+			elem_type = type->Vector.elem;
+		}
+	#if defined(ALLOW_ARRAY_PROGRAMMING)
+		else if (is_type_array(type)) {
+			max_count = type->Array.count;
+			elem_type = type->Array.elem;
+		}
+	#endif
 		i128 max_count128 = i128_from_i64(max_count);
-		isize arg_count = 0;
+		i64 arg_count = 0;
 		for_array(i, ce->args) {
 			if (i == 0) {
 				continue;
@@ -3382,13 +3425,13 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 				return false;
 			}
 
-			if (i128_lt(op.value.value_integer, I128_ZERO)) {
+			if (op.value.value_integer < I128_ZERO) {
 				error(op.expr, "Negative `swizzle` index");
 				return false;
 			}
 
-			if (i128_le(max_count128, op.value.value_integer)) {
-				error(op.expr, "`swizzle` index exceeds vector length");
+			if (max_count128 <= op.value.value_integer) {
+				error(op.expr, "`swizzle` index exceeds length");
 				return false;
 			}
 
@@ -3400,8 +3443,14 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 
-		Type *elem_type = vector_type->Vector.elem;
-		operand->type = make_type_vector(c->allocator, elem_type, arg_count);
+		if (is_type_vector(type)) {
+			operand->type = make_type_vector(c->allocator, elem_type, arg_count);
+		}
+	#if defined(ALLOW_ARRAY_PROGRAMMING)
+		else if (is_type_array(type)) {
+			operand->type = make_type_array(c->allocator, elem_type, arg_count);
+		}
+	#endif
 		operand->mode = Addressing_Value;
 
 		break;

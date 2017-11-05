@@ -2086,6 +2086,27 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 		return ir_emit_load(proc, res);
 
 	}
+#if defined(ALLOW_ARRAY_PROGRAMMING)
+	if (is_type_array(ir_type(x))) {
+		ir_emit_comment(proc, str_lit("array.arith.begin"));
+		// IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
+		Type *tl = base_type(ir_type(x));
+		irValue *val = ir_address_from_load_or_generate_local(proc, x);
+		GB_ASSERT(is_type_array(type));
+		Type *elem_type = base_type(type)->Array.elem;
+
+		irValue *res = ir_add_local_generated(proc, type);
+		for (i32 i = 0; i < tl->Array.count; i++) {
+			irValue *e = ir_emit_load(proc, ir_emit_array_epi(proc, val, i));
+			irValue *z = ir_emit_unary_arith(proc, op, e, elem_type);
+			ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
+		}
+		ir_emit_comment(proc, str_lit("array.arith.end"));
+		return ir_emit_load(proc, res);
+
+	}
+#endif
+
 	return ir_emit(proc, ir_instr_unary_op(proc, op, x, type));
 }
 
@@ -2116,6 +2137,30 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 		ir_emit_comment(proc, str_lit("vector.arith.end"));
 		return ir_emit_load(proc, res);
 	}
+
+#if defined(ALLOW_ARRAY_PROGRAMMING)
+	if (is_type_array(t_left) || is_type_array(t_right)) {
+		ir_emit_comment(proc, str_lit("array.arith.begin"));
+		// IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
+		left  = ir_emit_conv(proc, left, type);
+		right = ir_emit_conv(proc, right, type);
+		irValue *lhs = ir_address_from_load_or_generate_local(proc, left);
+		irValue *rhs = ir_address_from_load_or_generate_local(proc, right);
+		GB_ASSERT(is_type_array(type));
+		Type *elem_type = base_type(type)->Array.elem;
+
+		irValue *res = ir_add_local_generated(proc, type);
+		i64 count = base_type(type)->Array.count;
+		for (i32 i = 0; i < count; i++) {
+			irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
+			irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
+			irValue *z = ir_emit_arith(proc, op, x, y, elem_type);
+			ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
+		}
+		ir_emit_comment(proc, str_lit("array.arith.end"));
+		return ir_emit_load(proc, res);
+	}
+#endif
 
 	if (is_type_complex(t_left)) {
 		ir_emit_comment(proc, str_lit("complex.arith.begin"));
@@ -2282,7 +2327,6 @@ irValue *ir_emit_union_tag_value(irProcedure *proc, irValue *u) {
 	return ir_emit(proc, ir_instr_union_tag_value(proc, u));
 }
 
-irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irValue *right);
 
 irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue *x) {
 	Type *t = ir_type(x);
@@ -2386,7 +2430,7 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 		irValue *rhs = ir_address_from_load_or_generate_local(proc, right);
 
 		GB_ASSERT(is_type_vector(result));
-		Type *elem_type = base_type(result)->Vector.elem;
+		Type *elem_type = base_vector_type(result);
 
 		irValue *res = ir_add_local_generated(proc, result);
 		for (i32 i = 0; i < tl->Vector.count; i++) {
@@ -2399,6 +2443,36 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 		ir_emit_comment(proc, str_lit("vector.comp.end"));
 		return ir_emit_load(proc, res);
 	}
+
+#if defined(ALLOW_ARRAY_PROGRAMMING)
+	if (is_type_array(a)) {
+		ir_emit_comment(proc, str_lit("array.comp.begin"));
+		defer (ir_emit_comment(proc, str_lit("array.comp.end")));
+
+		Type *tl = base_type(a);
+		irValue *lhs = ir_address_from_load_or_generate_local(proc, left);
+		irValue *rhs = ir_address_from_load_or_generate_local(proc, right);
+
+
+		TokenKind cmp_op = Token_And;
+		irValue *res = v_true;
+		if (op_kind == Token_NotEq) {
+			res = v_false;
+			cmp_op = Token_Or;
+		}
+
+		// IMPORTANT TODO(bill): Make this much more efficient
+		for (i32 i = 0; i < tl->Array.count; i++) {
+			irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
+			irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
+			irValue *cmp = ir_emit_comp(proc, op_kind, x, y);
+			res = ir_emit_arith(proc, cmp_op, res, cmp, result);
+		}
+
+		return ir_emit_conv(proc, res, result);
+	}
+
+#endif
 
 
 	return ir_emit(proc, ir_instr_binary_op(proc, op_kind, left, right, result));
@@ -3153,6 +3227,21 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return ir_emit_load(proc, v);
 	}
 
+#if defined(ALLOW_ARRAY_PROGRAMMING)
+	if (is_type_array(dst)) {
+		Type *dst_elem = dst->Array.elem;
+		value = ir_emit_conv(proc, value, dst_elem);
+		irValue *v = ir_add_local_generated(proc, t);
+		isize index_count = dst->Array.count;
+
+		for (i32 i = 0; i < index_count; i++) {
+			irValue *elem = ir_emit_array_epi(proc, v, i);
+			ir_emit_store(proc, elem, value);
+		}
+		return ir_emit_load(proc, v);
+	}
+#endif
+
 	if (is_type_any(dst)) {
 		irValue *result = ir_add_local_generated(proc, t_any);
 
@@ -3162,17 +3251,8 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 		Type *st = default_type(src_type);
 
-		irValue *data = nullptr;
-		if (value->kind == irValue_Instr &&
-		    value->Instr.kind == irInstr_Load) {
-			// NOTE(bill): Addreirble value
-			data = value->Instr.Load.address;
-		} else {
-			// NOTE(bill): Non-addreirble value
-			data = ir_add_local_generated(proc, st);
-			ir_emit_store(proc, data, value);
-		}
-		GB_ASSERT(is_type_pointer(ir_type(data)));
+		irValue *data = ir_address_from_load_or_generate_local(proc, value);
+		GB_ASSERT_MSG(is_type_pointer(ir_type(data)), type_to_string(ir_type(data)));
 		GB_ASSERT_MSG(is_type_typed(st), "%s", type_to_string(st));
 		data = ir_emit_conv(proc, data, t_rawptr);
 
@@ -3427,42 +3507,18 @@ irValue *ir_type_info(irProcedure *proc, Type *type) {
 	return ir_emit_array_ep(proc, ir_global_type_info_data, ir_const_i32(proc->module->allocator, entry_index));
 }
 
-
-
-irValue *ir_emit_logical_binary_expr(irProcedure *proc, AstNode *expr) {
-	ast_node(be, BinaryExpr, expr);
-#if 0
-	irBlock *true_   = ir_new_block(proc, nullptr, "logical.cmp.true");
-	irBlock *false_  = ir_new_block(proc, nullptr, "logical.cmp.false");
-	irBlock *done  = ir_new_block(proc, nullptr, "logical.cmp.done");
-
-	irValue *result = ir_add_local_generated(proc, t_bool);
-	ir_build_cond(proc, expr, true_, false_);
-
-	ir_start_block(proc, true_);
-	ir_emit_store(proc, result, v_true);
-	ir_emit_jump(proc, done);
-
-	ir_start_block(proc, false_);
-	ir_emit_store(proc, result, v_false);
-	ir_emit_jump(proc, done);
-
-	ir_start_block(proc, done);
-
-	return ir_emit_load(proc, result);
-#else
+irValue *ir_emit_logical_binary_expr(irProcedure *proc, TokenKind op, AstNode *left, AstNode *right, Type *type) {
 	irBlock *rhs  = ir_new_block(proc, nullptr, "logical.cmp.rhs");
 	irBlock *done = ir_new_block(proc, nullptr, "logical.cmp.done");
 
-	Type *type = type_of_expr(proc->module->info, expr);
 	type = default_type(type);
 
 	irValue *short_circuit = nullptr;
-	if (be->op.kind == Token_CmpAnd) {
-		ir_build_cond(proc, be->left, rhs, done);
+	if (op == Token_CmpAnd) {
+		ir_build_cond(proc, left, rhs, done);
 		short_circuit = v_false;
-	} else if (be->op.kind == Token_CmpOr) {
-		ir_build_cond(proc, be->left, done, rhs);
+	} else if (op == Token_CmpOr) {
+		ir_build_cond(proc, left, done, rhs);
 		short_circuit = v_true;
 	}
 
@@ -3473,7 +3529,7 @@ irValue *ir_emit_logical_binary_expr(irProcedure *proc, AstNode *expr) {
 
 	if (done->preds.count == 0) {
 		ir_start_block(proc, rhs);
-		return ir_build_expr(proc, be->right);
+		return ir_build_expr(proc, right);
 	}
 
 	Array<irValue *> edges = {};
@@ -3483,12 +3539,22 @@ irValue *ir_emit_logical_binary_expr(irProcedure *proc, AstNode *expr) {
 	}
 
 	ir_start_block(proc, rhs);
-	array_add(&edges, ir_build_expr(proc, be->right));
+	array_add(&edges, ir_build_expr(proc, right));
 	ir_emit_jump(proc, done);
 	ir_start_block(proc, done);
 
 	return ir_emit(proc, ir_instr_phi(proc, edges, type));
-#endif
+}
+
+irValue *ir_emit_logical_binary_expr(irProcedure *proc, AstNode *expr) {
+	ast_node(be, BinaryExpr, expr);
+	irBlock *rhs  = ir_new_block(proc, nullptr, "logical.cmp.rhs");
+	irBlock *done = ir_new_block(proc, nullptr, "logical.cmp.done");
+
+	Type *type = type_of_expr(proc->module->info, expr);
+	type = default_type(type);
+
+	return ir_emit_logical_binary_expr(proc, be->op.kind, be->left, be->right, type);
 }
 
 
@@ -4632,6 +4698,17 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			irValue *x = ir_add_module_constant(proc->module, elem, value);
 			return ir_emit_conv(proc, x, tv.type);
 		}
+
+#if defined(ALLOW_ARRAY_PROGRAMMING)
+		// NOTE(bill): Edge case
+		if (tv.value.kind != ExactValue_Compound &&
+		    is_type_array(tv.type)) {
+			Type *elem = base_array_type(tv.type);
+			ExactValue value = convert_exact_value_for_type(tv.value, elem);
+			irValue *x = ir_add_module_constant(proc->module, elem, value);
+			return ir_emit_conv(proc, x, tv.type);
+		}
+#endif
 
 		return ir_add_module_constant(proc->module, tv.type, tv.value);
 	}

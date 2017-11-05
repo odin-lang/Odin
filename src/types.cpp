@@ -662,6 +662,11 @@ bool is_type_numeric(Type *t) {
 	if (t->kind == Type_Vector) {
 		return is_type_numeric(t->Vector.elem);
 	}
+#if defined(ALLOW_ARRAY_PROGRAMMING)
+	if (t->kind == Type_Array) {
+		return is_type_numeric(t->Array.elem);
+	}
+#endif
 	return false;
 }
 bool is_type_string(Type *t) {
@@ -807,6 +812,13 @@ Type *base_vector_type(Type *t) {
 	if (is_type_vector(t)) {
 		t = base_type(t);
 		return t->Vector.elem;
+	}
+	return t;
+}
+Type *base_array_type(Type *t) {
+	if (is_type_array(t)) {
+		t = base_type(t);
+		return t->Array.elem;
 	}
 	return t;
 }
@@ -1067,7 +1079,7 @@ bool is_type_comparable(Type *t) {
 	case Type_Enum:
 		return is_type_comparable(core_type(t));
 	case Type_Array:
-		return false;
+		return is_type_comparable(t->Array.elem);
 	case Type_Vector:
 		return is_type_comparable(t->Vector.elem);
 	case Type_Proc:

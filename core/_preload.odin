@@ -331,8 +331,7 @@ append :: proc "contextless" (array: ^$T/[]$E, args: ...E) -> int {
 		s := cast(^raw.Slice)array;
 		data := cast(^E)s.data;
 		assert(data != nil);
-		sz :: size_of(E);
-		__mem_copy(data + s.len, &args[0], sz*arg_len);
+		__mem_copy(data + s.len, &args[0], size_of(E)*arg_len);
 		s.len += arg_len;
 	}
 	return len(array);
