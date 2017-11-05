@@ -781,7 +781,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				if hash do write_string(fi.buf, ",\n");
 			}
 
-			if hash do for in 0..fi.indent do write_byte(fi.buf, '\t');
+			if hash do for in 0..indent do write_byte(fi.buf, '\t');
 			write_byte(fi.buf, '}');
 
 		case:

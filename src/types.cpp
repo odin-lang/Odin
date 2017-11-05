@@ -1731,7 +1731,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 
 
 struct TypePath {
-	Array<Type *> path; // Entity_TypeName;
+	Array<Entity *> path; // Entity_TypeName;
 	bool failure;
 };
 
@@ -1748,38 +1748,37 @@ void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
 	GB_ASSERT(tp != nullptr);
 
 	GB_ASSERT(start_index < tp->path.count);
-	Type *t = tp->path[start_index];
-	GB_ASSERT(t != nullptr);
-
-	GB_ASSERT_MSG(is_type_named(t), "%s", type_to_string(t));
-	Entity *e = t->Named.type_name;
-	error(e->token, "Illegal declaration cycle of `%.*s`", LIT(t->Named.name));
+	Entity *e = tp->path[start_index];
+	GB_ASSERT(e != nullptr);
+	error(e->token, "Illegal declaration cycle of `%.*s`", LIT(e->token.string));
 	// NOTE(bill): Print cycle, if it's deep enough
 	for (isize j = start_index; j < tp->path.count; j++) {
-		Type *t = tp->path[j];
-		GB_ASSERT_MSG(is_type_named(t), "%s", type_to_string(t));
-		Entity *e = t->Named.type_name;
-		error(e->token, "\t%.*s refers to", LIT(t->Named.name));
+		Entity *e = tp->path[j];
+		error(e->token, "\t%.*s refers to", LIT(e->token.string));
 	}
 	// NOTE(bill): This will only print if the path count > 1
-	error(e->token, "\t%.*s", LIT(t->Named.name));
+	error(e->token, "\t%.*s", LIT(e->token.string));
 	tp->failure = true;
-	t->failure = true;
+	e->type->failure = true;
+	base_type(e->type)->failure = true;
 }
 
-TypePath *type_path_push(TypePath *tp, Type *t) {
+bool type_path_push(TypePath *tp, Type *t) {
 	GB_ASSERT(tp != nullptr);
+	if (t->kind != Type_Named) {
+		return false;
+	}
+	Entity *e = t->Named.type_name;
 
 	for (isize i = 0; i < tp->path.count; i++) {
-		if (tp->path[i] == t) {
+		Entity *p = tp->path[i];
+		if (p == e) {
 			type_path_print_illegal_cycle(tp, i);
 		}
 	}
 
-	if (!tp->failure && is_type_named(t)) {
-		array_add(&tp->path, t);
-	}
-	return tp;
+	array_add(&tp->path, e);
+	return true;
 }
 
 void type_path_pop(TypePath *tp) {
@@ -1830,6 +1829,7 @@ i64 type_align_of(gbAllocator allocator, Type *t) {
 
 
 i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
+	GB_ASSERT(path != nullptr);
 	if (t->failure) {
 		return FAILURE_ALIGNMENT;
 	}
@@ -1853,14 +1853,26 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 	case Type_Array: {
 		Type *elem = t->Array.elem;
-		type_path_push(path, elem);
+		bool pop = type_path_push(path, elem);
 		if (path->failure) {
 			return FAILURE_ALIGNMENT;
 		}
 		i64 align = type_align_of_internal(allocator, t->Array.elem, path);
-		type_path_pop(path);
+		if (pop) type_path_pop(path);
 		return align;
 	}
+	case Type_Vector: {
+		Type *elem = t->Vector.elem;
+		bool pop = type_path_push(path, elem);
+		if (path->failure) {
+			return FAILURE_ALIGNMENT;
+		}
+		i64 size = type_size_of_internal(allocator, t->Vector.elem, path);
+		if (pop) type_path_pop(path);
+		i64 count = gb_max(prev_pow2(t->Vector.count), 1);
+		i64 total = size * count;
+		return gb_clamp(total, 1, build_context.max_align);
+	} break;
 
 	case Type_DynamicArray:
 		// data, count, capacity, allocator
@@ -1869,18 +1881,6 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	case Type_Slice:
 		return build_context.word_size;
 
-	case Type_Vector: {
-		Type *elem = t->Vector.elem;
-		type_path_push(path, elem);
-		if (path->failure) {
-			return FAILURE_ALIGNMENT;
-		}
-		i64 size = type_size_of_internal(allocator, t->Vector.elem, path);
-		type_path_pop(path);
-		i64 count = gb_max(prev_pow2(t->Vector.count), 1);
-		i64 total = size * count;
-		return gb_clamp(total, 1, build_context.max_align);
-	} break;
 
 	case Type_Tuple: {
 		i64 max = 1;
@@ -1911,12 +1911,12 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		i64 max = union_tag_size(t);
 		for_array(i, t->Union.variants) {
 			Type *variant = t->Union.variants[i];
-			type_path_push(path, variant);
+			bool pop = type_path_push(path, variant);
 			if (path->failure) {
 				return FAILURE_ALIGNMENT;
 			}
 			i64 align = type_align_of_internal(allocator, variant, path);
-			type_path_pop(path);
+			if (pop) type_path_pop(path);
 			if (max < align) {
 				max = align;
 			}
@@ -1932,12 +1932,12 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			i64 max = 1;
 			for_array(i, t->Struct.fields) {
 				Type *field_type = t->Struct.fields[i]->type;
-				type_path_push(path, field_type);
+				bool pop = type_path_push(path, field_type);
 				if (path->failure) {
 					return FAILURE_ALIGNMENT;
 				}
 				i64 align = type_align_of_internal(allocator, field_type, path);
-				type_path_pop(path);
+				if (pop) type_path_pop(path);
 				if (max < align) {
 					max = align;
 				}
@@ -1948,10 +1948,10 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			// NOTE(bill): Check the fields to check for cyclic definitions
 			for_array(i, t->Struct.fields) {
 				Type *field_type = t->Struct.fields[i]->type;
-				type_path_push(path, field_type);
+				bool pop = type_path_push(path, field_type);
 				if (path->failure) return FAILURE_ALIGNMENT;
 				i64 align = type_align_of_internal(allocator, field_type, path);
-				type_path_pop(path);
+				if (pop) type_path_pop(path);
 				if (max < align) {
 					max = align;
 				}
@@ -2033,12 +2033,12 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 	switch (t->kind) {
 	case Type_Named: {
-		type_path_push(path, t);
+		bool pop = type_path_push(path, t);
 		if (path->failure) {
 			return FAILURE_ALIGNMENT;
 		}
 		i64 size = type_size_of_internal(allocator, t->Named.base, path);
-		type_path_pop(path);
+		if (pop) type_path_pop(path);
 		return size;
 	} break;
 
@@ -2080,12 +2080,12 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		if (count == 0) {
 			return 0;
 		}
-		type_path_push(path, t->Vector.elem);
+		bool pop = type_path_push(path, t->Vector.elem);
 		if (path->failure) {
 			return FAILURE_SIZE;
 		}
 		bit_size = 8*type_size_of_internal(allocator, t->Vector.elem, path);
-		type_path_pop(path);
+		if (pop) type_path_pop(path);
 		if (is_type_boolean(t->Vector.elem)) {
 			bit_size = 1; // NOTE(bill): LLVM can store booleans as 1 bit because a boolean _is_ an `i1`
 			              // Silly LLVM spec
