@@ -155,14 +155,13 @@ TokenPos token_pos(String file, isize line, isize column) {
 }
 
 i32 token_pos_cmp(TokenPos const &a, TokenPos const &b) {
-	if (a.line == b.line) {
-		if (a.column == b.column) {
-			isize min_len = gb_min(a.file.len, b.file.len);
-			return gb_memcompare(a.file.text, b.file.text, min_len);
-		}
+	if (a.line != b.line) {
+		return (a.line < b.line) ? -1 : +1;
+	}
+	if (a.column != b.column) {
 		return (a.column < b.column) ? -1 : +1;
 	}
-	return (a.line < b.line) ? -1 : +1;
+	return string_compare(a.file, b.file);
 }
 
 bool operator==(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) == 0; }

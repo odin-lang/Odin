@@ -5012,6 +5012,8 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 				Entity *e = pt->variables[i];
 				if (e->kind == Entity_TypeName) {
 					args[i] = ir_value_nil(proc->module->allocator, e->type);
+				} else if (e->kind == Entity_Constant) {
+					continue;
 				} else {
 					GB_ASSERT(e->kind == Entity_Variable);
 					if (args[i] == nullptr) {
@@ -5029,8 +5031,6 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			return ir_emit_call(proc, value, args, param_count);
 		}
 
-		isize arg_index = 0;
-
 		isize arg_count = 0;
 		for_array(i, ce->args) {
 			AstNode *a = ce->args[i];
@@ -5042,8 +5042,8 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			}
 		}
 
-
-		irValue **args = gb_alloc_array(proc->module->allocator, irValue *, gb_max(type->param_count, arg_count));
+		Array<irValue *> args = {};
+		array_init(&args, proc->module->allocator, gb_max(type->param_count, arg_count));
 		bool variadic = type->variadic;
 		bool vari_expand = ce->ellipsis.pos.line != 0;
 		bool is_c_vararg = type->c_vararg;
@@ -5052,7 +5052,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			AstNode *arg = ce->args[i];
 			TypeAndValue arg_tv = type_and_value_of_expr(proc->module->info, arg);
 			if (arg_tv.mode == Addressing_Type) {
-				args[arg_index++] = ir_value_nil(proc->module->allocator, arg_tv.type);
+				array_add(&args, ir_value_nil(proc->module->allocator, arg_tv.type));
 			} else {
 				irValue *a = ir_build_expr(proc, arg);
 				Type *at = ir_type(a);
@@ -5060,10 +5060,10 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					for_array(i, at->Tuple.variables) {
 						Entity *e = at->Tuple.variables[i];
 						irValue *v = ir_emit_struct_ev(proc, a, cast(i32)i);
-						args[arg_index++] = v;
+						array_add(&args, v);
 					}
 				} else {
-					args[arg_index++] = a;
+					array_add(&args, a);
 				}
 			}
 		}
@@ -5081,15 +5081,15 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			if (variadic) {
 				end--;
 			}
-			while (arg_index < end) {
-				Entity *e = pt->variables[arg_index];
+			while (args.count < end) {
+				Entity *e = pt->variables[args.count];
 				GB_ASSERT(e->kind == Entity_Variable);
 				if (e->Variable.default_value.kind != ExactValue_Invalid) {
-					args[arg_index++] = ir_value_constant(proc->module->allocator, e->type, e->Variable.default_value);
+					array_add(&args, ir_value_constant(proc->module->allocator, e->type, e->Variable.default_value));
 				} else if (e->Variable.default_is_location) {
-					args[arg_index++] = ir_emit_source_code_location(proc, procedure, pos);
+					array_add(&args, ir_emit_source_code_location(proc, procedure, pos));
 				} else {
-					args[arg_index++] = ir_value_nil(proc->module->allocator, e->type);
+					array_add(&args, ir_value_nil(proc->module->allocator, e->type));
 				}
 			}
 		}
@@ -5172,7 +5172,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			args[arg_count-1] = ir_emit_load(proc, slice);
 		}
 
-		return ir_emit_call(proc, value, args, final_count);
+		return ir_emit_call(proc, value, args.data, final_count);
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);

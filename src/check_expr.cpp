@@ -755,8 +755,6 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 	}
 }
 
-
-
 bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool compound, bool modify_type) {
 	Operand o = {Addressing_Value};
 	o.type = source;
@@ -792,20 +790,78 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 		}
 		return false;
 	case Type_Array:
-		if (source->kind == Type_Array &&
-		    poly->Array.count == source->Array.count) {
-			return is_polymorphic_type_assignable(c, poly->Array.elem, source->Array.elem, true, modify_type);
+		if (source->kind == Type_Array) {
+			if (poly->Array.generic_type && modify_type) {
+				Type *gt = poly->Array.generic_type;
+				GB_ASSERT(gt->kind == Type_Generic);
+				Entity *e = scope_lookup_entity(gt->Generic.scope, gt->Generic.name);
+				GB_ASSERT(e != nullptr);
+				if (e->kind == Entity_TypeName) {
+					poly->Array.generic_type = nullptr;
+					poly->Array.count = source->Array.count;
+
+					e->kind = Entity_Constant;
+					e->Constant.value = exact_value_i64(source->Array.count);
+					e->type = t_untyped_integer;
+				} else if (e->kind == Entity_Constant) {
+					poly->Array.generic_type = nullptr;
+					if (e->Constant.value.kind != ExactValue_Integer) {
+						return false;
+					}
+					i64 count = i128_to_i64(e->Constant.value.value_integer);
+					if (count != source->Array.count) {
+						return false;
+					}
+					poly->Array.count = source->Array.count;
+				} else {
+					return false;
+				}
+
+				return is_polymorphic_type_assignable(c, poly->Array.elem, source->Array.elem, true, modify_type);
+			}
+			if (poly->Array.count == source->Array.count) {
+				return is_polymorphic_type_assignable(c, poly->Array.elem, source->Array.elem, true, modify_type);
+			}
+		}
+		return false;
+	case Type_Vector:
+		if (source->kind == Type_Vector) {
+			if (poly->Vector.generic_type && modify_type) {
+				Type *gt = poly->Vector.generic_type;
+				GB_ASSERT(gt->kind == Type_Generic);
+				Entity *e = scope_lookup_entity(gt->Generic.scope, gt->Generic.name);
+				GB_ASSERT(e != nullptr);
+				if (e->kind == Entity_TypeName) {
+					poly->Vector.generic_type = nullptr;
+					poly->Vector.count = source->Vector.count;
+
+					e->kind = Entity_Constant;
+					e->Constant.value = exact_value_i64(source->Vector.count);
+					e->type = t_untyped_integer;
+				} else if (e->kind == Entity_Constant) {
+					poly->Vector.generic_type = nullptr;
+					if (e->Constant.value.kind != ExactValue_Integer) {
+						return false;
+					}
+					i64 count = i128_to_i64(e->Constant.value.value_integer);
+					if (count != source->Vector.count) {
+						return false;
+					}
+					poly->Vector.count = source->Vector.count;
+				} else {
+					return false;
+				}
+
+				return is_polymorphic_type_assignable(c, poly->Vector.elem, source->Vector.elem, true, modify_type);
+			}
+			if (poly->Vector.count == source->Vector.count) {
+				return is_polymorphic_type_assignable(c, poly->Vector.elem, source->Vector.elem, true, modify_type);
+			}
 		}
 		return false;
 	case Type_DynamicArray:
 		if (source->kind == Type_DynamicArray) {
 			return is_polymorphic_type_assignable(c, poly->DynamicArray.elem, source->DynamicArray.elem, true, modify_type);
-		}
-		return false;
-	case Type_Vector:
-		if (source->kind == Type_Vector &&
-		    poly->Vector.count == source->Vector.count) {
-			return is_polymorphic_type_assignable(c, poly->Vector.elem, source->Vector.elem, true, modify_type);
 		}
 		return false;
 	case Type_Slice:
@@ -4109,12 +4165,13 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				break;
 			}
 
-			GB_ASSERT(e->kind == Entity_Variable);
-			if (e->Variable.default_value.kind != ExactValue_Invalid ||
-			    e->Variable.default_is_nil ||
-			    e->Variable.default_is_location) {
-				param_count_excluding_defaults--;
-				continue;
+			if (e->kind == Entity_Variable) {
+				if (e->Variable.default_value.kind != ExactValue_Invalid ||
+				    e->Variable.default_is_nil ||
+				    e->Variable.default_is_location) {
+					param_count_excluding_defaults--;
+					continue;
+				}
 			}
 			break;
 		}
@@ -4374,6 +4431,8 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 				if (e->kind == Entity_TypeName) {
 					error(call, "Type parameter `%.*s` is missing in procedure call",
 					      LIT(e->token.string));
+				} else if (e->kind == Entity_Constant && e->Constant.value.kind != ExactValue_Invalid) {
+					// Ignore
 				} else {
 					gbString str = type_to_string(e->type);
 					error(call, "Parameter `%.*s` of type `%s` is missing in procedure call",
@@ -5339,7 +5398,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		if (cl->type != nullptr) {
 			type = nullptr;
 
-			// [..]Type
+			// [...]Type
 			if (cl->type->kind == AstNode_ArrayType && cl->type->ArrayType.count != nullptr) {
 				AstNode *count = cl->type->ArrayType.count;
 				if (count->kind == AstNode_UnaryExpr &&

@@ -98,11 +98,20 @@ struct TypeStruct {
 		i64    id;                                        \
 		String name;                                      \
 		Type * specialized;                               \
+		Scope *scope;                                     \
 	})                                                    \
 	TYPE_KIND(Pointer, struct { Type *elem; })            \
-	TYPE_KIND(Array,   struct { Type *elem; i64 count; }) \
+	TYPE_KIND(Array,   struct {                           \
+		Type *elem;                                       \
+		i64   count;                                      \
+		Type *generic_type;                               \
+	})                                                    \
 	TYPE_KIND(DynamicArray, struct { Type *elem; })       \
-	TYPE_KIND(Vector,  struct { Type *elem; i64 count; }) \
+	TYPE_KIND(Vector,  struct {                           \
+		Type *elem;                                       \
+		i64 count;                                        \
+		Type *generic_type;                               \
+	})                                                    \
 	TYPE_KIND(Slice,   struct { Type *elem; })            \
 	TYPE_KIND(Struct,  TypeStruct)                        \
 	TYPE_KIND(Enum, struct {                              \
@@ -466,11 +475,12 @@ Type *make_type_basic(gbAllocator a, BasicType basic) {
 	return t;
 }
 
-Type *make_type_generic(gbAllocator a, i64 id, String name, Type *specialized) {
+Type *make_type_generic(gbAllocator a, Scope *scope, i64 id, String name, Type *specialized) {
 	Type *t = alloc_type(a, Type_Generic);
 	t->Generic.id = id;
 	t->Generic.name = name;
 	t->Generic.specialized = specialized;
+	t->Generic.scope = scope;
 	return t;
 }
 
@@ -480,10 +490,11 @@ Type *make_type_pointer(gbAllocator a, Type *elem) {
 	return t;
 }
 
-Type *make_type_array(gbAllocator a, Type *elem, i64 count) {
+Type *make_type_array(gbAllocator a, Type *elem, i64 count, Type *generic_type = nullptr) {
 	Type *t = alloc_type(a, Type_Array);
 	t->Array.elem = elem;
 	t->Array.count = count;
+	t->Array.generic_type = generic_type;
 	return t;
 }
 
@@ -493,10 +504,11 @@ Type *make_type_dynamic_array(gbAllocator a, Type *elem) {
 	return t;
 }
 
-Type *make_type_vector(gbAllocator a, Type *elem, i64 count) {
+Type *make_type_vector(gbAllocator a, Type *elem, i64 count, Type *generic_type = nullptr) {
 	Type *t = alloc_type(a, Type_Vector);
 	t->Vector.elem = elem;
 	t->Vector.count = count;
+	t->Vector.generic_type = generic_type;
 	return t;
 }
 
@@ -951,11 +963,14 @@ bool is_type_polymorphic(Type *t) {
 	case Type_Pointer:
 		return is_type_polymorphic(t->Pointer.elem);
 	case Type_Array:
+		if (t->Array.generic_type != nullptr) {
+			return true;
+		}
 		return is_type_polymorphic(t->Array.elem);
-	case Type_DynamicArray:
-		return is_type_polymorphic(t->DynamicArray.elem);
 	case Type_Vector:
 		return is_type_polymorphic(t->Vector.elem);
+	case Type_DynamicArray:
+		return is_type_polymorphic(t->DynamicArray.elem);
 	case Type_Slice:
 		return is_type_polymorphic(t->Slice.elem);
 
@@ -2415,12 +2430,19 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_Tuple:
 		if (type->Tuple.variables.count > 0) {
+			isize comma_index = 0;
 			for_array(i, type->Tuple.variables) {
 				Entity *var = type->Tuple.variables[i];
 				if (var != nullptr) {
-					if (i > 0) {
+					if (var->kind == Entity_Constant) {
+						// Ignore
+						continue;
+					}
+
+					if (comma_index++ > 0) {
 						str = gb_string_appendc(str, ", ");
 					}
+
 					if (var->kind == Entity_Variable) {
 						if (var->flags&EntityFlag_CVarArg) {
 							str = gb_string_appendc(str, "#c_vararg ");

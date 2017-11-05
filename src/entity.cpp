@@ -43,6 +43,7 @@ enum EntityFlag {
 	EntityFlag_Value         = 1<<9,
 	EntityFlag_Sret          = 1<<10,
 	EntityFlag_BitFieldValue = 1<<11,
+	EntityFlag_PolyConst     = 1<<12,
 
 	EntityFlag_CVarArg       = 1<<20,
 };
@@ -206,6 +207,16 @@ Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, 
 	entity->flags |= EntityFlag_Param;
 	return entity;
 }
+
+
+Entity *make_entity_const_param(gbAllocator a, Scope *scope, Token token, Type *type, ExactValue value, bool poly_const) {
+	Entity *entity = make_entity_constant(a, scope, token, type, value);
+	entity->flags |= EntityFlag_Used;
+	if (poly_const) entity->flags |= EntityFlag_PolyConst;
+	entity->flags |= EntityFlag_Param;
+	return entity;
+}
+
 
 Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, bool is_using, i32 field_src_index) {
 	Entity *entity = make_entity_variable(a, scope, token, type, false);

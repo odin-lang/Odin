@@ -686,7 +686,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 							specialization = nullptr;
 						}
 					}
-					type = make_type_generic(c->allocator, 0, str_lit(""), specialization);
+					type = make_type_generic(c->allocator, c->context.scope, 0, str_lit(""), specialization);
 				} else {
 					type = check_type(c, type_expr);
 					if (is_type_polymorphic(type)) {
@@ -1270,6 +1270,9 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		bool detemine_type_from_operand = false;
 		Type *specialization = nullptr;
 
+		bool is_using = (p->flags&FieldFlag_using) != 0;
+		bool is_constant_value = (p->flags&FieldFlag_const) != 0;
+
 
 		if (type_expr == nullptr) {
 			if (default_value->kind == AstNode_BasicDirective &&
@@ -1338,7 +1341,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					detemine_type_from_operand = true;
 					type = t_invalid;
 				} else {
-					type = make_type_generic(c->allocator, 0, str_lit(""), specialization);
+					type = make_type_generic(c->allocator, c->context.scope, 0, str_lit(""), specialization);
 				}
 			} else {
 				bool prev = c->context.allow_polymorphic_types;
@@ -1357,6 +1360,8 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			if (default_value != nullptr) {
 				if (type_expr->kind == AstNode_TypeType) {
 					error(default_value, "A type parameter may not have a default value");
+				} else if (is_constant_value) {
+					error(default_value, "A constant parameter may not have a default value");
 				} else {
 					Operand o = {};
 					if (default_value->kind == AstNode_BasicDirective &&
@@ -1431,6 +1436,16 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			}
 		}
 
+		if (is_constant_value) {
+			if (is_type_param) {
+				error(p->type, "`$` is not needed for a `type` parameter");
+			}
+			if (p->flags&FieldFlag_no_alias) {
+				error(p->type, "`#no_alias` can only be applied to variable fields of pointer type");
+				p->flags &= ~FieldFlag_no_alias; // Remove the flag
+			}
+
+		}
 
 		for_array(j, p->names) {
 			AstNode *name = p->names[j];
@@ -1475,16 +1490,16 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				param = make_entity_type_name(c->allocator, scope, name->Ident.token, type);
 				param->TypeName.is_type_alias = true;
 			} else {
-				if (operands != nullptr && is_type_polymorphic_type &&
-				    operands->count > variables.count) {
-					Operand op = (*operands)[variables.count];
-					type = determine_type_from_polymorphic(c, type, op);
-					if (type == t_invalid) {
-						success = false;
-					} else if (!c->context.no_polymorphic_errors) {
-						// NOTE(bill): The type should be determined now and thus, no need to determine the type any more
-						is_type_polymorphic_type = false;
-						// is_type_polymorphic_type = is_type_polymorphic(base_type(type));
+				if (operands != nullptr && variables.count < operands->count) {
+					if (is_type_polymorphic_type) {
+						Operand op = (*operands)[variables.count];
+						type = determine_type_from_polymorphic(c, type, op);
+						if (type == t_invalid) {
+							success = false;
+						} else if (!c->context.no_polymorphic_errors) {
+							// NOTE(bill): The type should be determined now and thus, no need to determine the type any more
+							is_type_polymorphic_type = false;
+						}
 					}
 				}
 
@@ -1495,11 +1510,33 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					}
 				}
 
-				param = make_entity_param(c->allocator, scope, name->Ident.token, type,
-				                          (p->flags&FieldFlag_using) != 0, false);
-				param->Variable.default_value = value;
-				param->Variable.default_is_nil = default_is_nil;
-				param->Variable.default_is_location = default_is_location;
+				if (is_constant_value) {
+					if (!is_type_constant_type(type)) {
+						gbString str = type_to_string(type);
+						error(params[i], "Invalid constant type, %s", str);
+						gb_string_free(str);
+					}
+
+					bool poly_const = true;
+					if (operands != nullptr) {
+						poly_const = false;
+						if (variables.count < operands->count) {
+							Operand op = (*operands)[variables.count];
+							if (op.mode != Addressing_Constant) {
+								error(op.expr, "Expected a constant parameter value");
+							} else {
+								value = op.value;
+							}
+						}
+					}
+
+					param = make_entity_const_param(c->allocator, scope, name->Ident.token, type, value, poly_const);
+				} else {
+					param = make_entity_param(c->allocator, scope, name->Ident.token, type, is_using, false);
+					param->Variable.default_value = value;
+					param->Variable.default_is_nil = default_is_nil;
+					param->Variable.default_is_location = default_is_location;
+				}
 
 			}
 			if (p->flags&FieldFlag_no_alias) {
@@ -1952,27 +1989,36 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 }
 
 
-i64 check_array_count(Checker *c, AstNode *e) {
+i64 check_array_count(Checker *c, Operand *o, AstNode *e) {
 	if (e == nullptr) {
 		return 0;
 	}
-	Operand o = {};
 	if (e->kind == AstNode_UnaryExpr &&
 	    e->UnaryExpr.op.kind == Token_Ellipsis) {
 		return -1;
 	}
 
-	check_expr(c, &o, e);
-	if (o.mode != Addressing_Constant) {
-		if (o.mode != Addressing_Invalid) {
+	check_expr_or_type(c, o, e);
+	if (o->mode == Addressing_Type && o->type->kind == Type_Generic) {
+		if (c->context.allow_polymorphic_types) {
+			if (o->type->Generic.specialized) {
+				o->type->Generic.specialized = nullptr;
+				error(o->expr, "Polymorphic array length cannot have a specialization");
+			}
+			return 0;
+		}
+	}
+	if (o->mode != Addressing_Constant) {
+		if (o->mode != Addressing_Invalid) {
+			o->mode = Addressing_Invalid;
 			error(e, "Array count must be a constant");
 		}
 		return 0;
 	}
-	Type *type = base_type(o.type);
+	Type *type = base_type(o->type);
 	if (is_type_untyped(type) || is_type_integer(type)) {
-		if (o.value.kind == ExactValue_Integer) {
-			i64 count = i128_to_i64(o.value.value_integer);
+		if (o->value.kind == ExactValue_Integer) {
+			i64 count = i128_to_i64(o->value.value_integer);
 			if (count >= 0) {
 				return count;
 			}
@@ -2162,7 +2208,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 				specific = nullptr;
 			}
 		}
-		Type *t = make_type_generic(c->allocator, 0, token.string, specific);
+		Type *t = make_type_generic(c->allocator, c->context.scope, 0, token.string, specific);
 		if (c->context.allow_polymorphic_types) {
 			Scope *ps = c->context.polymorphic_scope;
 			Scope *s = c->context.scope;
@@ -2176,7 +2222,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			add_entity(c, ps, ident, e);
 			add_entity(c, s, ident, e);
 		} else {
-			error(ident, "Invalid use of a polymorphic type `$%.*s`", LIT(token.string));
+			error(ident, "Invalid use of a polymorphic parameter `$%.*s`", LIT(token.string));
 			*type = t_invalid;
 			return false;
 		}
@@ -2233,13 +2279,18 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 
 	case_ast_node(at, ArrayType, e);
 		if (at->count != nullptr) {
-			Type *elem = check_type(c, at->elem, nullptr);
-			i64 count = check_array_count(c, at->count);
+			Operand o = {};
+			i64 count = check_array_count(c, &o, at->count);
+			Type *generic_type = nullptr;
+			if (o.mode == Addressing_Type && o.type->kind == Type_Generic) {
+				generic_type = o.type;
+			}
 			if (count < 0) {
 				error(at->count, "... can only be used in conjuction with compound literals");
 				count = 0;
 			}
-			*type = make_type_array(c->allocator, elem, count);
+			Type *elem = check_type(c, at->elem, nullptr);
+			*type = make_type_array(c->allocator, elem, count, generic_type);
 		} else {
 			Type *elem = check_type(c, at->elem);
 			*type = make_type_slice(c->allocator, elem);
@@ -2256,15 +2307,25 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 
 
 	case_ast_node(vt, VectorType, e);
+
+		Operand o = {};
+		i64 count = check_array_count(c, &o, vt->count);
+		Type *generic_type = nullptr;
+		if (o.mode == Addressing_Type && o.type->kind == Type_Generic) {
+			generic_type = o.type;
+		}
+		if (count < 0) {
+			count = 0;
+		}
+
 		Type *elem = check_type(c, vt->elem);
 		Type *be = base_type(elem);
-		i64 count = check_array_count(c, vt->count);
 		if (is_type_vector(be) || (!is_type_boolean(be) && !is_type_numeric(be) && be->kind != Type_Generic)) {
 			gbString err_str = type_to_string(elem);
 			error(vt->elem, "Vector element type must be numerical or a boolean, got `%s`", err_str);
 			gb_string_free(err_str);
 		}
-		*type = make_type_vector(c->allocator, elem, count);
+		*type = make_type_vector(c->allocator, elem, count, generic_type);
 		return true;
 	case_end;
 

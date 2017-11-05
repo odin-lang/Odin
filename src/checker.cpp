@@ -514,15 +514,15 @@ void    scope_lookup_parent_entity (Scope *s, String name, Scope **scope_, Entit
 Entity *scope_insert_entity        (Scope *s, Entity *entity);
 
 
-ExprInfo *check_get_expr_info(CheckerInfo *i, AstNode *expr);
-void check_set_expr_info(CheckerInfo *i, AstNode *expr, ExprInfo info);
-void check_remove_expr_info(CheckerInfo *i, AstNode *expr);
-void add_untyped(CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value);
-void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value);
-void add_entity_use(Checker *c, AstNode *identifier, Entity *entity);
-void add_implicit_entity(Checker *c, AstNode *node, Entity *e);
-void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d);
-void add_implicit_entity(Checker *c, AstNode *node, Entity *e);
+ExprInfo *check_get_expr_info     (CheckerInfo *i, AstNode *expr);
+void      check_set_expr_info     (CheckerInfo *i, AstNode *expr, ExprInfo info);
+void      check_remove_expr_info  (CheckerInfo *i, AstNode *expr);
+void      add_untyped             (CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value);
+void      add_type_and_value      (CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value);
+void      add_entity_use          (Checker *c, AstNode *identifier, Entity *entity);
+void      add_implicit_entity     (Checker *c, AstNode *node, Entity *e);
+void      add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d);
+void      add_implicit_entity     (Checker *c, AstNode *node, Entity *e);
 
 void check_add_import_decl(Checker *c, AstNodeImportDecl *id);
 void check_add_export_decl(Checker *c, AstNodeExportDecl *ed);

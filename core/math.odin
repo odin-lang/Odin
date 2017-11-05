@@ -16,9 +16,9 @@ EPSILON      :: 1.19209290e-7;
 τ :: TAU;
 π :: PI;
 
-Vec2 :: [vector 2]f32;
-Vec3 :: [vector 3]f32;
-Vec4 :: [vector 4]f32;
+Vec2 :: [2]f32;
+Vec3 :: [3]f32;
+Vec4 :: [4]f32;
 
 // Column major
 Mat2 :: [2][2]f32;
@@ -122,38 +122,38 @@ to_degrees :: proc(radians: f32) -> f32 do return radians * 360 / TAU;
 
 
 
-dot :: proc(a, b: $T/[vector 2]$E) -> E { c := a*b; return c.x + c.y; }
-dot :: proc(a, b: $T/[vector 3]$E) -> E { c := a*b; return c.x + c.y + c.z; }
-dot :: proc(a, b: $T/[vector 4]$E) -> E { c := a*b; return c.x + c.y + c.z + c.w; }
+dot :: proc(a, b: $T/[2]$E) -> E { c := a*b; return c[0] + c[1]; }
+dot :: proc(a, b: $T/[3]$E) -> E { c := a*b; return c[0] + c[1] + c[2]; }
+dot :: proc(a, b: $T/[4]$E) -> E { c := a*b; return c[0] + c[1] + c[2] + c[3]; }
 
-cross :: proc(x, y: $T/[vector 3]$E) -> T {
+cross :: proc(x, y: $T/[3]$E) -> T {
 	a := swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
 	b := swizzle(x, 2, 0, 1) * swizzle(y, 1, 2, 0);
 	return T(a - b);
 }
 
 
-mag :: proc(v: $T/[vector 2]$E) -> E do return sqrt(dot(v, v));
-mag :: proc(v: $T/[vector 3]$E) -> E do return sqrt(dot(v, v));
-mag :: proc(v: $T/[vector 4]$E) -> E do return sqrt(dot(v, v));
+mag :: proc(v: $T/[2]$E) -> E do return sqrt(dot(v, v));
+mag :: proc(v: $T/[3]$E) -> E do return sqrt(dot(v, v));
+mag :: proc(v: $T/[4]$E) -> E do return sqrt(dot(v, v));
 
-norm :: proc(v: $T/[vector 2]$E) -> T do return v / mag(v);
-norm :: proc(v: $T/[vector 3]$E) -> T do return v / mag(v);
-norm :: proc(v: $T/[vector 4]$E) -> T do return v / mag(v);
+norm :: proc(v: $T/[2]$E) -> T do return v / mag(v);
+norm :: proc(v: $T/[3]$E) -> T do return v / mag(v);
+norm :: proc(v: $T/[4]$E) -> T do return v / mag(v);
 
-norm0 :: proc(v: $T/[vector 2]$E) -> T {
+norm0 :: proc(v: $T/[2]$E) -> T {
 	m := mag(v);
 	if m == 0 do return 0;
 	return v/m;
 }
 
-norm0 :: proc(v: $T/[vector 3]$E) -> T {
+norm0 :: proc(v: $T/[3]$E) -> T {
 	m := mag(v);
 	if m == 0 do return 0;
 	return v/m;
 }
 
-norm0 :: proc(v: $T/[vector 4]$E) -> T {
+norm0 :: proc(v: $T/[4]$E) -> T {
 	m := mag(v);
 	if m == 0 do return 0;
 	return v/m;
@@ -194,10 +194,10 @@ mul :: proc(a, b: Mat4) -> Mat4 {
 
 mul :: proc(m: Mat4, v: Vec4) -> Vec4 {
 	return Vec4{
-		m[0][0]*v.x + m[1][0]*v.y + m[2][0]*v.z + m[3][0]*v.w,
-		m[0][1]*v.x + m[1][1]*v.y + m[2][1]*v.z + m[3][1]*v.w,
-		m[0][2]*v.x + m[1][2]*v.y + m[2][2]*v.z + m[3][2]*v.w,
-		m[0][3]*v.x + m[1][3]*v.y + m[2][3]*v.z + m[3][3]*v.w,
+		m[0][0]*v[0] + m[1][0]*v[1] + m[2][0]*v[2] + m[3][0]*v[3],
+		m[0][1]*v[0] + m[1][1]*v[1] + m[2][1]*v[2] + m[3][1]*v[3],
+		m[0][2]*v[0] + m[1][2]*v[1] + m[2][2]*v[2] + m[3][2]*v[3],
+		m[0][3]*v[0] + m[1][3]*v[1] + m[2][3]*v[2] + m[3][3]*v[3],
 	};
 }
 
@@ -273,9 +273,9 @@ inverse :: proc(m: Mat4) -> Mat4 {
 
 mat4_translate :: proc(v: Vec3) -> Mat4 {
 	m := mat4_identity();
-	m[3][0] = v.x;
-	m[3][1] = v.y;
-	m[3][2] = v.z;
+	m[3][0] = v[0];
+	m[3][1] = v[1];
+	m[3][2] = v[2];
 	m[3][3] = 1;
 	return m;
 }
@@ -289,28 +289,28 @@ mat4_rotate :: proc(v: Vec3, angle_radians: f32) -> Mat4 {
 
 	rot := mat4_identity();
 
-	rot[0][0] = c + t.x*a.x;
-	rot[0][1] = 0 + t.x*a.y + s*a.z;
-	rot[0][2] = 0 + t.x*a.z - s*a.y;
+	rot[0][0] = c + t[0]*a[0];
+	rot[0][1] = 0 + t[0]*a[1] + s*a[2];
+	rot[0][2] = 0 + t[0]*a[2] - s*a[1];
 	rot[0][3] = 0;
 
-	rot[1][0] = 0 + t.y*a.x - s*a.z;
-	rot[1][1] = c + t.y*a.y;
-	rot[1][2] = 0 + t.y*a.z + s*a.x;
+	rot[1][0] = 0 + t[1]*a[0] - s*a[2];
+	rot[1][1] = c + t[1]*a[1];
+	rot[1][2] = 0 + t[1]*a[2] + s*a[0];
 	rot[1][3] = 0;
 
-	rot[2][0] = 0 + t.z*a.x + s*a.y;
-	rot[2][1] = 0 + t.z*a.y - s*a.x;
-	rot[2][2] = c + t.z*a.z;
+	rot[2][0] = 0 + t[2]*a[0] + s*a[1];
+	rot[2][1] = 0 + t[2]*a[1] - s*a[0];
+	rot[2][2] = c + t[2]*a[2];
 	rot[2][3] = 0;
 
 	return rot;
 }
 
 scale :: proc(m: Mat4, v: Vec3) -> Mat4 {
-	m[0][0] *= v.x;
-	m[1][1] *= v.y;
-	m[2][2] *= v.z;
+	m[0][0] *= v[0];
+	m[1][1] *= v[1];
+	m[2][2] *= v[2];
 	return m;
 }
 
@@ -328,9 +328,9 @@ look_at :: proc(eye, centre, up: Vec3) -> Mat4 {
 	u := cross(s, f);
 
 	return Mat4{
-		{+s.x, +u.x, -f.x, 0},
-		{+s.y, +u.y, -f.y, 0},
-		{+s.z, +u.z, -f.z, 0},
+		{+s[0], +u[0], -f[0], 0},
+		{+s[1], +u[1], -f[1], 0},
+		{+s[2], +u[2], -f[2], 0},
 		{-dot(s, eye), -dot(u, eye), dot(f, eye), 1},
 	};
 }
