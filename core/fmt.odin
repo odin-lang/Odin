@@ -497,7 +497,7 @@ _fmt_int :: proc(fi: ^Fmt_Info, u: u128, base: int, is_signed: bool, bit_size: i
 		switch base {
 		case 2:  c = 'b';
 		case 8:  c = 'o';
-		case 10: c = 'd';
+		// case 10: c = 'd';
 		case 12: c = 'z';
 		case 16: c = 'x';
 		}
@@ -755,7 +755,6 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			}
 			write_string(fi.buf, info.name);
 			write_byte(fi.buf, '{');
-			defer write_byte(fi.buf, '}');
 
 			hash   := fi.hash;   defer fi.hash = hash;
 			indent := fi.indent; defer fi.indent -= 1;
@@ -767,11 +766,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 			for _, i in b.names {
 				if !hash && i > 0 do write_string(fi.buf, ", ");
-				if hash {
-					for in 0..fi.indent {
-						write_byte(fi.buf, '\t');
-					}
-				}
+				if hash do for in 0..fi.indent do write_byte(fi.buf, '\t');
 
 				write_string(fi.buf, b.names[i]);
 				write_string(fi.buf, " = ");
@@ -785,6 +780,9 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 				if hash do write_string(fi.buf, ",\n");
 			}
+
+			if hash do for in 0..fi.indent do write_byte(fi.buf, '\t');
+			write_byte(fi.buf, '}');
 
 		case:
 			fmt_value(fi, any{v.data, info.base}, verb);

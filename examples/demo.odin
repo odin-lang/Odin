@@ -559,7 +559,7 @@ threading_example :: proc() {
 }
 
 main :: proc() {
-	when false {
+	when true {
 		fmt.println("\n# general_stuff");              general_stuff();
 		fmt.println("\n# default_struct_values");      default_struct_values();
 		fmt.println("\n# union_type");                 union_type();
