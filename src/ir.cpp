@@ -3230,11 +3230,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 #if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (is_type_array(dst)) {
 		Type *elem = dst->Array.elem;
-		bool is_ta = is_type_array(elem);
-
-		gb_printf("%s\n", type_to_string(ir_type(value)));
 		irValue *e = ir_emit_conv(proc, value, elem);
-		gb_printf("%s\n", type_to_string(elem));
 		irValue *v = ir_add_local_generated(proc, t);
 		isize index_count = dst->Array.count;
 
