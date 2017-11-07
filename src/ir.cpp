@@ -2074,7 +2074,7 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 		Type *tl = base_type(ir_type(x));
 		irValue *val = ir_address_from_load_or_generate_local(proc, x);
 		GB_ASSERT(is_type_vector(type));
-		Type *elem_type = base_type(type)->Vector.elem;
+		Type *elem_type = base_vector_type(type);
 
 		irValue *res = ir_add_local_generated(proc, type);
 		for (i32 i = 0; i < tl->Vector.count; i++) {
@@ -2093,7 +2093,7 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 		Type *tl = base_type(ir_type(x));
 		irValue *val = ir_address_from_load_or_generate_local(proc, x);
 		GB_ASSERT(is_type_array(type));
-		Type *elem_type = base_type(type)->Array.elem;
+		Type *elem_type = base_array_type(type);
 
 		irValue *res = ir_add_local_generated(proc, type);
 		for (i32 i = 0; i < tl->Array.count; i++) {
@@ -2124,7 +2124,7 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 		irValue *lhs = ir_address_from_load_or_generate_local(proc, left);
 		irValue *rhs = ir_address_from_load_or_generate_local(proc, right);
 		GB_ASSERT(is_type_vector(type));
-		Type *elem_type = base_type(type)->Vector.elem;
+		Type *elem_type = base_vector_type(type);
 
 		irValue *res = ir_add_local_generated(proc, type);
 		i64 count = base_type(type)->Vector.count;
@@ -2147,7 +2147,7 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 		irValue *lhs = ir_address_from_load_or_generate_local(proc, left);
 		irValue *rhs = ir_address_from_load_or_generate_local(proc, right);
 		GB_ASSERT(is_type_array(type));
-		Type *elem_type = base_type(type)->Array.elem;
+		Type *elem_type = base_array_type(type);
 
 		irValue *res = ir_add_local_generated(proc, type);
 		i64 count = base_type(type)->Array.count;
@@ -3229,14 +3229,18 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 #if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (is_type_array(dst)) {
-		Type *dst_elem = dst->Array.elem;
-		value = ir_emit_conv(proc, value, dst_elem);
+		Type *elem = dst->Array.elem;
+		bool is_ta = is_type_array(elem);
+
+		gb_printf("%s\n", type_to_string(ir_type(value)));
+		irValue *e = ir_emit_conv(proc, value, elem);
+		gb_printf("%s\n", type_to_string(elem));
 		irValue *v = ir_add_local_generated(proc, t);
 		isize index_count = dst->Array.count;
 
 		for (i32 i = 0; i < index_count; i++) {
 			irValue *elem = ir_emit_array_epi(proc, v, i);
-			ir_emit_store(proc, elem, value);
+			ir_emit_store(proc, elem, e);
 		}
 		return ir_emit_load(proc, v);
 	}
@@ -4693,7 +4697,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		// NOTE(bill): Edge case
 		if (tv.value.kind != ExactValue_Compound &&
 		    is_type_vector(tv.type)) {
-			Type *elem = base_vector_type(tv.type);
+			Type *elem = core_array_or_vector_type(tv.type);
 			ExactValue value = convert_exact_value_for_type(tv.value, elem);
 			irValue *x = ir_add_module_constant(proc->module, elem, value);
 			return ir_emit_conv(proc, x, tv.type);
@@ -4703,7 +4707,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		// NOTE(bill): Edge case
 		if (tv.value.kind != ExactValue_Compound &&
 		    is_type_array(tv.type)) {
-			Type *elem = base_array_type(tv.type);
+			Type *elem = core_array_or_vector_type(tv.type);
 			ExactValue value = convert_exact_value_for_type(tv.value, elem);
 			irValue *x = ir_add_module_constant(proc->module, elem, value);
 			return ir_emit_conv(proc, x, tv.type);

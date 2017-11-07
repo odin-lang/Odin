@@ -835,6 +835,16 @@ Type *base_array_type(Type *t) {
 	return t;
 }
 
+Type *core_array_or_vector_type(Type *t) {
+	for (;;) {
+		Type *prev = t;
+		t = base_array_type(t);
+		t = base_vector_type(t);
+		if (prev == t) break;
+	}
+	return t;
+}
+
 Type *base_complex_elem_type(Type *t) {
 	t = core_type(t);
 	if (is_type_complex(t)) {

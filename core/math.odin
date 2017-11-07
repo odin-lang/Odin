@@ -122,9 +122,11 @@ to_degrees :: proc(radians: f32) -> f32 do return radians * 360 / TAU;
 
 
 
-dot :: proc(a, b: $T/[2]$E) -> E { c := a*b; return c[0] + c[1]; }
-dot :: proc(a, b: $T/[3]$E) -> E { c := a*b; return c[0] + c[1] + c[2]; }
-dot :: proc(a, b: $T/[4]$E) -> E { c := a*b; return c[0] + c[1] + c[2] + c[3]; }
+dot :: proc(a, b: $T/[$N]$E) -> E {
+	res: E;
+	for i in 0..N do res += a[i] * b[i];
+	return res;
+}
 
 cross :: proc(x, y: $T/[3]$E) -> T {
 	a := swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
@@ -133,27 +135,11 @@ cross :: proc(x, y: $T/[3]$E) -> T {
 }
 
 
-mag :: proc(v: $T/[2]$E) -> E do return sqrt(dot(v, v));
-mag :: proc(v: $T/[3]$E) -> E do return sqrt(dot(v, v));
-mag :: proc(v: $T/[4]$E) -> E do return sqrt(dot(v, v));
+mag :: proc(v: $T/[$N]$E) -> E do return sqrt(dot(v, v));
 
-norm :: proc(v: $T/[2]$E) -> T do return v / mag(v);
-norm :: proc(v: $T/[3]$E) -> T do return v / mag(v);
-norm :: proc(v: $T/[4]$E) -> T do return v / mag(v);
+norm :: proc(v: $T/[$N]$E) -> T do return v / mag(v);
 
-norm0 :: proc(v: $T/[2]$E) -> T {
-	m := mag(v);
-	if m == 0 do return 0;
-	return v/m;
-}
-
-norm0 :: proc(v: $T/[3]$E) -> T {
-	m := mag(v);
-	if m == 0 do return 0;
-	return v/m;
-}
-
-norm0 :: proc(v: $T/[4]$E) -> T {
+norm0 :: proc(v: $T/[$N]$E) -> T {
 	m := mag(v);
 	if m == 0 do return 0;
 	return v/m;
