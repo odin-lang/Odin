@@ -1830,7 +1830,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				String name = e->token.string;
 				Type *t = base_type(type_deref(e->type));
 
-				if (is_type_struct(t) || is_type_raw_union(t)) {
+				if (is_blank_ident(name)) {
+					error(token, "`using` cannot be applied variable declared as `_`");
+				} else if (is_type_struct(t) || is_type_raw_union(t)) {
 					Scope *scope = scope_of_node(&c->info, t->Struct.node);
 					for_array(i, scope->elements.entries) {
 						Entity *f = scope->elements.entries[i].value;
