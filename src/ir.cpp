@@ -1750,7 +1750,7 @@ irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 	if (is_type_integer(t)) {
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, key, hash_type));
 	} else if (is_type_pointer(t)) {
-		irValue *p = ir_emit_conv(proc, key, t_uint);
+		irValue *p = ir_emit_conv(proc, key, t_uintptr);
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, p, hash_type));
 	} else if (is_type_float(t)) {
 		irValue *bits = nullptr;
@@ -2980,8 +2980,8 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 				ev = exact_value_to_integer(ev);
 			} else if (is_type_pointer(dst)) {
 				// IMPORTANT NOTE(bill): LLVM doesn't support pointer constants expect `null`
-				irValue *i = ir_add_module_constant(proc->module, t_uint, ev);
-				return ir_emit(proc, ir_instr_conv(proc, irConv_inttoptr, i, t_uint, dst));
+				irValue *i = ir_add_module_constant(proc->module, t_uintptr, ev);
+				return ir_emit(proc, ir_instr_conv(proc, irConv_inttoptr, i, t_uintptr, dst));
 			}
 			return ir_add_module_constant(proc->module, t, ev);
 		}
