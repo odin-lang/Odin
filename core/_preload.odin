@@ -141,6 +141,15 @@ __argv__: ^^u8;
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 
+
+Source_Code_Location :: struct #ordered {
+	file_path:    string,
+	line, column: i64,
+	procedure:    string,
+}
+
+
+
 Allocator_Mode :: enum u8 {
 	Alloc,
 	Free,
@@ -151,7 +160,7 @@ Allocator_Mode :: enum u8 {
 
 Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
 	                         size, alignment: int,
-	                         old_memory: rawptr, old_size: int, flags: u64 = 0) -> rawptr;
+	                         old_memory: rawptr, old_size: int, flags: u64 = 0, location := #caller_location) -> rawptr;
 
 
 Allocator :: struct #ordered {
@@ -171,13 +180,6 @@ Context :: struct #ordered {
 }
 
 DEFAULT_ALIGNMENT :: align_of([vector 4]f32);
-
-Source_Code_Location :: struct #ordered {
-	file_path:    string,
-	line, column: i64,
-	procedure:    string,
-}
-
 
 __INITIAL_MAP_CAP :: 16;
 
@@ -576,7 +578,7 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 
 default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                size, alignment: int,
-                               old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
+                               old_memory: rawptr, old_size: int, flags: u64, location := #caller_location) -> rawptr {
 	using Allocator_Mode;
 
 	switch mode {

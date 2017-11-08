@@ -135,7 +135,7 @@ import "core:fmt.odin";
 
 arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
-                             old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
+                             old_memory: rawptr, old_size: int, flags: u64, location := #caller_location) -> rawptr {
 	using Allocator_Mode;
 	arena := cast(^Arena)allocator_data;
 
