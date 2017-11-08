@@ -5442,8 +5442,11 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			}
 			irValue *index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
 			irValue *elem = ir_emit_array_ep(proc, vector, index);
-			irValue *len = ir_const_int(a, t->Vector.count);
-			ir_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
+			auto index_tv = type_and_value_of_expr(proc->module->info, ie->index);
+			if (index_tv.mode != Addressing_Constant) {
+				irValue *len = ir_const_int(a, t->Vector.count);
+				ir_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
+			}
 			return ir_addr(elem);
 			break;
 		}
@@ -5460,8 +5463,12 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			}
 			irValue *index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
 			irValue *elem = ir_emit_array_ep(proc, array, index);
-			irValue *len = ir_const_int(a, t->Vector.count);
-			ir_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
+
+			auto index_tv = type_and_value_of_expr(proc->module->info, ie->index);
+			if (index_tv.mode != Addressing_Constant) {
+				irValue *len = ir_const_int(a, t->Vector.count);
+				ir_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
+			}
 			return ir_addr(elem);
 			break;
 		}
@@ -5477,8 +5484,8 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 				}
 			}
 			irValue *elem = ir_slice_elem(proc, slice);
-			irValue *len = ir_slice_count(proc, slice);
 			irValue *index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
+			irValue *len = ir_slice_count(proc, slice);
 			ir_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
 			irValue *v = ir_emit_ptr_offset(proc, elem, index);
 			return ir_addr(v);
@@ -5604,8 +5611,13 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			if (high == nullptr) high = ir_array_len(proc, base);
 			if (max == nullptr)  max  = ir_array_len(proc, base);
 
-			ir_emit_slice_bounds_check(proc, se->open, low, high, max, false);
+			bool low_const  = type_and_value_of_expr(proc->module->info, se->low).mode  == Addressing_Constant;
+			bool high_const = type_and_value_of_expr(proc->module->info, se->high).mode == Addressing_Constant;
+			bool max_const  = type_and_value_of_expr(proc->module->info, se->max).mode  == Addressing_Constant;
 
+			if (!low_const || !high_const || !max_const) {
+				ir_emit_slice_bounds_check(proc, se->open, low, high, max, false);
+			}
 			irValue *elem = ir_emit_ptr_offset(proc, ir_array_elem(proc, addr), low);
 			irValue *len  = ir_emit_arith(proc, Token_Sub, high, low, t_int);
 			irValue *cap  = ir_emit_arith(proc, Token_Sub, max, low, t_int);
