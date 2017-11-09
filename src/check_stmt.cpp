@@ -181,13 +181,13 @@ bool check_is_terminating(AstNode *node) {
 	return false;
 }
 
-Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
+Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 	if (rhs->mode == Addressing_Invalid ||
 	    (rhs->type == t_invalid && rhs->mode != Addressing_Overload)) {
 		return nullptr;
 	}
 
-	AstNode *node = unparen_expr(lhs_node);
+	AstNode *node = unparen_expr(lhs->expr);
 
 	// NOTE(bill): Ignore assignments to `_`
 	if (is_blank_ident(node)) {
@@ -201,12 +201,9 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 
 	Entity *e = nullptr;
 	bool used = false;
-	Operand lhs = {Addressing_Invalid};
 
-
-	check_expr(c, &lhs, lhs_node);
-	if (lhs.mode == Addressing_Invalid ||
-	    (lhs.type == t_invalid && lhs.mode != Addressing_Overload)) {
+	if (lhs->mode == Addressing_Invalid ||
+	    (lhs->type == t_invalid && lhs->mode != Addressing_Overload)) {
 		return nullptr;
 	}
 
@@ -224,7 +221,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 			Operand x = {};
 			x.mode = Addressing_Value;
 			x.type = t;
-			if (check_is_assignable_to(c, &x, lhs.type)) {
+			if (check_is_assignable_to(c, &x, lhs->type)) {
 				e = procs[i];
 				add_entity_use(c, rhs->expr, e);
 				break;
@@ -253,14 +250,14 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 		e->flags |= EntityFlag_Used;
 	}
 
-	Type *assignment_type = lhs.type;
-	switch (lhs.mode) {
+	Type *assignment_type = lhs->type;
+	switch (lhs->mode) {
 	case Addressing_Invalid:
 		return nullptr;
 
 	case Addressing_Variable: {
-		if (is_type_bit_field_value(lhs.type)) {
-			Type *lt = base_type(lhs.type);
+		if (is_type_bit_field_value(lhs->type)) {
+			Type *lt = base_type(lhs->type);
 			i64 lhs_bits = lt->BitFieldValue.bits;
 			if (rhs->mode == Addressing_Constant) {
 				ExactValue v = exact_value_to_integer(rhs->value);
@@ -284,7 +281,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 				// TODO(bill): Any other checks?
 				return rhs->type;
 			}
-			gbString lhs_expr = expr_to_string(lhs.expr);
+			gbString lhs_expr = expr_to_string(lhs->expr);
 			gbString rhs_expr = expr_to_string(rhs->expr);
 			error(rhs->expr, "Cannot assign `%s` to bit field `%s`", rhs_expr, lhs_expr);
 			gb_string_free(rhs_expr);
@@ -295,15 +292,15 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 	}
 
 	case Addressing_MapIndex: {
-		AstNode *ln = unparen_expr(lhs_node);
+		AstNode *ln = unparen_expr(lhs->expr);
 		if (ln->kind == AstNode_IndexExpr) {
 			AstNode *x = ln->IndexExpr.expr;
 			TypeAndValue tav = type_and_value_of_expr(&c->info, x);
 			GB_ASSERT(tav.mode != Addressing_Invalid);
 			if (tav.mode != Addressing_Variable) {
 				if (!is_type_pointer(tav.type)) {
-					gbString str = expr_to_string(lhs.expr);
-					error(lhs.expr, "Cannot assign to the value of a map `%s`", str);
+					gbString str = expr_to_string(lhs->expr);
+					error(lhs->expr, "Cannot assign to the value of a map `%s`", str);
 					gb_string_free(str);
 					return nullptr;
 				}
@@ -314,24 +311,24 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 	}
 
 	default: {
-		if (lhs.expr->kind == AstNode_SelectorExpr) {
+		if (lhs->expr->kind == AstNode_SelectorExpr) {
 			// NOTE(bill): Extra error checks
 			Operand op_c = {Addressing_Invalid};
-			ast_node(se, SelectorExpr, lhs.expr);
+			ast_node(se, SelectorExpr, lhs->expr);
 			check_expr(c, &op_c, se->expr);
 			if (op_c.mode == Addressing_MapIndex) {
-				gbString str = expr_to_string(lhs.expr);
-				error(lhs.expr, "Cannot assign to struct field `%s` in map", str);
+				gbString str = expr_to_string(lhs->expr);
+				error(lhs->expr, "Cannot assign to struct field `%s` in map", str);
 				gb_string_free(str);
 				return nullptr;
 			}
 		}
 
-		gbString str = expr_to_string(lhs.expr);
-		if (lhs.mode == Addressing_Immutable) {
-			error(lhs.expr, "Cannot assign to an immutable: `%s`", str);
+		gbString str = expr_to_string(lhs->expr);
+		if (lhs->mode == Addressing_Immutable) {
+			error(lhs->expr, "Cannot assign to an immutable: `%s`", str);
 		} else {
-			error(lhs.expr, "Cannot assign to `%s`", str);
+			error(lhs->expr, "Cannot assign to `%s`", str);
 		}
 		gb_string_free(str);
 
@@ -694,26 +691,31 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 			// an extra allocation
-			Array<Operand> operands = {};
-			array_init(&operands, c->tmp_allocator, 2 * lhs_count);
-			check_unpack_arguments(c, nullptr, lhs_count, &operands, as->rhs, true);
+			Array<Operand> lhs_operands = {};
+			Array<Operand> rhs_operands = {};
+			array_init_count(&lhs_operands, c->tmp_allocator, lhs_count);
+			array_init(&rhs_operands, c->tmp_allocator, 2 * lhs_count);
 
-			isize rhs_count = operands.count;
-			for_array(i, operands) {
-				if (operands[i].mode == Addressing_Invalid) {
+			for_array(i, as->lhs) {
+				check_expr(c, &lhs_operands[i], as->lhs[i]);
+			}
+
+			check_unpack_arguments(c, nullptr, lhs_operands.count, &rhs_operands, as->rhs, true);
+
+			isize rhs_count = rhs_operands.count;
+			for_array(i, rhs_operands) {
+				if (rhs_operands[i].mode == Addressing_Invalid) {
 					rhs_count--;
 				}
 			}
 
 			isize max = gb_min(lhs_count, rhs_count);
 			for (isize i = 0; i < max; i++) {
-				check_assignment_variable(c, &operands[i], as->lhs[i]);
+				check_assignment_variable(c, &lhs_operands[i], &rhs_operands[i]);
 			}
 			if (lhs_count != rhs_count) {
 				error(as->lhs[0], "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 			}
-
-
 			break;
 		}
 
@@ -728,7 +730,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				error(op, "Unknown Assignment operation `%.*s`", LIT(op.string));
 				return;
 			}
-			Operand operand = {Addressing_Invalid};
+			Operand lhs = {Addressing_Invalid};
+			Operand rhs = {Addressing_Invalid};
 			AstNode binary_expr = {AstNode_BinaryExpr};
 			ast_node(be, BinaryExpr, &binary_expr);
 			be->op = op;
@@ -737,12 +740,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			be->left  = as->lhs[0];
 			be->right = as->rhs[0];
 
-			check_binary_expr(c, &operand, &binary_expr);
-			if (operand.mode == Addressing_Invalid) {
+			check_expr(c, &lhs, as->lhs[0]);
+			check_binary_expr(c, &rhs, &binary_expr);
+			if (rhs.mode == Addressing_Invalid) {
 				return;
 			}
 			// NOTE(bill): Only use the first one will be used
-			check_assignment_variable(c, &operand, as->lhs[0]);
+			check_assignment_variable(c, &lhs, &rhs);
 
 			break;
 		}

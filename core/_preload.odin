@@ -290,32 +290,32 @@ __check_context :: proc() {
 }
 */
 
-alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr {
+alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, location := #caller_location) -> rawptr {
 	a := context.allocator;
-	return a.procedure(a.data, Allocator_Mode.Alloc, size, alignment, nil, 0, 0);
+	return a.procedure(a.data, Allocator_Mode.Alloc, size, alignment, nil, 0, 0, location);
 }
 
-free_ptr_with_allocator :: inline proc(a: Allocator, ptr: rawptr) {
+free_ptr_with_allocator :: inline proc(a: Allocator, ptr: rawptr, location := #caller_location) {
 	if ptr == nil do return;
 	if a.procedure == nil do return;
-	a.procedure(a.data, Allocator_Mode.Free, 0, 0, ptr, 0, 0);
+	a.procedure(a.data, Allocator_Mode.Free, 0, 0, ptr, 0, 0, location);
 }
 
-free_ptr :: inline proc(ptr: rawptr) do free_ptr_with_allocator(context.allocator, ptr);
+free_ptr :: inline proc(ptr: rawptr, location := #caller_location) do free_ptr_with_allocator(context.allocator, ptr);
 
-free_all :: inline proc() {
+free_all :: inline proc(location := #caller_location) {
 	a := context.allocator;
-	a.procedure(a.data, Allocator_Mode.FreeAll, 0, 0, nil, 0, 0);
+	a.procedure(a.data, Allocator_Mode.FreeAll, 0, 0, nil, 0, 0, location);
 }
 
 
-resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr {
+resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, location := #caller_location) -> rawptr {
 	a := context.allocator;
-	return a.procedure(a.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, 0);
+	return a.procedure(a.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, 0, location);
 }
 
 
-copy :: proc(dst, src: $T/[]$E) -> int {
+copy :: proc "contextless" (dst, src: $T/[]$E) -> int {
 	n := max(0, min(len(dst), len(src)));
 	if n > 0 do __mem_copy(&dst[0], &src[0], n*size_of(E));
 	return n;
@@ -406,7 +406,7 @@ clear :: inline proc "contextless" (m: ^$T/map[$K]$V) {
 	entries.len = 0;
 }
 
-reserve :: proc(array: ^$T/[dynamic]$E, capacity: int) -> bool {
+reserve :: proc(array: ^$T/[dynamic]$E, capacity: int, location := #caller_location) -> bool {
 	if array == nil do return false;
 	a := cast(^raw.Dynamic_Array)array;
 
@@ -421,7 +421,10 @@ reserve :: proc(array: ^$T/[dynamic]$E, capacity: int) -> bool {
 	new_size  := capacity * size_of(E);
 	allocator := a.allocator;
 
-	new_data := allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, align_of(E), a.data, old_size, 0);
+	new_data := allocator.procedure(
+		allocator.data, Allocator_Mode.Resize, new_size, align_of(E),
+		a.data, old_size, 0, location,
+	);
 	if new_data == nil do return false;
 
 	a.data = new_data;
@@ -490,25 +493,33 @@ delete :: proc(m: ^$T/map[$K]$V, key: K) {
 
 
 
-new  :: inline proc(T: type) -> ^T {
-	ptr := cast(^T)alloc(size_of(T), align_of(T));
+new  :: inline proc(T: type, location := #caller_location) -> ^T {
+	ptr := cast(^T)alloc(size_of(T), align_of(T), location);
 	ptr^ = T{};
 	return ptr;
 }
-new_clone :: inline proc(data: $T) -> ^T {
-	ptr := cast(^T)alloc(size_of(T), align_of(T));
+new_clone :: inline proc(data: $T, location := #caller_location) -> ^T {
+	ptr := cast(^T)alloc(size_of(T), align_of(T), location);
 	ptr^ = data;
 	return ptr;
 }
 
-free :: proc(ptr:   rawptr)         do free_ptr(ptr);
-free :: proc(str:   $T/string)      do free_ptr((^raw.String      )(&str).data);
-free :: proc(array: $T/[dynamic]$E) do free_ptr((^raw.Dynamic_Array)(&array).data);
-free :: proc(slice: $T/[]$E)        do free_ptr((^raw.Slice       )(&slice).data);
-free :: proc(m:     $T/map[$K]$V) {
+free :: proc(ptr: rawptr, location := #caller_location) {
+	free_ptr(ptr, location);
+}
+free :: proc(str: $T/string, location := #caller_location) {
+	free_ptr((^raw.String)(&str).data, location);
+}
+free :: proc(array: $T/[dynamic]$E, location := #caller_location) {
+	free_ptr((^raw.Dynamic_Array)(&array).data, location);
+}
+free :: proc(slice: $T/[]$E, location := #caller_location) {
+	free_ptr((^raw.Slice)(&slice).data, location);
+}
+free :: proc(m: $T/map[$K]$V, location := #caller_location) {
 	raw := cast(^raw.Map)&m;
-	free(raw.hashes);
-	free(raw.entries.data);
+	free(raw.hashes, location);
+	free(raw.entries.data, location);
 }
 
 // NOTE(bill): This code works but I will prefer having `make` a built-in procedure
@@ -557,21 +568,21 @@ make :: proc(T: type/map[$K]$V, cap: int = 16, using location := #caller_locatio
 
 
 
-default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: int) -> rawptr {
-	if old_memory == nil do return alloc(new_size, alignment);
+default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: int, location := #caller_location) -> rawptr {
+	if old_memory == nil do return alloc(new_size, alignment, location);
 
 	if new_size == 0 {
-		free(old_memory);
+		free(old_memory, location);
 		return nil;
 	}
 
 	if new_size == old_size do return old_memory;
 
-	new_memory := alloc(new_size, alignment);
+	new_memory := alloc(new_size, alignment, location);
 	if new_memory == nil do return nil;
 
 	__mem_copy(new_memory, old_memory, min(old_size, new_size));;
-	free(old_memory);
+	free(old_memory, location);
 	return new_memory;
 }
 

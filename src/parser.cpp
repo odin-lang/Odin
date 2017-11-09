@@ -2223,6 +2223,9 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		return ast_basic_lit(f, token);
 	}
 
+	case Token_OpenBrace:
+		if (!lhs) return parse_literal_value(f, nullptr);
+		break;
 
 	case Token_OpenParen: {
 		Token open, close;

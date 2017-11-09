@@ -4082,13 +4082,17 @@ void check_unpack_arguments(Checker *c, Entity **lhs, isize lhs_count, Array<Ope
 
 		Operand o = {};
 
+		Type *type_hint = nullptr;
+
 		if (lhs != nullptr && tuple_index < lhs_count) {
 			// NOTE(bill): override DeclInfo for dependency
-			DeclInfo *decl = decl_info_of_entity(&c->info, lhs[tuple_index]);
+			Entity *e = lhs[tuple_index];
+			DeclInfo *decl = decl_info_of_entity(&c->info, e);
 			if (decl) c->context.decl = decl;
+			type_hint = e->type;
 		}
 
-		check_expr_base(c, &o, rhs[i], nullptr);
+		check_expr_base(c, &o, rhs[i], type_hint);
 		if (o.mode == Addressing_NoValue) {
 			error_operand_no_value(&o);
 			o.mode = Addressing_Invalid;
@@ -5508,7 +5512,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						}
 
 						fields_visited[sel.index[0]] = true;
-						check_expr(c, o, fv->value);
+						check_expr_with_type_hint(c, o, fv->value, field->type);
 
 						if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type)) {
 							is_constant = false;
@@ -5530,7 +5534,13 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						}
 					}
 
+					isize field_index = 0;
 					for_array(index, cl->elems) {
+						Entity *field = t->Struct.fields_in_src_order[field_index++];
+						if (!all_fields_are_blank && is_blank_ident(field->token)) {
+							// NOTE(bill): Ignore blank identifiers
+							continue;
+						}
 						AstNode *elem = cl->elems[index];
 						if (elem->kind == AstNode_FieldValue) {
 							error(elem, "Mixture of `field = value` and value elements in a literal is not allowed");
@@ -5541,12 +5551,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 							break;
 						}
 
-						Entity *field = t->Struct.fields_in_src_order[index];
-						if (!all_fields_are_blank && is_blank_ident(field->token)) {
-							// NOTE(bill): Ignore blank identifiers
-							continue;
-						}
-						check_expr(c, o, elem);
+						check_expr_with_type_hint(c, o, elem, field->type);
 
 						if (!check_is_field_exported(c, field)) {
 							gbString t = type_to_string(type);
