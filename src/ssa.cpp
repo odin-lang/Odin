@@ -2176,9 +2176,6 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 		ssa_emit_jump(p, b);
 	case_end;
 
-	case_ast_node(pa, PushAllocator, node);
-		GB_PANIC("TODO: PushAllocator");
-	case_end;
 	case_ast_node(pc, PushContext, node);
 		GB_PANIC("TODO: PushContext");
 	case_end;

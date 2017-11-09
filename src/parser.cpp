@@ -313,12 +313,7 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 		AstNode *clobber_list; \
 		isize output_count, input_count, clobber_count; \
 	}) \
-	AST_NODE_KIND(PushAllocator, "push_allocator statement", struct { \
-		Token token;   \
-		AstNode *expr; \
-		AstNode *body; \
-	}) \
-	AST_NODE_KIND(PushContext, "push_context statement", struct { \
+	AST_NODE_KIND(PushContext, "context <- statement", struct { \
 		Token token;   \
 		AstNode *expr; \
 		AstNode *body; \
@@ -596,7 +591,6 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_BranchStmt:    return node->BranchStmt.token;
 	case AstNode_UsingStmt:     return node->UsingStmt.token;
 	case AstNode_AsmStmt:       return node->AsmStmt.token;
-	case AstNode_PushAllocator: return node->PushAllocator.token;
 	case AstNode_PushContext:   return node->PushContext.token;
 
 	case AstNode_BadDecl:            return node->BadDecl.begin;
@@ -828,10 +822,6 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		n->AsmStmt.output_list  = clone_ast_node(a, n->AsmStmt.output_list);
 		n->AsmStmt.input_list   = clone_ast_node(a, n->AsmStmt.input_list);
 		n->AsmStmt.clobber_list = clone_ast_node(a, n->AsmStmt.clobber_list);
-		break;
-	case AstNode_PushAllocator:
-		n->PushAllocator.expr = clone_ast_node(a, n->PushAllocator.expr);
-		n->PushAllocator.body = clone_ast_node(a, n->PushAllocator.body);
 		break;
 	case AstNode_PushContext:
 		n->PushContext.expr = clone_ast_node(a, n->PushContext.expr);
@@ -1365,14 +1355,6 @@ AstNode *ast_asm_stmt(AstFile *f, Token token, bool is_volatile, Token open, Tok
 	return result;
 }
 
-AstNode *ast_push_allocator(AstFile *f, Token token, AstNode *expr, AstNode *body) {
-	AstNode *result = make_ast_node(f, AstNode_PushAllocator);
-	result->PushAllocator.token = token;
-	result->PushAllocator.expr = expr;
-	result->PushAllocator.body = body;
-	return result;
-}
-
 AstNode *ast_push_context(AstFile *f, Token token, AstNode *expr, AstNode *body) {
 	AstNode *result = make_ast_node(f, AstNode_PushContext);
 	result->PushContext.token = token;
@@ -1831,9 +1813,6 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_break:
 		case Token_continue:
 		case Token_fallthrough:
-
-		case Token_push_allocator:
-		case Token_push_context:
 
 		case Token_Hash:
 		{
@@ -4454,6 +4433,25 @@ AstNode *parse_stmt(AstFile *f) {
 	switch (token.kind) {
 	// Operands
 	case Token_context:
+		if (look_ahead_token_kind(f, 1) == Token_ArrowLeft) {
+			advance_token(f);
+			Token arrow = expect_token(f, Token_ArrowLeft);
+			AstNode *body = nullptr;
+			isize prev_level = f->expr_level;
+			f->expr_level = -1;
+			AstNode *expr = parse_expr(f, false);
+			f->expr_level = prev_level;
+
+			if (allow_token(f, Token_do)) {
+				body = convert_stmt_to_body(f, parse_stmt(f));
+			} else {
+				body = parse_block_stmt(f, false);
+			}
+
+			return ast_push_context(f, token, expr, body);
+		}
+		/*fallthrough*/
+
 	case Token_Ident:
 	case Token_Integer:
 	case Token_Float:
@@ -4537,40 +4535,6 @@ AstNode *parse_stmt(AstFile *f) {
 
 		syntax_error(token, "Illegal use of `using` statement");
 		return ast_bad_stmt(f, token, f->curr_token);
-	} break;
-
-	case Token_push_allocator: {
-		advance_token(f);
-		AstNode *body = nullptr;
-		isize prev_level = f->expr_level;
-		f->expr_level = -1;
-		AstNode *expr = parse_expr(f, false);
-		f->expr_level = prev_level;
-
-		if (allow_token(f, Token_do)) {
-			body = convert_stmt_to_body(f, parse_stmt(f));
-		} else {
-			body = parse_block_stmt(f, false);
-		}
-
-		return ast_push_allocator(f, token, expr, body);
-	} break;
-
-	case Token_push_context: {
-		advance_token(f);
-		AstNode *body = nullptr;
-		isize prev_level = f->expr_level;
-		f->expr_level = -1;
-		AstNode *expr = parse_expr(f, false);
-		f->expr_level = prev_level;
-
-		if (allow_token(f, Token_do)) {
-			body = convert_stmt_to_body(f, parse_stmt(f));
-		} else {
-			body = parse_block_stmt(f, false);
-		}
-
-		return ast_push_context(f, token, expr, body);
 	} break;
 
 	case Token_At: {

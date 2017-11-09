@@ -385,7 +385,7 @@ parametric_polymorphism :: proc() {
 			c := context;
 			if table.allocator.procedure != nil do c.allocator = table.allocator;
 
-			push_context c {
+			context <- c {
 				table.slots = make_slice(type_of(table.slots), max(capacity, TABLE_SIZE_MIN));
 			}
 		}
@@ -394,7 +394,7 @@ parametric_polymorphism :: proc() {
 			c := context;
 			if table.allocator.procedure != nil do c.allocator = table.allocator;
 
-			push_context c {
+			context <- c {
 				old_slots := table.slots;
 
 				cap := max(2*cap(table.slots), TABLE_SIZE_MIN);
@@ -559,7 +559,7 @@ threading_example :: proc() {
 }
 
 main :: proc() {
-	when true {
+	when false {
 		fmt.println("\n# general_stuff");              general_stuff();
 		fmt.println("\n# default_struct_values");      default_struct_values();
 		fmt.println("\n# union_type");                 union_type();

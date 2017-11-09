@@ -61,7 +61,7 @@ accept_sizes := [256]u8{
 encode_rune :: proc(r: rune) -> ([4]u8, int) {
 	buf: [4]u8;
 	i := u32(r);
-	mask: u8 : 0x3f;
+	mask :: u8(0x3f);
 	if i <= 1<<7-1 {
 		buf[0] = u8(r);
 		return buf, 1;

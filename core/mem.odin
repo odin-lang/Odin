@@ -115,9 +115,16 @@ init_arena_from_context :: proc(using a: ^Arena, size: int) {
 	temp_count = 0;
 }
 
+
+context_from_allocator :: proc(a: Allocator) -> Context {
+	c := context;
+	c.allocator = a;
+	return c;
+}
+
 destroy_arena :: proc(using a: ^Arena) {
 	if backing.procedure != nil {
-		push_allocator backing {
+		context <- context_from_allocator(backing) {
 			free(memory);
 			memory = nil;
 		}

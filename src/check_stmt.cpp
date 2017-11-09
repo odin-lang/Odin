@@ -170,9 +170,6 @@ bool check_is_terminating(AstNode *node) {
 		return has_default;
 	case_end;
 
-	case_ast_node(pa, PushAllocator, node);
-		return check_is_terminating(pa->body);
-	case_end;
 	case_ast_node(pc, PushContext, node);
 		return check_is_terminating(pc->body);
 	case_end;
@@ -697,7 +694,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			array_init(&rhs_operands, c->tmp_allocator, 2 * lhs_count);
 
 			for_array(i, as->lhs) {
-				check_expr(c, &lhs_operands[i], as->lhs[i]);
+				if (is_blank_ident(as->lhs[i])) {
+					Operand *o = &lhs_operands[i];
+					o->expr = as->lhs[i];
+					o->mode = Addressing_Value;
+				} else {
+					check_expr(c, &lhs_operands[i], as->lhs[i]);
+				}
 			}
 
 			check_unpack_arguments(c, nullptr, lhs_operands.count, &rhs_operands, as->rhs, true);
@@ -1648,18 +1651,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 
-	case_ast_node(pa, PushAllocator, node);
-		Operand op = {};
-		check_expr(c, &op, pa->expr);
-		check_assignment(c, &op, t_allocator, str_lit("argument to push_allocator"));
-		check_stmt(c, pa->body, mod_flags);
-	case_end;
-
 
 	case_ast_node(pa, PushContext, node);
 		Operand op = {};
 		check_expr(c, &op, pa->expr);
-		check_assignment(c, &op, t_context, str_lit("argument to push_context"));
+		check_assignment(c, &op, t_context, str_lit("argument to context <-"));
 		check_stmt(c, pa->body, mod_flags);
 	case_end;
 

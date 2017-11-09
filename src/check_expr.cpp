@@ -5179,7 +5179,6 @@ bool ternary_compare_types(Type *x, Type *y) {
 	return are_types_identical(x, y);
 }
 
-
 ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *type_hint) {
 	ExprKind kind = Expr_Stmt;
 
@@ -5550,21 +5549,30 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						}
 					}
 
-					isize field_index = 0;
+					bool seen_field_value = false;
+
 					for_array(index, cl->elems) {
-						Entity *field = t->Struct.fields_in_src_order[field_index++];
-						if (!all_fields_are_blank && is_blank_ident(field->token)) {
-							// NOTE(bill): Ignore blank identifiers
-							continue;
-						}
+						Entity *field = nullptr;
 						AstNode *elem = cl->elems[index];
 						if (elem->kind == AstNode_FieldValue) {
-							error(elem, "Mixture of `field = value` and value elements in a literal is not allowed");
+							seen_field_value = true;
+							// error(elem, "Mixture of `field = value` and value elements in a literal is not allowed");
+							// continue;
+						} else if (seen_field_value) {
+							error(elem, "Value elements cannot be used after a `field = value`");
 							continue;
 						}
 						if (index >= field_count) {
 							error(o->expr, "Too many values in structure literal, expected %td, got %td", field_count, cl->elems.count);
 							break;
+						}
+
+						if (field == nullptr) {
+							field = t->Struct.fields_in_src_order[index];
+						}
+						if (!all_fields_are_blank && is_blank_ident(field->token)) {
+							// NOTE(bill): Ignore blank identifiers
+							continue;
 						}
 
 						check_expr_with_type_hint(c, o, elem, field->type);

@@ -32,7 +32,7 @@ create :: proc(procedure: Thread_Proc) -> ^Thread {
 		}
 
 		exit := 0;
-		push_context c {
+		context <- c {
 			exit = t.procedure(t);
 		}
 

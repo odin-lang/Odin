@@ -117,8 +117,6 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_inline,                 "inline"),                 \
 	TOKEN_KIND(Token_no_inline,              "no_inline"),              \
 	TOKEN_KIND(Token_context,                "context"),                \
-	TOKEN_KIND(Token_push_context,           "push_context"),           \
-	TOKEN_KIND(Token_push_allocator,         "push_allocator"),         \
 	TOKEN_KIND(Token_size_of,                "size_of"),                \
 	TOKEN_KIND(Token_align_of,               "align_of"),               \
 	TOKEN_KIND(Token_offset_of,              "offset_of"),              \
