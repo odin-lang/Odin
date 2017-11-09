@@ -2865,6 +2865,7 @@ void check_add_foreign_import_decl(Checker *c, AstNode *decl) {
 
 		gbFile f = {};
 		gbFileError file_err = gb_file_open(&f, c_str);
+		defer (gb_file_close(&f));
 
 		switch (file_err) {
 		case gbFileError_Invalid:

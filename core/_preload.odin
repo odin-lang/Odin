@@ -207,7 +207,7 @@ __Map_Header :: struct #ordered {
 	is_key_string: bool,
 	entry_size:    int,
 	entry_align:   int,
-	value_offset:  int,
+	value_offset:  uintptr,
 	value_size:    int,
 }
 
@@ -217,8 +217,11 @@ type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 	if info == nil do return nil;
 
 	base := info;
-	switch i in base.variant {
-	case Type_Info_Named: base = i.base;
+	loop: for {
+		switch i in base.variant {
+		case Type_Info_Named: base = i.base;
+		case: break loop;
+		}
 	}
 	return base;
 }
@@ -228,9 +231,12 @@ type_info_base_without_enum :: proc(info: ^Type_Info) -> ^Type_Info {
 	if info == nil do return nil;
 
 	base := info;
-	switch i in base.variant {
-	case Type_Info_Named: base = i.base;
-	case Type_Info_Enum:  base = i.base;
+	loop: for {
+		switch i in base.variant {
+		case Type_Info_Named: base = i.base;
+		case Type_Info_Enum:  base = i.base;
+		case: break loop;
+		}
 	}
 	return base;
 }
@@ -875,24 +881,6 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 	__mem_zero(data + (elem_size*array.len), elem_size);
 	array.len += 1;
 	return array.len;
-}
-
-__slice_append :: proc(slice_: rawptr, elem_size, elem_align: int,
-                       items: rawptr, item_count: int) -> int {
-	slice := cast(^raw.Slice)slice_;
-
-	if item_count <= 0 || items == nil {
-		return slice.len;
-	}
-
-	item_count = min(slice.cap-slice.len, item_count);
-	if item_count > 0 {
-		data := cast(^u8)slice.data;
-		assert(data != nil);
-		__mem_copy(data + (elem_size*slice.len), items, elem_size * item_count);
-		slice.len += item_count;
-	}
-	return slice.len;
 }
 
 // Map stuff

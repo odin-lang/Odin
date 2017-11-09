@@ -1129,6 +1129,9 @@ irValue *ir_emit(irProcedure *proc, irValue *instr) {
 irValue *ir_const_int(gbAllocator a, i64 i) {
 	return ir_value_constant(a, t_int, exact_value_i64(i));
 }
+irValue *ir_const_uintptr(gbAllocator a, u64 i) {
+	return ir_value_constant(a, t_uintptr, exact_value_i64(i));
+}
 irValue *ir_const_i32(gbAllocator a, i32 i) {
 	return ir_value_constant(a, t_i32, exact_value_i64(i));
 }
@@ -1735,7 +1738,7 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val, Type *map_type) 
 
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 2), ir_const_int(a, entry_size));
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 3), ir_const_int(a, entry_align));
-	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 4), ir_const_int(a, value_offset));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 4), ir_const_uintptr(a, value_offset));
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 5), ir_const_int(a, value_size));
 
 

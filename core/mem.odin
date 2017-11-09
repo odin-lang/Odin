@@ -26,19 +26,19 @@ compare :: proc "contextless" (a, b: []u8) -> int {
 slice_ptr :: proc "contextless" (ptr: ^$T, len: int) -> []T {
 	assert(len >= 0);
 	slice := raw.Slice{data = ptr, len = len, cap = len};
-	return (cast(^[]T)&slice)^;
+	return transmute([]T)slice;
 }
 slice_ptr :: proc "contextless" (ptr: ^$T, len, cap: int) -> []T {
 	assert(0 <= len && len <= cap);
 	slice := raw.Slice{data = ptr, len = len, cap = cap};
-	return (cast(^[]T)&slice)^;
+	return transmute([]T)slice;
 }
 
-slice_to_bytes :: proc "contextless" (slice: []$T) -> []u8 {
-	s := cast(^raw.Slice)&slice;
+slice_to_bytes :: proc "contextless" (slice: $E/[]$T) -> []u8 {
+	s := transmute(raw.Slice)slice;
 	s.len *= size_of(T);
 	s.cap *= size_of(T);
-	return (cast(^[]u8)s)^;
+	return transmute([]u8)s;
 }
 
 
