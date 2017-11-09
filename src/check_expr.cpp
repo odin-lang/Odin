@@ -62,7 +62,7 @@ Entity * check_selector                 (Checker *c, Operand *operand, AstNode *
 Entity * check_ident                    (Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name);
 Entity * find_polymorphic_struct_entity(Checker *c, Type *original_type, isize param_count, Array<Operand> ordered_operands);
 void     check_not_tuple                (Checker *c, Operand *operand);
-void     convert_to_typed               (Checker *c, Operand *operand, Type *target_type, i32 level);
+void     convert_to_typed               (Checker *c, Operand *operand, Type *target_type);
 gbString expr_to_string                 (AstNode *expression);
 void     check_entity_decl              (Checker *c, Entity *e, DeclInfo *decl, Type *named_type);
 void     check_const_decl               (Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr, Type *named_type);
@@ -658,7 +658,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 		if (target_type != nullptr && is_type_vector(target_type)) {
 			// NOTE(bill): continue to below
 		} else {
-			convert_to_typed(c, operand, target_type, 0);
+			convert_to_typed(c, operand, target_type);
 			if (operand->mode == Addressing_Invalid) {
 				return;
 			}
@@ -1622,7 +1622,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 	if (is_type_unsigned(y->type)) {
 
 	} else if (is_type_untyped(y->type)) {
-		convert_to_typed(c, y, t_untyped_integer, 0);
+		convert_to_typed(c, y, t_untyped_integer);
 		if (y->mode == Addressing_Invalid) {
 			x->mode = Addressing_Invalid;
 			return;
@@ -2026,11 +2026,11 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		}
 	}
 
-	convert_to_typed(c, x, y->type, 0);
+	convert_to_typed(c, x, y->type);
 	if (x->mode == Addressing_Invalid) {
 		return;
 	}
-	convert_to_typed(c, y, x->type, 0);
+	convert_to_typed(c, y, x->type);
 	if (y->mode == Addressing_Invalid) {
 		x->mode = Addressing_Invalid;
 		return;
@@ -2253,8 +2253,7 @@ ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
 	return v;
 }
 
-// NOTE(bill): Set initial level to 0
-void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level) {
+void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 	GB_ASSERT_NOT_NULL(target_type);
 	if (operand->mode == Addressing_Invalid ||
 	    operand->mode == Addressing_Type ||
@@ -2471,7 +2470,7 @@ bool check_index_value(Checker *c, bool open_range, AstNode *index_value, i64 ma
 		return false;
 	}
 
-	convert_to_typed(c, &operand, t_int, 0);
+	convert_to_typed(c, &operand, t_int);
 	if (operand.mode == Addressing_Invalid) {
 		if (value) *value = 0;
 		return false;
@@ -3526,8 +3525,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 
-		convert_to_typed(c, &x, y.type, 0); if (x.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &y, x.type, 0); if (y.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &x, y.type); if (x.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
 		if (x.mode == Addressing_Constant &&
 		    y.mode == Addressing_Constant) {
 			if (is_type_numeric(x.type) && exact_value_imag(x.value).value_float == 0) {
@@ -3585,7 +3584,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 					x->type = t_untyped_complex;
 				}
 			} else {
-				convert_to_typed(c, x, t_complex128, 0);
+				convert_to_typed(c, x, t_complex128);
 				if (x->mode == Addressing_Invalid) {
 					return false;
 				}
@@ -3771,11 +3770,11 @@ break;
 			operand->mode = Addressing_Value;
 			operand->type = type;
 
-			convert_to_typed(c, &a, b.type, 0);
+			convert_to_typed(c, &a, b.type);
 			if (a.mode == Addressing_Invalid) {
 				return false;
 			}
-			convert_to_typed(c, &b, a.type, 0);
+			convert_to_typed(c, &b, a.type);
 			if (b.mode == Addressing_Invalid) {
 				return false;
 			}
@@ -3841,11 +3840,11 @@ break;
 			operand->mode = Addressing_Value;
 			operand->type = type;
 
-			convert_to_typed(c, &a, b.type, 0);
+			convert_to_typed(c, &a, b.type);
 			if (a.mode == Addressing_Invalid) {
 				return false;
 			}
-			convert_to_typed(c, &b, a.type, 0);
+			convert_to_typed(c, &b, a.type);
 			if (b.mode == Addressing_Invalid) {
 				return false;
 			}
@@ -3966,17 +3965,17 @@ break;
 			operand->mode = Addressing_Value;
 			operand->type = type;
 
-			convert_to_typed(c, &x, y.type, 0);
+			convert_to_typed(c, &x, y.type);
 			if (x.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &y, x.type, 0);
+			convert_to_typed(c, &y, x.type);
 			if (y.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &x, z.type, 0);
+			convert_to_typed(c, &x, z.type);
 			if (x.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &z, x.type, 0);
+			convert_to_typed(c, &z, x.type);
 			if (z.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &y, z.type, 0);
+			convert_to_typed(c, &y, z.type);
 			if (y.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &z, y.type, 0);
+			convert_to_typed(c, &z, y.type);
 			if (z.mode == Addressing_Invalid) { return false; }
 
 			if (!are_types_identical(x.type, y.type) || !are_types_identical(x.type, z.type)) {
@@ -5167,6 +5166,19 @@ bool check_set_index_data(Operand *o, Type *type, bool indirection, i64 *max_cou
 	return false;
 }
 
+bool ternary_compare_types(Type *x, Type *y) {
+	if (is_type_untyped_undef(x) && type_has_undef(y)) {
+		return true;
+	} else if (is_type_untyped_nil(x) && type_has_nil(y)) {
+		return true;
+	} else if (is_type_untyped_undef(y) && type_has_undef(x)) {
+		return true;
+	} else if (is_type_untyped_nil(y) && type_has_nil(x)) {
+		return true;
+	}
+	return are_types_identical(x, y);
+}
+
 
 ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *type_hint) {
 	ExprKind kind = Expr_Stmt;
@@ -5357,18 +5369,17 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			return Expr_Expr;
 		}
 
-		convert_to_typed(c, &x, y.type, 0);
+		convert_to_typed(c, &x, y.type);
 		if (x.mode == Addressing_Invalid) {
 			return kind;
 		}
-		convert_to_typed(c, &y, x.type, 0);
+		convert_to_typed(c, &y, x.type);
 		if (y.mode == Addressing_Invalid) {
 			x.mode = Addressing_Invalid;
 			return kind;
 		}
 
-
-		if (!are_types_identical(x.type, y.type)) {
+		if (!ternary_compare_types(x.type, y.type)) {
 			gbString its = type_to_string(x.type);
 			gbString ets = type_to_string(y.type);
 			error(node, "Mismatched types in ternary expression, %s vs %s", its, ets);
@@ -5377,7 +5388,12 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			return kind;
 		}
 
-		o->type = x.type;
+		Type *type = x.type;
+		if (is_type_untyped_nil(type) || is_type_untyped_undef(type)) {
+			type = y.type;
+		}
+
+		o->type = type;
 		o->mode = Addressing_Value;
 
 		if (cond.mode == Addressing_Constant && is_type_boolean(cond.type) &&

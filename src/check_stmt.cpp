@@ -997,20 +997,20 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				goto skip_expr;
 			}
 
-			convert_to_typed(c, &x, y.type, 0);
+			convert_to_typed(c, &x, y.type);
 			if (x.mode == Addressing_Invalid) {
 				goto skip_expr;
 			}
-			convert_to_typed(c, &y, x.type, 0);
+			convert_to_typed(c, &y, x.type);
 			if (y.mode == Addressing_Invalid) {
 				goto skip_expr;
 			}
 
-			convert_to_typed(c, &x, default_type(y.type), 0);
+			convert_to_typed(c, &x, default_type(y.type));
 			if (x.mode == Addressing_Invalid) {
 				goto skip_expr;
 			}
-			convert_to_typed(c, &y, default_type(x.type), 0);
+			convert_to_typed(c, &y, default_type(x.type));
 			if (y.mode == Addressing_Invalid) {
 				goto skip_expr;
 			}
@@ -1321,7 +1321,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						continue;
 					}
 
-					convert_to_typed(c, &y, x.type, 0);
+					convert_to_typed(c, &y, x.type);
 					if (y.mode == Addressing_Invalid) {
 						continue;
 					}
