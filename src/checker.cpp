@@ -1862,7 +1862,6 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 struct AttributeContext {
 	String  link_name;
 	String  link_prefix;
-	bool    link_prefix_overridden;
 	isize   init_expr_list_count;
 	String  thread_local_model;
 };
@@ -1922,9 +1921,6 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		return true;
 	} else if (name == "link_prefix") {
 		if (value.kind == ExactValue_String) {
-			if (ac->link_prefix.len > 0) {
-				ac->link_prefix_overridden = true;
-			}
 			ac->link_prefix = value.value_string;
 			if (!is_foreign_name_valid(ac->link_prefix)) {
 				error(elem, "Invalid link prefix: %.*s", LIT(ac->link_prefix));
@@ -1955,9 +1951,6 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		return true;
 	} else if (name == "link_prefix") {
 		if (value.kind == ExactValue_String) {
-			if (ac->link_prefix.len > 0) {
-				ac->link_prefix_overridden = true;
-			}
 			ac->link_prefix = value.value_string;
 			if (!is_foreign_name_valid(ac->link_prefix)) {
 				error(elem, "Invalid link prefix: %.*s", LIT(ac->link_prefix));
@@ -2002,6 +1995,12 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 
 void check_decl_attributes(Checker *c, Array<AstNode *> attributes, DeclAttributeProc *proc, AttributeContext *ac) {
 	if (attributes.count == 0) return;
+
+	String original_link_prefix = {};
+	if (ac) {
+		original_link_prefix = ac->link_prefix;
+	}
+
 	StringSet set = {};
 	string_set_init(&set, heap_allocator());
 	defer (string_set_destroy(&set));
@@ -2048,6 +2047,15 @@ void check_decl_attributes(Checker *c, Array<AstNode *> attributes, DeclAttribut
 
 			if (!proc(c, elem, name, ev, ac)) {
 				error(elem, "Unknown attribute element name `%.*s`", LIT(name));
+			}
+		}
+	}
+
+	if (ac) {
+		if (ac->link_prefix.text == original_link_prefix.text) {
+			if (ac->link_name.len > 0) {
+				ac->link_prefix.text = nullptr;
+				ac->link_prefix.len  = 0;
 			}
 		}
 	}

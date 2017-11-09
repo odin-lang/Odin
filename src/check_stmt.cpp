@@ -1762,7 +1762,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			if (e->type == nullptr) {
 				e->type = init_type;
 			}
-			ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix, ac.link_prefix_overridden);
+			ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix);
 			e->Variable.thread_local_model = ac.thread_local_model;
 
 			if (ac.link_name.len > 0) {

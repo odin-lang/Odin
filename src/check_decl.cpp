@@ -429,9 +429,9 @@ void init_entity_foreign_library(Checker *c, Entity *e) {
 	}
 }
 
-String handle_link_name(Checker *c, Token token, String link_name, String link_prefix, bool link_prefix_overridden) {
+String handle_link_name(Checker *c, Token token, String link_name, String link_prefix) {
 	if (link_prefix.len > 0) {
-		if (link_name.len > 0 && !link_prefix_overridden) {
+		if (link_name.len > 0) {
 			error(token, "`link_name` and `link_prefix` cannot be used together");
 		} else {
 			isize len = link_prefix.len + token.string.len;
@@ -485,7 +485,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 
-	ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix, ac.link_prefix_overridden);
+	ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix);
 
 	if (d->scope->file != nullptr && e->token.string == "main") {
 		if (pt->param_count != 0 ||
@@ -635,7 +635,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		check_decl_attributes(c, decl->attributes, var_decl_attribute, &ac);
 	}
 
-	ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix, ac.link_prefix_overridden);
+	ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix);
 	e->Variable.thread_local_model = ac.thread_local_model;
 
 	String context_name = str_lit("variable declaration");
