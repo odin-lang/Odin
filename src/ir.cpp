@@ -4013,7 +4013,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 
 		}
 		return ir_emit_source_code_location(proc, procedure, pos);
-		break;
 	}
 
 	case BuiltinProc_type_info_of: {
@@ -4122,6 +4121,11 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		gbAllocator a = proc->module->allocator;
 		Type *type = type_of_expr(proc->module->info, ce->args[0]);
 
+		String proc_name = {};
+		if (proc->entity != nullptr) {
+			proc_name = proc->entity->token.string;
+		}
+
 		if (is_type_slice(type)) {
 			Type *elem_type = core_type(type)->Slice.elem;
 			Type *elem_ptr_type = make_type_pointer(a, elem_type);
@@ -4140,10 +4144,12 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 
 			irValue *slice_size = ir_emit_arith(proc, Token_Mul, elem_size, capacity, t_int);
 
-			irValue **args = gb_alloc_array(a, irValue *, 2);
+
+			irValue **args = gb_alloc_array(a, irValue *, 3);
 			args[0] = slice_size;
 			args[1] = elem_align;
-			irValue *call = ir_emit_global_call(proc, "alloc", args, 2);
+			args[2] = ir_emit_source_code_location(proc, proc_name, ast_node_token(expr).pos);
+			irValue *call = ir_emit_global_call(proc, "alloc", args, 3);
 
 			irValue *ptr = ir_emit_conv(proc, call, elem_ptr_type);
 
