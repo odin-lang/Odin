@@ -4130,35 +4130,42 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			Type *elem_type = core_type(type)->Slice.elem;
 			Type *elem_ptr_type = make_type_pointer(a, elem_type);
 
-			irValue *elem_size  = ir_const_int(a, type_size_of(a, elem_type));
-			irValue *elem_align = ir_const_int(a, type_align_of(a, elem_type));
+			i64 esz = type_size_of(a, elem_type);
+			i64 eal = type_align_of(a, elem_type);
 
-			irValue *count = ir_emit_conv(proc, ir_build_expr(proc, ce->args[1]), t_int);
-			irValue *capacity = count;
+			irValue *elem_size  = ir_const_int(a, esz);
+			irValue *elem_align = ir_const_int(a, eal);
+
+			irValue *len = ir_emit_conv(proc, ir_build_expr(proc, ce->args[1]), t_int);
+			irValue *cap = len;
 
 			if (ce->args.count == 3)  {
-				capacity = ir_emit_conv(proc, ir_build_expr(proc, ce->args[2]), t_int);
+				cap = ir_emit_conv(proc, ir_build_expr(proc, ce->args[2]), t_int);
 			}
 
-			ir_emit_slice_bounds_check(proc, ast_node_token(ce->args[1]), v_zero, count, capacity, false);
+			ir_emit_slice_bounds_check(proc, ast_node_token(ce->args[1]), v_zero, len, cap, false);
 
-			irValue *slice_size = ir_emit_arith(proc, Token_Mul, elem_size, capacity, t_int);
+			irValue *slice_size = cap;
+			if (eal != 1) {
+				slice_size = ir_emit_arith(proc, Token_Mul, elem_size, cap, t_int);
+			}
 
+			TokenPos pos = ast_node_token(ce->args[0]).pos;
 
 			irValue **args = gb_alloc_array(a, irValue *, 3);
 			args[0] = slice_size;
 			args[1] = elem_align;
-			args[2] = ir_emit_source_code_location(proc, proc_name, ast_node_token(expr).pos);
+			args[2] = ir_emit_source_code_location(proc, proc_name, pos);
 			irValue *call = ir_emit_global_call(proc, "alloc", args, 3);
 
 			irValue *ptr = ir_emit_conv(proc, call, elem_ptr_type);
 
 			if (ir_type_has_default_values(elem_type)) {
-				ir_init_data_with_defaults(proc, ptr, count);
+				ir_init_data_with_defaults(proc, ptr, len);
 			}
 
 			irValue *slice = ir_add_local_generated(proc, type);
-			ir_fill_slice(proc, slice, ptr, count, capacity);
+			ir_fill_slice(proc, slice, ptr, len, cap);
 			return ir_emit_load(proc, slice);
 		} else if (is_type_map(type)) {
 			irValue *int_16 = ir_const_int(a, 16);
