@@ -2625,7 +2625,7 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 			Token eq = expect_token(f, Token_Eq);
 
 			if (prefix_ellipsis) {
-				syntax_error(ellipsis, "`..` must be applied to value rather than the field name");
+				syntax_error(ellipsis, "`...` must be applied to value rather than the field name");
 			}
 			if (f->curr_token.kind == Token_Ellipsis) {
 				ellipsis = f->curr_token;
@@ -3526,18 +3526,26 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 
 	isize total_name_count = 0;
 	bool allow_ellipsis = allowed_flags&FieldFlag_ellipsis;
+	bool seen_ellipsis = false;
 
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_Colon &&
 	       f->curr_token.kind != Token_EOF) {
 		u32 flags = parse_field_prefixes(f);
 		AstNode *param = parse_var_type(f, allow_ellipsis, allow_type_token);
+		if (param->kind == AstNode_Ellipsis) {
+			if (seen_ellipsis) syntax_error(param, "Extra variadic parameter");
+			seen_ellipsis = true;
+		} else if (seen_ellipsis) {
+			syntax_error(param, "Extra parameter have variadic parameters");
+		}
 		AstNodeAndFlags naf = {param, flags};
 		array_add(&list, naf);
 		if (!allow_token(f, Token_Comma)) {
 			break;
 		}
 	}
+
 
 	if (f->curr_token.kind == Token_Colon) {
 		Array<AstNode *> names = convert_to_ident_list(f, list, true); // Copy for semantic reasons
@@ -3557,6 +3565,12 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 		expect_token_after(f, Token_Colon, "field list");
 		if (f->curr_token.kind != Token_Eq) {
 			type = parse_var_type(f, allow_ellipsis, allow_type_token);
+		}
+		if (type != nullptr && type->kind == AstNode_Ellipsis) {
+			if (seen_ellipsis) syntax_error(type, "Extra variadic parameter");
+			seen_ellipsis = true;
+		} else if (seen_ellipsis) {
+			syntax_error(f->curr_token, "Extra variadic parameter");
 		}
 		if (allow_token(f, Token_Eq)) {
 			// TODO(bill): Should this be true==lhs or false==rhs?
@@ -3593,6 +3607,12 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 			expect_token_after(f, Token_Colon, "field list");
 			if (f->curr_token.kind != Token_Eq) {
 				type = parse_var_type(f, allow_ellipsis, allow_type_token);
+			}
+			if (type != nullptr && type->kind == AstNode_Ellipsis) {
+				if (seen_ellipsis) syntax_error(type, "Extra variadic parameter");
+				seen_ellipsis = true;
+			} else if (seen_ellipsis) {
+				syntax_error(f->curr_token, "Extra variadic parameter");
 			}
 			if (allow_token(f, Token_Eq)) {
 				// TODO(bill): Should this be true==lhs or false==rhs?
@@ -4881,21 +4901,21 @@ bool determine_path_from_string(Parser *p, AstNode *node, String base_dir, Strin
 			return false;
 		}
 	} else {
-#if !defined(GB_SYSTEM_WINDOWS) 
-		// @NOTE(vassvik): foreign imports of shared libraries that are not in the system collection on 
-		//                 linux/mac have to be local to the executable for consistency with shared libraries. 
-		//                 Unix does not have a concept of "import library" for shared/dynamic libraries, 
+#if !defined(GB_SYSTEM_WINDOWS)
+		// @NOTE(vassvik): foreign imports of shared libraries that are not in the system collection on
+		//                 linux/mac have to be local to the executable for consistency with shared libraries.
+		//                 Unix does not have a concept of "import library" for shared/dynamic libraries,
 		//                 so we need to pass the relative path to the linker, and add the current
 		//                 working directory of the exe to the library search paths.
 		//                 Static libraries can be linked directly with the full pathname
-		//                 
+		//
 		if (node->kind == AstNode_ForeignImportDecl && string_has_extension(file_str, str_lit("so"))) {
 			*path = file_str;
 			return true;
 		}
 #endif
 	}
-	
+
 	String fullpath = string_trim_whitespace(get_fullpath_relative(a, base_dir, file_str));
 	*path = fullpath;
 
