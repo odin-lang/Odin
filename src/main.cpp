@@ -833,7 +833,10 @@ int main(int arg_count, char **arg_ptr) {
 				if(lib.len > 2 && lib[0] == '-' && lib[1] == 'f') {
 					// framework thingie
 					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
-				} else if (string_has_extension(lib, str_lit("dylib"))) {
+				} else if (string_has_extension(lib, str_lit("a"))) {
+					// static libs, absolute full path relative to the file in which the lib was imported from
+					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " %.*s ", LIT(lib));
+				} else if (string_has_extension(lib, str_lit("dylib"))) {
 					// dynamic lib, relative path to executable
 					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l:%s/%.*s ", cwd, LIT(lib));
 				} else {
@@ -869,7 +872,6 @@ int main(int arg_count, char **arg_ptr) {
 		char *linker;
 		if (build_context.is_dll) {
 			// Shared libraries are .dylib on MacOS and .so on Linux.
-			// TODO(zangent): Is that statement entirely truthful?
 			#if defined(GB_SYSTEM_OSX)
 				output_ext = ".dylib";
 			#else

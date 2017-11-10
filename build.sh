@@ -7,11 +7,13 @@ libraries="-pthread -ldl -lm -lstdc++"
 other_args=""
 compiler="clang"
 
+if [ -z "$release_mode" ]; then release_mode="0"; fi
+
 if [ "$release_mode" -eq "0" ]; then
-	other_args="${other_args} -g
+	other_args="${other_args} -g"
 fi
 if [ "$release_mode" -eq "1" ]; then
-	other_args="${other_args} -O3 -march=native
+	other_args="${other_args} -O3 -march=native"
 fi
 
 if [[ "$(uname)" == "Darwin" ]]; then
