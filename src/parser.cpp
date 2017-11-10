@@ -4880,7 +4880,22 @@ bool determine_path_from_string(Parser *p, AstNode *node, String base_dir, Strin
 			syntax_error(node, "Unknown library collection: `%.*s`", LIT(collection_name));
 			return false;
 		}
+	} else {
+#if !defined(GB_SYSTEM_WINDOWS) 
+		// @NOTE(vassvik): foreign imports of shared libraries that are not in the system collection on 
+		//                 linux/mac have to be local to the executable for consistency with shared libraries. 
+		//                 Unix does not have a concept of "import library" for shared/dynamic libraries, 
+		//                 so we need to pass the relative path to the linker, and add the current
+		//                 working directory of the exe to the library search paths.
+		//                 Static libraries can be linked directly with the full pathname
+		//                 
+		if (node->kind == AstNode_ForeignImportDecl && string_has_extension(file_str, str_lit("so"))) {
+			*path = file_str;
+			return true;
+		}
+#endif
 	}
+	
 	String fullpath = string_trim_whitespace(get_fullpath_relative(a, base_dir, file_str));
 	*path = fullpath;
 

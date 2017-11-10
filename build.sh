@@ -1,15 +1,19 @@
 #!/bin/bash
 
-release_mode=0
+release_mode=$1
 
-warnings_to_disable="-std=c++11 -g -Wno-switch -Wno-pointer-sign -Wno-tautological-constant-out-of-range-compare -Wno-tautological-compare -Wno-macro-redefined -Wno-writable-strings"
+warnings_to_disable="-std=c++11 -Wno-switch -Wno-pointer-sign -Wno-tautological-constant-out-of-range-compare -Wno-tautological-compare -Wno-macro-redefined -Wno-writable-strings"
 libraries="-pthread -ldl -lm -lstdc++"
 other_args=""
 compiler="clang"
 
 if [ "$release_mode" -eq "0" ]; then
-	other_args="${other_args} -g -fno-inline-functions"
+	other_args="${other_args} -g
 fi
+if [ "$release_mode" -eq "1" ]; then
+	other_args="${other_args} -O3 -march=native
+fi
+
 if [[ "$(uname)" == "Darwin" ]]; then
 
 	# Set compiler to clang on MacOS

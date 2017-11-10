@@ -257,7 +257,17 @@ paket-files/
 builds/
 bin/
 *.exe
+*.obj
+*.pdb
 
 # - Linux/MacOS
 odin
 odin.dSYM
+
+
+# shared collection
+shared/
+
+# temp files
+* .ll
+*.bc
