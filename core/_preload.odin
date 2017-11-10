@@ -451,7 +451,7 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> __Map_Header {
 	header.is_key_string = is_string;
 	header.entry_size    = int(size_of(Entry));
 	header.entry_align   = int(align_of(Entry));
-	header.value_offset  = int(offset_of(Entry, value));
+	header.value_offset  = uintptr(offset_of(Entry, value));
 	header.value_size    = int(size_of(V));
 	return header;
 }
