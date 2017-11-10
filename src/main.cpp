@@ -811,9 +811,15 @@ int main(int arg_count, char **arg_ptr) {
 			return exit_code;
 		}
 
-		timings_start_section(&timings, str_lit("ld-link"));
+		// NOTE(vassvik): get cwd, for used for local shared libs linking, since those have to be relative to the exe
+		char cwd[256];
+		getcwd(&cwd[0], 256);
+		//printf("%s\n", cwd);
 
-		gbString lib_str = gb_string_make(heap_allocator(), "");
+		// NOTE(vassvik): needs to add the root to the library search paths, so that the full filenames of the library
+		//                files can be passed with -l:
+		gbString lib_str = gb_string_make(heap_allocator(), "-L/");
+
 		defer (gb_string_free(lib_str));
 		char lib_str_buf[1024] = {0};
 		for_array(i, ir_gen.module.foreign_library_paths) {
@@ -825,15 +831,33 @@ int main(int arg_count, char **arg_ptr) {
 			#if defined(GB_SYSTEM_OSX)
 				isize len;
 				if(lib.len > 2 && lib[0] == '-' && lib[1] == 'f') {
-					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-					                        " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
+					// framework thingie
+					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
+				} else if (string_has_extension(lib, str_lit("dylib"))) {
+					// dynamic lib, relative path to executable
+					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l:%s/%.*s ", cwd, LIT(lib));
 				} else {
-					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-					                        " -l%.*s ", LIT(lib));
+					// dynamic or static system lib, just link regularly searching system library paths
+					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l%.*s ", LIT(lib));
 				}
 			#else
-				isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-				                        " -l%.*s ", LIT(lib));
+				// NOTE(vassvik): static libraries (.a files) in linux can be linked to directly using the full path, 
+				//                since those are statically linked to at link time. shared libraries (.so) has to be 
+				//                available at runtime wherever the executable is run, so we make require those to be
+				//                local to the executable (unless the system collection is used, in which case we search
+				//                the system library paths for the library file). 
+				if (string_has_extension(lib, str_lit("a"))) {
+					// static libs, absolute full path relative to the file in which the lib was imported from
+					isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l:%.*s ", LIT(lib));
+				} else if (string_has_extension(lib, str_lit("so"))) {
+					// dynamic lib, relative path to executable
+					// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible 
+					//                at runtimeto the executable
+					isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l:%s/%.*s ", cwd, LIT(lib));
+				} else {
+					// dynamic or static system lib, just link regularly searching system library paths
+					isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l%.*s ", LIT(lib));
+				}
 			#endif
 			lib_str = gb_string_appendc(lib_str, lib_str_buf);
 		}
