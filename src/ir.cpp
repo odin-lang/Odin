@@ -1380,6 +1380,7 @@ irValue *ir_add_local_for_identifier(irProcedure *proc, AstNode *ident, bool zer
 
 irValue *ir_add_local_generated(irProcedure *proc, Type *type, bool zero_initialized = true) {
 	GB_ASSERT(type != nullptr);
+	type = default_type(type);
 
 	Scope *scope = nullptr;
 	if (proc->curr_block) {
@@ -1395,6 +1396,8 @@ irValue *ir_add_local_generated(irProcedure *proc, Type *type, bool zero_initial
 
 irValue *ir_add_global_generated(irModule *m, Type *type, irValue *value) {
 	GB_ASSERT(type != nullptr);
+	type = default_type(type);
+
 	gbAllocator a = m->allocator;
 
 	isize max_len = 7+8+1;
