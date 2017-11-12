@@ -55,8 +55,6 @@ TOKEN_KIND(Token__AssignOpEnd, "_AssignOpEnd"), \
 	TOKEN_KIND(Token_ArrowRight,       "->"), \
 	TOKEN_KIND(Token_ArrowLeft,        "<-"), \
 	TOKEN_KIND(Token_DoubleArrowRight, "=>"), \
-/* 	TOKEN_KIND(Token_Inc,              "++"), */ \
-/* 	TOKEN_KIND(Token_Dec,              "--"), */ \
 	TOKEN_KIND(Token_Undef,            "---"), \
 \
 TOKEN_KIND(Token__ComparisonBegin, "_ComparisonBegin"), \

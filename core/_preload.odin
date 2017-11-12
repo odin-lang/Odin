@@ -10,7 +10,6 @@ import "core:raw.odin"
 //
 // Import Name:        snake_case (but prefer single word)
 // Types:              Ada_Case
-// Union Variants:     Ada_Case
 // Enum Values:        Ada_Case
 // Procedures:         snake_case
 // Local Variables:    snake_case

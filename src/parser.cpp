@@ -126,9 +126,8 @@ enum FieldFlag {
 	FieldFlag_using     = 1<<1,
 	FieldFlag_no_alias  = 1<<2,
 	FieldFlag_c_vararg  = 1<<3,
-	FieldFlag_const     = 1<<4,
 
-	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_const,
+	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg,
 	FieldFlag_Struct    = FieldFlag_using,
 };
 
@@ -3292,10 +3291,6 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token) {
 			is_generic = true;
 			break;
 		}
-		if (f->flags&FieldFlag_const) {
-			is_generic = true;
-			break;
-		}
 	}
 
 
@@ -3340,7 +3335,6 @@ enum FieldPrefixKind {
 	FieldPrefix_using,
 	FieldPrefix_no_alias,
 	FieldPrefix_c_var_arg,
-	FieldPrefix_const,
 };
 
 FieldPrefixKind is_token_field_prefix(AstFile *f) {
@@ -3359,8 +3353,6 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 				return FieldPrefix_no_alias;
 			} else if (f->curr_token.string == "c_vararg") {
 				return FieldPrefix_c_var_arg;
-			} else if (f->curr_token.string == "const") {
-				return FieldPrefix_const;
 			}
 			break;
 		}
@@ -3374,7 +3366,6 @@ u32 parse_field_prefixes(AstFile *f) {
 	i32 using_count    = 0;
 	i32 no_alias_count = 0;
 	i32 c_vararg_count = 0;
-	i32 const_count    = 0;
 
 	for (;;) {
 		FieldPrefixKind kind = is_token_field_prefix(f);
@@ -3391,20 +3382,17 @@ u32 parse_field_prefixes(AstFile *f) {
 		case FieldPrefix_using:     using_count    += 1; advance_token(f); break;
 		case FieldPrefix_no_alias:  no_alias_count += 1; advance_token(f); break;
 		case FieldPrefix_c_var_arg: c_vararg_count += 1; advance_token(f); break;
-		case FieldPrefix_const:     const_count    += 1; advance_token(f); break;
 		}
 	}
 	if (using_count     > 1) syntax_error(f->curr_token, "Multiple 'using' in this field list");
 	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple '#no_alias' in this field list");
 	if (c_vararg_count  > 1) syntax_error(f->curr_token, "Multiple '#c_vararg' in this field list");
-	if (const_count     > 1) syntax_error(f->curr_token, "Multiple '#const' in this field list");
 
 
 	u32 field_flags = 0;
 	if (using_count     > 0) field_flags |= FieldFlag_using;
 	if (no_alias_count  > 0) field_flags |= FieldFlag_no_alias;
 	if (c_vararg_count  > 0) field_flags |= FieldFlag_c_vararg;
-	if (const_count     > 0) field_flags |= FieldFlag_const;
 	return field_flags;
 }
 
@@ -3425,10 +3413,6 @@ u32 check_field_prefixes(AstFile *f, isize name_count, u32 allowed_flags, u32 se
 	if ((allowed_flags&FieldFlag_c_vararg) == 0 && (set_flags&FieldFlag_c_vararg)) {
 		syntax_error(f->curr_token, "'#c_vararg' is not allowed within this field list");
 		set_flags &= ~FieldFlag_c_vararg;
-	}
-	if ((allowed_flags&FieldFlag_const) == 0 && (set_flags&FieldFlag_const)) {
-		syntax_error(f->curr_token, "'$' is not allowed within this field list");
-		set_flags &= ~FieldFlag_const;
 	}
 	return set_flags;
 }
