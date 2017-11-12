@@ -1272,7 +1272,6 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		Type *specialization = nullptr;
 
 		bool is_using          = (p->flags&FieldFlag_using) != 0;
-		bool is_constant_value = (p->flags&FieldFlag_const) != 0;
 
 
 		if (type_expr == nullptr) {
@@ -1372,9 +1371,6 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				if (type_expr->kind == AstNode_TypeType) {
 					error(default_value, "A type parameter may not have a default value");
 					continue;
-				} else if (is_constant_value) {
-					error(default_value, "A constant parameter may not have a default value");
-					continue;
 				} else {
 					Operand o = {};
 					if (default_value->kind == AstNode_BasicDirective &&
@@ -1448,17 +1444,6 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			}
 		}
 
-		if (is_constant_value) {
-			if (is_type_param) {
-				error(param, "'$' is not needed for a 'type' parameter");
-			}
-			if (p->flags&FieldFlag_no_alias) {
-				error(param, "'#no_alias' can only be applied to variable fields of pointer type");
-				p->flags &= ~FieldFlag_no_alias; // Remove the flag
-			}
-
-		}
-
 		for_array(j, p->names) {
 			AstNode *name = p->names[j];
 			if (!ast_node_expect(name, AstNode_Ident)) {
@@ -1522,34 +1507,10 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					}
 				}
 
-				if (is_constant_value) {
-					if (!is_type_constant_type(type)) {
-						gbString str = type_to_string(type);
-						error(params[i], "Invalid constant type, %s", str);
-						gb_string_free(str);
-					}
-
-					bool poly_const = true;
-					if (operands != nullptr) {
-						poly_const = false;
-						if (variables.count < operands->count) {
-							Operand op = (*operands)[variables.count];
-							if (op.mode != Addressing_Constant) {
-								error(op.expr, "Expected a constant parameter value");
-							} else {
-								value = op.value;
-							}
-						}
-					}
-
-					param = make_entity_const_param(c->allocator, scope, name->Ident.token, type, value, poly_const);
-				} else {
-					param = make_entity_param(c->allocator, scope, name->Ident.token, type, is_using, false);
-					param->Variable.default_value = value;
-					param->Variable.default_is_nil = default_is_nil;
-					param->Variable.default_is_location = default_is_location;
-				}
-
+				param = make_entity_param(c->allocator, scope, name->Ident.token, type, is_using, false);
+				param->Variable.default_value = value;
+				param->Variable.default_is_nil = default_is_nil;
+				param->Variable.default_is_location = default_is_location;
 			}
 			if (p->flags&FieldFlag_no_alias) {
 				param->flags |= EntityFlag_NoAlias;

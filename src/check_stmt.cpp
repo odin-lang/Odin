@@ -341,21 +341,21 @@ Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 	return rhs->type;
 }
 
-enum SwitchTypeKind {
-	SwitchType_Invalid,
-	SwitchType_Union,
-	SwitchType_Any,
+enum SwitchKind {
+	Switch_Invalid,
+	Switch_Union,
+	Switch_Any,
 };
 
-SwitchTypeKind check_valid_type_switch_type(Type *type) {
+SwitchKind check_valid_type_switch_type(Type *type) {
 	type = type_deref(type);
 	if (is_type_union(type)) {
-		return SwitchType_Union;
+		return Switch_Union;
 	}
 	if (is_type_any(type)) {
-		return SwitchType_Any;
+		return Switch_Any;
 	}
-	return SwitchType_Invalid;
+	return Switch_Invalid;
 }
 
 void check_stmt_internal(Checker *c, AstNode *node, u32 flags);
@@ -1401,7 +1401,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		check_open_scope(c, node);
 		check_label(c, ss->label); // TODO(bill): What should the label's "scope" be?
 
-		SwitchTypeKind switch_type_kind = SwitchType_Invalid;
+		SwitchKind switch_kind = Switch_Invalid;
 
 		if (ss->tag->kind != AstNode_AssignStmt) {
 			error(ss->tag, "Expected an 'in' assignment for this type switch statement");
@@ -1423,8 +1423,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		check_expr(c, &x, rhs);
 		check_assignment(c, &x, nullptr, str_lit("type switch expression"));
-		switch_type_kind = check_valid_type_switch_type(x.type);
-		if (check_valid_type_switch_type(x.type) == SwitchType_Invalid) {
+		switch_kind = check_valid_type_switch_type(x.type);
+		if (check_valid_type_switch_type(x.type) == Switch_Invalid) {
 			gbString str = type_to_string(x.type);
 			error(x.expr, "Invalid type for this type switch expression, got '%s'", str);
 			gb_string_free(str);
@@ -1488,7 +1488,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					Operand y = {};
 					check_expr_or_type(c, &y, type_expr);
 
-					if (switch_type_kind == SwitchType_Union) {
+					if (switch_kind == Switch_Union) {
 						GB_ASSERT(is_type_union(bt));
 						bool tag_type_found = false;
 						for_array(i, bt->Union.variants) {
@@ -1505,7 +1505,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 							continue;
 						}
 						case_type = y.type;
-					} else if (switch_type_kind == SwitchType_Any) {
+					} else if (switch_kind == Switch_Any) {
 						case_type = y.type;
 					} else {
 						GB_PANIC("Unknown type to type switch statement");
