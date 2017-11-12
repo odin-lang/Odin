@@ -57,7 +57,7 @@ struct AstFile {
 	Array<AstNode *>    decls;
 	ImportedFileKind    file_kind;
 	bool                is_global_scope;
-	Array<AstNode *>    imports_and_exports; // `import` `using import` `export`
+	Array<AstNode *>    imports_and_exports; // 'import' 'using import' 'export'
 
 
 	AstNode *           curr_proc;
@@ -1004,11 +1004,11 @@ AstNode *ast_binary_expr(AstFile *f, Token op, AstNode *left, AstNode *right) {
 	AstNode *result = make_ast_node(f, AstNode_BinaryExpr);
 
 	if (left == nullptr) {
-		syntax_error(op, "No lhs expression for binary expression `%.*s`", LIT(op.string));
+		syntax_error(op, "No lhs expression for binary expression '%.*s'", LIT(op.string));
 		left = ast_bad_expr(f, op, op);
 	}
 	if (right == nullptr) {
-		syntax_error(op, "No rhs expression for binary expression `%.*s`", LIT(op.string));
+		syntax_error(op, "No rhs expression for binary expression '%.*s'", LIT(op.string));
 		right = ast_bad_expr(f, op, op);
 	}
 
@@ -1706,7 +1706,7 @@ Token expect_token(AstFile *f, TokenKind kind) {
 	if (prev.kind != kind) {
 		String c = token_strings[kind];
 		String p = token_strings[prev.kind];
-		syntax_error(f->curr_token, "Expected `%.*s`, got `%.*s`", LIT(c), LIT(p));
+		syntax_error(f->curr_token, "Expected '%.*s', got '%.*s'", LIT(c), LIT(p));
 		if (prev.kind == Token_EOF) {
 			gb_exit(1);
 		}
@@ -1720,7 +1720,7 @@ Token expect_token_after(AstFile *f, TokenKind kind, char *msg) {
 	Token prev = f->curr_token;
 	if (prev.kind != kind) {
 		String p = token_strings[prev.kind];
-		syntax_error(f->curr_token, "Expected `%.*s` after %s, got `%.*s`",
+		syntax_error(f->curr_token, "Expected '%.*s' after %s, got '%.*s'",
 		             LIT(token_strings[kind]),
 		             msg,
 		             LIT(p));
@@ -1733,10 +1733,10 @@ Token expect_token_after(AstFile *f, TokenKind kind, char *msg) {
 Token expect_operator(AstFile *f) {
 	Token prev = f->curr_token;
 	if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
-		syntax_error(f->curr_token, "Expected an operator, got `%.*s`",
+		syntax_error(f->curr_token, "Expected an operator, got '%.*s'",
 		             LIT(token_strings[prev.kind]));
 	} else if (!f->allow_range && (prev.kind == Token_Ellipsis || prev.kind == Token_HalfClosed)) {
-		syntax_error(f->curr_token, "Expected an non-range operator, got `%.*s`",
+		syntax_error(f->curr_token, "Expected an non-range operator, got '%.*s'",
 		             LIT(token_strings[prev.kind]));
 	}
 	advance_token(f);
@@ -1746,7 +1746,7 @@ Token expect_operator(AstFile *f) {
 Token expect_keyword(AstFile *f) {
 	Token prev = f->curr_token;
 	if (!gb_is_between(prev.kind, Token__KeywordBegin+1, Token__KeywordEnd-1)) {
-		syntax_error(f->curr_token, "Expected a keyword, got `%.*s`",
+		syntax_error(f->curr_token, "Expected a keyword, got '%.*s'",
 		             LIT(token_strings[prev.kind]));
 	}
 	advance_token(f);
@@ -1837,7 +1837,7 @@ Token expect_closing(AstFile *f, TokenKind kind, String context) {
 	if (f->curr_token.kind != kind &&
 	    f->curr_token.kind == Token_Semicolon &&
 	    f->curr_token.string == "\n") {
-		syntax_error(f->curr_token, "Missing `,` before newline in %.*s", LIT(context));
+		syntax_error(f->curr_token, "Missing ',' before newline in %.*s", LIT(context));
 		advance_token(f);
 	}
 	return expect_token(f, kind);
@@ -1926,10 +1926,10 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 			return;
 		}
 		String node_string = ast_node_strings[s->kind];
-		syntax_error(prev_token, "Expected `;` after %.*s, got %.*s",
+		syntax_error(prev_token, "Expected ';' after %.*s, got %.*s",
 		             LIT(node_string), LIT(token_strings[prev_token.kind]));
 	} else {
-		syntax_error(prev_token, "Expected `;`");
+		syntax_error(prev_token, "Expected ';'");
 	}
 	fix_advance_to_next_stmt(f);
 }
@@ -2125,7 +2125,7 @@ AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
 		return statement->ExprStmt.expr;
 	}
 
-	syntax_error(f->curr_token, "Expected `%.*s`, found a simple statement.", LIT(kind));
+	syntax_error(f->curr_token, "Expected '%.*s', found a simple statement.", LIT(kind));
 	Token end = f->curr_token;
 	if (f->tokens.count < f->curr_token_index) {
 		end = f->tokens[f->curr_token_index+1];
@@ -2264,7 +2264,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		if (pi != ProcInlining_none) {
 			if (expr->ProcLit.inlining != ProcInlining_none &&
 			    expr->ProcLit.inlining != pi) {
-				syntax_error(expr, "You cannot apply both `inline` and `no_inline` to a procedure literal");
+				syntax_error(expr, "You cannot apply both 'inline' and 'no_inline' to a procedure literal");
 			}
 			expr->ProcLit.inlining = pi;
 		}
@@ -2409,41 +2409,41 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			Token tag = expect_token_after(f, Token_Ident, "#");
 			if (tag.string == "packed") {
 				if (is_packed) {
-					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_packed = true;
 			} else if (tag.string == "ordered") {
 				if (is_ordered) {
-					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_ordered = true;
 			} else if (tag.string == "align") {
 				if (align) {
-					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				align = parse_expr(f, true);
 			} else if (tag.string == "raw_union") {
 				if (is_raw_union) {
-					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_raw_union = true;
 			} else {
-				syntax_error(tag, "Invalid struct tag `#%.*s`", LIT(tag.string));
+				syntax_error(tag, "Invalid struct tag '#%.*s'", LIT(tag.string));
 			}
 		}
 
 		f->expr_level = prev_level;
 
 		if (is_packed && is_ordered) {
-			syntax_error(token, "`#ordered` is not needed with `#packed` which implies ordering");
+			syntax_error(token, "'#ordered' is not needed with '#packed' which implies ordering");
 		}
 		if (is_raw_union && is_packed) {
 			is_packed = false;
-			syntax_error(token, "`#raw_union` cannot also be `#packed`");
+			syntax_error(token, "'#raw_union' cannot also be '#packed'");
 		}
 		if (is_raw_union && is_ordered) {
 			is_ordered = false;
-			syntax_error(token, "`#raw_union` cannot also be `#ordered`");
+			syntax_error(token, "'#raw_union' cannot also be '#ordered'");
 		}
 
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
@@ -2475,11 +2475,11 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			Token tag = expect_token_after(f, Token_Ident, "#");
 			 if (tag.string == "align") {
 				if (align) {
-					syntax_error(tag, "Duplicate union tag `#%.*s`", LIT(tag.string));
+					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
 				}
 				align = parse_expr(f, true);
 			} else {
-				syntax_error(tag, "Invalid union tag `#%.*s`", LIT(tag.string));
+				syntax_error(tag, "Invalid union tag '#%.*s'", LIT(tag.string));
 			}
 		}
 
@@ -2527,11 +2527,11 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			Token tag = expect_token_after(f, Token_Ident, "#");
 			if (tag.string == "align") {
 				if (align) {
-					syntax_error(tag, "Duplicate bit_field tag `#%.*s`", LIT(tag.string));
+					syntax_error(tag, "Duplicate bit_field tag '#%.*s'", LIT(tag.string));
 				}
 				align = parse_expr(f, true);
 			} else {
-				syntax_error(tag, "Invalid bit_field tag `#%.*s`", LIT(tag.string));
+				syntax_error(tag, "Invalid bit_field tag '#%.*s'", LIT(tag.string));
 			}
 		}
 
@@ -2624,7 +2624,7 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 			Token eq = expect_token(f, Token_Eq);
 
 			if (prefix_ellipsis) {
-				syntax_error(ellipsis, "`...` must be applied to value rather than the field name");
+				syntax_error(ellipsis, "'...' must be applied to value rather than the field name");
 			}
 
 			AstNode *value = parse_value(f);
@@ -3259,7 +3259,7 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token) {
 		Token token = expect_token(f, Token_String);
 		auto c = string_to_calling_convention(token.string);
 		if (c == ProcCC_Invalid) {
-			syntax_error(token, "Unknown procedure calling convention: `%.*s`\n", LIT(token.string));
+			syntax_error(token, "Unknown procedure calling convention: '%.*s'\n", LIT(token.string));
 		} else {
 			cc = c;
 		}
@@ -3307,7 +3307,7 @@ AstNode *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_type_token) 
 		Token tok = advance_token(f);
 		AstNode *type = parse_type_or_ident(f);
 		if (type == nullptr) {
-			syntax_error(tok, "variadic field missing type after `...`");
+			syntax_error(tok, "variadic field missing type after '...'");
 			type = ast_bad_expr(f, tok, f->curr_token);
 		}
 		return ast_ellipsis(f, tok, type);
@@ -3382,7 +3382,7 @@ u32 parse_field_prefixes(AstFile *f) {
 			break;
 		}
 		if (kind == FieldPrefix_Unknown) {
-			syntax_error(f->curr_token, "Unknown prefix kind `#%.*s`", LIT(f->curr_token.string));
+			syntax_error(f->curr_token, "Unknown prefix kind '#%.*s'", LIT(f->curr_token.string));
 			advance_token(f);
 			continue;
 		}
@@ -3394,10 +3394,10 @@ u32 parse_field_prefixes(AstFile *f) {
 		case FieldPrefix_const:     const_count    += 1; advance_token(f); break;
 		}
 	}
-	if (using_count     > 1) syntax_error(f->curr_token, "Multiple `using` in this field list");
-	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple `#no_alias` in this field list");
-	if (c_vararg_count  > 1) syntax_error(f->curr_token, "Multiple `#c_vararg` in this field list");
-	if (const_count     > 1) syntax_error(f->curr_token, "Multiple `#const` in this field list");
+	if (using_count     > 1) syntax_error(f->curr_token, "Multiple 'using' in this field list");
+	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple '#no_alias' in this field list");
+	if (c_vararg_count  > 1) syntax_error(f->curr_token, "Multiple '#c_vararg' in this field list");
+	if (const_count     > 1) syntax_error(f->curr_token, "Multiple '#const' in this field list");
 
 
 	u32 field_flags = 0;
@@ -3410,24 +3410,24 @@ u32 parse_field_prefixes(AstFile *f) {
 
 u32 check_field_prefixes(AstFile *f, isize name_count, u32 allowed_flags, u32 set_flags) {
 	if (name_count > 1 && (set_flags&FieldFlag_using)) {
-		syntax_error(f->curr_token, "Cannot apply `using` to more than one of the same type");
+		syntax_error(f->curr_token, "Cannot apply 'using' to more than one of the same type");
 		set_flags &= ~FieldFlag_using;
 	}
 
 	if ((allowed_flags&FieldFlag_using) == 0 && (set_flags&FieldFlag_using)) {
-		syntax_error(f->curr_token, "`using` is not allowed within this field list");
+		syntax_error(f->curr_token, "'using' is not allowed within this field list");
 		set_flags &= ~FieldFlag_using;
 	}
 	if ((allowed_flags&FieldFlag_no_alias) == 0 && (set_flags&FieldFlag_no_alias)) {
-		syntax_error(f->curr_token, "`#no_alias` is not allowed within this field list");
+		syntax_error(f->curr_token, "'#no_alias' is not allowed within this field list");
 		set_flags &= ~FieldFlag_no_alias;
 	}
 	if ((allowed_flags&FieldFlag_c_vararg) == 0 && (set_flags&FieldFlag_c_vararg)) {
-		syntax_error(f->curr_token, "`#c_vararg` is not allowed within this field list");
+		syntax_error(f->curr_token, "'#c_vararg' is not allowed within this field list");
 		set_flags &= ~FieldFlag_c_vararg;
 	}
 	if ((allowed_flags&FieldFlag_const) == 0 && (set_flags&FieldFlag_const)) {
-		syntax_error(f->curr_token, "`$` is not allowed within this field list");
+		syntax_error(f->curr_token, "'$' is not allowed within this field list");
 		set_flags &= ~FieldFlag_const;
 	}
 	return set_flags;
@@ -3795,28 +3795,28 @@ AstNode *parse_type_or_ident(AstFile *f) {
 			Token tag = expect_token_after(f, Token_Ident, "#");
 			if (tag.string == "packed") {
 				if (is_packed) {
-					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_packed = true;
 			} else if (tag.string == "ordered") {
 				if (is_ordered) {
-					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_ordered = true;
 			} else if (tag.string == "align") {
 				if (align) {
-					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				align = parse_expr(f, true);
 			} else {
-				syntax_error(tag, "Invalid struct tag `#%.*s`", LIT(tag.string));
+				syntax_error(tag, "Invalid struct tag '#%.*s'", LIT(tag.string));
 			}
 		}
 
 		f->expr_level = prev_level;
 
 		if (is_packed && is_ordered) {
-			syntax_error(token, "`#ordered` is not needed with `#packed` which implies ordering");
+			syntax_error(token, "'#ordered' is not needed with '#packed' which implies ordering");
 		}
 
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
@@ -3904,11 +3904,11 @@ AstNode *parse_type_or_ident(AstFile *f) {
 			Token tag = expect_token_after(f, Token_Ident, "#");
 			if (tag.string == "align") {
 				if (align) {
-					syntax_error(tag, "Duplicate bit_field tag `#%.*s`", LIT(tag.string));
+					syntax_error(tag, "Duplicate bit_field tag '#%.*s'", LIT(tag.string));
 				}
 				align = parse_expr(f, true);
 			} else {
-				syntax_error(tag, "Invalid bit_field tag `#%.*s`", LIT(tag.string));
+				syntax_error(tag, "Invalid bit_field tag '#%.*s'", LIT(tag.string));
 			}
 		}
 
@@ -4329,7 +4329,7 @@ AstNode *parse_defer_stmt(AstFile *f) {
 	AstNode *stmt = parse_stmt(f);
 	switch (stmt->kind) {
 	case AstNode_EmptyStmt:
-		syntax_error(token, "Empty statement after defer (e.g. `;`)");
+		syntax_error(token, "Empty statement after defer (e.g. ';')");
 		break;
 	case AstNode_DeferStmt:
 		syntax_error(token, "You cannot defer a defer statement");
@@ -4385,14 +4385,14 @@ AstNode *parse_import_decl(AstFile *f, bool is_using) {
 	}
 
 	if (!is_using && is_blank_ident(import_name)) {
-		syntax_error(import_name, "Illegal import name: `_`");
+		syntax_error(import_name, "Illegal import name: '_'");
 	}
 
 	Token file_path = expect_token_after(f, Token_String, "import");
 
 	AstNode *s = nullptr;
 	if (f->curr_proc != nullptr) {
-		syntax_error(import_name, "You cannot use `import` within a procedure. This must be done at the file scope");
+		syntax_error(import_name, "You cannot use 'import' within a procedure. This must be done at the file scope");
 		s = ast_bad_decl(f, import_name, file_path);
 	} else {
 		s = ast_import_decl(f, token, is_using, file_path, import_name, docs, f->line_comment);
@@ -4408,7 +4408,7 @@ AstNode *parse_export_decl(AstFile *f) {
 	Token file_path = expect_token_after(f, Token_String, "export");
 	AstNode *s = nullptr;
 	if (f->curr_proc != nullptr) {
-		syntax_error(token, "You cannot use `export` within a procedure. This must be done at the file scope");
+		syntax_error(token, "You cannot use 'export' within a procedure. This must be done at the file scope");
 		s = ast_bad_decl(f, token, file_path);
 	} else {
 		s = ast_export_decl(f, token, file_path, docs, f->line_comment);
@@ -4439,7 +4439,7 @@ AstNode *parse_foreign_decl(AstFile *f) {
 			break;
 		}
 		if (is_blank_ident(lib_name)) {
-			syntax_error(lib_name, "Illegal foreign_library name: `_`");
+			syntax_error(lib_name, "Illegal foreign_library name: '_'");
 		}
 		Token file_path = expect_token(f, Token_String);
 		AstNode *s = nullptr;
@@ -4545,7 +4545,7 @@ AstNode *parse_stmt(AstFile *f) {
 		AstNode *decl = nullptr;
 		Array<AstNode *> list = parse_lhs_expr_list(f);
 		if (list.count == 0) {
-			syntax_error(token, "Illegal use of `using` statement");
+			syntax_error(token, "Illegal use of 'using' statement");
 			expect_semicolon(f, nullptr);
 			return ast_bad_stmt(f, token, f->curr_token);
 		}
@@ -4558,14 +4558,14 @@ AstNode *parse_stmt(AstFile *f) {
 
 		if (decl != nullptr && decl->kind == AstNode_ValueDecl) {
 			if (!decl->ValueDecl.is_mutable) {
-				syntax_error(token, "`using` may only be applied to variable declarations");
+				syntax_error(token, "'using' may only be applied to variable declarations");
 				return decl;
 			}
 			decl->ValueDecl.is_using = true;
 			return decl;
 		}
 
-		syntax_error(token, "Illegal use of `using` statement");
+		syntax_error(token, "Illegal use of 'using' statement");
 		return ast_bad_stmt(f, token, f->curr_token);
 	} break;
 
@@ -4644,10 +4644,10 @@ AstNode *parse_stmt(AstFile *f) {
 		}
 
 		if (tag == "include") {
-			syntax_error(token, "#include is not a valid import declaration kind. Did you mean `import`?");
+			syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");
 			s = ast_bad_stmt(f, token, f->curr_token);
 		} else {
-			syntax_error(token, "Unknown tag directive used: `%.*s`", LIT(tag));
+			syntax_error(token, "Unknown tag directive used: '%.*s'", LIT(tag));
 			s = ast_bad_stmt(f, token, f->curr_token);
 		}
 
@@ -4666,7 +4666,7 @@ AstNode *parse_stmt(AstFile *f) {
 	}
 
 	syntax_error(token,
-	             "Expected a statement, got `%.*s`",
+	             "Expected a statement, got '%.*s'",
 	             LIT(token_strings[token.kind]));
 	fix_advance_to_next_stmt(f);
 	return ast_bad_stmt(f, token, f->curr_token);
@@ -4886,7 +4886,7 @@ bool determine_path_from_string(Parser *p, AstNode *node, String base_dir, Strin
 	}
 
 	if (!is_import_path_valid(file_str)) {
-		syntax_error(node, "Invalid import path: `%.*s`", LIT(file_str));
+		syntax_error(node, "Invalid import path: '%.*s'", LIT(file_str));
 		return false;
 	}
 
@@ -4901,7 +4901,7 @@ bool determine_path_from_string(Parser *p, AstNode *node, String base_dir, Strin
 	if (collection_name.len > 0) {
 		if (collection_name == "system") {
 			if (node->kind != AstNode_ForeignImportDecl) {
-				syntax_error(node, "The library collection `system` is restrict for `foreign_library`");
+				syntax_error(node, "The library collection 'system' is restrict for 'foreign_library'");
 				return false;
 			} else {
 				*path = file_str;
@@ -4909,7 +4909,7 @@ bool determine_path_from_string(Parser *p, AstNode *node, String base_dir, Strin
 			}
 		} else if (!find_library_collection_path(collection_name, &base_dir)) {
 			// NOTE(bill): It's a naughty name
-			syntax_error(node, "Unknown library collection: `%.*s`", LIT(collection_name));
+			syntax_error(node, "Unknown library collection: '%.*s'", LIT(collection_name));
 			return false;
 		}
 	} else {
@@ -5071,7 +5071,7 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 		gb_printf_err("Failed to parse file: %.*s\n\t", LIT(import_rel_path));
 		switch (err) {
 		case ParseFile_WrongExtension:
-			gb_printf_err("Invalid file extension: File must have the extension `.odin`");
+			gb_printf_err("Invalid file extension: File must have the extension '.odin'");
 			break;
 		case ParseFile_InvalidFile:
 			gb_printf_err("Invalid file or cannot be found");
@@ -5080,7 +5080,7 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 			gb_printf_err("File permissions problem");
 			break;
 		case ParseFile_NotFound:
-			gb_printf_err("File cannot be found (`%.*s`)", LIT(import_path));
+			gb_printf_err("File cannot be found ('%.*s')", LIT(import_path));
 			break;
 		case ParseFile_InvalidToken:
 			gb_printf_err("Invalid token found in file at (%td:%td)", err_pos.line, err_pos.column);

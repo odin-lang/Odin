@@ -93,7 +93,7 @@ struct irDefer {
 	irBlock *   block;
 	union {
 		AstNode *stmt;
-		// NOTE(bill): `instr` will be copied every time to create a new one
+		// NOTE(bill): 'instr' will be copied every time to create a new one
 		irValue *instr;
 	};
 };
@@ -2268,7 +2268,7 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 
 	case Token_AndNot: {
 		// NOTE(bill): x &~ y == x & (~y) == x & (y ~ -1)
-		// NOTE(bill): "not" `x` == `x` "xor" `-1`
+		// NOTE(bill): "not" 'x' == 'x' "xor" '-1'
 		irValue *neg = ir_add_module_constant(proc->module, type, exact_value_i64(-1));
 		op = Token_Xor;
 		right = ir_emit_arith(proc, op, right, neg, type);
@@ -2988,7 +2988,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 			} else if (is_type_integer(dst)) {
 				ev = exact_value_to_integer(ev);
 			} else if (is_type_pointer(dst)) {
-				// IMPORTANT NOTE(bill): LLVM doesn't support pointer constants expect `null`
+				// IMPORTANT NOTE(bill): LLVM doesn't support pointer constants expect 'null'
 				irValue *i = ir_add_module_constant(proc->module, t_uintptr, ev);
 				return ir_emit(proc, ir_instr_conv(proc, irConv_inttoptr, i, t_uintptr, dst));
 			}
@@ -3137,7 +3137,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		}
 	}
 
-	// NOTE(bill): This has to be done before `Pointer <-> Pointer` as it's
+	// NOTE(bill): This has to be done before 'Pointer <-> Pointer' as it's
 	// subtype polymorphism casting
 	if (check_is_assignable_to_using_subtype(src_type, t)) {
 		Type *st = type_deref(src_type);
@@ -3281,7 +3281,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	gb_printf_err("Not Identical %s != %s\n", type_to_string(src), type_to_string(dst));
 
 
-	GB_PANIC("Invalid type conversion: `%s` to `%s` for procedure `%.*s`",
+	GB_PANIC("Invalid type conversion: '%s' to '%s' for procedure '%.*s'",
 	         type_to_string(src_type), type_to_string(t),
 	         LIT(proc->name));
 
@@ -3338,7 +3338,7 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 	i64 sz = type_size_of(m->allocator, src);
 	i64 dz = type_size_of(m->allocator, dst);
 
-	GB_ASSERT_MSG(sz == dz, "Invalid transmute conversion: `%s` to `%s`", type_to_string(src_type), type_to_string(t));
+	GB_ASSERT_MSG(sz == dz, "Invalid transmute conversion: '%s' to '%s'", type_to_string(src_type), type_to_string(t));
 
 	// NOTE(bill): Casting between an integer and a pointer cannot be done through a bitcast
 	if (is_type_uintptr(src) && is_type_pointer(dst)) {
@@ -3862,7 +3862,7 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	#if 0
 	if (is_type_union(e->type)) {
 		Type *bt = base_type(e->type);
-		// NOTE(bill): Zeroth entry is null (for `match type` stmts)
+		// NOTE(bill): Zeroth entry is null (for 'match type' stmts)
 		for (isize j = 1; j < bt->Struct.variant_count; j++) {
 			ir_mangle_add_sub_type_name(m, bt->Struct.variants[j], name);
 		}
@@ -3923,7 +3923,7 @@ irValue *ir_emit_clamp(irProcedure *proc, Type *t, irValue *x, irValue *min, irV
 
 irValue *ir_find_global_variable(irProcedure *proc, String name) {
 	irValue **value = map_get(&proc->module->members, hash_string(name));
-	GB_ASSERT_MSG(value != nullptr, "Unable to find global variable `%.*s`", LIT(name));
+	GB_ASSERT_MSG(value != nullptr, "Unable to find global variable '%.*s'", LIT(name));
 	return *value;
 }
 
@@ -4298,7 +4298,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		} else if (is_type_string(type)) {
 			ptr = ir_string_elem(proc, val);
 		} else {
-			GB_PANIC("Invalid type to `free`");
+			GB_PANIC("Invalid type to 'free'");
 		}
 
 		if (ptr == nullptr) {
@@ -4345,7 +4345,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			args[1] = capacity;
 			return ir_emit_global_call(proc, "__dynamic_map_reserve", args, 2);
 		} else {
-			GB_PANIC("Unknown type for `reserve`");
+			GB_PANIC("Unknown type for 'reserve'");
 		}
 		break;
 	}
@@ -4372,7 +4372,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			irValue *count_ptr = ir_emit_struct_ep(proc, ptr, 1);
 			ir_emit_store(proc, count_ptr, v_zero);
 		} else {
-			GB_PANIC("TODO(bill): ir clear for `%s`", type_to_string(t));
+			GB_PANIC("TODO(bill): ir clear for '%s'", type_to_string(t));
 		}
 		return nullptr;
 		break;
@@ -4778,7 +4778,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		GB_ASSERT_MSG(e != nullptr, "%s", expr_to_string(expr));
 		if (e->kind == Entity_Builtin) {
 			Token token = ast_node_token(expr);
-			GB_PANIC("TODO(bill): ir_build_single_expr Entity_Builtin `%.*s`\n"
+			GB_PANIC("TODO(bill): ir_build_single_expr Entity_Builtin '%.*s'\n"
 			         "\t at %.*s(%td:%td)", LIT(builtin_procs[e->Builtin.id].name),
 			         LIT(token.pos.file), token.pos.line, token.pos.column);
 			return nullptr;
@@ -5715,7 +5715,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(ce, CallExpr, expr);
-		// NOTE(bill): This is make sure you never need to have an `array_ev`
+		// NOTE(bill): This is make sure you never need to have an 'array_ev'
 		irValue *e = ir_build_expr(proc, expr);
 		irValue *v = ir_add_local_generated(proc, ir_type(e));
 		ir_emit_store(proc, v, e);
@@ -5772,7 +5772,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 		case Type_Struct: {
 
-			// TODO(bill): "constant" `#raw_union`s are not initialized constantly at the moment.
+			// TODO(bill): "constant" '#raw_union's are not initialized constantly at the moment.
 			// NOTE(bill): This is due to the layout of the unions when printed to LLVM-IR
 			bool is_raw_union = is_type_raw_union(bt);
 			GB_ASSERT(is_type_struct(bt) || is_raw_union);
@@ -6235,7 +6235,7 @@ void ir_build_when_stmt(irProcedure *proc, AstNodeWhenStmt *ws) {
 			ir_build_when_stmt(proc, &ws->else_stmt->WhenStmt);
 			break;
 		default:
-			GB_PANIC("Invalid `else` statement in `when` statement");
+			GB_PANIC("Invalid 'else' statement in 'when' statement");
 			break;
 		}
 	}
@@ -6407,7 +6407,7 @@ void ir_build_range_string(irProcedure *proc, irValue *expr, Type *val_type,
 void ir_build_range_interval(irProcedure *proc, AstNodeBinaryExpr *node, Type *val_type,
                               irValue **val_, irValue **idx_, irBlock **loop_, irBlock **done_) {
 	// TODO(bill): How should the behaviour work for lower and upper bounds checking for iteration?
-	// If `lower` is changed, should `val` do so or is that not typical behaviour?
+	// If 'lower' is changed, should 'val' do so or is that not typical behaviour?
 
 	irValue *lower = ir_build_expr(proc, node->left);
 	irValue *upper = nullptr;
@@ -7175,8 +7175,8 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		Type *parent_type = ir_type(parent);
 		bool is_parent_ptr = is_type_pointer(ir_type(parent));
 
-		MatchTypeKind match_type_kind = check_valid_type_match_type(ir_type(parent));
-		GB_ASSERT(match_type_kind != MatchType_Invalid);
+		SwitchTypeKind switch_type_kind = check_valid_type_switch_type(ir_type(parent));
+		GB_ASSERT(switch_type_kind != SwitchType_Invalid);
 
 		irValue *parent_value = parent;
 
@@ -7187,7 +7187,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 		irValue *tag_index = nullptr;
 		irValue *union_data = nullptr;
-		if (match_type_kind == MatchType_Union) {
+		if (switch_type_kind == SwitchType_Union) {
 			ir_emit_comment(proc, str_lit("get union's tag"));
 			tag_index = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, parent_ptr));
 			union_data = ir_emit_conv(proc, parent_ptr, t_rawptr);
@@ -7220,11 +7220,11 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				next = ir_new_block(proc, nullptr, "typeswitch.next");
 				case_type = type_of_expr(proc->module->info, cc->list[type_index]);
 				irValue *cond = nullptr;
-				if (match_type_kind == MatchType_Union) {
+				if (switch_type_kind == SwitchType_Union) {
 					Type *ut = base_type(type_deref(parent_type));
 					irValue *variant_tag = ir_const_union_tag(proc->module->allocator, ut, case_type);
 					cond = ir_emit_comp(proc, Token_CmpEq, tag_index, variant_tag);
-				} else if (match_type_kind == MatchType_Any) {
+				} else if (switch_type_kind == SwitchType_Any) {
 					irValue *any_ti  = ir_emit_load(proc, ir_emit_struct_ep(proc, parent_ptr, 1));
 					irValue *case_ti = ir_type_info(proc, case_type);
 					cond = ir_emit_comp(proc, Token_CmpEq, any_ti, case_ti);
@@ -7250,9 +7250,9 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				}
 				GB_ASSERT_MSG(is_type_pointer(ct), "%s", type_to_string(ct));
 				irValue *data = nullptr;
-				if (match_type_kind == MatchType_Union) {
+				if (switch_type_kind == SwitchType_Union) {
 					data = union_data;
-				} else if (match_type_kind == MatchType_Any) {
+				} else if (switch_type_kind == SwitchType_Any) {
 					irValue *any_data = ir_emit_load(proc, ir_emit_struct_ep(proc, parent_ptr, 0));
 					data = any_data;
 				}
@@ -8713,7 +8713,7 @@ void ir_gen_tree(irGen *s) {
 				Type *t = type_deref(ir_type(var->var));
 
 				if (is_type_any(t)) {
-					// NOTE(bill): Edge case for `any` type
+					// NOTE(bill): Edge case for 'any' type
 					Type *var_type = default_type(ir_type(var->init));
 					irValue *g = ir_add_global_generated(proc->module, var_type, var->init);
 					ir_emit_store(proc, g, var->init);

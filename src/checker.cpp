@@ -230,7 +230,7 @@ struct Scope {
 	Array<Scope *>   shared;
 	Array<AstNode *> delayed_file_decls;
 	PtrSet<Scope *>  imported;
-	PtrSet<Scope *>  exported; // NOTE(bhall): Contains `using import` too
+	PtrSet<Scope *>  exported; // NOTE(bhall): Contains 'using import' too
 	bool             is_proc;
 	bool             is_global;
 	bool             is_file;
@@ -617,7 +617,7 @@ void destroy_scope(Scope *scope) {
 		if (e->kind == Entity_Variable) {
 			if (!(e->flags & EntityFlag_Used)) {
 #if 0
-				warning(e->token, "Unused variable `%.*s`", LIT(e->token.string));
+				warning(e->token, "Unused variable '%.*s'", LIT(e->token.string));
 #endif
 			}
 		}
@@ -833,7 +833,7 @@ void add_declaration_dependency(Checker *c, Entity *e) {
 Entity *add_global_entity(Entity *entity) {
 	String name = entity->token.string;
 	if (gb_memchr(name.text, ' ', name.len)) {
-		return entity; // NOTE(bill): `untyped thing`
+		return entity; // NOTE(bill): 'untyped thing'
 	}
 	if (scope_insert_entity(universal_scope, entity)) {
 		compiler_error("double declaration");
@@ -1123,7 +1123,7 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	}
 
 	if (error_on_failure && entry_index < 0) {
-		compiler_error("TypeInfo for `%s` could not be found", type_to_string(type));
+		compiler_error("TypeInfo for '%s' could not be found", type_to_string(type));
 	}
 	return entry_index;
 }
@@ -1189,7 +1189,7 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 					return false;
 				}
 				error(entity->token,
-				      "Redeclaration of `%.*s` in this scope through `using`\n"
+				      "Redeclaration of '%.*s' in this scope through 'using'\n"
 				      "\tat %.*s(%td:%td)",
 				      LIT(name),
 				      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
@@ -1200,7 +1200,7 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 					return false;
 				}
 				error(entity->token,
-				      "Redeclaration of `%.*s` in this scope\n"
+				      "Redeclaration of '%.*s' in this scope\n"
 				      "\tat %.*s(%td:%td)",
 				      LIT(name),
 				      LIT(pos.file), pos.line, pos.column);
@@ -1565,26 +1565,26 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		EntityGraphNode *n = entry->value;
 
 		if (e->kind == Entity_Procedure) {
-			// Connect each pred `p` of `n` with each succ `s` and from
+			// Connect each pred 'p' of 'n' with each succ 's' and from
 			// the procedure node
 			for_array(j, n->pred.entries) {
 				EntityGraphNode *p = cast(EntityGraphNode *)n->pred.entries[j].ptr;
 
 				// Ignore self-cycles
 				if (p != n) {
-					// Each succ `s` of `n` becomes a succ of `p`, and
-					// each pred `p` of `n` becomes a pred of `s`
+					// Each succ 's' of 'n' becomes a succ of 'p', and
+					// each pred 'p' of 'n' becomes a pred of 's'
 					for_array(k, n->succ.entries) {
 						EntityGraphNode *s = n->succ.entries[k].ptr;
 						// Ignore self-cycles
 						if (s != n) {
 							entity_graph_node_set_add(&p->succ, s);
 							entity_graph_node_set_add(&s->pred, p);
-							// Remove edge to `n`
+							// Remove edge to 'n'
 							entity_graph_node_set_remove(&s->pred, n);
 						}
 					}
-					// Remove edge to `n`
+					// Remove edge to 'n'
 					entity_graph_node_set_remove(&p->succ, n);
 				}
 			}
@@ -1609,8 +1609,8 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 Entity *find_core_entity(Checker *c, String name) {
 	Entity *e = current_scope_lookup_entity(c->global_scope, name);
 	if (e == nullptr) {
-		compiler_error("Could not find type declaration for `%.*s`\n"
-		               "Is `_preload.odin` missing from the `core` directory relative to odin.exe?", LIT(name));
+		compiler_error("Could not find type declaration for '%.*s'\n"
+		               "Is '_preload.odin' missing from the 'core' directory relative to odin.exe?", LIT(name));
 		// NOTE(bill): This will exit the program as it's cannot continue without it!
 	}
 	return e;
@@ -1619,8 +1619,8 @@ Entity *find_core_entity(Checker *c, String name) {
 Type *find_core_type(Checker *c, String name) {
 	Entity *e = current_scope_lookup_entity(c->global_scope, name);
 	if (e == nullptr) {
-		compiler_error("Could not find type declaration for `%.*s`\n"
-		               "Is `_preload.odin` missing from the `core` directory relative to odin.exe?", LIT(name));
+		compiler_error("Could not find type declaration for '%.*s'\n"
+		               "Is '_preload.odin' missing from the 'core' directory relative to odin.exe?", LIT(name));
 		// NOTE(bill): This will exit the program as it's cannot continue without it!
 	}
 	return e->type;
@@ -1812,25 +1812,25 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
 			switch (kind) {
 			case ProcOverload_Identical:
-				error(p->token, "Overloaded procedure `%.*s` as the same type as another procedure in this scope", LIT(name));
+				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
 				is_invalid = true;
 				break;
 			// case ProcOverload_CallingConvention:
-				// error(p->token, "Overloaded procedure `%.*s` as the same type as another procedure in this scope", LIT(name));
+				// error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
 				// is_invalid = true;
 				// break;
 			case ProcOverload_ParamVariadic:
-				error(p->token, "Overloaded procedure `%.*s` as the same type as another procedure in this scope", LIT(name));
+				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
 				is_invalid = true;
 				break;
 			case ProcOverload_ResultCount:
 			case ProcOverload_ResultTypes:
-				error(p->token, "Overloaded procedure `%.*s` as the same parameters but different results in this scope", LIT(name));
+				error(p->token, "Overloaded procedure '%.*s' as the same parameters but different results in this scope", LIT(name));
 				is_invalid = true;
 				break;
 			case ProcOverload_Polymorphic:
 				#if 0
-				error(p->token, "Overloaded procedure `%.*s` has a polymorphic counterpart in this scope which is not allowed", LIT(name));
+				error(p->token, "Overloaded procedure '%.*s' has a polymorphic counterpart in this scope which is not allowed", LIT(name));
 				is_invalid = true;
 				#endif
 				break;
@@ -1883,24 +1883,24 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 		if (value.kind == ExactValue_String) {
 			auto cc = string_to_calling_convention(value.value_string);
 			if (cc == ProcCC_Invalid) {
-				error(elem, "Unknown procedure calling convention: `%.*s`\n", LIT(value.value_string));
+				error(elem, "Unknown procedure calling convention: '%.*s'\n", LIT(value.value_string));
 			} else {
 				c->context.foreign_context.default_cc = cc;
 			}
 		} else {
-			error(elem, "Expected a string value for `%.*s`", LIT(name));
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
 	} else if (name == "link_prefix") {
 		if (value.kind == ExactValue_String) {
 			String link_prefix = value.value_string;
 			if (!is_foreign_name_valid(link_prefix)) {
-				error(elem, "Invalid link prefix: `%.*s`\n", LIT(link_prefix));
+				error(elem, "Invalid link prefix: '%.*s'\n", LIT(link_prefix));
 			} else {
 				c->context.foreign_context.link_prefix = link_prefix;
 			}
 		} else {
-			error(elem, "Expected a string value for `%.*s`", LIT(name));
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
 	}
@@ -1916,7 +1916,7 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 				error(elem, "Invalid link name: %.*s", LIT(ac->link_name));
 			}
 		} else {
-			error(elem, "Expected a string value for `%.*s`", LIT(name));
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
 	} else if (name == "link_prefix") {
@@ -1926,7 +1926,7 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 				error(elem, "Invalid link prefix: %.*s", LIT(ac->link_prefix));
 			}
 		} else {
-			error(elem, "Expected a string value for `%.*s`", LIT(name));
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
 	}
@@ -1935,7 +1935,7 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 
 DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 	if (c->context.curr_proc_decl != nullptr) {
-		error(elem, "Only a variable at file scope can have a `%.*s`", LIT(name));
+		error(elem, "Only a variable at file scope can have a '%.*s'", LIT(name));
 		return true;
 	}
 
@@ -1946,7 +1946,7 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 				error(elem, "Invalid link name: %.*s", LIT(ac->link_name));
 			}
 		} else {
-			error(elem, "Expected a string value for `%.*s`", LIT(name));
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
 	} else if (name == "link_prefix") {
@@ -1956,7 +1956,7 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 				error(elem, "Invalid link prefix: %.*s", LIT(ac->link_prefix));
 			}
 		} else {
-			error(elem, "Expected a string value for `%.*s`", LIT(name));
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
 	} else if (name == "thread_local") {
@@ -1973,10 +1973,10 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 			    model == "localexec") {
 				ac->thread_local_model = model;
 			} else {
-				error(elem, "Invalid thread local model `%.*s`", LIT(model));
+				error(elem, "Invalid thread local model '%.*s'", LIT(model));
 			}
 		} else {
-			error(elem, "Expected either no value or a string for `%.*s`", LIT(name));
+			error(elem, "Expected either no value or a string for '%.*s'", LIT(name));
 		}
 		return true;
 	}
@@ -2039,14 +2039,14 @@ void check_decl_attributes(Checker *c, Array<AstNode *> attributes, DeclAttribut
 			}
 
 			if (string_set_exists(&set, name)) {
-				error(elem, "Previous declaration of `%.*s`", LIT(name));
+				error(elem, "Previous declaration of '%.*s'", LIT(name));
 				continue;
 			} else {
 				string_set_add(&set, name);
 			}
 
 			if (!proc(c, elem, name, ev, ac)) {
-				error(elem, "Unknown attribute element name `%.*s`", LIT(name));
+				error(elem, "Unknown attribute element name '%.*s'", LIT(name));
 			}
 		}
 	}
@@ -2075,7 +2075,7 @@ bool check_arity_match(Checker *c, AstNodeValueDecl *vd, bool is_global) {
 		if (lhs < vd->values.count) {
 			AstNode *n = vd->values[lhs];
 			gbString str = expr_to_string(n);
-			error(n, "Extra initial expression `%s`", str);
+			error(n, "Extra initial expression '%s'", str);
 			gb_string_free(str);
 		} else {
 			error(vd->names[0], "Extra initial expression");
@@ -2085,7 +2085,7 @@ bool check_arity_match(Checker *c, AstNodeValueDecl *vd, bool is_global) {
 		if (!is_global && rhs != 1) {
 			AstNode *n = vd->names[rhs];
 			gbString str = expr_to_string(n);
-			error(n, "Missing expression for `%s`", str);
+			error(n, "Missing expression for '%s'", str);
 			gb_string_free(str);
 			return false;
 		} else if (is_global) {
@@ -2103,10 +2103,10 @@ void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 	if (!ws->is_cond_determined) {
 		check_expr(c, &operand, ws->cond);
 		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error(ws->cond, "Non-boolean condition in `when` statement");
+			error(ws->cond, "Non-boolean condition in 'when' statement");
 		}
 		if (operand.mode != Addressing_Constant) {
-			error(ws->cond, "Non-constant condition in `when` statement");
+			error(ws->cond, "Non-constant condition in 'when' statement");
 		}
 
 		ws->is_cond_determined = true;
@@ -2114,7 +2114,7 @@ void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 	}
 
 	if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
-		error(ws->cond, "Invalid body for `when` statement");
+		error(ws->cond, "Invalid body for 'when' statement");
 	} else {
 		if (ws->determined_cond) {
 			check_collect_entities(c, ws->body->BlockStmt.stmts);
@@ -2127,7 +2127,7 @@ void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 				check_collect_entities_from_when_stmt(c, &ws->else_stmt->WhenStmt);
 				break;
 			default:
-				error(ws->else_stmt, "Invalid `else` statement in `when` statement");
+				error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
 				break;
 			}
 		}
@@ -2176,7 +2176,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 
 			if (vd->is_using) {
 				vd->is_using = false; // NOTE(bill): This error will be only caught once
-				error(name, "`using` is not allowed at the file scope");
+				error(name, "'using' is not allowed at the file scope");
 			}
 
 			AstNode *fl = c->context.foreign_context.curr_library;
@@ -2282,7 +2282,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 					AstNodeKind kind = init->kind;
 					error(name, "Only procedures and variables are allowed to be in a foreign block, got %.*s", LIT(ast_node_strings[kind]));
 					if (kind == AstNode_ProcType) {
-						gb_printf_err("\tDid you forget to append `---` to the procedure?\n");
+						gb_printf_err("\tDid you forget to append '---' to the procedure?\n");
 					}
 				}
 			}
@@ -2309,7 +2309,7 @@ void check_add_foreign_block_decl(Checker *c, AstNode *decl) {
 	} else if (foreign_library->kind == AstNode_Implicit && foreign_library->Implicit.kind == Token_export) {
 		c->context.foreign_context.in_export = true;
 	} else {
-		error(foreign_library, "Foreign block name must be an identifier or `export`");
+		error(foreign_library, "Foreign block name must be an identifier or 'export'");
 		c->context.foreign_context.curr_library = nullptr;
 	}
 
@@ -2386,7 +2386,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 		}
 	}
 
-	// NOTE(bill): `when` stmts need to be handled after the other as the condition may refer to something
+	// NOTE(bill): 'when' stmts need to be handled after the other as the condition may refer to something
 	// declared after this stmt in source
 	if (!c->context.scope->is_file || c->context.collect_delayed_decls) {
 		for_array(i, nodes) {
@@ -2427,11 +2427,11 @@ void check_all_global_entities(Checker *c) {
 		if (e->token.string == "main") {
 			if (e->kind != Entity_Procedure) {
 				if (e->scope->is_init) {
-					error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
+					error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
 					continue;
 				}
 			} else if (e->scope->is_global) {
-				error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
+				error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
 				continue;
 			}
 		}
@@ -2563,7 +2563,7 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 		GB_ASSERT(found_node != nullptr);
 		n = *found_node;
 
-		// TODO(bill): How should the edges be attched for `import`?
+		// TODO(bill): How should the edges be attched for 'import'?
 		import_graph_node_set_add(&n->succ, m);
 		import_graph_node_set_add(&m->pred, n);
 		ptr_set_add(&m->scope->imported, n->scope);
@@ -2825,7 +2825,7 @@ void check_add_export_decl(Checker *c, AstNodeExportDecl *ed) {
 	}
 
 	if (parent_scope->is_global) {
-		error(ed->token, "`export` cannot be used on #shared_global_scope");
+		error(ed->token, "'export' cannot be used on #shared_global_scope");
 		return;
 	}
 
@@ -2877,10 +2877,10 @@ void check_add_foreign_import_decl(Checker *c, AstNode *decl) {
 
 		switch (file_err) {
 		case gbFileError_Invalid:
-			error(decl, "Invalid file or cannot be found (`%.*s`)", LIT(fullpath));
+			error(decl, "Invalid file or cannot be found ('%.*s')", LIT(fullpath));
 			return;
 		case gbFileError_NotExists:
-			error(decl, "File cannot be found (`%.*s`)", LIT(fullpath));
+			error(decl, "File cannot be found ('%.*s')", LIT(fullpath));
 			return;
 		}
 	}
@@ -2930,10 +2930,10 @@ bool collect_checked_files_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 	if (!ws->is_cond_determined) {
 		check_expr(c, &operand, ws->cond);
 		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error(ws->cond, "Non-boolean condition in `when` statement");
+			error(ws->cond, "Non-boolean condition in 'when' statement");
 		}
 		if (operand.mode != Addressing_Constant) {
-			error(ws->cond, "Non-constant condition in `when` statement");
+			error(ws->cond, "Non-constant condition in 'when' statement");
 		}
 
 		ws->is_cond_determined = true;
@@ -2941,7 +2941,7 @@ bool collect_checked_files_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 	}
 
 	if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
-		error(ws->cond, "Invalid body for `when` statement");
+		error(ws->cond, "Invalid body for 'when' statement");
 	} else {
 		if (ws->determined_cond) {
 			return collect_checked_files_from_import_decl_list(c, ws->body->BlockStmt.stmts);
@@ -2952,7 +2952,7 @@ bool collect_checked_files_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 			case AstNode_WhenStmt:
 				return collect_checked_files_from_when_stmt(c, &ws->else_stmt->WhenStmt);
 			default:
-				error(ws->else_stmt, "Invalid `else` statement in `when` statement");
+				error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
 				break;
 			}
 		}
@@ -2994,10 +2994,10 @@ bool collect_file_decls_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 	if (!ws->is_cond_determined) {
 		check_expr(c, &operand, ws->cond);
 		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error(ws->cond, "Non-boolean condition in `when` statement");
+			error(ws->cond, "Non-boolean condition in 'when' statement");
 		}
 		if (operand.mode != Addressing_Constant) {
-			error(ws->cond, "Non-constant condition in `when` statement");
+			error(ws->cond, "Non-constant condition in 'when' statement");
 		}
 
 		ws->is_cond_determined = true;
@@ -3005,7 +3005,7 @@ bool collect_file_decls_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 	}
 
 	if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
-		error(ws->cond, "Invalid body for `when` statement");
+		error(ws->cond, "Invalid body for 'when' statement");
 	} else {
 		if (ws->determined_cond) {
 			return collect_file_decls(c, ws->body->BlockStmt.stmts);
@@ -3016,7 +3016,7 @@ bool collect_file_decls_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
 			case AstNode_WhenStmt:
 				return collect_file_decls_from_when_stmt(c, &ws->else_stmt->WhenStmt);
 			default:
-				error(ws->else_stmt, "Invalid `else` statement in `when` statement");
+				error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
 				break;
 			}
 		}
@@ -3124,17 +3124,17 @@ void check_import_entities(Checker *c) {
 			if (path.count == 1) {
 				ImportPathItem item = path[0];
 				String filename = fn(item);
-				error(item.decl, "Self importation of `%.*s`", LIT(filename));
+				error(item.decl, "Self importation of '%.*s'", LIT(filename));
 			} else if (path.count > 0) {
 				ImportPathItem item = path[path.count-1];
 				String filename = fn(item);
-				error(item.decl, "Cyclic importation of `%.*s`", LIT(filename));
+				error(item.decl, "Cyclic importation of '%.*s'", LIT(filename));
 				for (isize i = 0; i < path.count; i++) {
-					error(item.decl, "`%.*s` refers to", LIT(filename));
+					error(item.decl, "'%.*s' refers to", LIT(filename));
 					item = path[i];
 					filename = fn(item);
 				}
-				error(item.decl, "`%.*s`", LIT(filename));
+				error(item.decl, "'%.*s'", LIT(filename));
 			}
 
 		}
@@ -3287,12 +3287,12 @@ void calculate_global_init_order(Checker *c) {
 
 			if (path.count > 0) {
 				Entity *e = path[0];
-				error(e->token, "Cyclic initialization of `%.*s`", LIT(e->token.string));
+				error(e->token, "Cyclic initialization of '%.*s'", LIT(e->token.string));
 				for (isize i = path.count-1; i >= 0; i--) {
-					error(e->token, "\t`%.*s` refers to", LIT(e->token.string));
+					error(e->token, "\t'%.*s' refers to", LIT(e->token.string));
 					e = path[i];
 				}
-				error(e->token, "\t`%.*s`", LIT(e->token.string));
+				error(e->token, "\t'%.*s'", LIT(e->token.string));
 			}
 		}
 
@@ -3328,7 +3328,7 @@ void calculate_global_init_order(Checker *c) {
 				Entity *e = d->entities[j];
 				if (j == 0) gb_printf("\t");
 				if (j > 0) gb_printf(", ");
-				gb_printf("`%.*s` %td", LIT(e->token.string), e->order_in_src);
+				gb_printf("'%.*s' %td", LIT(e->token.string), e->order_in_src);
 			}
 			gb_printf("\n");
 		}
@@ -3365,7 +3365,7 @@ void check_parsed_files(Checker *c) {
 
 	check_import_entities(c);
 	check_all_global_entities(c);
-	init_preload(c); // NOTE(bill): This could be setup previously through the use of `type_info_of`
+	init_preload(c); // NOTE(bill): This could be setup previously through the use of 'type_info_of'
 
 	// Check procedure bodies
 	// NOTE(bill): Nested procedures bodies will be added to this "queue"
@@ -3458,7 +3458,7 @@ void check_parsed_files(Checker *c) {
 				token.pos.column = 1;
 			}
 
-			error(token, "Undefined entry point procedure `main`");
+			error(token, "Undefined entry point procedure 'main'");
 		}
 	}
 }

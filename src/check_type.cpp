@@ -18,9 +18,9 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 				Entity *e = *found;
 				// TODO(bill): Better type error
 				if (str != nullptr) {
-					error(e->token, "`%.*s` is already declared in `%s`", LIT(name), str);
+					error(e->token, "'%.*s' is already declared in '%s'", LIT(name), str);
 				} else {
-					error(e->token, "`%.*s` is already declared`", LIT(name));
+					error(e->token, "'%.*s' is already declared", LIT(name));
 				}
 			} else {
 				map_set(entity_map, key, f);
@@ -42,11 +42,11 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 		Operand operand = {Addressing_Invalid};
 		check_expr(c, &operand, ws->cond);
 		if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
-			error(ws->cond, "Non-constant boolean `when` condition");
+			error(ws->cond, "Non-constant boolean 'when' condition");
 			return;
 		}
 		if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
-			error(ws->cond, "Invalid body for `when` statement");
+			error(ws->cond, "Invalid body for 'when' statement");
 			return;
 		}
 		if (operand.value.kind == ExactValue_Bool &&
@@ -67,7 +67,7 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 				check_struct_field_decl(c, ws->else_stmt, fields, entity_map, struct_node, context, allow_default_values);
 				break;
 			default:
-				error(ws->else_stmt, "Invalid `else` statement in `when` statement");
+				error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
 				break;
 			}
 		}
@@ -85,7 +85,7 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 	bool is_using = vd->is_using;
 
 	if (is_using && vd->names.count > 1) {
-		error(vd->names[0], "Cannot apply `using` to more than one of the same type");
+		error(vd->names[0], "Cannot apply 'using' to more than one of the same type");
 		is_using = false;
 	}
 
@@ -175,7 +175,7 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 				error(b.expr, "Default field value must be a constant");
 			} else if (is_type_any(e->type) || is_type_union(e->type)) {
 				gbString str = type_to_string(e->type);
-				error(b.expr, "A struct field of type `%s` cannot have a default value", str);
+				error(b.expr, "A struct field of type '%s' cannot have a default value", str);
 				gb_string_free(str);
 			} else {
 				e->Variable.default_value = b.value;
@@ -196,7 +196,7 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 				Entity *e = *found;
 				// NOTE(bill): Scope checking already checks the declaration but in many cases, this can happen so why not?
 				// This may be a little janky but it's not really that much of a problem
-				error(name_token, "`%.*s` is already declared in this type", LIT(name_token.string));
+				error(name_token, "'%.*s' is already declared in this type", LIT(name_token.string));
 				error(e->token,   "\tpreviously declared");
 			} else {
 				map_set(entity_map, key, e);
@@ -235,11 +235,11 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 					using_index_expr = (*fields)[fields->count-1];
 				} else {
 					(*fields)[fields->count-1]->flags &= ~EntityFlag_Using;
-					error(name_token, "Previous `using` for an index expression `%.*s`", LIT(name_token.string));
+					error(name_token, "Previous 'using' for an index expression '%.*s'", LIT(name_token.string));
 				}
 			} else {
 				gbString type_str = type_to_string(first_type);
-				error(name_token, "`using` cannot be applied to the field `%.*s` of type `%s`", LIT(name_token.string), type_str);
+				error(name_token, "'using' cannot be applied to the field '%.*s' of type '%s'", LIT(name_token.string), type_str);
 				gb_string_free(type_str);
 				return;
 			}
@@ -382,7 +382,7 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 		}
 		if (is_type_empty_union(type)) {
 			gbString str = type_to_string(type);
-			error(params[i], "Invalid use of an empty union `%s`", str);
+			error(params[i], "Invalid use of an empty union '%s'", str);
 			gb_string_free(str);
 			type = t_invalid;
 		}
@@ -436,11 +436,11 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 						using_index_expr = fields[fields.count-1];
 					} else {
 						fields[fields.count-1]->flags &= ~EntityFlag_Using;
-						error(name_token, "Previous `using` for an index expression `%.*s`", LIT(name_token.string));
+						error(name_token, "Previous 'using' for an index expression '%.*s'", LIT(name_token.string));
 					}
 				} else {
 					gbString type_str = type_to_string(first_type);
-					error(name_token, "`using` cannot be applied to the field `%.*s` of type `%s`", LIT(name_token.string), type_str);
+					error(name_token, "'using' cannot be applied to the field '%.*s' of type '%s'", LIT(name_token.string), type_str);
 					gb_string_free(type_str);
 					continue;
 				}
@@ -465,7 +465,7 @@ gb_global gbAllocator   __checker_allocator = {};
 
 GB_COMPARE_PROC(cmp_reorder_struct_fields) {
 	// Rule:
-	// `using` over non-`using`
+	// 'using' over non-'using'
 	// Biggest to smallest alignment
 	// if same alignment: biggest to smallest size
 	// if same size: order by source order
@@ -847,7 +847,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 
 	if (st->align != nullptr) {
 		if (st->is_packed) {
-			syntax_error(st->align, "`#align` cannot be applied with `#packed`");
+			syntax_error(st->align, "'#align' cannot be applied with '#packed'");
 			return;
 		}
 		i64 custom_align = 1;
@@ -881,14 +881,14 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 			if (is_type_untyped(t) || is_type_empty_union(t)) {
 				ok = false;
 				gbString str = type_to_string(t);
-				error(node, "Invalid variant type in union `%s`", str);
+				error(node, "Invalid variant type in union '%s'", str);
 				gb_string_free(str);
 			} else {
 				for_array(j, variants) {
 					if (are_types_identical(t, variants[j])) {
 						ok = false;
 						gbString str = type_to_string(t);
-						error(node, "Duplicate variant type `%s`", str);
+						error(node, "Duplicate variant type '%s'", str);
 						gb_string_free(str);
 						break;
 					}
@@ -935,7 +935,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		return;
 	}
 
-	// NOTE(bill): Must be up here for the `check_init_constant` system
+	// NOTE(bill): Must be up here for the 'check_init_constant' system
 	enum_type->Enum.base_type = base_type;
 
 	Map<Entity *> entity_map = {}; // Key: String
@@ -997,19 +997,19 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		if (is_blank_ident(name)) {
 			continue;
 		} else if (name == "count") {
-			error(field, "`count` is a reserved identifier for enumerations");
+			error(field, "'count' is a reserved identifier for enumerations");
 			continue;
 		} else if (name == "min_value") {
-			error(field, "`min_value` is a reserved identifier for enumerations");
+			error(field, "'min_value' is a reserved identifier for enumerations");
 			continue;
 		} else if (name == "max_value") {
-			error(field, "`max_value` is a reserved identifier for enumerations");
+			error(field, "'max_value' is a reserved identifier for enumerations");
 			continue;
 		} else if (name == "names") {
-			error(field, "`names` is a reserved identifier for enumerations");
+			error(field, "'names' is a reserved identifier for enumerations");
 			continue;
 		}/*  else if (name == "base_type") {
-			error(field, "`base_type` is a reserved identifier for enumerations");
+			error(field, "'base_type' is a reserved identifier for enumerations");
 			continue;
 		} */
 
@@ -1026,7 +1026,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 
 		HashKey key = hash_string(name);
 		if (map_get(&entity_map, key) != nullptr) {
-			error(ident, "`%.*s` is already declared in this enumeration", LIT(name));
+			error(ident, "'%.*s' is already declared in this enumeration", LIT(name));
 		} else {
 			map_set(&entity_map, key, e);
 			add_entity(c, c->context.scope, nullptr, e);
@@ -1104,7 +1104,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, AstNode *node) {
 		HashKey key = hash_string(name);
 		if (!is_blank_ident(name) &&
 		    map_get(&entity_map, key) != nullptr) {
-			error(ident, "`%.*s` is already declared in this bit field", LIT(name));
+			error(ident, "'%.*s' is already declared in this bit field", LIT(name));
 		} else {
 			map_set(&entity_map, key, e);
 			add_entity(c, c->context.scope, nullptr, e);
@@ -1204,7 +1204,7 @@ Type *determine_type_from_polymorphic(Checker *c, Type *poly_type, Operand opera
 		gbString ots = type_to_string(operand.type);
 		defer (gb_string_free(pts));
 		defer (gb_string_free(ots));
-		error(operand.expr, "Cannot determine polymorphic type from parameter: `%s` to `%s`", ots, pts);
+		error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
 	}
 	return t_invalid;
 }
@@ -1432,7 +1432,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		}
 		if (is_type_empty_union(type)) {
 			gbString str = type_to_string(type);
-			error(param, "Invalid use of an empty union `%s`", str);
+			error(param, "Invalid use of an empty union '%s'", str);
 			gb_string_free(str);
 			type = t_invalid;
 		}
@@ -1441,7 +1441,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		if (p->flags&FieldFlag_c_vararg) {
 			if (p->type == nullptr ||
 			    p->type->kind != AstNode_Ellipsis) {
-				error(param, "`#c_vararg` can only be applied to variadic type fields");
+				error(param, "'#c_vararg' can only be applied to variadic type fields");
 				p->flags &= ~FieldFlag_c_vararg; // Remove the flag
 			} else {
 				is_c_vararg = true;
@@ -1450,10 +1450,10 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 
 		if (is_constant_value) {
 			if (is_type_param) {
-				error(param, "`$` is not needed for a `type` parameter");
+				error(param, "'$' is not needed for a 'type' parameter");
 			}
 			if (p->flags&FieldFlag_no_alias) {
-				error(param, "`#no_alias` can only be applied to variable fields of pointer type");
+				error(param, "'#no_alias' can only be applied to variable fields of pointer type");
 				p->flags &= ~FieldFlag_no_alias; // Remove the flag
 			}
 
@@ -1480,7 +1480,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					}
 					if (is_type_polymorphic(type)) {
 						gbString str = type_to_string(type);
-						error(o.expr, "Cannot pass polymorphic type as a parameter, got `%s`", str);
+						error(o.expr, "Cannot pass polymorphic type as a parameter, got '%s'", str);
 						gb_string_free(str);
 						success = false;
 						type = t_invalid;
@@ -1491,7 +1491,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 						if (!c->context.no_polymorphic_errors) {
 							gbString t = type_to_string(type);
 							gbString s = type_to_string(specialization);
-							error(o.expr, "Cannot convert type `%s` to the specialization `%s`", t, s);
+							error(o.expr, "Cannot convert type '%s' to the specialization '%s'", t, s);
 							gb_string_free(s);
 							gb_string_free(t);
 						}
@@ -1517,7 +1517,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 
 				if (p->flags&FieldFlag_no_alias) {
 					if (!is_type_pointer(type)) {
-						error(name, "`#no_alias` can only be applied to fields of pointer type");
+						error(name, "'#no_alias' can only be applied to fields of pointer type");
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
 				}
@@ -1713,7 +1713,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 				continue;
 			}
 			if (x == y) {
-				error(variables[j]->token, "Duplicate return value name `%.*s`", LIT(y));
+				error(variables[j]->token, "Duplicate return value name '%.*s'", LIT(y));
 			}
 		}
 	}
@@ -1912,7 +1912,7 @@ bool abi_compat_return_by_value(gbAllocator a, ProcCallingConvention cc, Type *a
 	return false;
 }
 
-// NOTE(bill): `operands` is for generating non generic procedure type
+// NOTE(bill): 'operands' is for generating non generic procedure type
 bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array<Operand> *operands) {
 	ast_node(pt, ProcType, proc_type_node);
 
@@ -2147,7 +2147,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 			error(node, "A boolean cannot be used as a key for a map, use an array instead for this case");
 		} else {
 			gbString str = type_to_string(key);
-			error(node, "Invalid type of a key for a map, got `%s`", str);
+			error(node, "Invalid type of a key for a map, got '%s'", str);
 			gb_string_free(str);
 		}
 	}
@@ -2159,7 +2159,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 	init_preload(c);
 	generate_map_internal_types(c->allocator, type);
 
-	// error(node, "`map` types are not yet implemented");
+	// error(node, "'map' types are not yet implemented");
 }
 
 bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) {
@@ -2185,13 +2185,13 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 
 		case Addressing_NoValue:
 			err_str = expr_to_string(e);
-			error(e, "`%s` used as a type", err_str);
+			error(e, "'%s' used as a type", err_str);
 			gb_string_free(err_str);
 			break;
 
 		default:
 			err_str = expr_to_string(e);
-			error(e, "`%s` used as a type when not a type", err_str);
+			error(e, "'%s' used as a type when not a type", err_str);
 			gb_string_free(err_str);
 			break;
 		}
@@ -2202,7 +2202,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_end;
 
 	case_ast_node(at, AliasType, e);
-		error(e, "Invalid use of `#alias`");
+		error(e, "Invalid use of '#alias'");
 		// NOTE(bill): Treat it as a HelperType to remove errors
 		return check_type_internal(c, at->type, type, named_type);
 	case_end;
@@ -2241,7 +2241,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			add_entity(c, ps, ident, e);
 			add_entity(c, s, ident, e);
 		} else {
-			error(ident, "Invalid use of a polymorphic parameter `$%.*s`", LIT(token.string));
+			error(ident, "Invalid use of a polymorphic parameter '$%.*s'", LIT(token.string));
 			*type = t_invalid;
 			return false;
 		}
@@ -2263,12 +2263,12 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			return true;
 		case Addressing_NoValue:
 			err_str = expr_to_string(e);
-			error(e, "`%s` used as a type", err_str);
+			error(e, "'%s' used as a type", err_str);
 			gb_string_free(err_str);
 			break;
 		default:
 			err_str = expr_to_string(e);
-			error(e, "`%s` is not a type", err_str);
+			error(e, "'%s' is not a type", err_str);
 			gb_string_free(err_str);
 			break;
 		}
@@ -2341,7 +2341,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		Type *be = base_type(elem);
 		if (is_type_vector(be) || (!is_type_boolean(be) && !is_type_numeric(be) && be->kind != Type_Generic)) {
 			gbString err_str = type_to_string(elem);
-			error(vt->elem, "Vector element type must be numerical or a boolean, got `%s`", err_str);
+			error(vt->elem, "Vector element type must be numerical or a boolean, got '%s'", err_str);
 			gb_string_free(err_str);
 		}
 		*type = make_type_vector(c->allocator, elem, count, generic_type);
@@ -2434,7 +2434,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 
 	if (!ok) {
 		gbString err_str = expr_to_string(e);
-		error(e, "`%s` is not a type", err_str);
+		error(e, "'%s' is not a type", err_str);
 		gb_string_free(err_str);
 		type = t_invalid;
 	}
@@ -2447,7 +2447,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 	    type->Named.base == nullptr) {
 		// IMPORTANT TODO(bill): Is this a serious error?!
 		#if 0
-		error(e, "Invalid type definition of `%.*s`", LIT(type->Named.name));
+		error(e, "Invalid type definition of '%.*s'", LIT(type->Named.name));
 		#endif
 		type->Named.base = t_invalid;
 	}
@@ -2455,7 +2455,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 	#if 0
 	if (!c->context.allow_polymorphic_types && is_type_polymorphic(type)) {
 		gbString str = type_to_string(type);
-		error(e, "Invalid use of a polymorphic type `%s`", str);
+		error(e, "Invalid use of a polymorphic type '%s'", str);
 		gb_string_free(str);
 		type = t_invalid;
 	}

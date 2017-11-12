@@ -1,7 +1,7 @@
 bool check_is_terminating(AstNode *node);
 void check_stmt          (Checker *c, AstNode *node, u32 flags);
 
-// NOTE(bill): `content_name` is for debugging and error messages
+// NOTE(bill): 'content_name' is for debugging and error messages
 Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String context_name) {
 	if (operand->mode == Addressing_Invalid ||
 		operand->type == t_invalid ||
@@ -13,7 +13,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 			// TODO(bill): is this a good enough error message?
 			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error(operand->expr,
-				  "Cannot assign built-in procedure `%s` in %.*s",
+				  "Cannot assign built-in procedure '%s' in %.*s",
 				  expr_str,
 				  LIT(context_name));
 
@@ -25,7 +25,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 
 		if (operand->mode == Addressing_Overload) {
 			if (e->type == nullptr) {
-				error(operand->expr, "Cannot determine type from overloaded procedure `%.*s`", LIT(operand->overload_entities[0]->token.string));
+				error(operand->expr, "Cannot determine type from overloaded procedure '%.*s'", LIT(operand->overload_entities[0]->token.string));
 			} else {
 				check_assignment(c, operand, e->type, str_lit("variable assignment"));
 				if (operand->mode != Addressing_Type) {
@@ -62,13 +62,13 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 		if (is_type_polymorphic(t)) {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
-			error(e->token, "Invalid use of a polymorphic type `%s` in %.*s", str, LIT(context_name));
+			error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
 			e->type = t_invalid;
 			return nullptr;
 		} else if (is_type_empty_union(t)) {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
-			error(e->token, "An empty union `%s` cannot be instantiated in %.*s", str, LIT(context_name));
+			error(e->token, "An empty union '%s' cannot be instantiated in %.*s", str, LIT(context_name));
 			e->type = t_invalid;
 			return nullptr;
 		}
@@ -122,7 +122,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, Array<AstNo
 		}
 	}
 	if (rhs_count > 0 && lhs_count != rhs_count) {
-		error(lhs[0]->token, "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
+		error(lhs[0]->token, "Assignment count mismatch '%td' = '%td'", lhs_count, rhs_count);
 	}
 }
 
@@ -139,7 +139,7 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	if (operand->mode != Addressing_Constant) {
 		// TODO(bill): better error
 		gbString str = expr_to_string(operand->expr);
-		error(operand->expr, "`%s` is not a constant", str);
+		error(operand->expr, "'%s' is not a constant", str);
 		gb_string_free(str);
 		if (e->type == nullptr) {
 			e->type = t_invalid;
@@ -148,7 +148,7 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	}
 	if (!is_type_constant_type(operand->type)) {
 		gbString type_str = type_to_string(operand->type);
-		error(operand->expr, "Invalid constant type: `%s`", type_str);
+		error(operand->expr, "Invalid constant type: '%s'", type_str);
 		gb_string_free(type_str);
 		if (e->type == nullptr) {
 			e->type = t_invalid;
@@ -211,7 +211,7 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, bool 
 			e->TypeName.is_type_alias = true;
 		} else {
 			gbString str = type_to_string(bt);
-			error(type_expr, "Type alias declaration with a non-named type `%s`", str);
+			error(type_expr, "Type alias declaration with a non-named type '%s'", str);
 			gb_string_free(str);
 		}
 	}
@@ -231,7 +231,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 		Type *t = check_type(c, type_expr);
 		if (!is_type_constant_type(t)) {
 			gbString str = type_to_string(t);
-			error(type_expr, "Invalid constant type `%s`", str);
+			error(type_expr, "Invalid constant type '%s'", str);
 			gb_string_free(str);
 			e->type = t_invalid;
 			return;
@@ -324,7 +324,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 	if (operand.mode == Addressing_Invalid ||
 		base_type(operand.type) == t_invalid) {
 		gbString str = expr_to_string(init);
-		error(e->token, "Invalid declaration type `%s`", str);
+		error(e->token, "Invalid declaration type '%s'", str);
 		gb_string_free(str);
 	}
 
@@ -415,12 +415,12 @@ void init_entity_foreign_library(Checker *c, Entity *e) {
 		Entity *found = scope_lookup_entity(c->context.scope, name);
 		if (found == nullptr) {
 			if (is_blank_ident(name)) {
-				error(ident, "`_` cannot be used as a value type");
+				error(ident, "'_' cannot be used as a value type");
 			} else {
 				error(ident, "Undeclared name: %.*s", LIT(name));
 			}
 		} else if (found->kind != Entity_LibraryName) {
-			error(ident, "`%.*s` cannot be used as a library name", LIT(name));
+			error(ident, "'%.*s' cannot be used as a library name", LIT(name));
 		} else {
 			// TODO(bill): Extra stuff to do with library names?
 			*foreign_library = found;
@@ -432,7 +432,7 @@ void init_entity_foreign_library(Checker *c, Entity *e) {
 String handle_link_name(Checker *c, Token token, String link_name, String link_prefix) {
 	if (link_prefix.len > 0) {
 		if (link_name.len > 0) {
-			error(token, "`link_name` and `link_prefix` cannot be used together");
+			error(token, "'link_name' and 'link_prefix' cannot be used together");
 		} else {
 			isize len = link_prefix.len + token.string.len;
 			u8 *name = gb_alloc_array(c->allocator, u8, len+1);
@@ -491,17 +491,17 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		if (pt->param_count != 0 ||
 		    pt->result_count != 0) {
 			gbString str = type_to_string(proc_type);
-			error(e->token, "Procedure type of `main` was expected to be `proc()`, got %s", str);
+			error(e->token, "Procedure type of 'main' was expected to be 'proc()', got %s", str);
 			gb_string_free(str);
 		}
 		if (pt->calling_convention != ProcCC_Odin &&
 		    pt->calling_convention != ProcCC_Contextless) {
-			error(e->token, "Procedure `main` cannot have a custom calling convention");
+			error(e->token, "Procedure 'main' cannot have a custom calling convention");
 		}
 		pt->calling_convention = ProcCC_Contextless;
 		if (d->scope->is_init) {
 			if (c->info.entry_point != nullptr) {
-				error(e->token, "Redeclaration of the entry pointer procedure `main`");
+				error(e->token, "Redeclaration of the entry pointer procedure 'main'");
 			} else {
 				c->info.entry_point = e;
 			}
@@ -509,7 +509,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	if (is_foreign && is_export) {
-		error(pl->type, "A foreign procedure cannot have an `export` tag");
+		error(pl->type, "A foreign procedure cannot have an 'export' tag");
 	}
 
 	if (pt->is_polymorphic) {
@@ -528,7 +528,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			error(pl->body, "A foreign procedure cannot have a body");
 		}
 		if (proc_type->Proc.c_vararg) {
-			error(pl->body, "A procedure with a `#c_vararg` field cannot have a body and must be foreign");
+			error(pl->body, "A procedure with a '#c_vararg' field cannot have a body and must be foreign");
 		}
 
 		d->scope = c->context.scope;
@@ -546,7 +546,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	if (pt->result_count == 0 && is_require_results) {
-		error(pl->type, "`#require_results` is not needed on a procedure with no results");
+		error(pl->type, "'#require_results' is not needed on a procedure with no results");
 	} else {
 		pt->require_results = is_require_results;
 	}
@@ -576,18 +576,18 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			if (is_type_proc(this_type) && is_type_proc(other_type)) {
 				if (!are_signatures_similar_enough(this_type, other_type)) {
 					error(d->proc_lit,
-					      "Redeclaration of foreign procedure `%.*s` with different type signatures\n"
+					      "Redeclaration of foreign procedure '%.*s' with different type signatures\n"
 					      "\tat %.*s(%td:%td)",
 					      LIT(name), LIT(pos.file), pos.line, pos.column);
 				}
 			} else if (!are_types_identical(this_type, other_type)) {
 				error(d->proc_lit,
-				      "Foreign entity `%.*s` previously declared elsewhere with a different type\n"
+				      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
 				      "\tat %.*s(%td:%td)",
 				      LIT(name), LIT(pos.file), pos.line, pos.column);
 			}
 		} else if (name == "main") {
-			error(d->proc_lit, "The link name `main` is reserved for internal use");
+			error(d->proc_lit, "The link name 'main' is reserved for internal use");
 		} else {
 			map_set(fp, key, e);
 		}
@@ -605,11 +605,11 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 				TokenPos pos = f->token.pos;
 				// TODO(bill): Better error message?
 				error(d->proc_lit,
-				      "Non unique linking name for procedure `%.*s`\n"
+				      "Non unique linking name for procedure '%.*s'\n"
 				      "\tother at %.*s(%td:%td)",
 				      LIT(name), LIT(pos.file), pos.line, pos.column);
 			} else if (name == "main") {
-				error(d->proc_lit, "The link name `main` is reserved for internal use");
+				error(d->proc_lit, "The link name 'main' is reserved for internal use");
 			} else {
 				map_set(fp, key, e);
 			}
@@ -647,12 +647,12 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		if (is_type_polymorphic(base_type(e->type))) {
 			gbString str = type_to_string(e->type);
 			defer (gb_string_free(str));
-			error(e->token, "Invalid use of a polymorphic type `%s` in %.*s", str, LIT(context_name));
+			error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
 			e->type = t_invalid;
 		} else if (is_type_empty_union(e->type)) {
 			gbString str = type_to_string(e->type);
 			defer (gb_string_free(str));
-			error(e->token, "An empty union `%s` cannot be instantiated in %.*s", str, LIT(context_name));
+			error(e->token, "An empty union '%s' cannot be instantiated in %.*s", str, LIT(context_name));
 			e->type = t_invalid;
 		}
 	}
@@ -683,7 +683,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 			Type *other_type = base_type(f->type);
 			if (!are_types_identical(this_type, other_type)) {
 				error(e->token,
-				      "Foreign entity `%.*s` previously declared elsewhere with a different type\n"
+				      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
 				      "\tat %.*s(%td:%td)",
 				      LIT(name), LIT(pos.file), pos.line, pos.column);
 			}
@@ -720,7 +720,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 			e->type = t_invalid;
 			set_base_type(named_type, t_invalid);
 			return;
-			// GB_PANIC("`%.*s` should been declared!", LIT(e->token.string));
+			// GB_PANIC("'%.*s' should been declared!", LIT(e->token.string));
 		}
 	}
 
@@ -801,13 +801,13 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 						uvar->Variable.is_immutable = is_immutable;
 						Entity *prev = scope_insert_entity(c->context.scope, uvar);
 						if (prev != nullptr) {
-							error(e->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
+							error(e->token, "Namespace collision while 'using' '%.*s' of: %.*s", LIT(name), LIT(prev->token.string));
 							break;
 						}
 					}
 				}
 			} else {
-				error(e->token, "`using` can only be applied to variables of type struct");
+				error(e->token, "'using' can only be applied to variables of type struct");
 				break;
 			}
 		}
@@ -820,7 +820,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 		if (type->Proc.result_count > 0) {
 			if (!check_is_terminating(body)) {
 				if (token.kind == Token_Ident) {
-					error(bs->close, "Missing return statement at the end of the procedure `%.*s`", LIT(token.string));
+					error(bs->close, "Missing return statement at the end of the procedure '%.*s'", LIT(token.string));
 				} else {
 					error(bs->close, "Missing return statement at the end of the procedure");
 				}
