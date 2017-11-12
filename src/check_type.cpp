@@ -1210,7 +1210,7 @@ Type *determine_type_from_polymorphic(Checker *c, Type *poly_type, Operand opera
 }
 
 
-Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_, bool *success_, isize *specialization_count_, Array<Operand> *operands) {
+Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> *operands) {
 	if (_params == nullptr) {
 		return nullptr;
 	}
@@ -1250,6 +1250,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 
 
 	bool is_variadic = false;
+	isize variadic_index = -1;
 	bool is_c_vararg = false;
 	Array<Entity *> variables = {};
 	array_init(&variables, c->allocator, variable_count);
@@ -1270,7 +1271,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		bool detemine_type_from_operand = false;
 		Type *specialization = nullptr;
 
-		bool is_using = (p->flags&FieldFlag_using) != 0;
+		bool is_using          = (p->flags&FieldFlag_using) != 0;
 		bool is_constant_value = (p->flags&FieldFlag_const) != 0;
 
 
@@ -1304,6 +1305,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 							add_entity_use(c, e->identifier, e);
 						} else {
 							error(default_value, "Default parameter must be a constant");
+							continue;
 						}
 					}
 				} else {
@@ -1315,12 +1317,21 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		} else {
 			if (type_expr->kind == AstNode_Ellipsis) {
 				type_expr = type_expr->Ellipsis.expr;
+				#if 1
+					is_variadic = true;
+					variadic_index = variables.count;
+					if (p->names.count != 1) {
+						error(param, "Invalid AST: Invalid variadic parameter with multiple names");
+						success = false;
+					}
+				#else
 				if (i+1 == params.count) {
 					is_variadic = true;
 				} else {
 					error(param, "Invalid AST: Invalid variadic parameter");
 					success = false;
 				}
+				#endif
 			}
 			if (type_expr->kind == AstNode_TypeType) {
 				ast_node(tt, TypeType, type_expr);
@@ -1360,8 +1371,10 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			if (default_value != nullptr) {
 				if (type_expr->kind == AstNode_TypeType) {
 					error(default_value, "A type parameter may not have a default value");
+					continue;
 				} else if (is_constant_value) {
 					error(default_value, "A constant parameter may not have a default value");
+					continue;
 				} else {
 					Operand o = {};
 					if (default_value->kind == AstNode_BasicDirective &&
@@ -1404,23 +1417,22 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					check_is_assignable_to(c, &o, type);
 				}
 			}
-
 		}
 		if (type == nullptr) {
-			error(params[i], "Invalid parameter type");
+			error(param, "Invalid parameter type");
 			type = t_invalid;
 		}
 		if (is_type_untyped(type)) {
 			if (is_type_untyped_undef(type)) {
-				error(params[i], "Cannot determine parameter type from ---");
+				error(param, "Cannot determine parameter type from ---");
 			} else {
-				error(params[i], "Cannot determine parameter type from a nil");
+				error(param, "Cannot determine parameter type from a nil");
 			}
 			type = t_invalid;
 		}
 		if (is_type_empty_union(type)) {
 			gbString str = type_to_string(type);
-			error(params[i], "Invalid use of an empty union `%s`", str);
+			error(param, "Invalid use of an empty union `%s`", str);
 			gb_string_free(str);
 			type = t_invalid;
 		}
@@ -1429,7 +1441,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		if (p->flags&FieldFlag_c_vararg) {
 			if (p->type == nullptr ||
 			    p->type->kind != AstNode_Ellipsis) {
-				error(params[i], "`#c_vararg` can only be applied to variadic type fields");
+				error(param, "`#c_vararg` can only be applied to variadic type fields");
 				p->flags &= ~FieldFlag_c_vararg; // Remove the flag
 			} else {
 				is_c_vararg = true;
@@ -1438,10 +1450,10 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 
 		if (is_constant_value) {
 			if (is_type_param) {
-				error(p->type, "`$` is not needed for a `type` parameter");
+				error(param, "`$` is not needed for a `type` parameter");
 			}
 			if (p->flags&FieldFlag_no_alias) {
-				error(p->type, "`#no_alias` can only be applied to variable fields of pointer type");
+				error(param, "`#no_alias` can only be applied to variable fields of pointer type");
 				p->flags &= ~FieldFlag_no_alias; // Remove the flag
 			}
 
@@ -1505,7 +1517,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 
 				if (p->flags&FieldFlag_no_alias) {
 					if (!is_type_pointer(type)) {
-						error(params[i], "`#no_alias` can only be applied to fields of pointer type");
+						error(name, "`#no_alias` can only be applied to fields of pointer type");
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
 				}
@@ -1550,10 +1562,14 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 
 
 	if (is_variadic) {
+		GB_ASSERT(variadic_index >= 0);
+	}
+
+	if (is_variadic) {
 		GB_ASSERT(params.count > 0);
 		// NOTE(bill): Change last variadic parameter to be a slice
 		// Custom Calling convention for variadic parameters
-		Entity *end = variables[variable_count-1];
+		Entity *end = variables[variadic_index];
 		end->type = make_type_slice(c->allocator, end->type);
 		end->flags |= EntityFlag_Ellipsis;
 		if (is_c_vararg) {
@@ -1581,6 +1597,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 	if (success_) *success_ = success;
 	if (specialization_count_) *specialization_count_ = specialization_count;
 	if (is_variadic_) *is_variadic_ = is_variadic;
+	if (variadic_index_) *variadic_index_ = variadic_index;
 
 	return tuple;
 }
@@ -1904,9 +1921,10 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 	}
 
 	bool variadic = false;
+	isize variadic_index = -1;
 	bool success = true;
 	isize specialization_count = 0;
-	Type *params  = check_get_params(c, c->context.scope, pt->params, &variadic, &success, &specialization_count, operands);
+	Type *params  = check_get_params(c, c->context.scope, pt->params, &variadic, &variadic_index, &success, &specialization_count, operands);
 	Type *results = check_get_results(c, c->context.scope, pt->results);
 
 
@@ -1941,6 +1959,7 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 	type->Proc.results              = results;
 	type->Proc.result_count         = cast(i32)result_count;
 	type->Proc.variadic             = variadic;
+	type->Proc.variadic_index       = variadic_index;
 	type->Proc.calling_convention   = cc;
 	type->Proc.is_polymorphic       = pt->generic;
 	type->Proc.specialization_count = specialization_count;

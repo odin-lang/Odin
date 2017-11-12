@@ -31,7 +31,7 @@ enum BasicKind {
 	Basic_uintptr,
 	Basic_rawptr,
 	Basic_string, // ^u8 + int
-	Basic_any,    // ^Type_Info + rawptr
+	Basic_any,    // rawptr + ^Type_Info
 
 	Basic_UntypedBool,
 	Basic_UntypedInteger,
@@ -153,6 +153,7 @@ struct TypeStruct {
 		Type *   abi_compat_result_type;                  \
 		bool     return_by_pointer;                       \
 		bool     variadic;                                \
+		i32      variadic_index;                          \
 		bool     require_results;                         \
 		bool     c_vararg;                                \
 		bool     is_polymorphic;                          \
