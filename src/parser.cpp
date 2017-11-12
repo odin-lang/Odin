@@ -2616,8 +2616,7 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 		bool prefix_ellipsis = false;
 		if (f->curr_token.kind == Token_Ellipsis) {
 			prefix_ellipsis = true;
-			ellipsis = f->curr_token;
-			advance_token(f);
+			ellipsis = expect_token(f, Token_Ellipsis);
 		}
 
 		AstNode *arg = parse_expr(f, false);
@@ -2626,10 +2625,6 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 
 			if (prefix_ellipsis) {
 				syntax_error(ellipsis, "`...` must be applied to value rather than the field name");
-			}
-			if (f->curr_token.kind == Token_Ellipsis) {
-				ellipsis = f->curr_token;
-				advance_token(f);
 			}
 
 			AstNode *value = parse_value(f);
@@ -3339,12 +3334,13 @@ AstNode *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_type_token) 
 
 
 enum FieldPrefixKind {
-	FieldPrefix_Invalid,
+	FieldPrefix_Unknown = -1,
+	FieldPrefix_Invalid = 0,
 
-	FieldPrefix_Using,
-	FieldPrefix_NoAlias,
-	FieldPrefix_CVarArg,
-	FieldPrefix_Const,
+	FieldPrefix_using,
+	FieldPrefix_no_alias,
+	FieldPrefix_c_var_arg,
+	FieldPrefix_const,
 };
 
 FieldPrefixKind is_token_field_prefix(AstFile *f) {
@@ -3353,23 +3349,22 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 		return FieldPrefix_Invalid;
 
 	case Token_using:
-		return FieldPrefix_Using;
+		return FieldPrefix_using;
 
-
-	case Token_Hash: {
+	case Token_Hash:
 		advance_token(f);
 		switch (f->curr_token.kind) {
 		case Token_Ident:
 			if (f->curr_token.string == "no_alias") {
-				return FieldPrefix_NoAlias;
+				return FieldPrefix_no_alias;
 			} else if (f->curr_token.string == "c_vararg") {
-				return FieldPrefix_CVarArg;
+				return FieldPrefix_c_var_arg;
 			} else if (f->curr_token.string == "const") {
-				return FieldPrefix_Const;
+				return FieldPrefix_const;
 			}
 			break;
 		}
-	} break;
+		return FieldPrefix_Unknown;
 	}
 	return FieldPrefix_Invalid;
 }
@@ -3386,24 +3381,30 @@ u32 parse_field_prefixes(AstFile *f) {
 		if (kind == FieldPrefix_Invalid) {
 			break;
 		}
+		if (kind == FieldPrefix_Unknown) {
+			syntax_error(f->curr_token, "Unknown prefix kind `#%.*s`", LIT(f->curr_token.string));
+			advance_token(f);
+			continue;
+		}
+
 		switch (kind) {
-		case FieldPrefix_Using:   using_count    += 1; advance_token(f); break;
-		case FieldPrefix_NoAlias: no_alias_count += 1; advance_token(f); break;
-		case FieldPrefix_CVarArg: c_vararg_count += 1; advance_token(f); break;
-		case FieldPrefix_Const:   const_count += 1; advance_token(f); break;
+		case FieldPrefix_using:     using_count    += 1; advance_token(f); break;
+		case FieldPrefix_no_alias:  no_alias_count += 1; advance_token(f); break;
+		case FieldPrefix_c_var_arg: c_vararg_count += 1; advance_token(f); break;
+		case FieldPrefix_const:     const_count    += 1; advance_token(f); break;
 		}
 	}
 	if (using_count     > 1) syntax_error(f->curr_token, "Multiple `using` in this field list");
 	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple `#no_alias` in this field list");
 	if (c_vararg_count  > 1) syntax_error(f->curr_token, "Multiple `#c_vararg` in this field list");
-	if (const_count     > 1) syntax_error(f->curr_token, "Multiple `$` in this field list");
+	if (const_count     > 1) syntax_error(f->curr_token, "Multiple `#const` in this field list");
 
 
 	u32 field_flags = 0;
 	if (using_count     > 0) field_flags |= FieldFlag_using;
 	if (no_alias_count  > 0) field_flags |= FieldFlag_no_alias;
 	if (c_vararg_count  > 0) field_flags |= FieldFlag_c_vararg;
-	if (const_count  > 0)    field_flags |= FieldFlag_const;
+	if (const_count     > 0) field_flags |= FieldFlag_const;
 	return field_flags;
 }
 
@@ -3534,10 +3535,10 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 		u32 flags = parse_field_prefixes(f);
 		AstNode *param = parse_var_type(f, allow_ellipsis, allow_type_token);
 		if (param->kind == AstNode_Ellipsis) {
-			if (seen_ellipsis) syntax_error(param, "Extra variadic parameter");
+			if (seen_ellipsis) syntax_error(param, "Extra variadic parameter after ellipsis");
 			seen_ellipsis = true;
 		} else if (seen_ellipsis) {
-			syntax_error(param, "Extra parameter have variadic parameters");
+			syntax_error(param, "Extra parameter after ellipsis");
 		}
 		AstNodeAndFlags naf = {param, flags};
 		array_add(&list, naf);
@@ -3566,12 +3567,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 		if (f->curr_token.kind != Token_Eq) {
 			type = parse_var_type(f, allow_ellipsis, allow_type_token);
 		}
-		if (type != nullptr && type->kind == AstNode_Ellipsis) {
-			if (seen_ellipsis) syntax_error(type, "Extra variadic parameter");
-			seen_ellipsis = true;
-		} else if (seen_ellipsis) {
-			syntax_error(f->curr_token, "Extra variadic parameter");
-		}
+
 		if (allow_token(f, Token_Eq)) {
 			// TODO(bill): Should this be true==lhs or false==rhs?
 			default_value = parse_expr(f, false);
@@ -3582,6 +3578,16 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 
 		if (default_value != nullptr && names.count > 1) {
 			syntax_error(f->curr_token, "Default parameters can only be applied to single values");
+		}
+
+		if (type != nullptr && type->kind == AstNode_Ellipsis) {
+			if (seen_ellipsis) syntax_error(type, "Extra variadic parameter after ellipsis");
+			seen_ellipsis = true;
+			if (names.count != 1) {
+				syntax_error(type, "Variadic parameters can only have one field name");
+			}
+		} else if (seen_ellipsis && default_value == nullptr) {
+			syntax_error(f->curr_token, "Extra parameter after ellipsis without a default value");
 		}
 
 		parse_expect_field_separator(f, type);
@@ -3608,12 +3614,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 			if (f->curr_token.kind != Token_Eq) {
 				type = parse_var_type(f, allow_ellipsis, allow_type_token);
 			}
-			if (type != nullptr && type->kind == AstNode_Ellipsis) {
-				if (seen_ellipsis) syntax_error(type, "Extra variadic parameter");
-				seen_ellipsis = true;
-			} else if (seen_ellipsis) {
-				syntax_error(f->curr_token, "Extra variadic parameter");
-			}
+
 			if (allow_token(f, Token_Eq)) {
 				// TODO(bill): Should this be true==lhs or false==rhs?
 				default_value = parse_expr(f, false);
@@ -3625,6 +3626,17 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 			if (default_value != nullptr && names.count > 1) {
 				syntax_error(f->curr_token, "Default parameters can only be applied to single values");
 			}
+
+			if (type != nullptr && type->kind == AstNode_Ellipsis) {
+				if (seen_ellipsis) syntax_error(type, "Extra variadic parameter after ellipsis");
+				seen_ellipsis = true;
+				if (names.count != 1) {
+					syntax_error(type, "Variadic parameters can only have one field name");
+				}
+			} else if (seen_ellipsis && default_value == nullptr) {
+				syntax_error(f->curr_token, "Extra parameter after ellipsis without a default value");
+			}
+
 
 			bool ok = parse_expect_field_separator(f, param);
 			AstNode *param = ast_field(f, names, type, default_value, set_flags, docs, f->line_comment);

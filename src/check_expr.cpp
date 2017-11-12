@@ -4156,6 +4156,22 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 
 		param_count = param_tuple->variables.count;
 		if (variadic) {
+			for (isize i = param_count-1; i >= 0; i--) {
+				Entity *e = param_tuple->variables[i];
+				if (e->kind == Entity_TypeName) {
+					break;
+				}
+
+				if (e->kind == Entity_Variable) {
+					if (e->Variable.default_value.kind != ExactValue_Invalid ||
+					    e->Variable.default_is_nil ||
+					    e->Variable.default_is_location) {
+						param_count--;
+						continue;
+					}
+				}
+				break;
+			}
 			param_count--;
 		}
 	}
@@ -4262,9 +4278,8 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 
 					continue;
 				}
-				if (variadic) {
-					o = operands[operand_index];
-				}
+
+
 				i64 s = 0;
 				if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
 					if (show_error) {
