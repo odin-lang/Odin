@@ -30,11 +30,11 @@ void check_stmt_list(Checker *c, Array<AstNode *> stmts, u32 flags) {
 		if (i+1 < max) {
 			switch (n->kind) {
 			case AstNode_ReturnStmt:
-				error(n, "Statements after this `return` are never executed");
+				error(n, "Statements after this 'return' are never executed");
 				break;
 
 			case AstNode_BranchStmt:
-				error(n, "Statements after this `%.*s` are never executed", LIT(n->BranchStmt.token.string));
+				error(n, "Statements after this '%.*s' are never executed", LIT(n->BranchStmt.token.string));
 				break;
 			}
 		}
@@ -93,9 +93,9 @@ bool check_has_break(AstNode *stmt, bool implicit) {
 
 
 
-// NOTE(bill): The last expression has to be a `return` statement
+// NOTE(bill): The last expression has to be a 'return' statement
 // TODO(bill): This is a mild hack and should be probably handled properly
-// TODO(bill): Warn/err against code after `return` that it won't be executed
+// TODO(bill): Warn/err against code after 'return' that it won't be executed
 bool check_is_terminating(AstNode *node) {
 	switch (node->kind) {
 	case_ast_node(rs, ReturnStmt, node);
@@ -186,10 +186,10 @@ Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 
 	AstNode *node = unparen_expr(lhs->expr);
 
-	// NOTE(bill): Ignore assignments to `_`
+	// NOTE(bill): Ignore assignments to '_'
 	if (is_blank_ident(node)) {
 		add_entity_definition(&c->info, node, nullptr);
-		check_assignment(c, rhs, nullptr, str_lit("assignment to `_` identifier"));
+		check_assignment(c, rhs, nullptr, str_lit("assignment to '_' identifier"));
 		if (rhs->mode == Addressing_Invalid) {
 			return nullptr;
 		}
@@ -280,7 +280,7 @@ Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 			}
 			gbString lhs_expr = expr_to_string(lhs->expr);
 			gbString rhs_expr = expr_to_string(rhs->expr);
-			error(rhs->expr, "Cannot assign `%s` to bit field `%s`", rhs_expr, lhs_expr);
+			error(rhs->expr, "Cannot assign '%s' to bit field '%s'", rhs_expr, lhs_expr);
 			gb_string_free(rhs_expr);
 			gb_string_free(lhs_expr);
 			return nullptr;
@@ -297,7 +297,7 @@ Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 			if (tav.mode != Addressing_Variable) {
 				if (!is_type_pointer(tav.type)) {
 					gbString str = expr_to_string(lhs->expr);
-					error(lhs->expr, "Cannot assign to the value of a map `%s`", str);
+					error(lhs->expr, "Cannot assign to the value of a map '%s'", str);
 					gb_string_free(str);
 					return nullptr;
 				}
@@ -315,7 +315,7 @@ Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 			check_expr(c, &op_c, se->expr);
 			if (op_c.mode == Addressing_MapIndex) {
 				gbString str = expr_to_string(lhs->expr);
-				error(lhs->expr, "Cannot assign to struct field `%s` in map", str);
+				error(lhs->expr, "Cannot assign to struct field '%s' in map", str);
 				gb_string_free(str);
 				return nullptr;
 			}
@@ -323,9 +323,9 @@ Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 
 		gbString str = expr_to_string(lhs->expr);
 		if (lhs->mode == Addressing_Immutable) {
-			error(lhs->expr, "Cannot assign to an immutable: `%s`", str);
+			error(lhs->expr, "Cannot assign to an immutable: '%s'", str);
 		} else {
-			error(lhs->expr, "Cannot assign to `%s`", str);
+			error(lhs->expr, "Cannot assign to '%s'", str);
 		}
 		gb_string_free(str);
 
@@ -341,21 +341,21 @@ Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 	return rhs->type;
 }
 
-enum MatchTypeKind {
-	MatchType_Invalid,
-	MatchType_Union,
-	MatchType_Any,
+enum SwitchTypeKind {
+	SwitchType_Invalid,
+	SwitchType_Union,
+	SwitchType_Any,
 };
 
-MatchTypeKind check_valid_type_match_type(Type *type) {
+SwitchTypeKind check_valid_type_switch_type(Type *type) {
 	type = type_deref(type);
 	if (is_type_union(type)) {
-		return MatchType_Union;
+		return SwitchType_Union;
 	}
 	if (is_type_any(type)) {
-		return MatchType_Any;
+		return SwitchType_Any;
 	}
-	return MatchType_Invalid;
+	return SwitchType_Invalid;
 }
 
 void check_stmt_internal(Checker *c, AstNode *node, u32 flags);
@@ -394,11 +394,11 @@ void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, ws->cond);
 	if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
-		error(ws->cond, "Non-constant boolean `when` condition");
+		error(ws->cond, "Non-constant boolean 'when' condition");
 		return;
 	}
 	if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
-		error(ws->cond, "Invalid body for `when` statement");
+		error(ws->cond, "Invalid body for 'when' statement");
 		return;
 	}
 	if (operand.value.kind == ExactValue_Bool &&
@@ -413,7 +413,7 @@ void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
 			check_when_stmt(c, &ws->else_stmt->WhenStmt, flags);
 			break;
 		default:
-			error(ws->else_stmt, "Invalid `else` statement in `when` statement");
+			error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
 			break;
 		}
 	}
@@ -445,7 +445,7 @@ void check_label(Checker *c, AstNode *label) {
 	for_array(i, c->context.decl->labels) {
 		BlockLabel bl = c->context.decl->labels[i];
 		if (bl.name == name) {
-			error(label, "Duplicate label with the name `%.*s`", LIT(name));
+			error(label, "Duplicate label with the name '%.*s'", LIT(name));
 			ok = false;
 			break;
 		}
@@ -461,10 +461,10 @@ void check_label(Checker *c, AstNode *label) {
 	}
 }
 
-// Returns `true` for `continue`, `false` for `return`
+// Returns 'true' for 'continue', 'false' for 'return'
 bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bool is_selector, Entity *e) {
 	if (e == nullptr) {
-		error(us->token, "`using` applied to an unknown entity");
+		error(us->token, "'using' applied to an unknown entity");
 		return true;
 	}
 
@@ -481,14 +481,14 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 				Entity *found = scope_insert_entity(c->context.scope, f);
 				if (found != nullptr) {
 					gbString expr_str = expr_to_string(expr);
-					error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+					error(us->token, "Namespace collision while 'using' '%s' of: %.*s", expr_str, LIT(found->token.string));
 					gb_string_free(expr_str);
 					return false;
 				}
 				f->using_parent = e;
 			}
 		} else {
-			error(us->token, "`using` can be only applied to enum type entities");
+			error(us->token, "'using' can be only applied to enum type entities");
 		}
 
 		break;
@@ -504,7 +504,7 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 			if (found != nullptr) {
 				gbString expr_str = expr_to_string(expr);
 				error(us->token,
-				      "Namespace collision while `using` `%s` of: %.*s\n"
+				      "Namespace collision while 'using' '%s' of: %.*s\n"
 				      "\tat %.*s(%td:%td)\n"
 				      "\tat %.*s(%td:%td)",
 				      expr_str, LIT(found->token.string),
@@ -534,14 +534,14 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 					Entity *prev = scope_insert_entity(c->context.scope, uvar);
 					if (prev != nullptr) {
 						gbString expr_str = expr_to_string(expr);
-						error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(prev->token.string));
+						error(us->token, "Namespace collision while 'using' '%s' of: %.*s", expr_str, LIT(prev->token.string));
 						gb_string_free(expr_str);
 						return false;
 					}
 				}
 			}
 		} else {
-			error(us->token, "`using` can only be applied to variables of type struct or raw_union");
+			error(us->token, "'using' can only be applied to variables of type struct or raw_union");
 			return false;
 		}
 
@@ -549,28 +549,28 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 	}
 
 	case Entity_Constant:
-		error(us->token, "`using` cannot be applied to a constant");
+		error(us->token, "'using' cannot be applied to a constant");
 		break;
 
 	case Entity_Procedure:
 	case Entity_Builtin:
-		error(us->token, "`using` cannot be applied to a procedure");
+		error(us->token, "'using' cannot be applied to a procedure");
 		break;
 
 	case Entity_Nil:
-		error(us->token, "`using` cannot be applied to `nil`");
+		error(us->token, "'using' cannot be applied to 'nil'");
 		break;
 
 	case Entity_Label:
-		error(us->token, "`using` cannot be applied to a label");
+		error(us->token, "'using' cannot be applied to a label");
 		break;
 
 	case Entity_Invalid:
-		error(us->token, "`using` cannot be applied to an invalid entity");
+		error(us->token, "'using' cannot be applied to an invalid entity");
 		break;
 
 	default:
-		GB_PANIC("TODO(bill): `using` other expressions?");
+		GB_PANIC("TODO(bill): 'using' other expressions?");
 	}
 
 	return true;
@@ -589,7 +589,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		switch (operand.mode) {
 		case Addressing_Type: {
 			gbString str = type_to_string(operand.type);
-			error(node, "`%s` is not an expression", str);
+			error(node, "'%s' is not an expression", str);
 			gb_string_free(str);
 
 			break;
@@ -606,14 +606,14 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				if (is_type_proc(t)) {
 					if (t->Proc.require_results) {
 						gbString expr_str = expr_to_string(ce->proc);
-						error(node, "`%s` requires that its results must be handled", expr_str);
+						error(node, "'%s' requires that its results must be handled", expr_str);
 						gb_string_free(expr_str);
 					}
 				}
 				return;
 			}
 			gbString expr_str = expr_to_string(operand.expr);
-			error(node, "Expression is not used: `%s`", expr_str);
+			error(node, "Expression is not used: '%s'", expr_str);
 			gb_string_free(expr_str);
 
 			break;
@@ -717,7 +717,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				check_assignment_variable(c, &lhs_operands[i], &rhs_operands[i]);
 			}
 			if (lhs_count != rhs_count) {
-				error(as->lhs[0], "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
+				error(as->lhs[0], "Assignment count mismatch '%td' = '%td'", lhs_count, rhs_count);
 			}
 			break;
 		}
@@ -726,11 +726,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			// a += 1; // Single-sided
 			Token op = as->op;
 			if (as->lhs.count != 1 || as->rhs.count != 1) {
-				error(op, "Assignment operation `%.*s` requires single-valued expressions", LIT(op.string));
+				error(op, "Assignment operation '%.*s' requires single-valued expressions", LIT(op.string));
 				return;
 			}
 			if (!gb_is_between(op.kind, Token__AssignOpBegin+1, Token__AssignOpEnd-1)) {
-				error(op, "Unknown Assignment operation `%.*s`", LIT(op.string));
+				error(op, "Unknown Assignment operation '%.*s'", LIT(op.string));
 				return;
 			}
 			Operand lhs = {Addressing_Invalid};
@@ -772,7 +772,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		Operand operand = {Addressing_Invalid};
 		check_expr(c, &operand, is->cond);
 		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error(is->cond, "Non-boolean condition in `if` statement");
+			error(is->cond, "Non-boolean condition in 'if' statement");
 		}
 
 		check_stmt(c, is->body, mod_flags);
@@ -784,7 +784,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				check_stmt(c, is->else_stmt, mod_flags);
 				break;
 			default:
-				error(is->else_stmt, "Invalid `else` statement in `if` statement");
+				error(is->else_stmt, "Invalid 'else' statement in 'if' statement");
 				break;
 			}
 		}
@@ -800,7 +800,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		GB_ASSERT(c->proc_stack.count > 0);
 
 		if (c->context.in_defer) {
-			error(rs->token, "You cannot `return` within a defer statement");
+			error(rs->token, "You cannot 'return' within a defer statement");
 			break;
 		}
 
@@ -817,7 +817,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					mix = arg->kind == AstNode_FieldValue;
 				}
 				if (mix) {
-					error(arg, "Mixture of `field = value` and value elements in a procedure all is not allowed");
+					error(arg, "Mixture of 'field = value' and value elements in a procedure all is not allowed");
 					fail = true;
 				}
 			}
@@ -876,18 +876,18 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				ast_node(fv, FieldValue, arg);
 				if (fv->field->kind != AstNode_Ident) {
 					gbString expr_str = expr_to_string(fv->field);
-					error(arg, "Invalid parameter name `%s` in return statement", expr_str);
+					error(arg, "Invalid parameter name '%s' in return statement", expr_str);
 					gb_string_free(expr_str);
 					continue;
 				}
 				String name = fv->field->Ident.token.string;
 				isize index = lookup_procedure_result(pt, name);
 				if (index < 0) {
-					error(arg, "No result named `%.*s` for this procedure type", LIT(name));
+					error(arg, "No result named '%.*s' for this procedure type", LIT(name));
 					continue;
 				}
 				if (visited[index]) {
-					error(arg, "Duplicate result `%.*s` in return statement", LIT(name));
+					error(arg, "Duplicate result '%.*s' in return statement", LIT(name));
 					continue;
 				}
 
@@ -913,7 +913,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					}
 
 					gbString str = type_to_string(e->type);
-					error(node, "Return value `%.*s` of type `%s` is missing in return statement",
+					error(node, "Return value '%.*s' of type '%s' is missing in return statement",
 					      LIT(e->token.string), str);
 					gb_string_free(str);
 				}
@@ -956,7 +956,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			Operand o = {Addressing_Invalid};
 			check_expr(c, &o, fs->cond);
 			if (o.mode != Addressing_Invalid && !is_type_boolean(o.type)) {
-				error(fs->cond, "Non-boolean condition in `for` statement");
+				error(fs->cond, "Non-boolean condition in 'for' statement");
 			}
 		}
 		if (fs->post != nullptr) {
@@ -964,7 +964,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			if (fs->post->kind != AstNode_AssignStmt &&
 			    fs->post->kind != AstNode_IncDecStmt) {
-				error(fs->post, "`for` statement post statement must be a simple statement");
+				error(fs->post, "'for' statement post statement must be a simple statement");
 			}
 		}
 		check_stmt(c, fs->body, new_flags);
@@ -1024,7 +1024,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					gbString xt = type_to_string(x.type);
 					gbString yt = type_to_string(y.type);
 					gbString expr_str = expr_to_string(x.expr);
-					error(ie->op, "Mismatched types in interval expression `%s` : `%s` vs `%s`", expr_str, xt, yt);
+					error(ie->op, "Mismatched types in interval expression '%s' : '%s' vs '%s'", expr_str, xt, yt);
 					gb_string_free(expr_str);
 					gb_string_free(yt);
 					gb_string_free(xt);
@@ -1078,7 +1078,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			if (operand.mode == Addressing_Type) {
 				if (!is_type_enum(operand.type)) {
 					gbString t = type_to_string(operand.type);
-					error(operand.expr, "Cannot iterate over the type `%s`", t);
+					error(operand.expr, "Cannot iterate over the type '%s'", t);
 					gb_string_free(t);
 					goto skip_expr;
 				} else {
@@ -1127,7 +1127,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			if (val == nullptr) {
 				gbString s = expr_to_string(operand.expr);
 				gbString t = type_to_string(operand.type);
-				error(operand.expr, "Cannot iterate over `%s` of type `%s`", s, t);
+				error(operand.expr, "Cannot iterate over '%s' of type '%s'", s, t);
 				gb_string_free(t);
 				gb_string_free(s);
 			}
@@ -1160,7 +1160,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				} else {
 					TokenPos pos = found->token.pos;
 					error(token,
-					      "Redeclaration of `%.*s` in this scope\n"
+					      "Redeclaration of '%.*s' in this scope\n"
 					      "\tat %.*s(%td:%td)",
 					      LIT(str), LIT(pos.file), pos.line, pos.column);
 					entity = found;
@@ -1202,7 +1202,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 		if (ss->tag != nullptr) {
 			check_expr(c, &x, ss->tag);
-			check_assignment(c, &x, nullptr, str_lit("match expression"));
+			check_assignment(c, &x, nullptr, str_lit("switch expression"));
 		} else {
 			x.mode  = Addressing_Constant;
 			x.type  = t_bool;
@@ -1215,7 +1215,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 		if (is_type_vector(x.type)) {
 			gbString str = type_to_string(x.type);
-			error(x.expr, "Invalid match expression type: %s", str);
+			error(x.expr, "Invalid switch expression type: %s", str);
 			gb_string_free(str);
 			break;
 		}
@@ -1240,7 +1240,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				if (first_default != nullptr) {
 					TokenPos pos = ast_node_token(first_default).pos;
 					error(stmt,
-					           "multiple `default` clauses\n"
+					           "multiple default clauses\n"
 					           "\tfirst at %.*s(%td:%td)",
 					           LIT(pos.file), pos.line, pos.column);
 				} else {
@@ -1281,7 +1281,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 					if (!is_type_ordered(x.type)) {
 						gbString str = type_to_string(x.type);
-						error(x.expr, "Unordered type `%s`, is invalid for an interval expression", str);
+						error(x.expr, "Unordered type '%s', is invalid for an interval expression", str);
 						gb_string_free(str);
 						continue;
 					}
@@ -1359,7 +1359,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 									TokenPos pos = tap.token.pos;
 									gbString expr_str = expr_to_string(y.expr);
 									error(y.expr,
-									           "Duplicate case `%s`\n"
+									           "Duplicate case '%s'\n"
 									           "\tprevious case at %.*s(%td:%td)",
 									           expr_str,
 									           LIT(pos.file), pos.line, pos.column);
@@ -1401,32 +1401,32 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		check_open_scope(c, node);
 		check_label(c, ss->label); // TODO(bill): What should the label's "scope" be?
 
-		MatchTypeKind match_type_kind = MatchType_Invalid;
+		SwitchTypeKind switch_type_kind = SwitchType_Invalid;
 
 		if (ss->tag->kind != AstNode_AssignStmt) {
-			error(ss->tag, "Expected an `in` assignment for this type match statement");
+			error(ss->tag, "Expected an 'in' assignment for this type switch statement");
 			break;
 		}
 
 		ast_node(as, AssignStmt, ss->tag);
 		Token as_token = ast_node_token(ss->tag);
 		if (as->lhs.count != 1) {
-			syntax_error(as_token, "Expected 1 name before `in`");
+			syntax_error(as_token, "Expected 1 name before 'in'");
 			break;
 		}
 		if (as->rhs.count != 1) {
-			syntax_error(as_token, "Expected 1 expression after `in`");
+			syntax_error(as_token, "Expected 1 expression after 'in'");
 			break;
 		}
 		AstNode *lhs = as->lhs[0];
 		AstNode *rhs = as->rhs[0];
 
 		check_expr(c, &x, rhs);
-		check_assignment(c, &x, nullptr, str_lit("type match expression"));
-		match_type_kind = check_valid_type_match_type(x.type);
-		if (check_valid_type_match_type(x.type) == MatchType_Invalid) {
+		check_assignment(c, &x, nullptr, str_lit("type switch expression"));
+		switch_type_kind = check_valid_type_switch_type(x.type);
+		if (check_valid_type_switch_type(x.type) == SwitchType_Invalid) {
 			gbString str = type_to_string(x.type);
-			error(x.expr, "Invalid type for this type match expression, got `%s`", str);
+			error(x.expr, "Invalid type for this type switch expression, got '%s'", str);
 			gb_string_free(str);
 			break;
 		}
@@ -1452,7 +1452,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				if (first_default != nullptr) {
 					TokenPos pos = ast_node_token(first_default).pos;
 					error(stmt,
-					           "Multiple `default` clauses\n"
+					           "Multiple 'default' clauses\n"
 					           "\tfirst at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
 				} else {
 					first_default = default_stmt;
@@ -1462,7 +1462,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 
 		if (lhs->kind != AstNode_Ident) {
-			error(rhs, "Expected an identifier, got `%.*s`", LIT(ast_node_strings[rhs->kind]));
+			error(rhs, "Expected an identifier, got '%.*s'", LIT(ast_node_strings[rhs->kind]));
 			break;
 		}
 
@@ -1488,7 +1488,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					Operand y = {};
 					check_expr_or_type(c, &y, type_expr);
 
-					if (match_type_kind == MatchType_Union) {
+					if (switch_type_kind == SwitchType_Union) {
 						GB_ASSERT(is_type_union(bt));
 						bool tag_type_found = false;
 						for_array(i, bt->Union.variants) {
@@ -1500,15 +1500,15 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						}
 						if (!tag_type_found) {
 							gbString type_str = type_to_string(y.type);
-							error(y.expr, "Unknown tag type, got `%s`", type_str);
+							error(y.expr, "Unknown tag type, got '%s'", type_str);
 							gb_string_free(type_str);
 							continue;
 						}
 						case_type = y.type;
-					} else if (match_type_kind == MatchType_Any) {
+					} else if (switch_type_kind == SwitchType_Any) {
 						case_type = y.type;
 					} else {
-						GB_PANIC("Unknown type to type match statement");
+						GB_PANIC("Unknown type to type switch statement");
 					}
 
 					HashKey key = hash_type(y.type);
@@ -1517,7 +1517,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						TokenPos pos = cc->token.pos;
 						gbString expr_str = expr_to_string(y.expr);
 						error(y.expr,
-						           "Duplicate type case `%s`\n"
+						           "Duplicate type case '%s'\n"
 						           "\tprevious type case at %.*s(%td:%td)",
 						           expr_str,
 						           LIT(pos.file), pos.line, pos.column);
@@ -1577,21 +1577,21 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		switch (token.kind) {
 		case Token_break:
 			if ((flags & Stmt_BreakAllowed) == 0) {
-				error(token, "`break` only allowed in loops or `match` statements");
+				error(token, "'break' only allowed in loops or 'switch' statements");
 			}
 			break;
 		case Token_continue:
 			if ((flags & Stmt_ContinueAllowed) == 0) {
-				error(token, "`continue` only allowed in loops");
+				error(token, "'continue' only allowed in loops");
 			}
 			break;
 		case Token_fallthrough:
 			if ((flags & Stmt_FallthroughAllowed) == 0) {
-				error(token, "`fallthrough` statement in illegal position");
+				error(token, "'fallthrough' statement in illegal position");
 			}
 			break;
 		default:
-			error(token, "Invalid AST: Branch Statement `%.*s`", LIT(token.string));
+			error(token, "Invalid AST: Branch Statement '%.*s'", LIT(token.string));
 			break;
 		}
 
@@ -1610,7 +1610,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 			add_entity_use(c, ident, e);
 			if (e->kind != Entity_Label) {
-				error(ident, "`%.*s` is not a label", LIT(name));
+				error(ident, "'%.*s' is not a label", LIT(name));
 				return;
 			}
 		}
@@ -1619,7 +1619,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(us, UsingStmt, node);
 		if (us->list.count == 0) {
-			error(us->token, "Empty `using` list");
+			error(us->token, "Empty 'using' list");
 			return;
 		}
 		for_array(i, us->list) {
@@ -1637,10 +1637,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				is_selector = true;
 				break;
 			case AstNode_Implicit:
-				error(us->token, "`using` applied to an implicit value");
+				error(us->token, "'using' applied to an implicit value");
 				continue;
 			default:
-				error(us->token, "`using` can only be applied to an entity, got %.*s", LIT(ast_node_strings[expr->kind]));
+				error(us->token, "'using' can only be applied to an entity, got %.*s", LIT(ast_node_strings[expr->kind]));
 				continue;
 			}
 
@@ -1697,7 +1697,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				Token token = name->Ident.token;
 				String str = token.string;
 				Entity *found = nullptr;
-				// NOTE(bill): Ignore assignments to `_`
+				// NOTE(bill): Ignore assignments to '_'
 				if (!is_blank_ident(str)) {
 					found = current_scope_lookup_entity(c->context.scope, str);
 				}
@@ -1714,7 +1714,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				} else {
 					TokenPos pos = found->token.pos;
 					error(token,
-					      "Redeclaration of `%.*s` in this scope\n"
+					      "Redeclaration of '%.*s' in this scope\n"
 					      "\tat %.*s(%td:%td)",
 					      LIT(str), LIT(pos.file), pos.line, pos.column);
 					entity = found;
@@ -1734,12 +1734,12 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				init_type = t_invalid;
 			} else if (is_type_polymorphic(base_type(init_type))) {
 				gbString str = type_to_string(init_type);
-				error(vd->type, "Invalid use of a polymorphic type `%s` in variable declaration", str);
+				error(vd->type, "Invalid use of a polymorphic type '%s' in variable declaration", str);
 				gb_string_free(str);
 				init_type = t_invalid;
 			} else if (is_type_empty_union(init_type)) {
 				gbString str = type_to_string(init_type);
-				error(vd->type, "An empty union `%s` cannot be instantiated in variable declaration", str);
+				error(vd->type, "An empty union '%s' cannot be instantiated in variable declaration", str);
 				gb_string_free(str);
 				init_type = t_invalid;
 			}
@@ -1800,7 +1800,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					Type *other_type = base_type(f->type);
 					if (!are_types_identical(this_type, other_type)) {
 						error(e->token,
-						      "Foreign entity `%.*s` previously declared elsewhere with a different type\n"
+						      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
 						      "\tat %.*s(%td:%td)",
 						      LIT(name), LIT(pos.file), pos.line, pos.column);
 					}
@@ -1814,8 +1814,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		if (vd->is_using != 0) {
 			Token token = ast_node_token(node);
 			if (vd->type != nullptr && entity_count > 1) {
-				error(token, "`using` can only be applied to one variable of the same type");
-				// TODO(bill): Should a `continue` happen here?
+				error(token, "'using' can only be applied to one variable of the same type");
+				// TODO(bill): Should a 'continue' happen here?
 			}
 
 			for (isize entity_index = 0; entity_index < entity_count; entity_index++) {
@@ -1831,7 +1831,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				Type *t = base_type(type_deref(e->type));
 
 				if (is_blank_ident(name)) {
-					error(token, "`using` cannot be applied variable declared as `_`");
+					error(token, "'using' cannot be applied variable declared as '_'");
 				} else if (is_type_struct(t) || is_type_raw_union(t)) {
 					Scope *scope = scope_of_node(&c->info, t->Struct.node);
 					for_array(i, scope->elements.entries) {
@@ -1841,14 +1841,14 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 							uvar->Variable.is_immutable = is_immutable;
 							Entity *prev = scope_insert_entity(c->context.scope, uvar);
 							if (prev != nullptr) {
-								error(token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
+								error(token, "Namespace collision while 'using' '%.*s' of: %.*s", LIT(name), LIT(prev->token.string));
 								return;
 							}
 						}
 					}
 				} else {
 					// NOTE(bill): skip the rest to remove extra errors
-					error(token, "`using` can only be applied to variables of type struct or raw_union");
+					error(token, "'using' can only be applied to variables of type struct or raw_union");
 					return;
 				}
 			}

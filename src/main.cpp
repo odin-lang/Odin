@@ -19,7 +19,7 @@
 #include "ir_print.cpp"
 
 #if defined(GB_SYSTEM_WINDOWS)
-// NOTE(bill): `name` is used in debugging and profiling modes
+// NOTE(bill): 'name' is used in debugging and profiling modes
 i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
@@ -275,7 +275,7 @@ bool parse_build_flags(Array<String> args) {
 			if (bf.name == name) {
 				found = true;
 				if (set_flags[bf.kind]) {
-					gb_printf_err("Previous flag set: `%.*s`\n", LIT(name));
+					gb_printf_err("Previous flag set: '%.*s'\n", LIT(name));
 					bad_flags = true;
 				} else {
 					ExactValue value = {};
@@ -284,11 +284,11 @@ bool parse_build_flags(Array<String> args) {
 						if (param.len == 0) {
 							ok = true;
 						} else {
-							gb_printf_err("Flag `%.*s` was not expecting a parameter `%.*s`\n", LIT(name), LIT(param));
+							gb_printf_err("Flag '%.*s' was not expecting a parameter '%.*s'\n", LIT(name), LIT(param));
 							bad_flags = true;
 						}
 					} else if (param.len == 0) {
-						gb_printf_err("Flag missing for `%.*s`\n", LIT(name));
+						gb_printf_err("Flag missing for '%.*s'\n", LIT(name));
 						bad_flags = true;
 					} else {
 						ok = true;
@@ -320,7 +320,7 @@ bool parse_build_flags(Array<String> args) {
 							} else if (param == "0") {
 								value = exact_value_bool(false);
 							} else {
-								gb_printf_err("Invalid flag parameter for `%.*s` = `%.*s`\n", LIT(name), LIT(param));
+								gb_printf_err("Invalid flag parameter for '%.*s' = '%.*s'\n", LIT(name), LIT(param));
 							}
 						} break;
 						case BuildFlagParam_Integer:
@@ -408,20 +408,20 @@ bool parse_build_flags(Array<String> args) {
 								}
 							}
 							if (eq_pos < 0) {
-								gb_printf_err("Expected `name=path`, got `%.*s`\n", LIT(param));
+								gb_printf_err("Expected 'name=path', got '%.*s'\n", LIT(param));
 								bad_flags = true;
 								break;
 							}
 							String name = substring(str, 0, eq_pos);
 							String path = substring(str, eq_pos+1, str.len);
 							if (name.len == 0 || path.len == 0) {
-								gb_printf_err("Expected `name=path`, got `%.*s`\n", LIT(param));
+								gb_printf_err("Expected 'name=path', got '%.*s'\n", LIT(param));
 								bad_flags = true;
 								break;
 							}
 
 							if (!string_is_valid_identifier(name)) {
-								gb_printf_err("Library collection name `%.*s` must be a valid identifier\n", LIT(name));
+								gb_printf_err("Library collection name '%.*s' must be a valid identifier\n", LIT(name));
 								bad_flags = true;
 								break;
 							}
@@ -433,7 +433,7 @@ bool parse_build_flags(Array<String> args) {
 							}
 
 							if (name == "system") {
-								gb_printf_err("Library collection name `system` is reserved\n");
+								gb_printf_err("Library collection name 'system' is reserved\n");
 								bad_flags = true;
 								break;
 							}
@@ -441,7 +441,7 @@ bool parse_build_flags(Array<String> args) {
 							String prev_path = {};
 							bool found = find_library_collection_path(name, &prev_path);
 							if (found) {
-								gb_printf_err("Library collection `%.*s` already exists with path `%.*s`\n", LIT(name), LIT(prev_path));
+								gb_printf_err("Library collection '%.*s' already exists with path '%.*s'\n", LIT(name), LIT(prev_path));
 								bad_flags = true;
 								break;
 							}
@@ -449,7 +449,7 @@ bool parse_build_flags(Array<String> args) {
 							gbAllocator a = heap_allocator();
 							String fullpath = path_to_fullpath(a, path);
 							if (!path_is_directory(fullpath)) {
-								gb_printf_err("Library collection `%.*s` path must be a directory, got `%.*s`\n", LIT(name), LIT(fullpath));
+								gb_printf_err("Library collection '%.*s' path must be a directory, got '%.*s'\n", LIT(name), LIT(fullpath));
 								gb_free(a, fullpath.text);
 								bad_flags = true;
 								break;
@@ -470,7 +470,7 @@ bool parse_build_flags(Array<String> args) {
 			}
 		}
 		if (!found) {
-			gb_printf_err("Unknown flag: `%.*s`\n", LIT(name));
+			gb_printf_err("Unknown flag: '%.*s'\n", LIT(name));
 			bad_flags = true;
 		}
 	}
@@ -552,7 +552,7 @@ int main(int arg_count, char **arg_ptr) {
 	init_global_error_collector();
 
 	array_init(&library_collections, heap_allocator());
-	// NOTE(bill): `core` cannot be (re)defined by the user
+	// NOTE(bill): 'core' cannot be (re)defined by the user
 	add_library_collection(str_lit("core"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("core")));
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
@@ -606,7 +606,7 @@ int main(int arg_count, char **arg_ptr) {
 	}
 
 
-	// NOTE(bill): add `shared` directory if it is not already set
+	// NOTE(bill): add 'shared' directory if it is not already set
 	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
 		add_library_collection(str_lit("shared"),
 		                       get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared")));
@@ -717,7 +717,7 @@ int main(int arg_count, char **arg_ptr) {
 			#if defined(GB_SYSTEM_OSX)
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
-				//       make sure to also change the `macosx_version_min` param passed to `llc`
+				//       make sure to also change the 'macosx_version_min' param passed to 'llc'
 				"-mtriple=x86_64-apple-macosx10.8 "
 			#endif
 			"",
@@ -844,17 +844,17 @@ int main(int arg_count, char **arg_ptr) {
 					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l%.*s ", LIT(lib));
 				}
 			#else
-				// NOTE(vassvik): static libraries (.a files) in linux can be linked to directly using the full path, 
-				//                since those are statically linked to at link time. shared libraries (.so) has to be 
+				// NOTE(vassvik): static libraries (.a files) in linux can be linked to directly using the full path,
+				//                since those are statically linked to at link time. shared libraries (.so) has to be
 				//                available at runtime wherever the executable is run, so we make require those to be
 				//                local to the executable (unless the system collection is used, in which case we search
-				//                the system library paths for the library file). 
+				//                the system library paths for the library file).
 				if (string_has_extension(lib, str_lit("a"))) {
 					// static libs, absolute full path relative to the file in which the lib was imported from
 					isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l:%.*s ", LIT(lib));
 				} else if (string_has_extension(lib, str_lit("so"))) {
 					// dynamic lib, relative path to executable
-					// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible 
+					// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
 					//                at runtimeto the executable
 					isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l:%s/%.*s ", cwd, LIT(lib));
 				} else {
@@ -902,7 +902,7 @@ int main(int arg_count, char **arg_ptr) {
 			#if defined(GB_SYSTEM_OSX)
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
-				//       make sure to also change the `mtriple` param passed to `opt`
+				//       make sure to also change the 'mtriple' param passed to 'opt'
 				" -macosx_version_min 10.8.0 "
 				// This points the linker to where the entry point is
 				" -e _main "

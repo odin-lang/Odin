@@ -246,7 +246,7 @@ ExactValue exact_value_from_basic_literal(Token token) {
 	case Token_Imag: {
 		String str = token.string;
 		Rune last_rune = cast(Rune)str[str.len-1];
-		str.len--; // Ignore the `i|j|k`
+		str.len--; // Ignore the 'i|j|k'
 		f64 imag = float_from_string(str);
 
 		if (last_rune == 'i') {
@@ -344,7 +344,7 @@ ExactValue exact_value_make_imag(ExactValue v) {
 	case ExactValue_Float:
 		return exact_value_complex(0, v.value_float);
 	default:
-		GB_PANIC("Expected an integer or float type for `exact_value_make_imag`");
+		GB_PANIC("Expected an integer or float type for 'exact_value_make_imag'");
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
