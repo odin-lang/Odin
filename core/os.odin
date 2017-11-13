@@ -37,8 +37,12 @@ read_entire_file :: proc(name: string) -> (data: []u8, success: bool) {
 	return data[0..bytes_read], true;
 }
 
-write_entire_file :: proc(name: string, data: []u8) -> (success: bool) {
-	fd, err := open(name, O_WRONLY|O_CREATE, 0);
+write_entire_file :: proc(name: string, data: []u8, truncate := true) -> (success: bool) {
+	flags: int = O_WRONLY|O_CREATE;
+	if truncate {
+		flags |= O_TRUNC;
+	}
+	fd, err := open(name, flags, 0);
 	if err != 0 {
 		return false;
 	}
