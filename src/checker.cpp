@@ -388,7 +388,7 @@ int import_graph_node_cmp(ImportGraphNode **data, isize i, isize j) {
 	bool xg = x->scope->is_global;
 	bool yg = y->scope->is_global;
 	if (xg != yg) return xg ? -1 : +1;
-	if (xg && yg) return x->file_id < y->file_id ? -1 : +1;
+	if (xg && yg) return x->file_id < y->file_id ? +1 : -1;
 	if (x->dep_count < y->dep_count) return -1;
 	if (x->dep_count > y->dep_count) return +1;
 	return 0;
@@ -2634,6 +2634,7 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 	}
 }
 
+
 Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
 	gbAllocator a = heap_allocator();
 
@@ -2700,7 +2701,10 @@ Array<ImportPathItem> find_import_path(Checker *c, Scope *start, Scope *end, Ptr
 			AstNode *decl = f->imports_and_exports[i];
 			if (decl->kind == AstNode_ExportDecl) {
 				s = decl->ExportDecl.file->scope;
-			} else if (decl->kind == AstNode_ImportDecl && decl->ImportDecl.is_using) {
+			} else if (decl->kind == AstNode_ImportDecl) {
+				if (!decl->ImportDecl.is_using) {
+					// continue;
+				}
 				s = decl->ImportDecl.file->scope;
 			} else {
 				continue;
@@ -3136,13 +3140,12 @@ void check_import_entities(Checker *c) {
 				}
 				error(item.decl, "'%.*s'", LIT(filename));
 			}
-
 		}
 
 		for_array(i, n->pred.entries) {
 			ImportGraphNode *p = n->pred.entries[i].ptr;
-			// p->dep_count = gb_max(p->dep_count-1, 0);
-			p->dep_count -= 1;
+			p->dep_count = gb_max(p->dep_count-1, 0);
+			// p->dep_count -= 1;
 			priority_queue_fix(&pq, p->index);
 		}
 
