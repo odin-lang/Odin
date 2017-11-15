@@ -1494,6 +1494,13 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 			o->mode = Addressing_Invalid;
 			return;
 		}
+		if (op.kind == Token_Sub && is_type_unsigned(type)) {
+			gbString err_str = expr_to_string(node);
+			error(op, "A unsigned constant cannot be negated '%s'", err_str);
+			gb_string_free(err_str);
+			o->mode = Addressing_Invalid;
+			return;
+		}
 
 		o->value = exact_unary_operator_value(op.kind, o->value, precision);
 
