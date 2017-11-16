@@ -41,6 +41,16 @@ slice_to_bytes :: proc "contextless" (slice: $E/[]$T) -> []u8 {
 	return transmute([]u8)s;
 }
 
+ptr_to_bytes :: proc "contextless" (ptr: ^$T, len := 1) -> []u8 {
+    assert(len >= 0);
+    return transmute([]u8)raw.Slice{ptr, len*size_of(T), len*size_of(T)};
+}
+
+ptr_to_bytes :: proc "contextless" (ptr: ^$T, len, cap: int) -> []u8 {
+    assert(0 <= len && len <= cap);
+    return transmute([]u8)raw.Slice{ptr, len*size_of(T), cap*size_of(T)};
+}
+
 
 kilobytes :: inline proc "contextless" (x: int) -> int do return          (x) * 1024;
 megabytes :: inline proc "contextless" (x: int) -> int do return kilobytes(x) * 1024;
