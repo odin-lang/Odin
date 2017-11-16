@@ -625,24 +625,22 @@ default_allocator :: proc() -> Allocator {
 }
 
 
-assert :: proc "contextless" (condition: bool, message := "", using loc := #caller_location) -> bool {
+assert :: proc "contextless" (condition: bool, message := "", args: ...any, using loc := #caller_location) -> bool {
 	if !condition {
-		if len(message) > 0 {
-			fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion: %s\n", file_path, line, column, message);
-		} else {
-			fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion\n", file_path, line, column);
-		}
+		fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion", file_path, line, column);
+		if len(message) > 0 do fmt.fprint(os.stderr, ": ");
+		fmt.fprintf(os.stderr, message, ...args);
+		fmt.fprintf(os.stderr, "\n");
 		__debug_trap();
 	}
 	return condition;
 }
 
-panic :: proc "contextless" (message := "", using loc := #caller_location) {
-	if len(message) > 0 {
-		fmt.fprintf(os.stderr, "%s(%d:%d) Panic: %s\n", file_path, line, column, message);
-	} else {
-		fmt.fprintf(os.stderr, "%s(%d:%d) Panic\n", file_path, line, column);
-	}
+panic :: proc "contextless" (message := "", args: ...any, using loc := #caller_location) {
+	fmt.fprintf(os.stderr, "%s(%d:%d) Panic", file_path, line, column);
+	if len(message) > 0 do fmt.fprint(os.stderr, ": ");
+	fmt.fprintf(os.stderr, message, ...args);
+	fmt.fprintf(os.stderr, "\n");
 	__debug_trap();
 }
 
