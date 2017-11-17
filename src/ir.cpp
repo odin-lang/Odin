@@ -7750,7 +7750,7 @@ bool ir_gen_init(irGen *s, Checker *c) {
 	int dir_pos = cast(int)string_extension_position(init_fullpath);
 	s->output_name = filename_from_path(init_fullpath);
 	s->output_base = make_string(init_fullpath.text, pos);
-	gbFileError err = gb_file_create(&s->output_file, gb_bprintf("%.*s.ll", pos, init_fullpath.text));
+	gbFileError err = gb_file_create(&s->output_file, gb_bprintf("%.*s.ll", LIT(s->output_base)));
 	if (err != gbFileError_None) {
 		return false;
 	}
