@@ -171,42 +171,6 @@ void usage(String argv0) {
 }
 
 
-
-enum BuildFlagKind {
-	BuildFlag_Invalid,
-
-	BuildFlag_OptimizationLevel,
-	BuildFlag_ShowTimings,
-	BuildFlag_ThreadCount,
-	BuildFlag_KeepTempFiles,
-	BuildFlag_Collection,
-
-	BuildFlag_COUNT,
-};
-
-enum BuildFlagParamKind {
-	BuildFlagParam_None,
-
-	BuildFlagParam_Boolean,
-	BuildFlagParam_Integer,
-	BuildFlagParam_Float,
-	BuildFlagParam_String,
-
-	BuildFlagParam_COUNT,
-};
-
-struct BuildFlag {
-	BuildFlagKind      kind;
-	String             name;
-	BuildFlagParamKind param_kind;
-};
-
-
-void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind) {
-	BuildFlag flag = {kind, name, param_kind};
-	array_add(build_flags, flag);
-}
-
 bool string_is_valid_identifier(String str) {
 	if (str.len <= 0) return false;
 
@@ -237,6 +201,41 @@ bool string_is_valid_identifier(String str) {
 	return true;
 }
 
+enum BuildFlagKind {
+	BuildFlag_Invalid,
+
+	BuildFlag_OptimizationLevel,
+	BuildFlag_ShowTimings,
+	BuildFlag_ThreadCount,
+	BuildFlag_KeepTempFiles,
+	BuildFlag_Collection,
+	BuildFlag_BuildMode,
+
+	BuildFlag_COUNT,
+};
+
+enum BuildFlagParamKind {
+	BuildFlagParam_None,
+
+	BuildFlagParam_Boolean,
+	BuildFlagParam_Integer,
+	BuildFlagParam_Float,
+	BuildFlagParam_String,
+
+	BuildFlagParam_COUNT,
+};
+
+struct BuildFlag {
+	BuildFlagKind      kind;
+	String             name;
+	BuildFlagParamKind param_kind;
+};
+
+void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind) {
+	BuildFlag flag = {kind, name, param_kind};
+	array_add(build_flags, flag);
+}
+
 bool parse_build_flags(Array<String> args) {
 	Array<BuildFlag> build_flags = {};
 	array_init(&build_flags, heap_allocator(), BuildFlag_COUNT);
@@ -245,6 +244,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),    BuildFlagParam_Integer);
 	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),      BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),      BuildFlagParam_String);
 
 
 	Array<String> flag_args = args;
@@ -391,7 +391,8 @@ bool parse_build_flags(Array<String> args) {
 							} else {
 								build_context.thread_count = count;
 							}
-						} break;
+							break;
+						}
 						case BuildFlag_KeepTempFiles:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.keep_temp_files = true;
@@ -459,7 +460,30 @@ bool parse_build_flags(Array<String> args) {
 
 							// NOTE(bill): Allow for multiple library collections
 							continue;
-						} break;
+						}
+
+						case BuildFlag_BuildMode: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String str = value.value_string;
+
+							if (build_context.command != "build") {
+								gb_printf_err("'build-mode' can only be used with the 'build' command\n");
+								bad_flags = true;
+								break;
+							}
+
+							if (str == "dll") {
+								build_context.is_dll = true;
+							} else if (str == "exe") {
+								build_context.is_dll = false;
+							} else {
+								gb_printf_err("Unknown build mode '%.*s'\n", LIT(str));
+								bad_flags = true;
+								break;
+							}
+
+							break;
+						}
 						}
 					}
 
@@ -559,29 +583,24 @@ int main(int arg_count, char **arg_ptr) {
 
 #if 1
 
+	String command = args[1];
+
 	String init_filename = {};
 	bool run_output = false;
-	if (args[1] == "run") {
+	if (command == "run") {
 		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
 		}
 		init_filename = args[2];
 		run_output = true;
-	} else if (args[1] == "build_dll") {
+	} else if (command == "build") {
 		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
 		}
 		init_filename = args[2];
-		build_context.is_dll = true;
-	} else if (args[1] == "build") {
-		if (args.count < 3) {
-			usage(args[0]);
-			return 1;
-		}
-		init_filename = args[2];
-	} else if (args[1] == "docs") {
+	} else if (command == "docs") {
 		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
@@ -593,7 +612,7 @@ int main(int arg_count, char **arg_ptr) {
 		print_usage_line(0, "Documentation generation is not yet supported");
 		return 1;
 		#endif
-	} else if (args[1] == "version") {
+	} else if (command == "version") {
 		gb_printf("%.*s version %.*s\n", LIT(args[0]), LIT(ODIN_VERSION));
 		return 0;
 	} else {
@@ -601,9 +620,12 @@ int main(int arg_count, char **arg_ptr) {
 		return 1;
 	}
 
+	build_context.command = command;
+
 	if (!parse_build_flags(args)) {
 		return 1;
 	}
+
 
 
 	// NOTE(bill): add 'shared' directory if it is not already set
@@ -686,7 +708,6 @@ int main(int arg_count, char **arg_ptr) {
 
 	String output_name = ir_gen.output_name;
 	String output_base = ir_gen.output_base;
-	int base_name_len = cast(int)output_base.len;
 
 	build_context.optimization_level = gb_clamp(build_context.optimization_level, 0, 3);
 

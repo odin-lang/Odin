@@ -12,6 +12,8 @@ struct BuildContext {
 	i64    word_size; // Size of a pointer, must be >= 4
 	i64    max_align; // max alignment, must be >= 1 (and typically >= word_size)
 
+	String command;
+
 	String opt_flags;
 	String llc_flags;
 	String link_flags;
