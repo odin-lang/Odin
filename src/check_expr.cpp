@@ -767,7 +767,9 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 		if (check_type_specialization_to(c, poly, source, compound, modify_type)) {
 			return true;
 		}
-		if (compound) return are_types_identical(poly, source);
+		if (compound || !is_type_generic(poly)) {
+			return are_types_identical(poly, source);
+		}
 		return check_is_assignable_to(c, &o, poly);
 	}
 

@@ -836,6 +836,12 @@ Type *base_array_type(Type *t) {
 	return t;
 }
 
+bool is_type_generic(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_Generic;
+}
+
+
 Type *core_array_or_vector_type(Type *t) {
 	for (;;) {
 		Type *prev = t;
