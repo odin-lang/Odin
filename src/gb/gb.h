@@ -1515,6 +1515,7 @@ typedef struct gbStringHeader {
 
 #define GB_STRING_HEADER(str) (cast(gbStringHeader *)(str) - 1)
 
+GB_DEF gbString gb_string_make_reserve   (gbAllocator a, isize capacity);
 GB_DEF gbString gb_string_make           (gbAllocator a, char const *str);
 GB_DEF gbString gb_string_make_length    (gbAllocator a, void const *str, isize num_bytes);
 GB_DEF void     gb_string_free           (gbString str);
@@ -6504,6 +6505,27 @@ gb_inline void gb__set_string_length  (gbString str, isize len) { GB_STRING_HEAD
 gb_inline void gb__set_string_capacity(gbString str, isize cap) { GB_STRING_HEADER(str)->capacity = cap; }
 
 
+gbString gb_string_make_reserve(gbAllocator a, isize capacity) {
+	isize header_size = gb_size_of(gbStringHeader);
+	void *ptr = gb_alloc(a, header_size + capacity + 1);
+
+	gbString str;
+	gbStringHeader *header;
+
+	if (ptr == NULL) return NULL;
+	gb_zero_size(ptr, header_size + capacity + 1);
+
+	str = cast(char *)ptr + header_size;
+	header = GB_STRING_HEADER(str);
+	header->allocator = a;
+	header->length    = 0;
+	header->capacity  = capacity;
+	str[capacity] = '\0';
+
+	return str;
+}
+
+
 gb_inline gbString gb_string_make(gbAllocator a, char const *str) {
 	isize len = str ? gb_strlen(str) : 0;
 	return gb_string_make_length(a, str, len);
@@ -6516,8 +6538,8 @@ gbString gb_string_make_length(gbAllocator a, void const *init_str, isize num_by
 	gbString str;
 	gbStringHeader *header;
 
-	if (!init_str) gb_zero_size(ptr, header_size + num_bytes + 1);
 	if (ptr == NULL) return NULL;
+	if (!init_str) gb_zero_size(ptr, header_size + num_bytes + 1);
 
 	str = cast(char *)ptr + header_size;
 	header = GB_STRING_HEADER(str);

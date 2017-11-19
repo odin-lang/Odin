@@ -22,6 +22,7 @@ struct BuildContext {
 	i32    optimization_level;
 	bool   show_timings;
 	bool   keep_temp_files;
+	bool   debug;
 
 	gbAffinity affinity;
 	isize      thread_count;

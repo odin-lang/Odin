@@ -109,6 +109,16 @@ struct irBranchBlocks {
 };
 
 
+struct irDebugLocation {
+	TokenPos     pos;
+	irDebugInfo *debug_scope;
+};
+
+struct irDebugScope {
+	irDebugScope *  parent;
+	irDebugLocation loc;
+};
+
 struct irProcedure {
 	irProcedure *         parent;
 	Array<irProcedure *>  children;
@@ -124,6 +134,8 @@ struct irProcedure {
 	bool                  is_foreign;
 	bool                  is_export;
 	bool                  is_entry_point;
+
+	irDebugInfo *         debug_scope;
 
 	irValue *             return_ptr;
 	Array<irValue *>      params;
@@ -145,6 +157,9 @@ struct irProcedure {
 	i32                   instr_count;
 	i32                   block_count;
 };
+
+
+
 
 #define IR_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"
 #define IR_TYPE_INFO_DATA_NAME       "__$type_info_data"
@@ -231,11 +246,10 @@ struct irProcedure {
 		irValue **args;                                               \
 		isize     arg_count;                                          \
 		irValue * context_ptr;                                        \
-		irDebugInfo *debug_location;                                  \
 	})                                                                \
 	IR_INSTR_KIND(StartupRuntime, i32)                                \
 	IR_INSTR_KIND(DebugDeclare, struct {                              \
-		irDebugInfo *debug_info;                                      \
+		irDebugInfo *scope;                                           \
 		AstNode *    expr;                                            \
 		Entity *     entity;                                          \
 		bool         is_addr;                                         \
@@ -388,10 +402,12 @@ struct irValueParam {
 	Array<irValue *> referrers;
 };
 
+
 struct irValue {
-	irValueKind kind;
-	i32         index;
-	bool        index_set;
+	irValueKind     kind;
+	i32             index;
+	bool            index_set;
+	irDebugLocation loc;
 	union {
 		irValueConstant      Constant;
 		irValueConstantSlice ConstantSlice;
@@ -490,8 +506,6 @@ enum irDebugInfoKind {
 	irDebugInfo_Proc,
 	irDebugInfo_AllProcs,
 
-	irDebugInfo_Location,
-
 	irDebugInfo_BasicType,      // basic types
 	irDebugInfo_ProcType,
 	irDebugInfo_DerivedType,    // pointer, typedef
@@ -534,11 +548,6 @@ struct irDebugInfo {
 		struct {
 			Array<irDebugInfo *> procs;
 		} AllProcs;
-		struct {
-			irDebugInfo *scope;
-			TokenPos     pos;
-		} Location;
-
 
 		struct {
 			String          name;
@@ -1070,18 +1079,6 @@ irValue *ir_instr_call(irProcedure *p, irValue *value, irValue *return_ptr, irVa
 	v->Instr.Call.arg_count   = arg_count;
 	v->Instr.Call.type        = result_type;
 	v->Instr.Call.context_ptr = context_ptr;
-
-	irDebugInfo **pp = map_get(&p->module->debug_info, hash_entity(p->entity));
-	if (pp != nullptr) {
-		GB_ASSERT_MSG(pp != nullptr, "%.*s %p", LIT(p->name), p->entity);
-		irDebugInfo *dl = ir_alloc_debug_info(p->module->allocator, irDebugInfo_Location);
-		dl->Location.scope = *pp;
-		dl->Location.pos = p->entity->token.pos;
-		map_set(&p->module->debug_info, hash_pointer(v), dl);
-
-		v->Instr.Call.debug_location = dl;
-	}
-
 	return v;
 }
 
@@ -1100,9 +1097,9 @@ irValue *ir_instr_comment(irProcedure *p, String text) {
 	return v;
 }
 
-irValue *ir_instr_debug_declare(irProcedure *p, irDebugInfo *debug_info, AstNode *expr, Entity *entity, bool is_addr, irValue *value) {
+irValue *ir_instr_debug_declare(irProcedure *p, irDebugInfo *scope, AstNode *expr, Entity *entity, bool is_addr, irValue *value) {
 	irValue *v = ir_alloc_instr(p, irInstr_DebugDeclare);
-	v->Instr.DebugDeclare.debug_info = debug_info;
+	v->Instr.DebugDeclare.scope      = scope;
 	v->Instr.DebugDeclare.expr       = expr;
 	v->Instr.DebugDeclare.entity     = entity;
 	v->Instr.DebugDeclare.is_addr    = is_addr;
@@ -1128,7 +1125,6 @@ irValue *ir_value_constant_slice(gbAllocator a, Type *type, irValue *backing_arr
 	v->ConstantSlice.count = count;
 	return v;
 }
-
 
 
 irValue *ir_emit(irProcedure *proc, irValue *instr) {
@@ -1518,6 +1514,8 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 	di->Proc.name = name;
 	di->Proc.file = file;
 	di->Proc.pos = entity->token.pos;
+
+	proc->debug_scope = di;
 
 	map_set(&proc->module->debug_info, hash_entity(entity), di);
 	return di;
@@ -7665,7 +7663,10 @@ void ir_init_module(irModule *m, Checker *c) {
 	m->tmp_allocator = gb_arena_allocator(&m->tmp_arena);
 	m->info = &c->info;
 
-	m->generate_debug_info = build_context.ODIN_OS == "windows" && build_context.word_size == 8;
+	m->generate_debug_info = false;
+	if (build_context.debug) {
+		m->generate_debug_info = build_context.ODIN_OS == "windows" && build_context.word_size == 8;
+	}
 
 	map_init(&m->values,                  heap_allocator());
 	map_init(&m->members,                 heap_allocator());

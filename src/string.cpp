@@ -180,17 +180,20 @@ template <isize N> bool operator >= (String const &a, char const (&b)[N]) { retu
 
 
 
-gb_inline bool str_has_prefix(String s, String prefix) {
-	isize i;
-	if (prefix.len < s.len) {
+gb_inline bool string_starts_with(String s, String prefix) {
+	if (prefix.len > s.len) {
 		return false;
 	}
-	for (i = 0; i < prefix.len; i++) {
-		if (s[i] != prefix[i]) {
-			return false;
-		}
+
+	return substring(s, 0, prefix.len) == prefix;
+}
+
+gb_inline bool string_ends_with(String s, String suffix) {
+	if (suffix.len > s.len) {
+		return false;
 	}
-	return true;
+
+	return substring(s, s.len-suffix.len, s.len) == suffix;
 }
 
 gb_inline isize string_extension_position(String str) {
@@ -223,26 +226,6 @@ String string_trim_whitespace(String str) {
 	}
 
 	return str;
-}
-
-gb_inline bool string_has_extension(String str, String ext) {
-	str = string_trim_whitespace(str);
-	if (str.len <= ext.len+1) {
-		return false;
-	}
-	isize len = str.len;
-	for (isize i = len-1; i >= 0; i--) {
-		if (str[i] == '.') {
-			break;
-		}
-		len--;
-	}
-	if (len == 0) {
-		return false;
-	}
-
-	u8 *s = str.text + len;
-	return gb_memcompare(s, ext.text, ext.len) == 0;
 }
 
 bool string_contains_char(String s, u8 c) {

@@ -1465,8 +1465,19 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		}
 		ir_write_string(f, ")");
 
-		if (m->generate_debug_info && call->debug_location) {
-			ir_fprintf(f, ", !dbg !%d", call->debug_location->id);
+		if (m->generate_debug_info) {
+			TokenPos pos = value->loc.pos;
+			irDebugInfo *scope = value->loc.debug_scope;
+			i32 id = 0;
+			irProcedure *proc = instr->parent->parent;
+			if (scope != nullptr) {
+				id = scope->id;
+			} else if (proc->debug_scope != nullptr) {
+				id = proc->debug_scope->id;
+			}
+			if (id > 0) {
+				ir_fprintf(f, ", !dbg !DILocation(line: %td, column: %td, scope: !%d)", pos.line, pos.column, id);
+			}
 		}
 
 		ir_write_string(f, "\n");
@@ -1632,17 +1643,17 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	#endif
 
 	case irInstr_DebugDeclare: {
+		if (!m->generate_debug_info) {
+			break;
+		}
+
 		irInstrDebugDeclare *dd = &instr->DebugDeclare;
 		Type *vt = ir_type(dd->value);
-		irDebugInfo *di = dd->debug_info;
+		irDebugInfo *di = dd->scope;
 		Entity *e = dd->entity;
 		String name = e->token.string;
 		TokenPos pos = e->token.pos;
 
-
-		if (!m->generate_debug_info) {
-			ir_write_string(f, "; ");
-		}
 		ir_write_string(f, "call void @llvm.dbg.declare(");
 		ir_write_string(f, "metadata ");
 		ir_print_type(f, m, vt);
@@ -1762,14 +1773,12 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 		break;
 	}
 
-	if (proc->entity != nullptr) {
-		if (proc->body != nullptr) {
-			irDebugInfo **di_ = map_get(&proc->module->debug_info, hash_pointer(proc->entity));
-			if (di_ != nullptr) {
-				irDebugInfo *di = *di_;
-				GB_ASSERT(di->kind == irDebugInfo_Proc);
-				ir_fprintf(f, "!dbg !%d ", di->id);
-			}
+	if (m->generate_debug_info && proc->entity != nullptr && proc->body != nullptr) {
+		irDebugInfo **di_ = map_get(&proc->module->debug_info, hash_pointer(proc->entity));
+		if (di_ != nullptr) {
+			irDebugInfo *di = *di_;
+			GB_ASSERT(di->kind == irDebugInfo_Proc);
+			ir_fprintf(f, "!dbg !%d ", di->id);
 		}
 	}
 
@@ -1846,13 +1855,14 @@ void print_llvm_ir(irGen *ir) {
 	irModule *m = &ir->module;
 	irFileBuffer buf = {}, *f = &buf;
 	ir_file_buffer_init(f, &ir->output_file);
+	defer (ir_file_buffer_destroy(f));
 
 	if (m->generate_debug_info) {
-		ir_write_string(f, "target datalayout = \"e-m:w-i64:64-f80:128-n8:16:32:64-S128\"\n");
-		ir_write_string(f, "target triple = \"x86_64-pc-windows-msvc19.11.25508\"\n\n");
+		i32 word_bits = cast(i32)(8*build_context.word_size);
+		ir_fprintf(f, "target datalayout = \"e-m:w-i%d:%d-f80:128-n8:16:32:64-S128\"\n", word_bits, word_bits);
+		ir_fprintf(f, "target triple = \"x86%s-pc-windows-msvc17\"\n\n", word_bits == 64 ? "-64" : "");
+		ir_fprintf(f, "\n\n");
 	}
-
-
 
 	ir_print_encoded_local(f, str_lit("..opaque"));
 	ir_write_string(f, str_lit(" = type {};\n"));
@@ -1869,7 +1879,6 @@ void print_llvm_ir(irGen *ir) {
 	ir_write_string(f, str_lit(" = type {float, float} ; Basic_complex64\n"));
 	ir_print_encoded_local(f, str_lit("..complex128"));
 	ir_write_string(f, str_lit(" = type {double, double} ; Basic_complex128\n"));
-
 
 	ir_print_encoded_local(f, str_lit("..any"));
 	ir_write_string(f, str_lit(" = type {"));
@@ -2016,16 +2025,17 @@ void print_llvm_ir(irGen *ir) {
 				            ", runtimeVersion: 0"
 				            ", isOptimized: false"
 				            ", emissionKind: FullDebug"
+				            ", retainedTypes: !0"
+				            ", enums: !0"
+				            ", globals: !0"
 				            ")",
 				            file->id, LIT(build_context.ODIN_VERSION));
 
 				break;
 			}
 			case irDebugInfo_File:
-				ir_fprintf(f, "!DIFile(filename: \"");
-				ir_print_escape_path(f, di->File.filename);
-				ir_fprintf(f, "\", directory: \"");
-				ir_print_escape_path(f, di->File.directory);
+				ir_fprintf(f, "!DIFile(filename: \""); ir_print_escape_path(f, di->File.filename);
+				ir_fprintf(f, "\", directory: \""); ir_print_escape_path(f, di->File.directory);
 				ir_fprintf(f, "\"");
 				ir_fprintf(f, ")");
 				break;
@@ -2057,12 +2067,6 @@ void print_llvm_ir(irGen *ir) {
 				ir_write_byte(f, '}');
 				break;
 
-			case irDebugInfo_Location:
-				GB_ASSERT(di->Location.scope != nullptr);
-				ir_fprintf(f, "!DILocation(line: %td, column: %td, scope: !%d)",
-				           di->Location.pos.line, di->Location.pos.column, di->Location.scope->id);
-				break;
-
 			default:
 				GB_PANIC("Unhandled irDebugInfo kind %d", di->kind);
 				break;
@@ -2077,6 +2081,4 @@ void print_llvm_ir(irGen *ir) {
 		ir_fprintf(f, "!%d = !{i32 2, !\"CodeView\", i32 1}\n",           di_code_view);
 		ir_fprintf(f, "!%d = !{i32 1, !\"wchar_size\", i32 2}\n",         di_wchar_size);
 	}
-
-	ir_file_buffer_destroy(f);
 }
