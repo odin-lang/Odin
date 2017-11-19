@@ -795,7 +795,7 @@ int main(int arg_count, char **arg_ptr) {
 		}
 
 		if (build_context.debug) {
-			link_settings = gb_string_append_fmt(link_settings, " /DEBUG /SYMBOLS");
+			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
 		}
 
 		exit_code = system_exec_command_line_app("msvc-link", true,
