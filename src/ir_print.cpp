@@ -139,6 +139,49 @@ void ir_print_escape_string(irFileBuffer *f, String name, bool print_quotes, boo
 }
 
 
+void ir_print_escape_path(irFileBuffer *f, String path) {
+	isize extra = 0;
+	for (isize i = 0; i < path.len; i++) {
+		u8 c = path[i];
+		if (!ir_valid_char(c)) {
+			extra += 2;
+		}
+	}
+
+	if (extra == 0) {
+		ir_write_string(f, path);
+		return;
+	}
+
+
+	char hex_table[] = "0123456789ABCDEF";
+	isize buf_len = path.len + extra + 2 + 1;
+
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+
+	u8 *buf = gb_alloc_array(string_buffer_allocator, u8, buf_len);
+
+	isize j = 0;
+
+	for (isize i = 0; i < path.len; i++) {
+		u8 c = path[i];
+		if (ir_valid_char(c) || c == ':') {
+			buf[j++] = c;
+		} else if (c == '\\') {
+			buf[j++] = '/';
+		} else {
+			buf[j] = '\\';
+			buf[j+1] = hex_table[c >> 4];
+			buf[j+2] = hex_table[c & 0x0f];
+			j += 3;
+		}
+	}
+
+	ir_file_write(f, buf, j);
+
+	gb_temp_arena_memory_end(tmp);
+}
+
 
 void ir_print_encoded_local(irFileBuffer *f, String name) {
 	ir_write_byte(f, '%');
@@ -1245,32 +1288,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 		if (gb_is_between(bo->op, Token__ComparisonBegin+1, Token__ComparisonEnd-1)) {
 			if (is_type_string(elem_type)) {
-				ir_write_string(f, "call ");
-				ir_print_calling_convention(f, m, ProcCC_Odin);
-				ir_print_type(f, m, t_bool);
-				char *runtime_proc = "";
-				switch (bo->op) {
-				case Token_CmpEq: runtime_proc = "__string_eq"; break;
-				case Token_NotEq: runtime_proc = "__string_ne"; break;
-				case Token_Lt:    runtime_proc = "__string_lt"; break;
-				case Token_Gt:    runtime_proc = "__string_gt"; break;
-				case Token_LtEq:  runtime_proc = "__string_le"; break;
-				case Token_GtEq:  runtime_proc = "__string_gt"; break;
-				}
-
-				ir_write_byte(f, ' ');
-				ir_print_encoded_global(f, make_string_c(runtime_proc), false);
-				ir_write_byte(f, '(');
-				ir_print_type(f, m, type);
-				ir_write_byte(f, ' ');
-				ir_print_value(f, m, bo->left, type);
-				ir_write_string(f, str_lit(", "));
-				ir_print_type(f, m, type);
-				ir_write_byte(f, ' ');
-				ir_print_value(f, m, bo->right, type);
-				ir_write_string(f, ")\n");
-				return;
-
+				GB_PANIC("Unhandled string type");
 			} else if (is_type_float(elem_type)) {
 				ir_write_string(f, "fcmp ");
 				switch (bo->op) {
@@ -1282,37 +1300,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 				case Token_GtEq:  ir_write_string(f, "oge"); break;
 				}
 			} else if (is_type_complex(elem_type)) {
-				ir_write_string(f, "call ");
-				ir_print_calling_convention(f, m, ProcCC_Odin);
-				ir_print_type(f, m, t_bool);
-				char *runtime_proc = "";
-				i64 sz = 8*type_size_of(m->allocator, elem_type);
-				switch (sz) {
-				case 64:
-					switch (bo->op) {
-					case Token_CmpEq: runtime_proc = "__complex64_eq"; break;
-					case Token_NotEq: runtime_proc = "__complex64_ne"; break;
-					}
-					break;
-				case 128:
-					switch (bo->op) {
-					case Token_CmpEq: runtime_proc = "__complex128_eq"; break;
-					case Token_NotEq: runtime_proc = "__complex128_ne"; break;
-					}
-					break;
-				}
-
-				ir_write_byte(f, ' ');
-				ir_print_encoded_global(f, make_string_c(runtime_proc), false);
-				ir_write_byte(f, '(');
-				ir_print_type(f, m, type);
-				ir_write_byte(f, ' ');
-				ir_print_value(f, m, bo->left, type);
-				ir_write_string(f, str_lit(", "));
-				ir_print_type(f, m, type);
-				ir_write_byte(f, ' ');
-				ir_print_value(f, m, bo->right, type);
-				ir_write_string(f, ")\n");
+				GB_PANIC("Unhandled complex type");
 				return;
 			} else {
 				ir_write_string(f, "icmp ");
@@ -1475,7 +1463,13 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			ir_write_string(f, " noalias nonnull ");
 			ir_print_value(f, m, call->context_ptr, t_context_ptr);
 		}
-		ir_write_string(f, ")\n");
+		ir_write_string(f, ")");
+
+		if (m->generate_debug_info && call->debug_location) {
+			ir_fprintf(f, ", !dbg !%d", call->debug_location->id);
+		}
+
+		ir_write_string(f, "\n");
 
 		break;
 	}
@@ -1644,8 +1638,11 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		Entity *e = dd->entity;
 		String name = e->token.string;
 		TokenPos pos = e->token.pos;
-		// gb_printf("debug_declare %.*s\n", LIT(dd->entity->token.string));
-		ir_write_string(f, "; ");
+
+
+		if (!m->generate_debug_info) {
+			ir_write_string(f, "; ");
+		}
 		ir_write_string(f, "call void @llvm.dbg.declare(");
 		ir_write_string(f, "metadata ");
 		ir_print_type(f, m, vt);
@@ -1752,11 +1749,16 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	ir_write_string(f, ") ");
 
 	switch (proc->inlining) {
+	default:
+		ir_fprintf(f, "#0 ");
+		break;
 	case ProcInlining_no_inline:
 		ir_write_string(f, "noinline ");
+		ir_fprintf(f, "#0 ");
 		break;
 	case ProcInlining_inline:
 		ir_write_string(f, "alwaysinline ");
+		ir_fprintf(f, "#1 ");
 		break;
 	}
 
@@ -1766,10 +1768,11 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 			if (di_ != nullptr) {
 				irDebugInfo *di = *di_;
 				GB_ASSERT(di->kind == irDebugInfo_Proc);
-				// ir_fprintf(f, "!dbg !%d ", di->id);
+				ir_fprintf(f, "!dbg !%d ", di->id);
 			}
 		}
 	}
+
 
 
 	if (proc->body != nullptr) {
@@ -1843,6 +1846,13 @@ void print_llvm_ir(irGen *ir) {
 	irModule *m = &ir->module;
 	irFileBuffer buf = {}, *f = &buf;
 	ir_file_buffer_init(f, &ir->output_file);
+
+	if (m->generate_debug_info) {
+		ir_write_string(f, "target datalayout = \"e-m:w-i64:64-f80:128-n8:16:32:64-S128\"\n");
+		ir_write_string(f, "target triple = \"x86_64-pc-windows-msvc19.11.25508\"\n\n");
+	}
+
+
 
 	ir_print_encoded_local(f, str_lit("..opaque"));
 	ir_write_string(f, str_lit(" = type {};\n"));
@@ -1970,23 +1980,28 @@ void print_llvm_ir(irGen *ir) {
 	}
 
 
-#if 0
-	// if (m->generate_debug_info) {
-	{
+	if (m->generate_debug_info) {
 		ir_write_byte(f, '\n');
 
 		i32 diec = m->debug_info.entries.count;
 
-		ir_fprintf(f, "!llvm.dbg.cu = !{!0}\n");
-		ir_fprintf(f, "!llvm.ident = !{!%d}\n", diec+3);
-		ir_fprintf(f, "!%d = !{i32 2, !\"Dwarf Version\", i32 4}\n", diec+0);
-		ir_fprintf(f, "!%d = !{i32 2, !\"Debug Info Version\", i32 3}\n", diec+1);
-		ir_fprintf(f, "!%d = !{i32 1, !\"PIC Level\", i32 2}\n", diec+2);
-		ir_fprintf(f, "!%d = !{!\"clang version 3.9.0 (branches/release_39)\"}\n", diec+3);
+		i32 di_version    = diec+1;
+		i32 di_debug_info = diec+2;
+		i32 di_code_view  = diec+3;
+		i32 di_wchar_size = diec+4;
+
+		ir_fprintf(f, "attributes #0 = {nounwind noinline optnone uwtable}\n");
+		ir_fprintf(f, "attributes #1 = {nounwind alwaysinline uwtable}\n");
+
+
+		ir_fprintf(f, "!llvm.dbg.cu = !{!%d}\n", m->debug_compile_unit->id);
+		ir_fprintf(f, "!llvm.ident = !{!%d}\n", di_version);
+		ir_fprintf(f, "!llvm.module.flags = !{!%d, !%d, !%d}\n", di_debug_info, di_code_view, di_wchar_size);
+
+		ir_fprintf(f, "!0 = !{}\n");
 
 		for_array(di_index, m->debug_info.entries) {
-			MapIrDebugInfoEntry *entry = &m->debug_info.entries[di_index];
-			irDebugInfo *di = entry->value;
+			irDebugInfo *di = m->debug_info.entries[di_index].value;
 			ir_fprintf(f, "!%d = ", di->id);
 
 			switch (di->kind) {
@@ -1994,38 +2009,42 @@ void print_llvm_ir(irGen *ir) {
 				irDebugInfo *file = *map_get(&m->debug_info, hash_pointer(di->CompileUnit.file));
 				ir_fprintf(f,
 				            "distinct !DICompileUnit("
-				            "language: DW_LANG_Go, " // Is this good enough?
-				            "file: !%d, "
-				            "producer: \"clang version 3.9.0 (branches/release_39)\", "
-				            "flags: \"\", "
-				            "runtimeVersion: 0, "
-				            "isOptimized: false, "
-				            "emissionKind: FullDebug"
+				              "language: DW_LANG_C_plus_plus" // Is this good enough?
+				            ", file: !%d"
+				            ", producer: \"Odin %.*s\""
+				            ", flags: \"\""
+				            ", runtimeVersion: 0"
+				            ", isOptimized: false"
+				            ", emissionKind: FullDebug"
 				            ")",
-				            file->id);
+				            file->id, LIT(build_context.ODIN_VERSION));
 
 				break;
 			}
 			case irDebugInfo_File:
 				ir_fprintf(f, "!DIFile(filename: \"");
-				ir_print_escape_string(f, di->File.filename, false);
+				ir_print_escape_path(f, di->File.filename);
 				ir_fprintf(f, "\", directory: \"");
-				ir_print_escape_string(f, di->File.directory, false);
-				ir_fprintf(f, "\")");
+				ir_print_escape_path(f, di->File.directory);
+				ir_fprintf(f, "\"");
+				ir_fprintf(f, ")");
 				break;
 			case irDebugInfo_Proc:
 				ir_fprintf(f, "distinct !DISubprogram("
-				            "name: \"%.*s\", "
-				            // "linkageName: \"\", "
-				            "file: !%d, "
-				            "line: %td, "
-				            "isDefinition: true, "
-				            "isLocal: false, "
-				            "unit: !0"
+				              "name: \"%.*s\""
+				            ", linkageName: \"%.*s\""
+				            ", file: !%d"
+				            ", line: %td"
+				            ", isDefinition: true"
+				            ", isLocal: true"
+				            ", flags: DIFlagPrototyped"
+				            ", isOptimized: false"
+				            ", unit: !%d"
 				            ")",
+				            LIT(di->Proc.entity->token.string),
 				            LIT(di->Proc.name),
-				            di->Proc.file->id,
-				            di->Proc.pos.line);
+				            di->Proc.file->id, di->Proc.pos.line,
+				            m->debug_compile_unit->id);
 				break;
 
 			case irDebugInfo_AllProcs:
@@ -2037,11 +2056,27 @@ void print_llvm_ir(irGen *ir) {
 				}
 				ir_write_byte(f, '}');
 				break;
+
+			case irDebugInfo_Location:
+				GB_ASSERT(di->Location.scope != nullptr);
+				ir_fprintf(f, "!DILocation(line: %td, column: %td, scope: !%d)",
+				           di->Location.pos.line, di->Location.pos.column, di->Location.scope->id);
+				break;
+
+			default:
+				GB_PANIC("Unhandled irDebugInfo kind %d", di->kind);
+				break;
 			}
 
 			ir_write_byte(f, '\n');
 		}
+
+
+		ir_fprintf(f, "!%d = !{!\"Odin version %.*s \"}\n", di_version, LIT(build_context.ODIN_VERSION));
+		ir_fprintf(f, "!%d = !{i32 2, !\"Debug Info Version\", i32 3}\n", di_debug_info);
+		ir_fprintf(f, "!%d = !{i32 2, !\"CodeView\", i32 1}\n",           di_code_view);
+		ir_fprintf(f, "!%d = !{i32 1, !\"wchar_size\", i32 2}\n",         di_wchar_size);
 	}
-#endif
+
 	ir_file_buffer_destroy(f);
 }

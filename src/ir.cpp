@@ -11,7 +11,7 @@ struct irModule {
 	gbArena       tmp_arena;
 	gbAllocator   allocator;
 	gbAllocator   tmp_allocator;
-	// bool generate_debug_info;
+	bool generate_debug_info;
 
 	u64 stmt_state_flags;
 
@@ -25,6 +25,9 @@ struct irModule {
 	Map<String>           entity_names;        // Key: Entity * of the typename
 	Map<irDebugInfo *>    debug_info;          // Key: Unique pointer
 	Map<irValue *>        anonymous_proc_lits; // Key: AstNode *
+
+	irDebugInfo *         debug_compile_unit;
+
 
 	i32                   global_string_index;
 	i32                   global_array_index; // For ConstantSlice
@@ -228,6 +231,7 @@ struct irProcedure {
 		irValue **args;                                               \
 		isize     arg_count;                                          \
 		irValue * context_ptr;                                        \
+		irDebugInfo *debug_location;                                  \
 	})                                                                \
 	IR_INSTR_KIND(StartupRuntime, i32)                                \
 	IR_INSTR_KIND(DebugDeclare, struct {                              \
@@ -486,6 +490,8 @@ enum irDebugInfoKind {
 	irDebugInfo_Proc,
 	irDebugInfo_AllProcs,
 
+	irDebugInfo_Location,
+
 	irDebugInfo_BasicType,      // basic types
 	irDebugInfo_ProcType,
 	irDebugInfo_DerivedType,    // pointer, typedef
@@ -528,6 +534,10 @@ struct irDebugInfo {
 		struct {
 			Array<irDebugInfo *> procs;
 		} AllProcs;
+		struct {
+			irDebugInfo *scope;
+			TokenPos     pos;
+		} Location;
 
 
 		struct {
@@ -1060,6 +1070,18 @@ irValue *ir_instr_call(irProcedure *p, irValue *value, irValue *return_ptr, irVa
 	v->Instr.Call.arg_count   = arg_count;
 	v->Instr.Call.type        = result_type;
 	v->Instr.Call.context_ptr = context_ptr;
+
+	irDebugInfo **pp = map_get(&p->module->debug_info, hash_entity(p->entity));
+	if (pp != nullptr) {
+		GB_ASSERT_MSG(pp != nullptr, "%.*s %p", LIT(p->name), p->entity);
+		irDebugInfo *dl = ir_alloc_debug_info(p->module->allocator, irDebugInfo_Location);
+		dl->Location.scope = *pp;
+		dl->Location.pos = p->entity->token.pos;
+		map_set(&p->module->debug_info, hash_pointer(v), dl);
+
+		v->Instr.Call.debug_location = dl;
+	}
+
 	return v;
 }
 
@@ -2482,6 +2504,49 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 	}
 
 #endif
+
+	if (is_type_string(a)) {
+		char *runtime_proc = nullptr;
+		switch (op_kind) {
+		case Token_CmpEq: runtime_proc = "__string_eq"; break;
+		case Token_NotEq: runtime_proc = "__string_ne"; break;
+		case Token_Lt:    runtime_proc = "__string_lt"; break;
+		case Token_Gt:    runtime_proc = "__string_gt"; break;
+		case Token_LtEq:  runtime_proc = "__string_le"; break;
+		case Token_GtEq:  runtime_proc = "__string_gt"; break;
+		}
+		GB_ASSERT(runtime_proc != nullptr);
+
+		irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 2);
+		args[0] = left;
+		args[1] = right;
+		return ir_emit_global_call(proc, runtime_proc, args, 2);
+	}
+
+	if (is_type_complex(a)) {
+		char *runtime_proc = "";
+		i64 sz = 8*type_size_of(proc->module->allocator, a);
+		switch (sz) {
+		case 64:
+			switch (op_kind) {
+			case Token_CmpEq: runtime_proc = "__complex64_eq"; break;
+			case Token_NotEq: runtime_proc = "__complex64_ne"; break;
+			}
+			break;
+		case 128:
+			switch (op_kind) {
+			case Token_CmpEq: runtime_proc = "__complex128_eq"; break;
+			case Token_NotEq: runtime_proc = "__complex128_ne"; break;
+			}
+			break;
+		}
+		GB_ASSERT(runtime_proc != nullptr);
+
+		irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 2);
+		args[0] = left;
+		args[1] = right;
+		return ir_emit_global_call(proc, runtime_proc, args, 2);
+	}
 
 
 	return ir_emit(proc, ir_instr_binary_op(proc, op_kind, left, right, result));
@@ -7600,6 +7665,8 @@ void ir_init_module(irModule *m, Checker *c) {
 	m->tmp_allocator = gb_arena_allocator(&m->tmp_arena);
 	m->info = &c->info;
 
+	m->generate_debug_info = build_context.ODIN_OS == "windows" && build_context.word_size == 8;
+
 	map_init(&m->values,                  heap_allocator());
 	map_init(&m->members,                 heap_allocator());
 	map_init(&m->debug_info,              heap_allocator());
@@ -7706,6 +7773,8 @@ void ir_init_module(irModule *m, Checker *c) {
 		di->CompileUnit.producer = str_lit("odin");
 
 		map_set(&m->debug_info, hash_pointer(m), di);
+
+		m->debug_compile_unit = di;
 	}
 }
 
@@ -8466,9 +8535,7 @@ void ir_gen_tree(irGen *s) {
 
 	isize all_proc_max_count = 0;
 	for_array(i, m->debug_info.entries) {
-		auto *entry = &m->debug_info.entries[i];
-		irDebugInfo *di = entry->value;
-		di->id = cast(i32)i;
+		irDebugInfo *di = m->debug_info.entries[i].value;
 		if (di->kind == irDebugInfo_Proc) {
 			all_proc_max_count++;
 		}
@@ -8480,12 +8547,12 @@ void ir_gen_tree(irGen *s) {
 
 
 	for_array(i, m->debug_info.entries) {
-		auto *entry = &m->debug_info.entries[i];
-		irDebugInfo *di = entry->value;
+		irDebugInfo *di = m->debug_info.entries[i].value;
 		if (di->kind == irDebugInfo_Proc) {
 			array_add(&all_procs->AllProcs.procs, di);
 		}
 	}
+
 
 #if defined(GB_SYSTEM_WINDOWS)
 	if (build_context.is_dll && !has_dll_main) {
@@ -8754,9 +8821,8 @@ void ir_gen_tree(irGen *s) {
 	for_array(i, m->debug_info.entries) {
 		auto *entry = &m->debug_info.entries[i];
 		irDebugInfo *di = entry->value;
-		di->id = cast(i32)i;
+		di->id = cast(i32)(i+1);
 	}
-
 
 
 	// m->layout = str_lit("e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64");
