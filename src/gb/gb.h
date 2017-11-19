@@ -6614,7 +6614,7 @@ gbString gb_string_append_fmt(gbString str, char const *fmt, ...) {
 	char buf[4096] = {0};
 	va_list va;
 	va_start(va, fmt);
-	res = gb_snprintf_va(str, gb_count_of(buf)-1, fmt, va);
+	res = gb_snprintf_va(buf, gb_count_of(buf)-1, fmt, va)-1;
 	va_end(va);
 	return gb_string_append_length(str, buf, res);
 }

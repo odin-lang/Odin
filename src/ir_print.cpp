@@ -1763,13 +1763,13 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	default:
 		ir_fprintf(f, "#0 ");
 		break;
-	case ProcInlining_no_inline:
-		ir_write_string(f, "noinline ");
-		ir_fprintf(f, "#0 ");
-		break;
 	case ProcInlining_inline:
 		ir_write_string(f, "alwaysinline ");
 		ir_fprintf(f, "#1 ");
+		break;
+	case ProcInlining_no_inline:
+		ir_write_string(f, "noinline ");
+		ir_fprintf(f, "#2 ");
 		break;
 	}
 
@@ -1857,11 +1857,12 @@ void print_llvm_ir(irGen *ir) {
 	ir_file_buffer_init(f, &ir->output_file);
 	defer (ir_file_buffer_destroy(f));
 
-	if (m->generate_debug_info) {
-		i32 word_bits = cast(i32)(8*build_context.word_size);
-		ir_fprintf(f, "target datalayout = \"e-m:w-i%d:%d-f80:128-n8:16:32:64-S128\"\n", word_bits, word_bits);
-		ir_fprintf(f, "target triple = \"x86%s-pc-windows-msvc17\"\n\n", word_bits == 64 ? "-64" : "");
-		ir_fprintf(f, "\n\n");
+	i32 word_bits = cast(i32)(8*build_context.word_size);
+	if (build_context.ODIN_OS == "osx" || build_context.ODIN_OS == "macos") {
+		GB_ASSERT(word_bits == 64);
+		ir_write_string(f, "target triple = x86_64-apple-macosx10.8\n\n");
+	} else if (build_context.ODIN_OS == "windows") {
+		ir_fprintf(f, "target triple = \"x86%s-pc-windows\"\n\n", word_bits == 64 ? "_64" : "");
 	}
 
 	ir_print_encoded_local(f, str_lit("..opaque"));
@@ -1988,6 +1989,9 @@ void print_llvm_ir(irGen *ir) {
 		ir_write_byte(f, '\n');
 	}
 
+	ir_fprintf(f, "attributes #0 = {nounwind uwtable}\n");
+	ir_fprintf(f, "attributes #1 = {nounwind alwaysinline uwtable}\n");
+	ir_fprintf(f, "attributes #2 = {nounwind noinline optnone uwtable}\n");
 
 	if (m->generate_debug_info) {
 		ir_write_byte(f, '\n');
@@ -1999,8 +2003,6 @@ void print_llvm_ir(irGen *ir) {
 		i32 di_code_view  = diec+3;
 		i32 di_wchar_size = diec+4;
 
-		ir_fprintf(f, "attributes #0 = {nounwind noinline optnone uwtable}\n");
-		ir_fprintf(f, "attributes #1 = {nounwind alwaysinline uwtable}\n");
 
 
 		ir_fprintf(f, "!llvm.dbg.cu = !{!%d}\n", m->debug_compile_unit->id);

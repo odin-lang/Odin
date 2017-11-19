@@ -736,16 +736,10 @@ int main(int arg_count, char **arg_ptr) {
 		// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
 		//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
 		exit_code = system_exec_command_line_app("llvm-opt", false,
-			"opt \"%.*s\".ll -o \"%.*s\".bc %.*s "
+			"opt \"%.*s.ll\" -o \"%.*s\".bc %.*s "
 			"-mem2reg "
 			"-memcpyopt "
 			"-die "
-			#if defined(GB_SYSTEM_OSX)
-				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
-				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
-				//       make sure to also change the 'macosx_version_min' param passed to 'llc'
-				"-mtriple=x86_64-apple-macosx10.8 "
-			#endif
 			"",
 			LIT(output_base), LIT(output_base),
 			LIT(build_context.opt_flags));
@@ -759,12 +753,14 @@ int main(int arg_count, char **arg_ptr) {
 		// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 		exit_code = system_exec_command_line_app("llvm-llc", false,
 			"\"%.*sbin/llc\" \"%.*s.bc\" -filetype=obj -O%d "
+			"-o \"%.*s.obj\" "
 			"%.*s "
 			// "-debug-pass=Arguments "
 			"",
 			LIT(build_context.ODIN_ROOT),
 			LIT(output_base),
 			build_context.optimization_level,
+			LIT(output_base),
 			LIT(build_context.llc_flags));
 		if (exit_code != 0) {
 			return exit_code;
@@ -794,7 +790,7 @@ int main(int arg_count, char **arg_ptr) {
 			link_settings = gb_string_append_fmt(link_settings, "/ENTRY:mainCRTStartup");
 		}
 
-		if (build_context.debug) {
+		if (ir_gen.module.generate_debug_info) {
 			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
 		}
 
@@ -809,7 +805,7 @@ int main(int arg_count, char **arg_ptr) {
 			LIT(output_base), LIT(output_base), output_ext,
 			lib_str, LIT(build_context.link_flags),
 			link_settings
-			);
+		);
 		if (exit_code != 0) {
 			return exit_code;
 		}
