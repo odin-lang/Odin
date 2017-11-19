@@ -209,6 +209,7 @@ enum BuildFlagKind {
 	BuildFlag_KeepTempFiles,
 	BuildFlag_Collection,
 	BuildFlag_BuildMode,
+	BuildFlag_Debug,
 
 	BuildFlag_COUNT,
 };
@@ -244,6 +245,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),      BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),      BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),           BuildFlagParam_None);
 
 
 	Array<String> flag_args = args;
@@ -483,6 +485,10 @@ bool parse_build_flags(Array<String> args) {
 
 							break;
 						}
+
+						case BuildFlag_Debug:
+							build_context.debug = true;
+							break;
 						}
 					}
 
@@ -778,19 +784,24 @@ int main(int arg_count, char **arg_ptr) {
 		}
 
 		char *output_ext = "exe";
-		char *link_settings = "";
+		gbString link_settings = gb_string_make_reserve(heap_allocator(), 256);
+		defer (gb_string_free(link_settings));
+
 		if (build_context.is_dll) {
 			output_ext = "dll";
-			link_settings = "/DLL";
+			link_settings = gb_string_append_fmt(link_settings, "/DLL");
 		} else {
-			link_settings = "/ENTRY:mainCRTStartup";
+			link_settings = gb_string_append_fmt(link_settings, "/ENTRY:mainCRTStartup");
+		}
+
+		if (build_context.debug) {
+			link_settings = gb_string_append_fmt(link_settings, " /DEBUG /SYMBOLS");
 		}
 
 		exit_code = system_exec_command_line_app("msvc-link", true,
 			"link \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 			"/defaultlib:libcmt "
 			// "/nodefaultlib "
-			// "/debug "
 			"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 			" %.*s "
 			" %s "
@@ -840,9 +851,8 @@ int main(int arg_count, char **arg_ptr) {
 		// NOTE(vassvik): needs to add the root to the library search paths, so that the full filenames of the library
 		//                files can be passed with -l:
 		gbString lib_str = gb_string_make(heap_allocator(), "-L/");
-
 		defer (gb_string_free(lib_str));
-		char lib_str_buf[1024] = {0};
+
 		for_array(i, ir_gen.module.foreign_library_paths) {
 			String lib = ir_gen.module.foreign_library_paths[i];
 
@@ -850,19 +860,18 @@ int main(int arg_count, char **arg_ptr) {
 			//   This allows you to specify '-f' in a #foreign_system_library,
 			//   without having to implement any new syntax specifically for MacOS.
 			#if defined(GB_SYSTEM_OSX)
-				isize len;
-				if(lib.len > 2 && lib[0] == '-' && lib[1] == 'f') {
+				if (lib.len > 2 && lib[0] == '-' && lib[1] == 'f') {
 					// framework thingie
-					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
+					lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
 				} else if (string_has_extension(lib, str_lit("a"))) {
 					// static libs, absolute full path relative to the file in which the lib was imported from
-					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " %.*s ", LIT(lib));
+					lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
 				} else if (string_has_extension(lib, str_lit("dylib"))) {
 					// dynamic lib, relative path to executable
-					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l:%s/%.*s ", cwd, LIT(lib));
+					lib_str = gb_string_append_fmt(lib_str, " -l:%s/%.*s ", cwd, LIT(lib));
 				} else {
 					// dynamic or static system lib, just link regularly searching system library paths
-					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l%.*s ", LIT(lib));
+					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 				}
 			#else
 				// NOTE(vassvik): static libraries (.a files) in linux can be linked to directly using the full path,
@@ -872,18 +881,17 @@ int main(int arg_count, char **arg_ptr) {
 				//                the system library paths for the library file).
 				if (string_has_extension(lib, str_lit("a"))) {
 					// static libs, absolute full path relative to the file in which the lib was imported from
-					isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l:%.*s ", LIT(lib));
+					lib_str = gb_string_append_fmt(lib_str, " -l:%.*s ", LIT(lib));
 				} else if (string_has_extension(lib, str_lit("so"))) {
 					// dynamic lib, relative path to executable
 					// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
 					//                at runtimeto the executable
-					isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l:%s/%.*s ", cwd, LIT(lib));
+					lib_str = gb_string_append_fmt(lib_str, " -l:%s/%.*s ", cwd, LIT(lib));
 				} else {
 					// dynamic or static system lib, just link regularly searching system library paths
-					isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf), " -l%.*s ", LIT(lib));
+					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 				}
 			#endif
-			lib_str = gb_string_appendc(lib_str, lib_str_buf);
 		}
 
 		// Unlike the Win32 linker code, the output_ext includes the dot, because

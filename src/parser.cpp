@@ -4679,7 +4679,7 @@ Array<AstNode *> parse_stmt_list(AstFile *f) {
 
 ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	f->fullpath = string_trim_whitespace(fullpath); // Just in case
-	if (!string_has_extension(f->fullpath, str_lit("odin"))) {
+	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {
 		return ParseFile_WrongExtension;
 	}
 	TokenizerInitError err = init_tokenizer(&f->tokenizer, f->fullpath);
