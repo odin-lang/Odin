@@ -164,7 +164,6 @@ void usage(String argv0) {
 	print_usage_line(1, "%.*s command [arguments]", LIT(argv0));
 	print_usage_line(0, "Commands:");
 	print_usage_line(1, "build        compile .odin file as executable");
-	print_usage_line(1, "build_dll    compile .odin file as dll");
 	print_usage_line(1, "run          compile and run .odin file");
 	print_usage_line(1, "docs         generate documentation for a .odin file");
 	print_usage_line(1, "version      print version");
@@ -791,6 +790,7 @@ int main(int arg_count, char **arg_ptr) {
 			"link \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 			"/defaultlib:libcmt "
 			// "/nodefaultlib "
+			// "/debug "
 			"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 			" %.*s "
 			" %s "
