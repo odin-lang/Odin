@@ -1281,7 +1281,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 					if (!is_type_ordered(x.type)) {
 						gbString str = type_to_string(x.type);
-						error(x.expr, "Unordered type '%s', is invalid for an interval expression", str);
+						error(expr, "Unordered type '%s', is invalid for an interval expression", str);
 						gb_string_free(str);
 						continue;
 					}

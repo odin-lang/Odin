@@ -5531,6 +5531,10 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 		if (is_type_map(t)) {
 			irValue *map_val = ir_build_addr_ptr(proc, ie->expr);
+			if (deref) {
+				map_val = ir_emit_load(proc, map_val);
+			}
+
 			irValue *key = ir_build_expr(proc, ie->index);
 			key = ir_emit_conv(proc, key, t->Map.key);
 
