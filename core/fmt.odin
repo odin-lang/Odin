@@ -939,7 +939,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		}
 
 		if data == nil || tag <= 0 {
-			write_string(fi.buf, "(union)");
+			write_string(fi.buf, "nil");
 		} else {
 			ti := info.variants[tag-1];
 			fmt_arg(fi, any{data, ti}, verb);
