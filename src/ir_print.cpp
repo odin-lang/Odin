@@ -1860,7 +1860,7 @@ void print_llvm_ir(irGen *ir) {
 	i32 word_bits = cast(i32)(8*build_context.word_size);
 	if (build_context.ODIN_OS == "osx" || build_context.ODIN_OS == "macos") {
 		GB_ASSERT(word_bits == 64);
-		ir_write_string(f, "target triple = x86_64-apple-macosx10.8\n\n");
+		ir_write_string(f, "target triple = \"x86_64-apple-macosx10.8\"\n\n");
 	} else if (build_context.ODIN_OS == "windows") {
 		// ir_fprintf(f, "target triple = \"x86%s-pc-windows\"\n\n", word_bits == 64 ? "_64" : "");
 	}

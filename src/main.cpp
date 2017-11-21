@@ -859,10 +859,10 @@ int main(int arg_count, char **arg_ptr) {
 				if (lib.len > 2 && lib[0] == '-' && lib[1] == 'f') {
 					// framework thingie
 					lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
-				} else if (string_has_extension(lib, str_lit("a"))) {
+				} else if (string_ends_with(lib, str_lit(".a"))) {
 					// static libs, absolute full path relative to the file in which the lib was imported from
 					lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
-				} else if (string_has_extension(lib, str_lit("dylib"))) {
+				} else if (string_ends_with(lib, str_lit(".dylib"))) {
 					// dynamic lib, relative path to executable
 					lib_str = gb_string_append_fmt(lib_str, " -l:%s/%.*s ", cwd, LIT(lib));
 				} else {
@@ -875,10 +875,10 @@ int main(int arg_count, char **arg_ptr) {
 				//                available at runtime wherever the executable is run, so we make require those to be
 				//                local to the executable (unless the system collection is used, in which case we search
 				//                the system library paths for the library file).
-				if (string_has_extension(lib, str_lit("a"))) {
+				if (string_ends_with(lib, str_lit(".a"))) {
 					// static libs, absolute full path relative to the file in which the lib was imported from
 					lib_str = gb_string_append_fmt(lib_str, " -l:%.*s ", LIT(lib));
-				} else if (string_has_extension(lib, str_lit("so"))) {
+				} else if (string_ends_with(lib, str_lit(".so"))) {
 					// dynamic lib, relative path to executable
 					// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
 					//                at runtimeto the executable
