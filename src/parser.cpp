@@ -4905,7 +4905,7 @@ bool determine_path_from_string(Parser *p, AstNode *node, String base_dir, Strin
 		//                 working directory of the exe to the library search paths.
 		//                 Static libraries can be linked directly with the full pathname
 		//
-		if (node->kind == AstNode_ForeignImportDecl && string_has_extension(file_str, str_lit("so"))) {
+		if (node->kind == AstNode_ForeignImportDecl && string_ends_with(file_str, str_lit(".so"))) {
 			*path = file_str;
 			return true;
 		}
