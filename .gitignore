@@ -263,7 +263,11 @@ bin/
 # - Linux/MacOS
 odin
 odin.dSYM
-
+examples/demo
+examples/factorial
+examples/game
+examples/hello
+examples/punity
 
 # shared collection
 shared/
