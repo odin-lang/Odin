@@ -1193,8 +1193,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	case_ast_node(ss, SwitchStmt, node);
 		Operand x = {};
 
-		mod_flags |= Stmt_BreakAllowed;
+		mod_flags |= Stmt_BreakAllowed | Stmt_FallthroughAllowed;
 		check_open_scope(c, node);
+		defer (check_close_scope(c));
+
 		check_label(c, ss->label); // TODO(bill): What should the label's "scope" be?
 
 		if (ss->init != nullptr) {
@@ -1251,9 +1253,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		Map<TypeAndToken> seen = {}; // NOTE(bill): Multimap
 		map_init(&seen, heap_allocator());
+		defer (map_destroy(&seen));
 
-		for_array(i, bs->stmts) {
-			AstNode *stmt = bs->stmts[i];
+		for_array(stmt_index, bs->stmts) {
+			AstNode *stmt = bs->stmts[stmt_index];
 			if (stmt->kind != AstNode_CaseClause) {
 				// NOTE(bill): error handled by above multiple default checker
 				continue;
@@ -1381,17 +1384,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 
 			check_open_scope(c, stmt);
-			u32 ft_flags = mod_flags;
-			if (i+1 < bs->stmts.count) {
-				ft_flags |= Stmt_FallthroughAllowed;
-			}
-			check_stmt_list(c, cc->stmts, ft_flags);
+			check_stmt_list(c, cc->stmts, mod_flags);
 			check_close_scope(c);
 		}
-
-		map_destroy(&seen);
-
-		check_close_scope(c);
 	case_end;
 
 	case_ast_node(ss, TypeSwitchStmt, node);
@@ -1587,7 +1582,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			break;
 		case Token_fallthrough:
 			if ((flags & Stmt_FallthroughAllowed) == 0) {
-				error(token, "'fallthrough' statement in illegal position");
+				error(token, "'fallthrough' statement in illegal position, expected at the end of a 'case' block");
 			}
 			break;
 		default:
