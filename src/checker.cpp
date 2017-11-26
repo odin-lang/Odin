@@ -458,7 +458,6 @@ struct CheckerInfo {
 	Scope *               init_scope;
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
-
 };
 
 struct Checker {

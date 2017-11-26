@@ -2830,39 +2830,32 @@ irValue *ir_vector_elem(irProcedure *proc, irValue *vector) {
 
 
 irValue *ir_slice_elem(irProcedure *proc, irValue *slice) {
-	Type *t = base_type(ir_type(slice));
-	GB_ASSERT(t->kind == Type_Slice);
+	GB_ASSERT(is_type_slice(ir_type(slice)));
 	return ir_emit_struct_ev(proc, slice, 0);
 }
 irValue *ir_slice_count(irProcedure *proc, irValue *slice) {
-	Type *t = base_type(ir_type(slice));
-	GB_ASSERT(t->kind == Type_Slice);
+	GB_ASSERT(is_type_slice(ir_type(slice)));
 	return ir_emit_struct_ev(proc, slice, 1);
 }
 irValue *ir_slice_capacity(irProcedure *proc, irValue *slice) {
-	Type *t = base_type(ir_type(slice));
-	GB_ASSERT(t->kind == Type_Slice);
+	GB_ASSERT(is_type_slice(ir_type(slice)));
 	return ir_emit_struct_ev(proc, slice, 2);
 }
 
 irValue *ir_dynamic_array_elem(irProcedure *proc, irValue *da) {
-	Type *t = ir_type(da);
-	GB_ASSERT(t->kind == Type_DynamicArray);
+	GB_ASSERT(is_type_dynamic_array(ir_type(da)));
 	return ir_emit_struct_ev(proc, da, 0);
 }
 irValue *ir_dynamic_array_count(irProcedure *proc, irValue *da) {
-	Type *t = base_type(ir_type(da));
-	GB_ASSERT_MSG(t->kind == Type_DynamicArray, "%s", type_to_string(t));
+	GB_ASSERT(is_type_dynamic_array(ir_type(da)));
 	return ir_emit_struct_ev(proc, da, 1);
 }
 irValue *ir_dynamic_array_capacity(irProcedure *proc, irValue *da) {
-	Type *t = base_type(ir_type(da));
-	GB_ASSERT(t->kind == Type_DynamicArray);
+	GB_ASSERT(is_type_dynamic_array(ir_type(da)));
 	return ir_emit_struct_ev(proc, da, 2);
 }
 irValue *ir_dynamic_array_allocator(irProcedure *proc, irValue *da) {
-	Type *t = base_type(ir_type(da));
-	GB_ASSERT(t->kind == Type_DynamicArray);
+	GB_ASSERT(is_type_dynamic_array(ir_type(da)));
 	return ir_emit_struct_ev(proc, da, 3);
 }
 
