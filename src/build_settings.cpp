@@ -309,6 +309,8 @@ String get_fullpath_core(gbAllocator a, String path) {
 
 
 String const ODIN_VERSION = str_lit("0.7.1");
+String cross_compile_target = str_lit("");
+String cross_compile_lib_dir = str_lit("");
 
 void init_build_context(void) {
 	BuildContext *bc = &build_context;
@@ -329,6 +331,10 @@ void init_build_context(void) {
 #else
 	bc->ODIN_OS      = str_lit("linux");
 #endif
+
+	if (cross_compile_target.len) {
+		bc->ODIN_OS = cross_compile_target;
+	}
 
 #if defined(GB_ARCH_64_BIT)
 	bc->ODIN_ARCH = str_lit("amd64");
@@ -376,7 +382,11 @@ void init_build_context(void) {
 		bc->max_align = 16;
 
 		bc->llc_flags = str_lit("-march=x86-64 ");
-		bc->link_flags = str_lit(LINK_FLAG_X64 " ");
+		if (str_eq_ignore_case(cross_compile_target, str_lit("Essence"))) {
+			bc->link_flags = str_lit(" ");
+		} else {
+			bc->link_flags = str_lit(LINK_FLAG_X64 " ");
+		}
 	} else if (bc->ODIN_ARCH == "x86") {
 		bc->word_size = 4;
 		bc->max_align = 8;
