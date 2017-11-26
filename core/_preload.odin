@@ -356,14 +356,6 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ...string, loc := #caller
 	return len(array);
 }
 
-pop :: proc "contextless" (array: ^$T/[]$E) -> E {
-	if array == nil do return E{};
-	assert(len(array) > 0);
-	res := array[len(array)-1];
-	(^raw.Slice)(array).len -= 1;
-	return res;
-}
-
 pop :: proc "contextless" (array: ^$T/[dynamic]$E) -> E {
 	if array == nil do return E{};
 	assert(len(array) > 0);
@@ -372,9 +364,6 @@ pop :: proc "contextless" (array: ^$T/[dynamic]$E) -> E {
 	return res;
 }
 
-clear :: inline proc "contextless" (slice: ^$T/[]$E) {
-	if slice != nil do (cast(^raw.Slice)slice).len = 0;
-}
 clear :: inline proc "contextless" (array: ^$T/[dynamic]$E) {
 	if array != nil do (cast(^raw.Dynamic_Array)array).len = 0;
 }
