@@ -266,8 +266,8 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 	AST_NODE_KIND(RangeStmt, "range statement", struct { \
 		Token    token; \
 		AstNode *label; \
-		AstNode *value; \
-		AstNode *index; \
+		AstNode *val0; \
+		AstNode *val1; \
 		Token    in_token; \
 		AstNode *expr; \
 		AstNode *body; \
@@ -782,8 +782,8 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		break;
 	case AstNode_RangeStmt:
 		n->RangeStmt.label = clone_ast_node(a, n->RangeStmt.label);
-		n->RangeStmt.value = clone_ast_node(a, n->RangeStmt.value);
-		n->RangeStmt.index = clone_ast_node(a, n->RangeStmt.index);
+		n->RangeStmt.val0  = clone_ast_node(a, n->RangeStmt.val0);
+		n->RangeStmt.val1  = clone_ast_node(a, n->RangeStmt.val1);
 		n->RangeStmt.expr  = clone_ast_node(a, n->RangeStmt.expr);
 		n->RangeStmt.body  = clone_ast_node(a, n->RangeStmt.body);
 		break;
@@ -1262,11 +1262,11 @@ AstNode *ast_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, Ast
 	return result;
 }
 
-AstNode *ast_range_stmt(AstFile *f, Token token, AstNode *value, AstNode *index, Token in_token, AstNode *expr, AstNode *body) {
+AstNode *ast_range_stmt(AstFile *f, Token token, AstNode *val0, AstNode *val1, Token in_token, AstNode *expr, AstNode *body) {
 	AstNode *result = make_ast_node(f, AstNode_RangeStmt);
 	result->RangeStmt.token = token;
-	result->RangeStmt.value = value;
-	result->RangeStmt.index = index;
+	result->RangeStmt.val0 = val0;
+	result->RangeStmt.val1 = val1;
 	result->RangeStmt.in_token = in_token;
 	result->RangeStmt.expr  = expr;
 	result->RangeStmt.body  = body;
