@@ -978,10 +978,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		check_open_scope(c, node);
 		check_label(c, rs->label);
 
-		Type *val = nullptr;
-		Type *idx = nullptr;
+		Type *val0 = nullptr;
+		Type *val1 = nullptr;
 		Entity *entities[2] = {};
 		isize entity_count = 0;
+		bool is_map = false;
 
 		AstNode *expr = unparen_expr(rs->expr);
 
@@ -1069,8 +1070,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			add_type_and_value(&c->info, ie->left,  x.mode, x.type, x.value);
 			add_type_and_value(&c->info, ie->right, y.mode, y.type, y.value);
-			val = type;
-			idx = t_int;
+			val0 = type;
+			val1 = t_int;
 		} else {
 			Operand operand = {Addressing_Invalid};
 			check_expr_or_type(c, &operand, rs->expr);
@@ -1082,8 +1083,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					gb_string_free(t);
 					goto skip_expr;
 				} else {
-					val = operand.type;
-					idx = t_int;
+					val0 = operand.type;
+					val1 = t_int;
 					add_type_info_type(c, operand.type);
 					goto skip_expr;
 				}
@@ -1093,38 +1094,39 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				switch (t->kind) {
 				case Type_Basic:
 					if (is_type_string(t)) {
-						val = t_rune;
-						idx = t_int;
+						val0 = t_rune;
+						val1 = t_int;
 					}
 					break;
 				case Type_Array:
-					val = t->Array.elem;
-					idx = t_int;
+					val0 = t->Array.elem;
+					val1 = t_int;
 					break;
 
 				case Type_DynamicArray:
-					val = t->DynamicArray.elem;
-					idx = t_int;
+					val0 = t->DynamicArray.elem;
+					val1 = t_int;
 					break;
 
 				case Type_Slice:
-					val = t->Slice.elem;
-					idx = t_int;
+					val0 = t->Slice.elem;
+					val1 = t_int;
 					break;
 
 				case Type_Vector:
-					val = t->Vector.elem;
-					idx = t_int;
+					val0 = t->Vector.elem;
+					val1 = t_int;
 					break;
 
 				case Type_Map:
-					val = t->Map.value;
-					idx = t->Map.key;
+					is_map = true;
+					val0 = t->Map.key;
+					val1 = t->Map.value;
 					break;
 				}
 			}
 
-			if (val == nullptr) {
+			if (val0 == nullptr) {
 				gbString s = expr_to_string(operand.expr);
 				gbString t = type_to_string(operand.type);
 				error(operand.expr, "Cannot iterate over '%s' of type '%s'", s, t);
@@ -1134,8 +1136,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 
 	skip_expr:; // NOTE(zhiayang): again, declaring a variable immediately after a label... weird.
-		AstNode *lhs[2] = {rs->value, rs->index};
-		Type *   rhs[2] = {val, idx};
+		AstNode *lhs[2] = {rs->val0, rs->val1};
+		Type *   rhs[2] = {val0, val1};
 
 		for (isize i = 0; i < 2; i++) {
 			if (lhs[i] == nullptr) {

@@ -6920,32 +6920,33 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 	case_ast_node(rs, RangeStmt, node);
 		ir_emit_comment(proc, str_lit("RangeStmt"));
 
-		Type *val_type = nullptr;
-		Type *idx_type = nullptr;
-		if (rs->value != nullptr && !is_blank_ident(rs->value)) {
-			val_type = type_of_expr(proc->module->info, rs->value);
+		Type *val0_type = nullptr;
+		Type *val1_type = nullptr;
+		if (rs->val0 != nullptr && !is_blank_ident(rs->val0)) {
+			val0_type = type_of_expr(proc->module->info, rs->val0);
 		}
-		if (rs->index != nullptr && !is_blank_ident(rs->index)) {
-			idx_type = type_of_expr(proc->module->info, rs->index);
+		if (rs->val1 != nullptr && !is_blank_ident(rs->val1)) {
+			val1_type = type_of_expr(proc->module->info, rs->val1);
 		}
 
-		if (val_type != nullptr) {
-			ir_add_local_for_identifier(proc, rs->value, true);
+		if (val0_type != nullptr) {
+			ir_add_local_for_identifier(proc, rs->val0, true);
 		}
-		if (idx_type != nullptr) {
-			ir_add_local_for_identifier(proc, rs->index, true);
+		if (val1_type != nullptr) {
+			ir_add_local_for_identifier(proc, rs->val1, true);
 		}
 
 		irValue *val = nullptr;
-		irValue *index = nullptr;
+		irValue *key = nullptr;
 		irBlock *loop = nullptr;
 		irBlock *done = nullptr;
 		AstNode *expr = unparen_expr(rs->expr);
+		bool is_map = false;
 
 		TypeAndValue tav = type_and_value_of_expr(proc->module->info, expr);
 
 		if (is_ast_node_a_range(expr)) {
-			ir_build_range_interval(proc, &expr->BinaryExpr, val_type, &val, &index, &loop, &done);
+			ir_build_range_interval(proc, &expr->BinaryExpr, val0_type, &val, &key, &loop, &done);
 		} else if (tav.mode == Addressing_Type) {
 			TokenPos pos = ast_node_token(expr).pos;
 			gbAllocator a = proc->module->allocator;
@@ -6982,8 +6983,8 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			irValue *val_ptr = ir_emit_ptr_offset(proc, values_data, offset);
 			ir_emit_increment(proc, offset_);
 
-			index = offset;
-			if (val_type != nullptr) {
+			key = offset;
+			if (val0_type != nullptr) {
 				if (is_type_float(core_elem)) {
 					irValue *f = ir_emit_load(proc, ir_emit_conv(proc, val_ptr, t_f64_ptr));
 					val = ir_emit_conv(proc, f, t);
@@ -6999,6 +7000,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			Type *et = base_type(type_deref(expr_type));
 			switch (et->kind) {
 			case Type_Map: {
+				is_map = true;
 				irAddr addr = ir_build_addr(proc, rs->expr);
 				irValue *map = ir_addr_get_ptr(proc, addr);
 				if (is_type_pointer(type_deref(ir_addr_type(addr)))) {
@@ -7006,7 +7008,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				}
 				irValue *entries_ptr = ir_emit_struct_ep(proc, map, 1);
 				irValue *count_ptr = ir_emit_struct_ep(proc, entries_ptr, 1);
-				ir_build_range_indexed(proc, map, val_type, count_ptr, &val, &index, &loop, &done);
+				ir_build_range_indexed(proc, map, val0_type, count_ptr, &val, &key, &loop, &done);
 				break;
 			}
 			case Type_Array: {
@@ -7017,7 +7019,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				}
 				count_ptr = ir_add_local_generated(proc, t_int);
 				ir_emit_store(proc, count_ptr, ir_const_int(proc->module->allocator, et->Array.count));
-				ir_build_range_indexed(proc, array, val_type, count_ptr, &val, &index, &loop, &done);
+				ir_build_range_indexed(proc, array, val0_type, count_ptr, &val, &key, &loop, &done);
 				break;
 			}
 			case Type_Vector: {
@@ -7028,7 +7030,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				}
 				count_ptr = ir_add_local_generated(proc, t_int);
 				ir_emit_store(proc, count_ptr, ir_const_int(proc->module->allocator, et->Vector.count));
-				ir_build_range_indexed(proc, vector, val_type, count_ptr, &val, &index, &loop, &done);
+				ir_build_range_indexed(proc, vector, val0_type, count_ptr, &val, &key, &loop, &done);
 				break;
 			}
 			case Type_DynamicArray: {
@@ -7038,7 +7040,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					array = ir_emit_load(proc, array);
 				}
 				count_ptr = ir_emit_struct_ep(proc, array, 1);
-				ir_build_range_indexed(proc, array, val_type, count_ptr, &val, &index, &loop, &done);
+				ir_build_range_indexed(proc, array, val0_type, count_ptr, &val, &key, &loop, &done);
 				break;
 			}
 			case Type_Slice: {
@@ -7051,7 +7053,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					count_ptr = ir_add_local_generated(proc, t_int);
 					ir_emit_store(proc, count_ptr, ir_slice_count(proc, slice));
 				}
-				ir_build_range_indexed(proc, slice, val_type, count_ptr, &val, &index, &loop, &done);
+				ir_build_range_indexed(proc, slice, val0_type, count_ptr, &val, &key, &loop, &done);
 				break;
 			}
 			case Type_Basic: {
@@ -7064,7 +7066,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					ir_emit_store(proc, s, string);
 					string = ir_emit_load(proc, s);
 				}
-				ir_build_range_string(proc, string, val_type, &val, &index, &loop, &done);
+				ir_build_range_string(proc, string, val0_type, &val, &key, &loop, &done);
 				break;
 			}
 			default:
@@ -7073,19 +7075,17 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			}
 		}
 
-		irAddr val_addr = {};
-		irAddr idx_addr = {};
-		if (val_type != nullptr) {
-			val_addr = ir_build_addr(proc, rs->value);
-		}
-		if (idx_type != nullptr) {
-			idx_addr = ir_build_addr(proc, rs->index);
-		}
-		if (val_type != nullptr) {
-			ir_addr_store(proc, val_addr, val);
-		}
-		if (idx_type != nullptr) {
-			ir_addr_store(proc, idx_addr, index);
+		irAddr val0_addr = {};
+		irAddr val1_addr = {};
+		if (val0_type) val0_addr = ir_build_addr(proc, rs->val0);
+		if (val1_type) val1_addr = ir_build_addr(proc, rs->val1);
+
+		if (is_map) {
+			if (val0_type) ir_addr_store(proc, val0_addr, key);
+			if (val1_type) ir_addr_store(proc, val1_addr, val);
+		} else {
+			if (val0_type) ir_addr_store(proc, val0_addr, val);
+			if (val1_type) ir_addr_store(proc, val1_addr, key);
 		}
 
 		ir_push_target_list(proc, rs->label, done, loop, nullptr);
