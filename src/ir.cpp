@@ -8634,6 +8634,14 @@ void ir_gen_tree(irGen *s) {
 	if (!(build_context.is_dll && !has_dll_main)) {
 		// main :: proc(argc: i32, argv: ^^u8) -> i32
 		String name = str_lit("main");
+
+		if (str_eq_ignore_case(cross_compile_target, str_lit("Essence"))) {
+			// This is a bit hacky,
+			// because this makes this function the first function run in the executable
+			// so it won't actually have the argc/argv arguments.
+			name = str_lit("ProgramEntry");
+		}
+
 		Type *proc_params = make_type_tuple(a);
 		Type *proc_results = make_type_tuple(a);
 
