@@ -410,15 +410,17 @@ bool parse_build_flags(Array<String> args) {
 #ifdef GB_SYSTEM_UNIX
 #ifdef GB_ARCH_64_BIT
 							if (str_eq_ignore_case(cross_compile_target, str_lit("Essence"))) {
+
+							} else
 #endif
 #endif
-							} else {
+							{
 								gb_printf_err("Unsupported cross compilation target '%.*s'\n", LIT(cross_compile_target));
 								gb_printf_err("Currently supported targets: Essence (from 64-bit Unixes only)\n");
 								bad_flags = true;
 							}
 							break;
-						} 
+						}
 
 						case BuildFlag_CrossLibDir: {
 							GB_ASSERT(value.kind == ExactValue_String);
@@ -972,8 +974,8 @@ int main(int arg_count, char **arg_ptr) {
 				" -e _main "
 			#endif
 			, linker, LIT(output_base), LIT(output_base), output_ext,
-			lib_str, 
-			str_eq_ignore_case(cross_compile_target, str_lit("Essence")) ? "" : "-lc -lm", 
+			lib_str,
+			str_eq_ignore_case(cross_compile_target, str_lit("Essence")) ? "" : "-lc -lm",
 			LIT(build_context.link_flags),
 			link_settings,
 			LIT(cross_compile_lib_dir)
