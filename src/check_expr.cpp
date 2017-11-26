@@ -3077,7 +3077,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		isize max_args = 1;
 		if (is_type_slice(type)) {
 			min_args = 2;
-			max_args = 3;
+			max_args = 2;
 		} else if (is_type_map(type)) {
 			min_args = 1;
 			max_args = 2;
@@ -6084,12 +6084,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		switch (t->kind) {
 		case Type_Basic:
 			if (is_type_string(t)) {
-				if (se->index3) {
-					error(node, "3-index slice on a string in not needed");
-					o->mode = Addressing_Invalid;
-					o->expr = node;
-					return kind;
-				}
 				valid = true;
 				if (o->mode == Addressing_Constant) {
 					max_count = o->value.value_string.len;
@@ -6141,25 +6135,10 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			// It is okay to continue as it will assume the 1st index is zero
 		}
 
-		if (se->index3 && (se->high == nullptr || se->max == nullptr)) {
-			error(se->close, "2nd and 3rd indices are required in a 3-index slice");
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
+		TokenKind interval_kind = se->interval.kind;
 
-		if (se->index3 && se->interval0.kind != se->interval1.kind) {
-			error(se->close, "The interval separators for in a 3-index slice must be the same");
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
-
-
-		TokenKind interval_kind = se->interval0.kind;
-
-		i64 indices[3] = {};
-		AstNode *nodes[3] = {se->low, se->high, se->max};
+		i64 indices[2] = {};
+		AstNode *nodes[2] = {se->low, se->high};
 		for (isize i = 0; i < gb_count_of(nodes); i++) {
 			i64 index = max_count;
 			if (nodes[i] != nullptr) {
@@ -6461,12 +6440,8 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, se->expr);
 		str = gb_string_append_rune(str, '[');
 		str = write_expr_to_string(str, se->low);
-		str = gb_string_appendc(str, "..");
+		str = string_append_token(str, se->interval);
 		str = write_expr_to_string(str, se->high);
-		if (se->index3) {
-			str = gb_string_appendc(str, "..");
-			str = write_expr_to_string(str, se->max);
-		}
 		str = gb_string_append_rune(str, ']');
 	case_end;
 

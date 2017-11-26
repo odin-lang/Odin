@@ -323,7 +323,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	case Type_Slice:
 		ir_write_byte(f, '{');
 		ir_print_type(f, m, t->Slice.elem);
-		ir_fprintf(f, "*, i%lld, i%lld}", word_bits, word_bits);
+		ir_fprintf(f, "*, i%lld}", word_bits);
 		return;
 	case Type_DynamicArray:
 		ir_write_byte(f, '{');

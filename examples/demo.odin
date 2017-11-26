@@ -20,6 +20,7 @@ when ODIN_OS == "windows" {
 }
 
 general_stuff :: proc() {
+	fmt.println("# general_stuff");
 	{ // `do` for inline statmes rather than block
 		foo :: proc() do fmt.println("Foo!");
 		if   false do foo();
@@ -77,6 +78,7 @@ general_stuff :: proc() {
 }
 
 default_struct_values :: proc() {
+	fmt.println("# default_struct_values");
 	{
 		Vector3 :: struct {
 			x: f32,
@@ -138,6 +140,7 @@ default_struct_values :: proc() {
 
 
 union_type :: proc() {
+	fmt.println("\n# union_type");
 	{
 		val: union{int, bool};
 		val = 137;
@@ -310,6 +313,8 @@ union_type :: proc() {
 }
 
 parametric_polymorphism :: proc() {
+	fmt.println("# parametric_polymorphism");
+
 	print_value :: proc(value: $T) {
 		fmt.printf("print_value: %T %v\n", value, value);
 	}
@@ -510,12 +515,14 @@ prefix_table := [...]string{
 
 threading_example :: proc() {
 	when ODIN_OS == "windows" {
-		unordered_remove :: proc(array: ^[]$T, index: int, loc := #caller_location) {
+		fmt.println("# threading_example");
+
+		unordered_remove :: proc(array: ^[dynamic]$T, index: int, loc := #caller_location) {
 			__bounds_check_error_loc(loc, index, len(array));
 			array[index] = array[len(array)-1];
 			pop(array);
 		}
-		ordered_remove :: proc(array: ^[]$T, index: int, loc := #caller_location) {
+		ordered_remove :: proc(array: ^[dynamic]$T, index: int, loc := #caller_location) {
 			__bounds_check_error_loc(loc, index, len(array));
 			copy(array[index..], array[index+1..]);
 			pop(array);
@@ -530,7 +537,7 @@ threading_example :: proc() {
 			return 0;
 		}
 
-		threads := make([]^thread.Thread, 0, len(prefix_table));
+		threads := make([dynamic]^thread.Thread, 0, len(prefix_table));
 		defer free(threads);
 
 		for i in 0..len(prefix_table) {
@@ -559,12 +566,12 @@ threading_example :: proc() {
 }
 
 main :: proc() {
-	when false {
-		fmt.println("\n# general_stuff");              general_stuff();
-		fmt.println("\n# default_struct_values");      default_struct_values();
-		fmt.println("\n# union_type");                 union_type();
-		fmt.println("\n# parametric_polymorphism");    parametric_polymorphism();
-		fmt.println("\n# threading_example");          threading_example();
+	when true {
+		general_stuff();
+		default_struct_values();
+		union_type();
+		parametric_polymorphism();
+		threading_example();
 	}
 }
 

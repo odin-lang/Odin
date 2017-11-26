@@ -55,7 +55,7 @@ Glyph_Metrics_Float :: struct {
 Create_Context_Attribs_ARB_Type :: #type proc "c" (hdc: Hdc, h_share_context: rawptr, attribList: ^i32) -> Hglrc;
 Choose_Pixel_Format_ARB_Type    :: #type proc "c" (hdc: Hdc, attrib_i_list: ^i32, attrib_f_list: ^f32, max_formats: u32, formats: ^i32, num_formats : ^u32) -> Bool;
 Swap_Interval_EXT_Type          :: #type proc "c" (interval: i32) -> bool;
-Get_Extensions_String_ARB_Type  :: #type proc "c" (Hdc) -> ^u8;
+Get_Extensions_String_ARB_Type  :: #type proc "c" (Hdc) -> ^byte;
 
 // Procedures
 	create_context_attribs_arb: Create_Context_Attribs_ARB_Type;
@@ -72,7 +72,7 @@ foreign opengl32 {
 	make_current :: proc(hdc: Hdc, hglrc: Hglrc) -> Bool ---;
 
 	@(link_name="wglGetProcAddress")
-	get_proc_address :: proc(c_str: ^u8) -> rawptr ---;
+	get_proc_address :: proc(c_str: ^byte) -> rawptr ---;
 
 	@(link_name="wglDeleteContext")
 	delete_context :: proc(hglrc: Hglrc) -> Bool ---;

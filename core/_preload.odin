@@ -74,8 +74,8 @@ Type_Info_Tuple :: struct #ordered { // Only really used for procedures
 Type_Info_Struct :: struct #ordered {
 	types:        []^Type_Info,
 	names:        []string,
-	offsets:      []int,  // offsets may not be used in tuples
-	usings:       []bool, // usings may not be used in tuples
+	offsets:      []uintptr, // offsets may not be used in tuples
+	usings:       []bool,    // usings may not be used in tuples
 	is_packed:    bool,
 	is_ordered:   bool,
 	is_raw_union: bool,
@@ -83,7 +83,7 @@ Type_Info_Struct :: struct #ordered {
 };
 Type_Info_Union :: struct #ordered {
 	variants:   []^Type_Info,
-	tag_offset: int,
+	tag_offset: uintptr,
 	tag_type:   ^Type_Info,
 };
 Type_Info_Enum :: struct #ordered {
@@ -136,7 +136,7 @@ Type_Info :: struct #ordered {
 __type_table: []Type_Info;
 
 __argc__: i32;
-__argv__: ^^u8;
+__argv__: ^^byte;
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 
@@ -149,7 +149,7 @@ Source_Code_Location :: struct #ordered {
 
 
 
-Allocator_Mode :: enum u8 {
+Allocator_Mode :: enum byte {
 	Alloc,
 	Free,
 	FreeAll,
@@ -327,23 +327,6 @@ copy :: proc "contextless" (dst, src: $T/[]$E) -> int {
 }
 
 
-append :: proc "contextless" (array: ^$T/[]$E, args: ...E) -> int {
-	if array == nil do return 0;
-
-	arg_len := len(args);
-	if arg_len <= 0 do return len(array);
-
-	arg_len = min(cap(array)-len(array), arg_len);
-	if arg_len > 0 {
-		s := cast(^raw.Slice)array;
-		data := cast(^E)s.data;
-		assert(data != nil);
-		__mem_copy(data + s.len, &args[0], size_of(E)*arg_len);
-		s.len += arg_len;
-	}
-	return len(array);
-}
-
 append :: proc(array: ^$T/[dynamic]$E, args: ...E, loc := #caller_location) -> int {
 	if array == nil do return 0;
 
@@ -366,12 +349,6 @@ append :: proc(array: ^$T/[dynamic]$E, args: ...E, loc := #caller_location) -> i
 	return len(array);
 }
 
-append_string :: proc(array: ^$T/[]u8, args: ...string) -> int {
-	for arg in args {
-		append(array, ...cast(T)arg);
-	}
-	return len(array);
-}
 append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ...string, loc := #caller_location) -> int {
 	for arg in args {
 		append(array = array, args = cast([]E)arg, loc = loc);
@@ -691,16 +668,24 @@ __bounds_check_error :: proc "contextless" (file: string, line, column: int, ind
 	__debug_trap();
 }
 
-__slice_expr_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
+__slice_expr_error :: proc "contextless" (file: string, line, column: int, low, high: int) {
+	if 0 <= low && low <= high do return;
+	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: %d..%d\n",
+	            file, line, column, low, high);
+	__debug_trap();
+}
+
+__dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
 	if 0 <= low && low <= high && high <= max do return;
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: [%d..%d..%d]\n",
+	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: %d..%d..%d\n",
 	            file, line, column, low, high, max);
 	__debug_trap();
 }
 
+
 __substring_expr_error :: proc "contextless" (file: string, line, column: int, low, high: int) {
 	if 0 <= low && low <= high do return;
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: [%d..%d]\n",
+	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: %d..%d\n",
 	            file, line, column, low, high);
 	__debug_trap();
 }
@@ -718,8 +703,8 @@ __string_decode_rune :: inline proc "contextless" (s: string) -> (rune, int) {
 __bounds_check_error_loc :: inline proc "contextless" (using loc := #caller_location, index, count: int) {
 	__bounds_check_error(file_path, int(line), int(column), index, count);
 }
-__slice_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, low, high, max: int) {
-	__slice_expr_error(file_path, int(line), int(column), low, high, max);
+__slice_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, low, high: int) {
+	__slice_expr_error(file_path, int(line), int(column), low, high);
 }
 __substring_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, low, high: int) {
 	__substring_expr_error(file_path, int(line), int(column), low, high);
@@ -730,13 +715,13 @@ __mem_set :: proc "contextless" (data: rawptr, value: i32, len: int) -> rawptr {
 	foreign __llvm_core {
 		when size_of(rawptr) == 8 {
 			@(link_name="llvm.memset.p0i8.i64")
-			llvm_memset :: proc(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) ---;
+			llvm_memset :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) ---;
 		} else {
 			@(link_name="llvm.memset.p0i8.i32")
-			llvm_memset :: proc(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) ---;
+			llvm_memset :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) ---;
 		}
 	}
-	llvm_memset(data, u8(value), len, 1, false);
+	llvm_memset(data, byte(value), len, 1, false);
 	return data;
 }
 __mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
@@ -773,7 +758,7 @@ __mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) ->
 	return dst;
 }
 
-__mem_compare :: proc "contextless" (a, b: ^u8, n: int) -> int {
+__mem_compare :: proc "contextless" (a, b: ^byte, n: int) -> int {
 	for i in 0..n do switch {
 	case (a+i)^ < (b+i)^: return -1;
 	case (a+i)^ > (b+i)^: return +1;
@@ -867,7 +852,7 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 	// TODO(bill): Better error handling for failed reservation
 	if !ok do return array.len;
 
-	data := cast(^u8)array.data;
+	data := cast(^byte)array.data;
 	assert(data != nil);
 	__mem_copy(data + (elem_size*array.len), items, elem_size * item_count);
 	array.len += item_count;
@@ -885,7 +870,7 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 	// TODO(bill): Better error handling for failed reservation
 	if !ok do return array.len;
 
-	data := cast(^u8)array.data;
+	data := cast(^byte)array.data;
 	assert(data != nil);
 	__mem_zero(data + (elem_size*array.len), elem_size);
 	array.len += 1;
@@ -894,8 +879,8 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 
 // Map stuff
 
-__default_hash :: proc(data: []u8) -> u128 {
-	fnv128a :: proc(data: []u8) -> u128 {
+__default_hash :: proc(data: []byte) -> u128 {
+	fnv128a :: proc(data: []byte) -> u128 {
 		h: u128 = 0x6c62272e07bb014262b821756295c58d;
 		for b in data {
 			h = (h ~ u128(b)) * 0x1000000000000000000013b;
@@ -904,7 +889,7 @@ __default_hash :: proc(data: []u8) -> u128 {
 	}
 	return fnv128a(data);
 }
-__default_hash_string :: proc(s: string) -> u128 do return __default_hash(cast([]u8)s);
+__default_hash_string :: proc(s: string) -> u128 do return __default_hash(cast([]byte)s);
 
 __dynamic_map_reserve :: proc(using header: __Map_Header, cap: int, loc := #caller_location)  {
 	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap, loc);
@@ -927,7 +912,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int, loc := 
 		if len(nm.hashes) == 0 do __dynamic_map_grow(new_header, loc);
 
 		entry_header := __dynamic_map_get_entry(header, i);
-		data := cast(^u8)entry_header;
+		data := cast(^byte)entry_header;
 
 		fr := __dynamic_map_find(new_header, entry_header.key);
 		j := __dynamic_map_add_entry(new_header, entry_header.key, loc);
@@ -940,7 +925,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int, loc := 
 
 		e := __dynamic_map_get_entry(new_header, j);
 		e.next = fr.entry_index;
-		ndata := cast(^u8)e;
+		ndata := cast(^byte)e;
 		__mem_copy(ndata+value_offset, data+value_offset, value_size);
 
 		if __dynamic_map_full(new_header) do __dynamic_map_grow(new_header, loc);
@@ -953,7 +938,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int, loc := 
 __dynamic_map_get :: proc(h: __Map_Header, key: __Map_Key) -> rawptr {
 	index := __dynamic_map_find(h, key).entry_index;
 	if index >= 0 {
-		data := cast(^u8)__dynamic_map_get_entry(h, index);
+		data := cast(^byte)__dynamic_map_get_entry(h, index);
 		return data + h.value_offset;
 	}
 	return nil;
@@ -983,7 +968,7 @@ __dynamic_map_set :: proc(using h: __Map_Header, key: __Map_Key, value: rawptr, 
 	{
 		e := __dynamic_map_get_entry(h, index);
 		e.key = key;
-		val := cast(^u8)e + value_offset;
+		val := cast(^byte)e + value_offset;
 		__mem_copy(val, value, value_size);
 	}
 
@@ -1045,7 +1030,7 @@ __dynamic_map_delete :: proc(using h: __Map_Header, key: __Map_Key) {
 }
 
 __dynamic_map_get_entry :: proc(using h: __Map_Header, index: int) -> ^__Map_Entry_Header {
-	return cast(^__Map_Entry_Header)(cast(^u8)m.entries.data + index*entry_size);
+	return cast(^__Map_Entry_Header)(cast(^byte)m.entries.data + index*entry_size);
 }
 
 __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {

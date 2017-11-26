@@ -18,37 +18,27 @@ copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	return __mem_copy_non_overlapping(dst, src, len);
 }
-compare :: proc "contextless" (a, b: []u8) -> int {
+compare :: proc "contextless" (a, b: []byte) -> int {
 	return __mem_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
 
 slice_ptr :: proc "contextless" (ptr: ^$T, len: int) -> []T {
 	assert(len >= 0);
-	slice := raw.Slice{data = ptr, len = len, cap = len};
-	return transmute([]T)slice;
-}
-slice_ptr :: proc "contextless" (ptr: ^$T, len, cap: int) -> []T {
-	assert(0 <= len && len <= cap);
-	slice := raw.Slice{data = ptr, len = len, cap = cap};
+	slice := raw.Slice{data = ptr, len = len};
 	return transmute([]T)slice;
 }
 
-slice_to_bytes :: proc "contextless" (slice: $E/[]$T) -> []u8 {
+slice_to_bytes :: proc "contextless" (slice: $E/[]$T) -> []byte {
 	s := transmute(raw.Slice)slice;
 	s.len *= size_of(T);
 	s.cap *= size_of(T);
-	return transmute([]u8)s;
+	return transmute([]byte)s;
 }
 
-ptr_to_bytes :: proc "contextless" (ptr: ^$T, len := 1) -> []u8 {
+ptr_to_bytes :: proc "contextless" (ptr: ^$T, len := 1) -> []byte {
     assert(len >= 0);
-    return transmute([]u8)raw.Slice{ptr, len*size_of(T), len*size_of(T)};
-}
-
-ptr_to_bytes :: proc "contextless" (ptr: ^$T, len, cap: int) -> []u8 {
-    assert(0 <= len && len <= cap);
-    return transmute([]u8)raw.Slice{ptr, len*size_of(T), cap*size_of(T)};
+    return transmute([]byte)raw.Slice{ptr, len*size_of(T), len*size_of(T)};
 }
 
 
@@ -93,6 +83,17 @@ allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 }
 
 
+Fixed_Byte_Buffer :: [dynamic]byte;
+
+make_fixed_byte_buffer :: proc(backing: []byte) -> Fixed_Byte_Buffer {
+	s := transmute(raw.Slice)backing;
+	d: raw.Dynamic_Array;
+	d.data = s.data;
+	d.len = 0;
+	d.cap = s.len;
+	d.allocator = nil_allocator();
+	return transmute(Fixed_Byte_Buffer)d;
+}
 
 
 
@@ -100,7 +101,7 @@ allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 
 Arena :: struct {
 	backing:    Allocator,
-	memory:     []u8,
+	memory:     Fixed_Byte_Buffer,
 	temp_count: int,
 }
 
@@ -113,15 +114,15 @@ ArenaTempMemory :: struct {
 
 
 
-init_arena_from_memory :: proc(using a: ^Arena, data: []u8) {
+init_arena_from_memory :: proc(using a: ^Arena, data: []byte) {
 	backing    = Allocator{};
-	memory     = data[..0];
+	memory     = make_fixed_byte_buffer(data);
 	temp_count = 0;
 }
 
 init_arena_from_context :: proc(using a: ^Arena, size: int) {
 	backing = context.allocator;
-	memory = make([]u8, 0, size);
+	memory = make_fixed_byte_buffer(make([]byte, size));
 	temp_count = 0;
 }
 
@@ -135,7 +136,9 @@ context_from_allocator :: proc(a: Allocator) -> Context {
 destroy_arena :: proc(using a: ^Arena) {
 	if backing.procedure != nil {
 		context <- context_from_allocator(backing) {
-			free(memory);
+			if memory != nil {
+				free(&memory[0]);
+			}
 			memory = nil;
 		}
 	}
@@ -194,7 +197,7 @@ begin_arena_temp_memory :: proc(a: ^Arena) -> ArenaTempMemory {
 end_arena_temp_memory :: proc(using tmp: ArenaTempMemory) {
 	assert(len(arena.memory) >= original_count);
 	assert(arena.temp_count > 0);
-	arena.memory = arena.memory[..original_count];
+	(^raw.Dynamic_Array)(&arena.memory).len = original_count;
 	arena.temp_count -= 1;
 }
 

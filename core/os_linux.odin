@@ -122,28 +122,28 @@ W_OK :: 2; // Test for write permission
 R_OK :: 4; // Test for read permission
 
 foreign libc {
-	@(link_name="open")    _unix_open    :: proc(path: ^u8, mode: int) -> Handle ---;
+	@(link_name="open")    _unix_open    :: proc(path: ^byte, mode: int) -> Handle ---;
 	@(link_name="close")   _unix_close   :: proc(fd: Handle) -> i32 ---;
 	@(link_name="read")    _unix_read    :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
 	@(link_name="write")   _unix_write   :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
 	@(link_name="lseek64") _unix_seek    :: proc(fd: Handle, offset: i64, whence: i32) -> i64 ---;
 	@(link_name="gettid")  _unix_gettid  :: proc() -> u64 ---;
-	@(link_name="stat")    _unix_stat    :: proc(path: ^u8, stat: ^Stat) -> i32 ---;
-	@(link_name="access")  _unix_access  :: proc(path: ^u8, mask: int) -> i32 ---;
+	@(link_name="stat")    _unix_stat    :: proc(path: ^byte, stat: ^Stat) -> i32 ---;
+	@(link_name="access")  _unix_access  :: proc(path: ^byte, mask: int) -> i32 ---;
 
 	@(link_name="malloc")  _unix_malloc  :: proc(size: int) -> rawptr ---;
 	@(link_name="calloc")  _unix_calloc  :: proc(num, size: int) -> rawptr ---;
 	@(link_name="free")    _unix_free    :: proc(ptr: rawptr) ---;
 	@(link_name="realloc") _unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr ---;
-	@(link_name="getenv")  _unix_getenv  :: proc(^u8) -> ^u8 ---;
+	@(link_name="getenv")  _unix_getenv  :: proc(^byte) -> ^byte ---;
 
 	@(link_name="exit")    _unix_exit    :: proc(status: int) ---;
 }
 foreign dl {
-	@(link_name="dlopen")  _unix_dlopen  :: proc(filename: ^u8, flags: int) -> rawptr ---;
-	@(link_name="dlsym")   _unix_dlsym   :: proc(handle: rawptr, symbol: ^u8) -> rawptr ---;
+	@(link_name="dlopen")  _unix_dlopen  :: proc(filename: ^byte, flags: int) -> rawptr ---;
+	@(link_name="dlsym")   _unix_dlsym   :: proc(handle: rawptr, symbol: ^byte) -> rawptr ---;
 	@(link_name="dlclose") _unix_dlclose :: proc(handle: rawptr) -> int ---;
-	@(link_name="dlerror") _unix_dlerror :: proc() -> ^u8 ---;
+	@(link_name="dlerror") _unix_dlerror :: proc() -> ^byte ---;
 }
 
 // TODO(zangent): Change this to just `open` when Bill fixes overloading.
@@ -166,12 +166,12 @@ close :: proc(fd: Handle) {
 	_unix_close(fd);
 }
 
-read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
+read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	sz := _unix_read(fd, &data[0], len(data));
 	return sz, 0;
 }
 
-write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
+write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	sz := _unix_write(fd, &data[0], len(data));
 	return sz, 0;
 }
@@ -201,9 +201,10 @@ last_write_time_by_name :: proc(name: string) -> File_Time {}
 */
 
 stat :: inline proc(path: string) -> (Stat, int) {
-	s: Stat;
 	cstr := strings.new_c_string(path);
 	defer free(cstr);
+
+	s: Stat;
 	ret_int := _unix_stat(cstr, &s);
 	return s, int(ret_int);
 }
@@ -229,9 +230,9 @@ heap_free :: proc(ptr: rawptr) {
 
 getenv :: proc(name: string) -> (string, bool) {
 	path_str := strings.new_c_string(name);
-	cstr: ^u8 = _unix_getenv(path_str);
-	free(path_str);
-	if(cstr == nil) {
+	defer free(path_str);
+	cstr := _unix_getenv(path_str);
+	if cstr == nil {
 		return "", false;
 	}
 	return strings.to_odin_string(cstr), true;
@@ -248,15 +249,15 @@ current_thread_id :: proc() -> int {
 
 dlopen :: inline proc(filename: string, flags: int) -> rawptr {
 	cstr := strings.new_c_string(filename);
+	defer free(cstr);
 	handle := _unix_dlopen(cstr, flags);
-	free(cstr);
 	return handle;
 }
 dlsym :: inline proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil);
 	cstr := strings.new_c_string(symbol);
+	defer free(cstr);
 	proc_handle := _unix_dlsym(handle, cstr);
-	free(cstr);
 	return proc_handle;
 }
 dlclose :: inline proc(handle: rawptr) -> bool {

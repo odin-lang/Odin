@@ -852,6 +852,9 @@ void add_global_string_constant(gbAllocator a, String name, String value) {
 }
 
 
+void add_global_type_entity(gbAllocator a, String name, Type *type) {
+	add_global_entity(make_entity_type_name(a, nullptr, make_token_ident(name), type));
+}
 
 
 
@@ -863,17 +866,9 @@ void init_universal_scope(void) {
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
-		add_global_entity(make_entity_type_name(a, nullptr, make_token_ident(basic_types[i].Basic.name), &basic_types[i]));
+		add_global_type_entity(a, basic_types[i].Basic.name, &basic_types[i]);
 	}
-#if 1
-	// for (isize i = 0; i < gb_count_of(basic_type_aliases); i++) {
-		// add_global_entity(make_entity_type_name(a, nullptr, make_token_ident(basic_type_aliases[i].Basic.name), &basic_type_aliases[i]));
-	// }
-#else
-	{
-		t_byte = add_global_type_alias(a, str_lit("byte"), &basic_types[Basic_u8]);
-	}
-#endif
+	add_global_type_entity(a, str_lit("byte"), &basic_types[Basic_u8]);
 
 // Constants
 	add_global_constant(a, str_lit("true"),  t_untyped_bool, exact_value_bool(true));
