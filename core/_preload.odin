@@ -351,13 +351,12 @@ append :: proc(array: ^$T/[dynamic]$E, args: ...E, loc := #caller_location) -> i
 	if arg_len <= 0 do return len(array);
 
 
-	ok := true;
 	if cap(array) <= len(array)+arg_len {
 		cap := 2 * cap(array) + max(8, arg_len);
-		ok = reserve(array, cap, loc);
+		_ = reserve(array, cap, loc);
 	}
-	// TODO(bill): Better error handling for failed reservation
-	if ok {
+	arg_len = min(cap(array)-len(array), arg_len);
+	if arg_len > 0 {
 		a := cast(^raw.Dynamic_Array)array;
 		data := cast(^E)a.data;
 		assert(data != nil);
@@ -367,13 +366,13 @@ append :: proc(array: ^$T/[dynamic]$E, args: ...E, loc := #caller_location) -> i
 	return len(array);
 }
 
-append :: proc(array: ^$T/[]u8, args: ...string) -> int {
+append_string :: proc(array: ^$T/[]u8, args: ...string) -> int {
 	for arg in args {
 		append(array, ...cast(T)arg);
 	}
 	return len(array);
 }
-append :: proc(array: ^$T/[dynamic]$E/u8, args: ...string, loc := #caller_location) -> int {
+append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ...string, loc := #caller_location) -> int {
 	for arg in args {
 		append(array = array, args = cast([]E)arg, loc = loc);
 	}
@@ -594,7 +593,7 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 
 default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                size, alignment: int,
-                               old_memory: rawptr, old_size: int, flags: u64, loc := #caller_location) -> rawptr {
+                               old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
 	using Allocator_Mode;
 
 	switch mode {
@@ -620,6 +619,19 @@ default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 default_allocator :: proc() -> Allocator {
 	return Allocator{
 		procedure = default_allocator_proc,
+		data = nil,
+	};
+}
+
+nil_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
+                           size, alignment: int,
+                           old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+	return nil;
+}
+
+nil_allocator :: proc() -> Allocator {
+	return Allocator{
+		procedure = nil_allocator_proc,
 		data = nil,
 	};
 }

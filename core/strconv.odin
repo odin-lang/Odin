@@ -111,6 +111,11 @@ parse_uint :: proc(s: string, base: int) -> uint {
 	return uint(parse_u128(s));
 }
 
+parse_f32 :: proc(s: string) -> f32 {
+	return f32(parse_f64(s));
+}
+
+
 parse_f64 :: proc(s: string) -> f64 {
 	i := 0;
 
@@ -181,8 +186,8 @@ parse_f64 :: proc(s: string) -> f64 {
 
 
 append_bool :: proc(buf: []u8, b: bool) -> string {
-	if b do append(&buf, "true");
-	else do append(&buf, "false");
+	if b do append_string(&buf, "true");
+	else do append_string(&buf, "false");
 	return string(buf);
 }
 
