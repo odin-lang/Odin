@@ -2373,7 +2373,7 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 		}
 	} else if (is_type_slice(t)) {
 		irValue *data = ir_emit_struct_ev(proc, x, 0);
-		irValue *cap  = ir_emit_struct_ev(proc, x, 2);
+		irValue *cap  = ir_emit_struct_ev(proc, x, 1);
 		if (op_kind == Token_CmpEq) {
 			irValue *a = ir_emit_comp(proc, Token_CmpEq, data, v_raw_nil);
 			irValue *b = ir_emit_comp(proc, Token_CmpEq, cap, v_zero);
@@ -2700,7 +2700,7 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 		break;
 	}
 
-	GB_ASSERT(result_type != nullptr);
+	GB_ASSERT_MSG(result_type != nullptr, "%s, %d", type_to_string(ir_type(s)), index);
 
 	return ir_emit(proc, ir_instr_struct_extract_value(proc, s, index, result_type));
 }
