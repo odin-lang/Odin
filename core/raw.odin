@@ -11,7 +11,6 @@ String :: struct #ordered {
 Slice :: struct #ordered {
 	data: rawptr,
 	len:  int,
-	cap:  int,
 }
 
 Dynamic_Array :: struct #ordered {

@@ -42,7 +42,7 @@ Wnd_Class_Ex_A :: struct #ordered {
 	icon:                  Hicon,
 	cursor:                Hcursor,
 	background:            Hbrush,
-	menu_name, class_name: ^u8,
+	menu_name, class_name: ^byte,
 	sm:                    Hicon,
 }
 
@@ -116,8 +116,8 @@ Find_Data :: struct #ordered{
     file_size_low:       u32,
     reserved0:           u32,
     reserved1:           u32,
-    file_name:           [MAX_PATH]u8,
-    alternate_file_name: [14]u8,
+    file_name:           [MAX_PATH]byte,
+    alternate_file_name: [14]byte,
 }
 
 Security_Attributes :: struct #ordered {
@@ -152,7 +152,7 @@ Pixel_Format_Descriptor :: struct #ordered {
 	stencil_bits,
 	aux_buffers,
 	layer_type,
-	reserved: u8,
+	reserved: byte,
 
 	layer_mask,
 	visible_mask,
@@ -201,7 +201,7 @@ Raw_Input_Header :: struct #ordered {
 Raw_HID :: struct #ordered {
 	size_hid: u32,
 	count:    u32,
-	raw_data: [1]u8,
+	raw_data: [1]byte,
 }
 
 Raw_Keyboard :: struct #ordered {
@@ -435,14 +435,14 @@ GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1;
 foreign kernel32 {
 	@(link_name="GetLastError")              get_last_error              :: proc() -> i32 ---;
 	@(link_name="ExitProcess")               exit_process                :: proc(exit_code: u32) ---;
-	@(link_name="GetModuleHandleA")          get_module_handle_a         :: proc(module_name: ^u8) -> Hinstance ---;
+	@(link_name="GetModuleHandleA")          get_module_handle_a         :: proc(module_name: ^byte) -> Hinstance ---;
 	@(link_name="GetModuleHandleW")          get_module_handle_w         :: proc(module_name: ^u16) -> Hinstance ---;
 	@(link_name="Sleep")                     sleep                       :: proc(ms: i32) -> i32 ---;
 	@(link_name="QueryPerformanceFrequency") query_performance_frequency :: proc(result: ^i64) -> i32 ---;
 	@(link_name="QueryPerformanceCounter")   query_performance_counter   :: proc(result: ^i64) -> i32 ---;
-	@(link_name="OutputDebugStringA")        output_debug_string_a       :: proc(c_str: ^u8) ---;
+	@(link_name="OutputDebugStringA")        output_debug_string_a       :: proc(c_str: ^byte) ---;
 
-	@(link_name="GetCommandLineA")    get_command_line_a    :: proc() -> ^u8 ---;
+	@(link_name="GetCommandLineA")    get_command_line_a    :: proc() -> ^byte ---;
 	@(link_name="GetCommandLineW")    get_command_line_w    :: proc() -> ^u16 ---;
 	@(link_name="GetSystemMetrics")   get_system_metrics    :: proc(index: i32) -> i32 ---;
 	@(link_name="GetCurrentThreadId") get_current_thread_id :: proc() -> u32 ---;
@@ -456,7 +456,7 @@ foreign kernel32 {
 	@(link_name="GetStdHandle") get_std_handle :: proc(h: i32) -> Handle ---;
 
 	@(link_name="CreateFileA")
-	create_file_a :: proc(filename: ^u8, desired_access, share_module: u32,
+	create_file_a :: proc(filename: ^byte, desired_access, share_module: u32,
 	                      security: rawptr,
 	                      creation, flags_and_attribs: u32, template_file: Handle) -> Handle ---;
 
@@ -464,8 +464,8 @@ foreign kernel32 {
 	@(link_name="WriteFile") write_file :: proc(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool ---;
 
 	@(link_name="GetFileSizeEx")              get_file_size_ex               :: proc(file_handle: Handle, file_size: ^i64) -> Bool ---;
-	@(link_name="GetFileAttributesA")         get_file_attributes_a          :: proc(filename: ^u8) -> u32 ---;
-	@(link_name="GetFileAttributesExA")       get_file_attributes_ex_a       :: proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool ---;
+	@(link_name="GetFileAttributesA")         get_file_attributes_a          :: proc(filename: ^byte) -> u32 ---;
+	@(link_name="GetFileAttributesExA")       get_file_attributes_ex_a       :: proc(filename: ^byte, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool ---;
 	@(link_name="GetFileInformationByHandle") get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool ---;
 
 	@(link_name="GetFileType")    get_file_type    :: proc(file_handle: Handle) -> u32 ---;
@@ -473,7 +473,7 @@ foreign kernel32 {
 
 	@(link_name="SetHandleInformation") set_handle_information :: proc(obj: Handle, mask, flags: u32) -> Bool ---;
 
-	@(link_name="FindFirstFileA") find_first_file_a :: proc(file_name : ^u8, data : ^Find_Data) -> Handle ---;
+	@(link_name="FindFirstFileA") find_first_file_a :: proc(file_name : ^byte, data : ^Find_Data) -> Handle ---;
 	@(link_name="FindNextFileA")  find_next_file_a  :: proc(file : Handle, data : ^Find_Data) -> Bool ---;
 	@(link_name="FindClose")      find_close        :: proc(file : Handle) -> Bool ---;
 
@@ -484,7 +484,7 @@ foreign kernel32 {
 	@(link_name="GetProcessHeap") get_process_heap :: proc() -> Handle ---;
 
 
-	@(link_name="CreateSemaphoreA")    create_semaphore_a     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^u8) -> Handle ---;
+	@(link_name="CreateSemaphoreA")    create_semaphore_a     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^byte) -> Handle ---;
 	@(link_name="ReleaseSemaphore")    release_semaphore      :: proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool ---;
 	@(link_name="WaitForSingleObject") wait_for_single_object :: proc(handle: Handle, milliseconds: u32) -> u32 ---;
 }
@@ -527,12 +527,12 @@ foreign kernel32 {
 	@(link_name="EnterCriticalSection")                  enter_critical_section                     :: proc(critical_section: ^Critical_Section) ---;
 	@(link_name="LeaveCriticalSection")                  leave_critical_section                     :: proc(critical_section: ^Critical_Section) ---;
 
-	@(link_name="CreateEventA") create_event_a :: proc(event_attributes: ^Security_Attributes, manual_reset, initial_state: Bool, name: ^u8) -> Handle ---;
+	@(link_name="CreateEventA") create_event_a :: proc(event_attributes: ^Security_Attributes, manual_reset, initial_state: Bool, name: ^byte) -> Handle ---;
 
-	@(link_name="LoadLibraryA")   load_library_a   :: proc(c_str: ^u8)  -> Hmodule ---;
+	@(link_name="LoadLibraryA")   load_library_a   :: proc(c_str: ^byte)  -> Hmodule ---;
 	@(link_name="LoadLibraryW")   load_library_a   :: proc(c_str: ^u16) -> Hmodule ---;
 	@(link_name="FreeLibrary")    free_library     :: proc(h: Hmodule) ---;
-	@(link_name="GetProcAddress") get_proc_address :: proc(h: Hmodule, c_str: ^u8) -> rawptr ---;
+	@(link_name="GetProcAddress") get_proc_address :: proc(h: Hmodule, c_str: ^byte) -> rawptr ---;
 
 }
 
@@ -545,13 +545,13 @@ foreign user32 {
 	@(link_name="ScreenToClient")   screen_to_client    :: proc(h: Hwnd, p: ^Point) -> Bool ---;
 	@(link_name="ClientToScreen")   client_to_screen    :: proc(h: Hwnd, p: ^Point) -> Bool ---;
 	@(link_name="PostQuitMessage")  post_quit_message   :: proc(exit_code: i32) ---;
-	@(link_name="SetWindowTextA")   set_window_text_a   :: proc(hwnd: Hwnd, c_string: ^u8) -> Bool ---;
+	@(link_name="SetWindowTextA")   set_window_text_a   :: proc(hwnd: Hwnd, c_string: ^byte) -> Bool ---;
 	@(link_name="RegisterClassExA") register_class_ex_a :: proc(wc: ^Wnd_Class_Ex_A) -> i16 ---;
 	@(link_name="RegisterClassExW") register_class_ex_w :: proc(wc: ^Wnd_Class_Ex_W) -> i16 ---;
 
 	@(link_name="CreateWindowExA")
 	create_window_ex_a :: proc(ex_style: u32,
-	                           class_name, title: ^u8,
+	                           class_name, title: ^byte,
 	                           style: u32,
 	                           x, y, w, h: i32,
 	                           parent: Hwnd, menu: Hmenu, instance: Hinstance,
@@ -601,7 +601,7 @@ foreign user32 {
 	@(link_name="GetWindowLongPtrW") get_window_long_ptr_w :: proc(wnd: Hwnd, index: i32) -> Long_Ptr ---;
 	@(link_name="SetWindowLongPtrW") set_window_long_ptr_w :: proc(wnd: Hwnd, index: i32, new: Long_Ptr) -> Long_Ptr ---;
 
-	@(link_name="GetWindowText") get_window_text :: proc(wnd: Hwnd, str: ^u8, maxCount: i32) -> i32 ---;
+	@(link_name="GetWindowText") get_window_text :: proc(wnd: Hwnd, str: ^byte, maxCount: i32) -> i32 ---;
 
 	@(link_name="GetClientRect") get_client_rect :: proc(hwnd: Hwnd, rect: ^Rect) -> Bool ---;
 
@@ -757,7 +757,7 @@ Bitmap_Info :: struct #ordered {
 }
 
 
-Rgb_Quad :: struct #ordered {blue, green, red, reserved: u8}
+Rgb_Quad :: struct #ordered {blue, green, red, reserved: byte}
 
 
 Key_Code :: enum i32 {

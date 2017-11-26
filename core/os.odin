@@ -6,10 +6,10 @@ when ODIN_OS == "essence" do export "core:os_essence.odin";
 import "mem.odin";
 
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
-	return write(fd, cast([]u8)str);
+	return write(fd, cast([]byte)str);
 }
 
-read_entire_file :: proc(name: string) -> (data: []u8, success: bool) {
+read_entire_file :: proc(name: string) -> (data: []byte, success: bool) {
 	fd, err := open(name, O_RDONLY, 0);
 	if err != 0 {
 		return nil, false;
@@ -25,7 +25,7 @@ read_entire_file :: proc(name: string) -> (data: []u8, success: bool) {
 		return nil, true;
 	}
 
-	data := make([]u8, int(length));
+	data := make([]byte, int(length));
 	if data == nil {
 		return nil, false;
 	}
@@ -38,7 +38,7 @@ read_entire_file :: proc(name: string) -> (data: []u8, success: bool) {
 	return data[0..bytes_read], true;
 }
 
-write_entire_file :: proc(name: string, data: []u8, truncate := true) -> (success: bool) {
+write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (success: bool) {
 	flags: int = O_WRONLY|O_CREATE;
 	if truncate {
 		flags |= O_TRUNC;
@@ -54,9 +54,9 @@ write_entire_file :: proc(name: string, data: []u8, truncate := true) -> (succes
 }
 
 write :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
-	return write(fd, mem.slice_ptr(cast(^u8)data, len));
+	return write(fd, mem.slice_ptr(cast(^byte)data, len));
 }
 
 read :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
-	return read(fd, mem.slice_ptr(cast(^u8)data, len));
+	return read(fd, mem.slice_ptr(cast(^byte)data, len));
 }
