@@ -77,6 +77,7 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	va_end(va);
 	cmd = make_string(cast(u8 *)&cmd_line, cmd_len-1);
 
+	//printf("do: %s\n", cmd_line);
 	exit_code = system(&cmd_line[0]);
 
 	// pid_t pid = fork();
@@ -210,6 +211,8 @@ enum BuildFlagKind {
 	BuildFlag_Collection,
 	BuildFlag_BuildMode,
 	BuildFlag_Debug,
+	BuildFlag_CrossCompile,
+	BuildFlag_CrossLibDir,
 
 	BuildFlag_COUNT,
 };
@@ -246,6 +249,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),      BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),      BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),           BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_CrossCompile,      str_lit("cross-compile"),   BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_CrossLibDir,       str_lit("cross-lib-dir"),   BuildFlagParam_String);
 
 
 	Array<String> flag_args = args;
@@ -398,6 +403,33 @@ bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.keep_temp_files = true;
 							break;
+
+						case BuildFlag_CrossCompile: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							cross_compile_target = value.value_string;
+#ifdef GB_SYSTEM_UNIX
+#ifdef GB_ARCH_64_BIT
+							if (str_eq_ignore_case(cross_compile_target, str_lit("Essence"))) {
+#endif
+#endif
+							} else {
+								gb_printf_err("Unsupported cross compilation target '%.*s'\n", LIT(cross_compile_target));
+								gb_printf_err("Currently supported targets: Essence (from 64-bit Unixes only)\n");
+								bad_flags = true;
+							}
+							break;
+						} 
+
+						case BuildFlag_CrossLibDir: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							if (cross_compile_lib_dir.len) {
+								gb_printf_err("Multiple cross compilation library directories\n");
+								bad_flags = true;
+							} else {
+								cross_compile_lib_dir = concatenate_strings(heap_allocator(), str_lit("-L"), value.value_string);
+							}
+							break;
+						}
 
 						case BuildFlag_Collection: {
 							GB_ASSERT(value.kind == ExactValue_String);
@@ -831,10 +863,12 @@ int main(int arg_count, char **arg_ptr) {
 			"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
 			"%.*s "
 			// "-debug-pass=Arguments "
+			"%s"
 			"",
 			LIT(output_base),
 			build_context.optimization_level,
-			LIT(build_context.llc_flags));
+			LIT(build_context.llc_flags),
+			str_eq_ignore_case(cross_compile_target, str_lit("Essence")) ? "-mtriple=x86_64-pc-none-elf" : "");
 		if (exit_code != 0) {
 			return exit_code;
 		}
@@ -916,14 +950,19 @@ int main(int arg_count, char **arg_ptr) {
 			//   It probably has to do with including the entire CRT, but
 			//   that's quite a complicated issue to solve while remaining distro-agnostic.
 			//   Clang can figure out linker flags for us, and that's good enough _for now_.
-			linker = "clang -Wno-unused-command-line-argument";
+			if (str_eq_ignore_case(cross_compile_target, str_lit("Essence"))) {
+				linker = "x86_64-elf-gcc -T core/sys/essence_linker_userland64.ld -ffreestanding -nostdlib -lgcc -g -z max-page-size=0x1000 -Wno-unused-command-line-argument";
+			} else {
+				linker = "clang -Wno-unused-command-line-argument";
+			}
 		#endif
 
 		exit_code = system_exec_command_line_app("ld-link", true,
 			"%s \"%.*s.o\" -o \"%.*s%s\" %s "
-			"-lc -lm "
+			" %s "
 			" %.*s "
 			" %s "
+			" %.*s "
 			#if defined(GB_SYSTEM_OSX)
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
@@ -933,8 +972,11 @@ int main(int arg_count, char **arg_ptr) {
 				" -e _main "
 			#endif
 			, linker, LIT(output_base), LIT(output_base), output_ext,
-			lib_str, LIT(build_context.link_flags),
-			link_settings
+			lib_str, 
+			str_eq_ignore_case(cross_compile_target, str_lit("Essence")) ? "" : "-lc -lm", 
+			LIT(build_context.link_flags),
+			link_settings,
+			LIT(cross_compile_lib_dir)
 			);
 		if (exit_code != 0) {
 			return exit_code;
