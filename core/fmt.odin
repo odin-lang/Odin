@@ -503,7 +503,7 @@ fmt_rune :: proc(fi: ^Fmt_Info, r: rune, verb: rune) {
 	case 'c', 'r', 'v':
 		write_rune(fi.buf, r);
 	case:
-		fmt_bad_verb(fi, verb);
+		fmt_int(fi, u128(r), false, 32, verb);
 	}
 }
 
