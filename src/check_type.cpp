@@ -1701,7 +1701,8 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		// Especially the only Odin types
 		case Type_Basic: {
 			i64 sz = bt->Basic.size;
-			if (sz > 8 && build_context.word_size < 8) {
+			// if (sz > 8 && build_context.word_size < 8) {
+			if (sz > 8) {
 				new_type = make_type_pointer(a, original_type);
 			}
 			break;
@@ -1742,7 +1743,8 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		// Especially the only Odin types
 		case Type_Basic: {
 			i64 sz = bt->Basic.size;
-			if (sz > 8 && build_context.word_size < 8) {
+			// if (sz > 8 && build_context.word_size < 8) {
+			if (sz > 8) {
 				new_type = make_type_pointer(a, original_type);
 			}
 
