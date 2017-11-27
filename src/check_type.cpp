@@ -1709,17 +1709,16 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		case Type_Pointer: break;
 		case Type_Proc:    break; // NOTE(bill): Just a pointer
 
-		// Odin only types
-		case Type_Slice:
-		case Type_DynamicArray:
-		case Type_Map:
-			break;
-
 		// Odin specific
+		case Type_Slice:
 		case Type_Array:
 		case Type_Vector:
+		case Type_DynamicArray:
+		case Type_Map:
+		case Type_Union:
 		// Could be in C too
-		case Type_Struct: {
+		case Type_Struct:
+		{
 			i64 align = type_align_of(a, original_type);
 			i64 size  = type_size_of(a, original_type);
 			switch (8*size) {
@@ -1752,15 +1751,13 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		case Type_Pointer: break;
 		case Type_Proc:    break; // NOTE(bill): Just a pointer
 
-		// Odin only types
-		case Type_Slice:
-		case Type_DynamicArray:
-		case Type_Map:
-			break;
-
 		// Odin specific
+		case Type_Slice:
 		case Type_Array:
 		case Type_Vector:
+		case Type_DynamicArray:
+		case Type_Map:
+		case Type_Union:
 		// Could be in C too
 		case Type_Struct: {
 			i64 align = type_align_of(a, original_type);
