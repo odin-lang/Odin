@@ -3351,6 +3351,7 @@ bool ir_is_type_aggregate(Type *t) {
 	case Type_Array:
 	case Type_Slice:
 	case Type_Struct:
+	case Type_Union:
 	case Type_Tuple:
 	case Type_DynamicArray:
 	case Type_Map:
@@ -6020,7 +6021,17 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 	case_ast_node(tc, TypeCast, expr);
 		Type *type = type_of_expr(proc->module->info, expr);
 		irValue *x = ir_build_expr(proc, tc->expr);
-		irValue *e = ir_emit_conv(proc, x, type);
+		irValue *e = nullptr;
+		switch (tc->token.kind) {
+		case Token_cast:
+			e = ir_emit_conv(proc, x, type);
+			break;
+		case Token_transmute:
+			e = ir_emit_transmute(proc, x, type);
+			break;
+		default:
+			GB_PANIC("Invalid AST TypeCast");
+		}
 		irValue *v = ir_add_local_generated(proc, type);
 		ir_emit_store(proc, v, e);
 		return ir_addr(v);

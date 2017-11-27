@@ -6423,7 +6423,8 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_append_rune(str, ')');
 	case_end;
 		case_ast_node(tc, TypeCast, node);
-		str = gb_string_appendc(str, "cast(");
+		str = string_append_token(str, tc->token);
+		str = gb_string_append_rune(str, '(');
 		str = write_expr_to_string(str, tc->type);
 		str = gb_string_append_rune(str, ')');
 		str = write_expr_to_string(str, tc->expr);
