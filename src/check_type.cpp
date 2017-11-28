@@ -208,7 +208,6 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 
 	}
 
-	Entity *using_index_expr = nullptr;
 
 	if (is_using && fields->count > 0) {
 		Type *first_type = (*fields)[fields->count-1]->type;
@@ -217,32 +216,10 @@ void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 		    vd->names.count >= 1 &&
 		    vd->names[0]->kind == AstNode_Ident) {
 			Token name_token = vd->names[0]->Ident.token;
-			if (is_type_indexable(t)) {
-				bool ok = true;
-				for_array(emi, entity_map->entries) {
-					Entity *e = entity_map->entries[emi].value;
-					if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
-						if (is_type_indexable(e->type)) {
-							if (e->identifier != vd->names[0]) {
-								ok = false;
-								using_index_expr = e;
-								break;
-							}
-						}
-					}
-				}
-				if (ok) {
-					using_index_expr = (*fields)[fields->count-1];
-				} else {
-					(*fields)[fields->count-1]->flags &= ~EntityFlag_Using;
-					error(name_token, "Previous 'using' for an index expression '%.*s'", LIT(name_token.string));
-				}
-			} else {
-				gbString type_str = type_to_string(first_type);
-				error(name_token, "'using' cannot be applied to the field '%.*s' of type '%s'", LIT(name_token.string), type_str);
-				gb_string_free(type_str);
-				return;
-			}
+			gbString type_str = type_to_string(first_type);
+			error(name_token, "'using' cannot be applied to the field '%.*s' of type '%s'", LIT(name_token.string), type_str);
+			gb_string_free(type_str);
+			return;
 		}
 
 		populate_using_entity_map(c, struct_node, type, entity_map);
@@ -408,7 +385,6 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 			field_src_index += 1;
 		}
 
-		Entity *using_index_expr = nullptr;
 
 		if (is_using && p->names.count > 0) {
 			Type *first_type = fields[fields.count-1]->type;
@@ -418,32 +394,10 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 			    p->names.count >= 1 &&
 			    p->names[0]->kind == AstNode_Ident) {
 				Token name_token = p->names[0]->Ident.token;
-				if (is_type_indexable(t)) {
-					bool ok = true;
-					for_array(emi, entity_map.entries) {
-						Entity *e = entity_map.entries[emi].value;
-						if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
-							if (is_type_indexable(e->type)) {
-								if (e->identifier != p->names[0]) {
-									ok = false;
-									using_index_expr = e;
-									break;
-								}
-							}
-						}
-					}
-					if (ok) {
-						using_index_expr = fields[fields.count-1];
-					} else {
-						fields[fields.count-1]->flags &= ~EntityFlag_Using;
-						error(name_token, "Previous 'using' for an index expression '%.*s'", LIT(name_token.string));
-					}
-				} else {
-					gbString type_str = type_to_string(first_type);
-					error(name_token, "'using' cannot be applied to the field '%.*s' of type '%s'", LIT(name_token.string), type_str);
-					gb_string_free(type_str);
-					continue;
-				}
+				gbString type_str = type_to_string(first_type);
+				error(name_token, "'using' cannot be applied to the field '%.*s' of type '%s'", LIT(name_token.string), type_str);
+				gb_string_free(type_str);
+				continue;
 			}
 
 			populate_using_entity_map(c, node, type, &entity_map);
