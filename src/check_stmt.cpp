@@ -540,7 +540,7 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 				}
 			}
 		} else {
-			error(us->token, "'using' can only be applied to variables of type struct or raw_union");
+			error(us->token, "'using' can only be applied to variables of type `struct`");
 			return false;
 		}
 
@@ -774,6 +774,173 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		check_stmt_list(c, cc->stmts, mod_flags);
 		check_close_scope(c);
 	}
+}
+
+void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
+	ast_node(ss, TypeSwitchStmt, node);
+	Operand x = {};
+
+	mod_flags |= Stmt_BreakAllowed;
+	check_open_scope(c, node);
+	check_label(c, ss->label); // TODO(bill): What should the label's "scope" be?
+
+	SwitchKind switch_kind = Switch_Invalid;
+
+	if (ss->tag->kind != AstNode_AssignStmt) {
+		error(ss->tag, "Expected an 'in' assignment for this type switch statement");
+		return;
+	}
+
+	ast_node(as, AssignStmt, ss->tag);
+	Token as_token = ast_node_token(ss->tag);
+	if (as->lhs.count != 1) {
+		syntax_error(as_token, "Expected 1 name before 'in'");
+		return;
+	}
+	if (as->rhs.count != 1) {
+		syntax_error(as_token, "Expected 1 expression after 'in'");
+		return;
+	}
+	AstNode *lhs = as->lhs[0];
+	AstNode *rhs = as->rhs[0];
+
+	check_expr(c, &x, rhs);
+	check_assignment(c, &x, nullptr, str_lit("type switch expression"));
+	switch_kind = check_valid_type_switch_type(x.type);
+	if (check_valid_type_switch_type(x.type) == Switch_Invalid) {
+		gbString str = type_to_string(x.type);
+		error(x.expr, "Invalid type for this type switch expression, got '%s'", str);
+		gb_string_free(str);
+		return;
+	}
+
+	bool is_ptr = is_type_pointer(x.type);
+
+	// NOTE(bill): Check for multiple defaults
+	AstNode *first_default = nullptr;
+	ast_node(bs, BlockStmt, ss->body);
+	for_array(i, bs->stmts) {
+		AstNode *stmt = bs->stmts[i];
+		AstNode *default_stmt = nullptr;
+		if (stmt->kind == AstNode_CaseClause) {
+			ast_node(cc, CaseClause, stmt);
+			if (cc->list.count == 0) {
+				default_stmt = stmt;
+			}
+		} else {
+			error(stmt, "Invalid AST - expected case clause");
+		}
+
+		if (default_stmt != nullptr) {
+			if (first_default != nullptr) {
+				TokenPos pos = ast_node_token(first_default).pos;
+				error(stmt,
+				           "Multiple 'default' clauses\n"
+				           "\tfirst at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
+			} else {
+				first_default = default_stmt;
+			}
+		}
+	}
+
+
+	if (lhs->kind != AstNode_Ident) {
+		error(rhs, "Expected an identifier, got '%.*s'", LIT(ast_node_strings[rhs->kind]));
+		return;
+	}
+
+
+	Map<bool> seen = {}; // Multimap
+	map_init(&seen, heap_allocator());
+
+	for_array(i, bs->stmts) {
+		AstNode *stmt = bs->stmts[i];
+		if (stmt->kind != AstNode_CaseClause) {
+			// NOTE(bill): error handled by above multiple default checker
+			continue;
+		}
+		ast_node(cc, CaseClause, stmt);
+
+		// TODO(bill): Make robust
+		Type *bt = base_type(type_deref(x.type));
+
+		Type *case_type = nullptr;
+		for_array(type_index, cc->list) {
+			AstNode *type_expr = cc->list[type_index];
+			if (type_expr != nullptr) { // Otherwise it's a default expression
+				Operand y = {};
+				check_expr_or_type(c, &y, type_expr);
+
+				if (switch_kind == Switch_Union) {
+					GB_ASSERT(is_type_union(bt));
+					bool tag_type_found = false;
+					for_array(i, bt->Union.variants) {
+						Type *vt = bt->Union.variants[i];
+						if (are_types_identical(vt, y.type)) {
+							tag_type_found = true;
+							break;
+						}
+					}
+					if (!tag_type_found) {
+						gbString type_str = type_to_string(y.type);
+						error(y.expr, "Unknown tag type, got '%s'", type_str);
+						gb_string_free(type_str);
+						continue;
+					}
+					case_type = y.type;
+				} else if (switch_kind == Switch_Any) {
+					case_type = y.type;
+				} else {
+					GB_PANIC("Unknown type to type switch statement");
+				}
+
+				HashKey key = hash_type(y.type);
+				bool *found = map_get(&seen, key);
+				if (found) {
+					TokenPos pos = cc->token.pos;
+					gbString expr_str = expr_to_string(y.expr);
+					error(y.expr,
+					           "Duplicate type case '%s'\n"
+					           "\tprevious type case at %.*s(%td:%td)",
+					           expr_str,
+					           LIT(pos.file), pos.line, pos.column);
+					gb_string_free(expr_str);
+					break;
+				}
+				map_set(&seen, key, cast(bool)true);
+			}
+		}
+
+		if (is_ptr &&
+		    !is_type_any(type_deref(x.type)) &&
+		    cc->list.count == 1 &&
+		    case_type != nullptr) {
+			case_type = make_type_pointer(c->allocator, case_type);
+		}
+
+		if (cc->list.count > 1) {
+			case_type = nullptr;
+		}
+		if (case_type == nullptr) {
+			case_type = x.type;
+		}
+		add_type_info_type(c, case_type);
+
+		check_open_scope(c, stmt);
+		{
+			Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, lhs->Ident.token, case_type, false);
+			tag_var->flags |= EntityFlag_Used;
+			tag_var->flags |= EntityFlag_Value;
+			add_entity(c, c->context.scope, lhs, tag_var);
+			add_entity_use(c, lhs, tag_var);
+			add_implicit_entity(c, stmt, tag_var);
+		}
+		check_stmt_list(c, cc->stmts, mod_flags);
+		check_close_scope(c);
+	}
+	map_destroy(&seen);
+
+	check_close_scope(c);
 }
 
 void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
@@ -1396,169 +1563,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(ss, TypeSwitchStmt, node);
-		Operand x = {};
-
-		mod_flags |= Stmt_BreakAllowed;
-		check_open_scope(c, node);
-		check_label(c, ss->label); // TODO(bill): What should the label's "scope" be?
-
-		SwitchKind switch_kind = Switch_Invalid;
-
-		if (ss->tag->kind != AstNode_AssignStmt) {
-			error(ss->tag, "Expected an 'in' assignment for this type switch statement");
-			break;
-		}
-
-		ast_node(as, AssignStmt, ss->tag);
-		Token as_token = ast_node_token(ss->tag);
-		if (as->lhs.count != 1) {
-			syntax_error(as_token, "Expected 1 name before 'in'");
-			break;
-		}
-		if (as->rhs.count != 1) {
-			syntax_error(as_token, "Expected 1 expression after 'in'");
-			break;
-		}
-		AstNode *lhs = as->lhs[0];
-		AstNode *rhs = as->rhs[0];
-
-		check_expr(c, &x, rhs);
-		check_assignment(c, &x, nullptr, str_lit("type switch expression"));
-		switch_kind = check_valid_type_switch_type(x.type);
-		if (check_valid_type_switch_type(x.type) == Switch_Invalid) {
-			gbString str = type_to_string(x.type);
-			error(x.expr, "Invalid type for this type switch expression, got '%s'", str);
-			gb_string_free(str);
-			break;
-		}
-
-		bool is_ptr = is_type_pointer(x.type);
-
-		// NOTE(bill): Check for multiple defaults
-		AstNode *first_default = nullptr;
-		ast_node(bs, BlockStmt, ss->body);
-		for_array(i, bs->stmts) {
-			AstNode *stmt = bs->stmts[i];
-			AstNode *default_stmt = nullptr;
-			if (stmt->kind == AstNode_CaseClause) {
-				ast_node(cc, CaseClause, stmt);
-				if (cc->list.count == 0) {
-					default_stmt = stmt;
-				}
-			} else {
-				error(stmt, "Invalid AST - expected case clause");
-			}
-
-			if (default_stmt != nullptr) {
-				if (first_default != nullptr) {
-					TokenPos pos = ast_node_token(first_default).pos;
-					error(stmt,
-					           "Multiple 'default' clauses\n"
-					           "\tfirst at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
-				} else {
-					first_default = default_stmt;
-				}
-			}
-		}
-
-
-		if (lhs->kind != AstNode_Ident) {
-			error(rhs, "Expected an identifier, got '%.*s'", LIT(ast_node_strings[rhs->kind]));
-			break;
-		}
-
-
-		Map<bool> seen = {}; // Multimap
-		map_init(&seen, heap_allocator());
-
-		for_array(i, bs->stmts) {
-			AstNode *stmt = bs->stmts[i];
-			if (stmt->kind != AstNode_CaseClause) {
-				// NOTE(bill): error handled by above multiple default checker
-				continue;
-			}
-			ast_node(cc, CaseClause, stmt);
-
-			// TODO(bill): Make robust
-			Type *bt = base_type(type_deref(x.type));
-
-			Type *case_type = nullptr;
-			for_array(type_index, cc->list) {
-				AstNode *type_expr = cc->list[type_index];
-				if (type_expr != nullptr) { // Otherwise it's a default expression
-					Operand y = {};
-					check_expr_or_type(c, &y, type_expr);
-
-					if (switch_kind == Switch_Union) {
-						GB_ASSERT(is_type_union(bt));
-						bool tag_type_found = false;
-						for_array(i, bt->Union.variants) {
-							Type *vt = bt->Union.variants[i];
-							if (are_types_identical(vt, y.type)) {
-								tag_type_found = true;
-								break;
-							}
-						}
-						if (!tag_type_found) {
-							gbString type_str = type_to_string(y.type);
-							error(y.expr, "Unknown tag type, got '%s'", type_str);
-							gb_string_free(type_str);
-							continue;
-						}
-						case_type = y.type;
-					} else if (switch_kind == Switch_Any) {
-						case_type = y.type;
-					} else {
-						GB_PANIC("Unknown type to type switch statement");
-					}
-
-					HashKey key = hash_type(y.type);
-					bool *found = map_get(&seen, key);
-					if (found) {
-						TokenPos pos = cc->token.pos;
-						gbString expr_str = expr_to_string(y.expr);
-						error(y.expr,
-						           "Duplicate type case '%s'\n"
-						           "\tprevious type case at %.*s(%td:%td)",
-						           expr_str,
-						           LIT(pos.file), pos.line, pos.column);
-						gb_string_free(expr_str);
-						break;
-					}
-					map_set(&seen, key, cast(bool)true);
-				}
-			}
-
-			if (is_ptr &&
-			    !is_type_any(type_deref(x.type)) &&
-			    cc->list.count == 1 &&
-			    case_type != nullptr) {
-				case_type = make_type_pointer(c->allocator, case_type);
-			}
-
-			if (cc->list.count > 1) {
-				case_type = nullptr;
-			}
-			if (case_type == nullptr) {
-				case_type = x.type;
-			}
-			add_type_info_type(c, case_type);
-
-			check_open_scope(c, stmt);
-			{
-				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, lhs->Ident.token, case_type, false);
-				tag_var->flags |= EntityFlag_Used;
-				tag_var->flags |= EntityFlag_Value;
-				add_entity(c, c->context.scope, lhs, tag_var);
-				add_entity_use(c, lhs, tag_var);
-				add_implicit_entity(c, stmt, tag_var);
-			}
-			check_stmt_list(c, cc->stmts, mod_flags);
-			check_close_scope(c);
-		}
-		map_destroy(&seen);
-
-		check_close_scope(c);
+		check_type_switch_stmt(c, node, mod_flags);
 	case_end;
 
 
