@@ -327,6 +327,7 @@ gb_global Type *t_untyped_nil        = &basic_types[Basic_UntypedNil];
 gb_global Type *t_untyped_undef      = &basic_types[Basic_UntypedUndef];
 
 
+
 gb_global Type *t_u8_ptr       = nullptr;
 gb_global Type *t_int_ptr      = nullptr;
 gb_global Type *t_i64_ptr      = nullptr;
@@ -949,7 +950,18 @@ bool is_type_valid_for_keys(Type *t) {
 
 
 bool is_type_indexable(Type *t) {
-	return is_type_array(t) || is_type_slice(t) || is_type_vector(t) || is_type_string(t);
+	Type *bt = base_type(t);
+	switch (bt->kind) {
+	case Type_Basic:
+		return is_type_string(bt);
+	case Type_Array:
+	case Type_Slice:
+	case Type_Vector:
+	case Type_DynamicArray:
+	case Type_Map:
+		return true;
+	}
+	return false;
 }
 
 bool is_type_polymorphic_struct(Type *t) {
@@ -2127,8 +2139,8 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	} break;
 
 
-	case Type_Slice: // ptr + count
-		return 3 * build_context.word_size;
+	case Type_Slice: // ptr + len
+		return 2 * build_context.word_size;
 
 	case Type_DynamicArray:
 		// data + len + cap + allocator(procedure+data)

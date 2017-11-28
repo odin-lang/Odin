@@ -41,7 +41,6 @@ void check_stmt_list(Checker *c, Array<AstNode *> stmts, u32 flags) {
 
 		check_stmt(c, n, new_flags);
 	}
-
 }
 
 bool check_is_terminating_list(Array<AstNode *> stmts) {
@@ -576,6 +575,207 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 	return true;
 }
 
+void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
+	ast_node(ss, SwitchStmt, node);
+
+	Operand x = {};
+
+	mod_flags |= Stmt_BreakAllowed | Stmt_FallthroughAllowed;
+	check_open_scope(c, node);
+	defer (check_close_scope(c));
+
+	check_label(c, ss->label); // TODO(bill): What should the label's "scope" be?
+
+	if (ss->init != nullptr) {
+		check_stmt(c, ss->init, 0);
+	}
+	if (ss->tag != nullptr) {
+		check_expr(c, &x, ss->tag);
+		check_assignment(c, &x, nullptr, str_lit("switch expression"));
+	} else {
+		x.mode  = Addressing_Constant;
+		x.type  = t_bool;
+		x.value = exact_value_bool(true);
+
+		Token token  = {};
+		token.pos    = ast_node_token(ss->body).pos;
+		token.string = str_lit("true");
+		x.expr       = ast_ident(c->curr_ast_file, token);
+	}
+	if (is_type_vector(x.type)) {
+		gbString str = type_to_string(x.type);
+		error(x.expr, "Invalid switch expression type: %s", str);
+		gb_string_free(str);
+		return;
+	}
+
+
+	// NOTE(bill): Check for multiple defaults
+	AstNode *first_default = nullptr;
+	ast_node(bs, BlockStmt, ss->body);
+	for_array(i, bs->stmts) {
+		AstNode *stmt = bs->stmts[i];
+		AstNode *default_stmt = nullptr;
+		if (stmt->kind == AstNode_CaseClause) {
+			ast_node(cc, CaseClause, stmt);
+			if (cc->list.count == 0) {
+				default_stmt = stmt;
+			}
+		} else {
+			error(stmt, "Invalid AST - expected case clause");
+		}
+
+		if (default_stmt != nullptr) {
+			if (first_default != nullptr) {
+				TokenPos pos = ast_node_token(first_default).pos;
+				error(stmt,
+				           "multiple default clauses\n"
+				           "\tfirst at %.*s(%td:%td)",
+				           LIT(pos.file), pos.line, pos.column);
+			} else {
+				first_default = default_stmt;
+			}
+		}
+	}
+
+	Map<TypeAndToken> seen = {}; // NOTE(bill): Multimap
+	map_init(&seen, heap_allocator());
+	defer (map_destroy(&seen));
+
+	for_array(stmt_index, bs->stmts) {
+		AstNode *stmt = bs->stmts[stmt_index];
+		if (stmt->kind != AstNode_CaseClause) {
+			// NOTE(bill): error handled by above multiple default checker
+			continue;
+		}
+		ast_node(cc, CaseClause, stmt);
+
+		for_array(j, cc->list) {
+			AstNode *expr = unparen_expr(cc->list[j]);
+
+			if (is_ast_node_a_range(expr)) {
+				ast_node(ie, BinaryExpr, expr);
+				Operand lhs = {};
+				Operand rhs = {};
+				check_expr(c, &lhs, ie->left);
+				if (x.mode == Addressing_Invalid) {
+					continue;
+				}
+				if (lhs.mode == Addressing_Invalid) {
+					continue;
+				}
+				check_expr(c, &rhs, ie->right);
+				if (rhs.mode == Addressing_Invalid) {
+					continue;
+				}
+
+				if (!is_type_ordered(x.type)) {
+					gbString str = type_to_string(x.type);
+					error(expr, "Unordered type '%s', is invalid for an interval expression", str);
+					gb_string_free(str);
+					continue;
+				}
+
+
+				TokenKind op = Token_Invalid;
+
+				Operand a = lhs;
+				Operand b = rhs;
+				check_comparison(c, &a, &x, Token_LtEq);
+				if (a.mode == Addressing_Invalid) {
+					continue;
+				}
+				switch (ie->op.kind) {
+				case Token_Ellipsis:   op = Token_GtEq; break;
+				case Token_HalfClosed: op = Token_Gt;   break;
+				default: error(ie->op, "Invalid interval operator"); continue;
+				}
+
+				check_comparison(c, &b, &x, op);
+				if (b.mode == Addressing_Invalid) {
+					continue;
+				}
+
+				switch (ie->op.kind) {
+				case Token_Ellipsis:   op = Token_LtEq; break;
+				case Token_HalfClosed: op = Token_Lt;   break;
+				default: error(ie->op, "Invalid interval operator"); continue;
+				}
+
+				Operand a1 = lhs;
+				Operand b1 = rhs;
+				check_comparison(c, &a1, &b1, op);
+			} else {
+				Operand y = {};
+				check_expr(c, &y, expr);
+
+				if (x.mode == Addressing_Invalid ||
+				    y.mode == Addressing_Invalid) {
+					continue;
+				}
+
+				convert_to_typed(c, &y, x.type);
+				if (y.mode == Addressing_Invalid) {
+					continue;
+				}
+
+				// NOTE(bill): the ordering here matters
+				Operand z = y;
+				check_comparison(c, &z, &x, Token_CmpEq);
+				if (z.mode == Addressing_Invalid) {
+					continue;
+				}
+				if (y.mode != Addressing_Constant) {
+					continue;
+				}
+
+
+				if (y.value.kind != ExactValue_Invalid) {
+					HashKey key = hash_exact_value(y.value);
+					TypeAndToken *found = map_get(&seen, key);
+					if (found != nullptr) {
+						gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+						defer (gb_temp_arena_memory_end(tmp));
+
+						isize count = multi_map_count(&seen, key);
+						TypeAndToken *taps = gb_alloc_array(c->tmp_allocator, TypeAndToken, count);
+
+						multi_map_get_all(&seen, key, taps);
+						bool continue_outer = false;
+
+						for (isize i = 0; i < count; i++) {
+							TypeAndToken tap = taps[i];
+							if (are_types_identical(y.type, tap.type)) {
+								TokenPos pos = tap.token.pos;
+								gbString expr_str = expr_to_string(y.expr);
+								error(y.expr,
+								           "Duplicate case '%s'\n"
+								           "\tprevious case at %.*s(%td:%td)",
+								           expr_str,
+								           LIT(pos.file), pos.line, pos.column);
+								gb_string_free(expr_str);
+								continue_outer = true;
+								break;
+							}
+						}
+
+
+						if (continue_outer) {
+							continue;
+						}
+					}
+					TypeAndToken tap = {y.type, ast_node_token(y.expr)};
+					multi_map_insert(&seen, key, tap);
+				}
+			}
+		}
+
+		check_open_scope(c, stmt);
+		check_stmt_list(c, cc->stmts, mod_flags);
+		check_close_scope(c);
+	}
+}
+
 void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
@@ -940,7 +1140,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				check_assignment(c, &operands[i], e->type, str_lit("return statement"));
 			}
 		}
-
 	case_end;
 
 	case_ast_node(fs, ForStmt, node);
@@ -978,10 +1177,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		check_open_scope(c, node);
 		check_label(c, rs->label);
 
-		Type *val = nullptr;
-		Type *idx = nullptr;
+		Type *val0 = nullptr;
+		Type *val1 = nullptr;
 		Entity *entities[2] = {};
 		isize entity_count = 0;
+		bool is_map = false;
 
 		AstNode *expr = unparen_expr(rs->expr);
 
@@ -1069,8 +1269,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			add_type_and_value(&c->info, ie->left,  x.mode, x.type, x.value);
 			add_type_and_value(&c->info, ie->right, y.mode, y.type, y.value);
-			val = type;
-			idx = t_int;
+			val0 = type;
+			val1 = t_int;
 		} else {
 			Operand operand = {Addressing_Invalid};
 			check_expr_or_type(c, &operand, rs->expr);
@@ -1082,8 +1282,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					gb_string_free(t);
 					goto skip_expr;
 				} else {
-					val = operand.type;
-					idx = t_int;
+					val0 = operand.type;
+					val1 = t_int;
 					add_type_info_type(c, operand.type);
 					goto skip_expr;
 				}
@@ -1093,38 +1293,39 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				switch (t->kind) {
 				case Type_Basic:
 					if (is_type_string(t)) {
-						val = t_rune;
-						idx = t_int;
+						val0 = t_rune;
+						val1 = t_int;
 					}
 					break;
 				case Type_Array:
-					val = t->Array.elem;
-					idx = t_int;
+					val0 = t->Array.elem;
+					val1 = t_int;
 					break;
 
 				case Type_DynamicArray:
-					val = t->DynamicArray.elem;
-					idx = t_int;
+					val0 = t->DynamicArray.elem;
+					val1 = t_int;
 					break;
 
 				case Type_Slice:
-					val = t->Slice.elem;
-					idx = t_int;
+					val0 = t->Slice.elem;
+					val1 = t_int;
 					break;
 
 				case Type_Vector:
-					val = t->Vector.elem;
-					idx = t_int;
+					val0 = t->Vector.elem;
+					val1 = t_int;
 					break;
 
 				case Type_Map:
-					val = t->Map.value;
-					idx = t->Map.key;
+					is_map = true;
+					val0 = t->Map.key;
+					val1 = t->Map.value;
 					break;
 				}
 			}
 
-			if (val == nullptr) {
+			if (val0 == nullptr) {
 				gbString s = expr_to_string(operand.expr);
 				gbString t = type_to_string(operand.type);
 				error(operand.expr, "Cannot iterate over '%s' of type '%s'", s, t);
@@ -1134,8 +1335,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 
 	skip_expr:; // NOTE(zhiayang): again, declaring a variable immediately after a label... weird.
-		AstNode *lhs[2] = {rs->value, rs->index};
-		Type *   rhs[2] = {val, idx};
+		AstNode *lhs[2] = {rs->val0, rs->val1};
+		Type *   rhs[2] = {val0, val1};
 
 		for (isize i = 0; i < 2; i++) {
 			if (lhs[i] == nullptr) {
@@ -1191,202 +1392,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(ss, SwitchStmt, node);
-		Operand x = {};
-
-		mod_flags |= Stmt_BreakAllowed | Stmt_FallthroughAllowed;
-		check_open_scope(c, node);
-		defer (check_close_scope(c));
-
-		check_label(c, ss->label); // TODO(bill): What should the label's "scope" be?
-
-		if (ss->init != nullptr) {
-			check_stmt(c, ss->init, 0);
-		}
-		if (ss->tag != nullptr) {
-			check_expr(c, &x, ss->tag);
-			check_assignment(c, &x, nullptr, str_lit("switch expression"));
-		} else {
-			x.mode  = Addressing_Constant;
-			x.type  = t_bool;
-			x.value = exact_value_bool(true);
-
-			Token token  = {};
-			token.pos    = ast_node_token(ss->body).pos;
-			token.string = str_lit("true");
-			x.expr       = ast_ident(c->curr_ast_file, token);
-		}
-		if (is_type_vector(x.type)) {
-			gbString str = type_to_string(x.type);
-			error(x.expr, "Invalid switch expression type: %s", str);
-			gb_string_free(str);
-			break;
-		}
-
-
-		// NOTE(bill): Check for multiple defaults
-		AstNode *first_default = nullptr;
-		ast_node(bs, BlockStmt, ss->body);
-		for_array(i, bs->stmts) {
-			AstNode *stmt = bs->stmts[i];
-			AstNode *default_stmt = nullptr;
-			if (stmt->kind == AstNode_CaseClause) {
-				ast_node(cc, CaseClause, stmt);
-				if (cc->list.count == 0) {
-					default_stmt = stmt;
-				}
-			} else {
-				error(stmt, "Invalid AST - expected case clause");
-			}
-
-			if (default_stmt != nullptr) {
-				if (first_default != nullptr) {
-					TokenPos pos = ast_node_token(first_default).pos;
-					error(stmt,
-					           "multiple default clauses\n"
-					           "\tfirst at %.*s(%td:%td)",
-					           LIT(pos.file), pos.line, pos.column);
-				} else {
-					first_default = default_stmt;
-				}
-			}
-		}
-
-		Map<TypeAndToken> seen = {}; // NOTE(bill): Multimap
-		map_init(&seen, heap_allocator());
-		defer (map_destroy(&seen));
-
-		for_array(stmt_index, bs->stmts) {
-			AstNode *stmt = bs->stmts[stmt_index];
-			if (stmt->kind != AstNode_CaseClause) {
-				// NOTE(bill): error handled by above multiple default checker
-				continue;
-			}
-			ast_node(cc, CaseClause, stmt);
-
-			for_array(j, cc->list) {
-				AstNode *expr = unparen_expr(cc->list[j]);
-
-				if (is_ast_node_a_range(expr)) {
-					ast_node(ie, BinaryExpr, expr);
-					Operand lhs = {};
-					Operand rhs = {};
-					check_expr(c, &lhs, ie->left);
-					if (x.mode == Addressing_Invalid) {
-						continue;
-					}
-					if (lhs.mode == Addressing_Invalid) {
-						continue;
-					}
-					check_expr(c, &rhs, ie->right);
-					if (rhs.mode == Addressing_Invalid) {
-						continue;
-					}
-
-					if (!is_type_ordered(x.type)) {
-						gbString str = type_to_string(x.type);
-						error(expr, "Unordered type '%s', is invalid for an interval expression", str);
-						gb_string_free(str);
-						continue;
-					}
-
-
-					TokenKind op = Token_Invalid;
-
-					Operand a = lhs;
-					Operand b = rhs;
-					check_comparison(c, &a, &x, Token_LtEq);
-					if (a.mode == Addressing_Invalid) {
-						continue;
-					}
-					switch (ie->op.kind) {
-					case Token_Ellipsis:   op = Token_GtEq; break;
-					case Token_HalfClosed: op = Token_Gt;   break;
-					default: error(ie->op, "Invalid interval operator"); continue;
-					}
-
-					check_comparison(c, &b, &x, op);
-					if (b.mode == Addressing_Invalid) {
-						continue;
-					}
-
-					switch (ie->op.kind) {
-					case Token_Ellipsis:   op = Token_LtEq; break;
-					case Token_HalfClosed: op = Token_Lt;   break;
-					default: error(ie->op, "Invalid interval operator"); continue;
-					}
-
-					Operand a1 = lhs;
-					Operand b1 = rhs;
-					check_comparison(c, &a1, &b1, op);
-				} else {
-					Operand y = {};
-					check_expr(c, &y, expr);
-
-					if (x.mode == Addressing_Invalid ||
-					    y.mode == Addressing_Invalid) {
-						continue;
-					}
-
-					convert_to_typed(c, &y, x.type);
-					if (y.mode == Addressing_Invalid) {
-						continue;
-					}
-
-					// NOTE(bill): the ordering here matters
-					Operand z = y;
-					check_comparison(c, &z, &x, Token_CmpEq);
-					if (z.mode == Addressing_Invalid) {
-						continue;
-					}
-					if (y.mode != Addressing_Constant) {
-						continue;
-					}
-
-
-					if (y.value.kind != ExactValue_Invalid) {
-						HashKey key = hash_exact_value(y.value);
-						TypeAndToken *found = map_get(&seen, key);
-						if (found != nullptr) {
-							gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-							defer (gb_temp_arena_memory_end(tmp));
-
-							isize count = multi_map_count(&seen, key);
-							TypeAndToken *taps = gb_alloc_array(c->tmp_allocator, TypeAndToken, count);
-
-							multi_map_get_all(&seen, key, taps);
-							bool continue_outer = false;
-
-							for (isize i = 0; i < count; i++) {
-								TypeAndToken tap = taps[i];
-								if (are_types_identical(y.type, tap.type)) {
-									TokenPos pos = tap.token.pos;
-									gbString expr_str = expr_to_string(y.expr);
-									error(y.expr,
-									           "Duplicate case '%s'\n"
-									           "\tprevious case at %.*s(%td:%td)",
-									           expr_str,
-									           LIT(pos.file), pos.line, pos.column);
-									gb_string_free(expr_str);
-									continue_outer = true;
-									break;
-								}
-							}
-
-
-							if (continue_outer) {
-								continue;
-							}
-						}
-						TypeAndToken tap = {y.type, ast_node_token(y.expr)};
-						multi_map_insert(&seen, key, tap);
-					}
-				}
-			}
-
-			check_open_scope(c, stmt);
-			check_stmt_list(c, cc->stmts, mod_flags);
-			check_close_scope(c);
-		}
+		check_switch_stmt(c, node, mod_flags);
 	case_end;
 
 	case_ast_node(ss, TypeSwitchStmt, node);

@@ -14,35 +14,35 @@ OS_Node_Type :: enum i32 {
 }
 
 OS_Node_Information :: struct #ordered {
-	handle: Handle,
-	id: [16]u8,
-	ntype: OS_Node_Type,
-	size: i64,
+	handle:   Handle,
+	id:       [16]byte,
+	ntype:    OS_Node_Type,
+	size:     i64,
 	position: i64,
 }
 
 foreign api {
-	@(link_name="OSHelloWorld")		os_hello_world :: proc() ---;
-	@(link_name="OSPrintDirect")		os_print_direct :: proc(string: ^u8, length: int) ---;
-	@(link_name="OSHeapAllocate")		os_heap_allocate :: proc(bytes: int, zero: bool) -> rawptr ---;
-	@(link_name="OSHeapFree")		os_heap_free :: proc(address: rawptr) ---;
-	@(link_name="OSOpenNode")		os_open_node :: proc(path: ^u8, path_length: int, flags: u64, information: ^OS_Node_Information) -> Errno ---;
-	@(link_name="OSResizeFile")		os_resize_file :: proc(handle: Handle, new_size: u64) -> Errno ---;
-	@(link_name="OSCloseHandle")		os_close_handle :: proc(handle: Handle) ---;
-	@(link_name="OSWriteFileSync")		os_write_file_sync :: proc(handle: Handle, offset: i64, size: i64, buffer: rawptr) -> i64 ---;
-	@(link_name="OSReadFileSync")		os_read_file_sync :: proc(handle: Handle, offset: i64, size: i64, buffer: rawptr) -> i64 ---;
-	@(link_name="OSInitialiseAPI")		os_initialise_api :: proc() -> int ---;
-	@(link_name="OSTerminateProcess")	os_terminate_process :: proc(handle: Handle) ---;
-	@(link_name="realloc")			os_heap_reallocate :: proc(address: rawptr, size: int) -> rawptr ---;
+	@(link_name="OSHelloWorld")       os_hello_world       :: proc() ---;
+	@(link_name="OSPrintDirect")      os_print_direct      :: proc(string: ^byte, length: int) ---;
+	@(link_name="OSHeapAllocate")     os_heap_allocate     :: proc(bytes: int, zero: bool) -> rawptr ---;
+	@(link_name="OSHeapFree")         os_heap_free         :: proc(address: rawptr) ---;
+	@(link_name="OSOpenNode")         os_open_node         :: proc(path: ^byte, path_length: int, flags: u64, information: ^OS_Node_Information) -> Errno ---;
+	@(link_name="OSResizeFile")       os_resize_file       :: proc(handle: Handle, new_size: u64) -> Errno ---;
+	@(link_name="OSCloseHandle")      os_close_handle      :: proc(handle: Handle) ---;
+	@(link_name="OSWriteFileSync")    os_write_file_sync   :: proc(handle: Handle, offset: i64, size: i64, buffer: rawptr) -> i64 ---;
+	@(link_name="OSReadFileSync")     os_read_file_sync    :: proc(handle: Handle, offset: i64, size: i64, buffer: rawptr) -> i64 ---;
+	@(link_name="OSInitialiseAPI")    os_initialise_api    :: proc() -> int ---;
+	@(link_name="OSTerminateProcess") os_terminate_process :: proc(handle: Handle) ---;
+	@(link_name="realloc")            os_heap_reallocate   :: proc(address: rawptr, size: int) -> rawptr ---;
 }
 
-stdin  := cast(Handle) -1; // Not implemented
-stdout := cast(Handle) 0;
-stderr := cast(Handle) 0;
+stdin  := Handle(-1); // Not implemented
+stdout := Handle(0);
+stderr := Handle(0);
 
 current_thread_id :: proc() -> int {
 	// Not implemented
-	return int(-1);
+	return -1;
 }
 
 heap_alloc :: proc(size: int) -> rawptr {
@@ -59,55 +59,53 @@ heap_resize :: proc(address: rawptr, new_size: int) -> rawptr {
 
 open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) {
 	information := new(OS_Node_Information);
-	error := os_open_node(&path[0], len(path), cast(u64) mode, information);
-	if (error < -1) { return 0,1; }
+	error := os_open_node(&path[0], len(path), u64(mode), information);
+	if error < -1 do return 0, 1;
 	information.position = 0;
-	if (mode&O_TRUNC==O_TRUNC) {
+	if mode&O_TRUNC==O_TRUNC {
 		error := os_resize_file(information.handle, 0);
-		if (error < -1) { return 0,1; }
+		if error < -1 do return 0, 1;
 	}
-	return cast(Handle) cast(uintptr) information,0;
+	return Handle(uintptr(information)), 0;
 }
 
 close :: proc(fd: Handle) {
-	information := cast(^OS_Node_Information) cast(uintptr) fd;
+	information := (^OS_Node_Information)(uintptr(fd));
 	os_close_handle(information.handle);
 	free(information);
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
 	// Not (properly) implemented
-	information := cast(^OS_Node_Information) cast(uintptr) fd;
+	information := cast(^OS_Node_Information)uintptr(fd);
 	return information.size,0;
 }
 
-write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
-	if (fd == 0) {
+write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+	if fd == 0 {
 		os_print_direct(&data[0], len(data));
 		return len(data), 0;
-	} else if (fd == 1) {
+	} else if fd == 1 {
 		assert(false);
 		return 0, 1;
-	} else {
-		information := cast(^OS_Node_Information) cast(uintptr) fd;
-		count := os_write_file_sync(information.handle, information.position, cast(i64) len(data), cast(rawptr) &data[0]);
-		if (count < 0) { return 0, 1; }
-		information.position += count;
-		return cast(int) count, 0;
 	}
+	information := (^OS_Node_Information)(uintptr(fd));
+	count := os_write_file_sync(information.handle, information.position, i64(len(data)), &data[0]);
+	if count < 0 do  return 0, 1;
+	information.position += count;
+	return int(count), 0;
 }
 
-read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
+read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if (fd == 0 || fd == 1) {
 		assert(false);
 		return 0, 1;
-	} else {
-		information := cast(^OS_Node_Information) cast(uintptr) fd;
-		count := os_read_file_sync(information.handle, information.position, cast(i64) len(data), cast(rawptr) &data[0]);
-		if (count < 0) { return 0, 1; }
-		information.position += count;
-		return cast(int) count, 0;
 	}
+	information := (^OS_Node_Information)(uintptr(fd));
+	count := os_read_file_sync(information.handle, information.position, i64(len(data)), &data[0]);
+	if count < 0 do return 0, 1;
+	information.position += count;
+	return int(count), 0;
 }
 
 os_terminate_this_process :: proc() {

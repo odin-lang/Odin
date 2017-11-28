@@ -2,14 +2,14 @@
 // NOTE: This is only for floating point printing and nothing else
 
 Decimal :: struct {
-	digits:        [384]u8, // big-endian digits
+	digits:        [384]byte, // big-endian digits
 	count:         int,
 	decimal_point: int,
 	neg, trunc:    bool,
 }
 
-decimal_to_string :: proc(buf: []u8, a: ^Decimal) -> string {
-	digit_zero :: proc(buf: []u8) -> int {
+decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
+	digit_zero :: proc(buf: []byte) -> int {
 		for _, i in buf do buf[i] = '0';
 		return len(buf);
 	}
@@ -56,12 +56,12 @@ trim :: proc(a: ^Decimal) {
 
 
 assign :: proc(a: ^Decimal, i: u64) {
-	buf: [64]u8;
+	buf: [64]byte;
 	n := 0;
 	for i > 0 {
 		j := i/10;
 		i -= 10*j;
-		buf[n] = u8('0'+i);
+		buf[n] = byte('0'+i);
 		n += 1;
 		i = j;
 	}
@@ -106,7 +106,7 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 		c := uint(a.digits[r]);
 		dig := n>>k;
 		n &= mask;
-		a.digits[w] = u8('0' + dig);
+		a.digits[w] = byte('0' + dig);
 		w += 1;
 		n = n*10 + c - '0';
 	}
@@ -115,7 +115,7 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 		dig := n>>k;
 		n &= mask;
 		if w < len(a.digits) {
-			a.digits[w] = u8('0' + dig);
+			a.digits[w] = byte('0' + dig);
 			w += 1;
 		} else if dig > 0 {
 			a.trunc = true;
@@ -141,7 +141,7 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 		rem := n - 10*quo;
 		w -= 1;
 		if w < len(a.digits) {
-			a.digits[w] = u8('0' + rem);
+			a.digits[w] = byte('0' + rem);
 		} else if rem != 0 {
 			a.trunc = true;
 		}
@@ -153,7 +153,7 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 		rem := n - 10*quo;
 		w -= 1;
 		if 0 <= w && w < len(a.digits) {
-			a.digits[w] = u8('0' + rem);
+			a.digits[w] = byte('0' + rem);
 		} else if rem != 0 {
 			a.trunc = true;
 		}

@@ -104,16 +104,40 @@ void timings_start_section(Timings *t, String label) {
 	array_add(&t->sections, make_time_stamp(label));
 }
 
-f64 time_stamp_as_second(TimeStamp ts, u64 freq) {
+f64 time_stamp_as_s(TimeStamp const &ts, u64 freq) {
 	GB_ASSERT_MSG(ts.finish >= ts.start, "time_stamp_as_ms - %.*s", LIT(ts.label));
 	return cast(f64)(ts.finish - ts.start) / cast(f64)freq;
 }
 
-f64 time_stamp_as_ms(TimeStamp ts, u64 freq) {
-	return 1000.0*time_stamp_as_second(ts, freq);
+f64 time_stamp_as_ms(TimeStamp const &ts, u64 freq) {
+	return 1000.0*time_stamp_as_s(ts, freq);
 }
 
-void timings_print_all(Timings *t) {
+f64 time_stamp_as_us(TimeStamp const &ts, u64 freq) {
+	return 1000000.0*time_stamp_as_s(ts, freq);
+}
+
+enum TimingUnit {
+	TimingUnit_Second,
+	TimingUnit_Millisecond,
+	TimingUnit_Microsecond,
+
+	TimingUnit_COUNT,
+};
+
+char const *timing_unit_strings[TimingUnit_COUNT] = {"s", "ms", "us"};
+
+f64 time_stamp(TimeStamp const &ts, u64 freq, TimingUnit unit) {
+	f64 total_time = 0;
+	switch (unit) {
+	case TimingUnit_Millisecond: return time_stamp_as_ms(ts, freq);
+	case TimingUnit_Microsecond: return time_stamp_as_us(ts, freq);
+	default: /*fallthrough*/
+	case TimingUnit_Second:      return time_stamp_as_s (ts, freq);
+	}
+}
+
+void timings_print_all(Timings *t, TimingUnit unit = TimingUnit_Millisecond) {
 	char const SPACES[] = "                                                                ";
 	isize max_len;
 
@@ -121,6 +145,7 @@ void timings_print_all(Timings *t) {
 	t->total.finish = time_stamp_time_now();
 
 	max_len = t->total.label.len;
+	max_len = 36;
 	for_array(i, t->sections) {
 		TimeStamp ts = t->sections[i];
 		max_len = gb_max(max_len, ts.label.len);
@@ -128,22 +153,25 @@ void timings_print_all(Timings *t) {
 
 	GB_ASSERT(max_len <= gb_size_of(SPACES)-1);
 
-	t->total_time_seconds = time_stamp_as_second(t->total, t->freq);
+	t->total_time_seconds = time_stamp_as_s(t->total, t->freq);
 
-	f64 total_ms = time_stamp_as_ms(t->total, t->freq);
+	f64 total_time = time_stamp(t->total, t->freq, unit);
 
-	gb_printf("%.*s%.*s - % 9.3f ms - %6.2f%%\n",
+	gb_printf("%.*s%.*s - % 9.3f %s - %6.2f%%\n",
 	          LIT(t->total.label),
 	          cast(int)(max_len-t->total.label.len), SPACES,
-	          total_ms,
+	          total_time,
+	          timing_unit_strings[unit],
 	          cast(f64)100.0);
 
 	for_array(i, t->sections) {
 		TimeStamp ts = t->sections[i];
-		f64 section_ms = time_stamp_as_ms(ts, t->freq);
-		gb_printf("%.*s%.*s - % 9.3f ms - %6.2f%%\n",
+		f64 section_time = time_stamp(ts, t->freq, unit);
+		gb_printf("%.*s%.*s - % 9.3f %s - %6.2f%%\n",
 		          LIT(ts.label),
 	              cast(int)(max_len-ts.label.len), SPACES,
-		          section_ms, 100*section_ms/total_ms);
+		          section_time,
+		          timing_unit_strings[unit],
+		          100.0*section_time/total_time);
 	}
 }

@@ -1,6 +1,6 @@
 import "core:mem.odin"
 
-adler32 :: proc(data: []u8) -> u32 {
+adler32 :: proc(data: []byte) -> u32 {
 	ADLER_CONST :: 65521;
 	a, b: u32 = 1, 0;
 	for x in data {
@@ -10,14 +10,14 @@ adler32 :: proc(data: []u8) -> u32 {
 	return (b << 16) | a;
 }
 
-crc32 :: proc(data: []u8) -> u32 {
+crc32 :: proc(data: []byte) -> u32 {
 	result := ~u32(0);
 	for b in data {
 		result = result>>8 ~ _crc32_table[(result ~ u32(b)) & 0xff];
 	}
 	return ~result;
 }
-crc64 :: proc(data: []u8) -> u64 {
+crc64 :: proc(data: []byte) -> u64 {
 	result := ~u64(0);
 	for b in data {
 		result = result>>8 ~ _crc64_table[(result ~ u64(b)) & 0xff];
@@ -25,7 +25,7 @@ crc64 :: proc(data: []u8) -> u64 {
 	return ~result;
 }
 
-fnv32 :: proc(data: []u8) -> u32 {
+fnv32 :: proc(data: []byte) -> u32 {
 	h: u32 = 0x811c9dc5;
 	for b in data {
 		h = (h * 0x01000193) ~ u32(b);
@@ -33,7 +33,7 @@ fnv32 :: proc(data: []u8) -> u32 {
 	return h;
 }
 
-fnv64 :: proc(data: []u8) -> u64 {
+fnv64 :: proc(data: []byte) -> u64 {
 	h: u64 = 0xcbf29ce484222325;
 	for b in data {
 		h = (h * 0x100000001b3) ~ u64(b);
@@ -41,7 +41,7 @@ fnv64 :: proc(data: []u8) -> u64 {
 	return h;
 }
 
-fnv32a :: proc(data: []u8) -> u32 {
+fnv32a :: proc(data: []byte) -> u32 {
 	h: u32 = 0x811c9dc5;
 	for b in data {
 		h = (h ~ u32(b)) * 0x01000193;
@@ -49,7 +49,7 @@ fnv32a :: proc(data: []u8) -> u32 {
 	return h;
 }
 
-fnv64a :: proc(data: []u8) -> u64 {
+fnv64a :: proc(data: []byte) -> u64 {
 	h: u64 = 0xcbf29ce484222325;
 	for b in data {
 		h = (h ~ u64(b)) * 0x100000001b3;
@@ -57,7 +57,7 @@ fnv64a :: proc(data: []u8) -> u64 {
 	return h;
 }
 
-murmur32 :: proc(data: []u8) -> u32 {
+murmur32 :: proc(data: []byte) -> u32 {
 	c1_32: u32 : 0xcc9e2d51;
 	c2_32: u32 : 0x1b873593;
 
@@ -106,7 +106,7 @@ murmur32 :: proc(data: []u8) -> u32 {
 	return h1;
 }
 
-murmur64 :: proc(data: []u8) -> u64 {
+murmur64 :: proc(data: []byte) -> u64 {
 	SEED :: 0x9747b28c;
 
 	when size_of(int) == 8 {

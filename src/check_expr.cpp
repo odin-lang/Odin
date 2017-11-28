@@ -2541,27 +2541,6 @@ isize entity_overload_count(Scope *s, String name) {
 	return 1;
 }
 
-bool check_is_field_exported(Checker *c, Entity *field) {
-	if (field == nullptr) {
-		// NOTE(bill): Just incase
-		return true;
-	}
-	if (field->kind != Entity_Variable) {
-		return true;
-	}
-	Scope *file_scope = field->scope;
-	if (file_scope == nullptr) {
-		return true;
-	}
-	while (file_scope->file == nullptr) {
-		file_scope = file_scope->parent;
-	}
-	if (!is_entity_exported(field) && file_scope != c->context.file_scope) {
-		return false;
-	}
-	return true;
-}
-
 Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_hint) {
 	ast_node(se, SelectorExpr, node);
 
@@ -2730,13 +2709,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	if (entity == nullptr && selector->kind == AstNode_Ident) {
 		String field_name = selector->Ident.token.string;
 		sel = lookup_field(c->allocator, operand->type, field_name, operand->mode == Addressing_Type);
-
-		if (operand->mode != Addressing_Type && !check_is_field_exported(c, sel.entity)) {
-			error(op_expr, "'%.*s' is an unexported field", LIT(field_name));
-			operand->mode = Addressing_Invalid;
-			operand->expr = node;
-			return nullptr;
-		}
 		entity = sel.entity;
 
 		// NOTE(bill): Add type info needed for fields like 'names'
@@ -3077,7 +3049,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		isize max_args = 1;
 		if (is_type_slice(type)) {
 			min_args = 2;
-			max_args = 3;
+			max_args = 2;
 		} else if (is_type_map(type)) {
 			min_args = 1;
 			max_args = 2;
@@ -4718,29 +4690,6 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 }
 
 
-Entity *find_using_index_expr(Type *t) {
-	t = base_type(t);
-	if (t->kind != Type_Struct) {
-		return nullptr;
-	}
-
-	for_array(i, t->Struct.fields) {
-		Entity *f = t->Struct.fields[i];
-		if (f->kind == Entity_Variable &&
-		    (f->flags & EntityFlag_Field) != 0 &&
-		    (f->flags & EntityFlag_Using) != 0) {
-			if (is_type_indexable(f->type)) {
-				return f;
-			}
-			Entity *res = find_using_index_expr(f->type);
-			if (res != nullptr) {
-				return res;
-			}
-		}
-	}
-	return nullptr;
-}
-
 isize lookup_polymorphic_struct_parameter(TypeStruct *st, String parameter_name) {
 	if (!st->is_polymorphic) return -1;
 
@@ -5531,11 +5480,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 							error(elem, "Unknown field '%.*s' in structure literal", LIT(name));
 							continue;
 						}
-						if (!is_unknown && !check_is_field_exported(c, sel.entity)) {
-							error(elem, "Cannot assign to an unexported field '%.*s' in structure literal", LIT(name));
-							continue;
-						}
-
 
 						if (sel.index.count > 1) {
 							error(elem, "Cannot assign to an anonymous field '%.*s' in a structure literal (at the moment)", LIT(name));
@@ -5564,15 +5508,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						check_assignment(c, o, field->type, str_lit("structure literal"));
 					}
 				} else {
-					bool all_fields_are_blank = true;
-					for_array(i, t->Struct.fields_in_src_order) {
-						Entity *field = t->Struct.fields_in_src_order[i];
-						if (!is_blank_ident(field->token)) {
-							all_fields_are_blank = false;
-							break;
-						}
-					}
-
 					bool seen_field_value = false;
 
 					for_array(index, cl->elems) {
@@ -5594,20 +5529,8 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						if (field == nullptr) {
 							field = t->Struct.fields_in_src_order[index];
 						}
-						if (!all_fields_are_blank && is_blank_ident(field->token)) {
-							// NOTE(bill): Ignore blank identifiers
-							continue;
-						}
 
 						check_expr_with_type_hint(c, o, elem, field->type);
-
-						if (!check_is_field_exported(c, field)) {
-							gbString t = type_to_string(type);
-							error(o->expr, "Implicit assignment to an unexported field '%.*s' in '%s' literal",
-							           LIT(field->token.string), t);
-							gb_string_free(t);
-							continue;
-						}
 
 						if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type)) {
 							is_constant = false;
@@ -6032,13 +5955,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			valid = false;
 		}
 
-		if (!valid && t->kind == Type_Struct) {
-			Entity *found = find_using_index_expr(t);
-			if (found != nullptr) {
-				valid = check_set_index_data(o, found->type, is_type_pointer(found->type), &max_count);
-			}
-		}
-
 		if (!valid) {
 			gbString str = expr_to_string(o->expr);
 			gbString type_str = type_to_string(o->type);
@@ -6084,12 +6000,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		switch (t->kind) {
 		case Type_Basic:
 			if (is_type_string(t)) {
-				if (se->index3) {
-					error(node, "3-index slice on a string in not needed");
-					o->mode = Addressing_Invalid;
-					o->expr = node;
-					return kind;
-				}
 				valid = true;
 				if (o->mode == Addressing_Constant) {
 					max_count = o->value.value_string.len;
@@ -6141,25 +6051,10 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			// It is okay to continue as it will assume the 1st index is zero
 		}
 
-		if (se->index3 && (se->high == nullptr || se->max == nullptr)) {
-			error(se->close, "2nd and 3rd indices are required in a 3-index slice");
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
+		TokenKind interval_kind = se->interval.kind;
 
-		if (se->index3 && se->interval0.kind != se->interval1.kind) {
-			error(se->close, "The interval separators for in a 3-index slice must be the same");
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
-
-
-		TokenKind interval_kind = se->interval0.kind;
-
-		i64 indices[3] = {};
-		AstNode *nodes[3] = {se->low, se->high, se->max};
+		i64 indices[2] = {};
+		AstNode *nodes[2] = {se->low, se->high};
 		for (isize i = 0; i < gb_count_of(nodes); i++) {
 			i64 index = max_count;
 			if (nodes[i] != nullptr) {
@@ -6444,7 +6339,8 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_append_rune(str, ')');
 	case_end;
 		case_ast_node(tc, TypeCast, node);
-		str = gb_string_appendc(str, "cast(");
+		str = string_append_token(str, tc->token);
+		str = gb_string_append_rune(str, '(');
 		str = write_expr_to_string(str, tc->type);
 		str = gb_string_append_rune(str, ')');
 		str = write_expr_to_string(str, tc->expr);
@@ -6461,12 +6357,8 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, se->expr);
 		str = gb_string_append_rune(str, '[');
 		str = write_expr_to_string(str, se->low);
-		str = gb_string_appendc(str, "..");
+		str = string_append_token(str, se->interval);
 		str = write_expr_to_string(str, se->high);
-		if (se->index3) {
-			str = gb_string_appendc(str, "..");
-			str = write_expr_to_string(str, se->max);
-		}
 		str = gb_string_append_rune(str, ']');
 	case_end;
 

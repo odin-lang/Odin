@@ -458,7 +458,6 @@ struct CheckerInfo {
 	Scope *               init_scope;
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
-
 };
 
 struct Checker {
@@ -853,6 +852,9 @@ void add_global_string_constant(gbAllocator a, String name, String value) {
 }
 
 
+void add_global_type_entity(gbAllocator a, String name, Type *type) {
+	add_global_entity(make_entity_type_name(a, nullptr, make_token_ident(name), type));
+}
 
 
 
@@ -864,17 +866,9 @@ void init_universal_scope(void) {
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
-		add_global_entity(make_entity_type_name(a, nullptr, make_token_ident(basic_types[i].Basic.name), &basic_types[i]));
+		add_global_type_entity(a, basic_types[i].Basic.name, &basic_types[i]);
 	}
-#if 1
-	// for (isize i = 0; i < gb_count_of(basic_type_aliases); i++) {
-		// add_global_entity(make_entity_type_name(a, nullptr, make_token_ident(basic_type_aliases[i].Basic.name), &basic_type_aliases[i]));
-	// }
-#else
-	{
-		t_byte = add_global_type_alias(a, str_lit("byte"), &basic_types[Basic_u8]);
-	}
-#endif
+	add_global_type_entity(a, str_lit("byte"), &basic_types[Basic_u8]);
 
 // Constants
 	add_global_constant(a, str_lit("true"),  t_untyped_bool, exact_value_bool(true));
@@ -1557,18 +1551,18 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 	}
 
 	Array<EntityGraphNode *> G = {};
-	array_init(&G, a);
+	array_init(&G, a, 2*M.entries.count);
 
 	for_array(i, M.entries) {
 		auto *entry = &M.entries[i];
-		Entity *   e = cast(Entity *)entry->key.ptr;
+		auto *e = cast(Entity *)entry->key.ptr;
 		EntityGraphNode *n = entry->value;
 
 		if (e->kind == Entity_Procedure) {
 			// Connect each pred 'p' of 'n' with each succ 's' and from
 			// the procedure node
 			for_array(j, n->pred.entries) {
-				EntityGraphNode *p = cast(EntityGraphNode *)n->pred.entries[j].ptr;
+				EntityGraphNode *p = n->pred.entries[j].ptr;
 
 				// Ignore self-cycles
 				if (p != n) {
@@ -1599,6 +1593,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		n->dep_count = n->succ.entries.count;
 		GB_ASSERT(n->dep_count >= 0);
 	}
+
 
 	return G;
 }
@@ -3341,6 +3336,20 @@ void calculate_global_init_order(Checker *c) {
 
 
 void check_parsed_files(Checker *c) {
+#if 0
+	Timings timings = {};
+	timings_init(&timings, str_lit("check_parsed_files"), 16);
+	defer ({
+		timings_print_all(&timings);
+		timings_destroy(&timings);
+	});
+#define TIME_SECTION(str) timings_start_section(&timings, str_lit(str))
+#else
+#define TIME_SECTION(str)
+#endif
+
+	TIME_SECTION("map full filepaths to scope");
+
 	add_type_info_type(c, t_invalid);
 
 	// Map full filepaths to Scopes
@@ -3357,6 +3366,7 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+	TIME_SECTION("collect entities");
 	// Collect Entities
 	for_array(i, c->parser->files) {
 		AstFile *f = c->parser->files[i];
@@ -3366,10 +3376,16 @@ void check_parsed_files(Checker *c) {
 		c->context = prev_context;
 	}
 
+	TIME_SECTION("import entities");
 	check_import_entities(c);
+
+	TIME_SECTION("check all global entities");
 	check_all_global_entities(c);
+
+	TIME_SECTION("init preload");
 	init_preload(c); // NOTE(bill): This could be setup previously through the use of 'type_info_of'
 
+	TIME_SECTION("check procedure bodies");
 	// Check procedure bodies
 	// NOTE(bill): Nested procedures bodies will be added to this "queue"
 	for_array(i, c->procs.entries) {
@@ -3403,12 +3419,16 @@ void check_parsed_files(Checker *c) {
 		check_proc_body(c, pi->token, pi->decl, pi->type, pi->body);
 	}
 
+	TIME_SECTION("generate minimum dependency set");
 	c->info.minimum_dependency_set = generate_minimum_dependency_set(&c->info, c->info.entry_point);
 
 
+	TIME_SECTION("calculate global init order");
 	// Calculate initialization order of global variables
 	calculate_global_init_order(c);
 
+
+	TIME_SECTION("add untyped expression values");
 	// Add untyped expression values
 	for_array(i, c->info.untyped.entries) {
 		auto *entry = &c->info.untyped.entries[i];
@@ -3426,6 +3446,8 @@ void check_parsed_files(Checker *c) {
 	// TODO(bill): Check for unused imports (and remove) or even warn/err
 	// TODO(bill): Any other checks?
 
+
+	TIME_SECTION("add type information");
 	// Add "Basic" type information
 	for (isize i = 0; i < gb_count_of(basic_types)-1; i++) {
 		Type *t = &basic_types[i];
@@ -3446,6 +3468,7 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+	TIME_SECTION("check entry poiny");
 	if (!build_context.is_dll) {
 		Scope *s = c->info.init_scope;
 		GB_ASSERT(s != nullptr);
@@ -3464,4 +3487,6 @@ void check_parsed_files(Checker *c) {
 			error(token, "Undefined entry point procedure 'main'");
 		}
 	}
+
+#undef TIME_SECTION
 }
