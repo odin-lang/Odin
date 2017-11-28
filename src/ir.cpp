@@ -7006,7 +7006,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				}
 				irValue *entries_ptr = ir_emit_struct_ep(proc, map, 1);
 				irValue *count_ptr = ir_emit_struct_ep(proc, entries_ptr, 1);
-				ir_build_range_indexed(proc, map, val0_type, count_ptr, &val, &key, &loop, &done);
+				ir_build_range_indexed(proc, map, val1_type, count_ptr, &val, &key, &loop, &done);
 				break;
 			}
 			case Type_Array: {
