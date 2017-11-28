@@ -1574,8 +1574,6 @@ irValue *ir_emit_bitcast(irProcedure *proc, irValue *data, Type *type) {
 irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t);
 
 
-irValue *ir_emit_global_call(irProcedure *proc, char *name_, irValue **args, isize arg_count);
-
 irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 	if (proc->context_stack.count > 0) {
 		return proc->context_stack[proc->context_stack.count-1];
@@ -1635,8 +1633,8 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 	return result;
 }
 
-irValue *ir_emit_global_call(irProcedure *proc, char *name_, irValue **args, isize arg_count) {
-	String name = make_string_c(name_);
+irValue *ir_emit_global_call(irProcedure *proc, char const *name_, irValue **args, isize arg_count) {
+	String name = make_string_c(cast(char *)name_);
 	irValue **found = map_get(&proc->module->members, hash_string(name));
 	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
 	irValue *gp = *found;
@@ -3652,7 +3650,7 @@ void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, ir
 	args[3] = low;
 	args[4] = high;
 
-	char *func = is_substring ? "__substring_expr_error" : "__slice_expr_error";
+	char const *func = is_substring ? "__substring_expr_error" : "__slice_expr_error";
 	ir_emit_global_call(proc, func, args, 5);
 }
 
