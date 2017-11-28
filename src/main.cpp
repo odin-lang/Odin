@@ -558,7 +558,7 @@ void show_timings(Checker *c, Timings *t) {
 	{
 		TimeStamp ts = t->sections[0];
 		GB_ASSERT(ts.label == "parse files");
-		f64 parse_time = time_stamp_as_second(ts, t->freq);
+		f64 parse_time = time_stamp_as_s(ts, t->freq);
 		gb_printf("Parse pass\n");
 		gb_printf("LOC/s        - %.3f\n", cast(f64)lines/parse_time);
 		gb_printf("us/LOC       - %.3f\n", 1.0e6*parse_time/cast(f64)lines);
@@ -610,6 +610,7 @@ int main(int arg_count, char **arg_ptr) {
 	Timings timings = {0};
 	timings_init(&timings, str_lit("Total Time"), 128);
 	defer (timings_destroy(&timings));
+
 	init_string_buffer_memory();
 	init_scratch_memory(gb_megabytes(10));
 	init_global_error_collector();
@@ -853,7 +854,6 @@ int main(int arg_count, char **arg_ptr) {
 		if (run_output) {
 			system_exec_command_line_app("odin run", false, "%.*s.exe", LIT(output_base));
 		}
-
 	#else
 
 		// NOTE(zangent): Linux / Unix is unfinished and not tested very well.
@@ -993,7 +993,6 @@ int main(int arg_count, char **arg_ptr) {
 		if (run_output) {
 			system_exec_command_line_app("odin run", false, "%.*s", LIT(output_base));
 		}
-
 	#endif
 #endif
 #endif

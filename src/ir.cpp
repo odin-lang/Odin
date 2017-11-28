@@ -5335,7 +5335,7 @@ bool ir_is_elem_const(irModule *m, AstNode *elem, Type *elem_type) {
 		elem = elem->FieldValue.value;
 	}
 	TypeAndValue tav = type_and_value_of_expr(m->info, elem);
-	GB_ASSERT(tav.mode != Addressing_Invalid);
+	GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s", expr_to_string(elem), type_to_string(tav.type));
 	return tav.value.kind != ExactValue_Invalid;
 }
 
@@ -5517,6 +5517,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 		bool deref = is_type_pointer(t);
 		t = base_type(type_deref(t));
+		GB_ASSERT_MSG(is_type_indexable(t), "%s %s", type_to_string(t), expr_to_string(expr));
 
 		if (is_type_map(t)) {
 			irValue *map_val = ir_build_addr_ptr(proc, ie->expr);
@@ -5532,18 +5533,6 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		}
 
 		irValue *using_addr = nullptr;
-		if (!is_type_indexable(t)) {
-			// Using index expression
-			Entity *using_field = find_using_index_expr(t);
-			if (using_field != nullptr) {
-				Selection sel = lookup_field(a, t, using_field->token.string, false);
-				irValue *e = ir_build_addr_ptr(proc, ie->expr);
-				using_addr = ir_emit_deep_field_gep(proc, e, sel);
-
-				t = using_field->type;
-			}
-		}
-
 
 		switch (t->kind) {
 		case Type_Vector: {
