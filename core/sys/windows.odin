@@ -668,7 +668,7 @@ HIWORD :: proc(lParam: Lparam) -> u16 { return u16((u32(lParam) >> 16) & 0xffff)
 LOWORD :: proc(wParam: Wparam) -> u16 { return u16(wParam); }
 LOWORD :: proc(lParam: Lparam) -> u16 { return u16(lParam); }
 
-is_key_down :: inline proc(key: Key_Code) -> bool do return get_async_key_state(i32(key)) < 0;
+is_key_down :: inline proc(key: Key_Code) -> bool { return get_async_key_state(i32(key)) < 0; }
 
 
 
