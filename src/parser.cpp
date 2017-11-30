@@ -436,11 +436,6 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		Token token; \
 		AstNode *elem; \
 	}) \
-	AST_NODE_KIND(VectorType, "vector type", struct { \
-		Token token; \
-		AstNode *count; \
-		AstNode *elem; \
-	}) \
 	AST_NODE_KIND(StructType, "struct type", struct { \
 		Token            token;               \
 		Array<AstNode *> fields;              \
@@ -621,7 +616,6 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_PointerType:      return node->PointerType.token;
 	case AstNode_ArrayType:        return node->ArrayType.token;
 	case AstNode_DynamicArrayType: return node->DynamicArrayType.token;
-	case AstNode_VectorType:       return node->VectorType.token;
 	case AstNode_StructType:       return node->StructType.token;
 	case AstNode_UnionType:        return node->UnionType.token;
 	case AstNode_EnumType:         return node->EnumType.token;
@@ -878,10 +872,6 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		break;
 	case AstNode_DynamicArrayType:
 		n->DynamicArrayType.elem = clone_ast_node(a, n->DynamicArrayType.elem);
-		break;
-	case AstNode_VectorType:
-		n->VectorType.count = clone_ast_node(a, n->VectorType.count);
-		n->VectorType.elem  = clone_ast_node(a, n->VectorType.elem);
 		break;
 	case AstNode_StructType:
 		n->StructType.fields = clone_ast_node_array(a, n->StructType.fields);
@@ -1455,14 +1445,6 @@ AstNode *ast_dynamic_array_type(AstFile *f, Token token, AstNode *elem) {
 	AstNode *result = make_ast_node(f, AstNode_DynamicArrayType);
 	result->DynamicArrayType.token = token;
 	result->DynamicArrayType.elem  = elem;
-	return result;
-}
-
-AstNode *ast_vector_type(AstFile *f, Token token, AstNode *count, AstNode *elem) {
-	AstNode *result = make_ast_node(f, AstNode_VectorType);
-	result->VectorType.token = token;
-	result->VectorType.count = count;
-	result->VectorType.elem  = elem;
 	return result;
 }
 
@@ -2339,15 +2321,6 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 		if (f->curr_token.kind == Token_Ellipsis) {
 			count_expr = ast_unary_expr(f, expect_token(f, Token_Ellipsis), nullptr);
-		} else if (allow_token(f, Token_vector)) {
-			if (f->curr_token.kind != Token_CloseBracket) {
-				f->expr_level++;
-				count_expr = parse_expr(f, false);
-				f->expr_level--;
-			} else {
-				syntax_error(f->curr_token, "Vector type missing count");
-			}
-			is_vector = true;
 		} else if (allow_token(f, Token_dynamic)) {
 			expect_token(f, Token_CloseBracket);
 			return ast_dynamic_array_type(f, token, parse_type(f));
@@ -2357,9 +2330,6 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			f->expr_level--;
 		}
 		expect_token(f, Token_CloseBracket);
-		if (is_vector) {
-			return ast_vector_type(f, token, count_expr, parse_type(f));
-		}
 		return ast_array_type(f, token, count_expr, parse_type(f));
 	} break;
 
@@ -2577,7 +2547,6 @@ bool is_literal_type(AstNode *node) {
 	case AstNode_Ident:
 	case AstNode_SelectorExpr:
 	case AstNode_ArrayType:
-	case AstNode_VectorType:
 	case AstNode_StructType:
 	case AstNode_UnionType:
 	case AstNode_EnumType:

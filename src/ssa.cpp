@@ -631,8 +631,6 @@ bool can_ssa_type(Type *t) {
 	switch (t->kind) {
 	case Type_Array:
 		return t->Array.count == 0;
-	case Type_Vector:
-		return s < 2*build_context.word_size;
 
 	case Type_DynamicArray:
 		return false;
@@ -793,12 +791,10 @@ ssaValue *ssa_emit_array_index(ssaProc *p, ssaValue *v, ssaValue *index) {
 	GB_ASSERT(v != nullptr);
 	GB_ASSERT(is_type_pointer(v->type));
 	Type *t = base_type(type_deref(v->type));
-	GB_ASSERT_MSG(is_type_array(t) || is_type_vector(t), "%s", type_to_string(t));
+	GB_ASSERT_MSG(is_type_array(t), "%s", type_to_string(t));
 	Type *elem_ptr = nullptr;
 	if (is_type_array(t)) {
 		elem_ptr = make_type_pointer(p->allocator, t->Array.elem);
-	} else if (is_type_vector(t)) {
-		elem_ptr = make_type_pointer(p->allocator, t->Vector.elem);
 	}
 
 	return ssa_new_value2(p, ssaOp_ArrayIndex, elem_ptr, v, index);
@@ -960,8 +956,6 @@ ssaValue *ssa_emit_deep_field_ptr_index(ssaProc *p, ssaValue *e, Selection sel) 
 			e = ssa_emit_ptr_index(p, e, index);
 		} else if (type->kind == Type_DynamicArray) {
 			e = ssa_emit_ptr_index(p, e, index);
-		} else if (type->kind == Type_Vector) {
-			e = ssa_emit_array_index(p, e, ssa_const_int(p, t_int, index));
 		} else if (type->kind == Type_Array) {
 			e = ssa_emit_array_index(p, e, ssa_const_int(p, t_int, index));
 		} else if (type->kind == Type_Map) {
@@ -1386,31 +1380,6 @@ ssaValue *ssa_emit_comp(ssaProc *p, TokenKind op, ssaValue *x, ssaValue *y) {
 	}
 
 	Type *result = t_bool;
-	if (is_type_vector(a)) {
-		result = make_type_vector(p->allocator, t_bool, a->Vector.count);
-	}
-
-	if (is_type_vector(a)) {
-		ssa_emit_comment(p, str_lit("vector.comp.begin"));
-		Type *tl = base_type(a);
-		ssaValue *lhs = ssa_address_from_load_or_generate_local(p, x);
-		ssaValue *rhs = ssa_address_from_load_or_generate_local(p, y);
-
-		GB_ASSERT(is_type_vector(result));
-		Type *elem_type = base_type(result)->Vector.elem;
-
-		ssaAddr addr = ssa_add_local_generated(p, result);
-		for (i32 i = 0; i < tl->Vector.count; i++) {
-			ssaValue *index = ssa_const_int(p, t_int, i);
-			ssaValue *x = ssa_emit_load(p, ssa_emit_array_index(p, lhs, index));
-			ssaValue *y = ssa_emit_load(p, ssa_emit_array_index(p, rhs, index));
-			ssaValue *z = ssa_emit_comp(p, op, x, y);
-			ssa_emit_store(p, ssa_emit_array_index(p, addr.addr, index), z);
-		}
-
-		ssa_emit_comment(p, str_lit("vector.comp.end"));
-		return ssa_addr_load(p, addr);
-	}
 
 	return ssa_new_value2(p, ssa_determine_op(op, x->type), x->type, x, y);
 }
@@ -1418,27 +1387,6 @@ ssaValue *ssa_emit_comp(ssaProc *p, TokenKind op, ssaValue *x, ssaValue *y) {
 
 
 ssaValue *ssa_emit_unary_arith(ssaProc *p, TokenKind op, ssaValue *x, Type *type) {
-	if (is_type_vector(x->type)) {
-		ssa_emit_comment(p, str_lit("vector.arith.begin"));
-		// IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
-		Type *tl = base_type(x->type);
-		ssaValue *val = ssa_address_from_load_or_generate_local(p, x);
-		GB_ASSERT(is_type_vector(type));
-		Type *elem_type = base_type(type)->Vector.elem;
-
-		ssaAddr res = ssa_add_local_generated(p, type);
-		for (i64 i = 0; i < tl->Vector.count; i++) {
-			ssaValue *index = ssa_const_int(p, t_int, i);
-			ssaValue *e = ssa_emit_load(p, ssa_emit_array_index(p, val, index));
-			ssaValue *z = ssa_emit_unary_arith(p, op, e, elem_type);
-			ssa_emit_store(p, ssa_emit_array_index(p, res.addr, index), z);
-		}
-		ssa_emit_comment(p, str_lit("vector.arith.end"));
-		return ssa_addr_load(p, res);
-
-	}
-
-
 	switch (op) {
 	case Token_Pointer: {
 		GB_PANIC("Token_Pointer should be handled elsewhere");
@@ -1481,9 +1429,7 @@ ssaValue *ssa_emit_unary_arith(ssaProc *p, TokenKind op, ssaValue *x, Type *type
 	return nullptr;
 }
 ssaValue *ssa_emit_arith(ssaProc *p, TokenKind op, ssaValue *x, ssaValue *y, Type *type) {
-	if (is_type_vector(x->type)) {
-		GB_PANIC("TODO(bill): ssa_emit_arith vector");
-	} else if (is_type_complex(x->type)) {
+	if (is_type_complex(x->type)) {
 		GB_PANIC("TODO(bill): ssa_emit_arith complex");
 	}
 

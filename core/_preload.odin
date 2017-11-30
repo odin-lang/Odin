@@ -66,7 +66,6 @@ Type_Info_Array :: struct #ordered {
 };
 Type_Info_Dynamic_Array :: struct #ordered {elem: ^Type_Info, elem_size: int};
 Type_Info_Slice         :: struct #ordered {elem: ^Type_Info, elem_size: int};
-Type_Info_Vector        :: struct #ordered {elem: ^Type_Info, elem_size, count: int};
 Type_Info_Tuple :: struct #ordered { // Only really used for procedures
 	types:        []^Type_Info,
 	names:        []string,
@@ -121,7 +120,6 @@ Type_Info :: struct #ordered {
 		Type_Info_Array,
 		Type_Info_Dynamic_Array,
 		Type_Info_Slice,
-		Type_Info_Vector,
 		Type_Info_Tuple,
 		Type_Info_Struct,
 		Type_Info_Union,
@@ -178,7 +176,7 @@ Context :: struct #ordered {
 	derived:    any, // May be used for derived data types
 }
 
-DEFAULT_ALIGNMENT :: align_of([vector 4]f32);
+DEFAULT_ALIGNMENT :: 2*align_of(rawptr);
 
 __INITIAL_MAP_CAP :: 16;
 

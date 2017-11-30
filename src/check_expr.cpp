@@ -561,14 +561,6 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		}
 	}
 
-	if (is_type_vector(dst)) {
-		Type *elem = base_vector_type(dst);
-		i64 distance = check_distance_between_types(c, operand, elem);
-		if (distance >= 0) {
-			return distance + 5;
-		}
-	}
-
 #if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (is_type_array(dst)) {
 		Type *elem = base_array_type(dst);
@@ -656,13 +648,9 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 			add_type_info_type(c, target_type);
 		}
 
-		if (target_type != nullptr && is_type_vector(target_type)) {
-			// NOTE(bill): continue to below
-		} else {
-			convert_to_typed(c, operand, target_type);
-			if (operand->mode == Addressing_Invalid) {
-				return;
-			}
+		convert_to_typed(c, operand, target_type);
+		if (operand->mode == Addressing_Invalid) {
+			return;
 		}
 	}
 
@@ -825,41 +813,6 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 			}
 			if (poly->Array.count == source->Array.count) {
 				return is_polymorphic_type_assignable(c, poly->Array.elem, source->Array.elem, true, modify_type);
-			}
-		}
-		return false;
-	case Type_Vector:
-		if (source->kind == Type_Vector) {
-			if (poly->Vector.generic_type && modify_type) {
-				Type *gt = poly->Vector.generic_type;
-				GB_ASSERT(gt->kind == Type_Generic);
-				Entity *e = scope_lookup_entity(gt->Generic.scope, gt->Generic.name);
-				GB_ASSERT(e != nullptr);
-				if (e->kind == Entity_TypeName) {
-					poly->Vector.generic_type = nullptr;
-					poly->Vector.count = source->Vector.count;
-
-					e->kind = Entity_Constant;
-					e->Constant.value = exact_value_i64(source->Vector.count);
-					e->type = t_untyped_integer;
-				} else if (e->kind == Entity_Constant) {
-					poly->Vector.generic_type = nullptr;
-					if (e->Constant.value.kind != ExactValue_Integer) {
-						return false;
-					}
-					i64 count = i128_to_i64(e->Constant.value.value_integer);
-					if (count != source->Vector.count) {
-						return false;
-					}
-					poly->Vector.count = source->Vector.count;
-				} else {
-					return false;
-				}
-
-				return is_polymorphic_type_assignable(c, poly->Vector.elem, source->Vector.elem, true, modify_type);
-			}
-			if (poly->Vector.count == source->Vector.count) {
-				return is_polymorphic_type_assignable(c, poly->Vector.elem, source->Vector.elem, true, modify_type);
 			}
 		}
 		return false;
@@ -1132,7 +1085,7 @@ bool check_unary_op(Checker *c, Operand *o, Token op) {
 		return false;
 	}
 	// TODO(bill): Handle errors correctly
-	Type *type = base_type(base_vector_type(o->type));
+	Type *type = base_type(core_array_type(o->type));
 	gbString str = nullptr;
 	switch (op.kind) {
 	case Token_Add:
@@ -1168,7 +1121,7 @@ bool check_unary_op(Checker *c, Operand *o, Token op) {
 
 bool check_binary_op(Checker *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
-	Type *type = base_type(base_vector_type(o->type));
+	Type *type = base_type(core_array_type(o->type));
 	switch (op.kind) {
 	case Token_Sub:
 	case Token_SubEq:
@@ -1403,43 +1356,11 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 	}
 }
 
-bool check_is_expr_vector_index(Checker *c, AstNode *expr) {
-	// HACK(bill): Handle this correctly. Maybe with a custom AddressingMode
-	expr = unparen_expr(expr);
-	if (expr->kind == AstNode_IndexExpr) {
-		ast_node(ie, IndexExpr, expr);
-		Type *t = type_deref(type_of_expr(&c->info, ie->expr));
-		if (t != nullptr) {
-			return is_type_vector(t);
-		}
-	}
-	return false;
-}
-
-bool check_is_vector_elem(Checker *c, AstNode *expr) {
-	// HACK(bill): Handle this correctly. Maybe with a custom AddressingMode
-	expr = unparen_expr(expr);
-	if (expr->kind == AstNode_SelectorExpr) {
-		ast_node(se, SelectorExpr, expr);
-		Type *t = type_deref(type_of_expr(&c->info, se->expr));
-		if (t != nullptr && is_type_vector(t)) {
-			return true;
-		}
-	}
-	return false;
-}
-
 bool check_is_not_addressable(Checker *c, Operand *o) {
 	if (o->mode != Addressing_Variable) {
 		return true;
 	}
 	if (is_type_bit_field_value(o->type)) {
-		return true;
-	}
-	if (check_is_expr_vector_index(c, o->expr)) {
-		return true;
-	}
-	if (check_is_vector_elem(c, o->expr)) {
 		return true;
 	}
 
@@ -1474,7 +1395,7 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 		return;
 	}
 
-	if (o->mode == Addressing_Constant && !is_type_vector(o->type)) {
+	if (o->mode == Addressing_Constant) {
 		Type *type = base_type(o->type);
 		if (!is_type_constant_type(o->type)) {
 			gbString xt = type_to_string(o->type);
@@ -1603,11 +1524,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 			update_expr_type(c, y->expr, default_type(y->type), true);
 		}
 
-		if (is_type_vector(base_type(y->type))) {
-			x->type = make_type_vector(c->allocator, t_bool, base_type(y->type)->Vector.count);
-		} else {
-			x->type = t_untyped_bool;
-		}
+		x->type = t_untyped_bool;
 	}
 
 }
@@ -1888,8 +1805,6 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 			x->mode = Addressing_Value;
 		} else if (is_type_slice(type) && is_type_string(x->type)) {
 			x->mode = Addressing_Value;
-		} else if (!is_type_vector(x->type) && is_type_vector(type)) {
-			x->mode = Addressing_Value;
 		}
 		can_convert = true;
 	}
@@ -1955,14 +1870,7 @@ bool check_transmute(Checker *c, AstNode *node, Operand *o, Type *t) {
 	return true;
 }
 
-bool check_binary_array_vector_expr(Checker *c, Token op, Operand *x, Operand *y) {
-	if (is_type_vector(x->type) && !is_type_vector(y->type)) {
-		if (check_is_assignable_to(c, y, x->type)) {
-			if (check_binary_op(c, x, op)) {
-				return true;
-			}
-		}
-	}
+bool check_binary_array_expr(Checker *c, Token op, Operand *x, Operand *y) {
 	if (is_type_array(x->type) && !is_type_array(y->type)) {
 		if (check_is_assignable_to(c, y, x->type)) {
 			if (check_binary_op(c, x, op)) {
@@ -2054,12 +1962,12 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		return;
 	}
 
-	if (check_binary_array_vector_expr(c, op, x, y)) {
+	if (check_binary_array_expr(c, op, x, y)) {
 		x->mode = Addressing_Value;
 		x->type = x->type;
 		return;
 	}
-	if (check_binary_array_vector_expr(c, op, y, x)) {
+	if (check_binary_array_expr(c, op, y, x)) {
 		x->mode = Addressing_Value;
 		x->type = y->type;
 		return;
@@ -2332,19 +2240,6 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 			}
 		}
 		break;
-
-	case Type_Vector: {
-		Type *elem = base_vector_type(t);
-		if (check_is_assignable_to(c, operand, elem)) {
-			operand->mode = Addressing_Value;
-		} else {
-			operand->mode = Addressing_Invalid;
-			convert_untyped_error(c, operand, target_type);
-			return;
-		}
-
-		break;
-	}
 
 #if defined(ALLOW_ARRAY_PROGRAMMING)
 	case Type_Array: {
@@ -2952,11 +2847,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			mode = Addressing_Constant;
 			value = exact_value_i64(at->Array.count);
 			type = t_untyped_integer;
-		} else if (is_type_vector(op_type) && id == BuiltinProc_len) {
-			Type *at = core_type(op_type);
-			mode = Addressing_Constant;
-			value = exact_value_i64(at->Vector.count);
-			type = t_untyped_integer;
 		} else if (is_type_slice(op_type)) {
 			mode = Addressing_Value;
 		} else if (is_type_dynamic_array(op_type)) {
@@ -3323,7 +3213,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			error(field_arg, "Expected an identifier for field argument");
 			return false;
 		}
-		if (is_type_array(type) || is_type_vector(type)) {
+		if (is_type_array(type)) {
 			error(field_arg, "Invalid type for 'offset_of'");
 			return false;
 		}
@@ -3422,29 +3312,19 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_swizzle: {
 		// proc swizzle(v: [N]T, ...int) -> [M]T
-		// proc swizzle(v: [vector N]T, ...int) -> [vector M]T
 		Type *type = base_type(operand->type);
-		if (!is_type_vector(type) && !is_type_array(type)) {
+		if (!is_type_array(type)) {
 			gbString type_str = type_to_string(operand->type);
 			error(call,
-			      "You can only 'swizzle' a vector or array, got '%s'",
+			      "You can only 'swizzle' an array, got '%s'",
 			      type_str);
 			gb_string_free(type_str);
 			return false;
 		}
 
-		Type *elem_type = nullptr;
-		i64 max_count = 0;
-		if (is_type_vector(type)) {
-			max_count = type->Vector.count;
-			elem_type = type->Vector.elem;
-		}
-	#if defined(ALLOW_ARRAY_PROGRAMMING)
-		else if (is_type_array(type)) {
-			max_count = type->Array.count;
-			elem_type = type->Array.elem;
-		}
-	#endif
+		i64 max_count = type->Array.count;
+		Type *elem_type = type->Array.elem;
+
 		i128 max_count128 = i128_from_i64(max_count);
 		i64 arg_count = 0;
 		for_array(i, ce->args) {
@@ -3481,14 +3361,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 
-		if (is_type_vector(type)) {
-			operand->type = make_type_vector(c->allocator, elem_type, arg_count);
-		}
-	#if defined(ALLOW_ARRAY_PROGRAMMING)
-		else if (is_type_array(type)) {
-			operand->type = make_type_array(c->allocator, elem_type, arg_count);
-		}
-	#endif
+		operand->type = make_type_array(c->allocator, elem_type, arg_count);
 		operand->mode = Addressing_Value;
 
 		break;
@@ -3850,7 +3723,7 @@ break;
 
 	case BuiltinProc_abs: {
 		// proc abs(n: numeric) -> numeric
-		if (!is_type_numeric(operand->type) && !is_type_vector(operand->type)) {
+		if (!is_type_numeric(operand->type)) {
 			gbString type_str = type_to_string(operand->type);
 			error(call, "Expected a numeric type to 'abs', got '%s'", type_str);
 			gb_string_free(type_str);
@@ -5118,13 +4991,6 @@ bool check_set_index_data(Operand *o, Type *type, bool indirection, i64 *max_cou
 		o->type = t->Array.elem;
 		return true;
 
-	case Type_Vector:
-		*max_count = t->Vector.count;
-		check_set_mode_with_indirection(o, indirection);
-		o->type = t->Vector.elem;
-		return true;
-
-
 	case Type_Slice:
 		o->type = t->Slice.elem;
 		if (o->mode != Addressing_Immutable) {
@@ -5559,7 +5425,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		case Type_Slice:
 		case Type_Array:
-		case Type_Vector:
 		case Type_DynamicArray:
 		{
 			Type *elem_type = nullptr;
@@ -5568,10 +5433,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			if (t->kind == Type_Slice) {
 				elem_type = t->Slice.elem;
 				context_name = str_lit("slice literal");
-			} else if (t->kind == Type_Vector) {
-				elem_type = t->Vector.elem;
-				context_name = str_lit("vector literal");
-				max_type_count = t->Vector.count;
 			} else if (t->kind == Type_Array) {
 				elem_type = t->Array.elem;
 				context_name = str_lit("array literal");
@@ -5621,12 +5482,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			}
 			if (max < index) {
 				max = index;
-			}
-
-			if (t->kind == Type_Vector) {
-				if (t->Vector.count > 1 && gb_is_between(index, 2, t->Vector.count-1)) {
-					error(cl->elems[0], "Expected either 1 (broadcast) or %td elements in vector literal, got %td", t->Vector.count, index);
-				}
 			}
 
 			if (t->kind == Type_Array && is_to_be_determined_array_count) {
@@ -6128,7 +5983,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 	case AstNode_PointerType:
 	case AstNode_ArrayType:
 	case AstNode_DynamicArrayType:
-	case AstNode_VectorType:
 	case AstNode_StructType:
 	case AstNode_UnionType:
 	// case AstNode_RawUnionType:
@@ -6416,13 +6270,6 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_ast_node(at, DynamicArrayType, node);
 		str = gb_string_appendc(str, "[dynamic]");
 		str = write_expr_to_string(str, at->elem);
-	case_end;
-
-	case_ast_node(vt, VectorType, node);
-		str = gb_string_appendc(str, "[vector ");
-		str = write_expr_to_string(str, vt->count);
-		str = gb_string_append_rune(str, ']');
-		str = write_expr_to_string(str, vt->elem);
 	case_end;
 
 	case_ast_node(mt, MapType, node);

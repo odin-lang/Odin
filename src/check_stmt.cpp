@@ -606,13 +606,6 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		token.string = str_lit("true");
 		x.expr       = ast_ident(c->curr_ast_file, token);
 	}
-	if (is_type_vector(x.type)) {
-		gbString str = type_to_string(x.type);
-		error(x.expr, "Invalid switch expression type: %s", str);
-		gb_string_free(str);
-		return;
-	}
-
 
 	// NOTE(bill): Check for multiple defaults
 	AstNode *first_default = nullptr;
@@ -1480,11 +1473,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 				case Type_Slice:
 					val0 = t->Slice.elem;
-					val1 = t_int;
-					break;
-
-				case Type_Vector:
-					val0 = t->Vector.elem;
 					val1 = t_int;
 					break;
 

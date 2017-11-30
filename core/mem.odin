@@ -220,7 +220,7 @@ align_of_type_info :: proc(type_info: ^Type_Info) -> int {
 	}
 
 	WORD_SIZE :: size_of(int);
-	MAX_ALIGN :: size_of([vector 64]f64); // TODO(bill): Should these constants be builtin constants?
+	MAX_ALIGN :: 2*align_of(rawptr); // TODO(bill): Should these constants be builtin constants?
 	switch info in type_info.variant {
 	case Type_Info_Named:
 		return align_of_type_info(info.base);
@@ -246,11 +246,6 @@ align_of_type_info :: proc(type_info: ^Type_Info) -> int {
 		return WORD_SIZE;
 	case Type_Info_Slice:
 		return WORD_SIZE;
-	case Type_Info_Vector:
-		size  := size_of_type_info(info.elem);
-		count := int(max(prev_pow2(i64(info.count)), 1));
-		total := size * count;
-		return clamp(total, 1, MAX_ALIGN);
 	case Type_Info_Tuple:
 		return type_info.align;
 	case Type_Info_Struct:
@@ -303,13 +298,6 @@ size_of_type_info :: proc(type_info: ^Type_Info) -> int {
 		return size_of(rawptr) + 2*size_of(int) + size_of(Allocator);
 	case Type_Info_Slice:
 		return 2*WORD_SIZE;
-	case Type_Info_Vector:
-		count := info.count;
-		if count == 0 do return 0;
-		size      := size_of_type_info(info.elem);
-		align     := align_of_type_info(info.elem);
-		alignment := align_formula(size, align);
-		return alignment*(count-1) + size;
 	case Type_Info_Struct:
 		return type_info.size;
 	case Type_Info_Union:
