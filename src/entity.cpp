@@ -36,7 +36,7 @@ enum EntityFlag {
 	EntityFlag_Using         = 1<<2,
 	EntityFlag_Field         = 1<<3,
 	EntityFlag_Param         = 1<<4,
-	EntityFlag_VectorElem    = 1<<5,
+	EntityFlag_ArrayElem     = 1<<5,
 	EntityFlag_Ellipsis      = 1<<6,
 	EntityFlag_NoAlias       = 1<<7,
 	EntityFlag_TypeField     = 1<<8,
@@ -227,12 +227,12 @@ Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, 
 	return entity;
 }
 
-Entity *make_entity_vector_elem(gbAllocator a, Scope *scope, Token token, Type *type, i32 field_src_index) {
+Entity *make_entity_array_elem(gbAllocator a, Scope *scope, Token token, Type *type, i32 field_src_index) {
 	Entity *entity = make_entity_variable(a, scope, token, type, false);
 	entity->Variable.field_src_index = field_src_index;
 	entity->Variable.field_index = field_src_index;
 	entity->flags |= EntityFlag_Field;
-	entity->flags |= EntityFlag_VectorElem;
+	entity->flags |= EntityFlag_ArrayElem;
 	return entity;
 }
 

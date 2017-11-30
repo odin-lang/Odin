@@ -1667,7 +1667,6 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		// Odin specific
 		case Type_Slice:
 		case Type_Array:
-		case Type_Vector:
 		case Type_DynamicArray:
 		case Type_Map:
 		case Type_Union:
@@ -1710,7 +1709,6 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		// Odin specific
 		case Type_Slice:
 		case Type_Array:
-		case Type_Vector:
 		case Type_DynamicArray:
 		case Type_Map:
 		case Type_Union:
@@ -2234,31 +2232,6 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_ast_node(dat, DynamicArrayType, e);
 		Type *elem = check_type(c, dat->elem);
 		*type = make_type_dynamic_array(c->allocator, elem);
-		return true;
-	case_end;
-
-
-
-	case_ast_node(vt, VectorType, e);
-
-		Operand o = {};
-		i64 count = check_array_count(c, &o, vt->count);
-		Type *generic_type = nullptr;
-		if (o.mode == Addressing_Type && o.type->kind == Type_Generic) {
-			generic_type = o.type;
-		}
-		if (count < 0) {
-			count = 0;
-		}
-
-		Type *elem = check_type(c, vt->elem);
-		Type *be = base_type(elem);
-		if (is_type_vector(be) || (!is_type_boolean(be) && !is_type_numeric(be) && be->kind != Type_Generic)) {
-			gbString err_str = type_to_string(elem);
-			error(vt->elem, "Vector element type must be numerical or a boolean, got '%s'", err_str);
-			gb_string_free(err_str);
-		}
-		*type = make_type_vector(c->allocator, elem, count, generic_type);
 		return true;
 	case_end;
 

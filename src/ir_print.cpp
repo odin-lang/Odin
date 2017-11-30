@@ -312,14 +312,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		ir_print_type(f, m, t->Array.elem);
 		ir_write_byte(f, ']');
 		return;
-	case Type_Vector: {
-		i64 align = type_align_of(heap_allocator(), t);
-		i64 count = t->Vector.count;
-		ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x ", align, count);
-		ir_print_type(f, m, t->Vector.elem);
-		ir_fprintf(f, "]}");
-		return;
-	}
 	case Type_Slice:
 		ir_write_byte(f, '{');
 		ir_print_type(f, m, t->Slice.elem);
@@ -617,44 +609,6 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			}
 
 			ir_write_byte(f, ']');
-		} else if (is_type_vector(type)) {
-			ast_node(cl, CompoundLit, value.value_compound);
-			isize elem_count = cl->elems.count;
-			if (elem_count == 0) {
-				ir_write_string(f, "zeroinitializer");
-				break;
-			}
-
-			i64 align = type_align_of(m->allocator, type);
-			i64 count = type->Vector.count;
-			Type *elem_type = type->Vector.elem;
-
-			ir_fprintf(f, "{[0 x <%lld x i8>] zeroinitializer, [%lld x ", align, count);
-			ir_print_type(f, m, elem_type);
-			ir_write_string(f, "][");
-
-			if (elem_count == 1 && type->Vector.count > 1) {
-				TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[0]);
-				GB_ASSERT(tav.mode != Addressing_Invalid);
-
-				for (isize i = 0; i < type->Vector.count; i++) {
-					if (i > 0) {
-						ir_write_string(f, str_lit(", "));
-					}
-					ir_print_compound_element(f, m, tav.value, elem_type);
-				}
-			} else {
-				for (isize i = 0; i < elem_count; i++) {
-					if (i > 0) {
-						ir_write_string(f, str_lit(", "));
-					}
-					TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
-					GB_ASSERT(tav.mode != Addressing_Invalid);
-					ir_print_compound_element(f, m, tav.value, elem_type);
-				}
-			}
-
-			ir_write_string(f, "]}");
 		} else if (is_type_struct(type)) {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
 			defer (gb_temp_arena_memory_end(tmp));
@@ -1018,10 +972,6 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_write_string(f, str_lit(", "));
 		ir_print_type(f, m, t_int);
 		ir_write_string(f, " 0, ");
-		if (is_type_vector(type_deref(et))) {
-			ir_print_type(f, m, t_i32);
-			ir_write_string(f, " 1, ");
-		}
 
 		irValue *index =instr->ArrayElementPtr.elem_index;
 		Type *t = ir_type(index);
@@ -1230,9 +1180,6 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		irInstrUnaryOp *uo = &value->Instr.UnaryOp;
 		Type *type = base_type(ir_type(uo->expr));
 		Type *elem_type = type;
-		while (elem_type->kind == Type_Vector) {
-			elem_type = base_type(elem_type->Vector.elem);
-		}
 
 		ir_fprintf(f, "%%%d = ", value->index);
 		switch (uo->op) {
@@ -1280,7 +1227,6 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		irInstrBinaryOp *bo = &value->Instr.BinaryOp;
 		Type *type = base_type(ir_type(bo->left));
 		Type *elem_type = type;
-		GB_ASSERT_MSG(!is_type_vector(elem_type), type_to_string(elem_type));
 
 		ir_fprintf(f, "%%%d = ", value->index);
 

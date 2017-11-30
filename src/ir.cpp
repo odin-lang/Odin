@@ -433,7 +433,6 @@ gb_global irValue *v_raw_nil = nullptr;
 
 enum irAddrKind {
 	irAddr_Default,
-	// irAddr_Vector,
 	irAddr_Map,
 	irAddr_BitField,
 };
@@ -451,9 +450,6 @@ struct irAddr {
 			i32      bit_field_value_index;
 		};
 	};
-	// union {
-		// struct { irValue *index; } Vector;
-	// };
 };
 
 irAddr ir_addr(irValue *addr) {
@@ -939,7 +935,7 @@ irValue *ir_instr_array_element_ptr(irProcedure *p, irValue *address, irValue *e
 	Type *t = ir_type(address);
 	GB_ASSERT_MSG(is_type_pointer(t), "%s", type_to_string(t));
 	t = base_type(type_deref(t));
-	GB_ASSERT(is_type_array(t) || is_type_vector(t));
+	GB_ASSERT(is_type_array(t));
 
 	Type *result_type = make_type_pointer(p->module->allocator, t->Array.elem);
 
@@ -2095,24 +2091,7 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 		GB_PANIC("This should be handled elsewhere");
 		break;
 	}
-	if (is_type_vector(ir_type(x))) {
-		ir_emit_comment(proc, str_lit("vector.arith.begin"));
-		// IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
-		Type *tl = base_type(ir_type(x));
-		irValue *val = ir_address_from_load_or_generate_local(proc, x);
-		GB_ASSERT(is_type_vector(type));
-		Type *elem_type = base_vector_type(type);
 
-		irValue *res = ir_add_local_generated(proc, type);
-		for (i32 i = 0; i < tl->Vector.count; i++) {
-			irValue *e = ir_emit_load(proc, ir_emit_array_epi(proc, val, i));
-			irValue *z = ir_emit_unary_arith(proc, op, e, elem_type);
-			ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
-		}
-		ir_emit_comment(proc, str_lit("vector.arith.end"));
-		return ir_emit_load(proc, res);
-
-	}
 #if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (is_type_array(ir_type(x))) {
 		ir_emit_comment(proc, str_lit("array.arith.begin"));
@@ -2142,28 +2121,6 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *right, Type *type) {
 	Type *t_left = ir_type(left);
 	Type *t_right = ir_type(right);
-
-	if (is_type_vector(t_left) || is_type_vector(t_right)) {
-		ir_emit_comment(proc, str_lit("vector.arith.begin"));
-		// IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
-		left  = ir_emit_conv(proc, left, type);
-		right = ir_emit_conv(proc, right, type);
-		irValue *lhs = ir_address_from_load_or_generate_local(proc, left);
-		irValue *rhs = ir_address_from_load_or_generate_local(proc, right);
-		GB_ASSERT(is_type_vector(type));
-		Type *elem_type = base_vector_type(type);
-
-		irValue *res = ir_add_local_generated(proc, type);
-		i64 count = base_type(type)->Vector.count;
-		for (i32 i = 0; i < count; i++) {
-			irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
-			irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
-			irValue *z = ir_emit_arith(proc, op, x, y, elem_type);
-			ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
-		}
-		ir_emit_comment(proc, str_lit("vector.arith.end"));
-		return ir_emit_load(proc, res);
-	}
 
 #if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (is_type_array(t_left) || is_type_array(t_right)) {
@@ -2446,31 +2403,6 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 	}
 
 	Type *result = t_bool;
-	if (is_type_vector(a)) {
-		result = make_type_vector(proc->module->allocator, t_bool, a->Vector.count);
-	}
-
-	if (is_type_vector(a)) {
-		ir_emit_comment(proc, str_lit("vector.comp.begin"));
-		Type *tl = base_type(a);
-		irValue *lhs = ir_address_from_load_or_generate_local(proc, left);
-		irValue *rhs = ir_address_from_load_or_generate_local(proc, right);
-
-		GB_ASSERT(is_type_vector(result));
-		Type *elem_type = base_vector_type(result);
-
-		irValue *res = ir_add_local_generated(proc, result);
-		for (i32 i = 0; i < tl->Vector.count; i++) {
-			irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
-			irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
-			irValue *z = ir_emit_comp(proc, op_kind, x, y);
-			ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
-		}
-
-		ir_emit_comment(proc, str_lit("vector.comp.end"));
-		return ir_emit_load(proc, res);
-	}
-
 #if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (is_type_array(a)) {
 		ir_emit_comment(proc, str_lit("array.comp.begin"));
@@ -2553,7 +2485,7 @@ irValue *ir_emit_array_ep(irProcedure *proc, irValue *s, irValue *index) {
 	Type *t = ir_type(s);
 	GB_ASSERT(is_type_pointer(t));
 	Type *st = base_type(type_deref(t));
-	GB_ASSERT_MSG(is_type_array(st) || is_type_vector(st), "%s", type_to_string(st));
+	GB_ASSERT_MSG(is_type_array(st), "%s", type_to_string(st));
 
 	// NOTE(bill): For some weird legacy reason in LLVM, structure elements must be accessed as an i32
 	index = ir_emit_conv(proc, index, t_i32);
@@ -2755,8 +2687,6 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 			e = ir_emit_struct_ep(proc, e, index);
 		} else if (type->kind == Type_DynamicArray) {
 			e = ir_emit_struct_ep(proc, e, index);
-		} else if (type->kind == Type_Vector) {
-			e = ir_emit_array_epi(proc, e, index);
 		} else if (type->kind == Type_Array) {
 			e = ir_emit_array_epi(proc, e, index);
 		} else if (type->kind == Type_Map) {
@@ -3261,19 +3191,6 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return ir_emit_load(proc, slice);
 	}
 
-	if (is_type_vector(dst)) {
-		Type *dst_elem = dst->Vector.elem;
-		value = ir_emit_conv(proc, value, dst_elem);
-		irValue *v = ir_add_local_generated(proc, t);
-		isize index_count = dst->Vector.count;
-
-		for (i32 i = 0; i < index_count; i++) {
-			irValue *elem = ir_emit_array_epi(proc, v, i);
-			ir_emit_store(proc, elem, value);
-		}
-		return ir_emit_load(proc, v);
-	}
-
 #if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (is_type_array(dst)) {
 		Type *elem = dst->Array.elem;
@@ -3345,7 +3262,6 @@ bool ir_is_type_aggregate(Type *t) {
 	case Type_Pointer:
 		return false;
 
-	case Type_Vector:
 	case Type_Array:
 	case Type_Slice:
 	case Type_Struct:
@@ -4107,8 +4023,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			return ir_string_len(proc, v);
 		} else if (is_type_array(t)) {
 			GB_PANIC("Array lengths are constant");
-		} else if (is_type_vector(t)) {
-			GB_PANIC("Vector lengths are constant");
 		} else if (is_type_slice(t)) {
 			return ir_slice_count(proc, v);
 		} else if (is_type_dynamic_array(t)) {
@@ -4135,8 +4049,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			GB_PANIC("Unreachable");
 		} else if (is_type_array(t)) {
 			GB_PANIC("Array lengths are constant");
-		} else if (is_type_vector(t)) {
-			GB_PANIC("Unreachable");
 		} else if (is_type_slice(t)) {
 			return ir_slice_count(proc, v);
 		} else if (is_type_dynamic_array(t)) {
@@ -4777,20 +4689,11 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	#endif
 
 	if (tv.value.kind != ExactValue_Invalid) {
-		// NOTE(bill): Edge case
-		if (tv.value.kind != ExactValue_Compound &&
-		    is_type_vector(tv.type)) {
-			Type *elem = core_array_or_vector_type(tv.type);
-			ExactValue value = convert_exact_value_for_type(tv.value, elem);
-			irValue *x = ir_add_module_constant(proc->module, elem, value);
-			return ir_emit_conv(proc, x, tv.type);
-		}
-
 #if defined(ALLOW_ARRAY_PROGRAMMING)
 		// NOTE(bill): Edge case
 		if (tv.value.kind != ExactValue_Compound &&
 		    is_type_array(tv.type)) {
-			Type *elem = core_array_or_vector_type(tv.type);
+			Type *elem = core_array_type(tv.type);
 			ExactValue value = convert_exact_value_for_type(tv.value, elem);
 			irValue *x = ir_add_module_constant(proc->module, elem, value);
 			return ir_emit_conv(proc, x, tv.type);
@@ -5014,16 +4917,6 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 		case Token_CmpAnd:
 		case Token_CmpOr:
-			if (is_type_vector(type)) {
-				TokenKind op = {};
-				switch (be->op.kind) {
-				case Token_CmpAnd: op = Token_And; break;
-				case Token_CmpOr:  op = Token_Or;  break;
-				}
-				irValue *right = ir_build_expr(proc, be->right);
-				return ir_emit_arith(proc, op, left, right, type);
-			}
-
 			return ir_emit_logical_binary_expr(proc, expr);
 
 		default:
@@ -5533,27 +5426,6 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		irValue *using_addr = nullptr;
 
 		switch (t->kind) {
-		case Type_Vector: {
-			irValue *vector = nullptr;
-			if (using_addr != nullptr) {
-				vector = using_addr;
-			} else {
-				vector = ir_build_addr_ptr(proc, ie->expr);
-				if (deref) {
-					vector = ir_emit_load(proc, vector);
-				}
-			}
-			irValue *index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
-			irValue *elem = ir_emit_array_ep(proc, vector, index);
-			auto index_tv = type_and_value_of_expr(proc->module->info, ie->index);
-			if (index_tv.mode != Addressing_Constant) {
-				irValue *len = ir_const_int(a, t->Vector.count);
-				ir_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
-			}
-			return ir_addr(elem);
-			break;
-		}
-
 		case Type_Array: {
 			irValue *array = nullptr;
 			if (using_addr != nullptr) {
@@ -5569,7 +5441,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 			auto index_tv = type_and_value_of_expr(proc->module->info, ie->index);
 			if (index_tv.mode != Addressing_Constant) {
-				irValue *len = ir_const_int(a, t->Vector.count);
+				irValue *len = ir_const_int(a, t->Array.count);
 				ir_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
 			}
 			return ir_addr(elem);
@@ -5761,7 +5633,6 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 		Type *et = nullptr;
 		switch (bt->kind) {
-		case Type_Vector: et = bt->Vector.elem; break;
 		case Type_Array:  et = bt->Array.elem;  break;
 		case Type_Slice:  et = bt->Slice.elem;  break;
 		}
@@ -5774,31 +5645,6 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 		switch (bt->kind) {
 		default: GB_PANIC("Unknown CompoundLit type: %s", type_to_string(type)); break;
-
-		case Type_Vector: {
-			if (cl->elems.count == 1 && bt->Vector.count > 1) {
-				isize index_count = bt->Vector.count;
-				irValue *elem_val = ir_build_expr(proc, cl->elems[0]);
-				for (isize i = 0; i < index_count; i++) {
-					ir_emit_store(proc, ir_emit_array_epi(proc, v, cast(i32)i), elem_val);
-				}
-			} else if (cl->elems.count > 0) {
-				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
-				for_array(i, cl->elems) {
-					AstNode *elem = cl->elems[i];
-					if (ir_is_elem_const(proc->module, elem, et)) {
-						continue;
-					}
-					irValue *field_expr = ir_build_expr(proc, elem);
-					Type *t = ir_type(field_expr);
-					GB_ASSERT(t->kind != Type_Tuple);
-					irValue *ev = ir_emit_conv(proc, field_expr, et);
-					irValue *gep = ir_emit_array_epi(proc, v, cast(i32)i);
-					ir_emit_store(proc, gep, ev);
-				}
-			}
-			break;
-		}
 
 		case Type_Struct: {
 
@@ -6291,9 +6137,6 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 	case Type_Array:
 		count = ir_const_int(proc->module->allocator, expr_type->Array.count);
 		break;
-	case Type_Vector:
-		count = ir_const_int(proc->module->allocator, expr_type->Vector.count);
-		break;
 	}
 
 	irValue *val = nullptr;
@@ -6330,10 +6173,6 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 	if (val_type != nullptr) {
 		switch (expr_type->kind) {
 		case Type_Array: {
-			val = ir_emit_load(proc, ir_emit_array_ep(proc, expr, idx));
-			break;
-		}
-		case Type_Vector: {
 			val = ir_emit_load(proc, ir_emit_array_ep(proc, expr, idx));
 			break;
 		}
@@ -7018,17 +6857,6 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				count_ptr = ir_add_local_generated(proc, t_int);
 				ir_emit_store(proc, count_ptr, ir_const_int(proc->module->allocator, et->Array.count));
 				ir_build_range_indexed(proc, array, val0_type, count_ptr, &val, &key, &loop, &done);
-				break;
-			}
-			case Type_Vector: {
-				irValue *count_ptr = nullptr;
-				irValue *vector = ir_build_addr_ptr(proc, rs->expr);
-				if (is_type_pointer(type_deref(ir_type(vector)))) {
-					vector = ir_emit_load(proc, vector);
-				}
-				count_ptr = ir_add_local_generated(proc, t_int);
-				ir_emit_store(proc, count_ptr, ir_const_int(proc->module->allocator, et->Vector.count));
-				ir_build_range_indexed(proc, vector, val0_type, count_ptr, &val, &key, &loop, &done);
 				break;
 			}
 			case Type_DynamicArray: {
@@ -8021,18 +7849,6 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			isize ez = type_size_of(a, t->Slice.elem);
 			irValue *elem_size = ir_emit_struct_ep(proc, tag, 1);
 			ir_emit_store(proc, elem_size, ir_const_int(a, ez));
-			break;
-		}
-		case Type_Vector: {
-			ir_emit_comment(proc, str_lit("TypeInfoVector"));
-			tag = ir_emit_conv(proc, variant_ptr, t_type_info_vector_ptr);
-			irValue *gep = ir_get_type_info_ptr(proc, t->Vector.elem);
-			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
-
-			isize ez = type_size_of(a, t->Vector.elem);
-			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), ir_const_int(a, ez));
-			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), ir_const_int(a, t->Vector.count));
-
 			break;
 		}
 		case Type_Proc: {

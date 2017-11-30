@@ -78,12 +78,6 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		if !ok do return false;
 		return are_types_identical(x.elem, y.elem);
 
-	case Type_Info_Vector:
-		y, ok := b.variant.(Type_Info_Vector);
-		if !ok do return false;
-		if x.count != y.count do return false;
-		return are_types_identical(x.elem, y.elem);
-
 	case Type_Info_Tuple:
 		y, ok := b.variant.(Type_Info_Tuple);
 		if !ok do return false;
@@ -229,11 +223,6 @@ is_dynamic_map :: proc(info: ^Type_Info) -> bool {
 is_slice :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
 	_, ok := type_info_base(info).variant.(Type_Info_Slice);
-	return ok;
-}
-is_vector :: proc(info: ^Type_Info) -> bool {
-	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Vector);
 	return ok;
 }
 is_tuple :: proc(info: ^Type_Info) -> bool {

@@ -1341,10 +1341,6 @@ void add_type_info_type(Checker *c, Type *t) {
 		add_type_info_type(c, make_type_pointer(c->allocator, bt->Slice.elem));
 		add_type_info_type(c, t_int);
 		break;
-	case Type_Vector:
-		add_type_info_type(c, bt->Vector.elem);
-		add_type_info_type(c, t_int);
-		break;
 
 	case Type_Enum:
 		add_type_info_type(c, bt->Enum.base_type);
@@ -1657,7 +1653,6 @@ void init_preload(Checker *c) {
 		t_type_info_array         = find_core_type(c, str_lit("Type_Info_Array"));
 		t_type_info_dynamic_array = find_core_type(c, str_lit("Type_Info_Dynamic_Array"));
 		t_type_info_slice         = find_core_type(c, str_lit("Type_Info_Slice"));
-		t_type_info_vector        = find_core_type(c, str_lit("Type_Info_Vector"));
 		t_type_info_tuple         = find_core_type(c, str_lit("Type_Info_Tuple"));
 		t_type_info_struct        = find_core_type(c, str_lit("Type_Info_Struct"));
 		t_type_info_union         = find_core_type(c, str_lit("Type_Info_Union"));
@@ -1678,7 +1673,6 @@ void init_preload(Checker *c) {
 		t_type_info_array_ptr         = make_type_pointer(c->allocator, t_type_info_array);
 		t_type_info_dynamic_array_ptr = make_type_pointer(c->allocator, t_type_info_dynamic_array);
 		t_type_info_slice_ptr         = make_type_pointer(c->allocator, t_type_info_slice);
-		t_type_info_vector_ptr        = make_type_pointer(c->allocator, t_type_info_vector);
 		t_type_info_tuple_ptr         = make_type_pointer(c->allocator, t_type_info_tuple);
 		t_type_info_struct_ptr        = make_type_pointer(c->allocator, t_type_info_struct);
 		t_type_info_union_ptr         = make_type_pointer(c->allocator, t_type_info_union);

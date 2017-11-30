@@ -244,11 +244,6 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 	case Type_Info_Slice:
 		write_string(buf, "[]");
 		write_type(buf, info.elem);
-	case Type_Info_Vector:
-		write_string(buf, "[vector ");
-		write_int(buf, i64(info.count), 10);
-		write_string(buf, "]");
-		write_type(buf, info.elem);
 
 	case Type_Info_Map:
 		write_string(buf, "map[");
@@ -813,17 +808,6 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 			data := uintptr(slice.data) + uintptr(i*info.elem_size);
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
-		}
-
-	case Type_Info_Vector:
-		write_byte(fi.buf, '<');
-		defer write_byte(fi.buf, '>');
-
-		for i in 0..info.count {
-			if i > 0 do write_string(fi.buf, ", ");
-
-			data := uintptr(v.data) + uintptr(i*info.elem_size);
-			fmt_value(fi, any{rawptr(data), info.elem}, verb);
 		}
 
 	case Type_Info_Map:

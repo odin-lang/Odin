@@ -107,11 +107,6 @@ struct TypeStruct {
 		Type *generic_type;                               \
 	})                                                    \
 	TYPE_KIND(DynamicArray, struct { Type *elem; })       \
-	TYPE_KIND(Vector,  struct {                           \
-		Type *elem;                                       \
-		i64 count;                                        \
-		Type *generic_type;                               \
-	})                                                    \
 	TYPE_KIND(Slice,   struct { Type *elem; })            \
 	TYPE_KIND(Struct,  TypeStruct)                        \
 	TYPE_KIND(Enum, struct {                              \
@@ -212,7 +207,7 @@ struct Type {
 
 
 // TODO(bill): Should I add extra information here specifying the kind of selection?
-// e.g. field, constant, vector field, type field, etc.
+// e.g. field, constant, array field, type field, etc.
 struct Selection {
 	Entity *   entity;
 	Array<i32> index;
@@ -356,7 +351,6 @@ gb_global Type *t_type_info_procedure         = nullptr;
 gb_global Type *t_type_info_array             = nullptr;
 gb_global Type *t_type_info_dynamic_array     = nullptr;
 gb_global Type *t_type_info_slice             = nullptr;
-gb_global Type *t_type_info_vector            = nullptr;
 gb_global Type *t_type_info_tuple             = nullptr;
 gb_global Type *t_type_info_struct            = nullptr;
 gb_global Type *t_type_info_union             = nullptr;
@@ -378,7 +372,6 @@ gb_global Type *t_type_info_procedure_ptr     = nullptr;
 gb_global Type *t_type_info_array_ptr         = nullptr;
 gb_global Type *t_type_info_dynamic_array_ptr = nullptr;
 gb_global Type *t_type_info_slice_ptr         = nullptr;
-gb_global Type *t_type_info_vector_ptr        = nullptr;
 gb_global Type *t_type_info_tuple_ptr         = nullptr;
 gb_global Type *t_type_info_struct_ptr        = nullptr;
 gb_global Type *t_type_info_union_ptr         = nullptr;
@@ -503,14 +496,6 @@ Type *make_type_array(gbAllocator a, Type *elem, i64 count, Type *generic_type =
 Type *make_type_dynamic_array(gbAllocator a, Type *elem) {
 	Type *t = alloc_type(a, Type_DynamicArray);
 	t->DynamicArray.elem = elem;
-	return t;
-}
-
-Type *make_type_vector(gbAllocator a, Type *elem, i64 count, Type *generic_type = nullptr) {
-	Type *t = alloc_type(a, Type_Vector);
-	t->Vector.elem = elem;
-	t->Vector.count = count;
-	t->Vector.generic_type = generic_type;
 	return t;
 }
 
@@ -673,9 +658,6 @@ bool is_type_numeric(Type *t) {
 		return (t->Basic.flags & BasicFlag_Numeric) != 0;
 	}
 	// TODO(bill): Should this be here?
-	if (t->kind == Type_Vector) {
-		return is_type_numeric(t->Vector.elem);
-	}
 #if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (t->kind == Type_Array) {
 		return is_type_numeric(t->Array.elem);
@@ -714,8 +696,6 @@ bool is_type_ordered(Type *t) {
 		return (t->Basic.flags & BasicFlag_Ordered) != 0;
 	case Type_Pointer:
 		return true;
-	case Type_Vector:
-		return is_type_ordered(t->Vector.elem);
 	}
 	return false;
 }
@@ -810,10 +790,6 @@ bool is_type_u8_slice(Type *t) {
 	}
 	return false;
 }
-bool is_type_vector(Type *t) {
-	t = base_type(t);
-	return t->kind == Type_Vector;
-}
 bool is_type_proc(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Proc;
@@ -821,13 +797,6 @@ bool is_type_proc(Type *t) {
 bool is_type_poly_proc(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Proc && t->Proc.is_polymorphic;
-}
-Type *base_vector_type(Type *t) {
-	if (is_type_vector(t)) {
-		t = base_type(t);
-		return t->Vector.elem;
-	}
-	return t;
 }
 Type *base_array_type(Type *t) {
 	if (is_type_array(t)) {
@@ -843,11 +812,10 @@ bool is_type_generic(Type *t) {
 }
 
 
-Type *core_array_or_vector_type(Type *t) {
+Type *core_array_type(Type *t) {
 	for (;;) {
 		Type *prev = t;
 		t = base_array_type(t);
-		t = base_vector_type(t);
 		if (prev == t) break;
 	}
 	return t;
@@ -956,7 +924,6 @@ bool is_type_indexable(Type *t) {
 		return is_type_string(bt);
 	case Type_Array:
 	case Type_Slice:
-	case Type_Vector:
 	case Type_DynamicArray:
 	case Type_Map:
 		return true;
@@ -996,8 +963,6 @@ bool is_type_polymorphic(Type *t) {
 			return true;
 		}
 		return is_type_polymorphic(t->Array.elem);
-	case Type_Vector:
-		return is_type_polymorphic(t->Vector.elem);
 	case Type_DynamicArray:
 		return is_type_polymorphic(t->DynamicArray.elem);
 	case Type_Slice:
@@ -1124,8 +1089,6 @@ bool is_type_comparable(Type *t) {
 		return is_type_comparable(core_type(t));
 	case Type_Array:
 		return is_type_comparable(t->Array.elem);
-	case Type_Vector:
-		return is_type_comparable(t->Vector.elem);
 	case Type_Proc:
 		return true;
 	}
@@ -1164,12 +1127,6 @@ bool are_types_identical(Type *x, Type *y) {
 	case Type_DynamicArray:
 		if (y->kind == Type_DynamicArray) {
 			return are_types_identical(x->DynamicArray.elem, y->DynamicArray.elem);
-		}
-		break;
-
-	case Type_Vector:
-		if (y->kind == Type_Vector) {
-			return (x->Vector.count == y->Vector.count) && are_types_identical(x->Vector.elem, y->Vector.elem);
 		}
 		break;
 
@@ -1355,9 +1312,6 @@ bool is_type_cte_safe(Type *type) {
 		return false;
 	case Type_Map:
 		return false;
-
-	case Type_Vector: // NOTE(bill): This should always to be true but this is for sanity reasons
-		return is_type_cte_safe(type->Vector.elem);
 
 	case Type_Slice:
 		return false;
@@ -1620,26 +1574,26 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		}
 
 		return sel;
-	} else if (type->kind == Type_Vector) {
-		if (type->Vector.count <= 4 && !is_type_boolean(type->Vector.elem)) {
+	} else if (type->kind == Type_Array) {
+		if (type->Array.count <= 4) {
 			// HACK(bill): Memory leak
-			switch (type->Vector.count) {
-			#define _VECTOR_FIELD_CASE(_length, _name) \
+			switch (type->Array.count) {
+			#define _ARRAY_FIELD_CASE(_length, _name) \
 			case (_length): \
 				if (field_name == _name) { \
 					selection_add_index(&sel, (_length)-1); \
-					sel.entity = make_entity_vector_elem(a, nullptr, make_token_ident(str_lit(_name)), type->Vector.elem, (_length)-1); \
+					sel.entity = make_entity_array_elem(a, nullptr, make_token_ident(str_lit(_name)), type->Array.elem, (_length)-1); \
 					return sel; \
 				} \
 				/*fallthrough*/
 
-			_VECTOR_FIELD_CASE(4, "w");
-			_VECTOR_FIELD_CASE(3, "z");
-			_VECTOR_FIELD_CASE(2, "y");
-			_VECTOR_FIELD_CASE(1, "x");
+			_ARRAY_FIELD_CASE(4, "w");
+			_ARRAY_FIELD_CASE(3, "z");
+			_ARRAY_FIELD_CASE(2, "y");
+			_ARRAY_FIELD_CASE(1, "x");
 			default: break;
 
-			#undef _VECTOR_FIELD_CASE
+			#undef _ARRAY_FIELD_CASE
 			}
 		}
 	}
@@ -1890,18 +1844,6 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		if (pop) type_path_pop(path);
 		return align;
 	}
-	case Type_Vector: {
-		Type *elem = t->Vector.elem;
-		bool pop = type_path_push(path, elem);
-		if (path->failure) {
-			return FAILURE_ALIGNMENT;
-		}
-		i64 size = type_size_of_internal(allocator, t->Vector.elem, path);
-		if (pop) type_path_pop(path);
-		i64 count = gb_max(prev_pow2(t->Vector.count), 1);
-		i64 total = size * count;
-		return gb_clamp(total, 1, build_context.max_align);
-	} break;
 
 	case Type_DynamicArray:
 		// data, count, capacity, allocator
@@ -2101,43 +2043,6 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		alignment = align_formula(size, align);
 		return alignment*(count-1) + size;
 	} break;
-
-	case Type_Vector: {
-#if 0
-		i64 count, bit_size, total_size_in_bits, total_size;
-		count = t->Vector.count;
-		if (count == 0) {
-			return 0;
-		}
-		bool pop = type_path_push(path, t->Vector.elem);
-		if (path->failure) {
-			return FAILURE_SIZE;
-		}
-		bit_size = 8*type_size_of_internal(allocator, t->Vector.elem, path);
-		if (pop) type_path_pop(path);
-		if (is_type_boolean(t->Vector.elem)) {
-			bit_size = 1; // NOTE(bill): LLVM can store booleans as 1 bit because a boolean _is_ an `i1`
-			              // Silly LLVM spec
-		}
-		total_size_in_bits = bit_size * count;
-		total_size = (total_size_in_bits+7)/8;
-		return total_size;
-#else
-		i64 count = t->Vector.count;
-		if (count == 0) {
-			return 0;
-		}
-		i64 elem_align = type_align_of_internal(allocator, t->Vector.elem, path);
-		if (path->failure) {
-			return FAILURE_SIZE;
-		}
-		i64 vector_align = type_align_of_internal(allocator, t, path);
-		i64 elem_size = type_size_of_internal(allocator, t->Vector.elem, path);
-		i64 alignment = align_formula(elem_size, elem_align);
-		return align_formula(alignment*(count-1) + elem_size, vector_align);
-#endif
-	} break;
-
 
 	case Type_Slice: // ptr + len
 		return 2 * build_context.word_size;
@@ -2376,11 +2281,6 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_Array:
 		str = gb_string_appendc(str, gb_bprintf("[%d]", cast(int)type->Array.count));
 		str = write_type_to_string(str, type->Array.elem);
-		break;
-
-	case Type_Vector:
-		str = gb_string_appendc(str, gb_bprintf("[vector %d]", cast(int)type->Vector.count));
-		str = write_type_to_string(str, type->Vector.elem);
 		break;
 
 	case Type_Slice:
