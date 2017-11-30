@@ -4828,7 +4828,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		GB_ASSERT_MSG(e != nullptr, "%s", expr_to_string(expr));
 		if (e->kind == Entity_Builtin) {
 			Token token = ast_node_token(expr);
-			GB_PANIC("TODO(bill): ir_build_single_expr Entity_Builtin '%.*s'\n"
+			GB_PANIC("TODO(bill): ir_build_expr Entity_Builtin '%.*s'\n"
 			         "\t at %.*s(%td:%td)", LIT(builtin_procs[e->Builtin.id].name),
 			         LIT(token.pos.file), token.pos.line, token.pos.column);
 			return nullptr;

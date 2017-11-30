@@ -623,6 +623,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 	if (operand->mode == Addressing_Invalid) {
 		return;
 	}
+
 	#if 0
 	if (operand->mode == Addressing_Type) {
 		Type *t = base_type(type);
@@ -664,6 +665,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 			}
 		}
 	}
+
 
 	if (type == nullptr) {
 		return;
