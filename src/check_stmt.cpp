@@ -178,8 +178,12 @@ bool check_is_terminating(AstNode *node) {
 }
 
 Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
-	if (rhs->mode == Addressing_Invalid ||
-	    (rhs->type == t_invalid && rhs->mode != Addressing_Overload)) {
+	if (rhs->mode == Addressing_Invalid) {
+		return nullptr;
+	}
+	if (rhs->type == t_invalid &&
+	    rhs->mode != Addressing_Overload &&
+	    rhs->mode != Addressing_Builtin) {
 		return nullptr;
 	}
 
