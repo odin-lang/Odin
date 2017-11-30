@@ -621,6 +621,30 @@ panic :: proc "contextless" (message := "", args: ...any, using loc := #caller_l
 }
 
 
+buffer_from_slice :: proc(backing: $T/[]$E) -> [dynamic]E {
+	s := transmute(raw.Slice)backing;
+	d := raw.Dynamic_Array{
+		data      = s.data,
+		len       = 0,
+		cap       = s.len,
+		allocator = nil_allocator(),
+	};
+	return transmute([dynamic]E)d;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 __string_eq :: proc "contextless" (a, b: string) -> bool {
 	switch {
 	case len(a) != len(b): return false;
