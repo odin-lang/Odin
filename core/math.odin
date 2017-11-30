@@ -55,13 +55,13 @@ foreign __llvm_core {
 	fmuladd :: proc(a, b, c: f64) -> f64 ---;
 }
 
-tan :: proc "c" (θ: f32) -> f32 do return sin(θ)/cos(θ);
-tan :: proc "c" (θ: f64) -> f64 do return sin(θ)/cos(θ);
+tan :: proc "c" (θ: f32) -> f32 { return sin(θ)/cos(θ); }
+tan :: proc "c" (θ: f64) -> f64 { return sin(θ)/cos(θ); }
 
-lerp   :: proc(a, b: $T, t: $E) -> (x: T) do return a*(1-t) + b*t;
+lerp   :: proc(a, b: $T, t: $E) -> (x: T) { return a*(1-t) + b*t; }
 
-unlerp :: proc(a, b, x: f32) -> (t: f32) do return (x-a)/(b-a);
-unlerp :: proc(a, b, x: f64) -> (t: f64) do return (x-a)/(b-a);
+unlerp :: proc(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
+unlerp :: proc(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
 
 
 sign :: proc(x: f32) -> f32 { return x >= 0 ? +1 : -1; }
@@ -94,8 +94,8 @@ floor :: proc(x: f64) -> f64 { return x >= 0 ? f64(i64(x)) : f64(i64(x-0.5)); } 
 ceil :: proc(x: f32) -> f32 { return x < 0 ? f32(i64(x)) : f32(i64(x+1)); }// TODO: Get accurate versions
 ceil :: proc(x: f64) -> f64 { return x < 0 ? f64(i64(x)) : f64(i64(x+1)); }// TODO: Get accurate versions
 
-remainder :: proc(x, y: f32) -> f32 do return x - round(x/y) * y;
-remainder :: proc(x, y: f64) -> f64 do return x - round(x/y) * y;
+remainder :: proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
+remainder :: proc(x, y: f64) -> f64 { return x - round(x/y) * y; }
 
 mod :: proc(x, y: f32) -> f32 {
 	result: f32;
@@ -117,30 +117,34 @@ mod :: proc(x, y: f64) -> f64 {
 }
 
 
-to_radians :: proc(degrees: f32) -> f32 do return degrees * TAU / 360;
-to_degrees :: proc(radians: f32) -> f32 do return radians * 360 / TAU;
+to_radians :: proc(degrees: f32) -> f32 { return degrees * TAU / 360; }
+to_degrees :: proc(radians: f32) -> f32 { return radians * 360 / TAU; }
 
 
 
 dot :: proc(a, b: $T/[$N]$E) -> E {
 	res: E;
-	for i in 0..N do res += a[i] * b[i];
+	for i in 0..N { res += a[i] * b[i]; }
 	return res;
 }
 
-cross :: proc(x, y: $T/[3]$E) -> T {
-	a := swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
-	b := swizzle(x, 2, 0, 1) * swizzle(y, 1, 2, 0);
-	return T(a - b);
+cross :: proc(a, b: $T/[2]$E) -> E {
+	return a[0]*b[1] - a[1]*b[0];
+}
+
+cross :: proc(a, b: $T/[3]$E) -> T {
+	i := swizzle(a, 1, 2, 0) * swizzle(b, 2, 0, 1);
+	j := swizzle(a, 2, 0, 1) * swizzle(b, 1, 2, 0);
+	return T(i - j);
 }
 
 
-mag :: proc(v: $T/[$N]$E) -> E do return sqrt(dot(v, v));
+length :: proc(v: $T/[$N]$E) -> E { return sqrt(dot(v, v)); }
 
-norm :: proc(v: $T/[$N]$E) -> T do return v / mag(v);
+norm :: proc(v: $T/[$N]$E) -> T { return v / length(v); }
 
 norm0 :: proc(v: $T/[$N]$E) -> T {
-	m := mag(v);
+	m := length(v);
 	return m == 0 ? 0 : v/m;
 }
 
@@ -155,7 +159,7 @@ mat4_identity :: proc() -> Mat4 {
 	};
 }
 
-mat4_transpose :: proc(m: Mat4) -> Mat4 {
+transpose :: proc(m: Mat4) -> Mat4 {
 	for j in 0..4 {
 		for i in 0..4 {
 			m[i][j], m[j][i] = m[j][i], m[i][j];
@@ -313,9 +317,9 @@ look_at :: proc(eye, centre, up: Vec3) -> Mat4 {
 	u := cross(s, f);
 
 	return Mat4{
-		{+s[0], +u[0], -f[0], 0},
-		{+s[1], +u[1], -f[1], 0},
-		{+s[2], +u[2], -f[2], 0},
+		{+s.x, +u.x, -f.x, 0},
+		{+s.y, +u.y, -f.y, 0},
+		{+s.z, +u.z, -f.z, 0},
 		{-dot(s, eye), -dot(u, eye), dot(f, eye), 1},
 	};
 }

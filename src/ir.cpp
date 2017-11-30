@@ -3824,8 +3824,9 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 		return;
 	}
 
-	if (!ptr_set_exists(&m->min_dep_set, e)) return;
-
+	if (!ptr_set_exists(&m->min_dep_set, e)) {
+		return;
+	}
 	irValue *t = ir_value_type_name(m->allocator, name, e->type);
 	ir_module_add_value(m, e, t);
 	map_set(&m->members, hash_string(name), t);
@@ -4874,8 +4875,78 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
-		case Token_And:
+		case Token_And: {
+			AstNode *ue_expr = unparen_expr(ue->expr);
+			if (ue_expr->kind == AstNode_TypeAssertion) {
+				gbAllocator a = proc->module->allocator;
+
+
+				GB_ASSERT(is_type_pointer(tv.type));
+
+				ast_node(ta, TypeAssertion, ue_expr);
+				TokenPos pos = ast_node_token(expr).pos;
+				Type *type = type_of_expr(proc->module->info, ue_expr);
+				GB_ASSERT(!is_type_tuple(type));
+
+				irValue *e = ir_build_expr(proc, ta->expr);
+				Type *t = type_deref(ir_type(e));
+				if (is_type_union(t)) {
+					irValue *v = e;
+					if (!is_type_pointer(ir_type(v))) {
+						v = ir_address_from_load_or_generate_local(proc, v);
+					}
+					Type *src_type = type_deref(ir_type(v));
+					Type *dst_type = type;
+
+					irValue *src_tag = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, v));
+					irValue *dst_tag = ir_const_union_tag(a, src_type, dst_type);
+
+					irValue *ok = ir_emit_comp(proc, Token_CmpEq, src_tag, dst_tag);
+					irValue **args = gb_alloc_array(a, irValue *, 6);
+					args[0] = ok;
+
+					args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
+					args[2] = ir_const_int(a, pos.line);
+					args[3] = ir_const_int(a, pos.column);
+
+					args[4] = ir_type_info(proc, src_type);
+					args[5] = ir_type_info(proc, dst_type);
+					ir_emit_global_call(proc, "__type_assertion_check", args, 6);
+
+					irValue *data_ptr = v;
+					return ir_emit_conv(proc, data_ptr, tv.type);
+				} else if (is_type_any(t)) {
+					irValue *v = e;
+					if (is_type_pointer(ir_type(v))) {
+						v = ir_emit_load(proc, v);
+					}
+
+					irValue *data_ptr = ir_emit_struct_ev(proc, v, 0);
+					irValue *any_ti = ir_emit_struct_ev(proc, v, 1);
+					irValue *ti_ptr = ir_type_info(proc, type);
+
+
+					irValue *ok = ir_emit_comp(proc, Token_CmpEq, any_ti, ti_ptr);
+					irValue **args = gb_alloc_array(a, irValue *, 6);
+					args[0] = ok;
+
+					args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
+					args[2] = ir_const_int(a, pos.line);
+					args[3] = ir_const_int(a, pos.column);
+
+					args[4] = any_ti;
+					args[5] = ti_ptr;
+					ir_emit_global_call(proc, "__type_assertion_check", args, 6);
+
+					return ir_emit_conv(proc, data_ptr, tv.type);
+				} else {
+					GB_PANIC("TODO(bill): type assertion %s", type_to_string(type));
+				}
+
+			}
+
 			return ir_emit_ptr_offset(proc, ir_build_addr_ptr(proc, ue->expr), v_zero); // Make a copy of the pointer
+		}
 		default:
 			return ir_emit_unary_arith(proc, ue->op.kind, ir_build_expr(proc, ue->expr), tv.type);
 		}

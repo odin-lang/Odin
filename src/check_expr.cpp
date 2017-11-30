@@ -1357,6 +1357,25 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 }
 
 bool check_is_not_addressable(Checker *c, Operand *o) {
+	if (o->mode == Addressing_OptionalOk) {
+		AstNode *expr = unparen_expr(o->expr);
+		if (expr->kind != AstNode_TypeAssertion) {
+			return true;
+		}
+		ast_node(ta, TypeAssertion, expr);
+		TypeAndValue tv = type_and_value_of_expr(&c->info, ta->expr);
+		if (is_type_pointer(tv.type)) {
+			return false;
+		}
+		if (is_type_union(tv.type) && tv.mode == Addressing_Variable) {
+			return false;
+		}
+		if (is_type_any(tv.type)) {
+			return false;
+		}
+		return true;
+
+	}
 	if (o->mode != Addressing_Variable) {
 		return true;
 	}
@@ -1370,10 +1389,6 @@ bool check_is_not_addressable(Checker *c, Operand *o) {
 void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 	switch (op.kind) {
 	case Token_And: { // Pointer address
-		if (o->mode == Addressing_Type) {
-			o->type = make_type_pointer(c->allocator, o->type);
-			return;
-		}
 		if (check_is_not_addressable(c, o)) {
 			if (ast_node_expect(node, AstNode_UnaryExpr)) {
 				ast_node(ue, UnaryExpr, node);
