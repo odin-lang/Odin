@@ -999,6 +999,11 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 
 	if (e->kind == Entity_ProcedureGrouping) {
 		auto *pge = &e->ProcedureGrouping;
+
+		DeclInfo *d = decl_info_of_entity(&c->info, e);
+		check_entity_decl(c, e, d, nullptr);
+
+
 		Entity **procs = pge->entities.data;
 		isize overload_count = pge->entities.count;
 		bool skip = false;
