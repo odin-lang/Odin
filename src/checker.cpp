@@ -1472,7 +1472,7 @@ PtrSet<Entity *> generate_minimum_dependency_set(CheckerInfo *info, Entity *star
 		Entity *e = info->definitions.entries[i].value;
 		// if (e->scope->is_global && !is_type_poly_proc(e->type)) { // TODO(bill): is the check enough?
 		if (e->scope->is_global) { // TODO(bill): is the check enough?
-			if (!is_type_poly_proc(e->type))  {
+			if (e->type == nullptr || !is_type_poly_proc(e->type))  {
 				// NOTE(bill): Require runtime stuff
 				add_dependency_to_map(&map, info, e);
 			}

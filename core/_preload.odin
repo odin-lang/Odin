@@ -362,10 +362,10 @@ pop :: proc "contextless" (array: ^$T/[dynamic]$E) -> E {
 	return res;
 }
 
-clear :: inline proc "contextless" (array: ^$T/[dynamic]$E) {
+clear_dynamic_array :: inline proc "contextless" (array: ^$T/[dynamic]$E) {
 	if array != nil do (cast(^raw.Dynamic_Array)array).len = 0;
 }
-clear :: inline proc "contextless" (m: ^$T/map[$K]$V) {
+clear_map :: inline proc "contextless" (m: ^$T/map[$K]$V) {
 	if m == nil do return;
 	raw_map := cast(^raw.Map)m;
 	hashes  := cast(^raw.Dynamic_Array)&raw_map.hashes;
@@ -373,6 +373,8 @@ clear :: inline proc "contextless" (m: ^$T/map[$K]$V) {
 	hashes.len  = 0;
 	entries.len = 0;
 }
+
+clear :: proc[clear_dynamic_array, clear_map];
 
 reserve :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #caller_location) -> bool {
 	if array == nil do return false;
@@ -472,23 +474,25 @@ new_clone :: inline proc(data: $T, loc := #caller_location) -> ^T {
 	return ptr;
 }
 
-free :: proc(ptr: rawptr, loc := #caller_location) {
-	free_ptr(ptr, loc);
-}
-free :: proc(str: $T/string, loc := #caller_location) {
+free_string :: proc(str: string, loc := #caller_location) {
 	free_ptr((^raw.String)(&str).data, loc);
 }
-free :: proc(array: $T/[dynamic]$E, loc := #caller_location) {
+free_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) {
 	free_ptr((^raw.Dynamic_Array)(&array).data, loc);
 }
-free :: proc(slice: $T/[]$E, loc := #caller_location) {
-	free_ptr((^raw.Slice)(&slice).data, loc);
+free_slice :: proc(array: $T/[]$E, loc := #caller_location) {
+	free_ptr((^raw.Slice)(&array).data, loc);
 }
-free :: proc(m: $T/map[$K]$V, loc := #caller_location) {
+free_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
 	raw := cast(^raw.Map)&m;
-	free(raw.hashes, loc);
-	free(raw.entries.data, loc);
+	free_dynamic_array(raw.hashes, loc);
+	free_ptr(raw.entries.data, loc);
 }
+
+free :: proc[
+	free_ptr, free_string, free_dynamic_array, free_slice, free_map,
+];
+
 
 // NOTE(bill): This code works but I will prefer having `make` a built-in procedure
 // to have better error messages
@@ -498,14 +502,7 @@ make :: proc(T: type/[]$E, len: int, using loc := #caller_location) -> T {
 	__slice_expr_error(file_path, int(line), int(column), 0, len, cap);
 	data := cast(^E)alloc(len * size_of(E), align_of(E));
 	for i in 0..len do (data+i)^ = E{};
-	s := raw.Slice{data = data, len = len, cap = len};
-	return (cast(^T)&s)^;
-}
-make :: proc(T: type/[]$E, len, cap: int, using loc := #caller_location) -> T {
-	__slice_expr_error(file_path, int(line), int(column), 0, len, cap);
-	data := cast(^E)alloc(len * size_of(E), align_of(E));
-	for i in 0..len do (data+i)^ = E{};
-	s := raw.Slice{data = data, len = len, cap = len};
+	s := raw.Slice{data = data, len = len};
 	return (cast(^T)&s)^;
 }
 make :: proc(T: type/[dynamic]$E, len: int = 8, using loc := #caller_location) -> T {
