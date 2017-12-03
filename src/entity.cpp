@@ -200,11 +200,13 @@ Entity *make_entity_type_name(gbAllocator a, Scope *scope, Token token, Type *ty
 	return entity;
 }
 
-Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, bool is_using, bool is_immutable) {
+Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, bool is_using, bool is_value) {
+	bool is_immutable = false;
 	Entity *entity = make_entity_variable(a, scope, token, type, is_immutable);
 	entity->flags |= EntityFlag_Used;
-	if (is_using) entity->flags |= EntityFlag_Using;
 	entity->flags |= EntityFlag_Param;
+	if (is_using) entity->flags |= EntityFlag_Using;
+	if (is_value) entity->flags |= EntityFlag_Value;
 	return entity;
 }
 
