@@ -466,6 +466,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	// NOTE(bill): Is this correct? Does this handle all cases regarding arrays?
 	if (is_type_array(type) &&
 	    value.kind != ExactValue_Invalid &&
+	    value.kind != ExactValue_String &&
 	    value.kind != ExactValue_Compound) {
 		i64 count  = type->Array.count;
 		Type *elem = type->Array.elem;
