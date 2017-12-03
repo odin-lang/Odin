@@ -65,12 +65,12 @@ write_rune :: proc(buf: ^String_Buffer, r: rune) {
 	write_bytes(buf, b[..n]);
 }
 
-write_int :: proc(buf: ^String_Buffer, i: i128, base: int) {
+write_i128 :: proc(buf: ^String_Buffer, i: i128, base: int) {
 	b: [129]byte;
 	s := strconv.append_bits(b[..], u128(i), base, true, 128, strconv.digits, 0);
 	write_string(buf, s);
 }
-write_int :: proc(buf: ^String_Buffer, i: i64, base: int) {
+write_i64 :: proc(buf: ^String_Buffer, i: i64, base: int) {
 	b: [129]byte;
 	s := strconv.append_bits(b[..], u128(i), base, true, 64, strconv.digits, 0);
 	write_string(buf, s);
@@ -171,7 +171,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 		case:
 			if info.signed do write_byte(buf, 'i');
 			else           do write_byte(buf, 'u');
-			write_int(buf, i64(8*ti.size), 10);
+			write_i64(buf, i64(8*ti.size), 10);
 		}
 	case Type_Info_Rune:
 		write_string(buf, "rune");
@@ -235,7 +235,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 	case Type_Info_Array:
 		write_string(buf, "[");
 		fi := Fmt_Info{buf = buf};
-		write_int(buf, i64(info.count), 10);
+		write_i64(buf, i64(info.count), 10);
 		write_string(buf, "]");
 		write_type(buf, info.elem);
 	case Type_Info_Dynamic_Array:
@@ -258,7 +258,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 		if info.is_raw_union do write_string(buf, "#raw_union ");
 		if info.custom_align {
 			write_string(buf, "#align ");
-			write_int(buf, i64(ti.align), 10);
+			write_i64(buf, i64(ti.align), 10);
 			write_byte(buf, ' ');
 		}
 		write_byte(buf, '{');
@@ -292,7 +292,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 		write_string(buf, "bit_field ");
 		if ti.align != 1 {
 			write_string(buf, "#align ");
-			write_int(buf, i64(ti.align), 10);
+			write_i64(buf, i64(ti.align), 10);
 			write_rune(buf, ' ');
 		}
 		write_string(buf, " {");
@@ -300,7 +300,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 			if i > 0 do write_string(buf, ", ");
 			write_string(buf, name);
 			write_string(buf, ": ");
-			write_int(buf, i64(info.bits[i]), 10);
+			write_i64(buf, i64(info.bits[i]), 10);
 		}
 		write_string(buf, "}");
 	}

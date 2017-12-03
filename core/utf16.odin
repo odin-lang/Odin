@@ -38,11 +38,11 @@ encode :: proc(d: []u16, s: []rune) -> int {
 
 	for r in s {
 		switch r {
-		case 0.._surr1, _surr3.._surr_self:
+		case 0.._surr1, _surr3 .. _surr_self:
 			d[n] = u16(r);
 			n += 1;
 
-		case _surr_self..MAX_RUNE:
+		case _surr_self .. MAX_RUNE:
 			r1, r2 := encode_surrogate_pair(r);
 			d[n]    = u16(r1);
 			d[n+1]  = u16(r2);
@@ -66,11 +66,11 @@ encode :: proc(d: []u16, s: string) -> int {
 
 	for r in s {
 		switch r {
-		case 0.._surr1, _surr3.._surr_self:
+		case 0.._surr1, _surr3 .. _surr_self:
 			d[n] = u16(r);
 			n += 1;
 
-		case _surr_self..MAX_RUNE:
+		case _surr_self .. MAX_RUNE:
 			r1, r2 := encode_surrogate_pair(r);
 			d[n]    = u16(r1);
 			d[n+1]  = u16(r2);

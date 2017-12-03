@@ -56,7 +56,7 @@ void     check_expr_or_type             (Checker *c, Operand *operand, AstNode *
 ExprKind check_expr_base                (Checker *c, Operand *operand, AstNode *expression, Type *type_hint);
 void     check_expr_with_type_hint      (Checker *c, Operand *o, AstNode *e, Type *t);
 Type *   check_type                     (Checker *c, AstNode *expression, Type *named_type = nullptr);
-Type *   make_optional_ok_type(gbAllocator a, Type *value);
+Type *   make_optional_ok_type          (gbAllocator a, Type *value);
 void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def, bool alias);
 Entity * check_selector                 (Checker *c, Operand *operand, AstNode *node, Type *type_hint);
 Entity * check_ident                    (Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name);
@@ -2862,7 +2862,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			mode = Addressing_Constant;
 			value = exact_value_i64(at->Array.count);
 			type = t_untyped_integer;
-		} else if (is_type_slice(op_type)) {
+		} else if (is_type_slice(op_type) && id == BuiltinProc_len) {
 			mode = Addressing_Value;
 		} else if (is_type_dynamic_array(op_type)) {
 			mode = Addressing_Value;

@@ -120,10 +120,10 @@ default_struct_values :: proc() {
 		heap_one      := new(Vector3);         defer free(heap_one);
 		heap_two      := new_clone(Vector3{}); defer free(heap_two);
 
-		fmt.println("stack_default - ", stack_default);
-		fmt.println("stack_literal - ", stack_literal);
-		fmt.println("heap_one      - ", heap_one^);
-		fmt.println("heap_two      - ", heap_two^);
+		fmt.println("stack_default  - ", stack_default);
+		fmt.println("stack_literal  - ", stack_literal);
+		fmt.println("heap_one       - ", heap_one^);
+		fmt.println("heap_two       - ", heap_two^);
 
 
 		N :: 4;
@@ -291,15 +291,15 @@ union_type :: proc() {
 		/*
 			Entity :: struct {
 				...
-				derived: union{^Frog, ^Monster};
+				derived: union{^Frog, ^Monster},
 			}
 
 			Frog :: struct {
-				using entity: Entity;
+				using entity: Entity,
 				...
 			}
 			Monster :: struct {
-				using entity: Entity;
+				using entity: Entity,
 				...
 
 			}
@@ -402,7 +402,7 @@ parametric_polymorphism :: proc() {
 			context <- c {
 				old_slots := table.slots;
 
-				cap := max(2*cap(table.slots), TABLE_SIZE_MIN);
+				cap := max(2*len(table.slots), TABLE_SIZE_MIN);
 				allocate(table, cap);
 
 				for s in old_slots do if s.occupied {
@@ -419,16 +419,16 @@ parametric_polymorphism :: proc() {
 			hash := get_hash(key); // Ad-hoc method which would fail in a different scope
 			index := find_index(table, key, hash);
 			if index < 0 {
-				if f64(table.count) >= 0.75*f64(cap(table.slots)) {
+				if f64(table.count) >= 0.75*f64(len(table.slots)) {
 					expand(table);
 				}
-				assert(table.count <= cap(table.slots));
+				assert(table.count <= len(table.slots));
 
 				hash := get_hash(key);
-				index = int(hash % u32(cap(table.slots)));
+				index = int(hash % u32(len(table.slots)));
 
 				for table.slots[index].occupied {
-					if index += 1; index >= cap(table.slots) {
+					if index += 1; index >= len(table.slots) {
 						index = 0;
 					}
 				}
@@ -455,9 +455,9 @@ parametric_polymorphism :: proc() {
 		}
 
 		find_index :: proc(table: ^Table($Key, $Value), key: Key, hash: u32) -> int {
-			if cap(table.slots) <= 0 do return -1;
+			if len(table.slots) <= 0 do return -1;
 
-			index := int(hash % u32(cap(table.slots)));
+			index := int(hash % u32(len(table.slots)));
 			for table.slots[index].occupied {
 				if table.slots[index].hash == hash {
 					if table.slots[index].key == key {
@@ -465,7 +465,7 @@ parametric_polymorphism :: proc() {
 					}
 				}
 
-				if index += 1; index >= cap(table.slots) {
+				if index += 1; index >= len(table.slots) {
 					index = 0;
 				}
 			}
@@ -565,13 +565,60 @@ threading_example :: proc() {
 	}
 }
 
+array_programming :: proc() {
+	fmt.println("# array_programming");
+	{
+		a := [3]f32{1, 2, 3};
+		b := [3]f32{5, 6, 7};
+		c := a * b;
+		d := a + b;
+		e := 1 +  (c - d) / 2;
+		fmt.printf("%.1f\n", e); // [0.5, 3.0, 6.5]
+	}
+
+	{
+		a := [3]f32{1, 2, 3};
+		b := swizzle(a, 2, 1, 0);
+		assert(b == [3]f32{3, 2, 1});
+
+		c := swizzle(a, 0, 0);
+		assert(c == [2]f32{1, 1});
+		assert(c == 1);
+	}
+
+	{
+		Vector3 :: [3]f32;
+		a := Vector3{1, 2, 3};
+		b := Vector3{5, 6, 7};
+		c := (a * b)/2 + 1;
+		d := c.x + c.y + c.z;
+		fmt.printf("%.1f\n", d); // 22.0
+
+		cross :: proc(a, b: Vector3) -> Vector3 {
+			i := swizzle(a, 1, 2, 0) * swizzle(b, 2, 0, 1);
+			j := swizzle(a, 2, 0, 1) * swizzle(b, 1, 2, 0);
+			return Vector3(i - j);
+		}
+
+		blah :: proc(a: Vector3) -> f32 {
+			return a.x + a.y + a.z;
+		}
+
+		x := cross(a, b);
+		fmt.println(x);
+		fmt.println(blah(x));
+	}
+}
+
+
 main :: proc() {
-	when true {
+	when false {
 		general_stuff();
 		default_struct_values();
 		union_type();
 		parametric_polymorphism();
 		threading_example();
+		array_programming();
 	}
 }
 
