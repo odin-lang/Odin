@@ -1,10 +1,6 @@
 #define ALLOW_ARRAY_PROGRAMMING
 
-#define USE_CUSTOM_BACKEND 0
 // #define NO_ARRAY_BOUNDS_CHECK
-#if !defined(USE_THREADED_PARSER)
-#define USE_THREADED_PARSER 0
-#endif
 
 #include "common.cpp"
 #include "timings.cpp"
@@ -13,7 +9,6 @@
 #include "parser.cpp"
 #include "docs.cpp"
 #include "checker.cpp"
-#include "ssa.cpp"
 #include "ir.cpp"
 #include "ir_opt.cpp"
 #include "ir_print.cpp"
@@ -621,8 +616,6 @@ int main(int arg_count, char **arg_ptr) {
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
 
-#if 1
-
 	String command = args[1];
 
 	String init_filename = {};
@@ -701,7 +694,6 @@ int main(int arg_count, char **arg_ptr) {
 		return 0;
 	}
 
-#if 1
 	timings_start_section(&timings, str_lit("type check"));
 
 	Checker checker = {0};
@@ -711,26 +703,11 @@ int main(int arg_count, char **arg_ptr) {
 
 	check_parsed_files(&checker);
 
-
-#endif
-#if defined(USE_CUSTOM_BACKEND) && USE_CUSTOM_BACKEND
-	if (global_error_collector.count != 0) {
-		return 1;
-	}
-
-	if (checker.parser->total_token_count < 2) {
-		return 1;
-	}
-
-	if (!ssa_generate(&parser, &checker.info)) {
-		return 1;
-	}
-#else
 	irGen ir_gen = {0};
 	if (!ir_gen_init(&ir_gen, &checker)) {
 		return 1;
 	}
-	defer (ir_gen_destroy(&ir_gen));
+	// defer (ir_gen_destroy(&ir_gen));
 
 	timings_start_section(&timings, str_lit("llvm ir gen"));
 	ir_gen_tree(&ir_gen);
@@ -743,7 +720,6 @@ int main(int arg_count, char **arg_ptr) {
 
 	// prof_print_all();
 
-	#if 1
 	timings_start_section(&timings, str_lit("llvm-opt"));
 
 	String output_name = ir_gen.output_name;
@@ -994,9 +970,6 @@ int main(int arg_count, char **arg_ptr) {
 			system_exec_command_line_app("odin run", false, "%.*s", LIT(output_base));
 		}
 	#endif
-#endif
-#endif
-#endif
 
 	return 0;
 }
