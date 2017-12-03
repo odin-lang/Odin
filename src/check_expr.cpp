@@ -997,6 +997,43 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 		gb_free(heap_allocator(), procs);
 	}
 
+	if (e->kind == Entity_ProcedureGrouping) {
+		auto *pge = &e->ProcedureGrouping;
+		Entity **procs = pge->entities.data;
+		isize overload_count = pge->entities.count;
+		bool skip = false;
+
+		if (type_hint != nullptr) {
+			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+			defer (gb_temp_arena_memory_end(tmp));
+
+			// NOTE(bill): These should be done
+			for (isize i = 0; i < overload_count; i++) {
+				Type *t = base_type(procs[i]->type);
+				if (t == t_invalid) {
+					continue;
+				}
+				Operand x = {};
+				x.mode = Addressing_Value;
+				x.type = t;
+				if (check_is_assignable_to(c, &x, type_hint)) {
+					e = procs[i];
+					add_entity_use(c, n, e);
+					skip = true;
+					break;
+				}
+			}
+		}
+
+		if (!skip) {
+			o->mode              = Addressing_Overload;
+			o->type              = t_invalid;
+			o->overload_count    = overload_count;
+			o->overload_entities = procs;
+			return nullptr;
+		}
+	}
+
 	add_entity_use(c, n, e);
 	check_entity_decl(c, e, nullptr, named_type);
 
@@ -4427,11 +4464,12 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 		defer (gb_free(heap_allocator(), procs));
 		defer (gb_free(heap_allocator(), valids));
 
-		String name = procs[0]->token.string;
+		gbString expr_name = expr_to_string(operand->expr);
+		defer (gb_string_free(expr_name));
 
 		for (isize i = 0; i < overload_count; i++) {
 			Entity *e = procs[i];
-			GB_ASSERT(e->token.string == name);
+			// GB_ASSERT(e->token.string == name);
 			DeclInfo *d = decl_info_of_entity(&c->info, e);
 			GB_ASSERT(d != nullptr);
 			check_entity_decl(c, e, d, nullptr);
@@ -4476,7 +4514,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 
 
 		if (valid_count == 0) {
-			error(operand->expr, "No overloads or ambiguous call for '%.*s' that match with the given arguments", LIT(name));
+			error(operand->expr, "No overloads or ambiguous call for '%s' that match with the given arguments", expr_name);
 			gb_printf_err("\tGiven argument types -> (");
 			for_array(i, operands) {
 				Operand o = operands[i];
@@ -4502,6 +4540,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 				} else {
 					pt = type_to_string(t);
 				}
+				String name = proc->token.string;
 				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td) with score %lld\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
 				// gb_printf_err("\t%.*s :: %s at %.*s(%td:%td)\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column);
 				gb_string_free(pt);
@@ -4511,7 +4550,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 			}
 			result_type = t_invalid;
 		} else if (valid_count > 1) {
-			error(operand->expr, "Ambiguous procedure call '%.*s' tha match with the given arguments", LIT(name));
+			error(operand->expr, "Ambiguous procedure call '%s' tha match with the given arguments", expr_name);
 			gb_printf_err("\tGiven argument types -> (");
 			for_array(i, operands) {
 				Operand o = operands[i];
@@ -4532,6 +4571,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 				} else {
 					pt = type_to_string(t);
 				}
+				String name = proc->token.string;
 				// gb_printf_err("\t%.*s :: %s at %.*s(%td:%td) with score %lld\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
 				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td)\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column);
 				gb_string_free(pt);
@@ -5147,6 +5187,11 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			GB_PANIC("Unknown basic directive");
 		}
 		o->mode = Addressing_Constant;
+	case_end;
+
+	case_ast_node(pg, ProcGrouping, node);
+		error(node, "Illegal use of a procedure grouping");
+		o->mode = Addressing_Invalid;
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);
@@ -6141,6 +6186,15 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(ud, Undef, node);
 		str = gb_string_appendc(str, "---");
+	case_end;
+
+	case_ast_node(pg, ProcGrouping, node);
+		str = gb_string_appendc(str, "proc[");
+		for_array(i, pg->args) {
+			if (i > 0) str = gb_string_appendc(str, ", ");
+			str = write_expr_to_string(str, pg->args[i]);
+		}
+		str = gb_string_append_rune(str, ']');
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);

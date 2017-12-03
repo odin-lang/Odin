@@ -10,6 +10,7 @@ struct DeclInfo;
 	ENTITY_KIND(Variable) \
 	ENTITY_KIND(TypeName) \
 	ENTITY_KIND(Procedure) \
+	ENTITY_KIND(ProcedureGrouping) \
 	ENTITY_KIND(Builtin) \
 	ENTITY_KIND(Alias) \
 	ENTITY_KIND(ImportName) \
@@ -107,6 +108,9 @@ struct Entity {
 			Entity *     foreign_library;
 			AstNode *    foreign_library_ident;
 		} Procedure;
+		struct {
+			Array<Entity *> entities;
+		} ProcedureGrouping;
 		struct {
 			i32 id;
 		} Builtin;
@@ -243,6 +247,12 @@ Entity *make_entity_procedure(gbAllocator a, Scope *scope, Token token, Type *si
 	entity->Procedure.tags = tags;
 	return entity;
 }
+
+Entity *make_entity_procedure_grouping(gbAllocator a, Scope *scope, Token token, Type *type) {
+	Entity *entity = alloc_entity(a, Entity_ProcedureGrouping, scope, token, type);
+	return entity;
+}
+
 
 Entity *make_entity_builtin(gbAllocator a, Scope *scope, Token token, Type *type, i32 id) {
 	Entity *entity = alloc_entity(a, Entity_Builtin, scope, token, type);
