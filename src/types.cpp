@@ -126,6 +126,7 @@ struct TypeStruct {
 		Scope *  scope;                                   \
 		i64      variant_block_size;                      \
 		i64      custom_align;                            \
+		i64      tag_size;                                \
 	})                                                    \
 	TYPE_KIND(Named, struct {                             \
 		String  name;                                     \
@@ -1361,16 +1362,23 @@ i64 union_variant_index(Type *u, Type *v) {
 	return 0;
 }
 
-i64 union_tag_size(Type *u) {
+i64 union_tag_size(gbAllocator a, Type *u) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
-	u64 cl2 = ceil_log2(cast(u64)u->Union.variants.count);
-	i64 s = (next_pow2(cast(i64)cl2) + 7)/8;
-	return gb_clamp(s, 1, build_context.word_size);
+	if (u->Union.tag_size > 0) {
+		return u->Union.tag_size;
+	}
+
+	i64 tag_size = type_align_of(a, u);
+	if (tag_size < 1) {
+		tag_size = build_context.word_size;
+	}
+	u->Union.tag_size = tag_size;
+	return tag_size;
 }
 
-Type *union_tag_type(Type *u) {
-	i64 s = union_tag_size(u);
+Type *union_tag_type(gbAllocator a, Type *u) {
+	i64 s = union_tag_size(a, u);
 	switch (s) {
 	case  1: return  t_u8;
 	case  2: return  t_u16;
@@ -1879,7 +1887,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			return gb_clamp(t->Union.custom_align, 1, build_context.max_align);
 		}
 
-		i64 max = union_tag_size(t);
+		i64 max = 1;
 		for_array(i, t->Union.variants) {
 			Type *variant = t->Union.variants[i];
 			bool pop = type_path_push(path, variant);
@@ -2091,9 +2099,10 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		}
 
 		// NOTE(bill): Align to tag
-		i64 tag_size = union_tag_size(t);
+		i64 tag_size = gb_max(align, 1);
 		i64 size = align_formula(max, tag_size);
 		// NOTE(bill): Calculate the padding between the common fields and the tag
+		t->Union.tag_size = tag_size;
 		t->Union.variant_block_size = size - field_size;
 
 		size += tag_size;

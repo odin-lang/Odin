@@ -989,7 +989,7 @@ irValue *ir_instr_union_tag_ptr(irProcedure *p, irValue *address) {
 	i->UnionTagPtr.address = address;
 	// i->UnionTagPtr.type = make_type_pointer(p->module->allocator, t_type_info_ptr);
 	Type *u = type_deref(ir_type(address));
-	i->UnionTagPtr.type = make_type_pointer(p->module->allocator, union_tag_type(u));
+	i->UnionTagPtr.type = make_type_pointer(p->module->allocator, union_tag_type(p->module->allocator, u));
 	return v;
 }
 
@@ -1000,7 +1000,7 @@ irValue *ir_instr_union_tag_value(irProcedure *p, irValue *address) {
 	// i->UnionTagValue.type = t_type_info_ptr;
 	// i->UnionTagValue.type = t_int;
 	Type *u = type_deref(ir_type(address));
-	i->UnionTagPtr.type = union_tag_type(u);
+	i->UnionTagPtr.type = union_tag_type(p->module->allocator, u);
 	return v;
 }
 
@@ -2751,10 +2751,6 @@ irValue *ir_array_len(irProcedure *proc, irValue *array) {
 	return ir_const_int(proc->module->allocator, t->Array.count);
 }
 
-irValue *ir_vector_elem(irProcedure *proc, irValue *vector) {
-	return ir_emit_array_ep(proc, vector, v_one32);
-}
-
 
 irValue *ir_slice_elem(irProcedure *proc, irValue *slice) {
 	GB_ASSERT(is_type_slice(ir_type(slice)));
@@ -2869,7 +2865,7 @@ irValue *ir_find_or_add_entity_string(irModule *m, String str) {
 
 
 irValue *ir_const_union_tag(gbAllocator a, Type *u, Type *v) {
-	return ir_value_constant(a, union_tag_type(u), exact_value_i64(union_variant_index(u, v)));
+	return ir_value_constant(a, union_tag_type(a, u), exact_value_i64(union_variant_index(u, v)));
 }
 
 
@@ -4474,12 +4470,12 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 
 	case BuiltinProc_swizzle: {
 		ir_emit_comment(proc, str_lit("swizzle.begin"));
-		irAddr vector_addr = ir_build_addr(proc, ce->args[0]);
+		irAddr addr = ir_build_addr(proc, ce->args[0]);
 		isize index_count = ce->args.count-1;
 		if (index_count == 0) {
-			return ir_addr_load(proc, vector_addr);
+			return ir_addr_load(proc, addr);
 		}
-		irValue *src = ir_addr_get_ptr(proc, vector_addr);
+		irValue *src = ir_addr_get_ptr(proc, addr);
 		irValue *dst = ir_add_local_generated(proc, tv.type);
 
 		for (i32 i = 1; i < ce->args.count; i++) {
@@ -4497,8 +4493,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		}
 		ir_emit_comment(proc, str_lit("swizzle.end"));
 		return ir_emit_load(proc, dst);
-		// return ir_emit(proc, ir_instr_vector_shuffle(proc, vector, indices, index_count));
-		break;
 	}
 
 	case BuiltinProc_complex: {
@@ -7810,7 +7804,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 
 		switch (t->kind) {
 		case Type_Named: {
-			ir_emit_comment(proc, str_lit("TypeInfoNamed"));
+			ir_emit_comment(proc, str_lit("Type_Info_Named"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_named_ptr);
 
 			// TODO(bill): Which is better? The mangled name or actual name?
@@ -7823,7 +7817,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 		}
 
 		case Type_Basic:
-			ir_emit_comment(proc, str_lit("TypeInfoBasic"));
+			ir_emit_comment(proc, str_lit("Type_Info_Basic"));
 			switch (t->Basic.kind) {
 			case Basic_bool:
 				tag = ir_emit_conv(proc, variant_ptr, t_type_info_boolean_ptr);
@@ -7879,14 +7873,14 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			break;
 
 		case Type_Pointer: {
-			ir_emit_comment(proc, str_lit("TypeInfoPointer"));
+			ir_emit_comment(proc, str_lit("Type_Info_Pointer"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_pointer_ptr);
 			irValue *gep = ir_get_type_info_ptr(proc, t->Pointer.elem);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 			break;
 		}
 		case Type_Array: {
-			ir_emit_comment(proc, str_lit("TypeInfoArray"));
+			ir_emit_comment(proc, str_lit("Type_Info_Array"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_array_ptr);
 			irValue *gep = ir_get_type_info_ptr(proc, t->Array.elem);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
@@ -7901,7 +7895,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			break;
 		}
 		case Type_DynamicArray: {
-			ir_emit_comment(proc, str_lit("TypeInfoDynamicArray"));
+			ir_emit_comment(proc, str_lit("Type_Info_Dynamic_Array"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_dynamic_array_ptr);
 			irValue *gep = ir_get_type_info_ptr(proc, t->DynamicArray.elem);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
@@ -7912,7 +7906,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			break;
 		}
 		case Type_Slice: {
-			ir_emit_comment(proc, str_lit("TypeInfoSlice"));
+			ir_emit_comment(proc, str_lit("Type_Info_Slice"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_slice_ptr);
 			irValue *gep = ir_get_type_info_ptr(proc, t->Slice.elem);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
@@ -7923,7 +7917,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			break;
 		}
 		case Type_Proc: {
-			ir_emit_comment(proc, str_lit("TypeInfoProc"));
+			ir_emit_comment(proc, str_lit("Type_Info_Proc"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_procedure_ptr);
 
 			irValue *params     = ir_emit_struct_ep(proc, tag, 0);
@@ -7944,7 +7938,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			break;
 		}
 		case Type_Tuple: {
-			ir_emit_comment(proc, str_lit("TypeInfoTuple"));
+			ir_emit_comment(proc, str_lit("Type_Info_Tuple"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_tuple_ptr);
 
 			irValue *memory_types = ir_type_info_member_types_offset(proc, t->Tuple.variables.count);
@@ -7970,7 +7964,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			break;
 		}
 		case Type_Enum:
-			ir_emit_comment(proc, str_lit("TypeInfoEnum"));
+			ir_emit_comment(proc, str_lit("Type_Info_Enum"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_enum_ptr);
 			{
 				GB_ASSERT(t->Enum.base_type != nullptr);
@@ -8015,7 +8009,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			break;
 
 		case Type_Union: {
-			ir_emit_comment(proc, str_lit("TypeInfoUnion"));
+			ir_emit_comment(proc, str_lit("Type_Info_Union"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_union_ptr);
 
 			{
@@ -8039,17 +8033,17 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				irValue *count = ir_const_int(a, variant_count);
 				ir_fill_slice(proc, variant_types, memory_types, count);
 
-				i64 tag_size   = union_tag_size(t);
+				i64 tag_size   = union_tag_size(a, t);
 				i64 tag_offset = align_formula(t->Union.variant_block_size, tag_size);
 				ir_emit_store(proc, tag_offset_ptr, ir_const_uintptr(a, tag_offset));
-				ir_emit_store(proc, tag_type_ptr,   ir_type_info(proc, union_tag_type(t)));
+				ir_emit_store(proc, tag_type_ptr,   ir_type_info(proc, union_tag_type(a, t)));
 			}
 
 			break;
 		}
 
 		case Type_Struct: {
-			ir_emit_comment(proc, str_lit("TypeInfoStruct"));
+			ir_emit_comment(proc, str_lit("Type_Info_Struct"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_struct_ptr);
 
 			{
@@ -8103,7 +8097,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			break;
 		}
 		case Type_Map: {
-			ir_emit_comment(proc, str_lit("TypeInfoMap"));
+			ir_emit_comment(proc, str_lit("Type_Info_Map"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_map_ptr);
 			generate_map_internal_types(a, t);
 
@@ -8118,7 +8112,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 		}
 
 		case Type_BitField: {
-			ir_emit_comment(proc, str_lit("TypeInfoBitField"));
+			ir_emit_comment(proc, str_lit("Type_Info_Bit_Field"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_bit_field_ptr);
 			// names:   []string;
 			// bits:    []u32;

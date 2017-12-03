@@ -342,7 +342,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 			ir_fprintf(f, "{[0 x <%lld x i8>], ", align);
 			ir_fprintf(f, "[%lld x i8], ", block_size);
 			// ir_print_type(f, m, t_type_info_ptr);
-			ir_print_type(f, m, union_tag_type(t));
+			ir_print_type(f, m, union_tag_type(m->allocator, t));
 			ir_write_byte(f, '}');
 		}
 	} return;
@@ -463,6 +463,26 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	type = core_type(type);
 	value = convert_exact_value_for_type(value, type);
 
+	// NOTE(bill): Is this correct? Does this handle all cases regarding arrays?
+	if (is_type_array(type) &&
+	    value.kind != ExactValue_Invalid &&
+	    value.kind != ExactValue_Compound) {
+		i64 count  = type->Array.count;
+		Type *elem = type->Array.elem;
+		ir_write_byte(f, '[');
+
+		for (i64 i = 0; i < count; i++) {
+			if (i > 0) ir_write_string(f, ", ");
+			ir_print_type(f, m, elem);
+			ir_write_byte(f, ' ');
+			ir_print_exact_value(f, m, value, elem);
+		}
+
+		ir_write_byte(f, ']');
+		return;
+	}
+
+
 	switch (value.kind) {
 	case ExactValue_Bool:
 		if (value.value_bool) {
@@ -548,7 +568,6 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		}
 		break;
 	}
-
 	case ExactValue_Complex: {
 		type = core_type(type);
 		GB_ASSERT_MSG(is_type_complex(type), "%s", type_to_string(type));
@@ -562,7 +581,6 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		ir_write_byte(f, '}');
 		break;
 	}
-
 	case ExactValue_Pointer:
 		if (value.value_pointer == 0) {
 			ir_write_string(f, "null");
@@ -574,7 +592,6 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_write_byte(f, ')');
 		}
 		break;
-
 	case ExactValue_Compound: {
 		type = base_type(type);
 		if (is_type_slice(type)) {
@@ -700,7 +717,6 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 		break;
 	}
-
 	case ExactValue_Procedure: {
 		irValue **found = nullptr;
 		AstNode *expr = value.value_procedure;
@@ -719,7 +735,6 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		ir_print_value(f, m, val, type);
 		break;
 	}
-
 	default: {
 		bool has_defaults = ir_type_has_default_values(type);
 		if (!has_defaults) {
