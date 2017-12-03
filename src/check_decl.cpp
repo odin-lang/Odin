@@ -708,6 +708,47 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	check_init_variables(c, entities, entity_count, init_expr_list, context_name);
 }
 
+void check_proc_grouping_decl(Checker *c, Entity *pg_entity, DeclInfo *d) {
+	GB_ASSERT(pg_entity->kind == Entity_ProcedureGrouping);
+	auto *pge = &pg_entity->ProcedureGrouping;
+
+	ast_node(pg, ProcGrouping, d->init_expr);
+
+	array_init(&pge->entities, c->allocator, pg->args.count);
+
+
+	PtrSet<Entity *> entity_map = {};
+	ptr_set_init(&entity_map, heap_allocator());
+	defer (ptr_set_destroy(&entity_map));
+
+	for_array(i, pg->args) {
+		AstNode *arg = pg->args[i];
+		Entity *e = nullptr;
+		Operand o = {};
+		if (arg->kind == AstNode_Ident) {
+			e = check_ident(c, &o, arg, nullptr, nullptr, true);
+		} else if (arg->kind == AstNode_SelectorExpr) {
+			e = check_selector(c, &o, arg, nullptr);
+		}
+		if (e == nullptr) {
+			error(arg, "Expected a valid entity name in procedure grouping");
+			continue;
+		}
+		if (e->kind != Entity_Procedure) {
+			error(arg, "Expected a procedure entity");
+			continue;
+		}
+
+		if (ptr_set_exists(&entity_map, e)) {
+			error(arg, "Previous use of `%.*s` in procedure grouping", LIT(e->token.string));
+			continue;
+		}
+		ptr_set_add(&entity_map, e);
+
+		array_add(&pge->entities, e);
+	}
+}
+
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 	if (e->type != nullptr) {
 		return;
@@ -744,6 +785,11 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 	}
 	case Entity_Procedure:
 		check_proc_decl(c, e, d);
+		break;
+
+	case Entity_ProcedureGrouping:
+		// error(e->token, "Procedure groupings are not yet supported");
+		check_proc_grouping_decl(c, e, d);
 		break;
 	}
 
