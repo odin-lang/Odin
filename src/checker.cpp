@@ -780,7 +780,7 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	HashKey key = hash_string(name);
 	Entity **found = map_get(&s->elements, key);
 
-#if 1
+#ifndef DISABLE_PROCEDURE_OVERLOADING
 	// IMPORTANT NOTE(bill): Procedure overloading code
 	Entity *prev = nullptr;
 	if (found) {

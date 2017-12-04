@@ -534,7 +534,7 @@ _pad :: proc(fi: ^Fmt_Info, s: string) {
 	}
 
 
-	width := fi.width - utf8.rune_count(s);
+	width := fi.width - utf8.rune_count_from_string(s);
 	if fi.minus { // right pad
 		write_string(fi.buf, s);
 		fmt_write_padding(fi, width);
@@ -1126,7 +1126,7 @@ sbprintf :: proc(b: ^String_Buffer, fmt: string, args: ...any) -> string {
 			break;
 		}
 
-		verb, w := utf8.decode_rune(fmt[i..]);
+		verb, w := utf8.decode_rune_from_string(fmt[i..]);
 		i += w;
 
 		if verb == '%' {

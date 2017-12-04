@@ -72,7 +72,7 @@ foreign opengl32 {
 	make_current :: proc(hdc: Hdc, hglrc: Hglrc) -> Bool ---;
 
 	@(link_name="wglGetProcAddress")
-	get_proc_address :: proc(c_str: ^byte) -> rawptr ---;
+	get_gl_proc_address :: proc(c_str: ^byte) -> rawptr ---;
 
 	@(link_name="wglDeleteContext")
 	delete_context :: proc(hglrc: Hglrc) -> Bool ---;

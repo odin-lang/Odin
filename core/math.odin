@@ -25,51 +25,49 @@ Mat2 :: [2][2]f32;
 Mat3 :: [3][3]f32;
 Mat4 :: [4][4]f32;
 
-Complex :: complex64;
+Quat :: struct {x, y, z: f32, w: f32 = 1};
 
 @(default_calling_convention="c")
 foreign __llvm_core {
 	@(link_name="llvm.sqrt.f32")
-	sqrt :: proc(x: f32) -> f32 ---;
+	sqrt_f32 :: proc(x: f32) -> f32 ---;
 	@(link_name="llvm.sqrt.f64")
-	sqrt :: proc(x: f64) -> f64 ---;
+	sqrt_f64 :: proc(x: f64) -> f64 ---;
 
 	@(link_name="llvm.sin.f32")
-	sin :: proc(θ: f32) -> f32 ---;
+	sin_f32 :: proc(θ: f32) -> f32 ---;
 	@(link_name="llvm.sin.f64")
-	sin :: proc(θ: f64) -> f64 ---;
+	sin_f64 :: proc(θ: f64) -> f64 ---;
 
 	@(link_name="llvm.cos.f32")
-	cos :: proc(θ: f32) -> f32 ---;
+	cos_f32 :: proc(θ: f32) -> f32 ---;
 	@(link_name="llvm.cos.f64")
-	cos :: proc(θ: f64) -> f64 ---;
+	cos_f64 :: proc(θ: f64) -> f64 ---;
 
 	@(link_name="llvm.pow.f32")
-	pow :: proc(x, power: f32) -> f32 ---;
+	pow_f32 :: proc(x, power: f32) -> f32 ---;
 	@(link_name="llvm.pow.f64")
-	pow :: proc(x, power: f64) -> f64 ---;
+	pow_f64 :: proc(x, power: f64) -> f64 ---;
 
 	@(link_name="llvm.fmuladd.f32")
-	fmuladd :: proc(a, b, c: f32) -> f32 ---;
+	fmuladd_f32 :: proc(a, b, c: f32) -> f32 ---;
 	@(link_name="llvm.fmuladd.f64")
-	fmuladd :: proc(a, b, c: f64) -> f64 ---;
+	fmuladd_f64 :: proc(a, b, c: f64) -> f64 ---;
 }
 
-tan :: proc "c" (θ: f32) -> f32 { return sin(θ)/cos(θ); }
-tan :: proc "c" (θ: f64) -> f64 { return sin(θ)/cos(θ); }
+tan_f32 :: proc "c" (θ: f32) -> f32 { return sin(θ)/cos(θ); }
+tan_f64 :: proc "c" (θ: f64) -> f64 { return sin(θ)/cos(θ); }
 
-lerp   :: proc(a, b: $T, t: $E) -> (x: T) { return a*(1-t) + b*t; }
+lerp :: proc(a, b: $T, t: $E) -> (x: T) { return a*(1-t) + b*t; }
 
-unlerp :: proc(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
-unlerp :: proc(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
-
-
-sign :: proc(x: f32) -> f32 { return x >= 0 ? +1 : -1; }
-sign :: proc(x: f64) -> f64 { return x >= 0 ? +1 : -1; }
+unlerp_f32 :: proc(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
+unlerp_f64 :: proc(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
 
 
+sign_f32 :: proc(x: f32) -> f32 { return x >= 0 ? +1 : -1; }
+sign_f64 :: proc(x: f64) -> f64 { return x >= 0 ? +1 : -1; }
 
-copy_sign :: proc(x, y: f32) -> f32 {
+copy_sign_f32 :: proc(x, y: f32) -> f32 {
 	ix := transmute(u32)x;
 	iy := transmute(u32)y;
 	ix &= 0x7fff_ffff;
@@ -77,7 +75,7 @@ copy_sign :: proc(x, y: f32) -> f32 {
 	return transmute(f32)ix;
 }
 
-copy_sign :: proc(x, y: f64) -> f64 {
+copy_sign_f64 :: proc(x, y: f64) -> f64 {
 	ix := transmute(u64)x;
 	iy := transmute(u64)y;
 	ix &= 0x7fff_ffff_ffff_ff;
@@ -85,19 +83,34 @@ copy_sign :: proc(x, y: f64) -> f64 {
 	return transmute(f64)ix;
 }
 
-round :: proc(x: f32) -> f32 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
-round :: proc(x: f64) -> f64 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
 
-floor :: proc(x: f32) -> f32 { return x >= 0 ? f32(i64(x)) : f32(i64(x-0.5)); } // TODO: Get accurate versions
-floor :: proc(x: f64) -> f64 { return x >= 0 ? f64(i64(x)) : f64(i64(x-0.5)); } // TODO: Get accurate versions
+sqrt      :: proc[sqrt_f32, sqrt_f64];
+sin       :: proc[sin_f32, sin_f64];
+cos       :: proc[cos_f32, cos_f64];
+tan       :: proc[tan_f32, tan_f64];
+pow       :: proc[pow_f32, pow_f64];
+fmuladd   :: proc[fmuladd_f32, fmuladd_f64];
+sign      :: proc[sign_f32, sign_f64];
+copy_sign :: proc[copy_sign_f32, copy_sign_f64];
 
-ceil :: proc(x: f32) -> f32 { return x < 0 ? f32(i64(x)) : f32(i64(x+1)); }// TODO: Get accurate versions
-ceil :: proc(x: f64) -> f64 { return x < 0 ? f64(i64(x)) : f64(i64(x+1)); }// TODO: Get accurate versions
 
-remainder :: proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
-remainder :: proc(x, y: f64) -> f64 { return x - round(x/y) * y; }
+round_f32 :: proc(x: f32) -> f32 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
+round_f64 :: proc(x: f64) -> f64 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
+round :: proc[round_f32, round_f64];
 
-mod :: proc(x, y: f32) -> f32 {
+floor_f32 :: proc(x: f32) -> f32 { return x >= 0 ? f32(i64(x)) : f32(i64(x-0.5)); } // TODO: Get accurate versions
+floor_f64 :: proc(x: f64) -> f64 { return x >= 0 ? f64(i64(x)) : f64(i64(x-0.5)); } // TODO: Get accurate versions
+floor :: proc[floor_f32, floor_f64];
+
+ceil_f32 :: proc(x: f32) -> f32 { return x < 0 ? f32(i64(x)) : f32(i64(x+1)); }// TODO: Get accurate versions
+ceil_f64 :: proc(x: f64) -> f64 { return x < 0 ? f64(i64(x)) : f64(i64(x+1)); }// TODO: Get accurate versions
+ceil :: proc[ceil_f32, ceil_f64];
+
+remainder_f32 :: proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
+remainder_f64 :: proc(x, y: f64) -> f64 { return x - round(x/y) * y; }
+remainder :: proc[remainder_f32, remainder_f64];
+
+mod_f32 :: proc(x, y: f32) -> f32 {
 	result: f32;
 	y = abs(y);
 	result = remainder(abs(x), y);
@@ -106,7 +119,7 @@ mod :: proc(x, y: f32) -> f32 {
 	}
 	return copy_sign(result, x);
 }
-mod :: proc(x, y: f64) -> f64 {
+mod_f64 :: proc(x, y: f64) -> f64 {
 	result: f64;
 	y = abs(y);
 	result = remainder(abs(x), y);
@@ -115,6 +128,8 @@ mod :: proc(x, y: f64) -> f64 {
 	}
 	return copy_sign(result, x);
 }
+mod :: proc[mod_f32, mod_f64];
+
 
 
 to_radians :: proc(degrees: f32) -> f32 { return degrees * TAU / 360; }
@@ -122,21 +137,37 @@ to_degrees :: proc(radians: f32) -> f32 { return radians * 360 / TAU; }
 
 
 
+
+mul :: proc[
+	mat4_mul, mat4_mul_vec4,
+	quat_mul, quat_mulf,
+];
+
+div :: proc[
+	quat_div, quat_divf,
+];
+
+inverse :: proc[mat4_inverse, quat_inverse];
+
+
 dot :: proc(a, b: $T/[$N]$E) -> E {
 	res: E;
-	for i in 0..N { res += a[i] * b[i]; }
+	for i in 0..N {
+		res += a[i] * b[i];
+	}
 	return res;
 }
 
-cross :: proc(a, b: $T/[2]$E) -> E {
+cross2 :: proc(a, b: $T/[2]$E) -> E {
 	return a[0]*b[1] - a[1]*b[0];
 }
 
-cross :: proc(a, b: $T/[3]$E) -> T {
+cross3 :: proc(a, b: $T/[3]$E) -> T {
 	i := swizzle(a, 1, 2, 0) * swizzle(b, 2, 0, 1);
 	j := swizzle(a, 2, 0, 1) * swizzle(b, 1, 2, 0);
 	return T(i - j);
 }
+cross :: proc[cross2, cross3];
 
 
 length :: proc(v: $T/[$N]$E) -> E { return sqrt(dot(v, v)); }
@@ -150,13 +181,10 @@ norm0 :: proc(v: $T/[$N]$E) -> T {
 
 
 
-mat4_identity :: proc() -> Mat4 {
-	return Mat4{
-		{1, 0, 0, 0},
-		{0, 1, 0, 0},
-		{0, 0, 1, 0},
-		{0, 0, 0, 1},
-	};
+identity :: proc(T: type/[$N][N]$E) -> T {
+	m: T;
+	for i in 0..N do m[i][i] = E(1);
+	return m;
 }
 
 transpose :: proc(m: Mat4) -> Mat4 {
@@ -168,7 +196,7 @@ transpose :: proc(m: Mat4) -> Mat4 {
 	return m;
 }
 
-mul :: proc(a, b: Mat4) -> Mat4 {
+mat4_mul :: proc(a, b: Mat4) -> Mat4 {
 	c: Mat4;
 	for j in 0..4 {
 		for i in 0..4 {
@@ -181,7 +209,7 @@ mul :: proc(a, b: Mat4) -> Mat4 {
 	return c;
 }
 
-mul :: proc(m: Mat4, v: Vec4) -> Vec4 {
+mat4_mul_vec4 :: proc(m: Mat4, v: Vec4) -> Vec4 {
 	return Vec4{
 		m[0][0]*v[0] + m[1][0]*v[1] + m[2][0]*v[2] + m[3][0]*v[3],
 		m[0][1]*v[0] + m[1][1]*v[1] + m[2][1]*v[2] + m[3][1]*v[3],
@@ -190,7 +218,8 @@ mul :: proc(m: Mat4, v: Vec4) -> Vec4 {
 	};
 }
 
-inverse :: proc(m: Mat4) -> Mat4 {
+
+mat4_inverse :: proc(m: Mat4) -> Mat4 {
 	o: Mat4;
 
 	sf00 := m[2][2] * m[3][3] - m[3][2] * m[2][3];
@@ -261,7 +290,7 @@ inverse :: proc(m: Mat4) -> Mat4 {
 
 
 mat4_translate :: proc(v: Vec3) -> Mat4 {
-	m := mat4_identity();
+	m := identity(Mat4);
 	m[3][0] = v[0];
 	m[3][1] = v[1];
 	m[3][2] = v[2];
@@ -276,7 +305,7 @@ mat4_rotate :: proc(v: Vec3, angle_radians: f32) -> Mat4 {
 	a := norm(v);
 	t := a * (1-c);
 
-	rot := mat4_identity();
+	rot := identity(Mat4);
 
 	rot[0][0] = c + t[0]*a[0];
 	rot[0][1] = 0 + t[0]*a[1] + s*a[2];
@@ -296,19 +325,21 @@ mat4_rotate :: proc(v: Vec3, angle_radians: f32) -> Mat4 {
 	return rot;
 }
 
-scale :: proc(m: Mat4, v: Vec3) -> Mat4 {
+scale_vec3 :: proc(m: Mat4, v: Vec3) -> Mat4 {
 	m[0][0] *= v[0];
 	m[1][1] *= v[1];
 	m[2][2] *= v[2];
 	return m;
 }
 
-scale :: proc(m: Mat4, s: f32) -> Mat4 {
+scale_f32 :: proc(m: Mat4, s: f32) -> Mat4 {
 	m[0][0] *= s;
 	m[1][1] *= s;
 	m[2][2] *= s;
 	return m;
 }
+
+scale :: proc[scale_vec3, scale_f32];
 
 
 look_at :: proc(eye, centre, up: Vec3) -> Mat4 {
@@ -338,13 +369,76 @@ perspective :: proc(fovy, aspect, near, far: f32) -> Mat4 {
 
 
 ortho3d :: proc(left, right, bottom, top, near, far: f32) -> Mat4 {
-	m := mat4_identity();
+	m := identity(Mat4);
 	m[0][0] = +2.0 / (right - left);
 	m[1][1] = +2.0 / (top - bottom);
 	m[2][2] = -2.0 / (far - near);
 	m[3][0] = -(right + left)   / (right - left);
 	m[3][1] = -(top   + bottom) / (top   - bottom);
 	m[3][2] = -(far + near) / (far - near);
+	return m;
+}
+
+
+// Quaternion operations
+
+conj :: proc(q: Quat) -> Quat {
+	return Quat{-q.x, -q.y, -q.z, q.w};
+}
+
+quat_mul :: proc(q0, q1: Quat) -> Quat {
+	d: Quat;
+	d.x = q0.w * q1.x + q0.x * q1.w + q0.y * q1.z - q0.z * q1.y;
+	d.y = q0.w * q1.y - q0.x * q1.z + q0.y * q1.w + q0.z * q1.x;
+	d.z = q0.w * q1.z + q0.x * q1.y - q0.y * q1.x + q0.z * q1.w;
+	d.w = q0.w * q1.w - q0.x * q1.x - q0.y * q1.y - q0.z * q1.z;
+	return d;
+}
+
+quat_mulf :: proc(q: Quat, f: f32) -> Quat { return Quat{q.x*f, q.y*f, q.z*f, q.w*f}; }
+quat_divf :: proc(q: Quat, f: f32) -> Quat { return Quat{q.x/f, q.y/f, q.z/f, q.w/f}; }
+
+quat_div     :: proc(q0, q1: Quat) -> Quat { return mul(q0, quat_inverse(q1)); }
+quat_inverse :: proc(q: Quat) -> Quat { return div(conj(q), quat_dot(q, q)); }
+quat_dot     :: proc(q0, q1: Quat) -> f32 { return q0.x*q1.x + q0.y*q1.y + q0.z*q1.z + q0.w*q1.w; }
+
+quat_norm :: proc(q: Quat) -> Quat {
+	m := sqrt(quat_dot(q, q));
+	return div(q, m);
+}
+
+axis_angle :: proc(axis: Vec3, angle_radians: f32) -> Quat {
+	v := norm(axis) * sin(0.5*angle_radians);
+	w := cos(0.5*angle_radians);
+	return Quat{v.x, v.y, v.z, w};
+}
+
+euler_angles :: proc(pitch, yaw, roll: f32) -> Quat {
+	p := axis_angle(Vec3{1, 0, 0}, pitch);
+	y := axis_angle(Vec3{0, 1, 0}, pitch);
+	r := axis_angle(Vec3{0, 0, 1}, pitch);
+	return mul(mul(y, p), r);
+}
+
+quat_to_mat4 :: proc(q: Quat) -> Mat4 {
+	a := quat_norm(q);
+	xx := a.x*a.x; yy := a.y*a.y; zz := a.z*a.z;
+	xy := a.x*a.y; xz := a.x*a.z; yz := a.y*a.z;
+	wx := a.w*a.x; wy := a.w*a.y; wz := a.w*a.z;
+
+	m := identity(Mat4);
+
+	m[0][0] = 1 - 2*(yy + zz);
+	m[0][1] =     2*(xy + wz);
+	m[0][2] =     2*(xz - wy);
+
+	m[1][0] =     2*(xy - wz);
+	m[1][1] = 1 - 2*(xx + zz);
+	m[1][2] =     2*(yz + wx);
+
+	m[2][0] =     2*(xz + wy);
+	m[2][1] =     2*(yz - wx);
+	m[2][2] = 1 - 2*(xx + yy);
 	return m;
 }
 

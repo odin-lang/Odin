@@ -44,13 +44,13 @@ _string_data :: inline proc(s: string) -> ^u8 do return &s[0];
 
 _libgl := win32.load_library_a(_string_data("opengl32.dll\x00"));
 
-get_proc_address :: proc(name: string) -> rawptr {
+get_gl_proc_address :: proc(name: string) -> rawptr {
 	if name[len(name)-1] == 0 {
 		name = name[..len(name)-1];
 	}
 	// NOTE(bill): null terminated
 	assert((&name[0] + len(name))^ == 0);
-	res := wgl.get_proc_address(&name[0]);
+	res := wgl.get_gl_proc_address(&name[0]);
 	if res == nil {
 		res = win32.get_proc_address(_libgl, &name[0]);
 	}
@@ -122,7 +122,7 @@ get_proc_address :: proc(name: string) -> rawptr {
 init :: proc() {
 	set_proc_address :: proc(p: rawptr, name: string) {
 		x := cast(^rawptr)p;
-		x^ = get_proc_address(name);
+		x^ = get_gl_proc_address(name);
 	}
 
 	set_proc_address(&GenBuffers,              "glGenBuffers\x00");

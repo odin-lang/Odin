@@ -1,4 +1,4 @@
-bubble_sort :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
+bubble_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	assert(f != nil);
 	count := len(array);
 
@@ -45,7 +45,7 @@ bubble_sort :: proc(array: $A/[]$T) {
 	}
 }
 
-quick_sort :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
+quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	assert(f != nil);
 	a := array;
 	n := len(a);
@@ -98,7 +98,7 @@ _log2 :: proc(n: int) -> int {
 	return res;
 }
 
-merge_sort :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
+merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	merge_slices :: proc(arr1, arr2, out: A, f: proc(T, T) -> int) {
 		N1, N2 := len(arr1), len(arr2);
 		i, j := 0, 0;
