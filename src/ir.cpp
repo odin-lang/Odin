@@ -8314,7 +8314,7 @@ void ir_gen_tree(irGen *s) {
 			continue;
 		}
 
-		if (e->kind == Entity_Variable) {
+		if (e->kind == Entity_Variable || e->kind == Entity_ProcedureGrouping) {
 			// NOTE(bill): Handled above as it requires a specific load order
 			continue;
 		}
