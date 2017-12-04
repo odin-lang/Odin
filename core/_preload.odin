@@ -376,7 +376,7 @@ clear_map :: inline proc "contextless" (m: ^$T/map[$K]$V) {
 
 clear :: proc[clear_dynamic_array, clear_map];
 
-reserve :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #caller_location) -> bool {
+reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #caller_location) -> bool {
 	if array == nil do return false;
 	a := cast(^raw.Dynamic_Array)array;
 
@@ -453,13 +453,15 @@ __get_map_key :: proc "contextless" (key: $K) -> __Map_Key {
 	return map_key;
 }
 
-reserve :: proc(m: ^$T/map[$K]$V, capacity: int) {
+reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int) {
 	if m != nil do __dynamic_map_reserve(__get_map_header(m), capacity);
 }
 
 delete :: proc(m: ^$T/map[$K]$V, key: K) {
 	if m != nil do __dynamic_map_delete(__get_map_header(m), __get_map_key(key));
 }
+
+reserve :: proc[reserve_dynamic_array, reserve_map];
 
 
 
@@ -705,7 +707,7 @@ __type_assertion_check :: proc "contextless" (ok: bool, file: string, line, colu
 }
 
 __string_decode_rune :: inline proc "contextless" (s: string) -> (rune, int) {
-	return utf8.decode_rune(s);
+	return utf8.decode_rune_from_string(s);
 }
 
 __bounds_check_error_loc :: inline proc "contextless" (using loc := #caller_location, index, count: int) {

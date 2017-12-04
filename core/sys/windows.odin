@@ -530,7 +530,7 @@ foreign kernel32 {
 	@(link_name="CreateEventA") create_event_a :: proc(event_attributes: ^Security_Attributes, manual_reset, initial_state: Bool, name: ^byte) -> Handle ---;
 
 	@(link_name="LoadLibraryA")   load_library_a   :: proc(c_str: ^byte)  -> Hmodule ---;
-	@(link_name="LoadLibraryW")   load_library_a   :: proc(c_str: ^u16) -> Hmodule ---;
+	@(link_name="LoadLibraryW")   load_library_w   :: proc(c_str: ^u16) -> Hmodule ---;
 	@(link_name="FreeLibrary")    free_library     :: proc(h: Hmodule) ---;
 	@(link_name="GetProcAddress") get_proc_address :: proc(h: Hmodule, c_str: ^byte) -> rawptr ---;
 
@@ -663,10 +663,10 @@ get_query_performance_frequency :: proc() -> i64 {
 	return r;
 }
 
-HIWORD :: proc(wParam: Wparam) -> u16 { return u16((u32(wParam) >> 16) & 0xffff); }
-HIWORD :: proc(lParam: Lparam) -> u16 { return u16((u32(lParam) >> 16) & 0xffff); }
-LOWORD :: proc(wParam: Wparam) -> u16 { return u16(wParam); }
-LOWORD :: proc(lParam: Lparam) -> u16 { return u16(lParam); }
+HIWORD_W :: proc(wParam: Wparam) -> u16 { return u16((u32(wParam) >> 16) & 0xffff); }
+HIWORD_L :: proc(lParam: Lparam) -> u16 { return u16((u32(lParam) >> 16) & 0xffff); }
+LOWORD_W :: proc(wParam: Wparam) -> u16 { return u16(wParam); }
+LOWORD_L :: proc(lParam: Lparam) -> u16 { return u16(lParam); }
 
 is_key_down :: inline proc(key: Key_Code) -> bool { return get_async_key_state(i32(key)) < 0; }
 

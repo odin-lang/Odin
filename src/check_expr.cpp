@@ -4459,8 +4459,9 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 	}
 
 	if (operand->mode == Addressing_Overload) {
-		GB_ASSERT(operand->overload_entities != nullptr &&
-		          operand->overload_count > 0);
+		// GB_ASSERT_MSG(operand->overload_entities != nullptr &&
+		//               operand->overload_count > 0,
+		//               "%p %td", operand->overload_entities, operand->overload_count);
 		isize               overload_count = operand->overload_count;
 		Entity **           procs          = operand->overload_entities;
 		ValidIndexAndScore *valids         = gb_alloc_array(heap_allocator(), ValidIndexAndScore, overload_count);

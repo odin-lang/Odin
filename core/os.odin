@@ -53,10 +53,10 @@ write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (succ
 	return write_err != 0;
 }
 
-write :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
+write_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
 	return write(fd, mem.slice_ptr(cast(^byte)data, len));
 }
 
-read :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
+read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
 	return read(fd, mem.slice_ptr(cast(^byte)data, len));
 }

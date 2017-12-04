@@ -57,8 +57,8 @@ encode :: proc(d: []u16, s: []rune) -> int {
 }
 
 
-encode :: proc(d: []u16, s: string) -> int {
-	n := utf8.rune_count(s);
+encode_string :: proc(d: []u16, s: string) -> int {
+	n := utf8.rune_count_from_string(s);
 	for r in s do if r >= _surr_self do n += 1;
 
 	max_n := min(len(d), n);
