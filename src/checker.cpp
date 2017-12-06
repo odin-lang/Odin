@@ -2261,7 +2261,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 				d->type_expr = pl->type;
 			} else if (init->kind == AstNode_ProcGrouping) {
 				ast_node(pg, ProcGrouping, init);
-				e = make_entity_procedure_grouping(c->allocator, d->scope, token, nullptr);
+				e = make_entity_procedure_grouping(c->allocator, d->scope, token, t_invalid);
 				if (fl != nullptr) {
 					error(name, "Procedure groupings are not allowed within a foreign block");
 				}
