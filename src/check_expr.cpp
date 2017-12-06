@@ -2572,7 +2572,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			}
 
 			check_entity_decl(c, entity, nullptr, nullptr);
-			GB_ASSERT(entity->type != nullptr);
+			GB_ASSERT(entity->type != nullptr || entity->kind == Entity_ProcedureGrouping);
 
 			if (is_alias) {
 				// TODO(bill): Which scope do you search for for an alias?
@@ -2592,13 +2592,20 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			}
 
 
+			Entity **procs = nullptr;
+
 			if (is_overloaded) {
 				HashKey key = hash_string(entity_name);
-				bool skip = false;
-
-				Entity **procs = gb_alloc_array(heap_allocator(), Entity *, overload_count);
+				procs = gb_alloc_array(heap_allocator(), Entity *, overload_count);
 				multi_map_get_all(&import_scope->elements, key, procs);
+			} else if (entity->kind == Entity_ProcedureGrouping) {
+				is_overloaded = true;
+				procs = entity->ProcedureGrouping.entities.data;
+				overload_count = entity->ProcedureGrouping.entities.count;
+			}
 
+			if (is_overloaded) {
+				bool skip = false;
 				for (isize i = 0; i < overload_count; i++) {
 					Type *t = base_type(procs[i]->type);
 					if (t == t_invalid) {
@@ -2782,6 +2789,10 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	case Entity_Builtin:
 		operand->mode = Addressing_Builtin;
 		operand->builtin_id = cast(BuiltinProcId)entity->Builtin.id;
+		break;
+
+	case Entity_ProcedureGrouping:
+		entity->type = t_invalid;
 		break;
 
 	// NOTE(bill): These cases should never be hit but are here for sanity reasons
