@@ -10,7 +10,7 @@ struct DeclInfo;
 	ENTITY_KIND(Variable) \
 	ENTITY_KIND(TypeName) \
 	ENTITY_KIND(Procedure) \
-	ENTITY_KIND(ProcedureGrouping) \
+	ENTITY_KIND(ProcGroup) \
 	ENTITY_KIND(Builtin) \
 	ENTITY_KIND(Alias) \
 	ENTITY_KIND(ImportName) \
@@ -110,7 +110,7 @@ struct Entity {
 		} Procedure;
 		struct {
 			Array<Entity *> entities;
-		} ProcedureGrouping;
+		} ProcGroup;
 		struct {
 			i32 id;
 		} Builtin;
@@ -248,8 +248,8 @@ Entity *make_entity_procedure(gbAllocator a, Scope *scope, Token token, Type *si
 	return entity;
 }
 
-Entity *make_entity_procedure_grouping(gbAllocator a, Scope *scope, Token token, Type *type) {
-	Entity *entity = alloc_entity(a, Entity_ProcedureGrouping, scope, token, type);
+Entity *make_entity_proc_group(gbAllocator a, Scope *scope, Token token, Type *type) {
+	Entity *entity = alloc_entity(a, Entity_ProcGroup, scope, token, type);
 	return entity;
 }
 

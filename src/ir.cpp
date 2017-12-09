@@ -3620,7 +3620,7 @@ String ir_mangle_name(irGen *s, String path, Entity *e) {
 	isize base_len = ext-1-base;
 
 	isize max_len = base_len + 1 + 1 + 10 + 1 + name.len;
-	bool require_suffix_id = check_is_entity_overloaded(e) || is_type_polymorphic(e->type);
+	bool require_suffix_id = is_type_polymorphic(e->type);
 	if (require_suffix_id) {
 		max_len += 21;
 	}
@@ -8304,18 +8304,21 @@ void ir_gen_tree(irGen *s) {
 	}
 
 	for_array(i, info->entities.entries) {
-		auto *entry = &info->entities.entries[i];
-		Entity *e = cast(Entity *)entry->key.ptr;
-		String name = e->token.string;
-		DeclInfo *decl = entry->value;
-		Scope *scope = e->scope;
+		auto *    entry = &info->entities.entries[i];
+		Entity *  e     = cast(Entity *)entry->key.ptr;
+		String    name  = e->token.string;
+		DeclInfo *decl  = entry->value;
+		Scope *   scope = e->scope;
 
 		if (!scope->is_file) {
 			continue;
 		}
 
-		if (e->kind == Entity_Variable || e->kind == Entity_ProcedureGrouping) {
+		switch (e->kind) {
+		case Entity_Variable:
 			// NOTE(bill): Handled above as it requires a specific load order
+			continue;
+		case Entity_ProcGroup:
 			continue;
 		}
 
@@ -8341,8 +8344,6 @@ void ir_gen_tree(irGen *s) {
 			} else {
 				name = ir_mangle_name(s, e->token.pos.file, e);
 			}
-		} else if (check_is_entity_overloaded(e)) {
-			name = ir_mangle_name(s, e->token.pos.file, e);
 		}
 		ir_add_entity_name(m, e, name);
 
@@ -8373,7 +8374,7 @@ void ir_gen_tree(irGen *s) {
 			ir_module_add_value(m, e, p);
 			HashKey hash_name = hash_string(name);
 			if (map_get(&m->members, hash_name) == nullptr) {
-				multi_map_insert(&m->members, hash_name, p);
+				map_set(&m->members, hash_name, p);
 			}
 			break;
 		}

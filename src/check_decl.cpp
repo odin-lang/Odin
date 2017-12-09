@@ -23,9 +23,9 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 		}
 
 
-		if (operand->mode == Addressing_Overload) {
+		if (operand->mode == Addressing_ProcGroup) {
 			if (e->type == nullptr) {
-				error(operand->expr, "Cannot determine type from overloaded procedure '%.*s'", LIT(operand->overload_entities[0]->token.string));
+				error(operand->expr, "Cannot determine type from overloaded procedure '%.*s'", LIT(operand->proc_group->token.string));
 			} else {
 				check_assignment(c, operand, e->type, str_lit("variable assignment"));
 				if (operand->mode != Addressing_Type) {
@@ -275,11 +275,15 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 			e->type = t_invalid;
 			return;
 
-		case Addressing_Overload:
-			e->kind = Entity_Alias;
-			e->Alias.base = operand.overload_entities[0];
+		case Addressing_ProcGroup: {
+			GB_ASSERT(operand.proc_group != nullptr);
+			GB_ASSERT(operand.proc_group->kind == Entity_ProcGroup);
+
+			e->kind = Entity_ProcGroup;
 			e->type = t_invalid;
+			gb_memcopy(&e->ProcGroup, &operand.proc_group->ProcGroup, gb_size_of(e->ProcGroup));
 			return;
+		}
 	#endif
 		}
 	#if 1
@@ -708,11 +712,11 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	check_init_variables(c, entities, entity_count, init_expr_list, context_name);
 }
 
-void check_proc_grouping_decl(Checker *c, Entity *pg_entity, DeclInfo *d) {
-	GB_ASSERT(pg_entity->kind == Entity_ProcedureGrouping);
-	auto *pge = &pg_entity->ProcedureGrouping;
+void check_proc_group_decl(Checker *c, Entity *pg_entity, DeclInfo *d) {
+	GB_ASSERT(pg_entity->kind == Entity_ProcGroup);
+	auto *pge = &pg_entity->ProcGroup;
 
-	ast_node(pg, ProcGrouping, d->init_expr);
+	ast_node(pg, ProcGroup, d->init_expr);
 
 	array_init(&pge->entities, c->allocator, pg->args.count);
 
@@ -731,21 +735,86 @@ void check_proc_grouping_decl(Checker *c, Entity *pg_entity, DeclInfo *d) {
 			e = check_selector(c, &o, arg, nullptr);
 		}
 		if (e == nullptr) {
-			error(arg, "Expected a valid entity name in procedure grouping");
+			error(arg, "Expected a valid entity name in procedure group");
 			continue;
 		}
-		if (e->kind != Entity_Procedure) {
+		if (e->kind == Entity_Variable) {
+			if (!is_type_proc(e->type)) {
+				error(arg, "Expected a procedure variable");
+				continue;
+			}
+		} else if (e->kind != Entity_Procedure) {
 			error(arg, "Expected a procedure entity");
 			continue;
 		}
 
 		if (ptr_set_exists(&entity_map, e)) {
-			error(arg, "Previous use of `%.*s` in procedure grouping", LIT(e->token.string));
+			error(arg, "Previous use of `%.*s` in procedure group", LIT(e->token.string));
 			continue;
 		}
 		ptr_set_add(&entity_map, e);
 
 		array_add(&pge->entities, e);
+	}
+
+	for_array(j, pge->entities) {
+		Entity *p = pge->entities[j];
+		if (p->type == t_invalid) {
+			// NOTE(bill): This invalid overload has already been handled
+			continue;
+		}
+
+		String name = p->token.string;
+
+		for (isize k = j+1; k < pge->entities.count; k++) {
+			Entity *q = pge->entities[k];
+			GB_ASSERT(p != q);
+
+			bool is_invalid = false;
+
+			TokenPos pos = q->token.pos;
+
+			if (q->type == nullptr || q->type == t_invalid) {
+				continue;
+			}
+
+			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
+			switch (kind) {
+			case ProcOverload_Identical:
+				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
+				is_invalid = true;
+				break;
+			// case ProcOverload_CallingConvention:
+				// error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
+				// is_invalid = true;
+				// break;
+			case ProcOverload_ParamVariadic:
+				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
+				is_invalid = true;
+				break;
+			case ProcOverload_ResultCount:
+			case ProcOverload_ResultTypes:
+				error(p->token, "Overloaded procedure '%.*s' as the same parameters but different results in this scope", LIT(name));
+				is_invalid = true;
+				break;
+			case ProcOverload_Polymorphic:
+				#if 0
+				error(p->token, "Overloaded procedure '%.*s' has a polymorphic counterpart in this scope which is not allowed", LIT(name));
+				is_invalid = true;
+				#endif
+				break;
+			case ProcOverload_ParamCount:
+			case ProcOverload_ParamTypes:
+				// This is okay :)
+				break;
+
+			}
+
+			if (is_invalid) {
+				gb_printf_err("\tprevious procedure at %.*s(%td:%td)\n", LIT(pos.file), pos.line, pos.column);
+				q->type = t_invalid;
+			}
+		}
 	}
 }
 
@@ -787,9 +856,8 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 		check_proc_decl(c, e, d);
 		break;
 
-	case Entity_ProcedureGrouping:
-		// error(e->token, "Procedure groupings are not yet supported");
-		check_proc_grouping_decl(c, e, d);
+	case Entity_ProcGroup:
+		check_proc_group_decl(c, e, d);
 		break;
 	}
 

@@ -1,5 +1,5 @@
-import win32 "core:sys/windows.odin" when ODIN_OS == "windows";
-import wgl "core:sys/wgl.odin" when ODIN_OS == "windows";
+when ODIN_OS == "windows" do import win32 "core:sys/windows.odin";
+when ODIN_OS == "windows" import wgl "core:sys/wgl.odin";
 import "core:fmt.odin";
 import "core:math.odin";
 import "core:os.odin";

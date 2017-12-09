@@ -2,6 +2,8 @@
 // with the use of the `multi_*` procedures.
 // TODO(bill): I should probably allow the `multi_map_*` stuff to be #ifdefed out
 
+#define MAP_ENABLE_MULTI_MAP 1
+
 #ifndef MAP_UTIL_STUFF
 #define MAP_UTIL_STUFF
 // NOTE(bill): This util stuff is the same for every `Map`
@@ -110,6 +112,7 @@ template <typename T> void map_clear            (Map<T> *h);
 template <typename T> void map_grow             (Map<T> *h);
 template <typename T> void map_rehash           (Map<T> *h, isize new_count);
 
+#if MAP_ENABLE_MULTI_MAP
 // Mutlivalued map procedure
 template <typename T> MapEntry<T> * multi_map_find_first(Map<T> *h, HashKey key);
 template <typename T> MapEntry<T> * multi_map_find_next (Map<T> *h, MapEntry<T> *e);
@@ -119,7 +122,7 @@ template <typename T> void  multi_map_get_all   (Map<T> *h, HashKey key, T *item
 template <typename T> void  multi_map_insert    (Map<T> *h, HashKey key, T const &value);
 template <typename T> void  multi_map_remove    (Map<T> *h, HashKey key, MapEntry<T> *e);
 template <typename T> void  multi_map_remove_all(Map<T> *h, HashKey key);
-
+#endif
 
 template <typename T>
 gb_inline void map_init(Map<T> *h, gbAllocator a, isize capacity) {
@@ -291,7 +294,7 @@ gb_inline void map_clear(Map<T> *h) {
 }
 
 
-#if 1
+#if MAP_ENABLE_MULTI_MAP
 template <typename T>
 MapEntry<T> *multi_map_find_first(Map<T> *h, HashKey key) {
 	isize i = map__find(h, key).entry_index;
