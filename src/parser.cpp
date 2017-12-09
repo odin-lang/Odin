@@ -164,7 +164,7 @@ Array<AstNode *> make_ast_node_array(AstFile *f, isize init_capacity = 8) {
 		Token token; \
 		AstNode *expr; \
 	}) \
-	AST_NODE_KIND(ProcGrouping, "procedure grouping", struct { \
+	AST_NODE_KIND(ProcGroup, "procedure group", struct { \
 		Token token; \
 		Token open;  \
 		Token close; \
@@ -540,7 +540,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_Undef:          return node->Undef;
 	case AstNode_BasicLit:       return node->BasicLit;
 	case AstNode_BasicDirective: return node->BasicDirective.token;
-	case AstNode_ProcGrouping:   return node->ProcGrouping.token;
+	case AstNode_ProcGroup:      return node->ProcGroup.token;
 	case AstNode_ProcLit:        return ast_node_token(node->ProcLit.type);
 	case AstNode_CompoundLit:
 		if (node->CompoundLit.type != nullptr) {
@@ -669,8 +669,8 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_Ellipsis:
 		n->Ellipsis.expr = clone_ast_node(a, n->Ellipsis.expr);
 		break;
-	case AstNode_ProcGrouping:
-		n->ProcGrouping.args = clone_ast_node_array(a, n->ProcGrouping.args);
+	case AstNode_ProcGroup:
+		n->ProcGroup.args = clone_ast_node_array(a, n->ProcGroup.args);
 		break;
 	case AstNode_ProcLit:
 		n->ProcLit.type = clone_ast_node(a, n->ProcLit.type);
@@ -1121,12 +1121,12 @@ AstNode *ast_ellipsis(AstFile *f, Token token, AstNode *expr) {
 }
 
 
-AstNode *ast_proc_grouping(AstFile *f, Token token, Token open, Token close, Array<AstNode *> args) {
-	AstNode *result = make_ast_node(f, AstNode_ProcGrouping);
-	result->ProcGrouping.token = token;
-	result->ProcGrouping.open  = open;
-	result->ProcGrouping.close = close;
-	result->ProcGrouping.args = args;
+AstNode *ast_proc_group(AstFile *f, Token token, Token open, Token close, Array<AstNode *> args) {
+	AstNode *result = make_ast_node(f, AstNode_ProcGroup);
+	result->ProcGroup.token = token;
+	result->ProcGroup.open  = open;
+	result->ProcGroup.close = close;
+	result->ProcGroup.args = args;
 	return result;
 }
 
@@ -2266,11 +2266,11 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		return expr;
 	} break;
 
-	// Parse Procedure Type or Literal or Grouping
+	// Parse Procedure Type or Literal or Group
 	case Token_proc: {
 		Token token = expect_token(f, Token_proc);
 
-		if (f->curr_token.kind == Token_OpenBracket) { // ProcGrouping
+		if (f->curr_token.kind == Token_OpenBracket) { // ProcGroup
 			Token open = expect_token(f, Token_OpenBracket);
 
 			Array<AstNode *> args = {};
@@ -2289,10 +2289,10 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			Token close = expect_token(f, Token_CloseBracket);
 
 			if (args.count == 0) {
-				syntax_error(token, "Expected a least 1 argument in a procedure grouping");
+				syntax_error(token, "Expected a least 1 argument in a procedure group");
 			}
 
-			return ast_proc_grouping(f, token, open, close, args);
+			return ast_proc_group(f, token, open, close, args);
 		}
 
 		AstNode *type = parse_proc_type(f, token);

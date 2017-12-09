@@ -120,7 +120,7 @@ enum AddressingMode {
 	Addressing_Constant,      // constant
 	Addressing_Type,          // type
 	Addressing_Builtin,       // built-in procedure
-	Addressing_Overload,      // overloaded procedure
+	Addressing_ProcGroup,     // procedure group (overloaded procedure)
 	Addressing_MapIndex,      // map index expression -
 	                          // 	lhs: acts like a Variable
 	                          // 	rhs: acts like OptionalOk
@@ -138,8 +138,7 @@ struct Operand {
 	ExactValue     value;
 	AstNode *      expr;
 	BuiltinProcId  builtin_id;
-	isize          overload_count;
-	Entity **      overload_entities;
+	Entity *       proc_group;
 };
 
 struct TypeAndValue {
@@ -165,6 +164,8 @@ bool is_operand_nil(Operand o) {
 bool is_operand_undef(Operand o) {
 	return o.mode == Addressing_Value && o.type == t_untyped_undef;
 }
+
+
 
 struct BlockLabel {
 	String   name;
@@ -780,28 +781,10 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	HashKey key = hash_string(name);
 	Entity **found = map_get(&s->elements, key);
 
-#ifndef DISABLE_PROCEDURE_OVERLOADING
-	// IMPORTANT NOTE(bill): Procedure overloading code
-	Entity *prev = nullptr;
-	if (found) {
-		prev = *found;
-		if (prev->kind != Entity_Procedure ||
-		    entity->kind != Entity_Procedure) {
-			return prev;
-		}
-	}
-
-	if (prev != nullptr && entity->kind == Entity_Procedure) {
-		multi_map_insert(&s->elements, key, entity);
-	} else {
-		map_set(&s->elements, key, entity);
-	}
-#else
 	if (found) {
 		return *found;
 	}
 	map_set(&s->elements, key, entity);
-#endif
 	if (entity->scope == nullptr) {
 		entity->scope = s;
 	}
@@ -1620,6 +1603,18 @@ Type *find_core_type(Checker *c, String name) {
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type);
 
+Array<Entity *> proc_group_entities(Checker *c, Operand o) {
+	Array<Entity *> procs = {};
+	if (o.mode == Addressing_ProcGroup) {
+		GB_ASSERT(o.proc_group != nullptr);
+		if (o.proc_group->kind == Entity_ProcGroup) {
+			check_entity_decl(c, o.proc_group, nullptr, nullptr);
+			return o.proc_group->ProcGroup.entities;
+		}
+	}
+	return procs;
+}
+
 void init_preload(Checker *c) {
 	if (t_type_info == nullptr) {
 		Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
@@ -1735,118 +1730,6 @@ bool check_arity_match(Checker *c, AstNodeValueDecl *vd, bool is_global = false)
 void check_collect_entities(Checker *c, Array<AstNode *> nodes);
 void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws);
 void check_delayed_file_import_entity(Checker *c, AstNode *decl);
-
-bool check_is_entity_overloaded(Entity *e) {
-	if (e->kind != Entity_Procedure) {
-		return false;
-	}
-	Scope *s = e->scope;
-	HashKey key = hash_string(e->token.string);
-	isize overload_count = multi_map_count(&s->elements, key);
-	return overload_count > 1;
-}
-
-void check_procedure_overloading(Checker *c, Entity *e) {
-	GB_ASSERT(e->kind == Entity_Procedure);
-	if (e->type == t_invalid) {
-		return;
-	}
-	if (e->Procedure.overload_kind != Overload_Unknown) {
-		// NOTE(bill): The overloading has already been handled
-		return;
-	}
-
-
-	// NOTE(bill): Procedures call only overload other procedures in the same scope
-
-	String name = e->token.string;
-	HashKey key = hash_string(name);
-	Scope *s = e->scope;
-	isize overload_count = multi_map_count(&s->elements, key);
-	GB_ASSERT(overload_count >= 1);
-	if (overload_count == 1) {
-		e->Procedure.overload_kind = Overload_No;
-		return;
-	}
-	GB_ASSERT(overload_count > 1);
-
-
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-	Entity **procs = gb_alloc_array(c->tmp_allocator, Entity *, overload_count);
-	multi_map_get_all(&s->elements, key, procs);
-
-	for (isize j = 0; j < overload_count; j++) {
-		Entity *p = procs[j];
-		if (p->type == t_invalid) {
-			// NOTE(bill): This invalid overload has already been handled
-			continue;
-		}
-
-		String name = p->token.string;
-
-		GB_ASSERT(p->kind == Entity_Procedure);
-		for (isize k = j+1; k < overload_count; k++) {
-			Entity *q = procs[k];
-			GB_ASSERT(p != q);
-
-			bool is_invalid = false;
-			GB_ASSERT(q->kind == Entity_Procedure);
-
-			TokenPos pos = q->token.pos;
-
-			if (q->type == nullptr || q->type == t_invalid) {
-				continue;
-			}
-
-			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
-			switch (kind) {
-			case ProcOverload_Identical:
-				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
-				is_invalid = true;
-				break;
-			// case ProcOverload_CallingConvention:
-				// error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
-				// is_invalid = true;
-				// break;
-			case ProcOverload_ParamVariadic:
-				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
-				is_invalid = true;
-				break;
-			case ProcOverload_ResultCount:
-			case ProcOverload_ResultTypes:
-				error(p->token, "Overloaded procedure '%.*s' as the same parameters but different results in this scope", LIT(name));
-				is_invalid = true;
-				break;
-			case ProcOverload_Polymorphic:
-				#if 0
-				error(p->token, "Overloaded procedure '%.*s' has a polymorphic counterpart in this scope which is not allowed", LIT(name));
-				is_invalid = true;
-				#endif
-				break;
-			case ProcOverload_ParamCount:
-			case ProcOverload_ParamTypes:
-				// This is okay :)
-				break;
-
-			}
-
-			if (is_invalid) {
-				gb_printf_err("\tprevious procedure at %.*s(%td:%td)\n", LIT(pos.file), pos.line, pos.column);
-				q->type = t_invalid;
-			}
-		}
-	}
-
-	for (isize j = 0; j < overload_count; j++) {
-		Entity *p = procs[j];
-		if (p->type != t_invalid) {
-			p->Procedure.overload_kind = Overload_Yes;
-		}
-	}
-
-	gb_temp_arena_memory_end(tmp);
-}
-
 
 struct AttributeContext {
 	String  link_name;
@@ -2259,11 +2142,11 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 				}
 				d->proc_lit = init;
 				d->type_expr = pl->type;
-			} else if (init->kind == AstNode_ProcGrouping) {
-				ast_node(pg, ProcGrouping, init);
-				e = make_entity_procedure_grouping(c->allocator, d->scope, token, nullptr);
+			} else if (init->kind == AstNode_ProcGroup) {
+				ast_node(pg, ProcGroup, init);
+				e = make_entity_proc_group(c->allocator, d->scope, token, nullptr);
 				if (fl != nullptr) {
-					error(name, "Procedure groupings are not allowed within a foreign block");
+					error(name, "Procedure groups are not allowed within a foreign block");
 				}
 				d->init_expr = init;
 			} else {
@@ -2446,15 +2329,6 @@ void check_all_global_entities(Checker *c) {
 		if (!processing_preload) {
 			init_preload(c);
 		}
-	}
-
-	for_array(i, c->info.entities.entries) {
-		auto *entry = &c->info.entities.entries[i];
-		Entity *e = cast(Entity *)entry->key.ptr;
-		if (e->kind != Entity_Procedure) {
-			continue;
-		}
-		check_procedure_overloading(c, e);
 	}
 }
 

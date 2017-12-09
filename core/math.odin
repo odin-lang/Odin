@@ -148,9 +148,10 @@ div :: proc[
 ];
 
 inverse :: proc[mat4_inverse, quat_inverse];
+dot     :: proc[vec_dot, quat_dot];
+cross   :: proc[cross2, cross3];
 
-
-dot :: proc(a, b: $T/[$N]$E) -> E {
+vec_dot :: proc(a, b: $T/[$N]$E) -> E {
 	res: E;
 	for i in 0..N {
 		res += a[i] * b[i];
@@ -167,7 +168,6 @@ cross3 :: proc(a, b: $T/[3]$E) -> T {
 	j := swizzle(a, 2, 0, 1) * swizzle(b, 1, 2, 0);
 	return T(i - j);
 }
-cross :: proc[cross2, cross3];
 
 
 length :: proc(v: $T/[$N]$E) -> E { return sqrt(dot(v, v)); }
