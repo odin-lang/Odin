@@ -3280,11 +3280,12 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token) {
 	for_array(i, params->FieldList.list) {
 		AstNode *param = params->FieldList.list[i];
 		ast_node(f, Field, param);
-		if (f->type != nullptr &&
-		    (f->type->kind == AstNode_TypeType ||
-		     f->type->kind == AstNode_PolyType)) {
-			is_generic = true;
-			break;
+		if (f->type != nullptr) {
+		    if (f->type->kind == AstNode_TypeType ||
+		        f->type->kind == AstNode_PolyType) {
+				is_generic = true;
+				break;
+			}
 		}
 	}
 

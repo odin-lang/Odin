@@ -82,17 +82,17 @@ struct Entity {
 			i32        field_index;
 			i32        field_src_index;
 			ExactValue default_value;
-			bool       default_is_nil;
-			bool       default_is_undef;
-			bool       default_is_location;
-			bool       is_immutable;
-			String     thread_local_model;
-			bool       is_foreign;
-			bool       is_export;
 			Entity *   foreign_library;
 			AstNode *  foreign_library_ident;
 			String     link_name;
 			String     link_prefix;
+			String     thread_local_model;
+			bool       default_is_nil;
+			bool       default_is_undef;
+			bool       default_is_location;
+			bool       is_immutable;
+			bool       is_foreign;
+			bool       is_export;
 		} Variable;
 		struct {
 			bool  is_type_alias;

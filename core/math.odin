@@ -399,11 +399,11 @@ quat_mulf :: proc(q: Quat, f: f32) -> Quat { return Quat{q.x*f, q.y*f, q.z*f, q.
 quat_divf :: proc(q: Quat, f: f32) -> Quat { return Quat{q.x/f, q.y/f, q.z/f, q.w/f}; }
 
 quat_div     :: proc(q0, q1: Quat) -> Quat { return mul(q0, quat_inverse(q1)); }
-quat_inverse :: proc(q: Quat) -> Quat { return div(conj(q), quat_dot(q, q)); }
+quat_inverse :: proc(q: Quat) -> Quat { return div(conj(q), dot(q, q)); }
 quat_dot     :: proc(q0, q1: Quat) -> f32 { return q0.x*q1.x + q0.y*q1.y + q0.z*q1.z + q0.w*q1.w; }
 
 quat_norm :: proc(q: Quat) -> Quat {
-	m := sqrt(quat_dot(q, q));
+	m := sqrt(dot(q, q));
 	return div(q, m);
 }
 

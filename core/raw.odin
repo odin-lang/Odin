@@ -4,7 +4,7 @@ Any :: struct #ordered {
 }
 
 String :: struct #ordered {
-	data: ^u8,
+	data: ^byte,
 	len:  int,
 }
 
@@ -25,3 +25,15 @@ Map :: struct #ordered {
 	entries: Dynamic_Array,
 }
 
+string_data :: inline proc(s: $T/string) -> ^byte {
+	return (^String)(&s).data;
+}
+
+slice_data :: inline proc(a: $T/[]$E) -> ^E {
+	return cast(^E)(^Slice)(&a).data;
+}
+dynamic_array_data :: inline proc(a: $T/[dynamic]$E) -> ^E {
+	return cast(^E)(^Dynamic_Array)(&a).data;
+}
+
+data :: proc[string_data, slice_data, dynamic_array_data];

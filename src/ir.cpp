@@ -5080,8 +5080,11 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 		isize arg_count = 0;
 		for_array(i, ce->args) {
-			AstNode *a = ce->args[i];
-			Type *at = base_type(type_of_expr(proc->module->info, a));
+			AstNode *arg = ce->args[i];
+			TypeAndValue tav = type_and_value_of_expr(proc->module->info, arg);
+			GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s", expr_to_string(arg));
+			GB_ASSERT_MSG(tav.mode != Addressing_ProcGroup, "%s", expr_to_string(arg));
+			Type *at = tav.type;
 			if (at->kind == Type_Tuple) {
 				arg_count += at->Tuple.variables.count;
 			} else {

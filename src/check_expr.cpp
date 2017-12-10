@@ -2497,7 +2497,8 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			}
 
 			check_entity_decl(c, entity, nullptr, nullptr);
-			GB_ASSERT(entity->type != nullptr || entity->kind == Entity_ProcGroup);
+			GB_ASSERT(entity->type != nullptr);
+
 
 			if (is_alias) {
 				// TODO(bill): Which scope do you search for for an alias?
@@ -2514,13 +2515,24 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 				is_not_exported = true;
 			}
 
-			if (is_not_exported && entity->kind == Entity_ProcGroup) {
-				check_entity_decl(c, entity, nullptr, nullptr);
+
+
+			if (is_not_exported) {
+				gbString sel_str = expr_to_string(selector);
+				error(op_expr, "'%s' is not exported by '%.*s'", sel_str, LIT(import_name));
+				gb_string_free(sel_str);
+				operand->mode = Addressing_Invalid;
+				operand->expr = node;
+				return nullptr;
+			}
+
+			if (entity->kind == Entity_ProcGroup) {
 				auto *pge = &entity->ProcGroup;
 				Array<Entity *> procs = pge->entities;
 				bool skip = false;
 				for_array(i, procs) {
-					Type *t = base_type(procs[i]->type);
+					Entity *p = procs[i];
+					Type *t = base_type(p->type);
 					if (t == t_invalid) {
 						continue;
 					}
@@ -2530,7 +2542,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 					x.type = t;
 					if (type_hint != nullptr) {
 						if (check_is_assignable_to(c, &x, type_hint)) {
-							entity = procs[i];
+							entity = p;
 							skip = true;
 							break;
 						}
@@ -2538,22 +2550,13 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 				}
 
 				if (!skip) {
-					GB_ASSERT(e != nullptr);
+					GB_ASSERT(entity != nullptr);
 					operand->mode       = Addressing_ProcGroup;
 					operand->type       = t_invalid;
 					operand->expr       = node;
-					operand->proc_group = e;
-					return e;
+					operand->proc_group = entity;
+					return entity;
 				}
-			}
-
-			if (is_not_exported) {
-				gbString sel_str = expr_to_string(selector);
-				error(op_expr, "'%s' is not exported by '%.*s'", sel_str, LIT(import_name));
-				gb_string_free(sel_str);
-				operand->mode = Addressing_Invalid;
-				operand->expr = node;
-				return nullptr;
 			}
 		}
 	}
@@ -2693,7 +2696,8 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		break;
 
 	case Entity_ProcGroup:
-		entity->type = t_invalid;
+		operand->mode = Addressing_ProcGroup;
+		operand->proc_group = entity;
 		break;
 
 	// NOTE(bill): These cases should never be hit but are here for sanity reasons
@@ -3330,7 +3334,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 
-		operand->type = make_type_array(c->allocator, elem_type, arg_count);
+		if (arg_count < max_count) {
+			operand->type = make_type_array(c->allocator, elem_type, arg_count);
+		}
 		operand->mode = Addressing_Value;
 
 		break;
@@ -4370,6 +4376,8 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 	}
 
 	if (operand->mode == Addressing_ProcGroup) {
+		check_entity_decl(c, operand->proc_group, nullptr, nullptr);
+
 		Array<Entity *> procs = proc_group_entities(c, *operand);
 
 		ValidIndexAndScore *valids         = gb_alloc_array(heap_allocator(), ValidIndexAndScore, procs.count);
@@ -4421,7 +4429,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 
 		if (valid_count == 0) {
 			error(operand->expr, "No procedures or ambiguous call for procedure group '%s' that match with the given arguments", expr_name);
-			gb_printf_err("\tGiven argument types -> (");
+			gb_printf_err("\tGiven argument types: (");
 			for_array(i, operands) {
 				Operand o = operands[i];
 				if (i > 0) gb_printf_err(", ");
@@ -4441,15 +4449,20 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 				if (t == t_invalid) continue;
 				GB_ASSERT(t->kind == Type_Proc);
 				gbString pt;
+				defer (gb_string_free(pt));
 				if (t->Proc.node != nullptr) {
 					pt = expr_to_string(t->Proc.node);
 				} else {
 					pt = type_to_string(t);
 				}
 				String name = proc->token.string;
-				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td) with score %lld\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
-				// gb_printf_err("\t%.*s :: %s at %.*s(%td:%td)\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column);
-				gb_string_free(pt);
+
+				char const *sep = "::";
+				if (proc->kind == Entity_Variable) {
+					sep = ":=";
+				}
+				// gb_printf_err("\t%.*s %s %s at %.*s(%td:%td) with score %lld\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
+				gb_printf_err("\t%.*s %s %s at %.*s(%td:%td)\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
 			}
 			if (procs.count > 0) {
 				gb_printf_err("\n");
@@ -4457,7 +4470,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 			result_type = t_invalid;
 		} else if (valid_count > 1) {
 			error(operand->expr, "Ambiguous procedure group call '%s' that match with the given arguments", expr_name);
-			gb_printf_err("\tGiven argument types -> (");
+			gb_printf_err("\tGiven argument types: (");
 			for_array(i, operands) {
 				Operand o = operands[i];
 				if (i > 0) gb_printf_err(", ");
@@ -4472,15 +4485,18 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 				TokenPos pos = proc->token.pos;
 				Type *t = base_type(proc->type); GB_ASSERT(t->kind == Type_Proc);
 				gbString pt;
+				defer (gb_string_free(pt));
 				if (t->Proc.node != nullptr) {
 					pt = expr_to_string(t->Proc.node);
 				} else {
 					pt = type_to_string(t);
 				}
 				String name = proc->token.string;
-				// gb_printf_err("\t%.*s :: %s at %.*s(%td:%td) with score %lld\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
-				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td)\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column);
-				gb_string_free(pt);
+				char const *sep = "::";
+				if (proc->kind == Entity_Variable) {
+					sep = ":=";
+				}
+				gb_printf_err("\t%.*s %s %s at %.*s(%td:%td)\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
 			}
 			result_type = t_invalid;
 		} else {

@@ -477,13 +477,13 @@ new_clone :: inline proc(data: $T, loc := #caller_location) -> ^T {
 }
 
 free_string :: proc(str: string, loc := #caller_location) {
-	free_ptr((^raw.String)(&str).data, loc);
+	free_ptr(raw.data(str), loc);
 }
 free_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) {
-	free_ptr((^raw.Dynamic_Array)(&array).data, loc);
+	free_ptr(raw.data(array), loc);
 }
 free_slice :: proc(array: $T/[]$E, loc := #caller_location) {
-	free_ptr((^raw.Slice)(&array).data, loc);
+	free_ptr(raw.data(array), loc);
 }
 free_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
 	raw := cast(^raw.Map)&m;

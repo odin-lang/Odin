@@ -715,11 +715,11 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 void check_proc_group_decl(Checker *c, Entity *pg_entity, DeclInfo *d) {
 	GB_ASSERT(pg_entity->kind == Entity_ProcGroup);
 	auto *pge = &pg_entity->ProcGroup;
+	String proc_group_name = pg_entity->token.string;
 
 	ast_node(pg, ProcGroup, d->init_expr);
 
 	array_init(&pge->entities, c->allocator, pg->args.count);
-
 
 	PtrSet<Entity *> entity_map = {};
 	ptr_set_init(&entity_map, heap_allocator());
@@ -735,12 +735,14 @@ void check_proc_group_decl(Checker *c, Entity *pg_entity, DeclInfo *d) {
 			e = check_selector(c, &o, arg, nullptr);
 		}
 		if (e == nullptr) {
-			error(arg, "Expected a valid entity name in procedure group");
+			error(arg, "Expected a valid entity name in procedure group, got %.*s", LIT(ast_node_strings[arg->kind]));
 			continue;
 		}
 		if (e->kind == Entity_Variable) {
 			if (!is_type_proc(e->type)) {
-				error(arg, "Expected a procedure variable");
+				gbString s = type_to_string(e->type);
+				defer (gb_string_free(s));
+				error(arg, "Expected a procedure, got %s", s);
 				continue;
 			}
 		} else if (e->kind != Entity_Procedure) {
@@ -753,7 +755,6 @@ void check_proc_group_decl(Checker *c, Entity *pg_entity, DeclInfo *d) {
 			continue;
 		}
 		ptr_set_add(&entity_map, e);
-
 		array_add(&pge->entities, e);
 	}
 
@@ -816,6 +817,8 @@ void check_proc_group_decl(Checker *c, Entity *pg_entity, DeclInfo *d) {
 			}
 		}
 	}
+
+	pg_entity->type = t_invalid;
 }
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {

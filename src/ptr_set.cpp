@@ -19,7 +19,7 @@ struct PtrSet {
 
 template <typename T> void ptr_set_init             (PtrSet<T> *s, gbAllocator a, isize capacity = 16);
 template <typename T> void ptr_set_destroy          (PtrSet<T> *s);
-template <typename T> void ptr_set_add              (PtrSet<T> *s, T ptr);
+template <typename T> T    ptr_set_add              (PtrSet<T> *s, T ptr);
 template <typename T> bool ptr_set_exists           (PtrSet<T> *s, T ptr);
 template <typename T> void ptr_set_remove           (PtrSet<T> *s, T ptr);
 template <typename T> void ptr_set_clear            (PtrSet<T> *s);
@@ -136,7 +136,7 @@ gb_inline bool ptr_set_exists(PtrSet<T> *s, T ptr) {
 
 // Returns true if it already exists
 template <typename T>
-void ptr_set_add(PtrSet<T> *s, T ptr) {
+T ptr_set_add(PtrSet<T> *s, T ptr) {
 	isize index;
 	PtrSetFindResult fr;
 	if (s->hashes.count == 0) {
@@ -156,6 +156,7 @@ void ptr_set_add(PtrSet<T> *s, T ptr) {
 	if (ptr_set__full(s)) {
 		ptr_set_grow(s);
 	}
+	return ptr;
 }
 
 
