@@ -1225,8 +1225,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		bool detemine_type_from_operand = false;
 		Type *specialization = nullptr;
 
-		bool is_using          = (p->flags&FieldFlag_using) != 0;
-
+		bool is_using = (p->flags&FieldFlag_using) != 0;
 
 		if (type_expr == nullptr) {
 			if (default_value->kind == AstNode_BasicDirective &&

@@ -119,6 +119,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_offset_of,              "offset_of"),              \
 	TOKEN_KIND(Token_type_of,                "type_of"),                \
 	TOKEN_KIND(Token_type_info_of,           "type_info_of"),           \
+	TOKEN_KIND(Token_const,                  "const"),                  \
 	TOKEN_KIND(Token_asm,                    "asm"),                    \
 	TOKEN_KIND(Token_yield,                  "yield"),                  \
 	TOKEN_KIND(Token_await,                  "await"),                  \
