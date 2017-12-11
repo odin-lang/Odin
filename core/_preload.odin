@@ -240,18 +240,19 @@ type_info_base_without_enum :: proc(info: ^Type_Info) -> ^Type_Info {
 
 
 
+@(default_calling_convention = "c")
 foreign __llvm_core {
 	@(link_name="llvm.assume")
-	assume :: proc "c" (cond: bool) ---;
+	assume :: proc(cond: bool) ---;
 
 	@(link_name="llvm.debugtrap")
-	__debug_trap :: proc "c" () ---;
+	__debug_trap :: proc() ---;
 
 	@(link_name="llvm.trap")
-	__trap :: proc "c" () ---;
+	__trap :: proc() ---;
 
 	@(link_name="llvm.readcyclecounter")
-	read_cycle_counter :: proc "c" () -> u64 ---;
+	read_cycle_counter :: proc() -> u64 ---;
 }
 
 
@@ -776,6 +777,7 @@ __mem_compare :: proc "contextless" (a, b: ^byte, n: int) -> int {
 	return 0;
 }
 
+@(default_calling_convention = "c")
 foreign __llvm_core {
 	@(link_name="llvm.sqrt.f32") __sqrt_f32 :: proc(x: f32) -> f32 ---;
 	@(link_name="llvm.sqrt.f64") __sqrt_f64 :: proc(x: f64) -> f64 ---;
@@ -791,6 +793,14 @@ foreign __llvm_core {
 
 	@(link_name="llvm.fmuladd.f32") fmuladd32  :: proc(a, b, c: f32) -> f32 ---;
 	@(link_name="llvm.fmuladd.f64") fmuladd64  :: proc(a, b, c: f64) -> f64 ---;
+
+	@(link_name="llvm.fabs.f32") __abs_f32 :: proc(x: f32) -> f32 ---;
+	@(link_name="llvm.fabs.f64") __abs_f64 :: proc(x: f64) -> f32 ---;
+
+	@(link_name="llvm.minnum.f32") __min_f32 :: proc(a, b: f32) -> f32 ---;
+	@(link_name="llvm.minnum.f64") __min_f64 :: proc(a, b: f64) -> f32 ---;
+	@(link_name="llvm.maxnum.f32") __max_f32 :: proc(a, b: f32) -> f32 ---;
+	@(link_name="llvm.maxnum.f64") __max_f64 :: proc(a, b: f64) -> f32 ---;
 }
 __abs_complex64 :: inline proc "contextless" (x: complex64) -> f32 {
 	r, i := real(x), imag(x);

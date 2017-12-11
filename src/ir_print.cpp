@@ -1826,29 +1826,29 @@ void print_llvm_ir(irGen *ir) {
 	}
 
 	ir_print_encoded_local(f, str_lit("..opaque"));
-	ir_write_string(f, str_lit(" = type {};\n"));
+	ir_write_string(f, " = type {};\n");
 	ir_print_encoded_local(f, str_lit("..string"));
-	ir_write_string(f, str_lit(" = type {i8*, "));
+	ir_write_string(f, " = type {i8*, ");
 	ir_print_type(f, m, t_int);
-	ir_write_string(f, str_lit("} ; Basic_string\n"));
+	ir_write_string(f, "} ; Basic_string\n");
 	ir_print_encoded_local(f, str_lit("..rawptr"));
-	ir_write_string(f, str_lit(" = type i8* ; Basic_rawptr\n"));
+	ir_write_string(f, " = type i8* ; Basic_rawptr\n");
 
 	ir_print_encoded_local(f, str_lit("..complex32"));
-	ir_write_string(f, str_lit(" = type {half, half} ; Basic_complex32\n"));
+	ir_write_string(f, " = type {half, half} ; Basic_complex32\n");
 	ir_print_encoded_local(f, str_lit("..complex64"));
-	ir_write_string(f, str_lit(" = type {float, float} ; Basic_complex64\n"));
+	ir_write_string(f, " = type {float, float} ; Basic_complex64\n");
 	ir_print_encoded_local(f, str_lit("..complex128"));
-	ir_write_string(f, str_lit(" = type {double, double} ; Basic_complex128\n"));
+	ir_write_string(f, " = type {double, double} ; Basic_complex128\n");
 
 	ir_print_encoded_local(f, str_lit("..any"));
-	ir_write_string(f, str_lit(" = type {"));
+	ir_write_string(f, " = type {");
 	ir_print_type(f, m, t_rawptr);
-	ir_write_string(f, str_lit(", "));
+	ir_write_string(f, ", ");
 	ir_print_type(f, m, t_type_info_ptr);
-	ir_write_string(f, str_lit("} ; Basic_any\n"));
+	ir_write_string(f, "} ; Basic_any\n");
 
-	ir_write_string(f, str_lit("declare void @llvm.dbg.declare(metadata, metadata, metadata) nounwind readnone \n"));
+	ir_write_string(f, "declare void @llvm.dbg.declare(metadata, metadata, metadata) nounwind readnone \n");
 	ir_write_byte(f, '\n');
 
 

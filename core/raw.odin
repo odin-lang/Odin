@@ -25,10 +25,13 @@ Map :: struct #ordered {
 	entries: Dynamic_Array,
 }
 
+make_any :: inline proc(data: rawptr, type_info: ^Type_Info) -> any {
+	return transmute(any)Any{data, type_info};
+}
+
 string_data :: inline proc(s: $T/string) -> ^byte {
 	return (^String)(&s).data;
 }
-
 slice_data :: inline proc(a: $T/[]$E) -> ^E {
 	return cast(^E)(^Slice)(&a).data;
 }

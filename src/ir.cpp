@@ -1602,6 +1602,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 		if (e->kind != Entity_Variable) {
 			continue;
 		}
+		GB_ASSERT(e->flags & EntityFlag_Param);
 		Type *original_type = e->type;
 		Type *new_type = pt->Proc.abi_compat_params[i];
 		if (original_type != new_type) {
@@ -3873,19 +3874,48 @@ void ir_build_defer_stmt(irProcedure *proc, irDefer d) {
 	}
 }
 
+irValue *ir_emit_min(irProcedure *proc, Type *t, irValue *x, irValue *y) {
+	x = ir_emit_conv(proc, x, t);
+	y = ir_emit_conv(proc, y, t);
+
+	if (is_type_float(t)) {
+		gbAllocator a = proc->module->allocator;
+		i64 sz = 8*type_size_of(a, t);
+		irValue **args = gb_alloc_array(a, irValue *, 1);
+		args[0] = x;
+		switch (sz) {
+		case 32: return ir_emit_global_call(proc, "__min_f32", args, 1);
+		case 64: return ir_emit_global_call(proc, "__min_f64", args, 1);
+		}
+		GB_PANIC("Unknown float type");
+	}
+	return ir_emit_select(proc, ir_emit_comp(proc, Token_Lt, x, y), x, y);
+}
+irValue *ir_emit_max(irProcedure *proc, Type *t, irValue *x, irValue *y) {
+	x = ir_emit_conv(proc, x, t);
+	y = ir_emit_conv(proc, y, t);
+
+	if (is_type_float(t)) {
+		gbAllocator a = proc->module->allocator;
+		i64 sz = 8*type_size_of(a, t);
+		irValue **args = gb_alloc_array(a, irValue *, 1);
+		args[0] = x;
+		switch (sz) {
+		case 32: return ir_emit_global_call(proc, "__max_f32", args, 1);
+		case 64: return ir_emit_global_call(proc, "__max_f64", args, 1);
+		}
+		GB_PANIC("Unknown float type");
+	}
+	return ir_emit_select(proc, ir_emit_comp(proc, Token_Gt, x, y), x, y);
+}
+
 
 irValue *ir_emit_clamp(irProcedure *proc, Type *t, irValue *x, irValue *min, irValue *max) {
-	irValue *cond = nullptr;
 	ir_emit_comment(proc, str_lit("clamp"));
-	x   = ir_emit_conv(proc, x, t);
-	min = ir_emit_conv(proc, min, t);
-	max = ir_emit_conv(proc, max, t);
-
-	cond = ir_emit_comp(proc, Token_Gt, min, x);
-	x    = ir_emit_select(proc, cond,   min, x);
-	cond = ir_emit_comp(proc, Token_Lt, max, x);
-	x    = ir_emit_select(proc, cond,   max, x);
-	return x;
+	irValue *z = nullptr;
+	z = ir_emit_max(proc, t, x, min);
+	z = ir_emit_min(proc, t, z, max);
+	return z;
 }
 
 
@@ -4543,46 +4573,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		break;
 	}
 
-	#if 0
-	case BuiltinProc_slice_ptr: {
-		ir_emit_comment(proc, str_lit("slice_ptr"));
-		irValue *ptr = ir_build_expr(proc, ce->args[0]);
-		irValue *count = ir_build_expr(proc, ce->args[1]);
-		count = ir_emit_conv(proc, count, t_int);
-		irValue *capacity = count;
-		if (ce->args.count > 2) {
-			capacity = ir_build_expr(proc, ce->args[2]);
-			capacity = ir_emit_conv(proc, capacity, t_int);
-		}
-
-		Type *slice_type = make_type_slice(proc->module->allocator, type_deref(ir_type(ptr)));
-		irValue *slice = ir_add_local_generated(proc, slice_type);
-		ir_fill_slice(proc, slice, ptr, count, capacity);
-		return ir_emit_load(proc, slice);
-		break;
-	}
-
-	case BuiltinProc_slice_to_bytes: {
-		ir_emit_comment(proc, str_lit("slice_to_bytes"));
-		irValue *s = ir_build_expr(proc, ce->args[0]);
-		Type *t = base_type(ir_type(s));
-		if (is_type_u8_slice(t)) {
-			return ir_emit_conv(proc, s, tv.type);
-		}
-		irValue *slice = ir_add_local_generated(proc, tv.type);
-		i64 elem_size = type_size_of(proc->module->allocator, t->Slice.elem);
-
-		irValue *ptr   = ir_emit_conv(proc, ir_slice_elem(proc, s), t_u8_ptr);
-		irValue *count = ir_slice_count(proc, s);
-		irValue *capacity = ir_slice_capacity(proc, s);
-		count = ir_emit_arith(proc, Token_Mul, count, ir_const_int(proc->module->allocator, elem_size), t_int);
-		capacity = ir_emit_arith(proc, Token_Mul, capacity, ir_const_int(proc->module->allocator, elem_size), t_int);
-		ir_fill_slice(proc, slice, ptr, count, capacity);
-		return ir_emit_load(proc, slice);
-		break;
-	}
-	#endif
-
 	case BuiltinProc_expand_to_tuple: {
 		ir_emit_comment(proc, str_lit("expand_to_tuple"));
 		irValue *s = ir_build_expr(proc, ce->args[0]);
@@ -4600,35 +4590,26 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			ir_emit_store(proc, ep, f);
 		}
 		return ir_emit_load(proc, tuple);
-		break;
 	}
 
 	case BuiltinProc_min: {
 		ir_emit_comment(proc, str_lit("min"));
 		Type *t = type_of_expr(proc->module->info, expr);
-		irValue *x = ir_emit_conv(proc, ir_build_expr(proc, ce->args[0]), t);
-		irValue *y = ir_emit_conv(proc, ir_build_expr(proc, ce->args[1]), t);
-		irValue *cond = ir_emit_comp(proc, Token_Lt, x, y);
-		return ir_emit_select(proc, cond, x, y);
-		break;
+		return ir_emit_min(proc, t, ir_build_expr(proc, ce->args[0]), ir_build_expr(proc, ce->args[1]));
 	}
 
 	case BuiltinProc_max: {
 		ir_emit_comment(proc, str_lit("max"));
 		Type *t = type_of_expr(proc->module->info, expr);
-		irValue *x = ir_emit_conv(proc, ir_build_expr(proc, ce->args[0]), t);
-		irValue *y = ir_emit_conv(proc, ir_build_expr(proc, ce->args[1]), t);
-		irValue *cond = ir_emit_comp(proc, Token_Gt, x, y);
-		return ir_emit_select(proc, cond, x, y);
-		break;
+		return ir_emit_max(proc, t, ir_build_expr(proc, ce->args[0]), ir_build_expr(proc, ce->args[1]));
 	}
 
 	case BuiltinProc_abs: {
 		ir_emit_comment(proc, str_lit("abs"));
+		gbAllocator a = proc->module->allocator;
 		irValue *x = ir_build_expr(proc, ce->args[0]);
 		Type *t = ir_type(x);
 		if (is_type_complex(t)) {
-			gbAllocator a = proc->module->allocator;
 			i64 sz = 8*type_size_of(a, t);
 			irValue **args = gb_alloc_array(a, irValue *, 1);
 			args[0] = x;
@@ -4637,12 +4618,20 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			case 128: return ir_emit_global_call(proc, "__abs_complex128", args, 1);
 			}
 			GB_PANIC("Unknown complex type");
+		} else if (is_type_float(t)) {
+			i64 sz = 8*type_size_of(a, t);
+			irValue **args = gb_alloc_array(a, irValue *, 1);
+			args[0] = x;
+			switch (sz) {
+			case 32: return ir_emit_global_call(proc, "__abs_f32", args, 1);
+			case 64: return ir_emit_global_call(proc, "__abs_f64", args, 1);
+			}
+			GB_PANIC("Unknown float type");
 		}
 		irValue *zero = ir_emit_conv(proc, v_zero, t);
 		irValue *cond = ir_emit_comp(proc, Token_Lt, x, zero);
 		irValue *neg = ir_emit(proc, ir_instr_unary_op(proc, Token_Sub, x, t));
 		return ir_emit_select(proc, cond, neg, x);
-		break;
 	}
 
 	case BuiltinProc_clamp: {
@@ -4652,7 +4641,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		                     ir_build_expr(proc, ce->args[0]),
 		                     ir_build_expr(proc, ce->args[1]),
 		                     ir_build_expr(proc, ce->args[2]));
-		break;
 	}
 	}
 
