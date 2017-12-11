@@ -2527,8 +2527,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			}
 
 			if (entity->kind == Entity_ProcGroup) {
-				auto *pge = &entity->ProcGroup;
-				Array<Entity *> procs = pge->entities;
+				Array<Entity *> procs = entity->ProcGroup.entities;
 				bool skip = false;
 				for_array(i, procs) {
 					Entity *p = procs[i];
@@ -5460,8 +5459,12 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				max = index;
 			}
 
-			if (t->kind == Type_Array && is_to_be_determined_array_count) {
-				t->Array.count = max;
+			if (t->kind == Type_Array) {
+				if (is_to_be_determined_array_count) {
+					t->Array.count = max;
+				} else if (0 < max && max < t->Array.count) {
+					error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
+				}
 			}
 
 			break;
