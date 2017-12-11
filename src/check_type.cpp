@@ -357,12 +357,6 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 			}
 			type = t_invalid;
 		}
-		if (is_type_empty_union(type)) {
-			gbString str = type_to_string(type);
-			error(params[i], "Invalid use of an empty union '%s'", str);
-			gb_string_free(str);
-			type = t_invalid;
-		}
 
 		bool is_using = (p->flags&FieldFlag_using) != 0;
 
