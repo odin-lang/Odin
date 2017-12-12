@@ -127,14 +127,12 @@ template <typename T> void  multi_map_remove_all(Map<T> *h, HashKey key);
 template <typename T>
 gb_inline void map_init(Map<T> *h, gbAllocator a, isize capacity) {
 	array_init(&h->hashes,  a, capacity);
-	array_init(&h->entries, a, capacity);
-}
+	array_init(&h->entries, a, capacity);}
 
 template <typename T>
 gb_inline void map_destroy(Map<T> *h) {
 	array_free(&h->entries);
-	array_free(&h->hashes);
-}
+	array_free(&h->hashes);}
 
 template <typename T>
 gb_internal isize map__add_entry(Map<T> *h, HashKey key) {
@@ -237,8 +235,9 @@ template <typename T>
 void map_set(Map<T> *h, HashKey key, T const &value) {
 	isize index;
 	MapFindResult fr;
-	if (h->hashes.count == 0)
+	if (h->hashes.count == 0) {
 		map_grow(h);
+	}
 	fr = map__find(h, key);
 	if (fr.entry_index >= 0) {
 		index = fr.entry_index;

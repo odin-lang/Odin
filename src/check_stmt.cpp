@@ -1682,6 +1682,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			Entity **entities = gb_alloc_array(c->allocator, Entity *, vd->names.count);
 			isize entity_count = 0;
 
+			isize new_name_count = 0;
 			for_array(i, vd->names) {
 				AstNode *name = vd->names[i];
 				Entity *entity = nullptr;
@@ -1694,6 +1695,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					// NOTE(bill): Ignore assignments to '_'
 					if (!is_blank_ident(str)) {
 						found = current_scope_lookup_entity(c->context.scope, str);
+						new_name_count += 1;
 					}
 					if (found == nullptr) {
 						entity = make_entity_variable(c->allocator, c->context.scope, token, nullptr, false);
@@ -1719,6 +1721,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				}
 				entity->parent_proc_decl = c->context.curr_proc_decl;
 				entities[entity_count++] = entity;
+			}
+
+			if (new_name_count == 0) {
+				error(node, "No new declarations on the lhs");
 			}
 
 			Type *init_type = nullptr;

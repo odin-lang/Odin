@@ -234,7 +234,6 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 
 	case Type_Info_Array:
 		write_string(buf, "[");
-		fi := Fmt_Info{buf = buf};
 		write_i64(buf, i64(info.count), 10);
 		write_string(buf, "]");
 		write_type(buf, info.elem);
@@ -313,8 +312,6 @@ _parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: boo
 	}
 
 	result := 0;
-	ok := true;
-
 	i := 0;
 	for i < len(s[offset..]) {
 		c := rune(s[offset+i]);
@@ -855,11 +852,10 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		write_byte(fi.buf, '{');
 		defer write_byte(fi.buf, '}');
 
-		hash   := fi.hash;   defer fi.hash = hash;
-		indent := fi.indent; defer fi.indent -= 1;
-
+		fi.indent += 1;  defer fi.indent -= 1;
+		hash := fi.hash; defer fi.hash = hash;
 		fi.hash = false;
-		fi.indent += 1;
+
 
 		if hash	do write_byte(fi.buf, '\n');
 
@@ -1016,7 +1012,7 @@ sbprintln :: proc(buf: ^String_Buffer, args: ...any) -> string {
 	fi: Fmt_Info;
 	fi.buf = buf;
 
-	for arg, i in args {
+	for _, i in args {
 		if i > 0 do write_byte(buf, ' ');
 
 		fmt_value(&fi, args[i], 'v');

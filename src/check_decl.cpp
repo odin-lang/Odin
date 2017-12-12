@@ -265,7 +265,6 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 		}
 
 	// NOTE(bill): Check to see if the expression it to be aliases
-	#if 1
 		case Addressing_Builtin:
 			if (e->type != nullptr) {
 				error(type_expr, "A constant alias of a built-in procedure may not have a type initializer");
@@ -275,18 +274,16 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 			e->type = t_invalid;
 			return;
 
-		case Addressing_ProcGroup: {
+		case Addressing_ProcGroup:
 			GB_ASSERT(operand.proc_group != nullptr);
 			GB_ASSERT(operand.proc_group->kind == Entity_ProcGroup);
 
 			e->kind = Entity_ProcGroup;
 			e->type = t_invalid;
-			gb_memcopy(&e->ProcGroup, &operand.proc_group->ProcGroup, gb_size_of(e->ProcGroup));
+			gb_memmove(&e->ProcGroup, &operand.proc_group->ProcGroup, gb_size_of(e->ProcGroup));
 			return;
 		}
-	#endif
-		}
-	#if 1
+
 		if (entity != nullptr) {
 			switch (entity->kind) {
 			case Entity_Alias:
@@ -316,7 +313,6 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 				return;
 			}
 		}
-	#endif
 	}
 
 	if (init != nullptr) {
@@ -858,7 +854,6 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 	case Entity_Procedure:
 		check_proc_decl(c, e, d);
 		break;
-
 	case Entity_ProcGroup:
 		check_proc_group_decl(c, e, d);
 		break;

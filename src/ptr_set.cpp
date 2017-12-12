@@ -30,14 +30,12 @@ template <typename T> void ptr_set_rehash           (PtrSet<T> *s, isize new_cou
 template <typename T>
 void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
 	array_init(&s->hashes,  a, capacity);
-	array_init(&s->entries, a, capacity);
-}
+	array_init(&s->entries, a, capacity);}
 
 template <typename T>
 void ptr_set_destroy(PtrSet<T> *s) {
 	array_free(&s->hashes);
-	array_free(&s->entries);
-}
+	array_free(&s->entries);}
 
 template <typename T>
 gb_internal isize ptr_set__add_entry(PtrSet<T> *s, T ptr) {

@@ -49,6 +49,7 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 
 	case Type_Info_Pointer:
 		y, ok := b.variant.(Type_Info_Pointer);
+		if !ok do return false;
 		return are_types_identical(x.elem, y.elem);
 
 	case Type_Info_Procedure:
