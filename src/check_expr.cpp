@@ -5054,13 +5054,13 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 	case_ast_node(bl, BasicLit, node);
 		Type *t = t_invalid;
-		switch (bl->kind) {
+		switch (bl->token.kind) {
 		case Token_Integer: t = t_untyped_integer; break;
 		case Token_Float:   t = t_untyped_float;   break;
 		case Token_String:  t = t_untyped_string;  break;
 		case Token_Rune:    t = t_untyped_rune;    break;
 		case Token_Imag: {
-			String s = bl->string;
+			String s = bl->token.string;
 			Rune r = s[s.len-1];
 			switch (r) {
 			case 'i': t = t_untyped_complex; break;
@@ -5072,7 +5072,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		}
 		o->mode  = Addressing_Constant;
 		o->type  = t;
-		o->value = exact_value_from_basic_literal(*bl);
+		o->value = exact_value_from_basic_literal(bl->token);
 	case_end;
 
 	case_ast_node(bd, BasicDirective, node);
@@ -5429,7 +5429,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			}
 
 			for (; index < elem_count; index++) {
-				GB_ASSERT(cl->elems.data != nullptr);
 				AstNode *e = cl->elems[index];
 				if (e == nullptr) {
 					error(node, "Invalid literal element");
@@ -5449,9 +5448,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				check_expr_with_type_hint(c, &operand, e, elem_type);
 				check_assignment(c, &operand, elem_type, context_name);
 
-				if (is_constant) {
-					is_constant = operand.mode == Addressing_Constant;
-				}
+				is_constant = is_constant && operand.mode == Addressing_Constant;
 			}
 			if (max < index) {
 				max = index;
@@ -6093,7 +6090,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(bl, BasicLit, node);
-		str = string_append_token(str, *bl);
+		str = string_append_token(str, bl->token);
 	case_end;
 
 	case_ast_node(bd, BasicDirective, node);

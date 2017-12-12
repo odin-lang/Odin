@@ -4683,8 +4683,8 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 	switch (expr->kind) {
 	case_ast_node(bl, BasicLit, expr);
-		TokenPos pos = bl->pos;
-		GB_PANIC("Non-constant basic literal %.*s(%td:%td) - %.*s", LIT(pos.file), pos.line, pos.column, LIT(token_strings[bl->kind]));
+		TokenPos pos = bl->token.pos;
+		GB_PANIC("Non-constant basic literal %.*s(%td:%td) - %.*s", LIT(pos.file), pos.line, pos.column, LIT(token_strings[bl->token.kind]));
 	case_end;
 
 	case_ast_node(bd, BasicDirective, expr);
