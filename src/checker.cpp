@@ -464,6 +464,7 @@ struct CheckerInfo {
 struct Checker {
 	Parser *    parser;
 	CheckerInfo info;
+	gbMutex     mutex;
 
 	AstFile *                  curr_ast_file;
 	Scope *                    global_scope;
@@ -792,8 +793,40 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 }
 
 
+GB_COMPARE_PROC(entity_variable_pos_cmp) {
+	Entity *x = *cast(Entity **)a;
+	Entity *y = *cast(Entity **)b;
+
+	return token_pos_cmp(x->token.pos, y->token.pos);
+}
+
 void check_scope_usage(Checker *c, Scope *scope) {
 	// TODO(bill): Use this?
+	Array<Entity *> unused = {};
+	array_init(&unused, heap_allocator());
+	defer (array_free(&unused));
+
+	for_array(i, scope->elements.entries) {
+		Entity *e = scope->elements.entries[i].value;
+		if (e != nullptr && e->kind == Entity_Variable && (e->flags&EntityFlag_Used) == 0) {
+			array_add(&unused, e);
+		}
+	}
+
+	gb_sort_array(unused.data, unused.count, entity_variable_pos_cmp);
+
+	for_array(i, unused) {
+		Entity *e = unused[i];
+		error(e->token, "'%.*s' declared but not used", LIT(e->token.string));
+	}
+
+	for (Scope *child = scope->first_child;
+	     child != nullptr;
+	     child = child->next) {
+		if (!child->is_proc && !child->is_struct && !child->is_file) {
+			check_scope_usage(c, child);
+		}
+	}
 }
 
 
@@ -941,6 +974,7 @@ void init_checker(Checker *c, Parser *parser) {
 
 	c->parser = parser;
 	init_checker_info(&c->info);
+	gb_mutex_init(&c->mutex);
 
 	array_init(&c->proc_stack, a);
 	map_init(&c->procs, a);
@@ -973,6 +1007,8 @@ void init_checker(Checker *c, Parser *parser) {
 
 void destroy_checker(Checker *c) {
 	destroy_checker_info(&c->info);
+	gb_mutex_destroy(&c->mutex);
+
 	destroy_scope(c->global_scope);
 	array_free(&c->proc_stack);
 	map_destroy(&c->procs);
@@ -3281,7 +3317,6 @@ void check_parsed_files(Checker *c) {
 
 		bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
 		bool no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
-
 
 		if (bounds_check) {
 			c->context.stmt_state_flags |= StmtStateFlag_bounds_check;

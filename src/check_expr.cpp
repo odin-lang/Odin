@@ -267,6 +267,8 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	}
 
 
+	gb_mutex_lock(&c->mutex);
+	defer (gb_mutex_unlock(&c->mutex));
 
 	auto *found_gen_procs = map_get(&c->info.gen_procs, hash_pointer(base_entity->identifier));
 	if (found_gen_procs) {
@@ -553,7 +555,6 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		}
 	}
 
-#if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (is_type_array(dst)) {
 		Type *elem = base_array_type(dst);
 		i64 distance = check_distance_between_types(c, operand, elem);
@@ -561,7 +562,6 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 			return distance + 6;
 		}
 	}
-#endif
 
 	if (is_type_any(dst)) {
 		if (!is_type_polymorphic(src)) {
@@ -2235,7 +2235,6 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 		}
 		break;
 
-#if defined(ALLOW_ARRAY_PROGRAMMING)
 	case Type_Array: {
 		Type *elem = base_array_type(t);
 		if (check_is_assignable_to(c, operand, elem)) {
@@ -2248,7 +2247,6 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 
 		break;
 	}
-#endif
 
 	case Type_Union:
 		if (!is_operand_nil(*operand) && !is_operand_undef(*operand)) {

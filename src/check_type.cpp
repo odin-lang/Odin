@@ -34,198 +34,6 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 
 }
 
-
-void check_struct_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields, Map<Entity *> *entity_map, AstNode *struct_node, String context, bool allow_default_values) {
-	GB_ASSERT(fields != nullptr);
-	if (decl->kind == AstNode_WhenStmt) {
-		ast_node(ws, WhenStmt, decl);
-		Operand operand = {Addressing_Invalid};
-		check_expr(c, &operand, ws->cond);
-		if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
-			error(ws->cond, "Non-constant boolean 'when' condition");
-			return;
-		}
-		if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
-			error(ws->cond, "Invalid body for 'when' statement");
-			return;
-		}
-		if (operand.value.kind == ExactValue_Bool &&
-		    operand.value.value_bool) {
-			for_array(i, ws->body->BlockStmt.stmts) {
-				AstNode *stmt = ws->body->BlockStmt.stmts[i];
-				check_struct_field_decl(c, stmt, fields, entity_map, struct_node, context, allow_default_values);
-			}
-		} else if (ws->else_stmt) {
-			switch (ws->else_stmt->kind) {
-			case AstNode_BlockStmt:
-				for_array(i, ws->else_stmt->BlockStmt.stmts) {
-					AstNode *stmt = ws->else_stmt->BlockStmt.stmts[i];
-					check_struct_field_decl(c, stmt, fields, entity_map, struct_node, context, allow_default_values);
-				}
-				break;
-			case AstNode_WhenStmt:
-				check_struct_field_decl(c, ws->else_stmt, fields, entity_map, struct_node, context, allow_default_values);
-				break;
-			default:
-				error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
-				break;
-			}
-		}
-	}
-
-	if (decl->kind != AstNode_ValueDecl) {
-		return;
-	}
-
-
-	ast_node(vd, ValueDecl, decl);
-
-	if (!vd->is_mutable) return;
-
-	bool is_using = vd->is_using;
-
-	if (is_using && vd->names.count > 1) {
-		error(vd->names[0], "Cannot apply 'using' to more than one of the same type");
-		is_using = false;
-	}
-
-	bool arity_ok = check_arity_match(c, vd);
-
-	if (vd->values.count > 0 && !allow_default_values) {
-		error(vd->values[0], "Default values are not allowed within a %.*s", LIT(context));
-	}
-
-
-	Type *type = nullptr;
-	if (vd->type != nullptr) {
-		type = check_type(c, vd->type);
-	} else if (!allow_default_values) {
-		error(vd->names[0], "Expected a type for this field");
-		type = t_invalid;
-	}
-
-	if (type != nullptr) {
-		if (is_type_empty_union(type)) {
-			error(vd->names[0], "An empty union cannot be used as a field type in %.*s", LIT(context));
-			type = t_invalid;
-		}
-		if (!c->context.allow_polymorphic_types && is_type_polymorphic(base_type(type))) {
-			error(vd->names[0], "Invalid use of a polymorphic type in %.*s", LIT(context));
-			type = t_invalid;
-		}
-	}
-
-	Array<Operand> default_values = {};
-	defer (array_free(&default_values));
-	if (vd->values.count > 0 && allow_default_values) {
-		array_init(&default_values, heap_allocator(), 2*vd->values.count);
-
-		Type *type_hint = nullptr;
-		if (type != t_invalid && type != nullptr) {
-			type_hint = type;
-		}
-
-		for_array(i, vd->values) {
-			AstNode *v = vd->values[i];
-			Operand o = {};
-
-			check_expr_base(c, &o, v, type_hint);
-			check_not_tuple(c, &o);
-
-			if (o.mode == Addressing_NoValue) {
-				error_operand_no_value(&o);
-			} else {
-				if (o.mode == Addressing_Value && o.type->kind == Type_Tuple) {
-					// NOTE(bill): Tuples are not first class thus never named
-					for_array(index, o.type->Tuple.variables) {
-						Operand single = {Addressing_Value};
-						single.type    = o.type->Tuple.variables[index]->type;
-						single.expr    = v;
-						array_add(&default_values, single);
-					}
-				} else {
-					array_add(&default_values, o);
-				}
-			}
-		}
-	}
-
-
-	isize name_field_index = 0;
-	for_array(name_index, vd->names) {
-		AstNode *name = vd->names[name_index];
-		if (!ast_node_expect(name, AstNode_Ident)) {
-			return;
-		}
-
-		Token name_token = name->Ident.token;
-
-		Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, is_using, cast(i32)fields->count);
-		e->identifier = name;
-
-		if (name_field_index < default_values.count) {
-			Operand a = default_values[name_field_index];
-			Operand b = default_values[name_field_index];
-			check_init_variable(c, e, &b, str_lit("struct field assignment"));
-			if (is_operand_nil(a)) {
-				e->Variable.default_is_nil = true;
-			} else if (is_operand_undef(a)) {
-				e->Variable.default_is_undef = true;
-			} else if (b.mode != Addressing_Constant) {
-				error(b.expr, "Default field value must be a constant");
-			} else if (is_type_any(e->type) || is_type_union(e->type)) {
-				gbString str = type_to_string(e->type);
-				error(b.expr, "A struct field of type '%s' cannot have a default value", str);
-				gb_string_free(str);
-			} else {
-				e->Variable.default_value = b.value;
-			}
-
-			name_field_index++;
-		}
-
-		GB_ASSERT(e->type != nullptr);
-		GB_ASSERT(is_type_typed(e->type));
-
-		if (is_blank_ident(name_token)) {
-			array_add(fields, e);
-		} else {
-			HashKey key = hash_string(name_token.string);
-			Entity **found = map_get(entity_map, key);
-			if (found != nullptr) {
-				Entity *e = *found;
-				// NOTE(bill): Scope checking already checks the declaration but in many cases, this can happen so why not?
-				// This may be a little janky but it's not really that much of a problem
-				error(name_token, "'%.*s' is already declared in this type", LIT(name_token.string));
-				error(e->token,   "\tpreviously declared");
-			} else {
-				map_set(entity_map, key, e);
-				array_add(fields, e);
-				add_entity(c, c->context.scope, name, e);
-			}
-			add_entity_use(c, name, e);
-		}
-
-	}
-
-
-	if (is_using && fields->count > 0) {
-		Type *first_type = (*fields)[fields->count-1]->type;
-		Type *t = base_type(type_deref(first_type));
-		if (!is_type_struct(t) && !is_type_raw_union(t) && !is_type_bit_field(t) &&
-		    vd->names.count >= 1 &&
-		    vd->names[0]->kind == AstNode_Ident) {
-			Token name_token = vd->names[0]->Ident.token;
-			gbString type_str = type_to_string(first_type);
-			error(name_token, "'using' cannot be applied to the field '%.*s' of type '%s'", LIT(name_token.string), type_str);
-			gb_string_free(type_str);
-			return;
-		}
-
-		populate_using_entity_map(c, struct_node, type, entity_map);
-	}
-}
-
 // Returns filled field_count
 Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> params,
                                     isize init_field_capacity, Type *named_type, String context) {
@@ -301,6 +109,10 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 
 			type = default_type(o.type);
 		} else {
+			if (type_expr->kind == AstNode_Ident && type_expr->Ident.token.string == "Element") {
+				gb_printf_err("Element\n");
+			}
+
 			type = check_type(c, type_expr);
 
 			if (default_value != nullptr) {
@@ -398,11 +210,6 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 		}
 	}
 
-	// for_array(decl_index, params) {
-		// check_struct_field_decl(c, params[decl_index], &fields, &entity_map, node, context, context == "struct");
-	// }
-
-
 	return fields;
 }
 
@@ -488,8 +295,10 @@ bool check_custom_align(Checker *c, AstNode *node, i64 *align_) {
 
 
 Entity *find_polymorphic_struct_entity(Checker *c, Type *original_type, isize param_count, Array<Operand> ordered_operands) {
-	auto *found_gen_types = map_get(&c->info.gen_types, hash_pointer(original_type));
+	gb_mutex_lock(&c->mutex);
+	defer (gb_mutex_unlock(&c->mutex));
 
+	auto *found_gen_types = map_get(&c->info.gen_types, hash_pointer(original_type));
 	if (found_gen_types != nullptr) {
 		for_array(i, *found_gen_types) {
 			Entity *e = (*found_gen_types)[i];
@@ -761,12 +570,15 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 	}
 
 
+#if 0
+	// TODO(bill): Move this to the appropriate place
 	if (!struct_type->Struct.is_raw_union) {
 		type_set_offsets(c->allocator, struct_type);
 
 		if (!struct_type->failure && !st->is_packed && !st->is_ordered) {
 			struct_type->failure = false;
 			struct_type->Struct.are_offsets_set = false;
+			struct_type->Struct.are_offsets_being_processed = false;
 			gb_zero_item(&struct_type->Struct.offsets);
 			// NOTE(bill): Reorder fields for reduced size/performance
 
@@ -791,7 +603,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 
 		type_set_offsets(c->allocator, struct_type);
 	}
-
+#endif
 
 	if (st->align != nullptr) {
 		if (st->is_packed) {
@@ -2195,9 +2007,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_end;
 
 	case_ast_node(pt, PointerType, e);
-		Type *elem = check_type(c, pt->type);
-		i64 esz = type_size_of(c->allocator, elem);
-		*type = make_type_pointer(c->allocator, elem);
+		*type = make_type_pointer(c->allocator, check_type(c, pt->type));
 		return true;
 	case_end;
 

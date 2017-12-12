@@ -2093,7 +2093,6 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 		break;
 	}
 
-#if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (is_type_array(ir_type(x))) {
 		ir_emit_comment(proc, str_lit("array.arith.begin"));
 		// IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
@@ -2112,7 +2111,6 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 		return ir_emit_load(proc, res);
 
 	}
-#endif
 
 	return ir_emit(proc, ir_instr_unary_op(proc, op, x, type));
 }
@@ -2123,7 +2121,6 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	Type *t_left = ir_type(left);
 	Type *t_right = ir_type(right);
 
-#if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (is_type_array(t_left) || is_type_array(t_right)) {
 		ir_emit_comment(proc, str_lit("array.arith.begin"));
 		// IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
@@ -2145,7 +2142,6 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 		ir_emit_comment(proc, str_lit("array.arith.end"));
 		return ir_emit_load(proc, res);
 	}
-#endif
 
 	if (is_type_complex(t_left)) {
 		ir_emit_comment(proc, str_lit("complex.arith.begin"));
@@ -2404,7 +2400,6 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 	}
 
 	Type *result = t_bool;
-#if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (is_type_array(a)) {
 		ir_emit_comment(proc, str_lit("array.comp.begin"));
 		defer (ir_emit_comment(proc, str_lit("array.comp.end")));
@@ -2431,8 +2426,6 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 
 		return ir_emit_conv(proc, res, result);
 	}
-
-#endif
 
 	if (is_type_string(a)) {
 		char *runtime_proc = nullptr;
@@ -3188,7 +3181,6 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return ir_emit_load(proc, slice);
 	}
 
-#if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (is_type_array(dst)) {
 		Type *elem = dst->Array.elem;
 		irValue *e = ir_emit_conv(proc, value, elem);
@@ -3201,7 +3193,6 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		}
 		return ir_emit_load(proc, v);
 	}
-#endif
 
 	if (is_type_any(dst)) {
 		irValue *result = ir_add_local_generated(proc, t_any);
@@ -4672,7 +4663,6 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	#endif
 
 	if (tv.value.kind != ExactValue_Invalid) {
-#if defined(ALLOW_ARRAY_PROGRAMMING)
 		// NOTE(bill): Edge case
 		if (tv.value.kind != ExactValue_Compound &&
 		    is_type_array(tv.type)) {
@@ -4681,7 +4671,6 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			irValue *x = ir_add_module_constant(proc->module, elem, value);
 			return ir_emit_conv(proc, x, tv.type);
 		}
-#endif
 
 		return ir_add_module_constant(proc->module, tv.type, tv.value);
 	}

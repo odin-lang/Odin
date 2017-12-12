@@ -189,6 +189,7 @@ Entity *make_entity_using_variable(gbAllocator a, Entity *parent, Token token, T
 	entity->using_parent = parent;
 	entity->parent_proc_decl = parent->parent_proc_decl;
 	entity->flags |= EntityFlag_Using;
+	entity->flags |= EntityFlag_Used;
 	return entity;
 }
 

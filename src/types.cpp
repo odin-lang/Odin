@@ -659,11 +659,9 @@ bool is_type_numeric(Type *t) {
 		return (t->Basic.flags & BasicFlag_Numeric) != 0;
 	}
 	// TODO(bill): Should this be here?
-#if defined(ALLOW_ARRAY_PROGRAMMING)
 	if (t->kind == Type_Array) {
 		return is_type_numeric(t->Array.elem);
 	}
-#endif
 	return false;
 }
 bool is_type_string(Type *t) {
@@ -1973,8 +1971,9 @@ Array<i64> type_set_offsets_of(gbAllocator allocator, Array<Entity *> fields, bo
 		}
 	} else {
 		for_array(i, fields) {
-			i64 align = gb_max(type_align_of(allocator, fields[i]->type), 1);
-			i64 size  = gb_max(type_size_of(allocator, fields[i]->type), 0);
+			Type *t = fields[i]->type;
+			i64 align = gb_max(type_align_of(allocator, t), 1);
+			i64 size  = gb_max(type_size_of(allocator,  t), 0);
 			curr_offset = align_formula(curr_offset, align);
 			offsets[i] = curr_offset;
 			curr_offset += size;
@@ -1989,6 +1988,7 @@ bool type_set_offsets(gbAllocator allocator, Type *t) {
 		if (!t->Struct.are_offsets_set) {
 			t->Struct.are_offsets_being_processed = true;
 			t->Struct.offsets = type_set_offsets_of(allocator, t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union);
+			t->Struct.are_offsets_being_processed = false;
 			t->Struct.are_offsets_set = true;
 			return true;
 		}
@@ -1996,6 +1996,7 @@ bool type_set_offsets(gbAllocator allocator, Type *t) {
 		if (!t->Tuple.are_offsets_set) {
 			t->Struct.are_offsets_being_processed = true;
 			t->Tuple.offsets = type_set_offsets_of(allocator, t->Tuple.variables, false, false);
+			t->Struct.are_offsets_being_processed = false;
 			t->Tuple.are_offsets_set = true;
 			return true;
 		}
@@ -2036,6 +2037,9 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			return build_context.word_size;
 		}
 	} break;
+
+	case Type_Pointer:
+		return build_context.word_size;
 
 	case Type_Array: {
 		i64 count, align, size, alignment;
@@ -2105,9 +2109,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		t->Union.tag_size = tag_size;
 		t->Union.variant_block_size = size - field_size;
 
-		size += tag_size;
-		size = align_formula(size, align);
-		return size;
+		return align_formula(size + tag_size, align);
 	} break;
 
 
@@ -2128,11 +2130,13 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			// TODO(bill): Is this how it should work?
 			return align_formula(max, align);
 		} else {
-			i64 count = t->Struct.fields.count;
+			i64 count = 0, size = 0, align = 0;
+
+			count = t->Struct.fields.count;
 			if (count == 0) {
 				return 0;
 			}
-			i64 align = type_align_of_internal(allocator, t, path);
+			align = type_align_of_internal(allocator, t, path);
 			if (path->failure) {
 				return FAILURE_SIZE;
 			}
@@ -2141,7 +2145,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 				return FAILURE_SIZE;
 			}
 			type_set_offsets(allocator, t);
-			i64 size = t->Struct.offsets[count-1] + type_size_of_internal(allocator, t->Struct.fields[count-1]->type, path);
+			size = t->Struct.offsets[count-1] + type_size_of_internal(allocator, t->Struct.fields[count-1]->type, path);
 			return align_formula(size, align);
 		}
 	} break;

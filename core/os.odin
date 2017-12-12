@@ -49,7 +49,7 @@ write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (succ
 	}
 	defer close(fd);
 
-	bytes_written, write_err := write(fd, data);
+	_, write_err := write(fd, data);
 	return write_err == 0;
 }
 

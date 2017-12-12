@@ -30,25 +30,23 @@ encode_surrogate_pair :: proc(r: rune) -> (r1, r2: rune) {
 }
 
 encode :: proc(d: []u16, s: []rune) -> int {
-	n := len(s);
-	for r in s do if r >= _surr_self do n += 1;
-
-	max_n := min(len(d), n);
-	n = 0;
-
-	for r in s {
+	n, m := 0, len(d);
+	loop: for r in s {
 		switch r {
 		case 0.._surr1, _surr3 .. _surr_self:
+			if m+1 < n do break loop;
 			d[n] = u16(r);
 			n += 1;
 
 		case _surr_self .. MAX_RUNE:
+			if m+2 < n do break loop;
 			r1, r2 := encode_surrogate_pair(r);
 			d[n]    = u16(r1);
 			d[n+1]  = u16(r2);
 			n += 2;
 
 		case:
+			if m+1 < n do break loop;
 			d[n] = u16(REPLACEMENT_CHAR);
 			n += 1;
 		}
@@ -58,25 +56,23 @@ encode :: proc(d: []u16, s: []rune) -> int {
 
 
 encode_string :: proc(d: []u16, s: string) -> int {
-	n := utf8.rune_count_from_string(s);
-	for r in s do if r >= _surr_self do n += 1;
-
-	max_n := min(len(d), n);
-	n = 0;
-
-	for r in s {
+	n, m := 0, len(d);
+	loop: for r in s {
 		switch r {
 		case 0.._surr1, _surr3 .. _surr_self:
+			if m+1 < n do break loop;
 			d[n] = u16(r);
 			n += 1;
 
 		case _surr_self .. MAX_RUNE:
+			if m+2 < n do break loop;
 			r1, r2 := encode_surrogate_pair(r);
 			d[n]    = u16(r1);
 			d[n+1]  = u16(r2);
 			n += 2;
 
 		case:
+			if m+1 < n do break loop;
 			d[n] = u16(REPLACEMENT_CHAR);
 			n += 1;
 		}
