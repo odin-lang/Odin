@@ -845,7 +845,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 	}
 
 
-	Map<bool> seen = {}; // Multimap
+	Map<bool> seen = {}; // Multimap, Key: Type *
 	map_init(&seen, heap_allocator());
 
 	for_array(i, bs->stmts) {

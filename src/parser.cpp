@@ -1,5 +1,6 @@
 struct AstNode;
 struct Scope;
+struct Entity;
 struct DeclInfo;
 
 enum ParseFileError {
@@ -151,7 +152,8 @@ Array<AstNode *> make_ast_node_array(AstFile *f, isize init_capacity = 8) {
 // all the nodes and even memcpy in a different kind of node
 #define AST_NODE_KINDS \
 	AST_NODE_KIND(Ident,          "identifier",      struct { \
-		Token token;      \
+		Token   token;  \
+		Entity *entity; \
 	}) \
 	AST_NODE_KIND(Implicit,       "implicit",        Token) \
 	AST_NODE_KIND(Undef,          "undef",           Token) \
@@ -279,9 +281,10 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 		AstNode *body; \
 	}) \
 	AST_NODE_KIND(CaseClause, "case clause", struct { \
-		Token token;        \
-		Array<AstNode *> list;  \
-		Array<AstNode *> stmts; \
+		Token token;             \
+		Array<AstNode *> list;   \
+		Array<AstNode *> stmts;  \
+		Entity *implicit_entity; \
 	}) \
 	AST_NODE_KIND(SwitchStmt, "switch statement", struct { \
 		Token token;   \
@@ -498,6 +501,8 @@ struct AstNode {
 	AstNodeKind kind;
 	u32         stmt_state_flags;
 	AstFile *   file;
+	Scope *     scope;
+
 	union {
 #define AST_NODE_KIND(_kind_name_, name, ...) GB_JOIN2(AstNode, _kind_name_) _kind_name_;
 	AST_NODE_KINDS
@@ -656,7 +661,9 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	default: GB_PANIC("Unhandled AstNode %.*s", LIT(ast_node_strings[n->kind])); break;
 
 	case AstNode_Invalid:        break;
-	case AstNode_Ident:          break;
+	case AstNode_Ident:
+		n->Ident.entity = nullptr;
+		break;
 	case AstNode_Implicit:       break;
 	case AstNode_Undef:          break;
 	case AstNode_BasicLit:       break;
@@ -794,6 +801,7 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_CaseClause:
 		n->CaseClause.list  = clone_ast_node_array(a, n->CaseClause.list);
 		n->CaseClause.stmts = clone_ast_node_array(a, n->CaseClause.stmts);
+		n->CaseClause.implicit_entity = nullptr;
 		break;
 	case AstNode_SwitchStmt:
 		n->SwitchStmt.label = clone_ast_node(a, n->SwitchStmt.label);
