@@ -1,4 +1,3 @@
-#include "exact_value.cpp"
 #include "entity.cpp"
 
 enum ExprKind {
@@ -226,7 +225,7 @@ struct Scope {
 	Scope *          first_child;
 	Scope *          last_child;
 	Map<Entity *>    elements; // Key: String
-	Map<bool>        implicit; // Key: Entity *
+	PtrSet<Entity *> implicit;
 
 	Array<Scope *>   shared;
 	Array<AstNode *> delayed_file_decls;
@@ -247,9 +246,9 @@ void scope_reset(Scope *scope) {
 
 	scope->first_child = nullptr;
 	scope->last_child  = nullptr;
-	map_clear  (&scope->elements);
-	map_clear  (&scope->implicit);
-	array_clear(&scope->shared);
+	map_clear    (&scope->elements);
+	array_clear  (&scope->shared);
+	ptr_set_clear(&scope->implicit);
 	ptr_set_clear(&scope->imported);
 	ptr_set_clear(&scope->exported);
 }
@@ -440,18 +439,15 @@ struct CheckerContext {
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Map<TypeAndValue>     types;           // Key: AstNode * | Expression -> Type (and value)
-	Map<Entity *>         definitions;     // Key: AstNode * | Identifier -> Entity
-	Map<Entity *>         uses;            // Key: AstNode * | Identifier -> Entity
-	Map<Scope *>          scopes;          // Key: AstNode * | Node       -> Scope
 	Map<ExprInfo>         untyped;         // Key: AstNode * | Expression -> ExprInfo
-	Map<Entity *>         implicits;       // Key: AstNode *
-	Map<Array<Entity *> > gen_procs;       // Key: AstNode * | Identifier -> Entity
-	Map<Array<Entity *> > gen_types;       // Key: Type *
-	Map<DeclInfo *>       entities;        // Key: Entity *
-	Map<Entity *>         foreigns;        // Key: String
 	Map<AstFile *>        files;           // Key: String (full path)
+	Map<Entity *>         foreigns;        // Key: String
+	Array<Entity *>       definitions;
+	Array<Entity *>       entities;
 	Array<DeclInfo *>     variable_init_order;
 
+	Map<Array<Entity *> > gen_procs;       // Key: AstNode * | Identifier -> Entity
+	Map<Array<Entity *> > gen_types;       // Key: Type *
 
 	Map<isize>            type_info_map;   // Key: Type *
 	isize                 type_info_count;
@@ -469,11 +465,10 @@ struct Checker {
 	AstFile *                  curr_ast_file;
 	Scope *                    global_scope;
 	// NOTE(bill): Procedures to check
-	Map<ProcedureInfo>         procs; // Key: DeclInfo *
+	Array<ProcedureInfo>       procs;
 	Map<Scope *>               file_scopes; // Key: String (fullpath)
 	Array<ImportGraphNode *>   file_order;
 
-	Pool                       pool;
 	gbAllocator                allocator;
 	gbArena                    arena;
 	gbArena                    tmp_arena;
@@ -523,7 +518,6 @@ void      add_type_and_value      (CheckerInfo *i, AstNode *expression, Addressi
 void      add_entity_use          (Checker *c, AstNode *identifier, Entity *entity);
 void      add_implicit_entity     (Checker *c, AstNode *node, Entity *e);
 void      add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d);
-void      add_implicit_entity     (Checker *c, AstNode *node, Entity *e);
 
 void check_add_import_decl(Checker *c, AstNodeImportDecl *id);
 void check_add_export_decl(Checker *c, AstNodeExportDecl *ed);
@@ -573,8 +567,8 @@ Scope *create_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
 	map_init(&s->elements,     heap_allocator());
-	map_init(&s->implicit,     heap_allocator());
 	array_init(&s->shared,     heap_allocator());
+	ptr_set_init(&s->implicit, heap_allocator());
 	ptr_set_init(&s->imported, heap_allocator());
 	ptr_set_init(&s->exported, heap_allocator());
 
@@ -629,9 +623,9 @@ void destroy_scope(Scope *scope) {
 	}
 
 	map_destroy(&scope->elements);
-	map_destroy(&scope->implicit);
 	array_free(&scope->shared);
 	array_free(&scope->delayed_file_decls);
+	ptr_set_destroy(&scope->implicit);
 	ptr_set_destroy(&scope->imported);
 	ptr_set_destroy(&scope->exported);
 
@@ -643,7 +637,7 @@ void add_scope(Checker *c, AstNode *node, Scope *scope) {
 	GB_ASSERT(node != nullptr);
 	GB_ASSERT(scope != nullptr);
 	scope->node = node;
-	map_set(&c->info.scopes, hash_node(node), scope);
+	node->scope = scope;
 }
 
 
@@ -931,13 +925,10 @@ void init_universal_scope(void) {
 void init_checker_info(CheckerInfo *i) {
 	gbAllocator a = heap_allocator();
 	map_init(&i->types,         a);
-	map_init(&i->definitions,   a);
-	map_init(&i->uses,          a);
-	map_init(&i->scopes,        a);
-	map_init(&i->entities,      a);
+	array_init(&i->definitions, a);
+	array_init(&i->entities,    a);
 	map_init(&i->untyped,       a);
 	map_init(&i->foreigns,      a);
-	map_init(&i->implicits,     a);
 	map_init(&i->gen_procs,     a);
 	map_init(&i->gen_types,     a);
 	map_init(&i->type_info_map, a);
@@ -949,13 +940,10 @@ void init_checker_info(CheckerInfo *i) {
 
 void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->types);
-	map_destroy(&i->definitions);
-	map_destroy(&i->uses);
-	map_destroy(&i->scopes);
-	map_destroy(&i->entities);
+	array_free(&i->definitions);
+	array_free(&i->entities);
 	map_destroy(&i->untyped);
 	map_destroy(&i->foreigns);
-	map_destroy(&i->implicits);
 	map_destroy(&i->gen_procs);
 	map_destroy(&i->gen_types);
 	map_destroy(&i->type_info_map);
@@ -977,7 +965,7 @@ void init_checker(Checker *c, Parser *parser) {
 	gb_mutex_init(&c->mutex);
 
 	array_init(&c->proc_stack, a);
-	map_init(&c->procs, a);
+	array_init(&c->procs, a);
 
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
@@ -990,7 +978,6 @@ void init_checker(Checker *c, Parser *parser) {
 	gb_arena_init_from_allocator(&c->tmp_arena, a, arena_size);
 	gb_arena_init_from_allocator(&c->arena, a, arena_size);
 
-	pool_init(&c->pool, gb_megabytes(4), gb_kilobytes(384));
 	// c->allocator = pool_allocator(&c->pool);
 	c->allocator = heap_allocator();
 	// c->allocator     = gb_arena_allocator(&c->arena);
@@ -1011,9 +998,8 @@ void destroy_checker(Checker *c) {
 
 	destroy_scope(c->global_scope);
 	array_free(&c->proc_stack);
-	map_destroy(&c->procs);
+	array_free(&c->procs);
 
-	pool_destroy(&c->pool);
 	gb_arena_free(&c->tmp_arena);
 
 	map_destroy(&c->file_scopes);
@@ -1024,14 +1010,7 @@ void destroy_checker(Checker *c) {
 
 Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
 	if (identifier->kind == AstNode_Ident) {
-		Entity **found = map_get(&i->definitions, hash_node(identifier));
-		if (found) {
-			return *found;
-		}
-		found = map_get(&i->uses, hash_node(identifier));
-		if (found) {
-			return *found;
-		}
+		return identifier->Ident.entity;
 	}
 	return nullptr;
 }
@@ -1059,24 +1038,24 @@ Type *type_of_expr(CheckerInfo *i, AstNode *expr) {
 }
 
 Entity *implicit_entity_of_node(CheckerInfo *i, AstNode *clause) {
-	Entity **found = map_get(&i->implicits, hash_node(clause));
-	if (found != nullptr) {
-		return *found;
+	// Entity **found = map_get(&i->implicits, hash_node(clause));
+	// if (found != nullptr) {
+		// return *found;
+	// }
+	if (clause->kind == AstNode_CaseClause) {
+		return clause->CaseClause.implicit_entity;
 	}
 	return nullptr;
 }
 bool is_entity_implicitly_imported(Entity *import_name, Entity *e) {
 	GB_ASSERT(import_name->kind == Entity_ImportName);
-	return map_get(&import_name->ImportName.scope->implicit, hash_entity(e)) != nullptr;
+	return ptr_set_exists(&import_name->ImportName.scope->implicit, e);
 }
 
 
 DeclInfo *decl_info_of_entity(CheckerInfo *i, Entity *e) {
 	if (e != nullptr) {
-		DeclInfo **found = map_get(&i->entities, hash_entity(e));
-		if (found != nullptr) {
-			return *found;
-		}
+		return e->decl_info;
 	}
 	return nullptr;
 }
@@ -1093,11 +1072,7 @@ AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
 	return nullptr;
 }
 Scope *scope_of_node(CheckerInfo *i, AstNode *node) {
-	Scope **found = map_get(&i->scopes, hash_node(node));
-	if (found) {
-		return *found;
-	}
-	return nullptr;
+	return node->scope;
 }
 ExprInfo *check_get_expr_info(CheckerInfo *i, AstNode *expr) {
 	return map_get(&i->untyped, hash_node(expr));
@@ -1156,10 +1131,6 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 
 	if (mode == Addressing_Constant) {
 		if (is_type_constant_type(type)) {
-			// if (value.kind == ExactValue_Invalid) {
-				// TODO(bill): Is this correct?
-				// return;
-			// }
 			if (!(type != t_invalid || is_type_constant_type(type))) {
 				compiler_error("add_type_and_value - invalid type: %s", type_to_string(type));
 			}
@@ -1179,8 +1150,13 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 		if (is_blank_ident(identifier)) {
 			return;
 		}
-		HashKey key = hash_node(identifier);
-		map_set(&i->definitions, key, entity);
+		if (identifier->Ident.entity != nullptr) {
+			return;
+		}
+
+		identifier->Ident.entity = entity;
+		entity->identifier = identifier;
+		array_add(&i->definitions, entity);
 	} else {
 		// NOTE(bill): Error should be handled elsewhere
 	}
@@ -1238,8 +1214,7 @@ void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
 	if (entity->identifier == nullptr) {
 		entity->identifier = identifier;
 	}
-	HashKey key = hash_node(identifier);
-	map_set(&c->info.uses, key, entity);
+	identifier->Ident.entity = entity;
 	add_declaration_dependency(c, entity); // TODO(bill): Should this be here?
 }
 
@@ -1250,15 +1225,20 @@ void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclIn
 	GB_ASSERT(identifier->Ident.token.string == e->token.string);
 	if (e->scope != nullptr) add_entity(c, e->scope, identifier, e);
 	add_entity_definition(&c->info, identifier, e);
-	map_set(&c->info.entities, hash_entity(e), d);
-	e->order_in_src = c->info.entities.entries.count;
+	GB_ASSERT(e->decl_info == nullptr);
+	e->decl_info = d;
+	array_add(&c->info.entities, e);
+	e->order_in_src = c->info.entities.count;
+	// map_set(&c->info.entities, hash_entity(e), d);
+	// e->order_in_src = c->info.entities.entries.count;
 }
 
 
-void add_implicit_entity(Checker *c, AstNode *node, Entity *e) {
-	GB_ASSERT(node != nullptr);
+void add_implicit_entity(Checker *c, AstNode *clause, Entity *e) {
+	GB_ASSERT(clause != nullptr);
 	GB_ASSERT(e != nullptr);
-	map_set(&c->info.implicits, hash_node(node), e);
+	GB_ASSERT(clause->kind == AstNode_CaseClause);
+	clause->CaseClause.implicit_entity = e;
 }
 
 
@@ -1407,10 +1387,9 @@ void add_type_info_type(Checker *c, Type *t) {
 	}
 }
 
-void check_procedure_later(Checker *c, ProcedureInfo info) {
-	if (info.decl != nullptr) {
-		map_set(&c->procs, hash_decl_info(info.decl), info);
-	}
+void check_procedure_later(Checker *c, ProcedureInfo const &info) {
+	GB_ASSERT(info.decl != nullptr);
+	array_add(&c->procs, info);
 }
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body, u64 tags) {
@@ -1487,8 +1466,8 @@ PtrSet<Entity *> generate_minimum_dependency_set(CheckerInfo *info, Entity *star
 	PtrSet<Entity *> map = {}; // Key: Entity *
 	ptr_set_init(&map, heap_allocator());
 
-	for_array(i, info->definitions.entries) {
-		Entity *e = info->definitions.entries[i].value;
+	for_array(i, info->definitions) {
+		Entity *e = info->definitions[i];
 		// if (e->scope->is_global && !is_type_poly_proc(e->type)) { // TODO(bill): is the check enough?
 		if (e->scope->is_global) { // TODO(bill): is the check enough?
 			if (e->type == nullptr || !is_type_poly_proc(e->type))  {
@@ -1531,10 +1510,9 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 	Map<EntityGraphNode *> M = {}; // Key: Entity *
 	map_init(&M, a);
 	defer (map_destroy(&M));
-	for_array(i, info->entities.entries) {
-		auto *entry = &info->entities.entries[i];
-		Entity *  e = cast(Entity *)entry->key.ptr;
-		DeclInfo *d = entry->value;
+	for_array(i, info->entities) {
+		Entity *e = info->entities[i];
+		DeclInfo *d = e->decl_info;
 		if (is_entity_a_dependency(e)) {
 			EntityGraphNode *n = gb_alloc_item(a, EntityGraphNode);
 			n->entity = e;
@@ -2320,10 +2298,9 @@ void check_all_global_entities(Checker *c) {
 	Scope *prev_file = nullptr;
 
 	bool processing_preload = true;
-	for_array(i, c->info.entities.entries) {
-		auto *entry = &c->info.entities.entries[i];
-		Entity *e = cast(Entity *)entry->key.ptr;
-		DeclInfo *d = entry->value;
+	for_array(i, c->info.entities) {
+		Entity *e = c->info.entities[i];
+		DeclInfo *d = e->decl_info;
 
 		if (d->scope != e->scope) {
 			continue;
@@ -2696,12 +2673,12 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 				// gb_printf_err("%.*s %.*s get_proc_address\n", LIT(scope->file->fullpath), LIT(parent_scope->file->fullpath));
 			}
 
-			bool implicit_is_found = map_get(&scope->implicit, hash_entity(e)) != nullptr;
+			bool implicit_is_found = ptr_set_exists(&scope->implicit, e);
 			if (is_entity_exported(e) && !implicit_is_found) {
 				Entity *prev = scope_lookup_entity(parent_scope, e->token.string);
 				// if (prev) gb_printf_err("%.*s\n", LIT(prev->token.string));
 				bool ok = add_entity(c, parent_scope, e->identifier, e);
-				if (ok) map_set(&parent_scope->implicit, hash_entity(e), true);
+				if (ok) ptr_set_add(&parent_scope->implicit, e);
 			}
 		}
 	}
@@ -3124,7 +3101,7 @@ void check_import_entities(Checker *c) {
 	// gb_exit(1);
 }
 
-Array<Entity *> find_entity_path(Map<DeclInfo *> *map, Entity *start, Entity *end, Map<Entity *> *visited = nullptr) {
+Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visited = nullptr) {
 	Map<Entity *> visited_ = {};
 	bool made_visited = false;
 	if (visited == nullptr) {
@@ -3145,9 +3122,8 @@ Array<Entity *> find_entity_path(Map<DeclInfo *> *map, Entity *start, Entity *en
 	}
 	map_set(visited, key, start);
 
-	DeclInfo **found = map_get(map, key);
-	if (found) {
-		DeclInfo *decl = *found;
+	DeclInfo *decl = start->decl_info;
+	if (decl) {
 		for_array(i, decl->deps.entries) {
 			Entity *dep = decl->deps.entries[i].ptr;
 			if (dep == end) {
@@ -3156,7 +3132,7 @@ Array<Entity *> find_entity_path(Map<DeclInfo *> *map, Entity *start, Entity *en
 				array_add(&path, dep);
 				return path;
 			}
-			Array<Entity *> next_path = find_entity_path(map, dep, end, visited);
+			Array<Entity *> next_path = find_entity_path(dep, end, visited);
 			if (next_path.count > 0) {
 				array_add(&next_path, dep);
 				return next_path;
@@ -3169,7 +3145,6 @@ Array<Entity *> find_entity_path(Map<DeclInfo *> *map, Entity *start, Entity *en
 
 void calculate_global_init_order(Checker *c) {
 	CheckerInfo *info = &c->info;
-	auto *m = &info->entities;
 
 	Array<EntityGraphNode *> dep_graph = generate_entity_dependency_graph(info);
 	defer ({
@@ -3191,7 +3166,7 @@ void calculate_global_init_order(Checker *c) {
 		Entity *e = n->entity;
 
 		if (n->dep_count > 0) {
-			auto path = find_entity_path(m, e, e);
+			auto path = find_entity_path(e, e);
 			defer (array_free(&path));
 
 			if (path.count > 0) {
@@ -3299,8 +3274,8 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("check procedure bodies");
 	// Check procedure bodies
 	// NOTE(bill): Nested procedures bodies will be added to this "queue"
-	for_array(i, c->procs.entries) {
-		ProcedureInfo *pi = &c->procs.entries[i].value;
+	for_array(i, c->procs) {
+		ProcedureInfo *pi = &c->procs[i];
 		if (pi->type == nullptr) {
 			continue;
 		}
@@ -3367,8 +3342,8 @@ void check_parsed_files(Checker *c) {
 	}
 
 	// NOTE(bill): Check for illegal cyclic type declarations
-	for_array(i, c->info.definitions.entries) {
-		Entity *e = c->info.definitions.entries[i].value;
+	for_array(i, c->info.definitions) {
+		Entity *e = c->info.definitions[i];
 		if (e->kind == Entity_TypeName && e->type != nullptr) {
 			// i64 size  = type_size_of(c->sizes, c->allocator, e->type);
 			i64 align = type_align_of(c->allocator, e->type);
