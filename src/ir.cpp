@@ -605,7 +605,9 @@ struct irGen {
 
 
 
-
+gb_inline bool ir_min_dep_entity(irModule *m, Entity *e) {
+	return ptr_set_exists(&m->min_dep_set, e);
+}
 
 Type *ir_type(irValue *value);
 Type *ir_instr_type(irInstr *instr) {
@@ -3804,7 +3806,7 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 			for_array(i, *found) {
 				Entity *sub = (*found)[i];
 				// gb_printf_err("--> %.*s\n", LIT(sub->token.string));
-				if (ptr_set_exists(&m->min_dep_set, sub)) {
+				if (ir_min_dep_entity(m, sub)) {
 					ir_mangle_add_sub_type_name(m, sub, name);
 				}
 			}
@@ -3812,7 +3814,7 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 		return;
 	}
 
-	if (!ptr_set_exists(&m->min_dep_set, e)) {
+	if (!ir_min_dep_entity(m, e)) {
 		return;
 	}
 	irValue *t = ir_value_type_name(m->allocator, name, e->type);
@@ -5977,7 +5979,7 @@ irValue *ir_build_cond(irProcedure *proc, AstNode *cond, irBlock *true_block, ir
 void ir_build_poly_proc(irProcedure *proc, AstNodeProcLit *pd, Entity *e) {
 	GB_ASSERT(pd->body != nullptr);
 
-	if (ptr_set_exists(&proc->module->min_dep_set, e) == false) {
+	if (ir_min_dep_entity(proc->module, e) == false) {
 		// NOTE(bill): Nothing depends upon it so doesn't need to be built
 		return;
 	}
@@ -6037,7 +6039,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 				}
 			}
 
-			if (!polymorphic_struct && !ptr_set_exists(&proc->module->min_dep_set, e)) {
+			if (!polymorphic_struct && !ir_min_dep_entity(proc->module, e)) {
 				continue;
 			}
 
@@ -6065,7 +6067,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 					auto procs = *found;
 					for_array(i, procs) {
 						Entity *e = procs[i];
-						if (!ptr_set_exists(&proc->module->min_dep_set, e)) {
+						if (!ir_min_dep_entity(proc->module, e)) {
 							continue;
 						}
 						DeclInfo *d = decl_info_of_entity(info, e);
@@ -8194,9 +8196,9 @@ void ir_gen_tree(irGen *s) {
 		}
 	}
 
-	{ // Add global default context
-		m->global_default_context = ir_add_global_generated(m, t_context, nullptr);
-	}
+	// Add global default context
+	m->global_default_context = ir_add_global_generated(m, t_context, nullptr);
+
 	struct irGlobalVariable {
 		irValue *var, *init;
 		DeclInfo *decl;
@@ -8217,7 +8219,7 @@ void ir_gen_tree(irGen *s) {
 				continue;
 			}
 
-			if (!ptr_set_exists(&m->min_dep_set, e)) {
+			if (!ir_min_dep_entity(m, e)) {
 				continue;
 			}
 			DeclInfo *decl = decl_info_of_entity(info, e);
@@ -8310,7 +8312,7 @@ void ir_gen_tree(irGen *s) {
 			}
 		}
 
-		if (!polymorphic_struct && !ptr_set_exists(&m->min_dep_set, e)) {
+		if (!polymorphic_struct && !ir_min_dep_entity(m, e)) {
 			// NOTE(bill): Nothing depends upon it so doesn't need to be built
 			continue;
 		}
@@ -8438,6 +8440,7 @@ void ir_gen_tree(irGen *s) {
 		e->Procedure.link_name = name;
 
 		ir_begin_procedure_body(proc);
+		defer (ir_end_procedure_body(proc));
 
 		// NOTE(bill): https://msdn.microsoft.com/en-us/library/windows/desktop/ms682583(v=vs.85).aspx
 		// DLL_PROCESS_ATTACH == 1
@@ -8461,9 +8464,6 @@ void ir_gen_tree(irGen *s) {
 		ir_start_block(proc, done);
 
 		ir_emit_return(proc, v_one32);
-
-
-		ir_end_procedure_body(proc);
 	}
 #endif
 	if (!(build_context.is_dll && !has_dll_main)) {
@@ -8517,6 +8517,7 @@ void ir_gen_tree(irGen *s) {
 		e->Procedure.link_name = name;
 
 		ir_begin_procedure_body(proc);
+		defer (ir_end_procedure_body(proc));
 
 		// NOTE(bill): https://msdn.microsoft.com/en-us/library/windows/desktop/ms682583(v=vs.85).aspx
 		// DLL_PROCESS_ATTACH == 1
@@ -8539,7 +8540,6 @@ void ir_gen_tree(irGen *s) {
 		}
 
 		ir_emit_return(proc, v_zero32);
-		ir_end_procedure_body(proc);
 	}
 
 #if 0 && defined(GB_SYSTEM_WINDOWS)
@@ -8607,6 +8607,7 @@ void ir_gen_tree(irGen *s) {
 		proc->inlining = ProcInlining_no_inline; // TODO(bill): is no_inline a good idea?
 
 		ir_begin_procedure_body(proc);
+		defer (ir_end_procedure_body(proc));
 
 		{
 			irValue **args = gb_alloc_array(a, irValue *, 1);
@@ -8643,22 +8644,7 @@ void ir_gen_tree(irGen *s) {
 			}
 		}
 
-		ir_end_procedure_body(proc);
 	}
-
-	for_array(type_info_map_index, info->type_info_map.entries) {
-		auto *entry = &info->type_info_map.entries[type_info_map_index];
-		Type *t = cast(Type *)entry->key.ptr;
-		t = default_type(t);
-		isize entry_index = entry->value;
-
-		gbString s = type_to_string(t);
-		GB_ASSERT(s[0] != 0);
-		// gb_printf_err("%s\n", s);
-	}
-
-
-
 
 	for_array(i, m->procs_to_generate) {
 		irValue *p = m->procs_to_generate[i];
