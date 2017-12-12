@@ -8173,9 +8173,8 @@ void ir_gen_tree(irGen *s) {
 	bool has_dll_main = false;
 	bool has_win_main = false;
 
-	for_array(i, info->entities.entries) {
-		auto *entry = &info->entities.entries[i];
-		Entity *e = cast(Entity *)entry->key.ptr;
+	for_array(i, info->entities) {
+		Entity *e = info->entities[i];
 		String name = e->token.string;
 		if (e->kind == Entity_Variable) {
 			global_variable_max_count++;
@@ -8285,11 +8284,10 @@ void ir_gen_tree(irGen *s) {
 		}
 	}
 
-	for_array(i, info->entities.entries) {
-		auto *    entry = &info->entities.entries[i];
-		Entity *  e     = cast(Entity *)entry->key.ptr;
+	for_array(i, info->entities) {
+		Entity *  e     = info->entities[i];
 		String    name  = e->token.string;
-		DeclInfo *decl  = entry->value;
+		DeclInfo *decl  = e->decl_info;
 		Scope *   scope = e->scope;
 
 		if (!scope->is_file) {

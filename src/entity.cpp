@@ -66,6 +66,7 @@ struct Entity {
 	Scope *    scope;
 	Type *     type;
 	AstNode *  identifier; // Can be nullptr
+	DeclInfo * decl_info;
 	DeclInfo * parent_proc_decl; // nullptr if in file/global scope
 
 	// TODO(bill): Cleanup how `using` works for entities

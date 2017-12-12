@@ -4,6 +4,7 @@
 #include "timings.cpp"
 #include "build_settings.cpp"
 #include "tokenizer.cpp"
+#include "exact_value.cpp"
 #include "parser.cpp"
 #include "docs.cpp"
 #include "checker.cpp"
