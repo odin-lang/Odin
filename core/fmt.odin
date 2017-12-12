@@ -909,9 +909,14 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		fmt_enum(fi, v, verb);
 
 	case Type_Info_Procedure:
-		write_type(fi.buf, v.type_info);
-		write_string(fi.buf, " @ ");
-		fmt_pointer(fi, (^rawptr)(v.data)^, 'p');
+		ptr := (^rawptr)(v.data)^;
+		if ptr == nil {
+			write_string(fi.buf, "nil");
+		} else {
+			write_type(fi.buf, v.type_info);
+			write_string(fi.buf, " @ ");
+			fmt_pointer(fi, ptr, 'p');
+		}
 	}
 }
 

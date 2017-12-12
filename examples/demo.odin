@@ -40,12 +40,12 @@ general_stuff :: proc() {
 		i := i32(137);
 		ptr := &i;
 
-		fp1 := (^f32)(ptr);
+		_ = (^f32)(ptr);
 		// ^f32(ptr) == ^(f32(ptr))
-		fp2 := cast(^f32)ptr;
+		_ = cast(^f32)ptr;
 
-		f1 := (^f32)(ptr)^;
-		f2 := (cast(^f32)ptr)^;
+		_ = (^f32)(ptr)^;
+		_ = (cast(^f32)ptr)^;
 
 		// Questions: Should there be two ways to do it?
 	}
@@ -540,7 +540,7 @@ threading_example :: proc() {
 		threads := make([dynamic]^thread.Thread, 0, len(prefix_table));
 		defer free(threads);
 
-		for i in 0..len(prefix_table) {
+		for in prefix_table {
 			if t := thread.create(worker_proc); t != nil {
 				t.init_context = context;
 				t.use_init_context = true;

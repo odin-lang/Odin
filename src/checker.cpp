@@ -802,6 +802,7 @@ GB_COMPARE_PROC(entity_variable_pos_cmp) {
 
 void check_scope_usage(Checker *c, Scope *scope) {
 	// TODO(bill): Use this?
+#if 0
 	Array<Entity *> unused = {};
 	array_init(&unused, heap_allocator());
 	defer (array_free(&unused));
@@ -827,6 +828,7 @@ void check_scope_usage(Checker *c, Scope *scope) {
 			check_scope_usage(c, child);
 		}
 	}
+#endif
 }
 
 
