@@ -822,6 +822,20 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 		return;
 	}
 
+#if 0
+	char buf[256] = {};
+	isize n = gb_snprintf(buf, 256, "%.*s %d", LIT(e->token.string), e->kind);
+	Timings timings = {};
+	timings_init(&timings, make_string(cast(u8 *)buf, n-1), 16);
+	defer ({
+		timings_print_all(&timings);
+		timings_destroy(&timings);
+	});
+#define TIME_SECTION(str) timings_start_section(&timings, str_lit(str))
+#else
+#define TIME_SECTION(str)
+#endif
+
 	if (d == nullptr) {
 		d = decl_info_of_entity(&c->info, e);
 		if (d == nullptr) {
@@ -860,6 +874,8 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 	}
 
 	c->context = prev;
+
+#undef TIME_SECTION
 }
 
 

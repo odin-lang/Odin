@@ -17,14 +17,14 @@ struct PtrSet {
 	Array<PtrSetEntry<T>> entries;
 };
 
-template <typename T> void ptr_set_init             (PtrSet<T> *s, gbAllocator a, isize capacity = 16);
-template <typename T> void ptr_set_destroy          (PtrSet<T> *s);
-template <typename T> T    ptr_set_add              (PtrSet<T> *s, T ptr);
-template <typename T> bool ptr_set_exists           (PtrSet<T> *s, T ptr);
-template <typename T> void ptr_set_remove           (PtrSet<T> *s, T ptr);
-template <typename T> void ptr_set_clear            (PtrSet<T> *s);
-template <typename T> void ptr_set_grow             (PtrSet<T> *s);
-template <typename T> void ptr_set_rehash           (PtrSet<T> *s, isize new_count);
+template <typename T> void ptr_set_init   (PtrSet<T> *s, gbAllocator a, isize capacity = 16);
+template <typename T> void ptr_set_destroy(PtrSet<T> *s);
+template <typename T> T    ptr_set_add    (PtrSet<T> *s, T ptr);
+template <typename T> bool ptr_set_exists (PtrSet<T> *s, T ptr);
+template <typename T> void ptr_set_remove (PtrSet<T> *s, T ptr);
+template <typename T> void ptr_set_clear  (PtrSet<T> *s);
+template <typename T> void ptr_set_grow   (PtrSet<T> *s);
+template <typename T> void ptr_set_rehash (PtrSet<T> *s, isize new_count);
 
 
 template <typename T>
@@ -88,9 +88,12 @@ gb_internal b32 ptr_set__full(PtrSet<T> *s) {
 	return 0.75f * s->hashes.count <= s->entries.count;
 }
 
+#define PTR_ARRAY_GROW_FORMULA(x) (4*(x) + 7)
+GB_STATIC_ASSERT(PTR_ARRAY_GROW_FORMULA(0) > 0);
+
 template <typename T>
 gb_inline void ptr_set_grow(PtrSet<T> *s) {
-	isize new_count = ARRAY_GROW_FORMULA(s->entries.count);
+	isize new_count = PTR_ARRAY_GROW_FORMULA(s->entries.count);
 	ptr_set_rehash(s, new_count);
 }
 

@@ -157,7 +157,9 @@ Array<AstNode *> make_ast_node_array(AstFile *f, isize init_capacity = 8) {
 	}) \
 	AST_NODE_KIND(Implicit,       "implicit",        Token) \
 	AST_NODE_KIND(Undef,          "undef",           Token) \
-	AST_NODE_KIND(BasicLit,       "basic literal",   Token) \
+	AST_NODE_KIND(BasicLit,       "basic literal",   struct { \
+		Token token; \
+	}) \
 	AST_NODE_KIND(BasicDirective, "basic directive", struct { \
 		Token token; \
 		String name; \
@@ -543,7 +545,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_Ident:          return node->Ident.token;
 	case AstNode_Implicit:       return node->Implicit;
 	case AstNode_Undef:          return node->Undef;
-	case AstNode_BasicLit:       return node->BasicLit;
+	case AstNode_BasicLit:       return node->BasicLit.token;
 	case AstNode_BasicDirective: return node->BasicDirective.token;
 	case AstNode_ProcGroup:      return node->ProcGroup.token;
 	case AstNode_ProcLit:        return ast_node_token(node->ProcLit.type);
@@ -1110,7 +1112,7 @@ AstNode *ast_undef(AstFile *f, Token token) {
 
 AstNode *ast_basic_lit(AstFile *f, Token basic_lit) {
 	AstNode *result = make_ast_node(f, AstNode_BasicLit);
-	result->BasicLit = basic_lit;
+	result->BasicLit.token = basic_lit;
 	return result;
 }
 
@@ -2179,30 +2181,8 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		return parse_call_expr(f, ast_implicit(f, advance_token(f)));
 
 
-	case Token_String: {
-		Token token = advance_token(f);
-		if (f->curr_token.kind == Token_String) {
-			// NOTE(bill): Allow neighbouring string literals to be merge together to
-			// become one big string
-			String s = f->curr_token.string;
-			Array<u8> data = {};
-			array_init_count(&data, heap_allocator(), token.string.len+s.len);
-			gb_memmove(data.data, token.string.text, token.string.len);
-
-			while (f->curr_token.kind == Token_String) {
-				String s = f->curr_token.string;
-				isize old_count = data.count;
-				array_resize(&data, data.count + s.len);
-				gb_memmove(data.data+old_count, s.text, s.len);
-				advance_token(f);
-			}
-
-			token.string = make_string(data.data, data.count);
-			array_add(&f->tokenizer.allocated_strings, token.string);
-		}
-
-		return ast_basic_lit(f, token);
-	}
+	case Token_String:
+		return ast_basic_lit(f, advance_token(f));
 
 	case Token_OpenBrace:
 		if (!lhs) return parse_literal_value(f, nullptr);

@@ -269,6 +269,14 @@ i32 is_scope_an_ancestor(Scope *parent, Scope *child) {
 struct EntityGraphNode;
 typedef PtrSet<EntityGraphNode *> EntityGraphNodeSet;
 
+struct EntityGraphNode {
+	Entity *     entity; // Procedure, Variable, Constant
+	EntityGraphNodeSet pred;
+	EntityGraphNodeSet succ;
+	isize        index; // Index in array/queue
+	isize        dep_count;
+};
+
 void entity_graph_node_set_destroy(EntityGraphNodeSet *s) {
 	if (s->hashes.data != nullptr) {
 		ptr_set_destroy(s);
@@ -289,16 +297,6 @@ bool entity_graph_node_set_exists(EntityGraphNodeSet *s, EntityGraphNode *n) {
 void entity_graph_node_set_remove(EntityGraphNodeSet *s, EntityGraphNode *n) {
 	ptr_set_remove(s, n);
 }
-
-
-struct EntityGraphNode {
-	Entity *     entity; // Procedure, Variable, Constant
-	EntityGraphNodeSet pred;
-	EntityGraphNodeSet succ;
-	isize        index; // Index in array/queue
-	isize        dep_count;
-};
-
 
 void entity_graph_node_destroy(EntityGraphNode *n, gbAllocator a) {
 	entity_graph_node_set_destroy(&n->pred);
@@ -1119,8 +1117,17 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 }
 
 
-void add_untyped(CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value) {
-	map_set(&i->untyped, hash_node(expression), make_expr_info(lhs, mode, basic_type, value));
+void add_untyped(CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode mode, Type *type, ExactValue value) {
+	if (expression == nullptr) {
+		return;
+	}
+	if (mode == Addressing_Invalid) {
+		return;
+	}
+	if (mode == Addressing_Constant && type == t_invalid) {
+		compiler_error("add_untyped - invalid type: %s", type_to_string(type));
+	}
+	map_set(&i->untyped, hash_node(expression), make_expr_info(lhs, mode, type, value));
 }
 
 void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value) {
@@ -1130,13 +1137,8 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 	if (mode == Addressing_Invalid) {
 		return;
 	}
-
-	if (mode == Addressing_Constant) {
-		if (is_type_constant_type(type)) {
-			if (!(type != t_invalid || is_type_constant_type(type))) {
-				compiler_error("add_type_and_value - invalid type: %s", type_to_string(type));
-			}
-		}
+	if (mode == Addressing_Constant && type == t_invalid) {
+		compiler_error("add_type_and_value - invalid type: %s", type_to_string(type));
 	}
 
 	TypeAndValue tv = {};
@@ -1148,20 +1150,18 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 
 void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != nullptr);
-	if (identifier->kind == AstNode_Ident) {
-		if (is_blank_ident(identifier)) {
-			return;
-		}
-		if (identifier->Ident.entity != nullptr) {
-			return;
-		}
-
-		identifier->Ident.entity = entity;
-		entity->identifier = identifier;
-		array_add(&i->definitions, entity);
-	} else {
-		// NOTE(bill): Error should be handled elsewhere
+	GB_ASSERT(identifier->kind == AstNode_Ident);
+	if (is_blank_ident(identifier)) {
+		return;
 	}
+	if (identifier->Ident.entity != nullptr) {
+		// NOTE(bill): Identifier has already been handled
+		return;
+	}
+
+	identifier->Ident.entity = entity;
+	entity->identifier = identifier;
+	array_add(&i->definitions, entity);
 }
 
 bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
@@ -1510,7 +1510,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 	gbAllocator a = heap_allocator();
 
 	Map<EntityGraphNode *> M = {}; // Key: Entity *
-	map_init(&M, a);
+	map_init(&M, a, info->entities.count);
 	defer (map_destroy(&M));
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
@@ -1521,7 +1521,6 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 			map_set(&M, hash_pointer(e), n);
 		}
 	}
-
 
 	// Calculate edges for graph M
 	for_array(i, M.entries) {
@@ -1546,7 +1545,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 	}
 
 	Array<EntityGraphNode *> G = {};
-	array_init(&G, a, 2*M.entries.count);
+	array_init(&G, a, M.entries.count);
 
 	for_array(i, M.entries) {
 		auto *entry = &M.entries[i];
@@ -1588,7 +1587,6 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		n->dep_count = n->succ.entries.count;
 		GB_ASSERT(n->dep_count >= 0);
 	}
-
 
 	return G;
 }
@@ -3146,8 +3144,22 @@ Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visi
 
 
 void calculate_global_init_order(Checker *c) {
+#if 0
+	Timings timings = {};
+	timings_init(&timings, str_lit("calculate_global_init_order"), 16);
+	defer ({
+		timings_print_all(&timings);
+		timings_destroy(&timings);
+	});
+#define TIME_SECTION(str) timings_start_section(&timings, str_lit(str))
+#else
+#define TIME_SECTION(str)
+#endif
+
+
 	CheckerInfo *info = &c->info;
 
+	TIME_SECTION("generate entity dependency graph");
 	Array<EntityGraphNode *> dep_graph = generate_entity_dependency_graph(info);
 	defer ({
 		for_array(i, dep_graph) {
@@ -3156,6 +3168,7 @@ void calculate_global_init_order(Checker *c) {
 		array_free(&dep_graph);
 	});
 
+	TIME_SECTION("priority queue create");
 	// NOTE(bill): Priority queue
 	auto pq = priority_queue_create(dep_graph, entity_graph_node_cmp, entity_graph_node_swap);
 
@@ -3163,6 +3176,7 @@ void calculate_global_init_order(Checker *c) {
 	ptr_set_init(&emitted, heap_allocator());
 	defer (ptr_set_destroy(&emitted));
 
+	TIME_SECTION("queue sort");
 	while (pq.queue.count > 0) {
 		EntityGraphNode *n = priority_queue_pop(&pq);
 		Entity *e = n->entity;
@@ -3220,6 +3234,8 @@ void calculate_global_init_order(Checker *c) {
 		}
 		gb_printf("\n");
 	}
+
+#undef TIME_SECTION
 }
 
 

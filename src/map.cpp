@@ -183,9 +183,12 @@ gb_internal b32 map__full(Map<T> *h) {
 	return 0.75f * h->hashes.count <= h->entries.count;
 }
 
+#define MAP_ARRAY_GROW_FORMULA(x) (4*(x) + 7)
+GB_STATIC_ASSERT(MAP_ARRAY_GROW_FORMULA(0) > 0);
+
 template <typename T>
 gb_inline void map_grow(Map<T> *h) {
-	isize new_count = ARRAY_GROW_FORMULA(h->entries.count);
+	isize new_count = MAP_ARRAY_GROW_FORMULA(h->entries.count);
 	map_rehash(h, new_count);
 }
 

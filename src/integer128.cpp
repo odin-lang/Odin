@@ -491,6 +491,11 @@ void u128_divide(u128 a, u128 b, u128 *quo, u128 *rem) {
 		if (rem) *rem = U128_ZERO;
 		return;
 	}
+	if (a.hi == 0 && b.hi == 0) {
+		if (quo) *quo = u128_from_u64(a.lo/b.lo);
+		if (rem) *rem = u128_from_u64(a.lo%b.lo);
+		return;
+	}
 	u128 r = a;
 	u128 d = b;
 	u128 x = U128_ONE;
@@ -670,7 +675,7 @@ i128 i128_mul(i128 a, i128 b) {
 }
 
 void i128_divide(i128 a, i128 b, i128 *quo_, i128 *rem_) {
-	// TODO(bill): Optimize this i128 division calculation
+	// IMPORTANT TODO(bill): Optimize this i128 division calculation
 	i128 iquo = {0};
 	i128 irem = {0};
 	if (a.hi == 0 && b.hi == 0) {
