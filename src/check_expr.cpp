@@ -3884,7 +3884,7 @@ break;
 
 isize add_dependencies_from_unpacking(Checker *c, Entity **lhs, isize lhs_count, isize tuple_index, isize tuple_count) {
 	if (lhs != nullptr) {
-		for (isize j = 0; tuple_index < lhs_count && j < tuple_count; j++) {
+		for (isize j = 0; (tuple_index + j) < lhs_count && j < tuple_count; j++) {
 			Entity *e = lhs[tuple_index + j];
 			DeclInfo *decl = decl_info_of_entity(&c->info, e);
 			if (decl != nullptr) {
@@ -5421,14 +5421,13 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 			i64 max = 0;
 			isize index = 0;
-			isize elem_count = cl->elems.count;
 
 			Type *bet = base_type(elem_type);
 			if (!elem_type_can_be_constant(bet)) {
 				is_constant = false;
 			}
 
-			for (; index < elem_count; index++) {
+			for (; index < cl->elems.count; index++) {
 				AstNode *e = cl->elems[index];
 				if (e == nullptr) {
 					error(node, "Invalid literal element");
