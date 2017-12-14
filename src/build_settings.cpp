@@ -263,7 +263,7 @@ String path_to_fullpath(gbAllocator a, String s) {
 	gb_mutex_lock(&string_buffer_mutex);
 	p = realpath(cast(char *)s.text, 0);
 	gb_mutex_unlock(&string_buffer_mutex);
-	if(p == nullptr) return make_string_c("");
+	if(p == nullptr) return String{};
 	return make_string_c(p);
 }
 #else
