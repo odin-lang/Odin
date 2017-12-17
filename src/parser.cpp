@@ -362,6 +362,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token    import_name;   \
 		bool     is_using;      \
 		bool     been_handled;  \
+		Array<AstNode *> using_in_list; \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -371,6 +372,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token    relpath;       \
 		String   fullpath;      \
 		bool     been_handled;  \
+		Array<AstNode *> using_in_list; \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 	}) \
@@ -4515,6 +4517,25 @@ AstNode *parse_stmt(AstFile *f) {
 		if (list.count == 0) {
 			syntax_error(token, "Illegal use of 'using' statement");
 			expect_semicolon(f, nullptr);
+			return ast_bad_stmt(f, token, f->curr_token);
+		}
+
+		if (f->curr_token.kind == Token_in) {
+			Token in_token = expect_token(f, Token_in);
+			if (f->curr_token.kind == Token_import) {
+				AstNode *import_decl = parse_import_decl(f, true);
+				if (import_decl->kind == AstNode_ImportDecl) {
+					import_decl->ImportDecl.using_in_list = list;
+				}
+				return import_decl;
+			} else if (f->curr_token.kind == Token_export) {
+				AstNode *export_decl = parse_export_decl(f);
+				if (export_decl->kind == AstNode_ExportDecl) {
+					export_decl->ExportDecl.using_in_list = list;
+				}
+				return export_decl;
+			}
+			syntax_error(token, "Illegal use of 'using' statement");
 			return ast_bad_stmt(f, token, f->curr_token);
 		}
 
