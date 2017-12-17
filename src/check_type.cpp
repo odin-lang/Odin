@@ -1844,7 +1844,8 @@ void generate_map_internal_types(gbAllocator a, Type *type) {
 
 	type_set_offsets(a, generated_struct_type);
 	type->Map.generated_struct_type = generated_struct_type;
-	type->Map.lookup_result_type = make_optional_ok_type(a, value);
+	type->Map.internal_type         = make_type_pointer(a, generated_struct_type);
+	type->Map.lookup_result_type    = make_optional_ok_type(a, value);
 }
 
 void check_map_type(Checker *c, Type *type, AstNode *node) {

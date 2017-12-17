@@ -815,32 +815,32 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		write_string(fi.buf, "map[");
 		defer write_byte(fi.buf, ']');
 
-		entries    := &(^raw.Map)(v.data).entries;
-		gs         := type_info_base(info.generated_struct).variant.(Type_Info_Struct);
-		ed         := type_info_base(gs.types[1]).variant.(Type_Info_Dynamic_Array);
-		entry_type := ed.elem.variant.(Type_Info_Struct);
-		entry_size := ed.elem_size;
+		if (^raw.Map)(v.data).internal != nil {
+			entries    := &(^raw.Map)(v.data).entries;
+			gs         := type_info_base(info.generated_struct).variant.(Type_Info_Struct);
+			ed         := type_info_base(gs.types[1]).variant.(Type_Info_Dynamic_Array);
+			entry_type := ed.elem.variant.(Type_Info_Struct);
+			entry_size := ed.elem_size;
 
-		for i in 0..entries.len {
-			if i > 0 do write_string(fi.buf, ", ");
+			for i in 0..entries.len {
+				if i > 0 do write_string(fi.buf, ", ");
 
-			data := uintptr(entries.data) + uintptr(i*entry_size);
-			header := cast(^__Map_Entry_Header)data;
+				data := uintptr(entries.data) + uintptr(i*entry_size);
+				header := cast(^__Map_Entry_Header)data;
 
-			if types.is_string(info.key) {
-				write_string(fi.buf, header.key.str);
-			} else {
-				fi := Fmt_Info{buf = fi.buf};
-				fmt_arg(&fi, any{rawptr(&header.key.hash), info.key}, 'v');
+				if types.is_string(info.key) {
+					write_string(fi.buf, header.key.str);
+				} else {
+					fi := Fmt_Info{buf = fi.buf};
+					fmt_arg(&fi, any{rawptr(&header.key.hash), info.key}, 'v');
+				}
+
+				write_string(fi.buf, "=");
+
+				value := data + entry_type.offsets[2];
+				fmt_arg(fi, any{rawptr(value), info.value}, 'v');
 			}
-
-			write_string(fi.buf, "=");
-
-			value := data + entry_type.offsets[2];
-			fmt_arg(fi, any{rawptr(value), info.value}, 'v');
 		}
-
-
 
 	case Type_Info_Struct:
 		if info.is_raw_union {
