@@ -1119,7 +1119,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(bs, BlockStmt, node);
 		check_open_scope(c, node);
-		check_stmt_list(c, bs->stmts, mod_flags);
+		check_stmt_list(c, bs->stmts, flags);
 		check_close_scope(c);
 	case_end;
 
