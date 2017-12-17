@@ -216,8 +216,6 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 
 // TODO(bill): Cleanup struct field reordering
 // TODO(bill): Inline sorting procedure?
-gb_global gbAllocator   __checker_allocator = {};
-
 GB_COMPARE_PROC(cmp_reorder_struct_fields) {
 	// Rule:
 	// 'using' over non-'using'
@@ -232,10 +230,10 @@ GB_COMPARE_PROC(cmp_reorder_struct_fields) {
 	GB_ASSERT(y->kind == Entity_Variable);
 	bool xu = (x->flags & EntityFlag_Using) != 0;
 	bool yu = (y->flags & EntityFlag_Using) != 0;
-	i64 xa = type_align_of(__checker_allocator, x->type);
-	i64 ya = type_align_of(__checker_allocator, y->type);
-	i64 xs = type_size_of(__checker_allocator, x->type);
-	i64 ys = type_size_of(__checker_allocator, y->type);
+	i64 xa = type_align_of(heap_allocator(), x->type);
+	i64 ya = type_align_of(heap_allocator(), y->type);
+	i64 xs = type_size_of(heap_allocator(), x->type);
+	i64 ys = type_size_of(heap_allocator(), y->type);
 
 	if (xu != yu) {
 		return xu ? -1 : +1;
@@ -545,7 +543,6 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 
 	struct_type->Struct.scope                   = c->context.scope;
 	struct_type->Struct.is_packed               = st->is_packed;
-	struct_type->Struct.is_ordered              = st->is_ordered;
 	struct_type->Struct.polymorphic_params      = polymorphic_params;
 	struct_type->Struct.is_polymorphic          = is_polymorphic;
 	struct_type->Struct.is_poly_specialized     = is_poly_specialized;
@@ -590,7 +587,6 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 
 			// NOTE(bill): Hacky thing
 			// TODO(bill): Probably make an inline sorting procedure rather than use global variables
-			__checker_allocator = c->allocator;
 			// NOTE(bill): compound literal order must match source not layout
 			gb_sort_array(reordered_fields.data, fields.count, cmp_reorder_struct_fields);
 
@@ -1806,7 +1802,6 @@ void generate_map_entry_type(gbAllocator a, Type *type) {
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("value")), type->Map.value, false, 2));
 
 
-	entry_type->Struct.is_ordered          = true;
 	entry_type->Struct.fields              = fields;
 	entry_type->Struct.fields_in_src_order = fields;
 
@@ -1844,7 +1839,6 @@ void generate_map_internal_types(gbAllocator a, Type *type) {
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0));
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("entries")), entries_type, false, 1));
 
-	generated_struct_type->Struct.is_ordered          = true;
 	generated_struct_type->Struct.fields              = fields;
 	generated_struct_type->Struct.fields_in_src_order = fields;
 

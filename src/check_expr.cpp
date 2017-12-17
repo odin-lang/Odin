@@ -6380,7 +6380,6 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_ast_node(st, StructType, node);
 		str = gb_string_appendc(str, "struct ");
 		if (st->is_packed)    str = gb_string_appendc(str, "#packed ");
-		if (st->is_ordered)   str = gb_string_appendc(str, "#ordered ");
 		if (st->is_raw_union) str = gb_string_appendc(str, "#raw_union ");
 		str = gb_string_append_rune(str, '{');
 		str = write_struct_fields_to_string(str, st->fields);

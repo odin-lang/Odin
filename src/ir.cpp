@@ -7245,6 +7245,11 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		irValue *next = ir_add_local_generated(proc, t_context);
 		ir_emit_store(proc, next, new_context);
 
+		Selection sel = lookup_field(proc->module->allocator, t_context, str_lit("parent"), false);
+		GB_ASSERT(sel.entity != nullptr);
+		irValue *parent_ptr = ir_emit_deep_field_gep(proc, next, sel);
+		ir_emit_store(proc, parent_ptr, prev);
+
 		array_add(&proc->context_stack, next);
 		defer (array_pop(&proc->context_stack));
 
@@ -8030,13 +8035,11 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 
 			{
 				irValue *is_packed       = ir_const_bool(a, t->Struct.is_packed);
-				irValue *is_ordered      = ir_const_bool(a, t->Struct.is_ordered);
 				irValue *is_raw_union    = ir_const_bool(a, t->Struct.is_raw_union);
 				irValue *is_custom_align = ir_const_bool(a, t->Struct.custom_align != 0);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 4), is_packed);
-				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 5), is_ordered);
-				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 6), is_raw_union);
-				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 7), is_custom_align);
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 5), is_raw_union);
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 6), is_custom_align);
 			}
 
 			isize count = t->Struct.fields.count;

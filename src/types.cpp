@@ -80,7 +80,6 @@ struct TypeStruct {
 	bool       are_offsets_set;
 	bool       are_offsets_being_processed;
 	bool       is_packed;
-	bool       is_ordered;
 	bool       is_raw_union;
 	bool       is_polymorphic;
 	bool       is_poly_specialized;
@@ -1177,7 +1176,6 @@ bool are_types_identical(Type *x, Type *y) {
 			if (x->Struct.is_raw_union == y->Struct.is_raw_union &&
 			    x->Struct.fields.count == y->Struct.fields.count &&
 			    x->Struct.is_packed    == y->Struct.is_packed &&
-			    x->Struct.is_ordered   == y->Struct.is_ordered &&
 			    x->Struct.custom_align == y->Struct.custom_align) {
 				// TODO(bill); Fix the custom alignment rule
 				for_array(i, x->Struct.fields) {
@@ -2338,7 +2336,6 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_Struct: {
 			str = gb_string_appendc(str, "struct");
 		if (type->Struct.is_packed)    str = gb_string_appendc(str, " #packed");
-		if (type->Struct.is_ordered)   str = gb_string_appendc(str, " #ordered");
 		if (type->Struct.is_raw_union) str = gb_string_appendc(str, " #raw_union");
 		str = gb_string_appendc(str, " {");
 		for_array(i, type->Struct.fields) {

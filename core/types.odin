@@ -97,7 +97,6 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 	   	switch {
 		case len(x.types)   != len(y.types),
 		     x.is_packed    != y.is_packed,
-		     x.is_ordered   != y.is_ordered,
 		     x.is_raw_union != y.is_raw_union,
 		     x.custom_align != y.custom_align:
 		     return false;

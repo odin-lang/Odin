@@ -253,7 +253,6 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 	case Type_Info_Struct:
 		write_string(buf, "struct ");
 		if info.is_packed    do write_string(buf, "#packed ");
-		if info.is_ordered   do write_string(buf, "#ordered ");
 		if info.is_raw_union do write_string(buf, "#raw_union ");
 		if info.custom_align {
 			write_string(buf, "#align ");

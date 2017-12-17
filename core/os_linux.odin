@@ -40,7 +40,7 @@ RTLD_GLOBAL       :: 0x100;
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments();
 
-_File_Time :: struct #ordered {
+_File_Time :: struct {
 	seconds:     i64,
 	nanoseconds: i32,
 	reserved:    i32,
@@ -50,7 +50,7 @@ _File_Time :: struct #ordered {
 //  https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.7-4.6/+/jb-dev/sysroot/usr/include/bits/stat.h
 // Validity is not guaranteed.
 
-Stat :: struct #ordered {
+Stat :: struct {
 	device_id:     u64, // ID of device containing file
 	serial:        u64, // File serial number
 	nlink:         u32, // Number of hard links
