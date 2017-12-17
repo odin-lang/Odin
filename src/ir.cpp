@@ -1733,8 +1733,8 @@ void ir_emit_startup_runtime(irProcedure *proc) {
 irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index);
 irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irValue *right);
 
-irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val, Type *map_type) {
-	GB_ASSERT_MSG(is_type_pointer(ir_type(map_val)), "%s", type_to_string(ir_type(map_val)));
+irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_type) {
+	GB_ASSERT_MSG(is_type_pointer(ir_type(map_val_ptr)), "%s", type_to_string(ir_type(map_val_ptr)));
 	gbAllocator a = proc->module->allocator;
 	irValue *h = ir_add_local_generated(proc, t_map_header);
 	map_type = base_type(map_type);
@@ -1744,7 +1744,7 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val, Type *map_type) 
 
 	// NOTE(bill): Removes unnecessary allocation if split gep
 	irValue *gep0 = ir_emit_struct_ep(proc, h, 0);
-	irValue *m = ir_emit_conv(proc, map_val, type_deref(ir_type(gep0)));
+	irValue *m = ir_emit_conv(proc, map_val_ptr, type_deref(ir_type(gep0)));
 	ir_emit_store(proc, gep0, m);
 
 	if (is_type_string(key_type)) {
@@ -2536,14 +2536,18 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		case 2: result_type = t_int_ptr;                                      break;
 		case 3: result_type = t_allocator_ptr;                                break;
 		}
-	} else if (is_type_map(t)) {
+	} /* else if (is_type_map(t)) {
 		generate_map_internal_types(a, t);
+		Type *itp = make_type_pointer(a, t->Map.internal_type);
+		s = ir_emit_load(proc, ir_emit_transmute(proc, s, itp));
+
 		Type *gst = t->Map.generated_struct_type;
+		GB_ASSERT(gst->kind == Type_Struct);
 		switch (index) {
 		case 0: result_type = make_type_pointer(a, gst->Struct.fields[0]->type); break;
 		case 1: result_type = make_type_pointer(a, gst->Struct.fields[1]->type); break;
 		}
-	}else {
+	} */else {
 		GB_PANIC("TODO(bill): struct_gep type: %s, %d", type_to_string(ir_type(s)), index);
 	}
 
@@ -2611,15 +2615,15 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 		}
 		break;
 
-	case Type_Map: {
-		generate_map_internal_types(a, t);
-		Type *gst = t->Map.generated_struct_type;
-		switch (index) {
-		case 0: result_type = gst->Struct.fields[0]->type; break;
-		case 1: result_type = gst->Struct.fields[1]->type; break;
-		}
-		break;
-	}
+	// case Type_Map: {
+	// 	generate_map_internal_types(a, t);
+	// 	Type *gst = t->Map.generated_struct_type;
+	// 	switch (index) {
+	// 	case 0: result_type = gst->Struct.fields[0]->type; break;
+	// 	case 1: result_type = gst->Struct.fields[1]->type; break;
+	// 	}
+	// 	break;
+	// }
 
 	default:
 		GB_PANIC("TODO(bill): struct_ev type: %s, %d", type_to_string(ir_type(s)), index);
@@ -6192,10 +6196,6 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 	irBlock *done = nullptr;
 	irBlock *body = nullptr;
 
-	irValue *key = nullptr;
-	if (expr_type->kind == Type_Map) {
-		key = ir_add_local_generated(proc, expr_type->Map.key);
-	}
 
 	irValue *index = ir_add_local_generated(proc, t_int);
 	ir_emit_store(proc, index, ir_const_int(proc->module->allocator, -1));
@@ -6210,6 +6210,7 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 	body = ir_new_block(proc, nullptr, "for.index.body");
 	done = ir_new_block(proc, nullptr, "for.index.done");
 	if (count == nullptr) {
+		GB_ASSERT(count_ptr != nullptr);
 		count = ir_emit_load(proc, count_ptr);
 	}
 	irValue *cond = ir_emit_comp(proc, Token_Lt, incr, count);
@@ -6217,52 +6218,59 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 	ir_start_block(proc, body);
 
 	idx = ir_emit_load(proc, index);
-	if (val_type != nullptr) {
-		switch (expr_type->kind) {
-		case Type_Array: {
+	switch (expr_type->kind) {
+	case Type_Array: {
+		if (val_type != nullptr) {
 			val = ir_emit_load(proc, ir_emit_array_ep(proc, expr, idx));
-			break;
 		}
-		case Type_Slice: {
+		break;
+	}
+	case Type_Slice: {
+		if (val_type != nullptr) {
 			irValue *elem = ir_slice_elem(proc, expr);
 			val = ir_emit_load(proc, ir_emit_ptr_offset(proc, elem, idx));
-			break;
 		}
-		case Type_DynamicArray: {
+		break;
+	}
+	case Type_DynamicArray: {
+		if (val_type != nullptr) {
 			irValue *elem = ir_emit_struct_ep(proc, expr, 0);
 			elem = ir_emit_load(proc, elem);
 			val = ir_emit_load(proc, ir_emit_ptr_offset(proc, elem, idx));
-			break;
 		}
-		case Type_Map: {
-			irValue *entries = ir_emit_struct_ep(proc, expr, 1);
-			irValue *elem = ir_emit_struct_ep(proc, entries, 0);
-			elem = ir_emit_load(proc, elem);
-
-			irValue *entry = ir_emit_ptr_offset(proc, elem, idx);
-			val = ir_emit_load(proc, ir_emit_struct_ep(proc, entry, 2));
-
-			irValue *hash = ir_emit_struct_ep(proc, entry, 0);
-			if (is_type_string(expr_type->Map.key)) {
-				irValue *str = ir_emit_struct_ep(proc, hash, 1);
-				ir_emit_store(proc, key, ir_emit_load(proc, str));
-			} else {
-				irValue *hash_ptr = ir_emit_struct_ep(proc, hash, 0);
-				hash_ptr = ir_emit_conv(proc, hash_ptr, ir_type(key));
-				ir_emit_store(proc, key, ir_emit_load(proc, hash_ptr));
-			}
-
-
-			break;
-		}
-		default:
-			GB_PANIC("Cannot do range_indexed of %s", type_to_string(expr_type));
-			break;
-		}
+		break;
 	}
+	case Type_Map: {
+		irValue *key = ir_add_local_generated(proc, expr_type->Map.key);
 
-	if (key != nullptr) {
+		Type *itp = make_type_pointer(proc->module->allocator, expr_type->Map.internal_type);
+		irValue *data_ptr = ir_emit_transmute(proc, expr, itp);
+		irValue *internal_ptr = ir_emit_load(proc, data_ptr);
+
+		irValue *entries = ir_emit_struct_ep(proc, internal_ptr, 1);
+		irValue *elem = ir_emit_struct_ep(proc, entries, 0);
+		elem = ir_emit_load(proc, elem);
+
+		irValue *entry = ir_emit_ptr_offset(proc, elem, idx);
+		val = ir_emit_load(proc, ir_emit_struct_ep(proc, entry, 2));
+
+		irValue *hash = ir_emit_struct_ep(proc, entry, 0);
+		if (is_type_string(expr_type->Map.key)) {
+			irValue *str = ir_emit_struct_ep(proc, hash, 1);
+			ir_emit_store(proc, key, ir_emit_load(proc, str));
+		} else {
+			irValue *hash_ptr = ir_emit_struct_ep(proc, hash, 0);
+			hash_ptr = ir_emit_conv(proc, hash_ptr, ir_type(key));
+			ir_emit_store(proc, key, ir_emit_load(proc, hash_ptr));
+		}
+
 		idx = ir_emit_load(proc, key);
+
+		break;
+	}
+	default:
+		GB_PANIC("Cannot do range_indexed of %s", type_to_string(expr_type));
+		break;
 	}
 
 	if (val_)  *val_  = val;
@@ -6863,7 +6871,6 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			ir_emit_if(proc, cond, body, done);
 			ir_start_block(proc, body);
 
-
 			irValue *val_ptr = ir_emit_ptr_offset(proc, values_data, offset);
 			ir_emit_increment(proc, offset_);
 
@@ -6885,14 +6892,34 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			switch (et->kind) {
 			case Type_Map: {
 				is_map = true;
+				gbAllocator a = proc->module->allocator;
 				irAddr addr = ir_build_addr(proc, rs->expr);
 				irValue *map = ir_addr_get_ptr(proc, addr);
 				if (is_type_pointer(type_deref(ir_addr_type(addr)))) {
 					map = ir_addr_load(proc, addr);
 				}
-				irValue *entries_ptr = ir_emit_struct_ep(proc, map, 1);
-				irValue *count_ptr = ir_emit_struct_ep(proc, entries_ptr, 1);
-				ir_build_range_indexed(proc, map, val1_type, count_ptr, &val, &key, &loop, &done);
+				irValue *count_ptr = ir_add_local_generated(proc, t_int);
+				irValue *count_ptr_ptr = ir_add_local_generated(proc, t_int_ptr);
+				ir_emit_store(proc, count_ptr_ptr, count_ptr);
+
+				irBlock *not_nil_block = ir_new_block(proc, nullptr, "map.not.nil.block");
+				irBlock *end_nil_block = ir_new_block(proc, nullptr, "map.end.nil.block");
+				{
+					Type *itp = make_type_pointer(a, et->Map.internal_type);
+					irValue *data_ptr = ir_emit_transmute(proc, map, itp);
+					irValue *internal_ptr = ir_emit_load(proc, data_ptr);
+
+					irValue *cond = ir_emit_comp(proc, Token_NotEq, internal_ptr, v_raw_nil);
+					ir_emit_if(proc, cond, not_nil_block, end_nil_block);
+					ir_start_block(proc, not_nil_block);
+
+					irValue *entries_ptr = ir_emit_struct_ep(proc, internal_ptr, 1);
+					irValue *cp = ir_emit_struct_ep(proc, entries_ptr, 1);
+					ir_emit_store(proc, count_ptr_ptr, cp);
+					ir_emit_jump(proc, end_nil_block);
+				}
+				ir_start_block(proc, end_nil_block);
+				ir_build_range_indexed(proc, map, val1_type, ir_emit_load(proc, count_ptr_ptr), &val, &key, &loop, &done);
 				break;
 			}
 			case Type_Array: {
@@ -6947,6 +6974,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				break;
 			}
 		}
+
 
 		irAddr val0_addr = {};
 		irAddr val1_addr = {};

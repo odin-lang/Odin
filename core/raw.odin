@@ -20,9 +20,13 @@ Dynamic_Array :: struct {
 	allocator: Allocator,
 }
 
-Map :: struct {
+Map_Internal :: struct {
 	hashes:  [dynamic]int,
 	entries: Dynamic_Array,
+}
+
+Map :: struct {
+	using internal: ^Map_Internal,
 }
 
 make_any :: inline proc(data: rawptr, type_info: ^Type_Info) -> any {

@@ -162,6 +162,7 @@ struct TypeStruct {
 		Type * value;                                     \
 		Type * entry_type;                                \
 		Type * generated_struct_type;                     \
+		Type * internal_type;                             \
 		Type * lookup_result_type;                        \
 	})                                                    \
 	TYPE_KIND(BitFieldValue, struct { u32 bits; })        \
@@ -1365,10 +1366,10 @@ i64 union_tag_size(gbAllocator a, Type *u) {
 		return u->Union.tag_size;
 	}
 
-	i64 tag_size = type_align_of(a, u);
-	if (tag_size < 1) {
-		tag_size = build_context.word_size;
-	}
+	u64 n = cast(u64)u->Union.variants.count;
+	i64 bytes = next_pow2(cast(i64)(floor_log2(n)/8 + 1));
+	i64 tag_size = gb_max(bytes, 1);
+
 	u->Union.tag_size = tag_size;
 	return tag_size;
 }
@@ -1383,7 +1384,7 @@ Type *union_tag_type(gbAllocator a, Type *u) {
 	case 16: return t_u128;
 	}
 	GB_PANIC("Invalid union_tag_size");
-	return t_int;
+	return t_uint;
 }
 
 
@@ -1870,7 +1871,8 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 	case Type_Map:
 		generate_map_internal_types(allocator, t);
-		return type_align_of_internal(allocator, t->Map.generated_struct_type, path);
+		// return type_align_of_internal(allocator, t->Map.generated_struct_type, path);
+		return build_context.word_size;
 
 	case Type_Enum:
 		return type_align_of_internal(allocator, t->Enum.base_type, path);
@@ -2063,7 +2065,8 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 	case Type_Map:
 		generate_map_internal_types(allocator, t);
-		return type_size_of_internal(allocator, t->Map.generated_struct_type, path);
+		// return type_size_of_internal(allocator, t->Map.generated_struct_type, path);
+		return build_context.word_size;
 
 	case Type_Tuple: {
 		i64 count, align, size;
@@ -2101,7 +2104,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		}
 
 		// NOTE(bill): Align to tag
-		i64 tag_size = gb_max(align, 1);
+		i64 tag_size = union_tag_size(allocator, t);
 		i64 size = align_formula(max, tag_size);
 		// NOTE(bill): Calculate the padding between the common fields and the tag
 		t->Union.tag_size = tag_size;
