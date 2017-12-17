@@ -4359,22 +4359,31 @@ AstNode *parse_asm_stmt(AstFile *f) {
 }
 
 
-AstNode *parse_import_decl(AstFile *f, bool is_using) {
+enum ImportDeclKind {
+	ImportDecl_Standard,
+	ImportDecl_Using,
+	ImportDecl_UsingIn,
+};
+
+AstNode *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 	CommentGroup docs = f->lead_comment;
 	Token token = expect_token(f, Token_import);
 	Token import_name = {};
+	bool is_using = kind != ImportDecl_Standard;
 
-	switch (f->curr_token.kind) {
-	case Token_Ident:
-		import_name = advance_token(f);
-		break;
-	default:
-		import_name.pos = f->curr_token.pos;
-		break;
-	}
+	if (kind != ImportDecl_UsingIn) {
+		switch (f->curr_token.kind) {
+		case Token_Ident:
+			import_name = advance_token(f);
+			break;
+		default:
+			import_name.pos = f->curr_token.pos;
+			break;
+		}
 
-	if (!is_using && is_blank_ident(import_name)) {
-		syntax_error(import_name, "Illegal import name: '_'");
+		if (!is_using && is_blank_ident(import_name)) {
+			syntax_error(import_name, "Illegal import name: '_'");
+		}
 	}
 
 	Token file_path = expect_token_after(f, Token_String, "import");
@@ -4496,7 +4505,7 @@ AstNode *parse_stmt(AstFile *f) {
 		return parse_foreign_decl(f);
 
 	case Token_import:
-		return parse_import_decl(f, false);
+		return parse_import_decl(f, ImportDecl_Standard);
 
 	case Token_export:
 		return parse_export_decl(f);
@@ -4528,7 +4537,7 @@ AstNode *parse_stmt(AstFile *f) {
 		CommentGroup docs = f->lead_comment;
 		Token token = expect_token(f, Token_using);
 		if (f->curr_token.kind == Token_import) {
-			return parse_import_decl(f, true);
+			return parse_import_decl(f, ImportDecl_Using);
 		}
 
 		AstNode *decl = nullptr;
@@ -4542,7 +4551,7 @@ AstNode *parse_stmt(AstFile *f) {
 		if (f->curr_token.kind == Token_in) {
 			Token in_token = expect_token(f, Token_in);
 			if (f->curr_token.kind == Token_import) {
-				AstNode *import_decl = parse_import_decl(f, true);
+				AstNode *import_decl = parse_import_decl(f, ImportDecl_UsingIn);
 				if (import_decl->kind == AstNode_ImportDecl) {
 					import_decl->ImportDecl.using_in_list = list;
 				}
