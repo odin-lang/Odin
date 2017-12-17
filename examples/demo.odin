@@ -14,7 +14,6 @@ import "core:utf8.odin"
 
 when ODIN_OS == "windows" {
 	import "core:atomics.odin"
-	import "core:opengl.odin"
 	import "core:thread.odin"
 	import win32 "core:sys/windows.odin"
 }
@@ -609,7 +608,6 @@ array_programming :: proc() {
 		fmt.println(blah(x));
 	}
 }
-
 
 main :: proc() {
 	when false {

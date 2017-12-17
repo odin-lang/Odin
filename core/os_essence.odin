@@ -13,7 +13,7 @@ OS_Node_Type :: enum i32 {
 	Directory = 1,
 }
 
-OS_Node_Information :: struct #ordered {
+OS_Node_Information :: struct {
 	handle:   Handle,
 	id:       [16]byte,
 	ntype:    OS_Node_Type,

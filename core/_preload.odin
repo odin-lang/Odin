@@ -23,12 +23,12 @@ import "core:raw.odin"
 
 // NOTE(bill): This must match the compiler's
 Calling_Convention :: enum {
-	Invalid         = 0,
-	Odin            = 1,
-	Contextless     = 2,
-	C               = 3,
-	Std             = 4,
-	Fast            = 5,
+	Invalid     = 0,
+	Odin        = 1,
+	Contextless = 2,
+	C           = 3,
+	Std         = 4,
+	Fast        = 5,
 }
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
@@ -42,67 +42,66 @@ Type_Info_Enum_Value :: union {
 };
 
 // Variant Types
-Type_Info_Named   :: struct #ordered {name: string, base: ^Type_Info};
-Type_Info_Integer :: struct #ordered {signed: bool};
+Type_Info_Named   :: struct {name: string, base: ^Type_Info};
+Type_Info_Integer :: struct {signed: bool};
 Type_Info_Rune    :: struct{};
 Type_Info_Float   :: struct{};
 Type_Info_Complex :: struct{};
 Type_Info_String  :: struct{};
 Type_Info_Boolean :: struct{};
 Type_Info_Any     :: struct{};
-Type_Info_Pointer :: struct #ordered {
+Type_Info_Pointer :: struct {
 	elem: ^Type_Info // nil -> rawptr
 };
-Type_Info_Procedure :: struct #ordered {
+Type_Info_Procedure :: struct {
 	params:     ^Type_Info, // Type_Info_Tuple
 	results:    ^Type_Info, // Type_Info_Tuple
 	variadic:   bool,
 	convention: Calling_Convention,
 };
-Type_Info_Array :: struct #ordered {
+Type_Info_Array :: struct {
 	elem:      ^Type_Info,
 	elem_size: int,
 	count:     int,
 };
-Type_Info_Dynamic_Array :: struct #ordered {elem: ^Type_Info, elem_size: int};
-Type_Info_Slice         :: struct #ordered {elem: ^Type_Info, elem_size: int};
-Type_Info_Tuple :: struct #ordered { // Only really used for procedures
+Type_Info_Dynamic_Array :: struct {elem: ^Type_Info, elem_size: int};
+Type_Info_Slice         :: struct {elem: ^Type_Info, elem_size: int};
+Type_Info_Tuple :: struct { // Only really used for procedures
 	types:        []^Type_Info,
 	names:        []string,
 };
-Type_Info_Struct :: struct #ordered {
+Type_Info_Struct :: struct {
 	types:        []^Type_Info,
 	names:        []string,
 	offsets:      []uintptr, // offsets may not be used in tuples
 	usings:       []bool,    // usings may not be used in tuples
 	is_packed:    bool,
-	is_ordered:   bool,
 	is_raw_union: bool,
 	custom_align: bool,
 };
-Type_Info_Union :: struct #ordered {
+Type_Info_Union :: struct {
 	variants:   []^Type_Info,
 	tag_offset: uintptr,
 	tag_type:   ^Type_Info,
 };
-Type_Info_Enum :: struct #ordered {
+Type_Info_Enum :: struct {
 	base:   ^Type_Info,
 	names:  []string,
 	values: []Type_Info_Enum_Value,
 };
-Type_Info_Map :: struct #ordered {
+Type_Info_Map :: struct {
 	key:              ^Type_Info,
 	value:            ^Type_Info,
 	generated_struct: ^Type_Info,
 };
-Type_Info_Bit_Field :: struct #ordered {
+Type_Info_Bit_Field :: struct {
 	names:   []string,
 	bits:    []i32,
 	offsets: []i32,
 };
 
 
-Type_Info :: struct #ordered {
+Type_Info :: struct {
 	size:  int,
 	align: int,
 
@@ -139,7 +138,7 @@ __argv__: ^^byte;
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 
 
-Source_Code_Location :: struct #ordered {
+Source_Code_Location :: struct {
 	file_path:    string,
 	line, column: int,
 	procedure:    string,
@@ -160,19 +159,20 @@ Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
 	                         old_memory: rawptr, old_size: int, flags: u64 = 0, location := #caller_location) -> rawptr;
 
 
-Allocator :: struct #ordered {
+Allocator :: struct {
 	procedure: Allocator_Proc,
 	data:      rawptr,
 }
 
 
-Context :: struct #ordered {
+Context :: struct {
 	allocator:  Allocator,
 	thread_id:  int,
 
 	user_data:  any,
 	user_index: int,
 
+	parent:     ^Context,
 	derived:    any, // May be used for derived data types
 }
 
@@ -180,18 +180,18 @@ DEFAULT_ALIGNMENT :: 2*align_of(rawptr);
 
 __INITIAL_MAP_CAP :: 16;
 
-__Map_Key :: struct #ordered {
+__Map_Key :: struct {
 	hash: u128,
 	str:  string,
 }
 
-__Map_Find_Result :: struct #ordered {
+__Map_Find_Result :: struct {
 	hash_index:  int,
 	entry_prev:  int,
 	entry_index: int,
 }
 
-__Map_Entry_Header :: struct #ordered {
+__Map_Entry_Header :: struct {
 	key:  __Map_Key,
 	next: int,
 /*
@@ -199,7 +199,7 @@ __Map_Entry_Header :: struct #ordered {
 */
 }
 
-__Map_Header :: struct #ordered {
+__Map_Header :: struct {
 	m:             ^raw.Map,
 	is_key_string: bool,
 	entry_size:    int,

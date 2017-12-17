@@ -1389,7 +1389,7 @@ void add_type_info_type(Checker *c, Type *t) {
 	}
 }
 
-void check_procedure_later(Checker *c, ProcedureInfo const &info) {
+void check_procedure_later(Checker *c, ProcedureInfo info) {
 	GB_ASSERT(info.decl != nullptr);
 	array_add(&c->procs, info);
 }
@@ -3064,9 +3064,12 @@ void check_import_entities(Checker *c) {
 			};
 
 			if (path.count == 1) {
+				// TODO(bill): Should this be allowed or disabled?
+			#if 0
 				ImportPathItem item = path[0];
 				String filename = fn(item);
 				error(item.decl, "Self importation of '%.*s'", LIT(filename));
+			#endif
 			} else if (path.count > 0) {
 				ImportPathItem item = path[path.count-1];
 				String filename = fn(item);

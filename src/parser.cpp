@@ -185,10 +185,6 @@ Array<AstNode *> make_ast_node_array(AstFile *f, isize init_capacity = 8) {
 		Array<AstNode *> elems; \
 		Token open, close; \
 	}) \
-	AST_NODE_KIND(Alias, "alias", struct { \
-		Token token; \
-		AstNode *expr; \
-	}) \
 AST_NODE_KIND(_ExprBegin,  "",  i32) \
 	AST_NODE_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
 	AST_NODE_KIND(TagExpr,      "tag expression",         struct { Token token, name; AstNode *expr; }) \
@@ -461,7 +457,6 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		isize            field_count;         \
 		AstNode *        polymorphic_params;  \
 		bool             is_packed;           \
-		bool             is_ordered;          \
 		bool             is_raw_union;        \
 		AstNode *        align;               \
 	}) \
@@ -562,7 +557,6 @@ Token ast_node_token(AstNode *node) {
 			return ast_node_token(node->CompoundLit.type);
 		}
 		return node->CompoundLit.open;
-	case AstNode_Alias:         return node->Alias.token;
 
 	case AstNode_TagExpr:       return node->TagExpr.token;
 	case AstNode_RunExpr:       return node->RunExpr.token;
@@ -697,9 +691,6 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_CompoundLit:
 		n->CompoundLit.type  = clone_ast_node(a, n->CompoundLit.type);
 		n->CompoundLit.elems = clone_ast_node_array(a, n->CompoundLit.elems);
-		break;
-	case AstNode_Alias:
-		n->Alias.expr = clone_ast_node(a, n->Alias.expr);
 		break;
 
 	case AstNode_BadExpr: break;
@@ -1177,12 +1168,6 @@ AstNode *ast_compound_lit(AstFile *f, AstNode *type, Array<AstNode *> elems, Tok
 	result->CompoundLit.close = close;
 	return result;
 }
-AstNode *ast_alias(AstFile *f, Token token, AstNode *expr) {
-	AstNode *result = make_ast_node(f, AstNode_Alias);
-	result->Alias.token = token;
-	result->Alias.expr  = expr;
-	return result;
-}
 
 
 AstNode *ast_ternary_expr(AstFile *f, AstNode *cond, AstNode *x, AstNode *y) {
@@ -1499,7 +1484,7 @@ AstNode *ast_dynamic_array_type(AstFile *f, Token token, AstNode *elem) {
 }
 
 AstNode *ast_struct_type(AstFile *f, Token token, Array<AstNode *> fields, isize field_count,
-                         AstNode *polymorphic_params, bool is_packed, bool is_ordered, bool is_raw_union,
+                         AstNode *polymorphic_params, bool is_packed, bool is_raw_union,
                          AstNode *align) {
 	AstNode *result = make_ast_node(f, AstNode_StructType);
 	result->StructType.token              = token;
@@ -1507,7 +1492,6 @@ AstNode *ast_struct_type(AstFile *f, Token token, Array<AstNode *> fields, isize
 	result->StructType.field_count        = field_count;
 	result->StructType.polymorphic_params = polymorphic_params;
 	result->StructType.is_packed          = is_packed;
-	result->StructType.is_ordered         = is_ordered;
 	result->StructType.is_raw_union       = is_raw_union;
 	result->StructType.align              = align;
 	return result;
@@ -2226,7 +2210,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			return ast_helper_type(f, token, parse_type(f));
 		}
 		Token name = expect_token(f, Token_Ident);
-		if (name.string == "alias") {
+		if (name.string == "type_alias") {
 			return ast_alias_type(f, token, parse_type(f));
 		} else if (name.string == "run") {
 			AstNode *expr = parse_expr(f, false);
@@ -2405,7 +2389,6 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		Token    token = expect_token(f, Token_struct);
 		AstNode *polymorphic_params = nullptr;
 		bool     is_packed          = false;
-		bool     is_ordered         = false;
 		bool     is_raw_union       = false;
 		AstNode *align              = nullptr;
 
@@ -2429,11 +2412,6 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_packed = true;
-			} else if (tag.string == "ordered") {
-				if (is_ordered) {
-					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
-				}
-				is_ordered = true;
 			} else if (tag.string == "align") {
 				if (align) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
@@ -2451,16 +2429,9 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 		f->expr_level = prev_level;
 
-		if (is_packed && is_ordered) {
-			syntax_error(token, "'#ordered' is not needed with '#packed' which implies ordering");
-		}
 		if (is_raw_union && is_packed) {
 			is_packed = false;
 			syntax_error(token, "'#raw_union' cannot also be '#packed'");
-		}
-		if (is_raw_union && is_ordered) {
-			is_ordered = false;
-			syntax_error(token, "'#raw_union' cannot also be '#ordered'");
 		}
 
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
@@ -2475,7 +2446,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			decls = fields->FieldList.list;
 		}
 
-		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_ordered, is_raw_union, align);
+		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, align);
 	} break;
 
 	case Token_union: {
@@ -3659,7 +3630,6 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 }
 
 AstNode *parse_type_or_ident(AstFile *f) {
-#if 1
 	bool prev_allow_type = f->allow_type;
 	isize prev_expr_level = f->expr_level;
 	defer (f->allow_type = prev_allow_type);
@@ -3669,281 +3639,6 @@ AstNode *parse_type_or_ident(AstFile *f) {
 	AstNode *operand = parse_operand(f, true);
 	AstNode *type = parse_atom_expr(f, operand, true);
 	return type;
-#else
-	switch (f->curr_token.kind) {
-	case Token_Dollar: {
-		Token token = expect_token(f, Token_Dollar);
-		AstNode *type = parse_ident(f);
-		return ast_poly_type(f, token, type);
-	} break;
-
-	case Token_type_of: {
-		AstNode *i = ast_implicit(f, expect_token(f, Token_type_of));
-		AstNode *type = parse_call_expr(f, i);
-		while (f->curr_token.kind == Token_Period) {
-			Token token = advance_token(f);
-			AstNode *sel = parse_ident(f);
-			type = ast_selector_expr(f, token, type, sel);
-		}
-		return type;
-	} break;
-
-	case Token_Ident: {
-		AstNode *e = parse_ident(f);
-		while (f->curr_token.kind == Token_Period) {
-			Token token = advance_token(f);
-			AstNode *sel = parse_ident(f);
-			e = ast_selector_expr(f, token, e, sel);
-		}
-		// TODO(bill): Merge type_or_ident into the general parsing for expressions
-		// if (f->curr_token.kind == Token_OpenParen) {
-			// HACK NOTE(bill): For type_of_val(expr) et al.
-			// e = parse_call_expr(f, e);
-		// }
-		return e;
-	} break;
-
-	case Token_Pointer: {
-		Token token = expect_token(f, Token_Pointer);
-		AstNode *elem = parse_type(f);
-		return ast_pointer_type(f, token, elem);
-	} break;
-
-	case Token_atomic: {
-		Token token = expect_token(f, Token_atomic);
-		AstNode *elem = parse_type(f);
-		return ast_atomic_type(f, token, elem);
-	} break;
-
-	case Token_Hash: {
-		Token hash_token = expect_token(f, Token_Hash);
-		Token type_token = expect_token(f, Token_type);
-		AstNode *type = parse_type(f);
-		return ast_helper_type(f, hash_token, type);
-	}
-
-	case Token_OpenBracket: {
-		Token token = expect_token(f, Token_OpenBracket);
-		AstNode *count_expr = nullptr;
-		bool is_vector = false;
-
-		if (f->curr_token.kind == Token_Ellipsis) {
-			count_expr = ast_unary_expr(f, expect_token(f, Token_Ellipsis), nullptr);
-		} else if (allow_token(f, Token_vector)) {
-			if (f->curr_token.kind != Token_CloseBracket) {
-				f->expr_level++;
-				count_expr = parse_expr(f, false);
-				f->expr_level--;
-			} else {
-				syntax_error(f->curr_token, "Vector type missing count");
-			}
-			is_vector = true;
-		} else if (allow_token(f, Token_dynamic)) {
-			expect_token(f, Token_CloseBracket);
-			return ast_dynamic_array_type(f, token, parse_type(f));
-		} else if (f->curr_token.kind != Token_CloseBracket) {
-			f->expr_level++;
-			count_expr = parse_expr(f, false);
-			f->expr_level--;
-		}
-		expect_token(f, Token_CloseBracket);
-		if (is_vector) {
-			return ast_vector_type(f, token, count_expr, parse_type(f));
-		}
-		return ast_array_type(f, token, count_expr, parse_type(f));
-	} break;
-
-	case Token_map: {
-		Token token = expect_token(f, Token_map);
-		AstNode *count = nullptr;
-		AstNode *key   = nullptr;
-		AstNode *value = nullptr;
-
-		Token open  = expect_token_after(f, Token_OpenBracket, "map");
-		key = parse_expr(f, true);
-		if (allow_token(f, Token_Comma)) {
-			count = key;
-			key = parse_type(f);
-		}
-		Token close = expect_token(f, Token_CloseBracket);
-		value = parse_type(f);
-
-		return ast_map_type(f, token, count, key, value);
-	} break;
-
-	case Token_struct: {
-		Token token = expect_token(f, Token_struct);
-		bool is_packed = false;
-		bool is_ordered = false;
-		AstNode *align = nullptr;
-
-		isize prev_level = f->expr_level;
-		f->expr_level = -1;
-
-		while (allow_token(f, Token_Hash)) {
-			Token tag = expect_token_after(f, Token_Ident, "#");
-			if (tag.string == "packed") {
-				if (is_packed) {
-					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
-				}
-				is_packed = true;
-			} else if (tag.string == "ordered") {
-				if (is_ordered) {
-					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
-				}
-				is_ordered = true;
-			} else if (tag.string == "align") {
-				if (align) {
-					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
-				}
-				align = parse_expr(f, true);
-			} else {
-				syntax_error(tag, "Invalid struct tag '#%.*s'", LIT(tag.string));
-			}
-		}
-
-		f->expr_level = prev_level;
-
-		if (is_packed && is_ordered) {
-			syntax_error(token, "'#ordered' is not needed with '#packed' which implies ordering");
-		}
-
-		Token open = expect_token_after(f, Token_OpenBrace, "struct");
-
-		isize    name_count = 0;
-		AstNode *fields = parse_struct_field_list(f, &name_count);
-		Token    close  = expect_token(f, Token_CloseBrace);
-
-		Array<AstNode *> decls = {};
-		if (fields != nullptr) {
-			GB_ASSERT(fields->kind == AstNode_FieldList);
-			decls = fields->FieldList.list;
-		}
-
-		return ast_struct_type(f, token, decls, name_count, is_packed, is_ordered, align);
-	} break;
-
-	case Token_union: {
-		Token token = expect_token(f, Token_union);
-		Token open = expect_token_after(f, Token_OpenBrace, "union");
-		Array<AstNode *> variants = make_ast_node_array(f);
-		isize total_decl_name_count = 0;
-
-		CommentGroup docs = f->lead_comment;
-		Token start_token = f->curr_token;
-
-
-		while (f->curr_token.kind != Token_CloseBrace &&
-		       f->curr_token.kind != Token_EOF) {
-			AstNode *type = parse_type(f);
-			if (type->kind != AstNode_BadExpr) {
-				array_add(&variants, type);
-			}
-			if (!allow_token(f, Token_Comma)) {
-				break;
-			}
-		}
-
-		Token close = expect_token(f, Token_CloseBrace);
-
-		return ast_union_type(f, token, variants);
-	} break;
-
-	case Token_raw_union: {
-		Token token = expect_token(f, Token_raw_union);
-		Token open = expect_token_after(f, Token_OpenBrace, "raw_union");
-
-		isize    decl_count = 0;
-		AstNode *fields     = parse_struct_field_list(f, &decl_count);
-		Token    close      = expect_token(f, Token_CloseBrace);
-
-		Array<AstNode *> decls = {};
-		if (fields != nullptr) {
-			GB_ASSERT(fields->kind == AstNode_FieldList);
-			decls = fields->FieldList.list;
-		}
-
-		return ast_raw_union_type(f, token, decls, decl_count);
-	} break;
-
-	case Token_enum: {
-		Token token = expect_token(f, Token_enum);
-		AstNode *base_type = nullptr;
-		if (f->curr_token.kind != Token_OpenBrace) {
-			base_type = parse_type(f);
-		}
-		Token open = expect_token(f, Token_OpenBrace);
-
-		Array<AstNode *> values = parse_element_list(f);
-		Token close = expect_token(f, Token_CloseBrace);
-
-		return ast_enum_type(f, token, base_type, values);
-	} break;
-
-	case Token_bit_field: {
-		Token token = expect_token(f, Token_bit_field);
-		Array<AstNode *> fields = make_ast_node_array(f);
-		AstNode *align = nullptr;
-		Token open, close;
-
-		isize prev_level = f->expr_level;
-		f->expr_level = -1;
-
-		while (allow_token(f, Token_Hash)) {
-			Token tag = expect_token_after(f, Token_Ident, "#");
-			if (tag.string == "align") {
-				if (align) {
-					syntax_error(tag, "Duplicate bit_field tag '#%.*s'", LIT(tag.string));
-				}
-				align = parse_expr(f, true);
-			} else {
-				syntax_error(tag, "Invalid bit_field tag '#%.*s'", LIT(tag.string));
-			}
-		}
-
-		f->expr_level = prev_level;
-
-		open = expect_token_after(f, Token_OpenBrace, "bit_field");
-
-		while (f->curr_token.kind != Token_EOF &&
-		       f->curr_token.kind != Token_CloseBrace) {
-			AstNode *name = parse_ident(f);
-			Token colon = expect_token(f, Token_Colon);
-			AstNode *value = parse_expr(f, true);
-
-			AstNode *field = ast_field_value(f, name, value, colon);
-			array_add(&fields, field);
-
-			if (f->curr_token.kind != Token_Comma) {
-				break;
-			}
-			advance_token(f);
-		}
-
-		close = expect_token(f, Token_CloseBrace);
-
-		return ast_bit_field_type(f, token, fields, align);
-	} break;
-
-	case Token_proc: {
-		Token token = advance_token(f);
-		AstNode *pt = parse_proc_type(f, token, nullptr);
-		if (pt->ProcType.tags != 0) {
-			syntax_error(token, "A procedure type cannot have tags");
-		}
-		return pt;
-	} break;
-
-	case Token_OpenParen: {
-		Token    open  = expect_token(f, Token_OpenParen);
-		AstNode *type  = parse_type(f);
-		Token    close = expect_token(f, Token_CloseParen);
-		return ast_paren_expr(f, type, open, close);
-	} break;
-	}
-
-	return nullptr;
-#endif
 }
 
 

@@ -30,11 +30,11 @@ Bool :: i32;
 FALSE: Bool : 0;
 TRUE:  Bool : 1;
 
-Point :: struct #ordered {
+Point :: struct {
 	x, y: i32,
 }
 
-Wnd_Class_Ex_A :: struct #ordered {
+Wnd_Class_Ex_A :: struct {
 	size, style:           u32,
 	wnd_proc:              Wnd_Proc,
 	cls_extra, wnd_extra:  i32,
@@ -46,7 +46,7 @@ Wnd_Class_Ex_A :: struct #ordered {
 	sm:                    Hicon,
 }
 
-Wnd_Class_Ex_W :: struct #ordered {
+Wnd_Class_Ex_W :: struct {
 	size, style:           u32,
 	wnd_proc:              Wnd_Proc,
 	cls_extra, wnd_extra:  i32,
@@ -59,7 +59,7 @@ Wnd_Class_Ex_W :: struct #ordered {
 }
 
 
-Msg :: struct #ordered {
+Msg :: struct {
 	hwnd:    Hwnd,
 	message: u32,
 	wparam:  Wparam,
@@ -68,24 +68,24 @@ Msg :: struct #ordered {
 	pt:      Point,
 }
 
-Rect :: struct #ordered {
+Rect :: struct {
 	left:   i32,
 	top:    i32,
 	right:  i32,
 	bottom: i32,
 }
 
-Filetime :: struct #ordered {
+Filetime :: struct {
 	lo, hi: u32,
 }
 
-Systemtime :: struct #ordered {
+Systemtime :: struct {
 	year, month: u16,
 	day_of_week, day: u16,
 	hour, minute, second, millisecond: u16,
 }
 
-By_Handle_File_Information :: struct #ordered {
+By_Handle_File_Information :: struct {
 	file_attributes:      u32,
 	creation_time,
 	last_access_time,
@@ -98,7 +98,7 @@ By_Handle_File_Information :: struct #ordered {
 	file_index_low:       u32,
 }
 
-File_Attribute_Data :: struct #ordered {
+File_Attribute_Data :: struct {
 	file_attributes:  u32,
 	creation_time,
 	last_access_time,
@@ -107,7 +107,7 @@ File_Attribute_Data :: struct #ordered {
 	file_size_low:    u32,
 }
 
-Find_Data :: struct #ordered{
+Find_Data :: struct{
     file_attributes:     u32,
     creation_time:       Filetime,
     last_access_time:    Filetime,
@@ -120,7 +120,7 @@ Find_Data :: struct #ordered{
     alternate_file_name: [14]byte,
 }
 
-Security_Attributes :: struct #ordered {
+Security_Attributes :: struct {
 	length:              u32,
 	security_descriptor: rawptr,
 	inherit_handle:      Bool,
@@ -128,7 +128,7 @@ Security_Attributes :: struct #ordered {
 
 
 
-Pixel_Format_Descriptor :: struct #ordered {
+Pixel_Format_Descriptor :: struct {
 	size,
 	version,
 	flags: u32,
@@ -159,7 +159,7 @@ Pixel_Format_Descriptor :: struct #ordered {
 	damage_mask: u32,
 }
 
-Critical_Section :: struct #ordered {
+Critical_Section :: struct {
 	debug_info:      ^Critical_Section_Debug,
 
 	lock_count:      i32,
@@ -169,7 +169,7 @@ Critical_Section :: struct #ordered {
 	spin_count:      ^u32,
 }
 
-Critical_Section_Debug :: struct #ordered {
+Critical_Section_Debug :: struct {
 	typ:                           u16,
 	creator_back_trace_index:      u16,
 	critical_section:              ^Critical_Section,
@@ -181,30 +181,30 @@ Critical_Section_Debug :: struct #ordered {
 	spare_word:                    u16,
 }
 
-List_Entry :: struct #ordered {flink, blink: ^List_Entry};
+List_Entry :: struct {flink, blink: ^List_Entry};
 
 
-Raw_Input_Device :: struct #ordered {
+Raw_Input_Device :: struct {
 	usage_page: u16,
 	usage:      u16,
 	flags:      u32,
 	wnd_target: Hwnd,
 }
 
-Raw_Input_Header :: struct #ordered {
+Raw_Input_Header :: struct {
 	kind:   u32,
 	size:   u32,
 	device: Handle,
 	wparam: Wparam,
 }
 
-Raw_HID :: struct #ordered {
+Raw_HID :: struct {
 	size_hid: u32,
 	count:    u32,
 	raw_data: [1]byte,
 }
 
-Raw_Keyboard :: struct #ordered {
+Raw_Keyboard :: struct {
 	make_code:         u16,
 	flags:             u16,
 	reserved:          u16,
@@ -213,11 +213,11 @@ Raw_Keyboard :: struct #ordered {
 	extra_information: u32,
 }
 
-Raw_Mouse :: struct #ordered {
+Raw_Mouse :: struct {
 	flags: u16,
 	using data: struct #raw_union {
 		buttons: u32,
-		using _: struct #ordered {
+		using _: struct {
 			button_flags: u16,
 			button_data:  u16,
 		},
@@ -228,7 +228,7 @@ Raw_Mouse :: struct #ordered {
 	extra_information: u32,
 }
 
-Raw_Input :: struct #ordered {
+Raw_Input :: struct {
 	using header: Raw_Input_Header,
 	data: struct #raw_union {
 		mouse:    Raw_Mouse,
@@ -724,14 +724,14 @@ FILE_TYPE_CHAR :: 0x0002;
 FILE_TYPE_PIPE :: 0x0003;
 
 
-Monitor_Info :: struct #ordered {
+Monitor_Info :: struct {
 	size:      u32,
 	monitor:   Rect,
 	work:      Rect,
 	flags:     u32,
 }
 
-Window_Placement :: struct #ordered {
+Window_Placement :: struct {
 	length:     u32,
 	flags:      u32,
 	show_cmd:   u32,
@@ -740,7 +740,7 @@ Window_Placement :: struct #ordered {
 	normal_pos: Rect,
 }
 
-Bitmap_Info_Header :: struct #ordered {
+Bitmap_Info_Header :: struct {
 	size:              u32,
 	width, height:     i32,
 	planes, bit_count: i16,
@@ -751,13 +751,13 @@ Bitmap_Info_Header :: struct #ordered {
 	clr_used:          u32,
 	clr_important:     u32,
 }
-Bitmap_Info :: struct #ordered {
+Bitmap_Info :: struct {
 	using header: Bitmap_Info_Header,
 	colors:       [1]Rgb_Quad,
 }
 
 
-Rgb_Quad :: struct #ordered {blue, green, red, reserved: byte}
+Rgb_Quad :: struct {blue, green, red, reserved: byte}
 
 
 Key_Code :: enum i32 {

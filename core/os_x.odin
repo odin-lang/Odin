@@ -46,12 +46,12 @@ RTLD_FIRST    :: 0x100;
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments();
 
-_File_Time :: struct #ordered {
+_File_Time :: struct {
 	seconds: i64,
 	nanoseconds: i64,
 }
 
-Stat :: struct #ordered {
+Stat :: struct {
 	device_id:     i32, // ID of device containing file
 	mode:          u16, // Mode of the file
 	nlink:         u16, // Number of hard links
