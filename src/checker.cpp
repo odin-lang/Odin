@@ -2688,8 +2688,7 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 
 				bool implicit_is_found = ptr_set_exists(&scope->implicit, e);
 				if (is_entity_exported(e) && !implicit_is_found) {
-					Entity *prev = scope_lookup_entity(parent_scope, e->token.string);
-					// if (prev) gb_printf_err("%.*s\n", LIT(prev->token.string));
+					add_entity_use(c, node, e);
 					bool ok = add_entity(c, parent_scope, e->identifier, e);
 					if (ok) ptr_set_add(&parent_scope->implicit, e);
 				} else {

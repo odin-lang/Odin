@@ -697,6 +697,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 
 	// NOTE(bill): Must be up here for the 'check_init_constant' system
 	enum_type->Enum.base_type = base_type;
+	enum_type->Enum.scope = c->context.scope;
 
 	Map<Entity *> entity_map = {}; // Key: String
 	map_init(&entity_map, c->tmp_allocator, 2*(et->fields.count));

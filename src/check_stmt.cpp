@@ -522,27 +522,25 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 
 	case Entity_Variable: {
 		Type *t = base_type(type_deref(e->type));
-		if (is_type_struct(t) || is_type_raw_union(t) || is_type_union(t)) {
+		if (t->kind == Type_Struct) {
 			// TODO(bill): Make it work for unions too
 			Scope *found = scope_of_node(&c->info, t->Struct.node);
 			for_array(i, found->elements.entries) {
 				Entity *f = found->elements.entries[i].value;
 				if (f->kind == Entity_Variable) {
 					Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
-					// if (is_selector) {
-						uvar->using_expr = expr;
-					// }
+					uvar->using_expr = expr;
 					Entity *prev = scope_insert_entity(c->context.scope, uvar);
 					if (prev != nullptr) {
 						gbString expr_str = expr_to_string(expr);
-						error(us->token, "Namespace collision while 'using' '%s' of: %.*s", expr_str, LIT(prev->token.string));
+						error(us->token, "Namespace collision while using '%s' of: '%.*s'", expr_str, LIT(prev->token.string));
 						gb_string_free(expr_str);
 						return false;
 					}
 				}
 			}
 		} else {
-			error(us->token, "'using' can only be applied to variables of type `struct`");
+			error(us->token, "'using' can only be applied to variables of type 'struct'");
 			return false;
 		}
 
@@ -554,6 +552,7 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 		break;
 
 	case Entity_Procedure:
+	case Entity_ProcGroup:
 	case Entity_Builtin:
 		error(us->token, "'using' cannot be applied to a procedure");
 		break;
@@ -1643,6 +1642,151 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			if (!check_using_stmt_entity(c, us, expr, is_selector, e)) {
 				return;
 			}
+		}
+	case_end;
+
+	case_ast_node(uis, UsingInStmt, node);
+		if (uis->list.count == 0) {
+			error(node, "Empty 'using' list");
+			return;
+		}
+		AstNode *expr = uis->expr;
+		Entity *e = nullptr;
+		Operand o = {};
+		if (expr->kind == AstNode_Ident) {
+			e = check_ident(c, &o, expr, nullptr, nullptr, true);
+		} else if (expr->kind == AstNode_SelectorExpr) {
+			e = check_selector(c, &o, expr, nullptr);
+		}
+		if (e == nullptr) {
+			error(expr, "'using' applied to an unknown entity");
+			return;
+		}
+		add_entity_use(c, expr, e);
+
+
+		switch (e->kind) {
+		case Entity_TypeName: {
+			Type *t = base_type(e->type);
+			if (t->kind == Type_Enum) {
+				GB_ASSERT(t->Enum.scope != nullptr);
+				for_array(list_index, uis->list) {
+					AstNode *node = uis->list[list_index];
+					ast_node(ident, Ident, node);
+					String name = ident->token.string;
+					Entity *f = scope_lookup_entity(t->Enum.scope, name);
+
+					if (f == nullptr || !is_entity_exported(f)) {
+						if (is_blank_ident(name)) {
+							error(node, "'_' cannot be used as a value");
+						} else {
+							error(node, "Undeclared name in this enumeration: '%.*s'", LIT(name));
+						}
+						continue;
+					}
+
+					add_entity_use(c, node, f);
+					add_entity(c, c->context.scope, node, f);
+				}
+			} else {
+				error(node, "'using' can be only applied to enum type entities");
+			}
+
+			break;
+		}
+
+		case Entity_ImportName: {
+			Scope *scope = e->ImportName.scope;
+			for_array(list_index, uis->list) {
+				AstNode *node = uis->list[list_index];
+				ast_node(ident, Ident, node);
+				String name = ident->token.string;
+
+				Entity *f = scope_lookup_entity(scope, name);
+				if (f == nullptr) {
+					if (is_blank_ident(name)) {
+						error(node, "'_' cannot be used as a value");
+					} else {
+						error(node, "Undeclared name in this import name: '%.*s'", LIT(name));
+					}
+					continue;
+				}
+
+				bool implicit_is_found = ptr_set_exists(&scope->implicit, f);
+				if (is_entity_exported(f) && !implicit_is_found) {
+					add_entity_use(c, node, f);
+					add_entity(c, c->context.scope, node, f);
+				} else {
+					error(node, "'%.*s' is exported from '%.*s'", LIT(f->token.string), LIT(e->token.string));
+					continue;
+				}
+			}
+
+			break;
+		}
+
+		case Entity_Variable: {
+			Type *t = base_type(type_deref(e->type));
+			if (t->kind == Type_Struct) {
+				// TODO(bill): Make it work for unions too
+				Scope *found = scope_of_node(&c->info, t->Struct.node);
+				for_array(list_index, uis->list) {
+					AstNode *node = uis->list[list_index];
+					ast_node(ident, Ident, node);
+					String name = ident->token.string;
+
+					Entity *f = scope_lookup_entity(found, name);
+					if (f == nullptr || f->kind != Entity_Variable) {
+						if (is_blank_ident(name)) {
+							error(node, "'_' cannot be used as a value");
+						} else {
+							error(node, "Undeclared name in this variable: '%.*s'", LIT(name));
+						}
+						continue;
+					}
+
+					Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
+					uvar->using_expr = expr;
+					Entity *prev = scope_insert_entity(c->context.scope, uvar);
+					if (prev != nullptr) {
+						gbString expr_str = expr_to_string(expr);
+						error(node, "Namespace collision while using '%s' of: '%.*s'", expr_str, LIT(prev->token.string));
+						gb_string_free(expr_str);
+						continue;
+					}
+				}
+			} else {
+				error(node, "'using' can only be applied to variables of type `struct`");
+				return;
+			}
+
+			break;
+		}
+
+		case Entity_Constant:
+			error(node, "'using' cannot be applied to a constant");
+			break;
+
+		case Entity_Procedure:
+		case Entity_ProcGroup:
+		case Entity_Builtin:
+			error(node, "'using' cannot be applied to a procedure");
+			break;
+
+		case Entity_Nil:
+			error(node, "'using' cannot be applied to 'nil'");
+			break;
+
+		case Entity_Label:
+			error(node, "'using' cannot be applied to a label");
+			break;
+
+		case Entity_Invalid:
+			error(node, "'using' cannot be applied to an invalid entity");
+			break;
+
+		default:
+			GB_PANIC("TODO(bill): 'using' other expressions?");
 		}
 	case_end;
 

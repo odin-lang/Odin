@@ -307,6 +307,12 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 		Token token;   \
 		Array<AstNode *> list; \
 	}) \
+	AST_NODE_KIND(UsingInStmt, "using in statement",  struct { \
+		Token using_token;     \
+		Array<AstNode *> list; \
+		Token in_token;        \
+		AstNode *expr;         \
+	}) \
 	AST_NODE_KIND(AsmOperand, "assembly operand", struct { \
 		Token string;     \
 		AstNode *operand; \
@@ -598,6 +604,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_DeferStmt:     return node->DeferStmt.token;
 	case AstNode_BranchStmt:    return node->BranchStmt.token;
 	case AstNode_UsingStmt:     return node->UsingStmt.token;
+	case AstNode_UsingInStmt:   return node->UsingInStmt.using_token;
 	case AstNode_AsmStmt:       return node->AsmStmt.token;
 	case AstNode_PushContext:   return node->PushContext.token;
 
@@ -826,6 +833,10 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		break;
 	case AstNode_UsingStmt:
 		n->UsingStmt.list = clone_ast_node_array(a, n->UsingStmt.list);
+		break;
+	case AstNode_UsingInStmt:
+		n->UsingInStmt.list = clone_ast_node_array(a, n->UsingInStmt.list);
+		n->UsingInStmt.expr = clone_ast_node(a, n->UsingInStmt.expr);
 		break;
 	case AstNode_AsmOperand:
 		n->AsmOperand.operand = clone_ast_node(a, n->AsmOperand.operand);
@@ -1339,6 +1350,14 @@ AstNode *ast_using_stmt(AstFile *f, Token token, Array<AstNode *> list) {
 	AstNode *result = make_ast_node(f, AstNode_UsingStmt);
 	result->UsingStmt.token = token;
 	result->UsingStmt.list  = list;
+	return result;
+}
+AstNode *ast_using_in_stmt(AstFile *f, Token using_token, Array<AstNode *> list, Token in_token, AstNode *expr) {
+	AstNode *result = make_ast_node(f, AstNode_UsingInStmt);
+	result->UsingInStmt.using_token = using_token;
+	result->UsingInStmt.list        = list;
+	result->UsingInStmt.in_token    = in_token;
+	result->UsingInStmt.expr        = expr;
 	return result;
 }
 
@@ -4535,8 +4554,10 @@ AstNode *parse_stmt(AstFile *f) {
 				}
 				return export_decl;
 			}
-			syntax_error(token, "Illegal use of 'using' statement");
-			return ast_bad_stmt(f, token, f->curr_token);
+
+			AstNode *expr = parse_expr(f, true);
+			expect_semicolon(f, expr);
+			return ast_using_in_stmt(f, token, list, in_token, expr);
 		}
 
 		if (f->curr_token.kind != Token_Colon) {
