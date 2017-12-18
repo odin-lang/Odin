@@ -921,6 +921,20 @@ __dynamic_map_check_init :: proc(h: __Map_Header) {
 	}
 }
 
+__dynamic_map_len :: inline proc "contextless" (p: rawptr) -> int {
+	if m := transmute(raw.Map)p; m.internal != nil {
+		return m.internal.entries.len;
+	}
+	return 0;
+}
+
+__dynamic_map_cap :: inline proc "contextless" (p: rawptr) -> int {
+	if m := transmute(raw.Map)p; m.internal != nil {
+		return m.internal.entries.cap;
+	}
+	return 0;
+}
+
 __dynamic_map_reserve :: proc(using header: __Map_Header, cap: int, loc := #caller_location)  {
 	__dynamic_map_check_init(header);
 	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap, loc);
@@ -1093,8 +1107,4 @@ __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
 	} else {
 		m.hashes[last.hash_index] = fr.entry_index;
 	}
-}
-
-__map_for_test :: proc "c" (s: string) {
-	fmt.printf("__map_for_test '%s'\n", s);
 }
