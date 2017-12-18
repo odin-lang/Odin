@@ -2074,6 +2074,22 @@ irValue *ir_build_addr_ptr(irProcedure *proc, AstNode *expr) {
 
 
 
+irValue *ir_map_count(irProcedure *proc, irValue *value) {
+	GB_ASSERT(is_type_map(ir_type(value)));
+	irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 1);
+	args[0] = ir_emit_transmute(proc, value, t_rawptr);
+	return ir_emit_global_call(proc, "__dynamic_map_len", args, 1);
+}
+
+irValue *ir_map_capacity(irProcedure *proc, irValue *value) {
+	GB_ASSERT(is_type_map(ir_type(value)));
+	irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 1);
+	args[0] = ir_emit_transmute(proc, value, t_rawptr);
+	return ir_emit_global_call(proc, "__dynamic_map_cap", args, 1);
+}
+
+
+
 irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index);
 irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index);
 
@@ -2350,15 +2366,8 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 			return ir_emit_arith(proc, Token_And, a, b, t_bool);
 		}
 	} else if (is_type_map(t)) {
-		irValue *hashes = ir_emit_struct_ev(proc, x, 0);
-		irValue *entries = ir_emit_struct_ev(proc, x, 1);
-		irValue *a = ir_emit_comp_against_nil(proc, op_kind, hashes);
-		irValue *b = ir_emit_comp_against_nil(proc, op_kind, entries);
-		if (op_kind == Token_CmpEq) {
-			return ir_emit_arith(proc, Token_Or, a, b, t_bool);
-		} else if (op_kind == Token_NotEq) {
-			return ir_emit_arith(proc, Token_And, a, b, t_bool);
-		}
+		irValue *len = ir_map_count(proc, x);
+		return ir_emit_comp(proc, op_kind, len, v_zero);
 	} else if (is_type_union(t)) {
 		irValue *tag = ir_emit_union_tag_value(proc, x);
 		return ir_emit_comp(proc, op_kind, tag, v_zero);
@@ -2813,8 +2822,6 @@ irValue *ir_emit_string(irProcedure *proc, irValue *elem, irValue *len) {
 	ir_fill_string(proc, str, elem, len);
 	return ir_emit_load(proc, str);
 }
-
-
 
 
 irValue *ir_add_local_slice(irProcedure *proc, Type *slice_type, irValue *base, irValue *low, irValue *high) {
@@ -4052,9 +4059,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		} else if (is_type_dynamic_array(t)) {
 			return ir_dynamic_array_count(proc, v);
 		} else if (is_type_map(t)) {
-			ir_emit_comment(proc, str_lit("len: map"));
-			irValue *entries = ir_emit_struct_ev(proc, v, 1);
-			return ir_dynamic_array_count(proc, entries);
+			return ir_map_count(proc, v);
 		}
 
 		GB_PANIC("Unreachable");
@@ -4078,8 +4083,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		} else if (is_type_dynamic_array(t)) {
 			return ir_dynamic_array_capacity(proc, v);
 		} else if (is_type_map(t)) {
-			irValue *entries = ir_emit_struct_ev(proc, v, 1);
-			return ir_dynamic_array_capacity(proc, entries);
+			return ir_map_capacity(proc, v);
 		}
 
 		GB_PANIC("Unreachable");
