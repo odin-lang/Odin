@@ -487,12 +487,9 @@ free_slice :: proc(array: $T/[]$E, loc := #caller_location) {
 }
 free_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
 	raw := transmute(raw.Map)m;
-	if raw.internal != nil {
-		free_dynamic_array(raw.hashes, loc);
-		free_ptr(raw.entries.data, loc);
-		free_ptr(raw.internal, loc);
-		raw.internal = nil;
-	}
+	free_dynamic_array(raw.hashes, loc);
+	free_ptr(raw.entries.data, loc);
+	free_ptr(raw.internal, loc);
 }
 
 free :: proc[
