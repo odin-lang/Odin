@@ -20,14 +20,11 @@ Dynamic_Array :: struct {
 	allocator: Allocator,
 }
 
-Map_Internal :: struct {
+Map :: struct {
 	hashes:  [dynamic]int,
 	entries: Dynamic_Array,
 }
 
-Map :: struct {
-	using internal: ^Map_Internal,
-}
 
 make_any :: inline proc(data: rawptr, type_info: ^Type_Info) -> any {
 	return transmute(any)Any{data, type_info};
@@ -44,3 +41,5 @@ dynamic_array_data :: inline proc(a: $T/[dynamic]$E) -> ^E {
 }
 
 data :: proc[string_data, slice_data, dynamic_array_data];
+
+

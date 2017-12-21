@@ -1200,6 +1200,18 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			}
 		}
 
+		if (p->flags&FieldFlag_in) {
+			if (is_type_param) {
+				error(param, "'in' cannot be applied to a type parameter");
+				p->flags &= ~FieldFlag_in;
+			} else if (is_variadic) {
+				error(param, "'in' cannot be applied to a variadic parameter");
+				p->flags &= ~FieldFlag_in;
+			}
+		}
+
+		bool is_in = (p->flags&FieldFlag_in) != 0;
+
 		for_array(j, p->names) {
 			AstNode *name = p->names[j];
 			if (!ast_node_expect(name, AstNode_Ident)) {
@@ -1263,7 +1275,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					}
 				}
 
-				param = make_entity_param(c->allocator, scope, name->Ident.token, type, is_using, false);
+				param = make_entity_param(c->allocator, scope, name->Ident.token, type, is_using, is_in);
 				param->Variable.default_value = value;
 				param->Variable.default_is_nil = default_is_nil;
 				param->Variable.default_is_location = default_is_location;
@@ -1812,7 +1824,9 @@ void generate_map_entry_type(gbAllocator a, Type *type) {
 void generate_map_internal_types(gbAllocator a, Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
 	generate_map_entry_type(a, type);
+	if (type->Map.internal_type != nullptr) return;
 	if (type->Map.generated_struct_type != nullptr) return;
+
 	Type *key   = type->Map.key;
 	Type *value = type->Map.value;
 	GB_ASSERT(key != nullptr);
@@ -1844,7 +1858,7 @@ void generate_map_internal_types(gbAllocator a, Type *type) {
 
 	type_set_offsets(a, generated_struct_type);
 	type->Map.generated_struct_type = generated_struct_type;
-	type->Map.internal_type         = make_type_pointer(a, generated_struct_type);
+	type->Map.internal_type         = generated_struct_type;
 	type->Map.lookup_result_type    = make_optional_ok_type(a, value);
 }
 

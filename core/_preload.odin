@@ -36,8 +36,7 @@ Calling_Convention :: enum {
 Type_Info_Enum_Value :: union {
 	rune,
 	i8, i16, i32, i64, i128, int,
-	u8, u16, u32, u64, u128, uint,
-	uintptr,
+	u8, u16, u32, u64, u128, uint, uintptr,
 	f32, f64,
 };
 
@@ -915,36 +914,13 @@ __default_hash :: proc(data: []byte) -> u128 {
 }
 __default_hash_string :: proc(s: string) -> u128 do return __default_hash(cast([]byte)s);
 
-__dynamic_map_check_init :: proc(h: __Map_Header) {
-	if h.m.internal == nil {
-		h.m.internal = new(raw.Map_Internal);
-	}
-}
-
-__dynamic_map_len :: inline proc "contextless" (p: rawptr) -> int {
-	if m := transmute(raw.Map)p; m.internal != nil {
-		return m.internal.entries.len;
-	}
-	return 0;
-}
-
-__dynamic_map_cap :: inline proc "contextless" (p: rawptr) -> int {
-	if m := transmute(raw.Map)p; m.internal != nil {
-		return m.internal.entries.cap;
-	}
-	return 0;
-}
-
 __dynamic_map_reserve :: proc(using header: __Map_Header, cap: int, loc := #caller_location)  {
-	__dynamic_map_check_init(header);
 	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap, loc);
 	__dynamic_array_reserve(&m.entries, entry_size, entry_align,    cap, loc);
 }
 __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int, loc := #caller_location) {
-	__dynamic_map_check_init(header);
 	new_header: __Map_Header = header;
 	nm: raw.Map;
-	nm.internal = new(raw.Map_Internal);
 	new_header.m = &nm;
 
 	header_hashes := cast(^raw.Dynamic_Array)&header.m.hashes;
@@ -982,7 +958,6 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int, loc := 
 }
 
 __dynamic_map_get :: proc(h: __Map_Header, key: __Map_Key) -> rawptr {
-	__dynamic_map_check_init(h);
 	index := __dynamic_map_find(h, key).entry_index;
 	if index >= 0 {
 		data := cast(^byte)__dynamic_map_get_entry(h, index);
@@ -992,7 +967,6 @@ __dynamic_map_get :: proc(h: __Map_Header, key: __Map_Key) -> rawptr {
 }
 
 __dynamic_map_set :: proc(h: __Map_Header, key: __Map_Key, value: rawptr, loc := #caller_location) {
-	__dynamic_map_check_init(h);
 
 	index: int;
 	assert(value != nil);
@@ -1028,13 +1002,11 @@ __dynamic_map_set :: proc(h: __Map_Header, key: __Map_Key, value: rawptr, loc :=
 
 
 __dynamic_map_grow :: proc(using h: __Map_Header, loc := #caller_location) {
-	__dynamic_map_check_init(h);
 	new_count := max(2*m.entries.cap + 8, __INITIAL_MAP_CAP);
 	__dynamic_map_rehash(h, new_count, loc);
 }
 
 __dynamic_map_full :: inline proc(using h: __Map_Header) -> bool {
-	__dynamic_map_check_init(h);
 	return int(0.75 * f64(len(m.hashes))) <= m.entries.cap;
 }
 
@@ -1048,7 +1020,6 @@ __dynamic_map_hash_equal :: proc(h: __Map_Header, a, b: __Map_Key) -> bool {
 }
 
 __dynamic_map_find :: proc(using h: __Map_Header, key: __Map_Key) -> __Map_Find_Result {
-	__dynamic_map_check_init(h);
 	fr := __Map_Find_Result{-1, -1, -1};
 	if len(m.hashes) > 0 {
 		fr.hash_index = int(key.hash % u128(len(m.hashes)));
@@ -1064,7 +1035,6 @@ __dynamic_map_find :: proc(using h: __Map_Header, key: __Map_Key) -> __Map_Find_
 }
 
 __dynamic_map_add_entry :: proc(using h: __Map_Header, key: __Map_Key, loc := #caller_location) -> int {
-	__dynamic_map_check_init(h);
 	prev := m.entries.len;
 	c := __dynamic_array_append_nothing(&m.entries, entry_size, entry_align, loc);
 	if c != prev {
@@ -1076,7 +1046,6 @@ __dynamic_map_add_entry :: proc(using h: __Map_Header, key: __Map_Key, loc := #c
 }
 
 __dynamic_map_delete :: proc(using h: __Map_Header, key: __Map_Key) {
-	__dynamic_map_check_init(h);
 	fr := __dynamic_map_find(h, key);
 	if fr.entry_index >= 0 {
 		__dynamic_map_erase(h, fr);
@@ -1084,13 +1053,11 @@ __dynamic_map_delete :: proc(using h: __Map_Header, key: __Map_Key) {
 }
 
 __dynamic_map_get_entry :: proc(using h: __Map_Header, index: int) -> ^__Map_Entry_Header {
-	__dynamic_map_check_init(h);
 	assert(0 <= index && index < m.entries.len);
 	return cast(^__Map_Entry_Header)(cast(^byte)m.entries.data + index*entry_size);
 }
 
 __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
-	__dynamic_map_check_init(h);
 	if fr.entry_prev < 0 {
 		m.hashes[fr.hash_index] = __dynamic_map_get_entry(h, fr.entry_index).next;
 	} else {
