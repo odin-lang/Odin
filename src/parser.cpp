@@ -127,7 +127,9 @@ enum FieldFlag {
 	FieldFlag_using     = 1<<1,
 	FieldFlag_no_alias  = 1<<2,
 	FieldFlag_c_vararg  = 1<<3,
+	FieldFlag_in        = 1<<4,
 
+	// FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_in,
 	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg,
 	FieldFlag_Struct    = FieldFlag_using,
 };
@@ -2778,32 +2780,23 @@ AstNode *parse_atom_expr(AstFile *f, AstNode *operand, bool lhs) {
 
 AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 	switch (f->curr_token.kind) {
+	case Token_transmute:
+	case Token_cast: {
+		Token token = advance_token(f);
+		expect_token(f, Token_OpenParen);
+		AstNode *type = parse_type(f);
+		expect_token(f, Token_CloseParen);
+		return ast_type_cast(f, token, type, parse_unary_expr(f, lhs));
+	}
 	case Token_Add:
 	case Token_Sub:
 	case Token_Not:
 	case Token_Xor:
-	case Token_And: {
-		Token op = advance_token(f);
-		return ast_unary_expr(f, op, parse_unary_expr(f, lhs));
-	} break;
-	case Token_cast: {
-		Token token = expect_token(f, Token_cast);
-		Token open  = expect_token_after(f, Token_OpenParen, "cast");
-		AstNode *type = parse_type(f);
-		Token close = expect_token(f, Token_CloseParen);
-		return ast_type_cast(f, token, type, parse_unary_expr(f, lhs));
-	} break;
-	case Token_transmute: {
-		Token token = expect_token(f, Token_transmute);
-		Token open  = expect_token_after(f, Token_OpenParen, "transmute");
-		AstNode *type = parse_type(f);
-		Token close = expect_token(f, Token_CloseParen);
-		return ast_type_cast(f, token, type, parse_unary_expr(f, lhs));
-	} break;
+	case Token_And:
+		return ast_unary_expr(f, advance_token(f), parse_unary_expr(f, lhs));
 	}
 
-	AstNode *operand = parse_operand(f, lhs);
-	return parse_atom_expr(f, operand, lhs);
+	return parse_atom_expr(f, parse_operand(f, lhs), lhs);
 }
 
 bool is_ast_node_a_range(AstNode *expr) {
@@ -2829,10 +2822,10 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 		return 1;
 	case Token_Ellipsis:
 	case Token_HalfClosed:
-		if (f->allow_range) {
-			return 2;
+		if (!f->allow_range) {
+			return 0;
 		}
-		return 0;
+		return 2;
 	case Token_CmpOr:
 		return 3;
 	case Token_CmpAnd:
@@ -2938,17 +2931,8 @@ Array<AstNode *> parse_ident_list(AstFile *f) {
 	return list;
 }
 
-
-AstNode *parse_type_attempt(AstFile *f) {
-	AstNode *type = parse_type_or_ident(f);
-	if (type != nullptr) {
-		// TODO(bill): Handle?
-	}
-	return type;
-}
-
 AstNode *parse_type(AstFile *f) {
-	AstNode *type = parse_type_attempt(f);
+	AstNode *type = parse_type_or_ident(f);
 	if (type == nullptr) {
 		Token token = advance_token(f);
 		syntax_error(token, "Expected a type");
@@ -3021,7 +3005,7 @@ AstNode *parse_value_decl(AstFile *f, Array<AstNode *> names, CommentGroup docs)
 		type = ast_type_type(f, advance_token(f), nullptr);
 		is_mutable = false;
 	} else {
-		type = parse_type_attempt(f);
+		type = parse_type_or_ident(f);
 	}
 
 	if (f->curr_token.kind == Token_Eq ||
@@ -3293,12 +3277,7 @@ AstNode *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_type_token) 
 		}
 		type = ast_type_type(f, token, specialization);
 	} else {
-		type = parse_type_attempt(f);
-	}
-	if (type == nullptr) {
-		Token tok = f->curr_token;
-		syntax_error(tok, "Expected a type");
-		type = ast_bad_expr(f, tok, f->curr_token);
+		type = parse_type(f);
 	}
 	return type;
 }
@@ -3311,6 +3290,7 @@ enum FieldPrefixKind {
 	FieldPrefix_using,
 	FieldPrefix_no_alias,
 	FieldPrefix_c_var_arg,
+	FieldPrefix_in,
 };
 
 FieldPrefixKind is_token_field_prefix(AstFile *f) {
@@ -3320,6 +3300,9 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 
 	case Token_using:
 		return FieldPrefix_using;
+
+	case Token_in:
+		return FieldPrefix_in;
 
 	case Token_Hash:
 		advance_token(f);
@@ -3342,6 +3325,7 @@ u32 parse_field_prefixes(AstFile *f) {
 	i32 using_count    = 0;
 	i32 no_alias_count = 0;
 	i32 c_vararg_count = 0;
+	i32 in_count       = 0;
 
 	for (;;) {
 		FieldPrefixKind kind = is_token_field_prefix(f);
@@ -3358,17 +3342,20 @@ u32 parse_field_prefixes(AstFile *f) {
 		case FieldPrefix_using:     using_count    += 1; advance_token(f); break;
 		case FieldPrefix_no_alias:  no_alias_count += 1; advance_token(f); break;
 		case FieldPrefix_c_var_arg: c_vararg_count += 1; advance_token(f); break;
+		case FieldPrefix_in:        in_count       += 1; advance_token(f); break;
 		}
 	}
 	if (using_count     > 1) syntax_error(f->curr_token, "Multiple 'using' in this field list");
 	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple '#no_alias' in this field list");
 	if (c_vararg_count  > 1) syntax_error(f->curr_token, "Multiple '#c_vararg' in this field list");
+	if (in_count        > 1) syntax_error(f->curr_token, "Multiple 'in' in this field list");
 
 
 	u32 field_flags = 0;
 	if (using_count     > 0) field_flags |= FieldFlag_using;
 	if (no_alias_count  > 0) field_flags |= FieldFlag_no_alias;
 	if (c_vararg_count  > 0) field_flags |= FieldFlag_c_vararg;
+	if (in_count        > 0) field_flags |= FieldFlag_in;
 	return field_flags;
 }
 
@@ -3632,12 +3619,17 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 AstNode *parse_type_or_ident(AstFile *f) {
 	bool prev_allow_type = f->allow_type;
 	isize prev_expr_level = f->expr_level;
-	defer (f->allow_type = prev_allow_type);
-	defer (f->expr_level = prev_expr_level);
+	defer ({
+		f->allow_type = prev_allow_type;
+		f->expr_level = prev_expr_level;
+	});
+
 	f->allow_type = true;
 	f->expr_level = -1;
-	AstNode *operand = parse_operand(f, true);
-	AstNode *type = parse_atom_expr(f, operand, true);
+
+	bool lhs = true;
+	AstNode *operand = parse_operand(f, lhs);
+	AstNode *type = parse_atom_expr(f, operand, lhs);
 	return type;
 }
 
@@ -3809,29 +3801,6 @@ AstNode *parse_return_stmt(AstFile *f) {
 	expect_semicolon(f, end);
 	return ast_return_stmt(f, token, results);
 }
-
-
-// AstNode *parse_give_stmt(AstFile *f) {
-// 	if (f->curr_proc == nullptr) {
-// 		syntax_error(f->curr_token, "You cannot use a give statement in the file scope");
-// 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
-// 	}
-// 	if (f->expr_level == 0) {
-// 		syntax_error(f->curr_token, "A give statement must be used within an expression");
-// 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
-// 	}
-
-// 	Token token = expect_token(f, Token_give);
-// 	Array<AstNode *> results;
-// 	if (f->curr_token.kind != Token_Semicolon && f->curr_token.kind != Token_CloseBrace) {
-// 		results = parse_rhs_expr_list(f);
-// 	} else {
-// 		results = make_ast_node_array(f);
-// 	}
-// 	AstNode *ge = ast_give_expr(f, token, results);
-// 	expect_semicolon(f, ge);
-// 	return ast_expr_stmt(f, ge);
-// }
 
 AstNode *parse_for_stmt(AstFile *f) {
 	if (f->curr_proc == nullptr) {

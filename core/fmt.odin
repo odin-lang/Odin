@@ -815,8 +815,9 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		write_string(fi.buf, "map[");
 		defer write_byte(fi.buf, ']');
 
-		if (^raw.Map)(v.data).internal != nil {
-			entries    := &(^raw.Map)(v.data).entries;
+		m := (^raw.Map)(v.data);
+		if m != nil {
+			entries    := &m.entries;
 			gs         := type_info_base(info.generated_struct).variant.(Type_Info_Struct);
 			ed         := type_info_base(gs.types[1]).variant.(Type_Info_Dynamic_Array);
 			entry_type := ed.elem.variant.(Type_Info_Struct);

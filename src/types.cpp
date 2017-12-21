@@ -1871,9 +1871,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 	case Type_Map:
 		generate_map_internal_types(allocator, t);
-		// return type_align_of_internal(allocator, t->Map.generated_struct_type, path);
-		return build_context.word_size;
-
+		return type_align_of_internal(allocator, t->Map.internal_type, path);
 	case Type_Enum:
 		return type_align_of_internal(allocator, t->Enum.base_type, path);
 
@@ -2065,8 +2063,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 	case Type_Map:
 		generate_map_internal_types(allocator, t);
-		// return type_size_of_internal(allocator, t->Map.generated_struct_type, path);
-		return build_context.word_size;
+		return type_size_of_internal(allocator, t->Map.internal_type, path);
 
 	case Type_Tuple: {
 		i64 count, align, size;
