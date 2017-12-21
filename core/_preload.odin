@@ -489,7 +489,6 @@ free_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
 	raw := transmute(raw.Map)m;
 	free_dynamic_array(raw.hashes, loc);
 	free_ptr(raw.entries.data, loc);
-	free_ptr(raw.internal, loc);
 }
 
 free :: proc[
