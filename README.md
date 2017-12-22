@@ -11,6 +11,30 @@ The Odin programming language is fast, concise, readable, pragmatic and open sou
 
 Website: [https://odin.handmade.network/](https://odin.handmade.network/)
 
+```go
+import "core:fmt.odin"
+
+main :: proc() {
+	program := "+ + * 😃 - /";
+	accumulator := 0;
+
+	for token in program {
+		switch token {
+		case '+': accumulator += 1;
+		case '-': accumulator -= 1;
+		case '*': accumulator *= 2;
+		case '/': accumulator /= 2;
+		case '😃': accumulator *= accumulator;
+		case: // Ignore everything else
+		}
+	}
+
+	fmt.printf("The program \"%s\" calculates the value %d\n",
+	           program, accumulator);
+}
+
+```
+
 ## Demonstrations:
 * First Talk & Demo
 	- [Talk](https://youtu.be/TMCkT-uASaE?t=338)
