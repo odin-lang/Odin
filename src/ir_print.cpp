@@ -193,7 +193,7 @@ void ir_print_encoded_global(irFileBuffer *f, String name, bool remove_prefix) {
 	ir_print_escape_string(f, name, true, !remove_prefix);
 }
 
-void ir_print_type(irFileBuffer *f, irModule *m, Type *t);
+void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct = false);
 void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hint);
 
 
@@ -260,7 +260,7 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 	ir_write_byte(f, ')');
 }
 
-void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
+void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 	i64 word_bits = 8*build_context.word_size;
 	GB_ASSERT_NOT_NULL(t);
 	t = default_type(t);
@@ -269,7 +269,9 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	switch (t->kind) {
 	case Type_Basic:
 		switch (t->Basic.kind) {
-		case Basic_bool:   ir_write_string(f, "i1");                   return;
+		case Basic_bool:      ir_write_string(f, "i8"); return;
+		case Basic_llvm_bool: ir_write_string(f, "i1"); return;
+
 		case Basic_i8:     ir_write_string(f, "i8");                   return;
 		case Basic_u8:     ir_write_string(f, "i8");                   return;
 		case Basic_i16:    ir_write_string(f, "i16");                  return;
@@ -370,7 +372,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 				if (i > 0) {
 					ir_write_string(f, str_lit(", "));
 				}
-				ir_print_type(f, m, t->Struct.fields[i]->type);
+				ir_print_type(f, m, t->Struct.fields[i]->type, true);
 			}
 			ir_write_byte(f, '}');
 			if (t->Struct.is_packed) {
@@ -487,9 +489,9 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	switch (value.kind) {
 	case ExactValue_Bool:
 		if (value.value_bool) {
-			ir_write_string(f, "true");
+			ir_write_string(f, type == t_llvm_bool ? "true" : "1");
 		} else {
-			ir_write_string(f, "false");
+			ir_write_string(f, type == t_llvm_bool ? "false" : "0");
 		}
 		break;
 	case ExactValue_String: {
@@ -975,7 +977,6 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_fprintf(f, ", align %lld\n", type_align_of(m->allocator, type));
 		break;
 	}
-
 	case irInstr_ArrayElementPtr: {
 		Type *et = ir_type(instr->ArrayElementPtr.address);
 		ir_fprintf(f, "%%%d = getelementptr inbounds ", value->index);
@@ -1108,13 +1109,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, t_int);
 		ir_write_string(f, " 0, ");
 		ir_print_type(f, m, t_i32);
-	#if 1
-		ir_fprintf(f, " 2");
-	#else
-		ir_fprintf(f, " %d", 2);
-	#endif
-		ir_write_string(f, " ; UnionTagPtr");
-		ir_write_byte(f, '\n');
+		ir_fprintf(f, " 2 ; UnionTagPtr\n");
 		break;
 	}
 
@@ -1127,14 +1122,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, et);
 		ir_write_byte(f, ' ');
 		ir_print_value(f, m, instr->UnionTagValue.address, et);
-		ir_write_byte(f, ',');
-	#if 1
-		ir_fprintf(f, " 2");
-	#else
-		ir_fprintf(f, " %d", 2);
-	#endif
-		ir_write_string(f, " ; UnionTagValue");
-		ir_write_byte(f, '\n');
+		ir_fprintf(f, ", 2 ; UnionTagValue\n");
 		break;
 	}
 
@@ -1146,8 +1134,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	}
 
 	case irInstr_If: {;
-		ir_write_string(f, "br ");
-		ir_print_type(f, m, t_bool);
+		ir_write_string(f, "br i1");
 		ir_write_byte(f, ' ');
 		ir_print_value(f, m, instr->If.cond, t_bool);
 		ir_write_string(f, ", ");
@@ -1381,6 +1368,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					}
 					ir_write_byte(f, ' ');
 					irValue *arg = call->args[i];
+					if (is_type_boolean(t)) {
+
+					}
 					ir_print_value(f, m, arg, t);
 					param_index++;
 				}

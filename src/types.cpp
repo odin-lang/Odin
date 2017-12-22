@@ -4,6 +4,7 @@ struct AstNode;
 enum BasicKind {
 	Basic_Invalid,
 
+	Basic_llvm_bool,
 	Basic_bool,
 	Basic_i8,
 	Basic_u8,
@@ -236,6 +237,8 @@ void selection_add_index(Selection *s, isize index) {
 gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_Invalid,           0,                                          0, STR_LIT("invalid type")}},
 
+	{Type_Basic, {Basic_llvm_bool,         BasicFlag_Boolean,                          1, STR_LIT("llvm bool")}},
+
 	{Type_Basic, {Basic_bool,              BasicFlag_Boolean,                          1, STR_LIT("bool")}},
 
 	{Type_Basic, {Basic_i8,                BasicFlag_Integer,                          1, STR_LIT("i8")}},
@@ -283,6 +286,7 @@ gb_global Type basic_types[] = {
 // };
 
 gb_global Type *t_invalid         = &basic_types[Basic_Invalid];
+gb_global Type *t_llvm_bool       = &basic_types[Basic_llvm_bool];
 gb_global Type *t_bool            = &basic_types[Basic_bool];
 gb_global Type *t_i8              = &basic_types[Basic_i8];
 gb_global Type *t_u8              = &basic_types[Basic_u8];
