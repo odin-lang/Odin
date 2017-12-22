@@ -3412,7 +3412,7 @@ void check_parsed_files(Checker *c) {
 	// Add "Basic" type information
 	for (isize i = 0; i < gb_count_of(basic_types)-1; i++) {
 		Type *t = &basic_types[i];
-		if (t->Basic.size > 0) {
+		if (t->Basic.size > 0 && t->Basic.kind != Basic_llvm_bool)  {
 			add_type_info_type(c, t);
 		}
 	}

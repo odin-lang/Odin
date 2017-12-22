@@ -854,6 +854,8 @@ irValue *ir_value_param(gbAllocator a, irProcedure *parent, Entity *e, Type *abi
 			}
 		} else if (is_type_integer(abi_type)) {
 			v->Param.kind = irParamPass_Integer;
+		} else if (abi_type == t_llvm_bool) {
+			v->Param.kind = irParamPass_Value;
 		} else {
 			GB_PANIC("Invalid abi type pass kind");
 		}
@@ -911,6 +913,12 @@ irValue *ir_instr_local(irProcedure *p, Entity *e, bool zero_initialized) {
 	return v;
 }
 
+irValue *ir_instr_zero_init(irProcedure *p, irValue *address) {
+	irValue *v = ir_alloc_instr(p, irInstr_ZeroInit);
+	irInstr *i = &v->Instr;
+	i->ZeroInit.address = address;
+	return v;
+}
 
 irValue *ir_instr_store(irProcedure *p, irValue *address, irValue *value, bool atomic) {
 	irValue *v = ir_alloc_instr(p, irInstr_Store);
@@ -918,13 +926,6 @@ irValue *ir_instr_store(irProcedure *p, irValue *address, irValue *value, bool a
 	i->Store.address = address;
 	i->Store.value = value;
 	i->Store.atomic = atomic;
-	return v;
-}
-
-irValue *ir_instr_zero_init(irProcedure *p, irValue *address) {
-	irValue *v = ir_alloc_instr(p, irInstr_ZeroInit);
-	irInstr *i = &v->Instr;
-	i->ZeroInit.address = address;
 	return v;
 }
 
@@ -1040,7 +1041,7 @@ irValue *ir_instr_jump(irProcedure *p, irBlock *block) {
 irValue *ir_instr_if(irProcedure *p, irValue *cond, irBlock *true_block, irBlock *false_block) {
 	irValue *v = ir_alloc_instr(p, irInstr_If);
 	irInstr *i = &v->Instr;
-	i->If.cond = cond;
+	i->If.cond = ir_emit_conv(p, cond, t_llvm_bool);
 	i->If.true_block = true_block;
 	i->If.false_block = false_block;
 	return v;
@@ -1447,8 +1448,12 @@ irValue *ir_add_param(irProcedure *proc, Entity *e, AstNode *expr, Type *abi_typ
 	switch (p->kind) {
 	case irParamPass_Value: {
 		irValue *l = ir_add_local(proc, e, expr, false);
-		ir_emit_store(proc, l, v);
-		return v;
+		irValue *x = v;
+		if (abi_type == t_llvm_bool) {
+			x = ir_emit_conv(proc, x, t_bool);
+		}
+		ir_emit_store(proc, l, x);
+		return x;
 	}
 	case irParamPass_Pointer:
 		ir_module_add_value(proc->module, e, v);
@@ -1534,29 +1539,41 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 //
 ////////////////////////////////////////////////////////////////
 
-
+irValue *ir_emit_global_call(irProcedure *proc, char const *name_, irValue **args, isize arg_count);
 
 irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
-#if 1
 	// NOTE(bill): Sanity check
 	Type *a = type_deref(ir_type(address));
 	Type *b = ir_type(value);
 	if (!is_type_untyped(b)) {
 		GB_ASSERT_MSG(are_types_identical(core_type(a), core_type(b)), "%s %s", type_to_string(a), type_to_string(b));
 	}
-#endif
+
+	// if (is_type_boolean(a)) {
+		// return ir_emit(p, ir_instr_store_bool(p, address, value, false));
+	// }
 	return ir_emit(p, ir_instr_store(p, address, value, false));
 }
 irValue *ir_emit_load(irProcedure *p, irValue *address) {
 	GB_ASSERT(address != nullptr);
+	Type *t = type_deref(ir_type(address));
+	// if (is_type_boolean(t)) {
+		// return ir_emit(p, ir_instr_load_bool(p, address));
+	// }
 	return ir_emit(p, ir_instr_load(p, address));
 }
 irValue *ir_emit_select(irProcedure *p, irValue *cond, irValue *t, irValue *f) {
 	return ir_emit(p, ir_instr_select(p, cond, t, f));
 }
 
-irValue *ir_emit_zero_init(irProcedure *p, irValue *address)  {
-	return ir_emit(p, ir_instr_zero_init(p, address));
+irValue *ir_emit_zero_init(irProcedure *p, irValue *address) {
+	gbAllocator a = p->module->allocator;
+	Type *t = type_deref(ir_type(address));
+	irValue **args = gb_alloc_array(a, irValue *, 2);
+	args[0] = ir_emit_conv(p, address, t_rawptr);
+	args[1] = ir_const_int(a, type_size_of(a, t));
+	return ir_emit_global_call(p, "__mem_zero", args, 2);
+	// return ir_emit(p, ir_instr_zero_init(p, address));
 }
 
 irValue *ir_emit_comment(irProcedure *p, String text) {
@@ -1626,6 +1643,8 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 				}
 			} else if (is_type_integer(new_type)) {
 				args[i] = ir_emit_transmute(p, args[i], new_type);
+			} else if (new_type == t_llvm_bool) {
+				args[i] = ir_emit_conv(p, args[i], new_type);
 			}
 		}
 	}
@@ -2446,7 +2465,6 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 		}
 	}
 
-	Type *result = t_bool;
 	if (is_type_array(a)) {
 		ir_emit_comment(proc, str_lit("array.comp.begin"));
 		defer (ir_emit_comment(proc, str_lit("array.comp.end")));
@@ -2468,10 +2486,10 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 			irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
 			irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
 			irValue *cmp = ir_emit_comp(proc, op_kind, x, y);
-			res = ir_emit_arith(proc, cmp_op, res, cmp, result);
+			res = ir_emit_arith(proc, cmp_op, res, cmp, t_bool);
 		}
 
-		return ir_emit_conv(proc, res, result);
+		return ir_emit_conv(proc, res, t_bool);
 	}
 
 	if (is_type_string(a)) {
@@ -2518,7 +2536,7 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 	}
 
 
-	return ir_emit(proc, ir_instr_binary_op(proc, op_kind, left, right, result));
+	return ir_emit(proc, ir_instr_binary_op(proc, op_kind, left, right, t_llvm_bool));
 }
 
 irValue *ir_emit_array_ep(irProcedure *proc, irValue *s, irValue *index) {
@@ -3034,6 +3052,14 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		}
 
 		return ir_emit(proc, ir_instr_conv(proc, kind, value, src_type, t));
+	}
+
+	// bool <-> llvm bool
+	if (is_type_boolean(src) && dst == t_llvm_bool) {
+		return ir_emit(proc, ir_instr_conv(proc, irConv_trunc, value, src_type, t));
+	}
+	if (src == t_llvm_bool && is_type_boolean(dst)) {
+		return ir_emit(proc, ir_instr_conv(proc, irConv_zext, value, src_type, t));
 	}
 
 	// boolean -> integer
@@ -8195,7 +8221,9 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			irValue *ptr = ir_emit_union_tag_ptr(proc, variant_ptr);
 			ir_emit_store(proc, ptr, tag);
 		} else {
-			GB_PANIC("Unhandled Type_Info variant: %s", type_to_string(t));
+			if (t != t_llvm_bool) {
+				GB_PANIC("Unhandled Type_Info variant: %s", type_to_string(t));
+			}
 		}
 	}
 }
