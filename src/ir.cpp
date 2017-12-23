@@ -1542,11 +1542,15 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 irValue *ir_emit_global_call(irProcedure *proc, char const *name_, irValue **args, isize arg_count);
 
 irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
+	Type *a = type_deref(ir_type(address));
+
 	if (ir_type(value) == t_llvm_bool) {
 		value = ir_emit_conv(p, value, t_bool);
 	}
-	// NOTE(bill): Sanity check
-	Type *a = type_deref(ir_type(address));
+	if (a == t_llvm_bool) {
+		value = ir_emit_conv(p, value, t_llvm_bool);
+	}
+
 	Type *b = ir_type(value);
 	if (!is_type_untyped(b)) {
 		GB_ASSERT_MSG(are_types_identical(core_type(a), core_type(b)), "%s %s", type_to_string(a), type_to_string(b));
