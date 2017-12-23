@@ -1088,6 +1088,9 @@ void check_remove_expr_info(CheckerInfo *i, AstNode *expr) {
 
 isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	type = default_type(type);
+	if (type == t_llvm_bool) {
+		type = t_bool;
+	}
 
 	isize entry_index = -1;
 	HashKey key = hash_type(type);
