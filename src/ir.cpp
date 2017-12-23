@@ -1542,6 +1542,9 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 irValue *ir_emit_global_call(irProcedure *proc, char const *name_, irValue **args, isize arg_count);
 
 irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
+	if (ir_type(value) == t_llvm_bool) {
+		value = ir_emit_conv(p, value, t_bool);
+	}
 	// NOTE(bill): Sanity check
 	Type *a = type_deref(ir_type(address));
 	Type *b = ir_type(value);
@@ -1994,7 +1997,7 @@ irValue *ir_addr_load(irProcedure *proc, irAddr addr) {
 		args[1] = key;
 
 		irValue *ptr = ir_emit_global_call(proc, "__dynamic_map_get", args, 2);
-		irValue *ok = ir_emit_comp(proc, Token_NotEq, ptr, v_raw_nil);
+		irValue *ok = ir_emit_conv(proc, ir_emit_comp(proc, Token_NotEq, ptr, v_raw_nil), t_bool);
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 1), ok);
 
 		irBlock *then = ir_new_block(proc, nullptr, "map.get.then");
