@@ -792,15 +792,45 @@ foreign __llvm_core {
 
 	@(link_name="llvm.fmuladd.f32") fmuladd32  :: proc(a, b, c: f32) -> f32 ---;
 	@(link_name="llvm.fmuladd.f64") fmuladd64  :: proc(a, b, c: f64) -> f64 ---;
-
-	@(link_name="llvm.fabs.f32") __abs_f32 :: proc(x: f32) -> f32 ---;
-	@(link_name="llvm.fabs.f64") __abs_f64 :: proc(x: f64) -> f32 ---;
-
-	@(link_name="llvm.minnum.f32") __min_f32 :: proc(a, b: f32) -> f32 ---;
-	@(link_name="llvm.minnum.f64") __min_f64 :: proc(a, b: f64) -> f32 ---;
-	@(link_name="llvm.maxnum.f32") __max_f32 :: proc(a, b: f32) -> f32 ---;
-	@(link_name="llvm.maxnum.f64") __max_f64 :: proc(a, b: f64) -> f32 ---;
 }
+__abs_f32 :: inline proc "contextless" (x: f32) -> f32 {
+	foreign __llvm_core {
+		@(link_name="llvm.fabs.f32") _abs :: proc "c" (x: f32) -> f32 ---;
+	}
+	return _abs(x);
+}
+__abs_f64 :: inline proc "contextless" (x: f64) -> f64 {
+	foreign __llvm_core {
+		@(link_name="llvm.fabs.f64") _abs :: proc "c" (x: f64) -> f64 ---;
+	}
+	return _abs(x);
+}
+
+__min_f32 :: proc(a, b: f32) -> f32 {
+	foreign __llvm_core {
+		@(link_name="llvm.minnum.f32") _min :: proc "c" (a, b: f32) -> f32 ---;
+	}
+	return _min(a, b);
+}
+__min_f64 :: proc(a, b: f64) -> f64 {
+	foreign __llvm_core {
+		@(link_name="llvm.minnum.f64") _min :: proc "c" (a, b: f64) -> f64 ---;
+	}
+	return _min(a, b);
+}
+__max_f32 :: proc(a, b: f32) -> f32 {
+	foreign __llvm_core {
+		@(link_name="llvm.maxnum.f32") _max :: proc "c" (a, b: f32) -> f32 ---;
+	}
+	return _max(a, b);
+}
+__max_f64 :: proc(a, b: f64) -> f64 {
+	foreign __llvm_core {
+		@(link_name="llvm.maxnum.f64") _max :: proc "c" (a, b: f64) -> f64 ---;
+	}
+	return _max(a, b);
+}
+
 __abs_complex64 :: inline proc "contextless" (x: complex64) -> f32 {
 	r, i := real(x), imag(x);
 	return __sqrt_f32(r*r + i*i);
