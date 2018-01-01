@@ -3989,7 +3989,7 @@ AstNode *parse_defer_stmt(AstFile *f) {
 		stmt = stmt->DeferStmt.stmt;
 		break;
 	case AstNode_ReturnStmt:
-		syntax_error(token, "You cannot a return statement");
+		syntax_error(token, "You cannot defer a return statement");
 		break;
 	}
 
