@@ -1782,6 +1782,12 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 }
 
 void check_cast(Checker *c, Operand *x, Type *type) {
+	if (!is_operand_value(*x)) {
+		error(x->expr, "'cast' can only be applied to values");
+		x->mode = Addressing_Invalid;
+		return;
+	}
+
 	bool is_const_expr = x->mode == Addressing_Constant;
 	bool can_convert = false;
 
@@ -1828,6 +1834,12 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 }
 
 bool check_transmute(Checker *c, AstNode *node, Operand *o, Type *t) {
+	if (!is_operand_value(*o)) {
+		error(o->expr, "'transmute' can only be applied to values");
+		o->mode = Addressing_Invalid;
+		return false;
+	}
+
 	if (o->mode == Addressing_Constant) {
 		gbString expr_str = expr_to_string(o->expr);
 		error(o->expr, "Cannot transmute a constant expression: '%s'", expr_str);
