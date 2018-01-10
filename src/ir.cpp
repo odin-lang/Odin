@@ -1626,9 +1626,11 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 		context_ptr = ir_find_or_generate_context_ptr(p);
 	}
 
+	bool is_c_vararg = pt->Proc.c_vararg;
 	isize param_count = pt->Proc.param_count;
-	if (pt->Proc.c_vararg) {
+	if (is_c_vararg) {
 		GB_ASSERT(param_count-1 <= arg_count);
+		param_count -= 1;
 	} else {
 		GB_ASSERT_MSG(param_count == arg_count, "%td == %td", param_count, arg_count);
 	}
