@@ -4,6 +4,7 @@ import "core:mem.odin"
 import "core:bits.odin"
 import "core:hash.odin"
 import "core:math.odin"
+import "core:math/rand.odin"
 import "core:os.odin"
 import "core:raw.odin"
 import "core:sort.odin"
@@ -596,7 +597,7 @@ array_programming :: proc() {
 		cross :: proc(a, b: Vector3) -> Vector3 {
 			i := swizzle(a, 1, 2, 0) * swizzle(b, 2, 0, 1);
 			j := swizzle(a, 2, 0, 1) * swizzle(b, 1, 2, 0);
-			return Vector3(i - j);
+			return i - j;
 		}
 
 		blah :: proc(a: Vector3) -> f32 {
@@ -609,6 +610,27 @@ array_programming :: proc() {
 	}
 }
 
+
+using println in import "core:fmt.odin"
+
+using_in :: proc() {
+	using print in fmt;
+
+	println("Hellope1");
+	print("Hellope2\n");
+
+	Foo :: struct {
+		x, y: int,
+		b: bool,
+	}
+	f: Foo;
+	f.x, f.y = 123, 321;
+	println(f);
+	using x, y in f;
+	f.x, f.y = 456, 654;
+	println(f);
+}
+
 main :: proc() {
 	when false {
 		general_stuff();
@@ -617,6 +639,7 @@ main :: proc() {
 		parametric_polymorphism();
 		threading_example();
 		array_programming();
+		using_in();
 	}
 }
 
