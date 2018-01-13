@@ -1808,7 +1808,7 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_ty
 }
 
 irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
-	Type *hash_type = t_u128;
+	Type *hash_type = t_u64;
 	irValue *v = ir_add_local_generated(proc, t_map_key);
 	Type *t = base_type(ir_type(key));
 	key = ir_emit_conv(proc, key, key_type);
@@ -1834,8 +1834,8 @@ irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 		if (str->kind == irValue_Constant) {
 			ExactValue ev = str->Constant.value;
 			GB_ASSERT(ev.kind == ExactValue_String);
-			u128 hs = fnv128a(ev.value_string.text, ev.value_string.len);
-			hashed_str = ir_value_constant(proc->module->allocator, t_u128, exact_value_u128(hs));
+			u64 hs = fnv64a(ev.value_string.text, ev.value_string.len);
+			hashed_str = ir_value_constant(proc->module->allocator, t_u64, exact_value_u64(hs));
 		} else {
 			irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 1);
 			args[0] = str;
@@ -1936,7 +1936,6 @@ irValue *ir_addr_store(irProcedure *proc, irAddr addr, irValue *value) {
 		case 2:  int_type = t_u16;  break;
 		case 4:  int_type = t_u32;  break;
 		case 8:  int_type = t_u64;  break;
-		case 16: int_type = t_u128; break;
 		}
 		GB_ASSERT(int_type != nullptr);
 
@@ -2051,7 +2050,6 @@ irValue *ir_addr_load(irProcedure *proc, irAddr addr) {
 		case 2:  int_type = t_u16;  break;
 		case 4:  int_type = t_u32;  break;
 		case 8:  int_type = t_u64;  break;
-		case 16: int_type = t_u128; break;
 		}
 		GB_ASSERT(int_type != nullptr);
 
@@ -2353,23 +2351,6 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 		irValue *a = ir_emit_arith(proc, Token_Mod, n, m, type);
 		irValue *b = ir_emit_arith(proc, Token_Add, a, m, type);
 		return ir_emit_arith(proc, Token_Mod, b, m, type);
-	}
-
-	if (is_type_i128_or_u128(type)) {
-		// IMPORTANT NOTE(bill): LLVM is goddamn buggy!
-		bool is_unsigned = is_type_unsigned(type);
-		char *name = nullptr;
-		if (op == Token_Quo) {
-			name = cast(char *)(is_unsigned ? "__udivti3" : "__divti3");
-		} else if (op == Token_Mod) {
-			name = cast(char *)(is_unsigned ? "__umodti3" : "__modti3");
-		}
-		if (name != nullptr) {
-			irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 2);
-			args[0] = left;
-			args[1] = right;
-			return ir_emit_global_call(proc, name, args, 2);
-		}
 	}
 
 	return ir_emit(proc, ir_instr_binary_op(proc, op, left, right, type));
@@ -4587,7 +4568,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			GB_ASSERT(is_type_integer(tv.type));
 			GB_ASSERT(tv.value.kind == ExactValue_Integer);
 
-			i32 src_index = cast(i32)i128_to_i64(tv.value.value_integer);
+			i32 src_index = cast(i32)tv.value.value_integer;
 			i32 dst_index = i-1;
 
 			irValue *src_elem = ir_emit_array_epi(proc, src, src_index);
@@ -5484,7 +5465,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			Type *selector_type = base_type(type_of_expr(proc->module->info, se->selector));
 			GB_ASSERT_MSG(is_type_integer(selector_type), "%s", type_to_string(selector_type));
 			ExactValue val = type_and_value_of_expr(proc->module->info, sel).value;
-			i64 index = i128_to_i64(val.value_integer);
+			i64 index = val.value_integer;
 
 			Selection sel = lookup_field_from_index(proc->module->allocator, type, index);
 			GB_ASSERT(sel.entity != nullptr);
@@ -7900,8 +7881,6 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			case Basic_u32:
 			case Basic_i64:
 			case Basic_u64:
-			case Basic_i128:
-			case Basic_u128:
 			case Basic_int:
 			case Basic_uint:
 			case Basic_uintptr: {

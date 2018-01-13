@@ -271,7 +271,7 @@ bool check_custom_align(Checker *c, AstNode *node, i64 *align_) {
 	Type *type = base_type(o.type);
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		if (o.value.kind == ExactValue_Integer) {
-			i64 align = i128_to_i64(o.value.value_integer);
+			i64 align = o.value.value_integer;
 			if (align < 1 || !gb_is_power_of_two(align)) {
 				error(node, "#align must be a power of 2, got %lld", align);
 				return false;
@@ -847,9 +847,9 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, AstNode *node) {
 			error(value, "Bit field bit size must be a constant integer");
 			continue;
 		}
-		i64 bits = i128_to_i64(v.value_integer);
-		if (bits < 0 || bits > 128) {
-			error(value, "Bit field's bit size must be within the range 1..<128, got %lld", cast(long long)bits);
+		i64 bits = v.value_integer;
+		if (bits < 0 || bits > 64) {
+			error(value, "Bit field's bit size must be within the range 1..<64, got %lld", cast(long long)bits);
 			continue;
 		}
 
@@ -1767,7 +1767,7 @@ i64 check_array_count(Checker *c, Operand *o, AstNode *e) {
 	Type *type = base_type(o->type);
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		if (o->value.kind == ExactValue_Integer) {
-			i64 count = i128_to_i64(o->value.value_integer);
+			i64 count = o->value.value_integer;
 			if (count >= 0) {
 				return count;
 			}

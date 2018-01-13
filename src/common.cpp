@@ -95,22 +95,112 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 #include "unicode.cpp"
 #include "string.cpp"
 #include "array.cpp"
-#include "integer128.cpp"
+// #include "integer128.cpp"
 #include "murmurhash3.cpp"
 
 #define for_array(index_, array_) for (isize index_ = 0; index_ < (array_).count; index_++)
 
 
-u128 fnv128a(void const *data, isize len) {
-	u128 o = u128_lo_hi(0x13bull, 0x1000000ull);
-	u128 h = u128_lo_hi(0x62b821756295c58dull, 0x6c62272e07bb0142ull);
+u64 fnv64a(void const *data, isize len) {
 	u8 const *bytes = cast(u8 const *)data;
+	u64 h = 0xcbf29ce484222325ull;
 	for (isize i = 0; i < len; i++) {
-		h.lo ^= bytes[i];
-		h = h * o;
+		u64 b = cast(u64)bytes[i];
+		h = (h ^ b) * 0x100000001b3ull;
 	}
 	return h;
 }
+
+u64 u64_digit_value(Rune r) {
+	if ('0' <= r && r <= '9') {
+		return r - '0';
+	} else if ('a' <= r && r <= 'f') {
+		return r - 'a' + 10;
+	} else if ('A' <= r && r <= 'F') {
+		return r - 'A' + 10;
+	}
+	return 16; // NOTE(bill): Larger than highest possible
+}
+
+
+u64 u64_from_string(String string) {
+	u64 base = 10;
+	bool has_prefix = false;
+	if (string.len > 2 && string[0] == '0') {
+		switch (string[1]) {
+		case 'b': base = 2;  has_prefix = true; break;
+		case 'o': base = 8;  has_prefix = true; break;
+		case 'd': base = 10; has_prefix = true; break;
+		case 'z': base = 12; has_prefix = true; break;
+		case 'x': base = 16; has_prefix = true; break;
+		}
+	}
+
+	u8 *text = string.text;
+	isize len = string.len;
+	if (has_prefix) {
+		text += 2;
+		len -= 2;
+	}
+
+	u64 result = 0ull;
+	for (isize i = 0; i < len; i++) {
+		Rune r = cast(Rune)text[i];
+		if (r == '_') {
+			continue;
+		}
+		u64 v = u64_digit_value(r);
+		if (v >= base) {
+			break;
+		}
+		result *= base;
+		result += v;
+	}
+	return result;
+}
+
+String u64_to_string(u64 v, char *out_buf, isize out_buf_len) {
+	char buf[200] = {0};
+	isize i = gb_size_of(buf);
+
+	u64 b = 10;
+	while (v >= b) {
+		buf[--i] = gb__num_to_char_table[v%b];
+		v /= b;
+	}
+	buf[--i] = gb__num_to_char_table[v%b];
+
+	isize len = gb_min(gb_size_of(buf)-i, out_buf_len);
+	gb_memcopy(out_buf, &buf[i], len);
+	return make_string(cast(u8 *)out_buf, len);
+}
+String i64_to_string(i64 a, char *out_buf, isize out_buf_len) {
+	char buf[200] = {0};
+	isize i = gb_size_of(buf);
+	bool negative = false;
+	if (a < 0) {
+		negative = true;
+		a = -a;
+	}
+
+	u64 v = cast(u64)a;
+	u64 b = 10;
+	while (v >= b) {
+		buf[--i] = gb__num_to_char_table[v%b];
+		v /= b;
+	}
+	buf[--i] = gb__num_to_char_table[v%b];
+
+	if (negative) {
+		buf[--i] = '-';
+	}
+
+	isize len = gb_min(gb_size_of(buf)-i, out_buf_len);
+	gb_memcopy(out_buf, &buf[i], len);
+	return make_string(cast(u8 *)out_buf, len);
+}
+
+
 
 
 

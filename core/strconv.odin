@@ -28,7 +28,7 @@ _digit_value :: proc(r: rune) -> int {
 	return v;
 }
 
-parse_i128 :: proc(s: string) -> i128 {
+parse_i64 :: proc(s: string) -> i64 {
 	neg := false;
 	if len(s) > 1 {
 		switch s[0] {
@@ -41,7 +41,7 @@ parse_i128 :: proc(s: string) -> i128 {
 	}
 
 
-	base: i128 = 10;
+	base: i64 = 10;
 	if len(s) > 2 && s[0] == '0' {
 		switch s[1] {
 		case 'b': base =  2;  s = s[2..];
@@ -53,13 +53,13 @@ parse_i128 :: proc(s: string) -> i128 {
 	}
 
 
-	value: i128;
+	value: i64;
 	for r in s {
 		if r == '_' {
 			continue;
 		}
 
-		v := i128(_digit_value(r));
+		v := i64(_digit_value(r));
 		if v >= base {
 			break;
 		}
@@ -71,14 +71,14 @@ parse_i128 :: proc(s: string) -> i128 {
 	return value;
 }
 
-parse_u128 :: proc(s: string) -> u128 {
+parse_u64 :: proc(s: string) -> u64 {
 	neg := false;
 	if len(s) > 1 && s[0] == '+' {
 		s = s[1..];
 	}
 
 
-	base := u128(10);
+	base := u64(10);
 	if len(s) > 2 && s[0] == '0' {
 		switch s[1] {
 		case 'b': base =  2;  s = s[2..];
@@ -90,13 +90,13 @@ parse_u128 :: proc(s: string) -> u128 {
 	}
 
 
-	value: u128;
+	value: u64;
 	for r in s {
 		if r == '_' do continue;
-		v := u128(_digit_value(r));
+		v := u64(_digit_value(r));
 		if v >= base do break;
 		value *= base;
-		value += u128(v);
+		value += u64(v);
 	}
 
 	if neg do return -value;
@@ -105,10 +105,10 @@ parse_u128 :: proc(s: string) -> u128 {
 
 
 parse_int :: proc(s: string) -> int {
-	return int(parse_i128(s));
+	return int(parse_i64(s));
 }
 parse_uint :: proc(s: string, base: int) -> uint {
-	return uint(parse_u128(s));
+	return uint(parse_u64(s));
 }
 
 parse_f32 :: proc(s: string) -> f32 {
@@ -193,10 +193,10 @@ append_bool :: proc(buf: []byte, b: bool) -> string {
 }
 
 append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
-	return append_bits(buf, u128(u), base, false, 8*size_of(uint), digits, 0);
+	return append_bits(buf, u64(u), base, false, 8*size_of(uint), digits, 0);
 }
 append_int :: proc(buf: []byte, i: i64, base: int) -> string {
-	return append_bits(buf, u128(i), base, true, 8*size_of(int), digits, 0);
+	return append_bits(buf, u64(i), base, true, 8*size_of(int), digits, 0);
 }
 itoa :: proc(buf: []byte, i: int) -> string do return append_int(buf, i64(i), 10);
 
@@ -427,30 +427,26 @@ MAX_BASE :: 32;
 digits := "0123456789abcdefghijklmnopqrstuvwxyz";
 
 
-is_integer_negative :: proc(u: u128, is_signed: bool, bit_size: int) -> (unsigned: u128, neg: bool) {
+is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned: u64, neg: bool) {
 	neg := false;
 	if is_signed {
 		switch bit_size {
 		case 8:
 			i := i8(u);
 			neg = i < 0;
-			u = u128(abs(i));
+			u = u64(abs(i));
 		case 16:
 			i := i16(u);
 			neg = i < 0;
-			u = u128(abs(i));
+			u = u64(abs(i));
 		case 32:
 			i := i32(u);
 			neg = i < 0;
-			u = u128(abs(i));
+			u = u64(abs(i));
 		case 64:
 			i := i64(u);
 			neg = i < 0;
-			u = u128(abs(i));
-		case 128:
-			i := i128(u);
-			neg = i < 0;
-			u = u128(abs(i));
+			u = u64(abs(i));
 		case:
 			panic("is_integer_negative: Unknown integer size");
 		}
@@ -458,7 +454,7 @@ is_integer_negative :: proc(u: u128, is_signed: bool, bit_size: int) -> (unsigne
 	return u, neg;
 }
 
-append_bits :: proc(buf: []byte, u: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flag) -> string {
+append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flag) -> string {
 	if base < 2 || base > MAX_BASE {
 		panic("strconv: illegal base passed to append_bits");
 	}
@@ -467,12 +463,12 @@ append_bits :: proc(buf: []byte, u: u128, base: int, is_signed: bool, bit_size: 
 	a: [129]byte;
 	i := len(a);
 	u, neg = is_integer_negative(u, is_signed, bit_size);
-	b := u128(base);
+	b := u64(base);
 	for u >= b {
-		i-=1; a[i] = digits[uint(u % b)];
+		i-=1; a[i] = digits[u % b];
 		u /= b;
 	}
-	i-=1; a[i] = digits[uint(u % b)];
+	i-=1; a[i] = digits[u % b];
 
 	if flags&Int_Flag.Prefix != 0 {
 		ok := true;

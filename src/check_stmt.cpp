@@ -260,16 +260,16 @@ Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 			if (rhs->mode == Addressing_Constant) {
 				ExactValue v = exact_value_to_integer(rhs->value);
 				if (v.kind == ExactValue_Integer) {
-					i128 i = v.value_integer;
-					u128 u = *cast(u128 *)&i;
-					u128 umax = U128_NEG_ONE;
-					if (lhs_bits < 128) {
-						umax = u128_sub(u128_shl(U128_ONE, cast(u32)lhs_bits), U128_ONE);
+					i64 i = v.value_integer;
+					u64 u = *cast(u64 *)&i;
+					u64 umax = ~cast(u64)0ull;
+					if (lhs_bits < 64) {
+						umax = (1ull << cast(u64)lhs_bits) - 1ull;
 					}
-					i128 imax = i128_shl(I128_ONE, cast(u32)lhs_bits-1);
+					i64 imax = 1ll << (cast(i64)lhs_bits-1ll);
 
 					bool ok = false;
-					ok = !(u128_lt(u, U128_ZERO) || u128_gt(u, umax));
+					ok = !(u < 0 || u > umax);
 
 					if (ok) {
 						return rhs->type;

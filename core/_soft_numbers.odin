@@ -1,5 +1,6 @@
 #shared_global_scope
 
+/*
 @(link_name="__multi3")
 __multi3 :: proc "c" (a, b: u128) -> u128 {
 	bits_in_dword_2 :: size_of(i64) * 4;
@@ -108,3 +109,4 @@ __u128_quo_mod :: proc "c" (a, b: u128, rem: ^u128) -> (quo: u128) {
 	if rem != nil do rem^ = r;
 	return q;
 }
+*/

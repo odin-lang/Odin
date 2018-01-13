@@ -361,7 +361,7 @@ bool parse_build_flags(Array<String> args) {
 						if (ok) switch (bf.kind) {
 						case BuildFlag_OptimizationLevel:
 							GB_ASSERT(value.kind == ExactValue_Integer);
-							build_context.optimization_level = cast(i32)i128_to_i64(value.value_integer);
+							build_context.optimization_level = cast(i32)value.value_integer;
 							break;
 						case BuildFlag_ShowTimings:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
@@ -369,7 +369,7 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_ThreadCount: {
 							GB_ASSERT(value.kind == ExactValue_Integer);
-							isize count = cast(isize)i128_to_i64(value.value_integer);
+							isize count = cast(isize)value.value_integer;
 							if (count <= 0) {
 								gb_printf_err("%.*s expected a positive non-zero number, got %.*s", LIT(name), LIT(param));
 								build_context.thread_count = 0;
