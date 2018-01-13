@@ -793,7 +793,7 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 					if (e->Constant.value.kind != ExactValue_Integer) {
 						return false;
 					}
-					i64 count = i128_to_i64(e->Constant.value.value_integer);
+					i64 count = e->Constant.value.value_integer;
 					if (count != source->Array.count) {
 						return false;
 					}
@@ -1211,37 +1211,39 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 			return true;
 		}
 
-		i128 i = v.value_integer;
-		u128 u = *cast(u128 *)&i;
+		i64 i = v.value_integer;
+		u64 u = *cast(u64 *)&i;
 		i64 s = 8*type_size_of(c->allocator, type);
-		u128 umax = U128_NEG_ONE;
-		if (s < 128) {
-			umax = u128_sub(u128_shl(U128_ONE, cast(u32)s), U128_ONE);
+		u64 umax = ~cast(u64)0ull;
+		if (s < 64) {
+			umax = (1ull << cast(u64)s) - 1ull;
 		} else {
 			// IMPORTANT TODO(bill): I NEED A PROPER BIG NUMBER LIBRARY THAT CAN SUPPORT 128 bit floats
-			s = 128;
+			s = 64;
 		}
-		i128 imax = i128_shl(I128_ONE, cast(u32)s-1);
+		i64 imin = -1ll << (s-1ll);
+		i64 imax = (1ll << (s-1ll))-1ll;
 
 		switch (type->Basic.kind) {
 		case Basic_rune:
 		case Basic_i8:
 		case Basic_i16:
 		case Basic_i32:
-		case Basic_i64:
-		case Basic_i128:
 		case Basic_int:
-			return i128_le(i128_neg(imax), i) && i128_le(i, i128_sub(imax, I128_ONE));
+			return imin <= i && i <= imax;
 
 		case Basic_u8:
 		case Basic_u16:
 		case Basic_u32:
-		case Basic_u64:
-		case Basic_u128:
 		case Basic_uint:
 		case Basic_uintptr:
-			return !(u128_lt(u, U128_ZERO) || u128_gt(u, umax));
+			return !(u < 0ull || u > umax);
 
+		case Basic_u64:
+			return 0ull <= i;
+
+		case Basic_i64:
+			return true;
 		case Basic_UntypedInteger:
 			return true;
 
@@ -1317,11 +1319,11 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 			} else {
 				char buf[127] = {};
 				String str = {};
-				i128 i = o->value.value_integer;
+				i64 i = o->value.value_integer;
 				if (is_type_unsigned(o->type)) {
-					str = u128_to_string(*cast(u128 *)&i, buf, gb_size_of(buf));
+					str = u64_to_string(*cast(u64 *)&i, buf, gb_size_of(buf));
 				} else {
-					str = i128_to_string(i, buf, gb_size_of(buf));
+					str = i64_to_string(i, buf, gb_size_of(buf));
 				}
 				error(o->expr, "'%s = %.*s' overflows '%s'", a, LIT(str), b);
 			}
@@ -1569,7 +1571,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 				return;
 			}
 
-			i64 amount = i128_to_i64(y_val.value_integer);
+			i64 amount = y_val.value_integer;
 			if (amount > 128) {
 				gbString err_str = expr_to_string(y->expr);
 				error(node, "Shift amount too large: '%s'", err_str);
@@ -1604,7 +1606,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 		}
 	}
 
-	if (y->mode == Addressing_Constant && i128_lt(y->value.value_integer, I128_ZERO)) {
+	if (y->mode == Addressing_Constant && y->value.value_integer < 0) {
 		gbString err_str = expr_to_string(y->expr);
 		error(node, "Shift amount cannot be negative: '%s'", err_str);
 		gb_string_free(err_str);
@@ -1656,7 +1658,7 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 
 	if (ptr->mode == Addressing_Constant && offset->mode == Addressing_Constant) {
 		i64 ptr_val = ptr->value.value_pointer;
-		i64 offset_val = i128_to_i64(exact_value_to_integer(offset->value).value_integer);
+		i64 offset_val = exact_value_to_integer(offset->value).value_integer;
 		i64 new_ptr_val = ptr_val;
 		if (op == Token_Add) {
 			new_ptr_val += elem_size*offset_val;
@@ -2010,7 +2012,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			bool fail = false;
 			switch (y->value.kind) {
 			case ExactValue_Integer:
-				if (i128_eq(y->value.value_integer, I128_ZERO)) {
+				if (y->value.value_integer == 0 ) {
 					fail = true;
 				}
 				break;
@@ -2148,7 +2150,7 @@ void convert_untyped_error(Checker *c, Operand *operand, Type *target_type) {
 	char *extra_text = "";
 
 	if (operand->mode == Addressing_Constant) {
-		if (i128_eq(operand->value.value_integer, I128_ZERO)) {
+		if (operand->value.value_integer == 0) {
 			if (make_string_c(expr_str) != "nil") { // HACK NOTE(bill): Just in case
 				// NOTE(bill): Doesn't matter what the type is as it's still zero in the union
 				extra_text = " - Did you want 'nil'?";
@@ -2396,7 +2398,7 @@ bool check_index_value(Checker *c, bool open_range, AstNode *index_value, i64 ma
 
 	if (operand.mode == Addressing_Constant &&
 	    (c->context.stmt_state_flags & StmtStateFlag_no_bounds_check) == 0) {
-		i64 i = i128_to_i64(exact_value_to_integer(operand.value).value_integer);
+		i64 i = exact_value_to_integer(operand.value).value_integer;
 		if (i < 0) {
 			gbString expr_str = expr_to_string(operand.expr);
 			error(operand.expr, "Index '%s' cannot be a negative value", expr_str);
@@ -2605,7 +2607,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 				operand->expr = node;
 				return nullptr;
 			}
-			i64 index = i128_to_i64(o.value.value_integer);
+			i64 index = o.value.value_integer;
 			if (index < 0) {
 				error(o.expr, "Index %lld cannot be a negative value", index);
 				operand->mode = Addressing_Invalid;
@@ -3307,7 +3309,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		i64 max_count = type->Array.count;
 		Type *elem_type = type->Array.elem;
 
-		i128 max_count128 = i128_from_i64(max_count);
 		i64 arg_count = 0;
 		for_array(i, ce->args) {
 			if (i == 0) {
@@ -3325,12 +3326,12 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 				return false;
 			}
 
-			if (op.value.value_integer < I128_ZERO) {
+			if (op.value.value_integer < 0) {
 				error(op.expr, "Negative 'swizzle' index");
 				return false;
 			}
 
-			if (max_count128 <= op.value.value_integer) {
+			if (max_count <= op.value.value_integer) {
 				error(op.expr, "'swizzle' index exceeds length");
 				return false;
 			}
@@ -3717,7 +3718,7 @@ break;
 		if (operand->mode == Addressing_Constant) {
 			switch (operand->value.kind) {
 			case ExactValue_Integer:
-				operand->value.value_integer = i128_abs(operand->value.value_integer);
+				operand->value.value_integer = gb_abs(operand->value.value_integer);
 				break;
 			case ExactValue_Float:
 				operand->value.value_float = gb_abs(operand->value.value_float);

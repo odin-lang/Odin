@@ -212,14 +212,14 @@ void MurmurHash3_x86_128(void const *key, isize len, u32 seed, void *out) {
 	((u32 *)out)[3] = h4;
 }
 
-gb_inline u128 MurmurHash3_128(void const *key, isize len, u32 seed) {
-	u128 res;
-#if defined(GB_ARCH_64_BIT)
-	MurmurHash3_x64_128(key, len, seed, &res);
-#else
-	MurmurHash3_x86_128(key, len, seed, &res);
-#endif
-	return res;
-}
+// gb_inline u128 MurmurHash3_128(void const *key, isize len, u32 seed) {
+// 	u128 res;
+// #if defined(GB_ARCH_64_BIT)
+// 	MurmurHash3_x64_128(key, len, seed, &res);
+// #else
+// 	MurmurHash3_x86_128(key, len, seed, &res);
+// #endif
+// 	return res;
+// }
 
 

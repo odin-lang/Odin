@@ -913,7 +913,6 @@ void init_universal_scope(void) {
 	t_u8_ptr       = make_type_pointer(a, t_u8);
 	t_int_ptr      = make_type_pointer(a, t_int);
 	t_i64_ptr      = make_type_pointer(a, t_i64);
-	t_i128_ptr     = make_type_pointer(a, t_i128);
 	t_f64_ptr      = make_type_pointer(a, t_f64);
 	t_u8_slice     = make_type_slice(a, t_u8);
 	t_string_slice = make_type_slice(a, t_string);

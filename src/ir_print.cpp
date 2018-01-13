@@ -54,9 +54,9 @@ void ir_write_string(irFileBuffer *f, char const *s) {
 void ir_write_byte(irFileBuffer *f, u8 c) {
 	ir_file_buffer_write(f, &c, 1);
 }
-void ir_write_i128(irFileBuffer *f, i128 i) {
+void ir_write_i64(irFileBuffer *f, i64 i) {
 	char buf[200] = {};
-	String str = i128_to_string(i, buf, gb_size_of(buf)-1);
+	String str = i64_to_string(i, buf, gb_size_of(buf)-1);
 	ir_write_string(f, str);
 }
 
@@ -280,8 +280,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		case Basic_u32:    ir_write_string(f, "i32");                  return;
 		case Basic_i64:    ir_write_string(f, "i64");                  return;
 		case Basic_u64:    ir_write_string(f, "i64");                  return;
-		case Basic_i128:   ir_write_string(f, "i128");                 return;
-		case Basic_u128:   ir_write_string(f, "i128");                 return;
 
 		case Basic_rune:   ir_write_string(f, "i32");                  return;
 
@@ -525,19 +523,19 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	}
 	case ExactValue_Integer: {
 		if (is_type_pointer(type)) {
-			if (i128_eq(value.value_integer, I128_ZERO)) {
+			if (value.value_integer == 0) {
 				ir_write_string(f, "null");
 			} else {
 				ir_write_string(f, "inttoptr (");
 				ir_print_type(f, m, t_int);
 				ir_write_byte(f, ' ');
-				ir_write_i128(f, value.value_integer);
+				ir_write_i64(f, value.value_integer);
 				ir_write_string(f, " to ");
 				ir_print_type(f, m, t_rawptr);
 				ir_write_string(f, ")");
 			}
 		} else {
-			ir_write_i128(f, value.value_integer);
+			ir_write_i64(f, value.value_integer);
 		}
 		break;
 	}

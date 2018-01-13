@@ -35,8 +35,8 @@ Calling_Convention :: enum {
 
 Type_Info_Enum_Value :: union {
 	rune,
-	i8, i16, i32, i64, i128, int,
-	u8, u16, u32, u64, u128, uint, uintptr,
+	i8, i16, i32, i64, int,
+	u8, u16, u32, u64, uint, uintptr,
 	f32, f64,
 };
 
@@ -180,7 +180,7 @@ DEFAULT_ALIGNMENT :: 2*align_of(rawptr);
 __INITIAL_MAP_CAP :: 16;
 
 __Map_Key :: struct {
-	hash: u128,
+	hash: u64,
 	str:  string,
 }
 
@@ -426,21 +426,20 @@ __get_map_key :: proc "contextless" (key: $K) -> __Map_Key {
 	switch _ in ti.variant {
 	case Type_Info_Integer:
 		switch 8*size_of(key) {
-		case   8: map_key.hash = u128((  ^u8)(&key)^);
-		case  16: map_key.hash = u128(( ^u16)(&key)^);
-		case  32: map_key.hash = u128(( ^u32)(&key)^);
-		case  64: map_key.hash = u128(( ^u64)(&key)^);
-		case 128: map_key.hash = u128((^u128)(&key)^);
+		case   8: map_key.hash = u64((  ^u8)(&key)^);
+		case  16: map_key.hash = u64(( ^u16)(&key)^);
+		case  32: map_key.hash = u64(( ^u32)(&key)^);
+		case  64: map_key.hash = u64(( ^u64)(&key)^);
 		case: panic("Unhandled integer size");
 		}
 	case Type_Info_Rune:
-		map_key.hash = u128((cast(^rune)&key)^);
+		map_key.hash = u64((cast(^rune)&key)^);
 	case Type_Info_Pointer:
-		map_key.hash = u128(uintptr((^rawptr)(&key)^));
+		map_key.hash = u64(uintptr((^rawptr)(&key)^));
 	case Type_Info_Float:
 		switch 8*size_of(key) {
-		case 32: map_key.hash = u128((^u32)(&key)^);
-		case 64: map_key.hash = u128((^u64)(&key)^);
+		case 32: map_key.hash = u64((^u32)(&key)^);
+		case 64: map_key.hash = u64((^u64)(&key)^);
 		case: panic("Unhandled float size");
 		}
 	case Type_Info_String:
@@ -928,17 +927,17 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 
 // Map stuff
 
-__default_hash :: proc(data: []byte) -> u128 {
-	fnv128a :: proc(data: []byte) -> u128 {
-		h: u128 = 0x6c62272e07bb014262b821756295c58d;
+__default_hash :: proc(data: []byte) -> u64 {
+	fnv64a :: proc(data: []byte) -> u64 {
+		h: u64 = 0xcbf29ce484222325;
 		for b in data {
-			h = (h ~ u128(b)) * 0x1000000000000000000013b;
+			h = (h ~ u64(b)) * 0x100000001b3;
 		}
 		return h;
 	}
-	return fnv128a(data);
+	return fnv64a(data);
 }
-__default_hash_string :: proc(s: string) -> u128 do return __default_hash(cast([]byte)s);
+__default_hash_string :: proc(s: string) -> u64 do return __default_hash(cast([]byte)s);
 
 __dynamic_map_reserve :: proc(using header: __Map_Header, cap: int, loc := #caller_location)  {
 	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap, loc);
@@ -1048,7 +1047,7 @@ __dynamic_map_hash_equal :: proc(h: __Map_Header, a, b: __Map_Key) -> bool {
 __dynamic_map_find :: proc(using h: __Map_Header, key: __Map_Key) -> __Map_Find_Result {
 	fr := __Map_Find_Result{-1, -1, -1};
 	if len(m.hashes) > 0 {
-		fr.hash_index = int(key.hash % u128(len(m.hashes)));
+		fr.hash_index = int(key.hash % u64(len(m.hashes)));
 		fr.entry_index = m.hashes[fr.hash_index];
 		for fr.entry_index >= 0 {
 			entry := __dynamic_map_get_entry(h, fr.entry_index);
