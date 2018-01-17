@@ -309,26 +309,26 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 }
 
 
-_parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: bool) {
+_parse_int :: proc(s: string, offset: int) -> (result: int, new_offset: int, ok: bool) {
 	is_digit :: inline proc(r: rune) -> bool{
 		return '0' <= r && r <= '9';
 	}
 
-	result := 0;
-	i := 0;
-	for i < len(s[offset..]) {
-		c := rune(s[offset+i]);
+	new_offset = offset;
+	n := len(s[new_offset..]);
+	for new_offset < n {
+		c := rune(s[new_offset]);
 		if !is_digit(c) do break;
-		i += 1;
+		new_offset += 1;
 
 		result *= 10;
 		result += int(c)-'0';
 	}
-
-	return result, offset+i, i != 0;
+	ok = new_offset > offset;
+	return;
 }
 
-_arg_number :: proc(fi: ^Fmt_Info, arg_index: int, format: string, offset, arg_count: int) -> (index, offset: int, ok: bool) {
+_arg_number :: proc(fi: ^Fmt_Info, arg_index: int, format: string, offset, arg_count: int) -> (index, new_offset: int, ok: bool) {
 	parse_arg_number :: proc(format: string) -> (int, int, bool) {
 		if len(format) < 3 do return 0, 1, false;
 
@@ -350,7 +350,9 @@ _arg_number :: proc(fi: ^Fmt_Info, arg_index: int, format: string, offset, arg_c
 		return arg_index, offset, false;
 	}
 	fi.reordered = true;
-	index, width, ok := parse_arg_number(format[offset..]);
+
+	width: int;
+	index, width, ok = parse_arg_number(format[offset..]);
 	if ok && 0 <= index && index < arg_count {
 		return index, offset+width, true;
 	}

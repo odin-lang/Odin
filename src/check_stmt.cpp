@@ -1165,135 +1165,76 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			break;
 		}
 
-		bool first_is_field_value = false;
-		if (rs->results.count > 0) {
-			bool fail = false;
-			first_is_field_value = (rs->results[0]->kind == AstNode_FieldValue);
-			for_array(i, rs->results) {
-				AstNode *arg = rs->results[i];
-				bool mix = false;
-				if (first_is_field_value) {
-					mix = arg->kind != AstNode_FieldValue;
-				} else {
-					mix = arg->kind == AstNode_FieldValue;
-				}
-				if (mix) {
-					error(arg, "Mixture of 'field = value' and value elements in a procedure all is not allowed");
-					fail = true;
-				}
-			}
+		// bool first_is_field_value = false;
+		// if (rs->results.count > 0) {
+		// 	bool fail = false;
+		// 	first_is_field_value = (rs->results[0]->kind == AstNode_FieldValue);
+		// 	for_array(i, rs->results) {
+		// 		AstNode *arg = rs->results[i];
+		// 		bool mix = false;
+		// 		if (first_is_field_value) {
+		// 			mix = arg->kind != AstNode_FieldValue;
+		// 		} else {
+		// 			mix = arg->kind == AstNode_FieldValue;
+		// 		}
+		// 		if (mix) {
+		// 			error(arg, "Mixture of 'field = value' and value elements in a procedure all is not allowed");
+		// 			fail = true;
+		// 		}
+		// 	}
 
-			if (fail) {
-				return;
-			}
-		}
+		// 	if (fail) {
+		// 		return;
+		// 	}
+		// }
 
 
 		Type *proc_type = c->proc_stack[c->proc_stack.count-1];
 		TypeProc *pt = &proc_type->Proc;
 		isize result_count = 0;
+		bool has_named_results = pt->has_named_results;
 		if (pt->results) {
 			result_count = proc_type->Proc.results->Tuple.variables.count;
 		}
 
 
-		isize result_count_excluding_defaults = result_count;
-		for (isize i = result_count-1; i >= 0; i--) {
-			Entity *e = pt->results->Tuple.variables[i];
-			if (e->kind == Entity_TypeName) {
-				break;
-			}
+		// isize result_count_excluding_defaults = result_count;
+		// for (isize i = result_count-1; i >= 0; i--) {
+		// 	Entity *e = pt->results->Tuple.variables[i];
+		// 	if (e->kind == Entity_TypeName) {
+		// 		break;
+		// 	}
 
-			GB_ASSERT(e->kind == Entity_Variable);
-			if (e->Variable.default_value.kind != ExactValue_Invalid ||
-			    e->Variable.default_is_nil) {
-				result_count_excluding_defaults--;
-				continue;
-			}
-			break;
-		}
+		// 	GB_ASSERT(e->kind == Entity_Variable);
+		// 	if (e->Variable.default_value.kind != ExactValue_Invalid ||
+		// 	    e->Variable.default_is_nil) {
+		// 		result_count_excluding_defaults--;
+		// 		continue;
+		// 	}
+		// 	break;
+		// }
 
 		Array<Operand> operands = {};
 		defer (array_free(&operands));
 
-		if (first_is_field_value) {
-			array_init_count(&operands, heap_allocator(), rs->results.count);
-			for_array(i, rs->results) {
-				AstNode *arg = rs->results[i];
-				ast_node(fv, FieldValue, arg);
-				check_expr(c, &operands[i], fv->value);
-			}
-		} else {
+		// if (first_is_field_value) {
+		// 	array_init_count(&operands, heap_allocator(), rs->results.count);
+		// 	for_array(i, rs->results) {
+		// 		AstNode *arg = rs->results[i];
+		// 		ast_node(fv, FieldValue, arg);
+		// 		check_expr(c, &operands[i], fv->value);
+		// 	}
+		// } else {
 			array_init(&operands, heap_allocator(), 2*rs->results.count);
 			check_unpack_arguments(c, nullptr, -1, &operands, rs->results, false);
-		}
+		// }
 
-
-		if (first_is_field_value) {
-			bool *visited = gb_alloc_array(c->allocator, bool, result_count);
-
-			for_array(i, rs->results) {
-				AstNode *arg = rs->results[i];
-				ast_node(fv, FieldValue, arg);
-				if (fv->field->kind != AstNode_Ident) {
-					gbString expr_str = expr_to_string(fv->field);
-					error(arg, "Invalid parameter name '%s' in return statement", expr_str);
-					gb_string_free(expr_str);
-					continue;
-				}
-				String name = fv->field->Ident.token.string;
-				isize index = lookup_procedure_result(pt, name);
-				if (index < 0) {
-					error(arg, "No result named '%.*s' for this procedure type", LIT(name));
-					continue;
-				}
-				if (visited[index]) {
-					error(arg, "Duplicate result '%.*s' in return statement", LIT(name));
-					continue;
-				}
-
-				visited[index] = true;
-				Operand *o = &operands[i];
-				Entity *e = pt->results->Tuple.variables[index];
-				check_assignment(c, &operands[i], e->type, str_lit("return statement"));
-			}
-
-			for (isize i = 0; i < result_count; i++) {
-				if (!visited[i]) {
-					Entity *e = pt->results->Tuple.variables[i];
-					if (is_blank_ident(e->token)) {
-						continue;
-					}
-					GB_ASSERT(e->kind == Entity_Variable);
-					if (e->Variable.default_value.kind != ExactValue_Invalid) {
-						continue;
-					}
-
-					if (e->Variable.default_is_nil) {
-						continue;
-					}
-
-					gbString str = type_to_string(e->type);
-					error(node, "Return value '%.*s' of type '%s' is missing in return statement",
-					      LIT(e->token.string), str);
-					gb_string_free(str);
-				}
-			}
-
-		} else if (result_count == 0 && rs->results.count > 0) {
+		if (result_count == 0 && rs->results.count > 0) {
 			error(rs->results[0], "No return values expected");
-		} else if (operands.count > result_count) {
-			if (result_count_excluding_defaults < result_count) {
-				error(node, "Expected a maximum of %td return values, got %td", result_count, operands.count);
-			} else {
-				error(node, "Expected %td return values, got %td", result_count, operands.count);
-			}
-		} else if (operands.count < result_count_excluding_defaults) {
-			if (result_count_excluding_defaults < result_count) {
-				error(node, "Expected a minimum of %td return values, got %td", result_count_excluding_defaults, operands.count);
-			} else {
-				error(node, "Expected %td return values, got %td", result_count_excluding_defaults, operands.count);
-			}
+		} else if (has_named_results && operands.count == 0) {
+			// Okay
+		} else if (operands.count != result_count) {
+			error(node, "Expected %td return values, got %td", result_count, operands.count);
 		} else {
 			isize max_count = rs->results.count;
 			for (isize i = 0; i < max_count; i++) {

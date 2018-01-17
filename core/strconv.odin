@@ -14,7 +14,7 @@ parse_bool :: proc(s: string) -> (result: bool = false, ok: bool) {
 	case "0", "f", "F", "false", "FALSE", "False":
 		return false, true;
 	}
-	return ok = false;
+	return;
 }
 
 _digit_value :: proc(r: rune) -> int {
@@ -428,7 +428,6 @@ digits := "0123456789abcdefghijklmnopqrstuvwxyz";
 
 
 is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned: u64, neg: bool) {
-	neg := false;
 	if is_signed {
 		switch bit_size {
 		case 8:

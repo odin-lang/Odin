@@ -1,10 +1,15 @@
 // #define NO_ARRAY_BOUNDS_CHECK
+// #define NO_POINTER_ARITHMETIC
 
 #include "common.cpp"
 #include "timings.cpp"
 #include "build_settings.cpp"
 #include "tokenizer.cpp"
 #include "exact_value.cpp"
+
+#include "parser.hpp"
+#include "checker.hpp"
+
 #include "parser.cpp"
 #include "docs.cpp"
 #include "checker.cpp"
@@ -37,6 +42,7 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	// gb_printf_err("%.*s\n", cast(int)cmd_len, cmd_line);
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	defer (gb_temp_arena_memory_end(tmp));
 
 	cmd = string_to_string16(string_buffer_allocator, make_string(cast(u8 *)cmd_line, cmd_len-1));
 
@@ -54,7 +60,6 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 		exit_code = -1;
 	}
 
-	gb_temp_arena_memory_end(tmp);
 	return exit_code;
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
@@ -386,12 +391,10 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_CrossCompile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							cross_compile_target = value.value_string;
-#ifdef GB_SYSTEM_UNIX
-#ifdef GB_ARCH_64_BIT
+#if defined(GB_SYSTEM_UNIX) && defined(GB_ARCH_64_BIT)
 							if (str_eq_ignore_case(cross_compile_target, str_lit("Essence"))) {
 
 							} else
-#endif
 #endif
 							{
 								gb_printf_err("Unsupported cross compilation target '%.*s'\n", LIT(cross_compile_target));
