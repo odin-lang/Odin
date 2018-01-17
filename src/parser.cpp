@@ -210,13 +210,6 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 		Token        close; \
 		Token        ellipsis; \
 	}) \
-	AST_NODE_KIND(MacroCallExpr, "macro call expression", struct { \
-		AstNode *    macro; \
-		Token        bang; \
-		Array<AstNode *> args; \
-		Token        open; \
-		Token        close; \
-	}) \
 	AST_NODE_KIND(FieldValue,    "field value",         struct { Token eq; AstNode *field, *value; }) \
 	AST_NODE_KIND(TernaryExpr,   "ternary expression",  struct { AstNode *cond, *x, *y; }) \
 	AST_NODE_KIND(TypeAssertion, "type assertion",      struct { AstNode *expr; Token dot; AstNode *type; }) \
@@ -567,7 +560,6 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_BinaryExpr:    return ast_node_token(node->BinaryExpr.left);
 	case AstNode_ParenExpr:     return node->ParenExpr.open;
 	case AstNode_CallExpr:      return ast_node_token(node->CallExpr.proc);
-	case AstNode_MacroCallExpr: return ast_node_token(node->MacroCallExpr.macro);
 	case AstNode_SelectorExpr:
 		if (node->SelectorExpr.selector != nullptr) {
 			return ast_node_token(node->SelectorExpr.selector);
@@ -731,10 +723,6 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_CallExpr:
 		n->CallExpr.proc = clone_ast_node(a, n->CallExpr.proc);
 		n->CallExpr.args = clone_ast_node_array(a, n->CallExpr.args);
-		break;
-	case AstNode_MacroCallExpr:
-		n->MacroCallExpr.macro = clone_ast_node(a, n->MacroCallExpr.macro);
-		n->MacroCallExpr.args  = clone_ast_node_array(a, n->MacroCallExpr.args);
 		break;
 
 	case AstNode_FieldValue:
@@ -1046,16 +1034,6 @@ AstNode *ast_call_expr(AstFile *f, AstNode *proc, Array<AstNode *> args, Token o
 	result->CallExpr.open     = open;
 	result->CallExpr.close    = close;
 	result->CallExpr.ellipsis = ellipsis;
-	return result;
-}
-
-AstNode *ast_macro_call_expr(AstFile *f, AstNode *macro, Token bang, Array<AstNode *> args, Token open, Token close) {
-	AstNode *result = make_ast_node(f, AstNode_MacroCallExpr);
-	result->MacroCallExpr.macro = macro;
-	result->MacroCallExpr.bang  = bang;
-	result->MacroCallExpr.args  = args;
-	result->MacroCallExpr.open  = open;
-	result->MacroCallExpr.close = close;
 	return result;
 }
 
@@ -2634,36 +2612,6 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 	return ast_call_expr(f, operand, args, open_paren, close_paren, ellipsis);
 }
 
-
-AstNode *parse_macro_call_expr(AstFile *f, AstNode *operand) {
-	Array<AstNode *> args = make_ast_node_array(f);
-	Token bang, open_paren, close_paren;
-
-	bang = expect_token(f, Token_Not);
-
-	f->expr_level++;
-	open_paren = expect_token(f, Token_OpenParen);
-
-	while (f->curr_token.kind != Token_CloseParen &&
-	       f->curr_token.kind != Token_EOF) {
-		if (f->curr_token.kind == Token_Comma) {
-			syntax_error(f->curr_token, "Expected an expression not a ,");
-		}
-
-		AstNode *arg = parse_expr(f, false);
-		array_add(&args, arg);
-
-		if (!allow_token(f, Token_Comma)) {
-			break;
-		}
-	}
-
-	f->expr_level--;
-	close_paren = expect_closing(f, Token_CloseParen, str_lit("argument list"));
-
-	return ast_macro_call_expr(f, operand, bang, args, open_paren, close_paren);
-}
-
 AstNode *parse_atom_expr(AstFile *f, AstNode *operand, bool lhs) {
 	if (operand == nullptr) {
 		if (f->allow_type) return nullptr;
@@ -2678,9 +2626,6 @@ AstNode *parse_atom_expr(AstFile *f, AstNode *operand, bool lhs) {
 		switch (f->curr_token.kind) {
 		case Token_OpenParen:
 			operand = parse_call_expr(f, operand);
-			break;
-		case Token_Not:
-			operand = parse_macro_call_expr(f, operand);
 			break;
 
 		case Token_Period: {
