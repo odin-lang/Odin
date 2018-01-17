@@ -5932,11 +5932,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		return check_call_expr(c, o, node);
 	case_end;
 
-	case_ast_node(ce, MacroCallExpr, node);
-		error(node, "Macro calls are not yet supported");
-		return kind;
-	case_end;
-
 	case_ast_node(de, DerefExpr, node);
 		check_expr_or_type(c, o, de->expr);
 		if (o->mode == Addressing_Invalid) {
