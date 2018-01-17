@@ -1427,6 +1427,10 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			} else if (proc->debug_scope != nullptr) {
 				id = proc->debug_scope->id;
 			}
+			if (proc->entity != nullptr) {
+				pos = proc->entity->token.pos;
+			}
+
 			if (id > 0) {
 				ir_fprintf(f, ", !dbg !DILocation(line: %td, column: %td, scope: !%d)", pos.line, pos.column, id);
 			}
@@ -1814,7 +1818,7 @@ void print_llvm_ir(irGen *ir) {
 		GB_ASSERT(word_bits == 64);
 		ir_write_string(f, "target triple = \"x86_64-apple-macosx10.8\"\n\n");
 	} else if (build_context.ODIN_OS == "windows") {
-		// ir_fprintf(f, "target triple = \"x86%s-pc-windows\"\n\n", word_bits == 64 ? "_64" : "");
+		ir_fprintf(f, "target triple = \"x86%s-pc-windows-msvc\"\n\n", word_bits == 64 ? "_64" : "");
 	}
 
 	ir_print_encoded_local(f, str_lit("..opaque"));
