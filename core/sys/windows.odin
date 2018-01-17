@@ -26,9 +26,7 @@ Wnd_Proc  :: #type proc "c" (Hwnd, u32, Wparam, Lparam) -> Lresult;
 
 Long_Ptr :: int;
 
-Bool :: i32;
-FALSE: Bool : 0;
-TRUE:  Bool : 1;
+Bool :: b32;
 
 Point :: struct {
 	x, y: i32,

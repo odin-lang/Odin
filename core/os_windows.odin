@@ -76,7 +76,7 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 
 	share_mode := u32(win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE);
 	sa: ^win32.Security_Attributes = nil;
-	sa_inherit := win32.Security_Attributes{length = size_of(win32.Security_Attributes), inherit_handle = 1};
+	sa_inherit := win32.Security_Attributes{length = size_of(win32.Security_Attributes), inherit_handle = true};
 	if mode&O_CLOEXEC == 0 {
 		sa = &sa_inherit;
 	}
@@ -123,7 +123,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 		to_write: i32 = min(i32(remaining), MAX);
 
 		e := win32.write_file(win32.Handle(fd), &data[total_write], to_write, &single_write_length, nil);
-		if single_write_length <= 0 || e == win32.FALSE {
+		if single_write_length <= 0 || !e {
 			err := Errno(win32.get_last_error());
 			return int(total_write), err;
 		}
@@ -145,7 +145,7 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 		to_read: u32 = min(u32(remaining), MAX);
 
 		e := win32.read_file(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
-		if single_read_length <= 0 || e == win32.FALSE {
+		if single_read_length <= 0 || !e {
 			err := Errno(win32.get_last_error());
 			return int(total_read), err;
 		}
@@ -177,7 +177,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 file_size :: proc(fd: Handle) -> (i64, Errno) {
 	length: i64;
 	err: Errno;
-	if win32.get_file_size_ex(win32.Handle(fd), &length) == 0 {
+	if !win32.get_file_size_ex(win32.Handle(fd), &length) {
 		err = Errno(win32.get_last_error());
 	}
 	return length, err;
@@ -219,7 +219,7 @@ last_write_time_by_name :: proc(name: string) -> File_Time {
 
 	copy(buf[..], cast([]byte)name);
 
-	if win32.get_file_attributes_ex_a(&buf[0], win32.GetFileExInfoStandard, &data) != 0 {
+	if win32.get_file_attributes_ex_a(&buf[0], win32.GetFileExInfoStandard, &data) {
 		last_write_time = data.last_write_time;
 	}
 
