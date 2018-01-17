@@ -75,6 +75,23 @@ general_stuff :: proc() {
 		for in 0..2  {} // 0, 1
 		for in 0...2 {} // 0, 1, 2
 	}
+
+	{ // Multiple sized booleans
+
+		x0: bool; // default
+		x1: b8  = true;
+		x2: b16 = false;
+		x3: b32 = true;
+		x4: b64 = false;
+
+		fmt.printf("x1: %T = %v;\n", x1, x1);
+		fmt.printf("x2: %T = %v;\n", x2, x2);
+		fmt.printf("x3: %T = %v;\n", x3, x3);
+		fmt.printf("x4: %T = %v;\n", x4, x4);
+
+		// Having specific sized booleans is very useful when dealing with foreign code
+		// and to enforce specific alignment for a boolean, especially within a struct
+	}
 }
 
 default_struct_values :: proc() {
@@ -632,8 +649,8 @@ using_in :: proc() {
 }
 
 main :: proc() {
+	general_stuff();
 	when false {
-		general_stuff();
 		default_struct_values();
 		union_type();
 		parametric_polymorphism();

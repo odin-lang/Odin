@@ -3019,8 +3019,18 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return value;
 	}
 
+
+	// bool <-> llvm bool
+	if (is_type_boolean(src) && dst == t_llvm_bool) {
+		return ir_emit(proc, ir_instr_conv(proc, irConv_trunc, value, src_type, t));
+	}
+	if (src == t_llvm_bool && is_type_boolean(dst)) {
+		return ir_emit(proc, ir_instr_conv(proc, irConv_zext, value, src_type, t));
+	}
+
 	// integer -> integer
-	if (is_type_integer(src) && is_type_integer(dst)) {
+	if ((is_type_integer(src) && is_type_integer(dst)) ||
+	    (is_type_boolean(src) && is_type_boolean(dst))) {
 		GB_ASSERT(src->kind == Type_Basic &&
 		          dst->kind == Type_Basic);
 		i64 sz = type_size_of(proc->module->allocator, default_type(src));
@@ -3044,13 +3054,6 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return ir_emit(proc, ir_instr_conv(proc, kind, value, src_type, t));
 	}
 
-	// bool <-> llvm bool
-	if (is_type_boolean(src) && dst == t_llvm_bool) {
-		return ir_emit(proc, ir_instr_conv(proc, irConv_trunc, value, src_type, t));
-	}
-	if (src == t_llvm_bool && is_type_boolean(dst)) {
-		return ir_emit(proc, ir_instr_conv(proc, irConv_zext, value, src_type, t));
-	}
 
 	// boolean -> integer
 	if (is_type_boolean(src) && is_type_integer(dst)) {
@@ -3061,7 +3064,6 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	if (is_type_integer(src) && is_type_boolean(dst)) {
 		return ir_emit_comp(proc, Token_NotEq, value, v_zero);
 	}
-
 
 	// float -> float
 	if (is_type_float(src) && is_type_float(dst)) {
@@ -7870,6 +7872,10 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			ir_emit_comment(proc, str_lit("Type_Info_Basic"));
 			switch (t->Basic.kind) {
 			case Basic_bool:
+			case Basic_b8:
+			case Basic_b16:
+			case Basic_b32:
+			case Basic_b64:
 				tag = ir_emit_conv(proc, variant_ptr, t_type_info_boolean_ptr);
 				break;
 
