@@ -1544,21 +1544,15 @@ irValue *ir_emit_global_call(irProcedure *proc, char const *name_, irValue **arg
 irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
 	Type *a = type_deref(ir_type(address));
 
-	if (ir_type(value) == t_llvm_bool) {
-		value = ir_emit_conv(p, value, t_bool);
-	}
-	if (a == t_llvm_bool) {
-		value = ir_emit_conv(p, value, t_llvm_bool);
+	if (is_type_boolean(a)) {
+		// NOTE(bill): There are multiple sized booleans, thus force a conversion (if necessarily)
+		value = ir_emit_conv(p, value, a);
 	}
 
 	Type *b = ir_type(value);
 	if (!is_type_untyped(b)) {
 		GB_ASSERT_MSG(are_types_identical(core_type(a), core_type(b)), "%s %s", type_to_string(a), type_to_string(b));
 	}
-
-	// if (is_type_boolean(a)) {
-		// return ir_emit(p, ir_instr_store_bool(p, address, value, false));
-	// }
 	return ir_emit(p, ir_instr_store(p, address, value, false));
 }
 irValue *ir_emit_load(irProcedure *p, irValue *address) {
