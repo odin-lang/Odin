@@ -34,13 +34,12 @@ slice_ptr :: proc "contextless" (ptr: ^$T, len: int) -> []T {
 slice_to_bytes :: proc "contextless" (slice: $E/[]$T) -> []byte {
 	s := transmute(raw.Slice)slice;
 	s.len *= size_of(T);
-	s.cap *= size_of(T);
 	return transmute([]byte)s;
 }
 
 ptr_to_bytes :: proc "contextless" (ptr: ^$T, len := 1) -> []byte {
     assert(len >= 0);
-    return transmute([]byte)raw.Slice{ptr, len*size_of(T), len*size_of(T)};
+    return transmute([]byte)raw.Slice{ptr, len*size_of(T)};
 }
 
 
