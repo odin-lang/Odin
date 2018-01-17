@@ -25,7 +25,7 @@ read_entire_file :: proc(name: string) -> (data: []byte, success: bool) {
 		return nil, true;
 	}
 
-	data := make([]byte, int(length));
+	data = make([]byte, int(length));
 	if data == nil {
 		return nil, false;
 	}

@@ -158,6 +158,7 @@ struct TypeStruct {
 		bool     is_polymorphic;                          \
 		bool     is_poly_specialized;                     \
 		bool     has_proc_default_values;                 \
+		bool     has_named_results;                       \
 		isize    specialization_count;                    \
 		ProcCallingConvention calling_convention;         \
 	})                                                    \

@@ -648,15 +648,35 @@ using_in :: proc() {
 	println(f);
 }
 
+named_proc_parameters :: proc() {
+	foo0 :: proc() -> int {
+		return 123;
+	}
+	foo1 :: proc() -> (a: int) {
+		a = 123;
+		return;
+	}
+	foo2 :: proc() -> (a, b: int) {
+		// Named return values act like variables within the scope
+		a = 321;
+		b = 567;
+		return b, a;
+	}
+	fmt.println("foo0 =", foo0());
+	fmt.println("foo1 =", foo1());
+	fmt.println("foo2 =", foo2());
+}
+
 main :: proc() {
-	general_stuff();
 	when false {
+		general_stuff();
 		default_struct_values();
 		union_type();
 		parametric_polymorphism();
 		threading_example();
 		array_programming();
 		using_in();
+		named_proc_parameters();
 	}
 }
 

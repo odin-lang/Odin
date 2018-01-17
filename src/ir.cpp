@@ -6657,63 +6657,14 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		isize return_count = proc->type->Proc.result_count;
 		isize res_count = rs->results.count;
 
-		if (res_count > 0 &&
-		    rs->results[0]->kind == AstNode_FieldValue) {
-			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
-			defer (gb_temp_arena_memory_end(tmp));
-
-			Array<irValue *> results;
-			array_init_count(&results, proc->module->tmp_allocator, return_count);
-
-			for_array(arg_index, rs->results) {
-				AstNode *arg = rs->results[arg_index];
-				ast_node(fv, FieldValue, arg);
-				GB_ASSERT(fv->field->kind == AstNode_Ident);
-				String name = fv->field->Ident.token.string;
-				isize index = lookup_procedure_result(&proc->type->Proc, name);
-				GB_ASSERT(index >= 0);
-				irValue *expr = ir_build_expr(proc, fv->value);
-				results[index] = expr;
-			}
-			for (isize i = 0; i < return_count; i++) {
-				Entity *e = tuple->variables[i];
-				GB_ASSERT(e->kind == Entity_Variable);
-				if (results[i] == nullptr) {
-					if (e->Variable.default_value.kind != ExactValue_Invalid) {
-						results[i] = ir_value_constant(proc->module->allocator, e->type, e->Variable.default_value);
-					} else {
-						results[i] = ir_value_nil(proc->module->allocator, e->type);
-					}
-				} else {
-					results[i] = ir_emit_conv(proc, results[i], e->type);
-				}
-			}
-
-			if (results.count == 1) {
-				v = results[0];
-			} else {
-				GB_ASSERT(results.count == return_count);
-
-				Type *ret_type = proc->type->Proc.results;
-				v = ir_add_local_generated(proc, ret_type);
-				for_array(i, results) {
-					irValue *field = ir_emit_struct_ep(proc, v, cast(i32)i);
-					irValue *res = results[i];
-					ir_emit_store(proc, field, res);
-				}
-
-				v = ir_emit_load(proc, v);
-			}
-		} else if (return_count == 0) {
+		if (return_count == 0) {
 			// No return values
 		} else if (return_count == 1) {
 			Entity *e = tuple->variables[0];
 			if (res_count == 0) {
-				if (e->Variable.default_value.kind != ExactValue_Invalid) {
-					v = ir_value_constant(proc->module->allocator, e->type, e->Variable.default_value);
-				} else {
-					v = ir_value_nil(proc->module->allocator, e->type);
-				}
+				irValue **found = map_get(&proc->module->values, hash_entity(e));
+				GB_ASSERT(found);
+				v = ir_emit_load(proc, *found);
 			} else {
 				v = ir_build_expr(proc, rs->results[0]);
 				v = ir_emit_conv(proc, v, e->type);
@@ -6725,33 +6676,28 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			Array<irValue *> results;
 			array_init(&results, proc->module->tmp_allocator, return_count);
 
-			isize total_index = 0;
-			isize res_index = 0;
-			for (; res_index < res_count; res_index++) {
-				irValue *res = ir_build_expr(proc, rs->results[res_index]);
-				Type *t = ir_type(res);
-				if (t->kind == Type_Tuple) {
-					for_array(i, t->Tuple.variables) {
-						Entity *e = t->Tuple.variables[i];
-						irValue *v = ir_emit_struct_ev(proc, res, cast(i32)i);
-						array_add(&results, v);
-						total_index++;
+			if (res_count != 0) {
+				for (isize res_index = 0; res_index < res_count; res_index++) {
+					irValue *res = ir_build_expr(proc, rs->results[res_index]);
+					Type *t = ir_type(res);
+					if (t->kind == Type_Tuple) {
+						for_array(i, t->Tuple.variables) {
+							Entity *e = t->Tuple.variables[i];
+							irValue *v = ir_emit_struct_ev(proc, res, cast(i32)i);
+							array_add(&results, v);
+						}
+					} else {
+						array_add(&results, res);
 					}
-				} else {
+				}
+			} else {
+				for (isize res_index = 0; res_index < return_count; res_index++) {
+					Entity *e = tuple->variables[res_index];
+					irValue **found = map_get(&proc->module->values, hash_entity(e));
+					GB_ASSERT(found);
+					irValue *res = ir_emit_load(proc, *found);
 					array_add(&results, res);
-					total_index++;
 				}
-			}
-			while (total_index < return_count) {
-				Entity *e = tuple->variables[total_index];
-				irValue *res = nullptr;
-				if (e->Variable.default_value.kind != ExactValue_Invalid) {
-					res = ir_value_constant(proc->module->allocator, e->type, e->Variable.default_value);
-				} else {
-					res = ir_value_nil(proc->module->allocator, e->type);
-				}
-				array_add(&results, res);
-				total_index++;
 			}
 
 			GB_ASSERT(results.count == return_count);
@@ -6766,7 +6712,6 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			}
 
 			v = ir_emit_load(proc, v);
-
 		}
 
 		ir_emit_return(proc, v);
@@ -7436,6 +7381,26 @@ void ir_begin_procedure_body(irProcedure *proc) {
 				if (e->token.string != "" && !is_blank_ident(e->token)) {
 					irValue *param = ir_add_param(proc, e, nullptr, abi_type);
 					array_add(&proc->params, param);
+				}
+			}
+		}
+	}
+
+	if (proc->type->Proc.has_named_results) {
+		GB_ASSERT(proc->type->Proc.result_count > 0);
+		TypeTuple *results = &proc->type->Proc.results->Tuple;
+		for_array(i, results->variables) {
+			Entity *e = results->variables[i];
+			if (e->kind != Entity_Variable) {
+				continue;
+			}
+
+			if (e->token.string != "") {
+				GB_ASSERT(!is_blank_ident(e->token));
+				irValue *res = ir_add_local(proc, e, e->identifier, true);
+				if (e->Variable.default_value.kind != ExactValue_Invalid) {
+					irValue *c = ir_value_constant(a, e->type, e->Variable.default_value);
+					ir_emit_store(proc, res, c);
 				}
 			}
 		}

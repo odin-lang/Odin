@@ -1423,10 +1423,16 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 					token = name->Ident.token;
 				}
 
+				if (is_blank_ident(token))  {
+					error(name, "Result value cannot be a blank identifer `_`");
+				}
+
 				Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
+				param->flags |= EntityFlag_Result;
 				param->Variable.default_value = value;
 				param->Variable.default_is_nil = default_is_nil;
 				array_add(&variables, param);
+				add_entity(c, scope, name, param);
 			}
 		}
 	}
@@ -1672,6 +1678,12 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 			}
 		}
 	}
+
+	if (result_count > 0) {
+		Entity *first = results->Tuple.variables[0];
+		type->Proc.has_named_results = first->token.string != "";
+	}
+
 
 	ProcCallingConvention cc = pt->calling_convention;
 	if (cc == ProcCC_ForeignBlockDefault) {

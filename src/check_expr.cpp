@@ -1108,6 +1108,12 @@ bool check_binary_op(Checker *c, Operand *o, Token op) {
 			error(op, "Operator '%.*s' is only allowed with numeric or pointer expressions", LIT(op.string));
 			return false;
 		}
+#if defined(NO_POINTER_ARITHMETIC)
+		if (is_type_pointer(type)) {
+			error(o->expr, "Pointer arithmetic is not supported");
+			return false;
+		}
+#else
 		if (is_type_pointer(type)) {
 			o->type = t_int;
 		}
@@ -1118,6 +1124,7 @@ bool check_binary_op(Checker *c, Operand *o, Token op) {
 			return false;
 		}
 		break;
+#endif
 
 	case Token_Mul:
 	case Token_Quo:
@@ -1644,6 +1651,12 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 		return operand;
 	}
 
+#if defined(NO_POINTER_ARITHMETIC)
+	operand.mode = Addressing_Invalid;
+	error(operand.expr, "Pointer arithmetic is not supported");
+	return operand;
+#else
+
 	Type *base_ptr = base_type(ptr->type); GB_ASSERT(base_ptr->kind == Type_Pointer);
 	Type *elem = base_ptr->Pointer.elem;
 	i64 elem_size = type_size_of(c->allocator, elem);
@@ -1670,6 +1683,7 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 	}
 
 	return operand;
+#endif
 }
 
 
