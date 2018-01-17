@@ -269,8 +269,12 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 	switch (t->kind) {
 	case Type_Basic:
 		switch (t->Basic.kind) {
-		case Basic_bool:      ir_write_string(f, "i8"); return;
-		case Basic_llvm_bool: ir_write_string(f, "i1"); return;
+		case Basic_llvm_bool: ir_write_string(f, "i1");  return;
+		case Basic_bool:      ir_write_string(f, "i8");  return;
+		case Basic_b8:        ir_write_string(f, "i8");  return;
+		case Basic_b16:       ir_write_string(f, "i16"); return;
+		case Basic_b32:       ir_write_string(f, "i32"); return;
+		case Basic_b64:       ir_write_string(f, "i64"); return;
 
 		case Basic_i8:     ir_write_string(f, "i8");                   return;
 		case Basic_u8:     ir_write_string(f, "i8");                   return;

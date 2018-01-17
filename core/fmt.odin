@@ -159,10 +159,11 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 	case Type_Info_Named:
 		write_string(buf, info.name);
 	case Type_Info_Integer:
-		switch {
-		case ti == type_info_of(int):     write_string(buf, "int");
-		case ti == type_info_of(uint):    write_string(buf, "uint");
-		case ti == type_info_of(uintptr): write_string(buf, "uintptr");
+		a := any{type_info = ti};
+		switch _ in a {
+		case int:     write_string(buf, "int");
+		case uint:    write_string(buf, "uint");
+		case uintptr: write_string(buf, "uintptr");
 		case:
 			if info.signed do write_byte(buf, 'i');
 			else           do write_byte(buf, 'u');
@@ -182,8 +183,16 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 		case 8:  write_string(buf, "complex64");
 		case 16: write_string(buf, "complex128");
 		}
-	case Type_Info_String:  write_string(buf, "string");
-	case Type_Info_Boolean: write_string(buf, "bool");
+	case Type_Info_String:
+		write_string(buf, "string");
+	case Type_Info_Boolean:
+		a := any{type_info = ti};
+		switch _ in a {
+		case bool: write_string(buf, "bool");
+		case:
+			write_byte(buf, 'b');
+			write_i64(buf, i64(8*ti.size), 10);
+		}
 	case Type_Info_Any:
 		write_string(buf, "any");
 
@@ -948,8 +957,13 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	base_arg := arg;
 	base_arg.type_info = type_info_base(base_arg.type_info);
 	switch a in base_arg {
+	case bool:          fmt_bool(fi, bool(a), verb);
+	case b8:            fmt_bool(fi, bool(a), verb);
+	case b16:           fmt_bool(fi, bool(a), verb);
+	case b32:           fmt_bool(fi, bool(a), verb);
+	case b64:           fmt_bool(fi, bool(a), verb);
+
 	case any:           fmt_arg(fi,  a, verb);
-	case bool:          fmt_bool(fi, a, verb);
 	case rune:          fmt_rune(fi, a, verb);
 
 	case f32:           fmt_float(fi, f64(a), 32, verb);

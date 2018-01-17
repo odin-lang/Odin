@@ -6,6 +6,11 @@ enum BasicKind {
 
 	Basic_llvm_bool,
 	Basic_bool,
+	Basic_b8,
+	Basic_b16,
+	Basic_b32,
+	Basic_b64,
+
 	Basic_i8,
 	Basic_u8,
 	Basic_i16,
@@ -238,6 +243,10 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_llvm_bool,         BasicFlag_Boolean,                          1, STR_LIT("llvm bool")}},
 
 	{Type_Basic, {Basic_bool,              BasicFlag_Boolean,                          1, STR_LIT("bool")}},
+	{Type_Basic, {Basic_b8,                BasicFlag_Boolean,                          1, STR_LIT("b8")}},
+	{Type_Basic, {Basic_b16,               BasicFlag_Boolean,                          2, STR_LIT("b16")}},
+	{Type_Basic, {Basic_b32,               BasicFlag_Boolean,                          4, STR_LIT("b32")}},
+	{Type_Basic, {Basic_b64,               BasicFlag_Boolean,                          8, STR_LIT("b64")}},
 
 	{Type_Basic, {Basic_i8,                BasicFlag_Integer,                          1, STR_LIT("i8")}},
 	{Type_Basic, {Basic_u8,                BasicFlag_Integer | BasicFlag_Unsigned,     1, STR_LIT("u8")}},
