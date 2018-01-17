@@ -1861,6 +1861,7 @@ void print_llvm_ir(irGen *ir) {
 
 	bool dll_main_found = false;
 
+	// NOTE(bill): Print foreign prototypes first
 	for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		irValue *v = entry->value;
@@ -1873,6 +1874,7 @@ void print_llvm_ir(irGen *ir) {
 		}
 	}
 
+	// NOTE(bill): Print procedures with bodies next
 	for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		irValue *v = entry->value;
