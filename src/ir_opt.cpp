@@ -232,7 +232,7 @@ bool ir_opt_block_fusion(irProcedure *proc, irBlock *a) {
 	array_pop(&a->instrs); // Remove branch at end
 	for_array(i, b->instrs) {
 		array_add(&a->instrs, b->instrs[i]);
-		ir_set_instr_parent(b->instrs[i], a);
+		ir_set_instr_block(b->instrs[i], a);
 	}
 
 	array_clear(&a->succs);

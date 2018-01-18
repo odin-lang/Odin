@@ -59,7 +59,7 @@ struct irDomNode {
 struct irBlock {
 	i32          index;
 	String       label;
-	irProcedure *parent;
+	irProcedure *proc;
 	AstNode *    node; // Can be nullptr
 	Scope *      scope;
 	isize        scope_index;
@@ -112,11 +112,6 @@ struct irBranchBlocks {
 struct irDebugLocation {
 	TokenPos     pos;
 	irDebugInfo *debug_scope;
-};
-
-struct irDebugScope {
-	irDebugScope *  parent;
-	irDebugLocation loc;
 };
 
 struct irProcedure {
@@ -319,7 +314,7 @@ String const ir_conv_strings[] = {
 struct irInstr {
 	irInstrKind kind;
 
-	irBlock *parent;
+	irBlock *block;
 	Type *type;
 
 	union {
@@ -743,9 +738,9 @@ void ir_add_edge(irBlock *from, irBlock *to) {
 	}
 }
 
-void ir_set_instr_parent(irValue *instr, irBlock *parent) {
+void ir_set_instr_block(irValue *instr, irBlock *block) {
 	if (instr->kind == irValue_Instr) {
-		instr->Instr.parent = parent;
+		instr->Instr.block = block;
 	}
 }
 
@@ -783,7 +778,7 @@ Array<irValue *> *ir_value_referrers(irValue *v) {
 ////////////////////////////////////////////////////////////////
 
 void     ir_module_add_value    (irModule *m, Entity *e, irValue *v);
-irValue *ir_emit_zero_init      (irProcedure *p, irValue *address);
+irValue *ir_emit_zero_init      (irProcedure *p, irValue *address, AstNode *expr);
 irValue *ir_emit_comment        (irProcedure *p, String text);
 irValue *ir_emit_store          (irProcedure *p, irValue *address, irValue *value);
 irValue *ir_emit_load           (irProcedure *p, irValue *address);
@@ -1134,7 +1129,7 @@ irValue *ir_value_constant_slice(gbAllocator a, Type *type, irValue *backing_arr
 irValue *ir_emit(irProcedure *proc, irValue *instr) {
 	GB_ASSERT(instr->kind == irValue_Instr);
 	irBlock *b = proc->curr_block;
-	instr->Instr.parent = b;
+	instr->Instr.block = b;
 	if (b != nullptr) {
 		irInstr *i = ir_get_last_instr(b);
 		if (!ir_is_instr_terminating(i)) {
@@ -1230,7 +1225,7 @@ irBlock *ir_new_block(irProcedure *proc, AstNode *node, char *label) {
 	v->Block.label  = make_string_c(label);
 	v->Block.node   = node;
 	v->Block.scope  = scope;
-	v->Block.parent = proc;
+	v->Block.proc   = proc;
 	// TODO(bill): Is this correct or even needed?
 	v->Block.scope_index = proc->scope_index;
 
@@ -1356,13 +1351,13 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 irValue *ir_add_local(irProcedure *proc, Entity *e, AstNode *expr, bool zero_initialized) {
 	irBlock *b = proc->decl_block; // all variables must be in the first block
 	irValue *instr = ir_instr_local(proc, e, true);
-	instr->Instr.parent = b;
+	instr->Instr.block = b;
 	array_add(&b->instrs, instr);
 	array_add(&b->locals, instr);
 	proc->local_count++;
 
 	if (zero_initialized) {
-		ir_emit_zero_init(proc, instr);
+		ir_emit_zero_init(proc, instr, expr);
 	}
 
 	if (expr != nullptr && proc->entity != nullptr) {
@@ -1539,7 +1534,7 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 //
 ////////////////////////////////////////////////////////////////
 
-irValue *ir_emit_global_call(irProcedure *proc, char const *name_, irValue **args, isize arg_count);
+irValue *ir_emit_global_call(irProcedure *proc, char const *name_, irValue **args, isize arg_count, AstNode *expr = nullptr);
 
 irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
 	Type *a = type_deref(ir_type(address));
@@ -1567,13 +1562,20 @@ irValue *ir_emit_select(irProcedure *p, irValue *cond, irValue *t, irValue *f) {
 	return ir_emit(p, ir_instr_select(p, cond, t, f));
 }
 
-irValue *ir_emit_zero_init(irProcedure *p, irValue *address) {
+void ir_add_debug_location_to_value(irProcedure *proc, irValue *v, AstNode *e) {
+	if (v != nullptr && e != nullptr) {
+		v->loc.debug_scope = proc->debug_scope;
+		v->loc.pos = ast_node_token(e).pos;
+	}
+}
+
+irValue *ir_emit_zero_init(irProcedure *p, irValue *address, AstNode *expr) {
 	gbAllocator a = p->module->allocator;
 	Type *t = type_deref(ir_type(address));
 	irValue **args = gb_alloc_array(a, irValue *, 2);
 	args[0] = ir_emit_conv(p, address, t_rawptr);
 	args[1] = ir_const_int(a, type_size_of(a, t));
-	return ir_emit_global_call(p, "__mem_zero", args, 2);
+	return ir_emit_global_call(p, "__mem_zero", args, 2, expr);
 	// return ir_emit(p, ir_instr_zero_init(p, address));
 }
 
@@ -1668,12 +1670,14 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 	return result;
 }
 
-irValue *ir_emit_global_call(irProcedure *proc, char const *name_, irValue **args, isize arg_count) {
+irValue *ir_emit_global_call(irProcedure *proc, char const *name_, irValue **args, isize arg_count, AstNode *expr) {
 	String name = make_string_c(cast(char *)name_);
 	irValue **found = map_get(&proc->module->members, hash_string(name));
 	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
 	irValue *gp = *found;
-	return ir_emit_call(proc, gp, args, arg_count);
+	irValue *call = ir_emit_call(proc, gp, args, arg_count);
+	ir_add_debug_location_to_value(proc, call, expr);
+	return call;
 }
 
 
@@ -4033,7 +4037,7 @@ void ir_emit_increment(irProcedure *proc, irValue *addr) {
 
 }
 
-void ir_init_data_with_defaults(irProcedure *proc, irValue *ptr, irValue *count) {
+void ir_init_data_with_defaults(irProcedure *proc, irValue *ptr, irValue *count, AstNode *expr) {
 	Type *elem_type = type_deref(ir_type(ptr));
 	GB_ASSERT(is_type_struct(elem_type) || is_type_array(elem_type));
 
@@ -4056,7 +4060,7 @@ void ir_init_data_with_defaults(irProcedure *proc, irValue *ptr, irValue *count)
 	ir_start_block(proc, body);
 
 	irValue *offset_ptr = ir_emit_ptr_offset(proc, ptr, ir_emit_load(proc, index));
-	ir_emit_zero_init(proc, offset_ptr);
+	ir_emit_zero_init(proc, offset_ptr, expr);
 
 	ir_emit_increment(proc, index);
 
@@ -4229,7 +4233,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			irValue *ptr = ir_emit_conv(proc, call, elem_ptr_type);
 
 			if (ir_type_has_default_values(elem_type)) {
-				ir_init_data_with_defaults(proc, ptr, len);
+				ir_init_data_with_defaults(proc, ptr, len, expr);
 			}
 
 			irValue *slice = ir_add_local_generated(proc, type);
@@ -4278,7 +4282,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			ir_emit_global_call(proc, "__dynamic_array_make", args, 6);
 
 			if (ir_type_has_default_values(elem_type)) {
-				ir_init_data_with_defaults(proc, ir_dynamic_array_elem(proc, ir_emit_load(proc, array)), len);
+				ir_init_data_with_defaults(proc, ir_dynamic_array_elem(proc, ir_emit_load(proc, array)), len, expr);
 			}
 
 			return ir_emit_load(proc, array);
@@ -4708,7 +4712,15 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 	return nullptr;
 }
 
+irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr);
+
 irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
+	irValue *v = ir_build_expr_internal(proc, expr);
+	ir_add_debug_location_to_value(proc, v, expr);
+	return v;
+}
+
+irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 	expr = unparen_expr(expr);
 
 	TypeAndValue tv = type_and_value_of_expr(proc->module->info, expr);
