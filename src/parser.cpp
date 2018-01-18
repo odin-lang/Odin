@@ -1371,8 +1371,12 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 			if (is_semicolon_optional_for_node(f, s)) {
 				return;
 			}
-		} else if (f->curr_token.kind == Token_CloseBrace) {
-			return;
+		} else {
+			switch (f->curr_token.kind) {
+			case Token_CloseBrace:
+			case Token_CloseParen:
+				return;
+			}
 		}
 		String node_string = ast_node_strings[s->kind];
 		syntax_error(prev_token, "Expected ';' after %.*s, got %.*s",
