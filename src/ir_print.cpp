@@ -193,6 +193,33 @@ void ir_print_encoded_global(irFileBuffer *f, String name, bool remove_prefix) {
 	ir_print_escape_string(f, name, true, !remove_prefix);
 }
 
+
+bool ir_print_debug_location(irFileBuffer *f, irModule *m, irValue *v, irProcedure *proc = nullptr) {
+#if 1
+	if (m->generate_debug_info && v != nullptr) {
+		TokenPos pos = v->loc.pos;
+		irDebugInfo *scope = v->loc.debug_scope;
+		i32 id = 0;
+		if (scope != nullptr) {
+			id = scope->id;
+		} else if (proc != nullptr) {
+			if (proc->debug_scope != nullptr) {
+				id = proc->debug_scope->id;
+				pos = proc->entity->token.pos;
+			}
+		}
+		if (id > 0 && pos.line > 0) {
+			ir_fprintf(f, ", !dbg !DILocation(line: %td, column: %td, scope: !%d)", pos.line, pos.column, id);
+			return true;
+		}
+	}
+	return false;
+#else
+	return true;
+#endif
+}
+
+
 void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct = false);
 void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hint);
 
@@ -964,6 +991,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, type);
 		ir_write_string(f, "* ");
 		ir_print_value(f, m, instr->Store.address, type);
+		ir_print_debug_location(f, m, value);
 		ir_write_byte(f, '\n');
 		break;
 	}
@@ -976,7 +1004,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, type);
 		ir_write_string(f, "* ");
 		ir_print_value(f, m, instr->Load.address, type);
-		ir_fprintf(f, ", align %lld\n", type_align_of(m->allocator, type));
+		ir_fprintf(f, ", align %lld", type_align_of(m->allocator, type));
+		ir_print_debug_location(f, m, value);
+		ir_write_byte(f, '\n');
 		break;
 	}
 	case irInstr_ArrayElementPtr: {
@@ -1060,9 +1090,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 			irValue *edge = instr->Phi.edges[i];
 			irBlock *block = nullptr;
-			if (instr->parent != nullptr &&
-			    i < instr->parent->preds.count) {
-				block = instr->parent->preds[i];
+			if (instr->block != nullptr &&
+			    i < instr->block->preds.count) {
+				block = instr->block->preds[i];
 			}
 
 			ir_write_string(f, "[ ");
@@ -1131,6 +1161,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	case irInstr_Jump: {;
 		ir_write_string(f, "br label %");
 		ir_print_block_name(f, instr->Jump.block);
+		ir_print_debug_location(f, m, value);
 		ir_write_byte(f, '\n');
 		break;
 	}
@@ -1142,6 +1173,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_write_string(f, ", ");
 		ir_write_string(f, "label %");   ir_print_block_name(f, instr->If.true_block);
 		ir_write_string(f, ", label %"); ir_print_block_name(f, instr->If.false_block);
+		ir_print_debug_location(f, m, value);
 		ir_write_byte(f, '\n');
 		break;
 	}
@@ -1157,7 +1189,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			ir_write_byte(f, ' ');
 			ir_print_value(f, m, ret->value, t);
 		}
-
+		ir_print_debug_location(f, m, value);
 		ir_write_byte(f, '\n');
 
 		break;
@@ -1171,6 +1203,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_value(f, m, c->value, c->from);
 		ir_write_string(f, " to ");
 		ir_print_type(f, m, c->to);
+		ir_print_debug_location(f, m, value);
 		ir_write_byte(f, '\n');
 
 		break;
@@ -1224,6 +1257,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		}
 		ir_write_string(f, str_lit(", "));
 		ir_print_value(f, m, uo->expr, type);
+		ir_print_debug_location(f, m, value);
 		ir_write_byte(f, '\n');
 		break;
 	}
@@ -1313,6 +1347,8 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_value(f, m, bo->left, type);
 		ir_write_string(f, str_lit(", "));
 		ir_print_value(f, m, bo->right, type);
+
+		ir_print_debug_location(f, m, value);
 		ir_write_byte(f, '\n');
 		break;
 	}
@@ -1417,25 +1453,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		}
 		ir_write_string(f, ")");
 
-		if (m->generate_debug_info) {
-			TokenPos pos = value->loc.pos;
-			irDebugInfo *scope = value->loc.debug_scope;
-			i32 id = 0;
-			irProcedure *proc = instr->parent->parent;
-			if (scope != nullptr) {
-				id = scope->id;
-			} else if (proc->debug_scope != nullptr) {
-				id = proc->debug_scope->id;
-			}
-			if (proc->entity != nullptr) {
-				pos = proc->entity->token.pos;
-			}
-
-			if (id > 0) {
-				ir_fprintf(f, ", !dbg !DILocation(line: %td, column: %td, scope: !%d)", pos.line, pos.column, id);
-			}
-		}
-
+		ir_print_debug_location(f, m, value, instr->block->proc);
 		ir_write_string(f, "\n");
 
 		break;
@@ -1452,6 +1470,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, ir_type(instr->Select.false_value));
 		ir_write_byte(f, ' ');
 		ir_print_value(f, m, instr->Select.false_value, ir_type(instr->Select.false_value));
+		ir_print_debug_location(f, m, value);
 		ir_write_byte(f, '\n');
 		break;
 	}
@@ -1809,6 +1828,7 @@ void ir_print_type_name(irFileBuffer *f, irModule *m, irValue *v) {
 
 void print_llvm_ir(irGen *ir) {
 	irModule *m = &ir->module;
+
 	irFileBuffer buf = {}, *f = &buf;
 	ir_file_buffer_init(f, &ir->output_file);
 	defer (ir_file_buffer_destroy(f));
