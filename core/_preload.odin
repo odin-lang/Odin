@@ -691,13 +691,6 @@ __dynamic_array_expr_error :: proc "contextless" (file: string, line, column: in
 	__debug_trap();
 }
 
-
-__substring_expr_error :: proc "contextless" (file: string, line, column: int, low, high: int) {
-	if 0 <= low && low <= high do return;
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: %d..%d\n",
-	            file, line, column, low, high);
-	__debug_trap();
-}
 __type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: ^Type_Info) {
 	if ok do return;
 	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid type_assertion from %T to %T\n",
@@ -714,9 +707,6 @@ __bounds_check_error_loc :: inline proc "contextless" (using loc := #caller_loca
 }
 __slice_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, low, high: int) {
 	__slice_expr_error(file_path, int(line), int(column), low, high);
-}
-__substring_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, low, high: int) {
-	__substring_expr_error(file_path, int(line), int(column), low, high);
 }
 
 __mem_set :: proc "contextless" (data: rawptr, value: i32, len: int) -> rawptr {

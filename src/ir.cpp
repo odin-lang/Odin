@@ -3585,6 +3585,9 @@ irValue *ir_emit_logical_binary_expr(irProcedure *proc, AstNode *expr) {
 
 
 void ir_emit_bounds_check(irProcedure *proc, Token token, irValue *index, irValue *len) {
+	if (build_context.no_bounds_check) {
+		return;
+	}
 	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
 		return;
 	}
@@ -3610,6 +3613,9 @@ void ir_emit_bounds_check(irProcedure *proc, Token token, irValue *index, irValu
 }
 
 void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, irValue *high, bool is_substring) {
+	if (build_context.no_bounds_check) {
+		return;
+	}
 	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
 		return;
 	}
@@ -3628,11 +3634,13 @@ void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, ir
 	args[3] = low;
 	args[4] = high;
 
-	char const *func = is_substring ? "__substring_expr_error" : "__slice_expr_error";
-	ir_emit_global_call(proc, func, args, 5);
+	ir_emit_global_call(proc, "__slice_expr_error", args, 5);
 }
 
 void ir_emit_dynamic_array_bounds_check(irProcedure *proc, Token token, irValue *low, irValue *high, irValue *max) {
+	if (build_context.no_bounds_check) {
+		return;
+	}
 	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
 		return;
 	}

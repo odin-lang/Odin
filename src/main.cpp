@@ -212,6 +212,7 @@ enum BuildFlagKind {
 	BuildFlag_Debug,
 	BuildFlag_CrossCompile,
 	BuildFlag_CrossLibDir,
+	BuildFlag_NoBoundsCheck,
 
 	BuildFlag_COUNT,
 };
@@ -250,6 +251,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),           BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_CrossCompile,      str_lit("cross-compile"),   BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_CrossLibDir,       str_lit("cross-lib-dir"),   BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"), BuildFlagParam_None);
 
 
 	GB_ASSERT(args.count >= 3);
@@ -504,6 +506,10 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_Debug:
 							build_context.debug = true;
+							break;
+
+						case BuildFlag_NoBoundsCheck:
+							build_context.no_bounds_check = true;
 							break;
 						}
 					}

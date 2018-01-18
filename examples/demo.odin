@@ -19,6 +19,7 @@ when ODIN_OS == "windows" {
 	import win32 "core:sys/windows.odin"
 }
 
+@(link_name="general_stuff")
 general_stuff :: proc() {
 	fmt.println("# general_stuff");
 	{ // `do` for inline statmes rather than block
@@ -367,11 +368,7 @@ parametric_polymorphism :: proc() {
 	}
 
 	copy_slice :: proc(dst, src: []$T) -> int {
-		n := min(len(dst), len(src));
-		if n > 0 {
-			mem.copy(&dst[0], &src[0], n*size_of(T));
-		}
-		return n;
+		return mem.copy(&dst[0], &src[0], n*size_of(T));
 	}
 
 	double_params :: proc(a: $A, b: $B) -> A {
@@ -662,21 +659,21 @@ named_proc_parameters :: proc() {
 		b = 567;
 		return b, a;
 	}
-	fmt.println("foo0 =", foo0());
-	fmt.println("foo1 =", foo1());
-	fmt.println("foo2 =", foo2());
+	fmt.println("foo0 =", foo0()); // 123
+	fmt.println("foo1 =", foo1()); // 123
+	fmt.println("foo2 =", foo2()); // 567 321
 }
 
 main :: proc() {
-	when false {
 		general_stuff();
 		default_struct_values();
+	when false {
 		union_type();
 		parametric_polymorphism();
 		threading_example();
 		array_programming();
+	}
 		using_in();
 		named_proc_parameters();
-	}
 }
 
