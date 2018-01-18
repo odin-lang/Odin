@@ -63,7 +63,6 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 	#else
 	case gbAllocation_Alloc:
 		// TODO(bill): Make sure this is aligned correctly
-		// ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, align_formula_isize(size, alignment));
 		ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, align_formula_isize(size, alignment));
 		break;
 	case gbAllocation_Free:
