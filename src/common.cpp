@@ -12,6 +12,21 @@
 
 #include <math.h>
 
+gb_inline i64 align_formula(i64 size, i64 align) {
+	if (align > 0) {
+		i64 result = size + align-1;
+		return result - result%align;
+	}
+	return size;
+}
+gb_inline isize align_formula_isize(isize size, isize align) {
+	if (align > 0) {
+		isize result = size + align-1;
+		return result - result%align;
+	}
+	return size;
+}
+
 GB_ALLOCATOR_PROC(heap_allocator_proc);
 
 gbAllocator heap_allocator(void) {
@@ -26,13 +41,18 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 	void *ptr = NULL;
 	gb_unused(allocator_data);
 	gb_unused(old_size);
+
+
+
 // TODO(bill): Throughly test!
 	switch (type) {
 #if defined(GB_COMPILER_MSVC)
+	#if 0
 	case gbAllocation_Alloc:
 		ptr = _aligned_malloc(size, alignment);
-		if (flags & gbAllocatorFlag_ClearToZero)
+		if (flags & gbAllocatorFlag_ClearToZero) {
 			gb_zero_size(ptr, size);
+		}
 		break;
 	case gbAllocation_Free:
 		_aligned_free(old_memory);
@@ -40,6 +60,19 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 	case gbAllocation_Resize:
 		ptr = _aligned_realloc(old_memory, size, alignment);
 		break;
+	#else
+	case gbAllocation_Alloc:
+		// TODO(bill): Make sure this is aligned correctly
+		// ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, align_formula_isize(size, alignment));
+		ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, align_formula_isize(size, alignment));
+		break;
+	case gbAllocation_Free:
+		HeapFree(GetProcessHeap(), 0, old_memory);
+		break;
+	case gbAllocation_Resize:
+		ptr = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, old_memory, align_formula_isize(size, alignment));
+		break;
+	#endif
 
 #elif defined(GB_SYSTEM_LINUX)
 	// TODO(bill): *nix version that's decent
