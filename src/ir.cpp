@@ -1285,7 +1285,6 @@ irDefer ir_add_defer_instr(irProcedure *proc, isize scope_index, irValue *instr)
 
 irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 	gbAllocator a = m->allocator;
-	// gbAllocator a = gb_heap_allocator();
 
 	if (is_type_slice(type)) {
 		ast_node(cl, CompoundLit, value.value_compound);
@@ -1321,7 +1320,7 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 	// TODO(bill): Should this use the arena allocator or the heap allocator?
 	// Strings could be huge!
 	// gbAllocator a = m->allocator;
-	gbAllocator a = gb_heap_allocator();
+	gbAllocator a = heap_allocator();
 
 	isize max_len = 6+8+1;
 	u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);

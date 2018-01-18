@@ -1782,13 +1782,7 @@ void type_path_pop(TypePath *tp) {
 i64 type_size_of_internal (gbAllocator allocator, Type *t, TypePath *path);
 i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path);
 
-i64 align_formula(i64 size, i64 align) {
-	if (align > 0) {
-		i64 result = size + align-1;
-		return result - result%align;
-	}
-	return size;
-}
+
 
 i64 type_size_of(gbAllocator allocator, Type *t) {
 	if (t == nullptr) {
