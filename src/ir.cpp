@@ -8076,8 +8076,11 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 
 				i64 tag_size   = union_tag_size(a, t);
 				i64 tag_offset = align_formula(t->Union.variant_block_size, tag_size);
-				ir_emit_store(proc, tag_offset_ptr, ir_const_uintptr(a, tag_offset));
-				ir_emit_store(proc, tag_type_ptr,   ir_type_info(proc, union_tag_type(a, t)));
+
+				if (tag_size > 0) {
+					ir_emit_store(proc, tag_offset_ptr, ir_const_uintptr(a, tag_offset));
+					ir_emit_store(proc, tag_type_ptr,   ir_type_info(proc, union_tag_type(a, t)));
+				}
 			}
 
 			break;
