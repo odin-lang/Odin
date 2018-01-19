@@ -97,6 +97,11 @@ struct TypeStruct {
 
 #define TYPE_KINDS                                        \
 	TYPE_KIND(Basic,   BasicType)                         \
+	TYPE_KIND(Named, struct {                             \
+		String  name;                                     \
+		Type *  base;                                     \
+		Entity *type_name; /* Entity_TypeName */          \
+	})                                                    \
 	TYPE_KIND(Generic, struct {                           \
 		i64    id;                                        \
 		String name;                                      \
@@ -109,8 +114,16 @@ struct TypeStruct {
 		i64   count;                                      \
 		Type *generic_type;                               \
 	})                                                    \
-	TYPE_KIND(DynamicArray, struct { Type *elem; })       \
 	TYPE_KIND(Slice,   struct { Type *elem; })            \
+	TYPE_KIND(DynamicArray, struct { Type *elem; })       \
+	TYPE_KIND(Map, struct {                               \
+		Type * key;                                       \
+		Type * value;                                     \
+		Type * entry_type;                                \
+		Type * generated_struct_type;                     \
+		Type * internal_type;                             \
+		Type * lookup_result_type;                        \
+	})                                                    \
 	TYPE_KIND(Struct,  TypeStruct)                        \
 	TYPE_KIND(Enum, struct {                              \
 		Entity **fields;                                  \
@@ -130,11 +143,6 @@ struct TypeStruct {
 		i64      variant_block_size;                      \
 		i64      custom_align;                            \
 		i64      tag_size;                                \
-	})                                                    \
-	TYPE_KIND(Named, struct {                             \
-		String  name;                                     \
-		Type *  base;                                     \
-		Entity *type_name; /* Entity_TypeName */          \
 	})                                                    \
 	TYPE_KIND(Tuple, struct {                             \
 		Array<Entity *> variables; /* Entity_Variable */  \
@@ -161,14 +169,6 @@ struct TypeStruct {
 		bool     has_named_results;                       \
 		isize    specialization_count;                    \
 		ProcCallingConvention calling_convention;         \
-	})                                                    \
-	TYPE_KIND(Map, struct {                               \
-		Type * key;                                       \
-		Type * value;                                     \
-		Type * entry_type;                                \
-		Type * generated_struct_type;                     \
-		Type * internal_type;                             \
-		Type * lookup_result_type;                        \
 	})                                                    \
 	TYPE_KIND(BitFieldValue, struct { u32 bits; })        \
 	TYPE_KIND(BitField, struct {                          \
@@ -1367,6 +1367,10 @@ i64 union_tag_size(gbAllocator a, Type *u) {
 	}
 
 	u64 n = cast(u64)u->Union.variants.count;
+	if (n == 0) {
+		return 0;
+	}
+
 	i64 bytes = next_pow2(cast(i64)(floor_log2(n)/8 + 1));
 	i64 tag_size = gb_max(bytes, 1);
 
