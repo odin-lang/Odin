@@ -41,12 +41,10 @@ set linker_settings=%libs% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-rem odin run examples/node-lang/node-lang.odin && goto end_of_build
-
 
 cl %compiler_settings% "src\main.cpp" ^
 	/link %linker_settings% -OUT:%exe_name% ^
-	&& odin build examples/demo.odin -show-timings
+	&& odin run examples/demo.odin
 	rem && odin docs core/fmt.odin
 
 del *.obj > NUL 2> NUL

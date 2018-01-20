@@ -665,11 +665,7 @@ named_proc_parameters :: proc() {
 }
 
 main :: proc() {
-	Foo :: union {
-
-	}
-
-	when false {
+	when true {
 		general_stuff();
 		default_struct_values();
 		union_type();
