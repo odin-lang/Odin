@@ -711,8 +711,6 @@ int main(int arg_count, char **arg_ptr) {
 	timings_start_section(&timings, str_lit("llvm ir print"));
 	print_llvm_ir(&ir_gen);
 
-	// prof_print_all();
-
 	timings_start_section(&timings, str_lit("llvm-opt"));
 
 	String output_name = ir_gen.output_name;

@@ -3051,7 +3051,7 @@ void check_parsed_files(Checker *c) {
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
 		if (e->kind == Entity_TypeName && e->type != nullptr) {
-			// i64 size  = type_size_of(c->sizes, c->allocator, e->type);
+			// i64 size  = type_size_of(c->allocator, e->type);
 			i64 align = type_align_of(c->allocator, e->type);
 			if (align > 0) {
 				add_type_info_type(c, e->type);
