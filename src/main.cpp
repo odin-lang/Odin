@@ -711,7 +711,6 @@ int main(int arg_count, char **arg_ptr) {
 	timings_start_section(&timings, str_lit("llvm ir print"));
 	print_llvm_ir(&ir_gen);
 
-	timings_start_section(&timings, str_lit("llvm-opt"));
 
 	String output_name = ir_gen.output_name;
 	String output_base = ir_gen.output_base;
@@ -720,6 +719,7 @@ int main(int arg_count, char **arg_ptr) {
 
 	i32 exit_code = 0;
 
+	// timings_start_section(&timings, str_lit("llvm-opt"));
 	// #if defined(GB_SYSTEM_WINDOWS)
 	// 	// For more passes arguments: http://llvm.org/docs/Passes.html
 	// 	exit_code = system_exec_command_line_app("llvm-opt", false,
