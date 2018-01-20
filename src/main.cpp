@@ -720,41 +720,41 @@ int main(int arg_count, char **arg_ptr) {
 
 	i32 exit_code = 0;
 
-	#if defined(GB_SYSTEM_WINDOWS)
-		// For more passes arguments: http://llvm.org/docs/Passes.html
-		exit_code = system_exec_command_line_app("llvm-opt", false,
-			"\"%.*sbin/opt\" \"%.*s\".ll -o \"%.*s\".bc %.*s "
-			"-mem2reg "
-			"-memcpyopt "
-			"-die "
-			"",
-			LIT(build_context.ODIN_ROOT),
-			LIT(output_base), LIT(output_base),
-			LIT(build_context.opt_flags));
-		if (exit_code != 0) {
-			return exit_code;
-		}
-	#else
-		// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
-		//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
-		exit_code = system_exec_command_line_app("llvm-opt", false,
-			"opt \"%.*s.ll\" -o \"%.*s\".bc %.*s "
-			"-mem2reg "
-			"-memcpyopt "
-			"-die "
-			"",
-			LIT(output_base), LIT(output_base),
-			LIT(build_context.opt_flags));
-		if (exit_code != 0) {
-			return exit_code;
-		}
-	#endif
+	// #if defined(GB_SYSTEM_WINDOWS)
+	// 	// For more passes arguments: http://llvm.org/docs/Passes.html
+	// 	exit_code = system_exec_command_line_app("llvm-opt", false,
+	// 		"\"%.*sbin/opt\" \"%.*s\".ll -o \"%.*s\".bc %.*s "
+	// 		"-mem2reg "
+	// 		"-memcpyopt "
+	// 		"-die "
+	// 		"",
+	// 		LIT(build_context.ODIN_ROOT),
+	// 		LIT(output_base), LIT(output_base),
+	// 		LIT(build_context.opt_flags));
+	// 	if (exit_code != 0) {
+	// 		return exit_code;
+	// 	}
+	// #else
+	// 	// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
+	// 	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
+	// 	exit_code = system_exec_command_line_app("llvm-opt", false,
+	// 		"opt \"%.*s.ll\" -o \"%.*s\".bc %.*s "
+	// 		"-mem2reg "
+	// 		"-memcpyopt "
+	// 		"-die "
+	// 		"",
+	// 		LIT(output_base), LIT(output_base),
+	// 		LIT(build_context.opt_flags));
+	// 	if (exit_code != 0) {
+	// 		return exit_code;
+	// 	}
+	// #endif
 
 	#if defined(GB_SYSTEM_WINDOWS)
 		timings_start_section(&timings, str_lit("llvm-llc"));
 		// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 		exit_code = system_exec_command_line_app("llvm-llc", false,
-			"\"%.*sbin/llc\" \"%.*s.bc\" -filetype=obj -O%d "
+			"\"%.*sbin/llc\" \"%.*s.ll\" -filetype=obj -O%d "
 			"-o \"%.*s.obj\" "
 			"%.*s "
 			// "-debug-pass=Arguments "
@@ -829,7 +829,7 @@ int main(int arg_count, char **arg_ptr) {
 		timings_start_section(&timings, str_lit("llvm-llc"));
 		// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 		exit_code = system_exec_command_line_app("llc", false,
-			"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
+			"llc \"%.*s.ll\" -filetype=obj -relocation-model=pic -O%d "
 			"%.*s "
 			// "-debug-pass=Arguments "
 			"%s"
