@@ -208,6 +208,10 @@ struct Type {
 	TYPE_KINDS
 #undef TYPE_KIND
 	};
+
+	// NOTE(bill): These need to be at the end to not affect the unionized data
+	i64  cached_size;
+	i64  cached_align;
 	bool failure;
 };
 
@@ -468,6 +472,8 @@ Type *alloc_type(gbAllocator a, TypeKind kind) {
 	Type *t = gb_alloc_item(a, Type);
 	gb_zero_item(t);
 	t->kind = kind;
+	t->cached_size  = -1;
+	t->cached_align = -1;
 	return t;
 }
 
@@ -1792,24 +1798,31 @@ i64 type_size_of(gbAllocator allocator, Type *t) {
 	if (t == nullptr) {
 		return 0;
 	}
-	i64 size;
+	// NOTE(bill): Always calculate the size when it is a Type_Basic
+	if (t->kind != Type_Basic && t->cached_size >= 0) {
+		return t->cached_size;
+	}
 	TypePath path = {0};
 	type_path_init(&path);
-	size = type_size_of_internal(allocator, t, &path);
+	t->cached_size = type_size_of_internal(allocator, t, &path);
 	type_path_free(&path);
-	return size;
+	return t->cached_size;
 }
 
 i64 type_align_of(gbAllocator allocator, Type *t) {
 	if (t == nullptr) {
 		return 1;
 	}
-	i64 align;
+	// NOTE(bill): Always calculate the size when it is a Type_Basic
+	if (t->kind != Type_Basic && t->cached_align > 0) {
+		return t->cached_align;
+	}
+
 	TypePath path = {0};
 	type_path_init(&path);
-	align = type_align_of_internal(allocator, t, &path);
+	t->cached_align = type_align_of_internal(allocator, t, &path);
 	type_path_free(&path);
-	return align;
+	return t->cached_align;
 }
 
 

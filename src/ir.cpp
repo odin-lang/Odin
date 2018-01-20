@@ -889,6 +889,9 @@ String ir_get_global_name(irModule *m, irValue *v) {
 
 void ir_add_entity_name(irModule *m, Entity *e, String name) {
 	GB_ASSERT(name.len > 0);
+	if (e != nullptr && e->kind == Entity_TypeName) {
+		e->TypeName.ir_mangled_name = name;
+	}
 	map_set(&m->entity_names, hash_entity(e), name);
 }
 
@@ -6141,7 +6144,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 			String name = make_string(name_text, name_len-1);
 
 			irValue *value = ir_value_type_name(m->allocator, name, e->type);
-			map_set(&m->entity_names, hash_entity(e), name);
+			ir_add_entity_name(m, e, name);
 			ir_gen_global_type_name(m, e, name);
 		} else if (e->kind == Entity_Procedure) {
 			CheckerInfo *info = proc->module->info;

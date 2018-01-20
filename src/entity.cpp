@@ -97,8 +97,9 @@ struct Entity {
 			bool       is_export;
 		} Variable;
 		struct {
-			bool  is_type_alias;
-			Type *type_parameter_specialization;
+			bool   is_type_alias;
+			Type * type_parameter_specialization;
+			String ir_mangled_name;
 		} TypeName;
 		struct {
 			OverloadKind overload_kind;
