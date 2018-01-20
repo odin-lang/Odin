@@ -1509,8 +1509,6 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		break;
 	}
 	}
-
-#endif
 }
 
 
