@@ -664,6 +664,16 @@ named_proc_parameters :: proc() {
 	fmt.println("foo2 =", foo2()); // 567 321
 }
 
+
+enum_export :: proc() {
+	Foo :: enum #export {A, B, C};
+
+	f0 := A;
+	f1 := B;
+	f2 := C;
+	fmt.println(f0, f1, f2);
+}
+
 main :: proc() {
 	when true {
 		general_stuff();
@@ -674,6 +684,7 @@ main :: proc() {
 		array_programming();
 		using_in();
 		named_proc_parameters();
+		enum_export();
 	}
 }
 
