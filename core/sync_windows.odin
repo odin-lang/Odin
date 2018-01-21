@@ -58,7 +58,7 @@ mutex_lock :: proc(m: ^Mutex) {
 }
 
 mutex_try_lock :: proc(m: ^Mutex) -> bool {
-	return win32.try_enter_critical_section(&m._critical_section) != 0;
+	return bool(win32.try_enter_critical_section(&m._critical_section));
 }
 
 mutex_unlock :: proc(m: ^Mutex) {
