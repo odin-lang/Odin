@@ -132,6 +132,7 @@ struct TypeStruct {
 		Scope *  scope;                                   \
 		Entity * names;                                   \
 		Type *   base_type;                               \
+		bool     is_export;                               \
 		Entity * count;                                   \
 		Entity * min_value;                               \
 		Entity * max_value;                               \

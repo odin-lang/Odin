@@ -723,7 +723,7 @@ int main(int arg_count, char **arg_ptr) {
 	#if defined(GB_SYSTEM_WINDOWS)
 		// For more passes arguments: http://llvm.org/docs/Passes.html
 		exit_code = system_exec_command_line_app("llvm-opt", false,
-			"\"%.*sbin/opt\" \"%.*s\".ll -o \"%.*s\".bc %.*s "
+			"\"%.*sbin/opt\" \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
 			"-mem2reg "
 			"-memcpyopt "
 			"-die "
@@ -731,6 +731,11 @@ int main(int arg_count, char **arg_ptr) {
 			LIT(build_context.ODIN_ROOT),
 			LIT(output_base), LIT(output_base),
 			LIT(build_context.opt_flags));
+		// exit_code = system_exec_command_line_app("llvm-opt", false,
+		// 	"\"%.*sbin/llvm-as\" \"%.*s.ll\" -o \"%.*s.bc\" "
+		// 	"",
+		// 	LIT(build_context.ODIN_ROOT),
+		// 	LIT(output_base), LIT(output_base));
 		if (exit_code != 0) {
 			return exit_code;
 		}
@@ -738,7 +743,7 @@ int main(int arg_count, char **arg_ptr) {
 		// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
 		//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
 		exit_code = system_exec_command_line_app("llvm-opt", false,
-			"opt \"%.*s.ll\" -o \"%.*s\".bc %.*s "
+			"opt \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
 			"-mem2reg "
 			"-memcpyopt "
 			"-die "

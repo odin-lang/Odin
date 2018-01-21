@@ -947,10 +947,11 @@ AstNode *ast_union_type(AstFile *f, Token token, Array<AstNode *> variants, AstN
 }
 
 
-AstNode *ast_enum_type(AstFile *f, Token token, AstNode *base_type, Array<AstNode *> fields) {
+AstNode *ast_enum_type(AstFile *f, Token token, AstNode *base_type, bool is_export, Array<AstNode *> fields) {
 	AstNode *result = make_ast_node(f, AstNode_EnumType);
 	result->EnumType.token = token;
 	result->EnumType.base_type = base_type;
+	result->EnumType.is_export = is_export;
 	result->EnumType.fields = fields;
 	return result;
 }
@@ -1933,17 +1934,36 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	} break;
 
 	case Token_enum: {
+		bool is_export = false;
 		Token token = expect_token(f, Token_enum);
 		AstNode *base_type = nullptr;
 		if (f->curr_token.kind != Token_OpenBrace) {
-			base_type = parse_type(f);
+			if (f->curr_token.kind != Token_Hash) {
+				base_type = parse_type(f);
+			}
+			while (allow_token(f, Token_Hash)) {
+				Token tag = f->curr_token;
+				if (f->curr_token.kind != Token_Ident && f->curr_token.kind != Token_export) {
+					expect_token_after(f, Token_Ident, "#");
+				} else {
+					tag = advance_token(f);
+				}
+				if (tag.string == "export") {
+					if (is_export) {
+						syntax_error(tag, "Duplicate enum tag '#%.*s'", LIT(tag.string));
+					}
+					is_export = true;
+				} else {
+					syntax_error(tag, "Invalid enum tag '#%.*s'", LIT(tag.string));
+				}
+			}
 		}
 		Token open = expect_token(f, Token_OpenBrace);
 
 		Array<AstNode *> values = parse_element_list(f);
 		Token close = expect_token(f, Token_CloseBrace);
 
-		return ast_enum_type(f, token, base_type, values);
+		return ast_enum_type(f, token, base_type, is_export, values);
 	} break;
 
 	case Token_bit_field: {

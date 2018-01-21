@@ -469,6 +469,7 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 	AST_NODE_KIND(EnumType, "enum type", struct { \
 		Token            token; \
 		AstNode *        base_type; \
+		bool             is_export; \
 		Array<AstNode *> fields; /* FieldValue */ \
 	}) \
 	AST_NODE_KIND(BitFieldType, "bit field type", struct { \

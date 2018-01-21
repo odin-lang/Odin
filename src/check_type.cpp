@@ -796,6 +796,21 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 
 	enum_type->Enum.fields      = fields.data;
 	enum_type->Enum.field_count = cast(i32)fields.count;
+	enum_type->Enum.is_export   = et->is_export;
+	if (et->is_export) {
+		Scope *parent = c->context.scope->parent;
+		for_array(i, fields) {
+			Entity *f = fields[i];
+			if (f->kind != Entity_Constant) {
+				continue;
+			}
+			String name = f->token.string;
+			if (is_blank_ident(name)) {
+				continue;
+			}
+			add_entity(c, parent, nullptr, f);
+		}
+	}
 
 	enum_type->Enum.count = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("count")), t_int, exact_value_i64(fields.count));
