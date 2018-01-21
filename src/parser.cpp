@@ -1943,10 +1943,8 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			}
 			while (allow_token(f, Token_Hash)) {
 				Token tag = f->curr_token;
-				if (f->curr_token.kind != Token_Ident && f->curr_token.kind != Token_export) {
+				if (!allow_token(f, Token_Ident) && !allow_token(f, Token_export)) {
 					expect_token_after(f, Token_Ident, "#");
-				} else {
-					tag = advance_token(f);
 				}
 				if (tag.string == "export") {
 					if (is_export) {
