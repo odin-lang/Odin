@@ -14,7 +14,7 @@ Thread_Os_Specific :: struct {
 Thread :: struct {
 	using specific:   Thread_Os_Specific,
 	procedure:        Thread_Proc,
-	data:             any,
+	data:             rawptr,
 	user_index:       int,
 
 	init_context:     Context,
@@ -69,6 +69,7 @@ join :: proc(using thread: ^Thread) {
 	win32.close_handle(win32_thread);
 	win32_thread = win32.INVALID_HANDLE;
 }
+
 destroy :: proc(thread: ^Thread) {
 	join(thread);
 	free(thread);
