@@ -1691,7 +1691,7 @@ void ir_emit_defer_stmts(irProcedure *proc, irDeferExitKind kind, irBlock *block
 		irDefer d = proc->defer_stmts[i];
 		if (kind == irDeferExit_Default) {
 			if (proc->scope_index == d.scope_index &&
-			    d.scope_index > 1) {
+			    d.scope_index > 0) { // TODO(bill): Which is correct: > 0 or > 1?
 				ir_build_defer_stmt(proc, d);
 				array_pop(&proc->defer_stmts);
 				continue;
