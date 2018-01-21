@@ -3053,21 +3053,14 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return ir_emit(proc, ir_instr_conv(proc, kind, value, src_type, t));
 	}
 
-	// boolean -> boolean
-	if (is_type_boolean(src) && is_type_boolean(dst)) {
-		GB_ASSERT(src->kind == Type_Basic &&
-		          dst->kind == Type_Basic);
+	// boolean -> boolean/integer
+	if (is_type_boolean(src) && (is_type_boolean(dst) || is_type_integer(dst))) {
 		GB_ASSERT(src != t_llvm_bool);
 
 		irValue *b = ir_emit(proc, ir_instr_binary_op(proc, Token_NotEq, value, v_zero, t_llvm_bool));
 		return ir_emit(proc, ir_instr_conv(proc, irConv_zext, b, t_llvm_bool, t));
 	}
 
-
-	// boolean -> integer
-	if (is_type_boolean(src) && is_type_integer(dst)) {
-		return ir_emit(proc, ir_instr_conv(proc, irConv_zext, value, src_type, t));
-	}
 
 	// integer -> boolean
 	if (is_type_integer(src) && is_type_boolean(dst)) {
