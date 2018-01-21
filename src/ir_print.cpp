@@ -34,7 +34,7 @@ void ir_file_buffer_write(irFileBuffer *f, void const *data, isize len) {
 		f->offset = 0;
 	}
 	u8 *cursor = cast(u8 *)f->vm.data + f->offset;
-	memmove(cursor, data, len);
+	gb_memmove(cursor, data, len);
 	f->offset += len;
 }
 
