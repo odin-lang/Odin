@@ -522,6 +522,7 @@ foreign kernel32 {
 	@(link_name="GetFileInformationByHandle") get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool ---;
 
 	@(link_name="CreateDirectoryA") 		  create_directory_a			 :: proc(path: ^byte, security_attributes: ^Security_Attributes) -> Bool ---;
+	@(link_name="CreateDirectoryW") 		  create_directory_w			 :: proc(path: ^u16, security_attributes: ^Security_Attributes) -> Bool ---;
 
 	@(link_name="GetFileType")    get_file_type    :: proc(file_handle: Handle) -> u32 ---;
 	@(link_name="SetFilePointer") set_file_pointer :: proc(file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 ---;
@@ -533,6 +534,12 @@ foreign kernel32 {
 	@(link_name="FindClose")      find_close        :: proc(file : Handle) -> Bool ---;
 
 	@(link_name="MoveFileExA")    move_file_ex_a    :: proc(existing, new: ^byte, flags: u32) -> Bool ---;
+	@(link_name="DeleteFileA")    delete_file_a     :: proc(file_name : ^byte) -> Bool ---;
+	@(link_name="CopyFileA")      copy_file_a       :: proc(existing, new: ^byte, fail_if_exists: Bool) -> Bool ---;
+
+	@(link_name="MoveFileExW")    move_file_ex_w    :: proc(existing, new: ^u16, flags: u32) -> Bool ---;
+	@(link_name="DeleteFileW")    delete_file_w     :: proc(file_name : ^u16) -> Bool ---;
+	@(link_name="CopyFileW")      copy_file_w       :: proc(existing, new: ^u16, fail_if_exists: Bool) -> Bool ---;
 
 	@(link_name="HeapAlloc")      heap_alloc       :: proc(h: Handle, flags: u32, bytes: int) -> rawptr ---;
 	@(link_name="HeapReAlloc")    heap_realloc     :: proc(h: Handle, flags: u32, memory: rawptr, bytes: int) -> rawptr ---;
