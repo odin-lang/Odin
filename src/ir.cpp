@@ -7628,22 +7628,12 @@ void ir_init_module(irModule *m, Checker *c) {
 	{
 		// Add type info data
 		{
-			isize max_index = -1;
-			for_array(type_info_map_index, m->info->type_info_map.entries) {
-				auto *entry = &m->info->type_info_map.entries[type_info_map_index];
-				Type *t = cast(Type *)entry->key.ptr;
-				t = default_type(t);
-				isize entry_index = type_info_index(m->info, t);
-				if (max_index < entry_index) {
-					max_index = entry_index;
-				}
-			}
-			isize max_type_info_count = max_index+1;
+			isize max_type_info_count = m->info->type_info_types.count;
 
 			String name = str_lit(IR_TYPE_INFO_DATA_NAME);
 			Entity *e = make_entity_variable(m->allocator, nullptr, make_token_ident(name), make_type_array(m->allocator, t_type_info, max_type_info_count), false);
 			irValue *g = ir_value_global(m->allocator, e, nullptr);
-			g->Global.is_private  = true;
+			g->Global.is_private = true;
 			ir_module_add_value(m, e, g);
 			map_set(&m->members, hash_string(name), g);
 			ir_global_type_info_data = g;
@@ -7654,9 +7644,8 @@ void ir_init_module(irModule *m, Checker *c) {
 			// NOTE(bill): Removes need for heap allocation by making it global memory
 			isize count = 0;
 
-			for_array(entry_index, m->info->type_info_map.entries) {
-				auto *entry = &m->info->type_info_map.entries[entry_index];
-				Type *t = cast(Type *)entry->key.ptr;
+			for_array(entry_index, m->info->type_info_types) {
+				Type *t = m->info->type_info_types[entry_index];
 
 				switch (t->kind) {
 				case Type_Union:
