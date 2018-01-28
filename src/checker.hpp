@@ -298,8 +298,8 @@ struct CheckerInfo {
 	Map<Array<Entity *> > gen_procs;       // Key: AstNode * | Identifier -> Entity
 	Map<Array<Entity *> > gen_types;       // Key: Type *
 
+	Array<Type *>         type_info_types;
 	Map<isize>            type_info_map;   // Key: Type *
-	isize                 type_info_count;
 
 	Scope *               init_scope;
 	Entity *              entry_point;

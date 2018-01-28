@@ -1,7 +1,7 @@
 #shared_global_scope
 
 import "core:os.odin"
-import "core:fmt.odin" // TODO(bill): Remove the need for `fmt` here
+// import "core:fmt.odin" // TODO(bill): Remove the need for `fmt` here
 import "core:utf8.odin"
 import "core:raw.odin"
 
@@ -599,22 +599,55 @@ nil_allocator :: proc() -> Allocator {
 }
 
 
-assert :: proc "contextless" (condition: bool, message := "", args: ...any, using loc := #caller_location) -> bool {
+__print_u64 :: proc(fd: os.Handle, u: u64) {
+	digits := "0123456789";
+
+	a: [129]byte;
+	i := len(a);
+	b := u64(10);
+	for u >= b {
+		i -= 1; a[i] = digits[u % b];
+		u /= b;
+	}
+	i -= 1; a[i] = digits[u % b];
+
+	os.write(fd, a[i..]);
+}
+
+__print_caller_location :: proc(fd: os.Handle, using loc: Source_Code_Location) {
+	os.write_string(fd, file_path);
+	os.write_byte(fd, '(');
+	__print_u64(fd, u64(line));
+	os.write_byte(fd, ':');
+	__print_u64(fd, u64(column));
+	os.write_byte(fd, ')');
+}
+
+
+assert :: proc "contextless" (condition: bool, message := "", using loc := #caller_location) -> bool {
 	if !condition {
-		fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion", file_path, line, column);
-		if len(message) > 0 do fmt.fprint(os.stderr, ": ");
-		fmt.fprintf(os.stderr, message, ...args);
-		fmt.fprintf(os.stderr, "\n");
+		fd := os.stderr;
+		__print_caller_location(fd, loc);
+		os.write_string(fd, " Runtime assertion");
+		if len(message) > 0 {
+			os.write_string(fd, ": ");
+			os.write_string(fd, message);
+			os.write_byte(fd, '\n');
+		}
 		__debug_trap();
 	}
 	return condition;
 }
 
-panic :: proc "contextless" (message := "", args: ...any, using loc := #caller_location) {
-	fmt.fprintf(os.stderr, "%s(%d:%d) Panic", file_path, line, column);
-	if len(message) > 0 do fmt.fprint(os.stderr, ": ");
-	fmt.fprintf(os.stderr, message, ...args);
-	fmt.fprintf(os.stderr, "\n");
+panic :: proc "contextless" (message := "", using loc := #caller_location) {
+	fd := os.stderr;
+	__print_caller_location(fd, loc);
+	os.write_string(fd, " Panic");
+	if len(message) > 0 {
+		os.write_string(fd, ": ");
+		os.write_string(fd, message);
+		os.write_byte(fd, '\n');
+	}
 	__debug_trap();
 }
 
@@ -672,29 +705,59 @@ __complex128_ne :: inline proc "contextless" (a, b: complex128) -> bool { return
 
 __bounds_check_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
 	if 0 <= index && index < count do return;
-	fmt.fprintf(os.stderr, "%s(%d:%d) Index %d is out of bounds range 0..%d\n",
-	            file, line, column, index, count);
+
+	fd := os.stderr;
+	__print_caller_location(fd, Source_Code_Location{file, line, column, ""});
+	os.write_string(fd, " Index ");
+	__print_u64(fd, u64(index));
+	os.write_string(fd, " is out of bounds range 0..");
+	__print_u64(fd, u64(count));
+	os.write_byte(fd, '\n');
 	__debug_trap();
 }
 
 __slice_expr_error :: proc "contextless" (file: string, line, column: int, low, high: int) {
 	if 0 <= low && low <= high do return;
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: %d..%d\n",
-	            file, line, column, low, high);
+
+
+	fd := os.stderr;
+	__print_caller_location(fd, Source_Code_Location{file, line, column, ""});
+	os.write_string(fd, " Invalid slice indices: ");
+	__print_u64(fd, u64(low));
+	os.write_string(fd, "..");
+	__print_u64(fd, u64(high));
+	os.write_byte(fd, '\n');
+	__debug_trap();
+
+	// fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: %d..%d\n",
+	            // file, line, column, low, high);
 	__debug_trap();
 }
 
 __dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
 	if 0 <= low && low <= high && high <= max do return;
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: %d..%d..%d\n",
-	            file, line, column, low, high, max);
+
+	fd := os.stderr;
+	__print_caller_location(fd, Source_Code_Location{file, line, column, ""});
+	os.write_string(fd, " Invalid slice indices: ");
+	__print_u64(fd, u64(low));
+	os.write_string(fd, "..");
+	__print_u64(fd, u64(high));
+	os.write_string(fd, "..");
+	__print_u64(fd, u64(max));
+	os.write_byte(fd, '\n');
+	__debug_trap();
 	__debug_trap();
 }
 
 __type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: ^Type_Info) {
 	if ok do return;
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid type_assertion from %T to %T\n",
-	            file, line, column, from, to);
+
+	fd := os.stderr;
+	__print_caller_location(fd, Source_Code_Location{file, line, column, ""});
+	os.write_string(fd, " Invalid type assertion");
+	// fmt.fprintf(os.stderr, "%s(%d:%d) Invalid type_assertion from %T to %T\n",
+	            // file, line, column, from, to);
 	__debug_trap();
 }
 

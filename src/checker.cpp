@@ -576,18 +576,17 @@ void init_universal_scope(void) {
 
 void init_checker_info(CheckerInfo *i) {
 	gbAllocator a = heap_allocator();
-	map_init(&i->types,         a);
-	array_init(&i->definitions, a);
-	array_init(&i->entities,    a);
-	map_init(&i->untyped,       a);
-	map_init(&i->foreigns,      a);
-	map_init(&i->gen_procs,     a);
-	map_init(&i->gen_types,     a);
-	map_init(&i->type_info_map, a);
-	map_init(&i->files,         a);
+	map_init(&i->types,           a);
+	array_init(&i->definitions,   a);
+	array_init(&i->entities,      a);
+	map_init(&i->untyped,         a);
+	map_init(&i->foreigns,        a);
+	map_init(&i->gen_procs,       a);
+	map_init(&i->gen_types,       a);
+	array_init(&i->type_info_types, a);
+	map_init(&i->type_info_map,   a);
+	map_init(&i->files,           a);
 	array_init(&i->variable_init_order, a);
-
-	i->type_info_count = 0;
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -598,6 +597,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->foreigns);
 	map_destroy(&i->gen_procs);
 	map_destroy(&i->gen_types);
+	array_free(&i->type_info_types);
 	map_destroy(&i->type_info_map);
 	map_destroy(&i->files);
 	array_free(&i->variable_init_order);
@@ -922,6 +922,7 @@ void add_type_info_type(Checker *c, Type *t) {
 		return;
 	}
 
+	bool prev = false;
 	isize ti_index = -1;
 	for_array(i, c->info.type_info_map.entries) {
 		auto *e = &c->info.type_info_map.entries[i];
@@ -929,19 +930,22 @@ void add_type_info_type(Checker *c, Type *t) {
 		if (are_types_identical(t, prev_type)) {
 			// Duplicate entry
 			ti_index = e->value;
+			prev = true;
 			break;
 		}
 	}
 	if (ti_index < 0) {
 		// Unique entry
 		// NOTE(bill): map entries grow linearly and in order
-		ti_index = c->info.type_info_count;
-		c->info.type_info_count++;
+		ti_index = c->info.type_info_types.count;
+		array_add(&c->info.type_info_types, t);
 	}
 	map_set(&c->info.type_info_map, hash_type(t), ti_index);
 
-
-
+	if (prev) {
+		// NOTE(bill): If a previous one exists already, no need to continue
+		return;
+	}
 
 	// Add nested types
 
@@ -3053,7 +3057,8 @@ void check_parsed_files(Checker *c) {
 	// Add "Basic" type information
 	for (isize i = 0; i < gb_count_of(basic_types)-1; i++) {
 		Type *t = &basic_types[i];
-		if (t->Basic.size > 0 && t->Basic.kind != Basic_llvm_bool)  {
+		if (t->Basic.size > 0 &&
+		    t->Basic.kind != Basic_llvm_bool) {
 			add_type_info_type(c, t);
 		}
 	}
@@ -3064,7 +3069,7 @@ void check_parsed_files(Checker *c) {
 		if (e->kind == Entity_TypeName && e->type != nullptr) {
 			// i64 size  = type_size_of(c->allocator, e->type);
 			i64 align = type_align_of(c->allocator, e->type);
-			if (align > 0) {
+			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
 				add_type_info_type(c, e->type);
 			}
 		}
