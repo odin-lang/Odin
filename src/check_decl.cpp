@@ -425,6 +425,7 @@ void init_entity_foreign_library(Checker *c, Entity *e) {
 		} else {
 			// TODO(bill): Extra stuff to do with library names?
 			*foreign_library = found;
+			found->LibraryName.used = true;
 			add_entity_use(c, ident, found);
 		}
 	}

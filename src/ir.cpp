@@ -1347,6 +1347,30 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 	return g;
 }
 
+void ir_add_foreign_library_path(irModule *m, Entity *e) {
+	GB_ASSERT(e != nullptr);
+	GB_ASSERT(e->kind == Entity_LibraryName);
+	GB_ASSERT(e->LibraryName.used);
+
+	String library_path = e->LibraryName.path;
+	if (library_path.len == 0) {
+		return;
+	}
+
+	for_array(path_index, m->foreign_library_paths) {
+		String path = m->foreign_library_paths[path_index];
+#if defined(GB_SYSTEM_WINDOWS)
+		if (str_eq_ignore_case(path, library_path)) {
+#else
+		if (str_eq(path, library_path)) {
+#endif
+			return;
+		}
+	}
+	array_add(&m->foreign_library_paths, library_path);
+}
+
+
 
 
 
@@ -1380,9 +1404,9 @@ irValue *ir_add_local_for_identifier(irProcedure *proc, AstNode *ident, bool zer
 			HashKey key = hash_string(name);
 			irValue **prev_value = map_get(&proc->module->members, key);
 			if (prev_value == nullptr) {
+				ir_add_foreign_library_path(proc->module, e->Variable.foreign_library);
 				// NOTE(bill): Don't do mutliple declarations in the IR
 				irValue *g = ir_value_global(proc->module->allocator, e, nullptr);
-
 				g->Global.name = name;
 				g->Global.is_foreign = true;
 				ir_module_add_value(proc->module, e, g);
@@ -6163,6 +6187,11 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 				// FFI - Foreign function interace
 				String original_name = e->token.string;
 				String name = original_name;
+
+				if (e->Procedure.is_foreign) {
+					ir_add_foreign_library_path(proc->module, e->Procedure.foreign_library);
+				}
+
 				if (e->Procedure.link_name.len > 0) {
 					name = e->Procedure.link_name;
 				}
@@ -7775,25 +7804,6 @@ irValue *ir_type_info_member_usings_offset(irProcedure *proc, isize count) {
 
 
 
-void ir_add_foreign_library_path(irModule *m, Entity *e) {
-	GB_ASSERT(e != nullptr);
-	String library_path = e->LibraryName.path;
-	if (library_path.len == 0) {
-		return;
-	}
-
-	for_array(path_index, m->foreign_library_paths) {
-		String path = m->foreign_library_paths[path_index];
-#if defined(GB_SYSTEM_WINDOWS)
-		if (str_eq_ignore_case(path, library_path)) {
-#else
-		if (str_eq(path, library_path)) {
-#endif
-			return;
-		}
-	}
-	array_add(&m->foreign_library_paths, library_path);
-}
 
 void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info data
 	irModule *m = proc->module;
@@ -8679,6 +8689,14 @@ void ir_gen_tree(irGen *s) {
 			irGlobalVariable *var = &global_variables[i];
 			if (var->decl->init_expr != nullptr)  {
 				var->init = ir_build_expr(proc, var->decl->init_expr);
+			}
+
+			Entity *e = var->var->Global.entity;
+			GB_ASSERT(e->kind == Entity_Variable);
+
+			if (e->Variable.is_foreign) {
+				Entity *fl = e->Procedure.foreign_library;
+				ir_add_foreign_library_path(m, fl);
 			}
 
 			if (var->init != nullptr) {
