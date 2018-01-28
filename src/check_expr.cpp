@@ -60,7 +60,7 @@ Type *   make_optional_ok_type          (gbAllocator a, Type *value);
 void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def, bool alias);
 Entity * check_selector                 (Checker *c, Operand *operand, AstNode *node, Type *type_hint);
 Entity * check_ident                    (Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name);
-Entity * find_polymorphic_struct_entity(Checker *c, Type *original_type, isize param_count, Array<Operand> ordered_operands);
+Entity * find_polymorphic_struct_entity (Checker *c, Type *original_type, isize param_count, Array<Operand> ordered_operands);
 void     check_not_tuple                (Checker *c, Operand *operand);
 void     convert_to_typed               (Checker *c, Operand *operand, Type *target_type);
 gbString expr_to_string                 (AstNode *expression);
