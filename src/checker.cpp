@@ -1110,10 +1110,27 @@ void add_dependency_to_map(PtrSet<Entity *> *map, CheckerInfo *info, Entity *ent
 
 	ptr_set_add(map, entity);
 	DeclInfo *decl = decl_info_of_entity(info, entity);
-	if (decl != nullptr) {
-		for_array(i, decl->deps.entries) {
-			Entity *e = decl->deps.entries[i].ptr;
-			add_dependency_to_map(map, info, e);
+	if (decl == nullptr) {
+		return;
+	}
+	for_array(i, decl->deps.entries) {
+		Entity *e = decl->deps.entries[i].ptr;
+		add_dependency_to_map(map, info, e);
+		if (e->kind == Entity_Procedure && e->Procedure.is_foreign) {
+			Entity *fl = e->Procedure.foreign_library;
+			GB_ASSERT_MSG(fl != nullptr &&
+			              fl->kind == Entity_LibraryName &&
+			              fl->LibraryName.used,
+			              "%.*s", LIT(name));
+			add_dependency_to_map(map, info, fl);
+		}
+		if (e->kind == Entity_Variable && e->Variable.is_foreign) {
+			Entity *fl = e->Variable.foreign_library;
+			GB_ASSERT_MSG(fl != nullptr &&
+			              fl->kind == Entity_LibraryName &&
+			              fl->LibraryName.used,
+			              "%.*s", LIT(name));
+			add_dependency_to_map(map, info, fl);
 		}
 	}
 }
@@ -1130,17 +1147,10 @@ PtrSet<Entity *> generate_minimum_dependency_set(CheckerInfo *info, Entity *star
 				// NOTE(bill): Require runtime stuff
 				add_dependency_to_map(&map, info, e);
 			}
-		} else if (e->kind == Entity_Procedure) {
-			if (e->Procedure.is_export) {
-				add_dependency_to_map(&map, info, e);
-			}
-			if (e->Procedure.is_foreign) {
-				add_dependency_to_map(&map, info, e->Procedure.foreign_library);
-			}
-		} else if (e->kind == Entity_Variable) {
-			if (e->Variable.is_export) {
-				add_dependency_to_map(&map, info, e);
-			}
+		} else if (e->kind == Entity_Procedure && e->Procedure.is_export) {
+			add_dependency_to_map(&map, info, e);
+		} else if (e->kind == Entity_Variable && e->Procedure.is_export) {
+			add_dependency_to_map(&map, info, e);
 		}
 	}
 
