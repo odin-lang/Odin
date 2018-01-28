@@ -623,6 +623,165 @@ __print_caller_location :: proc(fd: os.Handle, using loc: Source_Code_Location) 
 	os.write_byte(fd, ')');
 }
 
+__print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
+	if ti == nil {
+		os.write_string(fd, "nil");
+		return;
+	}
+
+	switch info in ti.variant {
+	case Type_Info_Named:
+		os.write_string(fd, info.name);
+	case Type_Info_Integer:
+		a := any{type_info = ti};
+		switch _ in a {
+		case int:     os.write_string(fd, "int");
+		case uint:    os.write_string(fd, "uint");
+		case uintptr: os.write_string(fd, "uintptr");
+		case:
+			if info.signed do os.write_byte(fd, 'i');
+			else           do os.write_byte(fd, 'u');
+			__print_u64(fd, u64(8*ti.size));
+		}
+	case Type_Info_Rune:
+		os.write_string(fd, "rune");
+	case Type_Info_Float:
+		switch ti.size {
+		case 2: os.write_string(fd, "f16");
+		case 4: os.write_string(fd, "f32");
+		case 8: os.write_string(fd, "f64");
+		}
+	case Type_Info_Complex:
+		switch ti.size {
+		case 4:  os.write_string(fd, "complex32");
+		case 8:  os.write_string(fd, "complex64");
+		case 16: os.write_string(fd, "complex128");
+		}
+	case Type_Info_String:
+		os.write_string(fd, "string");
+	case Type_Info_Boolean:
+		a := any{type_info = ti};
+		switch _ in a {
+		case bool: os.write_string(fd, "bool");
+		case:
+			os.write_byte(fd, 'b');
+			__print_u64(fd, u64(8*ti.size));
+		}
+	case Type_Info_Any:
+		os.write_string(fd, "any");
+
+	case Type_Info_Pointer:
+		if info.elem == nil {
+			os.write_string(fd, "rawptr");
+		} else {
+			os.write_string(fd, "^");
+			__print_type(fd, info.elem);
+		}
+	case Type_Info_Procedure:
+		os.write_string(fd, "proc");
+		if info.params == nil {
+			os.write_string(fd, "()");
+		} else {
+			t := info.params.variant.(Type_Info_Tuple);
+			os.write_string(fd, "(");
+			for t, i in t.types {
+				if i > 0 do os.write_string(fd, ", ");
+				__print_type(fd, t);
+			}
+			os.write_string(fd, ")");
+		}
+		if info.results != nil {
+			os.write_string(fd, " -> ");
+			__print_type(fd, info.results);
+		}
+	case Type_Info_Tuple:
+		count := len(info.names);
+		if count != 1 do os.write_string(fd, "(");
+		for name, i in info.names {
+			if i > 0 do os.write_string(fd, ", ");
+
+			t := info.types[i];
+
+			if len(name) > 0 {
+				os.write_string(fd, name);
+				os.write_string(fd, ": ");
+			}
+			__print_type(fd, t);
+		}
+		if count != 1 do os.write_string(fd, ")");
+
+	case Type_Info_Array:
+		os.write_string(fd, "[");
+		__print_u64(fd, u64(info.count));
+		os.write_string(fd, "]");
+		__print_type(fd, info.elem);
+	case Type_Info_Dynamic_Array:
+		os.write_string(fd, "[dynamic]");
+		__print_type(fd, info.elem);
+	case Type_Info_Slice:
+		os.write_string(fd, "[]");
+		__print_type(fd, info.elem);
+
+	case Type_Info_Map:
+		os.write_string(fd, "map[");
+		__print_type(fd, info.key);
+		os.write_byte(fd, ']');
+		__print_type(fd, info.value);
+
+	case Type_Info_Struct:
+		os.write_string(fd, "struct ");
+		if info.is_packed    do os.write_string(fd, "#packed ");
+		if info.is_raw_union do os.write_string(fd, "#raw_union ");
+		if info.custom_align {
+			os.write_string(fd, "#align ");
+			__print_u64(fd, u64(ti.align));
+			os.write_byte(fd, ' ');
+		}
+		os.write_byte(fd, '{');
+		for name, i in info.names {
+			if i > 0 do os.write_string(fd, ", ");
+			os.write_string(fd, name);
+			os.write_string(fd, ": ");
+			__print_type(fd, info.types[i]);
+		}
+		os.write_byte(fd, '}');
+
+	case Type_Info_Union:
+		os.write_string(fd, "union {");
+		for variant, i in info.variants {
+			if i > 0 do os.write_string(fd, ", ");
+			__print_type(fd, variant);
+		}
+		os.write_string(fd, "}");
+
+	case Type_Info_Enum:
+		os.write_string(fd, "enum ");
+		__print_type(fd, info.base);
+		os.write_string(fd, " {");
+		for name, i in info.names {
+			if i > 0 do os.write_string(fd, ", ");
+			os.write_string(fd, name);
+		}
+		os.write_string(fd, "}");
+
+	case Type_Info_Bit_Field:
+		os.write_string(fd, "bit_field ");
+		if ti.align != 1 {
+			os.write_string(fd, "#align ");
+			__print_u64(fd, u64(ti.align));
+			os.write_byte(fd, ' ');
+		}
+		os.write_string(fd, " {");
+		for name, i in info.names {
+			if i > 0 do os.write_string(fd, ", ");
+			os.write_string(fd, name);
+			os.write_string(fd, ": ");
+			__print_u64(fd, u64(info.bits[i]));
+		}
+		os.write_string(fd, "}");
+	}
+}
+
 
 assert :: proc "contextless" (condition: bool, message := "", using loc := #caller_location) -> bool {
 	if !condition {
@@ -728,10 +887,6 @@ __slice_expr_error :: proc "contextless" (file: string, line, column: int, low, 
 	__print_u64(fd, u64(high));
 	os.write_byte(fd, '\n');
 	__debug_trap();
-
-	// fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: %d..%d\n",
-	            // file, line, column, low, high);
-	__debug_trap();
 }
 
 __dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
@@ -747,7 +902,6 @@ __dynamic_array_expr_error :: proc "contextless" (file: string, line, column: in
 	__print_u64(fd, u64(max));
 	os.write_byte(fd, '\n');
 	__debug_trap();
-	__debug_trap();
 }
 
 __type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: ^Type_Info) {
@@ -755,9 +909,11 @@ __type_assertion_check :: proc "contextless" (ok: bool, file: string, line, colu
 
 	fd := os.stderr;
 	__print_caller_location(fd, Source_Code_Location{file, line, column, ""});
-	os.write_string(fd, " Invalid type assertion");
-	// fmt.fprintf(os.stderr, "%s(%d:%d) Invalid type_assertion from %T to %T\n",
-	            // file, line, column, from, to);
+	os.write_string(fd, " Invalid type assertion from");
+	__print_type(fd, from);
+	os.write_string(fd, " to ");
+	__print_type(fd, to);
+	os.write_byte(fd, '\n');
 	__debug_trap();
 }
 
