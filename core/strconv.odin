@@ -117,6 +117,9 @@ parse_f32 :: proc(s: string) -> f32 {
 
 
 parse_f64 :: proc(s: string) -> f64 {
+	if s == "" {
+		return 0;
+	}
 	i := 0;
 
 	sign: f64 = 1;
