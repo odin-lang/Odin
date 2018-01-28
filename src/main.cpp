@@ -505,7 +505,7 @@ bool parse_build_flags(Array<String> args) {
 						}
 
 						case BuildFlag_Debug:
-							build_context.debug = true;
+							build_context.ODIN_DEBUG = true;
 							break;
 
 						case BuildFlag_NoBoundsCheck:

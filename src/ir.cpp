@@ -7598,7 +7598,7 @@ void ir_init_module(irModule *m, Checker *c) {
 	m->info = &c->info;
 
 	m->generate_debug_info = false;
-	if (build_context.debug) {
+	if (build_context.ODIN_DEBUG) {
 		m->generate_debug_info = build_context.ODIN_OS == "windows" && build_context.word_size == 8;
 	}
 

@@ -7,6 +7,7 @@ struct BuildContext {
 	String ODIN_VENDOR;  // compiler vendor
 	String ODIN_VERSION; // compiler version
 	String ODIN_ROOT;    // Odin ROOT
+	bool   ODIN_DEBUG;   // Odin in debug mode
 
 	// In bytes
 	i64    word_size; // Size of a pointer, must be >= 4
@@ -22,7 +23,6 @@ struct BuildContext {
 	i32    optimization_level;
 	bool   show_timings;
 	bool   keep_temp_files;
-	bool   debug;
 	bool   no_bounds_check;
 
 	gbAffinity affinity;

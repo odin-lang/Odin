@@ -548,6 +548,7 @@ void init_universal_scope(void) {
 	add_global_string_constant(a, str_lit("ODIN_VENDOR"),  bc->ODIN_VENDOR);
 	add_global_string_constant(a, str_lit("ODIN_VERSION"), bc->ODIN_VERSION);
 	add_global_string_constant(a, str_lit("ODIN_ROOT"),    bc->ODIN_ROOT);
+	add_global_constant(a, str_lit("ODIN_DEBUG"), t_untyped_bool, exact_value_bool(bc->ODIN_DEBUG));
 
 
 // Builtin Procedures
