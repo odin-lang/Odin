@@ -175,7 +175,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 		write_byte(buf, 'f');
 		write_i64(buf, i64(8*ti.size), 10);
 	case Type_Info_Complex:
-		write_string(buf, 'complex');
+		write_string(buf, "complex");
 		write_i64(buf, i64(8*ti.size), 10);
 	case Type_Info_String:
 		write_string(buf, "string");
