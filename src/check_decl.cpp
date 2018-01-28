@@ -254,6 +254,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 		switch (operand.mode) {
 		case Addressing_Type: {
 			e->kind = Entity_TypeName;
+			e->type = nullptr;
 
 			DeclInfo *d = c->context.decl;
 			if (d->type_expr != nullptr) {
