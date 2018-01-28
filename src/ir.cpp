@@ -2993,6 +2993,20 @@ irValue *ir_emit_uintptr_to_ptr(irProcedure *proc, irValue *value, Type *t) {
 	return ir_emit(proc, ir_instr_conv(proc, irConv_inttoptr, value, vt, t));
 }
 
+
+void ir_emit_store_union_variant(irProcedure *proc, irValue *parent, irValue *variant, Type *variant_type) {
+	gbAllocator a = proc->module->allocator;
+	irValue *underlying = ir_emit_conv(proc, parent, make_type_pointer(a, variant_type));
+
+	irValue *v = variant;
+	ir_emit_store(proc, underlying, variant);
+
+	Type *t = type_deref(ir_type(parent));
+
+	irValue *tag_ptr = ir_emit_union_tag_ptr(proc, parent);
+	ir_emit_store(proc, tag_ptr, ir_const_union_tag(a, t, variant_type));
+}
+
 irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	Type *src_type = ir_type(value);
 	if (are_types_identical(t, src_type)) {
@@ -3178,12 +3192,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 				ir_emit_comment(proc, str_lit("union - child to parent"));
 				gbAllocator a = proc->module->allocator;
 				irValue *parent = ir_add_local_generated(proc, t);
-				irValue *underlying = ir_emit_conv(proc, parent, make_type_pointer(a, vt));
-				ir_emit_store(proc, underlying, value);
-
-				irValue *tag_ptr = ir_emit_union_tag_ptr(proc, parent);
-				ir_emit_store(proc, tag_ptr, ir_const_union_tag(a, t, src_type));
-
+				ir_emit_store_union_variant(proc, parent, value, vt);
 				return ir_emit_load(proc, parent);
 			}
 		}
@@ -8038,8 +8047,8 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 						ExactValue value = fields[i]->Constant.value;
 						irValue *v = ir_value_constant(a, t->Enum.base_type, value);
 
-						ir_emit_store(proc, value_ep, ir_emit_conv(proc, v, t_type_info_enum_value));
-						ir_emit_store(proc, name_ep,  ir_const_string(a, fields[i]->token.string));
+						ir_emit_store_union_variant(proc, value_ep, v, ir_type(v));
+						ir_emit_store(proc, name_ep, ir_const_string(a, fields[i]->token.string));
 					}
 
 					irValue *v_count = ir_const_int(a, count);
@@ -8208,10 +8217,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 		if (tag != nullptr) {
 			Type *tag_type = type_deref(ir_type(tag));
 			GB_ASSERT(is_type_named(tag_type));
-			Type *variant_type = type_deref(ir_type(variant_ptr));
-			irValue *tag = ir_const_union_tag(a, variant_type, tag_type);
-			irValue *ptr = ir_emit_union_tag_ptr(proc, variant_ptr);
-			ir_emit_store(proc, ptr, tag);
+			ir_emit_store_union_variant(proc, variant_ptr, ir_emit_load(proc, tag), tag_type);
 		} else {
 			if (t != t_llvm_bool) {
 				GB_PANIC("Unhandled Type_Info variant: %s", type_to_string(t));
