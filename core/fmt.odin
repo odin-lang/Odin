@@ -172,17 +172,11 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 	case Type_Info_Rune:
 		write_string(buf, "rune");
 	case Type_Info_Float:
-		switch ti.size {
-		case 2: write_string(buf, "f16");
-		case 4: write_string(buf, "f32");
-		case 8: write_string(buf, "f64");
-		}
+		write_byte(buf, 'f');
+		write_i64(buf, i64(8*ti.size), 10);
 	case Type_Info_Complex:
-		switch ti.size {
-		case 4:  write_string(buf, "complex32");
-		case 8:  write_string(buf, "complex64");
-		case 16: write_string(buf, "complex128");
-		}
+		write_string(buf, 'complex');
+		write_i64(buf, i64(8*ti.size), 10);
 	case Type_Info_String:
 		write_string(buf, "string");
 	case Type_Info_Boolean:
