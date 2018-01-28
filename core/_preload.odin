@@ -1132,7 +1132,7 @@ __dynamic_map_delete :: proc(using h: __Map_Header, key: __Map_Key) {
 
 __dynamic_map_get_entry :: proc(using h: __Map_Header, index: int) -> ^__Map_Entry_Header {
 	assert(0 <= index && index < m.entries.len);
-	return cast(^__Map_Entry_Header)(cast(^byte)m.entries.data + index*entry_size);
+	return cast(^__Map_Entry_Header)(uintptr(m.entries.data) + uintptr(index*entry_size));
 }
 
 __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
