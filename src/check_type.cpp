@@ -1671,6 +1671,10 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 		c->context.polymorphic_scope = c->context.scope;
 	}
 
+	CheckerContext prev = c->context;
+	defer (c->context = prev);
+	c->context.curr_proc_sig = type;
+
 	bool variadic = false;
 	isize variadic_index = -1;
 	bool success = true;

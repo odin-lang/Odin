@@ -275,6 +275,7 @@ struct CheckerContext {
 	String     proc_name;
 	Type *     type_hint;
 	DeclInfo * curr_proc_decl;
+	Type *     curr_proc_sig;
 	ForeignContext foreign_context;
 
 	bool       collect_delayed_decls;
