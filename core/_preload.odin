@@ -646,17 +646,11 @@ __print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 	case Type_Info_Rune:
 		os.write_string(fd, "rune");
 	case Type_Info_Float:
-		switch ti.size {
-		case 2: os.write_string(fd, "f16");
-		case 4: os.write_string(fd, "f32");
-		case 8: os.write_string(fd, "f64");
-		}
+		os.write_byte(fd, 'f');
+		__print_u64(fd, u64(8*ti.size));
 	case Type_Info_Complex:
-		switch ti.size {
-		case 4:  os.write_string(fd, "complex32");
-		case 8:  os.write_string(fd, "complex64");
-		case 16: os.write_string(fd, "complex128");
-		}
+		os.write_string(fd, "complex");
+		__print_u64(fd, u64(8*ti.size));
 	case Type_Info_String:
 		os.write_string(fd, "string");
 	case Type_Info_Boolean:
