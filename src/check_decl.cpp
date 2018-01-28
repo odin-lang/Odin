@@ -718,6 +718,10 @@ void check_proc_group_decl(Checker *c, Entity *pg_entity, DeclInfo *d) {
 
 	array_init(&pge->entities, c->allocator, pg->args.count);
 
+	// NOTE(bill): This must be set here to prevent cycles in checking if someone
+	// places the entity within itself
+	pg_entity->type = t_invalid;
+
 	PtrSet<Entity *> entity_map = {};
 	ptr_set_init(&entity_map, heap_allocator());
 	defer (ptr_set_destroy(&entity_map));
@@ -815,7 +819,6 @@ void check_proc_group_decl(Checker *c, Entity *pg_entity, DeclInfo *d) {
 		}
 	}
 
-	pg_entity->type = t_invalid;
 }
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
