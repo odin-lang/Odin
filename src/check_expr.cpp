@@ -3242,23 +3242,40 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	}
 
 
-	case BuiltinProc_type_of:
+	case BuiltinProc_type_of: {
 		// proc type_of(val: Type) -> type(Type)
-		check_assignment(c, operand, nullptr, str_lit("argument of 'type_of'"));
-		if (operand->mode == Addressing_Invalid || operand->mode == Addressing_Builtin) {
+		AstNode *expr = ce->args[0];
+		Operand o = {};
+		check_expr_or_type(c, &o, expr);
+
+		// check_assignment(c, operand, nullptr, str_lit("argument of 'type_of'"));
+		if (o.mode == Addressing_Invalid || o.mode == Addressing_Builtin) {
 			return false;
 		}
-		if (operand->type == nullptr || operand->type == t_invalid) {
-			error(operand->expr, "Invalid argument to 'type_of'");
+		if (o.type == nullptr || o.type == t_invalid) {
+			error(o.expr, "Invalid argument to 'type_of'");
 			return false;
 		}
-		if (is_type_polymorphic(operand->type)) {
-			error(operand->expr, "'type_of' of polymorphic type cannot be determined");
+		if (o.type == nullptr || o.type == t_invalid) {
+			error(o.expr, "Invalid argument to 'type_of'");
+			return false;
+		}
+		// NOTE(bill): Prevent type cycles for procedure declarations
+		if (c->context.curr_proc_sig == o.type) {
+			gbString s = expr_to_string(o.expr);
+			error(o.expr, "Invalid cyclic type usage from 'type_of', got '%s'", s);
+			gb_string_free(s);
+			return false;
+		}
+
+		if (is_type_polymorphic(o.type)) {
+			error(o.expr, "'type_of' of polymorphic type cannot be determined");
 			return false;
 		}
 		operand->mode = Addressing_Type;
+		operand->type = o.type;
 		break;
-
+	}
 
 	case BuiltinProc_type_info_of: {
 		// proc type_info_of(Type) -> ^Type_Info
@@ -3270,7 +3287,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		init_preload(c);
 		AstNode *expr = ce->args[0];
 		Operand o = {};
-		check_expr_or_type(c, &o, ce->args[0]);
+		check_expr_or_type(c, &o, expr);
 		if (o.mode == Addressing_Invalid) {
 			return false;
 		}
