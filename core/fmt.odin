@@ -316,7 +316,7 @@ _parse_int :: proc(s: string, offset: int) -> (result: int, new_offset: int, ok:
 
 	new_offset = offset;
 	n := len(s[new_offset..]);
-	for new_offset < n {
+	for new_offset <= n {
 		c := rune(s[new_offset]);
 		if !is_digit(c) do break;
 		new_offset += 1;
@@ -1034,7 +1034,7 @@ sbprintf :: proc(b: ^String_Buffer, fmt: string, args: ...any) -> string {
 	was_prev_index := false;
 
 
-	for i := 0; i < end; /**/ {
+	loop: for i := 0; i < end; /**/ {
 		fi = Fmt_Info{buf = b, good_arg_index = true};
 
 		prev_i := i;
@@ -1045,7 +1045,7 @@ sbprintf :: proc(b: ^String_Buffer, fmt: string, args: ...any) -> string {
 			write_string(b, fmt[prev_i..i]);
 		}
 		if i >= end {
-			break;
+			break loop;
 		}
 
 		// Process a "verb"
@@ -1125,19 +1125,20 @@ sbprintf :: proc(b: ^String_Buffer, fmt: string, args: ...any) -> string {
 
 		if i >= end {
 			write_string(b, "%!(NO VERB)");
-			break;
+			break loop;
 		}
 
 		verb, w := utf8.decode_rune_from_string(fmt[i..]);
 		i += w;
 
-		if verb == '%' {
+		switch {
+		case verb == '%':
 			write_byte(b, '%');
-		} else if !fi.good_arg_index {
+		case !fi.good_arg_index:
 			write_string(b, "%!(BAD ARGUMENT NUMBER)");
-		} else if arg_index >= len(args) {
+		case arg_index >= len(args):
 			write_string(b, "%!(MISSING ARGUMENT)");
-		} else {
+		case:
 			fmt_arg(&fi, args[arg_index], verb);
 			arg_index += 1;
 		}
