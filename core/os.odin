@@ -9,6 +9,11 @@ write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, cast([]byte)str);
 }
 
+write_byte :: proc(fd: Handle, b: byte) -> (int, Errno) {
+	return write(fd, []byte{b});
+}
+
+
 read_entire_file :: proc(name: string) -> (data: []byte, success: bool) {
 	fd, err := open(name, O_RDONLY, 0);
 	if err != 0 {

@@ -7838,9 +7838,8 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 	i32 type_info_member_names_index = 0;
 	i32 type_info_member_offsets_index = 0;
 
-	for_array(type_info_map_index, info->type_info_map.entries) {
-		auto *entry = &info->type_info_map.entries[type_info_map_index];
-		Type *t = cast(Type *)entry->key.ptr;
+	for_array(type_info_type_index, info->type_info_types) {
+		Type *t = info->type_info_types[type_info_type_index];
 		t = default_type(t);
 		if (t == t_invalid) {
 			continue;
