@@ -124,7 +124,33 @@ Security_Attributes :: struct {
 	inherit_handle:      Bool,
 }
 
+Process_Information :: struct {
+	process:    Handle,
+	thread:     Handle, 
+	process_id: u32,
+	thread_id:  u32
+}
 
+Startup_Info :: struct {
+    cb             : u32,
+    reserved       : ^u16,
+    desktop        : ^u16,
+    title          : ^u16,
+    x              : u32,
+    y              : u32,
+    x_size         : u32,
+    y_size         : u32,
+    x_count_chars  : u32,
+    y_count_chars  : u32,
+    fill_attribute : u32,
+    flags          : u32,
+    show_window    : u16,
+    _              : u16,
+    _              : ^byte,
+    stdin          : Handle,
+    stdout         : Handle,
+    stderr         : Handle,
+}
 
 Pixel_Format_Descriptor :: struct {
 	size,
@@ -429,9 +455,38 @@ GET_FILEEX_INFO_LEVELS :: i32;
 GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0;
 GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1;
 
+STARTF_USESHOWWINDOW    :: 0x00000001;
+STARTF_USESIZE          :: 0x00000002;
+STARTF_USEPOSITION      :: 0x00000004;
+STARTF_USECOUNTCHARS    :: 0x00000008;
+STARTF_USEFILLATTRIBUTE :: 0x00000010;
+STARTF_RUNFULLSCREEN    :: 0x00000020;  // ignored for non-x86 platforms
+STARTF_FORCEONFEEDBACK  :: 0x00000040;
+STARTF_FORCEOFFFEEDBACK :: 0x00000080;
+STARTF_USESTDHANDLES    :: 0x00000100;
+STARTF_USEHOTKEY        :: 0x00000200;
+STARTF_TITLEISLINKNAME  :: 0x00000800;
+STARTF_TITLEISAPPID     :: 0x00001000;
+STARTF_PREVENTPINNING   :: 0x00002000;
+STARTF_UNTRUSTEDSOURCE  :: 0x00008000;
+
+
+MOVEFILE_REPLACE_EXISTING      :: 0x00000001;
+MOVEFILE_COPY_ALLOWED          :: 0x00000002;
+MOVEFILE_DELAY_UNTIL_REBOOT    :: 0x00000004;
+MOVEFILE_WRITE_THROUGH         :: 0x00000008;
+MOVEFILE_CREATE_HARDLINK       :: 0x00000010;
+MOVEFILE_FAIL_IF_NOT_TRACKABLE :: 0x00000020;
+
 @(default_calling_convention = "std")
 foreign kernel32 {
 	@(link_name="GetLastError")              get_last_error              :: proc() -> i32 ---;
+	@(link_name="CreateProcessA")		     create_process_a		     :: proc(application_name, command_line: ^byte, 
+	                                                              				 process_attributes, thread_attributes: ^Security_Attributes, 
+	                                                              				 inherit_handle: Bool, creation_flags: u32, environment: rawptr, 
+	                                                              				 current_direcotry: ^byte, startup_info : ^Startup_Info,
+	                                                              				 process_information : ^Process_Information) -> Bool ---;
+	@(link_name="GetExitCodeProcess")		 get_exit_code_process       :: proc(process: Handle, exit: ^u32) -> Bool ---;
 	@(link_name="ExitProcess")               exit_process                :: proc(exit_code: u32) ---;
 	@(link_name="GetModuleHandleA")          get_module_handle_a         :: proc(module_name: ^byte) -> Hinstance ---;
 	@(link_name="GetModuleHandleW")          get_module_handle_w         :: proc(module_name: ^u16) -> Hinstance ---;
@@ -466,6 +521,9 @@ foreign kernel32 {
 	@(link_name="GetFileAttributesExA")       get_file_attributes_ex_a       :: proc(filename: ^byte, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool ---;
 	@(link_name="GetFileInformationByHandle") get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool ---;
 
+	@(link_name="CreateDirectoryA") 		  create_directory_a			 :: proc(path: ^byte, security_attributes: ^Security_Attributes) -> Bool ---;
+	@(link_name="CreateDirectoryW") 		  create_directory_w			 :: proc(path: ^u16, security_attributes: ^Security_Attributes) -> Bool ---;
+
 	@(link_name="GetFileType")    get_file_type    :: proc(file_handle: Handle) -> u32 ---;
 	@(link_name="SetFilePointer") set_file_pointer :: proc(file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 ---;
 
@@ -475,6 +533,13 @@ foreign kernel32 {
 	@(link_name="FindNextFileA")  find_next_file_a  :: proc(file : Handle, data : ^Find_Data) -> Bool ---;
 	@(link_name="FindClose")      find_close        :: proc(file : Handle) -> Bool ---;
 
+	@(link_name="MoveFileExA")    move_file_ex_a    :: proc(existing, new: ^byte, flags: u32) -> Bool ---;
+	@(link_name="DeleteFileA")    delete_file_a     :: proc(file_name : ^byte) -> Bool ---;
+	@(link_name="CopyFileA")      copy_file_a       :: proc(existing, new: ^byte, fail_if_exists: Bool) -> Bool ---;
+
+	@(link_name="MoveFileExW")    move_file_ex_w    :: proc(existing, new: ^u16, flags: u32) -> Bool ---;
+	@(link_name="DeleteFileW")    delete_file_w     :: proc(file_name : ^u16) -> Bool ---;
+	@(link_name="CopyFileW")      copy_file_w       :: proc(existing, new: ^u16, fail_if_exists: Bool) -> Bool ---;
 
 	@(link_name="HeapAlloc")      heap_alloc       :: proc(h: Handle, flags: u32, bytes: int) -> rawptr ---;
 	@(link_name="HeapReAlloc")    heap_realloc     :: proc(h: Handle, flags: u32, memory: rawptr, bytes: int) -> rawptr ---;
