@@ -639,8 +639,7 @@ __print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 		case uint:    os.write_string(fd, "uint");
 		case uintptr: os.write_string(fd, "uintptr");
 		case:
-			if info.signed do os.write_byte(fd, 'i');
-			else           do os.write_byte(fd, 'u');
+			os.write_byte(fd, info.signed ? 'i' : 'u');
 			__print_u64(fd, u64(8*ti.size));
 		}
 	case Type_Info_Rune:
@@ -785,8 +784,8 @@ assert :: proc "contextless" (condition: bool, message := "", using loc := #call
 		if len(message) > 0 {
 			os.write_string(fd, ": ");
 			os.write_string(fd, message);
-			os.write_byte(fd, '\n');
 		}
+		os.write_byte(fd, '\n');
 		__debug_trap();
 	}
 	return condition;
@@ -799,8 +798,8 @@ panic :: proc "contextless" (message := "", using loc := #caller_location) {
 	if len(message) > 0 {
 		os.write_string(fd, ": ");
 		os.write_string(fd, message);
-		os.write_byte(fd, '\n');
 	}
+	os.write_byte(fd, '\n');
 	__debug_trap();
 }
 
@@ -1230,7 +1229,8 @@ __dynamic_map_set :: proc(h: __Map_Header, key: __Map_Key, value: rawptr, loc :=
 
 
 __dynamic_map_grow :: proc(using h: __Map_Header, loc := #caller_location) {
-	new_count := max(2*m.entries.cap + 8, __INITIAL_MAP_CAP);
+	// TODO(bill): Determine an efficient growing rate
+	new_count := max(4*m.entries.cap + 7, __INITIAL_MAP_CAP);
 	__dynamic_map_rehash(h, new_count, loc);
 }
 
