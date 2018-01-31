@@ -165,8 +165,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 		case uint:    write_string(buf, "uint");
 		case uintptr: write_string(buf, "uintptr");
 		case:
-			if info.signed do write_byte(buf, 'i');
-			else           do write_byte(buf, 'u');
+			write_byte(buf, info.signed ? 'i' : 'u');
 			write_i64(buf, i64(8*ti.size), 10);
 		}
 	case Type_Info_Rune:

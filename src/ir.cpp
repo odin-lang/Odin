@@ -778,7 +778,7 @@ Array<irValue *> *ir_value_referrers(irValue *v) {
 ////////////////////////////////////////////////////////////////
 
 void     ir_module_add_value    (irModule *m, Entity *e, irValue *v);
-irValue *ir_emit_zero_init      (irProcedure *p, irValue *address, AstNode *expr);
+void     ir_emit_zero_init      (irProcedure *p, irValue *address, AstNode *expr);
 irValue *ir_emit_comment        (irProcedure *p, String text);
 irValue *ir_emit_store          (irProcedure *p, irValue *address, irValue *value);
 irValue *ir_emit_load           (irProcedure *p, irValue *address);
@@ -1595,14 +1595,14 @@ void ir_add_debug_location_to_value(irProcedure *proc, irValue *v, AstNode *e) {
 	}
 }
 
-irValue *ir_emit_zero_init(irProcedure *p, irValue *address, AstNode *expr) {
+void ir_emit_zero_init(irProcedure *p, irValue *address, AstNode *expr) {
 	gbAllocator a = p->module->allocator;
 	Type *t = type_deref(ir_type(address));
 	irValue **args = gb_alloc_array(a, irValue *, 2);
 	args[0] = ir_emit_conv(p, address, t_rawptr);
 	args[1] = ir_const_int(a, type_size_of(a, t));
-	return ir_emit_global_call(p, "__mem_zero", args, 2, expr);
-	// return ir_emit(p, ir_instr_zero_init(p, address));
+	ir_emit(p, ir_instr_zero_init(p, address));
+	ir_emit_global_call(p, "__mem_zero", args, 2, expr);
 }
 
 irValue *ir_emit_comment(irProcedure *p, String text) {
