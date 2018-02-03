@@ -1292,14 +1292,15 @@ __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
 		__dynamic_map_get_entry(h, fr.entry_prev).next = __dynamic_map_get_entry(h, fr.entry_index).next;
 	}
 
-	if fr.entry_index == m.entries.len-1 {
-		m.entries.len -= 1;
-	}
 	__mem_copy(__dynamic_map_get_entry(h, fr.entry_index), __dynamic_map_get_entry(h, m.entries.len-1), entry_size);
 	last := __dynamic_map_find(h, __dynamic_map_get_entry(h, fr.entry_index).key);
 	if last.entry_prev >= 0 {
 		__dynamic_map_get_entry(h, last.entry_prev).next = fr.entry_index;
 	} else {
 		m.hashes[last.hash_index] = fr.entry_index;
+	}
+
+	if fr.entry_index == m.entries.len-1 {
+		m.entries.len -= 1;
 	}
 }
