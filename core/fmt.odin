@@ -303,14 +303,11 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 
 
 _parse_int :: proc(s: string, offset: int) -> (result: int, new_offset: int, ok: bool) {
-	is_digit :: inline proc(r: rune) -> bool{
-		return '0' <= r && r <= '9';
-	}
+	is_digit :: inline proc(r: byte) -> bool { return '0' <= r && r <= '9' }
 
 	new_offset = offset;
-	n := len(s[new_offset..]);
-	for new_offset <= n {
-		c := rune(s[new_offset]);
+	for new_offset <= len(s) {
+		c := s[new_offset];
 		if !is_digit(c) do break;
 		new_offset += 1;
 
