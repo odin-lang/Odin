@@ -53,7 +53,6 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_BranchStmt:    return node->BranchStmt.token;
 	case AstNode_UsingStmt:     return node->UsingStmt.token;
 	case AstNode_UsingInStmt:   return node->UsingInStmt.using_token;
-	case AstNode_AsmStmt:       return node->AsmStmt.token;
 	case AstNode_PushContext:   return node->PushContext.token;
 
 	case AstNode_BadDecl:            return node->BadDecl.begin;
@@ -278,14 +277,6 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_UsingInStmt:
 		n->UsingInStmt.list = clone_ast_node_array(a, n->UsingInStmt.list);
 		n->UsingInStmt.expr = clone_ast_node(a, n->UsingInStmt.expr);
-		break;
-	case AstNode_AsmOperand:
-		n->AsmOperand.operand = clone_ast_node(a, n->AsmOperand.operand);
-		break;
-	case AstNode_AsmStmt:
-		n->AsmStmt.output_list  = clone_ast_node(a, n->AsmStmt.output_list);
-		n->AsmStmt.input_list   = clone_ast_node(a, n->AsmStmt.input_list);
-		n->AsmStmt.clobber_list = clone_ast_node(a, n->AsmStmt.clobber_list);
 		break;
 	case AstNode_PushContext:
 		n->PushContext.expr = clone_ast_node(a, n->PushContext.expr);
@@ -786,32 +777,6 @@ AstNode *ast_using_in_stmt(AstFile *f, Token using_token, Array<AstNode *> list,
 	return result;
 }
 
-
-AstNode *ast_asm_operand(AstFile *f, Token string, AstNode *operand) {
-	AstNode *result = make_ast_node(f, AstNode_AsmOperand);
-	result->AsmOperand.string  = string;
-	result->AsmOperand.operand = operand;
-	return result;
-
-}
-
-AstNode *ast_asm_stmt(AstFile *f, Token token, bool is_volatile, Token open, Token close, Token code_string,
-                                 AstNode *output_list, AstNode *input_list, AstNode *clobber_list,
-                                 isize output_count, isize input_count, isize clobber_count) {
-	AstNode *result = make_ast_node(f, AstNode_AsmStmt);
-	result->AsmStmt.token = token;
-	result->AsmStmt.is_volatile = is_volatile;
-	result->AsmStmt.open  = open;
-	result->AsmStmt.close = close;
-	result->AsmStmt.code_string = code_string;
-	result->AsmStmt.output_list = output_list;
-	result->AsmStmt.input_list = input_list;
-	result->AsmStmt.clobber_list = clobber_list;
-	result->AsmStmt.output_count = output_count;
-	result->AsmStmt.input_count = input_count;
-	result->AsmStmt.clobber_count = clobber_count;
-	return result;
-}
 
 AstNode *ast_push_context(AstFile *f, Token token, AstNode *expr, AstNode *body) {
 	AstNode *result = make_ast_node(f, AstNode_PushContext);
@@ -2213,14 +2178,18 @@ AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 		expect_token(f, Token_OpenParen);
 		AstNode *type = parse_type(f);
 		expect_token(f, Token_CloseParen);
-		return ast_type_cast(f, token, type, parse_unary_expr(f, lhs));
+		AstNode *expr = parse_unary_expr(f, lhs);
+		return ast_type_cast(f, token, type, expr);
 	}
 	case Token_Add:
 	case Token_Sub:
 	case Token_Not:
 	case Token_Xor:
-	case Token_And:
-		return ast_unary_expr(f, advance_token(f), parse_unary_expr(f, lhs));
+	case Token_And: {
+		Token token = advance_token(f);
+		AstNode *expr = parse_unary_expr(f, lhs);
+		return ast_unary_expr(f, token, expr);
+	}
 	}
 
 	return parse_atom_expr(f, parse_operand(f, lhs), lhs);
@@ -3427,32 +3396,6 @@ AstNode *parse_defer_stmt(AstFile *f) {
 	return ast_defer_stmt(f, token, stmt);
 }
 
-AstNode *parse_asm_stmt(AstFile *f) {
-	Token token = expect_token(f, Token_asm);
-	bool is_volatile = false;
-	Token open, close, code_string;
-	open = expect_token(f, Token_OpenBrace);
-	code_string = expect_token(f, Token_String);
-	AstNode *output_list = nullptr;
-	AstNode *input_list = nullptr;
-	AstNode *clobber_list = nullptr;
-	isize output_count = 0;
-	isize input_count = 0;
-	isize clobber_count = 0;
-
-	// TODO(bill): Finish asm statement and determine syntax
-
-	// if (f->curr_token.kind != Token_CloseBrace) {
-		// expect_token(f, Token_Colon);
-	// }
-
-	close = expect_token(f, Token_CloseBrace);
-
-	return ast_asm_stmt(f, token, is_volatile, open, close, code_string,
-	                     output_list, input_list, clobber_list,
-	                     output_count, input_count, clobber_count);
-}
-
 
 enum ImportDeclKind {
 	ImportDecl_Standard,
@@ -3612,7 +3555,6 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_switch: return parse_switch_stmt(f);
 	case Token_defer:  return parse_defer_stmt(f);
 	case Token_return: return parse_return_stmt(f);
-	case Token_asm:    return parse_asm_stmt(f);
 
 	case Token_break:
 	case Token_continue:
@@ -3833,17 +3775,17 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 
 	if (err == TokenizerInit_Empty) {
 		Token token = {Token_EOF};
-		token.pos.file = fullpath;
-		token.pos.line = 1;
+		token.pos.file   = fullpath;
+		token.pos.line   = 1;
 		token.pos.column = 1;
 		array_add(&f->tokens, token);
 		return ParseFile_None;
 	}
 
-	for (;;) {
+	while (f->curr_token.kind != Token_EOF) {
 		Token token = tokenizer_get_token(&f->tokenizer);
 		if (token.kind == Token_Invalid) {
-			err_pos->line = token.pos.line;
+			err_pos->line   = token.pos.line;
 			err_pos->column = token.pos.column;
 			return ParseFile_InvalidToken;
 		}

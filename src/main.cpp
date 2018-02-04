@@ -17,9 +17,9 @@
 #include "ir_opt.cpp"
 #include "ir_print.cpp"
 
-#if defined(GB_SYSTEM_WINDOWS)
 // NOTE(bill): 'name' is used in debugging and profiling modes
 i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
+#if defined(GB_SYSTEM_WINDOWS)
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
 	char cmd_line[4096] = {0};
@@ -61,9 +61,8 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	}
 
 	return exit_code;
-}
+
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 
 	char cmd_line[4096] = {0};
 	isize cmd_len;
@@ -107,8 +106,8 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	// exit_code = status;
 
 	return exit_code;
-}
 #endif
+}
 
 
 
@@ -393,11 +392,11 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_CrossCompile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							cross_compile_target = value.value_string;
-#if defined(GB_SYSTEM_UNIX) && defined(GB_ARCH_64_BIT)
+						#if defined(GB_SYSTEM_UNIX) && defined(GB_ARCH_64_BIT)
 							if (str_eq_ignore_case(cross_compile_target, str_lit("Essence"))) {
 
 							} else
-#endif
+						#endif
 							{
 								gb_printf_err("Unsupported cross compilation target '%.*s'\n", LIT(cross_compile_target));
 								gb_printf_err("Currently supported targets: Essence (from 64-bit Unixes only)\n");
@@ -528,7 +527,6 @@ bool parse_build_flags(Array<String> args) {
 
 	return !bad_flags;
 }
-
 
 void show_timings(Checker *c, Timings *t) {
 	Parser *p    = c->parser;

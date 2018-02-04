@@ -169,23 +169,23 @@ Array<AstNode *> make_ast_node_array(AstFile *f, isize init_capacity = 8) {
 		Token token; \
 	}) \
 	AST_NODE_KIND(BasicDirective, "basic directive", struct { \
-		Token token; \
+		Token  token; \
 		String name; \
 	}) \
 	AST_NODE_KIND(Ellipsis,       "ellipsis", struct { \
-		Token token; \
+		Token    token; \
 		AstNode *expr; \
 	}) \
 	AST_NODE_KIND(ProcGroup, "procedure group", struct { \
-		Token token; \
-		Token open;  \
-		Token close; \
+		Token            token; \
+		Token            open;  \
+		Token            close; \
 		Array<AstNode *> args; \
 	}) \
 	AST_NODE_KIND(ProcLit, "procedure literal", struct { \
-		AstNode *type; \
-		AstNode *body; \
-		u64      tags; \
+		AstNode *    type; \
+		AstNode *    body; \
+		u64          tags; \
 		ProcInlining inlining; \
 	}) \
 	AST_NODE_KIND(CompoundLit, "compound literal", struct { \
@@ -193,7 +193,7 @@ Array<AstNode *> make_ast_node_array(AstFile *f, isize init_capacity = 8) {
 		Array<AstNode *> elems; \
 		Token open, close; \
 	}) \
-AST_NODE_KIND(_ExprBegin,  "",  i32) \
+AST_NODE_KIND(_ExprBegin,  "",  struct {}) \
 	AST_NODE_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
 	AST_NODE_KIND(TagExpr,      "tag expression",         struct { Token token, name; AstNode *expr; }) \
 	AST_NODE_KIND(RunExpr,      "run expression",         struct { Token token, name; AstNode *expr; }) \
@@ -220,8 +220,8 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 	AST_NODE_KIND(TernaryExpr,   "ternary expression",  struct { AstNode *cond, *x, *y; }) \
 	AST_NODE_KIND(TypeAssertion, "type assertion",      struct { AstNode *expr; Token dot; AstNode *type; }) \
 	AST_NODE_KIND(TypeCast,      "type cast",           struct { Token token; AstNode *type, *expr; }) \
-AST_NODE_KIND(_ExprEnd,       "", i32) \
-AST_NODE_KIND(_StmtBegin,     "", i32) \
+AST_NODE_KIND(_ExprEnd,       "", struct {}) \
+AST_NODE_KIND(_StmtBegin,     "", struct {}) \
 	AST_NODE_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
 	AST_NODE_KIND(EmptyStmt,  "empty statement",               struct { Token token; }) \
 	AST_NODE_KIND(ExprStmt,   "expression statement",          struct { AstNode *expr; } ) \
@@ -238,7 +238,7 @@ AST_NODE_KIND(_StmtBegin,     "", i32) \
 		Token op; \
 		AstNode *expr; \
 	}) \
-AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
+AST_NODE_KIND(_ComplexStmtBegin, "", struct {}) \
 	AST_NODE_KIND(BlockStmt, "block statement", struct { \
 		Array<AstNode *> stmts; \
 		Token open, close; \
@@ -310,28 +310,14 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 		Token in_token;        \
 		AstNode *expr;         \
 	}) \
-	AST_NODE_KIND(AsmOperand, "assembly operand", struct { \
-		Token string;     \
-		AstNode *operand; \
-	}) \
-	AST_NODE_KIND(AsmStmt,    "assembly statement", struct { \
-		Token token;           \
-		bool is_volatile;      \
-		Token open, close;     \
-		Token code_string;     \
-		AstNode *output_list;  \
-		AstNode *input_list;   \
-		AstNode *clobber_list; \
-		isize output_count, input_count, clobber_count; \
-	}) \
 	AST_NODE_KIND(PushContext, "context <- statement", struct { \
 		Token token;   \
 		AstNode *expr; \
 		AstNode *body; \
 	}) \
-AST_NODE_KIND(_ComplexStmtEnd, "", i32) \
-AST_NODE_KIND(_StmtEnd,        "", i32) \
-AST_NODE_KIND(_DeclBegin,      "", i32) \
+AST_NODE_KIND(_ComplexStmtEnd, "", struct {}) \
+AST_NODE_KIND(_StmtEnd,        "", struct {}) \
+AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 	AST_NODE_KIND(BadDecl,     "bad declaration",     struct { Token begin, end; }) \
 	AST_NODE_KIND(ForeignBlockDecl, "foreign block declaration", struct { \
 		Token            token;           \
@@ -339,8 +325,8 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token            open, close;     \
 		Array<AstNode *> decls;           \
 		Array<AstNode *> attributes;      \
-		bool             been_handled;    \
 		CommentGroup     docs;            \
+		bool             been_handled;    \
 	}) \
 	AST_NODE_KIND(Label, "label", struct { 	\
 		Token token; \
@@ -350,12 +336,12 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Array<AstNode *> names;        \
 		AstNode *        type;         \
 		Array<AstNode *> values;       \
-		bool             is_using;     \
-		bool             is_mutable;   \
-		bool             been_handled; \
 		Array<AstNode *> attributes;   \
 		CommentGroup     docs;         \
 		CommentGroup     comment;      \
+		bool             is_using;     \
+		bool             is_mutable;   \
+		bool             been_handled; \
 	}) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		AstFile *file;          \
@@ -363,21 +349,21 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token    relpath;       \
 		String   fullpath;      \
 		Token    import_name;   \
-		bool     is_using;      \
-		bool     been_handled;  \
 		Array<AstNode *> using_in_list; \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
+		bool     is_using;      \
+		bool     been_handled;  \
 	}) \
 	AST_NODE_KIND(ExportDecl, "export declaration", struct { \
 		AstFile *file;          \
 		Token    token;         \
 		Token    relpath;       \
 		String   fullpath;      \
-		bool     been_handled;  \
 		Array<AstNode *> using_in_list; \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
+		bool     been_handled;  \
 	}) \
 	AST_NODE_KIND(ForeignImportDecl, "foreign import declaration", struct { \
 		Token    token;           \
@@ -386,11 +372,11 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		String   base_dir;        \
 		String   collection_name; \
 		String   fullpath;        \
-		bool     been_handled;    \
 		CommentGroup docs;        \
 		CommentGroup comment;     \
+		bool     been_handled;    \
 	}) \
-AST_NODE_KIND(_DeclEnd,   "", i32) \
+AST_NODE_KIND(_DeclEnd,   "", struct {}) \
 	AST_NODE_KIND(Attribute, "attribute", struct { \
 		Token    token;         \
 		AstNode *type;          \
@@ -413,7 +399,7 @@ AST_NODE_KIND(_DeclEnd,   "", i32) \
 		AstNode *name; \
 		AstNode *list; \
 	}) \
-AST_NODE_KIND(_TypeBegin, "", i32) \
+AST_NODE_KIND(_TypeBegin, "", struct {}) \
 	AST_NODE_KIND(TypeType, "type", struct { \
 		Token token; \
 		AstNode *specialization; \
@@ -457,9 +443,9 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		Array<AstNode *> fields;              \
 		isize            field_count;         \
 		AstNode *        polymorphic_params;  \
+		AstNode *        align;               \
 		bool             is_packed;           \
 		bool             is_raw_union;        \
-		AstNode *        align;               \
 	}) \
 	AST_NODE_KIND(UnionType, "union type", struct { \
 		Token            token;    \
@@ -469,8 +455,8 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 	AST_NODE_KIND(EnumType, "enum type", struct { \
 		Token            token; \
 		AstNode *        base_type; \
-		bool             is_export; \
 		Array<AstNode *> fields; /* FieldValue */ \
+		bool             is_export; \
 	}) \
 	AST_NODE_KIND(BitFieldType, "bit field type", struct { \
 		Token            token; \
@@ -483,7 +469,7 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		AstNode *key; \
 		AstNode *value; \
 	}) \
-AST_NODE_KIND(_TypeEnd,  "", i32)
+AST_NODE_KIND(_TypeEnd,  "", struct {})
 
 enum AstNodeKind {
 	AstNode_Invalid,
