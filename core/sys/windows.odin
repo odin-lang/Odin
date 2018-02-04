@@ -262,6 +262,26 @@ Raw_Input :: struct {
 }
 
 
+Overlapped :: struct {
+    internal      : ^u64,
+    internal_high : ^u64,
+    using _ : struct #raw_union {
+        using _ : struct {
+            offset      : u32,
+            offset_high : u32,
+        },
+        pointer : rawptr,
+    },
+    event : Handle,
+}
+
+File_Notify_Information :: struct {
+  next_entry_offset: u32,
+  action:            u32,
+  file_name_length:  u32,
+  file_name:         [1]u16,
+}
+
 MAPVK_VK_TO_VSC    :: 0;
 MAPVK_VSC_TO_VK    :: 1;
 MAPVK_VK_TO_CHAR   :: 2;
@@ -478,6 +498,42 @@ MOVEFILE_WRITE_THROUGH         :: 0x00000008;
 MOVEFILE_CREATE_HARDLINK       :: 0x00000010;
 MOVEFILE_FAIL_IF_NOT_TRACKABLE :: 0x00000020;
 
+FILE_NOTIFY_CHANGE_FILE_NAME   :: 0x00000001;   
+FILE_NOTIFY_CHANGE_DIR_NAME    :: 0x00000002;   
+FILE_NOTIFY_CHANGE_ATTRIBUTES  :: 0x00000004;   
+FILE_NOTIFY_CHANGE_SIZE        :: 0x00000008;   
+FILE_NOTIFY_CHANGE_LAST_WRITE  :: 0x00000010;   
+FILE_NOTIFY_CHANGE_LAST_ACCESS :: 0x00000020;   
+FILE_NOTIFY_CHANGE_CREATION    :: 0x00000040;   
+FILE_NOTIFY_CHANGE_SECURITY    :: 0x00000100; 
+
+FILE_FLAG_WRITE_THROUGH        :: 0x80000000;
+FILE_FLAG_OVERLAPPED           :: 0x40000000;
+FILE_FLAG_NO_BUFFERING         :: 0x20000000;
+FILE_FLAG_RANDOM_ACCESS        :: 0x10000000;
+FILE_FLAG_SEQUENTIAL_SCAN      :: 0x08000000;
+FILE_FLAG_DELETE_ON_CLOSE      :: 0x04000000;
+FILE_FLAG_BACKUP_SEMANTICS     :: 0x02000000;
+FILE_FLAG_POSIX_SEMANTICS      :: 0x01000000;
+FILE_FLAG_SESSION_AWARE        :: 0x00800000;
+FILE_FLAG_OPEN_REPARSE_POINT   :: 0x00200000;
+FILE_FLAG_OPEN_NO_RECALL       :: 0x00100000;
+FILE_FLAG_FIRST_PIPE_INSTANCE  :: 0x00080000;
+
+FILE_ACTION_ADDED            :: 0x00000001;
+FILE_ACTION_REMOVED          :: 0x00000002;
+FILE_ACTION_MODIFIED         :: 0x00000003;
+FILE_ACTION_RENAMED_OLD_NAME :: 0x00000004;
+FILE_ACTION_RENAMED_NEW_NAME :: 0x00000005;
+
+CP_ACP        :: 0;     // default to ANSI code page
+CP_OEMCP      :: 1;     // default to OEM  code page
+CP_MACCP      :: 2;     // default to MAC  code page
+CP_THREAD_ACP :: 3;     // current thread's ANSI code page
+CP_SYMBOL     :: 42;    // SYMBOL translations
+CP_UTF7       :: 65000; // UTF-7 translation
+CP_UTF8       :: 65001; // UTF-8 translation
+
 @(default_calling_convention = "std")
 foreign kernel32 {
 	@(link_name="GetLastError")              get_last_error              :: proc() -> i32 ---;
@@ -546,7 +602,20 @@ foreign kernel32 {
 	@(link_name="HeapFree")       heap_free        :: proc(h: Handle, flags: u32, memory: rawptr) -> Bool ---;
 	@(link_name="GetProcessHeap") get_process_heap :: proc() -> Handle ---;
 
+	@(link_name="FindFirstChangeNotificationA") find_first_change_notification_a :: proc(path: ^byte, watch_subtree: Bool, filter: u32) -> Handle ---;
+	@(link_name="FindNextChangeNotification")   find_next_change_notification    :: proc(h: Handle) -> Bool ---;
+	@(link_name="FindCloseChangeNotification")  find_close_change_notification   :: proc(h: Handle) -> Bool ---;
 
+	@(link_name="ReadDirectoryChangesW") read_directory_changes_w :: proc(dir: Handle, buf: rawptr, buf_length: u32, 
+	                                                                      watch_subtree: Bool, notify_filter: u32,
+	                                                                      bytes_returned: ^u32, overlapped: ^Overlapped,
+	                                                                      completion: rawptr) -> Bool ---;
+
+	@(link_name="WideCharToMultiByte") wide_char_to_multi_byte :: proc(code_page: u32, flags : u32,
+	                                                                   wchar_str: ^u16, wchar: i32,
+	                                                                   multi_str: ^byte, multi: i32,
+	                                                                   default_char: ^byte, used_default_char: ^Bool) -> i32 ---;
+	
 	@(link_name="CreateSemaphoreA")    create_semaphore_a     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^byte) -> Handle ---;
 	@(link_name="ReleaseSemaphore")    release_semaphore      :: proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool ---;
 	@(link_name="WaitForSingleObject") wait_for_single_object :: proc(handle: Handle, milliseconds: u32) -> u32 ---;
