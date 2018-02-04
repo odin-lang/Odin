@@ -169,8 +169,8 @@ bool operator>=(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, 
 
 struct Token {
 	TokenKind kind;
-	String string;
-	TokenPos pos;
+	String    string;
+	TokenPos  pos;
 };
 
 Token empty_token = {Token_Invalid};
