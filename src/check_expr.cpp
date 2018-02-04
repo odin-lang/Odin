@@ -6256,7 +6256,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(ht, AliasType, node);
-		str = gb_string_appendc(str, "#alias ");
+		str = gb_string_appendc(str, "#type_alias ");
 		str = write_expr_to_string(str, ht->type);
 	case_end;
 
