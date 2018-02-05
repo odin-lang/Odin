@@ -905,7 +905,9 @@ irValue *ir_instr_local(irProcedure *p, Entity *e, bool zero_initialized) {
 	i->Local.entity = e;
 	i->Local.type = make_type_pointer(p->module->allocator, e->type);
 	i->Local.zero_initialized = zero_initialized;
-	i->Local.alignment = type_align_of(p->module->allocator, e->type);
+	// i->Local.alignment = type_align_of(p->module->allocator, e->type);
+	// TODO(bill): determine the correct alignment
+	i->Local.alignment = gb_max(16, type_align_of(p->module->allocator, e->type));
 	array_init(&i->Local.referrers, heap_allocator()); // TODO(bill): Replace heap allocator here
 	ir_module_add_value(p->module, e, v);
 	return v;
