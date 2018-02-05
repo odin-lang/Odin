@@ -1611,6 +1611,19 @@ irValue *ir_emit_comment(irProcedure *p, String text) {
 	return ir_emit(p, ir_instr_comment(p, text));
 }
 
+void ir_emit_init_context(irProcedure *proc, irValue *c = nullptr) {
+	irModule *m = proc->module;
+	gbAllocator a = m->allocator;
+	irValue **args = gb_alloc_array(a, irValue *, 1);
+	args[0] = c ? c : m->global_default_context;
+	ir_emit_global_call(proc, "__init_context", args, 1);
+}
+
+
+
+
+
+
 irValue *ir_copy_value_to_ptr(irProcedure *proc, irValue *val, Type *new_type, i64 alignment) {
 	i64 type_alignment = type_align_of(proc->module->allocator, new_type);
 	if (alignment < type_alignment) {
@@ -1628,14 +1641,21 @@ irValue *ir_emit_bitcast(irProcedure *proc, irValue *data, Type *type) {
 
 irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t);
 irValue *ir_address_from_load_or_generate_local(irProcedure *proc, irValue *val);
+irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index);
+
 
 irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 	if (proc->context_stack.count > 0) {
 		return proc->context_stack[proc->context_stack.count-1];
 	}
 	irValue *c = ir_add_local_generated(proc, t_context);
-	ir_emit_store(proc, c, ir_emit_load(proc, proc->module->global_default_context));
 	array_add(&proc->context_stack, c);
+	ir_emit_store(proc, c, ir_emit_load(proc, proc->module->global_default_context));
+
+	irValue *ep = ir_emit_struct_ep(proc, c, 0);
+	irValue *v = ir_emit_global_call(proc, "default_allocator", nullptr, 0);
+	ir_emit_store(proc, ep, v);
+
 	return c;
 }
 
@@ -1790,15 +1810,9 @@ void ir_emit_if(irProcedure *proc, irValue *cond, irBlock *true_block, irBlock *
 	ir_start_block(proc, nullptr);
 }
 
-void ir_emit_startup_runtime(irProcedure *proc) {
-	GB_ASSERT(proc->parent == nullptr && proc->name == "main");
-	ir_emit(proc, ir_alloc_instr(proc, irInstr_StartupRuntime));
-}
 
 
 
-
-irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index);
 irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irValue *right);
 
 irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_type) {
@@ -8671,12 +8685,7 @@ void ir_gen_tree(irGen *s) {
 		ir_begin_procedure_body(proc);
 		defer (ir_end_procedure_body(proc));
 
-		{
-			irValue **args = gb_alloc_array(a, irValue *, 1);
-			args[0] = m->global_default_context;
-			ir_emit_global_call(proc, "__init_context", args, 1);
-		}
-
+		ir_emit_init_context(proc);
 
 		ir_setup_type_info_data(proc);
 
