@@ -8,7 +8,7 @@ import "core:raw.odin"
 
 _BUFFER_SIZE :: 1<<12;
 
-String_Buffer :: [dynamic]byte;
+String_Buffer :: distinct [dynamic]byte;
 
 Fmt_Info :: struct {
 	minus:     bool,

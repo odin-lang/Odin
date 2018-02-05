@@ -80,7 +80,7 @@ Token ast_node_token(AstNode *node) {
 
 	case AstNode_TypeType:         return node->TypeType.token;
 	case AstNode_HelperType:       return node->HelperType.token;
-	case AstNode_AliasType:        return node->AliasType.token;
+	case AstNode_DistinctType:     return node->DistinctType.token;
 	case AstNode_PolyType:         return node->PolyType.token;
 	case AstNode_ProcType:         return node->ProcType.token;
 	case AstNode_PointerType:      return node->PointerType.token;
@@ -321,8 +321,8 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_HelperType:
 		n->HelperType.type = clone_ast_node(a, n->HelperType.type);
 		break;
-	case AstNode_AliasType:
-		n->AliasType.type = clone_ast_node(a, n->AliasType.type);
+	case AstNode_DistinctType:
+		n->DistinctType.type = clone_ast_node(a, n->DistinctType.type);
 		break;
 	case AstNode_ProcType:
 		n->ProcType.params  = clone_ast_node(a, n->ProcType.params);
@@ -837,13 +837,12 @@ AstNode *ast_helper_type(AstFile *f, Token token, AstNode *type) {
 	return result;
 }
 
-AstNode *ast_alias_type(AstFile *f, Token token, AstNode *type) {
-	AstNode *result = make_ast_node(f, AstNode_AliasType);
-	result->AliasType.token = token;
-	result->AliasType.type  = type;
+AstNode *ast_distinct_type(AstFile *f, Token token, AstNode *type) {
+	AstNode *result = make_ast_node(f, AstNode_DistinctType);
+	result->DistinctType.token = token;
+	result->DistinctType.type  = type;
 	return result;
 }
-
 
 AstNode *ast_poly_type(AstFile *f, Token token, AstNode *type, AstNode *specialization) {
 	AstNode *result = make_ast_node(f, AstNode_PolyType);
@@ -1277,8 +1276,8 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 
 	case AstNode_HelperType:
 		return is_semicolon_optional_for_node(f, s->HelperType.type);
-	case AstNode_AliasType:
-		return is_semicolon_optional_for_node(f, s->AliasType.type);
+	case AstNode_DistinctType:
+		return is_semicolon_optional_for_node(f, s->DistinctType.type);
 
 	case AstNode_PointerType:
 		return is_semicolon_optional_for_node(f, s->PointerType.type);
@@ -1614,15 +1613,19 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		return ast_paren_expr(f, operand, open, close);
 	}
 
+	case Token_distinct: {
+		Token token = expect_token(f, Token_distinct);
+		AstNode *type = parse_type(f);
+		return ast_distinct_type(f, token, type);
+	}
+
 	case Token_Hash: {
 		Token token = expect_token(f, Token_Hash);
 		if (allow_token(f, Token_type)) {
 			return ast_helper_type(f, token, parse_type(f));
 		}
 		Token name = expect_token(f, Token_Ident);
-		if (name.string == "type_alias") {
-			return ast_alias_type(f, token, parse_type(f));
-		} else if (name.string == "run") {
+		if (name.string == "run") {
 			AstNode *expr = parse_expr(f, false);
 			operand = ast_run_expr(f, token, name, expr);
 			if (unparen_expr(expr)->kind != AstNode_CallExpr) {

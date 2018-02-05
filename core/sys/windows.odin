@@ -6,27 +6,27 @@ when ODIN_OS == "windows" {
 	foreign import "system:shell32.lib"
 }
 
-Handle    :: rawptr;
-Hwnd      :: Handle;
-Hdc       :: Handle;
-Hinstance :: Handle;
-Hicon     :: Handle;
-Hcursor   :: Handle;
-Hmenu     :: Handle;
-Hbrush    :: Handle;
-Hgdiobj   :: Handle;
-Hmodule   :: Handle;
-Hmonitor  :: Handle;
-Hrawinput :: Handle;
-HKL       :: Handle;
-Wparam    :: uint;
-Lparam    :: int;
-Lresult   :: int;
-Wnd_Proc  :: #type proc "c" (Hwnd, u32, Wparam, Lparam) -> Lresult;
+Handle    :: distinct rawptr;
+Hwnd      :: distinct Handle;
+Hdc       :: distinct Handle;
+Hinstance :: distinct Handle;
+Hicon     :: distinct Handle;
+Hcursor   :: distinct Handle;
+Hmenu     :: distinct Handle;
+Hbrush    :: distinct Handle;
+Hgdiobj   :: distinct Handle;
+Hmodule   :: distinct Handle;
+Hmonitor  :: distinct Handle;
+Hrawinput :: distinct Handle;
+HKL       :: distinct Handle;
+Wparam    :: distinct uint;
+Lparam    :: distinct int;
+Lresult   :: distinct int;
+Wnd_Proc  :: distinct #type proc "c" (Hwnd, u32, Wparam, Lparam) -> Lresult;
 
-Long_Ptr :: int;
+Long_Ptr :: distinct int;
 
-Bool :: b32;
+Bool :: distinct b32;
 
 Point :: struct {
 	x, y: i32,
@@ -126,7 +126,7 @@ Security_Attributes :: struct {
 
 Process_Information :: struct {
 	process:    Handle,
-	thread:     Handle, 
+	thread:     Handle,
 	process_id: u32,
 	thread_id:  u32
 }
@@ -471,7 +471,7 @@ PFD_DEPTH_DONTCARE        :: 0x20000000;
 PFD_DOUBLEBUFFER_DONTCARE :: 0x40000000;
 PFD_STEREO_DONTCARE       :: 0x80000000;
 
-GET_FILEEX_INFO_LEVELS :: i32;
+GET_FILEEX_INFO_LEVELS :: distinct i32;
 GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0;
 GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1;
 
@@ -498,14 +498,14 @@ MOVEFILE_WRITE_THROUGH         :: 0x00000008;
 MOVEFILE_CREATE_HARDLINK       :: 0x00000010;
 MOVEFILE_FAIL_IF_NOT_TRACKABLE :: 0x00000020;
 
-FILE_NOTIFY_CHANGE_FILE_NAME   :: 0x00000001;   
-FILE_NOTIFY_CHANGE_DIR_NAME    :: 0x00000002;   
-FILE_NOTIFY_CHANGE_ATTRIBUTES  :: 0x00000004;   
-FILE_NOTIFY_CHANGE_SIZE        :: 0x00000008;   
-FILE_NOTIFY_CHANGE_LAST_WRITE  :: 0x00000010;   
-FILE_NOTIFY_CHANGE_LAST_ACCESS :: 0x00000020;   
-FILE_NOTIFY_CHANGE_CREATION    :: 0x00000040;   
-FILE_NOTIFY_CHANGE_SECURITY    :: 0x00000100; 
+FILE_NOTIFY_CHANGE_FILE_NAME   :: 0x00000001;
+FILE_NOTIFY_CHANGE_DIR_NAME    :: 0x00000002;
+FILE_NOTIFY_CHANGE_ATTRIBUTES  :: 0x00000004;
+FILE_NOTIFY_CHANGE_SIZE        :: 0x00000008;
+FILE_NOTIFY_CHANGE_LAST_WRITE  :: 0x00000010;
+FILE_NOTIFY_CHANGE_LAST_ACCESS :: 0x00000020;
+FILE_NOTIFY_CHANGE_CREATION    :: 0x00000040;
+FILE_NOTIFY_CHANGE_SECURITY    :: 0x00000100;
 
 FILE_FLAG_WRITE_THROUGH        :: 0x80000000;
 FILE_FLAG_OVERLAPPED           :: 0x40000000;
@@ -537,9 +537,9 @@ CP_UTF8       :: 65001; // UTF-8 translation
 @(default_calling_convention = "std")
 foreign kernel32 {
 	@(link_name="GetLastError")              get_last_error              :: proc() -> i32 ---;
-	@(link_name="CreateProcessA")		     create_process_a		     :: proc(application_name, command_line: ^byte, 
-	                                                              				 process_attributes, thread_attributes: ^Security_Attributes, 
-	                                                              				 inherit_handle: Bool, creation_flags: u32, environment: rawptr, 
+	@(link_name="CreateProcessA")		     create_process_a		     :: proc(application_name, command_line: ^byte,
+	                                                              				 process_attributes, thread_attributes: ^Security_Attributes,
+	                                                              				 inherit_handle: Bool, creation_flags: u32, environment: rawptr,
 	                                                              				 current_direcotry: ^byte, startup_info : ^Startup_Info,
 	                                                              				 process_information : ^Process_Information) -> Bool ---;
 	@(link_name="GetExitCodeProcess")		 get_exit_code_process       :: proc(process: Handle, exit: ^u32) -> Bool ---;
@@ -606,7 +606,7 @@ foreign kernel32 {
 	@(link_name="FindNextChangeNotification")   find_next_change_notification    :: proc(h: Handle) -> Bool ---;
 	@(link_name="FindCloseChangeNotification")  find_close_change_notification   :: proc(h: Handle) -> Bool ---;
 
-	@(link_name="ReadDirectoryChangesW") read_directory_changes_w :: proc(dir: Handle, buf: rawptr, buf_length: u32, 
+	@(link_name="ReadDirectoryChangesW") read_directory_changes_w :: proc(dir: Handle, buf: rawptr, buf_length: u32,
 	                                                                      watch_subtree: Bool, notify_filter: u32,
 	                                                                      bytes_returned: ^u32, overlapped: ^Overlapped,
 	                                                                      completion: rawptr) -> Bool ---;
@@ -615,7 +615,7 @@ foreign kernel32 {
 	                                                                   wchar_str: ^u16, wchar: i32,
 	                                                                   multi_str: ^byte, multi: i32,
 	                                                                   default_char: ^byte, used_default_char: ^Bool) -> i32 ---;
-	
+
 	@(link_name="CreateSemaphoreA")    create_semaphore_a     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^byte) -> Handle ---;
 	@(link_name="ReleaseSemaphore")    release_semaphore      :: proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool ---;
 	@(link_name="WaitForSingleObject") wait_for_single_object :: proc(handle: Handle, milliseconds: u32) -> u32 ---;

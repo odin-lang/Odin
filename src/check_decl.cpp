@@ -170,22 +170,57 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	e->Constant.value = operand->value;
 }
 
-AstNode *remove_type_alias(AstNode *node) {
+
+bool is_type_distinct(AstNode *node) {
+	for (;;) {
+		if (node == nullptr) {
+			return false;
+		}
+		if (node->kind == AstNode_ParenExpr) {
+			node = node->ParenExpr.expr;
+		} else if (node->kind == AstNode_HelperType) {
+			node = node->HelperType.type;
+		} else {
+			break;
+		}
+	}
+
+	switch (node->kind) {
+	case AstNode_DistinctType:
+		return true;
+
+	case AstNode_StructType:
+	case AstNode_UnionType:
+	case AstNode_EnumType:
+	case AstNode_BitFieldType:
+	case AstNode_ProcType:
+		return true;
+
+	case AstNode_PointerType:
+	case AstNode_ArrayType:
+	case AstNode_DynamicArrayType:
+	case AstNode_MapType:
+		return true;
+	}
+	return false;
+}
+
+AstNode *remove_type_alias_clutter(AstNode *node) {
 	for (;;) {
 		if (node == nullptr) {
 			return nullptr;
 		}
 		if (node->kind == AstNode_ParenExpr) {
 			node = node->ParenExpr.expr;
-		} else if (node->kind == AstNode_AliasType) {
-			node = node->AliasType.type;
+		} else if (node->kind == AstNode_DistinctType) {
+			node = node->DistinctType.type;
 		} else {
 			return node;
 		}
 	}
 }
 
-void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, bool is_alias) {
+void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
 	GB_ASSERT(e->type == nullptr);
 
 	DeclInfo *decl = decl_info_of_entity(&c->info, e);
@@ -193,7 +228,8 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, bool 
 		error(decl->attributes[0], "Attributes are not allowed on type declarations");
 	}
 
-	AstNode *te = remove_type_alias(type_expr);
+	bool is_distinct = is_type_distinct(type_expr);
+	AstNode *te = remove_type_alias_clutter(type_expr);
 	e->type = t_invalid;
 	String name = e->token.string;
 	Type *named = make_type_named(c->allocator, name, nullptr, e);
@@ -205,16 +241,20 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, bool 
 
 	Type *bt = check_type(c, te, named);
 	named->Named.base = base_type(bt);
-	if (is_alias) {
-		if (is_type_named(bt)) {
-			e->type = bt;
-			e->TypeName.is_type_alias = true;
-		} else {
-			gbString str = type_to_string(bt);
-			error(type_expr, "Type alias declaration with a non-named type '%s'", str);
-			gb_string_free(str);
-		}
+	if (!is_distinct) {
+		e->type = bt;
+		e->TypeName.is_type_alias = true;
 	}
+	// if (is_alias) {
+	// 	if (is_type_named(bt)) {
+	// 		e->type = bt;
+	// 		e->TypeName.is_type_alias = true;
+	// 	} else {
+	// 		gbString str = type_to_string(bt);
+	// 		error(type_expr, "Type alias declaration with a non-named type '%s'", str);
+	// 		gb_string_free(str);
+	// 	}
+	// }
 }
 
 void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, Type *named_type) {
@@ -261,7 +301,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 				error(e->token, "A type declaration cannot have an type parameter");
 			}
 			d->type_expr = d->init_expr;
-			check_type_decl(c, e, d->type_expr, named_type, false);
+			check_type_decl(c, e, d->type_expr, named_type);
 			return;
 		}
 
@@ -866,8 +906,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 		check_const_decl(c, e, d->type_expr, d->init_expr, named_type);
 		break;
 	case Entity_TypeName: {
-		bool is_alias = unparen_expr(d->type_expr)->kind == AstNode_AliasType;
-		check_type_decl(c, e, d->type_expr, named_type, is_alias);
+		check_type_decl(c, e, d->type_expr, named_type);
 		break;
 	}
 	case Entity_Procedure:
