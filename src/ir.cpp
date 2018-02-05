@@ -1602,7 +1602,9 @@ void ir_emit_zero_init(irProcedure *p, irValue *address, AstNode *expr) {
 	args[0] = ir_emit_conv(p, address, t_rawptr);
 	args[1] = ir_const_int(a, type_size_of(a, t));
 	ir_emit(p, ir_instr_zero_init(p, address));
-	ir_emit_global_call(p, "__mem_zero", args, 2, expr);
+	if (p->entity->token.string != "__mem_zero") {
+		ir_emit_global_call(p, "__mem_zero", args, 2, expr);
+	}
 }
 
 irValue *ir_emit_comment(irProcedure *p, String text) {
