@@ -57,7 +57,7 @@ ExprKind check_expr_base                (Checker *c, Operand *operand, AstNode *
 void     check_expr_with_type_hint      (Checker *c, Operand *o, AstNode *e, Type *t);
 Type *   check_type                     (Checker *c, AstNode *expression, Type *named_type = nullptr);
 Type *   make_optional_ok_type          (gbAllocator a, Type *value);
-void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def, bool alias);
+void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def);
 Entity * check_selector                 (Checker *c, Operand *operand, AstNode *node, Type *type_hint);
 Entity * check_ident                    (Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name);
 Entity * find_polymorphic_struct_entity (Checker *c, Type *original_type, isize param_count, Array<Operand> ordered_operands);
@@ -6255,11 +6255,10 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, ht->type);
 	case_end;
 
-	case_ast_node(ht, AliasType, node);
-		str = gb_string_appendc(str, "#type_alias ");
+	case_ast_node(ht, DistinctType, node);
+		str = gb_string_appendc(str, "distinct ");
 		str = write_expr_to_string(str, ht->type);
 	case_end;
-
 
 	case_ast_node(pt, PolyType, node);
 		str = gb_string_append_rune(str, '$');

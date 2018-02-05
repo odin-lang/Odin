@@ -84,7 +84,7 @@ allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 }
 
 
-Fixed_Byte_Buffer :: [dynamic]byte;
+Fixed_Byte_Buffer :: distinct [dynamic]byte;
 
 make_fixed_byte_buffer :: proc(backing: []byte) -> Fixed_Byte_Buffer {
 	s := transmute(raw.Slice)backing;
