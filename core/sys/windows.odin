@@ -105,7 +105,20 @@ File_Attribute_Data :: struct {
 	file_size_low:    u32,
 }
 
-Find_Data :: struct{
+Find_Data_W :: struct{
+    file_attributes:     u32,
+    creation_time:       Filetime,
+    last_access_time:    Filetime,
+    last_write_time:     Filetime,
+    file_size_high:      u32,
+    file_size_low:       u32,
+    reserved0:           u32,
+    reserved1:           u32,
+    file_name:           [MAX_PATH]u16,
+    alternate_file_name: [14]u16,
+}
+
+Find_Data_A :: struct{
     file_attributes:     u32,
     creation_time:       Filetime,
     last_access_time:    Filetime,
@@ -569,11 +582,18 @@ foreign kernel32 {
 	                      security: rawptr,
 	                      creation, flags_and_attribs: u32, template_file: Handle) -> Handle ---;
 
+	@(link_name="CreateFileW")
+	create_file_w :: proc(filename: ^u16, desired_access, share_module: u32,
+	                      security: rawptr,
+	                      creation, flags_and_attribs: u32, template_file: Handle) -> Handle ---;
+
+
 	@(link_name="ReadFile")  read_file  :: proc(h: Handle, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> Bool ---;
 	@(link_name="WriteFile") write_file :: proc(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool ---;
 
 	@(link_name="GetFileSizeEx")              get_file_size_ex               :: proc(file_handle: Handle, file_size: ^i64) -> Bool ---;
 	@(link_name="GetFileAttributesA")         get_file_attributes_a          :: proc(filename: ^byte) -> u32 ---;
+	@(link_name="GetFileAttributesW")         get_file_attributes_w          :: proc(filename: ^u16) -> u32 ---;
 	@(link_name="GetFileAttributesExA")       get_file_attributes_ex_a       :: proc(filename: ^byte, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool ---;
 	@(link_name="GetFileInformationByHandle") get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool ---;
 
@@ -585,8 +605,12 @@ foreign kernel32 {
 
 	@(link_name="SetHandleInformation") set_handle_information :: proc(obj: Handle, mask, flags: u32) -> Bool ---;
 
-	@(link_name="FindFirstFileA") find_first_file_a :: proc(file_name : ^byte, data : ^Find_Data) -> Handle ---;
-	@(link_name="FindNextFileA")  find_next_file_a  :: proc(file : Handle, data : ^Find_Data) -> Bool ---;
+	@(link_name="FindFirstFileA") find_first_file_a :: proc(file_name : ^byte, data : ^Find_Data_A) -> Handle ---;
+	@(link_name="FindNextFileA")  find_next_file_a  :: proc(file : Handle, data : ^Find_Data_A) -> Bool ---;
+	
+	@(link_name="FindFirstFileW") find_first_file_w :: proc(file_name : ^u16, data : ^Find_Data_W) -> Handle ---;
+	@(link_name="FindNextFileW")  find_next_file_w  :: proc(file : Handle, data : ^Find_Data_W) -> Bool ---;
+	
 	@(link_name="FindClose")      find_close        :: proc(file : Handle) -> Bool ---;
 
 	@(link_name="MoveFileExA")    move_file_ex_a    :: proc(existing, new: ^byte, flags: u32) -> Bool ---;
@@ -615,6 +639,10 @@ foreign kernel32 {
 	                                                                   wchar_str: ^u16, wchar: i32,
 	                                                                   multi_str: ^byte, multi: i32,
 	                                                                   default_char: ^byte, used_default_char: ^Bool) -> i32 ---;
+	
+	@(link_name="MultiByteToWideChar") multi_byte_to_wide_char :: proc(code_page: u32, flags : u32,
+	                                                                   mb_str: ^byte, mb: i32,
+	                                                                   wc_str : ^u16, wc: i32) -> i32 ---;
 	
 	@(link_name="CreateSemaphoreA")    create_semaphore_a     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^byte) -> Handle ---;
 	@(link_name="ReleaseSemaphore")    release_semaphore      :: proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool ---;
@@ -749,7 +777,9 @@ foreign user32 {
 	@(link_name="SetForegroundWindow") set_foreground_window :: proc(h: Hwnd) -> Bool ---;
 	@(link_name="SetFocus")            set_focus             :: proc(h: Hwnd) -> Hwnd ---;
 
-
+	@(link_name="LoadCursorA")      load_cursor_a       :: proc(instance : Hinstance, cursor_name : ^u8) -> Hcursor ---;
+	@(link_name="GetCursor")        get_cursor          :: proc() -> Hcursor ---;
+	@(link_name="SetCursor")        set_cursor          :: proc(cursor : Hcursor) -> Hcursor ---;
 
 	@(link_name="RegisterRawInputDevices") register_raw_input_devices :: proc(raw_input_device: ^Raw_Input_Device, num_devices, size: u32) -> Bool ---;
 
