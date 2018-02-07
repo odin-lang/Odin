@@ -14,14 +14,14 @@ EPSILON      :: 1.19209290e-7;
 τ :: TAU;
 π :: PI;
 
-Vec2 :: [2]f32;
-Vec3 :: [3]f32;
-Vec4 :: [4]f32;
+Vec2 :: distinct [2]f32;
+Vec3 :: distinct [3]f32;
+Vec4 :: distinct [4]f32;
 
 // Column major
-Mat2 :: [2][2]f32;
-Mat3 :: [3][3]f32;
-Mat4 :: [4][4]f32;
+Mat2 :: distinct [2][2]f32;
+Mat3 :: distinct [3][3]f32;
+Mat4 :: distinct [4][4]f32;
 
 Quat :: struct {x, y, z: f32, w: f32 = 1};
 

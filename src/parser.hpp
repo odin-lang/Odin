@@ -408,7 +408,7 @@ AST_NODE_KIND(_TypeBegin, "", struct {}) \
 		Token token; \
 		AstNode *type; \
 	}) \
-	AST_NODE_KIND(AliasType, "alias type", struct { \
+	AST_NODE_KIND(DistinctType, "distinct type", struct { \
 		Token token; \
 		AstNode *type; \
 	}) \

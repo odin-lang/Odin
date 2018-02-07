@@ -266,13 +266,7 @@ make_source_code_location :: inline proc "contextless" (file: string, line, colu
 __init_context_from_ptr :: proc "contextless" (c: ^Context, other: ^Context) {
 	if c == nil do return;
 	c^ = other^;
-
-	if c.allocator.procedure == nil {
-		c.allocator = default_allocator();
-	}
-	if c.thread_id == 0 {
-		c.thread_id = os.current_thread_id();
-	}
+	__init_context(c);
 }
 
 __init_context :: proc "contextless" (c: ^Context) {

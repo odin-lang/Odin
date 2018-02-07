@@ -22,7 +22,7 @@ when ODIN_OS == "windows" {
 @(link_name="general_stuff")
 general_stuff :: proc() {
 	fmt.println("# general_stuff");
-	{ // `do` for inline statmes rather than block
+	{ // `do` for inline statments rather than block
 		foo :: proc() do fmt.println("Foo!");
 		if   false do foo();
 		for  false do foo();
@@ -92,6 +92,21 @@ general_stuff :: proc() {
 
 		// Having specific sized booleans is very useful when dealing with foreign code
 		// and to enforce specific alignment for a boolean, especially within a struct
+	}
+
+	{ // `distinct` types
+		// Originally, all type declarations would create a distinct type unless #type_alias was present.
+		// Now the behaviour has been reversed. All type declarations create a type alias unless `distinct` is present.
+		// If the type expression is `struct`, `union`, `enum`, `proc`, or `bit_field`, the types will always been distinct.
+
+		Int32 :: i32;
+		compile_assert(Int32 == i32);
+
+		My_Int32 :: distinct i32;
+		compile_assert(My_Int32 != i32);
+
+		My_Struct :: struct{x: int};
+		compile_assert(My_Struct != struct{x: int});
 	}
 }
 
@@ -601,7 +616,7 @@ array_programming :: proc() {
 	}
 
 	{
-		Vector3 :: [3]f32;
+		Vector3 :: distinct [3]f32;
 		a := Vector3{1, 2, 3};
 		b := Vector3{5, 6, 7};
 		c := (a * b)/2 + 1;
@@ -675,7 +690,7 @@ enum_export :: proc() {
 }
 
 main :: proc() {
-	when true {
+	when false {
 		general_stuff();
 		default_struct_values();
 		union_type();
@@ -687,4 +702,3 @@ main :: proc() {
 		enum_export();
 	}
 }
-

@@ -12,8 +12,8 @@ CONTEXT_FORWARD_COMPATIBLE_BIT_ARB    :: 0x0002;
 CONTEXT_CORE_PROFILE_BIT_ARB          :: 0x00000001;
 CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB :: 0x00000002;
 
-Hglrc     :: Handle;
-Color_Ref :: u32;
+Hglrc     :: distinct Handle;
+Color_Ref :: distinct u32;
 
 Layer_Plane_Descriptor :: struct {
 	size:             u16,
