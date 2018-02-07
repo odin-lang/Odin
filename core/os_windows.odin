@@ -1,8 +1,9 @@
 import win32 "core:sys/windows.odin"
 import "core:mem.odin"
 
-Handle    :: uintptr;
-File_Time :: u64;
+Handle    :: distinct uintptr;
+File_Time :: distinct u64;
+Errno     :: distinct int;
 
 
 INVALID_HANDLE :: ~Handle(0);
@@ -22,7 +23,6 @@ O_SYNC     :: 0x01000;
 O_ASYNC    :: 0x02000;
 O_CLOEXEC  :: 0x80000;
 
-Errno :: int;
 
 ERROR_NONE:                   Errno : 0;
 ERROR_FILE_NOT_FOUND:         Errno : 2;

@@ -203,7 +203,9 @@ Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 	bool used = false;
 
 	if (lhs->mode == Addressing_Invalid ||
-	    (lhs->type == t_invalid && lhs->mode != Addressing_ProcGroup)) {
+	    (lhs->type == t_invalid &&
+	     lhs->mode != Addressing_ProcGroup &&
+	     lhs->mode != Addressing_Builtin)) {
 		return nullptr;
 	}
 

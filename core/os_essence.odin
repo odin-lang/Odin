@@ -1,7 +1,7 @@
 foreign import api "system:api"
 
-Handle    :: int;
-Errno     :: int;
+Handle    :: distinct int;
+Errno     :: distinct int;
 
 O_RDONLY   :: 1;
 O_WRONLY   :: 2;

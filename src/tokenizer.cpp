@@ -110,6 +110,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_dynamic,                "dynamic"),                \
 	TOKEN_KIND(Token_cast,                   "cast"),                   \
 	TOKEN_KIND(Token_transmute,              "transmute"),              \
+	TOKEN_KIND(Token_distinct,               "distinct"),               \
 	TOKEN_KIND(Token_using,                  "using"),                  \
 	TOKEN_KIND(Token_inline,                 "inline"),                 \
 	TOKEN_KIND(Token_no_inline,              "no_inline"),              \

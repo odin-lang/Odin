@@ -4,9 +4,9 @@ foreign import libc "system:c"
 import "core:strings.odin"
 import "core:mem.odin"
 
-Handle    :: i32;
-File_Time :: u64;
-Errno     :: i32;
+Handle    :: distinct i32;
+File_Time :: distinct u64;
+Errno     :: distinct i32;
 
 
 O_RDONLY   :: 0x00000;
