@@ -387,12 +387,6 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 }
 
 
-
-struct TypeAndToken {
-	Type *type;
-	Token token;
-};
-
 void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, ws->cond);
@@ -633,6 +627,11 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 			}
 		}
 	}
+
+	struct TypeAndToken {
+		Type *type;
+		Token token;
+	};
 
 	Map<TypeAndToken> seen = {}; // NOTE(bill): Multimap
 	map_init(&seen, heap_allocator());
