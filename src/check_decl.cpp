@@ -305,7 +305,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 			return;
 		}
 
-	// NOTE(bill): Check to see if the expression it to be aliases
+		// NOTE(bill): Check to see if the expression it to be aliases
 		case Addressing_Builtin:
 			if (e->type != nullptr) {
 				error(type_expr, "A constant alias of a built-in procedure may not have a type initializer");
