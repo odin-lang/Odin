@@ -4272,7 +4272,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			ir_emit_slice_bounds_check(proc, ast_node_token(ce->args[1]), v_zero, len, false);
 
 			irValue *slice_size = len;
-			if (eal != 1) {
+			if (esz != 1) {
 				slice_size = ir_emit_arith(proc, Token_Mul, elem_size, len, t_int);
 			}
 
@@ -5578,7 +5578,10 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(be, BinaryExpr, expr);
-		GB_PANIC("Invalid binary expression for ir_build_addr: %.*s\n", LIT(be->op.string));
+		irValue *v = ir_build_expr(proc, expr);
+		Type *t = ir_type(v);
+		GB_ASSERT(is_type_pointer(t));
+		return ir_addr(v);
 	case_end;
 
 	case_ast_node(ie, IndexExpr, expr);
