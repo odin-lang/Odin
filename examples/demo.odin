@@ -732,7 +732,9 @@ explicit_procedure_overloading :: proc() {
 main :: proc() {
 	when false {
 		general_stuff();
+	}
 		default_struct_values();
+	when false {
 		union_type();
 		parametric_polymorphism();
 		threading_example();
