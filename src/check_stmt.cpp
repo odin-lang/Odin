@@ -94,7 +94,6 @@ bool check_has_break(AstNode *stmt, bool implicit) {
 
 // NOTE(bill): The last expression has to be a 'return' statement
 // TODO(bill): This is a mild hack and should be probably handled properly
-// TODO(bill): Warn/err against code after 'return' that it won't be executed
 bool check_is_terminating(AstNode *node) {
 	switch (node->kind) {
 	case_ast_node(rs, ReturnStmt, node);
@@ -344,22 +343,6 @@ Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 	return rhs->type;
 }
 
-enum SwitchKind {
-	Switch_Invalid,
-	Switch_Union,
-	Switch_Any,
-};
-
-SwitchKind check_valid_type_switch_type(Type *type) {
-	type = type_deref(type);
-	if (is_type_union(type)) {
-		return Switch_Union;
-	}
-	if (is_type_any(type)) {
-		return Switch_Any;
-	}
-	return Switch_Invalid;
-}
 
 void check_stmt_internal(Checker *c, AstNode *node, u32 flags);
 void check_stmt(Checker *c, AstNode *node, u32 flags) {
@@ -771,12 +754,32 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 	}
 }
 
+
+enum SwitchKind {
+	Switch_Invalid,
+	Switch_Union,
+	Switch_Any,
+};
+
+SwitchKind check_valid_type_switch_type(Type *type) {
+	type = type_deref(type);
+	if (is_type_union(type)) {
+		return Switch_Union;
+	}
+	if (is_type_any(type)) {
+		return Switch_Any;
+	}
+	return Switch_Invalid;
+}
+
 void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 	ast_node(ss, TypeSwitchStmt, node);
 	Operand x = {};
 
 	mod_flags |= Stmt_BreakAllowed;
 	check_open_scope(c, node);
+	defer (check_close_scope(c));
+
 	check_label(c, ss->label); // TODO(bill): What should the label's "scope" be?
 
 	SwitchKind switch_kind = Switch_Invalid;
@@ -802,7 +805,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 	check_expr(c, &x, rhs);
 	check_assignment(c, &x, nullptr, str_lit("type switch expression"));
 	switch_kind = check_valid_type_switch_type(x.type);
-	if (check_valid_type_switch_type(x.type) == Switch_Invalid) {
+	if (switch_kind == Switch_Invalid) {
 		gbString str = type_to_string(x.type);
 		error(x.expr, "Invalid type for this type switch expression, got '%s'", str);
 		gb_string_free(str);
@@ -838,15 +841,14 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		}
 	}
 
-
 	if (lhs->kind != AstNode_Ident) {
 		error(rhs, "Expected an identifier, got '%.*s'", LIT(ast_node_strings[rhs->kind]));
 		return;
 	}
 
-
-	Map<bool> seen = {}; // Multimap, Key: Type *
+	Map<bool> seen = {}; // Key: Type *
 	map_init(&seen, heap_allocator());
+	defer (map_destroy(&seen));
 
 	for_array(i, bs->stmts) {
 		AstNode *stmt = bs->stmts[i];
@@ -933,9 +935,6 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		check_stmt_list(c, cc->stmts, mod_flags);
 		check_close_scope(c);
 	}
-	map_destroy(&seen);
-
-	check_close_scope(c);
 }
 
 void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
@@ -988,51 +987,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		error(node, "Tag statements are not supported yet");
 		check_stmt(c, ts->stmt, flags);
 	case_end;
-
-	#if 0
-	case_ast_node(s, IncDecStmt, node);
-		TokenKind op = s->op.kind;
-		switch (op) {
-		case Token_Inc: op = Token_Add; break;
-		case Token_Dec: op = Token_Sub; break;
-		default:
-			error(node, "Invalid inc/dec operation");
-			return;
-		}
-
-		Operand x = {};
-		check_expr(c, &x, s->expr);
-		if (x.mode == Addressing_Invalid) {
-			return;
-		}
-		if (!is_type_integer(x.type) && !is_type_float(x.type)) {
-			gbString e = expr_to_string(s->expr);
-			gbString t = type_to_string(x.type);
-			error(node, "%s%.*s used on non-numeric type %s", e, LIT(s->op.string), t);
-			gb_string_free(t);
-			gb_string_free(e);
-			return;
-		}
-		AstNode *left = s->expr;
-		AstNode *right = gb_alloc_item(c->allocator, AstNode);
-		right->kind = AstNode_BasicLit;
-		right->BasicLit.pos = s->op.pos;
-		right->BasicLit.kind = Token_Integer;
-		right->BasicLit.string = str_lit("1");
-
-		AstNode *be = gb_alloc_item(c->allocator, AstNode);
-		be->kind = AstNode_BinaryExpr;
-		be->BinaryExpr.op = s->op;
-		be->BinaryExpr.op.kind = op;
-		be->BinaryExpr.left = left;
-		be->BinaryExpr.right = right;
-		check_binary_expr(c, &x, be);
-		if (x.mode == Addressing_Invalid) {
-			return;
-		}
-		check_assignment_variable(c, &x, left);
-	case_end;
-	#endif
 
 	case_ast_node(as, AssignStmt, node);
 		switch (as->op.kind) {

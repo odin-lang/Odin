@@ -2008,6 +2008,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			return false;
 		}
 		*type = t;
+		set_base_type(named_type, *type);
 		return true;
 	case_end;
 
@@ -2038,21 +2039,22 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 
 	case_ast_node(pe, ParenExpr, e);
 		*type = check_type(c, pe->expr, named_type);
+		set_base_type(named_type, *type);
 		return true;
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, e);
-		if (ue->op.kind == Token_Pointer) {
+		switch (ue->op.kind) {
+		case Token_Pointer:
 			*type = make_type_pointer(c->allocator, check_type(c, ue->expr));
+			set_base_type(named_type, *type);
 			return true;
-		} /* else if (ue->op.kind == Token_Maybe) {
-			*type = make_type_maybe(c->allocator, check_type(c, ue->expr));
-			return true;
-		} */
+		}
 	case_end;
 
 	case_ast_node(pt, PointerType, e);
 		*type = make_type_pointer(c->allocator, check_type(c, pt->type));
+		set_base_type(named_type, *type);
 		return true;
 	case_end;
 
@@ -2074,12 +2076,14 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			Type *elem = check_type(c, at->elem);
 			*type = make_type_slice(c->allocator, elem);
 		}
+		set_base_type(named_type, *type);
 		return true;
 	case_end;
 
 	case_ast_node(dat, DynamicArrayType, e);
 		Type *elem = check_type(c, dat->elem);
 		*type = make_type_dynamic_array(c->allocator, elem);
+		set_base_type(named_type, *type);
 		return true;
 	case_end;
 
@@ -2143,6 +2147,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		check_expr_or_type(c, &o, e);
 		if (o.mode == Addressing_Type) {
 			*type = o.type;
+			set_base_type(named_type, *type);
 			return true;
 		}
 	case_end;
@@ -2152,6 +2157,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		check_expr_or_type(c, &o, e);
 		if (o.mode == Addressing_Type) {
 			*type = o.type;
+			set_base_type(named_type, *type);
 			return true;
 		}
 	case_end;

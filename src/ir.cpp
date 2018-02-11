@@ -1603,10 +1603,10 @@ void ir_emit_zero_init(irProcedure *p, irValue *address, AstNode *expr) {
 	irValue **args = gb_alloc_array(a, irValue *, 2);
 	args[0] = ir_emit_conv(p, address, t_rawptr);
 	args[1] = ir_const_int(a, type_size_of(a, t));
-	ir_emit(p, ir_instr_zero_init(p, address));
 	if (p->entity->token.string != "__mem_zero") {
 		ir_emit_global_call(p, "__mem_zero", args, 2, expr);
 	}
+	ir_emit(p, ir_instr_zero_init(p, address));
 }
 
 irValue *ir_emit_comment(irProcedure *p, String text) {
@@ -8033,6 +8033,9 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				irValue *base = ir_type_info(proc, t->Enum.base_type);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), base);
 
+				// is_export
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), ir_const_bool(a, t->Enum.is_export));
+
 				if (t->Enum.field_count > 0) {
 					Entity **fields = t->Enum.fields;
 					isize count = t->Enum.field_count;
@@ -8342,22 +8345,17 @@ void ir_gen_tree(irGen *s) {
 				}
 			}
 
-			if (decl->init_expr != nullptr) {
-				if (is_type_any(e->type)) {
-				} else {
-					TypeAndValue tav = type_and_value_of_expr(info, decl->init_expr);
-					if (tav.mode != Addressing_Invalid) {
-						if (tav.value.kind != ExactValue_Invalid) {
-							ExactValue v = tav.value;
-							g->Global.value = ir_add_module_constant(m, tav.type, v);
-						}
+			if (decl->init_expr != nullptr && !is_type_any(e->type)) {
+				TypeAndValue tav = type_and_value_of_expr(info, decl->init_expr);
+				if (tav.mode != Addressing_Invalid) {
+					if (tav.value.kind != ExactValue_Invalid) {
+						ExactValue v = tav.value;
+						g->Global.value = ir_add_module_constant(m, tav.type, v);
 					}
 				}
 			}
 
-			// if (g->Global.value == nullptr) {
-				array_add(&global_variables, var);
-			// }
+			array_add(&global_variables, var);
 
 			ir_module_add_value(m, e, g);
 			map_set(&m->members, hash_string(name), g);
