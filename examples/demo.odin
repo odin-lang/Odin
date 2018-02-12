@@ -13,6 +13,7 @@ import "core:types.odin"
 import "core:utf16.odin"
 import "core:utf8.odin"
 
+// File scope `when` statements
 when ODIN_OS == "windows" {
 	import "core:atomics.odin"
 	import "core:thread.odin"
@@ -643,6 +644,7 @@ array_programming :: proc() {
 using println in import "core:fmt.odin"
 
 using_in :: proc() {
+	fmt.println("# using in");
 	using print in fmt;
 
 	println("Hellope1");
@@ -660,7 +662,9 @@ using_in :: proc() {
 	println(f);
 }
 
-named_proc_parameters :: proc() {
+named_proc_return_parameters :: proc() {
+	fmt.println("# named proc return parameters");
+
 	foo0 :: proc() -> int {
 		return 123;
 	}
@@ -681,6 +685,8 @@ named_proc_parameters :: proc() {
 
 
 enum_export :: proc() {
+	fmt.println("# enum #export");
+
 	Foo :: enum #export {A, B, C};
 
 	f0 := A;
@@ -689,8 +695,42 @@ enum_export :: proc() {
 	fmt.println(f0, f1, f2);
 }
 
+explicit_procedure_overloading :: proc() {
+	fmt.println("# explicit procedure overloading");
+
+	add_ints :: proc(a, b: int) -> int {
+		x := a + b;
+		fmt.println("add_ints", x);
+		return x;
+	}
+	add_floats :: proc(a, b: f32) -> f32 {
+		x := a + b;
+		fmt.println("add_floats", x);
+		return x;
+	}
+	add_numbers :: proc(a: int, b: f32, c: u8) -> int {
+		x := int(a) + int(b) + int(c);
+		fmt.println("add_numbers", x);
+		return x;
+	}
+
+	add :: proc[add_ints, add_floats, add_numbers];
+
+	add(int(1), int(2));
+	add(f32(1), f32(2));
+	add(int(1), f32(2), u8(3));
+
+	add(1, 2);     // untyped ints coerce to int tighter than f32
+	add(1.0, 2.0); // untyped floats coerce to f32 tighter than int
+	add(1, 2, 3);  // three parameters
+
+	// Ambiguous answers
+	// add(1.0, 2);
+	// add(1, 2.0);
+}
+
 main :: proc() {
-	when false {
+	when true {
 		general_stuff();
 		default_struct_values();
 		union_type();
@@ -698,7 +738,8 @@ main :: proc() {
 		threading_example();
 		array_programming();
 		using_in();
-		named_proc_parameters();
+		named_proc_return_parameters();
 		enum_export();
+		explicit_procedure_overloading();
 	}
 }

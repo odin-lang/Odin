@@ -782,7 +782,7 @@ void add_untyped(CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode m
 	if (mode == Addressing_Constant && type == t_invalid) {
 		compiler_error("add_untyped - invalid type: %s", type_to_string(type));
 	}
-	map_set(&i->untyped, hash_node(expression), make_expr_info(lhs, mode, type, value));
+	map_set(&i->untyped, hash_node(expression), make_expr_info(mode, type, value, lhs));
 }
 
 void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value) {
@@ -880,14 +880,14 @@ void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclIn
 	GB_ASSERT(identifier->kind == AstNode_Ident);
 	GB_ASSERT(e != nullptr && d != nullptr);
 	GB_ASSERT(identifier->Ident.token.string == e->token.string);
-	if (e->scope != nullptr) add_entity(c, e->scope, identifier, e);
+	if (e->scope != nullptr) {
+		add_entity(c, e->scope, identifier, e);
+	}
 	add_entity_definition(&c->info, identifier, e);
 	GB_ASSERT(e->decl_info == nullptr);
 	e->decl_info = d;
 	array_add(&c->info.entities, e);
 	e->order_in_src = c->info.entities.count;
-	// map_set(&c->info.entities, hash_entity(e), d);
-	// e->order_in_src = c->info.entities.entries.count;
 }
 
 

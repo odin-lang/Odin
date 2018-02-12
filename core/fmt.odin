@@ -32,11 +32,12 @@ Fmt_Info :: struct {
 
 string_buffer_from_slice :: proc(backing: []byte) -> String_Buffer {
 	s := transmute(raw.Slice)backing;
-	d: raw.Dynamic_Array;
-	d.data = s.data;
-	d.len = 0;
-	d.cap = s.len;
-	d.allocator = nil_allocator();
+	d := raw.Dynamic_Array{
+		data = s.data,
+		len  = 0,
+		cap  = s.len,
+		allocator = nil_allocator(),
+	};
 	return transmute(String_Buffer)d;
 }
 
@@ -276,6 +277,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 	case Type_Info_Enum:
 		write_string(buf, "enum ");
 		write_type(buf, info.base);
+		if info.is_export do write_string(buf, " #export");
 		write_string(buf, " {");
 		for name, i in info.names {
 			if i > 0 do write_string(buf, ", ");
@@ -394,9 +396,7 @@ fmt_bad_verb :: proc(using fi: ^Fmt_Info, verb: rune) {
 fmt_bool :: proc(using fi: ^Fmt_Info, b: bool, verb: rune) {
 	switch verb {
 	case 't', 'v':
-		s := "false";
-		if b do s = "true";
-		write_string(buf, s);
+		write_string(buf, b ? "true" : "false");
 	case:
 		fmt_bad_verb(fi, verb);
 	}
@@ -603,16 +603,14 @@ fmt_string :: proc(fi: ^Fmt_Info, s: string, verb: rune) {
 fmt_pointer :: proc(fi: ^Fmt_Info, p: rawptr, verb: rune) {
 	switch verb {
 	case 'p', 'v':
-		// Okay
+		u := u64(uintptr(p));
+		if !fi.hash || verb == 'v' {
+			write_string(fi.buf, "0x");
+		}
+		_fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
 	case:
 		fmt_bad_verb(fi, verb);
-		return;
 	}
-	u := u64(uintptr(p));
-	if !fi.hash || verb == 'v' {
-		write_string(fi.buf, "0x");
-	}
-	_fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
 }
 
 enum_value_to_string :: proc(v: any) -> (string, bool) {
@@ -945,38 +943,35 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 		return;
 	}
 
-
 	base_arg := arg;
 	base_arg.type_info = type_info_base(base_arg.type_info);
 	switch a in base_arg {
-	case bool:          fmt_bool(fi, bool(a), verb);
-	case b8:            fmt_bool(fi, bool(a), verb);
-	case b16:           fmt_bool(fi, bool(a), verb);
-	case b32:           fmt_bool(fi, bool(a), verb);
-	case b64:           fmt_bool(fi, bool(a), verb);
+	case bool:       fmt_bool(fi, bool(a), verb);
+	case b8:         fmt_bool(fi, bool(a), verb);
+	case b16:        fmt_bool(fi, bool(a), verb);
+	case b32:        fmt_bool(fi, bool(a), verb);
+	case b64:        fmt_bool(fi, bool(a), verb);
 
-	case any:           fmt_arg(fi,  a, verb);
-	case rune:          fmt_rune(fi, a, verb);
+	case any:        fmt_arg(fi,  a, verb);
+	case rune:       fmt_rune(fi, a, verb);
 
-	case f32:           fmt_float(fi, f64(a), 32, verb);
-	case f64:           fmt_float(fi, a,      64, verb);
+	case f32:        fmt_float(fi, f64(a), 32, verb);
+	case f64:        fmt_float(fi, a,      64, verb);
 
-	case complex64:     fmt_complex(fi, complex128(a), 64, verb);
-	case complex128:    fmt_complex(fi, a, 128, verb);
+	case complex64:  fmt_complex(fi, complex128(a), 64, verb);
+	case complex128: fmt_complex(fi, a, 128, verb);
 
-	case int:     fmt_int(fi, u64(a), true,  8*size_of(int), verb);
-	case i8:      fmt_int(fi, u64(a), true,  8, verb);
+	case i8:      fmt_int(fi, u64(a), true,   8, verb);
+	case u8:      fmt_int(fi, u64(a), false,  8, verb);
 	case i16:     fmt_int(fi, u64(a), true,  16, verb);
-	case i32:     fmt_int(fi, u64(a), true,  32, verb);
-	case i64:     fmt_int(fi, u64(a), true,  64, verb);
-
-	case uintptr: fmt_int(fi, u64(a), false, 8*size_of(uintptr), verb);
-
-	case uint:    fmt_int(fi, u64(a), false, 8*size_of(uint), verb);
-	case u8:      fmt_int(fi, u64(a), false, 8, verb);
 	case u16:     fmt_int(fi, u64(a), false, 16, verb);
+	case i32:     fmt_int(fi, u64(a), true,  32, verb);
 	case u32:     fmt_int(fi, u64(a), false, 32, verb);
+	case i64:     fmt_int(fi, u64(a), true,  64, verb);
 	case u64:     fmt_int(fi, u64(a), false, 64, verb);
+	case int:     fmt_int(fi, u64(a), true,  8*size_of(int), verb);
+	case uint:    fmt_int(fi, u64(a), false, 8*size_of(uint), verb);
+	case uintptr: fmt_int(fi, u64(a), false, 8*size_of(uintptr), verb);
 
 	case string:  fmt_string(fi, a, verb);
 

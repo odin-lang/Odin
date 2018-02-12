@@ -31,14 +31,18 @@ struct TypeAndValue {
 
 // ExprInfo stores information used for "untyped" expressions
 struct ExprInfo {
-	bool           is_lhs; // Debug info
 	AddressingMode mode;
 	Type *         type; // Type_Basic
 	ExactValue     value;
+	bool           is_lhs; // Debug info
 };
 
-gb_inline ExprInfo make_expr_info(bool is_lhs, AddressingMode mode, Type *type, ExactValue value) {
-	ExprInfo ei = {is_lhs, mode, type, value};
+gb_inline ExprInfo make_expr_info(AddressingMode mode, Type *type, ExactValue value, bool is_lhs) {
+	ExprInfo ei = {};
+	ei.is_lhs = is_lhs;
+	ei.mode   = mode;
+	ei.type   = type;
+	ei.value  = value;
 	return ei;
 }
 
