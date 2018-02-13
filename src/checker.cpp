@@ -2424,7 +2424,16 @@ void check_add_export_decl(Checker *c, AstNodeExportDecl *ed) {
 		// NOTE(bill): Add imported entities to this file's scope
 		for_array(elem_index, scope->elements.entries) {
 			Entity *e = scope->elements.entries[elem_index].value;
+			String name = e->token.string;
 			if (e->scope == parent_scope) continue;
+			DeclInfo *d = e->decl_info;
+			// NOTE(bill): The enum #export must be evaluated before use
+			if (d != nullptr && d->init_expr != nullptr) {
+				AstNode *expr = unparen_expr(d->init_expr);
+				if (expr->kind == AstNode_EnumType && expr->EnumType.is_export) {
+					check_entity_decl(c, e, d, nullptr);
+				}
+			}
 
 			if (is_entity_kind_exported(e->kind)) {
 				add_entity(c, parent_scope, e->identifier, e);
