@@ -5275,11 +5275,11 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		if (cl->type != nullptr) {
 			type = nullptr;
 
-			// [...]Type
+			// [?]Type
 			if (cl->type->kind == AstNode_ArrayType && cl->type->ArrayType.count != nullptr) {
 				AstNode *count = cl->type->ArrayType.count;
 				if (count->kind == AstNode_UnaryExpr &&
-				    count->UnaryExpr.op.kind == Token_Ellipsis) {
+				    count->UnaryExpr.op.kind == Token_Question) {
 					type = make_type_array(c->allocator, check_type(c, cl->type->ArrayType.elem), -1);
 					is_to_be_determined_array_count = true;
 				}
@@ -6278,8 +6278,8 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_append_rune(str, '[');
 		if (at->count != nullptr &&
 		    at->count->kind == AstNode_UnaryExpr &&
-		    at->count->UnaryExpr.op.kind == Token_Ellipsis) {
-			str = gb_string_appendc(str, "...");
+		    at->count->UnaryExpr.op.kind == Token_Question) {
+			str = gb_string_appendc(str, "?");
 		} else {
 			str = write_expr_to_string(str, at->count);
 		}
