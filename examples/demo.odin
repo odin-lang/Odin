@@ -23,7 +23,7 @@ when ODIN_OS == "windows" {
 @(link_name="general_stuff")
 general_stuff :: proc() {
 	fmt.println("# general_stuff");
-	{ // `do` for inline statments rather than block
+	{ // `do` for inline statements rather than block
 		foo :: proc() do fmt.println("Foo!");
 		if   false do foo();
 		for  false do foo();
@@ -534,7 +534,7 @@ parametric_polymorphism :: proc() {
 
 
 
-prefix_table := [...]string{
+prefix_table := [?]string{
 	"White",
 	"Red",
 	"Green",
@@ -658,7 +658,7 @@ using_in :: proc() {
 	f.x, f.y = 123, 321;
 	println(f);
 	using x, y in f;
-	f.x, f.y = 456, 654;
+	x, y = 456, 654;
 	println(f);
 }
 
@@ -731,15 +731,15 @@ explicit_procedure_overloading :: proc() {
 
 main :: proc() {
 	when true {
-		general_stuff();
-		default_struct_values();
-		union_type();
-		parametric_polymorphism();
-		threading_example();
-		array_programming();
-		using_in();
-		named_proc_return_parameters();
-		enum_export();
-		explicit_procedure_overloading();
+		// general_stuff();
+		// default_struct_values();
+		// union_type();
+		// parametric_polymorphism();
+		// threading_example();
+		// array_programming();
+		// using_in();
+		// named_proc_return_parameters();
+		// enum_export();
+		// explicit_procedure_overloading();
 	}
 }

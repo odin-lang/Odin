@@ -1770,8 +1770,8 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		AstNode *count_expr = nullptr;
 		bool is_vector = false;
 
-		if (f->curr_token.kind == Token_Ellipsis) {
-			count_expr = ast_unary_expr(f, expect_token(f, Token_Ellipsis), nullptr);
+		if (f->curr_token.kind == Token_Question) {
+			count_expr = ast_unary_expr(f, expect_token(f, Token_Question), nullptr);
 		} else if (allow_token(f, Token_dynamic)) {
 			expect_token(f, Token_CloseBracket);
 			return ast_dynamic_array_type(f, token, parse_type(f));

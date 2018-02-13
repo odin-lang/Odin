@@ -202,7 +202,7 @@ loops :: proc() {
 		fmt.println(val, idx);
 	}
 
-	primes := [...]int{2, 3, 5, 7, 11, 13, 17, 19};
+	primes := [?]int{2, 3, 5, 7, 11, 13, 17, 19};
 
 	for p in primes {
 		fmt.println(p);
