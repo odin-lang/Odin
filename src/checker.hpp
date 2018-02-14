@@ -285,6 +285,7 @@ struct CheckerContext {
 	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;
 	bool       no_polymorphic_errors;
+	bool       in_polymorphic_specialization;
 	Scope *    polymorphic_scope;
 };
 

@@ -954,6 +954,14 @@ bool is_type_polymorphic_struct_specialized(Type *t) {
 	return false;
 }
 
+bool is_type_polymorphic_struct_unspecialized(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Struct) {
+		return t->Struct.is_polymorphic && !t->Struct.is_poly_specialized;
+	}
+	return false;
+}
+
 
 bool is_type_polymorphic(Type *t) {
 	switch (t->kind) {
