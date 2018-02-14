@@ -920,6 +920,7 @@ bool check_type_specialization_to(Checker *c, Type *specialization, Type *type, 
 	}
 	// gb_printf_err("#1 %s %s\n", type_to_string(type), type_to_string(specialization));
 	if (t->kind == Type_Struct) {
+
 		if (t->Struct.polymorphic_parent == specialization) {
 			return true;
 		}
@@ -1937,24 +1938,31 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		Operand o = {};
 		check_ident(c, &o, e, named_type, nullptr, false);
 
-		gbString err_str;
+		gbString err_str = nullptr;
+		defer (gb_string_free(err_str));
+
 		switch (o.mode) {
 		case Addressing_Invalid:
 			break;
-		case Addressing_Type:
+		case Addressing_Type: {
 			*type = o.type;
+			if (!c->context.in_polymorphic_specialization) {
+				if (is_type_polymorphic_struct_unspecialized(o.type)) {
+					err_str = expr_to_string(e);
+					error(e, "Invalid use of a non-specialized polymorphic type '%s'", err_str);
+				}
+			}
 			return true;
+		}
 
 		case Addressing_NoValue:
 			err_str = expr_to_string(e);
 			error(e, "'%s' used as a type", err_str);
-			gb_string_free(err_str);
 			break;
 
 		default:
 			err_str = expr_to_string(e);
 			error(e, "'%s' used as a type when not a type", err_str);
-			gb_string_free(err_str);
 			break;
 		}
 	case_end;
@@ -1980,6 +1988,10 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		Token token = ident->Ident.token;
 		Type *specific = nullptr;
 		if (pt->specialization != nullptr) {
+			auto prev_ips = c->context.in_polymorphic_specialization;
+			defer (c->context.in_polymorphic_specialization = prev_ips);
+			c->context.in_polymorphic_specialization = true;
+
 			AstNode *s = pt->specialization;
 			specific = check_type(c, s);
 			if (false && !is_type_polymorphic_struct(specific)) {
@@ -2088,6 +2100,10 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_end;
 
 	case_ast_node(st, StructType, e);
+		bool ips = c->context.in_polymorphic_specialization;
+		defer (c->context.in_polymorphic_specialization = ips);
+		c->context.in_polymorphic_specialization = false;
+
 		*type = make_type_struct(c->allocator);
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
@@ -2098,6 +2114,10 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_end;
 
 	case_ast_node(ut, UnionType, e);
+		bool ips = c->context.in_polymorphic_specialization;
+		defer (c->context.in_polymorphic_specialization = ips);
+		c->context.in_polymorphic_specialization = false;
+
 		*type = make_type_union(c->allocator);
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
@@ -2108,6 +2128,10 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_end;
 
 	case_ast_node(et, EnumType, e);
+		bool ips = c->context.in_polymorphic_specialization;
+		defer (c->context.in_polymorphic_specialization = ips);
+		c->context.in_polymorphic_specialization = false;
+
 		*type = make_type_enum(c->allocator);
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
@@ -2127,6 +2151,10 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_end;
 
 	case_ast_node(pt, ProcType, e);
+		bool ips = c->context.in_polymorphic_specialization;
+		defer (c->context.in_polymorphic_specialization = ips);
+		c->context.in_polymorphic_specialization = false;
+
 		*type = alloc_type(c->allocator, Type_Proc);
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
@@ -2136,6 +2164,10 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_end;
 
 	case_ast_node(mt, MapType, e);
+		bool ips = c->context.in_polymorphic_specialization;
+		defer (c->context.in_polymorphic_specialization = ips);
+		c->context.in_polymorphic_specialization = false;
+
 		*type = alloc_type(c->allocator, Type_Map);
 		set_base_type(named_type, *type);
 		check_map_type(c, *type, e);

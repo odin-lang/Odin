@@ -200,7 +200,9 @@ void warning_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.warning_count++;
 	// NOTE(bill): Duplicate error, skip it
-	if (global_error_collector.prev != token.pos) {
+	if (token.pos.line == 0) {
+		gb_printf_err("Error: %s\n", gb_bprintf_va(fmt, va));
+	} else if (global_error_collector.prev != token.pos) {
 		global_error_collector.prev = token.pos;
 		gb_printf_err("%.*s(%td:%td) Warning: %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
@@ -214,15 +216,14 @@ void error_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
-	if (global_error_collector.prev != token.pos) {
+	if (token.pos.line == 0) {
+		gb_printf_err("Error: %s\n", gb_bprintf_va(fmt, va));
+	} else if (global_error_collector.prev != token.pos) {
 		global_error_collector.prev = token.pos;
 		gb_printf_err("%.*s(%td:%td) %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
 		              gb_bprintf_va(fmt, va));
-	} else if (token.pos.line == 0) {
-		gb_printf_err("Error: %s\n", gb_bprintf_va(fmt, va));
 	}
-
 	gb_mutex_unlock(&global_error_collector.mutex);
 }
 
