@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Odin Compiler"
-#define MyAppVersion "0.7.1"
+#define MyAppVersion "0.8.1"
 #define MyAppPublisher "Odin-lang Org."
 #define MyAppURL "http://www.odin-lang.com/"
 #define MyAppExeName "odin.exe"
