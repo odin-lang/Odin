@@ -562,6 +562,9 @@ struct TypeAndToken {
 };
 
 void add_constant_switch_case(Checker *c, Map<TypeAndToken> *seen, Operand operand, bool use_expr = true) {
+	if (operand.mode != Addressing_Constant) {
+		return;
+	}
 	if (operand.value.kind == ExactValue_Invalid) {
 		return;
 	}
@@ -767,10 +770,8 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 						add_constant_switch_case(c, &seen, x, use_expr);
 					}
 				} else {
-					if (lhs.mode == Addressing_Constant) {
-						add_constant_switch_case(c, &seen, lhs);
-					}
-					if (rhs.mode == Addressing_Constant && op == Token_LtEq) {
+					add_constant_switch_case(c, &seen, lhs);
+					if (op == Token_LtEq) {
 						add_constant_switch_case(c, &seen, rhs);
 					}
 				}
@@ -939,8 +940,9 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 			if (first_default != nullptr) {
 				TokenPos pos = ast_node_token(first_default).pos;
 				error(stmt,
-				           "Multiple 'default' clauses\n"
-				           "\tfirst at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
+				      "Multiple 'default' clauses\n"
+				      "\tfirst at %.*s(%td:%td)",
+				      LIT(pos.file), pos.line, pos.column);
 			} else {
 				first_default = default_stmt;
 			}
