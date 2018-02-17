@@ -126,8 +126,7 @@ struct TypeStruct {
 	})                                                    \
 	TYPE_KIND(Struct,  TypeStruct)                        \
 	TYPE_KIND(Enum, struct {                              \
-		Entity **fields;                                  \
-		i32      field_count;                             \
+		Array<Entity *> fields;                           \
 		AstNode *node;                                    \
 		Scope *  scope;                                   \
 		Entity * names;                                   \
@@ -1657,7 +1656,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				}
 			}
 
-			for (isize i = 0; i < type->Enum.field_count; i++) {
+			for_array(i, type->Enum.fields) {
 				Entity *f = type->Enum.fields[i];
 				GB_ASSERT(f->kind == Entity_Constant);
 				String str = f->token.string;
@@ -2330,7 +2329,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 			str = write_type_to_string(str, type->Enum.base_type);
 		}
 		str = gb_string_appendc(str, " {");
-		for (isize i = 0; i < type->Enum.field_count; i++) {
+		for_array(i, type->Enum.fields) {
 			Entity *f = type->Enum.fields[i];
 			GB_ASSERT(f->kind == Entity_Constant);
 			if (i > 0) {

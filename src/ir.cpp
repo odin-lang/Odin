@@ -6925,7 +6925,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			Type *enum_ptr = make_type_pointer(a, t);
 			t = base_type(t);
 			Type *core_elem = core_type(t);
-			i64 enum_count = t->Enum.field_count;
+			i64 enum_count = t->Enum.fields.count;
 			irValue *max_count = ir_const_int(a, enum_count);
 
 			irValue *ti          = ir_type_info(proc, t);
@@ -8039,12 +8039,11 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				// is_export
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), ir_const_bool(a, t->Enum.is_export));
 
-				if (t->Enum.field_count > 0) {
-					Entity **fields = t->Enum.fields;
-					isize count = t->Enum.field_count;
-					irValue *name_array  = ir_generate_array(m, t_string, count,
+				if (t->Enum.fields.count > 0) {
+					auto fields = t->Enum.fields;
+					irValue *name_array  = ir_generate_array(m, t_string, fields.count,
 					                                         str_lit("__$enum_names"), cast(i64)entry_index);
-					irValue *value_array = ir_generate_array(m, t_type_info_enum_value, count,
+					irValue *value_array = ir_generate_array(m, t_type_info_enum_value, fields.count,
 					                                         str_lit("__$enum_values"), cast(i64)entry_index);
 
 					bool is_value_int = is_type_integer(t->Enum.base_type);
@@ -8052,7 +8051,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 						GB_ASSERT(is_type_float(t->Enum.base_type));
 					}
 
-					for (isize i = 0; i < count; i++) {
+					for_array(i, fields) {
 						irValue *name_ep  = ir_emit_array_epi(proc, name_array, cast(i32)i);
 						irValue *value_ep = ir_emit_array_epi(proc, value_array, cast(i32)i);
 
@@ -8063,7 +8062,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 						ir_emit_store(proc, name_ep, ir_const_string(a, fields[i]->token.string));
 					}
 
-					irValue *v_count = ir_const_int(a, count);
+					irValue *v_count = ir_const_int(a, fields.count);
 
 					irValue *names = ir_emit_struct_ep(proc, tag, 1);
 					irValue *name_array_elem = ir_array_elem(proc, name_array);

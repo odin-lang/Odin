@@ -46,7 +46,31 @@ struct ExactValue {
 gb_global ExactValue const empty_exact_value = {};
 
 HashKey hash_exact_value(ExactValue v) {
+	switch (v.kind) {
+	case ExactValue_Invalid:
+		return HashKey{};
+	case ExactValue_Bool:
+		return hash_integer(u64(v.value_bool));
+	case ExactValue_String:
+		return hash_string(v.value_string);
+	case ExactValue_Integer:
+		return hash_integer(u64(v.value_integer));
+	case ExactValue_Float:
+		return hash_f64(v.value_float);
+	case ExactValue_Pointer:
+		return hash_integer(v.value_pointer);
+	case ExactValue_Complex:
+		return hashing_proc(&v.value_complex, gb_size_of(Complex128));
+
+	case ExactValue_Compound:
+		return hash_pointer(v.value_compound);
+	case ExactValue_Procedure:
+		return hash_pointer(v.value_procedure);
+	case ExactValue_Type:
+		return hash_pointer(v.value_type);
+	}
 	return hashing_proc(&v, gb_size_of(ExactValue));
+
 }
 
 

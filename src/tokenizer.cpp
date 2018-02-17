@@ -227,6 +227,22 @@ void error_va(Token token, char *fmt, va_list va) {
 	gb_mutex_unlock(&global_error_collector.mutex);
 }
 
+void error_no_newline_va(Token token, char *fmt, va_list va) {
+	gb_mutex_lock(&global_error_collector.mutex);
+	global_error_collector.count++;
+	// NOTE(bill): Duplicate error, skip it
+	if (token.pos.line == 0) {
+		gb_printf_err("Error: %s", gb_bprintf_va(fmt, va));
+	} else if (global_error_collector.prev != token.pos) {
+		global_error_collector.prev = token.pos;
+		gb_printf_err("%.*s(%td:%td) %s",
+		              LIT(token.pos.file), token.pos.line, token.pos.column,
+		              gb_bprintf_va(fmt, va));
+	}
+	gb_mutex_unlock(&global_error_collector.mutex);
+}
+
+
 void syntax_error_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;

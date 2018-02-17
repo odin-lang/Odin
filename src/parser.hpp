@@ -286,17 +286,19 @@ AST_NODE_KIND(_ComplexStmtBegin, "", struct {}) \
 		Entity *implicit_entity; \
 	}) \
 	AST_NODE_KIND(SwitchStmt, "switch statement", struct { \
-		Token token;   \
-		AstNode *label; \
-		AstNode *init; \
-		AstNode *tag;  \
-		AstNode *body; \
+		Token    token;    \
+		AstNode *label;    \
+		AstNode *init;     \
+		AstNode *tag;      \
+		AstNode *body;     \
+		bool     complete; \
 	}) \
 	AST_NODE_KIND(TypeSwitchStmt, "type switch statement", struct { \
-		Token    token; \
-		AstNode *label; \
-		AstNode *tag;   \
-		AstNode *body;  \
+		Token    token;    \
+		AstNode *label;    \
+		AstNode *tag;      \
+		AstNode *body;     \
+		bool     complete; \
 	}) \
 	AST_NODE_KIND(DeferStmt,  "defer statement",  struct { Token token; AstNode *stmt; }) \
 	AST_NODE_KIND(BranchStmt, "branch statement", struct { Token token; AstNode *label; }) \
