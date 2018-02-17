@@ -666,6 +666,13 @@ bool is_type_rune(Type *t) {
 	}
 	return false;
 }
+bool is_type_number(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		return (t->Basic.flags & BasicFlag_Numeric) != 0;
+	}
+	return false;
+}
 bool is_type_numeric(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {

@@ -744,9 +744,9 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 					}
 				}
 
-				if (a1.mode != Addressing_Invalid &&
+				if (a1.mode != Addressing_Invalid && b1.mode != Addressing_Invalid &&
 				    lhs.mode == Addressing_Constant && rhs.mode == Addressing_Constant &&
-				    !is_type_string(lhs.type) && !is_type_string(rhs.type)) {
+				    is_type_number(lhs.type) && is_type_number(rhs.type)) {
 					ExactValue start = lhs.value;
 					ExactValue end   = rhs.value;
 					ExactValue one   = exact_value_i64(1);
