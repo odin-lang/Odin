@@ -1,4 +1,19 @@
-<img src="misc/logo-slim.png" alt="Odin logo" height="74">
+<p align="center">
+    <img src="misc/logo-slim.png" alt="Odin logo" height="120">
+    <br/>
+    A fast, concise, readable, pragmatic and open sourced programming language.
+    <br/>
+    <br/>
+    <a href="https://github.com/odin-lang/odin/releases/latest">
+        <img src="https://img.shields.io/github/release/odin-lang/odin.svg">
+    </a>
+    <a href="https://github.com/odin-lang/odin/releases/latest">
+        <img src="https://img.shields.io/badge/platforms-Windows%20|%20Linux%20|%20macOS-green.svg">
+    </a>
+    <a href="https://github.com/odin-lang/odin/blob/master/LICENSE">
+        <img src="https://img.shields.io/github/license/odin-lang/odin.svg">
+    </a>
+</p>
 
 # The Odin Programming Language
 
