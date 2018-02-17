@@ -852,8 +852,6 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 
 	check_label(c, ss->label); // TODO(bill): What should the label's "scope" be?
 
-	TypeSwitchKind switch_kind = TypeSwitch_Invalid;
-
 	if (ss->tag->kind != AstNode_AssignStmt) {
 		error(ss->tag, "Expected an 'in' assignment for this type switch statement");
 		return;
@@ -874,7 +872,8 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 
 	check_expr(c, &x, rhs);
 	check_assignment(c, &x, nullptr, str_lit("type switch expression"));
-	switch_kind = check_valid_type_switch_type(x.type);
+
+	TypeSwitchKind switch_kind = check_valid_type_switch_type(x.type);
 	if (switch_kind == TypeSwitch_Invalid) {
 		gbString str = type_to_string(x.type);
 		error(x.expr, "Invalid type for this type switch expression, got '%s'", str);
@@ -911,7 +910,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 			if (first_default != nullptr) {
 				TokenPos pos = ast_node_token(first_default).pos;
 				error(stmt,
-				      "Multiple 'default' clauses\n"
+				      "Multiple default clauses\n"
 				      "\tfirst at %.*s(%td:%td)",
 				      LIT(pos.file), pos.line, pos.column);
 			} else {
