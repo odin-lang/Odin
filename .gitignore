@@ -271,3 +271,6 @@ shared/
 # temp files
 * .ll
 *.bc
+
+# vim swap files
+.swp
