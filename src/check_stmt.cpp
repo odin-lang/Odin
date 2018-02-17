@@ -745,7 +745,8 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 				}
 
 				if (a1.mode != Addressing_Invalid &&
-				    lhs.mode == Addressing_Constant && rhs.mode == Addressing_Constant) {
+				    lhs.mode == Addressing_Constant && rhs.mode == Addressing_Constant &&
+				    !is_type_string(lhs.type) && !is_type_string(rhs.type)) {
 					ExactValue start = lhs.value;
 					ExactValue end   = rhs.value;
 					ExactValue one   = exact_value_i64(1);
@@ -950,9 +951,9 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		return;
 	}
 
-	Map<bool> seen = {}; // Key: Type *
-	map_init(&seen, heap_allocator());
-	defer (map_destroy(&seen));
+	PtrSet<Type *> seen = {};
+	ptr_set_init(&seen, heap_allocator());
+	defer (ptr_set_destroy(&seen));
 
 	for_array(i, bs->stmts) {
 		AstNode *stmt = bs->stmts[i];
@@ -995,9 +996,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 					GB_PANIC("Unknown type to type switch statement");
 				}
 
-				HashKey key = hash_type(y.type);
-				bool *found = map_get(&seen, key);
-				if (found) {
+				if (ptr_set_exists(&seen, y.type)) {
 					TokenPos pos = cc->token.pos;
 					gbString expr_str = expr_to_string(y.expr);
 					error(y.expr,
@@ -1008,7 +1007,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 					gb_string_free(expr_str);
 					break;
 				}
-				map_set(&seen, key, cast(bool)true);
+				ptr_set_add(&seen, y.type);
 			}
 		}
 
@@ -1053,8 +1052,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 
 		for_array(i, variants) {
 			Type *t = variants[i];
-			auto found = map_get(&seen, hash_type(t));
-			if (!found) {
+			if (!ptr_set_exists(&seen, t)) {
 				array_add(&unhandled, t);
 			}
 		}

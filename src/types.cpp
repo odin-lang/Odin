@@ -117,12 +117,12 @@ struct TypeStruct {
 	TYPE_KIND(Slice,   struct { Type *elem; })            \
 	TYPE_KIND(DynamicArray, struct { Type *elem; })       \
 	TYPE_KIND(Map, struct {                               \
-		Type * key;                                       \
-		Type * value;                                     \
-		Type * entry_type;                                \
-		Type * generated_struct_type;                     \
-		Type * internal_type;                             \
-		Type * lookup_result_type;                        \
+		Type *key;                                        \
+		Type *value;                                      \
+		Type *entry_type;                                 \
+		Type *generated_struct_type;                      \
+		Type *internal_type;                              \
+		Type *lookup_result_type;                         \
 	})                                                    \
 	TYPE_KIND(Struct,  TypeStruct)                        \
 	TYPE_KIND(Enum, struct {                              \
