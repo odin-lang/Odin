@@ -739,41 +739,12 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 				Operand b1 = rhs;
 				check_comparison(c, &a1, &b1, op);
 				if (complete) {
-					if (lhs.mode != Addressing_Constant) {
-						error(lhs.expr, "#complete switch statement only allows constant case clauses");
-					}
-					if (rhs.mode != Addressing_Constant) {
-						error(rhs.expr, "#complete switch statement only allows constant case clauses");
-					}
+					error(lhs.expr, "#complete switch statement does not allow ranges");
 				}
 
-				if (complete &&
-				    a1.mode != Addressing_Invalid && b1.mode != Addressing_Invalid &&
-				    lhs.mode == Addressing_Constant && rhs.mode == Addressing_Constant &&
-				    is_type_number(lhs.type) && is_type_number(rhs.type)) {
-					ExactValue start = lhs.value;
-					ExactValue end   = rhs.value;
-					ExactValue one   = exact_value_i64(1);
-					match_exact_values(&one, &start);
-					for (ExactValue i = start;
-					     compare_exact_values(op, i, end);
-					     i = exact_value_add(i, one)) {
-						bool use_expr = false;
-						Operand x = lhs;
-						x.value = i;
-						if (compare_exact_values(Token_CmpEq, i, start)) {
-							use_expr = true;
-						} else if (compare_exact_values(Token_CmpEq, i, end)) {
-							x = rhs;
-							use_expr = true;
-						}
-						add_constant_switch_case(c, &seen, x, use_expr);
-					}
-				} else {
-					add_constant_switch_case(c, &seen, lhs);
-					if (op == Token_LtEq) {
-						add_constant_switch_case(c, &seen, rhs);
-					}
+				add_constant_switch_case(c, &seen, lhs);
+				if (op == Token_LtEq) {
+					add_constant_switch_case(c, &seen, rhs);
 				}
 			} else {
 				Operand y = {};

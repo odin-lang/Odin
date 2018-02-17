@@ -741,10 +741,10 @@ complete_switch :: proc() {
 		b := Foo.B;
 		f := Foo.A;
 		#complete switch f {
-		case A...C: fmt.println("A...C");
-		// case A: fmt.println("A");
-		// case B: fmt.println("B");
-		// case C: fmt.println("C");
+		// case A...C: fmt.println("A...C");
+		case A: fmt.println("A");
+		case B: fmt.println("B");
+		case C: fmt.println("C");
 		case D: fmt.println("D");
 		case:   fmt.println("?");
 		}
