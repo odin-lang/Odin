@@ -730,6 +730,7 @@ explicit_procedure_overloading :: proc() {
 }
 
 complete_switch :: proc() {
+	fmt.println("# complete_switch");
 	{ // enum
 		Foo :: enum #export {
 			A,
@@ -741,7 +742,6 @@ complete_switch :: proc() {
 		b := Foo.B;
 		f := Foo.A;
 		#complete switch f {
-		// case A...C: fmt.println("A...C");
 		case A: fmt.println("A");
 		case B: fmt.println("B");
 		case C: fmt.println("C");
