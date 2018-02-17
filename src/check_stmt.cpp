@@ -454,7 +454,7 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 	case Entity_TypeName: {
 		Type *t = base_type(e->type);
 		if (t->kind == Type_Enum) {
-			for (isize i = 0; i < t->Enum.field_count; i++) {
+			for_array(i, t->Enum.fields) {
 				Entity *f = t->Enum.fields[i];
 				if (!is_entity_exported(f)) continue;
 
@@ -555,6 +555,52 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 	return true;
 }
 
+
+struct TypeAndToken {
+	Type *type;
+	Token token;
+};
+
+void add_constant_switch_case(Checker *c, Map<TypeAndToken> *seen, Operand operand, bool use_expr = true) {
+	if (operand.value.kind == ExactValue_Invalid) {
+		return;
+	}
+	HashKey key = hash_exact_value(operand.value);
+	TypeAndToken *found = map_get(seen, key);
+	if (found != nullptr) {
+		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+		defer (gb_temp_arena_memory_end(tmp));
+
+		isize count = multi_map_count(seen, key);
+		TypeAndToken *taps = gb_alloc_array(c->tmp_allocator, TypeAndToken, count);
+
+		multi_map_get_all(seen, key, taps);
+		for (isize i = 0; i < count; i++) {
+			TypeAndToken tap = taps[i];
+			if (are_types_identical(operand.type, tap.type)) {
+				TokenPos pos = tap.token.pos;
+				if (use_expr) {
+					gbString expr_str = expr_to_string(operand.expr);
+					error(operand.expr,
+					      "Duplicate case '%s'\n"
+					      "\tprevious case at %.*s(%td:%td)",
+					      expr_str,
+					      LIT(pos.file), pos.line, pos.column);
+					gb_string_free(expr_str);
+				} else {
+					error(operand.expr,
+					      "Duplicate case found with previous case at %.*s(%td:%td)",
+					      LIT(pos.file), pos.line, pos.column);
+				}
+				return;
+			}
+		}
+	}
+
+	TypeAndToken tap = {operand.type, ast_node_token(operand.expr)};
+	multi_map_insert(seen, key, tap);
+}
+
 void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 	ast_node(ss, SwitchStmt, node);
 
@@ -611,12 +657,16 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		}
 	}
 
-	struct TypeAndToken {
-		Type *type;
-		Token token;
-	};
+	bool complete = ss->complete;
 
-	Map<TypeAndToken> seen = {}; // NOTE(bill): Multimap
+	if (complete) {
+		if (!is_type_enum(x.type)) {
+			error(x.expr, "#complete switch statement can be only used with an enum type");
+			complete = false;
+		}
+	}
+
+	Map<TypeAndToken> seen = {}; // NOTE(bill): Multimap, Key: ExactValue
 	map_init(&seen, heap_allocator());
 	defer (map_destroy(&seen));
 
@@ -680,9 +730,48 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 				default: error(ie->op, "Invalid interval operator"); continue;
 				}
 
+
+
 				Operand a1 = lhs;
 				Operand b1 = rhs;
 				check_comparison(c, &a1, &b1, op);
+				if (complete) {
+					if (lhs.mode != Addressing_Constant) {
+						error(lhs.expr, "#complete switch statement only allows constant case clauses");
+					}
+					if (rhs.mode != Addressing_Constant) {
+						error(rhs.expr, "#complete switch statement only allows constant case clauses");
+					}
+				}
+
+				if (a1.mode != Addressing_Invalid &&
+				    lhs.mode == Addressing_Constant && rhs.mode == Addressing_Constant) {
+					ExactValue start = lhs.value;
+					ExactValue end   = rhs.value;
+					ExactValue one   = exact_value_i64(1);
+					match_exact_values(&one, &start);
+					for (ExactValue i = start;
+					     compare_exact_values(op, i, end);
+					     i = exact_value_add(i, one)) {
+						bool use_expr = false;
+						Operand x = lhs;
+						x.value = i;
+						if (compare_exact_values(Token_CmpEq, i, start)) {
+							use_expr = true;
+						} else if (compare_exact_values(Token_CmpEq, i, end)) {
+							x = rhs;
+							use_expr = true;
+						}
+						add_constant_switch_case(c, &seen, x, use_expr);
+					}
+				} else {
+					if (lhs.mode == Addressing_Constant) {
+						add_constant_switch_case(c, &seen, lhs);
+					}
+					if (rhs.mode == Addressing_Constant && op == Token_LtEq) {
+						add_constant_switch_case(c, &seen, rhs);
+					}
+				}
 			} else {
 				Operand y = {};
 				check_expr(c, &y, expr);
@@ -704,53 +793,60 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 					continue;
 				}
 				if (y.mode != Addressing_Constant) {
+					if (complete) {
+						error(y.expr, "#complete switch statement only allows constant case clauses");
+					}
 					continue;
 				}
 
-
-				if (y.value.kind != ExactValue_Invalid) {
-					HashKey key = hash_exact_value(y.value);
-					TypeAndToken *found = map_get(&seen, key);
-					if (found != nullptr) {
-						gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-						defer (gb_temp_arena_memory_end(tmp));
-
-						isize count = multi_map_count(&seen, key);
-						TypeAndToken *taps = gb_alloc_array(c->tmp_allocator, TypeAndToken, count);
-
-						multi_map_get_all(&seen, key, taps);
-						bool continue_outer = false;
-
-						for (isize i = 0; i < count; i++) {
-							TypeAndToken tap = taps[i];
-							if (are_types_identical(y.type, tap.type)) {
-								TokenPos pos = tap.token.pos;
-								gbString expr_str = expr_to_string(y.expr);
-								error(y.expr,
-								           "Duplicate case '%s'\n"
-								           "\tprevious case at %.*s(%td:%td)",
-								           expr_str,
-								           LIT(pos.file), pos.line, pos.column);
-								gb_string_free(expr_str);
-								continue_outer = true;
-								break;
-							}
-						}
-
-
-						if (continue_outer) {
-							continue;
-						}
-					}
-					TypeAndToken tap = {y.type, ast_node_token(y.expr)};
-					multi_map_insert(&seen, key, tap);
-				}
+				add_constant_switch_case(c, &seen, y);
 			}
 		}
 
 		check_open_scope(c, stmt);
 		check_stmt_list(c, cc->stmts, mod_flags);
 		check_close_scope(c);
+	}
+
+	if (complete) {
+		Type *et = base_type(x.type);
+		GB_ASSERT(is_type_enum(et));
+		auto fields = et->Enum.fields;
+
+		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+		defer (gb_temp_arena_memory_end(tmp));
+
+		Array<Entity *> unhandled = {};
+		array_init(&unhandled, c->tmp_allocator, fields.count);
+
+		for_array(i, fields) {
+			Entity *f = fields[i];
+			if (f->kind != Entity_Constant) {
+				continue;
+			}
+			ExactValue v = f->Constant.value;
+			HashKey key = hash_exact_value(v);
+			auto found = map_get(&seen, key);
+			if (!found) {
+				array_add(&unhandled, f);
+			}
+		}
+
+		if (unhandled.count > 0) {
+			if (unhandled.count == 1) {
+				error_no_newline(node, "Unhandled switch case: ");
+			} else {
+				error_no_newline(node, "Unhandled switch cases: ");
+			}
+			for_array(i, unhandled) {
+				Entity *f = unhandled[i];
+				if (i > 0)  {
+					gb_printf_err(", ");
+				}
+				gb_printf_err("%.*s", LIT(f->token.string));
+			}
+			gb_printf_err("\n");
+		}
 	}
 }
 
@@ -810,6 +906,14 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		error(x.expr, "Invalid type for this type switch expression, got '%s'", str);
 		gb_string_free(str);
 		return;
+	}
+
+	bool complete = ss->complete;
+	if (complete) {
+		if (switch_kind != Switch_Union) {
+			error(node, "#complete switch statement may only be used with a union");
+			complete = false;
+		}
 	}
 
 	bool is_ptr = is_type_pointer(x.type);
@@ -934,6 +1038,44 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		}
 		check_stmt_list(c, cc->stmts, mod_flags);
 		check_close_scope(c);
+	}
+
+	if (complete) {
+		Type *ut = base_type(x.type);
+		GB_ASSERT(is_type_union(ut));
+		auto variants = ut->Union.variants;
+
+		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+		defer (gb_temp_arena_memory_end(tmp));
+
+		Array<Type *> unhandled = {};
+		array_init(&unhandled, c->tmp_allocator, variants.count);
+
+		for_array(i, variants) {
+			Type *t = variants[i];
+			auto found = map_get(&seen, hash_type(t));
+			if (!found) {
+				array_add(&unhandled, t);
+			}
+		}
+
+		if (unhandled.count > 0) {
+			if (unhandled.count == 1) {
+				error_no_newline(node, "Unhandled switch case: ");
+			} else {
+				error_no_newline(node, "Unhandled switch cases: ");
+			}
+			for_array(i, unhandled) {
+				Type *t = unhandled[i];
+				if (i > 0)  {
+					gb_printf_err(", ");
+				}
+				gbString s = type_to_string(t);
+				gb_printf_err("%s", s);
+				gb_string_free(s);
+			}
+			gb_printf_err("\n");
+		}
 	}
 }
 

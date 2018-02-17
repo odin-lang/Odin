@@ -729,17 +729,49 @@ explicit_procedure_overloading :: proc() {
 	// add(1, 2.0);
 }
 
+complete_switch :: proc() {
+	{ // enum
+		Foo :: enum #export {
+			A,
+			B,
+			C,
+			D,
+		}
+
+		b := Foo.B;
+		f := Foo.A;
+		#complete switch f {
+		case A...C: fmt.println("A...C");
+		// case A: fmt.println("A");
+		// case B: fmt.println("B");
+		// case C: fmt.println("C");
+		case D: fmt.println("D");
+		case:   fmt.println("?");
+		}
+	}
+	{ // union
+		Foo :: union {int, bool};
+		f: Foo = 123;
+		#complete switch _ in f {
+		case int:  fmt.println("int");
+		case bool: fmt.println("bool");
+		case:
+		}
+	}
+}
+
 main :: proc() {
 	when true {
-		// general_stuff();
-		// default_struct_values();
-		// union_type();
-		// parametric_polymorphism();
-		// threading_example();
-		// array_programming();
-		// using_in();
-		// named_proc_return_parameters();
-		// enum_export();
-		// explicit_procedure_overloading();
+		general_stuff();
+		default_struct_values();
+		union_type();
+		parametric_polymorphism();
+		threading_example();
+		array_programming();
+		using_in();
+		named_proc_return_parameters();
+		enum_export();
+		explicit_procedure_overloading();
+		complete_switch();
 	}
 }

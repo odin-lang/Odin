@@ -30,8 +30,8 @@ struct HashKey {
 	// u128        key;
 	u64         key;
 	union {
-		String       string; // if String, s.len > 0
-		void *       ptr;
+		String   string; // if String, s.len > 0
+		void *   ptr;
 		PtrAndId ptr_and_id;
 	};
 };
@@ -63,6 +63,16 @@ gb_inline HashKey hash_ptr_and_id(void *ptr, u32 id) {
 	h.key = cast(u64)cast(uintptr)ptr;
 	h.ptr_and_id.ptr = ptr;
 	h.ptr_and_id.id  = id;
+	return h;
+}
+gb_inline HashKey hash_integer(u64 u) {
+	HashKey h = {HashKey_Default};
+	h.key = u;
+	return h;
+}
+gb_inline HashKey hash_f64(f64 f) {
+	HashKey h = {HashKey_Default};
+	h.key = *cast(u64 *)&f;
 	return h;
 }
 

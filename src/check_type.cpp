@@ -794,9 +794,8 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	GB_ASSERT(fields.count <= et->fields.count);
 
 
-	enum_type->Enum.fields      = fields.data;
-	enum_type->Enum.field_count = cast(i32)fields.count;
-	enum_type->Enum.is_export   = et->is_export;
+	enum_type->Enum.fields    = fields;
+	enum_type->Enum.is_export = et->is_export;
 	if (et->is_export) {
 		Scope *parent = c->context.scope->parent;
 		for_array(i, fields) {

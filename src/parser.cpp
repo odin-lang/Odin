@@ -375,6 +375,17 @@ void error(AstNode *node, char *fmt, ...) {
 	va_end(va);
 }
 
+void error_no_newline(AstNode *node, char *fmt, ...) {
+	Token token = {};
+	if (node != nullptr) {
+		token = ast_node_token(node);
+	}
+	va_list va;
+	va_start(va, fmt);
+	error_no_newline_va(token, fmt, va);
+	va_end(va);
+}
+
 void warning(AstNode *node, char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
@@ -3698,6 +3709,20 @@ AstNode *parse_stmt(AstFile *f) {
 			s->stmt_state_flags |= StmtStateFlag_no_bounds_check;
 			if ((s->stmt_state_flags & StmtStateFlag_bounds_check) != 0) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
+			}
+			return s;
+		} else if (tag == "complete") {
+			s = parse_stmt(f);
+			switch (s->kind) {
+			case AstNode_SwitchStmt:
+				s->SwitchStmt.complete = true;
+				break;
+			case AstNode_TypeSwitchStmt:
+				s->TypeSwitchStmt.complete = true;
+				break;
+			default:
+				syntax_error(token, "#complete can only be applied to a switch statement");
+				break;
 			}
 			return s;
 		}
