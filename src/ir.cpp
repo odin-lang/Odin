@@ -7177,8 +7177,8 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		Type *parent_type = ir_type(parent);
 		bool is_parent_ptr = is_type_pointer(ir_type(parent));
 
-		SwitchKind switch_kind = check_valid_type_switch_type(ir_type(parent));
-		GB_ASSERT(switch_kind != Switch_Invalid);
+		TypeSwitchKind switch_kind = check_valid_type_switch_type(ir_type(parent));
+		GB_ASSERT(switch_kind != TypeSwitch_Invalid);
 
 		irValue *parent_value = parent;
 
@@ -7189,7 +7189,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 		irValue *tag_index = nullptr;
 		irValue *union_data = nullptr;
-		if (switch_kind == Switch_Union) {
+		if (switch_kind == TypeSwitch_Union) {
 			ir_emit_comment(proc, str_lit("get union's tag"));
 			tag_index = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, parent_ptr));
 			union_data = ir_emit_conv(proc, parent_ptr, t_rawptr);
@@ -7222,11 +7222,11 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				next = ir_new_block(proc, nullptr, "typeswitch.next");
 				case_type = type_of_expr(proc->module->info, cc->list[type_index]);
 				irValue *cond = nullptr;
-				if (switch_kind == Switch_Union) {
+				if (switch_kind == TypeSwitch_Union) {
 					Type *ut = base_type(type_deref(parent_type));
 					irValue *variant_tag = ir_const_union_tag(proc->module->allocator, ut, case_type);
 					cond = ir_emit_comp(proc, Token_CmpEq, tag_index, variant_tag);
-				} else if (switch_kind == Switch_Any) {
+				} else if (switch_kind == TypeSwitch_Any) {
 					irValue *any_ti  = ir_emit_load(proc, ir_emit_struct_ep(proc, parent_ptr, 1));
 					irValue *case_ti = ir_type_info(proc, case_type);
 					cond = ir_emit_comp(proc, Token_CmpEq, any_ti, case_ti);
@@ -7252,9 +7252,9 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				}
 				GB_ASSERT_MSG(is_type_pointer(ct), "%s", type_to_string(ct));
 				irValue *data = nullptr;
-				if (switch_kind == Switch_Union) {
+				if (switch_kind == TypeSwitch_Union) {
 					data = union_data;
-				} else if (switch_kind == Switch_Any) {
+				} else if (switch_kind == TypeSwitch_Any) {
 					irValue *any_data = ir_emit_load(proc, ir_emit_struct_ep(proc, parent_ptr, 0));
 					data = any_data;
 				}
@@ -7291,22 +7291,12 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				break;
 			}
 		} else {
-			switch (bs->token.kind) {
-			case Token_break:
-				for (irTargetList *t = proc->target_list; t != nullptr && block == nullptr; t = t->prev) {
-					block = t->break_;
+			for (irTargetList *t = proc->target_list; t != nullptr && block == nullptr; t = t->prev) {
+				switch (bs->token.kind) {
+				case Token_break:       block = t->break_;       break;
+				case Token_continue:    block = t->continue_;    break;
+				case Token_fallthrough: block = t->fallthrough_; break;
 				}
-				break;
-			case Token_continue:
-				for (irTargetList *t = proc->target_list; t != nullptr && block == nullptr; t = t->prev) {
-					block = t->continue_;
-				}
-				break;
-			case Token_fallthrough:
-				for (irTargetList *t = proc->target_list; t != nullptr && block == nullptr; t = t->prev) {
-					block = t->fallthrough_;
-				}
-				break;
 			}
 		}
 		if (block != nullptr) {

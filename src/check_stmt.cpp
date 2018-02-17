@@ -744,7 +744,8 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 					}
 				}
 
-				if (a1.mode != Addressing_Invalid && b1.mode != Addressing_Invalid &&
+				if (complete &&
+				    a1.mode != Addressing_Invalid && b1.mode != Addressing_Invalid &&
 				    lhs.mode == Addressing_Constant && rhs.mode == Addressing_Constant &&
 				    is_type_number(lhs.type) && is_type_number(rhs.type)) {
 					ExactValue start = lhs.value;
@@ -852,21 +853,21 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 }
 
 
-enum SwitchKind {
-	Switch_Invalid,
-	Switch_Union,
-	Switch_Any,
+enum TypeSwitchKind {
+	TypeSwitch_Invalid,
+	TypeSwitch_Union,
+	TypeSwitch_Any,
 };
 
-SwitchKind check_valid_type_switch_type(Type *type) {
+TypeSwitchKind check_valid_type_switch_type(Type *type) {
 	type = type_deref(type);
 	if (is_type_union(type)) {
-		return Switch_Union;
+		return TypeSwitch_Union;
 	}
 	if (is_type_any(type)) {
-		return Switch_Any;
+		return TypeSwitch_Any;
 	}
-	return Switch_Invalid;
+	return TypeSwitch_Invalid;
 }
 
 void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
@@ -879,7 +880,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 
 	check_label(c, ss->label); // TODO(bill): What should the label's "scope" be?
 
-	SwitchKind switch_kind = Switch_Invalid;
+	TypeSwitchKind switch_kind = TypeSwitch_Invalid;
 
 	if (ss->tag->kind != AstNode_AssignStmt) {
 		error(ss->tag, "Expected an 'in' assignment for this type switch statement");
@@ -902,7 +903,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 	check_expr(c, &x, rhs);
 	check_assignment(c, &x, nullptr, str_lit("type switch expression"));
 	switch_kind = check_valid_type_switch_type(x.type);
-	if (switch_kind == Switch_Invalid) {
+	if (switch_kind == TypeSwitch_Invalid) {
 		gbString str = type_to_string(x.type);
 		error(x.expr, "Invalid type for this type switch expression, got '%s'", str);
 		gb_string_free(str);
@@ -911,7 +912,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 
 	bool complete = ss->complete;
 	if (complete) {
-		if (switch_kind != Switch_Union) {
+		if (switch_kind != TypeSwitch_Union) {
 			error(node, "#complete switch statement may only be used with a union");
 			complete = false;
 		}
@@ -973,7 +974,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 				Operand y = {};
 				check_expr_or_type(c, &y, type_expr);
 
-				if (switch_kind == Switch_Union) {
+				if (switch_kind == TypeSwitch_Union) {
 					GB_ASSERT(is_type_union(bt));
 					bool tag_type_found = false;
 					for_array(i, bt->Union.variants) {
@@ -990,7 +991,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 						continue;
 					}
 					case_type = y.type;
-				} else if (switch_kind == Switch_Any) {
+				} else if (switch_kind == TypeSwitch_Any) {
 					case_type = y.type;
 				} else {
 					GB_PANIC("Unknown type to type switch statement");
