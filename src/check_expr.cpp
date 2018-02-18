@@ -394,7 +394,7 @@ bool find_or_generate_polymorphic_procedure_from_parameters(Checker *c, Entity *
 
 bool check_type_specialization_to(Checker *c, Type *specialization, Type *type, bool compound, bool modify_type);
 bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool compound, bool modify_type);
-
+bool check_cast_internal(Checker *c, Operand *x, Type *type);
 
 i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 	if (operand->mode == Addressing_Invalid ||
@@ -571,7 +571,15 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		}
 	}
 
-
+	AstNode *expr = unparen_expr(operand->expr);
+	if (expr != nullptr && expr->kind == AstNode_AutoCast) {
+		Operand x = *operand;
+		x.expr = expr->AutoCast.expr;
+		bool ok = check_cast_internal(c, &x, type);
+		if (ok) {
+			return 10;
+		}
+	}
 
 	return -1;
 }
@@ -1797,13 +1805,7 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	return false;
 }
 
-void check_cast(Checker *c, Operand *x, Type *type) {
-	if (!is_operand_value(*x)) {
-		error(x->expr, "'cast' can only be applied to values");
-		x->mode = Addressing_Invalid;
-		return;
-	}
-
+bool check_cast_internal(Checker *c, Operand *x, Type *type) {
 	bool is_const_expr = x->mode == Addressing_Constant;
 	bool can_convert = false;
 
@@ -1811,9 +1813,9 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 	if (is_const_expr && is_type_constant_type(bt)) {
 		if (core_type(bt)->kind == Type_Basic) {
 			if (check_representable_as_constant(c, x->value, bt, &x->value)) {
-				can_convert = true;
+				return true;
 			} else if (is_type_pointer(type) && check_is_castable_to(c, x, type)) {
-				can_convert = true;
+				return true;
 			}
 		}
 	} else if (check_is_castable_to(c, x, type)) {
@@ -1822,8 +1824,21 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 		} else if (is_type_slice(type) && is_type_string(x->type)) {
 			x->mode = Addressing_Value;
 		}
-		can_convert = true;
+		return true;
 	}
+	return false;
+
+}
+
+void check_cast(Checker *c, Operand *x, Type *type) {
+	if (!is_operand_value(*x)) {
+		error(x->expr, "Only values can be casted");
+		x->mode = Addressing_Invalid;
+		return;
+	}
+
+	bool is_const_expr = x->mode == Addressing_Constant;
+	bool can_convert = check_cast_internal(c, x, type);
 
 	if (!can_convert) {
 		gbString expr_str = expr_to_string(x->expr);
@@ -5767,6 +5782,19 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		return Expr_Expr;
 	case_end;
 
+	case_ast_node(ac, AutoCast, node);
+		check_expr_base(c, o, ac->expr, type_hint);
+		if (o->mode == Addressing_Invalid) {
+			o->expr = node;
+			return kind;
+		}
+		if (type_hint) {
+			check_cast(c, o, type_hint);
+		}
+		o->expr = node;
+		return Expr_Expr;
+	case_end;
+
 	case_ast_node(ue, UnaryExpr, node);
 		check_expr_base(c, o, ue->expr, type_hint);
 		if (o->mode == Addressing_Invalid) {
@@ -6215,12 +6243,19 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, ta->type);
 		str = gb_string_append_rune(str, ')');
 	case_end;
-		case_ast_node(tc, TypeCast, node);
+
+	case_ast_node(tc, TypeCast, node);
 		str = string_append_token(str, tc->token);
 		str = gb_string_append_rune(str, '(');
 		str = write_expr_to_string(str, tc->type);
 		str = gb_string_append_rune(str, ')');
 		str = write_expr_to_string(str, tc->expr);
+	case_end;
+
+	case_ast_node(ac, AutoCast, node);
+		str = string_append_token(str, ac->token);
+		str = gb_string_append_rune(str, ' ');
+		str = write_expr_to_string(str, ac->expr);
 	case_end;
 
 	case_ast_node(ie, IndexExpr, node);

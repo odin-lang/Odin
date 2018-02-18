@@ -25,35 +25,36 @@ Token ast_node_token(AstNode *node) {
 			return ast_node_token(node->SelectorExpr.selector);
 		}
 		return node->SelectorExpr.token;
-	case AstNode_IndexExpr:     return node->IndexExpr.open;
-	case AstNode_SliceExpr:     return node->SliceExpr.open;
-	case AstNode_Ellipsis:      return node->Ellipsis.token;
-	case AstNode_FieldValue:    return node->FieldValue.eq;
-	case AstNode_DerefExpr:     return node->DerefExpr.op;
-	case AstNode_TernaryExpr:   return ast_node_token(node->TernaryExpr.cond);
-	case AstNode_TypeAssertion: return ast_node_token(node->TypeAssertion.expr);
-	case AstNode_TypeCast:      return node->TypeCast.token;
+	case AstNode_IndexExpr:          return node->IndexExpr.open;
+	case AstNode_SliceExpr:          return node->SliceExpr.open;
+	case AstNode_Ellipsis:           return node->Ellipsis.token;
+	case AstNode_FieldValue:         return node->FieldValue.eq;
+	case AstNode_DerefExpr:          return node->DerefExpr.op;
+	case AstNode_TernaryExpr:        return ast_node_token(node->TernaryExpr.cond);
+	case AstNode_TypeAssertion:      return ast_node_token(node->TypeAssertion.expr);
+	case AstNode_TypeCast:           return node->TypeCast.token;
+	case AstNode_AutoCast:           return node->AutoCast.token;
 
-	case AstNode_BadStmt:       return node->BadStmt.begin;
-	case AstNode_EmptyStmt:     return node->EmptyStmt.token;
-	case AstNode_ExprStmt:      return ast_node_token(node->ExprStmt.expr);
-	case AstNode_TagStmt:       return node->TagStmt.token;
-	case AstNode_AssignStmt:    return node->AssignStmt.op;
-	case AstNode_IncDecStmt:    return ast_node_token(node->IncDecStmt.expr);
-	case AstNode_BlockStmt:     return node->BlockStmt.open;
-	case AstNode_IfStmt:        return node->IfStmt.token;
-	case AstNode_WhenStmt:      return node->WhenStmt.token;
-	case AstNode_ReturnStmt:    return node->ReturnStmt.token;
-	case AstNode_ForStmt:       return node->ForStmt.token;
-	case AstNode_RangeStmt:     return node->RangeStmt.token;
-	case AstNode_CaseClause:    return node->CaseClause.token;
-	case AstNode_SwitchStmt:     return node->SwitchStmt.token;
-	case AstNode_TypeSwitchStmt: return node->TypeSwitchStmt.token;
-	case AstNode_DeferStmt:     return node->DeferStmt.token;
-	case AstNode_BranchStmt:    return node->BranchStmt.token;
-	case AstNode_UsingStmt:     return node->UsingStmt.token;
-	case AstNode_UsingInStmt:   return node->UsingInStmt.using_token;
-	case AstNode_PushContext:   return node->PushContext.token;
+	case AstNode_BadStmt:            return node->BadStmt.begin;
+	case AstNode_EmptyStmt:          return node->EmptyStmt.token;
+	case AstNode_ExprStmt:           return ast_node_token(node->ExprStmt.expr);
+	case AstNode_TagStmt:            return node->TagStmt.token;
+	case AstNode_AssignStmt:         return node->AssignStmt.op;
+	case AstNode_IncDecStmt:         return ast_node_token(node->IncDecStmt.expr);
+	case AstNode_BlockStmt:          return node->BlockStmt.open;
+	case AstNode_IfStmt:             return node->IfStmt.token;
+	case AstNode_WhenStmt:           return node->WhenStmt.token;
+	case AstNode_ReturnStmt:         return node->ReturnStmt.token;
+	case AstNode_ForStmt:            return node->ForStmt.token;
+	case AstNode_RangeStmt:          return node->RangeStmt.token;
+	case AstNode_CaseClause:         return node->CaseClause.token;
+	case AstNode_SwitchStmt:         return node->SwitchStmt.token;
+	case AstNode_TypeSwitchStmt:     return node->TypeSwitchStmt.token;
+	case AstNode_DeferStmt:          return node->DeferStmt.token;
+	case AstNode_BranchStmt:         return node->BranchStmt.token;
+	case AstNode_UsingStmt:          return node->UsingStmt.token;
+	case AstNode_UsingInStmt:        return node->UsingInStmt.using_token;
+	case AstNode_PushContext:        return node->PushContext.token;
 
 	case AstNode_BadDecl:            return node->BadDecl.begin;
 	case AstNode_Label:              return node->Label.token;
@@ -631,6 +632,12 @@ AstNode *ast_type_cast(AstFile *f, Token token, AstNode *type, AstNode *expr) {
 	result->TypeCast.token = token;
 	result->TypeCast.type  = type;
 	result->TypeCast.expr  = expr;
+	return result;
+}
+AstNode *ast_auto_cast(AstFile *f, Token token, AstNode *expr) {
+	AstNode *result = make_ast_node(f, AstNode_AutoCast);
+	result->AutoCast.token = token;
+	result->AutoCast.expr  = expr;
 	return result;
 }
 
@@ -2195,6 +2202,13 @@ AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 		AstNode *expr = parse_unary_expr(f, lhs);
 		return ast_type_cast(f, token, type, expr);
 	}
+
+	case Token_auto_cast: {
+		Token token = advance_token(f);
+		AstNode *expr = parse_unary_expr(f, lhs);
+		return ast_auto_cast(f, token, expr);
+	}
+
 	case Token_Add:
 	case Token_Sub:
 	case Token_Not:

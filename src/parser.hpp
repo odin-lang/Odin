@@ -220,6 +220,7 @@ AST_NODE_KIND(_ExprBegin,  "",  struct {}) \
 	AST_NODE_KIND(TernaryExpr,   "ternary expression",  struct { AstNode *cond, *x, *y; }) \
 	AST_NODE_KIND(TypeAssertion, "type assertion",      struct { AstNode *expr; Token dot; AstNode *type; }) \
 	AST_NODE_KIND(TypeCast,      "type cast",           struct { Token token; AstNode *type, *expr; }) \
+	AST_NODE_KIND(AutoCast,      "auto_cast",           struct { Token token; AstNode *expr; }) \
 AST_NODE_KIND(_ExprEnd,       "", struct {}) \
 AST_NODE_KIND(_StmtBegin,     "", struct {}) \
 	AST_NODE_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
