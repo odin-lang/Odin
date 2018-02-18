@@ -1946,7 +1946,8 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		case Addressing_Type: {
 			*type = o.type;
 			if (!c->context.in_polymorphic_specialization) {
-				if (is_type_polymorphic_struct_unspecialized(o.type)) {
+				Type *t = base_type(o.type);
+				if (t != nullptr && is_type_polymorphic_struct_unspecialized(t)) {
 					err_str = expr_to_string(e);
 					error(e, "Invalid use of a non-specialized polymorphic type '%s'", err_str);
 				}
