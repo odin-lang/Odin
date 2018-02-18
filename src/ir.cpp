@@ -4979,6 +4979,10 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 		GB_PANIC("Invalid AST TypeCast");
 	case_end;
 
+	case_ast_node(ac, AutoCast, expr);
+		return ir_build_expr(proc, ac->expr);
+	case_end;
+
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
 		case Token_And: {
@@ -6051,6 +6055,10 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		irValue *v = ir_add_local_generated(proc, type);
 		ir_emit_store(proc, v, e);
 		return ir_addr(v);
+	case_end;
+
+	case_ast_node(ac, AutoCast, expr);
+		return ir_build_addr(proc, ac->expr);
 	case_end;
 	}
 

@@ -243,6 +243,7 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
 	named->Named.base = base_type(bt);
 	if (!is_distinct) {
 		e->type = bt;
+		named->Named.base = bt;
 		e->TypeName.is_type_alias = true;
 	}
 	// if (is_alias) {

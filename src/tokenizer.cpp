@@ -108,6 +108,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_map,                    "map"),                    \
 	TOKEN_KIND(Token_static,                 "static"),                 \
 	TOKEN_KIND(Token_dynamic,                "dynamic"),                \
+	TOKEN_KIND(Token_auto_cast,              "auto_cast"),              \
 	TOKEN_KIND(Token_cast,                   "cast"),                   \
 	TOKEN_KIND(Token_transmute,              "transmute"),              \
 	TOKEN_KIND(Token_distinct,               "distinct"),               \
