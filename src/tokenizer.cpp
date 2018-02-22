@@ -3,16 +3,16 @@
 	TOKEN_KIND(Token_EOF,     "EOF"), \
 	TOKEN_KIND(Token_Comment, "Comment"), \
 \
-TOKEN_KIND(Token__LiteralBegin, "_LiteralBegin"), \
+TOKEN_KIND(Token__LiteralBegin, ""), \
 	TOKEN_KIND(Token_Ident,     "identifier"), \
 	TOKEN_KIND(Token_Integer,   "integer"), \
 	TOKEN_KIND(Token_Float,     "float"), \
 	TOKEN_KIND(Token_Imag,      "imaginary"), \
 	TOKEN_KIND(Token_Rune,      "rune"), \
 	TOKEN_KIND(Token_String,    "string"), \
-TOKEN_KIND(Token__LiteralEnd,   "_LiteralEnd"), \
+TOKEN_KIND(Token__LiteralEnd,   ""), \
 \
-TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
+TOKEN_KIND(Token__OperatorBegin, ""), \
 	TOKEN_KIND(Token_Eq,       "="), \
 	TOKEN_KIND(Token_Not,      "!"), \
 	TOKEN_KIND(Token_Hash,     "#"), \
@@ -36,7 +36,7 @@ TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
 	TOKEN_KIND(Token_CmpAnd, "&&"), \
 	TOKEN_KIND(Token_CmpOr,  "||"), \
 \
-TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
+TOKEN_KIND(Token__AssignOpBegin, ""), \
 	TOKEN_KIND(Token_AddEq,    "+="), \
 	TOKEN_KIND(Token_SubEq,    "-="), \
 	TOKEN_KIND(Token_MulEq,    "*="), \
@@ -51,20 +51,20 @@ TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 	TOKEN_KIND(Token_ShrEq,    ">>="), \
 	TOKEN_KIND(Token_CmpAndEq, "&&="), \
 	TOKEN_KIND(Token_CmpOrEq,  "||="), \
-TOKEN_KIND(Token__AssignOpEnd, "_AssignOpEnd"), \
+TOKEN_KIND(Token__AssignOpEnd, ""), \
 	TOKEN_KIND(Token_ArrowRight,       "->"), \
 	TOKEN_KIND(Token_ArrowLeft,        "<-"), \
 	TOKEN_KIND(Token_DoubleArrowRight, "=>"), \
 	TOKEN_KIND(Token_Undef,            "---"), \
 \
-TOKEN_KIND(Token__ComparisonBegin, "_ComparisonBegin"), \
+TOKEN_KIND(Token__ComparisonBegin, ""), \
 	TOKEN_KIND(Token_CmpEq, "=="), \
 	TOKEN_KIND(Token_NotEq, "!="), \
 	TOKEN_KIND(Token_Lt,    "<"), \
 	TOKEN_KIND(Token_Gt,    ">"), \
 	TOKEN_KIND(Token_LtEq,  "<="), \
 	TOKEN_KIND(Token_GtEq,  ">="), \
-TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
+TOKEN_KIND(Token__ComparisonEnd, ""), \
 \
 	TOKEN_KIND(Token_OpenParen,     "("),   \
 	TOKEN_KIND(Token_CloseParen,    ")"),   \
@@ -79,9 +79,9 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 	TOKEN_KIND(Token_Ellipsis,      "..."), \
 	TOKEN_KIND(Token_HalfClosed,    ".."),  \
 	TOKEN_KIND(Token_BackSlash,     "\\"),  \
-TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
+TOKEN_KIND(Token__OperatorEnd, ""), \
 \
-TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
+TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_import,                 "import"),                 \
 	TOKEN_KIND(Token_export,                 "export"),                 \
 	TOKEN_KIND(Token_foreign,                "foreign"),                \
@@ -125,7 +125,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_asm,                    "asm"),                    \
 	TOKEN_KIND(Token_yield,                  "yield"),                  \
 	TOKEN_KIND(Token_await,                  "await"),                  \
-TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \
+TOKEN_KIND(Token__KeywordEnd, ""), \
 	TOKEN_KIND(Token_Count, "")
 
 enum TokenKind {

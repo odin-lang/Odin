@@ -1123,19 +1123,21 @@ void add_dependency_to_map(PtrSet<Entity *> *map, CheckerInfo *info, Entity *ent
 		add_dependency_to_map(map, info, e);
 		if (e->kind == Entity_Procedure && e->Procedure.is_foreign) {
 			Entity *fl = e->Procedure.foreign_library;
-			GB_ASSERT_MSG(fl != nullptr &&
-			              fl->kind == Entity_LibraryName &&
-			              fl->LibraryName.used,
-			              "%.*s", LIT(name));
-			add_dependency_to_map(map, info, fl);
+			if (fl != nullptr) {
+				GB_ASSERT_MSG(fl->kind == Entity_LibraryName &&
+				              fl->LibraryName.used,
+				              "%.*s", LIT(name));
+				add_dependency_to_map(map, info, fl);
+			}
 		}
 		if (e->kind == Entity_Variable && e->Variable.is_foreign) {
 			Entity *fl = e->Variable.foreign_library;
-			GB_ASSERT_MSG(fl != nullptr &&
-			              fl->kind == Entity_LibraryName &&
-			              fl->LibraryName.used,
-			              "%.*s", LIT(name));
-			add_dependency_to_map(map, info, fl);
+			if (fl != nullptr) {
+				GB_ASSERT_MSG(fl->kind == Entity_LibraryName &&
+				              fl->LibraryName.used,
+				              "%.*s", LIT(name));
+				add_dependency_to_map(map, info, fl);
+			}
 		}
 	}
 }
