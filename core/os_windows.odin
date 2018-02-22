@@ -262,53 +262,24 @@ current_thread_id :: proc() -> int {
 
 
 _alloc_command_line_arguments :: proc() -> []string {
-	alloc_ucs2_to_utf8 :: proc(wstr: ^u16) -> string {
-		wstr_len := 0;
-		for (wstr+wstr_len)^ != 0 do wstr_len += 1;
+    arg_count: i32;
+    arg_list_ptr := win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
+    arg_list := make([]string, int(arg_count));
+    for _, i in arg_list {
+        wc_str := (arg_list_ptr+i)^;
+        olen := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, wc_str, -1,
+                                              nil, 0, nil, nil);
 
-		len := 2*wstr_len-1;
-		buf := make([]byte, len+1);
-		str := mem.slice_ptr(wstr, wstr_len+1);
+        buf := make([]byte, olen);
+       	n := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, wc_str, -1,
+       	                                   &buf[0], olen, nil, nil);
+       	if n > 0 {
+       		n -= 1;
+       	}
+        arg_list[i] = string(buf[..n]);
+    }
 
-		i, j := 0, 0;
-		for str[j] != 0 {
-			switch {
-			case str[j] < 0x80:
-				if i+1 > len do return "";
-				buf[i] = byte(str[j]); i += 1;
-				j += 1;
-			case str[j] < 0x800:
-				if i+2 > len do return "";
-				buf[i] = byte(0xc0 + (str[j]>>6));   i += 1;
-				buf[i] = byte(0x80 + (str[j]&0x3f)); i += 1;
-				j += 1;
-			case 0xd800 <= str[j] && str[j] < 0xdc00:
-				if i+4 > len do return "";
-			c := rune((str[j] - 0xd800) << 10) + rune((str[j+1]) - 0xdc00) + 0x10000;
-				buf[i] = byte(0xf0 +  (c >> 18));         i += 1;
-				buf[i] = byte(0x80 + ((c >> 12) & 0x3f)); i += 1;
-				buf[i] = byte(0x80 + ((c >>  6) & 0x3f)); i += 1;
-				buf[i] = byte(0x80 + ((c      ) & 0x3f)); i += 1;
-				j += 2;
-			case 0xdc00 <= str[j] && str[j] < 0xe000:
-				return "";
-			case:
-				if i+3 > len do return "";
-				buf[i] = 0xe0 + byte (str[j] >> 12);         i += 1;
-				buf[i] = 0x80 + byte((str[j] >>  6) & 0x3f); i += 1;
-				buf[i] = 0x80 + byte((str[j]      ) & 0x3f); i += 1;
-				j += 1;
-			}
-		}
-
-		return string(buf[..i]);
-	}
-
-	arg_count: i32;
-	arg_list_ptr := win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
-	arg_list := make([]string, int(arg_count));
-	for _, i in arg_list do arg_list[i] = alloc_ucs2_to_utf8((arg_list_ptr+i)^);
-	return arg_list;
+    return arg_list;
 }
 
 
