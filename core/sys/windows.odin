@@ -626,6 +626,10 @@ foreign kernel32 {
 	@(link_name="HeapFree")       heap_free        :: proc(h: Handle, flags: u32, memory: rawptr) -> Bool ---;
 	@(link_name="GetProcessHeap") get_process_heap :: proc() -> Handle ---;
 
+	@(link_name="LocalAlloc")     local_alloc      :: proc(flags: u32, bytes: int) -> rawptr ---;
+	@(link_name="LocalReAlloc")   local_realloc    :: proc(mem: rawptr, bytes: int, flags: uint) -> rawptr ---;
+	@(link_name="LocalFree")      local_free       :: proc(mem: rawptr) -> rawptr ---;
+
 	@(link_name="FindFirstChangeNotificationA") find_first_change_notification_a :: proc(path: ^byte, watch_subtree: Bool, filter: u32) -> Handle ---;
 	@(link_name="FindNextChangeNotification")   find_next_change_notification    :: proc(h: Handle) -> Bool ---;
 	@(link_name="FindCloseChangeNotification")  find_close_change_notification   :: proc(h: Handle) -> Bool ---;
