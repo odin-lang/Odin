@@ -42,6 +42,10 @@ ptr_to_bytes :: proc "contextless" (ptr: ^$T, len := 1) -> []byte {
     return transmute([]byte)raw.Slice{ptr, len*size_of(T)};
 }
 
+any_to_bytes :: proc "contextless" (val: any) -> []byte {
+	return transmute([]byte)raw.Slice{val.data, val.type_info.size};
+}
+
 
 kilobytes :: inline proc "contextless" (x: int) -> int do return          (x) * 1024;
 megabytes :: inline proc "contextless" (x: int) -> int do return kilobytes(x) * 1024;
