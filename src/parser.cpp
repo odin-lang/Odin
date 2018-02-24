@@ -1358,6 +1358,7 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 			switch (f->curr_token.kind) {
 			case Token_CloseBrace:
 			case Token_CloseParen:
+			case Token_else:
 				return;
 			}
 		}
@@ -3175,7 +3176,7 @@ AstNode *parse_when_stmt(AstFile *f) {
 			break;
 		case Token_do: {
 			Token arrow = expect_token(f, Token_do);
-			body = convert_stmt_to_body(f, parse_stmt(f));
+			else_stmt = convert_stmt_to_body(f, parse_stmt(f));
 		} break;
 		default:
 			syntax_error(f->curr_token, "Expected when statement block statement");
@@ -3183,11 +3184,6 @@ AstNode *parse_when_stmt(AstFile *f) {
 			break;
 		}
 	}
-
-	// if (f->curr_proc == nullptr && f->when_level > 1) {
-	// 	syntax_error(token, "Nested when statements are not currently supported at the file scope");
-	// 	return ast_bad_stmt(f, token, f->curr_token);
-	// }
 
 	return ast_when_stmt(f, token, cond, body, else_stmt);
 }
