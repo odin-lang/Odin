@@ -90,8 +90,6 @@ enum BuiltinProcId {
 	BuiltinProc_type_of,
 	BuiltinProc_type_info_of,
 
-	BuiltinProc_compile_assert,
-
 	BuiltinProc_swizzle,
 
 	BuiltinProc_complex,
@@ -133,8 +131,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("offset_of"),        2, false, Expr_Expr},
 	{STR_LIT("type_of"),          1, false, Expr_Expr},
 	{STR_LIT("type_info_of"),     1, false, Expr_Expr},
-
-	{STR_LIT("compile_assert"),   1, false, Expr_Expr},
 
 	{STR_LIT("swizzle"),          1, true,  Expr_Expr},
 
@@ -221,6 +217,7 @@ struct Scope {
 
 	Array<Scope *>   shared;
 	Array<AstNode *> delayed_file_decls;
+	Array<AstNode *> delayed_asserts;
 	PtrSet<Scope *>  imported;
 	PtrSet<Scope *>  exported; // NOTE(bhall): Contains 'using import' too
 	bool             is_proc;

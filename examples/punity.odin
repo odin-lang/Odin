@@ -10,7 +10,7 @@ CANVAS_SCALE  :: 3;
 FRAME_TIME    :: 1.0/30.0;
 WINDOW_TITLE  :: "Punity\x00";
 
-_ :: compile_assert(CANVAS_WIDTH % 16 == 0);
+#assert(CANVAS_WIDTH % 16 == 0);
 
 
 WINDOW_WIDTH  :: CANVAS_WIDTH  * CANVAS_SCALE;

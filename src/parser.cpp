@@ -1659,6 +1659,9 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		} else if (name.string == "location") {
 			AstNode *tag = ast_basic_directive(f, token, name.string);
 			return parse_call_expr(f, tag);
+		} else if (name.string == "assert") {
+			AstNode *tag = ast_basic_directive(f, token, name.string);
+			return parse_call_expr(f, tag);
 		} else {
 			operand = ast_tag_expr(f, token, name, parse_expr(f, false));
 		}
@@ -3735,6 +3738,9 @@ AstNode *parse_stmt(AstFile *f) {
 				break;
 			}
 			return s;
+		} else if (tag == "assert") {
+			AstNode *t = ast_basic_directive(f, hash_token, tag);
+			return parse_call_expr(f, t);
 		}
 
 		if (tag == "include") {
@@ -4058,6 +4064,14 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 		    node->kind != AstNode_EmptyStmt &&
 		    node->kind != AstNode_WhenStmt) {
 			// NOTE(bill): Sanity check
+
+			if (node->kind == AstNode_CallExpr &&
+			    node->CallExpr.proc->kind == AstNode_BasicDirective &&
+			    node->CallExpr.proc->BasicDirective.name == "assert") {
+				// NOTE(bill): Okay!
+				continue;
+			}
+
 			syntax_error(node, "Only declarations are allowed at file scope, got %.*s", LIT(ast_node_strings[node->kind]));
 		} else if (node->kind == AstNode_ImportDecl) {
 			ast_node(id, ImportDecl, node);

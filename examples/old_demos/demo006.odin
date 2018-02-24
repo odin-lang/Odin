@@ -24,7 +24,7 @@ when true {
 	 * ..< and ... removed and replace with .. (half-closed range)
 
 	Changed:
-	 * `compile_assert` and `assert` return the value of the condition for semantic reasons
+	 * `#assert` and `assert` return the value of the condition for semantic reasons
 	 * thread_local -> #thread_local
 	 * #include -> #load
 	 * Files only get checked if they are actually used
@@ -159,8 +159,8 @@ when true {
 			fmt.println(i);
 		}
 
-		compile_assert(size_of([vector 7]bool) >= size_of([7]bool));
-		compile_assert(size_of([vector 7]i32) >= size_of([7]i32));
+		#assert(size_of([vector 7]bool) >= size_of([7]bool));
+		#assert(size_of([vector 7]i32) >= size_of([7]i32));
 		// align_of([vector 7]i32) != align_of([7]i32) // this may be the case
 	}
 

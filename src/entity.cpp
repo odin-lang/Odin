@@ -303,8 +303,6 @@ Entity *make_entity_label(gbAllocator a, Scope *scope, Token token, Type *type,
 	return entity;
 }
 
-
-
 Entity *make_entity_dummy_variable(gbAllocator a, Scope *scope, Token token) {
 	token.string = str_lit("_");
 	return make_entity_variable(a, scope, token, nullptr, false);
