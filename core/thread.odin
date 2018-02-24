@@ -1,4 +1,4 @@
-_ :: compile_assert(ODIN_OS == "windows");
+#assert(ODIN_OS == "windows");
 
 when ODIN_OS == "windows" {
 	import win32 "core:sys/windows.odin"

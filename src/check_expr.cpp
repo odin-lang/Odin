@@ -2813,27 +2813,48 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	case BuiltinProc_DIRECTIVE: {
 		ast_node(bd, BasicDirective, ce->proc);
 		String name = bd->name;
-		GB_ASSERT(name == "location");
-		if (ce->args.count > 1) {
-			error(ce->args[0], "'#location' expects either 0 or 1 arguments, got %td", ce->args.count);
-		}
-		if (ce->args.count > 0) {
-			AstNode *arg = ce->args[0];
-			Entity *e = nullptr;
-			Operand o = {};
-			if (arg->kind == AstNode_Ident) {
-				e = check_ident(c, &o, arg, nullptr, nullptr, true);
-			} else if (arg->kind == AstNode_SelectorExpr) {
-				e = check_selector(c, &o, arg, nullptr);
+		if (name == "location") {
+			if (ce->args.count > 1) {
+				error(ce->args[0], "'#location' expects either 0 or 1 arguments, got %td", ce->args.count);
 			}
-			if (e == nullptr) {
-				error(ce->args[0], "'#location' expected a valid entity name");
+			if (ce->args.count > 0) {
+				AstNode *arg = ce->args[0];
+				Entity *e = nullptr;
+				Operand o = {};
+				if (arg->kind == AstNode_Ident) {
+					e = check_ident(c, &o, arg, nullptr, nullptr, true);
+				} else if (arg->kind == AstNode_SelectorExpr) {
+					e = check_selector(c, &o, arg, nullptr);
+				}
+				if (e == nullptr) {
+					error(ce->args[0], "'#location' expected a valid entity name");
+				}
 			}
+
+			operand->type = t_source_code_location;
+			operand->mode = Addressing_Value;
+		} else if (name == "assert") {
+			if (ce->args.count != 1) {
+				error(call, "'#assert' expects at 1 argument, got %td", ce->args.count);
+				return false;
+			}
+			if (!is_type_boolean(operand->type) && operand->mode != Addressing_Constant) {
+				gbString str = expr_to_string(ce->args[0]);
+				error(call, "'%s' is not a constant boolean", str);
+				gb_string_free(str);
+				return false;
+			}
+			if (!operand->value.value_bool) {
+				gbString arg = expr_to_string(ce->args[0]);
+				error(call, "Compile time assertion: %s", arg);
+				gb_string_free(arg);
+			}
+
+			operand->type = t_untyped_bool;
+			operand->mode = Addressing_Constant;
+		} else {
+			GB_PANIC("Unhandled #%.*s", LIT(name));
 		}
-
-
-		operand->type = t_source_code_location;
-		operand->mode = Addressing_Value;
 
 		break;
 	}
@@ -3320,25 +3341,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		break;
 	}
-
-	case BuiltinProc_compile_assert:
-		// proc compile_assert(cond: bool) -> bool
-
-		if (!is_type_boolean(operand->type) && operand->mode != Addressing_Constant) {
-			gbString str = expr_to_string(ce->args[0]);
-			error(call, "'%s' is not a constant boolean", str);
-			gb_string_free(str);
-			return false;
-		}
-		if (!operand->value.value_bool) {
-			gbString str = expr_to_string(ce->args[0]);
-			error(call, "Compile time assertion: '%s'", str);
-			gb_string_free(str);
-		}
-
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
 
 	case BuiltinProc_swizzle: {
 		// proc swizzle(v: [N]T, ...int) -> [M]T
@@ -4805,12 +4807,15 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	    ce->proc->kind == AstNode_BasicDirective) {
 		ast_node(bd, BasicDirective, ce->proc);
 		String name = bd->name;
-		GB_ASSERT(name == "location");
-		operand->mode = Addressing_Builtin;
-		operand->builtin_id = BuiltinProc_DIRECTIVE;
-		operand->expr = ce->proc;
-		operand->type = t_invalid;
-		add_type_and_value(&c->info, ce->proc, operand->mode, operand->type, operand->value);
+		if (name == "location" || name == "assert") {
+			operand->mode = Addressing_Builtin;
+			operand->builtin_id = BuiltinProc_DIRECTIVE;
+			operand->expr = ce->proc;
+			operand->type = t_invalid;
+			add_type_and_value(&c->info, ce->proc, operand->mode, operand->type, operand->value);
+		} else {
+			GB_PANIC("Unhandled #%.*s", LIT(name));
+		}
 	} else {
 		check_expr_or_type(c, operand, ce->proc);
 	}

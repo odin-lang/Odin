@@ -4,7 +4,7 @@
 when ODIN_OS == "windows" {
 	import win32 "core:sys/windows.odin"
 }
-_ :: compile_assert(ODIN_ARCH == "amd64"); // TODO(bill): x86 version
+#assert(ODIN_ARCH == "amd64"); // TODO(bill): x86 version
 
 
 yield_thread :: proc() { win32.mm_pause(); }

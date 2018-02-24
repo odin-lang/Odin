@@ -171,8 +171,8 @@ new_builtins :: proc() {
 	{
 		// Compile time assert
 		COND :: true;
-		compile_assert(COND);
-		// compile_assert(!COND)
+		#assert(COND);
+		// #assert(!COND)
 
 		// Runtime assert
 		x := true;

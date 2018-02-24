@@ -328,7 +328,7 @@ miscellany :: proc() {
 	*/
 
 	// assert(false)
-	// compile_assert(false)
+	// #assert(false)
 	// panic("Panic message goes here")
 }
 

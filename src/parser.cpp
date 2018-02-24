@@ -1358,6 +1358,7 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 			switch (f->curr_token.kind) {
 			case Token_CloseBrace:
 			case Token_CloseParen:
+			case Token_else:
 				return;
 			}
 		}
@@ -1656,6 +1657,9 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		} else if (name.string == "procedure") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "caller_location") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "location") {
+			AstNode *tag = ast_basic_directive(f, token, name.string);
+			return parse_call_expr(f, tag);
+		} else if (name.string == "assert") {
 			AstNode *tag = ast_basic_directive(f, token, name.string);
 			return parse_call_expr(f, tag);
 		} else {
@@ -3175,7 +3179,7 @@ AstNode *parse_when_stmt(AstFile *f) {
 			break;
 		case Token_do: {
 			Token arrow = expect_token(f, Token_do);
-			body = convert_stmt_to_body(f, parse_stmt(f));
+			else_stmt = convert_stmt_to_body(f, parse_stmt(f));
 		} break;
 		default:
 			syntax_error(f->curr_token, "Expected when statement block statement");
@@ -3183,11 +3187,6 @@ AstNode *parse_when_stmt(AstFile *f) {
 			break;
 		}
 	}
-
-	// if (f->curr_proc == nullptr && f->when_level > 1) {
-	// 	syntax_error(token, "Nested when statements are not currently supported at the file scope");
-	// 	return ast_bad_stmt(f, token, f->curr_token);
-	// }
 
 	return ast_when_stmt(f, token, cond, body, else_stmt);
 }
@@ -3739,6 +3738,9 @@ AstNode *parse_stmt(AstFile *f) {
 				break;
 			}
 			return s;
+		} else if (tag == "assert") {
+			AstNode *t = ast_basic_directive(f, hash_token, tag);
+			return parse_call_expr(f, t);
 		}
 
 		if (tag == "include") {
@@ -4062,6 +4064,14 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 		    node->kind != AstNode_EmptyStmt &&
 		    node->kind != AstNode_WhenStmt) {
 			// NOTE(bill): Sanity check
+
+			if (node->kind == AstNode_CallExpr &&
+			    node->CallExpr.proc->kind == AstNode_BasicDirective &&
+			    node->CallExpr.proc->BasicDirective.name == "assert") {
+				// NOTE(bill): Okay!
+				continue;
+			}
+
 			syntax_error(node, "Only declarations are allowed at file scope, got %.*s", LIT(ast_node_strings[node->kind]));
 		} else if (node->kind == AstNode_ImportDecl) {
 			ast_node(id, ImportDecl, node);

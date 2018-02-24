@@ -46,7 +46,7 @@ memory_copy :: proc(dst, src: rawptr, n: int) #inline {
 	}
 
 	v128b :: type {4}u32
-	compile_assert(align_of(v128b) == 16)
+	#assert(align_of(v128b) == 16)
 
 	d, s: ^byte = dst, src
 
