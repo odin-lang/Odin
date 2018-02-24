@@ -43,7 +43,7 @@ syntax :: proc() {
 	Thing2 :: struct {x: f32, y: int, z: ^[]int};
 
 	// Slice interals are now just a `ptr+len+cap`
-	slice: []int; compile_assert(size_of(slice) == 3*size_of(int));
+	slice: []int; #assert(size_of(slice) == 3*size_of(int));
 
 	// Helper type - Help the reader understand what it is quicker
 	My_Int  :: #type int;
@@ -218,7 +218,7 @@ loops :: proc() {
 	name := "你好，世界";
 	fmt.println(name);
 	for r in name {
-		compile_assert(type_of(r) == rune);
+		#assert(type_of(r) == rune);
 		fmt.printf("%r\n", r);
 	}
 

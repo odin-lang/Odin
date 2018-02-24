@@ -101,13 +101,13 @@ general_stuff :: proc() {
 		// If the type expression is `struct`, `union`, `enum`, `proc`, or `bit_field`, the types will always been distinct.
 
 		Int32 :: i32;
-		compile_assert(Int32 == i32);
+		#assert(Int32 == i32);
 
 		My_Int32 :: distinct i32;
-		compile_assert(My_Int32 != i32);
+		#assert(My_Int32 != i32);
 
 		My_Struct :: struct{x: int};
-		compile_assert(My_Struct != struct{x: int});
+		#assert(My_Struct != struct{x: int});
 	}
 }
 
@@ -759,6 +759,7 @@ complete_switch :: proc() {
 		}
 	}
 }
+
 
 main :: proc() {
 	when true {
