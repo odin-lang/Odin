@@ -50,9 +50,9 @@ general_stuff :: proc() {
 	foo := Foo{123, 0.513, "A string"};
 	x, y, z := expand_to_tuple(foo);
 	fmt.println(x, y, z);
-	compile_assert(type_of(x) == int);
-	compile_assert(type_of(y) == f32);
-	compile_assert(type_of(z) == string);
+	#assert(type_of(x) == int);
+	#assert(type_of(y) == f32);
+	#assert(type_of(z) == string);
 
 
 	// By default, all variables are zeroed

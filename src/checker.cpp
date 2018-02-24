@@ -1,6 +1,8 @@
 #include "entity.cpp"
 #include "types.cpp"
 
+void check_expr(Checker *c, Operand *operand, AstNode *expression);
+
 
 bool is_operand_value(Operand o) {
 	switch (o.mode) {
@@ -272,6 +274,7 @@ void destroy_scope(Scope *scope) {
 	map_destroy(&scope->elements);
 	array_free(&scope->shared);
 	array_free(&scope->delayed_file_decls);
+	array_free(&scope->delayed_asserts);
 	ptr_set_destroy(&scope->implicit);
 	ptr_set_destroy(&scope->imported);
 	ptr_set_destroy(&scope->exported);
@@ -443,6 +446,7 @@ GB_COMPARE_PROC(entity_variable_pos_cmp) {
 
 	return token_pos_cmp(x->token.pos, y->token.pos);
 }
+
 
 void check_scope_usage(Checker *c, Scope *scope) {
 	// TODO(bill): Use this?
@@ -2676,6 +2680,14 @@ bool collect_file_decls(Checker *c, Array<AstNode *> decls) {
 				if (collect_file_decls_from_when_stmt(c, ws)) {
 					return true;
 				}
+			}
+		case_end;
+
+		case_ast_node(ce, CallExpr, decl);
+			if (ce->proc->kind == AstNode_BasicDirective &&
+			    ce->proc->BasicDirective.name == "assert") {
+				Operand o = {};
+				check_expr(c, &o, decl);
 			}
 		case_end;
 		}

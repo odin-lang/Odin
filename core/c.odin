@@ -29,7 +29,7 @@ c_double         :: f64;
 c_complex_float  :: complex64;
 c_complex_double :: complex128;
 
-_ :: compile_assert(size_of(uintptr) == size_of(int));
+#assert(size_of(uintptr) == size_of(int));
 
 c_size_t    :: uint;
 c_ssize_t   :: int;
