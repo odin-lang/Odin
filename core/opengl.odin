@@ -8,7 +8,7 @@ when ODIN_OS == "windows" {
 
 export "core:opengl_constants.odin"
 
-(ODIN_OS != "osx");
+#assert(ODIN_OS != "osx");
 
 @(default_calling_convention="c", link_prefix="gl")
 foreign lib {
