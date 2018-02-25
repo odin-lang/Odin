@@ -1159,11 +1159,11 @@ __default_hash :: proc(data: []byte) -> u64 {
 }
 __default_hash_string :: proc(s: string) -> u64 do return __default_hash(cast([]byte)s);
 
-__dynamic_map_reserve :: proc(using header: __Map_Header, cap: int, loc := #caller_location)  {
+__dynamic_map_reserve :: proc(using header: __Map_Header, cap: int, loc := #caller_location) {
 	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap, loc);
 	__dynamic_array_reserve(&m.entries, entry_size, entry_align,    cap, loc);
 }
-__dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int, loc := #caller_location) {
+__dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int, loc := #caller_location) #no_bounds_check {
 	new_header: __Map_Header = header;
 	nm: raw.Map;
 	new_header.m = &nm;
@@ -1211,7 +1211,7 @@ __dynamic_map_get :: proc(h: __Map_Header, key: __Map_Key) -> rawptr {
 	return nil;
 }
 
-__dynamic_map_set :: proc(h: __Map_Header, key: __Map_Key, value: rawptr, loc := #caller_location) {
+__dynamic_map_set :: proc(h: __Map_Header, key: __Map_Key, value: rawptr, loc := #caller_location) #no_bounds_check {
 
 	index: int;
 	assert(value != nil);
@@ -1265,7 +1265,7 @@ __dynamic_map_hash_equal :: proc(h: __Map_Header, a, b: __Map_Key) -> bool {
 	return false;
 }
 
-__dynamic_map_find :: proc(using h: __Map_Header, key: __Map_Key) -> __Map_Find_Result {
+__dynamic_map_find :: proc(using h: __Map_Header, key: __Map_Key) -> __Map_Find_Result #no_bounds_check {
 	fr := __Map_Find_Result{-1, -1, -1};
 	if len(m.hashes) > 0 {
 		fr.hash_index = int(key.hash % u64(len(m.hashes)));
@@ -1303,7 +1303,7 @@ __dynamic_map_get_entry :: proc(using h: __Map_Header, index: int) -> ^__Map_Ent
 	return cast(^__Map_Entry_Header)(uintptr(m.entries.data) + uintptr(index*entry_size));
 }
 
-__dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
+__dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) #no_bounds_check {
 	if fr.entry_prev < 0 {
 		m.hashes[fr.hash_index] = __dynamic_map_get_entry(h, fr.entry_index).next;
 	} else {
