@@ -278,7 +278,7 @@ f64 u128_to_f64(u128 a) {
 	return -((cast(f64)h * 18446744073709551616.0) + cast(f64)l);
 }
 i128 u128_to_i128(u128 a) {
-	return *cast(i128 *)&a;
+	return bit_cast<i128>(a);
 }
 
 
@@ -306,7 +306,7 @@ f64 i128_to_f64(i128 a) {
 	return -((cast(f64)h * 18446744073709551616.0) + cast(f64)l);
 }
 u128 i128_to_u128(i128 a) {
-	return *cast(u128 *)&a;
+	return bit_cast<u128>(a);
 }
 
 
@@ -335,7 +335,7 @@ String i128_to_string(i128 a, char *out_buf, isize out_buf_len) {
 		a = i128_neg(a);
 	}
 
-	u128 v = *cast(u128 *)&a;
+	u128 v = bit_cast<u128>(a);
 	u128 b = u128_from_u64(10);;
 	while (u128_ge(v, b)) {
 		buf[--i] = gb__num_to_char_table[u128_to_i64(u128_mod(v, b))];
@@ -692,9 +692,9 @@ void i128_divide(i128 a, i128 b, i128 *quo_, i128 *rem_) {
 		irem = i128_from_i64(r);
 	} else if (a.hi > 0 || b.hi > 0) {
 		u128 q, r = {0};
-		u128_divide(*cast(u128 *)&a, *cast(u128 *)&b, &q, &r);
-		iquo = *cast(i128 *)&q;
-		irem = *cast(i128 *)&r;
+		u128_divide(bit_cast<u128>(a), bit_cast<u128>(b), &q, &r);
+		iquo = bit_cast<i128>(q);
+		irem = bit_cast<i128>(r);
 	} else if (i128_eq(b, I128_ZERO)) {
 		iquo = i128_from_u64(a.lo/b.lo);
 	} else {

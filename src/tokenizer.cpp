@@ -254,7 +254,7 @@ void syntax_error_va(Token token, char *fmt, va_list va) {
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
 		              gb_bprintf_va(fmt, va));
 	} else if (token.pos.line == 0) {
-		gb_printf_err("Error: %s\n", gb_bprintf_va(fmt, va));
+		gb_printf_err("Syntax Error: %s\n", gb_bprintf_va(fmt, va));
 	}
 
 	gb_mutex_unlock(&global_error_collector.mutex);
@@ -401,14 +401,14 @@ void tokenizer_err(Tokenizer *t, char *msg, ...) {
 	if (column < 1) {
 		column = 1;
 	}
-
-	gb_printf_err("%.*s(%td:%td) Syntax error: ", LIT(t->fullpath), t->line_count, column);
+	Token token = {};
+	token.pos.file = t->fullpath;
+	token.pos.line = t->line_count;
+	token.pos.column = column;
 
 	va_start(va, msg);
-	gb_printf_err_va(msg, va);
+	syntax_error_va(token, msg, va);
 	va_end(va);
-
-	gb_printf_err("\n");
 
 	t->error_count++;
 }
@@ -577,14 +577,32 @@ Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
 			}
-		} /* else if (t->curr_rune == 'h') { // Hexadecimal Float
+		} else if (t->curr_rune == 'h') { // Hexadecimal Float
 			token.kind = Token_Float;
 			advance_to_next_rune(t);
 			scan_mantissa(t, 16);
 			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
+			} else {
+				u8 *start = prev+2;
+				isize n = t->curr - start;
+				isize digit_count = 0;
+				for (isize i = 0; i < n; i++) {
+					if (start[i] != '_') {
+						digit_count += 1;
+					}
+				}
+				switch (digit_count) {
+				case 8:
+				case 16:
+					break;
+				default:
+					tokenizer_err(t, "Invalid hexadecimal float, expected 8 or 16 digits, got %td", digit_count);
+					break;
+				}
 			}
-		} */ else {
+
+		} else {
 			seen_decimal_point = false;
 			scan_mantissa(t, 10);
 

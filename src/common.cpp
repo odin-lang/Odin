@@ -12,6 +12,14 @@
 
 #include <math.h>
 
+
+template <typename U, typename V>
+gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
+
+template <typename U, typename V>
+gb_inline U const &bit_cast(V const &v) { return reinterpret_cast<U const &>(v); }
+
+
 gb_inline i64 align_formula(i64 size, i64 align) {
 	if (align > 0) {
 		i64 result = size + align-1;
@@ -164,6 +172,7 @@ u64 u64_from_string(String string) {
 		case 'd': base = 10; has_prefix = true; break;
 		case 'z': base = 12; has_prefix = true; break;
 		case 'x': base = 16; has_prefix = true; break;
+		case 'h': base = 16; has_prefix = true; break;
 		}
 	}
 
