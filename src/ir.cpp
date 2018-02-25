@@ -7795,6 +7795,7 @@ bool ir_gen_init(irGen *s, Checker *c) {
 
 	gbFileError err = gb_file_create(&s->output_file, output_file_path);
 	if (err != gbFileError_None) {
+		gb_printf_err("Failed to create file %s\n", output_file_path);
 		return false;
 	}
 

@@ -713,6 +713,7 @@ int main(int arg_count, char **arg_ptr) {
 		return 0;
 	}
 
+
 	timings_start_section(&timings, str_lit("type check"));
 
 	Checker checker = {0};
@@ -727,6 +728,8 @@ int main(int arg_count, char **arg_ptr) {
 		return 1;
 	}
 	// defer (ir_gen_destroy(&ir_gen));
+
+
 
 	timings_start_section(&timings, str_lit("llvm ir gen"));
 	ir_gen_tree(&ir_gen);
