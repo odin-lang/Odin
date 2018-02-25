@@ -792,10 +792,9 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, AstNode *node) {
 	Map<Entity *> entity_map = {}; // Key: String
 	map_init(&entity_map, c->tmp_allocator, 2*(bft->fields.count));
 
-	isize field_count = 0;
-	Entity **fields  = gb_alloc_array(c->allocator, Entity *, bft->fields.count);
-	u32 *    sizes   = gb_alloc_array(c->allocator, u32,      bft->fields.count);
-	u32 *    offsets = gb_alloc_array(c->allocator, u32,      bft->fields.count);
+	auto fields  = array_make<Entity*>(c->allocator, 0, bft->fields.count);
+	auto sizes   = array_make<u32>    (c->allocator, 0, bft->fields.count);
+	auto offsets = array_make<u32>    (c->allocator, 0, bft->fields.count);
 
 	u32 curr_offset = 0;
 	for_array(i, bft->fields) {
@@ -821,13 +820,14 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, AstNode *node) {
 			error(value, "Bit field bit size must be a constant integer");
 			continue;
 		}
-		i64 bits = v.value_integer;
-		if (bits < 0 || bits > 64) {
-			error(value, "Bit field's bit size must be within the range 1..<64, got %lld", cast(long long)bits);
+		i64 bits_ = v.value_integer;
+		if (bits_ < 0 || bits_ > 64) {
+			error(value, "Bit field's bit size must be within the range 1...64, got %lld", cast(long long)bits_);
 			continue;
 		}
+		u32 bits = cast(u32)bits_;
 
-		Type *value_type = make_type_bit_field_value(c->allocator, cast(i32)bits);
+		Type *value_type = make_type_bit_field_value(c->allocator, bits);
 		Entity *e = make_entity_variable(c->allocator, bit_field_type->BitField.scope, ident->Ident.token, value_type, false);
 		e->identifier = ident;
 		e->flags |= EntityFlag_BitFieldValue;
@@ -841,21 +841,18 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, AstNode *node) {
 			add_entity(c, c->context.scope, nullptr, e);
 			add_entity_use(c, field, e);
 
-			fields [field_count] = e;
-			offsets[field_count] = curr_offset;
-			sizes  [field_count] = cast(i32)bits;
-			field_count++;
+			array_add(&fields,  e);
+			array_add(&offsets, curr_offset);
+			array_add(&sizes,   bits);
 
-			curr_offset += cast(i32)bits;
+			curr_offset += bits;
 		}
 	}
-	GB_ASSERT(field_count <= bft->fields.count);
+	GB_ASSERT(fields.count <= bft->fields.count);
 
 	bit_field_type->BitField.fields      = fields;
-	bit_field_type->BitField.field_count = cast(i32)field_count;
 	bit_field_type->BitField.sizes       = sizes;
 	bit_field_type->BitField.offsets     = offsets;
-
 
 	if (bft->align != nullptr) {
 		i64 custom_align = 1;
@@ -1708,7 +1705,7 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 	type->Proc.is_polymorphic = is_polymorphic;
 
 
-	type->Proc.abi_compat_params = gb_alloc_array(c->allocator, Type *, param_count);
+	type->Proc.abi_compat_params = array_make<Type *>(c->allocator, param_count);
 	for (isize i = 0; i < param_count; i++) {
 		Entity *e = type->Proc.params->Tuple.variables[i];
 		if (e->kind == Entity_Variable) {

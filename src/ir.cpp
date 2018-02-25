@@ -5115,8 +5115,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 		TypeProc *pt = &proc_type_->Proc;
 
 		if (is_call_expr_field_value(ce)) {
-			isize param_count = pt->param_count;
-			irValue **args = gb_alloc_array(proc->module->allocator, irValue *, param_count);
+			auto args = array_make<irValue *>(proc->module->allocator, pt->param_count);
 
 			for_array(arg_index, ce->args) {
 				AstNode *arg = ce->args[arg_index];
@@ -5133,7 +5132,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 				}
 			}
 			TypeTuple *params = &pt->params->Tuple;
-			for (isize i = 0; i < param_count; i++) {
+			for (isize i = 0; i < args.count; i++) {
 				Entity *e = params->variables[i];
 				if (e->kind == Entity_TypeName) {
 					args[i] = ir_value_nil(proc->module->allocator, e->type);
@@ -5152,8 +5151,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 					}
 				}
 			}
-			auto call_args = array_make_from_ptr(args, param_count, param_count);
-			return ir_emit_call(proc, value, call_args);
+			return ir_emit_call(proc, value, args);
 		}
 
 		isize arg_index = 0;
@@ -5178,7 +5176,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 			param_count = pt->params->Tuple.variables.count;
 		}
 
-		irValue **args = gb_alloc_array(proc->module->allocator, irValue *, gb_max(param_count, arg_count));
+		auto args = array_make<irValue *>(proc->module->allocator, gb_max(param_count, arg_count));
 		isize variadic_index = pt->variadic_index;
 		bool variadic = pt->variadic && variadic_index >= 0;
 		bool vari_expand = ce->ellipsis.pos.line != 0;
@@ -5331,7 +5329,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 			final_count = arg_count;
 		}
 
-		auto call_args = array_make_from_ptr(args, final_count, final_count);
+		auto call_args = array_slice(args, 0, final_count);
 		return ir_emit_call(proc, value, call_args);
 	case_end;
 
@@ -7409,7 +7407,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 				}
 			}
 		} else {
-			Type **abi_types = proc->type->Proc.abi_compat_params;
+			auto abi_types = proc->type->Proc.abi_compat_params;
 
 			for_array(i, params->variables) {
 				Entity *e = params->variables[i];
@@ -7417,8 +7415,8 @@ void ir_begin_procedure_body(irProcedure *proc) {
 					continue;
 				}
 				Type *abi_type = e->type;
-				if (abi_types != nullptr) {
-					abi_type = proc->type->Proc.abi_compat_params[i];
+				if (abi_types.count > 0) {
+					abi_type = abi_types[i];
 				}
 				if (e->token.string != "" && !is_blank_ident(e->token)) {
 					irValue *param = ir_add_param(proc, e, nullptr, abi_type);
@@ -8158,9 +8156,9 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			// names:   []string;
 			// bits:    []u32;
 			// offsets: []u32;
-			isize count = t->BitField.field_count;
+			isize count = t->BitField.fields.count;
 			if (count > 0) {
-				Entity **fields = t->BitField.fields;
+				auto fields = t->BitField.fields;
 				irValue *name_array   = ir_generate_array(m, t_string, count, str_lit("__$bit_field_names"),   cast(i64)entry_index);
 				irValue *bit_array    = ir_generate_array(m, t_i32,    count, str_lit("__$bit_field_bits"),    cast(i64)entry_index);
 				irValue *offset_array = ir_generate_array(m, t_i32,    count, str_lit("__$bit_field_offsets"), cast(i64)entry_index);
@@ -8471,7 +8469,7 @@ void ir_gen_tree(irGen *s) {
 		                                 proc_results, 1, false, ProcCC_StdCall);
 
 		// TODO(bill): make this more robust
-		proc_type->Proc.abi_compat_params = gb_alloc_array(a, Type *, proc_params->Tuple.variables.count);
+		proc_type->Proc.abi_compat_params = array_make<Type *>(a, proc_params->Tuple.variables.count);
 		for_array(i, proc_params->Tuple.variables) {
 			proc_type->Proc.abi_compat_params[i] = proc_params->Tuple.variables[i]->type;
 		}
@@ -8549,15 +8547,15 @@ void ir_gen_tree(irGen *s) {
 		                                 proc_results, 1, false, ProcCC_CDecl);
 
 		// TODO(bill): make this more robust
-		proc_type->Proc.abi_compat_params = gb_alloc_array(a, Type *, proc_params->Tuple.variables.count);
+		proc_type->Proc.abi_compat_params = array_make<Type *>(a, proc_params->Tuple.variables.count);
 		for_array(i, proc_params->Tuple.variables) {
 			proc_type->Proc.abi_compat_params[i] = proc_params->Tuple.variables[i]->type;
 		}
 		proc_type->Proc.abi_compat_result_type = proc_results->Tuple.variables[0]->type;
 
 		AstNode *body = gb_alloc_item(a, AstNode);
-		Entity *e = make_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
-		irValue *p = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
+		Entity *e     = make_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
+		irValue *p    = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
 
 		map_set(&m->values, hash_entity(e), p);
 		map_set(&m->members, hash_string(name), p);

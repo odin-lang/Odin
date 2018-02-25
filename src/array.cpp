@@ -24,20 +24,21 @@ struct Array {
 	}
 };
 
-template <typename T> void     array_init        (Array<T> *array, gbAllocator const &a);
-template <typename T> void     array_init        (Array<T> *array, gbAllocator const &a, isize count);
-template <typename T> void     array_init        (Array<T> *array, gbAllocator const &a, isize count, isize capacity);
-template <typename T> Array<T> array_make        (gbAllocator const &a);
-template <typename T> Array<T> array_make        (gbAllocator const &a, isize count);
-template <typename T> Array<T> array_make        (gbAllocator const &a, isize count, isize capacity);
+template <typename T> void     array_init         (Array<T> *array, gbAllocator const &a);
+template <typename T> void     array_init         (Array<T> *array, gbAllocator const &a, isize count);
+template <typename T> void     array_init         (Array<T> *array, gbAllocator const &a, isize count, isize capacity);
+template <typename T> Array<T> array_make         (gbAllocator const &a);
+template <typename T> Array<T> array_make         (gbAllocator const &a, isize count);
+template <typename T> Array<T> array_make         (gbAllocator const &a, isize count, isize capacity);
 template <typename T> Array<T> array_make_from_ptr(T *data, isize count, isize capacity);
-template <typename T> void     array_free        (Array<T> *array);
-template <typename T> void     array_add         (Array<T> *array, T const &t);
-template <typename T> T        array_pop         (Array<T> *array);
-template <typename T> void     array_clear       (Array<T> *array);
-template <typename T> void     array_reserve     (Array<T> *array, isize capacity);
-template <typename T> void     array_resize      (Array<T> *array, isize count);
-template <typename T> void     array_set_capacity(Array<T> *array, isize capacity);
+template <typename T> void     array_free         (Array<T> *array);
+template <typename T> void     array_add          (Array<T> *array, T const &t);
+template <typename T> T        array_pop          (Array<T> *array);
+template <typename T> void     array_clear        (Array<T> *array);
+template <typename T> void     array_reserve      (Array<T> *array, isize capacity);
+template <typename T> void     array_resize       (Array<T> *array, isize count);
+template <typename T> void     array_set_capacity (Array<T> *array, isize capacity);
+template <typename T> Array<T> array_slice        (Array<T> const &array, isize lo, isize hi);
 
 template <typename T>
 gb_inline void array_init(Array<T> *array, gbAllocator const &a) {
@@ -102,7 +103,7 @@ gb_inline Array<T> array_make(gbAllocator const &a, isize count, isize capacity)
 
 
 template <typename T>
-void array_free(Array<T> *array) {
+gb_inline void array_free(Array<T> *array) {
 	if (array->allocator.proc != nullptr) {
 		gb_free(array->allocator, array->data);
 	}
@@ -129,7 +130,7 @@ void array_add(Array<T> *array, T const &t) {
 }
 
 template <typename T>
-T array_pop(Array<T> *array) {
+gb_inline T array_pop(Array<T> *array) {
 	GB_ASSERT(array->count > 0);
 	array->count--;
 	return array->data[array->count];
@@ -174,6 +175,21 @@ void array_set_capacity(Array<T> *array, isize capacity) {
 	array->data = new_data;
 	array->capacity = capacity;
 }
+
+
+template <typename T>
+gb_inline Array<T> array_slice(Array<T> const &array, isize lo, isize hi) {
+	GB_ASSERT(0 <= lo && lo <= hi && hi <= array.count);
+	Array<T> out = {};
+	isize len = hi-lo;
+	if (len > 0) {
+		out.data = array.data+lo;
+		out.count = len;
+		out.capacity = len;
+	}
+	return out;
+}
+
 
 #endif
 
