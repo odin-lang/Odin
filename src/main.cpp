@@ -202,6 +202,7 @@ bool string_is_valid_identifier(String str) {
 enum BuildFlagKind {
 	BuildFlag_Invalid,
 
+	BuildFlag_OutFile,
 	BuildFlag_OptimizationLevel,
 	BuildFlag_ShowTimings,
 	BuildFlag_ThreadCount,
@@ -241,6 +242,7 @@ void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, Bu
 bool parse_build_flags(Array<String> args) {
 	Array<BuildFlag> build_flags = {};
 	array_init(&build_flags, heap_allocator(), BuildFlag_COUNT);
+	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),             BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),             BuildFlagParam_Integer);
 	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),    BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),    BuildFlagParam_Integer);
@@ -320,9 +322,16 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlagParam_Float:
 							value = exact_value_float_from_string(param);
 							break;
-						case BuildFlagParam_String:
+						case BuildFlagParam_String: {
 							value = exact_value_string(param);
+							if (value.kind == ExactValue_String) {
+								String s = value.value_string;
+								if (s.len > 1 && s[0] == '"' && s[s.len-1] == '"') {
+									value.value_string = substring(s, 1, s.len-1);
+								}
+							}
 							break;
+						}
 						}
 					}
 					if (ok) {
@@ -365,6 +374,24 @@ bool parse_build_flags(Array<String> args) {
 						}
 
 						if (ok) switch (bf.kind) {
+						case BuildFlag_OutFile: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String path = value.value_string;
+							path = string_trim_whitespace(path);
+							if (is_import_path_valid(path)) {
+								#if defined(GB_SYSTEM_WINDOWS)
+									String ext = path_extension(path);
+									if (ext == ".exe") {
+										path = substring(path, 0, string_extension_position(path));
+									}
+								#endif
+								build_context.out_filepath = path;
+							} else {
+								gb_printf_err("Invalid -out path, got %.*s\n", LIT(path));
+								bad_flags = true;
+							}
+							break;
+						}
 						case BuildFlag_OptimizationLevel:
 							GB_ASSERT(value.kind == ExactValue_Integer);
 							build_context.optimization_level = cast(i32)value.value_integer;
@@ -377,7 +404,7 @@ bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_Integer);
 							isize count = cast(isize)value.value_integer;
 							if (count <= 0) {
-								gb_printf_err("%.*s expected a positive non-zero number, got %.*s", LIT(name), LIT(param));
+								gb_printf_err("%.*s expected a positive non-zero number, got %.*s\n", LIT(name), LIT(param));
 								build_context.thread_count = 0;
 							} else {
 								build_context.thread_count = count;

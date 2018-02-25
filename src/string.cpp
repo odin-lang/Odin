@@ -84,7 +84,7 @@ gb_inline String make_string_c(char *text) {
 
 String substring(String s, isize lo, isize hi) {
 	isize max = s.len;
-	GB_ASSERT(lo <= hi && hi <= max);
+	GB_ASSERT_MSG(lo <= hi && hi <= max, "%td..%td..%td", lo, hi, max);
 
 	return make_string(s.text+lo, hi-lo);
 }
@@ -211,6 +211,15 @@ gb_inline isize string_extension_position(String str) {
 	return dot_pos;
 }
 
+String path_extension(String str) {
+	isize pos = string_extension_position(str);
+	if (pos < 0) {
+		return make_string(nullptr, 0);
+	}
+	return substring(str, pos, str.len);
+}
+
+
 String string_trim_whitespace(String str) {
 	while (str.len > 0 && rune_is_whitespace(str[str.len-1])) {
 		str.len--;
@@ -239,17 +248,16 @@ bool string_contains_char(String s, u8 c) {
 
 String filename_from_path(String s) {
 	isize i = string_extension_position(s);
+	s = substring(s, 0, i);
 	if (i > 0) {
 		isize j = 0;
-		s.len = i;
-		for (j = i-1; j >= 0; j--) {
+		for (j = s.len-1; j >= 0; j--) {
 			if (s[j] == '/' ||
 				s[j] == '\\') {
 				break;
 			}
 		}
-		s.text += j+1;
-		s.len = i-j-1;
+		return substring(s, j+1, s.len);
 	}
 	return make_string(nullptr, 0);
 }

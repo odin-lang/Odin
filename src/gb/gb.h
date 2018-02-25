@@ -6547,7 +6547,7 @@ gbString gb_string_make_length(gbAllocator a, void const *init_str, isize num_by
 	header->allocator = a;
 	header->length    = num_bytes;
 	header->capacity  = num_bytes;
-	if (num_bytes && init_str) {
+	if (num_bytes > 0 && init_str) {
 		gb_memcopy(str, init_str, num_bytes);
 	}
 	str[num_bytes] = '\0';
