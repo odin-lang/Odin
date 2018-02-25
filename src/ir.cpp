@@ -1650,6 +1650,12 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 	if (proc->context_stack.count > 0) {
 		return proc->context_stack[proc->context_stack.count-1];
 	}
+
+	irBlock *tmp_block = proc->curr_block;
+	proc->curr_block = proc->blocks[0];
+
+	defer (proc->curr_block = tmp_block);
+	
 	irValue *c = ir_add_local_generated(proc, t_context);
 	array_add(&proc->context_stack, c);
 	ir_emit_store(proc, c, ir_emit_load(proc, proc->module->global_default_context));
