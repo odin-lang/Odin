@@ -46,9 +46,10 @@ struct ExactValue {
 gb_global ExactValue const empty_exact_value = {};
 
 HashKey hash_exact_value(ExactValue v) {
+	HashKey empty = {};
 	switch (v.kind) {
 	case ExactValue_Invalid:
-		return HashKey{};
+		return empty;
 	case ExactValue_Bool:
 		return hash_integer(u64(v.value_bool));
 	case ExactValue_String:
