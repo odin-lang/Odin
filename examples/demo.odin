@@ -752,7 +752,7 @@ complete_switch :: proc() {
 	{ // union
 		Foo :: union {int, bool};
 		f: Foo = 123;
-		#complete switch _ in f {
+		#complete switch in f {
 		case int:  fmt.println("int");
 		case bool: fmt.println("bool");
 		case:

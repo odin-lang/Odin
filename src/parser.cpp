@@ -3360,8 +3360,13 @@ AstNode *parse_switch_stmt(AstFile *f) {
 		defer (f->expr_level = prev_level);
 
 		if (allow_token(f, Token_in)) {
-			Array<AstNode *> lhs = {};
+			Array<AstNode *> lhs = make_ast_node_array(f, 1);
 			Array<AstNode *> rhs = make_ast_node_array(f, 1);
+			Token blank_ident = token;
+			blank_ident.kind = Token_Ident;
+			blank_ident.string = str_lit("_");
+			AstNode *blank = ast_ident(f, blank_ident);
+			array_add(&lhs, blank);
 			array_add(&rhs, parse_expr(f, false));
 
 			tag = ast_assign_stmt(f, token, lhs, rhs);
@@ -3391,12 +3396,11 @@ AstNode *parse_switch_stmt(AstFile *f) {
 
 	body = ast_block_stmt(f, list, open, close);
 
-	if (!is_type_match) {
-		tag = convert_stmt_to_expr(f, tag, str_lit("switch expression"));
-		return ast_switch_stmt(f, token, init, tag, body);
-	} else {
+	if (is_type_match) {
 		return ast_type_switch_stmt(f, token, tag, body);
 	}
+	tag = convert_stmt_to_expr(f, tag, str_lit("switch expression"));
+	return ast_switch_stmt(f, token, init, tag, body);
 }
 
 AstNode *parse_defer_stmt(AstFile *f) {
