@@ -61,22 +61,6 @@ gb_internal StringSetFindResult string_set__find(StringSet *s, HashKey key) {
 	return fr;
 }
 
-gb_internal StringSetFindResult string_set__find_from_entry(StringSet *s, StringSetEntry *e) {
-	StringSetFindResult fr = {-1, -1, -1};
-	if (s->hashes.count > 0) {
-		fr.hash_index  = e->key.key % s->hashes.count;
-		fr.entry_index = s->hashes[fr.hash_index];
-		while (fr.entry_index >= 0) {
-			if (&s->entries[fr.entry_index] == e) {
-				return fr;
-			}
-			fr.entry_prev = fr.entry_index;
-			fr.entry_index = s->entries[fr.entry_index].next;
-		}
-	}
-	return fr;
-}
-
 gb_internal b32 string_set__full(StringSet *s) {
 	return 0.75f * s->hashes.count <= s->entries.count;
 }

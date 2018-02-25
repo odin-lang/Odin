@@ -18,9 +18,8 @@ set compiler_warnings= ^
 	-W4 -WX ^
 	-wd4100 -wd4101 -wd4127 -wd4189 ^
 	-wd4201 -wd4204 -wd4244 ^
-	-wd4306 ^
-	-wd4456 -wd4457 -wd4480 ^
-	-wd4505 -wd4512 -wd4550
+	-wd4456 -wd4457 ^
+	-wd4512
 
 set compiler_includes=
 set libs= ^
@@ -45,7 +44,6 @@ del *.ilk > NUL 2> NUL
 cl %compiler_settings% "src\main.cpp" ^
 	/link %linker_settings% -OUT:%exe_name% ^
 	&& odin run examples/demo.odin
-	rem && odin docs core/fmt.odin
 
 del *.obj > NUL 2> NUL
 
