@@ -1391,14 +1391,14 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			ir_print_type(f, m, proc_type->Proc.results);
 			ir_write_str_lit(f, "* ");
 			ir_print_value(f, m, call->return_ptr, ir_type(call->return_ptr));
-			if (call->arg_count > 0) {
+			if (call->args.count > 0) {
 				ir_write_str_lit(f, ", ");
 			}
 		}
 
 
 		isize param_index = 0;
-		if (call->arg_count > 0) {
+		if (call->args.count > 0) {
 			TypeTuple *params = &proc_type->Proc.params->Tuple;
 			if (proc_type->Proc.c_vararg) {
 				isize i = 0;
@@ -1422,7 +1422,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					ir_print_value(f, m, arg, t);
 					param_index++;
 				}
-				for (; i < call->arg_count; i++) {
+				for (; i < call->args.count; i++) {
 					if (param_index > 0) ir_write_str_lit(f, ", ");
 
 					irValue *arg = call->args[i];
@@ -1433,7 +1433,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					param_index++;
 				}
 			} else {
-				GB_ASSERT(call->arg_count == params->variables.count);
+				GB_ASSERT(call->args.count == params->variables.count);
 				for_array(i, params->variables) {
 					Entity *e = params->variables[i];
 					GB_ASSERT(e != nullptr);

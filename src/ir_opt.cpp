@@ -62,7 +62,7 @@ void ir_opt_add_operands(Array<irValue *> *ops, irInstr *i) {
 		break;
 	case irInstr_Call:
 		array_add(ops, i->Call.value);
-		for (isize j = 0; j < i->Call.arg_count; j++) {
+		for_array(j, i->Call.args) {
 			array_add(ops, i->Call.args[j]);
 		}
 		break;
