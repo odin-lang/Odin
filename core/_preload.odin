@@ -609,6 +609,27 @@ __print_u64 :: proc(fd: os.Handle, u: u64) {
 	os.write(fd, a[i..]);
 }
 
+__print_i64 :: proc(fd: os.Handle, u: i64) {
+	digits := "0123456789";
+
+	neg := u < 0;
+	u = abs(u);
+
+	a: [129]byte;
+	i := len(a);
+	b := i64(10);
+	for u >= b {
+		i -= 1; a[i] = digits[u % b];
+		u /= b;
+	}
+	i -= 1; a[i] = digits[u % b];
+	if neg {
+		i -= 1; a[i] = '-';
+	}
+
+	os.write(fd, a[i..]);
+}
+
 __print_caller_location :: proc(fd: os.Handle, using loc: Source_Code_Location) {
 	os.write_string(fd, file_path);
 	os.write_byte(fd, '(');
@@ -856,23 +877,25 @@ __bounds_check_error :: proc "contextless" (file: string, line, column: int, ind
 	fd := os.stderr;
 	__print_caller_location(fd, Source_Code_Location{file, line, column, ""});
 	os.write_string(fd, " Index ");
-	__print_u64(fd, u64(index));
+	__print_i64(fd, i64(index));
 	os.write_string(fd, " is out of bounds range 0..");
-	__print_u64(fd, u64(count));
+	__print_i64(fd, i64(count));
 	os.write_byte(fd, '\n');
 	__debug_trap();
 }
 
-__slice_expr_error :: proc "contextless" (file: string, line, column: int, low, high: int) {
-	if 0 <= low && low <= high do return;
+__slice_expr_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
+	if 0 <= lo && lo <= hi && hi <= len do return;
 
 
 	fd := os.stderr;
 	__print_caller_location(fd, Source_Code_Location{file, line, column, ""});
 	os.write_string(fd, " Invalid slice indices: ");
-	__print_u64(fd, u64(low));
+	__print_i64(fd, i64(lo));
 	os.write_string(fd, "..");
-	__print_u64(fd, u64(high));
+	__print_i64(fd, i64(hi));
+	os.write_string(fd, "..");
+	__print_i64(fd, i64(len));
 	os.write_byte(fd, '\n');
 	__debug_trap();
 }
@@ -882,12 +905,12 @@ __dynamic_array_expr_error :: proc "contextless" (file: string, line, column: in
 
 	fd := os.stderr;
 	__print_caller_location(fd, Source_Code_Location{file, line, column, ""});
-	os.write_string(fd, " Invalid slice indices: ");
-	__print_u64(fd, u64(low));
+	os.write_string(fd, " Invalid dynamic array values: ");
+	__print_i64(fd, i64(low));
 	os.write_string(fd, "..");
-	__print_u64(fd, u64(high));
+	__print_i64(fd, i64(high));
 	os.write_string(fd, "..");
-	__print_u64(fd, u64(max));
+	__print_i64(fd, i64(max));
 	os.write_byte(fd, '\n');
 	__debug_trap();
 }
@@ -912,8 +935,8 @@ __string_decode_rune :: inline proc "contextless" (s: string) -> (rune, int) {
 __bounds_check_error_loc :: inline proc "contextless" (using loc := #caller_location, index, count: int) {
 	__bounds_check_error(file_path, int(line), int(column), index, count);
 }
-__slice_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, low, high: int) {
-	__slice_expr_error(file_path, int(line), int(column), low, high);
+__slice_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, lo, hi: int, len: int) {
+	__slice_expr_error(file_path, int(line), int(column), lo, hi, len);
 }
 
 __mem_set :: proc "contextless" (data: rawptr, value: i32, len: int) -> rawptr {
