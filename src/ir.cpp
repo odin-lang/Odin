@@ -3679,7 +3679,7 @@ void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, ir
 	low  = ir_emit_conv(proc, low,  t_int);
 	high = ir_emit_conv(proc, high, t_int);
 
-	irValue **args = gb_alloc_array(a, irValue *, 5);
+	irValue **args = gb_alloc_array(a, irValue *, 6);
 	args[0] = file;
 	args[1] = line;
 	args[2] = column;
