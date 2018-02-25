@@ -536,6 +536,9 @@ Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 	token.pos.column = t->curr-t->line+1;
 
 	if (seen_decimal_point) {
+		token.string.text -= 1;
+		token.string.len  += 1;
+		token.pos.column -= 1;
 		token.kind = Token_Float;
 		scan_mantissa(t, 10);
 		goto exponent;
@@ -906,7 +909,6 @@ Token tokenizer_get_token(Tokenizer *t) {
 		} break;
 
 		case '.':
-			token.kind = Token_Period; // Default
 			if (t->curr_rune == '.') { // Could be an ellipsis
 				advance_to_next_rune(t);
 				token.kind = Token_HalfClosed;
@@ -914,6 +916,10 @@ Token tokenizer_get_token(Tokenizer *t) {
 					advance_to_next_rune(t);
 					token.kind = Token_Ellipsis;
 				}
+			} else if ('0' <= t->curr_rune && t->curr_rune <= '9') {
+				token = scan_number_to_token(t, true);
+			} else {
+				token.kind = Token_Period;
 			}
 			break;
 

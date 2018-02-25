@@ -2106,9 +2106,9 @@ AstNode *parse_atom_expr(AstFile *f, AstNode *operand, bool lhs) {
 			case Token_Ident:
 				operand = ast_selector_expr(f, token, operand, parse_ident(f));
 				break;
-			case Token_Integer:
-				operand = ast_selector_expr(f, token, operand, parse_expr(f, lhs));
-				break;
+			// case Token_Integer:
+				// operand = ast_selector_expr(f, token, operand, parse_expr(f, lhs));
+				// break;
 			case Token_OpenParen: {
 				Token open = expect_token(f, Token_OpenParen);
 				AstNode *type = parse_type(f);
