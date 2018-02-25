@@ -113,15 +113,13 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 
 
 Array<String> setup_args(int argc, char **argv) {
-	Array<String> args = {};
 	gbAllocator a = heap_allocator();
-	int i;
 
 #if defined(GB_SYSTEM_WINDOWS)
 	int wargc = 0;
 	wchar_t **wargv = command_line_to_wargv(GetCommandLineW(), &wargc);
-	args = array_make<String>(a, 0, wargc);
-	for (i = 0; i < wargc; i++) {
+	auto args = array_make<String>(a, 0, wargc);
+	for (isize i = 0; i < wargc; i++) {
 		wchar_t *warg = wargv[i];
 		isize wlen = string16_len(warg);
 		String16 wstr = make_string16(warg, wlen);
@@ -130,17 +128,17 @@ Array<String> setup_args(int argc, char **argv) {
 			array_add(&args, arg);
 		}
 	}
-
+	return args;
 #else
-	args = array_make<String>(a, 0, argc);
-	for (i = 0; i < argc; i++) {
+	auto args = array_make<String>(a, 0, argc);
+	for (isize i = 0; i < argc; i++) {
 		String arg = make_string_c(argv[i]);
 		if (arg.len > 0) {
 			array_add(&args, arg);
 		}
 	}
-#endif
 	return args;
+#endif
 }
 
 
@@ -613,6 +611,62 @@ void remove_temp_files(String output_base) {
 #undef EXT_REMOVE
 }
 
+i32 exec_llvm_opt(String output_base) {
+#if defined(GB_SYSTEM_WINDOWS)
+	// For more passes arguments: http://llvm.org/docs/Passes.html
+	return system_exec_command_line_app("llvm-opt", false,
+		"\"%.*sbin/opt\" \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
+		"-mem2reg "
+		"-memcpyopt "
+		"-die "
+		"",
+		LIT(build_context.ODIN_ROOT),
+		LIT(output_base), LIT(output_base),
+		LIT(build_context.opt_flags));
+#else
+	// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
+	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
+	return system_exec_command_line_app("llvm-opt", false,
+		"opt \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
+		"-mem2reg "
+		"-memcpyopt "
+		"-die "
+		"",
+		LIT(output_base), LIT(output_base),
+		LIT(build_context.opt_flags));
+#endif
+}
+
+i32 exec_llvm_llc(String output_base) {
+#if defined(GB_SYSTEM_WINDOWS)
+	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
+	return system_exec_command_line_app("llvm-llc", false,
+		"\"%.*sbin/llc\" \"%.*s.bc\" -filetype=obj -O%d "
+		"-o \"%.*s.obj\" "
+		"%.*s "
+		// "-debug-pass=Arguments "
+		"",
+		LIT(build_context.ODIN_ROOT),
+		LIT(output_base),
+		build_context.optimization_level,
+		LIT(output_base),
+		LIT(build_context.llc_flags));
+#else
+	// NOTE(zangent): Linux / Unix is unfinished and not tested very well.
+	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
+	return system_exec_command_line_app("llc", false,
+		"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
+		"%.*s "
+		// "-debug-pass=Arguments "
+		"%s"
+		"",
+		LIT(output_base),
+		build_context.optimization_level,
+		LIT(build_context.llc_flags),
+		str_eq_ignore_case(cross_compile_target, str_lit("Essence")) ? "-mtriple=x86_64-pc-none-elf" : "");
+#endif
+}
+
 int main(int arg_count, char **arg_ptr) {
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
@@ -747,59 +801,18 @@ int main(int arg_count, char **arg_ptr) {
 	i32 exit_code = 0;
 
 	timings_start_section(&timings, str_lit("llvm-opt"));
-	#if defined(GB_SYSTEM_WINDOWS)
-		// For more passes arguments: http://llvm.org/docs/Passes.html
-		exit_code = system_exec_command_line_app("llvm-opt", false,
-			"\"%.*sbin/opt\" \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
-			"-mem2reg "
-			"-memcpyopt "
-			"-die "
-			"",
-			LIT(build_context.ODIN_ROOT),
-			LIT(output_base), LIT(output_base),
-			LIT(build_context.opt_flags));
-		// exit_code = system_exec_command_line_app("llvm-opt", false,
-		// 	"\"%.*sbin/llvm-as\" \"%.*s.ll\" -o \"%.*s.bc\" "
-		// 	"",
-		// 	LIT(build_context.ODIN_ROOT),
-		// 	LIT(output_base), LIT(output_base));
-		if (exit_code != 0) {
-			return exit_code;
-		}
-	#else
-		// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
-		//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
-		exit_code = system_exec_command_line_app("llvm-opt", false,
-			"opt \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
-			"-mem2reg "
-			"-memcpyopt "
-			"-die "
-			"",
-			LIT(output_base), LIT(output_base),
-			LIT(build_context.opt_flags));
-		if (exit_code != 0) {
-			return exit_code;
-		}
-	#endif
+	exit_code = exec_llvm_opt(output_base);
+	if (exit_code != 0) {
+		return exit_code;
+	}
+
+	timings_start_section(&timings, str_lit("llvm-llc"));
+	exit_code = exec_llvm_llc(output_base);
+	if (exit_code != 0) {
+		return exit_code;
+	}
 
 	#if defined(GB_SYSTEM_WINDOWS)
-		timings_start_section(&timings, str_lit("llvm-llc"));
-		// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
-		exit_code = system_exec_command_line_app("llvm-llc", false,
-			"\"%.*sbin/llc\" \"%.*s.bc\" -filetype=obj -O%d "
-			"-o \"%.*s.obj\" "
-			"%.*s "
-			// "-debug-pass=Arguments "
-			"",
-			LIT(build_context.ODIN_ROOT),
-			LIT(output_base),
-			build_context.optimization_level,
-			LIT(output_base),
-			LIT(build_context.llc_flags));
-		if (exit_code != 0) {
-			return exit_code;
-		}
-
 		timings_start_section(&timings, str_lit("msvc-link"));
 
 		gbString lib_str = gb_string_make(heap_allocator(), "");
@@ -854,25 +867,7 @@ int main(int arg_count, char **arg_ptr) {
 			system_exec_command_line_app("odin run", false, "%.*s.exe", LIT(output_base));
 		}
 	#else
-
-		// NOTE(zangent): Linux / Unix is unfinished and not tested very well.
-
-
-		timings_start_section(&timings, str_lit("llvm-llc"));
-		// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
-		exit_code = system_exec_command_line_app("llc", false,
-			"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
-			"%.*s "
-			// "-debug-pass=Arguments "
-			"%s"
-			"",
-			LIT(output_base),
-			build_context.optimization_level,
-			LIT(build_context.llc_flags),
-			str_eq_ignore_case(cross_compile_target, str_lit("Essence")) ? "-mtriple=x86_64-pc-none-elf" : "");
-		if (exit_code != 0) {
-			return exit_code;
-		}
+		timings_start_section(&timings, str_lit("ld-link"));
 
 		// NOTE(vassvik): get cwd, for used for local shared libs linking, since those have to be relative to the exe
 		char cwd[256];
