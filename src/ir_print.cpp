@@ -595,7 +595,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	case ExactValue_Float: {
 		GB_ASSERT_MSG(is_type_float(type), "%s", type_to_string(type));
 		type = core_type(type);
-		u64 u = *cast(u64*)&value.value_float;
+		u64 u = bit_cast<u64>(value.value_float);
 		switch (type->Basic.kind) {
 		case Basic_f32:
 			// IMPORTANT NOTE(bill): LLVM requires all floating point constants to be

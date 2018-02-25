@@ -346,7 +346,7 @@ void init_build_context(void) {
 
 	{
 		u16 x = 1;
-		bool big = !(*cast(u8 *)&x);
+		bool big = !bit_cast<u8>(x);
 		bc->ODIN_ENDIAN = big ? str_lit("big") : str_lit("little");
 	}
 

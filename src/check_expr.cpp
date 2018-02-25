@@ -1227,7 +1227,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		}
 
 		i64 i = v.value_integer;
-		u64 u = *cast(u64 *)&i;
+		u64 u = bit_cast<u64>(i);
 		i64 s = 8*type_size_of(c->allocator, type);
 		u64 umax = ~cast(u64)0ull;
 		if (s < 64) {
@@ -1336,7 +1336,7 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 				String str = {};
 				i64 i = o->value.value_integer;
 				if (is_type_unsigned(o->type)) {
-					str = u64_to_string(*cast(u64 *)&i, buf, gb_size_of(buf));
+					str = u64_to_string(bit_cast<u64>(i), buf, gb_size_of(buf));
 				} else {
 					str = i64_to_string(i, buf, gb_size_of(buf));
 				}

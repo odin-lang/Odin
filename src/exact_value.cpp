@@ -156,39 +156,6 @@ f64 float_from_string(String string) {
 		i++;
 	}
 
-#if 0
-	if (len-i > 2 &&
-	    str[i] == '0' &&
-	    str[i+1] == 'h') {
-		i += 2;
-		u8 *text = string.text;
-		isize len = string.len;
-		if (has_prefix) {
-			text += 2;
-			len -= 2;
-		}
-
-		u64 base = 16;
-
-		u64 result = {0};
-		for (isize i = 0; i < len; i++) {
-			Rune r = cast(Rune)text[i];
-			if (r == '_') {
-				continue;
-			}
-			u64 v = bit128__digit_value(r);
-			if (v >= base) {
-				break;
-			}
-			result *= base;
-			result += v;
-		}
-
-
-		return *cast(f64 *)&result;
-	}
-#endif
-
 	f64 value = 0.0;
 	for (; i < len; i++) {
 		Rune r = cast(Rune)str[i];
@@ -255,7 +222,29 @@ f64 float_from_string(String string) {
 }
 
 ExactValue exact_value_float_from_string(String string) {
-	return exact_value_float(float_from_string(string));
+	if (string.len > 2 && string[0] == '0' && string[1] == 'h') {
+
+		isize digit_count = 0;
+		for (isize i = 2; i < string.len; i++) {
+			if (string[i] != '_') {
+				digit_count += 1;
+			}
+		}
+		u64 u = u64_from_string(string);
+		if (digit_count == 8) {
+			u32 x = cast(u32)u;
+			f32 f = bit_cast<f32>(x);
+			return exact_value_float(cast(f64)f);
+		} else if (digit_count == 16) {
+			f64 f = bit_cast<f64>(u);
+			return exact_value_float(f);
+		} else {
+			GB_PANIC("Invalid hexadecimal float, expected 8 or 16 digits, got %td", digit_count);
+		}
+	}
+
+	f64 f = float_from_string(string);
+	return exact_value_float(f);
 }
 
 

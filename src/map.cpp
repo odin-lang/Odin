@@ -72,7 +72,7 @@ gb_inline HashKey hash_integer(u64 u) {
 }
 gb_inline HashKey hash_f64(f64 f) {
 	HashKey h = {HashKey_Default};
-	h.key = *cast(u64 *)&f;
+	h.key = bit_cast<u64>(f);
 	return h;
 }
 

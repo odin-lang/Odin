@@ -262,7 +262,7 @@ Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 				ExactValue v = exact_value_to_integer(rhs->value);
 				if (v.kind == ExactValue_Integer) {
 					i64 i = v.value_integer;
-					u64 u = *cast(u64 *)&i;
+					u64 u = bit_cast<u64>(i);
 					u64 umax = ~cast(u64)0ull;
 					if (lhs_bits < 64) {
 						umax = (1ull << cast(u64)lhs_bits) - 1ull;
