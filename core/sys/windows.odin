@@ -681,7 +681,8 @@ foreign kernel32 {
 	@(link_name="ResumeThread")      resume_thread        :: proc(thread: Handle) -> u32 ---;
 	@(link_name="GetThreadPriority") get_thread_priority  :: proc(thread: Handle) -> i32 ---;
 	@(link_name="SetThreadPriority") set_thread_priority  :: proc(thread: Handle, priority: i32) -> Bool ---;
-	@(link_name="GetExitCodeThread") get_exit_code_thread :: proc(thread: Handle, exit_code: ^u32) -> Bool ---;
+    @(link_name="GetExitCodeThread") get_exit_code_thread :: proc(thread: Handle, exit_code: ^u32) -> Bool ---;
+	@(link_name="TerminateThread")   terminate_thread     :: proc(thread: Handle, exit_code: u32) -> Bool ---;
 
 	@(link_name="InitializeCriticalSection")             initialize_critical_section                :: proc(critical_section: ^Critical_Section) ---;
 	@(link_name="InitializeCriticalSectionAndSpinCount") initialize_critical_section_and_spin_count :: proc(critical_section: ^Critical_Section, spin_count: u32) ---;
