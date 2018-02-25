@@ -223,7 +223,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	if (param_operands) {
 		operands = *param_operands;
 	} else {
-		array_init(&operands, a, dst->Proc.param_count);
+		operands = array_make<Operand>(a, 0, dst->Proc.param_count);
 		for (isize i = 0; i < dst->Proc.param_count; i++) {
 			Entity *param = dst->Proc.params->Tuple.variables[i];
 			Operand o = {Addressing_Value};
@@ -362,8 +362,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	if (found_gen_procs) {
 		array_add(found_gen_procs, entity);
 	} else {
-		Array<Entity *> array = {};
-		array_init(&array, heap_allocator());
+		auto array = array_make<Entity *>(heap_allocator());
 		array_add(&array, entity);
 		map_set(&c->info.gen_procs, hash_pointer(base_entity->identifier), array);
 	}
@@ -3606,7 +3605,7 @@ break;
 
 		Type *tuple = make_type_tuple(a);
 		isize variable_count = type->Struct.fields.count;
-		array_init_count(&tuple->Tuple.variables, a, variable_count);
+		array_init(&tuple->Tuple.variables, a, variable_count);
 		// TODO(bill): Should I copy each of the entities or is this good enough?
 		gb_memcopy_array(tuple->Tuple.variables.data, type->Struct.fields_in_src_order.data, variable_count);
 
@@ -4277,8 +4276,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	isize param_count = pt->param_count;
 	bool *visited = gb_alloc_array(c->tmp_allocator, bool, param_count);
 
-	Array<Operand> ordered_operands = {};
-	array_init_count(&ordered_operands, c->tmp_allocator, param_count);
+	auto ordered_operands = array_make<Operand>(c->tmp_allocator, param_count);
 
 	for_array(i, ce->args) {
 		AstNode *arg = ce->args[i];
@@ -4416,7 +4414,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 	if (is_call_expr_field_value(ce)) {
 		call_checker = check_named_call_arguments;
 
-		array_init_count(&operands, heap_allocator(), ce->args.count);
+		operands = array_make<Operand>(heap_allocator(), ce->args.count);
 		for_array(i, ce->args) {
 			AstNode *arg = ce->args[i];
 			ast_node(fv, FieldValue, arg);
@@ -4429,7 +4427,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 		}
 
 	} else {
-		array_init(&operands, heap_allocator(), 2*ce->args.count);
+		operands = array_make<Operand>(heap_allocator(), 0, 2*ce->args.count);
 		check_unpack_arguments(c, nullptr, -1, &operands, ce->args, false);
 	}
 
@@ -4630,7 +4628,7 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 
 	if (is_call_expr_field_value(ce)) {
 		named_fields = true;
-		array_init_count(&operands, heap_allocator(), ce->args.count);
+		operands = array_make<Operand>(heap_allocator(), ce->args.count);
 		for_array(i, ce->args) {
 			AstNode *arg = ce->args[i];
 			ast_node(fv, FieldValue, arg);
@@ -4643,7 +4641,7 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 		}
 
 	} else {
-		array_init(&operands, heap_allocator(), 2*ce->args.count);
+		operands = array_make<Operand>(heap_allocator(), 0, 2*ce->args.count);
 		check_unpack_arguments(c, nullptr, -1, &operands, ce->args, false);
 	}
 
@@ -4656,7 +4654,7 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 	if (named_fields) {
 		bool *visited = gb_alloc_array(c->allocator, bool, param_count);
 
-		array_init_count(&ordered_operands, c->tmp_allocator, param_count);
+		ordered_operands = array_make<Operand>(c->tmp_allocator, param_count);
 
 		for_array(i, ce->args) {
 			AstNode *arg = ce->args[i];

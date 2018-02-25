@@ -645,7 +645,7 @@ void init_checker(Checker *c, Parser *parser) {
 	map_init(&c->file_scopes, heap_allocator());
 	ptr_set_init(&c->checked_files, heap_allocator());
 
-	array_init(&c->file_order, heap_allocator(), c->parser->files.count);
+	array_init(&c->file_order, heap_allocator(), 0, c->parser->files.count);
 }
 
 void destroy_checker(Checker *c) {
@@ -1219,8 +1219,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		}
 	}
 
-	Array<EntityGraphNode *> G = {};
-	array_init(&G, a, M.entries.count);
+	auto G = array_make<EntityGraphNode *>(a, 0, M.entries.count);
 
 	for_array(i, M.entries) {
 		auto *entry = &M.entries[i];
@@ -2247,12 +2246,11 @@ Array<ImportPathItem> find_import_path(Checker *c, Scope *start, Scope *end, Ptr
 
 			ImportPathItem item = {s, decl};
 			if (s == end) {
-				Array<ImportPathItem> path = {};
-				array_init(&path, heap_allocator());
+				auto path = array_make<ImportPathItem>(heap_allocator());
 				array_add(&path, item);
 				return path;
 			}
-			Array<ImportPathItem> next_path = find_import_path(c, s, end, visited);
+			auto next_path = find_import_path(c, s, end, visited);
 			if (next_path.count > 0) {
 				array_add(&next_path, item);
 				return next_path;
@@ -2853,12 +2851,11 @@ Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visi
 		for_array(i, decl->deps.entries) {
 			Entity *dep = decl->deps.entries[i].ptr;
 			if (dep == end) {
-				Array<Entity *> path = {};
-				array_init(&path, heap_allocator());
+				auto path = array_make<Entity *>(heap_allocator());
 				array_add(&path, dep);
 				return path;
 			}
-			Array<Entity *> next_path = find_entity_path(dep, end, visited);
+			auto next_path = find_entity_path(dep, end, visited);
 			if (next_path.count > 0) {
 				array_add(&next_path, dep);
 				return next_path;

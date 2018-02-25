@@ -40,8 +40,7 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 	defer (gb_temp_arena_memory_end(tmp));
 
-	Array<Entity *> fields = {};
-	array_init(&fields, heap_allocator(), init_field_capacity);
+	auto fields = array_make<Entity *>(heap_allocator(), 0, init_field_capacity);
 
 	Map<Entity *> entity_map = {};
 	map_init(&entity_map, c->tmp_allocator, 2*init_field_capacity);
@@ -360,8 +359,7 @@ void add_polymorphic_struct_entity(Checker *c, AstNode *node, Type *named_type, 
 	if (found_gen_types) {
 		array_add(found_gen_types, e);
 	} else {
-		Array<Entity *> array = {};
-		array_init(&array, heap_allocator());
+		auto array = array_make<Entity *>(heap_allocator());
 		array_add(&array, e);
 		map_set(&c->info.gen_types, hash_pointer(original_type), array);
 	}
@@ -407,8 +405,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 				}
 			}
 
-			Array<Entity *> entities = {};
-			array_init(&entities, c->allocator, variable_count);
+			auto entities = array_make<Entity *>(c->allocator, 0, variable_count);
 
 			for_array(i, params) {
 				AstNode *param = params[i];
@@ -566,41 +563,6 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 		}
 	}
 
-
-#if 0
-	// TODO(bill): Move this to the appropriate place
-	if (!struct_type->Struct.is_raw_union) {
-		type_set_offsets(c->allocator, struct_type);
-
-		if (!struct_type->failure && !st->is_packed && !st->is_ordered) {
-			struct_type->failure = false;
-			struct_type->Struct.are_offsets_set = false;
-			struct_type->Struct.are_offsets_being_processed = false;
-			gb_zero_item(&struct_type->Struct.offsets);
-			// NOTE(bill): Reorder fields for reduced size/performance
-
-			Array<Entity *> reordered_fields = {};
-			array_init_count(&reordered_fields, c->allocator, fields.count);
-			for_array(i, reordered_fields) {
-				reordered_fields[i] = struct_type->Struct.fields_in_src_order[i];
-			}
-
-			// NOTE(bill): Hacky thing
-			// TODO(bill): Probably make an inline sorting procedure rather than use global variables
-			// NOTE(bill): compound literal order must match source not layout
-			gb_sort_array(reordered_fields.data, fields.count, cmp_reorder_struct_fields);
-
-			for_array(i, fields) {
-				reordered_fields[i]->Variable.field_index = cast(i32)i;
-			}
-
-			struct_type->Struct.fields = reordered_fields;
-		}
-
-		type_set_offsets(c->allocator, struct_type);
-	}
-#endif
-
 	if (st->align != nullptr) {
 		if (st->is_packed) {
 			syntax_error(st->align, "'#align' cannot be applied with '#packed'");
@@ -623,8 +585,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	Entity *using_index_expr = nullptr;
 
-	Array<Type *> variants = {};
-	array_init(&variants, c->allocator, variant_count);
+	auto variants = array_make<Type *>(c->allocator, 0, variant_count);
 
 	union_type->Union.scope = c->context.scope;
 
@@ -698,8 +659,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	Map<Entity *> entity_map = {}; // Key: String
 	map_init(&entity_map, c->tmp_allocator, 2*(et->fields.count));
 
-	Array<Entity *> fields = {};
-	array_init(&fields, c->allocator, et->fields.count);
+	auto fields = array_make<Entity *>(c->allocator, 0, et->fields.count);
 
 	Type *constant_type = enum_type;
 	if (named_type != nullptr) {
@@ -1024,8 +984,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 	bool is_variadic = false;
 	isize variadic_index = -1;
 	bool is_c_vararg = false;
-	Array<Entity *> variables = {};
-	array_init(&variables, c->allocator, variable_count);
+	auto variables = array_make<Entity *>(c->allocator, 0, variable_count);
 	for_array(i, params) {
 		AstNode *param = params[i];
 		if (param->kind != AstNode_Field) {
@@ -1367,8 +1326,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 		}
 	}
 
-	Array<Entity *> variables = {};
-	array_init(&variables, c->allocator, variable_count);
+	auto variables = array_make<Entity *>(c->allocator, 0, variable_count);
 	for_array(i, results) {
 		ast_node(field, Field, results[i]);
 		AstNode *default_value = unparen_expr(field->default_value);
@@ -1624,8 +1582,7 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 
 	if (new_type != original_type) {
 		Type *tuple = make_type_tuple(a);
-		Array<Entity *> variables = {};
-		array_init(&variables, a, 1);
+		auto variables = array_make<Entity *>(a, 0, 1);
 		array_add(&variables, make_entity_param(a, original_type->Tuple.variables[0]->scope, empty_token, new_type, false, false));
 		tuple->Tuple.variables = variables;
 		new_type = tuple;
@@ -1814,7 +1771,7 @@ i64 check_array_count(Checker *c, Operand *o, AstNode *e) {
 Type *make_optional_ok_type(gbAllocator a, Type *value) {
 	bool typed = true;
 	Type *t = make_type_tuple(a);
-	array_init(&t->Tuple.variables, a, 2);
+	array_init(&t->Tuple.variables, a, 0, 2);
 	array_add (&t->Tuple.variables, make_entity_field(a, nullptr, blank_token, value,  false, 0));
 	array_add (&t->Tuple.variables, make_entity_field(a, nullptr, blank_token, typed ? t_bool : t_untyped_bool, false, 1));
 	return t;
@@ -1841,9 +1798,7 @@ void generate_map_entry_type(gbAllocator a, Type *type) {
 	dummy_node->kind = AstNode_Invalid;
 	Scope *s = create_scope(universal_scope, a);
 
-	isize field_count = 3;
-	Array<Entity *> fields = {};
-	array_init(&fields, a, 3);
+	auto fields = array_make<Entity *>(a, 0, 3);
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("key")),   t_map_key,       false, 0));
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("next")),  t_int,           false, 1));
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("value")), type->Map.value, false, 2));
@@ -1883,8 +1838,7 @@ void generate_map_internal_types(gbAllocator a, Type *type) {
 	Type *entries_type = make_type_dynamic_array(a, type->Map.entry_type);
 
 
-	Array<Entity *> fields = {};
-	array_init(&fields, a, 2);
+	auto fields = array_make<Entity *>(a, 0, 2);
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0));
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("entries")), entries_type, false, 1));
 

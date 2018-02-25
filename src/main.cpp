@@ -120,7 +120,7 @@ Array<String> setup_args(int argc, char **argv) {
 #if defined(GB_SYSTEM_WINDOWS)
 	int wargc = 0;
 	wchar_t **wargv = command_line_to_wargv(GetCommandLineW(), &wargc);
-	array_init(&args, a, wargc);
+	args = array_make<String>(a, 0, wargc);
 	for (i = 0; i < wargc; i++) {
 		wchar_t *warg = wargv[i];
 		isize wlen = string16_len(warg);
@@ -132,7 +132,7 @@ Array<String> setup_args(int argc, char **argv) {
 	}
 
 #else
-	array_init(&args, a, argc);
+	args = array_make<String>(a, 0, argc);
 	for (i = 0; i < argc; i++) {
 		String arg = make_string_c(argv[i]);
 		if (arg.len > 0) {
@@ -241,8 +241,7 @@ void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, Bu
 }
 
 bool parse_build_flags(Array<String> args) {
-	Array<BuildFlag> build_flags = {};
-	array_init(&build_flags, heap_allocator(), BuildFlag_COUNT);
+	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),             BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),             BuildFlagParam_Integer);
 	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),    BuildFlagParam_None);
@@ -594,8 +593,7 @@ void show_timings(Checker *c, Timings *t) {
 void remove_temp_files(String output_base) {
 	if (build_context.keep_temp_files) return;
 
-	Array<u8> data = {};
-	array_init_count(&data, heap_allocator(), output_base.len + 10);
+	auto data = array_make<u8>(heap_allocator(), output_base.len + 10);
 	defer (array_free(&data));
 
 	isize n = output_base.len;

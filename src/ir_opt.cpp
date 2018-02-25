@@ -276,8 +276,8 @@ void ir_opt_blocks(irProcedure *proc) {
 void ir_opt_build_referrers(irProcedure *proc) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
 
-	Array<irValue *> ops = {0}; // NOTE(bill): Act as a buffer
-	array_init(&ops, proc->module->tmp_allocator, 64); // HACK(bill): This _could_ overflow the temp arena
+	// NOTE(bill): Acta as a buffer
+	auto ops = array_make<irValue *>(proc->module->tmp_allocator, 0, 64); // TODO HACK(bill): This _could_ overflow the temp arena
 	for_array(i, proc->blocks) {
 		irBlock *b = proc->blocks[i];
 		for_array(j, b->instrs) {
