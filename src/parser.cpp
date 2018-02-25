@@ -4213,6 +4213,7 @@ skip:
 	file->id = imported_file.index;
 	array_add(&p->files, file);
 	p->total_line_count += file->tokenizer.line_count;
+	p->total_token_count += file->tokens.count;
 	gb_mutex_unlock(&p->file_add_mutex);
 
 	return ParseFile_None;
@@ -4258,7 +4259,6 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 	array_add(&p->imports, init_imported_file);
 	p->init_fullpath = init_fullpath;
 
-
 	// IMPORTANT TODO(bill): Figure out why this doesn't work on *nix sometimes
 #if USE_THREADED_PARSER && defined(GB_SYSTEM_WINDOWS)
 	isize thread_count = gb_max(build_context.thread_count, 1);
@@ -4297,7 +4297,8 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 					if (err != ParseFile_None) {
 						return err;
 					}
-					t->user_index = curr_import_index++;
+					t->user_index = curr_import_index;
+					curr_import_index++;
 					gb_thread_start(t, parse_worker_file_proc, p);
 					are_any_alive = true;
 				}
@@ -4306,7 +4307,6 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 				break;
 			}
 		}
-
 	} else {
 		for_array(i, p->imports) {
 			ParseFileError err = parse_import(p, p->imports[i]);
@@ -4316,7 +4316,6 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 		}
 	}
 #else
-
 	for_array(i, p->imports) {
 		ParseFileError err = parse_import(p, p->imports[i]);
 		if (err != ParseFile_None) {
@@ -4324,11 +4323,6 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 		}
 	}
 #endif
-
-	for_array(i, p->files) {
-		p->total_token_count += p->files[i]->tokens.count;
-	}
-
 
 	return ParseFile_None;
 }
