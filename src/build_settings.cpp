@@ -128,7 +128,6 @@ String odin_root_dir(void) {
 
 String odin_root_dir(void) {
 	String path = global_module_path;
-	Array<char> path_buf;
 	isize len, i;
 	gbTempArenaMemory tmp;
 	u8 *text;
@@ -137,7 +136,7 @@ String odin_root_dir(void) {
 		return global_module_path;
 	}
 
-	array_init_count(&path_buf, heap_allocator(), 300);
+	auto path_buf = array_make<char>(heap_allocator(), 300);
 
 	len = 0;
 	for (;;) {
@@ -184,7 +183,6 @@ String odin_root_dir(void) {
 
 String odin_root_dir(void) {
 	String path = global_module_path;
-	Array<char> path_buf;
 	isize len, i;
 	gbTempArenaMemory tmp;
 	u8 *text;
@@ -193,7 +191,7 @@ String odin_root_dir(void) {
 		return global_module_path;
 	}
 
-	array_init_count(&path_buf, heap_allocator(), 300);
+	auto path_buf = array_make<char>(heap_allocator(), 300);
 	defer (array_free(&path_buf));
 
 	len = 0;
