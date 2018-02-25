@@ -415,8 +415,10 @@ void     generate_map_internal_types(gbAllocator a, Type *type);
 
 
 Type *base_type(Type *t) {
+	Type *p = t;
 	for (;;) {
 		if (t == nullptr) {
+			t = p;
 			break;
 		}
 		if (t->kind != Type_Named) {
@@ -425,6 +427,7 @@ Type *base_type(Type *t) {
 		if (t == t->Named.base) {
 			return t_invalid;
 		}
+		p = t;
 		t = t->Named.base;
 	}
 	return t;
