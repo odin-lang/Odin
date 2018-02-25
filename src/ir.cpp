@@ -1655,7 +1655,7 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 	proc->curr_block = proc->blocks[0];
 
 	defer (proc->curr_block = tmp_block);
-	
+
 	irValue *c = ir_add_local_generated(proc, t_context);
 	array_add(&proc->context_stack, c);
 	ir_emit_store(proc, c, ir_emit_load(proc, proc->module->global_default_context));
@@ -7772,12 +7772,23 @@ bool ir_gen_init(irGen *s, Checker *c) {
 	// s->module.generate_debug_info = false;
 
 	String init_fullpath = c->parser->init_fullpath;
-	// TODO(bill): generate appropriate output name
-	int pos = cast(int)string_extension_position(init_fullpath);
-	int dir_pos = cast(int)string_extension_position(init_fullpath);
-	s->output_name = filename_from_path(init_fullpath);
-	s->output_base = make_string(init_fullpath.text, pos);
-	gbFileError err = gb_file_create(&s->output_file, gb_bprintf("%.*s.ll", LIT(s->output_base)));
+
+	if (build_context.out_filepath.len == 0) {
+		s->output_name = filename_from_path(init_fullpath);
+		s->output_base = s->output_name;
+	} else {
+		s->output_name = build_context.out_filepath;
+		isize pos = string_extension_position(s->output_name);
+		if (pos < 0) {
+			s->output_base = s->output_name;
+		} else {
+			s->output_base = substring(s->output_name, 0, pos);
+		}
+	}
+
+	gbString output_file_path = gb_string_make_length(heap_allocator(), s->output_base.text, s->output_base.len);
+	output_file_path = gb_string_appendc(output_file_path, ".ll");
+	gbFileError err = gb_file_create(&s->output_file, output_file_path);
 	if (err != gbFileError_None) {
 		return false;
 	}
