@@ -762,7 +762,7 @@ complete_switch :: proc() {
 
 
 main :: proc() {
-	when false {
+	when true {
 		general_stuff();
 		default_struct_values();
 		union_type();

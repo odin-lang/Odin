@@ -11,7 +11,7 @@ if %release_mode% EQU 0 ( rem Debug
 	set compiler_flags=%compiler_flags% -Od -MDd -Z7
 	rem -DDISPLAY_TIMING
 ) else ( rem Release
-	set compiler_flags=%compiler_flags% -O2 -MT -Z7
+	set compiler_flags=%compiler_flags% -O2 -MT -Z7 -DNO_ARRAY_BOUNDS_CHECK
 )
 
 set compiler_warnings= ^
@@ -24,7 +24,6 @@ set compiler_warnings= ^
 set compiler_includes=
 set libs= ^
 	kernel32.lib
-	rem "src\dyncall\lib\*.lib"
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console
 
