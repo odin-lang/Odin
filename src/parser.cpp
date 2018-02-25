@@ -4258,20 +4258,12 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 	array_add(&p->imports, init_imported_file);
 	p->init_fullpath = init_fullpath;
 
-/*
+
 	// IMPORTANT TODO(bill): Figure out why this doesn't work on *nix sometimes
 #if USE_THREADED_PARSER && defined(GB_SYSTEM_WINDOWS)
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	if (thread_count > 1) {
-		Array<gbThread> worker_threads = {};
-		array_init_count(&worker_threads, heap_allocator(), thread_count);
-		defer (array_free(&worker_threads));
-
-		for_array(i, p->imports) {
-			gbThread *t = &worker_threads[i];
-			gb_thread_init(t);
-		}
-		isize curr_import_index = 0;
+		isize volatile curr_import_index = 0;
 
 		// NOTE(bill): Make sure that these are in parsed in this order
 		for (isize i = 0; i < shared_file_count; i++) {
@@ -4282,6 +4274,18 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 			curr_import_index++;
 		}
 
+		Array<gbThread> worker_threads = {};
+		array_init_count(&worker_threads, heap_allocator(), thread_count);
+		defer (array_free(&worker_threads));
+
+		for_array(i, worker_threads) {
+			gbThread *t = &worker_threads[i];
+			gb_thread_init(t);
+		}
+		defer (for_array(i, worker_threads) {
+			gb_thread_destroy(&worker_threads[i]);
+		});
+
 		for (;;) {
 			bool are_any_alive = false;
 			for_array(i, worker_threads) {
@@ -4291,9 +4295,6 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 				} else if (curr_import_index < p->imports.count) {
 					auto err = cast(ParseFileError)t->return_value;
 					if (err != ParseFile_None) {
-						for_array(i, worker_threads) {
-							gb_thread_destroy(&worker_threads[i]);
-						}
 						return err;
 					}
 					t->user_index = curr_import_index++;
@@ -4306,9 +4307,6 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 			}
 		}
 
-		for_array(i, worker_threads) {
-			gb_thread_destroy(&worker_threads[i]);
-		}
 	} else {
 		for_array(i, p->imports) {
 			ParseFileError err = parse_import(p, p->imports[i]);
@@ -4317,15 +4315,15 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 			}
 		}
 	}
-#else */
-	isize import_index = 0;
-	for (; import_index < p->imports.count; import_index++) {
-		ParseFileError err = parse_import(p, p->imports[import_index]);
+#else
+
+	for_array(i, p->imports) {
+		ParseFileError err = parse_import(p, p->imports[i]);
 		if (err != ParseFile_None) {
 			return err;
 		}
 	}
-// #endif
+#endif
 
 	for_array(i, p->files) {
 		p->total_token_count += p->files[i]->tokens.count;
