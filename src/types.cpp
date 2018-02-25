@@ -96,7 +96,7 @@ struct TypeStruct {
 };
 
 #define TYPE_KINDS                                        \
-	TYPE_KIND(Basic,   BasicType)                         \
+	TYPE_KIND(Basic, BasicType)                           \
 	TYPE_KIND(Named, struct {                             \
 		String  name;                                     \
 		Type *  base;                                     \
@@ -156,7 +156,7 @@ struct TypeStruct {
 		Type *   results; /* Type_Tuple */                \
 		i32      param_count;                             \
 		i32      result_count;                            \
-		Type **  abi_compat_params;                       \
+		Array<Type *> abi_compat_params;                  \
 		Type *   abi_compat_result_type;                  \
 		bool     return_by_pointer;                       \
 		bool     variadic;                                \
@@ -172,12 +172,11 @@ struct TypeStruct {
 	})                                                    \
 	TYPE_KIND(BitFieldValue, struct { u32 bits; })        \
 	TYPE_KIND(BitField, struct {                          \
-		Scope *  scope;                                   \
-		Entity **fields;                                  \
-		i32      field_count;                             \
-		u32 *    offsets;                                 \
-		u32 *    sizes;                                   \
-		i64      custom_align;                            \
+		Array<Entity *> fields;                           \
+		Array<u32>      offsets;                          \
+		Array<u32>      sizes;                            \
+		Scope *         scope;                            \
+		i64             custom_align;                     \
 	})                                                    \
 
 
@@ -1159,9 +1158,9 @@ bool are_types_identical(Type *x, Type *y) {
 
 	case Type_BitField:
 		if (y->kind == Type_BitField) {
-			if (x->BitField.field_count == y->BitField.field_count &&
+			if (x->BitField.fields.count == y->BitField.fields.count &&
 			    x->BitField.custom_align == y->BitField.custom_align) {
-				for (i32 i = 0; i < x->BitField.field_count; i++) {
+				for (i32 i = 0; i < x->BitField.fields.count; i++) {
 					if (x->BitField.offsets[i] != y->BitField.offsets[i]) {
 						return false;
 					}
@@ -1509,7 +1508,7 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 	switch (type->kind) {
 	case Type_Struct:   max_count = type->Struct.fields.count;   break;
 	case Type_Tuple:    max_count = type->Tuple.variables.count; break;
-	case Type_BitField: max_count = type->BitField.field_count;  break;
+	case Type_BitField: max_count = type->BitField.fields.count; break;
 	}
 
 	if (index >= max_count) {
@@ -1719,7 +1718,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			}
 		}
 	} else if (type->kind == Type_BitField) {
-		for (isize i = 0; i < type->BitField.field_count; i++) {
+		for_array(i, type->BitField.fields) {
 			Entity *f = type->BitField.fields[i];
 			if (f->kind != Entity_Variable ||
 			    (f->flags & EntityFlag_BitFieldValue) == 0) {
@@ -2172,8 +2171,8 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	case Type_BitField: {
 		i64 align = 8*type_align_of_internal(allocator, t, path);
 		i64 end = 0;
-		if (t->BitField.field_count > 0) {
-			i64 last = t->BitField.field_count-1;
+		if (t->BitField.fields.count > 0) {
+			i64 last = t->BitField.fields.count-1;
 			end = t->BitField.offsets[last] + t->BitField.sizes[last];
 		}
 		i64 bits = align_formula(end, align);
@@ -2472,7 +2471,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 		}
 		str = gb_string_append_rune(str, '{');
 
-		for (isize i = 0; i < type->BitField.field_count; i++) {
+		for_array(i, type->BitField.fields)	{
 			Entity *f = type->BitField.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
 			GB_ASSERT(f->type != nullptr && f->type->kind == Type_BitFieldValue);

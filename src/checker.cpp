@@ -2037,8 +2037,7 @@ String path_to_entity_name(String name, String fullpath) {
 		slash = i;
 	}
 
-	filename.text += slash;
-	filename.len -= slash;
+	filename = substring(filename, slash, filename.len);
 
 	dot = filename.len;
 	while (dot --> 0) {
@@ -2048,7 +2047,7 @@ String path_to_entity_name(String name, String fullpath) {
 		}
 	}
 
-	filename.len = dot;
+	filename = substring(filename, 0, dot);
 
 	if (is_string_an_identifier(filename)) {
 		return filename;

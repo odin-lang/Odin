@@ -254,9 +254,7 @@ bool parse_build_flags(Array<String> args) {
 
 
 	GB_ASSERT(args.count >= 3);
-	Array<String> flag_args = args;
-	flag_args.data  += 3;
-	flag_args.count -= 3;
+	Array<String> flag_args = array_slice(args, 3, args.count);
 
 	bool set_flags[BuildFlag_COUNT] = {};
 
