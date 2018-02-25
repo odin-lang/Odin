@@ -74,3 +74,7 @@ destroy :: proc(thread: ^Thread) {
 	join(thread);
 	free(thread);
 }
+
+terminate :: proc(using thread : ^Thread, exit_code : u32) {
+	win32.terminate_thread(win32_thread, exit_code);
+}
