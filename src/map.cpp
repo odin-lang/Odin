@@ -136,13 +136,15 @@ template <typename T> void  multi_map_remove_all(Map<T> *h, HashKey key);
 
 template <typename T>
 gb_inline void map_init(Map<T> *h, gbAllocator a, isize capacity) {
-	array_init(&h->hashes,  a, capacity);
-	array_init(&h->entries, a, capacity);}
+	array_init(&h->hashes,  a, 0, capacity);
+	array_init(&h->entries, a, 0, capacity);
+}
 
 template <typename T>
 gb_inline void map_destroy(Map<T> *h) {
 	array_free(&h->entries);
-	array_free(&h->hashes);}
+	array_free(&h->hashes);
+}
 
 template <typename T>
 gb_internal isize map__add_entry(Map<T> *h, HashKey key) {

@@ -101,7 +101,7 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node);
 Array<AstNode *> clone_ast_node_array(gbAllocator a, Array<AstNode *> array) {
 	Array<AstNode *> result = {};
 	if (array.count > 0) {
-		array_init_count(&result, a, array.count);
+		result = array_make<AstNode *>(a, array.count);
 		for_array(i, array) {
 			result[i] = clone_ast_node(a, array[i]);
 		}
@@ -1413,7 +1413,7 @@ AstNode *unparen_expr(AstNode *node) {
 AstNode *parse_value(AstFile *f);
 
 Array<AstNode *> parse_element_list(AstFile *f) {
-	Array<AstNode *> elems = make_ast_node_array(f);
+	auto elems = array_make<AstNode *>(heap_allocator());
 
 	while (f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
@@ -1581,7 +1581,7 @@ AstNode *convert_stmt_to_body(AstFile *f, AstNode *stmt) {
 	GB_ASSERT(is_ast_node_stmt(stmt) || is_ast_node_decl(stmt));
 	Token open = ast_node_token(stmt);
 	Token close = ast_node_token(stmt);
-	Array<AstNode *> stmts = make_ast_node_array(f, 1);
+	auto stmts = array_make<AstNode *>(heap_allocator(), 0, 1);
 	array_add(&stmts, stmt);
 	return ast_block_stmt(f, stmts, open, close);
 }
@@ -1701,8 +1701,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		if (f->curr_token.kind == Token_OpenBracket) { // ProcGroup
 			Token open = expect_token(f, Token_OpenBracket);
 
-			Array<AstNode *> args = {};
-			array_init(&args, heap_allocator());
+			auto args = array_make<AstNode *>(heap_allocator());
 
 			while (f->curr_token.kind != Token_CloseBracket &&
 			       f->curr_token.kind != Token_EOF) {
@@ -1887,7 +1886,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	case Token_union: {
 		Token token = expect_token(f, Token_union);
 		Token open = expect_token_after(f, Token_OpenBrace, "union");
-		Array<AstNode *> variants = make_ast_node_array(f);
+		auto variants = array_make<AstNode *>(heap_allocator());
 		isize total_decl_name_count = 0;
 		AstNode *align = nullptr;
 
@@ -1956,7 +1955,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_bit_field: {
 		Token token = expect_token(f, Token_bit_field);
-		Array<AstNode *> fields = make_ast_node_array(f);
+		auto fields = array_make<AstNode *>(heap_allocator());
 		AstNode *align = nullptr;
 		Token open, close;
 
@@ -2036,7 +2035,7 @@ bool is_literal_type(AstNode *node) {
 }
 
 AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
-	Array<AstNode *> args = make_ast_node_array(f);
+	auto args = array_make<AstNode *>(heap_allocator());
 	Token open_paren, close_paren;
 	Token ellipsis = {};
 
@@ -2322,7 +2321,7 @@ AstNode *parse_expr(AstFile *f, bool lhs) {
 
 
 Array<AstNode *> parse_expr_list(AstFile *f, bool lhs) {
-	Array<AstNode *> list = make_ast_node_array(f);
+	auto list = array_make<AstNode *>(heap_allocator());
 	for (;;) {
 		AstNode *e = parse_expr(f, lhs);
 		array_add(&list, e);
@@ -2345,16 +2344,16 @@ Array<AstNode *> parse_rhs_expr_list(AstFile *f) {
 }
 
 Array<AstNode *> parse_ident_list(AstFile *f) {
-	Array<AstNode *> list = make_ast_node_array(f);
+	auto list = array_make<AstNode *>(heap_allocator());
 
-	do {
+	for (;;) {
 		array_add(&list, parse_ident(f));
 		if (f->curr_token.kind != Token_Comma ||
 		    f->curr_token.kind == Token_EOF) {
 		    break;
 		}
 		advance_token(f);
-	} while (true);
+	}
 
 	return list;
 }
@@ -2398,7 +2397,7 @@ AstNode *parse_foreign_block(AstFile *f, Token token) {
 	}
 	Token open = {};
 	Token close = {};
-	Array<AstNode *> decls = make_ast_node_array(f);
+	auto decls = array_make<AstNode *>(heap_allocator());
 
 	bool prev_in_foreign_block = f->in_foreign_block;
 	defer (f->in_foreign_block = prev_in_foreign_block);
@@ -2468,7 +2467,7 @@ AstNode *parse_value_decl(AstFile *f, Array<AstNode *> names, CommentGroup docs)
 	}
 
 	if (values.data == nullptr) {
-		values = make_ast_node_array(f);
+		values = array_make<AstNode *>(heap_allocator());
 	}
 
 	if (f->expr_level >= 0) {
@@ -2531,7 +2530,7 @@ AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 			AstNode *expr = parse_expr(f, false);
 			f->allow_range = prev_allow_range;
 
-			Array<AstNode *> rhs = make_ast_node_array(f, 1);
+			auto rhs = array_make<AstNode *>(heap_allocator(), 0, 1);
 			array_add(&rhs, expr);
 
 			return ast_assign_stmt(f, token, lhs, rhs);
@@ -2610,7 +2609,7 @@ AstNode *parse_results(AstFile *f) {
 		CommentGroup empty_group = {};
 		Token begin_token = f->curr_token;
 		Array<AstNode *> empty_names = {};
-		Array<AstNode *> list = make_ast_node_array(f, 1);
+		auto list = array_make<AstNode *>(heap_allocator(), 0, 1);
 		AstNode *type = parse_type(f);
 		array_add(&list, ast_field(f, empty_names, type, nullptr, 0, empty_group, empty_group));
 		return ast_field_list(f, begin_token, list);
@@ -2814,7 +2813,7 @@ struct AstNodeAndFlags {
 };
 
 Array<AstNode *> convert_to_ident_list(AstFile *f, Array<AstNodeAndFlags> list, bool ignore_flags) {
-	Array<AstNode *> idents = make_ast_node_array(f, list.count);
+	auto idents = array_make<AstNode *>(heap_allocator(), 0, list.count);
 	// Convert to ident list
 	for_array(i, list) {
 		AstNode *ident = list[i].node;
@@ -2880,7 +2879,7 @@ AstNode *parse_struct_field_list(AstFile *f, isize *name_count_) {
 	CommentGroup docs = f->lead_comment;
 	Token start_token = f->curr_token;
 
-	Array<AstNode *> decls = make_ast_node_array(f);
+	auto decls = array_make<AstNode *>(heap_allocator());
 
 	isize total_name_count = 0;
 
@@ -2895,9 +2894,9 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 
 	CommentGroup docs = f->lead_comment;
 
-	Array<AstNode *> params = make_ast_node_array(f);
+	auto params = array_make<AstNode *>(heap_allocator());
 
-	Array<AstNodeAndFlags> list = {}; array_init(&list, heap_allocator());
+	auto list = array_make<AstNodeAndFlags>(heap_allocator());
 	defer (array_free(&list));
 
 	isize total_name_count = 0;
@@ -3027,7 +3026,6 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 	}
 
 	for_array(i, list) {
-		Array<AstNode *> names = {};
 		AstNode *type = list[i].node;
 		Token token = blank_token;
 		if (allowed_flags&FieldFlag_Results) {
@@ -3035,7 +3033,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 			token.string = str_lit("");
 		}
 
-		array_init_count(&names, heap_allocator(), 1);
+		auto names = array_make<AstNode *>(heap_allocator(), 1);
 		token.pos = ast_node_token(type).pos;
 		names[0] = ast_ident(f, token);
 		u32 flags = check_field_prefixes(f, list.count, allowed_flags, list[i].flags);
@@ -3203,7 +3201,7 @@ AstNode *parse_return_stmt(AstFile *f) {
 	}
 
 	Token token = expect_token(f, Token_return);
-	Array<AstNode *> results = make_ast_node_array(f);
+	auto results = array_make<AstNode *>(heap_allocator());
 
 	while (f->curr_token.kind != Token_Semicolon) {
 		AstNode *arg = parse_expr(f, false);
@@ -3352,7 +3350,7 @@ AstNode *parse_switch_stmt(AstFile *f) {
 	AstNode *body = nullptr;
 	Token open, close;
 	bool is_type_match = false;
-	Array<AstNode *> list = make_ast_node_array(f);
+	auto list = array_make<AstNode *>(heap_allocator());
 
 	if (f->curr_token.kind != Token_OpenBrace) {
 		isize prev_level = f->expr_level;
@@ -3360,8 +3358,8 @@ AstNode *parse_switch_stmt(AstFile *f) {
 		defer (f->expr_level = prev_level);
 
 		if (allow_token(f, Token_in)) {
-			Array<AstNode *> lhs = make_ast_node_array(f, 1);
-			Array<AstNode *> rhs = make_ast_node_array(f, 1);
+			auto lhs = array_make<AstNode *>(heap_allocator(), 0, 1);
+			auto rhs = array_make<AstNode *>(heap_allocator(), 0, 1);
 			Token blank_ident = token;
 			blank_ident.kind = Token_Ident;
 			blank_ident.string = str_lit("_");
@@ -3663,7 +3661,7 @@ AstNode *parse_stmt(AstFile *f) {
 		Token open = expect_token(f, Token_OpenParen);
 		f->expr_level++;
 		if (f->curr_token.kind != Token_CloseParen) {
-			elems = make_ast_node_array(f);
+			elems = array_make<AstNode *>(heap_allocator());
 			while (f->curr_token.kind != Token_CloseParen &&
 			       f->curr_token.kind != Token_EOF) {
 				AstNode *elem = parse_ident(f);
@@ -3777,7 +3775,7 @@ AstNode *parse_stmt(AstFile *f) {
 }
 
 Array<AstNode *> parse_stmt_list(AstFile *f) {
-	Array<AstNode *> list = make_ast_node_array(f);
+	auto list = array_make<AstNode *>(heap_allocator());
 
 	while (f->curr_token.kind != Token_case &&
 	       f->curr_token.kind != Token_CloseBrace &&
@@ -3798,6 +3796,7 @@ Array<AstNode *> parse_stmt_list(AstFile *f) {
 
 
 ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
+	GB_ASSERT(f != nullptr);
 	f->fullpath = string_trim_whitespace(fullpath); // Just in case
 	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {
 		return ParseFile_WrongExtension;
@@ -3819,7 +3818,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 
 	isize file_size = f->tokenizer.end - f->tokenizer.start;
 	isize init_token_cap = cast(isize)gb_max(next_pow2(cast(i64)(file_size/2ll)), 16);
-	array_init(&f->tokens, heap_allocator(), gb_max(init_token_cap, 16));
+	array_init(&f->tokens, heap_allocator(), 0, gb_max(init_token_cap, 16));
 
 	if (err == TokenizerInit_Empty) {
 		Token token = {Token_EOF};
@@ -3861,6 +3860,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 }
 
 void destroy_ast_file(AstFile *f) {
+	GB_ASSERT(f != nullptr);
 	gb_arena_free(&f->arena);
 	array_free(&f->tokens);
 	array_free(&f->comments);
@@ -3870,6 +3870,7 @@ void destroy_ast_file(AstFile *f) {
 }
 
 bool init_parser(Parser *p) {
+	GB_ASSERT(p != nullptr);
 	array_init(&p->files, heap_allocator());
 	array_init(&p->imports, heap_allocator());
 	gb_mutex_init(&p->file_add_mutex);
@@ -3878,6 +3879,7 @@ bool init_parser(Parser *p) {
 }
 
 void destroy_parser(Parser *p) {
+	GB_ASSERT(p != nullptr);
 	// TODO(bill): Fix memory leak
 	for_array(i, p->files) {
 		destroy_ast_file(p->files[i]);
@@ -4274,8 +4276,7 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 			curr_import_index++;
 		}
 
-		Array<gbThread> worker_threads = {};
-		array_init_count(&worker_threads, heap_allocator(), thread_count);
+		auto worker_threads = array_make<gbThread>(heap_allocator(), thread_count);
 		defer (array_free(&worker_threads));
 
 		for_array(i, worker_threads) {

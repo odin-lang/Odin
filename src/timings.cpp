@@ -84,7 +84,7 @@ TimeStamp make_time_stamp(String label) {
 }
 
 void timings_init(Timings *t, String label, isize buffer_size) {
-	array_init(&t->sections, heap_allocator(), buffer_size);
+	array_init(&t->sections, heap_allocator(), 0, buffer_size);
 	t->total = make_time_stamp(label);
 	t->freq  = time_stamp__freq();
 }

@@ -100,8 +100,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, Array<AstNo
 
 	// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 	// an extra allocation
-	Array<Operand> operands = {};
-	array_init(&operands, c->tmp_allocator, 2*lhs_count);
+	auto operands = array_make<Operand>(c->tmp_allocator, 0, 2*lhs_count);
 	check_unpack_arguments(c, lhs, lhs_count, &operands, inits, true);
 
 	isize rhs_count = operands.count;
@@ -758,7 +757,7 @@ void check_proc_group_decl(Checker *c, Entity *pg_entity, DeclInfo *d) {
 
 	ast_node(pg, ProcGroup, d->init_expr);
 
-	array_init(&pge->entities, c->allocator, pg->args.count);
+	pge->entities = array_make<Entity*>(c->allocator, 0, pg->args.count);
 
 	// NOTE(bill): This must be set here to prevent cycles in checking if someone
 	// places the entity within itself

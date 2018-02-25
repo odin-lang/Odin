@@ -148,13 +148,6 @@ enum StmtAllowFlag {
 
 
 
-Array<AstNode *> make_ast_node_array(AstFile *f, isize init_capacity = 8) {
-	Array<AstNode *> a;
-	array_init(&a, heap_allocator(), init_capacity);
-	return a;
-}
-
-
 // NOTE(bill): This massive define is so it is possible to create a discriminated union (and extra debug info)
 // for the AstNode. I personally prefer discriminated unions over subtype polymorphism as I can preallocate
 // all the nodes and even memcpy in a different kind of node

@@ -790,8 +790,7 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 		defer (gb_temp_arena_memory_end(tmp));
 
-		Array<Entity *> unhandled = {};
-		array_init(&unhandled, c->tmp_allocator, fields.count);
+		auto unhandled = array_make<Entity *>(c->tmp_allocator, 0, fields.count);
 
 		for_array(i, fields) {
 			Entity *f = fields[i];
@@ -1020,8 +1019,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 		defer (gb_temp_arena_memory_end(tmp));
 
-		Array<Type *> unhandled = {};
-		array_init(&unhandled, c->tmp_allocator, variants.count);
+		auto unhandled = array_make<Type *>(c->tmp_allocator, 0, variants.count);
 
 		for_array(i, variants) {
 			Type *t = variants[i];
@@ -1117,10 +1115,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 			// an extra allocation
-			Array<Operand> lhs_operands = {};
-			Array<Operand> rhs_operands = {};
-			array_init_count(&lhs_operands, c->tmp_allocator, lhs_count);
-			array_init(&rhs_operands, c->tmp_allocator, 2 * lhs_count);
+			auto lhs_operands = array_make<Operand>(c->tmp_allocator, lhs_count);
+			auto rhs_operands = array_make<Operand>(c->tmp_allocator, 0, 2*lhs_count);
 
 			for_array(i, as->lhs) {
 				if (is_blank_ident(as->lhs[i])) {
@@ -1233,30 +1229,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			break;
 		}
 
-		// bool first_is_field_value = false;
-		// if (rs->results.count > 0) {
-		// 	bool fail = false;
-		// 	first_is_field_value = (rs->results[0]->kind == AstNode_FieldValue);
-		// 	for_array(i, rs->results) {
-		// 		AstNode *arg = rs->results[i];
-		// 		bool mix = false;
-		// 		if (first_is_field_value) {
-		// 			mix = arg->kind != AstNode_FieldValue;
-		// 		} else {
-		// 			mix = arg->kind == AstNode_FieldValue;
-		// 		}
-		// 		if (mix) {
-		// 			error(arg, "Mixture of 'field = value' and value elements in a procedure all is not allowed");
-		// 			fail = true;
-		// 		}
-		// 	}
-
-		// 	if (fail) {
-		// 		return;
-		// 	}
-		// }
-
-
 		Type *proc_type = c->proc_stack[c->proc_stack.count-1];
 		TypeProc *pt = &proc_type->Proc;
 		isize result_count = 0;
@@ -1266,36 +1238,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 
 
-		// isize result_count_excluding_defaults = result_count;
-		// for (isize i = result_count-1; i >= 0; i--) {
-		// 	Entity *e = pt->results->Tuple.variables[i];
-		// 	if (e->kind == Entity_TypeName) {
-		// 		break;
-		// 	}
-
-		// 	GB_ASSERT(e->kind == Entity_Variable);
-		// 	if (e->Variable.default_value.kind != ExactValue_Invalid ||
-		// 	    e->Variable.default_is_nil) {
-		// 		result_count_excluding_defaults--;
-		// 		continue;
-		// 	}
-		// 	break;
-		// }
-
-		Array<Operand> operands = {};
+		auto operands = array_make<Operand>(heap_allocator(), 0, 2*rs->results.count);
 		defer (array_free(&operands));
 
-		// if (first_is_field_value) {
-		// 	array_init_count(&operands, heap_allocator(), rs->results.count);
-		// 	for_array(i, rs->results) {
-		// 		AstNode *arg = rs->results[i];
-		// 		ast_node(fv, FieldValue, arg);
-		// 		check_expr(c, &operands[i], fv->value);
-		// 	}
-		// } else {
-			array_init(&operands, heap_allocator(), 2*rs->results.count);
-			check_unpack_arguments(c, nullptr, -1, &operands, rs->results, false);
-		// }
+		check_unpack_arguments(c, nullptr, -1, &operands, rs->results, false);
 
 		if (result_count == 0 && rs->results.count > 0) {
 			error(rs->results[0], "No return values expected");

@@ -1522,8 +1522,7 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 			Entity *f = type->Struct.fields[i];
 			if (f->kind == Entity_Variable) {
 				if (f->Variable.field_src_index == index) {
-					Array<i32> sel_array = {0};
-					array_init_count(&sel_array, a, 1);
+					auto sel_array = array_make<i32>(a, 1);
 					sel_array[0] = cast(i32)i;
 					return make_selection(f, sel_array, false);
 				}
@@ -1534,8 +1533,7 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 		for (isize i = 0; i < max_count; i++) {
 			Entity *f = type->Tuple.variables[i];
 			if (i == index) {
-				Array<i32> sel_array = {0};
-				array_init_count(&sel_array, a, 1);
+				auto sel_array = array_make<i32>(a, 1);
 				sel_array[0] = cast(i32)i;
 				return make_selection(f, sel_array, false);
 			}
@@ -1543,8 +1541,7 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 		break;
 
 	case Type_BitField: {
-		Array<i32> sel_array = {0};
-		array_init_count(&sel_array, a, 1);
+		auto sel_array = array_make<i32>(a, 1);
 		sel_array[0] = cast(i32)index;
 		return make_selection(type->BitField.fields[index], sel_array, false);
 	} break;
@@ -1979,8 +1976,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 }
 
 Array<i64> type_set_offsets_of(gbAllocator allocator, Array<Entity *> fields, bool is_packed, bool is_raw_union) {
-	Array<i64> offsets = {};
-	array_init_count(&offsets, allocator, fields.count);
+	auto offsets = array_make<i64>(allocator, fields.count);
 	i64 curr_offset = 0;
 	if (is_raw_union) {
 		for_array(i, fields) {
