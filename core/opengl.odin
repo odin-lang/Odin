@@ -31,7 +31,7 @@ foreign lib {
 	Color3f        :: proc(r, g, b: f32) ---;
 	Vertex3f       :: proc(x, y, z: f32) ---;
 	GetError       :: proc() -> i32 ---;
-	GetString      :: proc(name: i32) -> ^u8 ---;
+	GetString      :: proc(name: i32) -> cstring ---;
 	GetIntegerv    :: proc(name: i32, v: ^i32) ---;
 	TexCoord2f     :: proc(x, y: f32) ---;
 	TexImage2D     :: proc(target, level, internal_format: i32,
@@ -40,9 +40,7 @@ foreign lib {
 }
 
 
-_string_data :: inline proc(s: string) -> ^u8 do return &s[0];
-
-_libgl := win32.load_library_a(_string_data("opengl32.dll\x00"));
+_libgl := win32.load_library_a("opengl32.dll");
 
 get_gl_proc_address :: proc(name: string) -> rawptr {
 	if name[len(name)-1] == 0 {
@@ -50,9 +48,9 @@ get_gl_proc_address :: proc(name: string) -> rawptr {
 	}
 	// NOTE(bill): null terminated
 	assert((&name[0] + len(name))^ == 0);
-	res := wgl.get_gl_proc_address(&name[0]);
+	res := wgl.get_gl_proc_address(cstring(&name[0]));
 	if res == nil {
-		res = win32.get_proc_address(_libgl, &name[0]);
+		res = win32.get_proc_address(_libgl, cstring(&name[0]));
 	}
 	return rawptr(res);
 }
@@ -79,7 +77,7 @@ get_gl_proc_address :: proc(name: string) -> rawptr {
 	EnableVertexAttribArray:  proc "c" (index: u32);
 
 	CreateShader:             proc "c" (shader_type: i32) -> u32;
-	ShaderSource:             proc "c" (shader: u32, count: u32, str: ^^u8, length: ^i32);
+	ShaderSource:             proc "c" (shader: u32, count: u32, str: ^cstring, length: ^i32);
 	CompileShader:            proc "c" (shader: u32);
 	CreateProgram:            proc "c" () -> u32;
 	AttachShader:             proc "c" (program, shader: u32);
@@ -92,8 +90,8 @@ get_gl_proc_address :: proc(name: string) -> rawptr {
 
 	GetShaderiv:              proc "c" (shader:  u32, pname: i32, params: ^i32);
 	GetProgramiv:             proc "c" (program: u32, pname: i32, params: ^i32);
-	GetShaderInfoLog:         proc "c" (shader:  u32, max_length: u32, length: ^u32, info_long: ^u8);
-	GetProgramInfoLog:        proc "c" (program: u32, max_length: u32, length: ^u32, info_long: ^u8);
+	GetShaderInfoLog:         proc "c" (shader:  u32, max_length: u32, length: ^u32, info_long: cstring);
+	GetProgramInfoLog:        proc "c" (program: u32, max_length: u32, length: ^u32, info_long: cstring);
 
 	ActiveTexture:            proc "c" (texture: i32);
 	GenerateMipmap:           proc "c" (target:  i32);
@@ -116,7 +114,7 @@ get_gl_proc_address :: proc(name: string) -> rawptr {
 	Uniform4f:                proc "c" (loc: i32, v0, v1, v2, v3: f32);
 	UniformMatrix4fv:         proc "c" (loc: i32, count: u32, transpose: i32, value: ^f32);
 
-	GetUniformLocation:       proc "c" (program: u32, name: ^u8) -> i32;
+	GetUniformLocation:       proc "c" (program: u32, name: cstring) -> i32;
 
 
 init :: proc() {

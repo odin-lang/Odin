@@ -98,7 +98,7 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 	buf: [300]byte;
 	copy(buf[..], cast([]byte)path);
 
-	handle := Handle(win32.create_file_a(&buf[0], access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
+	handle := Handle(win32.create_file_a(cstring(&buf[0]), access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
 	if handle != INVALID_HANDLE do return handle, ERROR_NONE;
 
 	err := Errno(win32.get_last_error());
@@ -219,7 +219,7 @@ last_write_time_by_name :: proc(name: string) -> File_Time {
 
 	copy(buf[..], cast([]byte)name);
 
-	if win32.get_file_attributes_ex_a(&buf[0], win32.GetFileExInfoStandard, &data) {
+	if win32.get_file_attributes_ex_a(cstring(&buf[0]), win32.GetFileExInfoStandard, &data) {
 		last_write_time = data.last_write_time;
 	}
 
@@ -272,7 +272,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 
         buf := make([]byte, olen);
        	n := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, wc_str, -1,
-       	                                   &buf[0], olen, nil, nil);
+       	                                   cstring(&buf[0]), olen, nil, nil);
        	if n > 0 {
        		n -= 1;
        	}
