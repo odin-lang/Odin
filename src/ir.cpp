@@ -2421,7 +2421,10 @@ irValue *ir_emit_union_tag_value(irProcedure *proc, irValue *u) {
 
 irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue *x) {
 	Type *t = ir_type(x);
-	if (is_type_any(t)) {
+	if (is_type_cstring(t)) {
+		irValue *ptr = ir_emit_conv(proc, x, t_u8_ptr);
+		return ir_emit_comp(proc, op_kind, ptr, v_raw_nil);
+	} else if (is_type_any(t)) {
 		irValue *data = ir_emit_struct_ev(proc, x, 0);
 		irValue *ti   = ir_emit_struct_ev(proc, x, 1);
 		if (op_kind == Token_CmpEq) {
@@ -3130,7 +3133,10 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return ir_emit(proc, ir_instr_conv(proc, irConv_zext, b, t_llvm_bool, t));
 	}
 
-	if (src == t_cstring && is_type_u8_ptr(dst)) {
+	if (is_type_cstring(src) && is_type_u8_ptr(dst)) {
+		return ir_emit_bitcast(proc, value, dst);
+	}
+	if (is_type_u8_ptr(src) && is_type_cstring(dst)) {
 		return ir_emit_bitcast(proc, value, dst);
 	}
 
