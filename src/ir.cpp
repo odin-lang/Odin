@@ -2890,6 +2890,14 @@ irValue *ir_string_len(irProcedure *proc, irValue *string) {
 	return ir_emit_struct_ev(proc, string, 1);
 }
 
+irValue *ir_cstring_len(irProcedure *proc, irValue *value) {
+	GB_ASSERT(is_type_cstring(ir_type(value)));
+	auto args = array_make<irValue *>(proc->module->allocator, 1);
+	args[0] = ir_emit_conv(proc, value, t_cstring);
+	return ir_emit_global_call(proc, "__cstring_len", args);
+}
+
+
 
 void ir_fill_slice(irProcedure *proc, irValue *slice_ptr, irValue *data, irValue *len) {
 	Type *t = ir_type(slice_ptr);
@@ -3120,6 +3128,18 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 		irValue *b = ir_emit(proc, ir_instr_binary_op(proc, Token_NotEq, value, v_zero, t_llvm_bool));
 		return ir_emit(proc, ir_instr_conv(proc, irConv_zext, b, t_llvm_bool, t));
+	}
+
+	if (src == t_cstring && is_type_u8_ptr(dst)) {
+		return ir_emit_bitcast(proc, value, dst);
+	}
+
+	if (src == t_cstring && dst == t_string) {
+		irValue *c = ir_emit_conv(proc, value, t_cstring);
+		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		args[0] = c;
+		irValue *s = ir_emit_global_call(proc, "__cstring_to_string", args);
+		return ir_emit_conv(proc, s, dst);
 	}
 
 
@@ -4171,7 +4191,9 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			v = ir_emit_load(proc, v);
 			t = type_deref(t);
 		}
-		if (is_type_string(t)) {
+		if (is_type_cstring(t)) {
+			return ir_cstring_len(proc, v);
+		} else if (is_type_string(t)) {
 			return ir_string_len(proc, v);
 		} else if (is_type_array(t)) {
 			GB_PANIC("Array lengths are constant");
@@ -7900,6 +7922,11 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 
 			case Basic_string:
 				tag = ir_emit_conv(proc, variant_ptr, t_type_info_string_ptr);
+				break;
+
+			case Basic_cstring:
+				tag = ir_emit_conv(proc, variant_ptr, t_type_info_string_ptr);
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), v_true); // is_cstring
 				break;
 
 			case Basic_any:

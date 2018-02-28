@@ -1786,7 +1786,19 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 			return true;
 		// }
 	}
+	// cstring -> string
+	if (src == t_cstring && dst == t_string) {
+		return true;
+	}
+	// cstring -> ^u8
+	if (src == t_cstring && is_type_u8_ptr(dst)) {
+		return true;
+	}
 
+	// ^u8 -> cstring
+	if (is_type_u8_ptr(src) && dst == t_cstring) {
+		return true;
+	}
 	// proc <-> proc
 	if (is_type_proc(src) && is_type_proc(dst)) {
 		return true;
@@ -5005,7 +5017,7 @@ bool check_set_index_data(Operand *o, Type *type, bool indirection, i64 *max_cou
 
 	switch (t->kind) {
 	case Type_Basic:
-		if (is_type_string(t)) {
+		if (t->Basic.kind == Basic_string) {
 			if (o->mode == Addressing_Constant) {
 				*max_count = o->value.value_string.len;
 			}
@@ -5904,7 +5916,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		Type *t = base_type(type_deref(o->type));
 		switch (t->kind) {
 		case Type_Basic:
-			if (is_type_string(t)) {
+			if (t->Basic.kind == Basic_string) {
 				valid = true;
 				if (o->mode == Addressing_Constant) {
 					max_count = o->value.value_string.len;
