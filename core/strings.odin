@@ -1,4 +1,5 @@
 import "core:mem.odin"
+import "core:raw.odin"
 
 new_string :: proc(s: string) -> string {
 	c := make([]byte, len(s)+1);
@@ -17,6 +18,10 @@ new_cstring :: proc(s: string) -> cstring {
 to_odin_string :: proc(str: cstring) -> string {
 	if str == nil do return "";
 	return string(str);
+}
+
+string_from_ptr :: proc(ptr: ^byte, len: int) -> string {
+	return transmute(string)raw.String{ptr, len};
 }
 
 contains_rune :: proc(s: string, r: rune) -> int {
