@@ -340,6 +340,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		case Basic_any:     ir_write_str_lit(f, "%..any");              return;
 		case Basic_rawptr:  ir_write_str_lit(f, "%..rawptr");           return;
 		case Basic_string:  ir_write_str_lit(f, "%..string");           return;
+		case Basic_cstring: ir_write_str_lit(f, "i8*");                 return;
 
 		}
 		break;
@@ -551,11 +552,25 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_write_str_lit(f, "zeroinitializer");
 			break;
 		}
+		Type *t = core_type(type);
 		if (!is_type_string(type)) {
 			GB_ASSERT(is_type_array(type));
 			ir_write_str_lit(f, "c\"");
 			ir_print_escape_string(f, str, false, false);
 			ir_write_str_lit(f, "\\00\"");
+		} else if (t == t_cstring) {
+			// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
+			// of the .ll file
+			irValue *str_array = ir_add_global_string_array(m, str);
+			ir_write_str_lit(f, "getelementptr inbounds (");
+			ir_print_type(f, m, str_array->Global.entity->type);
+			ir_write_str_lit(f, ", ");
+			ir_print_type(f, m, str_array->Global.entity->type);
+			ir_write_str_lit(f, "* ");
+			ir_print_encoded_global(f, str_array->Global.entity->token.string, false);
+			ir_write_str_lit(f, ", ");
+			ir_print_type(f, m, t_int);
+			ir_write_str_lit(f, " 0, i32 0)");
 		} else {
 			// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
 			// of the .ll file

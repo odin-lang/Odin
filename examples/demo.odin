@@ -761,6 +761,23 @@ complete_switch :: proc() {
 }
 
 
+cstring_example :: proc() {
+	W :: "Hellope";
+	X :: cstring(W);
+	Y :: string(X);
+
+	w := W;
+	x: cstring = X;
+	y: string = Y;
+	z := string(x);
+	fmt.println(x, y, z);
+	fmt.println(len(x), len(y), len(z));
+	fmt.println(len(W), len(X), len(Y));
+	// IMPORTANT NOTE for cstring variables
+	// len(cstring) is O(N)
+	// cast(cstring)string is O(N)
+}
+
 main :: proc() {
 	when true {
 		general_stuff();
@@ -774,5 +791,6 @@ main :: proc() {
 		enum_export();
 		explicit_procedure_overloading();
 		complete_switch();
+		cstring_example();
 	}
 }

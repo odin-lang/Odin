@@ -178,7 +178,11 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 		write_string(buf, "complex");
 		write_i64(buf, i64(8*ti.size), 10);
 	case Type_Info_String:
-		write_string(buf, "string");
+		if info.is_cstring {
+			write_string(buf, "cstring");
+		} else {
+			write_string(buf, "string");
+		}
 	case Type_Info_Boolean:
 		a := any{type_info = ti};
 		switch _ in a {
@@ -599,6 +603,9 @@ fmt_string :: proc(fi: ^Fmt_Info, s: string, verb: rune) {
 		fmt_bad_verb(fi, verb);
 	}
 }
+fmt_cstring :: proc(fi: ^Fmt_Info, s: cstring, verb: rune) {
+	fmt_string(fi, string(s), verb);
+}
 
 fmt_pointer :: proc(fi: ^Fmt_Info, p: rawptr, verb: rune) {
 	switch verb {
@@ -974,6 +981,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	case uintptr: fmt_int(fi, u64(a), false, 8*size_of(uintptr), verb);
 
 	case string:  fmt_string(fi, a, verb);
+	case cstring: fmt_cstring(fi, a, verb);
 
 	case:         fmt_value(fi, arg, verb);
 	}

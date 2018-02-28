@@ -34,8 +34,9 @@ enum BasicKind {
 	Basic_uint,
 	Basic_uintptr,
 	Basic_rawptr,
-	Basic_string, // ^u8 + int
-	Basic_any,    // rawptr + ^Type_Info
+	Basic_string,  // ^u8 + int
+	Basic_cstring, // ^u8
+	Basic_any,     // rawptr + ^Type_Info
 
 	Basic_UntypedBool,
 	Basic_UntypedInteger,
@@ -277,6 +278,7 @@ gb_global Type basic_types[] = {
 
 	{Type_Basic, {Basic_rawptr,            BasicFlag_Pointer,                         -1, STR_LIT("rawptr")}},
 	{Type_Basic, {Basic_string,            BasicFlag_String,                          -1, STR_LIT("string")}},
+	{Type_Basic, {Basic_cstring,           BasicFlag_String,                          -1, STR_LIT("cstring")}},
 	{Type_Basic, {Basic_any,               0,                                         -1, STR_LIT("any")}},
 
 	{Type_Basic, {Basic_UntypedBool,       BasicFlag_Boolean    | BasicFlag_Untyped,   0, STR_LIT("untyped bool")}},
@@ -322,6 +324,7 @@ gb_global Type *t_uintptr         = &basic_types[Basic_uintptr];
 
 gb_global Type *t_rawptr          = &basic_types[Basic_rawptr];
 gb_global Type *t_string          = &basic_types[Basic_string];
+gb_global Type *t_cstring         = &basic_types[Basic_cstring];
 gb_global Type *t_any             = &basic_types[Basic_any];
 
 gb_global Type *t_untyped_bool       = &basic_types[Basic_UntypedBool];
@@ -690,6 +693,13 @@ bool is_type_string(Type *t) {
 	}
 	return false;
 }
+bool is_type_cstring(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
+		return t->Basic.kind == Basic_cstring;
+	}
+	return false;
+}
 bool is_type_typed(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) {
@@ -798,6 +808,13 @@ bool is_type_slice(Type *t) {
 bool is_type_u8_slice(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Slice) {
+		return is_type_u8(t->Slice.elem);
+	}
+	return false;
+}
+bool is_type_u8_ptr(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Pointer) {
 		return is_type_u8(t->Slice.elem);
 	}
 	return false;
@@ -933,7 +950,7 @@ bool is_type_indexable(Type *t) {
 	Type *bt = base_type(t);
 	switch (bt->kind) {
 	case Type_Basic:
-		return is_type_string(bt);
+		return bt->Basic.kind == Basic_string;
 	case Type_Array:
 	case Type_Slice:
 	case Type_DynamicArray:
@@ -1101,6 +1118,8 @@ bool is_type_comparable(Type *t) {
 			return false;
 		case Basic_rune:
 			return true;
+		case Basic_cstring:
+			return false;
 		}
 		return true;
 	case Type_Pointer:
@@ -1849,8 +1868,9 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	case Type_Basic: {
 		GB_ASSERT(is_type_typed(t));
 		switch (t->Basic.kind) {
-		case Basic_string: return build_context.word_size;
-		case Basic_any:    return build_context.word_size;
+		case Basic_string:  return build_context.word_size;
+		case Basic_cstring: return build_context.word_size;
+		case Basic_any:     return build_context.word_size;
 
 		case Basic_int: case Basic_uint: case Basic_uintptr: case Basic_rawptr:
 			return build_context.word_size;
@@ -2048,8 +2068,9 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			return size;
 		}
 		switch (kind) {
-		case Basic_string: return 2*build_context.word_size;
-		case Basic_any:    return 2*build_context.word_size;
+		case Basic_string:  return 2*build_context.word_size;
+		case Basic_cstring: return build_context.word_size;
+		case Basic_any:     return 2*build_context.word_size;
 
 		case Basic_int: case Basic_uint: case Basic_uintptr: case Basic_rawptr:
 			return build_context.word_size;

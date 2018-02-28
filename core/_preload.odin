@@ -41,15 +41,15 @@ Type_Info_Enum_Value :: union {
 };
 
 // Variant Types
-Type_Info_Named   :: struct {name: string, base: ^Type_Info};
-Type_Info_Integer :: struct {signed: bool};
-Type_Info_Rune    :: struct{};
-Type_Info_Float   :: struct{};
-Type_Info_Complex :: struct{};
-Type_Info_String  :: struct{};
-Type_Info_Boolean :: struct{};
-Type_Info_Any     :: struct{};
-Type_Info_Pointer :: struct {
+Type_Info_Named    :: struct {name: string, base: ^Type_Info};
+Type_Info_Integer  :: struct {signed: bool};
+Type_Info_Rune     :: struct {};
+Type_Info_Float    :: struct {};
+Type_Info_Complex  :: struct {};
+Type_Info_String   :: struct {is_cstring: bool};
+Type_Info_Boolean  :: struct {};
+Type_Info_Any      :: struct {};
+Type_Info_Pointer  :: struct {
 	elem: ^Type_Info // nil -> rawptr
 };
 Type_Info_Procedure :: struct {
@@ -862,6 +862,20 @@ __string_lt :: inline proc "contextless" (a, b: string) -> bool { return __strin
 __string_gt :: inline proc "contextless" (a, b: string) -> bool { return __string_cmp(a, b) > 0; }
 __string_le :: inline proc "contextless" (a, b: string) -> bool { return __string_cmp(a, b) <= 0; }
 __string_ge :: inline proc "contextless" (a, b: string) -> bool { return __string_cmp(a, b) >= 0; }
+
+__cstring_len :: proc "contextless" (s: cstring) -> int {
+	n := 0;
+	for p := (^byte)(s); p != nil && p^ != 0; p += 1 {
+		n += 1;
+	}
+	return n;
+}
+
+__cstring_to_string :: proc "contextless" (s: cstring) -> string {
+	ptr := (^byte)(s);
+	n := __cstring_len(s);
+	return transmute(string)raw.String{ptr, n};
+}
 
 
 __complex64_eq :: inline proc "contextless"  (a, b: complex64)  -> bool { return real(a) == real(b) && imag(a) == imag(b); }
