@@ -1083,6 +1083,8 @@ bool type_has_nil(Type *t) {
 		case Basic_rawptr:
 		case Basic_any:
 			return true;
+		case Basic_cstring:
+			return true;
 		}
 		return false;
 	} break;

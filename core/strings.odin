@@ -7,18 +7,16 @@ new_string :: proc(s: string) -> string {
 	return string(c[..len(s)]);
 }
 
-new_c_string :: proc(s: string) -> ^byte {
+new_cstring :: proc(s: string) -> cstring {
 	c := make([]byte, len(s)+1);
 	copy(c, cast([]byte)s);
 	c[len(s)] = 0;
-	return &c[0];
+	return cstring(&c[0]);
 }
 
-to_odin_string :: proc(str: ^byte) -> string {
+to_odin_string :: proc(str: cstring) -> string {
 	if str == nil do return "";
-	end := str;
-	for end^ != 0 do end+=1;
-	return string(mem.slice_ptr(str, end-str));
+	return string(str);
 }
 
 contains_rune :: proc(s: string, r: rune) -> int {

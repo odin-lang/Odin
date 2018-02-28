@@ -8,6 +8,10 @@ String :: struct {
 	len:  int,
 }
 
+Cstring :: struct {
+	data: ^byte,
+}
+
 Slice :: struct {
 	data: rawptr,
 	len:  int,

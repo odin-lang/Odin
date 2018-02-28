@@ -122,34 +122,33 @@ W_OK :: 2; // Test for write permission
 R_OK :: 4; // Test for read permission
 
 foreign libc {
-	@(link_name="open")    _unix_open    :: proc(path: ^byte, mode: int) -> Handle ---;
+	@(link_name="open")    _unix_open    :: proc(path: cstring, mode: int) -> Handle ---;
 	@(link_name="close")   _unix_close   :: proc(fd: Handle) -> i32 ---;
 	@(link_name="read")    _unix_read    :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
 	@(link_name="write")   _unix_write   :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
 	@(link_name="lseek64") _unix_seek    :: proc(fd: Handle, offset: i64, whence: i32) -> i64 ---;
 	@(link_name="gettid")  _unix_gettid  :: proc() -> u64 ---;
-	@(link_name="stat")    _unix_stat    :: proc(path: ^byte, stat: ^Stat) -> i32 ---;
-	@(link_name="access")  _unix_access  :: proc(path: ^byte, mask: int) -> i32 ---;
+	@(link_name="stat")    _unix_stat    :: proc(path: cstring, stat: ^Stat) -> i32 ---;
+	@(link_name="access")  _unix_access  :: proc(path: cstring, mask: int) -> i32 ---;
 
 	@(link_name="malloc")  _unix_malloc  :: proc(size: int) -> rawptr ---;
 	@(link_name="calloc")  _unix_calloc  :: proc(num, size: int) -> rawptr ---;
 	@(link_name="free")    _unix_free    :: proc(ptr: rawptr) ---;
 	@(link_name="realloc") _unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr ---;
-	@(link_name="getenv")  _unix_getenv  :: proc(^byte) -> ^byte ---;
+	@(link_name="getenv")  _unix_getenv  :: proc(cstring) -> cstring ---;
 
 	@(link_name="exit")    _unix_exit    :: proc(status: int) ---;
 }
 foreign dl {
-	@(link_name="dlopen")  _unix_dlopen  :: proc(filename: ^byte, flags: int) -> rawptr ---;
-	@(link_name="dlsym")   _unix_dlsym   :: proc(handle: rawptr, symbol: ^byte) -> rawptr ---;
+	@(link_name="dlopen")  _unix_dlopen  :: proc(filename: cstring, flags: int) -> rawptr ---;
+	@(link_name="dlsym")   _unix_dlsym   :: proc(handle: rawptr, symbol: cstring) -> rawptr ---;
 	@(link_name="dlclose") _unix_dlclose :: proc(handle: rawptr) -> int ---;
-	@(link_name="dlerror") _unix_dlerror :: proc() -> ^byte ---;
+	@(link_name="dlerror") _unix_dlerror :: proc() -> cstring ---;
 }
 
 // TODO(zangent): Change this to just `open` when Bill fixes overloading.
 open_simple :: proc(path: string, mode: int) -> (Handle, Errno) {
-
-	cstr := strings.new_c_string(path);
+	cstr := strings.new_cstring(path);
 	handle := _unix_open(cstr, mode);
 	free(cstr);
 	if(handle == -1) {
@@ -201,7 +200,7 @@ last_write_time_by_name :: proc(name: string) -> File_Time {}
 */
 
 stat :: inline proc(path: string) -> (Stat, int) {
-	cstr := strings.new_c_string(path);
+	cstr := strings.new_cstring(path);
 	defer free(cstr);
 
 	s: Stat;
@@ -210,7 +209,7 @@ stat :: inline proc(path: string) -> (Stat, int) {
 }
 
 access :: inline proc(path: string, mask: int) -> bool {
-	cstr := strings.new_c_string(path);
+	cstr := strings.new_cstring(path);
 	defer free(cstr);
 	return _unix_access(cstr, mask) == 0;
 }
@@ -229,13 +228,13 @@ heap_free :: proc(ptr: rawptr) {
 }
 
 getenv :: proc(name: string) -> (string, bool) {
-	path_str := strings.new_c_string(name);
+	path_str := strings.new_cstring(name);
 	defer free(path_str);
 	cstr := _unix_getenv(path_str);
 	if cstr == nil {
 		return "", false;
 	}
-	return strings.to_odin_string(cstr), true;
+	return string(cstr), true;
 }
 
 exit :: proc(code: int) {
@@ -248,14 +247,14 @@ current_thread_id :: proc() -> int {
 }
 
 dlopen :: inline proc(filename: string, flags: int) -> rawptr {
-	cstr := strings.new_c_string(filename);
+	cstr := strings.new_cstring(filename);
 	defer free(cstr);
 	handle := _unix_dlopen(cstr, flags);
 	return handle;
 }
 dlsym :: inline proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil);
-	cstr := strings.new_c_string(symbol);
+	cstr := strings.new_cstring(symbol);
 	defer free(cstr);
 	proc_handle := _unix_dlsym(handle, cstr);
 	return proc_handle;
@@ -265,14 +264,14 @@ dlclose :: inline proc(handle: rawptr) -> bool {
 	return _unix_dlclose(handle) == 0;
 }
 dlerror :: proc() -> string {
-	return strings.to_odin_string(_unix_dlerror());
+	return string(_unix_dlerror());
 }
 
 
 _alloc_command_line_arguments :: proc() -> []string {
 	args := make([]string, __argc__);
 	for i in 0..__argc__ {
-		args[i] = strings.to_odin_string((__argv__+i)^);
+		args[i] = string((__argv__+i)^);
 	}
 	return args;
 }

@@ -1497,9 +1497,9 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 				err_type = y->type;
 			}
 			gbString type_string = type_to_string(err_type);
+			defer (gb_string_free(type_string));
 			err_str = gb_string_make(c->tmp_allocator,
 			                         gb_bprintf("operator '%.*s' not defined for type '%s'", LIT(token_strings[op]), type_string));
-			gb_string_free(type_string);
 		}
 	} else {
 		gbString xt, yt;
@@ -2278,6 +2278,8 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 
 			case Basic_UntypedNil:
 				if (is_type_any(target_type)) {
+					target_type = t_untyped_nil;
+				} else if (is_type_cstring(target_type)) {
 					target_type = t_untyped_nil;
 				} else if (!type_has_nil(target_type)) {
 					operand->mode = Addressing_Invalid;

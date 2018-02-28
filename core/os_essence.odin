@@ -23,10 +23,10 @@ OS_Node_Information :: struct {
 
 foreign api {
 	@(link_name="OSHelloWorld")       os_hello_world       :: proc() ---;
-	@(link_name="OSPrintDirect")      os_print_direct      :: proc(string: ^byte, length: int) ---;
+	@(link_name="OSPrintDirect")      os_print_direct      :: proc(str: cstring, length: int) ---;
 	@(link_name="OSHeapAllocate")     os_heap_allocate     :: proc(bytes: int, zero: bool) -> rawptr ---;
 	@(link_name="OSHeapFree")         os_heap_free         :: proc(address: rawptr) ---;
-	@(link_name="OSOpenNode")         os_open_node         :: proc(path: ^byte, path_length: int, flags: u64, information: ^OS_Node_Information) -> Errno ---;
+	@(link_name="OSOpenNode")         os_open_node         :: proc(path: cstring, path_length: int, flags: u64, information: ^OS_Node_Information) -> Errno ---;
 	@(link_name="OSResizeFile")       os_resize_file       :: proc(handle: Handle, new_size: u64) -> Errno ---;
 	@(link_name="OSCloseHandle")      os_close_handle      :: proc(handle: Handle) ---;
 	@(link_name="OSWriteFileSync")    os_write_file_sync   :: proc(handle: Handle, offset: i64, size: i64, buffer: rawptr) -> i64 ---;
