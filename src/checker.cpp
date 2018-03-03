@@ -708,6 +708,29 @@ bool is_entity_implicitly_imported(Entity *import_name, Entity *e) {
 	return ptr_set_exists(&import_name->ImportName.scope->implicit, e);
 }
 
+// Will return nullptr if not found
+Entity *entity_of_node(CheckerInfo *i, AstNode *expr) {
+	expr = unparen_expr(expr);
+	switch (expr->kind) {
+	case_ast_node(ident, Ident, expr);
+		return entity_of_ident(i, expr);
+	case_end;
+	case_ast_node(se, SelectorExpr, expr);
+		AstNode *s = se->selector;
+		while (s->kind == AstNode_SelectorExpr) {
+			s = s->SelectorExpr.selector;
+		}
+		if (s->kind == AstNode_Ident) {
+			return entity_of_ident(i, s);
+		}
+	case_end;
+	case_ast_node(cc, CaseClause, expr);
+		return cc->implicit_entity;
+	case_end;
+	}
+	return nullptr;
+}
+
 
 DeclInfo *decl_info_of_entity(CheckerInfo *i, Entity *e) {
 	if (e != nullptr) {
@@ -877,6 +900,11 @@ void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
 	}
 	identifier->Ident.entity = entity;
 	add_declaration_dependency(c, entity); // TODO(bill): Should this be here?
+
+	String dmsg = entity->deprecated_message;
+	if (dmsg.len > 0) {
+		warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
+	}
 }
 
 
@@ -1465,6 +1493,18 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "deprecated") {
+		if (value.kind == ExactValue_String) {
+			String msg = value.value_string;
+			if (msg.len == 0) {
+				error(elem, "Deprecation message cannot be an empty string");
+			} else {
+				ac->deprecated_message = msg;
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	}
 	return false;
 }
@@ -1567,6 +1607,7 @@ void check_decl_attributes(Checker *c, Array<AstNode *> attributes, DeclAttribut
 			if (value != nullptr) {
 				Operand op = {};
 				check_expr(c, &op, value);
+				if (op.mode )
 				if (op.mode != Addressing_Constant) {
 					error(value, "An attribute element must be constant");
 				} else {

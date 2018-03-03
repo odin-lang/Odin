@@ -75,6 +75,7 @@ struct Entity {
 	AstNode *  using_expr;
 
 	isize      order_in_src;
+	String     deprecated_message;
 
 	union {
 		struct {

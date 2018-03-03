@@ -778,6 +778,20 @@ cstring_example :: proc() {
 	// cast(cstring)string is O(N)
 }
 
+deprecated_attribute :: proc() {
+	@(deprecated="Use foo_v2 instead")
+	foo_v1 :: proc(x: int) {
+		fmt.println("foo_v1");
+	}
+	foo_v2 :: proc(x: int) {
+		fmt.println("foo_v2");
+	}
+
+	// NOTE: Uncomment to see the warning messages
+	// foo_v1(1);
+}
+
+
 main :: proc() {
 	when true {
 		general_stuff();
@@ -792,5 +806,6 @@ main :: proc() {
 		explicit_procedure_overloading();
 		complete_switch();
 		cstring_example();
+		deprecated_attribute();
 	}
 }

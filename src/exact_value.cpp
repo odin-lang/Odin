@@ -6,6 +6,7 @@
 struct AstNode;
 struct HashKey;
 struct Type;
+struct Entity;
 bool are_types_identical(Type *x, Type *y);
 
 struct Complex128 {
@@ -21,9 +22,9 @@ enum ExactValueKind {
 	ExactValue_Float,
 	ExactValue_Complex,
 	ExactValue_Pointer,
-	ExactValue_Compound, // TODO(bill): Is this good enough?
+	ExactValue_Compound,  // TODO(bill): Is this good enough?
 	ExactValue_Procedure, // TODO(bill): Is this good enough?
-	ExactValue_Type,
+	ExactValue_Entity,    // TODO(bill): Is this good enough?
 
 	ExactValue_Count,
 };
@@ -39,7 +40,7 @@ struct ExactValue {
 		Complex128    value_complex;
 		AstNode *     value_compound;
 		AstNode *     value_procedure;
-		Type *        value_type;
+		Entity *      value_entity;
 	};
 };
 
@@ -67,8 +68,8 @@ HashKey hash_exact_value(ExactValue v) {
 		return hash_pointer(v.value_compound);
 	case ExactValue_Procedure:
 		return hash_pointer(v.value_procedure);
-	case ExactValue_Type:
-		return hash_pointer(v.value_type);
+	case ExactValue_Entity:
+		return hash_pointer(v.value_entity);
 	}
 	return hashing_proc(&v, gb_size_of(ExactValue));
 
@@ -125,15 +126,15 @@ ExactValue exact_value_pointer(i64 ptr) {
 	return result;
 }
 
-ExactValue exact_value_type(Type *type) {
-	ExactValue result = {ExactValue_Type};
-	result.value_type = type;
-	return result;
-}
-
 ExactValue exact_value_procedure(AstNode *node) {
 	ExactValue result = {ExactValue_Procedure};
 	result.value_procedure = node;
+	return result;
+}
+
+ExactValue exact_value_entity(Entity *entity) {
+	ExactValue result = {ExactValue_Entity};
+	result.value_entity = entity;
 	return result;
 }
 
@@ -690,13 +691,6 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 		}
 		break;
 	}
-
-	case ExactValue_Type:
-		switch (op) {
-		case Token_CmpEq: return are_types_identical(x.value_type, y.value_type);
-		case Token_NotEq: return !are_types_identical(x.value_type, y.value_type);
-		}
-		break;
 	}
 
 	GB_PANIC("Invalid comparison");

@@ -15,8 +15,8 @@ new_cstring :: proc(s: string) -> cstring {
 	return cstring(&c[0]);
 }
 
+@(deprecated="Please use a standard cast for cstring to string")
 to_odin_string :: proc(str: cstring) -> string {
-	if str == nil do return "";
 	return string(str);
 }
 
