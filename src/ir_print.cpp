@@ -731,7 +731,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 					}
 				} else {
 					for_array(i, cl->elems) {
-						Entity *f = type->Struct.fields_in_src_order[i];
+						Entity *f = type->Struct.fields[i];
 						TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
 						ExactValue val = {};
 						if (tav.mode != Addressing_Invalid) {

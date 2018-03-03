@@ -1347,7 +1347,7 @@ void init_preload(Checker *c) {
 
 		GB_ASSERT(tis->fields.count == 3);
 
-		Entity *type_info_variant = tis->fields_in_src_order[2];
+		Entity *type_info_variant = tis->fields[2];
 		Type *tiv_type = type_info_variant->type;
 		GB_ASSERT(is_type_union(tiv_type));
 

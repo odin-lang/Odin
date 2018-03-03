@@ -77,7 +77,6 @@ struct BasicType {
 
 struct TypeStruct {
 	Array<Entity *> fields;
-	Array<Entity *> fields_in_src_order;
 	AstNode *node;
 	Scope *  scope;
 
