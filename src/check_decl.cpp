@@ -527,6 +527,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 
+	e->deprecated_message = ac.deprecated_message;
 	ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix);
 
 	if (d->scope->file != nullptr && e->token.string == "main") {

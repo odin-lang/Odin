@@ -548,17 +548,17 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		break;
 	case ExactValue_String: {
 		String str = value.value_string;
-		if (str.len == 0) {
+		Type *t = core_type(type);
+		if (str.len == 0 && !is_type_cstring(t)) {
 			ir_write_str_lit(f, "zeroinitializer");
 			break;
 		}
-		Type *t = core_type(type);
 		if (!is_type_string(type)) {
 			GB_ASSERT(is_type_array(type));
 			ir_write_str_lit(f, "c\"");
 			ir_print_escape_string(f, str, false, false);
 			ir_write_str_lit(f, "\\00\"");
-		} else if (t == t_cstring) {
+		} else if (is_type_cstring(t)) {
 			// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
 			// of the .ll file
 			irValue *str_array = ir_add_global_string_array(m, str);

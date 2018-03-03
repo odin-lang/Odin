@@ -193,8 +193,6 @@ struct DeclInfo {
 };
 
 // ProcedureInfo stores the information needed for checking a procedure
-
-
 struct ProcedureInfo {
 	AstFile *             file;
 	Token                 token;
@@ -356,6 +354,9 @@ AstFile *    ast_file_of_filename   (CheckerInfo *i, String   filename);
 // IMPORTANT: Only to use once checking is done
 isize        type_info_index        (CheckerInfo *i, Type *   type, bool error_on_failure = true);
 
+// Will return nullptr if not found
+Entity *entity_of_node(CheckerInfo *i, AstNode *expr);
+
 
 Entity *current_scope_lookup_entity(Scope *s, String name);
 Entity *scope_lookup_entity        (Scope *s, String name);
@@ -389,6 +390,7 @@ struct AttributeContext {
 	String  link_prefix;
 	isize   init_expr_list_count;
 	String  thread_local_model;
+	String  deprecated_message;
 };
 
 AttributeContext make_attribute_context(String link_prefix) {

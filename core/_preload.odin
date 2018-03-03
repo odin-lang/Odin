@@ -877,6 +877,7 @@ __cstring_len :: proc "contextless" (s: cstring) -> int {
 }
 
 __cstring_to_string :: proc "contextless" (s: cstring) -> string {
+	if s == nil do return "";
 	ptr := (^byte)(s);
 	n := __cstring_len(s);
 	return transmute(string)raw.String{ptr, n};

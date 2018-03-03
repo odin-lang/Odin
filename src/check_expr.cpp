@@ -4943,6 +4943,16 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		}
 	}
 
+	// NOTE(bill): Should this be here or on the `add_entity_use`?
+	// if (ce->proc != nullptr) {
+	// 	Entity *e = entity_of_node(&c->info, ce->proc);
+	// 	if (e != nullptr && e->kind == Entity_Procedure) {
+	// 		String msg = e->Procedure.deprecated_message;
+	// 		if (msg.len > 0) {
+	// 			warning(call, "%.*s is deprecated: %.*s", LIT(e->token.string), LIT(msg));
+	// 		}
+	// 	}
+	// }
 
 	CallArgumentData data = check_call_arguments(c, operand, proc_type, call);
 	Type *result_type = data.result_type;
