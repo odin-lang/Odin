@@ -3621,7 +3621,7 @@ break;
 		isize variable_count = type->Struct.fields.count;
 		array_init(&tuple->Tuple.variables, a, variable_count);
 		// TODO(bill): Should I copy each of the entities or is this good enough?
-		gb_memcopy_array(tuple->Tuple.variables.data, type->Struct.fields_in_src_order.data, variable_count);
+		gb_memcopy_array(tuple->Tuple.variables.data, type->Struct.fields.data, variable_count);
 
 		operand->type = tuple;
 		operand->mode = Addressing_Value;
@@ -5370,7 +5370,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				isize field_count = t->Struct.fields.count;
 				isize min_field_count = t->Struct.fields.count;
 				for (isize i = min_field_count-1; i >= 0; i--) {
-					Entity *e = t->Struct.fields_in_src_order[i];
+					Entity *e = t->Struct.fields[i];
 					GB_ASSERT(e->kind == Entity_Variable);
 					if (e->Variable.default_is_nil) {
 						min_field_count--;
@@ -5454,7 +5454,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						}
 
 						if (field == nullptr) {
-							field = t->Struct.fields_in_src_order[index];
+							field = t->Struct.fields[index];
 						}
 
 						check_expr_with_type_hint(c, o, elem, field->type);

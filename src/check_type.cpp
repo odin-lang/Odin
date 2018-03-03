@@ -34,13 +34,12 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 
 }
 
-// Returns filled field_count
-Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> params,
-                                    isize init_field_capacity, Type *named_type, String context) {
+void check_struct_fields(Checker *c, AstNode *node, Array<Entity *> *fields, Array<AstNode *> params,
+                         isize init_field_capacity, Type *named_type, String context) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 	defer (gb_temp_arena_memory_end(tmp));
 
-	auto fields = array_make<Entity *>(heap_allocator(), 0, init_field_capacity);
+	*fields = array_make<Entity *>(heap_allocator(), 0, init_field_capacity);
 
 	Map<Entity *> entity_map = {};
 	map_init(&entity_map, c->tmp_allocator, 2*init_field_capacity);
@@ -185,14 +184,14 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 			field->Variable.default_is_nil = default_is_nil;
 
 			add_entity(c, c->context.scope, name, field);
-			array_add(&fields, field);
+			array_add(fields, field);
 
 			field_src_index += 1;
 		}
 
 
 		if (is_using && p->names.count > 0) {
-			Type *first_type = fields[fields.count-1]->type;
+			Type *first_type = (*fields)[fields->count-1]->type;
 			Type *t = base_type(type_deref(first_type));
 
 			if (!is_type_struct(t) && !is_type_raw_union(t) && !is_type_bit_field(t) &&
@@ -208,8 +207,6 @@ Array<Entity *> check_struct_fields(Checker *c, AstNode *node, Array<AstNode *> 
 			populate_using_entity_map(c, node, type, &entity_map);
 		}
 	}
-
-	return fields;
 }
 
 
@@ -544,17 +541,13 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 	struct_type->Struct.is_polymorphic          = is_polymorphic;
 	struct_type->Struct.is_poly_specialized     = is_poly_specialized;
 
-	Array<Entity *> fields = {};
 
 	if (!is_polymorphic) {
-		fields = check_struct_fields(c, node, st->fields, min_field_count, named_type, context);
+		check_struct_fields(c, node, &struct_type->Struct.fields, st->fields, min_field_count, named_type, context);
 	}
 
-	struct_type->Struct.fields              = fields;
-	struct_type->Struct.fields_in_src_order = fields;
-
-	for_array(i, fields) {
-		Entity *f = fields[i];
+	for_array(i, struct_type->Struct.fields) {
+		Entity *f = struct_type->Struct.fields[i];
 		if (f->kind == Entity_Variable) {
 			if (f->Variable.default_value.kind == ExactValue_Procedure) {
 				struct_type->Struct.has_proc_default_values = true;
@@ -1801,8 +1794,7 @@ void generate_map_entry_type(gbAllocator a, Type *type) {
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("value")), type->Map.value, false, 2));
 
 
-	entry_type->Struct.fields              = fields;
-	entry_type->Struct.fields_in_src_order = fields;
+	entry_type->Struct.fields = fields;
 
 	// type_set_offsets(a, entry_type);
 	type->Map.entry_type = entry_type;
@@ -1839,8 +1831,7 @@ void generate_map_internal_types(gbAllocator a, Type *type) {
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0));
 	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("entries")), entries_type, false, 1));
 
-	generated_struct_type->Struct.fields              = fields;
-	generated_struct_type->Struct.fields_in_src_order = fields;
+	generated_struct_type->Struct.fields = fields;
 
 	type_set_offsets(a, generated_struct_type);
 	type->Map.generated_struct_type = generated_struct_type;

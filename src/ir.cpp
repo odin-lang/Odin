@@ -683,7 +683,7 @@ bool ir_type_has_default_values(Type *t) {
 	case Type_Struct:
 		if (t->Struct.is_raw_union) return false;
 		for_array(i, t->Struct.fields) {
-			Entity *f = t->Struct.fields_in_src_order[i];
+			Entity *f = t->Struct.fields[i];
 			if (f->kind != Entity_Variable) continue;
 			if (f->Variable.default_is_nil) {
 				// NOTE(bill): This is technically zero
@@ -4735,7 +4735,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 
 		irValue *tuple = ir_add_local_generated(proc, tv.type);
 		for_array(src_index, t->Struct.fields) {
-			Entity *field = t->Struct.fields_in_src_order[src_index];
+			Entity *field = t->Struct.fields[src_index];
 			i32 field_index = field->Variable.field_index;
 			irValue *f = ir_emit_struct_ev(proc, s, field_index);
 			irValue *ep = ir_emit_struct_ep(proc, tuple, cast(i32)src_index);
@@ -5851,7 +5851,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 					} else {
 						TypeAndValue tav = type_and_value_of_expr(proc->module->info, elem);
 						Selection sel = lookup_field_from_index(proc->module->allocator, bt,
-						                                        st->fields_in_src_order[field_index]->Variable.field_src_index);
+						                                        st->fields[field_index]->Variable.field_src_index);
 						index = sel.index[0];
 					}
 
@@ -8141,7 +8141,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			type_set_offsets(a, t); // NOTE(bill): Just incase the offsets have not been set yet
 			for (isize source_index = 0; source_index < count; source_index++) {
 				// TODO(bill): Order fields in source order not layout order
-				Entity *f = t->Struct.fields_in_src_order[source_index];
+				Entity *f = t->Struct.fields[source_index];
 				irValue *tip = ir_get_type_info_ptr(proc, f->type);
 				i64 foffset = 0;
 				if (!t->Struct.is_raw_union) {
