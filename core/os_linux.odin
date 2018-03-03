@@ -271,7 +271,7 @@ dlerror :: proc() -> string {
 _alloc_command_line_arguments :: proc() -> []string {
 	args := make([]string, __argc__);
 	for i in 0..__argc__ {
-		args[i] = string((__argv__+i)^);
+		args[i] = string(cstring((__argv__+i)^));
 	}
 	return args;
 }
