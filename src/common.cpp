@@ -692,3 +692,12 @@ wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
 	}
 #endif
 
+
+String path_to_full_path(gbAllocator a, String path) {
+	gbAllocator ha = heap_allocator();
+	char *path_c = gb_alloc_str_len(ha, cast(char *)path.text, path.len);
+	defer (gb_free(ha, path_c));
+
+	char *fullpath = gb_path_get_full_name(a, path_c);
+	return make_string_c(fullpath);
+}

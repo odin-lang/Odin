@@ -7766,8 +7766,10 @@ bool ir_gen_init(irGen *s, Checker *c) {
 			s->output_base = substring(s->output_name, 0, pos);
 		}
 	}
+	gbAllocator ha = heap_allocator();
+	s->output_base = path_to_full_path(ha, s->output_base);
 
-	gbString output_file_path = gb_string_make_length(heap_allocator(), s->output_base.text, s->output_base.len);
+	gbString output_file_path = gb_string_make_length(ha, s->output_base.text, s->output_base.len);
 	output_file_path = gb_string_appendc(output_file_path, ".ll");
 	defer (gb_string_free(output_file_path));
 
