@@ -39,7 +39,7 @@ void scope_reset(Scope *scope) {
 }
 
 i32 is_scope_an_ancestor(Scope *parent, Scope *child) {
-	isize i = 0;
+	i32 i = 0;
 	while (child != nullptr) {
 		if (parent == child) {
 			return i;
@@ -612,8 +612,6 @@ void init_checker(Checker *c, Parser *parser) {
 	if (global_error_collector.count > 0) {
 		gb_exit(1);
 	}
-	BuildContext *bc = &build_context;
-
 	gbAllocator a = heap_allocator();
 
 	c->parser = parser;
