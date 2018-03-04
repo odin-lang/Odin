@@ -210,41 +210,6 @@ void check_struct_fields(Checker *c, AstNode *node, Array<Entity *> *fields, Arr
 }
 
 
-// TODO(bill): Cleanup struct field reordering
-// TODO(bill): Inline sorting procedure?
-GB_COMPARE_PROC(cmp_reorder_struct_fields) {
-	// Rule:
-	// 'using' over non-'using'
-	// Biggest to smallest alignment
-	// if same alignment: biggest to smallest size
-	// if same size: order by source order
-	Entity *x = *(Entity **)a;
-	Entity *y = *(Entity **)b;
-	GB_ASSERT(x != nullptr);
-	GB_ASSERT(y != nullptr);
-	GB_ASSERT(x->kind == Entity_Variable);
-	GB_ASSERT(y->kind == Entity_Variable);
-	bool xu = (x->flags & EntityFlag_Using) != 0;
-	bool yu = (y->flags & EntityFlag_Using) != 0;
-	i64 xa = type_align_of(heap_allocator(), x->type);
-	i64 ya = type_align_of(heap_allocator(), y->type);
-	i64 xs = type_size_of(heap_allocator(), x->type);
-	i64 ys = type_size_of(heap_allocator(), y->type);
-
-	if (xu != yu) {
-		return xu ? -1 : +1;
-	}
-
-	if (xa != ya) {
-		return xa > ya ? -1 : xa < ya;
-	}
-	if (xs != ys) {
-		return xs > ys ? -1 : xs < ys;
-	}
-	i32 diff = x->Variable.field_index - y->Variable.field_index;
-	return diff < 0 ? -1 : diff > 0;
-}
-
 Entity *make_names_field_for_struct(Checker *c, Scope *scope) {
 	Entity *e = make_entity_field(c->allocator, scope,
 		make_token_ident(str_lit("names")), t_string_slice, false, 0);
@@ -428,12 +393,12 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 					if (type_expr->TypeType.specialization != nullptr) {
 						AstNode *s = type_expr->TypeType.specialization;
 						specialization = check_type(c, s);
-						if (false && !is_type_polymorphic_struct(specialization)) {
-							gbString str = type_to_string(specialization);
-							defer (gb_string_free(str));
-							error(s, "Expected a polymorphic struct, got %s", str);
-							specialization = nullptr;
-						}
+						// if (!is_type_polymorphic_struct(specialization)) {
+						// 	gbString str = type_to_string(specialization);
+						// 	defer (gb_string_free(str));
+						// 	error(s, "Expected a polymorphic struct, got %s", str);
+						// 	specialization = nullptr;
+						// }
 					}
 					type = make_type_generic(c->allocator, c->context.scope, 0, str_lit(""), specialization);
 				} else {
@@ -1667,7 +1632,7 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 	type->Proc.results              = results;
 	type->Proc.result_count         = cast(i32)result_count;
 	type->Proc.variadic             = variadic;
-	type->Proc.variadic_index       = variadic_index;
+	type->Proc.variadic_index       = cast(i32)variadic_index;
 	type->Proc.calling_convention   = cc;
 	type->Proc.is_polymorphic       = pt->generic;
 	type->Proc.specialization_count = specialization_count;
@@ -1936,12 +1901,12 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 
 			AstNode *s = pt->specialization;
 			specific = check_type(c, s);
-			if (false && !is_type_polymorphic_struct(specific)) {
-				gbString str = type_to_string(specific);
-				error(s, "Expected a polymorphic struct, got %s", str);
-				gb_string_free(str);
-				specific = nullptr;
-			}
+			// if (!is_type_polymorphic_struct(specific)) {
+			// 	gbString str = type_to_string(specific);
+			// 	error(s, "Expected a polymorphic struct, got %s", str);
+			// 	gb_string_free(str);
+			// 	specific = nullptr;
+			// }
 		}
 		Type *t = make_type_generic(c->allocator, c->context.scope, 0, token.string, specific);
 		if (c->context.allow_polymorphic_types) {

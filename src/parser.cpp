@@ -1789,8 +1789,6 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	case Token_OpenBracket: {
 		Token token = expect_token(f, Token_OpenBracket);
 		AstNode *count_expr = nullptr;
-		bool is_vector = false;
-
 		if (f->curr_token.kind == Token_Question) {
 			count_expr = ast_unary_expr(f, expect_token(f, Token_Question), nullptr);
 		} else if (allow_token(f, Token_dynamic)) {
@@ -1887,7 +1885,6 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		Token token = expect_token(f, Token_union);
 		Token open = expect_token_after(f, Token_OpenBrace, "union");
 		auto variants = array_make<AstNode *>(heap_allocator());
-		isize total_decl_name_count = 0;
 		AstNode *align = nullptr;
 
 		CommentGroup docs = f->lead_comment;
@@ -2143,7 +2140,6 @@ AstNode *parse_atom_expr(AstFile *f, AstNode *operand, bool lhs) {
 			    f->curr_token.kind != Token_HalfClosed) {
 				indices[0] = parse_expr(f, false);
 			}
-			bool is_index = true;
 
 			if ((f->curr_token.kind == Token_Ellipsis ||
 			        f->curr_token.kind == Token_HalfClosed)) {
@@ -2889,7 +2885,6 @@ AstNode *parse_struct_field_list(AstFile *f, isize *name_count_) {
 }
 
 AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_type_token) {
-	TokenKind separator = Token_Comma;
 	Token start_token = f->curr_token;
 
 	CommentGroup docs = f->lead_comment;

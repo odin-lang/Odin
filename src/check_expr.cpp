@@ -1354,6 +1354,9 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 bool check_is_not_addressable(Checker *c, Operand *o) {
 	if (o->mode == Addressing_OptionalOk) {
 		AstNode *expr = unparen_expr(o->expr);
+		while (expr->kind == AstNode_SelectorExpr) {
+			expr = expr->SelectorExpr.selector;
+		}
 		if (expr->kind != AstNode_TypeAssertion) {
 			return true;
 		}

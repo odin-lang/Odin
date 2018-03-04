@@ -2245,7 +2245,7 @@ i64 type_offset_of(gbAllocator allocator, Type *t, i32 index) {
 		case 3: return 3*build_context.word_size; // allocator
 		}
 	} else if (t->kind == Type_Union) {
-		i64 s = type_size_of(allocator, t);
+		/* i64 s = */ type_size_of(allocator, t);
 		switch (index) {
 		case -1: return align_formula(t->Union.variant_block_size, build_context.word_size); // __type_info
 		}

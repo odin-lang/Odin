@@ -128,7 +128,6 @@ enum TimingUnit {
 char const *timing_unit_strings[TimingUnit_COUNT] = {"s", "ms", "us"};
 
 f64 time_stamp(TimeStamp const &ts, u64 freq, TimingUnit unit) {
-	f64 total_time = 0;
 	switch (unit) {
 	case TimingUnit_Millisecond: return time_stamp_as_ms(ts, freq);
 	case TimingUnit_Microsecond: return time_stamp_as_us(ts, freq);
