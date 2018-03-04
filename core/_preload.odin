@@ -132,8 +132,7 @@ Type_Info :: struct {
 // This will be set by the compiler
 __type_table: []Type_Info;
 
-__argc__: i32;
-__argv__: ^^byte;
+__args__: []cstring;
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 

@@ -8566,9 +8566,9 @@ void ir_gen_tree(irGen *s) {
 		array_init(&proc_params->Tuple.variables, a, 2);
 		array_init(&proc_results->Tuple.variables, a, 1);
 
-		Type *char_ptr_ptr = make_type_pointer(a, make_type_pointer(a, t_u8));
+		Type *cstring_ptr = make_type_pointer(a, t_cstring);
 		proc_params->Tuple.variables[0] = make_entity_param(a, proc_scope, make_token_ident(str_lit("argc")), t_i32, false, false);
-		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, make_token_ident(str_lit("argv")), char_ptr_ptr, false, false);
+		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, make_token_ident(str_lit("argv")), cstring_ptr, false, false);
 
 
 		proc_results->Tuple.variables[0] = make_entity_param(a, proc_scope, empty_token, t_i32, false, false);
@@ -8606,11 +8606,9 @@ void ir_gen_tree(irGen *s) {
 		irValue *argc = ir_emit_load(proc, *map_get(&proc->module->values, hash_entity(proc_params->Tuple.variables[0])));
 		irValue *argv = ir_emit_load(proc, *map_get(&proc->module->values, hash_entity(proc_params->Tuple.variables[1])));
 
-		irValue *global_argc = ir_find_global_variable(proc, str_lit("__argc__"));
-		irValue *global_argv = ir_find_global_variable(proc, str_lit("__argv__"));
+		irValue *global_args = ir_find_global_variable(proc, str_lit("__args__"));
 
-		ir_emit_store(proc, global_argc, argc);
-		ir_emit_store(proc, global_argv, argv);
+		ir_fill_slice(proc, global_args, argv, ir_emit_conv(proc, argc, t_int));
 
 		ir_emit(proc, ir_alloc_instr(proc, irInstr_StartupRuntime));
 		{
