@@ -38,8 +38,8 @@ slice_to_bytes :: proc "contextless" (slice: $E/[]$T) -> []byte {
 }
 
 ptr_to_bytes :: proc "contextless" (ptr: ^$T, len := 1) -> []byte {
-    assert(len >= 0);
-    return transmute([]byte)raw.Slice{ptr, len*size_of(T)};
+	assert(len >= 0);
+	return transmute([]byte)raw.Slice{ptr, len*size_of(T)};
 }
 
 any_to_bytes :: proc "contextless" (val: any) -> []byte {
