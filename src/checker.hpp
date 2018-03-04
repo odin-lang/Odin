@@ -30,11 +30,8 @@ struct TypeAndValue {
 
 
 // ExprInfo stores information used for "untyped" expressions
-struct ExprInfo {
-	AddressingMode mode;
-	Type *         type; // Type_Basic
-	ExactValue     value;
-	bool           is_lhs; // Debug info
+struct ExprInfo : TypeAndValue {
+	bool is_lhs; // Debug info
 };
 
 gb_inline ExprInfo make_expr_info(AddressingMode mode, Type *type, ExactValue value, bool is_lhs) {

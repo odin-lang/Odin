@@ -4164,11 +4164,8 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		String procedure = proc->entity->token.string;
 		TokenPos pos = ast_node_token(ce->proc).pos;
 		if (ce->args.count > 0) {
-			AstNode *ident = ce->args[0];;
-
-			while (ident->kind == AstNode_SelectorExpr) {
-				ident = ident->SelectorExpr.selector;
-			}
+			AstNode *ident = unselector_expr(ce->args[0]);
+			GB_ASSERT(ident->kind == AstNode_Ident);
 			Entity *e = entity_of_ident(proc->module->info, ident);
 			GB_ASSERT(e != nullptr);
 

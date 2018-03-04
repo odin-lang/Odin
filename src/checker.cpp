@@ -714,10 +714,7 @@ Entity *entity_of_node(CheckerInfo *i, AstNode *expr) {
 		return entity_of_ident(i, expr);
 	case_end;
 	case_ast_node(se, SelectorExpr, expr);
-		AstNode *s = se->selector;
-		while (s->kind == AstNode_SelectorExpr) {
-			s = s->SelectorExpr.selector;
-		}
+		AstNode *s = unselector_expr(se->selector);
 		if (s->kind == AstNode_Ident) {
 			return entity_of_ident(i, s);
 		}
@@ -3113,10 +3110,10 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("add type information");
 	// Add "Basic" type information
-	for (isize i = 0; i < gb_count_of(basic_types)-1; i++) {
+	for (isize i = 0; i < Basic_COUNT; i++) {
 		Type *t = &basic_types[i];
 		if (t->Basic.size > 0 &&
-		    t->Basic.kind != Basic_llvm_bool) {
+		    (t->Basic.flags & BasicFlag_LLVM) == 0) {
 			add_type_info_type(c, t);
 		}
 	}
@@ -3133,7 +3130,7 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
-	TIME_SECTION("check entry poiny");
+	TIME_SECTION("check entry point");
 	if (!build_context.is_dll) {
 		Scope *s = c->info.init_scope;
 		GB_ASSERT(s != nullptr);

@@ -1410,6 +1410,17 @@ AstNode *unparen_expr(AstNode *node) {
 	}
 }
 
+AstNode *unselector_expr(AstNode *node) {
+	node = unparen_expr(node);
+	if (node == nullptr) {
+		return nullptr;
+	}
+	while (node->kind == AstNode_SelectorExpr) {
+		node = node->SelectorExpr.selector;
+	}
+	return node;
+}
+
 AstNode *parse_value(AstFile *f);
 
 Array<AstNode *> parse_element_list(AstFile *f) {

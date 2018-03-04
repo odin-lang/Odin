@@ -63,6 +63,8 @@ enum BasicFlag {
 	BasicFlag_Rune        = GB_BIT(7),
 	BasicFlag_Untyped     = GB_BIT(8),
 
+	BasicFlag_LLVM        = GB_BIT(10),
+
 	BasicFlag_Numeric      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Complex,
 	BasicFlag_Ordered      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
 	BasicFlag_ConstantType = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
@@ -244,7 +246,7 @@ void selection_add_index(Selection *s, isize index) {
 gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_Invalid,           0,                                          0, STR_LIT("invalid type")}},
 
-	{Type_Basic, {Basic_llvm_bool,         BasicFlag_Boolean,                          1, STR_LIT("llvm bool")}},
+	{Type_Basic, {Basic_llvm_bool,         BasicFlag_Boolean | BasicFlag_LLVM,         1, STR_LIT("llvm bool")}},
 
 	{Type_Basic, {Basic_bool,              BasicFlag_Boolean,                          1, STR_LIT("bool")}},
 	{Type_Basic, {Basic_b8,                BasicFlag_Boolean,                          1, STR_LIT("b8")}},
