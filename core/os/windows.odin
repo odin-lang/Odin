@@ -260,26 +260,25 @@ current_thread_id :: proc() -> int {
 
 
 
-
 _alloc_command_line_arguments :: proc() -> []string {
-    arg_count: i32;
-    arg_list_ptr := win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
-    arg_list := make([]string, int(arg_count));
-    for _, i in arg_list {
-        wc_str := (arg_list_ptr+i)^;
-        olen := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, wc_str, -1,
-                                              nil, 0, nil, nil);
+	arg_count: i32;
+	arg_list_ptr := win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
+	arg_list := make([]string, int(arg_count));
+	for _, i in arg_list {
+		wc_str := (arg_list_ptr+i)^;
+		olen := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, wc_str, -1,
+		                                      nil, 0, nil, nil);
 
-        buf := make([]byte, olen);
-       	n := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, wc_str, -1,
-       	                                   cstring(&buf[0]), olen, nil, nil);
-       	if n > 0 {
-       		n -= 1;
-       	}
-        arg_list[i] = string(buf[..n]);
-    }
+		buf := make([]byte, olen);
+		n := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, wc_str, -1,
+		                                   cstring(&buf[0]), olen, nil, nil);
+		if n > 0 {
+			n -= 1;
+		}
+		arg_list[i] = string(buf[..n]);
+	}
 
-    return arg_list;
+	return arg_list;
 }
 
 

@@ -1,7 +1,7 @@
-when ODIN_OS == "windows" do export "core:os_windows.odin";
-when ODIN_OS == "osx"     do export "core:os_x.odin";
-when ODIN_OS == "linux"   do export "core:os_linux.odin";
-when ODIN_OS == "essence" do export "core:os_essence.odin";
+when ODIN_OS == "windows" do export "core:os/windows.odin";
+when ODIN_OS == "osx"     do export "core:os/osx.odin";
+when ODIN_OS == "linux"   do export "core:os/linux.odin";
+when ODIN_OS == "essence" do export "core:os/essence.odin";
 
 import "mem.odin";
 
