@@ -16,6 +16,8 @@ struct BuildContext {
 	String command;
 
 	String out_filepath;
+	String resource_filepath;
+	bool   has_resource;
 	String opt_flags;
 	String llc_flags;
 	String link_flags;
