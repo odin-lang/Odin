@@ -395,7 +395,7 @@ bool parse_build_flags(Array<String> args) {
 							path = string_trim_whitespace(path);
 							if (is_import_path_valid(path)) {
 								if(!string_ends_with(path, str_lit(".rc"))) {
-									gb_printf_err("Invalid -resource path, got %.*s\n", LIT(path));
+									gb_printf_err("Invalid -resource path, missing .rc\n", LIT(path));
 									bad_flags = true;
 									break;
 								}
