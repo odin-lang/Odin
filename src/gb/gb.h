@@ -4027,10 +4027,10 @@ gb_inline void *gb_resize      (gbAllocator a, void *ptr, isize old_size, isize 
 gb_inline void *gb_resize_align(gbAllocator a, void *ptr, isize old_size, isize new_size, isize alignment) { return a.proc(a.data, gbAllocation_Resize, new_size, alignment, ptr, old_size, GB_DEFAULT_ALLOCATOR_FLAGS); }
 
 gb_inline void *gb_alloc_copy      (gbAllocator a, void const *src, isize size) {
-	return gb_memcopy(gb_alloc(a, size), src, size);
+	return gb_memmove(gb_alloc(a, size), src, size);
 }
 gb_inline void *gb_alloc_copy_align(gbAllocator a, void const *src, isize size, isize alignment) {
-	return gb_memcopy(gb_alloc_align(a, size, alignment), src, size);
+	return gb_memmove(gb_alloc_align(a, size, alignment), src, size);
 }
 
 gb_inline char *gb_alloc_str(gbAllocator a, char const *str) {
@@ -4039,7 +4039,8 @@ gb_inline char *gb_alloc_str(gbAllocator a, char const *str) {
 
 gb_inline char *gb_alloc_str_len(gbAllocator a, char const *str, isize len) {
 	char *result;
-	result = cast(char *)gb_alloc_copy(a, str, len+1);
+	result = cast(char *)gb_alloc(a, len+1);
+	gb_memmove(result, str, len);
 	result[len] = '\0';
 	return result;
 }
