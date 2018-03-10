@@ -46,7 +46,6 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	defer (gb_temp_arena_memory_end(tmp));
 
 	cmd = string_to_string16(string_buffer_allocator, make_string(cast(u8 *)cmd_line, cmd_len-1));
-
 	if (CreateProcessW(nullptr, cmd.text,
 	                   nullptr, nullptr, true, 0, nullptr, nullptr,
 	                   &start_info, &pi)) {
@@ -202,6 +201,7 @@ enum BuildFlagKind {
 	BuildFlag_Invalid,
 
 	BuildFlag_OutFile,
+	BuildFlag_ResourceFile,
 	BuildFlag_OptimizationLevel,
 	BuildFlag_ShowTimings,
 	BuildFlag_ThreadCount,
@@ -241,6 +241,7 @@ void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, Bu
 bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),             BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_ResourceFile,      str_lit("resource"),        BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),             BuildFlagParam_Integer);
 	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),    BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),    BuildFlagParam_Integer);
@@ -384,6 +385,24 @@ bool parse_build_flags(Array<String> args) {
 								build_context.out_filepath = path;
 							} else {
 								gb_printf_err("Invalid -out path, got %.*s\n", LIT(path));
+								bad_flags = true;
+							}
+							break;
+						}
+						case BuildFlag_ResourceFile: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String path = value.value_string;
+							path = string_trim_whitespace(path);
+							if (is_import_path_valid(path)) {
+								if(!string_ends_with(path, str_lit(".rc"))) {
+									gb_printf_err("Invalid -resource path, missing .rc\n", LIT(path));
+									bad_flags = true;
+									break;
+								}
+								build_context.resource_filepath = substring(path, 0, string_extension_position(path));
+								build_context.has_resource = true;
+							} else {
+								gb_printf_err("Invalid -resource path, got %.*s\n", LIT(path));
 								bad_flags = true;
 							}
 							break;
@@ -602,6 +621,7 @@ void remove_temp_files(String output_base) {
 	EXT_REMOVE(".bc");
 #if defined(GB_SYSTEM_WINDOWS)
 	EXT_REMOVE(".obj");
+	EXT_REMOVE(".res");
 #else
 	EXT_REMOVE(".o");
 #endif
@@ -839,18 +859,44 @@ int main(int arg_count, char **arg_ptr) {
 			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
 		}
 
-		exit_code = system_exec_command_line_app("msvc-link", true,
-			"link \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
-			"/defaultlib:libcmt "
-			// "/nodefaultlib "
-			"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
-			" %.*s "
-			" %s "
-			"",
-			LIT(output_base), LIT(output_base), output_ext,
-			lib_str, LIT(build_context.link_flags),
-			link_settings
-		);
+		if(build_context.has_resource) {
+			exit_code = system_exec_command_line_app("msvc-link", true,
+                "rc /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
+                LIT(output_base),
+                LIT(build_context.resource_filepath)
+            );
+
+            if (exit_code != 0) {
+				return exit_code;
+			}
+
+			exit_code = system_exec_command_line_app("msvc-link", true,
+				"link \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
+				"/defaultlib:libcmt "
+				// "/nodefaultlib "
+				"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
+				" %.*s "
+				" %s "
+				"",
+				LIT(output_base), LIT(output_base), LIT(output_base), output_ext,
+				lib_str, LIT(build_context.link_flags),
+				link_settings
+			);
+		} else {
+			exit_code = system_exec_command_line_app("msvc-link", true,
+				"link \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
+				"/defaultlib:libcmt "
+				// "/nodefaultlib "
+				"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
+				" %.*s "
+				" %s "
+				"",
+				LIT(output_base), LIT(output_base), output_ext,
+				lib_str, LIT(build_context.link_flags),
+				link_settings
+			);
+		}
+
 		if (exit_code != 0) {
 			return exit_code;
 		}
