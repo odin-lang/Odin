@@ -1602,11 +1602,12 @@ void check_decl_attributes(Checker *c, Array<AstNode *> attributes, DeclAttribut
 			if (value != nullptr) {
 				Operand op = {};
 				check_expr(c, &op, value);
-				if (op.mode )
-				if (op.mode != Addressing_Constant) {
-					error(value, "An attribute element must be constant");
-				} else {
-					ev = op.value;
+				if (op.mode) {
+					if (op.mode != Addressing_Constant) {
+						error(value, "An attribute element must be constant");
+					} else {
+						ev = op.value;
+					}
 				}
 			}
 
