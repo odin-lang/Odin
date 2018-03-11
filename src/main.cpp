@@ -1013,7 +1013,7 @@ int main(int arg_count, char **arg_ptr) {
 			#endif
 			, linker, LIT(output_base), LIT(output_base), output_ext,
 			lib_str,
-			str_eq_ignore_case(cross_compile_target, str_lit("Essence")) ? "" : "-lc -lm",
+			str_eq_ignore_case(cross_compile_target, str_lit("Essence")) ? "-lfreetype -lglue" : "-lc -lm",
 			LIT(build_context.link_flags),
 			link_settings,
 			LIT(cross_compile_lib_dir)
