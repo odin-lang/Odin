@@ -507,20 +507,20 @@ Entity *add_global_entity(Entity *entity) {
 	return entity;
 }
 
-void add_global_constant(gbAllocator a, String name, Type *type, ExactValue value) {
-	Entity *entity = alloc_entity(a, Entity_Constant, nullptr, make_token_ident(name), type);
+void add_global_constant(String name, Type *type, ExactValue value) {
+	Entity *entity = alloc_entity(Entity_Constant, nullptr, make_token_ident(name), type);
 	entity->Constant.value = value;
 	add_global_entity(entity);
 }
 
 
-void add_global_string_constant(gbAllocator a, String name, String value) {
-	add_global_constant(a, name, t_untyped_string, exact_value_string(value));
+void add_global_string_constant(String name, String value) {
+	add_global_constant(name, t_untyped_string, exact_value_string(value));
 }
 
 
-void add_global_type_entity(gbAllocator a, String name, Type *type) {
-	add_global_entity(make_entity_type_name(a, nullptr, make_token_ident(name), type));
+void add_global_type_entity(String name, Type *type) {
+	add_global_entity(alloc_entity_type_name(nullptr, make_token_ident(name), type));
 }
 
 
@@ -533,27 +533,27 @@ void init_universal_scope(void) {
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
-		add_global_type_entity(a, basic_types[i].Basic.name, &basic_types[i]);
+		add_global_type_entity(basic_types[i].Basic.name, &basic_types[i]);
 	}
-	add_global_type_entity(a, str_lit("byte"), &basic_types[Basic_u8]);
+	add_global_type_entity(str_lit("byte"), &basic_types[Basic_u8]);
 
 // Constants
-	add_global_constant(a, str_lit("true"),  t_untyped_bool, exact_value_bool(true));
-	add_global_constant(a, str_lit("false"), t_untyped_bool, exact_value_bool(false));
+	add_global_constant(str_lit("true"),  t_untyped_bool, exact_value_bool(true));
+	add_global_constant(str_lit("false"), t_untyped_bool, exact_value_bool(false));
 
-	add_global_entity(make_entity_nil(a, str_lit("nil"), t_untyped_nil));
-	add_global_entity(make_entity_library_name(a,  universal_scope,
-	                                           make_token_ident(str_lit("__llvm_core")), t_invalid,
-	                                           str_lit(""), str_lit("__llvm_core")));
+	add_global_entity(alloc_entity_nil(str_lit("nil"), t_untyped_nil));
+	add_global_entity(alloc_entity_library_name(universal_scope,
+	                                            make_token_ident(str_lit("__llvm_core")), t_invalid,
+	                                            str_lit(""), str_lit("__llvm_core")));
 
 	// TODO(bill): Set through flags in the compiler
-	add_global_string_constant(a, str_lit("ODIN_OS"),      bc->ODIN_OS);
-	add_global_string_constant(a, str_lit("ODIN_ARCH"),    bc->ODIN_ARCH);
-	add_global_string_constant(a, str_lit("ODIN_ENDIAN"),  bc->ODIN_ENDIAN);
-	add_global_string_constant(a, str_lit("ODIN_VENDOR"),  bc->ODIN_VENDOR);
-	add_global_string_constant(a, str_lit("ODIN_VERSION"), bc->ODIN_VERSION);
-	add_global_string_constant(a, str_lit("ODIN_ROOT"),    bc->ODIN_ROOT);
-	add_global_constant(a, str_lit("ODIN_DEBUG"), t_untyped_bool, exact_value_bool(bc->ODIN_DEBUG));
+	add_global_string_constant(str_lit("ODIN_OS"),      bc->ODIN_OS);
+	add_global_string_constant(str_lit("ODIN_ARCH"),    bc->ODIN_ARCH);
+	add_global_string_constant(str_lit("ODIN_ENDIAN"),  bc->ODIN_ENDIAN);
+	add_global_string_constant(str_lit("ODIN_VENDOR"),  bc->ODIN_VENDOR);
+	add_global_string_constant(str_lit("ODIN_VERSION"), bc->ODIN_VERSION);
+	add_global_string_constant(str_lit("ODIN_ROOT"),    bc->ODIN_ROOT);
+	add_global_constant(str_lit("ODIN_DEBUG"), t_untyped_bool, exact_value_bool(bc->ODIN_DEBUG));
 
 
 // Builtin Procedures
@@ -561,7 +561,7 @@ void init_universal_scope(void) {
 		BuiltinProcId id = cast(BuiltinProcId)i;
 		String name = builtin_procs[i].name;
 		if (name != "") {
-			Entity *entity = alloc_entity(a, Entity_Builtin, nullptr, make_token_ident(name), t_invalid);
+			Entity *entity = alloc_entity(Entity_Builtin, nullptr, make_token_ident(name), t_invalid);
 			entity->Builtin.id = id;
 			add_global_entity(entity);
 		}
@@ -639,12 +639,17 @@ void init_checker(Checker *c, Parser *parser) {
 	c->tmp_allocator = gb_arena_allocator(&c->tmp_arena);
 
 	c->global_scope = create_scope(universal_scope, c->allocator);
-	c->context.scope = c->global_scope;
 
 	map_init(&c->file_scopes, heap_allocator());
 	ptr_set_init(&c->checked_files, heap_allocator());
 
 	array_init(&c->file_order, heap_allocator(), 0, c->parser->files.count);
+
+	// Init context
+	c->context.scope = c->global_scope;
+
+	c->context.type_path = new_checker_type_path();
+	c->context.type_level = 0;
 }
 
 void destroy_checker(Checker *c) {
@@ -660,6 +665,8 @@ void destroy_checker(Checker *c) {
 	map_destroy(&c->file_scopes);
 	ptr_set_destroy(&c->checked_files);
 	array_free(&c->file_order);
+
+	destroy_checker_type_path(c->context.type_path);
 }
 
 
@@ -1312,6 +1319,31 @@ Type *find_core_type(Checker *c, String name) {
 	return e->type;
 }
 
+CheckerTypePath *new_checker_type_path() {
+	gbAllocator a = heap_allocator();
+	auto *tp = gb_alloc_item(a, CheckerTypePath);
+	array_init(tp, a, 0, 16);
+	return tp;
+}
+
+void destroy_checker_type_path(CheckerTypePath *tp) {
+	array_free(tp);
+	gb_free(heap_allocator(), tp);
+}
+
+
+void check_type_path_push(Checker *c, Entity *e) {
+	GB_ASSERT(c->context.type_path != nullptr);
+	GB_ASSERT(e != nullptr);
+	array_add(c->context.type_path, e);
+}
+Entity *check_type_path_pop(Checker *c) {
+	GB_ASSERT(c->context.type_path != nullptr);
+	return array_pop(c->context.type_path);
+}
+
+
+
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type);
 
@@ -1424,9 +1456,9 @@ void init_preload(Checker *c) {
 		Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
 		Scope *preload_scope = type_info_entity->scope;
 
-		Entity *e = make_entity_import_name(c->allocator, preload_scope, make_token_ident(_global), t_invalid,
-		                                    str_lit(""), _global,
-		                                    preload_scope);
+		Entity *e = alloc_entity_import_name(preload_scope, make_token_ident(_global), t_invalid,
+		                                     str_lit(""), _global,
+		                                     preload_scope);
 
 		add_entity(c, universal_scope, nullptr, e);
 	}
@@ -1745,7 +1777,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 				error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 				continue;
 			}
-			Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident.token, nullptr, false);
+			Entity *e = alloc_entity_variable(c->context.scope, name->Ident.token, nullptr, false);
 			e->identifier = name;
 
 			if (vd->is_using) {
@@ -1808,7 +1840,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 
 			if (is_ast_node_type(init) ||
 				(vd->type != nullptr && vd->type->kind == AstNode_TypeType)) {
-				e = make_entity_type_name(c->allocator, d->scope, token, nullptr);
+				e = alloc_entity_type_name(d->scope, token, nullptr);
 				if (vd->type != nullptr) {
 					error(name, "A type declaration cannot have an type parameter");
 				}
@@ -1820,7 +1852,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 					continue;
 				}
 				ast_node(pl, ProcLit, init);
-				e = make_entity_procedure(c->allocator, d->scope, token, nullptr, pl->tags);
+				e = alloc_entity_procedure(d->scope, token, nullptr, pl->tags);
 				if (fl != nullptr) {
 					GB_ASSERT(fl->kind == AstNode_Ident);
 					e->Procedure.foreign_library_ident = fl;
@@ -1846,13 +1878,13 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 				d->type_expr = pl->type;
 			} else if (init->kind == AstNode_ProcGroup) {
 				ast_node(pg, ProcGroup, init);
-				e = make_entity_proc_group(c->allocator, d->scope, token, nullptr);
+				e = alloc_entity_proc_group(d->scope, token, nullptr);
 				if (fl != nullptr) {
 					error(name, "Procedure groups are not allowed within a foreign block");
 				}
 				d->init_expr = init;
 			} else {
-				e = make_entity_constant(c->allocator, d->scope, token, nullptr, empty_exact_value);
+				e = alloc_entity_constant(d->scope, token, nullptr, empty_exact_value);
 				d->type_expr = vd->type;
 				d->init_expr = init;
 			}
@@ -2340,9 +2372,9 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 		} else {
 			GB_ASSERT(id->import_name.pos.line != 0);
 			id->import_name.string = import_name;
-			Entity *e = make_entity_import_name(c->allocator, parent_scope, id->import_name, t_invalid,
-			                                    id->fullpath, id->import_name.string,
-			                                    scope);
+			Entity *e = alloc_entity_import_name(parent_scope, id->import_name, t_invalid,
+			                                     id->fullpath, id->import_name.string,
+			                                     scope);
 
 			add_entity(c, parent_scope, nullptr, e);
 		}
@@ -2524,8 +2556,8 @@ void check_add_foreign_import_decl(Checker *c, AstNode *decl) {
 
 	GB_ASSERT(fl->library_name.pos.line != 0);
 	fl->library_name.string = library_name;
-	Entity *e = make_entity_library_name(c->allocator, parent_scope, fl->library_name, t_invalid,
-	                                     fl->fullpath, library_name);
+	Entity *e = alloc_entity_library_name(parent_scope, fl->library_name, t_invalid,
+	                                      fl->fullpath, library_name);
 	add_entity(c, parent_scope, nullptr, e);
 }
 

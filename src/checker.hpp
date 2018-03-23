@@ -262,18 +262,22 @@ struct ForeignContext {
 	bool                  in_export;
 };
 
+typedef Array<Entity *> CheckerTypePath;
+
 struct CheckerContext {
 	Scope *    file_scope;
 	Scope *    scope;
 	DeclInfo * decl;
 	u32        stmt_state_flags;
 	bool       in_defer; // TODO(bill): Actually handle correctly
-	isize      type_level; // TODO(bill): Actually handle correctly
 	String     proc_name;
 	Type *     type_hint;
 	DeclInfo * curr_proc_decl;
 	Type *     curr_proc_sig;
 	ForeignContext foreign_context;
+
+	CheckerTypePath *type_path;
+	isize            type_level; // TODO(bill): Actually handle correctly
 
 	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;
@@ -382,7 +386,6 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes);
 void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws);
 void check_delayed_file_import_entity(Checker *c, AstNode *decl);
 
-
 struct AttributeContext {
 	String  link_name;
 	String  link_prefix;
@@ -401,3 +404,9 @@ AttributeContext make_attribute_context(String link_prefix) {
 typedef DECL_ATTRIBUTE_PROC(DeclAttributeProc);
 
 void check_decl_attributes(Checker *c, Array<AstNode *> attributes, DeclAttributeProc *proc, AttributeContext *ac);
+
+CheckerTypePath *new_checker_type_path();
+void destroy_checker_type_path(CheckerTypePath *tp);
+
+void    check_type_path_push(Checker *c, Entity *e);
+Entity *check_type_path_pop (Checker *c);

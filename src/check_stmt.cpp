@@ -431,7 +431,7 @@ void check_label(Checker *c, AstNode *label) {
 		}
 	}
 
-	Entity *e = make_entity_label(c->allocator, c->context.scope, l->name->Ident.token, t_invalid, label);
+	Entity *e = alloc_entity_label(c->context.scope, l->name->Ident.token, t_invalid, label);
 	add_entity(c, c->context.scope, l->name, e);
 	e->parent_proc_decl = c->context.curr_proc_decl;
 
@@ -507,7 +507,7 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 			for_array(i, found->elements.entries) {
 				Entity *f = found->elements.entries[i].value;
 				if (f->kind == Entity_Variable) {
-					Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
+					Entity *uvar = alloc_entity_using_variable(e, f->token, f->type);
 					uvar->using_expr = expr;
 					Entity *prev = scope_insert_entity(c->context.scope, uvar);
 					if (prev != nullptr) {
@@ -1000,7 +1000,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 
 		check_open_scope(c, stmt);
 		{
-			Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, lhs->Ident.token, case_type, false, EntityState_Resolved);
+			Entity *tag_var = alloc_entity_variable(c->context.scope, lhs->Ident.token, case_type, false, EntityState_Resolved);
 			tag_var->flags |= EntityFlag_Used;
 			tag_var->flags |= EntityFlag_Value;
 			add_entity(c, c->context.scope, lhs, tag_var);
@@ -1467,7 +1467,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				}
 				if (found == nullptr) {
 					bool is_immutable = true;
-					entity = make_entity_variable(c->allocator, c->context.scope, token, type, is_immutable, EntityState_Resolved);
+					entity = alloc_entity_variable(c->context.scope, token, type, is_immutable, EntityState_Resolved);
 					add_entity_definition(&c->info, name, entity);
 				} else {
 					TokenPos pos = found->token.pos;
@@ -1482,7 +1482,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 
 			if (entity == nullptr) {
-				entity = make_entity_dummy_variable(c->allocator, c->global_scope, ast_node_token(name));
+				entity = alloc_entity_dummy_variable(c->global_scope, ast_node_token(name));
 			}
 
 			entities[entity_count++] = entity;
@@ -1700,7 +1700,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						continue;
 					}
 
-					Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
+					Entity *uvar = alloc_entity_using_variable(e, f->token, f->type);
 					uvar->using_expr = expr;
 					Entity *prev = scope_insert_entity(c->context.scope, uvar);
 					if (prev != nullptr) {
@@ -1797,7 +1797,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						new_name_count += 1;
 					}
 					if (found == nullptr) {
-						entity = make_entity_variable(c->allocator, c->context.scope, token, nullptr, false);
+						entity = alloc_entity_variable(c->context.scope, token, nullptr, false);
 						entity->identifier = name;
 
 						AstNode *fl = c->context.foreign_context.curr_library;
@@ -1816,7 +1816,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					}
 				}
 				if (entity == nullptr) {
-					entity = make_entity_dummy_variable(c->allocator, c->global_scope, ast_node_token(name));
+					entity = alloc_entity_dummy_variable(c->global_scope, ast_node_token(name));
 				}
 				entity->parent_proc_decl = c->context.curr_proc_decl;
 				entities[entity_count++] = entity;
@@ -1828,7 +1828,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			Type *init_type = nullptr;
 			if (vd->type != nullptr) {
-				init_type = check_type(c, vd->type, nullptr);
+				init_type = check_type(c, vd->type);
 				if (init_type == nullptr) {
 					init_type = t_invalid;
 				} else if (is_type_polymorphic(base_type(init_type))) {
@@ -1938,7 +1938,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						for_array(i, scope->elements.entries) {
 							Entity *f = scope->elements.entries[i].value;
 							if (f->kind == Entity_Variable) {
-								Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
+								Entity *uvar = alloc_entity_using_variable(e, f->token, f->type);
 								uvar->Variable.is_immutable = is_immutable;
 								Entity *prev = scope_insert_entity(c->context.scope, uvar);
 								if (prev != nullptr) {

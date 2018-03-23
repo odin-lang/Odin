@@ -1206,10 +1206,7 @@ irValue *ir_generate_array(irModule *m, Type *elem_type, i64 count, String prefi
 
 	String s = make_string_c(text);
 
-	Entity *e = make_entity_variable(a, nullptr,
-	                                 make_token_ident(s),
-	                                 alloc_type_array(elem_type, count),
-	                                 false);
+	Entity *e = alloc_entity_variable(nullptr, make_token_ident(s), alloc_type_array(elem_type, count), false);
 	irValue *value = ir_value_global(a, e, nullptr);
 	value->Global.is_private = true;
 	ir_module_add_value(m, e, value);
@@ -1308,7 +1305,7 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 
 		String name = make_string(str, len-1);
 
-		Entity *e = make_entity_constant(a, nullptr, make_token_ident(name), t, value);
+		Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
 		irValue *g = ir_value_global(a, e, backing_array);
 		ir_module_add_value(m, e, g);
 		map_set(&m->members, hash_string(name), g);
@@ -1335,7 +1332,7 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 	token.string = name;
 	Type *type = alloc_type_array(t_u8, string.len+1);
 	ExactValue ev = exact_value_string(string);
-	Entity *entity = make_entity_constant(a, nullptr, token, type, ev);
+	Entity *entity = alloc_entity_constant(nullptr, token, type, ev);
 	irValue *g = ir_value_global(a, entity, ir_add_module_constant(m, type, ev));
 	g->Global.is_private      = true;
 	g->Global.is_unnamed_addr = true;
@@ -1429,10 +1426,7 @@ irValue *ir_add_local_generated(irProcedure *proc, Type *type, bool zero_initial
 	if (proc->curr_block) {
 		scope = proc->curr_block->scope;
 	}
-	Entity *e = make_entity_variable(proc->module->allocator,
-	                                 scope,
-	                                 empty_token,
-	                                 type, false);
+	Entity *e = alloc_entity_variable(scope, empty_token, type, false);
 	return ir_add_local(proc, e, nullptr, zero_initialized);
 }
 
@@ -1450,11 +1444,7 @@ irValue *ir_add_global_generated(irModule *m, Type *type, irValue *value) {
 	String name = make_string(str, len-1);
 
 	Scope *scope = nullptr;
-	Entity *e = make_entity_variable(a,
-	                                 scope,
-	                                 make_token_ident(name),
-	                                 type, false);
-
+	Entity *e = alloc_entity_variable(scope, make_token_ident(name), type, false);
 	irValue *g = ir_value_global(a, e, value);
 	ir_module_add_value(m, e, g);
 	map_set(&m->members, hash_string(name), g);
@@ -7389,7 +7379,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	if (proc->type->Proc.return_by_pointer) {
 		// NOTE(bill): this must be the first parameter stored
 		Type *ptr_type = alloc_type_pointer(reduce_tuple_to_single_type(proc->type->Proc.results));
-		Entity *e = make_entity_param(a, nullptr, make_token_ident(str_lit("agg.result")), ptr_type, false, false);
+		Entity *e = alloc_entity_param(nullptr, make_token_ident(str_lit("agg.result")), ptr_type, false, false);
 		e->flags |= EntityFlag_Sret | EntityFlag_NoAlias;
 
 		irValue *param = ir_value_param(a, proc, e, ptr_type);
@@ -7472,7 +7462,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 
 
 	if (proc->type->Proc.calling_convention == ProcCC_Odin) {
-		Entity *e = make_entity_param(a, nullptr, make_token_ident(str_lit("__.context_ptr")), t_context_ptr, false, false);
+		Entity *e = alloc_entity_param(nullptr, make_token_ident(str_lit("__.context_ptr")), t_context_ptr, false, false);
 		e->flags |= EntityFlag_NoAlias;
 		irValue *param = ir_value_param(a, proc, e, e->type);
 		ir_module_add_value(proc->module, e, param);
@@ -7633,7 +7623,7 @@ void ir_init_module(irModule *m, Checker *c) {
 			isize max_type_info_count = m->info->type_info_types.count;
 
 			String name = str_lit(IR_TYPE_INFO_DATA_NAME);
-			Entity *e = make_entity_variable(m->allocator, nullptr, make_token_ident(name), alloc_type_array(t_type_info, max_type_info_count), false);
+			Entity *e = alloc_entity_variable(nullptr, make_token_ident(name), alloc_type_array(t_type_info, max_type_info_count), false);
 			irValue *g = ir_value_global(m->allocator, e, nullptr);
 			g->Global.is_private = true;
 			ir_module_add_value(m, e, g);
@@ -7664,8 +7654,8 @@ void ir_init_module(irModule *m, Checker *c) {
 
 			{
 				String name = str_lit(IR_TYPE_INFO_TYPES_NAME);
-				Entity *e = make_entity_variable(m->allocator, nullptr, make_token_ident(name),
-				                                 alloc_type_array(t_type_info_ptr, count), false);
+				Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
+				                                  alloc_type_array(t_type_info_ptr, count), false);
 				irValue *g = ir_value_global(m->allocator, e, nullptr);
 				ir_module_add_value(m, e, g);
 				map_set(&m->members, hash_string(name), g);
@@ -7673,8 +7663,8 @@ void ir_init_module(irModule *m, Checker *c) {
 			}
 			{
 				String name = str_lit(IR_TYPE_INFO_NAMES_NAME);
-				Entity *e = make_entity_variable(m->allocator, nullptr, make_token_ident(name),
-				                                 alloc_type_array(t_string, count), false);
+				Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
+				                                  alloc_type_array(t_string, count), false);
 				irValue *g = ir_value_global(m->allocator, e, nullptr);
 				ir_module_add_value(m, e, g);
 				map_set(&m->members, hash_string(name), g);
@@ -7682,8 +7672,8 @@ void ir_init_module(irModule *m, Checker *c) {
 			}
 			{
 				String name = str_lit(IR_TYPE_INFO_OFFSETS_NAME);
-				Entity *e = make_entity_variable(m->allocator, nullptr, make_token_ident(name),
-				                                 alloc_type_array(t_uintptr, count), false);
+				Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
+				                                  alloc_type_array(t_uintptr, count), false);
 				irValue *g = ir_value_global(m->allocator, e, nullptr);
 				ir_module_add_value(m, e, g);
 				map_set(&m->members, hash_string(name), g);
@@ -7692,8 +7682,8 @@ void ir_init_module(irModule *m, Checker *c) {
 
 			{
 				String name = str_lit(IR_TYPE_INFO_USINGS_NAME);
-				Entity *e = make_entity_variable(m->allocator, nullptr, make_token_ident(name),
-				                                 alloc_type_array(t_bool, count), false);
+				Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
+				                                  alloc_type_array(t_bool, count), false);
 				irValue *g = ir_value_global(m->allocator, e, nullptr);
 				ir_module_add_value(m, e, g);
 				map_set(&m->members, hash_string(name), g);
@@ -8487,12 +8477,12 @@ void ir_gen_tree(irGen *s) {
 		array_init(&proc_params->Tuple.variables, a, 3);
 		array_init(&proc_results->Tuple.variables, a, 1);
 
-		proc_params->Tuple.variables[0] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false, false);
-		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, make_token_ident(str_lit("reason")), t_i32, false, false);
-		proc_params->Tuple.variables[2] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false, false);
+		proc_params->Tuple.variables[0] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false, false);
+		proc_params->Tuple.variables[1] = alloc_entity_param(proc_scope, make_token_ident(str_lit("reason")), t_i32, false, false);
+		proc_params->Tuple.variables[2] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false, false);
 
 
-		proc_results->Tuple.variables[0] = make_entity_param(a, proc_scope, empty_token, t_i32, false, false);
+		proc_results->Tuple.variables[0] = alloc_entity_param(proc_scope, empty_token, t_i32, false, false);
 
 
 		Type *proc_type = alloc_type_proc(proc_scope,
@@ -8507,7 +8497,7 @@ void ir_gen_tree(irGen *s) {
 		proc_type->Proc.abi_compat_result_type = proc_results->Tuple.variables[0]->type;
 
 		AstNode *body = gb_alloc_item(a, AstNode);
-		Entity *e = make_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
+		Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
 
 		map_set(&m->values, hash_entity(e), p);
@@ -8566,11 +8556,11 @@ void ir_gen_tree(irGen *s) {
 		array_init(&proc_results->Tuple.variables, a, 1);
 
 		Type *cstring_ptr = alloc_type_pointer(t_cstring);
-		proc_params->Tuple.variables[0] = make_entity_param(a, proc_scope, make_token_ident(str_lit("argc")), t_i32, false, false);
-		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, make_token_ident(str_lit("argv")), cstring_ptr, false, false);
+		proc_params->Tuple.variables[0] = alloc_entity_param(proc_scope, make_token_ident(str_lit("argc")), t_i32, false, false);
+		proc_params->Tuple.variables[1] = alloc_entity_param(proc_scope, make_token_ident(str_lit("argv")), cstring_ptr, false, false);
 
 
-		proc_results->Tuple.variables[0] = make_entity_param(a, proc_scope, empty_token, t_i32, false, false);
+		proc_results->Tuple.variables[0] = alloc_entity_param(proc_scope, empty_token, t_i32, false, false);
 
 
 		Type *proc_type = alloc_type_proc(proc_scope,
@@ -8585,7 +8575,7 @@ void ir_gen_tree(irGen *s) {
 		proc_type->Proc.abi_compat_result_type = proc_results->Tuple.variables[0]->type;
 
 		AstNode *body = gb_alloc_item(a, AstNode);
-		Entity *e     = make_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
+		Entity *e     = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p    = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
 
 		map_set(&m->values, hash_entity(e), p);
@@ -8636,12 +8626,12 @@ void ir_gen_tree(irGen *s) {
 		proc_results->Tuple.variables = gb_alloc_array(a, Entity *, 1);
 		proc_results->Tuple.variable_count = 1;
 
-		proc_params->Tuple.variables[0] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false);
-		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false);
-		proc_params->Tuple.variables[2] = make_entity_param(a, proc_scope, blank_token, t_u8_ptr, false);
-		proc_params->Tuple.variables[3] = make_entity_param(a, proc_scope, blank_token, t_i32,    false);
+		proc_params->Tuple.variables[0] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false);
+		proc_params->Tuple.variables[1] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false);
+		proc_params->Tuple.variables[2] = alloc_entity_param(proc_scope, blank_token, t_u8_ptr, false);
+		proc_params->Tuple.variables[3] = alloc_entity_param(proc_scope, blank_token, t_i32,    false);
 
-		proc_results->Tuple.variables[0] = make_entity_param(a, proc_scope, empty_token, t_i32, false);
+		proc_results->Tuple.variables[0] = alloc_entity_param(proc_scope, empty_token, t_i32, false);
 
 
 		Type *proc_type = alloc_type_proc(a, proc_scope,
@@ -8649,7 +8639,7 @@ void ir_gen_tree(irGen *s) {
 		                                 proc_results, 1, false, ProcCC_Std);
 
 		AstNode *body = gb_alloc_item(a, AstNode);
-		Entity *e = make_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
+		Entity *e = alloc_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
 
 		m->entry_point_entity = e;
@@ -8675,7 +8665,7 @@ void ir_gen_tree(irGen *s) {
 		                                  nullptr, 0, false,
 		                                  ProcCC_Contextless);
 		AstNode *body = gb_alloc_item(a, AstNode);
-		Entity *e = make_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
+		Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
 
 		map_set(&m->values, hash_entity(e), p);
