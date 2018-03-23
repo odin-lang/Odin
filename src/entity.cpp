@@ -57,25 +57,32 @@ enum OverloadKind {
 	Overload_Yes     = 2,
 };
 
+enum EntityState {
+	EntityState_Unresolved = 0,
+	EntityState_InProgress  = 1,
+	EntityState_Resolved   = 2,
+};
+
 
 // An Entity is a named "thing" in the language
 struct Entity {
-	EntityKind kind;
-	u64        id;
-	u32        flags;
-	Token      token;
-	Scope *    scope;
-	Type *     type;
-	AstNode *  identifier; // Can be nullptr
-	DeclInfo * decl_info;
-	DeclInfo * parent_proc_decl; // nullptr if in file/global scope
+	EntityKind  kind;
+	u64         id;
+	u32         flags;
+	EntityState state;
+	Token       token;
+	Scope *     scope;
+	Type *      type;
+	AstNode *   identifier; // Can be nullptr
+	DeclInfo *  decl_info;
+	DeclInfo *  parent_proc_decl; // nullptr if in file/global scope
 
 	// TODO(bill): Cleanup how `using` works for entities
-	Entity *   using_parent;
-	AstNode *  using_expr;
+	Entity *    using_parent;
+	AstNode *   using_expr;
 
-	isize      order_in_src;
-	String     deprecated_message;
+	isize       order_in_src;
+	String      deprecated_message;
 
 	union {
 		struct {
@@ -173,6 +180,7 @@ gb_global u64 global_entity_id = 0;
 Entity *alloc_entity(gbAllocator a, EntityKind kind, Scope *scope, Token token, Type *type) {
 	Entity *entity = gb_alloc_item(a, Entity);
 	entity->kind   = kind;
+	entity->state  = EntityState_Unresolved;
 	entity->scope  = scope;
 	entity->token  = token;
 	entity->type   = type;
@@ -180,9 +188,10 @@ Entity *alloc_entity(gbAllocator a, EntityKind kind, Scope *scope, Token token, 
 	return entity;
 }
 
-Entity *make_entity_variable(gbAllocator a, Scope *scope, Token token, Type *type, bool is_immutable) {
+Entity *make_entity_variable(gbAllocator a, Scope *scope, Token token, Type *type, bool is_immutable, EntityState state = EntityState_Unresolved) {
 	Entity *entity = alloc_entity(a, Entity_Variable, scope, token, type);
 	entity->Variable.is_immutable = is_immutable;
+	entity->state = state;
 	return entity;
 }
 
@@ -194,6 +203,7 @@ Entity *make_entity_using_variable(gbAllocator a, Entity *parent, Token token, T
 	entity->parent_proc_decl = parent->parent_proc_decl;
 	entity->flags |= EntityFlag_Using;
 	entity->flags |= EntityFlag_Used;
+	entity->state = EntityState_Resolved;
 	return entity;
 }
 
@@ -204,8 +214,9 @@ Entity *make_entity_constant(gbAllocator a, Scope *scope, Token token, Type *typ
 	return entity;
 }
 
-Entity *make_entity_type_name(gbAllocator a, Scope *scope, Token token, Type *type) {
+Entity *make_entity_type_name(gbAllocator a, Scope *scope, Token token, Type *type, EntityState state = EntityState_Unresolved) {
 	Entity *entity = alloc_entity(a, Entity_TypeName, scope, token, type);
+	entity->state = state;
 	return entity;
 }
 
@@ -214,6 +225,7 @@ Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, 
 	Entity *entity = make_entity_variable(a, scope, token, type, is_immutable);
 	entity->flags |= EntityFlag_Used;
 	entity->flags |= EntityFlag_Param;
+	entity->state = EntityState_Resolved;
 	if (is_using) entity->flags |= EntityFlag_Using;
 	if (is_value) entity->flags |= EntityFlag_Value;
 	return entity;
@@ -229,12 +241,13 @@ Entity *make_entity_const_param(gbAllocator a, Scope *scope, Token token, Type *
 }
 
 
-Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, bool is_using, i32 field_src_index) {
+Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, bool is_using, i32 field_src_index, EntityState state = EntityState_Unresolved) {
 	Entity *entity = make_entity_variable(a, scope, token, type, false);
 	entity->Variable.field_src_index = field_src_index;
 	entity->Variable.field_index = field_src_index;
 	if (is_using) entity->flags |= EntityFlag_Using;
 	entity->flags |= EntityFlag_Field;
+	entity->state = state;
 	return entity;
 }
 
@@ -244,6 +257,7 @@ Entity *make_entity_array_elem(gbAllocator a, Scope *scope, Token token, Type *t
 	entity->Variable.field_index = field_src_index;
 	entity->flags |= EntityFlag_Field;
 	entity->flags |= EntityFlag_ArrayElem;
+	entity->state = EntityState_Resolved;
 	return entity;
 }
 
@@ -262,6 +276,7 @@ Entity *make_entity_proc_group(gbAllocator a, Scope *scope, Token token, Type *t
 Entity *make_entity_builtin(gbAllocator a, Scope *scope, Token token, Type *type, i32 id) {
 	Entity *entity = alloc_entity(a, Entity_Builtin, scope, token, type);
 	entity->Builtin.id = id;
+	entity->state = EntityState_Resolved;
 	return entity;
 }
 
@@ -277,6 +292,7 @@ Entity *make_entity_import_name(gbAllocator a, Scope *scope, Token token, Type *
 	entity->ImportName.path = path;
 	entity->ImportName.name = name;
 	entity->ImportName.scope = import_scope;
+	entity->state = EntityState_Resolved; // TODO(bill): Is this correct?
 	return entity;
 }
 
@@ -285,6 +301,7 @@ Entity *make_entity_library_name(gbAllocator a, Scope *scope, Token token, Type 
 	Entity *entity = alloc_entity(a, Entity_LibraryName, scope, token, type);
 	entity->LibraryName.path = path;
 	entity->LibraryName.name = name;
+	entity->state = EntityState_Resolved; // TODO(bill): Is this correct?
 	return entity;
 }
 
@@ -301,6 +318,7 @@ Entity *make_entity_label(gbAllocator a, Scope *scope, Token token, Type *type,
                           AstNode *node) {
 	Entity *entity = alloc_entity(a, Entity_Label, scope, token, type);
 	entity->Label.node = node;
+	entity->state = EntityState_Resolved;
 	return entity;
 }
 

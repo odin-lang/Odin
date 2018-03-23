@@ -1000,7 +1000,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 
 		check_open_scope(c, stmt);
 		{
-			Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, lhs->Ident.token, case_type, false);
+			Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, lhs->Ident.token, case_type, false, EntityState_Resolved);
 			tag_var->flags |= EntityFlag_Used;
 			tag_var->flags |= EntityFlag_Value;
 			add_entity(c, c->context.scope, lhs, tag_var);
@@ -1467,7 +1467,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				}
 				if (found == nullptr) {
 					bool is_immutable = true;
-					entity = make_entity_variable(c->allocator, c->context.scope, token, type, is_immutable);
+					entity = make_entity_variable(c->allocator, c->context.scope, token, type, is_immutable, EntityState_Resolved);
 					add_entity_definition(&c->info, name, entity);
 				} else {
 					TokenPos pos = found->token.pos;
@@ -1858,8 +1858,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				}
 				e->flags |= EntityFlag_Visited;
 
+				e->state = EntityState_InProgress;
 				if (e->type == nullptr) {
 					e->type = init_type;
+					e->state = EntityState_Resolved;
 				}
 				ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix);
 				e->Variable.thread_local_model = ac.thread_local_model;

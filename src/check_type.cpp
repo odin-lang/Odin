@@ -312,6 +312,7 @@ void add_polymorphic_struct_entity(Checker *c, AstNode *node, Type *named_type, 
 		node->Ident.token = token;
 
 		e = make_entity_type_name(a, s, token, named_type);
+		e->state = EntityState_Resolved;
 		add_entity_use(c, node, e);
 	}
 
@@ -468,6 +469,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 						}
 					}
 
+					e->state = EntityState_Resolved;
 					add_entity(c, scope, name, e);
 					array_add(&entities, e);
 				}
@@ -698,6 +700,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		Entity *e = make_entity_constant(c->allocator, c->context.scope, ident->Ident.token, constant_type, iota);
 		e->identifier = ident;
 		e->flags |= EntityFlag_Visited;
+		e->state = EntityState_Resolved;
 
 		HashKey key = hash_string(name);
 		if (map_get(&entity_map, key) != nullptr) {
@@ -1181,7 +1184,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 						type = t_invalid;
 					}
 				}
-				param = make_entity_type_name(c->allocator, scope, name->Ident.token, type);
+				param = make_entity_type_name(c->allocator, scope, name->Ident.token, type, EntityState_Resolved);
 				param->TypeName.is_type_alias = true;
 			} else {
 				if (operands != nullptr && variables.count < operands->count) {
@@ -1212,6 +1215,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			if (p->flags&FieldFlag_no_alias) {
 				param->flags |= EntityFlag_NoAlias;
 			}
+			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
 
 			add_entity(c, scope, name, param);
 			array_add(&variables, param);
@@ -1754,9 +1758,9 @@ void generate_map_entry_type(gbAllocator a, Type *type) {
 	Scope *s = create_scope(universal_scope, a);
 
 	auto fields = array_make<Entity *>(a, 0, 3);
-	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("key")),   t_map_key,       false, 0));
-	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("next")),  t_int,           false, 1));
-	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("value")), type->Map.value, false, 2));
+	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("key")),   t_map_key,       false, 0, EntityState_Resolved));
+	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("next")),  t_int,           false, 1, EntityState_Resolved));
+	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("value")), type->Map.value, false, 2, EntityState_Resolved));
 
 
 	entry_type->Struct.fields = fields;
@@ -1793,8 +1797,8 @@ void generate_map_internal_types(gbAllocator a, Type *type) {
 
 
 	auto fields = array_make<Entity *>(a, 0, 2);
-	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0));
-	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("entries")), entries_type, false, 1));
+	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0, EntityState_Resolved));
+	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("entries")), entries_type, false, 1, EntityState_Resolved));
 
 	generated_struct_type->Struct.fields = fields;
 
@@ -1842,7 +1846,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_ast_node(i, Ident, e);
 
 		Operand o = {};
-		check_ident(c, &o, e, named_type, nullptr, false);
+		Entity *entity = check_ident(c, &o, e, named_type, nullptr, false);
 
 		gbString err_str = nullptr;
 		defer (gb_string_free(err_str));
@@ -1857,7 +1861,12 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 				if (t != nullptr && is_type_polymorphic_struct_unspecialized(t)) {
 					err_str = expr_to_string(e);
 					error(e, "Invalid use of a non-specialized polymorphic type '%s'", err_str);
+					return true;
 				}
+			}
+
+			if (c->context.type_level == 0 && entity->state == EntityState_InProgress) {
+				error(e, "Illegal declaration cycle of `%.*s`", LIT(entity->token.string));
 			}
 			return true;
 		}
@@ -1895,8 +1904,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		Token token = ident->Ident.token;
 		Type *specific = nullptr;
 		if (pt->specialization != nullptr) {
-			auto prev_ips = c->context.in_polymorphic_specialization;
-			defer (c->context.in_polymorphic_specialization = prev_ips);
+			CheckerContext prev = c->context; defer (c->context = prev);
 			c->context.in_polymorphic_specialization = true;
 
 			AstNode *s = pt->specialization;
@@ -1919,6 +1927,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			}
 			Entity *e = make_entity_type_name(c->allocator, entity_scope, token, t);
 			e->TypeName.is_type_alias = true;
+			e->state = EntityState_Resolved;
 			add_entity(c, ps, ident, e);
 			add_entity(c, s, ident, e);
 		} else {
@@ -2007,9 +2016,9 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_end;
 
 	case_ast_node(st, StructType, e);
-		bool ips = c->context.in_polymorphic_specialization;
-		defer (c->context.in_polymorphic_specialization = ips);
+		CheckerContext prev = c->context; defer (c->context = prev);
 		c->context.in_polymorphic_specialization = false;
+		c->context.type_level += 1;
 
 		*type = make_type_struct(c->allocator);
 		set_base_type(named_type, *type);
@@ -2021,9 +2030,9 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_end;
 
 	case_ast_node(ut, UnionType, e);
-		bool ips = c->context.in_polymorphic_specialization;
-		defer (c->context.in_polymorphic_specialization = ips);
+		CheckerContext prev = c->context; defer (c->context = prev);
 		c->context.in_polymorphic_specialization = false;
+		c->context.type_level += 1;
 
 		*type = make_type_union(c->allocator);
 		set_base_type(named_type, *type);

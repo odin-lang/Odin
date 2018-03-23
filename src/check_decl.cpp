@@ -864,13 +864,21 @@ void check_proc_group_decl(Checker *c, Entity *pg_entity, DeclInfo *d) {
 }
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
-	if (e->type != nullptr) {
+	if (e->state == EntityState_Resolved)  {
+		return;
+	}
+	String name = e->token.string;
+
+	if (e->type != nullptr || e->state != EntityState_Unresolved) {
+		error(e->token, "Illegal declaration cycle of `%.*s`", LIT(name));
 		return;
 	}
 
+	GB_ASSERT(e->state == EntityState_Unresolved);
+
 #if 0
 	char buf[256] = {};
-	isize n = gb_snprintf(buf, 256, "%.*s %d", LIT(e->token.string), e->kind);
+	isize n = gb_snprintf(buf, 256, "%.*s %d", LIT(name), e->kind);
 	Timings timings = {};
 	timings_init(&timings, make_string(cast(u8 *)buf, n-1), 16);
 	defer ({
@@ -887,17 +895,21 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 		if (d == nullptr) {
 			// TODO(bill): Err here?
 			e->type = t_invalid;
+			e->state = EntityState_Resolved;
 			set_base_type(named_type, t_invalid);
 			return;
-			// GB_PANIC("'%.*s' should been declared!", LIT(e->token.string));
+			// GB_PANIC("'%.*s' should been declared!", LIT(name));
 		}
 	}
 
 	CheckerContext prev = c->context;
 	c->context.scope = d->scope;
 	c->context.decl  = d;
+	c->context.type_level = 0;
 
 	e->parent_proc_decl = c->context.curr_proc_decl;
+	e->state = EntityState_InProgress;
+
 
 	switch (e->kind) {
 	case Entity_Variable:
@@ -917,6 +929,8 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 		check_proc_group_decl(c, e, d);
 		break;
 	}
+
+	e->state = EntityState_Resolved;
 
 	c->context = prev;
 
