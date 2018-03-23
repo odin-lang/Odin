@@ -503,6 +503,7 @@ Entity *add_global_entity(Entity *entity) {
 	if (scope_insert_entity(universal_scope, entity)) {
 		compiler_error("double declaration");
 	}
+	entity->state = EntityState_Resolved;
 	return entity;
 }
 

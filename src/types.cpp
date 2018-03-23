@@ -217,6 +217,7 @@ struct Type {
 };
 
 
+
 // TODO(bill): Should I add extra information here specifying the kind of selection?
 // e.g. field, constant, array field, type field, etc.
 struct Selection {
@@ -480,12 +481,6 @@ Type *alloc_type(gbAllocator a, TypeKind kind) {
 	return t;
 }
 
-
-Type *make_type_basic(gbAllocator a, BasicType basic) {
-	Type *t = alloc_type(a, Type_Basic);
-	t->Basic = basic;
-	return t;
-}
 
 Type *make_type_generic(gbAllocator a, Scope *scope, i64 id, String name, Type *specialized) {
 	Type *t = alloc_type(a, Type_Generic);

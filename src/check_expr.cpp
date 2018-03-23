@@ -984,7 +984,9 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 	}
 
 	add_entity_use(c, n, e);
-	check_entity_decl(c, e, nullptr, named_type);
+	if (e->state == EntityState_Unresolved) {
+		check_entity_decl(c, e, nullptr, named_type);
+	}
 
 
 	if (e->type == nullptr) {
