@@ -782,21 +782,21 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 		if (source->kind == Type_Array) {
 
 			// IMPORTANT TODO(bill): Which is correct?
-			// if (poly->Array.generic_type != nullptr && modify_type) {
-			if (poly->Array.generic_type != nullptr) {
-				Type *gt = poly->Array.generic_type;
+			// if (poly->Array.generic_count != nullptr && modify_type) {
+			if (poly->Array.generic_count != nullptr) {
+				Type *gt = poly->Array.generic_count;
 				GB_ASSERT(gt->kind == Type_Generic);
 				Entity *e = scope_lookup_entity(gt->Generic.scope, gt->Generic.name);
 				GB_ASSERT(e != nullptr);
 				if (e->kind == Entity_TypeName) {
-					poly->Array.generic_type = nullptr;
+					poly->Array.generic_count = nullptr;
 					poly->Array.count = source->Array.count;
 
 					e->kind = Entity_Constant;
 					e->Constant.value = exact_value_i64(source->Array.count);
 					e->type = t_untyped_integer;
 				} else if (e->kind == Entity_Constant) {
-					poly->Array.generic_type = nullptr;
+					poly->Array.generic_count = nullptr;
 					if (e->Constant.value.kind != ExactValue_Integer) {
 						return false;
 					}

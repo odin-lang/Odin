@@ -698,6 +698,7 @@ int main(int arg_count, char **arg_ptr) {
 	init_string_buffer_memory();
 	init_scratch_memory(gb_megabytes(10));
 	init_global_error_collector();
+	init_cached_type_maps();
 
 	array_init(&library_collections, heap_allocator());
 	// NOTE(bill): 'core' cannot be (re)defined by the user

@@ -114,7 +114,7 @@ struct TypeStruct {
 	TYPE_KIND(Array,   struct {                           \
 		Type *elem;                                       \
 		i64   count;                                      \
-		Type *generic_type;                               \
+		Type *generic_count;                              \
 	})                                                    \
 	TYPE_KIND(Slice,   struct { Type *elem; })            \
 	TYPE_KIND(DynamicArray, struct { Type *elem; })       \
@@ -408,6 +408,67 @@ gb_global Type *t_map_header                  = nullptr;
 
 
 
+/*
+	NOTE(bill): This caching system is to reduce allocation clutter - inspired by Per Vogensen's Bitwise
+ */
+enum CachedTypeKind {
+	CachedType_Invalid,
+
+	CachedType_Pointer,
+	CachedType_Array,
+	CachedType_Slice,
+	CachedType_DynamicArray,
+	CachedType_Map,
+
+	CachedType_COUNT
+};
+
+struct CachedType {
+	CachedTypeKind kind;
+	Type *type;
+};
+
+HashKey hash_cache_type_elem(Type *elem) {
+	return hash_ptr_and_id(elem, 0);
+}
+HashKey hash_cache_type_array(Type *elem, i64 count) {
+	return hash_ptr_and_id(elem, cast(u64)count);
+}
+HashKey hash_cache_type_map(Type *key, Type *value) {
+	u64 v = cast(u64)cast(uintptr)value;
+	return hash_ptr_and_id(key, v);
+}
+
+
+// Key: elem/elem+count/key+value
+gb_global Map<CachedType> cached_type_maps[CachedType_COUNT] = {};
+
+void init_cached_type_maps() {
+	for (isize i = 1; i < CachedType_COUNT; i++) {
+		map_init(&cached_type_maps[i], heap_allocator());
+	}
+}
+
+
+CachedType *find_cached_type(CachedTypeKind kind, HashKey key) {
+	GB_ASSERT(key.kind == HashKey_PtrAndId);
+	if (key.ptr_and_id.ptr == nullptr) {
+		return nullptr;
+	}
+	auto *m = &cached_type_maps[kind];
+	return map_get(m, key);
+}
+
+void add_cached_type(CachedTypeKind kind, HashKey key, Type *type) {
+	GB_ASSERT(key.kind == HashKey_PtrAndId);
+	if (key.ptr_and_id.ptr == nullptr) {
+		return;
+	}
+	CachedType ct = {};
+	ct.kind = kind;
+	ct.type = type;
+	map_set(&cached_type_maps[kind], key, ct);
+}
 
 
 i64      type_size_of               (Type *t);
@@ -493,28 +554,56 @@ Type *alloc_type_generic(Scope *scope, i64 id, String name, Type *specialized) {
 }
 
 Type *alloc_type_pointer(Type *elem) {
+	auto hkey = hash_cache_type_elem(elem);
+	if (auto found = find_cached_type(CachedType_Pointer, hkey)) {
+		return found->type;
+	}
+
 	Type *t = alloc_type(Type_Pointer);
 	t->Pointer.elem = elem;
+
+	add_cached_type(CachedType_Pointer, hkey, t);
 	return t;
 }
 
-Type *alloc_type_array(Type *elem, i64 count, Type *generic_type = nullptr) {
+Type *alloc_type_array(Type *elem, i64 count, Type *generic_count = nullptr) {
+	if (generic_count != nullptr) {
+		Type *t = alloc_type(Type_Array);
+		t->Array.elem = elem;
+		t->Array.count = count;
+		t->Array.generic_count = generic_count;
+		return t;
+	}
+	auto hkey = hash_cache_type_array(elem, count);
+	if (auto found = find_cached_type(CachedType_Array, hkey)) {
+		return found->type;
+	}
 	Type *t = alloc_type(Type_Array);
 	t->Array.elem = elem;
 	t->Array.count = count;
-	t->Array.generic_type = generic_type;
-	return t;
-}
-
-Type *alloc_type_dynamic_array(Type *elem) {
-	Type *t = alloc_type(Type_DynamicArray);
-	t->DynamicArray.elem = elem;
+	add_cached_type(CachedType_Array, hkey, t);
 	return t;
 }
 
 Type *alloc_type_slice(Type *elem) {
+	auto hkey = hash_cache_type_elem(elem);
+	if (auto found = find_cached_type(CachedType_Slice, hkey)) {
+		return found->type;
+	}
 	Type *t = alloc_type(Type_Slice);
 	t->Array.elem = elem;
+	add_cached_type(CachedType_Slice, hkey, t);
+	return t;
+}
+
+Type *alloc_type_dynamic_array(Type *elem) {
+	auto hkey = hash_cache_type_elem(elem);
+	if (auto found = find_cached_type(CachedType_DynamicArray, hkey)) {
+		return found->type;
+	}
+	Type *t = alloc_type(Type_DynamicArray);
+	t->DynamicArray.elem = elem;
+	add_cached_type(CachedType_DynamicArray, hkey, t);
 	return t;
 }
 
@@ -579,12 +668,18 @@ Type *alloc_type_proc(Scope *scope, Type *params, isize param_count, Type *resul
 bool is_type_valid_for_keys(Type *t);
 
 Type *alloc_type_map(i64 count, Type *key, Type *value) {
-	Type *t = alloc_type(Type_Map);
 	if (key != nullptr) {
 		GB_ASSERT(is_type_valid_for_keys(key));
+		GB_ASSERT(value != nullptr);
 	}
+	auto hkey = hash_cache_type_map(key, value);
+	if (auto found = find_cached_type(CachedType_Map, hkey)) {
+		return found->type;
+	}
+	Type *t = alloc_type(Type_Map);
 	t->Map.key   = key;
 	t->Map.value = value;
+	add_cached_type(CachedType_Map, hkey, t);
 	return t;
 }
 
@@ -993,7 +1088,7 @@ bool is_type_polymorphic(Type *t) {
 	case Type_Pointer:
 		return is_type_polymorphic(t->Pointer.elem);
 	case Type_Array:
-		if (t->Array.generic_type != nullptr) {
+		if (t->Array.generic_count != nullptr) {
 			return true;
 		}
 		return is_type_polymorphic(t->Array.elem);
