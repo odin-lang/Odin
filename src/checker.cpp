@@ -568,12 +568,12 @@ void init_universal_scope(void) {
 	}
 
 
-	t_u8_ptr       = make_type_pointer(a, t_u8);
-	t_int_ptr      = make_type_pointer(a, t_int);
-	t_i64_ptr      = make_type_pointer(a, t_i64);
-	t_f64_ptr      = make_type_pointer(a, t_f64);
-	t_u8_slice     = make_type_slice(a, t_u8);
-	t_string_slice = make_type_slice(a, t_string);
+	t_u8_ptr       = alloc_type_pointer(t_u8);
+	t_int_ptr      = alloc_type_pointer(t_int);
+	t_i64_ptr      = alloc_type_pointer(t_i64);
+	t_f64_ptr      = alloc_type_pointer(t_f64);
+	t_u8_slice     = alloc_type_slice(t_u8);
+	t_string_slice = alloc_type_slice(t_string);
 }
 
 
@@ -1015,18 +1015,18 @@ void add_type_info_type(Checker *c, Type *t) {
 
 	case Type_Array:
 		add_type_info_type(c, bt->Array.elem);
-		add_type_info_type(c, make_type_pointer(c->allocator, bt->Array.elem));
+		add_type_info_type(c, alloc_type_pointer(bt->Array.elem));
 		add_type_info_type(c, t_int);
 		break;
 	case Type_DynamicArray:
 		add_type_info_type(c, bt->DynamicArray.elem);
-		add_type_info_type(c, make_type_pointer(c->allocator, bt->DynamicArray.elem));
+		add_type_info_type(c, alloc_type_pointer(bt->DynamicArray.elem));
 		add_type_info_type(c, t_int);
 		add_type_info_type(c, t_allocator);
 		break;
 	case Type_Slice:
 		add_type_info_type(c, bt->Slice.elem);
-		add_type_info_type(c, make_type_pointer(c->allocator, bt->Slice.elem));
+		add_type_info_type(c, alloc_type_pointer(bt->Slice.elem));
 		add_type_info_type(c, t_int);
 		break;
 
@@ -1056,7 +1056,7 @@ void add_type_info_type(Checker *c, Type *t) {
 		break;
 
 	case Type_Map:
-		generate_map_internal_types(c->allocator, bt);
+		init_map_internal_types(bt);
 		add_type_info_type(c, bt->Map.key);
 		add_type_info_type(c, bt->Map.value);
 		add_type_info_type(c, bt->Map.generated_struct_type);
@@ -1332,14 +1332,14 @@ void init_preload(Checker *c) {
 		Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
 
 		t_type_info = type_info_entity->type;
-		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
+		t_type_info_ptr = alloc_type_pointer(t_type_info);
 		GB_ASSERT(is_type_struct(type_info_entity->type));
 		TypeStruct *tis = &base_type(type_info_entity->type)->Struct;
 
 		Entity *type_info_enum_value = find_core_entity(c, str_lit("Type_Info_Enum_Value"));
 
 		t_type_info_enum_value = type_info_enum_value->type;
-		t_type_info_enum_value_ptr = make_type_pointer(c->allocator, t_type_info_enum_value);
+		t_type_info_enum_value_ptr = alloc_type_pointer(t_type_info_enum_value);
 
 		GB_ASSERT(tis->fields.count == 3);
 
@@ -1367,44 +1367,44 @@ void init_preload(Checker *c) {
 		t_type_info_map           = find_core_type(c, str_lit("Type_Info_Map"));
 		t_type_info_bit_field     = find_core_type(c, str_lit("Type_Info_Bit_Field"));
 
-		t_type_info_named_ptr         = make_type_pointer(c->allocator, t_type_info_named);
-		t_type_info_integer_ptr       = make_type_pointer(c->allocator, t_type_info_integer);
-		t_type_info_rune_ptr          = make_type_pointer(c->allocator, t_type_info_rune);
-		t_type_info_float_ptr         = make_type_pointer(c->allocator, t_type_info_float);
-		t_type_info_complex_ptr       = make_type_pointer(c->allocator, t_type_info_complex);
-		t_type_info_string_ptr        = make_type_pointer(c->allocator, t_type_info_string);
-		t_type_info_boolean_ptr       = make_type_pointer(c->allocator, t_type_info_boolean);
-		t_type_info_any_ptr           = make_type_pointer(c->allocator, t_type_info_any);
-		t_type_info_pointer_ptr       = make_type_pointer(c->allocator, t_type_info_pointer);
-		t_type_info_procedure_ptr     = make_type_pointer(c->allocator, t_type_info_procedure);
-		t_type_info_array_ptr         = make_type_pointer(c->allocator, t_type_info_array);
-		t_type_info_dynamic_array_ptr = make_type_pointer(c->allocator, t_type_info_dynamic_array);
-		t_type_info_slice_ptr         = make_type_pointer(c->allocator, t_type_info_slice);
-		t_type_info_tuple_ptr         = make_type_pointer(c->allocator, t_type_info_tuple);
-		t_type_info_struct_ptr        = make_type_pointer(c->allocator, t_type_info_struct);
-		t_type_info_union_ptr         = make_type_pointer(c->allocator, t_type_info_union);
-		t_type_info_enum_ptr          = make_type_pointer(c->allocator, t_type_info_enum);
-		t_type_info_map_ptr           = make_type_pointer(c->allocator, t_type_info_map);
-		t_type_info_bit_field_ptr     = make_type_pointer(c->allocator, t_type_info_bit_field);
+		t_type_info_named_ptr         = alloc_type_pointer(t_type_info_named);
+		t_type_info_integer_ptr       = alloc_type_pointer(t_type_info_integer);
+		t_type_info_rune_ptr          = alloc_type_pointer(t_type_info_rune);
+		t_type_info_float_ptr         = alloc_type_pointer(t_type_info_float);
+		t_type_info_complex_ptr       = alloc_type_pointer(t_type_info_complex);
+		t_type_info_string_ptr        = alloc_type_pointer(t_type_info_string);
+		t_type_info_boolean_ptr       = alloc_type_pointer(t_type_info_boolean);
+		t_type_info_any_ptr           = alloc_type_pointer(t_type_info_any);
+		t_type_info_pointer_ptr       = alloc_type_pointer(t_type_info_pointer);
+		t_type_info_procedure_ptr     = alloc_type_pointer(t_type_info_procedure);
+		t_type_info_array_ptr         = alloc_type_pointer(t_type_info_array);
+		t_type_info_dynamic_array_ptr = alloc_type_pointer(t_type_info_dynamic_array);
+		t_type_info_slice_ptr         = alloc_type_pointer(t_type_info_slice);
+		t_type_info_tuple_ptr         = alloc_type_pointer(t_type_info_tuple);
+		t_type_info_struct_ptr        = alloc_type_pointer(t_type_info_struct);
+		t_type_info_union_ptr         = alloc_type_pointer(t_type_info_union);
+		t_type_info_enum_ptr          = alloc_type_pointer(t_type_info_enum);
+		t_type_info_map_ptr           = alloc_type_pointer(t_type_info_map);
+		t_type_info_bit_field_ptr     = alloc_type_pointer(t_type_info_bit_field);
 	}
 
 	if (t_allocator == nullptr) {
 		Entity *e = find_core_entity(c, str_lit("Allocator"));
 		t_allocator = e->type;
-		t_allocator_ptr = make_type_pointer(c->allocator, t_allocator);
+		t_allocator_ptr = alloc_type_pointer(t_allocator);
 	}
 
 	if (t_context == nullptr) {
 		Entity *e = find_core_entity(c, str_lit("Context"));
 		e_context = e;
 		t_context = e->type;
-		t_context_ptr = make_type_pointer(c->allocator, t_context);
+		t_context_ptr = alloc_type_pointer(t_context);
 	}
 
 	if (t_source_code_location == nullptr) {
 		Entity *e = find_core_entity(c, str_lit("Source_Code_Location"));
 		t_source_code_location = e->type;
-		t_source_code_location_ptr = make_type_pointer(c->allocator, t_allocator);
+		t_source_code_location_ptr = alloc_type_pointer(t_allocator);
 	}
 
 	if (t_map_key == nullptr) {
@@ -3125,7 +3125,7 @@ void check_parsed_files(Checker *c) {
 		Entity *e = c->info.definitions[i];
 		if (e->kind == Entity_TypeName && e->type != nullptr) {
 			// i64 size  = type_size_of(c->allocator, e->type);
-			i64 align = type_align_of(c->allocator, e->type);
+			i64 align = type_align_of(e->type);
 			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
 				add_type_info_type(c, e->type);
 			}

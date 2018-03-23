@@ -401,7 +401,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 						// 	specialization = nullptr;
 						// }
 					}
-					type = make_type_generic(c->allocator, c->context.scope, 0, str_lit(""), specialization);
+					type = alloc_type_generic(c->context.scope, 0, str_lit(""), specialization);
 				} else {
 					type = check_type(c, type_expr);
 					if (is_type_polymorphic(type)) {
@@ -476,7 +476,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 			}
 
 			if (entities.count > 0) {
-				Type *tuple = make_type_tuple(c->allocator);
+				Type *tuple = alloc_type_tuple();
 				tuple->Tuple.variables = entities;
 				polymorphic_params = tuple;
 			}
@@ -788,7 +788,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, AstNode *node) {
 		}
 		u32 bits = cast(u32)bits_;
 
-		Type *value_type = make_type_bit_field_value(c->allocator, bits);
+		Type *value_type = alloc_type_bit_field_value(bits);
 		Entity *e = make_entity_variable(c->allocator, bit_field_type->BitField.scope, ident->Ident.token, value_type, false);
 		e->identifier = ident;
 		e->flags |= EntityFlag_BitFieldValue;
@@ -1039,7 +1039,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					detemine_type_from_operand = true;
 					type = t_invalid;
 				} else {
-					type = make_type_generic(c->allocator, c->context.scope, 0, str_lit(""), specialization);
+					type = alloc_type_generic(c->context.scope, 0, str_lit(""), specialization);
 				}
 			} else {
 				bool prev = c->context.allow_polymorphic_types;
@@ -1232,7 +1232,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		// NOTE(bill): Change last variadic parameter to be a slice
 		// Custom Calling convention for variadic parameters
 		Entity *end = variables[variadic_index];
-		end->type = make_type_slice(c->allocator, end->type);
+		end->type = alloc_type_slice(end->type);
 		end->flags |= EntityFlag_Ellipsis;
 		if (is_c_vararg) {
 			end->flags |= EntityFlag_CVarArg;
@@ -1253,7 +1253,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		}
 	}
 
-	Type *tuple = make_type_tuple(c->allocator);
+	Type *tuple = alloc_type_tuple();
 	tuple->Tuple.variables = variables;
 
 	if (success_) *success_ = success;
@@ -1274,7 +1274,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 	if (results.count == 0) {
 		return nullptr;
 	}
-	Type *tuple = make_type_tuple(c->allocator);
+	Type *tuple = alloc_type_tuple();
 
 	isize variable_count = 0;
 	for_array(i, results) {
@@ -1413,7 +1413,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 			i64 sz = bt->Basic.size;
 			// if (sz > 8 && build_context.word_size < 8) {
 			if (sz > 8) {
-				new_type = make_type_pointer(a, original_type);
+				new_type = alloc_type_pointer(original_type);
 			}
 			break;
 		}
@@ -1429,15 +1429,15 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		// Could be in C too
 		case Type_Struct:
 		{
-			i64 align = type_align_of(a, original_type);
-			i64 size  = type_size_of(a, original_type);
+			i64 align = type_align_of(original_type);
+			i64 size  = type_size_of(original_type);
 			switch (8*size) {
 			case 8:  new_type = t_u8;  break;
 			case 16: new_type = t_u16; break;
 			case 32: new_type = t_u32; break;
 			case 64: new_type = t_u64; break;
 			default:
-				new_type = make_type_pointer(a, original_type);
+				new_type = alloc_type_pointer(original_type);
 				break;
 			}
 
@@ -1454,7 +1454,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 			i64 sz = bt->Basic.size;
 			// if (sz > 8 && build_context.word_size < 8) {
 			if (sz > 8) {
-				new_type = make_type_pointer(a, original_type);
+				new_type = alloc_type_pointer(original_type);
 			}
 
 			break;
@@ -1470,10 +1470,10 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		case Type_Union:
 		// Could be in C too
 		case Type_Struct: {
-			i64 align = type_align_of(a, original_type);
-			i64 size  = type_size_of(a, original_type);
+			i64 align = type_align_of(original_type);
+			i64 size  = type_size_of(original_type);
 			if (8*size > 16) {
-				new_type = make_type_pointer(a, original_type);
+				new_type = alloc_type_pointer(original_type);
 			}
 
 			break;
@@ -1518,8 +1518,8 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 
 
 		default: {
-			i64 align = type_align_of(a, original_type);
-			i64 size  = type_size_of(a, original_type);
+			i64 align = type_align_of(original_type);
+			i64 size  = type_size_of(original_type);
 			switch (8*size) {
 #if 1
 			case 8:  new_type = t_u8;  break;
@@ -1540,7 +1540,7 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 	}
 
 	if (new_type != original_type) {
-		Type *tuple = make_type_tuple(a);
+		Type *tuple = alloc_type_tuple();
 		auto variables = array_make<Entity *>(a, 0, 1);
 		array_add(&variables, make_entity_param(a, original_type->Tuple.variables[0]->scope, empty_token, new_type, false, false));
 		tuple->Tuple.variables = variables;
@@ -1564,7 +1564,7 @@ bool abi_compat_return_by_value(gbAllocator a, ProcCallingConvention cc, Type *a
 
 
 	if (build_context.ODIN_OS == "windows") {
-		i64 size = 8*type_size_of(a, abi_return_type);
+		i64 size = 8*type_size_of(abi_return_type);
 		switch (size) {
 		case 0:
 		case 8:
@@ -1727,23 +1727,24 @@ i64 check_array_count(Checker *c, Operand *o, AstNode *e) {
 	return 0;
 }
 
-Type *make_optional_ok_type(gbAllocator a, Type *value) {
+Type *make_optional_ok_type(Type *value) {
+	gbAllocator a = heap_allocator();
 	bool typed = true;
-	Type *t = make_type_tuple(a);
+	Type *t = alloc_type_tuple();
 	array_init(&t->Tuple.variables, a, 0, 2);
 	array_add (&t->Tuple.variables, make_entity_field(a, nullptr, blank_token, value,  false, 0));
 	array_add (&t->Tuple.variables, make_entity_field(a, nullptr, blank_token, typed ? t_bool : t_untyped_bool, false, 1));
 	return t;
 }
 
-void generate_map_entry_type(gbAllocator a, Type *type) {
+void init_map_entry_type(Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
 	if (type->Map.entry_type != nullptr) return;
 
 	// NOTE(bill): The preload types may have not been set yet
 	GB_ASSERT(t_map_key != nullptr);
-
-	Type *entry_type = make_type_struct(a);
+	gbAllocator a = heap_allocator();
+	Type *entry_type = alloc_type_struct();
 
 	/*
 	struct {
@@ -1769,9 +1770,9 @@ void generate_map_entry_type(gbAllocator a, Type *type) {
 	type->Map.entry_type = entry_type;
 }
 
-void generate_map_internal_types(gbAllocator a, Type *type) {
+void init_map_internal_types(Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
-	generate_map_entry_type(a, type);
+	init_map_entry_type(type);
 	if (type->Map.internal_type != nullptr) return;
 	if (type->Map.generated_struct_type != nullptr) return;
 
@@ -1780,7 +1781,7 @@ void generate_map_internal_types(gbAllocator a, Type *type) {
 	GB_ASSERT(key != nullptr);
 	GB_ASSERT(value != nullptr);
 
-	Type *generated_struct_type = make_type_struct(a);
+	Type *generated_struct_type = alloc_type_struct();
 
 	/*
 	struct {
@@ -1788,12 +1789,13 @@ void generate_map_internal_types(gbAllocator a, Type *type) {
 		entries: [dynamic]EntryType;
 	}
 	*/
+	gbAllocator a = heap_allocator();
 	AstNode *dummy_node = gb_alloc_item(a, AstNode);
 	dummy_node->kind = AstNode_Invalid;
 	Scope *s = create_scope(universal_scope, a);
 
-	Type *hashes_type  = make_type_dynamic_array(a, t_int);
-	Type *entries_type = make_type_dynamic_array(a, type->Map.entry_type);
+	Type *hashes_type  = alloc_type_dynamic_array(t_int);
+	Type *entries_type = alloc_type_dynamic_array(type->Map.entry_type);
 
 
 	auto fields = array_make<Entity *>(a, 0, 2);
@@ -1802,10 +1804,10 @@ void generate_map_internal_types(gbAllocator a, Type *type) {
 
 	generated_struct_type->Struct.fields = fields;
 
-	type_set_offsets(a, generated_struct_type);
+	type_set_offsets(generated_struct_type);
 	type->Map.generated_struct_type = generated_struct_type;
 	type->Map.internal_type         = generated_struct_type;
-	type->Map.lookup_result_type    = make_optional_ok_type(a, value);
+	type->Map.lookup_result_type    = make_optional_ok_type(value);
 }
 
 void check_map_type(Checker *c, Type *type, AstNode *node) {
@@ -1830,7 +1832,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 
 
 	init_preload(c);
-	generate_map_internal_types(c->allocator, type);
+	init_map_internal_types(type);
 
 	// error(node, "'map' types are not yet implemented");
 }
@@ -1916,7 +1918,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			// 	specific = nullptr;
 			// }
 		}
-		Type *t = make_type_generic(c->allocator, c->context.scope, 0, token.string, specific);
+		Type *t = alloc_type_generic(c->context.scope, 0, token.string, specific);
 		if (c->context.allow_polymorphic_types) {
 			Scope *ps = c->context.polymorphic_scope;
 			Scope *s = c->context.scope;
@@ -1974,14 +1976,14 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_ast_node(ue, UnaryExpr, e);
 		switch (ue->op.kind) {
 		case Token_Pointer:
-			*type = make_type_pointer(c->allocator, check_type(c, ue->expr));
+			*type = alloc_type_pointer(check_type(c, ue->expr));
 			set_base_type(named_type, *type);
 			return true;
 		}
 	case_end;
 
 	case_ast_node(pt, PointerType, e);
-		*type = make_type_pointer(c->allocator, check_type(c, pt->type));
+		*type = alloc_type_pointer(check_type(c, pt->type));
 		set_base_type(named_type, *type);
 		return true;
 	case_end;
@@ -1999,10 +2001,10 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 				count = 0;
 			}
 			Type *elem = check_type(c, at->elem, nullptr);
-			*type = make_type_array(c->allocator, elem, count, generic_type);
+			*type = alloc_type_array(elem, count, generic_type);
 		} else {
 			Type *elem = check_type(c, at->elem);
-			*type = make_type_slice(c->allocator, elem);
+			*type = alloc_type_slice(elem);
 		}
 		set_base_type(named_type, *type);
 		return true;
@@ -2010,7 +2012,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 
 	case_ast_node(dat, DynamicArrayType, e);
 		Type *elem = check_type(c, dat->elem);
-		*type = make_type_dynamic_array(c->allocator, elem);
+		*type = alloc_type_dynamic_array(elem);
 		set_base_type(named_type, *type);
 		return true;
 	case_end;
@@ -2020,7 +2022,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		c->context.in_polymorphic_specialization = false;
 		c->context.type_level += 1;
 
-		*type = make_type_struct(c->allocator);
+		*type = alloc_type_struct();
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
 		check_struct_type(c, *type, e, nullptr, named_type);
@@ -2034,7 +2036,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		c->context.in_polymorphic_specialization = false;
 		c->context.type_level += 1;
 
-		*type = make_type_union(c->allocator);
+		*type = alloc_type_union();
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
 		check_union_type(c, *type, e);
@@ -2048,7 +2050,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		defer (c->context.in_polymorphic_specialization = ips);
 		c->context.in_polymorphic_specialization = false;
 
-		*type = make_type_enum(c->allocator);
+		*type = alloc_type_enum();
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
 		check_enum_type(c, *type, named_type, e);
@@ -2058,7 +2060,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_end;
 
 	case_ast_node(et, BitFieldType, e);
-		*type = make_type_bit_field(c->allocator);
+		*type = alloc_type_bit_field();
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
 		check_bit_field_type(c, *type, e);
@@ -2071,7 +2073,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		defer (c->context.in_polymorphic_specialization = ips);
 		c->context.in_polymorphic_specialization = false;
 
-		*type = alloc_type(c->allocator, Type_Proc);
+		*type = alloc_type(Type_Proc);
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
 		check_procedure_type(c, *type, e);
@@ -2084,7 +2086,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		defer (c->context.in_polymorphic_specialization = ips);
 		c->context.in_polymorphic_specialization = false;
 
-		*type = alloc_type(c->allocator, Type_Map);
+		*type = alloc_type(Type_Map);
 		set_base_type(named_type, *type);
 		check_map_type(c, *type, e);
 		return true;
