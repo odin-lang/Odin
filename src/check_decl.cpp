@@ -227,6 +227,8 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
 		error(decl->attributes[0], "Attributes are not allowed on type declarations");
 	}
 
+
+
 	bool is_distinct = is_type_distinct(type_expr);
 	AstNode *te = remove_type_alias_clutter(type_expr);
 	e->type = t_invalid;
@@ -238,7 +240,10 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
 	}
 	e->type = named;
 
-	Type *bt = check_type(c, te, named);
+	check_type_path_push(c, e);
+	Type *bt = check_type_expr(c, te, named);
+	check_type_path_pop(c);
+
 	named->Named.base = base_type(bt);
 	if (!is_distinct) {
 		e->type = bt;
@@ -985,7 +990,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 				for_array(i, scope->elements.entries) {
 					Entity *f = scope->elements.entries[i].value;
 					if (f->kind == Entity_Variable) {
-						Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
+						Entity *uvar = alloc_entity_using_variable(e, f->token, f->type);
 						uvar->Variable.is_immutable = is_immutable;
 						if (is_value) uvar->flags |= EntityFlag_Value;
 

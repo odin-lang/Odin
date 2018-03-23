@@ -111,7 +111,7 @@ void check_struct_fields(Checker *c, AstNode *node, Array<Entity *> *fields, Arr
 				gb_printf_err("Element\n");
 			}
 
-			type = check_type(c, type_expr);
+			type = check_type_expr(c, type_expr, nullptr);
 
 			if (default_value != nullptr) {
 				Operand o = {};
@@ -179,7 +179,7 @@ void check_struct_fields(Checker *c, AstNode *node, Array<Entity *> *fields, Arr
 			Token name_token = name->Ident.token;
 
 			Entity *field = nullptr;
-			field = make_entity_field(c->allocator, c->context.scope, name_token, type, is_using, field_src_index);
+			field = alloc_entity_field(c->context.scope, name_token, type, is_using, field_src_index);
 			field->Variable.default_value = value;
 			field->Variable.default_is_nil = default_is_nil;
 
@@ -211,8 +211,7 @@ void check_struct_fields(Checker *c, AstNode *node, Array<Entity *> *fields, Arr
 
 
 Entity *make_names_field_for_struct(Checker *c, Scope *scope) {
-	Entity *e = make_entity_field(c->allocator, scope,
-		make_token_ident(str_lit("names")), t_string_slice, false, 0);
+	Entity *e = alloc_entity_field(scope, make_token_ident(str_lit("names")), t_string_slice, false, 0);
 	e->Variable.is_immutable = true;
 	e->flags |= EntityFlag_TypeField;
 	return e;
@@ -311,7 +310,7 @@ void add_polymorphic_struct_entity(Checker *c, AstNode *node, Type *named_type, 
 		node->kind = AstNode_Ident;
 		node->Ident.token = token;
 
-		e = make_entity_type_name(a, s, token, named_type);
+		e = alloc_entity_type_name(s, token, named_type);
 		e->state = EntityState_Resolved;
 		add_entity_use(c, node, e);
 	}
@@ -454,18 +453,18 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 								is_polymorphic = true;
 								can_check_fields = false;
 							}
-							e = make_entity_type_name(c->allocator, scope, token, operand.type);
+							e = alloc_entity_type_name(scope, token, operand.type);
 							e->TypeName.is_type_alias = true;
 						} else {
 							GB_ASSERT(operand.mode == Addressing_Constant);
-							e = make_entity_constant(c->allocator, scope, token, operand.type, operand.value);
+							e = alloc_entity_constant(scope, token, operand.type, operand.value);
 						}
 					} else {
 						if (is_type_param) {
-							e = make_entity_type_name(c->allocator, scope, token, type);
+							e = alloc_entity_type_name(scope, token, type);
 							e->TypeName.is_type_alias = true;
 						} else {
-							e = make_entity_constant(c->allocator, scope, token, type, empty_exact_value);
+							e = alloc_entity_constant(scope, token, type, empty_exact_value);
 						}
 					}
 
@@ -551,7 +550,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	for_array(i, ut->variants) {
 		AstNode *node = ut->variants[i];
-		Type *t = check_type(c, node);
+		Type *t = check_type_expr(c, node, nullptr);
 		if (t != nullptr && t != t_invalid) {
 			bool ok = true;
 			t = default_type(t);
@@ -697,7 +696,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 			max_value = iota;
 		}
 
-		Entity *e = make_entity_constant(c->allocator, c->context.scope, ident->Ident.token, constant_type, iota);
+		Entity *e = alloc_entity_constant(c->context.scope, ident->Ident.token, constant_type, iota);
 		e->identifier = ident;
 		e->flags |= EntityFlag_Visited;
 		e->state = EntityState_Resolved;
@@ -732,12 +731,10 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		}
 	}
 
-	enum_type->Enum.count = make_entity_constant(c->allocator, c->context.scope,
-		make_token_ident(str_lit("count")), t_int, exact_value_i64(fields.count));
-	enum_type->Enum.min_value = make_entity_constant(c->allocator, c->context.scope,
-		make_token_ident(str_lit("min_value")), constant_type, min_value);
-	enum_type->Enum.max_value = make_entity_constant(c->allocator, c->context.scope,
-		make_token_ident(str_lit("max_value")), constant_type, max_value);
+	Scope *s = c->context.scope;
+	enum_type->Enum.count     = alloc_entity_constant(s, make_token_ident(str_lit("count")), t_int, exact_value_i64(fields.count));
+	enum_type->Enum.min_value = alloc_entity_constant(s, make_token_ident(str_lit("min_value")), constant_type, min_value);
+	enum_type->Enum.max_value = alloc_entity_constant(s, make_token_ident(str_lit("max_value")), constant_type, max_value);
 
 	enum_type->Enum.names = make_names_field_for_struct(c, c->context.scope);
 }
@@ -789,7 +786,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, AstNode *node) {
 		u32 bits = cast(u32)bits_;
 
 		Type *value_type = alloc_type_bit_field_value(bits);
-		Entity *e = make_entity_variable(c->allocator, bit_field_type->BitField.scope, ident->Ident.token, value_type, false);
+		Entity *e = alloc_entity_variable(bit_field_type->BitField.scope, ident->Ident.token, value_type, false);
 		e->identifier = ident;
 		e->flags |= EntityFlag_BitFieldValue;
 
@@ -1184,7 +1181,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 						type = t_invalid;
 					}
 				}
-				param = make_entity_type_name(c->allocator, scope, name->Ident.token, type, EntityState_Resolved);
+				param = alloc_entity_type_name(scope, name->Ident.token, type, EntityState_Resolved);
 				param->TypeName.is_type_alias = true;
 			} else {
 				if (operands != nullptr && variables.count < operands->count) {
@@ -1207,7 +1204,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					}
 				}
 
-				param = make_entity_param(c->allocator, scope, name->Ident.token, type, is_using, is_in);
+				param = alloc_entity_param(scope, name->Ident.token, type, is_using, is_in);
 				param->Variable.default_value = value;
 				param->Variable.default_is_nil = default_is_nil;
 				param->Variable.default_is_location = default_is_location;
@@ -1336,7 +1333,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 		if (field->names.count == 0) {
 			Token token = ast_node_token(field->type);
 			token.string = str_lit("");
-			Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
+			Entity *param = alloc_entity_param(scope, token, type, false, false);
 			param->Variable.default_value = value;
 			param->Variable.default_is_nil = default_is_nil;
 			array_add(&variables, param);
@@ -1359,7 +1356,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 					error(name, "Result value cannot be a blank identifer `_`");
 				}
 
-				Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
+				Entity *param = alloc_entity_param(scope, token, type, false, false);
 				param->flags |= EntityFlag_Result;
 				param->Variable.default_value = value;
 				param->Variable.default_is_nil = default_is_nil;
@@ -1542,7 +1539,7 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 	if (new_type != original_type) {
 		Type *tuple = alloc_type_tuple();
 		auto variables = array_make<Entity *>(a, 0, 1);
-		array_add(&variables, make_entity_param(a, original_type->Tuple.variables[0]->scope, empty_token, new_type, false, false));
+		array_add(&variables, alloc_entity_param(original_type->Tuple.variables[0]->scope, empty_token, new_type, false, false));
 		tuple->Tuple.variables = variables;
 		new_type = tuple;
 	}
@@ -1732,8 +1729,8 @@ Type *make_optional_ok_type(Type *value) {
 	bool typed = true;
 	Type *t = alloc_type_tuple();
 	array_init(&t->Tuple.variables, a, 0, 2);
-	array_add (&t->Tuple.variables, make_entity_field(a, nullptr, blank_token, value,  false, 0));
-	array_add (&t->Tuple.variables, make_entity_field(a, nullptr, blank_token, typed ? t_bool : t_untyped_bool, false, 1));
+	array_add (&t->Tuple.variables, alloc_entity_field(nullptr, blank_token, value,  false, 0));
+	array_add (&t->Tuple.variables, alloc_entity_field(nullptr, blank_token, typed ? t_bool : t_untyped_bool, false, 1));
 	return t;
 }
 
@@ -1759,9 +1756,9 @@ void init_map_entry_type(Type *type) {
 	Scope *s = create_scope(universal_scope, a);
 
 	auto fields = array_make<Entity *>(a, 0, 3);
-	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("key")),   t_map_key,       false, 0, EntityState_Resolved));
-	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("next")),  t_int,           false, 1, EntityState_Resolved));
-	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("value")), type->Map.value, false, 2, EntityState_Resolved));
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("key")),   t_map_key,       false, 0, EntityState_Resolved));
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("next")),  t_int,           false, 1, EntityState_Resolved));
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("value")), type->Map.value, false, 2, EntityState_Resolved));
 
 
 	entry_type->Struct.fields = fields;
@@ -1799,8 +1796,8 @@ void init_map_internal_types(Type *type) {
 
 
 	auto fields = array_make<Entity *>(a, 0, 2);
-	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0, EntityState_Resolved));
-	array_add(&fields, make_entity_field(a, s, make_token_ident(str_lit("entries")), entries_type, false, 1, EntityState_Resolved));
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0, EntityState_Resolved));
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("entries")), entries_type, false, 1, EntityState_Resolved));
 
 	generated_struct_type->Struct.fields = fields;
 
@@ -1837,6 +1834,8 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 	// error(node, "'map' types are not yet implemented");
 }
 
+
+
 bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) {
 	GB_ASSERT_NOT_NULL(type);
 	if (e == nullptr) {
@@ -1846,7 +1845,6 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 
 	switch (e->kind) {
 	case_ast_node(i, Ident, e);
-
 		Operand o = {};
 		Entity *entity = check_ident(c, &o, e, named_type, nullptr, false);
 
@@ -1867,9 +1865,15 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 				}
 			}
 
-			if (c->context.type_level == 0 && entity->state == EntityState_InProgress) {
-				error(e, "Illegal declaration cycle of `%.*s`", LIT(entity->token.string));
-			}
+			// if (c->context.type_level == 0 && entity->state == EntityState_InProgress) {
+			// 	error(entity->token, "Illegal declaration cycle of `%.*s`", LIT(entity->token.string));
+			// 	for_array(j, *c->context.type_path) {
+			// 		Entity *k = (*c->context.type_path)[j];
+			// 		error(k->token, "\t%.*s refers to", LIT(k->token.string));
+			// 	}
+			// 	error(entity->token, "\t%.*s", LIT(entity->token.string));
+			// 	*type = t_invalid;
+			// }
 			return true;
 		}
 
@@ -1927,7 +1931,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 				GB_ASSERT(is_scope_an_ancestor(ps, s) >= 0);
 				entity_scope = ps;
 			}
-			Entity *e = make_entity_type_name(c->allocator, entity_scope, token, t);
+			Entity *e = alloc_entity_type_name(entity_scope, token, t);
 			e->TypeName.is_type_alias = true;
 			e->state = EntityState_Resolved;
 			add_entity(c, ps, ident, e);
@@ -1968,7 +1972,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	case_end;
 
 	case_ast_node(pe, ParenExpr, e);
-		*type = check_type(c, pe->expr, named_type);
+		*type = check_type_expr(c, pe->expr, named_type);
 		set_base_type(named_type, *type);
 		return true;
 	case_end;
@@ -2000,7 +2004,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 				error(at->count, "... can only be used in conjuction with compound literals");
 				count = 0;
 			}
-			Type *elem = check_type(c, at->elem, nullptr);
+			Type *elem = check_type_expr(c, at->elem, nullptr);
 			*type = alloc_type_array(elem, count, generic_type);
 		} else {
 			Type *elem = check_type(c, at->elem);
@@ -2117,9 +2121,15 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 	return false;
 }
 
+Type *check_type(Checker *c, AstNode *e) {
+	auto prev_context = c->context; defer (c->context = prev_context);
+	c->context.type_path = new_checker_type_path();
+	defer (destroy_checker_type_path(c->context.type_path));
 
+	return check_type_expr(c, e, nullptr);
+}
 
-Type *check_type(Checker *c, AstNode *e, Type *named_type) {
+Type *check_type_expr(Checker *c, AstNode *e, Type *named_type) {
 	Type *type = nullptr;
 	bool ok = check_type_internal(c, e, &type, named_type);
 

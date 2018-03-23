@@ -55,7 +55,8 @@ void     check_multi_expr               (Checker *c, Operand *operand, AstNode *
 void     check_expr_or_type             (Checker *c, Operand *operand, AstNode *expression, Type *type_hint = nullptr);
 ExprKind check_expr_base                (Checker *c, Operand *operand, AstNode *expression, Type *type_hint);
 void     check_expr_with_type_hint      (Checker *c, Operand *o, AstNode *e, Type *t);
-Type *   check_type                     (Checker *c, AstNode *expression, Type *named_type = nullptr);
+Type *   check_type                     (Checker *c, AstNode *expression);
+Type *   check_type_expr                (Checker *c, AstNode *expression, Type *named_type);
 Type *   make_optional_ok_type          (Type *value);
 void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def);
 Entity * check_selector                 (Checker *c, Operand *operand, AstNode *node, Type *type_hint);
@@ -334,7 +335,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	d->proc_lit = proc_lit;
 
 
-	Entity *entity = make_entity_procedure(c->allocator, nullptr, token, final_proc_type, tags);
+	Entity *entity = alloc_entity_procedure(nullptr, token, final_proc_type, tags);
 	entity->identifier = ident;
 
 	add_entity_and_decl_info(c, ident, entity, d);
@@ -903,6 +904,27 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 	return false;
 }
 
+bool check_cycle(Checker *c, Entity *curr, bool report) {
+	if (curr->state != EntityState_InProgress) {
+		return false;
+	}
+	for_array(i, *c->context.type_path) {
+		Entity *prev = (*c->context.type_path)[i];
+		if (prev == curr) {
+			if (report) {
+				error(curr->token, "Illegal declaration cycle of `%.*s`", LIT(curr->token.string));
+				for (isize j = i; j < c->context.type_path->count; j++) {
+					Entity *curr = (*c->context.type_path)[j];
+					error(curr->token, "\t%.*s refers to", LIT(curr->token.string));
+				}
+				error(curr->token, "\t%.*s", LIT(curr->token.string));
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
 
 Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name) {
 	GB_ASSERT(n->kind == AstNode_Ident);
@@ -1036,6 +1058,9 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 
 	case Entity_TypeName:
 		o->mode = Addressing_Type;
+		if (check_cycle(c, e, true)) {
+			type = t_invalid;
+		}
 		break;
 
 	case Entity_ImportName:
@@ -3152,8 +3177,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *proc_type_params = alloc_type_tuple(c->allocator);
 		proc_type_params->Tuple.variables = gb_alloc_array(c->allocator, Entity *, 2);
 		proc_type_params->Tuple.variable_count = 2;
-		proc_type_params->Tuple.variables[0] = make_entity_param(c->allocator, nullptr, blank_token, operand->type, false, false);
-		proc_type_params->Tuple.variables[1] = make_entity_param(c->allocator, nullptr, blank_token, slice_elem, false, false);
+		proc_type_params->Tuple.variables[0] = alloc_entity_param(c->allocator, nullptr, blank_token, operand->type, false, false);
+		proc_type_params->Tuple.variables[1] = alloc_entity_param(c->allocator, nullptr, blank_token, slice_elem, false, false);
 		Type *proc_type = alloc_type_proc(nullptr, proc_type_params, 2, nullptr, false, true, ProcCC_Odin);
 
 		check_call_arguments(c, &prev_operand, proc_type, call);

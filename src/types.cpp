@@ -435,8 +435,12 @@ HashKey hash_cache_type_array(Type *elem, i64 count) {
 	return hash_ptr_and_id(elem, cast(u64)count);
 }
 HashKey hash_cache_type_map(Type *key, Type *value) {
-	u64 v = cast(u64)cast(uintptr)value;
-	return hash_ptr_and_id(key, v);
+	HashKey hkey = {};
+	if ((key != nullptr) == (value != nullptr)) {
+		u64 v = cast(u64)cast(uintptr)value;
+		hkey = hash_ptr_and_id(key, v);
+	}
+	return hkey;
 }
 
 
@@ -453,6 +457,7 @@ void init_cached_type_maps() {
 CachedType *find_cached_type(CachedTypeKind kind, HashKey key) {
 	GB_ASSERT(key.kind == HashKey_PtrAndId);
 	if (key.ptr_and_id.ptr == nullptr) {
+		// NOTE(bill): uncachable types
 		return nullptr;
 	}
 	auto *m = &cached_type_maps[kind];
@@ -462,6 +467,7 @@ CachedType *find_cached_type(CachedTypeKind kind, HashKey key) {
 void add_cached_type(CachedTypeKind kind, HashKey key, Type *type) {
 	GB_ASSERT(key.kind == HashKey_PtrAndId);
 	if (key.ptr_and_id.ptr == nullptr) {
+		// NOTE(bill): uncachable types
 		return;
 	}
 	CachedType ct = {};
@@ -1694,10 +1700,10 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 			String data_str = str_lit("data");
 			String type_info_str = str_lit("type_info");
 			if (entity__any_data == nullptr) {
-				entity__any_data = make_entity_field(a, nullptr, make_token_ident(data_str), t_rawptr, false, 0);
+				entity__any_data = alloc_entity_field(nullptr, make_token_ident(data_str), t_rawptr, false, 0);
 			}
 			if (entity__any_type_info == nullptr) {
-				entity__any_type_info = make_entity_field(a, nullptr, make_token_ident(type_info_str), t_type_info_ptr, false, 1);
+				entity__any_type_info = alloc_entity_field(nullptr, make_token_ident(type_info_str), t_type_info_ptr, false, 1);
 			}
 
 			if (field_name == data_str) {
@@ -1722,7 +1728,7 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 			case (_length): \
 				if (field_name == _name) { \
 					selection_add_index(&sel, (_length)-1); \
-					sel.entity = make_entity_array_elem(a, nullptr, make_token_ident(str_lit(_name)), type->Array.elem, (_length)-1); \
+					sel.entity = alloc_entity_array_elem(nullptr, make_token_ident(str_lit(_name)), type->Array.elem, (_length)-1); \
 					return sel; \
 				} \
 				/*fallthrough*/
@@ -1853,10 +1859,13 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 }
 
 
+// IMPORTANT TODO(bill): SHould this TypePath code be removed since type cycle checking is handled much earlier on?
+
 struct TypePath {
 	Array<Entity *> path; // Entity_TypeName;
 	bool failure;
 };
+
 
 void type_path_init(TypePath *tp) {
 	// TODO(bill): Use an allocator that uses a backing array if it can and then use alternative allocator when exhausted
