@@ -987,7 +987,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		    !is_type_any(type_deref(x.type)) &&
 		    cc->list.count == 1 &&
 		    case_type != nullptr) {
-			case_type = make_type_pointer(c->allocator, case_type);
+			case_type = alloc_type_pointer(case_type);
 		}
 
 		if (cc->list.count > 1) {

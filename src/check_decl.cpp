@@ -231,7 +231,7 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
 	AstNode *te = remove_type_alias_clutter(type_expr);
 	e->type = t_invalid;
 	String name = e->token.string;
-	Type *named = make_type_named(c->allocator, name, nullptr, e);
+	Type *named = alloc_type_named(name, nullptr, e);
 	named->Named.type_name = e;
 	if (def != nullptr && def->kind == Type_Named) {
 		def->Named.base = named;
@@ -400,8 +400,8 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 		if (is_type_integer(x) && is_type_integer(y)) {
 			GB_ASSERT(x->kind == Type_Basic);
 			GB_ASSERT(y->kind == Type_Basic);
-			i64 sx = type_size_of(heap_allocator(), x);
-			i64 sy = type_size_of(heap_allocator(), y);
+			i64 sx = type_size_of(x);
+			i64 sy = type_size_of(y);
 			if (sx == sy) continue;
 		}
 
@@ -417,8 +417,8 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 		if (is_type_integer(x) && is_type_integer(y)) {
 			GB_ASSERT(x->kind == Type_Basic);
 			GB_ASSERT(y->kind == Type_Basic);
-			i64 sx = type_size_of(heap_allocator(), x);
-			i64 sy = type_size_of(heap_allocator(), y);
+			i64 sx = type_size_of(x);
+			i64 sy = type_size_of(y);
 			if (sx == sy) continue;
 		}
 
@@ -500,7 +500,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	if (d->gen_proc_type != nullptr) {
 		proc_type = d->gen_proc_type;
 	} else {
-		proc_type = make_type_proc(c->allocator, e->scope, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
+		proc_type = alloc_type_proc(e->scope, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 	}
 	e->type = proc_type;
 	ast_node(pl, ProcLit, d->proc_lit);

@@ -56,7 +56,7 @@ void     check_expr_or_type             (Checker *c, Operand *operand, AstNode *
 ExprKind check_expr_base                (Checker *c, Operand *operand, AstNode *expression, Type *type_hint);
 void     check_expr_with_type_hint      (Checker *c, Operand *o, AstNode *e, Type *t);
 Type *   check_type                     (Checker *c, AstNode *expression, Type *named_type = nullptr);
-Type *   make_optional_ok_type          (gbAllocator a, Type *value);
+Type *   make_optional_ok_type          (Type *value);
 void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def);
 Entity * check_selector                 (Checker *c, Operand *operand, AstNode *node, Type *type_hint);
 Entity * check_ident                    (Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name);
@@ -259,7 +259,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 
 	// NOTE(bill): This is slightly memory leaking if the type already exists
 	// Maybe it's better to check with the previous types first?
-	Type *final_proc_type = make_type_proc(c->allocator, scope, nullptr, 0, nullptr, 0, false, pt->calling_convention);
+	Type *final_proc_type = alloc_type_proc(scope, nullptr, 0, nullptr, 0, false, pt->calling_convention);
 	bool success = check_procedure_type(c, final_proc_type, pt->node, &operands);
 
 	if (!success) {
@@ -499,7 +499,7 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		Type *bfv = base_type(operand->type);
 		i32 bits = bfv->BitFieldValue.bits;
 		i32 size = next_pow2((bits+7)/8);
-		i32 dst_size = cast(i32)type_size_of(c->allocator, type);
+		i32 dst_size = cast(i32)type_size_of(type);
 		i32 diff = gb_abs(dst_size - size);
 		// TODO(bill): figure out a decent rule here
 		return 1;
@@ -1229,7 +1229,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 
 		i64 i = v.value_integer;
 		u64 u = bit_cast<u64>(i);
-		i64 s = 8*type_size_of(c->allocator, type);
+		i64 s = 8*type_size_of(type);
 		u64 umax = ~cast(u64)0ull;
 		if (s < 64) {
 			umax = (1ull << cast(u64)s) - 1ull;
@@ -1397,7 +1397,7 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 			return;
 		}
 		o->mode = Addressing_Value;
-		o->type = make_type_pointer(c->allocator, o->type);
+		o->type = alloc_type_pointer(o->type);
 		return;
 	}
 	}
@@ -1422,7 +1422,7 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 
 		i32 precision = 0;
 		if (is_type_unsigned(type)) {
-			precision = cast(i32)(8 * type_size_of(c->allocator, type));
+			precision = cast(i32)(8 * type_size_of(type));
 		}
 		if (op.kind == Token_Xor && is_type_untyped(type)) {
 			gbString err_str = expr_to_string(node);
@@ -1668,7 +1668,7 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 
 	Type *base_ptr = base_type(ptr->type); GB_ASSERT(base_ptr->kind == Type_Pointer);
 	Type *elem = base_ptr->Pointer.elem;
-	i64 elem_size = type_size_of(c->allocator, elem);
+	i64 elem_size = type_size_of(elem);
 
 	if (elem_size <= 0) {
 		gbString str = type_to_string(elem);
@@ -1902,8 +1902,8 @@ bool check_transmute(Checker *c, AstNode *node, Operand *o, Type *t) {
 		return false;
 	}
 
-	i64 srcz = type_size_of(c->allocator, o->type);
-	i64 dstz = type_size_of(c->allocator, t);
+	i64 srcz = type_size_of(o->type);
+	i64 dstz = type_size_of(t);
 	if (srcz != dstz) {
 		gbString expr_str = expr_to_string(o->expr);
 		gbString type_str = type_to_string(t);
@@ -2082,7 +2082,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		if (is_type_pointer(type)) {
 			GB_ASSERT(op.kind == Token_Sub);
 			i64 bytes = a.value_pointer - b.value_pointer;
-			i64 diff = bytes/type_size_of(c->allocator, type);
+			i64 diff = bytes/type_size_of(type);
 			x->value = exact_value_pointer(diff);
 			return;
 		}
@@ -2628,7 +2628,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 	if (entity == nullptr && selector->kind == AstNode_Ident) {
 		String field_name = selector->Ident.token.string;
-		sel = lookup_field(c->allocator, operand->type, field_name, operand->mode == Addressing_Type);
+		sel = lookup_field(operand->type, field_name, operand->mode == Addressing_Type);
 		entity = sel.entity;
 
 		// NOTE(bill): Add type info needed for fields like 'names'
@@ -2672,7 +2672,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 				return nullptr;
 			}
 
-			sel = lookup_field_from_index(heap_allocator(), type, index);
+			sel = lookup_field_from_index(type, index);
 			entity = sel.entity;
 
 			GB_ASSERT(entity != nullptr);
@@ -2929,7 +2929,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 		operand->mode = Addressing_Value;
-		operand->type = make_type_pointer(c->allocator, type);
+		operand->type = alloc_type_pointer(type);
 
 		break;
 	}
@@ -2970,7 +2970,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Value;
-		operand->type = make_type_slice(c->allocator, type);
+		operand->type = alloc_type_slice(type);
 
 		break;
 	}
@@ -3147,14 +3147,14 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		} else {
 			elem = type->Slice.elem;
 		}
-		Type *slice_elem = make_type_slice(c->allocator, elem);
+		Type *slice_elem = alloc_type_slice(elem);
 
-		Type *proc_type_params = make_type_tuple(c->allocator);
+		Type *proc_type_params = alloc_type_tuple(c->allocator);
 		proc_type_params->Tuple.variables = gb_alloc_array(c->allocator, Entity *, 2);
 		proc_type_params->Tuple.variable_count = 2;
 		proc_type_params->Tuple.variables[0] = make_entity_param(c->allocator, nullptr, blank_token, operand->type, false, false);
 		proc_type_params->Tuple.variables[1] = make_entity_param(c->allocator, nullptr, blank_token, slice_elem, false, false);
-		Type *proc_type = make_type_proc(c->allocator, nullptr, proc_type_params, 2, nullptr, false, true, ProcCC_Odin);
+		Type *proc_type = alloc_type_proc(nullptr, proc_type_params, 2, nullptr, false, true, ProcCC_Odin);
 
 		check_call_arguments(c, &prev_operand, proc_type, call);
 
@@ -3218,7 +3218,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		t = default_type(t);
 
 		operand->mode = Addressing_Constant;
-		operand->value = exact_value_i64(type_size_of(c->allocator, t));
+		operand->value = exact_value_i64(type_size_of(t));
 		operand->type = t_untyped_integer;
 
 		break;
@@ -3239,7 +3239,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		t = default_type(t);
 
 		operand->mode = Addressing_Constant;
-		operand->value = exact_value_i64(type_align_of(c->allocator, t));
+		operand->value = exact_value_i64(type_align_of(t));
 		operand->type = t_untyped_integer;
 
 		break;
@@ -3269,7 +3269,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 
 		ast_node(arg, Ident, field_arg);
-		Selection sel = lookup_field(c->allocator, type, arg->token.string, operand->mode == Addressing_Type);
+		Selection sel = lookup_field(type, arg->token.string, operand->mode == Addressing_Type);
 		if (sel.entity == nullptr) {
 			gbString type_str = type_to_string(bt);
 			error(ce->args[0],
@@ -3286,7 +3286,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = exact_value_i64(type_offset_of_from_selection(c->allocator, type, sel));
+		operand->value = exact_value_i64(type_offset_of_from_selection(type, sel));
 		operand->type  = t_uintptr;
 
 		break;
@@ -3408,7 +3408,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		if (arg_count < max_count) {
-			operand->type = make_type_array(c->allocator, elem_type, arg_count);
+			operand->type = alloc_type_array(elem_type, arg_count);
 		}
 		operand->mode = Addressing_Value;
 
@@ -3586,7 +3586,7 @@ break;
 				// No need quit
 			}
 		}
-		operand->type = make_type_slice(c->allocator, ptr_type->Pointer.elem);
+		operand->type = alloc_type_slice(ptr_type->Pointer.elem);
 		operand->mode = Addressing_Value;
 
 		break;
@@ -3619,7 +3619,7 @@ break;
 		}
 		gbAllocator a = c->allocator;
 
-		Type *tuple = make_type_tuple(a);
+		Type *tuple = alloc_type_tuple();
 		isize variable_count = type->Struct.fields.count;
 		array_init(&tuple->Tuple.variables, a, variable_count);
 		// TODO(bill): Should I copy each of the entities or is this good enough?
@@ -3933,8 +3933,8 @@ break;
 			return false;
 		}
 
-		i64 srcz = type_size_of(c->allocator, o->type);
-		i64 dstz = type_size_of(c->allocator, t);
+		i64 srcz = type_size_of(o->type);
+		i64 dstz = type_size_of(t);
 		if (srcz != dstz) {
 			gbString expr_str = expr_to_string(o->expr);
 			gbString type_str = type_to_string(t);
@@ -4005,7 +4005,7 @@ void check_unpack_arguments(Checker *c, Entity **lhs, isize lhs_count, Array<Ope
 		if (o.type == nullptr || o.type->kind != Type_Tuple) {
 			if (allow_ok && lhs_count == 2 && rhs.count == 1 &&
 			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk)) {
-				Type *tuple = make_optional_ok_type(c->allocator, o.type);
+				Type *tuple = make_optional_ok_type(o.type);
 				add_type_and_value(&c->info, o.expr, o.mode, tuple, o.value);
 
 				Operand val = o;
@@ -4797,9 +4797,9 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 
 		String generated_name = make_string_c(expr_to_string(call));
 
-		Type *named_type = make_type_named(a, generated_name, nullptr, nullptr);
+		Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
 		AstNode *node = clone_ast_node(a, st->node);
-		Type *struct_type = make_type_struct(a);
+		Type *struct_type = alloc_type_struct();
 		struct_type->Struct.node = node;
 		struct_type->Struct.polymorphic_parent = original_type;
 		set_base_type(named_type, struct_type);
@@ -5198,7 +5198,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 	case_ast_node(pl, ProcLit, node);
 		CheckerContext prev_context = c->context;
 		DeclInfo *decl = nullptr;
-		Type *type = alloc_type(c->allocator, Type_Proc);
+		Type *type = alloc_type(Type_Proc);
 		check_open_scope(c, pl->type);
 		{
 			decl = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
@@ -5324,7 +5324,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				AstNode *count = cl->type->ArrayType.count;
 				if (count->kind == AstNode_UnaryExpr &&
 				    count->UnaryExpr.op.kind == Token_Question) {
-					type = make_type_array(c->allocator, check_type(c, cl->type->ArrayType.elem), -1);
+					type = alloc_type_array(check_type(c, cl->type->ArrayType.elem), -1);
 					is_to_be_determined_array_count = true;
 				}
 			}
@@ -5403,7 +5403,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						}
 						String name = fv->field->Ident.token.string;
 
-						Selection sel = lookup_field(c->allocator, type, name, o->mode == Addressing_Type);
+						Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
 						bool is_unknown = sel.entity == nullptr;
 						if (is_unknown) {
 							error(elem, "Unknown field '%.*s' in structure literal", LIT(name));
@@ -5583,7 +5583,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						}
 						String name = fv->field->Ident.token.string;
 
-						Selection sel = lookup_field(c->allocator, type, name, o->mode == Addressing_Type);
+						Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
 						if (sel.entity == nullptr) {
 							error(elem, "Unknown field '%.*s' in 'any' literal", LIT(name));
 							continue;
@@ -5950,7 +5950,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				o->expr = node;
 				return kind;
 			}
-			o->type = make_type_slice(c->allocator, t->Array.elem);
+			o->type = alloc_type_slice(t->Array.elem);
 			break;
 
 		case Type_Slice:
@@ -5960,7 +5960,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		case Type_DynamicArray:
 			valid = true;
-			o->type = make_type_slice(c->allocator, t->DynamicArray.elem);
+			o->type = alloc_type_slice(t->DynamicArray.elem);
 			break;
 		}
 

@@ -410,11 +410,11 @@ gb_global Type *t_map_header                  = nullptr;
 
 
 
-i64      type_size_of               (gbAllocator allocator, Type *t);
-i64      type_align_of              (gbAllocator allocator, Type *t);
-i64      type_offset_of             (gbAllocator allocator, Type *t, i32 index);
+i64      type_size_of               (Type *t);
+i64      type_align_of              (Type *t);
+i64      type_offset_of             (Type *t, i32 index);
 gbString type_to_string             (Type *type);
-void     generate_map_internal_types(gbAllocator a, Type *type);
+void     init_map_internal_types(Type *type);
 
 
 
@@ -472,7 +472,8 @@ void set_base_type(Type *t, Type *base) {
 }
 
 
-Type *alloc_type(gbAllocator a, TypeKind kind) {
+Type *alloc_type(TypeKind kind) {
+	gbAllocator a = heap_allocator();
 	Type *t = gb_alloc_item(a, Type);
 	gb_zero_item(t);
 	t->kind = kind;
@@ -482,8 +483,8 @@ Type *alloc_type(gbAllocator a, TypeKind kind) {
 }
 
 
-Type *make_type_generic(gbAllocator a, Scope *scope, i64 id, String name, Type *specialized) {
-	Type *t = alloc_type(a, Type_Generic);
+Type *alloc_type_generic(Scope *scope, i64 id, String name, Type *specialized) {
+	Type *t = alloc_type(Type_Generic);
 	t->Generic.id = id;
 	t->Generic.name = name;
 	t->Generic.specialized = specialized;
@@ -491,45 +492,45 @@ Type *make_type_generic(gbAllocator a, Scope *scope, i64 id, String name, Type *
 	return t;
 }
 
-Type *make_type_pointer(gbAllocator a, Type *elem) {
-	Type *t = alloc_type(a, Type_Pointer);
+Type *alloc_type_pointer(Type *elem) {
+	Type *t = alloc_type(Type_Pointer);
 	t->Pointer.elem = elem;
 	return t;
 }
 
-Type *make_type_array(gbAllocator a, Type *elem, i64 count, Type *generic_type = nullptr) {
-	Type *t = alloc_type(a, Type_Array);
+Type *alloc_type_array(Type *elem, i64 count, Type *generic_type = nullptr) {
+	Type *t = alloc_type(Type_Array);
 	t->Array.elem = elem;
 	t->Array.count = count;
 	t->Array.generic_type = generic_type;
 	return t;
 }
 
-Type *make_type_dynamic_array(gbAllocator a, Type *elem) {
-	Type *t = alloc_type(a, Type_DynamicArray);
+Type *alloc_type_dynamic_array(Type *elem) {
+	Type *t = alloc_type(Type_DynamicArray);
 	t->DynamicArray.elem = elem;
 	return t;
 }
 
-Type *make_type_slice(gbAllocator a, Type *elem) {
-	Type *t = alloc_type(a, Type_Slice);
+Type *alloc_type_slice(Type *elem) {
+	Type *t = alloc_type(Type_Slice);
 	t->Array.elem = elem;
 	return t;
 }
 
 
-Type *make_type_struct(gbAllocator a) {
-	Type *t = alloc_type(a, Type_Struct);
+Type *alloc_type_struct() {
+	Type *t = alloc_type(Type_Struct);
 	return t;
 }
 
-Type *make_type_union(gbAllocator a) {
-	Type *t = alloc_type(a, Type_Union);
+Type *alloc_type_union() {
+	Type *t = alloc_type(Type_Union);
 	return t;
 }
 
-Type *make_type_enum(gbAllocator a) {
-	Type *t = alloc_type(a, Type_Enum);
+Type *alloc_type_enum() {
+	Type *t = alloc_type(Type_Enum);
 	return t;
 }
 
@@ -537,21 +538,21 @@ Type *make_type_enum(gbAllocator a) {
 
 
 
-Type *make_type_named(gbAllocator a, String name, Type *base, Entity *type_name) {
-	Type *t = alloc_type(a, Type_Named);
+Type *alloc_type_named(String name, Type *base, Entity *type_name) {
+	Type *t = alloc_type(Type_Named);
 	t->Named.name = name;
 	t->Named.base = base;
 	t->Named.type_name = type_name;
 	return t;
 }
 
-Type *make_type_tuple(gbAllocator a) {
-	Type *t = alloc_type(a, Type_Tuple);
+Type *alloc_type_tuple() {
+	Type *t = alloc_type(Type_Tuple);
 	return t;
 }
 
-Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_count, Type *results, isize result_count, bool variadic, ProcCallingConvention calling_convention) {
-	Type *t = alloc_type(a, Type_Proc);
+Type *alloc_type_proc(Scope *scope, Type *params, isize param_count, Type *results, isize result_count, bool variadic, ProcCallingConvention calling_convention) {
+	Type *t = alloc_type(Type_Proc);
 
 	if (variadic) {
 		if (param_count == 0) {
@@ -577,8 +578,8 @@ Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_coun
 
 bool is_type_valid_for_keys(Type *t);
 
-Type *make_type_map(gbAllocator a, i64 count, Type *key, Type *value) {
-	Type *t = alloc_type(a, Type_Map);
+Type *alloc_type_map(i64 count, Type *key, Type *value) {
+	Type *t = alloc_type(Type_Map);
 	if (key != nullptr) {
 		GB_ASSERT(is_type_valid_for_keys(key));
 	}
@@ -587,14 +588,14 @@ Type *make_type_map(gbAllocator a, i64 count, Type *key, Type *value) {
 	return t;
 }
 
-Type *make_type_bit_field_value(gbAllocator a, u32 bits) {
-	Type *t = alloc_type(a, Type_BitFieldValue);
+Type *alloc_type_bit_field_value(u32 bits) {
+	Type *t = alloc_type(Type_BitFieldValue);
 	t->BitFieldValue.bits = bits;
 	return t;
 }
 
-Type *make_type_bit_field(gbAllocator a) {
-	Type *t = alloc_type(a, Type_BitField);
+Type *alloc_type_bit_field() {
+	Type *t = alloc_type(Type_BitField);
 	return t;
 }
 
@@ -1396,7 +1397,7 @@ i64 union_variant_index(Type *u, Type *v) {
 	return 0;
 }
 
-i64 union_tag_size(gbAllocator a, Type *u) {
+i64 union_tag_size(Type *u) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
 	if (u->Union.tag_size > 0) {
@@ -1415,8 +1416,8 @@ i64 union_tag_size(gbAllocator a, Type *u) {
 	return tag_size;
 }
 
-Type *union_tag_type(gbAllocator a, Type *u) {
-	i64 s = union_tag_size(a, u);
+Type *union_tag_type(Type *u) {
+	i64 s = union_tag_size(u);
 	switch (s) {
 	case  1: return  t_u8;
 	case  2: return  t_u16;
@@ -1511,16 +1512,17 @@ ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 
 
 
-Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel);
+Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel);
 
-Selection lookup_field(gbAllocator a, Type *type_, String field_name, bool is_type) {
-	return lookup_field_with_selection(a, type_, field_name, is_type, empty_selection);
+Selection lookup_field(Type *type_, String field_name, bool is_type) {
+	return lookup_field_with_selection(type_, field_name, is_type, empty_selection);
 }
 
-Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
+Selection lookup_field_from_index(Type *type, i64 index) {
 	GB_ASSERT(is_type_struct(type) || is_type_union(type) || is_type_tuple(type));
 	type = base_type(type);
 
+	gbAllocator a = heap_allocator();
 	isize max_count = 0;
 	switch (type->kind) {
 	case Type_Struct:   max_count = type->Struct.fields.count;   break;
@@ -1574,13 +1576,14 @@ gb_global Entity *entity__any_type_info  = nullptr;
 
 Entity *current_scope_lookup_entity(Scope *s, String name);
 
-Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel) {
+Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel) {
 	GB_ASSERT(type_ != nullptr);
 
 	if (is_blank_ident(field_name)) {
 		return empty_selection;
 	}
 
+	gbAllocator a = heap_allocator();
 	Type *type = type_deref(type_);
 	bool is_ptr = type != type_;
 	sel.indirect = sel.indirect || is_ptr;
@@ -1701,7 +1704,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		}
 		if (type->kind == Type_Generic && type->Generic.specialized != nullptr) {
 			Type *specialized = type->Generic.specialized;
-			return lookup_field_with_selection(a, specialized, field_name, is_type, sel);
+			return lookup_field_with_selection(specialized, field_name, is_type, sel);
 		}
 
 	} else if (type->kind == Type_Union) {
@@ -1723,7 +1726,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				isize prev_count = sel.index.count;
 				selection_add_index(&sel, i); // HACK(bill): Leaky memory
 
-				sel = lookup_field_with_selection(a, f->type, field_name, is_type, sel);
+				sel = lookup_field_with_selection(f->type, field_name, is_type, sel);
 
 				if (sel.entity != nullptr) {
 					if (is_type_pointer(f->type)) {
@@ -1817,12 +1820,12 @@ void type_path_pop(TypePath *tp) {
 #define FAILURE_ALIGNMENT 0
 
 
-i64 type_size_of_internal (gbAllocator allocator, Type *t, TypePath *path);
-i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path);
+i64 type_size_of_internal (Type *t, TypePath *path);
+i64 type_align_of_internal(Type *t, TypePath *path);
 
 
 
-i64 type_size_of(gbAllocator allocator, Type *t) {
+i64 type_size_of(Type *t) {
 	if (t == nullptr) {
 		return 0;
 	}
@@ -1832,12 +1835,12 @@ i64 type_size_of(gbAllocator allocator, Type *t) {
 	}
 	TypePath path = {0};
 	type_path_init(&path);
-	t->cached_size = type_size_of_internal(allocator, t, &path);
+	t->cached_size = type_size_of_internal(t, &path);
 	type_path_free(&path);
 	return t->cached_size;
 }
 
-i64 type_align_of(gbAllocator allocator, Type *t) {
+i64 type_align_of(Type *t) {
 	if (t == nullptr) {
 		return 1;
 	}
@@ -1848,13 +1851,13 @@ i64 type_align_of(gbAllocator allocator, Type *t) {
 
 	TypePath path = {0};
 	type_path_init(&path);
-	t->cached_align = type_align_of_internal(allocator, t, &path);
+	t->cached_align = type_align_of_internal(t, &path);
 	type_path_free(&path);
 	return t->cached_align;
 }
 
 
-i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
+i64 type_align_of_internal(Type *t, TypePath *path) {
 	GB_ASSERT(path != nullptr);
 	if (t->failure) {
 		return FAILURE_ALIGNMENT;
@@ -1874,7 +1877,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			return build_context.word_size;
 
 		case Basic_complex64: case Basic_complex128:
-			return type_size_of_internal(allocator, t, path) / 2;
+			return type_size_of_internal(t, path) / 2;
 		}
 	} break;
 
@@ -1884,7 +1887,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		if (path->failure) {
 			return FAILURE_ALIGNMENT;
 		}
-		i64 align = type_align_of_internal(allocator, t->Array.elem, path);
+		i64 align = type_align_of_internal(t->Array.elem, path);
 		if (pop) type_path_pop(path);
 		return align;
 	}
@@ -1900,7 +1903,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	case Type_Tuple: {
 		i64 max = 1;
 		for_array(i, t->Tuple.variables) {
-			i64 align = type_align_of_internal(allocator, t->Tuple.variables[i]->type, path);
+			i64 align = type_align_of_internal(t->Tuple.variables[i]->type, path);
 			if (max < align) {
 				max = align;
 			}
@@ -1909,10 +1912,10 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	} break;
 
 	case Type_Map:
-		generate_map_internal_types(allocator, t);
-		return type_align_of_internal(allocator, t->Map.internal_type, path);
+		init_map_internal_types(t);
+		return type_align_of_internal(t->Map.internal_type, path);
 	case Type_Enum:
-		return type_align_of_internal(allocator, t->Enum.base_type, path);
+		return type_align_of_internal(t->Enum.base_type, path);
 
 	case Type_Union: {
 		if (t->Union.variants.count == 0) {
@@ -1929,7 +1932,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			if (path->failure) {
 				return FAILURE_ALIGNMENT;
 			}
-			i64 align = type_align_of_internal(allocator, variant, path);
+			i64 align = type_align_of_internal(variant, path);
 			if (pop) type_path_pop(path);
 			if (max < align) {
 				max = align;
@@ -1950,7 +1953,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 				if (path->failure) {
 					return FAILURE_ALIGNMENT;
 				}
-				i64 align = type_align_of_internal(allocator, field_type, path);
+				i64 align = type_align_of_internal(field_type, path);
 				if (pop) type_path_pop(path);
 				if (max < align) {
 					max = align;
@@ -1964,7 +1967,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 				Type *field_type = t->Struct.fields[i]->type;
 				bool pop = type_path_push(path, field_type);
 				if (path->failure) return FAILURE_ALIGNMENT;
-				i64 align = type_align_of_internal(allocator, field_type, path);
+				i64 align = type_align_of_internal(field_type, path);
 				if (pop) type_path_pop(path);
 				if (max < align) {
 					max = align;
@@ -1986,14 +1989,15 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	} break;
 	}
 
-	// return gb_clamp(next_pow2(type_size_of(allocator, t)), 1, build_context.max_align);
+	// return gb_clamp(next_pow2(type_size_of(t)), 1, build_context.max_align);
 	// NOTE(bill): Things that are bigger than build_context.word_size, are actually comprised of smaller types
 	// TODO(bill): Is this correct for 128-bit types (integers)?
-	return gb_clamp(next_pow2(type_size_of_internal(allocator, t, path)), 1, build_context.word_size);
+	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.word_size);
 }
 
-Array<i64> type_set_offsets_of(gbAllocator allocator, Array<Entity *> fields, bool is_packed, bool is_raw_union) {
-	auto offsets = array_make<i64>(allocator, fields.count);
+Array<i64> type_set_offsets_of(Array<Entity *> fields, bool is_packed, bool is_raw_union) {
+	gbAllocator a = heap_allocator();
+	auto offsets = array_make<i64>(a, fields.count);
 	i64 curr_offset = 0;
 	if (is_raw_union) {
 		for_array(i, fields) {
@@ -2001,15 +2005,15 @@ Array<i64> type_set_offsets_of(gbAllocator allocator, Array<Entity *> fields, bo
 		}
 	} else if (is_packed) {
 		for_array(i, fields) {
-			i64 size = type_size_of(allocator, fields[i]->type);
+			i64 size = type_size_of(fields[i]->type);
 			offsets[i] = curr_offset;
 			curr_offset += size;
 		}
 	} else {
 		for_array(i, fields) {
 			Type *t = fields[i]->type;
-			i64 align = gb_max(type_align_of(allocator, t), 1);
-			i64 size  = gb_max(type_size_of(allocator,  t), 0);
+			i64 align = gb_max(type_align_of(t), 1);
+			i64 size  = gb_max(type_size_of( t), 0);
 			curr_offset = align_formula(curr_offset, align);
 			offsets[i] = curr_offset;
 			curr_offset += size;
@@ -2018,12 +2022,12 @@ Array<i64> type_set_offsets_of(gbAllocator allocator, Array<Entity *> fields, bo
 	return offsets;
 }
 
-bool type_set_offsets(gbAllocator allocator, Type *t) {
+bool type_set_offsets(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
 		if (!t->Struct.are_offsets_set) {
 			t->Struct.are_offsets_being_processed = true;
-			t->Struct.offsets = type_set_offsets_of(allocator, t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union);
+			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union);
 			t->Struct.are_offsets_being_processed = false;
 			t->Struct.are_offsets_set = true;
 			return true;
@@ -2031,7 +2035,7 @@ bool type_set_offsets(gbAllocator allocator, Type *t) {
 	} else if (is_type_tuple(t)) {
 		if (!t->Tuple.are_offsets_set) {
 			t->Struct.are_offsets_being_processed = true;
-			t->Tuple.offsets = type_set_offsets_of(allocator, t->Tuple.variables, false, false);
+			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, false, false);
 			t->Struct.are_offsets_being_processed = false;
 			t->Tuple.are_offsets_set = true;
 			return true;
@@ -2042,7 +2046,7 @@ bool type_set_offsets(gbAllocator allocator, Type *t) {
 	return false;
 }
 
-i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
+i64 type_size_of_internal(Type *t, TypePath *path) {
 	if (t->failure) {
 		return FAILURE_SIZE;
 	}
@@ -2053,7 +2057,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		if (path->failure) {
 			return FAILURE_ALIGNMENT;
 		}
-		i64 size = type_size_of_internal(allocator, t->Named.base, path);
+		i64 size = type_size_of_internal(t->Named.base, path);
 		if (pop) type_path_pop(path);
 		return size;
 	} break;
@@ -2084,11 +2088,11 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		if (count == 0) {
 			return 0;
 		}
-		align = type_align_of_internal(allocator, t->Array.elem, path);
+		align = type_align_of_internal(t->Array.elem, path);
 		if (path->failure) {
 			return FAILURE_SIZE;
 		}
-		size  = type_size_of_internal( allocator, t->Array.elem, path);
+		size  = type_size_of_internal( t->Array.elem, path);
 		alignment = align_formula(size, align);
 		return alignment*(count-1) + size;
 	} break;
@@ -2101,8 +2105,8 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		return 3*build_context.word_size + 2*build_context.word_size;
 
 	case Type_Map:
-		generate_map_internal_types(allocator, t);
-		return type_size_of_internal(allocator, t->Map.internal_type, path);
+		init_map_internal_types(t);
+		return type_size_of_internal(t->Map.internal_type, path);
 
 	case Type_Tuple: {
 		i64 count, align, size;
@@ -2110,20 +2114,20 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		if (count == 0) {
 			return 0;
 		}
-		align = type_align_of_internal(allocator, t, path);
-		type_set_offsets(allocator, t);
-		size = t->Tuple.offsets[count-1] + type_size_of_internal(allocator, t->Tuple.variables[count-1]->type, path);
+		align = type_align_of_internal(t, path);
+		type_set_offsets(t);
+		size = t->Tuple.offsets[count-1] + type_size_of_internal(t->Tuple.variables[count-1]->type, path);
 		return align_formula(size, align);
 	} break;
 
 	case Type_Enum:
-		return type_size_of_internal(allocator, t->Enum.base_type, path);
+		return type_size_of_internal(t->Enum.base_type, path);
 
 	case Type_Union: {
 		if (t->Union.variants.count == 0) {
 			return 0;
 		}
-		i64 align = type_align_of_internal(allocator, t, path);
+		i64 align = type_align_of_internal(t, path);
 		if (path->failure) {
 			return FAILURE_SIZE;
 		}
@@ -2133,14 +2137,14 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 		for_array(i, t->Union.variants) {
 			Type *variant_type = t->Union.variants[i];
-			i64 size = type_size_of_internal(allocator, variant_type, path);
+			i64 size = type_size_of_internal(variant_type, path);
 			if (max < size) {
 				max = size;
 			}
 		}
 
 		// NOTE(bill): Align to tag
-		i64 tag_size = union_tag_size(allocator, t);
+		i64 tag_size = union_tag_size(t);
 		i64 size = align_formula(max, tag_size);
 		// NOTE(bill): Calculate the padding between the common fields and the tag
 		t->Union.tag_size = tag_size;
@@ -2153,13 +2157,13 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	case Type_Struct: {
 		if (t->Struct.is_raw_union) {
 			i64 count = t->Struct.fields.count;
-			i64 align = type_align_of_internal(allocator, t, path);
+			i64 align = type_align_of_internal(t, path);
 			if (path->failure) {
 				return FAILURE_SIZE;
 			}
 			i64 max = 0;
 			for (isize i = 0; i < count; i++) {
-				i64 size = type_size_of_internal(allocator, t->Struct.fields[i]->type, path);
+				i64 size = type_size_of_internal(t->Struct.fields[i]->type, path);
 				if (max < size) {
 					max = size;
 				}
@@ -2173,7 +2177,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			if (count == 0) {
 				return 0;
 			}
-			align = type_align_of_internal(allocator, t, path);
+			align = type_align_of_internal(t, path);
 			if (path->failure) {
 				return FAILURE_SIZE;
 			}
@@ -2181,14 +2185,14 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 				type_path_print_illegal_cycle(path, path->path.count-1);
 				return FAILURE_SIZE;
 			}
-			type_set_offsets(allocator, t);
-			size = t->Struct.offsets[count-1] + type_size_of_internal(allocator, t->Struct.fields[count-1]->type, path);
+			type_set_offsets(t);
+			size = t->Struct.offsets[count-1] + type_size_of_internal(t->Struct.fields[count-1]->type, path);
 			return align_formula(size, align);
 		}
 	} break;
 
 	case Type_BitField: {
-		i64 align = 8*type_align_of_internal(allocator, t, path);
+		i64 align = 8*type_align_of_internal(t, path);
 		i64 end = 0;
 		if (t->BitField.fields.count > 0) {
 			i64 last = t->BitField.fields.count-1;
@@ -2204,15 +2208,15 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	return build_context.word_size;
 }
 
-i64 type_offset_of(gbAllocator allocator, Type *t, i32 index) {
+i64 type_offset_of(Type *t, i32 index) {
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
-		type_set_offsets(allocator, t);
+		type_set_offsets(t);
 		if (gb_is_between(index, 0, t->Struct.fields.count-1)) {
 			return t->Struct.offsets[index];
 		}
 	} else if (t->kind == Type_Tuple) {
-		type_set_offsets(allocator, t);
+		type_set_offsets(t);
 		if (gb_is_between(index, 0, t->Tuple.variables.count-1)) {
 			return t->Tuple.offsets[index];
 		}
@@ -2242,7 +2246,7 @@ i64 type_offset_of(gbAllocator allocator, Type *t, i32 index) {
 		case 3: return 3*build_context.word_size; // allocator
 		}
 	} else if (t->kind == Type_Union) {
-		/* i64 s = */ type_size_of(allocator, t);
+		/* i64 s = */ type_size_of(t);
 		switch (index) {
 		case -1: return align_formula(t->Union.variant_block_size, build_context.word_size); // __type_info
 		}
@@ -2251,7 +2255,7 @@ i64 type_offset_of(gbAllocator allocator, Type *t, i32 index) {
 }
 
 
-i64 type_offset_of_from_selection(gbAllocator allocator, Type *type, Selection sel) {
+i64 type_offset_of_from_selection(Type *type, Selection sel) {
 	GB_ASSERT(sel.indirect == false);
 
 	Type *t = type;
@@ -2259,7 +2263,7 @@ i64 type_offset_of_from_selection(gbAllocator allocator, Type *type, Selection s
 	for_array(i, sel.index) {
 		i32 index = sel.index[i];
 		t = base_type(t);
-		offset += type_offset_of(allocator, t, index);
+		offset += type_offset_of(t, index);
 		if (t->kind == Type_Struct && !t->Struct.is_raw_union) {
 			t = t->Struct.fields[index]->type;
 		} else {

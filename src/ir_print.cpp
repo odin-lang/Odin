@@ -385,13 +385,13 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		} else {
 			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
 			// LLVM takes the first element's alignment as the entire alignment (like C)
-			i64 align = type_align_of(heap_allocator(), t);
+			i64 align = type_align_of(t);
 			i64 block_size =  t->Union.variant_block_size;
 
 			ir_fprintf(f, "{[0 x <%lld x i8>], ", align);
 			ir_fprintf(f, "[%lld x i8], ", block_size);
 			// ir_print_type(f, m, t_type_info_ptr);
-			ir_print_type(f, m, union_tag_type(m->allocator, t));
+			ir_print_type(f, m, union_tag_type(t));
 			ir_write_byte(f, '}');
 		}
 		return;
@@ -400,8 +400,8 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		if (t->Struct.is_raw_union) {
 			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
 			// LLVM takes the first element's alignment as the entire alignment (like C)
-			i64 size_of_union  = type_size_of(heap_allocator(), t);
-			i64 align_of_union = type_align_of(heap_allocator(), t);
+			i64 size_of_union  = type_size_of(t);
+			i64 align_of_union = type_align_of(t);
 			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align_of_union, size_of_union);
 			return;
 		} else {
@@ -481,14 +481,14 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		return;
 
 	case Type_Map:
-		generate_map_internal_types(m->allocator, t);
+		init_map_internal_types(t);
 		GB_ASSERT(t->Map.internal_type != nullptr);
 		ir_print_type(f, m, t->Map.internal_type);
 		break;
 
 	case Type_BitField: {
-		i64 align = type_align_of(heap_allocator(), t);
-		i64 size  = type_size_of(heap_allocator(),  t);
+		i64 align = type_align_of(t);
+		i64 size  = type_size_of(t);
 		ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align, size);
 		break;
 	}
@@ -723,7 +723,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 						TypeAndValue tav = type_and_value_of_expr(m->info, fv->value);
 						GB_ASSERT(tav.mode != Addressing_Invalid);
 
-						Selection sel = lookup_field(m->allocator, type, name, false);
+						Selection sel = lookup_field(type, name, false);
 						Entity *f = type->Struct.fields[sel.index[0]];
 
 						values[f->Variable.field_index] = tav.value;
@@ -998,7 +998,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		Type *type = instr->Local.entity->type;
 		i64 align = instr->Local.alignment;
 		if (align <= 0) {
-			align = type_align_of(m->allocator, type);
+			align = type_align_of(type);
 		}
 		ir_fprintf(f, "%%%d = alloca ", value->index);
 		ir_print_type(f, m, type);
@@ -1040,7 +1040,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, type);
 		ir_write_str_lit(f, "* ");
 		ir_print_value(f, m, instr->Load.address, type);
-		ir_fprintf(f, ", align %lld", type_align_of(m->allocator, type));
+		ir_fprintf(f, ", align %lld", type_align_of(type));
 		ir_print_debug_location(f, m, value);
 		break;
 	}
