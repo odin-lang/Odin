@@ -22,7 +22,7 @@ enum HashKeyKind {
 
 struct PtrAndId {
 	void *ptr;
-	u32   id;
+	u64   id;
 };
 
 struct HashKey {
@@ -58,7 +58,7 @@ gb_inline HashKey hash_pointer(void *ptr) {
 	h.ptr = ptr;
 	return h;
 }
-gb_inline HashKey hash_ptr_and_id(void *ptr, u32 id) {
+gb_inline HashKey hash_ptr_and_id(void *ptr, u64 id) {
 	HashKey h = {HashKey_PtrAndId};
 	h.key = cast(u64)cast(uintptr)ptr;
 	h.ptr_and_id.ptr = ptr;
