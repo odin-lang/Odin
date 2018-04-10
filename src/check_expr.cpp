@@ -1016,10 +1016,9 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 
 
 	if (e->type == nullptr) {
-		if (e->state == EntityState_Unresolved) {
-			return nullptr;
-		}
-		compiler_error("How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(name));
+		// TODO(bill): Which is correct? return or compiler_error?
+		// compiler_error("How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(name));
+		return nullptr;
 	}
 
 	e->flags |= EntityFlag_Used;
