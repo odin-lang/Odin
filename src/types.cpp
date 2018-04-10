@@ -1201,6 +1201,10 @@ bool type_has_nil(Type *t) {
 }
 
 bool elem_type_can_be_constant(Type *t) {
+	t = base_type(t);
+	if (t == t_invalid) {
+		return false;
+	}
 	if (is_type_any(t) || is_type_union(t)) {
 		return false;
 	}
