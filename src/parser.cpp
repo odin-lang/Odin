@@ -4213,6 +4213,11 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 			break;
 		}
 		gb_printf_err("\n");
+
+		gb_mutex_lock(&global_error_collector.mutex);
+		global_error_collector.count++;
+		gb_mutex_unlock(&global_error_collector.mutex);
+
 		return err;
 	}
 
@@ -4296,6 +4301,8 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 			gb_thread_destroy(&worker_threads[i]);
 		});
 
+		auto errors = array_make<ParseFileError>(heap_allocator(), 0, 16);
+
 		for (;;) {
 			bool are_any_alive = false;
 			for_array(i, worker_threads) {
@@ -4303,19 +4310,24 @@ ParseFileError parse_files(Parser *p, String init_filename) {
 				if (gb_thread_is_running(t)) {
 					are_any_alive = true;
 				} else if (curr_import_index < p->imports.count) {
-					auto err = cast(ParseFileError)t->return_value;
-					if (err != ParseFile_None) {
-						return err;
+					auto curr_err = cast(ParseFileError)t->return_value;
+					if (curr_err != ParseFile_None) {
+						array_add(&errors, curr_err);
+					} else {
+						t->user_index = curr_import_index;
+						curr_import_index++;
+						gb_thread_start(t, parse_worker_file_proc, p);
+						are_any_alive = true;
 					}
-					t->user_index = curr_import_index;
-					curr_import_index++;
-					gb_thread_start(t, parse_worker_file_proc, p);
-					are_any_alive = true;
 				}
 			}
 			if (!are_any_alive && curr_import_index >= p->imports.count) {
 				break;
 			}
+		}
+
+		if (errors.count > 0) {
+			return errors[errors.count-1];
 		}
 	} else {
 		for_array(i, p->imports) {
