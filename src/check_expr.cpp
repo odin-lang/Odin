@@ -5544,6 +5544,10 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				is_constant = false;
 			}
 
+			if (bet == t_invalid) {
+				break;
+			}
+
 			for (; index < cl->elems.count; index++) {
 				AstNode *e = cl->elems[index];
 				if (e == nullptr) {
