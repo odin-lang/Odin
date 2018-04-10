@@ -565,9 +565,13 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 
 	if (is_type_any(dst)) {
 		if (!is_type_polymorphic(src)) {
-			// NOTE(bill): Anything can cast to 'Any'
-			add_type_info_type(c, s);
-			return 10;
+			if (operand->mode == Addressing_Immutable && operand->type == t_context) {
+				return -1;
+			} else {
+				// NOTE(bill): Anything can cast to 'Any'
+				add_type_info_type(c, s);
+				return 10;
+			}
 		}
 	}
 
@@ -5126,7 +5130,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			}
 
 			init_preload(c);
-			o->mode = Addressing_Value;
+			o->mode = Addressing_Immutable;
 			o->type = t_context;
 			break;
 
