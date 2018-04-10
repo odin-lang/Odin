@@ -5524,7 +5524,9 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			} else if (t->kind == Type_Array) {
 				elem_type = t->Array.elem;
 				context_name = str_lit("array literal");
-				max_type_count = t->Array.count;
+				if (!is_to_be_determined_array_count) {
+					max_type_count = t->Array.count;
+				}
 			} else if (t->kind == Type_DynamicArray) {
 				elem_type = t->DynamicArray.elem;
 				context_name = str_lit("dynamic array literal");
