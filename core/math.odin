@@ -413,8 +413,8 @@ axis_angle :: proc(axis: Vec3, angle_radians: f32) -> Quat {
 
 euler_angles :: proc(pitch, yaw, roll: f32) -> Quat {
 	p := axis_angle(Vec3{1, 0, 0}, pitch);
-	y := axis_angle(Vec3{0, 1, 0}, pitch);
-	r := axis_angle(Vec3{0, 0, 1}, pitch);
+	y := axis_angle(Vec3{0, 1, 0}, yaw);
+	r := axis_angle(Vec3{0, 0, 1}, roll);
 	return mul(mul(y, p), r);
 }
 
