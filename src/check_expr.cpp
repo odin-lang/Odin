@@ -5584,7 +5584,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
 				}
 			}
-
 			break;
 		}
 

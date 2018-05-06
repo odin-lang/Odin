@@ -1876,7 +1876,7 @@ void GB_JOIN2(FUNC,rehash)(NAME *h, isize new_count) { \
 		gbHashTableFindResult fr; \
 		if (gb_array_count(nh.hashes) == 0) \
 			GB_JOIN2(FUNC,grow)(&nh); \
-		e = &nh.entries[i]; \
+		e = &h->entries[i]; \
 		fr = GB_JOIN2(FUNC,_find)(&nh, e->key); \
 		j = GB_JOIN2(FUNC,_add_entry)(&nh, e->key); \
 		if (fr.entry_prev < 0) \
