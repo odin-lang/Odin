@@ -319,6 +319,8 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 
 		case Basic_rune:   ir_write_str_lit(f, "i32"); return;
 
+		case Basic_typeid:
+			/* fallthrough */
 		case Basic_int:
 		case Basic_uint:
 		case Basic_uintptr:
@@ -341,8 +343,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		case Basic_rawptr:  ir_write_str_lit(f, "%..rawptr");           return;
 		case Basic_string:  ir_write_str_lit(f, "%..string");           return;
 		case Basic_cstring: ir_write_str_lit(f, "i8*");                 return;
-
-		case Basic_typeid:     ir_write_str_lit(f, "%..typeid");        return;
 		}
 		break;
 
@@ -538,7 +538,6 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		return;
 	}
 
-
 	switch (value.kind) {
 	case ExactValue_Bool:
 		if (value.value_bool) {
@@ -653,7 +652,11 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	}
 	case ExactValue_Pointer:
 		if (value.value_pointer == 0) {
-			ir_write_str_lit(f, "null");
+			if (is_type_typeid(type)) {
+				ir_write_str_lit(f, "0");
+			} else {
+				ir_write_str_lit(f, "null");
+			}
 		} else {
 			ir_write_str_lit(f, "inttoptr (");
 			ir_print_type(f, m, t_int);
@@ -1748,14 +1751,8 @@ void print_llvm_ir(irGen *ir) {
 	ir_write_str_lit(f, " = type {");
 	ir_print_type(f, m, t_rawptr);
 	ir_write_str_lit(f, ", ");
-	ir_print_type(f, m, t_type_info_ptr);
+	ir_print_type(f, m, t_typeid);
 	ir_write_str_lit(f, "} ; Basic_any\n");
-
-	ir_print_encoded_local(f, str_lit("..typeid"));
-	ir_write_str_lit(f, " = type ");
-	ir_print_type(f, m, t_uintptr);
-	ir_write_str_lit(f, "; Basic_typeid\n");
-
 
 	ir_write_str_lit(f, "declare void @llvm.dbg.declare(metadata, metadata, metadata) nounwind readnone \n");
 	ir_write_byte(f, '\n');

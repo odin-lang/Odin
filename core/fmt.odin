@@ -164,7 +164,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 	case Type_Info_Named:
 		write_string(buf, info.name);
 	case Type_Info_Integer:
-		a := any{type_info = ti};
+		a := any{typeid = typeid_from_type_info(ti)};
 		switch _ in a {
 		case int:     write_string(buf, "int");
 		case uint:    write_string(buf, "uint");
@@ -188,7 +188,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 			write_string(buf, "string");
 		}
 	case Type_Info_Boolean:
-		a := any{type_info = ti};
+		a := any{typeid = typeid_from_type_info(ti)};
 		switch _ in a {
 		case bool: write_string(buf, "bool");
 		case:
@@ -369,7 +369,7 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 	ok := true;
 	if arg_index < len(args) {
 		arg := args[arg_index];
-		arg.type_info = type_info_base(arg.type_info);
+		arg.typeid = typeid_base(arg.typeid);
 		switch i in arg {
 		case int:  num = i;
 		case i8:   num = int(i);
@@ -394,8 +394,8 @@ fmt_bad_verb :: proc(using fi: ^Fmt_Info, verb: rune) {
 	write_string(buf, "%!");
 	write_rune(buf, verb);
 	write_byte(buf, '(');
-	if arg.type_info != nil {
-		write_type(buf, arg.type_info);
+	if arg.typeid != nil {
+		write_typeid(buf, arg.typeid);
 		write_byte(buf, '=');
 		fmt_value(fi, arg, 'v');
 	} else {
@@ -628,9 +628,10 @@ fmt_pointer :: proc(fi: ^Fmt_Info, p: rawptr, verb: rune) {
 }
 
 enum_value_to_string :: proc(v: any) -> (string, bool) {
-	v.type_info = type_info_base(v.type_info);
+	v.typeid = typeid_base(v.typeid);
+	type_info := type_info_from_typeid(v.typeid);
 
-	switch e in v.type_info.variant {
+	switch e in type_info.variant {
 	case: return "", false;
 	case Type_Info_Enum:
 		get_str :: proc(i: $T, e: Type_Info_Enum) -> (string, bool) {
@@ -652,7 +653,7 @@ enum_value_to_string :: proc(v: any) -> (string, bool) {
 			return "", false;
 		}
 
-		a := any{v.data, type_info_base(e.base)};
+		a := any{v.data, typeid_from_type_info(type_info_base(e.base))};
 		switch v in a {
 		case rune:    return get_str(v, e);
 		case i8:      return get_str(v, e);
@@ -690,18 +691,19 @@ string_to_enum_value :: proc(T: type, s: string) -> (T, bool) {
 }
 
 fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
-	if v.type_info == nil || v.data == nil {
+	if v.typeid == nil || v.data == nil {
 		write_string(fi.buf, "<nil>");
 		return;
 	}
 
-	switch e in v.type_info.variant {
+	type_info := type_info_from_typeid(v.typeid);
+	switch e in type_info.variant {
 	case: fmt_bad_verb(fi, verb);
 	case Type_Info_Enum:
 		switch verb {
 		case: fmt_bad_verb(fi, verb);
 		case 'd', 'f':
-			fmt_arg(fi, any{v.data, type_info_base(e.base)}, verb);
+			fmt_arg(fi, any{v.data, typeid_from_type_info(type_info_base(e.base))}, verb);
 		case 's', 'v':
 			str, ok := enum_value_to_string(v);
 			if !ok do str = "!%(BAD ENUM VALUE)";
@@ -712,12 +714,13 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 
 fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
-	if v.data == nil || v.type_info == nil {
+	if v.data == nil || v.typeid == nil {
 		write_string(fi.buf, "<nil>");
 		return;
 	}
 
-	switch info in v.type_info.variant {
+	type_info := type_info_from_typeid(v.typeid);
+	switch info in type_info.variant {
 	case Type_Info_Named:
 		switch b in info.base.variant {
 		case Type_Info_Struct:
@@ -751,8 +754,9 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				if t := b.types[i]; types.is_any(t) {
 					write_string(fi.buf, "any{}");
 				} else {
-					data := uintptr(v.data) + b.offsets[i];
-					fmt_arg(fi, any{rawptr(data), t}, 'v');
+					data := rawptr(uintptr(v.data) + b.offsets[i]);
+					id := typeid_from_type_info(t);
+					fmt_arg(fi, any{data, id}, 'v');
 				}
 
 				if hash do write_string(fi.buf, ",\n");
@@ -762,7 +766,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			write_byte(fi.buf, '}');
 
 		case:
-			fmt_value(fi, any{v.data, info.base}, verb);
+			fmt_value(fi, any{v.data, typeid_from_type_info(info.base)}, verb);
 		}
 
 	case Type_Info_Boolean:    fmt_arg(fi, v, verb);
@@ -773,7 +777,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	case Type_Info_String:     fmt_arg(fi, v, verb);
 
 	case Type_Info_Pointer:
-		if v.type_info == type_info_of(^Type_Info) {
+		if v.typeid == typeid_of(^Type_Info) {
 			write_type(fi.buf, (^^Type_Info)(v.data)^);
 		} else {
 			fmt_pointer(fi, (^rawptr)(v.data)^, verb);
@@ -786,7 +790,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			if i > 0 do write_string(fi.buf, ", ");
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size);
-			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
+			fmt_arg(fi, any{rawptr(data), typeid_from_type_info(info.elem)}, verb);
 		}
 
 	case Type_Info_Dynamic_Array:
@@ -797,7 +801,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			if i > 0 do write_string(fi.buf, ", ");
 
 			data := uintptr(array.data) + uintptr(i*info.elem_size);
-			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
+			fmt_arg(fi, any{rawptr(data), typeid_from_type_info(info.elem)}, verb);
 		}
 
 	case Type_Info_Slice:
@@ -808,7 +812,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			if i > 0 do write_string(fi.buf, ", ");
 
 			data := uintptr(slice.data) + uintptr(i*info.elem_size);
-			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
+			fmt_arg(fi, any{rawptr(data), typeid_from_type_info(info.elem)}, verb);
 		}
 
 	case Type_Info_Map:
@@ -839,13 +843,13 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 					write_string(fi.buf, header.key.str);
 				} else {
 					fi := Fmt_Info{buf = fi.buf};
-					fmt_arg(&fi, any{rawptr(&header.key.hash), info.key}, 'v');
+					fmt_arg(&fi, any{rawptr(&header.key.hash), typeid_from_type_info(info.key)}, 'v');
 				}
 
 				write_string(fi.buf, "=");
 
 				value := data + entry_type.offsets[2];
-				fmt_arg(fi, any{rawptr(value), info.value}, 'v');
+				fmt_arg(fi, any{rawptr(value), typeid_from_type_info(info.value)}, 'v');
 			}
 		}
 
@@ -880,14 +884,15 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				write_string(fi.buf, "any{}");
 			} else {
 				data := uintptr(v.data) + info.offsets[i];
-				fmt_arg(fi, any{rawptr(data), t}, 'v');
+				id := typeid_from_type_info(t);
+				fmt_arg(fi, any{rawptr(data), id}, 'v');
 			}
 			if hash do write_string(fi.buf, ",\n");
 		}
 
 	case Type_Info_Union:
 		tag_ptr := uintptr(v.data) + info.tag_offset;
-		tag_any := any{rawptr(tag_ptr), info.tag_type};
+		tag_any := any{rawptr(tag_ptr), typeid_from_type_info(info.tag_type)};
 
 		tag: i64 = -1;
 		switch i in tag_any {
@@ -905,8 +910,8 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		if v.data == nil || tag == 0 {
 			write_string(fi.buf, "nil");
 		} else {
-			ti := info.variants[tag-1];
-			fmt_arg(fi, any{v.data, ti}, verb);
+			id := typeid_from_type_info(info.variants[tag-1]);
+			fmt_arg(fi, any{v.data, id}, verb);
 		}
 
 	case Type_Info_Enum:
@@ -917,7 +922,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		if ptr == nil {
 			write_string(fi.buf, "nil");
 		} else {
-			write_type(fi.buf, v.type_info);
+			write_typeid(fi.buf, v.typeid);
 			write_string(fi.buf, " @ ");
 			fmt_pointer(fi, ptr, 'p');
 		}
@@ -953,7 +958,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	fi.arg = arg;
 
 	if verb == 'T' {
-		ti := arg.type_info;
+		ti := type_info_from_typeid(arg.typeid);
 		switch a in arg {
 		case ^Type_Info: ti = a;
 		}
@@ -962,7 +967,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	}
 
 	base_arg := arg;
-	base_arg.type_info = type_info_base(base_arg.type_info);
+	base_arg.typeid = typeid_base(base_arg.typeid);
 	switch a in base_arg {
 	case bool:       fmt_bool(fi, bool(a), verb);
 	case b8:         fmt_bool(fi, bool(a), verb);
@@ -1010,7 +1015,7 @@ sbprint :: proc(buf: ^String_Buffer, args: ...any) -> string {
 	fi.buf = buf;
 
 	for arg, i in args {
-		is_string := arg != nil && types.is_string(arg.type_info);
+		is_string := arg != nil && types.is_string(type_info_from_typeid(arg.typeid));
 		if i > 0 && !is_string && !prev_string {
 			write_byte(buf, ' ');
 		}

@@ -239,9 +239,27 @@ type_info_base_without_enum :: proc(info: ^Type_Info) -> ^Type_Info {
 	return base;
 }
 
+
+typeid_from_type_info :: proc(ti: ^Type_Info) -> typeid {
+	id: uintptr = 0;
+	if ti != nil {
+		id = (uintptr(ti) - uintptr(&__type_table[0]))/size_of(Type_Info);
+	}
+	return transmute(typeid)id;
+}
 type_info_from_typeid :: proc(t: typeid) -> ^Type_Info {
 	index := transmute(uintptr)t;
 	return &__type_table[index];
+}
+typeid_base :: proc(id: typeid) -> typeid {
+	ti := type_info_from_typeid(id);
+	ti = type_info_base(ti);
+	return typeid_from_type_info(ti);
+}
+typeid_base_without_enum :: proc(id: typeid) -> typeid {
+	ti := type_info_from_typeid(id);
+	ti = type_info_base_without_enum(ti);
+	return typeid_from_type_info(ti);
 }
 
 
@@ -649,7 +667,10 @@ __print_caller_location :: proc(fd: os.Handle, using loc: Source_Code_Location) 
 	__print_u64(fd, u64(column));
 	os.write_byte(fd, ')');
 }
-
+__print_typeid :: proc(fd: os.Handle, id: typeid) {
+	ti := type_info_from_typeid(id);
+	__print_type(fd, ti);
+}
 __print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 	if ti == nil {
 		os.write_string(fd, "nil");
@@ -660,7 +681,7 @@ __print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 	case Type_Info_Named:
 		os.write_string(fd, info.name);
 	case Type_Info_Integer:
-		a := any{type_info = ti};
+		a := any{typeid = typeid_from_type_info(ti)};
 		switch _ in a {
 		case int:     os.write_string(fd, "int");
 		case uint:    os.write_string(fd, "uint");
@@ -680,7 +701,7 @@ __print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 	case Type_Info_String:
 		os.write_string(fd, "string");
 	case Type_Info_Boolean:
-		a := any{type_info = ti};
+		a := any{typeid = typeid_from_type_info(ti)};
 		switch _ in a {
 		case bool: os.write_string(fd, "bool");
 		case:
@@ -689,6 +710,8 @@ __print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 		}
 	case Type_Info_Any:
 		os.write_string(fd, "any");
+	case Type_Info_Type_Id:
+		os.write_string(fd, "typeid");
 
 	case Type_Info_Pointer:
 		if info.elem == nil {
@@ -941,15 +964,15 @@ __dynamic_array_expr_error :: proc "contextless" (file: string, line, column: in
 	__debug_trap();
 }
 
-__type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: ^Type_Info) {
+__type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: typeid) {
 	if ok do return;
 
 	fd := os.stderr;
 	__print_caller_location(fd, Source_Code_Location{file, line, column, ""});
 	os.write_string(fd, " Invalid type assertion from");
-	__print_type(fd, from);
+	__print_typeid(fd, from);
 	os.write_string(fd, " to ");
-	__print_type(fd, to);
+	__print_typeid(fd, to);
 	os.write_byte(fd, '\n');
 	__debug_trap();
 }
