@@ -3586,13 +3586,41 @@ gb_global i32      ir_global_type_info_member_names_index   = 0;
 gb_global i32      ir_global_type_info_member_offsets_index = 0;
 gb_global i32      ir_global_type_info_member_usings_index  = 0;
 
+#if 1
+isize ir_type_info_count(CheckerInfo *info) {
+	return info->minimum_dependency_type_info_set.entries.count+1;
+}
+
+isize ir_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
+	isize index = type_info_index(info, type);
+	auto *set = &info->minimum_dependency_type_info_set;
+	for_array(i, set->entries) {
+		if (set->entries[i].ptr == index) {
+			return i+1;
+		}
+	}
+	if (err_on_not_found) {
+		GB_PANIC("NOT FOUND ir_type_info_index %s", type_to_string(type));
+	}
+	return -1;
+}
+#else
+isize ir_type_info_count(CheckerInfo *info) {
+	return info->type_info_types.count;
+}
+
+isize ir_type_info_index(CheckerInfo *info, Type *type) {
+	isize index = type_info_index(info, type);
+	return index;
+}
+#endif
 
 irValue *ir_type_info(irProcedure *proc, Type *type) {
 	CheckerInfo *info = proc->module->info;
 
 	type = default_type(type);
 
-	i32 entry_index = cast(i32)type_info_index(info, type);
+	i32 entry_index = cast(i32)ir_type_info_index(info, type);
 	GB_ASSERT(entry_index >= 0);
 
 	// gb_printf_err("%d %s\n", entry_index, type_to_string(type));
@@ -4173,7 +4201,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 	case BuiltinProc_type_info_of: {
 		Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
 		return ir_type_info(proc, t);
-		break;
 	}
 
 	case BuiltinProc_len: {
@@ -4806,7 +4833,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 	if (tv.mode == Addressing_Type) {
 		// // TODO(bill): Handle this correctly
 		#if 0
-		i32 entry_index = type_info_index(proc->module->info, tv.type, false);
+		i32 entry_index = ir_type_info_index(proc->module->info, tv.type, false);
 		if (entry_index >= 0) {
 			return ir_get_type_info_ptr(proc, tv.type);
 			// i32 id = entry_index+1;
@@ -7615,7 +7642,7 @@ void ir_init_module(irModule *m, Checker *c) {
 	{
 		// Add type info data
 		{
-			isize max_type_info_count = m->info->type_info_types.count;
+			isize max_type_info_count = ir_type_info_count(m->info);
 
 			String name = str_lit(IR_TYPE_INFO_DATA_NAME);
 			Entity *e = alloc_entity_variable(nullptr, make_token_ident(name), alloc_type_array(t_type_info, max_type_info_count), false);
@@ -7774,7 +7801,7 @@ void ir_gen_destroy(irGen *s) {
 // Type Info stuff
 //
 irValue *ir_get_type_info_ptr(irProcedure *proc, Type *type) {
-	i32 index = cast(i32)type_info_index(proc->module->info, type);
+	i32 index = cast(i32)ir_type_info_index(proc->module->info, type);
 	// gb_printf_err("%d %s\n", index, type_to_string(type));
 	irValue *ptr = ir_emit_array_epi(proc, ir_global_type_info_data, index);
 	return ir_emit_bitcast(proc, ptr, t_type_info_ptr);
@@ -7837,7 +7864,10 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			continue;
 		}
 
-		isize entry_index = type_info_index(info, t);
+		isize entry_index = ir_type_info_index(info, t, false);
+		if (entry_index <= 0) {
+			continue;
+		}
 
 		irValue *tag = nullptr;
 		irValue *ti_ptr = ir_emit_array_epi(proc, ir_global_type_info_data, cast(i32)entry_index);
