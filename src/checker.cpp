@@ -1195,27 +1195,35 @@ PtrSet<Entity *> generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("default_allocator"),
 		str_lit("make_source_code_location"),
 
-		str_lit("__bounds_check_error"),
-		str_lit("__slice_expr_error"),
-		str_lit("__dynamic_array_expr_error"),
-
 		str_lit("__args__"),
 		str_lit("__type_table"),
+
+		str_lit("Type_Info"),
+		str_lit("Source_Code_Location"),
+		str_lit("Allocator"),
+		str_lit("Context"),
 	};
 	for (isize i = 0; i < gb_count_of(required_entities); i++) {
 		add_dependency_to_map(&map, info, scope_lookup_entity(c->global_scope, required_entities[i]));
 	}
 
+	if (!build_context.no_bounds_check) {
+		String bounds_check_entities[] = {
+			str_lit("__bounds_check_error"),
+			str_lit("__slice_expr_error"),
+			str_lit("__dynamic_array_expr_error"),
+		};
+		for (isize i = 0; i < gb_count_of(bounds_check_entities); i++) {
+			add_dependency_to_map(&map, info, scope_lookup_entity(c->global_scope, bounds_check_entities[i]));
+		}
+	}
+
 	for_array(i, info->definitions) {
 		Entity *e = info->definitions[i];
 		// if (e->scope->is_global && !is_type_poly_proc(e->type)) { // TODO(bill): is the check enough?
-		if (e->scope->is_global) { // TODO(bill): is the check enough?
+		if (e->scope == universal_scope) { // TODO(bill): is the check enough?
 			if (e->type == nullptr || !is_type_poly_proc(e->type)) {
-				if (e->kind == Entity_TypeName) {
-					add_dependency_to_map(&map, info, e);
-				} else {
-					// add_dependency_to_map(&map, info, e);
-				}
+				add_dependency_to_map(&map, info, e);
 			}
 		} else if (e->kind == Entity_Procedure && e->Procedure.is_export) {
 			add_dependency_to_map(&map, info, e);
