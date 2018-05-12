@@ -1338,7 +1338,6 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("__mem_zero"),
 		str_lit("__init_context"),
 		str_lit("default_allocator"),
-		str_lit("make_source_code_location"),
 
 		str_lit("__args__"),
 		str_lit("__type_table"),

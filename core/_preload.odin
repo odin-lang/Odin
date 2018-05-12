@@ -244,7 +244,7 @@ __typeid_of :: proc "contextless" (ti: ^Type_Info) -> typeid {
 	start := uintptr(&__type_table[0]);
 	end := uintptr(ti);
 	id := (end-start)/size_of(Type_Info);
-	if uintptr(len(__type_table)) < id {
+	if uintptr(len(__type_table)) <= id {
 		return nil;
 	}
 	return transmute(typeid)id;
@@ -287,11 +287,6 @@ foreign __llvm_core {
 
 
 
-make_source_code_location :: inline proc "contextless" (file: string, line, column: int, procedure: string) -> Source_Code_Location {
-	return Source_Code_Location{file, line, column, procedure};
-}
-
-
 
 
 __init_context_from_ptr :: proc "contextless" (c: ^Context, other: ^Context) {
@@ -312,11 +307,6 @@ __init_context :: proc "contextless" (c: ^Context) {
 }
 
 
-/*
-__check_context :: proc() {
-	__init_context(&__context);
-}
-*/
 
 alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
 	a := context.allocator;
@@ -489,7 +479,7 @@ reserve :: proc[reserve_dynamic_array, reserve_map];
 
 
 
-new  :: inline proc(T: type, loc := #caller_location) -> ^T {
+new :: inline proc(T: type, loc := #caller_location) -> ^T {
 	ptr := cast(^T)alloc(size_of(T), align_of(T), loc);
 	ptr^ = T{};
 	return ptr;

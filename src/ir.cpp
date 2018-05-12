@@ -334,6 +334,7 @@ enum irValueKind {
 	irValue_TypeName,
 	irValue_Global,
 	irValue_Param,
+	irValue_SourceCodeLocation,
 
 	irValue_Proc,
 	irValue_Block,
@@ -397,6 +398,13 @@ struct irValueParam {
 	Array<irValue *> referrers;
 };
 
+struct irValueSourceCodeLocation {
+	irValue *file;
+	irValue *line;
+	irValue *column;
+	irValue *procedure;
+};
+
 
 struct irValue {
 	irValueKind     kind;
@@ -414,6 +422,7 @@ struct irValue {
 		irProcedure          Proc;
 		irBlock              Block;
 		irInstr              Instr;
+		irValueSourceCodeLocation SourceCodeLocation;
 	};
 };
 
@@ -663,6 +672,8 @@ Type *ir_type(irValue *value) {
 		return value->Global.type;
 	case irValue_Param:
 		return value->Param.type;
+	case irValue_SourceCodeLocation:
+		return t_source_code_location;
 	case irValue_Proc:
 		return value->Proc.type;
 	case irValue_Instr:
@@ -4121,12 +4132,12 @@ bool is_double_pointer(Type *t) {
 
 irValue *ir_emit_source_code_location(irProcedure *proc, String procedure, TokenPos pos) {
 	gbAllocator a = proc->module->allocator;
-	auto args = array_make<irValue *>(proc->module->allocator, 4);
-	args[0] = ir_find_or_add_entity_string(proc->module, pos.file);
-	args[1] = ir_const_int(a, pos.line);
-	args[2] = ir_const_int(a, pos.column);
-	args[3] = ir_find_or_add_entity_string(proc->module, procedure);
-	return ir_emit_global_call(proc, "make_source_code_location", args);
+	irValue *v = ir_alloc_value(a, irValue_SourceCodeLocation);
+	v->SourceCodeLocation.file      = ir_find_or_add_entity_string(proc->module, pos.file);
+	v->SourceCodeLocation.line      = ir_const_int(a, pos.line);
+	v->SourceCodeLocation.column    = ir_const_int(a, pos.column);
+	v->SourceCodeLocation.procedure = ir_find_or_add_entity_string(proc->module, procedure);
+	return v;
 }
 
 
@@ -7695,6 +7706,11 @@ void ir_init_module(irModule *m, Checker *c) {
 			for_array(entry_index, m->info->type_info_types) {
 				Type *t = m->info->type_info_types[entry_index];
 
+				isize index = ir_type_info_index(m->info, t, false);
+				if (index < 0) {
+					continue;
+				}
+
 				switch (t->kind) {
 				case Type_Union:
 					count += t->Union.variants.count;
@@ -7708,42 +7724,44 @@ void ir_init_module(irModule *m, Checker *c) {
 				}
 			}
 
-			{
-				String name = str_lit(IR_TYPE_INFO_TYPES_NAME);
-				Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
-				                                  alloc_type_array(t_type_info_ptr, count), false);
-				irValue *g = ir_value_global(m->allocator, e, nullptr);
-				ir_module_add_value(m, e, g);
-				map_set(&m->members, hash_string(name), g);
-				ir_global_type_info_member_types = g;
-			}
-			{
-				String name = str_lit(IR_TYPE_INFO_NAMES_NAME);
-				Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
-				                                  alloc_type_array(t_string, count), false);
-				irValue *g = ir_value_global(m->allocator, e, nullptr);
-				ir_module_add_value(m, e, g);
-				map_set(&m->members, hash_string(name), g);
-				ir_global_type_info_member_names = g;
-			}
-			{
-				String name = str_lit(IR_TYPE_INFO_OFFSETS_NAME);
-				Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
-				                                  alloc_type_array(t_uintptr, count), false);
-				irValue *g = ir_value_global(m->allocator, e, nullptr);
-				ir_module_add_value(m, e, g);
-				map_set(&m->members, hash_string(name), g);
-				ir_global_type_info_member_offsets = g;
-			}
+			if (count > 0) {
+				{
+					String name = str_lit(IR_TYPE_INFO_TYPES_NAME);
+					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
+					                                  alloc_type_array(t_type_info_ptr, count), false);
+					irValue *g = ir_value_global(m->allocator, e, nullptr);
+					ir_module_add_value(m, e, g);
+					map_set(&m->members, hash_string(name), g);
+					ir_global_type_info_member_types = g;
+				}
+				{
+					String name = str_lit(IR_TYPE_INFO_NAMES_NAME);
+					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
+					                                  alloc_type_array(t_string, count), false);
+					irValue *g = ir_value_global(m->allocator, e, nullptr);
+					ir_module_add_value(m, e, g);
+					map_set(&m->members, hash_string(name), g);
+					ir_global_type_info_member_names = g;
+				}
+				{
+					String name = str_lit(IR_TYPE_INFO_OFFSETS_NAME);
+					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
+					                                  alloc_type_array(t_uintptr, count), false);
+					irValue *g = ir_value_global(m->allocator, e, nullptr);
+					ir_module_add_value(m, e, g);
+					map_set(&m->members, hash_string(name), g);
+					ir_global_type_info_member_offsets = g;
+				}
 
-			{
-				String name = str_lit(IR_TYPE_INFO_USINGS_NAME);
-				Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
-				                                  alloc_type_array(t_bool, count), false);
-				irValue *g = ir_value_global(m->allocator, e, nullptr);
-				ir_module_add_value(m, e, g);
-				map_set(&m->members, hash_string(name), g);
-				ir_global_type_info_member_usings = g;
+				{
+					String name = str_lit(IR_TYPE_INFO_USINGS_NAME);
+					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
+					                                  alloc_type_array(t_bool, count), false);
+					irValue *g = ir_value_global(m->allocator, e, nullptr);
+					ir_module_add_value(m, e, g);
+					map_set(&m->members, hash_string(name), g);
+					ir_global_type_info_member_usings = g;
+				}
 			}
 		}
 	}
