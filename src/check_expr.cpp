@@ -329,7 +329,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	u64 tags = base_entity->Procedure.tags;
 	AstNode *ident = clone_ast_node(a, base_entity->identifier);
 	Token token = ident->Ident.token;
-	DeclInfo *d = make_declaration_info(c->allocator, scope, old_decl->parent);
+	DeclInfo *d = make_decl_info(c->allocator, scope, old_decl->parent);
 	d->gen_proc_type = final_proc_type;
 	d->type_expr = pl->type;
 	d->proc_lit = proc_lit;
@@ -4327,6 +4327,9 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 						err = CallArgumentError_WrongTypes;
 					}
 					score += s;
+					if (is_type_any(elem)) {
+						add_type_info_type(c, o.type);
+					}
 				}
 			}
 		}
@@ -5299,7 +5302,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		Type *type = alloc_type(Type_Proc);
 		check_open_scope(c, pl->type);
 		{
-			decl = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
+			decl = make_decl_info(c->allocator, c->context.scope, c->context.decl);
 			decl->proc_lit  = node;
 			c->context.decl = decl;
 

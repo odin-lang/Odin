@@ -871,6 +871,7 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 
 	check_expr(c, &x, rhs);
 	check_assignment(c, &x, nullptr, str_lit("type switch expression"));
+	add_type_info_type(c, x.type);
 
 	TypeSwitchKind switch_kind = check_valid_type_switch_type(x.type);
 	if (switch_kind == TypeSwitch_Invalid) {
@@ -962,8 +963,10 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 						continue;
 					}
 					case_type = y.type;
+					add_type_info_type(c, y.type);
 				} else if (switch_kind == TypeSwitch_Any) {
 					case_type = y.type;
+					add_type_info_type(c, y.type);
 				} else {
 					GB_PANIC("Unknown type to type switch statement");
 				}
