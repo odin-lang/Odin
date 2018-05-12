@@ -484,6 +484,13 @@ void add_dependency(DeclInfo *d, Entity *e) {
 	ptr_set_add(&d->deps, e);
 }
 
+void add_preload_dependency(Checker *c, char *name) {
+	String n = make_string_c(name);
+	Entity *e = scope_lookup_entity(c->global_scope, n);
+	GB_ASSERT(e != nullptr);
+	ptr_set_add(&c->context.decl->deps, e);
+}
+
 void add_declaration_dependency(Checker *c, Entity *e) {
 	if (e == nullptr) {
 		return;
@@ -1177,17 +1184,38 @@ void add_dependency_to_map(PtrSet<Entity *> *map, CheckerInfo *info, Entity *ent
 	}
 }
 
-PtrSet<Entity *> generate_minimum_dependency_set(CheckerInfo *info, Entity *start) {
+PtrSet<Entity *> generate_minimum_dependency_set(Checker *c, Entity *start) {
+	CheckerInfo *info = &c->info;
 	PtrSet<Entity *> map = {}; // Key: Entity *
 	ptr_set_init(&map, heap_allocator());
+
+	String required_entities[] = {
+		str_lit("__mem_zero"),
+		str_lit("__init_context"),
+		str_lit("default_allocator"),
+		str_lit("make_source_code_location"),
+
+		str_lit("__bounds_check_error"),
+		str_lit("__slice_expr_error"),
+		str_lit("__dynamic_array_expr_error"),
+
+		str_lit("__args__"),
+		str_lit("__type_table"),
+	};
+	for (isize i = 0; i < gb_count_of(required_entities); i++) {
+		add_dependency_to_map(&map, info, scope_lookup_entity(c->global_scope, required_entities[i]));
+	}
 
 	for_array(i, info->definitions) {
 		Entity *e = info->definitions[i];
 		// if (e->scope->is_global && !is_type_poly_proc(e->type)) { // TODO(bill): is the check enough?
 		if (e->scope->is_global) { // TODO(bill): is the check enough?
-			if (e->type == nullptr || !is_type_poly_proc(e->type))  {
-				// NOTE(bill): Require runtime stuff
-				add_dependency_to_map(&map, info, e);
+			if (e->type == nullptr || !is_type_poly_proc(e->type)) {
+				if (e->kind == Entity_TypeName) {
+					add_dependency_to_map(&map, info, e);
+				} else {
+					// add_dependency_to_map(&map, info, e);
+				}
 			}
 		} else if (e->kind == Entity_Procedure && e->Procedure.is_export) {
 			add_dependency_to_map(&map, info, e);
@@ -3115,7 +3143,7 @@ void check_parsed_files(Checker *c) {
 	}
 
 	TIME_SECTION("generate minimum dependency set");
-	c->info.minimum_dependency_set = generate_minimum_dependency_set(&c->info, c->info.entry_point);
+	c->info.minimum_dependency_set = generate_minimum_dependency_set(c, c->info.entry_point);
 
 
 	TIME_SECTION("calculate global init order");

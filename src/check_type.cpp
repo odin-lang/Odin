@@ -1827,6 +1827,10 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 	type->Map.key   = key;
 	type->Map.value = value;
 
+	if (is_type_string(key)) {
+		add_preload_dependency(c, "__default_hash_string");
+	}
+
 
 	init_preload(c);
 	init_map_internal_types(type);

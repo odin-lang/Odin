@@ -1344,9 +1344,15 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			case Token_Or:     ir_write_str_lit(f, "or");   break;
 			case Token_Xor:    ir_write_str_lit(f, "xor");  break;
 			case Token_Shl:    ir_write_str_lit(f, "shl");  break;
-			case Token_Shr:    ir_write_str_lit(f, "lshr"); break;
 			case Token_Mul:    ir_write_str_lit(f, "mul");  break;
 			case Token_Not:    ir_write_str_lit(f, "xor");  break;
+			case Token_Shr:
+				if (is_type_unsigned(elem_type)) {
+					ir_write_str_lit(f, "lshr");
+				} else {
+					ir_write_str_lit(f, "ashr");
+				}
+				break;
 
 			case Token_AndNot: GB_PANIC("Token_AndNot Should never be called");
 
