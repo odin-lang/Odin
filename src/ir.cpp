@@ -4209,13 +4209,30 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 	}
 
 	case BuiltinProc_type_info_of: {
-		Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
-		return ir_type_info(proc, t);
+		AstNode *arg = ce->args[0];
+		TypeAndValue tav = type_and_value_of_expr(proc->module->info, arg);
+		if (tav.mode == Addressing_Type) {
+			Type *t = default_type(type_of_expr(proc->module->info, arg));
+			return ir_type_info(proc, t);
+		}
+		GB_ASSERT(is_type_typeid(tav.type));
+		irValue *id = ir_emit_bitcast(proc, ir_build_expr(proc, arg), t_uintptr);
+		return ir_emit_array_ep(proc, ir_global_type_info_data, id);
 	}
 
 	case BuiltinProc_typeid_of: {
-		Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
-		return ir_typeid(proc, t);
+		AstNode *arg = ce->args[0];
+		TypeAndValue tav = type_and_value_of_expr(proc->module->info, arg);
+		if (tav.mode == Addressing_Type) {
+			Type *t = default_type(type_of_expr(proc->module->info, arg));
+			return ir_typeid(proc, t);
+		}
+		Type *t = base_type(tav.type);
+		GB_ASSERT(are_types_identical(t, t_type_info_ptr));
+
+		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		args[0] = ir_emit_conv(proc, ir_build_expr(proc, arg), t_type_info_ptr);
+		return ir_emit_global_call(proc, "__typeid_of", args);
 	}
 
 	case BuiltinProc_len: {

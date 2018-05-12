@@ -3421,6 +3421,13 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		add_type_info_type(c, t);
 
+		if (is_operand_value(o) && is_type_typeid(t)) {
+			// Okay
+		} else if (o.mode != Addressing_Type) {
+			error(ce->args[0], "Expected a type or typeid for 'type_info_of'");
+			return false;
+		}
+
 		operand->mode = Addressing_Value;
 		operand->type = t_type_info_ptr;
 
@@ -3449,6 +3456,16 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		t = default_type(t);
 
 		add_type_info_type(c, t);
+
+		t = base_type(t);
+		if (is_operand_value(o) && are_types_identical(t, t_type_info_ptr)) {
+			add_preload_dependency(c, "__typeid_of");
+		} else if (o.mode != Addressing_Type) {
+			gbString ts = type_to_string(o.type);
+			error(ce->args[0], "Expected a type or type info for 'typeid_of', got %s", ts);
+			gb_string_free(ts);
+			return false;
+		}
 
 		operand->mode = Addressing_Value;
 		operand->type = t_typeid;
