@@ -342,6 +342,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		case Basic_string:  ir_write_str_lit(f, "%..string");           return;
 		case Basic_cstring: ir_write_str_lit(f, "i8*");                 return;
 
+		case Basic_typeid:     ir_write_str_lit(f, "%..typeid");        return;
 		}
 		break;
 
@@ -1749,6 +1750,12 @@ void print_llvm_ir(irGen *ir) {
 	ir_write_str_lit(f, ", ");
 	ir_print_type(f, m, t_type_info_ptr);
 	ir_write_str_lit(f, "} ; Basic_any\n");
+
+	ir_print_encoded_local(f, str_lit("..typeid"));
+	ir_write_str_lit(f, " = type ");
+	ir_print_type(f, m, t_uintptr);
+	ir_write_str_lit(f, "; Basic_typeid\n");
+
 
 	ir_write_str_lit(f, "declare void @llvm.dbg.declare(metadata, metadata, metadata) nounwind readnone \n");
 	ir_write_byte(f, '\n');

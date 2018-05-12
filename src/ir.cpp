@@ -4203,6 +4203,13 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		return ir_type_info(proc, t);
 	}
 
+	case BuiltinProc_typeid_of: {
+		Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
+		i32 entry_index = cast(i32)ir_type_info_index(proc->module->info, t);
+		GB_ASSERT(entry_index >= 0);
+	return ir_value_constant(proc->module->allocator, t_typeid, exact_value_i64(entry_index));
+	}
+
 	case BuiltinProc_len: {
 		irValue *v = ir_build_expr(proc, ce->args[0]);
 		Type *t = base_type(ir_type(v));
@@ -7950,6 +7957,10 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 
 			case Basic_any:
 				tag = ir_emit_conv(proc, variant_ptr, t_type_info_any_ptr);
+				break;
+
+			case Basic_typeid:
+				tag = ir_emit_conv(proc, variant_ptr, t_type_info_typeid_ptr);
 				break;
 			}
 			break;

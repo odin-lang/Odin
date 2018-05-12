@@ -2873,6 +2873,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	case BuiltinProc_align_of:
 	case BuiltinProc_offset_of:
 	case BuiltinProc_type_info_of:
+	case BuiltinProc_typeid_of:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 	default:
@@ -3423,6 +3424,34 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_Value;
 		operand->type = t_type_info_ptr;
 
+		break;
+	}
+
+	case BuiltinProc_typeid_of: {
+		// proc typeid_of(Type) -> ^Type_Info
+		if (c->context.scope->is_global) {
+			compiler_error("'typeid_of' Cannot be declared within a #shared_global_scope due to how the internals of the compiler works");
+		}
+
+		// NOTE(bill): The type information may not be setup yet
+		init_preload(c);
+		AstNode *expr = ce->args[0];
+		Operand o = {};
+		check_expr_or_type(c, &o, expr);
+		if (o.mode == Addressing_Invalid) {
+			return false;
+		}
+		Type *t = o.type;
+		if (t == nullptr || t == t_invalid || is_type_polymorphic(operand->type)) {
+			error(ce->args[0], "Invalid argument for 'typeid_of'");
+			return false;
+		}
+		t = default_type(t);
+
+		add_type_info_type(c, t);
+
+		operand->mode = Addressing_Value;
+		operand->type = t_typeid;
 		break;
 	}
 

@@ -49,6 +49,7 @@ Type_Info_Complex  :: struct {};
 Type_Info_String   :: struct {is_cstring: bool};
 Type_Info_Boolean  :: struct {};
 Type_Info_Any      :: struct {};
+Type_Info_Type_Id  :: struct {};
 Type_Info_Pointer  :: struct {
 	elem: ^Type_Info // nil -> rawptr
 };
@@ -114,6 +115,7 @@ Type_Info :: struct {
 		Type_Info_String,
 		Type_Info_Boolean,
 		Type_Info_Any,
+		Type_Info_Type_Id,
 		Type_Info_Pointer,
 		Type_Info_Procedure,
 		Type_Info_Array,
@@ -235,6 +237,11 @@ type_info_base_without_enum :: proc(info: ^Type_Info) -> ^Type_Info {
 		}
 	}
 	return base;
+}
+
+type_info_from_typeid :: proc(t: typeid) -> ^Type_Info {
+	index := transmute(uintptr)t;
+	return &__type_table[index];
 }
 
 
