@@ -199,7 +199,7 @@ bool is_type_distinct(AstNode *node) {
 	case AstNode_ArrayType:
 	case AstNode_DynamicArrayType:
 	case AstNode_MapType:
-		return true;
+		return false;
 	}
 	return false;
 }
