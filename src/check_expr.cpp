@@ -3422,7 +3422,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		add_type_info_type(c, t);
 
 		if (is_operand_value(o) && is_type_typeid(t)) {
-			// Okay
+			add_preload_dependency(c, "__type_info_of");
 		} else if (o.mode != Addressing_Type) {
 			error(ce->args[0], "Expected a type or typeid for 'type_info_of'");
 			return false;

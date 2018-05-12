@@ -755,8 +755,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 					write_string(fi.buf, "any{}");
 				} else {
 					data := rawptr(uintptr(v.data) + b.offsets[i]);
-					id := typeid_of(t);
-					fmt_arg(fi, any{data, id}, 'v');
+					fmt_arg(fi, any{data, typeid_of(t)}, 'v');
 				}
 
 				if hash do write_string(fi.buf, ",\n");
@@ -884,8 +883,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				write_string(fi.buf, "any{}");
 			} else {
 				data := uintptr(v.data) + info.offsets[i];
-				id := typeid_of(t);
-				fmt_arg(fi, any{rawptr(data), id}, 'v');
+				fmt_arg(fi, any{rawptr(data), typeid_of(t)}, 'v');
 			}
 			if hash do write_string(fi.buf, ",\n");
 		}
