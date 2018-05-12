@@ -3149,39 +3149,39 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		gbAllocator a = proc->module->allocator;
 		i64 sz = type_size_of(src);
 		i64 dz = type_size_of(dst);
-		if (sz == 2) {
-			switch (dz) {
-			case 2: return value;
-			case 4: {
-				auto args = array_make<irValue *>(proc->module->allocator, 1);
-				args[0] = value;
-				return ir_emit_global_call(proc, "__gnu_h2f_ieee", args);
-				break;
-			}
-			case 8: {
-				auto args = array_make<irValue *>(proc->module->allocator, 1);
-				args[0] = value;
-				return ir_emit_global_call(proc, "__f16_to_f64", args);
-				break;
-			}
-			}
-		} else if (dz == 2) {
-			switch (sz) {
-			case 2: return value;
-			case 4: {
-				auto args = array_make<irValue *>(proc->module->allocator, 1);
-				args[0] = value;
-				return ir_emit_global_call(proc, "__gnu_f2h_ieee", args);
-				break;
-			}
-			case 8: {
-				auto args = array_make<irValue *>(proc->module->allocator, 1);
-				args[0] = value;
-				return ir_emit_global_call(proc, "__truncdfhf2", args);
-				break;
-			}
-			}
-		}
+		// if (sz == 2) {
+		// 	switch (dz) {
+		// 	case 2: return value;
+		// 	case 4: {
+		// 		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		// 		args[0] = value;
+		// 		return ir_emit_global_call(proc, "__gnu_h2f_ieee", args);
+		// 		break;
+		// 	}
+		// 	case 8: {
+		// 		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		// 		args[0] = value;
+		// 		return ir_emit_global_call(proc, "__f16_to_f64", args);
+		// 		break;
+		// 	}
+		// 	}
+		// } else if (dz == 2) {
+		// 	switch (sz) {
+		// 	case 2: return value;
+		// 	case 4: {
+		// 		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		// 		args[0] = value;
+		// 		return ir_emit_global_call(proc, "__gnu_f2h_ieee", args);
+		// 		break;
+		// 	}
+		// 	case 8: {
+		// 		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		// 		args[0] = value;
+		// 		return ir_emit_global_call(proc, "__truncdfhf2", args);
+		// 		break;
+		// 	}
+		// 	}
+		// }
 
 		irConvKind kind = irConv_fptrunc;
 		if (dz >= sz) {
@@ -5113,11 +5113,6 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 				id = cast(BuiltinProcId)e->Builtin.id;
 			} else {
 				id = BuiltinProc_DIRECTIVE;
-				if (ce->proc->kind == AstNode_Implicit) {
-					ast_node(i, Implicit, ce->proc);
-					GB_ASSERT(i->kind == Token_type_info_of);
-					id = BuiltinProc_type_info_of;
-				}
 			}
 			return ir_build_builtin_proc(proc, expr, tv, id);
 		}
