@@ -244,9 +244,18 @@ __typeid_of :: proc "contextless" (ti: ^Type_Info) -> typeid {
 	start := uintptr(&__type_table[0]);
 	end := uintptr(ti);
 	id := (end-start)/size_of(Type_Info);
+	if uintptr(len(__type_table)) < id {
+		return nil;
+	}
 	return transmute(typeid)id;
 }
-
+__type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info {
+	n := int(transmute(uintptr)id);
+	if n < 0 || n >= len(__type_table) {
+		n = 0;
+	}
+	return &__type_table[n];
+}
 
 typeid_base :: proc "contextless" (id: typeid) -> typeid {
 	ti := type_info_of(id);

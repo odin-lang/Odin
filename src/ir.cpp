@@ -4216,8 +4216,10 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			return ir_type_info(proc, t);
 		}
 		GB_ASSERT(is_type_typeid(tav.type));
-		irValue *id = ir_emit_bitcast(proc, ir_build_expr(proc, arg), t_uintptr);
-		return ir_emit_array_ep(proc, ir_global_type_info_data, id);
+
+		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		args[0] = ir_build_expr(proc, arg);
+		return ir_emit_global_call(proc, "__type_info_of", args);
 	}
 
 	case BuiltinProc_typeid_of: {
