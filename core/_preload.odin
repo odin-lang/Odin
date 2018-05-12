@@ -211,7 +211,7 @@ __Map_Header :: struct {
 
 
 
-type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
+type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	if info == nil do return nil;
 
 	base := info;
@@ -225,7 +225,7 @@ type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 }
 
 
-type_info_base_without_enum :: proc(info: ^Type_Info) -> ^Type_Info {
+type_info_base_without_enum :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	if info == nil do return nil;
 
 	base := info;
@@ -239,27 +239,24 @@ type_info_base_without_enum :: proc(info: ^Type_Info) -> ^Type_Info {
 	return base;
 }
 
-
-typeid_from_type_info :: proc(ti: ^Type_Info) -> typeid {
-	id: uintptr = 0;
-	if ti != nil {
-		id = (uintptr(ti) - uintptr(&__type_table[0]))/size_of(Type_Info);
-	}
+__typeid_of :: proc "contextless" (ti: ^Type_Info) -> typeid {
+	if ti == nil do return nil;
+	start := uintptr(&__type_table[0]);
+	end := uintptr(ti);
+	id := (end-start)/size_of(Type_Info);
 	return transmute(typeid)id;
 }
-type_info_from_typeid :: proc(t: typeid) -> ^Type_Info {
-	index := transmute(uintptr)t;
-	return &__type_table[index];
-}
-typeid_base :: proc(id: typeid) -> typeid {
-	ti := type_info_from_typeid(id);
+
+
+typeid_base :: proc "contextless" (id: typeid) -> typeid {
+	ti := type_info_of(id);
 	ti = type_info_base(ti);
-	return typeid_from_type_info(ti);
+	return typeid_of(ti);
 }
-typeid_base_without_enum :: proc(id: typeid) -> typeid {
-	ti := type_info_from_typeid(id);
+typeid_base_without_enum :: proc "contextless" (id: typeid) -> typeid {
+	ti := type_info_of(id);
 	ti = type_info_base_without_enum(ti);
-	return typeid_from_type_info(ti);
+	return typeid_of(ti);
 }
 
 
@@ -668,7 +665,7 @@ __print_caller_location :: proc(fd: os.Handle, using loc: Source_Code_Location) 
 	os.write_byte(fd, ')');
 }
 __print_typeid :: proc(fd: os.Handle, id: typeid) {
-	ti := type_info_from_typeid(id);
+	ti := type_info_of(id);
 	__print_type(fd, ti);
 }
 __print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
@@ -681,7 +678,7 @@ __print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 	case Type_Info_Named:
 		os.write_string(fd, info.name);
 	case Type_Info_Integer:
-		a := any{typeid = typeid_from_type_info(ti)};
+		a := any{typeid = typeid_of(ti)};
 		switch _ in a {
 		case int:     os.write_string(fd, "int");
 		case uint:    os.write_string(fd, "uint");
@@ -701,7 +698,7 @@ __print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 	case Type_Info_String:
 		os.write_string(fd, "string");
 	case Type_Info_Boolean:
-		a := any{typeid = typeid_from_type_info(ti)};
+		a := any{typeid = typeid_of(ti)};
 		switch _ in a {
 		case bool: os.write_string(fd, "bool");
 		case:
