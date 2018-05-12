@@ -1,6 +1,6 @@
 Any :: struct {
-	data:      rawptr,
-	type_info: ^Type_Info,
+	data:   rawptr,
+	typeid: typeid,
 }
 
 String :: struct {
@@ -30,8 +30,8 @@ Map :: struct {
 }
 
 
-make_any :: inline proc(data: rawptr, type_info: ^Type_Info) -> any {
-	return transmute(any)Any{data, type_info};
+make_any :: inline proc(data: rawptr, id: typeid) -> any {
+	return transmute(any)Any{data, id};
 }
 
 string_data :: inline proc(s: $T/string) -> ^byte {

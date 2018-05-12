@@ -3428,7 +3428,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	}
 
 	case BuiltinProc_typeid_of: {
-		// proc typeid_of(Type) -> ^Type_Info
+		// proc typeid_of(Type) -> typeid
 		if (c->context.scope->is_global) {
 			compiler_error("'typeid_of' Cannot be declared within a #shared_global_scope due to how the internals of the compiler works");
 		}
@@ -5701,7 +5701,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				break; // NOTE(bill): No need to init
 			}
 			{ // Checker values
-				Type *field_types[2] = {t_rawptr, t_type_info_ptr};
+				Type *field_types[2] = {t_rawptr, t_typeid};
 				isize field_count = 2;
 				if (cl->elems[0]->kind == AstNode_FieldValue) {
 					bool fields_visited[2] = {};

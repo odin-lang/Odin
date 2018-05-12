@@ -911,6 +911,10 @@ bool is_type_any(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_any);
 }
+bool is_type_typeid(Type *t) {
+	t = base_type(t);
+	return (t->kind == Type_Basic && t->Basic.kind == Basic_typeid);
+}
 bool is_type_untyped_nil(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_UntypedNil);
@@ -1094,6 +1098,8 @@ bool type_has_nil(Type *t) {
 		case Basic_any:
 			return true;
 		case Basic_cstring:
+			return true;
+		case Basic_typeid:
 			return true;
 		}
 		return false;
@@ -1590,9 +1596,6 @@ Selection lookup_field_from_index(Type *type, i64 index) {
 }
 
 
-gb_global Entity *entity__any_data       = nullptr;
-gb_global Entity *entity__any_type_info  = nullptr;
-
 Entity *current_scope_lookup_entity(Scope *s, String name);
 
 Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel) {
@@ -1616,21 +1619,17 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 			// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
 			// `Raw_Any` type?
 			String data_str = str_lit("data");
-			String type_info_str = str_lit("type_info");
-			if (entity__any_data == nullptr) {
-				entity__any_data = alloc_entity_field(nullptr, make_token_ident(data_str), t_rawptr, false, 0);
-			}
-			if (entity__any_type_info == nullptr) {
-				entity__any_type_info = alloc_entity_field(nullptr, make_token_ident(type_info_str), t_type_info_ptr, false, 1);
-			}
+			String typeid_str = str_lit("typeid");
+			gb_local_persist Entity *entity__any_data = alloc_entity_field(nullptr, make_token_ident(data_str), t_rawptr, false, 0);
+			gb_local_persist Entity *entity__any_typeid = alloc_entity_field(nullptr, make_token_ident(typeid_str), t_typeid, false, 1);
 
 			if (field_name == data_str) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__any_data;;
 				return sel;
-			} else if (field_name == type_info_str) {
+			} else if (field_name == typeid_str) {
 				selection_add_index(&sel, 1);
-				sel.entity = entity__any_type_info;
+				sel.entity = entity__any_typeid;
 				return sel;
 			}
 		#endif

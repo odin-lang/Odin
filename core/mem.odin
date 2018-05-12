@@ -43,7 +43,9 @@ ptr_to_bytes :: proc "contextless" (ptr: ^$T, len := 1) -> []byte {
 }
 
 any_to_bytes :: proc "contextless" (val: any) -> []byte {
-	return transmute([]byte)raw.Slice{val.data, val.type_info.size};
+	ti := type_info_from_typeid(val.typeid);
+	size := ti != nil ? ti.size : 0;
+	return transmute([]byte)raw.Slice{val.data, size};
 }
 
 
