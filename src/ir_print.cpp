@@ -319,8 +319,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 
 		case Basic_rune:   ir_write_str_lit(f, "i32"); return;
 
-		case Basic_typeid:
-			/* fallthrough */
 		case Basic_int:
 		case Basic_uint:
 		case Basic_uintptr:
@@ -343,6 +341,8 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		case Basic_rawptr:  ir_write_str_lit(f, "%..rawptr");           return;
 		case Basic_string:  ir_write_str_lit(f, "%..string");           return;
 		case Basic_cstring: ir_write_str_lit(f, "i8*");                 return;
+
+		case Basic_typeid:  ir_write_str_lit(f, "%..typeid");           return;
 		}
 		break;
 
@@ -953,6 +953,23 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 	case irValue_Param:
 		ir_print_encoded_local(f, value->Param.entity->token.string);
 		break;
+	case irValue_SourceCodeLocation: {
+		irValue *file      = value->SourceCodeLocation.file;
+		irValue *line      = value->SourceCodeLocation.line;
+		irValue *column    = value->SourceCodeLocation.column;
+		irValue *procedure = value->SourceCodeLocation.procedure;
+
+		ir_write_byte(f, '{');
+		ir_print_type(f, m, t_string); ir_write_byte(f, ' '); ir_print_value(f, m, file, t_string);
+		ir_write_string(f, str_lit(", "));
+		ir_print_type(f, m, t_int);    ir_write_byte(f, ' '); ir_print_value(f, m, line, t_int);
+		ir_write_string(f, str_lit(", "));
+		ir_print_type(f, m, t_int);    ir_write_byte(f, ' '); ir_print_value(f, m, column, t_int);
+		ir_write_string(f, str_lit(", "));
+		ir_print_type(f, m, t_string); ir_write_byte(f, ' '); ir_print_value(f, m, procedure, t_string);
+		ir_write_byte(f, '}');
+		break;
+	}
 	case irValue_Proc:
 		ir_print_encoded_global(f, value->Proc.name, ir_print_is_proc_global(m, &value->Proc));
 		break;
@@ -1747,6 +1764,11 @@ void print_llvm_ir(irGen *ir) {
 	ir_print_encoded_local(f, str_lit("..complex128"));
 	ir_write_str_lit(f, " = type {double, double} ; Basic_complex128\n");
 
+	ir_print_encoded_local(f, str_lit("..typeid"));
+	ir_write_str_lit(f, " = type ");
+	ir_print_type(f, m, t_uintptr);
+	ir_write_str_lit(f, " ; Basic_typeid\n");
+
 	ir_print_encoded_local(f, str_lit("..any"));
 	ir_write_str_lit(f, " = type {");
 	ir_print_type(f, m, t_rawptr);
@@ -1851,7 +1873,11 @@ void print_llvm_ir(irGen *ir) {
 			if (g->value != nullptr) {
 				ir_print_value(f, m, g->value, g->entity->type);
 			} else {
-				ir_write_string(f, str_lit("zeroinitializer"));
+				if (ir_type_has_default_values(g->entity->type)) {
+					ir_print_exact_value(f, m, empty_exact_value, g->entity->type);
+				} else {
+					ir_write_string(f, str_lit("zeroinitializer"));
+				}
 			}
 		}
 		ir_write_byte(f, '\n');
