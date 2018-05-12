@@ -51,7 +51,14 @@ foreign __llvm_core {
 	fmuladd_f32 :: proc(a, b, c: f32) -> f32 ---;
 	@(link_name="llvm.fmuladd.f64")
 	fmuladd_f64 :: proc(a, b, c: f64) -> f64 ---;
+
+	@(link_name="llvm.log.f32")
+	log_f32 :: proc(x: f32) -> f32 ---;
+	@(link_name="llvm.log.f64")
+	log_f64 :: proc(x: f64) -> f64 ---;
 }
+
+log :: proc[log_f32, log_f64];
 
 tan_f32 :: proc "c" (θ: f32) -> f32 { return sin(θ)/cos(θ); }
 tan_f64 :: proc "c" (θ: f64) -> f64 { return sin(θ)/cos(θ); }
