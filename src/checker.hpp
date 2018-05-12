@@ -86,6 +86,7 @@ enum BuiltinProcId {
 	BuiltinProc_offset_of,
 	BuiltinProc_type_of,
 	BuiltinProc_type_info_of,
+	BuiltinProc_typeid_of,
 
 	BuiltinProc_swizzle,
 
@@ -128,6 +129,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("offset_of"),        2, false, Expr_Expr},
 	{STR_LIT("type_of"),          1, false, Expr_Expr},
 	{STR_LIT("type_info_of"),     1, false, Expr_Expr},
+	{STR_LIT("typeid_of"),        1, false, Expr_Expr},
 
 	{STR_LIT("swizzle"),          1, true,  Expr_Expr},
 

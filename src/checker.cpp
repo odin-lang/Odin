@@ -1023,6 +1023,8 @@ void add_type_info_type(Checker *c, Type *t) {
 			add_type_info_type(c, t_type_info_ptr);
 			add_type_info_type(c, t_rawptr);
 			break;
+		case Basic_typeid:
+			break;
 
 		case Basic_complex64:
 			add_type_info_type(c, t_type_info_float);
@@ -1564,6 +1566,7 @@ void init_preload(Checker *c) {
 		t_type_info_string        = find_core_type(c, str_lit("Type_Info_String"));
 		t_type_info_boolean       = find_core_type(c, str_lit("Type_Info_Boolean"));
 		t_type_info_any           = find_core_type(c, str_lit("Type_Info_Any"));
+		t_type_info_typeid        = find_core_type(c, str_lit("Type_Info_Type_Id"));
 		t_type_info_pointer       = find_core_type(c, str_lit("Type_Info_Pointer"));
 		t_type_info_procedure     = find_core_type(c, str_lit("Type_Info_Procedure"));
 		t_type_info_array         = find_core_type(c, str_lit("Type_Info_Array"));
@@ -1584,6 +1587,7 @@ void init_preload(Checker *c) {
 		t_type_info_string_ptr        = alloc_type_pointer(t_type_info_string);
 		t_type_info_boolean_ptr       = alloc_type_pointer(t_type_info_boolean);
 		t_type_info_any_ptr           = alloc_type_pointer(t_type_info_any);
+		t_type_info_typeid_ptr        = alloc_type_pointer(t_type_info_typeid);
 		t_type_info_pointer_ptr       = alloc_type_pointer(t_type_info_pointer);
 		t_type_info_procedure_ptr     = alloc_type_pointer(t_type_info_procedure);
 		t_type_info_array_ptr         = alloc_type_pointer(t_type_info_array);

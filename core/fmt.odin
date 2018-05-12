@@ -150,6 +150,10 @@ fprint_type :: proc(fd: os.Handle, info: ^Type_Info) {
 	os.write(fd, buf[..]);
 }
 
+write_typeid :: proc(buf: ^String_Buffer, id: typeid) {
+	write_type(buf, type_info_from_typeid(id));
+}
+
 write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 	if ti == nil {
 		write_string(buf, "nil");
@@ -193,6 +197,9 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 		}
 	case Type_Info_Any:
 		write_string(buf, "any");
+
+	case Type_Info_Type_Id:
+		write_string(buf, "typeid");
 
 	case Type_Info_Pointer:
 		if info.elem == nil {
@@ -914,6 +921,10 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			write_string(fi.buf, " @ ");
 			fmt_pointer(fi, ptr, 'p');
 		}
+
+	case Type_Info_Type_Id:
+		id := (^typeid)(v.data)^;
+		write_typeid(fi.buf, id);
 	}
 }
 
@@ -983,7 +994,9 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	case string:  fmt_string(fi, a, verb);
 	case cstring: fmt_cstring(fi, a, verb);
 
-	case:         fmt_value(fi, arg, verb);
+	case typeid:  write_typeid(fi.buf, a);
+
+	case: fmt_value(fi, arg, verb);
 	}
 
 }
