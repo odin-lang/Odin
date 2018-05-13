@@ -149,6 +149,7 @@ to_degrees :: proc(radians: f32) -> f32 { return radians * 360 / TAU; }
 
 
 mul :: proc[
+    mat3_mul,
 	mat4_mul, mat4_mul_vec4,
 	quat_mul, quat_mulf,
 ];
@@ -197,13 +198,25 @@ identity :: proc(T: type/[$N][N]$E) -> T {
 	return m;
 }
 
-transpose :: proc(m: Mat4) -> Mat4 {
-	for j in 0..4 {
-		for i in 0..4 {
+transpose :: proc(m: $M/[$N][N]f32) -> M {
+	for j in 0..N {
+		for i in 0..N {
 			m[i][j], m[j][i] = m[j][i], m[i][j];
 		}
 	}
 	return m;
+}
+
+mat3_mul :: proc(a, b: Mat3) -> Mat3 {
+	c: Mat3;
+	for j in 0..3 {
+		for i in 0..3 {
+			c[j][i] = a[0][i]*b[j][0] +
+			          a[1][i]*b[j][1] +
+			          a[2][i]*b[j][2];
+		}
+	}
+	return c;
 }
 
 mat4_mul :: proc(a, b: Mat4) -> Mat4 {
@@ -227,7 +240,6 @@ mat4_mul_vec4 :: proc(m: Mat4, v: Vec4) -> Vec4 {
 		m[0][3]*v[0] + m[1][3]*v[1] + m[2][3]*v[2] + m[3][3]*v[3],
 	};
 }
-
 
 mat4_inverse :: proc(m: Mat4) -> Mat4 {
 	o: Mat4;
