@@ -1551,9 +1551,9 @@ void init_preload(Checker *c) {
 		t_type_info_enum_value = type_info_enum_value->type;
 		t_type_info_enum_value_ptr = alloc_type_pointer(t_type_info_enum_value);
 
-		GB_ASSERT(tis->fields.count == 3);
+		GB_ASSERT(tis->fields.count == 4);
 
-		Entity *type_info_variant = tis->fields[2];
+		Entity *type_info_variant = tis->fields[3];
 		Type *tiv_type = type_info_variant->type;
 		GB_ASSERT(is_type_union(tiv_type));
 

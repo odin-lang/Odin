@@ -795,7 +795,7 @@ irValue *ir_emit_load           (irProcedure *p, irValue *address);
 void     ir_emit_jump           (irProcedure *proc, irBlock *block);
 irValue *ir_emit_conv           (irProcedure *proc, irValue *value, Type *t);
 irValue *ir_type_info           (irProcedure *proc, Type *type);
-irValue *ir_typeid              (irProcedure *proc, Type *type);
+irValue *ir_typeid              (irModule *m, Type *type);
 irValue *ir_build_expr          (irProcedure *proc, AstNode *expr);
 void     ir_build_stmt          (irProcedure *proc, AstNode *node);
 irValue *ir_build_cond          (irProcedure *proc, AstNode *cond, irBlock *true_block, irBlock *false_block);
@@ -3365,7 +3365,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		data = ir_emit_conv(proc, data, t_rawptr);
 
 
-		irValue *id = ir_typeid(proc, st);
+		irValue *id = ir_typeid(proc->module, st);
 
 		ir_emit_store(proc, ir_emit_struct_ep(proc, result, 0), data);
 		ir_emit_store(proc, ir_emit_struct_ep(proc, result, 1), id);
@@ -3516,8 +3516,8 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 			args[2] = ir_const_int(a, pos.line);
 			args[3] = ir_const_int(a, pos.column);
 
-			args[4] = ir_typeid(proc, src_type);
-			args[5] = ir_typeid(proc, dst_type);
+			args[4] = ir_typeid(proc->module, src_type);
+			args[5] = ir_typeid(proc->module, dst_type);
 			ir_emit_global_call(proc, "__type_assertion_check", args);
 		}
 
@@ -3544,7 +3544,7 @@ irAddr ir_emit_any_cast_addr(irProcedure *proc, irValue *value, Type *type, Toke
 
 	irValue *v = ir_add_local_generated(proc, tuple);
 
-	irValue *dst_typeid = ir_typeid(proc, dst_type);
+	irValue *dst_typeid = ir_typeid(proc->module, dst_type);
 	irValue *any_typeid = ir_emit_struct_ev(proc, value, 1);
 
 
@@ -3639,13 +3639,12 @@ irValue *ir_type_info(irProcedure *proc, Type *type) {
 	return ir_emit_array_ep(proc, ir_global_type_info_data, ir_const_i32(proc->module->allocator, id));
 }
 
-irValue *ir_typeid(irProcedure *proc, Type *type) {
-	CheckerInfo *info = proc->module->info;
+irValue *ir_typeid(irModule *m, Type *type) {
 	type = default_type(type);
 
-	isize id = ir_type_info_index(info, type);
+	isize id = ir_type_info_index(m->info, type);
 	GB_ASSERT(id >= 0);
-	return ir_value_constant(proc->module->allocator, t_typeid, exact_value_i64(id));
+	return ir_value_constant(m->allocator, t_typeid, exact_value_i64(id));
 }
 
 
@@ -4238,7 +4237,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		TypeAndValue tav = type_and_value_of_expr(proc->module->info, arg);
 		if (tav.mode == Addressing_Type) {
 			Type *t = default_type(type_of_expr(proc->module->info, arg));
-			return ir_typeid(proc, t);
+			return ir_typeid(proc->module, t);
 		}
 		Type *t = base_type(tav.type);
 		GB_ASSERT(are_types_identical(t, t_type_info_ptr));
@@ -5070,8 +5069,8 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 					args[2] = ir_const_int(a, pos.line);
 					args[3] = ir_const_int(a, pos.column);
 
-					args[4] = ir_typeid(proc, src_type);
-					args[5] = ir_typeid(proc, dst_type);
+					args[4] = ir_typeid(proc->module, src_type);
+					args[5] = ir_typeid(proc->module, dst_type);
 					ir_emit_global_call(proc, "__type_assertion_check", args);
 
 					irValue *data_ptr = v;
@@ -5084,7 +5083,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 
 					irValue *data_ptr = ir_emit_struct_ev(proc, v, 0);
 					irValue *any_id = ir_emit_struct_ev(proc, v, 1);
-					irValue *id = ir_typeid(proc, type);
+					irValue *id = ir_typeid(proc->module, type);
 
 
 					irValue *ok = ir_emit_comp(proc, Token_CmpEq, any_id, id);
@@ -7276,7 +7275,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					cond = ir_emit_comp(proc, Token_CmpEq, tag_index, variant_tag);
 				} else if (switch_kind == TypeSwitch_Any) {
 					irValue *any_typeid  = ir_emit_load(proc, ir_emit_struct_ep(proc, parent_ptr, 1));
-					irValue *case_typeid = ir_typeid(proc, case_type);
+					irValue *case_typeid = ir_typeid(proc->module, case_type);
 					cond = ir_emit_comp(proc, Token_CmpEq, any_typeid, case_typeid);
 				}
 				GB_ASSERT(cond != nullptr);
@@ -7923,10 +7922,11 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 
 		irValue *tag = nullptr;
 		irValue *ti_ptr = ir_emit_array_epi(proc, ir_global_type_info_data, cast(i32)entry_index);
-		irValue *variant_ptr = ir_emit_struct_ep(proc, ti_ptr, 2);
+		irValue *variant_ptr = ir_emit_struct_ep(proc, ti_ptr, 3);
 
 		ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 0), ir_const_int(a, type_size_of(t)));
 		ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 1), ir_const_int(a, type_align_of(t)));
+		ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 2), ir_typeid(proc->module, t));
 
 
 		switch (t->kind) {
