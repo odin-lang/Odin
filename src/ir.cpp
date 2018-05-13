@@ -684,6 +684,7 @@ Type *ir_type(irValue *value) {
 
 
 bool ir_type_has_default_values(Type *t) {
+#if 1
 	switch (t->kind) {
 	case Type_Named:
 		return ir_type_has_default_values(t->Named.base);
@@ -709,7 +710,7 @@ bool ir_type_has_default_values(Type *t) {
 		}
 		break;
 	}
-
+#endif
 	return false;
 }
 
@@ -1913,7 +1914,7 @@ irValue *ir_address_from_load_or_generate_local(irProcedure *proc, irValue *val)
 }
 
 
-Type *ir_addr_type(irAddr addr) {
+Type *ir_addr_type(irAddr const &addr) {
 	if (addr.addr == nullptr) {
 		return nullptr;
 	}
@@ -1955,7 +1956,7 @@ irValue *ir_insert_dynamic_map_key_and_value(irProcedure *proc, irValue *addr, T
 
 
 
-irValue *ir_addr_store(irProcedure *proc, irAddr addr, irValue *value) {
+irValue *ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 	if (addr.addr == nullptr) {
 		return nullptr;
 	}
@@ -2033,7 +2034,7 @@ irValue *ir_addr_store(irProcedure *proc, irAddr addr, irValue *value) {
 	return ir_emit_store(proc, addr.addr, v);
 }
 
-irValue *ir_addr_load(irProcedure *proc, irAddr addr) {
+irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 	if (addr.addr == nullptr) {
 		GB_PANIC("Illegal addr load");
 		return nullptr;
@@ -2139,7 +2140,7 @@ irValue *ir_addr_load(irProcedure *proc, irAddr addr) {
 	return ir_emit_load(proc, addr.addr);
 }
 
-irValue *ir_addr_get_ptr(irProcedure *proc, irAddr addr) {
+irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr) {
 	if (addr.addr == nullptr) {
 		GB_PANIC("Illegal addr -> nullptr");
 		return nullptr;
@@ -2157,7 +2158,7 @@ irValue *ir_addr_get_ptr(irProcedure *proc, irAddr addr) {
 }
 
 irValue *ir_build_addr_ptr(irProcedure *proc, AstNode *expr) {
-	irAddr addr = ir_build_addr(proc, expr);
+	irAddr const &addr = ir_build_addr(proc, expr);
 	return ir_addr_get_ptr(proc, addr);
 }
 
@@ -4553,7 +4554,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 	case BuiltinProc_clear: {
 		ir_emit_comment(proc, str_lit("clear"));
 		Type *original_type = type_of_expr(proc->module->info, ce->args[0]);
-		irAddr addr = ir_build_addr(proc, ce->args[0]);
+		irAddr const &addr = ir_build_addr(proc, ce->args[0]);
 		irValue *ptr = addr.addr;
 		if (is_double_pointer(ir_type(ptr))) {
 			ptr = ir_addr_load(proc, addr);
@@ -4710,7 +4711,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 
 	case BuiltinProc_swizzle: {
 		ir_emit_comment(proc, str_lit("swizzle.begin"));
-		irAddr addr = ir_build_addr(proc, ce->args[0]);
+		irAddr const &addr = ir_build_addr(proc, ce->args[0]);
 		isize index_count = ce->args.count-1;
 		if (index_count == 0) {
 			return ir_addr_load(proc, addr);
@@ -5559,7 +5560,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 
 			if (sel.entity->type->kind == Type_BitFieldValue) {
-				irAddr addr = ir_build_addr(proc, se->expr);
+				irAddr const &addr = ir_build_addr(proc, se->expr);
 				Type *bft = type_deref(ir_addr_type(addr));
 				if (sel.index.count == 1) {
 					GB_ASSERT(is_type_bit_field(bft));
@@ -6118,7 +6119,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 	return ir_addr(nullptr);
 }
 
-void ir_build_assign_op(irProcedure *proc, irAddr lhs, irValue *value, TokenKind op) {
+void ir_build_assign_op(irProcedure *proc, irAddr const &lhs, irValue *value, TokenKind op) {
 	irValue *old_value = ir_addr_load(proc, lhs);
 	Type *type = ir_type(old_value);
 
@@ -6629,7 +6630,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		if (s->op.kind == Token_Dec) {
 			op = Token_Sub;
 		}
-		irAddr addr = ir_build_addr(proc, s->expr);
+		irAddr const &addr = ir_build_addr(proc, s->expr);
 		ir_build_assign_op(proc, addr, v_one, op);
 	case_end;
 	#endif
@@ -7018,7 +7019,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			case Type_Map: {
 				is_map = true;
 				gbAllocator a = proc->module->allocator;
-				irAddr addr = ir_build_addr(proc, rs->expr);
+				irAddr const &addr = ir_build_addr(proc, rs->expr);
 				irValue *map = ir_addr_get_ptr(proc, addr);
 				if (is_type_pointer(type_deref(ir_addr_type(addr)))) {
 					map = ir_addr_load(proc, addr);
