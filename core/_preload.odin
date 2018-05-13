@@ -105,6 +105,7 @@ Type_Info_Bit_Field :: struct {
 Type_Info :: struct {
 	size:  int,
 	align: int,
+	id:    typeid,
 
 	variant: union {
 		Type_Info_Named,
@@ -241,13 +242,7 @@ type_info_base_without_enum :: proc "contextless" (info: ^Type_Info) -> ^Type_In
 
 __typeid_of :: proc "contextless" (ti: ^Type_Info) -> typeid {
 	if ti == nil do return nil;
-	start := uintptr(&__type_table[0]);
-	end := uintptr(ti);
-	id := (end-start)/size_of(Type_Info);
-	if uintptr(len(__type_table)) <= id {
-		return nil;
-	}
-	return transmute(typeid)id;
+	return ti.id;
 }
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info {
 	n := int(transmute(uintptr)id);
@@ -263,8 +258,7 @@ typeid_base :: proc "contextless" (id: typeid) -> typeid {
 	return typeid_of(ti);
 }
 typeid_base_without_enum :: proc "contextless" (id: typeid) -> typeid {
-	ti := type_info_of(id);
-	ti = type_info_base_without_enum(ti);
+	ti := type_info_base_without_enum(type_info_of(id));
 	return typeid_of(ti);
 }
 
