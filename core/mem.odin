@@ -183,7 +183,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		// NOTE(bill): Free all at once
 		// Use ArenaTempMemory if you want to free a block
 
-	case FreeAll:
+	case Free_All:
 		(^raw.Slice)(&arena.memory).len = 0;
 
 	case Resize:
