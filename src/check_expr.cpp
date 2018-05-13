@@ -346,9 +346,9 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	{
 		Scope *s = entity->scope;
 		while (s != nullptr && s->file == nullptr) {
+			file = s->file;
 			s = s->parent;
 		}
-		file = s->file;
 	}
 
 	ProcedureInfo proc_info = {};
@@ -1232,6 +1232,7 @@ bool check_binary_op(Checker *c, Operand *o, Token op) {
 
 }
 
+
 bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value) {
 	if (in_value.kind == ExactValue_Invalid) {
 		// NOTE(bill): There's already been an error
@@ -1259,16 +1260,10 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 
 		i64 i = v.value_integer;
 		u64 u = bit_cast<u64>(i);
-		i64 s = 8*type_size_of(type);
-		u64 umax = ~cast(u64)0ull;
-		if (s < 64) {
-			umax = (1ull << cast(u64)s) - 1ull;
-		} else {
-			// IMPORTANT TODO(bill): I NEED A PROPER BIG NUMBER LIBRARY THAT CAN SUPPORT 128 bit floats
-			s = 64;
-		}
-		i64 imin = -1ll << (s-1ll);
-		i64 imax = (1ll << (s-1ll))-1ll;
+		i64 bit_size = type_size_of(type);
+		u64 umax = unsigned_integer_maxs[bit_size];
+		i64 imin = signed_integer_mins[bit_size];
+		i64 imax = signed_integer_maxs[bit_size];
 
 		switch (type->Basic.kind) {
 		case Basic_rune:
@@ -1283,7 +1278,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		case Basic_u32:
 		case Basic_uint:
 		case Basic_uintptr:
-			return !(u < 0ull || u > umax);
+			return 0ull <= u && u <= umax;
 
 		case Basic_u64:
 			return 0ull <= i;
@@ -1488,7 +1483,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 	if (x->mode == Addressing_Type && y->mode == Addressing_Type) {
 		bool comp = are_types_identical(x->type, y->type);
 		switch (op) {
-		case Token_CmpEq: comp = comp;  break;
+		case Token_CmpEq: /* comp = comp; */ break;
 		case Token_NotEq: comp = !comp; break;
 		}
 		x->mode  = Addressing_Constant;
@@ -3722,7 +3717,7 @@ break;
 	#endif
 	case BuiltinProc_expand_to_tuple: {
 		Type *type = base_type(operand->type);
-		if (!is_type_struct(type) &
+		if (!is_type_struct(type) &&
 		    !is_type_union(type)) {
 			gbString type_str = type_to_string(operand->type);
 			error(call, "Expected a struct or union type, got '%s'", type_str);

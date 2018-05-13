@@ -859,6 +859,7 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 		// NOTE(bill): Identifier has already been handled
 		return;
 	}
+	GB_ASSERT(entity != nullptr);
 
 	identifier->Ident.entity = entity;
 	entity->identifier = identifier;

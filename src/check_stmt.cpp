@@ -190,7 +190,6 @@ Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 
 	// NOTE(bill): Ignore assignments to '_'
 	if (is_blank_ident(node)) {
-		add_entity_definition(&c->info, node, nullptr);
 		check_assignment(c, rhs, nullptr, str_lit("assignment to '_' identifier"));
 		if (rhs->mode == Addressing_Invalid) {
 			return nullptr;
@@ -269,8 +268,7 @@ Type *check_assignment_variable(Checker *c, Operand *lhs, Operand *rhs) {
 					}
 					i64 imax = 1ll << (cast(i64)lhs_bits-1ll);
 
-					bool ok = false;
-					ok = !(u < 0 || u > umax);
+					bool ok = !(u < 0 || u > umax);
 
 					if (ok) {
 						return rhs->type;

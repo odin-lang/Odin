@@ -241,6 +241,39 @@ String i64_to_string(i64 a, char *out_buf, isize out_buf_len) {
 }
 
 
+gb_global i64 const signed_integer_mins[] = {
+	0,
+	-128ll,
+	-32768ll,
+	0,
+	-2147483648ll,
+	0,
+	0,
+	0,
+	-9223372036854775808ll,
+};
+gb_global i64 const signed_integer_maxs[] = {
+	0,
+	127ll,
+	32767ll,
+	0,
+	2147483647ll,
+	0,
+	0,
+	0,
+	9223372036854775807ll,
+};
+gb_global u64 const unsigned_integer_maxs[] = {
+	0,
+	255ull,
+	65535ull,
+	0,
+	4294967295ull,
+	0,
+	0,
+	0,
+	18446744073709551615ull,
+};
 
 
 

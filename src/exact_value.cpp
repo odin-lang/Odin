@@ -413,9 +413,10 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 		// NOTE(bill): unsigned integers will be negative and will need to be
 		// limited to the types precision
 		// IMPORTANT NOTE(bill): Max precision is 64 bits as that's how integers are stored
-		if (0 < precision && precision < 64) {
-			i = i & ~(-1ll << precision);
-		}
+		i = i & unsigned_integer_maxs[precision/8];
+		// if (0 < precision && precision < 64) {
+		// 	i = i & ~(-1ll << precision);
+		// }
 
 		return exact_value_i64(i);
 	}
@@ -438,7 +439,7 @@ failure:
 }
 
 // NOTE(bill): Make sure things are evaluated in correct order
-i32 exact_value_order(ExactValue v) {
+i32 exact_value_order(ExactValue const &v) {
 	switch (v.kind) {
 	case ExactValue_Invalid:
 		return 0;
@@ -612,11 +613,21 @@ error:; // NOTE(bill): MSVC accepts this??? apparently you cannot declare variab
 	return empty_exact_value;
 }
 
-gb_inline ExactValue exact_value_add(ExactValue x, ExactValue y) { return exact_binary_operator_value(Token_Add, x, y); }
-gb_inline ExactValue exact_value_sub(ExactValue x, ExactValue y) { return exact_binary_operator_value(Token_Sub, x, y); }
-gb_inline ExactValue exact_value_mul(ExactValue x, ExactValue y) { return exact_binary_operator_value(Token_Mul, x, y); }
-gb_inline ExactValue exact_value_quo(ExactValue x, ExactValue y) { return exact_binary_operator_value(Token_Quo, x, y); }
-gb_inline ExactValue exact_value_shift(TokenKind op, ExactValue x, ExactValue y) { return exact_binary_operator_value(op, x, y); }
+gb_inline ExactValue exact_value_add(ExactValue const &x, ExactValue const &y) {
+	return exact_binary_operator_value(Token_Add, x, y);
+}
+gb_inline ExactValue exact_value_sub(ExactValue const &x, ExactValue const &y) {
+	return exact_binary_operator_value(Token_Sub, x, y);
+}
+gb_inline ExactValue exact_value_mul(ExactValue const &x, ExactValue const &y) {
+	return exact_binary_operator_value(Token_Mul, x, y);
+}
+gb_inline ExactValue exact_value_quo(ExactValue const &x, ExactValue const &y) {
+	return exact_binary_operator_value(Token_Quo, x, y);
+}
+gb_inline ExactValue exact_value_shift(TokenKind op, ExactValue const &x, ExactValue const &y) {
+	return exact_binary_operator_value(op, x, y);
+}
 
 
 i32 cmp_f64(f64 a, f64 b) {

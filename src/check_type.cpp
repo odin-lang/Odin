@@ -178,8 +178,7 @@ void check_struct_fields(Checker *c, AstNode *node, Array<Entity *> *fields, Arr
 
 			Token name_token = name->Ident.token;
 
-			Entity *field = nullptr;
-			field = alloc_entity_field(c->context.scope, name_token, type, is_using, field_src_index);
+			Entity *field = alloc_entity_field(c->context.scope, name_token, type, is_using, field_src_index);
 			field->Variable.default_value = value;
 			field->Variable.default_is_nil = default_is_nil;
 
