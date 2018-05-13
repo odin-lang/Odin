@@ -2959,10 +2959,12 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 			syntax_error(f->curr_token, "Default parameters can only be applied to single values");
 		}
 
-		// if (allowed_flags == FieldFlag_Struct && default_value != nullptr) {
-		// 	syntax_error(default_value, "Default parameters are not allowed for structs");
-		// 	default_value = nullptr;
-		// }
+	#if defined(NO_DEFAULT_STRUCT_VALUES)
+		if (allowed_flags == FieldFlag_Struct && default_value != nullptr) {
+			syntax_error(default_value, "Default parameters are not allowed for structs");
+			default_value = nullptr;
+		}
+	#endif
 
 		if (type != nullptr && type->kind == AstNode_Ellipsis) {
 			if (seen_ellipsis) syntax_error(type, "Extra variadic parameter after ellipsis");

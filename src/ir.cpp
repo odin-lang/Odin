@@ -684,7 +684,7 @@ Type *ir_type(irValue *value) {
 
 
 bool ir_type_has_default_values(Type *t) {
-#if 1
+#if !defined(NO_DEFAULT_STRUCT_VALUES)
 	switch (t->kind) {
 	case Type_Named:
 		return ir_type_has_default_values(t->Named.base);
