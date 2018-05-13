@@ -29,7 +29,23 @@ u64 win32_time_stamp__freq(void) {
 	return win32_perf_count_freq.QuadPart;
 }
 
-#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+#elif defined(GB_SYSTEM_OSX)
+
+#include <mach/mach_time.h>
+
+u64 osx_time_stamp_time_now(void) {
+	return mach_absolute_time();
+}
+
+u64 osx_time_stamp__freq(void) {
+	mach_timebase_info_data_t data;
+	data.numer = 0;
+	data.denom = 0;
+	mach_timebase_info(&data);
+	return (data.numer / data.denom) * 1000000000;
+}
+
+#elif defined(GB_SYSTEM_UNIX)
 
 #include <time.h>
 
@@ -52,6 +68,8 @@ u64 unix_time_stamp__freq(void) {
 	return freq;
 }
 
+
+
 #else
 #error Implement system
 #endif
@@ -59,7 +77,9 @@ u64 unix_time_stamp__freq(void) {
 u64 time_stamp_time_now(void) {
 #if defined(GB_SYSTEM_WINDOWS)
 	return win32_time_stamp_time_now();
-#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+#elif defined(GB_SYSTEM_OSX)
+	return osx_time_stamp_time_now();
+#elif defined(GB_SYSTEM_UNIX)
 	return unix_time_stamp_time_now();
 #else
 #error time_stamp_time_now
@@ -69,7 +89,9 @@ u64 time_stamp_time_now(void) {
 u64 time_stamp__freq(void) {
 #if defined(GB_SYSTEM_WINDOWS)
 	return win32_time_stamp__freq();
-#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+#elif defined(GB_SYSTEM_OSX)
+	return osx_time_stamp__freq();
+#elif defined(GB_SYSTEM_UNIX)
 	return unix_time_stamp__freq();
 #else
 #error time_stamp__freq
