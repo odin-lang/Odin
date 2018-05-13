@@ -111,67 +111,6 @@ general_stuff :: proc() {
 	}
 }
 
-default_struct_values :: proc() {
-	fmt.println("# default_struct_values");
-	{
-		Vector3 :: struct {
-			x: f32,
-			y: f32,
-			z: f32,
-		}
-		v: Vector3;
-		fmt.println(v);
-	}
-	{
-		// Default values must be constants
-		Vector3 :: struct {
-			x: f32 = 1,
-			y: f32 = 4,
-			z: f32 = 9,
-		}
-		v: Vector3;
-		fmt.println(v);
-
-		v = Vector3{};
-		fmt.println(v);
-
-		// Uses the same semantics as a default values in a procedure
-		v = Vector3{137};
-		fmt.println(v);
-
-		v = Vector3{z = 137};
-		fmt.println(v);
-	}
-
-	{
-		Vector3 :: struct {
-			x := 1.0,
-			y := 4.0,
-			z := 9.0,
-		}
-		stack_default: Vector3;
-		stack_literal := Vector3{};
-		heap_one      := new(Vector3);         defer free(heap_one);
-		heap_two      := new_clone(Vector3{}); defer free(heap_two);
-
-		fmt.println("stack_default  - ", stack_default);
-		fmt.println("stack_literal  - ", stack_literal);
-		fmt.println("heap_one       - ", heap_one^);
-		fmt.println("heap_two       - ", heap_two^);
-
-
-		N :: 4;
-		stack_array: [N]Vector3;
-		heap_array := new([N]Vector3);    defer free(heap_array);
-		heap_slice := make([]Vector3, N); defer free(heap_slice);
-		fmt.println("stack_array[1] - ", stack_array[1]);
-		fmt.println("heap_array[1]  - ", heap_array[1]);
-		fmt.println("heap_slice[1]  - ", heap_slice[1]);
-	}
-}
-
-
-
 
 union_type :: proc() {
 	fmt.println("\n# union_type");
@@ -384,7 +323,11 @@ parametric_polymorphism :: proc() {
 	}
 
 	copy_slice :: proc(dst, src: []$T) -> int {
-		return mem.copy(&dst[0], &src[0], n*size_of(T));
+		n := min(len(dst), len(src));
+		if n > 0 {
+			mem.copy(&dst[0], &src[0], n*size_of(T));
+		}
+		return n;
 	}
 
 	double_params :: proc(a: $A, b: $B) -> A {
@@ -795,7 +738,6 @@ deprecated_attribute :: proc() {
 main :: proc() {
 	when true {
 		general_stuff();
-		default_struct_values();
 		union_type();
 		parametric_polymorphism();
 		threading_example();

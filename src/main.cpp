@@ -1,5 +1,6 @@
 // #define NO_ARRAY_BOUNDS_CHECK
 #define NO_POINTER_ARITHMETIC
+// #define NO_DEFAULT_STRUCT_VALUES
 
 #include "common.cpp"
 #include "timings.cpp"
