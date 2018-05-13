@@ -151,7 +151,7 @@ Source_Code_Location :: struct {
 Allocator_Mode :: enum byte {
 	Alloc,
 	Free,
-	FreeAll,
+	Free_All,
 	Resize,
 }
 
@@ -317,7 +317,7 @@ free_ptr :: inline proc(ptr: rawptr, loc := #caller_location) do free_ptr_with_a
 
 free_all :: inline proc(loc := #caller_location) {
 	a := context.allocator;
-	a.procedure(a.data, Allocator_Mode.FreeAll, 0, 0, nil, 0, 0, loc);
+	a.procedure(a.data, Allocator_Mode.Free_All, 0, 0, nil, 0, 0, loc);
 }
 
 
@@ -580,7 +580,7 @@ default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		os.heap_free(old_memory);
 		return nil;
 
-	case FreeAll:
+	case Free_All:
 		// NOTE(bill): Does nothing
 
 	case Resize:
