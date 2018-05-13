@@ -1785,8 +1785,7 @@ struct TypePath {
 
 
 void type_path_init(TypePath *tp) {
-	// TODO(bill): Use an allocator that uses a backing array if it can and then use alternative allocator when exhausted
-	array_init(&tp->path, heap_allocator());
+	tp->path.allocator = heap_allocator();
 }
 
 void type_path_free(TypePath *tp) {

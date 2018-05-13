@@ -64,9 +64,9 @@ murmur32 :: proc(data: []byte) -> u32 {
 	h1: u32 = 0;
 	nblocks := len(data)/4;
 	p := &data[0];
-	p1 := p + 4*nblocks;
+	p1 := mem.ptr_offset(p, 4*nblocks);
 
-	for ; p < p1; p += 4 {
+	for ; p < p1; p = mem.ptr_offset(p, 4) {
 		k1 := (cast(^u32)p)^;
 
 		k1 *= c1_32;

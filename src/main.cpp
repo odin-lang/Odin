@@ -1,6 +1,6 @@
 #define USE_THREADED_PARSER 1
 // #define NO_ARRAY_BOUNDS_CHECK
-// #define NO_POINTER_ARITHMETIC
+#define NO_POINTER_ARITHMETIC
 
 #include "common.cpp"
 #include "timings.cpp"

@@ -4,6 +4,7 @@ import "core:os.odin"
 // import "core:fmt.odin" // TODO(bill): Remove the need for `fmt` here
 import "core:utf8.odin"
 import "core:raw.odin"
+import "core:mem.odin"
 
 // Naming Conventions:
 // In general, Ada_Case for types and snake_case for values
@@ -347,10 +348,10 @@ append :: proc(array: ^$T/[dynamic]$E, args: ...E, loc := #caller_location) -> i
 	}
 	arg_len = min(cap(array)-len(array), arg_len);
 	if arg_len > 0 {
-		a := cast(^raw.Dynamic_Array)array;
-		data := cast(^E)a.data;
+		a := (^raw.Dynamic_Array)(array);
+		data := (^E)(a.data);
 		assert(data != nil);
-		__mem_copy(data + a.len, &args[0], size_of(E) * arg_len);
+		__mem_copy(mem.ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
 		a.len += arg_len;
 	}
 	return len(array);
@@ -358,7 +359,7 @@ append :: proc(array: ^$T/[dynamic]$E, args: ...E, loc := #caller_location) -> i
 
 append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ...string, loc := #caller_location) -> int {
 	for arg in args {
-		append(array = array, args = cast([]E)arg, loc = loc);
+		append(array = array, args = ([]E)(arg), loc = loc);
 	}
 	return len(array);
 }
@@ -372,13 +373,13 @@ pop :: proc "contextless" (array: ^$T/[dynamic]$E) -> E {
 }
 
 clear_dynamic_array :: inline proc "contextless" (array: ^$T/[dynamic]$E) {
-	if array != nil do (cast(^raw.Dynamic_Array)array).len = 0;
+	if array != nil do (^raw.Dynamic_Array)(array).len = 0;
 }
 clear_map :: inline proc "contextless" (m: ^$T/map[$K]$V) {
 	if m == nil do return;
-	raw_map := cast(^raw.Map)m;
-	hashes  := cast(^raw.Dynamic_Array)&raw_map.hashes;
-	entries := cast(^raw.Dynamic_Array)&raw_map.entries;
+	raw_map := (^raw.Map)(m);
+	hashes  := (^raw.Dynamic_Array)(&raw_map.hashes);
+	entries := (^raw.Dynamic_Array)(&raw_map.entries);
 	hashes.len  = 0;
 	entries.len = 0;
 }
@@ -387,7 +388,7 @@ clear :: proc[clear_dynamic_array, clear_map];
 
 reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #caller_location) -> bool {
 	if array == nil do return false;
-	a := cast(^raw.Dynamic_Array)array;
+	a := (^raw.Dynamic_Array)(array);
 
 	if capacity <= a.cap do return true;
 
@@ -413,7 +414,7 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 
 
 __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> __Map_Header {
-	header := __Map_Header{m = cast(^raw.Map)m};
+	header := __Map_Header{m = (^raw.Map)(m)};
 	Entry :: struct {
 		key:   __Map_Key,
 		next:  int,
@@ -442,7 +443,7 @@ __get_map_key :: proc "contextless" (key: $K) -> __Map_Key {
 		case: panic("Unhandled integer size");
 		}
 	case Type_Info_Rune:
-		map_key.hash = u64((cast(^rune)&key)^);
+		map_key.hash = u64((^rune)(&key)^);
 	case Type_Info_Pointer:
 		map_key.hash = u64(uintptr((^rawptr)(&key)^));
 	case Type_Info_Float:
@@ -474,12 +475,12 @@ reserve :: proc[reserve_dynamic_array, reserve_map];
 
 
 new :: inline proc(T: type, loc := #caller_location) -> ^T {
-	ptr := cast(^T)alloc(size_of(T), align_of(T), loc);
+	ptr := (^T)(alloc(size_of(T), align_of(T), loc));
 	ptr^ = T{};
 	return ptr;
 }
 new_clone :: inline proc(data: $T, loc := #caller_location) -> ^T {
-	ptr := cast(^T)alloc(size_of(T), align_of(T), loc);
+	ptr := (^T)(alloc(size_of(T), align_of(T), loc));
 	ptr^ = data;
 	return ptr;
 }
@@ -889,7 +890,7 @@ __string_ge :: inline proc "contextless" (a, b: string) -> bool { return __strin
 
 __cstring_len :: proc "contextless" (s: cstring) -> int {
 	n := 0;
-	for p := (^byte)(s); p != nil && p^ != 0; p += 1 {
+	for p := (^byte)(s); p != nil && p^ != 0; p = mem.ptr_offset(p, 1) {
 		n += 1;
 	}
 	return n;
@@ -1027,9 +1028,10 @@ __mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) ->
 }
 
 __mem_compare :: proc "contextless" (a, b: ^byte, n: int) -> int {
+	pa :: mem.ptr_offset;
 	for i in 0..n do switch {
-	case (a+i)^ < (b+i)^: return -1;
-	case (a+i)^ > (b+i)^: return +1;
+	case pa(a, i)^ < pa(b, i)^: return -1;
+	case pa(a, i)^ > pa(b, i)^: return +1;
 	}
 	return 0;
 }
@@ -1102,7 +1104,7 @@ __abs_complex128 :: inline proc "contextless" (x: complex128) -> f64 {
 
 
 __dynamic_array_make :: proc(array_: rawptr, elem_size, elem_align: int, len, cap: int, loc := #caller_location) {
-	array := cast(^raw.Dynamic_Array)array_;
+	array := (^raw.Dynamic_Array)(array_);
 	array.allocator = context.allocator;
 	assert(array.allocator.procedure != nil);
 
@@ -1113,7 +1115,7 @@ __dynamic_array_make :: proc(array_: rawptr, elem_size, elem_align: int, len, ca
 }
 
 __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap: int, loc := #caller_location) -> bool {
-	array := cast(^raw.Dynamic_Array)array_;
+	array := (^raw.Dynamic_Array)(array_);
 
 	if cap <= array.cap do return true;
 
@@ -1135,7 +1137,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 }
 
 __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: int, loc := #caller_location) -> bool {
-	array := cast(^raw.Dynamic_Array)array_;
+	array := (^raw.Dynamic_Array)(array_);
 
 	ok := __dynamic_array_reserve(array_, elem_size, elem_align, len, loc);
 	if ok do array.len = len;
@@ -1145,7 +1147,7 @@ __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: 
 
 __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
                                items: rawptr, item_count: int, loc := #caller_location) -> int {
-	array := cast(^raw.Dynamic_Array)array_;
+	array := (^raw.Dynamic_Array)(array_);
 
 	if items == nil    do return 0;
 	if item_count <= 0 do return 0;
@@ -1159,15 +1161,16 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 	// TODO(bill): Better error handling for failed reservation
 	if !ok do return array.len;
 
-	data := cast(^byte)array.data;
-	assert(data != nil);
-	__mem_copy(data + (elem_size*array.len), items, elem_size * item_count);
+	assert(array.data != nil);
+	data := uintptr(array.data) + uintptr(elem_size*array.len);
+
+	__mem_copy(rawptr(data), items, elem_size * item_count);
 	array.len += item_count;
 	return array.len;
 }
 
 __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: int, loc := #caller_location) -> int {
-	array := cast(^raw.Dynamic_Array)array_;
+	array := (^raw.Dynamic_Array)(array_);
 
 	ok := true;
 	if array.cap <= array.len+1 {
@@ -1177,9 +1180,9 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 	// TODO(bill): Better error handling for failed reservation
 	if !ok do return array.len;
 
-	data := cast(^byte)array.data;
-	assert(data != nil);
-	__mem_zero(data + (elem_size*array.len), elem_size);
+	assert(array.data != nil);
+	data := uintptr(array.data) + uintptr(elem_size*array.len);
+	__mem_zero(rawptr(data), elem_size);
 	array.len += 1;
 	return array.len;
 }
@@ -1196,7 +1199,7 @@ __default_hash :: proc(data: []byte) -> u64 {
 	}
 	return fnv64a(data);
 }
-__default_hash_string :: proc(s: string) -> u64 do return __default_hash(cast([]byte)s);
+__default_hash_string :: proc(s: string) -> u64 do return __default_hash(([]byte)(s));
 
 __dynamic_map_reserve :: proc(using header: __Map_Header, cap: int, loc := #caller_location) {
 	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap, loc);
@@ -1207,8 +1210,8 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int, loc := 
 	nm: raw.Map;
 	new_header.m = &nm;
 
-	header_hashes := cast(^raw.Dynamic_Array)&header.m.hashes;
-	nm_hashes     := cast(^raw.Dynamic_Array)&nm.hashes;
+	header_hashes := (^raw.Dynamic_Array)(&header.m.hashes);
+	nm_hashes     := (^raw.Dynamic_Array)(&nm.hashes);
 
 	__dynamic_array_resize(nm_hashes, size_of(int), align_of(int), new_count, loc);
 	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len, loc);
@@ -1218,7 +1221,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int, loc := 
 		if len(nm.hashes) == 0 do __dynamic_map_grow(new_header, loc);
 
 		entry_header := __dynamic_map_get_entry(header, i);
-		data := cast(^byte)entry_header;
+		data := uintptr(entry_header);
 
 		fr := __dynamic_map_find(new_header, entry_header.key);
 		j := __dynamic_map_add_entry(new_header, entry_header.key, loc);
@@ -1231,8 +1234,8 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int, loc := 
 
 		e := __dynamic_map_get_entry(new_header, j);
 		e.next = fr.entry_index;
-		ndata := cast(^byte)e;
-		__mem_copy(ndata+value_offset, data+value_offset, value_size);
+		ndata := uintptr(e);
+		__mem_copy(rawptr(ndata+value_offset), rawptr(data+value_offset), value_size);
 
 		if __dynamic_map_full(new_header) do __dynamic_map_grow(new_header, loc);
 	}
@@ -1244,8 +1247,8 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int, loc := 
 __dynamic_map_get :: proc(h: __Map_Header, key: __Map_Key) -> rawptr {
 	index := __dynamic_map_find(h, key).entry_index;
 	if index >= 0 {
-		data := cast(^byte)__dynamic_map_get_entry(h, index);
-		return data + h.value_offset;
+		data := uintptr(__dynamic_map_get_entry(h, index));
+		return rawptr(data + h.value_offset);
 	}
 	return nil;
 }
@@ -1275,7 +1278,7 @@ __dynamic_map_set :: proc(h: __Map_Header, key: __Map_Key, value: rawptr, loc :=
 	{
 		e := __dynamic_map_get_entry(h, index);
 		e.key = key;
-		val := cast(^byte)(uintptr(e) + h.value_offset);
+		val := (^byte)(uintptr(e) + h.value_offset);
 		__mem_copy(val, value, h.value_size);
 	}
 
@@ -1339,7 +1342,7 @@ __dynamic_map_delete :: proc(using h: __Map_Header, key: __Map_Key) {
 
 __dynamic_map_get_entry :: proc(using h: __Map_Header, index: int) -> ^__Map_Entry_Header {
 	assert(0 <= index && index < m.entries.len);
-	return cast(^__Map_Entry_Header)(uintptr(m.entries.data) + uintptr(index*entry_size));
+	return (^__Map_Entry_Header)(uintptr(m.entries.data) + uintptr(index*entry_size));
 }
 
 __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) #no_bounds_check {
