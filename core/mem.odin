@@ -1,4 +1,5 @@
 import "core:raw.odin"
+import "core:mem.odin"
 
 foreign __llvm_core {
 	@(link_name = "llvm.bswap.i16") swap16 :: proc(b: u16) -> u16 ---;
@@ -24,6 +25,15 @@ compare :: proc "contextless" (a, b: []byte) -> int {
 	return __mem_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
+
+ptr_offset :: proc "contextless" (ptr: $P/^$T, n: int) -> P {
+	new := uintptr(ptr) + uintptr(size_of(T)*n);
+	return P(new);
+}
+
+ptr_sub :: proc "contextless" (a, b: $P/^$T) -> int {
+	return (int(uintptr(a)) - int(uintptr(b)))/size_of(T);
+}
 
 slice_ptr :: proc "contextless" (ptr: ^$T, len: int) -> []T {
 	assert(len >= 0);
@@ -75,18 +85,18 @@ AllocationHeader :: struct {size: int};
 
 allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: int) {
 	header.size = size;
-	ptr := cast(^uint)(header+1);
-	n := cast(^uint)data - ptr;
+	ptr := cast(^uint)(mem.ptr_offset(header, 1));
+	n := mem.ptr_sub(cast(^uint)data, ptr);
 
 	for i in 0..n {
-		(ptr+i)^ = ~uint(0);
+		mem.ptr_offset(ptr, i)^ = ~uint(0);
 	}
 }
 allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 	if data == nil do return nil;
 	p := cast(^uint)data;
-	for (p-1)^ == ~uint(0) do p = (p-1);
-	return cast(^AllocationHeader)(p-1);
+	for ptr_offset(p, -1)^ == ~uint(0) do p = ptr_offset(p, -1);
+	return (^AllocationHeader)(ptr_offset(p, -1));
 }
 
 

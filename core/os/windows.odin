@@ -265,7 +265,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 	arg_list_ptr := win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
 	arg_list := make([]string, int(arg_count));
 	for _, i in arg_list {
-		wc_str := (arg_list_ptr+i)^;
+		wc_str := mem.ptr_offset(arg_list_ptr, i)^;
 		olen := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, wc_str, -1,
 		                                      nil, 0, nil, nil);
 
