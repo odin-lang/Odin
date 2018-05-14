@@ -250,7 +250,7 @@ gb_global i64 const signed_integer_mins[] = {
 	0,
 	0,
 	0,
-	-9223372036854775808ll,
+	(-9223372036854775807ll - 1ll),
 };
 gb_global i64 const signed_integer_maxs[] = {
 	0,
