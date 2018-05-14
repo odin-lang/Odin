@@ -1931,7 +1931,8 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			Scope *s = c->context.scope;
 			Scope *entity_scope = s;
 			if (ps != nullptr && ps != s) {
-				GB_ASSERT(is_scope_an_ancestor(ps, s) >= 0);
+				// TODO(bill): Is this check needed?
+				// GB_ASSERT_MSG(is_scope_an_ancestor(ps, s) >= 0);
 				entity_scope = ps;
 			}
 			Entity *e = alloc_entity_type_name(entity_scope, token, t);
