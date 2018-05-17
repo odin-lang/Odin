@@ -758,6 +758,8 @@ int main(int arg_count, char **arg_ptr) {
 		return 1;
 	}
 
+
+
 	// NOTE(bill): add 'shared' directory if it is not already set
 	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
 		add_library_collection(str_lit("shared"),
