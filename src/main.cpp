@@ -162,7 +162,7 @@ void usage(String argv0) {
 	print_usage_line(0, "Commands:");
 	print_usage_line(1, "build     compile .odin file as executable");
 	print_usage_line(1, "run       compile and run .odin file");
-	print_usage_line(1, "check     parse and typecheck .odin file");
+	print_usage_line(1, "check     parse and type check .odin file");
 	print_usage_line(1, "docs      generate documentation for a .odin file");
 	print_usage_line(1, "version   print version");
 }
@@ -806,6 +806,10 @@ int main(int arg_count, char **arg_ptr) {
 	if (build_context.no_output_files) {
 		if (build_context.show_timings) {
 			show_timings(&checker, &timings);
+		}
+
+		if (global_error_collector.count != 0) {
+			return 1;
 		}
 
 		return 0;
