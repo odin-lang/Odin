@@ -162,6 +162,7 @@ void usage(String argv0) {
 	print_usage_line(0, "Commands:");
 	print_usage_line(1, "build     compile .odin file as executable");
 	print_usage_line(1, "run       compile and run .odin file");
+	print_usage_line(1, "check     parse and typecheck .odin file");
 	print_usage_line(1, "docs      generate documentation for a .odin file");
 	print_usage_line(1, "version   print version");
 }
@@ -724,6 +725,13 @@ int main(int arg_count, char **arg_ptr) {
 			return 1;
 		}
 		init_filename = args[2];
+	} else if (command == "check") {
+		if (args.count < 3) {
+			usage(args[0]);
+			return 1;
+		}
+		build_context.no_output_files = true;
+		init_filename = args[2];
 	} else if (command == "docs") {
 		if (args.count < 3) {
 			usage(args[0]);
@@ -750,7 +758,9 @@ int main(int arg_count, char **arg_ptr) {
 		return 1;
 	}
 
-
+	if (build_context.no_output_files) {
+		// are there any flags that it shouldn't work with? maybe -out or -keep-temp-files?
+	}
 
 	// NOTE(bill): add 'shared' directory if it is not already set
 	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
@@ -794,6 +804,14 @@ int main(int arg_count, char **arg_ptr) {
 	defer (destroy_checker(&checker));
 
 	check_parsed_files(&checker);
+
+	if (build_context.no_output_files) {
+		if (build_context.show_timings) {
+			show_timings(&checker, &timings);
+		}
+
+		return 0;
+	}
 
 	irGen ir_gen = {0};
 	if (!ir_gen_init(&ir_gen, &checker)) {
