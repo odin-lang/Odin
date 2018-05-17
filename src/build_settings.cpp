@@ -27,6 +27,7 @@ struct BuildContext {
 	bool   show_timings;
 	bool   keep_temp_files;
 	bool   no_bounds_check;
+	bool   no_output_files;
 
 	gbAffinity affinity;
 	isize      thread_count;
