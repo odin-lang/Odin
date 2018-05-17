@@ -758,10 +758,6 @@ int main(int arg_count, char **arg_ptr) {
 		return 1;
 	}
 
-	if (build_context.no_output_files) {
-		// are there any flags that it shouldn't work with? maybe -out or -keep-temp-files?
-	}
-
 	// NOTE(bill): add 'shared' directory if it is not already set
 	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
 		add_library_collection(str_lit("shared"),
