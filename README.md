@@ -61,6 +61,8 @@ main :: proc() {
 * [when, for & procedure overloading](https://www.youtube.com/watch?v=OzeOekzyZK8)
 * [Context Types, Unexported Entities, Labelled Branches](https://www.youtube.com/watch?v=CkHVwT1Qk-g)
 * [Bit Fields, i128 & u128, Syntax Changes](https://www.youtube.com/watch?v=NlTutcLyF64)
+* [Default and Named Arguments; Explicit Parametric Polymorphism](https://www.youtube.com/watch?v=-XQZE6S6zUU)
+* [Loadsachanges](https://www.youtube.com/watch?v=ar0vFMoMtrI)
 
 ## Requirements to build and run
 
@@ -86,24 +88,3 @@ main :: proc() {
 
 * This is still highly in development and the language's design is quite volatile.
 * Syntax is not fixed.
-
-## Roadmap
-
-Not in any particular order and not be implemented
-
-* Compile Time Execution (CTE)
-	- More metaprogramming madness
-	- Compiler as a library
-	- AST inspection and modification
-* CTE-based build system
-* Replace LLVM backend with my own custom backend
-* Improve SSA design to accommodate for lowering to a "bytecode"
-* SSA optimizations
-* Documentation Generator for "Entities"
-* Multiple Architecture support
-* Debug Information
-	- pdb format too
-* Command Line Tooling
-* Compiler Internals:
-	- Big numbers library
-	- Multithreading for performance increase
