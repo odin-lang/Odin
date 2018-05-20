@@ -308,16 +308,16 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		case Basic_b32:       ir_write_str_lit(f, "i32"); return;
 		case Basic_b64:       ir_write_str_lit(f, "i64"); return;
 
-		case Basic_i8:     ir_write_str_lit(f, "i8");  return;
-		case Basic_u8:     ir_write_str_lit(f, "i8");  return;
-		case Basic_i16:    ir_write_str_lit(f, "i16"); return;
-		case Basic_u16:    ir_write_str_lit(f, "i16"); return;
-		case Basic_i32:    ir_write_str_lit(f, "i32"); return;
-		case Basic_u32:    ir_write_str_lit(f, "i32"); return;
-		case Basic_i64:    ir_write_str_lit(f, "i64"); return;
-		case Basic_u64:    ir_write_str_lit(f, "i64"); return;
+		case Basic_i8:   ir_write_str_lit(f, "i8");  return;
+		case Basic_u8:   ir_write_str_lit(f, "i8");  return;
+		case Basic_i16:  ir_write_str_lit(f, "i16"); return;
+		case Basic_u16:  ir_write_str_lit(f, "i16"); return;
+		case Basic_i32:  ir_write_str_lit(f, "i32"); return;
+		case Basic_u32:  ir_write_str_lit(f, "i32"); return;
+		case Basic_i64:  ir_write_str_lit(f, "i64"); return;
+		case Basic_u64:  ir_write_str_lit(f, "i64"); return;
 
-		case Basic_rune:   ir_write_str_lit(f, "i32"); return;
+		case Basic_rune: ir_write_str_lit(f, "i32"); return;
 
 		case Basic_int:
 		case Basic_uint:
@@ -503,11 +503,7 @@ void ir_print_compound_element(irFileBuffer *f, irModule *m, ExactValue v, Type 
 	ir_write_byte(f, ' ');
 
 	if (v.kind == ExactValue_Invalid || !elem_type_can_be_constant(elem_type)) {
-		if (ir_type_has_default_values(elem_type)) {
-			ir_print_exact_value(f, m, v, elem_type);
-		} else {
-			ir_fprintf(f, "zeroinitializer");
-		}
+		ir_fprintf(f, "zeroinitializer");
 	} else {
 		ir_print_exact_value(f, m, v, elem_type);
 	}
@@ -675,13 +671,8 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 			Type *elem_type = type->Array.elem;
 			isize elem_count = cl->elems.count;
-			bool has_defaults = ir_type_has_default_values(type);
 			if (elem_count == 0) {
-				if (!has_defaults) {
-					ir_write_str_lit(f, "zeroinitializer");
-				} else {
-					ir_print_exact_value(f, m, empty_exact_value, type);
-				}
+				ir_write_str_lit(f, "zeroinitializer");
 				break;
 			}
 			GB_ASSERT_MSG(elem_count == type->Array.count, "%td != %td", elem_count, type->Array.count);
@@ -706,8 +697,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 			ast_node(cl, CompoundLit, value.value_compound);
 
-			bool has_defaults = ir_type_has_default_values(type);
-			if (cl->elems.count == 0 && !has_defaults) {
+			if (cl->elems.count == 0) {
 				ir_write_str_lit(f, "zeroinitializer");
 				break;
 			}
@@ -748,18 +738,6 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				}
 			}
 
-			for (isize i = 0; i < value_count; i++) {
-				if (visited[i]) continue;
-				Entity *f = type->Struct.fields[i];
-				ExactValue v = {};
-				if (!f->Variable.default_is_nil) {
-					v = f->Variable.default_value;
-				}
-				values[i] = v;
-			}
-
-
-
 			if (type->Struct.is_packed) ir_write_byte(f, '<');
 			ir_write_byte(f, '{');
 			if (type->Struct.custom_align > 0) {
@@ -773,13 +751,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			for (isize i = 0; i < value_count; i++) {
 				if (i > 0) ir_write_string(f, str_lit(", "));
 				Entity *e = type->Struct.fields[i];
-
-				if (!visited[i] && e->Variable.default_is_undef) {
-					ir_print_type(f, m, e->type);
-					ir_write_str_lit(f, " undef");
-				} else {
-					ir_print_compound_element(f, m, values[i], e->type);
-				}
+				ir_print_compound_element(f, m, values[i], e->type);
 			}
 
 
@@ -809,62 +781,9 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		ir_print_value(f, m, val, type);
 		break;
 	}
-	default: {
-		bool has_defaults = ir_type_has_default_values(type);
-		if (!has_defaults) {
-			ir_write_str_lit(f, "zeroinitializer");
-		} else {
-			if (is_type_struct(type)) {
-				i32 value_count = cast(i32)type->Struct.fields.count;
-				if (type->Struct.is_packed) ir_write_byte(f, '<');
-				ir_write_byte(f, '{');
-				if (type->Struct.custom_align > 0) {
-					ir_fprintf(f, "[0 x <%lld x i8>] zeroinitializer", cast(i64)type->Struct.custom_align);
-					if (value_count > 0) {
-						ir_write_string(f, str_lit(", "));
-					}
-				}
-
-				for (isize i = 0; i < value_count; i++) {
-					if (i > 0) ir_write_string(f, str_lit(", "));
-					Entity *e = type->Struct.fields[i];
-					if (e->Variable.default_is_undef) {
-						ir_print_type(f, m, e->type);
-						ir_write_str_lit(f, " undef");
-					} else {
-						ExactValue value = {};
-						if (!e->Variable.default_is_nil) {
-							value = e->Variable.default_value;
-						}
-						ir_print_compound_element(f, m, value, e->type);
-					}
-				}
-
-				ir_write_byte(f, '}');
-				if (type->Struct.is_packed) ir_write_byte(f, '>');
-
-			} else if (is_type_array(type)) {
-				i64 count = type->Array.count;
-				if (count == 0) {
-					ir_write_str_lit(f, "zeroinitializer");
-				} else {
-					Type *elem = type->Array.elem;
-					ir_write_byte(f, '[');
-					for (i64 i = 0; i < count; i++) {
-						if (i > 0) ir_write_string(f, str_lit(", "));
-						ir_print_type(f, m, elem);
-						ir_write_byte(f, ' ');
-						ir_print_exact_value(f, m, empty_exact_value, elem);
-					}
-					ir_write_byte(f, ']');
-				}
-			} else {
-				GB_PANIC("Unknown type for default values");
-			}
-		}
-		// GB_PANIC("Invalid ExactValue: %d", value.kind);
+	default:
+		ir_write_str_lit(f, "zeroinitializer");
 		break;
-	}
 	}
 }
 
@@ -1873,11 +1792,7 @@ void print_llvm_ir(irGen *ir) {
 			if (g->value != nullptr) {
 				ir_print_value(f, m, g->value, g->entity->type);
 			} else {
-				if (ir_type_has_default_values(g->entity->type)) {
-					ir_print_exact_value(f, m, empty_exact_value, g->entity->type);
-				} else {
-					ir_write_string(f, str_lit("zeroinitializer"));
-				}
+				ir_write_string(f, str_lit("zeroinitializer"));
 			}
 		}
 		ir_write_byte(f, '\n');

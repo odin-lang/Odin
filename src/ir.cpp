@@ -683,37 +683,6 @@ Type *ir_type(irValue *value) {
 }
 
 
-bool ir_type_has_default_values(Type *t) {
-#if !defined(NO_DEFAULT_STRUCT_VALUES)
-	switch (t->kind) {
-	case Type_Named:
-		return ir_type_has_default_values(t->Named.base);
-
-	case Type_Array:
-		return ir_type_has_default_values(t->Array.elem);
-
-	case Type_Struct:
-		if (t->Struct.is_raw_union) return false;
-		for_array(i, t->Struct.fields) {
-			Entity *f = t->Struct.fields[i];
-			if (f->kind != Entity_Variable) continue;
-			if (f->Variable.default_is_nil) {
-				// NOTE(bill): This is technically zero
-				continue;
-			} else if (f->Variable.default_value.kind != ExactValue_Invalid) {
-				return true;
-			} else if (f->Variable.default_is_undef) {
-				return true;
-			}
-			bool sub = ir_type_has_default_values(f->type);
-			if (sub) return true;
-		}
-		break;
-	}
-#endif
-	return false;
-}
-
 
 irInstr *ir_get_last_instr(irBlock *block) {
 	if (block != nullptr) {
@@ -3942,39 +3911,6 @@ irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, AstNode *exp
 	return value;
 }
 
-void ir_check_type_and_gen_for_proc_lit(irProcedure *proc, Type *t) {
-	if (t == nullptr) return;
-	if (t->kind == Type_Struct && t->Struct.has_proc_default_values) {
-		for_array(i, t->Struct.fields) {
-			Entity *f = t->Struct.fields[i];
-			if (f->kind == Entity_Variable && f->Variable.default_value.kind == ExactValue_Procedure) {
-				AstNode *expr = f->Variable.default_value.value_procedure;
-				GB_ASSERT(expr != nullptr);
-				if (expr->kind == AstNode_ProcLit) {
-					ir_gen_anonymous_proc_lit(proc->module, proc->name, expr, proc);
-				}
-			}
-		}
-	}
-}
-
-void ir_check_type_and_gen_for_proc_lit(irModule *m, String prefix_name, Type *t) {
-	if (t == nullptr) return;
-	if (t->kind == Type_Struct && t->Struct.has_proc_default_values) {
-		for_array(i, t->Struct.fields) {
-			Entity *f = t->Struct.fields[i];
-			if (f->kind == Entity_Variable && f->Variable.default_value.kind == ExactValue_Procedure) {
-				AstNode *expr = f->Variable.default_value.value_procedure;
-				GB_ASSERT(expr != nullptr);
-				if (expr->kind == AstNode_ProcLit) {
-					ir_gen_anonymous_proc_lit(m, prefix_name, expr);
-				}
-			}
-		}
-	}
-}
-
-
 void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	if (e->type == nullptr) return;
 
@@ -4037,8 +3973,6 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	// 		}
 	// 	}
 	// }
-
-	ir_check_type_and_gen_for_proc_lit(m, e->token.string, bt);
 }
 
 
@@ -4376,11 +4310,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			irValue *call = ir_emit_global_call(proc, "alloc", args);
 
 			irValue *ptr = ir_emit_conv(proc, call, elem_ptr_type);
-
-			if (ir_type_has_default_values(elem_type)) {
-				ir_init_data_with_defaults(proc, ptr, len, expr);
-			}
-
 			irValue *slice = ir_add_local_generated(proc, type);
 			ir_fill_slice(proc, slice, ptr, len);
 			return ir_emit_load(proc, slice);
@@ -4427,11 +4356,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			args[4] = cap;
 			args[5] = ir_emit_source_code_location(proc, ce->args[0]);
 			ir_emit_global_call(proc, "__dynamic_array_make", args);
-
-			if (ir_type_has_default_values(elem_type)) {
-				ir_init_data_with_defaults(proc, ir_dynamic_array_elem(proc, ir_emit_load(proc, array)), len, expr);
-			}
-
 			return ir_emit_load(proc, array);
 		}
 		break;
@@ -6660,8 +6584,6 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 						lval = ir_build_addr(proc, name);
 					}
 					array_add(&lvals, lval);
-
-					ir_check_type_and_gen_for_proc_lit(proc, ir_addr_type(lval));
 				}
 
 				for_array(i, vd->values) {
@@ -7627,8 +7549,6 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 					if (expr->kind == AstNode_ProcLit) {
 						ir_gen_anonymous_proc_lit(proc->module, proc->name, expr, proc);
 					}
-				} else {
-					ir_check_type_and_gen_for_proc_lit(proc, f->type);
 				}
 			}
 		}
@@ -8405,20 +8325,6 @@ void ir_gen_tree(irGen *s) {
 			irGlobalVariable var = {};
 			var.var = g;
 			var.decl = decl;
-
-
-			if (e->type->kind == Type_Struct && e->type->Struct.has_proc_default_values) {
-				for_array(i, e->type->Struct.fields) {
-					Entity *f = e->type->Struct.fields[i];
-					if (f->kind == Entity_Variable && f->Variable.default_value.kind == ExactValue_Procedure) {
-						AstNode *expr = f->Variable.default_value.value_procedure;
-						GB_ASSERT(expr != nullptr);
-						if (expr->kind == AstNode_ProcLit) {
-							ir_gen_anonymous_proc_lit(m, e->token.string, expr);
-						}
-					}
-				}
-			}
 
 			if (decl->init_expr != nullptr && !is_type_any(e->type)) {
 				TypeAndValue tav = type_and_value_of_expr(info, decl->init_expr);
