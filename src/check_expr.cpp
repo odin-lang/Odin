@@ -2906,7 +2906,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 			operand->type = t_source_code_location;
 			operand->mode = Addressing_Value;
-			add_preload_dependency(c, "make_source_code_location");
 		} else if (name == "assert") {
 			if (ce->args.count != 1) {
 				error(call, "'#assert' expects at 1 argument, got %td", ce->args.count);
