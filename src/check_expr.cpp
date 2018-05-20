@@ -2908,7 +2908,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			operand->mode = Addressing_Value;
 		} else if (name == "assert") {
 			if (ce->args.count != 1) {
-				error(call, "'#assert' expects at 1 argument, got %td", ce->args.count);
+				error(call, "'#assert' expects 1 argument, got %td", ce->args.count);
 				return false;
 			}
 			if (!is_type_boolean(operand->type) && operand->mode != Addressing_Constant) {
