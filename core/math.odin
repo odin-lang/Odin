@@ -23,7 +23,10 @@ Mat2 :: distinct [2][2]f32;
 Mat3 :: distinct [3][3]f32;
 Mat4 :: distinct [4][4]f32;
 
-Quat :: struct {x, y, z: f32, w: f32 = 1};
+Quat :: struct {x, y, z, w: f32};
+
+QUAT_IDENTITY := Quat{x = 0, y = 0, z = 0, w = 1};
+
 
 @(default_calling_convention="c")
 foreign __llvm_core {

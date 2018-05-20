@@ -2889,7 +2889,7 @@ AstNode *parse_struct_field_list(AstFile *f, isize *name_count_) {
 
 	isize total_name_count = 0;
 
-	AstNode *params = parse_field_list(f, &total_name_count, FieldFlag_Struct, Token_CloseBrace, true, false);
+	AstNode *params = parse_field_list(f, &total_name_count, FieldFlag_Struct, Token_CloseBrace, false, false);
 	if (name_count_) *name_count_ = total_name_count;
 	return params;
 }
@@ -2948,7 +2948,6 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 		}
 
 		if (allow_token(f, Token_Eq)) {
-			// TODO(bill): Should this be true==lhs or false==rhs?
 			default_value = parse_expr(f, false);
 			if (!allow_default_parameters) {
 				syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
@@ -3001,10 +3000,10 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 			}
 
 			if (allow_token(f, Token_Eq)) {
-				// TODO(bill): Should this be true==lhs or false==rhs?
 				default_value = parse_expr(f, false);
 				if (!allow_default_parameters) {
 					syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
+				default_value = nullptr;
 				}
 			}
 
