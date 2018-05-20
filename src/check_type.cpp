@@ -65,92 +65,11 @@ void check_struct_fields(Checker *c, AstNode *node, Array<Entity *> *fields, Arr
 		ast_node(p, Field, param);
 		AstNode *type_expr = p->type;
 		Type *type = nullptr;
-		AstNode *default_value = unparen_expr(p->default_value);
-		ExactValue value = {};
-		bool default_is_nil = false;
 		bool detemine_type_from_operand = false;
 
 
-		if (type_expr == nullptr) {
-			Operand o = {};
-			check_expr_or_type(c, &o, default_value);
-			if (is_operand_nil(o)) {
-				default_is_nil = true;
-			} else if (o.mode != Addressing_Constant) {
-				if (default_value->kind == AstNode_ProcLit) {
-					if (named_type != nullptr) {
-						value = exact_value_procedure(default_value);
-					} else {
-						error(default_value, "A procedure literal cannot be a default value in an anonymous structure");
-					}
-				} else {
-					Entity *e = nullptr;
-					if (o.mode == Addressing_Value && is_type_proc(o.type)) {
-						Operand x = {};
-						if (default_value->kind == AstNode_Ident) {
-							e = check_ident(c, &x, default_value, nullptr, nullptr, false);
-						} else if (default_value->kind == AstNode_SelectorExpr) {
-							e = check_selector(c, &x, default_value, nullptr);
-						}
-					}
-
-					if (e != nullptr && e->kind == Entity_Procedure) {
-						value = exact_value_procedure(e->identifier);
-						add_entity_use(c, e->identifier, e);
-					} else {
-						error(default_value, "Default parameter must be a constant");
-					}
-				}
-			} else {
-				value = o.value;
-			}
-
-			type = default_type(o.type);
-		} else {
-			if (type_expr->kind == AstNode_Ident && type_expr->Ident.token.string == "Element") {
-				gb_printf_err("Element\n");
-			}
-
+		if (type_expr != nullptr) {
 			type = check_type_expr(c, type_expr, nullptr);
-
-			if (default_value != nullptr) {
-				Operand o = {};
-				check_expr_with_type_hint(c, &o, default_value, type);
-
-				if (is_operand_nil(o)) {
-					default_is_nil = true;
-				} else if (o.mode != Addressing_Constant) {
-					if (default_value->kind == AstNode_ProcLit) {
-						if (named_type != nullptr) {
-							value = exact_value_procedure(default_value);
-						} else {
-							error(default_value, "A procedure literal cannot be a default value in an anonymous structure");
-						}
-					} else {
-						Entity *e = nullptr;
-						if (o.mode == Addressing_Value && is_type_proc(o.type)) {
-							Operand x = {};
-							if (default_value->kind == AstNode_Ident) {
-								e = check_ident(c, &x, default_value, nullptr, nullptr, false);
-							} else if (default_value->kind == AstNode_SelectorExpr) {
-								e = check_selector(c, &x, default_value, nullptr);
-							}
-						}
-
-						if (e != nullptr && e->kind == Entity_Procedure) {
-							value = exact_value_procedure(e->identifier);
-							add_entity_use(c, e->identifier, e);
-						} else {
-							error(default_value, "Default parameter must be a constant");
-						}
-					}
-				} else {
-					value = o.value;
-				}
-
-				check_is_assignable_to(c, &o, type);
-			}
-
 			if (is_type_polymorphic(type)) {
 				type = nullptr;
 			}
@@ -179,9 +98,6 @@ void check_struct_fields(Checker *c, AstNode *node, Array<Entity *> *fields, Arr
 			Token name_token = name->Ident.token;
 
 			Entity *field = alloc_entity_field(c->context.scope, name_token, type, is_using, field_src_index);
-			field->Variable.default_value = value;
-			field->Variable.default_is_nil = default_is_nil;
-
 			add_entity(c, c->context.scope, name, field);
 			array_add(fields, field);
 
@@ -509,16 +425,6 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 
 	if (!is_polymorphic) {
 		check_struct_fields(c, node, &struct_type->Struct.fields, st->fields, min_field_count, named_type, context);
-	}
-
-	for_array(i, struct_type->Struct.fields) {
-		Entity *f = struct_type->Struct.fields[i];
-		if (f->kind == Entity_Variable) {
-			if (f->Variable.default_value.kind == ExactValue_Procedure) {
-				struct_type->Struct.has_proc_default_values = true;
-				break;
-			}
-		}
 	}
 
 	if (st->align != nullptr) {
