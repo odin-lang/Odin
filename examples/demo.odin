@@ -154,7 +154,7 @@ union_type :: proc() {
 	}
 
 	Vector3 :: struct {x, y, z: f32};
-	Quaternion :: struct {x, y, z: f32, w: f32 = 1};
+	Quaternion :: struct {x, y, z, w: f32};
 
 	// More realistic examples
 	{
