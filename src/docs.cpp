@@ -93,15 +93,15 @@ void print_declaration(AstNode *decl) {
 }
 
 void generate_documentation(Parser *parser) {
-	for_array(file_index, parser->files) {
-		AstFile *file = parser->files[file_index];
-		Tokenizer *tokenizer = &file->tokenizer;
-		String fullpath = tokenizer->fullpath;
-		gb_printf("%.*s\n", LIT(fullpath));
+	// for_array(file_index, parser->files) {
+	// 	AstFile *file = parser->files[file_index];
+	// 	Tokenizer *tokenizer = &file->tokenizer;
+	// 	String fullpath = tokenizer->fullpath;
+	// 	gb_printf("%.*s\n", LIT(fullpath));
 
-		for_array(decl_index, file->decls) {
-			AstNode *decl = file->decls[decl_index];
-			print_declaration(decl);
-		}
-	}
+	// 	for_array(decl_index, file->decls) {
+	// 		AstNode *decl = file->decls[decl_index];
+	// 		print_declaration(decl);
+	// 	}
+	// }
 }

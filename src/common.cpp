@@ -734,3 +734,103 @@ String path_to_full_path(gbAllocator a, String path) {
 	char *fullpath = gb_path_get_full_name(a, path_c);
 	return make_string_c(fullpath);
 }
+
+
+
+struct FileInfo {
+	String name;
+	String fullpath;
+	i64    size;
+	bool   is_dir;
+};
+
+enum ReadDirectoryError {
+	ReadDirectory_None,
+
+	ReadDirectory_InvalidPath,
+	ReadDirectory_NotDir,
+	ReadDirectory_EOF,
+	ReadDirectory_Unknown,
+
+	ReadDirectory_COUNT,
+};
+
+#if defined(GB_SYSTEM_WINDOWS)
+
+ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
+	GB_ASSERT(fi != nullptr);
+
+	while (path.len > 0) {
+		Rune end = path[path.len-1];
+		if (end == '/') {
+			path.len -= 1;
+		} else if (end == '\\') {
+			path.len -= 1;
+		} else {
+			break;
+		}
+	}
+
+	if (path.len == 0) {
+		return ReadDirectory_InvalidPath;
+	}
+	if (!path_is_directory(path)) {
+		return ReadDirectory_NotDir;
+	}
+
+	gbAllocator a = heap_allocator();
+
+	char *new_path = gb_alloc_array(a, char, path.len+3);
+	defer (gb_free(a, new_path));
+
+	gb_memmove(new_path, path.text, path.len);
+	gb_memmove(new_path+path.len, "/*", 2);
+	new_path[path.len+2] = 0;
+
+	String np = make_string(cast(u8 *)new_path, path.len+2);
+	String16 wstr = string_to_string16(a, np);
+	defer (gb_free(a, wstr.text));
+
+	WIN32_FIND_DATAW file_data = {};
+	HANDLE find_file = FindFirstFileW(wstr.text, &file_data);
+	if (find_file == INVALID_HANDLE_VALUE) {
+		return ReadDirectory_Unknown;
+	}
+	defer (FindClose(find_file));
+
+	array_init(fi, a, 0, 100);
+
+	do {
+		wchar_t *filename_w = file_data.cFileName;
+		i64 size = cast(i64)file_data.nFileSizeLow;
+		size |= (cast(i64)file_data.nFileSizeHigh) << 32;
+		String name = string16_to_string(a, make_string16_c(filename_w));
+		if (name == "." || name == "..") {
+			gb_free(a, name.text);
+			continue;
+		}
+
+		String filepath = {};
+		filepath.len = path.len+1+name.len;
+		filepath.text = gb_alloc_array(a, u8, filepath.len+1);
+		defer (gb_free(a, filepath.text));
+		gb_memmove(filepath.text, path.text, path.len);
+		gb_memmove(filepath.text+path.len, "/", 1);
+		gb_memmove(filepath.text+path.len+1, name.text, name.len);
+
+		FileInfo info = {};
+		info.name = name;
+		info.fullpath = path_to_full_path(a, filepath);
+		info.size = size;
+		info.is_dir = (file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+		array_add(fi, info);
+
+	} while (FindNextFileW(find_file, &file_data));
+
+
+	return ReadDirectory_None;
+}
+
+#else
+#error Implement read_directory
+#endif
