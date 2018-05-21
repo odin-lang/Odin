@@ -3712,17 +3712,18 @@ AstNode *parse_stmt(AstFile *f) {
 		Token name = expect_token(f, Token_Ident);
 		String tag = name.string;
 
-		if (tag == "shared_global_scope") {
-			if (f->curr_proc == nullptr) {
-				f->is_global_scope = true;
-				s = ast_empty_stmt(f, f->curr_token);
-			} else {
-				syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope");
-				s = ast_bad_decl(f, token, f->curr_token);
-			}
-			expect_semicolon(f, s);
-			return s;
-		} else if (tag == "bounds_check") {
+		// if (tag == "shared_global_scope") {
+		// 	if (f->curr_proc == nullptr) {
+		// 		f->is_global_scope = true;
+		// 		s = ast_empty_stmt(f, f->curr_token);
+		// 	} else {
+		// 		syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope");
+		// 		s = ast_bad_decl(f, token, f->curr_token);
+		// 	}
+		// 	expect_semicolon(f, s);
+		// 	return s;
+		// } else
+		if (tag == "bounds_check") {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_bounds_check;
 			if ((s->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
@@ -3830,6 +3831,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	isize init_token_cap = cast(isize)gb_max(next_pow2(cast(i64)(file_size/2ll)), 16);
 	array_init(&f->tokens, heap_allocator(), 0, gb_max(init_token_cap, 16));
 
+
 	if (err == TokenizerInit_Empty) {
 		Token token = {Token_EOF};
 		token.pos.file   = fullpath;
@@ -3881,8 +3883,9 @@ void destroy_ast_file(AstFile *f) {
 
 bool init_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
-	array_init(&p->files, heap_allocator());
+	map_init(&p->packages, heap_allocator());
 	array_init(&p->imports, heap_allocator());
+	array_init(&p->files, heap_allocator());
 	gb_mutex_init(&p->file_add_mutex);
 	gb_mutex_init(&p->file_decl_mutex);
 	return true;
@@ -3921,8 +3924,8 @@ bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) 
 		}
 	}
 
-	ImportedFile item = {};
-	item.kind     = ImportedFile_Normal;
+	ImportedPackage item = {};
+	item.kind     = ImportedPackage_Normal;
 	item.path     = path;
 	item.rel_path = rel_path;
 	item.pos      = pos;
@@ -4164,28 +4167,33 @@ void parse_file(Parser *p, AstFile *f) {
 
 	comsume_comment_groups(f, f->prev_token);
 
+
+	f->package_token = expect_token(f, Token_package);
+	Token package_name = expect_token_after(f, Token_Ident, "package");
+	if (package_name.kind == Token_Ident) {
+		if (package_name.string == "_") {
+			error(package_name, "Invalid package name '_'");
+		} else if (f->package->kind != ImportedPackage_Runtime && package_name.string == "runtime") {
+			error(package_name, "Use of reserved package name '%.*s'", LIT(package_name.string));
+		}
+	}
+	f->package_name = package_name.string;
+
 	f->decls = parse_stmt_list(f);
 	parse_setup_file_decls(p, f, base_dir, f->decls);
 }
 
 
-
-ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
-	String import_path = imported_file.path;
-	String import_rel_path = imported_file.rel_path;
-	TokenPos pos = imported_file.pos;
+ParseFileError parse_imported_file(Parser *p, AstPackage *package, FileInfo *fi, TokenPos pos) {
 	AstFile *file = gb_alloc_item(heap_allocator(), AstFile);
-	file->file_kind = imported_file.kind;
-	if (file->file_kind == ImportedFile_Shared) {
-		file->is_global_scope = true;
-	}
+	file->package = package;
 
 	TokenPos err_pos = {0};
-	ParseFileError err = init_ast_file(file, import_path, &err_pos);
+	ParseFileError err = init_ast_file(file, fi->fullpath, &err_pos);
 
 	if (err != ParseFile_None) {
 		if (err == ParseFile_EmptyFile) {
-			if (import_path == p->init_fullpath) {
+			if (fi->fullpath == p->init_fullpath) {
 				gb_printf_err("Initial file is empty - %.*s\n", LIT(p->init_fullpath));
 				gb_exit(1);
 			}
@@ -4195,7 +4203,7 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 		if (pos.line != 0) {
 			gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
 		}
-		gb_printf_err("Failed to parse file: %.*s\n\t", LIT(import_rel_path));
+		gb_printf_err("Failed to parse file: %.*s\n\t", LIT(fi->name));
 		switch (err) {
 		case ParseFile_WrongExtension:
 			gb_printf_err("Invalid file extension: File must have the extension '.odin'");
@@ -4207,7 +4215,7 @@ ParseFileError parse_import(Parser *p, ImportedFile imported_file) {
 			gb_printf_err("File permissions problem");
 			break;
 		case ParseFile_NotFound:
-			gb_printf_err("File cannot be found ('%.*s')", LIT(import_path));
+			gb_printf_err("File cannot be found ('%.*s')", LIT(fi->fullpath));
 			break;
 		case ParseFile_InvalidToken:
 			gb_printf_err("Invalid token found in file at (%td:%td)", err_pos.line, err_pos.column);
@@ -4230,11 +4238,82 @@ skip:
 	parse_file(p, file);
 
 	gb_mutex_lock(&p->file_add_mutex);
-	file->id = imported_file.index;
+	// file->id = imported_package.index;
+	HashKey key = hash_string(fi->fullpath);
+	map_set(&package->files, key, file);
 	array_add(&p->files, file);
+
+	if (package->name.len == 0) {
+		package->name = file->package_name;
+	} else if (file->tokens.count > 0 && package->name != file->package_name) {
+		error(file->package_token, "Different package name, expected '%.*s', got '%.*s'", LIT(package->name), LIT(file->package_name));
+	}
+
 	p->total_line_count += file->tokenizer.line_count;
 	p->total_token_count += file->tokens.count;
 	gb_mutex_unlock(&p->file_add_mutex);
+
+	return ParseFile_None;
+}
+
+
+ParseFileError parse_import(Parser *p, ImportedPackage imported_package) {
+	String import_path = imported_package.path;
+	String import_rel_path = imported_package.rel_path;
+	TokenPos pos = imported_package.pos;
+
+	HashKey path_key = hash_string(import_path);
+	if (map_get(&p->packages, path_key) != nullptr) {
+		return ParseFile_None;
+	}
+
+
+	Array<FileInfo> list = {};
+	ReadDirectoryError rd_err = read_directory(import_path, &list);
+	defer (array_free(&list));
+
+	if (rd_err != ReadDirectory_EOF && rd_err != ReadDirectory_None && pos.line != 0) {
+		gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
+	}
+
+	switch (rd_err) {
+	case ReadDirectory_InvalidPath:
+		gb_printf_err("Invalid path: %.*s\n", LIT(import_rel_path));
+		gb_mutex_lock(&global_error_collector.mutex);
+		global_error_collector.count++;
+		gb_mutex_unlock(&global_error_collector.mutex);
+		return ParseFile_InvalidFile;
+	case ReadDirectory_NotDir:
+		gb_printf_err("Expected a directory for a package, got a file: %.*s\n", LIT(import_rel_path));
+		gb_mutex_lock(&global_error_collector.mutex);
+		global_error_collector.count++;
+		gb_mutex_unlock(&global_error_collector.mutex);
+		return ParseFile_InvalidFile;
+	case ReadDirectory_Unknown:
+		gb_printf_err("Unknown error whilst reading directory");
+		gb_mutex_lock(&global_error_collector.mutex);
+		global_error_collector.count++;
+		gb_mutex_unlock(&global_error_collector.mutex);
+		return ParseFile_InvalidFile;
+	case ReadDirectory_EOF:
+		break;
+	}
+
+	AstPackage *package = gb_alloc_item(heap_allocator(), AstPackage);
+	package->kind = imported_package.kind;
+	package->fullpath = import_path;
+	map_init(&package->files, heap_allocator());
+
+	// TODO(bill): Fix concurrency
+	for_array(i, list) {
+		FileInfo *fi = &list[i];
+		if (string_ends_with(fi->name, str_lit(".odin"))) {
+			ParseFileError err = parse_imported_file(p, package, fi, pos);
+			if (err != ParseFile_None) {
+				return err;
+			}
+		}
+	}
 
 	return ParseFile_None;
 }
@@ -4243,8 +4322,8 @@ GB_THREAD_PROC(parse_worker_file_proc) {
 	if (thread == nullptr) return 0;
 	auto *p = cast(Parser *)thread->user_data;
 	isize index = thread->user_index;
-	ImportedFile imported_file = p->imports[index];
-	ParseFileError err = parse_import(p, imported_file);
+	ImportedPackage imported_package = p->imports[index];
+	ParseFileError err = parse_import(p, imported_package);
 	return cast(isize)err;
 }
 
@@ -4254,29 +4333,24 @@ struct ParserThreadWork {
 	isize   import_index;
 };
 
-ParseFileError parse_files(Parser *p, String init_filename) {
+ParseFileError parse_packages(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
 
 	char *fullpath_str = gb_path_get_full_name(heap_allocator(), cast(char *)&init_filename[0]);
 	String init_fullpath = string_trim_whitespace(make_string_c(fullpath_str));
+
 	TokenPos init_pos = {};
-	ImportedFile init_imported_file = {ImportedFile_Init, init_fullpath, init_fullpath, init_pos};
+	ImportedPackage init_imported_package = {ImportedPackage_Init, init_fullpath, init_fullpath, init_pos};
 
 	isize shared_file_count = 0;
 	if (!build_context.generate_docs) {
-		String s = get_fullpath_core(heap_allocator(), str_lit("_preload.odin"));
-		ImportedFile runtime_file = {ImportedFile_Shared, s, s, init_pos};
-		array_add(&p->imports, runtime_file);
-		shared_file_count++;
-	}
-	if (!build_context.generate_docs) {
-		String s = get_fullpath_core(heap_allocator(), str_lit("_soft_numbers.odin"));
-		ImportedFile runtime_file = {ImportedFile_Shared, s, s, init_pos};
-		array_add(&p->imports, runtime_file);
+		String s = get_fullpath_core(heap_allocator(), str_lit("runtime"));
+		ImportedPackage runtime_package = {ImportedPackage_Runtime, s, s, init_pos};
+		array_add(&p->imports, runtime_package);
 		shared_file_count++;
 	}
 
-	array_add(&p->imports, init_imported_file);
+	array_add(&p->imports, init_imported_package);
 	p->init_fullpath = init_fullpath;
 
 	// IMPORTANT TODO(bill): Figure out why this doesn't work on *nix sometimes

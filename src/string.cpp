@@ -82,6 +82,10 @@ gb_inline String make_string_c(char *text) {
 	return make_string(cast(u8 *)cast(void *)text, gb_strlen(text));
 }
 
+gb_inline String16 make_string16_c(wchar_t *text) {
+	return make_string16(text, string16_len(text));
+}
+
 String substring(String const &s, isize lo, isize hi) {
 	isize max = s.len;
 	GB_ASSERT_MSG(lo <= hi && hi <= max, "%td..%td..%td", lo, hi, max);

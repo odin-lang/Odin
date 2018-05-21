@@ -12,11 +12,13 @@
 #include "checker.hpp"
 
 #include "parser.cpp"
+#if 0
 #include "docs.cpp"
 #include "checker.cpp"
 #include "ir.cpp"
 #include "ir_opt.cpp"
 #include "ir_print.cpp"
+#endif
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
 i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
@@ -772,8 +774,9 @@ int main(int arg_count, char **arg_ptr) {
 		print_usage_line(0, "%s 32-bit is not yet supported", args[0]);
 		return 1;
 	}
+#if 0
 	init_universal_scope();
-
+#endif
 	// TODO(bill): prevent compiling without a linker
 
 	timings_start_section(&timings, str_lit("parse files"));
@@ -784,10 +787,11 @@ int main(int arg_count, char **arg_ptr) {
 	}
 	defer (destroy_parser(&parser));
 
-	if (parse_files(&parser, init_filename) != ParseFile_None) {
+	if (parse_packages(&parser, init_filename) != ParseFile_None) {
 		return 1;
 	}
 
+#if 0
 	if (build_context.generate_docs) {
 		generate_documentation(&parser);
 		return 0;
@@ -1054,6 +1058,6 @@ int main(int arg_count, char **arg_ptr) {
 			system_exec_command_line_app("odin run", false, "%.*s", LIT(output_base));
 		}
 	#endif
-
+#endif
 	return 0;
 }

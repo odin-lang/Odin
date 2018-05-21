@@ -3,6 +3,8 @@ struct Scope;
 struct Type;
 struct Entity;
 struct DeclInfo;
+struct AstFile;
+struct AstPackage;
 
 
 enum ParseFileError {
@@ -23,23 +25,23 @@ struct CommentGroup {
 };
 
 
-enum ImportedFileKind {
-	ImportedFile_Normal,
-	ImportedFile_Shared,
-	ImportedFile_Init,
+enum ImportedPackageKind {
+	ImportedPackage_Normal,
+	ImportedPackage_Runtime,
+	ImportedPackage_Init,
 };
 
-struct ImportedFile {
-	ImportedFileKind kind;
-	String           path;
-	String           rel_path;
-	TokenPos         pos; // import
-	isize            index;
+struct ImportedPackage {
+	ImportedPackageKind kind;
+	String              path;
+	String              rel_path;
+	TokenPos            pos; // import
+	isize               index;
 };
-
 
 struct AstFile {
-	isize               id;
+	AstPackage *        package;
+	// isize               id;
 	String              fullpath;
 	gbArena             arena;
 	Tokenizer           tokenizer;
@@ -47,6 +49,8 @@ struct AstFile {
 	isize               curr_token_index;
 	Token               curr_token;
 	Token               prev_token; // previous non-comment
+	Token               package_token;
+	String              package_name;
 
 	// >= 0: In Expression
 	// <  0: In Control Clause
@@ -58,8 +62,6 @@ struct AstFile {
 	isize               when_level;
 
 	Array<AstNode *>    decls;
-	ImportedFileKind    file_kind;
-	bool                is_global_scope;
 	Array<AstNode *>    imports_and_exports; // 'import' 'using import' 'export'
 
 
@@ -81,14 +83,23 @@ struct AstFile {
 };
 
 
+struct AstPackage {
+	ImportedPackageKind kind;
+	String              name;
+	String              fullpath;
+	Map<AstFile *>      files; // Key: String (names)
+};
+
+
 struct Parser {
-	String              init_fullpath;
-	Array<AstFile *>    files;
-	Array<ImportedFile> imports;
-	isize               total_token_count;
-	isize               total_line_count;
-	gbMutex             file_add_mutex;
-	gbMutex             file_decl_mutex;
+	String                 init_fullpath;
+	Map<AstPackage *>      packages; // Key: String (fullpath)
+	Array<AstFile *>       files;
+	Array<ImportedPackage> imports;
+	isize                  total_token_count;
+	isize                  total_line_count;
+	gbMutex                file_add_mutex;
+	gbMutex                file_decl_mutex;
 };
 
 enum ProcInlining {
@@ -525,4 +536,5 @@ gb_inline bool is_ast_node_type(AstNode *node) {
 gb_inline bool is_ast_node_when_stmt(AstNode *node) {
 	return node->kind == AstNode_WhenStmt;
 }
+
 
