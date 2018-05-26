@@ -194,8 +194,7 @@ struct DeclInfo {
 
 // ProcedureInfo stores the information needed for checking a procedure
 struct ProcedureInfo {
-	// AstFile *             file;
-	AstPackage *          package;
+	AstFile *             file;
 	Token                 token;
 	DeclInfo *            decl;
 	Type *                type; // Type_Procedure
@@ -214,8 +213,8 @@ struct Scope {
 	Scope *          last_child;
 	Map<Entity *>    elements; // Key: String
 	PtrSet<Entity *> implicit;
+	Scope *          shared;
 
-	Array<Scope *>   shared;
 	Array<AstNode *> delayed_asserts;
 	Array<AstNode *> delayed_imports;
 	PtrSet<Scope *>  imported;
@@ -223,11 +222,15 @@ struct Scope {
 	bool             is_proc;
 	bool             is_global;
 	bool             is_package;
+	bool             is_file;
 	bool             is_init;
 	bool             is_struct;
 	bool             has_been_imported; // This is only applicable to file scopes
 
-	AstPackage *     package;
+	union {
+		AstPackage *package;
+		AstFile *   file;
+	};
 };
 
 
@@ -321,8 +324,9 @@ struct Checker {
 	CheckerInfo info;
 	gbMutex     mutex;
 
-	AstPackage *               curr_ast_package;
-	Scope *                    global_scope;
+
+	AstFile *                  curr_ast_file;
+	AstPackage *               runtime_package;
 	// NOTE(bill): Procedures to check
 	Array<ProcedureInfo>       procs;
 	Map<Scope *>               package_scopes; // Key: String (fullpath)

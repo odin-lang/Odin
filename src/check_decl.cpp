@@ -583,7 +583,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 		GB_ASSERT(pl->body->kind == AstNode_BlockStmt);
 		if (!pt->is_polymorphic) {
-			check_procedure_later(c, c->curr_ast_package, e->token, d, proc_type, pl->body, pl->tags);
+			check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pl->body, pl->tags);
 		}
 	} else if (!is_foreign) {
 		if (e->Procedure.is_export) {
@@ -914,7 +914,6 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 
 	e->parent_proc_decl = c->context.curr_proc_decl;
 	e->state = EntityState_InProgress;
-
 
 	switch (e->kind) {
 	case Entity_Variable:

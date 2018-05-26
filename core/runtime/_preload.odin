@@ -1,7 +1,6 @@
 package runtime
 
 import "core:os"
-// import "core:fmt" // TODO(bill): Remove the need for `fmt` here
 import "core:unicode/utf8"
 import "core:raw"
 import "core:mem"

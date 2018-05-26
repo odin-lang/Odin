@@ -1487,7 +1487,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 
 			if (entity == nullptr) {
-				entity = alloc_entity_dummy_variable(c->global_scope, ast_node_token(name));
+				entity = alloc_entity_dummy_variable(universal_scope, ast_node_token(name));
 			}
 
 			entities[entity_count++] = entity;
@@ -1821,7 +1821,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					}
 				}
 				if (entity == nullptr) {
-					entity = alloc_entity_dummy_variable(c->global_scope, ast_node_token(name));
+					entity = alloc_entity_dummy_variable(universal_scope, ast_node_token(name));
 				}
 				entity->parent_proc_decl = c->context.curr_proc_decl;
 				entities[entity_count++] = entity;
