@@ -1,3 +1,38 @@
+enum TargetOsKind {
+	TargetOs_Invalid,
+
+	TargetOs_windows,
+	TargetOs_osx,
+	TargetOs_linux,
+	TargetOs_essence,
+
+	TargetOs_COUNT,
+};
+
+enum TargetArchKind {
+	TargetArch_Invalid,
+
+	TargetArch_amd64,
+	TargetArch_x64,
+
+	TargetArch_COUNT,
+};
+
+String target_os_names[TargetOs_COUNT] = {
+	str_lit(""),
+	str_lit("windows"),
+	str_lit("osx"),
+	str_lit("linux"),
+	str_lit("essence"),
+};
+
+String target_arch_names[TargetArch_COUNT] = {
+	str_lit(""),
+	str_lit("amd64"),
+	str_lit("x86"),
+};
+
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -14,6 +49,9 @@ struct BuildContext {
 	i64    max_align; // max alignment, must be >= 1 (and typically >= word_size)
 
 	String command;
+
+	TargetOsKind   target_os;
+	TargetArchKind target_arch;
 
 	String out_filepath;
 	String resource_filepath;
@@ -35,6 +73,72 @@ struct BuildContext {
 
 
 gb_global BuildContext build_context = {0};
+
+
+TargetOsKind get_target_os_from_string(String str) {
+	for (isize i = 0; i < TargetOs_COUNT; i++) {
+		if (target_os_names[i] == str) {
+			return cast(TargetOsKind)i;
+		}
+	}
+	return TargetOs_Invalid;
+}
+
+TargetArchKind get_target_arch_from_string(String str) {
+	for (isize i = 0; i < TargetArch_COUNT; i++) {
+		if (target_os_names[i] == str) {
+			return cast(TargetArchKind)i;
+		}
+	}
+	return TargetArch_Invalid;
+}
+
+bool is_excluded_target_filename(String name) {
+	String const ext = str_lit(".odin");
+	GB_ASSERT(string_ends_with(name, ext));
+	name = substring(name, 0, name.len-ext.len);
+
+	String str1 = {};
+	String str2 = {};
+	isize n = 0;
+
+	str1 = name;
+	n = str1.len;
+	for (isize i = str1.len-1; i >= 0 && str1[i] != '_'; i--) {
+		n -= 1;
+	}
+	str1 = substring(str1, n, str1.len);
+
+	str2 = str1;
+	n = str2.len;
+	for (isize i = str2.len-1; i >= 0 && str2[i] != '_'; i--) {
+		n -= 1;
+	}
+	str2 = substring(str2, n, str2.len);
+
+	if (str1 == name) {
+		return false;
+	}
+
+
+	TargetOsKind   os1   = get_target_os_from_string(str1);
+	TargetArchKind arch1 = get_target_arch_from_string(str1);
+	TargetOsKind   os2   = get_target_os_from_string(str2);
+	TargetArchKind arch2 = get_target_arch_from_string(str2);
+
+	if (arch1 != TargetArch_Invalid && os2 != TargetOs_Invalid) {
+		return arch1 != build_context.target_arch || os2 != build_context.target_os;
+	} else if (arch1 != TargetArch_Invalid && os1 != TargetOs_Invalid) {
+		return arch2 != build_context.target_arch || os1 != build_context.target_os;
+	} else if (os1 != TargetOs_Invalid) {
+		return os1 != build_context.target_os;
+	} else if (arch1 != TargetArch_Invalid) {
+		return arch1 != build_context.target_arch;
+	}
+
+	return false;
+}
+
 
 
 struct LibraryCollections {
@@ -327,11 +431,14 @@ void init_build_context(void) {
 	bc->ODIN_ROOT    = odin_root_dir();
 
 #if defined(GB_SYSTEM_WINDOWS)
-	bc->ODIN_OS      = str_lit("windows");
+	bc->ODIN_OS   = str_lit("windows");
+	bc->target_os = TargetOs_windows;
 #elif defined(GB_SYSTEM_OSX)
-	bc->ODIN_OS      = str_lit("osx");
+	bc->ODIN_OS   = str_lit("osx");
+	bc->target_os = TargetOs_osx;
 #else
-	bc->ODIN_OS      = str_lit("linux");
+	bc->ODIN_OS   = str_lit("linux");
+	bc->target_os = TargetOs_linux;
 #endif
 
 	if (cross_compile_target.len) {
@@ -340,8 +447,10 @@ void init_build_context(void) {
 
 #if defined(GB_ARCH_64_BIT)
 	bc->ODIN_ARCH = str_lit("amd64");
+	bc->target_arch = TargetArch_amd64;
 #else
 	bc->ODIN_ARCH = str_lit("x86");
+	bc->target_arch = TargetArch_x86;
 #endif
 
 	{

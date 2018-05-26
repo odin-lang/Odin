@@ -448,11 +448,8 @@ void advance_to_next_rune(Tokenizer *t) {
 TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 	TokenizerInitError err = TokenizerInit_None;
 
-	char *c_str = gb_alloc_array(heap_allocator(), char, fullpath.len+1);
+	char *c_str = alloc_cstring(heap_allocator(), fullpath);
 	defer (gb_free(heap_allocator(), c_str));
-
-	gb_memcopy(c_str, fullpath.text, fullpath.len);
-	c_str[fullpath.len] = '\0';
 
 	// TODO(bill): Memory map rather than copy contents
 	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);

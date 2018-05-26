@@ -1,8 +1,8 @@
 package win32
 
-when ODIN_OS == "windows" {
+// when ODIN_OS == "windows" {
 	foreign import "system:opengl32.lib"
-}
+// }
 
 
 CONTEXT_MAJOR_VERSION_ARB             :: 0x2091;

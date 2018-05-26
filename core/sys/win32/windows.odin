@@ -1,12 +1,12 @@
 package win32
 
-when ODIN_OS == "windows" {
+// when ODIN_OS == "windows" {
 	foreign import "system:kernel32.lib"
 	foreign import "system:user32.lib"
 	foreign import "system:gdi32.lib"
 	foreign import "system:winmm.lib"
 	foreign import "system:shell32.lib"
-}
+// }
 
 Handle    :: distinct rawptr;
 Hwnd      :: distinct Handle;

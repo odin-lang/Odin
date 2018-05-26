@@ -748,6 +748,8 @@ enum ReadDirectoryError {
 	ReadDirectory_None,
 
 	ReadDirectory_InvalidPath,
+	ReadDirectory_NotExists,
+	ReadDirectory_Permission,
 	ReadDirectory_NotDir,
 	ReadDirectory_EOF,
 	ReadDirectory_Unknown,
@@ -759,6 +761,8 @@ enum ReadDirectoryError {
 
 ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 	GB_ASSERT(fi != nullptr);
+
+	gbAllocator a = heap_allocator();
 
 	while (path.len > 0) {
 		Rune end = path[path.len-1];
@@ -774,11 +778,25 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 	if (path.len == 0) {
 		return ReadDirectory_InvalidPath;
 	}
+	{
+		char *c_str = alloc_cstring(a, path);
+		defer (gb_free(a, c_str));
+
+		gbFile f = {};
+		gbFileError file_err = gb_file_open(&f, c_str);
+		defer (gb_file_close(&f));
+
+		switch (file_err) {
+		case gbFileError_Invalid:    return ReadDirectory_InvalidPath;
+		case gbFileError_NotExists:  return ReadDirectory_NotExists;
+		// case gbFileError_Permission: return ReadDirectory_Permission;
+		}
+	}
+
 	if (!path_is_directory(path)) {
 		return ReadDirectory_NotDir;
 	}
 
-	gbAllocator a = heap_allocator();
 
 	char *new_path = gb_alloc_array(a, char, path.len+3);
 	defer (gb_free(a, new_path));

@@ -194,7 +194,8 @@ struct DeclInfo {
 
 // ProcedureInfo stores the information needed for checking a procedure
 struct ProcedureInfo {
-	AstFile *             file;
+	// AstFile *             file;
+	AstPackage *          package;
 	Token                 token;
 	DeclInfo *            decl;
 	Type *                type; // Type_Procedure
@@ -202,6 +203,7 @@ struct ProcedureInfo {
 	u64                   tags;
 	bool                  generated_from_polymorphic;
 };
+
 
 
 struct Scope {
@@ -214,17 +216,18 @@ struct Scope {
 	PtrSet<Entity *> implicit;
 
 	Array<Scope *>   shared;
-	Array<AstNode *> delayed_file_decls;
 	Array<AstNode *> delayed_asserts;
+	Array<AstNode *> delayed_imports;
 	PtrSet<Scope *>  imported;
 	PtrSet<Scope *>  exported; // NOTE(bhall): Contains 'using import' too
 	bool             is_proc;
 	bool             is_global;
-	bool             is_file;
+	bool             is_package;
 	bool             is_init;
 	bool             is_struct;
 	bool             has_been_imported; // This is only applicable to file scopes
-	AstFile *        file;
+
+	AstPackage *     package;
 };
 
 
@@ -250,7 +253,7 @@ typedef PtrSet<ImportGraphNode *> ImportGraphNodeSet;
 struct ImportGraphNode {
 	Scope *            scope;
 	String             path;
-	isize              file_id;
+	isize              package_id;
 	ImportGraphNodeSet pred;
 	ImportGraphNodeSet succ;
 	isize              index; // Index in array/queue
@@ -268,7 +271,7 @@ struct ForeignContext {
 typedef Array<Entity *> CheckerTypePath;
 
 struct CheckerContext {
-	Scope *    file_scope;
+	Scope *    package_scope;
 	Scope *    scope;
 	DeclInfo * decl;
 	u32        stmt_state_flags;
@@ -282,7 +285,6 @@ struct CheckerContext {
 	CheckerTypePath *type_path;
 	isize            type_level; // TODO(bill): Actually handle correctly
 
-	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;
 	bool       no_polymorphic_errors;
 	bool       in_polymorphic_specialization;
@@ -295,6 +297,7 @@ struct CheckerInfo {
 	Map<TypeAndValue>     types;           // Key: AstNode * | Expression -> Type (and value)
 	Map<ExprInfo>         untyped;         // Key: AstNode * | Expression -> ExprInfo
 	Map<AstFile *>        files;           // Key: String (full path)
+	Map<AstPackage *>     packages;        // Key: String (full path)
 	Map<Entity *>         foreigns;        // Key: String
 	Array<Entity *>       definitions;
 	Array<Entity *>       entities;
@@ -318,12 +321,12 @@ struct Checker {
 	CheckerInfo info;
 	gbMutex     mutex;
 
-	AstFile *                  curr_ast_file;
+	AstPackage *               curr_ast_package;
 	Scope *                    global_scope;
 	// NOTE(bill): Procedures to check
 	Array<ProcedureInfo>       procs;
-	Map<Scope *>               file_scopes; // Key: String (fullpath)
-	Array<ImportGraphNode *>   file_order;
+	Map<Scope *>               package_scopes; // Key: String (fullpath)
+	Array<ImportGraphNode *>   package_order;
 
 	gbAllocator                allocator;
 	gbArena                    arena;
@@ -334,9 +337,6 @@ struct Checker {
 
 	Array<Type *>              proc_stack;
 	bool                       done_preload;
-
-	PtrSet<AstFile *>          checked_files;
-
 };
 
 
@@ -382,7 +382,7 @@ void      add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, D
 void      add_type_info_type      (Checker *c, Type *t);
 
 void check_add_import_decl(Checker *c, AstNodeImportDecl *id);
-void check_add_export_decl(Checker *c, AstNodeExportDecl *ed);
+// void check_add_export_decl(Checker *c, AstNodeExportDecl *ed);
 void check_add_foreign_import_decl(Checker *c, AstNode *decl);
 
 

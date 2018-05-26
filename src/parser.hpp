@@ -67,8 +67,8 @@ struct AstFile {
 
 	AstNode *           curr_proc;
 	isize               scope_level;
-	Scope *             scope;       // NOTE(bill): Created in checker
-	DeclInfo *          decl_info;   // NOTE(bill): Created in checker
+	// Scope *             scope;       // NOTE(bill): Created in checker
+	// DeclInfo *          decl_info;   // NOTE(bill): Created in checker
 
 
 	CommentGroup        lead_comment; // Comment (block) before the decl
@@ -84,17 +84,21 @@ struct AstFile {
 
 
 struct AstPackage {
+	isize               id;
 	ImportedPackageKind kind;
 	String              name;
 	String              fullpath;
 	Map<AstFile *>      files; // Key: String (names)
+
+	Scope *   scope;       // NOTE(bill): Created in checker
+	DeclInfo *decl_info;   // NOTE(bill): Created in checker
 };
 
 
 struct Parser {
 	String                 init_fullpath;
-	Map<AstPackage *>      packages; // Key: String (fullpath)
-	Array<AstFile *>       files;
+	Map<bool>              imported_files; // Key: String (fullpath)
+	Array<AstPackage *>    packages;
 	Array<ImportedPackage> imports;
 	isize                  total_token_count;
 	isize                  total_line_count;
@@ -351,7 +355,7 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		bool             been_handled; \
 	}) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
-		AstFile *file;          \
+		AstPackage *package;    \
 		Token    token;         \
 		Token    relpath;       \
 		String   fullpath;      \
@@ -362,7 +366,7 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		bool     is_using;      \
 		bool     been_handled;  \
 	}) \
-	AST_NODE_KIND(ExportDecl, "export declaration", struct { \
+	/* AST_NODE_KIND(ExportDecl, "export declaration", struct { \
 		AstFile *file;          \
 		Token    token;         \
 		Token    relpath;       \
@@ -371,7 +375,7 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 		bool     been_handled;  \
-	}) \
+	}) */ \
 	AST_NODE_KIND(ForeignImportDecl, "foreign import declaration", struct { \
 		Token    token;           \
 		Token    filepath;        \

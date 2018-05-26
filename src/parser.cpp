@@ -61,7 +61,7 @@ Token ast_node_token(AstNode *node) {
 
 	case AstNode_ValueDecl:          return ast_node_token(node->ValueDecl.names[0]);
 	case AstNode_ImportDecl:         return node->ImportDecl.token;
-	case AstNode_ExportDecl:         return node->ExportDecl.token;
+	// case AstNode_ExportDecl:         return node->ExportDecl.token;
 	case AstNode_ForeignImportDecl:  return node->ForeignImportDecl.token;
 
 	case AstNode_ForeignBlockDecl:   return node->ForeignBlockDecl.token;
@@ -1002,15 +1002,15 @@ AstNode *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, 
 	return result;
 }
 
-AstNode *ast_export_decl(AstFile *f, Token token, Token relpath,
-                         CommentGroup docs, CommentGroup comment) {
-	AstNode *result = make_ast_node(f, AstNode_ExportDecl);
-	result->ExportDecl.token       = token;
-	result->ExportDecl.relpath     = relpath;
-	result->ExportDecl.docs        = docs;
-	result->ExportDecl.comment     = comment;
-	return result;
-}
+// AstNode *ast_export_decl(AstFile *f, Token token, Token relpath,
+//                          CommentGroup docs, CommentGroup comment) {
+// 	AstNode *result = make_ast_node(f, AstNode_ExportDecl);
+// 	result->ExportDecl.token       = token;
+// 	result->ExportDecl.relpath     = relpath;
+// 	result->ExportDecl.docs        = docs;
+// 	result->ExportDecl.comment     = comment;
+// 	return result;
+// }
 
 AstNode *ast_foreign_import_decl(AstFile *f, Token token, Token filepath, Token library_name,
                                  CommentGroup docs, CommentGroup comment) {
@@ -1309,7 +1309,7 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 		return s->ProcLit.body != nullptr;
 
 	case AstNode_ImportDecl:
-	case AstNode_ExportDecl:
+	// case AstNode_ExportDecl:
 	case AstNode_ForeignImportDecl:
 		return true;
 
@@ -3477,21 +3477,21 @@ AstNode *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 	return s;
 }
 
-AstNode *parse_export_decl(AstFile *f) {
-	CommentGroup docs = f->lead_comment;
-	Token token = expect_token(f, Token_export);
-	Token file_path = expect_token_after(f, Token_String, "export");
-	AstNode *s = nullptr;
-	if (f->curr_proc != nullptr) {
-		syntax_error(token, "You cannot use 'export' within a procedure. This must be done at the file scope");
-		s = ast_bad_decl(f, token, file_path);
-	} else {
-		s = ast_export_decl(f, token, file_path, docs, f->line_comment);
-		array_add(&f->imports_and_exports, s);
-	}
-	expect_semicolon(f, s);
-	return s;
-}
+// AstNode *parse_export_decl(AstFile *f) {
+// 	CommentGroup docs = f->lead_comment;
+// 	Token token = expect_token(f, Token_export);
+// 	Token file_path = expect_token_after(f, Token_String, "export");
+// 	AstNode *s = nullptr;
+// 	if (f->curr_proc != nullptr) {
+// 		syntax_error(token, "You cannot use 'export' within a procedure. This must be done at the file scope");
+// 		s = ast_bad_decl(f, token, file_path);
+// 	} else {
+// 		s = ast_export_decl(f, token, file_path, docs, f->line_comment);
+// 		array_add(&f->imports_and_exports, s);
+// 	}
+// 	expect_semicolon(f, s);
+// 	return s;
+// }
 
 AstNode *parse_foreign_decl(AstFile *f) {
 	CommentGroup docs = f->lead_comment;
@@ -3584,8 +3584,8 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_import:
 		return parse_import_decl(f, ImportDecl_Standard);
 
-	case Token_export:
-		return parse_export_decl(f);
+	// case Token_export:
+	// 	return parse_export_decl(f);
 
 
 	case Token_if:     return parse_if_stmt(f);
@@ -3632,13 +3632,13 @@ AstNode *parse_stmt(AstFile *f) {
 					import_decl->ImportDecl.using_in_list = list;
 				}
 				return import_decl;
-			} else if (f->curr_token.kind == Token_export) {
+			} /* else if (f->curr_token.kind == Token_export) {
 				AstNode *export_decl = parse_export_decl(f);
 				if (export_decl->kind == AstNode_ExportDecl) {
 					export_decl->ExportDecl.using_in_list = list;
 				}
 				return export_decl;
-			}
+			} */
 
 			AstNode *expr = parse_expr(f, true);
 			expect_semicolon(f, expr);
@@ -3883,9 +3883,9 @@ void destroy_ast_file(AstFile *f) {
 
 bool init_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
-	map_init(&p->packages, heap_allocator());
+	map_init(&p->imported_files, heap_allocator());
+	array_init(&p->packages, heap_allocator());
 	array_init(&p->imports, heap_allocator());
-	array_init(&p->files, heap_allocator());
 	gb_mutex_init(&p->file_add_mutex);
 	gb_mutex_init(&p->file_decl_mutex);
 	return true;
@@ -3894,22 +3894,27 @@ bool init_parser(Parser *p) {
 void destroy_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
 	// TODO(bill): Fix memory leak
-	for_array(i, p->files) {
-		destroy_ast_file(p->files[i]);
+	for_array(i, p->packages) {
+		AstPackage *package = p->packages[i];
+		for_array(j, package->files.entries) {
+			destroy_ast_file(package->files.entries[j].value);
+		}
+		map_destroy(&package->files);
 	}
 #if 0
 	for_array(i, p->imports) {
 		// gb_free(heap_allocator(), p->imports[i].text);
 	}
 #endif
-	array_free(&p->files);
+	array_free(&p->packages);
 	array_free(&p->imports);
+	map_destroy(&p->imported_files);
 	gb_mutex_destroy(&p->file_add_mutex);
 	gb_mutex_destroy(&p->file_decl_mutex);
 }
 
 // NOTE(bill): Returns true if it's added
-bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
+bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos, ImportedPackageKind kind = ImportedPackage_Normal) {
 	if (build_context.generate_docs) {
 		return false;
 	}
@@ -3917,21 +3922,19 @@ bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) 
 	path = string_trim_whitespace(path);
 	rel_path = string_trim_whitespace(rel_path);
 
-	for_array(i, p->imports) {
-		String import = p->imports[i].path;
-		if (import == path) {
-			return false;
-		}
+	HashKey key = hash_string(path);
+	if (map_get(&p->imported_files, key) != nullptr) {
+		return false;
 	}
+	map_set(&p->imported_files, key, true);
 
 	ImportedPackage item = {};
-	item.kind     = ImportedPackage_Normal;
+	item.kind     = kind;
 	item.path     = path;
 	item.rel_path = rel_path;
 	item.pos      = pos;
 	item.index    = p->imports.count;
 	array_add(&p->imports, item);
-
 
 	return true;
 }
@@ -4054,34 +4057,12 @@ bool determine_path_from_string(Parser *p, AstNode *node, String base_dir, Strin
 }
 
 
-void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNode *> decls);
-
-void parse_setup_file_when_stmt(Parser *p, AstFile *f, String base_dir, AstNodeWhenStmt *ws) {
-	if (ws->body != nullptr) {
-		auto stmts = ws->body->BlockStmt.stmts;
-		parse_setup_file_decls(p, f, base_dir, stmts);
-	}
-
-	if (ws->else_stmt != nullptr) {
-		switch (ws->else_stmt->kind) {
-		case AstNode_BlockStmt: {
-			auto stmts = ws->else_stmt->BlockStmt.stmts;
-			parse_setup_file_decls(p, f, base_dir, stmts);
-		} break;
-		case AstNode_WhenStmt:
-			parse_setup_file_when_stmt(p, f, base_dir, &ws->else_stmt->WhenStmt);
-			break;
-		}
-	}
-}
-
 void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNode *> decls) {
 	for_array(i, decls) {
 		AstNode *node = decls[i];
 		if (!is_ast_node_decl(node) &&
 		    node->kind != AstNode_BadStmt &&
-		    node->kind != AstNode_EmptyStmt &&
-		    node->kind != AstNode_WhenStmt) {
+		    node->kind != AstNode_EmptyStmt) {
 			// NOTE(bill): Sanity check
 
 			if (node->kind == AstNode_ExprStmt) {
@@ -4108,7 +4089,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 
 			id->fullpath = import_path;
 			try_add_import_path(p, import_path, original_string, ast_node_token(node).pos);
-		} else if (node->kind == AstNode_ExportDecl) {
+		} /* else if (node->kind == AstNode_ExportDecl) {
 			ast_node(ed, ExportDecl, node);
 
 			String original_string = ed->relpath.string;
@@ -4123,7 +4104,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 
 			ed->fullpath = export_path;
 			try_add_import_path(p, export_path, original_string, ast_node_token(node).pos);
-		} else if (node->kind == AstNode_ForeignImportDecl) {
+		}  */else if (node->kind == AstNode_ForeignImportDecl) {
 			ast_node(fl, ForeignImportDecl, node);
 
 			String file_str = fl->filepath.string;
@@ -4140,9 +4121,6 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 				fl->fullpath = foreign_path;
 			}
 
-		} else if (node->kind == AstNode_WhenStmt) {
-			ast_node(ws, WhenStmt, node);
-			parse_setup_file_when_stmt(p, f, base_dir, ws);
 		}
 	}
 }
@@ -4241,7 +4219,6 @@ skip:
 	// file->id = imported_package.index;
 	HashKey key = hash_string(fi->fullpath);
 	map_set(&package->files, key, file);
-	array_add(&p->files, file);
 
 	if (package->name.len == 0) {
 		package->name = file->package_name;
@@ -4262,41 +4239,47 @@ ParseFileError parse_import(Parser *p, ImportedPackage imported_package) {
 	String import_rel_path = imported_package.rel_path;
 	TokenPos pos = imported_package.pos;
 
-	HashKey path_key = hash_string(import_path);
-	if (map_get(&p->packages, path_key) != nullptr) {
-		return ParseFile_None;
-	}
-
-
 	Array<FileInfo> list = {};
 	ReadDirectoryError rd_err = read_directory(import_path, &list);
 	defer (array_free(&list));
 
-	if (rd_err != ReadDirectory_EOF && rd_err != ReadDirectory_None && pos.line != 0) {
-		gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
+	if (list.count == 1) {
+		GB_ASSERT(import_path != list[0].fullpath);
 	}
 
-	switch (rd_err) {
-	case ReadDirectory_InvalidPath:
-		gb_printf_err("Invalid path: %.*s\n", LIT(import_rel_path));
+	if (rd_err != ReadDirectory_EOF && rd_err != ReadDirectory_None) {
+		if (pos.line != 0) {
+			gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
+		}
 		gb_mutex_lock(&global_error_collector.mutex);
+		defer (gb_mutex_unlock(&global_error_collector.mutex));
 		global_error_collector.count++;
-		gb_mutex_unlock(&global_error_collector.mutex);
-		return ParseFile_InvalidFile;
-	case ReadDirectory_NotDir:
-		gb_printf_err("Expected a directory for a package, got a file: %.*s\n", LIT(import_rel_path));
-		gb_mutex_lock(&global_error_collector.mutex);
-		global_error_collector.count++;
-		gb_mutex_unlock(&global_error_collector.mutex);
-		return ParseFile_InvalidFile;
-	case ReadDirectory_Unknown:
-		gb_printf_err("Unknown error whilst reading directory");
-		gb_mutex_lock(&global_error_collector.mutex);
-		global_error_collector.count++;
-		gb_mutex_unlock(&global_error_collector.mutex);
-		return ParseFile_InvalidFile;
-	case ReadDirectory_EOF:
-		break;
+
+
+		switch (rd_err) {
+		case ReadDirectory_InvalidPath:
+			gb_printf_err("Invalid path: %.*s\n", LIT(import_rel_path));
+			return ParseFile_InvalidFile;
+
+		case ReadDirectory_NotExists:
+			gb_printf_err("Path does not exist: %.*s\n", LIT(import_rel_path));
+			return ParseFile_NotFound;
+
+		case ReadDirectory_NotDir:
+			gb_printf_err("Expected a directory for a package, got a file: %.*s\n", LIT(import_rel_path));
+			return ParseFile_InvalidFile;
+
+		case ReadDirectory_Unknown:
+			gb_printf_err("Unknown error whilst reading path %.*s\n", LIT(import_rel_path));
+			return ParseFile_InvalidFile;
+		case ReadDirectory_Permission:
+			gb_printf_err("Unknown error whilst reading path %.*s\n", LIT(import_rel_path));
+			return ParseFile_InvalidFile;
+
+		case ReadDirectory_EOF:
+			gb_printf_err("Unknown error whilst reading path %.*s\n", LIT(import_rel_path));
+			return ParseFile_InvalidFile;
+		}
 	}
 
 	AstPackage *package = gb_alloc_item(heap_allocator(), AstPackage);
@@ -4307,13 +4290,22 @@ ParseFileError parse_import(Parser *p, ImportedPackage imported_package) {
 	// TODO(bill): Fix concurrency
 	for_array(i, list) {
 		FileInfo *fi = &list[i];
-		if (string_ends_with(fi->name, str_lit(".odin"))) {
+		String name = fi->name;
+		String const ext = str_lit(".odin");
+		if (string_ends_with(name, ext)) {
+			if (is_excluded_target_filename(name)) {
+				continue;
+			}
 			ParseFileError err = parse_imported_file(p, package, fi, pos);
 			if (err != ParseFile_None) {
 				return err;
 			}
 		}
 	}
+
+	package->id = p->packages.count+1;
+	array_add(&p->packages, package);
+
 
 	return ParseFile_None;
 }
@@ -4342,25 +4334,24 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 	TokenPos init_pos = {};
 	ImportedPackage init_imported_package = {ImportedPackage_Init, init_fullpath, init_fullpath, init_pos};
 
-	isize shared_file_count = 0;
+	isize shared_package_count = 0;
 	if (!build_context.generate_docs) {
 		String s = get_fullpath_core(heap_allocator(), str_lit("runtime"));
-		ImportedPackage runtime_package = {ImportedPackage_Runtime, s, s, init_pos};
-		array_add(&p->imports, runtime_package);
-		shared_file_count++;
+		try_add_import_path(p, s, s, init_pos, ImportedPackage_Runtime);
+		shared_package_count++;
 	}
 
 	array_add(&p->imports, init_imported_package);
 	p->init_fullpath = init_fullpath;
 
 	// IMPORTANT TODO(bill): Figure out why this doesn't work on *nix sometimes
-#if defined(GB_SYSTEM_WINDOWS)
+#if 0 && defined(GB_SYSTEM_WINDOWS)
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	if (thread_count > 1) {
 		isize volatile curr_import_index = 0;
 
 		// NOTE(bill): Make sure that these are in parsed in this order
-		for (isize i = 0; i < shared_file_count; i++) {
+		for (isize i = 0; i < shared_package_count; i++) {
 			ParseFileError err = parse_import(p, p->imports[i]);
 			if (err != ParseFile_None) {
 				return err;

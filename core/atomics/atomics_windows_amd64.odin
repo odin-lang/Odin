@@ -3,10 +3,7 @@ package atomics
 // TODO(bill): Use assembly instead here to implement atomics
 // Inline vs external file?
 
-when ODIN_OS == "windows" {
-	import win32 "core:sys/windows.odin"
-}
-#assert(ODIN_ARCH == "amd64"); // TODO(bill): x86 version
+import "core:sys/win32"
 
 
 yield_thread :: proc() { win32.mm_pause(); }

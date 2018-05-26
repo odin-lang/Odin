@@ -627,7 +627,10 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		Token token  = {};
 		token.pos    = ast_node_token(ss->body).pos;
 		token.string = str_lit("true");
-		x.expr       = ast_ident(c->curr_ast_file, token);
+
+		x.expr = gb_alloc_item(c->allocator, AstNode);
+		x.expr->kind = AstNode_Ident;
+		x.expr->Ident.token = token;
 	}
 
 	// NOTE(bill): Check for multiple defaults

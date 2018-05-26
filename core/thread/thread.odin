@@ -1,10 +1,7 @@
 package thread
 
 #assert(ODIN_OS == "windows");
-
-when ODIN_OS == "windows" {
-	import win32 "core:sys/windows.odin"
-}
+import "core:sys/win32"
 
 Thread_Proc :: #type proc(^Thread) -> int;
 

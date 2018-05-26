@@ -1,4 +1,4 @@
-package utf8
+package utf16
 
 import "core:unicode/utf8"
 
