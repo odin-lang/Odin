@@ -41,7 +41,8 @@ struct ImportedPackage {
 
 struct AstFile {
 	AstPackage *        package;
-	// isize               id;
+	Scope *             scope;
+
 	String              fullpath;
 	gbArena             arena;
 	Tokenizer           tokenizer;
@@ -67,7 +68,6 @@ struct AstFile {
 
 	AstNode *           curr_proc;
 	isize               scope_level;
-	// Scope *             scope;       // NOTE(bill): Created in checker
 	// DeclInfo *          decl_info;   // NOTE(bill): Created in checker
 
 
