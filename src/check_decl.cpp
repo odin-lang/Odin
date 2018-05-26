@@ -535,7 +535,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	e->deprecated_message = ac.deprecated_message;
 	ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix);
 
-	if (d->scope->file != nullptr && e->token.string == "main") {
+	if (d->scope->package != nullptr && e->token.string == "main") {
 		if (pt->param_count != 0 ||
 		    pt->result_count != 0) {
 			gbString str = type_to_string(proc_type);
@@ -583,7 +583,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 		GB_ASSERT(pl->body->kind == AstNode_BlockStmt);
 		if (!pt->is_polymorphic) {
-			check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pl->body, pl->tags);
+			check_procedure_later(c, c->curr_ast_package, e->token, d, proc_type, pl->body, pl->tags);
 		}
 	} else if (!is_foreign) {
 		if (e->Procedure.is_export) {

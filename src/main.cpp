@@ -12,9 +12,9 @@
 #include "checker.hpp"
 
 #include "parser.cpp"
-#if 0
 #include "docs.cpp"
 #include "checker.cpp"
+#if 0
 #include "ir.cpp"
 #include "ir_opt.cpp"
 #include "ir_print.cpp"
@@ -574,16 +574,22 @@ bool parse_build_flags(Array<String> args) {
 }
 
 void show_timings(Checker *c, Timings *t) {
-	Parser *p    = c->parser;
-	isize lines  = p->total_line_count;
-	isize tokens = p->total_token_count;
-	isize files  = p->files.count;
+	Parser *p      = c->parser;
+	isize lines    = p->total_line_count;
+	isize tokens   = p->total_token_count;
+	isize files    = 0;
+	isize packages = p->packages.count;
+	for_array(i, p->packages) {
+		files += p->packages[i]->files.entries.count;
+	}
+
 	{
 		timings_print_all(t);
 		gb_printf("\n");
-		gb_printf("Total Lines  - %td\n", lines);
-		gb_printf("Total Tokens - %td\n", tokens);
-		gb_printf("Total Files  - %td\n", files);
+		gb_printf("Total Lines    - %td\n", lines);
+		gb_printf("Total Tokens   - %td\n", tokens);
+		gb_printf("Total Files    - %td\n", files);
+		gb_printf("Total Packages - %td\n", packages);
 		gb_printf("\n");
 	}
 	{
@@ -774,9 +780,8 @@ int main(int arg_count, char **arg_ptr) {
 		print_usage_line(0, "%s 32-bit is not yet supported", args[0]);
 		return 1;
 	}
-#if 0
+
 	init_universal_scope();
-#endif
 	// TODO(bill): prevent compiling without a linker
 
 	timings_start_section(&timings, str_lit("parse files"));
@@ -791,9 +796,8 @@ int main(int arg_count, char **arg_ptr) {
 		return 1;
 	}
 
-#if 0
 	if (build_context.generate_docs) {
-		generate_documentation(&parser);
+		// generate_documentation(&parser);
 		return 0;
 	}
 
@@ -807,6 +811,7 @@ int main(int arg_count, char **arg_ptr) {
 
 	check_parsed_files(&checker);
 
+#if 0
 	if (build_context.no_output_files) {
 		if (build_context.show_timings) {
 			show_timings(&checker, &timings);

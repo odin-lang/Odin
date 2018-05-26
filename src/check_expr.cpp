@@ -109,7 +109,7 @@ void error_operand_no_value(Operand *o) {
 
 void check_scope_decls(Checker *c, Array<AstNode *> nodes, isize reserve_size) {
 	Scope *s = c->context.scope;
-	GB_ASSERT(s->file == nullptr);
+	GB_ASSERT(s->package == nullptr);
 
 	check_collect_entities(c, nodes);
 
@@ -342,17 +342,18 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	// NOTE(bill): Set the scope afterwards as this is not real overloading
 	entity->scope = scope->parent;
 
-	AstFile *file = nullptr;
+	AstPackage *package = nullptr;
 	{
 		Scope *s = entity->scope;
-		while (s != nullptr && s->file == nullptr) {
-			file = s->file;
+		while (s != nullptr && s->package == nullptr) {
+			package = s->package;
 			s = s->parent;
 		}
 	}
 
 	ProcedureInfo proc_info = {};
-	proc_info.file  = file;
+	// proc_info.file  = file;
+	proc_info.package = package;
 	proc_info.token = token;
 	proc_info.decl  = d;
 	proc_info.type  = final_proc_type;
@@ -5362,7 +5363,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				return kind;
 			}
 
-			check_procedure_later(c, c->curr_ast_file, empty_token, decl, type, pl->body, pl->tags);
+			check_procedure_later(c, c->curr_ast_package, empty_token, decl, type, pl->body, pl->tags);
 		}
 		check_close_scope(c);
 

@@ -122,9 +122,9 @@ void import_graph_node_set_remove(ImportGraphNodeSet *s, ImportGraphNode *n) {
 
 ImportGraphNode *import_graph_node_create(gbAllocator a, Scope *scope) {
 	ImportGraphNode *n = gb_alloc_item(a, ImportGraphNode);
-	n->scope   = scope;
-	n->path    = scope->file->tokenizer.fullpath;
-	n->file_id = scope->file->id;
+	n->scope      = scope;
+	n->path       = scope->package->fullpath;
+	n->package_id = scope->package->id;
 	return n;
 }
 
@@ -145,7 +145,7 @@ int import_graph_node_cmp(ImportGraphNode **data, isize i, isize j) {
 	bool xg = x->scope->is_global;
 	bool yg = y->scope->is_global;
 	if (xg != yg) return xg ? -1 : +1;
-	if (xg && yg) return x->file_id < y->file_id ? +1 : -1;
+	if (xg && yg) return x->package_id < y->package_id ? +1 : -1;
 	if (x->dep_count < y->dep_count) return -1;
 	if (x->dep_count > y->dep_count) return +1;
 	return 0;
@@ -222,31 +222,61 @@ Scope *create_scope(Scope *parent, gbAllocator allocator) {
 	ptr_set_init(&s->imported, heap_allocator());
 	ptr_set_init(&s->exported, heap_allocator());
 
+	s->delayed_imports.allocator = heap_allocator();
+	s->delayed_asserts.allocator = heap_allocator();
+
 	if (parent != nullptr && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
 	}
 	return s;
 }
 
-Scope *create_scope_from_file(Checker *c, AstFile *f) {
-	GB_ASSERT(f != nullptr);
+// Scope *create_scope_from_file(Checker *c, AstFile *f) {
+// 	GB_ASSERT(f != nullptr);
+
+// 	Scope *s = create_scope(c->global_scope, c->allocator);
+
+
+// 	s->file = f;
+// 	f->scope = s;
+// 	s->is_file   = true;
+
+// 	if (f->tokenizer.fullpath == c->parser->init_fullpath) {
+// 		s->is_init = true;
+// 	} else {
+// 		s->is_init = f->package->kind == ImportedPackage_Init;
+// 	}
+
+// 	s->is_global = f->is_global_scope;
+// 	if (s->is_global) array_add(&c->global_scope->shared, s);
+
+
+// 	if (s->is_init || s->is_global) {
+// 		s->has_been_imported = true;
+// 	}
+
+// 	return s;
+// }
+
+Scope *create_scope_from_package(Checker *c, AstPackage *p) {
+	GB_ASSERT(p != nullptr);
 
 	Scope *s = create_scope(c->global_scope, c->allocator);
 
-	array_init(&s->delayed_file_decls, heap_allocator());
+	s->is_package = true;
+	s->package = p;
+	p->scope = s;
 
-	s->file = f;
-	f->scope = s;
-	s->is_file   = true;
-
-	if (f->tokenizer.fullpath == c->parser->init_fullpath) {
+	if (p->fullpath == c->parser->init_fullpath) {
 		s->is_init = true;
 	} else {
-		s->is_init = f->file_kind == ImportedFile_Init;
+		s->is_init = p->kind == ImportedPackage_Init;
 	}
 
-	s->is_global = f->is_global_scope;
-	if (s->is_global) array_add(&c->global_scope->shared, s);
+	s->is_global = p->kind == ImportedPackage_Runtime;
+	if (s->is_global) {
+		array_add(&c->global_scope->shared, s);
+	}
 
 
 	if (s->is_init || s->is_global) {
@@ -274,7 +304,7 @@ void destroy_scope(Scope *scope) {
 
 	map_destroy(&scope->elements);
 	array_free(&scope->shared);
-	array_free(&scope->delayed_file_decls);
+	array_free(&scope->delayed_imports);
 	array_free(&scope->delayed_asserts);
 	ptr_set_destroy(&scope->implicit);
 	ptr_set_destroy(&scope->imported);
@@ -330,7 +360,7 @@ Entity *current_scope_lookup_entity(Scope *s, String name) {
 		if (found) {
 			Entity *e = *found;
 			if (e->kind == Entity_Variable &&
-			    !e->scope->is_file &&
+			    !e->scope->is_package &&
 			    !e->scope->is_global) {
 				continue;
 			}
@@ -348,7 +378,7 @@ Entity *current_scope_lookup_entity(Scope *s, String name) {
 
 void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entity **entity_) {
 	bool gone_thru_proc = false;
-	bool gone_thru_file = false;
+	bool gone_thru_package = false;
 	HashKey key = hash_string(name);
 	for (Scope *s = scope; s != nullptr; s = s->parent) {
 		Entity **found = map_get(&s->elements, key);
@@ -360,7 +390,7 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 					continue;
 				}
 				if (e->kind == Entity_Variable &&
-				    !e->scope->is_file &&
+				    !e->scope->is_package &&
 				    !e->scope->is_global) {
 					continue;
 				}
@@ -381,7 +411,7 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 				if (found) {
 					Entity *e = *found;
 					if (e->kind == Entity_Variable &&
-					    !e->scope->is_file &&
+					    !e->scope->is_package &&
 					    !e->scope->is_global) {
 						continue;
 					}
@@ -393,7 +423,7 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 
 					if ((e->kind == Entity_ImportName ||
 					     e->kind == Entity_LibraryName)
-					     && gone_thru_file) {
+					     && gone_thru_package) {
 						continue;
 					}
 
@@ -404,8 +434,8 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 			}
 		}
 
-		if (s->is_file) {
-			gone_thru_file = true;
+		if (s->is_package) {
+			gone_thru_package = true;
 		}
 	}
 
@@ -607,6 +637,7 @@ void init_checker_info(CheckerInfo *i) {
 	array_init(&i->type_info_types, a);
 	map_init(&i->type_info_map,   a);
 	map_init(&i->files,           a);
+	map_init(&i->packages,        a);
 	array_init(&i->variable_init_order, a);
 }
 
@@ -621,6 +652,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->type_info_types);
 	map_destroy(&i->type_info_map);
 	map_destroy(&i->files);
+	map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
 }
 
@@ -640,11 +672,7 @@ void init_checker(Checker *c, Parser *parser) {
 
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
-	isize total_token_count = 0;
-	for_array(i, c->parser->files) {
-		AstFile *f = c->parser->files[i];
-		total_token_count += f->tokens.count;
-	}
+	isize total_token_count = c->parser->total_token_count;
 	isize arena_size = 2 * item_size * total_token_count;
 	gb_arena_init_from_allocator(&c->tmp_arena, a, arena_size);
 	gb_arena_init_from_allocator(&c->arena, a, arena_size);
@@ -654,12 +682,15 @@ void init_checker(Checker *c, Parser *parser) {
 	// c->allocator     = gb_arena_allocator(&c->arena);
 	c->tmp_allocator = gb_arena_allocator(&c->tmp_arena);
 
+	GB_ASSERT(universal_scope != nullptr);
 	c->global_scope = create_scope(universal_scope, c->allocator);
 
-	map_init(&c->file_scopes, heap_allocator());
-	ptr_set_init(&c->checked_files, heap_allocator());
+	GB_ASSERT(scope_lookup_entity(c->global_scope, str_lit("ODIN_OS")) != nullptr);
 
-	array_init(&c->file_order, heap_allocator(), 0, c->parser->files.count);
+
+	map_init(&c->package_scopes, heap_allocator());
+
+	array_init(&c->package_order, heap_allocator(), 0, c->parser->packages.count);
 
 	// Init context
 	c->context.scope = c->global_scope;
@@ -678,9 +709,8 @@ void destroy_checker(Checker *c) {
 
 	gb_arena_free(&c->tmp_arena);
 
-	map_destroy(&c->file_scopes);
-	ptr_set_destroy(&c->checked_files);
-	array_free(&c->file_order);
+	map_destroy(&c->package_scopes);
+	array_free(&c->package_order);
 
 	destroy_checker_type_path(c->context.type_path);
 }
@@ -1110,9 +1140,9 @@ void check_procedure_later(Checker *c, ProcedureInfo info) {
 	array_add(&c->procs, info);
 }
 
-void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body, u64 tags) {
+void check_procedure_later(Checker *c, AstPackage *package, Token token, DeclInfo *decl, Type *type, AstNode *body, u64 tags) {
 	ProcedureInfo info = {};
-	info.file = file;
+	info.package = package;
 	info.token = token;
 	info.decl  = decl;
 	info.type  = type;
@@ -1137,14 +1167,14 @@ Type *const curr_procedure_type(Checker *c) {
 	return nullptr;
 }
 
-void add_curr_ast_file(Checker *c, AstFile *file) {
-	if (file != nullptr) {
+void add_curr_ast_package(Checker *c, AstPackage *package) {
+	if (package != nullptr) {
 		TokenPos zero_pos = {};
 		global_error_collector.prev = zero_pos;
-		c->curr_ast_file = file;
-		c->context.decl  = file->decl_info;
-		c->context.scope = file->scope;
-		c->context.file_scope = file->scope;
+		c->curr_ast_package = package;
+		c->context.decl  = package->decl_info;
+		c->context.scope = package->scope;
+		c->context.package_scope = package->scope;
 	}
 }
 
@@ -1928,7 +1958,7 @@ void check_collect_value_decl(Checker *c, AstNode *decl) {
 	vd->been_handled = true;
 
 	if (vd->is_mutable) {
-		if (!c->context.scope->is_file) {
+		if (!c->context.scope->is_package) {
 			// NOTE(bill): local scope -> handle later and in order
 			return;
 		}
@@ -2109,7 +2139,6 @@ void check_add_foreign_block_decl(Checker *c, AstNode *decl) {
 
 	check_decl_attributes(c, fb->attributes, foreign_block_decl_attribute, nullptr);
 
-	c->context.collect_delayed_decls = true;
 	check_collect_entities(c, fb->decls);
 	c->context = prev_context;
 }
@@ -2135,31 +2164,17 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 		case_end;
 
 		case_ast_node(id, ImportDecl, decl);
-			if (!c->context.scope->is_file) {
+			if (!c->context.scope->is_package) {
 				error(decl, "import declarations are only allowed in the file scope");
 				// NOTE(bill): _Should_ be caught by the parser
 				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
-			if (c->context.collect_delayed_decls) {
-				check_add_import_decl(c, id);
-			}
-		case_end;
-
-		case_ast_node(ed, ExportDecl, decl);
-			if (!c->context.scope->is_file) {
-				error(decl, "export declarations are only allowed in the file scope");
-				// NOTE(bill): _Should_ be caught by the parser
-				// TODO(bill): Better error handling if it isn't
-				continue;
-			}
-			if (c->context.collect_delayed_decls) {
-				check_add_export_decl(c, ed);
-			}
+			array_add(&c->context.scope->delayed_imports, decl);
 		case_end;
 
 		case_ast_node(fl, ForeignImportDecl, decl);
-			if (!c->context.scope->is_file) {
+			if (!c->context.scope->is_package) {
 				error(decl, "%.*s declarations are only allowed in the file scope", LIT(fl->token.string));
 				// NOTE(bill): _Should_ be caught by the parser
 				// TODO(bill): Better error handling if it isn't
@@ -2172,8 +2187,20 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 			check_add_foreign_block_decl(c, decl);
 		case_end;
 
+
+		case_ast_node(ce, CallExpr, decl);
+			if (c->context.scope->is_package &&
+			    ce->proc->kind == AstNode_BasicDirective &&
+			    ce->proc->BasicDirective.name == "assert") {
+				array_add(&c->context.scope->delayed_asserts, decl);
+			} else {
+				goto error_case;
+			}
+		case_end;
+
+		error_case:
 		default:
-			if (c->context.scope->is_file) {
+			if (c->context.scope->is_package) {
 				error(decl, "Only declarations are allowed at file scope");
 			}
 			break;
@@ -2182,7 +2209,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 
 	// NOTE(bill): 'when' stmts need to be handled after the other as the condition may refer to something
 	// declared after this stmt in source
-	if (!c->context.scope->is_file || c->context.collect_delayed_decls) {
+	if (!c->context.scope->is_package) {
 		for_array(i, nodes) {
 			AstNode *node = nodes[i];
 			switch (node->kind) {
@@ -2214,8 +2241,8 @@ void check_all_global_entities(Checker *c) {
 		}
 
 
-		AstFile *file = d->scope->file;
-		add_curr_ast_file(c, file);
+		AstPackage *package = d->scope->package;
+		add_curr_ast_package(c, package);
 
 		if (e->token.string == "main") {
 			if (e->kind != Entity_Procedure) {
@@ -2228,6 +2255,7 @@ void check_all_global_entities(Checker *c) {
 				continue;
 			}
 		}
+
 
 		CheckerContext prev_context = c->context;
 		c->context.decl = d;
@@ -2311,19 +2339,20 @@ String path_to_entity_name(String name, String fullpath) {
 
 
 
+#if 1
 
 void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *> *M) {
-	Scope *parent_file_scope = decl->file->scope;
+	Scope *parent_package_scope = decl->file->package->scope;
 
 	switch (decl->kind) {
 	case_ast_node(id, ImportDecl, decl);
 		String path = id->fullpath;
 		HashKey key = hash_string(path);
-		Scope **found = map_get(&c->file_scopes, key);
+		Scope **found = map_get(&c->package_scopes, key);
 		if (found == nullptr) {
-			for_array(scope_index, c->file_scopes.entries) {
-				Scope *scope = c->file_scopes.entries[scope_index].value;
-				gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
+			for_array(scope_index, c->package_scopes.entries) {
+				Scope *scope = c->package_scopes.entries[scope_index].value;
+				gb_printf_err("%.*s\n", LIT(scope->package->fullpath));
 			}
 			Token token = ast_node_token(decl);
 			gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
@@ -2332,7 +2361,7 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 		Scope *scope = *found;
 		GB_ASSERT(scope != nullptr);
 
-		id->file = scope->file;
+		id->package = scope->package;
 
 		ImportGraphNode **found_node = nullptr;
 		ImportGraphNode *m = nullptr;
@@ -2342,7 +2371,7 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 		GB_ASSERT(found_node != nullptr);
 		m = *found_node;
 
-		found_node = map_get(M, hash_pointer(parent_file_scope));
+		found_node = map_get(M, hash_pointer(parent_package_scope));
 		GB_ASSERT(found_node != nullptr);
 		n = *found_node;
 
@@ -2356,39 +2385,39 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 	case_end;
 
 
-	case_ast_node(ed, ExportDecl, decl);
-		String path = ed->fullpath;
-		HashKey key = hash_string(path);
-		Scope **found = map_get(&c->file_scopes, key);
-		if (found == nullptr) {
-			for_array(scope_index, c->file_scopes.entries) {
-				Scope *scope = c->file_scopes.entries[scope_index].value;
-				gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
-			}
-			Token token = ast_node_token(decl);
-			gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
-			GB_PANIC("Unable to find scope for file: %.*s", LIT(path));
-		}
-		Scope *scope = *found;
-		GB_ASSERT(scope != nullptr);
-		ed->file = scope->file;
+	// case_ast_node(ed, ExportDecl, decl);
+	// 	String path = ed->fullpath;
+	// 	HashKey key = hash_string(path);
+	// 	Scope **found = map_get(&c->file_scopes, key);
+	// 	if (found == nullptr) {
+	// 		for_array(scope_index, c->file_scopes.entries) {
+	// 			Scope *scope = c->file_scopes.entries[scope_index].value;
+	// 			gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
+	// 		}
+	// 		Token token = ast_node_token(decl);
+	// 		gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
+	// 		GB_PANIC("Unable to find scope for file: %.*s", LIT(path));
+	// 	}
+	// 	Scope *scope = *found;
+	// 	GB_ASSERT(scope != nullptr);
+	// 	ed->file = scope->file;
 
-		ImportGraphNode **found_node = nullptr;
-		ImportGraphNode *m = nullptr;
-		ImportGraphNode *n = nullptr;
+	// 	ImportGraphNode **found_node = nullptr;
+	// 	ImportGraphNode *m = nullptr;
+	// 	ImportGraphNode *n = nullptr;
 
-		found_node = map_get(M, hash_pointer(scope));
-		GB_ASSERT(found_node != nullptr);
-		m = *found_node;
+	// 	found_node = map_get(M, hash_pointer(scope));
+	// 	GB_ASSERT(found_node != nullptr);
+	// 	m = *found_node;
 
-		found_node = map_get(M, hash_pointer(parent_file_scope));
-		GB_ASSERT(found_node != nullptr);
-		n = *found_node;
+	// 	found_node = map_get(M, hash_pointer(parent_package_scope));
+	// 	GB_ASSERT(found_node != nullptr);
+	// 	n = *found_node;
 
-		import_graph_node_set_add(&n->succ, m);
-		import_graph_node_set_add(&m->pred, n);
-		ptr_set_add(&m->scope->exported, n->scope);
-	case_end;
+	// 	import_graph_node_set_add(&n->succ, m);
+	// 	import_graph_node_set_add(&m->pred, n);
+	// 	ptr_set_add(&m->scope->exported, n->scope);
+	// case_end;
 
 	case_ast_node(ws, WhenStmt, decl);
 		if (ws->body != nullptr) {
@@ -2417,7 +2446,6 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 	}
 }
 
-
 Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
 	gbAllocator a = heap_allocator();
 
@@ -2425,19 +2453,22 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
 	map_init(&M, a);
 	defer (map_destroy(&M));
 
-	for_array(i, c->parser->files) {
-		Scope *scope = c->parser->files[i]->scope;
+	for_array(i, c->parser->packages) {
+		Scope *scope = c->parser->packages[i]->scope;
 
 		ImportGraphNode *n = import_graph_node_create(heap_allocator(), scope);
 		map_set(&M, hash_pointer(scope), n);
 	}
 
 	// Calculate edges for graph M
-	for_array(i, c->parser->files) {
-		AstFile *f = c->parser->files[i];
-		for_array(j, f->decls) {
-			AstNode *decl = f->decls[j];
-			add_import_dependency_node(c, decl, &M);
+	for_array(i, c->parser->packages) {
+		AstPackage *p = c->parser->packages[i];
+		for_array(j, p->files.entries) {
+			AstFile *f = p->files.entries[j].value;
+			for_array(k, f->decls) {
+				AstNode *decl = f->decls[k];
+				add_import_dependency_node(c, decl, &M);
+			}
 		}
 	}
 
@@ -2472,66 +2503,68 @@ Array<ImportPathItem> find_import_path(Checker *c, Scope *start, Scope *end, Ptr
 	ptr_set_add(visited, start);
 
 
-	String path = start->file->tokenizer.fullpath;
+	String path = start->package->fullpath;
 	HashKey key = hash_string(path);
-	Scope **found = map_get(&c->file_scopes, key);
-	if (found) {
-		AstFile *f = (*found)->file;
-		GB_ASSERT(f != nullptr);
+	Scope **found = map_get(&c->package_scopes, key);
+	// if (found) {
+	// 	AstPackage *p = (*found)->package;
+	// 	GB_ASSERT(p != nullptr);
 
-		for_array(i, f->imports_and_exports) {
-			Scope *s = nullptr;
-			AstNode *decl = f->imports_and_exports[i];
-			if (decl->kind == AstNode_ExportDecl) {
-				s = decl->ExportDecl.file->scope;
-			} else if (decl->kind == AstNode_ImportDecl) {
-				if (!decl->ImportDecl.is_using) {
-					// continue;
-				}
-				s = decl->ImportDecl.file->scope;
-			} else {
-				continue;
-			}
-			GB_ASSERT(s != nullptr);
+	// 	for_array(i, f->imports_and_exports) {
+	// 		Scope *s = nullptr;
+	// 		AstNode *decl = f->imports_and_exports[i];
+	// 		/* if (decl->kind == AstNode_ExportDecl) {
+	// 			s = decl->ExportDecl.file->scope;
+	// 		} else */
+	// 		if (decl->kind == AstNode_ImportDecl) {
+	// 			if (!decl->ImportDecl.is_using) {
+	// 				// continue;
+	// 			}
+	// 			s = decl->ImportDecl.package->scope;
+	// 		} else {
+	// 			continue;
+	// 		}
+	// 		GB_ASSERT(s != nullptr);
 
-			ImportPathItem item = {s, decl};
-			if (s == end) {
-				auto path = array_make<ImportPathItem>(heap_allocator());
-				array_add(&path, item);
-				return path;
-			}
-			auto next_path = find_import_path(c, s, end, visited);
-			if (next_path.count > 0) {
-				array_add(&next_path, item);
-				return next_path;
-			}
-		}
-	}
+	// 		ImportPathItem item = {s, decl};
+	// 		if (s == end) {
+	// 			auto path = array_make<ImportPathItem>(heap_allocator());
+	// 			array_add(&path, item);
+	// 			return path;
+	// 		}
+	// 		auto next_path = find_import_path(c, s, end, visited);
+	// 		if (next_path.count > 0) {
+	// 			array_add(&next_path, item);
+	// 			return next_path;
+	// 		}
+	// 	}
+	// }
 	return empty_path;
 }
-
+#endif
 void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 	if (id->been_handled) return;
 	id->been_handled = true;
 
 	Scope *parent_scope = c->context.scope;
-	GB_ASSERT(parent_scope->is_file);
+	GB_ASSERT(parent_scope->is_package);
 
 	Token token = id->relpath;
 	HashKey key = hash_string(id->fullpath);
-	Scope **found = map_get(&c->file_scopes, key);
+	Scope **found = map_get(&c->package_scopes, key);
 	if (found == nullptr) {
-		for_array(scope_index, c->file_scopes.entries) {
-			Scope *scope = c->file_scopes.entries[scope_index].value;
-			gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
+		for_array(scope_index, c->package_scopes.entries) {
+			Scope *scope = c->package_scopes.entries[scope_index].value;
+			gb_printf_err("%.*s\n", LIT(scope->package->fullpath));
 		}
 		gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
-		GB_PANIC("Unable to find scope for file: %.*s", LIT(id->fullpath));
+		GB_PANIC("Unable to find scope for package: %.*s", LIT(id->fullpath));
 	}
 	Scope *scope = *found;
+	GB_ASSERT(scope->is_package && scope->package != nullptr);
 
 	if (scope->is_global) {
-		error(token, "Importing a #shared_global_scope is disallowed and unnecessary");
+		error(token, "Importing a runtime package is disallowed and unnecessary");
 		return;
 	}
 
@@ -2543,12 +2576,15 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 
 
 	if (id->using_in_list.count == 0) {
-		String import_name = path_to_entity_name(id->import_name.string, id->fullpath);
+		String import_name = id->import_name.string;
+		if (import_name.len == 0) {
+			import_name = scope->package->name;
+		}
 		if (is_blank_ident(import_name)) {
 			if (id->is_using) {
 				// TODO(bill): Should this be a warning?
 			} else {
-				error(token, "File name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+				error(token, "Import name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
 			}
 		} else {
 			GB_ASSERT(id->import_name.pos.line != 0);
@@ -2563,12 +2599,13 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 
 	if (id->is_using) {
 		if (parent_scope->is_global) {
-			error(id->import_name, "#shared_global_scope imports cannot use using");
+			error(id->import_name, "runtime package imports cannot use using");
 			return;
 		}
 
 		// NOTE(bill): Add imported entities to this file's scope
 		if (id->using_in_list.count > 0) {
+
 			for_array(list_index, id->using_in_list) {
 				AstNode *node = id->using_in_list[list_index];
 				ast_node(ident, Ident, node);
@@ -2583,7 +2620,9 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 					}
 					continue;
 				}
-				if (e->scope == parent_scope) continue;
+				if (e->scope == parent_scope) {
+					continue;
+				}
 
 				bool implicit_is_found = ptr_set_exists(&scope->implicit, e);
 				if (is_entity_exported(e) && !implicit_is_found) {
@@ -2610,94 +2649,10 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 			}
 		}
 	}
-	ptr_set_add(&c->checked_files, scope->file);
+
 	scope->has_been_imported = true;
 }
 
-void check_add_export_decl(Checker *c, AstNodeExportDecl *ed) {
-	if (ed->been_handled) return;
-	ed->been_handled = true;
-
-	Scope *parent_scope = c->context.scope;
-	GB_ASSERT(parent_scope->is_file);
-
-	Token token = ed->relpath;
-	HashKey key = hash_string(ed->fullpath);
-	Scope **found = map_get(&c->file_scopes, key);
-	if (found == nullptr) {
-		for_array(scope_index, c->file_scopes.entries) {
-			Scope *scope = c->file_scopes.entries[scope_index].value;
-			gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
-		}
-		gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
-		GB_PANIC("Unable to find scope for file: %.*s", LIT(ed->fullpath));
-	}
-	Scope *scope = *found;
-
-	if (scope->is_global) {
-		error(token, "Exporting a #shared_global_scope is disallowed and unnecessary");
-		return;
-	}
-
-	if (parent_scope->is_global) {
-		error(ed->token, "'export' cannot be used on #shared_global_scope");
-		return;
-	}
-
-	if (ptr_set_exists(&parent_scope->imported, scope)) {
-		// error(token, "Multiple import of the same file within this scope");
-	} else {
-		ptr_set_add(&parent_scope->imported, scope);
-	}
-
-	if (ed->using_in_list.count > 0) {
-		for_array(list_index, ed->using_in_list) {
-			AstNode *node = ed->using_in_list[list_index];
-			ast_node(ident, Ident, node);
-			String name = ident->token.string;
-
-			Entity *e = scope_lookup_entity(scope, name);
-			if (e == nullptr) {
-				if (is_blank_ident(name)) {
-					error(node, "'_' cannot be used as a value");
-				} else {
-					error(node, "Undeclared name in this importation: '%.*s'", LIT(name));
-				}
-				continue;
-			}
-			if (e->scope == parent_scope) continue;
-
-			if (is_entity_exported(e)) {
-				add_entity(c, parent_scope, e->identifier, e);
-			} else {
-				error(node, "'%.*s' is exported from this scope", LIT(name));
-				continue;
-			}
-		}
-	} else {
-		// NOTE(bill): Add imported entities to this file's scope
-		for_array(elem_index, scope->elements.entries) {
-			Entity *e = scope->elements.entries[elem_index].value;
-			String name = e->token.string;
-			if (e->scope == parent_scope) continue;
-			DeclInfo *d = e->decl_info;
-			// NOTE(bill): The enum #export must be evaluated before use
-			if (d != nullptr && d->init_expr != nullptr) {
-				AstNode *expr = unparen_expr(d->init_expr);
-				if (expr->kind == AstNode_EnumType && expr->EnumType.is_export) {
-					check_entity_decl(c, e, d, nullptr);
-				}
-			}
-
-			if (is_entity_kind_exported(e->kind)) {
-				add_entity(c, parent_scope, e->identifier, e);
-			}
-		}
-	}
-
-	ptr_set_add(&c->checked_files, scope->file);
-	scope->has_been_imported = true;
-}
 
 void check_add_foreign_import_decl(Checker *c, AstNode *decl) {
 	ast_node(fl, ForeignImportDecl, decl);
@@ -2706,7 +2661,7 @@ void check_add_foreign_import_decl(Checker *c, AstNode *decl) {
 	fl->been_handled = true;
 
 	Scope *parent_scope = c->context.scope;
-	GB_ASSERT(parent_scope->is_file);
+	GB_ASSERT(parent_scope->is_package);
 
 	String fullpath = fl->fullpath;
 	String library_name = path_to_entity_name(fl->library_name.string, fullpath);
@@ -2743,206 +2698,6 @@ void check_add_foreign_import_decl(Checker *c, AstNode *decl) {
 }
 
 
-bool collect_checked_files_from_import_decl_list(Checker *c, Array<AstNode *> decls) {
-	bool new_files = false;
-	for_array(i, decls) {
-		AstNode *decl = decls[i];
-		switch (decl->kind) {
-		case_ast_node(id, ImportDecl, decl);
-			HashKey key = hash_string(id->fullpath);
-			Scope **found = map_get(&c->file_scopes, key);
-			if (found == nullptr) continue;
-			Scope *s = *found;
-			if (!ptr_set_exists(&c->checked_files, s->file)) {
-				new_files = true;
-				ptr_set_add(&c->checked_files, s->file);
-			}
-		case_end;
-
-		case_ast_node(ed, ExportDecl, decl);
-			HashKey key = hash_string(ed->fullpath);
-			Scope **found = map_get(&c->file_scopes, key);
-			if (found == nullptr) continue;
-			Scope *s = *found;
-			if (!ptr_set_exists(&c->checked_files, s->file)) {
-				new_files = true;
-				ptr_set_add(&c->checked_files, s->file);
-			}
-		case_end;
-		}
-	}
-	return new_files;
-}
-
-
-bool collect_checked_files_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
-	Operand operand = {Addressing_Invalid};
-	if (!ws->is_cond_determined) {
-		check_expr(c, &operand, ws->cond);
-		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error(ws->cond, "Non-boolean condition in 'when' statement");
-		}
-		if (operand.mode != Addressing_Constant) {
-			error(ws->cond, "Non-constant condition in 'when' statement");
-		}
-
-		ws->is_cond_determined = true;
-		ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
-	}
-
-	if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
-		error(ws->cond, "Invalid body for 'when' statement");
-	} else {
-		if (ws->determined_cond) {
-			return collect_checked_files_from_import_decl_list(c, ws->body->BlockStmt.stmts);
-		} else if (ws->else_stmt) {
-			switch (ws->else_stmt->kind) {
-			case AstNode_BlockStmt:
-				return collect_checked_files_from_import_decl_list(c, ws->else_stmt->BlockStmt.stmts);
-			case AstNode_WhenStmt:
-				return collect_checked_files_from_when_stmt(c, &ws->else_stmt->WhenStmt);
-			default:
-				error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
-				break;
-			}
-		}
-	}
-
-	return false;
-}
-
-void check_delayed_file_import_entity(Checker *c, AstNode *decl) {
-	Scope *parent_scope = c->context.scope;
-	GB_ASSERT(parent_scope->is_file);
-
-	switch (decl->kind) {
-	case_ast_node(ws, WhenStmt, decl);
-		check_collect_entities_from_when_stmt(c, ws);
-	case_end;
-
-	case_ast_node(id, ImportDecl, decl);
-		check_add_import_decl(c, id);
-	case_end;
-
-	case_ast_node(ed, ExportDecl, decl);
-		check_add_export_decl(c, ed);
-	case_end;
-
-	case_ast_node(fl, ForeignImportDecl, decl);
-		check_add_foreign_import_decl(c, decl);
-	case_end;
-	}
-}
-
-
-// NOTE(bill): Returns true if a new file is present
-bool collect_file_decls(Checker *c, Array<AstNode *> decls);
-bool collect_file_decls_from_when_stmt(Checker *c, AstNodeWhenStmt *ws);
-
-bool collect_file_decls_from_when_stmt(Checker *c, AstNodeWhenStmt *ws) {
-	Operand operand = {Addressing_Invalid};
-	if (!ws->is_cond_determined) {
-		check_expr(c, &operand, ws->cond);
-		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error(ws->cond, "Non-boolean condition in 'when' statement");
-		}
-		if (operand.mode != Addressing_Constant) {
-			error(ws->cond, "Non-constant condition in 'when' statement");
-		}
-
-		ws->is_cond_determined = true;
-		ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
-	}
-
-	if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
-		error(ws->cond, "Invalid body for 'when' statement");
-	} else {
-		if (ws->determined_cond) {
-			return collect_file_decls(c, ws->body->BlockStmt.stmts);
-		} else if (ws->else_stmt) {
-			switch (ws->else_stmt->kind) {
-			case AstNode_BlockStmt:
-				return collect_file_decls(c, ws->else_stmt->BlockStmt.stmts);
-			case AstNode_WhenStmt:
-				return collect_file_decls_from_when_stmt(c, &ws->else_stmt->WhenStmt);
-			default:
-				error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
-				break;
-			}
-		}
-	}
-
-	return false;
-}
-
-bool collect_file_decls(Checker *c, Array<AstNode *> decls) {
-	Scope *parent_scope = c->context.scope;
-	GB_ASSERT(parent_scope->is_file);
-
-	if (collect_checked_files_from_import_decl_list(c, decls)) {
-		return true;
-	}
-
-	for_array(i, decls) {
-		AstNode *decl = decls[i];
-		switch (decl->kind) {
-		case_ast_node(vd, ValueDecl, decl);
-			check_collect_value_decl(c, decl);
-		case_end;
-
-		case_ast_node(id, ImportDecl, decl);
-			check_add_import_decl(c, id);
-		case_end;
-
-		case_ast_node(ed, ExportDecl, decl);
-			check_add_export_decl(c, ed);
-		case_end;
-
-		case_ast_node(fl, ForeignImportDecl, decl);
-			check_add_foreign_import_decl(c, decl);
-		case_end;
-
-		case_ast_node(fb, ForeignBlockDecl, decl);
-			check_add_foreign_block_decl(c, decl);
-		case_end;
-
-		case_ast_node(ws, WhenStmt, decl);
-			if (!ws->is_cond_determined) {
-				if (collect_checked_files_from_when_stmt(c, ws)) {
-					return true;
-				}
-
-				CheckerContext prev_context = c->context;
-				defer (c->context = prev_context);
-				c->context.collect_delayed_decls = true;
-
-				if (collect_file_decls_from_when_stmt(c, ws)) {
-					return true;
-				}
-			} else {
-
-				CheckerContext prev_context = c->context;
-				defer (c->context = prev_context);
-				c->context.collect_delayed_decls = true;
-
-				if (collect_file_decls_from_when_stmt(c, ws)) {
-					return true;
-				}
-			}
-		case_end;
-
-		case_ast_node(ce, CallExpr, decl);
-			if (ce->proc->kind == AstNode_BasicDirective &&
-			    ce->proc->BasicDirective.name == "assert") {
-				Operand o = {};
-				check_expr(c, &o, decl);
-			}
-		case_end;
-		}
-	}
-
-	return false;
-}
 
 void check_import_entities(Checker *c) {
 	Array<ImportGraphNode *> dep_graph = generate_import_dependency_graph(c);
@@ -2960,6 +2715,7 @@ void check_import_entities(Checker *c) {
 	ptr_set_init(&emitted, heap_allocator());
 	defer (ptr_set_destroy(&emitted));
 
+
 	while (pq.queue.count > 0) {
 		ImportGraphNode *n = priority_queue_pop(&pq);
 
@@ -2976,7 +2732,8 @@ void check_import_entities(Checker *c) {
 			// TODO(bill): This needs better TokenPos finding
 			auto const fn = [](ImportPathItem item) -> String {
 				Scope *s = item.scope;
-				return remove_directory_from_path(s->file->tokenizer.fullpath);
+				// return remove_directory_from_path(s->package->fullpath);
+				return s->package->name;
 			};
 
 			if (path.count == 1) {
@@ -3014,62 +2771,35 @@ void check_import_entities(Checker *c) {
 		}
 		ptr_set_add(&emitted, s);
 
-		array_add(&c->file_order, n);
+		array_add(&c->package_order, n);
 	}
 
-	for_array(file_index, c->parser->files) {
-		AstFile *f = c->parser->files[file_index];
-		Scope *s = f->scope;
-		if (s->is_init || s->is_global) {
-			ptr_set_add(&c->checked_files, f);
-		}
-	}
-
-	// for_array(file_index, c->file_order) {
-	// 	ImportGraphNode *node = c->file_order[file_index];
-	// 	AstFile *f = node->scope->file;
-	// 	gb_printf_err("---   %.*s -> %td\n", LIT(f->fullpath), node->succ.entries.count);
-	// }
-
-	for (;;) {
-		bool new_files = false;
-		for_array(file_index, c->file_order) {
-			ImportGraphNode *node = c->file_order[file_index];
-			AstFile *f = node->scope->file;
-
-			if (!ptr_set_exists(&c->checked_files, f)) {
-				continue;
-			}
-
-			CheckerContext prev_context = c->context;
-			defer (c->context = prev_context);
-			add_curr_ast_file(c, f);
-
-			new_files |= collect_checked_files_from_import_decl_list(c, f->decls);
-		}
-		if (new_files) break;
-	}
-
-	for (isize file_index = 0; file_index < c->file_order.count; file_index += 1) {
-		ImportGraphNode *node = c->file_order[file_index];
-		AstFile *f = node->scope->file;
-
-		if (!ptr_set_exists(&c->checked_files, f)) {
-			continue;
-		}
+	for_array(i, c->package_order) {
+		ImportGraphNode *node = c->package_order[i];
+		GB_ASSERT(node->scope->is_package);
+		AstPackage *p = node->scope->package;
 
 		CheckerContext prev_context = c->context;
 		defer (c->context = prev_context);
-		c->context.collect_delayed_decls = true;
-		add_curr_ast_file(c, f);
+		add_curr_ast_package(c, p);
 
-		bool new_files = collect_file_decls(c, f->decls);
-		if (new_files) {
-			// TODO(bill): Only start from the lowest new file
-			file_index = -1;
-			continue;
+		for_array(i, p->files.entries) {
+			AstFile *f = p->files.entries[i].value;
+			check_collect_entities(c, f->decls);
+		}
+
+		for_array(j, node->scope->delayed_imports) {
+			ast_node(id, ImportDecl, node->scope->delayed_imports[j]);
+			check_add_import_decl(c, id);
+		}
+
+		for_array(j, node->scope->delayed_asserts) {
+			AstNode *expr = node->scope->delayed_asserts[j];
+			Operand o = {};
+			check_expr(c, &o, expr);
 		}
 	}
+
 
 	// gb_printf_err("End here!\n");
 	// gb_exit(1);
@@ -3230,13 +2960,13 @@ void check_parsed_files(Checker *c) {
 	add_type_info_type(c, t_invalid);
 
 	// Map full filepaths to Scopes
-	for_array(i, c->parser->files) {
-		AstFile *f = c->parser->files[i];
-		Scope *scope = create_scope_from_file(c, f);
-		f->decl_info = make_decl_info(c->allocator, f->scope, c->context.decl);
-		HashKey key = hash_string(f->tokenizer.fullpath);
-		map_set(&c->file_scopes, key, scope);
-		map_set(&c->info.files, key, f);
+	for_array(i, c->parser->packages) {
+		AstPackage *p = c->parser->packages[i];
+		Scope *scope = create_scope_from_package(c, p);
+		p->decl_info = make_decl_info(c->allocator, p->scope, c->context.decl);
+		HashKey key = hash_string(p->fullpath);
+		map_set(&c->package_scopes, key, scope);
+		map_set(&c->info.packages, key, p);
 
 		if (scope->is_init) {
 			c->info.init_scope = scope;
@@ -3245,11 +2975,14 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("collect entities");
 	// Collect Entities
-	for_array(i, c->parser->files) {
-		AstFile *f = c->parser->files[i];
+	for_array(i, c->parser->packages) {
+		AstPackage *p = c->parser->packages[i];
 		CheckerContext prev_context = c->context;
-		add_curr_ast_file(c, f);
-		check_collect_entities(c, f->decls);
+		add_curr_ast_package(c, p);
+		for_array(j, p->files.entries) {
+			AstFile *f = p->files.entries[j].value;
+			check_collect_entities(c, f->decls);
+		}
 		c->context = prev_context;
 	}
 
@@ -3279,7 +3012,7 @@ void check_parsed_files(Checker *c) {
 			GB_ASSERT_MSG(pt->is_poly_specialized, "%.*s", LIT(name));
 		}
 
-		add_curr_ast_file(c, pi->file);
+		add_curr_ast_package(c, pi->package);
 
 		bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
 		bool no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
@@ -3353,12 +3086,14 @@ void check_parsed_files(Checker *c) {
 		Entity *e = current_scope_lookup_entity(s, str_lit("main"));
 		if (e == nullptr) {
 			Token token = {};
-			if (s->file->tokens.count > 0) {
-				token = s->file->tokens[0];
-			} else {
-				token.pos.file   = s->file->tokenizer.fullpath;
-				token.pos.line   = 1;
-				token.pos.column = 1;
+			token.pos.file   = s->package->fullpath;
+			token.pos.line   = 1;
+			token.pos.column = 1;
+			if (s->package->files.entries.count > 0) {
+				AstFile *f = s->package->files.entries[0].value;
+				if (f->tokens.count > 0) {
+					token = f->tokens[0];
+				}
 			}
 
 			error(token, "Undefined entry point procedure 'main'");

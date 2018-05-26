@@ -94,6 +94,13 @@ String substring(String const &s, isize lo, isize hi) {
 }
 
 
+char *alloc_cstring(gbAllocator a, String s) {
+	char *c_str = gb_alloc_array(a, char, s.len+1);
+	gb_memcopy(c_str, s.text, s.len);
+	c_str[s.len] = '\0';
+	return c_str;
+}
+
 
 
 gb_inline bool str_eq_ignore_case(String const &a, String const &b) {
