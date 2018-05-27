@@ -1,5 +1,7 @@
 package os
 
+OS :: "essence";
+
 // foreign import api "system:api"
 
 // Handle    :: distinct int;

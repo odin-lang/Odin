@@ -6,6 +6,8 @@ foreign import libc "system:c"
 import "core:strings"
 import "core:mem"
 
+OS :: "osx";
+
 Handle    :: distinct i32;
 File_Time :: distinct u64;
 Errno     :: distinct int;

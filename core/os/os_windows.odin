@@ -3,6 +3,8 @@ package os
 import "core:sys/win32"
 import "core:mem"
 
+OS :: "windows";
+
 Handle    :: distinct uintptr;
 File_Time :: distinct u64;
 Errno     :: distinct int;

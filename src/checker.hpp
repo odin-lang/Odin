@@ -326,7 +326,7 @@ struct Checker {
 
 
 	AstFile *                  curr_ast_file;
-	AstPackage *               runtime_package;
+	AstPackage *               builtin_package;
 	// NOTE(bill): Procedures to check
 	Array<ProcedureInfo>       procs;
 	Map<Scope *>               package_scopes; // Key: String (fullpath)

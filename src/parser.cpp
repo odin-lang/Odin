@@ -4150,7 +4150,7 @@ void parse_file(Parser *p, AstFile *f) {
 	if (package_name.kind == Token_Ident) {
 		if (package_name.string == "_") {
 			error(package_name, "Invalid package name '_'");
-		} else if (f->package->kind != ImportedPackage_Runtime && package_name.string == "runtime") {
+		} else if (f->package->kind != ImportedPackage_Builtin && package_name.string == "builtin") {
 			error(package_name, "Use of reserved package name '%.*s'", LIT(package_name.string));
 		}
 	}
@@ -4338,8 +4338,8 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 
 	isize shared_package_count = 0;
 	if (!build_context.generate_docs) {
-		String s = get_fullpath_core(heap_allocator(), str_lit("runtime"));
-		try_add_import_path(p, s, s, init_pos, ImportedPackage_Runtime);
+		String s = get_fullpath_core(heap_allocator(), str_lit("builtin"));
+		try_add_import_path(p, s, s, init_pos, ImportedPackage_Builtin);
 		shared_package_count++;
 	}
 

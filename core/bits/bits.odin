@@ -1,5 +1,7 @@
 package bits
 
+import "core:os"
+
 U8_MIN   ::   u8(0);
 U16_MIN  ::  u16(0);
 U32_MIN  ::  u32(0);
@@ -95,29 +97,29 @@ reverse_bits32  :: proc(i:  u32) ->  u32 { return __llvm_bitreverse32(i); }
 reverse_bits64  :: proc(i:  u64) ->  u64 { return __llvm_bitreverse64(i); }
 
 from_be_u8   :: proc(i:   u8) ->   u8 { return i; }
-from_be_u16  :: proc(i:  u16) ->  u16 { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
-from_be_u32  :: proc(i:  u32) ->  u32 { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
-from_be_u64  :: proc(i:  u64) ->  u64 { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
-from_be_uint :: proc(i: uint) -> uint { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
+from_be_u16  :: proc(i:  u16) ->  u16 { when os.ENDIAN == "big" { return i; } else { return byte_swap(i); } }
+from_be_u32  :: proc(i:  u32) ->  u32 { when os.ENDIAN == "big" { return i; } else { return byte_swap(i); } }
+from_be_u64  :: proc(i:  u64) ->  u64 { when os.ENDIAN == "big" { return i; } else { return byte_swap(i); } }
+from_be_uint :: proc(i: uint) -> uint { when os.ENDIAN == "big" { return i; } else { return byte_swap(i); } }
 
 from_le_u8   :: proc(i:   u8) ->   u8 { return i; }
-from_le_u16  :: proc(i:  u16) ->  u16 { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
-from_le_u32  :: proc(i:  u32) ->  u32 { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
-from_le_u64  :: proc(i:  u64) ->  u64 { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
-from_le_uint :: proc(i: uint) -> uint { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
+from_le_u16  :: proc(i:  u16) ->  u16 { when os.ENDIAN == "little" { return i; } else { return byte_swap(i); } }
+from_le_u32  :: proc(i:  u32) ->  u32 { when os.ENDIAN == "little" { return i; } else { return byte_swap(i); } }
+from_le_u64  :: proc(i:  u64) ->  u64 { when os.ENDIAN == "little" { return i; } else { return byte_swap(i); } }
+from_le_uint :: proc(i: uint) -> uint { when os.ENDIAN == "little" { return i; } else { return byte_swap(i); } }
 
 to_be_u8   :: proc(i:   u8) ->   u8 { return i; }
-to_be_u16  :: proc(i:  u16) ->  u16 { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
-to_be_u32  :: proc(i:  u32) ->  u32 { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
-to_be_u64  :: proc(i:  u64) ->  u64 { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
-to_be_uint :: proc(i: uint) -> uint { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
+to_be_u16  :: proc(i:  u16) ->  u16 { when os.ENDIAN == "big" { return i; } else { return byte_swap(i); } }
+to_be_u32  :: proc(i:  u32) ->  u32 { when os.ENDIAN == "big" { return i; } else { return byte_swap(i); } }
+to_be_u64  :: proc(i:  u64) ->  u64 { when os.ENDIAN == "big" { return i; } else { return byte_swap(i); } }
+to_be_uint :: proc(i: uint) -> uint { when os.ENDIAN == "big" { return i; } else { return byte_swap(i); } }
 
 
 to_le_u8   :: proc(i:   u8) ->   u8 { return i; }
-to_le_u16  :: proc(i:  u16) ->  u16 { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
-to_le_u32  :: proc(i:  u32) ->  u32 { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
-to_le_u64  :: proc(i:  u64) ->  u64 { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
-to_le_uint :: proc(i: uint) -> uint { when ODIN_ENDIAN == "little" { return i; } else { return byte_swap(i); } }
+to_le_u16  :: proc(i:  u16) ->  u16 { when os.ENDIAN == "little" { return i; } else { return byte_swap(i); } }
+to_le_u32  :: proc(i:  u32) ->  u32 { when os.ENDIAN == "little" { return i; } else { return byte_swap(i); } }
+to_le_u64  :: proc(i:  u64) ->  u64 { when os.ENDIAN == "little" { return i; } else { return byte_swap(i); } }
+to_le_uint :: proc(i: uint) -> uint { when os.ENDIAN == "little" { return i; } else { return byte_swap(i); } }
 
 
 overflowing_add_u8   :: proc(lhs, rhs:   u8) -> (u8, bool)   { foreign __llvm_core @(link_name="llvm.uadd.with.overflow.i8")   op :: proc(u8, u8)     -> (u8, bool)   ---; return op(lhs, rhs); }

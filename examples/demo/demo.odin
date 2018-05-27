@@ -488,7 +488,7 @@ prefix_table := [?]string{
 };
 
 threading_example :: proc() {
-	when ODIN_OS == "windows" {
+	when os.OS == "windows" {
 		fmt.println("# threading_example");
 
 		unordered_remove :: proc(array: ^[dynamic]$T, index: int, loc := #caller_location) {
