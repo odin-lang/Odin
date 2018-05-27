@@ -25,18 +25,18 @@ struct CommentGroup {
 };
 
 
-enum ImportedPackageKind {
-	ImportedPackage_Normal,
-	ImportedPackage_Builtin,
-	ImportedPackage_Init,
+enum PackageKind {
+	Package_Normal,
+	Package_Builtin,
+	Package_Init,
 };
 
 struct ImportedPackage {
-	ImportedPackageKind kind;
-	String              path;
-	String              rel_path;
-	TokenPos            pos; // import
-	isize               index;
+	PackageKind kind;
+	String      path;
+	String      rel_path;
+	TokenPos    pos; // import
+	isize       index;
 };
 
 struct AstFile {
@@ -85,11 +85,11 @@ struct AstFile {
 
 
 struct AstPackage {
-	isize               id;
-	ImportedPackageKind kind;
-	String              name;
-	String              fullpath;
-	Map<AstFile *>      files; // Key: String (names)
+	isize          id;
+	PackageKind    kind;
+	String         name;
+	String         fullpath;
+	Map<AstFile *> files; // Key: String (names)
 
 	Scope *   scope;       // NOTE(bill): Created in checker
 	DeclInfo *decl_info;   // NOTE(bill): Created in checker

@@ -255,11 +255,11 @@ Scope *create_scope_from_package(Checker *c, AstPackage *p) {
 	if (p->fullpath == c->parser->init_fullpath) {
 		s->is_init = true;
 	} else {
-		s->is_init = p->kind == ImportedPackage_Init;
+		s->is_init = p->kind == Package_Init;
 	}
 
-	s->is_global = p->kind == ImportedPackage_Builtin;
-	if (p->kind == ImportedPackage_Builtin) {
+	if (p->kind == Package_Builtin) {
+		s->is_global = true;
 		universal_scope->shared = s;
 	}
 
@@ -2954,7 +2954,7 @@ void check_parsed_files(Checker *c) {
 		if (scope->is_init) {
 			c->info.init_scope = scope;
 		}
-		if (p->kind == ImportedPackage_Builtin) {
+		if (p->kind == Package_Builtin) {
 			GB_ASSERT(c->builtin_package == nullptr);
 			c->builtin_package = p;
 		}
