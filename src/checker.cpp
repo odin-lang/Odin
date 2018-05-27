@@ -2532,7 +2532,7 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 	GB_ASSERT(scope->is_package && scope->package != nullptr);
 
 	if (scope->is_global) {
-		error(token, "Importing a runtime package is disallowed and unnecessary");
+		error(token, "Importing a built-in package is disallowed and unnecessary");
 		return;
 	}
 
@@ -2567,7 +2567,7 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 
 	if (id->is_using) {
 		if (parent_scope->is_global) {
-			error(id->import_name, "'runtime' package imports cannot use using");
+			error(id->import_name, "'builtin' package imports cannot use using");
 			return;
 		}
 

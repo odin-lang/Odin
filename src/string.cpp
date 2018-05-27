@@ -287,6 +287,16 @@ String remove_directory_from_path(String const &s) {
 	}
 	return substring(s, s.len-len, s.len);
 }
+String directory_from_path(String const &s) {
+	isize i = s.len-1;
+	for (; i >= 0; i--) {
+		if (s[i] == '/' ||
+		    s[i] == '\\') {
+			break;
+		}
+	}
+	return substring(s, 0, i);
+}
 
 
 String concatenate_strings(gbAllocator a, String const &x, String const &y) {

@@ -1,5 +1,7 @@
 package c
 
+import "core:os"
+
 CHAR_BIT :: 8;
 
 c_bool   :: bool;
@@ -12,17 +14,8 @@ c_ushort :: u16;
 c_int    :: i32;
 c_uint   :: u32;
 
-when ODIN_OS == "windows" || size_of(rawptr) == 4 {
-	c_long :: i32;
-} else {
-	c_long :: i64;
-}
-
-when ODIN_OS == "windows" || size_of(rawptr) == 4 {
-	c_ulong :: u32;
-} else {
-	c_ulong :: u64;
-}
+c_long  :: (os.OS == "windows" || size_of(rawptr) == 4) ? i32 : i64;
+c_ulong :: (os.OS == "windows" || size_of(rawptr) == 4) ? u32 : u64;
 
 c_longlong       :: i64;
 c_ulonglong      :: u64;

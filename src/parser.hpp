@@ -70,7 +70,7 @@ struct AstFile {
 	AstNode *           curr_proc;
 	isize               scope_level;
 	// DeclInfo *          decl_info;   // NOTE(bill): Created in checker
-
+	isize               error_count;
 
 	CommentGroup        lead_comment; // Comment (block) before the decl
 	CommentGroup        line_comment; // Comment after the semicolon
