@@ -215,7 +215,7 @@ bool decl_info_has_init(DeclInfo *d) {
 Scope *create_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
-	map_init(&s->elements,     heap_allocator());
+	map_init(&s->elements, heap_allocator());
 	ptr_set_init(&s->implicit, heap_allocator());
 	ptr_set_init(&s->imported, heap_allocator());
 	ptr_set_init(&s->exported, heap_allocator());
@@ -2119,6 +2119,16 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 	for_array(decl_index, nodes) {
 		AstNode *decl = nodes[decl_index];
 		if (!is_ast_node_decl(decl) && !is_ast_node_when_stmt(decl)) {
+
+			if (c->context.scope->is_file && decl->kind == AstNode_ExprStmt) {
+				AstNode *expr = decl->ExprStmt.expr;
+				if (expr->kind == AstNode_CallExpr &&
+				    expr->CallExpr.proc->kind == AstNode_BasicDirective &&
+				    expr->CallExpr.proc->BasicDirective.name == "assert") {
+					array_add(&c->context.scope->delayed_asserts, expr);
+					continue;
+				}
+			}
 			continue;
 		}
 
@@ -2158,18 +2168,6 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes) {
 			check_add_foreign_block_decl(c, decl);
 		case_end;
 
-
-		case_ast_node(ce, CallExpr, decl);
-			if (c->context.scope->is_file &&
-			    ce->proc->kind == AstNode_BasicDirective &&
-			    ce->proc->BasicDirective.name == "assert") {
-				array_add(&c->context.scope->delayed_asserts, decl);
-			} else {
-				goto error_case;
-			}
-		case_end;
-
-		error_case:
 		default:
 			if (c->context.scope->is_file) {
 				error(decl, "Only declarations are allowed at file scope");
@@ -2708,17 +2706,6 @@ void check_import_entities(Checker *c) {
 		ImportGraphNode *node = c->package_order[i];
 		GB_ASSERT(node->scope->is_package);
 		AstPackage *p = node->scope->package;
-
-
-
-		for_array(i, p->files.entries) {
-			AstFile *f = p->files.entries[i].value;
-
-			CheckerContext prev_context = c->context;
-			defer (c->context = prev_context);
-			add_curr_ast_file(c, f);
-			check_collect_entities(c, f->decls);
-		}
 
 		for_array(i, p->files.entries) {
 			AstFile *f = p->files.entries[i].value;

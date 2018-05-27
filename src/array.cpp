@@ -54,7 +54,10 @@ gb_inline void array_init(Array<T> *array, gbAllocator const &a, isize count) {
 template <typename T>
 gb_inline void array_init(Array<T> *array, gbAllocator const &a, isize count, isize capacity) {
 	array->allocator = a;
-	array->data = gb_alloc_array(a, T, capacity);
+	array->data = nullptr;
+	if (capacity > 0) {
+		array->data = gb_alloc_array(a, T, capacity);
+	}
 	array->count = count;
 	array->capacity = capacity;
 }

@@ -1,7 +1,5 @@
 package main
 
-#assert(_BUFFER_SIZE > 0);
-
 import "core:fmt"
 import "core:strconv"
 import "core:mem"
