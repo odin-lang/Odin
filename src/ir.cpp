@@ -1532,7 +1532,9 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 //
 ////////////////////////////////////////////////////////////////
 
-irValue *ir_emit_global_call(irProcedure *proc, char const *name_, Array<irValue *> args, AstNode *expr = nullptr);
+irValue *ir_emit_global_call (irProcedure *proc,                            char const *name_, Array<irValue *> args, AstNode *expr = nullptr);
+irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char const *name_, Array<irValue *> args, AstNode *expr = nullptr);
+
 
 irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
 	Type *a = type_deref(ir_type(address));
@@ -1632,7 +1634,7 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 
 	irValue *ep = ir_emit_struct_ep(proc, c, 0);
 	Array<irValue *> args = {};
-	irValue *v = ir_emit_global_call(proc, "default_allocator", args);
+	irValue *v = ir_emit_package_call(proc, "mem", "default_allocator", args);
 	ir_emit_store(proc, ep, v);
 
 	return c;
@@ -1700,6 +1702,19 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args) {
 irValue *ir_emit_global_call(irProcedure *proc, char const *name_, Array<irValue *> args, AstNode *expr) {
 	String name = make_string_c(cast(char *)name_);
 	irValue **found = map_get(&proc->module->members, hash_string(name));
+	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
+	irValue *gp = *found;
+	irValue *call = ir_emit_call(proc, gp, args);
+	ir_add_debug_location_to_value(proc, call, expr);
+	return call;
+}
+irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char const *name_, Array<irValue *> args, AstNode *expr) {
+	String name = make_string_c(cast(char *)name_);
+	String package_name = make_string_c(cast(char *)package_name_);
+
+	AstPackage *p = get_core_package(proc->module->info, package_name);
+	Entity *e = current_scope_lookup_entity(p->scope, name);
+	irValue **found = map_get(&proc->module->values, hash_entity(e));
 	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
 	irValue *gp = *found;
 	irValue *call = ir_emit_call(proc, gp, args);
@@ -3755,9 +3770,10 @@ void ir_emit_dynamic_array_bounds_check(irProcedure *proc, Token token, irValue 
 //
 ////////////////////////////////////////////////////////////////
 
-String ir_mangle_name(irGen *s, String path, Entity *e) {
+String ir_mangle_name(irGen *s, Entity *e) {
 	// NOTE(bill): prefix names not in the init scope
 	// TODO(bill): make robust and not just rely on the file's name
+	String path = e->token.pos.file;
 	String name = e->token.string;
 	irModule *m = &s->module;
 	CheckerInfo *info = m->info;
@@ -4307,7 +4323,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			args[0] = slice_size;
 			args[1] = elem_align;
 			args[2] = ir_emit_source_code_location(proc, proc_name, pos);
-			irValue *call = ir_emit_global_call(proc, "alloc", args);
+			irValue *call = ir_emit_package_call(proc, "mem", "alloc", args);
 
 			irValue *ptr = ir_emit_conv(proc, call, elem_ptr_type);
 			irValue *slice = ir_add_local_generated(proc, type);
@@ -8318,7 +8334,7 @@ void ir_gen_tree(irGen *s) {
 
 			String name = e->token.string;
 			if (!no_name_mangle) {
-				name = ir_mangle_name(s, e->token.pos.file, e);
+				name = ir_mangle_name(s, e);
 			}
 			ir_add_entity_name(m, e, name);
 
@@ -8390,7 +8406,7 @@ void ir_gen_tree(irGen *s) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
 			} else {
-				name = ir_mangle_name(s, e->token.pos.file, e);
+				name = ir_mangle_name(s, e);
 			}
 		}
 		ir_add_entity_name(m, e, name);

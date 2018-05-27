@@ -38,7 +38,7 @@ string_buffer_from_slice :: proc(backing: []byte) -> String_Buffer {
 		data = s.data,
 		len  = 0,
 		cap  = s.len,
-		allocator = nil_allocator(),
+		allocator = mem.nil_allocator(),
 	};
 	return transmute(String_Buffer)d;
 }

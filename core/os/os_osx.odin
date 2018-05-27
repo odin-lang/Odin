@@ -4,7 +4,6 @@ foreign import dl   "system:dl"
 foreign import libc "system:c"
 
 import "core:strings"
-import "core:mem"
 
 OS :: "osx";
 

@@ -1415,7 +1415,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					if (is_type_string(t)) {
 						val0 = t_rune;
 						val1 = t_int;
-						add_preload_dependency(c, "__string_decode_rune");
+						add_package_dependency(c, "runtime", "__string_decode_rune");
 					}
 					break;
 				case Type_Array:

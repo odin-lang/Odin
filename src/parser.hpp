@@ -27,7 +27,7 @@ struct CommentGroup {
 
 enum PackageKind {
 	Package_Normal,
-	Package_Builtin,
+	Package_Runtime,
 	Package_Init,
 };
 
@@ -85,11 +85,11 @@ struct AstFile {
 
 
 struct AstPackage {
-	isize          id;
-	PackageKind    kind;
-	String         name;
-	String         fullpath;
-	Map<AstFile *> files; // Key: String (names)
+	isize            id;
+	PackageKind      kind;
+	String           name;
+	String           fullpath;
+	Array<AstFile *> files;
 
 	Scope *   scope;       // NOTE(bill): Created in checker
 	DeclInfo *decl_info;   // NOTE(bill): Created in checker
@@ -355,6 +355,12 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		bool             is_using;     \
 		bool             is_mutable;   \
 		bool             been_handled; \
+	}) \
+	AST_NODE_KIND(PackageDecl, "package declaration", struct { \
+		Token token;          \
+		Token name;           \
+		CommentGroup docs;    \
+		CommentGroup comment; \
 	}) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		AstPackage *package;    \

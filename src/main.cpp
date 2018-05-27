@@ -578,7 +578,7 @@ void show_timings(Checker *c, Timings *t) {
 	isize files    = 0;
 	isize packages = p->packages.count;
 	for_array(i, p->packages) {
-		files += p->packages[i]->files.entries.count;
+		files += p->packages[i]->files.count;
 	}
 
 	{

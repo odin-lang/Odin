@@ -1733,7 +1733,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 	type->Map.value = value;
 
 	if (is_type_string(key)) {
-		add_preload_dependency(c, "__default_hash_string");
+		add_package_dependency(c, "runtime", "__default_hash_string");
 	}
 
 
