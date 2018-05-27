@@ -2352,41 +2352,6 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 		}
 	case_end;
 
-
-	// case_ast_node(ed, ExportDecl, decl);
-	// 	String path = ed->fullpath;
-	// 	HashKey key = hash_string(path);
-	// 	Scope **found = map_get(&c->file_scopes, key);
-	// 	if (found == nullptr) {
-	// 		for_array(scope_index, c->file_scopes.entries) {
-	// 			Scope *scope = c->file_scopes.entries[scope_index].value;
-	// 			gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
-	// 		}
-	// 		Token token = ast_node_token(decl);
-	// 		gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
-	// 		GB_PANIC("Unable to find scope for file: %.*s", LIT(path));
-	// 	}
-	// 	Scope *scope = *found;
-	// 	GB_ASSERT(scope != nullptr);
-	// 	ed->file = scope->file;
-
-	// 	ImportGraphNode **found_node = nullptr;
-	// 	ImportGraphNode *m = nullptr;
-	// 	ImportGraphNode *n = nullptr;
-
-	// 	found_node = map_get(M, hash_pointer(scope));
-	// 	GB_ASSERT(found_node != nullptr);
-	// 	m = *found_node;
-
-	// 	found_node = map_get(M, hash_pointer(parent_package_scope));
-	// 	GB_ASSERT(found_node != nullptr);
-	// 	n = *found_node;
-
-	// 	import_graph_node_set_add(&n->succ, m);
-	// 	import_graph_node_set_add(&m->pred, n);
-	// 	ptr_set_add(&m->scope->exported, n->scope);
-	// case_end;
-
 	case_ast_node(ws, WhenStmt, decl);
 		if (ws->body != nullptr) {
 			auto stmts = ws->body->BlockStmt.stmts;
@@ -2474,39 +2439,36 @@ Array<ImportPathItem> find_import_path(Checker *c, Scope *start, Scope *end, Ptr
 	String path = start->package->fullpath;
 	HashKey key = hash_string(path);
 	Scope **found = map_get(&c->package_scopes, key);
-	// if (found) {
-	// 	AstPackage *p = (*found)->package;
-	// 	GB_ASSERT(p != nullptr);
+	if (found) {
+		AstPackage *p = (*found)->package;
+		GB_ASSERT(p != nullptr);
 
-	// 	for_array(i, f->imports_and_exports) {
-	// 		Scope *s = nullptr;
-	// 		AstNode *decl = f->imports_and_exports[i];
-	// 		/* if (decl->kind == AstNode_ExportDecl) {
-	// 			s = decl->ExportDecl.file->scope;
-	// 		} else */
-	// 		if (decl->kind == AstNode_ImportDecl) {
-	// 			if (!decl->ImportDecl.is_using) {
-	// 				// continue;
-	// 			}
-	// 			s = decl->ImportDecl.package->scope;
-	// 		} else {
-	// 			continue;
-	// 		}
-	// 		GB_ASSERT(s != nullptr);
+		for_array(i, p->files.entries) {
+			AstFile *f = p->files.entries[i].value;
+			for_array(j, f->imports) {
+				Scope *s = nullptr;
+				AstNode *decl = f->imports[j];
+				if (decl->kind == AstNode_ImportDecl) {
+					s = decl->ImportDecl.package->scope;
+				} else {
+					continue;
+				}
+				GB_ASSERT(s != nullptr && s->is_package);
 
-	// 		ImportPathItem item = {s, decl};
-	// 		if (s == end) {
-	// 			auto path = array_make<ImportPathItem>(heap_allocator());
-	// 			array_add(&path, item);
-	// 			return path;
-	// 		}
-	// 		auto next_path = find_import_path(c, s, end, visited);
-	// 		if (next_path.count > 0) {
-	// 			array_add(&next_path, item);
-	// 			return next_path;
-	// 		}
-	// 	}
-	// }
+				ImportPathItem item = {s, decl};
+				if (s == end) {
+					auto path = array_make<ImportPathItem>(heap_allocator());
+					array_add(&path, item);
+					return path;
+				}
+				auto next_path = find_import_path(c, s, end, visited);
+				if (next_path.count > 0) {
+					array_add(&next_path, item);
+					return next_path;
+				}
+			}
+		}
+	}
 	return empty_path;
 }
 #endif

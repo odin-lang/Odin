@@ -61,7 +61,6 @@ Token ast_node_token(AstNode *node) {
 
 	case AstNode_ValueDecl:          return ast_node_token(node->ValueDecl.names[0]);
 	case AstNode_ImportDecl:         return node->ImportDecl.token;
-	// case AstNode_ExportDecl:         return node->ExportDecl.token;
 	case AstNode_ForeignImportDecl:  return node->ForeignImportDecl.token;
 
 	case AstNode_ForeignBlockDecl:   return node->ForeignBlockDecl.token;
@@ -1011,16 +1010,6 @@ AstNode *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, 
 	return result;
 }
 
-// AstNode *ast_export_decl(AstFile *f, Token token, Token relpath,
-//                          CommentGroup docs, CommentGroup comment) {
-// 	AstNode *result = make_ast_node(f, AstNode_ExportDecl);
-// 	result->ExportDecl.token       = token;
-// 	result->ExportDecl.relpath     = relpath;
-// 	result->ExportDecl.docs        = docs;
-// 	result->ExportDecl.comment     = comment;
-// 	return result;
-// }
-
 AstNode *ast_foreign_import_decl(AstFile *f, Token token, Token filepath, Token library_name,
                                  CommentGroup docs, CommentGroup comment) {
 	AstNode *result = make_ast_node(f, AstNode_ForeignImportDecl);
@@ -1319,7 +1308,6 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 		return s->ProcLit.body != nullptr;
 
 	case AstNode_ImportDecl:
-	// case AstNode_ExportDecl:
 	case AstNode_ForeignImportDecl:
 		return true;
 
@@ -3481,7 +3469,7 @@ AstNode *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 		s = ast_bad_decl(f, import_name, file_path);
 	} else {
 		s = ast_import_decl(f, token, is_using, file_path, import_name, docs, f->line_comment);
-		array_add(&f->imports_and_exports, s);
+		array_add(&f->imports, s);
 	}
 	expect_semicolon(f, s);
 	return s;
@@ -3642,13 +3630,7 @@ AstNode *parse_stmt(AstFile *f) {
 					import_decl->ImportDecl.using_in_list = list;
 				}
 				return import_decl;
-			} /* else if (f->curr_token.kind == Token_export) {
-				AstNode *export_decl = parse_export_decl(f);
-				if (export_decl->kind == AstNode_ExportDecl) {
-					export_decl->ExportDecl.using_in_list = list;
-				}
-				return export_decl;
-			} */
+			}
 
 			AstNode *expr = parse_expr(f, true);
 			expect_semicolon(f, expr);
@@ -3873,7 +3855,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	arena_size *= 2*f->tokens.count;
 	gb_arena_init_from_allocator(&f->arena, heap_allocator(), arena_size);
 	array_init(&f->comments, heap_allocator());
-	array_init(&f->imports_and_exports, heap_allocator());
+	array_init(&f->imports, heap_allocator());
 
 	f->curr_proc = nullptr;
 
@@ -3885,7 +3867,7 @@ void destroy_ast_file(AstFile *f) {
 	gb_arena_free(&f->arena);
 	array_free(&f->tokens);
 	array_free(&f->comments);
-	array_free(&f->imports_and_exports);
+	array_free(&f->imports);
 	gb_free(heap_allocator(), f->tokenizer.fullpath.text);
 	destroy_tokenizer(&f->tokenizer);
 }
@@ -4098,22 +4080,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 
 			id->fullpath = import_path;
 			try_add_import_path(p, import_path, original_string, ast_node_token(node).pos);
-		} /* else if (node->kind == AstNode_ExportDecl) {
-			ast_node(ed, ExportDecl, node);
-
-			String original_string = ed->relpath.string;
-			String export_path = {};
-			bool ok = determine_path_from_string(p, node, base_dir, original_string, &export_path);
-			if (!ok) {
-				decls[i] = ast_bad_decl(f, ed->relpath, ed->relpath);
-				continue;
-			}
-
-			export_path = string_trim_whitespace(export_path);
-
-			ed->fullpath = export_path;
-			try_add_import_path(p, export_path, original_string, ast_node_token(node).pos);
-		}  */else if (node->kind == AstNode_ForeignImportDecl) {
+		} else if (node->kind == AstNode_ForeignImportDecl) {
 			ast_node(fl, ForeignImportDecl, node);
 
 			String file_str = fl->filepath.string;
