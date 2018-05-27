@@ -533,6 +533,7 @@ void init_universal_scope(void) {
 	// NOTE(bill): No need to free these
 	gbAllocator a = heap_allocator();
 	universal_scope = create_scope(nullptr, a);
+	universal_scope->is_package = true;
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
@@ -2961,6 +2962,9 @@ void check_parsed_files(Checker *c) {
 		for_array(j, p->files.entries) {
 			AstFile *f = p->files.entries[j].value;
 			create_scope_from_file(c, f);
+			HashKey key = hash_string(f->fullpath);
+			map_set(&c->info.files, key, f);
+
 			add_curr_ast_file(c, f);
 			check_collect_entities(c, f->decls);
 		}

@@ -14,11 +14,9 @@
 #include "parser.cpp"
 #include "docs.cpp"
 #include "checker.cpp"
-#if 0
 #include "ir.cpp"
 #include "ir_opt.cpp"
 #include "ir_print.cpp"
-#endif
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
 i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
@@ -811,7 +809,7 @@ int main(int arg_count, char **arg_ptr) {
 
 	check_parsed_files(&checker);
 
-#if 0
+#if 1
 	if (build_context.no_output_files) {
 		if (build_context.show_timings) {
 			show_timings(&checker, &timings);
