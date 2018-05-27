@@ -153,7 +153,6 @@ Allocator_Mode :: enum byte {
 	Resize,
 }
 
-
 Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
 	                         size, alignment: int,
 	                         old_memory: rawptr, old_size: int, flags: u64 = 0, location := #caller_location) -> rawptr;
@@ -310,7 +309,7 @@ __init_context :: proc "contextless" (c: ^Context) {
 
 copy :: proc "contextless" (dst, src: $T/[]$E) -> int {
 	n := max(0, min(len(dst), len(src)));
-	if n > 0 do __mem_copy(&dst[0], &src[0], n*size_of(E));
+	if n > 0 do mem.copy(&dst[0], &src[0], n*size_of(E));
 	return n;
 }
 
@@ -390,7 +389,7 @@ append :: proc(array: ^$T/[dynamic]$E, args: ...E, loc := #caller_location) -> i
 		a := (^raw.Dynamic_Array)(array);
 		data := (^E)(a.data);
 		assert(data != nil);
-		__mem_copy(mem.ptr_offset(data, uintptr(a.len)), &args[0], size_of(E) * arg_len);
+		mem.copy(mem.ptr_offset(data, uintptr(a.len)), &args[0], size_of(E) * arg_len);
 		a.len += arg_len;
 	}
 	return len(array);
@@ -531,7 +530,7 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 	assert(array.data != nil);
 	data := uintptr(array.data) + uintptr(elem_size*array.len);
 
-	__mem_copy(rawptr(data), items, elem_size * item_count);
+	mem.copy(rawptr(data), items, elem_size * item_count);
 	array.len += item_count;
 	return array.len;
 }
@@ -549,7 +548,7 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 
 	assert(array.data != nil);
 	data := uintptr(array.data) + uintptr(elem_size*array.len);
-	__mem_zero(rawptr(data), elem_size);
+	mem.zero(rawptr(data), elem_size);
 	array.len += 1;
 	return array.len;
 }
@@ -655,7 +654,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int, loc := 
 		e := __dynamic_map_get_entry(new_header, j);
 		e.next = fr.entry_index;
 		ndata := uintptr(e);
-		__mem_copy(rawptr(ndata+value_offset), rawptr(data+value_offset), value_size);
+		mem.copy(rawptr(ndata+value_offset), rawptr(data+value_offset), value_size);
 
 		if __dynamic_map_full(new_header) do __dynamic_map_grow(new_header, loc);
 	}
@@ -699,7 +698,7 @@ __dynamic_map_set :: proc(h: __Map_Header, key: __Map_Key, value: rawptr, loc :=
 		e := __dynamic_map_get_entry(h, index);
 		e.key = key;
 		val := (^byte)(uintptr(e) + h.value_offset);
-		__mem_copy(val, value, h.value_size);
+		mem.copy(val, value, h.value_size);
 	}
 
 	if __dynamic_map_full(h) {
@@ -772,7 +771,7 @@ __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) #no_bo
 		__dynamic_map_get_entry(h, fr.entry_prev).next = __dynamic_map_get_entry(h, fr.entry_index).next;
 	}
 
-	__mem_copy(__dynamic_map_get_entry(h, fr.entry_index), __dynamic_map_get_entry(h, m.entries.len-1), entry_size);
+	mem.copy(__dynamic_map_get_entry(h, fr.entry_index), __dynamic_map_get_entry(h, m.entries.len-1), entry_size);
 	last := __dynamic_map_find(h, __dynamic_map_get_entry(h, fr.entry_index).key);
 	if last.entry_prev >= 0 {
 		__dynamic_map_get_entry(h, last.entry_prev).next = fr.entry_index;

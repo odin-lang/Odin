@@ -313,6 +313,8 @@ struct CheckerInfo {
 	Array<Type *>         type_info_types;
 	Map<isize>            type_info_map;   // Key: Type *
 
+
+	AstPackage *          runtime_package;
 	Scope *               init_scope;
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
@@ -326,7 +328,6 @@ struct Checker {
 
 
 	AstFile *                  curr_ast_file;
-	AstPackage *               runtime_package;
 	// NOTE(bill): Procedures to check
 	Array<ProcedureInfo>       procs;
 	Map<Scope *>               package_scopes; // Key: String (fullpath)

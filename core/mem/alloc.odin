@@ -62,7 +62,7 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 	new_memory := alloc(new_size, alignment, loc);
 	if new_memory == nil do return nil;
 
-	__mem_copy(new_memory, old_memory, min(old_size, new_size));;
+	copy(new_memory, old_memory, min(old_size, new_size));;
 	free(old_memory, loc);
 	return new_memory;
 }
