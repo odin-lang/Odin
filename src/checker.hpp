@@ -274,15 +274,16 @@ struct ForeignContext {
 typedef Array<Entity *> CheckerTypePath;
 
 struct CheckerContext {
-	Scope *    package_scope;
-	Scope *    scope;
-	DeclInfo * decl;
-	u32        stmt_state_flags;
-	bool       in_defer; // TODO(bill): Actually handle correctly
-	String     proc_name;
-	Type *     type_hint;
-	DeclInfo * curr_proc_decl;
-	Type *     curr_proc_sig;
+	AstPackage *   package;
+	Scope *        package_scope;
+	Scope *        scope;
+	DeclInfo *     decl;
+	u32            stmt_state_flags;
+	bool           in_defer; // TODO(bill): Actually handle correctly
+	String         proc_name;
+	Type *         type_hint;
+	DeclInfo *     curr_proc_decl;
+	Type *         curr_proc_sig;
 	ForeignContext foreign_context;
 
 	CheckerTypePath *type_path;
@@ -312,7 +313,6 @@ struct CheckerInfo {
 	Array<Type *>         type_info_types;
 	Map<isize>            type_info_map;   // Key: Type *
 
-
 	Scope *               init_scope;
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
@@ -326,7 +326,7 @@ struct Checker {
 
 
 	AstFile *                  curr_ast_file;
-	AstPackage *               builtin_package;
+	AstPackage *               runtime_package;
 	// NOTE(bill): Procedures to check
 	Array<ProcedureInfo>       procs;
 	Map<Scope *>               package_scopes; // Key: String (fullpath)

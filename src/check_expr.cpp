@@ -1565,25 +1565,25 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 
 			if (is_type_string(x->type) || is_type_string(y->type)) {
 				switch (op) {
-				case Token_CmpEq: add_preload_dependency(c, "__string_eq"); break;
-				case Token_NotEq: add_preload_dependency(c, "__string_ne"); break;
-				case Token_Lt:    add_preload_dependency(c, "__string_lt"); break;
-				case Token_Gt:    add_preload_dependency(c, "__string_gt"); break;
-				case Token_LtEq:  add_preload_dependency(c, "__string_le"); break;
-				case Token_GtEq:  add_preload_dependency(c, "__string_gt"); break;
+				case Token_CmpEq: add_package_dependency(c, "runtime", "__string_eq"); break;
+				case Token_NotEq: add_package_dependency(c, "runtime", "__string_ne"); break;
+				case Token_Lt:    add_package_dependency(c, "runtime", "__string_lt"); break;
+				case Token_Gt:    add_package_dependency(c, "runtime", "__string_gt"); break;
+				case Token_LtEq:  add_package_dependency(c, "runtime", "__string_le"); break;
+				case Token_GtEq:  add_package_dependency(c, "runtime", "__string_gt"); break;
 				}
 			} else if (is_type_complex(x->type) || is_type_complex(y->type)) {
 				switch (op) {
 				case Token_CmpEq:
 					switch (8*size) {
-					case 64:  add_preload_dependency(c, "__complex64_eq");  break;
-					case 128: add_preload_dependency(c, "__complex128_eq"); break;
+					case 64:  add_package_dependency(c, "runtime", "__complex64_eq");  break;
+					case 128: add_package_dependency(c, "runtime", "__complex128_eq"); break;
 					}
 					break;
 				case Token_NotEq:
 					switch (8*size) {
-					case 64:  add_preload_dependency(c, "__complex64_ne");  break;
-					case 128: add_preload_dependency(c, "__complex128_ne"); break;
+					case 64:  add_package_dependency(c, "runtime", "__complex64_ne");  break;
+					case 128: add_package_dependency(c, "runtime", "__complex128_ne"); break;
 					}
 					break;
 				}
@@ -1845,7 +1845,7 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	// cstring -> string
 	if (src == t_cstring && dst == t_string) {
 		if (operand->mode != Addressing_Constant) {
-			add_preload_dependency(c, "__cstring_to_string");
+			add_package_dependency(c, "runtime", "__cstring_to_string");
 		}
 		return true;
 	}
@@ -2949,7 +2949,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			} else {
 				mode = Addressing_Value;
 				if (is_type_cstring(op_type)) {
-					add_preload_dependency(c, "__cstring_len");
+					add_package_dependency(c, "runtime", "__cstring_len");
 				}
 			}
 		} else if (is_type_array(op_type)) {
@@ -3052,15 +3052,15 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (is_type_slice(type)) {
 			min_args = 2;
 			max_args = 2;
-			add_preload_dependency(c, "alloc");
+			add_package_dependency(c, "mem", "alloc");
 		} else if (is_type_map(type)) {
 			min_args = 1;
 			max_args = 2;
-			add_preload_dependency(c, "__dynamic_map_reserve");
+			add_package_dependency(c, "runtime", "__dynamic_map_reserve");
 		} else if (is_type_dynamic_array(type)) {
 			min_args = 1;
 			max_args = 3;
-			add_preload_dependency(c, "__dynamic_array_make");
+			add_package_dependency(c, "runtime", "__dynamic_array_make");
 		} else {
 			gbString str = type_to_string(type);
 			error(call, "Cannot 'make' %s; type must be a slice, map, or dynamic array", str);
@@ -3416,7 +3416,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		add_type_info_type(c, t);
 
 		if (is_operand_value(o) && is_type_typeid(t)) {
-			add_preload_dependency(c, "__type_info_of");
+			add_package_dependency(c, "runtime", "__type_info_of");
 		} else if (o.mode != Addressing_Type) {
 			error(expr, "Expected a type or typeid for 'type_info_of'");
 			return false;
@@ -3452,7 +3452,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		t = base_type(t);
 		if (is_operand_value(o) && are_types_identical(t, t_type_info_ptr)) {
-			add_preload_dependency(c, "__typeid_of");
+			add_package_dependency(c, "runtime", "__typeid_of");
 		} else if (o.mode != Addressing_Type) {
 			error(expr, "Expected a type or type info for 'typeid_of'");
 			return false;
@@ -3802,8 +3802,8 @@ break;
 
 			{
 				Type *bt = base_type(a.type);
-				if (bt == t_f32) add_preload_dependency(c, "__min_f32");
-				if (bt == t_f64) add_preload_dependency(c, "__min_f64");
+				if (bt == t_f32) add_package_dependency(c, "runtime", "__min_f32");
+				if (bt == t_f64) add_package_dependency(c, "runtime", "__min_f64");
 			}
 
 		}
@@ -3879,8 +3879,8 @@ break;
 
 			{
 				Type *bt = base_type(a.type);
-				if (bt == t_f32) add_preload_dependency(c, "__max_f32");
-				if (bt == t_f64) add_preload_dependency(c, "__max_f64");
+				if (bt == t_f32) add_package_dependency(c, "runtime", "__max_f32");
+				if (bt == t_f64) add_package_dependency(c, "runtime", "__max_f64");
 			}
 		}
 
@@ -3921,10 +3921,10 @@ break;
 
 			{
 				Type *bt = base_type(operand->type);
-				if (bt == t_f32)        add_preload_dependency(c, "__abs_f32");
-				if (bt == t_f64)        add_preload_dependency(c, "__abs_f64");
-				if (bt == t_complex64)  add_preload_dependency(c, "__abs_complex64");
-				if (bt == t_complex128) add_preload_dependency(c, "__abs_complex128");
+				if (bt == t_f32)        add_package_dependency(c, "runtime", "__abs_f32");
+				if (bt == t_f64)        add_package_dependency(c, "runtime", "__abs_f64");
+				if (bt == t_complex64)  add_package_dependency(c, "runtime", "__abs_complex64");
+				if (bt == t_complex128) add_package_dependency(c, "runtime", "__abs_complex128");
 			}
 		}
 
@@ -4025,12 +4025,12 @@ break;
 			{
 				Type *bt = base_type(x.type);
 				if (bt == t_f32) {
-					add_preload_dependency(c, "__min_f32");
-					add_preload_dependency(c, "__max_f32");
+					add_package_dependency(c, "runtime", "__min_f32");
+					add_package_dependency(c, "runtime", "__max_f32");
 				}
 				if (bt == t_f64) {
-					add_preload_dependency(c, "__min_f64");
-					add_preload_dependency(c, "__max_f64");
+					add_package_dependency(c, "runtime", "__min_f64");
+					add_package_dependency(c, "runtime", "__max_f64");
 				}
 			}
 		}
@@ -5643,8 +5643,8 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				context_name = str_lit("dynamic array literal");
 				is_constant = false;
 
-				add_preload_dependency(c, "__dynamic_array_reserve");
-				add_preload_dependency(c, "__dynamic_array_append");
+				add_package_dependency(c, "runtime", "__dynamic_array_reserve");
+				add_package_dependency(c, "runtime", "__dynamic_array_append");
 			} else {
 				GB_PANIC("unreachable");
 			}
@@ -5803,8 +5803,8 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				}
 			}
 
-			add_preload_dependency(c, "__dynamic_map_reserve");
-			add_preload_dependency(c, "__dynamic_map_set");
+			add_package_dependency(c, "runtime", "__dynamic_map_reserve");
+			add_package_dependency(c, "runtime", "__dynamic_map_set");
 			break;
 		}
 
@@ -5927,7 +5927,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			return kind;
 		}
 
-		add_preload_dependency(c, "__type_assertion_check");
+		add_package_dependency(c, "runtime", "__type_assertion_check");
 	case_end;
 
 	case_ast_node(tc, TypeCast, node);
@@ -6027,8 +6027,8 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			o->type = t->Map.value;
 			o->expr = node;
 
-			add_preload_dependency(c, "__dynamic_map_get");
-			add_preload_dependency(c, "__dynamic_map_set");
+			add_package_dependency(c, "runtime", "__dynamic_map_get");
+			add_package_dependency(c, "runtime", "__dynamic_map_set");
 			return Expr_Expr;
 		}
 

@@ -23,12 +23,19 @@ copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawpt
 	return __mem_copy_non_overlapping(dst, src, len);
 }
 compare :: proc "contextless" (a, b: []byte) -> int {
-	return __mem_compare(&a[0], &b[0], min(len(a), len(b)));
+	return compare_byte_ptrs(&a[0], &b[0], min(len(a), len(b)));
+}
+compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int {
+	pa :: ptr_offset;
+	for i in 0..uintptr(n) do switch {
+	case pa(a, i)^ < pa(b, i)^: return -1;
+	case pa(a, i)^ > pa(b, i)^: return +1;
+	}
+	return 0;
 }
 
-
-ptr_offset :: proc "contextless" (ptr: $P/^$T, n: int) -> P {
-	new := uintptr(ptr) + uintptr(size_of(T)*n);
+ptr_offset :: proc "contextless" (ptr: $P/^$T, n: uintptr) -> P {
+	new := uintptr(ptr) + size_of(T)*n;
 	return P(new);
 }
 
@@ -46,6 +53,18 @@ slice_to_bytes :: proc "contextless" (slice: $E/[]$T) -> []byte {
 	s := transmute(raw.Slice)slice;
 	s.len *= size_of(T);
 	return transmute([]byte)s;
+}
+
+
+buffer_from_slice :: proc(backing: $T/[]$E) -> [dynamic]E {
+	s := transmute(raw.Slice)backing;
+	d := raw.Dynamic_Array{
+		data      = s.data,
+		len       = 0,
+		cap       = s.len,
+		allocator = nil_allocator(),
+	};
+	return transmute([dynamic]E)d;
 }
 
 ptr_to_bytes :: proc "contextless" (ptr: ^$T, len := 1) -> []byte {
@@ -89,7 +108,7 @@ allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: in
 	ptr := cast(^uint)(ptr_offset(header, 1));
 	n := ptr_sub(cast(^uint)data, ptr);
 
-	for i in 0..n {
+	for i in 0..uintptr(n) {
 		ptr_offset(ptr, i)^ = ~uint(0);
 	}
 }

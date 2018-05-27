@@ -1,6 +1,6 @@
 package os
 
-import "core:mem"
+import "core:raw"
 
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, cast([]byte)str);
@@ -56,9 +56,11 @@ write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (succ
 }
 
 write_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
-	return write(fd, mem.slice_ptr(cast(^byte)data, len));
+	s := transmute([]byte)raw.Slice{data, len};
+	return write(fd, s);
 }
 
 read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
-	return read(fd, mem.slice_ptr(cast(^byte)data, len));
+	s := transmute([]byte)raw.Slice{data, len};
+	return read(fd, s);
 }

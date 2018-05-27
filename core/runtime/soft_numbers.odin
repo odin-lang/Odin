@@ -1,4 +1,4 @@
-package builtin
+package runtime
 
 /*
 @(link_name="__multi3")

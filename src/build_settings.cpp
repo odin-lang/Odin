@@ -351,6 +351,7 @@ String path_to_fullpath(gbAllocator a, String s) {
 	defer (gb_mutex_unlock(&string_buffer_mutex));
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	defer (gb_temp_arena_memory_end(tmp));
 	String16 string16 = string_to_string16(string_buffer_allocator, s);
 
 	DWORD len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
@@ -359,8 +360,9 @@ String path_to_fullpath(gbAllocator a, String s) {
 		GetFullPathNameW(&string16[0], len, text, nullptr);
 		text[len] = 0;
 		result = string16_to_string(a, make_string16(text, len));
+		result = string_trim_whitespace(result);
 	}
-	gb_temp_arena_memory_end(tmp);
+
 	return result;
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
