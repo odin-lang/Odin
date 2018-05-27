@@ -11,16 +11,51 @@ swap :: proc[swap16, swap32, swap64];
 
 
 set :: proc "contextless" (data: rawptr, value: i32, len: int) -> rawptr {
-	return __mem_set(data, value, len);
+	if data == nil do return nil;
+	foreign __llvm_core {
+		when size_of(rawptr) == 8 {
+			@(link_name="llvm.memset.p0i8.i64")
+			llvm_memset :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) ---;
+		} else {
+			@(link_name="llvm.memset.p0i8.i32")
+			llvm_memset :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) ---;
+		}
+	}
+	llvm_memset(data, byte(value), len, 1, false);
+	return data;
 }
 zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
-	return __mem_zero(data, len);
+	return set(data, 0, len);
 }
 copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
-	return __mem_copy(dst, src, len);
+	if src == nil do return dst;
+	// NOTE(bill): This _must_ be implemented like C's memmove
+	foreign __llvm_core {
+		when size_of(rawptr) == 8 {
+			@(link_name="llvm.memmove.p0i8.p0i8.i64")
+			llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+		} else {
+			@(link_name="llvm.memmove.p0i8.p0i8.i32")
+			llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+		}
+	}
+	llvm_memmove(dst, src, len, 1, false);
+	return dst;
 }
 copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
-	return __mem_copy_non_overlapping(dst, src, len);
+	if src == nil do return dst;
+	// NOTE(bill): This _must_ be implemented like C's memcpy
+	foreign __llvm_core {
+		when size_of(rawptr) == 8 {
+			@(link_name="llvm.memcpy.p0i8.p0i8.i64")
+	 		llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+		} else {
+			@(link_name="llvm.memcpy.p0i8.p0i8.i32")
+	 		llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+		}
+	}
+	llvm_memcpy(dst, src, len, 1, false);
+	return dst;
 }
 compare :: proc "contextless" (a, b: []byte) -> int {
 	return compare_byte_ptrs(&a[0], &b[0], min(len(a), len(b)));

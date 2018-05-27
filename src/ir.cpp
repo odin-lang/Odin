@@ -1575,8 +1575,9 @@ void ir_emit_zero_init(irProcedure *p, irValue *address, AstNode *expr) {
 	auto args = array_make<irValue *>(a, 2);
 	args[0] = ir_emit_conv(p, address, t_rawptr);
 	args[1] = ir_const_int(a, type_size_of(t));
-	if (p->entity->token.string != "__mem_zero") {
-		ir_emit_global_call(p, "__mem_zero", args, expr);
+	AstPackage *package = get_core_package(p->module->info, str_lit("mem"));
+	if (p->entity->token.string != "zero" && p->entity->package != package) {
+		ir_emit_package_call(p, "mem", "zero", args, expr);
 	}
 	ir_emit(p, ir_instr_zero_init(p, address));
 }
@@ -1701,7 +1702,10 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args) {
 
 irValue *ir_emit_global_call(irProcedure *proc, char const *name_, Array<irValue *> args, AstNode *expr) {
 	String name = make_string_c(cast(char *)name_);
-	irValue **found = map_get(&proc->module->members, hash_string(name));
+
+	AstPackage *p = proc->module->info->runtime_package;
+	Entity *e = current_scope_lookup_entity(p->scope, name);
+	irValue **found = map_get(&proc->module->values, hash_entity(e));
 	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
 	irValue *gp = *found;
 	irValue *call = ir_emit_call(proc, gp, args);
@@ -3771,13 +3775,15 @@ void ir_emit_dynamic_array_bounds_check(irProcedure *proc, Token token, irValue 
 ////////////////////////////////////////////////////////////////
 
 String ir_mangle_name(irGen *s, Entity *e) {
+	irModule *m = &s->module;
+	CheckerInfo *info = m->info;
+	gbAllocator a = m->allocator;
+
+#if 0
 	// NOTE(bill): prefix names not in the init scope
 	// TODO(bill): make robust and not just rely on the file's name
 	String path = e->token.pos.file;
 	String name = e->token.string;
-	irModule *m = &s->module;
-	CheckerInfo *info = m->info;
-	gbAllocator a = m->allocator;
 	AstFile *file = ast_file_of_filename(info, path);
 
 	char *str = gb_alloc_array(a, char, path.len+1);
@@ -3825,6 +3831,35 @@ String ir_mangle_name(irGen *s, Entity *e) {
 	}
 
 	return make_string(new_name, new_name_len-1);
+
+#else
+	GB_ASSERT(e->package != nullptr);
+	String pkg = e->package->name;
+	GB_ASSERT(!rune_is_digit(pkg[0]));
+
+	String name = e->token.string;
+
+
+	isize max_len = pkg.len + 1 + name.len + 1;
+	bool require_suffix_id = is_type_polymorphic(e->type);
+	if (require_suffix_id) {
+		max_len += 21;
+	}
+
+	u8 *new_name = gb_alloc_array(a, u8, max_len);
+	isize new_name_len = gb_snprintf(
+		cast(char *)new_name, max_len,
+		"%.*s.%.*s", LIT(pkg), LIT(name)
+	);
+	if (require_suffix_id) {
+		char *str = cast(char *)new_name + new_name_len-1;
+		isize len = max_len-new_name_len;
+		isize extra = gb_snprintf(str, len, "-%llu", cast(unsigned long long)e->id);
+		new_name_len += extra-1;
+	}
+
+	return make_string(new_name, new_name_len-1);
+#endif
 }
 
 
@@ -4060,7 +4095,9 @@ irValue *ir_emit_clamp(irProcedure *proc, Type *t, irValue *x, irValue *min, irV
 
 
 irValue *ir_find_global_variable(irProcedure *proc, String name) {
-	irValue **value = map_get(&proc->module->members, hash_string(name));
+	AstPackage *pkg = proc->module->info->runtime_package;
+	Entity *e = current_scope_lookup_entity(pkg->scope, name);
+	irValue **value = map_get(&proc->module->values, hash_entity(e));
 	GB_ASSERT_MSG(value != nullptr, "Unable to find global variable '%.*s'", LIT(name));
 	return *value;
 }
@@ -8325,12 +8362,9 @@ void ir_gen_tree(irGen *s) {
 			}
 			GB_ASSERT(e->kind == Entity_Variable);
 
-
-			bool is_global = e->package != nullptr;
-
 			bool is_foreign = e->Variable.is_foreign;
 			bool is_export  = e->Variable.is_export;
-			bool no_name_mangle = is_global || e->Variable.link_name.len > 0 || is_foreign || is_export;
+			bool no_name_mangle = e->Variable.link_name.len > 0 || is_foreign || is_export;
 
 			String name = e->token.string;
 			if (!no_name_mangle) {
@@ -8401,6 +8435,7 @@ void ir_gen_tree(irGen *s) {
 
 		String original_name = name;
 
+	#if 0
 		if (!package_scope->is_global || polymorphic_struct || is_type_polymorphic(e->type)) {
 			if (e->kind == Entity_Procedure && e->Procedure.is_export) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
@@ -8409,6 +8444,16 @@ void ir_gen_tree(irGen *s) {
 				name = ir_mangle_name(s, e);
 			}
 		}
+	#else
+			if (e->kind == Entity_Procedure && e->Procedure.is_export) {
+				// Okay
+			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
+				// Handle later
+			} else {
+				name = ir_mangle_name(s, e);
+			}
+	#endif
+
 		ir_add_entity_name(m, e, name);
 
 		switch (e->kind) {

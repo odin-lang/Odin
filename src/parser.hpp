@@ -99,6 +99,7 @@ struct AstPackage {
 struct Parser {
 	String                 init_fullpath;
 	Map<bool>              imported_files; // Key: String (fullpath)
+	Map<AstPackage *>      package_map; // Key: String (package name)
 	Array<AstPackage *>    packages;
 	Array<ImportedPackage> imports;
 	isize                  total_token_count;

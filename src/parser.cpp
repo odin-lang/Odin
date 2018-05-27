@@ -3886,6 +3886,7 @@ void destroy_ast_file(AstFile *f) {
 bool init_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
 	map_init(&p->imported_files, heap_allocator());
+	map_init(&p->package_map, heap_allocator());
 	array_init(&p->packages, heap_allocator());
 	array_init(&p->imports, heap_allocator());
 	gb_mutex_init(&p->file_add_mutex);
@@ -3911,6 +3912,7 @@ void destroy_parser(Parser *p) {
 	array_free(&p->packages);
 	array_free(&p->imports);
 	map_destroy(&p->imported_files);
+	map_destroy(&p->package_map);
 	gb_mutex_destroy(&p->file_add_mutex);
 	gb_mutex_destroy(&p->file_decl_mutex);
 }
@@ -4234,6 +4236,20 @@ skip:
 void parser_add_package(Parser *p, AstPackage *package) {
 	package->id = p->packages.count+1;
 	array_add(&p->packages, package);
+	if (package->name.len > 0) {
+		HashKey key = hash_string(package->name);
+		auto found = map_get(&p->package_map, key);
+		if (found) {
+			GB_ASSERT(package->files.count > 0);
+			AstFile *f = package->files[0];
+			error(f->package_token, "Non-unique package name '%.*s'", LIT(package->name));
+			GB_ASSERT((*found)->files.count > 0);
+			TokenPos pos = (*found)->files[0]->package_token.pos;
+			gb_printf_err("\tpreviously declared at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
+		} else {
+			map_set(&p->package_map, key, package);
+		}
+	}
 }
 
 ParseFileError parse_import(Parser *p, ImportedPackage imported_package) {

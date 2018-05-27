@@ -1350,7 +1350,6 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	ptr_set_init(&c->info.minimum_dependency_type_info_set, heap_allocator());
 
 	String required_builtin_entities[] = {
-		str_lit("__mem_zero"),
 		str_lit("__init_context"),
 
 		str_lit("__args__"),
@@ -1362,12 +1361,13 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("Context"),
 	};
 	for (isize i = 0; i < gb_count_of(required_builtin_entities); i++) {
-		add_dependency_to_set(c, scope_lookup_entity(c->runtime_package->scope, required_builtin_entities[i]));
+		add_dependency_to_set(c, scope_lookup_entity(c->info.runtime_package->scope, required_builtin_entities[i]));
 	}
 
 	AstPackage *mem = get_core_package(&c->info, str_lit("mem"));
 	String required_mem_entities[] = {
 		str_lit("default_allocator"),
+		str_lit("zero"),
 	};
 	for (isize i = 0; i < gb_count_of(required_mem_entities); i++) {
 		add_dependency_to_set(c, scope_lookup_entity(mem->scope, required_mem_entities[i]));
@@ -1380,7 +1380,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			str_lit("__dynamic_array_expr_error"),
 		};
 		for (isize i = 0; i < gb_count_of(bounds_check_entities); i++) {
-			add_dependency_to_set(c, scope_lookup_entity(c->runtime_package->scope, bounds_check_entities[i]));
+			add_dependency_to_set(c, scope_lookup_entity(c->info.runtime_package->scope, bounds_check_entities[i]));
 		}
 	}
 
@@ -1500,7 +1500,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 
 
 Entity *find_core_entity(Checker *c, String name) {
-	Entity *e = current_scope_lookup_entity(c->runtime_package->scope, name);
+	Entity *e = current_scope_lookup_entity(c->info.runtime_package->scope, name);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
 		               "Is '_preload.odin' missing from the 'core' directory relative to odin.exe?", LIT(name));
@@ -1510,7 +1510,7 @@ Entity *find_core_entity(Checker *c, String name) {
 }
 
 Type *find_core_type(Checker *c, String name) {
-	Entity *e = current_scope_lookup_entity(c->runtime_package->scope, name);
+	Entity *e = current_scope_lookup_entity(c->info.runtime_package->scope, name);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
 		               "Is '_preload.odin' missing from the 'core' directory relative to odin.exe?", LIT(name));
@@ -2513,10 +2513,11 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 	Scope *scope = *found;
 	GB_ASSERT(scope->is_package && scope->package != nullptr);
 
-	if (scope->is_global) {
-		error(token, "Importing a built-in package is disallowed and unnecessary");
-		return;
-	}
+	// TODO(bill): Should this be allowed or not?
+	// if (scope->is_global) {
+	// 	error(token, "Importing a runtime package is disallowed and unnecessary");
+	// 	return;
+	// }
 
 	if (ptr_set_exists(&parent_scope->imported, scope)) {
 		// error(token, "Multiple import of the same file within this scope");
@@ -2926,8 +2927,8 @@ void check_parsed_files(Checker *c) {
 			c->info.init_scope = scope;
 		}
 		if (p->kind == Package_Runtime) {
-			GB_ASSERT(c->runtime_package == nullptr);
-			c->runtime_package = p;
+			GB_ASSERT(c->info.runtime_package == nullptr);
+			c->info.runtime_package = p;
 		}
 	}
 
