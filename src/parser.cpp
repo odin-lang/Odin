@@ -4366,6 +4366,11 @@ struct ParserThreadWork {
 	isize   import_index;
 };
 
+void add_shared_package(Parser *p, String name, TokenPos pos, PackageKind kind) {
+	String s = get_fullpath_core(heap_allocator(), name);
+	try_add_import_path(p, s, s, pos, kind);
+}
+
 ParseFileError parse_packages(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
 
@@ -4384,9 +4389,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 
 	isize shared_package_count = 0;
 	if (!build_context.generate_docs) {
-		String s = get_fullpath_core(heap_allocator(), str_lit("runtime"));
-		try_add_import_path(p, s, s, init_pos, Package_Runtime);
-		shared_package_count++;
+		add_shared_package(p, str_lit("runtime"), init_pos, Package_Runtime); shared_package_count++;
 	}
 
 	array_add(&p->imports, init_imported_package);

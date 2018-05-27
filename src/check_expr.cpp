@@ -2583,7 +2583,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			String entity_name = selector->Ident.token.string;
 
 			check_op_expr = false;
-			entity = scope_lookup_entity(import_scope, entity_name);
+			entity = current_scope_lookup_entity(import_scope, entity_name);
 			bool is_declared = entity != nullptr;
 			if (is_declared) {
 				if (entity->kind == Entity_Builtin) {
