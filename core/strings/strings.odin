@@ -1,6 +1,5 @@
 package strings
 
-import "core:mem"
 import "core:raw"
 
 new_string :: proc(s: string) -> string {

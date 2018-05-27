@@ -1,7 +1,5 @@
 package utf16
 
-import "core:unicode/utf8"
-
 REPLACEMENT_CHAR :: '\uFFFD';
 MAX_RUNE         :: '\U0010FFFF';
 

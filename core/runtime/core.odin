@@ -1,13 +1,13 @@
 package runtime
 
 import "core:os"
-import "core:unicode/utf8"
 import "core:raw"
 import "core:mem"
 
 // Naming Conventions:
 // In general, Ada_Case for types and snake_case for values
 //
+// Package Name:       snake_case (but prefer single word)
 // Import Name:        snake_case (but prefer single word)
 // Types:              Ada_Case
 // Enum Values:        Ada_Case

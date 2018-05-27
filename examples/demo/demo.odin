@@ -85,6 +85,7 @@ general_stuff :: proc() {
 		x3: b32 = true;
 		x4: b64 = false;
 
+		fmt.printf("x0: %T = %v;\n", x0, x0);
 		fmt.printf("x1: %T = %v;\n", x1, x1);
 		fmt.printf("x2: %T = %v;\n", x2, x2);
 		fmt.printf("x3: %T = %v;\n", x3, x3);
