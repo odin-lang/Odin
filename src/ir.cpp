@@ -8257,12 +8257,7 @@ void ir_gen_tree(irGen *s) {
 		Entity *e = info->entities[i];
 		String name = e->token.string;
 
-		bool is_global = false;
-		if (e->scope->is_package) {
-			is_global = true;
-		} else if (e->scope->parent && e->scope->parent->is_package) {
-			is_global = true;
-		}
+		bool is_global = e->package != nullptr;
 
 		if (e->kind == Entity_Variable) {
 			global_variable_max_count++;
@@ -8315,12 +8310,7 @@ void ir_gen_tree(irGen *s) {
 			GB_ASSERT(e->kind == Entity_Variable);
 
 
-			bool is_global = false;
-			if (e->scope->is_package) {
-				is_global = true;
-			} else if (e->scope->parent && e->scope->parent->is_package) {
-				is_global = true;
-			}
+			bool is_global = e->package != nullptr;
 
 			bool is_foreign = e->Variable.is_foreign;
 			bool is_export  = e->Variable.is_export;

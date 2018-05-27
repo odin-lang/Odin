@@ -13,7 +13,7 @@ enum TargetArchKind {
 	TargetArch_Invalid,
 
 	TargetArch_amd64,
-	TargetArch_x64,
+	TargetArch_x86,
 
 	TargetArch_COUNT,
 };
@@ -77,7 +77,7 @@ gb_global BuildContext build_context = {0};
 
 TargetOsKind get_target_os_from_string(String str) {
 	for (isize i = 0; i < TargetOs_COUNT; i++) {
-		if (target_os_names[i] == str) {
+		if (str_eq_ignore_case(target_os_names[i], str)) {
 			return cast(TargetOsKind)i;
 		}
 	}
@@ -86,7 +86,7 @@ TargetOsKind get_target_os_from_string(String str) {
 
 TargetArchKind get_target_arch_from_string(String str) {
 	for (isize i = 0; i < TargetArch_COUNT; i++) {
-		if (target_os_names[i] == str) {
+		if (str_eq_ignore_case(target_arch_names[i], str)) {
 			return cast(TargetArchKind)i;
 		}
 	}

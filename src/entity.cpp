@@ -6,7 +6,6 @@ struct DeclInfo;
 
 #define ENTITY_KINDS \
 	ENTITY_KIND(Invalid) \
-	ENTITY_KIND(Package) \
 	ENTITY_KIND(Constant) \
 	ENTITY_KIND(Variable) \
 	ENTITY_KIND(TypeName) \
@@ -77,6 +76,7 @@ struct Entity {
 	AstNode *   identifier; // Can be nullptr
 	DeclInfo *  decl_info;
 	DeclInfo *  parent_proc_decl; // nullptr if in file/global scope
+	AstPackage *package;
 
 	// TODO(bill): Cleanup how `using` works for entities
 	Entity *    using_parent;
@@ -86,12 +86,6 @@ struct Entity {
 	String      deprecated_message;
 
 	union {
-		struct {
-			String fullpath;
-			String name;
-			Scope *scope;
-			// Array<Entity *> imports; // Entity_Package
-		} Package;
 		struct {
 			ExactValue value;
 		} Constant;
@@ -193,15 +187,6 @@ Entity *alloc_entity(EntityKind kind, Scope *scope, Token token, Type *type) {
 	entity->token  = token;
 	entity->type   = type;
 	entity->id     = ++global_entity_id;
-	return entity;
-}
-
-Entity *alloc_entity_package(Scope *scope, Type *type, String fullpath, String name) {
-	Token token = empty_token;
-	token.string = name;
-	Entity *entity = alloc_entity(Entity_Package, scope, token, type);
-	entity->Package.fullpath = fullpath;
-	entity->Package.name     = name;
 	return entity;
 }
 

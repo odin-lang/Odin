@@ -27,7 +27,7 @@ struct CommentGroup {
 
 enum ImportedPackageKind {
 	ImportedPackage_Normal,
-	ImportedPackage_Runtime,
+	ImportedPackage_Builtin,
 	ImportedPackage_Init,
 };
 

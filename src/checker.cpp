@@ -258,8 +258,8 @@ Scope *create_scope_from_package(Checker *c, AstPackage *p) {
 		s->is_init = p->kind == ImportedPackage_Init;
 	}
 
-	s->is_global = p->kind == ImportedPackage_Runtime;
-	if (p->kind == ImportedPackage_Runtime) {
+	s->is_global = p->kind == ImportedPackage_Builtin;
+	if (p->kind == ImportedPackage_Builtin) {
 		universal_scope->shared = s;
 	}
 
@@ -481,7 +481,7 @@ void add_type_info_dependency(DeclInfo *d, Type *type) {
 
 void add_preload_dependency(Checker *c, char *name) {
 	String n = make_string_c(name);
-	Entity *e = scope_lookup_entity(c->runtime_package->scope, n);
+	Entity *e = scope_lookup_entity(c->builtin_package->scope, n);
 	GB_ASSERT(e != nullptr);
 	ptr_set_add(&c->context.decl->deps, e);
 	// add_type_info_type(c, e->type);
@@ -551,9 +551,9 @@ void init_universal_scope(void) {
 	                                            str_lit(""), str_lit("__llvm_core")));
 
 	// TODO(bill): Set through flags in the compiler
-	add_global_string_constant(str_lit("ODIN_OS"),      bc->ODIN_OS);
-	add_global_string_constant(str_lit("ODIN_ARCH"),    bc->ODIN_ARCH);
-	add_global_string_constant(str_lit("ODIN_ENDIAN"),  bc->ODIN_ENDIAN);
+	// add_global_string_constant(str_lit("ODIN_OS"),      bc->ODIN_OS);
+	// add_global_string_constant(str_lit("ODIN_ARCH"),    bc->ODIN_ARCH);
+	// add_global_string_constant(str_lit("ODIN_ENDIAN"),  bc->ODIN_ENDIAN);
 	add_global_string_constant(str_lit("ODIN_VENDOR"),  bc->ODIN_VENDOR);
 	add_global_string_constant(str_lit("ODIN_VERSION"), bc->ODIN_VERSION);
 	add_global_string_constant(str_lit("ODIN_ROOT"),    bc->ODIN_ROOT);
@@ -921,10 +921,16 @@ void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclIn
 			case Entity_LibraryName:
 				// NOTE(bill): Entities local to file rather than package
 				break;
-			default:
-				GB_ASSERT(scope->file->package->scope == scope->parent);
-				scope = scope->file->package->scope;
+			default: {
+				AstPackage *p = scope->file->package;
+				GB_ASSERT(p->scope == scope->parent);
+				scope = p->scope;
+				if (e->package != nullptr) {
+					GB_ASSERT(e->package == p);
+				}
+				e->package = p;
 				break;
+			}
 			}
 		}
 		add_entity(c, scope, identifier, e);
@@ -1343,7 +1349,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("Context"),
 	};
 	for (isize i = 0; i < gb_count_of(required_entities); i++) {
-		add_dependency_to_set(c, scope_lookup_entity(c->runtime_package->scope, required_entities[i]));
+		add_dependency_to_set(c, scope_lookup_entity(c->builtin_package->scope, required_entities[i]));
 	}
 
 	if (!build_context.no_bounds_check) {
@@ -1353,7 +1359,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			str_lit("__dynamic_array_expr_error"),
 		};
 		for (isize i = 0; i < gb_count_of(bounds_check_entities); i++) {
-			add_dependency_to_set(c, scope_lookup_entity(c->runtime_package->scope, bounds_check_entities[i]));
+			add_dependency_to_set(c, scope_lookup_entity(c->builtin_package->scope, bounds_check_entities[i]));
 		}
 	}
 
@@ -1473,7 +1479,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 
 
 Entity *find_core_entity(Checker *c, String name) {
-	Entity *e = current_scope_lookup_entity(c->runtime_package->scope, name);
+	Entity *e = current_scope_lookup_entity(c->builtin_package->scope, name);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
 		               "Is '_preload.odin' missing from the 'core' directory relative to odin.exe?", LIT(name));
@@ -1483,7 +1489,7 @@ Entity *find_core_entity(Checker *c, String name) {
 }
 
 Type *find_core_type(Checker *c, String name) {
-	Entity *e = current_scope_lookup_entity(c->runtime_package->scope, name);
+	Entity *e = current_scope_lookup_entity(c->builtin_package->scope, name);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
 		               "Is '_preload.odin' missing from the 'core' directory relative to odin.exe?", LIT(name));
@@ -2948,9 +2954,9 @@ void check_parsed_files(Checker *c) {
 		if (scope->is_init) {
 			c->info.init_scope = scope;
 		}
-		if (p->kind == ImportedPackage_Runtime) {
-			GB_ASSERT(c->runtime_package == nullptr);
-			c->runtime_package = p;
+		if (p->kind == ImportedPackage_Builtin) {
+			GB_ASSERT(c->builtin_package == nullptr);
+			c->builtin_package = p;
 		}
 	}
 

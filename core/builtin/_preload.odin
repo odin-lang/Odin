@@ -1,4 +1,4 @@
-package runtime
+package builtin
 
 import "core:os"
 import "core:unicode/utf8"
