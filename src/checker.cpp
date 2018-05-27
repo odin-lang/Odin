@@ -445,8 +445,14 @@ void check_scope_usage(Checker *c, Scope *scope) {
 
 	for_array(i, scope->elements.entries) {
 		Entity *e = scope->elements.entries[i].value;
-		if (e != nullptr && e->kind == Entity_Variable && (e->flags&EntityFlag_Used) == 0) {
-			array_add(&unused, e);
+		if (e != nullptr && (e->flags&EntityFlag_Used) == 0) {
+			switch (e->kind) {
+			case Entity_Variable:
+			case Entity_ImportName:
+			case Entity_LibraryName:
+				array_add(&unused, e);
+				break;
+			}
 		}
 	}
 
@@ -901,23 +907,25 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 }
 
 void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
-	GB_ASSERT(identifier != nullptr);
-	if (identifier->kind != AstNode_Ident) {
-		return;
-	}
 	if (entity == nullptr) {
 		return;
 	}
-	if (entity->identifier == nullptr) {
-		entity->identifier = identifier;
-	}
-	identifier->Ident.entity = entity;
-	add_declaration_dependency(c, entity); // TODO(bill): Should this be here?
+	if (identifier != nullptr) {
+		if (identifier->kind != AstNode_Ident) {
+			return;
+		}
+		if (entity->identifier == nullptr) {
+			entity->identifier = identifier;
+		}
+		identifier->Ident.entity = entity;
 
-	String dmsg = entity->deprecated_message;
-	if (dmsg.len > 0) {
-		warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
+		String dmsg = entity->deprecated_message;
+		if (dmsg.len > 0) {
+			warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
+		}
 	}
+	entity->flags |= EntityFlag_Used;
+	add_declaration_dependency(c, entity); // TODO(bill): Should this be here?
 }
 
 
@@ -2545,6 +2553,9 @@ void check_add_import_decl(Checker *c, AstNodeImportDecl *id) {
 			                                     scope);
 
 			add_entity(c, parent_scope, nullptr, e);
+			if (id->is_using) {
+				add_entity_use(c, nullptr, e);
+			}
 		}
 	}
 
@@ -2989,6 +3000,11 @@ void check_parsed_files(Checker *c) {
 		}
 
 		check_proc_body(c, pi->token, pi->decl, pi->type, pi->body);
+	}
+
+	for_array(i, c->info.files.entries) {
+		AstFile *f = c->info.files.entries[i].value;
+		check_scope_usage(c, f->scope);
 	}
 
 	TIME_SECTION("generate minimum dependency set");
