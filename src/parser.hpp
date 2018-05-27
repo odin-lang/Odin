@@ -40,6 +40,7 @@ struct ImportedPackage {
 };
 
 struct AstFile {
+	isize               id;
 	AstPackage *        package;
 	Scope *             scope;
 
@@ -104,6 +105,7 @@ struct Parser {
 	isize                  total_line_count;
 	gbMutex                file_add_mutex;
 	gbMutex                file_decl_mutex;
+	isize                  file_index;
 };
 
 enum ProcInlining {

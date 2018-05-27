@@ -259,7 +259,10 @@ bool string_contains_char(String const &s, u8 c) {
 
 String filename_from_path(String s) {
 	isize i = string_extension_position(s);
-	s = substring(s, 0, i);
+	if (i >= 0) {
+		s = substring(s, 0, i);
+		return s;
+	}
 	if (i > 0) {
 		isize j = 0;
 		for (j = s.len-1; j >= 0; j--) {

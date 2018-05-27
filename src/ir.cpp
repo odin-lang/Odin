@@ -7735,7 +7735,8 @@ bool ir_gen_init(irGen *s, Checker *c) {
 	String init_fullpath = c->parser->init_fullpath;
 
 	if (build_context.out_filepath.len == 0) {
-		s->output_name = filename_from_path(init_fullpath);
+		// s->output_name = filename_from_path(init_fullpath);
+		s->output_name = str_lit("main");
 		s->output_base = s->output_name;
 	} else {
 		s->output_name = build_context.out_filepath;
@@ -8255,9 +8256,17 @@ void ir_gen_tree(irGen *s) {
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
 		String name = e->token.string;
+
+		bool is_global = false;
+		if (e->scope->is_package) {
+			is_global = true;
+		} else if (e->scope->parent && e->scope->parent->is_package) {
+			is_global = true;
+		}
+
 		if (e->kind == Entity_Variable) {
 			global_variable_max_count++;
-		} else if (e->kind == Entity_Procedure && !e->scope->is_global) {
+		} else if (e->kind == Entity_Procedure && !is_global) {
 			if (e->scope->is_init && name == "main") {
 				GB_ASSERT(e == entry_point);
 				// entry_point = e;
@@ -8306,9 +8315,16 @@ void ir_gen_tree(irGen *s) {
 			GB_ASSERT(e->kind == Entity_Variable);
 
 
+			bool is_global = false;
+			if (e->scope->is_package) {
+				is_global = true;
+			} else if (e->scope->parent && e->scope->parent->is_package) {
+				is_global = true;
+			}
+
 			bool is_foreign = e->Variable.is_foreign;
 			bool is_export  = e->Variable.is_export;
-			bool no_name_mangle = e->scope->is_global || e->Variable.link_name.len > 0 || is_foreign || is_export;
+			bool no_name_mangle = is_global || e->Variable.link_name.len > 0 || is_foreign || is_export;
 
 			String name = e->token.string;
 			if (!no_name_mangle) {
@@ -8353,6 +8369,9 @@ void ir_gen_tree(irGen *s) {
 			continue;
 		}
 
+		Scope *package_scope = scope->parent;
+		GB_ASSERT(package_scope->is_package);
+
 		switch (e->kind) {
 		case Entity_Variable:
 			// NOTE(bill): Handled above as it requires a specific load order
@@ -8376,7 +8395,7 @@ void ir_gen_tree(irGen *s) {
 
 		String original_name = name;
 
-		if (!scope->is_global || polymorphic_struct || is_type_polymorphic(e->type)) {
+		if (!package_scope->is_global || polymorphic_struct || is_type_polymorphic(e->type)) {
 			if (e->kind == Entity_Procedure && e->Procedure.is_export) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later

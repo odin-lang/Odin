@@ -3831,7 +3831,6 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	isize init_token_cap = cast(isize)gb_max(next_pow2(cast(i64)(file_size/2ll)), 16);
 	array_init(&f->tokens, heap_allocator(), 0, gb_max(init_token_cap, 16));
 
-
 	if (err == TokenizerInit_Empty) {
 		Token token = {Token_EOF};
 		token.pos.file   = fullpath;
@@ -4165,6 +4164,9 @@ void parse_file(Parser *p, AstFile *f) {
 ParseFileError parse_imported_file(Parser *p, AstPackage *package, FileInfo *fi, TokenPos pos) {
 	AstFile *file = gb_alloc_item(heap_allocator(), AstFile);
 	file->package = package;
+
+	p->file_index += 1;
+	file->id = p->file_index;
 
 	TokenPos err_pos = {0};
 	ParseFileError err = init_ast_file(file, fi->fullpath, &err_pos);

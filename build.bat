@@ -42,7 +42,7 @@ del *.ilk > NUL 2> NUL
 
 cl %compiler_settings% "src\main.cpp" ^
 	/link %linker_settings% -OUT:%exe_name% ^
-	&& odin check examples/demo
+	&& odin run examples/demo
 
 del *.obj > NUL 2> NUL
 
