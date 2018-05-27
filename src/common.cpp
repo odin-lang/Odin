@@ -751,7 +751,7 @@ enum ReadDirectoryError {
 	ReadDirectory_NotExists,
 	ReadDirectory_Permission,
 	ReadDirectory_NotDir,
-	ReadDirectory_EOF,
+	ReadDirectory_Empty,
 	ReadDirectory_Unknown,
 
 	ReadDirectory_COUNT,
@@ -858,6 +858,9 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 
 	} while (FindNextFileW(find_file, &file_data));
 
+	if (fi->count == 0) {
+		return ReadDirectory_Empty;
+	}
 
 	return ReadDirectory_None;
 }

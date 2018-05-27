@@ -4253,7 +4253,7 @@ ParseFileError parse_import(Parser *p, ImportedPackage imported_package) {
 		GB_ASSERT(import_path != list[0].fullpath);
 	}
 
-	if (rd_err != ReadDirectory_EOF && rd_err != ReadDirectory_None) {
+	if (rd_err != ReadDirectory_None) {
 		if (pos.line != 0) {
 			gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
 		}
@@ -4282,9 +4282,9 @@ ParseFileError parse_import(Parser *p, ImportedPackage imported_package) {
 			gb_printf_err("Unknown error whilst reading path %.*s\n", LIT(import_rel_path));
 			return ParseFile_InvalidFile;
 
-		case ReadDirectory_EOF:
-			gb_printf_err("Unknown error whilst reading path %.*s\n", LIT(import_rel_path));
-			return ParseFile_InvalidFile;
+		case ReadDirectory_Empty:
+			gb_printf_err("Empty directory: %.*s\n", LIT(import_rel_path));
+			return ParseFile_EmptyFile;
 		}
 	}
 
