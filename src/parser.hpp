@@ -64,7 +64,7 @@ struct AstFile {
 	isize               when_level;
 
 	Array<AstNode *>    decls;
-	Array<AstNode *>    imports_and_exports; // 'import' 'using import' 'export'
+	Array<AstNode *>    imports; // 'import' 'using import'
 
 
 	AstNode *           curr_proc;
@@ -368,16 +368,6 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		bool     is_using;      \
 		bool     been_handled;  \
 	}) \
-	/* AST_NODE_KIND(ExportDecl, "export declaration", struct { \
-		AstFile *file;          \
-		Token    token;         \
-		Token    relpath;       \
-		String   fullpath;      \
-		Array<AstNode *> using_in_list; \
-		CommentGroup docs;      \
-		CommentGroup comment;   \
-		bool     been_handled;  \
-	}) */ \
 	AST_NODE_KIND(ForeignImportDecl, "foreign import declaration", struct { \
 		Token    token;           \
 		Token    filepath;        \
