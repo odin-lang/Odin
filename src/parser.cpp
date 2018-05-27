@@ -374,6 +374,9 @@ void error(AstNode *node, char *fmt, ...) {
 	va_start(va, fmt);
 	error_va(token, fmt, va);
 	va_end(va);
+	if (node != nullptr && node->file != nullptr) {
+		node->file->error_count += 1;
+	}
 }
 
 void error_no_newline(AstNode *node, char *fmt, ...) {
@@ -385,6 +388,9 @@ void error_no_newline(AstNode *node, char *fmt, ...) {
 	va_start(va, fmt);
 	error_no_newline_va(token, fmt, va);
 	va_end(va);
+	if (node != nullptr && node->file != nullptr) {
+		node->file->error_count += 1;
+	}
 }
 
 void warning(AstNode *node, char *fmt, ...) {
@@ -399,6 +405,9 @@ void syntax_error(AstNode *node, char *fmt, ...) {
 	va_start(va, fmt);
 	syntax_error_va(ast_node_token(node), fmt, va);
 	va_end(va);
+	if (node != nullptr && node->file != nullptr) {
+		node->file->error_count += 1;
+	}
 }
 
 
@@ -1227,6 +1236,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 			return;
 
 
+		case Token_package:
 		case Token_foreign:
 		case Token_import:
 		case Token_export:
@@ -4144,7 +4154,6 @@ void parse_file(Parser *p, AstFile *f) {
 
 	comsume_comment_groups(f, f->prev_token);
 
-
 	f->package_token = expect_token(f, Token_package);
 	Token package_name = expect_token_after(f, Token_Ident, "package");
 	if (package_name.kind == Token_Ident) {
@@ -4155,6 +4164,10 @@ void parse_file(Parser *p, AstFile *f) {
 		}
 	}
 	f->package_name = package_name.string;
+
+	if (f->error_count > 0) {
+		return;
+	}
 
 	f->decls = parse_stmt_list(f);
 	parse_setup_file_decls(p, f, base_dir, f->decls);
@@ -4218,7 +4231,6 @@ skip:
 	parse_file(p, file);
 
 	gb_mutex_lock(&p->file_add_mutex);
-	// file->id = imported_package.index;
 	HashKey key = hash_string(fi->fullpath);
 	map_set(&package->files, key, file);
 
@@ -4332,6 +4344,14 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 
 	char *fullpath_str = gb_path_get_full_name(heap_allocator(), cast(char *)&init_filename[0]);
 	String init_fullpath = string_trim_whitespace(make_string_c(fullpath_str));
+	if (!path_is_directory(init_fullpath)) {
+		String const ext = str_lit(".odin");
+		if (!string_ends_with(init_fullpath, ext)) {
+			gb_printf_err("Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
+			return ParseFile_WrongExtension;
+		}
+		init_fullpath = directory_from_path(init_fullpath);
+	}
 
 	TokenPos init_pos = {};
 	ImportedPackage init_imported_package = {ImportedPackage_Init, init_fullpath, init_fullpath, init_pos};
@@ -4347,7 +4367,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 	p->init_fullpath = init_fullpath;
 
 	// IMPORTANT TODO(bill): Figure out why this doesn't work on *nix sometimes
-#if 0 && defined(GB_SYSTEM_WINDOWS)
+#if defined(GB_SYSTEM_WINDOWS)
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	if (thread_count > 1) {
 		isize volatile curr_import_index = 0;
