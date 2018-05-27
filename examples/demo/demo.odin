@@ -735,7 +735,6 @@ deprecated_attribute :: proc() {
 
 
 main :: proc() {
-	fmt.println("HERE\n");
 	when true {
 		general_stuff();
 		union_type();
