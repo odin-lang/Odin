@@ -14,6 +14,7 @@ import "core:strings"
 import "core:types"
 import "core:unicode/utf16"
 import "core:unicode/utf8"
+import "core:c"
 
 import "core:atomics"
 import "core:thread"

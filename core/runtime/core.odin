@@ -166,7 +166,7 @@ Allocator :: struct {
 
 
 Context :: struct {
-	allocator:  mem.Allocator,
+	allocator:  Allocator,
 	thread_id:  int,
 
 	user_data:  any,
@@ -494,7 +494,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	new_size  := cap * elem_size;
 	allocator := array.allocator;
 
-	new_data := allocator.procedure(allocator.data, mem.Allocator_Mode.Resize, new_size, elem_align, array.data, old_size, 0, loc);
+	new_data := allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, elem_align, array.data, old_size, 0, loc);
 	if new_data == nil do return false;
 
 	array.data = new_data;
