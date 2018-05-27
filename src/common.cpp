@@ -757,8 +757,21 @@ enum ReadDirectoryError {
 	ReadDirectory_COUNT,
 };
 
-#if defined(GB_SYSTEM_WINDOWS)
+i64 get_file_size(String path) {
+	char *c_str = alloc_cstring(heap_allocator(), path);
+	defer (gb_free(heap_allocator(), c_str));
 
+	gbFile f = {};
+	gbFileError err = gb_file_open(&f, c_str);
+	defer (gb_file_close(&f));
+	if (err != gbFileError_None) {
+		return -1;
+	}
+	return gb_file_size(&f);
+}
+
+
+#if defined(GB_SYSTEM_WINDOWS)
 ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 	GB_ASSERT(fi != nullptr);
 

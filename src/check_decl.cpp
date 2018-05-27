@@ -546,7 +546,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			error(e->token, "Procedure 'main' cannot have a custom calling convention");
 		}
 		pt->calling_convention = ProcCC_Contextless;
-		if (e->package->kind == ImportedPackage_Init) {
+		if (e->package->kind == Package_Init) {
 			if (c->info.entry_point != nullptr) {
 				error(e->token, "Redeclaration of the entry pointer procedure 'main'");
 			} else {

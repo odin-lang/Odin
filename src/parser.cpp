@@ -3923,7 +3923,7 @@ void destroy_parser(Parser *p) {
 }
 
 // NOTE(bill): Returns true if it's added
-bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos, ImportedPackageKind kind = ImportedPackage_Normal) {
+bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
 	if (build_context.generate_docs) {
 		return false;
 	}
@@ -4159,7 +4159,7 @@ void parse_file(Parser *p, AstFile *f) {
 	if (package_name.kind == Token_Ident) {
 		if (package_name.string == "_") {
 			error(package_name, "Invalid package name '_'");
-		} else if (f->package->kind != ImportedPackage_Builtin && package_name.string == "builtin") {
+		} else if (f->package->kind != Package_Builtin && package_name.string == "builtin") {
 			error(package_name, "Use of reserved package name '%.*s'", LIT(package_name.string));
 		}
 	}
@@ -4252,6 +4252,31 @@ ParseFileError parse_import(Parser *p, ImportedPackage imported_package) {
 	String import_path = imported_package.path;
 	String import_rel_path = imported_package.rel_path;
 	TokenPos pos = imported_package.pos;
+	String const ext = str_lit(".odin");
+
+	// NOTE(bill): Single file initial package
+	if (imported_package.kind == Package_Init && string_ends_with(import_path, ext)) {
+		AstPackage *package = gb_alloc_item(heap_allocator(), AstPackage);
+		package->kind = imported_package.kind;
+		package->fullpath = import_path;
+		map_init(&package->files, heap_allocator());
+
+		FileInfo fi = {};
+		fi.name = filename_from_path(import_path);
+		fi.fullpath = import_path;
+		fi.size = get_file_size(import_path);
+		fi.is_dir = false;
+
+		ParseFileError err = parse_imported_file(p, package, &fi, pos);
+		if (err != ParseFile_None) {
+			return err;
+		}
+
+		package->id = p->packages.count+1;
+		array_add(&p->packages, package);
+
+		return ParseFile_None;
+	}
 
 	Array<FileInfo> list = {};
 	ReadDirectoryError rd_err = read_directory(import_path, &list);
@@ -4305,7 +4330,6 @@ ParseFileError parse_import(Parser *p, ImportedPackage imported_package) {
 	for_array(i, list) {
 		FileInfo *fi = &list[i];
 		String name = fi->name;
-		String const ext = str_lit(".odin");
 		if (string_ends_with(name, ext)) {
 			if (is_excluded_target_filename(name)) {
 				continue;
@@ -4350,16 +4374,15 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 			gb_printf_err("Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
 			return ParseFile_WrongExtension;
 		}
-		init_fullpath = directory_from_path(init_fullpath);
 	}
 
 	TokenPos init_pos = {};
-	ImportedPackage init_imported_package = {ImportedPackage_Init, init_fullpath, init_fullpath, init_pos};
+	ImportedPackage init_imported_package = {Package_Init, init_fullpath, init_fullpath, init_pos};
 
 	isize shared_package_count = 0;
 	if (!build_context.generate_docs) {
 		String s = get_fullpath_core(heap_allocator(), str_lit("builtin"));
-		try_add_import_path(p, s, s, init_pos, ImportedPackage_Builtin);
+		try_add_import_path(p, s, s, init_pos, Package_Builtin);
 		shared_package_count++;
 	}
 
