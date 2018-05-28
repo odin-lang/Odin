@@ -111,7 +111,7 @@ void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Ar
 	isize max = gb_min(lhs_count, rhs_count);
 	for (isize i = 0; i < max; i++) {
 		Entity *e = lhs[i];
-		DeclInfo *d = decl_info_of_entity(&ctx->checker->info, e);
+		DeclInfo *d = decl_info_of_entity(e);
 		Operand *o = &operands[i];
 		check_init_variable(ctx, e, o, context_name);
 		if (d != nullptr) {
@@ -220,7 +220,7 @@ AstNode *remove_type_alias_clutter(AstNode *node) {
 void check_type_decl(CheckerContext *ctx, Entity *e, AstNode *type_expr, Type *def) {
 	GB_ASSERT(e->type == nullptr);
 
-	DeclInfo *decl = decl_info_of_entity(&ctx->checker->info, e);
+	DeclInfo *decl = decl_info_of_entity(e);
 	if (decl != nullptr && decl->attributes.count > 0) {
 		error(decl->attributes[0], "Attributes are not allowed on type declarations");
 	}
@@ -373,7 +373,7 @@ void check_const_decl(CheckerContext *ctx, Entity *e, AstNode *type_expr, AstNod
 	}
 
 
-	DeclInfo *decl = decl_info_of_entity(&ctx->checker->info, e);
+	DeclInfo *decl = decl_info_of_entity(e);
 	if (decl != nullptr && decl->attributes.count > 0) {
 		error(decl->attributes[0], "Attributes are not allowed on constant value declarations");
 	}
@@ -544,10 +544,13 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 		pt->calling_convention = ProcCC_Contextless;
 		if (e->pkg->kind == Package_Init) {
-			if (ctx->checker->info.entry_point != nullptr) {
+			gb_mutex_lock(&ctx->info->mutex);
+			defer (gb_mutex_unlock(&ctx->info->mutex));
+
+			if (ctx->info->entry_point != nullptr) {
 				error(e->token, "Redeclaration of the entry pointer procedure 'main'");
 			} else {
-				ctx->checker->info.entry_point = e;
+				ctx->info->entry_point = e;
 			}
 		}
 	}
@@ -609,7 +612,10 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 		init_entity_foreign_library(ctx, e);
 
-		auto *fp = &ctx->checker->info.foreigns;
+		gb_mutex_lock(&ctx->info->mutex);
+		defer (gb_mutex_unlock(&ctx->info->mutex));
+
+		auto *fp = &ctx->info->foreigns;
 		HashKey key = hash_string(name);
 		Entity **found = map_get(fp, key);
 		if (found) {
@@ -641,7 +647,10 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			name = e->Procedure.link_name;
 		}
 		if (e->Procedure.link_name.len > 0 || is_export) {
-			auto *fp = &ctx->checker->info.foreigns;
+			gb_mutex_lock(&ctx->info->mutex);
+			defer (gb_mutex_unlock(&ctx->info->mutex));
+
+			auto *fp = &ctx->info->foreigns;
 			HashKey key = hash_string(name);
 			Entity **found = map_get(fp, key);
 			if (found) {
@@ -674,7 +683,7 @@ void check_var_decl(CheckerContext *ctx, Entity *e, Entity **entities, isize ent
 	AttributeContext ac = make_attribute_context(e->Variable.link_prefix);
 	ac.init_expr_list_count = init_expr_list.count;
 
-	DeclInfo *decl = decl_info_of_entity(&ctx->checker->info, e);
+	DeclInfo *decl = decl_info_of_entity(e);
 	if (decl != nullptr) {
 		check_decl_attributes(ctx, decl->attributes, var_decl_attribute, &ac);
 	}
@@ -717,7 +726,10 @@ void check_var_decl(CheckerContext *ctx, Entity *e, Entity **entities, isize ent
 		if (e->Variable.link_name.len > 0) {
 			name = e->Variable.link_name;
 		}
-		auto *fp = &ctx->checker->info.foreigns;
+		gb_mutex_lock(&ctx->info->mutex);
+		defer (gb_mutex_unlock(&ctx->info->mutex));
+
+		auto *fp = &ctx->info->foreigns;
 		HashKey key = hash_string(name);
 		Entity **found = map_get(fp, key);
 		if (found) {
@@ -892,7 +904,7 @@ void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_
 #endif
 
 	if (d == nullptr) {
-		d = decl_info_of_entity(&ctx->checker->info, e);
+		d = decl_info_of_entity(e);
 		if (d == nullptr) {
 			// TODO(bill): Err here?
 			e->type = t_invalid;
@@ -978,7 +990,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 			if (t->kind == Type_Struct) {
 				Scope *scope = t->Struct.scope;
 				if (scope == nullptr) {
-					scope = scope_of_node(&ctx->checker->info, t->Struct.node);
+					scope = scope_of_node(t->Struct.node);
 				}
 				GB_ASSERT(scope != nullptr);
 				for_array(i, scope->elements.entries) {
@@ -1017,6 +1029,9 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 	check_scope_usage(ctx->checker, ctx->scope);
 
 	if (decl->parent != nullptr) {
+		gb_mutex_lock(&ctx->checker->mutex);
+		defer (gb_mutex_unlock(&ctx->checker->mutex));
+
 		// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 		for_array(i, decl->deps.entries) {
 			Entity *e = decl->deps.entries[i].ptr;

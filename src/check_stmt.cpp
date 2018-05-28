@@ -501,7 +501,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstNodeUsingStmt *us, AstNode 
 		Type *t = base_type(type_deref(e->type));
 		if (t->kind == Type_Struct) {
 			// TODO(bill): Make it work for unions too
-			Scope *found = scope_of_node(&ctx->checker->info, t->Struct.node);
+			Scope *found = scope_of_node(t->Struct.node);
 			for_array(i, found->elements.entries) {
 				Entity *f = found->elements.entries[i].value;
 				if (f->kind == Entity_Variable) {
@@ -1685,7 +1685,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 			Type *t = base_type(type_deref(e->type));
 			if (t->kind == Type_Struct) {
 				// TODO(bill): Make it work for unions too
-				Scope *found = scope_of_node(&ctx->checker->info, t->Struct.node);
+				Scope *found = scope_of_node(t->Struct.node);
 				for_array(list_index, uis->list) {
 					AstNode *node = uis->list[list_index];
 					ast_node(ident, Ident, node);
@@ -1933,7 +1933,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 					if (is_blank_ident(name)) {
 						error(token, "'using' cannot be applied variable declared as '_'");
 					} else if (is_type_struct(t) || is_type_raw_union(t)) {
-						Scope *scope = scope_of_node(&ctx->checker->info, t->Struct.node);
+						Scope *scope = scope_of_node(t->Struct.node);
 						for_array(i, scope->elements.entries) {
 							Entity *f = scope->elements.entries[i].value;
 							if (f->kind == Entity_Variable) {

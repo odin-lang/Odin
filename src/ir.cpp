@@ -1199,7 +1199,7 @@ irValue *ir_generate_array(irModule *m, Type *elem_type, i64 count, String prefi
 irBlock *ir_new_block(irProcedure *proc, AstNode *node, char *label) {
 	Scope *scope = nullptr;
 	if (node != nullptr) {
-		scope = scope_of_node(proc->module->info, node);
+		scope = scope_of_node(node);
 		GB_ASSERT_MSG(scope != nullptr, "Block scope not found for %.*s", LIT(ast_node_strings[node->kind]));
 	}
 
@@ -1374,7 +1374,7 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, AstNode *expr, bool zero_ini
 }
 
 irValue *ir_add_local_for_identifier(irProcedure *proc, AstNode *ident, bool zero_initialized) {
-	Entity *e = entity_of_ident(proc->module->info, ident);
+	Entity *e = entity_of_ident(ident);
 	if (e != nullptr) {
 		String name = e->token.string;
 		ir_emit_comment(proc, name);
@@ -3885,7 +3885,7 @@ void ir_mangle_add_sub_type_name(irModule *m, Entity *field, String parent) {
 
 irBranchBlocks ir_lookup_branch_blocks(irProcedure *proc, AstNode *ident) {
 	GB_ASSERT(ident->kind == AstNode_Ident);
-	Entity *e = entity_of_ident(proc->module->info, ident);
+	Entity *e = entity_of_ident(ident);
 	GB_ASSERT(e->kind == Entity_Label);
 	for_array(i, proc->branch_blocks) {
 		irBranchBlocks *b = &proc->branch_blocks[i];
@@ -4194,7 +4194,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		if (ce->args.count > 0) {
 			AstNode *ident = unselector_expr(ce->args[0]);
 			GB_ASSERT(ident->kind == AstNode_Ident);
-			Entity *e = entity_of_ident(proc->module->info, ident);
+			Entity *e = entity_of_ident(ident);
 			GB_ASSERT(e != nullptr);
 
 			if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity_count > 0) {
@@ -4906,7 +4906,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(i, Ident, expr);
-		Entity *e = entity_of_ident(proc->module->info, expr);
+		Entity *e = entity_of_ident(expr);
 		GB_ASSERT_MSG(e != nullptr, "%s", expr_to_string(expr));
 		if (e->kind == Entity_Builtin) {
 			Token token = ast_node_token(expr);
@@ -5158,7 +5158,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 
 		AstNode *p = unparen_expr(ce->proc);
 		if (proc_mode == Addressing_Builtin) {
-			Entity *e = entity_of_ident(proc->module->info, p);
+			Entity *e = entity_of_ident(p);
 			BuiltinProcId id = BuiltinProc_Invalid;
 			if (e != nullptr) {
 				id = cast(BuiltinProcId)e->Builtin.id;
@@ -5481,7 +5481,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			return val;
 		}
 		String name = i->token.string;
-		Entity *e = entity_of_ident(proc->module->info, expr);
+		Entity *e = entity_of_ident(expr);
 		// GB_ASSERT(name == e->token.string);
 		return ir_build_addr_from_entity(proc, e, expr);
 	case_end;
@@ -5499,7 +5499,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 			if (tav.mode == Addressing_Invalid) {
 				// NOTE(bill): Imports
-				Entity *imp = entity_of_ident(proc->module->info, se->expr);
+				Entity *imp = entity_of_ident(se->expr);
 				if (imp != nullptr) {
 					GB_ASSERT(imp->kind == Entity_ImportName);
 				}
@@ -6189,7 +6189,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 	for_array(i, vd->names) {
 		AstNode *ident = vd->names[i];
 		GB_ASSERT(ident->kind == AstNode_Ident);
-		Entity *e = entity_of_ident(proc->module->info, ident);
+		Entity *e = entity_of_ident(ident);
 		GB_ASSERT(e != nullptr);
 		switch (e->kind) {
 		case Entity_TypeName:
@@ -6228,7 +6228,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 			ir_gen_global_type_name(m, e, name);
 		} else if (e->kind == Entity_Procedure) {
 			CheckerInfo *info = proc->module->info;
-			DeclInfo *decl = decl_info_of_entity(info, e);
+			DeclInfo *decl = decl_info_of_entity(e);
 			ast_node(pl, ProcLit, decl->proc_lit);
 			if (pl->body != nullptr) {
 				auto *found = map_get(&info->gen_procs, hash_pointer(ident));
@@ -6239,7 +6239,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 						if (!ir_min_dep_entity(proc->module, e)) {
 							continue;
 						}
-						DeclInfo *d = decl_info_of_entity(info, e);
+						DeclInfo *d = decl_info_of_entity(e);
 						ir_build_poly_proc(proc, &d->proc_lit->ProcLit, e);
 					}
 				} else {
@@ -7406,7 +7406,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	array_init(&proc->branch_blocks,    heap_allocator());
 	array_init(&proc->context_stack,    heap_allocator());
 
-	DeclInfo *decl = decl_info_of_entity(proc->module->info, proc->entity);
+	DeclInfo *decl = decl_info_of_entity(proc->entity);
 	if (decl != nullptr) {
 		for_array(i, decl->labels) {
 			BlockLabel bl = decl->labels[i];
@@ -8358,7 +8358,7 @@ void ir_gen_tree(irGen *s) {
 			if (!ir_min_dep_entity(m, e)) {
 				continue;
 			}
-			DeclInfo *decl = decl_info_of_entity(info, e);
+			DeclInfo *decl = decl_info_of_entity(e);
 			if (decl == nullptr) {
 				continue;
 			}
