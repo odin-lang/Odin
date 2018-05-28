@@ -45,41 +45,41 @@ int valid_index_and_score_cmp(void const *a, void const *b) {
 
 
 
-#define CALL_ARGUMENT_CHECKER(name) CallArgumentError name(Checker *c, AstNode *call, Type *proc_type, Entity *entity, Array<Operand> operands, CallArgumentErrorMode show_error_mode, CallArgumentData *data)
+#define CALL_ARGUMENT_CHECKER(name) CallArgumentError name(CheckerContext *c, AstNode *call, Type *proc_type, Entity *entity, Array<Operand> operands, CallArgumentErrorMode show_error_mode, CallArgumentData *data)
 typedef CALL_ARGUMENT_CHECKER(CallArgumentCheckerType);
 
 
 
-void     check_expr                     (Checker *c, Operand *operand, AstNode *expression);
-void     check_multi_expr               (Checker *c, Operand *operand, AstNode *expression);
-void     check_expr_or_type             (Checker *c, Operand *operand, AstNode *expression, Type *type_hint = nullptr);
-ExprKind check_expr_base                (Checker *c, Operand *operand, AstNode *expression, Type *type_hint);
-void     check_expr_with_type_hint      (Checker *c, Operand *o, AstNode *e, Type *t);
-Type *   check_type                     (Checker *c, AstNode *expression);
-Type *   check_type_expr                (Checker *c, AstNode *expression, Type *named_type);
+void     check_expr                     (CheckerContext *c, Operand *operand, AstNode *expression);
+void     check_multi_expr               (CheckerContext *c, Operand *operand, AstNode *expression);
+void     check_expr_or_type             (CheckerContext *c, Operand *operand, AstNode *expression, Type *type_hint = nullptr);
+ExprKind check_expr_base                (CheckerContext *c, Operand *operand, AstNode *expression, Type *type_hint);
+void     check_expr_with_type_hint      (CheckerContext *c, Operand *o, AstNode *e, Type *t);
+Type *   check_type                     (CheckerContext *c, AstNode *expression);
+Type *   check_type_expr                (CheckerContext *c, AstNode *expression, Type *named_type);
 Type *   make_optional_ok_type          (Type *value);
-void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def);
-Entity * check_selector                 (Checker *c, Operand *operand, AstNode *node, Type *type_hint);
-Entity * check_ident                    (Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name);
-Entity * find_polymorphic_struct_entity (Checker *c, Type *original_type, isize param_count, Array<Operand> ordered_operands);
-void     check_not_tuple                (Checker *c, Operand *operand);
-void     convert_to_typed               (Checker *c, Operand *operand, Type *target_type);
+void     check_type_decl                (CheckerContext *c, Entity *e, AstNode *type_expr, Type *def);
+Entity * check_selector                 (CheckerContext *c, Operand *operand, AstNode *node, Type *type_hint);
+Entity * check_ident                    (CheckerContext *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name);
+Entity * find_polymorphic_struct_entity (CheckerContext *c, Type *original_type, isize param_count, Array<Operand> ordered_operands);
+void     check_not_tuple                (CheckerContext *c, Operand *operand);
+void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type);
 gbString expr_to_string                 (AstNode *expression);
-void     check_entity_decl              (Checker *c, Entity *e, DeclInfo *decl, Type *named_type);
-void     check_const_decl               (Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr, Type *named_type);
-void     check_proc_body                (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
-void     update_expr_type               (Checker *c, AstNode *e, Type *type, bool final);
+void     check_entity_decl              (CheckerContext *c, Entity *e, DeclInfo *decl, Type *named_type);
+void     check_const_decl               (CheckerContext *c, Entity *e, AstNode *type_expr, AstNode *init_expr, Type *named_type);
+void     check_proc_body                (CheckerContext *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
+void     update_expr_type               (CheckerContext *c, AstNode *e, Type *type, bool final);
 bool     check_is_terminating           (AstNode *node);
 bool     check_has_break                (AstNode *stmt, bool implicit);
-void     check_stmt                     (Checker *c, AstNode *node, u32 flags);
-void     check_stmt_list                (Checker *c, Array<AstNode *> stmts, u32 flags);
-void     check_init_constant            (Checker *c, Entity *e, Operand *operand);
-bool     check_representable_as_constant(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
-bool     check_procedure_type           (Checker *c, Type *type, AstNode *proc_type_node, Array<Operand> *operands = nullptr);
-void     check_struct_type              (Checker *c, Type *struct_type, AstNode *node, Array<Operand> *poly_operands,
+void     check_stmt                     (CheckerContext *c, AstNode *node, u32 flags);
+void     check_stmt_list                (CheckerContext *c, Array<AstNode *> stmts, u32 flags);
+void     check_init_constant            (CheckerContext *c, Entity *e, Operand *operand);
+bool     check_representable_as_constant(CheckerContext *c, ExactValue in_value, Type *type, ExactValue *out_value);
+bool     check_procedure_type           (CheckerContext *c, Type *type, AstNode *proc_type_node, Array<Operand> *operands = nullptr);
+void     check_struct_type              (CheckerContext *c, Type *struct_type, AstNode *node, Array<Operand> *poly_operands,
                                          Type *named_type = nullptr, Type *original_type_for_poly = nullptr);
-CallArgumentData check_call_arguments   (Checker *c, Operand *operand, Type *proc_type, AstNode *call);
-Type *           check_init_variable    (Checker *c, Entity *e, Operand *operand, String context_name);
+CallArgumentData check_call_arguments   (CheckerContext *c, Operand *operand, Type *proc_type, AstNode *call);
+Type *           check_init_variable    (CheckerContext *c, Entity *e, Operand *operand, String context_name);
 
 
 
@@ -107,8 +107,8 @@ void error_operand_no_value(Operand *o) {
 }
 
 
-void check_scope_decls(Checker *c, Array<AstNode *> nodes, isize reserve_size) {
-	Scope *s = c->context.scope;
+void check_scope_decls(CheckerContext *c, Array<AstNode *> nodes, isize reserve_size) {
+	Scope *s = c->scope;
 	GB_ASSERT(s->package == nullptr);
 
 	check_collect_entities(c, nodes);
@@ -123,7 +123,7 @@ void check_scope_decls(Checker *c, Array<AstNode *> nodes, isize reserve_size) {
 		default:
 			continue;
 		}
-		DeclInfo *d = decl_info_of_entity(&c->info, e);
+		DeclInfo *d = decl_info_of_entity(&c->checker->info, e);
 		if (d != nullptr) {
 			check_entity_decl(c, e, d, nullptr);
 		}
@@ -165,7 +165,7 @@ bool check_is_assignable_to_using_subtype(Type *src, Type *dst) {
 	return false;
 }
 
-bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Type *type,
+bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_entity, Type *type,
                                             Array<Operand> *param_operands, PolyProcData *poly_proc_data) {
 	///////////////////////////////////////////////////////////////////////////////
 	//                                                                           //
@@ -211,7 +211,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	}
 
 
-	DeclInfo *old_decl = decl_info_of_entity(&c->info, base_entity);
+	DeclInfo *old_decl = decl_info_of_entity(&c->checker->info, base_entity);
 	if (old_decl == nullptr) {
 		return false;
 	}
@@ -239,39 +239,38 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 
 
 
-	CheckerContext prev_context = c->context;
-	defer (c->context = prev_context);
+	CheckerContext nctx = *c;
 
 	Scope *scope = create_scope(base_entity->scope, a);
 	scope->is_proc = true;
-	c->context.scope = scope;
-	c->context.allow_polymorphic_types = true;
-	if (c->context.polymorphic_scope == nullptr) {
-		c->context.polymorphic_scope = scope;
+	nctx.scope = scope;
+	nctx.allow_polymorphic_types = true;
+	if (nctx.polymorphic_scope == nullptr) {
+		nctx.polymorphic_scope = scope;
 	}
 	if (param_operands == nullptr) {
-		// c->context.no_polymorphic_errors = false;
+		// c->no_polymorphic_errors = false;
 	}
 
 
-	bool generate_type_again = c->context.no_polymorphic_errors;
+	bool generate_type_again = nctx.no_polymorphic_errors;
 
 	auto *pt = &src->Proc;
 
 	// NOTE(bill): This is slightly memory leaking if the type already exists
 	// Maybe it's better to check with the previous types first?
 	Type *final_proc_type = alloc_type_proc(scope, nullptr, 0, nullptr, 0, false, pt->calling_convention);
-	bool success = check_procedure_type(c, final_proc_type, pt->node, &operands);
+	bool success = check_procedure_type(&nctx, final_proc_type, pt->node, &operands);
 
 	if (!success) {
 		return false;
 	}
 
 
-	gb_mutex_lock(&c->mutex);
-	defer (gb_mutex_unlock(&c->mutex));
+	gb_mutex_lock(&nctx.checker->mutex);
+	defer (gb_mutex_unlock(&nctx.checker->mutex));
 
-	auto *found_gen_procs = map_get(&c->info.gen_procs, hash_pointer(base_entity->identifier));
+	auto *found_gen_procs = map_get(&nctx.checker->info.gen_procs, hash_pointer(base_entity->identifier));
 	if (found_gen_procs) {
 		auto procs = *found_gen_procs;
 		for_array(i, procs) {
@@ -289,14 +288,14 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 
 	if (generate_type_again) {
 		// LEAK TODO(bill): This is technically a memory leak as it has to generate the type twice
-		bool prev_no_polymorphic_errors = c->context.no_polymorphic_errors;
-		defer (c->context.no_polymorphic_errors = prev_no_polymorphic_errors);
-		c->context.no_polymorphic_errors = false;
+		bool prev_no_polymorphic_errors = nctx.no_polymorphic_errors;
+		defer (nctx.no_polymorphic_errors = prev_no_polymorphic_errors);
+		nctx.no_polymorphic_errors = false;
 
 		// NOTE(bill): Reset scope from the failed procedure type
 		scope_reset(scope);
 
-		success = check_procedure_type(c, final_proc_type, pt->node, &operands);
+		success = check_procedure_type(&nctx, final_proc_type, pt->node, &operands);
 
 		if (!success) {
 			return false;
@@ -322,25 +321,25 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	AstNode *proc_lit = clone_ast_node(a, old_decl->proc_lit);
 	ast_node(pl, ProcLit, proc_lit);
 	// NOTE(bill): Associate the scope declared above withinth this procedure declaration's type
-	add_scope(c, pl->type, final_proc_type->Proc.scope);
+	add_scope(&nctx, pl->type, final_proc_type->Proc.scope);
 	final_proc_type->Proc.is_poly_specialized = true;
 	final_proc_type->Proc.is_polymorphic = true;
 
 	u64 tags = base_entity->Procedure.tags;
 	AstNode *ident = clone_ast_node(a, base_entity->identifier);
 	Token token = ident->Ident.token;
-	DeclInfo *d = make_decl_info(c->allocator, scope, old_decl->parent);
+	DeclInfo *d = make_decl_info(nctx.allocator, scope, old_decl->parent);
 	d->gen_proc_type = final_proc_type;
 	d->type_expr = pl->type;
 	d->proc_lit = proc_lit;
 
-
 	Entity *entity = alloc_entity_procedure(nullptr, token, final_proc_type, tags);
 	entity->identifier = ident;
 
-	add_entity_and_decl_info(c, ident, entity, d);
+	add_entity_and_decl_info(&nctx, ident, entity, d);
 	// NOTE(bill): Set the scope afterwards as this is not real overloading
 	entity->scope = scope->parent;
+	entity->pkg = base_entity->pkg;
 
 	AstFile *file = nullptr;
 	{
@@ -365,7 +364,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	} else {
 		auto array = array_make<Entity *>(heap_allocator());
 		array_add(&array, entity);
-		map_set(&c->info.gen_procs, hash_pointer(base_entity->identifier), array);
+		map_set(&nctx.checker->info.gen_procs, hash_pointer(base_entity->identifier), array);
 	}
 
 	GB_ASSERT(entity != nullptr);
@@ -376,27 +375,27 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	}
 
 	// NOTE(bill): Check the newly generated procedure body
-	check_procedure_later(c, proc_info);
+	check_procedure_later(nctx.checker, proc_info);
 
 	return true;
 }
 
-bool check_polymorphic_procedure_assignment(Checker *c, Operand *operand, Type *type, PolyProcData *poly_proc_data) {
+bool check_polymorphic_procedure_assignment(CheckerContext *c, Operand *operand, Type *type, PolyProcData *poly_proc_data) {
 	if (operand->expr == nullptr) return false;
-	Entity *base_entity = entity_of_ident(&c->info, operand->expr);
+	Entity *base_entity = entity_of_ident(&c->checker->info, operand->expr);
 	if (base_entity == nullptr) return false;
 	return find_or_generate_polymorphic_procedure(c, base_entity, type, nullptr, poly_proc_data);
 }
 
-bool find_or_generate_polymorphic_procedure_from_parameters(Checker *c, Entity *base_entity, Array<Operand> *operands, PolyProcData *poly_proc_data) {
+bool find_or_generate_polymorphic_procedure_from_parameters(CheckerContext *c, Entity *base_entity, Array<Operand> *operands, PolyProcData *poly_proc_data) {
 	return find_or_generate_polymorphic_procedure(c, base_entity, nullptr, operands, poly_proc_data);
 }
 
-bool check_type_specialization_to(Checker *c, Type *specialization, Type *type, bool compound, bool modify_type);
-bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool compound, bool modify_type);
-bool check_cast_internal(Checker *c, Operand *x, Type *type);
+bool check_type_specialization_to(CheckerContext *c, Type *specialization, Type *type, bool compound, bool modify_type);
+bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source, bool compound, bool modify_type);
+bool check_cast_internal(CheckerContext *c, Operand *x, Type *type);
 
-i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
+i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type) {
 	if (operand->mode == Addressing_Invalid ||
 	    type == t_invalid) {
 		return -1;
@@ -529,7 +528,7 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 #endif
 
 	if (is_type_polymorphic(dst) && !is_type_polymorphic(src)) {
-		bool modify_type = !c->context.no_polymorphic_errors;
+		bool modify_type = !c->no_polymorphic_errors;
 		if (is_polymorphic_type_assignable(c, type, s, false, modify_type)) {
 			return 2;
 		}
@@ -595,7 +594,7 @@ i64 assign_score_function(i64 distance) {
 }
 
 
-bool check_is_assignable_to_with_score(Checker *c, Operand *operand, Type *type, i64 *score_) {
+bool check_is_assignable_to_with_score(CheckerContext *c, Operand *operand, Type *type, i64 *score_) {
 	i64 score = 0;
 	i64 distance = check_distance_between_types(c, operand, type);
 	bool ok = distance >= 0;
@@ -607,14 +606,14 @@ bool check_is_assignable_to_with_score(Checker *c, Operand *operand, Type *type,
 }
 
 
-bool check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
+bool check_is_assignable_to(CheckerContext *c, Operand *operand, Type *type) {
 	i64 score = 0;
 	return check_is_assignable_to_with_score(c, operand, type, &score);
 }
 
 
 // NOTE(bill): 'content_name' is for debugging and error messages
-void check_assignment(Checker *c, Operand *operand, Type *type, String context_name) {
+void check_assignment(CheckerContext *c, Operand *operand, Type *type, String context_name) {
 	check_not_tuple(c, operand);
 	if (operand->mode == Addressing_Invalid) {
 		return;
@@ -742,7 +741,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 	}
 }
 
-bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool compound, bool modify_type) {
+bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source, bool compound, bool modify_type) {
 	Operand o = {Addressing_Value};
 	o.type = source;
 	switch (poly->kind) {
@@ -903,17 +902,17 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 	return false;
 }
 
-bool check_cycle(Checker *c, Entity *curr, bool report) {
+bool check_cycle(CheckerContext *c, Entity *curr, bool report) {
 	if (curr->state != EntityState_InProgress) {
 		return false;
 	}
-	for_array(i, *c->context.type_path) {
-		Entity *prev = (*c->context.type_path)[i];
+	for_array(i, *c->type_path) {
+		Entity *prev = (*c->type_path)[i];
 		if (prev == curr) {
 			if (report) {
 				error(curr->token, "Illegal declaration cycle of `%.*s`", LIT(curr->token.string));
-				for (isize j = i; j < c->context.type_path->count; j++) {
-					Entity *curr = (*c->context.type_path)[j];
+				for (isize j = i; j < c->type_path->count; j++) {
+					Entity *curr = (*c->type_path)[j];
 					error(curr->token, "\t%.*s refers to", LIT(curr->token.string));
 				}
 				error(curr->token, "\t%.*s", LIT(curr->token.string));
@@ -925,13 +924,13 @@ bool check_cycle(Checker *c, Entity *curr, bool report) {
 }
 
 
-Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name) {
+Entity *check_ident(CheckerContext *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name) {
 	GB_ASSERT(n->kind == AstNode_Ident);
 	o->mode = Addressing_Invalid;
 	o->expr = n;
 	String name = n->Ident.token.string;
 
-	Entity *e = scope_lookup_entity(c->context.scope, name);
+	Entity *e = scope_lookup_entity(c->scope, name);
 	if (e == nullptr) {
 		if (is_blank_ident(name)) {
 			error(n, "'_' cannot be used as a value type");
@@ -946,7 +945,7 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 		return nullptr;
 	}
 	if (e->parent_proc_decl != nullptr &&
-	    e->parent_proc_decl != c->context.curr_proc_decl) {
+	    e->parent_proc_decl != c->curr_proc_decl) {
 		if (e->kind == Entity_Variable) {
 			error(n, "Nested procedures do not capture its parent's variables: %.*s", LIT(name));
 			return nullptr;
@@ -967,7 +966,7 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 	if (e->kind == Entity_ProcGroup) {
 		auto *pge = &e->ProcGroup;
 
-		DeclInfo *d = decl_info_of_entity(&c->info, e);
+		DeclInfo *d = decl_info_of_entity(&c->checker->info, e);
 		check_entity_decl(c, e, d, nullptr);
 
 
@@ -1087,7 +1086,7 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 }
 
 
-bool check_unary_op(Checker *c, Operand *o, Token op) {
+bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 	if (o->type == nullptr) {
 		gbString str = expr_to_string(o->expr);
 		error(o->expr, "Expression has no value '%s'", str);
@@ -1129,7 +1128,7 @@ bool check_unary_op(Checker *c, Operand *o, Token op) {
 	return true;
 }
 
-bool check_binary_op(Checker *c, Operand *o, Token op) {
+bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
 	Type *type = base_type(core_array_type(o->type));
 	switch (op.kind) {
@@ -1225,7 +1224,7 @@ bool check_binary_op(Checker *c, Operand *o, Token op) {
 }
 
 
-bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value) {
+bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Type *type, ExactValue *out_value) {
 	if (in_value.kind == ExactValue_Invalid) {
 		// NOTE(bill): There's already been an error
 		return true;
@@ -1340,7 +1339,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 	return false;
 }
 
-void check_is_expressible(Checker *c, Operand *o, Type *type) {
+void check_is_expressible(CheckerContext *c, Operand *o, Type *type) {
 	GB_ASSERT(is_type_constant_type(type));
 	GB_ASSERT(o->mode == Addressing_Constant);
 	if (!check_representable_as_constant(c, o->value, type, &o->value)) {
@@ -1370,14 +1369,14 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 	}
 }
 
-bool check_is_not_addressable(Checker *c, Operand *o) {
+bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 	if (o->mode == Addressing_OptionalOk) {
 		AstNode *expr = unselector_expr(o->expr);
 		if (expr->kind != AstNode_TypeAssertion) {
 			return true;
 		}
 		ast_node(ta, TypeAssertion, expr);
-		TypeAndValue tv = type_and_value_of_expr(&c->info, ta->expr);
+		TypeAndValue tv = type_and_value_of_expr(&c->checker->info, ta->expr);
 		if (is_type_pointer(tv.type)) {
 			return false;
 		}
@@ -1400,7 +1399,7 @@ bool check_is_not_addressable(Checker *c, Operand *o) {
 	return false;
 }
 
-void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
+void check_unary_expr(CheckerContext *c, Operand *o, Token op, AstNode *node) {
 	switch (op.kind) {
 	case Token_And: { // Pointer address
 		if (check_is_not_addressable(c, o)) {
@@ -1471,7 +1470,7 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 }
 
 
-void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
+void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 	if (x->mode == Addressing_Type && y->mode == Addressing_Type) {
 		bool comp = are_types_identical(x->type, y->type);
 		switch (op) {
@@ -1585,7 +1584,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 
 }
 
-void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
+void check_shift(CheckerContext *c, Operand *x, Operand *y, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_BinaryExpr);
 	ast_node(be, BinaryExpr, node);
 
@@ -1656,7 +1655,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 
 		TokenPos pos = ast_node_token(x->expr).pos;
 		if (x_is_untyped) {
-			ExprInfo *info = check_get_expr_info(&c->info, x->expr);
+			ExprInfo *info = check_get_expr_info(&c->checker->info, x->expr);
 			if (info != nullptr) {
 				info->is_lhs = true;
 			}
@@ -1684,7 +1683,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 }
 
 
-Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offset, AstNode *node) {
+Operand check_ptr_addition(CheckerContext *c, TokenKind op, Operand *ptr, Operand *offset, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_BinaryExpr);
 	ast_node(be, BinaryExpr, node);
 	GB_ASSERT(is_type_pointer(ptr->type));
@@ -1741,7 +1740,7 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 
 
 
-bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
+bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (check_is_assignable_to(c, operand, y)) {
 		return true;
 	}
@@ -1865,7 +1864,7 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	return false;
 }
 
-bool check_cast_internal(Checker *c, Operand *x, Type *type) {
+bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) {
 	bool is_const_expr = x->mode == Addressing_Constant;
 	bool can_convert = false;
 
@@ -1890,7 +1889,7 @@ bool check_cast_internal(Checker *c, Operand *x, Type *type) {
 
 }
 
-void check_cast(Checker *c, Operand *x, Type *type) {
+void check_cast(CheckerContext *c, Operand *x, Type *type) {
 	if (!is_operand_value(*x)) {
 		error(x->expr, "Only values can be casted");
 		x->mode = Addressing_Invalid;
@@ -1924,7 +1923,7 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 	x->type = type;
 }
 
-bool check_transmute(Checker *c, AstNode *node, Operand *o, Type *t) {
+bool check_transmute(CheckerContext *c, AstNode *node, Operand *o, Type *t) {
 	if (!is_operand_value(*o)) {
 		error(o->expr, "'transmute' can only be applied to values");
 		o->mode = Addressing_Invalid;
@@ -1967,7 +1966,7 @@ bool check_transmute(Checker *c, AstNode *node, Operand *o, Type *t) {
 	return true;
 }
 
-bool check_binary_array_expr(Checker *c, Token op, Operand *x, Operand *y) {
+bool check_binary_array_expr(CheckerContext *c, Token op, Operand *x, Operand *y) {
 	if (is_type_array(x->type) && !is_type_array(y->type)) {
 		if (check_is_assignable_to(c, y, x->type)) {
 			if (check_binary_op(c, x, op)) {
@@ -1979,7 +1978,7 @@ bool check_binary_array_expr(Checker *c, Token op, Operand *x, Operand *y) {
 }
 
 
-void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
+void check_binary_expr(CheckerContext *c, Operand *x, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_BinaryExpr);
 	Operand y_ = {}, *y = &y_;
 
@@ -2167,8 +2166,8 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 }
 
 
-void update_expr_type(Checker *c, AstNode *e, Type *type, bool final) {
-	ExprInfo *found = check_get_expr_info(&c->info, e);
+void update_expr_type(CheckerContext *c, AstNode *e, Type *type, bool final) {
+	ExprInfo *found = check_get_expr_info(&c->checker->info, e);
 	if (found == nullptr) {
 		return;
 	}
@@ -2207,12 +2206,12 @@ void update_expr_type(Checker *c, AstNode *e, Type *type, bool final) {
 
 	if (!final && is_type_untyped(type)) {
 		old.type = base_type(type);
-		check_set_expr_info(&c->info, e, old);
+		check_set_expr_info(&c->checker->info, e, old);
 		return;
 	}
 
 	// We need to remove it and then give it a new one
-	check_remove_expr_info(&c->info, e);
+	check_remove_expr_info(&c->checker->info, e);
 
 	if (old.is_lhs && !is_type_integer(type)) {
 		gbString expr_str = expr_to_string(e);
@@ -2223,17 +2222,17 @@ void update_expr_type(Checker *c, AstNode *e, Type *type, bool final) {
 		return;
 	}
 
-	add_type_and_value(&c->info, e, old.mode, type, old.value);
+	add_type_and_value(&c->checker->info, e, old.mode, type, old.value);
 }
 
-void update_expr_value(Checker *c, AstNode *e, ExactValue value) {
-	ExprInfo *found = check_get_expr_info(&c->info, e);
+void update_expr_value(CheckerContext *c, AstNode *e, ExactValue value) {
+	ExprInfo *found = check_get_expr_info(&c->checker->info, e);
 	if (found) {
 		found->value = value;
 	}
 }
 
-void convert_untyped_error(Checker *c, Operand *operand, Type *target_type) {
+void convert_untyped_error(CheckerContext *c, Operand *operand, Type *target_type) {
 	gbString expr_str = expr_to_string(operand->expr);
 	gbString type_str = type_to_string(target_type);
 	char *extra_text = "";
@@ -2269,7 +2268,7 @@ ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
 	return v;
 }
 
-void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
+void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 	GB_ASSERT_NOT_NULL(target_type);
 	if (operand->mode == Addressing_Invalid ||
 	    operand->mode == Addressing_Type ||
@@ -2464,7 +2463,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 	update_expr_type(c, operand->expr, target_type, true);
 }
 
-bool check_index_value(Checker *c, bool open_range, AstNode *index_value, i64 max_count, i64 *value) {
+bool check_index_value(CheckerContext *c, bool open_range, AstNode *index_value, i64 max_count, i64 *value) {
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, index_value);
 	if (operand.mode == Addressing_Invalid) {
@@ -2487,7 +2486,7 @@ bool check_index_value(Checker *c, bool open_range, AstNode *index_value, i64 ma
 	}
 
 	if (operand.mode == Addressing_Constant &&
-	    (c->context.stmt_state_flags & StmtStateFlag_no_bounds_check) == 0) {
+	    (c->stmt_state_flags & StmtStateFlag_no_bounds_check) == 0) {
 		i64 i = exact_value_to_integer(operand.value).value_integer;
 		if (i < 0) {
 			gbString expr_str = expr_to_string(operand.expr);
@@ -2522,7 +2521,7 @@ bool check_index_value(Checker *c, bool open_range, AstNode *index_value, i64 ma
 	return true;
 }
 
-Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_hint) {
+Entity *check_selector(CheckerContext *c, Operand *operand, AstNode *node, Type *type_hint) {
 	ast_node(se, SelectorExpr, node);
 
 	bool check_op_expr = true;
@@ -2550,7 +2549,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 	if (op_expr->kind == AstNode_Ident) {
 		String op_name = op_expr->Ident.token.string;
-		Entity *e = scope_lookup_entity(c->context.scope, op_name);
+		Entity *e = scope_lookup_entity(c->scope, op_name);
 
 		bool is_alias = false;
 		while (e != nullptr && e->kind == Entity_Alias) {
@@ -2813,7 +2812,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	return entity;
 }
 
-bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id) {
+bool check_builtin_procedure(CheckerContext *c, Operand *operand, AstNode *call, i32 id) {
 	GB_ASSERT(call->kind == AstNode_CallExpr);
 	ast_node(ce, CallExpr, call);
 	BuiltinProc *bp = &builtin_procs[id];
@@ -3365,7 +3364,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 		// NOTE(bill): Prevent type cycles for procedure declarations
-		if (c->context.curr_proc_sig == o.type) {
+		if (c->curr_proc_sig == o.type) {
 			gbString s = expr_to_string(o.expr);
 			error(o.expr, "Invalid cyclic type usage from 'type_of', got '%s'", s);
 			gb_string_free(s);
@@ -3383,12 +3382,12 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_type_info_of: {
 		// proc type_info_of(Type) -> ^Type_Info
-		if (c->context.scope->is_global) {
+		if (c->scope->is_global) {
 			compiler_error("'type_info_of' Cannot be declared within a #shared_global_scope due to how the internals of the compiler works");
 		}
 
 		// NOTE(bill): The type information may not be setup yet
-		init_preload(c);
+		init_preload(c->checker);
 		AstNode *expr = ce->args[0];
 		Operand o = {};
 		check_expr_or_type(c, &o, expr);
@@ -3418,12 +3417,12 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_typeid_of: {
 		// proc typeid_of(Type) -> typeid
-		if (c->context.scope->is_global) {
+		if (c->scope->is_global) {
 			compiler_error("'typeid_of' Cannot be declared within a #shared_global_scope due to how the internals of the compiler works");
 		}
 
 		// NOTE(bill): The type information may not be setup yet
-		init_preload(c);
+		init_preload(c->checker);
 		AstNode *expr = ce->args[0];
 		Operand o = {};
 		check_expr_or_type(c, &o, expr);
@@ -4086,13 +4085,13 @@ break;
 }
 
 
-isize add_dependencies_from_unpacking(Checker *c, Entity **lhs, isize lhs_count, isize tuple_index, isize tuple_count) {
+isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs_count, isize tuple_index, isize tuple_count) {
 	if (lhs != nullptr) {
 		for (isize j = 0; (tuple_index + j) < lhs_count && j < tuple_count; j++) {
 			Entity *e = lhs[tuple_index + j];
-			DeclInfo *decl = decl_info_of_entity(&c->info, e);
+			DeclInfo *decl = decl_info_of_entity(&c->checker->info, e);
 			if (decl != nullptr) {
-				c->context.decl = decl; // will be reset by the 'defer' any way
+				c->decl = decl; // will be reset by the 'defer' any way
 				for_array(k, decl->deps.entries) {
 					Entity *dep = decl->deps.entries[k].ptr;
 					add_declaration_dependency(c, dep); // TODO(bill): Should this be here?
@@ -4104,12 +4103,12 @@ isize add_dependencies_from_unpacking(Checker *c, Entity **lhs, isize lhs_count,
 }
 
 
-void check_unpack_arguments(Checker *c, Entity **lhs, isize lhs_count, Array<Operand> *operands, Array<AstNode *> rhs, bool allow_ok, bool *optional_ok_ = nullptr) {
+void check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Array<AstNode *> rhs, bool allow_ok, bool *optional_ok_ = nullptr) {
 	bool optional_ok = false;
 	isize tuple_index = 0;
 	for_array(i, rhs) {
-		CheckerContext prev_context = c->context;
-		defer (c->context = prev_context);
+		CheckerContext c_ = *ctx;
+		CheckerContext *c = &c_;
 
 		Operand o = {};
 
@@ -4118,8 +4117,8 @@ void check_unpack_arguments(Checker *c, Entity **lhs, isize lhs_count, Array<Ope
 		if (lhs != nullptr && tuple_index < lhs_count) {
 			// NOTE(bill): override DeclInfo for dependency
 			Entity *e = lhs[tuple_index];
-			DeclInfo *decl = decl_info_of_entity(&c->info, e);
-			if (decl) c->context.decl = decl;
+			DeclInfo *decl = decl_info_of_entity(&c->checker->info, e);
+			if (decl) c->decl = decl;
 			type_hint = e->type;
 		}
 
@@ -4134,7 +4133,7 @@ void check_unpack_arguments(Checker *c, Entity **lhs, isize lhs_count, Array<Ope
 			if (allow_ok && lhs_count == 2 && rhs.count == 1 &&
 			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk)) {
 				Type *tuple = make_optional_ok_type(o.type);
-				add_type_and_value(&c->info, o.expr, o.mode, tuple, o.value);
+				add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
 
 				Operand val = o;
 				Operand ok = o;
@@ -4547,7 +4546,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	return err;
 }
 
-CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
+CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type *proc_type, AstNode *call) {
 	ast_node(ce, CallExpr, call);
 
 	CallArgumentCheckerType *call_checker = check_call_arguments_internal;
@@ -4595,12 +4594,12 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 			if (pt != nullptr && is_type_proc(pt)) {
 				CallArgumentError err = CallArgumentError_None;
 				CallArgumentData data = {};
-				CheckerContext prev_context = c->context;
-				defer (c->context = prev_context);
-				c->context.no_polymorphic_errors = true;
-				c->context.allow_polymorphic_types = is_type_polymorphic(pt);
+				CheckerContext ctx = *c;
 
-				err = call_checker(c, call, pt, p, operands, CallArgumentMode_NoErrors, &data);
+				ctx.no_polymorphic_errors = true;
+				ctx.allow_polymorphic_types = is_type_polymorphic(pt);
+
+				err = call_checker(&ctx, call, pt, p, operands, CallArgumentMode_NoErrors, &data);
 
 				if (err == CallArgumentError_None) {
 					valids[valid_count].index = i;
@@ -4723,7 +4722,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 			ident = s;
 		}
 
-		Entity *e = entity_of_ident(&c->info, ident);
+		Entity *e = entity_of_ident(&c->checker->info, ident);
 		CallArgumentData data = {};
 		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
 		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
@@ -4755,7 +4754,7 @@ isize lookup_polymorphic_struct_parameter(TypeStruct *st, String parameter_name)
 }
 
 
-CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, AstNode *call) {
+CallArgumentError check_polymorphic_struct_type(CheckerContext *c, Operand *operand, AstNode *call) {
 	ast_node(ce, CallExpr, call);
 
 	Type *original_type = operand->type;
@@ -4945,7 +4944,7 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 }
 
 
-ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
+ExprKind check_call_expr(CheckerContext *c, Operand *operand, AstNode *call) {
 	ast_node(ce, CallExpr, call);
 	if (ce->proc != nullptr &&
 	    ce->proc->kind == AstNode_BasicDirective) {
@@ -4956,7 +4955,7 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
 			operand->expr = ce->proc;
 			operand->type = t_invalid;
-			add_type_and_value(&c->info, ce->proc, operand->mode, operand->type, operand->value);
+			add_type_and_value(&c->checker->info, ce->proc, operand->mode, operand->type, operand->value);
 		} else {
 			GB_PANIC("Unhandled #%.*s", LIT(name));
 		}
@@ -5014,7 +5013,7 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 				Type *ot = operand->type; GB_ASSERT(ot->kind == Type_Named);
 				Entity *e = ot->Named.type_name;
 				add_entity_use(c, ident, e);
-				add_type_and_value(&c->info, call, Addressing_Type, ot, empty_exact_value);
+				add_type_and_value(&c->checker->info, call, Addressing_Type, ot, empty_exact_value);
 			} else {
 				operand->mode = Addressing_Invalid;
 				operand->type = t_invalid;
@@ -5122,7 +5121,7 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 }
 
 
-void check_expr_with_type_hint(Checker *c, Operand *o, AstNode *e, Type *t) {
+void check_expr_with_type_hint(CheckerContext *c, Operand *o, AstNode *e, Type *t) {
 	check_expr_base(c, o, e, t);
 	check_not_tuple(c, o);
 	char *err_str = nullptr;
@@ -5206,7 +5205,7 @@ bool ternary_compare_types(Type *x, Type *y) {
 	return are_types_identical(x, y);
 }
 
-ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *type_hint) {
+ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, AstNode *node, Type *type_hint) {
 	ExprKind kind = Expr_Stmt;
 
 	o->mode = Addressing_Invalid;
@@ -5223,12 +5222,12 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 	case_ast_node(i, Implicit, node)
 		switch (i->kind) {
 		case Token_context:
-			if (c->context.proc_name.len == 0) {
+			if (c->proc_name.len == 0) {
 				error(node, "'context' is only allowed within procedures");
 				return kind;
 			}
 
-			init_preload(c);
+			init_preload(c->checker);
 			o->mode = Addressing_Immutable;
 			o->type = t_context;
 			break;
@@ -5299,16 +5298,16 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			o->type = t_untyped_integer;
 			o->value = exact_value_i64(bd->token.pos.line);
 		} else if (bd->name == "procedure") {
-			if (c->context.curr_proc_decl == nullptr) {
+			if (c->curr_proc_decl == nullptr) {
 				error(node, "#procedure may only be used within procedures");
 				o->type = t_untyped_string;
 				o->value = exact_value_string(str_lit(""));
 			} else {
 				o->type = t_untyped_string;
-				o->value = exact_value_string(c->context.proc_name);
+				o->value = exact_value_string(c->proc_name);
 			}
 		} else if (bd->name == "caller_location") {
-			init_preload(c);
+			init_preload(c->checker);
 			error(node, "#caller_location may only be used as a default argument parameter");
 			o->type = t_source_code_location;
 			o->mode = Addressing_Value;
@@ -5324,26 +5323,27 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);
-		CheckerContext prev_context = c->context;
+		CheckerContext ctx = *c;
+
 		DeclInfo *decl = nullptr;
 		Type *type = alloc_type(Type_Proc);
-		check_open_scope(c, pl->type);
+		check_open_scope(&ctx, pl->type);
 		{
-			decl = make_decl_info(c->allocator, c->context.scope, c->context.decl);
+			decl = make_decl_info(ctx.allocator, ctx.scope, ctx.decl);
 			decl->proc_lit  = node;
-			c->context.decl = decl;
+			ctx.decl = decl;
 
 			if (pl->tags != 0) {
 				error(node, "A procedure literal cannot have tags");
 				pl->tags = 0; // TODO(bill): Should I zero this?!
 			}
 
-			check_procedure_type(c, type, pl->type);
+			check_procedure_type(&ctx, type, pl->type);
 			if (!is_type_proc(type)) {
 				gbString str = expr_to_string(node);
 				error(node, "Invalid procedure literal '%s'", str);
 				gb_string_free(str);
-				check_close_scope(c);
+				check_close_scope(&ctx);
 				return kind;
 			}
 
@@ -5352,11 +5352,10 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				return kind;
 			}
 
-			check_procedure_later(c, c->context.file, empty_token, decl, type, pl->body, pl->tags);
+			check_procedure_later(ctx.checker, ctx.file, empty_token, decl, type, pl->body, pl->tags);
 		}
-		check_close_scope(c);
+		check_close_scope(&ctx);
 
-		c->context = prev_context;
 
 		o->mode = Addressing_Value;
 		o->type = type;
@@ -6210,7 +6209,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 	return kind;
 }
 
-ExprKind check_expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint) {
+ExprKind check_expr_base(CheckerContext *c, Operand *o, AstNode *node, Type *type_hint) {
 	ExprKind kind = check_expr_base_internal(c, o, node, type_hint);
 	Type *type = nullptr;
 	ExactValue value = {ExactValue_Invalid};
@@ -6231,16 +6230,16 @@ ExprKind check_expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint)
 	}
 
 	if (type != nullptr && is_type_untyped(type)) {
-		add_untyped(&c->info, node, false, o->mode, type, value);
+		add_untyped(&c->checker->info, node, false, o->mode, type, value);
 	} else {
-		add_type_and_value(&c->info, node, o->mode, type, value);
+		add_type_and_value(&c->checker->info, node, o->mode, type, value);
 	}
 	return kind;
 }
 
 
 
-void check_multi_expr(Checker *c, Operand *o, AstNode *e) {
+void check_multi_expr(CheckerContext *c, Operand *o, AstNode *e) {
 	check_expr_base(c, o, e, nullptr);
 	switch (o->mode) {
 	default:
@@ -6255,7 +6254,7 @@ void check_multi_expr(Checker *c, Operand *o, AstNode *e) {
 	o->mode = Addressing_Invalid;
 }
 
-void check_not_tuple(Checker *c, Operand *o) {
+void check_not_tuple(CheckerContext *c, Operand *o) {
 	if (o->mode == Addressing_Value) {
 		// NOTE(bill): Tuples are not first class thus never named
 		if (o->type->kind == Type_Tuple) {
@@ -6268,13 +6267,13 @@ void check_not_tuple(Checker *c, Operand *o) {
 	}
 }
 
-void check_expr(Checker *c, Operand *o, AstNode *e) {
+void check_expr(CheckerContext *c, Operand *o, AstNode *e) {
 	check_multi_expr(c, o, e);
 	check_not_tuple(c, o);
 }
 
 
-void check_expr_or_type(Checker *c, Operand *o, AstNode *e, Type *type_hint) {
+void check_expr_or_type(CheckerContext *c, Operand *o, AstNode *e, Type *type_hint) {
 	check_expr_base(c, o, e, type_hint);
 	check_not_tuple(c, o);
 	error_operand_no_value(o);
