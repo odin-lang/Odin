@@ -27,7 +27,9 @@ The Odin programming language is fast, concise, readable, pragmatic and open sou
 Website: [https://odin.handmade.network/](https://odin.handmade.network/)
 
 ```go
-import "core:fmt.odin"
+package main
+
+import "core:fmt"
 
 main :: proc() {
 	program := "+ + * 😃 - /";

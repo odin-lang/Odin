@@ -36,13 +36,11 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 
 void check_struct_fields(Checker *c, AstNode *node, Array<Entity *> *fields, Array<AstNode *> params,
                          isize init_field_capacity, Type *named_type, String context) {
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-	defer (gb_temp_arena_memory_end(tmp));
-
 	*fields = array_make<Entity *>(heap_allocator(), 0, init_field_capacity);
 
 	Map<Entity *> entity_map = {};
-	map_init(&entity_map, c->tmp_allocator, 2*init_field_capacity);
+	map_init(&entity_map, c->allocator, 2*init_field_capacity);
+	defer (map_destroy(&entity_map));
 
 
 	GB_ASSERT(node->kind == AstNode_StructType);
@@ -444,9 +442,6 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	isize variant_count = ut->variants.count;
 
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-	defer (gb_temp_arena_memory_end(tmp));
-
 	Entity *using_index_expr = nullptr;
 
 	auto variants = array_make<Type *>(c->allocator, 0, variant_count);
@@ -499,9 +494,6 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	ast_node(et, EnumType, node);
 	GB_ASSERT(is_type_enum(enum_type));
 
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-	defer (gb_temp_arena_memory_end(tmp));
-
 	Type *base_type = t_int;
 	if (et->base_type != nullptr) {
 		base_type = check_type(c, et->base_type);
@@ -521,7 +513,8 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	enum_type->Enum.scope = c->context.scope;
 
 	Map<Entity *> entity_map = {}; // Key: String
-	map_init(&entity_map, c->tmp_allocator, 2*(et->fields.count));
+	map_init(&entity_map, c->allocator, 2*(et->fields.count));
+	defer (map_destroy(&entity_map));
 
 	auto fields = array_make<Entity *>(c->allocator, 0, et->fields.count);
 
@@ -649,11 +642,9 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, AstNode *node) {
 	ast_node(bft, BitFieldType, node);
 	GB_ASSERT(is_type_bit_field(bit_field_type));
 
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-	defer (gb_temp_arena_memory_end(tmp));
-
 	Map<Entity *> entity_map = {}; // Key: String
-	map_init(&entity_map, c->tmp_allocator, 2*(bft->fields.count));
+	map_init(&entity_map, c->allocator, 2*(bft->fields.count));
+	defer (map_destroy(&entity_map));
 
 	auto fields  = array_make<Entity*>(c->allocator, 0, bft->fields.count);
 	auto sizes   = array_make<u32>    (c->allocator, 0, bft->fields.count);

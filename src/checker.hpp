@@ -5,6 +5,7 @@ struct Entity;
 struct Scope;
 struct DeclInfo;
 struct AstFile;
+struct Checker;
 
 enum AddressingMode {
 	Addressing_Invalid,       // invalid addressing mode
@@ -274,13 +275,17 @@ struct ForeignContext {
 typedef Array<Entity *> CheckerTypePath;
 
 struct CheckerContext {
+	Checker *      checker;
 	AstPackage *   pkg;
+	AstFile *      file;
 	Scope *        scope;
 	DeclInfo *     decl;
+
 	u32            stmt_state_flags;
 	bool           in_defer; // TODO(bill): Actually handle correctly
-	String         proc_name;
 	Type *         type_hint;
+
+	String         proc_name;
 	DeclInfo *     curr_proc_decl;
 	Type *         curr_proc_sig;
 	ForeignContext foreign_context;
@@ -326,20 +331,14 @@ struct Checker {
 	gbMutex     mutex;
 
 
-	AstFile *                  curr_ast_file;
-	// NOTE(bill): Procedures to check
-	Array<ProcedureInfo>       procs;
+	Array<ProcedureInfo>       procs_to_check;
 	Map<Scope *>               package_scopes; // Key: String (fullpath)
 	Array<ImportGraphNode *>   package_order;
 
 	gbAllocator                allocator;
-	gbArena                    arena;
-	gbArena                    tmp_arena;
-	gbAllocator                tmp_allocator;
 
 	CheckerContext             context;
 
-	Array<Type *>              proc_stack;
 	bool                       done_preload;
 };
 

@@ -416,7 +416,7 @@ String get_fullpath_core(gbAllocator a, String path) {
 }
 
 
-String const ODIN_VERSION = str_lit("0.8.2");
+String const ODIN_VERSION = str_lit("0.9.0");
 String cross_compile_target = str_lit("");
 String cross_compile_lib_dir = str_lit("");
 
