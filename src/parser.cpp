@@ -4217,6 +4217,22 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 	}
 }
 
+String build_tag_get_token(String s, String *out) {
+	s = string_trim_whitespace(s);
+	isize n = 0;
+	while (n < s.len) {
+		Rune rune = 0;
+		isize width = gb_utf8_decode(&s[n], s.len-n, &rune);
+		if (rune_is_whitespace(rune)) {
+			*out = substring(s, n+width, s.len);
+			return substring(s, 0, n);
+		}
+		n += width;
+	}
+	out->len = 0;
+	return s;
+}
+
 bool parse_build_tag(Token token_for_pos, String s) {
 	String const prefix = str_lit("+build");
 	GB_ASSERT(string_starts_with(s, prefix));
@@ -4226,49 +4242,51 @@ bool parse_build_tag(Token token_for_pos, String s) {
 		return true;
 	}
 
-	auto platforms = array_make<String>(heap_allocator());
-	defer (array_free(&platforms));
-
-	isize n = 0;
-	while (n < s.len) {
-		Rune rune = 0;
-		isize width = gb_utf8_decode(&s[n], s.len, &rune);
-		if (rune_is_whitespace(rune)) {
-			String f = substring(s, 0, n);
-			array_add(&platforms, f);
-			s = substring(s, n+width, s.len);
-			n = 0;
-			continue;
-		} else if (n+width == s.len) {
-			String f = substring(s, 0, n+width);
-			array_add(&platforms, f);
-			break;
-		}
-		n += width;
-	}
-
-
 	bool any_correct = false;
-	for_array(i, platforms) {
-		String p = platforms[i];
-		TargetOsKind   os   = get_target_os_from_string(p);
-		TargetArchKind arch = get_target_arch_from_string(p);
-		if (os != TargetOs_Invalid) {
-			GB_ASSERT(arch == TargetArch_Invalid);
-			any_correct = true;
-			if (os == build_context.target_os) {
-				return true;
-			}
-		} else if (arch != TargetArch_Invalid) {
-			any_correct = true;
-			if (arch == build_context.target_arch) {
-				return true;
+
+	do {
+		String p = build_tag_get_token(s, &s);
+		if (p.len == 0) break;
+		bool is_notted = false;
+		if (p[0] == '!') {
+			is_notted = true;
+			p = substring(p, 1, p.len);
+			if (p.len == 0) {
+				error(token_for_pos, "Expected a build platform after '!'");
+				break;
 			}
 		}
-		if (os == TargetOs_Invalid && arch == TargetArch_Invalid) {
-			error(token_for_pos, "Invalid build tag platform: %.*s", LIT(p));
+
+		if (p.len > 0) {
+			TargetOsKind   os   = get_target_os_from_string(p);
+			TargetArchKind arch = get_target_arch_from_string(p);
+			if (os != TargetOs_Invalid) {
+				GB_ASSERT(arch == TargetArch_Invalid);
+				any_correct = true;
+				if (is_notted) {
+					if (os != build_context.target_os) {
+						return true;
+					}
+				} else if (os == build_context.target_os) {
+					return true;
+				}
+			} else if (arch != TargetArch_Invalid) {
+				any_correct = true;
+				if (is_notted) {
+					if (arch != build_context.target_arch) {
+						return true;
+					}
+				} else if (arch == build_context.target_arch) {
+					return true;
+				}
+			}
+			if (os == TargetOs_Invalid && arch == TargetArch_Invalid) {
+				error(token_for_pos, "Invalid build tag platform: %.*s", LIT(p));
+				break;
+			}
 		}
-	}
+	} while (s.len > 0);
+
 	if (any_correct) {
 		return false;
 	}
