@@ -1575,8 +1575,8 @@ void ir_emit_zero_init(irProcedure *p, irValue *address, AstNode *expr) {
 	auto args = array_make<irValue *>(a, 2);
 	args[0] = ir_emit_conv(p, address, t_rawptr);
 	args[1] = ir_const_int(a, type_size_of(t));
-	AstPackage *package = get_core_package(p->module->info, str_lit("mem"));
-	if (p->entity->token.string != "zero" && p->entity->package != package) {
+	AstPackage *pkg = get_core_package(p->module->info, str_lit("mem"));
+	if (p->entity->token.string != "zero" && p->entity->pkg != pkg) {
 		ir_emit_package_call(p, "mem", "zero", args, expr);
 	}
 	ir_emit(p, ir_instr_zero_init(p, address));
@@ -3833,8 +3833,8 @@ String ir_mangle_name(irGen *s, Entity *e) {
 	return make_string(new_name, new_name_len-1);
 
 #else
-	GB_ASSERT(e->package != nullptr);
-	String pkg = e->package->name;
+	GB_ASSERT(e->pkg != nullptr);
+	String pkg = e->pkg->name;
 	GB_ASSERT(!rune_is_digit(pkg[0]));
 
 	String name = e->token.string;
@@ -8310,7 +8310,7 @@ void ir_gen_tree(irGen *s) {
 		Entity *e = info->entities[i];
 		String name = e->token.string;
 
-		bool is_global = e->package != nullptr;
+		bool is_global = e->pkg != nullptr;
 
 		if (e->kind == Entity_Variable) {
 			global_variable_max_count++;

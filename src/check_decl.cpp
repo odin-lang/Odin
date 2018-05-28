@@ -534,7 +534,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	e->deprecated_message = ac.deprecated_message;
 	ac.link_name = handle_link_name(c, e->token, ac.link_name, ac.link_prefix);
 
-	if (e->package != nullptr && e->token.string == "main") {
+	if (e->pkg != nullptr && e->token.string == "main") {
 		if (pt->param_count != 0 ||
 		    pt->result_count != 0) {
 			gbString str = type_to_string(proc_type);
@@ -546,7 +546,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			error(e->token, "Procedure 'main' cannot have a custom calling convention");
 		}
 		pt->calling_convention = ProcCC_Contextless;
-		if (e->package->kind == Package_Init) {
+		if (e->pkg->kind == Package_Init) {
 			if (c->info.entry_point != nullptr) {
 				error(e->token, "Redeclaration of the entry pointer procedure 'main'");
 			} else {

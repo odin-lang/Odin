@@ -39,9 +39,17 @@ struct ImportedPackage {
 	isize       index;
 };
 
+
+struct ImportedFile {
+	AstPackage *pkg;
+	FileInfo    fi;
+	TokenPos    pos; // import
+	isize       index;
+};
+
 struct AstFile {
 	isize               id;
-	AstPackage *        package;
+	AstPackage *        pkg;
 	Scope *             scope;
 
 	String              fullpath;
@@ -65,10 +73,10 @@ struct AstFile {
 
 	Array<AstNode *>    decls;
 	Array<AstNode *>    imports; // 'import' 'using import'
+	isize               assert_decl_count;
 
 
 	AstNode *           curr_proc;
-	isize               scope_level;
 	// DeclInfo *          decl_info;   // NOTE(bill): Created in checker
 	isize               error_count;
 
@@ -85,8 +93,8 @@ struct AstFile {
 
 
 struct AstPackage {
-	isize            id;
 	PackageKind      kind;
+	isize            id;
 	String           name;
 	String           fullpath;
 	Array<AstFile *> files;
@@ -98,15 +106,15 @@ struct AstPackage {
 
 struct Parser {
 	String                 init_fullpath;
-	Map<bool>              imported_files; // Key: String (fullpath)
+	StringSet              imported_files; // fullpath
 	Map<AstPackage *>      package_map; // Key: String (package name)
 	Array<AstPackage *>    packages;
-	Array<ImportedPackage> imports;
+	Array<ImportedPackage> package_imports;
+	Array<ImportedFile>    files_to_process;
 	isize                  total_token_count;
 	isize                  total_line_count;
 	gbMutex                file_add_mutex;
 	gbMutex                file_decl_mutex;
-	isize                  file_index;
 };
 
 enum ProcInlining {

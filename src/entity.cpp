@@ -76,7 +76,7 @@ struct Entity {
 	AstNode *   identifier; // Can be nullptr
 	DeclInfo *  decl_info;
 	DeclInfo *  parent_proc_decl; // nullptr if in file/global scope
-	AstPackage *package;
+	AstPackage *pkg;
 
 	// TODO(bill): Cleanup how `using` works for entities
 	Entity *    using_parent;

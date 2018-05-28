@@ -274,8 +274,7 @@ struct ForeignContext {
 typedef Array<Entity *> CheckerTypePath;
 
 struct CheckerContext {
-	AstPackage *   package;
-	Scope *        package_scope;
+	AstPackage *   pkg;
 	Scope *        scope;
 	DeclInfo *     decl;
 	u32            stmt_state_flags;
