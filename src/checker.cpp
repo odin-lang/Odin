@@ -652,20 +652,16 @@ void init_checker(Checker *c, Parser *parser) {
 	init_checker_info(&c->info);
 	gb_mutex_init(&c->mutex);
 
-	array_init(&c->proc_stack, a);
-	array_init(&c->procs, a);
+	array_init(&c->procs_to_check, a);
 
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
 	isize total_token_count = c->parser->total_token_count;
 	isize arena_size = 2 * item_size * total_token_count;
-	gb_arena_init_from_allocator(&c->tmp_arena, a, arena_size);
-	gb_arena_init_from_allocator(&c->arena, a, arena_size);
+	// gb_arena_init_from_allocator(&c->tmp_arena, a, arena_size);
 
-	// c->allocator = pool_allocator(&c->pool);
 	c->allocator = heap_allocator();
-	// c->allocator     = gb_arena_allocator(&c->arena);
-	c->tmp_allocator = gb_arena_allocator(&c->tmp_arena);
+	// c->tmp_allocator = gb_arena_allocator(&c->tmp_arena);
 
 	isize pkg_cap = 2*c->parser->packages.count;
 
@@ -674,7 +670,8 @@ void init_checker(Checker *c, Parser *parser) {
 	array_init(&c->package_order, heap_allocator(), 0, c->parser->packages.count);
 
 	// Init context
-	c->context.scope = universal_scope;
+	c->context.checker = c;
+	c->context.scope   = universal_scope;
 
 	c->context.type_path = new_checker_type_path();
 	c->context.type_level = 0;
@@ -684,10 +681,9 @@ void destroy_checker(Checker *c) {
 	destroy_checker_info(&c->info);
 	gb_mutex_destroy(&c->mutex);
 
-	array_free(&c->proc_stack);
-	array_free(&c->procs);
+	array_free(&c->procs_to_check);
 
-	gb_arena_free(&c->tmp_arena);
+	// gb_arena_free(&c->tmp_arena);
 
 	map_destroy(&c->package_scopes);
 	array_free(&c->package_order);
@@ -1138,7 +1134,7 @@ void add_type_info_type(Checker *c, Type *t) {
 
 void check_procedure_later(Checker *c, ProcedureInfo info) {
 	GB_ASSERT(info.decl != nullptr);
-	array_add(&c->procs, info);
+	array_add(&c->procs_to_check, info);
 }
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body, u64 tags) {
@@ -1152,30 +1148,14 @@ void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *dec
 	check_procedure_later(c, info);
 }
 
-void push_procedure(Checker *c, Type *type) {
-	array_add(&c->proc_stack, type);
-}
-
-void pop_procedure(Checker *c) {
-	array_pop(&c->proc_stack);
-}
-
-Type *const curr_procedure_type(Checker *c) {
-	isize count = c->proc_stack.count;
-	if (count > 0) {
-		return c->proc_stack[count-1];
-	}
-	return nullptr;
-}
-
 void add_curr_ast_file(Checker *c, AstFile *file) {
 	if (file != nullptr) {
 		TokenPos zero_pos = {};
 		global_error_collector.prev = zero_pos;
-		c->curr_ast_file     = file;
-		c->context.decl      = file->pkg->decl_info;
-		c->context.scope     = file->scope;
-		c->context.pkg       = file->pkg;
+		c->context.file  = file;
+		c->context.decl  = file->pkg->decl_info;
+		c->context.scope = file->scope;
+		c->context.pkg   = file->pkg;
 	}
 }
 
@@ -2980,10 +2960,9 @@ void check_parsed_files(Checker *c) {
 	init_preload(c); // NOTE(bill): This could be setup previously through the use of 'type_info_of'
 
 	TIME_SECTION("check procedure bodies");
-	// Check procedure bodies
 	// NOTE(bill): Nested procedures bodies will be added to this "queue"
-	for_array(i, c->procs) {
-		ProcedureInfo *pi = &c->procs[i];
+	for_array(i, c->procs_to_check) {
+		ProcedureInfo *pi = &c->procs_to_check[i];
 		if (pi->type == nullptr) {
 			continue;
 		}

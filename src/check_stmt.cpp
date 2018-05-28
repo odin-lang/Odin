@@ -413,7 +413,7 @@ void check_label(Checker *c, AstNode *label) {
 	}
 
 
-	if (c->proc_stack.count == 0) {
+	if (c->context.curr_proc_decl == nullptr) {
 		error(l->name, "A label is only allowed within a procedure");
 		return;
 	}
@@ -569,11 +569,9 @@ void add_constant_switch_case(Checker *c, Map<TypeAndToken> *seen, Operand opera
 	HashKey key = hash_exact_value(operand.value);
 	TypeAndToken *found = map_get(seen, key);
 	if (found != nullptr) {
-		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-		defer (gb_temp_arena_memory_end(tmp));
-
 		isize count = multi_map_count(seen, key);
-		TypeAndToken *taps = gb_alloc_array(c->tmp_allocator, TypeAndToken, count);
+		TypeAndToken *taps = gb_alloc_array(c->allocator, TypeAndToken, count);
+		defer (gb_free(c->allocator, taps));
 
 		multi_map_get_all(seen, key, taps);
 		for (isize i = 0; i < count; i++) {
@@ -788,10 +786,8 @@ void check_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		GB_ASSERT(is_type_enum(et));
 		auto fields = et->Enum.fields;
 
-		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-		defer (gb_temp_arena_memory_end(tmp));
-
-		auto unhandled = array_make<Entity *>(c->tmp_allocator, 0, fields.count);
+		auto unhandled = array_make<Entity *>(c->allocator, 0, fields.count);
+		defer (array_free(&unhandled));
 
 		for_array(i, fields) {
 			Entity *f = fields[i];
@@ -1020,10 +1016,8 @@ void check_type_switch_stmt(Checker *c, AstNode *node, u32 mod_flags) {
 		GB_ASSERT(is_type_union(ut));
 		auto variants = ut->Union.variants;
 
-		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-		defer (gb_temp_arena_memory_end(tmp));
-
-		auto unhandled = array_make<Type *>(c->tmp_allocator, 0, variants.count);
+		auto unhandled = array_make<Type *>(c->allocator, 0, variants.count);
+		defer (array_free(&unhandled));
 
 		for_array(i, variants) {
 			Type *t = variants[i];
@@ -1114,13 +1108,12 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				return;
 			}
 
-			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-			defer (gb_temp_arena_memory_end(tmp));
-
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 			// an extra allocation
-			auto lhs_operands = array_make<Operand>(c->tmp_allocator, lhs_count);
-			auto rhs_operands = array_make<Operand>(c->tmp_allocator, 0, 2*lhs_count);
+			auto lhs_operands = array_make<Operand>(c->allocator, lhs_count);
+			auto rhs_operands = array_make<Operand>(c->allocator, 0, 2*lhs_count);
+			defer (array_free(&lhs_operands));
+			defer (array_free(&rhs_operands));
 
 			for_array(i, as->lhs) {
 				if (is_blank_ident(as->lhs[i])) {
@@ -1226,14 +1219,17 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);
-		GB_ASSERT(c->proc_stack.count > 0);
+		GB_ASSERT(c->context.curr_proc_sig != nullptr);
 
 		if (c->context.in_defer) {
 			error(rs->token, "You cannot 'return' within a defer statement");
 			break;
 		}
 
-		Type *proc_type = c->proc_stack[c->proc_stack.count-1];
+		Type *proc_type = c->context.curr_proc_sig;
+		GB_ASSERT(proc_type != nullptr);
+		GB_ASSERT(proc_type->kind == Type_Proc);
+		// Type *proc_type = c->proc_stack[c->proc_stack.count-1];
 		TypeProc *pt = &proc_type->Proc;
 		isize result_count = 0;
 		bool has_named_results = pt->has_named_results;

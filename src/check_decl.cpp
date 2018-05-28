@@ -95,12 +95,10 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, Array<AstNo
 	}
 
 
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-	defer (gb_temp_arena_memory_end(tmp));
-
 	// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 	// an extra allocation
-	auto operands = array_make<Operand>(c->tmp_allocator, 0, 2*lhs_count);
+	auto operands = array_make<Operand>(c->allocator, 0, 2*lhs_count);
+	defer (array_free(&operands));
 	check_unpack_arguments(c, lhs, lhs_count, &operands, inits, true);
 
 	isize rhs_count = operands.count;
@@ -582,7 +580,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 		GB_ASSERT(pl->body->kind == AstNode_BlockStmt);
 		if (!pt->is_polymorphic) {
-			check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pl->body, pl->tags);
+			check_procedure_later(c, c->context.file, e->token, d, proc_type, pl->body, pl->tags);
 		}
 	} else if (!is_foreign) {
 		if (e->Procedure.is_export) {
@@ -963,6 +961,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	c->context.decl = decl;
 	c->context.proc_name = proc_name;
 	c->context.curr_proc_decl = decl;
+	c->context.curr_proc_sig  = type;
 
 	GB_ASSERT(type->kind == Type_Proc);
 	if (type->Proc.param_count > 0) {
@@ -1006,21 +1005,17 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 		}
 	}
 
-	push_procedure(c, type);
-	{
-		ast_node(bs, BlockStmt, body);
-		check_stmt_list(c, bs->stmts, Stmt_CheckScopeDecls);
-		if (type->Proc.result_count > 0) {
-			if (!check_is_terminating(body)) {
-				if (token.kind == Token_Ident) {
-					error(bs->close, "Missing return statement at the end of the procedure '%.*s'", LIT(token.string));
-				} else {
-					error(bs->close, "Missing return statement at the end of the procedure");
-				}
+	ast_node(bs, BlockStmt, body);
+	check_stmt_list(c, bs->stmts, Stmt_CheckScopeDecls);
+	if (type->Proc.result_count > 0) {
+		if (!check_is_terminating(body)) {
+			if (token.kind == Token_Ident) {
+				error(bs->close, "Missing return statement at the end of the procedure '%.*s'", LIT(token.string));
+			} else {
+				error(bs->close, "Missing return statement at the end of the procedure");
 			}
 		}
 	}
-	pop_procedure(c);
 
 	check_scope_usage(c, c->context.scope);
 

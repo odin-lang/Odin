@@ -287,158 +287,105 @@ gb_global u64 const unsigned_integer_maxs[] = {
 gb_global String global_module_path = {0};
 gb_global bool global_module_path_set = false;
 
-gb_global gbScratchMemory scratch_memory = {0};
-
-void init_scratch_memory(isize size) {
-	void *memory = gb_alloc(heap_allocator(), size);
-	gb_scratch_memory_init(&scratch_memory, memory, size);
-}
-
-gbAllocator scratch_allocator(void) {
-	return gb_scratch_allocator(&scratch_memory);
-}
-
+#if 0
 struct Pool {
-	isize       memblock_size;
-	isize       out_of_band_size;
-	isize       alignment;
-
-	Array<u8 *> unused_memblock;
-	Array<u8 *> used_memblock;
-	Array<u8 *> out_of_band_allocations;
-
-	u8 *        current_memblock;
-	u8 *        current_pos;
-	isize       bytes_left;
-
-	gbAllocator block_allocator;
+	gbAllocator backing;
+	u8 *ptr;
+	u8 *end;
+	Array<u8 *> blocks;
+	isize block_size;
+	isize alignment;
 };
 
-enum {
-	POOL_BUCKET_SIZE_DEFAULT      = 65536,
-	POOL_OUT_OF_BAND_SIZE_DEFAULT = 6554,
-};
+#define POOL_BLOCK_SIZE (8*1024*1024)
+#define POOL_ALIGNMENT  16
 
-void pool_init(Pool *pool,
-               isize memblock_size = POOL_BUCKET_SIZE_DEFAULT,
-               isize out_of_band_size = POOL_OUT_OF_BAND_SIZE_DEFAULT,
-               isize alignment = 8,
-               gbAllocator block_allocator = heap_allocator(),
-               gbAllocator array_allocator = heap_allocator()) {
-	pool->memblock_size = memblock_size;
-	pool->out_of_band_size = out_of_band_size;
+#define ALIGN_DOWN(n, a) ((n) & ~((a) - 1))
+#define ALIGN_UP(n, a) ALIGN_DOWN((n) + (a) - 1, (a))
+#define ALIGN_DOWN_PTR(p, a) ((void *)ALIGN_DOWN((uintptr)(p), (a)))
+#define ALIGN_UP_PTR(p, a) ((void *)ALIGN_UP((uintptr)(p), (a)))
+
+void pool_init(Pool *pool, gbAllocator backing, isize block_size=POOL_BLOCK_SIZE, isize alignment=POOL_ALIGNMENT) {
+	pool->ptr = nullptr;
+	pool->end = nullptr;
+	pool->backing = backing;
+	pool->block_size = block_size;
 	pool->alignment = alignment;
-	pool->block_allocator = block_allocator;
-
-	array_init(&pool->unused_memblock,         array_allocator);
-	array_init(&pool->used_memblock,           array_allocator);
-	array_init(&pool->out_of_band_allocations, array_allocator);
+	array_init(&pool->blocks, backing);
 }
 
-void pool_free_all(Pool *p) {
-	if (p->current_memblock != nullptr) {
-		array_add(&p->unused_memblock, p->current_memblock);
-		p->current_memblock = nullptr;
+void pool_free_all(Pool *pool) {
+	for_array(i, pool->blocks) {
+		gb_free(pool->backing, pool->blocks[i]);
 	}
-
-	for_array(i, p->used_memblock) {
-		array_add(&p->unused_memblock, p->used_memblock[i]);
-	}
-	array_clear(&p->unused_memblock);
-
-	for_array(i, p->out_of_band_allocations) {
-		gb_free(p->block_allocator, p->out_of_band_allocations[i]);
-	}
-	array_clear(&p->out_of_band_allocations);
+	array_clear(&pool->blocks);
 }
 
-void pool_destroy(Pool *p) {
-	pool_free_all(p);
-
-	for_array(i, p->unused_memblock) {
-		gb_free(p->block_allocator, p->unused_memblock[i]);
-	}
+void pool_destroy(Pool *pool) {
+	pool_free_all(pool);
+	array_free(&pool->blocks);
 }
 
-void pool_cycle_new_block(Pool *p) {
-	GB_ASSERT_MSG(p->block_allocator.proc != nullptr,
-	              "You must call pool_init on a Pool before using it!");
-
-	if (p->current_memblock != nullptr) {
-		array_add(&p->used_memblock, p->current_memblock);
-	}
-
-	u8 *new_block = nullptr;
-
-	if (p->unused_memblock.count > 0) {
-		new_block = array_pop(&p->unused_memblock);
-	} else {
-		GB_ASSERT(p->block_allocator.proc != nullptr);
-		new_block = cast(u8 *)gb_alloc_align(p->block_allocator, p->memblock_size, p->alignment);
-	}
-
-	p->bytes_left       = p->memblock_size;
-	p->current_memblock = new_block;
-	p->current_memblock = new_block;
+void pool_grow(Pool *pool, isize min_size) {
+	isize size = ALIGN_UP(gb_max(min_size, pool->block_size), pool->alignment);
+	pool->ptr = cast(u8 *)gb_alloc(pool->backing, size);
+	GB_ASSERT(pool->ptr == ALIGN_DOWN_PTR(pool->ptr, pool->alignment));
+	pool->end = pool->ptr + size;
+	array_add(&pool->blocks, pool->ptr);
 }
 
-void *pool_get(Pool *p,
-               isize size, isize alignment = 0) {
-	if (alignment <= 0) alignment = p->alignment;
-
-	isize extra = alignment - (size & alignment);
-	size += extra;
-	if (size >= p->out_of_band_size) {
-		GB_ASSERT(p->block_allocator.proc != nullptr);
-		u8 *memory = cast(u8 *)gb_alloc_align(p->block_allocator, p->memblock_size, alignment);
-		if (memory != nullptr) {
-			array_add(&p->out_of_band_allocations, memory);
-		}
-		return memory;
+void *pool_alloc(Pool *pool, isize size, isize align) {
+	if (size > (pool->end - pool->ptr)) {
+		pool_grow(pool, size);
+		GB_ASSERT(size <= (pool->end - pool->ptr));
 	}
-
-	if (p->bytes_left < size) {
-		pool_cycle_new_block(p);
-		if (p->current_memblock != nullptr) {
-			return nullptr;
-		}
-	}
-
-	u8 *res = p->current_pos;
-	p->current_pos += size;
-	p->bytes_left  -= size;
-	return res;
+	align = gb_max(align, pool->alignment);
+	void *ptr = pool->ptr;
+	pool->ptr = cast(u8 *)ALIGN_UP_PTR(pool->ptr + size, align);
+	GB_ASSERT(pool->ptr <= pool->end);
+	GB_ASSERT(ptr == ALIGN_DOWN_PTR(ptr, align));
+	return ptr;
 }
 
+GB_ALLOCATOR_PROC(pool_allocator_proc) {
+	void *ptr = NULL;
+	Pool *pool = cast(Pool *)allocator_data;
 
-gbAllocator pool_allocator(Pool *pool);
-
-GB_ALLOCATOR_PROC(pool_allocator_procedure) {
-	Pool *p = cast(Pool *)allocator_data;
-	void *ptr = nullptr;
 
 	switch (type) {
 	case gbAllocation_Alloc:
-		return pool_get(p, size, alignment);
-	case gbAllocation_Free:
-		// Does nothing
+		ptr = pool_alloc(pool, size, alignment);
 		break;
 	case gbAllocation_FreeAll:
-		pool_free_all(p);
+		pool_free_all(pool);
 		break;
+
+	case gbAllocation_Free:
 	case gbAllocation_Resize:
-		return gb_default_resize_align(pool_allocator(p), old_memory, old_size, size, alignment);
+		GB_PANIC("A pool allocator does not support free or resize");
+		break;
 	}
 
 	return ptr;
 }
-
 gbAllocator pool_allocator(Pool *pool) {
-	gbAllocator allocator;
-	allocator.proc = pool_allocator_procedure;
-	allocator.data = pool;
-	return allocator;
+	gbAllocator a;
+	a.proc = pool_allocator_proc;
+	a.data = pool;
+	return a;
 }
+
+
+gb_global Pool global_pool = {};
+
+gbAllocator perm_allocator(void) {
+	return pool_allocator(&global_pool);
+}
+#endif
+
+
+
+
 
 
 

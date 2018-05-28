@@ -708,7 +708,6 @@ int main(int arg_count, char **arg_ptr) {
 	defer (timings_destroy(&timings));
 
 	init_string_buffer_memory();
-	init_scratch_memory(gb_megabytes(10));
 	init_global_error_collector();
 
 	array_init(&library_collections, heap_allocator());

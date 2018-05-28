@@ -664,11 +664,6 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 	}
 
 	if (operand->mode == Addressing_ProcGroup) {
-		// GB_PANIC("HERE!\n");
-
-		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-		defer (gb_temp_arena_memory_end(tmp));
-
 		Array<Entity *> procs = proc_group_entities(c, *operand);
 		bool good = false;
 		// NOTE(bill): These should be done
@@ -980,9 +975,6 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 		bool skip = false;
 
 		if (type_hint != nullptr) {
-			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-			defer (gb_temp_arena_memory_end(tmp));
-
 			// NOTE(bill): These should be done
 			for_array(i, procs) {
 				Type *t = base_type(procs[i]->type);
@@ -1497,8 +1489,6 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 	defer (if (err_str != nullptr) {
 		gb_string_free(err_str);
 	});
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-	defer (gb_temp_arena_memory_end(tmp));
 
 	if (check_is_assignable_to(c, x, y->type) ||
 	    check_is_assignable_to(c, y, x->type)) {
@@ -1525,7 +1515,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 			}
 			gbString type_string = type_to_string(err_type);
 			defer (gb_string_free(type_string));
-			err_str = gb_string_make(c->tmp_allocator,
+			err_str = gb_string_make(c->allocator,
 			                         gb_bprintf("operator '%.*s' not defined for type '%s'", LIT(token_strings[op]), type_string));
 		}
 	} else {
@@ -1540,7 +1530,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 		} else {
 			yt = type_to_string(y->type);
 		}
-		err_str = gb_string_make(c->tmp_allocator,
+		err_str = gb_string_make(c->allocator,
 		                         gb_bprintf("mismatched types '%s' and '%s'", xt, yt));
 		gb_string_free(yt);
 		gb_string_free(xt);
@@ -2365,10 +2355,9 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 
 	case Type_Union:
 		if (!is_operand_nil(*operand) && !is_operand_undef(*operand)) {
-			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-			defer (gb_temp_arena_memory_end(tmp));
 			isize count = t->Union.variants.count;
-			ValidIndexAndScore *valids = gb_alloc_array(c->tmp_allocator, ValidIndexAndScore, count);
+			ValidIndexAndScore *valids = gb_alloc_array(c->allocator, ValidIndexAndScore, count);
+			defer (gb_free(c->allocator, valids));
 			isize valid_count = 0;
 			isize first_success_index = -1;
 			for_array(i, t->Union.variants) {
@@ -4428,13 +4417,11 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
 	CallArgumentError err = CallArgumentError_None;
 
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-	defer (gb_temp_arena_memory_end(tmp));
-
 	isize param_count = pt->param_count;
-	bool *visited = gb_alloc_array(c->tmp_allocator, bool, param_count);
-
-	auto ordered_operands = array_make<Operand>(c->tmp_allocator, param_count);
+	bool *visited = gb_alloc_array(c->allocator, bool, param_count);
+	defer (gb_free(c->allocator, visited));
+	auto ordered_operands = array_make<Operand>(c->allocator, param_count);
+	defer (array_free(&ordered_operands));
 
 	for_array(i, ce->args) {
 		AstNode *arg = ce->args[i];
@@ -4812,7 +4799,8 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 	if (named_fields) {
 		bool *visited = gb_alloc_array(c->allocator, bool, param_count);
 
-		ordered_operands = array_make<Operand>(c->tmp_allocator, param_count);
+		// LEAK(bill)
+		ordered_operands = array_make<Operand>(c->allocator, param_count);
 
 		for_array(i, ce->args) {
 			AstNode *arg = ce->args[i];
@@ -5294,7 +5282,9 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 			break;
 		}
-		default:            GB_PANIC("Unknown literal"); break;
+		default:
+			GB_PANIC("Unknown literal");
+			break;
 		}
 		o->mode  = Addressing_Constant;
 		o->type  = t;
@@ -5309,7 +5299,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			o->type = t_untyped_integer;
 			o->value = exact_value_i64(bd->token.pos.line);
 		} else if (bd->name == "procedure") {
-			if (c->proc_stack.count == 0) {
+			if (c->context.curr_proc_decl == nullptr) {
 				error(node, "#procedure may only be used within procedures");
 				o->type = t_untyped_string;
 				o->value = exact_value_string(str_lit(""));
@@ -5362,7 +5352,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				return kind;
 			}
 
-			check_procedure_later(c, c->curr_ast_file, empty_token, decl, type, pl->body, pl->tags);
+			check_procedure_later(c, c->context.file, empty_token, decl, type, pl->body, pl->tags);
 		}
 		check_close_scope(c);
 
