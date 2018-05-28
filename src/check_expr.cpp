@@ -123,7 +123,7 @@ void check_scope_decls(CheckerContext *c, Array<AstNode *> nodes, isize reserve_
 		default:
 			continue;
 		}
-		DeclInfo *d = decl_info_of_entity(&c->checker->info, e);
+		DeclInfo *d = decl_info_of_entity(e);
 		if (d != nullptr) {
 			check_entity_decl(c, e, d, nullptr);
 		}
@@ -211,7 +211,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	}
 
 
-	DeclInfo *old_decl = decl_info_of_entity(&c->checker->info, base_entity);
+	DeclInfo *old_decl = decl_info_of_entity(base_entity);
 	if (old_decl == nullptr) {
 		return false;
 	}
@@ -267,10 +267,10 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	}
 
 
-	gb_mutex_lock(&nctx.checker->mutex);
-	defer (gb_mutex_unlock(&nctx.checker->mutex));
+	gb_mutex_lock(&nctx.info->mutex);
+	defer (gb_mutex_unlock(&nctx.info->mutex));
 
-	auto *found_gen_procs = map_get(&nctx.checker->info.gen_procs, hash_pointer(base_entity->identifier));
+	auto *found_gen_procs = map_get(&nctx.info->gen_procs, hash_pointer(base_entity->identifier));
 	if (found_gen_procs) {
 		auto procs = *found_gen_procs;
 		for_array(i, procs) {
@@ -382,7 +382,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 
 bool check_polymorphic_procedure_assignment(CheckerContext *c, Operand *operand, Type *type, PolyProcData *poly_proc_data) {
 	if (operand->expr == nullptr) return false;
-	Entity *base_entity = entity_of_ident(&c->checker->info, operand->expr);
+	Entity *base_entity = entity_of_ident(operand->expr);
 	if (base_entity == nullptr) return false;
 	return find_or_generate_polymorphic_procedure(c, base_entity, type, nullptr, poly_proc_data);
 }
@@ -966,7 +966,7 @@ Entity *check_ident(CheckerContext *c, Operand *o, AstNode *n, Type *named_type,
 	if (e->kind == Entity_ProcGroup) {
 		auto *pge = &e->ProcGroup;
 
-		DeclInfo *d = decl_info_of_entity(&c->checker->info, e);
+		DeclInfo *d = decl_info_of_entity(e);
 		check_entity_decl(c, e, d, nullptr);
 
 
@@ -4089,7 +4089,7 @@ isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs
 	if (lhs != nullptr) {
 		for (isize j = 0; (tuple_index + j) < lhs_count && j < tuple_count; j++) {
 			Entity *e = lhs[tuple_index + j];
-			DeclInfo *decl = decl_info_of_entity(&c->checker->info, e);
+			DeclInfo *decl = decl_info_of_entity(e);
 			if (decl != nullptr) {
 				c->decl = decl; // will be reset by the 'defer' any way
 				for_array(k, decl->deps.entries) {
@@ -4117,7 +4117,7 @@ void check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 		if (lhs != nullptr && tuple_index < lhs_count) {
 			// NOTE(bill): override DeclInfo for dependency
 			Entity *e = lhs[tuple_index];
-			DeclInfo *decl = decl_info_of_entity(&c->checker->info, e);
+			DeclInfo *decl = decl_info_of_entity(e);
 			if (decl) c->decl = decl;
 			type_hint = e->type;
 		}
@@ -4722,7 +4722,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			ident = s;
 		}
 
-		Entity *e = entity_of_ident(&c->checker->info, ident);
+		Entity *e = entity_of_ident(ident);
 		CallArgumentData data = {};
 		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
 		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;

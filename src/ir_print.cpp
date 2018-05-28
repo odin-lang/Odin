@@ -772,7 +772,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			found = map_get(&m->anonymous_proc_lits, hash_pointer(expr));
 		} else {
 			GB_ASSERT(expr->kind == AstNode_Ident);
-			Entity *e = entity_of_ident(m->info, expr);
+			Entity *e = entity_of_ident(expr);
 			GB_ASSERT(e != nullptr);
 			found = map_get(&m->values, hash_entity(e));
 		}

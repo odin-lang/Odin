@@ -623,6 +623,7 @@ void init_checker_info(CheckerInfo *i) {
 	map_init(&i->files,           a);
 	map_init(&i->packages,        a);
 	array_init(&i->variable_init_order, a);
+	gb_mutex_init(&i->mutex);
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -638,11 +639,13 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->files);
 	map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
+	gb_mutex_destroy(&i->mutex);
 }
 
 CheckerContext make_checker_context(Checker *c) {
 	CheckerContext ctx = c->init_ctx;
 	ctx.checker   = c;
+	ctx.info      = &c->info;
 	ctx.allocator = c->allocator;
 	ctx.scope     = universal_scope;
 
@@ -698,7 +701,7 @@ void destroy_checker(Checker *c) {
 }
 
 
-Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
+Entity *entity_of_ident(AstNode *identifier) {
 	if (identifier->kind == AstNode_Ident) {
 		return identifier->Ident.entity;
 	}
@@ -706,6 +709,9 @@ Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
 }
 
 TypeAndValue type_and_value_of_expr(CheckerInfo *i, AstNode *expr) {
+	gb_mutex_lock(&i->mutex);
+	defer (gb_mutex_unlock(&i->mutex));
+
 	TypeAndValue result = {};
 	TypeAndValue *found = map_get(&i->types, hash_node(expr));
 	if (found) result = *found;
@@ -713,12 +719,15 @@ TypeAndValue type_and_value_of_expr(CheckerInfo *i, AstNode *expr) {
 }
 
 Type *type_of_expr(CheckerInfo *i, AstNode *expr) {
+	gb_mutex_lock(&i->mutex);
+	defer (gb_mutex_unlock(&i->mutex));
+
 	TypeAndValue tav = type_and_value_of_expr(i, expr);
 	if (tav.mode != Addressing_Invalid) {
 		return tav.type;
 	}
 	if (expr->kind == AstNode_Ident) {
-		Entity *entity = entity_of_ident(i, expr);
+		Entity *entity = entity_of_ident(expr);
 		if (entity) {
 			return entity->type;
 		}
@@ -747,12 +756,12 @@ Entity *entity_of_node(CheckerInfo *i, AstNode *expr) {
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
 	case_ast_node(ident, Ident, expr);
-		return entity_of_ident(i, expr);
+		return entity_of_ident(expr);
 	case_end;
 	case_ast_node(se, SelectorExpr, expr);
 		AstNode *s = unselector_expr(se->selector);
 		if (s->kind == AstNode_Ident) {
-			return entity_of_ident(i, s);
+			return entity_of_ident(s);
 		}
 	case_end;
 	case_ast_node(cc, CaseClause, expr);
@@ -763,34 +772,42 @@ Entity *entity_of_node(CheckerInfo *i, AstNode *expr) {
 }
 
 
-DeclInfo *decl_info_of_entity(CheckerInfo *i, Entity *e) {
+DeclInfo *decl_info_of_entity(Entity *e) {
 	if (e != nullptr) {
 		return e->decl_info;
 	}
 	return nullptr;
 }
 
-DeclInfo *decl_info_of_ident(CheckerInfo *i, AstNode *ident) {
-	return decl_info_of_entity(i, entity_of_ident(i, ident));
+DeclInfo *decl_info_of_ident(AstNode *ident) {
+	return decl_info_of_entity(entity_of_ident(ident));
 }
 
 AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
+	gb_mutex_lock(&i->mutex);
+	defer (gb_mutex_unlock(&i->mutex));
 	AstFile **found = map_get(&i->files, hash_string(filename));
 	if (found != nullptr) {
 		return *found;
 	}
 	return nullptr;
 }
-Scope *scope_of_node(CheckerInfo *i, AstNode *node) {
+Scope *scope_of_node(AstNode *node) {
 	return node->scope;
 }
 ExprInfo *check_get_expr_info(CheckerInfo *i, AstNode *expr) {
+	gb_mutex_lock(&i->mutex);
+	defer (gb_mutex_unlock(&i->mutex));
 	return map_get(&i->untyped, hash_node(expr));
 }
 void check_set_expr_info(CheckerInfo *i, AstNode *expr, ExprInfo info) {
+	gb_mutex_lock(&i->mutex);
+	defer (gb_mutex_unlock(&i->mutex));
 	map_set(&i->untyped, hash_node(expr), info);
 }
 void check_remove_expr_info(CheckerInfo *i, AstNode *expr) {
+	gb_mutex_lock(&i->mutex);
+	defer (gb_mutex_unlock(&i->mutex));
 	map_remove(&i->untyped, hash_node(expr));
 }
 
@@ -801,6 +818,9 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	if (type == t_llvm_bool) {
 		type = t_bool;
 	}
+
+	gb_mutex_lock(&info->mutex);
+	defer (gb_mutex_unlock(&info->mutex));
 
 	isize entry_index = -1;
 	HashKey key = hash_type(type);
@@ -840,6 +860,8 @@ void add_untyped(CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode m
 	if (mode == Addressing_Constant && type == t_invalid) {
 		compiler_error("add_untyped - invalid type: %s", type_to_string(type));
 	}
+	gb_mutex_lock(&i->mutex);
+	defer (gb_mutex_unlock(&i->mutex));
 	map_set(&i->untyped, hash_node(expression), make_expr_info(mode, type, value, lhs));
 }
 
@@ -853,6 +875,9 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 	if (mode == Addressing_Constant && type == t_invalid) {
 		compiler_error("add_type_and_value - invalid type: %s", type_to_string(type));
 	}
+
+	gb_mutex_lock(&i->mutex);
+	defer (gb_mutex_unlock(&i->mutex));
 
 	TypeAndValue tv = {};
 	tv.type  = type;
@@ -872,6 +897,9 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 		return;
 	}
 	GB_ASSERT(entity != nullptr);
+
+	gb_mutex_lock(&i->mutex);
+	defer (gb_mutex_unlock(&i->mutex));
 
 	identifier->Ident.entity = entity;
 	entity->identifier = identifier;
@@ -1002,7 +1030,10 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		return;
 	}
 
-	auto found = map_get(&c->checker->info.type_info_map, hash_type(t));
+	gb_mutex_lock(&c->info->mutex);
+	defer (gb_mutex_unlock(&c->info->mutex));
+
+	auto found = map_get(&c->info->type_info_map, hash_type(t));
 	if (found != nullptr) {
 		// Types have already been added
 		add_type_info_dependency(c->decl, t);
@@ -1011,8 +1042,8 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 
 	bool prev = false;
 	isize ti_index = -1;
-	for_array(i, c->checker->info.type_info_map.entries) {
-		auto *e = &c->checker->info.type_info_map.entries[i];
+	for_array(i, c->info->type_info_map.entries) {
+		auto *e = &c->info->type_info_map.entries[i];
 		Type *prev_type = cast(Type *)e->key.ptr;
 		if (are_types_identical(t, prev_type)) {
 			// Duplicate entry
@@ -1024,8 +1055,8 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 	if (ti_index < 0) {
 		// Unique entry
 		// NOTE(bill): map entries grow linearly and in order
-		ti_index = c->checker->info.type_info_types.count;
-		array_add(&c->checker->info.type_info_types, t);
+		ti_index = c->info->type_info_types.count;
+		array_add(&c->info->type_info_types, t);
 	}
 	map_set(&c->checker->info.type_info_map, hash_type(t), ti_index);
 
@@ -1140,7 +1171,9 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 
 void check_procedure_later(Checker *c, ProcedureInfo info) {
 	GB_ASSERT(info.decl != nullptr);
+	gb_mutex_lock(&c->mutex);
 	array_add(&c->procs_to_check, info);
+	gb_mutex_unlock(&c->mutex);
 }
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body, u64 tags) {
@@ -1303,7 +1336,7 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 	if (entity->type != nullptr &&
 	    is_type_polymorphic(entity->type)) {
 
-		DeclInfo *decl = decl_info_of_entity(&c->info, entity);
+		DeclInfo *decl = decl_info_of_entity(entity);
 		if (decl != nullptr && decl->gen_proc_type == nullptr) {
 			return;
 		}
@@ -1315,7 +1348,7 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 
 
 	ptr_set_add(set, entity);
-	DeclInfo *decl = decl_info_of_entity(info, entity);
+	DeclInfo *decl = decl_info_of_entity(entity);
 	if (decl == nullptr) {
 		return;
 	}
@@ -1437,7 +1470,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		Entity *   e = cast(Entity *)M.entries[i].key.ptr;
 		EntityGraphNode *n = M.entries[i].value;
 
-		DeclInfo *decl = decl_info_of_entity(info, e);
+		DeclInfo *decl = decl_info_of_entity(e);
 		if (decl != nullptr) {
 			for_array(j, decl->deps.entries) {
 				auto entry = decl->deps.entries[j];
@@ -2874,7 +2907,7 @@ void calculate_global_init_order(Checker *c) {
 		if (e == nullptr || e->kind != Entity_Variable) {
 			continue;
 		}
-		DeclInfo *d = decl_info_of_entity(info, e);
+		DeclInfo *d = decl_info_of_entity(e);
 
 		if (ptr_set_exists(&emitted, d)) {
 			continue;
@@ -2908,8 +2941,99 @@ void calculate_global_init_order(Checker *c) {
 }
 
 
+void check_proc_info(Checker *c, ProcedureInfo pi) {
+	if (pi.type == nullptr) {
+		return;
+	}
+
+	CheckerContext ctx = make_checker_context(c);
+	defer (destroy_checker_context(&ctx));
+	add_curr_ast_file(&ctx, pi.file);
+
+	TypeProc *pt = &pi.type->Proc;
+	String name = pi.token.string;
+	if (pt->is_polymorphic) {
+		GB_ASSERT_MSG(pt->is_poly_specialized, "%.*s", LIT(name));
+	}
+
+
+	bool bounds_check    = (pi.tags & ProcTag_bounds_check)    != 0;
+	bool no_bounds_check = (pi.tags & ProcTag_no_bounds_check) != 0;
+
+	if (bounds_check) {
+		ctx.stmt_state_flags |= StmtStateFlag_bounds_check;
+		ctx.stmt_state_flags &= ~StmtStateFlag_no_bounds_check;
+	} else if (no_bounds_check) {
+		ctx.stmt_state_flags |= StmtStateFlag_no_bounds_check;
+		ctx.stmt_state_flags &= ~StmtStateFlag_bounds_check;
+	}
+
+	check_proc_body(&ctx, pi.token, pi.decl, pi.type, pi.body);
+}
+
+GB_THREAD_PROC(check_proc_info_worker_proc) {
+	if (thread == nullptr) return 0;
+	auto *c = cast(Checker *)thread->user_data;
+	isize index = thread->user_index;
+	check_proc_info(c, c->procs_to_check[index]);
+	return 0;
+}
+
+void check_proc_bodies(Checker *c) {
+	// IMPORTANT TODO(bill): Figure out why this doesn't work on *nix sometimes
+#if 0 && defined(GB_SYSTEM_WINDOWS)
+	isize thread_count = gb_max(build_context.thread_count, 1);
+	gb_printf_err("Threads: %td\n", thread_count);
+	// isize thread_count = 1;
+	if (thread_count > 1) {
+		isize volatile curr_proc_index = 0;
+
+		auto worker_threads = array_make<gbThread>(heap_allocator(), thread_count);
+		defer (array_free(&worker_threads));
+
+		for_array(i, worker_threads) {
+			gbThread *t = &worker_threads[i];
+			gb_thread_init(t);
+		}
+		defer (for_array(i, worker_threads) {
+			gb_thread_destroy(&worker_threads[i]);
+		});
+
+
+		for (;;) {
+			bool are_any_alive = false;
+			for_array(i, worker_threads) {
+				gbThread *t = &worker_threads[i];
+				if (gb_thread_is_running(t)) {
+					are_any_alive = true;
+				} else if (curr_proc_index < c->procs_to_check.count) {
+					t->user_index = curr_proc_index;
+					curr_proc_index++;
+					gb_thread_start(t, check_proc_info_worker_proc, c);
+					are_any_alive = true;
+				}
+			}
+			if (!are_any_alive && curr_proc_index >= c->procs_to_check.count) {
+				break;
+			}
+		}
+
+	} else {
+		for_array(i, c->procs_to_check) {
+			ProcedureInfo pi = c->procs_to_check[i];
+			check_proc_info(c, pi);
+		}
+	}
+#else
+	for_array(i, c->procs_to_check) {
+		ProcedureInfo pi = c->procs_to_check[i];
+		check_proc_info(c, pi);
+	}
+#endif
+}
+
 void check_parsed_files(Checker *c) {
-#if 0
+#if 1
 	Timings timings = {};
 	timings_init(&timings, str_lit("check_parsed_files"), 16);
 	defer ({
@@ -2977,37 +3101,7 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("check procedure bodies");
 	// NOTE(bill): Nested procedures bodies will be added to this "queue"
-	for_array(i, c->procs_to_check) {
-		ProcedureInfo *pi = &c->procs_to_check[i];
-		if (pi->type == nullptr) {
-			continue;
-		}
-
-		CheckerContext ctx = make_checker_context(c);
-		defer (destroy_checker_context(&ctx));
-		add_curr_ast_file(&ctx, pi->file);
-
-		TypeProc *pt = &pi->type->Proc;
-		String name = pi->token.string;
-		if (pt->is_polymorphic) {
-			GB_ASSERT_MSG(pt->is_poly_specialized, "%.*s", LIT(name));
-		}
-
-
-		bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
-		bool no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
-
-		if (bounds_check) {
-			ctx.stmt_state_flags |= StmtStateFlag_bounds_check;
-			ctx.stmt_state_flags &= ~StmtStateFlag_no_bounds_check;
-		} else if (no_bounds_check) {
-			ctx.stmt_state_flags |= StmtStateFlag_no_bounds_check;
-			ctx.stmt_state_flags &= ~StmtStateFlag_bounds_check;
-		}
-
-		check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
-	}
-
+	check_proc_bodies(c);
 
 	for_array(i, c->info.files.entries) {
 		AstFile *f = c->info.files.entries[i].value;

@@ -6,6 +6,7 @@ struct Scope;
 struct DeclInfo;
 struct AstFile;
 struct Checker;
+struct CheckerInfo;
 
 enum AddressingMode {
 	Addressing_Invalid,       // invalid addressing mode
@@ -279,6 +280,7 @@ typedef Array<Entity *> CheckerTypePath;
 
 struct CheckerContext {
 	Checker *      checker;
+	CheckerInfo *  info;
 	AstPackage *   pkg;
 	AstFile *      file;
 	Scope *        scope;
@@ -327,6 +329,8 @@ struct CheckerInfo {
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
 	PtrSet<isize>         minimum_dependency_type_info_set;
+
+	gbMutex               mutex;
 };
 
 struct Checker {
@@ -359,11 +363,11 @@ HashKey hash_decl_info(DeclInfo *decl) { return hash_pointer(decl); }
 // CheckerInfo API
 TypeAndValue type_and_value_of_expr (CheckerInfo *i, AstNode *expr);
 Type *       type_of_expr           (CheckerInfo *i, AstNode *expr);
-Entity *     entity_of_ident        (CheckerInfo *i, AstNode *identifier);
+Entity *     entity_of_ident        (AstNode *identifier);
 Entity *     implicit_entity_of_node(CheckerInfo *i, AstNode *clause);
-Scope *      scope_of_node          (CheckerInfo *i, AstNode *node);
-DeclInfo *   decl_info_of_ident     (CheckerInfo *i, AstNode *ident);
-DeclInfo *   decl_info_of_entity    (CheckerInfo *i, Entity * e);
+Scope *      scope_of_node          (AstNode *node);
+DeclInfo *   decl_info_of_ident     (AstNode *ident);
+DeclInfo *   decl_info_of_entity    (Entity * e);
 AstFile *    ast_file_of_filename   (CheckerInfo *i, String   filename);
 // IMPORTANT: Only to use once checking is done
 isize        type_info_index        (CheckerInfo *i, Type *   type, bool error_on_failure = true);
