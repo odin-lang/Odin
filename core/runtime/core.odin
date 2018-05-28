@@ -1,3 +1,6 @@
+// This is the runtime code required by the compiler
+// IMPORTANT NOTE(bill): Do not change the order of any of this data
+// The compiler relies upon this _exact_ order
 package runtime
 
 import "core:os"
@@ -30,8 +33,6 @@ Calling_Convention :: enum {
 	Std         = 4,
 	Fast        = 5,
 }
-// IMPORTANT NOTE(bill): Do not change the order of any of this data
-// The compiler relies upon this _exact_ order
 
 Type_Info_Enum_Value :: union {
 	rune,

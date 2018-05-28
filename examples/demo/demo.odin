@@ -735,7 +735,6 @@ deprecated_attribute :: proc() {
 	// foo_v1(1);
 }
 
-
 main :: proc() {
 	when true {
 		general_stuff();
@@ -752,3 +751,4 @@ main :: proc() {
 		deprecated_attribute();
 	}
 }
+

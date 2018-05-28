@@ -2263,23 +2263,23 @@ void check_all_global_entities(Checker *c) {
 			continue;
 		}
 
-
 		CheckerContext ctx = c->init_ctx;
 
 		GB_ASSERT(d->scope->is_file);
 		AstFile *file = d->scope->file;
 		add_curr_ast_file(&ctx, file);
-		Scope *package_scope = file->pkg->scope;
+		AstPackage *pkg = file->pkg;
+
 		GB_ASSERT(ctx.pkg != nullptr);
 		GB_ASSERT(e->pkg != nullptr);
 
 		if (e->token.string == "main") {
 			if (e->kind != Entity_Procedure) {
-				if (package_scope->is_init) {
+				if (pkg->kind == Package_Init) {
 					error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
 					continue;
 				}
-			} else if (package_scope->is_global) {
+			} else if (pkg->kind == Package_Runtime) {
 				error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
 				continue;
 			}
@@ -2290,7 +2290,7 @@ void check_all_global_entities(Checker *c) {
 		check_entity_decl(&ctx, e, d, nullptr);
 
 
-		if (!package_scope->is_global) {
+		if (pkg->kind != Package_Runtime) {
 			processing_preload = false;
 		}
 
@@ -3033,7 +3033,7 @@ void check_proc_bodies(Checker *c) {
 }
 
 void check_parsed_files(Checker *c) {
-#if 1
+#if 0
 	Timings timings = {};
 	timings_init(&timings, str_lit("check_parsed_files"), 16);
 	defer ({
@@ -3046,7 +3046,6 @@ void check_parsed_files(Checker *c) {
 #endif
 
 	TIME_SECTION("map full filepaths to scope");
-
 	add_type_info_type(&c->init_ctx, t_invalid);
 
 	// Map full filepaths to Scopes
@@ -3146,6 +3145,7 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+	TIME_SECTION("check for type cycles");
 	// NOTE(bill): Check for illegal cyclic type declarations
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
