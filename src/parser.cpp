@@ -3885,10 +3885,11 @@ void destroy_ast_file(AstFile *f) {
 
 bool init_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
-	map_init(&p->imported_files, heap_allocator());
+	string_set_init(&p->imported_files, heap_allocator());
 	map_init(&p->package_map, heap_allocator());
 	array_init(&p->packages, heap_allocator());
-	array_init(&p->imports, heap_allocator());
+	array_init(&p->package_imports, heap_allocator());
+	array_init(&p->files_to_process, heap_allocator());
 	gb_mutex_init(&p->file_add_mutex);
 	gb_mutex_init(&p->file_decl_mutex);
 	return true;
@@ -3898,47 +3899,144 @@ void destroy_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
 	// TODO(bill): Fix memory leak
 	for_array(i, p->packages) {
-		AstPackage *package = p->packages[i];
-		for_array(j, package->files) {
-			destroy_ast_file(package->files[j]);
+		AstPackage *pkg = p->packages[i];
+		for_array(j, pkg->files) {
+			destroy_ast_file(pkg->files[j]);
 		}
-		array_free(&package->files);
+		array_free(&pkg->files);
 	}
 #if 0
-	for_array(i, p->imports) {
-		// gb_free(heap_allocator(), p->imports[i].text);
+	for_array(i, p->package_imports) {
+		// gb_free(heap_allocator(), p->package_imports[i].text);
 	}
 #endif
 	array_free(&p->packages);
-	array_free(&p->imports);
-	map_destroy(&p->imported_files);
+	array_free(&p->package_imports);
+	array_free(&p->files_to_process);
+	string_set_destroy(&p->imported_files);
 	map_destroy(&p->package_map);
 	gb_mutex_destroy(&p->file_add_mutex);
 	gb_mutex_destroy(&p->file_decl_mutex);
 }
 
+
+void parser_add_package(Parser *p, AstPackage *pkg) {
+	pkg->id = p->packages.count+1;
+	array_add(&p->packages, pkg);
+	if (pkg->name.len > 0) {
+		HashKey key = hash_string(pkg->name);
+		auto found = map_get(&p->package_map, key);
+		if (found) {
+			GB_ASSERT(pkg->files.count > 0);
+			AstFile *f = pkg->files[0];
+			error(f->package_token, "Non-unique package name '%.*s'", LIT(pkg->name));
+			GB_ASSERT((*found)->files.count > 0);
+			TokenPos pos = (*found)->files[0]->package_token.pos;
+			gb_printf_err("\tpreviously declared at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
+		} else {
+			map_set(&p->package_map, key, pkg);
+		}
+	}
+}
+
+void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo fi, TokenPos pos) {
+	ImportedFile f = {pkg, fi, pos, p->files_to_process.count};
+	array_add(&p->files_to_process, f);
+}
+
+
 // NOTE(bill): Returns true if it's added
-bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
+bool try_add_import_path(Parser *p, String const &path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
 	if (build_context.generate_docs) {
 		return false;
 	}
 
-	path = string_trim_whitespace(path);
-	rel_path = string_trim_whitespace(rel_path);
+	String const FILE_EXT = str_lit(".odin");
 
-	HashKey key = hash_string(path);
-	if (map_get(&p->imported_files, key) != nullptr) {
+	gb_mutex_lock(&p->file_add_mutex);
+	defer (gb_mutex_unlock(&p->file_add_mutex));
+
+	if (string_set_exists(&p->imported_files, path)) {
 		return false;
 	}
-	map_set(&p->imported_files, key, true);
+	string_set_add(&p->imported_files, path);
 
-	ImportedPackage item = {};
-	item.kind     = kind;
-	item.path     = path;
-	item.rel_path = rel_path;
-	item.pos      = pos;
-	item.index    = p->imports.count;
-	array_add(&p->imports, item);
+
+	AstPackage *pkg = gb_alloc_item(heap_allocator(), AstPackage);
+	pkg->kind = kind;
+	pkg->fullpath = path;
+	array_init(&pkg->files, heap_allocator());
+
+	// NOTE(bill): Single file initial package
+	if (kind == Package_Init && string_ends_with(path, FILE_EXT)) {
+		FileInfo fi = {};
+		fi.name = filename_from_path(path);
+		fi.fullpath = path;
+		fi.size = get_file_size(path);
+		fi.is_dir = false;
+
+		parser_add_file_to_process(p, pkg, fi, pos);
+		parser_add_package(p, pkg);
+		return true;
+	}
+
+
+	Array<FileInfo> list = {};
+	ReadDirectoryError rd_err = read_directory(path, &list);
+	defer (array_free(&list));
+
+	if (list.count == 1) {
+		GB_ASSERT(path != list[0].fullpath);
+	}
+
+
+	if (rd_err != ReadDirectory_None) {
+		if (pos.line != 0) {
+			gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
+		}
+		gb_mutex_lock(&global_error_collector.mutex);
+		defer (gb_mutex_unlock(&global_error_collector.mutex));
+		global_error_collector.count++;
+
+
+		switch (rd_err) {
+		case ReadDirectory_InvalidPath:
+			gb_printf_err("Invalid path: %.*s\n", LIT(rel_path));
+			return false;
+
+		case ReadDirectory_NotExists:
+			gb_printf_err("Path does not exist: %.*s\n", LIT(rel_path));
+			return false;
+
+		case ReadDirectory_NotDir:
+			gb_printf_err("Expected a directory for a package, got a file: %.*s\n", LIT(rel_path));
+			return false;
+
+		case ReadDirectory_Unknown:
+			gb_printf_err("Unknown error whilst reading path %.*s\n", LIT(rel_path));
+			return false;
+		case ReadDirectory_Permission:
+			gb_printf_err("Unknown error whilst reading path %.*s\n", LIT(rel_path));
+			return false;
+
+		case ReadDirectory_Empty:
+			gb_printf_err("Empty directory: %.*s\n", LIT(rel_path));
+			return false;
+		}
+	}
+
+	for_array(list_index, list) {
+		FileInfo fi = list[list_index];
+		String name = fi.name;
+		if (string_ends_with(name, FILE_EXT)) {
+			if (is_excluded_target_filename(name)) {
+				continue;
+			}
+			parser_add_file_to_process(p, pkg, fi, pos);
+		}
+	}
+
+	parser_add_package(p, pkg);
 
 	return true;
 }
@@ -4074,7 +4172,8 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 				if (expr->kind == AstNode_CallExpr &&
 				    expr->CallExpr.proc->kind == AstNode_BasicDirective &&
 				    expr->CallExpr.proc->BasicDirective.name == "assert") {
-					// NOTE(bill): Okay!
+
+					f->assert_decl_count += 1;
 					continue;
 				}
 			}
@@ -4083,13 +4182,14 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 		} else if (node->kind == AstNode_ImportDecl) {
 			ast_node(id, ImportDecl, node);
 
-			String original_string = id->relpath.string;
+			String original_string = string_trim_whitespace(id->relpath.string);
 			String import_path = {};
 			bool ok = determine_path_from_string(p, node, base_dir, original_string, &import_path);
 			if (!ok) {
 				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
 				continue;
 			}
+			import_path = string_trim_whitespace(import_path);
 
 			id->fullpath = import_path;
 			try_add_import_path(p, import_path, original_string, ast_node_token(node).pos);
@@ -4141,7 +4241,7 @@ bool parse_file(Parser *p, AstFile *f) {
 	if (package_name.kind == Token_Ident) {
 		if (package_name.string == "_") {
 			error(package_name, "Invalid package name '_'");
-		} else if (f->package->kind != Package_Runtime && package_name.string == "runtime") {
+		} else if (f->pkg->kind != Package_Runtime && package_name.string == "runtime") {
 			error(package_name, "Use of reserved package name '%.*s'", LIT(package_name.string));
 		}
 	}
@@ -4161,17 +4261,24 @@ bool parse_file(Parser *p, AstFile *f) {
 }
 
 
-ParseFileError parse_imported_file(Parser *p, AstPackage *package, FileInfo *fi, TokenPos pos) {
-	AstFile *file = gb_alloc_item(heap_allocator(), AstFile);
-	file->package = package;
+ParseFileError process_imported_file(Parser *p, ImportedFile imported_file) {
+	AstPackage *pkg = imported_file.pkg;
+	FileInfo *fi = &imported_file.fi;
+	TokenPos pos = imported_file.pos;
 
-	p->file_index += 1;
-	file->id = p->file_index;
+	AstFile *file = gb_alloc_item(heap_allocator(), AstFile);
+	file->pkg = pkg;
+
+	file->id = imported_file.index+1;
 
 	TokenPos err_pos = {0};
 	ParseFileError err = init_ast_file(file, fi->fullpath, &err_pos);
 
 	if (err != ParseFile_None) {
+		gb_mutex_lock(&global_error_collector.mutex);
+		defer (gb_mutex_unlock(&global_error_collector.mutex));
+		global_error_collector.count++;
+
 		if (err == ParseFile_EmptyFile) {
 			if (fi->fullpath == p->init_fullpath) {
 				gb_printf_err("Initial file is empty - %.*s\n", LIT(p->init_fullpath));
@@ -4206,9 +4313,6 @@ ParseFileError parse_imported_file(Parser *p, AstPackage *package, FileInfo *fi,
 		}
 		gb_printf_err("\n");
 
-		gb_mutex_lock(&global_error_collector.mutex);
-		global_error_collector.count++;
-		gb_mutex_unlock(&global_error_collector.mutex);
 
 		return err;
 	}
@@ -4217,164 +4321,39 @@ ParseFileError parse_imported_file(Parser *p, AstPackage *package, FileInfo *fi,
 skip:
 	if (parse_file(p, file)) {
 		gb_mutex_lock(&p->file_add_mutex);
-		array_add(&package->files, file);
+		defer (gb_mutex_unlock(&p->file_add_mutex));
 
-		if (package->name.len == 0) {
-			package->name = file->package_name;
-		} else if (file->tokens.count > 0 && package->name != file->package_name) {
-			error(file->package_token, "Different package name, expected '%.*s', got '%.*s'", LIT(package->name), LIT(file->package_name));
+		array_add(&pkg->files, file);
+
+		if (pkg->name.len == 0) {
+			pkg->name = file->package_name;
+		} else if (file->tokens.count > 0 && pkg->name != file->package_name) {
+			error(file->package_token, "Different package name, expected '%.*s', got '%.*s'", LIT(pkg->name), LIT(file->package_name));
 		}
 
 		p->total_line_count += file->tokenizer.line_count;
 		p->total_token_count += file->tokens.count;
-		gb_mutex_unlock(&p->file_add_mutex);
 	}
 	return ParseFile_None;
 }
 
-
-void parser_add_package(Parser *p, AstPackage *package) {
-	package->id = p->packages.count+1;
-	array_add(&p->packages, package);
-	if (package->name.len > 0) {
-		HashKey key = hash_string(package->name);
-		auto found = map_get(&p->package_map, key);
-		if (found) {
-			GB_ASSERT(package->files.count > 0);
-			AstFile *f = package->files[0];
-			error(f->package_token, "Non-unique package name '%.*s'", LIT(package->name));
-			GB_ASSERT((*found)->files.count > 0);
-			TokenPos pos = (*found)->files[0]->package_token.pos;
-			gb_printf_err("\tpreviously declared at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
-		} else {
-			map_set(&p->package_map, key, package);
-		}
-	}
-}
-
-ParseFileError parse_import(Parser *p, ImportedPackage imported_package) {
-	String import_path = imported_package.path;
-	String import_rel_path = imported_package.rel_path;
-	TokenPos pos = imported_package.pos;
-	String const file_ext = str_lit(".odin");
-
-	// NOTE(bill): Single file initial package
-	if (imported_package.kind == Package_Init && string_ends_with(import_path, file_ext)) {
-		AstPackage *package = gb_alloc_item(heap_allocator(), AstPackage);
-		package->kind = imported_package.kind;
-		package->fullpath = import_path;
-		array_init(&package->files, heap_allocator());
-
-		FileInfo fi = {};
-		fi.name = filename_from_path(import_path);
-		fi.fullpath = import_path;
-		fi.size = get_file_size(import_path);
-		fi.is_dir = false;
-
-		ParseFileError err = parse_imported_file(p, package, &fi, pos);
-		if (err != ParseFile_None) {
-			return err;
-		}
-
-		parser_add_package(p, package);
-
-		return ParseFile_None;
-	}
-
-
-	Array<FileInfo> list = {};
-	ReadDirectoryError rd_err = read_directory(import_path, &list);
-	defer (array_free(&list));
-
-	if (list.count == 1) {
-		GB_ASSERT(import_path != list[0].fullpath);
-	}
-
-
-	if (rd_err != ReadDirectory_None) {
-		if (pos.line != 0) {
-			gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
-		}
-		gb_mutex_lock(&global_error_collector.mutex);
-		defer (gb_mutex_unlock(&global_error_collector.mutex));
-		global_error_collector.count++;
-
-
-		switch (rd_err) {
-		case ReadDirectory_InvalidPath:
-			gb_printf_err("Invalid path: %.*s\n", LIT(import_rel_path));
-			return ParseFile_InvalidFile;
-
-		case ReadDirectory_NotExists:
-			gb_printf_err("Path does not exist: %.*s\n", LIT(import_rel_path));
-			return ParseFile_NotFound;
-
-		case ReadDirectory_NotDir:
-			gb_printf_err("Expected a directory for a package, got a file: %.*s\n", LIT(import_rel_path));
-			return ParseFile_InvalidFile;
-
-		case ReadDirectory_Unknown:
-			gb_printf_err("Unknown error whilst reading path %.*s\n", LIT(import_rel_path));
-			return ParseFile_InvalidFile;
-		case ReadDirectory_Permission:
-			gb_printf_err("Unknown error whilst reading path %.*s\n", LIT(import_rel_path));
-			return ParseFile_InvalidFile;
-
-		case ReadDirectory_Empty:
-			gb_printf_err("Empty directory: %.*s\n", LIT(import_rel_path));
-			return ParseFile_EmptyFile;
-		}
-	}
-
-	AstPackage *package = gb_alloc_item(heap_allocator(), AstPackage);
-	package->kind = imported_package.kind;
-	package->fullpath = import_path;
-	array_init(&package->files, heap_allocator());
-
-	// TODO(bill): Fix concurrency
-	for_array(list_index, list) {
-		FileInfo *fi = &list[list_index];
-		String name = fi->name;
-		if (string_ends_with(name, file_ext)) {
-			if (is_excluded_target_filename(name)) {
-				continue;
-			}
-			ParseFileError err = parse_imported_file(p, package, fi, pos);
-			if (err != ParseFile_None) {
-				return err;
-			}
-		}
-	}
-
-	parser_add_package(p, package);
-
-	return ParseFile_None;
-}
 
 GB_THREAD_PROC(parse_worker_file_proc) {
 	if (thread == nullptr) return 0;
 	auto *p = cast(Parser *)thread->user_data;
 	isize index = thread->user_index;
-	ImportedPackage imported_package = p->imports[index];
-	ParseFileError err = parse_import(p, imported_package);
+	ParseFileError err = process_imported_file(p, p->files_to_process[index]);
 	return cast(isize)err;
 }
 
+void add_shared_package(Parser *p, String name, TokenPos pos) {
 
-struct ParserThreadWork {
-	Parser *parser;
-	isize   import_index;
-};
-
-void add_shared_package(Parser *p, String name, TokenPos pos, PackageKind kind) {
-	String s = get_fullpath_core(heap_allocator(), name);
-	try_add_import_path(p, s, s, pos, kind);
 }
 
 ParseFileError parse_packages(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
 
-	char *fullpath_str = gb_path_get_full_name(heap_allocator(), cast(char *)&init_filename[0]);
+	char *fullpath_str = gb_path_get_full_name(heap_allocator(), cast(char const *)&init_filename[0]);
 	String init_fullpath = string_trim_whitespace(make_string_c(fullpath_str));
 	if (!path_is_directory(init_fullpath)) {
 		String const ext = str_lit(".odin");
@@ -4385,25 +4364,24 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 	}
 
 	TokenPos init_pos = {};
-	ImportedPackage init_imported_package = {Package_Init, init_fullpath, init_fullpath, init_pos};
 
-	isize shared_package_count = 0;
 	if (!build_context.generate_docs) {
-		add_shared_package(p, str_lit("runtime"), init_pos, Package_Runtime); shared_package_count++;
+		String s = get_fullpath_core(heap_allocator(), str_lit("runtime"));
+		try_add_import_path(p, s, s, init_pos, Package_Runtime);
 	}
 
-	array_add(&p->imports, init_imported_package);
+	try_add_import_path(p, init_fullpath, init_fullpath, init_pos, Package_Init);
 	p->init_fullpath = init_fullpath;
 
 	// IMPORTANT TODO(bill): Figure out why this doesn't work on *nix sometimes
-#if defined(GB_SYSTEM_WINDOWS)
+#if 1 && defined(GB_SYSTEM_WINDOWS)
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	if (thread_count > 1) {
 		isize volatile curr_import_index = 0;
-
+		isize initial_file_count = p->files_to_process.count;
 		// NOTE(bill): Make sure that these are in parsed in this order
-		for (isize i = 0; i < shared_package_count; i++) {
-			ParseFileError err = parse_import(p, p->imports[i]);
+		for (isize i = 0; i < initial_file_count; i++) {
+			ParseFileError err = process_imported_file(p, p->files_to_process[i]);
 			if (err != ParseFile_None) {
 				return err;
 			}
@@ -4429,7 +4407,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 				gbThread *t = &worker_threads[i];
 				if (gb_thread_is_running(t)) {
 					are_any_alive = true;
-				} else if (curr_import_index < p->imports.count) {
+				} else if (curr_import_index < p->files_to_process.count) {
 					auto curr_err = cast(ParseFileError)t->return_value;
 					if (curr_err != ParseFile_None) {
 						array_add(&errors, curr_err);
@@ -4441,7 +4419,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 					}
 				}
 			}
-			if (!are_any_alive && curr_import_index >= p->imports.count) {
+			if (!are_any_alive && curr_import_index >= p->files_to_process.count) {
 				break;
 			}
 		}
@@ -4450,16 +4428,17 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 			return errors[errors.count-1];
 		}
 	} else {
-		for_array(i, p->imports) {
-			ParseFileError err = parse_import(p, p->imports[i]);
+		for_array(i, p->files_to_process) {
+			ParseFileError err = process_imported_file(p, p->files_to_process[i]);
 			if (err != ParseFile_None) {
 				return err;
 			}
 		}
 	}
 #else
-	for_array(i, p->imports) {
-		ParseFileError err = parse_import(p, p->imports[i]);
+	for_array(i, p->files_to_process) {
+		ImportedFile f = p->files_to_process[i];
+		ParseFileError err = process_imported_file(p, f);
 		if (err != ParseFile_None) {
 			return err;
 		}

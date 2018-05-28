@@ -580,7 +580,9 @@ void show_timings(Checker *c, Timings *t) {
 	for_array(i, p->packages) {
 		files += p->packages[i]->files.count;
 	}
-
+#if 1
+	timings_print_all(t);
+#else
 	{
 		timings_print_all(t);
 		gb_printf("\n");
@@ -610,6 +612,7 @@ void show_timings(Checker *c, Timings *t) {
 		gb_printf("us/Token     - %.3f\n", 1.0e6*total_time/cast(f64)tokens);
 		gb_printf("\n");
 	}
+#endif
 }
 
 void remove_temp_files(String output_base) {

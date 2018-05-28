@@ -212,13 +212,13 @@ bool decl_info_has_init(DeclInfo *d) {
 
 
 
-Scope *create_scope(Scope *parent, gbAllocator allocator) {
+Scope *create_scope(Scope *parent, gbAllocator allocator, isize init_elements_capacity=16) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
-	map_init(&s->elements, heap_allocator());
-	ptr_set_init(&s->implicit, heap_allocator());
-	ptr_set_init(&s->imported, heap_allocator());
-	ptr_set_init(&s->exported, heap_allocator());
+	map_init(&s->elements, heap_allocator(), init_elements_capacity);
+	ptr_set_init(&s->implicit, heap_allocator(), 0);
+	ptr_set_init(&s->imported, heap_allocator(), 0);
+	ptr_set_init(&s->exported, heap_allocator(), 0);
 
 	s->delayed_imports.allocator = heap_allocator();
 	s->delayed_asserts.allocator = heap_allocator();
@@ -231,10 +231,13 @@ Scope *create_scope(Scope *parent, gbAllocator allocator) {
 
 Scope *create_scope_from_file(Checker *c, AstFile *f) {
 	GB_ASSERT(f != nullptr);
-	GB_ASSERT(f->package != nullptr);
-	GB_ASSERT(f->package->scope != nullptr);
+	GB_ASSERT(f->pkg != nullptr);
+	GB_ASSERT(f->pkg->scope != nullptr);
 
-	Scope *s = create_scope(f->package->scope, c->allocator);
+	Scope *s = create_scope(f->pkg->scope, c->allocator);
+
+	array_reserve(&s->delayed_imports, f->imports.count);
+	array_reserve(&s->delayed_asserts, f->assert_decl_count);
 
 	s->is_file = true;
 	s->file = f;
@@ -246,7 +249,13 @@ Scope *create_scope_from_file(Checker *c, AstFile *f) {
 Scope *create_scope_from_package(Checker *c, AstPackage *p) {
 	GB_ASSERT(p != nullptr);
 
-	Scope *s = create_scope(universal_scope, c->allocator);
+	isize decl_count = 0;
+	for_array(i, p->files) {
+		decl_count += p->files[i]->decls.count;
+	}
+	isize init_elements_capacity = 2*decl_count;
+
+	Scope *s = create_scope(universal_scope, c->allocator, init_elements_capacity);
 
 	s->is_package = true;
 	s->package = p;
@@ -658,7 +667,9 @@ void init_checker(Checker *c, Parser *parser) {
 	// c->allocator     = gb_arena_allocator(&c->arena);
 	c->tmp_allocator = gb_arena_allocator(&c->tmp_arena);
 
-	map_init(&c->package_scopes, heap_allocator());
+	isize pkg_cap = 2*c->parser->packages.count;
+
+	map_init(&c->package_scopes, heap_allocator(), pkg_cap);
 
 	array_init(&c->package_order, heap_allocator(), 0, c->parser->packages.count);
 
@@ -943,10 +954,10 @@ void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclIn
 				// NOTE(bill): Entities local to file rather than package
 				break;
 			default: {
-				AstPackage *p = scope->file->package;
-				GB_ASSERT(p->scope == scope->parent);
-				GB_ASSERT(c->context.package == p);
-				scope = p->scope;
+				AstPackage *pkg = scope->file->pkg;
+				GB_ASSERT(pkg->scope == scope->parent);
+				GB_ASSERT(c->context.pkg == pkg);
+				scope = pkg->scope;
 				break;
 			}
 			}
@@ -959,7 +970,7 @@ void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclIn
 	e->decl_info = d;
 	array_add(&c->info.entities, e);
 	e->order_in_src = c->info.entities.count;
-	e->package = c->context.package;
+	e->pkg = c->context.pkg;
 }
 
 
@@ -1161,11 +1172,10 @@ void add_curr_ast_file(Checker *c, AstFile *file) {
 	if (file != nullptr) {
 		TokenPos zero_pos = {};
 		global_error_collector.prev = zero_pos;
-		c->curr_ast_file            = file;
-		c->context.decl             = file->package->decl_info;
-		c->context.scope            = file->scope;
-		c->context.package          = file->package;
-		c->context.package_scope    = file->package->scope;
+		c->curr_ast_file     = file;
+		c->context.decl      = file->pkg->decl_info;
+		c->context.scope     = file->scope;
+		c->context.pkg       = file->pkg;
 	}
 }
 
@@ -2239,7 +2249,7 @@ void check_all_global_entities(Checker *c) {
 		GB_ASSERT(d->scope->is_file);
 		AstFile *file = d->scope->file;
 		add_curr_ast_file(c, file);
-		Scope *package_scope = file->package->scope;
+		Scope *package_scope = file->pkg->scope;
 
 		if (e->token.string == "main") {
 			if (e->kind != Entity_Procedure) {
@@ -2338,7 +2348,7 @@ String path_to_entity_name(String name, String fullpath) {
 #if 1
 
 void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *> *M) {
-	Scope *parent_package_scope = decl->file->package->scope;
+	Scope *parent_package_scope = decl->file->pkg->scope;
 
 	switch (decl->kind) {
 	case_ast_node(id, ImportDecl, decl);
