@@ -1063,6 +1063,8 @@ Token consume_comment(AstFile *f, isize *end_line_) {
 				end_line++;
 			}
 		}
+	} else {
+		end_line++;
 	}
 
 	if (end_line_) *end_line_ = end_line;
@@ -1107,8 +1109,9 @@ void comsume_comment_groups(AstFile *f, Token prev) {
 	while (f->curr_token.kind == Token_Comment) {
 		comment = consume_comment_group(f, 1, &end_line);
 	}
-
-	if (end_line+1 == f->curr_token.pos.line) {
+	if (end_line < 0) {
+		f->lead_comment = comment;
+	} else if (end_line+1 == f->curr_token.pos.line) {
 		f->lead_comment = comment;
 	}
 
@@ -4214,6 +4217,65 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 	}
 }
 
+bool parse_build_tag(Token token_for_pos, String s) {
+	String const prefix = str_lit("+build");
+	GB_ASSERT(string_starts_with(s, prefix));
+	s = string_trim_whitespace(substring(s, prefix.len, s.len));
+
+	if (s.len == 0) {
+		return true;
+	}
+
+	auto platforms = array_make<String>(heap_allocator());
+	defer (array_free(&platforms));
+
+	isize n = 0;
+	while (n < s.len) {
+		Rune rune = 0;
+		isize width = gb_utf8_decode(&s[n], s.len, &rune);
+		if (rune_is_whitespace(rune)) {
+			String f = substring(s, 0, n);
+			array_add(&platforms, f);
+			s = substring(s, n+width, s.len);
+			n = 0;
+			continue;
+		} else if (n+width == s.len) {
+			String f = substring(s, 0, n+width);
+			array_add(&platforms, f);
+			break;
+		}
+		n += width;
+	}
+
+
+	bool any_correct = false;
+	for_array(i, platforms) {
+		String p = platforms[i];
+		TargetOsKind   os   = get_target_os_from_string(p);
+		TargetArchKind arch = get_target_arch_from_string(p);
+		if (os != TargetOs_Invalid) {
+			GB_ASSERT(arch == TargetArch_Invalid);
+			any_correct = true;
+			if (os == build_context.target_os) {
+				return true;
+			}
+		} else if (arch != TargetArch_Invalid) {
+			any_correct = true;
+			if (arch == build_context.target_arch) {
+				return true;
+			}
+		}
+		if (os == TargetOs_Invalid && arch == TargetArch_Invalid) {
+			error(token_for_pos, "Invalid build tag platform: %.*s", LIT(p));
+		}
+	}
+	if (any_correct) {
+		return false;
+	}
+
+	return true;
+}
+
 bool parse_file(Parser *p, AstFile *f) {
 	if (f->tokens.count == 0) {
 		return true;
@@ -4247,8 +4309,26 @@ bool parse_file(Parser *p, AstFile *f) {
 	}
 	f->package_name = package_name.string;
 
+	if (docs.list.count > 0) {
+		for_array(i, docs.list) {
+			Token tok = docs.list[i]; GB_ASSERT(tok.kind == Token_Comment);
+			String str = tok.string;
+			if (string_starts_with(str, str_lit("//"))) {
+				String lc = string_trim_whitespace(substring(str, 2, str.len));
+				if (lc.len > 0 && lc[0] == '+') {
+					if (string_starts_with(lc, str_lit("+build"))) {
+						if (!parse_build_tag(tok, lc)) {
+							return false;
+						}
+					}
+				}
+			}
+		}
+	}
+
 	AstNode *pd = ast_package_decl(f, f->package_token, package_name, docs, f->line_comment);
 	expect_semicolon(f, pd);
+	f->pkg_decl = pd;
 
 	if (f->error_count > 0) {
 		return false;
@@ -4344,10 +4424,6 @@ GB_THREAD_PROC(parse_worker_file_proc) {
 	isize index = thread->user_index;
 	ParseFileError err = process_imported_file(p, p->files_to_process[index]);
 	return cast(isize)err;
-}
-
-void add_shared_package(Parser *p, String name, TokenPos pos) {
-
 }
 
 ParseFileError parse_packages(Parser *p, String init_filename) {

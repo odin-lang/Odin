@@ -47,6 +47,16 @@ free_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
 	free_ptr(raw.entries.data, loc);
 }
 
+free :: proc[
+	free_ptr,
+	free_string,
+	free_cstring,
+	free_dynamic_array,
+	free_slice,
+	free_map,
+];
+
+
 
 
 default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: int, loc := #caller_location) -> rawptr {

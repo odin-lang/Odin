@@ -52,6 +52,7 @@ struct AstFile {
 	AstPackage *        pkg;
 	Scope *             scope;
 
+	AstNode *           pkg_decl;
 	String              fullpath;
 	gbArena             arena;
 	Tokenizer           tokenizer;
