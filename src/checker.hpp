@@ -31,16 +31,19 @@ struct TypeAndValue {
 
 
 // ExprInfo stores information used for "untyped" expressions
-struct ExprInfo : TypeAndValue {
+struct ExprInfo {
+	AddressingMode mode;
+	Type *         type;
+	ExactValue     value;
 	bool is_lhs; // Debug info
 };
 
 gb_inline ExprInfo make_expr_info(AddressingMode mode, Type *type, ExactValue value, bool is_lhs) {
 	ExprInfo ei = {};
-	ei.is_lhs = is_lhs;
 	ei.mode   = mode;
 	ei.type   = type;
 	ei.value  = value;
+	ei.is_lhs = is_lhs;
 	return ei;
 }
 
@@ -289,6 +292,7 @@ struct CheckerContext {
 	DeclInfo *     curr_proc_decl;
 	Type *         curr_proc_sig;
 	ForeignContext foreign_context;
+	gbAllocator    allocator;
 
 	CheckerTypePath *type_path;
 	isize            type_level; // TODO(bill): Actually handle correctly
@@ -337,7 +341,7 @@ struct Checker {
 
 	gbAllocator                allocator;
 
-	CheckerContext             context;
+	CheckerContext             init_ctx;
 
 	bool                       done_preload;
 };
@@ -379,20 +383,20 @@ void      check_set_expr_info     (CheckerInfo *i, AstNode *expr, ExprInfo info)
 void      check_remove_expr_info  (CheckerInfo *i, AstNode *expr);
 void      add_untyped             (CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value);
 void      add_type_and_value      (CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value);
-void      add_entity_use          (Checker *c, AstNode *identifier, Entity *entity);
-void      add_implicit_entity     (Checker *c, AstNode *node, Entity *e);
-void      add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d);
-void      add_type_info_type      (Checker *c, Type *t);
+void      add_entity_use          (CheckerContext *c, AstNode *identifier, Entity *entity);
+void      add_implicit_entity     (CheckerContext *c, AstNode *node, Entity *e);
+void      add_entity_and_decl_info(CheckerContext *c, AstNode *identifier, Entity *e, DeclInfo *d);
+void      add_type_info_type      (CheckerContext *c, Type *t);
 
-void check_add_import_decl(Checker *c, AstNodeImportDecl *id);
+void check_add_import_decl(CheckerContext *c, AstNodeImportDecl *id);
 // void check_add_export_decl(Checker *c, AstNodeExportDecl *ed);
-void check_add_foreign_import_decl(Checker *c, AstNode *decl);
+void check_add_foreign_import_decl(CheckerContext *c, AstNode *decl);
 
 
-bool check_arity_match(Checker *c, AstNodeValueDecl *vd, bool is_global = false);
-void check_collect_entities(Checker *c, Array<AstNode *> nodes);
-void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws);
-void check_delayed_file_import_entity(Checker *c, AstNode *decl);
+bool check_arity_match(CheckerContext *c, AstNodeValueDecl *vd, bool is_global = false);
+void check_collect_entities(CheckerContext *c, Array<AstNode *> nodes);
+void check_collect_entities_from_when_stmt(CheckerContext *c, AstNodeWhenStmt *ws);
+void check_delayed_file_import_entity(CheckerContext *c, AstNode *decl);
 
 struct AttributeContext {
 	String  link_name;
@@ -408,13 +412,13 @@ AttributeContext make_attribute_context(String link_prefix) {
 	return ac;
 }
 
-#define DECL_ATTRIBUTE_PROC(_name) bool _name(Checker *c, AstNode *elem, String name, ExactValue value, AttributeContext *ac)
+#define DECL_ATTRIBUTE_PROC(_name) bool _name(CheckerContext *c, AstNode *elem, String name, ExactValue value, AttributeContext *ac)
 typedef DECL_ATTRIBUTE_PROC(DeclAttributeProc);
 
-void check_decl_attributes(Checker *c, Array<AstNode *> attributes, DeclAttributeProc *proc, AttributeContext *ac);
+void check_decl_attributes(CheckerContext *c, Array<AstNode *> attributes, DeclAttributeProc *proc, AttributeContext *ac);
 
 CheckerTypePath *new_checker_type_path();
 void destroy_checker_type_path(CheckerTypePath *tp);
 
-void    check_type_path_push(Checker *c, Entity *e);
-Entity *check_type_path_pop (Checker *c);
+void    check_type_path_push(CheckerContext *c, Entity *e);
+Entity *check_type_path_pop (CheckerContext *c);

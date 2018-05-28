@@ -3833,14 +3833,16 @@ String ir_mangle_name(irGen *s, Entity *e) {
 	return make_string(new_name, new_name_len-1);
 
 #else
-	GB_ASSERT(e->pkg != nullptr);
-	String pkg = e->pkg->name;
-	GB_ASSERT(!rune_is_digit(pkg[0]));
-
 	String name = e->token.string;
 
+	AstPackage *pkg = e->pkg;
+	GB_ASSERT_MSG(pkg != nullptr, "Missing package for '%.*s'", LIT(name));
+	String pkgn = pkg->name;
+	GB_ASSERT(!rune_is_digit(pkgn[0]));
 
-	isize max_len = pkg.len + 1 + name.len + 1;
+
+
+	isize max_len = pkgn.len + 1 + name.len + 1;
 	bool require_suffix_id = is_type_polymorphic(e->type);
 	if (require_suffix_id) {
 		max_len += 21;
@@ -3849,7 +3851,7 @@ String ir_mangle_name(irGen *s, Entity *e) {
 	u8 *new_name = gb_alloc_array(a, u8, max_len);
 	isize new_name_len = gb_snprintf(
 		cast(char *)new_name, max_len,
-		"%.*s.%.*s", LIT(pkg), LIT(name)
+		"%.*s.%.*s", LIT(pkgn), LIT(name)
 	);
 	if (require_suffix_id) {
 		char *str = cast(char *)new_name + new_name_len-1;
