@@ -1,5 +1,5 @@
 
-void populate_using_entity_map(CheckerContext *ctx, AstNode *node, Type *t, Map<Entity *> *entity_map) {
+void populate_using_entity_scope(CheckerContext *ctx, AstNode *node, Type *t) {
 	t = base_type(type_deref(t));
 	gbString str = nullptr;
 	defer (gb_string_free(str));
@@ -11,11 +11,9 @@ void populate_using_entity_map(CheckerContext *ctx, AstNode *node, Type *t, Map<
 		for_array(i, t->Struct.fields) {
 			Entity *f = t->Struct.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
-			String name = f->token.string;
-			HashKey key = hash_string(name);
-			Entity **found = map_get(entity_map, key);
-			if (found != nullptr && name != "_") {
-				Entity *e = *found;
+			String name = f->token.string;;
+			Entity *e = current_scope_lookup_entity(ctx->scope, name);
+			if (e != nullptr && name != "_") {
 				// TODO(bill): Better type error
 				if (str != nullptr) {
 					error(e->token, "'%.*s' is already declared in '%s'", LIT(name), str);
@@ -23,10 +21,9 @@ void populate_using_entity_map(CheckerContext *ctx, AstNode *node, Type *t, Map<
 					error(e->token, "'%.*s' is already declared", LIT(name));
 				}
 			} else {
-				map_set(entity_map, key, f);
 				add_entity(ctx->checker, ctx->scope, nullptr, f);
 				if (f->flags & EntityFlag_Using) {
-					populate_using_entity_map(ctx, node, f->type, entity_map);
+					populate_using_entity_scope(ctx, node, f->type);
 				}
 			}
 		}
@@ -37,11 +34,6 @@ void populate_using_entity_map(CheckerContext *ctx, AstNode *node, Type *t, Map<
 void check_struct_fields(CheckerContext *ctx, AstNode *node, Array<Entity *> *fields, Array<AstNode *> params,
                          isize init_field_capacity, Type *named_type, String context) {
 	*fields = array_make<Entity *>(heap_allocator(), 0, init_field_capacity);
-
-	Map<Entity *> entity_map = {};
-	map_init(&entity_map, ctx->allocator, 2*init_field_capacity);
-	defer (map_destroy(&entity_map));
-
 
 	GB_ASSERT(node->kind == AstNode_StructType);
 
@@ -117,7 +109,7 @@ void check_struct_fields(CheckerContext *ctx, AstNode *node, Array<Entity *> *fi
 				continue;
 			}
 
-			populate_using_entity_map(ctx, node, type, &entity_map);
+			populate_using_entity_scope(ctx, node, type);
 		}
 	}
 }
@@ -166,9 +158,6 @@ bool check_custom_align(CheckerContext *ctx, AstNode *node, i64 *align_) {
 
 
 Entity *find_polymorphic_struct_entity(CheckerContext *ctx, Type *original_type, isize param_count, Array<Operand> ordered_operands) {
-	gb_mutex_lock(&ctx->checker->mutex);
-	defer (gb_mutex_unlock(&ctx->checker->mutex));
-
 	auto *found_gen_types = map_get(&ctx->checker->info.gen_types, hash_pointer(original_type));
 	if (found_gen_types != nullptr) {
 		for_array(i, *found_gen_types) {
@@ -257,6 +246,8 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, AstNode *node, Ar
 		}
 	}
 	struct_type->Struct.names = make_names_field_for_struct(ctx, ctx->scope);
+
+	scope_reserve(ctx->scope, min_field_count);
 
 	if (st->is_raw_union) {
 		struct_type->Struct.is_raw_union = true;
@@ -513,10 +504,6 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 	enum_type->Enum.base_type = base_type;
 	enum_type->Enum.scope = ctx->scope;
 
-	Map<Entity *> entity_map = {}; // Key: String
-	map_init(&entity_map, ctx->allocator, 2*(et->fields.count));
-	defer (map_destroy(&entity_map));
-
 	auto fields = array_make<Entity *>(ctx->allocator, 0, et->fields.count);
 
 	Type *constant_type = enum_type;
@@ -527,6 +514,8 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 	ExactValue iota = exact_value_i64(-1);
 	ExactValue min_value = exact_value_i64(0);
 	ExactValue max_value = exact_value_i64(0);
+
+	scope_reserve(ctx->scope, et->fields.count);
 
 	for_array(i, et->fields) {
 		AstNode *field = et->fields[i];
@@ -600,13 +589,12 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		e->flags |= EntityFlag_Visited;
 		e->state = EntityState_Resolved;
 
-		HashKey key = hash_string(name);
-		if (map_get(&entity_map, key) != nullptr) {
+		if (current_scope_lookup_entity(ctx->scope, name) != nullptr) {
 			error(ident, "'%.*s' is already declared in this enumeration", LIT(name));
 		} else {
-			map_set(&entity_map, key, e);
 			add_entity(ctx->checker, ctx->scope, nullptr, e);
 			array_add(&fields, e);
+			// TODO(bill): Should I add a use for the enum value?
 			add_entity_use(ctx, field, e);
 		}
 	}
@@ -643,13 +631,11 @@ void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type, AstNode *no
 	ast_node(bft, BitFieldType, node);
 	GB_ASSERT(is_type_bit_field(bit_field_type));
 
-	Map<Entity *> entity_map = {}; // Key: String
-	map_init(&entity_map, ctx->allocator, 2*(bft->fields.count));
-	defer (map_destroy(&entity_map));
-
 	auto fields  = array_make<Entity*>(ctx->allocator, 0, bft->fields.count);
 	auto sizes   = array_make<u32>    (ctx->allocator, 0, bft->fields.count);
 	auto offsets = array_make<u32>    (ctx->allocator, 0, bft->fields.count);
+
+	scope_reserve(ctx->scope, bft->fields.count);
 
 	u32 curr_offset = 0;
 	for_array(i, bft->fields) {
@@ -687,13 +673,12 @@ void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type, AstNode *no
 		e->identifier = ident;
 		e->flags |= EntityFlag_BitFieldValue;
 
-		HashKey key = hash_string(name);
 		if (!is_blank_ident(name) &&
-		    map_get(&entity_map, key) != nullptr) {
+		    current_scope_lookup_entity(ctx->scope, name) != nullptr) {
 			error(ident, "'%.*s' is already declared in this bit field", LIT(name));
 		} else {
-			map_set(&entity_map, key, e);
 			add_entity(ctx->checker, ctx->scope, nullptr, e);
+			// TODO(bill): Should this entity be "used"?
 			add_entity_use(ctx, field, e);
 
 			array_add(&fields,  e);
