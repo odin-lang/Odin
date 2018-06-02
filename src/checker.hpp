@@ -220,10 +220,9 @@ struct Scope {
 	PtrSet<Entity *> implicit;
 	Scope *          shared;
 
-	Array<AstNode *> delayed_asserts;
+	Array<AstNode *> delayed_directives;
 	Array<AstNode *> delayed_imports;
 	PtrSet<Scope *>  imported;
-	PtrSet<Scope *>  exported; // NOTE(bhall): Contains 'using import' too
 	bool             is_proc;
 	bool             is_global;
 	bool             is_package;
@@ -259,9 +258,8 @@ typedef PtrSet<ImportGraphNode *> ImportGraphNodeSet;
 
 
 struct ImportGraphNode {
+	AstPackage *       pkg;
 	Scope *            scope;
-	String             path;
-	isize              package_id;
 	ImportGraphNodeSet pred;
 	ImportGraphNodeSet succ;
 	isize              index; // Index in array/queue
@@ -277,6 +275,31 @@ struct ForeignContext {
 };
 
 typedef Array<Entity *> CheckerTypePath;
+
+// CheckerInfo stores all the symbol information for a type-checked program
+struct CheckerInfo {
+	Map<TypeAndValue>     types;           // Key: AstNode * | Expression -> Type (and value)
+	Map<ExprInfo>         untyped;         // Key: AstNode * | Expression -> ExprInfo
+	Map<AstFile *>        files;           // Key: String (full path)
+	Map<AstPackage *>     packages;        // Key: String (full path)
+	Map<Entity *>         foreigns;        // Key: String
+	Array<Entity *>       definitions;
+	Array<Entity *>       entities;
+	Array<DeclInfo *>     variable_init_order;
+
+	Map<Array<Entity *> > gen_procs;       // Key: AstNode * | Identifier -> Entity
+	Map<Array<Entity *> > gen_types;       // Key: Type *
+
+	Array<Type *>         type_info_types;
+	Map<isize>            type_info_map;   // Key: Type *
+
+
+	AstPackage *          runtime_package;
+	Scope *               init_scope;
+	Entity *              entry_point;
+	PtrSet<Entity *>      minimum_dependency_set;
+	PtrSet<isize>         minimum_dependency_type_info_set;
+};
 
 struct CheckerContext {
 	Checker *      checker;
@@ -305,49 +328,14 @@ struct CheckerContext {
 	Scope *    polymorphic_scope;
 };
 
-
-// CheckerInfo stores all the symbol information for a type-checked program
-struct CheckerInfo {
-	Map<TypeAndValue>     types;           // Key: AstNode * | Expression -> Type (and value)
-	Map<ExprInfo>         untyped;         // Key: AstNode * | Expression -> ExprInfo
-	Map<AstFile *>        files;           // Key: String (full path)
-	Map<AstPackage *>     packages;        // Key: String (full path)
-	Map<Entity *>         foreigns;        // Key: String
-	Array<Entity *>       definitions;
-	Array<Entity *>       entities;
-	Array<DeclInfo *>     variable_init_order;
-
-	Map<Array<Entity *> > gen_procs;       // Key: AstNode * | Identifier -> Entity
-	Map<Array<Entity *> > gen_types;       // Key: Type *
-
-	Array<Type *>         type_info_types;
-	Map<isize>            type_info_map;   // Key: Type *
-
-
-	AstPackage *          runtime_package;
-	Scope *               init_scope;
-	Entity *              entry_point;
-	PtrSet<Entity *>      minimum_dependency_set;
-	PtrSet<isize>         minimum_dependency_type_info_set;
-
-	gbMutex               mutex;
-};
-
 struct Checker {
 	Parser *    parser;
 	CheckerInfo info;
-	gbMutex     mutex;
 
-
-	Array<ProcedureInfo>       procs_to_check;
-	Map<Scope *>               package_scopes; // Key: String (fullpath)
-	Array<ImportGraphNode *>   package_order;
-
-	gbAllocator                allocator;
-
-	CheckerContext             init_ctx;
-
-	bool                       done_preload;
+	Array<ProcedureInfo> procs_to_check;
+	gbAllocator          allocator;
+	CheckerContext       init_ctx;
+	bool                 done_preload;
 };
 
 

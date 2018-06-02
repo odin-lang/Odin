@@ -34,7 +34,13 @@ void scope_reset(Scope *scope) {
 	map_clear    (&scope->elements);
 	ptr_set_clear(&scope->implicit);
 	ptr_set_clear(&scope->imported);
-	ptr_set_clear(&scope->exported);
+}
+
+void scope_reserve(Scope *scope, isize capacity) {
+	isize cap = 2*capacity;
+	if (cap > scope->elements.hashes.capacity) {
+		map_rehash(&scope->elements, capacity);
+	}
 }
 
 i32 is_scope_an_ancestor(Scope *parent, Scope *child) {
@@ -119,11 +125,10 @@ void import_graph_node_set_remove(ImportGraphNodeSet *s, ImportGraphNode *n) {
 	ptr_set_remove(s, n);
 }
 
-ImportGraphNode *import_graph_node_create(gbAllocator a, Scope *scope) {
+ImportGraphNode *import_graph_node_create(gbAllocator a, AstPackage *pkg) {
 	ImportGraphNode *n = gb_alloc_item(a, ImportGraphNode);
-	n->scope      = scope;
-	n->path       = scope->package->fullpath;
-	n->package_id = scope->package->id;
+	n->pkg = pkg;
+	n->scope = pkg->scope;
 	return n;
 }
 
@@ -144,7 +149,7 @@ int import_graph_node_cmp(ImportGraphNode **data, isize i, isize j) {
 	bool xg = x->scope->is_global;
 	bool yg = y->scope->is_global;
 	if (xg != yg) return xg ? -1 : +1;
-	if (xg && yg) return x->package_id < y->package_id ? +1 : -1;
+	if (xg && yg) return x->pkg->id < y->pkg->id ? +1 : -1;
 	if (x->dep_count < y->dep_count) return -1;
 	if (x->dep_count > y->dep_count) return +1;
 	return 0;
@@ -218,10 +223,9 @@ Scope *create_scope(Scope *parent, gbAllocator allocator, isize init_elements_ca
 	map_init(&s->elements, heap_allocator(), init_elements_capacity);
 	ptr_set_init(&s->implicit, heap_allocator(), 0);
 	ptr_set_init(&s->imported, heap_allocator(), 0);
-	ptr_set_init(&s->exported, heap_allocator(), 0);
 
 	s->delayed_imports.allocator = heap_allocator();
-	s->delayed_asserts.allocator = heap_allocator();
+	s->delayed_directives.allocator = heap_allocator();
 
 	if (parent != nullptr && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
@@ -237,7 +241,7 @@ Scope *create_scope_from_file(CheckerContext *c, AstFile *f) {
 	Scope *s = create_scope(f->pkg->scope, c->allocator);
 
 	array_reserve(&s->delayed_imports, f->imports.count);
-	array_reserve(&s->delayed_asserts, f->assert_decl_count);
+	array_reserve(&s->delayed_directives, f->assert_decl_count);
 
 	s->is_file = true;
 	s->file = f;
@@ -296,10 +300,9 @@ void destroy_scope(Scope *scope) {
 
 	map_destroy(&scope->elements);
 	array_free(&scope->delayed_imports);
-	array_free(&scope->delayed_asserts);
+	array_free(&scope->delayed_directives);
 	ptr_set_destroy(&scope->implicit);
 	ptr_set_destroy(&scope->imported);
-	ptr_set_destroy(&scope->exported);
 
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
 }
@@ -623,7 +626,6 @@ void init_checker_info(CheckerInfo *i) {
 	map_init(&i->files,           a);
 	map_init(&i->packages,        a);
 	array_init(&i->variable_init_order, a);
-	gb_mutex_init(&i->mutex);
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -639,7 +641,6 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->files);
 	map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
-	gb_mutex_destroy(&i->mutex);
 }
 
 CheckerContext make_checker_context(Checker *c) {
@@ -666,7 +667,6 @@ void init_checker(Checker *c, Parser *parser) {
 
 	c->parser = parser;
 	init_checker_info(&c->info);
-	gb_mutex_init(&c->mutex);
 
 	array_init(&c->procs_to_check, a);
 
@@ -677,25 +677,15 @@ void init_checker(Checker *c, Parser *parser) {
 
 	c->allocator = heap_allocator();
 
-	isize pkg_cap = 2*c->parser->packages.count;
-
-	map_init(&c->package_scopes, heap_allocator(), pkg_cap);
-
-	array_init(&c->package_order, heap_allocator(), 0, c->parser->packages.count);
-
 	c->init_ctx = make_checker_context(c);
 }
 
 void destroy_checker(Checker *c) {
 	destroy_checker_info(&c->info);
-	gb_mutex_destroy(&c->mutex);
 
 	array_free(&c->procs_to_check);
 
 	// gb_arena_free(&c->tmp_arena);
-
-	map_destroy(&c->package_scopes);
-	array_free(&c->package_order);
 
 	destroy_checker_context(&c->init_ctx);
 }
@@ -709,9 +699,6 @@ Entity *entity_of_ident(AstNode *identifier) {
 }
 
 TypeAndValue type_and_value_of_expr(CheckerInfo *i, AstNode *expr) {
-	gb_mutex_lock(&i->mutex);
-	defer (gb_mutex_unlock(&i->mutex));
-
 	TypeAndValue result = {};
 	TypeAndValue *found = map_get(&i->types, hash_node(expr));
 	if (found) result = *found;
@@ -719,9 +706,6 @@ TypeAndValue type_and_value_of_expr(CheckerInfo *i, AstNode *expr) {
 }
 
 Type *type_of_expr(CheckerInfo *i, AstNode *expr) {
-	gb_mutex_lock(&i->mutex);
-	defer (gb_mutex_unlock(&i->mutex));
-
 	TypeAndValue tav = type_and_value_of_expr(i, expr);
 	if (tav.mode != Addressing_Invalid) {
 		return tav.type;
@@ -784,8 +768,6 @@ DeclInfo *decl_info_of_ident(AstNode *ident) {
 }
 
 AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
-	gb_mutex_lock(&i->mutex);
-	defer (gb_mutex_unlock(&i->mutex));
 	AstFile **found = map_get(&i->files, hash_string(filename));
 	if (found != nullptr) {
 		return *found;
@@ -796,18 +778,12 @@ Scope *scope_of_node(AstNode *node) {
 	return node->scope;
 }
 ExprInfo *check_get_expr_info(CheckerInfo *i, AstNode *expr) {
-	gb_mutex_lock(&i->mutex);
-	defer (gb_mutex_unlock(&i->mutex));
 	return map_get(&i->untyped, hash_node(expr));
 }
 void check_set_expr_info(CheckerInfo *i, AstNode *expr, ExprInfo info) {
-	gb_mutex_lock(&i->mutex);
-	defer (gb_mutex_unlock(&i->mutex));
 	map_set(&i->untyped, hash_node(expr), info);
 }
 void check_remove_expr_info(CheckerInfo *i, AstNode *expr) {
-	gb_mutex_lock(&i->mutex);
-	defer (gb_mutex_unlock(&i->mutex));
 	map_remove(&i->untyped, hash_node(expr));
 }
 
@@ -818,9 +794,6 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	if (type == t_llvm_bool) {
 		type = t_bool;
 	}
-
-	gb_mutex_lock(&info->mutex);
-	defer (gb_mutex_unlock(&info->mutex));
 
 	isize entry_index = -1;
 	HashKey key = hash_type(type);
@@ -860,8 +833,6 @@ void add_untyped(CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode m
 	if (mode == Addressing_Constant && type == t_invalid) {
 		compiler_error("add_untyped - invalid type: %s", type_to_string(type));
 	}
-	gb_mutex_lock(&i->mutex);
-	defer (gb_mutex_unlock(&i->mutex));
 	map_set(&i->untyped, hash_node(expression), make_expr_info(mode, type, value, lhs));
 }
 
@@ -875,9 +846,6 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 	if (mode == Addressing_Constant && type == t_invalid) {
 		compiler_error("add_type_and_value - invalid type: %s", type_to_string(type));
 	}
-
-	gb_mutex_lock(&i->mutex);
-	defer (gb_mutex_unlock(&i->mutex));
 
 	TypeAndValue tv = {};
 	tv.type  = type;
@@ -897,9 +865,6 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 		return;
 	}
 	GB_ASSERT(entity != nullptr);
-
-	gb_mutex_lock(&i->mutex);
-	defer (gb_mutex_unlock(&i->mutex));
 
 	identifier->Ident.entity = entity;
 	entity->identifier = identifier;
@@ -1029,9 +994,6 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 	if (is_type_polymorphic(base_type(t))) {
 		return;
 	}
-
-	gb_mutex_lock(&c->info->mutex);
-	defer (gb_mutex_unlock(&c->info->mutex));
 
 	auto found = map_get(&c->info->type_info_map, hash_type(t));
 	if (found != nullptr) {
@@ -1171,9 +1133,7 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 
 void check_procedure_later(Checker *c, ProcedureInfo info) {
 	GB_ASSERT(info.decl != nullptr);
-	gb_mutex_lock(&c->mutex);
 	array_add(&c->procs_to_check, info);
-	gb_mutex_unlock(&c->mutex);
 }
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body, u64 tags) {
@@ -2176,16 +2136,12 @@ void check_add_foreign_block_decl(CheckerContext *ctx, AstNode *decl) {
 void check_collect_entities(CheckerContext *c, Array<AstNode *> nodes) {
 	for_array(decl_index, nodes) {
 		AstNode *decl = nodes[decl_index];
-		if (c->scope->is_file) {
-		}
 		if (!is_ast_node_decl(decl) && !is_ast_node_when_stmt(decl)) {
-
 			if (c->scope->is_file && decl->kind == AstNode_ExprStmt) {
 				AstNode *expr = decl->ExprStmt.expr;
 				if (expr->kind == AstNode_CallExpr &&
-				    expr->CallExpr.proc->kind == AstNode_BasicDirective &&
-				    expr->CallExpr.proc->BasicDirective.name == "assert") {
-					array_add(&c->scope->delayed_asserts, expr);
+				    expr->CallExpr.proc->kind == AstNode_BasicDirective) {
+					array_add(&c->scope->delayed_directives, expr);
 					continue;
 				}
 			}
@@ -2368,46 +2324,43 @@ String path_to_entity_name(String name, String fullpath) {
 #if 1
 
 void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *> *M) {
-	Scope *parent_package_scope = decl->file->pkg->scope;
+	AstPackage *parent_pkg = decl->file->pkg;
 
 	switch (decl->kind) {
 	case_ast_node(id, ImportDecl, decl);
 		String path = id->fullpath;
 		HashKey key = hash_string(path);
-		Scope **found = map_get(&c->package_scopes, key);
+		AstPackage **found = map_get(&c->info.packages, key);
 		if (found == nullptr) {
-			for_array(scope_index, c->package_scopes.entries) {
-				Scope *scope = c->package_scopes.entries[scope_index].value;
-				gb_printf_err("%.*s\n", LIT(scope->package->fullpath));
+			for_array(pkg_index, c->info.packages.entries) {
+				AstPackage *pkg = c->info.packages.entries[pkg_index].value;
+				gb_printf_err("%.*s\n", LIT(pkg->fullpath));
 			}
 			Token token = ast_node_token(decl);
 			gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
-			GB_PANIC("Unable to find scope for file: %.*s", LIT(path));
+			GB_PANIC("Unable to find package: %.*s", LIT(path));
 		}
-		Scope *scope = *found;
-		GB_ASSERT(scope != nullptr);
+		AstPackage *pkg = *found;
+		GB_ASSERT(pkg->scope != nullptr);
 
-		id->package = scope->package;
+		id->package = pkg;
 
 		ImportGraphNode **found_node = nullptr;
 		ImportGraphNode *m = nullptr;
 		ImportGraphNode *n = nullptr;
 
-		found_node = map_get(M, hash_pointer(scope));
+		found_node = map_get(M, hash_pointer(pkg));
 		GB_ASSERT(found_node != nullptr);
 		m = *found_node;
 
-		found_node = map_get(M, hash_pointer(parent_package_scope));
+		found_node = map_get(M, hash_pointer(parent_pkg));
 		GB_ASSERT(found_node != nullptr);
 		n = *found_node;
 
-		// TODO(bill): How should the edges be attched for 'import'?
+		// TODO(bill): How should the edges be attached for 'import'?
 		import_graph_node_set_add(&n->succ, m);
 		import_graph_node_set_add(&m->pred, n);
 		ptr_set_add(&m->scope->imported, n->scope);
-		if (id->is_using) {
-			ptr_set_add(&m->scope->exported, n->scope);
-		}
 	case_end;
 
 	case_ast_node(ws, WhenStmt, decl);
@@ -2438,17 +2391,14 @@ void add_import_dependency_node(Checker *c, AstNode *decl, Map<ImportGraphNode *
 }
 
 Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
-	gbAllocator a = heap_allocator();
-
-	Map<ImportGraphNode *> M = {}; // Key: Scope *
-	map_init(&M, a);
+	Map<ImportGraphNode *> M = {}; // Key: AstPackage *
+	map_init(&M, heap_allocator(), 2*c->parser->packages.count);
 	defer (map_destroy(&M));
 
 	for_array(i, c->parser->packages) {
-		Scope *scope = c->parser->packages[i]->scope;
-
-		ImportGraphNode *n = import_graph_node_create(heap_allocator(), scope);
-		map_set(&M, hash_pointer(scope), n);
+		AstPackage *pkg = c->parser->packages[i];
+		ImportGraphNode *n = import_graph_node_create(heap_allocator(), pkg);
+		map_set(&M, hash_pointer(pkg), n);
 	}
 
 	// Calculate edges for graph M
@@ -2464,28 +2414,25 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
 	}
 
 	Array<ImportGraphNode *> G = {};
-	array_init(&G, a);
+	array_init(&G, heap_allocator(), 0, M.entries.count);
 
 	for_array(i, M.entries) {
-		array_add(&G, M.entries[i].value);
-	}
-
-	for_array(i, G) {
-		ImportGraphNode *n = G[i];
+		auto n = M.entries[i].value;
 		n->index = i;
 		n->dep_count = n->succ.entries.count;
 		GB_ASSERT(n->dep_count >= 0);
+		array_add(&G, n);
 	}
 
 	return G;
 }
 
 struct ImportPathItem {
-	Scope *  scope;
-	AstNode *decl;
+	AstPackage *pkg;
+	AstNode *   decl;
 };
 
-Array<ImportPathItem> find_import_path(Checker *c, Scope *start, Scope *end, PtrSet<Scope *> *visited) {
+Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start, AstPackage *end, PtrSet<AstPackage *> *visited) {
 	Array<ImportPathItem> empty_path = {};
 
 	if (ptr_set_exists(visited, start)) {
@@ -2494,32 +2441,32 @@ Array<ImportPathItem> find_import_path(Checker *c, Scope *start, Scope *end, Ptr
 	ptr_set_add(visited, start);
 
 
-	String path = start->package->fullpath;
+	String path = start->fullpath;
 	HashKey key = hash_string(path);
-	Scope **found = map_get(&c->package_scopes, key);
+	AstPackage **found = map_get(&c->info.packages, key);
 	if (found) {
-		AstPackage *p = (*found)->package;
-		GB_ASSERT(p != nullptr);
+		AstPackage *pkg = *found;
+		GB_ASSERT(pkg != nullptr);
 
-		for_array(i, p->files) {
-			AstFile *f = p->files[i];
+		for_array(i, pkg->files) {
+			AstFile *f = pkg->files[i];
 			for_array(j, f->imports) {
-				Scope *s = nullptr;
+				AstPackage *pkg = nullptr;
 				AstNode *decl = f->imports[j];
 				if (decl->kind == AstNode_ImportDecl) {
-					s = decl->ImportDecl.package->scope;
+					pkg = decl->ImportDecl.package;
 				} else {
 					continue;
 				}
-				GB_ASSERT(s != nullptr && s->is_package);
+				GB_ASSERT(pkg != nullptr && pkg->scope != nullptr);
 
-				ImportPathItem item = {s, decl};
-				if (s == end) {
+				ImportPathItem item = {pkg, decl};
+				if (pkg == end) {
 					auto path = array_make<ImportPathItem>(heap_allocator());
 					array_add(&path, item);
 					return path;
 				}
-				auto next_path = find_import_path(c, s, end, visited);
+				auto next_path = find_import_path(c, pkg, end, visited);
 				if (next_path.count > 0) {
 					array_add(&next_path, item);
 					return next_path;
@@ -2534,27 +2481,25 @@ void check_add_import_decl(CheckerContext *ctx, AstNodeImportDecl *id) {
 	if (id->been_handled) return;
 	id->been_handled = true;
 
-	gb_mutex_lock(&ctx->checker->mutex);
-	defer (gb_mutex_unlock(&ctx->checker->mutex));
-
 	Scope *parent_scope = ctx->scope;
 	GB_ASSERT(parent_scope->is_file);
 
-	auto *pkg_scopes = &ctx->checker->package_scopes;
+	auto *pkgs = &ctx->checker->info.packages;
 
 	Token token = id->relpath;
 	HashKey key = hash_string(id->fullpath);
-	Scope **found = map_get(pkg_scopes, key);
+	AstPackage **found = map_get(pkgs, key);
 	if (found == nullptr) {
-		for_array(scope_index, pkg_scopes->entries) {
-			Scope *scope = pkg_scopes->entries[scope_index].value;
-			gb_printf_err("%.*s\n", LIT(scope->package->fullpath));
+		for_array(pkg_index, pkgs->entries) {
+			AstPackage *pkg = pkgs->entries[pkg_index].value;
+			gb_printf_err("%.*s\n", LIT(pkg->fullpath));
 		}
 		gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
 		GB_PANIC("Unable to find scope for package: %.*s", LIT(id->fullpath));
 	}
-	Scope *scope = *found;
-	GB_ASSERT(scope->is_package && scope->package != nullptr);
+	AstPackage *pkg = *found;
+	Scope *scope = pkg->scope;
+	GB_ASSERT(scope->is_package);
 
 	// TODO(bill): Should this be allowed or not?
 	// if (scope->is_global) {
@@ -2707,29 +2652,30 @@ void check_import_entities(Checker *c) {
 	// NOTE(bill): Priority queue
 	auto pq = priority_queue_create(dep_graph, import_graph_node_cmp, import_graph_node_swap);
 
-	PtrSet<Scope *> emitted = {};
+	PtrSet<AstPackage *> emitted = {};
 	ptr_set_init(&emitted, heap_allocator());
 	defer (ptr_set_destroy(&emitted));
 
+	Array<ImportGraphNode *> package_order = {};
+	array_init(&package_order, heap_allocator(), 0, c->parser->packages.count);
+	defer (array_free(&package_order));
 
 	while (pq.queue.count > 0) {
 		ImportGraphNode *n = priority_queue_pop(&pq);
 
-		Scope *s = n->scope;
+		AstPackage *pkg = n->pkg;
 
 		if (n->dep_count > 0) {
-			PtrSet<Scope *> visited = {};
+			PtrSet<AstPackage *> visited = {};
 			ptr_set_init(&visited, heap_allocator());
 			defer (ptr_set_destroy(&visited));
 
-			auto path = find_import_path(c, s, s, &visited);
+			auto path = find_import_path(c, pkg, pkg, &visited);
 			defer (array_free(&path));
 
 			// TODO(bill): This needs better TokenPos finding
 			auto const fn = [](ImportPathItem item) -> String {
-				Scope *s = item.scope;
-				// return remove_directory_from_path(s->package->fullpath);
-				return s->package->name;
+				return item.pkg->name;
 			};
 
 			if (path.count == 1) {
@@ -2759,24 +2705,24 @@ void check_import_entities(Checker *c) {
 			priority_queue_fix(&pq, p->index);
 		}
 
-		if (s == nullptr) {
+		if (pkg == nullptr) {
 			continue;
 		}
-		if (ptr_set_exists(&emitted, s)) {
+		if (ptr_set_exists(&emitted, pkg)) {
 			continue;
 		}
-		ptr_set_add(&emitted, s);
+		ptr_set_add(&emitted, pkg);
 
-		array_add(&c->package_order, n);
+		array_add(&package_order, n);
 	}
 
-	for_array(i, c->package_order) {
-		ImportGraphNode *node = c->package_order[i];
+	for_array(i, package_order) {
+		ImportGraphNode *node = package_order[i];
 		GB_ASSERT(node->scope->is_package);
-		AstPackage *p = node->scope->package;
+		AstPackage *pkg = node->scope->package;
 
-		for_array(i, p->files) {
-			AstFile *f = p->files[i];
+		for_array(i, pkg->files) {
+			AstFile *f = pkg->files[i];
 			CheckerContext ctx = c->init_ctx;
 
 			add_curr_ast_file(&ctx, f);
@@ -2787,21 +2733,17 @@ void check_import_entities(Checker *c) {
 			}
 		}
 
-		for_array(i, p->files) {
-			AstFile *f = p->files[i];
+		for_array(i, pkg->files) {
+			AstFile *f = pkg->files[i];
 			CheckerContext ctx = c->init_ctx;
 			add_curr_ast_file(&ctx, f);
-			for_array(j, f->scope->delayed_asserts) {
-				AstNode *expr = f->scope->delayed_asserts[j];
+			for_array(j, f->scope->delayed_directives) {
+				AstNode *expr = f->scope->delayed_directives[j];
 				Operand o = {};
 				check_expr(&ctx, &o, expr);
 			}
 		}
 	}
-
-
-	// gb_printf_err("End here!\n");
-	// gb_exit(1);
 }
 
 Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visited = nullptr) {
@@ -2979,58 +2921,6 @@ GB_THREAD_PROC(check_proc_info_worker_proc) {
 	return 0;
 }
 
-void check_proc_bodies(Checker *c) {
-	// IMPORTANT TODO(bill): Figure out why this doesn't work on *nix sometimes
-#if 0 && defined(GB_SYSTEM_WINDOWS)
-	isize thread_count = gb_max(build_context.thread_count, 1);
-	gb_printf_err("Threads: %td\n", thread_count);
-	// isize thread_count = 1;
-	if (thread_count > 1) {
-		isize volatile curr_proc_index = 0;
-
-		auto worker_threads = array_make<gbThread>(heap_allocator(), thread_count);
-		defer (array_free(&worker_threads));
-
-		for_array(i, worker_threads) {
-			gbThread *t = &worker_threads[i];
-			gb_thread_init(t);
-		}
-		defer (for_array(i, worker_threads) {
-			gb_thread_destroy(&worker_threads[i]);
-		});
-
-
-		for (;;) {
-			bool are_any_alive = false;
-			for_array(i, worker_threads) {
-				gbThread *t = &worker_threads[i];
-				if (gb_thread_is_running(t)) {
-					are_any_alive = true;
-				} else if (curr_proc_index < c->procs_to_check.count) {
-					t->user_index = curr_proc_index;
-					curr_proc_index++;
-					gb_thread_start(t, check_proc_info_worker_proc, c);
-					are_any_alive = true;
-				}
-			}
-			if (!are_any_alive && curr_proc_index >= c->procs_to_check.count) {
-				break;
-			}
-		}
-
-	} else {
-		for_array(i, c->procs_to_check) {
-			ProcedureInfo pi = c->procs_to_check[i];
-			check_proc_info(c, pi);
-		}
-	}
-#else
-	for_array(i, c->procs_to_check) {
-		ProcedureInfo pi = c->procs_to_check[i];
-		check_proc_info(c, pi);
-	}
-#endif
-}
 
 void check_parsed_files(Checker *c) {
 #if 0
@@ -3054,7 +2944,6 @@ void check_parsed_files(Checker *c) {
 		Scope *scope = create_scope_from_package(&c->init_ctx, p);
 		p->decl_info = make_decl_info(c->allocator, scope, c->init_ctx.decl);
 		HashKey key = hash_string(p->fullpath);
-		map_set(&c->package_scopes, key, scope);
 		map_set(&c->info.packages, key, p);
 
 		if (scope->is_init) {
@@ -3100,7 +2989,10 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("check procedure bodies");
 	// NOTE(bill): Nested procedures bodies will be added to this "queue"
-	check_proc_bodies(c);
+	for_array(i, c->procs_to_check) {
+		ProcedureInfo pi = c->procs_to_check[i];
+		check_proc_info(c, pi);
+	}
 
 	for_array(i, c->info.files.entries) {
 		AstFile *f = c->info.files.entries[i].value;

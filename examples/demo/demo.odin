@@ -735,6 +735,14 @@ deprecated_attribute :: proc() {
 	// foo_v1(1);
 }
 
+A :: struct {x, y, z: int};
+B :: struct {x, y, z: int};
+C :: struct {
+	using a: A,
+	b: B,
+}
+
+
 main :: proc() {
 	when true {
 		general_stuff();

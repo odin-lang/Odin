@@ -544,9 +544,6 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 		pt->calling_convention = ProcCC_Contextless;
 		if (e->pkg->kind == Package_Init) {
-			gb_mutex_lock(&ctx->info->mutex);
-			defer (gb_mutex_unlock(&ctx->info->mutex));
-
 			if (ctx->info->entry_point != nullptr) {
 				error(e->token, "Redeclaration of the entry pointer procedure 'main'");
 			} else {
@@ -612,9 +609,6 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 		init_entity_foreign_library(ctx, e);
 
-		gb_mutex_lock(&ctx->info->mutex);
-		defer (gb_mutex_unlock(&ctx->info->mutex));
-
 		auto *fp = &ctx->info->foreigns;
 		HashKey key = hash_string(name);
 		Entity **found = map_get(fp, key);
@@ -647,9 +641,6 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			name = e->Procedure.link_name;
 		}
 		if (e->Procedure.link_name.len > 0 || is_export) {
-			gb_mutex_lock(&ctx->info->mutex);
-			defer (gb_mutex_unlock(&ctx->info->mutex));
-
 			auto *fp = &ctx->info->foreigns;
 			HashKey key = hash_string(name);
 			Entity **found = map_get(fp, key);
@@ -726,8 +717,6 @@ void check_var_decl(CheckerContext *ctx, Entity *e, Entity **entities, isize ent
 		if (e->Variable.link_name.len > 0) {
 			name = e->Variable.link_name;
 		}
-		gb_mutex_lock(&ctx->info->mutex);
-		defer (gb_mutex_unlock(&ctx->info->mutex));
 
 		auto *fp = &ctx->info->foreigns;
 		HashKey key = hash_string(name);
@@ -777,9 +766,8 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) 
 	// places the entity within itself
 	pg_entity->type = t_invalid;
 
-	PtrSet<Entity *> entity_map = {};
-	ptr_set_init(&entity_map, heap_allocator());
-	defer (ptr_set_destroy(&entity_map));
+	PtrSet<Entity *> entity_set = {};
+	ptr_set_init(&entity_set, heap_allocator(), 2*pg->args.count);
 
 	for_array(i, pg->args) {
 		AstNode *arg = pg->args[i];
@@ -806,13 +794,16 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) 
 			continue;
 		}
 
-		if (ptr_set_exists(&entity_map, e)) {
+		if (ptr_set_exists(&entity_set, e)) {
 			error(arg, "Previous use of `%.*s` in procedure group", LIT(e->token.string));
 			continue;
 		}
-		ptr_set_add(&entity_map, e);
+		ptr_set_add(&entity_set, e);
 		array_add(&pge->entities, e);
 	}
+
+	ptr_set_destroy(&entity_set);
+
 
 	for_array(j, pge->entities) {
 		Entity *p = pge->entities[j];
@@ -1021,6 +1012,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 			if (token.kind == Token_Ident) {
 				error(bs->close, "Missing return statement at the end of the procedure '%.*s'", LIT(token.string));
 			} else {
+				// NOTE(bill): Anonymous procedure (lambda)
 				error(bs->close, "Missing return statement at the end of the procedure");
 			}
 		}
@@ -1029,9 +1021,6 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 	check_scope_usage(ctx->checker, ctx->scope);
 
 	if (decl->parent != nullptr) {
-		gb_mutex_lock(&ctx->checker->mutex);
-		defer (gb_mutex_unlock(&ctx->checker->mutex));
-
 		// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 		for_array(i, decl->deps.entries) {
 			Entity *e = decl->deps.entries[i].ptr;

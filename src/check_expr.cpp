@@ -267,9 +267,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	}
 
 
-	gb_mutex_lock(&nctx.info->mutex);
-	defer (gb_mutex_unlock(&nctx.info->mutex));
-
 	auto *found_gen_procs = map_get(&nctx.info->gen_procs, hash_pointer(base_entity->identifier));
 	if (found_gen_procs) {
 		auto procs = *found_gen_procs;
