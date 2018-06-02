@@ -604,6 +604,17 @@ void show_timings(Checker *c, Timings *t) {
 		gb_printf("\n");
 	}
 	{
+		TimeStamp ts = t->sections[1];
+		GB_ASSERT(ts.label == "type check");
+		f64 parse_time = time_stamp_as_s(ts, t->freq);
+		gb_printf("Checker pass\n");
+		gb_printf("LOC/s        - %.3f\n", cast(f64)lines/parse_time);
+		gb_printf("us/LOC       - %.3f\n", 1.0e6*parse_time/cast(f64)lines);
+		gb_printf("Tokens/s     - %.3f\n", cast(f64)tokens/parse_time);
+		gb_printf("us/Token     - %.3f\n", 1.0e6*parse_time/cast(f64)tokens);
+		gb_printf("\n");
+	}
+	{
 		f64 total_time = t->total_time_seconds;
 		gb_printf("Total pass\n");
 		gb_printf("LOC/s        - %.3f\n", cast(f64)lines/total_time);

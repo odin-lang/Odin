@@ -4162,10 +4162,33 @@ bool determine_path_from_string(Parser *p, AstNode *node, String base_dir, Strin
 }
 
 
-void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNode *> decls) {
+
+void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNode *> &decls);
+
+void parse_setup_file_when_stmt(Parser *p, AstFile *f, String base_dir, AstNodeWhenStmt *ws) {
+	if (ws->body != nullptr) {
+		auto stmts = ws->body->BlockStmt.stmts;
+		parse_setup_file_decls(p, f, base_dir, stmts);
+	}
+
+	if (ws->else_stmt != nullptr) {
+		switch (ws->else_stmt->kind) {
+		case AstNode_BlockStmt: {
+			auto stmts = ws->else_stmt->BlockStmt.stmts;
+			parse_setup_file_decls(p, f, base_dir, stmts);
+		} break;
+		case AstNode_WhenStmt:
+			parse_setup_file_when_stmt(p, f, base_dir, &ws->else_stmt->WhenStmt);
+			break;
+		}
+	}
+}
+
+void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNode *> &decls) {
 	for_array(i, decls) {
 		AstNode *node = decls[i];
 		if (!is_ast_node_decl(node) &&
+		    node->kind != AstNode_WhenStmt &&
 		    node->kind != AstNode_BadStmt &&
 		    node->kind != AstNode_EmptyStmt) {
 			// NOTE(bill): Sanity check
@@ -4212,7 +4235,9 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 				}
 				fl->fullpath = foreign_path;
 			}
-
+		} else if (node->kind == AstNode_WhenStmt) {
+			ast_node(ws, WhenStmt, node);
+			parse_setup_file_when_stmt(p, f, base_dir, ws);
 		}
 	}
 }
