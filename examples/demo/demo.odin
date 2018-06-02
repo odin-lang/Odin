@@ -16,9 +16,11 @@ import "core:unicode/utf16"
 import "core:unicode/utf8"
 import "core:c"
 
-import "core:atomics"
-import "core:thread"
-import "core:sys/win32"
+when os.OS == "windows" {
+	import "core:atomics"
+	import "core:thread"
+	import "core:sys/win32"
+}
 
 @(link_name="general_stuff")
 general_stuff :: proc() {

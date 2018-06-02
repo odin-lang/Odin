@@ -669,6 +669,7 @@ void init_checker(Checker *c, Parser *parser) {
 	init_checker_info(&c->info);
 
 	array_init(&c->procs_to_check, a);
+	ptr_set_init(&c->checked_packages, a);
 
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
@@ -684,8 +685,7 @@ void destroy_checker(Checker *c) {
 	destroy_checker_info(&c->info);
 
 	array_free(&c->procs_to_check);
-
-	// gb_arena_free(&c->tmp_arena);
+	ptr_set_destroy(&c->checked_packages);
 
 	destroy_checker_context(&c->init_ctx);
 }
@@ -1800,7 +1800,7 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 
 
 
-void check_decl_attributes(CheckerContext *c, Array<AstNode *> attributes, DeclAttributeProc *proc, AttributeContext *ac) {
+void check_decl_attributes(CheckerContext *c, Array<AstNode *> const &attributes, DeclAttributeProc *proc, AttributeContext *ac) {
 	if (attributes.count == 0) return;
 
 	String original_link_prefix = {};
@@ -2129,19 +2129,21 @@ void check_add_foreign_block_decl(CheckerContext *ctx, AstNode *decl) {
 
 	check_decl_attributes(&c, fb->attributes, foreign_block_decl_attribute, nullptr);
 
+	c.collect_delayed_decls = true;
 	check_collect_entities(&c, fb->decls);
 }
 
 // NOTE(bill): If file_scopes == nullptr, this will act like a local scope
-void check_collect_entities(CheckerContext *c, Array<AstNode *> nodes) {
+void check_collect_entities(CheckerContext *c, Array<AstNode *> const &nodes) {
 	for_array(decl_index, nodes) {
 		AstNode *decl = nodes[decl_index];
 		if (!is_ast_node_decl(decl) && !is_ast_node_when_stmt(decl)) {
 			if (c->scope->is_file && decl->kind == AstNode_ExprStmt) {
 				AstNode *expr = decl->ExprStmt.expr;
-				if (expr->kind == AstNode_CallExpr &&
-				    expr->CallExpr.proc->kind == AstNode_BasicDirective) {
-					array_add(&c->scope->delayed_directives, expr);
+				if (expr->kind == AstNode_CallExpr && expr->CallExpr.proc->kind == AstNode_BasicDirective) {
+					if (c->collect_delayed_decls) {
+						array_add(&c->scope->delayed_directives, expr);
+					}
 					continue;
 				}
 			}
@@ -2167,7 +2169,9 @@ void check_collect_entities(CheckerContext *c, Array<AstNode *> nodes) {
 				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
-			array_add(&c->scope->delayed_imports, decl);
+			if (c->collect_delayed_decls) {
+				array_add(&c->scope->delayed_imports, decl);
+			}
 		case_end;
 
 		case_ast_node(fl, ForeignImportDecl, decl);
@@ -2194,7 +2198,7 @@ void check_collect_entities(CheckerContext *c, Array<AstNode *> nodes) {
 
 	// NOTE(bill): 'when' stmts need to be handled after the other as the condition may refer to something
 	// declared after this stmt in source
-	if (!c->scope->is_file) {
+	if (!c->scope->is_file || c->collect_delayed_decls) {
 		for_array(i, nodes) {
 			AstNode *node = nodes[i];
 			switch (node->kind) {
@@ -2591,6 +2595,7 @@ void check_add_import_decl(CheckerContext *ctx, AstNodeImportDecl *id) {
 		}
 	}
 
+	ptr_set_add(&ctx->checker->checked_packages, pkg);
 	scope->has_been_imported = true;
 }
 
@@ -2638,7 +2643,163 @@ void check_add_foreign_import_decl(CheckerContext *ctx, AstNode *decl) {
 	add_entity(ctx->checker, parent_scope, nullptr, e);
 }
 
+bool collect_checked_packages_from_decl_list(Checker *c, Array<AstNode *> const &decls) {
+	bool new_files = false;
+	for_array(i, decls) {
+		AstNode *decl = decls[i];
+		switch (decl->kind) {
+		case_ast_node(id, ImportDecl, decl);
+			HashKey key = hash_string(id->fullpath);
+			AstPackage **found = map_get(&c->info.packages, key);
+			if (found == nullptr) {
+				continue;
+			}
+			AstPackage *pkg = *found;
+			if (!ptr_set_exists(&c->checked_packages, pkg)) {
+				new_files = true;
+				ptr_set_add(&c->checked_packages, pkg);
+			}
+		case_end;
+		}
+	}
+	return new_files;
+}
 
+// Returns true if a new package is present
+bool collect_file_decls(CheckerContext *ctx, Array<AstNode *> const &decls);
+bool collect_file_decls_from_when_stmt(CheckerContext *ctx, AstNodeWhenStmt *ws);
+
+bool collect_when_stmt_from_file(CheckerContext *ctx, AstNodeWhenStmt *ws) {
+	Operand operand = {Addressing_Invalid};
+	if (!ws->is_cond_determined) {
+		check_expr(ctx, &operand, ws->cond);
+		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+			error(ws->cond, "Non-boolean condition in 'when' statement");
+		}
+		if (operand.mode != Addressing_Constant) {
+			error(ws->cond, "Non-constant condition in 'when' statement");
+		}
+
+		ws->is_cond_determined = true;
+		ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
+	}
+
+	if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
+		error(ws->cond, "Invalid body for 'when' statement");
+	} else {
+		if (ws->determined_cond) {
+			return collect_checked_packages_from_decl_list(ctx->checker, ws->body->BlockStmt.stmts);
+		} else if (ws->else_stmt) {
+			switch (ws->else_stmt->kind) {
+			case AstNode_BlockStmt:
+				return collect_checked_packages_from_decl_list(ctx->checker, ws->else_stmt->BlockStmt.stmts);
+			case AstNode_WhenStmt:
+				return collect_when_stmt_from_file(ctx, &ws->else_stmt->WhenStmt);
+			default:
+				error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
+				break;
+			}
+		}
+	}
+
+	return false;
+}
+
+bool collect_file_decls_from_when_stmt(CheckerContext *ctx, AstNodeWhenStmt *ws) {
+	Operand operand = {Addressing_Invalid};
+	if (!ws->is_cond_determined) {
+		check_expr(ctx, &operand, ws->cond);
+		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+			error(ws->cond, "Non-boolean condition in 'when' statement");
+		}
+		if (operand.mode != Addressing_Constant) {
+			error(ws->cond, "Non-constant condition in 'when' statement");
+		}
+
+		ws->is_cond_determined = true;
+		ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
+	}
+
+	if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
+		error(ws->cond, "Invalid body for 'when' statement");
+	} else {
+		if (ws->determined_cond) {
+			return collect_file_decls(ctx, ws->body->BlockStmt.stmts);
+		} else if (ws->else_stmt) {
+			switch (ws->else_stmt->kind) {
+			case AstNode_BlockStmt:
+				return collect_file_decls(ctx, ws->else_stmt->BlockStmt.stmts);
+			case AstNode_WhenStmt:
+				return collect_file_decls_from_when_stmt(ctx, &ws->else_stmt->WhenStmt);
+			default:
+				error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
+				break;
+			}
+		}
+	}
+
+	return false;
+}
+
+bool collect_file_decls(CheckerContext *ctx, Array<AstNode *> const &decls) {
+	GB_ASSERT(ctx->scope->is_file);
+
+	if (collect_checked_packages_from_decl_list(ctx->checker, decls)) {
+		return true;
+	}
+
+	for_array(i, decls) {
+		AstNode *decl = decls[i];
+		switch (decl->kind) {
+		case_ast_node(vd, ValueDecl, decl);
+			check_collect_value_decl(ctx, decl);
+		case_end;
+
+		case_ast_node(id, ImportDecl, decl);
+			check_add_import_decl(ctx, id);
+		case_end;
+
+		case_ast_node(fl, ForeignImportDecl, decl);
+			check_add_foreign_import_decl(ctx, decl);
+		case_end;
+
+		case_ast_node(fb, ForeignBlockDecl, decl);
+			check_add_foreign_block_decl(ctx, decl);
+		case_end;
+
+		case_ast_node(ws, WhenStmt, decl);
+			if (!ws->is_cond_determined) {
+				if (collect_when_stmt_from_file(ctx, ws)) {
+					return true;
+				}
+
+				CheckerContext nctx = *ctx;
+				nctx.collect_delayed_decls = true;
+
+				if (collect_file_decls_from_when_stmt(&nctx, ws)) {
+					return true;
+				}
+			} else {
+				CheckerContext nctx = *ctx;
+				nctx.collect_delayed_decls = true;
+
+				if (collect_file_decls_from_when_stmt(&nctx, ws)) {
+					return true;
+				}
+			}
+		case_end;
+
+		case_ast_node(ce, CallExpr, decl);
+			if (ce->proc->kind == AstNode_BasicDirective) {
+				Operand o = {};
+				check_expr(ctx, &o, decl);
+			}
+		case_end;
+		}
+	}
+
+	return false;
+}
 
 void check_import_entities(Checker *c) {
 	Array<ImportGraphNode *> dep_graph = generate_import_dependency_graph(c);
@@ -2687,14 +2848,14 @@ void check_import_entities(Checker *c) {
 			#endif
 			} else if (path.count > 0) {
 				ImportPathItem item = path[path.count-1];
-				String filename = fn(item);
-				error(item.decl, "Cyclic importation of '%.*s'", LIT(filename));
+				String pkg_name = item.pkg->name;
+				error(item.decl, "Cyclic importation of '%.*s'", LIT(pkg_name));
 				for (isize i = 0; i < path.count; i++) {
-					error(item.decl, "'%.*s' refers to", LIT(filename));
+					error(item.decl, "'%.*s' refers to", LIT(pkg_name));
 					item = path[i];
-					filename = fn(item);
+					pkg_name = item.pkg->name;
 				}
-				error(item.decl, "'%.*s'", LIT(filename));
+				error(item.decl, "'%.*s'", LIT(pkg_name));
 			}
 		}
 
@@ -2716,6 +2877,68 @@ void check_import_entities(Checker *c) {
 		array_add(&package_order, n);
 	}
 
+	for_array(i, c->parser->packages) {
+		AstPackage *pkg = c->parser->packages[i];
+		switch (pkg->kind) {
+		case Package_Init:
+		case Package_Runtime:
+			ptr_set_add(&c->checked_packages, pkg);
+			break;
+		}
+	}
+
+	for (isize loop_count = 0; ; loop_count++) {
+		bool new_files = false;
+		for_array(i, package_order) {
+			ImportGraphNode *node = package_order[i];
+			GB_ASSERT(node->scope->is_package);
+			AstPackage *pkg = node->scope->package;
+			if (!ptr_set_exists(&c->checked_packages, pkg)) {
+				continue;
+			}
+
+			for_array(i, pkg->files) {
+				AstFile *f = pkg->files[i];
+				CheckerContext ctx = c->init_ctx;
+				add_curr_ast_file(&ctx, f);
+				new_files |= collect_checked_packages_from_decl_list(c, f->decls);
+			}
+		}
+
+		if (!new_files) {
+			break;
+		}
+	}
+
+	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
+		ImportGraphNode *node = package_order[pkg_index];
+		AstPackage *pkg = node->pkg;
+
+		if (!ptr_set_exists(&c->checked_packages, pkg)) {
+			continue;
+		}
+
+		bool new_packages = false;
+
+		for_array(i, pkg->files) {
+			AstFile *f = pkg->files[i];
+
+			CheckerContext ctx = c->init_ctx;
+			ctx.collect_delayed_decls = true;
+			add_curr_ast_file(&ctx, f);
+
+			if (collect_file_decls(&ctx, f->decls)) {
+				new_packages = true;
+				break;
+			}
+		}
+
+		if (new_packages) {
+			pkg_index = -1;
+			continue;
+		}
+	}
+
 	for_array(i, package_order) {
 		ImportGraphNode *node = package_order[i];
 		GB_ASSERT(node->scope->is_package);
@@ -2731,12 +2954,6 @@ void check_import_entities(Checker *c) {
 				ast_node(id, ImportDecl, decl);
 				check_add_import_decl(&ctx, id);
 			}
-		}
-
-		for_array(i, pkg->files) {
-			AstFile *f = pkg->files[i];
-			CheckerContext ctx = c->init_ctx;
-			add_curr_ast_file(&ctx, f);
 			for_array(j, f->scope->delayed_directives) {
 				AstNode *expr = f->scope->delayed_directives[j];
 				Operand o = {};
@@ -2963,6 +3180,7 @@ void check_parsed_files(Checker *c) {
 		CheckerContext ctx = make_checker_context(c);
 		defer (destroy_checker_context(&ctx));
 		ctx.pkg = p;
+		ctx.collect_delayed_decls = false;
 
 		for_array(j, p->files) {
 			AstFile *f = p->files[j];

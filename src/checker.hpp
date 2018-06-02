@@ -322,6 +322,7 @@ struct CheckerContext {
 	CheckerTypePath *type_path;
 	isize            type_level; // TODO(bill): Actually handle correctly
 
+	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;
 	bool       no_polymorphic_errors;
 	bool       in_polymorphic_specialization;
@@ -333,6 +334,8 @@ struct Checker {
 	CheckerInfo info;
 
 	Array<ProcedureInfo> procs_to_check;
+	PtrSet<AstPackage *> checked_packages;
+
 	gbAllocator          allocator;
 	CheckerContext       init_ctx;
 	bool                 done_preload;
@@ -386,7 +389,7 @@ void check_add_foreign_import_decl(CheckerContext *c, AstNode *decl);
 
 
 bool check_arity_match(CheckerContext *c, AstNodeValueDecl *vd, bool is_global = false);
-void check_collect_entities(CheckerContext *c, Array<AstNode *> nodes);
+void check_collect_entities(CheckerContext *c, Array<AstNode *> const &nodes);
 void check_collect_entities_from_when_stmt(CheckerContext *c, AstNodeWhenStmt *ws);
 void check_delayed_file_import_entity(CheckerContext *c, AstNode *decl);
 
@@ -407,7 +410,7 @@ AttributeContext make_attribute_context(String link_prefix) {
 #define DECL_ATTRIBUTE_PROC(_name) bool _name(CheckerContext *c, AstNode *elem, String name, ExactValue value, AttributeContext *ac)
 typedef DECL_ATTRIBUTE_PROC(DeclAttributeProc);
 
-void check_decl_attributes(CheckerContext *c, Array<AstNode *> attributes, DeclAttributeProc *proc, AttributeContext *ac);
+void check_decl_attributes(CheckerContext *c, Array<AstNode *> const &attributes, DeclAttributeProc *proc, AttributeContext *ac);
 
 CheckerTypePath *new_checker_type_path();
 void destroy_checker_type_path(CheckerTypePath *tp);
