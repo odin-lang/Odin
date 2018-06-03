@@ -1,6 +1,6 @@
 package mem
 
-import "core:raw"
+import "core:runtime"
 
 foreign _ {
 	@(link_name = "llvm.bswap.i16") swap16 :: proc(b: u16) -> u16 ---;
@@ -80,20 +80,20 @@ ptr_sub :: proc "contextless" (a, b: $P/^$T) -> int {
 
 slice_ptr :: proc "contextless" (ptr: ^$T, len: int) -> []T {
 	assert(len >= 0);
-	slice := raw.Slice{data = ptr, len = len};
+	slice := Raw_Slice{data = ptr, len = len};
 	return transmute([]T)slice;
 }
 
 slice_to_bytes :: proc "contextless" (slice: $E/[]$T) -> []byte {
-	s := transmute(raw.Slice)slice;
+	s := transmute(Raw_Slice)slice;
 	s.len *= size_of(T);
 	return transmute([]byte)s;
 }
 
 
 buffer_from_slice :: proc(backing: $T/[]$E) -> [dynamic]E {
-	s := transmute(raw.Slice)backing;
-	d := raw.Dynamic_Array{
+	s := transmute(Raw_Slice)backing;
+	d := Raw_Dynamic_Array{
 		data      = s.data,
 		len       = 0,
 		cap       = s.len,
@@ -104,13 +104,13 @@ buffer_from_slice :: proc(backing: $T/[]$E) -> [dynamic]E {
 
 ptr_to_bytes :: proc "contextless" (ptr: ^$T, len := 1) -> []byte {
 	assert(len >= 0);
-	return transmute([]byte)raw.Slice{ptr, len*size_of(T)};
+	return transmute([]byte)Raw_Slice{ptr, len*size_of(T)};
 }
 
 any_to_bytes :: proc "contextless" (val: any) -> []byte {
 	ti := type_info_of(val.typeid);
 	size := ti != nil ? ti.size : 0;
-	return transmute([]byte)raw.Slice{val.data, size};
+	return transmute([]byte)Raw_Slice{val.data, size};
 }
 
 
@@ -158,8 +158,8 @@ allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 Fixed_Byte_Buffer :: distinct [dynamic]byte;
 
 make_fixed_byte_buffer :: proc(backing: []byte) -> Fixed_Byte_Buffer {
-	s := transmute(raw.Slice)backing;
-	d: raw.Dynamic_Array;
+	s := transmute(Raw_Slice)backing;
+	d: Raw_Dynamic_Array;
 	d.data = s.data;
 	d.len = 0;
 	d.cap = s.len;
@@ -199,7 +199,7 @@ init_arena_from_context :: proc(using a: ^Arena, size: int) {
 }
 
 
-context_from_allocator :: proc(a: Allocator) -> Context {
+context_from_allocator :: proc(a: Allocator) -> runtime.Context {
 	c := context;
 	c.allocator = a;
 	return c;
@@ -241,7 +241,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		#no_bounds_check end := &arena.memory[len(arena.memory)];
 
 		ptr := align_forward(end, uintptr(alignment));
-		(^raw.Slice)(&arena.memory).len += total_size;
+		(^Raw_Slice)(&arena.memory).len += total_size;
 		return zero(ptr, size);
 
 	case Free:
@@ -249,7 +249,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		// Use ArenaTempMemory if you want to free a block
 
 	case Free_All:
-		(^raw.Slice)(&arena.memory).len = 0;
+		(^Raw_Slice)(&arena.memory).len = 0;
 
 	case Resize:
 		return default_resize_align(old_memory, old_size, size, alignment);
@@ -269,7 +269,7 @@ begin_arena_temp_memory :: proc(a: ^Arena) -> ArenaTempMemory {
 end_arena_temp_memory :: proc(using tmp: ArenaTempMemory) {
 	assert(len(arena.memory) >= original_count);
 	assert(arena.temp_count > 0);
-	(^raw.Dynamic_Array)(&arena.memory).len = original_count;
+	(^Raw_Dynamic_Array)(&arena.memory).len = original_count;
 	arena.temp_count -= 1;
 }
 

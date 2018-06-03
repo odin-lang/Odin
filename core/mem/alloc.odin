@@ -1,7 +1,24 @@
 package mem
 
-import "core:raw"
-import "core:os"
+DEFAULT_ALIGNMENT :: 2*align_of(rawptr);
+
+Allocator_Mode :: enum byte {
+	Alloc,
+	Free,
+	Free_All,
+	Resize,
+}
+
+Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
+	                         size, alignment: int,
+	                         old_memory: rawptr, old_size: int, flags: u64 = 0, location := #caller_location) -> rawptr;
+
+
+Allocator :: struct {
+	procedure: Allocator_Proc,
+	data:      rawptr,
+}
+
 
 
 alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
@@ -30,16 +47,16 @@ resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEF
 
 
 free_string :: proc(str: string, loc := #caller_location) {
-	free_ptr(raw.data(str), loc);
+	free_ptr(raw_data(str), loc);
 }
 free_cstring :: proc(str: cstring, loc := #caller_location) {
 	free_ptr((^byte)(str), loc);
 }
 free_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) {
-	free_ptr(raw.data(array), loc);
+	free_ptr(raw_data(array), loc);
 }
 free_slice :: proc(array: $T/[]$E, loc := #caller_location) {
-	free_ptr(raw.data(array), loc);
+	free_ptr(raw_data(array), loc);
 }
 free_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
 	raw := transmute(raw.Map)m;
@@ -77,38 +94,6 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 	return new_memory;
 }
 
-
-default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
-                               size, alignment: int,
-                               old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
-	using Allocator_Mode;
-
-	switch mode {
-	case Alloc:
-		return os.heap_alloc(size);
-
-	case Free:
-		os.heap_free(old_memory);
-		return nil;
-
-	case Free_All:
-		// NOTE(bill): Does nothing
-
-	case Resize:
-		ptr := os.heap_resize(old_memory, size);
-		assert(ptr != nil);
-		return ptr;
-	}
-
-	return nil;
-}
-
-default_allocator :: proc() -> Allocator {
-	return Allocator{
-		procedure = default_allocator_proc,
-		data = nil,
-	};
-}
 
 nil_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                            size, alignment: int,

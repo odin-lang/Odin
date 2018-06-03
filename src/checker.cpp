@@ -272,7 +272,6 @@ Scope *create_scope_from_package(CheckerContext *c, AstPackage *p) {
 
 	if (p->kind == Package_Runtime) {
 		s->is_global = true;
-		universal_scope->shared = s;
 	}
 
 	if (s->is_init || s->is_global) {
@@ -377,31 +376,7 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 
 		if (s->is_proc) {
 			gone_thru_proc = true;
-		} else if (s->shared) {
-			Entity **found = map_get(&s->shared->elements, key);
-			if (found) {
-				Entity *e = *found;
-				if (e->kind == Entity_Variable &&
-				    !e->scope->is_file) {
-					continue;
-				}
-
-				if (e->scope->parent != s->shared) {
-					continue;
-				}
-
-				if ((e->kind == Entity_ImportName ||
-				     e->kind == Entity_LibraryName)
-				     && gone_thru_package) {
-					continue;
-				}
-
-				if (entity_) *entity_ = e;
-				if (scope_) *scope_ = s->shared;
-				return;
-			}
 		}
-
 		if (s->is_package) {
 			gone_thru_package = true;
 		}
@@ -511,7 +486,7 @@ void add_package_dependency(CheckerContext *c, char *package_name, char *name) {
 	String n = make_string_c(name);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
 	Entity *e = scope_lookup_entity(p->scope, n);
-	GB_ASSERT(e != nullptr);
+	GB_ASSERT_MSG(e != nullptr, "%s", name);
 	ptr_set_add(&c->decl->deps, e);
 	// add_type_info_type(c, e->type);
 }
@@ -841,7 +816,7 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 		return;
 	}
 	if (mode == Addressing_Constant && type == t_invalid) {
-		compiler_error("add_type_and_value - invalid type: %s", type_to_string(type));
+		return;
 	}
 
 	TypeAndValue tv = {};
@@ -939,20 +914,11 @@ void add_entity_and_decl_info(CheckerContext *c, AstNode *identifier, Entity *e,
 
 	if (e->scope != nullptr) {
 		Scope *scope = e->scope;
-		if (scope->is_file) {
-			switch (e->kind) {
-			case Entity_ImportName:
-			case Entity_LibraryName:
-				// NOTE(bill): Entities local to file rather than package
-				break;
-			default: {
-				AstPackage *pkg = scope->file->pkg;
-				GB_ASSERT(pkg->scope == scope->parent);
-				GB_ASSERT(c->pkg == pkg);
-				scope = pkg->scope;
-				break;
-			}
-			}
+		if (scope->is_file && is_entity_kind_exported(e->kind)) {
+			AstPackage *pkg = scope->file->pkg;
+			GB_ASSERT(pkg->scope == scope->parent);
+			GB_ASSERT(c->pkg == pkg);
+			scope = pkg->scope;
 		}
 		add_entity(c->checker, scope, identifier, e);
 	}
@@ -1346,12 +1312,11 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	String required_builtin_entities[] = {
 		str_lit("__init_context"),
 
-		str_lit("__args__"),
-		str_lit("__type_table"),
+		str_lit("args__"),
+		str_lit("type_table"),
 
 		str_lit("Type_Info"),
 		str_lit("Source_Code_Location"),
-		str_lit("Allocator"),
 		str_lit("Context"),
 	};
 	for (isize i = 0; i < gb_count_of(required_builtin_entities); i++) {
@@ -1360,18 +1325,27 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 	AstPackage *mem = get_core_package(&c->info, str_lit("mem"));
 	String required_mem_entities[] = {
-		str_lit("default_allocator"),
 		str_lit("zero"),
+		str_lit("Allocator"),
 	};
 	for (isize i = 0; i < gb_count_of(required_mem_entities); i++) {
 		add_dependency_to_set(c, scope_lookup_entity(mem->scope, required_mem_entities[i]));
 	}
 
+	AstPackage *os = get_core_package(&c->info, str_lit("os"));
+	String required_os_entities[] = {
+		str_lit("default_allocator"),
+	};
+	for (isize i = 0; i < gb_count_of(required_os_entities); i++) {
+		add_dependency_to_set(c, scope_lookup_entity(os->scope, required_mem_entities[i]));
+	}
+
+
 	if (!build_context.no_bounds_check) {
 		String bounds_check_entities[] = {
-			str_lit("__bounds_check_error"),
-			str_lit("__slice_expr_error"),
-			str_lit("__dynamic_array_expr_error"),
+			str_lit("bounds_check_error"),
+			str_lit("slice_expr_error"),
+			str_lit("dynamic_array_expr_error"),
 		};
 		for (isize i = 0; i < gb_count_of(bounds_check_entities); i++) {
 			add_dependency_to_set(c, scope_lookup_entity(c->info.runtime_package->scope, bounds_check_entities[i]));
@@ -1497,7 +1471,7 @@ Entity *find_core_entity(Checker *c, String name) {
 	Entity *e = current_scope_lookup_entity(c->info.runtime_package->scope, name);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
-		               "Is '_preload.odin' missing from the 'core' directory relative to odin.exe?", LIT(name));
+, LIT(name));
 		// NOTE(bill): This will exit the program as it's cannot continue without it!
 	}
 	return e;
@@ -1507,7 +1481,7 @@ Type *find_core_type(Checker *c, String name) {
 	Entity *e = current_scope_lookup_entity(c->info.runtime_package->scope, name);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
-		               "Is '_preload.odin' missing from the 'core' directory relative to odin.exe?", LIT(name));
+, LIT(name));
 		// NOTE(bill): This will exit the program as it's cannot continue without it!
 	}
 	return e->type;
@@ -1624,7 +1598,16 @@ void init_core_allocator(Checker *c) {
 	if (t_allocator != nullptr) {
 		return;
 	}
-	t_allocator = find_core_type(c, str_lit("Allocator"));
+	AstPackage *pkg = get_core_package(&c->info, str_lit("mem"));
+
+	String name = str_lit("Allocator");
+	Entity *e = current_scope_lookup_entity(pkg->scope, name);
+	if (e == nullptr) {
+		compiler_error("Could not find type declaration for '%.*s'\n", LIT(name));
+		// NOTE(bill): This will exit the program as it's cannot continue without it!
+	}
+
+	t_allocator = e->type;
 	t_allocator_ptr = alloc_type_pointer(t_allocator);
 }
 
@@ -1646,11 +1629,11 @@ void init_core_source_code_location(Checker *c) {
 
 void init_core_map_type(Checker *c) {
 	if (t_map_key == nullptr) {
-		t_map_key = find_core_type(c, str_lit("__Map_Key"));
+		t_map_key = find_core_type(c, str_lit("Map_Key"));
 	}
 
 	if (t_map_header == nullptr) {
-		t_map_header = find_core_type(c, str_lit("__Map_Header"));
+		t_map_header = find_core_type(c, str_lit("Map_Header"));
 	}
 }
 
@@ -1767,7 +1750,8 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 			ac->thread_local_model = str_lit("default");
 		} else if (value.kind == ExactValue_String) {
 			String model = value.value_string;
-			if (model == "localdynamic" ||
+			if (model == "default" ||
+			    model == "localdynamic" ||
 			    model == "initialexec" ||
 			    model == "localexec") {
 				ac->thread_local_model = model;
@@ -1935,6 +1919,66 @@ void check_collect_entities_from_when_stmt(CheckerContext *c, AstNodeWhenStmt *w
 	}
 }
 
+void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<AstNode *> *attributes) {
+	switch (e->kind) {
+	case Entity_ProcGroup:
+	case Entity_Procedure:
+	case Entity_TypeName:
+		// Okay
+		break;
+	default:
+		return;
+	}
+	if (!(ctx->scope->is_file && ctx->scope->file->pkg->kind == Package_Runtime)) {
+		return;
+	}
+
+	for_array(j, *attributes) {
+		AstNode *attr = (*attributes)[j];
+		if (attr->kind != AstNode_Attribute) continue;
+		for (isize k = 0; k < attr->Attribute.elems.count; k++) {
+			AstNode *elem = attr->Attribute.elems[k];
+			String name = {};
+			AstNode *value = nullptr;
+
+			switch (elem->kind) {
+			case_ast_node(i, Ident, elem);
+				name = i->token.string;
+			case_end;
+			case_ast_node(fv, FieldValue, elem);
+				GB_ASSERT(fv->field->kind == AstNode_Ident);
+				name = fv->field->Ident.token.string;
+				value = fv->value;
+			case_end;
+			default:
+				continue;
+			}
+
+			if (name == "builtin") {
+				add_entity(ctx->checker, universal_scope, nullptr, e);
+				GB_ASSERT(scope_lookup_entity(universal_scope, e->token.string) != nullptr);
+				if (value != nullptr) {
+					error(value, "'builtin' cannot have a field value");
+				}
+				// Remove the builtin tag
+				attr->Attribute.elems[k] = attr->Attribute.elems[attr->Attribute.elems.count-1];
+				attr->Attribute.elems.count -= 1;
+				k--;
+			}
+		}
+	}
+
+	for (isize i = 0; i < attributes->count; i++) {
+		AstNode *attr = (*attributes)[i];
+		if (attr->kind != AstNode_Attribute) continue;
+		if (attr->Attribute.elems.count == 0) {
+			(*attributes)[i] = (*attributes)[attributes->count-1];
+			attributes->count--;
+			i--;
+		}
+	}
+}
+
 void check_collect_value_decl(CheckerContext *c, AstNode *decl) {
 	ast_node(vd, ValueDecl, decl);
 
@@ -2093,6 +2137,7 @@ void check_collect_value_decl(CheckerContext *c, AstNode *decl) {
 				}
 			}
 
+			check_builtin_attributes(c, e, &d->attributes);
 
 			add_entity_and_decl_info(c, name, e, d);
 		}
@@ -2445,6 +2490,11 @@ Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start, AstPackage
 					continue;
 				}
 				GB_ASSERT(pkg != nullptr && pkg->scope != nullptr);
+
+				if (pkg->kind == Package_Runtime) {
+					// NOTE(bill): Allow cyclic imports within the runtime package for the time being
+					continue;
+				}
 
 				ImportPathItem item = {pkg, decl};
 				if (pkg == end) {
@@ -2821,6 +2871,7 @@ void check_import_entities(Checker *c) {
 				return item.pkg->name;
 			};
 
+		#if 1
 			if (path.count == 1) {
 				// TODO(bill): Should this be allowed or disabled?
 			#if 0
@@ -2839,12 +2890,12 @@ void check_import_entities(Checker *c) {
 				}
 				error(item.decl, "'%.*s'", LIT(pkg_name));
 			}
+		#endif
 		}
 
 		for_array(i, n->pred.entries) {
 			ImportGraphNode *p = n->pred.entries[i].ptr;
 			p->dep_count = gb_max(p->dep_count-1, 0);
-			// p->dep_count -= 1;
 			priority_queue_fix(&pq, p->index);
 		}
 

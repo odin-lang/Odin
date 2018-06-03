@@ -8,13 +8,13 @@ import "core:hash"
 import "core:math"
 import "core:math/rand"
 import "core:os"
-import "core:raw"
 import "core:sort"
 import "core:strings"
 import "core:types"
 import "core:unicode/utf16"
 import "core:unicode/utf8"
 import "core:c"
+import "core:runtime"
 
 when os.OS == "windows" {
 	import "core:atomics"
@@ -352,7 +352,7 @@ parametric_polymorphism :: proc() {
 		TABLE_SIZE_MIN :: 32;
 		Table :: struct(Key, Value: type) {
 			count:     int,
-			allocator: Allocator,
+			allocator: mem.Allocator,
 			slots:     []Table_Slot(Key, Value),
 		}
 
@@ -495,12 +495,12 @@ threading_example :: proc() {
 		fmt.println("# threading_example");
 
 		unordered_remove :: proc(array: ^[dynamic]$T, index: int, loc := #caller_location) {
-			__bounds_check_error_loc(loc, index, len(array));
+			runtime.bounds_check_error_loc(loc, index, len(array));
 			array[index] = array[len(array)-1];
 			pop(array);
 		}
 		ordered_remove :: proc(array: ^[dynamic]$T, index: int, loc := #caller_location) {
-			__bounds_check_error_loc(loc, index, len(array));
+			runtime.bounds_check_error_loc(loc, index, len(array));
 			copy(array[index..], array[index+1..]);
 			pop(array);
 		}

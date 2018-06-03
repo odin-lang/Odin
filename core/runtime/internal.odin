@@ -1,6 +1,5 @@
 package runtime
 
-import "core:raw"
 import "core:mem"
 import "core:os"
 import "core:unicode/utf8"
@@ -239,7 +238,7 @@ __cstring_to_string :: proc "contextless" (s: cstring) -> string {
 	if s == nil do return "";
 	ptr := (^byte)(s);
 	n := __cstring_len(s);
-	return transmute(string)raw.String{ptr, n};
+	return transmute(string)mem.Raw_String{ptr, n};
 }
 
 
@@ -250,7 +249,7 @@ __complex128_eq :: inline proc "contextless" (a, b: complex128) -> bool { return
 __complex128_ne :: inline proc "contextless" (a, b: complex128) -> bool { return real(a) != real(b) || imag(a) != imag(b); }
 
 
-__bounds_check_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
+bounds_check_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
 	if 0 <= index && index < count do return;
 
 	fd := os.stderr;
@@ -263,7 +262,7 @@ __bounds_check_error :: proc "contextless" (file: string, line, column: int, ind
 	__debug_trap();
 }
 
-__slice_expr_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
+slice_expr_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
 	if 0 <= lo && lo <= hi && hi <= len do return;
 
 
@@ -279,7 +278,7 @@ __slice_expr_error :: proc "contextless" (file: string, line, column: int, lo, h
 	__debug_trap();
 }
 
-__dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
+dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
 	if 0 <= low && low <= high && high <= max do return;
 
 	fd := os.stderr;
@@ -294,7 +293,7 @@ __dynamic_array_expr_error :: proc "contextless" (file: string, line, column: in
 	__debug_trap();
 }
 
-__type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: typeid) {
+type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: typeid) {
 	if ok do return;
 
 	fd := os.stderr;
@@ -311,11 +310,12 @@ __string_decode_rune :: inline proc "contextless" (s: string) -> (rune, int) {
 	return utf8.decode_rune_from_string(s);
 }
 
-__bounds_check_error_loc :: inline proc "contextless" (using loc := #caller_location, index, count: int) {
-	__bounds_check_error(file_path, int(line), int(column), index, count);
+bounds_check_error_loc :: inline proc "contextless" (using loc := #caller_location, index, count: int) {
+	bounds_check_error(file_path, int(line), int(column), index, count);
 }
-__slice_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, lo, hi: int, len: int) {
-	__slice_expr_error(file_path, int(line), int(column), lo, hi, len);
+
+slice_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, lo, hi: int, len: int) {
+	slice_expr_error(file_path, int(line), int(column), lo, hi, len);
 }
 
 

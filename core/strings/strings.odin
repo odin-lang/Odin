@@ -1,6 +1,6 @@
 package strings
 
-import "core:raw"
+import "core:mem"
 
 new_string :: proc(s: string) -> string {
 	c := make([]byte, len(s)+1);
@@ -22,7 +22,7 @@ to_odin_string :: proc(str: cstring) -> string {
 }
 
 string_from_ptr :: proc(ptr: ^byte, len: int) -> string {
-	return transmute(string)raw.String{ptr, len};
+	return transmute(string)mem.Raw_String{ptr, len};
 }
 
 contains_rune :: proc(s: string, r: rune) -> int {

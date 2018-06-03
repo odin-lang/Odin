@@ -1,6 +1,8 @@
 package types
 
-are_types_identical :: proc(a, b: ^Type_Info) -> bool {
+import "core:runtime"
+
+are_types_identical :: proc(a, b: ^runtime.Type_Info) -> bool {
 	if a == b do return true;
 
 	if (a == nil && b != nil) ||
@@ -15,47 +17,47 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 	}
 
 	switch x in a.variant {
-	case Type_Info_Named:
-		y, ok := b.variant.(Type_Info_Named);
+	case runtime.Type_Info_Named:
+		y, ok := b.variant.(runtime.Type_Info_Named);
 		if !ok do return false;
 		return x.base == y.base;
 
-	case Type_Info_Integer:
-		y, ok := b.variant.(Type_Info_Integer);
+	case runtime.Type_Info_Integer:
+		y, ok := b.variant.(runtime.Type_Info_Integer);
 		if !ok do return false;
 		return x.signed == y.signed;
 
-	case Type_Info_Rune:
-		_, ok := b.variant.(Type_Info_Rune);
+	case runtime.Type_Info_Rune:
+		_, ok := b.variant.(runtime.Type_Info_Rune);
 		return ok;
 
-	case Type_Info_Float:
-		_, ok := b.variant.(Type_Info_Float);
+	case runtime.Type_Info_Float:
+		_, ok := b.variant.(runtime.Type_Info_Float);
 		return ok;
 
-	case Type_Info_Complex:
-		_, ok := b.variant.(Type_Info_Complex);
+	case runtime.Type_Info_Complex:
+		_, ok := b.variant.(runtime.Type_Info_Complex);
 		return ok;
 
-	case Type_Info_String:
-		_, ok := b.variant.(Type_Info_String);
+	case runtime.Type_Info_String:
+		_, ok := b.variant.(runtime.Type_Info_String);
 		return ok;
 
-	case Type_Info_Boolean:
-		_, ok := b.variant.(Type_Info_Boolean);
+	case runtime.Type_Info_Boolean:
+		_, ok := b.variant.(runtime.Type_Info_Boolean);
 		return ok;
 
-	case Type_Info_Any:
-		_, ok := b.variant.(Type_Info_Any);
+	case runtime.Type_Info_Any:
+		_, ok := b.variant.(runtime.Type_Info_Any);
 		return ok;
 
-	case Type_Info_Pointer:
-		y, ok := b.variant.(Type_Info_Pointer);
+	case runtime.Type_Info_Pointer:
+		y, ok := b.variant.(runtime.Type_Info_Pointer);
 		if !ok do return false;
 		return are_types_identical(x.elem, y.elem);
 
-	case Type_Info_Procedure:
-		y, ok := b.variant.(Type_Info_Procedure);
+	case runtime.Type_Info_Procedure:
+		y, ok := b.variant.(runtime.Type_Info_Procedure);
 		if !ok do return false;
 		switch {
 		case x.variadic   != y.variadic,
@@ -65,24 +67,24 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 
 		return are_types_identical(x.params, y.params) && are_types_identical(x.results, y.results);
 
-	case Type_Info_Array:
-		y, ok := b.variant.(Type_Info_Array);
+	case runtime.Type_Info_Array:
+		y, ok := b.variant.(runtime.Type_Info_Array);
 		if !ok do return false;
 		if x.count != y.count do return false;
 		return are_types_identical(x.elem, y.elem);
 
-	case Type_Info_Dynamic_Array:
-		y, ok := b.variant.(Type_Info_Dynamic_Array);
+	case runtime.Type_Info_Dynamic_Array:
+		y, ok := b.variant.(runtime.Type_Info_Dynamic_Array);
 		if !ok do return false;
 		return are_types_identical(x.elem, y.elem);
 
-	case Type_Info_Slice:
-		y, ok := b.variant.(Type_Info_Slice);
+	case runtime.Type_Info_Slice:
+		y, ok := b.variant.(runtime.Type_Info_Slice);
 		if !ok do return false;
 		return are_types_identical(x.elem, y.elem);
 
-	case Type_Info_Tuple:
-		y, ok := b.variant.(Type_Info_Tuple);
+	case runtime.Type_Info_Tuple:
+		y, ok := b.variant.(runtime.Type_Info_Tuple);
 		if !ok do return false;
 		if len(x.types) != len(y.types) do return false;
 		for _, i in x.types {
@@ -93,8 +95,8 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		}
 		return true;
 
-	case Type_Info_Struct:
-		y, ok := b.variant.(Type_Info_Struct);
+	case runtime.Type_Info_Struct:
+		y, ok := b.variant.(runtime.Type_Info_Struct);
 		if !ok do return false;
 	   	switch {
 		case len(x.types)   != len(y.types),
@@ -112,8 +114,8 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		}
 		return true;
 
-	case Type_Info_Union:
-		y, ok := b.variant.(Type_Info_Union);
+	case runtime.Type_Info_Union:
+		y, ok := b.variant.(runtime.Type_Info_Union);
 		if !ok do return false;
 		if len(x.variants) != len(y.variants) do return false;
 
@@ -123,17 +125,17 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		}
 		return true;
 
-	case Type_Info_Enum:
+	case runtime.Type_Info_Enum:
 		// NOTE(bill): Should be handled above
 		return false;
 
-	case Type_Info_Map:
-		y, ok := b.variant.(Type_Info_Map);
+	case runtime.Type_Info_Map:
+		y, ok := b.variant.(runtime.Type_Info_Map);
 		if !ok do return false;
 		return are_types_identical(x.key, y.key) && are_types_identical(x.value, y.value);
 
-	case Type_Info_Bit_Field:
-		y, ok := b.variant.(Type_Info_Bit_Field);
+	case runtime.Type_Info_Bit_Field:
+		y, ok := b.variant.(runtime.Type_Info_Bit_Field);
 		if !ok do return false;
 		if len(x.names) != len(y.names) do return false;
 
@@ -154,101 +156,101 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 }
 
 
-is_signed :: proc(info: ^Type_Info) -> bool {
+is_signed :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	switch i in type_info_base(info).variant {
-	case Type_Info_Integer: return i.signed;
-	case Type_Info_Float:   return true;
+	switch i in runtime.type_info_base(info).variant {
+	case runtime.Type_Info_Integer: return i.signed;
+	case runtime.Type_Info_Float:   return true;
 	}
 	return false;
 }
-is_integer :: proc(info: ^Type_Info) -> bool {
+is_integer :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Integer);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Integer);
 	return ok;
 }
-is_rune :: proc(info: ^Type_Info) -> bool {
+is_rune :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Rune);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Rune);
 	return ok;
 }
-is_float :: proc(info: ^Type_Info) -> bool {
+is_float :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Float);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Float);
 	return ok;
 }
-is_complex :: proc(info: ^Type_Info) -> bool {
+is_complex :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Complex);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Complex);
 	return ok;
 }
-is_any :: proc(info: ^Type_Info) -> bool {
+is_any :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Any);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Any);
 	return ok;
 }
-is_string :: proc(info: ^Type_Info) -> bool {
+is_string :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_String);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_String);
 	return ok;
 }
-is_boolean :: proc(info: ^Type_Info) -> bool {
+is_boolean :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Boolean);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Boolean);
 	return ok;
 }
-is_pointer :: proc(info: ^Type_Info) -> bool {
+is_pointer :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Pointer);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Pointer);
 	return ok;
 }
-is_procedure :: proc(info: ^Type_Info) -> bool {
+is_procedure :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Procedure);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Procedure);
 	return ok;
 }
-is_array :: proc(info: ^Type_Info) -> bool {
+is_array :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Array);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Array);
 	return ok;
 }
-is_dynamic_array :: proc(info: ^Type_Info) -> bool {
+is_dynamic_array :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Dynamic_Array);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Dynamic_Array);
 	return ok;
 }
-is_dynamic_map :: proc(info: ^Type_Info) -> bool {
+is_dynamic_map :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Map);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Map);
 	return ok;
 }
-is_slice :: proc(info: ^Type_Info) -> bool {
+is_slice :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Slice);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Slice);
 	return ok;
 }
-is_tuple :: proc(info: ^Type_Info) -> bool {
+is_tuple :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Tuple);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Tuple);
 	return ok;
 }
-is_struct :: proc(info: ^Type_Info) -> bool {
+is_struct :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	s, ok := type_info_base(info).variant.(Type_Info_Struct);
+	s, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Struct);
 	return ok && !s.is_raw_union;
 }
-is_raw_union :: proc(info: ^Type_Info) -> bool {
+is_raw_union :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	s, ok := type_info_base(info).variant.(Type_Info_Struct);
+	s, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Struct);
 	return ok && s.is_raw_union;
 }
-is_union :: proc(info: ^Type_Info) -> bool {
+is_union :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Union);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Union);
 	return ok;
 }
-is_enum :: proc(info: ^Type_Info) -> bool {
+is_enum :: proc(info: ^runtime.Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := type_info_base(info).variant.(Type_Info_Enum);
+	_, ok := runtime.type_info_base(info).variant.(runtime.Type_Info_Enum);
 	return ok;
 }

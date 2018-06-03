@@ -40,13 +40,13 @@ GB_ALLOCATOR_PROC(heap_allocator_proc);
 gbAllocator heap_allocator(void) {
 	gbAllocator a;
 	a.proc = heap_allocator_proc;
-	a.data = NULL;
+	a.data = nullptr;
 	return a;
 }
 
 
 GB_ALLOCATOR_PROC(heap_allocator_proc) {
-	void *ptr = NULL;
+	void *ptr = nullptr;
 	gb_unused(allocator_data);
 	gb_unused(old_size);
 
@@ -348,7 +348,7 @@ void *pool_alloc(Pool *pool, isize size, isize align) {
 }
 
 GB_ALLOCATOR_PROC(pool_allocator_proc) {
-	void *ptr = NULL;
+	void *ptr = nullptr;
 	Pool *pool = cast(Pool *)allocator_data;
 
 

@@ -1,5 +1,7 @@
 package sort
 
+import "core:mem"
+
 bubble_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	assert(f != nil);
 	count := len(array);
@@ -211,5 +213,5 @@ compare_f64s :: proc(a, b: f64) -> int {
 	return 0;
 }
 compare_strings :: proc(a, b: string) -> int {
-	return __string_cmp(a, b);
+	return mem.compare_byte_ptrs(&a[0], &b[0], min(len(a), len(b)));
 }
