@@ -33,6 +33,11 @@ String target_arch_names[TargetArch_COUNT] = {
 };
 
 
+String const ODIN_VERSION = str_lit("0.9.0");
+String cross_compile_target = str_lit("");
+String cross_compile_lib_dir = str_lit("");
+
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -417,9 +422,6 @@ String get_fullpath_core(gbAllocator a, String path) {
 }
 
 
-String const ODIN_VERSION = str_lit("0.9.0");
-String cross_compile_target = str_lit("");
-String cross_compile_lib_dir = str_lit("");
 
 void init_build_context(void) {
 	BuildContext *bc = &build_context;
@@ -491,6 +493,7 @@ void init_build_context(void) {
 	#endif
 
 	gbString llc_flags = gb_string_make_reserve(heap_allocator(), 64);
+	gbString link_flags = gb_string_make_reserve(heap_allocator(), 64);
 	if (bc->ODIN_DEBUG) {
 		llc_flags = gb_string_appendc(llc_flags, "-debug-compile ");
 	}
@@ -518,20 +521,13 @@ void init_build_context(void) {
 
 	bc->llc_flags = make_string_c(llc_flags);
 
-
-	isize opt_max = 1023;
-	char *opt_flags_string = gb_alloc_array(heap_allocator(), char, opt_max+1);
-	isize opt_len = 0;
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
+
+	gbString opt_flags = gb_string_make_reserve(heap_allocator(), 16);
 	if (bc->optimization_level != 0) {
-		opt_len = gb_snprintf(opt_flags_string, opt_max, "-O%d", bc->optimization_level);
-	} else {
-		opt_len = gb_snprintf(opt_flags_string, opt_max, "");
+		opt_flags = gb_string_append_fmt(opt_flags, "-O%d", bc->optimization_level);
 	}
-	if (opt_len > 0) {
-		opt_len--;
-	}
-	bc->opt_flags = make_string(cast(u8 *)opt_flags_string, opt_len);
+	bc->opt_flags = make_string_c(opt_flags);
 
 
 	#undef LINK_FLAG_X64
