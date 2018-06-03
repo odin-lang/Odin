@@ -459,7 +459,7 @@ void init_entity_foreign_library(CheckerContext *ctx, Entity *e) {
 		Entity *found = scope_lookup_entity(ctx->scope, name);
 		if (found == nullptr) {
 			if (is_blank_ident(name)) {
-				error(ident, "'_' cannot be used as a value type");
+				// NOTE(bill): link against nothing
 			} else {
 				error(ident, "Undeclared name: %.*s", LIT(name));
 			}

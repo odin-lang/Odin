@@ -1318,7 +1318,7 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 	case AstNode_BitFieldType:
 		return true;
 	case AstNode_ProcLit:
-		return s->ProcLit.body != nullptr;
+		return true;
 
 	case AstNode_PackageDecl:
 	case AstNode_ImportDecl:
@@ -2410,6 +2410,8 @@ AstNode *parse_foreign_block(AstFile *f, Token token) {
 	AstNode *foreign_library = nullptr;
 	if (f->curr_token.kind == Token_export) {
 		foreign_library = ast_implicit(f, expect_token(f, Token_export));
+	} else if (f->curr_token.kind == Token_OpenBrace) {
+		foreign_library = ast_ident(f, blank_token);
 	} else {
 		foreign_library = parse_ident(f);
 	}
@@ -2421,18 +2423,15 @@ AstNode *parse_foreign_block(AstFile *f, Token token) {
 	defer (f->in_foreign_block = prev_in_foreign_block);
 	f->in_foreign_block = true;
 
-	if (f->curr_token.kind != Token_OpenBrace) {
+
+	open = expect_token(f, Token_OpenBrace);
+
+	while (f->curr_token.kind != Token_CloseBrace &&
+	       f->curr_token.kind != Token_EOF) {
 		parse_foreign_block_decl(f, &decls);
-	} else {
-		open = expect_token(f, Token_OpenBrace);
-
-		while (f->curr_token.kind != Token_CloseBrace &&
-		       f->curr_token.kind != Token_EOF) {
-			parse_foreign_block_decl(f, &decls);
-		}
-
-		close = expect_token(f, Token_CloseBrace);
 	}
+
+	close = expect_token(f, Token_CloseBrace);
 
 	AstNode *decl = ast_foreign_block_decl(f, token, foreign_library, open, close, decls, docs);
 	expect_semicolon(f, decl);
@@ -3512,6 +3511,7 @@ AstNode *parse_foreign_decl(AstFile *f) {
 	switch (f->curr_token.kind) {
 	case Token_export:
 	case Token_Ident:
+	case Token_OpenBrace:
 		return parse_foreign_block(f, token);
 
 	case Token_import: {

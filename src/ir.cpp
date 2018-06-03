@@ -1327,7 +1327,9 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 }
 
 void ir_add_foreign_library_path(irModule *m, Entity *e) {
-	GB_ASSERT(e != nullptr);
+	if (e == nullptr) {
+		return;
+	}
 	GB_ASSERT(e->kind == Entity_LibraryName);
 	GB_ASSERT(e->LibraryName.used);
 
