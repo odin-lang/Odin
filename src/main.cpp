@@ -683,7 +683,6 @@ i32 exec_llvm_llc(String output_base) {
 		"\"%.*sbin/llc\" \"%.*s.bc\" -filetype=obj -O%d "
 		"-o \"%.*s.obj\" "
 		"%.*s "
-		// "-debug-pass=Arguments "
 		"",
 		LIT(build_context.ODIN_ROOT),
 		LIT(output_base),
@@ -696,7 +695,6 @@ i32 exec_llvm_llc(String output_base) {
 	return system_exec_command_line_app("llc", false,
 		"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
 		"%.*s "
-		// "-debug-pass=Arguments "
 		"%s"
 		"",
 		LIT(output_base),
