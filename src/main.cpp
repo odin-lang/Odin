@@ -1062,6 +1062,21 @@ int main(int arg_count, char **arg_ptr) {
 			return exit_code;
 		}
 
+    #if defined(GB_SYSTEM_OSX)
+        if (BuildFlag_Debug) {
+            // NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
+            // to the symbols in the object file
+            exit_code = system_exec_command_line_app("dsymutil", true,
+                "%.*s%s", LIT(output_base), output_ext
+                );
+
+            if (exit_code != 0) {
+                return exit_code;
+            }
+        }
+    #endif
+
+
 		if (build_context.show_timings) {
 			show_timings(&checker, &timings);
 		}
