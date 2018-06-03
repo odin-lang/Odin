@@ -59,7 +59,7 @@ free_slice :: proc(array: $T/[]$E, loc := #caller_location) {
 	free_ptr(raw_data(array), loc);
 }
 free_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
-	raw := transmute(raw.Map)m;
+	raw := transmute(Raw_Map)m;
 	free_dynamic_array(raw.hashes, loc);
 	free_ptr(raw.entries.data, loc);
 }
