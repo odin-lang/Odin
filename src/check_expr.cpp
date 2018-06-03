@@ -3380,11 +3380,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, AstNode *call,
 	case BuiltinProc_type_info_of: {
 		// proc type_info_of(Type) -> ^Type_Info
 		if (c->scope->is_global) {
-			compiler_error("'type_info_of' Cannot be declared within a #shared_global_scope due to how the internals of the compiler works");
+			compiler_error("'type_info_of' Cannot be declared within the runtime package due to how the internals of the compiler works");
 		}
 
 		// NOTE(bill): The type information may not be setup yet
-		init_preload(c->checker);
+		init_core_type_info(c->checker);
 		AstNode *expr = ce->args[0];
 		Operand o = {};
 		check_expr_or_type(c, &o, expr);
@@ -3415,11 +3415,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, AstNode *call,
 	case BuiltinProc_typeid_of: {
 		// proc typeid_of(Type) -> typeid
 		if (c->scope->is_global) {
-			compiler_error("'typeid_of' Cannot be declared within a #shared_global_scope due to how the internals of the compiler works");
+			compiler_error("'typeid_of' Cannot be declared within the runtime package due to how the internals of the compiler works");
 		}
 
 		// NOTE(bill): The type information may not be setup yet
-		init_preload(c->checker);
+		init_core_type_info(c->checker);
 		AstNode *expr = ce->args[0];
 		Operand o = {};
 		check_expr_or_type(c, &o, expr);
@@ -5224,7 +5224,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, AstNode *node, 
 				return kind;
 			}
 
-			init_preload(c->checker);
+			init_core_context(c->checker);
 			o->mode = Addressing_Immutable;
 			o->type = t_context;
 			break;
@@ -5304,7 +5304,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, AstNode *node, 
 				o->value = exact_value_string(c->proc_name);
 			}
 		} else if (bd->name == "caller_location") {
-			init_preload(c->checker);
+			init_core_source_code_location(c->checker);
 			error(node, "#caller_location may only be used as a default argument parameter");
 			o->type = t_source_code_location;
 			o->mode = Addressing_Value;

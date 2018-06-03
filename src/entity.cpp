@@ -148,8 +148,6 @@ struct Entity {
 	};
 };
 
-gb_global Entity *e_context = nullptr;
-
 bool is_entity_kind_exported(EntityKind kind) {
 	switch (kind) {
 	case Entity_Builtin:

@@ -844,7 +844,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, AstNode *_params, bool
 		if (type_expr == nullptr) {
 			if (default_value->kind == AstNode_BasicDirective &&
 			    default_value->BasicDirective.name == "caller_location") {
-				init_preload(ctx->checker);
+				init_core_source_code_location(ctx->checker);
 				default_is_location = true;
 				type = t_source_code_location;
 			} else {
@@ -942,7 +942,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, AstNode *_params, bool
 					Operand o = {};
 					if (default_value->kind == AstNode_BasicDirective &&
 					    default_value->BasicDirective.name == "caller_location") {
-						init_preload(ctx->checker);
+						init_core_source_code_location(ctx->checker);
 						default_is_location = true;
 						o.type = t_source_code_location;
 						o.mode = Addressing_Value;
@@ -1715,7 +1715,7 @@ void check_map_type(CheckerContext *ctx, Type *type, AstNode *node) {
 	}
 
 
-	init_preload(ctx->checker);
+	init_core_map_type(ctx->checker);
 	init_map_internal_types(type);
 
 	// error(node, "'map' types are not yet implemented");
