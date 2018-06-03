@@ -4125,7 +4125,6 @@ void check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 			o.mode = Addressing_Invalid;
 		}
 
-
 		if (o.type == nullptr || o.type->kind != Type_Tuple) {
 			if (allow_ok && lhs_count == 2 && rhs.count == 1 &&
 			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk)) {
@@ -5913,7 +5912,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, AstNode *node, 
 			return kind;
 		}
 
-		add_package_dependency(c, "runtime", "__type_assertion_check");
+		add_package_dependency(c, "runtime", "type_assertion_check");
 	case_end;
 
 	case_ast_node(tc, TypeCast, node);
@@ -6218,8 +6217,8 @@ ExprKind check_expr_base(CheckerContext *c, Operand *o, AstNode *node, Type *typ
 		type = nullptr;
 		break;
 	case Addressing_Constant:
-		type = o->type;
 		value = o->value;
+		type = o->type;
 		break;
 	default:
 		type = o->type;

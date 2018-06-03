@@ -1,5 +1,6 @@
 package thread
 
+import "core:runtime"
 import "core:sys/win32"
 
 Thread_Proc :: #type proc(^Thread) -> int;
@@ -15,7 +16,7 @@ Thread :: struct {
 	data:             rawptr,
 	user_index:       int,
 
-	init_context:     Context,
+	init_context:     runtime.Context,
 	use_init_context: bool,
 }
 

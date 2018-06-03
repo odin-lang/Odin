@@ -1,6 +1,6 @@
 package os
 
-import "core:raw"
+import "core:mem"
 
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, cast([]byte)str);
@@ -56,11 +56,44 @@ write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (succ
 }
 
 write_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
-	s := transmute([]byte)raw.Slice{data, len};
+	s := transmute([]byte)mem.Raw_Slice{data, len};
 	return write(fd, s);
 }
 
 read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
-	s := transmute([]byte)raw.Slice{data, len};
+	s := transmute([]byte)mem.Raw_Slice{data, len};
 	return read(fd, s);
+}
+
+
+default_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
+                               size, alignment: int,
+                               old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+	using mem.Allocator_Mode;
+
+	switch mode {
+	case Alloc:
+		return heap_alloc(size);
+
+	case Free:
+		heap_free(old_memory);
+		return nil;
+
+	case Free_All:
+		// NOTE(bill): Does nothing
+
+	case Resize:
+		ptr := heap_resize(old_memory, size);
+		assert(ptr != nil);
+		return ptr;
+	}
+
+	return nil;
+}
+
+default_allocator :: proc() -> mem.Allocator {
+	return mem.Allocator{
+		procedure = default_allocator_proc,
+		data = nil,
+	};
 }

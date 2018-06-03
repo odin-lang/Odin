@@ -7,6 +7,7 @@ struct DeclInfo;
 struct AstFile;
 struct Checker;
 struct CheckerInfo;
+struct CheckerContext;
 
 enum AddressingMode {
 	Addressing_Invalid,       // invalid addressing mode
@@ -177,6 +178,26 @@ struct BlockLabel {
 	AstNode *label; //  AstNode_Label;
 };
 
+struct AttributeContext {
+	String  link_name;
+	String  link_prefix;
+	isize   init_expr_list_count;
+	String  thread_local_model;
+	String  deprecated_message;
+};
+
+AttributeContext make_attribute_context(String link_prefix) {
+	AttributeContext ac = {};
+	ac.link_prefix = link_prefix;
+	return ac;
+}
+
+#define DECL_ATTRIBUTE_PROC(_name) bool _name(CheckerContext *c, AstNode *elem, String name, ExactValue value, AttributeContext *ac)
+typedef DECL_ATTRIBUTE_PROC(DeclAttributeProc);
+
+void check_decl_attributes(CheckerContext *c, Array<AstNode *> const &attributes, DeclAttributeProc *proc, AttributeContext *ac);
+
+
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
 struct DeclInfo {
 	DeclInfo *        parent; // NOTE(bill): only used for procedure literals at the moment
@@ -218,7 +239,7 @@ struct Scope {
 	Scope *          last_child;
 	Map<Entity *>    elements; // Key: String
 	PtrSet<Entity *> implicit;
-	Scope *          shared;
+	// Scope *          shared;
 
 	Array<AstNode *> delayed_directives;
 	Array<AstNode *> delayed_imports;
@@ -391,25 +412,6 @@ bool check_arity_match(CheckerContext *c, AstNodeValueDecl *vd, bool is_global =
 void check_collect_entities(CheckerContext *c, Array<AstNode *> const &nodes);
 void check_collect_entities_from_when_stmt(CheckerContext *c, AstNodeWhenStmt *ws);
 void check_delayed_file_import_entity(CheckerContext *c, AstNode *decl);
-
-struct AttributeContext {
-	String  link_name;
-	String  link_prefix;
-	isize   init_expr_list_count;
-	String  thread_local_model;
-	String  deprecated_message;
-};
-
-AttributeContext make_attribute_context(String link_prefix) {
-	AttributeContext ac = {};
-	ac.link_prefix = link_prefix;
-	return ac;
-}
-
-#define DECL_ATTRIBUTE_PROC(_name) bool _name(CheckerContext *c, AstNode *elem, String name, ExactValue value, AttributeContext *ac)
-typedef DECL_ATTRIBUTE_PROC(DeclAttributeProc);
-
-void check_decl_attributes(CheckerContext *c, Array<AstNode *> const &attributes, DeclAttributeProc *proc, AttributeContext *ac);
 
 CheckerTypePath *new_checker_type_path();
 void destroy_checker_type_path(CheckerTypePath *tp);

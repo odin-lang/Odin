@@ -3680,7 +3680,8 @@ AstNode *parse_stmt(AstFile *f) {
 			elems = array_make<AstNode *>(heap_allocator());
 			while (f->curr_token.kind != Token_CloseParen &&
 			       f->curr_token.kind != Token_EOF) {
-				AstNode *elem = parse_ident(f);
+				AstNode *elem = nullptr;
+				elem = parse_ident(f);
 				if (f->curr_token.kind == Token_Eq) {
 					Token eq = expect_token(f, Token_Eq);
 					AstNode *value = parse_value(f);
