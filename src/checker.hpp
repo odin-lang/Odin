@@ -336,9 +336,8 @@ struct Checker {
 	Array<ProcedureInfo> procs_to_check;
 	PtrSet<AstPackage *> checked_packages;
 
-	gbAllocator          allocator;
-	CheckerContext       init_ctx;
-	bool                 done_preload;
+	gbAllocator    allocator;
+	CheckerContext init_ctx;
 };
 
 

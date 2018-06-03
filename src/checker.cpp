@@ -814,7 +814,7 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	}
 
 	if (error_on_failure && entry_index < 0) {
-		compiler_error("TypeInfo for '%s' could not be found", type_to_string(type));
+		compiler_error("Type_Info for '%s' could not be found", type_to_string(type));
 	}
 	return entry_index;
 }
@@ -1555,116 +1555,111 @@ Array<Entity *> proc_group_entities(CheckerContext *c, Operand o) {
 
 
 
-
-void init_preload(Checker *c) {
-	if (t_type_info == nullptr) {
-		Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
-
-		t_type_info = type_info_entity->type;
-		t_type_info_ptr = alloc_type_pointer(t_type_info);
-		GB_ASSERT(is_type_struct(type_info_entity->type));
-		TypeStruct *tis = &base_type(type_info_entity->type)->Struct;
-
-		Entity *type_info_enum_value = find_core_entity(c, str_lit("Type_Info_Enum_Value"));
-
-		t_type_info_enum_value = type_info_enum_value->type;
-		t_type_info_enum_value_ptr = alloc_type_pointer(t_type_info_enum_value);
-
-		GB_ASSERT(tis->fields.count == 4);
-
-		Entity *type_info_variant = tis->fields[3];
-		Type *tiv_type = type_info_variant->type;
-		GB_ASSERT(is_type_union(tiv_type));
-
-		t_type_info_named         = find_core_type(c, str_lit("Type_Info_Named"));
-		t_type_info_integer       = find_core_type(c, str_lit("Type_Info_Integer"));
-		t_type_info_rune          = find_core_type(c, str_lit("Type_Info_Rune"));
-		t_type_info_float         = find_core_type(c, str_lit("Type_Info_Float"));
-		t_type_info_complex       = find_core_type(c, str_lit("Type_Info_Complex"));
-		t_type_info_string        = find_core_type(c, str_lit("Type_Info_String"));
-		t_type_info_boolean       = find_core_type(c, str_lit("Type_Info_Boolean"));
-		t_type_info_any           = find_core_type(c, str_lit("Type_Info_Any"));
-		t_type_info_typeid        = find_core_type(c, str_lit("Type_Info_Type_Id"));
-		t_type_info_pointer       = find_core_type(c, str_lit("Type_Info_Pointer"));
-		t_type_info_procedure     = find_core_type(c, str_lit("Type_Info_Procedure"));
-		t_type_info_array         = find_core_type(c, str_lit("Type_Info_Array"));
-		t_type_info_dynamic_array = find_core_type(c, str_lit("Type_Info_Dynamic_Array"));
-		t_type_info_slice         = find_core_type(c, str_lit("Type_Info_Slice"));
-		t_type_info_tuple         = find_core_type(c, str_lit("Type_Info_Tuple"));
-		t_type_info_struct        = find_core_type(c, str_lit("Type_Info_Struct"));
-		t_type_info_union         = find_core_type(c, str_lit("Type_Info_Union"));
-		t_type_info_enum          = find_core_type(c, str_lit("Type_Info_Enum"));
-		t_type_info_map           = find_core_type(c, str_lit("Type_Info_Map"));
-		t_type_info_bit_field     = find_core_type(c, str_lit("Type_Info_Bit_Field"));
-
-		t_type_info_named_ptr         = alloc_type_pointer(t_type_info_named);
-		t_type_info_integer_ptr       = alloc_type_pointer(t_type_info_integer);
-		t_type_info_rune_ptr          = alloc_type_pointer(t_type_info_rune);
-		t_type_info_float_ptr         = alloc_type_pointer(t_type_info_float);
-		t_type_info_complex_ptr       = alloc_type_pointer(t_type_info_complex);
-		t_type_info_string_ptr        = alloc_type_pointer(t_type_info_string);
-		t_type_info_boolean_ptr       = alloc_type_pointer(t_type_info_boolean);
-		t_type_info_any_ptr           = alloc_type_pointer(t_type_info_any);
-		t_type_info_typeid_ptr        = alloc_type_pointer(t_type_info_typeid);
-		t_type_info_pointer_ptr       = alloc_type_pointer(t_type_info_pointer);
-		t_type_info_procedure_ptr     = alloc_type_pointer(t_type_info_procedure);
-		t_type_info_array_ptr         = alloc_type_pointer(t_type_info_array);
-		t_type_info_dynamic_array_ptr = alloc_type_pointer(t_type_info_dynamic_array);
-		t_type_info_slice_ptr         = alloc_type_pointer(t_type_info_slice);
-		t_type_info_tuple_ptr         = alloc_type_pointer(t_type_info_tuple);
-		t_type_info_struct_ptr        = alloc_type_pointer(t_type_info_struct);
-		t_type_info_union_ptr         = alloc_type_pointer(t_type_info_union);
-		t_type_info_enum_ptr          = alloc_type_pointer(t_type_info_enum);
-		t_type_info_map_ptr           = alloc_type_pointer(t_type_info_map);
-		t_type_info_bit_field_ptr     = alloc_type_pointer(t_type_info_bit_field);
+void init_core_type_info(Checker *c) {
+	if (t_type_info != nullptr) {
+		return;
 	}
+	Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
 
-	if (t_allocator == nullptr) {
-		AstPackage *mem = get_core_package(&c->info, str_lit("mem"));
-		Entity *e = scope_lookup_entity(mem->scope, str_lit("Allocator"));
-		t_allocator = e->type;
-		t_allocator_ptr = alloc_type_pointer(t_allocator);
+	t_type_info = type_info_entity->type;
+	t_type_info_ptr = alloc_type_pointer(t_type_info);
+	GB_ASSERT(is_type_struct(type_info_entity->type));
+	TypeStruct *tis = &base_type(type_info_entity->type)->Struct;
+
+	Entity *type_info_enum_value = find_core_entity(c, str_lit("Type_Info_Enum_Value"));
+
+	t_type_info_enum_value = type_info_enum_value->type;
+	t_type_info_enum_value_ptr = alloc_type_pointer(t_type_info_enum_value);
+
+	GB_ASSERT(tis->fields.count == 4);
+
+	Entity *type_info_variant = tis->fields[3];
+	Type *tiv_type = type_info_variant->type;
+	GB_ASSERT(is_type_union(tiv_type));
+
+	t_type_info_named         = find_core_type(c, str_lit("Type_Info_Named"));
+	t_type_info_integer       = find_core_type(c, str_lit("Type_Info_Integer"));
+	t_type_info_rune          = find_core_type(c, str_lit("Type_Info_Rune"));
+	t_type_info_float         = find_core_type(c, str_lit("Type_Info_Float"));
+	t_type_info_complex       = find_core_type(c, str_lit("Type_Info_Complex"));
+	t_type_info_string        = find_core_type(c, str_lit("Type_Info_String"));
+	t_type_info_boolean       = find_core_type(c, str_lit("Type_Info_Boolean"));
+	t_type_info_any           = find_core_type(c, str_lit("Type_Info_Any"));
+	t_type_info_typeid        = find_core_type(c, str_lit("Type_Info_Type_Id"));
+	t_type_info_pointer       = find_core_type(c, str_lit("Type_Info_Pointer"));
+	t_type_info_procedure     = find_core_type(c, str_lit("Type_Info_Procedure"));
+	t_type_info_array         = find_core_type(c, str_lit("Type_Info_Array"));
+	t_type_info_dynamic_array = find_core_type(c, str_lit("Type_Info_Dynamic_Array"));
+	t_type_info_slice         = find_core_type(c, str_lit("Type_Info_Slice"));
+	t_type_info_tuple         = find_core_type(c, str_lit("Type_Info_Tuple"));
+	t_type_info_struct        = find_core_type(c, str_lit("Type_Info_Struct"));
+	t_type_info_union         = find_core_type(c, str_lit("Type_Info_Union"));
+	t_type_info_enum          = find_core_type(c, str_lit("Type_Info_Enum"));
+	t_type_info_map           = find_core_type(c, str_lit("Type_Info_Map"));
+	t_type_info_bit_field     = find_core_type(c, str_lit("Type_Info_Bit_Field"));
+
+	t_type_info_named_ptr         = alloc_type_pointer(t_type_info_named);
+	t_type_info_integer_ptr       = alloc_type_pointer(t_type_info_integer);
+	t_type_info_rune_ptr          = alloc_type_pointer(t_type_info_rune);
+	t_type_info_float_ptr         = alloc_type_pointer(t_type_info_float);
+	t_type_info_complex_ptr       = alloc_type_pointer(t_type_info_complex);
+	t_type_info_string_ptr        = alloc_type_pointer(t_type_info_string);
+	t_type_info_boolean_ptr       = alloc_type_pointer(t_type_info_boolean);
+	t_type_info_any_ptr           = alloc_type_pointer(t_type_info_any);
+	t_type_info_typeid_ptr        = alloc_type_pointer(t_type_info_typeid);
+	t_type_info_pointer_ptr       = alloc_type_pointer(t_type_info_pointer);
+	t_type_info_procedure_ptr     = alloc_type_pointer(t_type_info_procedure);
+	t_type_info_array_ptr         = alloc_type_pointer(t_type_info_array);
+	t_type_info_dynamic_array_ptr = alloc_type_pointer(t_type_info_dynamic_array);
+	t_type_info_slice_ptr         = alloc_type_pointer(t_type_info_slice);
+	t_type_info_tuple_ptr         = alloc_type_pointer(t_type_info_tuple);
+	t_type_info_struct_ptr        = alloc_type_pointer(t_type_info_struct);
+	t_type_info_union_ptr         = alloc_type_pointer(t_type_info_union);
+	t_type_info_enum_ptr          = alloc_type_pointer(t_type_info_enum);
+	t_type_info_map_ptr           = alloc_type_pointer(t_type_info_map);
+	t_type_info_bit_field_ptr     = alloc_type_pointer(t_type_info_bit_field);
+}
+
+void init_core_allocator(Checker *c) {
+	if (t_allocator != nullptr) {
+		return;
 	}
+	t_allocator = find_core_type(c, str_lit("Allocator"));
+	t_allocator_ptr = alloc_type_pointer(t_allocator);
+}
 
-	if (t_context == nullptr) {
-		Entity *e = find_core_entity(c, str_lit("Context"));
-		e_context = e;
-		t_context = e->type;
-		t_context_ptr = alloc_type_pointer(t_context);
+void init_core_context(Checker *c) {
+	if (t_context != nullptr) {
+		return;
 	}
+	t_context = find_core_type(c, str_lit("Context"));
+	t_context_ptr = alloc_type_pointer(t_context);
+}
 
-	if (t_source_code_location == nullptr) {
-		Entity *e = find_core_entity(c, str_lit("Source_Code_Location"));
-		t_source_code_location = e->type;
-		t_source_code_location_ptr = alloc_type_pointer(t_allocator);
+void init_core_source_code_location(Checker *c) {
+	if (t_source_code_location != nullptr) {
+		return;
 	}
+	t_source_code_location = find_core_type(c, str_lit("Source_Code_Location"));
+	t_source_code_location_ptr = alloc_type_pointer(t_allocator);
+}
 
+void init_core_map_type(Checker *c) {
 	if (t_map_key == nullptr) {
-		Entity *e = find_core_entity(c, str_lit("__Map_Key"));
-		t_map_key = e->type;
+		t_map_key = find_core_type(c, str_lit("__Map_Key"));
 	}
 
 	if (t_map_header == nullptr) {
-		Entity *e = find_core_entity(c, str_lit("__Map_Header"));
-		t_map_header = e->type;
+		t_map_header = find_core_type(c, str_lit("__Map_Header"));
 	}
+}
 
-
-	{
-		String _global = str_lit("_global");
-
-		Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
-		Scope *preload_scope = type_info_entity->scope;
-
-		Entity *e = alloc_entity_import_name(preload_scope, make_token_ident(_global), t_invalid,
-		                                     str_lit(""), _global,
-		                                     preload_scope);
-
-		add_entity(c, universal_scope, nullptr, e);
-	}
-
-	c->done_preload = true;
-
+void init_preload(Checker *c) {
+	init_core_type_info(c);
+	init_core_allocator(c);
+	init_core_context(c);
+	init_core_source_code_location(c);
+	init_core_map_type(c);
 }
 
 
@@ -2210,7 +2205,6 @@ void check_collect_entities(CheckerContext *c, Array<AstNode *> const &nodes) {
 
 void check_all_global_entities(Checker *c) {
 	Scope *prev_file = nullptr;
-	bool processing_preload = true;
 
 	for_array(i, c->info.entities) {
 		Entity *e = c->info.entities[i];
@@ -2245,14 +2239,6 @@ void check_all_global_entities(Checker *c) {
 		ctx.decl = d;
 		ctx.scope = d->scope;
 		check_entity_decl(&ctx, e, d, nullptr);
-
-		if (pkg->kind != Package_Runtime) {
-			processing_preload = false;
-		}
-
-		if (!processing_preload) {
-			init_preload(c);
-		}
 	}
 }
 
@@ -3196,7 +3182,7 @@ void check_parsed_files(Checker *c) {
 	check_all_global_entities(c);
 
 	TIME_SECTION("init preload");
-	init_preload(c); // NOTE(bill): This could be setup previously through the use of 'type_info_of'
+	init_preload(c);
 
 	CheckerContext prev_context = c->init_ctx;
 	defer (c->init_ctx = prev_context);
