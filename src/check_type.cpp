@@ -31,7 +31,7 @@ void populate_using_entity_scope(CheckerContext *ctx, AstNode *node, Type *t) {
 
 }
 
-void check_struct_fields(CheckerContext *ctx, AstNode *node, Array<Entity *> *fields, Array<AstNode *> params,
+void check_struct_fields(CheckerContext *ctx, AstNode *node, Array<Entity *> *fields, Array<AstNode *> const &params,
                          isize init_field_capacity, Type *named_type, String context) {
 	*fields = array_make<Entity *>(heap_allocator(), 0, init_field_capacity);
 

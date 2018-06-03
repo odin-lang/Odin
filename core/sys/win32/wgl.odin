@@ -1,9 +1,7 @@
+// +build windows
 package win32
 
-// when ODIN_OS == "windows" {
-	foreign import "system:opengl32.lib"
-// }
-
+foreign import "system:opengl32.lib"
 
 CONTEXT_MAJOR_VERSION_ARB             :: 0x2091;
 CONTEXT_MINOR_VERSION_ARB             :: 0x2092;

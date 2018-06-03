@@ -2161,7 +2161,7 @@ irValue *ir_map_entries(irProcedure *proc, irValue *value) {
 	GB_ASSERT_MSG(t->kind == Type_Map, "%s", type_to_string(t));
 	init_map_internal_types(t);
 	Type *gst = t->Map.generated_struct_type;
-	isize index = 1;
+	i32 index = 1;
 	irValue *entries = ir_emit(proc, ir_instr_struct_extract_value(proc, value, index, gst->Struct.fields[index]->type));
 	return entries;
 }
@@ -2172,7 +2172,7 @@ irValue *ir_map_entries_ptr(irProcedure *proc, irValue *value) {
 	GB_ASSERT_MSG(t->kind == Type_Map, "%s", type_to_string(t));
 	init_map_internal_types(t);
 	Type *gst = t->Map.generated_struct_type;
-	isize index = 1;
+	i32 index = 1;
 	Type *ptr_t = alloc_type_pointer(gst->Struct.fields[index]->type);
 	irValue *entries = ir_emit(proc, ir_instr_struct_element_ptr(proc, value, index, ptr_t));
 	return entries;

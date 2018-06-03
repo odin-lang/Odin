@@ -18,6 +18,7 @@ import "core:c"
 
 when os.OS == "windows" {
 	import "core:atomics"
+	import "core:sync"
 	import "core:thread"
 	import "core:sys/win32"
 }
@@ -736,14 +737,6 @@ deprecated_attribute :: proc() {
 	// NOTE: Uncomment to see the warning messages
 	// foo_v1(1);
 }
-
-A :: struct {x, y, z: int};
-B :: struct {x, y, z: int};
-C :: struct {
-	using a: A,
-	b: B,
-}
-
 
 main :: proc() {
 	when true {

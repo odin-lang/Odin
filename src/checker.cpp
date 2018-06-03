@@ -2233,13 +2233,13 @@ void check_all_global_entities(Checker *c) {
 		GB_ASSERT(ctx.pkg != nullptr);
 		GB_ASSERT(e->pkg != nullptr);
 
-		if (e->token.string == "main") {
-			if (e->kind != Entity_Procedure) {
-				if (pkg->kind == Package_Init) {
-					error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
-					continue;
-				}
-			} else if (pkg->kind == Package_Runtime) {
+		if (pkg->kind == Package_Init) {
+			if (e->kind != Entity_Procedure && e->token.string == "main") {
+				error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
+				continue;
+			}
+		} else if (pkg->kind == Package_Runtime) {
+			if (e->token.string == "main") {
 				error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
 				continue;
 			}
@@ -2248,7 +2248,6 @@ void check_all_global_entities(Checker *c) {
 		ctx.decl = d;
 		ctx.scope = d->scope;
 		check_entity_decl(&ctx, e, d, nullptr);
-
 
 		if (pkg->kind != Package_Runtime) {
 			processing_preload = false;
