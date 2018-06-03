@@ -6166,12 +6166,8 @@ void ir_build_nested_proc(irProcedure *proc, AstNodeProcLit *pd, Entity *e) {
 	isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
 	u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
 
-	if (is_type_polymorphic(e->type)) {
-		i32 guid = cast(i32)proc->children.count;
-		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
-	} else {
-		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s", LIT(proc->name), LIT(pd_name));
-	}
+	i32 guid = cast(i32)proc->children.count;
+	name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
 	String name = make_string(name_text, name_len-1);
 
 
@@ -6226,12 +6222,9 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 			irModule *m = proc->module;
 			isize name_len = proc->name.len + 1 + ts_name.len + 1 + 10 + 1;
 			u8 *name_text = gb_alloc_array(m->allocator, u8, name_len);
-			if (is_type_polymorphic(e->type)) {
-				i32 guid = cast(i32)m->members.entries.count;
-				name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(ts_name), guid);
-			} else {
-				name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s", LIT(proc->name), LIT(ts_name));
-			}
+			i32 guid = cast(i32)m->members.entries.count;
+			name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(ts_name), guid);
+
 			String name = make_string(name_text, name_len-1);
 
 			irValue *value = ir_value_type_name(m->allocator, name, e->type);
