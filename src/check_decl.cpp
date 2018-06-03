@@ -89,7 +89,7 @@ Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, Stri
 	return e->type;
 }
 
-void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<AstNode *> inits, String context_name) {
+void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<AstNode *> const &inits, String context_name) {
 	if ((lhs == nullptr || lhs_count == 0) && inits.count == 0) {
 		return;
 	}
@@ -661,7 +661,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 }
 
-void check_var_decl(CheckerContext *ctx, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, Array<AstNode *> init_expr_list) {
+void check_var_decl(CheckerContext *ctx, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, Array<AstNode *> const &init_expr_list) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Variable);
 

@@ -1,4 +1,4 @@
-void check_stmt_list(CheckerContext *ctx, Array<AstNode *> stmts, u32 flags) {
+void check_stmt_list(CheckerContext *ctx, Array<AstNode *> const &stmts, u32 flags) {
 	if (stmts.count == 0) {
 		return;
 	}
@@ -43,7 +43,7 @@ void check_stmt_list(CheckerContext *ctx, Array<AstNode *> stmts, u32 flags) {
 	}
 }
 
-bool check_is_terminating_list(Array<AstNode *> stmts) {
+bool check_is_terminating_list(Array<AstNode *> const &stmts) {
 	// Iterate backwards
 	for (isize n = stmts.count-1; n >= 0; n--) {
 		AstNode *stmt = stmts[n];
@@ -55,7 +55,7 @@ bool check_is_terminating_list(Array<AstNode *> stmts) {
 	return false;
 }
 
-bool check_has_break_list(Array<AstNode *> stmts, bool implicit) {
+bool check_has_break_list(Array<AstNode *> const &stmts, bool implicit) {
 	for_array(i, stmts) {
 		AstNode *stmt = stmts[i];
 		if (check_has_break(stmt, implicit)) {

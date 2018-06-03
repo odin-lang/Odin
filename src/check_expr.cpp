@@ -72,7 +72,7 @@ void     update_expr_type               (CheckerContext *c, AstNode *e, Type *ty
 bool     check_is_terminating           (AstNode *node);
 bool     check_has_break                (AstNode *stmt, bool implicit);
 void     check_stmt                     (CheckerContext *c, AstNode *node, u32 flags);
-void     check_stmt_list                (CheckerContext *c, Array<AstNode *> stmts, u32 flags);
+void     check_stmt_list                (CheckerContext *c, Array<AstNode *> const &stmts, u32 flags);
 void     check_init_constant            (CheckerContext *c, Entity *e, Operand *operand);
 bool     check_representable_as_constant(CheckerContext *c, ExactValue in_value, Type *type, ExactValue *out_value);
 bool     check_procedure_type           (CheckerContext *c, Type *type, AstNode *proc_type_node, Array<Operand> *operands = nullptr);
@@ -107,7 +107,7 @@ void error_operand_no_value(Operand *o) {
 }
 
 
-void check_scope_decls(CheckerContext *c, Array<AstNode *> nodes, isize reserve_size) {
+void check_scope_decls(CheckerContext *c, Array<AstNode *> const &nodes, isize reserve_size) {
 	Scope *s = c->scope;
 	GB_ASSERT(s->package == nullptr);
 
@@ -4100,7 +4100,7 @@ isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs
 }
 
 
-void check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Array<AstNode *> rhs, bool allow_ok, bool *optional_ok_ = nullptr) {
+void check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Array<AstNode *> const &rhs, bool allow_ok, bool *optional_ok_ = nullptr) {
 	bool optional_ok = false;
 	isize tuple_index = 0;
 	for_array(i, rhs) {
@@ -6279,7 +6279,7 @@ void check_expr_or_type(CheckerContext *c, Operand *o, AstNode *e, Type *type_hi
 
 gbString write_expr_to_string(gbString str, AstNode *node);
 
-gbString write_struct_fields_to_string(gbString str, Array<AstNode *> params) {
+gbString write_struct_fields_to_string(gbString str, Array<AstNode *> const &params) {
 	for_array(i, params) {
 		if (i > 0) {
 			str = gb_string_appendc(str, ", ");

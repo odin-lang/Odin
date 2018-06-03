@@ -1,5 +1,7 @@
-import "core:atomics.odin"
-import "core:os.odin"
+package sync
+
+import "core:atomics"
+import "core:os"
 
 Semaphore :: struct {
 	// _handle: win32.Handle,

@@ -1652,6 +1652,10 @@ void ir_print_type_name(irFileBuffer *f, irModule *m, irValue *v) {
 	ir_write_byte(f, '\n');
 }
 
+void foo_bar(void) {
+
+}
+
 void print_llvm_ir(irGen *ir) {
 	irModule *m = &ir->module;
 
@@ -1805,7 +1809,7 @@ void print_llvm_ir(irGen *ir) {
 	if (m->generate_debug_info) {
 		ir_write_byte(f, '\n');
 
-		i32 diec = m->debug_info.entries.count;
+		i32 diec = cast(i32)m->debug_info.entries.count;
 
 		i32 di_version    = diec+1;
 		i32 di_debug_info = diec+2;
