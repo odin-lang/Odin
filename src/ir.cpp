@@ -1637,7 +1637,7 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 
 	irValue *ep = ir_emit_struct_ep(proc, c, 0);
 	Array<irValue *> args = {};
-	irValue *v = ir_emit_package_call(proc, "os", "default_allocator", args);
+	irValue *v = ir_emit_package_call(proc, "os", "heap_allocator", args);
 	ir_emit_store(proc, ep, v);
 
 	return c;

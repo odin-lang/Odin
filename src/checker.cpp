@@ -1334,7 +1334,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 	AstPackage *os = get_core_package(&c->info, str_lit("os"));
 	String required_os_entities[] = {
-		str_lit("default_allocator"),
+		str_lit("heap_allocator"),
 	};
 	for (isize i = 0; i < gb_count_of(required_os_entities); i++) {
 		add_dependency_to_set(c, scope_lookup_entity(os->scope, required_mem_entities[i]));

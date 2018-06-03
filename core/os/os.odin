@@ -66,7 +66,7 @@ read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
 }
 
 
-default_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
+heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                                size, alignment: int,
                                old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
 	using mem.Allocator_Mode;
@@ -91,9 +91,9 @@ default_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	return nil;
 }
 
-default_allocator :: proc() -> mem.Allocator {
+heap_allocator :: proc() -> mem.Allocator {
 	return mem.Allocator{
-		procedure = default_allocator_proc,
+		procedure = heap_allocator_proc,
 		data = nil,
 	};
 }

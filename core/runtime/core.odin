@@ -276,7 +276,7 @@ __init_context_from_ptr :: proc "contextless" (c: ^Context, other: ^Context) {
 __init_context :: proc "contextless" (c: ^Context) {
 	if c == nil do return;
 
-	c.allocator = os.default_allocator();
+	c.allocator = os.heap_allocator();
 	c.thread_id = os.current_thread_id();
 }
 
