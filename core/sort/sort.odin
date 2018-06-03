@@ -69,8 +69,8 @@ quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 		j -= 1;
 	}
 
-	quick_sort(a[0..i], f);
-	quick_sort(a[i..n], f);
+	quick_sort_proc(a[0..i], f);
+	quick_sort_proc(a[i..n], f);
 }
 
 quick_sort :: proc(array: $A/[]$T) {

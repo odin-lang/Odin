@@ -903,7 +903,7 @@ void add_entity_use(CheckerContext *c, AstNode *identifier, Entity *entity) {
 		}
 	}
 	entity->flags |= EntityFlag_Used;
-	add_declaration_dependency(c, entity); // TODO(bill): Should this be here?
+	add_declaration_dependency(c, entity);
 }
 
 
@@ -958,10 +958,11 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		return;
 	}
 
+	add_type_info_dependency(c->decl, t);
+
 	auto found = map_get(&c->info->type_info_map, hash_type(t));
 	if (found != nullptr) {
 		// Types have already been added
-		add_type_info_dependency(c->decl, t);
 		return;
 	}
 
@@ -987,7 +988,6 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 
 	if (prev) {
 		// NOTE(bill): If a previous one exists already, no need to continue
-		add_type_info_dependency(c->decl, t);
 		return;
 	}
 
@@ -1356,7 +1356,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		Entity *e = c->info.definitions[i];
 		// if (e->scope->is_global && !is_type_poly_proc(e->type)) { // TODO(bill): is the check enough?
 		if (e->scope == universal_scope) { // TODO(bill): is the check enough?
-			if (e->type == nullptr || !is_type_poly_proc(e->type)) {
+			if (e->type == nullptr) {
 				add_dependency_to_set(c, e);
 			}
 		} else if (e->kind == Entity_Procedure && e->Procedure.is_export) {
@@ -3141,13 +3141,13 @@ void check_proc_info(Checker *c, ProcedureInfo pi) {
 	CheckerContext ctx = make_checker_context(c);
 	defer (destroy_checker_context(&ctx));
 	add_curr_ast_file(&ctx, pi.file);
+	ctx.decl = pi.decl;
 
 	TypeProc *pt = &pi.type->Proc;
 	String name = pi.token.string;
 	if (pt->is_polymorphic) {
 		GB_ASSERT_MSG(pt->is_poly_specialized, "%.*s", LIT(name));
 	}
-
 
 	bool bounds_check    = (pi.tags & ProcTag_bounds_check)    != 0;
 	bool no_bounds_check = (pi.tags & ProcTag_no_bounds_check) != 0;
