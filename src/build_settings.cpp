@@ -490,12 +490,17 @@ void init_build_context(void) {
 		#define LINK_FLAG_X86 "-arch x86"
 	#endif
 
+	gbString llc_flags = gb_string_make_reserve(heap_allocator(), 64);
+	if (bc->ODIN_DEBUG) {
+		llc_flags = gb_string_appendc(llc_flags, "-debug-compile ");
+	}
 
 	if (bc->ODIN_ARCH == "amd64") {
 		bc->word_size = 8;
 		bc->max_align = 16;
 
-		bc->llc_flags = str_lit("-march=x86-64 ");
+		llc_flags = gb_string_appendc(llc_flags, "-march=x86-64 ");
+
 		if (str_eq_ignore_case(cross_compile_target, str_lit("Essence"))) {
 			bc->link_flags = str_lit(" ");
 		} else {
@@ -504,12 +509,14 @@ void init_build_context(void) {
 	} else if (bc->ODIN_ARCH == "x86") {
 		bc->word_size = 4;
 		bc->max_align = 8;
-		bc->llc_flags = str_lit("-march=x86 ");
+		llc_flags = gb_string_appendc(llc_flags, "-march=x86 ");
 		bc->link_flags = str_lit(LINK_FLAG_X86 " ");
 	} else {
 		gb_printf_err("This current architecture is not supported");
 		gb_exit(1);
 	}
+
+	bc->llc_flags = make_string_c(llc_flags);
 
 
 	isize opt_max = 1023;
