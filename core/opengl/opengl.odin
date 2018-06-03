@@ -1,15 +1,16 @@
 package opengl
 
-when ODIN_OS == "windows" {
+import "core:os"
+import "core:mem"
+
+when os.OS == "windows" {
 	foreign import lib "system:opengl32.lib"
 	import win32 "core:sys/win32"
-} else when ODIN_OS == "linux" {
+} else when os.OS == "linux" {
 	foreign import lib "system:gl"
 }
 
-export "core:opengl_constants.odin"
-
-#assert(ODIN_OS != "osx");
+#assert(os.OS != "osx");
 
 @(default_calling_convention="c", link_prefix="gl")
 foreign lib {
@@ -48,7 +49,7 @@ get_gl_proc_address :: proc(name: string) -> rawptr {
 		name = name[..len(name)-1];
 	}
 	// NOTE(bill): null terminated
-	assert((&name[0] + len(name))^ == 0);
+	assert(mem.ptr_offset(&name[0], cast(uintptr)len(name))^ == 0);
 	res := win32.get_gl_proc_address(cstring(&name[0]));
 	if res == nil {
 		res = win32.get_proc_address(_libgl, cstring(&name[0]));
