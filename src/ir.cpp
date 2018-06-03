@@ -3592,7 +3592,6 @@ gb_global i32      ir_global_type_info_member_names_index   = 0;
 gb_global i32      ir_global_type_info_member_offsets_index = 0;
 gb_global i32      ir_global_type_info_member_usings_index  = 0;
 
-#if 1
 isize ir_type_info_count(CheckerInfo *info) {
 	return info->minimum_dependency_type_info_set.entries.count+1;
 }
@@ -3610,16 +3609,6 @@ isize ir_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=tr
 	}
 	return -1;
 }
-#else
-isize ir_type_info_count(CheckerInfo *info) {
-	return info->type_info_types.count;
-}
-
-isize ir_type_info_index(CheckerInfo *info, Type *type) {
-	isize index = type_info_index(info, type);
-	return index;
-}
-#endif
 
 irValue *ir_type_info(irProcedure *proc, Type *type) {
 	CheckerInfo *info = proc->module->info;
@@ -6205,7 +6194,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 		if (e->kind == Entity_TypeName) {
 			bool polymorphic_struct = false;
 			if (e->type != nullptr && e->kind == Entity_TypeName) {
-				Type *bt = base_type(e->type);
+			Type *bt = base_type(e->type);
 				if (bt->kind == Type_Struct) {
 					polymorphic_struct = bt->Struct.is_polymorphic;
 				}

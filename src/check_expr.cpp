@@ -4709,6 +4709,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
 			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 			add_entity_use(c, ident, entity_to_use);
+
 			return data;
 		}
 	} else {
@@ -4719,10 +4720,12 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		}
 
 		Entity *e = entity_of_ident(ident);
+
 		CallArgumentData data = {};
 		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
 		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 		add_entity_use(c, ident, entity_to_use);
+
 		return data;
 	}
 
