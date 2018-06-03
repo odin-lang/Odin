@@ -2,7 +2,7 @@ package mem
 
 import "core:raw"
 
-foreign __llvm_core {
+foreign _ {
 	@(link_name = "llvm.bswap.i16") swap16 :: proc(b: u16) -> u16 ---;
 	@(link_name = "llvm.bswap.i32") swap32 :: proc(b: u32) -> u32 ---;
 	@(link_name = "llvm.bswap.i64") swap64 :: proc(b: u64) -> u64 ---;
@@ -12,7 +12,7 @@ swap :: proc[swap16, swap32, swap64];
 
 set :: proc "contextless" (data: rawptr, value: i32, len: int) -> rawptr {
 	if data == nil do return nil;
-	foreign __llvm_core {
+	foreign _ {
 		when size_of(rawptr) == 8 {
 			@(link_name="llvm.memset.p0i8.i64")
 			llvm_memset :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) ---;
@@ -30,7 +30,7 @@ zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memmove
-	foreign __llvm_core {
+	foreign _ {
 		when size_of(rawptr) == 8 {
 			@(link_name="llvm.memmove.p0i8.p0i8.i64")
 			llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
@@ -45,7 +45,7 @@ copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memcpy
-	foreign __llvm_core {
+	foreign _ {
 		when size_of(rawptr) == 8 {
 			@(link_name="llvm.memcpy.p0i8.p0i8.i64")
 	 		llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;

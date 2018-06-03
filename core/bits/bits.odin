@@ -22,7 +22,7 @@ I16_MAX  ::  -I16_MIN - 1;
 I32_MAX  ::  -I32_MIN - 1;
 I64_MAX  ::  -I64_MIN - 1;
 
-foreign __llvm_core {
+foreign {
 	@(link_name="llvm.ctpop.i8")        __llvm_ctpop8   :: proc(u8)   ->   u8 ---;
 	@(link_name="llvm.ctpop.i16")       __llvm_ctpop16  :: proc(u16)  ->  u16 ---;
 	@(link_name="llvm.ctpop.i32")       __llvm_ctpop32  :: proc(u32)  ->  u32 ---;
@@ -122,14 +122,14 @@ to_le_u64  :: proc(i:  u64) ->  u64 { when os.ENDIAN == "little" { return i; } e
 to_le_uint :: proc(i: uint) -> uint { when os.ENDIAN == "little" { return i; } else { return byte_swap(i); } }
 
 
-overflowing_add_u8   :: proc(lhs, rhs:   u8) -> (u8, bool)   { foreign __llvm_core @(link_name="llvm.uadd.with.overflow.i8")   op :: proc(u8, u8)     -> (u8, bool)   ---; return op(lhs, rhs); }
-overflowing_add_i8   :: proc(lhs, rhs:   i8) -> (i8, bool)   { foreign __llvm_core @(link_name="llvm.sadd.with.overflow.i8")   op :: proc(i8, i8)     -> (i8, bool)   ---; return op(lhs, rhs); }
-overflowing_add_u16  :: proc(lhs, rhs:  u16) -> (u16, bool)  { foreign __llvm_core @(link_name="llvm.uadd.with.overflow.i16")  op :: proc(u16, u16)   -> (u16, bool)  ---; return op(lhs, rhs); }
-overflowing_add_i16  :: proc(lhs, rhs:  i16) -> (i16, bool)  { foreign __llvm_core @(link_name="llvm.sadd.with.overflow.i16")  op :: proc(i16, i16)   -> (i16, bool)  ---; return op(lhs, rhs); }
-overflowing_add_u32  :: proc(lhs, rhs:  u32) -> (u32, bool)  { foreign __llvm_core @(link_name="llvm.uadd.with.overflow.i32")  op :: proc(u32, u32)   -> (u32, bool)  ---; return op(lhs, rhs); }
-overflowing_add_i32  :: proc(lhs, rhs:  i32) -> (i32, bool)  { foreign __llvm_core @(link_name="llvm.sadd.with.overflow.i32")  op :: proc(i32, i32)   -> (i32, bool)  ---; return op(lhs, rhs); }
-overflowing_add_u64  :: proc(lhs, rhs:  u64) -> (u64, bool)  { foreign __llvm_core @(link_name="llvm.uadd.with.overflow.i64")  op :: proc(u64, u64)   -> (u64, bool)  ---; return op(lhs, rhs); }
-overflowing_add_i64  :: proc(lhs, rhs:  i64) -> (i64, bool)  { foreign __llvm_core @(link_name="llvm.sadd.with.overflow.i64")  op :: proc(i64, i64)   -> (i64, bool)  ---; return op(lhs, rhs); }
+overflowing_add_u8   :: proc(lhs, rhs:   u8) -> (u8, bool)   { foreign { @(link_name="llvm.uadd.with.overflow.i8")   op :: proc(u8, u8)     -> (u8, bool)   --- }; return op(lhs, rhs); }
+overflowing_add_i8   :: proc(lhs, rhs:   i8) -> (i8, bool)   { foreign { @(link_name="llvm.sadd.with.overflow.i8")   op :: proc(i8, i8)     -> (i8, bool)   --- }; return op(lhs, rhs); }
+overflowing_add_u16  :: proc(lhs, rhs:  u16) -> (u16, bool)  { foreign { @(link_name="llvm.uadd.with.overflow.i16")  op :: proc(u16, u16)   -> (u16, bool)  --- }; return op(lhs, rhs); }
+overflowing_add_i16  :: proc(lhs, rhs:  i16) -> (i16, bool)  { foreign { @(link_name="llvm.sadd.with.overflow.i16")  op :: proc(i16, i16)   -> (i16, bool)  --- }; return op(lhs, rhs); }
+overflowing_add_u32  :: proc(lhs, rhs:  u32) -> (u32, bool)  { foreign { @(link_name="llvm.uadd.with.overflow.i32")  op :: proc(u32, u32)   -> (u32, bool)  --- }; return op(lhs, rhs); }
+overflowing_add_i32  :: proc(lhs, rhs:  i32) -> (i32, bool)  { foreign { @(link_name="llvm.sadd.with.overflow.i32")  op :: proc(i32, i32)   -> (i32, bool)  --- }; return op(lhs, rhs); }
+overflowing_add_u64  :: proc(lhs, rhs:  u64) -> (u64, bool)  { foreign { @(link_name="llvm.uadd.with.overflow.i64")  op :: proc(u64, u64)   -> (u64, bool)  --- }; return op(lhs, rhs); }
+overflowing_add_i64  :: proc(lhs, rhs:  i64) -> (i64, bool)  { foreign { @(link_name="llvm.sadd.with.overflow.i64")  op :: proc(i64, i64)   -> (i64, bool)  --- }; return op(lhs, rhs); }
 overflowing_add_uint :: proc(lhs, rhs: uint) -> (uint, bool) {
 	when size_of(uint) == size_of(u32) {
 		x, ok := overflowing_add_u32(u32(lhs), u32(rhs));
@@ -157,14 +157,14 @@ overflowing_add :: proc[
 	overflowing_add_uint, overflowing_add_int,
 ];
 
-overflowing_sub_u8   :: proc(lhs, rhs:   u8) -> (u8, bool)   { foreign __llvm_core @(link_name="llvm.usub.with.overflow.i8")   op :: proc(u8, u8)     -> (u8, bool)   ---; return op(lhs, rhs); }
-overflowing_sub_i8   :: proc(lhs, rhs:   i8) -> (i8, bool)   { foreign __llvm_core @(link_name="llvm.ssub.with.overflow.i8")   op :: proc(i8, i8)     -> (i8, bool)   ---; return op(lhs, rhs); }
-overflowing_sub_u16  :: proc(lhs, rhs:  u16) -> (u16, bool)  { foreign __llvm_core @(link_name="llvm.usub.with.overflow.i16")  op :: proc(u16, u16)   -> (u16, bool)  ---; return op(lhs, rhs); }
-overflowing_sub_i16  :: proc(lhs, rhs:  i16) -> (i16, bool)  { foreign __llvm_core @(link_name="llvm.ssub.with.overflow.i16")  op :: proc(i16, i16)   -> (i16, bool)  ---; return op(lhs, rhs); }
-overflowing_sub_u32  :: proc(lhs, rhs:  u32) -> (u32, bool)  { foreign __llvm_core @(link_name="llvm.usub.with.overflow.i32")  op :: proc(u32, u32)   -> (u32, bool)  ---; return op(lhs, rhs); }
-overflowing_sub_i32  :: proc(lhs, rhs:  i32) -> (i32, bool)  { foreign __llvm_core @(link_name="llvm.ssub.with.overflow.i32")  op :: proc(i32, i32)   -> (i32, bool)  ---; return op(lhs, rhs); }
-overflowing_sub_u64  :: proc(lhs, rhs:  u64) -> (u64, bool)  { foreign __llvm_core @(link_name="llvm.usub.with.overflow.i64")  op :: proc(u64, u64)   -> (u64, bool)  ---; return op(lhs, rhs); }
-overflowing_sub_i64  :: proc(lhs, rhs:  i64) -> (i64, bool)  { foreign __llvm_core @(link_name="llvm.ssub.with.overflow.i64")  op :: proc(i64, i64)   -> (i64, bool)  ---; return op(lhs, rhs); }
+overflowing_sub_u8   :: proc(lhs, rhs:   u8) -> (u8, bool)   { foreign { @(link_name="llvm.usub.with.overflow.i8")   op :: proc(u8, u8)     -> (u8, bool)   --- }; return op(lhs, rhs); }
+overflowing_sub_i8   :: proc(lhs, rhs:   i8) -> (i8, bool)   { foreign { @(link_name="llvm.ssub.with.overflow.i8")   op :: proc(i8, i8)     -> (i8, bool)   --- }; return op(lhs, rhs); }
+overflowing_sub_u16  :: proc(lhs, rhs:  u16) -> (u16, bool)  { foreign { @(link_name="llvm.usub.with.overflow.i16")  op :: proc(u16, u16)   -> (u16, bool)  --- }; return op(lhs, rhs); }
+overflowing_sub_i16  :: proc(lhs, rhs:  i16) -> (i16, bool)  { foreign { @(link_name="llvm.ssub.with.overflow.i16")  op :: proc(i16, i16)   -> (i16, bool)  --- }; return op(lhs, rhs); }
+overflowing_sub_u32  :: proc(lhs, rhs:  u32) -> (u32, bool)  { foreign { @(link_name="llvm.usub.with.overflow.i32")  op :: proc(u32, u32)   -> (u32, bool)  --- }; return op(lhs, rhs); }
+overflowing_sub_i32  :: proc(lhs, rhs:  i32) -> (i32, bool)  { foreign { @(link_name="llvm.ssub.with.overflow.i32")  op :: proc(i32, i32)   -> (i32, bool)  --- }; return op(lhs, rhs); }
+overflowing_sub_u64  :: proc(lhs, rhs:  u64) -> (u64, bool)  { foreign { @(link_name="llvm.usub.with.overflow.i64")  op :: proc(u64, u64)   -> (u64, bool)  --- }; return op(lhs, rhs); }
+overflowing_sub_i64  :: proc(lhs, rhs:  i64) -> (i64, bool)  { foreign { @(link_name="llvm.ssub.with.overflow.i64")  op :: proc(i64, i64)   -> (i64, bool)  --- }; return op(lhs, rhs); }
 overflowing_sub_uint :: proc(lhs, rhs: uint) -> (uint, bool) {
 	when size_of(uint) == size_of(u32) {
 		x, ok := overflowing_sub_u32(u32(lhs), u32(rhs));
@@ -193,14 +193,14 @@ overflowing_sub :: proc[
 ];
 
 
-overflowing_mul_u8   :: proc(lhs, rhs:   u8) -> (u8, bool)   { foreign __llvm_core @(link_name="llvm.umul.with.overflow.i8")   op :: proc(u8, u8)     -> (u8, bool)   ---; return op(lhs, rhs); }
-overflowing_mul_i8   :: proc(lhs, rhs:   i8) -> (i8, bool)   { foreign __llvm_core @(link_name="llvm.smul.with.overflow.i8")   op :: proc(i8, i8)     -> (i8, bool)   ---; return op(lhs, rhs); }
-overflowing_mul_u16  :: proc(lhs, rhs:  u16) -> (u16, bool)  { foreign __llvm_core @(link_name="llvm.umul.with.overflow.i16")  op :: proc(u16, u16)   -> (u16, bool)  ---; return op(lhs, rhs); }
-overflowing_mul_i16  :: proc(lhs, rhs:  i16) -> (i16, bool)  { foreign __llvm_core @(link_name="llvm.smul.with.overflow.i16")  op :: proc(i16, i16)   -> (i16, bool)  ---; return op(lhs, rhs); }
-overflowing_mul_u32  :: proc(lhs, rhs:  u32) -> (u32, bool)  { foreign __llvm_core @(link_name="llvm.umul.with.overflow.i32")  op :: proc(u32, u32)   -> (u32, bool)  ---; return op(lhs, rhs); }
-overflowing_mul_i32  :: proc(lhs, rhs:  i32) -> (i32, bool)  { foreign __llvm_core @(link_name="llvm.smul.with.overflow.i32")  op :: proc(i32, i32)   -> (i32, bool)  ---; return op(lhs, rhs); }
-overflowing_mul_u64  :: proc(lhs, rhs:  u64) -> (u64, bool)  { foreign __llvm_core @(link_name="llvm.umul.with.overflow.i64")  op :: proc(u64, u64)   -> (u64, bool)  ---; return op(lhs, rhs); }
-overflowing_mul_i64  :: proc(lhs, rhs:  i64) -> (i64, bool)  { foreign __llvm_core @(link_name="llvm.smul.with.overflow.i64")  op :: proc(i64, i64)   -> (i64, bool)  ---; return op(lhs, rhs); }
+overflowing_mul_u8   :: proc(lhs, rhs:   u8) -> (u8, bool)   { foreign { @(link_name="llvm.umul.with.overflow.i8")   op :: proc(u8, u8)     -> (u8, bool)   --- }; return op(lhs, rhs); }
+overflowing_mul_i8   :: proc(lhs, rhs:   i8) -> (i8, bool)   { foreign { @(link_name="llvm.smul.with.overflow.i8")   op :: proc(i8, i8)     -> (i8, bool)   --- }; return op(lhs, rhs); }
+overflowing_mul_u16  :: proc(lhs, rhs:  u16) -> (u16, bool)  { foreign { @(link_name="llvm.umul.with.overflow.i16")  op :: proc(u16, u16)   -> (u16, bool)  --- }; return op(lhs, rhs); }
+overflowing_mul_i16  :: proc(lhs, rhs:  i16) -> (i16, bool)  { foreign { @(link_name="llvm.smul.with.overflow.i16")  op :: proc(i16, i16)   -> (i16, bool)  --- }; return op(lhs, rhs); }
+overflowing_mul_u32  :: proc(lhs, rhs:  u32) -> (u32, bool)  { foreign { @(link_name="llvm.umul.with.overflow.i32")  op :: proc(u32, u32)   -> (u32, bool)  --- }; return op(lhs, rhs); }
+overflowing_mul_i32  :: proc(lhs, rhs:  i32) -> (i32, bool)  { foreign { @(link_name="llvm.smul.with.overflow.i32")  op :: proc(i32, i32)   -> (i32, bool)  --- }; return op(lhs, rhs); }
+overflowing_mul_u64  :: proc(lhs, rhs:  u64) -> (u64, bool)  { foreign { @(link_name="llvm.umul.with.overflow.i64")  op :: proc(u64, u64)   -> (u64, bool)  --- }; return op(lhs, rhs); }
+overflowing_mul_i64  :: proc(lhs, rhs:  i64) -> (i64, bool)  { foreign { @(link_name="llvm.smul.with.overflow.i64")  op :: proc(i64, i64)   -> (i64, bool)  --- }; return op(lhs, rhs); }
 overflowing_mul_uint :: proc(lhs, rhs: uint) -> (uint, bool) {
 	when size_of(uint) == size_of(u32) {
 		x, ok := overflowing_mul_u32(u32(lhs), u32(rhs));

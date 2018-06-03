@@ -321,56 +321,56 @@ __slice_expr_error_loc :: inline proc "contextless" (using loc := #caller_locati
 
 
 @(default_calling_convention = "c")
-foreign __llvm_core {
-	@(link_name="llvm.sqrt.f32") __sqrt_f32 :: proc(x: f32) -> f32 ---;
-	@(link_name="llvm.sqrt.f64") __sqrt_f64 :: proc(x: f64) -> f64 ---;
+foreign {
+	@(link_name="llvm.sqrt.f32") __sqrt_f32 :: proc(x: f32) -> f32 ---
+	@(link_name="llvm.sqrt.f64") __sqrt_f64 :: proc(x: f64) -> f64 ---
 
-	@(link_name="llvm.sin.f32") __sin_f32  :: proc(θ: f32) -> f32 ---;
-	@(link_name="llvm.sin.f64") __sin_f64  :: proc(θ: f64) -> f64 ---;
+	@(link_name="llvm.sin.f32") __sin_f32  :: proc(θ: f32) -> f32 ---
+	@(link_name="llvm.sin.f64") __sin_f64  :: proc(θ: f64) -> f64 ---
 
-	@(link_name="llvm.cos.f32") __cos_f32  :: proc(θ: f32) -> f32 ---;
-	@(link_name="llvm.cos.f64") __cos_f64  :: proc(θ: f64) -> f64 ---;
+	@(link_name="llvm.cos.f32") __cos_f32  :: proc(θ: f32) -> f32 ---
+	@(link_name="llvm.cos.f64") __cos_f64  :: proc(θ: f64) -> f64 ---
 
-	@(link_name="llvm.pow.f32") __pow_f32  :: proc(x, power: f32) -> f32 ---;
-	@(link_name="llvm.pow.f64") __pow_f64  :: proc(x, power: f64) -> f64 ---;
+	@(link_name="llvm.pow.f32") __pow_f32  :: proc(x, power: f32) -> f32 ---
+	@(link_name="llvm.pow.f64") __pow_f64  :: proc(x, power: f64) -> f64 ---
 
-	@(link_name="llvm.fmuladd.f32") fmuladd32  :: proc(a, b, c: f32) -> f32 ---;
-	@(link_name="llvm.fmuladd.f64") fmuladd64  :: proc(a, b, c: f64) -> f64 ---;
+	@(link_name="llvm.fmuladd.f32") fmuladd32  :: proc(a, b, c: f32) -> f32 ---
+	@(link_name="llvm.fmuladd.f64") fmuladd64  :: proc(a, b, c: f64) -> f64 ---
 }
 __abs_f32 :: inline proc "contextless" (x: f32) -> f32 {
-	foreign __llvm_core {
-		@(link_name="llvm.fabs.f32") _abs :: proc "c" (x: f32) -> f32 ---;
+	foreign {
+		@(link_name="llvm.fabs.f32") _abs :: proc "c" (x: f32) -> f32 ---
 	}
 	return _abs(x);
 }
 __abs_f64 :: inline proc "contextless" (x: f64) -> f64 {
-	foreign __llvm_core {
-		@(link_name="llvm.fabs.f64") _abs :: proc "c" (x: f64) -> f64 ---;
+	foreign {
+		@(link_name="llvm.fabs.f64") _abs :: proc "c" (x: f64) -> f64 ---
 	}
 	return _abs(x);
 }
 
 __min_f32 :: proc(a, b: f32) -> f32 {
-	foreign __llvm_core {
-		@(link_name="llvm.minnum.f32") _min :: proc "c" (a, b: f32) -> f32 ---;
+	foreign {
+		@(link_name="llvm.minnum.f32") _min :: proc "c" (a, b: f32) -> f32 ---
 	}
 	return _min(a, b);
 }
 __min_f64 :: proc(a, b: f64) -> f64 {
-	foreign __llvm_core {
-		@(link_name="llvm.minnum.f64") _min :: proc "c" (a, b: f64) -> f64 ---;
+	foreign {
+		@(link_name="llvm.minnum.f64") _min :: proc "c" (a, b: f64) -> f64 ---
 	}
 	return _min(a, b);
 }
 __max_f32 :: proc(a, b: f32) -> f32 {
-	foreign __llvm_core {
-		@(link_name="llvm.maxnum.f32") _max :: proc "c" (a, b: f32) -> f32 ---;
+	foreign {
+		@(link_name="llvm.maxnum.f32") _max :: proc "c" (a, b: f32) -> f32 ---
 	}
 	return _max(a, b);
 }
 __max_f64 :: proc(a, b: f64) -> f64 {
-	foreign __llvm_core {
-		@(link_name="llvm.maxnum.f64") _max :: proc "c" (a, b: f64) -> f64 ---;
+	foreign {
+		@(link_name="llvm.maxnum.f64") _max :: proc "c" (a, b: f64) -> f64 ---
 	}
 	return _max(a, b);
 }

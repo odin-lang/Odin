@@ -31,7 +31,7 @@ QUAT_IDENTITY := Quat{x = 0, y = 0, z = 0, w = 1};
 
 
 @(default_calling_convention="c")
-foreign __llvm_core {
+foreign _ {
 	@(link_name="llvm.sqrt.f32")
 	sqrt_f32 :: proc(x: f32) -> f32 ---;
 	@(link_name="llvm.sqrt.f64")

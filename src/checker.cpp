@@ -575,14 +575,11 @@ void init_universal_scope(void) {
 	add_global_constant(str_lit("false"), t_untyped_bool, exact_value_bool(false));
 
 	add_global_entity(alloc_entity_nil(str_lit("nil"), t_untyped_nil));
-	add_global_entity(alloc_entity_library_name(universal_scope,
-	                                            make_token_ident(str_lit("__llvm_core")), t_invalid,
-	                                            str_lit(""), str_lit("__llvm_core")));
+	// add_global_entity(alloc_entity_library_name(universal_scope,
+	//                                             make_token_ident(str_lit("__llvm_core")), t_invalid,
+	//                                             str_lit(""), str_lit("__llvm_core")));
 
 	// TODO(bill): Set through flags in the compiler
-	// add_global_string_constant(str_lit("ODIN_OS"),      bc->ODIN_OS);
-	// add_global_string_constant(str_lit("ODIN_ARCH"),    bc->ODIN_ARCH);
-	// add_global_string_constant(str_lit("ODIN_ENDIAN"),  bc->ODIN_ENDIAN);
 	add_global_string_constant(str_lit("ODIN_VENDOR"),  bc->ODIN_VENDOR);
 	add_global_string_constant(str_lit("ODIN_VERSION"), bc->ODIN_VERSION);
 	add_global_string_constant(str_lit("ODIN_ROOT"),    bc->ODIN_ROOT);

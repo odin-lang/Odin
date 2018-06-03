@@ -739,7 +739,7 @@ deprecated_attribute :: proc() {
 }
 
 main :: proc() {
-	when true {
+	when false {
 		general_stuff();
 		union_type();
 		parametric_polymorphism();
@@ -753,5 +753,8 @@ main :: proc() {
 		cstring_example();
 		deprecated_attribute();
 	}
+
+	x := f32(-123);
+	fmt.println(abs(x));
 }
 

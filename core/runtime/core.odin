@@ -270,7 +270,7 @@ typeid_base_without_enum :: proc "contextless" (id: typeid) -> typeid {
 
 
 @(default_calling_convention = "c")
-foreign __llvm_core {
+foreign {
 	@(link_name="llvm.assume")
 	assume :: proc(cond: bool) ---;
 
