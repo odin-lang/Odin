@@ -3092,7 +3092,7 @@ void calculate_global_init_order(Checker *c) {
 
 		for_array(i, n->pred.entries) {
 			EntityGraphNode *p = n->pred.entries[i].ptr;
-			p->dep_count -= 1;
+			p->dep_count -= gb_max(p->dep_count-1, 0);
 			priority_queue_fix(&pq, p->index);
 		}
 
