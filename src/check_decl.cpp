@@ -329,6 +329,7 @@ void check_const_decl(CheckerContext *ctx, Entity *e, AstNode *type_expr, AstNod
 		}
 
 		if (entity != nullptr) {
+			// TODO(bill): Clean up aliasing code
 			switch (entity->kind) {
 			case Entity_Alias:
 				e->kind = Entity_Alias;
@@ -346,14 +347,14 @@ void check_const_decl(CheckerContext *ctx, Entity *e, AstNode *type_expr, AstNod
 				e->ImportName.path  = entity->ImportName.path;
 				e->ImportName.name  = entity->ImportName.path;
 				e->ImportName.scope = entity->ImportName.scope;
-				e->ImportName.used  = false;
+				e->flags &= ~EntityFlag_Used;
 				return;
 			case Entity_LibraryName:
 				e->kind = Entity_LibraryName;
 				e->type = entity->type;
 				e->LibraryName.path  = entity->LibraryName.path;
 				e->LibraryName.name  = entity->LibraryName.path;
-				e->LibraryName.used  = false;
+				e->flags &= ~EntityFlag_Used;
 				return;
 			}
 		}
@@ -468,7 +469,7 @@ void init_entity_foreign_library(CheckerContext *ctx, Entity *e) {
 		} else {
 			// TODO(bill): Extra stuff to do with library names?
 			*foreign_library = found;
-			found->LibraryName.used = true;
+			found->flags |= EntityFlag_Used;
 			add_entity_use(ctx, ident, found);
 		}
 	}

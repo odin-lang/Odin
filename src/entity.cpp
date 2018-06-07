@@ -50,13 +50,6 @@ enum EntityFlag {
 	EntityFlag_CVarArg       = 1<<20,
 };
 
-// Zero value means the overloading process is not yet done
-enum OverloadKind {
-	Overload_Unknown = 0,
-	Overload_No      = 1,
-	Overload_Yes     = 2,
-};
-
 enum EntityState {
 	EntityState_Unresolved = 0,
 	EntityState_InProgress  = 1,
@@ -93,17 +86,18 @@ struct Entity {
 			i32        field_index;
 			i32        field_src_index;
 			ExactValue default_value;
+			String     thread_local_model;
 			Entity *   foreign_library;
 			AstNode *  foreign_library_ident;
 			String     link_name;
 			String     link_prefix;
-			String     thread_local_model;
+			bool       is_foreign;
+			bool       is_export;
+
 			bool       default_is_nil;
 			bool       default_is_undef;
 			bool       default_is_location;
 			bool       is_immutable;
-			bool       is_foreign;
-			bool       is_export;
 		} Variable;
 		struct {
 			bool   is_type_alias;
@@ -111,14 +105,13 @@ struct Entity {
 			String ir_mangled_name;
 		} TypeName;
 		struct {
-			OverloadKind overload_kind;
-			String       link_name;
-			String       link_prefix;
 			u64          tags;
-			bool         is_export;
-			bool         is_foreign;
 			Entity *     foreign_library;
 			AstNode *    foreign_library_ident;
+			String       link_name;
+			String       link_prefix;
+			bool         is_foreign;
+			bool         is_export;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;
@@ -133,12 +126,10 @@ struct Entity {
 			String path;
 			String name;
 			Scope *scope;
-			bool   used;
 		} ImportName;
 		struct {
 			String path;
 			String name;
-			bool   used;
 		} LibraryName;
 		i32 Nil;
 		struct {

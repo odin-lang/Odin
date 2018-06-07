@@ -1331,7 +1331,7 @@ void ir_add_foreign_library_path(irModule *m, Entity *e) {
 		return;
 	}
 	GB_ASSERT(e->kind == Entity_LibraryName);
-	GB_ASSERT(e->LibraryName.used);
+	GB_ASSERT(e->flags & EntityFlag_Used);
 
 	String library_path = e->LibraryName.path;
 	if (library_path.len == 0) {
