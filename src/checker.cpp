@@ -2298,7 +2298,8 @@ String path_to_entity_name(String name, String fullpath) {
 		}
 	}
 
-	filename = substring(filename, 0, dot);
+	if (dot > 0)
+		filename = substring(filename, 0, dot);
 
 	if (is_string_an_identifier(filename)) {
 		return filename;
