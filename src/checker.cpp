@@ -1287,7 +1287,7 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 			Entity *fl = e->Procedure.foreign_library;
 			if (fl != nullptr) {
 				GB_ASSERT_MSG(fl->kind == Entity_LibraryName &&
-				              fl->LibraryName.used,
+				              (fl->flags&EntityFlag_Used),
 				              "%.*s", LIT(name));
 				add_dependency_to_set(c, fl);
 			}
@@ -1296,7 +1296,7 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 			Entity *fl = e->Variable.foreign_library;
 			if (fl != nullptr) {
 				GB_ASSERT_MSG(fl->kind == Entity_LibraryName &&
-				              fl->LibraryName.used,
+				              (fl->flags&EntityFlag_Used),
 				              "%.*s", LIT(name));
 				add_dependency_to_set(c, fl);
 			}
@@ -2339,7 +2339,9 @@ String path_to_entity_name(String name, String fullpath) {
 		}
 	}
 
-	filename = substring(filename, 0, dot);
+	if (dot > 0) {
+		filename = substring(filename, 0, dot);
+	}
 
 	if (is_string_an_identifier(filename)) {
 		return filename;

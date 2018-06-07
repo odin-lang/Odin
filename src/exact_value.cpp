@@ -24,7 +24,6 @@ enum ExactValueKind {
 	ExactValue_Pointer,
 	ExactValue_Compound,  // TODO(bill): Is this good enough?
 	ExactValue_Procedure, // TODO(bill): Is this good enough?
-	ExactValue_Entity,    // TODO(bill): Is this good enough?
 
 	ExactValue_Count,
 };
@@ -68,8 +67,6 @@ HashKey hash_exact_value(ExactValue v) {
 		return hash_pointer(v.value_compound);
 	case ExactValue_Procedure:
 		return hash_pointer(v.value_procedure);
-	case ExactValue_Entity:
-		return hash_pointer(v.value_entity);
 	}
 	return hashing_proc(&v, gb_size_of(ExactValue));
 
@@ -129,12 +126,6 @@ ExactValue exact_value_pointer(i64 ptr) {
 ExactValue exact_value_procedure(AstNode *node) {
 	ExactValue result = {ExactValue_Procedure};
 	result.value_procedure = node;
-	return result;
-}
-
-ExactValue exact_value_entity(Entity *entity) {
-	ExactValue result = {ExactValue_Entity};
-	result.value_entity = entity;
 	return result;
 }
 
