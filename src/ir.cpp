@@ -8169,42 +8169,43 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			}
 
 			isize count = t->Struct.fields.count;
+			if (count > 0) {
+				irValue *memory_types   = ir_type_info_member_types_offset  (proc, count);
+				irValue *memory_names   = ir_type_info_member_names_offset  (proc, count);
+				irValue *memory_offsets = ir_type_info_member_offsets_offset(proc, count);
+				irValue *memory_usings  = ir_type_info_member_usings_offset (proc, count);
 
-			irValue *memory_types   = ir_type_info_member_types_offset  (proc, count);
-			irValue *memory_names   = ir_type_info_member_names_offset  (proc, count);
-			irValue *memory_offsets = ir_type_info_member_offsets_offset(proc, count);
-			irValue *memory_usings  = ir_type_info_member_usings_offset (proc, count);
+				type_set_offsets(t); // NOTE(bill): Just incase the offsets have not been set yet
+				for (isize source_index = 0; source_index < count; source_index++) {
+					// TODO(bill): Order fields in source order not layout order
+					Entity *f = t->Struct.fields[source_index];
+					irValue *tip = ir_get_type_info_ptr(proc, f->type);
+					i64 foffset = 0;
+					if (!t->Struct.is_raw_union) {
+						foffset = t->Struct.offsets[f->Variable.field_index];
+					}
+					GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 
-			type_set_offsets(t); // NOTE(bill): Just incase the offsets have not been set yet
-			for (isize source_index = 0; source_index < count; source_index++) {
-				// TODO(bill): Order fields in source order not layout order
-				Entity *f = t->Struct.fields[source_index];
-				irValue *tip = ir_get_type_info_ptr(proc, f->type);
-				i64 foffset = 0;
-				if (!t->Struct.is_raw_union) {
-					foffset = t->Struct.offsets[f->Variable.field_index];
+					irValue *index     = ir_const_int(a, source_index);
+					irValue *type_info = ir_emit_ptr_offset(proc, memory_types,   index);
+					irValue *offset    = ir_emit_ptr_offset(proc, memory_offsets, index);
+					irValue *is_using  = ir_emit_ptr_offset(proc, memory_usings, index);
+
+					ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
+					if (f->token.string.len > 0) {
+						irValue *name = ir_emit_ptr_offset(proc, memory_names,   index);
+						ir_emit_store(proc, name, ir_const_string(a, f->token.string));
+					}
+					ir_emit_store(proc, offset, ir_const_uintptr(a, foffset));
+					ir_emit_store(proc, is_using, ir_const_bool(a, (f->flags&EntityFlag_Using) != 0));
 				}
-				GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 
-				irValue *index     = ir_const_int(a, source_index);
-				irValue *type_info = ir_emit_ptr_offset(proc, memory_types,   index);
-				irValue *offset    = ir_emit_ptr_offset(proc, memory_offsets, index);
-				irValue *is_using  = ir_emit_ptr_offset(proc, memory_usings, index);
-
-				ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
-				if (f->token.string.len > 0) {
-					irValue *name = ir_emit_ptr_offset(proc, memory_names,   index);
-					ir_emit_store(proc, name, ir_const_string(a, f->token.string));
-				}
-				ir_emit_store(proc, offset, ir_const_uintptr(a, foffset));
-				ir_emit_store(proc, is_using, ir_const_bool(a, (f->flags&EntityFlag_Using) != 0));
+				irValue *cv = ir_const_int(a, count);
+				ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   cv);
+				ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   cv);
+				ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, cv);
+				ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 3), memory_usings,  cv);
 			}
-
-			irValue *cv = ir_const_int(a, count);
-			ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   cv);
-			ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   cv);
-			ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, cv);
-			ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 3), memory_usings,  cv);
 			break;
 		}
 		case Type_Map: {
