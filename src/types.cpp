@@ -1595,7 +1595,7 @@ Selection lookup_field_from_index(Type *type, i64 index) {
 }
 
 
-Entity *current_scope_lookup_entity(Scope *s, String name);
+Entity *scope_lookup_current(Scope *s, String name);
 
 Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel) {
 	GB_ASSERT(type_ != nullptr);
@@ -1712,7 +1712,7 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 		if (type->kind == Type_Struct) {
 			Scope *s = type->Struct.scope;
 			if (s != nullptr) {
-				Entity *found = current_scope_lookup_entity(s, field_name);
+				Entity *found = scope_lookup_current(s, field_name);
 				if (found != nullptr && found->kind != Entity_Variable) {
 					sel.entity = found;
 					return sel;

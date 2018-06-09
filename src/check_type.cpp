@@ -12,7 +12,7 @@ void populate_using_entity_scope(CheckerContext *ctx, AstNode *node, Type *t) {
 			Entity *f = t->Struct.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
 			String name = f->token.string;;
-			Entity *e = current_scope_lookup_entity(ctx->scope, name);
+			Entity *e = scope_lookup_current(ctx->scope, name);
 			if (e != nullptr && name != "_") {
 				// TODO(bill): Better type error
 				if (str != nullptr) {
@@ -589,7 +589,7 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		e->flags |= EntityFlag_Visited;
 		e->state = EntityState_Resolved;
 
-		if (current_scope_lookup_entity(ctx->scope, name) != nullptr) {
+		if (scope_lookup_current(ctx->scope, name) != nullptr) {
 			error(ident, "'%.*s' is already declared in this enumeration", LIT(name));
 		} else {
 			add_entity(ctx->checker, ctx->scope, nullptr, e);
@@ -674,7 +674,7 @@ void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type, AstNode *no
 		e->flags |= EntityFlag_BitFieldValue;
 
 		if (!is_blank_ident(name) &&
-		    current_scope_lookup_entity(ctx->scope, name) != nullptr) {
+		    scope_lookup_current(ctx->scope, name) != nullptr) {
 			error(ident, "'%.*s' is already declared in this bit field", LIT(name));
 		} else {
 			add_entity(ctx->checker, ctx->scope, nullptr, e);
