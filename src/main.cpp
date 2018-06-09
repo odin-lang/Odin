@@ -633,9 +633,9 @@ void remove_temp_files(String output_base) {
 	defer (array_free(&data));
 
 	isize n = output_base.len;
-	gb_memcopy(data.data, output_base.text, n);
+	gb_memmove(data.data, output_base.text, n);
 #define EXT_REMOVE(s) do {                         \
-		gb_memcopy(data.data+n, s, gb_size_of(s)); \
+		gb_memmove(data.data+n, s, gb_size_of(s)); \
 		gb_file_remove(cast(char *)data.data);     \
 	} while (0)
 	EXT_REMOVE(".ll");
@@ -718,6 +718,7 @@ int main(int arg_count, char **arg_ptr) {
 
 	init_string_buffer_memory();
 	init_global_error_collector();
+	arena_init(&global_ast_arena, heap_allocator());
 
 	array_init(&library_collections, heap_allocator());
 	// NOTE(bill): 'core' cannot be (re)defined by the user

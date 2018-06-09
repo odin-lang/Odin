@@ -241,7 +241,7 @@ Scope *create_scope_from_file(CheckerContext *c, AstFile *f) {
 	Scope *s = create_scope(f->pkg->scope, c->allocator);
 
 	array_reserve(&s->delayed_imports, f->imports.count);
-	array_reserve(&s->delayed_directives, f->assert_decl_count);
+	array_reserve(&s->delayed_directives, f->directive_count);
 
 	s->is_file = true;
 	s->file = f;
@@ -2652,7 +2652,7 @@ void check_add_foreign_import_decl(CheckerContext *ctx, AstNode *decl) {
 	if (fl->collection_name != "system") {
 		char *c_str = gb_alloc_array(heap_allocator(), char, fullpath.len+1);
 		defer (gb_free(heap_allocator(), c_str));
-		gb_memcopy(c_str, fullpath.text, fullpath.len);
+		gb_memmove(c_str, fullpath.text, fullpath.len);
 		c_str[fullpath.len] = '\0';
 
 		gbFile f = {};

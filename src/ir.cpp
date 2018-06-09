@@ -8550,7 +8550,7 @@ void ir_gen_tree(irGen *s) {
 		}
 		proc_type->Proc.abi_compat_result_type = proc_results->Tuple.variables[0]->type;
 
-		AstNode *body = gb_alloc_item(a, AstNode);
+		AstNode *body = alloc_ast_node(nullptr, AstNode_Invalid);
 		Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
 
@@ -8628,7 +8628,7 @@ void ir_gen_tree(irGen *s) {
 		}
 		proc_type->Proc.abi_compat_result_type = proc_results->Tuple.variables[0]->type;
 
-		AstNode *body = gb_alloc_item(a, AstNode);
+		AstNode *body = alloc_ast_node(nullptr, AstNode_Invalid);
 		Entity *e     = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p    = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
 
@@ -8692,7 +8692,7 @@ void ir_gen_tree(irGen *s) {
 		                                 proc_params, 4,
 		                                 proc_results, 1, false, ProcCC_Std);
 
-		AstNode *body = gb_alloc_item(a, AstNode);
+		AstNode *body = alloc_ast_node(nullptr, AstNode_Invalid);
 		Entity *e = alloc_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
 
@@ -8718,7 +8718,7 @@ void ir_gen_tree(irGen *s) {
 		                                  nullptr, 0,
 		                                  nullptr, 0, false,
 		                                  ProcCC_Contextless);
-		AstNode *body = gb_alloc_item(a, AstNode);
+		AstNode *body = alloc_ast_node(nullptr, AstNode_Invalid);
 		Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
 

@@ -208,9 +208,7 @@ void add_polymorphic_struct_entity(CheckerContext *ctx, AstNode *node, Type *nam
 		token.kind = Token_String;
 		token.string = named_type->Named.name;
 
-		AstNode *node = gb_alloc_item(a, AstNode);
-		node->kind = AstNode_Ident;
-		node->Ident.token = token;
+		AstNode *node = ast_ident(nullptr, token);
 
 		e = alloc_entity_type_name(s, token, named_type);
 		e->state = EntityState_Resolved;
@@ -1634,8 +1632,7 @@ void init_map_entry_type(Type *type) {
 		value: Value;
 	}
 	*/
-	AstNode *dummy_node = gb_alloc_item(a, AstNode);
-	dummy_node->kind = AstNode_Invalid;
+	AstNode *dummy_node = alloc_ast_node(nullptr, AstNode_Invalid);
 	Scope *s = create_scope(universal_scope, a);
 
 	auto fields = array_make<Entity *>(a, 0, 3);
@@ -1670,8 +1667,7 @@ void init_map_internal_types(Type *type) {
 	}
 	*/
 	gbAllocator a = heap_allocator();
-	AstNode *dummy_node = gb_alloc_item(a, AstNode);
-	dummy_node->kind = AstNode_Invalid;
+	AstNode *dummy_node = alloc_ast_node(nullptr, AstNode_Invalid);
 	Scope *s = create_scope(universal_scope, a);
 
 	Type *hashes_type  = alloc_type_dynamic_array(t_int);

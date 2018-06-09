@@ -352,10 +352,6 @@ void check_const_decl(CheckerContext *ctx, Entity *e, AstNode *type_expr, AstNod
 		}
 	}
 
-	if (init != nullptr) {
-		check_expr_or_type(ctx, &operand, init, e->type);
-	}
-
 	check_init_constant(ctx, e, &operand);
 
 	if (operand.mode == Addressing_Invalid ||

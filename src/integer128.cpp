@@ -323,7 +323,7 @@ String u128_to_string(u128 v, char *out_buf, isize out_buf_len) {
 	buf[--i] = gb__num_to_char_table[u128_to_i64(u128_mod(v, b))];
 
 	isize len = gb_min(gb_size_of(buf)-i, out_buf_len);
-	gb_memcopy(out_buf, &buf[i], len);
+	gb_memmove(out_buf, &buf[i], len);
 	return make_string(cast(u8 *)out_buf, len);
 }
 String i128_to_string(i128 a, char *out_buf, isize out_buf_len) {
@@ -348,7 +348,7 @@ String i128_to_string(i128 a, char *out_buf, isize out_buf_len) {
 	}
 
 	isize len = gb_min(gb_size_of(buf)-i, out_buf_len);
-	gb_memcopy(out_buf, &buf[i], len);
+	gb_memmove(out_buf, &buf[i], len);
 	return make_string(cast(u8 *)out_buf, len);
 }
 
