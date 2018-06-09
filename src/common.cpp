@@ -211,7 +211,7 @@ String u64_to_string(u64 v, char *out_buf, isize out_buf_len) {
 	buf[--i] = gb__num_to_char_table[v%b];
 
 	isize len = gb_min(gb_size_of(buf)-i, out_buf_len);
-	gb_memcopy(out_buf, &buf[i], len);
+	gb_memmove(out_buf, &buf[i], len);
 	return make_string(cast(u8 *)out_buf, len);
 }
 String i64_to_string(i64 a, char *out_buf, isize out_buf_len) {
@@ -236,7 +236,7 @@ String i64_to_string(i64 a, char *out_buf, isize out_buf_len) {
 	}
 
 	isize len = gb_min(gb_size_of(buf)-i, out_buf_len);
-	gb_memcopy(out_buf, &buf[i], len);
+	gb_memmove(out_buf, &buf[i], len);
 	return make_string(cast(u8 *)out_buf, len);
 }
 
@@ -287,103 +287,115 @@ gb_global u64 const unsigned_integer_maxs[] = {
 gb_global String global_module_path = {0};
 gb_global bool global_module_path_set = false;
 
-#if 0
-struct Pool {
-	gbAllocator backing;
-	u8 *ptr;
-	u8 *end;
+// Arena from Per Vognsen
+#define ALIGN_DOWN(n, a)     ((n) & ~((a) - 1))
+#define ALIGN_UP(n, a)       ALIGN_DOWN((n) + (a) - 1, (a))
+#define ALIGN_DOWN_PTR(p, a) (cast(void *)ALIGN_DOWN(cast(uintptr)(p), (a)))
+#define ALIGN_UP_PTR(p, a)   (cast(void *)ALIGN_UP(cast(uintptr)(p), (a)))
+
+typedef struct Arena {
+	u8 *        ptr;
+	u8 *        end;
 	Array<u8 *> blocks;
-	isize block_size;
-	isize alignment;
-};
+	gbAllocator backing;
+	isize       block_size;
+	gbMutex     mutex;
 
-#define POOL_BLOCK_SIZE (8*1024*1024)
-#define POOL_ALIGNMENT  16
+	isize total_used;
+	isize possible_used;
+} Arena;
 
-#define ALIGN_DOWN(n, a) ((n) & ~((a) - 1))
-#define ALIGN_UP(n, a) ALIGN_DOWN((n) + (a) - 1, (a))
-#define ALIGN_DOWN_PTR(p, a) ((void *)ALIGN_DOWN((uintptr)(p), (a)))
-#define ALIGN_UP_PTR(p, a) ((void *)ALIGN_UP((uintptr)(p), (a)))
+#define ARENA_MIN_ALIGNMENT 16
+#define ARENA_DEFAULT_BLOCK_SIZE (8*1024*1024)
 
-void pool_init(Pool *pool, gbAllocator backing, isize block_size=POOL_BLOCK_SIZE, isize alignment=POOL_ALIGNMENT) {
-	pool->ptr = nullptr;
-	pool->end = nullptr;
-	pool->backing = backing;
-	pool->block_size = block_size;
-	pool->alignment = alignment;
-	array_init(&pool->blocks, backing);
+void arena_init(Arena *arena, gbAllocator backing, isize block_size=ARENA_DEFAULT_BLOCK_SIZE) {
+	arena->backing = backing;
+	arena->block_size = block_size;
+	array_init(&arena->blocks, backing);
+	gb_mutex_init(&arena->mutex);
 }
 
-void pool_free_all(Pool *pool) {
-	for_array(i, pool->blocks) {
-		gb_free(pool->backing, pool->blocks[i]);
-	}
-	array_clear(&pool->blocks);
+void arena_grow(Arena *arena, isize min_size) {
+	gb_mutex_lock(&arena->mutex);
+	defer (gb_mutex_unlock(&arena->mutex));
+
+	isize size = gb_max(arena->block_size, min_size);
+	size = ALIGN_UP(size, ARENA_MIN_ALIGNMENT);
+	void *new_ptr = gb_alloc(arena->backing, size);
+    arena->ptr = cast(u8 *)new_ptr;
+    gb_zero_size(arena->ptr, size);
+    GB_ASSERT(arena->ptr == ALIGN_DOWN_PTR(arena->ptr, ARENA_MIN_ALIGNMENT));
+    arena->end = arena->ptr + size;
+    array_add(&arena->blocks, arena->ptr);
 }
 
-void pool_destroy(Pool *pool) {
-	pool_free_all(pool);
-	array_free(&pool->blocks);
+void *arena_alloc(Arena *arena, isize size, isize alignment) {
+	gb_mutex_lock(&arena->mutex);
+	defer (gb_mutex_unlock(&arena->mutex));
+
+	arena->total_used += size;
+
+    if (size > (arena->end - arena->ptr)) {
+        arena_grow(arena, size);
+        GB_ASSERT(size <= (arena->end - arena->ptr));
+    }
+
+    isize align = gb_max(alignment, ARENA_MIN_ALIGNMENT);
+    void *ptr = arena->ptr;
+    arena->ptr = cast(u8 *)ALIGN_UP_PTR(arena->ptr + size, align);
+    GB_ASSERT(arena->ptr <= arena->end);
+    GB_ASSERT(ptr == ALIGN_DOWN_PTR(ptr, align));
+    gb_zero_size(ptr, size);
+    return ptr;
 }
 
-void pool_grow(Pool *pool, isize min_size) {
-	isize size = ALIGN_UP(gb_max(min_size, pool->block_size), pool->alignment);
-	pool->ptr = cast(u8 *)gb_alloc(pool->backing, size);
-	GB_ASSERT(pool->ptr == ALIGN_DOWN_PTR(pool->ptr, pool->alignment));
-	pool->end = pool->ptr + size;
-	array_add(&pool->blocks, pool->ptr);
+void arena_free_all(Arena *arena) {
+	gb_mutex_lock(&arena->mutex);
+	defer (gb_mutex_unlock(&arena->mutex));
+
+	for_array(i, arena->blocks) {
+        gb_free(arena->backing, arena->blocks[i]);
+    }
+    array_clear(&arena->blocks);
+    arena->ptr = nullptr;
+    arena->end = nullptr;
 }
 
-void *pool_alloc(Pool *pool, isize size, isize align) {
-	if (size > (pool->end - pool->ptr)) {
-		pool_grow(pool, size);
-		GB_ASSERT(size <= (pool->end - pool->ptr));
-	}
-	align = gb_max(align, pool->alignment);
-	void *ptr = pool->ptr;
-	pool->ptr = cast(u8 *)ALIGN_UP_PTR(pool->ptr + size, align);
-	GB_ASSERT(pool->ptr <= pool->end);
-	GB_ASSERT(ptr == ALIGN_DOWN_PTR(ptr, align));
-	return ptr;
-}
-
-GB_ALLOCATOR_PROC(pool_allocator_proc) {
-	void *ptr = nullptr;
-	Pool *pool = cast(Pool *)allocator_data;
 
 
-	switch (type) {
-	case gbAllocation_Alloc:
-		ptr = pool_alloc(pool, size, alignment);
-		break;
-	case gbAllocation_FreeAll:
-		pool_free_all(pool);
-		break;
 
-	case gbAllocation_Free:
-	case gbAllocation_Resize:
-		GB_PANIC("A pool allocator does not support free or resize");
-		break;
-	}
+GB_ALLOCATOR_PROC(arena_allocator_proc);
 
-	return ptr;
-}
-gbAllocator pool_allocator(Pool *pool) {
+gbAllocator arena_allocator(Arena *arena) {
 	gbAllocator a;
-	a.proc = pool_allocator_proc;
-	a.data = pool;
+	a.proc = arena_allocator_proc;
+	a.data = arena;
 	return a;
 }
 
 
-gb_global Pool global_pool = {};
+GB_ALLOCATOR_PROC(arena_allocator_proc) {
+	void *ptr = nullptr;
+	Arena *arena = cast(Arena *)allocator_data;
+	GB_ASSERT_NOT_NULL(arena);
 
-gbAllocator perm_allocator(void) {
-	return pool_allocator(&global_pool);
+	switch (type) {
+	case gbAllocation_Alloc:
+		ptr = arena_alloc(arena, size, alignment);
+		break;
+	case gbAllocation_Free:
+		GB_PANIC("gbAllocation_Free not supported");
+		break;
+	case gbAllocation_Resize:
+		GB_PANIC("gbAllocation_Resize: not supported");
+		break;
+	case gbAllocation_FreeAll:
+		arena_free_all(arena);
+		break;
+	}
+
+	return ptr;
 }
-#endif
-
-
 
 
 

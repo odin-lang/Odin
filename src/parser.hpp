@@ -54,7 +54,6 @@ struct AstFile {
 
 	AstNode *           pkg_decl;
 	String              fullpath;
-	gbArena             arena;
 	Tokenizer           tokenizer;
 	Array<Token>        tokens;
 	isize               curr_token_index;
@@ -74,7 +73,7 @@ struct AstFile {
 
 	Array<AstNode *>    decls;
 	Array<AstNode *>    imports; // 'import' 'using import'
-	isize               assert_decl_count;
+	isize               directive_count;
 
 
 	AstNode *           curr_proc;
@@ -388,7 +387,6 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		Token    token;           \
 		Token    filepath;        \
 		Token    library_name;    \
-		String   base_dir;        \
 		String   collection_name; \
 		String   fullpath;        \
 		CommentGroup docs;        \
@@ -505,9 +503,18 @@ String const ast_node_strings[] = {
 #undef AST_NODE_KIND
 };
 
+
 #define AST_NODE_KIND(_kind_name_, name, ...) typedef __VA_ARGS__ GB_JOIN2(AstNode, _kind_name_);
 	AST_NODE_KINDS
 #undef AST_NODE_KIND
+
+
+isize const ast_node_sizes[] = {
+	0,
+#define AST_NODE_KIND(_kind_name_, name, ...) gb_size_of(GB_JOIN2(AstNode, _kind_name_)),
+	AST_NODE_KINDS
+#undef AST_NODE_KIND
+};
 
 struct AstNode {
 	AstNodeKind kind;
@@ -523,7 +530,9 @@ struct AstNode {
 };
 
 
-#define ast_node(n_, Kind_, node_) GB_JOIN2(AstNode, Kind_) *n_ = &(node_)->Kind_; GB_ASSERT((node_)->kind == GB_JOIN2(AstNode_, Kind_))
+#define ast_node(n_, Kind_, node_) GB_JOIN2(AstNode, Kind_) *n_ = &(node_)->Kind_; GB_ASSERT_MSG((node_)->kind == GB_JOIN2(AstNode_, Kind_), \
+	"expected '%.*s' got '%.*s'", \
+	LIT(ast_node_strings[GB_JOIN2(AstNode_, Kind_)]), LIT(ast_node_strings[(node_)->kind]))
 #define case_ast_node(n_, Kind_, node_) case GB_JOIN2(AstNode_, Kind_): { ast_node(n_, Kind_, node_);
 #ifndef case_end
 #define case_end } break;
@@ -549,4 +558,6 @@ gb_inline bool is_ast_node_when_stmt(AstNode *node) {
 	return node->kind == AstNode_WhenStmt;
 }
 
+gb_global Arena global_ast_arena = {};
 
+AstNode *alloc_ast_node(AstFile *f, AstNodeKind kind);

@@ -3632,7 +3632,7 @@ break;
 		isize variable_count = type->Struct.fields.count;
 		array_init(&tuple->Tuple.variables, a, variable_count);
 		// TODO(bill): Should I copy each of the entities or is this good enough?
-		gb_memcopy_array(tuple->Tuple.variables.data, type->Struct.fields.data, variable_count);
+		gb_memmove_array(tuple->Tuple.variables.data, type->Struct.fields.data, variable_count);
 
 		operand->type = tuple;
 		operand->mode = Addressing_Value;

@@ -113,7 +113,7 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	if (node == nullptr) {
 		return nullptr;
 	}
-	AstNode *n = gb_alloc_item(a, AstNode);
+	AstNode *n = alloc_ast_node(node->file, node->kind);
 	gb_memmove(n, node, gb_size_of(AstNode));
 
 	switch (n->kind) {
@@ -422,12 +422,13 @@ bool ast_node_expect(AstNode *node, AstNodeKind kind) {
 
 // NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
 AstNode *alloc_ast_node(AstFile *f, AstNodeKind kind) {
-	gbArena *arena = &f->arena;
-	if (gb_arena_size_remaining(arena, GB_DEFAULT_MEMORY_ALIGNMENT) <= gb_size_of(AstNode)) {
-		// NOTE(bill): If a syntax error is so bad, just quit!
-		gb_exit(1);
-	}
-	AstNode *node = gb_alloc_item(gb_arena_allocator(arena), AstNode);
+	Arena *arena = &global_ast_arena;
+	gbAllocator a = arena_allocator(arena);
+	AstNode *node = gb_alloc_item(a, AstNode);
+	gb_mutex_lock(&arena->mutex);
+	defer (gb_mutex_unlock(&arena->mutex));
+	arena->possible_used += ALIGN_UP(24 + ast_node_sizes[kind], 8);
+
 	node->kind = kind;
 	node->file = f;
 	return node;
@@ -3865,10 +3866,6 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	f->prev_token = f->tokens[f->curr_token_index];
 	f->curr_token = f->tokens[f->curr_token_index];
 
-	// NOTE(bill): Is this big enough or too small?
-	isize arena_size = gb_size_of(AstNode);
-	arena_size *= 2*f->tokens.count;
-	gb_arena_init_from_allocator(&f->arena, heap_allocator(), arena_size);
 	array_init(&f->comments, heap_allocator());
 	array_init(&f->imports, heap_allocator());
 
@@ -3879,7 +3876,6 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 
 void destroy_ast_file(AstFile *f) {
 	GB_ASSERT(f != nullptr);
-	gb_arena_free(&f->arena);
 	array_free(&f->tokens);
 	array_free(&f->comments);
 	array_free(&f->imports);
@@ -4197,10 +4193,8 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 			if (node->kind == AstNode_ExprStmt) {
 				AstNode *expr = node->ExprStmt.expr;
 				if (expr->kind == AstNode_CallExpr &&
-				    expr->CallExpr.proc->kind == AstNode_BasicDirective &&
-				    expr->CallExpr.proc->BasicDirective.name == "assert") {
-
-					f->assert_decl_count += 1;
+				    expr->CallExpr.proc->kind == AstNode_BasicDirective) {
+					f->directive_count += 1;
 					continue;
 				}
 			}
@@ -4224,7 +4218,6 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 			ast_node(fl, ForeignImportDecl, node);
 
 			String file_str = fl->filepath.string;
-			fl->base_dir = base_dir;
 			fl->fullpath = file_str;
 
 			if (fl->collection_name != "system") {
