@@ -1706,7 +1706,7 @@ irValue *ir_emit_runtime_call(irProcedure *proc, char const *name_, Array<irValu
 	String name = make_string_c(cast(char *)name_);
 
 	AstPackage *p = proc->module->info->runtime_package;
-	Entity *e = current_scope_lookup_entity(p->scope, name);
+	Entity *e = scope_lookup_current(p->scope, name);
 	irValue **found = map_get(&proc->module->values, hash_entity(e));
 	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
 	irValue *gp = *found;
@@ -1719,7 +1719,7 @@ irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char
 	String package_name = make_string_c(cast(char *)package_name_);
 
 	AstPackage *p = get_core_package(proc->module->info, package_name);
-	Entity *e = current_scope_lookup_entity(p->scope, name);
+	Entity *e = scope_lookup_current(p->scope, name);
 	irValue **found = map_get(&proc->module->values, hash_entity(e));
 	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
 	irValue *gp = *found;
@@ -4089,7 +4089,7 @@ irValue *ir_emit_clamp(irProcedure *proc, Type *t, irValue *x, irValue *min, irV
 
 irValue *ir_find_global_variable(irProcedure *proc, String name) {
 	AstPackage *pkg = proc->module->info->runtime_package;
-	Entity *e = current_scope_lookup_entity(pkg->scope, name);
+	Entity *e = scope_lookup_current(pkg->scope, name);
 	irValue **value = map_get(&proc->module->values, hash_entity(e));
 	GB_ASSERT_MSG(value != nullptr, "Unable to find global variable '%.*s'", LIT(name));
 	return *value;

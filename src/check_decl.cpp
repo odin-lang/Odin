@@ -260,6 +260,19 @@ void check_type_decl(CheckerContext *ctx, Entity *e, AstNode *type_expr, Type *d
 	// }
 }
 
+
+void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
+	// NOTE(bill): The original_entity's scope may not be same scope that it was inserted into
+	// e.g. file entity inserted into its package scope
+	String original_name = original_entity->token.string;
+	Scope *found_scope = nullptr;
+	Entity *found_entity = nullptr;
+	scope_lookup_parent(original_entity->scope, original_name, &found_scope, &found_entity);
+	GB_ASSERT(found_entity == original_entity);
+
+	map_set(&found_scope->elements, hash_string(original_name), new_entity);
+}
+
 void check_const_decl(CheckerContext *ctx, Entity *e, AstNode *type_expr, AstNode *init, Type *named_type) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Constant);
@@ -321,40 +334,19 @@ void check_const_decl(CheckerContext *ctx, Entity *e, AstNode *type_expr, AstNod
 		case Addressing_ProcGroup:
 			GB_ASSERT(operand.proc_group != nullptr);
 			GB_ASSERT(operand.proc_group->kind == Entity_ProcGroup);
-
-			e->kind = Entity_ProcGroup;
-			e->type = t_invalid;
-			gb_memmove(&e->ProcGroup, &operand.proc_group->ProcGroup, gb_size_of(e->ProcGroup));
+			override_entity_in_scope(e, operand.proc_group);
 			return;
 		}
 
 		if (entity != nullptr) {
-			// TODO(bill): Clean up aliasing code
+
+			// NOTE(bill): Override aliased entity
 			switch (entity->kind) {
-			case Entity_Alias:
-				e->kind = Entity_Alias;
-				e->type = entity->type;
-				e->Alias.base = entity->Alias.base;
-				return;
+			case Entity_ProcGroup:
 			case Entity_Procedure:
-				e->kind = Entity_Alias;
-				e->type = entity->type;
-				e->Alias.base = entity;
-				return;
-			case Entity_ImportName:
-				e->kind = Entity_ImportName;
-				e->type = entity->type;
-				e->ImportName.path  = entity->ImportName.path;
-				e->ImportName.name  = entity->ImportName.path;
-				e->ImportName.scope = entity->ImportName.scope;
-				e->flags &= ~EntityFlag_Used;
-				return;
 			case Entity_LibraryName:
-				e->kind = Entity_LibraryName;
-				e->type = entity->type;
-				e->LibraryName.path  = entity->LibraryName.path;
-				e->LibraryName.name  = entity->LibraryName.path;
-				e->flags &= ~EntityFlag_Used;
+			case Entity_ImportName:
+				override_entity_in_scope(e, entity);
 				return;
 			}
 		}
@@ -457,7 +449,7 @@ void init_entity_foreign_library(CheckerContext *ctx, Entity *e) {
 		error(ident, "foreign library names must be an identifier");
 	} else {
 		String name = ident->Ident.token.string;
-		Entity *found = scope_lookup_entity(ctx->scope, name);
+		Entity *found = scope_lookup(ctx->scope, name);
 		if (found == nullptr) {
 			if (is_blank_ident(name)) {
 				// NOTE(bill): link against nothing
@@ -992,7 +984,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 						uvar->Variable.is_immutable = is_immutable;
 						if (is_value) uvar->flags |= EntityFlag_Value;
 
-						Entity *prev = scope_insert_entity(ctx->scope, uvar);
+						Entity *prev = scope_insert(ctx->scope, uvar);
 						if (prev != nullptr) {
 							error(e->token, "Namespace collision while 'using' '%.*s' of: %.*s", LIT(name), LIT(prev->token.string));
 							break;

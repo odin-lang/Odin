@@ -782,7 +782,7 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 			if (poly->Array.generic_count != nullptr) {
 				Type *gt = poly->Array.generic_count;
 				GB_ASSERT(gt->kind == Type_Generic);
-				Entity *e = scope_lookup_entity(gt->Generic.scope, gt->Generic.name);
+				Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.name);
 				GB_ASSERT(e != nullptr);
 				if (e->kind == Entity_TypeName) {
 					poly->Array.generic_count = nullptr;
@@ -927,7 +927,7 @@ Entity *check_ident(CheckerContext *c, Operand *o, AstNode *n, Type *named_type,
 	o->expr = n;
 	String name = n->Ident.token.string;
 
-	Entity *e = scope_lookup_entity(c->scope, name);
+	Entity *e = scope_lookup(c->scope, name);
 	if (e == nullptr) {
 		if (is_blank_ident(name)) {
 			error(n, "'_' cannot be used as a value type");
@@ -950,12 +950,6 @@ Entity *check_ident(CheckerContext *c, Operand *o, AstNode *n, Type *named_type,
 			error(n, "Nested procedures do not capture its parent's labels: %.*s", LIT(name));
 			return nullptr;
 		}
-	}
-	bool is_alias = false;
-	while (e->kind == Entity_Alias) {
-		GB_ASSERT(e->Alias.base != nullptr);
-		e = e->Alias.base;
-		is_alias = true;
 	}
 
 	HashKey key = hash_string(e->token.string);
@@ -2536,7 +2530,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, AstNode *node, Type 
 		return nullptr;
 	}
 
-	if (selector->kind != AstNode_Ident && selector->kind != AstNode_BasicLit) {
+	if (selector->kind != AstNode_Ident) {
 	// if (selector->kind != AstNode_Ident) {
 		error(selector, "Illegal selector kind: '%.*s'", LIT(ast_node_strings[selector->kind]));
 		operand->mode = Addressing_Invalid;
@@ -2546,15 +2540,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, AstNode *node, Type 
 
 	if (op_expr->kind == AstNode_Ident) {
 		String op_name = op_expr->Ident.token.string;
-		Entity *e = scope_lookup_entity(c->scope, op_name);
-
-		bool is_alias = false;
-		while (e != nullptr && e->kind == Entity_Alias) {
-			GB_ASSERT(e->Alias.base != nullptr);
-			e = e->Alias.base;
-			is_alias = true;
-		}
-
+		Entity *e = scope_lookup(c->scope, op_name);
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
 
@@ -2568,7 +2554,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, AstNode *node, Type 
 			String entity_name = selector->Ident.token.string;
 
 			check_op_expr = false;
-			entity = current_scope_lookup_entity(import_scope, entity_name);
+			entity = scope_lookup_current(import_scope, entity_name);
 			bool is_declared = entity != nullptr;
 			if (is_declared) {
 				if (entity->kind == Entity_Builtin) {
@@ -2587,22 +2573,8 @@ Entity *check_selector(CheckerContext *c, Operand *operand, AstNode *node, Type 
 			}
 
 
-			bool is_alias = false;
-			while (entity->kind == Entity_Alias) {
-				GB_ASSERT(e->Alias.base != nullptr);
-				entity = entity->Alias.base;
-				is_alias = true;
-			}
-
 			check_entity_decl(c, entity, nullptr, nullptr);
 			GB_ASSERT(entity->type != nullptr);
-
-
-			if (is_alias) {
-				// TODO(bill): Which scope do you search for for an alias?
-				// import_scope = entity->scope;
-				entity_name = entity->token.string;
-			}
 
 
 			bool implicit_is_found = is_entity_implicitly_imported(e, entity);
@@ -2680,60 +2652,6 @@ Entity *check_selector(CheckerContext *c, Operand *operand, AstNode *node, Type 
 		if (is_type_enum(operand->type)) {
 			add_type_info_type(c, operand->type);
 		}
-	}
-	if (entity == nullptr && selector->kind == AstNode_BasicLit) {
-		if (is_type_struct(operand->type) || is_type_tuple(operand->type)) {
-			Type *type = base_type(operand->type);
-			Operand o = {};
-			check_expr(c, &o, selector);
-			if (o.mode != Addressing_Constant ||
-			    !is_type_integer(o.type)) {
-				error(op_expr, "Indexed based selectors must be a constant integer %s");
-				operand->mode = Addressing_Invalid;
-				operand->expr = node;
-				return nullptr;
-			}
-			i64 index = o.value.value_integer;
-			if (index < 0) {
-				error(o.expr, "Index %lld cannot be a negative value", index);
-				operand->mode = Addressing_Invalid;
-				operand->expr = node;
-				return nullptr;
-			}
-
-			i64 max_count = 0;
-			switch (type->kind) {
-			case Type_Struct: max_count = type->Struct.fields.count;   break;
-			case Type_Tuple:  max_count = type->Tuple.variables.count; break;
-			}
-
-			if (index >= max_count) {
-				error(o.expr, "Index %lld is out of bounds range 0..<%lld", index, max_count);
-				operand->mode = Addressing_Invalid;
-				operand->expr = node;
-				return nullptr;
-			}
-
-			sel = lookup_field_from_index(type, index);
-			entity = sel.entity;
-
-			GB_ASSERT(entity != nullptr);
-
-		} else {
-			error(op_expr, "Indexed based selectors may only be used on structs or tuples");
-			operand->mode = Addressing_Invalid;
-			operand->expr = node;
-			return nullptr;
-		}
-	}
-
-	if (entity == nullptr &&
-	    operand->type != nullptr && is_type_untyped(operand->type) && is_type_string(operand->type)) {
-		String s = operand->value.value_string;
-		operand->mode = Addressing_Constant;
-		operand->value = exact_value_i64(s.len);
-		operand->type = t_untyped_integer;
-		return nullptr;
 	}
 
 	if (entity == nullptr) {

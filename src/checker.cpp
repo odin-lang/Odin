@@ -341,7 +341,7 @@ void check_close_scope(CheckerContext *c) {
 }
 
 
-Entity *current_scope_lookup_entity(Scope *s, String name) {
+Entity *scope_lookup_current(Scope *s, String name) {
 	HashKey key = hash_string(name);
 	Entity **found = map_get(&s->elements, key);
 	if (found) {
@@ -350,7 +350,7 @@ Entity *current_scope_lookup_entity(Scope *s, String name) {
 	return nullptr;
 }
 
-void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entity **entity_) {
+void scope_lookup_parent(Scope *scope, String name, Scope **scope_, Entity **entity_) {
 	bool gone_thru_proc = false;
 	bool gone_thru_package = false;
 	HashKey key = hash_string(name);
@@ -387,15 +387,15 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 	if (scope_) *scope_ = nullptr;
 }
 
-Entity *scope_lookup_entity(Scope *s, String name) {
+Entity *scope_lookup(Scope *s, String name) {
 	Entity *entity = nullptr;
-	scope_lookup_parent_entity(s, name, nullptr, &entity);
+	scope_lookup_parent(s, name, nullptr, &entity);
 	return entity;
 }
 
 
 
-Entity *scope_insert_entity(Scope *s, Entity *entity) {
+Entity *scope_insert(Scope *s, Entity *entity) {
 	String name = entity->token.string;
 	if (name == "") {
 		return nullptr;
@@ -485,7 +485,7 @@ AstPackage *get_core_package(CheckerInfo *info, String name) {
 void add_package_dependency(CheckerContext *c, char *package_name, char *name) {
 	String n = make_string_c(name);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
-	Entity *e = scope_lookup_entity(p->scope, n);
+	Entity *e = scope_lookup(p->scope, n);
 	GB_ASSERT_MSG(e != nullptr, "%s", name);
 	ptr_set_add(&c->decl->deps, e);
 	// add_type_info_type(c, e->type);
@@ -496,7 +496,6 @@ void add_declaration_dependency(CheckerContext *c, Entity *e) {
 		return;
 	}
 	if (c->decl != nullptr) {
-		// DeclInfo *decl = decl_info_of_entity(&c->info, e);
 		add_dependency(c->decl, e);
 	}
 }
@@ -507,7 +506,7 @@ Entity *add_global_entity(Entity *entity) {
 	if (gb_memchr(name.text, ' ', name.len)) {
 		return entity; // NOTE(bill): 'untyped thing'
 	}
-	if (scope_insert_entity(universal_scope, entity)) {
+	if (scope_insert(universal_scope, entity)) {
 		compiler_error("double declaration");
 	}
 	entity->state = EntityState_Resolved;
@@ -849,7 +848,7 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 	}
 	String name = entity->token.string;
 	if (!is_blank_ident(name)) {
-		Entity *ie = scope_insert_entity(scope, entity);
+		Entity *ie = scope_insert(scope, entity);
 		if (ie != nullptr) {
 			TokenPos pos = ie->token.pos;
 			Entity *up = ie->using_parent;
@@ -1320,7 +1319,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("Context"),
 	};
 	for (isize i = 0; i < gb_count_of(required_builtin_entities); i++) {
-		add_dependency_to_set(c, scope_lookup_entity(c->info.runtime_package->scope, required_builtin_entities[i]));
+		add_dependency_to_set(c, scope_lookup(c->info.runtime_package->scope, required_builtin_entities[i]));
 	}
 
 	AstPackage *mem = get_core_package(&c->info, str_lit("mem"));
@@ -1329,7 +1328,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("Allocator"),
 	};
 	for (isize i = 0; i < gb_count_of(required_mem_entities); i++) {
-		add_dependency_to_set(c, scope_lookup_entity(mem->scope, required_mem_entities[i]));
+		add_dependency_to_set(c, scope_lookup(mem->scope, required_mem_entities[i]));
 	}
 
 	AstPackage *os = get_core_package(&c->info, str_lit("os"));
@@ -1337,7 +1336,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("heap_allocator"),
 	};
 	for (isize i = 0; i < gb_count_of(required_os_entities); i++) {
-		add_dependency_to_set(c, scope_lookup_entity(os->scope, required_mem_entities[i]));
+		add_dependency_to_set(c, scope_lookup(os->scope, required_mem_entities[i]));
 	}
 
 
@@ -1348,7 +1347,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			str_lit("dynamic_array_expr_error"),
 		};
 		for (isize i = 0; i < gb_count_of(bounds_check_entities); i++) {
-			add_dependency_to_set(c, scope_lookup_entity(c->info.runtime_package->scope, bounds_check_entities[i]));
+			add_dependency_to_set(c, scope_lookup(c->info.runtime_package->scope, bounds_check_entities[i]));
 		}
 	}
 
@@ -1468,7 +1467,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 
 
 Entity *find_core_entity(Checker *c, String name) {
-	Entity *e = current_scope_lookup_entity(c->info.runtime_package->scope, name);
+	Entity *e = scope_lookup_current(c->info.runtime_package->scope, name);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
 , LIT(name));
@@ -1478,7 +1477,7 @@ Entity *find_core_entity(Checker *c, String name) {
 }
 
 Type *find_core_type(Checker *c, String name) {
-	Entity *e = current_scope_lookup_entity(c->info.runtime_package->scope, name);
+	Entity *e = scope_lookup_current(c->info.runtime_package->scope, name);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
 , LIT(name));
@@ -1601,7 +1600,7 @@ void init_core_allocator(Checker *c) {
 	AstPackage *pkg = get_core_package(&c->info, str_lit("mem"));
 
 	String name = str_lit("Allocator");
-	Entity *e = current_scope_lookup_entity(pkg->scope, name);
+	Entity *e = scope_lookup_current(pkg->scope, name);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n", LIT(name));
 		// NOTE(bill): This will exit the program as it's cannot continue without it!
@@ -1956,7 +1955,7 @@ void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<AstNode *> *
 
 			if (name == "builtin") {
 				add_entity(ctx->checker, universal_scope, nullptr, e);
-				GB_ASSERT(scope_lookup_entity(universal_scope, e->token.string) != nullptr);
+				GB_ASSERT(scope_lookup(universal_scope, e->token.string) != nullptr);
 				if (value != nullptr) {
 					error(value, "'builtin' cannot have a field value");
 				}
@@ -2591,7 +2590,7 @@ void check_add_import_decl(CheckerContext *ctx, AstNodeImportDecl *id) {
 				ast_node(ident, Ident, node);
 				String name = ident->token.string;
 
-				Entity *e = scope_lookup_entity(scope, name);
+				Entity *e = scope_lookup(scope, name);
 				if (e == nullptr) {
 					if (is_blank_ident(name)) {
 						error(node, "'_' cannot be used as a value");
@@ -2621,7 +2620,7 @@ void check_add_import_decl(CheckerContext *ctx, AstNodeImportDecl *id) {
 
 				bool implicit_is_found = ptr_set_exists(&scope->implicit, e);
 				if (is_entity_exported(e) && !implicit_is_found) {
-					Entity *prev = scope_lookup_entity(parent_scope, e->token.string);
+					Entity *prev = scope_lookup(parent_scope, e->token.string);
 					bool ok = add_entity(ctx->checker, parent_scope, e->identifier, e);
 					if (ok) ptr_set_add(&parent_scope->implicit, e);
 				}
@@ -3308,7 +3307,7 @@ void check_parsed_files(Checker *c) {
 		Scope *s = c->info.init_scope;
 		GB_ASSERT(s != nullptr);
 		GB_ASSERT(s->is_init);
-		Entity *e = current_scope_lookup_entity(s, str_lit("main"));
+		Entity *e = scope_lookup_current(s, str_lit("main"));
 		if (e == nullptr) {
 			Token token = {};
 			token.pos.file   = s->package->fullpath;

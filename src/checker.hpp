@@ -387,10 +387,10 @@ isize        type_info_index        (CheckerInfo *i, Type *   type, bool error_o
 Entity *entity_of_node(CheckerInfo *i, AstNode *expr);
 
 
-Entity *current_scope_lookup_entity(Scope *s, String name);
-Entity *scope_lookup_entity        (Scope *s, String name);
-void    scope_lookup_parent_entity (Scope *s, String name, Scope **scope_, Entity **entity_);
-Entity *scope_insert_entity        (Scope *s, Entity *entity);
+Entity *scope_lookup_current(Scope *s, String name);
+Entity *scope_lookup (Scope *s, String name);
+void    scope_lookup_parent (Scope *s, String name, Scope **scope_, Entity **entity_);
+Entity *scope_insert (Scope *s, Entity *entity);
 
 
 ExprInfo *check_get_expr_info     (CheckerInfo *i, AstNode *expr);

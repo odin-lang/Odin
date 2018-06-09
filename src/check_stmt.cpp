@@ -236,7 +236,7 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 	} else {
 		if (node->kind == AstNode_Ident) {
 			ast_node(i, Ident, node);
-			e = scope_lookup_entity(ctx->scope, i->token.string);
+			e = scope_lookup(ctx->scope, i->token.string);
 			if (e != nullptr && e->kind == Entity_Variable) {
 				used = (e->flags & EntityFlag_Used) != 0; // TODO(bill): Make backup just in case
 			}
@@ -456,7 +456,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstNodeUsingStmt *us, AstNode 
 				Entity *f = t->Enum.fields[i];
 				if (!is_entity_exported(f)) continue;
 
-				Entity *found = scope_insert_entity(ctx->scope, f);
+				Entity *found = scope_insert(ctx->scope, f);
 				if (found != nullptr) {
 					gbString expr_str = expr_to_string(expr);
 					error(us->token, "Namespace collision while 'using' '%s' of: %.*s", expr_str, LIT(found->token.string));
@@ -478,7 +478,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstNodeUsingStmt *us, AstNode 
 			Entity *decl = scope->elements.entries[i].value;
 			if (!is_entity_exported(decl)) continue;
 
-			Entity *found = scope_insert_entity(ctx->scope, decl);
+			Entity *found = scope_insert(ctx->scope, decl);
 			if (found != nullptr) {
 				gbString expr_str = expr_to_string(expr);
 				error(us->token,
@@ -507,7 +507,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstNodeUsingStmt *us, AstNode 
 				if (f->kind == Entity_Variable) {
 					Entity *uvar = alloc_entity_using_variable(e, f->token, f->type);
 					uvar->using_expr = expr;
-					Entity *prev = scope_insert_entity(ctx->scope, uvar);
+					Entity *prev = scope_insert(ctx->scope, uvar);
 					if (prev != nullptr) {
 						gbString expr_str = expr_to_string(expr);
 						error(us->token, "Namespace collision while using '%s' of: '%.*s'", expr_str, LIT(prev->token.string));
@@ -1464,7 +1464,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 				Entity *found = nullptr;
 
 				if (!is_blank_ident(str)) {
-					found = current_scope_lookup_entity(ctx->scope, str);
+					found = scope_lookup_current(ctx->scope, str);
 				}
 				if (found == nullptr) {
 					bool is_immutable = true;
@@ -1630,7 +1630,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 					AstNode *node = uis->list[list_index];
 					ast_node(ident, Ident, node);
 					String name = ident->token.string;
-					Entity *f = scope_lookup_entity(t->Enum.scope, name);
+					Entity *f = scope_lookup(t->Enum.scope, name);
 
 					if (f == nullptr || !is_entity_exported(f)) {
 						if (is_blank_ident(name)) {
@@ -1658,7 +1658,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 				ast_node(ident, Ident, node);
 				String name = ident->token.string;
 
-				Entity *f = scope_lookup_entity(scope, name);
+				Entity *f = scope_lookup(scope, name);
 				if (f == nullptr) {
 					if (is_blank_ident(name)) {
 						error(node, "'_' cannot be used as a value");
@@ -1691,7 +1691,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 					ast_node(ident, Ident, node);
 					String name = ident->token.string;
 
-					Entity *f = scope_lookup_entity(found, name);
+					Entity *f = scope_lookup(found, name);
 					if (f == nullptr || f->kind != Entity_Variable) {
 						if (is_blank_ident(name)) {
 							error(node, "'_' cannot be used as a value");
@@ -1703,7 +1703,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 
 					Entity *uvar = alloc_entity_using_variable(e, f->token, f->type);
 					uvar->using_expr = expr;
-					Entity *prev = scope_insert_entity(ctx->scope, uvar);
+					Entity *prev = scope_insert(ctx->scope, uvar);
 					if (prev != nullptr) {
 						gbString expr_str = expr_to_string(expr);
 						error(node, "Namespace collision while using '%s' of: '%.*s'", expr_str, LIT(prev->token.string));
@@ -1792,7 +1792,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 					Entity *found = nullptr;
 					// NOTE(bill): Ignore assignments to '_'
 					if (!is_blank_ident(str)) {
-						found = current_scope_lookup_entity(ctx->scope, str);
+						found = scope_lookup_current(ctx->scope, str);
 						new_name_count += 1;
 					}
 					if (found == nullptr) {
@@ -1939,7 +1939,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 							if (f->kind == Entity_Variable) {
 								Entity *uvar = alloc_entity_using_variable(e, f->token, f->type);
 								uvar->Variable.is_immutable = is_immutable;
-								Entity *prev = scope_insert_entity(ctx->scope, uvar);
+								Entity *prev = scope_insert(ctx->scope, uvar);
 								if (prev != nullptr) {
 									error(token, "Namespace collision while 'using' '%.*s' of: %.*s", LIT(name), LIT(prev->token.string));
 									return;
