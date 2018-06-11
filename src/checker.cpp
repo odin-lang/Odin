@@ -2551,28 +2551,26 @@ void check_add_import_decl(CheckerContext *ctx, AstNodeImportDecl *id) {
 	}
 
 
-	if (id->using_in_list.count == 0) {
-		String import_name = id->import_name.string;
-		if (import_name.len == 0) {
-			import_name = scope->package->name;
-		}
-		if (is_blank_ident(import_name)) {
-			if (id->is_using) {
-				// TODO(bill): Should this be a warning?
-			} else {
-				error(token, "Import name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
-			}
+	String import_name = id->import_name.string;
+	if (import_name.len == 0) {
+		import_name = scope->package->name;
+	}
+	if (is_blank_ident(import_name)) {
+		if (id->is_using) {
+			// TODO(bill): Should this be a warning?
 		} else {
-			GB_ASSERT(id->import_name.pos.line != 0);
-			id->import_name.string = import_name;
-			Entity *e = alloc_entity_import_name(parent_scope, id->import_name, t_invalid,
-			                                     id->fullpath, id->import_name.string,
-			                                     scope);
+			error(token, "Import name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+		}
+	} else {
+		GB_ASSERT(id->import_name.pos.line != 0);
+		id->import_name.string = import_name;
+		Entity *e = alloc_entity_import_name(parent_scope, id->import_name, t_invalid,
+		                                     id->fullpath, id->import_name.string,
+		                                     scope);
 
-			add_entity(ctx->checker, parent_scope, nullptr, e);
-			if (id->is_using) {
-				add_entity_use(ctx, nullptr, e);
-			}
+		add_entity(ctx->checker, parent_scope, nullptr, e);
+		if (id->is_using) {
+			add_entity_use(ctx, nullptr, e);
 		}
 	}
 
@@ -2583,47 +2581,15 @@ void check_add_import_decl(CheckerContext *ctx, AstNodeImportDecl *id) {
 		}
 
 		// NOTE(bill): Add imported entities to this file's scope
-		if (id->using_in_list.count > 0) {
+		for_array(elem_index, scope->elements.entries) {
+			Entity *e = scope->elements.entries[elem_index].value;
+			if (e->scope == parent_scope) continue;
 
-			for_array(list_index, id->using_in_list) {
-				AstNode *node = id->using_in_list[list_index];
-				ast_node(ident, Ident, node);
-				String name = ident->token.string;
-
-				Entity *e = scope_lookup(scope, name);
-				if (e == nullptr) {
-					if (is_blank_ident(name)) {
-						error(node, "'_' cannot be used as a value");
-					} else {
-						error(node, "Undeclared name in this importation: '%.*s'", LIT(name));
-					}
-					continue;
-				}
-				if (e->scope == parent_scope) {
-					continue;
-				}
-
-				bool implicit_is_found = ptr_set_exists(&scope->implicit, e);
-				if (is_entity_exported(e) && !implicit_is_found) {
-					add_entity_use(ctx, node, e);
-					bool ok = add_entity(ctx->checker, parent_scope, e->identifier, e);
-					if (ok) ptr_set_add(&parent_scope->implicit, e);
-				} else {
-					error(node, "'%.*s' is exported from this scope", LIT(name));
-					continue;
-				}
-			}
-		} else {
-			for_array(elem_index, scope->elements.entries) {
-				Entity *e = scope->elements.entries[elem_index].value;
-				if (e->scope == parent_scope) continue;
-
-				bool implicit_is_found = ptr_set_exists(&scope->implicit, e);
-				if (is_entity_exported(e) && !implicit_is_found) {
-					Entity *prev = scope_lookup(parent_scope, e->token.string);
-					bool ok = add_entity(ctx->checker, parent_scope, e->identifier, e);
-					if (ok) ptr_set_add(&parent_scope->implicit, e);
-				}
+			bool implicit_is_found = ptr_set_exists(&scope->implicit, e);
+			if (is_entity_exported(e) && !implicit_is_found) {
+				Entity *prev = scope_lookup(parent_scope, e->token.string);
+				bool ok = add_entity(ctx->checker, parent_scope, e->identifier, e);
+				if (ok) ptr_set_add(&parent_scope->implicit, e);
 			}
 		}
 	}

@@ -172,11 +172,6 @@ enum StmtAllowFlag {
 	StmtAllowFlag_Label = 1<<1,
 };
 
-
-
-// NOTE(bill): This massive define is so it is possible to create a discriminated union (and extra debug info)
-// for the AstNode. I personally prefer discriminated unions over subtype polymorphism as I can preallocate
-// all the nodes and even memcpy in a different kind of node
 #define AST_NODE_KINDS \
 	AST_NODE_KIND(Ident,          "identifier",      struct { \
 		Token   token;  \
@@ -326,12 +321,6 @@ AST_NODE_KIND(_ComplexStmtBegin, "", struct {}) \
 		Token token;   \
 		Array<AstNode *> list; \
 	}) \
-	AST_NODE_KIND(UsingInStmt, "using in statement",  struct { \
-		Token using_token;     \
-		Array<AstNode *> list; \
-		Token in_token;        \
-		AstNode *expr;         \
-	}) \
 	AST_NODE_KIND(PushContext, "context <- statement", struct { \
 		Token token;   \
 		AstNode *expr; \
@@ -377,7 +366,6 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		Token    relpath;       \
 		String   fullpath;      \
 		Token    import_name;   \
-		Array<AstNode *> using_in_list; \
 		CommentGroup docs;      \
 		CommentGroup comment;   \
 		bool     is_using;      \

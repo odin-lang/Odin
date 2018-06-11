@@ -53,7 +53,6 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_DeferStmt:          return node->DeferStmt.token;
 	case AstNode_BranchStmt:         return node->BranchStmt.token;
 	case AstNode_UsingStmt:          return node->UsingStmt.token;
-	case AstNode_UsingInStmt:        return node->UsingInStmt.using_token;
 	case AstNode_PushContext:        return node->PushContext.token;
 
 	case AstNode_BadDecl:            return node->BadDecl.begin;
@@ -274,10 +273,6 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		break;
 	case AstNode_UsingStmt:
 		n->UsingStmt.list = clone_ast_node_array(a, n->UsingStmt.list);
-		break;
-	case AstNode_UsingInStmt:
-		n->UsingInStmt.list = clone_ast_node_array(a, n->UsingInStmt.list);
-		n->UsingInStmt.expr = clone_ast_node(a, n->UsingInStmt.expr);
 		break;
 	case AstNode_PushContext:
 		n->PushContext.expr = clone_ast_node(a, n->PushContext.expr);
@@ -796,15 +791,6 @@ AstNode *ast_using_stmt(AstFile *f, Token token, Array<AstNode *> list) {
 	result->UsingStmt.list  = list;
 	return result;
 }
-AstNode *ast_using_in_stmt(AstFile *f, Token using_token, Array<AstNode *> list, Token in_token, AstNode *expr) {
-	AstNode *result = alloc_ast_node(f, AstNode_UsingInStmt);
-	result->UsingInStmt.using_token = using_token;
-	result->UsingInStmt.list        = list;
-	result->UsingInStmt.in_token    = in_token;
-	result->UsingInStmt.expr        = expr;
-	return result;
-}
-
 
 AstNode *ast_push_context(AstFile *f, Token token, AstNode *expr, AstNode *body) {
 	AstNode *result = alloc_ast_node(f, AstNode_PushContext);
@@ -3451,7 +3437,6 @@ AstNode *parse_defer_stmt(AstFile *f) {
 enum ImportDeclKind {
 	ImportDecl_Standard,
 	ImportDecl_Using,
-	ImportDecl_UsingIn,
 };
 
 AstNode *parse_import_decl(AstFile *f, ImportDeclKind kind) {
@@ -3460,19 +3445,17 @@ AstNode *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 	Token import_name = {};
 	bool is_using = kind != ImportDecl_Standard;
 
-	if (kind != ImportDecl_UsingIn) {
-		switch (f->curr_token.kind) {
-		case Token_Ident:
-			import_name = advance_token(f);
-			break;
-		default:
-			import_name.pos = f->curr_token.pos;
-			break;
-		}
+	switch (f->curr_token.kind) {
+	case Token_Ident:
+		import_name = advance_token(f);
+		break;
+	default:
+		import_name.pos = f->curr_token.pos;
+		break;
+	}
 
-		if (!is_using && is_blank_ident(import_name)) {
-			syntax_error(import_name, "Illegal import name: '_'");
-		}
+	if (!is_using && is_blank_ident(import_name)) {
+		syntax_error(import_name, "Illegal import name: '_'");
 	}
 
 	Token file_path = expect_token_after(f, Token_String, "import");
@@ -3635,21 +3618,6 @@ AstNode *parse_stmt(AstFile *f) {
 			syntax_error(token, "Illegal use of 'using' statement");
 			expect_semicolon(f, nullptr);
 			return ast_bad_stmt(f, token, f->curr_token);
-		}
-
-		if (f->curr_token.kind == Token_in) {
-			Token in_token = expect_token(f, Token_in);
-			if (f->curr_token.kind == Token_import) {
-				AstNode *import_decl = parse_import_decl(f, ImportDecl_UsingIn);
-				if (import_decl->kind == AstNode_ImportDecl) {
-					import_decl->ImportDecl.using_in_list = list;
-				}
-				return import_decl;
-			}
-
-			AstNode *expr = parse_expr(f, true);
-			expect_semicolon(f, expr);
-			return ast_using_in_stmt(f, token, list, in_token, expr);
 		}
 
 		if (f->curr_token.kind != Token_Colon) {
