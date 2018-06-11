@@ -1289,6 +1289,7 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 	case AstNode_RangeStmt:
 	case AstNode_SwitchStmt:
 	case AstNode_TypeSwitchStmt:
+	case AstNode_PushContext:
 		return true;
 
 	case AstNode_HelperType:
@@ -1376,7 +1377,7 @@ AstNode *        parse_proc_type(AstFile *f, Token proc_token);
 Array<AstNode *> parse_stmt_list(AstFile *f);
 AstNode *        parse_stmt(AstFile *f);
 AstNode *        parse_body(AstFile *f);
-
+AstNode *        parse_block_stmt(AstFile *f, b32 is_when);
 
 
 
@@ -1556,7 +1557,7 @@ void parse_proc_tags(AstFile *f, u64 *tags) {
 
 Array<AstNode *> parse_lhs_expr_list    (AstFile *f);
 Array<AstNode *> parse_rhs_expr_list    (AstFile *f);
-AstNode *        parse_simple_stmt      (AstFile *f, StmtAllowFlag flags);
+AstNode *        parse_simple_stmt      (AstFile *f, u32 flags);
 AstNode *        parse_type             (AstFile *f);
 AstNode *        parse_call_expr        (AstFile *f, AstNode *operand);
 AstNode *        parse_struct_field_list(AstFile *f, isize *name_count_);
@@ -2490,7 +2491,7 @@ AstNode *parse_value_decl(AstFile *f, Array<AstNode *> names, CommentGroup docs)
 	return ast_value_decl(f, names, type, values, is_mutable, docs, f->line_comment);
 }
 
-AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
+AstNode *parse_simple_stmt(AstFile *f, u32 flags) {
 	Token token = f->curr_token;
 	CommentGroup docs = f->lead_comment;
 
@@ -2567,6 +2568,25 @@ AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 			}
 		}
 		return parse_value_decl(f, lhs, docs);
+
+	case Token_ArrowLeft:
+		if ((flags&StmtAllowFlag_Context) && lhs.count == 1) {
+			Token arrow = expect_token(f, Token_ArrowLeft);
+			AstNode *body = nullptr;
+			isize prev_level = f->expr_level;
+			f->expr_level = -1;
+			AstNode *expr = parse_expr(f, false);
+			f->expr_level = prev_level;
+
+			if (allow_token(f, Token_do)) {
+				body = convert_stmt_to_body(f, parse_stmt(f));
+			} else {
+				body = parse_block_stmt(f, false);
+			}
+
+			return ast_push_context(f, token, expr, body);
+		}
+		break;
 	}
 
 	if (lhs.count > 1) {
@@ -3535,26 +3555,7 @@ AstNode *parse_stmt(AstFile *f) {
 	Token token = f->curr_token;
 	switch (token.kind) {
 	// Operands
-	case Token_context:
-		if (look_ahead_token_kind(f, 1) == Token_ArrowLeft) {
-			advance_token(f);
-			Token arrow = expect_token(f, Token_ArrowLeft);
-			AstNode *body = nullptr;
-			isize prev_level = f->expr_level;
-			f->expr_level = -1;
-			AstNode *expr = parse_expr(f, false);
-			f->expr_level = prev_level;
-
-			if (allow_token(f, Token_do)) {
-				body = convert_stmt_to_body(f, parse_stmt(f));
-			} else {
-				body = parse_block_stmt(f, false);
-			}
-
-			return ast_push_context(f, token, expr, body);
-		}
-		/*fallthrough*/
-
+	case Token_context: // Also allows for `context <-`
 	case Token_Ident:
 	case Token_Integer:
 	case Token_Float:
@@ -3569,7 +3570,7 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 	case Token_And:
-		s = parse_simple_stmt(f, StmtAllowFlag_Label);
+		s = parse_simple_stmt(f, StmtAllowFlag_Label|StmtAllowFlag_Context);
 		expect_semicolon(f, s);
 		return s;
 
