@@ -1116,21 +1116,6 @@ Token advance_token(AstFile *f) {
 	return prev;
 }
 
-TokenKind look_ahead_token_kind(AstFile *f, isize amount) {
-	GB_ASSERT(amount > 0);
-
-	TokenKind kind = Token_Invalid;
-	isize index = f->curr_token_index;
-	while (amount > 0) {
-		index++;
-		kind = f->tokens[index].kind;
-		if (kind != Token_Comment) {
-			amount--;
-		}
-	}
-	return kind;
-}
-
 Token expect_token(AstFile *f, TokenKind kind) {
 	Token prev = f->curr_token;
 	if (prev.kind != kind) {
@@ -2432,7 +2417,6 @@ AstNode *parse_value_decl(AstFile *f, Array<AstNode *> names, CommentGroup docs)
 	AstNode *type = nullptr;
 	Array<AstNode *> values = {};
 
-	expect_token_after(f, Token_Colon, "identifier list");
 	if (f->curr_token.kind == Token_type) {
 		type = ast_type_type(f, advance_token(f), nullptr);
 		is_mutable = false;
@@ -2543,12 +2527,11 @@ AstNode *parse_simple_stmt(AstFile *f, u32 flags) {
 		break;
 
 	case Token_Colon:
+		expect_token_after(f, Token_Colon, "identifier list");
 		if ((flags&StmtAllowFlag_Label) && lhs.count == 1) {
-			TokenKind next = look_ahead_token_kind(f, 1);
-			switch (next) {
+			switch (f->curr_token.kind) {
 			case Token_for:
 			case Token_switch: {
-				expect_token_after(f, Token_Colon, "identifier list");
 				AstNode *name = lhs[0];
 				AstNode *label = ast_label_decl(f, ast_node_token(name), name);
 				AstNode *stmt = parse_stmt(f);
@@ -3625,6 +3608,7 @@ AstNode *parse_stmt(AstFile *f) {
 			expect_semicolon(f, list[list.count-1]);
 			return ast_using_stmt(f, token, list);
 		}
+		expect_token_after(f, Token_Colon, "identifier list");
 		decl = parse_value_decl(f, list, docs);
 
 		if (decl != nullptr && decl->kind == AstNode_ValueDecl) {
