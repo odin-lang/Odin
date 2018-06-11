@@ -1030,7 +1030,6 @@ AstNode *ast_attribute(AstFile *f, Token token, Token open, Token close, Array<A
 
 
 bool next_token0(AstFile *f) {
-	// Token prev = f->curr_token;
 	if (f->curr_token_index+1 < f->tokens.count) {
 		f->curr_token = f->tokens[++f->curr_token_index];
 		return true;
