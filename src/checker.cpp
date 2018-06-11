@@ -1243,9 +1243,7 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 
 
 void add_dependency_to_set(Checker *c, Entity *entity) {
-	if (entity == nullptr) {
-		return;
-	}
+	GB_ASSERT(entity != nullptr);
 
 	CheckerInfo *info = &c->info;
 	auto *set = &info->minimum_dependency_set;
@@ -1305,7 +1303,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	ptr_set_init(&c->info.minimum_dependency_set, heap_allocator());
 	ptr_set_init(&c->info.minimum_dependency_type_info_set, heap_allocator());
 
-	String required_builtin_entities[] = {
+	String required_runtime_entities[] = {
 		str_lit("__init_context"),
 
 		str_lit("args__"),
@@ -1315,8 +1313,8 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("Source_Code_Location"),
 		str_lit("Context"),
 	};
-	for (isize i = 0; i < gb_count_of(required_builtin_entities); i++) {
-		add_dependency_to_set(c, scope_lookup(c->info.runtime_package->scope, required_builtin_entities[i]));
+	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
+		add_dependency_to_set(c, scope_lookup(c->info.runtime_package->scope, required_runtime_entities[i]));
 	}
 
 	AstPackage *mem = get_core_package(&c->info, str_lit("mem"));
@@ -1333,7 +1331,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("heap_allocator"),
 	};
 	for (isize i = 0; i < gb_count_of(required_os_entities); i++) {
-		add_dependency_to_set(c, scope_lookup(os->scope, required_mem_entities[i]));
+		add_dependency_to_set(c, scope_lookup(os->scope, required_os_entities[i]));
 	}
 
 
