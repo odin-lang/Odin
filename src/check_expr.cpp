@@ -486,6 +486,12 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		}
 	}
 
+	if (is_type_enum(dst) && are_types_identical(dst->Enum.base_type, operand->type)) {
+		if (c->in_enum_type) {
+			return 3;
+		}
+	}
+
 #if 0
 	if (are_types_identical(dst, src) && (!is_type_named(dst) || !is_type_named(src))) {
 		return 1;

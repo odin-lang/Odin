@@ -343,6 +343,7 @@ struct CheckerContext {
 	CheckerTypePath *type_path;
 	isize            type_level; // TODO(bill): Actually handle correctly
 
+	bool       in_enum_type;
 	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;
 	bool       no_polymorphic_errors;

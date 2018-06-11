@@ -1931,6 +1931,7 @@ bool check_type_internal(CheckerContext *ctx, AstNode *e, Type **type, Type *nam
 		bool ips = ctx->in_polymorphic_specialization;
 		defer (ctx->in_polymorphic_specialization = ips);
 		ctx->in_polymorphic_specialization = false;
+		ctx->in_enum_type = true;
 
 		*type = alloc_type_enum();
 		set_base_type(named_type, *type);
