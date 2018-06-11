@@ -167,9 +167,10 @@ enum FieldFlag {
 };
 
 enum StmtAllowFlag {
-	StmtAllowFlag_None  = 0,
-	StmtAllowFlag_In    = 1<<0,
-	StmtAllowFlag_Label = 1<<1,
+	StmtAllowFlag_None    = 0,
+	StmtAllowFlag_In      = 1<<0,
+	StmtAllowFlag_Label   = 1<<1,
+	StmtAllowFlag_Context = 1<<2,
 };
 
 #define AST_NODE_KINDS \
