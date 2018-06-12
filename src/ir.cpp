@@ -2631,9 +2631,9 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 	} else if (is_type_dynamic_array(t)) {
 		switch (index) {
 		case 0: result_type = alloc_type_pointer(alloc_type_pointer(t->DynamicArray.elem)); break;
-		case 1: result_type = t_int_ptr;                                      break;
-		case 2: result_type = t_int_ptr;                                      break;
-		case 3: result_type = t_allocator_ptr;                                break;
+		case 1: result_type = t_int_ptr;       break;
+		case 2: result_type = t_int_ptr;       break;
+		case 3: result_type = t_allocator_ptr; break;
 		}
 	} /* else if (is_type_map(t)) {
 		init_map_internal_types(t);
@@ -2650,7 +2650,7 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		GB_PANIC("TODO(bill): struct_gep type: %s, %d", type_to_string(ir_type(s)), index);
 	}
 
-	GB_ASSERT(result_type != nullptr);
+	GB_ASSERT_MSG(result_type != nullptr, "%s %d", type_to_string(t), index);
 
 	return ir_emit(proc, ir_instr_struct_element_ptr(proc, s, index, result_type));
 }
@@ -2708,9 +2708,9 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 	case Type_DynamicArray:
 		switch (index) {
 		case 0: result_type = alloc_type_pointer(t->DynamicArray.elem); break;
-		case 1: result_type = t_int;                                      break;
-		case 2: result_type = t_int;                                      break;
-		case 3: result_type = t_allocator;                                break;
+		case 1: result_type = t_int;                                    break;
+		case 2: result_type = t_int;                                    break;
+		case 3: result_type = t_allocator;                              break;
 		}
 		break;
 

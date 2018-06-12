@@ -7,17 +7,12 @@ Semaphore :: struct {
 	_handle: win32.Handle,
 }
 
-/*
-Mutex :: struct {
-	_semaphore: Semaphore,
-	_counter:   i32,
-	_owner:     i32,
-	_recursion: i32,
-}
-*/
-
 Mutex :: struct {
 	_critical_section: win32.Critical_Section,
+}
+
+Condition :: struct {
+	event: win32.Handle,
 }
 
 current_thread_id :: proc() -> i32 {
@@ -41,7 +36,8 @@ semaphore_release :: inline proc(s: ^Semaphore) {
 }
 
 semaphore_wait :: proc(s: ^Semaphore) {
-	win32.wait_for_single_object(s._handle, win32.INFINITE);
+	result := win32.wait_for_single_object(s._handle, win32.INFINITE);
+	assert(result != win32.WAIT_FAILED);
 }
 
 
@@ -66,59 +62,23 @@ mutex_unlock :: proc(m: ^Mutex) {
 }
 
 
+condition_init :: proc(using c: ^Condition) {
+	event = win32.create_event_a(nil, false, false, nil);
+	assert(event != nil);
+}
 
-/*
-mutex_init :: proc(m: ^Mutex) {
-	atomics.store(&m._counter, 0);
-	atomics.store(&m._owner, current_thread_id());
-	semaphore_init(&m._semaphore);
-	m._recursion = 0;
+condition_signal :: proc(using c: ^Condition) {
+	ok := win32.set_event(event);
+	assert(bool(ok));
 }
-mutex_destroy :: proc(m: ^Mutex) {
-	semaphore_destroy(&m._semaphore);
-}
-mutex_lock :: proc(m: ^Mutex) {
-	thread_id := current_thread_id();
-	if atomics.fetch_add(&m._counter, 1) > 0 {
-		if thread_id != atomics.load(&m._owner) {
-			semaphore_wait(&m._semaphore);
-		}
-	}
-	atomics.store(&m._owner, thread_id);
-	m._recursion++;
-}
-mutex_try_lock :: proc(m: ^Mutex) -> bool {
-	thread_id := current_thread_id();
-	if atomics.load(&m._owner) == thread_id {
-		atomics.fetch_add(&m._counter, 1);
-	} else {
-		expected: i32 = 0;
-		if atomics.load(&m._counter) != 0 {
-			return false;
-		}
-		if atomics.compare_exchange(&m._counter, expected, 1) == 0 {
-			return false;
-		}
-		atomics.store(&m._owner, thread_id);
-	}
-	m._recursion++;
-	return true;
-}
-mutex_unlock :: proc(m: ^Mutex) {
-	recursion: i32;
-	thread_id := current_thread_id();
-	assert(thread_id == atomics.load(&m._owner));
 
-	m._recursion--;
-	recursion = m._recursion;
-	if recursion == 0 {
-		atomics.store(&m._owner, thread_id);
-	}
+condition_wait_for :: proc(using c: ^Condition) {
+	result := win32.wait_for_single_object(event, win32.INFINITE);
+	assert(result != win32.WAIT_FAILED);
+}
 
-	if atomics.fetch_add(&m._counter, -1) > 1 {
-		if recursion == 0 {
-			semaphore_release(&m._semaphore);
-		}
+condition_destroy :: proc(using c: ^Condition) {
+	if event != nil {
+		win32.close_handle(event);
 	}
 }
-*/
