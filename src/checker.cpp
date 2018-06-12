@@ -1588,7 +1588,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_bit_field_ptr     = alloc_type_pointer(t_type_info_bit_field);
 }
 
-void init_core_allocator(Checker *c) {
+void init_mem_allocator(Checker *c) {
 	if (t_allocator != nullptr) {
 		return;
 	}
@@ -1633,7 +1633,7 @@ void init_core_map_type(Checker *c) {
 
 void init_preload(Checker *c) {
 	init_core_type_info(c);
-	init_core_allocator(c);
+	init_mem_allocator(c);
 	init_core_context(c);
 	init_core_source_code_location(c);
 	init_core_map_type(c);

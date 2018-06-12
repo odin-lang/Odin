@@ -587,28 +587,6 @@ array_programming :: proc() {
 	}
 }
 
-
-using println in import "core:fmt"
-
-using_in :: proc() {
-	fmt.println("# using in");
-	using print in fmt;
-
-	println("Hellope1");
-	print("Hellope2\n");
-
-	Foo :: struct {
-		x, y: int,
-		b: bool,
-	}
-	f: Foo;
-	f.x, f.y = 123, 321;
-	println(f);
-	using x, y in f;
-	x, y = 456, 654;
-	println(f);
-}
-
 named_proc_return_parameters :: proc() {
 	fmt.println("# named proc return parameters");
 
@@ -745,7 +723,6 @@ main :: proc() {
 		parametric_polymorphism();
 		threading_example();
 		array_programming();
-		using_in();
 		named_proc_return_parameters();
 		enum_export();
 		explicit_procedure_overloading();

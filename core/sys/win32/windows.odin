@@ -701,6 +701,9 @@ foreign kernel32 {
 	@(link_name="LeaveCriticalSection")                  leave_critical_section                     :: proc(critical_section: ^Critical_Section) ---;
 
 	@(link_name="CreateEventA") create_event_a :: proc(event_attributes: ^Security_Attributes, manual_reset, initial_state: Bool, name: cstring) -> Handle ---;
+	@(link_name="PulseEvent")   pulse_event    :: proc(event: Handle) -> Bool ---;
+	@(link_name="SetEvent")     set_event      :: proc(event: Handle) -> Bool ---;
+	@(link_name="ResetEvent")   reset_event    :: proc(event: Handle) -> Bool ---;
 
 	@(link_name="LoadLibraryA")   load_library_a   :: proc(c_str: cstring)  -> Hmodule ---;
 	@(link_name="LoadLibraryW")   load_library_w   :: proc(c_str: Wstring) -> Hmodule ---;

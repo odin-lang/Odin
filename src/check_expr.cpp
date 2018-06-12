@@ -2648,6 +2648,9 @@ Entity *check_selector(CheckerContext *c, Operand *operand, AstNode *node, Type 
 
 	if (entity == nullptr && selector->kind == AstNode_Ident) {
 		String field_name = selector->Ident.token.string;
+		if (is_type_dynamic_array(type_deref(operand->type))) {
+			init_mem_allocator(c->checker);
+		}
 		sel = lookup_field(operand->type, field_name, operand->mode == Addressing_Type);
 		entity = sel.entity;
 

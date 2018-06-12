@@ -1611,55 +1611,6 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 
 	type = base_type(type);
 
-	if (type->kind == Type_Basic) {
-		switch (type->Basic.kind) {
-		case Basic_any: {
-		#if 1
-			// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
-			// `Raw_Any` type?
-			String data_str = str_lit("data");
-			String typeid_str = str_lit("typeid");
-			gb_local_persist Entity *entity__any_data = alloc_entity_field(nullptr, make_token_ident(data_str), t_rawptr, false, 0);
-			gb_local_persist Entity *entity__any_typeid = alloc_entity_field(nullptr, make_token_ident(typeid_str), t_typeid, false, 1);
-
-			if (field_name == data_str) {
-				selection_add_index(&sel, 0);
-				sel.entity = entity__any_data;;
-				return sel;
-			} else if (field_name == typeid_str) {
-				selection_add_index(&sel, 1);
-				sel.entity = entity__any_typeid;
-				return sel;
-			}
-		#endif
-		} break;
-		}
-
-		return sel;
-	} else if (type->kind == Type_Array) {
-		if (type->Array.count <= 4) {
-			// HACK(bill): Memory leak
-			switch (type->Array.count) {
-			#define _ARRAY_FIELD_CASE(_length, _name) \
-			case (_length): \
-				if (field_name == _name) { \
-					selection_add_index(&sel, (_length)-1); \
-					sel.entity = alloc_entity_array_elem(nullptr, make_token_ident(str_lit(_name)), type->Array.elem, (_length)-1); \
-					return sel; \
-				} \
-				/*fallthrough*/
-
-			_ARRAY_FIELD_CASE(4, "w");
-			_ARRAY_FIELD_CASE(3, "z");
-			_ARRAY_FIELD_CASE(2, "y");
-			_ARRAY_FIELD_CASE(1, "x");
-			default: break;
-
-			#undef _ARRAY_FIELD_CASE
-			}
-		}
-	}
-
 	if (is_type) {
 		switch (type->kind) {
 		case Type_Struct:
@@ -1768,6 +1719,65 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 				sel.entity = f;
 				return sel;
 			}
+		}
+	} else if (type->kind == Type_Basic) {
+		switch (type->Basic.kind) {
+		case Basic_any: {
+		#if 1
+			// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
+			// `Raw_Any` type?
+			String data_str = str_lit("data");
+			String typeid_str = str_lit("typeid");
+			gb_local_persist Entity *entity__any_data = alloc_entity_field(nullptr, make_token_ident(data_str), t_rawptr, false, 0);
+			gb_local_persist Entity *entity__any_typeid = alloc_entity_field(nullptr, make_token_ident(typeid_str), t_typeid, false, 1);
+
+			if (field_name == data_str) {
+				selection_add_index(&sel, 0);
+				sel.entity = entity__any_data;
+				return sel;
+			} else if (field_name == typeid_str) {
+				selection_add_index(&sel, 1);
+				sel.entity = entity__any_typeid;
+				return sel;
+			}
+		#endif
+		} break;
+		}
+
+		return sel;
+	} else if (type->kind == Type_Array) {
+		if (type->Array.count <= 4) {
+			// HACK(bill): Memory leak
+			switch (type->Array.count) {
+			#define _ARRAY_FIELD_CASE(_length, _name) \
+			case (_length): \
+				if (field_name == _name) { \
+					selection_add_index(&sel, (_length)-1); \
+					sel.entity = alloc_entity_array_elem(nullptr, make_token_ident(str_lit(_name)), type->Array.elem, (_length)-1); \
+					return sel; \
+				} \
+				/*fallthrough*/
+
+			_ARRAY_FIELD_CASE(4, "w");
+			_ARRAY_FIELD_CASE(3, "z");
+			_ARRAY_FIELD_CASE(2, "y");
+			_ARRAY_FIELD_CASE(1, "x");
+			default: break;
+
+			#undef _ARRAY_FIELD_CASE
+			}
+		}
+	} else if (type->kind == Type_DynamicArray) {
+		// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
+		// `Raw_Dynamic_Array` type?
+		GB_ASSERT(t_allocator != nullptr);
+		String allocator_str = str_lit("allocator");
+		gb_local_persist Entity *entity__allocator = alloc_entity_field(nullptr, make_token_ident(allocator_str), t_allocator, false, 0);
+
+		if (field_name == allocator_str) {
+			selection_add_index(&sel, 3);
+			sel.entity = entity__allocator;
+			return sel;
 		}
 	}
 
