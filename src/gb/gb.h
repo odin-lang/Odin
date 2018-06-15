@@ -1,4 +1,4 @@
-/* gb.h - v0.32  - Ginger Bill's C Helper Library - public domain
+/* gb.h - v0.33  - Ginger Bill's C Helper Library - public domain
                  - no warranty implied; use at your own risk
 
 	This is a single header file with a bunch of useful stuff
@@ -58,6 +58,7 @@ TODOS
 	- More date & time functions
 
 VERSION HISTORY
+	0.33  - Minor fixes
 	0.32  - Minor fixes
 	0.31  - Add gb_file_remove
 	0.30  - Changes to gbThread (and gbMutex on Windows)
@@ -6884,8 +6885,6 @@ gb_global gbUtf8AcceptRange const gb__utf8_accept_ranges[] = {
 
 
 isize gb_utf8_decode(u8 const *str, isize str_len, Rune *codepoint_out) {
-
-
 	isize width = 0;
 	Rune codepoint = GB_RUNE_INVALID;
 
@@ -6895,7 +6894,7 @@ isize gb_utf8_decode(u8 const *str, isize str_len, Rune *codepoint_out) {
 		u8 b1, b2, b3;
 		gbUtf8AcceptRange accept;
 		if (x >= 0xf0) {
-			Rune mask = (cast(Rune)x >> 31) << 31;
+			Rune mask = (cast(Rune)x << 31) >> 31;
 			codepoint = (cast(Rune)s0 & (~mask)) | (GB_RUNE_INVALID & mask);
 			width = 1;
 			goto end;
