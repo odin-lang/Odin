@@ -137,7 +137,7 @@ bool check_custom_align(CheckerContext *ctx, AstNode *node, i64 *align_) {
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		if (o.value.kind == ExactValue_Integer) {
 			i64 align = o.value.value_integer;
-			if (align < 1 || !gb_is_power_of_two(align)) {
+			if (align < 1 || !gb_is_power_of_two(cast(isize)align)) {
 				error(node, "#align must be a power of 2, got %lld", align);
 				return false;
 			}

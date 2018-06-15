@@ -528,8 +528,6 @@ void init_build_context(void) {
 	bc->opt_flags   = str_lit(" ");
 
 
-
-
 	gbString llc_flags = gb_string_make_reserve(heap_allocator(), 64);
 	if (bc->ODIN_DEBUG) {
 		llc_flags = gb_string_appendc(llc_flags, "-debug-compile ");

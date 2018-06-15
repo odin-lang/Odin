@@ -235,7 +235,7 @@ pool_alloc :: proc(using pool: ^Pool, bytes: int) -> rawptr {
 	}
 
 	memory := current_pos;
-	current_pos = ptr_offset((^byte)(current_pos), uintptr(bytes));
+	current_pos = ptr_offset((^byte)(current_pos), bytes);
 	bytes_left -= bytes;
 	return memory;
 }

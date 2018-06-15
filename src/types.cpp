@@ -1601,7 +1601,7 @@ Selection lookup_field_from_index(Type *type, i64 index) {
 	case Type_BitField: {
 		auto sel_array = array_make<i32>(a, 1);
 		sel_array[0] = cast(i32)index;
-		return make_selection(type->BitField.fields[index], sel_array, false);
+		return make_selection(type->BitField.fields[cast(isize)index], sel_array, false);
 	} break;
 
 	}
@@ -2163,7 +2163,7 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 		}
 		align = type_align_of_internal(t, path);
 		type_set_offsets(t);
-		size = t->Tuple.offsets[count-1] + type_size_of_internal(t->Tuple.variables[count-1]->type, path);
+		size = t->Tuple.offsets[cast(isize)count-1] + type_size_of_internal(t->Tuple.variables[cast(isize)count-1]->type, path);
 		return align_formula(size, align);
 	} break;
 
@@ -2233,7 +2233,7 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 				return FAILURE_SIZE;
 			}
 			type_set_offsets(t);
-			size = t->Struct.offsets[count-1] + type_size_of_internal(t->Struct.fields[count-1]->type, path);
+			size = t->Struct.offsets[cast(isize)count-1] + type_size_of_internal(t->Struct.fields[cast(isize)count-1]->type, path);
 			return align_formula(size, align);
 		}
 	} break;
@@ -2243,7 +2243,7 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 		i64 end = 0;
 		if (t->BitField.fields.count > 0) {
 			i64 last = t->BitField.fields.count-1;
-			end = t->BitField.offsets[last] + t->BitField.sizes[last];
+			end = t->BitField.offsets[cast(isize)last] + t->BitField.sizes[cast(isize)last];
 		}
 		i64 bits = align_formula(end, align);
 		GB_ASSERT((bits%8) == 0);

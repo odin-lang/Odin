@@ -3332,7 +3332,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		Type *elem = dst->Array.elem;
 		irValue *e = ir_emit_conv(proc, value, elem);
 		irValue *v = ir_add_local_generated(proc, t);
-		isize index_count = dst->Array.count;
+		isize index_count = cast(isize)dst->Array.count;
 
 		for (i32 i = 0; i < index_count; i++) {
 			irValue *elem = ir_emit_array_epi(proc, v, i);
@@ -5222,13 +5222,13 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 			}
 		}
 
-		i64 param_count = 0;
+		isize param_count = 0;
 		if (pt->params) {
 			GB_ASSERT(pt->params->kind == Type_Tuple);
 			param_count = pt->params->Tuple.variables.count;
 		}
 
-		auto args = array_make<irValue *>(proc->module->allocator, gb_max(param_count, arg_count));
+		auto args = array_make<irValue *>(proc->module->allocator, cast(isize)gb_max(param_count, arg_count));
 		isize variadic_index = pt->variadic_index;
 		bool variadic = pt->variadic && variadic_index >= 0;
 		bool vari_expand = ce->ellipsis.pos.line != 0;
@@ -5272,7 +5272,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 			GB_ASSERT(param_count < 1000000);
 
 			if (arg_count < param_count) {
-				isize end = param_count;
+				isize end = cast(isize)param_count;
 				if (variadic) {
 					end = variadic_index;
 				}
@@ -5328,7 +5328,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 					}
 				}
 			} else {
-				for (i64 i = 0; i < param_count; i++) {
+				for (isize i = 0; i < param_count; i++) {
 					Entity *e = param_tuple->variables[i];
 					if (e->kind == Entity_Variable) {
 						GB_ASSERT(args[i] != nullptr);
@@ -5376,7 +5376,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 			}
 		}
 
-		i64 final_count = param_count;
+		isize final_count = param_count;
 		if (is_c_vararg) {
 			final_count = arg_count;
 		}
@@ -7993,7 +7993,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			irValue *gep = ir_get_type_info_ptr(proc, t->Array.elem);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 
-			isize ez = type_size_of(t->Array.elem);
+			i64 ez = type_size_of(t->Array.elem);
 			irValue *elem_size = ir_emit_struct_ep(proc, tag, 1);
 			ir_emit_store(proc, elem_size, ir_const_int(a, ez));
 
@@ -8008,7 +8008,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			irValue *gep = ir_get_type_info_ptr(proc, t->DynamicArray.elem);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 
-			isize ez = type_size_of(t->DynamicArray.elem);
+			i64 ez = type_size_of(t->DynamicArray.elem);
 			irValue *elem_size = ir_emit_struct_ep(proc, tag, 1);
 			ir_emit_store(proc, elem_size, ir_const_int(a, ez));
 			break;
@@ -8019,7 +8019,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			irValue *gep = ir_get_type_info_ptr(proc, t->Slice.elem);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 
-			isize ez = type_size_of(t->Slice.elem);
+			i64 ez = type_size_of(t->Slice.elem);
 			irValue *elem_size = ir_emit_struct_ep(proc, tag, 1);
 			ir_emit_store(proc, elem_size, ir_const_int(a, ez));
 			break;
