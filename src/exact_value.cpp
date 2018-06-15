@@ -353,7 +353,7 @@ ExactValue exact_value_make_imag(ExactValue v) {
 }
 
 
-ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision) {
+ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision, bool is_unsigned) {
 	switch (op) {
 	case Token_Add:	{
 		switch (v.kind) {
@@ -404,7 +404,9 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 		// NOTE(bill): unsigned integers will be negative and will need to be
 		// limited to the types precision
 		// IMPORTANT NOTE(bill): Max precision is 64 bits as that's how integers are stored
-		i = i & unsigned_integer_maxs[precision/8];
+		if (is_unsigned) {
+			i = i & unsigned_integer_maxs[precision/8];
+		}
 		// if (0 < precision && precision < 64) {
 		// 	i = i & ~(-1ll << precision);
 		// }
