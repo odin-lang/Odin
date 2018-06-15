@@ -620,11 +620,14 @@ CheckerContext make_checker_context(Checker *c) {
 
 	ctx.type_path = new_checker_type_path();
 	ctx.type_level = 0;
+	ctx.poly_path = new_checker_poly_path();
+	ctx.poly_level = 0;
 	return ctx;
 }
 
 void destroy_checker_context(CheckerContext *ctx) {
 	destroy_checker_type_path(ctx->type_path);
+	destroy_checker_poly_path(ctx->poly_path);
 }
 
 void init_checker(Checker *c, Parser *parser) {
@@ -1090,13 +1093,13 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 	}
 }
 
-void check_procedure_later(Checker *c, ProcedureInfo info) {
+void check_procedure_later(Checker *c, ProcInfo info) {
 	GB_ASSERT(info.decl != nullptr);
 	array_add(&c->procs_to_check, info);
 }
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body, u64 tags) {
-	ProcedureInfo info = {};
+	ProcInfo info = {};
 	info.file  = file;
 	info.token = token;
 	info.decl  = decl;
@@ -1504,6 +1507,31 @@ Entity *check_type_path_pop(CheckerContext *c) {
 	return array_pop(c->type_path);
 }
 
+
+CheckerPolyPath *new_checker_poly_path(void) {
+	gbAllocator a = heap_allocator();
+	auto *pp = gb_alloc_item(a, CheckerPolyPath);
+	array_init(pp, a, 0, 16);
+	return pp;
+}
+
+void destroy_checker_poly_path(CheckerPolyPath *pp) {
+	array_free(pp);
+	gb_free(heap_allocator(), pp);
+}
+
+
+void check_poly_path_push(CheckerContext *c, Type *t) {
+	GB_ASSERT(c->poly_path != nullptr);
+	GB_ASSERT(t != nullptr);
+	GB_ASSERT(is_type_polymorphic(t));
+	array_add(c->poly_path, t);
+}
+
+Type *check_poly_path_pop(CheckerContext *c) {
+	GB_ASSERT(c->poly_path != nullptr);
+	return array_pop(c->poly_path);
+}
 
 
 
@@ -3095,7 +3123,7 @@ void calculate_global_init_order(Checker *c) {
 }
 
 
-void check_proc_info(Checker *c, ProcedureInfo pi) {
+void check_proc_info(Checker *c, ProcInfo pi) {
 	if (pi.type == nullptr) {
 		return;
 	}
@@ -3107,8 +3135,13 @@ void check_proc_info(Checker *c, ProcedureInfo pi) {
 
 	TypeProc *pt = &pi.type->Proc;
 	String name = pi.token.string;
-	if (pt->is_polymorphic) {
-		GB_ASSERT_MSG(pt->is_poly_specialized, "%.*s", LIT(name));
+	if (pt->is_polymorphic && !pt->is_poly_specialized) {
+		Token token = pi.token;
+		if (pi.poly_def_node != nullptr) {
+			token = ast_node_token(pi.poly_def_node);
+		}
+		error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
+		return;
 	}
 
 	bool bounds_check    = (pi.tags & ProcTag_bounds_check)    != 0;
@@ -3203,7 +3236,7 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("check procedure bodies");
 	// NOTE(bill): Nested procedures bodies will be added to this "queue"
 	for_array(i, c->procs_to_check) {
-		ProcedureInfo pi = c->procs_to_check[i];
+		ProcInfo pi = c->procs_to_check[i];
 		check_proc_info(c, pi);
 	}
 

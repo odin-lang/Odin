@@ -401,6 +401,11 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, AstNode *node, Ar
 				is_poly_specialized = false;
 				break;
 			}
+			if (struct_type == o.type) {
+				// NOTE(bill): Cycle
+				is_poly_specialized = false;
+				break;
+			}
 		}
 	}
 
@@ -604,7 +609,7 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 	if (et->is_export) {
 		Scope *parent = ctx->scope->parent;
 		if (parent->is_file) {
-			// NOTE(bhall): Use package scope
+			// NOTE(bill): Use package scope
 			parent = parent->parent;
 		}
 		for_array(i, fields) {
