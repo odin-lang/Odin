@@ -218,15 +218,16 @@ struct DeclInfo {
 	Array<BlockLabel> labels;
 };
 
-// ProcedureInfo stores the information needed for checking a procedure
-struct ProcedureInfo {
-	AstFile *             file;
-	Token                 token;
-	DeclInfo *            decl;
-	Type *                type; // Type_Procedure
-	AstNode *             body; // AstNode_BlockStmt
-	u64                   tags;
-	bool                  generated_from_polymorphic;
+// ProcInfo stores the information needed for checking a procedure
+struct ProcInfo {
+	AstFile * file;
+	Token     token;
+	DeclInfo *decl;
+	Type *    type; // Type_Procedure
+	AstNode * body; // AstNode_BlockStmt
+	u64       tags;
+	bool      generated_from_polymorphic;
+	AstNode * poly_def_node;
 };
 
 
@@ -296,6 +297,7 @@ struct ForeignContext {
 };
 
 typedef Array<Entity *> CheckerTypePath;
+typedef Array<Type *>   CheckerPolyPath;
 
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
@@ -342,6 +344,8 @@ struct CheckerContext {
 
 	CheckerTypePath *type_path;
 	isize            type_level; // TODO(bill): Actually handle correctly
+	CheckerPolyPath *poly_path;
+	isize            poly_level; // TODO(bill): Actually handle correctly
 
 	bool       in_enum_type;
 	bool       collect_delayed_decls;
@@ -355,7 +359,7 @@ struct Checker {
 	Parser *    parser;
 	CheckerInfo info;
 
-	Array<ProcedureInfo> procs_to_check;
+	Array<ProcInfo> procs_to_check;
 	PtrSet<AstPackage *> checked_packages;
 
 	gbAllocator    allocator;
@@ -419,3 +423,9 @@ void destroy_checker_type_path(CheckerTypePath *tp);
 
 void    check_type_path_push(CheckerContext *c, Entity *e);
 Entity *check_type_path_pop (CheckerContext *c);
+
+CheckerPolyPath *new_checker_poly_path();
+void destroy_checker_poly_path(CheckerPolyPath *);
+
+void  check_poly_path_push(CheckerContext *c, Type *t);
+Type *check_poly_path_pop (CheckerContext *c);

@@ -28,7 +28,7 @@ struct CallArgumentData {
 
 struct PolyProcData {
 	Entity *      gen_entity;
-	ProcedureInfo proc_info;
+	ProcInfo proc_info;
 };
 
 struct ValidIndexAndScore {
@@ -166,7 +166,7 @@ bool check_is_assignable_to_using_subtype(Type *src, Type *dst) {
 }
 
 bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_entity, Type *type,
-                                            Array<Operand> *param_operands, PolyProcData *poly_proc_data) {
+                                            Array<Operand> *param_operands, AstNode *poly_def_node, PolyProcData *poly_proc_data) {
 	///////////////////////////////////////////////////////////////////////////////
 	//                                                                           //
 	// TODO CLEANUP(bill): This procedure is very messy and hacky. Clean this!!! //
@@ -315,12 +315,24 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	}
 
 
+
 	AstNode *proc_lit = clone_ast_node(a, old_decl->proc_lit);
 	ast_node(pl, ProcLit, proc_lit);
 	// NOTE(bill): Associate the scope declared above withinth this procedure declaration's type
 	add_scope(&nctx, pl->type, final_proc_type->Proc.scope);
 	final_proc_type->Proc.is_poly_specialized = true;
 	final_proc_type->Proc.is_polymorphic = true;
+
+
+	for (isize i = 0; i < operands.count; i++) {
+		Operand o = operands[i];
+		if (final_proc_type == o.type ||
+		    base_entity->type == o.type) {
+			// NOTE(bill): Cycle
+			final_proc_type->Proc.is_poly_specialized = false;
+			break;
+		}
+	}
 
 	u64 tags = base_entity->Procedure.tags;
 	AstNode *ident = clone_ast_node(a, base_entity->identifier);
@@ -347,7 +359,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		}
 	}
 
-	ProcedureInfo proc_info = {};
+	ProcInfo proc_info = {};
 	proc_info.file  = file;
 	proc_info.token = token;
 	proc_info.decl  = d;
@@ -355,6 +367,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	proc_info.body  = pl->body;
 	proc_info.tags  = tags;
 	proc_info.generated_from_polymorphic = true;
+	proc_info.poly_def_node = poly_def_node;
 
 	if (found_gen_procs) {
 		array_add(found_gen_procs, entity);
@@ -377,15 +390,15 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	return true;
 }
 
-bool check_polymorphic_procedure_assignment(CheckerContext *c, Operand *operand, Type *type, PolyProcData *poly_proc_data) {
+bool check_polymorphic_procedure_assignment(CheckerContext *c, Operand *operand, Type *type, AstNode *poly_def_node, PolyProcData *poly_proc_data) {
 	if (operand->expr == nullptr) return false;
 	Entity *base_entity = entity_of_ident(operand->expr);
 	if (base_entity == nullptr) return false;
-	return find_or_generate_polymorphic_procedure(c, base_entity, type, nullptr, poly_proc_data);
+	return find_or_generate_polymorphic_procedure(c, base_entity, type, nullptr, poly_def_node, poly_proc_data);
 }
 
-bool find_or_generate_polymorphic_procedure_from_parameters(CheckerContext *c, Entity *base_entity, Array<Operand> *operands, PolyProcData *poly_proc_data) {
-	return find_or_generate_polymorphic_procedure(c, base_entity, nullptr, operands, poly_proc_data);
+bool find_or_generate_polymorphic_procedure_from_parameters(CheckerContext *c, Entity *base_entity, Array<Operand> *operands, AstNode *poly_def_node, PolyProcData *poly_proc_data) {
+	return find_or_generate_polymorphic_procedure(c, base_entity, nullptr, operands, poly_def_node, poly_proc_data);
 }
 
 bool check_type_specialization_to(CheckerContext *c, Type *specialization, Type *type, bool compound, bool modify_type);
@@ -551,7 +564,7 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 			return 3;
 		}
 		PolyProcData poly_proc_data = {};
-		if (check_polymorphic_procedure_assignment(c, operand, type, &poly_proc_data)) {
+		if (check_polymorphic_procedure_assignment(c, operand, type, operand->expr, &poly_proc_data)) {
 			add_entity_use(c, operand->expr, poly_proc_data.gen_entity);
 			return 4;
 		}
@@ -4088,7 +4101,6 @@ void check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 }
 
 
-
 CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	ast_node(ce, CallExpr, call);
 	GB_ASSERT(is_type_proc(proc_type));
@@ -4195,7 +4207,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			PolyProcData poly_proc_data = {};
 
 			if (pt->is_polymorphic && !pt->is_poly_specialized) {
-				if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &operands, &poly_proc_data)) {
+				if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &operands, call, &poly_proc_data)) {
 					gen_entity = poly_proc_data.gen_entity;
 					GB_ASSERT(is_type_proc(gen_entity->type));
 					final_proc_type = gen_entity->type;
@@ -4333,7 +4345,8 @@ isize lookup_procedure_result(TypeProc *pt, String result_name) {
 CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	ast_node(ce, CallExpr, call);
 	GB_ASSERT(is_type_proc(proc_type));
-	TypeProc *pt = &base_type(proc_type)->Proc;
+	proc_type = base_type(proc_type);
+	TypeProc *pt = &proc_type->Proc;
 
 	i64 score = 0;
 	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
@@ -4419,10 +4432,11 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	Entity *gen_entity = nullptr;
 	if (pt->is_polymorphic && !pt->is_poly_specialized && err == CallArgumentError_None) {
 		PolyProcData poly_proc_data = {};
-		if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &ordered_operands, &poly_proc_data)) {
+		if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &ordered_operands, call, &poly_proc_data)) {
 			gen_entity = poly_proc_data.gen_entity;
 			Type *gept = base_type(gen_entity->type);
 			GB_ASSERT(is_type_proc(gept));
+			proc_type = gept;
 			pt = &gept->Proc;
 		}
 	}
