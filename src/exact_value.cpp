@@ -407,10 +407,6 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision,
 		if (is_unsigned) {
 			i = i & unsigned_integer_maxs[precision/8];
 		}
-		// if (0 < precision && precision < 64) {
-		// 	i = i & ~(-1ll << precision);
-		// }
-
 		return exact_value_i64(i);
 	}
 

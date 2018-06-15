@@ -451,6 +451,7 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 
 	case 'a':  *rune = '\a'; break;
 	case 'b':  *rune = '\b'; break;
+	case 'e':  *rune = 0x1b; break;
 	case 'f':  *rune = '\f'; break;
 	case 'n':  *rune = '\n'; break;
 	case 'r':  *rune = '\r'; break;
