@@ -64,7 +64,7 @@ murmur32 :: proc(data: []byte) -> u32 {
 	c2_32: u32 : 0x1b873593;
 
 	h1: u32 = 0;
-	nblocks := uintptr(len(data)/4);
+	nblocks := len(data)/4;
 	p := &data[0];
 	p1 := mem.ptr_offset(p, 4*nblocks);
 
@@ -187,7 +187,7 @@ murmur64 :: proc(data: []byte) -> u64 {
 		}
 
 		// TODO(bill): Fix this
-		#no_bounds_check data8 := slice_to_bytes(data32[i..])[..3];
+		#no_bounds_check data8 := mem.slice_to_bytes(data32[i..])[..3];
 		switch len {
 		case 3:
 			h2 ~= u32(data8[2]) << 16;

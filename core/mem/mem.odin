@@ -62,16 +62,16 @@ compare :: proc "contextless" (a, b: []byte) -> int {
 }
 compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int {
 	pa :: ptr_offset;
-	for i in 0..uintptr(n) do switch {
+	for i in 0..n do switch {
 	case pa(a, i)^ < pa(b, i)^: return -1;
 	case pa(a, i)^ > pa(b, i)^: return +1;
 	}
 	return 0;
 }
 
-ptr_offset :: proc "contextless" (ptr: $P/^$T, n: uintptr) -> P {
-	new := uintptr(ptr) + size_of(T)*n;
-	return P(new);
+ptr_offset :: proc "contextless" (ptr: $P/^$T, n: int) -> P {
+	new := int(uintptr(ptr)) + size_of(T)*n;
+	return P(uintptr(new));
 }
 
 ptr_sub :: proc "contextless" (a, b: $P/^$T) -> int {
@@ -143,7 +143,7 @@ allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: in
 	ptr := cast(^uint)(ptr_offset(header, 1));
 	n := ptr_sub(cast(^uint)data, ptr);
 
-	for i in 0..uintptr(n) {
+	for i in 0..n {
 		ptr_offset(ptr, i)^ = ~uint(0);
 	}
 }
