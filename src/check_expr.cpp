@@ -1465,7 +1465,7 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, AstNode *node) {
 			return;
 		}
 
-		o->value = exact_unary_operator_value(op.kind, o->value, precision);
+		o->value = exact_unary_operator_value(op.kind, o->value, precision, is_type_unsigned(type));
 
 		if (is_type_typed(type)) {
 			if (node != nullptr) {
