@@ -946,8 +946,8 @@ void check_type_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 				if (switch_kind == TypeSwitch_Union) {
 					GB_ASSERT(is_type_union(bt));
 					bool tag_type_found = false;
-					for_array(i, bt->Union.variants) {
-						Type *vt = bt->Union.variants[i];
+					for_array(j, bt->Union.variants) {
+						Type *vt = bt->Union.variants[j];
 						if (are_types_identical(vt, y.type)) {
 							tag_type_found = true;
 							break;
@@ -955,7 +955,11 @@ void check_type_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 					}
 					if (!tag_type_found) {
 						gbString type_str = type_to_string(y.type);
-						error(y.expr, "Unknown tag type, got '%s'", type_str);
+						error(y.expr, "Unknown variant type, got '%s'", type_str);
+						for_array(j, bt->Union.variants) {
+							Type *vt = base_type(bt->Union.variants[j]);
+							gb_printf_err("\t%s\n", type_to_string(vt));
+						}
 						gb_string_free(type_str);
 						continue;
 					}
