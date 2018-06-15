@@ -4235,19 +4235,19 @@ bool parse_build_tag(Token token_for_pos, String s) {
 				GB_ASSERT(arch == TargetArch_Invalid);
 				any_correct = true;
 				if (is_notted) {
-					if (os != build_context.target_os) {
+					if (os != build_context.metrics.os) {
 						return true;
 					}
-				} else if (os == build_context.target_os) {
+				} else if (os == build_context.metrics.os) {
 					return true;
 				}
 			} else if (arch != TargetArch_Invalid) {
 				any_correct = true;
 				if (is_notted) {
-					if (arch != build_context.target_arch) {
+					if (arch != build_context.metrics.arch) {
 						return true;
 					}
-				} else if (arch == build_context.target_arch) {
+				} else if (arch == build_context.metrics.arch) {
 					return true;
 				}
 			}

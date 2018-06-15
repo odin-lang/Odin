@@ -956,10 +956,6 @@ void check_type_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 					if (!tag_type_found) {
 						gbString type_str = type_to_string(y.type);
 						error(y.expr, "Unknown variant type, got '%s'", type_str);
-						for_array(j, bt->Union.variants) {
-							Type *vt = base_type(bt->Union.variants[j]);
-							gb_printf_err("\t%s\n", type_to_string(vt));
-						}
 						gb_string_free(type_str);
 						continue;
 					}

@@ -13,7 +13,7 @@ enum TargetArchKind {
 	TargetArch_Invalid,
 
 	TargetArch_amd64,
-	TargetArch_x86,
+	TargetArch_386,
 
 	TargetArch_COUNT,
 };
@@ -29,13 +29,28 @@ String target_os_names[TargetOs_COUNT] = {
 String target_arch_names[TargetArch_COUNT] = {
 	str_lit(""),
 	str_lit("amd64"),
-	str_lit("x86"),
+	str_lit("386"),
+};
+
+String target_arch_endian[TargetArch_COUNT] = {
+	str_lit(""),
+	str_lit("little"),
+	str_lit("little"),
 };
 
 
 String const ODIN_VERSION = str_lit("0.9.0");
 String cross_compile_target = str_lit("");
 String cross_compile_lib_dir = str_lit("");
+
+
+
+struct TargetMetrics {
+	TargetOsKind   os;
+	TargetArchKind arch;
+	isize          word_size;
+	isize          max_align;
+};
 
 
 // This stores the information for the specify architecture of this build
@@ -55,8 +70,7 @@ struct BuildContext {
 
 	String command;
 
-	TargetOsKind   target_os;
-	TargetArchKind target_arch;
+	TargetMetrics metrics;
 
 	String out_filepath;
 	String resource_filepath;
@@ -77,7 +91,45 @@ struct BuildContext {
 };
 
 
+
 gb_global BuildContext build_context = {0};
+
+
+
+gb_global TargetMetrics target_windows_386 = {
+	TargetOs_windows,
+	TargetArch_386,
+	4,
+	8,
+};
+gb_global TargetMetrics target_windows_amd64 = {
+	TargetOs_windows,
+	TargetArch_amd64,
+	8,
+	16,
+};
+
+gb_global TargetMetrics target_linux_386 = {
+	TargetOs_linux,
+	TargetArch_386,
+	4,
+	8,
+};
+gb_global TargetMetrics target_linux_amd64 = {
+	TargetOs_linux,
+	TargetArch_amd64,
+	8,
+	16,
+};
+
+gb_global TargetMetrics target_osx_amd64 = {
+	TargetOs_osx,
+	TargetArch_amd64,
+	8,
+	16,
+};
+
+
 
 
 TargetOsKind get_target_os_from_string(String str) {
@@ -133,14 +185,15 @@ bool is_excluded_target_filename(String name) {
 	TargetArchKind arch2 = get_target_arch_from_string(str2);
 
 	if (arch1 != TargetArch_Invalid && os2 != TargetOs_Invalid) {
-		return arch1 != build_context.target_arch || os2 != build_context.target_os;
+		return arch1 != build_context.metrics.arch || os2 != build_context.metrics.os;
 	} else if (arch1 != TargetArch_Invalid && os1 != TargetOs_Invalid) {
-		return arch2 != build_context.target_arch || os1 != build_context.target_os;
+		return arch2 != build_context.metrics.arch || os1 != build_context.metrics.os;
 	} else if (os1 != TargetOs_Invalid) {
-		return os1 != build_context.target_os;
+		return os1 != build_context.metrics.os;
 	} else if (arch1 != TargetArch_Invalid) {
-		return arch1 != build_context.target_arch;
+		return arch1 != build_context.metrics.arch;
 	}
+
 
 	return false;
 }
@@ -435,87 +488,86 @@ void init_build_context(void) {
 	bc->ODIN_VERSION = ODIN_VERSION;
 	bc->ODIN_ROOT    = odin_root_dir();
 
-#if defined(GB_SYSTEM_WINDOWS)
-	bc->ODIN_OS   = str_lit("windows");
-	bc->target_os = TargetOs_windows;
-#elif defined(GB_SYSTEM_OSX)
-	bc->ODIN_OS   = str_lit("osx");
-	bc->target_os = TargetOs_osx;
-#else
-	bc->ODIN_OS   = str_lit("linux");
-	bc->target_os = TargetOs_linux;
-#endif
+	TargetMetrics metrics = {};
+
+	#if defined(GB_ARCH_64_BIT)
+		#if defined(GB_SYSTEM_WINDOWS)
+			metrics = target_windows_amd64;
+		#elif defined(GB_SYSTEM_OSX)
+			metrics = target_osx_amd64;
+		#else
+			metrics = target_linux_amd64;
+		#endif
+	#else
+		#if defined(GB_SYSTEM_WINDOWS)
+			metrics = target_windows_386;
+		#elif defined(GB_SYSTEM_OSX)
+			#error "Unsupported architecture"
+		#else
+			metrics = target_linux_386;
+		#endif
+	#endif
 
 	if (cross_compile_target.len) {
 		bc->ODIN_OS = cross_compile_target;
 	}
 
-#if defined(GB_ARCH_64_BIT)
-	bc->ODIN_ARCH = str_lit("amd64");
-	bc->target_arch = TargetArch_amd64;
-#else
-	bc->ODIN_ARCH = str_lit("x86");
-	bc->target_arch = TargetArch_x86;
-#endif
-
-	{
-		u16 x = 1;
-		bool big = !*cast(u8 *)&x;
-		bc->ODIN_ENDIAN = big ? str_lit("big") : str_lit("little");
-	}
+	GB_ASSERT(metrics.os != TargetOs_Invalid);
+	GB_ASSERT(metrics.arch != TargetArch_Invalid);
+	GB_ASSERT(metrics.word_size > 1);
+	GB_ASSERT(metrics.max_align > 1);
 
 
-	// NOTE(zangent): The linker flags to set the build architecture are different
-	// across OSs. It doesn't make sense to allocate extra data on the heap
-	// here, so I just #defined the linker flags to keep things concise.
-	#if defined(GB_SYSTEM_WINDOWS)
-		#define LINK_FLAG_X64 "/machine:x64"
-		#define LINK_FLAG_X86 "/machine:x86"
+	bc->metrics = metrics;
+	bc->ODIN_OS     = target_os_names[metrics.os];
+	bc->ODIN_ARCH   = target_arch_names[metrics.arch];
+	bc->ODIN_ENDIAN = target_arch_endian[metrics.arch];
+	bc->word_size   = metrics.word_size;
+	bc->max_align   = metrics.max_align;
+	bc->link_flags  = str_lit(" ");
+	bc->opt_flags   = str_lit(" ");
 
-	#elif defined(GB_SYSTEM_OSX)
-		// NOTE(zangent): MacOS systems are x64 only, so ld doesn't have
-		// an architecture option. All compilation done on MacOS must be x64.
-		GB_ASSERT(bc->ODIN_ARCH == "amd64");
 
-		#define LINK_FLAG_X64 ""
-		#define LINK_FLAG_X86 ""
-	#else
-		// Linux, but also BSDs and the like.
-		// NOTE(zangent): When clang is swapped out with ld as the linker,
-		//   the commented flags here should be used. Until then, we'll have
-		//   to use alternative build flags made for clang.
-		/*
-			#define LINK_FLAG_X64 "-m elf_x86_64"
-			#define LINK_FLAG_X86 "-m elf_i386"
-		*/
-		#define LINK_FLAG_X64 "-arch x86-64"
-		#define LINK_FLAG_X86 "-arch x86"
-	#endif
+
 
 	gbString llc_flags = gb_string_make_reserve(heap_allocator(), 64);
-	gbString link_flags = gb_string_make_reserve(heap_allocator(), 64);
 	if (bc->ODIN_DEBUG) {
 		llc_flags = gb_string_appendc(llc_flags, "-debug-compile ");
 	}
 
-	if (bc->ODIN_ARCH == "amd64") {
-		bc->word_size = 8;
-		bc->max_align = 16;
-
+	// NOTE(zangent): The linker flags to set the build architecture are different
+	// across OSs. It doesn't make sense to allocate extra data on the heap
+	// here, so I just #defined the linker flags to keep things concise.
+	if (bc->metrics.arch == TargetArch_amd64) {
 		llc_flags = gb_string_appendc(llc_flags, "-march=x86-64 ");
 
-		if (str_eq_ignore_case(cross_compile_target, str_lit("Essence"))) {
-			bc->link_flags = str_lit(" ");
-		} else {
-			bc->link_flags = str_lit(LINK_FLAG_X64 " ");
+		switch (bc->metrics.os) {
+		case TargetOs_windows:
+			bc->link_flags = str_lit("/machine:x64 ");
+			break;
+		case TargetOs_osx:
+			break;
+		case TargetOs_linux:
+			bc->link_flags = str_lit("-arch x86-64 ");
+			break;
 		}
-	} else if (bc->ODIN_ARCH == "x86") {
-		bc->word_size = 4;
-		bc->max_align = 8;
+	} else if (bc->metrics.arch == TargetArch_386) {
 		llc_flags = gb_string_appendc(llc_flags, "-march=x86 ");
-		bc->link_flags = str_lit(LINK_FLAG_X86 " ");
+
+		switch (bc->metrics.os) {
+		case TargetOs_windows:
+			bc->link_flags = str_lit("/machine:x86 ");
+			break;
+		case TargetOs_osx:
+			gb_printf_err("Unsupported architecture\n");
+			gb_exit(1);
+			break;
+		case TargetOs_linux:
+			bc->link_flags = str_lit("-arch x86 ");
+			break;
+		}
 	} else {
-		gb_printf_err("This current architecture is not supported");
+		gb_printf_err("Unsupported architecture\n");;
 		gb_exit(1);
 	}
 
@@ -531,5 +583,5 @@ void init_build_context(void) {
 
 
 	#undef LINK_FLAG_X64
-	#undef LINK_FLAG_X86
+	#undef LINK_FLAG_386
 }
