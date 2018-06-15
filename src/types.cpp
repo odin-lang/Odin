@@ -1157,6 +1157,19 @@ bool is_type_comparable(Type *t) {
 	return false;
 }
 
+Type *strip_type_aliasing(Type *x) {
+	if (x == nullptr) {
+		return x;
+	}
+	if (x->kind == Type_Named) {
+		Entity *e = x->Named.type_name;
+		if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.is_type_alias) {
+			return x->Named.base;
+		}
+	}
+	return x;
+}
+
 bool are_types_identical(Type *x, Type *y) {
 	if (x == y) {
 		return true;
@@ -1166,6 +1179,9 @@ bool are_types_identical(Type *x, Type *y) {
 	    (x != nullptr && y == nullptr)) {
 		return false;
 	}
+
+	x = strip_type_aliasing(x);
+	y = strip_type_aliasing(y);
 
 	switch (x->kind) {
 	case Type_Generic:

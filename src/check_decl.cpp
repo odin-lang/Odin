@@ -248,16 +248,6 @@ void check_type_decl(CheckerContext *ctx, Entity *e, AstNode *type_expr, Type *d
 		named->Named.base = bt;
 		e->TypeName.is_type_alias = true;
 	}
-	// if (is_alias) {
-	// 	if (is_type_named(bt)) {
-	// 		e->type = bt;
-	// 		e->TypeName.is_type_alias = true;
-	// 	} else {
-	// 		gbString str = type_to_string(bt);
-	// 		error(type_expr, "Type alias declaration with a non-named type '%s'", str);
-	// 		gb_string_free(str);
-	// 	}
-	// }
 }
 
 
