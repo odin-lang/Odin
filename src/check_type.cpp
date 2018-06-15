@@ -1278,7 +1278,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		return t_llvm_bool;
 	}
 
-	if (build_context.ODIN_ARCH == "x86") {
+	if (build_context.ODIN_ARCH == "386") {
 		return new_type;
 	}
 
