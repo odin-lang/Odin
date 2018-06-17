@@ -33,7 +33,6 @@ void scope_reset(Scope *scope) {
 	scope->first_child = nullptr;
 	scope->last_child  = nullptr;
 	map_clear    (&scope->elements);
-	ptr_set_clear(&scope->implicit);
 	ptr_set_clear(&scope->imported);
 }
 
@@ -222,7 +221,6 @@ Scope *create_scope(Scope *parent, gbAllocator allocator, isize init_elements_ca
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
 	map_init(&s->elements, heap_allocator(), init_elements_capacity);
-	ptr_set_init(&s->implicit, heap_allocator(), 0);
 	ptr_set_init(&s->imported, heap_allocator(), 0);
 
 	s->delayed_imports.allocator = heap_allocator();
@@ -301,7 +299,6 @@ void destroy_scope(Scope *scope) {
 	map_destroy(&scope->elements);
 	array_free(&scope->delayed_imports);
 	array_free(&scope->delayed_directives);
-	ptr_set_destroy(&scope->implicit);
 	ptr_set_destroy(&scope->imported);
 
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
@@ -706,10 +703,6 @@ Entity *implicit_entity_of_node(Ast *clause) {
 		return clause->CaseClause.implicit_entity;
 	}
 	return nullptr;
-}
-bool is_entity_implicitly_imported(Entity *import_name, Entity *e) {
-	GB_ASSERT(import_name->kind == Entity_ImportName);
-	return ptr_set_exists(&import_name->ImportName.scope->implicit, e);
 }
 
 // Will return nullptr if not found
@@ -2600,11 +2593,9 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 			Entity *e = scope->elements.entries[elem_index].value;
 			if (e->scope == parent_scope) continue;
 
-			bool implicit_is_found = ptr_set_exists(&scope->implicit, e);
-			if (is_entity_exported(e) && !implicit_is_found) {
+			if (is_entity_exported(e)) {
 				Entity *prev = scope_lookup(parent_scope, e->token.string);
-				bool ok = add_entity(ctx->checker, parent_scope, e->identifier, e);
-				if (ok) ptr_set_add(&parent_scope->implicit, e);
+				add_entity(ctx->checker, parent_scope, e->identifier, e);
 			}
 		}
 	}
