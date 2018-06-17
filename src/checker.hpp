@@ -9,28 +9,8 @@ struct Checker;
 struct CheckerInfo;
 struct CheckerContext;
 
-enum AddressingMode {
-	Addressing_Invalid,       // invalid addressing mode
-	Addressing_NoValue,       // no value (void in C)
-	Addressing_Value,         // computed value (rvalue)
-	Addressing_Immutable,     // immutable computed value (const rvalue)
-	Addressing_Variable,      // addressable variable (lvalue)
-	Addressing_Constant,      // constant
-	Addressing_Type,          // type
-	Addressing_Builtin,       // built-in procedure
-	Addressing_ProcGroup,     // procedure group (overloaded procedure)
-	Addressing_MapIndex,      // map index expression -
-	                          // 	lhs: acts like a Variable
-	                          // 	rhs: acts like OptionalOk
-	Addressing_OptionalOk,    // rhs: acts like a value with an optional boolean part (for existence check)
-};
-
-struct TypeAndValue {
-	AddressingMode mode;
-	Type *         type;
-	ExactValue     value;
-};
-
+enum AddressingMode;
+struct TypeAndValue;
 
 // ExprInfo stores information used for "untyped" expressions
 struct ExprInfo {
@@ -301,8 +281,9 @@ typedef Array<Type *>   CheckerPolyPath;
 
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
-	Map<TypeAndValue>     types;           // Key: Ast * | Expression -> Type (and value)
-	Map<ExprInfo>         untyped;         // Key: Ast * | Expression -> ExprInfo
+	Map<ExprInfo>         untyped; // Key: Ast * | Expression -> ExprInfo
+	                               // NOTE(bill): This needs to be a map and not on the Ast
+	                               // as it needs to be iterated across
 	Map<AstFile *>        files;           // Key: String (full path)
 	Map<AstPackage *>     packages;        // Key: String (full path)
 	Map<Entity *>         foreigns;        // Key: String
@@ -377,10 +358,10 @@ HashKey hash_decl_info(DeclInfo *decl) { return hash_pointer(decl); }
 
 
 // CheckerInfo API
-TypeAndValue type_and_value_of_expr (CheckerInfo *i, Ast *expr);
-Type *       type_of_expr           (CheckerInfo *i, Ast *expr);
+TypeAndValue type_and_value_of_expr (Ast *expr);
+Type *       type_of_expr           (Ast *expr);
 Entity *     entity_of_ident        (Ast *identifier);
-Entity *     implicit_entity_of_node(CheckerInfo *i, Ast *clause);
+Entity *     implicit_entity_of_node(Ast *clause);
 Scope *      scope_of_node          (Ast *node);
 DeclInfo *   decl_info_of_ident     (Ast *ident);
 DeclInfo *   decl_info_of_entity    (Entity * e);

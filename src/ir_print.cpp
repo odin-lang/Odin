@@ -681,7 +681,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 			for (isize i = 0; i < elem_count; i++) {
 				if (i > 0) ir_write_str_lit(f, ", ");
-				TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
+				TypeAndValue tav = cl->elems[i]->tav;
 				GB_ASSERT(tav.mode != Addressing_Invalid);
 				ir_print_compound_element(f, m, tav.value, elem_type);
 			}
@@ -715,7 +715,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 						ast_node(fv, FieldValue, cl->elems[i]);
 						String name = fv->field->Ident.token.string;
 
-						TypeAndValue tav = type_and_value_of_expr(m->info, fv->value);
+						TypeAndValue tav = fv->value->tav;
 						GB_ASSERT(tav.mode != Addressing_Invalid);
 
 						Selection sel = lookup_field(type, name, false);
@@ -727,7 +727,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				} else {
 					for_array(i, cl->elems) {
 						Entity *f = type->Struct.fields[i];
-						TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
+						TypeAndValue tav = cl->elems[i]->tav;
 						ExactValue val = {};
 						if (tav.mode != Addressing_Invalid) {
 							val = tav.value;

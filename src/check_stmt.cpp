@@ -292,7 +292,7 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 		Ast *ln = unparen_expr(lhs->expr);
 		if (ln->kind == Ast_IndexExpr) {
 			Ast *x = ln->IndexExpr.expr;
-			TypeAndValue tav = type_and_value_of_expr(&ctx->checker->info, x);
+			TypeAndValue tav = x->tav;
 			GB_ASSERT(tav.mode != Addressing_Invalid);
 			if (tav.mode != Addressing_Variable) {
 				if (!is_type_pointer(tav.type)) {
@@ -1072,7 +1072,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			}
 			if (operand.expr->kind == Ast_CallExpr) {
 				AstCallExpr *ce = &operand.expr->CallExpr;
-				Type *t = type_of_expr(&ctx->checker->info, ce->proc);
+				Type *t = type_of_expr(ce->proc);
 				if (is_type_proc(t)) {
 					if (t->Proc.require_results) {
 						gbString expr_str = expr_to_string(ce->proc);
