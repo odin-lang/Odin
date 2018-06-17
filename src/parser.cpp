@@ -417,13 +417,8 @@ bool ast_node_expect(AstNode *node, AstNodeKind kind) {
 
 // NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
 AstNode *alloc_ast_node(AstFile *f, AstNodeKind kind) {
-	Arena *arena = &global_ast_arena;
-	gbAllocator a = arena_allocator(arena);
+	gbAllocator a = ast_allocator();
 	AstNode *node = gb_alloc_item(a, AstNode);
-	gb_mutex_lock(&arena->mutex);
-	defer (gb_mutex_unlock(&arena->mutex));
-	arena->possible_used += ALIGN_UP(24 + ast_node_sizes[kind], 8);
-
 	node->kind = kind;
 	node->file = f;
 	return node;
@@ -811,7 +806,7 @@ AstNode *ast_bad_decl(AstFile *f, Token begin, Token end) {
 }
 
 AstNode *ast_field(AstFile *f, Array<AstNode *> names, AstNode *type, AstNode *default_value, u32 flags,
-                   CommentGroup docs, CommentGroup comment) {
+                   CommentGroup *docs, CommentGroup *comment) {
 	AstNode *result = alloc_ast_node(f, AstNode_Field);
 	result->Field.names         = names;
 	result->Field.type          = type;
@@ -952,7 +947,7 @@ AstNode *ast_map_type(AstFile *f, Token token, AstNode *key, AstNode *value) {
 
 
 AstNode *ast_foreign_block_decl(AstFile *f, Token token, AstNode *foreign_library, Token open, Token close, Array<AstNode *> decls,
-                                CommentGroup docs) {
+                                CommentGroup *docs) {
 	AstNode *result = alloc_ast_node(f, AstNode_ForeignBlockDecl);
 	result->ForeignBlockDecl.token           = token;
 	result->ForeignBlockDecl.foreign_library = foreign_library;
@@ -973,7 +968,7 @@ AstNode *ast_label_decl(AstFile *f, Token token, AstNode *name) {
 }
 
 AstNode *ast_value_decl(AstFile *f, Array<AstNode *> names, AstNode *type, Array<AstNode *> values, bool is_mutable,
-                        CommentGroup docs, CommentGroup comment) {
+                        CommentGroup *docs, CommentGroup *comment) {
 	AstNode *result = alloc_ast_node(f, AstNode_ValueDecl);
 	result->ValueDecl.names      = names;
 	result->ValueDecl.type       = type;
@@ -986,7 +981,7 @@ AstNode *ast_value_decl(AstFile *f, Array<AstNode *> names, AstNode *type, Array
 	return result;
 }
 
-AstNode *ast_package_decl(AstFile *f, Token token, Token name, CommentGroup docs, CommentGroup comment) {
+AstNode *ast_package_decl(AstFile *f, Token token, Token name, CommentGroup *docs, CommentGroup *comment) {
 	AstNode *result = alloc_ast_node(f, AstNode_PackageDecl);
 	result->PackageDecl.token       = token;
 	result->PackageDecl.name        = name;
@@ -996,7 +991,7 @@ AstNode *ast_package_decl(AstFile *f, Token token, Token name, CommentGroup docs
 }
 
 AstNode *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, Token import_name,
-                         CommentGroup docs, CommentGroup comment) {
+                         CommentGroup *docs, CommentGroup *comment) {
 	AstNode *result = alloc_ast_node(f, AstNode_ImportDecl);
 	result->ImportDecl.token       = token;
 	result->ImportDecl.is_using    = is_using;
@@ -1008,7 +1003,7 @@ AstNode *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, 
 }
 
 AstNode *ast_foreign_import_decl(AstFile *f, Token token, Token filepath, Token library_name,
-                                 CommentGroup docs, CommentGroup comment) {
+                                 CommentGroup *docs, CommentGroup *comment) {
 	AstNode *result = alloc_ast_node(f, AstNode_ForeignImportDecl);
 	result->ForeignImportDecl.token        = token;
 	result->ForeignImportDecl.filepath     = filepath;
@@ -1049,59 +1044,60 @@ Token consume_comment(AstFile *f, isize *end_line_) {
 				end_line++;
 			}
 		}
-	} else {
-		end_line++;
 	}
 
 	if (end_line_) *end_line_ = end_line;
 
 	next_token0(f);
+	if (f->curr_token.pos.line > tok.pos.line || tok.kind == Token_EOF) {
+		end_line++;
+	}
 	return tok;
 }
 
 
-CommentGroup consume_comment_group(AstFile *f, isize n, isize *end_line_) {
+CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_line_) {
 	Array<Token> list = {};
+	list.allocator = heap_allocator();
 	isize end_line = f->curr_token.pos.line;
-	if (f->curr_token.kind == Token_Comment) {
-		array_init(&list, heap_allocator());
-		while (f->curr_token.kind == Token_Comment &&
-		       f->curr_token.pos.line <= end_line+n) {
-			array_add(&list, consume_comment(f, &end_line));
-		}
+	while (f->curr_token.kind == Token_Comment &&
+	       f->curr_token.pos.line <= end_line+n) {
+		array_add(&list, consume_comment(f, &end_line));
 	}
 
 	if (end_line_) *end_line_ = end_line;
 
-	CommentGroup comments = {};
-	comments.list = list;
-	array_add(&f->comments, comments);
+	CommentGroup *comments = nullptr;
+	if (list.count > 0) {
+		comments = gb_alloc_item(ast_allocator(), CommentGroup);
+		comments->list = list;
+		array_add(&f->comments, comments);
+	}
 	return comments;
 }
 
 void comsume_comment_groups(AstFile *f, Token prev) {
-	if (f->curr_token.kind != Token_Comment) return;
-	CommentGroup comment = {};
-	isize end_line = 0;
+	if (f->curr_token.kind == Token_Comment) {
+		CommentGroup *comment = nullptr;
+		isize end_line = 0;
 
-	if (f->curr_token.pos.line == prev.pos.line) {
-		comment = consume_comment_group(f, 0, &end_line);
-		if (f->curr_token.pos.line != end_line) {
-			f->line_comment = comment;
+		if (f->curr_token.pos.line == prev.pos.line) {
+			comment = consume_comment_group(f, 0, &end_line);
+			if (f->curr_token.pos.line != end_line || f->curr_token.kind == Token_EOF) {
+				f->line_comment = comment;
+			}
 		}
-	}
 
-	end_line = -1;
-	while (f->curr_token.kind == Token_Comment) {
-		comment = consume_comment_group(f, 1, &end_line);
-	}
-	if (end_line < 0) {
-		f->lead_comment = comment;
-	} else if (end_line+1 == f->curr_token.pos.line) {
-		f->lead_comment = comment;
-	}
+		end_line = -1;
+		while (f->curr_token.kind == Token_Comment) {
+			comment = consume_comment_group(f, 1, &end_line);
+		}
+		if (end_line+1 == f->curr_token.pos.line || end_line < 0) {
+			f->lead_comment = comment;
+		}
 
-	GB_ASSERT(f->curr_token.kind != Token_Comment);
+		GB_ASSERT(f->curr_token.kind != Token_Comment);
+	}
 }
 
 
@@ -1881,7 +1877,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		auto variants = array_make<AstNode *>(heap_allocator());
 		AstNode *align = nullptr;
 
-		CommentGroup docs = f->lead_comment;
+		CommentGroup *docs = f->lead_comment;
 		Token start_token = f->curr_token;
 
 		while (allow_token(f, Token_Hash)) {
@@ -2378,7 +2374,7 @@ void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
 }
 
 AstNode *parse_foreign_block(AstFile *f, Token token) {
-	CommentGroup docs = f->lead_comment;
+	CommentGroup *docs = f->lead_comment;
 	AstNode *foreign_library = nullptr;
 	if (f->curr_token.kind == Token_export) {
 		foreign_library = ast_implicit(f, expect_token(f, Token_export));
@@ -2410,7 +2406,7 @@ AstNode *parse_foreign_block(AstFile *f, Token token) {
 	return decl;
 }
 
-AstNode *parse_value_decl(AstFile *f, Array<AstNode *> names, CommentGroup docs) {
+AstNode *parse_value_decl(AstFile *f, Array<AstNode *> names, CommentGroup *docs) {
 	bool is_mutable = true;
 
 	AstNode *type = nullptr;
@@ -2476,7 +2472,7 @@ AstNode *parse_value_decl(AstFile *f, Array<AstNode *> names, CommentGroup docs)
 
 AstNode *parse_simple_stmt(AstFile *f, u32 flags) {
 	Token token = f->curr_token;
-	CommentGroup docs = f->lead_comment;
+	CommentGroup *docs = f->lead_comment;
 
 	Array<AstNode *> lhs = parse_lhs_expr_list(f);
 	token = f->curr_token;
@@ -2612,12 +2608,11 @@ AstNode *parse_results(AstFile *f) {
 	// f->expr_level = -1;
 
 	if (f->curr_token.kind != Token_OpenParen) {
-		CommentGroup empty_group = {};
 		Token begin_token = f->curr_token;
 		Array<AstNode *> empty_names = {};
 		auto list = array_make<AstNode *>(heap_allocator(), 0, 1);
 		AstNode *type = parse_type(f);
-		array_add(&list, ast_field(f, empty_names, type, nullptr, 0, empty_group, empty_group));
+		array_add(&list, ast_field(f, empty_names, type, nullptr, 0, nullptr, nullptr));
 		return ast_field_list(f, begin_token, list);
 	}
 
@@ -2882,7 +2877,7 @@ bool parse_expect_struct_separator(AstFile *f, AstNode *param) {
 
 
 AstNode *parse_struct_field_list(AstFile *f, isize *name_count_) {
-	CommentGroup docs = f->lead_comment;
+	CommentGroup *docs = f->lead_comment;
 	Token start_token = f->curr_token;
 
 	auto decls = array_make<AstNode *>(heap_allocator());
@@ -2897,7 +2892,7 @@ AstNode *parse_struct_field_list(AstFile *f, isize *name_count_) {
 AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_type_token) {
 	Token start_token = f->curr_token;
 
-	CommentGroup docs = f->lead_comment;
+	CommentGroup *docs = f->lead_comment;
 
 	auto params = array_make<AstNode *>(heap_allocator());
 
@@ -2981,7 +2976,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 
 		while (f->curr_token.kind != follow &&
 		       f->curr_token.kind != Token_EOF) {
-			CommentGroup docs = f->lead_comment;
+			CommentGroup *docs = f->lead_comment;
 
 			u32 set_flags = parse_field_prefixes(f);
 			Array<AstNode *> names = parse_ident_list(f);
@@ -3442,7 +3437,7 @@ enum ImportDeclKind {
 };
 
 AstNode *parse_import_decl(AstFile *f, ImportDeclKind kind) {
-	CommentGroup docs = f->lead_comment;
+	CommentGroup *docs = f->lead_comment;
 	Token token = expect_token(f, Token_import);
 	Token import_name = {};
 	bool is_using = kind != ImportDecl_Standard;
@@ -3475,7 +3470,7 @@ AstNode *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 }
 
 // AstNode *parse_export_decl(AstFile *f) {
-// 	CommentGroup docs = f->lead_comment;
+// 	CommentGroup *docs = f->lead_comment;
 // 	Token token = expect_token(f, Token_export);
 // 	Token file_path = expect_token_after(f, Token_String, "export");
 // 	AstNode *s = nullptr;
@@ -3491,7 +3486,7 @@ AstNode *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 // }
 
 AstNode *parse_foreign_decl(AstFile *f) {
-	CommentGroup docs = f->lead_comment;
+	CommentGroup *docs = f->lead_comment;
 	Token token = expect_token(f, Token_foreign);
 
 	switch (f->curr_token.kind) {
@@ -3589,7 +3584,7 @@ AstNode *parse_stmt(AstFile *f) {
 	}
 
 	case Token_using: {
-		CommentGroup docs = f->lead_comment;
+		CommentGroup *docs = f->lead_comment;
 		Token token = expect_token(f, Token_using);
 		if (f->curr_token.kind == Token_import) {
 			return parse_import_decl(f, ImportDecl_Using);
@@ -4285,7 +4280,7 @@ bool parse_file(Parser *p, AstFile *f) {
 
 	comsume_comment_groups(f, f->prev_token);
 
-	CommentGroup docs = f->lead_comment;
+	CommentGroup *docs = f->lead_comment;
 
 	f->package_token = expect_token(f, Token_package);
 	Token package_name = expect_token_after(f, Token_Ident, "package");
@@ -4298,9 +4293,9 @@ bool parse_file(Parser *p, AstFile *f) {
 	}
 	f->package_name = package_name.string;
 
-	if (docs.list.count > 0) {
-		for_array(i, docs.list) {
-			Token tok = docs.list[i]; GB_ASSERT(tok.kind == Token_Comment);
+	if (docs != nullptr && docs->list.count > 0) {
+		for_array(i, docs->list) {
+			Token tok = docs->list[i]; GB_ASSERT(tok.kind == Token_Comment);
 			String str = tok.string;
 			if (string_starts_with(str, str_lit("//"))) {
 				String lc = string_trim_whitespace(substring(str, 2, str.len));

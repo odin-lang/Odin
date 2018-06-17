@@ -26,7 +26,7 @@ RUNE1_MAX :: 1<<7 - 1;
 RUNE2_MAX :: 1<<11 - 1;
 RUNE3_MAX :: 1<<16 - 1;
 
-	// The default lowest and highest continuation byte.
+// The default lowest and highest continuation byte.
 LOCB :: 0b1000_0000;
 HICB :: 0b1011_1111;
 

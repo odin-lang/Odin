@@ -302,7 +302,6 @@ typedef struct Arena {
 	gbMutex     mutex;
 
 	isize total_used;
-	isize possible_used;
 } Arena;
 
 #define ARENA_MIN_ALIGNMENT 16
