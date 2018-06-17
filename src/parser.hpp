@@ -208,7 +208,7 @@ enum StmtAllowFlag {
 		Array<Ast *> elems; \
 		Token open, close; \
 	}) \
-AST_KIND(_ExprBegin,  "",  struct {}) \
+AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
 	AST_KIND(TagExpr,      "tag expression",         struct { Token token, name; Ast *expr; }) \
 	AST_KIND(RunExpr,      "run expression",         struct { Token token, name; Ast *expr; }) \
@@ -236,8 +236,8 @@ AST_KIND(_ExprBegin,  "",  struct {}) \
 	AST_KIND(TypeAssertion, "type assertion",      struct { Ast *expr; Token dot; Ast *type; }) \
 	AST_KIND(TypeCast,      "type cast",           struct { Token token; Ast *type, *expr; }) \
 	AST_KIND(AutoCast,      "auto_cast",           struct { Token token; Ast *expr; }) \
-AST_KIND(_ExprEnd,       "", struct {}) \
-AST_KIND(_StmtBegin,     "", struct {}) \
+AST_KIND(_ExprEnd,       "", bool) \
+AST_KIND(_StmtBegin,     "", bool) \
 	AST_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
 	AST_KIND(EmptyStmt,  "empty statement",               struct { Token token; }) \
 	AST_KIND(ExprStmt,   "expression statement",          struct { Ast *expr; } ) \
@@ -254,7 +254,7 @@ AST_KIND(_StmtBegin,     "", struct {}) \
 		Token op; \
 		Ast *expr; \
 	}) \
-AST_KIND(_ComplexStmtBegin, "", struct {}) \
+AST_KIND(_ComplexStmtBegin, "", bool) \
 	AST_KIND(BlockStmt, "block statement", struct { \
 		Array<Ast *> stmts; \
 		Token open, close; \
@@ -327,9 +327,9 @@ AST_KIND(_ComplexStmtBegin, "", struct {}) \
 		Ast *expr; \
 		Ast *body; \
 	}) \
-AST_KIND(_ComplexStmtEnd, "", struct {}) \
-AST_KIND(_StmtEnd,        "", struct {}) \
-AST_KIND(_DeclBegin,      "", struct {}) \
+AST_KIND(_ComplexStmtEnd, "", bool) \
+AST_KIND(_StmtEnd,        "", bool) \
+AST_KIND(_DeclBegin,      "", bool) \
 	AST_KIND(BadDecl,     "bad declaration",     struct { Token begin, end; }) \
 	AST_KIND(ForeignBlockDecl, "foreign block declaration", struct { \
 		Token token;             \
@@ -377,7 +377,7 @@ AST_KIND(_DeclBegin,      "", struct {}) \
 		CommentGroup *docs;       \
 		CommentGroup *comment;    \
 	}) \
-AST_KIND(_DeclEnd,   "", struct {}) \
+AST_KIND(_DeclEnd,   "", bool) \
 	AST_KIND(Attribute, "attribute", struct { \
 		Token token;        \
 		Ast *type;          \
@@ -400,7 +400,7 @@ AST_KIND(_DeclEnd,   "", struct {}) \
 		Ast *name; \
 		Ast *list; \
 	}) \
-AST_KIND(_TypeBegin, "", struct {}) \
+AST_KIND(_TypeBegin, "", bool) \
 	AST_KIND(TypeType, "type", struct { \
 		Token token; \
 		Ast *specialization; \
@@ -470,7 +470,7 @@ AST_KIND(_TypeBegin, "", struct {}) \
 		Ast *key; \
 		Ast *value; \
 	}) \
-AST_KIND(_TypeEnd,  "", struct {})
+AST_KIND(_TypeEnd,  "", bool)
 
 enum AstKind {
 	Ast_Invalid,
