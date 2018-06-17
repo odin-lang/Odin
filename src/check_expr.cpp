@@ -108,7 +108,6 @@ void error_operand_no_value(Operand *o) {
 
 void check_scope_decls(CheckerContext *c, Array<Ast *> const &nodes, isize reserve_size) {
 	Scope *s = c->scope;
-	GB_ASSERT(s->package == nullptr);
 
 	check_collect_entities(c, nodes);
 

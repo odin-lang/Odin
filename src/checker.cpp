@@ -22,11 +22,6 @@ bool is_operand_undef(Operand o) {
 	return o.mode == Addressing_Value && o.type == t_untyped_undef;
 }
 
-
-
-gb_global Scope *universal_scope = nullptr;
-gb_global AstPackage *builtin_package = nullptr;
-
 void scope_reset(Scope *scope) {
 	if (scope == nullptr) return;
 
@@ -226,7 +221,7 @@ Scope *create_scope(Scope *parent, gbAllocator allocator, isize init_elements_ca
 	s->delayed_imports.allocator = heap_allocator();
 	s->delayed_directives.allocator = heap_allocator();
 
-	if (parent != nullptr && parent != universal_scope) {
+	if (parent != nullptr && parent != builtin_pkg->scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
 	}
 	return s;
@@ -249,27 +244,27 @@ Scope *create_scope_from_file(CheckerContext *c, AstFile *f) {
 	return s;
 }
 
-Scope *create_scope_from_package(CheckerContext *c, AstPackage *p) {
-	GB_ASSERT(p != nullptr);
+Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg) {
+	GB_ASSERT(pkg != nullptr);
 
 	isize decl_count = 0;
-	for_array(i, p->files) {
-		decl_count += p->files[i]->decls.count;
+	for_array(i, pkg->files) {
+		decl_count += pkg->files[i]->decls.count;
 	}
 	isize init_elements_capacity = 2*decl_count;
-	Scope *s = create_scope(universal_scope, c->allocator, init_elements_capacity);
+	Scope *s = create_scope(builtin_scope, c->allocator, init_elements_capacity);
 
-	s->is_package = true;
-	s->package = p;
-	p->scope = s;
+	s->is_pkg = true;
+	s->pkg = pkg;
+	pkg->scope = s;
 
-	if (p->fullpath == c->checker->parser->init_fullpath) {
+	if (pkg->fullpath == c->checker->parser->init_fullpath) {
 		s->is_init = true;
 	} else {
-		s->is_init = p->kind == Package_Init;
+		s->is_init = pkg->kind == Package_Init;
 	}
 
-	if (p->kind == Package_Runtime) {
+	if (pkg->kind == Package_Runtime) {
 		s->is_global = true;
 	}
 
@@ -375,7 +370,7 @@ void scope_lookup_parent(Scope *scope, String name, Scope **scope_, Entity **ent
 		if (s->is_proc) {
 			gone_thru_proc = true;
 		}
-		if (s->is_package) {
+		if (s->is_pkg) {
 			gone_thru_package = true;
 		}
 	}
@@ -504,7 +499,7 @@ Entity *add_global_entity(Entity *entity) {
 	if (gb_memchr(name.text, ' ', name.len)) {
 		return entity; // NOTE(bill): 'untyped thing'
 	}
-	if (scope_insert(universal_scope, entity)) {
+	if (scope_insert(builtin_scope, entity)) {
 		compiler_error("double declaration");
 	}
 	entity->state = EntityState_Resolved;
@@ -533,15 +528,16 @@ void init_universal(void) {
 	BuildContext *bc = &build_context;
 	// NOTE(bill): No need to free these
 	gbAllocator a = heap_allocator();
-	universal_scope = create_scope(nullptr, a);
-	universal_scope->is_package = true;
 
+	builtin_pkg = gb_alloc_item(a, AstPackage);
+	builtin_pkg->name = str_lit("builtin");
+	builtin_pkg->kind = Package_Normal;
 
-	builtin_package = gb_alloc_item(a, AstPackage);
-	builtin_package->name = str_lit("builtin");
-	builtin_package->kind = Package_Normal;
-	builtin_package->scope = universal_scope;
-	universal_scope->package = builtin_package;
+	builtin_scope = create_scope(nullptr, a);
+	builtin_scope->is_pkg = true;
+	builtin_scope->pkg = builtin_pkg;
+	builtin_pkg->scope = builtin_scope;
+
 
 
 
@@ -621,7 +617,8 @@ CheckerContext make_checker_context(Checker *c) {
 	ctx.checker   = c;
 	ctx.info      = &c->info;
 	ctx.allocator = c->allocator;
-	ctx.scope     = universal_scope;
+	ctx.scope     = builtin_pkg->scope;
+	ctx.pkg       = builtin_pkg;
 
 	ctx.type_path = new_checker_type_path();
 	ctx.type_level = 0;
@@ -1351,7 +1348,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
 		// if (e->scope->is_global && !is_type_poly_proc(e->type)) { // TODO(bill): is the check enough?
-		if (e->scope == universal_scope) { // TODO(bill): is the check enough?
+		if (e->scope == builtin_pkg->scope) { // TODO(bill): is the check enough?
 			if (e->type == nullptr) {
 				add_dependency_to_set(c, e);
 			}
@@ -1976,8 +1973,8 @@ void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<Ast *> *attr
 			}
 
 			if (name == "builtin") {
-				add_entity(ctx->checker, universal_scope, nullptr, e);
-				GB_ASSERT(scope_lookup(universal_scope, e->token.string) != nullptr);
+				add_entity(ctx->checker, builtin_scope, nullptr, e);
+				GB_ASSERT(scope_lookup(builtin_scope, e->token.string) != nullptr);
 				if (value != nullptr) {
 					error(value, "'builtin' cannot have a field value");
 				}
@@ -2532,7 +2529,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	Scope *scope = nullptr;
 
 	if (id->fullpath == "builtin") {
-		scope = universal_scope;
+		scope = builtin_pkg->scope;
 	} else {
 		HashKey key = hash_string(id->fullpath);
 		AstPackage **found = map_get(pkgs, key);
@@ -2549,7 +2546,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 			scope = pkg->scope;
 		}
 	}
-	GB_ASSERT(scope->is_package);
+	GB_ASSERT(scope->is_pkg);
 
 
 	if (ptr_set_exists(&parent_scope->imported, scope)) {
@@ -2561,7 +2558,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 
 	String import_name = id->import_name.string;
 	if (import_name.len == 0) {
-		import_name = scope->package->name;
+		import_name = scope->pkg->name;
 	}
 	if (is_blank_ident(import_name)) {
 		if (id->is_using) {
@@ -2896,8 +2893,8 @@ void check_import_entities(Checker *c) {
 		bool new_files = false;
 		for_array(i, package_order) {
 			ImportGraphNode *node = package_order[i];
-			GB_ASSERT(node->scope->is_package);
-			AstPackage *pkg = node->scope->package;
+			GB_ASSERT(node->scope->is_pkg);
+			AstPackage *pkg = node->scope->pkg;
 			if (!ptr_set_exists(&c->checked_packages, pkg)) {
 				continue;
 			}
@@ -2946,8 +2943,8 @@ void check_import_entities(Checker *c) {
 
 	for_array(i, package_order) {
 		ImportGraphNode *node = package_order[i];
-		GB_ASSERT(node->scope->is_package);
-		AstPackage *pkg = node->scope->package;
+		GB_ASSERT(node->scope->is_pkg);
+		AstPackage *pkg = node->scope->pkg;
 
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
@@ -3276,11 +3273,11 @@ void check_parsed_files(Checker *c) {
 		Entity *e = scope_lookup_current(s, str_lit("main"));
 		if (e == nullptr) {
 			Token token = {};
-			token.pos.file   = s->package->fullpath;
+			token.pos.file   = s->pkg->fullpath;
 			token.pos.line   = 1;
 			token.pos.column = 1;
-			if (s->package->files.count > 0) {
-				AstFile *f = s->package->files[0];
+			if (s->pkg->files.count > 0) {
+				AstFile *f = s->pkg->files[0];
 				if (f->tokens.count > 0) {
 					token = f->tokens[0];
 				}
