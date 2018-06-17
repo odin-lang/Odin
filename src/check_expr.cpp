@@ -2590,22 +2590,10 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 				return nullptr;
 			}
 
-
 			check_entity_decl(c, entity, nullptr, nullptr);
 			GB_ASSERT(entity->type != nullptr);
 
-
-			bool implicit_is_found = is_entity_implicitly_imported(e, entity);
-			bool is_not_exported = !is_entity_exported(entity);
-			if (entity->kind == Entity_ImportName) {
-				is_not_exported = true;
-			} else if (implicit_is_found) {
-				is_not_exported = true;
-			}
-
-
-
-			if (is_not_exported) {
+			if (!is_entity_exported(entity)) {
 				gbString sel_str = expr_to_string(selector);
 				error(op_expr, "'%s' is not exported by '%.*s'", sel_str, LIT(import_name));
 				gb_string_free(sel_str);

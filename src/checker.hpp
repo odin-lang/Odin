@@ -218,8 +218,6 @@ struct Scope {
 	Scope *          first_child;
 	Scope *          last_child;
 	Map<Entity *>    elements; // Key: String
-	PtrSet<Entity *> implicit;
-	// Scope *          shared;
 
 	Array<Ast *> delayed_directives;
 	Array<Ast *> delayed_imports;

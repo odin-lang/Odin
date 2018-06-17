@@ -1,33 +1,34 @@
 package c
 
+import b "core:builtin"
 import "core:os"
 
 CHAR_BIT :: 8;
 
-c_bool   :: bool;
-c_char   :: u8;
-c_byte   :: u8;
-c_schar  :: i8;
-c_uchar  :: u8;
-c_short  :: i16;
-c_ushort :: u16;
-c_int    :: i32;
-c_uint   :: u32;
+bool   :: b.bool;
+char   :: b.u8;
+byte   :: b.byte;
+schar  :: b.i8;
+uchar  :: b.u8;
+short  :: b.i16;
+ushort :: b.u16;
+int    :: b.i32;
+uint   :: b.u32;
 
-c_long  :: (os.OS == "windows" || size_of(rawptr) == 4) ? i32 : i64;
-c_ulong :: (os.OS == "windows" || size_of(rawptr) == 4) ? u32 : u64;
+long  :: (os.OS == "windows" || size_of(b.rawptr) == 4) ? b.i32 : b.i64;
+ulong :: (os.OS == "windows" || size_of(b.rawptr) == 4) ? b.u32 : b.u64;
 
-c_longlong       :: i64;
-c_ulonglong      :: u64;
-c_float          :: f32;
-c_double         :: f64;
-c_complex_float  :: complex64;
-c_complex_double :: complex128;
+longlong       :: b.i64;
+ulonglong      :: b.u64;
+float          :: b.f32;
+double         :: b.f64;
+complex_float  :: b.complex64;
+complex_double :: b.complex128;
 
-#assert(size_of(uintptr) == size_of(int));
+#assert(size_of(b.uintptr) == size_of(b.int));
 
-c_size_t    :: uint;
-c_ssize_t   :: int;
-c_ptrdiff_t :: int;
-c_uintptr_t :: uintptr;
-c_intptr_t  :: int;
+size_t    :: b.uint;
+ssize_t   :: b.int;
+ptrdiff_t :: b.int;
+uintptr_t :: b.uintptr;
+intptr_t  :: b.int;
