@@ -863,8 +863,7 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 		Scope *scope = e->scope;
 		bool in_global_scope = false;
 		if (scope != nullptr) {
-			// TODO(bill): Fix this rule. What should it be?
-			in_global_scope = scope->is_global || scope->is_init;
+			in_global_scope = (scope->flags & ScopeFlag_Global) != 0;
 		}
 		ir_print_encoded_global(f, ir_get_global_name(m, value), in_global_scope);
 		break;
@@ -1753,8 +1752,7 @@ void print_llvm_ir(irGen *ir) {
 		bool in_global_scope = false;
 		if (scope != nullptr) {
 			// TODO(bill): Fix this rule. What should it be?
-			in_global_scope = scope->is_global || scope->is_init;
-			// in_global_scope = value->Global.name_is_not_mangled;
+			in_global_scope = (scope->flags & ScopeFlag_Global) != 0;
 		}
 
 		ir_print_encoded_global(f, ir_get_global_name(m, v), in_global_scope);

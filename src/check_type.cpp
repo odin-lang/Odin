@@ -608,7 +608,7 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 	enum_type->Enum.is_export = et->is_export;
 	if (et->is_export) {
 		Scope *parent = ctx->scope->parent;
-		if (parent->is_file) {
+		if (parent->flags&ScopeFlag_File) {
 			// NOTE(bill): Use package scope
 			parent = parent->parent;
 		}

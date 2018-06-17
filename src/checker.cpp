@@ -141,8 +141,8 @@ int import_graph_node_cmp(ImportGraphNode **data, isize i, isize j) {
 
 	GB_ASSERT(x->scope != y->scope);
 
-	bool xg = x->scope->is_global;
-	bool yg = y->scope->is_global;
+	bool xg = (x->scope->flags&ScopeFlag_Global) != 0;
+	bool yg = (y->scope->flags&ScopeFlag_Global) != 0;
 	if (xg != yg) return xg ? -1 : +1;
 	if (xg && yg) return x->pkg->id < y->pkg->id ? +1 : -1;
 	if (x->dep_count < y->dep_count) return -1;
@@ -237,7 +237,7 @@ Scope *create_scope_from_file(CheckerContext *c, AstFile *f) {
 	array_reserve(&s->delayed_imports, f->imports.count);
 	array_reserve(&s->delayed_directives, f->directive_count);
 
-	s->is_file = true;
+	s->flags |= ScopeFlag_File;
 	s->file = f;
 	f->scope = s;
 
@@ -254,22 +254,20 @@ Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg) {
 	isize init_elements_capacity = 2*decl_count;
 	Scope *s = create_scope(builtin_scope, c->allocator, init_elements_capacity);
 
-	s->is_pkg = true;
+	s->flags |= ScopeFlag_Pkg;
 	s->pkg = pkg;
 	pkg->scope = s;
 
-	if (pkg->fullpath == c->checker->parser->init_fullpath) {
-		s->is_init = true;
-	} else {
-		s->is_init = pkg->kind == Package_Init;
+	if (pkg->fullpath == c->checker->parser->init_fullpath || pkg->kind == Package_Init) {
+		s->flags |= ScopeFlag_Init;
 	}
 
 	if (pkg->kind == Package_Runtime) {
-		s->is_global = true;
+		s->flags |= ScopeFlag_Global;
 	}
 
-	if (s->is_init || s->is_global) {
-		s->has_been_imported = true;
+	if (s->flags & (ScopeFlag_Init|ScopeFlag_Global)) {
+		s->flags |= ScopeFlag_HasBeenImported;
 	}
 
 	return s;
@@ -317,12 +315,12 @@ void check_open_scope(CheckerContext *c, Ast *node) {
 	add_scope(c, node, scope);
 	switch (node->kind) {
 	case Ast_ProcType:
-		scope->is_proc = true;
+		scope->flags |= ScopeFlag_Proc;
 		break;
 	case Ast_StructType:
 	case Ast_EnumType:
 	case Ast_UnionType:
-		scope->is_struct = true;
+		scope->flags |= ScopeFlag_Type;
 		break;
 	}
 	c->scope = scope;
@@ -357,7 +355,7 @@ void scope_lookup_parent(Scope *scope, String name, Scope **scope_, Entity **ent
 					continue;
 				}
 				if (e->kind == Entity_Variable &&
-				    !e->scope->is_file) {
+				    !(e->scope->flags&ScopeFlag_File)) {
 					continue;
 				}
 			}
@@ -367,10 +365,10 @@ void scope_lookup_parent(Scope *scope, String name, Scope **scope_, Entity **ent
 			return;
 		}
 
-		if (s->is_proc) {
+		if (s->flags&ScopeFlag_Proc) {
 			gone_thru_proc = true;
 		}
-		if (s->is_pkg) {
+		if (s->flags&ScopeFlag_Pkg) {
 			gone_thru_package = true;
 		}
 	}
@@ -534,7 +532,7 @@ void init_universal(void) {
 	builtin_pkg->kind = Package_Normal;
 
 	builtin_scope = create_scope(nullptr, a);
-	builtin_scope->is_pkg = true;
+	builtin_scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global;
 	builtin_scope->pkg = builtin_pkg;
 	builtin_pkg->scope = builtin_scope;
 
@@ -907,7 +905,7 @@ void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, Dec
 
 	if (e->scope != nullptr) {
 		Scope *scope = e->scope;
-		if (scope->is_file && is_entity_kind_exported(e->kind)) {
+		if ((scope->flags&ScopeFlag_File) && is_entity_kind_exported(e->kind)) {
 			AstPackage *pkg = scope->file->pkg;
 			GB_ASSERT(pkg->scope == scope->parent);
 			GB_ASSERT(c->pkg == pkg);
@@ -1947,7 +1945,7 @@ void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<Ast *> *attr
 	default:
 		return;
 	}
-	if (!(ctx->scope->is_file && ctx->scope->file->pkg->kind == Package_Runtime)) {
+	if (!((ctx->scope->flags&ScopeFlag_File) && ctx->scope->file->pkg->kind == Package_Runtime)) {
 		return;
 	}
 
@@ -2004,7 +2002,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	ast_node(vd, ValueDecl, decl);
 
 	if (vd->is_mutable) {
-		if (!c->scope->is_file) {
+		if (!(c->scope->flags&ScopeFlag_File)) {
 			// NOTE(bill): local scope -> handle later and in order
 			return;
 		}
@@ -2080,7 +2078,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				d->type_expr = init;
 				d->init_expr = init;
 			} else if (init->kind == Ast_ProcLit) {
-				if (c->scope->is_struct) {
+				if (c->scope->flags&ScopeFlag_Type) {
 					error(name, "Procedure declarations are not allowed within a struct");
 					continue;
 				}
@@ -2171,7 +2169,7 @@ void check_collect_entities(CheckerContext *c, Array<Ast *> const &nodes) {
 	for_array(decl_index, nodes) {
 		Ast *decl = nodes[decl_index];
 		if (!is_ast_decl(decl) && !is_ast_when_stmt(decl)) {
-			if (c->scope->is_file && decl->kind == Ast_ExprStmt) {
+			if ((c->scope->flags&ScopeFlag_File) != 0 && decl->kind == Ast_ExprStmt) {
 				Ast *expr = decl->ExprStmt.expr;
 				if (expr->kind == Ast_CallExpr && expr->CallExpr.proc->kind == Ast_BasicDirective) {
 					if (c->collect_delayed_decls) {
@@ -2196,7 +2194,7 @@ void check_collect_entities(CheckerContext *c, Array<Ast *> const &nodes) {
 		case_end;
 
 		case_ast_node(id, ImportDecl, decl);
-			if (!c->scope->is_file) {
+			if ((c->scope->flags&ScopeFlag_File) == 0) {
 				error(decl, "import declarations are only allowed in the file scope");
 				// NOTE(bill): _Should_ be caught by the parser
 				// TODO(bill): Better error handling if it isn't
@@ -2208,7 +2206,7 @@ void check_collect_entities(CheckerContext *c, Array<Ast *> const &nodes) {
 		case_end;
 
 		case_ast_node(fl, ForeignImportDecl, decl);
-			if (!c->scope->is_file) {
+			if ((c->scope->flags&ScopeFlag_File) == 0) {
 				error(decl, "%.*s declarations are only allowed in the file scope", LIT(fl->token.string));
 				// NOTE(bill): _Should_ be caught by the parser
 				// TODO(bill): Better error handling if it isn't
@@ -2222,7 +2220,7 @@ void check_collect_entities(CheckerContext *c, Array<Ast *> const &nodes) {
 		case_end;
 
 		default:
-			if (c->scope->is_file) {
+			if (c->scope->flags&ScopeFlag_File) {
 				error(decl, "Only declarations are allowed at file scope");
 			}
 			break;
@@ -2231,7 +2229,7 @@ void check_collect_entities(CheckerContext *c, Array<Ast *> const &nodes) {
 
 	// NOTE(bill): 'when' stmts need to be handled after the other as the condition may refer to something
 	// declared after this stmt in source
-	if (!c->scope->is_file || c->collect_delayed_decls) {
+	if ((c->scope->flags&ScopeFlag_File) == 0 || c->collect_delayed_decls) {
 		for_array(i, nodes) {
 			Ast *node = nodes[i];
 			switch (node->kind) {
@@ -2257,7 +2255,7 @@ void check_all_global_entities(Checker *c) {
 
 		CheckerContext ctx = c->init_ctx;
 
-		GB_ASSERT(d->scope->is_file);
+		GB_ASSERT(d->scope->flags&ScopeFlag_File);
 		AstFile *file = d->scope->file;
 		add_curr_ast_file(&ctx, file);
 		AstPackage *pkg = file->pkg;
@@ -2522,7 +2520,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	Token token = id->relpath;
 
 	Scope *parent_scope = ctx->scope;
-	GB_ASSERT(parent_scope->is_file);
+	GB_ASSERT(parent_scope->flags&ScopeFlag_File);
 
 	auto *pkgs = &ctx->checker->info.packages;
 
@@ -2546,7 +2544,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 			scope = pkg->scope;
 		}
 	}
-	GB_ASSERT(scope->is_pkg);
+	GB_ASSERT(scope->flags&ScopeFlag_Pkg);
 
 
 	if (ptr_set_exists(&parent_scope->imported, scope)) {
@@ -2580,8 +2578,8 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	}
 
 	if (id->is_using) {
-		if (parent_scope->is_global) {
-			error(id->import_name, "'builtin' package imports cannot use using");
+		if (parent_scope->flags & ScopeFlag_Global) {
+			error(id->import_name, "built-in package imports cannot use using");
 			return;
 		}
 
@@ -2597,7 +2595,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		}
 	}
 
-	scope->has_been_imported = true;
+	scope->flags |= ScopeFlag_HasBeenImported;
 }
 
 
@@ -2608,7 +2606,7 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	ast_node(fl, ForeignImportDecl, decl);
 
 	Scope *parent_scope = ctx->scope;
-	GB_ASSERT(parent_scope->is_file);
+	GB_ASSERT(parent_scope->flags&ScopeFlag_File);
 
 	String fullpath = fl->fullpath;
 	String library_name = path_to_entity_name(fl->library_name.string, fullpath);
@@ -2743,7 +2741,7 @@ bool collect_file_decls_from_when_stmt(CheckerContext *ctx, AstWhenStmt *ws) {
 }
 
 bool collect_file_decls(CheckerContext *ctx, Array<Ast *> const &decls) {
-	GB_ASSERT(ctx->scope->is_file);
+	GB_ASSERT(ctx->scope->flags&ScopeFlag_File);
 
 	if (collect_checked_packages_from_decl_list(ctx->checker, decls)) {
 		return true;
@@ -2893,7 +2891,7 @@ void check_import_entities(Checker *c) {
 		bool new_files = false;
 		for_array(i, package_order) {
 			ImportGraphNode *node = package_order[i];
-			GB_ASSERT(node->scope->is_pkg);
+			GB_ASSERT(node->scope->flags&ScopeFlag_Pkg);
 			AstPackage *pkg = node->scope->pkg;
 			if (!ptr_set_exists(&c->checked_packages, pkg)) {
 				continue;
@@ -2943,7 +2941,7 @@ void check_import_entities(Checker *c) {
 
 	for_array(i, package_order) {
 		ImportGraphNode *node = package_order[i];
-		GB_ASSERT(node->scope->is_pkg);
+		GB_ASSERT(node->scope->flags&ScopeFlag_Pkg);
 		AstPackage *pkg = node->scope->pkg;
 
 		for_array(i, pkg->files) {
@@ -3160,7 +3158,7 @@ void check_parsed_files(Checker *c) {
 		HashKey key = hash_string(p->fullpath);
 		map_set(&c->info.packages, key, p);
 
-		if (scope->is_init) {
+		if (scope->flags&ScopeFlag_Init) {
 			c->info.init_scope = scope;
 		}
 		if (p->kind == Package_Runtime) {
@@ -3269,7 +3267,7 @@ void check_parsed_files(Checker *c) {
 	if (!build_context.is_dll) {
 		Scope *s = c->info.init_scope;
 		GB_ASSERT(s != nullptr);
-		GB_ASSERT(s->is_init);
+		GB_ASSERT(s->flags&ScopeFlag_Init);
 		Entity *e = scope_lookup_current(s, str_lit("main"));
 		if (e == nullptr) {
 			Token token = {};
