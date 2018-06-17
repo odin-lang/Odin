@@ -80,10 +80,10 @@ struct AstFile {
 	// DeclInfo *          decl_info;   // NOTE(bill): Created in checker
 	isize               error_count;
 
-	CommentGroup        lead_comment; // Comment (block) before the decl
-	CommentGroup        line_comment; // Comment after the semicolon
-	CommentGroup        docs;         // current docs
-	Array<CommentGroup> comments;     // All the comments!
+	CommentGroup *        lead_comment; // Comment (block) before the decl
+	CommentGroup *        line_comment; // Comment after the semicolon
+	CommentGroup *        docs;         // current docs
+	Array<CommentGroup *> comments;     // All the comments!
 
 
 #define PARSER_MAX_FIX_COUNT 6
@@ -337,7 +337,7 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		Token            open, close;     \
 		Array<AstNode *> decls;           \
 		Array<AstNode *> attributes;      \
-		CommentGroup     docs;            \
+		CommentGroup *   docs;            \
 		bool             been_handled;    \
 	}) \
 	AST_NODE_KIND(Label, "label", struct { 	\
@@ -349,17 +349,17 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		AstNode *        type;         \
 		Array<AstNode *> values;       \
 		Array<AstNode *> attributes;   \
-		CommentGroup     docs;         \
-		CommentGroup     comment;      \
+		CommentGroup *   docs;         \
+		CommentGroup *   comment;      \
 		bool             is_using;     \
 		bool             is_mutable;   \
 		bool             been_handled; \
 	}) \
 	AST_NODE_KIND(PackageDecl, "package declaration", struct { \
-		Token token;          \
-		Token name;           \
-		CommentGroup docs;    \
-		CommentGroup comment; \
+		Token token;           \
+		Token name;            \
+		CommentGroup *docs;    \
+		CommentGroup *comment; \
 	}) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		AstPackage *package;    \
@@ -367,8 +367,8 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		Token    relpath;       \
 		String   fullpath;      \
 		Token    import_name;   \
-		CommentGroup docs;      \
-		CommentGroup comment;   \
+		CommentGroup *docs;     \
+		CommentGroup *comment;  \
 		bool     is_using;      \
 		bool     been_handled;  \
 	}) \
@@ -378,8 +378,8 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		Token    library_name;    \
 		String   collection_name; \
 		String   fullpath;        \
-		CommentGroup docs;        \
-		CommentGroup comment;     \
+		CommentGroup *docs;       \
+		CommentGroup *comment;    \
 		bool     been_handled;    \
 	}) \
 AST_NODE_KIND(_DeclEnd,   "", struct {}) \
@@ -394,8 +394,8 @@ AST_NODE_KIND(_DeclEnd,   "", struct {}) \
 		AstNode *        type;             \
 		AstNode *        default_value;    \
 		u32              flags;            \
-		CommentGroup     docs;             \
-		CommentGroup     comment;          \
+		CommentGroup *   docs;             \
+		CommentGroup *   comment;          \
 	}) \
 	AST_NODE_KIND(FieldList, "field list", struct { \
 		Token token; \
@@ -548,5 +548,10 @@ gb_inline bool is_ast_node_when_stmt(AstNode *node) {
 }
 
 gb_global Arena global_ast_arena = {};
+
+gbAllocator ast_allocator(void) {
+	Arena *arena = &global_ast_arena;
+	return arena_allocator(arena);
+}
 
 AstNode *alloc_ast_node(AstFile *f, AstNodeKind kind);
