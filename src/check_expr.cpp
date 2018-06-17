@@ -316,7 +316,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 
 
 
-	Ast *proc_lit = clone_ast_node(a, old_decl->proc_lit);
+	Ast *proc_lit = clone_ast(old_decl->proc_lit);
 	ast_node(pl, ProcLit, proc_lit);
 	// NOTE(bill): Associate the scope declared above withinth this procedure declaration's type
 	add_scope(&nctx, pl->type, final_proc_type->Proc.scope);
@@ -335,7 +335,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	}
 
 	u64 tags = base_entity->Procedure.tags;
-	Ast *ident = clone_ast_node(a, base_entity->identifier);
+	Ast *ident = clone_ast(base_entity->identifier);
 	Token token = ident->Ident.token;
 	DeclInfo *d = make_decl_info(nctx.allocator, scope, old_decl->parent);
 	d->gen_proc_type = final_proc_type;
@@ -4867,7 +4867,7 @@ CallArgumentError check_polymorphic_struct_type(CheckerContext *c, Operand *oper
 		String generated_name = make_string_c(expr_to_string(call));
 
 		Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
-		Ast *node = clone_ast_node(a, st->node);
+		Ast *node = clone_ast(st->node);
 		Type *struct_type = alloc_type_struct();
 		struct_type->Struct.node = node;
 		struct_type->Struct.polymorphic_parent = original_type;

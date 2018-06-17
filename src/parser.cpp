@@ -96,19 +96,19 @@ Token ast_token(Ast *node) {
 	return empty_token;
 }
 
-Ast *clone_ast_node(gbAllocator a, Ast *node);
-Array<Ast *> clone_ast_node_array(gbAllocator a, Array<Ast *> array) {
+Ast *clone_ast(Ast *node);
+Array<Ast *> clone_ast_array(Array<Ast *> array) {
 	Array<Ast *> result = {};
 	if (array.count > 0) {
-		result = array_make<Ast *>(a, array.count);
+		result = array_make<Ast *>(ast_allocator(), array.count);
 		for_array(i, array) {
-			result[i] = clone_ast_node(a, array[i]);
+			result[i] = clone_ast(array[i]);
 		}
 	}
 	return result;
 }
 
-Ast *clone_ast_node(gbAllocator a, Ast *node) {
+Ast *clone_ast(Ast *node) {
 	if (node == nullptr) {
 		return nullptr;
 	}
@@ -128,231 +128,231 @@ Ast *clone_ast_node(gbAllocator a, Ast *node) {
 	case Ast_BasicDirective: break;
 
 	case Ast_PolyType:
-		n->PolyType.type           = clone_ast_node(a, n->PolyType.type);
-		n->PolyType.specialization = clone_ast_node(a, n->PolyType.specialization);
+		n->PolyType.type           = clone_ast(n->PolyType.type);
+		n->PolyType.specialization = clone_ast(n->PolyType.specialization);
 		break;
 	case Ast_Ellipsis:
-		n->Ellipsis.expr = clone_ast_node(a, n->Ellipsis.expr);
+		n->Ellipsis.expr = clone_ast(n->Ellipsis.expr);
 		break;
 	case Ast_ProcGroup:
-		n->ProcGroup.args = clone_ast_node_array(a, n->ProcGroup.args);
+		n->ProcGroup.args = clone_ast_array(n->ProcGroup.args);
 		break;
 	case Ast_ProcLit:
-		n->ProcLit.type = clone_ast_node(a, n->ProcLit.type);
-		n->ProcLit.body = clone_ast_node(a, n->ProcLit.body);
+		n->ProcLit.type = clone_ast(n->ProcLit.type);
+		n->ProcLit.body = clone_ast(n->ProcLit.body);
 		break;
 	case Ast_CompoundLit:
-		n->CompoundLit.type  = clone_ast_node(a, n->CompoundLit.type);
-		n->CompoundLit.elems = clone_ast_node_array(a, n->CompoundLit.elems);
+		n->CompoundLit.type  = clone_ast(n->CompoundLit.type);
+		n->CompoundLit.elems = clone_ast_array(n->CompoundLit.elems);
 		break;
 
 	case Ast_BadExpr: break;
 	case Ast_TagExpr:
-		n->TagExpr.expr = clone_ast_node(a, n->TagExpr.expr);
+		n->TagExpr.expr = clone_ast(n->TagExpr.expr);
 		break;
 	case Ast_RunExpr:
-		n->RunExpr.expr = clone_ast_node(a, n->RunExpr.expr);
+		n->RunExpr.expr = clone_ast(n->RunExpr.expr);
 		break;
 	case Ast_UnaryExpr:
-		n->UnaryExpr.expr = clone_ast_node(a, n->UnaryExpr.expr);
+		n->UnaryExpr.expr = clone_ast(n->UnaryExpr.expr);
 		break;
 	case Ast_BinaryExpr:
-		n->BinaryExpr.left  = clone_ast_node(a, n->BinaryExpr.left);
-		n->BinaryExpr.right = clone_ast_node(a, n->BinaryExpr.right);
+		n->BinaryExpr.left  = clone_ast(n->BinaryExpr.left);
+		n->BinaryExpr.right = clone_ast(n->BinaryExpr.right);
 		break;
 	case Ast_ParenExpr:
-		n->ParenExpr.expr = clone_ast_node(a, n->ParenExpr.expr);
+		n->ParenExpr.expr = clone_ast(n->ParenExpr.expr);
 		break;
 	case Ast_SelectorExpr:
-		n->SelectorExpr.expr = clone_ast_node(a, n->SelectorExpr.expr);
-		n->SelectorExpr.selector = clone_ast_node(a, n->SelectorExpr.selector);
+		n->SelectorExpr.expr = clone_ast(n->SelectorExpr.expr);
+		n->SelectorExpr.selector = clone_ast(n->SelectorExpr.selector);
 		break;
 	case Ast_IndexExpr:
-		n->IndexExpr.expr  = clone_ast_node(a, n->IndexExpr.expr);
-		n->IndexExpr.index = clone_ast_node(a, n->IndexExpr.index);
+		n->IndexExpr.expr  = clone_ast(n->IndexExpr.expr);
+		n->IndexExpr.index = clone_ast(n->IndexExpr.index);
 		break;
 	case Ast_DerefExpr:
-		n->DerefExpr.expr = clone_ast_node(a, n->DerefExpr.expr);
+		n->DerefExpr.expr = clone_ast(n->DerefExpr.expr);
 		break;
 	case Ast_SliceExpr:
-		n->SliceExpr.expr = clone_ast_node(a, n->SliceExpr.expr);
-		n->SliceExpr.low  = clone_ast_node(a, n->SliceExpr.low);
-		n->SliceExpr.high = clone_ast_node(a, n->SliceExpr.high);
+		n->SliceExpr.expr = clone_ast(n->SliceExpr.expr);
+		n->SliceExpr.low  = clone_ast(n->SliceExpr.low);
+		n->SliceExpr.high = clone_ast(n->SliceExpr.high);
 		break;
 	case Ast_CallExpr:
-		n->CallExpr.proc = clone_ast_node(a, n->CallExpr.proc);
-		n->CallExpr.args = clone_ast_node_array(a, n->CallExpr.args);
+		n->CallExpr.proc = clone_ast(n->CallExpr.proc);
+		n->CallExpr.args = clone_ast_array(n->CallExpr.args);
 		break;
 
 	case Ast_FieldValue:
-		n->FieldValue.field = clone_ast_node(a, n->FieldValue.field);
-		n->FieldValue.value = clone_ast_node(a, n->FieldValue.value);
+		n->FieldValue.field = clone_ast(n->FieldValue.field);
+		n->FieldValue.value = clone_ast(n->FieldValue.value);
 		break;
 
 	case Ast_TernaryExpr:
-		n->TernaryExpr.cond = clone_ast_node(a, n->TernaryExpr.cond);
-		n->TernaryExpr.x    = clone_ast_node(a, n->TernaryExpr.x);
-		n->TernaryExpr.y    = clone_ast_node(a, n->TernaryExpr.y);
+		n->TernaryExpr.cond = clone_ast(n->TernaryExpr.cond);
+		n->TernaryExpr.x    = clone_ast(n->TernaryExpr.x);
+		n->TernaryExpr.y    = clone_ast(n->TernaryExpr.y);
 		break;
 	case Ast_TypeAssertion:
-		n->TypeAssertion.expr = clone_ast_node(a, n->TypeAssertion.expr);
-		n->TypeAssertion.type = clone_ast_node(a, n->TypeAssertion.type);
+		n->TypeAssertion.expr = clone_ast(n->TypeAssertion.expr);
+		n->TypeAssertion.type = clone_ast(n->TypeAssertion.type);
 		break;
 	case Ast_TypeCast:
-		n->TypeCast.type = clone_ast_node(a, n->TypeCast.type);
-		n->TypeCast.expr = clone_ast_node(a, n->TypeCast.expr);
+		n->TypeCast.type = clone_ast(n->TypeCast.type);
+		n->TypeCast.expr = clone_ast(n->TypeCast.expr);
 		break;
 
 	case Ast_BadStmt:   break;
 	case Ast_EmptyStmt: break;
 	case Ast_ExprStmt:
-		n->ExprStmt.expr = clone_ast_node(a, n->ExprStmt.expr);
+		n->ExprStmt.expr = clone_ast(n->ExprStmt.expr);
 		break;
 	case Ast_TagStmt:
-		n->TagStmt.stmt = clone_ast_node(a, n->TagStmt.stmt);
+		n->TagStmt.stmt = clone_ast(n->TagStmt.stmt);
 		break;
 	case Ast_AssignStmt:
-		n->AssignStmt.lhs = clone_ast_node_array(a, n->AssignStmt.lhs);
-		n->AssignStmt.rhs = clone_ast_node_array(a, n->AssignStmt.rhs);
+		n->AssignStmt.lhs = clone_ast_array(n->AssignStmt.lhs);
+		n->AssignStmt.rhs = clone_ast_array(n->AssignStmt.rhs);
 		break;
 	case Ast_IncDecStmt:
-		n->IncDecStmt.expr = clone_ast_node(a, n->IncDecStmt.expr);
+		n->IncDecStmt.expr = clone_ast(n->IncDecStmt.expr);
 		break;
 	case Ast_BlockStmt:
-		n->BlockStmt.stmts = clone_ast_node_array(a, n->BlockStmt.stmts);
+		n->BlockStmt.stmts = clone_ast_array(n->BlockStmt.stmts);
 		break;
 	case Ast_IfStmt:
-		n->IfStmt.init = clone_ast_node(a, n->IfStmt.init);
-		n->IfStmt.cond = clone_ast_node(a, n->IfStmt.cond);
-		n->IfStmt.body = clone_ast_node(a, n->IfStmt.body);
-		n->IfStmt.else_stmt = clone_ast_node(a, n->IfStmt.else_stmt);
+		n->IfStmt.init = clone_ast(n->IfStmt.init);
+		n->IfStmt.cond = clone_ast(n->IfStmt.cond);
+		n->IfStmt.body = clone_ast(n->IfStmt.body);
+		n->IfStmt.else_stmt = clone_ast(n->IfStmt.else_stmt);
 		break;
 	case Ast_WhenStmt:
-		n->WhenStmt.cond = clone_ast_node(a, n->WhenStmt.cond);
-		n->WhenStmt.body = clone_ast_node(a, n->WhenStmt.body);
-		n->WhenStmt.else_stmt = clone_ast_node(a, n->WhenStmt.else_stmt);
+		n->WhenStmt.cond = clone_ast(n->WhenStmt.cond);
+		n->WhenStmt.body = clone_ast(n->WhenStmt.body);
+		n->WhenStmt.else_stmt = clone_ast(n->WhenStmt.else_stmt);
 		break;
 	case Ast_ReturnStmt:
-		n->ReturnStmt.results = clone_ast_node_array(a, n->ReturnStmt.results);
+		n->ReturnStmt.results = clone_ast_array(n->ReturnStmt.results);
 		break;
 	case Ast_ForStmt:
-		n->ForStmt.label = clone_ast_node(a, n->ForStmt.label);
-		n->ForStmt.init  = clone_ast_node(a, n->ForStmt.init);
-		n->ForStmt.cond  = clone_ast_node(a, n->ForStmt.cond);
-		n->ForStmt.post  = clone_ast_node(a, n->ForStmt.post);
-		n->ForStmt.body  = clone_ast_node(a, n->ForStmt.body);
+		n->ForStmt.label = clone_ast(n->ForStmt.label);
+		n->ForStmt.init  = clone_ast(n->ForStmt.init);
+		n->ForStmt.cond  = clone_ast(n->ForStmt.cond);
+		n->ForStmt.post  = clone_ast(n->ForStmt.post);
+		n->ForStmt.body  = clone_ast(n->ForStmt.body);
 		break;
 	case Ast_RangeStmt:
-		n->RangeStmt.label = clone_ast_node(a, n->RangeStmt.label);
-		n->RangeStmt.val0  = clone_ast_node(a, n->RangeStmt.val0);
-		n->RangeStmt.val1  = clone_ast_node(a, n->RangeStmt.val1);
-		n->RangeStmt.expr  = clone_ast_node(a, n->RangeStmt.expr);
-		n->RangeStmt.body  = clone_ast_node(a, n->RangeStmt.body);
+		n->RangeStmt.label = clone_ast(n->RangeStmt.label);
+		n->RangeStmt.val0  = clone_ast(n->RangeStmt.val0);
+		n->RangeStmt.val1  = clone_ast(n->RangeStmt.val1);
+		n->RangeStmt.expr  = clone_ast(n->RangeStmt.expr);
+		n->RangeStmt.body  = clone_ast(n->RangeStmt.body);
 		break;
 	case Ast_CaseClause:
-		n->CaseClause.list  = clone_ast_node_array(a, n->CaseClause.list);
-		n->CaseClause.stmts = clone_ast_node_array(a, n->CaseClause.stmts);
+		n->CaseClause.list  = clone_ast_array(n->CaseClause.list);
+		n->CaseClause.stmts = clone_ast_array(n->CaseClause.stmts);
 		n->CaseClause.implicit_entity = nullptr;
 		break;
 	case Ast_SwitchStmt:
-		n->SwitchStmt.label = clone_ast_node(a, n->SwitchStmt.label);
-		n->SwitchStmt.init  = clone_ast_node(a, n->SwitchStmt.init);
-		n->SwitchStmt.tag   = clone_ast_node(a, n->SwitchStmt.tag);
-		n->SwitchStmt.body  = clone_ast_node(a, n->SwitchStmt.body);
+		n->SwitchStmt.label = clone_ast(n->SwitchStmt.label);
+		n->SwitchStmt.init  = clone_ast(n->SwitchStmt.init);
+		n->SwitchStmt.tag   = clone_ast(n->SwitchStmt.tag);
+		n->SwitchStmt.body  = clone_ast(n->SwitchStmt.body);
 		break;
 	case Ast_TypeSwitchStmt:
-		n->TypeSwitchStmt.label = clone_ast_node(a, n->TypeSwitchStmt.label);
-		n->TypeSwitchStmt.tag   = clone_ast_node(a, n->TypeSwitchStmt.tag);
-		n->TypeSwitchStmt.body  = clone_ast_node(a, n->TypeSwitchStmt.body);
+		n->TypeSwitchStmt.label = clone_ast(n->TypeSwitchStmt.label);
+		n->TypeSwitchStmt.tag   = clone_ast(n->TypeSwitchStmt.tag);
+		n->TypeSwitchStmt.body  = clone_ast(n->TypeSwitchStmt.body);
 		break;
 	case Ast_DeferStmt:
-		n->DeferStmt.stmt = clone_ast_node(a, n->DeferStmt.stmt);
+		n->DeferStmt.stmt = clone_ast(n->DeferStmt.stmt);
 		break;
 	case Ast_BranchStmt:
-		n->BranchStmt.label = clone_ast_node(a, n->BranchStmt.label);
+		n->BranchStmt.label = clone_ast(n->BranchStmt.label);
 		break;
 	case Ast_UsingStmt:
-		n->UsingStmt.list = clone_ast_node_array(a, n->UsingStmt.list);
+		n->UsingStmt.list = clone_ast_array(n->UsingStmt.list);
 		break;
 	case Ast_PushContext:
-		n->PushContext.expr = clone_ast_node(a, n->PushContext.expr);
-		n->PushContext.body = clone_ast_node(a, n->PushContext.body);
+		n->PushContext.expr = clone_ast(n->PushContext.expr);
+		n->PushContext.body = clone_ast(n->PushContext.body);
 		break;
 
 	case Ast_BadDecl: break;
 
 	case Ast_ForeignBlockDecl:
-		n->ForeignBlockDecl.foreign_library = clone_ast_node(a, n->ForeignBlockDecl.foreign_library);
-		n->ForeignBlockDecl.body            = clone_ast_node(a, n->ForeignBlockDecl.body);
-		n->ForeignBlockDecl.attributes      = clone_ast_node_array(a, n->ForeignBlockDecl.attributes);
+		n->ForeignBlockDecl.foreign_library = clone_ast(n->ForeignBlockDecl.foreign_library);
+		n->ForeignBlockDecl.body            = clone_ast(n->ForeignBlockDecl.body);
+		n->ForeignBlockDecl.attributes      = clone_ast_array(n->ForeignBlockDecl.attributes);
 		break;
 	case Ast_Label:
-		n->Label.name = clone_ast_node(a, n->Label.name);
+		n->Label.name = clone_ast(n->Label.name);
 		break;
 	case Ast_ValueDecl:
-		n->ValueDecl.names  = clone_ast_node_array(a, n->ValueDecl.names);
-		n->ValueDecl.type   = clone_ast_node(a, n->ValueDecl.type);
-		n->ValueDecl.values = clone_ast_node_array(a, n->ValueDecl.values);
-		n->ValueDecl.attributes = clone_ast_node_array(a, n->ValueDecl.attributes);
+		n->ValueDecl.names  = clone_ast_array(n->ValueDecl.names);
+		n->ValueDecl.type   = clone_ast(n->ValueDecl.type);
+		n->ValueDecl.values = clone_ast_array(n->ValueDecl.values);
+		n->ValueDecl.attributes = clone_ast_array(n->ValueDecl.attributes);
 		break;
 
 	case Ast_Attribute:
-		n->Attribute.elems = clone_ast_node_array(a, n->Attribute.elems);
+		n->Attribute.elems = clone_ast_array(n->Attribute.elems);
 		break;
 	case Ast_Field:
-		n->Field.names = clone_ast_node_array(a, n->Field.names);
-		n->Field.type  = clone_ast_node(a, n->Field.type);
+		n->Field.names = clone_ast_array(n->Field.names);
+		n->Field.type  = clone_ast(n->Field.type);
 		break;
 	case Ast_FieldList:
-		n->FieldList.list = clone_ast_node_array(a, n->FieldList.list);
+		n->FieldList.list = clone_ast_array(n->FieldList.list);
 		break;
 	case Ast_UnionField:
-		n->UnionField.name = clone_ast_node(a, n->UnionField.name);
-		n->UnionField.list = clone_ast_node(a, n->UnionField.list);
+		n->UnionField.name = clone_ast(n->UnionField.name);
+		n->UnionField.list = clone_ast(n->UnionField.list);
 		break;
 
 	case Ast_TypeType:
-		n->TypeType.specialization = clone_ast_node(a, n->TypeType.specialization);
+		n->TypeType.specialization = clone_ast(n->TypeType.specialization);
 		break;
 	case Ast_HelperType:
-		n->HelperType.type = clone_ast_node(a, n->HelperType.type);
+		n->HelperType.type = clone_ast(n->HelperType.type);
 		break;
 	case Ast_DistinctType:
-		n->DistinctType.type = clone_ast_node(a, n->DistinctType.type);
+		n->DistinctType.type = clone_ast(n->DistinctType.type);
 		break;
 	case Ast_ProcType:
-		n->ProcType.params  = clone_ast_node(a, n->ProcType.params);
-		n->ProcType.results = clone_ast_node(a, n->ProcType.results);
+		n->ProcType.params  = clone_ast(n->ProcType.params);
+		n->ProcType.results = clone_ast(n->ProcType.results);
 		break;
 	case Ast_PointerType:
-		n->PointerType.type = clone_ast_node(a, n->PointerType.type);
+		n->PointerType.type = clone_ast(n->PointerType.type);
 		break;
 	case Ast_ArrayType:
-		n->ArrayType.count = clone_ast_node(a, n->ArrayType.count);
-		n->ArrayType.elem  = clone_ast_node(a, n->ArrayType.elem);
+		n->ArrayType.count = clone_ast(n->ArrayType.count);
+		n->ArrayType.elem  = clone_ast(n->ArrayType.elem);
 		break;
 	case Ast_DynamicArrayType:
-		n->DynamicArrayType.elem = clone_ast_node(a, n->DynamicArrayType.elem);
+		n->DynamicArrayType.elem = clone_ast(n->DynamicArrayType.elem);
 		break;
 	case Ast_StructType:
-		n->StructType.fields = clone_ast_node_array(a, n->StructType.fields);
-		n->StructType.polymorphic_params = clone_ast_node(a, n->StructType.polymorphic_params);
-		n->StructType.align  = clone_ast_node(a, n->StructType.align);
+		n->StructType.fields = clone_ast_array(n->StructType.fields);
+		n->StructType.polymorphic_params = clone_ast(n->StructType.polymorphic_params);
+		n->StructType.align  = clone_ast(n->StructType.align);
 		break;
 	case Ast_UnionType:
-		n->UnionType.variants = clone_ast_node_array(a, n->UnionType.variants);
+		n->UnionType.variants = clone_ast_array(n->UnionType.variants);
 		break;
 	case Ast_EnumType:
-		n->EnumType.base_type = clone_ast_node(a, n->EnumType.base_type);
-		n->EnumType.fields    = clone_ast_node_array(a, n->EnumType.fields);
+		n->EnumType.base_type = clone_ast(n->EnumType.base_type);
+		n->EnumType.fields    = clone_ast_array(n->EnumType.fields);
 		break;
 	case Ast_BitFieldType:
-		n->BitFieldType.fields = clone_ast_node_array(a, n->BitFieldType.fields);
-		n->BitFieldType.align = clone_ast_node(a, n->BitFieldType.align);
+		n->BitFieldType.fields = clone_ast_array(n->BitFieldType.fields);
+		n->BitFieldType.align = clone_ast(n->BitFieldType.align);
 	case Ast_MapType:
-		n->MapType.count = clone_ast_node(a, n->MapType.count);
-		n->MapType.key   = clone_ast_node(a, n->MapType.key);
-		n->MapType.value = clone_ast_node(a, n->MapType.value);
+		n->MapType.count = clone_ast(n->MapType.count);
+		n->MapType.key   = clone_ast(n->MapType.key);
+		n->MapType.value = clone_ast(n->MapType.value);
 		break;
 	}
 
