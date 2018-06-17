@@ -709,7 +709,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			bool *visited = gb_alloc_array(m->tmp_allocator, bool, value_count);
 
 			if (cl->elems.count > 0) {
-				if (cl->elems[0]->kind == AstNode_FieldValue) {
+				if (cl->elems[0]->kind == Ast_FieldValue) {
 					isize elem_count = cl->elems.count;
 					for (isize i = 0; i < elem_count; i++) {
 						ast_node(fv, FieldValue, cl->elems[i]);
@@ -765,13 +765,13 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	}
 	case ExactValue_Procedure: {
 		irValue **found = nullptr;
-		AstNode *expr = value.value_procedure;
+		Ast *expr = value.value_procedure;
 		GB_ASSERT(expr != nullptr);
 
-		if (expr->kind == AstNode_ProcLit) {
+		if (expr->kind == Ast_ProcLit) {
 			found = map_get(&m->anonymous_proc_lits, hash_pointer(expr));
 		} else {
-			GB_ASSERT(expr->kind == AstNode_Ident);
+			GB_ASSERT(expr->kind == Ast_Ident);
 			Entity *e = entity_of_ident(expr);
 			GB_ASSERT(e != nullptr);
 			found = map_get(&m->values, hash_entity(e));

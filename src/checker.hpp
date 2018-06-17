@@ -167,7 +167,7 @@ struct Operand {
 	AddressingMode mode;
 	Type *         type;
 	ExactValue     value;
-	AstNode *      expr;
+	Ast *      expr;
 	BuiltinProcId  builtin_id;
 	Entity *       proc_group;
 };
@@ -175,7 +175,7 @@ struct Operand {
 
 struct BlockLabel {
 	String   name;
-	AstNode *label; //  AstNode_Label;
+	Ast *label; //  Ast_Label;
 };
 
 struct AttributeContext {
@@ -192,10 +192,10 @@ AttributeContext make_attribute_context(String link_prefix) {
 	return ac;
 }
 
-#define DECL_ATTRIBUTE_PROC(_name) bool _name(CheckerContext *c, AstNode *elem, String name, ExactValue value, AttributeContext *ac)
+#define DECL_ATTRIBUTE_PROC(_name) bool _name(CheckerContext *c, Ast *elem, String name, ExactValue value, AttributeContext *ac)
 typedef DECL_ATTRIBUTE_PROC(DeclAttributeProc);
 
-void check_decl_attributes(CheckerContext *c, Array<AstNode *> const &attributes, DeclAttributeProc *proc, AttributeContext *ac);
+void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, DeclAttributeProc *proc, AttributeContext *ac);
 
 
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
@@ -206,11 +206,11 @@ struct DeclInfo {
 	Entity **         entities;
 	isize             entity_count;
 
-	AstNode *         type_expr;
-	AstNode *         init_expr;
-	Array<AstNode *>  init_expr_list;
-	Array<AstNode *>  attributes;
-	AstNode *         proc_lit;      // AstNode_ProcLit
+	Ast *         type_expr;
+	Ast *         init_expr;
+	Array<Ast *>  init_expr_list;
+	Array<Ast *>  attributes;
+	Ast *         proc_lit;      // Ast_ProcLit
 	Type *            gen_proc_type; // Precalculated
 
 	PtrSet<Entity *>  deps;
@@ -224,16 +224,16 @@ struct ProcInfo {
 	Token     token;
 	DeclInfo *decl;
 	Type *    type; // Type_Procedure
-	AstNode * body; // AstNode_BlockStmt
+	Ast * body; // Ast_BlockStmt
 	u64       tags;
 	bool      generated_from_polymorphic;
-	AstNode * poly_def_node;
+	Ast * poly_def_node;
 };
 
 
 
 struct Scope {
-	AstNode *        node;
+	Ast *        node;
 	Scope *          parent;
 	Scope *          prev, *next;
 	Scope *          first_child;
@@ -242,8 +242,8 @@ struct Scope {
 	PtrSet<Entity *> implicit;
 	// Scope *          shared;
 
-	Array<AstNode *> delayed_directives;
-	Array<AstNode *> delayed_imports;
+	Array<Ast *> delayed_directives;
+	Array<Ast *> delayed_imports;
 	PtrSet<Scope *>  imported;
 	bool             is_proc;
 	bool             is_global;
@@ -290,7 +290,7 @@ struct ImportGraphNode {
 
 
 struct ForeignContext {
-	AstNode *             curr_library;
+	Ast *             curr_library;
 	ProcCallingConvention default_cc;
 	String                link_prefix;
 	bool                  in_export;
@@ -301,8 +301,8 @@ typedef Array<Type *>   CheckerPolyPath;
 
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
-	Map<TypeAndValue>     types;           // Key: AstNode * | Expression -> Type (and value)
-	Map<ExprInfo>         untyped;         // Key: AstNode * | Expression -> ExprInfo
+	Map<TypeAndValue>     types;           // Key: Ast * | Expression -> Type (and value)
+	Map<ExprInfo>         untyped;         // Key: Ast * | Expression -> ExprInfo
 	Map<AstFile *>        files;           // Key: String (full path)
 	Map<AstPackage *>     packages;        // Key: String (full path)
 	Map<Entity *>         foreigns;        // Key: String
@@ -310,7 +310,7 @@ struct CheckerInfo {
 	Array<Entity *>       entities;
 	Array<DeclInfo *>     variable_init_order;
 
-	Map<Array<Entity *> > gen_procs;       // Key: AstNode * | Identifier -> Entity
+	Map<Array<Entity *> > gen_procs;       // Key: Ast * | Identifier -> Entity
 	Map<Array<Entity *> > gen_types;       // Key: Type *
 
 	Array<Type *>         type_info_types;
@@ -368,7 +368,7 @@ struct Checker {
 
 
 
-HashKey hash_node     (AstNode *node)  { return hash_pointer(node); }
+HashKey hash_node     (Ast *node)  { return hash_pointer(node); }
 HashKey hash_ast_file (AstFile *file)  { return hash_pointer(file); }
 HashKey hash_entity   (Entity *e)      { return hash_pointer(e); }
 HashKey hash_type     (Type *t)        { return hash_pointer(t); }
@@ -377,19 +377,19 @@ HashKey hash_decl_info(DeclInfo *decl) { return hash_pointer(decl); }
 
 
 // CheckerInfo API
-TypeAndValue type_and_value_of_expr (CheckerInfo *i, AstNode *expr);
-Type *       type_of_expr           (CheckerInfo *i, AstNode *expr);
-Entity *     entity_of_ident        (AstNode *identifier);
-Entity *     implicit_entity_of_node(CheckerInfo *i, AstNode *clause);
-Scope *      scope_of_node          (AstNode *node);
-DeclInfo *   decl_info_of_ident     (AstNode *ident);
+TypeAndValue type_and_value_of_expr (CheckerInfo *i, Ast *expr);
+Type *       type_of_expr           (CheckerInfo *i, Ast *expr);
+Entity *     entity_of_ident        (Ast *identifier);
+Entity *     implicit_entity_of_node(CheckerInfo *i, Ast *clause);
+Scope *      scope_of_node          (Ast *node);
+DeclInfo *   decl_info_of_ident     (Ast *ident);
 DeclInfo *   decl_info_of_entity    (Entity * e);
 AstFile *    ast_file_of_filename   (CheckerInfo *i, String   filename);
 // IMPORTANT: Only to use once checking is done
 isize        type_info_index        (CheckerInfo *i, Type *   type, bool error_on_failure = true);
 
 // Will return nullptr if not found
-Entity *entity_of_node(CheckerInfo *i, AstNode *expr);
+Entity *entity_of_node(CheckerInfo *i, Ast *expr);
 
 
 Entity *scope_lookup_current(Scope *s, String name);
@@ -398,24 +398,24 @@ void    scope_lookup_parent (Scope *s, String name, Scope **scope_, Entity **ent
 Entity *scope_insert (Scope *s, Entity *entity);
 
 
-ExprInfo *check_get_expr_info     (CheckerInfo *i, AstNode *expr);
-void      check_set_expr_info     (CheckerInfo *i, AstNode *expr, ExprInfo info);
-void      check_remove_expr_info  (CheckerInfo *i, AstNode *expr);
-void      add_untyped             (CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value);
-void      add_type_and_value      (CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value);
-void      add_entity_use          (CheckerContext *c, AstNode *identifier, Entity *entity);
-void      add_implicit_entity     (CheckerContext *c, AstNode *node, Entity *e);
-void      add_entity_and_decl_info(CheckerContext *c, AstNode *identifier, Entity *e, DeclInfo *d);
+ExprInfo *check_get_expr_info     (CheckerInfo *i, Ast *expr);
+void      check_set_expr_info     (CheckerInfo *i, Ast *expr, ExprInfo info);
+void      check_remove_expr_info  (CheckerInfo *i, Ast *expr);
+void      add_untyped             (CheckerInfo *i, Ast *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value);
+void      add_type_and_value      (CheckerInfo *i, Ast *expression, AddressingMode mode, Type *type, ExactValue value);
+void      add_entity_use          (CheckerContext *c, Ast *identifier, Entity *entity);
+void      add_implicit_entity     (CheckerContext *c, Ast *node, Entity *e);
+void      add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, DeclInfo *d);
 void      add_type_info_type      (CheckerContext *c, Type *t);
 
-void check_add_import_decl(CheckerContext *c, AstNode *decl);
-void check_add_foreign_import_decl(CheckerContext *c, AstNode *decl);
+void check_add_import_decl(CheckerContext *c, Ast *decl);
+void check_add_foreign_import_decl(CheckerContext *c, Ast *decl);
 
 
-bool check_arity_match(CheckerContext *c, AstNodeValueDecl *vd, bool is_global = false);
-void check_collect_entities(CheckerContext *c, Array<AstNode *> const &nodes);
-void check_collect_entities_from_when_stmt(CheckerContext *c, AstNodeWhenStmt *ws);
-void check_delayed_file_import_entity(CheckerContext *c, AstNode *decl);
+bool check_arity_match(CheckerContext *c, AstValueDecl *vd, bool is_global = false);
+void check_collect_entities(CheckerContext *c, Array<Ast *> const &nodes);
+void check_collect_entities_from_when_stmt(CheckerContext *c, AstWhenStmt *ws);
+void check_delayed_file_import_entity(CheckerContext *c, Ast *decl);
 
 CheckerTypePath *new_checker_type_path();
 void destroy_checker_type_path(CheckerTypePath *tp);

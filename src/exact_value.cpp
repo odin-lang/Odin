@@ -3,7 +3,7 @@
 // TODO(bill): Big numbers
 // IMPORTANT TODO(bill): This needs to be completely fixed!!!!!!!!
 
-struct AstNode;
+struct Ast;
 struct HashKey;
 struct Type;
 struct Entity;
@@ -37,8 +37,8 @@ struct ExactValue {
 		f64           value_float;
 		i64           value_pointer;
 		Complex128    value_complex;
-		AstNode *     value_compound;
-		AstNode *     value_procedure;
+		Ast *     value_compound;
+		Ast *     value_procedure;
 		Entity *      value_entity;
 	};
 };
@@ -73,7 +73,7 @@ HashKey hash_exact_value(ExactValue v) {
 }
 
 
-ExactValue exact_value_compound(AstNode *node) {
+ExactValue exact_value_compound(Ast *node) {
 	ExactValue result = {ExactValue_Compound};
 	result.value_compound = node;
 	return result;
@@ -123,7 +123,7 @@ ExactValue exact_value_pointer(i64 ptr) {
 	return result;
 }
 
-ExactValue exact_value_procedure(AstNode *node) {
+ExactValue exact_value_procedure(Ast *node) {
 	ExactValue result = {ExactValue_Procedure};
 	result.value_procedure = node;
 	return result;

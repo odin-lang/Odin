@@ -1,5 +1,5 @@
 struct Scope;
-struct AstNode;
+struct Ast;
 
 enum BasicKind {
 	Basic_Invalid,
@@ -81,7 +81,7 @@ struct BasicType {
 
 struct TypeStruct {
 	Array<Entity *> fields;
-	AstNode *node;
+	Ast *node;
 	Scope *  scope;
 
 	Array<i64> offsets;
@@ -130,7 +130,7 @@ struct TypeStruct {
 	TYPE_KIND(Struct,  TypeStruct)                        \
 	TYPE_KIND(Enum, struct {                              \
 		Array<Entity *> fields;                           \
-		AstNode *node;                                    \
+		Ast *node;                                    \
 		Scope *  scope;                                   \
 		Entity * names;                                   \
 		Type *   base_type;                               \
@@ -141,7 +141,7 @@ struct TypeStruct {
 	})                                                    \
 	TYPE_KIND(Union, struct {                             \
 		Array<Type *> variants;                           \
-		AstNode *node;                                    \
+		Ast *node;                                    \
 		Scope *  scope;                                   \
 		i64      variant_block_size;                      \
 		i64      custom_align;                            \
@@ -153,7 +153,7 @@ struct TypeStruct {
 		bool            are_offsets_set;                  \
 	})                                                    \
 	TYPE_KIND(Proc, struct {                              \
-		AstNode *node;                                    \
+		Ast *node;                                    \
 		Scope *  scope;                                   \
 		Type *   params;  /* Type_Tuple */                \
 		Type *   results; /* Type_Tuple */                \

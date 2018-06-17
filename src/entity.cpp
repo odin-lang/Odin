@@ -65,14 +65,14 @@ struct Entity {
 	Token       token;
 	Scope *     scope;
 	Type *      type;
-	AstNode *   identifier; // Can be nullptr
+	Ast *   identifier; // Can be nullptr
 	DeclInfo *  decl_info;
 	DeclInfo *  parent_proc_decl; // nullptr if in file/global scope
 	AstPackage *pkg;
 
 	// TODO(bill): Cleanup how `using` works for entities
 	Entity *    using_parent;
-	AstNode *   using_expr;
+	Ast *   using_expr;
 
 	isize       order_in_src;
 	String      deprecated_message;
@@ -87,7 +87,7 @@ struct Entity {
 			ExactValue default_value;
 			String     thread_local_model;
 			Entity *   foreign_library;
-			AstNode *  foreign_library_ident;
+			Ast *  foreign_library_ident;
 			String     link_name;
 			String     link_prefix;
 			bool       is_foreign;
@@ -106,7 +106,7 @@ struct Entity {
 		struct {
 			u64          tags;
 			Entity *     foreign_library;
-			AstNode *    foreign_library_ident;
+			Ast *    foreign_library_ident;
 			String       link_name;
 			String       link_prefix;
 			bool         is_foreign;
@@ -130,7 +130,7 @@ struct Entity {
 		i32 Nil;
 		struct {
 			String   name;
-			AstNode *node;
+			Ast *node;
 		} Label;
 	};
 };
@@ -295,7 +295,7 @@ Entity *alloc_entity_nil(String name, Type *type) {
 	return entity;
 }
 
-Entity *alloc_entity_label(Scope *scope, Token token, Type *type, AstNode *node) {
+Entity *alloc_entity_label(Scope *scope, Token token, Type *type, Ast *node) {
 	Entity *entity = alloc_entity(Entity_Label, scope, token, type);
 	entity->Label.node = node;
 	entity->state = EntityState_Resolved;
