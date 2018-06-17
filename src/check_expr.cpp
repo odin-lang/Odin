@@ -44,7 +44,6 @@ int valid_index_and_score_cmp(void const *a, void const *b) {
 
 
 
-
 #define CALL_ARGUMENT_CHECKER(name) CallArgumentError name(CheckerContext *c, Ast *call, Type *proc_type, Entity *entity, Array<Operand> operands, CallArgumentErrorMode show_error_mode, CallArgumentData *data)
 typedef CALL_ARGUMENT_CHECKER(CallArgumentCheckerType);
 
@@ -5206,6 +5205,10 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 
 	case_ast_node(bl, BasicLit, node);
+		// NOTE(bill, 2018-06-17): Placing this in the parser is slower than
+		// placing it here for some reason. So don't move it to the parsing
+		// stage if you _think_ it will be faster, only do it if you _know_ it
+		// will be faster.
 		Type *t = t_invalid;
 		switch (bl->token.kind) {
 		case Token_Integer: t = t_untyped_integer; break;
@@ -5231,6 +5234,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case_end;
 
 	case_ast_node(bd, BasicDirective, node);
+		o->mode = Addressing_Constant;
 		if (bd->name == "file") {
 			o->type = t_untyped_string;
 			o->value = exact_value_string(bd->token.pos.file);
@@ -5254,7 +5258,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		} else {
 			GB_PANIC("Unknown basic directive");
 		}
-		o->mode = Addressing_Constant;
 	case_end;
 
 	case_ast_node(pg, ProcGroup, node);
@@ -5295,7 +5298,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			check_procedure_later(ctx.checker, ctx.file, empty_token, decl, type, pl->body, pl->tags);
 		}
 		check_close_scope(&ctx);
-
 
 		o->mode = Addressing_Value;
 		o->type = type;

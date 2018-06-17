@@ -180,18 +180,17 @@ void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, De
 
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
 struct DeclInfo {
-	DeclInfo *        parent; // NOTE(bill): only used for procedure literals at the moment
-	Scope *           scope;
+	DeclInfo *    parent; // NOTE(bill): only used for procedure literals at the moment
+	Scope *       scope;
 
-	Entity **         entities;
-	isize             entity_count;
+	Entity *entity;
 
 	Ast *         type_expr;
 	Ast *         init_expr;
-	Array<Ast *>  init_expr_list;
+	// Array<Ast *>  init_expr_list;
 	Array<Ast *>  attributes;
 	Ast *         proc_lit;      // Ast_ProcLit
-	Type *            gen_proc_type; // Precalculated
+	Type *        gen_proc_type; // Precalculated
 
 	PtrSet<Entity *>  deps;
 	PtrSet<Type *>    type_info_deps;
@@ -204,16 +203,16 @@ struct ProcInfo {
 	Token     token;
 	DeclInfo *decl;
 	Type *    type; // Type_Procedure
-	Ast * body; // Ast_BlockStmt
+	Ast *     body; // Ast_BlockStmt
 	u64       tags;
 	bool      generated_from_polymorphic;
-	Ast * poly_def_node;
+	Ast *     poly_def_node;
 };
 
 
 
 struct Scope {
-	Ast *        node;
+	Ast *            node;
 	Scope *          parent;
 	Scope *          prev, *next;
 	Scope *          first_child;
@@ -298,6 +297,7 @@ struct CheckerInfo {
 	Map<isize>            type_info_map;   // Key: Type *
 
 
+	AstPackage *          builtin_package;
 	AstPackage *          runtime_package;
 	Scope *               init_scope;
 	Entity *              entry_point;

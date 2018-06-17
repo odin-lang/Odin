@@ -640,7 +640,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 }
 
-void check_var_decl(CheckerContext *ctx, Entity *e, Entity **entities, isize entity_count, Ast *type_expr, Array<Ast *> const &init_expr_list) {
+void check_var_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_expr) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Variable);
 
@@ -651,7 +651,7 @@ void check_var_decl(CheckerContext *ctx, Entity *e, Entity **entities, isize ent
 	e->flags |= EntityFlag_Visited;
 
 	AttributeContext ac = make_attribute_context(e->Variable.link_prefix);
-	ac.init_expr_list_count = init_expr_list.count;
+	ac.init_expr_list_count = init_expr != nullptr ? 1 : 0;
 
 	DeclInfo *decl = decl_info_of_entity(e);
 	if (decl != nullptr) {
@@ -682,7 +682,7 @@ void check_var_decl(CheckerContext *ctx, Entity *e, Entity **entities, isize ent
 
 
 	if (e->Variable.is_foreign) {
-		if (init_expr_list.count > 0) {
+		if (init_expr != nullptr) {
 			error(e->token, "A foreign variable declaration cannot have a default value");
 		}
 		init_entity_foreign_library(ctx, e);
@@ -716,20 +716,16 @@ void check_var_decl(CheckerContext *ctx, Entity *e, Entity **entities, isize ent
 		}
 	}
 
-	if (init_expr_list.count == 0) {
+	if (init_expr == nullptr) {
 		if (type_expr == nullptr) {
 			e->type = t_invalid;
 		}
 		return;
 	}
 
-	if (type_expr != nullptr) {
-		for (isize i = 0; i < entity_count; i++) {
-			entities[i]->type = e->type;
-		}
-	}
-
-	check_init_variables(ctx, entities, entity_count, init_expr_list, context_name);
+	Operand o = {};
+	check_expr(ctx, &o, init_expr);
+	check_init_variable(ctx, e, &o, str_lit("variable declaration"));
 }
 
 void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) {
@@ -895,7 +891,7 @@ void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_
 
 	switch (e->kind) {
 	case Entity_Variable:
-		check_var_decl(&c, e, d->entities, d->entity_count, d->type_expr, d->init_expr_list);
+		check_var_decl(&c, e, d->type_expr, d->init_expr);
 		break;
 	case Entity_Constant:
 		check_const_decl(&c, e, d->type_expr, d->init_expr, named_type);

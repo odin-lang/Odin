@@ -4188,8 +4188,8 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 			Entity *e = entity_of_ident(ident);
 			GB_ASSERT(e != nullptr);
 
-			if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity_count > 0) {
-				procedure = e->parent_proc_decl->entities[0]->token.string;
+			if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity != nullptr) {
+				procedure = e->parent_proc_decl->entity->token.string;
 			} else {
 				procedure = str_lit("");
 			}
@@ -8343,57 +8343,55 @@ void ir_gen_tree(irGen *s) {
 	for_array(i, info->variable_init_order) {
 		DeclInfo *d = info->variable_init_order[i];
 
-		for (isize j = 0; j < d->entity_count; j++) {
-			Entity *e = d->entities[j];
+		Entity *e = d->entity;
 
-			if (!e->scope->is_file) {
-				continue;
-			}
+		if (!e->scope->is_file) {
+			continue;
+		}
 
-			if (!ir_min_dep_entity(m, e)) {
-				continue;
-			}
-			DeclInfo *decl = decl_info_of_entity(e);
-			if (decl == nullptr) {
-				continue;
-			}
-			GB_ASSERT(e->kind == Entity_Variable);
+		if (!ir_min_dep_entity(m, e)) {
+			continue;
+		}
+		DeclInfo *decl = decl_info_of_entity(e);
+		if (decl == nullptr) {
+			continue;
+		}
+		GB_ASSERT(e->kind == Entity_Variable);
 
-			bool is_foreign = e->Variable.is_foreign;
-			bool is_export  = e->Variable.is_export;
-			bool no_name_mangle = e->Variable.link_name.len > 0 || is_foreign || is_export;
+		bool is_foreign = e->Variable.is_foreign;
+		bool is_export  = e->Variable.is_export;
+		bool no_name_mangle = e->Variable.link_name.len > 0 || is_foreign || is_export;
 
-			String name = e->token.string;
-			if (!no_name_mangle) {
-				name = ir_mangle_name(s, e);
-			}
-			ir_add_entity_name(m, e, name);
+		String name = e->token.string;
+		if (!no_name_mangle) {
+			name = ir_mangle_name(s, e);
+		}
+		ir_add_entity_name(m, e, name);
 
-			irValue *g = ir_value_global(a, e, nullptr);
-			g->Global.name = name;
-			g->Global.thread_local_model = e->Variable.thread_local_model;
-			g->Global.is_foreign = is_foreign;
-			g->Global.is_export  = is_export;
+		irValue *g = ir_value_global(a, e, nullptr);
+		g->Global.name = name;
+		g->Global.thread_local_model = e->Variable.thread_local_model;
+		g->Global.is_foreign = is_foreign;
+		g->Global.is_export  = is_export;
 
-			irGlobalVariable var = {};
-			var.var = g;
-			var.decl = decl;
+		irGlobalVariable var = {};
+		var.var = g;
+		var.decl = decl;
 
-			if (decl->init_expr != nullptr && !is_type_any(e->type)) {
-				TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
-				if (tav.mode != Addressing_Invalid) {
-					if (tav.value.kind != ExactValue_Invalid) {
-						ExactValue v = tav.value;
-						g->Global.value = ir_add_module_constant(m, tav.type, v);
-					}
+		if (decl->init_expr != nullptr && !is_type_any(e->type)) {
+			TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
+			if (tav.mode != Addressing_Invalid) {
+				if (tav.value.kind != ExactValue_Invalid) {
+					ExactValue v = tav.value;
+					g->Global.value = ir_add_module_constant(m, tav.type, v);
 				}
 			}
-
-			array_add(&global_variables, var);
-
-			ir_module_add_value(m, e, g);
-			map_set(&m->members, hash_string(name), g);
 		}
+
+		array_add(&global_variables, var);
+
+		ir_module_add_value(m, e, g);
+		map_set(&m->members, hash_string(name), g);
 	}
 
 	for_array(i, info->entities) {
