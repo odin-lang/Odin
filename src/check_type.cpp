@@ -1642,7 +1642,7 @@ void init_map_entry_type(Type *type) {
 	}
 	*/
 	Ast *dummy_node = alloc_ast_node(nullptr, Ast_Invalid);
-	Scope *s = create_scope(universal_scope, a);
+	Scope *s = create_scope(builtin_scope, a);
 
 	auto fields = array_make<Entity *>(a, 0, 3);
 	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("key")),   t_map_key,       false, 0, EntityState_Resolved));
@@ -1677,7 +1677,7 @@ void init_map_internal_types(Type *type) {
 	*/
 	gbAllocator a = heap_allocator();
 	Ast *dummy_node = alloc_ast_node(nullptr, Ast_Invalid);
-	Scope *s = create_scope(universal_scope, a);
+	Scope *s = create_scope(builtin_scope, a);
 
 	Type *hashes_type  = alloc_type_dynamic_array(t_int);
 	Type *entries_type = alloc_type_dynamic_array(type->Map.entry_type);

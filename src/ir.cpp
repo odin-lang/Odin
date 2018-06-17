@@ -8405,7 +8405,7 @@ void ir_gen_tree(irGen *s) {
 		}
 
 		Scope *package_scope = scope->parent;
-		GB_ASSERT(package_scope->is_package);
+		GB_ASSERT(package_scope->is_pkg);
 
 		switch (e->kind) {
 		case Entity_Variable:

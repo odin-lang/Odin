@@ -224,14 +224,14 @@ struct Scope {
 	PtrSet<Scope *>  imported;
 	bool             is_proc;
 	bool             is_global;
-	bool             is_package;
+	bool             is_pkg;
 	bool             is_file;
 	bool             is_init;
 	bool             is_struct;
 	bool             has_been_imported; // This is only applicable to file scopes
 
 	union {
-		AstPackage *package;
+		AstPackage *pkg;
 		AstFile *   file;
 	};
 };
@@ -344,6 +344,13 @@ struct Checker {
 	gbAllocator    allocator;
 	CheckerContext init_ctx;
 };
+
+
+
+
+
+gb_global AstPackage *builtin_pkg   = nullptr;
+gb_global Scope *     builtin_scope = nullptr;
 
 
 
