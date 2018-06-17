@@ -211,25 +211,31 @@ struct ProcInfo {
 
 
 
+enum ScopeFlag {
+	ScopeFlag_Pkg    = 1<<1,
+	ScopeFlag_Global = 1<<2,
+	ScopeFlag_File   = 1<<3,
+	ScopeFlag_Init   = 1<<4,
+	ScopeFlag_Proc   = 1<<5,
+	ScopeFlag_Type   = 1<<6,
+
+
+	ScopeFlag_HasBeenImported = 1<<10, // This is only applicable to file scopes
+};
+
 struct Scope {
-	Ast *            node;
-	Scope *          parent;
-	Scope *          prev, *next;
-	Scope *          first_child;
-	Scope *          last_child;
-	Map<Entity *>    elements; // Key: String
+	Ast *         node;
+	Scope *       parent;
+	Scope *       prev, *next;
+	Scope *       first_child;
+	Scope *       last_child;
+	Map<Entity *> elements; // Key: String
 
-	Array<Ast *> delayed_directives;
-	Array<Ast *> delayed_imports;
-	PtrSet<Scope *>  imported;
-	bool             is_proc;
-	bool             is_global;
-	bool             is_pkg;
-	bool             is_file;
-	bool             is_init;
-	bool             is_struct;
-	bool             has_been_imported; // This is only applicable to file scopes
+	Array<Ast *>    delayed_directives;
+	Array<Ast *>    delayed_imports;
+	PtrSet<Scope *> imported;
 
+	i32             flags; // ScopeFlag
 	union {
 		AstPackage *pkg;
 		AstFile *   file;

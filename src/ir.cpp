@@ -8312,13 +8312,13 @@ void ir_gen_tree(irGen *s) {
 		if (e->kind == Entity_Variable) {
 			global_variable_max_count++;
 		} else if (e->kind == Entity_Procedure && !is_global) {
-			if (e->scope->is_init && name == "main") {
+			if ((e->scope->flags&ScopeFlag_Init) && name == "main") {
 				GB_ASSERT(e == entry_point);
 				// entry_point = e;
 			}
 			if (e->Procedure.is_export ||
 			    (e->Procedure.link_name.len > 0) ||
-			    (e->scope->is_file && e->Procedure.link_name.len > 0)) {
+			    ((e->scope->flags&ScopeFlag_File) && e->Procedure.link_name.len > 0)) {
 				if (!has_dll_main && name == "DllMain") {
 					has_dll_main = true;
 				} else if (!has_win_main && name == "WinMain") {
@@ -8345,7 +8345,7 @@ void ir_gen_tree(irGen *s) {
 
 		Entity *e = d->entity;
 
-		if (!e->scope->is_file) {
+		if ((e->scope->flags & ScopeFlag_File) == 0) {
 			continue;
 		}
 
@@ -8400,12 +8400,12 @@ void ir_gen_tree(irGen *s) {
 		DeclInfo *decl  = e->decl_info;
 		Scope *   scope = e->scope;
 
-		if (!scope->is_file) {
+		if ((scope->flags & ScopeFlag_File) == 0) {
 			continue;
 		}
 
 		Scope *package_scope = scope->parent;
-		GB_ASSERT(package_scope->is_pkg);
+		GB_ASSERT(package_scope->flags & ScopeFlag_Pkg);
 
 		switch (e->kind) {
 		case Entity_Variable:

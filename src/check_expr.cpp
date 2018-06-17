@@ -240,7 +240,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	CheckerContext nctx = *c;
 
 	Scope *scope = create_scope(base_entity->scope, a);
-	scope->is_proc = true;
+	scope->flags |= ScopeFlag_Proc;
 	nctx.scope = scope;
 	nctx.allow_polymorphic_types = true;
 	if (nctx.polymorphic_scope == nullptr) {
@@ -2578,7 +2578,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 					// NOTE(bill): Builtin's are in the universal scope which is part of every scopes hierarchy
 					// This means that we should just ignore the found result through it
 					is_declared = false;
-				} else if (entity->scope->is_global && !import_scope->is_global) {
+				} else if ((entity->scope->flags&ScopeFlag_Global) == ScopeFlag_Global && (import_scope->flags&ScopeFlag_Global) == 0) {
 					is_declared = false;
 				}
 			}
@@ -3305,7 +3305,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_type_info_of: {
 		// proc type_info_of(Type) -> ^Type_Info
-		if (c->scope->is_global) {
+		if (c->scope->flags&ScopeFlag_Global) {
 			compiler_error("'type_info_of' Cannot be declared within the runtime package due to how the internals of the compiler works");
 		}
 
@@ -3340,7 +3340,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_typeid_of: {
 		// proc typeid_of(Type) -> typeid
-		if (c->scope->is_global) {
+		if (c->scope->flags&ScopeFlag_Global) {
 			compiler_error("'typeid_of' Cannot be declared within the runtime package due to how the internals of the compiler works");
 		}
 
