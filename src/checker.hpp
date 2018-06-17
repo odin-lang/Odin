@@ -226,7 +226,8 @@ enum ScopeFlag {
 struct Scope {
 	Ast *         node;
 	Scope *       parent;
-	Scope *       prev, *next;
+	Scope *       prev;
+	Scope *       next;
 	Scope *       first_child;
 	Scope *       last_child;
 	Map<Entity *> elements; // Key: String
