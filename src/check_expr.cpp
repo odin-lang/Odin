@@ -1386,7 +1386,7 @@ bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 			return true;
 		}
 		ast_node(ta, TypeAssertion, expr);
-		TypeAndValue tv = type_and_value_of_expr(&c->checker->info, ta->expr);
+		TypeAndValue tv = ta->expr->tav;
 		if (is_type_pointer(tv.type)) {
 			return false;
 		}

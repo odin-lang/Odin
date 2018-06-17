@@ -582,7 +582,6 @@ void init_universal_scope(void) {
 
 void init_checker_info(CheckerInfo *i) {
 	gbAllocator a = heap_allocator();
-	map_init(&i->types,           a);
 	array_init(&i->definitions,   a);
 	array_init(&i->entities,      a);
 	map_init(&i->untyped,         a);
@@ -597,7 +596,6 @@ void init_checker_info(CheckerInfo *i) {
 }
 
 void destroy_checker_info(CheckerInfo *i) {
-	map_destroy(&i->types);
 	array_free(&i->definitions);
 	array_free(&i->entities);
 	map_destroy(&i->untyped);
@@ -669,15 +667,17 @@ Entity *entity_of_ident(Ast *identifier) {
 	return nullptr;
 }
 
-TypeAndValue type_and_value_of_expr(CheckerInfo *i, Ast *expr) {
-	TypeAndValue result = {};
-	TypeAndValue *found = map_get(&i->types, hash_node(expr));
-	if (found) result = *found;
-	return result;
+
+TypeAndValue type_and_value_of_expr(Ast *expr) {
+	TypeAndValue tav = {};
+	if (expr != nullptr) {
+		tav = expr->tav;
+	}
+	return tav;
 }
 
-Type *type_of_expr(CheckerInfo *i, Ast *expr) {
-	TypeAndValue tav = type_and_value_of_expr(i, expr);
+Type *type_of_expr(Ast *expr) {
+	TypeAndValue tav = expr->tav;
 	if (tav.mode != Addressing_Invalid) {
 		return tav.type;
 	}
@@ -691,11 +691,7 @@ Type *type_of_expr(CheckerInfo *i, Ast *expr) {
 	return nullptr;
 }
 
-Entity *implicit_entity_of_node(CheckerInfo *i, Ast *clause) {
-	// Entity **found = map_get(&i->implicits, hash_node(clause));
-	// if (found != nullptr) {
-		// return *found;
-	// }
+Entity *implicit_entity_of_node(Ast *clause) {
 	if (clause->kind == Ast_CaseClause) {
 		return clause->CaseClause.implicit_entity;
 	}
@@ -807,8 +803,8 @@ void add_untyped(CheckerInfo *i, Ast *expression, bool lhs, AddressingMode mode,
 	map_set(&i->untyped, hash_node(expression), make_expr_info(mode, type, value, lhs));
 }
 
-void add_type_and_value(CheckerInfo *i, Ast *expression, AddressingMode mode, Type *type, ExactValue value) {
-	if (expression == nullptr) {
+void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+	if (expr == nullptr) {
 		return;
 	}
 	if (mode == Addressing_Invalid) {
@@ -818,11 +814,9 @@ void add_type_and_value(CheckerInfo *i, Ast *expression, AddressingMode mode, Ty
 		return;
 	}
 
-	TypeAndValue tv = {};
-	tv.type  = type;
-	tv.value = value;
-	tv.mode  = mode;
-	map_set(&i->types, hash_node(expression), tv);
+	expr->tav.mode = mode;
+	expr->tav.type = type;
+	expr->tav.value = value;
 }
 
 void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
@@ -1246,7 +1240,9 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 
 
 void add_dependency_to_set(Checker *c, Entity *entity) {
-	GB_ASSERT(entity != nullptr);
+	if (entity == nullptr) {
+		return;
+	}
 
 	CheckerInfo *info = &c->info;
 	auto *set = &info->minimum_dependency_set;

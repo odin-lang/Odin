@@ -6,6 +6,28 @@ struct DeclInfo;
 struct AstFile;
 struct AstPackage;
 
+enum AddressingMode {
+	Addressing_Invalid,       // invalid addressing mode
+	Addressing_NoValue,       // no value (void in C)
+	Addressing_Value,         // computed value (rvalue)
+	Addressing_Immutable,     // immutable computed value (const rvalue)
+	Addressing_Variable,      // addressable variable (lvalue)
+	Addressing_Constant,      // constant
+	Addressing_Type,          // type
+	Addressing_Builtin,       // built-in procedure
+	Addressing_ProcGroup,     // procedure group (overloaded procedure)
+	Addressing_MapIndex,      // map index expression -
+	                          // 	lhs: acts like a Variable
+	                          // 	rhs: acts like OptionalOk
+	Addressing_OptionalOk,    // rhs: acts like a value with an optional boolean part (for existence check)
+};
+
+struct TypeAndValue {
+	AddressingMode mode;
+	Type *         type;
+	ExactValue     value;
+};
+
 
 enum ParseFileError {
 	ParseFile_None,
@@ -48,42 +70,41 @@ struct ImportedFile {
 };
 
 struct AstFile {
-	isize               id;
-	AstPackage *        pkg;
-	Scope *             scope;
+	isize        id;
+	AstPackage * pkg;
+	Scope *      scope;
 
-	Ast *           pkg_decl;
-	String              fullpath;
-	Tokenizer           tokenizer;
-	Array<Token>        tokens;
-	isize               curr_token_index;
-	Token               curr_token;
-	Token               prev_token; // previous non-comment
-	Token               package_token;
-	String              package_name;
+	Ast *        pkg_decl;
+	String       fullpath;
+	Tokenizer    tokenizer;
+	Array<Token> tokens;
+	isize        curr_token_index;
+	Token        curr_token;
+	Token        prev_token; // previous non-comment
+	Token        package_token;
+	String       package_name;
 
 	// >= 0: In Expression
 	// <  0: In Control Clause
 	// NOTE(bill): Used to prevent type literals in control clauses
-	isize               expr_level;
-	bool                allow_range; // NOTE(bill): Ranges are only allowed in certain cases
-	bool                in_foreign_block;
-	bool                allow_type;
-	isize               when_level;
+	isize        expr_level;
+	bool         allow_range; // NOTE(bill): Ranges are only allowed in certain cases
+	bool         in_foreign_block;
+	bool         allow_type;
+	isize        when_level;
 
-	Array<Ast *>    decls;
-	Array<Ast *>    imports; // 'import' 'using import'
-	isize               directive_count;
+	Array<Ast *> decls;
+	Array<Ast *> imports; // 'import' 'using import'
+	isize        directive_count;
 
 
-	Ast *           curr_proc;
-	// DeclInfo *          decl_info;   // NOTE(bill): Created in checker
-	isize               error_count;
+	Ast *        curr_proc;
+	isize        error_count;
 
-	CommentGroup *        lead_comment; // Comment (block) before the decl
-	CommentGroup *        line_comment; // Comment after the semicolon
-	CommentGroup *        docs;         // current docs
-	Array<CommentGroup *> comments;     // All the comments!
+	CommentGroup *lead_comment;     // Comment (block) before the decl
+	CommentGroup *line_comment;     // Comment after the semicolon
+	CommentGroup *docs;             // current docs
+	Array<CommentGroup *> comments; // All the comments!
 
 
 #define PARSER_MAX_FIX_COUNT 6
@@ -501,11 +522,12 @@ isize const ast_variant_sizes[] = {
 };
 
 struct Ast {
-	AstKind  kind;
-	u32      stmt_state_flags;
-	AstFile *file;
-	Scope *  scope;
-	bool     been_handled;
+	AstKind      kind;
+	u32          stmt_state_flags;
+	AstFile *    file;
+	Scope *      scope;
+	bool         been_handled;
+	TypeAndValue tav;
 
 	union {
 #define AST_KIND(_kind_name_, name, ...) GB_JOIN2(Ast, _kind_name_) _kind_name_;

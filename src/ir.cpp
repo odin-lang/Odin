@@ -3671,7 +3671,7 @@ irValue *ir_emit_logical_binary_expr(irProcedure *proc, Ast *expr) {
 	irBlock *rhs  = ir_new_block(proc, nullptr, "logical.cmp.rhs");
 	irBlock *done = ir_new_block(proc, nullptr, "logical.cmp.done");
 
-	Type *type = type_of_expr(proc->module->info, expr);
+	Type *type = type_of_expr(expr);
 	type = default_type(type);
 
 	return ir_emit_logical_binary_expr(proc, be->op.kind, be->left, be->right, type);
@@ -3935,7 +3935,7 @@ irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, Ast *expr, i
 	name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$anon-%d", LIT(prefix_name), name_id);
 	String name = make_string(name_text, name_len-1);
 
-	Type *type = type_of_expr(m->info, expr);
+	Type *type = type_of_expr(expr);
 	irValue *value = ir_value_procedure(m->allocator,
 	                                    m, nullptr, type, pl->type, pl->body, name);
 
@@ -4201,9 +4201,9 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 
 	case BuiltinProc_type_info_of: {
 		Ast *arg = ce->args[0];
-		TypeAndValue tav = type_and_value_of_expr(proc->module->info, arg);
+		TypeAndValue tav = type_and_value_of_expr(arg);
 		if (tav.mode == Addressing_Type) {
-			Type *t = default_type(type_of_expr(proc->module->info, arg));
+			Type *t = default_type(type_of_expr(arg));
 			return ir_type_info(proc, t);
 		}
 		GB_ASSERT(is_type_typeid(tav.type));
@@ -4215,9 +4215,9 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 
 	case BuiltinProc_typeid_of: {
 		Ast *arg = ce->args[0];
-		TypeAndValue tav = type_and_value_of_expr(proc->module->info, arg);
+		TypeAndValue tav = type_and_value_of_expr(arg);
 		if (tav.mode == Addressing_Type) {
-			Type *t = default_type(type_of_expr(proc->module->info, arg));
+			Type *t = default_type(type_of_expr(arg));
 			return ir_typeid(proc->module, t);
 		}
 		Type *t = base_type(tav.type);
@@ -4285,7 +4285,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		// proc new(Type) -> ^Type
 		gbAllocator a = proc->module->allocator;
 
-		Type *type = type_of_expr(proc->module->info, ce->args[0]);
+		Type *type = type_of_expr(ce->args[0]);
 		Type *allocation_type = type;
 		i32 variant_index = 0;
 		if (is_type_struct(type)) {
@@ -4321,7 +4321,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 	case BuiltinProc_make: {
 		ir_emit_comment(proc, str_lit("make"));
 		gbAllocator a = proc->module->allocator;
-		Type *type = type_of_expr(proc->module->info, ce->args[0]);
+		Type *type = type_of_expr(ce->args[0]);
 
 		String proc_name = {};
 		if (proc->entity != nullptr) {
@@ -4414,7 +4414,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		gbAllocator a = proc->module->allocator;
 
 		Ast *node = ce->args[0];
-		TypeAndValue tav = type_and_value_of_expr(proc->module->info, node);
+		TypeAndValue tav = type_and_value_of_expr(node);
 		Type *type = base_type(tav.type);
 
 		if (is_type_dynamic_array(type)) {
@@ -4523,7 +4523,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 	#if 0
 	case BuiltinProc_clear: {
 		ir_emit_comment(proc, str_lit("clear"));
-		Type *original_type = type_of_expr(proc->module->info, ce->args[0]);
+		Type *original_type = type_of_expr(ce->args[0]);
 		irAddr const &addr = ir_build_addr(proc, ce->args[0]);
 		irValue *ptr = addr.addr;
 		if (is_double_pointer(ir_type(ptr))) {
@@ -4553,7 +4553,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		ir_emit_comment(proc, str_lit("append"));
 		gbAllocator a = proc->module->allocator;
 
-		Type *value_type = type_of_expr(proc->module->info, ce->args[0]);
+		Type *value_type = type_of_expr(ce->args[0]);
 		irAddr array_addr = ir_build_addr(proc, ce->args[0]);
 		irValue *array_ptr = array_addr.addr;
 		if (is_double_pointer(ir_type(array_ptr))) {
@@ -4587,7 +4587,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		isize arg_count = 0;
 		for_array(i, ce->args) {
 			Ast *a = ce->args[i];
-			Type *at = base_type(type_of_expr(proc->module->info, a));
+			Type *at = base_type(type_of_expr(a));
 			if (at->kind == Type_Tuple) {
 				arg_count += at->Tuple.variable_count;
 			} else {
@@ -4690,7 +4690,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		irValue *dst = ir_add_local_generated(proc, tv.type);
 
 		for (i32 i = 1; i < ce->args.count; i++) {
-			TypeAndValue tv = type_and_value_of_expr(proc->module->info, ce->args[i]);
+			TypeAndValue tv = type_and_value_of_expr(ce->args[i]);
 			GB_ASSERT(is_type_integer(tv.type));
 			GB_ASSERT(tv.value.kind == ExactValue_Integer);
 
@@ -4775,13 +4775,13 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 
 	case BuiltinProc_min: {
 		ir_emit_comment(proc, str_lit("min"));
-		Type *t = type_of_expr(proc->module->info, expr);
+		Type *t = type_of_expr(expr);
 		return ir_emit_min(proc, t, ir_build_expr(proc, ce->args[0]), ir_build_expr(proc, ce->args[1]));
 	}
 
 	case BuiltinProc_max: {
 		ir_emit_comment(proc, str_lit("max"));
-		Type *t = type_of_expr(proc->module->info, expr);
+		Type *t = type_of_expr(expr);
 		return ir_emit_max(proc, t, ir_build_expr(proc, ce->args[0]), ir_build_expr(proc, ce->args[1]));
 	}
 
@@ -4817,7 +4817,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 
 	case BuiltinProc_clamp: {
 		ir_emit_comment(proc, str_lit("clamp"));
-		Type *t = type_of_expr(proc->module->info, expr);
+		Type *t = type_of_expr(expr);
 		return ir_emit_clamp(proc, t,
 		                     ir_build_expr(proc, ce->args[0]),
 		                     ir_build_expr(proc, ce->args[1]),
@@ -4840,7 +4840,7 @@ irValue *ir_build_expr(irProcedure *proc, Ast *expr) {
 irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 	expr = unparen_expr(expr);
 
-	TypeAndValue tv = type_and_value_of_expr(proc->module->info, expr);
+	TypeAndValue tv = type_and_value_of_expr(expr);
 	GB_ASSERT(tv.mode != Addressing_Invalid);
 	GB_ASSERT(tv.mode != Addressing_Type);
 
@@ -4936,7 +4936,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 	case_end;
 
 	case_ast_node(se, SelectorExpr, expr);
-		TypeAndValue tav = type_and_value_of_expr(proc->module->info, expr);
+		TypeAndValue tav = type_and_value_of_expr(expr);
 		GB_ASSERT(tav.mode != Addressing_Invalid);
 		return ir_addr_load(proc, ir_build_addr(proc, expr));
 	case_end;
@@ -4954,7 +4954,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		irValue *cond = ir_build_cond(proc, te->cond, then, else_);
 		ir_start_block(proc, then);
 
-		Type *type = type_of_expr(proc->module->info, expr);
+		Type *type = type_of_expr(expr);
 
 		ir_open_scope(proc);
 		array_add(&edges, ir_emit_conv(proc, ir_build_expr(proc, te->x), type));
@@ -5016,7 +5016,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 
 				ast_node(ta, TypeAssertion, ue_expr);
 				TokenPos pos = ast_token(expr).pos;
-				Type *type = type_of_expr(proc->module->info, ue_expr);
+				Type *type = type_of_expr(ue_expr);
 				GB_ASSERT(!is_type_tuple(type));
 
 				irValue *e = ir_build_expr(proc, ta->expr);
@@ -5138,7 +5138,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 
 
 	case_ast_node(ce, CallExpr, expr);
-		TypeAndValue proc_tv = type_and_value_of_expr(proc->module->info, ce->proc);
+		TypeAndValue proc_tv = type_and_value_of_expr(ce->proc);
 		AddressingMode proc_mode = proc_tv.mode;
 		if (proc_mode == Addressing_Type) {
 			GB_ASSERT(ce->args.count == 1);
@@ -5176,7 +5176,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 				String name = fv->field->Ident.token.string;
 				isize index = lookup_procedure_parameter(pt, name);
 				GB_ASSERT(index >= 0);
-				TypeAndValue tav = type_and_value_of_expr(proc->module->info, fv->value);
+				TypeAndValue tav = type_and_value_of_expr(fv->value);
 				if (tav.mode == Addressing_Type) {
 					args[index] = ir_value_nil(proc->module->allocator, tav.type);
 				} else {
@@ -5211,7 +5211,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		isize arg_count = 0;
 		for_array(i, ce->args) {
 			Ast *arg = ce->args[i];
-			TypeAndValue tav = type_and_value_of_expr(proc->module->info, arg);
+			TypeAndValue tav = type_and_value_of_expr(arg);
 			GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s", expr_to_string(arg));
 			GB_ASSERT_MSG(tav.mode != Addressing_ProcGroup, "%s", expr_to_string(arg));
 			Type *at = tav.type;
@@ -5248,7 +5248,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 
 		for_array(i, ce->args) {
 			Ast *arg = ce->args[i];
-			TypeAndValue arg_tv = type_and_value_of_expr(proc->module->info, arg);
+			TypeAndValue arg_tv = type_and_value_of_expr(arg);
 			if (arg_tv.mode == Addressing_Type) {
 				args[arg_index++] = ir_value_nil(proc->module->allocator, arg_tv.type);
 			} else {
@@ -5424,7 +5424,7 @@ bool ir_is_elem_const(irModule *m, Ast *elem, Type *elem_type) {
 	if (elem->kind == Ast_FieldValue) {
 		elem = elem->FieldValue.value;
 	}
-	TypeAndValue tav = type_and_value_of_expr(m->info, elem);
+	TypeAndValue tav = type_and_value_of_expr(elem);
 	GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s", expr_to_string(elem), type_to_string(tav.type));
 	return tav.value.kind != ExactValue_Invalid;
 }
@@ -5486,7 +5486,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 		Ast *sel = unparen_expr(se->selector);
 		if (sel->kind == Ast_Ident) {
 			String selector = sel->Ident.token.string;
-			TypeAndValue tav = type_and_value_of_expr(proc->module->info, se->expr);
+			TypeAndValue tav = type_and_value_of_expr(se->expr);
 
 			if (tav.mode == Addressing_Invalid) {
 				// NOTE(bill): Imports
@@ -5551,10 +5551,10 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			}
 		} else {
 			// NOTE(bill): x.0
-			Type *type = type_deref(type_of_expr(proc->module->info, se->expr));
-			Type *selector_type = base_type(type_of_expr(proc->module->info, se->selector));
+			Type *type = type_deref(type_of_expr(se->expr));
+			Type *selector_type = base_type(type_of_expr(se->selector));
 			GB_ASSERT_MSG(is_type_integer(selector_type), "%s", type_to_string(selector_type));
-			ExactValue val = type_and_value_of_expr(proc->module->info, sel).value;
+			ExactValue val = type_and_value_of_expr(sel).value;
 			i64 index = val.value_integer;
 
 			Selection sel = lookup_field_from_index(type, index);
@@ -5572,14 +5572,14 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 		irValue *e = ir_build_expr(proc, ta->expr);
 		Type *t = type_deref(ir_type(e));
 		if (is_type_union(t)) {
-			Type *type = type_of_expr(proc->module->info, expr);
+			Type *type = type_of_expr(expr);
 			irValue *v = ir_add_local_generated(proc, type);
 			ir_emit_comment(proc, str_lit("cast - union_cast"));
 			ir_emit_store(proc, v, ir_emit_union_cast(proc, ir_build_expr(proc, ta->expr), type, pos));
 			return ir_addr(v);
 		} else if (is_type_any(t)) {
 			ir_emit_comment(proc, str_lit("cast - any_cast"));
-			Type *type = type_of_expr(proc->module->info, expr);
+			Type *type = type_of_expr(expr);
 			return ir_emit_any_cast_addr(proc, ir_build_expr(proc, ta->expr), type, pos);
 		} else {
 			GB_PANIC("TODO(bill): type assertion %s", type_to_string(ir_type(e)));
@@ -5605,7 +5605,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 	case_ast_node(ie, IndexExpr, expr);
 		ir_emit_comment(proc, str_lit("IndexExpr"));
-		Type *t = base_type(type_of_expr(proc->module->info, ie->expr));
+		Type *t = base_type(type_of_expr(ie->expr));
 		gbAllocator a = proc->module->allocator;
 
 		bool deref = is_type_pointer(t);
@@ -5621,7 +5621,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			irValue *key = ir_build_expr(proc, ie->index);
 			key = ir_emit_conv(proc, key, t->Map.key);
 
-			Type *result_type = type_of_expr(proc->module->info, expr);
+			Type *result_type = type_of_expr(expr);
 			return ir_addr_map(map_val, key, t, result_type);
 		}
 
@@ -5641,7 +5641,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			irValue *index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
 			irValue *elem = ir_emit_array_ep(proc, array, index);
 
-			auto index_tv = type_and_value_of_expr(proc->module->info, ie->index);
+			auto index_tv = type_and_value_of_expr(ie->index);
 			if (index_tv.mode != Addressing_Constant) {
 				irValue *len = ir_const_int(a, t->Array.count);
 				ir_emit_bounds_check(proc, ast_token(ie->index), index, len);
@@ -5779,8 +5779,8 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 			if (high == nullptr) high = len;
 
-			bool low_const  = type_and_value_of_expr(proc->module->info, se->low).mode  == Addressing_Constant;
-			bool high_const = type_and_value_of_expr(proc->module->info, se->high).mode == Addressing_Constant;
+			bool low_const  = type_and_value_of_expr(se->low).mode  == Addressing_Constant;
+			bool high_const = type_and_value_of_expr(se->high).mode == Addressing_Constant;
 
 			if (!low_const || !high_const) {
 				ir_emit_slice_bounds_check(proc, se->open, low, high, len, false);
@@ -5830,7 +5830,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 	case_ast_node(cl, CompoundLit, expr);
 		ir_emit_comment(proc, str_lit("CompoundLit"));
-		Type *type = type_of_expr(proc->module->info, expr);
+		Type *type = type_of_expr(expr);
 		Type *bt = base_type(type);
 
 		irValue *v = ir_add_local_generated(proc, type, true);
@@ -5873,7 +5873,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 						index = sel.index[0];
 						elem = fv->value;
 					} else {
-						TypeAndValue tav = type_and_value_of_expr(proc->module->info, elem);
+						TypeAndValue tav = type_and_value_of_expr(elem);
 						Selection sel = lookup_field_from_index(bt, st->fields[field_index]->Variable.field_src_index);
 						index = sel.index[0];
 					}
@@ -6033,7 +6033,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 						index = sel.index[0];
 						elem = fv->value;
 					} else {
-						TypeAndValue tav = type_and_value_of_expr(proc->module->info, elem);
+						TypeAndValue tav = type_and_value_of_expr(elem);
 						Selection sel = lookup_field(bt, field_names[field_index], false);
 						index = sel.index[0];
 					}
@@ -6055,7 +6055,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 	case_end;
 
 	case_ast_node(tc, TypeCast, expr);
-		Type *type = type_of_expr(proc->module->info, expr);
+		Type *type = type_of_expr(expr);
 		irValue *x = ir_build_expr(proc, tc->expr);
 		irValue *e = nullptr;
 		switch (tc->token.kind) {
@@ -6557,7 +6557,7 @@ void ir_build_range_interval(irProcedure *proc, AstBinaryExpr *node, Type *val_t
 }
 
 void ir_store_type_case_implicit(irProcedure *proc, Ast *clause, irValue *value) {
-	Entity *e = implicit_entity_of_node(proc->module->info, clause);
+	Entity *e = implicit_entity_of_node(clause);
 	GB_ASSERT(e != nullptr);
 	irValue *x = ir_add_local(proc, e, nullptr, false);
 	ir_emit_store(proc, x, value);
@@ -6912,10 +6912,10 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		Type *val0_type = nullptr;
 		Type *val1_type = nullptr;
 		if (rs->val0 != nullptr && !is_blank_ident(rs->val0)) {
-			val0_type = type_of_expr(proc->module->info, rs->val0);
+			val0_type = type_of_expr(rs->val0);
 		}
 		if (rs->val1 != nullptr && !is_blank_ident(rs->val1)) {
-			val1_type = type_of_expr(proc->module->info, rs->val1);
+			val1_type = type_of_expr(rs->val1);
 		}
 
 		if (val0_type != nullptr) {
@@ -6932,7 +6932,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		Ast *expr = unparen_expr(rs->expr);
 		bool is_map = false;
 
-		TypeAndValue tav = type_and_value_of_expr(proc->module->info, expr);
+		TypeAndValue tav = type_and_value_of_expr(expr);
 
 		if (is_ast_range(expr)) {
 			ir_build_range_interval(proc, &expr->BinaryExpr, val0_type, &val, &key, &loop, &done);
@@ -6984,7 +6984,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 				}
 			}
 		} else {
-			Type *expr_type = type_of_expr(proc->module->info, rs->expr);
+			Type *expr_type = type_of_expr(rs->expr);
 			Type *et = base_type(type_deref(expr_type));
 			switch (et->kind) {
 			case Type_Map: {
@@ -7239,7 +7239,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			Type *case_type = nullptr;
 			for_array(type_index, cc->list) {
 				next = ir_new_block(proc, nullptr, "typeswitch.next");
-				case_type = type_of_expr(proc->module->info, cc->list[type_index]);
+				case_type = type_of_expr(cc->list[type_index]);
 				irValue *cond = nullptr;
 				if (switch_kind == TypeSwitch_Union) {
 					Type *ut = base_type(type_deref(parent_type));
@@ -7256,7 +7256,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 				ir_start_block(proc, next);
 			}
 
-			Entity *case_entity = implicit_entity_of_node(proc->module->info, clause);
+			Entity *case_entity = implicit_entity_of_node(clause);
 
 			irValue *value = parent_value;
 
@@ -8380,7 +8380,7 @@ void ir_gen_tree(irGen *s) {
 			var.decl = decl;
 
 			if (decl->init_expr != nullptr && !is_type_any(e->type)) {
-				TypeAndValue tav = type_and_value_of_expr(info, decl->init_expr);
+				TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
 				if (tav.mode != Addressing_Invalid) {
 					if (tav.value.kind != ExactValue_Invalid) {
 						ExactValue v = tav.value;
