@@ -283,7 +283,7 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 
 	case AstNode_ForeignBlockDecl:
 		n->ForeignBlockDecl.foreign_library = clone_ast_node(a, n->ForeignBlockDecl.foreign_library);
-		n->ForeignBlockDecl.decls           = clone_ast_node_array(a, n->ForeignBlockDecl.decls);
+		n->ForeignBlockDecl.body            = clone_ast_node(a, n->ForeignBlockDecl.body);
 		n->ForeignBlockDecl.attributes      = clone_ast_node_array(a, n->ForeignBlockDecl.attributes);
 		break;
 	case AstNode_Label:
@@ -946,14 +946,12 @@ AstNode *ast_map_type(AstFile *f, Token token, AstNode *key, AstNode *value) {
 }
 
 
-AstNode *ast_foreign_block_decl(AstFile *f, Token token, AstNode *foreign_library, Token open, Token close, Array<AstNode *> decls,
+AstNode *ast_foreign_block_decl(AstFile *f, Token token, AstNode *foreign_library, AstNode *body,
                                 CommentGroup *docs) {
 	AstNode *result = alloc_ast_node(f, AstNode_ForeignBlockDecl);
 	result->ForeignBlockDecl.token           = token;
 	result->ForeignBlockDecl.foreign_library = foreign_library;
-	result->ForeignBlockDecl.open            = open;
-	result->ForeignBlockDecl.close           = close;
-	result->ForeignBlockDecl.decls           = decls;
+	result->ForeignBlockDecl.body            = body;
 	result->ForeignBlockDecl.docs            = docs;
 
 	result->ForeignBlockDecl.attributes.allocator = heap_allocator();
@@ -1261,6 +1259,7 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 
 	switch (s->kind) {
 	case AstNode_EmptyStmt:
+	case AstNode_BlockStmt:
 		return true;
 
 	case AstNode_IfStmt:
@@ -1303,13 +1302,7 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 		break;
 
 	case AstNode_ForeignBlockDecl:
-		if (s->ForeignBlockDecl.close.pos.line != 0) {
-			return true;
-		}
-		if (s->ForeignBlockDecl.decls.count == 1) {
-			return is_semicolon_optional_for_node(f, s->ForeignBlockDecl.decls[0]);
-		}
-		break;
+		return is_semicolon_optional_for_node(f, s->ForeignBlockDecl.body);
 	}
 
 	return false;
@@ -2401,7 +2394,9 @@ AstNode *parse_foreign_block(AstFile *f, Token token) {
 
 	close = expect_token(f, Token_CloseBrace);
 
-	AstNode *decl = ast_foreign_block_decl(f, token, foreign_library, open, close, decls, docs);
+	AstNode *body = ast_block_stmt(f, decls, open, close);
+
+	AstNode *decl = ast_foreign_block_decl(f, token, foreign_library, body, docs);
 	expect_semicolon(f, decl);
 	return decl;
 }

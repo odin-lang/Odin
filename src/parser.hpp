@@ -334,11 +334,9 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 	AST_NODE_KIND(ForeignBlockDecl, "foreign block declaration", struct { \
 		Token            token;           \
 		AstNode *        foreign_library; \
-		Token            open, close;     \
-		Array<AstNode *> decls;           \
+		AstNode *        body;            \
 		Array<AstNode *> attributes;      \
 		CommentGroup *   docs;            \
-		bool             been_handled;    \
 	}) \
 	AST_NODE_KIND(Label, "label", struct { 	\
 		Token token; \
@@ -353,7 +351,6 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		CommentGroup *   comment;      \
 		bool             is_using;     \
 		bool             is_mutable;   \
-		bool             been_handled; \
 	}) \
 	AST_NODE_KIND(PackageDecl, "package declaration", struct { \
 		Token token;           \
@@ -370,7 +367,6 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		CommentGroup *docs;     \
 		CommentGroup *comment;  \
 		bool     is_using;      \
-		bool     been_handled;  \
 	}) \
 	AST_NODE_KIND(ForeignImportDecl, "foreign import declaration", struct { \
 		Token    token;           \
@@ -380,7 +376,6 @@ AST_NODE_KIND(_DeclBegin,      "", struct {}) \
 		String   fullpath;        \
 		CommentGroup *docs;       \
 		CommentGroup *comment;    \
-		bool     been_handled;    \
 	}) \
 AST_NODE_KIND(_DeclEnd,   "", struct {}) \
 	AST_NODE_KIND(Attribute, "attribute", struct { \
@@ -510,6 +505,7 @@ struct AstNode {
 	u32         stmt_state_flags;
 	AstFile *   file;
 	Scope *     scope;
+	bool        been_handled;
 
 	union {
 #define AST_NODE_KIND(_kind_name_, name, ...) GB_JOIN2(AstNode, _kind_name_) _kind_name_;

@@ -1620,8 +1620,9 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 
 		check_decl_attributes(&c, fb->attributes, foreign_block_decl_attribute, nullptr);
 
-		for_array(i, fb->decls) {
-			AstNode *decl = fb->decls[i];
+		ast_node(block, BlockStmt, fb->body);
+		for_array(i, block->stmts) {
+			AstNode *decl = block->stmts[i];
 			if (decl->kind == AstNode_ValueDecl && decl->ValueDecl.is_mutable) {
 				check_stmt(&c, decl, flags);
 			}

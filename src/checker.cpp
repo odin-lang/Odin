@@ -2002,10 +2002,10 @@ void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<AstNode *> *
 }
 
 void check_collect_value_decl(CheckerContext *c, AstNode *decl) {
-	ast_node(vd, ValueDecl, decl);
+	if (decl->been_handled) return;
+	decl->been_handled = true;
 
-	if (vd->been_handled) return;
-	vd->been_handled = true;
+	ast_node(vd, ValueDecl, decl);
 
 	if (vd->is_mutable) {
 		if (!c->scope->is_file) {
@@ -2169,11 +2169,10 @@ void check_collect_value_decl(CheckerContext *c, AstNode *decl) {
 }
 
 void check_add_foreign_block_decl(CheckerContext *ctx, AstNode *decl) {
+	if (decl->been_handled) return;
+	decl->been_handled = true;
+
 	ast_node(fb, ForeignBlockDecl, decl);
-
-	if (fb->been_handled) return;
-	fb->been_handled = true;
-
 	AstNode *foreign_library = fb->foreign_library;
 
 	CheckerContext c = *ctx;
@@ -2189,7 +2188,8 @@ void check_add_foreign_block_decl(CheckerContext *ctx, AstNode *decl) {
 	check_decl_attributes(&c, fb->attributes, foreign_block_decl_attribute, nullptr);
 
 	c.collect_delayed_decls = true;
-	check_collect_entities(&c, fb->decls);
+	ast_node(block, BlockStmt, fb->body);
+	check_collect_entities(&c, block->stmts);
 }
 
 // NOTE(bill): If file_scopes == nullptr, this will act like a local scope
@@ -2537,9 +2537,11 @@ Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start, AstPackage
 	return empty_path;
 }
 #endif
-void check_add_import_decl(CheckerContext *ctx, AstNodeImportDecl *id) {
-	if (id->been_handled) return;
-	id->been_handled = true;
+void check_add_import_decl(CheckerContext *ctx, AstNode *decl) {
+	if (decl->been_handled) return;
+	decl->been_handled = true;
+
+	ast_node(id, ImportDecl, decl);
 
 	Scope *parent_scope = ctx->scope;
 	GB_ASSERT(parent_scope->is_file);
@@ -2623,10 +2625,10 @@ void check_add_import_decl(CheckerContext *ctx, AstNodeImportDecl *id) {
 
 
 void check_add_foreign_import_decl(CheckerContext *ctx, AstNode *decl) {
-	ast_node(fl, ForeignImportDecl, decl);
+	if (decl->been_handled) return;
+	decl->been_handled = true;
 
-	if (fl->been_handled) return;
-	fl->been_handled = true;
+	ast_node(fl, ForeignImportDecl, decl);
 
 	Scope *parent_scope = ctx->scope;
 	GB_ASSERT(parent_scope->is_file);
@@ -2778,7 +2780,7 @@ bool collect_file_decls(CheckerContext *ctx, Array<AstNode *> const &decls) {
 		case_end;
 
 		case_ast_node(id, ImportDecl, decl);
-			check_add_import_decl(ctx, id);
+			check_add_import_decl(ctx, decl);
 		case_end;
 
 		case_ast_node(fl, ForeignImportDecl, decl);
@@ -2974,8 +2976,7 @@ void check_import_entities(Checker *c) {
 			add_curr_ast_file(&ctx, f);
 			for_array(j, f->scope->delayed_imports) {
 				AstNode *decl = f->scope->delayed_imports[j];
-				ast_node(id, ImportDecl, decl);
-				check_add_import_decl(&ctx, id);
+				check_add_import_decl(&ctx, decl);
 			}
 			for_array(j, f->scope->delayed_directives) {
 				AstNode *expr = f->scope->delayed_directives[j];
