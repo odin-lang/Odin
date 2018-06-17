@@ -2446,7 +2446,7 @@ Ast *parse_value_decl(AstFile *f, Array<Ast *> names, CommentGroup *docs) {
 	}
 
 	if (values.data == nullptr) {
-		values = array_make<Ast *>(heap_allocator());
+		values.allocator = heap_allocator();
 	}
 
 	if (f->expr_level >= 0) {
@@ -2459,6 +2459,12 @@ Ast *parse_value_decl(AstFile *f, Array<Ast *> names, CommentGroup *docs) {
 
 		} else {
 			expect_semicolon(f, end);
+		}
+	}
+
+	if (f->curr_proc == nullptr) {
+		if (values.count > 0 && names.count != values.count) {
+			syntax_error(values[0], "Expected %td expressions on the right hand side, got %td", names.count, values.count);
 		}
 	}
 
@@ -4094,8 +4100,13 @@ bool determine_path_from_string(Parser *p, Ast *node, String base_dir, String or
 #endif
 	}
 
-	String fullpath = string_trim_whitespace(get_fullpath_relative(a, base_dir, file_str));
-	*path = fullpath;
+
+	if (file_str == "builtin") {
+		*path = str_lit("builtin");
+	} else {
+		String fullpath = string_trim_whitespace(get_fullpath_relative(a, base_dir, file_str));
+		*path = fullpath;
+	}
 
 	return true;
 }
@@ -4155,6 +4166,9 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<Ast *>
 			import_path = string_trim_whitespace(import_path);
 
 			id->fullpath = import_path;
+			if (import_path == "builtin") {
+				continue;
+			}
 			try_add_import_path(p, import_path, original_string, ast_token(node).pos);
 		} else if (node->kind == Ast_ForeignImportDecl) {
 			ast_node(fl, ForeignImportDecl, node);
@@ -4283,6 +4297,8 @@ bool parse_file(Parser *p, AstFile *f) {
 		if (package_name.string == "_") {
 			error(package_name, "Invalid package name '_'");
 		} else if (f->pkg->kind != Package_Runtime && package_name.string == "runtime") {
+			error(package_name, "Use of reserved package name '%.*s'", LIT(package_name.string));
+		} else if (package_name.string == "builtin") {
 			error(package_name, "Use of reserved package name '%.*s'", LIT(package_name.string));
 		}
 	}
@@ -4418,8 +4434,8 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 		}
 	}
 
-	TokenPos init_pos = {};
 
+	TokenPos init_pos = {};
 	if (!build_context.generate_docs) {
 		String s = get_fullpath_core(heap_allocator(), str_lit("runtime"));
 		try_add_import_path(p, s, s, init_pos, Package_Runtime);

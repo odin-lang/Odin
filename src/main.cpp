@@ -791,7 +791,7 @@ int main(int arg_count, char **arg_ptr) {
 		return 1;
 	}
 
-	init_universal_scope();
+	init_universal();
 	// TODO(bill): prevent compiling without a linker
 
 	timings_start_section(&timings, str_lit("parse files"));

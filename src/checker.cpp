@@ -25,6 +25,7 @@ bool is_operand_undef(Operand o) {
 
 
 gb_global Scope *universal_scope = nullptr;
+gb_global AstPackage *builtin_package = nullptr;
 
 void scope_reset(Scope *scope) {
 	if (scope == nullptr) return;
@@ -531,12 +532,21 @@ void add_global_type_entity(String name, Type *type) {
 
 
 
-void init_universal_scope(void) {
+void init_universal(void) {
 	BuildContext *bc = &build_context;
 	// NOTE(bill): No need to free these
 	gbAllocator a = heap_allocator();
 	universal_scope = create_scope(nullptr, a);
 	universal_scope->is_package = true;
+
+
+	builtin_package = gb_alloc_item(a, AstPackage);
+	builtin_package->name = str_lit("builtin");
+	builtin_package->kind = Package_Normal;
+	builtin_package->scope = universal_scope;
+	universal_scope->package = builtin_package;
+
+
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
@@ -2009,19 +2019,6 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			return;
 		}
 
-		// NOTE(bill): You need to store the entity information here unline a constant declaration
-		isize entity_cap = vd->names.count;
-		isize entity_count = 0;
-		Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_cap);
-		DeclInfo *di = nullptr;
-		if (vd->values.count > 0) {
-			di = make_decl_info(heap_allocator(), c->scope, c->decl);
-			di->entities = entities;
-			di->type_expr = vd->type;
-			di->init_expr = vd->values[0];
-			di->init_expr_list = vd->values;
-		}
-
 		for_array(i, vd->names) {
 			Ast *name = vd->names[i];
 			Ast *value = nullptr;
@@ -2052,22 +2049,13 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				e->Variable.is_export = true;
 			}
 
-			entities[entity_count++] = e;
-
-			DeclInfo *d = di;
-			if (d == nullptr || i > 0) {
-				Ast *init_expr = value;
-				d = make_decl_info(heap_allocator(), e->scope, c->decl);
-				d->type_expr = vd->type;
-				d->init_expr = init_expr;
-			}
+			Ast *init_expr = value;
+			DeclInfo *d = make_decl_info(heap_allocator(), c->scope, c->decl);
+			d->type_expr = vd->type;
+			d->init_expr = init_expr;
 			d->attributes = vd->attributes;
 
 			add_entity_and_decl_info(c, name, e, d);
-		}
-
-		if (di != nullptr) {
-			di->entity_count = entity_count;
 		}
 
 		check_arity_match(c, vd, true);
@@ -2380,6 +2368,9 @@ void add_import_dependency_node(Checker *c, Ast *decl, Map<ImportGraphNode *> *M
 	switch (decl->kind) {
 	case_ast_node(id, ImportDecl, decl);
 		String path = id->fullpath;
+		if (path == "builtin") {
+			return;
+		}
 		HashKey key = hash_string(path);
 		AstPackage **found = map_get(&c->info.packages, key);
 		if (found == nullptr) {
@@ -2538,32 +2529,35 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	decl->been_handled = true;
 
 	ast_node(id, ImportDecl, decl);
+	Token token = id->relpath;
 
 	Scope *parent_scope = ctx->scope;
 	GB_ASSERT(parent_scope->is_file);
 
 	auto *pkgs = &ctx->checker->info.packages;
 
-	Token token = id->relpath;
-	HashKey key = hash_string(id->fullpath);
-	AstPackage **found = map_get(pkgs, key);
-	if (found == nullptr) {
-		for_array(pkg_index, pkgs->entries) {
-			AstPackage *pkg = pkgs->entries[pkg_index].value;
-			gb_printf_err("%.*s\n", LIT(pkg->fullpath));
+	Scope *scope = nullptr;
+
+	if (id->fullpath == "builtin") {
+		scope = universal_scope;
+	} else {
+		HashKey key = hash_string(id->fullpath);
+		AstPackage **found = map_get(pkgs, key);
+		if (found == nullptr) {
+			for_array(pkg_index, pkgs->entries) {
+				AstPackage *pkg = pkgs->entries[pkg_index].value;
+				gb_printf_err("%.*s\n", LIT(pkg->fullpath));
+			}
+			gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
+			GB_PANIC("Unable to find scope for package: %.*s", LIT(id->fullpath));
+		} else {
+			AstPackage *pkg = *found;
+			ptr_set_add(&ctx->checker->checked_packages, pkg);
+			scope = pkg->scope;
 		}
-		gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
-		GB_PANIC("Unable to find scope for package: %.*s", LIT(id->fullpath));
 	}
-	AstPackage *pkg = *found;
-	Scope *scope = pkg->scope;
 	GB_ASSERT(scope->is_package);
 
-	// TODO(bill): Should this be allowed or not?
-	// if (scope->is_global) {
-	// 	error(token, "Importing a runtime package is disallowed and unnecessary");
-	// 	return;
-	// }
 
 	if (ptr_set_exists(&parent_scope->imported, scope)) {
 		// error(token, "Multiple import of the same file within this scope");
@@ -2615,7 +2609,6 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		}
 	}
 
-	ptr_set_add(&ctx->checker->checked_packages, pkg);
 	scope->has_been_imported = true;
 }
 
@@ -3093,11 +3086,7 @@ void calculate_global_init_order(Checker *c) {
 		}
 		ptr_set_add(&emitted, d);
 
-		if (d->entities == nullptr) {
-			d->entities = gb_alloc_array(c->allocator, Entity *, 1);
-			d->entities[0] = e;
-			d->entity_count = 1;
-		}
+		d->entity = e;
 		array_add(&info->variable_init_order, d);
 	}
 
@@ -3105,13 +3094,8 @@ void calculate_global_init_order(Checker *c) {
 		gb_printf("Variable Initialization Order:\n");
 		for_array(i, info->variable_init_order) {
 			DeclInfo *d = info->variable_init_order[i];
-			for (isize j = 0; j < d->entity_count; j++) {
-				Entity *e = d->entities[j];
-				if (j == 0) gb_printf("\t");
-				if (j > 0) gb_printf(", ");
-				gb_printf("'%.*s' %td", LIT(e->token.string), e->order_in_src);
-			}
-			gb_printf("\n");
+			Entity *e = d->entity;
+			gb_printf("\t'%.*s' %td\n", LIT(e->token.string), e->order_in_src);
 		}
 		gb_printf("\n");
 	}
@@ -3200,15 +3184,15 @@ void check_parsed_files(Checker *c) {
 	TIME_SECTION("collect entities");
 	// Collect Entities
 	for_array(i, c->parser->packages) {
-		AstPackage *p = c->parser->packages[i];
+		AstPackage *pkg = c->parser->packages[i];
 
 		CheckerContext ctx = make_checker_context(c);
 		defer (destroy_checker_context(&ctx));
-		ctx.pkg = p;
+		ctx.pkg = pkg;
 		ctx.collect_delayed_decls = false;
 
-		for_array(j, p->files) {
-			AstFile *f = p->files[j];
+		for_array(j, pkg->files) {
+			AstFile *f = pkg->files[j];
 			create_scope_from_file(&ctx, f);
 			HashKey key = hash_string(f->fullpath);
 			map_set(&c->info.files, key, f);

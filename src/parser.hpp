@@ -573,3 +573,4 @@ gbAllocator ast_allocator(void) {
 }
 
 Ast *alloc_ast_node(AstFile *f, AstKind kind);
+
