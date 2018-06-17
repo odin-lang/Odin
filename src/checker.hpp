@@ -408,8 +408,7 @@ void      add_implicit_entity     (CheckerContext *c, AstNode *node, Entity *e);
 void      add_entity_and_decl_info(CheckerContext *c, AstNode *identifier, Entity *e, DeclInfo *d);
 void      add_type_info_type      (CheckerContext *c, Type *t);
 
-void check_add_import_decl(CheckerContext *c, AstNodeImportDecl *id);
-// void check_add_export_decl(Checker *c, AstNodeExportDecl *ed);
+void check_add_import_decl(CheckerContext *c, AstNode *decl);
 void check_add_foreign_import_decl(CheckerContext *c, AstNode *decl);
 
 

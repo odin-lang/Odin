@@ -6285,7 +6285,8 @@ void ir_build_stmt_list(irProcedure *proc, Array<AstNode *> stmts) {
 			ir_build_constant_value_decl(proc, vd);
 		case_end;
 		case_ast_node(fb, ForeignBlockDecl, stmt);
-			ir_build_stmt_list(proc, fb->decls);
+			ast_node(block, BlockStmt, fb->body);
+			ir_build_stmt_list(proc, block->stmts);
 		case_end;
 		}
 	}
