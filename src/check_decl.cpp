@@ -1,5 +1,5 @@
-bool check_is_terminating(AstNode *node);
-void check_stmt          (CheckerContext *ctx, AstNode *node, u32 flags);
+bool check_is_terminating(Ast *node);
+void check_stmt          (CheckerContext *ctx, Ast *node, u32 flags);
 
 // NOTE(bill): 'content_name' is for debugging and error messages
 Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, String context_name) {
@@ -89,7 +89,7 @@ Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, Stri
 	return e->type;
 }
 
-void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<AstNode *> const &inits, String context_name) {
+void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Ast *> const &inits, String context_name) {
 	if ((lhs == nullptr || lhs_count == 0) && inits.count == 0) {
 		return;
 	}
@@ -168,14 +168,14 @@ void check_init_constant(CheckerContext *ctx, Entity *e, Operand *operand) {
 }
 
 
-bool is_type_distinct(AstNode *node) {
+bool is_type_distinct(Ast *node) {
 	for (;;) {
 		if (node == nullptr) {
 			return false;
 		}
-		if (node->kind == AstNode_ParenExpr) {
+		if (node->kind == Ast_ParenExpr) {
 			node = node->ParenExpr.expr;
-		} else if (node->kind == AstNode_HelperType) {
+		} else if (node->kind == Ast_HelperType) {
 			node = node->HelperType.type;
 		} else {
 			break;
@@ -183,33 +183,33 @@ bool is_type_distinct(AstNode *node) {
 	}
 
 	switch (node->kind) {
-	case AstNode_DistinctType:
+	case Ast_DistinctType:
 		return true;
 
-	case AstNode_StructType:
-	case AstNode_UnionType:
-	case AstNode_EnumType:
-	case AstNode_BitFieldType:
-	case AstNode_ProcType:
+	case Ast_StructType:
+	case Ast_UnionType:
+	case Ast_EnumType:
+	case Ast_BitFieldType:
+	case Ast_ProcType:
 		return true;
 
-	case AstNode_PointerType:
-	case AstNode_ArrayType:
-	case AstNode_DynamicArrayType:
-	case AstNode_MapType:
+	case Ast_PointerType:
+	case Ast_ArrayType:
+	case Ast_DynamicArrayType:
+	case Ast_MapType:
 		return false;
 	}
 	return false;
 }
 
-AstNode *remove_type_alias_clutter(AstNode *node) {
+Ast *remove_type_alias_clutter(Ast *node) {
 	for (;;) {
 		if (node == nullptr) {
 			return nullptr;
 		}
-		if (node->kind == AstNode_ParenExpr) {
+		if (node->kind == Ast_ParenExpr) {
 			node = node->ParenExpr.expr;
-		} else if (node->kind == AstNode_DistinctType) {
+		} else if (node->kind == Ast_DistinctType) {
 			node = node->DistinctType.type;
 		} else {
 			return node;
@@ -217,7 +217,7 @@ AstNode *remove_type_alias_clutter(AstNode *node) {
 	}
 }
 
-void check_type_decl(CheckerContext *ctx, Entity *e, AstNode *type_expr, Type *def) {
+void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) {
 	GB_ASSERT(e->type == nullptr);
 
 	DeclInfo *decl = decl_info_of_entity(e);
@@ -228,7 +228,7 @@ void check_type_decl(CheckerContext *ctx, Entity *e, AstNode *type_expr, Type *d
 
 
 	bool is_distinct = is_type_distinct(type_expr);
-	AstNode *te = remove_type_alias_clutter(type_expr);
+	Ast *te = remove_type_alias_clutter(type_expr);
 	e->type = t_invalid;
 	String name = e->token.string;
 	Type *named = alloc_type_named(name, nullptr, e);
@@ -263,7 +263,7 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 	map_set(&found_scope->elements, hash_string(original_name), new_entity);
 }
 
-void check_const_decl(CheckerContext *ctx, Entity *e, AstNode *type_expr, AstNode *init, Type *named_type) {
+void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init, Type *named_type) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Constant);
 
@@ -289,9 +289,9 @@ void check_const_decl(CheckerContext *ctx, Entity *e, AstNode *type_expr, AstNod
 
 	if (init != nullptr) {
 		Entity *entity = nullptr;
-		if (init->kind == AstNode_Ident) {
+		if (init->kind == Ast_Ident) {
 			entity = check_ident(ctx, &operand, init, nullptr, e->type, true);
-		} else if (init->kind == AstNode_SelectorExpr) {
+		} else if (init->kind == Ast_SelectorExpr) {
 			entity = check_selector(ctx, &operand, init, e->type);
 		} else {
 			check_expr_or_type(ctx, &operand, init, e->type);
@@ -413,7 +413,7 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 }
 
 void init_entity_foreign_library(CheckerContext *ctx, Entity *e) {
-	AstNode *ident = nullptr;
+	Ast *ident = nullptr;
 	Entity **foreign_library = nullptr;
 
 	switch (e->kind) {
@@ -431,7 +431,7 @@ void init_entity_foreign_library(CheckerContext *ctx, Entity *e) {
 
 	if (ident == nullptr) {
 		error(e->token, "foreign entiies must declare which library they are from");
-	} else if (ident->kind != AstNode_Ident) {
+	} else if (ident->kind != Ast_Ident) {
 		error(ident, "foreign library names must be an identifier");
 	} else {
 		String name = ident->Ident.token.string;
@@ -472,7 +472,7 @@ String handle_link_name(CheckerContext *ctx, Token token, String link_name, Stri
 
 void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == nullptr);
-	if (d->proc_lit->kind != AstNode_ProcLit) {
+	if (d->proc_lit->kind != Ast_ProcLit) {
 		// TOOD(bill): Better error message
 		error(d->proc_lit, "Expected a procedure to check");
 		return;
@@ -556,7 +556,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 		d->scope = ctx->scope;
 
-		GB_ASSERT(pl->body->kind == AstNode_BlockStmt);
+		GB_ASSERT(pl->body->kind == Ast_BlockStmt);
 		if (!pt->is_polymorphic) {
 			check_procedure_later(ctx->checker, ctx->file, e->token, d, proc_type, pl->body, pl->tags);
 		}
@@ -640,7 +640,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 }
 
-void check_var_decl(CheckerContext *ctx, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, Array<AstNode *> const &init_expr_list) {
+void check_var_decl(CheckerContext *ctx, Entity *e, Entity **entities, isize entity_count, Ast *type_expr, Array<Ast *> const &init_expr_list) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Variable);
 
@@ -749,16 +749,16 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) 
 	ptr_set_init(&entity_set, heap_allocator(), 2*pg->args.count);
 
 	for_array(i, pg->args) {
-		AstNode *arg = pg->args[i];
+		Ast *arg = pg->args[i];
 		Entity *e = nullptr;
 		Operand o = {};
-		if (arg->kind == AstNode_Ident) {
+		if (arg->kind == Ast_Ident) {
 			e = check_ident(ctx, &o, arg, nullptr, nullptr, true);
-		} else if (arg->kind == AstNode_SelectorExpr) {
+		} else if (arg->kind == Ast_SelectorExpr) {
 			e = check_selector(ctx, &o, arg, nullptr);
 		}
 		if (e == nullptr) {
-			error(arg, "Expected a valid entity name in procedure group, got %.*s", LIT(ast_node_strings[arg->kind]));
+			error(arg, "Expected a valid entity name in procedure group, got %.*s", LIT(ast_strings[arg->kind]));
 			continue;
 		}
 		if (e->kind == Entity_Variable) {
@@ -919,11 +919,11 @@ void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_
 
 
 
-void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *type, AstNode *body) {
+void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *type, Ast *body) {
 	if (body == nullptr) {
 		return;
 	}
-	GB_ASSERT(body->kind == AstNode_BlockStmt);
+	GB_ASSERT(body->kind == Ast_BlockStmt);
 
 	String proc_name = {};
 	if (token.kind == Token_Ident) {

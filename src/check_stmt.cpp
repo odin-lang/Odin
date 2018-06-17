@@ -1,4 +1,4 @@
-void check_stmt_list(CheckerContext *ctx, Array<AstNode *> const &stmts, u32 flags) {
+void check_stmt_list(CheckerContext *ctx, Array<Ast *> const &stmts, u32 flags) {
 	if (stmts.count == 0) {
 		return;
 	}
@@ -12,14 +12,14 @@ void check_stmt_list(CheckerContext *ctx, Array<AstNode *> const &stmts, u32 fla
 
 	isize max = stmts.count;
 	for (isize i = stmts.count-1; i >= 0; i--) {
-		if (stmts[i]->kind != AstNode_EmptyStmt) {
+		if (stmts[i]->kind != Ast_EmptyStmt) {
 			break;
 		}
 		max--;
 	}
 	for (isize i = 0; i < max; i++) {
-		AstNode *n = stmts[i];
-		if (n->kind == AstNode_EmptyStmt) {
+		Ast *n = stmts[i];
+		if (n->kind == Ast_EmptyStmt) {
 			continue;
 		}
 		u32 new_flags = flags;
@@ -29,11 +29,11 @@ void check_stmt_list(CheckerContext *ctx, Array<AstNode *> const &stmts, u32 fla
 
 		if (i+1 < max) {
 			switch (n->kind) {
-			case AstNode_ReturnStmt:
+			case Ast_ReturnStmt:
 				error(n, "Statements after this 'return' are never execu");
 				break;
 
-			case AstNode_BranchStmt:
+			case Ast_BranchStmt:
 				error(n, "Statements after this '%.*s' are never executed", LIT(n->BranchStmt.token.string));
 				break;
 			}
@@ -43,11 +43,11 @@ void check_stmt_list(CheckerContext *ctx, Array<AstNode *> const &stmts, u32 fla
 	}
 }
 
-bool check_is_terminating_list(Array<AstNode *> const &stmts) {
+bool check_is_terminating_list(Array<Ast *> const &stmts) {
 	// Iterate backwards
 	for (isize n = stmts.count-1; n >= 0; n--) {
-		AstNode *stmt = stmts[n];
-		if (stmt->kind != AstNode_EmptyStmt) {
+		Ast *stmt = stmts[n];
+		if (stmt->kind != Ast_EmptyStmt) {
 			return check_is_terminating(stmt);
 		}
 	}
@@ -55,9 +55,9 @@ bool check_is_terminating_list(Array<AstNode *> const &stmts) {
 	return false;
 }
 
-bool check_has_break_list(Array<AstNode *> const &stmts, bool implicit) {
+bool check_has_break_list(Array<Ast *> const &stmts, bool implicit) {
 	for_array(i, stmts) {
-		AstNode *stmt = stmts[i];
+		Ast *stmt = stmts[i];
 		if (check_has_break(stmt, implicit)) {
 			return true;
 		}
@@ -66,24 +66,24 @@ bool check_has_break_list(Array<AstNode *> const &stmts, bool implicit) {
 }
 
 
-bool check_has_break(AstNode *stmt, bool implicit) {
+bool check_has_break(Ast *stmt, bool implicit) {
 	switch (stmt->kind) {
-	case AstNode_BranchStmt:
+	case Ast_BranchStmt:
 		if (stmt->BranchStmt.token.kind == Token_break) {
 			return implicit;
 		}
 		break;
-	case AstNode_BlockStmt:
+	case Ast_BlockStmt:
 		return check_has_break_list(stmt->BlockStmt.stmts, implicit);
 
-	case AstNode_IfStmt:
+	case Ast_IfStmt:
 		if (check_has_break(stmt->IfStmt.body, implicit) ||
 		    (stmt->IfStmt.else_stmt != nullptr && check_has_break(stmt->IfStmt.else_stmt, implicit))) {
 			return true;
 		}
 		break;
 
-	case AstNode_CaseClause:
+	case Ast_CaseClause:
 		return check_has_break_list(stmt->CaseClause.stmts, implicit);
 	}
 
@@ -94,7 +94,7 @@ bool check_has_break(AstNode *stmt, bool implicit) {
 
 // NOTE(bill): The last expression has to be a 'return' statement
 // TODO(bill): This is a mild hack and should be probably handled properly
-bool check_is_terminating(AstNode *node) {
+bool check_is_terminating(Ast *node) {
 	switch (node->kind) {
 	case_ast_node(rs, ReturnStmt, node);
 		return true;
@@ -139,7 +139,7 @@ bool check_is_terminating(AstNode *node) {
 	case_ast_node(ss, SwitchStmt, node);
 		bool has_default = false;
 		for_array(i, ss->body->BlockStmt.stmts) {
-			AstNode *clause = ss->body->BlockStmt.stmts[i];
+			Ast *clause = ss->body->BlockStmt.stmts[i];
 			ast_node(cc, CaseClause, clause);
 			if (cc->list.count == 0) {
 				has_default = true;
@@ -155,7 +155,7 @@ bool check_is_terminating(AstNode *node) {
 	case_ast_node(ss, TypeSwitchStmt, node);
 		bool has_default = false;
 		for_array(i, ss->body->BlockStmt.stmts) {
-			AstNode *clause = ss->body->BlockStmt.stmts[i];
+			Ast *clause = ss->body->BlockStmt.stmts[i];
 			ast_node(cc, CaseClause, clause);
 			if (cc->list.count == 0) {
 				has_default = true;
@@ -186,7 +186,7 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 		return nullptr;
 	}
 
-	AstNode *node = unparen_expr(lhs->expr);
+	Ast *node = unparen_expr(lhs->expr);
 
 	// NOTE(bill): Ignore assignments to '_'
 	if (is_blank_ident(node)) {
@@ -234,7 +234,7 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 			rhs->proc_group = nullptr;
 		}
 	} else {
-		if (node->kind == AstNode_Ident) {
+		if (node->kind == Ast_Ident) {
 			ast_node(i, Ident, node);
 			e = scope_lookup(ctx->scope, i->token.string);
 			if (e != nullptr && e->kind == Entity_Variable) {
@@ -289,9 +289,9 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 	}
 
 	case Addressing_MapIndex: {
-		AstNode *ln = unparen_expr(lhs->expr);
-		if (ln->kind == AstNode_IndexExpr) {
-			AstNode *x = ln->IndexExpr.expr;
+		Ast *ln = unparen_expr(lhs->expr);
+		if (ln->kind == Ast_IndexExpr) {
+			Ast *x = ln->IndexExpr.expr;
 			TypeAndValue tav = type_and_value_of_expr(&ctx->checker->info, x);
 			GB_ASSERT(tav.mode != Addressing_Invalid);
 			if (tav.mode != Addressing_Variable) {
@@ -308,7 +308,7 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 	}
 
 	default: {
-		if (lhs->expr->kind == AstNode_SelectorExpr) {
+		if (lhs->expr->kind == Ast_SelectorExpr) {
 			// NOTE(bill): Extra error checks
 			Operand op_c = {Addressing_Invalid};
 			ast_node(se, SelectorExpr, lhs->expr);
@@ -342,8 +342,8 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 }
 
 
-void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags);
-void check_stmt(CheckerContext *ctx, AstNode *node, u32 flags) {
+void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags);
+void check_stmt(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 prev_stmt_state_flags = ctx->stmt_state_flags;
 
 	if (node->stmt_state_flags != 0) {
@@ -368,14 +368,14 @@ void check_stmt(CheckerContext *ctx, AstNode *node, u32 flags) {
 }
 
 
-void check_when_stmt(CheckerContext *ctx, AstNodeWhenStmt *ws, u32 flags) {
+void check_when_stmt(CheckerContext *ctx, AstWhenStmt *ws, u32 flags) {
 	Operand operand = {Addressing_Invalid};
 	check_expr(ctx, &operand, ws->cond);
 	if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
 		error(ws->cond, "Non-constant boolean 'when' condition");
 		return;
 	}
-	if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
+	if (ws->body == nullptr || ws->body->kind != Ast_BlockStmt) {
 		error(ws->cond, "Invalid body for 'when' statement");
 		return;
 	}
@@ -384,10 +384,10 @@ void check_when_stmt(CheckerContext *ctx, AstNodeWhenStmt *ws, u32 flags) {
 		check_stmt_list(ctx, ws->body->BlockStmt.stmts, flags);
 	} else if (ws->else_stmt) {
 		switch (ws->else_stmt->kind) {
-		case AstNode_BlockStmt:
+		case Ast_BlockStmt:
 			check_stmt_list(ctx, ws->else_stmt->BlockStmt.stmts, flags);
 			break;
-		case AstNode_WhenStmt:
+		case Ast_WhenStmt:
 			check_when_stmt(ctx, &ws->else_stmt->WhenStmt, flags);
 			break;
 		default:
@@ -397,12 +397,12 @@ void check_when_stmt(CheckerContext *ctx, AstNodeWhenStmt *ws, u32 flags) {
 	}
 }
 
-void check_label(CheckerContext *ctx, AstNode *label) {
+void check_label(CheckerContext *ctx, Ast *label) {
 	if (label == nullptr) {
 		return;
 	}
 	ast_node(l, Label, label);
-	if (l->name->kind != AstNode_Ident) {
+	if (l->name->kind != Ast_Ident) {
 		error(l->name, "A label's name must be an identifier");
 		return;
 	}
@@ -440,7 +440,7 @@ void check_label(CheckerContext *ctx, AstNode *label) {
 }
 
 // Returns 'true' for 'continue', 'false' for 'return'
-bool check_using_stmt_entity(CheckerContext *ctx, AstNodeUsingStmt *us, AstNode *expr, bool is_selector, Entity *e) {
+bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, bool is_selector, Entity *e) {
 	if (e == nullptr) {
 		error(us->token, "'using' applied to an unknown entity");
 		return true;
@@ -596,11 +596,11 @@ void add_constant_switch_case(CheckerContext *ctx, Map<TypeAndToken> *seen, Oper
 		}
 	}
 
-	TypeAndToken tap = {operand.type, ast_node_token(operand.expr)};
+	TypeAndToken tap = {operand.type, ast_token(operand.expr)};
 	multi_map_insert(seen, key, tap);
 }
 
-void check_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
+void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(ss, SwitchStmt, node);
 
 	Operand x = {};
@@ -623,21 +623,21 @@ void check_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 		x.value = exact_value_bool(true);
 
 		Token token  = {};
-		token.pos    = ast_node_token(ss->body).pos;
+		token.pos    = ast_token(ss->body).pos;
 		token.string = str_lit("true");
 
-		x.expr = gb_alloc_item(ctx->allocator, AstNode);
-		x.expr->kind = AstNode_Ident;
+		x.expr = gb_alloc_item(ctx->allocator, Ast);
+		x.expr->kind = Ast_Ident;
 		x.expr->Ident.token = token;
 	}
 
 	// NOTE(bill): Check for multiple defaults
-	AstNode *first_default = nullptr;
+	Ast *first_default = nullptr;
 	ast_node(bs, BlockStmt, ss->body);
 	for_array(i, bs->stmts) {
-		AstNode *stmt = bs->stmts[i];
-		AstNode *default_stmt = nullptr;
-		if (stmt->kind == AstNode_CaseClause) {
+		Ast *stmt = bs->stmts[i];
+		Ast *default_stmt = nullptr;
+		if (stmt->kind == Ast_CaseClause) {
 			ast_node(cc, CaseClause, stmt);
 			if (cc->list.count == 0) {
 				default_stmt = stmt;
@@ -648,7 +648,7 @@ void check_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 
 		if (default_stmt != nullptr) {
 			if (first_default != nullptr) {
-				TokenPos pos = ast_node_token(first_default).pos;
+				TokenPos pos = ast_token(first_default).pos;
 				error(stmt,
 				           "multiple default clauses\n"
 				           "\tfirst at %.*s(%td:%td)",
@@ -673,17 +673,17 @@ void check_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 	defer (map_destroy(&seen));
 
 	for_array(stmt_index, bs->stmts) {
-		AstNode *stmt = bs->stmts[stmt_index];
-		if (stmt->kind != AstNode_CaseClause) {
+		Ast *stmt = bs->stmts[stmt_index];
+		if (stmt->kind != Ast_CaseClause) {
 			// NOTE(bill): error handled by above multiple default checker
 			continue;
 		}
 		ast_node(cc, CaseClause, stmt);
 
 		for_array(j, cc->list) {
-			AstNode *expr = unparen_expr(cc->list[j]);
+			Ast *expr = unparen_expr(cc->list[j]);
 
-			if (is_ast_node_a_range(expr)) {
+			if (is_ast_range(expr)) {
 				ast_node(ie, BinaryExpr, expr);
 				Operand lhs = {};
 				Operand rhs = {};
@@ -838,7 +838,7 @@ TypeSwitchKind check_valid_type_switch_type(Type *type) {
 	return TypeSwitch_Invalid;
 }
 
-void check_type_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
+void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(ss, TypeSwitchStmt, node);
 	Operand x = {};
 
@@ -848,13 +848,13 @@ void check_type_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 
 	check_label(ctx, ss->label); // TODO(bill): What should the label's "scope" be?
 
-	if (ss->tag->kind != AstNode_AssignStmt) {
+	if (ss->tag->kind != Ast_AssignStmt) {
 		error(ss->tag, "Expected an 'in' assignment for this type switch statement");
 		return;
 	}
 
 	ast_node(as, AssignStmt, ss->tag);
-	Token as_token = ast_node_token(ss->tag);
+	Token as_token = ast_token(ss->tag);
 	if (as->lhs.count != 1) {
 		syntax_error(as_token, "Expected 1 name before 'in'");
 		return;
@@ -863,8 +863,8 @@ void check_type_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 		syntax_error(as_token, "Expected 1 expression after 'in'");
 		return;
 	}
-	AstNode *lhs = as->lhs[0];
-	AstNode *rhs = as->rhs[0];
+	Ast *lhs = as->lhs[0];
+	Ast *rhs = as->rhs[0];
 
 	check_expr(ctx, &x, rhs);
 	check_assignment(ctx, &x, nullptr, str_lit("type switch expression"));
@@ -889,12 +889,12 @@ void check_type_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 	bool is_ptr = is_type_pointer(x.type);
 
 	// NOTE(bill): Check for multiple defaults
-	AstNode *first_default = nullptr;
+	Ast *first_default = nullptr;
 	ast_node(bs, BlockStmt, ss->body);
 	for_array(i, bs->stmts) {
-		AstNode *stmt = bs->stmts[i];
-		AstNode *default_stmt = nullptr;
-		if (stmt->kind == AstNode_CaseClause) {
+		Ast *stmt = bs->stmts[i];
+		Ast *default_stmt = nullptr;
+		if (stmt->kind == Ast_CaseClause) {
 			ast_node(cc, CaseClause, stmt);
 			if (cc->list.count == 0) {
 				default_stmt = stmt;
@@ -905,7 +905,7 @@ void check_type_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 
 		if (default_stmt != nullptr) {
 			if (first_default != nullptr) {
-				TokenPos pos = ast_node_token(first_default).pos;
+				TokenPos pos = ast_token(first_default).pos;
 				error(stmt,
 				      "Multiple default clauses\n"
 				      "\tfirst at %.*s(%td:%td)",
@@ -916,8 +916,8 @@ void check_type_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 		}
 	}
 
-	if (lhs->kind != AstNode_Ident) {
-		error(rhs, "Expected an identifier, got '%.*s'", LIT(ast_node_strings[rhs->kind]));
+	if (lhs->kind != Ast_Ident) {
+		error(rhs, "Expected an identifier, got '%.*s'", LIT(ast_strings[rhs->kind]));
 		return;
 	}
 
@@ -926,8 +926,8 @@ void check_type_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 	defer (ptr_set_destroy(&seen));
 
 	for_array(i, bs->stmts) {
-		AstNode *stmt = bs->stmts[i];
-		if (stmt->kind != AstNode_CaseClause) {
+		Ast *stmt = bs->stmts[i];
+		if (stmt->kind != Ast_CaseClause) {
 			// NOTE(bill): error handled by above multiple default checker
 			continue;
 		}
@@ -938,7 +938,7 @@ void check_type_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 
 		Type *case_type = nullptr;
 		for_array(type_index, cc->list) {
-			AstNode *type_expr = cc->list[type_index];
+			Ast *type_expr = cc->list[type_index];
 			if (type_expr != nullptr) { // Otherwise it's a default expression
 				Operand y = {};
 				check_expr_or_type(ctx, &y, type_expr);
@@ -1046,7 +1046,7 @@ void check_type_switch_stmt(CheckerContext *ctx, AstNode *node, u32 mod_flags) {
 	}
 }
 
-void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
+void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
 	case_ast_node(_, EmptyStmt, node); case_end;
@@ -1070,8 +1070,8 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 			if (kind == Expr_Stmt) {
 				return;
 			}
-			if (operand.expr->kind == AstNode_CallExpr) {
-				AstNodeCallExpr *ce = &operand.expr->CallExpr;
+			if (operand.expr->kind == Ast_CallExpr) {
+				AstCallExpr *ce = &operand.expr->CallExpr;
 				Type *t = type_of_expr(&ctx->checker->info, ce->proc);
 				if (is_type_proc(t)) {
 					if (t->Proc.require_results) {
@@ -1157,7 +1157,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 			}
 			Operand lhs = {Addressing_Invalid};
 			Operand rhs = {Addressing_Invalid};
-			AstNode binary_expr = {AstNode_BinaryExpr};
+			Ast binary_expr = {Ast_BinaryExpr};
 			ast_node(be, BinaryExpr, &binary_expr);
 			be->op = op;
 			be->op.kind = cast(TokenKind)(cast(i32)be->op.kind - (Token_AddEq - Token_Add));
@@ -1201,8 +1201,8 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 
 		if (is->else_stmt != nullptr) {
 			switch (is->else_stmt->kind) {
-			case AstNode_IfStmt:
-			case AstNode_BlockStmt:
+			case Ast_IfStmt:
+			case Ast_BlockStmt:
 				check_stmt(ctx, is->else_stmt, mod_flags);
 				break;
 			default:
@@ -1277,8 +1277,8 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 		if (fs->post != nullptr) {
 			check_stmt(ctx, fs->post, 0);
 
-			if (fs->post->kind != AstNode_AssignStmt &&
-			    fs->post->kind != AstNode_IncDecStmt) {
+			if (fs->post->kind != Ast_AssignStmt &&
+			    fs->post->kind != Ast_IncDecStmt) {
 				error(fs->post, "'for' statement post statement must be a simple statement");
 			}
 		}
@@ -1299,10 +1299,10 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 		isize entity_count = 0;
 		bool is_map = false;
 
-		AstNode *expr = unparen_expr(rs->expr);
+		Ast *expr = unparen_expr(rs->expr);
 
 
-		if (is_ast_node_a_range(expr)) {
+		if (is_ast_range(expr)) {
 			ast_node(ie, BinaryExpr, expr);
 			Operand x = {Addressing_Invalid};
 			Operand y = {Addressing_Invalid};
@@ -1447,18 +1447,18 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 		}
 
 	skip_expr:; // NOTE(zhiayang): again, declaring a variable immediately after a label... weird.
-		AstNode *lhs[2] = {rs->val0, rs->val1};
+		Ast *lhs[2] = {rs->val0, rs->val1};
 		Type *   rhs[2] = {val0, val1};
 
 		for (isize i = 0; i < 2; i++) {
 			if (lhs[i] == nullptr) {
 				continue;
 			}
-			AstNode *name = lhs[i];
+			Ast *name = lhs[i];
 			Type *   type = rhs[i];
 
 			Entity *entity = nullptr;
-			if (name->kind == AstNode_Ident) {
+			if (name->kind == Ast_Ident) {
 				Token token = name->Ident.token;
 				String str = token.string;
 				Entity *found = nullptr;
@@ -1483,7 +1483,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 			}
 
 			if (entity == nullptr) {
-				entity = alloc_entity_dummy_variable(universal_scope, ast_node_token(name));
+				entity = alloc_entity_dummy_variable(universal_scope, ast_token(name));
 			}
 
 			entities[entity_count++] = entity;
@@ -1513,7 +1513,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 
 
 	case_ast_node(ds, DeferStmt, node);
-		if (is_ast_node_decl(ds->stmt)) {
+		if (is_ast_decl(ds->stmt)) {
 			error(ds->token, "You cannot defer a declaration");
 		} else {
 			bool out_in_defer = ctx->in_defer;
@@ -1547,11 +1547,11 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 		}
 
 		if (bs->label != nullptr) {
-			if (bs->label->kind != AstNode_Ident) {
+			if (bs->label->kind != Ast_Ident) {
 				error(bs->label, "A branch statement's label name must be an identifier");
 				return;
 			}
-			AstNode *ident = bs->label;
+			Ast *ident = bs->label;
 			String name = ident->Ident.token.string;
 			Operand o = {};
 			Entity *e = check_ident(ctx, &o, ident, nullptr, nullptr, false);
@@ -1574,24 +1574,24 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 			return;
 		}
 		for_array(i, us->list) {
-			AstNode *expr = unparen_expr(us->list[0]);
+			Ast *expr = unparen_expr(us->list[0]);
 			Entity *e = nullptr;
 
 			bool is_selector = false;
 			Operand o = {};
 			switch (expr->kind) {
-			case AstNode_Ident:
+			case Ast_Ident:
 				e = check_ident(ctx, &o, expr, nullptr, nullptr, true);
 				break;
-			case AstNode_SelectorExpr:
+			case Ast_SelectorExpr:
 				e = check_selector(ctx, &o, expr, nullptr);
 				is_selector = true;
 				break;
-			case AstNode_Implicit:
+			case Ast_Implicit:
 				error(us->token, "'using' applied to an implicit value");
 				continue;
 			default:
-				error(us->token, "'using' can only be applied to an entity, got %.*s", LIT(ast_node_strings[expr->kind]));
+				error(us->token, "'using' can only be applied to an entity, got %.*s", LIT(ast_strings[expr->kind]));
 				continue;
 			}
 
@@ -1609,9 +1609,9 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(fb, ForeignBlockDecl, node);
-		AstNode *foreign_library = fb->foreign_library;
+		Ast *foreign_library = fb->foreign_library;
 		CheckerContext c = *ctx;
-		if (foreign_library->kind != AstNode_Ident) {
+		if (foreign_library->kind != Ast_Ident) {
 			error(foreign_library, "foreign library name must be an identifier");
 		} else {
 			c.foreign_context.curr_library = foreign_library;
@@ -1622,8 +1622,8 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 
 		ast_node(block, BlockStmt, fb->body);
 		for_array(i, block->stmts) {
-			AstNode *decl = block->stmts[i];
-			if (decl->kind == AstNode_ValueDecl && decl->ValueDecl.is_mutable) {
+			Ast *decl = block->stmts[i];
+			if (decl->kind == Ast_ValueDecl && decl->ValueDecl.is_mutable) {
 				check_stmt(&c, decl, flags);
 			}
 		}
@@ -1636,9 +1636,9 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 
 			isize new_name_count = 0;
 			for_array(i, vd->names) {
-				AstNode *name = vd->names[i];
+				Ast *name = vd->names[i];
 				Entity *entity = nullptr;
-				if (name->kind != AstNode_Ident) {
+				if (name->kind != Ast_Ident) {
 					error(name, "A variable declaration must be an identifier");
 				} else {
 					Token token = name->Ident.token;
@@ -1653,9 +1653,9 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 						entity = alloc_entity_variable(ctx->scope, token, nullptr, false);
 						entity->identifier = name;
 
-						AstNode *fl = ctx->foreign_context.curr_library;
+						Ast *fl = ctx->foreign_context.curr_library;
 						if (fl != nullptr) {
-							GB_ASSERT(fl->kind == AstNode_Ident);
+							GB_ASSERT(fl->kind == Ast_Ident);
 							entity->Variable.is_foreign = true;
 							entity->Variable.foreign_library_ident = fl;
 						}
@@ -1669,7 +1669,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 					}
 				}
 				if (entity == nullptr) {
-					entity = alloc_entity_dummy_variable(universal_scope, ast_node_token(name));
+					entity = alloc_entity_dummy_variable(universal_scope, ast_token(name));
 				}
 				entity->parent_proc_decl = ctx->curr_proc_decl;
 				entities[entity_count++] = entity;
@@ -1766,7 +1766,7 @@ void check_stmt_internal(CheckerContext *ctx, AstNode *node, u32 flags) {
 			}
 
 			if (vd->is_using != 0) {
-				Token token = ast_node_token(node);
+				Token token = ast_token(node);
 				if (vd->type != nullptr && entity_count > 1) {
 					error(token, "'using' can only be applied to one variable of the same type");
 					// TODO(bill): Should a 'continue' happen here?
