@@ -1578,7 +1578,7 @@ void ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
 	args[0] = ir_emit_conv(p, address, t_rawptr);
 	args[1] = ir_const_int(a, type_size_of(t));
 	AstPackage *pkg = get_core_package(p->module->info, str_lit("mem"));
-	if (p->entity->token.string != "zero" && p->entity->pkg != pkg) {
+	if (p->entity != nullptr && p->entity->token.string != "zero" && p->entity->pkg != pkg) {
 		ir_emit_package_call(p, "mem", "zero", args, expr);
 	}
 	ir_emit(p, ir_instr_zero_init(p, address));

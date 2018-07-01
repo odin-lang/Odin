@@ -18,7 +18,7 @@ set compiler_warnings= ^
 	-W4 -WX ^
 	-wd4100 -wd4101 -wd4127 -wd4189 ^
 	-wd4201 -wd4204 ^
-	-wd4456 -wd4457 ^
+	-wd4456 -wd4457 -wd4480 ^
 	-wd4512
 
 set compiler_includes=
