@@ -4644,7 +4644,7 @@ gb_inline b32 gb_mutex_try_lock(gbMutex *m) {
 
 gb_inline void gb_mutex_unlock(gbMutex *m) {
 #if defined(GB_SYSTEM_WINDOWS)
-	// LeaveCriticalSection(&m->win32_critical_section);
+	LeaveCriticalSection(&m->win32_critical_section);
 #else
 	// IMPORTANT TODO HACK(bill): Enable this
 	// pthread_mutex_unlock(&m->pthread_mutex);
