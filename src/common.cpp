@@ -822,7 +822,71 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 
 	return ReadDirectory_None;
 }
+#elif defined(GB_SYSTEM_LINUX)
 
+#include <dirent.h>
+
+ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
+	GB_ASSERT(fi != nullptr);
+
+	gbAllocator a = heap_allocator();
+
+	char *c_path = alloc_cstring(a, path);
+	defer (gb_free(a, c_path));
+
+	DIR *dir = opendir(c_path);
+	if (!dir) {
+		return ReadDirectory_NotDir;
+	}
+
+	array_init(fi, a, 0, 100);
+
+	for (;;) {
+		struct dirent *entry = readdir(dir);
+		if (entry == nullptr) {
+			break;
+		}
+
+		String name = make_string_c(entry->d_name);
+		if (name == "." || name == "..") {
+			continue;
+		}
+
+		String filepath = {};
+		filepath.len = path.len+1+name.len;
+		filepath.text = gb_alloc_array(a, u8, filepath.len+1);
+		defer (gb_free(a, filepath.text));
+		gb_memmove(filepath.text, path.text, path.len);
+		gb_memmove(filepath.text+path.len, "/", 1);
+		gb_memmove(filepath.text+path.len+1, name.text, name.len);
+		filepath.text[filepath.len] = 0;
+
+
+		struct stat dir_stat = {};
+
+		if (stat((char *)filepath.text, &dir_stat)) {
+			continue;
+		}
+
+		if (S_ISDIR(dir_stat.st_mode)) {
+			continue;
+		}
+
+		i64 size = dir_stat.st_size;
+
+		FileInfo info = {};
+		info.name = name;
+		info.fullpath = path_to_full_path(a, filepath);
+		info.size = size;
+		array_add(fi, info);
+	}
+
+	if (fi->count == 0) {
+		return ReadDirectory_Empty;
+	}
+
+	return ReadDirectory_None;
+}
 #else
 #error Implement read_directory
 #endif
