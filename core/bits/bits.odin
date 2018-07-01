@@ -43,21 +43,39 @@ foreign {
 	@(link_name="llvm.bitreverse.i32")  reverse_bits32 :: proc(i: u32) -> u32 ---
 	@(link_name="llvm.bitreverse.i64")  reverse_bits64 :: proc(i: u64) -> u64 ---
 
-	@(link_name="llvm.bswap.i16")       byte_swap16 :: proc(u16) -> u16 ---
-	@(link_name="llvm.bswap.i32")       byte_swap32 :: proc(u32) -> u32 ---
-	@(link_name="llvm.bswap.i64")       byte_swap64 :: proc(u64) -> u64 ---
+	@(link_name="llvm.bswap.i16")       byte_swap_u16 :: proc(u16) -> u16 ---
+	@(link_name="llvm.bswap.i32")       byte_swap_u32 :: proc(u32) -> u32 ---
+	@(link_name="llvm.bswap.i64")       byte_swap_u64 :: proc(u64) -> u64 ---
+	@(link_name="llvm.bswap.i16")       byte_swap_i16 :: proc(i16) -> i16 ---
+	@(link_name="llvm.bswap.i32")       byte_swap_i32 :: proc(i32) -> i32 ---
+	@(link_name="llvm.bswap.i64")       byte_swap_i64 :: proc(i64) -> i64 ---
 }
 
 byte_swap_uint :: proc(i: uint) -> uint {
 	when size_of(uint) == size_of(u32) {
-		return uint(byte_swap32(u32(i)));
+		return uint(byte_swap_u32(u32(i)));
 	} else {
-		return uint(byte_swap64(u64(i)));
+		return uint(byte_swap_u64(u64(i)));
+	}
+}
+byte_swap_int :: proc(i: int) -> int {
+	when size_of(int) == size_of(i32) {
+		return int(byte_swap_i32(i32(i)));
+	} else {
+		return int(byte_swap_i64(i64(i)));
 	}
 }
 
-byte_swap :: proc[byte_swap16, byte_swap32, byte_swap64, byte_swap_uint];
-
+byte_swap :: proc[
+	byte_swap_u16,
+	byte_swap_u32,
+	byte_swap_u64,
+	byte_swap_i16,
+	byte_swap_i32,
+	byte_swap_i64,
+	byte_swap_uint,
+	byte_swap_int,
+];
 
 count_zeros8   :: proc(i:   u8) ->   u8 { return   8 - count_ones8(i); }
 count_zeros16  :: proc(i:  u16) ->  u16 { return  16 - count_ones16(i); }

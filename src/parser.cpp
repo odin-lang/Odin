@@ -4292,6 +4292,9 @@ bool parse_file(Parser *p, AstFile *f) {
 	CommentGroup *docs = f->lead_comment;
 
 	f->package_token = expect_token(f, Token_package);
+	if (f->error_count > 0) {
+		return false;
+	}
 	Token package_name = expect_token_after(f, Token_Ident, "package");
 	if (package_name.kind == Token_Ident) {
 		if (package_name.string == "_") {
