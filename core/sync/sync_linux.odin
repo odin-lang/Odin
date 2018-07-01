@@ -1,5 +1,7 @@
 package sync
 
+/*
+
 import "core:atomics"
 import "core:os"
 
@@ -93,3 +95,4 @@ mutex_unlock :: proc(m: ^Mutex) {
 	}
 }
 
+*/
