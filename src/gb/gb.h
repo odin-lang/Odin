@@ -4609,7 +4609,8 @@ gb_inline void gb_mutex_init(gbMutex *m) {
 #if defined(GB_SYSTEM_WINDOWS)
 	InitializeCriticalSection(&m->win32_critical_section);
 #else
-	pthread_mutex_init(&m->pthread_mutex, NULL);
+	// IMPORTANT TODO HACK(bill): Enable this
+	// pthread_mutex_init(&m->pthread_mutex, NULL);
 #endif
 }
 
@@ -4617,7 +4618,8 @@ gb_inline void gb_mutex_destroy(gbMutex *m) {
 #if defined(GB_SYSTEM_WINDOWS)
 	DeleteCriticalSection(&m->win32_critical_section);
 #else
-	pthread_mutex_destroy(&m->pthread_mutex);
+	// IMPORTANT TODO HACK(bill): Enable this
+	// pthread_mutex_destroy(&m->pthread_mutex);
 #endif
 }
 
@@ -4625,7 +4627,8 @@ gb_inline void gb_mutex_lock(gbMutex *m) {
 #if defined(GB_SYSTEM_WINDOWS)
 	EnterCriticalSection(&m->win32_critical_section);
 #else
-	pthread_mutex_lock(&m->pthread_mutex);
+	// IMPORTANT TODO HACK(bill): Enable this
+	// pthread_mutex_lock(&m->pthread_mutex);
 #endif
 }
 
@@ -4633,15 +4636,18 @@ gb_inline b32 gb_mutex_try_lock(gbMutex *m) {
 #if defined(GB_SYSTEM_WINDOWS)
 	return TryEnterCriticalSection(&m->win32_critical_section) != 0;
 #else
-	return pthread_mutex_trylock(&m->pthread_mutex) == 0;
+	// IMPORTANT TODO HACK(bill): Enable this
+	// return pthread_mutex_trylock(&m->pthread_mutex) == 0;
+	return 1;
 #endif
 }
 
 gb_inline void gb_mutex_unlock(gbMutex *m) {
 #if defined(GB_SYSTEM_WINDOWS)
-	LeaveCriticalSection(&m->win32_critical_section);
+	// LeaveCriticalSection(&m->win32_critical_section);
 #else
-	pthread_mutex_unlock(&m->pthread_mutex);
+	// IMPORTANT TODO HACK(bill): Enable this
+	// pthread_mutex_unlock(&m->pthread_mutex);
 #endif
 }
 
