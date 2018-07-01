@@ -150,8 +150,10 @@ TargetArchKind get_target_arch_from_string(String str) {
 	return TargetArch_Invalid;
 }
 
+
 bool is_excluded_target_filename(String name) {
 	String const ext = str_lit(".odin");
+	String original_name = name;
 	GB_ASSERT(string_ends_with(name, ext));
 	name = substring(name, 0, name.len-ext.len);
 
@@ -166,7 +168,7 @@ bool is_excluded_target_filename(String name) {
 	}
 	str1 = substring(str1, n, str1.len);
 
-	str2 = str1;
+	str2 = substring(name, 0, gb_max(n-1, 0));
 	n = str2.len;
 	for (isize i = str2.len-1; i >= 0 && str2[i] != '_'; i--) {
 		n -= 1;
@@ -177,27 +179,23 @@ bool is_excluded_target_filename(String name) {
 		return false;
 	}
 
-
-
 	TargetOsKind   os1   = get_target_os_from_string(str1);
 	TargetArchKind arch1 = get_target_arch_from_string(str1);
 	TargetOsKind   os2   = get_target_os_from_string(str2);
 	TargetArchKind arch2 = get_target_arch_from_string(str2);
 
-	if (arch1 != TargetArch_Invalid && os2 != TargetOs_Invalid) {
+	if (os1 != TargetOs_Invalid && arch2 != TargetArch_Invalid) {
+		return os1 != build_context.metrics.os || arch2 != build_context.metrics.arch;
+	} else if (arch1 != TargetArch_Invalid && os2 != TargetOs_Invalid) {
 		return arch1 != build_context.metrics.arch || os2 != build_context.metrics.os;
-	} else if (arch1 != TargetArch_Invalid && os1 != TargetOs_Invalid) {
-		return arch2 != build_context.metrics.arch || os1 != build_context.metrics.os;
 	} else if (os1 != TargetOs_Invalid) {
 		return os1 != build_context.metrics.os;
 	} else if (arch1 != TargetArch_Invalid) {
 		return arch1 != build_context.metrics.arch;
 	}
 
-
 	return false;
 }
-
 
 
 struct LibraryCollections {
