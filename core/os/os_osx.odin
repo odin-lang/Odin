@@ -3,6 +3,7 @@ package os
 foreign import dl   "system:dl"
 foreign import libc "system:c"
 
+import "core:runtime"
 import "core:strings"
 
 OS :: "osx";
@@ -287,8 +288,8 @@ dlerror :: proc() -> string {
 
 
 _alloc_command_line_arguments :: proc() -> []string {
-	args := make([]string, len(__args__));
-	for arg, i in __args__ {
+	args := make([]string, len(runtime.args__));
+	for arg, i in runtime.args__ {
 		args[i] = string(arg);
 	}
 	return args;

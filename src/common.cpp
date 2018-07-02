@@ -822,7 +822,7 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 
 	return ReadDirectory_None;
 }
-#elif defined(GB_SYSTEM_LINUX)
+#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX)
 
 #include <dirent.h>
 
