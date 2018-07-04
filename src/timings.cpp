@@ -51,7 +51,7 @@ u64 osx_time_stamp__freq(void) {
 
 u64 unix_time_stamp_time_now(void) {
 	struct timespec ts;
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+	clock_gettime(CLOCK_MONOTONIC, &ts);
 
 	return (ts.tv_sec * 1000000000) + ts.tv_nsec;
 }
@@ -61,7 +61,7 @@ u64 unix_time_stamp__freq(void) {
 
 	if (freq == 0) {
 		struct timespec ts;
-		clock_getres(CLOCK_PROCESS_CPUTIME_ID, &ts);
+		clock_getres(CLOCK_MONOTONIC, &ts);
 		freq = cast(u64) ((1.0 / ts.tv_nsec) * 1000000000.0);
 	}
 
