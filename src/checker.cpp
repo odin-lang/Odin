@@ -2159,7 +2159,6 @@ void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
 
 	check_decl_attributes(&c, fb->attributes, foreign_block_decl_attribute, nullptr);
 
-	c.collect_delayed_decls = true;
 	ast_node(block, BlockStmt, fb->body);
 	check_collect_entities(&c, block->stmts);
 }
