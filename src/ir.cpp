@@ -2192,6 +2192,8 @@ irValue *ir_map_cap(irProcedure *proc, irValue *value) {
 
 
 
+void ir_emit_increment(irProcedure *proc, irValue *addr);
+irValue *ir_emit_array_ep(irProcedure *proc, irValue *s, irValue *index);
 irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index);
 irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index);
 
@@ -2253,11 +2255,43 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 
 		irValue *res = ir_add_local_generated(proc, type);
 		i64 count = base_type(type)->Array.count;
-		for (i32 i = 0; i < count; i++) {
-			irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
-			irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
+
+		bool inline_array_arith = type_size_of(type) <= build_context.max_align;
+
+		if (inline_array_arith) {
+			// inline
+			for (i32 i = 0; i < count; i++) {
+				irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
+				irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
+				irValue *z = ir_emit_arith(proc, op, x, y, elem_type);
+				ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
+			}
+		} else {
+			irValue *idx_addr = ir_add_local_generated(proc, t_int);
+			irValue *max = ir_const_int(proc->module->allocator, count);
+
+			irBlock *body = ir_new_block(proc, nullptr, "array.arith.body");
+			irBlock *done = ir_new_block(proc, nullptr, "array.arith.done");
+			irBlock *loop = ir_new_block(proc, nullptr, "array.arith.loop");
+
+			ir_emit_jump(proc, loop);
+			ir_start_block(proc, loop);
+
+			irValue *idx = ir_emit_load(proc, idx_addr);
+
+			irValue *cond = ir_emit_comp(proc, Token_Lt, idx, max);
+			ir_emit_if(proc, cond, body, done);
+			ir_start_block(proc, body);
+
+			irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, idx));
+			irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, idx));
 			irValue *z = ir_emit_arith(proc, op, x, y, elem_type);
-			ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
+			ir_emit_store(proc, ir_emit_array_ep(proc, res, idx), z);
+
+			ir_emit_increment(proc, idx_addr);
+			ir_emit_jump(proc, loop);
+
+			ir_start_block(proc, done);
 		}
 		ir_emit_comment(proc, str_lit("array.arith.end"));
 		return ir_emit_load(proc, res);
