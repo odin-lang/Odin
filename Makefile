@@ -12,7 +12,7 @@ endif
 all: debug demo
 
 demo:
-	./odin run examples/demo.odin
+	./odin run examples/demo
 
 debug:
 	$(CC) src/main.cpp $(DISABLED_WARNINGS) $(CFLAGS) -g $(LDFLAGS) -o odin
