@@ -2508,9 +2508,9 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 			if (value) *value = i;
 			bool out_of_bounds = false;
 			if (open_range) {
-				out_of_bounds = i >= max_count;
-			} else {
 				out_of_bounds = i > max_count;
+			} else {
+				out_of_bounds = i >= max_count;
 			}
 			if (out_of_bounds) {
 				gbString expr_str = expr_to_string(operand.expr);
@@ -2757,21 +2757,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 	}
 
-	if (ce->args.count > 0) {
-		if (ce->args[0]->kind == Ast_FieldValue) {
-			error(call, "'field = value' calling is not allowed on built-in procedures");
-			return false;
-		}
-	}
-
-
-	bool vari_expand = (ce->ellipsis.pos.line != 0);
-	// if (vari_expand && id != BuiltinProc_append) {
-		// error(ce->ellipsis, "Invalid use of '...' with built-in procedure 'append'");
-		// return false;
-	// }
-
-
 	switch (id) {
 	// case BuiltinProc_new:
 	case BuiltinProc_make:
@@ -2787,6 +2772,14 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			check_multi_expr(c, operand, ce->args[0]);
 		}
 		break;
+	}
+
+
+	if (ce->args.count > 0) {
+		if (ce->args[0]->kind == Ast_FieldValue) {
+			error(call, "'field = value' calling is not allowed on built-in procedures");
+			return false;
+		}
 	}
 
 	switch (id) {
@@ -2845,8 +2838,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_len:
 	case BuiltinProc_cap: {
-		// proc len(Type) -> int
-		// proc cap(Type) -> int
+		// len :: proc(Type) -> int
+		// cap :: proc(Type) -> int
 		Type *op_type = type_deref(operand->type);
 		Type *type = t_int;
 		AddressingMode mode = Addressing_Invalid;
@@ -2892,7 +2885,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	#if 0
 	case BuiltinProc_new: {
-		// proc new(Type) -> ^Type
+		// new :: proc(Type) -> ^Type
 		Operand op = {};
 		check_expr_or_type(c, &op, ce->args[0]);
 		Type *type = op.type;
@@ -2908,7 +2901,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	#endif
 	#if 0
 	case BuiltinProc_new_slice: {
-		// proc new_slice(Type, len: int) -> []Type
+		// new_slice :: proc(Type, len: int) -> []Type
 		// proc new_slice(Type, len, cap: int) -> []Type
 		Operand op = {};
 		check_expr_or_type(c, &op, ce->args[0]);
@@ -2948,7 +2941,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 	#endif
 	case BuiltinProc_make: {
-		// proc make(Type, len: int) -> Type
+		// make :: proc(Type, len: int) -> Type
 		// proc make(Type, len, cap: int) -> Type
 		Operand op = {};
 		check_expr_or_type(c, &op, ce->args[0]);
@@ -3010,7 +3003,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	#if 0
 	case BuiltinProc_free: {
-		// proc free(^Type)
+		// free :: proc(^Type)
 		// proc free([]Type)
 		// proc free(string)
 		// proc free(map[K]T)
@@ -3045,8 +3038,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	#if 0
 	case BuiltinProc_reserve: {
-		// proc reserve([dynamic]Type, count: int) {
-		// proc reserve(map[Key]Type, count: int) {
+		// reserve :: proc([dynamic]Type, count: int) {
+		// reserve :: proc(map[Key]Type, count: int) {
 		Type *type = operand->type;
 		if (!is_type_dynamic_array(type) && !is_type_dynamic_map(type)) {
 			gbString str = type_to_string(type);
@@ -3093,7 +3086,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	#endif
 	#if 0
 	case BuiltinProc_append: {
-		// proc append([dynamic]Type, item: ..Type)
+		// append :: proc([dynamic]Type, item: ..Type)
 		// proc append([]Type, item: ..Type)
 		Operand prev_operand = *operand;
 
@@ -3144,7 +3137,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	#endif
 	#if 0
 	case BuiltinProc_delete: {
-		// proc delete(map[Key]Value, key: Key)
+		// delete :: proc(map[Key]Value, key: Key)
 		Type *type = operand->type;
 		if (!is_type_map(type)) {
 			gbString str = type_to_string(type);
@@ -3179,7 +3172,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 
 	case BuiltinProc_size_of: {
-		// proc size_of(Type or expr) -> untyped int
+		// size_of :: proc(Type or expr) -> untyped int
 		Operand o = {};
 		check_expr_or_type(c, &o, ce->args[0]);
 		if (o.mode == Addressing_Invalid) {
@@ -3200,7 +3193,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	case BuiltinProc_align_of: {
-		// proc align_of(Type or expr) -> untyped int
+		// align_of :: proc(Type or expr) -> untyped int
 		Operand o = {};
 		check_expr_or_type(c, &o, ce->args[0]);
 		if (o.mode == Addressing_Invalid) {
@@ -3222,7 +3215,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 
 	case BuiltinProc_offset_of: {
-		// proc offset_of(Type, field) -> uintptr
+		// offset_of :: proc(Type, field) -> uintptr
 		Operand op = {};
 		Type *bt = check_type(c, ce->args[0]);
 		Type *type = base_type(bt);
@@ -3269,7 +3262,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 
 	case BuiltinProc_type_of: {
-		// proc type_of(val: Type) -> type(Type)
+		// type_of :: proc(val: Type) -> type(Type)
 		Ast *expr = ce->args[0];
 		Operand o = {};
 		check_expr_or_type(c, &o, expr);
@@ -3304,7 +3297,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	case BuiltinProc_type_info_of: {
-		// proc type_info_of(Type) -> ^Type_Info
+		// type_info_of :: proc(Type) -> ^Type_Info
 		if (c->scope->flags&ScopeFlag_Global) {
 			compiler_error("'type_info_of' Cannot be declared within the runtime package due to how the internals of the compiler works");
 		}
@@ -3339,7 +3332,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	case BuiltinProc_typeid_of: {
-		// proc typeid_of(Type) -> typeid
+		// typeid_of :: proc(Type) -> typeid
 		if (c->scope->flags&ScopeFlag_Global) {
 			compiler_error("'typeid_of' Cannot be declared within the runtime package due to how the internals of the compiler works");
 		}
@@ -3375,7 +3368,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	case BuiltinProc_swizzle: {
-		// proc swizzle(v: [N]T, ...int) -> [M]T
+		// swizzle :: proc(v: [N]T, ...int) -> [M]T
 		Type *type = base_type(operand->type);
 		if (!is_type_array(type)) {
 			gbString type_str = type_to_string(operand->type);
@@ -3433,7 +3426,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	case BuiltinProc_complex: {
-		// proc complex(real, imag: float_type) -> complex_type
+		// complex :: proc(real, imag: float_type) -> complex_type
 		Operand x = *operand;
 		Operand y = {};
 
@@ -3495,7 +3488,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_real:
 	case BuiltinProc_imag: {
-		// proc real(x: type) -> float_type
+		// real :: proc(x: type) -> float_type
 		// proc imag(x: type) -> float_type
 
 		Operand *x = operand;
@@ -3540,7 +3533,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	case BuiltinProc_conj: {
-		// proc conj(x: type) -> type
+		// conj :: proc(x: type) -> type
 		Operand *x = operand;
 		if (is_type_complex(x->type)) {
 			if (x->mode == Addressing_Constant) {
@@ -3565,7 +3558,7 @@ break;
 
 	#if 0
 	case BuiltinProc_slice_ptr: {
-		// proc slice_ptr(a: ^T, len: int) -> []T
+		// slice_ptr :: proc(a: ^T, len: int) -> []T
 		// proc slice_ptr(a: ^T, len, cap: int) -> []T
 		// ^T cannot be rawptr
 		Type *ptr_type = base_type(operand->type);
@@ -3610,7 +3603,7 @@ break;
 	}
 
 	case BuiltinProc_slice_to_bytes: {
-		// proc slice_to_bytes(a: []T) -> []u8
+		// slice_to_bytes :: proc(a: []T) -> []u8
 		Type *slice_type = base_type(operand->type);
 		if (!is_type_slice(slice_type)) {
 			gbString type_str = type_to_string(operand->type);
@@ -3649,7 +3642,7 @@ break;
 	}
 
 	case BuiltinProc_min: {
-		// proc min(a, b: ordered) -> ordered
+		// min :: proc(a, b: ordered) -> ordered
 		Type *type = base_type(operand->type);
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
@@ -3724,7 +3717,7 @@ break;
 	}
 
 	case BuiltinProc_max: {
-		// proc min(a, b: ordered) -> ordered
+		// min :: proc(a, b: ordered) -> ordered
 		Type *type = base_type(operand->type);
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
@@ -3800,7 +3793,7 @@ break;
 	}
 
 	case BuiltinProc_abs: {
-		// proc abs(n: numeric) -> numeric
+		// abs :: proc(n: numeric) -> numeric
 		if (!is_type_numeric(operand->type)) {
 			gbString type_str = type_to_string(operand->type);
 			error(call, "Expected a numeric type to 'abs', got '%s'", type_str);
@@ -3848,7 +3841,7 @@ break;
 	}
 
 	case BuiltinProc_clamp: {
-		// proc clamp(a, min, max: ordered) -> ordered
+		// clamp :: proc(a, min, max: ordered) -> ordered
 		Type *type = base_type(operand->type);
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
