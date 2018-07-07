@@ -992,12 +992,12 @@ int main(int arg_count, char **arg_ptr) {
 				//                the system library paths for the library file).
 				if (string_ends_with(lib, str_lit(".a"))) {
 					// static libs, absolute full path relative to the file in which the lib was imported from
-					lib_str = gb_string_append_fmt(lib_str, " -l:%.*s ", LIT(lib));
+					lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
 				} else if (string_ends_with(lib, str_lit(".so"))) {
 					// dynamic lib, relative path to executable
 					// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
 					//                at runtimeto the executable
-					lib_str = gb_string_append_fmt(lib_str, " -l:%s/%.*s ", cwd, LIT(lib));
+					lib_str = gb_string_append_fmt(lib_str, " -l:\"%s/%.*s\" ", cwd, LIT(lib));
 				} else {
 					// dynamic or static system lib, just link regularly searching system library paths
 					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
@@ -1085,7 +1085,7 @@ int main(int arg_count, char **arg_ptr) {
 		remove_temp_files(output_base);
 
 		if (run_output) {
-			system_exec_command_line_app("odin run", false, "%.*s", LIT(output_base));
+			system_exec_command_line_app("odin run", false, "\"%.*s\"", LIT(output_base));
 		}
 	#endif
 #endif
