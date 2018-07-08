@@ -34,7 +34,7 @@ read_entire_file :: proc(name: string) -> (data: []byte, success: bool) {
 
 	bytes_read, read_err := read(fd, data);
 	if read_err != 0 {
-		free(data);
+		delete(data);
 		return nil, false;
 	}
 	return data[0..bytes_read], true;

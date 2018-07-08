@@ -259,7 +259,7 @@ bounds_check_error :: proc "contextless" (file: string, line, column: int, index
 	os.write_string(fd, " is out of bounds range 0..");
 	__print_i64(fd, i64(count));
 	os.write_byte(fd, '\n');
-	__debug_trap();
+	debug_trap();
 }
 
 slice_expr_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
@@ -275,7 +275,7 @@ slice_expr_error :: proc "contextless" (file: string, line, column: int, lo, hi:
 	os.write_string(fd, "..");
 	__print_i64(fd, i64(len));
 	os.write_byte(fd, '\n');
-	__debug_trap();
+	debug_trap();
 }
 
 dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
@@ -290,7 +290,7 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int,
 	os.write_string(fd, "..");
 	__print_i64(fd, i64(max));
 	os.write_byte(fd, '\n');
-	__debug_trap();
+	debug_trap();
 }
 
 type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: typeid) {
@@ -303,7 +303,7 @@ type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column
 	os.write_string(fd, " to ");
 	__print_typeid(fd, to);
 	os.write_byte(fd, '\n');
-	__debug_trap();
+	debug_trap();
 }
 
 __string_decode_rune :: inline proc "contextless" (s: string) -> (rune, int) {

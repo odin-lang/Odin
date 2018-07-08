@@ -378,6 +378,7 @@ parametric_polymorphism :: proc() {
 
 			context <- c {
 				old_slots := table.slots;
+				defer delete(old_slots);
 
 				cap := max(2*len(table.slots), TABLE_SIZE_MIN);
 				allocate(table, cap);
@@ -385,8 +386,6 @@ parametric_polymorphism :: proc() {
 				for s in old_slots do if s.occupied {
 					put(table, s.key, s.value);
 				}
-
-				free(old_slots);
 			}
 		}
 
@@ -515,7 +514,7 @@ threading_example :: proc() {
 		}
 
 		threads := make([dynamic]^thread.Thread, 0, len(prefix_table));
-		defer free(threads);
+		defer delete(threads);
 
 		for in prefix_table {
 			if t := thread.create(worker_proc); t != nil {
