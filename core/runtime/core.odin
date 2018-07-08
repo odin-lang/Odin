@@ -254,10 +254,10 @@ foreign {
 	assume :: proc(cond: bool) ---;
 
 	@(link_name="llvm.debugtrap")
-	__debug_trap :: proc() ---;
+	debug_trap :: proc() ---;
 
 	@(link_name="llvm.trap")
-	__trap :: proc() ---;
+	trap :: proc() ---;
 
 	@(link_name="llvm.readcyclecounter")
 	read_cycle_counter :: proc() -> u64 ---;
@@ -309,29 +309,22 @@ reserve :: proc[reserve_dynamic_array, reserve_map];
 
 
 @(builtin)
-new :: inline proc(T: type, loc := #caller_location) -> ^T {
-	ptr := (^T)(mem.alloc(size_of(T), align_of(T), loc));
-	ptr^ = T{};
-	return ptr;
-}
+new :: proc[mem.new];
 
 @(builtin)
-new_clone :: inline proc(data: $T, loc := #caller_location) -> ^T {
-	ptr := (^T)(mem.alloc(size_of(T), align_of(T), loc));
-	ptr^ = data;
-	return ptr;
-}
+new_clone :: proc[mem.new_clone];
 
 @(builtin)
-free :: proc[
-	mem.free_ptr,
-	mem.free_string,
-	mem.free_cstring,
-	mem.free_dynamic_array,
-	mem.free_slice,
-	mem.free_map,
+free :: proc[mem.free];
+
+@(builtin)
+delete :: proc[
+	mem.delete_string,
+	mem.delete_cstring,
+	mem.delete_dynamic_array,
+	mem.delete_slice,
+	mem.delete_map,
 ];
-
 
 
 
@@ -351,8 +344,8 @@ reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int) {
 }
 
 @(builtin)
-delete :: proc(m: ^$T/map[$K]$V, key: K) {
-	if m != nil do __dynamic_map_delete(__get_map_header(m), __get_map_key(key));
+delete_key :: proc(m: ^$T/map[$K]$V, key: K) {
+	if m != nil do __dynamic_map_delete_key(__get_map_header(m), __get_map_key(key));
 }
 
 
@@ -436,7 +429,7 @@ assert :: proc "contextless" (condition: bool, message := "", using loc := #call
 			os.write_string(fd, message);
 		}
 		os.write_byte(fd, '\n');
-		__debug_trap();
+		debug_trap();
 	}
 	return condition;
 }
@@ -451,7 +444,7 @@ panic :: proc "contextless" (message := "", using loc := #caller_location) {
 		os.write_string(fd, message);
 	}
 	os.write_byte(fd, '\n');
-	__debug_trap();
+	debug_trap();
 }
 
 
@@ -742,7 +735,7 @@ __dynamic_map_add_entry :: proc(using h: Map_Header, key: Map_Key, loc := #calle
 	return prev;
 }
 
-__dynamic_map_delete :: proc(using h: Map_Header, key: Map_Key) {
+__dynamic_map_delete_key :: proc(using h: Map_Header, key: Map_Key) {
 	fr := __dynamic_map_find(h, key);
 	if fr.entry_index >= 0 {
 		__dynamic_map_erase(h, fr);

@@ -4496,6 +4496,23 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 		Array<Entity *> procs = proc_group_entities(c, *operand);
 
+		if (procs.count == 1) {
+			Ast *ident = operand->expr;
+			while (ident->kind == Ast_SelectorExpr) {
+				Ast *s = ident->SelectorExpr.selector;
+				ident = s;
+			}
+
+			Entity *e = procs[0];
+
+			CallArgumentData data = {};
+			CallArgumentError err = call_checker(c, call, e->type, e, operands, CallArgumentMode_ShowErrors, &data);
+			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
+			add_entity_use(c, ident, entity_to_use);
+
+			return data;
+		}
+
 		ValidIndexAndScore *valids         = gb_alloc_array(heap_allocator(), ValidIndexAndScore, procs.count);
 		isize               valid_count    = 0;
 		defer (gb_free(heap_allocator(), valids));

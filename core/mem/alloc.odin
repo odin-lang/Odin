@@ -32,7 +32,7 @@ free_ptr_with_allocator :: inline proc(a: Allocator, ptr: rawptr, loc := #caller
 	a.procedure(a.data, Allocator_Mode.Free, 0, 0, ptr, 0, 0, loc);
 }
 
-free_ptr :: inline proc(ptr: rawptr, loc := #caller_location) do free_ptr_with_allocator(context.allocator, ptr);
+free :: inline proc(ptr: rawptr, loc := #caller_location) do free_ptr_with_allocator(context.allocator, ptr);
 
 free_all :: inline proc(loc := #caller_location) {
 	a := context.allocator;
@@ -46,33 +46,45 @@ resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEF
 }
 
 
-free_string :: proc(str: string, loc := #caller_location) {
-	free_ptr(raw_data(str), loc);
+delete_string :: proc(str: string, loc := #caller_location) {
+	free(raw_data(str), loc);
 }
-free_cstring :: proc(str: cstring, loc := #caller_location) {
-	free_ptr((^byte)(str), loc);
+delete_cstring :: proc(str: cstring, loc := #caller_location) {
+	free((^byte)(str), loc);
 }
-free_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) {
-	free_ptr(raw_data(array), loc);
+delete_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) {
+	free(raw_data(array), loc);
 }
-free_slice :: proc(array: $T/[]$E, loc := #caller_location) {
-	free_ptr(raw_data(array), loc);
+delete_slice :: proc(array: $T/[]$E, loc := #caller_location) {
+	free(raw_data(array), loc);
 }
-free_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
+delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
 	raw := transmute(Raw_Map)m;
-	free_dynamic_array(raw.hashes, loc);
-	free_ptr(raw.entries.data, loc);
+	delete_dynamic_array(raw.hashes, loc);
+	free(raw.entries.data, loc);
 }
 
-free :: proc[
-	free_ptr,
-	free_string,
-	free_cstring,
-	free_dynamic_array,
-	free_slice,
-	free_map,
+
+delete :: proc[
+	delete_string,
+	delete_cstring,
+	delete_dynamic_array,
+	delete_slice,
+	delete_map,
 ];
 
+
+new :: inline proc(T: type, loc := #caller_location) -> ^T {
+	ptr := (^T)(alloc(size_of(T), align_of(T), loc));
+	ptr^ = T{};
+	return ptr;
+}
+
+new_clone :: inline proc(data: $T, loc := #caller_location) -> ^T {
+	ptr := (^T)(alloc(size_of(T), align_of(T), loc));
+	ptr^ = data;
+	return ptr;
+}
 
 
 default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: int, loc := #caller_location) -> rawptr {
@@ -182,8 +194,8 @@ pool_init :: proc(pool: ^Pool,
 
 pool_destroy :: proc(using pool: ^Pool) {
 	pool_free_all(pool);
-	free(unused_blocks);
-	free(used_blocks);
+	delete(unused_blocks);
+	delete(used_blocks);
 
 	zero(pool, size_of(pool^));
 }

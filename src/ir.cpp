@@ -6581,7 +6581,7 @@ void ir_build_range_string(irProcedure *proc, irValue *expr, Type *val_type,
 }
 
 void ir_build_range_interval(irProcedure *proc, AstBinaryExpr *node, Type *val_type,
-                              irValue **val_, irValue **idx_, irBlock **loop_, irBlock **done_) {
+                             irValue **val_, irValue **idx_, irBlock **loop_, irBlock **done_) {
 	// TODO(bill): How should the behaviour work for lower and upper bounds checking for iteration?
 	// If 'lower' is changed, should 'val' do so or is that not typical behaviour?
 
@@ -6634,6 +6634,58 @@ void ir_build_range_interval(irProcedure *proc, AstBinaryExpr *node, Type *val_t
 
 	if (val_)  *val_  = val;
 	if (idx_)  *idx_  = idx;
+	if (loop_) *loop_ = loop;
+	if (done_) *done_ = done;
+}
+
+void ir_build_range_enum(irProcedure *proc, Type *enum_type, Type *val_type, irValue **val_, irValue **idx_, irBlock **loop_, irBlock **done_) {
+	Type *t = enum_type;
+	GB_ASSERT(is_type_enum(t));
+	Type *enum_ptr = alloc_type_pointer(t);
+	t = base_type(t);
+	Type *core_elem = core_type(t);
+	i64 enum_count = t->Enum.fields.count;
+	irValue *max_count = ir_const_int(enum_count);
+
+	irValue *ti          = ir_type_info(proc, t);
+	irValue *variant     = ir_emit_struct_ep(proc, ti, 2);
+	irValue *eti_ptr     = ir_emit_conv(proc, variant, t_type_info_enum_ptr);
+	irValue *values      = ir_emit_load(proc, ir_emit_struct_ep(proc, eti_ptr, 2));
+	irValue *values_data = ir_slice_elem(proc, values);
+
+	irValue *offset_ = ir_add_local_generated(proc, t_int);
+	ir_emit_store(proc, offset_, v_zero);
+
+	irBlock *loop = ir_new_block(proc, nullptr, "for.enum.loop");
+	ir_emit_jump(proc, loop);
+	ir_start_block(proc, loop);
+
+	irBlock *body = ir_new_block(proc, nullptr, "for.enum.body");
+	irBlock *done = ir_new_block(proc, nullptr, "for.enum.done");
+
+	irValue *offset = ir_emit_load(proc, offset_);
+	irValue *cond = ir_emit_comp(proc, Token_Lt, offset, max_count);
+	ir_emit_if(proc, cond, body, done);
+	ir_start_block(proc, body);
+
+	irValue *val_ptr = ir_emit_ptr_offset(proc, values_data, offset);
+	ir_emit_increment(proc, offset_);
+
+	irValue *val = nullptr;
+	if (val_type != nullptr) {
+		if (is_type_float(core_elem)) {
+			irValue *f = ir_emit_load(proc, ir_emit_conv(proc, val_ptr, t_f64_ptr));
+			val = ir_emit_conv(proc, f, t);
+		} else if (is_type_integer(core_elem)) {
+			irValue *i = ir_emit_load(proc, ir_emit_conv(proc, val_ptr, t_i64_ptr));
+			val = ir_emit_conv(proc, i, t);
+		} else {
+			GB_PANIC("TODO(bill): enum core type %s", type_to_string(core_elem));
+		}
+	}
+
+	if (val_)  *val_  = val;
+	if (idx_)  *idx_  = offset;
 	if (loop_) *loop_ = loop;
 	if (done_) *done_ = done;
 }
@@ -7003,52 +7055,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		if (is_ast_range(expr)) {
 			ir_build_range_interval(proc, &expr->BinaryExpr, val0_type, &val, &key, &loop, &done);
 		} else if (tav.mode == Addressing_Type) {
-			TokenPos pos = ast_token(expr).pos;
-			gbAllocator a = ir_allocator();
-			Type *t = tav.type;
-			GB_ASSERT(is_type_enum(t));
-			Type *enum_ptr = alloc_type_pointer(t);
-			t = base_type(t);
-			Type *core_elem = core_type(t);
-			i64 enum_count = t->Enum.fields.count;
-			irValue *max_count = ir_const_int(enum_count);
-
-			irValue *ti          = ir_type_info(proc, t);
-			irValue *variant     = ir_emit_struct_ep(proc, ti, 2);
-			irValue *eti_ptr     = ir_emit_conv(proc, variant, t_type_info_enum_ptr);
-			irValue *values      = ir_emit_load(proc, ir_emit_struct_ep(proc, eti_ptr, 2));
-			irValue *values_data = ir_slice_elem(proc, values);
-
-			irValue *offset_ = ir_add_local_generated(proc, t_int);
-			ir_emit_store(proc, offset_, v_zero);
-
-			loop = ir_new_block(proc, nullptr, "for.enum.loop");
-			ir_emit_jump(proc, loop);
-			ir_start_block(proc, loop);
-
-			irBlock *body = ir_new_block(proc, nullptr, "for.enum.body");
-			done = ir_new_block(proc, nullptr, "for.enum.done");
-
-			irValue *offset = ir_emit_load(proc, offset_);
-			irValue *cond = ir_emit_comp(proc, Token_Lt, offset, max_count);
-			ir_emit_if(proc, cond, body, done);
-			ir_start_block(proc, body);
-
-			irValue *val_ptr = ir_emit_ptr_offset(proc, values_data, offset);
-			ir_emit_increment(proc, offset_);
-
-			key = offset;
-			if (val0_type != nullptr) {
-				if (is_type_float(core_elem)) {
-					irValue *f = ir_emit_load(proc, ir_emit_conv(proc, val_ptr, t_f64_ptr));
-					val = ir_emit_conv(proc, f, t);
-				} else if (is_type_integer(core_elem)) {
-					irValue *i = ir_emit_load(proc, ir_emit_conv(proc, val_ptr, t_i64_ptr));
-					val = ir_emit_conv(proc, i, t);
-				} else {
-					GB_PANIC("TODO(bill): enum core type %s", type_to_string(core_elem));
-				}
-			}
+			ir_build_range_enum(proc, tav.type, val0_type, &val, &key, &loop, &done);
 		} else {
 			Type *expr_type = type_of_expr(rs->expr);
 			Type *et = base_type(type_deref(expr_type));
