@@ -160,8 +160,6 @@ gbAllocator ir_allocator(void) {
 }
 
 
-
-
 #define IR_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"
 #define IR_TYPE_INFO_DATA_NAME       "__$type_info_data"
 #define IR_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"
@@ -2190,11 +2188,52 @@ irValue *ir_map_cap(irProcedure *proc, irValue *value) {
 }
 
 
-
 void ir_emit_increment(irProcedure *proc, irValue *addr);
 irValue *ir_emit_array_ep(irProcedure *proc, irValue *s, irValue *index);
 irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index);
 irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index);
+
+struct irLoopData {
+	irValue *idx_addr;
+	irValue *idx;
+	irBlock *body;
+	irBlock *done;
+	irBlock *loop;
+};
+
+irLoopData ir_loop_start(irProcedure *proc, isize count) {
+	irLoopData data = {};
+
+	irValue *max = ir_const_int(count);
+
+	data.idx_addr = ir_add_local_generated(proc, t_int);
+
+	data.body = ir_new_block(proc, nullptr, "loop.body");
+	data.done = ir_new_block(proc, nullptr, "loop.done");
+	data.loop = ir_new_block(proc, nullptr, "loop.loop");
+
+	ir_emit_jump(proc, data.loop);
+	ir_start_block(proc, data.loop);
+
+	data.idx = ir_emit_load(proc, data.idx_addr);
+
+	irValue *cond = ir_emit_comp(proc, Token_Lt, data.idx, max);
+	ir_emit_if(proc, cond, data.body, data.done);
+	ir_start_block(proc, data.body);
+
+	return data;
+}
+
+void ir_loop_end(irProcedure *proc, irLoopData const &data) {
+	if (data.idx_addr != nullptr) {
+		ir_emit_increment(proc, data.idx_addr);
+		ir_emit_jump(proc, data.loop);
+		ir_start_block(proc, data.done);
+	}
+}
+
+
+
 
 irValue *ir_emit_ptr_offset(irProcedure *proc, irValue *ptr, irValue *offset) {
 	offset = ir_emit_conv(proc, offset, t_int);
@@ -2223,10 +2262,26 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 		Type *elem_type = base_array_type(type);
 
 		irValue *res = ir_add_local_generated(proc, type);
-		for (i32 i = 0; i < tl->Array.count; i++) {
-			irValue *e = ir_emit_load(proc, ir_emit_array_epi(proc, val, i));
+
+		bool inline_array_arith = type_size_of(type) <= build_context.max_align;
+
+		i32 count = cast(i32)tl->Array.count;
+
+		if (inline_array_arith) {
+			// inline
+			for (i32 i = 0; i < count; i++) {
+				irValue *e = ir_emit_load(proc, ir_emit_array_epi(proc, val, i));
+				irValue *z = ir_emit_unary_arith(proc, op, e, elem_type);
+				ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
+			}
+		} else {
+			auto loop_data = ir_loop_start(proc, count);
+
+			irValue *e = ir_emit_load(proc, ir_emit_array_ep(proc, val, loop_data.idx));
 			irValue *z = ir_emit_unary_arith(proc, op, e, elem_type);
-			ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
+			ir_emit_store(proc, ir_emit_array_ep(proc, res, loop_data.idx), z);
+
+			ir_loop_end(proc, loop_data);
 		}
 		ir_emit_comment(proc, str_lit("array.arith.end"));
 		return ir_emit_load(proc, res);
@@ -2266,31 +2321,14 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 				ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
 			}
 		} else {
-			irValue *idx_addr = ir_add_local_generated(proc, t_int);
-			irValue *max = ir_const_int(count);
+			auto loop_data = ir_loop_start(proc, count);
 
-			irBlock *body = ir_new_block(proc, nullptr, "array.arith.body");
-			irBlock *done = ir_new_block(proc, nullptr, "array.arith.done");
-			irBlock *loop = ir_new_block(proc, nullptr, "array.arith.loop");
-
-			ir_emit_jump(proc, loop);
-			ir_start_block(proc, loop);
-
-			irValue *idx = ir_emit_load(proc, idx_addr);
-
-			irValue *cond = ir_emit_comp(proc, Token_Lt, idx, max);
-			ir_emit_if(proc, cond, body, done);
-			ir_start_block(proc, body);
-
-			irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, idx));
-			irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, idx));
+			irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, loop_data.idx));
+			irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, loop_data.idx));
 			irValue *z = ir_emit_arith(proc, op, x, y, elem_type);
-			ir_emit_store(proc, ir_emit_array_ep(proc, res, idx), z);
+			ir_emit_store(proc, ir_emit_array_ep(proc, res, loop_data.idx), z);
 
-			ir_emit_increment(proc, idx_addr);
-			ir_emit_jump(proc, loop);
-
-			ir_start_block(proc, done);
+			ir_loop_end(proc, loop_data);
 		}
 		ir_emit_comment(proc, str_lit("array.arith.end"));
 		return ir_emit_load(proc, res);
@@ -2353,6 +2391,7 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	}
 
 
+#if 0
 	if (op == Token_Add) {
 		if (is_type_pointer(t_left)) {
 			irValue *ptr = ir_emit_conv(proc, left, type);
@@ -2381,7 +2420,7 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 			return ir_emit_arith(proc, Token_Quo, diff, elem_size, type);
 		}
 	}
-
+#endif
 
 	switch (op) {
 	case Token_Shl:
@@ -2416,14 +2455,13 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	}
 
 	if (op == Token_ModMod) {
-		irValue *n = left;
-		irValue *m = right;
 		if (is_type_unsigned(type)) {
-			return ir_emit_arith(proc, Token_Mod, n, m, type);
+			op = Token_Mod;
+		} else {
+			irValue *a = ir_emit_arith(proc, Token_Mod, left, right, type);
+			irValue *b = ir_emit_arith(proc, Token_Add, a,    right, type);
+			return ir_emit_arith(proc, Token_Mod, b, right, type);
 		}
-		irValue *a = ir_emit_arith(proc, Token_Mod, n, m, type);
-		irValue *b = ir_emit_arith(proc, Token_Add, a, m, type);
-		return ir_emit_arith(proc, Token_Mod, b, m, type);
 	}
 
 	return ir_emit(proc, ir_instr_binary_op(proc, op, left, right, type));
@@ -2550,12 +2588,26 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 			cmp_op = Token_Or;
 		}
 
-		// IMPORTANT TODO(bill): Make this much more efficient
-		for (i32 i = 0; i < tl->Array.count; i++) {
-			irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
-			irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
+		bool inline_array_arith = type_size_of(tl) <= build_context.max_align;
+		i32 count = cast(i32)tl->Array.count;
+
+		if (inline_array_arith) {
+			// inline
+			for (i32 i = 0; i < count; i++) {
+				irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
+				irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
+				irValue *cmp = ir_emit_comp(proc, op_kind, x, y);
+				res = ir_emit_arith(proc, cmp_op, res, cmp, t_bool);
+			}
+		} else {
+			auto loop_data = ir_loop_start(proc, count);
+
+			irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, loop_data.idx));
+			irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, loop_data.idx));
 			irValue *cmp = ir_emit_comp(proc, op_kind, x, y);
 			res = ir_emit_arith(proc, cmp_op, res, cmp, t_bool);
+
+			ir_loop_end(proc, loop_data);
 		}
 
 		return ir_emit_conv(proc, res, t_bool);
@@ -6610,33 +6662,12 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 	case_ast_node(bs, EmptyStmt, node);
 	case_end;
 
-	// case_ast_node(fb, ForeignBlockDecl, node);
-	// 	ir_build_stmt_list(proc, fb->decls);
-	// case_end;
-
 	case_ast_node(us, UsingStmt, node);
-		for_array(i, us->list) {
-			Ast *decl = unparen_expr(us->list[i]);
-			// if (decl->kind == Ast_GenDecl) {
-				// ir_build_stmt(proc, decl);
-			// }
-		}
 	case_end;
 
 	case_ast_node(ws, WhenStmt, node);
 		ir_build_when_stmt(proc, ws);
 	case_end;
-
-	#if 0
-	case_ast_node(s, IncDecStmt, node);
-		TokenKind op = Token_Add;
-		if (s->op.kind == Token_Dec) {
-			op = Token_Sub;
-		}
-		irAddr const &addr = ir_build_addr(proc, s->expr);
-		ir_build_assign_op(proc, addr, v_one, op);
-	case_end;
-	#endif
 
 	case_ast_node(vd, ValueDecl, node);
 		if (vd->is_mutable) {
@@ -6853,9 +6884,12 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 	case_ast_node(is, IfStmt, node);
 		ir_emit_comment(proc, str_lit("IfStmt"));
 		if (is->init != nullptr) {
+			// TODO(bill): Should this have a separate block to begin with?
+		#if 1
 			irBlock *init = ir_new_block(proc, node, "if.init");
 			ir_emit_jump(proc, init);
 			ir_start_block(proc, init);
+		#endif
 			ir_build_stmt(proc, is->init);
 		}
 		irBlock *then = ir_new_block(proc, node, "if.then");
@@ -6891,9 +6925,11 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		ir_emit_comment(proc, str_lit("ForStmt"));
 
 		if (fs->init != nullptr) {
+		#if 1
 			irBlock *init = ir_new_block(proc, node, "for.init");
 			ir_emit_jump(proc, init);
 			ir_start_block(proc, init);
+		#endif
 			ir_build_stmt(proc, fs->init);
 		}
 		irBlock *body = ir_new_block(proc, node, "for.body");
