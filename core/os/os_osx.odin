@@ -154,7 +154,7 @@ foreign dl {
 // TODO(zangent): Change this to just `open` when Bill fixes overloading.
 open_simple :: proc(path: string, mode: int) -> (Handle, Errno) {
 	cstr := strings.new_cstring(path);
-	defer free(cstr);
+	defer delete(cstr);
 	handle := _unix_open(cstr, mode);
 	if handle == -1 {
 		return 0, 1;
@@ -223,14 +223,14 @@ last_write_time_by_name :: proc(name: string) -> File_Time {}
 stat :: inline proc(path: string) -> (Stat, bool) {
 	s: Stat;
 	cstr := strings.new_cstring(path);
-	defer free(cstr);
+	defer delete(cstr);
 	ret_int := _unix_stat(cstr, &s);
 	return s, ret_int==0;
 }
 
 access :: inline proc(path: string, mask: int) -> bool {
 	cstr := strings.new_cstring(path);
-	defer free(cstr);
+	defer delete(cstr);
 	return _unix_access(cstr, mask) == 0;
 }
 
@@ -247,7 +247,7 @@ heap_free :: inline proc(ptr: rawptr) {
 
 getenv :: proc(name: string) -> (string, bool) {
 	path_str := strings.new_cstring(name);
-	defer free(path_str);
+	defer delete(path_str);
 	cstr := _unix_getenv(path_str);
 	if cstr == nil {
 		return "", false;
@@ -267,14 +267,14 @@ current_thread_id :: proc() -> int {
 
 dlopen :: inline proc(filename: string, flags: int) -> rawptr {
 	cstr := strings.new_cstring(filename);
-	defer free(cstr);
+	defer delete(cstr);
 	handle := _unix_dlopen(cstr, flags);
 	return handle;
 }
 dlsym :: inline proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil);
 	cstr := strings.new_cstring(symbol);
-	defer free(cstr);
+	defer delete(cstr);
 	proc_handle := _unix_dlsym(handle, cstr);
 	return proc_handle;
 }
