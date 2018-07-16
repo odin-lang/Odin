@@ -149,7 +149,7 @@ to_degrees :: proc(radians: f32) -> f32 { return radians * 360 / TAU; }
 
 
 mul :: proc[
-    mat3_mul,
+	mat3_mul,
 	mat4_mul, mat4_mul_vec4,
 	quat_mul, quat_mulf,
 ];
