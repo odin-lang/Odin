@@ -813,7 +813,7 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 					if (e->Constant.value.kind != ExactValue_Integer) {
 						return false;
 					}
-					i64 count = e->Constant.value.value_integer;
+					i64 count = big_int_to_i64(&e->Constant.value.value_integer);
 					if (count != source->Array.count) {
 						return false;
 					}
@@ -1257,33 +1257,44 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 			return true;
 		}
 
-		i64 i = v.value_integer;
-		u64 u = bit_cast<u64>(i);
+		BigInt i = v.value_integer;
+
 		i64 bit_size = type_size_of(type);
-		u64 umax = unsigned_integer_maxs[bit_size];
-		i64 imin = signed_integer_mins[bit_size];
-		i64 imax = signed_integer_maxs[bit_size];
+		BigInt umax = {};
+		BigInt imin = {};
+		BigInt imax = {};
+
+		big_int_from_u64(&umax, unsigned_integer_maxs[bit_size]);
+		big_int_from_i64(&imin, signed_integer_mins[bit_size]);
+		big_int_from_i64(&imax, signed_integer_maxs[bit_size]);
 
 		switch (type->Basic.kind) {
 		case Basic_rune:
 		case Basic_i8:
 		case Basic_i16:
 		case Basic_i32:
+		case Basic_i64:
 		case Basic_int:
-			return imin <= i && i <= imax;
+			{
+				// return imin <= i && i <= imax;
+				int a = big_int_cmp(&imin, &i);
+				int b = big_int_cmp(&i, &imax);
+				return (a <= 0) && (b <= 0);
+			}
 
 		case Basic_u8:
 		case Basic_u16:
 		case Basic_u32:
+		case Basic_u64:
 		case Basic_uint:
 		case Basic_uintptr:
-			return 0ull <= u && u <= umax;
 
-		case Basic_u64:
-			return 0ull <= i;
+			{
+				// return 0ull <= i && i <= umax;
+				int b = big_int_cmp(&i, &umax);
+				return !i.neg && (b <= 0);
+			}
 
-		case Basic_i64:
-			return true;
 		case Basic_UntypedInteger:
 			return true;
 
@@ -1357,14 +1368,9 @@ void check_is_expressible(CheckerContext *c, Operand *o, Type *type) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error(o->expr, "'%s' truncated to '%s'", a, b);
 			} else {
-				char buf[127] = {};
-				String str = {};
-				i64 i = o->value.value_integer;
-				if (is_type_unsigned(o->type)) {
-					str = u64_to_string(bit_cast<u64>(i), buf, gb_size_of(buf));
-				} else {
-					str = i64_to_string(i, buf, gb_size_of(buf));
-				}
+				gbAllocator ha = heap_allocator();
+				String str = big_int_to_string(ha, &o->value.value_integer);
+				defer (gb_free(ha, str.text));
 				error(o->expr, "'%s = %.*s' overflows '%s'", a, LIT(str), b);
 			}
 		} else {
@@ -1444,10 +1450,7 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 		}
 
 
-		i32 precision = 0;
-		if (is_type_unsigned(type)) {
-			precision = cast(i32)(8 * type_size_of(type));
-		}
+
 		if (op.kind == Token_Xor && is_type_untyped(type)) {
 			gbString err_str = expr_to_string(node);
 			error(op, "Bitwise not cannot be applied to untyped constants '%s'", err_str);
@@ -1463,7 +1466,17 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 			return;
 		}
 
-		o->value = exact_unary_operator_value(op.kind, o->value, precision, is_type_unsigned(type));
+		i32 precision = 0;
+		if (is_type_typed(type)) {
+			precision = cast(i32)(8 * type_size_of(type));
+		}
+
+		bool is_unsigned = is_type_unsigned(type);
+		if (is_type_rune(type)) {
+			GB_ASSERT(!is_unsigned);
+		}
+
+		o->value = exact_unary_operator_value(op.kind, o->value, precision, is_unsigned);
 
 		if (is_type_typed(type)) {
 			if (node != nullptr) {
@@ -1638,8 +1651,10 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node) {
 				return;
 			}
 
-			i64 amount = y_val.value_integer;
-			if (amount > 128) {
+			BigInt max_shift = {};
+			big_int_from_u64(&max_shift, 128);
+
+			if (big_int_cmp(&y_val.value_integer, &max_shift) > 0) {
 				gbString err_str = expr_to_string(y->expr);
 				error(node, "Shift amount too large: '%s'", err_str);
 				gb_string_free(err_str);
@@ -1653,7 +1668,7 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node) {
 				x->type = t_untyped_integer;
 			}
 
-			x->value = exact_value_shift(be->op.kind, x_val, exact_value_i64(amount));
+			x->value = exact_value_shift(be->op.kind, x_val, y_val);
 
 			if (is_type_typed(x->type)) {
 				check_is_expressible(c, x, base_type(x->type));
@@ -1673,7 +1688,7 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node) {
 		}
 	}
 
-	if (y->mode == Addressing_Constant && y->value.value_integer < 0) {
+	if (y->mode == Addressing_Constant && y->value.value_integer.neg) {
 		gbString err_str = expr_to_string(y->expr);
 		error(node, "Shift amount cannot be negative: '%s'", err_str);
 		gb_string_free(err_str);
@@ -1691,60 +1706,60 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node) {
 }
 
 
-Operand check_ptr_addition(CheckerContext *c, TokenKind op, Operand *ptr, Operand *offset, Ast *node) {
-	GB_ASSERT(node->kind == Ast_BinaryExpr);
-	ast_node(be, BinaryExpr, node);
-	GB_ASSERT(is_type_pointer(ptr->type));
-	GB_ASSERT(is_type_integer(offset->type));
-	GB_ASSERT(op == Token_Add || op == Token_Sub);
+// Operand check_ptr_addition(CheckerContext *c, TokenKind op, Operand *ptr, Operand *offset, Ast *node) {
+// 	GB_ASSERT(node->kind == Ast_BinaryExpr);
+// 	ast_node(be, BinaryExpr, node);
+// 	GB_ASSERT(is_type_pointer(ptr->type));
+// 	GB_ASSERT(is_type_integer(offset->type));
+// 	GB_ASSERT(op == Token_Add || op == Token_Sub);
 
-	Operand operand = {};
-	operand.mode = Addressing_Value;
-	operand.type = ptr->type;
-	operand.expr = node;
+// 	Operand operand = {};
+// 	operand.mode = Addressing_Value;
+// 	operand.type = ptr->type;
+// 	operand.expr = node;
 
-	if (base_type(ptr->type) == t_rawptr) {
-		gbString str = type_to_string(ptr->type);
-		error(node, "Invalid pointer type for pointer arithmetic: '%s'", str);
-		gb_string_free(str);
-		operand.mode = Addressing_Invalid;
-		return operand;
-	}
+// 	if (base_type(ptr->type) == t_rawptr) {
+// 		gbString str = type_to_string(ptr->type);
+// 		error(node, "Invalid pointer type for pointer arithmetic: '%s'", str);
+// 		gb_string_free(str);
+// 		operand.mode = Addressing_Invalid;
+// 		return operand;
+// 	}
 
-#if defined(NO_POINTER_ARITHMETIC)
-	operand.mode = Addressing_Invalid;
-	error(operand.expr, "Pointer arithmetic is not supported");
-	return operand;
-#else
+// #if defined(NO_POINTER_ARITHMETIC)
+// 	operand.mode = Addressing_Invalid;
+// 	error(operand.expr, "Pointer arithmetic is not supported");
+// 	return operand;
+// #else
 
-	Type *base_ptr = base_type(ptr->type); GB_ASSERT(base_ptr->kind == Type_Pointer);
-	Type *elem = base_ptr->Pointer.elem;
-	i64 elem_size = type_size_of(elem);
+// 	Type *base_ptr = base_type(ptr->type); GB_ASSERT(base_ptr->kind == Type_Pointer);
+// 	Type *elem = base_ptr->Pointer.elem;
+// 	i64 elem_size = type_size_of(elem);
 
-	if (elem_size <= 0) {
-		gbString str = type_to_string(elem);
-		error(node, "Size of pointer's element type '%s' is zero and cannot be used for pointer arithmetic", str);
-		gb_string_free(str);
-		operand.mode = Addressing_Invalid;
-		return operand;
-	}
+// 	if (elem_size <= 0) {
+// 		gbString str = type_to_string(elem);
+// 		error(node, "Size of pointer's element type '%s' is zero and cannot be used for pointer arithmetic", str);
+// 		gb_string_free(str);
+// 		operand.mode = Addressing_Invalid;
+// 		return operand;
+// 	}
 
-	if (ptr->mode == Addressing_Constant && offset->mode == Addressing_Constant) {
-		i64 ptr_val = ptr->value.value_pointer;
-		i64 offset_val = exact_value_to_integer(offset->value).value_integer;
-		i64 new_ptr_val = ptr_val;
-		if (op == Token_Add) {
-			new_ptr_val += elem_size*offset_val;
-		} else {
-			new_ptr_val -= elem_size*offset_val;
-		}
-		operand.mode = Addressing_Constant;
-		operand.value = exact_value_pointer(new_ptr_val);
-	}
+// 	if (ptr->mode == Addressing_Constant && offset->mode == Addressing_Constant) {
+// 		i64 ptr_val = ptr->value.value_pointer;
+// 		i64 offset_val = exact_value_to_integer(offset->value).value_integer;
+// 		i64 new_ptr_val = ptr_val;
+// 		if (op == Token_Add) {
+// 			new_ptr_val += elem_size*offset_val;
+// 		} else {
+// 			new_ptr_val -= elem_size*offset_val;
+// 		}
+// 		operand.mode = Addressing_Constant;
+// 		operand.value = exact_value_pointer(new_ptr_val);
+// 	}
 
-	return operand;
-#endif
-}
+// 	return operand;
+// #endif
+// }
 
 
 
@@ -2030,24 +2045,24 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node) {
 		return;
 	}
 
-	if (op.kind == Token_Add || op.kind == Token_Sub) {
-		if (is_type_pointer(x->type) && is_type_integer(y->type)) {
-			*x = check_ptr_addition(c, op.kind, x, y, node);
-			return;
-		} else if (is_type_integer(x->type) && is_type_pointer(y->type)) {
-			if (op.kind == Token_Sub) {
-				gbString lhs = expr_to_string(x->expr);
-				gbString rhs = expr_to_string(y->expr);
-				error(node, "Invalid pointer arithmetic, did you mean '%s %.*s %s'?", rhs, LIT(op.string), lhs);
-				gb_string_free(rhs);
-				gb_string_free(lhs);
-				x->mode = Addressing_Invalid;
-				return;
-			}
-			*x = check_ptr_addition(c, op.kind, y, x, node);
-			return;
-		}
-	}
+	// if (op.kind == Token_Add || op.kind == Token_Sub) {
+	// 	if (is_type_pointer(x->type) && is_type_integer(y->type)) {
+	// 		*x = check_ptr_addition(c, op.kind, x, y, node);
+	// 		return;
+	// 	} else if (is_type_integer(x->type) && is_type_pointer(y->type)) {
+	// 		if (op.kind == Token_Sub) {
+	// 			gbString lhs = expr_to_string(x->expr);
+	// 			gbString rhs = expr_to_string(y->expr);
+	// 			error(node, "Invalid pointer arithmetic, did you mean '%s %.*s %s'?", rhs, LIT(op.string), lhs);
+	// 			gb_string_free(rhs);
+	// 			gb_string_free(lhs);
+	// 			x->mode = Addressing_Invalid;
+	// 			return;
+	// 		}
+	// 		*x = check_ptr_addition(c, op.kind, y, x, node);
+	// 		return;
+	// 	}
+	// }
 
 	convert_to_typed(c, x, y->type);
 	if (x->mode == Addressing_Invalid) {
@@ -2108,7 +2123,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node) {
 			bool fail = false;
 			switch (y->value.kind) {
 			case ExactValue_Integer:
-				if (y->value.value_integer == 0 ) {
+				if (big_int_is_zero(&y->value.value_integer)) {
 					fail = true;
 				}
 				break;
@@ -2246,7 +2261,7 @@ void convert_untyped_error(CheckerContext *c, Operand *operand, Type *target_typ
 	char *extra_text = "";
 
 	if (operand->mode == Addressing_Constant) {
-		if (operand->value.value_integer == 0) {
+		if (big_int_is_zero(&operand->value.value_integer)) {
 			if (make_string_c(expr_str) != "nil") { // HACK NOTE(bill): Just in case
 				// NOTE(bill): Doesn't matter what the type is as it's still zero in the union
 				extra_text = " - Did you want 'nil'?";
@@ -2495,8 +2510,8 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 
 	if (operand.mode == Addressing_Constant &&
 	    (c->stmt_state_flags & StmtStateFlag_no_bounds_check) == 0) {
-		i64 i = exact_value_to_integer(operand.value).value_integer;
-		if (i < 0) {
+		BigInt i = exact_value_to_integer(operand.value).value_integer;
+		if (i.neg) {
 			gbString expr_str = expr_to_string(operand.expr);
 			error(operand.expr, "Index '%s' cannot be a negative value", expr_str);
 			gb_string_free(expr_str);
@@ -2505,13 +2520,21 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 		}
 
 		if (max_count >= 0) { // NOTE(bill): Do array bound checking
-			if (value) *value = i;
+			i64 v = -1;
+			if (i.len <= 1) {
+				v = big_int_to_i64(&i);
+			}
+			if (value) *value = v;
 			bool out_of_bounds = false;
 			if (open_range) {
-				out_of_bounds = i > max_count;
+				out_of_bounds = v > max_count;
 			} else {
-				out_of_bounds = i >= max_count;
+				out_of_bounds = v >= max_count;
 			}
+			if (v < 0) {
+				out_of_bounds = true;
+			}
+
 			if (out_of_bounds) {
 				gbString expr_str = expr_to_string(operand.expr);
 				error(operand.expr, "Index '%s' is out of bounds range 0..<%lld", expr_str, max_count);
@@ -3399,12 +3422,14 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 
-			if (op.value.value_integer < 0) {
+			if (op.value.value_integer.neg) {
 				error(op.expr, "Negative 'swizzle' index");
 				return false;
 			}
 
-			if (max_count <= op.value.value_integer) {
+			BigInt mc = {};
+			big_int_from_i64(&mc, max_count);
+			if (big_int_cmp(&mc, &op.value.value_integer) <= 0) {
 				error(op.expr, "'swizzle' index exceeds length");
 				return false;
 			}
@@ -3804,7 +3829,7 @@ break;
 		if (operand->mode == Addressing_Constant) {
 			switch (operand->value.kind) {
 			case ExactValue_Integer:
-				operand->value.value_integer = gb_abs(operand->value.value_integer);
+				operand->value.value_integer.neg = false;
 				break;
 			case ExactValue_Float:
 				operand->value.value_float = gb_abs(operand->value.value_float);

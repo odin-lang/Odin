@@ -292,6 +292,16 @@ void error(Token token, char *fmt, ...) {
 	va_end(va);
 }
 
+void error(TokenPos pos, char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	Token token = {};
+	token.pos = pos;
+	error_va(token, fmt, va);
+	va_end(va);
+}
+
+
 void syntax_error(Token token, char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);

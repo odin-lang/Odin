@@ -3470,22 +3470,6 @@ Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 	return s;
 }
 
-// Ast *parse_export_decl(AstFile *f) {
-// 	CommentGroup *docs = f->lead_comment;
-// 	Token token = expect_token(f, Token_export);
-// 	Token file_path = expect_token_after(f, Token_String, "export");
-// 	Ast *s = nullptr;
-// 	if (f->curr_proc != nullptr) {
-// 		syntax_error(token, "You cannot use 'export' within a procedure. This must be done at the file scope");
-// 		s = ast_bad_decl(f, token, file_path);
-// 	} else {
-// 		s = ast_export_decl(f, token, file_path, docs, f->line_comment);
-// 		array_add(&f->imports_and_exports, s);
-// 	}
-// 	expect_semicolon(f, s);
-// 	return s;
-// }
-
 Ast *parse_foreign_decl(AstFile *f) {
 	CommentGroup *docs = f->lead_comment;
 	Token token = expect_token(f, Token_foreign);
@@ -3668,17 +3652,6 @@ Ast *parse_stmt(AstFile *f) {
 		Token name = expect_token(f, Token_Ident);
 		String tag = name.string;
 
-		// if (tag == "shared_global_scope") {
-		// 	if (f->curr_proc == nullptr) {
-		// 		f->is_global_scope = true;
-		// 		s = ast_empty_stmt(f, f->curr_token);
-		// 	} else {
-		// 		syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope");
-		// 		s = ast_bad_decl(f, token, f->curr_token);
-		// 	}
-		// 	expect_semicolon(f, s);
-		// 	return s;
-		// } else
 		if (tag == "bounds_check") {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_bounds_check;
@@ -3734,9 +3707,7 @@ Ast *parse_stmt(AstFile *f) {
 		return s;
 	}
 
-	syntax_error(token,
-	             "Expected a statement, got '%.*s'",
-	             LIT(token_strings[token.kind]));
+	syntax_error(token, "Expected a statement, got '%.*s'", LIT(token_strings[token.kind]));
 	fix_advance_to_next_stmt(f);
 	return ast_bad_stmt(f, token, f->curr_token);
 }
@@ -3938,39 +3909,25 @@ bool try_add_import_path(Parser *p, String const &path, String const &rel_path, 
 	}
 
 
-	if (rd_err != ReadDirectory_None) {
-		if (pos.line != 0) {
-			gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
-		}
-		gb_mutex_lock(&global_error_collector.mutex);
-		defer (gb_mutex_unlock(&global_error_collector.mutex));
-		global_error_collector.count++;
-
-
-		switch (rd_err) {
-		case ReadDirectory_InvalidPath:
-			gb_printf_err("Invalid path: %.*s\n", LIT(rel_path));
-			return false;
-
-		case ReadDirectory_NotExists:
-			gb_printf_err("Path does not exist: %.*s\n", LIT(rel_path));
-			return false;
-
-		case ReadDirectory_NotDir:
-			gb_printf_err("Expected a directory for a package, got a file: %.*s\n", LIT(rel_path));
-			return false;
-
-		case ReadDirectory_Unknown:
-			gb_printf_err("Unknown error whilst reading path %.*s\n", LIT(rel_path));
-			return false;
-		case ReadDirectory_Permission:
-			gb_printf_err("Unknown error whilst reading path %.*s\n", LIT(rel_path));
-			return false;
-
-		case ReadDirectory_Empty:
-			gb_printf_err("Empty directory: %.*s\n", LIT(rel_path));
-			return false;
-		}
+	switch (rd_err) {
+	case ReadDirectory_InvalidPath:
+		error(pos, "Invalid path: %.*s", LIT(rel_path));
+		return false;
+	case ReadDirectory_NotExists:
+		error(pos, "Path does not exist: %.*s", LIT(rel_path));
+		return false;
+	case ReadDirectory_Permission:
+		error(pos, "Unknown error whilst reading path %.*s", LIT(rel_path));
+		return false;
+	case ReadDirectory_NotDir:
+		error(pos, "Expected a directory for a package, got a file: %.*s", LIT(rel_path));
+		return false;
+	case ReadDirectory_Empty:
+		error(pos, "Empty directory: %.*s", LIT(rel_path));
+		return false;
+	case ReadDirectory_Unknown:
+		error(pos, "Unknown error whilst reading path %.*s", LIT(rel_path));
+		return false;
 	}
 
 	for_array(list_index, list) {
@@ -4353,44 +4310,34 @@ ParseFileError process_imported_file(Parser *p, ImportedFile imported_file) {
 	ParseFileError err = init_ast_file(file, fi->fullpath, &err_pos);
 
 	if (err != ParseFile_None) {
-		gb_mutex_lock(&global_error_collector.mutex);
-		defer (gb_mutex_unlock(&global_error_collector.mutex));
-		global_error_collector.count++;
-
 		if (err == ParseFile_EmptyFile) {
 			if (fi->fullpath == p->init_fullpath) {
-				gb_printf_err("Initial file is empty - %.*s\n", LIT(p->init_fullpath));
+				error(pos, "Initial file is empty - %.*s\n", LIT(p->init_fullpath));
 				gb_exit(1);
 			}
 			goto skip;
 		}
 
-		if (pos.line != 0) {
-			gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
-		}
-		gb_printf_err("Failed to parse file: %.*s\n\t", LIT(fi->name));
 		switch (err) {
 		case ParseFile_WrongExtension:
-			gb_printf_err("Invalid file extension: File must have the extension '.odin'");
+			error(pos, "Failed to parse file: %.*s; invalid file extension: File must have the extension '.odin'", LIT(fi->name));
 			break;
 		case ParseFile_InvalidFile:
-			gb_printf_err("Invalid file or cannot be found");
+			error(pos, "Failed to parse file: %.*s; invalid file or cannot be found", LIT(fi->name));
 			break;
 		case ParseFile_Permission:
-			gb_printf_err("File permissions problem");
+			error(pos, "Failed to parse file: %.*s; file permissions problem", LIT(fi->name));
 			break;
 		case ParseFile_NotFound:
-			gb_printf_err("File cannot be found ('%.*s')", LIT(fi->fullpath));
+			error(pos, "Failed to parse file: %.*s; file cannot be found ('%.*s')", LIT(fi->name), LIT(fi->fullpath));
 			break;
 		case ParseFile_InvalidToken:
-			gb_printf_err("Invalid token found in file at (%td:%td)", err_pos.line, err_pos.column);
+			error(pos, "Failed to parse file: %.*s; invalid token found in file at (%td:%td)", LIT(fi->name), err_pos.line, err_pos.column);
 			break;
 		case ParseFile_EmptyFile:
-			gb_printf_err("File contains no tokens");
+			error(pos, "Failed to parse file: %.*s; file contains no tokens", LIT(fi->name));
 			break;
 		}
-		gb_printf_err("\n");
-
 
 		return err;
 	}
