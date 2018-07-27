@@ -41,7 +41,7 @@ gb_inline gbAllocator big_int_allocator(void) {
 }
 
 void big_int_alloc(BigInt *dst, isize word_len, isize word_cap) {
-	GB_ASSERT(word_len <= word_cap);
+	GB_ASSERT_MSG(word_len <= word_cap, "%td %td", word_len, word_cap);
 	if (word_cap < dst->len) {
 		dst->len = cast(i32)word_len;
 	} else {
@@ -605,8 +605,10 @@ void big_int_shr(BigInt *dst, BigInt const *x, BigInt const *y) {
 		return;
 	}
 
-	big_int_alloc(dst, cast(i32)(x->len - word_shift_len), dst->len);
-	GB_ASSERT(dst->len > 1);
+	i32 len = cast(i32)(x->len - word_shift_len);
+	i32 cap = gb_max(len, dst->len);
+	big_int_alloc(dst, len, cap);
+	GB_ASSERT(dst->len >= 1);
 
 	u64 carry = 0;
 	for (i32 src_idx = x->len - 1; src_idx >= 0; src_idx--) {
