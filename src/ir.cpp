@@ -4778,7 +4778,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 			GB_ASSERT(is_type_integer(tv.type));
 			GB_ASSERT(tv.value.kind == ExactValue_Integer);
 
-			i32 src_index = cast(i32)tv.value.value_integer;
+			i32 src_index = cast(i32)big_int_to_i64(&tv.value.value_integer);
 			i32 dst_index = i-1;
 
 			irValue *src_elem = ir_emit_array_epi(proc, src, src_index);
@@ -5639,7 +5639,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			Type *selector_type = base_type(type_of_expr(se->selector));
 			GB_ASSERT_MSG(is_type_integer(selector_type), "%s", type_to_string(selector_type));
 			ExactValue val = type_and_value_of_expr(sel).value;
-			i64 index = val.value_integer;
+			i64 index = big_int_to_i64(&val.value_integer);
 
 			Selection sel = lookup_field_from_index(type, index);
 			GB_ASSERT(sel.entity != nullptr);

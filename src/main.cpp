@@ -4,6 +4,7 @@
 #include "timings.cpp"
 #include "build_settings.cpp"
 #include "tokenizer.cpp"
+#include "big_int.cpp"
 #include "exact_value.cpp"
 
 #include "parser.hpp"
@@ -408,7 +409,7 @@ bool parse_build_flags(Array<String> args) {
 						}
 						case BuildFlag_OptimizationLevel:
 							GB_ASSERT(value.kind == ExactValue_Integer);
-							build_context.optimization_level = cast(i32)value.value_integer;
+							build_context.optimization_level = cast(i32)big_int_to_i64(&value.value_integer);
 							break;
 						case BuildFlag_ShowTimings:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
@@ -416,7 +417,7 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_ThreadCount: {
 							GB_ASSERT(value.kind == ExactValue_Integer);
-							isize count = cast(isize)value.value_integer;
+							isize count = cast(isize)big_int_to_i64(&value.value_integer);
 							if (count <= 0) {
 								gb_printf_err("%.*s expected a positive non-zero number, got %.*s\n", LIT(name), LIT(param));
 								build_context.thread_count = 0;
@@ -716,6 +717,7 @@ int main(int arg_count, char **arg_ptr) {
 
 	init_string_buffer_memory();
 	init_global_error_collector();
+	global_big_int_init();
 	arena_init(&global_ast_arena, heap_allocator());
 
 	array_init(&library_collections, heap_allocator());

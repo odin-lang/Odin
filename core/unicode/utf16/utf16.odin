@@ -1,7 +1,7 @@
 package utf16
 
-REPLACEMENT_CHAR :: '\uFFFD';
-MAX_RUNE         :: '\U0010FFFF';
+REPLACEMENT_CHAR :: '\ufffd';
+MAX_RUNE         :: '\U0010ffff';
 
 _surr1           :: 0xd800;
 _surr2           :: 0xdc00;
