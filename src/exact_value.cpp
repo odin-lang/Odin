@@ -37,9 +37,8 @@ struct ExactValue {
 		f64           value_float;
 		i64           value_pointer;
 		Complex128    value_complex;
-		Ast *     value_compound;
-		Ast *     value_procedure;
-		Entity *      value_entity;
+		Ast *         value_compound;
+		Ast *         value_procedure;
 	};
 };
 

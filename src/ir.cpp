@@ -4840,19 +4840,29 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 
 	case BuiltinProc_expand_to_tuple: {
 		ir_emit_comment(proc, str_lit("expand_to_tuple"));
-		irValue *s = ir_build_expr(proc, ce->args[0]);
-		Type *t = base_type(ir_type(s));
+		irValue *val = ir_build_expr(proc, ce->args[0]);
+		Type *t = base_type(ir_type(val));
 
-		GB_ASSERT(t->kind == Type_Struct);
 		GB_ASSERT(is_type_tuple(tv.type));
-
 		irValue *tuple = ir_add_local_generated(proc, tv.type);
-		for_array(src_index, t->Struct.fields) {
-			Entity *field = t->Struct.fields[src_index];
-			i32 field_index = field->Variable.field_index;
-			irValue *f = ir_emit_struct_ev(proc, s, field_index);
-			irValue *ep = ir_emit_struct_ep(proc, tuple, cast(i32)src_index);
-			ir_emit_store(proc, ep, f);
+		if (t->kind == Type_Struct) {
+			for_array(src_index, t->Struct.fields) {
+				Entity *field = t->Struct.fields[src_index];
+				i32 field_index = field->Variable.field_index;
+				irValue *f = ir_emit_struct_ev(proc, val, field_index);
+				irValue *ep = ir_emit_struct_ep(proc, tuple, cast(i32)src_index);
+				ir_emit_store(proc, ep, f);
+			}
+		} else if (t->kind == Type_Array) {
+			// TODO(bill): Clean-up this code
+			irValue *ap = ir_address_from_load_or_generate_local(proc, val);
+			for (i32 i = 0; i < cast(i32)t->Array.count; i++) {
+				irValue *f = ir_emit_load(proc, ir_emit_array_epi(proc, ap, i));
+				irValue *ep = ir_emit_struct_ep(proc, tuple, i);
+				ir_emit_store(proc, ep, f);
+			}
+		} else {
+			GB_PANIC("Unknown type of expand_to_tuple");
 		}
 		return ir_emit_load(proc, tuple);
 	}
