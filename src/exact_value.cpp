@@ -33,7 +33,7 @@ struct ExactValue {
 	union {
 		bool          value_bool;
 		String        value_string;
-		i64           value_integer; // NOTE(bill): This must be an integer and not a pointer
+		BigInt        value_integer; // NOTE(bill): This must be an integer and not a pointer
 		f64           value_float;
 		i64           value_pointer;
 		Complex128    value_complex;
@@ -54,8 +54,14 @@ HashKey hash_exact_value(ExactValue v) {
 		return hash_integer(u64(v.value_bool));
 	case ExactValue_String:
 		return hash_string(v.value_string);
-	case ExactValue_Integer:
-		return hash_integer(u64(v.value_integer));
+	case ExactValue_Integer: {
+		u64 *d = big_int_ptr(&v.value_integer);
+		u64 x = 0;
+		for (i32 i = 0; i < v.value_integer.len; i++) {
+			x |= d[i];
+		}
+		return hash_integer(x);
+	}
 	case ExactValue_Float:
 		return hash_f64(v.value_float);
 	case ExactValue_Pointer:
@@ -94,13 +100,13 @@ ExactValue exact_value_string(String string) {
 
 ExactValue exact_value_i64(i64 i) {
 	ExactValue result = {ExactValue_Integer};
-	result.value_integer = i;
+	big_int_from_i64(&result.value_integer, i);
 	return result;
 }
 
 ExactValue exact_value_u64(u64 i) {
 	ExactValue result = {ExactValue_Integer};
-	result.value_integer = i64(i);
+	big_int_from_u64(&result.value_integer, i);
 	return result;
 }
 
@@ -293,7 +299,7 @@ ExactValue exact_value_to_integer(ExactValue v) {
 ExactValue exact_value_to_float(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
-		return exact_value_float(cast(f64)v.value_integer);
+		return exact_value_float(big_int_to_f64(&v.value_integer));
 	case ExactValue_Float:
 		return v;
 	}
@@ -304,7 +310,7 @@ ExactValue exact_value_to_float(ExactValue v) {
 ExactValue exact_value_to_complex(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
-		return exact_value_complex(cast(f64)v.value_integer, 0);
+		return exact_value_complex(big_int_to_f64(&v.value_integer), 0);
 	case ExactValue_Float:
 		return exact_value_complex(v.value_float, 0);
 	case ExactValue_Complex:
@@ -371,8 +377,8 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision,
 		case ExactValue_Invalid:
 			return v;
 		case ExactValue_Integer: {
-			ExactValue i = v;
-			i.value_integer = -i.value_integer;
+			ExactValue i = {ExactValue_Integer};
+			big_int_neg(&i.value_integer, &v.value_integer);
 			return i;
 		}
 		case ExactValue_Float: {
@@ -390,24 +396,18 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision,
 	}
 
 	case Token_Xor: {
-		i64 i = 0;
 		switch (v.kind) {
 		case ExactValue_Invalid:
 			return v;
-		case ExactValue_Integer:
-			i = ~v.value_integer;
-			break;
+		case ExactValue_Integer: {
+			GB_ASSERT(precision != 0);
+			ExactValue i = {ExactValue_Integer};
+			bit_int_not(&i.value_integer, &v.value_integer, precision, !is_unsigned);
+			return i;
+		}
 		default:
 			goto failure;
 		}
-
-		// NOTE(bill): unsigned integers will be negative and will need to be
-		// limited to the types precision
-		// IMPORTANT NOTE(bill): Max precision is 64 bits as that's how integers are stored
-		if (is_unsigned) {
-			i = i & unsigned_integer_maxs[precision/8];
-		}
-		return exact_value_i64(i);
 	}
 
 	case Token_Not: {
@@ -472,10 +472,10 @@ void match_exact_values(ExactValue *x, ExactValue *y) {
 			return;
 		case ExactValue_Float:
 			// TODO(bill): Is this good enough?
-			*x = exact_value_float(cast(f64)x->value_integer);
+			*x = exact_value_float(big_int_to_f64(&x->value_integer));
 			return;
 		case ExactValue_Complex:
-			*x = exact_value_complex(cast(f64)x->value_integer, 0);
+			*x = exact_value_complex(big_int_to_f64(&x->value_integer), 0);
 			return;
 		}
 		break;
@@ -513,28 +513,29 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		break;
 
 	case ExactValue_Integer: {
-		i64 a = x.value_integer;
-		i64 b = y.value_integer;
-		i64 c = 0ll;
+		BigInt const *a = &x.value_integer;
+		BigInt const *b = &y.value_integer;
+		BigInt c = {};
 		switch (op) {
-		case Token_Add:    c = a + b;                        break;
-		case Token_Sub:    c = a - b;                        break;
-		case Token_Mul:    c = a * b;                        break;
-		case Token_Quo:    return exact_value_float(fmod(cast(f64)a, cast(f64)b));
-		case Token_QuoEq:  c = a / b;                        break; // NOTE(bill): Integer division
-		case Token_Mod:    c = a % b;                        break;
-		case Token_ModMod: c = ((a % b) + b) % b;            break;
-		case Token_And:    c = a & b;                        break;
-		case Token_Or:     c = a | b;                        break;
-		case Token_Xor:    c = a ^ b;                        break;
-		case Token_AndNot: c = a & (~b);                     break;
-		case Token_Shl:    c = a << b;                       break;
-		case Token_Shr:    c = a >> b;                       break;
+		case Token_Add:    big_int_add(&c, a, b); break;
+		case Token_Sub:    big_int_sub(&c, a, b); break;
+		case Token_Mul:    big_int_mul(&c, a, b); break;
+		case Token_Quo:    return exact_value_float(fmod(big_int_to_f64(a), big_int_to_f64(b)));
+		case Token_QuoEq:  big_int_quo(&c, a, b); break; // NOTE(bill): Integer division
+		case Token_Mod:    big_int_rem(&c, a, b); break;
+		case Token_ModMod: big_int_euclidean_mod(&c, a, b); break;
+		case Token_And:    big_int_and(&c, a, b);     break;
+		case Token_Or:     big_int_or(&c, a, b);      break;
+		case Token_Xor:    big_int_xor(&c, a, b);     break;
+		case Token_AndNot: big_int_and_not(&c, a, b); break;
+		case Token_Shl:    big_int_shl(&c, a, b);     break;
+		case Token_Shr:    big_int_shr(&c, a, b);     break;
 		default: goto error;
 		}
 
-		return exact_value_i64(c);
-		break;
+		ExactValue res = {ExactValue_Integer};
+		res.value_integer = c;
+		return res;
 	}
 
 	case ExactValue_Float: {
@@ -638,15 +639,14 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 		break;
 
 	case ExactValue_Integer: {
-		i64 a = x.value_integer;
-		i64 b = y.value_integer;
+		i32 cmp = big_int_cmp(&x.value_integer, &y.value_integer);
 		switch (op) {
-		case Token_CmpEq: return a == b;
-		case Token_NotEq: return a != b;
-		case Token_Lt:    return a <  b;
-		case Token_LtEq:  return a <= b;
-		case Token_Gt:    return a >  b;
-		case Token_GtEq:  return a >= b;
+		case Token_CmpEq: return cmp == 0;
+		case Token_NotEq: return cmp != 0;
+		case Token_Lt:    return cmp <  0;
+		case Token_LtEq:  return cmp <= 0;
+		case Token_Gt:    return cmp >  0;
+		case Token_GtEq:  return cmp >= 0;
 		}
 		break;
 	}

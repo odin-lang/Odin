@@ -136,7 +136,15 @@ bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_) {
 	Type *type = base_type(o.type);
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		if (o.value.kind == ExactValue_Integer) {
-			i64 align = o.value.value_integer;
+			BigInt v = o.value.value_integer;
+			if (v.len > 1) {
+				gbAllocator a = heap_allocator();
+				String str = big_int_to_string(a, &v);
+				error(node, "#align too large, %.*s", LIT(str));
+				gb_free(a, str.text);
+				return false;
+			}
+			i64 align = big_int_to_i64(&v);
 			if (align < 1 || !gb_is_power_of_two(cast(isize)align)) {
 				error(node, "#align must be a power of 2, got %lld", align);
 				return false;
@@ -668,7 +676,7 @@ void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type, Ast *node) 
 			error(value, "Bit field bit size must be a constant integer");
 			continue;
 		}
-		i64 bits_ = v.value_integer;
+		i64 bits_ = big_int_to_i64(&v.value_integer); // TODO(bill): what if the integer is huge?
 		if (bits_ < 0 || bits_ > 64) {
 			error(value, "Bit field's bit size must be within the range 1...64, got %lld", cast(long long)bits_);
 			continue;
@@ -1601,11 +1609,22 @@ i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 	Type *type = base_type(o->type);
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		if (o->value.kind == ExactValue_Integer) {
-			i64 count = o->value.value_integer;
-			if (count >= 0) {
-				return count;
+			BigInt count = o->value.value_integer;
+			if (o->value.value_integer.neg) {
+				gbAllocator a = heap_allocator();
+				String str = big_int_to_string(a, &count);
+				error(e, "Invalid negative array count, %.*s", LIT(str));
+				gb_free(a, str.text);
+				return 0;
 			}
-			error(e, "Invalid negative array count %lld", cast(long long)count);
+			switch (count.len) {
+			case 0: return 0;
+			case 1: return count.d.word;
+			}
+			gbAllocator a = heap_allocator();
+			String str = big_int_to_string(a, &count);
+			error(e, "Array count too large, %.*s", LIT(str));
+			gb_free(a, str.text);
 			return 0;
 		}
 	}

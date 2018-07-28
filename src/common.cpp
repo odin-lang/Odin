@@ -3,6 +3,10 @@
 #include <xmmintrin.h>
 #endif
 
+#if defined(GB_COMPILER_MSVC)
+#include <intrin.h>
+#endif
+
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
@@ -200,7 +204,7 @@ u64 u64_from_string(String string) {
 }
 
 String u64_to_string(u64 v, char *out_buf, isize out_buf_len) {
-	char buf[200] = {0};
+	char buf[32] = {0};
 	isize i = gb_size_of(buf);
 
 	u64 b = 10;
@@ -215,7 +219,7 @@ String u64_to_string(u64 v, char *out_buf, isize out_buf_len) {
 	return make_string(cast(u8 *)out_buf, len);
 }
 String i64_to_string(i64 a, char *out_buf, isize out_buf_len) {
-	char buf[200] = {0};
+	char buf[32] = {0};
 	isize i = gb_size_of(buf);
 	bool negative = false;
 	if (a < 0) {
@@ -274,6 +278,44 @@ gb_global u64 const unsigned_integer_maxs[] = {
 	0,
 	18446744073709551615ull,
 };
+
+
+bool add_overflow_u64(u64 x, u64 y, u64 *result) {
+   *result = x + y;
+   return *result < x || *result < y;
+}
+
+bool sub_overflow_u64(u64 x, u64 y, u64 *result) {
+   *result = x - y;
+   return *result > x;
+}
+
+void mul_overflow_u64(u64 x, u64 y, u64 *lo, u64 *hi) {
+#if defined(GB_COMPILER_MSVC)
+	*lo = _umul128(x, y, hi);
+#else
+	// URL(bill): https://stackoverflow.com/questions/25095741/how-can-i-multiply-64-bit-operands-and-get-128-bit-result-portably#25096197
+	u64 u1, v1, w1, t, w3, k;
+
+	u1 = (x & 0xffffffff);
+	v1 = (y & 0xffffffff);
+	t = (u1 * v1);
+	w3 = (t & 0xffffffff);
+	k = (t >> 32);
+
+	x >>= 32;
+	t = (x * v1) + k;
+	k = (t & 0xffffffff);
+	w1 = (t >> 32);
+
+	y >>= 32;
+	t = (u1 * y) + k;
+	k = (t >> 32);
+
+	*hi = (x * y) + w1 + k;
+	*lo = (t << 32) + w3;
+#endif
+}
 
 
 
