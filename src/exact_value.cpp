@@ -523,21 +523,13 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		case Token_Quo:    return exact_value_float(fmod(big_int_to_f64(a), big_int_to_f64(b)));
 		case Token_QuoEq:  big_int_quo(&c, a, b); break; // NOTE(bill): Integer division
 		case Token_Mod:    big_int_rem(&c, a, b); break;
-		case Token_ModMod:
-			big_int_rem(&c, a, b);
-			big_int_add_eq(&c, b);
-			big_int_rem_eq(&c, b);
-			break;
+		case Token_ModMod: big_int_euclidean_mod(&c, a, b); break;
 		case Token_And:    big_int_and(&c, a, b);     break;
 		case Token_Or:     big_int_or(&c, a, b);      break;
 		case Token_Xor:    big_int_xor(&c, a, b);     break;
 		case Token_AndNot: big_int_and_not(&c, a, b); break;
-		case Token_Shl:
-			big_int_shl(&c, a, b);
-			break;
-		case Token_Shr:
-			big_int_shr(&c, a, b);
-			break;
+		case Token_Shl:    big_int_shl(&c, a, b);     break;
+		case Token_Shr:    big_int_shr(&c, a, b);     break;
 		default: goto error;
 		}
 
