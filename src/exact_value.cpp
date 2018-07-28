@@ -402,7 +402,7 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision,
 		case ExactValue_Integer: {
 			GB_ASSERT(precision != 0);
 			ExactValue i = {ExactValue_Integer};
-			bit_int_not(&i.value_integer, &v.value_integer, precision, !is_unsigned);
+			big_int_not(&i.value_integer, &v.value_integer, precision, !is_unsigned);
 			return i;
 		}
 		default:

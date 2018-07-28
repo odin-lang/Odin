@@ -96,7 +96,7 @@ void big_int_and    (BigInt *dst, BigInt const *x, BigInt const *y);
 void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y);
 void big_int_xor    (BigInt *dst, BigInt const *x, BigInt const *y);
 void big_int_or     (BigInt *dst, BigInt const *x, BigInt const *y);
-void big_int_not    (BigInt *dst, BigInt const *x);
+void big_int_not    (BigInt *dst, BigInt const *x, u64 bit_count, bool is_signed);
 
 
 void big_int_add_eq(BigInt *dst, BigInt const *x);
@@ -1230,7 +1230,7 @@ void big_int_or(BigInt *dst, BigInt const *x, BigInt const *y) {
 
 	if (x->neg == y->neg) {
 		if (x->neg) {
-			// (-x) || (-y) == ~(x-1) | ~(y-1) == ~((x-1) & (y-1)) == -(((x-1) & (y-1)) + 1)
+			// (-x) | (-y) == ~(x-1) | ~(y-1) == ~((x-1) & (y-1)) == -(((x-1) & (y-1)) + 1)
 			BigInt x1 = big_int_make_abs(x);
 			BigInt y1 = big_int_make_abs(y);
 			big_int_sub_eq(&x1, &BIG_INT_ONE);
@@ -1285,7 +1285,7 @@ void big_int_or(BigInt *dst, BigInt const *x, BigInt const *y) {
 }
 
 
-void bit_int_not(BigInt *dst, BigInt const *x, u64 bit_count, bool is_signed) {
+void big_int_not(BigInt *dst, BigInt const *x, u64 bit_count, bool is_signed) {
 	if (bit_count == 0) {
 		big_int_from_u64(dst, 0);
 		return;
