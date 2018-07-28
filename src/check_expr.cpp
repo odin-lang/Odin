@@ -2758,8 +2758,8 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 	return entity;
 }
 
+
 bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id) {
-	GB_ASSERT(call->kind == Ast_CallExpr);
 	ast_node(ce, CallExpr, call);
 	BuiltinProc *bp = &builtin_procs[id];
 	{

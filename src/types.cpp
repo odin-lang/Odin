@@ -67,9 +67,10 @@ enum BasicFlag {
 
 	BasicFlag_LLVM        = GB_BIT(10),
 
-	BasicFlag_Numeric      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Complex,
-	BasicFlag_Ordered      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
-	BasicFlag_ConstantType = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
+	BasicFlag_Numeric        = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Complex,
+	BasicFlag_Ordered        = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
+	BasicFlag_OrderedNumeric = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Rune,
+	BasicFlag_ConstantType   = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
 };
 
 struct BasicType {
@@ -733,6 +734,14 @@ bool is_type_ordered(Type *t) {
 		return (t->Basic.flags & BasicFlag_Ordered) != 0;
 	case Type_Pointer:
 		return true;
+	}
+	return false;
+}
+bool is_type_ordered_numeric(Type *t) {
+	t = core_type(t);
+	switch (t->kind) {
+	case Type_Basic:
+		return (t->Basic.flags & BasicFlag_OrderedNumeric) != 0;
 	}
 	return false;
 }
