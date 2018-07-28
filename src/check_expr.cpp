@@ -3645,20 +3645,28 @@ break;
 	#endif
 	case BuiltinProc_expand_to_tuple: {
 		Type *type = base_type(operand->type);
-		if (!is_type_struct(type) &&
-		    !is_type_union(type)) {
+		if (!is_type_struct(type) && !is_type_array(type)) {
 			gbString type_str = type_to_string(operand->type);
-			error(call, "Expected a struct or union type, got '%s'", type_str);
+			error(call, "Expected a struct or array type, got '%s'", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
 		gbAllocator a = c->allocator;
 
 		Type *tuple = alloc_type_tuple();
-		isize variable_count = type->Struct.fields.count;
-		array_init(&tuple->Tuple.variables, a, variable_count);
-		// TODO(bill): Should I copy each of the entities or is this good enough?
-		gb_memmove_array(tuple->Tuple.variables.data, type->Struct.fields.data, variable_count);
+
+		if (is_type_struct(type)) {
+			isize variable_count = type->Struct.fields.count;
+			array_init(&tuple->Tuple.variables, a, variable_count);
+			// TODO(bill): Should I copy each of the entities or is this good enough?
+			gb_memmove_array(tuple->Tuple.variables.data, type->Struct.fields.data, variable_count);
+		} else if (is_type_array(type)) {
+			isize variable_count = type->Array.count;
+			array_init(&tuple->Tuple.variables, a, variable_count);
+			for (isize i = 0; i < variable_count; i++) {
+				tuple->Tuple.variables[i] = alloc_entity_array_elem(nullptr, blank_token, type->Array.elem, cast(i32)i);
+			}
+		}
 
 		operand->type = tuple;
 		operand->mode = Addressing_Value;
