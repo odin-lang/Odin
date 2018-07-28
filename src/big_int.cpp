@@ -55,6 +55,8 @@ void big_int_from_i64(BigInt *dst, i64 x);
 void big_int_init    (BigInt *dst, BigInt const *src);
 void big_int_from_string(BigInt *dst, String const &s);
 
+BigInt big_int_make(BigInt const *b, bool abs=false);
+BigInt big_int_make_abs(BigInt const *b);
 BigInt big_int_make_u64(u64 x);
 BigInt big_int_make_i64(i64 x);
 
@@ -214,6 +216,22 @@ void big_int_init(BigInt *dst, BigInt const *src) {
 	u64 const *s = big_int_ptr(src);
 	gb_memmove(dst->d.words, s, gb_size_of(u64)*dst->len);
 }
+
+BigInt big_int_make(BigInt const *b, bool abs) {
+	BigInt i = {};
+	big_int_init(&i, b);
+	if (abs) i.neg = false;
+	return i;
+}
+BigInt big_int_make_abs(BigInt const *b) {
+	return big_int_make(b, true);
+}
+BigInt big_int_alias_abs(BigInt const *b) {
+	BigInt x = *b;
+	x.neg = false;
+	return x;
+}
+
 
 BigInt big_int_make_u64(u64 x) {
 	BigInt i = {};
@@ -786,14 +804,13 @@ void bi__divW(BigInt const *x, u64 y, BigInt *q_, u64 *r_) {
 		GB_PANIC("division by zero");
 	} else if (y == 1) {
 		q = *x;
-		goto end;
 	} else if (m == 0) {
-		goto end;
+		// okay
+	} else {
+		big_int_alloc(&q, m, m);
+		bi__divWVW(&q, 0, x, y, &r);
+		big_int_normalize(&q);
 	}
-	big_int_alloc(&q, m, m);
-	bi__divWVW(&q, 0, x, y, &r);
-	big_int_normalize(&q);
-end:
 	if (q_) *q_ = q;
 	if (r_) *r_ = r;
 }
@@ -989,45 +1006,64 @@ void big_int_and(BigInt *dst, BigInt const *x, BigInt const *y) {
 		return;
 	}
 
-	GB_ASSERT(x->neg == y->neg);
+	if (x->neg == y->neg) {
+		if (x->neg) {
+			// (-x) & (-y) == ~(x-1) & ~(x-y) == ~((x-1) | (y-1)) == -(((x-1) | (y-1)) + 1)
+			BigInt x1 = big_int_make_abs(x);
+			BigInt y1 = big_int_make_abs(y);
+			BigInt z1 = {};
 
-	dst->neg = x->neg;
-	u64 const *xd = big_int_ptr(x);
-	u64 const *yd = big_int_ptr(y);
+			big_int_sub_eq(&x1, &BIG_INT_ONE);
+			big_int_sub_eq(&y1, &BIG_INT_ONE);
+			big_int_or(&z1, &x1, &y1);
+			big_int_add(dst, &z1, &BIG_INT_ONE);
+			dst->neg = true; // NOTE(bill): dst cannot be 0 as x and y are both negative
+			big_int_normalize(dst);
+			return;
+		}
+		u64 const *xd = big_int_ptr(x);
+		u64 const *yd = big_int_ptr(y);
 
-	if (x->len == 1 && y->len == 1) {
-		dst->len = 1;
-		dst->d.word = xd[0] & yd[0];
+		if (x->len == 1 && y->len == 1) {
+			dst->len = 1;
+			dst->d.word = xd[0] & yd[0];
+			return;
+		}
+
+		i32 len = gb_max(x->len, y->len);
+		big_int_alloc(dst, len, len);
+		GB_ASSERT(dst->len > 1);
+
+		i32 i = 0;
+		for (; i < x->len && i < y->len; i++) {
+			dst->d.words[i] = xd[i] & yd[i];
+		}
+		for (; i < len; i++) {
+			dst->d.words[i] = 0;
+		}
+		dst->neg = false;
+		big_int_normalize(dst);
 		return;
 	}
-
-	i32 len = gb_max(x->len, y->len);
-	big_int_alloc(dst, len, len);
-	GB_ASSERT(dst->len > 1);
-
-	i32 i = 0;
-	for (; i < x->len && i < y->len; i++) {
-		dst->d.words[i] = xd[i] & yd[i];
+	if (x->neg) {
+		BigInt const *tmp = x;
+		x = y;
+		y = tmp;
+		// NOTE(bill): AND is symmetric
 	}
-	for (; i < len; i++) {
-		dst->d.words[i] = 0;
-	}
+
+
+	// x & (-y) == x &~ (y-1)
+
+	dst->neg = false;
+	BigInt x1 = big_int_make_abs(x);
+	BigInt y1 = big_int_make_abs(y);
+	big_int_sub_eq(&y1, &BIG_INT_ONE);
+	big_int_and_not(dst, &x1, &y1);
 	big_int_normalize(dst);
 }
 
-void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) {
-	if (x->len == 0) {
-		big_int_init(dst, y);
-		return;
-	}
-	if (y->len == 0) {
-		big_int_init(dst, x);
-		return;
-	}
-
-	GB_ASSERT(x->neg == y->neg);
-
-	dst->neg = x->neg;
+void big_int__and_not_abs(BigInt *dst, BigInt const *x, BigInt const *y) {
 	u64 const *xd = big_int_ptr(x);
 	u64 const *yd = big_int_ptr(y);
 
@@ -1058,18 +1094,58 @@ void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) {
 	big_int_normalize(dst);
 }
 
-void big_int_xor(BigInt *dst, BigInt const *x, BigInt const *y) {
+void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) {
 	if (x->len == 0) {
 		big_int_init(dst, y);
 		return;
-	} else if (y->len == 0) {
+	}
+	if (y->len == 0) {
 		big_int_init(dst, x);
 		return;
 	}
 
-	GB_ASSERT(x->neg == y->neg);
+	if (x->neg == y->neg) {
+		if (x->neg) {
+			// (-x) &~ (-y) == ~(x-1) &~ ~(y-1) == ~(x-1) & (y-1) == (y-1) &~ (x-1)
+			BigInt x1 = big_int_make_abs(x);
+			BigInt y1 = big_int_make_abs(y);
+			big_int_sub_eq(&x1, &BIG_INT_ONE);
+			big_int_sub_eq(&y1, &BIG_INT_ONE);
 
+			big_int__and_not_abs(dst, &y1, &x1);
+			dst->neg = false;
+			return;
+		}
+
+		big_int__and_not_abs(dst, x, y);
+		dst->neg = false;
+		return;
+	}
+
+	if (x->neg) {
+		// (-x) &~ y == ~(x-1) &~ y == ~(x-1) & ~y == ~((x-1) | y) == -(((x-1) | y) + 1)
+		BigInt x1 = big_int_make_abs(x);
+		BigInt y1 = big_int_make_abs(y);
+		big_int_sub_eq(&x1, &BIG_INT_ONE);
+
+		BigInt z1 = {};
+		big_int_or(&z1, &x1, &y1);
+		big_int_add(dst, &z1, &BIG_INT_ONE);
+		dst->neg = true;
+		return;
+	}
+
+	// x &~ (-y) == x &~ ~(y-1) == x & (y-1)
+	BigInt x1 = big_int_make_abs(x);
+	BigInt y1 = big_int_make_abs(y);
+	big_int_sub_eq(&y1, &BIG_INT_ONE);
+	big_int_and(dst, &x1, &y1);
 	dst->neg = false;
+	return;
+}
+
+
+void big_int__xor_abs(BigInt *dst, BigInt const *x, BigInt const *y) {
 	u64 const *xd = big_int_ptr(x);
 	u64 const *yd = big_int_ptr(y);
 
@@ -1098,6 +1174,50 @@ void big_int_xor(BigInt *dst, BigInt const *x, BigInt const *y) {
 	big_int_normalize(dst);
 }
 
+void big_int_xor(BigInt *dst, BigInt const *x, BigInt const *y) {
+	if (x->len == 0) {
+		big_int_init(dst, y);
+		return;
+	} else if (y->len == 0) {
+		big_int_init(dst, x);
+		return;
+	}
+
+	if (x->neg == y->neg) {
+		if (x->neg) {
+			// (-x) ^ (-y) == ~(x-1) ^ ~(y-1) == (x-1) ^ (y-1)
+			BigInt x1 = big_int_make_abs(x);
+			BigInt y1 = big_int_make_abs(y);
+			big_int_sub_eq(&x1, &BIG_INT_ONE);
+			big_int_sub_eq(&y1, &BIG_INT_ONE);
+			big_int__xor_abs(dst, &x1, &y1);
+			dst->neg = false;
+			return;
+		}
+
+		big_int__xor_abs(dst, x, y);
+		dst->neg = false;
+		return;
+	}
+
+	// x->neg != y->neg
+	if (x->neg) {
+		BigInt const *tmp = x;
+		x = y;
+		y = tmp;
+	}
+
+	// x ^ (-y) == x ^ ~(y-1) == ~(x ^ (y-1)) == -((x ^ (y-1)) + 1)
+
+	dst->neg = false;
+	BigInt y1 = big_int_make_abs(y);
+	big_int_sub_eq(&y1, &BIG_INT_ONE);
+	big_int__xor_abs(dst, x, &y1);
+	big_int_add_eq(dst, &BIG_INT_ONE);
+	dst->neg = true;
+	return;
+}
+
 
 void big_int_or(BigInt *dst, BigInt const *x, BigInt const *y) {
 	if (x->len == 0) {
@@ -1108,34 +1228,60 @@ void big_int_or(BigInt *dst, BigInt const *x, BigInt const *y) {
 		return;
 	}
 
-	GB_ASSERT(x->neg == y->neg);
-
-	dst->neg = x->neg;
-	u64 const *xd = big_int_ptr(x);
-	u64 const *yd = big_int_ptr(y);
-
-	if (x->len == 1 && y->len == 1) {
-		dst->len = 1;
-		dst->d.word = xd[0] | yd[0];
-		return;
-	}
-
-	i32 len = gb_max(x->len, y->len);
-	big_int_alloc(dst, len, len);
-	GB_ASSERT(dst->len > 1);
-
-	for (i32 i = 0; i < len; i++) {
-		u64 word = 0;
-		if (i < x->len) {
-			word |= xd[i];
-		}
-		if (i < y->len) {
-			word |= yd[i];
+	if (x->neg == y->neg) {
+		if (x->neg) {
+			// (-x) || (-y) == ~(x-1) | ~(y-1) == ~((x-1) & (y-1)) == -(((x-1) & (y-1)) + 1)
+			BigInt x1 = big_int_make_abs(x);
+			BigInt y1 = big_int_make_abs(y);
+			big_int_sub_eq(&x1, &BIG_INT_ONE);
+			big_int_sub_eq(&y1, &BIG_INT_ONE);
+			big_int_and(dst, &x1, &y1);
+			big_int_add_eq(dst, &BIG_INT_ONE);
+			dst->neg = true;
+			return;
 		}
 
-		dst->d.words[i] = word;
+		dst->neg = x->neg;
+		u64 const *xd = big_int_ptr(x);
+		u64 const *yd = big_int_ptr(y);
+
+		if (x->len == 1 && y->len == 1) {
+			dst->len = 1;
+			dst->d.word = xd[0] | yd[0];
+			return;
+		}
+
+		i32 len = gb_max(x->len, y->len);
+		big_int_alloc(dst, len, len);
+		GB_ASSERT(dst->len > 1);
+
+		for (i32 i = 0; i < len; i++) {
+			u64 word = 0;
+			if (i < x->len) {
+				word |= xd[i];
+			}
+			if (i < y->len) {
+				word |= yd[i];
+			}
+
+			dst->d.words[i] = word;
+		}
+		big_int_normalize(dst);
 	}
-	big_int_normalize(dst);
+
+	if (x->neg) {
+		BigInt const *tmp = x;
+		x = y;
+		y = tmp;
+	}
+
+	// x | (-y) == x | ~(y-1) == ~((y-1) &~ x) == -(~((y-1) &~ x) + 1)
+	BigInt y1 = big_int_make_abs(y);
+	big_int_sub_eq(&y1, &BIG_INT_ONE);
+	big_int__and_not_abs(dst, &y1, x);
+	big_int_add_eq(dst, &BIG_INT_ONE);
+	dst->neg = true;
+	return;
 }
 
 
@@ -1144,7 +1290,6 @@ void bit_int_not(BigInt *dst, BigInt const *x, u64 bit_count, bool is_signed) {
 		big_int_from_u64(dst, 0);
 		return;
 	}
-
 
 	dst->neg = false;
 	u64 const *xd = big_int_ptr(x);
@@ -1163,31 +1308,30 @@ void bit_int_not(BigInt *dst, BigInt const *x, u64 bit_count, bool is_signed) {
 				dst->d.word &= mask;
 			}
 		}
-		goto end;
+	} else {
+		dst->len = cast(i32)((bit_count+63ull) / 64ull);
+		GB_ASSERT(dst->len >= x->len);
+		big_int_alloc(dst, dst->len, dst->len);
+		GB_ASSERT(dst->len > 1);
+
+		i32 i = 0;
+		for (; i < x->len; i++) {
+			dst->d.words[i] = ~xd[i];
+		}
+		for (; i < dst->len; i++) {
+			dst->d.words[i] = ~cast(u64)0ull;
+		}
+
+		i32 word_idx = cast(i32)(cast(u64)dst->len - (bit_count/64ull)-1ull);
+		u32 word_bit_idx = bit_count % 64;
+		if (word_idx < dst->len) {
+			u64 mask = (1ull << word_bit_idx) - 1ull;
+			dst->d.words[word_idx] &= mask;
+		}
 	}
 
-	dst->len = cast(i32)((bit_count+63ull) / 64ull);
-	GB_ASSERT(dst->len >= x->len);
-	big_int_alloc(dst, dst->len, dst->len);
-	GB_ASSERT(dst->len > 1);
-
-	i32 i = 0;
-	for (; i < x->len; i++) {
-		dst->d.words[i] = ~xd[i];
-	}
-	for (; i < dst->len; i++) {
-		dst->d.words[i] = ~cast(u64)0ull;
-	}
-
-	i32 word_idx = cast(i32)(cast(u64)dst->len - (bit_count/64ull)-1ull);
-	u32 word_bit_idx = bit_count % 64;
-	if (word_idx < dst->len) {
-		u64 mask = (1ull << word_bit_idx) - 1ull;
-		dst->d.words[word_idx] &= mask;
-	}
-
-end:
 	big_int_normalize(dst);
+
 	if (is_signed) {
 		BigInt prec = big_int_make_u64(bit_count-1);
 		BigInt mask = {};
