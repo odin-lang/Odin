@@ -260,18 +260,17 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 			if (rhs->mode == Addressing_Constant) {
 				ExactValue v = exact_value_to_integer(rhs->value);
 				if (v.kind == ExactValue_Integer) {
-					i64 i = v.value_integer;
-					u64 u = bit_cast<u64>(i);
-					u64 umax = ~cast(u64)0ull;
-					if (lhs_bits < 64) {
-						umax = (1ull << cast(u64)lhs_bits) - 1ull;
-					}
-					i64 imax = 1ll << (cast(i64)lhs_bits-1ll);
+					BigInt i = v.value_integer;
+					if (!i.neg) {
+						u64 imax_ = ~cast(u64)0ull;
+						if (lhs_bits < 64) {
+							imax_ = (1ull << cast(u64)lhs_bits) - 1ull;
+						}
 
-					bool ok = !(u < 0 || u > umax);
-
-					if (ok) {
-						return rhs->type;
+						BigInt imax = big_int_make_u64(imax_);
+						if (big_int_cmp(&i, &imax) > 0) {
+							return rhs->type;
+						}
 					}
 				}
 			} else if (is_type_integer(rhs->type)) {

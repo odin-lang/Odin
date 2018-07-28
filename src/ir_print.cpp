@@ -65,6 +65,15 @@ void ir_write_i64(irFileBuffer *f, i64 i) {
 	String str = i64_to_string(i, f->buf, IR_FILE_BUFFER_BUF_LEN-1);
 	ir_write_string(f, str);
 }
+void ir_write_big_int(irFileBuffer *f, BigInt const &x) {
+	i64 i = 0;
+	if (x.neg) {
+		i = big_int_to_i64(&x);
+	} else {
+		i = cast(i64)big_int_to_u64(&x);
+	}
+	ir_write_i64(f, i);
+}
 
 void ir_file_write(irFileBuffer *f, void *data, isize len) {
 	ir_file_buffer_write(f, data, len);
@@ -587,19 +596,19 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	}
 	case ExactValue_Integer: {
 		if (is_type_pointer(type)) {
-			if (value.value_integer == 0) {
+			if (big_int_is_zero(&value.value_integer)) {
 				ir_write_str_lit(f, "null");
 			} else {
 				ir_write_str_lit(f, "inttoptr (");
 				ir_print_type(f, m, t_int);
 				ir_write_byte(f, ' ');
-				ir_write_i64(f, value.value_integer);
+				ir_write_big_int(f, value.value_integer);
 				ir_write_str_lit(f, " to ");
 				ir_print_type(f, m, t_rawptr);
 				ir_write_str_lit(f, ")");
 			}
 		} else {
-			ir_write_i64(f, value.value_integer);
+			ir_write_big_int(f, value.value_integer);
 		}
 		break;
 	}
