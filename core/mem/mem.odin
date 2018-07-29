@@ -69,6 +69,10 @@ compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int {
 	return 0;
 }
 
+compare_ptrs :: inline proc "contextless" (a, b: rawptr, n: int) -> int {
+	return compare_byte_ptrs((^byte)(a), (^byte)(b), n);
+}
+
 ptr_offset :: proc "contextless" (ptr: $P/^$T, n: int) -> P {
 	new := int(uintptr(ptr)) + size_of(T)*n;
 	return P(uintptr(new));

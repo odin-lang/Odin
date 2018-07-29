@@ -2615,37 +2615,39 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	Scope *parent_scope = ctx->scope;
 	GB_ASSERT(parent_scope->flags&ScopeFlag_File);
 
-	String fullpath = fl->fullpath;
+	GB_ASSERT(fl->fullpaths.count > 0);
+	String fullpath = fl->fullpaths[0];
 	String library_name = path_to_entity_name(fl->library_name.string, fullpath);
 	if (is_blank_ident(library_name)) {
 		error(fl->token, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
 		return;
 	}
 
-	if (fl->collection_name != "system") {
-		char *c_str = gb_alloc_array(heap_allocator(), char, fullpath.len+1);
-		defer (gb_free(heap_allocator(), c_str));
-		gb_memmove(c_str, fullpath.text, fullpath.len);
-		c_str[fullpath.len] = '\0';
+	// if (fl->collection_name != "system") {
+	// 	char *c_str = gb_alloc_array(heap_allocator(), char, fullpath.len+1);
+	// 	defer (gb_free(heap_allocator(), c_str));
+	// 	gb_memmove(c_str, fullpath.text, fullpath.len);
+	// 	c_str[fullpath.len] = '\0';
 
-		gbFile f = {};
-		gbFileError file_err = gb_file_open(&f, c_str);
-		defer (gb_file_close(&f));
+	// 	gbFile f = {};
+	// 	gbFileError file_err = gb_file_open(&f, c_str);
+	// 	defer (gb_file_close(&f));
 
-		switch (file_err) {
-		case gbFileError_Invalid:
-			error(decl, "Invalid file or cannot be found ('%.*s')", LIT(fullpath));
-			return;
-		case gbFileError_NotExists:
-			error(decl, "File cannot be found ('%.*s')", LIT(fullpath));
-			return;
-		}
-	}
+	// 	switch (file_err) {
+	// 	case gbFileError_Invalid:
+	// 		error(decl, "Invalid file or cannot be found ('%.*s')", LIT(fullpath));
+	// 		return;
+	// 	case gbFileError_NotExists:
+	// 		error(decl, "File cannot be found ('%.*s')", LIT(fullpath));
+	// 		return;
+	// 	}
+	// }
 
 	GB_ASSERT(fl->library_name.pos.line != 0);
 	fl->library_name.string = library_name;
+
 	Entity *e = alloc_entity_library_name(parent_scope, fl->library_name, t_invalid,
-	                                      fl->fullpath, library_name);
+	                                      fl->fullpaths, library_name);
 	add_entity(ctx->checker, parent_scope, nullptr, e);
 }
 
