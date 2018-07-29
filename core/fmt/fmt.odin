@@ -290,7 +290,6 @@ write_type :: proc(buf: ^String_Buffer, ti: ^runtime.Type_Info) {
 	case runtime.Type_Info_Enum:
 		write_string(buf, "enum ");
 		write_type(buf, info.base);
-		if info.is_export do write_string(buf, " #export");
 		write_string(buf, " {");
 		for name, i in info.names {
 			if i > 0 do write_string(buf, ", ");

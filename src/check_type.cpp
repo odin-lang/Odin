@@ -571,22 +571,10 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		// NOTE(bill): Skip blank identifiers
 		if (is_blank_ident(name)) {
 			continue;
-		} else if (name == "count") {
-			error(field, "'count' is a reserved identifier for enumerations");
-			continue;
-		} else if (name == "min_value") {
-			error(field, "'min_value' is a reserved identifier for enumerations");
-			continue;
-		} else if (name == "max_value") {
-			error(field, "'max_value' is a reserved identifier for enumerations");
-			continue;
 		} else if (name == "names") {
 			error(field, "'names' is a reserved identifier for enumerations");
 			continue;
-		}/*  else if (name == "base_type") {
-			error(field, "'base_type' is a reserved identifier for enumerations");
-			continue;
-		} */
+		}
 
 		if (compare_exact_values(Token_Gt, min_value, iota)) {
 			min_value = iota;
@@ -613,8 +601,9 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 
 
 	enum_type->Enum.fields    = fields;
-	enum_type->Enum.is_export = et->is_export;
-	if (et->is_export) {
+	enum_type->Enum.is_using = et->is_using;
+	// TODO(bill): Should this be done elsewhere? e.g. delayed
+	if (et->is_using) {
 		Scope *parent = ctx->scope->parent;
 		if (parent->flags&ScopeFlag_File) {
 			// NOTE(bill): Use package scope
@@ -634,10 +623,6 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 	}
 
 	Scope *s = ctx->scope;
-	enum_type->Enum.count     = alloc_entity_constant(s, make_token_ident(str_lit("count")), t_int, exact_value_i64(fields.count));
-	enum_type->Enum.min_value = alloc_entity_constant(s, make_token_ident(str_lit("min_value")), constant_type, min_value);
-	enum_type->Enum.max_value = alloc_entity_constant(s, make_token_ident(str_lit("max_value")), constant_type, max_value);
-
 	enum_type->Enum.names = make_names_field_for_struct(ctx, ctx->scope);
 }
 

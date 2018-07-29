@@ -478,7 +478,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Token        token; \
 		Ast *        base_type; \
 		Array<Ast *> fields; /* FieldValue */ \
-		bool         is_export; \
+		bool         is_using; \
 	}) \
 	AST_KIND(BitFieldType, "bit field type", struct { \
 		Token        token; \

@@ -2121,6 +2121,14 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			}
 			e->identifier = name;
 
+			if (vd->is_using) {
+				if (e->kind == Entity_TypeName && init->kind == Ast_EnumType) {
+					init->EnumType.is_using = true;
+				} else {
+					error(name, "'using' is not allowed on this constant value declaration");
+				}
+			}
+
 			if (e->kind != Entity_Procedure) {
 				if (fl != nullptr || c->foreign_context.in_export) {
 					AstKind kind = init->kind;

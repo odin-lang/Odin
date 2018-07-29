@@ -608,15 +608,16 @@ named_proc_return_parameters :: proc() {
 }
 
 
-enum_export :: proc() {
-	fmt.println("# enum #export");
+using_enum :: proc() {
+	fmt.println("# using enum");
 
-	Foo :: enum #export {A, B, C};
+	using Foo :: enum {A, B, C};
 
 	f0 := A;
 	f1 := B;
 	f2 := C;
 	fmt.println(f0, f1, f2);
+	fmt.println(len(Foo));
 }
 
 explicit_procedure_overloading :: proc() {
@@ -656,7 +657,7 @@ explicit_procedure_overloading :: proc() {
 complete_switch :: proc() {
 	fmt.println("# complete_switch");
 	{ // enum
-		Foo :: enum #export {
+		using Foo :: enum {
 			A,
 			B,
 			C,
@@ -723,7 +724,7 @@ main :: proc() {
 		threading_example();
 		array_programming();
 		named_proc_return_parameters();
-		enum_export();
+		using_enum();
 		explicit_procedure_overloading();
 		complete_switch();
 		cstring_example();
