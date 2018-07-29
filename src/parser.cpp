@@ -999,11 +999,11 @@ Ast *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, Toke
 	return result;
 }
 
-Ast *ast_foreign_import_decl(AstFile *f, Token token, Token filepath, Token library_name,
+Ast *ast_foreign_import_decl(AstFile *f, Token token, Array<Token> filepaths, Token library_name,
                                  CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_ForeignImportDecl);
 	result->ForeignImportDecl.token        = token;
-	result->ForeignImportDecl.filepath     = filepath;
+	result->ForeignImportDecl.filepaths    = filepaths;
 	result->ForeignImportDecl.library_name = library_name;
 	result->ForeignImportDecl.docs         = docs;
 	result->ForeignImportDecl.comment      = comment;
@@ -3491,15 +3491,38 @@ Ast *parse_foreign_decl(AstFile *f) {
 			break;
 		}
 		if (is_blank_ident(lib_name)) {
-			syntax_error(lib_name, "Illegal foreign_library name: '_'");
+			syntax_error(lib_name, "Illegal foreign import name: '_'");
 		}
-		Token file_path = expect_token(f, Token_String);
-		Ast *s = nullptr;
-		if (f->curr_proc != nullptr) {
-			syntax_error(lib_name, "You cannot use foreign_library within a procedure. This must be done at the file scope");
-			s = ast_bad_decl(f, lib_name, file_path);
+		Array<Token> filepaths = {};
+		if (allow_token(f, Token_OpenBrace)) {
+			array_init(&filepaths, heap_allocator());
+
+			while (f->curr_token.kind != Token_CloseBrace &&
+			       f->curr_token.kind != Token_EOF) {
+
+				Token path = expect_token(f, Token_String);
+				array_add(&filepaths, path);
+
+				if (!allow_token(f, Token_Comma)) {
+					break;
+				}
+			}
+			expect_token(f, Token_CloseBrace);
 		} else {
-			s = ast_foreign_import_decl(f, token, file_path, lib_name, docs, f->line_comment);
+			filepaths = array_make<Token>(heap_allocator(), 0, 1);
+			Token path = expect_token(f, Token_String);
+			array_add(&filepaths, path);
+		}
+
+		Ast *s = nullptr;
+		if (filepaths.count == 0) {
+			syntax_error(lib_name, "foreign import without any paths");
+			s = ast_bad_decl(f, lib_name, f->curr_token);
+		} else if (f->curr_proc != nullptr) {
+			syntax_error(lib_name, "You cannot use foreign import within a procedure. This must be done at the file scope");
+			s = ast_bad_decl(f, lib_name, filepaths[0]);
+		} else {
+			s = ast_foreign_import_decl(f, token, filepaths, lib_name, docs, f->line_comment);
 		}
 		expect_semicolon(f, s);
 		return s;
@@ -4129,22 +4152,34 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<Ast *>
 		} else if (node->kind == Ast_ForeignImportDecl) {
 			ast_node(fl, ForeignImportDecl, node);
 
-			String file_str = fl->filepath.string;
-			fl->fullpath = file_str;
+			fl->fullpaths.allocator = heap_allocator();
+			array_reserve(&fl->fullpaths, fl->filepaths.count);
 
-			if (fl->collection_name != "system") {
+			for_array(fp_idx, fl->filepaths) {
+				String file_str = fl->filepaths[fp_idx].string;
+				String fullpath = file_str;
+
 				String foreign_path = {};
 				bool ok = determine_path_from_string(p, node, base_dir, file_str, &foreign_path);
 				if (!ok) {
-					decls[i] = ast_bad_decl(f, fl->filepath, fl->filepath);
-					continue;
+					decls[i] = ast_bad_decl(f, fl->filepaths[fp_idx], fl->filepaths[fl->filepaths.count-1]);
+					goto end;
 				}
-				fl->fullpath = foreign_path;
+				fullpath = foreign_path;
+				array_add(&fl->fullpaths, fullpath);
 			}
+			if (fl->fullpaths.count == 0) {
+				error(decls[i], "No foreign paths found");
+				decls[i] = ast_bad_decl(f, fl->filepaths[0], fl->filepaths[fl->filepaths.count-1]);
+				goto end;
+			}
+
 		} else if (node->kind == Ast_WhenStmt) {
 			ast_node(ws, WhenStmt, node);
 			parse_setup_file_when_stmt(p, f, base_dir, ws);
 		}
+
+	end:;
 	}
 }
 

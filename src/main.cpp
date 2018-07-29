@@ -253,7 +253,6 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_CrossLibDir,       str_lit("cross-lib-dir"),   BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"), BuildFlagParam_None);
 
-
 	GB_ASSERT(args.count >= 3);
 	Array<String> flag_args = array_slice(args, 3, args.count);
 
@@ -877,9 +876,9 @@ int main(int arg_count, char **arg_ptr) {
 		gbString lib_str = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(lib_str));
 		char lib_str_buf[1024] = {0};
+
 		for_array(i, ir_gen.module.foreign_library_paths) {
 			String lib = ir_gen.module.foreign_library_paths[i];
-			// gb_printf_err("Linking lib: %.*s\n", LIT(lib));
 			isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
 			                        " \"%.*s\"", LIT(lib));
 			lib_str = gb_string_appendc(lib_str, lib_str_buf);

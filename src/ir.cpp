@@ -1332,22 +1332,24 @@ void ir_add_foreign_library_path(irModule *m, Entity *e) {
 	GB_ASSERT(e->kind == Entity_LibraryName);
 	GB_ASSERT(e->flags & EntityFlag_Used);
 
-	String library_path = e->LibraryName.path;
-	if (library_path.len == 0) {
-		return;
-	}
-
-	for_array(path_index, m->foreign_library_paths) {
-		String path = m->foreign_library_paths[path_index];
-#if defined(GB_SYSTEM_WINDOWS)
-		if (str_eq_ignore_case(path, library_path)) {
-#else
-		if (str_eq(path, library_path)) {
-#endif
-			return;
+	for_array(i, e->LibraryName.paths) {
+		String library_path = e->LibraryName.paths[i];
+		if (library_path.len == 0) {
+			continue;
 		}
+
+		for_array(path_index, m->foreign_library_paths) {
+			String path = m->foreign_library_paths[path_index];
+	#if defined(GB_SYSTEM_WINDOWS)
+			if (str_eq_ignore_case(path, library_path)) {
+	#else
+			if (str_eq(path, library_path)) {
+	#endif
+				continue;
+			}
+		}
+		array_add(&m->foreign_library_paths, library_path);
 	}
-	array_add(&m->foreign_library_paths, library_path);
 }
 
 

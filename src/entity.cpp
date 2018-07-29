@@ -124,7 +124,7 @@ struct Entity {
 			Scope *scope;
 		} ImportName;
 		struct {
-			String path;
+			Array<String> paths;
 			String name;
 		} LibraryName;
 		i32 Nil;
@@ -278,9 +278,9 @@ Entity *alloc_entity_import_name(Scope *scope, Token token, Type *type,
 }
 
 Entity *alloc_entity_library_name(Scope *scope, Token token, Type *type,
-                                  String path, String name) {
+                                  Array<String> paths, String name) {
 	Entity *entity = alloc_entity(Entity_LibraryName, scope, token, type);
-	entity->LibraryName.path = path;
+	entity->LibraryName.paths = paths;
 	entity->LibraryName.name = name;
 	entity->state = EntityState_Resolved; // TODO(bill): Is this correct?
 	return entity;
