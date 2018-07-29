@@ -2,25 +2,25 @@ package bits
 
 import "core:os"
 
-U8_MIN  ::  u8(0);
-U16_MIN :: u16(0);
-U32_MIN :: u32(0);
-U64_MIN :: u64(0);
+U8_MIN  :: 0;
+U16_MIN :: 0;
+U32_MIN :: 0;
+U64_MIN :: 0;
 
-U8_MAX  ::  ~u8(0);
-U16_MAX :: ~u16(0);
-U32_MAX :: ~u32(0);
-U64_MAX :: ~u64(0);
+U8_MAX  :: 1 <<  8 - 1;
+U16_MAX :: 1 << 16 - 1;
+U32_MAX :: 1 << 32 - 1;
+U64_MAX :: 1 << 64 - 1;
 
-I8_MIN  ::  i8( ~u8(0) >> 1);
-I16_MIN :: i16(~u16(0) >> 1);
-I32_MIN :: i32(~u32(0) >> 1);
-I64_MIN :: i64(~u64(0) >> 1);
+I8_MIN  :: - 1 << 7;
+I16_MIN :: - 1 << 15;
+I32_MIN :: - 1 << 31;
+I64_MIN :: - 1 << 63;
 
-I8_MAX  ::  -I8_MIN - 1;
-I16_MAX :: -I16_MIN - 1;
-I32_MAX :: -I32_MIN - 1;
-I64_MAX :: -I64_MIN - 1;
+I8_MAX  :: 1 <<  7 - 1;
+I16_MAX :: 1 << 15 - 1;
+I32_MAX :: 1 << 31 - 1;
+I64_MAX :: 1 << 63 - 1;
 
 foreign {
 	@(link_name="llvm.ctpop.i8")        count_ones8  :: proc(i:  u8) ->  u8 ---

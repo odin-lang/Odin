@@ -36,6 +36,11 @@ void global_big_int_init(void) {
 #endif
 }
 
+// IMPORTANT NOTE LEAK(bill): This entire BigInt library leaks memory like there is no tomorrow
+// However, this isn't really a problem as the vast majority of BigInt operations will not use
+// more than 1 word.
+// I could track how much this does leaks because I use an arena_allocator but I doubt I will require
+// it any time soon
 gb_inline gbAllocator big_int_allocator(void) {
 	return arena_allocator(&global_big_int_arena);
 }
@@ -54,6 +59,13 @@ void big_int_from_u64(BigInt *dst, u64 x);
 void big_int_from_i64(BigInt *dst, i64 x);
 void big_int_init    (BigInt *dst, BigInt const *src);
 void big_int_from_string(BigInt *dst, String const &s);
+
+void big_int_dealloc(BigInt *dst) {
+	if (dst->len > 1) {
+		gb_free(big_int_allocator(), dst->d.words);
+	}
+	gb_zero_item(dst);
+}
 
 BigInt big_int_make(BigInt const *b, bool abs=false);
 BigInt big_int_make_abs(BigInt const *b);
@@ -246,6 +258,10 @@ BigInt big_int_make_i64(i64 x) {
 
 
 void big_int_from_string(BigInt *dst, String const &s) {
+#if 0
+	u64 u = u64_from_string(s);
+	big_int_from_u64(dst, u);
+#else
 	u64 base = 10;
 	bool has_prefix = false;
 	if (s.len > 2 && s[0] == '0') {
@@ -266,28 +282,24 @@ void big_int_from_string(BigInt *dst, String const &s) {
 		len -= 2;
 	}
 
-	BigInt result = {};
-	BigInt val = {};
 	BigInt b = {};
 	big_int_from_u64(&b, base);
-	val.len = 1;
-	val.d.word = 100000000ull;
+	big_int_init(dst, &BIG_INT_ZERO);
 
-	// for (isize i = 0; i < len; i++) {
-	// 	Rune r = cast(Rune)text[i];
-	// 	if (r == '_') {
-	// 		continue;
-	// 	}
-	// 	u64 v = u64_digit_value(r);
-	// 	if (v >= base) {
-	// 		break;
-	// 	}
-	// 	val.d.word = v;
-
-	// 	big_int_mul_eq(&result, &b);
-	// 	big_int_add_eq(&result, &val);
-	// }
-	*dst = result;
+	for (isize i = 0; i < len; i++) {
+		Rune r = cast(Rune)text[i];
+		if (r == '_') {
+			continue;
+		}
+		u64 v = u64_digit_value(r);
+		if (v >= base) {
+			break;
+		}
+		BigInt val = big_int_make_u64(v);
+		big_int_mul_eq(dst, &b);
+		big_int_add_eq(dst, &val);
+	}
+#endif
 }
 
 
@@ -1291,6 +1303,8 @@ void big_int_not(BigInt *dst, BigInt const *x, u64 bit_count, bool is_signed) {
 		return;
 	}
 
+	// TODO(bill): Is this fast enough?
+
 	dst->neg = false;
 	u64 const *xd = big_int_ptr(x);
 	if (bit_count <= 64) {
@@ -1360,7 +1374,6 @@ char digit_to_char(u8 digit) {
 
 String big_int_to_string(gbAllocator allocator, BigInt const *x, u64 base) {
 	GB_ASSERT(base <= 16);
-
 
 	if ((x->len == 0) && (x->len == 1 && x->d.word == 0)) {
 		u8 *buf = gb_alloc_array(allocator, u8, 1);
