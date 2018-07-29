@@ -600,29 +600,7 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 	GB_ASSERT(fields.count <= et->fields.count);
 
 
-	enum_type->Enum.fields    = fields;
-	enum_type->Enum.is_using = et->is_using;
-	// TODO(bill): Should this be done elsewhere? e.g. delayed
-	if (et->is_using) {
-		Scope *parent = ctx->scope->parent;
-		if (parent->flags&ScopeFlag_File) {
-			// NOTE(bill): Use package scope
-			parent = parent->parent;
-		}
-		for_array(i, fields) {
-			Entity *f = fields[i];
-			if (f->kind != Entity_Constant) {
-				continue;
-			}
-			String name = f->token.string;
-			if (is_blank_ident(name)) {
-				continue;
-			}
-			add_entity(ctx->checker, parent, nullptr, f);
-		}
-	}
-
-	Scope *s = ctx->scope;
+	enum_type->Enum.fields = fields;
 	enum_type->Enum.names = make_names_field_for_struct(ctx, ctx->scope);
 }
 

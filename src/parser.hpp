@@ -435,9 +435,9 @@ AST_KIND(_TypeBegin, "", bool) \
 		Ast *type; \
 	}) \
 	AST_KIND(PolyType, "polymorphic type", struct { \
-		Token    token; \
-		Ast *type;  \
-		Ast *specialization;  \
+		Token token; \
+		Ast * type;  \
+		Ast * specialization;  \
 	}) \
 	AST_KIND(ProcType, "procedure type", struct { \
 		Token token;   \

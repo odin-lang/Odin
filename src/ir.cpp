@@ -8163,9 +8163,6 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				irValue *base = ir_type_info(proc, t->Enum.base_type);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), base);
 
-				// is_using
-				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), ir_const_bool(t->Enum.is_using));
-
 				if (t->Enum.fields.count > 0) {
 					auto fields = t->Enum.fields;
 					irValue *name_array  = ir_generate_array(m, t_string, fields.count,

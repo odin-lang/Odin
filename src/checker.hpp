@@ -187,10 +187,10 @@ struct DeclInfo {
 
 	Ast *         type_expr;
 	Ast *         init_expr;
-	// Array<Ast *>  init_expr_list;
 	Array<Ast *>  attributes;
 	Ast *         proc_lit;      // Ast_ProcLit
 	Type *        gen_proc_type; // Precalculated
+	bool          is_using;
 
 	PtrSet<Entity *>  deps;
 	PtrSet<Type *>    type_info_deps;
