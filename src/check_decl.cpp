@@ -260,18 +260,18 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) 
 			}
 
 			Type *t = base_type(e->type);
-			GB_ASSERT(t->kind == Type_Enum);
-
-			for_array(i, t->Enum.fields) {
-				Entity *f = t->Enum.fields[i];
-				if (f->kind != Entity_Constant) {
-					continue;
+			if (t->kind == Type_Enum) {
+				for_array(i, t->Enum.fields) {
+					Entity *f = t->Enum.fields[i];
+					if (f->kind != Entity_Constant) {
+						continue;
+					}
+					String name = f->token.string;
+					if (is_blank_ident(name)) {
+						continue;
+					}
+					add_entity(ctx->checker, parent, nullptr, f);
 				}
-				String name = f->token.string;
-				if (is_blank_ident(name)) {
-					continue;
-				}
-				add_entity(ctx->checker, parent, nullptr, f);
 			}
 		}
 	}
