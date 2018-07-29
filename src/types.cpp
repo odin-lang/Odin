@@ -135,7 +135,6 @@ struct TypeStruct {
 		Scope *  scope;                                   \
 		Entity * names;                                   \
 		Type *   base_type;                               \
-		bool     is_using;                                \
 	})                                                    \
 	TYPE_KIND(Union, struct {                             \
 		Array<Type *> variants;                           \

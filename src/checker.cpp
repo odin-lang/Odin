@@ -2123,7 +2123,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 			if (vd->is_using) {
 				if (e->kind == Entity_TypeName && init->kind == Ast_EnumType) {
-					init->EnumType.is_using = true;
+					d->is_using = true;
 				} else {
 					error(name, "'using' is not allowed on this constant value declaration");
 				}

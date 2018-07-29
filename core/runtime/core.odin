@@ -88,7 +88,6 @@ Type_Info_Enum :: struct {
 	base:      ^Type_Info,
 	names:     []string,
 	values:    []Type_Info_Enum_Value,
-	is_using:  bool, // TODO(bill): Should this be in the `Type_Info`?
 };
 Type_Info_Map :: struct {
 	key:              ^Type_Info,

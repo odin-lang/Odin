@@ -248,6 +248,33 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) 
 		named->Named.base = bt;
 		e->TypeName.is_type_alias = true;
 	}
+
+	// using decl
+	if (decl->is_using) {
+		// NOTE(bill): Must be an enum declaration
+		if (te->kind == Ast_EnumType) {
+			Scope *parent = ctx->scope->parent;
+			if (parent->flags&ScopeFlag_File) {
+				// NOTE(bill): Use package scope
+				parent = parent->parent;
+			}
+
+			Type *t = base_type(e->type);
+			GB_ASSERT(t->kind == Type_Enum);
+
+			for_array(i, t->Enum.fields) {
+				Entity *f = t->Enum.fields[i];
+				if (f->kind != Entity_Constant) {
+					continue;
+				}
+				String name = f->token.string;
+				if (is_blank_ident(name)) {
+					continue;
+				}
+				add_entity(ctx->checker, parent, nullptr, f);
+			}
+		}
+	}
 }
 
 
