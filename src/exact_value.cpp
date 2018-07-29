@@ -135,9 +135,10 @@ ExactValue exact_value_procedure(Ast *node) {
 }
 
 
-ExactValue exact_value_integer_from_string(String string) {
-	u64 u = u64_from_string(string);
-	return exact_value_u64(u);
+ExactValue exact_value_integer_from_string(String const &string) {
+	ExactValue result = {ExactValue_Integer};
+	big_int_from_string(&result.value_integer, string);
+	return result;
 }
 
 f64 float_from_string(String string) {
