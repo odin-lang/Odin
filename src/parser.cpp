@@ -920,11 +920,10 @@ Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> variants, Ast *align) 
 }
 
 
-Ast *ast_enum_type(AstFile *f, Token token, Ast *base_type, bool is_export, Array<Ast *> fields) {
+Ast *ast_enum_type(AstFile *f, Token token, Ast *base_type, Array<Ast *> fields) {
 	Ast *result = alloc_ast_node(f, Ast_EnumType);
 	result->EnumType.token = token;
 	result->EnumType.base_type = base_type;
-	result->EnumType.is_export = is_export;
 	result->EnumType.fields = fields;
 	return result;
 }
@@ -1903,34 +1902,34 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 	} break;
 
 	case Token_enum: {
-		bool is_export = false;
+		// bool is_export = false;
 		Token token = expect_token(f, Token_enum);
 		Ast *base_type = nullptr;
 		if (f->curr_token.kind != Token_OpenBrace) {
 			if (f->curr_token.kind != Token_Hash) {
 				base_type = parse_type(f);
 			}
-			while (allow_token(f, Token_Hash)) {
-				Token tag = f->curr_token;
-				if (!allow_token(f, Token_Ident) && !allow_token(f, Token_export)) {
-					expect_token_after(f, Token_Ident, "#");
-				}
-				if (tag.string == "export") {
-					if (is_export) {
-						syntax_error(tag, "Duplicate enum tag '#%.*s'", LIT(tag.string));
-					}
-					is_export = true;
-				} else {
-					syntax_error(tag, "Invalid enum tag '#%.*s'", LIT(tag.string));
-				}
-			}
+			// while (allow_token(f, Token_Hash)) {
+			// 	Token tag = f->curr_token;
+			// 	if (!allow_token(f, Token_Ident) && !allow_token(f, Token_export)) {
+			// 		expect_token_after(f, Token_Ident, "#");
+			// 	}
+			// 	if (tag.string == "export") {
+			// 		if (is_export) {
+			// 			syntax_error(tag, "Duplicate enum tag '#%.*s'", LIT(tag.string));
+			// 		}
+			// 		is_export = true;
+			// 	} else {
+			// 		syntax_error(tag, "Invalid enum tag '#%.*s'", LIT(tag.string));
+			// 	}
+			// }
 		}
 		Token open = expect_token(f, Token_OpenBrace);
 
 		Array<Ast *> values = parse_element_list(f);
 		Token close = expect_token(f, Token_CloseBrace);
 
-		return ast_enum_type(f, token, base_type, is_export, values);
+		return ast_enum_type(f, token, base_type, values);
 	} break;
 
 	case Token_bit_field: {
@@ -3591,10 +3590,10 @@ Ast *parse_stmt(AstFile *f) {
 		decl = parse_value_decl(f, list, docs);
 
 		if (decl != nullptr && decl->kind == Ast_ValueDecl) {
-			if (!decl->ValueDecl.is_mutable) {
-				syntax_error(token, "'using' may only be applied to variable declarations");
-				return decl;
-			}
+			// if (!decl->ValueDecl.is_mutable) {
+			// 	syntax_error(token, "'using' may only be applied to variable declarations");
+			// 	return decl;
+			// }
 			decl->ValueDecl.is_using = true;
 			return decl;
 		}

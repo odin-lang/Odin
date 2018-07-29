@@ -510,7 +510,6 @@ void big_int_add(BigInt *dst, BigInt const *x, BigInt const *y) {
 
 		u64 first_word = dst->d.word;
 		big_int_alloc(dst, 0, bigger->len);
-		GB_ASSERT(dst->len > 1);
 		dst->d.words[0] = first_word;
 
 		i32 i = 0;

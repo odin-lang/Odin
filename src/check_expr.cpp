@@ -2788,6 +2788,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_offset_of:
 	case BuiltinProc_type_info_of:
 	case BuiltinProc_typeid_of:
+	case BuiltinProc_len:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 	default:
@@ -2860,9 +2861,17 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	case BuiltinProc_len:
-	case BuiltinProc_cap: {
+		check_expr_or_type(c, operand, ce->args[0]);
+		if (operand->mode == Addressing_Invalid) {
+			return false;
+		}
+		/* fallthrough */
+
+	case BuiltinProc_cap:
+	{
 		// len :: proc(Type) -> int
 		// cap :: proc(Type) -> int
+
 		Type *op_type = type_deref(operand->type);
 		Type *type = t_int;
 		AddressingMode mode = Addressing_Invalid;
@@ -2890,6 +2899,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			mode = Addressing_Value;
 		} else if (is_type_map(op_type)) {
 			mode = Addressing_Value;
+		} else if (operand->mode == Addressing_Type && is_type_enum(op_type) && id == BuiltinProc_len) {
+			Type *bt = base_type(op_type);
+			mode  = Addressing_Constant;
+			value = exact_value_i64(bt->Enum.fields.count);
+			type  = t_untyped_integer;
 		}
 
 		if (mode == Addressing_Invalid) {

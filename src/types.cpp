@@ -131,14 +131,11 @@ struct TypeStruct {
 	TYPE_KIND(Struct,  TypeStruct)                        \
 	TYPE_KIND(Enum, struct {                              \
 		Array<Entity *> fields;                           \
-		Ast *node;                                    \
+		Ast *node;                                        \
 		Scope *  scope;                                   \
 		Entity * names;                                   \
 		Type *   base_type;                               \
-		bool     is_export;                               \
-		Entity * count;                                   \
-		Entity * min_value;                               \
-		Entity * max_value;                               \
+		bool     is_using;                                \
 	})                                                    \
 	TYPE_KIND(Union, struct {                             \
 		Array<Type *> variants;                           \
@@ -1657,21 +1654,6 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 
 		if (is_type_enum(type)) {
 			// NOTE(bill): These may not have been added yet, so check in case
-			if (type->Enum.count != nullptr) {
-				if (field_name == "count") {
-					sel.entity = type->Enum.count;
-					return sel;
-				}
-				if (field_name == "min_value") {
-					sel.entity = type->Enum.min_value;
-					return sel;
-				}
-				if (field_name == "max_value") {
-					sel.entity = type->Enum.max_value;
-					return sel;
-				}
-			}
-
 			for_array(i, type->Enum.fields) {
 				Entity *f = type->Enum.fields[i];
 				GB_ASSERT(f->kind == Entity_Constant);
