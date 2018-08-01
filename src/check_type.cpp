@@ -1548,7 +1548,7 @@ i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 		return 0;
 	}
 	if (e->kind == Ast_UnaryExpr &&
-	    e->UnaryExpr.op.kind == Token_Ellipsis) {
+	    e->UnaryExpr.op.kind == Token_Question) {
 		return -1;
 	}
 

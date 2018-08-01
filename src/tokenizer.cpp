@@ -76,8 +76,7 @@ TOKEN_KIND(Token__ComparisonEnd, ""), \
 	TOKEN_KIND(Token_Semicolon,     ";"),   \
 	TOKEN_KIND(Token_Period,        "."),   \
 	TOKEN_KIND(Token_Comma,         ","),   \
-	TOKEN_KIND(Token_Ellipsis,      "..."), \
-	TOKEN_KIND(Token_HalfClosed,    ".."),  \
+	TOKEN_KIND(Token_Ellipsis,    ".."),  \
 	TOKEN_KIND(Token_BackSlash,     "\\"),  \
 TOKEN_KIND(Token__OperatorEnd, ""), \
 \
@@ -226,6 +225,9 @@ void error_va(Token token, char *fmt, va_list va) {
 		              gb_bprintf_va(fmt, va));
 	}
 	gb_mutex_unlock(&global_error_collector.mutex);
+	if (global_error_collector.count > 20) {
+		gb_exit(1);
+	}
 }
 
 void error_no_newline_va(Token token, char *fmt, va_list va) {
@@ -241,6 +243,9 @@ void error_no_newline_va(Token token, char *fmt, va_list va) {
 		              gb_bprintf_va(fmt, va));
 	}
 	gb_mutex_unlock(&global_error_collector.mutex);
+	if (global_error_collector.count > 20) {
+		gb_exit(1);
+	}
 }
 
 
@@ -258,6 +263,9 @@ void syntax_error_va(Token token, char *fmt, va_list va) {
 	}
 
 	gb_mutex_unlock(&global_error_collector.mutex);
+	if (global_error_collector.count > 20) {
+		gb_exit(1);
+	}
 }
 
 void syntax_warning_va(Token token, char *fmt, va_list va) {
@@ -936,11 +944,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '.':
 			if (t->curr_rune == '.') { // Could be an ellipsis
 				advance_to_next_rune(t);
-				token.kind = Token_HalfClosed;
-				if (t->curr_rune == '.') {
-					advance_to_next_rune(t);
-					token.kind = Token_Ellipsis;
-				}
+				token.kind = Token_Ellipsis;
 			} else if ('0' <= t->curr_rune && t->curr_rune <= '9') {
 				token = scan_number_to_token(t, true);
 			} else {

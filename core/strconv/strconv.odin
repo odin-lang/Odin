@@ -23,9 +23,9 @@ _digit_value :: proc(r: rune) -> int {
 	ri := int(r);
 	v: int = 16;
 	switch r {
-	case '0'...'9': v = ri-'0';
-	case 'a'...'z': v = ri-'a'+10;
-	case 'A'...'Z': v = ri-'A'+10;
+	case '0'..'9': v = ri-'0';
+	case 'a'..'z': v = ri-'a'+10;
+	case 'A'..'Z': v = ri-'A'+10;
 	}
 	return v;
 }
@@ -36,9 +36,9 @@ parse_i64 :: proc(s: string) -> i64 {
 		switch s[0] {
 		case '-':
 			neg = true;
-			s = s[1..];
+			s = s[1:];
 		case '+':
-			s = s[1..];
+			s = s[1:];
 		}
 	}
 
@@ -46,11 +46,11 @@ parse_i64 :: proc(s: string) -> i64 {
 	base: i64 = 10;
 	if len(s) > 2 && s[0] == '0' {
 		switch s[1] {
-		case 'b': base =  2;  s = s[2..];
-		case 'o': base =  8;  s = s[2..];
-		case 'd': base = 10;  s = s[2..];
-		case 'z': base = 12;  s = s[2..];
-		case 'x': base = 16;  s = s[2..];
+		case 'b': base =  2;  s = s[2:];
+		case 'o': base =  8;  s = s[2:];
+		case 'd': base = 10;  s = s[2:];
+		case 'z': base = 12;  s = s[2:];
+		case 'x': base = 16;  s = s[2:];
 		}
 	}
 
@@ -76,18 +76,18 @@ parse_i64 :: proc(s: string) -> i64 {
 parse_u64 :: proc(s: string) -> u64 {
 	neg := false;
 	if len(s) > 1 && s[0] == '+' {
-		s = s[1..];
+		s = s[1:];
 	}
 
 
 	base := u64(10);
 	if len(s) > 2 && s[0] == '0' {
 		switch s[1] {
-		case 'b': base =  2;  s = s[2..];
-		case 'o': base =  8;  s = s[2..];
-		case 'd': base = 10;  s = s[2..];
-		case 'z': base = 12;  s = s[2..];
-		case 'x': base = 16;  s = s[2..];
+		case 'b': base =  2;  s = s[2:];
+		case 'o': base =  8;  s = s[2:];
+		case 'd': base = 10;  s = s[2:];
+		case 'z': base = 12;  s = s[2:];
+		case 'x': base = 16;  s = s[2:];
 		}
 	}
 
@@ -194,7 +194,7 @@ append_bool :: proc(buf: []byte, b: bool) -> string {
 	n := 0;
 	if b do n = copy(buf, cast([]byte)"true");
 	else do n = copy(buf, cast([]byte)"false");
-	return string(buf[..n]);
+	return string(buf[:n]);
 }
 
 append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
@@ -260,7 +260,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 			s = "+Inf";
 		}
 		n := copy(buf, cast([]byte)s);
-		return buf[..n];
+		return buf[:n];
 
 	case 0: // denormalized
 		exp += 1;
@@ -279,7 +279,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 	shortest := prec < 0;
 	if shortest {
 		round_shortest(d, mant, exp, flt);
-		digs = DecimalSlice{digits = d.digits[..], count = d.count, decimal_point = d.decimal_point};
+		digs = DecimalSlice{digits = d.digits[:], count = d.count, decimal_point = d.decimal_point};
 		switch fmt {
 		case 'e', 'E': prec = digs.count-1;
 		case 'f', 'F': prec = max(digs.count-digs.decimal_point, 0);
@@ -296,7 +296,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 			round(d, prec);
 		}
 
-		digs = DecimalSlice{digits = d.digits[..], count = d.count, decimal_point = d.decimal_point};
+		digs = DecimalSlice{digits = d.digits[:], count = d.count, decimal_point = d.decimal_point};
 	}
 	return format_digits(buf, shortest, neg, digs, prec, fmt);
 }
@@ -309,9 +309,9 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: DecimalSlice
 		n: int,
 	}
 
-	to_bytes :: proc(b: Buffer) -> []byte do return b.b[..b.n];
-	add_bytes :: proc(buf: ^Buffer, bytes: ...byte) {
-		buf.n += copy(buf.b[buf.n..], bytes);
+	to_bytes :: proc(b: Buffer) -> []byte do return b.b[:b.n];
+	add_bytes :: proc(buf: ^Buffer, bytes: ..byte) {
+		buf.n += copy(buf.b[buf.n:], bytes);
 	}
 
 	b := Buffer{b = buf};
@@ -323,7 +323,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: DecimalSlice
 		// integer, padded with zeros when needed
 		if digs.decimal_point > 0 {
 			m := min(digs.count, digs.decimal_point);
-			add_bytes(&b, ...digs.digits[0..m]);
+			add_bytes(&b, ..digs.digits[0:m]);
 			for ; m < digs.decimal_point; m += 1 {
 				add_bytes(&b, '0');
 			}
@@ -335,7 +335,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: DecimalSlice
 		// fractional part
 		if prec > 0 {
 			add_bytes(&b, '.');
-			for i in 0..prec {
+			for i in 0..prec-1 {
 				c: byte = '0';
 				if j := digs.decimal_point + i; 0 <= j && j < digs.count {
 					c = digs.digits[j];
@@ -398,7 +398,7 @@ round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^FloatInfo) {
 
 	inclusive := mant%2 == 0;
 
-	for i in 0..d.count {
+	for i in 0..d.count-1 {
 		l: byte = '0'; // lower digit
 		if i < lower.count {
 			l = lower.digits[i];
@@ -498,8 +498,8 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 		i-=1; a[i] = ' ';
 	}
 
-	out := a[i..];
+	out := a[i:];
 	copy(buf, out);
-	return string(buf[0..len(out)]);
+	return string(buf[0:len(out)]);
 }
 

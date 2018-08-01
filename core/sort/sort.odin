@@ -11,7 +11,7 @@ bubble_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	for {
 		init_swap, prev_swap := -1, -1;
 
-		for j in init_j..last_j {
+		for j in init_j..last_j-1 {
 			if f(array[j], array[j+1]) > 0 {
 				array[j], array[j+1] = array[j+1], array[j];
 				prev_swap = j;
@@ -34,7 +34,7 @@ bubble_sort :: proc(array: $A/[]$T) {
 	for {
 		init_swap, prev_swap := -1, -1;
 
-		for j in init_j..last_j {
+		for j in init_j..last_j-1 {
 			if array[j] > array[j+1] {
 				array[j], array[j+1] = array[j+1], array[j];
 				prev_swap = j;
@@ -69,8 +69,8 @@ quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 		j -= 1;
 	}
 
-	quick_sort_proc(a[0..i], f);
-	quick_sort_proc(a[i..n], f);
+	quick_sort_proc(a[0:i], f);
+	quick_sort_proc(a[i:n], f);
 }
 
 quick_sort :: proc(array: $A/[]$T) {
@@ -92,8 +92,8 @@ quick_sort :: proc(array: $A/[]$T) {
 		j -= 1;
 	}
 
-	quick_sort(a[0..i]);
-	quick_sort(a[i..n]);
+	quick_sort(a[0:i]);
+	quick_sort(a[i:n]);
 }
 
 _log2 :: proc(n: int) -> int {
@@ -106,7 +106,7 @@ merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	merge_slices :: proc(arr1, arr2, out: A, f: proc(T, T) -> int) {
 		N1, N2 := len(arr1), len(arr2);
 		i, j := 0, 0;
-		for k in 0..N1+N2 {
+		for k in 0..N1+N2-1 {
 			if j == N2 || i < N1 && j < N2 && f(arr1[i], arr2[j]) < 0 {
 				out[k] = arr1[i];
 				i += 1;
@@ -126,16 +126,16 @@ merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 
 	a, b, m, M := N/2, N, 1, _log2(N);
 
-	for i in 0..M+1 {
-		for j in 0..a {
+	for i in 0..M {
+		for j in 0..a-1 {
 			k := 2*j*m;
-			merge_slices(arr1[k..k+m], arr1[k+m..k+m+m], arr2[k..], f);
+			merge_slices(arr1[k:k+m], arr1[k+m:k+m+m], arr2[k:], f);
 		}
 		if N-b > m {
 			k := 2*a*m;
-			merge_slices(arr1[k..k+m], arr1[k+m..k+m+(N-b)&(m-1)], arr2[k..], f);
+			merge_slices(arr1[k:k+m], arr1[k+m : k+m+(N-b)&(m-1)], arr2[k:], f);
 		} else {
-			copy(arr2[b..N], arr1[b..N]);
+			copy(arr2[b:N], arr1[b:N]);
 		}
 		arr1, arr2 = arr2, arr1;
 		m <<= 1;
@@ -150,7 +150,7 @@ merge_sort :: proc(array: $A/[]$T) {
 	merge_slices :: proc(arr1, arr2, out: A) {
 		N1, N2 := len(arr1), len(arr2);
 		i, j := 0, 0;
-		for k in 0..N1+N2 {
+		for k in 0..N1+N2-1 {
 			if j == N2 || i < N1 && j < N2 && arr1[i] < arr2[j] {
 				out[k] = arr1[i];
 				i += 1;
@@ -168,16 +168,16 @@ merge_sort :: proc(array: $A/[]$T) {
 
 	a, b, m, M := N/2, N, 1, _log2(N);
 
-	for i in 0..M+1 {
-		for j in 0..a {
+	for i in 0..M {
+		for j in 0..a-1 {
 			k := 2*j*m;
-			merge_slices(arr1[k..k+m], arr1[k+m..k+m+m], arr2[k..]);
+			merge_slices(arr1[k:k+m], arr1[k+m:k+m+m], arr2[k:]);
 		}
 		if N-b > m {
 			k := 2*a*m;
-			merge_slices(arr1[k..k+m], arr1[k+m..k+m+(N-b)&(m-1)], arr2[k..]);
+			merge_slices(arr1[k:k+m], arr1[k+m : k+m+(N-b)&(m-1)], arr2[k:]);
 		} else {
-			copy(arr2[b..N], arr1[b..N]);
+			copy(arr2[b:N], arr1[b:N]);
 		}
 		arr1, arr2 = arr2, arr1;
 		m <<= 1;

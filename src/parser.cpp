@@ -1142,7 +1142,7 @@ Token expect_operator(AstFile *f) {
 	if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
 		syntax_error(f->curr_token, "Expected an operator, got '%.*s'",
 		             LIT(token_strings[prev.kind]));
-	} else if (!f->allow_range && (prev.kind == Token_Ellipsis || prev.kind == Token_HalfClosed)) {
+	} else if (!f->allow_range && (prev.kind == Token_Ellipsis)) {
 		syntax_error(f->curr_token, "Expected an non-range operator, got '%.*s'",
 		             LIT(token_strings[prev.kind]));
 	}
@@ -2041,7 +2041,7 @@ Ast *parse_call_expr(AstFile *f, Ast *operand) {
 			Token eq = expect_token(f, Token_Eq);
 
 			if (prefix_ellipsis) {
-				syntax_error(ellipsis, "'...' must be applied to value rather than the field name");
+				syntax_error(ellipsis, "'..' must be applied to value rather than the field name");
 			}
 
 			Ast *value = parse_value(f);
@@ -2118,18 +2118,14 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
 
-			if (f->curr_token.kind != Token_Ellipsis &&
-			    f->curr_token.kind != Token_HalfClosed) {
+			if (f->curr_token.kind != Token_Colon) {
 				indices[0] = parse_expr(f, false);
 			}
 
-			if ((f->curr_token.kind == Token_Ellipsis ||
-			        f->curr_token.kind == Token_HalfClosed)) {
+			if (f->curr_token.kind == Token_Colon) {
 				ellipsis = advance_token(f);
 				is_ellipsis = true;
-				if (f->curr_token.kind != Token_Ellipsis &&
-				    f->curr_token.kind != Token_HalfClosed &&
-				    f->curr_token.kind != Token_CloseBracket &&
+				if (f->curr_token.kind != Token_CloseBracket &&
 				    f->curr_token.kind != Token_EOF) {
 					indices[1] = parse_expr(f, false);
 				}
@@ -2214,7 +2210,6 @@ bool is_ast_range(Ast *expr) {
 	TokenKind op = expr->BinaryExpr.op.kind;
 	switch (op) {
 	case Token_Ellipsis:
-	case Token_HalfClosed:
 		return true;
 	}
 	return false;
@@ -2226,7 +2221,6 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_Question:
 		return 1;
 	case Token_Ellipsis:
-	case Token_HalfClosed:
 		if (!f->allow_range) {
 			return 0;
 		}
@@ -2690,7 +2684,7 @@ Ast *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_type_token) {
 		Token tok = advance_token(f);
 		Ast *type = parse_type_or_ident(f);
 		if (type == nullptr) {
-			syntax_error(tok, "variadic field missing type after '...'");
+			syntax_error(tok, "variadic field missing type after '..'");
 			type = ast_bad_expr(f, tok, f->curr_token);
 		}
 		return ast_ellipsis(f, tok, type);

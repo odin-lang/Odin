@@ -715,8 +715,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 					continue;
 				}
 				switch (ie->op.kind) {
-				case Token_Ellipsis:   op = Token_GtEq; break;
-				case Token_HalfClosed: op = Token_Gt;   break;
+				case Token_Ellipsis: op = Token_GtEq; break;
 				default: error(ie->op, "Invalid interval operator"); continue;
 				}
 
@@ -726,8 +725,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				}
 
 				switch (ie->op.kind) {
-				case Token_Ellipsis:   op = Token_LtEq; break;
-				case Token_HalfClosed: op = Token_Lt;   break;
+				case Token_Ellipsis: op = Token_LtEq; break;
 				default: error(ie->op, "Invalid interval operator"); continue;
 				}
 
@@ -1362,8 +1360,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 				TokenKind op = Token_Lt;
 				switch (ie->op.kind) {
-				case Token_Ellipsis:   op = Token_LtEq; break;
-				case Token_HalfClosed: op = Token_Lt; break;
+				case Token_Ellipsis: op = Token_LtEq; break;
 				default: error(ie->op, "Invalid range operator"); break;
 				}
 				bool ok = compare_exact_values(op, a, b);

@@ -95,7 +95,7 @@ enumerations :: proc() {
 }
 
 variadic_procedures :: proc() {
-	print_ints :: proc(args: ...int) {
+	print_ints :: proc(args: ..int) {
 		for arg, i in args {
 			if i > 0 do print(", ");
 			print(arg);
@@ -106,7 +106,7 @@ variadic_procedures :: proc() {
 	print_ints(1); nl();
 	print_ints(1, 2, 3); nl();
 
-	print_prefix_f32s :: proc(prefix: string, args: ...f32) {
+	print_prefix_f32s :: proc(prefix: string, args: ..f32) {
 		print(prefix);
 		print(": ");
 		for arg, i in args {
@@ -323,7 +323,7 @@ match_statement :: proc() {
 
 Vector3 :: struct {x, y, z: f32}
 
-print_floats :: proc(args: ...f32) {
+print_floats :: proc(args: ..f32) {
 	for arg, i in args {
 		if i > 0 do print(", ");
 		print(arg);

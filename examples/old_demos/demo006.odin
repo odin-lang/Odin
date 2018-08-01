@@ -21,7 +21,7 @@ when true {
 	Removed:
 	 * Maybe/option types
 	 * Remove `type` keyword and other "reserved" keywords
-	 * ..< and ... removed and replace with .. (half-closed range)
+	 * ..< and .. removed and replace with .. (half-closed range)
 
 	Changed:
 	 * `#assert` and `assert` return the value of the condition for semantic reasons
@@ -51,7 +51,7 @@ when true {
 	}
 
 	{
-		// Removal of ..< and ...
+		// Removal of ..< and ..
 		for i in 0..16 {
 		}
 		// Is similar to

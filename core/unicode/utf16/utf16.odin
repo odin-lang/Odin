@@ -33,7 +33,7 @@ encode :: proc(d: []u16, s: []rune) -> int {
 	n, m := 0, len(d);
 	loop: for r in s {
 		switch r {
-		case 0.._surr1, _surr3 .. _surr_self:
+		case 0.._surr1-1, _surr3 .. _surr_self-1:
 			if m+1 < n do break loop;
 			d[n] = u16(r);
 			n += 1;
@@ -59,7 +59,7 @@ encode_string :: proc(d: []u16, s: string) -> int {
 	n, m := 0, len(d);
 	loop: for r in s {
 		switch r {
-		case 0.._surr1, _surr3 .. _surr_self:
+		case 0.._surr1-1, _surr3 .. _surr_self-1:
 			if m+1 < n do break loop;
 			d[n] = u16(r);
 			n += 1;

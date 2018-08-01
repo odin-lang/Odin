@@ -73,7 +73,7 @@ Stat :: struct {
 	blocks:        i64,  // Number of blocks allocated for the file
 	block_size:    i32,  // Optimal blocksize for I/O
 	flags:         u32,  // User-defined flags for the file
-	gen_num:       u32,  // File generation number ...?
+	gen_num:       u32,  // File generation number ..?
 	_spare:        i32,  // RESERVED
 	_reserve1,
 	_reserve2:     i64,  // RESERVED

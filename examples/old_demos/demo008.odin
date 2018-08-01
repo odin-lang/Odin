@@ -72,10 +72,10 @@ general_stuff :: proc() {
 
 	{
 		// ..  half-closed range
-		// ... open range
+		// .. open range
 
 		for in 0..2  {} // 0, 1
-		for in 0...2 {} // 0, 1, 2
+		for in 0..2 {} // 0, 1, 2
 	}
 
 	{ // Multiple sized booleans
@@ -324,17 +324,17 @@ union_type :: proc() {
 
 		/*
 			Entity :: struct {
-				...
+				..
 				derived: union{^Frog, ^Monster},
 			}
 
 			Frog :: struct {
 				using entity: Entity,
-				...
+				..
 			}
 			Monster :: struct {
 				using entity: Entity,
-				...
+				..
 
 			}
 			new_entity :: proc(T: type) -> ^Entity {
@@ -559,7 +559,7 @@ threading_example :: proc() {
 		}
 
 		worker_proc :: proc(t: ^thread.Thread) -> int {
-			for iteration in 1...5 {
+			for iteration in 1..5 {
 				fmt.printf("Thread %d is on iteration %d\n", t.user_index, iteration);
 				fmt.printf("`%s`: iteration %d\n", prefix_table[t.user_index], iteration);
 				// win32.sleep(1);

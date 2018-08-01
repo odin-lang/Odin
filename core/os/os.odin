@@ -37,7 +37,7 @@ read_entire_file :: proc(name: string) -> (data: []byte, success: bool) {
 		delete(data);
 		return nil, false;
 	}
-	return data[0..bytes_read], true;
+	return data[0:bytes_read], true;
 }
 
 write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (success: bool) {

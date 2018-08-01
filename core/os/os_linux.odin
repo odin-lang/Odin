@@ -74,7 +74,7 @@ Stat :: struct {
 	_reserve1,
 	_reserve2,
 	_reserve3:     i64,
-	serial_numbe:  u64, // File serial number...? Maybe.
+	serial_numbe:  u64, // File serial number..? Maybe.
 	_reserve4:     i64,
 };
 
