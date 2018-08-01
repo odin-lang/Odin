@@ -17,7 +17,7 @@ __print_u64 :: proc(fd: os.Handle, u: u64) {
 	}
 	i -= 1; a[i] = digits[u % b];
 
-	os.write(fd, a[i..]);
+	os.write(fd, a[i:]);
 }
 
 __print_i64 :: proc(fd: os.Handle, u: i64) {
@@ -38,7 +38,7 @@ __print_i64 :: proc(fd: os.Handle, u: i64) {
 		i -= 1; a[i] = '-';
 	}
 
-	os.write(fd, a[i..]);
+	os.write(fd, a[i:]);
 }
 
 __print_caller_location :: proc(fd: os.Handle, using loc: Source_Code_Location) {
@@ -256,7 +256,7 @@ bounds_check_error :: proc "contextless" (file: string, line, column: int, index
 	__print_caller_location(fd, Source_Code_Location{file, line, column, ""});
 	os.write_string(fd, " Index ");
 	__print_i64(fd, i64(index));
-	os.write_string(fd, " is out of bounds range 0..");
+	os.write_string(fd, " is out of bounds range 0:");
 	__print_i64(fd, i64(count));
 	os.write_byte(fd, '\n');
 	debug_trap();
@@ -270,9 +270,9 @@ slice_expr_error :: proc "contextless" (file: string, line, column: int, lo, hi:
 	__print_caller_location(fd, Source_Code_Location{file, line, column, ""});
 	os.write_string(fd, " Invalid slice indices: ");
 	__print_i64(fd, i64(lo));
-	os.write_string(fd, "..");
+	os.write_string(fd, ":");
 	__print_i64(fd, i64(hi));
-	os.write_string(fd, "..");
+	os.write_string(fd, ":");
 	__print_i64(fd, i64(len));
 	os.write_byte(fd, '\n');
 	debug_trap();
@@ -285,9 +285,9 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int,
 	__print_caller_location(fd, Source_Code_Location{file, line, column, ""});
 	os.write_string(fd, " Invalid dynamic array values: ");
 	__print_i64(fd, i64(low));
-	os.write_string(fd, "..");
+	os.write_string(fd, ":");
 	__print_i64(fd, i64(high));
-	os.write_string(fd, "..");
+	os.write_string(fd, ":");
 	__print_i64(fd, i64(max));
 	os.write_byte(fd, '\n');
 	debug_trap();

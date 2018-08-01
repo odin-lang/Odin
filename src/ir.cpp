@@ -5820,10 +5820,6 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 		if (se->low  != nullptr) low  = ir_build_expr(proc, se->low);
 		if (se->high != nullptr) high = ir_build_expr(proc, se->high);
 
-		if (high != nullptr && se->interval.kind == Token_Ellipsis) {
-			high = ir_emit_arith(proc, Token_Add, high, v_one, t_int);
-		}
-
 		irValue *addr = ir_build_addr_ptr(proc, se->expr);
 		irValue *base = ir_emit_load(proc, addr);
 		Type *type = base_type(ir_type(base));
@@ -6625,8 +6621,7 @@ void ir_build_range_interval(irProcedure *proc, AstBinaryExpr *node, Type *val_t
 
 	TokenKind op = Token_Lt;
 	switch (node->op.kind) {
-	case Token_Ellipsis:   op = Token_LtEq; break;
-	case Token_HalfClosed: op = Token_Lt;   break;
+	case Token_Ellipsis: op = Token_LtEq;   break;
 	default: GB_PANIC("Invalid interval operator"); break;
 	}
 
@@ -7224,8 +7219,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 					ast_node(ie, BinaryExpr, expr);
 					TokenKind op = Token_Invalid;
 					switch (ie->op.kind) {
-					case Token_Ellipsis:   op = Token_LtEq; break;
-					case Token_HalfClosed: op = Token_Lt;   break;
+					case Token_Ellipsis: op = Token_LtEq; break;
 					default: GB_PANIC("Invalid interval operator"); break;
 					}
 					irValue *lhs = ir_build_expr(proc, ie->left);

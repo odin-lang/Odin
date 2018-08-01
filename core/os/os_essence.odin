@@ -49,7 +49,7 @@ OS_Node_Information :: struct {
 	ntype:    OS_Node_Type,
 	size:     i64,
 
-	// Our additions...
+	// Our additions..
 	position: i64,
 }
 

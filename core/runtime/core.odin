@@ -350,7 +350,7 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) {
 
 
 @(builtin)
-append :: proc(array: ^$T/[dynamic]$E, args: ...E, loc := #caller_location) -> int {
+append :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location) -> int {
 	if array == nil do return 0;
 
 	arg_len := len(args);
@@ -373,7 +373,7 @@ append :: proc(array: ^$T/[dynamic]$E, args: ...E, loc := #caller_location) -> i
 }
 
 @(builtin)
-append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ...string, loc := #caller_location) -> int {
+append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_location) -> int {
 	for arg in args {
 		append(array = array, args = ([]E)(arg), loc = loc);
 	}
@@ -616,9 +616,9 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 
 	__dynamic_array_resize(nm_hashes, size_of(int), align_of(int), new_count, loc);
 	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len, loc);
-	for i in 0..new_count do nm.hashes[i] = -1;
+	for i in 0..new_count-1 do nm.hashes[i] = -1;
 
-	for i in 0..m.entries.len {
+	for i in 0..m.entries.len-1 {
 		if len(nm.hashes) == 0 do __dynamic_map_grow(new_header, loc);
 
 		entry_header := __dynamic_map_get_entry(header, i);

@@ -20,29 +20,29 @@ decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
 
 	// TODO(bill): make this work with a buffer that's not big enough
 	assert(len(buf) >= n);
-	buf = buf[0..n];
+	buf = buf[0:n];
 
 	if a.count == 0 {
 		buf[0] = '0';
-		return string(buf[0..1]);
+		return string(buf[0:1]);
 	}
 
 	w := 0;
 	if a.decimal_point <= 0 {
 		buf[w] = '0'; w += 1;
 		buf[w] = '.'; w += 1;
-		w += digit_zero(buf[w .. w-a.decimal_point]);
-		w += copy(buf[w..], a.digits[0..a.count]);
+		w += digit_zero(buf[w : w-a.decimal_point]);
+		w += copy(buf[w:], a.digits[0:a.count]);
 	} else if a.decimal_point < a.count {
-		w += copy(buf[w..], a.digits[0..a.decimal_point]);
+		w += copy(buf[w:], a.digits[0:a.decimal_point]);
 		buf[w] = '.'; w += 1;
-		w += copy(buf[w..], a.digits[a.decimal_point .. a.count]);
+		w += copy(buf[w:], a.digits[a.decimal_point : a.count]);
 	} else {
-		w += copy(buf[w..], a.digits[0..a.count]);
-		w += digit_zero(buf[w .. w+a.decimal_point-a.count]);
+		w += copy(buf[w:], a.digits[0:a.count]);
+		w += digit_zero(buf[w : w+a.decimal_point-a.count]);
 	}
 
-	return string(buf[0..w]);
+	return string(buf[0:w]);
 }
 
 // trim trailing zeros

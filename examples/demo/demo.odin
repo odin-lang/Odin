@@ -74,11 +74,9 @@ general_stuff :: proc() {
 	}
 
 	{
-		// ..  half-closed range
-		// ... open range
+		// .. open range
 
-		for in 0..2  {} // 0, 1
-		for in 0...2 {} // 0, 1, 2
+		for in 0..2  {} // 0, 1, 2
 	}
 
 	{ // Multiple sized booleans
@@ -267,17 +265,17 @@ union_type :: proc() {
 
 		/*
 			Entity :: struct {
-				...
+				..
 				derived: union{^Frog, ^Monster},
 			}
 
 			Frog :: struct {
 				using entity: Entity,
-				...
+				..
 			}
 			Monster :: struct {
 				using entity: Entity,
-				...
+				..
 
 			}
 			new_entity :: proc(T: type) -> ^Entity {
@@ -451,7 +449,7 @@ parametric_polymorphism :: proc() {
 
 		get_hash :: proc(s: string) -> u32 { // fnv32a
 			h: u32 = 0x811c9dc5;
-			for i in 0..len(s) {
+			for i in 0..len(s)-1 {
 				h = (h ~ u32(s[i])) * 0x01000193;
 			}
 			return h;
@@ -500,12 +498,12 @@ threading_example :: proc() {
 		}
 		ordered_remove :: proc(array: ^[dynamic]$T, index: int, loc := #caller_location) {
 			runtime.bounds_check_error_loc(loc, index, len(array));
-			copy(array[index..], array[index+1..]);
+			copy(array[index:], array[index+1:]);
 			pop(array);
 		}
 
 		worker_proc :: proc(t: ^thread.Thread) -> int {
-			for iteration in 1...5 {
+			for iteration in 1..5 {
 				fmt.printf("Thread %d is on iteration %d\n", t.user_index, iteration);
 				fmt.printf("`%s`: iteration %d\n", prefix_table[t.user_index], iteration);
 				// win32.sleep(1);

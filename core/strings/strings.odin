@@ -6,7 +6,7 @@ new_string :: proc(s: string) -> string {
 	c := make([]byte, len(s)+1);
 	copy(c, cast([]byte)s);
 	c[len(s)] = 0;
-	return string(c[..len(s)]);
+	return string(c[:len(s)]);
 }
 
 new_cstring :: proc(s: string) -> cstring {

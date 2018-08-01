@@ -6110,8 +6110,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			// It is okay to continue as it will assume the 1st index is zero
 		}
 
-		TokenKind interval_kind = se->interval.kind;
-
 		i64 indices[2] = {};
 		Ast *nodes[2] = {se->low, se->high};
 		for (isize i = 0; i < gb_count_of(nodes); i++) {
@@ -6122,7 +6120,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					capacity = max_count;
 				}
 				i64 j = 0;
-				if (check_index_value(c, interval_kind == Token_Ellipsis, nodes[i], capacity, &j)) {
+				if (check_index_value(c, false, nodes[i], capacity, &j)) {
 					index = j;
 				}
 			} else if (i == 0) {
