@@ -364,26 +364,24 @@ parametric_polymorphism :: proc() {
 		allocate :: proc(table: ^$T/Table, capacity: int) {
 			c := context;
 			if table.allocator.procedure != nil do c.allocator = table.allocator;
+			context = c;
 
-			context <- c {
-				table.slots = make_slice(type_of(table.slots), max(capacity, TABLE_SIZE_MIN));
-			}
+			table.slots = make_slice(type_of(table.slots), max(capacity, TABLE_SIZE_MIN));
 		}
 
 		expand :: proc(table: ^$T/Table) {
 			c := context;
 			if table.allocator.procedure != nil do c.allocator = table.allocator;
+			context = c;
 
-			context <- c {
-				old_slots := table.slots;
-				defer delete(old_slots);
+			old_slots := table.slots;
+			defer delete(old_slots);
 
-				cap := max(2*len(table.slots), TABLE_SIZE_MIN);
-				allocate(table, cap);
+			cap := max(2*len(table.slots), TABLE_SIZE_MIN);
+			allocate(table, cap);
 
-				for s in old_slots do if s.occupied {
-					put(table, s.key, s.value);
-				}
+			for s in old_slots do if s.occupied {
+				put(table, s.key, s.value);
 			}
 		}
 

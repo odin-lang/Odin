@@ -167,10 +167,6 @@ bool check_is_terminating(Ast *node) {
 		}
 		return has_default;
 	case_end;
-
-	case_ast_node(pc, PushContext, node);
-		return check_is_terminating(pc->body);
-	case_end;
 	}
 
 	return false;
@@ -303,6 +299,10 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 			}
 		}
 
+		break;
+	}
+
+	case Addressing_Context: {
 		break;
 	}
 
@@ -1595,13 +1595,6 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				return;
 			}
 		}
-	case_end;
-
-	case_ast_node(pa, PushContext, node);
-		Operand op = {};
-		check_expr(ctx, &op, pa->expr);
-		check_assignment(ctx, &op, t_context, str_lit("argument to context <-"));
-		check_stmt(ctx, pa->body, mod_flags);
 	case_end;
 
 	case_ast_node(fb, ForeignBlockDecl, node);

@@ -338,6 +338,7 @@ gb_global bool global_module_path_set = false;
 typedef struct Arena {
 	u8 *        ptr;
 	u8 *        end;
+	u8 *        prev;
 	Array<u8 *> blocks;
 	gbAllocator backing;
 	isize       block_size;
@@ -363,11 +364,11 @@ void arena_grow(Arena *arena, isize min_size) {
 	isize size = gb_max(arena->block_size, min_size);
 	size = ALIGN_UP(size, ARENA_MIN_ALIGNMENT);
 	void *new_ptr = gb_alloc(arena->backing, size);
-    arena->ptr = cast(u8 *)new_ptr;
-    gb_zero_size(arena->ptr, size);
-    GB_ASSERT(arena->ptr == ALIGN_DOWN_PTR(arena->ptr, ARENA_MIN_ALIGNMENT));
-    arena->end = arena->ptr + size;
-    array_add(&arena->blocks, arena->ptr);
+	arena->ptr = cast(u8 *)new_ptr;
+	gb_zero_size(arena->ptr, size);
+	GB_ASSERT(arena->ptr == ALIGN_DOWN_PTR(arena->ptr, ARENA_MIN_ALIGNMENT));
+	arena->end = arena->ptr + size;
+	array_add(&arena->blocks, arena->ptr);
 }
 
 void *arena_alloc(Arena *arena, isize size, isize alignment) {
@@ -376,18 +377,19 @@ void *arena_alloc(Arena *arena, isize size, isize alignment) {
 
 	arena->total_used += size;
 
-    if (size > (arena->end - arena->ptr)) {
-        arena_grow(arena, size);
-        GB_ASSERT(size <= (arena->end - arena->ptr));
-    }
+	if (size > (arena->end - arena->ptr)) {
+		arena_grow(arena, size);
+		GB_ASSERT(size <= (arena->end - arena->ptr));
+	}
 
-    isize align = gb_max(alignment, ARENA_MIN_ALIGNMENT);
-    void *ptr = arena->ptr;
-    arena->ptr = cast(u8 *)ALIGN_UP_PTR(arena->ptr + size, align);
-    GB_ASSERT(arena->ptr <= arena->end);
-    GB_ASSERT(ptr == ALIGN_DOWN_PTR(ptr, align));
-    gb_zero_size(ptr, size);
-    return ptr;
+	isize align = gb_max(alignment, ARENA_MIN_ALIGNMENT);
+	void *ptr = arena->ptr;
+	arena->prev = arena->ptr;
+	arena->ptr = cast(u8 *)ALIGN_UP_PTR(arena->ptr + size, align);
+	GB_ASSERT(arena->ptr <= arena->end);
+	GB_ASSERT(ptr == ALIGN_DOWN_PTR(ptr, align));
+	gb_zero_size(ptr, size);
+	return ptr;
 }
 
 void arena_free_all(Arena *arena) {
@@ -395,11 +397,11 @@ void arena_free_all(Arena *arena) {
 	defer (gb_mutex_unlock(&arena->mutex));
 
 	for_array(i, arena->blocks) {
-        gb_free(arena->backing, arena->blocks[i]);
-    }
-    array_clear(&arena->blocks);
-    arena->ptr = nullptr;
-    arena->end = nullptr;
+		gb_free(arena->backing, arena->blocks[i]);
+	}
+	array_clear(&arena->blocks);
+	arena->ptr = nullptr;
+	arena->end = nullptr;
 }
 
 

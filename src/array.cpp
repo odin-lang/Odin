@@ -41,6 +41,15 @@ template <typename T> void     array_set_capacity (Array<T> *array, isize capaci
 template <typename T> Array<T> array_slice        (Array<T> const &array, isize lo, isize hi);
 
 template <typename T>
+T *array_end_ptr(Array<T> *array) {
+	if (array->count > 0) {
+		return &array->data[array->count-1];
+	}
+	return nullptr;
+}
+
+
+template <typename T>
 gb_inline void array_init(Array<T> *array, gbAllocator const &a) {
 	isize cap = ARRAY_GROW_FORMULA(0);
 	array_init(array, a, 0, cap);

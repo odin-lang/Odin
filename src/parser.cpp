@@ -53,7 +53,6 @@ Token ast_token(Ast *node) {
 	case Ast_DeferStmt:          return node->DeferStmt.token;
 	case Ast_BranchStmt:         return node->BranchStmt.token;
 	case Ast_UsingStmt:          return node->UsingStmt.token;
-	case Ast_PushContext:        return node->PushContext.token;
 
 	case Ast_BadDecl:            return node->BadDecl.begin;
 	case Ast_Label:              return node->Label.token;
@@ -273,10 +272,6 @@ Ast *clone_ast(Ast *node) {
 		break;
 	case Ast_UsingStmt:
 		n->UsingStmt.list = clone_ast_array(n->UsingStmt.list);
-		break;
-	case Ast_PushContext:
-		n->PushContext.expr = clone_ast(n->PushContext.expr);
-		n->PushContext.body = clone_ast(n->PushContext.body);
 		break;
 
 	case Ast_BadDecl: break;
@@ -787,15 +782,6 @@ Ast *ast_using_stmt(AstFile *f, Token token, Array<Ast *> list) {
 	return result;
 }
 
-Ast *ast_push_context(AstFile *f, Token token, Ast *expr, Ast *body) {
-	Ast *result = alloc_ast_node(f, Ast_PushContext);
-	result->PushContext.token = token;
-	result->PushContext.expr = expr;
-	result->PushContext.body = body;
-	return result;
-}
-
-
 
 
 Ast *ast_bad_decl(AstFile *f, Token begin, Token end) {
@@ -1267,7 +1253,6 @@ bool is_semicolon_optional_for_node(AstFile *f, Ast *s) {
 	case Ast_RangeStmt:
 	case Ast_SwitchStmt:
 	case Ast_TypeSwitchStmt:
-	case Ast_PushContext:
 		return true;
 
 	case Ast_HelperType:
@@ -2540,25 +2525,6 @@ Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 			}
 		}
 		return parse_value_decl(f, lhs, docs);
-
-	case Token_ArrowLeft:
-		if ((flags&StmtAllowFlag_Context) && lhs.count == 1) {
-			Token arrow = expect_token(f, Token_ArrowLeft);
-			Ast *body = nullptr;
-			isize prev_level = f->expr_level;
-			f->expr_level = -1;
-			Ast *expr = parse_expr(f, false);
-			f->expr_level = prev_level;
-
-			if (allow_token(f, Token_do)) {
-				body = convert_stmt_to_body(f, parse_stmt(f));
-			} else {
-				body = parse_block_stmt(f, false);
-			}
-
-			return ast_push_context(f, token, expr, body);
-		}
-		break;
 	}
 
 	if (lhs.count > 1) {
@@ -3548,7 +3514,7 @@ Ast *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 	case Token_And:
-		s = parse_simple_stmt(f, StmtAllowFlag_Label|StmtAllowFlag_Context);
+		s = parse_simple_stmt(f, StmtAllowFlag_Label);
 		expect_semicolon(f, s);
 		return s;
 
