@@ -11,6 +11,7 @@ enum AddressingMode {
 	Addressing_NoValue,       // no value (void in C)
 	Addressing_Value,         // computed value (rvalue)
 	Addressing_Immutable,     // immutable computed value (const rvalue)
+	Addressing_Context,       // context value
 	Addressing_Variable,      // addressable variable (lvalue)
 	Addressing_Constant,      // constant
 	Addressing_Type,          // type
@@ -191,7 +192,6 @@ enum StmtAllowFlag {
 	StmtAllowFlag_None    = 0,
 	StmtAllowFlag_In      = 1<<0,
 	StmtAllowFlag_Label   = 1<<1,
-	StmtAllowFlag_Context = 1<<2,
 };
 
 #define AST_KINDS \
@@ -342,11 +342,6 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 	AST_KIND(UsingStmt,  "using statement",  struct { \
 		Token token; \
 		Array<Ast *> list; \
-	}) \
-	AST_KIND(PushContext, "context <- statement", struct { \
-		Token token; \
-		Ast *expr; \
-		Ast *body; \
 	}) \
 AST_KIND(_ComplexStmtEnd, "", bool) \
 AST_KIND(_StmtEnd,        "", bool) \

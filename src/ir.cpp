@@ -113,6 +113,11 @@ struct irDebugLocation {
 	irDebugInfo *debug_scope;
 };
 
+struct irContextData {
+	irValue *value;
+	i32 scope_index;
+};
+
 struct irProcedure {
 	irProcedure *         parent;
 	Array<irProcedure *>  children;
@@ -142,7 +147,7 @@ struct irProcedure {
 	irTargetList *        target_list;
 	Array<irValue *>      referrers;
 
-	Array<irValue *>      context_stack;
+	Array<irContextData>  context_stack;
 
 
 	Array<irBranchBlocks> branch_blocks;
@@ -443,6 +448,7 @@ enum irAddrKind {
 	irAddr_Default,
 	irAddr_Map,
 	irAddr_BitField,
+	irAddr_Context,
 };
 
 struct irAddr {
@@ -472,6 +478,13 @@ irAddr ir_addr_map(irValue *addr, irValue *map_key, Type *map_type, Type *map_re
 	v.map_result = map_result;
 	return v;
 }
+
+
+irAddr ir_addr_context(irValue *addr) {
+	irAddr v = {irAddr_Context, addr};
+	return v;
+}
+
 
 irAddr ir_addr_bit_field(irValue *addr, i32 bit_field_value_index) {
 	irAddr v = {irAddr_BitField, addr};
@@ -1354,7 +1367,10 @@ void ir_add_foreign_library_path(irModule *m, Entity *e) {
 
 
 
-
+void ir_push_context_onto_stack(irProcedure *proc, irValue *ctx) {
+	irContextData cd = {ctx, proc->scope_index};
+	array_add(&proc->context_stack, cd);
+}
 
 irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initialized) {
 	irBlock *b = proc->decl_block; // all variables must be in the first block
@@ -1622,7 +1638,7 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index);
 
 irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 	if (proc->context_stack.count > 0) {
-		return proc->context_stack[proc->context_stack.count-1];
+		return proc->context_stack[proc->context_stack.count-1].value;
 	}
 
 	irBlock *tmp_block = proc->curr_block;
@@ -1631,7 +1647,7 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 	defer (proc->curr_block = tmp_block);
 
 	irValue *c = ir_add_local_generated(proc, t_context);
-	array_add(&proc->context_stack, c);
+	ir_push_context_onto_stack(proc, c);
 	ir_emit_store(proc, c, ir_emit_load(proc, proc->module->global_default_context));
 
 	irValue *ep = ir_emit_struct_ep(proc, c, 0);
@@ -1763,6 +1779,21 @@ void ir_open_scope(irProcedure *proc) {
 void ir_close_scope(irProcedure *proc, irDeferExitKind kind, irBlock *block) {
 	ir_emit_defer_stmts(proc, kind, block);
 	GB_ASSERT(proc->scope_index > 0);
+
+
+	// NOTE(bill): Remove `context`s made in that scope
+	for (;;) {
+		irContextData *end = array_end_ptr(&proc->context_stack);
+		if (end == nullptr) {
+			break;
+		}
+		if (end->scope_index != proc->scope_index) {
+			break;
+		}
+		array_pop(&proc->context_stack);
+	}
+
+
 	proc->scope_index--;
 }
 
@@ -1923,6 +1954,7 @@ irValue *ir_emit_source_code_location(irProcedure *proc, String procedure, Token
 irValue *ir_emit_source_code_location(irProcedure *proc, Ast *node);
 irValue *ir_emit_ptr_offset(irProcedure *proc, irValue *ptr, irValue *offset);
 irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *right, Type *type);
+irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel);
 
 irValue *ir_insert_dynamic_map_key_and_value(irProcedure *proc, irValue *addr, Type *map_type,
                                              irValue *map_key, irValue *map_value) {
@@ -1945,12 +1977,13 @@ irValue *ir_insert_dynamic_map_key_and_value(irProcedure *proc, irValue *addr, T
 
 
 
-irValue *ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
+void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 	if (addr.addr == nullptr) {
-		return nullptr;
+		return;
 	}
 	if (addr.kind == irAddr_Map) {
-		return ir_insert_dynamic_map_key_and_value(proc, addr.addr, addr.map_type, addr.map_key, value);
+		ir_insert_dynamic_map_key_and_value(proc, addr.addr, addr.map_type, addr.map_key, value);
+		return;
 	} else if (addr.kind == irAddr_BitField) {
 		gbAllocator a = ir_allocator();
 
@@ -1966,7 +1999,7 @@ irValue *ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 		i32 size_in_bytes = next_pow2((size_in_bits+7)/8);
 		if (size_in_bytes == 0) {
 			GB_ASSERT(size_in_bits == 0);
-			return nullptr;
+			return;
 		}
 
 		Type *int_type = nullptr;
@@ -1994,7 +2027,8 @@ irValue *ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 			}
 			irValue *ptr = ir_emit_conv(proc, bytes, alloc_type_pointer(int_type));
 			v = ir_emit_arith(proc, Token_Or, ir_emit_load(proc, ptr), v, int_type);
-			return ir_emit_store(proc, ptr, v);
+			ir_emit_store(proc, ptr, v);
+			return;
 		}
 
 
@@ -2015,12 +2049,30 @@ irValue *ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 			irValue *ptr = ir_emit_conv(proc, ir_emit_ptr_offset(proc, bytes, v_one), alloc_type_pointer(int_type));
 			irValue *v = ir_emit_arith(proc, Token_Shr, value, shift_amount, int_type);
 			v = ir_emit_arith(proc, Token_Or, ir_emit_load(proc, ptr), v, int_type);
-			return ir_emit_store(proc, ptr, v);
+			ir_emit_store(proc, ptr, v);
+			return;
 		}
+	} else if (addr.kind == irAddr_Context) {
+		irValue *new_context = ir_emit_conv(proc, value, ir_addr_type(addr));
+
+		irValue *prev = ir_find_or_generate_context_ptr(proc);
+		GB_ASSERT(addr.addr == prev);
+
+		irValue *next = ir_add_local_generated(proc, t_context);
+		ir_emit_store(proc, next, new_context);
+
+		Selection sel = lookup_field(t_context, str_lit("parent"), false);
+		GB_ASSERT(sel.entity != nullptr);
+		irValue *parent_ptr = ir_emit_deep_field_gep(proc, next, sel);
+		ir_emit_store(proc, parent_ptr, prev);
+
+		ir_push_context_onto_stack(proc, next);
+
+		return;
 	}
 
 	irValue *v = ir_emit_conv(proc, value, ir_addr_type(addr));
-	return ir_emit_store(proc, addr.addr, v);
+	ir_emit_store(proc, addr.addr, v);
 }
 
 irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
@@ -5559,7 +5611,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 		}
 
 		GB_ASSERT(v != nullptr);
-		return ir_addr(v);
+		return ir_addr_context(v);
 	case_end;
 
 	case_ast_node(i, Ident, expr);
@@ -7408,32 +7460,6 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		ir_emit_jump(proc, block);
 		ir_emit_unreachable(proc);
 	case_end;
-
-
-	case_ast_node(pc, PushContext, node);
-		ir_emit_comment(proc, str_lit("push_context"));
-		irValue *new_context = ir_build_expr(proc, pc->expr);
-
-		ir_open_scope(proc);
-
-		irValue *prev = ir_find_or_generate_context_ptr(proc);
-		irValue *next = ir_add_local_generated(proc, t_context);
-		ir_emit_store(proc, next, new_context);
-
-		Selection sel = lookup_field(t_context, str_lit("parent"), false);
-		GB_ASSERT(sel.entity != nullptr);
-		irValue *parent_ptr = ir_emit_deep_field_gep(proc, next, sel);
-		ir_emit_store(proc, parent_ptr, prev);
-
-		array_add(&proc->context_stack, next);
-		defer (array_pop(&proc->context_stack));
-
-		ir_build_stmt(proc, pc->body);
-
-		ir_close_scope(proc, irDeferExit_Default, nullptr);
-	case_end;
-
-
 	}
 }
 
@@ -7583,7 +7609,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 		e->flags |= EntityFlag_NoAlias;
 		irValue *param = ir_value_param(proc, e, e->type);
 		ir_module_add_value(proc->module, e, param);
-		array_add(&proc->context_stack, param);
+		array_add(&proc->context_stack, {param, proc->scope_index});
 	}
 }
 

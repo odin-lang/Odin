@@ -29,13 +29,9 @@ create :: proc(procedure: Thread_Proc) -> ^Thread {
 		if t.use_init_context {
 			c = t.init_context;
 		}
+		context = c;
 
-		exit := 0;
-		context <- c {
-			exit = t.procedure(t);
-		}
-
-		return i32(exit);
+		return i32(t.procedure(t));
 	}
 
 

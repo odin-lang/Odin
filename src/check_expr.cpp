@@ -578,7 +578,7 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 
 	if (is_type_any(dst)) {
 		if (!is_type_polymorphic(src)) {
-			if (operand->mode == Addressing_Immutable && operand->type == t_context) {
+			if (operand->mode == Addressing_Context && operand->type == t_context) {
 				return -1;
 			} else {
 				// NOTE(bill): Anything can cast to 'Any'
@@ -2040,6 +2040,17 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node) {
 		return;
 	}
 
+	if (x->mode == Addressing_Builtin) {
+		x->mode = Addressing_Invalid;
+		error(x->expr, "built-in expression in binary expression");
+		return;
+	}
+	if (y->mode == Addressing_Builtin) {
+		x->mode = Addressing_Invalid;
+		error(y->expr, "built-in expression in binary expression");
+		return;
+	}
+
 	if (token_is_shift(op.kind)) {
 		check_shift(c, x, y, node);
 		return;
@@ -2724,6 +2735,8 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		// TODO(bill): Is this the rule I need?
 		if (operand->mode == Addressing_Immutable) {
 			// Okay
+		} else if (operand->mode == Addressing_Context) {
+			operand->mode = Addressing_Value; // TODO(bill): Should this be Value or Immutable?
 		} else if (sel.indirect || operand->mode != Addressing_Value) {
 			operand->mode = Addressing_Variable;
 		} else {
@@ -5211,7 +5224,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			}
 
 			init_core_context(c->checker);
-			o->mode = Addressing_Immutable;
+			o->mode = Addressing_Context;
 			o->type = t_context;
 			break;
 

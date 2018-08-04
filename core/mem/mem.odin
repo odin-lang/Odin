@@ -211,12 +211,11 @@ context_from_allocator :: proc(a: Allocator) -> runtime.Context {
 
 destroy_arena :: proc(using a: ^Arena) {
 	if backing.procedure != nil {
-		context <- context_from_allocator(backing) {
-			if memory != nil {
-				free(&memory[0]);
-			}
-			memory = nil;
+		context = context_from_allocator(backing);
+		if memory != nil {
+			free(&memory[0]);
 		}
+		memory = nil;
 	}
 }
 
