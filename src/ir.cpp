@@ -92,6 +92,7 @@ enum irDeferKind {
 struct irDefer {
 	irDeferKind kind;
 	isize       scope_index;
+	isize       context_stack_count;
 	irBlock *   block;
 	union {
 		Ast *stmt;
@@ -115,7 +116,7 @@ struct irDebugLocation {
 
 struct irContextData {
 	irValue *value;
-	i32 scope_index;
+	isize scope_index;
 };
 
 struct irProcedure {
@@ -1264,6 +1265,7 @@ void ir_start_block(irProcedure *proc, irBlock *block) {
 irDefer ir_add_defer_node(irProcedure *proc, isize scope_index, Ast *stmt) {
 	irDefer d = {irDefer_Node};
 	d.scope_index = scope_index;
+	d.context_stack_count = proc->context_stack.count;
 	d.block = proc->curr_block;
 	d.stmt = stmt;
 	array_add(&proc->defer_stmts, d);
@@ -1750,6 +1752,10 @@ void ir_emit_defer_stmts(irProcedure *proc, irDeferExitKind kind, irBlock *block
 	isize i = count;
 	while (i --> 0) {
 		irDefer d = proc->defer_stmts[i];
+		if (d.context_stack_count >= 0) {
+			proc->context_stack.count = d.context_stack_count;
+		}
+
 		if (kind == irDeferExit_Default) {
 			if (proc->scope_index == d.scope_index &&
 			    d.scope_index > 0) { // TODO(bill): Which is correct: > 0 or > 1?
