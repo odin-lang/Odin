@@ -757,6 +757,72 @@ Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Oper
 }
 
 
+ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location) {
+	ParameterValue param_value = {};
+	// gb_printf_err("HERE\n");
+	if (expr == nullptr) {
+		return param_value;
+	}
+	Operand o = {};
+
+	if (allow_caller_location &&
+	    expr->kind == Ast_BasicDirective &&
+	    expr->BasicDirective.name == "caller_location") {
+		init_core_source_code_location(ctx->checker);
+		param_value.kind = ParameterValue_Location;
+		o.type = t_source_code_location;
+	} else {
+		if (in_type) {
+			check_expr_with_type_hint(ctx, &o, expr, in_type);
+		} else {
+			check_expr(ctx, &o, expr);
+		}
+
+		if (is_operand_nil(o)) {
+			param_value.kind = ParameterValue_Nil;
+		} else if (o.mode != Addressing_Constant) {
+			if (expr->kind == Ast_ProcLit) {
+				param_value.kind = ParameterValue_Constant;
+				param_value.value = exact_value_procedure(expr);
+			} else {
+				Entity *e = nullptr;
+				if (o.mode == Addressing_Value && is_type_proc(o.type)) {
+					Operand x = {};
+					if (expr->kind == Ast_Ident) {
+						e = check_ident(ctx, &x, expr, nullptr, nullptr, false);
+					} else if (expr->kind == Ast_SelectorExpr) {
+						e = check_selector(ctx, &x, expr, nullptr);
+					}
+				}
+
+				if (e != nullptr && e->kind == Entity_Procedure) {
+					param_value.kind = ParameterValue_Constant;
+					param_value.value = exact_value_procedure(e->identifier);
+					add_entity_use(ctx, e->identifier, e);
+				} else {
+					error(expr, "Default parameter must be a constant %d", o.mode);
+				}
+			}
+		} else {
+			if (o.value.kind != ExactValue_Invalid) {
+				param_value.kind = ParameterValue_Constant;
+				param_value.value = o.value;
+			} else {
+				error(o.expr, "Invalid constant parameter");
+			}
+		}
+	}
+
+	if (in_type) {
+		check_is_assignable_to(ctx, &o, in_type);
+	}
+
+	if (out_type_) *out_type_ = default_type(o.type);
+
+	return param_value;
+}
+
+
 Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> *operands) {
 	if (_params == nullptr) {
 		return nullptr;
@@ -809,9 +875,8 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 		Ast *type_expr = p->type;
 		Type *type = nullptr;
 		Ast *default_value = unparen_expr(p->default_value);
-		ExactValue value = {};
-		bool default_is_nil = false;
-		bool default_is_location = false;
+		ParameterValue param_value = {};
+
 		bool is_type_param = false;
 		bool is_type_polymorphic_type = false;
 		bool detemine_type_from_operand = false;
@@ -820,62 +885,16 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 		bool is_using = (p->flags&FieldFlag_using) != 0;
 
 		if (type_expr == nullptr) {
-			if (default_value->kind == Ast_BasicDirective &&
-			    default_value->BasicDirective.name == "caller_location") {
-				init_core_source_code_location(ctx->checker);
-				default_is_location = true;
-				type = t_source_code_location;
-			} else {
-				Operand o = {};
-				check_expr_or_type(ctx, &o, default_value);
-				if (is_operand_nil(o)) {
-					default_is_nil = true;
-				} else if (o.mode != Addressing_Constant) {
-					if (default_value->kind == Ast_ProcLit) {
-						value = exact_value_procedure(default_value);
-					} else {
-						Entity *e = nullptr;
-						if (o.mode == Addressing_Value && is_type_proc(o.type)) {
-							Operand x = {};
-							if (default_value->kind == Ast_Ident) {
-								e = check_ident(ctx, &x, default_value, nullptr, nullptr, false);
-							} else if (default_value->kind == Ast_SelectorExpr) {
-								e = check_selector(ctx, &x, default_value, nullptr);
-							}
-						}
-
-						if (e != nullptr && e->kind == Entity_Procedure) {
-							value = exact_value_procedure(e->identifier);
-							add_entity_use(ctx, e->identifier, e);
-						} else {
-							error(default_value, "Default parameter must be a constant");
-							continue;
-						}
-					}
-				} else {
-					value = o.value;
-				}
-
-				type = default_type(o.type);
-			}
+			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, true);
 		} else {
 			if (type_expr->kind == Ast_Ellipsis) {
 				type_expr = type_expr->Ellipsis.expr;
-				#if 1
-					is_variadic = true;
-					variadic_index = variables.count;
-					if (p->names.count != 1) {
-						error(param, "Invalid AST: Invalid variadic parameter with multiple names");
-						success = false;
-					}
-				#else
-				if (i+1 == params.count) {
-					is_variadic = true;
-				} else {
-					error(param, "Invalid AST: Invalid variadic parameter");
+				is_variadic = true;
+				variadic_index = variables.count;
+				if (p->names.count != 1) {
+					error(param, "Invalid AST: Invalid variadic parameter with multiple names");
 					success = false;
 				}
-				#endif
 			}
 			if (type_expr->kind == Ast_TypeType) {
 				ast_node(tt, TypeType, type_expr);
@@ -884,13 +903,6 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 				if (specialization == t_invalid){
 					specialization = nullptr;
 				}
-				// if (specialization) {
-				// 	if (!is_type_polymorphic(specialization)) {
-				// 		gbString str = type_to_string(specialization);
-				// 		error(tt->specialization, "Type specialization requires a polymorphic type, got %s", str);
-				// 		gb_string_free(str);
-				// 	}
-				// }
 
 				if (operands != nullptr) {
 					detemine_type_from_operand = true;
@@ -913,49 +925,10 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			}
 
 			if (default_value != nullptr) {
-				if (type_expr->kind == Ast_TypeType) {
-					error(default_value, "A type parameter may not have a default value");
-					continue;
+				if (type_expr != nullptr && type_expr->kind == Ast_TypeType) {
+					error(type_expr, "A type parameter may not have a default value");
 				} else {
-					Operand o = {};
-					if (default_value->kind == Ast_BasicDirective &&
-					    default_value->BasicDirective.name == "caller_location") {
-						init_core_source_code_location(ctx->checker);
-						default_is_location = true;
-						o.type = t_source_code_location;
-						o.mode = Addressing_Value;
-					} else {
-						check_expr_with_type_hint(ctx, &o, default_value, type);
-
-						if (is_operand_nil(o)) {
-							default_is_nil = true;
-						} else if (o.mode != Addressing_Constant) {
-							if (default_value->kind == Ast_ProcLit) {
-								value = exact_value_procedure(default_value);
-							} else {
-								Entity *e = nullptr;
-								if (o.mode == Addressing_Value && is_type_proc(o.type)) {
-									Operand x = {};
-									if (default_value->kind == Ast_Ident) {
-										e = check_ident(ctx, &x, default_value, nullptr, nullptr, false);
-									} else if (default_value->kind == Ast_SelectorExpr) {
-										e = check_selector(ctx, &x, default_value, nullptr);
-									}
-								}
-
-								if (e != nullptr && e->kind == Entity_Procedure) {
-									value = exact_value_procedure(e->identifier);
-									add_entity_use(ctx, e->identifier, e);
-								} else {
-									error(default_value, "Default parameter must be a constant");
-								}
-							}
-						} else {
-							value = o.value;
-						}
-					}
-
-					check_is_assignable_to(ctx, &o, type);
+					param_value = handle_parameter_value(ctx, type, nullptr, default_value, true);
 				}
 			}
 		}
@@ -1065,14 +1038,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 				}
 
 				param = alloc_entity_param(scope, name->Ident.token, type, is_using, is_in);
-				if (default_is_nil) {
-					param->Variable.param_value.kind = ParameterValue_Nil;
-				} else if (default_is_location) {
-					param->Variable.param_value.kind = ParameterValue_Location;
-				} else if (value.kind != ExactValue_Invalid) {
-					param->Variable.param_value.kind = ParameterValue_Constant;
-					param->Variable.param_value.value = value;
-				}
+				param->Variable.param_value = param_value;
 			}
 			if (p->flags&FieldFlag_no_alias) {
 				param->flags |= EntityFlag_NoAlias;
@@ -1151,37 +1117,16 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 	for_array(i, results) {
 		ast_node(field, Field, results[i]);
 		Ast *default_value = unparen_expr(field->default_value);
-		ExactValue value = {};
-		bool default_is_nil = false;
+		ParameterValue param_value = {};
 
 		Type *type = nullptr;
 		if (field->type == nullptr) {
-			Operand o = {};
-			check_expr(ctx, &o, default_value);
-			if (is_operand_nil(o)) {
-				default_is_nil = true;
-			} else if (o.mode != Addressing_Constant) {
-				error(default_value, "Default parameter must be a constant");
-			} else {
-				value = o.value;
-			}
-
-			type = default_type(o.type);
+			handle_parameter_value(ctx, nullptr, &type, default_value, false);
 		} else {
 			type = check_type(ctx, field->type);
 
 			if (default_value != nullptr) {
-				Operand o = {};
-				check_expr_with_type_hint(ctx, &o, default_value, type);
-
-				if (is_operand_nil(o)) {
-					default_is_nil = true;
-				} else if (o.mode != Addressing_Constant) {
-					error(default_value, "Default parameter must be a constant");
-				} else {
-					value = o.value;
-				}
-				check_is_assignable_to(ctx, &o, type);
+				handle_parameter_value(ctx, type, nullptr, default_value, false);
 			}
 		}
 
@@ -1199,12 +1144,7 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 			Token token = ast_token(field->type);
 			token.string = str_lit("");
 			Entity *param = alloc_entity_param(scope, token, type, false, false);
-			if (default_is_nil) {
-				param->Variable.param_value.kind = ParameterValue_Nil;
-			} else if (value.kind != ExactValue_Invalid) {
-				param->Variable.param_value.kind = ParameterValue_Constant;
-				param->Variable.param_value.value = value;
-			}
+			param->Variable.param_value = param_value;
 			array_add(&variables, param);
 		} else {
 			for_array(j, field->names) {
@@ -1227,12 +1167,7 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 
 				Entity *param = alloc_entity_param(scope, token, type, false, false);
 				param->flags |= EntityFlag_Result;
-				if (default_is_nil) {
-					param->Variable.param_value.kind = ParameterValue_Nil;
-				} else if (value.kind != ExactValue_Invalid) {
-					param->Variable.param_value.kind = ParameterValue_Constant;
-					param->Variable.param_value.value = value;
-				}
+				param->Variable.param_value = param_value;
 				array_add(&variables, param);
 				add_entity(ctx->checker, scope, name, param);
 			}
