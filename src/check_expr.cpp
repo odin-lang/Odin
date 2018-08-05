@@ -4168,9 +4168,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				}
 
 				if (e->kind == Entity_Variable) {
-					if (e->Variable.default_value.kind != ExactValue_Invalid ||
-					    e->Variable.default_is_nil ||
-					    e->Variable.default_is_location) {
+					if (e->Variable.param_value.kind != ParameterValue_Invalid) {
 						param_count--;
 						continue;
 					}
@@ -4190,9 +4188,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			}
 
 			if (e->kind == Entity_Variable) {
-				if (e->Variable.default_value.kind != ExactValue_Invalid ||
-				    e->Variable.default_is_nil ||
-				    e->Variable.default_is_location) {
+				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
 					param_count_excluding_defaults--;
 					continue;
 				}
@@ -4442,10 +4438,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 				continue;
 			}
 			if (e->kind == Entity_Variable) {
-				if (e->Variable.default_value.kind != ExactValue_Invalid) {
-					score += assign_score_function(1);
-					continue;
-				} else if (e->Variable.default_is_nil) {
+				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
 					score += assign_score_function(1);
 					continue;
 				}
@@ -5218,8 +5211,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case_ast_node(i, Implicit, node)
 		switch (i->kind) {
 		case Token_context:
-			if (c->proc_name.len == 0) {
-				error(node, "'context' is only allowed within procedures");
+			if (c->proc_name.len == 0 && c->curr_proc_sig == nullptr) {
+				error(node, "'context' is only allowed within procedures %p", c->curr_proc_decl);
 				return kind;
 			}
 
@@ -5500,11 +5493,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				for (isize i = min_field_count-1; i >= 0; i--) {
 					Entity *e = t->Struct.fields[i];
 					GB_ASSERT(e->kind == Entity_Variable);
-					if (e->Variable.default_is_nil) {
-						min_field_count--;
-					} else if (e->Variable.default_is_undef) {
-						min_field_count--;
-					} else if (e->Variable.default_value.kind != ExactValue_Invalid) {
+					if (e->Variable.param_value.kind != ParameterValue_Invalid) {
 						min_field_count--;
 					} else {
 						break;

@@ -5348,10 +5348,17 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 				} else {
 					GB_ASSERT(e->kind == Entity_Variable);
 					if (args[i] == nullptr) {
-						if (e->Variable.default_value.kind != ExactValue_Invalid) {
-							args[i] = ir_value_constant(e->type, e->Variable.default_value);
-						} else {
+						switch (e->Variable.param_value.kind) {
+						case ParameterValue_Constant:
+							args[i] = ir_value_constant(e->type, e->Variable.param_value.value);
+							break;
+						case ParameterValue_Nil:
 							args[i] = ir_value_nil(e->type);
+							break;
+						case ParameterValue_Location:
+							// args[i] =
+							GB_PANIC("TODO ParameterValue_Location");
+							break;
 						}
 					} else {
 						args[i] = ir_emit_conv(proc, args[i], e->type);
@@ -5434,12 +5441,17 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 				while (arg_index < end) {
 					Entity *e = param_tuple->variables[arg_index];
 					GB_ASSERT(e->kind == Entity_Variable);
-					if (e->Variable.default_value.kind != ExactValue_Invalid) {
-						args[arg_index++] = ir_value_constant(e->type, e->Variable.default_value);
-					} else if (e->Variable.default_is_location) {
-						args[arg_index++] = ir_emit_source_code_location(proc, proc_name, pos);
-					} else {
+
+					switch (e->Variable.param_value.kind) {
+					case ParameterValue_Constant:
+						args[arg_index++] = ir_value_constant(e->type, e->Variable.param_value.value);
+						break;
+					case ParameterValue_Nil:
 						args[arg_index++] = ir_value_nil(e->type);
+						break;
+					case ParameterValue_Location:
+						args[arg_index++] = ir_emit_source_code_location(proc, proc_name, pos);
+						break;
 					}
 				}
 			}
@@ -5521,12 +5533,16 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		if (variadic && variadic_index+1 < param_count) {
 			for (isize i = variadic_index+1; i < param_count; i++) {
 				Entity *e = param_tuple->variables[i];
-				if (e->Variable.default_value.kind != ExactValue_Invalid) {
-					args[i] = ir_value_constant(e->type, e->Variable.default_value);
-				} else if (e->Variable.default_is_location) {
-					args[i] = ir_emit_source_code_location(proc, proc_name, pos);
-				} else {
+				switch (e->Variable.param_value.kind) {
+				case ParameterValue_Constant:
+					args[i] = ir_value_constant(e->type, e->Variable.param_value.value);
+					break;
+				case ParameterValue_Nil:
 					args[i] = ir_value_nil(e->type);
+					break;
+				case ParameterValue_Location:
+					args[i] = ir_emit_source_code_location(proc, proc_name, pos);
+					break;
 				}
 			}
 		}
@@ -7602,8 +7618,20 @@ void ir_begin_procedure_body(irProcedure *proc) {
 			if (e->token.string != "") {
 				GB_ASSERT(!is_blank_ident(e->token));
 				irValue *res = ir_add_local(proc, e, e->identifier, true);
-				if (e->Variable.default_value.kind != ExactValue_Invalid) {
-					irValue *c = ir_value_constant(e->type, e->Variable.default_value);
+
+				irValue *c = nullptr;
+				switch (e->Variable.param_value.kind) {
+				case ParameterValue_Constant:
+					c = ir_value_constant(e->type, e->Variable.param_value.value);
+					break;
+				case ParameterValue_Nil:
+					c = ir_value_nil(e->type);
+					break;
+				case ParameterValue_Location:
+					GB_PANIC("ParameterValue_Location");
+					break;
+				}
+				if (c != nullptr) {
 					ir_emit_store(proc, res, c);
 				}
 			}
@@ -7704,8 +7732,22 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 		for_array(i, p->params->Tuple.variables) {
 			Entity *f = p->params->Tuple.variables[i];
 			if (f->kind == Entity_Variable) {
-				if (f->Variable.default_value.kind == ExactValue_Procedure) {
-					Ast *expr = f->Variable.default_value.value_procedure;
+				ParameterValue pv = f->Variable.param_value;
+				if (pv.kind ==  ParameterValue_Constant && pv.value.kind == ExactValue_Procedure) {
+					Ast *expr = f->Variable.param_value.value.value_procedure;
+					GB_ASSERT(expr != nullptr);
+					if (expr->kind == Ast_ProcLit) {
+						ir_gen_anonymous_proc_lit(proc->module, proc->name, expr, proc);
+					}
+				}
+			}
+		}
+		for_array(i, p->results->Tuple.variables) {
+			Entity *f = p->results->Tuple.variables[i];
+			if (f->kind == Entity_Variable) {
+				ParameterValue pv = f->Variable.param_value;
+				if (pv.kind ==  ParameterValue_Constant && pv.value.kind == ExactValue_Procedure) {
+					Ast *expr = f->Variable.param_value.value.value_procedure;
 					GB_ASSERT(expr != nullptr);
 					if (expr->kind == Ast_ProcLit) {
 						ir_gen_anonymous_proc_lit(proc->module, proc->name, expr, proc);
