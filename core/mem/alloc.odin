@@ -21,9 +21,11 @@ Allocator :: struct {
 
 
 
-alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
-	a := context.allocator;
+alloc_with_allocator :: inline proc(a: Allocator, size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
 	return a.procedure(a.data, Allocator_Mode.Alloc, size, alignment, nil, 0, 0, loc);
+}
+alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
+	return alloc_with_allocator(context.allocator, size, alignment, loc);
 }
 
 free_ptr_with_allocator :: inline proc(a: Allocator, ptr: rawptr, loc := #caller_location) {
@@ -31,18 +33,20 @@ free_ptr_with_allocator :: inline proc(a: Allocator, ptr: rawptr, loc := #caller
 	if a.procedure == nil do return;
 	a.procedure(a.data, Allocator_Mode.Free, 0, 0, ptr, 0, 0, loc);
 }
+free :: inline proc(ptr: rawptr, loc := #caller_location) do free_ptr_with_allocator(context.allocator, ptr, loc);
 
-free :: inline proc(ptr: rawptr, loc := #caller_location) do free_ptr_with_allocator(context.allocator, ptr);
-
-free_all :: inline proc(loc := #caller_location) {
-	a := context.allocator;
+free_all_with_allocator :: inline proc(a: Allocator, loc := #caller_location) {
 	a.procedure(a.data, Allocator_Mode.Free_All, 0, 0, nil, 0, 0, loc);
 }
+free_all :: inline proc(loc := #caller_location) {
+	free_all_with_allocator(context.allocator, loc);
+}
 
-
-resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
-	a := context.allocator;
+resize_with_allocator :: inline proc(a: Allocator, ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
 	return a.procedure(a.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, 0, loc);
+}
+resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
+	return resize_with_allocator(context.allocator, ptr, old_size, new_size, alignment, loc);
 }
 
 
@@ -79,9 +83,20 @@ new :: inline proc(T: type, loc := #caller_location) -> ^T {
 	ptr^ = T{};
 	return ptr;
 }
-
 new_clone :: inline proc(data: $T, loc := #caller_location) -> ^T {
 	ptr := (^T)(alloc(size_of(T), align_of(T), loc));
+	ptr^ = data;
+	return ptr;
+}
+
+new_with_allocator :: inline proc(a: Allocator, T: type, loc := #caller_location) -> ^T {
+	ptr := (^T)(alloc_with_allocator(a, size_of(T), align_of(T), loc));
+	ptr^ = T{};
+	return ptr;
+}
+
+new_clone_with_allocator :: inline proc(a: Allocator, data: $T, loc := #caller_location) -> ^T {
+	ptr := (^T)(alloc_with_allocator(a, size_of(T), align_of(T), loc));
 	ptr^ = data;
 	return ptr;
 }

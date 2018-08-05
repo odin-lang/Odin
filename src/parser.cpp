@@ -4342,7 +4342,7 @@ skip:
 		gb_mutex_lock(&p->file_add_mutex);
 		defer (gb_mutex_unlock(&p->file_add_mutex));
 
-		array_add(&pkg->files, file);
+		array_add(&file->pkg->files, file);
 
 		if (pkg->name.len == 0) {
 			pkg->name = file->package_name;
