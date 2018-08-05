@@ -3282,7 +3282,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return ir_emit_bitcast(proc, value, dst);
 	}
 
-	if (src == t_cstring && dst == t_string) {
+	if (are_types_identical(src, t_cstring) && are_types_identical(dst, t_string)) {
 		irValue *c = ir_emit_conv(proc, value, t_cstring);
 		auto args = array_make<irValue *>(ir_allocator(), 1);
 		args[0] = c;
