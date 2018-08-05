@@ -56,6 +56,19 @@ enum EntityState {
 };
 
 
+enum ParameterValueKind {
+	ParameterValue_Invalid,
+	ParameterValue_Constant,
+	ParameterValue_Nil,
+	ParameterValue_Location,
+};
+
+struct ParameterValue {
+	ParameterValueKind kind;
+	ExactValue value;
+};
+
+
 // An Entity is a named "thing" in the language
 struct Entity {
 	EntityKind  kind;
@@ -84,7 +97,9 @@ struct Entity {
 		struct {
 			i32        field_index;
 			i32        field_src_index;
-			ExactValue default_value;
+
+			ParameterValue param_value;
+
 			String     thread_local_model;
 			Entity *   foreign_library;
 			Ast *  foreign_library_ident;
@@ -93,9 +108,8 @@ struct Entity {
 			bool       is_foreign;
 			bool       is_export;
 
-			bool       default_is_nil;
-			bool       default_is_undef;
-			bool       default_is_location;
+			// bool       default_is_nil;
+			// bool       default_is_location;
 			bool       is_immutable;
 		} Variable;
 		struct {

@@ -1065,9 +1065,14 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 				}
 
 				param = alloc_entity_param(scope, name->Ident.token, type, is_using, is_in);
-				param->Variable.default_value = value;
-				param->Variable.default_is_nil = default_is_nil;
-				param->Variable.default_is_location = default_is_location;
+				if (default_is_nil) {
+					param->Variable.param_value.kind = ParameterValue_Nil;
+				} else if (default_is_location) {
+					param->Variable.param_value.kind = ParameterValue_Location;
+				} else if (value.kind != ExactValue_Invalid) {
+					param->Variable.param_value.kind = ParameterValue_Constant;
+					param->Variable.param_value.value = value;
+				}
 			}
 			if (p->flags&FieldFlag_no_alias) {
 				param->flags |= EntityFlag_NoAlias;
@@ -1194,8 +1199,12 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 			Token token = ast_token(field->type);
 			token.string = str_lit("");
 			Entity *param = alloc_entity_param(scope, token, type, false, false);
-			param->Variable.default_value = value;
-			param->Variable.default_is_nil = default_is_nil;
+			if (default_is_nil) {
+				param->Variable.param_value.kind = ParameterValue_Nil;
+			} else if (value.kind != ExactValue_Invalid) {
+				param->Variable.param_value.kind = ParameterValue_Constant;
+				param->Variable.param_value.value = value;
+			}
 			array_add(&variables, param);
 		} else {
 			for_array(j, field->names) {
@@ -1218,8 +1227,12 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 
 				Entity *param = alloc_entity_param(scope, token, type, false, false);
 				param->flags |= EntityFlag_Result;
-				param->Variable.default_value = value;
-				param->Variable.default_is_nil = default_is_nil;
+				if (default_is_nil) {
+					param->Variable.param_value.kind = ParameterValue_Nil;
+				} else if (value.kind != ExactValue_Invalid) {
+					param->Variable.param_value.kind = ParameterValue_Constant;
+					param->Variable.param_value.value = value;
+				}
 				array_add(&variables, param);
 				add_entity(ctx->checker, scope, name, param);
 			}
@@ -1465,9 +1478,13 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	if (param_count > 0) {
 		for_array(i, params->Tuple.variables) {
 			Entity *param = params->Tuple.variables[i];
-			if (param->kind == Entity_Variable && param->Variable.default_value.kind == ExactValue_Procedure) {
-				type->Proc.has_proc_default_values = true;
-				break;
+			if (param->kind == Entity_Variable) {
+				ParameterValue pv = param->Variable.param_value;
+				if (pv.kind == ParameterValue_Constant &&
+				    pv.value.kind == ExactValue_Procedure) {
+					type->Proc.has_proc_default_values = true;
+					break;
+				}
 			}
 		}
 	}
