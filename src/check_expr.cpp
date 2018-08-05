@@ -1855,7 +1855,7 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		// }
 	}
 	// cstring -> string
-	if (src == t_cstring && dst == t_string) {
+	if (are_types_identical(src, t_cstring) && are_types_identical(dst, t_string)) {
 		if (operand->mode != Addressing_Constant) {
 			add_package_dependency(c, "runtime", "__cstring_to_string");
 		}
