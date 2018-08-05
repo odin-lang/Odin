@@ -608,7 +608,7 @@ __dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller
 }
 __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #caller_location) #no_bounds_check {
 	new_header: Map_Header = header;
-	nm: mem.Raw_Map;
+	nm := mem.Raw_Map{};
 	new_header.m = &nm;
 
 	header_hashes := (^mem.Raw_Dynamic_Array)(&header.m.hashes);
@@ -616,9 +616,9 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 
 	__dynamic_array_resize(nm_hashes, size_of(int), align_of(int), new_count, loc);
 	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len, loc);
-	for i in 0..new_count-1 do nm.hashes[i] = -1;
+	for i in 0 .. new_count-1 do nm.hashes[i] = -1;
 
-	for i in 0..m.entries.len-1 {
+	for i in 0 .. m.entries.len-1 {
 		if len(nm.hashes) == 0 do __dynamic_map_grow(new_header, loc);
 
 		entry_header := __dynamic_map_get_entry(header, i);
@@ -710,8 +710,8 @@ __dynamic_map_hash_equal :: proc(h: Map_Header, a, b: Map_Key) -> bool {
 
 __dynamic_map_find :: proc(using h: Map_Header, key: Map_Key) -> Map_Find_Result #no_bounds_check {
 	fr := Map_Find_Result{-1, -1, -1};
-	if len(m.hashes) > 0 {
-		fr.hash_index = int(key.hash % u64(len(m.hashes)));
+	if n := u64(len(m.hashes)); n > 0 {
+		fr.hash_index = int(key.hash % n);
 		fr.entry_index = m.hashes[fr.hash_index];
 		for fr.entry_index >= 0 {
 			entry := __dynamic_map_get_entry(h, fr.entry_index);
@@ -750,18 +750,20 @@ __dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) #no_bounds
 	if fr.entry_prev < 0 {
 		m.hashes[fr.hash_index] = __dynamic_map_get_entry(h, fr.entry_index).next;
 	} else {
-		__dynamic_map_get_entry(h, fr.entry_prev).next = __dynamic_map_get_entry(h, fr.entry_index).next;
+		prev := __dynamic_map_get_entry(h, fr.entry_prev);
+		curr := __dynamic_map_get_entry(h, fr.entry_index);
+		prev.next = curr.next;
+	}
+	if (fr.entry_index == m.entries.len-1) {
+		m.entries.len -= 1;
+		return;
 	}
 
-	mem.copy(__dynamic_map_get_entry(h, fr.entry_index), __dynamic_map_get_entry(h, m.entries.len-1), entry_size);
 	last := __dynamic_map_find(h, __dynamic_map_get_entry(h, fr.entry_index).key);
 	if last.entry_prev >= 0 {
-		__dynamic_map_get_entry(h, last.entry_prev).next = fr.entry_index;
+		last_entry := __dynamic_map_get_entry(h, last.entry_prev);
+		last_entry.next = fr.entry_index;
 	} else {
 		m.hashes[last.hash_index] = fr.entry_index;
-	}
-
-	if fr.entry_index == m.entries.len-1 {
-		m.entries.len -= 1;
 	}
 }

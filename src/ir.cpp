@@ -1753,6 +1753,7 @@ void ir_emit_defer_stmts(irProcedure *proc, irDeferExitKind kind, irBlock *block
 	while (i --> 0) {
 		irDefer d = proc->defer_stmts[i];
 		if (d.context_stack_count >= 0) {
+			GB_ASSERT(proc->context_stack.count >= d.context_stack_count);
 			proc->context_stack.count = d.context_stack_count;
 		}
 
