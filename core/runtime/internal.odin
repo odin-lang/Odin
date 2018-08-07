@@ -293,6 +293,7 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int,
 	debug_trap();
 }
 
+
 type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: typeid) {
 	if ok do return;
 
@@ -317,6 +318,47 @@ bounds_check_error_loc :: inline proc "contextless" (using loc := #caller_locati
 slice_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, lo, hi: int, len: int) {
 	slice_expr_error(file_path, int(line), int(column), lo, hi, len);
 }
+
+dynamic_array_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, low, high, max: int) {
+	dynamic_array_expr_error(file_path, int(line), int(column), low, high, max);
+}
+
+
+make_slice_error_loc :: inline proc "contextless" (using loc := #caller_location, len: int) {
+	if 0 < len do return;
+
+	fd := os.stderr;
+	__print_caller_location(fd, loc);
+	os.write_string(fd, " Invalid slice length for make: ");
+	__print_i64(fd, i64(len));
+	os.write_byte(fd, '\n');
+	debug_trap();
+}
+
+make_dynamic_array_error_loc :: inline proc "contextless" (using loc := #caller_location, len, cap: int) {
+	if 0 < len && len < cap do return;
+
+	fd := os.stderr;
+	__print_caller_location(fd, loc);
+	os.write_string(fd, " Invalid dynamic array parameters for make: ");
+	__print_i64(fd, i64(len));
+	os.write_byte(fd, ':');
+	__print_i64(fd, i64(cap));
+	os.write_byte(fd, '\n');
+	debug_trap();
+}
+
+map_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, cap: int) {
+	if 0 < cap do return;
+
+	fd := os.stderr;
+	__print_caller_location(fd, loc);
+	os.write_string(fd, " Invalid map capacity for make: ");
+	__print_i64(fd, i64(cap));
+	os.write_byte(fd, '\n');
+	debug_trap();
+}
+
 
 
 

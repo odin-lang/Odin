@@ -1,5 +1,7 @@
 package mem
 
+import "core:runtime"
+
 DEFAULT_ALIGNMENT :: 2*align_of(rawptr);
 
 Allocator_Mode :: enum byte {
@@ -102,20 +104,23 @@ new_clone_with_allocator :: inline proc(a: Allocator, data: $T, loc := #caller_l
 }
 
 
-make_slice :: proc(T: type/[]$E, len: int) -> T {
+make_slice :: proc(T: type/[]$E, len: int, loc := #caller_location) -> T {
+	runtime.make_slice_error_loc(loc, len);
 	data := alloc(size_of(E)*len, align_of(E));
 	s := Raw_Slice{data, len};
 	return transmute(T)s;
 }
-make_dynamic_array_len :: proc(T: type/[dynamic]$E, len: int = 16) -> T {
-	return make_dynamic_array(T, len, len);
+make_dynamic_array_len :: proc(T: type/[dynamic]$E, len: int = 16, loc := #caller_location) -> T {
+	return make_dynamic_array(T, len, len, loc);
 }
-make_dynamic_array :: proc(T: type/[dynamic]$E, len, cap: int) -> T {
+make_dynamic_array :: proc(T: type/[dynamic]$E, len, cap: int, loc := #caller_location) -> T {
+	runtime.make_dynamic_array_error_loc(loc, len, cap);
 	data := alloc(size_of(E)*cap, align_of(E));
 	s := Raw_Dynamic_Array{data, len, cap, context.allocator};
 	return transmute(T)s;
 }
-make_map :: proc(T: type/map[$K]$E, cap: int = 16) -> T {
+make_map :: proc(T: type/map[$K]$E, cap: int = 16, loc := #caller_location) -> T {
+	runtime.make_map_array_error_loc(loc, cap);
 	m: T;
 	reserve_map(&m, cap);
 	return m;
