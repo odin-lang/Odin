@@ -865,7 +865,7 @@ u64 mulAddVWW(BigInt *z, BigInt const *x, u64 y, u64 r) {
 }
 
 bool bi__greater_than(u64 x1, u64 x2, u64 y1, u64 y2) {
-	return x1 > y1 || x1 == x2 && x2 > y2;
+	return x1 > y1 || (x1 == x2 && x2 > y2);
 }
 
 void bi__div_large(BigInt const *a, BigInt const *b, BigInt *q, BigInt *r) {
