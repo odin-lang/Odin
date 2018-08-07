@@ -58,15 +58,6 @@ enum BuiltinProcId {
 	BuiltinProc_len,
 	BuiltinProc_cap,
 
-	// BuiltinProc_new,
-	BuiltinProc_make,
-	// BuiltinProc_free,
-
-	// BuiltinProc_reserve,
-	// BuiltinProc_clear,
-	// BuiltinProc_append,
-	// BuiltinProc_delete,
-
 	BuiltinProc_size_of,
 	BuiltinProc_align_of,
 	BuiltinProc_offset_of,
@@ -80,9 +71,6 @@ enum BuiltinProcId {
 	BuiltinProc_real,
 	BuiltinProc_imag,
 	BuiltinProc_conj,
-
-	// BuiltinProc_slice_ptr,
-	// BuiltinProc_slice_to_bytes,
 
 	BuiltinProc_expand_to_tuple,
 
@@ -101,15 +89,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("len"),              1, false, Expr_Expr},
 	{STR_LIT("cap"),              1, false, Expr_Expr},
 
-	// {STR_LIT("new"),              1, false, Expr_Expr},
-	{STR_LIT("make"),             1, true,  Expr_Expr},
-	// {STR_LIT("free"),             1, false, Expr_Stmt},
-
-	// {STR_LIT("reserve"),          2, false, Expr_Stmt},
-	// {STR_LIT("clear"),            1, false, Expr_Stmt},
-	// {STR_LIT("append"),           1, true,  Expr_Expr},
-	// {STR_LIT("delete"),           2, false, Expr_Stmt},
-
 	{STR_LIT("size_of"),          1, false, Expr_Expr},
 	{STR_LIT("align_of"),         1, false, Expr_Expr},
 	{STR_LIT("offset_of"),        2, false, Expr_Expr},
@@ -123,9 +102,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("real"),             1, false, Expr_Expr},
 	{STR_LIT("imag"),             1, false, Expr_Expr},
 	{STR_LIT("conj"),             1, false, Expr_Expr},
-
-	// {STR_LIT("slice_ptr"),        2, true,  Expr_Expr},
-	// {STR_LIT("slice_to_bytes"),   1, false, Expr_Expr},
 
 	{STR_LIT("expand_to_tuple"),  1, false, Expr_Expr},
 

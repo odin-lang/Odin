@@ -2794,8 +2794,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	switch (id) {
-	// case BuiltinProc_new:
-	case BuiltinProc_make:
 	case BuiltinProc_size_of:
 	case BuiltinProc_align_of:
 	case BuiltinProc_offset_of:
@@ -2932,294 +2930,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		break;
 	}
-
-	#if 0
-	case BuiltinProc_new: {
-		// new :: proc(Type) -> ^Type
-		Operand op = {};
-		check_expr_or_type(c, &op, ce->args[0]);
-		Type *type = op.type;
-		if ((op.mode != Addressing_Type && type == nullptr) || type == t_invalid) {
-			error(ce->args[0], "Expected a type for 'new'");
-			return false;
-		}
-		operand->mode = Addressing_Value;
-		operand->type = alloc_type_pointer(type);
-
-		break;
-	}
-	#endif
-	#if 0
-	case BuiltinProc_new_slice: {
-		// new_slice :: proc(Type, len: int) -> []Type
-		// proc new_slice(Type, len, cap: int) -> []Type
-		Operand op = {};
-		check_expr_or_type(c, &op, ce->args[0]);
-		Type *type = op.type;
-		if ((op.mode != Addressing_Type && type == nullptr) || type == t_invalid) {
-			error(ce->args[0], "Expected a type for 'new_slice'");
-			return false;
-		}
-
-		isize arg_count = ce->args.count;
-		if (arg_count < 2 || 3 < arg_count) {
-			error(ce->args[0], "'new_slice' expects 2 or 3 arguments, found %td", arg_count);
-			// NOTE(bill): Return the correct type to reduce errors
-		} else {
-			// If any are constant
-			i64 sizes[2] = {};
-			isize size_count = 0;
-			for (isize i = 1; i < arg_count; i++) {
-				i64 val = 0;
-				bool ok = check_index_value(c, ce->args[i], -1, &val);
-				if (ok && val >= 0) {
-					GB_ASSERT(size_count < gb_count_of(sizes));
-					sizes[size_count++] = val;
-				}
-			}
-
-			if (size_count == 2 && sizes[0] > sizes[1]) {
-				error(ce->args[1], "'new_slice' count and capacity are swapped");
-				// No need quit
-			}
-		}
-
-		operand->mode = Addressing_Value;
-		operand->type = alloc_type_slice(type);
-
-		break;
-	}
-	#endif
-	case BuiltinProc_make: {
-		// make :: proc(Type, len: int) -> Type
-		// proc make(Type, len, cap: int) -> Type
-		Operand op = {};
-		check_expr_or_type(c, &op, ce->args[0]);
-		Type *type = op.type;
-		if ((op.mode != Addressing_Type && type == nullptr) || type == t_invalid) {
-			error(ce->args[0], "Expected a type for 'make'");
-			return false;
-		}
-
-		isize min_args = 0;
-		isize max_args = 1;
-		if (is_type_slice(type)) {
-			min_args = 2;
-			max_args = 2;
-			add_package_dependency(c, "mem", "alloc");
-		} else if (is_type_map(type)) {
-			min_args = 1;
-			max_args = 2;
-			add_package_dependency(c, "runtime", "__dynamic_map_reserve");
-		} else if (is_type_dynamic_array(type)) {
-			min_args = 1;
-			max_args = 3;
-			add_package_dependency(c, "runtime", "__dynamic_array_make");
-		} else {
-			gbString str = type_to_string(type);
-			error(call, "Cannot 'make' %s; type must be a slice, map, or dynamic array", str);
-			gb_string_free(str);
-			return false;
-		}
-
-		isize arg_count = ce->args.count;
-		if (arg_count < min_args || max_args < arg_count) {
-			error(ce->args[0], "'make' expects %td or %d argument, found %td", min_args, max_args, arg_count);
-			return false;
-		}
-
-		// If any are constant
-		i64 sizes[4] = {};
-		isize size_count = 0;
-		for (isize i = 1; i < arg_count; i++) {
-			i64 val = 0;
-			bool ok = check_index_value(c, false, ce->args[i], -1, &val);
-			if (ok && val >= 0) {
-				GB_ASSERT(size_count < gb_count_of(sizes));
-				sizes[size_count++] = val;
-			}
-		}
-
-		if (size_count == 2 && sizes[0] > sizes[1]) {
-			error(ce->args[1], "'make' count and capacity are swapped");
-			// No need quit
-		}
-
-		operand->mode = Addressing_Value;
-		operand->type = type;
-
-		break;
-	}
-
-	#if 0
-	case BuiltinProc_free: {
-		// free :: proc(^Type)
-		// proc free([]Type)
-		// proc free(string)
-		// proc free(map[K]T)
-		Type *type = operand->type;
-		bool ok = false;
-		if (is_type_pointer(type)) {
-			ok = true;
-		} else if (is_type_slice(type)) {
-			ok = true;
-		} else if (is_type_string(type)) {
-			ok = true;
-		} else if (is_type_dynamic_array(type)) {
-			ok = true;
-		} else if (is_type_dynamic_map(type)) {
-			ok = true;
-		}
-
-		if (!ok) {
-			gbString type_str = type_to_string(type);
-			error(operand->expr, "Invalid type for 'free', got '%s'", type_str);
-			gb_string_free(type_str);
-			return false;
-		}
-
-
-		operand->mode = Addressing_NoValue;
-
-		break;
-	}
-	#endif
-
-
-	#if 0
-	case BuiltinProc_reserve: {
-		// reserve :: proc([dynamic]Type, count: int) {
-		// reserve :: proc(map[Key]Type, count: int) {
-		Type *type = operand->type;
-		if (!is_type_dynamic_array(type) && !is_type_dynamic_map(type)) {
-			gbString str = type_to_string(type);
-			error(operand->expr, "Expected a dynamic array or dynamic map, got '%s'", str);
-			gb_string_free(str);
-			return false;
-		}
-
-		Ast *capacity = ce->args[1];
-		Operand op = {};
-		check_expr(c, &op, capacity);
-		if (op.mode == Addressing_Invalid) {
-			return false;
-		}
-		Type *arg_type = base_type(op.type);
-		if (!is_type_integer(arg_type)) {
-			error(operand->expr, "'reserve' capacities must be an integer");
-			return false;
-		}
-
-		operand->type = nullptr;
-		operand->mode = Addressing_NoValue;
-
-		break;
-	}
-	#endif
-	#if 0
-	case BuiltinProc_clear: {
-		Type *type = operand->type;
-		bool is_pointer = is_type_pointer(type);
-		type = base_type(type_deref(type));
-		if (!is_type_dynamic_array(type) && !is_type_map(type) && !is_type_slice(type)) {
-			gbString str = type_to_string(type);
-			error(operand->expr, "Invalid type for 'clear', got '%s'", str);
-			gb_string_free(str);
-			return false;
-		}
-
-		operand->type = nullptr;
-		operand->mode = Addressing_NoValue;
-
-		break;
-	}
-	#endif
-	#if 0
-	case BuiltinProc_append: {
-		// append :: proc([dynamic]Type, item: ..Type)
-		// proc append([]Type, item: ..Type)
-		Operand prev_operand = *operand;
-
-		Type *type = operand->type;
-		bool is_pointer = is_type_pointer(type);
-		type = base_type(type_deref(type));
-		if (!is_type_dynamic_array(type) && !is_type_slice(type)) {
-			gbString str = type_to_string(type);
-			error(operand->expr, "Expected a slice or dynamic array, got '%s'", str);
-			gb_string_free(str);
-			return false;
-		}
-
-		bool is_addressable = operand->mode == Addressing_Variable;
-		if (is_pointer) {
-			is_addressable = true;
-		}
-		if (!is_addressable) {
-			error(operand->expr, "'append' can only operate on addressable values");
-			return false;
-		}
-
-		Type *elem = nullptr;
-		if (is_type_dynamic_array(type)) {
-			elem = type->DynamicArray.elem;
-		} else {
-			elem = type->Slice.elem;
-		}
-		Type *slice_elem = alloc_type_slice(elem);
-
-		Type *proc_type_params = alloc_type_tuple(c->allocator);
-		proc_type_params->Tuple.variables = gb_alloc_array(c->allocator, Entity *, 2);
-		proc_type_params->Tuple.variable_count = 2;
-		proc_type_params->Tuple.variables[0] = alloc_entity_param(c->allocator, nullptr, blank_token, operand->type, false, false);
-		proc_type_params->Tuple.variables[1] = alloc_entity_param(c->allocator, nullptr, blank_token, slice_elem, false, false);
-		Type *proc_type = alloc_type_proc(nullptr, proc_type_params, 2, nullptr, false, true, ProcCC_Odin);
-
-		check_call_arguments(c, &prev_operand, proc_type, call);
-
-		if (prev_operand.mode == Addressing_Invalid) {
-			return false;
-		}
-		operand->mode = Addressing_Value;
-		operand->type = t_int;
-
-		break;
-	}
-	#endif
-	#if 0
-	case BuiltinProc_delete: {
-		// delete :: proc(map[Key]Value, key: Key)
-		Type *type = operand->type;
-		if (!is_type_map(type)) {
-			gbString str = type_to_string(type);
-			error(operand->expr, "Expected a map, got '%s'", str);
-			gb_string_free(str);
-			return false;
-		}
-
-		Type *key = base_type(type)->Map.key;
-		Operand x = {Addressing_Invalid};
-		Ast *key_node = ce->args[1];
-		Operand op = {};
-		check_expr(c, &op, key_node);
-		if (op.mode == Addressing_Invalid) {
-			return false;
-		}
-
-		if (!check_is_assignable_to(c, &op, key)) {
-			gbString kt = type_to_string(key);
-			gbString ot = type_to_string(op.type);
-			error(operand->expr, "Expected a key of type '%s', got '%s'", key, ot);
-			gb_string_free(ot);
-			gb_string_free(kt);
-			return false;
-		}
-
-		operand->mode = Addressing_NoValue;
-
-		break;
-	}
-	#endif
-
 
 	case BuiltinProc_size_of: {
 		// size_of :: proc(Type or expr) -> untyped int
@@ -3604,72 +3314,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 
-
-break;
-	}
-
-	#if 0
-	case BuiltinProc_slice_ptr: {
-		// slice_ptr :: proc(a: ^T, len: int) -> []T
-		// proc slice_ptr(a: ^T, len, cap: int) -> []T
-		// ^T cannot be rawptr
-		Type *ptr_type = base_type(operand->type);
-		if (!is_type_pointer(ptr_type)) {
-			gbString type_str = type_to_string(operand->type);
-			error(call, "Expected a pointer to 'slice_ptr', got '%s'", type_str);
-			gb_string_free(type_str);
-			return false;
-		}
-
-		if (ptr_type == t_rawptr) {
-			error(call, "'rawptr' cannot have pointer arithmetic");
-			return false;
-		}
-
-		isize arg_count = ce->args.count;
-		if (arg_count < 2 || 3 < arg_count) {
-			error(ce->args[0], "'slice_ptr' expects 2 or 3 arguments, found %td", arg_count);
-			// NOTE(bill): Return the correct type to reduce errors
-		} else {
-			// If any are constant
-			i64 sizes[2] = {};
-			isize size_count = 0;
-			for (isize i = 1; i < arg_count; i++) {
-				i64 val = 0;
-				bool ok = check_index_value(c, false, ce->args[i], -1, &val);
-				if (ok && val >= 0) {
-					GB_ASSERT(size_count < gb_count_of(sizes));
-					sizes[size_count++] = val;
-				}
-			}
-
-			if (size_count == 2 && sizes[0] > sizes[1]) {
-				error(ce->args[1], "'slice_ptr' count and capacity are swapped");
-				// No need quit
-			}
-		}
-		operand->type = alloc_type_slice(ptr_type->Pointer.elem);
-		operand->mode = Addressing_Value;
-
 		break;
 	}
 
-	case BuiltinProc_slice_to_bytes: {
-		// slice_to_bytes :: proc(a: []T) -> []u8
-		Type *slice_type = base_type(operand->type);
-		if (!is_type_slice(slice_type)) {
-			gbString type_str = type_to_string(operand->type);
-			error(call, "Expected a slice type, got '%s'", type_str);
-			gb_string_free(type_str);
-			return false;
-		}
-
-		operand->type = t_u8_slice;
-		operand->mode = Addressing_Value;
-
-		break;
-	}
-	#endif
 	case BuiltinProc_expand_to_tuple: {
 		Type *type = base_type(operand->type);
 		if (!is_type_struct(type) && !is_type_array(type)) {
@@ -3773,7 +3420,7 @@ break;
 		}
 
 
-break;
+		break;
 	}
 
 	case BuiltinProc_max: {
@@ -3849,7 +3496,7 @@ break;
 		}
 
 
-break;
+		break;
 	}
 
 	case BuiltinProc_abs: {
@@ -4002,59 +3649,6 @@ break;
 		break;
 	}
 
-	#if 0
-	case BuiltinProc_transmute: {
-		Operand op = {};
-		check_expr_or_type(c, &op, ce->args[0]);
-		Type *t = op.type;
-		if ((op.mode != Addressing_Type && t == nullptr) || t == t_invalid) {
-			error(ce->args[0], "Expected a type for 'transmute'");
-			return false;
-		}
-		Ast *expr = ce->args[1];
-		Operand *o = operand;
-		check_expr(c, o, expr);
-		if (o->mode == Addressing_Invalid) {
-			return false;
-		}
-
-		if (o->mode == Addressing_Constant) {
-			gbString expr_str = expr_to_string(o->expr);
-			error(o->expr, "Cannot transmute a constant expression: '%s'", expr_str);
-			gb_string_free(expr_str);
-			o->mode = Addressing_Invalid;
-			o->expr = expr;
-			return false;
-		}
-
-		if (is_type_untyped(o->type)) {
-			gbString expr_str = expr_to_string(o->expr);
-			error(o->expr, "Cannot transmute untyped expression: '%s'", expr_str);
-			gb_string_free(expr_str);
-			o->mode = Addressing_Invalid;
-			o->expr = expr;
-			return false;
-		}
-
-		i64 srcz = type_size_of(o->type);
-		i64 dstz = type_size_of(t);
-		if (srcz != dstz) {
-			gbString expr_str = expr_to_string(o->expr);
-			gbString type_str = type_to_string(t);
-			error(o->expr, "Cannot transmute '%s' to '%s', %lld vs %lld bytes", expr_str, type_str, srcz, dstz);
-			gb_string_free(type_str);
-			gb_string_free(expr_str);
-			o->mode = Addressing_Invalid;
-			o->expr = expr;
-			return false;
-		}
-
-		o->mode = Addressing_Value;
-		o->type = t;
-
-		break;
-	}
-	#endif
 	}
 
 	return true;
@@ -4246,6 +3840,8 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					gen_entity = poly_proc_data.gen_entity;
 					GB_ASSERT(is_type_proc(gen_entity->type));
 					final_proc_type = gen_entity->type;
+				} else {
+					err = CallArgumentError_WrongTypes;
 				}
 			}
 
@@ -4614,44 +4210,54 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 
 		if (valid_count == 0) {
-			error(operand->expr, "No procedures or ambiguous call for procedure group '%s' that match with the given arguments", expr_name);
-			gb_printf_err("\tGiven argument types: (");
+			bool all_invalid_type = true;
 			for_array(i, operands) {
 				Operand o = operands[i];
-				if (i > 0) gb_printf_err(", ");
-				gbString type = type_to_string(o.type);
-				defer (gb_string_free(type));
-				gb_printf_err("%s", type);
-			}
-			gb_printf_err(")\n");
-
-			if (procs.count > 0) {
-				gb_printf_err("Did you mean to use one of the following:\n");
-			}
-			for_array(i, procs) {
-				Entity *proc = procs[i];
-				TokenPos pos = proc->token.pos;
-				Type *t = base_type(proc->type);
-				if (t == t_invalid) continue;
-				GB_ASSERT(t->kind == Type_Proc);
-				gbString pt;
-				defer (gb_string_free(pt));
-				if (t->Proc.node != nullptr) {
-					pt = expr_to_string(t->Proc.node);
-				} else {
-					pt = type_to_string(t);
+				if (o.type != t_invalid)  {
+					all_invalid_type = false;
+					break;
 				}
-				String name = proc->token.string;
-
-				char const *sep = "::";
-				if (proc->kind == Entity_Variable) {
-					sep = ":=";
-				}
-				// gb_printf_err("\t%.*s %s %s at %.*s(%td:%td) with score %lld\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
-				gb_printf_err("\t%.*s %s %s at %.*s(%td:%td)\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
 			}
-			if (procs.count > 0) {
-				gb_printf_err("\n");
+			if (!all_invalid_type) {
+				error(operand->expr, "No procedures or ambiguous call for procedure group '%s' that match with the given arguments", expr_name);
+				gb_printf_err("\tGiven argument types: (");
+				for_array(i, operands) {
+					Operand o = operands[i];
+					if (i > 0) gb_printf_err(", ");
+					gbString type = type_to_string(o.type);
+					defer (gb_string_free(type));
+					gb_printf_err("%s", type);
+				}
+				gb_printf_err(")\n");
+
+				if (procs.count > 0) {
+					gb_printf_err("Did you mean to use one of the following:\n");
+				}
+				for_array(i, procs) {
+					Entity *proc = procs[i];
+					TokenPos pos = proc->token.pos;
+					Type *t = base_type(proc->type);
+					if (t == t_invalid) continue;
+					GB_ASSERT(t->kind == Type_Proc);
+					gbString pt;
+					defer (gb_string_free(pt));
+					if (t->Proc.node != nullptr) {
+						pt = expr_to_string(t->Proc.node);
+					} else {
+						pt = type_to_string(t);
+					}
+					String name = proc->token.string;
+
+					char const *sep = "::";
+					if (proc->kind == Entity_Variable) {
+						sep = ":=";
+					}
+					// gb_printf_err("\t%.*s %s %s at %.*s(%td:%td) with score %lld\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
+					gb_printf_err("\t%.*s %s %s at %.*s(%td:%td)\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
+				}
+				if (procs.count > 0) {
+					gb_printf_err("\n");
+				}
 			}
 			result_type = t_invalid;
 		} else if (valid_count > 1) {
