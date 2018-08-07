@@ -325,6 +325,15 @@ delete :: proc[
 	mem.delete_map,
 ];
 
+@(builtin)
+make :: proc[
+	mem.make_slice,
+	mem.make_dynamic_array_len,
+	mem.make_dynamic_array,
+	mem.make_map,
+];
+
+
 
 
 @(builtin)

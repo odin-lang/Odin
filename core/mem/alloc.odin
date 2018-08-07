@@ -102,6 +102,34 @@ new_clone_with_allocator :: inline proc(a: Allocator, data: $T, loc := #caller_l
 }
 
 
+make_slice :: proc(T: type/[]$E, len: int) -> T {
+	data := alloc(size_of(E)*len, align_of(E));
+	s := Raw_Slice{data, len};
+	return transmute(T)s;
+}
+make_dynamic_array_len :: proc(T: type/[dynamic]$E, len: int = 16) -> T {
+	return make_dynamic_array(T, len, len);
+}
+make_dynamic_array :: proc(T: type/[dynamic]$E, len, cap: int) -> T {
+	data := alloc(size_of(E)*cap, align_of(E));
+	s := Raw_Dynamic_Array{data, len, cap, context.allocator};
+	return transmute(T)s;
+}
+make_map :: proc(T: type/map[$K]$E, cap: int = 16) -> T {
+	m: T;
+	reserve_map(&m, cap);
+	return m;
+}
+
+make :: proc[
+	make_slice,
+	make_dynamic_array_len,
+	make_dynamic_array,
+	make_map,
+];
+
+
+
 default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: int, loc := #caller_location) -> rawptr {
 	if old_memory == nil do return alloc(new_size, alignment, loc);
 
