@@ -1084,6 +1084,7 @@ int main(int arg_count, char **arg_ptr) {
 		remove_temp_files(output_base);
 
 		if (run_output) {
+			output_base = path_to_full_path(heap_allocator(), output_base);
 			system_exec_command_line_app("odin run", false, "\"%.*s\"", LIT(output_base));
 		}
 	#endif
