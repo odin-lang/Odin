@@ -7244,7 +7244,8 @@ void ir_begin_procedure_body(irProcedure *proc) {
 		e->flags |= EntityFlag_NoAlias;
 		irValue *param = ir_value_param(proc, e, e->type);
 		ir_module_add_value(proc->module, e, param);
-		array_add(&proc->context_stack, {param, proc->scope_index});
+		irContextData ctx = {param, proc->scope_index};
+		array_add(&proc->context_stack, ctx);
 	}
 }
 
