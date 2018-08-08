@@ -325,7 +325,7 @@ dynamic_array_expr_error_loc :: inline proc "contextless" (using loc := #caller_
 
 
 make_slice_error_loc :: inline proc "contextless" (using loc := #caller_location, len: int) {
-	if 0 < len do return;
+	if 0 <= len do return;
 
 	fd := os.stderr;
 	__print_caller_location(fd, loc);
@@ -336,7 +336,7 @@ make_slice_error_loc :: inline proc "contextless" (using loc := #caller_location
 }
 
 make_dynamic_array_error_loc :: inline proc "contextless" (using loc := #caller_location, len, cap: int) {
-	if 0 < len && len < cap do return;
+	if 0 <= len && len <= cap do return;
 
 	fd := os.stderr;
 	__print_caller_location(fd, loc);
@@ -348,8 +348,8 @@ make_dynamic_array_error_loc :: inline proc "contextless" (using loc := #caller_
 	debug_trap();
 }
 
-map_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, cap: int) {
-	if 0 < cap do return;
+make_map_expr_error_loc :: inline proc "contextless" (using loc := #caller_location, cap: int) {
+	if 0 <= cap do return;
 
 	fd := os.stderr;
 	__print_caller_location(fd, loc);

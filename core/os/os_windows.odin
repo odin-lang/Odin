@@ -273,7 +273,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 		olen := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, wc_str, -1,
 		                                      nil, 0, nil, nil);
 
-		buf := make([]byte, olen);
+		buf := make([]byte, int(olen));
 		n := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, wc_str, -1,
 		                                   cstring(&buf[0]), olen, nil, nil);
 		if n > 0 {

@@ -120,7 +120,7 @@ make_dynamic_array :: proc(T: type/[dynamic]$E, len, cap: int, loc := #caller_lo
 	return transmute(T)s;
 }
 make_map :: proc(T: type/map[$K]$E, cap: int = 16, loc := #caller_location) -> T {
-	runtime.make_map_array_error_loc(loc, cap);
+	runtime.make_map_expr_error_loc(loc, cap);
 	m: T;
 	reserve_map(&m, cap);
 	return m;
