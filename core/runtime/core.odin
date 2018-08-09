@@ -328,8 +328,9 @@ delete :: proc[
 @(builtin)
 make :: proc[
 	mem.make_slice,
-	mem.make_dynamic_array_len,
 	mem.make_dynamic_array,
+	mem.make_dynamic_array_len,
+	mem.make_dynamic_array_len_cap,
 	mem.make_map,
 ];
 
