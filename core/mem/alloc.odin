@@ -110,10 +110,13 @@ make_slice :: proc(T: type/[]$E, auto_cast len: int, loc := #caller_location) ->
 	s := Raw_Slice{data, len};
 	return transmute(T)s;
 }
-make_dynamic_array_len :: proc(T: type/[dynamic]$E, auto_cast len: int = 16, loc := #caller_location) -> T {
-	return make_dynamic_array(T, len, len, loc);
+make_dynamic_array :: proc(T: type/[dynamic]$E, loc := #caller_location) -> T {
+	return make_dynamic_array_len_cap(T, 0, 16, loc);
 }
-make_dynamic_array :: proc(T: type/[dynamic]$E, auto_cast len: int, auto_cast cap: int, loc := #caller_location) -> T {
+make_dynamic_array_len :: proc(T: type/[dynamic]$E, auto_cast len: int, loc := #caller_location) -> T {
+	return make_dynamic_array_len_cap(T, len, len, loc);
+}
+make_dynamic_array_len_cap :: proc(T: type/[dynamic]$E, auto_cast len: int, auto_cast cap: int, loc := #caller_location) -> T {
 	runtime.make_dynamic_array_error_loc(loc, len, cap);
 	data := alloc(size_of(E)*cap, align_of(E));
 	s := Raw_Dynamic_Array{data, len, cap, context.allocator};
@@ -128,8 +131,9 @@ make_map :: proc(T: type/map[$K]$E, auto_cast cap: int = 16, loc := #caller_loca
 
 make :: proc[
 	make_slice,
-	make_dynamic_array_len,
 	make_dynamic_array,
+	make_dynamic_array_len,
+	make_dynamic_array_len_cap,
 	make_map,
 ];
 
