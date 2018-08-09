@@ -1043,6 +1043,9 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			if (p->flags&FieldFlag_no_alias) {
 				param->flags |= EntityFlag_NoAlias;
 			}
+			if (p->flags&FieldFlag_auto_cast) {
+				param->flags |= EntityFlag_AutoCast;
+			}
 			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
 
 			add_entity(ctx->checker, scope, name, param);

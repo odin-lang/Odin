@@ -3879,10 +3879,18 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 
 				i64 s = 0;
 				if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
-					if (show_error) {
-						check_assignment(c, &o, t, str_lit("argument"));
+					bool ok = false;
+					if (e->flags & EntityFlag_AutoCast) {
+						ok = check_is_castable_to(c, &o, t);
 					}
-					err = CallArgumentError_WrongTypes;
+					if (ok) {
+						s = assign_score_function(10);
+					} else {
+						if (show_error) {
+							check_assignment(c, &o, t, str_lit("argument"));
+						}
+						err = CallArgumentError_WrongTypes;
+					}
 				}
 				score += s;
 			}
@@ -6106,6 +6114,9 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 		}
 		if (f->flags&FieldFlag_c_vararg) {
 			str = gb_string_appendc(str, "#c_vararg ");
+		}
+		if (f->flags&FieldFlag_auto_cast) {
+			str = gb_string_appendc(str, "auto_cast ");
 		}
 
 		for_array(i, f->names) {
