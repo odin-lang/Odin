@@ -4101,10 +4101,18 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 		} else {
 			i64 s = 0;
 			if (!check_is_assignable_to_with_score(c, o, e->type, &s)) {
-				if (show_error) {
-					check_assignment(c, o, e->type, str_lit("procedure argument"));
+				bool ok = false;
+				if (e->flags & EntityFlag_AutoCast) {
+					ok = check_is_castable_to(c, o, e->type);
 				}
-				err = CallArgumentError_WrongTypes;
+				if (ok) {
+					s = assign_score_function(10);
+				} else {
+					if (show_error) {
+						check_assignment(c, o, e->type, str_lit("procedure argument"));
+					}
+					err = CallArgumentError_WrongTypes;
+				}
 			}
 			score += s;
 		}
