@@ -2737,6 +2737,8 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 			// Okay
 		} else if (operand->mode == Addressing_Context) {
 			operand->mode = Addressing_Value; // TODO(bill): Should this be Value or Immutable?
+		} else if (operand->mode == Addressing_MapIndex) {
+			operand->mode = Addressing_Value;
 		} else if (sel.indirect || operand->mode != Addressing_Value) {
 			operand->mode = Addressing_Variable;
 		} else {
