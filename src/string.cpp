@@ -462,9 +462,6 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 
 	case '\'':
 	case '"':
-		if (c != quote) {
-			return false;
-		}
 		*rune = c;
 		break;
 

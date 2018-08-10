@@ -667,8 +667,7 @@ end:
 	return token;
 }
 
-// Quote == " for string
-bool scan_escape(Tokenizer *t, Rune quote) {
+bool scan_escape(Tokenizer *t) {
 	isize len = 0;
 	u32 base = 0, max = 0, x = 0;
 
@@ -681,7 +680,8 @@ bool scan_escape(Tokenizer *t, Rune quote) {
 	    r == 't'  ||
 	    r == 'v'  ||
 	    r == '\\' ||
-	    r == quote) {
+	    r == '\'' ||
+	    r == '\"') {
 		advance_to_next_rune(t);
 		return true;
 	} else if (gb_is_between(r, '0', '7')) {
@@ -873,7 +873,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 				}
 				n++;
 				if (r == '\\') {
-					if (!scan_escape(t, quote)) {
+					if (!scan_escape(t)) {
 						valid = false;
 					}
 				}
@@ -913,7 +913,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 						break;
 					}
 					if (r == '\\') {
-						scan_escape(t, quote);
+						scan_escape(t);
 					}
 				}
 			} else {
