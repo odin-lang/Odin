@@ -142,16 +142,15 @@ String const token_strings[] = {
 
 struct TokenPos {
 	String file;
-	isize  line;
-	isize  column;
+	isize  offset; // starting at 0
+	isize  line;   // starting at 1
+	isize  column; // starting at 1
 };
 
-TokenPos token_pos(String file, isize line, isize column) {
-	TokenPos pos = {file, line, column};
-	return pos;
-}
-
 i32 token_pos_cmp(TokenPos const &a, TokenPos const &b) {
+	if (a.offset != b.offset) {
+		return (a.offset < b.offset) ? -1 : +1;
+	}
 	if (a.line != b.line) {
 		return (a.line < b.line) ? -1 : +1;
 	}
@@ -825,6 +824,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 	token.string = make_string(t->curr, 1);
 	token.pos.file = t->fullpath;
 	token.pos.line = t->line_count;
+	token.pos.offset = t->curr - t->start;
 	token.pos.column = t->curr - t->line + 1;
 
 	Rune curr_rune = t->curr_rune;

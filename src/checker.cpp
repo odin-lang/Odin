@@ -1314,6 +1314,19 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		add_dependency_to_set(c, scope_lookup(c->info.runtime_package->scope, required_runtime_entities[i]));
 	}
 
+	if (build_context.no_crt) {
+		String required_no_crt_entities[] = {
+			// NOTE(bill): Only if these exist
+			str_lit("memcpy"),
+			str_lit("memmove"),
+			str_lit("memset"),
+			// str_lit("memcmp"),
+		};
+		for (isize i = 0; i < gb_count_of(required_no_crt_entities); i++) {
+			add_dependency_to_set(c, scope_lookup(c->info.runtime_package->scope, required_no_crt_entities[i]));
+		}
+	}
+
 	AstPackage *mem = get_core_package(&c->info, str_lit("mem"));
 	String required_mem_entities[] = {
 		str_lit("zero"),

@@ -22,7 +22,7 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 #if defined(GB_SYSTEM_WINDOWS)
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
-	char cmd_line[4096] = {0};
+	char cmd_line[4*1024] = {0};
 	isize cmd_len;
 	va_list va;
 	gbTempArenaMemory tmp;
@@ -212,6 +212,7 @@ enum BuildFlagKind {
 	BuildFlag_CrossCompile,
 	BuildFlag_CrossLibDir,
 	BuildFlag_NoBoundsCheck,
+	BuildFlag_NoCRT,
 
 	BuildFlag_COUNT,
 };
@@ -252,6 +253,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_CrossCompile,      str_lit("cross-compile"),   BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_CrossLibDir,       str_lit("cross-lib-dir"),   BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"), BuildFlagParam_None);
 
 	GB_ASSERT(args.count >= 3);
 	Array<String> flag_args = array_slice(args, 3, args.count);
@@ -551,6 +553,10 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoBoundsCheck:
 							build_context.no_bounds_check = true;
 							break;
+
+						case BuildFlag_NoCRT:
+							build_context.no_crt = true;
+							break;
 						}
 					}
 
@@ -840,7 +846,6 @@ int main(int arg_count, char **arg_ptr) {
 	// defer (ir_gen_destroy(&ir_gen));
 
 
-
 	timings_start_section(&timings, str_lit("llvm ir gen"));
 	ir_gen_tree(&ir_gen);
 
@@ -879,6 +884,7 @@ int main(int arg_count, char **arg_ptr) {
 
 		for_array(i, ir_gen.module.foreign_library_paths) {
 			String lib = ir_gen.module.foreign_library_paths[i];
+			GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
 			isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
 			                        " \"%.*s\"", LIT(lib));
 			lib_str = gb_string_appendc(lib_str, lib_str_buf);
@@ -893,6 +899,9 @@ int main(int arg_count, char **arg_ptr) {
 			link_settings = gb_string_append_fmt(link_settings, "/DLL");
 		} else {
 			link_settings = gb_string_append_fmt(link_settings, "/ENTRY:mainCRTStartup");
+			if (build_context.no_crt) {
+				link_settings = gb_string_append_fmt(link_settings, " /nodefaultlib");
+			}
 		}
 
 		if (ir_gen.module.generate_debug_info) {
@@ -913,7 +922,6 @@ int main(int arg_count, char **arg_ptr) {
 			exit_code = system_exec_command_line_app("msvc-link", true,
 				"link \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
 				"/defaultlib:libcmt "
-				// "/nodefaultlib "
 				"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 				" %.*s "
 				" %s "
@@ -926,7 +934,6 @@ int main(int arg_count, char **arg_ptr) {
 			exit_code = system_exec_command_line_app("msvc-link", true,
 				"link \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 				"/defaultlib:libcmt "
-				// "/nodefaultlib "
 				"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 				" %.*s "
 				" %s "
