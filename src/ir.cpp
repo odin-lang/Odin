@@ -622,6 +622,7 @@ struct irGen {
 	bool     opt_called;
 	String   output_base;
 	String   output_name;
+	bool     print_chkstk;
 };
 
 
@@ -1353,6 +1354,7 @@ void ir_add_foreign_library_path(irModule *m, Entity *e) {
 			continue;
 		}
 
+		bool ok = true;
 		for_array(path_index, m->foreign_library_paths) {
 			String path = m->foreign_library_paths[path_index];
 	#if defined(GB_SYSTEM_WINDOWS)
@@ -1360,10 +1362,14 @@ void ir_add_foreign_library_path(irModule *m, Entity *e) {
 	#else
 			if (str_eq(path, library_path)) {
 	#endif
-				continue;
+				ok = false;
+				break;
 			}
 		}
-		array_add(&m->foreign_library_paths, library_path);
+
+		if (ok) {
+			array_add(&m->foreign_library_paths, library_path);
+		}
 	}
 }
 
@@ -8416,51 +8422,91 @@ void ir_gen_tree(irGen *s) {
 		ir_emit_return(proc, v_zero32);
 	}
 
-#if 0 && defined(GB_SYSTEM_WINDOWS)
-	if (!m->build_context->is_dll && !has_win_main) {
-		// proc WinMain(inst, prev: rawptr, cmd_line: ^byte, cmd_show: i32) -> i32
-		String name = str_lit("WinMain");
-		Type *proc_params = alloc_type_tuple();
-		Type *proc_results = alloc_type_tuple();
+#if defined(GB_SYSTEM_WINDOWS)
+	// if (!m->build_context->is_dll && !has_win_main) {
+	// 	// proc WinMain(inst, prev: rawptr, cmd_line: ^byte, cmd_show: i32) -> i32
+	// 	String name = str_lit("WinMain");
+	// 	Type *proc_params = alloc_type_tuple();
+	// 	Type *proc_results = alloc_type_tuple();
 
-		Scope *proc_scope = gb_alloc_item(a, Scope);
+	// 	Scope *proc_scope = gb_alloc_item(a, Scope);
 
-		proc_params->Tuple.variables = gb_alloc_array(a, Entity *, 4);
-		proc_params->Tuple.variable_count = 4;
+	// 	proc_params->Tuple.variables = gb_alloc_array(a, Entity *, 4);
+	// 	proc_params->Tuple.variable_count = 4;
 
-		proc_results->Tuple.variables = gb_alloc_array(a, Entity *, 1);
-		proc_results->Tuple.variable_count = 1;
+	// 	proc_results->Tuple.variables = gb_alloc_array(a, Entity *, 1);
+	// 	proc_results->Tuple.variable_count = 1;
 
-		proc_params->Tuple.variables[0] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false);
-		proc_params->Tuple.variables[1] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false);
-		proc_params->Tuple.variables[2] = alloc_entity_param(proc_scope, blank_token, t_u8_ptr, false);
-		proc_params->Tuple.variables[3] = alloc_entity_param(proc_scope, blank_token, t_i32,    false);
+	// 	proc_params->Tuple.variables[0] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false);
+	// 	proc_params->Tuple.variables[1] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false);
+	// 	proc_params->Tuple.variables[2] = alloc_entity_param(proc_scope, blank_token, t_u8_ptr, false);
+	// 	proc_params->Tuple.variables[3] = alloc_entity_param(proc_scope, blank_token, t_i32,    false);
 
-		proc_results->Tuple.variables[0] = alloc_entity_param(proc_scope, empty_token, t_i32, false);
+	// 	proc_results->Tuple.variables[0] = alloc_entity_param(proc_scope, empty_token, t_i32, false);
 
 
-		Type *proc_type = alloc_type_proc(a, proc_scope,
-		                                 proc_params, 4,
-		                                 proc_results, 1, false, ProcCC_Std);
+	// 	Type *proc_type = alloc_type_proc(a, proc_scope,
+	// 	                                 proc_params, 4,
+	// 	                                 proc_results, 1, false, ProcCC_Std);
 
-		Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
-		Entity *e = alloc_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
-		irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
+	// 	Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
+	// 	Entity *e = alloc_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
+	// 	irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
 
-		m->entry_point_entity = e;
+	// 	m->entry_point_entity = e;
 
-		map_set(&m->values, hash_entity(e), p);
-		map_set(&m->members, hash_string(name), p);
+	// 	map_set(&m->values, hash_entity(e), p);
+	// 	map_set(&m->members, hash_string(name), p);
 
-		irProcedure *proc = &p->Proc;
-		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
-		e->Procedure.link_name = name;
+	// 	irProcedure *proc = &p->Proc;
+	// 	proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
+	// 	e->Procedure.link_name = name;
 
-		ir_begin_procedure_body(proc);
-		ir_emit_runtime_call(proc, "main", nullptr, 0);
-		ir_emit_return(proc, v_one32);
-		ir_end_procedure_body(proc);
+	// 	ir_begin_procedure_body(proc);
+	// 	ir_emit_runtime_call(proc, "main", nullptr, 0);
+	// 	ir_emit_return(proc, v_one32);
+	// 	ir_end_procedure_body(proc);
+	// }
+	if (!build_context.is_dll && build_context.no_crt) {
+		s->print_chkstk = true;
+
+		{
+			// void mainCRTStartup(void)
+			String name = str_lit("mainCRTStartup");
+			Type *proc_params = alloc_type_tuple();
+			Type *proc_results = alloc_type_tuple();
+
+
+			Type *proc_type = alloc_type_proc(nullptr,
+			                                  nullptr, 0,
+			                                  nullptr, 0,
+			                                  false,
+			                                  ProcCC_StdCall);
+
+			Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
+			Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
+			irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
+
+			m->entry_point_entity = e;
+
+			map_set(&m->values, hash_entity(e), p);
+			map_set(&m->members, hash_string(name), p);
+
+			irProcedure *proc = &p->Proc;
+			// proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
+			e->Procedure.link_name = name;
+
+			ir_begin_procedure_body(proc);
+			ir_emit(proc, ir_alloc_instr(proc, irInstr_StartupRuntime));
+			irValue **found = map_get(&proc->module->values, hash_entity(entry_point));
+			if (found != nullptr) {
+				Array<irValue *> args = {};
+				ir_emit_call(proc, *found, args);
+			}
+			ir_end_procedure_body(proc);
+		}
 	}
+
 #endif
 	{ // Startup Runtime
 		// Cleanup(bill): probably better way of doing code insertion

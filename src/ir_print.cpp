@@ -1737,6 +1737,15 @@ void print_llvm_ir(irGen *ir) {
 		}
 	}
 
+	if (ir->print_chkstk) {
+		// TODO(bill): Clean up this code
+		ir_write_str_lit(f, "\n\n");
+		ir_write_str_lit(f, "define void @__chkstk() #0 {\n");
+		ir_write_str_lit(f, "\tcall void asm sideeffect \"push   %rcx \\09\\0Apush   %rax \\09\\0Acmp    $$0x1000,%rax \\09\\0Alea    24(%rsp),%rcx \\09\\0Ajb     1f \\09\\0A2: \\09\\0Asub    $$0x1000,%rcx \\09\\0Aorl    $$0,(%rcx) \\09\\0Asub    $$0x1000,%rax \\09\\0Acmp    $$0x1000,%rax \\09\\0Aja     2b \\09\\0A1: \\09\\0Asub    %rax,%rcx \\09\\0Aorl    $$0,(%rcx) \\09\\0Apop    %rax \\09\\0Apop    %rcx \\09\\0Aret \\09\\0A\", \"~{dirflag},~{fpsr},~{flags}\"()\n");
+		ir_write_str_lit(f, "\tret void\n");
+		ir_write_str_lit(f, "}\n\n");
+	}
+
 	// NOTE(bill): Print procedures with bodies next
 	for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];

@@ -85,6 +85,7 @@ struct BuildContext {
 	bool   keep_temp_files;
 	bool   no_bounds_check;
 	bool   no_output_files;
+	bool   no_crt;
 
 	gbAffinity affinity;
 	isize      thread_count;
@@ -528,7 +529,7 @@ void init_build_context(void) {
 
 	gbString llc_flags = gb_string_make_reserve(heap_allocator(), 64);
 	if (bc->ODIN_DEBUG) {
-		llc_flags = gb_string_appendc(llc_flags, "-debug-compile ");
+		// llc_flags = gb_string_appendc(llc_flags, "-debug-compile ");
 	}
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
