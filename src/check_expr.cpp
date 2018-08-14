@@ -503,9 +503,9 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		}
 	}
 
-	if (is_type_bit_set(dst) && are_types_identical(dst->BitSet.base_type, operand->type)) {
-		return 3;
-	}
+	// if (is_type_bit_set(dst) && are_types_identical(dst->BitSet.base_type, operand->type)) {
+	// 	return 3;
+	// }
 
 #if 0
 	if (are_types_identical(dst, src) && (!is_type_named(dst) || !is_type_named(src))) {
