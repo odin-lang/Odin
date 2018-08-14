@@ -3711,7 +3711,7 @@ isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs
 }
 
 
-void check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, Array<Operand> *operands, Array<Ast *> const &rhs, bool allow_ok, bool *optional_ok_ = nullptr) {
+bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, Array<Operand> *operands, Array<Ast *> const &rhs) {
 	bool optional_ok = false;
 	isize tuple_index = 0;
 	for_array(i, rhs) {
@@ -3733,7 +3733,7 @@ void check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 		}
 
 		if (o.type == nullptr || o.type->kind != Type_Tuple) {
-			if (allow_ok && lhs.count == 2 && rhs.count == 1 &&
+			if (lhs.count == 2 && rhs.count == 1 &&
 			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk)) {
 				Type *tuple = make_optional_ok_type(o.type);
 				add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
@@ -3742,7 +3742,7 @@ void check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 				Operand ok = o;
 				val.mode = Addressing_Value;
 				ok.mode  = Addressing_Value;
-				ok.type  = t_bool;
+				ok.type  = t_untyped_bool;
 				array_add(operands, val);
 				array_add(operands, ok);
 
@@ -3764,12 +3764,12 @@ void check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 		}
 	}
 
-	if (optional_ok_) *optional_ok_ = optional_ok;
+	return optional_ok;
 }
 
 
 
-void check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Array<Ast *> const &rhs, bool allow_ok, bool *optional_ok_ = nullptr) {
+bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Array<Ast *> const &rhs, bool allow_ok) {
 	bool optional_ok = false;
 	isize tuple_index = 0;
 	for_array(i, rhs) {
@@ -3826,7 +3826,7 @@ void check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 		}
 	}
 
-	if (optional_ok_) *optional_ok_ = optional_ok;
+	return optional_ok;
 }
 
 

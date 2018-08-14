@@ -1122,7 +1122,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				}
 			}
 
-			check_assignment_arguments(ctx, lhs_operands, &rhs_operands, as->rhs, true);
+			check_assignment_arguments(ctx, lhs_operands, &rhs_operands, as->rhs);
 
 			isize rhs_count = rhs_operands.count;
 			for_array(i, rhs_operands) {
