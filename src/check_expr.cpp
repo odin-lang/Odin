@@ -4249,7 +4249,19 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 	} else {
 		operands = array_make<Operand>(heap_allocator(), 0, 2*ce->args.count);
-		check_unpack_arguments(c, nullptr, -1, &operands, ce->args, false);
+		Entity **lhs = nullptr;
+		isize lhs_count = -1;
+		if (proc_type != nullptr && is_type_proc(proc_type)) {
+			TypeProc *pt = &base_type(proc_type)->Proc;
+			if (!pt->is_polymorphic || pt->is_poly_specialized) {
+				if (pt->params != nullptr) {
+					lhs = pt->params->Tuple.variables.data;
+					lhs_count = pt->params->Tuple.variables.count;
+				}
+			}
+		}
+
+		check_unpack_arguments(c, lhs, lhs_count, &operands, ce->args, false);
 	}
 
 	if (operand->mode == Addressing_ProcGroup) {
