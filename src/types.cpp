@@ -2075,7 +2075,8 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		if (bits <= 16) return 2;
 		if (bits <= 32) return 4;
 		if (bits <= 64) return 8;
-		GB_PANIC("unknown bit_set size");
+		return 8;
+
 	}
 	}
 
@@ -2301,7 +2302,7 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 		if (bits <= 16) return 2;
 		if (bits <= 32) return 4;
 		if (bits <= 64) return 8;
-		GB_PANIC("unknown bit_set size");
+		return 8;
 	}
 	}
 
