@@ -503,16 +503,6 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		}
 	}
 
-	// if (is_type_bit_set(dst) && are_types_identical(dst->BitSet.base_type, operand->type)) {
-	// 	return 3;
-	// }
-
-#if 0
-	if (are_types_identical(dst, src) && (!is_type_named(dst) || !is_type_named(src))) {
-		return 1;
-	}
-#endif
-
 	if (is_type_bit_field_value(operand->type) && is_type_integer(type)) {
 		Type *bfv = base_type(operand->type);
 		i32 bits = bfv->BitFieldValue.bits;
@@ -2002,7 +1992,7 @@ bool check_binary_array_expr(CheckerContext *c, Token op, Operand *x, Operand *y
 }
 
 
-void check_binary_expr(CheckerContext *c, Operand *x, Ast *node) {
+void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as_type_hint=false) {
 	GB_ASSERT(node->kind == Ast_BinaryExpr);
 	Operand y_ = {}, *y = &y_;
 
@@ -2065,7 +2055,11 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node) {
 
 	default:
 		check_expr(c, x, be->left);
-		check_expr(c, y, be->right);
+		if (use_lhs_as_type_hint) {
+			check_expr_with_type_hint(c, y, be->right, x->type);
+		} else {
+			check_expr(c, y, be->right);
+		}
 		break;
 	}
 	if (x->mode == Addressing_Invalid) {
