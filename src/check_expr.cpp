@@ -1553,7 +1553,11 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 	} else {
 		if (x->mode == Addressing_Constant &&
 		    y->mode == Addressing_Constant) {
-			x->value = exact_value_bool(compare_exact_values(op, x->value, y->value));
+			if (is_type_constant_type(x->type)) {
+				x->value = exact_value_bool(compare_exact_values(op, x->value, y->value));
+			} else {
+				x->mode = Addressing_Value;
+			}
 		} else {
 			x->mode = Addressing_Value;
 
