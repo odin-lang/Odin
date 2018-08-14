@@ -708,24 +708,14 @@ void check_bit_set_type(CheckerContext *ctx, Type *type, Ast *node) {
 			}
 			ExactValue value = exact_value_to_integer(e->Constant.value);
 			GB_ASSERT(value.kind == ExactValue_Integer);
-			BigInt v = value.value_integer;
-
-
-			if (big_int_cmp(&v, &BIG_INT_ZERO) < 0) {
-				error(bs->base_type, "Negative enum values are not allowed in a bit_set");
-				return;
-			}
-
-			if (big_int_cmp(&v, &v64) >= 0) {
-				error(bs->base_type, "Enum values overe 64 are not allowed in a bit_set");
-				return;
-			}
-
-			i64 x = big_int_to_i64(&v);
+			i64 x = big_int_to_i64(&value.value_integer);
 			min_value = gb_min(min_value, x);
 			max_value = gb_max(max_value, x);
 		}
 
+		if (max_value - min_value > 64) {
+			error(bs->base_type, "bit_set range is greater than 64 bits");
+		}
 
 		type->BitSet.min = min_value;
 		type->BitSet.max = max_value;
