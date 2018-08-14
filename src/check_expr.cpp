@@ -3711,6 +3711,64 @@ isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs
 }
 
 
+void check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, Array<Operand> *operands, Array<Ast *> const &rhs, bool allow_ok, bool *optional_ok_ = nullptr) {
+	bool optional_ok = false;
+	isize tuple_index = 0;
+	for_array(i, rhs) {
+		CheckerContext c_ = *ctx;
+		CheckerContext *c = &c_;
+
+		Operand o = {};
+
+		Type *type_hint = nullptr;
+
+		if (tuple_index < lhs.count) {
+			type_hint = lhs[tuple_index].type;
+		}
+
+		check_expr_base(c, &o, rhs[i], type_hint);
+		if (o.mode == Addressing_NoValue) {
+			error_operand_no_value(&o);
+			o.mode = Addressing_Invalid;
+		}
+
+		if (o.type == nullptr || o.type->kind != Type_Tuple) {
+			if (allow_ok && lhs.count == 2 && rhs.count == 1 &&
+			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk)) {
+				Type *tuple = make_optional_ok_type(o.type);
+				add_type_and_value(&c->checker->info, o.expr, o.mode, tuple, o.value);
+
+				Operand val = o;
+				Operand ok = o;
+				val.mode = Addressing_Value;
+				ok.mode  = Addressing_Value;
+				ok.type  = t_bool;
+				array_add(operands, val);
+				array_add(operands, ok);
+
+				optional_ok = true;
+				tuple_index += 2;
+			} else {
+				array_add(operands, o);
+				tuple_index += 1;
+			}
+		} else {
+			TypeTuple *tuple = &o.type->Tuple;
+			for_array(j, tuple->variables) {
+				o.type = tuple->variables[j]->type;
+				array_add(operands, o);
+			}
+
+			isize count = tuple->variables.count;
+			tuple_index += 2;
+		}
+	}
+
+	if (optional_ok_) *optional_ok_ = optional_ok;
+}
+
+
+
 void check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Array<Ast *> const &rhs, bool allow_ok, bool *optional_ok_ = nullptr) {
 	bool optional_ok = false;
 	isize tuple_index = 0;
