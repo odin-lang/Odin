@@ -1137,7 +1137,9 @@ Token expect_token_after(AstFile *f, TokenKind kind, char *msg) {
 
 Token expect_operator(AstFile *f) {
 	Token prev = f->curr_token;
-	if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
+	if (prev.kind == Token_in && (f->expr_level >= 0 || f->allow_in_expr)) {
+		// okay
+	} else if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
 		syntax_error(f->curr_token, "Expected an operator, got '%.*s'",
 		             LIT(token_strings[prev.kind]));
 	} else if (!f->allow_range && (prev.kind == Token_Ellipsis)) {
@@ -2242,11 +2244,16 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_LtEq:
 	case Token_GtEq:
 		return 5;
+	case Token_in:
+		if (f->expr_level >= 0 || f->allow_in_expr) {
+			return 6;
+		}
+		return 0;
 	case Token_Add:
 	case Token_Sub:
 	case Token_Or:
 	case Token_Xor:
-		return 6;
+		return 7;
 	case Token_Mul:
 	case Token_Quo:
 	case Token_Mod:
@@ -2255,7 +2262,7 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_AndNot:
 	case Token_Shl:
 	case Token_Shr:
-		return 7;
+		return 8;
 	}
 	return 0;
 }
@@ -3088,6 +3095,8 @@ Ast *parse_if_stmt(AstFile *f) {
 
 	isize prev_level = f->expr_level;
 	f->expr_level = -1;
+	bool prev_allow_in_expr = f->allow_in_expr;
+	f->allow_in_expr = true;
 
 	if (allow_token(f, Token_Semicolon)) {
 		cond = parse_expr(f, false);
@@ -3102,6 +3111,7 @@ Ast *parse_if_stmt(AstFile *f) {
 	}
 
 	f->expr_level = prev_level;
+	f->allow_in_expr = prev_allow_in_expr;
 
 	if (cond == nullptr) {
 		syntax_error(f->curr_token, "Expected condition for if statement");
@@ -3320,11 +3330,14 @@ Ast *parse_case_clause(AstFile *f, bool is_type) {
 	Array<Ast *> list = {};
 	expect_token(f, Token_case);
 	bool prev_allow_range = f->allow_range;
+	bool prev_allow_in_expr = f->allow_in_expr;
 	f->allow_range = !is_type;
+	f->allow_in_expr = !is_type;
 	if (f->curr_token.kind != Token_Colon) {
 		list = parse_rhs_expr_list(f);
 	}
 	f->allow_range = prev_allow_range;
+	f->allow_in_expr = prev_allow_in_expr;
 	expect_token(f, Token_Colon); // TODO(bill): Is this the best syntax?
 	Array<Ast *> stmts = parse_stmt_list(f);
 
