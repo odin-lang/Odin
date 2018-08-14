@@ -503,6 +503,10 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		}
 	}
 
+	if (is_type_bit_set(dst) && are_types_identical(dst->BitSet.base_type, operand->type)) {
+		return 3;
+	}
+
 #if 0
 	if (are_types_identical(dst, src) && (!is_type_named(dst) || !is_type_named(src))) {
 		return 1;
@@ -1345,6 +1349,10 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 			// return true;
 		}
 		if (out_value) *out_value = in_value;
+	} else if (is_type_bit_set(type)) {
+		if (in_value.kind == ExactValue_Integer) {
+			return true;
+		}
 	}
 
 
@@ -2019,6 +2027,42 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node) {
 		break;
 	}
 
+	case Token_in:
+		check_expr(c, x, be->left);
+		check_expr(c, y, be->right);
+		if (x->mode == Addressing_Invalid) {
+			return;
+		}
+		if (y->mode == Addressing_Invalid) {
+			x->mode = Addressing_Invalid;
+			x->expr = y->expr;
+			return;
+		}
+
+		if (is_type_map(y->type)) {
+			Type *yt = base_type(y->type);
+			check_assignment(c, x, yt->Map.key, str_lit("map 'in'"));
+
+			add_package_dependency(c, "runtime", "__dynamic_map_get");
+		} else if (is_type_bit_set(y->type)) {
+			Type *yt = base_type(y->type);
+			check_assignment(c, x, yt->BitSet.base_type, str_lit("bit_set 'in'"));
+		} else {
+			gbString t = type_to_string(y->type);
+			error(x->expr, "expected either a map or bitset for 'in', got %s", t);
+			gb_string_free(t);
+			x->expr = node;
+			x->mode = Addressing_Invalid;
+			return;
+		}
+		if (x->mode != Addressing_Invalid) {
+			x->mode = Addressing_Value;
+			x->type = t_untyped_bool;
+		}
+		x->expr = node;
+
+		return;
+
 	default:
 		check_expr(c, x, be->left);
 		check_expr(c, y, be->right);
@@ -2151,7 +2195,8 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node) {
 		ExactValue a = x->value;
 		ExactValue b = y->value;
 
-		Type *type = base_type(x->type);
+		// Type *type = base_type(x->type);
+		Type *type = x->type;
 		if (is_type_pointer(type)) {
 			GB_ASSERT(op.kind == Token_Sub);
 			i64 bytes = a.value_pointer - b.value_pointer;
@@ -5422,6 +5467,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 			if (cl->elems[0]->kind == Ast_FieldValue) {
 				error(cl->elems[0], "'field = value' in a bit_set a literal is not allowed");
+				is_constant = false;
 			} else {
 				for_array(index, cl->elems) {
 					Entity *field = nullptr;
@@ -5457,7 +5503,31 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 		if (is_constant) {
 			o->mode = Addressing_Constant;
-			o->value = exact_value_compound(node);
+
+			if (is_type_bit_set(type)) {
+				// NOTE(bill): Encode as an integer
+
+				i64 lower = base_type(type)->BitSet.min;
+
+				u64 bits = 0;
+				for_array(index, cl->elems) {
+					Entity *field = nullptr;
+					Ast *elem = cl->elems[index];
+					GB_ASSERT(elem->kind != Ast_FieldValue);
+					TypeAndValue tav = elem->tav;
+					ExactValue i = exact_value_to_integer(tav.value);
+					if (i.kind != ExactValue_Integer) {
+						continue;
+					}
+					i64 val = big_int_to_i64(&i.value_integer);
+					val -= lower;
+					u64 bit = u64(1ll<<val);
+					bits |= bit;
+				}
+				o->value = exact_value_u64(bits);
+			} else {
+				o->value = exact_value_compound(node);
+			}
 		} else {
 			o->mode = Addressing_Value;
 		}

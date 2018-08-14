@@ -724,11 +724,19 @@ bit_set_type :: proc() {
 	}
 
 	Days :: distinct bit_set[Day];
+	WEEKEND :: Days{Sunday, Saturday};
+
 	d: Days;
-	d = Days{Sunday};
+	d = Days{Sunday} | Days{Monday};
 	x := Tuesday;
-	d |= Days{Saturday, x};
-	fmt.println(d);
+	e := d | WEEKEND;
+	fmt.println(d, e);
+
+	ok := Saturday in e; // `in` is only allowed for `map` and `bit_set` types
+	fmt.println(ok);
+	if Saturday in e {
+		fmt.println("Saturday in", e);
+	}
 }
 
 main :: proc() {

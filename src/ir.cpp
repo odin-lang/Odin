@@ -2355,6 +2355,11 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 
 	}
 
+	if (op == Token_Not) {
+		irValue *cmp = ir_emit_comp(proc, Token_CmpEq, x, v_false);
+		return ir_emit_conv(proc, cmp, type);
+	}
+
 	return ir_emit(proc, ir_instr_unary_op(proc, op, x, type));
 }
 
@@ -4879,6 +4884,55 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		case Token_CmpAnd:
 		case Token_CmpOr:
 			return ir_emit_logical_binary_expr(proc, expr);
+
+
+		case Token_in: {
+			irValue *right = ir_build_expr(proc, be->right);
+			Type *rt = base_type(ir_type(right));
+			switch (rt->kind) {
+			case Type_Map:
+				{
+					ir_emit_comment(proc, str_lit("map in"));
+
+					irValue *addr = ir_address_from_load_or_generate_local(proc, right);
+					irValue *h = ir_gen_map_header(proc, addr, rt);
+					irValue *key = ir_gen_map_key(proc, left, rt->Map.key);
+
+					auto args = array_make<irValue *>(ir_allocator(), 2);
+					args[0] = h;
+					args[1] = key;
+
+					irValue *ptr = ir_emit_runtime_call(proc, "__dynamic_map_get", args);
+					return ir_emit_conv(proc, ir_emit_comp(proc, Token_NotEq, ptr, v_raw_nil), t_bool);
+				}
+				break;
+			case Type_BitSet:
+				{
+					ir_emit_comment(proc, str_lit("bit_set in"));
+
+					Type *key_type = rt->BitSet.base_type;
+					GB_ASSERT(are_types_identical(ir_type(left), key_type));
+
+					Type *it = bit_set_to_int(rt);
+					left = ir_emit_conv(proc, left, it);
+
+					irValue *lower = ir_value_constant(it, exact_value_i64(rt->BitSet.min));
+					irValue *key = ir_emit_arith(proc, Token_Sub, left, lower, it);
+					irValue *bit = ir_emit_arith(proc, Token_Shl, v_one, key, it);
+
+
+					irValue *old_value = ir_emit_bitcast(proc, right, it);
+					irValue *new_value = ir_emit_arith(proc, Token_And, old_value, bit, it);
+
+					return ir_emit_conv(proc, ir_emit_comp(proc, Token_NotEq, new_value, v_zero), t_bool);
+				}
+				break;
+			default:
+				GB_PANIC("Invalid 'in' type");
+			}
+			break;
+
+		}
 
 		default:
 			GB_PANIC("Invalid binary expression");
