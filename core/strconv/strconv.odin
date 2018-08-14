@@ -3,10 +3,11 @@ package strconv
 using import "core:decimal"
 
 Int_Flag :: enum {
-	Prefix = 1<<0,
-	Plus   = 1<<1,
-	Space  = 1<<2,
+	Prefix,
+	Plus,
+	Space,
 }
+Int_Flags :: bit_set[Int_Flag];
 
 
 parse_bool :: proc(s: string) -> (result: bool = false, ok: bool) {
@@ -458,7 +459,7 @@ is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned
 	return u, neg;
 }
 
-append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flag) -> string {
+append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
 	if base < 2 || base > MAX_BASE {
 		panic("strconv: illegal base passed to append_bits");
 	}
@@ -474,7 +475,7 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 	}
 	i-=1; a[i] = digits[u % b];
 
-	if flags&Int_Flag.Prefix != nil {
+	if Int_Flag.Prefix in flags {
 		ok := true;
 		switch base {
 		case  2: i-=1; a[i] = 'b';
@@ -492,9 +493,9 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 	switch {
 	case neg:
 		i-=1; a[i] = '-';
-	case flags&Int_Flag.Plus != nil:
+	case Int_Flag.Plus in flags:
 		i-=1; a[i] = '+';
-	case flags&Int_Flag.Space != nil:
+	case Int_Flag.Space in flags:
 		i-=1; a[i] = ' ';
 	}
 

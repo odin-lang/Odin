@@ -1163,7 +1163,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			be->right = as->rhs[0];
 
 			check_expr(ctx, &lhs, as->lhs[0]);
-			check_binary_expr(ctx, &rhs, &binary_expr);
+			check_binary_expr(ctx, &rhs, &binary_expr, true);
 			if (rhs.mode == Addressing_Invalid) {
 				return;
 			}

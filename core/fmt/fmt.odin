@@ -471,10 +471,11 @@ _fmt_int :: proc(fi: ^Fmt_Info, u: u64, base: int, is_signed: bool, bit_size: in
 	buf: [256]byte;
 	start := 0;
 
-	flags: strconv.Int_Flag;
-	if fi.hash && !fi.zero do flags |= strconv.Int_Flag.Prefix;
-	if fi.plus             do flags |= strconv.Int_Flag.Plus;
-	if fi.space            do flags |= strconv.Int_Flag.Space;
+	using strconv.Int_Flag;
+	flags: strconv.Int_Flags;
+	if fi.hash && !fi.zero do flags |= {Prefix};
+	if fi.plus             do flags |= {Plus};
+	if fi.space            do flags |= {Space};
 	s := strconv.append_bits(buf[start:], u, base, is_signed, bit_size, digits, flags);
 
 	if fi.hash && fi.zero {
