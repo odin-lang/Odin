@@ -99,7 +99,9 @@ Type_Info_Bit_Field :: struct {
 	bits:    []i32,
 	offsets: []i32,
 };
-
+Type_Info_Bit_Set :: struct {
+	base: ^Type_Info,
+};
 
 Type_Info :: struct {
 	size:  int,
@@ -127,6 +129,7 @@ Type_Info :: struct {
 		Type_Info_Enum,
 		Type_Info_Map,
 		Type_Info_Bit_Field,
+		Type_Info_Bit_Set,
 	},
 }
 

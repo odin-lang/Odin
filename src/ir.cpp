@@ -3275,8 +3275,6 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 	// boolean -> boolean/integer
 	if (is_type_boolean(src) && (is_type_boolean(dst) || is_type_integer(dst))) {
-		GB_ASSERT(src != t_llvm_bool);
-
 		irValue *b = ir_emit(proc, ir_instr_binary_op(proc, Token_NotEq, value, v_zero, t_llvm_bool));
 		return ir_emit(proc, ir_instr_conv(proc, irConv_zext, b, t_llvm_bool, t));
 	}
@@ -4247,7 +4245,7 @@ irValue *ir_find_global_variable(irProcedure *proc, String name) {
 }
 
 void ir_build_stmt_list(irProcedure *proc, Array<Ast *> stmts);
-
+void ir_build_assign_op(irProcedure *proc, irAddr const &lhs, irValue *value, TokenKind op);
 
 bool is_double_pointer(Type *t) {
 	if (!is_type_pointer(t)) {
@@ -5610,8 +5608,9 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 		Type *et = nullptr;
 		switch (bt->kind) {
-		case Type_Array:  et = bt->Array.elem;  break;
-		case Type_Slice:  et = bt->Slice.elem;  break;
+		case Type_Array:  et = bt->Array.elem;       break;
+		case Type_Slice:  et = bt->Slice.elem;       break;
+		case Type_BitSet: et = bt->BitSet.base_type; break;
 		}
 
 		String proc_name = {};
@@ -5821,7 +5820,42 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 					ir_emit_store(proc, gep, fv);
 				}
 			}
+
+			break;
 		}
+
+		case Type_BitSet: {
+
+			i64 sz = type_size_of(type);
+			if (cl->elems.count > 0 && sz > 0) {
+				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
+
+				irValue *lower = ir_value_constant(t_int, exact_value_i64(bt->BitSet.min));
+				for_array(i, cl->elems) {
+					Ast *elem = cl->elems[i];
+					GB_ASSERT(elem->kind != Ast_FieldValue);
+
+					if (ir_is_elem_const(proc->module, elem, et)) {
+						continue;
+					}
+
+					irValue *expr = ir_build_expr(proc, elem);
+					GB_ASSERT(ir_type(expr)->kind != Type_Tuple);
+
+					Type *it = bit_set_to_int(bt);
+					irValue *e = ir_emit_conv(proc, expr, it);
+					e = ir_emit_arith(proc, Token_Sub, e, lower, it);
+					e = ir_emit_arith(proc, Token_Shl, v_one, e, it);
+
+					irValue *old_value = ir_emit_bitcast(proc, ir_emit_load(proc, v), it);
+					irValue *new_value = ir_emit_arith(proc, Token_Or, old_value, e, it);
+					new_value = ir_emit_bitcast(proc, new_value, type);
+					ir_emit_store(proc, v, new_value);
+				}
+			}
+			break;
+		}
+
 		}
 
 		return ir_addr(v);
@@ -8025,8 +8059,14 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			}
 			break;
 		}
-		}
 
+		case Type_BitSet:
+			ir_emit_comment(proc, str_lit("Type_Info_Bit_Set"));
+			tag = ir_emit_conv(proc, variant_ptr, t_type_info_bit_set_ptr);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->BitSet.base_type));
+			break;
+
+		}
 
 		if (tag != nullptr) {
 			Type *tag_type = type_deref(ir_type(tag));

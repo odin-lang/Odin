@@ -65,6 +65,10 @@ void ir_write_i64(irFileBuffer *f, i64 i) {
 	String str = i64_to_string(i, f->buf, IR_FILE_BUFFER_BUF_LEN-1);
 	ir_write_string(f, str);
 }
+void ir_write_u64(irFileBuffer *f, u64 i) {
+	String str = u64_to_string(i, f->buf, IR_FILE_BUFFER_BUF_LEN-1);
+	ir_write_string(f, str);
+}
 void ir_write_big_int(irFileBuffer *f, BigInt const &x) {
 	i64 i = 0;
 	if (x.neg) {
@@ -502,6 +506,19 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align, size);
 		break;
 	}
+
+	case Type_BitSet: {
+		i64 align = type_align_of(t);
+		i64 size  = type_size_of(t);
+		switch (size) {
+		case 0: ir_write_str_lit(f, "{}");  return;
+		case 1: ir_write_str_lit(f, "i8");  return;
+		case 2: ir_write_str_lit(f, "i16"); return;
+		case 4: ir_write_str_lit(f, "i32"); return;
+		case 8: ir_write_str_lit(f, "i64"); return;
+		default: GB_PANIC("Unknown bit_set size"); break;
+		}
+	}
 	}
 }
 
@@ -766,6 +783,34 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 			ir_write_byte(f, '}');
 			if (type->Struct.is_packed) ir_write_byte(f, '>');
+		} else if (is_type_bit_set(type)) {
+			ast_node(cl, CompoundLit, value.value_compound);
+			if (cl->elems.count == 0) {
+				ir_write_str_lit(f, "zeroinitializer");
+				break;
+			}
+
+			i64 sz = type_size_of(type);
+			if (sz == 0) {
+				ir_write_str_lit(f, "zeroinitializer");
+				break;
+			}
+
+			u64 bits = 0;
+			for_array(i, cl->elems) {
+				Ast *e = cl->elems[i];
+				GB_ASSERT(e->kind != Ast_FieldValue);
+
+				TypeAndValue tav = e->tav;
+				if (tav.mode != Addressing_Constant) {
+					continue;
+				}
+				GB_ASSERT(tav.value.kind == ExactValue_Integer);
+				i64 v = big_int_to_i64(&tav.value.value_integer);
+				i64 lower = type->BitSet.min;
+				bits |= 1ull<<cast(u64)(v-lower);
+			}
+			ir_write_u64(f, bits);
 		} else {
 			ir_write_str_lit(f, "zeroinitializer");
 		}

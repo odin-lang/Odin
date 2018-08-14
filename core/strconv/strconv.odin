@@ -198,10 +198,10 @@ append_bool :: proc(buf: []byte, b: bool) -> string {
 }
 
 append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
-	return append_bits(buf, u64(u), base, false, 8*size_of(uint), digits, 0);
+	return append_bits(buf, u64(u), base, false, 8*size_of(uint), digits, nil);
 }
 append_int :: proc(buf: []byte, i: i64, base: int) -> string {
-	return append_bits(buf, u64(i), base, true, 8*size_of(int), digits, 0);
+	return append_bits(buf, u64(i), base, true, 8*size_of(int), digits, nil);
 }
 itoa :: proc(buf: []byte, i: int) -> string do return append_int(buf, i64(i), 10);
 
@@ -474,7 +474,7 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 	}
 	i-=1; a[i] = digits[u % b];
 
-	if flags&Int_Flag.Prefix != 0 {
+	if flags&Int_Flag.Prefix != nil {
 		ok := true;
 		switch base {
 		case  2: i-=1; a[i] = 'b';
@@ -492,9 +492,9 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 	switch {
 	case neg:
 		i-=1; a[i] = '-';
-	case flags&Int_Flag.Plus != 0:
+	case flags&Int_Flag.Plus != nil:
 		i-=1; a[i] = '+';
-	case flags&Int_Flag.Space != 0:
+	case flags&Int_Flag.Space != nil:
 		i-=1; a[i] = ' ';
 	}
 

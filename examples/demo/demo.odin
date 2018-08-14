@@ -712,6 +712,25 @@ deprecated_attribute :: proc() {
 	// foo_v1(1);
 }
 
+bit_set_type :: proc() {
+	using Day :: enum {
+		Sunday,
+		Monday,
+		Tuesday,
+		Wednesday,
+		Thursday,
+		Friday,
+		Saturday,
+	}
+
+	Days :: distinct bit_set[Day];
+	d: Days;
+	d = Days{Sunday};
+	x := Tuesday;
+	d |= Days{Saturday, x};
+	fmt.println(d);
+}
+
 main :: proc() {
 	when true {
 		general_stuff();
@@ -725,5 +744,6 @@ main :: proc() {
 		complete_switch();
 		cstring_example();
 		deprecated_attribute();
+		bit_set_type();
 	}
 }
