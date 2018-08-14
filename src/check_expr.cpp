@@ -841,6 +841,9 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 	case Type_Enum:
 		return false;
 
+	case Type_BitSet:
+		return false;
+
 	case Type_Union:
 		if (source->kind == Type_Union) {
 			TypeUnion *x = &poly->Union;
@@ -1115,8 +1118,8 @@ bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 		break;
 
 	case Token_Xor:
-		if (!is_type_integer(type) && !is_type_boolean(type)) {
-			error(op, "Operator '%.*s' is only allowed with integers or booleans", LIT(op.string));
+		if (!is_type_integer(type) && !is_type_boolean(type) && !is_type_bit_set(type)) {
+			error(op, "Operator '%.*s' is only allowed with integers, booleans, or bit sets", LIT(op.string));
 		}
 		break;
 
@@ -1142,33 +1145,17 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	switch (op.kind) {
 	case Token_Sub:
 	case Token_SubEq:
-		if (!is_type_numeric(type) && !is_type_pointer(type)) {
-			error(op, "Operator '%.*s' is only allowed with numeric or pointer expressions", LIT(op.string));
-			return false;
-		}
-#if defined(NO_POINTER_ARITHMETIC)
-		if (is_type_pointer(type)) {
-			error(o->expr, "Pointer arithmetic is not supported");
-			return false;
-		}
-#else
-		if (is_type_pointer(type)) {
-			o->type = t_int;
-		}
-		if (base_type(type) == t_rawptr) {
-			gbString str = type_to_string(type);
-			error(o->expr, "Invalid pointer type for pointer arithmetic: '%s'", str);
-			gb_string_free(str);
+		if (!is_type_numeric(type)) {
+			error(op, "Operator '%.*s' is only allowed with numeric expressions", LIT(op.string));
 			return false;
 		}
 		break;
-#endif
 
 	case Token_Mul:
 	case Token_Quo:
-	case Token_AddEq:
 	case Token_MulEq:
 	case Token_QuoEq:
+	case Token_AddEq:
 		if (!is_type_numeric(type)) {
 			error(op, "Operator '%.*s' is only allowed with numeric expressions", LIT(op.string));
 			return false;
@@ -1194,20 +1181,26 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	case Token_OrEq:
 	case Token_Xor:
 	case Token_XorEq:
-		if (!is_type_integer(type) && !is_type_boolean(type)) {
-			error(op, "Operator '%.*s' is only allowed with integers or booleans", LIT(op.string));
+		if (!is_type_integer(type) && !is_type_boolean(type) && !is_type_bit_set(type)) {
+			error(op, "Operator '%.*s' is only allowed with integers, booleans, or bit sets", LIT(op.string));
 			return false;
 		}
 		break;
 
 	case Token_Mod:
 	case Token_ModMod:
-	case Token_AndNot:
 	case Token_ModEq:
 	case Token_ModModEq:
-	case Token_AndNotEq:
 		if (!is_type_integer(type)) {
 			error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
+			return false;
+		}
+		break;
+
+	case Token_AndNot:
+	case Token_AndNotEq:
+		if (!is_type_integer(type) && !is_type_bit_set(type)) {
+			error(op, "Operator '%.*s' is only allowed with integers and bit sets", LIT(op.string));
 			return false;
 		}
 		break;
@@ -2329,7 +2322,11 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 		return;
 	}
 
-	Type *t = core_type(target_type);
+	Type *t = base_type(target_type);
+	if (c->in_enum_type) {
+		t = core_type(target_type);
+	}
+
 	switch (t->kind) {
 	case Type_Basic:
 		if (operand->mode == Addressing_Constant) {
@@ -4264,6 +4261,12 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 					} else {
 						pt = type_to_string(t);
 					}
+					String prefix = {};
+					String prefix_sep = {};
+					if (proc->pkg) {
+						prefix = proc->pkg->name;
+						prefix_sep = str_lit(".");
+					}
 					String name = proc->token.string;
 
 					char const *sep = "::";
@@ -4271,7 +4274,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 						sep = ":=";
 					}
 					// gb_printf_err("\t%.*s %s %s at %.*s(%td:%td) with score %lld\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
-					gb_printf_err("\t%.*s %s %s at %.*s(%td:%td)\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
+					gb_printf_err("\t%.*s%.*s%.*s %s %s at %.*s(%td:%td)\n", LIT(prefix), LIT(prefix_sep), LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
 				}
 				if (procs.count > 0) {
 					gb_printf_err("\n");
@@ -5096,9 +5099,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 		switch (t->kind) {
 		case Type_Struct: {
-			if (is_type_union(t)) {
-				is_constant = false;
-			}
 			if (cl->elems.count == 0) {
 				break; // NOTE(bill): No need to init
 			}
@@ -5111,7 +5111,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				break;
 			}
 
-			{ // Checker values
+			if (is_type_struct(t)) { // Checker values
 				isize field_count = t->Struct.fields.count;
 				isize min_field_count = t->Struct.fields.count;
 				for (isize i = min_field_count-1; i >= 0; i--) {
@@ -5220,6 +5220,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					}
 				}
 			}
+
 			break;
 		}
 
@@ -5406,6 +5407,39 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 			add_package_dependency(c, "runtime", "__dynamic_map_reserve");
 			add_package_dependency(c, "runtime", "__dynamic_map_set");
+			break;
+		}
+
+		case Type_BitSet: {
+			if (cl->elems.count == 0) {
+				break; // NOTE(bill): No need to init
+			}
+			Type *et = base_type(t->BitSet.base_type);
+			isize field_count = 0;
+			if (et->kind == Type_Enum) {
+				field_count = et->Enum.fields.count;
+			}
+
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				error(cl->elems[0], "'field = value' in a bit_set a literal is not allowed");
+			} else {
+				for_array(index, cl->elems) {
+					Entity *field = nullptr;
+					Ast *elem = cl->elems[index];
+					if (elem->kind == Ast_FieldValue) {
+						error(elem, "'field = value' in a bit_set a literal is not allowed");
+						continue;
+					}
+
+					check_expr(c, o, elem);
+
+					if (is_constant) {
+						is_constant = o->mode == Addressing_Constant;
+					}
+
+					check_assignment(c, o, t->BitSet.base_type, str_lit("bit_set literal"));
+				}
+			}
 			break;
 		}
 
@@ -6107,6 +6141,24 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 		str = gb_string_appendc(str, "[dynamic]");
 		str = write_expr_to_string(str, at->elem);
 	case_end;
+
+	case_ast_node(bf, BitFieldType, node);
+		str = gb_string_appendc(str, "bit_field ");
+		if (bf->align) {
+			str = gb_string_appendc(str, "#align ");
+			str = write_expr_to_string(str, bf->align);
+		}
+		str = gb_string_appendc(str, "{");
+		str = write_struct_fields_to_string(str, bf->fields);
+		str = gb_string_appendc(str, "}");
+	case_end;
+
+	case_ast_node(bs, BitSetType, node);
+		str = gb_string_appendc(str, "bit_set[");
+		str = write_expr_to_string(str, bs->base_type);
+		str = gb_string_appendc(str, "]");
+	case_end;
+
 
 	case_ast_node(mt, MapType, node);
 		str = gb_string_appendc(str, "map[");

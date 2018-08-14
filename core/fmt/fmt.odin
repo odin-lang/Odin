@@ -70,7 +70,7 @@ write_rune :: proc(buf: ^String_Buffer, r: rune) {
 
 write_i64 :: proc(buf: ^String_Buffer, i: i64, base: int) {
 	b: [129]byte;
-	s := strconv.append_bits(b[:], u64(i), base, true, 64, strconv.digits, 0);
+	s := strconv.append_bits(b[:], u64(i), base, true, 64, strconv.digits, nil);
 	write_string(buf, s);
 }
 
@@ -312,6 +312,11 @@ write_type :: proc(buf: ^String_Buffer, ti: ^runtime.Type_Info) {
 			write_i64(buf, i64(info.bits[i]), 10);
 		}
 		write_string(buf, "}");
+
+	case runtime.Type_Info_Bit_Set:
+		write_string(buf, "bit_set[");
+		write_type(buf, info.base);
+		write_string(buf, "]");
 	}
 }
 
@@ -714,6 +719,82 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 }
 
 
+
+enum_value_to_u64 :: proc(ev: runtime.Type_Info_Enum_Value) -> u64 {
+	switch i in ev {
+	case rune:    return u64(i);
+	case i8:      return u64(i);
+	case i16:     return u64(i);
+	case i32:     return u64(i);
+	case i64:     return u64(i);
+	case int:     return u64(i);
+	case u8:      return u64(i);
+	case u16:     return u64(i);
+	case u32:     return u64(i);
+	case u64:     return u64(i);
+	case uint:    return u64(i);
+	case uintptr: return u64(i);
+	case f32:     return u64(i);
+	case f64:     return u64(i);
+	}
+	return 0;
+}
+
+fmt_bit_set :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
+	type_info := type_info_of(v.typeid);
+	switch info in type_info.variant {
+	case runtime.Type_Info_Named:
+		val := v;
+		val.typeid = info.base.id;
+		fmt_bit_set(fi, val, info.name);
+
+	case runtime.Type_Info_Bit_Set:
+		bits: u64;
+		bit_size := u64(8*type_info.size);
+		verb := 'b';
+
+		switch bit_size {
+		case  0: bits = 0;
+		case  8: bits = u64( (^u8)(v.data)^);
+		case 16: bits = u64((^u16)(v.data)^);
+		case 32: bits = u64((^u32)(v.data)^);
+		case 64: bits = u64((^u64)(v.data)^);
+		case: panic("unknown bit_size size");
+		}
+
+		et := runtime.type_info_base(info.base);
+		e := et.variant.(runtime.Type_Info_Enum);
+
+		if name != "" {
+			write_string(fi.buf, name);
+		} else {
+			write_type(fi.buf, type_info);
+		}
+		write_byte(fi.buf, '{');
+		defer write_byte(fi.buf, '}');
+
+		commas := 0;
+		loop: for i in 0 .. bit_size-1 {
+			if bits & (1<<i) == 0 {
+				continue loop;
+			}
+
+			if commas > 0 do write_string(fi.buf, ", ");
+
+			defer commas += 1;
+
+			for ev, evi in e.values {
+				v := enum_value_to_u64(ev);
+				if v == i {
+					write_string(fi.buf, e.names[evi]);
+					continue loop;
+				}
+			}
+			write_i64(fi.buf, i64(i), 10);
+		}
+	}
+}
+
 fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	if v.data == nil || v.typeid == nil {
 		write_string(fi.buf, "<nil>");
@@ -765,6 +846,8 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			if hash do for in 0..indent-1 do write_byte(fi.buf, '\t');
 			write_byte(fi.buf, '}');
 
+		case runtime.Type_Info_Bit_Set:
+			fmt_bit_set(fi, v);
 		case:
 			fmt_value(fi, any{v.data, typeid_of(info.base)}, verb);
 		}
@@ -929,6 +1012,9 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	case runtime.Type_Info_Type_Id:
 		id := (^typeid)(v.data)^;
 		write_typeid(fi.buf, id);
+
+	case runtime.Type_Info_Bit_Set:
+		fmt_bit_set(fi, v);
 	}
 }
 

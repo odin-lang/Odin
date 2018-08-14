@@ -178,6 +178,11 @@ struct TypeStruct {
 		Scope *         scope;                            \
 		i64             custom_align;                     \
 	})                                                    \
+	TYPE_KIND(BitSet, struct {                            \
+		Type *base_type;                                  \
+		i64   min;                                        \
+		i64   max;                                        \
+	})                                                    \
 
 
 
@@ -376,6 +381,7 @@ gb_global Type *t_type_info_union             = nullptr;
 gb_global Type *t_type_info_enum              = nullptr;
 gb_global Type *t_type_info_map               = nullptr;
 gb_global Type *t_type_info_bit_field         = nullptr;
+gb_global Type *t_type_info_bit_set           = nullptr;
 
 gb_global Type *t_type_info_named_ptr         = nullptr;
 gb_global Type *t_type_info_integer_ptr       = nullptr;
@@ -398,6 +404,7 @@ gb_global Type *t_type_info_union_ptr         = nullptr;
 gb_global Type *t_type_info_enum_ptr          = nullptr;
 gb_global Type *t_type_info_map_ptr           = nullptr;
 gb_global Type *t_type_info_bit_field_ptr     = nullptr;
+gb_global Type *t_type_info_bit_set_ptr       = nullptr;
 
 gb_global Type *t_allocator                   = nullptr;
 gb_global Type *t_allocator_ptr               = nullptr;
@@ -605,6 +612,10 @@ Type *alloc_type_bit_field_value(u32 bits) {
 
 Type *alloc_type_bit_field() {
 	Type *t = alloc_type(Type_BitField);
+	return t;
+}
+Type *alloc_type_bit_set() {
+	Type *t = alloc_type(Type_BitSet);
 	return t;
 }
 
@@ -903,6 +914,10 @@ bool is_type_bit_field_value(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_BitFieldValue);
 }
+bool is_type_bit_set(Type *t) {
+	t = base_type(t);
+	return (t->kind == Type_BitSet);
+}
 bool is_type_map(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Map;
@@ -961,6 +976,19 @@ bool is_type_valid_for_keys(Type *t) {
 	}
 
 	return false;
+}
+
+Type *bit_set_to_int(Type *t) {
+	GB_ASSERT(is_type_bit_set(t));
+	i64 sz = type_size_of(t);
+	switch (sz) {
+	case 1: return t_u8;
+	case 2: return t_u16;
+	case 4: return t_u32;
+	case 8: return t_u64;
+	}
+	GB_PANIC("Unknown bit_set size");
+	return nullptr;
 }
 
 
@@ -1108,6 +1136,10 @@ bool type_has_nil(Type *t) {
 		}
 		return false;
 	} break;
+	case Type_Enum:
+	case Type_BitSet:
+	case Type_BitField:
+		return true;
 	case Type_Slice:
 	case Type_Proc:
 	case Type_Pointer:
@@ -1157,6 +1189,9 @@ bool is_type_comparable(Type *t) {
 	case Type_Array:
 		return is_type_comparable(t->Array.elem);
 	case Type_Proc:
+		return true;
+
+	case Type_BitSet:
 		return true;
 	}
 	return false;
@@ -1234,6 +1269,12 @@ bool are_types_identical(Type *x, Type *y) {
 
 				return true;
 			}
+		}
+		break;
+
+	case Type_BitSet:
+		if (y->kind == Type_BitSet) {
+			return are_types_identical(x->BitSet.base_type, y->BitSet.base_type);
 		}
 		break;
 
@@ -2023,6 +2064,16 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		}
 		return gb_clamp(next_pow2(align), 1, build_context.max_align);
 	} break;
+
+	case Type_BitSet: {
+		i64 bits = t->BitSet.max - t->BitSet.min + 1;
+		if (bits == 0)  return 0;
+		if (bits <= 8)  return 1;
+		if (bits <= 16) return 2;
+		if (bits <= 32) return 4;
+		if (bits <= 64) return 8;
+		GB_PANIC("unknown bit_set size");
+	}
 	}
 
 	// return gb_clamp(next_pow2(type_size_of(t)), 1, build_context.max_align);
@@ -2239,6 +2290,16 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 		GB_ASSERT((bits%8) == 0);
 		return bits/8;
 	} break;
+
+	case Type_BitSet: {
+		i64 bits = t->BitSet.max - t->BitSet.min + 1;
+		if (bits == 0)  return 0;
+		if (bits <= 8)  return 1;
+		if (bits <= 16) return 2;
+		if (bits <= 32) return 4;
+		if (bits <= 64) return 8;
+		GB_PANIC("unknown bit_set size");
+	}
 	}
 
 	// Catch all
@@ -2548,6 +2609,12 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_BitFieldValue:
 		str = gb_string_append_fmt(str, "(bit field value with %d bits)", cast(int)type->BitFieldValue.bits);
+		break;
+
+	case Type_BitSet:
+		str = gb_string_appendc(str, "bit_field[");
+		str = write_type_to_string(str, type->BitSet.base_type);
+		str = gb_string_appendc(str, "]");
 		break;
 	}
 

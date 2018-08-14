@@ -681,6 +681,59 @@ void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type, Ast *node) 
 }
 
 
+void check_bit_set_type(CheckerContext *ctx, Type *type, Ast *node) {
+	ast_node(bs, BitSetType, node);
+	GB_ASSERT(type->kind == Type_BitSet);
+
+	Type *bt = check_type_expr(ctx, bs->base_type, nullptr);
+
+	type->BitSet.base_type = bt;
+	if (!is_type_enum(bt)) {
+		error(bs->base_type, "Expected an enum type for a bit_set");
+	} else {
+		Type *et = base_type(bt);
+		GB_ASSERT(et->kind == Type_Enum);
+		if (!is_type_integer(et->Enum.base_type)) {
+			error(bs->base_type, "Enum type for bit_set must be an integer");
+			return;
+		}
+		i64 min_value = 0;
+		i64 max_value = 0;
+		BigInt v64 = {}; big_int_from_i64(&v64, 64);
+
+		for_array(i, et->Enum.fields) {
+			Entity *e = et->Enum.fields[i];
+			if (e->kind != Entity_Constant) {
+				continue;
+			}
+			ExactValue value = exact_value_to_integer(e->Constant.value);
+			GB_ASSERT(value.kind == ExactValue_Integer);
+			BigInt v = value.value_integer;
+
+
+			if (big_int_cmp(&v, &BIG_INT_ZERO) < 0) {
+				error(bs->base_type, "Negative enum values are not allowed in a bit_set");
+				return;
+			}
+
+			if (big_int_cmp(&v, &v64) >= 0) {
+				error(bs->base_type, "Enum values overe 64 are not allowed in a bit_set");
+				return;
+			}
+
+			i64 x = big_int_to_i64(&v);
+			min_value = gb_min(min_value, x);
+			max_value = gb_max(max_value, x);
+		}
+
+
+		type->BitSet.min = min_value;
+		type->BitSet.max = max_value;
+	}
+
+}
+
+
 bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Type *type, bool compound, bool modify_type) {
 	if (type == nullptr ||
 	    type == t_invalid) {
@@ -1014,6 +1067,12 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 						type = t_invalid;
 					}
 				}
+
+				if (p->flags&FieldFlag_auto_cast) {
+					error(name, "'auto_cast' can only be applied variable fields");
+					p->flags &= ~FieldFlag_auto_cast;
+				}
+
 				param = alloc_entity_type_name(scope, name->Ident.token, type, EntityState_Resolved);
 				param->TypeName.is_type_alias = true;
 			} else {
@@ -1885,17 +1944,27 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 		check_enum_type(ctx, *type, named_type, e);
 		check_close_scope(ctx);
 		(*type)->Enum.node = e;
+
+		ctx->in_enum_type = false;
 		return true;
 	case_end;
 
 	case_ast_node(et, BitFieldType, e);
 		*type = alloc_type_bit_field();
 		set_base_type(named_type, *type);
-		check_open_scope(ctx, e);
 		check_bit_field_type(ctx, *type, e);
+		return true;
+	case_end;
+
+	case_ast_node(bs, BitSetType, e);
+		*type = alloc_type_bit_set();
+		set_base_type(named_type, *type);
+		check_open_scope(ctx, e);
+		check_bit_set_type(ctx, *type, e);
 		check_close_scope(ctx);
 		return true;
 	case_end;
+
 
 	case_ast_node(pt, ProcType, e);
 		bool ips = ctx->in_polymorphic_specialization;
