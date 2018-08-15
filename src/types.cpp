@@ -179,7 +179,7 @@ struct TypeStruct {
 		i64             custom_align;                     \
 	})                                                    \
 	TYPE_KIND(BitSet, struct {                            \
-		Type *base_type;                                  \
+		Type *base;                                       \
 		i64   min;                                        \
 		i64   max;                                        \
 	})                                                    \
@@ -1277,7 +1277,7 @@ bool are_types_identical(Type *x, Type *y) {
 
 	case Type_BitSet:
 		if (y->kind == Type_BitSet) {
-			return are_types_identical(x->BitSet.base_type, y->BitSet.base_type);
+			return are_types_identical(x->BitSet.base, y->BitSet.base);
 		}
 		break;
 
@@ -2616,8 +2616,8 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_BitSet:
-		str = gb_string_appendc(str, "bit_field[");
-		str = write_type_to_string(str, type->BitSet.base_type);
+		str = gb_string_appendc(str, "bit_set[");
+		str = write_type_to_string(str, type->BitSet.base);
 		str = gb_string_appendc(str, "]");
 		break;
 	}
