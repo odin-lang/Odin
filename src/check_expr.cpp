@@ -2040,7 +2040,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 			add_package_dependency(c, "runtime", "__dynamic_map_get");
 		} else if (is_type_bit_set(y->type)) {
 			Type *yt = base_type(y->type);
-			check_assignment(c, x, yt->BitSet.base_type, str_lit("bit_set 'in'"));
+			check_assignment(c, x, yt->BitSet.base, str_lit("bit_set 'in'"));
 		} else {
 			gbString t = type_to_string(y->type);
 			error(x->expr, "expected either a map or bitset for 'in', got %s", t);
@@ -5527,7 +5527,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (cl->elems.count == 0) {
 				break; // NOTE(bill): No need to init
 			}
-			Type *et = base_type(t->BitSet.base_type);
+			Type *et = base_type(t->BitSet.base);
 			isize field_count = 0;
 			if (et->kind == Type_Enum) {
 				field_count = et->Enum.fields.count;
@@ -5551,7 +5551,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						is_constant = o->mode == Addressing_Constant;
 					}
 
-					check_assignment(c, o, t->BitSet.base_type, str_lit("bit_set literal"));
+					check_assignment(c, o, t->BitSet.base, str_lit("bit_set literal"));
 				}
 			}
 			break;
@@ -6293,7 +6293,7 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 
 	case_ast_node(bs, BitSetType, node);
 		str = gb_string_appendc(str, "bit_set[");
-		str = write_expr_to_string(str, bs->base_type);
+		str = write_expr_to_string(str, bs->base);
 		str = gb_string_appendc(str, "]");
 	case_end;
 

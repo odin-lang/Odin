@@ -483,7 +483,7 @@ AST_KIND(_TypeBegin, "", bool) \
 	}) \
 	AST_KIND(BitSetType, "bit set type", struct { \
 		Token token; \
-		Ast * base_type; \
+		Ast * base;  \
 	}) \
 	AST_KIND(MapType, "map type", struct { \
 		Token token; \

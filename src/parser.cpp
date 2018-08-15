@@ -347,7 +347,7 @@ Ast *clone_ast(Ast *node) {
 		n->BitFieldType.align = clone_ast(n->BitFieldType.align);
 		break;
 	case Ast_BitSetType:
-		n->BitSetType.base_type = clone_ast(n->BitSetType.base_type);
+		n->BitSetType.base = clone_ast(n->BitSetType.base);
 		break;
 	case Ast_MapType:
 		n->MapType.count = clone_ast(n->MapType.count);
@@ -927,10 +927,10 @@ Ast *ast_bit_field_type(AstFile *f, Token token, Array<Ast *> fields, Ast *align
 	return result;
 }
 
-Ast *ast_bit_set_type(AstFile *f, Token token, Ast *base_type) {
+Ast *ast_bit_set_type(AstFile *f, Token token, Ast *base) {
 	Ast *result = alloc_ast_node(f, Ast_BitSetType);
 	result->BitSetType.token = token;
-	result->BitSetType.base_type = base_type;
+	result->BitSetType.base = base;
 	return result;
 }
 
@@ -1901,27 +1901,10 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 	} break;
 
 	case Token_enum: {
-		// bool is_export = false;
 		Token token = expect_token(f, Token_enum);
 		Ast *base_type = nullptr;
 		if (f->curr_token.kind != Token_OpenBrace) {
-			if (f->curr_token.kind != Token_Hash) {
-				base_type = parse_type(f);
-			}
-			// while (allow_token(f, Token_Hash)) {
-			// 	Token tag = f->curr_token;
-			// 	if (!allow_token(f, Token_Ident) && !allow_token(f, Token_export)) {
-			// 		expect_token_after(f, Token_Ident, "#");
-			// 	}
-			// 	if (tag.string == "export") {
-			// 		if (is_export) {
-			// 			syntax_error(tag, "Duplicate enum tag '#%.*s'", LIT(tag.string));
-			// 		}
-			// 		is_export = true;
-			// 	} else {
-			// 		syntax_error(tag, "Invalid enum tag '#%.*s'", LIT(tag.string));
-			// 	}
-			// }
+			base_type = parse_type(f);
 		}
 		Token open = expect_token(f, Token_OpenBrace);
 
@@ -1978,11 +1961,11 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_bit_set: {
 		Token token = expect_token(f, Token_bit_set);
-		Token open = expect_token(f, Token_OpenBracket);
-		Ast *base_type = parse_type(f);
+		Token open  = expect_token(f, Token_OpenBracket);
+		Ast * base  = parse_type(f);
 		Token close = expect_token(f, Token_CloseBracket);
 
-		return ast_bit_set_type(f, token, base_type);
+		return ast_bit_set_type(f, token, base);
 	}
 
 	default: {

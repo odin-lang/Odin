@@ -502,8 +502,8 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		base_type = check_type(ctx, et->base_type);
 	}
 
-	if (base_type == nullptr || !(is_type_integer(base_type) || is_type_float(base_type))) {
-		error(node, "Base type for enumeration must be numeric");
+	if (base_type == nullptr || !is_type_integer(base_type)) {
+		error(node, "Base type for enumeration must be an integer");
 		return;
 	}
 	if (is_type_enum(base_type)) {
@@ -685,16 +685,16 @@ void check_bit_set_type(CheckerContext *ctx, Type *type, Ast *node) {
 	ast_node(bs, BitSetType, node);
 	GB_ASSERT(type->kind == Type_BitSet);
 
-	Type *bt = check_type_expr(ctx, bs->base_type, nullptr);
+	Type *bt = check_type_expr(ctx, bs->base, nullptr);
 
-	type->BitSet.base_type = bt;
+	type->BitSet.base = bt;
 	if (!is_type_enum(bt)) {
-		error(bs->base_type, "Expected an enum type for a bit_set");
+		error(bs->base, "Expected an enum type for a bit_set");
 	} else {
 		Type *et = base_type(bt);
 		GB_ASSERT(et->kind == Type_Enum);
 		if (!is_type_integer(et->Enum.base_type)) {
-			error(bs->base_type, "Enum type for bit_set must be an integer");
+			error(bs->base, "Enum type for bit_set must be an integer");
 			return;
 		}
 		i64 min_value = 0;
@@ -713,8 +713,10 @@ void check_bit_set_type(CheckerContext *ctx, Type *type, Ast *node) {
 			max_value = gb_max(max_value, x);
 		}
 
+		GB_ASSERT(min_value <= max_value);
+
 		if (max_value - min_value > 64) {
-			error(bs->base_type, "bit_set range is greater than 64 bits");
+			error(bs->base, "bit_set range is greater than 64 bits");
 		}
 
 		type->BitSet.min = min_value;

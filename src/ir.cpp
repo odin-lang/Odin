@@ -1758,8 +1758,7 @@ void ir_emit_defer_stmts(irProcedure *proc, irDeferExitKind kind, irBlock *block
 	isize i = count;
 	while (i --> 0) {
 		irDefer d = proc->defer_stmts[i];
-		if (d.context_stack_count >= 0) {
-			GB_ASSERT(proc->context_stack.count >= d.context_stack_count);
+		if (proc->context_stack.count >= d.context_stack_count) {
 			proc->context_stack.count = d.context_stack_count;
 		}
 
@@ -4910,7 +4909,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 				{
 					ir_emit_comment(proc, str_lit("bit_set in"));
 
-					Type *key_type = rt->BitSet.base_type;
+					Type *key_type = rt->BitSet.base;
 					GB_ASSERT(are_types_identical(ir_type(left), key_type));
 
 					Type *it = bit_set_to_int(rt);
@@ -5662,9 +5661,9 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 		Type *et = nullptr;
 		switch (bt->kind) {
-		case Type_Array:  et = bt->Array.elem;       break;
-		case Type_Slice:  et = bt->Slice.elem;       break;
-		case Type_BitSet: et = bt->BitSet.base_type; break;
+		case Type_Array:  et = bt->Array.elem;  break;
+		case Type_Slice:  et = bt->Slice.elem;  break;
+		case Type_BitSet: et = bt->BitSet.base; break;
 		}
 
 		String proc_name = {};
@@ -8117,7 +8116,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 		case Type_BitSet:
 			ir_emit_comment(proc, str_lit("Type_Info_Bit_Set"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_bit_set_ptr);
-			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->BitSet.base_type));
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->BitSet.base));
 			break;
 
 		}
