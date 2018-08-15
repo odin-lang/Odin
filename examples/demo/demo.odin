@@ -727,7 +727,7 @@ bit_set_type :: proc() {
 	WEEKEND :: Days{Sunday, Saturday};
 
 	d: Days;
-	d = Days{Sunday} | Days{Monday};
+	d = {Sunday, Monday};
 	x := Tuesday;
 	e := d | WEEKEND;
 	e |= {Monday};
@@ -738,6 +738,8 @@ bit_set_type :: proc() {
 	if Saturday in e {
 		fmt.println("Saturday in", e);
 	}
+	X :: Saturday in WEEKEND; // Constant evaluation
+	fmt.println(X);
 }
 
 main :: proc() {
