@@ -7423,7 +7423,7 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 
 	if (proc->type->Proc.has_proc_default_values) {
 		auto *p = &proc->type->Proc;
-		for_array(i, p->params->Tuple.variables) {
+		if (p->params != nullptr) for_array(i, p->params->Tuple.variables) {
 			Entity *f = p->params->Tuple.variables[i];
 			if (f->kind == Entity_Variable) {
 				ParameterValue pv = f->Variable.param_value;
@@ -7436,7 +7436,7 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 				}
 			}
 		}
-		for_array(i, p->results->Tuple.variables) {
+		if (p->results != nullptr) for_array(i, p->results->Tuple.variables) {
 			Entity *f = p->results->Tuple.variables[i];
 			if (f->kind == Entity_Variable) {
 				ParameterValue pv = f->Variable.param_value;
