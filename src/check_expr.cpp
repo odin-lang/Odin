@@ -2041,6 +2041,22 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 		} else if (is_type_bit_set(y->type)) {
 			Type *yt = base_type(y->type);
 			check_assignment(c, x, yt->BitSet.base, str_lit("bit_set 'in'"));
+
+			if (x->mode == Addressing_Constant && y->mode == Addressing_Constant) {
+				ExactValue k = exact_value_to_integer(x->value);
+				ExactValue v = exact_value_to_integer(y->value);
+				GB_ASSERT(k.kind == ExactValue_Integer);
+				GB_ASSERT(v.kind == ExactValue_Integer);
+				i64 bit = 1ll<<big_int_to_i64(&k.value_integer);
+				i64 bits = big_int_to_i64(&v.value_integer);
+
+				x->mode = Addressing_Constant;
+				x->type = t_untyped_bool;
+				x->value = exact_value_bool((bit & bits) != 0);
+				x->expr = node;
+				return;
+			}
+
 		} else {
 			gbString t = type_to_string(y->type);
 			error(x->expr, "expected either a map or bitset for 'in', got %s", t);
