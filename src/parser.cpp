@@ -2527,7 +2527,7 @@ Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 				_SET_LABEL(SwitchStmt, label);
 				_SET_LABEL(TypeSwitchStmt, label);
 				default:
-					syntax_error(token, "Labels can only be applied to a loop or match statement");
+					syntax_error(token, "Labels can only be applied to a loop or switch statement");
 					break;
 				}
 			#undef _SET_LABEL
@@ -3330,7 +3330,7 @@ Ast *parse_case_clause(AstFile *f, bool is_type) {
 
 Ast *parse_switch_stmt(AstFile *f) {
 	if (f->curr_proc == nullptr) {
-		syntax_error(f->curr_token, "You cannot use a match statement in the file scope");
+		syntax_error(f->curr_token, "You cannot use a switch statement in the file scope");
 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 
@@ -3339,7 +3339,7 @@ Ast *parse_switch_stmt(AstFile *f) {
 	Ast *tag  = nullptr;
 	Ast *body = nullptr;
 	Token open, close;
-	bool is_type_match = false;
+	bool is_type_switch = false;
 	auto list = array_make<Ast *>(heap_allocator());
 
 	if (f->curr_token.kind != Token_OpenBrace) {
@@ -3358,11 +3358,11 @@ Ast *parse_switch_stmt(AstFile *f) {
 			array_add(&rhs, parse_expr(f, false));
 
 			tag = ast_assign_stmt(f, token, lhs, rhs);
-			is_type_match = true;
+			is_type_switch = true;
 		} else {
 			tag = parse_simple_stmt(f, StmtAllowFlag_In);
 			if (tag->kind == Ast_AssignStmt && tag->AssignStmt.op.kind == Token_in) {
-				is_type_match = true;
+				is_type_switch = true;
 			} else {
 				if (allow_token(f, Token_Semicolon)) {
 					init = tag;
@@ -3377,14 +3377,14 @@ Ast *parse_switch_stmt(AstFile *f) {
 	open = expect_token(f, Token_OpenBrace);
 
 	while (f->curr_token.kind == Token_case) {
-		array_add(&list, parse_case_clause(f, is_type_match));
+		array_add(&list, parse_case_clause(f, is_type_switch));
 	}
 
 	close = expect_token(f, Token_CloseBrace);
 
 	body = ast_block_stmt(f, list, open, close);
 
-	if (is_type_match) {
+	if (is_type_switch) {
 		return ast_type_switch_stmt(f, token, tag, body);
 	}
 	tag = convert_stmt_to_expr(f, tag, str_lit("switch expression"));
