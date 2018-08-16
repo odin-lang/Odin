@@ -674,6 +674,7 @@ bool scan_escape(Tokenizer *t) {
 	Rune r = t->curr_rune;
 	if (r == 'a'  ||
 	    r == 'b'  ||
+	    r == 'e'  ||
 	    r == 'f'  ||
 	    r == 'n'  ||
 	    r == 'r'  ||

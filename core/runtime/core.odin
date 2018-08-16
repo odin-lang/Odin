@@ -100,7 +100,9 @@ Type_Info_Bit_Field :: struct {
 	offsets: []i32,
 };
 Type_Info_Bit_Set :: struct {
-	base: ^Type_Info,
+	elem: ^Type_Info,
+	lower: i64,
+	upper: i64,
 };
 
 Type_Info :: struct {

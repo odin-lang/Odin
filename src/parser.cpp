@@ -1962,7 +1962,12 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 	case Token_bit_set: {
 		Token token = expect_token(f, Token_bit_set);
 		Token open  = expect_token(f, Token_OpenBracket);
-		Ast * base  = parse_type(f);
+
+		bool prev_allow_range = f->allow_range;
+		f->allow_range = true;
+		Ast *base = parse_expr(f, false);
+		f->allow_range = prev_allow_range;
+
 		Token close = expect_token(f, Token_CloseBracket);
 
 		return ast_bit_set_type(f, token, base);

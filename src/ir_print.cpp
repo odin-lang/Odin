@@ -807,7 +807,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				}
 				GB_ASSERT(tav.value.kind == ExactValue_Integer);
 				i64 v = big_int_to_i64(&tav.value.value_integer);
-				i64 lower = type->BitSet.min;
+				i64 lower = type->BitSet.lower;
 				bits |= 1ull<<cast(u64)(v-lower);
 			}
 			ir_write_u64(f, bits);

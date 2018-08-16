@@ -706,42 +706,27 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				}
 
 
-				TokenKind op = Token_Invalid;
-
 				Operand a = lhs;
 				Operand b = rhs;
 				check_comparison(ctx, &a, &x, Token_LtEq);
 				if (a.mode == Addressing_Invalid) {
 					continue;
 				}
-				switch (ie->op.kind) {
-				case Token_Ellipsis: op = Token_GtEq; break;
-				default: error(ie->op, "Invalid interval operator"); continue;
-				}
 
-				check_comparison(ctx, &b, &x, op);
+				check_comparison(ctx, &b, &x, Token_GtEq);
 				if (b.mode == Addressing_Invalid) {
 					continue;
 				}
 
-				switch (ie->op.kind) {
-				case Token_Ellipsis: op = Token_LtEq; break;
-				default: error(ie->op, "Invalid interval operator"); continue;
-				}
-
-
-
 				Operand a1 = lhs;
 				Operand b1 = rhs;
-				check_comparison(ctx, &a1, &b1, op);
+				check_comparison(ctx, &a1, &b1, Token_LtEq);
 				if (complete) {
 					error(lhs.expr, "#complete switch statement does not allow ranges");
 				}
 
 				add_constant_switch_case(ctx, &seen, lhs);
-				if (op == Token_LtEq) {
-					add_constant_switch_case(ctx, &seen, rhs);
-				}
+				add_constant_switch_case(ctx, &seen, rhs);
 			} else {
 				Operand y = {};
 				check_expr(ctx, &y, expr);

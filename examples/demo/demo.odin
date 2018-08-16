@@ -713,33 +713,47 @@ deprecated_attribute :: proc() {
 }
 
 bit_set_type :: proc() {
-	using Day :: enum {
-		Sunday,
-		Monday,
-		Tuesday,
-		Wednesday,
-		Thursday,
-		Friday,
-		Saturday,
+	{
+		using Day :: enum {
+			Sunday,
+			Monday,
+			Tuesday,
+			Wednesday,
+			Thursday,
+			Friday,
+			Saturday,
+		}
+
+		Days :: distinct bit_set[Day];
+		WEEKEND :: Days{Sunday, Saturday};
+
+		d: Days;
+		d = {Sunday, Monday};
+		x := Tuesday;
+		e := d | WEEKEND;
+		e |= {Monday};
+		fmt.println(d, e);
+
+		ok := Saturday in e; // `in` is only allowed for `map` and `bit_set` types
+		fmt.println(ok);
+		if Saturday in e {
+			fmt.println("Saturday in", e);
+		}
+		X :: Saturday in WEEKEND; // Constant evaluation
+		fmt.println(X);
 	}
+	{
+		x: bit_set['A'..'Z'];
+		y: bit_set[0..8];
+		fmt.println(typeid_of(type_of(x))); // bit_set[A..Z]
+		fmt.println(typeid_of(type_of(y))); // bit_set[0..8]
 
-	Days :: distinct bit_set[Day];
-	WEEKEND :: Days{Sunday, Saturday};
+		x |= {'F'};
+		assert('F' in x);
 
-	d: Days;
-	d = {Sunday, Monday};
-	x := Tuesday;
-	e := d | WEEKEND;
-	e |= {Monday};
-	fmt.println(d, e);
-
-	ok := Saturday in e; // `in` is only allowed for `map` and `bit_set` types
-	fmt.println(ok);
-	if Saturday in e {
-		fmt.println("Saturday in", e);
+		y |= {1, 4, 2};
+		assert(2 in y);
 	}
-	X :: Saturday in WEEKEND; // Constant evaluation
-	fmt.println(X);
 }
 
 main :: proc() {

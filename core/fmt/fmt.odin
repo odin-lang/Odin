@@ -67,6 +67,34 @@ write_rune :: proc(buf: ^String_Buffer, r: rune) {
 	b, n := utf8.encode_rune(r);
 	write_bytes(buf, b[:n]);
 }
+write_encoded_rune :: proc(buf: ^String_Buffer, r: rune) {
+	write_byte(buf, '\'');
+	switch r {
+	case '\a': write_string(buf, "\\a");
+	case '\b': write_string(buf, "\\b");
+	case '\e': write_string(buf, "\\e");
+	case '\f': write_string(buf, "\\f");
+	case '\n': write_string(buf, "\\n");
+	case '\r': write_string(buf, "\\r");
+	case '\t': write_string(buf, "\\t");
+	case '\v': write_string(buf, "\\v");
+	case:
+		if r < 32 {
+			write_string(buf, "\\x");
+			b: [2]byte;
+			s := strconv.append_bits(b[:], u64(r), 16, true, 64, strconv.digits, nil);
+			switch len(s) {
+			case 0: write_string(buf, "00");
+			case 1: write_rune(buf, '0');
+			case 2: write_string(buf, s);
+			}
+		} else {
+			write_rune(buf, r);
+		}
+
+	}
+	write_byte(buf, '\'');
+}
 
 write_i64 :: proc(buf: ^String_Buffer, i: i64, base: int) {
 	b: [129]byte;
@@ -315,7 +343,18 @@ write_type :: proc(buf: ^String_Buffer, ti: ^runtime.Type_Info) {
 
 	case runtime.Type_Info_Bit_Set:
 		write_string(buf, "bit_set[");
-		write_type(buf, info.base);
+		switch {
+		case types.is_enum(info.elem):
+			write_type(buf, info.elem);
+		case types.is_rune(info.elem):
+			write_encoded_rune(buf, rune(info.lower));
+			write_string(buf, "..");
+			write_encoded_rune(buf, rune(info.upper));
+		case:
+			write_i64(buf, info.lower, 10);
+			write_string(buf, "..");
+			write_i64(buf, info.upper, 10);
+		}
 		write_string(buf, "]");
 	}
 }
@@ -763,8 +802,7 @@ fmt_bit_set :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
 		case: panic("unknown bit_size size");
 		}
 
-		et := runtime.type_info_base(info.base);
-		e := et.variant.(runtime.Type_Info_Enum);
+		et := runtime.type_info_base(info.elem);
 
 		if name != "" {
 			write_string(fi.buf, name);
@@ -774,6 +812,7 @@ fmt_bit_set :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
 		write_byte(fi.buf, '{');
 		defer write_byte(fi.buf, '}');
 
+		e, is_enum := et.variant.(runtime.Type_Info_Enum);
 		commas := 0;
 		loop: for i in 0 .. bit_size-1 {
 			if bits & (1<<i) == 0 {
@@ -784,7 +823,7 @@ fmt_bit_set :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
 
 			defer commas += 1;
 
-			for ev, evi in e.values {
+			if is_enum do for ev, evi in e.values {
 				v := enum_value_to_u64(ev);
 				if v == i {
 					write_string(fi.buf, e.names[evi]);

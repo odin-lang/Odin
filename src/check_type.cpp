@@ -680,49 +680,157 @@ void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type, Ast *node) 
 	}
 }
 
+bool is_type_valid_bit_set_range(Type *t) {
+	if (is_type_integer(t)) {
+		return true;
+	}
+	if (is_type_rune(t)) {
+		return true;
+	}
+	return false;
+}
 
-void check_bit_set_type(CheckerContext *ctx, Type *type, Ast *node) {
+void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 	ast_node(bs, BitSetType, node);
 	GB_ASSERT(type->kind == Type_BitSet);
 
-	Type *bt = check_type_expr(ctx, bs->base, nullptr);
-
-	type->BitSet.base = bt;
-	if (!is_type_enum(bt)) {
-		error(bs->base, "Expected an enum type for a bit_set");
-	} else {
-		Type *et = base_type(bt);
-		GB_ASSERT(et->kind == Type_Enum);
-		if (!is_type_integer(et->Enum.base_type)) {
-			error(bs->base, "Enum type for bit_set must be an integer");
+	Ast *base = unparen_expr(bs->base);
+	if (is_ast_range(base)) {
+		ast_node(be, BinaryExpr, base);
+		Operand lhs = {};
+		Operand rhs = {};
+		check_expr(c, &lhs, be->left);
+		check_expr(c, &rhs, be->right);
+		if (lhs.mode == Addressing_Invalid) {
 			return;
 		}
-		i64 min_value = 0;
-		i64 max_value = 0;
-		BigInt v64 = {}; big_int_from_i64(&v64, 64);
-
-		for_array(i, et->Enum.fields) {
-			Entity *e = et->Enum.fields[i];
-			if (e->kind != Entity_Constant) {
-				continue;
+		if (rhs.mode == Addressing_Invalid) {
+			return;
+		}
+		convert_to_typed(c, &lhs, rhs.type);
+		if (lhs.mode == Addressing_Invalid) {
+			return;
+		}
+		convert_to_typed(c, &rhs, lhs.type);
+		if (rhs.mode == Addressing_Invalid) {
+			return;
+		}
+		if (!are_types_identical(lhs.type, rhs.type)) {
+			if (lhs.type != t_invalid &&
+			    rhs.type != t_invalid) {
+				gbString xt = type_to_string(lhs.type);
+				gbString yt = type_to_string(rhs.type);
+				gbString expr_str = expr_to_string(bs->base);
+				error(bs->base, "Mismatched types in range '%s' : '%s' vs '%s'", expr_str, xt, yt);
+				gb_string_free(expr_str);
+				gb_string_free(yt);
+				gb_string_free(xt);
 			}
-			ExactValue value = exact_value_to_integer(e->Constant.value);
-			GB_ASSERT(value.kind == ExactValue_Integer);
-			i64 x = big_int_to_i64(&value.value_integer);
-			min_value = gb_min(min_value, x);
-			max_value = gb_max(max_value, x);
+			return;
 		}
 
-		GB_ASSERT(min_value <= max_value);
-
-		if (max_value - min_value > 64) {
-			error(bs->base, "bit_set range is greater than 64 bits");
+		if (!is_type_valid_bit_set_range(lhs.type)) {
+			gbString str = type_to_string(lhs.type);
+			error(bs->base, "'%s' is invalid for an interval expression, expected an integer or rune", str);
+			gb_string_free(str);
+			return;
 		}
 
-		type->BitSet.min = min_value;
-		type->BitSet.max = max_value;
+		if (lhs.mode != Addressing_Constant || rhs.mode != Addressing_Constant) {
+			error(bs->base, "Intervals must be constant values");
+			return;
+		}
+
+		ExactValue iv = exact_value_to_integer(lhs.value);
+		ExactValue jv = exact_value_to_integer(rhs.value);
+		GB_ASSERT(iv.kind == ExactValue_Integer);
+		GB_ASSERT(jv.kind == ExactValue_Integer);
+
+		BigInt i = iv.value_integer;
+		BigInt j = jv.value_integer;
+		if (big_int_cmp(&i, &j) > 0) {
+			gbAllocator a = heap_allocator();
+			String si = big_int_to_string(a, &i);
+			String sj = big_int_to_string(a, &j);
+			error(bs->base, "Lower interval bound larger than upper bound, %.*s .. %.*s", LIT(si), LIT(sj));
+			gb_free(a, si.text);
+			gb_free(a, sj.text);
+			return;
+		}
+
+		Type *t = default_type(lhs.type);
+
+		bool ok = true;
+		ok = check_representable_as_constant(c, iv, t, nullptr);
+		if (!ok) {
+			gbAllocator a = heap_allocator();
+			String s = big_int_to_string(a, &i);
+			gbString ts = type_to_string(t);
+			error(bs->base, "%.*s is not representable by %s", LIT(s), ts);
+			gb_string_free(ts);
+			gb_free(a, s.text);
+			return;
+		}
+		ok = check_representable_as_constant(c, iv, t, nullptr);
+		if (!ok) {
+			gbAllocator a = heap_allocator();
+			String s = big_int_to_string(a, &j);
+			gbString ts = type_to_string(t);
+			error(bs->base, "%.*s is not representable by %s", LIT(s), ts);
+			gb_string_free(ts);
+			gb_free(a, s.text);
+			return;
+		}
+		i64 lower = big_int_to_i64(&i);
+		i64 upper = big_int_to_i64(&j);
+
+		if (upper - lower > 64) {
+			error(bs->base, "bit_set range is greater than 64 bits, %lld bits are required", (upper-lower+1));
+		}
+		type->BitSet.base  = t;
+		type->BitSet.lower = lower;
+		type->BitSet.upper = upper;
+
+	} else {
+		Type *bt = check_type_expr(c, bs->base, nullptr);
+
+		type->BitSet.base = bt;
+		if (!is_type_enum(bt)) {
+			error(bs->base, "Expected an enum type for a bit_set");
+		} else {
+			Type *et = base_type(bt);
+			GB_ASSERT(et->kind == Type_Enum);
+			if (!is_type_integer(et->Enum.base_type)) {
+				error(bs->base, "Enum type for bit_set must be an integer");
+				return;
+			}
+			i64 lower = 0;
+			i64 upper = 0;
+			BigInt v64 = {}; big_int_from_i64(&v64, 64);
+
+			for_array(i, et->Enum.fields) {
+				Entity *e = et->Enum.fields[i];
+				if (e->kind != Entity_Constant) {
+					continue;
+				}
+				ExactValue value = exact_value_to_integer(e->Constant.value);
+				GB_ASSERT(value.kind == ExactValue_Integer);
+				// NOTE(bill): enum types should be able to store i64 values
+				i64 x = big_int_to_i64(&value.value_integer);
+				lower = gb_min(lower, x);
+				upper = gb_max(upper, x);
+			}
+
+			GB_ASSERT(lower <= upper);
+
+			if (upper - lower > 64) {
+				error(bs->base, "bit_set range is greater than 64 bits, %lld bits are required", (upper-lower+1));
+			}
+
+			type->BitSet.lower = lower;
+			type->BitSet.upper = upper;
+		}
 	}
-
 }
 
 
@@ -1951,9 +2059,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 	case_ast_node(bs, BitSetType, e);
 		*type = alloc_type_bit_set();
 		set_base_type(named_type, *type);
-		check_open_scope(ctx, e);
 		check_bit_set_type(ctx, *type, e);
-		check_close_scope(ctx);
 		return true;
 	case_end;
 

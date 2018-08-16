@@ -4915,7 +4915,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					Type *it = bit_set_to_int(rt);
 					left = ir_emit_conv(proc, left, it);
 
-					irValue *lower = ir_value_constant(it, exact_value_i64(rt->BitSet.min));
+					irValue *lower = ir_value_constant(it, exact_value_i64(rt->BitSet.lower));
 					irValue *key = ir_emit_arith(proc, Token_Sub, left, lower, it);
 					irValue *bit = ir_emit_arith(proc, Token_Shl, v_one, key, it);
 
@@ -5883,7 +5883,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			if (cl->elems.count > 0 && sz > 0) {
 				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
 
-				irValue *lower = ir_value_constant(t_int, exact_value_i64(bt->BitSet.min));
+				irValue *lower = ir_value_constant(t_int, exact_value_i64(bt->BitSet.lower));
 				for_array(i, cl->elems) {
 					Ast *elem = cl->elems[i];
 					GB_ASSERT(elem->kind != Ast_FieldValue);
@@ -6483,6 +6483,7 @@ void ir_type_case_body(irProcedure *proc, Ast *label, Ast *clause, irBlock *body
 
 	ir_emit_jump(proc, done);
 }
+
 
 void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 	switch (node->kind) {
@@ -8116,8 +8117,14 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 		case Type_BitSet:
 			ir_emit_comment(proc, str_lit("Type_Info_Bit_Set"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_bit_set_ptr);
+
+			GB_ASSERT(is_type_typed(t->BitSet.base));
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->BitSet.base));
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), ir_const_i64(t->BitSet.lower));
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), ir_const_i64(t->BitSet.upper));
 			break;
+
+
 
 		}
 
