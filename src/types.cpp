@@ -180,8 +180,8 @@ struct TypeStruct {
 	})                                                    \
 	TYPE_KIND(BitSet, struct {                            \
 		Type *base;                                       \
-		i64   min;                                        \
-		i64   max;                                        \
+		i64   lower;                                      \
+		i64   upper;                                      \
 	})                                                    \
 
 
@@ -2069,13 +2069,13 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 	} break;
 
 	case Type_BitSet: {
-		i64 bits = t->BitSet.max - t->BitSet.min + 1;
+		i64 bits = t->BitSet.upper - t->BitSet.lower + 1;
 		if (bits == 0)  return 0;
 		if (bits <= 8)  return 1;
 		if (bits <= 16) return 2;
 		if (bits <= 32) return 4;
 		if (bits <= 64) return 8;
-		return 8;
+		return 8; // NOTE(bill): Could be an invalid range so limit it for now
 
 	}
 	}
@@ -2296,13 +2296,13 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 	} break;
 
 	case Type_BitSet: {
-		i64 bits = t->BitSet.max - t->BitSet.min + 1;
+		i64 bits = t->BitSet.upper - t->BitSet.lower + 1;
 		if (bits == 0)  return 0;
 		if (bits <= 8)  return 1;
 		if (bits <= 16) return 2;
 		if (bits <= 32) return 4;
 		if (bits <= 64) return 8;
-		return 8;
+		return 8; // NOTE(bill): Could be an invalid range so limit it for now
 	}
 	}
 

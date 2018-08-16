@@ -148,8 +148,12 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 			if xo != yo do return false;
 			if xn != yn do return false;
 		}
-
 		return true;
+
+	case rt.Type_Info_Bit_Set:
+		y, ok := b.variant.(rt.Type_Info_Bit_Set);
+		if !ok do return false;
+		return x.elem == y.elem && x.lower == y.lower && x.upper == y.upper;
 	}
 
 	return false;
