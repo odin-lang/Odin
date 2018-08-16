@@ -694,6 +694,8 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 	ast_node(bs, BitSetType, node);
 	GB_ASSERT(type->kind == Type_BitSet);
 
+	i64 const MAX_BITS = 64;
+
 	Ast *base = unparen_expr(bs->base);
 	if (is_ast_range(base)) {
 		ast_node(be, BinaryExpr, base);
@@ -701,10 +703,7 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 		Operand rhs = {};
 		check_expr(c, &lhs, be->left);
 		check_expr(c, &rhs, be->right);
-		if (lhs.mode == Addressing_Invalid) {
-			return;
-		}
-		if (rhs.mode == Addressing_Invalid) {
+		if (lhs.mode == Addressing_Invalid || rhs.mode == Addressing_Invalid) {
 			return;
 		}
 		convert_to_typed(c, &lhs, rhs.type);
@@ -760,9 +759,7 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 
 		Type *t = default_type(lhs.type);
 
-		bool ok = true;
-		ok = check_representable_as_constant(c, iv, t, nullptr);
-		if (!ok) {
+		if (!check_representable_as_constant(c, iv, t, nullptr)) {
 			gbAllocator a = heap_allocator();
 			String s = big_int_to_string(a, &i);
 			gbString ts = type_to_string(t);
@@ -771,8 +768,7 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 			gb_free(a, s.text);
 			return;
 		}
-		ok = check_representable_as_constant(c, iv, t, nullptr);
-		if (!ok) {
+		if (!check_representable_as_constant(c, iv, t, nullptr)) {
 			gbAllocator a = heap_allocator();
 			String s = big_int_to_string(a, &j);
 			gbString ts = type_to_string(t);
@@ -784,8 +780,8 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 		i64 lower = big_int_to_i64(&i);
 		i64 upper = big_int_to_i64(&j);
 
-		if (upper - lower > 64) {
-			error(bs->base, "bit_set range is greater than 64 bits, %lld bits are required", (upper-lower+1));
+		if (upper - lower > MAX_BITS) {
+			error(bs->base, "bit_set range is greater than %lld bits, %lld bits are required", MAX_BITS, (upper-lower+1));
 		}
 		type->BitSet.base  = t;
 		type->BitSet.lower = lower;
@@ -806,7 +802,6 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 			}
 			i64 lower = 0;
 			i64 upper = 0;
-			BigInt v64 = {}; big_int_from_i64(&v64, 64);
 
 			for_array(i, et->Enum.fields) {
 				Entity *e = et->Enum.fields[i];
@@ -823,8 +818,8 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 
 			GB_ASSERT(lower <= upper);
 
-			if (upper - lower > 64) {
-				error(bs->base, "bit_set range is greater than 64 bits, %lld bits are required", (upper-lower+1));
+			if (upper - lower > MAX_BITS) {
+				error(bs->base, "bit_set range is greater than %lld bits, %lld bits are required", MAX_BITS, (upper-lower+1));
 			}
 
 			type->BitSet.lower = lower;
