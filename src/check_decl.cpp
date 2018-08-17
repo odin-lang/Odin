@@ -253,7 +253,7 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) 
 	if (decl->is_using) {
 		// NOTE(bill): Must be an enum declaration
 		if (te->kind == Ast_EnumType) {
-			Scope *parent = ctx->scope->parent;
+			Scope *parent = e->scope;
 			if (parent->flags&ScopeFlag_File) {
 				// NOTE(bill): Use package scope
 				parent = parent->parent;
