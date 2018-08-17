@@ -765,7 +765,7 @@ bit_set_type :: proc() {
 }
 
 main :: proc() {
-	when false {
+	when true {
 		general_stuff();
 		union_type();
 		parametric_polymorphism();
