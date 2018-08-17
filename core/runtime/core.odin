@@ -429,11 +429,11 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 }
 
 @(builtin)
-incl :: proc(s: ^$B/bit_set[$T], elem: T) {
+incl :: inline proc(s: ^$B/bit_set[$T], elem: T) {
 	s^ |= {elem};
 }
 @(builtin)
-excl :: proc(s: ^$B/bit_set[$T], elem: T) {
+excl :: inline proc(s: ^$B/bit_set[$T], elem: T) {
 	s^ &~= {elem};
 }
 
