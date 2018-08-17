@@ -614,6 +614,11 @@ using_enum :: proc() {
 	f2 := C;
 	fmt.println(f0, f1, f2);
 	fmt.println(len(Foo));
+
+	// Non-comparsion operations are not allowed with enum
+	// You must convert to an integer if you want to do this
+	// x := f0 + f1;
+	y := int(f0) + int(f1);
 }
 
 explicit_procedure_overloading :: proc() {
@@ -772,6 +777,6 @@ main :: proc() {
 		complete_switch();
 		cstring_example();
 		deprecated_attribute();
-	}
 		bit_set_type();
+	}
 }

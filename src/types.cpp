@@ -659,42 +659,40 @@ bool is_type_named_alias(Type *t) {
 }
 
 bool is_type_boolean(Type *t) {
-	t = core_type(t);
+	// t = core_type(t);
+	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Boolean) != 0;
 	}
 	return false;
 }
 bool is_type_integer(Type *t) {
-	t = core_type(t);
+	// t = core_type(t);
+	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Integer) != 0;
 	}
 	return false;
 }
 bool is_type_unsigned(Type *t) {
-	t = core_type(t);
+	t = base_type(t);
+	// t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Unsigned) != 0;
 	}
 	return false;
 }
 bool is_type_rune(Type *t) {
-	t = core_type(t);
+	// t = core_type(t);
+	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Rune) != 0;
 	}
 	return false;
 }
-bool is_type_number(Type *t) {
-	t = core_type(t);
-	if (t->kind == Type_Basic) {
-		return (t->Basic.flags & BasicFlag_Numeric) != 0;
-	}
-	return false;
-}
 bool is_type_numeric(Type *t) {
-	t = core_type(t);
+	// t = core_type(t);
+	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Numeric) != 0;
 	}
