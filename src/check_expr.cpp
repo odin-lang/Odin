@@ -2579,7 +2579,7 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 		return false;
 	}
 
-	if (!is_type_integer(operand.type)) {
+	if (!is_type_integer(operand.type) && !is_type_enum(operand.type)) {
 		gbString expr_str = expr_to_string(operand.expr);
 		error(operand.expr, "Index '%s' must be an integer", expr_str);
 		gb_string_free(expr_str);
