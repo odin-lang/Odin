@@ -696,7 +696,7 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 
 	i64 const MAX_BITS = 64;
 
-	Ast *base = unparen_expr(bs->base);
+	Ast *base = unparen_expr(bs->elem);
 	if (is_ast_range(base)) {
 		ast_node(be, BinaryExpr, base);
 		Operand lhs = {};
@@ -719,8 +719,8 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 			    rhs.type != t_invalid) {
 				gbString xt = type_to_string(lhs.type);
 				gbString yt = type_to_string(rhs.type);
-				gbString expr_str = expr_to_string(bs->base);
-				error(bs->base, "Mismatched types in range '%s' : '%s' vs '%s'", expr_str, xt, yt);
+				gbString expr_str = expr_to_string(bs->elem);
+				error(bs->elem, "Mismatched types in range '%s' : '%s' vs '%s'", expr_str, xt, yt);
 				gb_string_free(expr_str);
 				gb_string_free(yt);
 				gb_string_free(xt);
@@ -730,13 +730,13 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 
 		if (!is_type_valid_bit_set_range(lhs.type)) {
 			gbString str = type_to_string(lhs.type);
-			error(bs->base, "'%s' is invalid for an interval expression, expected an integer or rune", str);
+			error(bs->elem, "'%s' is invalid for an interval expression, expected an integer or rune", str);
 			gb_string_free(str);
 			return;
 		}
 
 		if (lhs.mode != Addressing_Constant || rhs.mode != Addressing_Constant) {
-			error(bs->base, "Intervals must be constant values");
+			error(bs->elem, "Intervals must be constant values");
 			return;
 		}
 
@@ -751,19 +751,29 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 			gbAllocator a = heap_allocator();
 			String si = big_int_to_string(a, &i);
 			String sj = big_int_to_string(a, &j);
-			error(bs->base, "Lower interval bound larger than upper bound, %.*s .. %.*s", LIT(si), LIT(sj));
+			error(bs->elem, "Lower interval bound larger than upper bound, %.*s .. %.*s", LIT(si), LIT(sj));
 			gb_free(a, si.text);
 			gb_free(a, sj.text);
 			return;
 		}
 
 		Type *t = default_type(lhs.type);
+		if (bs->underlying != nullptr) {
+			Type *u = check_type(c, bs->underlying);
+			if (!is_type_integer(u)) {
+				gbString ts = type_to_string(u);
+				error(bs->underlying, "Expected an underlying integer for the bit set, got %s", ts);
+				gb_string_free(ts);
+				return;
+			}
+			type->BitSet.underlying = u;
+		}
 
 		if (!check_representable_as_constant(c, iv, t, nullptr)) {
 			gbAllocator a = heap_allocator();
 			String s = big_int_to_string(a, &i);
 			gbString ts = type_to_string(t);
-			error(bs->base, "%.*s is not representable by %s", LIT(s), ts);
+			error(bs->elem, "%.*s is not representable by %s", LIT(s), ts);
 			gb_string_free(ts);
 			gb_free(a, s.text);
 			return;
@@ -772,7 +782,7 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 			gbAllocator a = heap_allocator();
 			String s = big_int_to_string(a, &j);
 			gbString ts = type_to_string(t);
-			error(bs->base, "%.*s is not representable by %s", LIT(s), ts);
+			error(bs->elem, "%.*s is not representable by %s", LIT(s), ts);
 			gb_string_free(ts);
 			gb_free(a, s.text);
 			return;
@@ -780,50 +790,68 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 		i64 lower = big_int_to_i64(&i);
 		i64 upper = big_int_to_i64(&j);
 
-		if (upper - lower > MAX_BITS) {
-			error(bs->base, "bit_set range is greater than %lld bits, %lld bits are required", MAX_BITS, (upper-lower+1));
+		i64 bits = MAX_BITS;
+		if (type->BitSet.underlying != nullptr) {
+			bits = 8*type_size_of(type->BitSet.underlying);
 		}
-		type->BitSet.base  = t;
+
+		if (upper - lower >= bits) {
+			error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, (upper-lower+1));
+		}
+		type->BitSet.elem  = t;
 		type->BitSet.lower = lower;
 		type->BitSet.upper = upper;
-
 	} else {
-		Type *bt = check_type_expr(c, bs->base, nullptr);
+		Type *elem = check_type_expr(c, bs->elem, nullptr);
 
-		type->BitSet.base = bt;
-		if (!is_type_enum(bt)) {
-			error(bs->base, "Expected an enum type for a bit_set");
+		type->BitSet.elem = elem;
+		if (!is_type_valid_bit_set_elem(elem)) {
+			error(bs->elem, "Expected an enum type for a bit_set");
 		} else {
-			Type *et = base_type(bt);
-			GB_ASSERT(et->kind == Type_Enum);
-			if (!is_type_integer(et->Enum.base_type)) {
-				error(bs->base, "Enum type for bit_set must be an integer");
-				return;
-			}
-			i64 lower = 0;
-			i64 upper = 0;
-
-			for_array(i, et->Enum.fields) {
-				Entity *e = et->Enum.fields[i];
-				if (e->kind != Entity_Constant) {
-					continue;
+			Type *et = base_type(elem);
+			if (et->kind == Type_Enum) {
+				if (!is_type_integer(et->Enum.base_type)) {
+					error(bs->elem, "Enum type for bit_set must be an integer");
+					return;
 				}
-				ExactValue value = exact_value_to_integer(e->Constant.value);
-				GB_ASSERT(value.kind == ExactValue_Integer);
-				// NOTE(bill): enum types should be able to store i64 values
-				i64 x = big_int_to_i64(&value.value_integer);
-				lower = gb_min(lower, x);
-				upper = gb_max(upper, x);
+				i64 lower = 0;
+				i64 upper = 0;
+
+				for_array(i, et->Enum.fields) {
+					Entity *e = et->Enum.fields[i];
+					if (e->kind != Entity_Constant) {
+						continue;
+					}
+					ExactValue value = exact_value_to_integer(e->Constant.value);
+					GB_ASSERT(value.kind == ExactValue_Integer);
+					// NOTE(bill): enum types should be able to store i64 values
+					i64 x = big_int_to_i64(&value.value_integer);
+					lower = gb_min(lower, x);
+					upper = gb_max(upper, x);
+				}
+
+				GB_ASSERT(lower <= upper);
+
+				i64 bits = MAX_BITS;
+				if (bs->underlying != nullptr) {
+					Type *u = check_type(c, bs->underlying);
+					if (!is_type_integer(u)) {
+						gbString ts = type_to_string(u);
+						error(bs->underlying, "Expected an underlying integer for the bit set, got %s", ts);
+						gb_string_free(ts);
+						return;
+					}
+					type->BitSet.underlying = u;
+					bits = 8*type_size_of(u);
+				}
+
+				if (upper - lower >= MAX_BITS) {
+					error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", MAX_BITS, (upper-lower+1));
+				}
+
+				type->BitSet.lower = lower;
+				type->BitSet.upper = upper;
 			}
-
-			GB_ASSERT(lower <= upper);
-
-			if (upper - lower > MAX_BITS) {
-				error(bs->base, "bit_set range is greater than %lld bits, %lld bits are required", MAX_BITS, (upper-lower+1));
-			}
-
-			type->BitSet.lower = lower;
-			type->BitSet.upper = upper;
 		}
 	}
 }

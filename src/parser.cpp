@@ -347,7 +347,8 @@ Ast *clone_ast(Ast *node) {
 		n->BitFieldType.align = clone_ast(n->BitFieldType.align);
 		break;
 	case Ast_BitSetType:
-		n->BitSetType.base = clone_ast(n->BitSetType.base);
+		n->BitSetType.elem       = clone_ast(n->BitSetType.elem);
+		n->BitSetType.underlying = clone_ast(n->BitSetType.underlying);
 		break;
 	case Ast_MapType:
 		n->MapType.count = clone_ast(n->MapType.count);
@@ -927,10 +928,11 @@ Ast *ast_bit_field_type(AstFile *f, Token token, Array<Ast *> fields, Ast *align
 	return result;
 }
 
-Ast *ast_bit_set_type(AstFile *f, Token token, Ast *base) {
+Ast *ast_bit_set_type(AstFile *f, Token token, Ast *elem, Ast *underlying) {
 	Ast *result = alloc_ast_node(f, Ast_BitSetType);
 	result->BitSetType.token = token;
-	result->BitSetType.base = base;
+	result->BitSetType.elem = elem;
+	result->BitSetType.underlying = underlying;
 	return result;
 }
 
@@ -1963,14 +1965,20 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Token token = expect_token(f, Token_bit_set);
 		Token open  = expect_token(f, Token_OpenBracket);
 
+		Ast *elem = nullptr;
+		Ast *underlying = nullptr;
+
 		bool prev_allow_range = f->allow_range;
 		f->allow_range = true;
-		Ast *base = parse_expr(f, false);
+		elem = parse_expr(f, false);
 		f->allow_range = prev_allow_range;
+		if (allow_token(f, Token_Semicolon)) {
+			underlying = parse_type(f);
+		}
 
 		Token close = expect_token(f, Token_CloseBracket);
 
-		return ast_bit_set_type(f, token, base);
+		return ast_bit_set_type(f, token, elem, underlying);
 	}
 
 	default: {

@@ -355,7 +355,11 @@ write_type :: proc(buf: ^String_Buffer, ti: ^runtime.Type_Info) {
 			write_string(buf, "..");
 			write_i64(buf, info.upper, 10);
 		}
-		write_string(buf, "]");
+		if info.underlying != nil {
+			write_string(buf, "; ");
+			write_type(buf, info.underlying);
+		}
+		write_byte(buf, ']');
 	}
 }
 

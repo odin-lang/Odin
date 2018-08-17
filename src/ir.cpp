@@ -4909,7 +4909,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 				{
 					ir_emit_comment(proc, str_lit("bit_set in"));
 
-					Type *key_type = rt->BitSet.base;
+					Type *key_type = rt->BitSet.elem;
 					GB_ASSERT(are_types_identical(ir_type(left), key_type));
 
 					Type *it = bit_set_to_int(rt);
@@ -5663,7 +5663,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 		switch (bt->kind) {
 		case Type_Array:  et = bt->Array.elem;  break;
 		case Type_Slice:  et = bt->Slice.elem;  break;
-		case Type_BitSet: et = bt->BitSet.base; break;
+		case Type_BitSet: et = bt->BitSet.elem; break;
 		}
 
 		String proc_name = {};
@@ -8118,10 +8118,13 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			ir_emit_comment(proc, str_lit("Type_Info_Bit_Set"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_bit_set_ptr);
 
-			GB_ASSERT(is_type_typed(t->BitSet.base));
-			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->BitSet.base));
-			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), ir_const_i64(t->BitSet.lower));
-			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), ir_const_i64(t->BitSet.upper));
+			GB_ASSERT(is_type_typed(t->BitSet.elem));
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->BitSet.elem));
+			if (t->BitSet.underlying != nullptr) {
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), ir_get_type_info_ptr(proc, t->BitSet.underlying));
+			}
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), ir_const_i64(t->BitSet.lower));
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), ir_const_i64(t->BitSet.upper));
 			break;
 
 

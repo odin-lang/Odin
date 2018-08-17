@@ -1044,7 +1044,7 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		break;
 
 	case Type_BitSet:
-		add_type_info_type(c, bt->BitSet.base);
+		add_type_info_type(c, bt->BitSet.elem);
 		break;
 
 	case Type_Union:

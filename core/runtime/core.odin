@@ -100,9 +100,10 @@ Type_Info_Bit_Field :: struct {
 	offsets: []i32,
 };
 Type_Info_Bit_Set :: struct {
-	elem: ^Type_Info,
-	lower: i64,
-	upper: i64,
+	elem:       ^Type_Info,
+	underlying: ^Type_Info, // Possibly nil
+	lower:      i64,
+	upper:      i64,
 };
 
 Type_Info :: struct {
@@ -427,6 +428,14 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 	return true;
 }
 
+@(builtin)
+incl :: proc(s: ^$B/bit_set[$T], elem: T) {
+	s^ |= {elem};
+}
+@(builtin)
+excl :: proc(s: ^$B/bit_set[$T], elem: T) {
+	s^ &~= {elem};
+}
 
 
 
