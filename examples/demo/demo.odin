@@ -744,12 +744,15 @@ bit_set_type :: proc() {
 	}
 	{
 		x: bit_set['A'..'Z'];
-		y: bit_set[0..8];
+		assert(size_of(x) == size_of(u32));
+		y: bit_set[0..8; u16];
 		fmt.println(typeid_of(type_of(x))); // bit_set[A..Z]
 		fmt.println(typeid_of(type_of(y))); // bit_set[0..8]
 
-		x |= {'F'};
+		incl(&x, 'F');
 		assert('F' in x);
+		excl(&x, 'F');
+		assert(!('F' in x));
 
 		y |= {1, 4, 2};
 		assert(2 in y);
@@ -757,7 +760,7 @@ bit_set_type :: proc() {
 }
 
 main :: proc() {
-	when true {
+	when false {
 		general_stuff();
 		union_type();
 		parametric_polymorphism();
@@ -769,6 +772,6 @@ main :: proc() {
 		complete_switch();
 		cstring_example();
 		deprecated_attribute();
-		bit_set_type();
 	}
+		bit_set_type();
 }

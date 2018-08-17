@@ -836,6 +836,9 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 		return false;
 
 	case Type_BitSet:
+		if (source->kind == Type_BitSet) {
+			return is_polymorphic_type_assignable(c, poly->BitSet.elem, source->BitSet.elem, true, modify_type);
+		}
 		return false;
 
 	case Type_Union:
@@ -2040,7 +2043,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 			add_package_dependency(c, "runtime", "__dynamic_map_get");
 		} else if (is_type_bit_set(y->type)) {
 			Type *yt = base_type(y->type);
-			check_assignment(c, x, yt->BitSet.base, str_lit("bit_set 'in'"));
+			check_assignment(c, x, yt->BitSet.elem, str_lit("bit_set 'in'"));
 
 			if (x->mode == Addressing_Constant && y->mode == Addressing_Constant) {
 				ExactValue k = exact_value_to_integer(x->value);
@@ -5552,7 +5555,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (cl->elems.count == 0) {
 				break; // NOTE(bill): No need to init
 			}
-			Type *et = base_type(t->BitSet.base);
+			Type *et = base_type(t->BitSet.elem);
 			isize field_count = 0;
 			if (et->kind == Type_Enum) {
 				field_count = et->Enum.fields.count;
@@ -5576,7 +5579,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						is_constant = o->mode == Addressing_Constant;
 					}
 
-					check_assignment(c, o, t->BitSet.base, str_lit("bit_set literal"));
+					check_assignment(c, o, t->BitSet.elem, str_lit("bit_set literal"));
 				}
 			}
 			break;
@@ -6318,7 +6321,7 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 
 	case_ast_node(bs, BitSetType, node);
 		str = gb_string_appendc(str, "bit_set[");
-		str = write_expr_to_string(str, bs->base);
+		str = write_expr_to_string(str, bs->elem);
 		str = gb_string_appendc(str, "]");
 	case_end;
 

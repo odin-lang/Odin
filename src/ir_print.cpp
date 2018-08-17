@@ -508,16 +508,13 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 	}
 
 	case Type_BitSet: {
-		i64 align = type_align_of(t);
-		i64 size  = type_size_of(t);
-		switch (size) {
-		case 0: ir_write_str_lit(f, "{}");  return;
-		case 1: ir_write_str_lit(f, "i8");  return;
-		case 2: ir_write_str_lit(f, "i16"); return;
-		case 4: ir_write_str_lit(f, "i32"); return;
-		case 8: ir_write_str_lit(f, "i64"); return;
-		default: GB_PANIC("Unknown bit_set size"); break;
+		i64 size = type_size_of(t);
+		if (size == 0) {
+			ir_write_str_lit(f, "{}");
+			return;
 		}
+		ir_print_type(f, m, bit_set_to_int(t));
+		return;
 	}
 	}
 }

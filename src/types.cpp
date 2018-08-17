@@ -179,7 +179,8 @@ struct TypeStruct {
 		i64             custom_align;                     \
 	})                                                    \
 	TYPE_KIND(BitSet, struct {                            \
-		Type *base;                                       \
+		Type *elem;                                       \
+		Type *underlying;                                 \
 		i64   lower;                                      \
 		i64   upper;                                      \
 	})                                                    \
@@ -981,10 +982,28 @@ bool is_type_valid_for_keys(Type *t) {
 	return false;
 }
 
+bool is_type_valid_bit_set_elem(Type *t) {
+	if (is_type_enum(t)) {
+		return true;
+	}
+	t = core_type(t);
+	if (t->kind == Type_Generic) {
+		return true;
+	}
+	return false;
+}
+
 Type *bit_set_to_int(Type *t) {
 	GB_ASSERT(is_type_bit_set(t));
+	Type *bt = base_type(t);
+	Type *underlying = bt->BitSet.underlying;
+	if (underlying != nullptr && is_type_integer(underlying)) {
+		return underlying;
+	}
+
 	i64 sz = type_size_of(t);
 	switch (sz) {
+	case 0: return t_u8;
 	case 1: return t_u8;
 	case 2: return t_u16;
 	case 4: return t_u32;
@@ -1277,7 +1296,7 @@ bool are_types_identical(Type *x, Type *y) {
 
 	case Type_BitSet:
 		if (y->kind == Type_BitSet) {
-			return are_types_identical(x->BitSet.base, y->BitSet.base);
+			return are_types_identical(x->BitSet.elem, y->BitSet.elem);
 		}
 		break;
 
@@ -2069,8 +2088,10 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 	} break;
 
 	case Type_BitSet: {
+		if (t->BitSet.underlying != nullptr) {
+			return type_align_of(t->BitSet.underlying);
+		}
 		i64 bits = t->BitSet.upper - t->BitSet.lower + 1;
-		if (bits == 0)  return 0;
 		if (bits <= 8)  return 1;
 		if (bits <= 16) return 2;
 		if (bits <= 32) return 4;
@@ -2296,8 +2317,10 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 	} break;
 
 	case Type_BitSet: {
+		if (t->BitSet.underlying != nullptr) {
+			return type_size_of(t->BitSet.underlying);
+		}
 		i64 bits = t->BitSet.upper - t->BitSet.lower + 1;
-		if (bits == 0)  return 0;
 		if (bits <= 8)  return 1;
 		if (bits <= 16) return 2;
 		if (bits <= 32) return 4;
@@ -2617,7 +2640,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_BitSet:
 		str = gb_string_appendc(str, "bit_set[");
-		str = write_type_to_string(str, type->BitSet.base);
+		str = write_type_to_string(str, type->BitSet.elem);
 		str = gb_string_appendc(str, "]");
 		break;
 	}
