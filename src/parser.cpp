@@ -4426,8 +4426,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 	try_add_import_path(p, init_fullpath, init_fullpath, init_pos, Package_Init);
 	p->init_fullpath = init_fullpath;
 
-	// IMPORTANT TODO(bill): Figure out why this doesn't work on *nix sometimes
-#if 1 && defined(GB_SYSTEM_WINDOWS)
+#if 1
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	if (thread_count > 1) {
 		isize volatile curr_import_index = 0;
