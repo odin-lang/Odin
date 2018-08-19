@@ -4611,7 +4611,7 @@ gb_inline void gb_mutex_init(gbMutex *m) {
 	InitializeCriticalSection(&m->win32_critical_section);
 #else
 	pthread_mutexattr_init(&m->pthread_mutexattr);
-    pthread_mutexattr_settype(&m->pthread_mutexattr, PTHREAD_MUTEX_RECURSIVE);
+	pthread_mutexattr_settype(&m->pthread_mutexattr, PTHREAD_MUTEX_RECURSIVE);
 	pthread_mutex_init(&m->pthread_mutex, &m->pthread_mutexattr);
 #endif
 }
@@ -4644,8 +4644,7 @@ gb_inline void gb_mutex_unlock(gbMutex *m) {
 #if defined(GB_SYSTEM_WINDOWS)
 	LeaveCriticalSection(&m->win32_critical_section);
 #else
-	// IMPORTANT TODO HACK(bill): Enable this
-	// pthread_mutex_unlock(&m->pthread_mutex);
+	pthread_mutex_unlock(&m->pthread_mutex);
 #endif
 }
 
