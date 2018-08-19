@@ -752,7 +752,7 @@ bit_set_type :: proc() {
 		assert(size_of(x) == size_of(u32));
 		y: bit_set[0..8; u16];
 		fmt.println(typeid_of(type_of(x))); // bit_set[A..Z]
-		fmt.println(typeid_of(type_of(y))); // bit_set[0..8]
+		fmt.println(typeid_of(type_of(y))); // bit_set[0..8l u16]
 
 		incl(&x, 'F');
 		assert('F' in x);
