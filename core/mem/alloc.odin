@@ -106,6 +106,9 @@ new_clone_with_allocator :: inline proc(a: Allocator, data: $T, loc := #caller_l
 
 make_slice :: proc(T: type/[]$E, auto_cast len: int, loc := #caller_location) -> T {
 	runtime.make_slice_error_loc(loc, len);
+	if len == 0 {
+		return nil;
+	}
 	data := alloc(size_of(E)*len, align_of(E));
 	s := Raw_Slice{data, len};
 	return transmute(T)s;
@@ -118,7 +121,8 @@ make_dynamic_array_len :: proc(T: type/[dynamic]$E, auto_cast len: int, loc := #
 }
 make_dynamic_array_len_cap :: proc(T: type/[dynamic]$E, auto_cast len: int, auto_cast cap: int, loc := #caller_location) -> T {
 	runtime.make_dynamic_array_error_loc(loc, len, cap);
-	data := alloc(size_of(E)*cap, align_of(E));
+	data: rawptr;
+	if cap > 0 do data = alloc(size_of(E)*cap, align_of(E));
 	s := Raw_Dynamic_Array{data, len, cap, context.allocator};
 	return transmute(T)s;
 }
