@@ -66,6 +66,10 @@ main :: proc() {
 * [Default and Named Arguments; Explicit Parametric Polymorphism](https://www.youtube.com/watch?v=-XQZE6S6zUU)
 * [Loadsachanges](https://www.youtube.com/watch?v=ar0vFMoMtrI)
 
+## Documentation
+* [Tutorial](https://odin.handmade.network/wiki/3329-odin_tutorial)
+* [Frequently Asked Questions](https://github.com/odin-lang/Odin/wiki/Frequently-Asked-Questions-(FAQ))
+
 ## Requirements to build and run
 
 - Windows
