@@ -403,6 +403,8 @@ bool check_type_specialization_to(CheckerContext *c, Type *specialization, Type 
 bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source, bool compound, bool modify_type);
 bool check_cast_internal(CheckerContext *c, Operand *x, Type *type);
 
+#define MAXIMUM_TYPE_DISTANCE 10
+
 i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type) {
 	if (operand->mode == Addressing_Invalid ||
 	    type == t_invalid) {
@@ -443,7 +445,7 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		if (is_type_any(dst)) {
 			// NOTE(bill): Anything can cast to 'Any'
 			add_type_info_type(c, s);
-			return 10;
+			return MAXIMUM_TYPE_DISTANCE;
 		}
 		if (dst->kind == Type_Basic) {
 			if (operand->mode == Addressing_Constant) {
@@ -577,7 +579,7 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 			} else {
 				// NOTE(bill): Anything can cast to 'Any'
 				add_type_info_type(c, s);
-				return 10;
+				return MAXIMUM_TYPE_DISTANCE;
 			}
 		}
 	}
@@ -588,7 +590,7 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		x.expr = expr->AutoCast.expr;
 		bool ok = check_cast_internal(c, &x, type);
 		if (ok) {
-			return 10;
+			return MAXIMUM_TYPE_DISTANCE;
 		}
 	}
 
@@ -596,18 +598,26 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 }
 
 
-i64 assign_score_function(i64 distance) {
+i64 assign_score_function(i64 distance, bool is_variadic=false) {
+	// 3*x^2 + 1 > x^2 + x + 1 (for positive x)
+	i64 const c = 3*MAXIMUM_TYPE_DISTANCE*MAXIMUM_TYPE_DISTANCE + 1;
+
 	// TODO(bill): A decent score function
-	return gb_max(1000000 - distance*distance, 0);
+	GB_ASSERT(distance <= MAXIMUM_TYPE_DISTANCE);
+	i64 d = distance*distance; // x^2
+	if (is_variadic && d >= 0) {
+		d += distance + 1; // x^2 + x + 1
+	}
+	return gb_max(c - d, 0);
 }
 
 
-bool check_is_assignable_to_with_score(CheckerContext *c, Operand *operand, Type *type, i64 *score_) {
+bool check_is_assignable_to_with_score(CheckerContext *c, Operand *operand, Type *type, i64 *score_, bool is_variadic=false) {
 	i64 score = 0;
 	i64 distance = check_distance_between_types(c, operand, type);
 	bool ok = distance >= 0;
 	if (ok) {
-		score = assign_score_function(distance);
+		score = assign_score_function(distance, is_variadic);
 	}
 	if (score_) *score_ = score;
 	return ok;
@@ -837,7 +847,17 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 
 	case Type_BitSet:
 		if (source->kind == Type_BitSet) {
-			return is_polymorphic_type_assignable(c, poly->BitSet.elem, source->BitSet.elem, true, modify_type);
+			if (!is_polymorphic_type_assignable(c, poly->BitSet.elem, source->BitSet.elem, true, modify_type)) {
+				return false;
+			}
+			if (poly->BitSet.underlying == nullptr) {
+				if (modify_type) {
+					poly->BitSet.underlying = source->BitSet.underlying;
+				}
+			} else if (!is_polymorphic_type_assignable(c, poly->BitSet.underlying, source->BitSet.underlying, true, modify_type)) {
+				return false;
+			}
+			return true;
 		}
 		return false;
 
@@ -3198,7 +3218,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	case BuiltinProc_swizzle: {
-		// swizzle :: proc(v: [N]T, ...int) -> [M]T
+		// swizzle :: proc(v: [N]T, ..int) -> [M]T
 		Type *type = base_type(operand->type);
 		if (!is_type_array(type)) {
 			gbString type_str = type_to_string(operand->type);
@@ -3926,14 +3946,14 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	if (vari_expand && !variadic) {
 		if (show_error) {
 			error(ce->ellipsis,
-			      "Cannot use '...' in call to a non-variadic procedure: '%.*s'",
+			      "Cannot use '..' in call to a non-variadic procedure: '%.*s'",
 			      LIT(ce->proc->Ident.token.string));
 		}
 		err = CallArgumentError_NonVariadicExpand;
 	} else if (vari_expand && pt->c_vararg) {
 		if (show_error) {
 			error(ce->ellipsis,
-			      "Cannot use '...' in call to a '#c_vararg' variadic procedure: '%.*s'",
+			      "Cannot use '..' in call to a '#c_vararg' variadic procedure: '%.*s'",
 			      LIT(ce->proc->Ident.token.string));
 		}
 		err = CallArgumentError_NonVariadicExpand;
@@ -3998,21 +4018,22 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					if (are_types_identical(e->type, o.type)) {
 						score += assign_score_function(1);
 					} else {
-						score += assign_score_function(10);
+						score += assign_score_function(MAXIMUM_TYPE_DISTANCE);
 					}
 
 					continue;
 				}
 
+				bool param_is_variadic = pt->variadic && pt->variadic_index == operand_index;
 
 				i64 s = 0;
-				if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
+				if (!check_is_assignable_to_with_score(c, &o, t, &s, param_is_variadic)) {
 					bool ok = false;
 					if (e->flags & EntityFlag_AutoCast) {
 						ok = check_is_castable_to(c, &o, t);
 					}
 					if (ok) {
-						s = assign_score_function(10);
+						s = assign_score_function(MAXIMUM_TYPE_DISTANCE);
 					} else {
 						if (show_error) {
 							check_assignment(c, &o, t, str_lit("argument"));
@@ -4036,7 +4057,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 						t = slice;
 						if (operand_index != param_count) {
 							if (show_error) {
-								error(o.expr, "'...' in a variadic procedure can only have one variadic argument at the end");
+								error(o.expr, "'..' in a variadic procedure can only have one variadic argument at the end");
 							}
 							if (data) {
 								data->score = score;
@@ -4047,7 +4068,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 						}
 					}
 					i64 s = 0;
-					if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
+					if (!check_is_assignable_to_with_score(c, &o, t, &s, true)) {
 						if (show_error) {
 							check_assignment(c, &o, t, str_lit("argument"));
 						}
@@ -4224,17 +4245,18 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			if (are_types_identical(e->type, o->type)) {
 				score += assign_score_function(1);
 			} else {
-				score += assign_score_function(10);
+				score += assign_score_function(MAXIMUM_TYPE_DISTANCE);
 			}
 		} else {
 			i64 s = 0;
-			if (!check_is_assignable_to_with_score(c, o, e->type, &s)) {
+			bool param_is_variadic = pt->variadic && pt->variadic_index == i;
+			if (!check_is_assignable_to_with_score(c, o, e->type, &s, param_is_variadic)) {
 				bool ok = false;
 				if (e->flags & EntityFlag_AutoCast) {
 					ok = check_is_castable_to(c, o, e->type);
 				}
 				if (ok) {
-					s = assign_score_function(10);
+					s = assign_score_function(MAXIMUM_TYPE_DISTANCE);
 				} else {
 					if (show_error) {
 						check_assignment(c, o, e->type, str_lit("procedure argument"));
@@ -4276,7 +4298,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 		bool vari_expand = (ce->ellipsis.pos.line != 0);
 		if (vari_expand) {
-			// error(ce->ellipsis, "Invalid use of '...' with 'field = value' call'");
+			// error(ce->ellipsis, "Invalid use of '..' with 'field = value' call'");
 		}
 
 	} else {
@@ -4451,6 +4473,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 					sep = ":=";
 				}
 				gb_printf_err("\t%.*s %s %s at %.*s(%td:%td)\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
+				// gb_printf_err("\t%.*s %s %s at %.*s(%td:%td) %lld\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column, valids[i].score);
 			}
 			result_type = t_invalid;
 		} else {
@@ -4538,7 +4561,7 @@ CallArgumentError check_polymorphic_struct_type(CheckerContext *c, Operand *oper
 
 		bool vari_expand = (ce->ellipsis.pos.line != 0);
 		if (vari_expand) {
-			error(ce->ellipsis, "Invalid use of '...' in a polymorphic type call'");
+			error(ce->ellipsis, "Invalid use of '..' in a polymorphic type call'");
 		}
 
 	} else {
@@ -4637,7 +4660,7 @@ CallArgumentError check_polymorphic_struct_type(CheckerContext *c, Operand *oper
 			if (are_types_identical(e->type, o->type)) {
 				score += assign_score_function(1);
 			} else {
-				score += assign_score_function(10);
+				score += assign_score_function(MAXIMUM_TYPE_DISTANCE);
 			}
 		} else {
 			i64 s = 0;
@@ -6256,7 +6279,7 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 	case_end;
 
 	case_ast_node(e, Ellipsis, node);
-		str = gb_string_appendc(str, "...");
+		str = gb_string_appendc(str, "..");
 		str = write_expr_to_string(str, e->expr);
 	case_end;
 
