@@ -24,6 +24,7 @@ Allocator :: struct {
 
 
 alloc_with_allocator :: inline proc(a: Allocator, size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
+	if size == 0 do return nil;
 	return a.procedure(a.data, Allocator_Mode.Alloc, size, alignment, nil, 0, 0, loc);
 }
 alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
@@ -45,6 +46,10 @@ free_all :: inline proc(loc := #caller_location) {
 }
 
 resize_with_allocator :: inline proc(a: Allocator, ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
+	if new_size == 0 {
+		free_ptr_with_allocator(a, ptr, loc);
+		return nil;
+	}
 	return a.procedure(a.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, 0, loc);
 }
 resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
@@ -82,33 +87,30 @@ delete :: proc[
 
 new :: inline proc(T: type, loc := #caller_location) -> ^T {
 	ptr := (^T)(alloc(size_of(T), align_of(T), loc));
-	ptr^ = T{};
+	if ptr != nil do ptr^ = T{};
 	return ptr;
 }
 new_clone :: inline proc(data: $T, loc := #caller_location) -> ^T {
 	ptr := (^T)(alloc(size_of(T), align_of(T), loc));
-	ptr^ = data;
+	if ptr != nil do ptr^ = data;
 	return ptr;
 }
 
 new_with_allocator :: inline proc(a: Allocator, T: type, loc := #caller_location) -> ^T {
 	ptr := (^T)(alloc_with_allocator(a, size_of(T), align_of(T), loc));
-	ptr^ = T{};
+	if ptr != nil do ptr^ = T{};
 	return ptr;
 }
 
 new_clone_with_allocator :: inline proc(a: Allocator, data: $T, loc := #caller_location) -> ^T {
 	ptr := (^T)(alloc_with_allocator(a, size_of(T), align_of(T), loc));
-	ptr^ = data;
+	if ptr != nil do ptr^ = data;
 	return ptr;
 }
 
 
 make_slice :: proc(T: type/[]$E, auto_cast len: int, loc := #caller_location) -> T {
 	runtime.make_slice_error_loc(loc, len);
-	if len == 0 {
-		return nil;
-	}
 	data := alloc(size_of(E)*len, align_of(E));
 	s := Raw_Slice{data, len};
 	return transmute(T)s;
@@ -121,8 +123,7 @@ make_dynamic_array_len :: proc(T: type/[dynamic]$E, auto_cast len: int, loc := #
 }
 make_dynamic_array_len_cap :: proc(T: type/[dynamic]$E, auto_cast len: int, auto_cast cap: int, loc := #caller_location) -> T {
 	runtime.make_dynamic_array_error_loc(loc, len, cap);
-	data: rawptr;
-	if cap > 0 do data = alloc(size_of(E)*cap, align_of(E));
+	data := alloc(size_of(E)*cap, align_of(E));
 	s := Raw_Dynamic_Array{data, len, cap, context.allocator};
 	return transmute(T)s;
 }

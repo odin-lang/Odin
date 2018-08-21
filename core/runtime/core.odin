@@ -366,7 +366,27 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) {
 
 
 @(builtin)
-append :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location) -> int {
+append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> int {
+	if array == nil do return 0;
+
+	arg_len := 1;
+
+	if cap(array) <= len(array)+arg_len {
+		cap := 2 * cap(array) + max(8, arg_len);
+		_ = reserve(array, cap, loc);
+	}
+	arg_len = min(cap(array)-len(array), arg_len);
+	if arg_len > 0 {
+		a := (^mem.Raw_Dynamic_Array)(array);
+		data := (^E)(a.data);
+		assert(data != nil);
+		mem.copy(mem.ptr_offset(data, a.len), &arg, size_of(E));
+		a.len += arg_len;
+	}
+	return len(array);
+}
+@(builtin)
+append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location) -> int {
 	if array == nil do return 0;
 
 	arg_len := len(args);
@@ -387,6 +407,9 @@ append :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location) -> in
 	}
 	return len(array);
 }
+@(builtin) append :: proc[append_elem, append_elems];
+
+
 
 @(builtin)
 append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_location) -> int {
@@ -428,14 +451,42 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 	return true;
 }
 
+
 @(builtin)
-incl :: inline proc(s: ^$B/bit_set[$T], elem: T) {
+incl_elem :: inline proc(s: ^$S/bit_set[$E; $U], elem: E) -> S {
 	s^ |= {elem};
+	return s^;
 }
 @(builtin)
-excl :: inline proc(s: ^$B/bit_set[$T], elem: T) {
-	s^ &~= {elem};
+incl_elems :: inline proc(s: ^$S/bit_set[$E; $U], elems: ..E) -> S {
+	for elem in elems do s^ |= {elem};
+	return s^;
 }
+@(builtin)
+incl_bit_set :: inline proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
+	s^ |= other;
+	return s^;
+}
+@(builtin)
+excl_elem :: inline proc(s: ^$S/bit_set[$E; $U], elem: E) -> S {
+	s^ &~= {elem};
+	return s^;
+}
+@(builtin)
+excl_elems :: inline proc(s: ^$S/bit_set[$E; $U], elems: ..E) -> S {
+	for elem in elems do s^ &~= {elem};
+	return s^;
+}
+@(builtin)
+excl_bit_set :: inline proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
+	s^ &~= other;
+	return s^;
+}
+
+@(builtin) incl :: proc[incl_elem, incl_elems, incl_bit_set];
+@(builtin) excl :: proc[excl_elem, excl_elems, excl_bit_set];
+
+
 
 
 
