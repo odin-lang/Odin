@@ -3503,8 +3503,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			{
 				Type *bt = base_type(a.type);
-				if (bt == t_f32) add_package_dependency(c, "runtime", "__min_f32");
-				if (bt == t_f64) add_package_dependency(c, "runtime", "__min_f64");
+				if (are_types_identical(bt, t_f32)) add_package_dependency(c, "runtime", "__min_f32");
+				if (are_types_identical(bt, t_f64)) add_package_dependency(c, "runtime", "__min_f64");
 			}
 
 		}
@@ -3622,10 +3622,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			{
 				Type *bt = base_type(operand->type);
-				if (bt == t_f32)        add_package_dependency(c, "runtime", "__abs_f32");
-				if (bt == t_f64)        add_package_dependency(c, "runtime", "__abs_f64");
-				if (bt == t_complex64)  add_package_dependency(c, "runtime", "__abs_complex64");
-				if (bt == t_complex128) add_package_dependency(c, "runtime", "__abs_complex128");
+				if (are_types_identical(bt, t_f32))        add_package_dependency(c, "runtime", "__abs_f32");
+				if (are_types_identical(bt, t_f64))        add_package_dependency(c, "runtime", "__abs_f64");
+				if (are_types_identical(bt, t_complex64))  add_package_dependency(c, "runtime", "__abs_complex64");
+				if (are_types_identical(bt, t_complex128)) add_package_dependency(c, "runtime", "__abs_complex128");
 			}
 		}
 
@@ -3725,11 +3725,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			{
 				Type *bt = base_type(x.type);
-				if (bt == t_f32) {
+				if (are_types_identical(bt, t_f32)) {
 					add_package_dependency(c, "runtime", "__min_f32");
 					add_package_dependency(c, "runtime", "__max_f32");
 				}
-				if (bt == t_f64) {
+				if (are_types_identical(bt, t_f64)) {
 					add_package_dependency(c, "runtime", "__min_f64");
 					add_package_dependency(c, "runtime", "__max_f64");
 				}
