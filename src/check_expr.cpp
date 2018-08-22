@@ -1880,12 +1880,20 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 	// cstring -> ^u8
-	if (src == t_cstring && is_type_u8_ptr(dst)) {
+	if (are_types_identical(src, t_cstring) && is_type_u8_ptr(dst)) {
+		return true;
+	}
+	// cstring -> rawptr
+	if (are_types_identical(src, t_cstring) && is_type_rawptr(dst)) {
 		return true;
 	}
 
 	// ^u8 -> cstring
-	if (is_type_u8_ptr(src) && dst == t_cstring) {
+	if (is_type_u8_ptr(src) && are_types_identical(dst, t_cstring)) {
+		return true;
+	}
+	// rawptr -> cstring
+	if (is_type_rawptr(src) && are_types_identical(dst, t_cstring)) {
 		return true;
 	}
 	// proc <-> proc
