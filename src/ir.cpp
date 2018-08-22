@@ -6419,11 +6419,12 @@ void ir_build_range_enum(irProcedure *proc, Type *enum_type, Type *val_type, irV
 	Type *enum_ptr = alloc_type_pointer(t);
 	t = base_type(t);
 	Type *core_elem = core_type(t);
+	GB_ASSERT(t->kind == Type_Enum);
 	i64 enum_count = t->Enum.fields.count;
 	irValue *max_count = ir_const_int(enum_count);
 
 	irValue *ti          = ir_type_info(proc, t);
-	irValue *variant     = ir_emit_struct_ep(proc, ti, 2);
+	irValue *variant     = ir_emit_struct_ep(proc, ti, 3);
 	irValue *eti_ptr     = ir_emit_conv(proc, variant, t_type_info_enum_ptr);
 	irValue *values      = ir_emit_load(proc, ir_emit_struct_ep(proc, eti_ptr, 2));
 	irValue *values_data = ir_slice_elem(proc, values);
@@ -6448,10 +6449,9 @@ void ir_build_range_enum(irProcedure *proc, Type *enum_type, Type *val_type, irV
 
 	irValue *val = nullptr;
 	if (val_type != nullptr) {
-		if (is_type_float(core_elem)) {
-			irValue *f = ir_emit_load(proc, ir_emit_conv(proc, val_ptr, t_f64_ptr));
-			val = ir_emit_conv(proc, f, t);
-		} else if (is_type_integer(core_elem)) {
+		GB_ASSERT(are_types_identical(enum_type, val_type));
+
+		if (is_type_integer(core_elem)) {
 			irValue *i = ir_emit_load(proc, ir_emit_conv(proc, val_ptr, t_i64_ptr));
 			val = ir_emit_conv(proc, i, t);
 		} else {
@@ -6831,7 +6831,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		if (is_ast_range(expr)) {
 			ir_build_range_interval(proc, &expr->BinaryExpr, val0_type, &val, &key, &loop, &done);
 		} else if (tav.mode == Addressing_Type) {
-			ir_build_range_enum(proc, tav.type, val0_type, &val, &key, &loop, &done);
+			ir_build_range_enum(proc, type_deref(tav.type), val0_type, &val, &key, &loop, &done);
 		} else {
 			Type *expr_type = type_of_expr(rs->expr);
 			Type *et = base_type(type_deref(expr_type));
@@ -7936,10 +7936,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 					irValue *value_array = ir_generate_array(m, t_type_info_enum_value, fields.count,
 					                                         str_lit("__$enum_values"), cast(i64)entry_index);
 
-					bool is_value_int = is_type_integer(t->Enum.base_type);
-					if (!is_value_int) {
-						GB_ASSERT(is_type_float(t->Enum.base_type));
-					}
+					GB_ASSERT(is_type_integer(t->Enum.base_type));
 
 					for_array(i, fields) {
 						irValue *name_ep  = ir_emit_array_epi(proc, name_array, cast(i32)i);

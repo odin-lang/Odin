@@ -299,7 +299,7 @@ type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column
 
 	fd := os.stderr;
 	__print_caller_location(fd, Source_Code_Location{file, line, column, ""});
-	os.write_string(fd, " Invalid type assertion from");
+	os.write_string(fd, " Invalid type assertion from ");
 	__print_typeid(fd, from);
 	os.write_string(fd, " to ");
 	__print_typeid(fd, to);
