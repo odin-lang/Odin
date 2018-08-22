@@ -1839,23 +1839,10 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 
 	// Cast between pointers
 	if (is_type_pointer(src) && is_type_pointer(dst)) {
-		#if 0
-		Type *s = base_type(type_deref(src));
-		if (is_type_union(s)) {
-			// NOTE(bill): Should the error be here?!
-			// NOTE(bill): This error should suppress the next casting error as it's at the same position
-			gbString xs = type_to_string(x);
-			gbString ys = type_to_string(y);
-			error(operand->expr, "Cannot cast from a union pointer '%s' to '%s', try using 'union_cast' or cast to a 'rawptr'", xs, ys);
-			gb_string_free(ys);
-			gb_string_free(xs);
-			return false;
-		}
-		#endif
 		return true;
 	}
 
-	// (u)int <-> pointer
+	// uintptr <-> pointer
 	if (is_type_uintptr(src) && is_type_pointer(dst)) {
 		return true;
 	}

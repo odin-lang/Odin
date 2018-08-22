@@ -717,9 +717,6 @@ enum_value_to_string :: proc(v: any) -> (string, bool) {
 		case u64:     return get_str(v, e);
 		case uint:    return get_str(v, e);
 		case uintptr: return get_str(v, e);
-
-		case f32:  return get_str(v, e);
-		case f64:  return get_str(v, e);
 		}
 	}
 
@@ -778,8 +775,6 @@ enum_value_to_u64 :: proc(ev: runtime.Type_Info_Enum_Value) -> u64 {
 	case u64:     return u64(i);
 	case uint:    return u64(i);
 	case uintptr: return u64(i);
-	case f32:     return u64(i);
-	case f64:     return u64(i);
 	}
 	return 0;
 }

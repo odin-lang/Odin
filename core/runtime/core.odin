@@ -37,7 +37,6 @@ Type_Info_Enum_Value :: union {
 	rune,
 	i8, i16, i32, i64, int,
 	u8, u16, u32, u64, uint, uintptr,
-	f32, f64,
 };
 
 // Variant Types
