@@ -1306,12 +1306,12 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 
 		Type *type = nullptr;
 		if (field->type == nullptr) {
-			handle_parameter_value(ctx, nullptr, &type, default_value, false);
+			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, false);
 		} else {
 			type = check_type(ctx, field->type);
 
 			if (default_value != nullptr) {
-				handle_parameter_value(ctx, type, nullptr, default_value, false);
+				param_value = handle_parameter_value(ctx, type, nullptr, default_value, false);
 			}
 		}
 
