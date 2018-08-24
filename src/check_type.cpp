@@ -1,5 +1,32 @@
 
-void populate_using_entity_scope(CheckerContext *ctx, Ast *node, Type *t) {
+void populate_using_array_index(CheckerContext *ctx, Ast *node, AstField *field, Type *t, String name, i32 idx) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Array);
+	Entity *e = scope_lookup_current(ctx->scope, name);
+	if (e != nullptr) {
+		gbString str = nullptr;
+		defer (gb_string_free(str));
+		if (node != nullptr) {
+			str = expr_to_string(node);
+		}
+		if (str != nullptr) {
+			error(e->token, "'%.*s' is already declared in '%s'", LIT(name), str);
+		} else {
+			error(e->token, "'%.*s' is already declared", LIT(name));
+		}
+	} else {
+		Token tok = make_token_ident(name);
+		if (field->names.count > 0) {
+			tok.pos = ast_token(field->names[0]).pos;
+		} else {
+			tok.pos = ast_token(field->type).pos;
+		}
+		Entity *f = alloc_entity_array_elem(nullptr, tok, t->Array.elem, idx);
+		add_entity(ctx->checker, ctx->scope, nullptr, f);
+	}
+}
+
+void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field, Type *t) {
 	t = base_type(type_deref(t));
 	gbString str = nullptr;
 	defer (gb_string_free(str));
@@ -11,7 +38,7 @@ void populate_using_entity_scope(CheckerContext *ctx, Ast *node, Type *t) {
 		for_array(i, t->Struct.fields) {
 			Entity *f = t->Struct.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
-			String name = f->token.string;;
+			String name = f->token.string;
 			Entity *e = scope_lookup_current(ctx->scope, name);
 			if (e != nullptr && name != "_") {
 				// TODO(bill): Better type error
@@ -23,9 +50,45 @@ void populate_using_entity_scope(CheckerContext *ctx, Ast *node, Type *t) {
 			} else {
 				add_entity(ctx->checker, ctx->scope, nullptr, f);
 				if (f->flags & EntityFlag_Using) {
-					populate_using_entity_scope(ctx, node, f->type);
+					populate_using_entity_scope(ctx, node, field, f->type);
 				}
 			}
+		}
+	} else if (t->kind == Type_BitField) {
+		for_array(i, t->BitField.fields) {
+			Entity *f = t->BitField.fields[i];
+			String name = f->token.string;
+			Entity *e = scope_lookup_current(ctx->scope, name);
+			if (e != nullptr && name != "_") {
+				// TODO(bill): Better type error
+				if (str != nullptr) {
+					error(e->token, "'%.*s' is already declared in '%s'", LIT(name), str);
+				} else {
+					error(e->token, "'%.*s' is already declared", LIT(name));
+				}
+			} else {
+				add_entity(ctx->checker, ctx->scope, nullptr, f);
+			}
+		}
+	} else if (t->kind == Type_Array && t->Array.count <= 4) {
+		Entity *e = nullptr;
+		String name = {};
+		i32 idx = 0;
+		switch (t->Array.count) {
+		case 4:
+			populate_using_array_index(ctx, node, field, t, str_lit("w"), 3);
+			/*fallthrough*/
+		case 3:
+			populate_using_array_index(ctx, node, field, t, str_lit("z"), 2);
+			/*fallthrough*/
+		case 2:
+			populate_using_array_index(ctx, node, field, t, str_lit("y"), 1);
+			/*fallthrough*/
+		case 1:
+			populate_using_array_index(ctx, node, field, t, str_lit("x"), 0);
+			/*fallthrough*/
+		default:
+			break;
 		}
 	}
 }
@@ -122,7 +185,7 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields
 				continue;
 			}
 
-			populate_using_entity_scope(ctx, node, type);
+			populate_using_entity_scope(ctx, node, p, type);
 		}
 	}
 }
