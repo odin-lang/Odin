@@ -28,7 +28,20 @@ void populate_using_entity_scope(CheckerContext *ctx, Ast *node, Type *t) {
 			}
 		}
 	}
+}
 
+bool does_field_type_allow_using(Type *t) {
+	t = base_type(t);
+	if (is_type_struct(t)) {
+		return true;
+	} else if (is_type_raw_union(t)) {
+		return true;
+	} else if (is_type_bit_field(t)) {
+		return true;
+	} else if (is_type_array(t)) {
+		return t->Array.count <= 4;
+	}
+	return false;
 }
 
 void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields, Array<Ast *> const &params,
@@ -99,7 +112,7 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields
 			Type *first_type = (*fields)[fields->count-1]->type;
 			Type *t = base_type(type_deref(first_type));
 
-			if (!is_type_struct(t) && !is_type_raw_union(t) && !is_type_bit_field(t) &&
+			if (!does_field_type_allow_using(t) &&
 			    p->names.count >= 1 &&
 			    p->names[0]->kind == Ast_Ident) {
 				Token name_token = p->names[0]->Ident.token;
