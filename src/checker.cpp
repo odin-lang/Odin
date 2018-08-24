@@ -2816,10 +2816,13 @@ bool collect_file_decls(CheckerContext *ctx, Array<Ast *> const &decls) {
 			}
 		case_end;
 
-		case_ast_node(ce, CallExpr, decl);
-			if (ce->proc->kind == Ast_BasicDirective) {
-				Operand o = {};
-				check_expr(ctx, &o, decl);
+		case_ast_node(es, ExprStmt, decl);
+			if (es->expr->kind == Ast_CallExpr) {
+				ast_node(ce, CallExpr, es->expr);
+				if (ce->proc->kind == Ast_BasicDirective) {
+					Operand o = {};
+					check_expr(ctx, &o, es->expr);
+				}
 			}
 		case_end;
 		}
