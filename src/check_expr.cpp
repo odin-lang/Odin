@@ -3586,7 +3586,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_abs: {
 		// abs :: proc(n: numeric) -> numeric
-		if (!is_type_numeric(operand->type)) {
+		if (!(is_type_numeric(operand->type) && !is_type_array(operand->type))) {
 			gbString type_str = type_to_string(operand->type);
 			error(call, "Expected a numeric type to 'abs', got '%s'", type_str);
 			gb_string_free(type_str);
