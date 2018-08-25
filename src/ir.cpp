@@ -3773,12 +3773,95 @@ irValue *ir_type_info(irProcedure *proc, Type *type) {
 	return ir_emit_array_ep(proc, ir_global_type_info_data, ir_const_i32(id));
 }
 
+// IMPORTANT NOTE(bill): This must match the same as the in core.odin
+enum Typeid_Kind : u8 {
+	Typeid_Invalid,
+	Typeid_Integer,
+	Typeid_Rune,
+	Typeid_Float,
+	Typeid_Complex,
+	Typeid_String,
+	Typeid_Boolean,
+	Typeid_Any,
+	Typeid_Type_Id,
+	Typeid_Pointer,
+	Typeid_Procedure,
+	Typeid_Array,
+	Typeid_Dynamic_Array,
+	Typeid_Slice,
+	Typeid_Tuple,
+	Typeid_Struct,
+	Typeid_Union,
+	Typeid_Enum,
+	Typeid_Map,
+	Typeid_Bit_Field,
+	Typeid_Bit_Set,
+};
+
+
 irValue *ir_typeid(irModule *m, Type *type) {
 	type = default_type(type);
 
-	isize id = ir_type_info_index(m->info, type);
+	u64 id = cast(u64)ir_type_info_index(m->info, type);
 	GB_ASSERT(id >= 0);
-	return ir_value_constant(t_typeid, exact_value_i64(id));
+
+	u64 kind = Typeid_Invalid;
+	u64 named = is_type_named(type) && type->kind != Type_Basic;
+	u64 special = 0;
+	u64 reserved = 0;
+
+	Type *bt = base_type(type);
+	TypeKind tk = bt->kind;
+	switch (tk) {
+	case Type_Basic: {
+		u32 flags = bt->Basic.flags;
+		if (flags & BasicFlag_Boolean)  kind = Typeid_Boolean;
+		if (flags & BasicFlag_Integer)  kind = Typeid_Integer;
+		if (flags & BasicFlag_Unsigned) kind = Typeid_Integer;
+		if (flags & BasicFlag_Float)    kind = Typeid_Float;
+		if (flags & BasicFlag_Complex)  kind = Typeid_Complex;
+		if (flags & BasicFlag_Pointer)  kind = Typeid_Pointer;
+		if (flags & BasicFlag_String)   kind = Typeid_String;
+		if (flags & BasicFlag_Rune)     kind = Typeid_Rune;
+	} break;
+	case Type_Pointer:      kind = Typeid_Pointer;       break;
+	case Type_Array:        kind = Typeid_Array;         break;
+	case Type_Slice:        kind = Typeid_Slice;         break;
+	case Type_DynamicArray: kind = Typeid_Dynamic_Array; break;
+	case Type_Map:          kind = Typeid_Map;           break;
+	case Type_Struct:       kind = Typeid_Struct;        break;
+	case Type_Enum:         kind = Typeid_Enum;          break;
+	case Type_Union:        kind = Typeid_Union;         break;
+	case Type_Tuple:        kind = Typeid_Tuple;         break;
+	case Type_Proc:         kind = Typeid_Procedure;     break;
+	case Type_BitField:     kind = Typeid_Bit_Field;     break;
+	case Type_BitSet:       kind = Typeid_Bit_Set;       break;
+	}
+
+	if (is_type_cstring(type)) {
+		special = 1;
+	} else if (is_type_integer(type) && !is_type_unsigned(type)) {
+		special = 1;
+	}
+
+	u64 data = 0;
+	if (build_context.word_size == 4) {
+		data |= (id       &~ (1u<<24)) << 0u;  // index
+		data |= (kind     &~ (1u<<5))  << 24u; // kind
+		data |= (named    &~ (1u<<1))  << 29u; // kind
+		data |= (special  &~ (1u<<1))  << 30u; // kind
+		data |= (reserved &~ (1u<<1))  << 31u; // kind
+	} else {
+		GB_ASSERT(build_context.word_size == 8);
+		data |= (id       &~ (1ull<<56)) << 0ul;  // index
+		data |= (kind     &~ (1ull<<5))  << 56ull; // kind
+		data |= (named    &~ (1ull<<1))  << 61ull; // kind
+		data |= (special  &~ (1ull<<1))  << 62ull; // kind
+		data |= (reserved &~ (1ull<<1))  << 63ull; // kind
+	}
+
+
+	return ir_value_constant(t_typeid, exact_value_u64(data));
 }
 
 

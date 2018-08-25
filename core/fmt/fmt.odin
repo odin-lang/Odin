@@ -96,6 +96,11 @@ write_encoded_rune :: proc(buf: ^String_Buffer, r: rune) {
 	write_byte(buf, '\'');
 }
 
+write_u64 :: proc(buf: ^String_Buffer, i: u64, base: int) {
+	b: [129]byte;
+	s := strconv.append_bits(b[:], u64(i), base, false, 64, strconv.digits, nil);
+	write_string(buf, s);
+}
 write_i64 :: proc(buf: ^String_Buffer, i: i64, base: int) {
 	b: [129]byte;
 	s := strconv.append_bits(b[:], u64(i), base, true, 64, strconv.digits, nil);
@@ -833,6 +838,51 @@ fmt_bit_set :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
 		}
 	}
 }
+fmt_bit_field :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
+	type_info := type_info_of(v.typeid);
+	switch info in type_info.variant {
+	case runtime.Type_Info_Named:
+		val := v;
+		val.typeid = info.base.id;
+		fmt_bit_field(fi, val, info.name);
+	case runtime.Type_Info_Bit_Field:
+		data: u64 = 0;
+		switch type_info.size {
+		case 1: data = cast(u64) (^u8)(v.data)^;
+		case 2: data = cast(u64)(^u16)(v.data)^;
+		case 4: data = cast(u64)(^u32)(v.data)^;
+		case 8: data = cast(u64)(^u64)(v.data)^;
+		}
+
+		if name != "" {
+			write_string(fi.buf, name);
+			write_byte(fi.buf, '{');
+		} else {
+			write_string(fi.buf, "bit_field{");
+		}
+		for name, i in info.names {
+			if i > 0 {
+				write_string(fi.buf, ", ");
+			}
+			bits := u64(info.bits[i]);
+			offset := u64(info.offsets[i]);
+			write_string(fi.buf, name);
+			write_string(fi.buf, " = ");
+
+			n := 8*u64(size_of(u64));
+			sa := n - bits;
+			u := data>>offset;
+			u <<= sa;
+			u >>= sa;
+
+			write_u64(fi.buf, u, 10);
+
+		}
+		write_byte(fi.buf, '}');
+	case:
+		write_string(fi.buf, "HERE");
+	}
+}
 
 fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	if v.data == nil || v.typeid == nil {
@@ -887,6 +937,8 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 		case runtime.Type_Info_Bit_Set:
 			fmt_bit_set(fi, v);
+		case runtime.Type_Info_Bit_Field:
+			fmt_bit_field(fi, v);
 		case:
 			fmt_value(fi, any{v.data, typeid_of(info.base)}, verb);
 		}
@@ -1051,6 +1103,9 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	case runtime.Type_Info_Type_Id:
 		id := (^typeid)(v.data)^;
 		write_typeid(fi.buf, id);
+
+	case runtime.Type_Info_Bit_Field:
+		fmt_bit_field(fi, v);
 
 	case runtime.Type_Info_Bit_Set:
 		fmt_bit_set(fi, v);
