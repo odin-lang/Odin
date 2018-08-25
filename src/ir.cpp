@@ -4539,13 +4539,29 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 	case BuiltinProc_min: {
 		ir_emit_comment(proc, str_lit("min"));
 		Type *t = type_of_expr(expr);
-		return ir_emit_min(proc, t, ir_build_expr(proc, ce->args[0]), ir_build_expr(proc, ce->args[1]));
+		if (ce->args.count == 2) {
+			return ir_emit_min(proc, t, ir_build_expr(proc, ce->args[0]), ir_build_expr(proc, ce->args[1]));
+		} else {
+			irValue *x = ir_build_expr(proc, ce->args[0]);
+			for (isize i = 1; i < ce->args.count; i++) {
+				x = ir_emit_min(proc, t, x, ir_build_expr(proc, ce->args[i]));
+			}
+			return x;
+		}
 	}
 
 	case BuiltinProc_max: {
 		ir_emit_comment(proc, str_lit("max"));
 		Type *t = type_of_expr(expr);
-		return ir_emit_max(proc, t, ir_build_expr(proc, ce->args[0]), ir_build_expr(proc, ce->args[1]));
+		if (ce->args.count == 2) {
+			return ir_emit_max(proc, t, ir_build_expr(proc, ce->args[0]), ir_build_expr(proc, ce->args[1]));
+		} else {
+			irValue *x = ir_build_expr(proc, ce->args[0]);
+			for (isize i = 1; i < ce->args.count; i++) {
+				x = ir_emit_max(proc, t, x, ir_build_expr(proc, ce->args[i]));
+			}
+			return x;
+		}
 	}
 
 	case BuiltinProc_abs: {

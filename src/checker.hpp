@@ -105,8 +105,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("expand_to_tuple"),  1, false, Expr_Expr},
 
-	{STR_LIT("min"),              2, false, Expr_Expr},
-	{STR_LIT("max"),              2, false, Expr_Expr},
+	{STR_LIT("min"),              2, true,  Expr_Expr},
+	{STR_LIT("max"),              2, true,  Expr_Expr},
 	{STR_LIT("abs"),              1, false, Expr_Expr},
 	{STR_LIT("clamp"),            3, false, Expr_Expr},
 

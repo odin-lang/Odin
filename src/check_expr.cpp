@@ -3435,152 +3435,207 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_min: {
 		// min :: proc(a, b: ordered) -> ordered
+		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
-			gbString type_str = type_to_string(operand->type);
+			gbString type_str = type_to_string(original_type);
 			error(call, "Expected a ordered numeric type to 'min', got '%s'", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
 
-		Ast *other_arg = ce->args[1];
-		Operand a = *operand;
-		Operand b = {};
-		check_expr(c, &b, other_arg);
-		if (b.mode == Addressing_Invalid) {
-			return false;
-		}
-		if (!is_type_ordered(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
-			gbString type_str = type_to_string(b.type);
-			error(call,
-			      "Expected a ordered numeric type to 'min', got '%s'",
-			      type_str);
-			gb_string_free(type_str);
-			return false;
-		}
+		bool all_constant = operand->mode == Addressing_Constant;
 
-		if (a.mode == Addressing_Constant &&
-		    b.mode == Addressing_Constant) {
-			ExactValue x = a.value;
-			ExactValue y = b.value;
+		auto operands = array_make<Operand>(heap_allocator(), 0, ce->args.count);
+		defer (array_free(&operands));
 
-			operand->mode = Addressing_Constant;
-			if (compare_exact_values(Token_Lt, x, y)) {
-				operand->value = x;
-				operand->type = a.type;
-			} else {
-				operand->value = y;
-				operand->type = b.type;
-			}
-		} else {
-			operand->mode = Addressing_Value;
-			operand->type = type;
+		array_add(&operands, *operand);
 
-			convert_to_typed(c, &a, b.type);
-			if (a.mode == Addressing_Invalid) {
-				return false;
-			}
-			convert_to_typed(c, &b, a.type);
+		for (isize i = 1; i < ce->args.count; i++) {
+			Ast *other_arg = ce->args[i];
+			Operand b = {};
+			check_expr(c, &b, other_arg);
 			if (b.mode == Addressing_Invalid) {
 				return false;
 			}
-
-			if (!are_types_identical(a.type, b.type)) {
-				gbString type_a = type_to_string(a.type);
-				gbString type_b = type_to_string(b.type);
+			if (!is_type_ordered(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
+				gbString type_str = type_to_string(b.type);
 				error(call,
-				      "Mismatched types to 'min', '%s' vs '%s'",
-				      type_a, type_b);
-				gb_string_free(type_b);
-				gb_string_free(type_a);
+				      "Expected a ordered numeric type to 'min', got '%s'",
+				      type_str);
+				gb_string_free(type_str);
 				return false;
 			}
+			array_add(&operands, b);
+
+			if (all_constant) {
+				all_constant = b.mode == Addressing_Constant;
+			}
+		}
+
+		if (all_constant) {
+			ExactValue value = operands[0].value;
+			Type *type = operands[0].type;
+			for (isize i = 1; i < operands.count; i++) {
+				Operand y = operands[i];
+				if (compare_exact_values(Token_Lt, value, y.value)) {
+					// okay
+				} else {
+					value = y.value;
+					type = y.type;
+				}
+			}
+			operand->value = value;
+			operand->type = type;
+		} else {
+			operand->mode = Addressing_Value;
+			operand->type = original_type;
+
+			for_array(i, operands) {
+				Operand *a = &operands[i];
+				for_array(j, operands) {
+					if (i == j) {
+						continue;
+					}
+					Operand *b = &operands[j];
+
+					convert_to_typed(c, a, b->type);
+					if (a->mode == Addressing_Invalid) {
+						return false;
+					}
+					convert_to_typed(c, b, a->type);
+					if (b->mode == Addressing_Invalid) {
+						return false;
+					}
+				}
+			}
+
+			for (isize i = 0; i < operands.count-1; i++) {
+				Operand *a = &operands[i];
+				Operand *b = &operands[i+1];
+
+				if (!are_types_identical(a->type, b->type)) {
+					gbString type_a = type_to_string(a->type);
+					gbString type_b = type_to_string(b->type);
+					error(a->expr,
+					      "Mismatched types to 'min', '%s' vs '%s'",
+					      type_a, type_b);
+					gb_string_free(type_b);
+					gb_string_free(type_a);
+					return false;
+				}
+			}
+
 
 			{
-				Type *bt = base_type(a.type);
+				Type *bt = base_type(operands[0].type);
 				if (are_types_identical(bt, t_f32)) add_package_dependency(c, "runtime", "__min_f32");
 				if (are_types_identical(bt, t_f64)) add_package_dependency(c, "runtime", "__min_f64");
 			}
-
 		}
-
-
 		break;
 	}
 
 	case BuiltinProc_max: {
-		// min :: proc(a, b: ordered) -> ordered
+		// max :: proc(a, b: ordered) -> ordered
+		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
-			gbString type_str = type_to_string(operand->type);
-			error(call,
-			      "Expected a ordered numeric or string type to 'max', got '%s'",
-			      type_str);
+			gbString type_str = type_to_string(original_type);
+			error(call, "Expected a ordered numeric type to 'max', got '%s'", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
 
-		Ast *other_arg = ce->args[1];
-		Operand a = *operand;
-		Operand b = {};
-		check_expr(c, &b, other_arg);
-		if (b.mode == Addressing_Invalid) {
-			return false;
-		}
-		if (!is_type_ordered(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
-			gbString type_str = type_to_string(b.type);
-			error(call,
-			      "Expected a ordered numeric or string type to 'max', got '%s'",
-			      type_str);
-			gb_string_free(type_str);
-			return false;
-		}
+		bool all_constant = operand->mode == Addressing_Constant;
 
-		if (a.mode == Addressing_Constant &&
-		    b.mode == Addressing_Constant) {
-			ExactValue x = a.value;
-			ExactValue y = b.value;
+		auto operands = array_make<Operand>(heap_allocator(), 0, ce->args.count);
+		defer (array_free(&operands));
 
-			operand->mode = Addressing_Constant;
-			if (compare_exact_values(Token_Gt, x, y)) {
-				operand->value = x;
-				operand->type = a.type;
-			} else {
-				operand->value = y;
-				operand->type = b.type;
-			}
-		} else {
-			operand->mode = Addressing_Value;
-			operand->type = type;
+		array_add(&operands, *operand);
 
-			convert_to_typed(c, &a, b.type);
-			if (a.mode == Addressing_Invalid) {
-				return false;
-			}
-			convert_to_typed(c, &b, a.type);
+
+		for (isize i = 1; i < ce->args.count; i++) {
+			Ast *arg = ce->args[i];
+			Operand b = {};
+			check_expr(c, &b, arg);
 			if (b.mode == Addressing_Invalid) {
 				return false;
 			}
-
-			if (!are_types_identical(a.type, b.type)) {
-				gbString type_a = type_to_string(a.type);
-				gbString type_b = type_to_string(b.type);
-				error(call,
-				      "Mismatched types to 'max', '%s' vs '%s'",
-				      type_a, type_b);
-				gb_string_free(type_b);
-				gb_string_free(type_a);
+			if (!is_type_ordered(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
+				gbString type_str = type_to_string(b.type);
+				error(arg,
+				      "Expected a ordered numeric type to 'max', got '%s'",
+				      type_str);
+				gb_string_free(type_str);
 				return false;
 			}
+			array_add(&operands, b);
 
-			{
-				Type *bt = base_type(a.type);
-				if (bt == t_f32) add_package_dependency(c, "runtime", "__max_f32");
-				if (bt == t_f64) add_package_dependency(c, "runtime", "__max_f64");
+			if (all_constant) {
+				all_constant = b.mode == Addressing_Constant;
 			}
 		}
 
+		if (all_constant) {
+			ExactValue value = operands[0].value;
+			Type *type = operands[0].type;
+			for (isize i = 1; i < operands.count; i++) {
+				Operand y = operands[i];
+				if (compare_exact_values(Token_Gt, value, y.value)) {
+					// okay
+				} else {
+					type  = y.type;
+					value = y.value;
+				}
+			}
+			operand->value = value;
+			operand->type = type;
+		} else {
+			operand->mode = Addressing_Value;
+			operand->type = original_type;
 
+			for_array(i, operands) {
+				Operand *a = &operands[i];
+				for_array(j, operands) {
+					if (i == j) {
+						continue;
+					}
+					Operand *b = &operands[j];
+
+					convert_to_typed(c, a, b->type);
+					if (a->mode == Addressing_Invalid) {
+						return false;
+					}
+					convert_to_typed(c, b, a->type);
+					if (b->mode == Addressing_Invalid) {
+						return false;
+					}
+				}
+			}
+
+			for (isize i = 0; i < operands.count-1; i++) {
+				Operand *a = &operands[i];
+				Operand *b = &operands[i+1];
+
+				if (!are_types_identical(a->type, b->type)) {
+					gbString type_a = type_to_string(a->type);
+					gbString type_b = type_to_string(b->type);
+					error(a->expr,
+					      "Mismatched types to 'max', '%s' vs '%s'",
+					      type_a, type_b);
+					gb_string_free(type_b);
+					gb_string_free(type_a);
+					return false;
+				}
+			}
+
+			{
+				Type *bt = base_type(operands[0].type);
+				if (are_types_identical(bt, t_f32)) add_package_dependency(c, "runtime", "__max_f32");
+				if (are_types_identical(bt, t_f64)) add_package_dependency(c, "runtime", "__max_f64");
+			}
+		}
 		break;
 	}
 
