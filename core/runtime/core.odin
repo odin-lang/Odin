@@ -135,6 +135,39 @@ Type_Info :: struct {
 	},
 }
 
+// NOTE(bill): This must match the compiler's
+Typeid_Kind :: enum u8 {
+	Invalid,
+	Integer,
+	Rune,
+	Float,
+	Complex,
+	String,
+	Boolean,
+	Any,
+	Type_Id,
+	Pointer,
+	Procedure,
+	Array,
+	Dynamic_Array,
+	Slice,
+	Tuple,
+	Struct,
+	Union,
+	Enum,
+	Map,
+	Bit_Field,
+	Bit_Set,
+}
+
+Typeid_Bit_Field :: bit_field #align align_of(uintptr) {
+	index:    8*size_of(align_of(uintptr)) - 8,
+	kind:     5, // Typeid_Kind
+	named:    1,
+	special:  1, // signed, cstring, etc
+	reserved: 1,
+}
+
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
 type_table: []Type_Info;
@@ -233,7 +266,8 @@ __typeid_of :: proc "contextless" (ti: ^Type_Info) -> typeid {
 	return ti.id;
 }
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info {
-	n := int(transmute(uintptr)id);
+	data := transmute(Typeid_Bit_Field)id;
+	n := int(data.index);
 	if n < 0 || n >= len(type_table) {
 		n = 0;
 	}
