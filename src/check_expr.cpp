@@ -1531,7 +1531,7 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 		switch (op) {
 		case Token_CmpEq:
 		case Token_NotEq:
-			defined = is_type_comparable(x->type) ||
+			defined = (is_type_comparable(x->type) && is_type_comparable(y->type)) ||
 			          (is_operand_nil(*x) && type_has_nil(y->type)) ||
 			          (is_operand_nil(*y) && type_has_nil(x->type));
 			break;
@@ -1539,7 +1539,7 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 		case Token_Gt:
 		case Token_LtEq:
 		case Token_GtEq:
-			defined = is_type_ordered(x->type);
+			defined = is_type_ordered(x->type) && is_type_ordered(y->type);
 			break;
 		}
 
