@@ -298,16 +298,6 @@ ExactValue exact_value_to_integer(ExactValue v) {
 	return r;
 }
 
-i64 exact_value_to_i64(ExactValue v) {
-	v = exact_value_to_integer(v);
-	i64 result = 0;
-	if (v.kind == ExactValue_Integer) {
-		return big_int_to_i64(&v.value_integer);
-	}
-	return result;
-}
-
-
 ExactValue exact_value_to_float(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
@@ -369,6 +359,25 @@ ExactValue exact_value_make_imag(ExactValue v) {
 	ExactValue r = {ExactValue_Invalid};
 	return r;
 }
+
+i64 exact_value_to_i64(ExactValue v) {
+	v = exact_value_to_integer(v);
+	if (v.kind == ExactValue_Integer) {
+		return big_int_to_i64(&v.value_integer);
+	}
+	return 0;
+}
+f64 exact_value_to_f64(ExactValue v) {
+	v = exact_value_to_float(v);
+	if (v.kind == ExactValue_Float) {
+		return v.value_float;
+	}
+	return 0.0;
+}
+
+
+
+
 
 
 ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision, bool is_unsigned) {
