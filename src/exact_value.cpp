@@ -141,6 +141,8 @@ ExactValue exact_value_integer_from_string(String const &string) {
 	return result;
 }
 
+
+
 f64 float_from_string(String string) {
 	isize i = 0;
 	u8 *str = string.text;
@@ -295,6 +297,16 @@ ExactValue exact_value_to_integer(ExactValue v) {
 	ExactValue r = {ExactValue_Invalid};
 	return r;
 }
+
+i64 exact_value_to_i64(ExactValue v) {
+	v = exact_value_to_integer(v);
+	i64 result = 0;
+	if (v.kind == ExactValue_Integer) {
+		return big_int_to_i64(&v.value_integer);
+	}
+	return result;
+}
+
 
 ExactValue exact_value_to_float(ExactValue v) {
 	switch (v.kind) {
