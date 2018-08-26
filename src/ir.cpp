@@ -4872,8 +4872,6 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 			Ast *ue_expr = unparen_expr(ue->expr);
 			if (ue_expr->kind == Ast_TypeAssertion) {
 				gbAllocator a = ir_allocator();
-
-
 				GB_ASSERT(is_type_pointer(tv.type));
 
 				ast_node(ta, TypeAssertion, ue_expr);
@@ -4935,10 +4933,25 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 				} else {
 					GB_PANIC("TODO(bill): type assertion %s", type_to_string(type));
 				}
-
+			} else if (ue_expr->kind == Ast_IndexExpr) {
+			#if 0
+				ast_node(ie, IndexExpr, ue_expr);
+				if (is_type_slice(ie->expr->tav.type)) {
+					auto tav = ie->index->tav;
+					if (tav.mode == Addressing_Constant) {
+						if (exact_value_to_i64(tav.value) == 0) {
+							irValue *s = ir_build_expr(proc, ie->expr);
+							if (is_type_pointer(ir_type(s))) {
+								s = ir_emit_load(proc, s);
+							}
+							return ir_slice_elem(proc, s);
+						}
+					}
+				}
+			#endif
 			}
 
-			return ir_emit_ptr_offset(proc, ir_build_addr_ptr(proc, ue->expr), v_zero); // Make a copy of the pointer
+			return ir_build_addr_ptr(proc, ue->expr);
 		}
 		default:
 			return ir_emit_unary_arith(proc, ue->op.kind, ir_build_expr(proc, ue->expr), tv.type);
@@ -6455,6 +6468,7 @@ void ir_build_range_string(irProcedure *proc, irValue *expr, Type *val_type,
 	if (done_) *done_ = done;
 }
 
+
 void ir_build_range_interval(irProcedure *proc, AstBinaryExpr *node, Type *val_type,
                              irValue **val_, irValue **idx_, irBlock **loop_, irBlock **done_) {
 	// TODO(bill): How should the behaviour work for lower and upper bounds checking for iteration?
@@ -6988,10 +7002,12 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 					string = ir_emit_load(proc, string);
 				}
 				if (is_type_untyped(expr_type)) {
-					irValue *s = ir_add_local_generated(proc, t_string);
+					irValue *s = ir_add_local_generated(proc, default_type(ir_type(string)));
 					ir_emit_store(proc, s, string);
 					string = ir_emit_load(proc, s);
 				}
+				Type *t = base_type(ir_type(string));
+				GB_ASSERT(!is_type_cstring(t));
 				ir_build_range_string(proc, string, val0_type, &val, &key, &loop, &done);
 				break;
 			}

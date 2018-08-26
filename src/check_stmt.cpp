@@ -1389,7 +1389,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				Type *t = base_type(type_deref(operand.type));
 				switch (t->kind) {
 				case Type_Basic:
-					if (is_type_string(t)) {
+					if (is_type_string(t) && t->Basic.kind != Basic_cstring) {
 						val0 = t_rune;
 						val1 = t_int;
 						add_package_dependency(ctx, "runtime", "__string_decode_rune");
