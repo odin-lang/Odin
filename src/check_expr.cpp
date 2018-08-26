@@ -1158,6 +1158,7 @@ bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
 	Type *type = base_type(core_array_type(o->type));
+	Type *ct = core_type(type);
 	switch (op.kind) {
 	case Token_Sub:
 	case Token_SubEq:
@@ -1197,7 +1198,7 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	case Token_OrEq:
 	case Token_Xor:
 	case Token_XorEq:
-		if (!is_type_integer(type) && !is_type_boolean(type) && !is_type_bit_set(type)) {
+		if (!is_type_integer(ct) && !is_type_boolean(ct) && !is_type_bit_set(ct)) {
 			error(op, "Operator '%.*s' is only allowed with integers, booleans, or bit sets", LIT(op.string));
 			return false;
 		}
@@ -1215,7 +1216,7 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 
 	case Token_AndNot:
 	case Token_AndNotEq:
-		if (!is_type_integer(type) && !is_type_bit_set(type)) {
+		if (!is_type_integer(ct) && !is_type_bit_set(ct)) {
 			error(op, "Operator '%.*s' is only allowed with integers and bit sets", LIT(op.string));
 			return false;
 		}
@@ -3746,18 +3747,16 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->mode = Addressing_Value;
 			operand->type = type;
 
-			convert_to_typed(c, &x, y.type);
-			if (x.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &y, x.type);
-			if (y.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &x, z.type);
-			if (x.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &z, x.type);
-			if (z.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &y, z.type);
-			if (y.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &z, y.type);
-			if (z.mode == Addressing_Invalid) { return false; }
+			Operand *ops[3] = {&x, &y, &z};
+			for (isize i = 0; i < 3; i++) {
+				Operand *a = ops[i];
+				for (isize j = 0; j < 3; j++) {
+					if (i == j) continue;
+					Operand *b = ops[j];
+					convert_to_typed(c, a, b->type);
+					if (a->mode == Addressing_Invalid) { return false; }
+				}
+			}
 
 			if (!are_types_identical(x.type, y.type) || !are_types_identical(x.type, z.type)) {
 				gbString type_x = type_to_string(x.type);
