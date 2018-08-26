@@ -603,7 +603,6 @@ i64 assign_score_function(i64 distance, bool is_variadic=false) {
 	i64 const c = 3*MAXIMUM_TYPE_DISTANCE*MAXIMUM_TYPE_DISTANCE + 1;
 
 	// TODO(bill): A decent score function
-	GB_ASSERT(distance <= MAXIMUM_TYPE_DISTANCE);
 	i64 d = distance*distance; // x^2
 	if (is_variadic && d >= 0) {
 		d += distance + 1; // x^2 + x + 1
