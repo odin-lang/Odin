@@ -1782,7 +1782,7 @@ i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 		}
 		return 0;
 	}
-	Type *type = base_type(o->type);
+	Type *type = core_type(o->type);
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		if (o->value.kind == ExactValue_Integer) {
 			BigInt count = o->value.value_integer;
