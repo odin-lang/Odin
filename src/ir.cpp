@@ -5128,6 +5128,9 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 							// args[i] =
 							GB_PANIC("TODO ParameterValue_Location");
 							break;
+						case ParameterValue_Value:
+							args[i] = ir_build_expr(proc, e->Variable.param_value.ast_value);
+							break;
 						}
 					} else {
 						args[i] = ir_emit_conv(proc, args[i], e->type);
@@ -5221,6 +5224,9 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					case ParameterValue_Location:
 						args[arg_index++] = ir_emit_source_code_location(proc, proc_name, pos);
 						break;
+					case ParameterValue_Value:
+						args[arg_index++] = ir_build_expr(proc, e->Variable.param_value.ast_value);
+						break;
 					}
 				}
 			}
@@ -5311,6 +5317,9 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					break;
 				case ParameterValue_Location:
 					args[i] = ir_emit_source_code_location(proc, proc_name, pos);
+					break;
+				case ParameterValue_Value:
+					args[i] = ir_build_expr(proc, e->Variable.param_value.ast_value);
 					break;
 				}
 			}
