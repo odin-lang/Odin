@@ -75,7 +75,7 @@ main :: proc() {
 - Windows
 	* x86-64
 	* MSVC 2010 installed (C++11 support)
-	* [LLVM binaries](https://github.com/gingerBill/Odin/releases/tag/llvm-4.0-windows) for `opt.exe` and `llc.exe`
+	* [LLVM binaries](https://github.com/odin-lang/Odin/releases/tag/llvm-windows) for `opt.exe`, `llc.exe`, and `lld-link.exe`
 	* Requires MSVC's link.exe as the linker
 		* run `vcvarsall.bat` to setup the path
 
