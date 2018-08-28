@@ -23,56 +23,46 @@ Allocator :: struct {
 
 
 
-alloc_with_allocator :: inline proc(a: Allocator, size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
+alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
 	if size == 0 do return nil;
-	return a.procedure(a.data, Allocator_Mode.Alloc, size, alignment, nil, 0, 0, loc);
-}
-alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
-	return alloc_with_allocator(context.allocator, size, alignment, loc);
+	return allocator.procedure(allocator.data, Allocator_Mode.Alloc, size, alignment, nil, 0, 0, loc);
 }
 
-free_ptr_with_allocator :: inline proc(a: Allocator, ptr: rawptr, loc := #caller_location) {
+free :: inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) {
 	if ptr == nil do return;
-	if a.procedure == nil do return;
-	a.procedure(a.data, Allocator_Mode.Free, 0, 0, ptr, 0, 0, loc);
-}
-free :: inline proc(ptr: rawptr, loc := #caller_location) do free_ptr_with_allocator(context.allocator, ptr, loc);
-
-free_all_with_allocator :: inline proc(a: Allocator, loc := #caller_location) {
-	a.procedure(a.data, Allocator_Mode.Free_All, 0, 0, nil, 0, 0, loc);
-}
-free_all :: inline proc(loc := #caller_location) {
-	free_all_with_allocator(context.allocator, loc);
+	if allocator.procedure == nil do return;
+	allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, 0, 0, loc);
 }
 
-resize_with_allocator :: inline proc(a: Allocator, ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
+free_all :: inline proc(allocator := context.allocator, loc := #caller_location) {
+	allocator.procedure(allocator.data, Allocator_Mode.Free_All, 0, 0, nil, 0, 0, loc);
+}
+
+resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
 	if new_size == 0 {
-		free_ptr_with_allocator(a, ptr, loc);
+		free(ptr, allocator, loc);
 		return nil;
 	}
-	return a.procedure(a.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, 0, loc);
-}
-resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> rawptr {
-	return resize_with_allocator(context.allocator, ptr, old_size, new_size, alignment, loc);
+	return allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, 0, loc);
 }
 
 
-delete_string :: proc(str: string, loc := #caller_location) {
-	free(raw_data(str), loc);
+delete_string :: proc(str: string, allocator := context.allocator, loc := #caller_location) {
+	free(raw_data(str), allocator, loc);
 }
-delete_cstring :: proc(str: cstring, loc := #caller_location) {
-	free((^byte)(str), loc);
+delete_cstring :: proc(str: cstring, allocator := context.allocator, loc := #caller_location) {
+	free((^byte)(str), allocator, loc);
 }
-delete_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) {
-	free(raw_data(array), loc);
+delete_dynamic_array :: proc(array: $T/[dynamic]$E, allocator := context.allocator, loc := #caller_location) {
+	free(raw_data(array), allocator, loc);
 }
-delete_slice :: proc(array: $T/[]$E, loc := #caller_location) {
-	free(raw_data(array), loc);
+delete_slice :: proc(array: $T/[]$E, allocator := context.allocator, loc := #caller_location) {
+	free(raw_data(array), allocator, loc);
 }
-delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
+delete_map :: proc(m: $T/map[$K]$V, allocator := context.allocator, loc := #caller_location) {
 	raw := transmute(Raw_Map)m;
-	delete_dynamic_array(raw.hashes, loc);
-	free(raw.entries.data, loc);
+	delete_dynamic_array(raw.hashes, allocator, loc);
+	free(raw.entries.data, allocator, loc);
 }
 
 
@@ -85,50 +75,43 @@ delete :: proc[
 ];
 
 
-new :: inline proc(T: type, loc := #caller_location) -> ^T {
-	ptr := (^T)(alloc(size_of(T), align_of(T), loc));
+new :: inline proc(T: type, allocator := context.allocator, loc := #caller_location) -> ^T {
+	ptr := (^T)(alloc(size_of(T), align_of(T), allocator, loc));
 	if ptr != nil do ptr^ = T{};
 	return ptr;
 }
-new_clone :: inline proc(data: $T, loc := #caller_location) -> ^T {
-	ptr := (^T)(alloc(size_of(T), align_of(T), loc));
-	if ptr != nil do ptr^ = data;
-	return ptr;
-}
-
-new_with_allocator :: inline proc(a: Allocator, T: type, loc := #caller_location) -> ^T {
-	ptr := (^T)(alloc_with_allocator(a, size_of(T), align_of(T), loc));
-	if ptr != nil do ptr^ = T{};
-	return ptr;
-}
-
-new_clone_with_allocator :: inline proc(a: Allocator, data: $T, loc := #caller_location) -> ^T {
-	ptr := (^T)(alloc_with_allocator(a, size_of(T), align_of(T), loc));
+new_clone :: inline proc(data: $T, allocator := context.allocator, loc := #caller_location) -> ^T {
+	ptr := (^T)(alloc(size_of(T), align_of(T), allocator, loc));
 	if ptr != nil do ptr^ = data;
 	return ptr;
 }
 
 
-make_slice :: proc(T: type/[]$E, auto_cast len: int, loc := #caller_location) -> T {
+make_slice :: proc(T: type/[]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
 	runtime.make_slice_error_loc(loc, len);
-	data := alloc(size_of(E)*len, align_of(E));
+	data := alloc(size_of(E)*len, align_of(E), allocator, loc);
 	s := Raw_Slice{data, len};
 	return transmute(T)s;
 }
-make_dynamic_array :: proc(T: type/[dynamic]$E, loc := #caller_location) -> T {
-	return make_dynamic_array_len_cap(T, 0, 16, loc);
+make_dynamic_array :: proc(T: type/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> T {
+	return make_dynamic_array_len_cap(T, 0, 16, allocator, loc);
 }
-make_dynamic_array_len :: proc(T: type/[dynamic]$E, auto_cast len: int, loc := #caller_location) -> T {
-	return make_dynamic_array_len_cap(T, len, len, loc);
+make_dynamic_array_len :: proc(T: type/[dynamic]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
+	return make_dynamic_array_len_cap(T, len, len, allocator, loc);
 }
-make_dynamic_array_len_cap :: proc(T: type/[dynamic]$E, auto_cast len: int, auto_cast cap: int, loc := #caller_location) -> T {
+make_dynamic_array_len_cap :: proc(T: type/[dynamic]$E, auto_cast len: int, auto_cast cap: int, allocator := context.allocator, loc := #caller_location) -> T {
 	runtime.make_dynamic_array_error_loc(loc, len, cap);
-	data := alloc(size_of(E)*cap, align_of(E));
-	s := Raw_Dynamic_Array{data, len, cap, context.allocator};
+	data := alloc(size_of(E)*cap, align_of(E), allocator, loc);
+	s := Raw_Dynamic_Array{data, len, cap, allocator};
 	return transmute(T)s;
 }
-make_map :: proc(T: type/map[$K]$E, auto_cast cap: int = 16, loc := #caller_location) -> T {
+make_map :: proc(T: type/map[$K]$E, auto_cast cap: int = 16, allocator := context.allocator, loc := #caller_location) -> T {
 	runtime.make_map_expr_error_loc(loc, cap);
+
+	c := context;
+	c.allocator = allocator;
+	context = c;
+
 	m: T;
 	reserve_map(&m, cap);
 	return m;
@@ -144,21 +127,21 @@ make :: proc[
 
 
 
-default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: int, loc := #caller_location) -> rawptr {
-	if old_memory == nil do return alloc(new_size, alignment, loc);
+default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: int, allocator := context.allocator, loc := #caller_location) -> rawptr {
+	if old_memory == nil do return alloc(new_size, alignment, allocator, loc);
 
 	if new_size == 0 {
-		free(old_memory, loc);
+		free(old_memory, allocator, loc);
 		return nil;
 	}
 
 	if new_size == old_size do return old_memory;
 
-	new_memory := alloc(new_size, alignment, loc);
+	new_memory := alloc(new_size, alignment, allocator, loc);
 	if new_memory == nil do return nil;
 
 	copy(new_memory, old_memory, min(old_size, new_size));;
-	free(old_memory, loc);
+	free(old_memory, allocator, loc);
 	return new_memory;
 }
 
@@ -322,7 +305,7 @@ pool_reset :: proc(using pool: ^Pool) {
 	clear(&used_blocks);
 
 	for a in out_band_allocations {
-		free_ptr_with_allocator(block_allocator, a);
+		free(a, block_allocator);
 	}
 	clear(&out_band_allocations);
 }
@@ -331,7 +314,7 @@ pool_free_all :: proc(using pool: ^Pool) {
 	pool_reset(pool);
 
 	for block in unused_blocks {
-		free_ptr_with_allocator(block_allocator, block);
+		free(block, block_allocator);
 	}
 	clear(&unused_blocks);
 }

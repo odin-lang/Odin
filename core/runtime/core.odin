@@ -748,8 +748,8 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 
 		if __dynamic_map_full(new_header) do __dynamic_map_grow(new_header, loc);
 	}
-	mem.free_ptr_with_allocator(header_hashes.allocator, header_hashes.data, loc);
-	mem.free_ptr_with_allocator(header.m.entries.allocator, header.m.entries.data, loc);
+	free(header_hashes.data,    header_hashes.allocator,    loc);
+	free(header.m.entries.data, header.m.entries.allocator, loc);
 	header.m^ = nm;
 }
 
