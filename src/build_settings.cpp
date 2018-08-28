@@ -86,6 +86,7 @@ struct BuildContext {
 	bool   no_bounds_check;
 	bool   no_output_files;
 	bool   no_crt;
+	bool   use_lld;
 
 	gbAffinity affinity;
 	isize      thread_count;
