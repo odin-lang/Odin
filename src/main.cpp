@@ -213,6 +213,7 @@ enum BuildFlagKind {
 	BuildFlag_CrossLibDir,
 	BuildFlag_NoBoundsCheck,
 	BuildFlag_NoCRT,
+	BuildFlag_UseLLD,
 
 	BuildFlag_COUNT,
 };
@@ -253,7 +254,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_CrossCompile,      str_lit("cross-compile"),   BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_CrossLibDir,       str_lit("cross-lib-dir"),   BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"), BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),          BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),             BuildFlagParam_None);
 
 	GB_ASSERT(args.count >= 3);
 	Array<String> flag_args = array_slice(args, 3, args.count);
@@ -557,6 +559,10 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoCRT:
 							build_context.no_crt = true;
 							break;
+
+						case BuildFlag_UseLLD:
+							build_context.use_lld = true;
+							break;
 						}
 					}
 
@@ -684,7 +690,7 @@ i32 exec_llvm_llc(String output_base) {
 #if defined(GB_SYSTEM_WINDOWS)
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	return system_exec_command_line_app("llvm-llc", false,
-		"\"%.*sbin/llc\" \"%.*s.bc\" -filetype=obj -O%d "
+		"\"%.*sbin\\llc\" \"%.*s.bc\" -filetype=obj -O%d "
 		"-o \"%.*s.obj\" "
 		"%.*s "
 		"",
@@ -899,45 +905,58 @@ int main(int arg_count, char **arg_ptr) {
 			link_settings = gb_string_append_fmt(link_settings, "/DLL");
 		} else {
 			link_settings = gb_string_append_fmt(link_settings, "/ENTRY:mainCRTStartup");
-			if (build_context.no_crt) {
-				link_settings = gb_string_append_fmt(link_settings, " /nodefaultlib");
-			}
+		}
+		if (build_context.no_crt) {
+			link_settings = gb_string_append_fmt(link_settings, " /nodefaultlib");
+		} else {
+			link_settings = gb_string_append_fmt(link_settings, " /defaultlib:libcmt");
 		}
 
 		if (ir_gen.module.generate_debug_info) {
 			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
 		}
+		if (!build_context.use_lld) { // msvc
+			if (build_context.has_resource) {
+				exit_code = system_exec_command_line_app("msvc-link", true,
+					"rc /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
+					LIT(output_base),
+					LIT(build_context.resource_filepath)
+				);
 
-		if(build_context.has_resource) {
-			exit_code = system_exec_command_line_app("msvc-link", true,
-                "rc /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
-                LIT(output_base),
-                LIT(build_context.resource_filepath)
-            );
+	            if (exit_code != 0) {
+					return exit_code;
+				}
 
-            if (exit_code != 0) {
-				return exit_code;
+				exit_code = system_exec_command_line_app("msvc-link", true,
+					"link \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
+					"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
+					" %.*s "
+					" %s "
+					"",
+					LIT(output_base), LIT(output_base), LIT(output_base), output_ext,
+					lib_str, LIT(build_context.link_flags),
+					link_settings
+				);
+			} else {
+				exit_code = system_exec_command_line_app("msvc-link", true,
+					"link \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
+					"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
+					" %.*s "
+					" %s "
+					"",
+					LIT(output_base), LIT(output_base), output_ext,
+					lib_str, LIT(build_context.link_flags),
+					link_settings
+				);
 			}
-
+		} else { // lld
 			exit_code = system_exec_command_line_app("msvc-link", true,
-				"link \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
-				"/defaultlib:libcmt "
+				"\"%.*s\\bin\\lld-link\" \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 				"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 				" %.*s "
 				" %s "
 				"",
-				LIT(output_base), LIT(output_base), LIT(output_base), output_ext,
-				lib_str, LIT(build_context.link_flags),
-				link_settings
-			);
-		} else {
-			exit_code = system_exec_command_line_app("msvc-link", true,
-				"link \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
-				"/defaultlib:libcmt "
-				"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
-				" %.*s "
-				" %s "
-				"",
+				LIT(build_context.ODIN_ROOT),
 				LIT(output_base), LIT(output_base), output_ext,
 				lib_str, LIT(build_context.link_flags),
 				link_settings
