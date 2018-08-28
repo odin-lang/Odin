@@ -255,7 +255,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		(^Raw_Slice)(&arena.memory).len = 0;
 
 	case Resize:
-		return default_resize_align(old_memory, old_size, size, alignment);
+		return default_resize_align(old_memory, old_size, size, alignment, arena_allocator(arena));
 	}
 
 	return nil;
