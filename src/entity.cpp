@@ -62,11 +62,15 @@ enum ParameterValueKind {
 	ParameterValue_Constant,
 	ParameterValue_Nil,
 	ParameterValue_Location,
+	ParameterValue_Value,
 };
 
 struct ParameterValue {
 	ParameterValueKind kind;
-	ExactValue value;
+	union {
+		ExactValue value;
+		Ast *ast_value;
+	};
 };
 
 

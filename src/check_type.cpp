@@ -1038,7 +1038,8 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 				param_value.value = exact_value_procedure(expr);
 			} else {
 				Entity *e = nullptr;
-				if (o.mode == Addressing_Value && is_type_proc(o.type)) {
+				// if (o.mode == Addressing_Value && is_type_proc(o.type)) {
+				if (o.mode == Addressing_Value || o.mode == Addressing_Variable) {
 					Operand x = {};
 					if (expr->kind == Ast_Ident) {
 						e = check_ident(ctx, &x, expr, nullptr, nullptr, false);
@@ -1047,12 +1048,21 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 					}
 				}
 
-				if (e != nullptr && e->kind == Entity_Procedure) {
-					param_value.kind = ParameterValue_Constant;
-					param_value.value = exact_value_procedure(e->identifier);
-					add_entity_use(ctx, e->identifier, e);
+				if (e != nullptr) {
+					if (e->kind == Entity_Procedure) {
+						param_value.kind = ParameterValue_Constant;
+						param_value.value = exact_value_procedure(e->identifier);
+						add_entity_use(ctx, e->identifier, e);
+					} else {
+						param_value.kind = ParameterValue_Value;
+						param_value.ast_value = expr;
+						add_entity_use(ctx, e->identifier, e);
+					}
+				} else if (allow_caller_location && o.mode == Addressing_Context) {
+					param_value.kind = ParameterValue_Value;
+					param_value.ast_value = expr;
 				} else {
-					error(expr, "Default parameter must be a constant %d", o.mode);
+					error(expr, "Default parameter must be a constant");
 				}
 			}
 		} else {
