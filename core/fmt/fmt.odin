@@ -159,6 +159,24 @@ aprintf :: proc(fmt: string, args: ..any) -> string {
 }
 
 
+// tprint* procedures return a string that was allocated with the current context's temporary allocator
+tprint :: proc(args: ..any) -> string {
+	buf := String_Buffer(make([dynamic]byte, context.temp_allocator));
+	sbprint(&buf, ..args);
+	return to_string(buf);
+}
+tprintln :: proc(args: ..any) -> string {
+	buf := String_Buffer(make([dynamic]byte, context.temp_allocator));
+	sbprintln(&buf, ..args);
+	return to_string(buf);
+}
+tprintf :: proc(fmt: string, args: ..any) -> string {
+	buf := String_Buffer(make([dynamic]byte, context.temp_allocator));
+	sbprintf(&buf, fmt, ..args);
+	return to_string(buf);
+}
+
+
 // bprint* procedures return a string using a buffer from an array
 bprint :: proc(buf: []byte, args: ..any) -> string {
 	sb := string_buffer_from_slice(buf[0:len(buf)]);

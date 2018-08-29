@@ -159,6 +159,84 @@ nil_allocator :: proc() -> Allocator {
 	};
 }
 
+Scratch_Allocator :: struct {
+	data:     []byte,
+	curr_offset: int,
+	prev_offset: int,
+	backup_allocator: Allocator,
+}
+
+scratch_allocator_init :: proc(scratch: ^Scratch_Allocator, data: []byte, backup_allocator := context.allocator) {
+	scratch.data = data;
+	scratch.curr_offset = 0;
+	scratch.prev_offset = 0;
+	scratch.backup_allocator = backup_allocator;
+}
+
+scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
+                               size, alignment: int,
+                               old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+
+	scratch := (^Scratch_Allocator)(allocator_data);
+
+	switch mode {
+	case Allocator_Mode.Alloc:
+		switch {
+		case scratch.curr_offset+size <= len(scratch.data):
+			offset := align_forward_uintptr(uintptr(scratch.curr_offset), uintptr(alignment));
+			ptr := &scratch.data[offset];
+			zero(ptr, size);
+			scratch.prev_offset = int(offset);
+			scratch.curr_offset = int(offset) + size;
+			return ptr;
+		case size <= len(scratch.data):
+			offset := align_forward_uintptr(uintptr(0), uintptr(alignment));
+			ptr := &scratch.data[offset];
+			zero(ptr, size);
+			scratch.prev_offset = int(offset);
+			scratch.curr_offset = int(offset) + size;
+			return ptr;
+		}
+		// TODO(bill): Should leaks be notified about? Should probably use a logging system that is built into the context system
+		a := scratch.backup_allocator;
+		if a.procedure == nil {
+			a = context.allocator;
+		}
+		return alloc(size, alignment, a, loc);
+
+	case Allocator_Mode.Free:
+		last_ptr := rawptr(&scratch.data[scratch.prev_offset]);
+		if old_memory == last_ptr {
+			size := scratch.curr_offset - scratch.prev_offset;
+			scratch.curr_offset = scratch.prev_offset;
+			zero(last_ptr, size);
+			return nil;
+		}
+		// NOTE(bill): It's scratch memory, don't worry about freeing
+
+	case Allocator_Mode.Free_All:
+		scratch.curr_offset = 0;
+		scratch.prev_offset = 0;
+
+	case Allocator_Mode.Resize:
+		last_ptr := rawptr(&scratch.data[scratch.prev_offset]);
+		if old_memory == last_ptr && len(scratch.data)-scratch.prev_offset >= size {
+			scratch.curr_offset = scratch.prev_offset+size;
+			return old_memory;
+		}
+		return scratch_allocator_proc(allocator_data, Allocator_Mode.Alloc, size, alignment, old_memory, old_size, flags, loc);
+	}
+
+	return nil;
+}
+
+scratch_allocator :: proc(scratch: ^Scratch_Allocator) -> Allocator {
+	return Allocator{
+		procedure = scratch_allocator_proc,
+		data = scratch,
+	};
+}
+
 
 
 
