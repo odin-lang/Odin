@@ -1644,6 +1644,14 @@ irValue *ir_address_from_load_or_generate_local(irProcedure *proc, irValue *val)
 irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index);
 
 
+irValue *ir_get_package_value(irModule *m, String package_name, String entity_name) {
+	AstPackage *rt_pkg = get_core_package(m->info, package_name);
+	Entity *e = scope_lookup_current(rt_pkg->scope, entity_name);
+	irValue **found = map_get(&m->values, hash_entity(e));
+	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(e->token.string));
+	return *found;
+}
+
 irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 	if (proc->context_stack.count > 0) {
 		return proc->context_stack[proc->context_stack.count-1].value;
@@ -1662,14 +1670,12 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 #if 1
 	Array<irValue *> args = {};
 	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 0), ir_emit_package_call(proc, "os", "heap_allocator", args));
+	// 1 will be handled later
 	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 2), ir_emit_package_call(proc, "os", "current_thread_id", args));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 3), ir_get_package_value(proc->module, str_lit("runtime"), str_lit("default_assertion_failure_proc")));
 
 	array_init(&args, heap_allocator(), 1);
-	AstPackage *rt_pkg = get_core_package(proc->module->info, str_lit("runtime"));
-	Entity *e = scope_lookup_current(rt_pkg->scope, str_lit("global_scratch_allocator_data"));
-	irValue **found = map_get(&proc->module->values, hash_entity(e));
-	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(e->token.string));
-	args[0] = *found;
+	args[0] = ir_get_package_value(proc->module, str_lit("runtime"), str_lit("global_scratch_allocator_data"));
 	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 1), ir_emit_package_call(proc, "mem", "scratch_allocator", args));
 #else
 	ir_emit_init_context(proc, c);

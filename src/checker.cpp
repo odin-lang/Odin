@@ -1306,6 +1306,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 	String required_runtime_entities[] = {
 		str_lit("__init_context"),
+		str_lit("default_assertion_failure_proc"),
 
 		str_lit("args__"),
 		str_lit("type_table"),
