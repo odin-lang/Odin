@@ -164,6 +164,7 @@ Scratch_Allocator :: struct {
 	curr_offset: int,
 	prev_offset: int,
 	backup_allocator: Allocator,
+	leaked_allocations: [dynamic]rawptr,
 }
 
 scratch_allocator_init :: proc(scratch: ^Scratch_Allocator, data: []byte, backup_allocator := context.allocator) {
@@ -178,6 +179,11 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
 
 	scratch := (^Scratch_Allocator)(allocator_data);
+
+	if scratch.data == nil {
+		DEFAULT_SCRATCH_BACKING_SIZE :: 1<<22;
+		scratch_allocator_init(scratch, make([]byte, 1<<22));
+	}
 
 	switch mode {
 	case Allocator_Mode.Alloc:
@@ -201,8 +207,16 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		a := scratch.backup_allocator;
 		if a.procedure == nil {
 			a = context.allocator;
+			scratch.backup_allocator = a;
 		}
-		return alloc(size, alignment, a, loc);
+
+		ptr := alloc(size, alignment, a, loc);
+		if scratch.leaked_allocations == nil {
+			scratch.leaked_allocations = make([dynamic]rawptr, a);
+		}
+		append(&scratch.leaked_allocations, ptr);
+
+		return ptr;
 
 	case Allocator_Mode.Free:
 		last_ptr := rawptr(&scratch.data[scratch.prev_offset]);
@@ -217,6 +231,10 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	case Allocator_Mode.Free_All:
 		scratch.curr_offset = 0;
 		scratch.prev_offset = 0;
+		for ptr in scratch.leaked_allocations {
+			free(ptr, scratch.backup_allocator);
+		}
+		clear(&scratch.leaked_allocations);
 
 	case Allocator_Mode.Resize:
 		last_ptr := rawptr(&scratch.data[scratch.prev_offset]);
