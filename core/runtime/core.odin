@@ -184,7 +184,8 @@ Source_Code_Location :: struct {
 }
 
 Context :: struct {
-	allocator:  mem.Allocator,
+	allocator:      mem.Allocator,
+	temp_allocator: mem.Allocator,
 	thread_id:  int,
 
 	user_data:  any,
@@ -193,6 +194,8 @@ Context :: struct {
 	parent:     ^Context,
 	derived:    any, // May be used for derived data types
 }
+
+global_scratch_allocator_data: mem.Scratch_Allocator;
 
 
 
@@ -315,7 +318,13 @@ __init_context :: proc "contextless" (c: ^Context) {
 	if c == nil do return;
 
 	c.allocator = os.heap_allocator();
+	c.temp_allocator = mem.scratch_allocator(&global_scratch_allocator_data);
 	c.thread_id = os.current_thread_id();
+}
+
+@(builtin)
+init_global_temporary_allocator :: proc(data: []byte, backup_allocator := context.allocator) {
+	mem.scratch_allocator_init(&global_scratch_allocator_data, data, backup_allocator);
 }
 
 

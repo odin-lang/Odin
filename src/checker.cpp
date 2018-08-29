@@ -1309,6 +1309,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 		str_lit("args__"),
 		str_lit("type_table"),
+		str_lit("global_scratch_allocator"),
 
 		str_lit("Type_Info"),
 		str_lit("Source_Code_Location"),

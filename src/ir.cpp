@@ -1658,11 +1658,22 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 	ir_push_context_onto_stack(proc, c);
 	ir_emit_store(proc, c, ir_emit_load(proc, proc->module->global_default_context));
 
-	irValue *ep = ir_emit_struct_ep(proc, c, 0);
-	Array<irValue *> args = {};
-	irValue *v = ir_emit_package_call(proc, "os", "heap_allocator", args);
-	ir_emit_store(proc, ep, v);
 
+#if 1
+	Array<irValue *> args = {};
+	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 0), ir_emit_package_call(proc, "os", "heap_allocator", args));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 2), ir_emit_package_call(proc, "os", "current_thread_id", args));
+
+	array_init(&args, heap_allocator(), 1);
+	AstPackage *rt_pkg = get_core_package(proc->module->info, str_lit("runtime"));
+	Entity *e = scope_lookup_current(rt_pkg->scope, str_lit("global_scratch_allocator_data"));
+	irValue **found = map_get(&proc->module->values, hash_entity(e));
+	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(e->token.string));
+	args[0] = *found;
+	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 1), ir_emit_package_call(proc, "mem", "scratch_allocator", args));
+#else
+	ir_emit_init_context(proc, c);
+#endif
 	return c;
 }
 

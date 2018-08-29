@@ -10,8 +10,9 @@ foreign _ {
 swap :: proc[swap16, swap32, swap64];
 
 
-set :: proc "contextless" (data: rawptr, value: i32, len: int) -> rawptr {
+set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	if data == nil do return nil;
+	if len < 0 do return data;
 	foreign _ {
 		when size_of(rawptr) == 8 {
 			@(link_name="llvm.memset.p0i8.i64")
@@ -138,6 +139,16 @@ align_forward :: proc(ptr: rawptr, align: uintptr) -> rawptr {
 	return rawptr(p);
 }
 
+align_forward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
+	assert(is_power_of_two(align));
+
+	a := uintptr(align);
+	p := uintptr(ptr);
+	modulo := p & (a-1);
+	if modulo != 0 do p += a - modulo;
+	return uintptr(p);
+}
+
 
 
 AllocationHeader :: struct {size: int};
@@ -181,7 +192,7 @@ Arena :: struct {
 	temp_count: int,
 }
 
-ArenaTempMemory :: struct {
+Arena_Temp_Memory :: struct {
 	arena:          ^Arena,
 	original_count: int,
 }
@@ -249,7 +260,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 	case Free:
 		// NOTE(bill): Free all at once
-		// Use ArenaTempMemory if you want to free a block
+		// Use Arena_Temp_Memory if you want to free a block
 
 	case Free_All:
 		(^Raw_Slice)(&arena.memory).len = 0;
@@ -261,15 +272,15 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	return nil;
 }
 
-begin_arena_temp_memory :: proc(a: ^Arena) -> ArenaTempMemory {
-	tmp: ArenaTempMemory;
+begin_arena_temp_memory :: proc(a: ^Arena) -> Arena_Temp_Memory {
+	tmp: Arena_Temp_Memory;
 	tmp.arena = a;
 	tmp.original_count = len(a.memory);
 	a.temp_count += 1;
 	return tmp;
 }
 
-end_arena_temp_memory :: proc(using tmp: ArenaTempMemory) {
+end_arena_temp_memory :: proc(using tmp: Arena_Temp_Memory) {
 	assert(len(arena.memory) >= original_count);
 	assert(arena.temp_count > 0);
 	(^Raw_Dynamic_Array)(&arena.memory).len = original_count;

@@ -489,12 +489,15 @@ threading_example :: proc() {
 	when os.OS == "windows" {
 		fmt.println("# threading_example");
 
-		unordered_remove :: proc(array: ^[dynamic]$T, index: int, loc := #caller_location) {
+		unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
 			runtime.bounds_check_error_loc(loc, index, len(array));
-			array[index] = array[len(array)-1];
+			n := len(array)-1;
+			if index != n {
+				array[index] = array[n];
+			}
 			pop(array);
 		}
-		ordered_remove :: proc(array: ^[dynamic]$T, index: int, loc := #caller_location) {
+		ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
 			runtime.bounds_check_error_loc(loc, index, len(array));
 			copy(array[index:], array[index+1:]);
 			pop(array);
