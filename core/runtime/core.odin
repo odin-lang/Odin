@@ -183,10 +183,14 @@ Source_Code_Location :: struct {
 	procedure:    string,
 }
 
+Assertion_Failure_Proc :: #type proc(prefix, message: string, loc: Source_Code_Location);
+
 Context :: struct {
 	allocator:      mem.Allocator,
 	temp_allocator: mem.Allocator,
 	thread_id:  int,
+
+	assertion_failure_proc:  Assertion_Failure_Proc,
 
 	user_data:  any,
 	user_index: int,
@@ -320,11 +324,25 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.allocator = os.heap_allocator();
 	c.temp_allocator = mem.scratch_allocator(&global_scratch_allocator_data);
 	c.thread_id = os.current_thread_id();
+	c.assertion_failure_proc = default_assertion_failure_proc;
 }
 
 @(builtin)
 init_global_temporary_allocator :: proc(data: []byte, backup_allocator := context.allocator) {
 	mem.scratch_allocator_init(&global_scratch_allocator_data, data, backup_allocator);
+}
+
+default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) {
+	fd := os.stderr;
+	__print_caller_location(fd, loc);
+	os.write_string(fd, " ");
+	os.write_string(fd, prefix);
+	if len(message) > 0 {
+		os.write_string(fd, ": ");
+		os.write_string(fd, message);
+	}
+	os.write_byte(fd, '\n');
+	debug_trap();
 }
 
 
@@ -535,32 +553,16 @@ excl_bit_set :: inline proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
 
 
 @(builtin)
-assert :: proc "contextless" (condition: bool, message := "", using loc := #caller_location) -> bool {
+assert :: proc "contextless" (condition: bool, message := "", loc := #caller_location) -> bool {
 	if !condition {
-		fd := os.stderr;
-		__print_caller_location(fd, loc);
-		os.write_string(fd, " Runtime assertion");
-		if len(message) > 0 {
-			os.write_string(fd, ": ");
-			os.write_string(fd, message);
-		}
-		os.write_byte(fd, '\n');
-		debug_trap();
+		context.assertion_failure_proc("Runtime assertion", message, loc);
 	}
 	return condition;
 }
 
 @(builtin)
-panic :: proc "contextless" (message := "", using loc := #caller_location) {
-	fd := os.stderr;
-	__print_caller_location(fd, loc);
-	os.write_string(fd, " Panic");
-	if len(message) > 0 {
-		os.write_string(fd, ": ");
-		os.write_string(fd, message);
-	}
-	os.write_byte(fd, '\n');
-	debug_trap();
+panic :: proc "contextless" (message := "", loc := #caller_location) {
+	context.assertion_failure_proc("Panic", message, loc);
 }
 
 
