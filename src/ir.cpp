@@ -2768,6 +2768,7 @@ irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index) {
 
 irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 	gbAllocator a = ir_allocator();
+	GB_ASSERT(is_type_pointer(ir_type(s)));
 	Type *t = base_type(type_deref(ir_type(s)));
 	Type *result_type = nullptr;
 
@@ -2808,18 +2809,18 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		case 2: result_type = t_int_ptr;       break;
 		case 3: result_type = t_allocator_ptr; break;
 		}
-	} /* else if (is_type_map(t)) {
+	} else if (is_type_map(t)) {
 		init_map_internal_types(t);
 		Type *itp = alloc_type_pointer(t->Map.internal_type);
-		s = ir_emit_load(proc, ir_emit_transmute(proc, s, itp));
+		s = ir_emit_transmute(proc, s, itp);
 
-		Type *gst = t->Map.generated_struct_type;
+		Type *gst = t->Map.internal_type;
 		GB_ASSERT(gst->kind == Type_Struct);
 		switch (index) {
 		case 0: result_type = alloc_type_pointer(gst->Struct.fields[0]->type); break;
 		case 1: result_type = alloc_type_pointer(gst->Struct.fields[1]->type); break;
 		}
-	} */else {
+	} else {
 		GB_PANIC("TODO(bill): struct_gep type: %s, %d", type_to_string(ir_type(s)), index);
 	}
 
@@ -2887,15 +2888,15 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 		}
 		break;
 
-	// case Type_Map: {
-	// 	init_map_internal_types(t);
-	// 	Type *gst = t->Map.generated_struct_type;
-	// 	switch (index) {
-	// 	case 0: result_type = gst->Struct.fields[0]->type; break;
-	// 	case 1: result_type = gst->Struct.fields[1]->type; break;
-	// 	}
-	// 	break;
-	// }
+	case Type_Map: {
+		init_map_internal_types(t);
+		Type *gst = t->Map.generated_struct_type;
+		switch (index) {
+		case 0: result_type = gst->Struct.fields[0]->type; break;
+		case 1: result_type = gst->Struct.fields[1]->type; break;
+		}
+		break;
+	}
 
 	default:
 		GB_PANIC("TODO(bill): struct_ev type: %s, %d", type_to_string(ir_type(s)), index);
@@ -2962,12 +2963,7 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 		} else if (type->kind == Type_Array) {
 			e = ir_emit_array_epi(proc, e, index);
 		} else if (type->kind == Type_Map) {
-			e = ir_emit_struct_ep(proc, e, 1);
-			switch (index) {
-			case 0: e = ir_emit_struct_ep(proc, e, 1); break; // count
-			case 1: e = ir_emit_struct_ep(proc, e, 2); break; // capacity
-			case 2: e = ir_emit_struct_ep(proc, e, 3); break; // allocator
-			}
+			e = ir_emit_struct_ep(proc, e, index);
 		} else {
 			GB_PANIC("un-gep-able type %s", type_to_string(type));
 		}

@@ -905,11 +905,14 @@ void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, Dec
 
 	if (e->scope != nullptr) {
 		Scope *scope = e->scope;
-		if ((scope->flags&ScopeFlag_File) && is_entity_kind_exported(e->kind)) {
-			AstPackage *pkg = scope->file->pkg;
-			GB_ASSERT(pkg->scope == scope->parent);
-			GB_ASSERT(c->pkg == pkg);
-			scope = pkg->scope;
+
+		if (scope->flags & ScopeFlag_File) {
+			if (is_entity_kind_exported(e->kind)) {
+				AstPackage *pkg = scope->file->pkg;
+				GB_ASSERT(pkg->scope == scope->parent);
+				GB_ASSERT(c->pkg == pkg);
+				scope = pkg->scope;
+			}
 		}
 		add_entity(c->checker, scope, identifier, e);
 	}

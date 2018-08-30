@@ -217,11 +217,22 @@ Ast *remove_type_alias_clutter(Ast *node) {
 	}
 }
 
+isize total_attribute_count(DeclInfo *decl) {
+	isize attribute_count = 0;
+	for_array(i, decl->attributes) {
+		Ast *attr = decl->attributes[i];
+		if (attr->kind != Ast_Attribute) continue;
+		attribute_count += attr->Attribute.elems.count;
+	}
+	return attribute_count;
+}
+
+
 void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) {
 	GB_ASSERT(e->type == nullptr);
 
 	DeclInfo *decl = decl_info_of_entity(e);
-	if (decl != nullptr && decl->attributes.count > 0) {
+	if (decl != nullptr && total_attribute_count(decl) > 0) {
 		error(decl->attributes[0], "Attributes are not allowed on type declarations");
 	}
 
@@ -289,6 +300,8 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 
 	map_set(&found_scope->elements, hash_string(original_name), new_entity);
 }
+
+
 
 void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init, Type *named_type) {
 	GB_ASSERT(e->type == nullptr);
@@ -380,7 +393,7 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 
 
 	DeclInfo *decl = decl_info_of_entity(e);
-	if (decl != nullptr && decl->attributes.count > 0) {
+	if (decl != nullptr && total_attribute_count(decl) > 0) {
 		error(decl->attributes[0], "Attributes are not allowed on constant value declarations");
 	}
 }

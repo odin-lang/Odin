@@ -45,6 +45,7 @@ enum EntityFlag {
 	EntityFlag_Sret          = 1<<11,
 	EntityFlag_BitFieldValue = 1<<12,
 	EntityFlag_PolyConst     = 1<<13,
+	EntityFlag_NotExported   = 1<<14,
 
 	EntityFlag_CVarArg       = 1<<20,
 	EntityFlag_AutoCast      = 1<<21,
@@ -169,6 +170,10 @@ bool is_entity_exported(Entity *e) {
 	// TODO(bill): Determine the actual exportation rules for imports of entities
 	GB_ASSERT(e != nullptr);
 	if (!is_entity_kind_exported(e->kind)) {
+		return false;
+	}
+
+	if (e->flags & EntityFlag_NotExported) {
 		return false;
 	}
 

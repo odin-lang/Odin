@@ -301,6 +301,7 @@ struct CheckerContext {
 	String         proc_name;
 	DeclInfo *     curr_proc_decl;
 	Type *         curr_proc_sig;
+	bool           in_proc_sig;
 	ForeignContext foreign_context;
 	gbAllocator    allocator;
 

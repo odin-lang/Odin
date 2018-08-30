@@ -27,7 +27,7 @@ Raw_Dynamic_Array :: struct {
 }
 
 Raw_Map :: struct {
-	hashes:  [dynamic]int,
+	hashes:  []int,
 	entries: Raw_Dynamic_Array,
 }
 

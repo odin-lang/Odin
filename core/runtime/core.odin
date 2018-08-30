@@ -410,10 +410,11 @@ make :: proc[
 clear_map :: inline proc "contextless" (m: ^$T/map[$K]$V) {
 	if m == nil do return;
 	raw_map := (^mem.Raw_Map)(m);
-	hashes  := (^mem.Raw_Dynamic_Array)(&raw_map.hashes);
 	entries := (^mem.Raw_Dynamic_Array)(&raw_map.entries);
-	hashes.len  = 0;
 	entries.len = 0;
+	for _, i in raw_map.hashes {
+		raw_map.hashes[i] = -1;
+	}
 }
 
 @(builtin)
@@ -597,6 +598,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	if cap <= array.cap do return true;
 
 	if array.allocator.procedure == nil {
+		os.write_string(os.stdout, "HERE\n");
 		array.allocator = context.allocator;
 	}
 	assert(array.allocator.procedure != nil);
@@ -731,20 +733,47 @@ __default_hash :: proc(data: []byte) -> u64 {
 }
 __default_hash_string :: proc(s: string) -> u64 do return __default_hash(([]byte)(s));
 
+__slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: mem.Allocator, loc := #caller_location) -> bool {
+	array := (^mem.Raw_Slice)(array_);
+
+	if new_count < array.len do return true;
+
+	assert(allocator.procedure != nil);
+
+	old_size := array.len*size_of(T);
+	new_size := new_count*size_of(T);
+
+	new_data := mem.resize(array.data, old_size, new_size, align_of(T), allocator, loc);
+	if new_data == nil do return false;
+	array.data = new_data;
+	array.len = new_count;
+	return true;
+}
+
 __dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller_location) {
-	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap, loc);
-	__dynamic_array_reserve(&m.entries, entry_size, entry_align,    cap, loc);
+	__dynamic_array_reserve(&m.entries, entry_size, entry_align, cap, loc);
+
+	old_len := len(m.hashes);
+	__slice_resize(&m.hashes, cap, m.entries.allocator, loc);
+	for i in old_len..len(m.hashes)-1 do m.hashes[i] = -1;
+
 }
 __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #caller_location) #no_bounds_check {
 	new_header: Map_Header = header;
 	nm := mem.Raw_Map{};
+	nm.entries.allocator = m.entries.allocator;
 	new_header.m = &nm;
 
-	header_hashes := (^mem.Raw_Dynamic_Array)(&header.m.hashes);
-	nm_hashes     := (^mem.Raw_Dynamic_Array)(&nm.hashes);
+	c := context;
+	if m.entries.allocator.procedure != nil {
+		c.allocator = m.entries.allocator;
+	}
+	__print_u64(os.stdout, u64(uintptr(c.allocator.data))); os.write_byte(os.stdout, '\n');
+	__print_u64(os.stdout, u64(uintptr(m.entries.allocator.data))); os.write_byte(os.stdout, '\n');
+	context = c;
 
-	__dynamic_array_resize(nm_hashes, size_of(int), align_of(int), new_count, loc);
 	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len, loc);
+	__slice_resize(&nm.hashes, new_count, m.entries.allocator, loc);
 	for i in 0 .. new_count-1 do nm.hashes[i] = -1;
 
 	for i in 0 .. m.entries.len-1 {
@@ -769,8 +798,8 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 
 		if __dynamic_map_full(new_header) do __dynamic_map_grow(new_header, loc);
 	}
-	free(header_hashes.data,    header_hashes.allocator,    loc);
-	free(header.m.entries.data, header.m.entries.allocator, loc);
+	delete(m.hashes, m.entries.allocator, loc);
+	free(m.entries.data, m.entries.allocator, loc);
 	header.m^ = nm;
 }
 

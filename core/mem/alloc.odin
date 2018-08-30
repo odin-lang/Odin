@@ -39,9 +39,12 @@ free_all :: inline proc(allocator := context.allocator, loc := #caller_location)
 }
 
 resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
+	assert(allocator.procedure != nil);
 	if new_size == 0 {
 		free(ptr, allocator, loc);
 		return nil;
+	} else if ptr == nil {
+		return allocator.procedure(allocator.data, Allocator_Mode.Alloc, new_size, alignment, nil, 0, 0, loc);
 	}
 	return allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, 0, loc);
 }
