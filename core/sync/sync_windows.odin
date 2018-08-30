@@ -20,7 +20,7 @@ current_thread_id :: proc() -> i32 {
 }
 
 semaphore_init :: proc(s: ^Semaphore) {
-	s._handle = win32.create_semaphore_a(nil, 0, 1<<31-1, nil);
+	s._handle = win32.create_semaphore_w(nil, 0, 1<<31-1, nil);
 }
 
 semaphore_destroy :: proc(s: ^Semaphore) {
@@ -63,7 +63,7 @@ mutex_unlock :: proc(m: ^Mutex) {
 
 
 condition_init :: proc(using c: ^Condition) {
-	event = win32.create_event_a(nil, false, false, nil);
+	event = win32.create_event_w(nil, false, false, nil);
 	assert(event != nil);
 }
 
