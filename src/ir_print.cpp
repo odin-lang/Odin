@@ -458,7 +458,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 				ir_print_encoded_local(f, name);
 			} else {
 				// TODO(bill): Is this correct behaviour?!
-				GB_ASSERT_MSG(name.len > 0, "%.*s %p", LIT(t->Named.name), e);
+				// GB_ASSERT_MSG(name.len > 0, "%.*s %p", LIT(t->Named.name), e);
 				// gb_printf_err("%.*s %p\n", LIT(t->Named.name), t->Named.type_name);
 				ir_print_type(f, m, bt);
 			}

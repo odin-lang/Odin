@@ -1839,9 +1839,22 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 		// `Raw_Dynamic_Array` type?
 		GB_ASSERT(t_allocator != nullptr);
 		String allocator_str = str_lit("allocator");
-		gb_local_persist Entity *entity__allocator = alloc_entity_field(nullptr, make_token_ident(allocator_str), t_allocator, false, 0);
+		gb_local_persist Entity *entity__allocator = alloc_entity_field(nullptr, make_token_ident(allocator_str), t_allocator, false, 3);
 
 		if (field_name == allocator_str) {
+			selection_add_index(&sel, 3);
+			sel.entity = entity__allocator;
+			return sel;
+		}
+	} else if (type->kind == Type_Map) {
+		// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
+		// `Raw_Map` type?
+		GB_ASSERT(t_allocator != nullptr);
+		String allocator_str = str_lit("allocator");
+		gb_local_persist Entity *entity__allocator = alloc_entity_field(nullptr, make_token_ident(allocator_str), t_allocator, false, 3);
+
+		if (field_name == allocator_str) {
+			selection_add_index(&sel, 1);
 			selection_add_index(&sel, 3);
 			sel.entity = entity__allocator;
 			return sel;

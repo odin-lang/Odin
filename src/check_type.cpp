@@ -1008,10 +1008,14 @@ Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Oper
 	return t_invalid;
 }
 
-bool is_expr_from_another_parameter(CheckerContext *ctx, Ast *expr) {
+bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
+	if (expr == nullptr) {
+		return false;
+	}
+	expr = unparen_expr(expr);
 	if (expr->kind == Ast_SelectorExpr) {
 		Ast *lhs = expr->SelectorExpr.expr;
-		return is_expr_from_another_parameter(ctx, lhs);
+		return is_expr_from_a_parameter(ctx, lhs);
 	} else if (expr->kind == Ast_Ident) {
 		Operand x= {};
 		Entity *e = check_ident(ctx, &x, expr, nullptr, nullptr, false);
@@ -1025,7 +1029,6 @@ bool is_expr_from_another_parameter(CheckerContext *ctx, Ast *expr) {
 
 ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location) {
 	ParameterValue param_value = {};
-	// gb_printf_err("HERE\n");
 	if (expr == nullptr) {
 		return param_value;
 	}
@@ -1071,7 +1074,7 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 						if (e->flags & EntityFlag_Param) {
 							error(expr, "Default parameter cannot be another parameter");
 						} else {
-							if (is_expr_from_another_parameter(ctx, expr)) {
+							if (is_expr_from_a_parameter(ctx, expr)) {
 								error(expr, "Default parameter cannot be another parameter");
 							} else {
 								param_value.kind = ParameterValue_Value;
@@ -1689,6 +1692,7 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	CheckerContext *c = &c_;
 
 	c->curr_proc_sig = type;
+	c->in_proc_sig = true;
 
 	bool variadic = false;
 	isize variadic_index = -1;
@@ -1898,7 +1902,7 @@ void init_map_internal_types(Type *type) {
 
 	/*
 	struct {
-		hashes:  [dynamic]int;
+		hashes:  []int;
 		entries: [dynamic]EntryType;
 	}
 	*/
@@ -1906,7 +1910,7 @@ void init_map_internal_types(Type *type) {
 	Ast *dummy_node = alloc_ast_node(nullptr, Ast_Invalid);
 	Scope *s = create_scope(builtin_scope, a);
 
-	Type *hashes_type  = alloc_type_dynamic_array(t_int);
+	Type *hashes_type  = alloc_type_slice(t_int);
 	Type *entries_type = alloc_type_dynamic_array(type->Map.entry_type);
 
 

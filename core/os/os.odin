@@ -83,6 +83,9 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		// NOTE(bill): Does nothing
 
 	case Resize:
+		if old_memory == nil {
+			return heap_alloc(size);
+		}
 		ptr := heap_resize(old_memory, size);
 		assert(ptr != nil);
 		return ptr;
