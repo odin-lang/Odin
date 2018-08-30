@@ -192,6 +192,27 @@ bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
 }
 
 
+assertf :: proc "contextless" (condition: bool, fmt: string, args: ..any, loc := #caller_location) -> bool {
+	if !condition {
+		p := context.assertion_failure_proc;
+		if p == nil {
+			p = runtime.default_assertion_failure_proc;
+		}
+		message := tprintf(fmt, ..args);
+		p("Runtime assertion", message, loc);
+	}
+	return condition;
+}
+
+panicf :: proc "contextless" (fmt: string, args: ..any, loc := #caller_location) {
+	p := context.assertion_failure_proc;
+	if p == nil {
+		p = runtime.default_assertion_failure_proc;
+	}
+	message := tprintf(fmt, ..args);
+	p("Panic", message, loc);
+}
+
 
 
 
