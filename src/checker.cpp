@@ -33,7 +33,7 @@ void scope_reset(Scope *scope) {
 
 void scope_reserve(Scope *scope, isize capacity) {
 	isize cap = 2*capacity;
-	if (cap > scope->elements.hashes.capacity) {
+	if (cap > scope->elements.hashes.count) {
 		map_rehash(&scope->elements, capacity);
 	}
 }
