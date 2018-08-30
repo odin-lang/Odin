@@ -1,7 +1,5 @@
 package mem
 
-import "core:runtime"
-
 foreign _ {
 	@(link_name = "llvm.bswap.i16") swap16 :: proc(b: u16) -> u16 ---;
 	@(link_name = "llvm.bswap.i32") swap32 :: proc(b: u32) -> u32 ---;
@@ -214,7 +212,7 @@ init_arena_from_context :: proc(using a: ^Arena, size: int) {
 }
 
 
-context_from_allocator :: proc(a: Allocator) -> runtime.Context {
+context_from_allocator :: proc(a: Allocator) -> type_of(context) {
 	c := context;
 	c.allocator = a;
 	return c;
