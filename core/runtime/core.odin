@@ -598,7 +598,6 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	if cap <= array.cap do return true;
 
 	if array.allocator.procedure == nil {
-		os.write_string(os.stdout, "HERE\n");
 		array.allocator = context.allocator;
 	}
 	assert(array.allocator.procedure != nil);
