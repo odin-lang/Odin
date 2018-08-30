@@ -67,8 +67,8 @@ read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
 
 
 heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
-                               size, alignment: int,
-                               old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+                            size, alignment: int,
+                            old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
 	using mem.Allocator_Mode;
 
 	switch mode {

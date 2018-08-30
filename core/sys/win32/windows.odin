@@ -550,6 +550,64 @@ CP_SYMBOL     :: 42;    // SYMBOL translations
 CP_UTF7       :: 65000; // UTF-7 translation
 CP_UTF8       :: 65001; // UTF-8 translation
 
+
+MB_ERR_INVALID_CHARS :: 8;
+WC_ERR_INVALID_CHARS :: 128;
+
+utf8_to_ucs2 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
+	if len(s) < 1 {
+		return nil;
+	}
+
+	n := multi_byte_to_wide_char(CP_UTF8, MB_ERR_INVALID_CHARS, cstring(&s[0]), i32(len(s)), nil, 0);
+	if n == 0 {
+		return nil;
+	}
+
+	text := make([]u16, n+1, allocator);
+
+	n1 := multi_byte_to_wide_char(CP_UTF8, MB_ERR_INVALID_CHARS, cstring(&s[0]), i32(len(s)), &text[0], i32(n));
+	if n1 == 0 {
+		delete(text, allocator);
+		return nil;
+	}
+
+	text[n] = 0;
+
+	return text[:len(text)-1];
+}
+utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> Wstring {
+	if res := utf8_to_ucs2(s, allocator); res != nil {
+		return &res[0];
+	}
+	return nil;
+}
+
+ucs2_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
+	if len(s) < 1 {
+		return "";
+	}
+
+	n := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, &s[0], i32(len(s)), nil, 0, nil, nil);
+	if n == 0 {
+		return "";
+	}
+
+	text := make([]byte, n+1, allocator);
+
+	n1 := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, &s[0], i32(len(s)), cstring(&text[0]), n, nil, nil);
+	if n1 == 0 {
+		delete(text, allocator);
+		return "";
+	}
+
+	text[n] = 0;
+
+	return string(text[:len(text)-1]);
+}
+
+
+
 @(default_calling_convention = "std")
 foreign kernel32 {
 	@(link_name="GetLastError")              get_last_error              :: proc() -> i32 ---;
@@ -603,6 +661,7 @@ foreign kernel32 {
 	@(link_name="GetFileAttributesA")         get_file_attributes_a          :: proc(filename: cstring) -> u32 ---;
 	@(link_name="GetFileAttributesW")         get_file_attributes_w          :: proc(filename: Wstring) -> u32 ---;
 	@(link_name="GetFileAttributesExA")       get_file_attributes_ex_a       :: proc(filename: cstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool ---;
+	@(link_name="GetFileAttributesExW")       get_file_attributes_ex_w       :: proc(filename: Wstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool ---;
 	@(link_name="GetFileInformationByHandle") get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool ---;
 
 	@(link_name="CreateDirectoryA") 		  create_directory_a			 :: proc(path: cstring, security_attributes: ^Security_Attributes) -> Bool ---;
@@ -657,6 +716,7 @@ foreign kernel32 {
 	                                                                   wc_str: Wstring, wc: i32) -> i32 ---;
 
 	@(link_name="CreateSemaphoreA")    create_semaphore_a     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: cstring) -> Handle ---;
+	@(link_name="CreateSemaphoreW")    create_semaphore_w     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: cstring) -> Handle ---;
 	@(link_name="ReleaseSemaphore")    release_semaphore      :: proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool ---;
 	@(link_name="WaitForSingleObject") wait_for_single_object :: proc(handle: Handle, milliseconds: u32) -> u32 ---;
 }
@@ -701,6 +761,7 @@ foreign kernel32 {
 	@(link_name="LeaveCriticalSection")                  leave_critical_section                     :: proc(critical_section: ^Critical_Section) ---;
 
 	@(link_name="CreateEventA") create_event_a :: proc(event_attributes: ^Security_Attributes, manual_reset, initial_state: Bool, name: cstring) -> Handle ---;
+	@(link_name="CreateEventW") create_event_w :: proc(event_attributes: ^Security_Attributes, manual_reset, initial_state: Bool, name: Wstring) -> Handle ---;
 	@(link_name="PulseEvent")   pulse_event    :: proc(event: Handle) -> Bool ---;
 	@(link_name="SetEvent")     set_event      :: proc(event: Handle) -> Bool ---;
 	@(link_name="ResetEvent")   reset_event    :: proc(event: Handle) -> Bool ---;
@@ -722,6 +783,7 @@ foreign user32 {
 	@(link_name="ClientToScreen")   client_to_screen    :: proc(h: Hwnd, p: ^Point) -> Bool ---;
 	@(link_name="PostQuitMessage")  post_quit_message   :: proc(exit_code: i32) ---;
 	@(link_name="SetWindowTextA")   set_window_text_a   :: proc(hwnd: Hwnd, c_string: cstring) -> Bool ---;
+	@(link_name="SetWindowTextW")   set_window_text_w   :: proc(hwnd: Hwnd, c_string: Wstring) -> Bool ---;
 	@(link_name="RegisterClassExA") register_class_ex_a :: proc(wc: ^Wnd_Class_Ex_A) -> i16 ---;
 	@(link_name="RegisterClassExW") register_class_ex_w :: proc(wc: ^Wnd_Class_Ex_W) -> i16 ---;
 
@@ -753,9 +815,11 @@ foreign user32 {
 	@(link_name="PeekMessageW") peek_message_w :: proc(msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool ---;
 
 
-	@(link_name="PostMessageA") post_message :: proc(hwnd: Hwnd, msg, wparam, lparam: u32) -> Bool ---;
+	@(link_name="PostMessageA") post_message_a :: proc(hwnd: Hwnd, msg, wparam, lparam: u32) -> Bool ---;
+	@(link_name="PostMessageW") post_message_w :: proc(hwnd: Hwnd, msg, wparam, lparam: u32) -> Bool ---;
 
 	@(link_name="DefWindowProcA") def_window_proc_a :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult ---;
+	@(link_name="DefWindowProcW") def_window_proc_w :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult ---;
 
 	@(link_name="AdjustWindowRect") adjust_window_rect :: proc(rect: ^Rect, style: u32, menu: Bool) -> Bool ---;
 	@(link_name="GetActiveWindow")  get_active_window  :: proc() -> Hwnd ---;
