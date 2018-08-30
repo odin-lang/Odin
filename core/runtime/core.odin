@@ -555,14 +555,22 @@ excl_bit_set :: inline proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
 @(builtin)
 assert :: proc "contextless" (condition: bool, message := "", loc := #caller_location) -> bool {
 	if !condition {
-		context.assertion_failure_proc("Runtime assertion", message, loc);
+		p := context.assertion_failure_proc;
+		if p == nil {
+			p = default_assertion_failure_proc;
+		}
+		p("Runtime assertion", message, loc);
 	}
 	return condition;
 }
 
 @(builtin)
 panic :: proc "contextless" (message := "", loc := #caller_location) {
-	context.assertion_failure_proc("Panic", message, loc);
+	p := context.assertion_failure_proc;
+	if p == nil {
+		p = default_assertion_failure_proc;
+	}
+	p("Panic", message, loc);
 }
 
 
