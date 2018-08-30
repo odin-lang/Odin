@@ -8,7 +8,7 @@ import "core:types"
 import "core:strconv"
 
 
-_BUFFER_SIZE :: 1<<12;
+DEFAULT_BUFFER_SIZE :: 1<<12;
 
 String_Buffer :: distinct [dynamic]byte;
 
@@ -108,7 +108,7 @@ write_i64 :: proc(buf: ^String_Buffer, i: i64, base: int) {
 }
 
 fprint :: proc(fd: os.Handle, args: ..any) -> int {
-	data: [_BUFFER_SIZE]byte;
+	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := string_buffer_from_slice(data[:]);
 	res := sbprint(&buf, ..args);
 	os.write_string(fd, res);
@@ -116,14 +116,14 @@ fprint :: proc(fd: os.Handle, args: ..any) -> int {
 }
 
 fprintln :: proc(fd: os.Handle, args: ..any) -> int {
-	data: [_BUFFER_SIZE]byte;
+	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := string_buffer_from_slice(data[:]);
 	res := sbprintln(&buf, ..args);
 	os.write_string(fd, res);
 	return len(res);
 }
 fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
-	data: [_BUFFER_SIZE]byte;
+	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := string_buffer_from_slice(data[:]);
 	res := sbprintf(&buf, fmt, ..args);
 	os.write_string(fd, res);
@@ -218,7 +218,7 @@ panicf :: proc "contextless" (fmt: string, args: ..any, loc := #caller_location)
 
 
 fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) {
-	data: [_BUFFER_SIZE]byte;
+	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := string_buffer_from_slice(data[:]);
 	write_type(&buf, info);
 	os.write(fd, buf[:]);
