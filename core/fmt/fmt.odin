@@ -462,7 +462,6 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 
 
 fmt_bad_verb :: proc(using fi: ^Fmt_Info, verb: rune) {
-	assert(verb != 'v');
 	write_string(buf, "%!");
 	write_rune(buf, verb);
 	write_byte(buf, '(');
@@ -1018,7 +1017,9 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 		m := (^mem.Raw_Map)(v.data);
 		if m != nil {
-			assert(info.generated_struct != nil);
+			if info.generated_struct == nil {
+				return;
+			}
 			entries    := &m.entries;
 			gs         := runtime.type_info_base(info.generated_struct).variant.(runtime.Type_Info_Struct);
 			ed         := runtime.type_info_base(gs.types[1]).variant.(runtime.Type_Info_Dynamic_Array);

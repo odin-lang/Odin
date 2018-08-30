@@ -5,6 +5,7 @@ package runtime
 
 import "core:os"
 import "core:mem"
+import "core:fmt"
 
 // Naming Conventions:
 // In general, Ada_Case for types and snake_case for values
@@ -565,11 +566,35 @@ assert :: proc "contextless" (condition: bool, message := "", loc := #caller_loc
 }
 
 @(builtin)
-panic :: proc "contextless" (message := "", loc := #caller_location) {
+panic :: proc "contextless" (message: string, loc := #caller_location) {
 	p := context.assertion_failure_proc;
 	if p == nil {
 		p = default_assertion_failure_proc;
 	}
+	p("Panic", message, loc);
+}
+
+
+@(builtin)
+assertf :: proc "contextless" (condition: bool, format: string, args: ..any, loc := #caller_location) -> bool {
+	if !condition {
+		p := context.assertion_failure_proc;
+		if p == nil {
+			p = default_assertion_failure_proc;
+		}
+		message := fmt.tprintf(format, ..args);
+		p("Runtime assertion", message, loc);
+	}
+	return condition;
+}
+
+@(builtin)
+panicf :: proc "contextless" (format: string, args: ..any, loc := #caller_location) {
+	p := context.assertion_failure_proc;
+	if p == nil {
+		p = default_assertion_failure_proc;
+	}
+	message := fmt.tprintf(format, ..args);
 	p("Panic", message, loc);
 }
 
