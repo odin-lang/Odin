@@ -383,6 +383,9 @@ new_clone :: proc[mem.new_clone];
 free :: proc[mem.free];
 
 @(builtin)
+free_all :: proc[mem.free_all];
+
+@(builtin)
 delete :: proc[
 	mem.delete_string,
 	mem.delete_cstring,
