@@ -1008,6 +1008,20 @@ Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Oper
 	return t_invalid;
 }
 
+bool is_expr_from_another_parameter(CheckerContext *ctx, Ast *expr) {
+	if (expr->kind == Ast_SelectorExpr) {
+		Ast *lhs = expr->SelectorExpr.expr;
+		return is_expr_from_another_parameter(ctx, lhs);
+	} else if (expr->kind == Ast_Ident) {
+		Operand x= {};
+		Entity *e = check_ident(ctx, &x, expr, nullptr, nullptr, false);
+		if (e->flags & EntityFlag_Param) {
+			return true;
+		}
+	}
+	return false;
+}
+
 
 ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location) {
 	ParameterValue param_value = {};
@@ -1054,9 +1068,17 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 						param_value.value = exact_value_procedure(e->identifier);
 						add_entity_use(ctx, e->identifier, e);
 					} else {
-						param_value.kind = ParameterValue_Value;
-						param_value.ast_value = expr;
-						add_entity_use(ctx, e->identifier, e);
+						if (e->flags & EntityFlag_Param) {
+							error(expr, "Default parameter cannot be another parameter");
+						} else {
+							if (is_expr_from_another_parameter(ctx, expr)) {
+								error(expr, "Default parameter cannot be another parameter");
+							} else {
+								param_value.kind = ParameterValue_Value;
+								param_value.ast_value = expr;
+								add_entity_use(ctx, e->identifier, e);
+							}
+						}
 					}
 				} else if (allow_caller_location && o.mode == Addressing_Context) {
 					param_value.kind = ParameterValue_Value;
