@@ -1190,6 +1190,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 				if (specialization == t_invalid){
 					specialization = nullptr;
 				}
+				// warning(type_expr, "'type' parameters are deprecated, please use a polymorphic identifier with a type of 'typeid'. For example, '$T: typeid'");
 
 				if (operands != nullptr) {
 					detemine_type_from_operand = true;
@@ -1263,8 +1264,28 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 
 		for_array(j, p->names) {
 			Ast *name = p->names[j];
+
+			bool is_poly_name = false;
+
+			switch (name->kind) {
+			case Ast_Ident:
+				break;
+			case Ast_PolyType:
+				GB_ASSERT(name->PolyType.specialization == nullptr);
+				is_poly_name = true;
+				name = name->PolyType.type;
+				break;
+			}
 			if (!ast_node_expect(name, Ast_Ident)) {
 				continue;
+			}
+
+			if (is_poly_name) {
+				if (type != nullptr && is_type_typeid(type)) {
+					is_type_param = true;
+				} else {
+					error(name, "Polymorphic names are not yet supported for non-typeid parameters");
+				}
 			}
 
 			Entity *param = nullptr;
@@ -2020,6 +2041,14 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 		error(e, "Invalid use of a distinct type");
 		// NOTE(bill): Treat it as a HelperType to remove errors
 		return check_type_internal(ctx, dt->type, type, named_type);
+	case_end;
+
+	case_ast_node(tt, TypeidType, e);
+		e->tav.mode = Addressing_Type;
+		e->tav.type = t_typeid;
+		*type = t_typeid;
+		set_base_type(named_type, *type);
+		return true;
 	case_end;
 
 	case_ast_node(pt, PolyType, e);

@@ -1,8 +1,8 @@
 package mem
 
 Raw_Any :: struct {
-	data:   rawptr,
-	typeid: typeid,
+	data: rawptr,
+	id:   typeid,
 }
 
 Raw_String :: struct {

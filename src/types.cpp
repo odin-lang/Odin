@@ -1794,17 +1794,17 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 			// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
 			// `Raw_Any` type?
 			String data_str = str_lit("data");
-			String typeid_str = str_lit("typeid");
+			String id_str = str_lit("id");
 			gb_local_persist Entity *entity__any_data = alloc_entity_field(nullptr, make_token_ident(data_str), t_rawptr, false, 0);
-			gb_local_persist Entity *entity__any_typeid = alloc_entity_field(nullptr, make_token_ident(typeid_str), t_typeid, false, 1);
+			gb_local_persist Entity *entity__any_id = alloc_entity_field(nullptr, make_token_ident(id_str), t_typeid, false, 1);
 
 			if (field_name == data_str) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__any_data;
 				return sel;
-			} else if (field_name == typeid_str) {
+			} else if (field_name == id_str) {
 				selection_add_index(&sel, 1);
-				sel.entity = entity__any_typeid;
+				sel.entity = entity__any_id;
 				return sel;
 			}
 		#endif

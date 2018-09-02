@@ -5159,7 +5159,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		for_array(i, ce->args) {
 			Ast *arg = ce->args[i];
 			TypeAndValue tav = type_and_value_of_expr(arg);
-			GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s", expr_to_string(arg));
+			GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s", expr_to_string(arg), expr_to_string(expr));
 			GB_ASSERT_MSG(tav.mode != Addressing_ProcGroup, "%s", expr_to_string(arg));
 			Type *at = tav.type;
 			if (at->kind == Type_Tuple) {
@@ -5973,7 +5973,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
 				String field_names[2] = {
 					str_lit("data"),
-					str_lit("typeid"),
+					str_lit("id"),
 				};
 				Type *field_types[2] = {
 					t_rawptr,

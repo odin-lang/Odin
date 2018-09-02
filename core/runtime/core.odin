@@ -268,10 +268,6 @@ type_info_base_without_enum :: proc "contextless" (info: ^Type_Info) -> ^Type_In
 	return base;
 }
 
-__typeid_of :: proc "contextless" (ti: ^Type_Info) -> typeid {
-	if ti == nil do return nil;
-	return ti.id;
-}
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info {
 	data := transmute(Typeid_Bit_Field)id;
 	n := int(data.index);
@@ -284,11 +280,11 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info {
 typeid_base :: proc "contextless" (id: typeid) -> typeid {
 	ti := type_info_of(id);
 	ti = type_info_base(ti);
-	return typeid_of(ti);
+	return ti.id;
 }
 typeid_base_without_enum :: proc "contextless" (id: typeid) -> typeid {
 	ti := type_info_base_without_enum(type_info_of(id));
-	return typeid_of(ti);
+	return ti.id;
 }
 
 
@@ -363,6 +359,23 @@ pop :: proc "contextless" (array: ^$T/[dynamic]$E) -> E {
 	res := array[len(array)-1];
 	(^mem.Raw_Dynamic_Array)(array).len -= 1;
 	return res;
+}
+
+@(builtin)
+unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
+	runtime.bounds_check_error_loc(loc, index, len(array));
+	n := len(array)-1;
+	if index != n {
+		array[index] = array[n];
+	}
+	pop(array);
+}
+
+@(builtin)
+ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
+	runtime.bounds_check_error_loc(loc, index, len(array));
+	copy(array[index:], array[index+1:]);
+	pop(array);
 }
 
 

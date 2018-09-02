@@ -232,10 +232,9 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) 
 	GB_ASSERT(e->type == nullptr);
 
 	DeclInfo *decl = decl_info_of_entity(e);
-	if (decl != nullptr && total_attribute_count(decl) > 0) {
-		error(decl->attributes[0], "Attributes are not allowed on type declarations");
+	if (decl != nullptr) {
+		check_decl_attributes(ctx, decl->attributes, const_decl_attribute, nullptr);
 	}
-
 
 
 	bool is_distinct = is_type_distinct(type_expr);
@@ -254,6 +253,11 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) 
 	check_type_path_pop(ctx);
 
 	named->Named.base = base_type(bt);
+
+	if (is_distinct && is_type_typeid(e->type)) {
+		error(type_expr, "'distinct' cannot be applied to 'typeid'");
+		is_distinct = false;
+	}
 	if (!is_distinct) {
 		e->type = bt;
 		named->Named.base = bt;
@@ -393,8 +397,8 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 
 
 	DeclInfo *decl = decl_info_of_entity(e);
-	if (decl != nullptr && total_attribute_count(decl) > 0) {
-		error(decl->attributes[0], "Attributes are not allowed on constant value declarations");
+	if (decl != nullptr) {
+		check_decl_attributes(ctx, decl->attributes, const_decl_attribute, nullptr);
 	}
 }
 
