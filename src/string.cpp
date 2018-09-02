@@ -82,6 +82,10 @@ gb_inline String make_string_c(char *text) {
 	return make_string(cast(u8 *)cast(void *)text, gb_strlen(text));
 }
 
+gb_inline String16 make_string16_c(wchar_t *text) {
+	return make_string16(text, string16_len(text));
+}
+
 String substring(String const &s, isize lo, isize hi) {
 	isize max = s.len;
 	GB_ASSERT_MSG(lo <= hi && hi <= max, "%td..%td..%td", lo, hi, max);
@@ -89,6 +93,13 @@ String substring(String const &s, isize lo, isize hi) {
 	return make_string(s.text+lo, hi-lo);
 }
 
+
+char *alloc_cstring(gbAllocator a, String s) {
+	char *c_str = gb_alloc_array(a, char, s.len+1);
+	gb_memmove(c_str, s.text, s.len);
+	c_str[s.len] = '\0';
+	return c_str;
+}
 
 
 
@@ -248,7 +259,10 @@ bool string_contains_char(String const &s, u8 c) {
 
 String filename_from_path(String s) {
 	isize i = string_extension_position(s);
-	s = substring(s, 0, i);
+	if (i >= 0) {
+		s = substring(s, 0, i);
+		return s;
+	}
 	if (i > 0) {
 		isize j = 0;
 		for (j = s.len-1; j >= 0; j--) {
@@ -272,6 +286,16 @@ String remove_directory_from_path(String const &s) {
 		len += 1;
 	}
 	return substring(s, s.len-len, s.len);
+}
+String directory_from_path(String const &s) {
+	isize i = s.len-1;
+	for (; i >= 0; i--) {
+		if (s[i] == '/' ||
+		    s[i] == '\\') {
+			break;
+		}
+	}
+	return substring(s, 0, i);
 }
 
 
@@ -427,6 +451,7 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 
 	case 'a':  *rune = '\a'; break;
 	case 'b':  *rune = '\b'; break;
+	case 'e':  *rune = 0x1b; break;
 	case 'f':  *rune = '\f'; break;
 	case 'n':  *rune = '\n'; break;
 	case 'r':  *rune = '\r'; break;
@@ -437,9 +462,6 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 
 	case '\'':
 	case '"':
-		if (c != quote) {
-			return false;
-		}
 		*rune = c;
 		break;
 

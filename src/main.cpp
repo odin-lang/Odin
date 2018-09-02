@@ -1,11 +1,10 @@
 // #define NO_ARRAY_BOUNDS_CHECK
-#define NO_POINTER_ARITHMETIC
-// #define NO_DEFAULT_STRUCT_VALUES
 
 #include "common.cpp"
 #include "timings.cpp"
 #include "build_settings.cpp"
 #include "tokenizer.cpp"
+#include "big_int.cpp"
 #include "exact_value.cpp"
 
 #include "parser.hpp"
@@ -23,7 +22,7 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 #if defined(GB_SYSTEM_WINDOWS)
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
-	char cmd_line[4096] = {0};
+	char cmd_line[4*1024] = {0};
 	isize cmd_len;
 	va_list va;
 	gbTempArenaMemory tmp;
@@ -213,6 +212,8 @@ enum BuildFlagKind {
 	BuildFlag_CrossCompile,
 	BuildFlag_CrossLibDir,
 	BuildFlag_NoBoundsCheck,
+	BuildFlag_NoCRT,
+	BuildFlag_UseLLD,
 
 	BuildFlag_COUNT,
 };
@@ -253,7 +254,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_CrossCompile,      str_lit("cross-compile"),   BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_CrossLibDir,       str_lit("cross-lib-dir"),   BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"), BuildFlagParam_None);
-
+	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),          BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),             BuildFlagParam_None);
 
 	GB_ASSERT(args.count >= 3);
 	Array<String> flag_args = array_slice(args, 3, args.count);
@@ -410,7 +412,7 @@ bool parse_build_flags(Array<String> args) {
 						}
 						case BuildFlag_OptimizationLevel:
 							GB_ASSERT(value.kind == ExactValue_Integer);
-							build_context.optimization_level = cast(i32)value.value_integer;
+							build_context.optimization_level = cast(i32)big_int_to_i64(&value.value_integer);
 							break;
 						case BuildFlag_ShowTimings:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
@@ -418,7 +420,7 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_ThreadCount: {
 							GB_ASSERT(value.kind == ExactValue_Integer);
-							isize count = cast(isize)value.value_integer;
+							isize count = cast(isize)big_int_to_i64(&value.value_integer);
 							if (count <= 0) {
 								gb_printf_err("%.*s expected a positive non-zero number, got %.*s\n", LIT(name), LIT(param));
 								build_context.thread_count = 0;
@@ -553,6 +555,14 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoBoundsCheck:
 							build_context.no_bounds_check = true;
 							break;
+
+						case BuildFlag_NoCRT:
+							build_context.no_crt = true;
+							break;
+
+						case BuildFlag_UseLLD:
+							build_context.use_lld = true;
+							break;
 						}
 					}
 
@@ -572,16 +582,24 @@ bool parse_build_flags(Array<String> args) {
 }
 
 void show_timings(Checker *c, Timings *t) {
-	Parser *p    = c->parser;
-	isize lines  = p->total_line_count;
-	isize tokens = p->total_token_count;
-	isize files  = p->files.count;
+	Parser *p      = c->parser;
+	isize lines    = p->total_line_count;
+	isize tokens   = p->total_token_count;
+	isize files    = 0;
+	isize packages = p->packages.count;
+	for_array(i, p->packages) {
+		files += p->packages[i]->files.count;
+	}
+#if 1
+	timings_print_all(t);
+#else
 	{
 		timings_print_all(t);
 		gb_printf("\n");
-		gb_printf("Total Lines  - %td\n", lines);
-		gb_printf("Total Tokens - %td\n", tokens);
-		gb_printf("Total Files  - %td\n", files);
+		gb_printf("Total Lines    - %td\n", lines);
+		gb_printf("Total Tokens   - %td\n", tokens);
+		gb_printf("Total Files    - %td\n", files);
+		gb_printf("Total Packages - %td\n", packages);
 		gb_printf("\n");
 	}
 	{
@@ -589,6 +607,17 @@ void show_timings(Checker *c, Timings *t) {
 		GB_ASSERT(ts.label == "parse files");
 		f64 parse_time = time_stamp_as_s(ts, t->freq);
 		gb_printf("Parse pass\n");
+		gb_printf("LOC/s        - %.3f\n", cast(f64)lines/parse_time);
+		gb_printf("us/LOC       - %.3f\n", 1.0e6*parse_time/cast(f64)lines);
+		gb_printf("Tokens/s     - %.3f\n", cast(f64)tokens/parse_time);
+		gb_printf("us/Token     - %.3f\n", 1.0e6*parse_time/cast(f64)tokens);
+		gb_printf("\n");
+	}
+	{
+		TimeStamp ts = t->sections[1];
+		GB_ASSERT(ts.label == "type check");
+		f64 parse_time = time_stamp_as_s(ts, t->freq);
+		gb_printf("Checker pass\n");
 		gb_printf("LOC/s        - %.3f\n", cast(f64)lines/parse_time);
 		gb_printf("us/LOC       - %.3f\n", 1.0e6*parse_time/cast(f64)lines);
 		gb_printf("Tokens/s     - %.3f\n", cast(f64)tokens/parse_time);
@@ -604,6 +633,7 @@ void show_timings(Checker *c, Timings *t) {
 		gb_printf("us/Token     - %.3f\n", 1.0e6*total_time/cast(f64)tokens);
 		gb_printf("\n");
 	}
+#endif
 }
 
 void remove_temp_files(String output_base) {
@@ -613,9 +643,9 @@ void remove_temp_files(String output_base) {
 	defer (array_free(&data));
 
 	isize n = output_base.len;
-	gb_memcopy(data.data, output_base.text, n);
+	gb_memmove(data.data, output_base.text, n);
 #define EXT_REMOVE(s) do {                         \
-		gb_memcopy(data.data+n, s, gb_size_of(s)); \
+		gb_memmove(data.data+n, s, gb_size_of(s)); \
 		gb_file_remove(cast(char *)data.data);     \
 	} while (0)
 	EXT_REMOVE(".ll");
@@ -660,10 +690,9 @@ i32 exec_llvm_llc(String output_base) {
 #if defined(GB_SYSTEM_WINDOWS)
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	return system_exec_command_line_app("llvm-llc", false,
-		"\"%.*sbin/llc\" \"%.*s.bc\" -filetype=obj -O%d "
+		"\"%.*sbin\\llc\" \"%.*s.bc\" -filetype=obj -O%d "
 		"-o \"%.*s.obj\" "
 		"%.*s "
-		// "-debug-pass=Arguments "
 		"",
 		LIT(build_context.ODIN_ROOT),
 		LIT(output_base),
@@ -676,7 +705,6 @@ i32 exec_llvm_llc(String output_base) {
 	return system_exec_command_line_app("llc", false,
 		"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
 		"%.*s "
-		// "-debug-pass=Arguments "
 		"%s"
 		"",
 		LIT(output_base),
@@ -699,8 +727,9 @@ int main(int arg_count, char **arg_ptr) {
 	defer (timings_destroy(&timings));
 
 	init_string_buffer_memory();
-	init_scratch_memory(gb_megabytes(10));
 	init_global_error_collector();
+	global_big_int_init();
+	arena_init(&global_ast_arena, heap_allocator());
 
 	array_init(&library_collections, heap_allocator());
 	// NOTE(bill): 'core' cannot be (re)defined by the user
@@ -772,8 +801,8 @@ int main(int arg_count, char **arg_ptr) {
 		print_usage_line(0, "%s 32-bit is not yet supported", args[0]);
 		return 1;
 	}
-	init_universal_scope();
 
+	init_universal();
 	// TODO(bill): prevent compiling without a linker
 
 	timings_start_section(&timings, str_lit("parse files"));
@@ -784,12 +813,12 @@ int main(int arg_count, char **arg_ptr) {
 	}
 	defer (destroy_parser(&parser));
 
-	if (parse_files(&parser, init_filename) != ParseFile_None) {
+	if (parse_packages(&parser, init_filename) != ParseFile_None) {
 		return 1;
 	}
 
 	if (build_context.generate_docs) {
-		generate_documentation(&parser);
+		// generate_documentation(&parser);
 		return 0;
 	}
 
@@ -803,6 +832,7 @@ int main(int arg_count, char **arg_ptr) {
 
 	check_parsed_files(&checker);
 
+#if 1
 	if (build_context.no_output_files) {
 		if (build_context.show_timings) {
 			show_timings(&checker, &timings);
@@ -820,7 +850,6 @@ int main(int arg_count, char **arg_ptr) {
 		return 1;
 	}
 	// defer (ir_gen_destroy(&ir_gen));
-
 
 
 	timings_start_section(&timings, str_lit("llvm ir gen"));
@@ -858,9 +887,10 @@ int main(int arg_count, char **arg_ptr) {
 		gbString lib_str = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(lib_str));
 		char lib_str_buf[1024] = {0};
+
 		for_array(i, ir_gen.module.foreign_library_paths) {
 			String lib = ir_gen.module.foreign_library_paths[i];
-			// gb_printf_err("Linking lib: %.*s\n", LIT(lib));
+			GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
 			isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
 			                        " \"%.*s\"", LIT(lib));
 			lib_str = gb_string_appendc(lib_str, lib_str_buf);
@@ -876,43 +906,57 @@ int main(int arg_count, char **arg_ptr) {
 		} else {
 			link_settings = gb_string_append_fmt(link_settings, "/ENTRY:mainCRTStartup");
 		}
+		if (build_context.no_crt) {
+			link_settings = gb_string_append_fmt(link_settings, " /nodefaultlib");
+		} else {
+			link_settings = gb_string_append_fmt(link_settings, " /defaultlib:libcmt");
+		}
 
 		if (ir_gen.module.generate_debug_info) {
 			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
 		}
+		if (!build_context.use_lld) { // msvc
+			if (build_context.has_resource) {
+				exit_code = system_exec_command_line_app("msvc-link", true,
+					"rc /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
+					LIT(output_base),
+					LIT(build_context.resource_filepath)
+				);
 
-		if(build_context.has_resource) {
-			exit_code = system_exec_command_line_app("msvc-link", true,
-                "rc /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
-                LIT(output_base),
-                LIT(build_context.resource_filepath)
-            );
+	            if (exit_code != 0) {
+					return exit_code;
+				}
 
-            if (exit_code != 0) {
-				return exit_code;
+				exit_code = system_exec_command_line_app("msvc-link", true,
+					"link \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
+					"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
+					" %.*s "
+					" %s "
+					"",
+					LIT(output_base), LIT(output_base), LIT(output_base), output_ext,
+					lib_str, LIT(build_context.link_flags),
+					link_settings
+				);
+			} else {
+				exit_code = system_exec_command_line_app("msvc-link", true,
+					"link \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
+					"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
+					" %.*s "
+					" %s "
+					"",
+					LIT(output_base), LIT(output_base), output_ext,
+					lib_str, LIT(build_context.link_flags),
+					link_settings
+				);
 			}
-
+		} else { // lld
 			exit_code = system_exec_command_line_app("msvc-link", true,
-				"link \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
-				"/defaultlib:libcmt "
-				// "/nodefaultlib "
+				"\"%.*s\\bin\\lld-link\" \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 				"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 				" %.*s "
 				" %s "
 				"",
-				LIT(output_base), LIT(output_base), LIT(output_base), output_ext,
-				lib_str, LIT(build_context.link_flags),
-				link_settings
-			);
-		} else {
-			exit_code = system_exec_command_line_app("msvc-link", true,
-				"link \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
-				"/defaultlib:libcmt "
-				// "/nodefaultlib "
-				"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
-				" %.*s "
-				" %s "
-				"",
+				LIT(build_context.ODIN_ROOT),
 				LIT(output_base), LIT(output_base), output_ext,
 				lib_str, LIT(build_context.link_flags),
 				link_settings
@@ -973,12 +1017,12 @@ int main(int arg_count, char **arg_ptr) {
 				//                the system library paths for the library file).
 				if (string_ends_with(lib, str_lit(".a"))) {
 					// static libs, absolute full path relative to the file in which the lib was imported from
-					lib_str = gb_string_append_fmt(lib_str, " -l:%.*s ", LIT(lib));
+					lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
 				} else if (string_ends_with(lib, str_lit(".so"))) {
 					// dynamic lib, relative path to executable
 					// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
 					//                at runtimeto the executable
-					lib_str = gb_string_append_fmt(lib_str, " -l:%s/%.*s ", cwd, LIT(lib));
+					lib_str = gb_string_append_fmt(lib_str, " -l:\"%s/%.*s\" ", cwd, LIT(lib));
 				} else {
 					// dynamic or static system lib, just link regularly searching system library paths
 					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
@@ -1044,6 +1088,21 @@ int main(int arg_count, char **arg_ptr) {
 			return exit_code;
 		}
 
+    #if defined(GB_SYSTEM_OSX)
+        if (BuildFlag_Debug) {
+            // NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
+            // to the symbols in the object file
+            exit_code = system_exec_command_line_app("dsymutil", true,
+                "%.*s%s", LIT(output_base), output_ext
+                );
+
+            if (exit_code != 0) {
+                return exit_code;
+            }
+        }
+    #endif
+
+
 		if (build_context.show_timings) {
 			show_timings(&checker, &timings);
 		}
@@ -1051,9 +1110,10 @@ int main(int arg_count, char **arg_ptr) {
 		remove_temp_files(output_base);
 
 		if (run_output) {
-			system_exec_command_line_app("odin run", false, "%.*s", LIT(output_base));
+			output_base = path_to_full_path(heap_allocator(), output_base);
+			system_exec_command_line_app("odin run", false, "\"%.*s\"", LIT(output_base));
 		}
 	#endif
-
+#endif
 	return 0;
 }

@@ -12,7 +12,6 @@ struct DeclInfo;
 	ENTITY_KIND(Procedure) \
 	ENTITY_KIND(ProcGroup) \
 	ENTITY_KIND(Builtin) \
-	ENTITY_KIND(Alias) \
 	ENTITY_KIND(ImportName) \
 	ENTITY_KIND(LibraryName) \
 	ENTITY_KIND(Nil) \
@@ -46,21 +45,34 @@ enum EntityFlag {
 	EntityFlag_Sret          = 1<<11,
 	EntityFlag_BitFieldValue = 1<<12,
 	EntityFlag_PolyConst     = 1<<13,
+	EntityFlag_NotExported   = 1<<14,
+
 
 	EntityFlag_CVarArg       = 1<<20,
-};
-
-// Zero value means the overloading process is not yet done
-enum OverloadKind {
-	Overload_Unknown = 0,
-	Overload_No      = 1,
-	Overload_Yes     = 2,
+	EntityFlag_AutoCast      = 1<<21,
 };
 
 enum EntityState {
 	EntityState_Unresolved = 0,
 	EntityState_InProgress  = 1,
 	EntityState_Resolved   = 2,
+};
+
+
+enum ParameterValueKind {
+	ParameterValue_Invalid,
+	ParameterValue_Constant,
+	ParameterValue_Nil,
+	ParameterValue_Location,
+	ParameterValue_Value,
+};
+
+struct ParameterValue {
+	ParameterValueKind kind;
+	union {
+		ExactValue value;
+		Ast *ast_value;
+	};
 };
 
 
@@ -73,13 +85,14 @@ struct Entity {
 	Token       token;
 	Scope *     scope;
 	Type *      type;
-	AstNode *   identifier; // Can be nullptr
+	Ast *   identifier; // Can be nullptr
 	DeclInfo *  decl_info;
 	DeclInfo *  parent_proc_decl; // nullptr if in file/global scope
+	AstPackage *pkg;
 
 	// TODO(bill): Cleanup how `using` works for entities
 	Entity *    using_parent;
-	AstNode *   using_expr;
+	Ast *   using_expr;
 
 	isize       order_in_src;
 	String      deprecated_message;
@@ -91,18 +104,17 @@ struct Entity {
 		struct {
 			i32        field_index;
 			i32        field_src_index;
-			ExactValue default_value;
+
+			ParameterValue param_value;
+
+			String     thread_local_model;
 			Entity *   foreign_library;
-			AstNode *  foreign_library_ident;
+			Ast *  foreign_library_ident;
 			String     link_name;
 			String     link_prefix;
-			String     thread_local_model;
-			bool       default_is_nil;
-			bool       default_is_undef;
-			bool       default_is_location;
-			bool       is_immutable;
 			bool       is_foreign;
 			bool       is_export;
+			bool       is_immutable;
 		} Variable;
 		struct {
 			bool   is_type_alias;
@@ -110,14 +122,13 @@ struct Entity {
 			String ir_mangled_name;
 		} TypeName;
 		struct {
-			OverloadKind overload_kind;
+			u64          tags;
+			Entity *     foreign_library;
+			Ast *    foreign_library_ident;
 			String       link_name;
 			String       link_prefix;
-			u64          tags;
-			bool         is_export;
 			bool         is_foreign;
-			Entity *     foreign_library;
-			AstNode *    foreign_library_ident;
+			bool         is_export;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;
@@ -126,28 +137,21 @@ struct Entity {
 			i32 id;
 		} Builtin;
 		struct {
-			Entity *base;
-		} Alias;
-		struct {
 			String path;
 			String name;
 			Scope *scope;
-			bool   used;
 		} ImportName;
 		struct {
-			String path;
+			Array<String> paths;
 			String name;
-			bool   used;
 		} LibraryName;
 		i32 Nil;
 		struct {
 			String   name;
-			AstNode *node;
+			Ast *node;
 		} Label;
 	};
 };
-
-gb_global Entity *e_context = nullptr;
 
 bool is_entity_kind_exported(EntityKind kind) {
 	switch (kind) {
@@ -164,6 +168,10 @@ bool is_entity_exported(Entity *e) {
 	// TODO(bill): Determine the actual exportation rules for imports of entities
 	GB_ASSERT(e != nullptr);
 	if (!is_entity_kind_exported(e->kind)) {
+		return false;
+	}
+
+	if (e->flags & EntityFlag_NotExported) {
 		return false;
 	}
 
@@ -281,12 +289,6 @@ Entity *alloc_entity_builtin(Scope *scope, Token token, Type *type, i32 id) {
 	return entity;
 }
 
-Entity *alloc_entity_alias(Scope *scope, Token token, Type *type, Entity *base) {
-	Entity *entity = alloc_entity(Entity_Alias, scope, token, type);
-	entity->Alias.base = base;
-	return entity;
-}
-
 Entity *alloc_entity_import_name(Scope *scope, Token token, Type *type,
                                  String path, String name, Scope *import_scope) {
 	Entity *entity = alloc_entity(Entity_ImportName, scope, token, type);
@@ -298,9 +300,9 @@ Entity *alloc_entity_import_name(Scope *scope, Token token, Type *type,
 }
 
 Entity *alloc_entity_library_name(Scope *scope, Token token, Type *type,
-                                  String path, String name) {
+                                  Array<String> paths, String name) {
 	Entity *entity = alloc_entity(Entity_LibraryName, scope, token, type);
-	entity->LibraryName.path = path;
+	entity->LibraryName.paths = paths;
 	entity->LibraryName.name = name;
 	entity->state = EntityState_Resolved; // TODO(bill): Is this correct?
 	return entity;
@@ -315,7 +317,7 @@ Entity *alloc_entity_nil(String name, Type *type) {
 	return entity;
 }
 
-Entity *alloc_entity_label(Scope *scope, Token token, Type *type, AstNode *node) {
+Entity *alloc_entity_label(Scope *scope, Token token, Type *type, Ast *node) {
 	Entity *entity = alloc_entity(Entity_Label, scope, token, type);
 	entity->Label.node = node;
 	entity->state = EntityState_Resolved;

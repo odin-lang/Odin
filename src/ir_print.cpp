@@ -65,6 +65,19 @@ void ir_write_i64(irFileBuffer *f, i64 i) {
 	String str = i64_to_string(i, f->buf, IR_FILE_BUFFER_BUF_LEN-1);
 	ir_write_string(f, str);
 }
+void ir_write_u64(irFileBuffer *f, u64 i) {
+	String str = u64_to_string(i, f->buf, IR_FILE_BUFFER_BUF_LEN-1);
+	ir_write_string(f, str);
+}
+void ir_write_big_int(irFileBuffer *f, BigInt const &x) {
+	i64 i = 0;
+	if (x.neg) {
+		i = big_int_to_i64(&x);
+	} else {
+		i = cast(i64)big_int_to_u64(&x);
+	}
+	ir_write_i64(f, i);
+}
 
 void ir_file_write(irFileBuffer *f, void *data, isize len) {
 	ir_file_buffer_write(f, data, len);
@@ -308,16 +321,16 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		case Basic_b32:       ir_write_str_lit(f, "i32"); return;
 		case Basic_b64:       ir_write_str_lit(f, "i64"); return;
 
-		case Basic_i8:     ir_write_str_lit(f, "i8");  return;
-		case Basic_u8:     ir_write_str_lit(f, "i8");  return;
-		case Basic_i16:    ir_write_str_lit(f, "i16"); return;
-		case Basic_u16:    ir_write_str_lit(f, "i16"); return;
-		case Basic_i32:    ir_write_str_lit(f, "i32"); return;
-		case Basic_u32:    ir_write_str_lit(f, "i32"); return;
-		case Basic_i64:    ir_write_str_lit(f, "i64"); return;
-		case Basic_u64:    ir_write_str_lit(f, "i64"); return;
+		case Basic_i8:   ir_write_str_lit(f, "i8");  return;
+		case Basic_u8:   ir_write_str_lit(f, "i8");  return;
+		case Basic_i16:  ir_write_str_lit(f, "i16"); return;
+		case Basic_u16:  ir_write_str_lit(f, "i16"); return;
+		case Basic_i32:  ir_write_str_lit(f, "i32"); return;
+		case Basic_u32:  ir_write_str_lit(f, "i32"); return;
+		case Basic_i64:  ir_write_str_lit(f, "i64"); return;
+		case Basic_u64:  ir_write_str_lit(f, "i64"); return;
 
-		case Basic_rune:   ir_write_str_lit(f, "i32"); return;
+		case Basic_rune: ir_write_str_lit(f, "i32"); return;
 
 		case Basic_int:
 		case Basic_uint:
@@ -445,7 +458,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 				ir_print_encoded_local(f, name);
 			} else {
 				// TODO(bill): Is this correct behaviour?!
-				GB_ASSERT_MSG(name.len > 0, "%.*s %p", LIT(t->Named.name), e);
+				// GB_ASSERT_MSG(name.len > 0, "%.*s %p", LIT(t->Named.name), e);
 				// gb_printf_err("%.*s %p\n", LIT(t->Named.name), t->Named.type_name);
 				ir_print_type(f, m, bt);
 			}
@@ -493,6 +506,16 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align, size);
 		break;
 	}
+
+	case Type_BitSet: {
+		i64 size = type_size_of(t);
+		if (size == 0) {
+			ir_write_str_lit(f, "{}");
+			return;
+		}
+		ir_print_type(f, m, bit_set_to_int(t));
+		return;
+	}
 	}
 }
 
@@ -503,11 +526,7 @@ void ir_print_compound_element(irFileBuffer *f, irModule *m, ExactValue v, Type 
 	ir_write_byte(f, ' ');
 
 	if (v.kind == ExactValue_Invalid || !elem_type_can_be_constant(elem_type)) {
-		if (ir_type_has_default_values(elem_type)) {
-			ir_print_exact_value(f, m, v, elem_type);
-		} else {
-			ir_fprintf(f, "zeroinitializer");
-		}
+		ir_fprintf(f, "zeroinitializer");
 	} else {
 		ir_print_exact_value(f, m, v, elem_type);
 	}
@@ -591,19 +610,19 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	}
 	case ExactValue_Integer: {
 		if (is_type_pointer(type)) {
-			if (value.value_integer == 0) {
+			if (big_int_is_zero(&value.value_integer)) {
 				ir_write_str_lit(f, "null");
 			} else {
 				ir_write_str_lit(f, "inttoptr (");
 				ir_print_type(f, m, t_int);
 				ir_write_byte(f, ' ');
-				ir_write_i64(f, value.value_integer);
+				ir_write_big_int(f, value.value_integer);
 				ir_write_str_lit(f, " to ");
 				ir_print_type(f, m, t_rawptr);
 				ir_write_str_lit(f, ")");
 			}
 		} else {
-			ir_write_i64(f, value.value_integer);
+			ir_write_big_int(f, value.value_integer);
 		}
 		break;
 	}
@@ -675,13 +694,8 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 			Type *elem_type = type->Array.elem;
 			isize elem_count = cl->elems.count;
-			bool has_defaults = ir_type_has_default_values(type);
 			if (elem_count == 0) {
-				if (!has_defaults) {
-					ir_write_str_lit(f, "zeroinitializer");
-				} else {
-					ir_print_exact_value(f, m, empty_exact_value, type);
-				}
+				ir_write_str_lit(f, "zeroinitializer");
 				break;
 			}
 			GB_ASSERT_MSG(elem_count == type->Array.count, "%td != %td", elem_count, type->Array.count);
@@ -690,7 +704,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 			for (isize i = 0; i < elem_count; i++) {
 				if (i > 0) ir_write_str_lit(f, ", ");
-				TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
+				TypeAndValue tav = cl->elems[i]->tav;
 				GB_ASSERT(tav.mode != Addressing_Invalid);
 				ir_print_compound_element(f, m, tav.value, elem_type);
 			}
@@ -706,8 +720,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 			ast_node(cl, CompoundLit, value.value_compound);
 
-			bool has_defaults = ir_type_has_default_values(type);
-			if (cl->elems.count == 0 && !has_defaults) {
+			if (cl->elems.count == 0) {
 				ir_write_str_lit(f, "zeroinitializer");
 				break;
 			}
@@ -719,13 +732,13 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			bool *visited = gb_alloc_array(m->tmp_allocator, bool, value_count);
 
 			if (cl->elems.count > 0) {
-				if (cl->elems[0]->kind == AstNode_FieldValue) {
+				if (cl->elems[0]->kind == Ast_FieldValue) {
 					isize elem_count = cl->elems.count;
 					for (isize i = 0; i < elem_count; i++) {
 						ast_node(fv, FieldValue, cl->elems[i]);
 						String name = fv->field->Ident.token.string;
 
-						TypeAndValue tav = type_and_value_of_expr(m->info, fv->value);
+						TypeAndValue tav = fv->value->tav;
 						GB_ASSERT(tav.mode != Addressing_Invalid);
 
 						Selection sel = lookup_field(type, name, false);
@@ -737,7 +750,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				} else {
 					for_array(i, cl->elems) {
 						Entity *f = type->Struct.fields[i];
-						TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
+						TypeAndValue tav = cl->elems[i]->tav;
 						ExactValue val = {};
 						if (tav.mode != Addressing_Invalid) {
 							val = tav.value;
@@ -747,18 +760,6 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 					}
 				}
 			}
-
-			for (isize i = 0; i < value_count; i++) {
-				if (visited[i]) continue;
-				Entity *f = type->Struct.fields[i];
-				ExactValue v = {};
-				if (!f->Variable.default_is_nil) {
-					v = f->Variable.default_value;
-				}
-				values[i] = v;
-			}
-
-
 
 			if (type->Struct.is_packed) ir_write_byte(f, '<');
 			ir_write_byte(f, '{');
@@ -773,18 +774,40 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			for (isize i = 0; i < value_count; i++) {
 				if (i > 0) ir_write_string(f, str_lit(", "));
 				Entity *e = type->Struct.fields[i];
-
-				if (!visited[i] && e->Variable.default_is_undef) {
-					ir_print_type(f, m, e->type);
-					ir_write_str_lit(f, " undef");
-				} else {
-					ir_print_compound_element(f, m, values[i], e->type);
-				}
+				ir_print_compound_element(f, m, values[i], e->type);
 			}
 
 
 			ir_write_byte(f, '}');
 			if (type->Struct.is_packed) ir_write_byte(f, '>');
+		} else if (is_type_bit_set(type)) {
+			ast_node(cl, CompoundLit, value.value_compound);
+			if (cl->elems.count == 0) {
+				ir_write_str_lit(f, "zeroinitializer");
+				break;
+			}
+
+			i64 sz = type_size_of(type);
+			if (sz == 0) {
+				ir_write_str_lit(f, "zeroinitializer");
+				break;
+			}
+
+			u64 bits = 0;
+			for_array(i, cl->elems) {
+				Ast *e = cl->elems[i];
+				GB_ASSERT(e->kind != Ast_FieldValue);
+
+				TypeAndValue tav = e->tav;
+				if (tav.mode != Addressing_Constant) {
+					continue;
+				}
+				GB_ASSERT(tav.value.kind == ExactValue_Integer);
+				i64 v = big_int_to_i64(&tav.value.value_integer);
+				i64 lower = type->BitSet.lower;
+				bits |= 1ull<<cast(u64)(v-lower);
+			}
+			ir_write_u64(f, bits);
 		} else {
 			ir_write_str_lit(f, "zeroinitializer");
 		}
@@ -793,14 +816,14 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	}
 	case ExactValue_Procedure: {
 		irValue **found = nullptr;
-		AstNode *expr = value.value_procedure;
+		Ast *expr = value.value_procedure;
 		GB_ASSERT(expr != nullptr);
 
-		if (expr->kind == AstNode_ProcLit) {
+		if (expr->kind == Ast_ProcLit) {
 			found = map_get(&m->anonymous_proc_lits, hash_pointer(expr));
 		} else {
-			GB_ASSERT(expr->kind == AstNode_Ident);
-			Entity *e = entity_of_ident(m->info, expr);
+			GB_ASSERT(expr->kind == Ast_Ident);
+			Entity *e = entity_of_ident(expr);
 			GB_ASSERT(e != nullptr);
 			found = map_get(&m->values, hash_entity(e));
 		}
@@ -809,62 +832,9 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		ir_print_value(f, m, val, type);
 		break;
 	}
-	default: {
-		bool has_defaults = ir_type_has_default_values(type);
-		if (!has_defaults) {
-			ir_write_str_lit(f, "zeroinitializer");
-		} else {
-			if (is_type_struct(type)) {
-				i32 value_count = cast(i32)type->Struct.fields.count;
-				if (type->Struct.is_packed) ir_write_byte(f, '<');
-				ir_write_byte(f, '{');
-				if (type->Struct.custom_align > 0) {
-					ir_fprintf(f, "[0 x <%lld x i8>] zeroinitializer", cast(i64)type->Struct.custom_align);
-					if (value_count > 0) {
-						ir_write_string(f, str_lit(", "));
-					}
-				}
-
-				for (isize i = 0; i < value_count; i++) {
-					if (i > 0) ir_write_string(f, str_lit(", "));
-					Entity *e = type->Struct.fields[i];
-					if (e->Variable.default_is_undef) {
-						ir_print_type(f, m, e->type);
-						ir_write_str_lit(f, " undef");
-					} else {
-						ExactValue value = {};
-						if (!e->Variable.default_is_nil) {
-							value = e->Variable.default_value;
-						}
-						ir_print_compound_element(f, m, value, e->type);
-					}
-				}
-
-				ir_write_byte(f, '}');
-				if (type->Struct.is_packed) ir_write_byte(f, '>');
-
-			} else if (is_type_array(type)) {
-				i64 count = type->Array.count;
-				if (count == 0) {
-					ir_write_str_lit(f, "zeroinitializer");
-				} else {
-					Type *elem = type->Array.elem;
-					ir_write_byte(f, '[');
-					for (i64 i = 0; i < count; i++) {
-						if (i > 0) ir_write_string(f, str_lit(", "));
-						ir_print_type(f, m, elem);
-						ir_write_byte(f, ' ');
-						ir_print_exact_value(f, m, empty_exact_value, elem);
-					}
-					ir_write_byte(f, ']');
-				}
-			} else {
-				GB_PANIC("Unknown type for default values");
-			}
-		}
-		// GB_PANIC("Invalid ExactValue: %d", value.kind);
+	default:
+		ir_write_str_lit(f, "zeroinitializer");
 		break;
-	}
 	}
 }
 
@@ -944,8 +914,7 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 		Scope *scope = e->scope;
 		bool in_global_scope = false;
 		if (scope != nullptr) {
-			// TODO(bill): Fix this rule. What should it be?
-			in_global_scope = scope->is_global || scope->is_init;
+			in_global_scope = (scope->flags & ScopeFlag_Global) != 0;
 		}
 		ir_print_encoded_global(f, ir_get_global_name(m, value), in_global_scope);
 		break;
@@ -1733,6 +1702,10 @@ void ir_print_type_name(irFileBuffer *f, irModule *m, irValue *v) {
 	ir_write_byte(f, '\n');
 }
 
+void foo_bar(void) {
+
+}
+
 void print_llvm_ir(irGen *ir) {
 	irModule *m = &ir->module;
 
@@ -1806,6 +1779,15 @@ void print_llvm_ir(irGen *ir) {
 		}
 	}
 
+	if (ir->print_chkstk) {
+		// TODO(bill): Clean up this code
+		ir_write_str_lit(f, "\n\n");
+		ir_write_str_lit(f, "define void @__chkstk() #0 {\n");
+		ir_write_str_lit(f, "\tcall void asm sideeffect \"push   %rcx \\09\\0Apush   %rax \\09\\0Acmp    $$0x1000,%rax \\09\\0Alea    24(%rsp),%rcx \\09\\0Ajb     1f \\09\\0A2: \\09\\0Asub    $$0x1000,%rcx \\09\\0Aorl    $$0,(%rcx) \\09\\0Asub    $$0x1000,%rax \\09\\0Acmp    $$0x1000,%rax \\09\\0Aja     2b \\09\\0A1: \\09\\0Asub    %rax,%rcx \\09\\0Aorl    $$0,(%rcx) \\09\\0Apop    %rax \\09\\0Apop    %rcx \\09\\0Aret \\09\\0A\", \"~{dirflag},~{fpsr},~{flags}\"()\n");
+		ir_write_str_lit(f, "\tret void\n");
+		ir_write_str_lit(f, "}\n\n");
+	}
+
 	// NOTE(bill): Print procedures with bodies next
 	for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
@@ -1830,8 +1812,7 @@ void print_llvm_ir(irGen *ir) {
 		bool in_global_scope = false;
 		if (scope != nullptr) {
 			// TODO(bill): Fix this rule. What should it be?
-			in_global_scope = scope->is_global || scope->is_init;
-			// in_global_scope = value->Global.name_is_not_mangled;
+			in_global_scope = (scope->flags & ScopeFlag_Global) != 0;
 		}
 
 		ir_print_encoded_global(f, ir_get_global_name(m, v), in_global_scope);
@@ -1873,11 +1854,7 @@ void print_llvm_ir(irGen *ir) {
 			if (g->value != nullptr) {
 				ir_print_value(f, m, g->value, g->entity->type);
 			} else {
-				if (ir_type_has_default_values(g->entity->type)) {
-					ir_print_exact_value(f, m, empty_exact_value, g->entity->type);
-				} else {
-					ir_write_string(f, str_lit("zeroinitializer"));
-				}
+				ir_write_string(f, str_lit("zeroinitializer"));
 			}
 		}
 		ir_write_byte(f, '\n');
@@ -1890,7 +1867,7 @@ void print_llvm_ir(irGen *ir) {
 	if (m->generate_debug_info) {
 		ir_write_byte(f, '\n');
 
-		i32 diec = m->debug_info.entries.count;
+		i32 diec = cast(i32)m->debug_info.entries.count;
 
 		i32 di_version    = diec+1;
 		i32 di_debug_info = diec+2;

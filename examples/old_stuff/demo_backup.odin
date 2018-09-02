@@ -36,7 +36,7 @@ general_stuff :: proc() {
 	// C-style variadic procedures
 	foreign __llvm_core {
 		// The variadic part allows for extra type checking too which C does not provide
-		c_printf :: proc(fmt: ^u8, #c_vararg args: ...any) -> i32 #link_name "printf" ---;
+		c_printf :: proc(fmt: ^u8, #c_vararg args: ..any) -> i32 #link_name "printf" ---;
 	}
 	str := "%d\n\x00";
 	// c_printf(&str[0], i32(789456123));
@@ -154,8 +154,8 @@ default_return_values :: proc() {
 		match x {
 		case 0: return;
 		case 1: return "Goodbye";
-		case 2: return "Goodbye", "cruel world...";
-		case 3: return second = "cruel world...", first = "Goodbye";
+		case 2: return "Goodbye", "cruel world..";
+		case 3: return second = "cruel world..", first = "Goodbye";
 		}
 
 		return second = "my old friend.";
@@ -231,7 +231,7 @@ explicit_parametric_polymorphic_procedures :: proc() {
 	defer free(another_ptr);
 
 
-	add :: proc(T: type, args: ...T) -> T {
+	add :: proc(T: type, args: ..T) -> T {
 		res: T;
 		for arg in args do res += arg;
 		return res;

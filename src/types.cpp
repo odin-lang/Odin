@@ -1,5 +1,5 @@
 struct Scope;
-struct AstNode;
+struct Ast;
 
 enum BasicKind {
 	Basic_Invalid,
@@ -67,9 +67,10 @@ enum BasicFlag {
 
 	BasicFlag_LLVM        = GB_BIT(10),
 
-	BasicFlag_Numeric      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Complex,
-	BasicFlag_Ordered      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
-	BasicFlag_ConstantType = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
+	BasicFlag_Numeric        = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Complex,
+	BasicFlag_Ordered        = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
+	BasicFlag_OrderedNumeric = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Rune,
+	BasicFlag_ConstantType   = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
 };
 
 struct BasicType {
@@ -81,7 +82,7 @@ struct BasicType {
 
 struct TypeStruct {
 	Array<Entity *> fields;
-	AstNode *node;
+	Ast *node;
 	Scope *  scope;
 
 	Array<i64> offsets;
@@ -91,7 +92,6 @@ struct TypeStruct {
 	bool       is_raw_union;
 	bool       is_polymorphic;
 	bool       is_poly_specialized;
-	bool       has_proc_default_values;
 	Type *     polymorphic_params; // Type_Tuple
 	Type *     polymorphic_parent;
 
@@ -131,18 +131,14 @@ struct TypeStruct {
 	TYPE_KIND(Struct,  TypeStruct)                        \
 	TYPE_KIND(Enum, struct {                              \
 		Array<Entity *> fields;                           \
-		AstNode *node;                                    \
+		Ast *node;                                        \
 		Scope *  scope;                                   \
 		Entity * names;                                   \
 		Type *   base_type;                               \
-		bool     is_export;                               \
-		Entity * count;                                   \
-		Entity * min_value;                               \
-		Entity * max_value;                               \
 	})                                                    \
 	TYPE_KIND(Union, struct {                             \
 		Array<Type *> variants;                           \
-		AstNode *node;                                    \
+		Ast *node;                                    \
 		Scope *  scope;                                   \
 		i64      variant_block_size;                      \
 		i64      custom_align;                            \
@@ -154,7 +150,7 @@ struct TypeStruct {
 		bool            are_offsets_set;                  \
 	})                                                    \
 	TYPE_KIND(Proc, struct {                              \
-		AstNode *node;                                    \
+		Ast *node;                                    \
 		Scope *  scope;                                   \
 		Type *   params;  /* Type_Tuple */                \
 		Type *   results; /* Type_Tuple */                \
@@ -181,6 +177,12 @@ struct TypeStruct {
 		Array<u32>      sizes;                            \
 		Scope *         scope;                            \
 		i64             custom_align;                     \
+	})                                                    \
+	TYPE_KIND(BitSet, struct {                            \
+		Type *elem;                                       \
+		Type *underlying;                                 \
+		i64   lower;                                      \
+		i64   upper;                                      \
 	})                                                    \
 
 
@@ -380,6 +382,7 @@ gb_global Type *t_type_info_union             = nullptr;
 gb_global Type *t_type_info_enum              = nullptr;
 gb_global Type *t_type_info_map               = nullptr;
 gb_global Type *t_type_info_bit_field         = nullptr;
+gb_global Type *t_type_info_bit_set           = nullptr;
 
 gb_global Type *t_type_info_named_ptr         = nullptr;
 gb_global Type *t_type_info_integer_ptr       = nullptr;
@@ -402,6 +405,7 @@ gb_global Type *t_type_info_union_ptr         = nullptr;
 gb_global Type *t_type_info_enum_ptr          = nullptr;
 gb_global Type *t_type_info_map_ptr           = nullptr;
 gb_global Type *t_type_info_bit_field_ptr     = nullptr;
+gb_global Type *t_type_info_bit_set_ptr       = nullptr;
 
 gb_global Type *t_allocator                   = nullptr;
 gb_global Type *t_allocator_ptr               = nullptr;
@@ -611,6 +615,10 @@ Type *alloc_type_bit_field() {
 	Type *t = alloc_type(Type_BitField);
 	return t;
 }
+Type *alloc_type_bit_set() {
+	Type *t = alloc_type(Type_BitSet);
+	return t;
+}
 
 
 
@@ -651,42 +659,40 @@ bool is_type_named_alias(Type *t) {
 }
 
 bool is_type_boolean(Type *t) {
-	t = core_type(t);
+	// t = core_type(t);
+	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Boolean) != 0;
 	}
 	return false;
 }
 bool is_type_integer(Type *t) {
-	t = core_type(t);
+	// t = core_type(t);
+	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Integer) != 0;
 	}
 	return false;
 }
 bool is_type_unsigned(Type *t) {
-	t = core_type(t);
+	t = base_type(t);
+	// t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Unsigned) != 0;
 	}
 	return false;
 }
 bool is_type_rune(Type *t) {
-	t = core_type(t);
+	// t = core_type(t);
+	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Rune) != 0;
 	}
 	return false;
 }
-bool is_type_number(Type *t) {
-	t = core_type(t);
-	if (t->kind == Type_Basic) {
-		return (t->Basic.flags & BasicFlag_Numeric) != 0;
-	}
-	return false;
-}
 bool is_type_numeric(Type *t) {
-	t = core_type(t);
+	// t = core_type(t);
+	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Numeric) != 0;
 	}
@@ -737,10 +743,21 @@ bool is_type_ordered(Type *t) {
 	}
 	return false;
 }
+bool is_type_ordered_numeric(Type *t) {
+	t = core_type(t);
+	switch (t->kind) {
+	case Type_Basic:
+		return (t->Basic.flags & BasicFlag_OrderedNumeric) != 0;
+	}
+	return false;
+}
 bool is_type_constant_type(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_ConstantType) != 0;
+	}
+	if (t->kind == Type_BitSet) {
+		return true;
 	}
 	return false;
 }
@@ -899,6 +916,10 @@ bool is_type_bit_field_value(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_BitFieldValue);
 }
+bool is_type_bit_set(Type *t) {
+	t = base_type(t);
+	return (t->kind == Type_BitSet);
+}
 bool is_type_map(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Map;
@@ -957,6 +978,37 @@ bool is_type_valid_for_keys(Type *t) {
 	}
 
 	return false;
+}
+
+bool is_type_valid_bit_set_elem(Type *t) {
+	if (is_type_enum(t)) {
+		return true;
+	}
+	t = core_type(t);
+	if (t->kind == Type_Generic) {
+		return true;
+	}
+	return false;
+}
+
+Type *bit_set_to_int(Type *t) {
+	GB_ASSERT(is_type_bit_set(t));
+	Type *bt = base_type(t);
+	Type *underlying = bt->BitSet.underlying;
+	if (underlying != nullptr && is_type_integer(underlying)) {
+		return underlying;
+	}
+
+	i64 sz = type_size_of(t);
+	switch (sz) {
+	case 0: return t_u8;
+	case 1: return t_u8;
+	case 2: return t_u16;
+	case 4: return t_u32;
+	case 8: return t_u64;
+	}
+	GB_PANIC("Unknown bit_set size");
+	return nullptr;
 }
 
 
@@ -1104,6 +1156,10 @@ bool type_has_nil(Type *t) {
 		}
 		return false;
 	} break;
+	case Type_Enum:
+	case Type_BitSet:
+	case Type_BitField:
+		return true;
 	case Type_Slice:
 	case Type_Proc:
 	case Type_Pointer:
@@ -1154,8 +1210,24 @@ bool is_type_comparable(Type *t) {
 		return is_type_comparable(t->Array.elem);
 	case Type_Proc:
 		return true;
+
+	case Type_BitSet:
+		return true;
 	}
 	return false;
+}
+
+Type *strip_type_aliasing(Type *x) {
+	if (x == nullptr) {
+		return x;
+	}
+	if (x->kind == Type_Named) {
+		Entity *e = x->Named.type_name;
+		if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.is_type_alias) {
+			return x->Named.base;
+		}
+	}
+	return x;
 }
 
 bool are_types_identical(Type *x, Type *y) {
@@ -1167,6 +1239,9 @@ bool are_types_identical(Type *x, Type *y) {
 	    (x != nullptr && y == nullptr)) {
 		return false;
 	}
+
+	x = strip_type_aliasing(x);
+	y = strip_type_aliasing(y);
 
 	switch (x->kind) {
 	case Type_Generic:
@@ -1214,6 +1289,12 @@ bool are_types_identical(Type *x, Type *y) {
 
 				return true;
 			}
+		}
+		break;
+
+	case Type_BitSet:
+		if (y->kind == Type_BitSet) {
+			return are_types_identical(x->BitSet.elem, y->BitSet.elem);
 		}
 		break;
 
@@ -1586,7 +1667,7 @@ Selection lookup_field_from_index(Type *type, i64 index) {
 	case Type_BitField: {
 		auto sel_array = array_make<i32>(a, 1);
 		sel_array[0] = cast(i32)index;
-		return make_selection(type->BitField.fields[index], sel_array, false);
+		return make_selection(type->BitField.fields[cast(isize)index], sel_array, false);
 	} break;
 
 	}
@@ -1596,7 +1677,7 @@ Selection lookup_field_from_index(Type *type, i64 index) {
 }
 
 
-Entity *current_scope_lookup_entity(Scope *s, String name);
+Entity *scope_lookup_current(Scope *s, String name);
 
 Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel) {
 	GB_ASSERT(type_ != nullptr);
@@ -1611,55 +1692,6 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 	sel.indirect = sel.indirect || is_ptr;
 
 	type = base_type(type);
-
-	if (type->kind == Type_Basic) {
-		switch (type->Basic.kind) {
-		case Basic_any: {
-		#if 1
-			// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
-			// `Raw_Any` type?
-			String data_str = str_lit("data");
-			String typeid_str = str_lit("typeid");
-			gb_local_persist Entity *entity__any_data = alloc_entity_field(nullptr, make_token_ident(data_str), t_rawptr, false, 0);
-			gb_local_persist Entity *entity__any_typeid = alloc_entity_field(nullptr, make_token_ident(typeid_str), t_typeid, false, 1);
-
-			if (field_name == data_str) {
-				selection_add_index(&sel, 0);
-				sel.entity = entity__any_data;;
-				return sel;
-			} else if (field_name == typeid_str) {
-				selection_add_index(&sel, 1);
-				sel.entity = entity__any_typeid;
-				return sel;
-			}
-		#endif
-		} break;
-		}
-
-		return sel;
-	} else if (type->kind == Type_Array) {
-		if (type->Array.count <= 4) {
-			// HACK(bill): Memory leak
-			switch (type->Array.count) {
-			#define _ARRAY_FIELD_CASE(_length, _name) \
-			case (_length): \
-				if (field_name == _name) { \
-					selection_add_index(&sel, (_length)-1); \
-					sel.entity = alloc_entity_array_elem(nullptr, make_token_ident(str_lit(_name)), type->Array.elem, (_length)-1); \
-					return sel; \
-				} \
-				/*fallthrough*/
-
-			_ARRAY_FIELD_CASE(4, "w");
-			_ARRAY_FIELD_CASE(3, "z");
-			_ARRAY_FIELD_CASE(2, "y");
-			_ARRAY_FIELD_CASE(1, "x");
-			default: break;
-
-			#undef _ARRAY_FIELD_CASE
-			}
-		}
-	}
 
 	if (is_type) {
 		switch (type->kind) {
@@ -1682,21 +1714,6 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 
 		if (is_type_enum(type)) {
 			// NOTE(bill): These may not have been added yet, so check in case
-			if (type->Enum.count != nullptr) {
-				if (field_name == "count") {
-					sel.entity = type->Enum.count;
-					return sel;
-				}
-				if (field_name == "min_value") {
-					sel.entity = type->Enum.min_value;
-					return sel;
-				}
-				if (field_name == "max_value") {
-					sel.entity = type->Enum.max_value;
-					return sel;
-				}
-			}
-
 			for_array(i, type->Enum.fields) {
 				Entity *f = type->Enum.fields[i];
 				GB_ASSERT(f->kind == Entity_Constant);
@@ -1713,7 +1730,7 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 		if (type->kind == Type_Struct) {
 			Scope *s = type->Struct.scope;
 			if (s != nullptr) {
-				Entity *found = current_scope_lookup_entity(s, field_name);
+				Entity *found = scope_lookup_current(s, field_name);
 				if (found != nullptr && found->kind != Entity_Variable) {
 					sel.entity = found;
 					return sel;
@@ -1769,6 +1786,78 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 				sel.entity = f;
 				return sel;
 			}
+		}
+	} else if (type->kind == Type_Basic) {
+		switch (type->Basic.kind) {
+		case Basic_any: {
+		#if 1
+			// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
+			// `Raw_Any` type?
+			String data_str = str_lit("data");
+			String id_str = str_lit("id");
+			gb_local_persist Entity *entity__any_data = alloc_entity_field(nullptr, make_token_ident(data_str), t_rawptr, false, 0);
+			gb_local_persist Entity *entity__any_id = alloc_entity_field(nullptr, make_token_ident(id_str), t_typeid, false, 1);
+
+			if (field_name == data_str) {
+				selection_add_index(&sel, 0);
+				sel.entity = entity__any_data;
+				return sel;
+			} else if (field_name == id_str) {
+				selection_add_index(&sel, 1);
+				sel.entity = entity__any_id;
+				return sel;
+			}
+		#endif
+		} break;
+		}
+
+		return sel;
+	} else if (type->kind == Type_Array) {
+		if (type->Array.count <= 4) {
+			// HACK(bill): Memory leak
+			switch (type->Array.count) {
+			#define _ARRAY_FIELD_CASE(_length, _name) \
+			case (_length): \
+				if (field_name == _name) { \
+					selection_add_index(&sel, (_length)-1); \
+					sel.entity = alloc_entity_array_elem(nullptr, make_token_ident(str_lit(_name)), type->Array.elem, (_length)-1); \
+					return sel; \
+				} \
+				/*fallthrough*/
+
+			_ARRAY_FIELD_CASE(4, "w");
+			_ARRAY_FIELD_CASE(3, "z");
+			_ARRAY_FIELD_CASE(2, "y");
+			_ARRAY_FIELD_CASE(1, "x");
+			default: break;
+
+			#undef _ARRAY_FIELD_CASE
+			}
+		}
+	} else if (type->kind == Type_DynamicArray) {
+		// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
+		// `Raw_Dynamic_Array` type?
+		GB_ASSERT(t_allocator != nullptr);
+		String allocator_str = str_lit("allocator");
+		gb_local_persist Entity *entity__allocator = alloc_entity_field(nullptr, make_token_ident(allocator_str), t_allocator, false, 3);
+
+		if (field_name == allocator_str) {
+			selection_add_index(&sel, 3);
+			sel.entity = entity__allocator;
+			return sel;
+		}
+	} else if (type->kind == Type_Map) {
+		// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
+		// `Raw_Map` type?
+		GB_ASSERT(t_allocator != nullptr);
+		String allocator_str = str_lit("allocator");
+		gb_local_persist Entity *entity__allocator = alloc_entity_field(nullptr, make_token_ident(allocator_str), t_allocator, false, 3);
+
+		if (field_name == allocator_str) {
+			selection_add_index(&sel, 1);
+			selection_add_index(&sel, 3);
+			sel.entity = entity__allocator;
+			return sel;
 		}
 	}
 
@@ -2008,6 +2097,19 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		}
 		return gb_clamp(next_pow2(align), 1, build_context.max_align);
 	} break;
+
+	case Type_BitSet: {
+		if (t->BitSet.underlying != nullptr) {
+			return type_align_of(t->BitSet.underlying);
+		}
+		i64 bits = t->BitSet.upper - t->BitSet.lower + 1;
+		if (bits <= 8)  return 1;
+		if (bits <= 16) return 2;
+		if (bits <= 32) return 4;
+		if (bits <= 64) return 8;
+		return 8; // NOTE(bill): Could be an invalid range so limit it for now
+
+	}
 	}
 
 	// return gb_clamp(next_pow2(type_size_of(t)), 1, build_context.max_align);
@@ -2138,7 +2240,7 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 		}
 		align = type_align_of_internal(t, path);
 		type_set_offsets(t);
-		size = t->Tuple.offsets[count-1] + type_size_of_internal(t->Tuple.variables[count-1]->type, path);
+		size = t->Tuple.offsets[cast(isize)count-1] + type_size_of_internal(t->Tuple.variables[cast(isize)count-1]->type, path);
 		return align_formula(size, align);
 	} break;
 
@@ -2208,7 +2310,7 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 				return FAILURE_SIZE;
 			}
 			type_set_offsets(t);
-			size = t->Struct.offsets[count-1] + type_size_of_internal(t->Struct.fields[count-1]->type, path);
+			size = t->Struct.offsets[cast(isize)count-1] + type_size_of_internal(t->Struct.fields[cast(isize)count-1]->type, path);
 			return align_formula(size, align);
 		}
 	} break;
@@ -2218,12 +2320,24 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 		i64 end = 0;
 		if (t->BitField.fields.count > 0) {
 			i64 last = t->BitField.fields.count-1;
-			end = t->BitField.offsets[last] + t->BitField.sizes[last];
+			end = t->BitField.offsets[cast(isize)last] + t->BitField.sizes[cast(isize)last];
 		}
 		i64 bits = align_formula(end, align);
 		GB_ASSERT((bits%8) == 0);
 		return bits/8;
 	} break;
+
+	case Type_BitSet: {
+		if (t->BitSet.underlying != nullptr) {
+			return type_size_of(t->BitSet.underlying);
+		}
+		i64 bits = t->BitSet.upper - t->BitSet.lower + 1;
+		if (bits <= 8)  return 1;
+		if (bits <= 16) return 2;
+		if (bits <= 32) return 4;
+		if (bits <= 64) return 8;
+		return 8; // NOTE(bill): Could be an invalid range so limit it for now
+	}
 	}
 
 	// Catch all
@@ -2453,7 +2567,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 						}
 						if (var->flags&EntityFlag_Ellipsis) {
 							Type *slice = base_type(var->type);
-							str = gb_string_appendc(str, "...");
+							str = gb_string_appendc(str, "..");
 							GB_ASSERT(var->type->kind == Type_Slice);
 							str = write_type_to_string(str, slice->Slice.elem);
 						} else {
@@ -2533,6 +2647,12 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_BitFieldValue:
 		str = gb_string_append_fmt(str, "(bit field value with %d bits)", cast(int)type->BitFieldValue.bits);
+		break;
+
+	case Type_BitSet:
+		str = gb_string_appendc(str, "bit_set[");
+		str = write_type_to_string(str, type->BitSet.elem);
+		str = gb_string_appendc(str, "]");
 		break;
 	}
 

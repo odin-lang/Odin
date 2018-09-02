@@ -76,54 +76,56 @@ TOKEN_KIND(Token__ComparisonEnd, ""), \
 	TOKEN_KIND(Token_Semicolon,     ";"),   \
 	TOKEN_KIND(Token_Period,        "."),   \
 	TOKEN_KIND(Token_Comma,         ","),   \
-	TOKEN_KIND(Token_Ellipsis,      "..."), \
-	TOKEN_KIND(Token_HalfClosed,    ".."),  \
+	TOKEN_KIND(Token_Ellipsis,    ".."),  \
 	TOKEN_KIND(Token_BackSlash,     "\\"),  \
 TOKEN_KIND(Token__OperatorEnd, ""), \
 \
 TOKEN_KIND(Token__KeywordBegin, ""), \
-	TOKEN_KIND(Token_import,                 "import"),                 \
-	TOKEN_KIND(Token_export,                 "export"),                 \
-	TOKEN_KIND(Token_foreign,                "foreign"),                \
-	TOKEN_KIND(Token_type,                   "type"),                   \
-	TOKEN_KIND(Token_when,                   "when"),                   \
-	TOKEN_KIND(Token_if,                     "if"),                     \
-	TOKEN_KIND(Token_else,                   "else"),                   \
-	TOKEN_KIND(Token_for,                    "for"),                    \
-	TOKEN_KIND(Token_switch,                 "switch"),                 \
-	TOKEN_KIND(Token_in,                     "in"),                     \
-	TOKEN_KIND(Token_do,                     "do"),                     \
-	TOKEN_KIND(Token_case,                   "case"),                   \
-	TOKEN_KIND(Token_break,                  "break"),                  \
-	TOKEN_KIND(Token_continue,               "continue"),               \
-	TOKEN_KIND(Token_fallthrough,            "fallthrough"),            \
-	TOKEN_KIND(Token_defer,                  "defer"),                  \
-	TOKEN_KIND(Token_return,                 "return"),                 \
-	TOKEN_KIND(Token_proc,                   "proc"),                   \
-	TOKEN_KIND(Token_macro,                  "macro"),                  \
-	TOKEN_KIND(Token_struct,                 "struct"),                 \
-	TOKEN_KIND(Token_union,                  "union"),                  \
-	TOKEN_KIND(Token_enum,                   "enum"),                   \
-	TOKEN_KIND(Token_bit_field,              "bit_field"),              \
-	TOKEN_KIND(Token_map,                    "map"),                    \
-	TOKEN_KIND(Token_static,                 "static"),                 \
-	TOKEN_KIND(Token_dynamic,                "dynamic"),                \
-	TOKEN_KIND(Token_auto_cast,              "auto_cast"),              \
-	TOKEN_KIND(Token_cast,                   "cast"),                   \
-	TOKEN_KIND(Token_transmute,              "transmute"),              \
-	TOKEN_KIND(Token_distinct,               "distinct"),               \
-	TOKEN_KIND(Token_using,                  "using"),                  \
-	TOKEN_KIND(Token_inline,                 "inline"),                 \
-	TOKEN_KIND(Token_no_inline,              "no_inline"),              \
-	TOKEN_KIND(Token_context,                "context"),                \
-	TOKEN_KIND(Token_size_of,                "size_of"),                \
-	TOKEN_KIND(Token_align_of,               "align_of"),               \
-	TOKEN_KIND(Token_offset_of,              "offset_of"),              \
-	TOKEN_KIND(Token_type_of,                "type_of"),                \
-	TOKEN_KIND(Token_const,                  "const"),                  \
-	TOKEN_KIND(Token_asm,                    "asm"),                    \
-	TOKEN_KIND(Token_yield,                  "yield"),                  \
-	TOKEN_KIND(Token_await,                  "await"),                  \
+	TOKEN_KIND(Token_import,      "import"),      \
+	TOKEN_KIND(Token_export,      "export"),      \
+	TOKEN_KIND(Token_foreign,     "foreign"),     \
+	TOKEN_KIND(Token_package,     "package"),     \
+	TOKEN_KIND(Token_type,        "type"),        \
+	TOKEN_KIND(Token_typeid,      "typeid"),      \
+	TOKEN_KIND(Token_when,        "when"),        \
+	TOKEN_KIND(Token_if,          "if"),          \
+	TOKEN_KIND(Token_else,        "else"),        \
+	TOKEN_KIND(Token_for,         "for"),         \
+	TOKEN_KIND(Token_switch,      "switch"),      \
+	TOKEN_KIND(Token_in,          "in"),          \
+	TOKEN_KIND(Token_do,          "do"),          \
+	TOKEN_KIND(Token_case,        "case"),        \
+	TOKEN_KIND(Token_break,       "break"),       \
+	TOKEN_KIND(Token_continue,    "continue"),    \
+	TOKEN_KIND(Token_fallthrough, "fallthrough"), \
+	TOKEN_KIND(Token_defer,       "defer"),       \
+	TOKEN_KIND(Token_return,      "return"),      \
+	TOKEN_KIND(Token_proc,        "proc"),        \
+	TOKEN_KIND(Token_macro,       "macro"),       \
+	TOKEN_KIND(Token_struct,      "struct"),      \
+	TOKEN_KIND(Token_union,       "union"),       \
+	TOKEN_KIND(Token_enum,        "enum"),        \
+	TOKEN_KIND(Token_bit_field,   "bit_field"),   \
+	TOKEN_KIND(Token_bit_set,     "bit_set"),     \
+	TOKEN_KIND(Token_map,         "map"),         \
+	TOKEN_KIND(Token_static,      "static"),      \
+	TOKEN_KIND(Token_dynamic,     "dynamic"),     \
+	TOKEN_KIND(Token_auto_cast,   "auto_cast"),   \
+	TOKEN_KIND(Token_cast,        "cast"),        \
+	TOKEN_KIND(Token_transmute,   "transmute"),   \
+	TOKEN_KIND(Token_distinct,    "distinct"),    \
+	TOKEN_KIND(Token_using,       "using"),       \
+	TOKEN_KIND(Token_inline,      "inline"),      \
+	TOKEN_KIND(Token_no_inline,   "no_inline"),   \
+	TOKEN_KIND(Token_context,     "context"),     \
+	TOKEN_KIND(Token_size_of,     "size_of"),     \
+	TOKEN_KIND(Token_align_of,    "align_of"),    \
+	TOKEN_KIND(Token_offset_of,   "offset_of"),   \
+	TOKEN_KIND(Token_type_of,     "type_of"),     \
+	TOKEN_KIND(Token_const,       "const"),       \
+	TOKEN_KIND(Token_asm,         "asm"),         \
+	TOKEN_KIND(Token_yield,       "yield"),       \
+	TOKEN_KIND(Token_await,       "await"),       \
 TOKEN_KIND(Token__KeywordEnd, ""), \
 	TOKEN_KIND(Token_Count, "")
 
@@ -142,16 +144,15 @@ String const token_strings[] = {
 
 struct TokenPos {
 	String file;
-	isize  line;
-	isize  column;
+	isize  offset; // starting at 0
+	isize  line;   // starting at 1
+	isize  column; // starting at 1
 };
 
-TokenPos token_pos(String file, isize line, isize column) {
-	TokenPos pos = {file, line, column};
-	return pos;
-}
-
 i32 token_pos_cmp(TokenPos const &a, TokenPos const &b) {
+	if (a.offset != b.offset) {
+		return (a.offset < b.offset) ? -1 : +1;
+	}
 	if (a.line != b.line) {
 		return (a.line < b.line) ? -1 : +1;
 	}
@@ -225,6 +226,9 @@ void error_va(Token token, char *fmt, va_list va) {
 		              gb_bprintf_va(fmt, va));
 	}
 	gb_mutex_unlock(&global_error_collector.mutex);
+	if (global_error_collector.count > 20) {
+		gb_exit(1);
+	}
 }
 
 void error_no_newline_va(Token token, char *fmt, va_list va) {
@@ -240,6 +244,9 @@ void error_no_newline_va(Token token, char *fmt, va_list va) {
 		              gb_bprintf_va(fmt, va));
 	}
 	gb_mutex_unlock(&global_error_collector.mutex);
+	if (global_error_collector.count > 20) {
+		gb_exit(1);
+	}
 }
 
 
@@ -257,6 +264,9 @@ void syntax_error_va(Token token, char *fmt, va_list va) {
 	}
 
 	gb_mutex_unlock(&global_error_collector.mutex);
+	if (global_error_collector.count > 20) {
+		gb_exit(1);
+	}
 }
 
 void syntax_warning_va(Token token, char *fmt, va_list va) {
@@ -290,6 +300,16 @@ void error(Token token, char *fmt, ...) {
 	error_va(token, fmt, va);
 	va_end(va);
 }
+
+void error(TokenPos pos, char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	Token token = {};
+	token.pos = pos;
+	error_va(token, fmt, va);
+	va_end(va);
+}
+
 
 void syntax_error(Token token, char *fmt, ...) {
 	va_list va;
@@ -447,11 +467,8 @@ void advance_to_next_rune(Tokenizer *t) {
 TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 	TokenizerInitError err = TokenizerInit_None;
 
-	char *c_str = gb_alloc_array(heap_allocator(), char, fullpath.len+1);
+	char *c_str = alloc_cstring(heap_allocator(), fullpath);
 	defer (gb_free(heap_allocator(), c_str));
-
-	gb_memcopy(c_str, fullpath.text, fullpath.len);
-	c_str[fullpath.len] = '\0';
 
 	// TODO(bill): Memory map rather than copy contents
 	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);
@@ -651,21 +668,22 @@ end:
 	return token;
 }
 
-// Quote == " for string
-bool scan_escape(Tokenizer *t, Rune quote) {
+bool scan_escape(Tokenizer *t) {
 	isize len = 0;
 	u32 base = 0, max = 0, x = 0;
 
 	Rune r = t->curr_rune;
 	if (r == 'a'  ||
 	    r == 'b'  ||
+	    r == 'e'  ||
 	    r == 'f'  ||
 	    r == 'n'  ||
 	    r == 'r'  ||
 	    r == 't'  ||
 	    r == 'v'  ||
 	    r == '\\' ||
-	    r == quote) {
+	    r == '\'' ||
+	    r == '\"') {
 		advance_to_next_rune(t);
 		return true;
 	} else if (gb_is_between(r, '0', '7')) {
@@ -809,6 +827,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 	token.string = make_string(t->curr, 1);
 	token.pos.file = t->fullpath;
 	token.pos.line = t->line_count;
+	token.pos.offset = t->curr - t->start;
 	token.pos.column = t->curr - t->line + 1;
 
 	Rune curr_rune = t->curr_rune;
@@ -857,7 +876,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 				}
 				n++;
 				if (r == '\\') {
-					if (!scan_escape(t, quote)) {
+					if (!scan_escape(t)) {
 						valid = false;
 					}
 				}
@@ -897,7 +916,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 						break;
 					}
 					if (r == '\\') {
-						scan_escape(t, quote);
+						scan_escape(t);
 					}
 				}
 			} else {
@@ -928,11 +947,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '.':
 			if (t->curr_rune == '.') { // Could be an ellipsis
 				advance_to_next_rune(t);
-				token.kind = Token_HalfClosed;
-				if (t->curr_rune == '.') {
-					advance_to_next_rune(t);
-					token.kind = Token_Ellipsis;
-				}
+				token.kind = Token_Ellipsis;
 			} else if ('0' <= t->curr_rune && t->curr_rune <= '9') {
 				token = scan_number_to_token(t, true);
 			} else {

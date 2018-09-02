@@ -1,6 +1,6 @@
 // Generates Documentation
 
-gbString expr_to_string(AstNode *expression);
+gbString expr_to_string(Ast *expression);
 
 String alloc_comment_group_string(gbAllocator a, CommentGroup g) {
 	isize len = 0;
@@ -33,9 +33,9 @@ String alloc_comment_group_string(gbAllocator a, CommentGroup g) {
 }
 
 #if 0
-void print_type_spec(AstNode *spec) {
+void print_type_spec(Ast *spec) {
 	ast_node(ts, TypeSpec, spec);
-	GB_ASSERT(ts->name->kind == AstNode_Ident);
+	GB_ASSERT(ts->name->kind == Ast_Ident);
 	String name = ts->name->Ident.string;
 	if (name.len == 0) {
 		return;
@@ -46,8 +46,8 @@ void print_type_spec(AstNode *spec) {
 	gb_printf("type %.*s\n", LIT(name));
 }
 
-void print_proc_decl(AstNodeProcDecl *pd) {
-	GB_ASSERT(pd->name->kind == AstNode_Ident);
+void print_proc_decl(AstProcDecl *pd) {
+	GB_ASSERT(pd->name->kind == Ast_Ident);
 	String name = pd->name->Ident.string;
 	if (name.len == 0) {
 		return;
@@ -89,19 +89,19 @@ void print_proc_decl(AstNodeProcDecl *pd) {
 	gb_printf("\n\n");
 }
 #endif
-void print_declaration(AstNode *decl) {
+void print_declaration(Ast *decl) {
 }
 
 void generate_documentation(Parser *parser) {
-	for_array(file_index, parser->files) {
-		AstFile *file = parser->files[file_index];
-		Tokenizer *tokenizer = &file->tokenizer;
-		String fullpath = tokenizer->fullpath;
-		gb_printf("%.*s\n", LIT(fullpath));
+	// for_array(file_index, parser->files) {
+	// 	AstFile *file = parser->files[file_index];
+	// 	Tokenizer *tokenizer = &file->tokenizer;
+	// 	String fullpath = tokenizer->fullpath;
+	// 	gb_printf("%.*s\n", LIT(fullpath));
 
-		for_array(decl_index, file->decls) {
-			AstNode *decl = file->decls[decl_index];
-			print_declaration(decl);
-		}
-	}
+	// 	for_array(decl_index, file->decls) {
+	// 		Ast *decl = file->decls[decl_index];
+	// 		print_declaration(decl);
+	// 	}
+	// }
 }

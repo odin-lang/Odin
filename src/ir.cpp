@@ -7,9 +7,8 @@ struct irDebugInfo;
 
 struct irModule {
 	CheckerInfo * info;
-	gbArena       arena;
 	gbArena       tmp_arena;
-	gbAllocator   allocator;
+	// gbAllocator   allocator;
 	gbAllocator   tmp_allocator;
 	bool generate_debug_info;
 
@@ -24,7 +23,7 @@ struct irModule {
 	Map<irValue *>        members;             // Key: String
 	Map<String>           entity_names;        // Key: Entity * of the typename
 	Map<irDebugInfo *>    debug_info;          // Key: Unique pointer
-	Map<irValue *>        anonymous_proc_lits; // Key: AstNode *
+	Map<irValue *>        anonymous_proc_lits; // Key: Ast *
 
 	irDebugInfo *         debug_compile_unit;
 
@@ -60,7 +59,7 @@ struct irBlock {
 	i32          index;
 	String       label;
 	irProcedure *proc;
-	AstNode *    node; // Can be nullptr
+	Ast *    node; // Can be nullptr
 	Scope *      scope;
 	isize        scope_index;
 	irDomNode    dom;
@@ -93,9 +92,10 @@ enum irDeferKind {
 struct irDefer {
 	irDeferKind kind;
 	isize       scope_index;
+	isize       context_stack_count;
 	irBlock *   block;
 	union {
-		AstNode *stmt;
+		Ast *stmt;
 		// NOTE(bill): 'instr' will be copied every time to create a new one
 		irValue *instr;
 	};
@@ -103,7 +103,7 @@ struct irDefer {
 
 
 struct irBranchBlocks {
-	AstNode *label;
+	Ast *label;
 	irBlock *break_;
 	irBlock *continue_;
 };
@@ -114,6 +114,11 @@ struct irDebugLocation {
 	irDebugInfo *debug_scope;
 };
 
+struct irContextData {
+	irValue *value;
+	isize scope_index;
+};
+
 struct irProcedure {
 	irProcedure *         parent;
 	Array<irProcedure *>  children;
@@ -122,8 +127,8 @@ struct irProcedure {
 	irModule *            module;
 	String                name;
 	Type *                type;
-	AstNode *             type_expr;
-	AstNode *             body;
+	Ast *                 type_expr;
+	Ast *                 body;
 	u64                   tags;
 	ProcInlining          inlining;
 	bool                  is_foreign;
@@ -143,7 +148,7 @@ struct irProcedure {
 	irTargetList *        target_list;
 	Array<irValue *>      referrers;
 
-	Array<irValue *>      context_stack;
+	Array<irContextData>  context_stack;
 
 
 	Array<irBranchBlocks> branch_blocks;
@@ -154,6 +159,11 @@ struct irProcedure {
 };
 
 
+gb_global Arena global_ir_arena = {};
+gbAllocator ir_allocator(void) {
+	Arena *arena = &global_ir_arena;
+	return arena_allocator(arena);
+}
 
 
 #define IR_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"
@@ -244,7 +254,7 @@ struct irProcedure {
 	IR_INSTR_KIND(StartupRuntime, i32)                                \
 	IR_INSTR_KIND(DebugDeclare, struct {                              \
 		irDebugInfo *scope;                                           \
-		AstNode *    expr;                                            \
+		Ast *    expr;                                            \
 		Entity *     entity;                                          \
 		bool         is_addr;                                         \
 		irValue *    value;                                           \
@@ -439,6 +449,7 @@ enum irAddrKind {
 	irAddr_Default,
 	irAddr_Map,
 	irAddr_BitField,
+	irAddr_Context,
 };
 
 struct irAddr {
@@ -468,6 +479,13 @@ irAddr ir_addr_map(irValue *addr, irValue *map_key, Type *map_type, Type *map_re
 	v.map_result = map_result;
 	return v;
 }
+
+
+irAddr ir_addr_context(irValue *addr) {
+	irAddr v = {irAddr_Context, addr};
+	return v;
+}
+
 
 irAddr ir_addr_bit_field(irValue *addr, i32 bit_field_value_index) {
 	irAddr v = {irAddr_BitField, addr};
@@ -604,6 +622,7 @@ struct irGen {
 	bool     opt_called;
 	String   output_base;
 	String   output_name;
+	bool     print_chkstk;
 };
 
 
@@ -683,37 +702,6 @@ Type *ir_type(irValue *value) {
 }
 
 
-bool ir_type_has_default_values(Type *t) {
-#if !defined(NO_DEFAULT_STRUCT_VALUES)
-	switch (t->kind) {
-	case Type_Named:
-		return ir_type_has_default_values(t->Named.base);
-
-	case Type_Array:
-		return ir_type_has_default_values(t->Array.elem);
-
-	case Type_Struct:
-		if (t->Struct.is_raw_union) return false;
-		for_array(i, t->Struct.fields) {
-			Entity *f = t->Struct.fields[i];
-			if (f->kind != Entity_Variable) continue;
-			if (f->Variable.default_is_nil) {
-				// NOTE(bill): This is technically zero
-				continue;
-			} else if (f->Variable.default_value.kind != ExactValue_Invalid) {
-				return true;
-			} else if (f->Variable.default_is_undef) {
-				return true;
-			}
-			bool sub = ir_type_has_default_values(f->type);
-			if (sub) return true;
-		}
-		break;
-	}
-#endif
-	return false;
-}
-
 
 irInstr *ir_get_last_instr(irBlock *block) {
 	if (block != nullptr) {
@@ -789,7 +777,7 @@ Array<irValue *> *ir_value_referrers(irValue *v) {
 ////////////////////////////////////////////////////////////////
 
 void     ir_module_add_value    (irModule *m, Entity *e, irValue *v);
-void     ir_emit_zero_init      (irProcedure *p, irValue *address, AstNode *expr);
+void     ir_emit_zero_init      (irProcedure *p, irValue *address, Ast *expr);
 irValue *ir_emit_comment        (irProcedure *p, String text);
 irValue *ir_emit_store          (irProcedure *p, irValue *address, irValue *value);
 irValue *ir_emit_load           (irProcedure *p, irValue *address);
@@ -797,11 +785,11 @@ void     ir_emit_jump           (irProcedure *proc, irBlock *block);
 irValue *ir_emit_conv           (irProcedure *proc, irValue *value, Type *t);
 irValue *ir_type_info           (irProcedure *proc, Type *type);
 irValue *ir_typeid              (irModule *m, Type *type);
-irValue *ir_build_expr          (irProcedure *proc, AstNode *expr);
-void     ir_build_stmt          (irProcedure *proc, AstNode *node);
-irValue *ir_build_cond          (irProcedure *proc, AstNode *cond, irBlock *true_block, irBlock *false_block);
+irValue *ir_build_expr          (irProcedure *proc, Ast *expr);
+void     ir_build_stmt          (irProcedure *proc, Ast *node);
+irValue *ir_build_cond          (irProcedure *proc, Ast *cond, irBlock *true_block, irBlock *false_block);
 void     ir_build_defer_stmt    (irProcedure *proc, irDefer d);
-irAddr   ir_build_addr          (irProcedure *proc, AstNode *expr);
+irAddr   ir_build_addr          (irProcedure *proc, Ast *expr);
 void     ir_build_proc          (irValue *value, irProcedure *parent);
 void     ir_gen_global_type_name(irModule *m, Entity *e, String name);
 irValue *ir_get_type_info_ptr   (irProcedure *proc, Type *type);
@@ -809,19 +797,19 @@ irValue *ir_get_type_info_ptr   (irProcedure *proc, Type *type);
 
 
 
-irValue *ir_alloc_value(gbAllocator a, irValueKind kind) {
-	irValue *v = gb_alloc_item(a, irValue);
+irValue *ir_alloc_value(irValueKind kind) {
+	irValue *v = gb_alloc_item(ir_allocator(), irValue);
 	v->kind = kind;
 	return v;
 }
 irValue *ir_alloc_instr(irProcedure *proc, irInstrKind kind) {
-	irValue *v = ir_alloc_value(proc->module->allocator, irValue_Instr);
+	irValue *v = ir_alloc_value(irValue_Instr);
 	v->Instr.kind = kind;
 	proc->instr_count++;
 	return v;
 }
-irDebugInfo *ir_alloc_debug_info(gbAllocator a, irDebugInfoKind kind) {
-	irDebugInfo *di = gb_alloc_item(a, irDebugInfo);
+irDebugInfo *ir_alloc_debug_info(irDebugInfoKind kind) {
+	irDebugInfo *di = gb_alloc_item(ir_allocator(), irDebugInfo);
 	di->kind = kind;
 	return di;
 }
@@ -829,23 +817,23 @@ irDebugInfo *ir_alloc_debug_info(gbAllocator a, irDebugInfoKind kind) {
 
 
 
-irValue *ir_value_type_name(gbAllocator a, String name, Type *type) {
-	irValue *v = ir_alloc_value(a, irValue_TypeName);
+irValue *ir_value_type_name(String name, Type *type) {
+	irValue *v = ir_alloc_value(irValue_TypeName);
 	v->TypeName.name = name;
 	v->TypeName.type = type;
 	return v;
 }
 
-irValue *ir_value_global(gbAllocator a, Entity *e, irValue *value) {
-	irValue *v = ir_alloc_value(a, irValue_Global);
+irValue *ir_value_global(Entity *e, irValue *value) {
+	irValue *v = ir_alloc_value(irValue_Global);
 	v->Global.entity = e;
 	v->Global.type = alloc_type_pointer(e->type);
 	v->Global.value = value;
-	array_init(&v->Global.referrers, heap_allocator()); // TODO(bill): Replace heap allocator here
+	array_init(&v->Global.referrers, ir_allocator()); // TODO(bill): Replace heap allocator here
 	return v;
 }
-irValue *ir_value_param(gbAllocator a, irProcedure *parent, Entity *e, Type *abi_type) {
-	irValue *v = ir_alloc_value(a, irValue_Param);
+irValue *ir_value_param(irProcedure *parent, Entity *e, Type *abi_type) {
+	irValue *v = ir_alloc_value(irValue_Param);
 	v->Param.kind          = irParamPass_Value;
 	v->Param.parent        = parent;
 	v->Param.entity        = e;
@@ -870,14 +858,14 @@ irValue *ir_value_param(gbAllocator a, irProcedure *parent, Entity *e, Type *abi
 	array_init(&v->Param.referrers, heap_allocator()); // TODO(bill): Replace heap allocator here
 	return v;
 }
-irValue *ir_value_nil(gbAllocator a, Type *type) {
-	irValue *v = ir_alloc_value(a, irValue_Nil);
+irValue *ir_value_nil(Type *type) {
+	irValue *v = ir_alloc_value(irValue_Nil);
 	v->Nil.type = type;
 	return v;
 }
 
-irValue *ir_value_undef(gbAllocator a, Type *type) {
-	irValue *v = ir_alloc_value(a, irValue_Undef);
+irValue *ir_value_undef(Type *type) {
+	irValue *v = ir_alloc_value(irValue_Undef);
 	v->Undef.type = type;
 	return v;
 }
@@ -1112,7 +1100,7 @@ irValue *ir_instr_comment(irProcedure *p, String text) {
 	return v;
 }
 
-irValue *ir_instr_debug_declare(irProcedure *p, irDebugInfo *scope, AstNode *expr, Entity *entity, bool is_addr, irValue *value) {
+irValue *ir_instr_debug_declare(irProcedure *p, irDebugInfo *scope, Ast *expr, Entity *entity, bool is_addr, irValue *value) {
 	irValue *v = ir_alloc_instr(p, irInstr_DebugDeclare);
 	v->Instr.DebugDeclare.scope      = scope;
 	v->Instr.DebugDeclare.expr       = expr;
@@ -1125,16 +1113,16 @@ irValue *ir_instr_debug_declare(irProcedure *p, irDebugInfo *scope, AstNode *exp
 
 
 
-irValue *ir_value_constant(gbAllocator a, Type *type, ExactValue value) {
-	irValue *v = ir_alloc_value(a, irValue_Constant);
+irValue *ir_value_constant(Type *type, ExactValue value) {
+	irValue *v = ir_alloc_value(irValue_Constant);
 	v->Constant.type  = type;
 	v->Constant.value = value;
 	return v;
 }
 
 
-irValue *ir_value_constant_slice(gbAllocator a, Type *type, irValue *backing_array, i64 count) {
-	irValue *v = ir_alloc_value(a, irValue_ConstantSlice);
+irValue *ir_value_constant_slice(Type *type, irValue *backing_array, i64 count) {
+	irValue *v = ir_alloc_value(irValue_ConstantSlice);
 	v->ConstantSlice.type = type;
 	v->ConstantSlice.backing_array = backing_array;
 	v->ConstantSlice.count = count;
@@ -1159,57 +1147,57 @@ irValue *ir_emit(irProcedure *proc, irValue *instr) {
 
 
 
-irValue *ir_const_int(gbAllocator a, i64 i) {
-	return ir_value_constant(a, t_int, exact_value_i64(i));
+irValue *ir_const_int(i64 i) {
+	return ir_value_constant(t_int, exact_value_i64(i));
 }
-irValue *ir_const_uintptr(gbAllocator a, u64 i) {
-	return ir_value_constant(a, t_uintptr, exact_value_i64(i));
+irValue *ir_const_uintptr(u64 i) {
+	return ir_value_constant(t_uintptr, exact_value_i64(i));
 }
-irValue *ir_const_i32(gbAllocator a, i32 i) {
-	return ir_value_constant(a, t_i32, exact_value_i64(i));
+irValue *ir_const_i32(i32 i) {
+	return ir_value_constant(t_i32, exact_value_i64(i));
 }
-irValue *ir_const_u32(gbAllocator a, u32 i) {
-	return ir_value_constant(a, t_u32, exact_value_i64(i));
+irValue *ir_const_u32(u32 i) {
+	return ir_value_constant(t_u32, exact_value_i64(i));
 }
-irValue *ir_const_i64(gbAllocator a, i64 i) {
-	return ir_value_constant(a, t_i64, exact_value_i64(i));
+irValue *ir_const_i64(i64 i) {
+	return ir_value_constant(t_i64, exact_value_i64(i));
 }
-irValue *ir_const_u64(gbAllocator a, u64 i) {
-	return ir_value_constant(a, t_u64, exact_value_i64(i));
+irValue *ir_const_u64(u64 i) {
+	return ir_value_constant(t_u64, exact_value_i64(i));
 }
-irValue *ir_const_f32(gbAllocator a, f32 f) {
-	return ir_value_constant(a, t_f32, exact_value_float(f));
+irValue *ir_const_f32(f32 f) {
+	return ir_value_constant(t_f32, exact_value_float(f));
 }
-irValue *ir_const_f64(gbAllocator a, f64 f) {
-	return ir_value_constant(a, t_f64, exact_value_float(f));
+irValue *ir_const_f64(f64 f) {
+	return ir_value_constant(t_f64, exact_value_float(f));
 }
-irValue *ir_const_bool(gbAllocator a, bool b) {
-	return ir_value_constant(a, t_bool, exact_value_bool(b != 0));
+irValue *ir_const_bool(bool b) {
+	return ir_value_constant(t_bool, exact_value_bool(b != 0));
 }
-irValue *ir_const_string(gbAllocator a, String s) {
-	return ir_value_constant(a, t_string, exact_value_string(s));
+irValue *ir_const_string(String s) {
+	return ir_value_constant(t_string, exact_value_string(s));
 }
 
-irValue *ir_value_procedure(gbAllocator a, irModule *m, Entity *entity, Type *type, AstNode *type_expr, AstNode *body, String name) {
-	irValue *v = ir_alloc_value(a, irValue_Proc);
+irValue *ir_value_procedure(irModule *m, Entity *entity, Type *type, Ast *type_expr, Ast *body, String name) {
+	irValue *v = ir_alloc_value(irValue_Proc);
 	v->Proc.module = m;
 	v->Proc.entity = entity;
 	v->Proc.type   = type;
 	v->Proc.type_expr = type_expr;
 	v->Proc.body   = body;
 	v->Proc.name   = name;
-	array_init(&v->Proc.referrers, heap_allocator()); // TODO(bill): replace heap allocator
+	array_init(&v->Proc.referrers, heap_allocator());
 
 	Type *t = base_type(type);
 	GB_ASSERT(is_type_proc(t));
-	array_init(&v->Proc.params, heap_allocator(), 0, t->Proc.param_count);
+	array_init(&v->Proc.params, ir_allocator(), 0, t->Proc.param_count);
 
 	return v;
 }
 
 
 irValue *ir_generate_array(irModule *m, Type *elem_type, i64 count, String prefix, i64 id) {
-	gbAllocator a = m->allocator;
+	gbAllocator a = ir_allocator();
 	Token token = {Token_Ident};
 	isize name_len = prefix.len + 10;
 
@@ -1220,21 +1208,21 @@ irValue *ir_generate_array(irModule *m, Type *elem_type, i64 count, String prefi
 	String s = make_string_c(text);
 
 	Entity *e = alloc_entity_variable(nullptr, make_token_ident(s), alloc_type_array(elem_type, count), false);
-	irValue *value = ir_value_global(a, e, nullptr);
+	irValue *value = ir_value_global(e, nullptr);
 	value->Global.is_private = true;
 	ir_module_add_value(m, e, value);
 	map_set(&m->members, hash_string(s), value);
 	return value;
 }
 
-irBlock *ir_new_block(irProcedure *proc, AstNode *node, char *label) {
+irBlock *ir_new_block(irProcedure *proc, Ast *node, char *label) {
 	Scope *scope = nullptr;
 	if (node != nullptr) {
-		scope = scope_of_node(proc->module->info, node);
-		GB_ASSERT_MSG(scope != nullptr, "Block scope not found for %.*s", LIT(ast_node_strings[node->kind]));
+		scope = scope_of_node(node);
+		GB_ASSERT_MSG(scope != nullptr, "Block scope not found for %.*s", LIT(ast_strings[node->kind]));
 	}
 
-	irValue *v = ir_alloc_value(proc->module->allocator, irValue_Block);
+	irValue *v = ir_alloc_value(irValue_Block);
 	v->Block.label  = make_string_c(label);
 	v->Block.node   = node;
 	v->Block.scope  = scope;
@@ -1275,9 +1263,10 @@ void ir_start_block(irProcedure *proc, irBlock *block) {
 
 
 
-irDefer ir_add_defer_node(irProcedure *proc, isize scope_index, AstNode *stmt) {
+irDefer ir_add_defer_node(irProcedure *proc, isize scope_index, Ast *stmt) {
 	irDefer d = {irDefer_Node};
 	d.scope_index = scope_index;
+	d.context_stack_count = proc->context_stack.count;
 	d.block = proc->curr_block;
 	d.stmt = stmt;
 	array_add(&proc->defer_stmts, d);
@@ -1297,14 +1286,14 @@ irDefer ir_add_defer_instr(irProcedure *proc, isize scope_index, irValue *instr)
 
 
 irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
-	gbAllocator a = m->allocator;
+	gbAllocator a = ir_allocator();
 
 	if (is_type_slice(type)) {
 		ast_node(cl, CompoundLit, value.value_compound);
 
 		isize count = cl->elems.count;
 		if (count == 0) {
-			return ir_value_nil(a, type);
+			return ir_value_nil(type);
 		}
 		Type *elem = base_type(type)->Slice.elem;
 		Type *t = alloc_type_array(elem, count);
@@ -1319,24 +1308,19 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 		String name = make_string(str, len-1);
 
 		Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
-		irValue *g = ir_value_global(a, e, backing_array);
+		irValue *g = ir_value_global(e, backing_array);
 		ir_module_add_value(m, e, g);
 		map_set(&m->members, hash_string(name), g);
 
-		return ir_value_constant_slice(a, type, g, count);
+		return ir_value_constant_slice(type, g, count);
 	}
 
-	return ir_value_constant(a, type, value);
+	return ir_value_constant(type, value);
 }
 
 irValue *ir_add_global_string_array(irModule *m, String string) {
-	// TODO(bill): Should this use the arena allocator or the heap allocator?
-	// Strings could be huge!
-	// gbAllocator a = m->allocator;
-	gbAllocator a = heap_allocator();
-
 	isize max_len = 6+8+1;
-	u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
+	u8 *str = cast(u8 *)gb_alloc_array(ir_allocator(), u8, max_len);
 	isize len = gb_snprintf(cast(char *)str, max_len, "__str$%x", m->global_string_index);
 	m->global_string_index++;
 
@@ -1346,7 +1330,7 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 	Type *type = alloc_type_array(t_u8, string.len+1);
 	ExactValue ev = exact_value_string(string);
 	Entity *entity = alloc_entity_constant(nullptr, token, type, ev);
-	irValue *g = ir_value_global(a, entity, ir_add_module_constant(m, type, ev));
+	irValue *g = ir_value_global(entity, ir_add_module_constant(m, type, ev));
 	g->Global.is_private      = true;
 	g->Global.is_unnamed_addr = true;
 	// g->Global.is_constant = true;
@@ -1358,33 +1342,45 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 }
 
 void ir_add_foreign_library_path(irModule *m, Entity *e) {
-	GB_ASSERT(e != nullptr);
-	GB_ASSERT(e->kind == Entity_LibraryName);
-	GB_ASSERT(e->LibraryName.used);
-
-	String library_path = e->LibraryName.path;
-	if (library_path.len == 0) {
+	if (e == nullptr) {
 		return;
 	}
+	GB_ASSERT(e->kind == Entity_LibraryName);
+	GB_ASSERT(e->flags & EntityFlag_Used);
 
-	for_array(path_index, m->foreign_library_paths) {
-		String path = m->foreign_library_paths[path_index];
-#if defined(GB_SYSTEM_WINDOWS)
-		if (str_eq_ignore_case(path, library_path)) {
-#else
-		if (str_eq(path, library_path)) {
-#endif
-			return;
+	for_array(i, e->LibraryName.paths) {
+		String library_path = e->LibraryName.paths[i];
+		if (library_path.len == 0) {
+			continue;
+		}
+
+		bool ok = true;
+		for_array(path_index, m->foreign_library_paths) {
+			String path = m->foreign_library_paths[path_index];
+	#if defined(GB_SYSTEM_WINDOWS)
+			if (str_eq_ignore_case(path, library_path)) {
+	#else
+			if (str_eq(path, library_path)) {
+	#endif
+				ok = false;
+				break;
+			}
+		}
+
+		if (ok) {
+			array_add(&m->foreign_library_paths, library_path);
 		}
 	}
-	array_add(&m->foreign_library_paths, library_path);
 }
 
 
 
+void ir_push_context_onto_stack(irProcedure *proc, irValue *ctx) {
+	irContextData cd = {ctx, proc->scope_index};
+	array_add(&proc->context_stack, cd);
+}
 
-
-irValue *ir_add_local(irProcedure *proc, Entity *e, AstNode *expr, bool zero_initialized) {
+irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initialized) {
 	irBlock *b = proc->decl_block; // all variables must be in the first block
 	irValue *instr = ir_instr_local(proc, e, true);
 	instr->Instr.block = b;
@@ -1404,8 +1400,8 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, AstNode *expr, bool zero_ini
 	return instr;
 }
 
-irValue *ir_add_local_for_identifier(irProcedure *proc, AstNode *ident, bool zero_initialized) {
-	Entity *e = entity_of_ident(proc->module->info, ident);
+irValue *ir_add_local_for_identifier(irProcedure *proc, Ast *ident, bool zero_initialized) {
+	Entity *e = entity_of_ident(ident);
 	if (e != nullptr) {
 		String name = e->token.string;
 		ir_emit_comment(proc, name);
@@ -1416,7 +1412,7 @@ irValue *ir_add_local_for_identifier(irProcedure *proc, AstNode *ident, bool zer
 			if (prev_value == nullptr) {
 				ir_add_foreign_library_path(proc->module, e->Variable.foreign_library);
 				// NOTE(bill): Don't do mutliple declarations in the IR
-				irValue *g = ir_value_global(proc->module->allocator, e, nullptr);
+				irValue *g = ir_value_global(e, nullptr);
 				g->Global.name = name;
 				g->Global.is_foreign = true;
 				ir_module_add_value(proc->module, e, g);
@@ -1448,25 +1444,23 @@ irValue *ir_add_global_generated(irModule *m, Type *type, irValue *value) {
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
-	gbAllocator a = m->allocator;
-
 	isize max_len = 7+8+1;
-	u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
+	u8 *str = cast(u8 *)gb_alloc_array(ir_allocator(), u8, max_len);
 	isize len = gb_snprintf(cast(char *)str, max_len, "__ggv$%x", m->global_generated_index);
 	m->global_generated_index++;
 	String name = make_string(str, len-1);
 
 	Scope *scope = nullptr;
 	Entity *e = alloc_entity_variable(scope, make_token_ident(name), type, false);
-	irValue *g = ir_value_global(a, e, value);
+	irValue *g = ir_value_global(e, value);
 	ir_module_add_value(m, e, g);
 	map_set(&m->members, hash_string(name), g);
 	return g;
 }
 
 
-irValue *ir_add_param(irProcedure *proc, Entity *e, AstNode *expr, Type *abi_type) {
-	irValue *v = ir_value_param(proc->module->allocator, proc, e, abi_type);
+irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type) {
+	irValue *v = ir_value_param(proc, e, abi_type);
 	irValueParam *p = &v->Param;
 
 	switch (p->kind) {
@@ -1513,7 +1507,7 @@ irDebugInfo *ir_add_debug_info_file(irProcedure *proc, AstFile *file) {
 	// }
 
 	GB_ASSERT(file != nullptr);
-	irDebugInfo *di = ir_alloc_debug_info(proc->module->allocator, irDebugInfo_File);
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_File);
 	di->File.file = file;
 
 	String filename = file->tokenizer.fullpath;
@@ -1545,7 +1539,7 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 	// }
 
 	GB_ASSERT(entity != nullptr);
-	irDebugInfo *di = ir_alloc_debug_info(proc->module->allocator, irDebugInfo_Proc);
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Proc);
 	di->Proc.entity = entity;
 	di->Proc.name = name;
 	di->Proc.file = file;
@@ -1563,7 +1557,9 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 //
 ////////////////////////////////////////////////////////////////
 
-irValue *ir_emit_global_call(irProcedure *proc, char const *name_, Array<irValue *> args, AstNode *expr = nullptr);
+irValue *ir_emit_runtime_call (irProcedure *proc,                            char const *name_, Array<irValue *> args, Ast *expr = nullptr);
+irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char const *name_, Array<irValue *> args, Ast *expr = nullptr);
+
 
 irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
 	Type *a = type_deref(ir_type(address));
@@ -1591,21 +1587,22 @@ irValue *ir_emit_select(irProcedure *p, irValue *cond, irValue *t, irValue *f) {
 	return ir_emit(p, ir_instr_select(p, cond, t, f));
 }
 
-void ir_add_debug_location_to_value(irProcedure *proc, irValue *v, AstNode *e) {
+void ir_add_debug_location_to_value(irProcedure *proc, irValue *v, Ast *e) {
 	if (v != nullptr && e != nullptr) {
 		v->loc.debug_scope = proc->debug_scope;
-		v->loc.pos = ast_node_token(e).pos;
+		v->loc.pos = ast_token(e).pos;
 	}
 }
 
-void ir_emit_zero_init(irProcedure *p, irValue *address, AstNode *expr) {
-	gbAllocator a = p->module->allocator;
+void ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
+	gbAllocator a = ir_allocator();
 	Type *t = type_deref(ir_type(address));
 	auto args = array_make<irValue *>(a, 2);
 	args[0] = ir_emit_conv(p, address, t_rawptr);
-	args[1] = ir_const_int(a, type_size_of(t));
-	if (p->entity->token.string != "__mem_zero") {
-		ir_emit_global_call(p, "__mem_zero", args, expr);
+	args[1] = ir_const_int(type_size_of(t));
+	AstPackage *pkg = get_core_package(p->module->info, str_lit("mem"));
+	if (p->entity != nullptr && p->entity->token.string != "zero" && p->entity->pkg != pkg) {
+		ir_emit_package_call(p, "mem", "zero", args, expr);
 	}
 	ir_emit(p, ir_instr_zero_init(p, address));
 }
@@ -1616,10 +1613,10 @@ irValue *ir_emit_comment(irProcedure *p, String text) {
 
 void ir_emit_init_context(irProcedure *proc, irValue *c = nullptr) {
 	irModule *m = proc->module;
-	gbAllocator a = m->allocator;
+	gbAllocator a = ir_allocator();
 	auto args = array_make<irValue *>(a, 1);
 	args[0] = c ? c : m->global_default_context;
-	ir_emit_global_call(proc, "__init_context", args);
+	ir_emit_runtime_call(proc, "__init_context", args);
 }
 
 
@@ -1647,9 +1644,17 @@ irValue *ir_address_from_load_or_generate_local(irProcedure *proc, irValue *val)
 irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index);
 
 
+irValue *ir_get_package_value(irModule *m, String package_name, String entity_name) {
+	AstPackage *rt_pkg = get_core_package(m->info, package_name);
+	Entity *e = scope_lookup_current(rt_pkg->scope, entity_name);
+	irValue **found = map_get(&m->values, hash_entity(e));
+	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(e->token.string));
+	return *found;
+}
+
 irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 	if (proc->context_stack.count > 0) {
-		return proc->context_stack[proc->context_stack.count-1];
+		return proc->context_stack[proc->context_stack.count-1].value;
 	}
 
 	irBlock *tmp_block = proc->curr_block;
@@ -1658,14 +1663,23 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 	defer (proc->curr_block = tmp_block);
 
 	irValue *c = ir_add_local_generated(proc, t_context);
-	array_add(&proc->context_stack, c);
+	ir_push_context_onto_stack(proc, c);
 	ir_emit_store(proc, c, ir_emit_load(proc, proc->module->global_default_context));
 
-	irValue *ep = ir_emit_struct_ep(proc, c, 0);
-	Array<irValue *> args = {};
-	irValue *v = ir_emit_global_call(proc, "default_allocator", args);
-	ir_emit_store(proc, ep, v);
 
+#if 1
+	Array<irValue *> args = {};
+	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 0), ir_emit_package_call(proc, "os", "heap_allocator", args));
+	// 1 will be handled later
+	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 2), ir_emit_package_call(proc, "os", "current_thread_id", args));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 3), ir_get_package_value(proc->module, str_lit("runtime"), str_lit("default_assertion_failure_proc")));
+
+	array_init(&args, heap_allocator(), 1);
+	args[0] = ir_get_package_value(proc->module, str_lit("runtime"), str_lit("global_scratch_allocator_data"));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 1), ir_emit_package_call(proc, "mem", "scratch_allocator", args));
+#else
+	ir_emit_init_context(proc, c);
+#endif
 	return c;
 }
 
@@ -1728,9 +1742,25 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args) {
 	return result;
 }
 
-irValue *ir_emit_global_call(irProcedure *proc, char const *name_, Array<irValue *> args, AstNode *expr) {
+irValue *ir_emit_runtime_call(irProcedure *proc, char const *name_, Array<irValue *> args, Ast *expr) {
 	String name = make_string_c(cast(char *)name_);
-	irValue **found = map_get(&proc->module->members, hash_string(name));
+
+	AstPackage *p = proc->module->info->runtime_package;
+	Entity *e = scope_lookup_current(p->scope, name);
+	irValue **found = map_get(&proc->module->values, hash_entity(e));
+	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
+	irValue *gp = *found;
+	irValue *call = ir_emit_call(proc, gp, args);
+	ir_add_debug_location_to_value(proc, call, expr);
+	return call;
+}
+irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char const *name_, Array<irValue *> args, Ast *expr) {
+	String name = make_string_c(cast(char *)name_);
+	String package_name = make_string_c(cast(char *)package_name_);
+
+	AstPackage *p = get_core_package(proc->module->info, package_name);
+	Entity *e = scope_lookup_current(p->scope, name);
+	irValue **found = map_get(&proc->module->values, hash_entity(e));
 	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
 	irValue *gp = *found;
 	irValue *call = ir_emit_call(proc, gp, args);
@@ -1745,6 +1775,10 @@ void ir_emit_defer_stmts(irProcedure *proc, irDeferExitKind kind, irBlock *block
 	isize i = count;
 	while (i --> 0) {
 		irDefer d = proc->defer_stmts[i];
+		if (proc->context_stack.count >= d.context_stack_count) {
+			proc->context_stack.count = d.context_stack_count;
+		}
+
 		if (kind == irDeferExit_Default) {
 			if (proc->scope_index == d.scope_index &&
 			    d.scope_index > 0) { // TODO(bill): Which is correct: > 0 or > 1?
@@ -1774,6 +1808,21 @@ void ir_open_scope(irProcedure *proc) {
 void ir_close_scope(irProcedure *proc, irDeferExitKind kind, irBlock *block) {
 	ir_emit_defer_stmts(proc, kind, block);
 	GB_ASSERT(proc->scope_index > 0);
+
+
+	// NOTE(bill): Remove `context`s made in that scope
+	for (;;) {
+		irContextData *end = array_end_ptr(&proc->context_stack);
+		if (end == nullptr) {
+			break;
+		}
+		if (end->scope_index != proc->scope_index) {
+			break;
+		}
+		array_pop(&proc->context_stack);
+	}
+
+
 	proc->scope_index--;
 }
 
@@ -1827,7 +1876,7 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 
 irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_type) {
 	GB_ASSERT_MSG(is_type_pointer(ir_type(map_val_ptr)), "%s", type_to_string(ir_type(map_val_ptr)));
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
 	irValue *h = ir_add_local_generated(proc, t_map_header);
 	map_type = base_type(map_type);
 
@@ -1848,10 +1897,10 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_ty
 	i64 value_offset = type_offset_of(map_type->Map.entry_type, 2);
 	i64 value_size   = type_size_of  (map_type->Map.value);
 
-	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 2), ir_const_int(a, entry_size));
-	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 3), ir_const_int(a, entry_align));
-	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 4), ir_const_uintptr(a, value_offset));
-	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 5), ir_const_int(a, value_size));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 2), ir_const_int(entry_size));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 3), ir_const_int(entry_align));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 4), ir_const_uintptr(value_offset));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 5), ir_const_int(value_size));
 
 
 	return ir_emit_load(proc, h);
@@ -1885,11 +1934,11 @@ irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 			ExactValue ev = str->Constant.value;
 			GB_ASSERT(ev.kind == ExactValue_String);
 			u64 hs = fnv64a(ev.value_string.text, ev.value_string.len);
-			hashed_str = ir_value_constant(proc->module->allocator, t_u64, exact_value_u64(hs));
+			hashed_str = ir_value_constant(t_u64, exact_value_u64(hs));
 		} else {
-			auto args = array_make<irValue *>(proc->module->allocator, 1);
+			auto args = array_make<irValue *>(ir_allocator(), 1);
 			args[0] = str;
-			hashed_str = ir_emit_global_call(proc, "__default_hash_string", args);
+			hashed_str = ir_emit_runtime_call(proc, "__default_hash_string", args);
 		}
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), hashed_str);
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 1), str);
@@ -1931,9 +1980,10 @@ Type *ir_addr_type(irAddr const &addr) {
 }
 
 irValue *ir_emit_source_code_location(irProcedure *proc, String procedure, TokenPos pos);
-irValue *ir_emit_source_code_location(irProcedure *proc, AstNode *node);
+irValue *ir_emit_source_code_location(irProcedure *proc, Ast *node);
 irValue *ir_emit_ptr_offset(irProcedure *proc, irValue *ptr, irValue *offset);
 irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *right, Type *type);
+irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel);
 
 irValue *ir_insert_dynamic_map_key_and_value(irProcedure *proc, irValue *addr, Type *map_type,
                                              irValue *map_key, irValue *map_value) {
@@ -1946,24 +1996,25 @@ irValue *ir_insert_dynamic_map_key_and_value(irProcedure *proc, irValue *addr, T
 	irValue *ptr = ir_add_local_generated(proc, ir_type(v));
 	ir_emit_store(proc, ptr, v);
 
-	auto args = array_make<irValue *>(proc->module->allocator, 4);
+	auto args = array_make<irValue *>(ir_allocator(), 4);
 	args[0] = h;
 	args[1] = key;
 	args[2] = ir_emit_conv(proc, ptr, t_rawptr);
 	args[3] = ir_emit_source_code_location(proc, nullptr);
-	return ir_emit_global_call(proc, "__dynamic_map_set", args);
+	return ir_emit_runtime_call(proc, "__dynamic_map_set", args);
 }
 
 
 
-irValue *ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
+void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 	if (addr.addr == nullptr) {
-		return nullptr;
+		return;
 	}
 	if (addr.kind == irAddr_Map) {
-		return ir_insert_dynamic_map_key_and_value(proc, addr.addr, addr.map_type, addr.map_key, value);
+		ir_insert_dynamic_map_key_and_value(proc, addr.addr, addr.map_type, addr.map_key, value);
+		return;
 	} else if (addr.kind == irAddr_BitField) {
-		gbAllocator a = proc->module->allocator;
+		gbAllocator a = ir_allocator();
 
 		Type *bft = base_type(type_deref(ir_type(addr.addr)));
 		GB_ASSERT(is_type_bit_field(bft));
@@ -1977,7 +2028,7 @@ irValue *ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 		i32 size_in_bytes = next_pow2((size_in_bits+7)/8);
 		if (size_in_bytes == 0) {
 			GB_ASSERT(size_in_bits == 0);
-			return nullptr;
+			return;
 		}
 
 		Type *int_type = nullptr;
@@ -1992,27 +2043,28 @@ irValue *ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 		value = ir_emit_conv(proc, value, int_type);
 
 		irValue *bytes = ir_emit_conv(proc, addr.addr, t_u8_ptr);
-		bytes = ir_emit_ptr_offset(proc, bytes, ir_const_int(a, byte_index));
+		bytes = ir_emit_ptr_offset(proc, bytes, ir_const_int(byte_index));
 
 
 		if (bit_inset == 0) {
 			irValue *v = value;
 			i32 sa = 8*size_in_bytes - size_in_bits;
 			if (sa > 0) {
-				irValue *shift_amount = ir_const_int(a, sa);
+				irValue *shift_amount = ir_const_int(sa);
 				v = ir_emit_arith(proc, Token_Shl, v, shift_amount, int_type);
 				v = ir_emit_arith(proc, Token_Shr, v, shift_amount, int_type);
 			}
 			irValue *ptr = ir_emit_conv(proc, bytes, alloc_type_pointer(int_type));
 			v = ir_emit_arith(proc, Token_Or, ir_emit_load(proc, ptr), v, int_type);
-			return ir_emit_store(proc, ptr, v);
+			ir_emit_store(proc, ptr, v);
+			return;
 		}
 
 
 		// First byte
 		{
 			i32 sa = 8 - bit_inset;
-			irValue *shift_amount = ir_const_int(a, sa);
+			irValue *shift_amount = ir_const_int(sa);
 			irValue *v = ir_emit_conv(proc, value, t_u8);
 			v = ir_emit_arith(proc, Token_Shl, v, shift_amount, int_type);
 			v = ir_emit_arith(proc, Token_Or, ir_emit_load(proc, bytes), v, int_type);
@@ -2022,16 +2074,34 @@ irValue *ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 
 		// Remaining bytes
 		{
-			irValue *shift_amount = ir_const_int(a, bit_inset);
+			irValue *shift_amount = ir_const_int(bit_inset);
 			irValue *ptr = ir_emit_conv(proc, ir_emit_ptr_offset(proc, bytes, v_one), alloc_type_pointer(int_type));
 			irValue *v = ir_emit_arith(proc, Token_Shr, value, shift_amount, int_type);
 			v = ir_emit_arith(proc, Token_Or, ir_emit_load(proc, ptr), v, int_type);
-			return ir_emit_store(proc, ptr, v);
+			ir_emit_store(proc, ptr, v);
+			return;
 		}
+	} else if (addr.kind == irAddr_Context) {
+		irValue *new_context = ir_emit_conv(proc, value, ir_addr_type(addr));
+
+		irValue *prev = ir_find_or_generate_context_ptr(proc);
+		GB_ASSERT(addr.addr == prev);
+
+		irValue *next = ir_add_local_generated(proc, t_context);
+		ir_emit_store(proc, next, new_context);
+
+		Selection sel = lookup_field(t_context, str_lit("parent"), false);
+		GB_ASSERT(sel.entity != nullptr);
+		irValue *parent_ptr = ir_emit_deep_field_gep(proc, next, sel);
+		ir_emit_store(proc, parent_ptr, prev);
+
+		ir_push_context_onto_stack(proc, next);
+
+		return;
 	}
 
 	irValue *v = ir_emit_conv(proc, value, ir_addr_type(addr));
-	return ir_emit_store(proc, addr.addr, v);
+	ir_emit_store(proc, addr.addr, v);
 }
 
 irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
@@ -2047,11 +2117,11 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 		irValue *h = ir_gen_map_header(proc, addr.addr, map_type);
 		irValue *key = ir_gen_map_key(proc, addr.map_key, map_type->Map.key);
 
-		auto args = array_make<irValue *>(proc->module->allocator, 2);
+		auto args = array_make<irValue *>(ir_allocator(), 2);
 		args[0] = h;
 		args[1] = key;
 
-		irValue *ptr = ir_emit_global_call(proc, "__dynamic_map_get", args);
+		irValue *ptr = ir_emit_runtime_call(proc, "__dynamic_map_get", args);
 		irValue *ok = ir_emit_conv(proc, ir_emit_comp(proc, Token_NotEq, ptr, v_raw_nil), t_bool);
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 1), ok);
 
@@ -2076,7 +2146,7 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 			return ir_emit_load(proc, single);
 		}
 	} else if (addr.kind == irAddr_BitField) {
-		gbAllocator a = proc->module->allocator;
+		gbAllocator a = ir_allocator();
 
 
 		Type *bft = base_type(type_deref(ir_type(addr.addr)));
@@ -2091,7 +2161,7 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 		i32 size_in_bytes = next_pow2((size_in_bits+7)/8);
 		if (size_in_bytes == 0) {
 			GB_ASSERT(size_in_bits == 0);
-			return ir_const_i32(a, 0);
+			return v_zero32;
 		}
 
 		Type *int_type = nullptr;
@@ -2105,7 +2175,7 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 
 
 		irValue *bytes = ir_emit_conv(proc, addr.addr, t_u8_ptr);
-		bytes = ir_emit_ptr_offset(proc, bytes, ir_const_int(a, byte_index));
+		bytes = ir_emit_ptr_offset(proc, bytes, ir_const_int(byte_index));
 
 		Type *int_ptr = alloc_type_pointer(int_type);
 
@@ -2113,7 +2183,7 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 			irValue *v = ir_emit_load(proc, ir_emit_conv(proc, bytes, int_ptr));
 			i32 sa = 8*size_in_bytes - size_in_bits;
 			if (sa > 0) {
-				irValue *shift_amount = ir_const_int(a, sa);
+				irValue *shift_amount = ir_const_int(sa);
 				v = ir_emit_arith(proc, Token_Shl, v, shift_amount, int_type);
 				v = ir_emit_arith(proc, Token_Shr, v, shift_amount, int_type);
 			}
@@ -2122,7 +2192,7 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 
 		GB_ASSERT(8 > bit_inset);
 
-		irValue *shift_amount = ir_value_constant(a, int_type, exact_value_i64(bit_inset));
+		irValue *shift_amount = ir_value_constant(int_type, exact_value_i64(bit_inset));
 		irValue *first_byte = ir_emit_load(proc, bytes);
 		irValue *res = ir_emit_arith(proc, Token_Shr, first_byte, shift_amount, int_type);
 
@@ -2157,7 +2227,7 @@ irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr) {
 	return addr.addr;
 }
 
-irValue *ir_build_addr_ptr(irProcedure *proc, AstNode *expr) {
+irValue *ir_build_addr_ptr(irProcedure *proc, Ast *expr) {
 	irAddr const &addr = ir_build_addr(proc, expr);
 	return ir_addr_get_ptr(proc, addr);
 }
@@ -2168,23 +2238,23 @@ irValue *ir_dynamic_array_cap(irProcedure *proc, irValue *da);
 
 
 irValue *ir_map_entries(irProcedure *proc, irValue *value) {
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
 	Type *t = base_type(ir_type(value));
 	GB_ASSERT_MSG(t->kind == Type_Map, "%s", type_to_string(t));
 	init_map_internal_types(t);
 	Type *gst = t->Map.generated_struct_type;
-	isize index = 1;
+	i32 index = 1;
 	irValue *entries = ir_emit(proc, ir_instr_struct_extract_value(proc, value, index, gst->Struct.fields[index]->type));
 	return entries;
 }
 
 irValue *ir_map_entries_ptr(irProcedure *proc, irValue *value) {
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
 	Type *t = base_type(type_deref(ir_type(value)));
 	GB_ASSERT_MSG(t->kind == Type_Map, "%s", type_to_string(t));
 	init_map_internal_types(t);
 	Type *gst = t->Map.generated_struct_type;
-	isize index = 1;
+	i32 index = 1;
 	Type *ptr_t = alloc_type_pointer(gst->Struct.fields[index]->type);
 	irValue *entries = ir_emit(proc, ir_instr_struct_element_ptr(proc, value, index, ptr_t));
 	return entries;
@@ -2201,9 +2271,52 @@ irValue *ir_map_cap(irProcedure *proc, irValue *value) {
 }
 
 
-
+void ir_emit_increment(irProcedure *proc, irValue *addr);
+irValue *ir_emit_array_ep(irProcedure *proc, irValue *s, irValue *index);
 irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index);
 irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index);
+
+struct irLoopData {
+	irValue *idx_addr;
+	irValue *idx;
+	irBlock *body;
+	irBlock *done;
+	irBlock *loop;
+};
+
+irLoopData ir_loop_start(irProcedure *proc, isize count) {
+	irLoopData data = {};
+
+	irValue *max = ir_const_int(count);
+
+	data.idx_addr = ir_add_local_generated(proc, t_int);
+
+	data.body = ir_new_block(proc, nullptr, "loop.body");
+	data.done = ir_new_block(proc, nullptr, "loop.done");
+	data.loop = ir_new_block(proc, nullptr, "loop.loop");
+
+	ir_emit_jump(proc, data.loop);
+	ir_start_block(proc, data.loop);
+
+	data.idx = ir_emit_load(proc, data.idx_addr);
+
+	irValue *cond = ir_emit_comp(proc, Token_Lt, data.idx, max);
+	ir_emit_if(proc, cond, data.body, data.done);
+	ir_start_block(proc, data.body);
+
+	return data;
+}
+
+void ir_loop_end(irProcedure *proc, irLoopData const &data) {
+	if (data.idx_addr != nullptr) {
+		ir_emit_increment(proc, data.idx_addr);
+		ir_emit_jump(proc, data.loop);
+		ir_start_block(proc, data.done);
+	}
+}
+
+
+
 
 irValue *ir_emit_ptr_offset(irProcedure *proc, irValue *ptr, irValue *offset) {
 	offset = ir_emit_conv(proc, offset, t_int);
@@ -2232,14 +2345,35 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 		Type *elem_type = base_array_type(type);
 
 		irValue *res = ir_add_local_generated(proc, type);
-		for (i32 i = 0; i < tl->Array.count; i++) {
-			irValue *e = ir_emit_load(proc, ir_emit_array_epi(proc, val, i));
+
+		bool inline_array_arith = type_size_of(type) <= build_context.max_align;
+
+		i32 count = cast(i32)tl->Array.count;
+
+		if (inline_array_arith) {
+			// inline
+			for (i32 i = 0; i < count; i++) {
+				irValue *e = ir_emit_load(proc, ir_emit_array_epi(proc, val, i));
+				irValue *z = ir_emit_unary_arith(proc, op, e, elem_type);
+				ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
+			}
+		} else {
+			auto loop_data = ir_loop_start(proc, count);
+
+			irValue *e = ir_emit_load(proc, ir_emit_array_ep(proc, val, loop_data.idx));
 			irValue *z = ir_emit_unary_arith(proc, op, e, elem_type);
-			ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
+			ir_emit_store(proc, ir_emit_array_ep(proc, res, loop_data.idx), z);
+
+			ir_loop_end(proc, loop_data);
 		}
 		ir_emit_comment(proc, str_lit("array.arith.end"));
 		return ir_emit_load(proc, res);
 
+	}
+
+	if (op == Token_Not) {
+		irValue *cmp = ir_emit_comp(proc, Token_CmpEq, x, v_false);
+		return ir_emit_conv(proc, cmp, type);
 	}
 
 	return ir_emit(proc, ir_instr_unary_op(proc, op, x, type));
@@ -2263,11 +2397,26 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 
 		irValue *res = ir_add_local_generated(proc, type);
 		i64 count = base_type(type)->Array.count;
-		for (i32 i = 0; i < count; i++) {
-			irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
-			irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
+
+		bool inline_array_arith = type_size_of(type) <= build_context.max_align;
+
+		if (inline_array_arith) {
+			// inline
+			for (i32 i = 0; i < count; i++) {
+				irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
+				irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
+				irValue *z = ir_emit_arith(proc, op, x, y, elem_type);
+				ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
+			}
+		} else {
+			auto loop_data = ir_loop_start(proc, count);
+
+			irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, loop_data.idx));
+			irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, loop_data.idx));
 			irValue *z = ir_emit_arith(proc, op, x, y, elem_type);
-			ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
+			ir_emit_store(proc, ir_emit_array_ep(proc, res, loop_data.idx), z);
+
+			ir_loop_end(proc, loop_data);
 		}
 		ir_emit_comment(proc, str_lit("array.arith.end"));
 		return ir_emit_load(proc, res);
@@ -2330,6 +2479,7 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	}
 
 
+#if 0
 	if (op == Token_Add) {
 		if (is_type_pointer(t_left)) {
 			irValue *ptr = ir_emit_conv(proc, left, type);
@@ -2351,14 +2501,14 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 			irModule *m = proc->module;
 			Type *ptr_type = base_type(t_left);
 			GB_ASSERT(!is_type_rawptr(ptr_type));
-			irValue *elem_size = ir_const_int(m->allocator, type_size_of(ptr_type->Pointer.elem));
+			irValue *elem_size = ir_const_int(type_size_of(ptr_type->Pointer.elem));
 			irValue *x = ir_emit_conv(proc, ir_emit_conv(proc, left, t_uintptr), type);
 			irValue *y = ir_emit_conv(proc, ir_emit_conv(proc, right, t_uintptr), type);
 			irValue *diff = ir_emit_arith(proc, op, x, y, type);
 			return ir_emit_arith(proc, Token_Quo, diff, elem_size, type);
 		}
 	}
-
+#endif
 
 	switch (op) {
 	case Token_Shl:
@@ -2393,14 +2543,13 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	}
 
 	if (op == Token_ModMod) {
-		irValue *n = left;
-		irValue *m = right;
 		if (is_type_unsigned(type)) {
-			return ir_emit_arith(proc, Token_Mod, n, m, type);
+			op = Token_Mod;
+		} else {
+			irValue *a = ir_emit_arith(proc, Token_Mod, left, right, type);
+			irValue *b = ir_emit_arith(proc, Token_Add, a,    right, type);
+			return ir_emit_arith(proc, Token_Mod, b, right, type);
 		}
-		irValue *a = ir_emit_arith(proc, Token_Mod, n, m, type);
-		irValue *b = ir_emit_arith(proc, Token_Add, a, m, type);
-		return ir_emit_arith(proc, Token_Mod, b, m, type);
 	}
 
 	return ir_emit(proc, ir_instr_binary_op(proc, op, left, right, type));
@@ -2470,7 +2619,7 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 		irValue *tag = ir_emit_union_tag_value(proc, x);
 		return ir_emit_comp(proc, op_kind, tag, v_zero);
 	} else if (is_type_typeid(t)) {
-		irValue *invalid_typeid = ir_value_constant(proc->module->allocator, t_typeid, exact_value_i64(0));
+		irValue *invalid_typeid = ir_value_constant(t_typeid, exact_value_i64(0));
 		return ir_emit_comp(proc, op_kind, x, invalid_typeid);
 	}
 	return nullptr;
@@ -2499,7 +2648,7 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 	} else if (right->kind == irValue_Constant || right->kind == irValue_Nil) {
 		right = ir_emit_conv(proc, right, ir_type(left));
 	} else {
-		gbAllocator a = proc->module->allocator;
+		gbAllocator a = ir_allocator();
 		i64 ls = type_size_of(ir_type(left));
 		i64 rs = type_size_of(ir_type(right));
 		if (ls < rs) {
@@ -2527,12 +2676,26 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 			cmp_op = Token_Or;
 		}
 
-		// IMPORTANT TODO(bill): Make this much more efficient
-		for (i32 i = 0; i < tl->Array.count; i++) {
-			irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
-			irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
+		bool inline_array_arith = type_size_of(tl) <= build_context.max_align;
+		i32 count = cast(i32)tl->Array.count;
+
+		if (inline_array_arith) {
+			// inline
+			for (i32 i = 0; i < count; i++) {
+				irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
+				irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
+				irValue *cmp = ir_emit_comp(proc, op_kind, x, y);
+				res = ir_emit_arith(proc, cmp_op, res, cmp, t_bool);
+			}
+		} else {
+			auto loop_data = ir_loop_start(proc, count);
+
+			irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, loop_data.idx));
+			irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, loop_data.idx));
 			irValue *cmp = ir_emit_comp(proc, op_kind, x, y);
 			res = ir_emit_arith(proc, cmp_op, res, cmp, t_bool);
+
+			ir_loop_end(proc, loop_data);
 		}
 
 		return ir_emit_conv(proc, res, t_bool);
@@ -2550,10 +2713,10 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 		}
 		GB_ASSERT(runtime_proc != nullptr);
 
-		auto args = array_make<irValue *>(proc->module->allocator, 2);
+		auto args = array_make<irValue *>(ir_allocator(), 2);
 		args[0] = left;
 		args[1] = right;
-		return ir_emit_global_call(proc, runtime_proc, args);
+		return ir_emit_runtime_call(proc, runtime_proc, args);
 	}
 
 	if (is_type_complex(a)) {
@@ -2575,10 +2738,10 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 		}
 		GB_ASSERT(runtime_proc != nullptr);
 
-		auto args = array_make<irValue *>(proc->module->allocator, 2);
+		auto args = array_make<irValue *>(ir_allocator(), 2);
 		args[0] = left;
 		args[1] = right;
-		return ir_emit_global_call(proc, runtime_proc, args);
+		return ir_emit_runtime_call(proc, runtime_proc, args);
 	}
 
 
@@ -2598,13 +2761,14 @@ irValue *ir_emit_array_ep(irProcedure *proc, irValue *s, irValue *index) {
 }
 
 irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index) {
-	return ir_emit_array_ep(proc, s, ir_const_i32(proc->module->allocator, index));
+	return ir_emit_array_ep(proc, s, ir_const_i32(index));
 }
 
 
 
 irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
+	GB_ASSERT(is_type_pointer(ir_type(s)));
 	Type *t = base_type(type_deref(ir_type(s)));
 	Type *result_type = nullptr;
 
@@ -2641,26 +2805,26 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 	} else if (is_type_dynamic_array(t)) {
 		switch (index) {
 		case 0: result_type = alloc_type_pointer(alloc_type_pointer(t->DynamicArray.elem)); break;
-		case 1: result_type = t_int_ptr;                                      break;
-		case 2: result_type = t_int_ptr;                                      break;
-		case 3: result_type = t_allocator_ptr;                                break;
+		case 1: result_type = t_int_ptr;       break;
+		case 2: result_type = t_int_ptr;       break;
+		case 3: result_type = t_allocator_ptr; break;
 		}
-	} /* else if (is_type_map(t)) {
+	} else if (is_type_map(t)) {
 		init_map_internal_types(t);
 		Type *itp = alloc_type_pointer(t->Map.internal_type);
-		s = ir_emit_load(proc, ir_emit_transmute(proc, s, itp));
+		s = ir_emit_transmute(proc, s, itp);
 
-		Type *gst = t->Map.generated_struct_type;
+		Type *gst = t->Map.internal_type;
 		GB_ASSERT(gst->kind == Type_Struct);
 		switch (index) {
 		case 0: result_type = alloc_type_pointer(gst->Struct.fields[0]->type); break;
 		case 1: result_type = alloc_type_pointer(gst->Struct.fields[1]->type); break;
 		}
-	} */else {
+	} else {
 		GB_PANIC("TODO(bill): struct_gep type: %s, %d", type_to_string(ir_type(s)), index);
 	}
 
-	GB_ASSERT(result_type != nullptr);
+	GB_ASSERT_MSG(result_type != nullptr, "%s %d", type_to_string(t), index);
 
 	return ir_emit(proc, ir_instr_struct_element_ptr(proc, s, index, result_type));
 }
@@ -2669,7 +2833,7 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 	// NOTE(bill): For some weird legacy reason in LLVM, structure elements must be accessed as an i32
 
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
 	Type *t = base_type(ir_type(s));
 	Type *result_type = nullptr;
 
@@ -2718,21 +2882,21 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 	case Type_DynamicArray:
 		switch (index) {
 		case 0: result_type = alloc_type_pointer(t->DynamicArray.elem); break;
-		case 1: result_type = t_int;                                      break;
-		case 2: result_type = t_int;                                      break;
-		case 3: result_type = t_allocator;                                break;
+		case 1: result_type = t_int;                                    break;
+		case 2: result_type = t_int;                                    break;
+		case 3: result_type = t_allocator;                              break;
 		}
 		break;
 
-	// case Type_Map: {
-	// 	init_map_internal_types(t);
-	// 	Type *gst = t->Map.generated_struct_type;
-	// 	switch (index) {
-	// 	case 0: result_type = gst->Struct.fields[0]->type; break;
-	// 	case 1: result_type = gst->Struct.fields[1]->type; break;
-	// 	}
-	// 	break;
-	// }
+	case Type_Map: {
+		init_map_internal_types(t);
+		Type *gst = t->Map.generated_struct_type;
+		switch (index) {
+		case 0: result_type = gst->Struct.fields[0]->type; break;
+		case 1: result_type = gst->Struct.fields[1]->type; break;
+		}
+		break;
+	}
 
 	default:
 		GB_PANIC("TODO(bill): struct_ev type: %s, %d", type_to_string(ir_type(s)), index);
@@ -2748,7 +2912,7 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 	GB_ASSERT(sel.index.count > 0);
 	Type *type = type_deref(ir_type(e));
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
 
 	for_array(i, sel.index) {
 		i32 index = cast(i32)sel.index[i];
@@ -2799,12 +2963,7 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 		} else if (type->kind == Type_Array) {
 			e = ir_emit_array_epi(proc, e, index);
 		} else if (type->kind == Type_Map) {
-			e = ir_emit_struct_ep(proc, e, 1);
-			switch (index) {
-			case 0: e = ir_emit_struct_ep(proc, e, 1); break; // count
-			case 1: e = ir_emit_struct_ep(proc, e, 2); break; // capacity
-			case 2: e = ir_emit_struct_ep(proc, e, 3); break; // allocator
-			}
+			e = ir_emit_struct_ep(proc, e, index);
 		} else {
 			GB_PANIC("un-gep-able type %s", type_to_string(type));
 		}
@@ -2857,7 +3016,7 @@ irValue *ir_array_elem(irProcedure *proc, irValue *array) {
 irValue *ir_array_len(irProcedure *proc, irValue *array) {
 	Type *t = base_type(ir_type(array));
 	GB_ASSERT(t->kind == Type_Array);
-	return ir_const_int(proc->module->allocator, t->Array.count);
+	return ir_const_int(t->Array.count);
 }
 
 
@@ -2901,9 +3060,9 @@ irValue *ir_string_len(irProcedure *proc, irValue *string) {
 
 irValue *ir_cstring_len(irProcedure *proc, irValue *value) {
 	GB_ASSERT(is_type_cstring(ir_type(value)));
-	auto args = array_make<irValue *>(proc->module->allocator, 1);
+	auto args = array_make<irValue *>(ir_allocator(), 1);
 	args[0] = ir_emit_conv(proc, value, t_cstring);
-	return ir_emit_global_call(proc, "__cstring_len", args);
+	return ir_emit_runtime_call(proc, "__cstring_len", args);
 }
 
 
@@ -2935,7 +3094,7 @@ irValue *ir_emit_string(irProcedure *proc, irValue *elem, irValue *len) {
 irValue *ir_add_local_slice(irProcedure *proc, Type *slice_type, irValue *base, irValue *low, irValue *high) {
 	// TODO(bill): array bounds checking for slice creation
 	// TODO(bill): check that low < high <= max
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
 	Type *bt = base_type(ir_type(base));
 
 	if (low == nullptr) {
@@ -2972,15 +3131,15 @@ irValue *ir_find_or_add_entity_string(irModule *m, String str) {
 	if (found != nullptr) {
 		return *found;
 	}
-	irValue *v = ir_const_string(m->allocator, str);
+	irValue *v = ir_const_string(str);
 	map_set(&m->const_strings, hash_string(str), v);
 	return v;
 
 }
 
 
-irValue *ir_const_union_tag(gbAllocator a, Type *u, Type *v) {
-	return ir_value_constant(a, union_tag_type(u), exact_value_i64(union_variant_index(u, v)));
+irValue *ir_const_union_tag(Type *u, Type *v) {
+	return ir_value_constant(union_tag_type(u), exact_value_i64(union_variant_index(u, v)));
 }
 
 
@@ -3035,7 +3194,7 @@ irValue *ir_emit_uintptr_to_ptr(irProcedure *proc, irValue *value, Type *t) {
 
 
 void ir_emit_store_union_variant(irProcedure *proc, irValue *parent, irValue *variant, Type *variant_type) {
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
 	irValue *underlying = ir_emit_conv(proc, parent, alloc_type_pointer(variant_type));
 
 	irValue *v = variant;
@@ -3044,7 +3203,7 @@ void ir_emit_store_union_variant(irProcedure *proc, irValue *parent, irValue *va
 	Type *t = type_deref(ir_type(parent));
 
 	irValue *tag_ptr = ir_emit_union_tag_ptr(proc, parent);
-	ir_emit_store(proc, tag_ptr, ir_const_union_tag(a, t, variant_type));
+	ir_emit_store(proc, tag_ptr, ir_const_union_tag(t, variant_type));
 }
 
 irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
@@ -3059,10 +3218,10 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 	// if (is_type_untyped_nil(src) && type_has_nil(dst)) {
 	if (is_type_untyped_nil(src)) {
-		return ir_value_nil(proc->module->allocator, t);
+		return ir_value_nil(t);
 	}
 	if (is_type_untyped_undef(src)) {
-		return ir_value_undef(proc->module->allocator, t);
+		return ir_value_undef(t);
 	}
 
 	if (value->kind == irValue_Constant) {
@@ -3133,8 +3292,6 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 	// boolean -> boolean/integer
 	if (is_type_boolean(src) && (is_type_boolean(dst) || is_type_integer(dst))) {
-		GB_ASSERT(src != t_llvm_bool);
-
 		irValue *b = ir_emit(proc, ir_instr_binary_op(proc, Token_NotEq, value, v_zero, t_llvm_bool));
 		return ir_emit(proc, ir_instr_conv(proc, irConv_zext, b, t_llvm_bool, t));
 	}
@@ -3146,11 +3303,11 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return ir_emit_bitcast(proc, value, dst);
 	}
 
-	if (src == t_cstring && dst == t_string) {
+	if (are_types_identical(src, t_cstring) && are_types_identical(dst, t_string)) {
 		irValue *c = ir_emit_conv(proc, value, t_cstring);
-		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		auto args = array_make<irValue *>(ir_allocator(), 1);
 		args[0] = c;
-		irValue *s = ir_emit_global_call(proc, "__cstring_to_string", args);
+		irValue *s = ir_emit_runtime_call(proc, "__cstring_to_string", args);
 		return ir_emit_conv(proc, s, dst);
 	}
 
@@ -3162,22 +3319,22 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 	// float -> float
 	if (is_type_float(src) && is_type_float(dst)) {
-		gbAllocator a = proc->module->allocator;
+		gbAllocator a = ir_allocator();
 		i64 sz = type_size_of(src);
 		i64 dz = type_size_of(dst);
 		// if (sz == 2) {
 		// 	switch (dz) {
 		// 	case 2: return value;
 		// 	case 4: {
-		// 		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		// 		auto args = array_make<irValue *>(ir_allocator(), 1);
 		// 		args[0] = value;
-		// 		return ir_emit_global_call(proc, "__gnu_h2f_ieee", args);
+		// 		return ir_emit_runtime_call(proc, "__gnu_h2f_ieee", args);
 		// 		break;
 		// 	}
 		// 	case 8: {
-		// 		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		// 		auto args = array_make<irValue *>(ir_allocator(), 1);
 		// 		args[0] = value;
-		// 		return ir_emit_global_call(proc, "__f16_to_f64", args);
+		// 		return ir_emit_runtime_call(proc, "__f16_to_f64", args);
 		// 		break;
 		// 	}
 		// 	}
@@ -3185,15 +3342,15 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		// 	switch (sz) {
 		// 	case 2: return value;
 		// 	case 4: {
-		// 		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		// 		auto args = array_make<irValue *>(ir_allocator(), 1);
 		// 		args[0] = value;
-		// 		return ir_emit_global_call(proc, "__gnu_f2h_ieee", args);
+		// 		return ir_emit_runtime_call(proc, "__gnu_f2h_ieee", args);
 		// 		break;
 		// 	}
 		// 	case 8: {
-		// 		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		// 		auto args = array_make<irValue *>(ir_allocator(), 1);
 		// 		args[0] = value;
-		// 		return ir_emit_global_call(proc, "__truncdfhf2", args);
+		// 		return ir_emit_runtime_call(proc, "__truncdfhf2", args);
 		// 		break;
 		// 	}
 		// 	}
@@ -3245,7 +3402,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 			Type *vt = dst->Union.variants[i];
 			if (are_types_identical(vt, src_type)) {
 				ir_emit_comment(proc, str_lit("union - child to parent"));
-				gbAllocator a = proc->module->allocator;
+				gbAllocator a = ir_allocator();
 				irValue *parent = ir_add_local_generated(proc, t);
 				ir_emit_store_union_variant(proc, parent, value, vt);
 				return ir_emit_load(proc, parent);
@@ -3342,7 +3499,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		Type *elem = dst->Array.elem;
 		irValue *e = ir_emit_conv(proc, value, elem);
 		irValue *v = ir_add_local_generated(proc, t);
-		isize index_count = dst->Array.count;
+		isize index_count = cast(isize)dst->Array.count;
 
 		for (i32 i = 0; i < index_count; i++) {
 			irValue *elem = ir_emit_array_epi(proc, v, i);
@@ -3461,7 +3618,7 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 
 
 irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, TokenPos pos, bool do_conversion_check=true) {
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
 
 	Type *src_type = ir_type(value);
 	bool is_ptr = is_type_pointer(src_type);
@@ -3485,7 +3642,7 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 
 	irValue *value_  = ir_address_from_load_or_generate_local(proc, value);
 	irValue *tag     = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, value_));
-	irValue *dst_tag = ir_const_union_tag(a, src, dst);
+	irValue *dst_tag = ir_const_union_tag(src, dst);
 
 
 	irBlock *ok_block = ir_new_block(proc, nullptr, "union_cast.ok");
@@ -3510,16 +3667,16 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 			Type *dst_type = tuple->Tuple.variables[0]->type;
 
 			irValue *ok = ir_emit_load(proc, ir_emit_struct_ep(proc, v, 1));
-			auto args = array_make<irValue *>(proc->module->allocator, 6);
+			auto args = array_make<irValue *>(ir_allocator(), 6);
 			args[0] = ok;
 
 			args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
-			args[2] = ir_const_int(a, pos.line);
-			args[3] = ir_const_int(a, pos.column);
+			args[2] = ir_const_int(pos.line);
+			args[3] = ir_const_int(pos.column);
 
 			args[4] = ir_typeid(proc->module, src_type);
 			args[5] = ir_typeid(proc->module, dst_type);
-			ir_emit_global_call(proc, "__type_assertion_check", args);
+			ir_emit_runtime_call(proc, "type_assertion_check", args);
 		}
 
 		return ir_emit_load(proc, ir_emit_struct_ep(proc, v, 0));
@@ -3528,7 +3685,7 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 }
 
 irAddr ir_emit_any_cast_addr(irProcedure *proc, irValue *value, Type *type, TokenPos pos) {
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
 	Type *src_type = ir_type(value);
 
 	if (is_type_pointer(src_type)) {
@@ -3570,16 +3727,16 @@ irAddr ir_emit_any_cast_addr(irProcedure *proc, irValue *value, Type *type, Toke
 		// NOTE(bill): Panic on invalid conversion
 
 		irValue *ok = ir_emit_load(proc, ir_emit_struct_ep(proc, v, 1));
-		auto args = array_make<irValue *>(proc->module->allocator, 6);
+		auto args = array_make<irValue *>(ir_allocator(), 6);
 		args[0] = ok;
 
 		args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
-		args[2] = ir_const_int(a, pos.line);
-		args[3] = ir_const_int(a, pos.column);
+		args[2] = ir_const_int(pos.line);
+		args[3] = ir_const_int(pos.column);
 
 		args[4] = any_typeid;
 		args[5] = dst_typeid;
-		ir_emit_global_call(proc, "__type_assertion_check", args);
+		ir_emit_runtime_call(proc, "type_assertion_check", args);
 
 		return ir_addr(ir_emit_struct_ep(proc, v, 0));
 	}
@@ -3602,7 +3759,6 @@ gb_global i32      ir_global_type_info_member_names_index   = 0;
 gb_global i32      ir_global_type_info_member_offsets_index = 0;
 gb_global i32      ir_global_type_info_member_usings_index  = 0;
 
-#if 1
 isize ir_type_info_count(CheckerInfo *info) {
 	return info->minimum_dependency_type_info_set.entries.count+1;
 }
@@ -3620,16 +3776,6 @@ isize ir_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=tr
 	}
 	return -1;
 }
-#else
-isize ir_type_info_count(CheckerInfo *info) {
-	return info->type_info_types.count;
-}
-
-isize ir_type_info_index(CheckerInfo *info, Type *type) {
-	isize index = type_info_index(info, type);
-	return index;
-}
-#endif
 
 irValue *ir_type_info(irProcedure *proc, Type *type) {
 	CheckerInfo *info = proc->module->info;
@@ -3637,19 +3783,102 @@ irValue *ir_type_info(irProcedure *proc, Type *type) {
 
 	i32 id = cast(i32)ir_type_info_index(info, type);
 	GB_ASSERT(id >= 0);
-	return ir_emit_array_ep(proc, ir_global_type_info_data, ir_const_i32(proc->module->allocator, id));
+	return ir_emit_array_ep(proc, ir_global_type_info_data, ir_const_i32(id));
 }
+
+// IMPORTANT NOTE(bill): This must match the same as the in core.odin
+enum Typeid_Kind : u8 {
+	Typeid_Invalid,
+	Typeid_Integer,
+	Typeid_Rune,
+	Typeid_Float,
+	Typeid_Complex,
+	Typeid_String,
+	Typeid_Boolean,
+	Typeid_Any,
+	Typeid_Type_Id,
+	Typeid_Pointer,
+	Typeid_Procedure,
+	Typeid_Array,
+	Typeid_Dynamic_Array,
+	Typeid_Slice,
+	Typeid_Tuple,
+	Typeid_Struct,
+	Typeid_Union,
+	Typeid_Enum,
+	Typeid_Map,
+	Typeid_Bit_Field,
+	Typeid_Bit_Set,
+};
+
 
 irValue *ir_typeid(irModule *m, Type *type) {
 	type = default_type(type);
 
-	isize id = ir_type_info_index(m->info, type);
+	u64 id = cast(u64)ir_type_info_index(m->info, type);
 	GB_ASSERT(id >= 0);
-	return ir_value_constant(m->allocator, t_typeid, exact_value_i64(id));
+
+	u64 kind = Typeid_Invalid;
+	u64 named = is_type_named(type) && type->kind != Type_Basic;
+	u64 special = 0;
+	u64 reserved = 0;
+
+	Type *bt = base_type(type);
+	TypeKind tk = bt->kind;
+	switch (tk) {
+	case Type_Basic: {
+		u32 flags = bt->Basic.flags;
+		if (flags & BasicFlag_Boolean)  kind = Typeid_Boolean;
+		if (flags & BasicFlag_Integer)  kind = Typeid_Integer;
+		if (flags & BasicFlag_Unsigned) kind = Typeid_Integer;
+		if (flags & BasicFlag_Float)    kind = Typeid_Float;
+		if (flags & BasicFlag_Complex)  kind = Typeid_Complex;
+		if (flags & BasicFlag_Pointer)  kind = Typeid_Pointer;
+		if (flags & BasicFlag_String)   kind = Typeid_String;
+		if (flags & BasicFlag_Rune)     kind = Typeid_Rune;
+	} break;
+	case Type_Pointer:      kind = Typeid_Pointer;       break;
+	case Type_Array:        kind = Typeid_Array;         break;
+	case Type_Slice:        kind = Typeid_Slice;         break;
+	case Type_DynamicArray: kind = Typeid_Dynamic_Array; break;
+	case Type_Map:          kind = Typeid_Map;           break;
+	case Type_Struct:       kind = Typeid_Struct;        break;
+	case Type_Enum:         kind = Typeid_Enum;          break;
+	case Type_Union:        kind = Typeid_Union;         break;
+	case Type_Tuple:        kind = Typeid_Tuple;         break;
+	case Type_Proc:         kind = Typeid_Procedure;     break;
+	case Type_BitField:     kind = Typeid_Bit_Field;     break;
+	case Type_BitSet:       kind = Typeid_Bit_Set;       break;
+	}
+
+	if (is_type_cstring(type)) {
+		special = 1;
+	} else if (is_type_integer(type) && !is_type_unsigned(type)) {
+		special = 1;
+	}
+
+	u64 data = 0;
+	if (build_context.word_size == 4) {
+		data |= (id       &~ (1u<<24)) << 0u;  // index
+		data |= (kind     &~ (1u<<5))  << 24u; // kind
+		data |= (named    &~ (1u<<1))  << 29u; // kind
+		data |= (special  &~ (1u<<1))  << 30u; // kind
+		data |= (reserved &~ (1u<<1))  << 31u; // kind
+	} else {
+		GB_ASSERT(build_context.word_size == 8);
+		data |= (id       &~ (1ull<<56)) << 0ul;  // index
+		data |= (kind     &~ (1ull<<5))  << 56ull; // kind
+		data |= (named    &~ (1ull<<1))  << 61ull; // kind
+		data |= (special  &~ (1ull<<1))  << 62ull; // kind
+		data |= (reserved &~ (1ull<<1))  << 63ull; // kind
+	}
+
+
+	return ir_value_constant(t_typeid, exact_value_u64(data));
 }
 
 
-irValue *ir_emit_logical_binary_expr(irProcedure *proc, TokenKind op, AstNode *left, AstNode *right, Type *type) {
+irValue *ir_emit_logical_binary_expr(irProcedure *proc, TokenKind op, Ast *left, Ast *right, Type *type) {
 	irBlock *rhs  = ir_new_block(proc, nullptr, "logical.cmp.rhs");
 	irBlock *done = ir_new_block(proc, nullptr, "logical.cmp.done");
 
@@ -3674,7 +3903,7 @@ irValue *ir_emit_logical_binary_expr(irProcedure *proc, TokenKind op, AstNode *l
 		return ir_build_expr(proc, right);
 	}
 
-	auto edges = array_make<irValue *>(proc->module->allocator, 0, done->preds.count+1);
+	auto edges = array_make<irValue *>(ir_allocator(), 0, done->preds.count+1);
 	for_array(i, done->preds) {
 		array_add(&edges, short_circuit);
 	}
@@ -3687,12 +3916,12 @@ irValue *ir_emit_logical_binary_expr(irProcedure *proc, TokenKind op, AstNode *l
 	return ir_emit(proc, ir_instr_phi(proc, edges, type));
 }
 
-irValue *ir_emit_logical_binary_expr(irProcedure *proc, AstNode *expr) {
+irValue *ir_emit_logical_binary_expr(irProcedure *proc, Ast *expr) {
 	ast_node(be, BinaryExpr, expr);
 	irBlock *rhs  = ir_new_block(proc, nullptr, "logical.cmp.rhs");
 	irBlock *done = ir_new_block(proc, nullptr, "logical.cmp.done");
 
-	Type *type = type_of_expr(proc->module->info, expr);
+	Type *type = type_of_expr(expr);
 	type = default_type(type);
 
 	return ir_emit_logical_binary_expr(proc, be->op.kind, be->left, be->right, type);
@@ -3710,20 +3939,20 @@ void ir_emit_bounds_check(irProcedure *proc, Token token, irValue *index, irValu
 	index = ir_emit_conv(proc, index, t_int);
 	len = ir_emit_conv(proc, len, t_int);
 
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
 	irValue *file = ir_find_or_add_entity_string(proc->module, token.pos.file);
-	irValue *line = ir_const_int(a, token.pos.line);
-	irValue *column = ir_const_int(a, token.pos.column);
+	irValue *line = ir_const_int(token.pos.line);
+	irValue *column = ir_const_int(token.pos.column);
 
 
-	auto args = array_make<irValue *>(proc->module->allocator, 5);
+	auto args = array_make<irValue *>(ir_allocator(), 5);
 	args[0] = file;
 	args[1] = line;
 	args[2] = column;
 	args[3] = index;
 	args[4] = len;
 
-	ir_emit_global_call(proc, "__bounds_check_error", args);
+	ir_emit_runtime_call(proc, "bounds_check_error", args);
 }
 
 void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, irValue *high, irValue *len, bool is_substring) {
@@ -3734,14 +3963,14 @@ void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, ir
 		return;
 	}
 
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
 	irValue *file = ir_find_or_add_entity_string(proc->module, token.pos.file);
-	irValue *line = ir_const_int(a, token.pos.line);
-	irValue *column = ir_const_int(a, token.pos.column);
+	irValue *line = ir_const_int(token.pos.line);
+	irValue *column = ir_const_int(token.pos.column);
 	low  = ir_emit_conv(proc, low,  t_int);
 	high = ir_emit_conv(proc, high, t_int);
 
-	auto args = array_make<irValue *>(proc->module->allocator, 6);
+	auto args = array_make<irValue *>(ir_allocator(), 6);
 	args[0] = file;
 	args[1] = line;
 	args[2] = column;
@@ -3749,7 +3978,7 @@ void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, ir
 	args[4] = high;
 	args[5] = len;
 
-	ir_emit_global_call(proc, "__slice_expr_error", args);
+	ir_emit_runtime_call(proc, "slice_expr_error", args);
 }
 
 void ir_emit_dynamic_array_bounds_check(irProcedure *proc, Token token, irValue *low, irValue *high, irValue *max) {
@@ -3760,14 +3989,14 @@ void ir_emit_dynamic_array_bounds_check(irProcedure *proc, Token token, irValue 
 		return;
 	}
 
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
 	irValue *file = ir_find_or_add_entity_string(proc->module, token.pos.file);
-	irValue *line = ir_const_int(a, token.pos.line);
-	irValue *column = ir_const_int(a, token.pos.column);
+	irValue *line = ir_const_int(token.pos.line);
+	irValue *column = ir_const_int(token.pos.column);
 	low  = ir_emit_conv(proc, low,  t_int);
 	high = ir_emit_conv(proc, high, t_int);
 
-	auto args = array_make<irValue *>(proc->module->allocator, 6);
+	auto args = array_make<irValue *>(ir_allocator(), 6);
 	args[0] = file;
 	args[1] = line;
 	args[2] = column;
@@ -3775,7 +4004,7 @@ void ir_emit_dynamic_array_bounds_check(irProcedure *proc, Token token, irValue 
 	args[4] = high;
 	args[5] = max;
 
-	ir_emit_global_call(proc, "__dynamic_array_expr_error", args);
+	ir_emit_runtime_call(proc, "dynamic_array_expr_error", args);
 }
 
 
@@ -3786,13 +4015,16 @@ void ir_emit_dynamic_array_bounds_check(irProcedure *proc, Token token, irValue 
 //
 ////////////////////////////////////////////////////////////////
 
-String ir_mangle_name(irGen *s, String path, Entity *e) {
-	// NOTE(bill): prefix names not in the init scope
-	// TODO(bill): make robust and not just rely on the file's name
-	String name = e->token.string;
+String ir_mangle_name(irGen *s, Entity *e) {
 	irModule *m = &s->module;
 	CheckerInfo *info = m->info;
-	gbAllocator a = m->allocator;
+	gbAllocator a = ir_allocator();
+
+#if 0
+	// NOTE(bill): prefix names not in the init scope
+	// TODO(bill): make robust and not just rely on the file's name
+	String path = e->token.pos.file;
+	String name = e->token.string;
 	AstFile *file = ast_file_of_filename(info, path);
 
 	char *str = gb_alloc_array(a, char, path.len+1);
@@ -3840,6 +4072,37 @@ String ir_mangle_name(irGen *s, String path, Entity *e) {
 	}
 
 	return make_string(new_name, new_name_len-1);
+
+#else
+	String name = e->token.string;
+
+	AstPackage *pkg = e->pkg;
+	GB_ASSERT_MSG(pkg != nullptr, "Missing package for '%.*s'", LIT(name));
+	String pkgn = pkg->name;
+	GB_ASSERT(!rune_is_digit(pkgn[0]));
+
+
+
+	isize max_len = pkgn.len + 1 + name.len + 1;
+	bool require_suffix_id = is_type_polymorphic(e->type);
+	if (require_suffix_id) {
+		max_len += 21;
+	}
+
+	u8 *new_name = gb_alloc_array(a, u8, max_len);
+	isize new_name_len = gb_snprintf(
+		cast(char *)new_name, max_len,
+		"%.*s.%.*s", LIT(pkgn), LIT(name)
+	);
+	if (require_suffix_id) {
+		char *str = cast(char *)new_name + new_name_len-1;
+		isize len = max_len-new_name_len;
+		isize extra = gb_snprintf(str, len, "-%llu", cast(unsigned long long)e->id);
+		new_name_len += extra-1;
+	}
+
+	return make_string(new_name, new_name_len-1);
+#endif
 }
 
 
@@ -3850,7 +4113,7 @@ void ir_mangle_add_sub_type_name(irModule *m, Entity *field, String parent) {
 
 	String cn = field->token.string;
 	isize len = parent.len + 1 + 16 + 1 + cn.len;
-	u8 *text = gb_alloc_array(m->allocator, u8, len);
+	u8 *text = gb_alloc_array(ir_allocator(), u8, len);
 	isize new_name_len = gb_snprintf(cast(char *)text, len,
 	                                 "%.*s.%.*s", LIT(parent), LIT(cn));
 
@@ -3861,9 +4124,9 @@ void ir_mangle_add_sub_type_name(irModule *m, Entity *field, String parent) {
 }
 
 
-irBranchBlocks ir_lookup_branch_blocks(irProcedure *proc, AstNode *ident) {
-	GB_ASSERT(ident->kind == AstNode_Ident);
-	Entity *e = entity_of_ident(proc->module->info, ident);
+irBranchBlocks ir_lookup_branch_blocks(irProcedure *proc, Ast *ident) {
+	GB_ASSERT(ident->kind == Ast_Ident);
+	Entity *e = entity_of_ident(ident);
 	GB_ASSERT(e->kind == Entity_Label);
 	for_array(i, proc->branch_blocks) {
 		irBranchBlocks *b = &proc->branch_blocks[i];
@@ -3878,8 +4141,8 @@ irBranchBlocks ir_lookup_branch_blocks(irProcedure *proc, AstNode *ident) {
 }
 
 
-void ir_push_target_list(irProcedure *proc, AstNode *label, irBlock *break_, irBlock *continue_, irBlock *fallthrough_) {
-	irTargetList *tl = gb_alloc_item(proc->module->allocator, irTargetList);
+void ir_push_target_list(irProcedure *proc, Ast *label, irBlock *break_, irBlock *continue_, irBlock *fallthrough_) {
+	irTargetList *tl = gb_alloc_item(ir_allocator(), irTargetList);
 	tl->prev          = proc->target_list;
 	tl->break_        = break_;
 	tl->continue_     = continue_;
@@ -3887,12 +4150,12 @@ void ir_push_target_list(irProcedure *proc, AstNode *label, irBlock *break_, irB
 	proc->target_list = tl;
 
 	if (label != nullptr) { // Set label blocks
-		GB_ASSERT(label->kind == AstNode_Label);
+		GB_ASSERT(label->kind == Ast_Label);
 
 		for_array(i, proc->branch_blocks) {
 			irBranchBlocks *b = &proc->branch_blocks[i];
 			GB_ASSERT(b->label != nullptr && label != nullptr);
-			GB_ASSERT(b->label->kind == AstNode_Label);
+			GB_ASSERT(b->label->kind == Ast_Label);
 			if (b->label == label) {
 				b->break_    = break_;
 				b->continue_ = continue_;
@@ -3910,21 +4173,20 @@ void ir_pop_target_list(irProcedure *proc) {
 
 
 
-irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, AstNode *expr, irProcedure *proc = nullptr) {
+irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, Ast *expr, irProcedure *proc = nullptr) {
 	ast_node(pl, ProcLit, expr);
 
 	// NOTE(bill): Generate a new name
 	// parent$count
 	isize name_len = prefix_name.len + 1 + 8 + 1;
-	u8 *name_text = gb_alloc_array(m->allocator, u8, name_len);
+	u8 *name_text = gb_alloc_array(ir_allocator(), u8, name_len);
 	i32 name_id = cast(i32)m->anonymous_proc_lits.entries.count;
 
 	name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$anon-%d", LIT(prefix_name), name_id);
 	String name = make_string(name_text, name_len-1);
 
-	Type *type = type_of_expr(m->info, expr);
-	irValue *value = ir_value_procedure(m->allocator,
-	                                    m, nullptr, type, pl->type, pl->body, name);
+	Type *type = type_of_expr(expr);
+	irValue *value = ir_value_procedure(m, nullptr, type, pl->type, pl->body, name);
 
 	value->Proc.tags = pl->tags;
 	value->Proc.inlining = pl->inlining;
@@ -3941,39 +4203,6 @@ irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, AstNode *exp
 
 	return value;
 }
-
-void ir_check_type_and_gen_for_proc_lit(irProcedure *proc, Type *t) {
-	if (t == nullptr) return;
-	if (t->kind == Type_Struct && t->Struct.has_proc_default_values) {
-		for_array(i, t->Struct.fields) {
-			Entity *f = t->Struct.fields[i];
-			if (f->kind == Entity_Variable && f->Variable.default_value.kind == ExactValue_Procedure) {
-				AstNode *expr = f->Variable.default_value.value_procedure;
-				GB_ASSERT(expr != nullptr);
-				if (expr->kind == AstNode_ProcLit) {
-					ir_gen_anonymous_proc_lit(proc->module, proc->name, expr, proc);
-				}
-			}
-		}
-	}
-}
-
-void ir_check_type_and_gen_for_proc_lit(irModule *m, String prefix_name, Type *t) {
-	if (t == nullptr) return;
-	if (t->kind == Type_Struct && t->Struct.has_proc_default_values) {
-		for_array(i, t->Struct.fields) {
-			Entity *f = t->Struct.fields[i];
-			if (f->kind == Entity_Variable && f->Variable.default_value.kind == ExactValue_Procedure) {
-				AstNode *expr = f->Variable.default_value.value_procedure;
-				GB_ASSERT(expr != nullptr);
-				if (expr->kind == AstNode_ProcLit) {
-					ir_gen_anonymous_proc_lit(m, prefix_name, expr);
-				}
-			}
-		}
-	}
-}
-
 
 void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	if (e->type == nullptr) return;
@@ -4012,7 +4241,7 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	if (!ir_min_dep_entity(m, e)) {
 		return;
 	}
-	irValue *t = ir_value_type_name(m->allocator, name, e->type);
+	irValue *t = ir_value_type_name(name, e->type);
 	ir_module_add_value(m, e, t);
 	map_set(&m->members, hash_string(name), t);
 
@@ -4037,8 +4266,6 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	// 		}
 	// 	}
 	// }
-
-	ir_check_type_and_gen_for_proc_lit(m, e->token.string, bt);
 }
 
 
@@ -4057,7 +4284,7 @@ void ir_build_defer_stmt(irProcedure *proc, irDefer d) {
 		ir_build_stmt(proc, d.stmt);
 	} else if (d.kind == irDefer_Instr) {
 		// NOTE(bill): Need to make a new copy
-		irValue *instr = cast(irValue *)gb_alloc_copy(proc->module->allocator, d.instr, gb_size_of(irValue));
+		irValue *instr = cast(irValue *)gb_alloc_copy(ir_allocator(), d.instr, gb_size_of(irValue));
 		ir_emit(proc, instr);
 	}
 }
@@ -4067,14 +4294,14 @@ irValue *ir_emit_min(irProcedure *proc, Type *t, irValue *x, irValue *y) {
 	y = ir_emit_conv(proc, y, t);
 
 	if (is_type_float(t)) {
-		gbAllocator a = proc->module->allocator;
+		gbAllocator a = ir_allocator();
 		i64 sz = 8*type_size_of(t);
-		auto args = array_make<irValue *>(proc->module->allocator, 2);
+		auto args = array_make<irValue *>(ir_allocator(), 2);
 		args[0] = x;
 		args[1] = y;
 		switch (sz) {
-		case 32: return ir_emit_global_call(proc, "__min_f32", args);
-		case 64: return ir_emit_global_call(proc, "__min_f64", args);
+		case 32: return ir_emit_runtime_call(proc, "__min_f32", args);
+		case 64: return ir_emit_runtime_call(proc, "__min_f64", args);
 		}
 		GB_PANIC("Unknown float type");
 	}
@@ -4085,14 +4312,14 @@ irValue *ir_emit_max(irProcedure *proc, Type *t, irValue *x, irValue *y) {
 	y = ir_emit_conv(proc, y, t);
 
 	if (is_type_float(t)) {
-		gbAllocator a = proc->module->allocator;
+		gbAllocator a = ir_allocator();
 		i64 sz = 8*type_size_of(t);
-		auto args = array_make<irValue *>(proc->module->allocator, 2);
+		auto args = array_make<irValue *>(ir_allocator(), 2);
 		args[0] = x;
 		args[1] = y;
 		switch (sz) {
-		case 32: return ir_emit_global_call(proc, "__max_f32", args);
-		case 64: return ir_emit_global_call(proc, "__max_f64", args);
+		case 32: return ir_emit_runtime_call(proc, "__max_f32", args);
+		case 64: return ir_emit_runtime_call(proc, "__max_f64", args);
 		}
 		GB_PANIC("Unknown float type");
 	}
@@ -4110,13 +4337,15 @@ irValue *ir_emit_clamp(irProcedure *proc, Type *t, irValue *x, irValue *min, irV
 
 
 irValue *ir_find_global_variable(irProcedure *proc, String name) {
-	irValue **value = map_get(&proc->module->members, hash_string(name));
+	AstPackage *pkg = proc->module->info->runtime_package;
+	Entity *e = scope_lookup_current(pkg->scope, name);
+	irValue **value = map_get(&proc->module->values, hash_entity(e));
 	GB_ASSERT_MSG(value != nullptr, "Unable to find global variable '%.*s'", LIT(name));
 	return *value;
 }
 
-void ir_build_stmt_list(irProcedure *proc, Array<AstNode *> stmts);
-
+void ir_build_stmt_list(irProcedure *proc, Array<Ast *> stmts);
+void ir_build_assign_op(irProcedure *proc, irAddr const &lhs, irValue *value, TokenKind op);
 
 bool is_double_pointer(Type *t) {
 	if (!is_type_pointer(t)) {
@@ -4131,24 +4360,24 @@ bool is_double_pointer(Type *t) {
 
 
 irValue *ir_emit_source_code_location(irProcedure *proc, String procedure, TokenPos pos) {
-	gbAllocator a = proc->module->allocator;
-	irValue *v = ir_alloc_value(a, irValue_SourceCodeLocation);
+	gbAllocator a = ir_allocator();
+	irValue *v = ir_alloc_value(irValue_SourceCodeLocation);
 	v->SourceCodeLocation.file      = ir_find_or_add_entity_string(proc->module, pos.file);
-	v->SourceCodeLocation.line      = ir_const_int(a, pos.line);
-	v->SourceCodeLocation.column    = ir_const_int(a, pos.column);
+	v->SourceCodeLocation.line      = ir_const_int(pos.line);
+	v->SourceCodeLocation.column    = ir_const_int(pos.column);
 	v->SourceCodeLocation.procedure = ir_find_or_add_entity_string(proc->module, procedure);
 	return v;
 }
 
 
-irValue *ir_emit_source_code_location(irProcedure *proc, AstNode *node) {
+irValue *ir_emit_source_code_location(irProcedure *proc, Ast *node) {
 	String proc_name = {};
 	if (proc->entity) {
 		proc_name = proc->entity->token.string;
 	}
 	TokenPos pos = {};
 	if (node) {
-		pos = ast_node_token(node).pos;
+		pos = ast_token(node).pos;
 	}
 	return ir_emit_source_code_location(proc, proc_name, pos);
 }
@@ -4160,12 +4389,12 @@ void ir_emit_increment(irProcedure *proc, irValue *addr) {
 
 }
 
-void ir_init_data_with_defaults(irProcedure *proc, irValue *ptr, irValue *count, AstNode *expr) {
+void ir_init_data_with_defaults(irProcedure *proc, irValue *ptr, irValue *count, Ast *expr) {
 	Type *elem_type = type_deref(ir_type(ptr));
 	GB_ASSERT(is_type_struct(elem_type) || is_type_array(elem_type));
 
 	irValue *index = ir_add_local_generated(proc, t_int);
-	ir_emit_store(proc, index, ir_const_int(proc->module->allocator, 0));
+	ir_emit_store(proc, index, ir_const_int(0));
 
 	irBlock *loop = nullptr;
 	irBlock *done = nullptr;
@@ -4192,7 +4421,7 @@ void ir_init_data_with_defaults(irProcedure *proc, irValue *ptr, irValue *count,
 }
 
 
-irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv, BuiltinProcId id) {
+irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, BuiltinProcId id) {
 	ast_node(ce, CallExpr, expr);
 
 	switch (id) {
@@ -4201,15 +4430,15 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		String name = bd->name;
 		GB_ASSERT(name == "location");
 		String procedure = proc->entity->token.string;
-		TokenPos pos = ast_node_token(ce->proc).pos;
+		TokenPos pos = ast_token(ce->proc).pos;
 		if (ce->args.count > 0) {
-			AstNode *ident = unselector_expr(ce->args[0]);
-			GB_ASSERT(ident->kind == AstNode_Ident);
-			Entity *e = entity_of_ident(proc->module->info, ident);
+			Ast *ident = unselector_expr(ce->args[0]);
+			GB_ASSERT(ident->kind == Ast_Ident);
+			Entity *e = entity_of_ident(ident);
 			GB_ASSERT(e != nullptr);
 
-			if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity_count > 0) {
-				procedure = e->parent_proc_decl->entities[0]->token.string;
+			if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity != nullptr) {
+				procedure = e->parent_proc_decl->entity->token.string;
 			} else {
 				procedure = str_lit("");
 			}
@@ -4220,32 +4449,32 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 	}
 
 	case BuiltinProc_type_info_of: {
-		AstNode *arg = ce->args[0];
-		TypeAndValue tav = type_and_value_of_expr(proc->module->info, arg);
+		Ast *arg = ce->args[0];
+		TypeAndValue tav = type_and_value_of_expr(arg);
 		if (tav.mode == Addressing_Type) {
-			Type *t = default_type(type_of_expr(proc->module->info, arg));
+			Type *t = default_type(type_of_expr(arg));
 			return ir_type_info(proc, t);
 		}
 		GB_ASSERT(is_type_typeid(tav.type));
 
-		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		auto args = array_make<irValue *>(ir_allocator(), 1);
 		args[0] = ir_build_expr(proc, arg);
-		return ir_emit_global_call(proc, "__type_info_of", args);
+		return ir_emit_runtime_call(proc, "__type_info_of", args);
 	}
 
 	case BuiltinProc_typeid_of: {
-		AstNode *arg = ce->args[0];
-		TypeAndValue tav = type_and_value_of_expr(proc->module->info, arg);
+		Ast *arg = ce->args[0];
+		TypeAndValue tav = type_and_value_of_expr(arg);
 		if (tav.mode == Addressing_Type) {
-			Type *t = default_type(type_of_expr(proc->module->info, arg));
+			Type *t = default_type(type_of_expr(arg));
 			return ir_typeid(proc->module, t);
 		}
 		Type *t = base_type(tav.type);
 		GB_ASSERT(are_types_identical(t, t_type_info_ptr));
 
-		auto args = array_make<irValue *>(proc->module->allocator, 1);
+		auto args = array_make<irValue *>(ir_allocator(), 1);
 		args[0] = ir_emit_conv(proc, ir_build_expr(proc, arg), t_type_info_ptr);
-		return ir_emit_global_call(proc, "__typeid_of", args);
+		return ir_emit_runtime_call(proc, "__typeid_of", args);
 	}
 
 	case BuiltinProc_len: {
@@ -4299,416 +4528,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		break;
 	}
 
-	#if 0
-	case BuiltinProc_new: {
-		ir_emit_comment(proc, str_lit("new"));
-		// proc new(Type) -> ^Type
-		gbAllocator a = proc->module->allocator;
-
-		Type *type = type_of_expr(proc->module->info, ce->args[0]);
-		Type *allocation_type = type;
-		i32 variant_index = 0;
-		if (is_type_struct(type)) {
-			Type *st = base_type(type);
-			if (st->Struct.variant_parent != nullptr) {
-				allocation_type = st->Struct.variant_parent;
-				variant_index = st->Struct.variant_index;
-				GB_ASSERT(allocation_type != nullptr);
-			}
-		}
-		Type *ptr_type = alloc_type_pointer(type);
-
-		i64 size  = type_size_of(allocation_type);
-		i64 align = type_align_of(allocation_type);
-
-		irValue **args = gb_alloc_array(a, irValue *, 2);
-		args[0] = ir_const_int(a, size);
-		args[1] = ir_const_int(a, align);
-		irValue *call = ir_emit_global_call(proc, "alloc", args, 2);
-		irValue *v = ir_emit_conv(proc, call, ptr_type);
-		if (type != allocation_type) {
-			Type *u = base_type(allocation_type);
-			Type *uptr_type = alloc_type_pointer(u);
-			irValue *parent = ir_emit_conv(proc, call, uptr_type);
-			irValue *tag_ptr = ir_emit_union_tag_ptr(proc, parent);
-			ir_emit_store(proc, tag_ptr, ir_const_int(a, variant_index));
-		}
-		return v;
-		break;
-	}
-	#endif
-
-	case BuiltinProc_make: {
-		ir_emit_comment(proc, str_lit("make"));
-		gbAllocator a = proc->module->allocator;
-		Type *type = type_of_expr(proc->module->info, ce->args[0]);
-
-		String proc_name = {};
-		if (proc->entity != nullptr) {
-			proc_name = proc->entity->token.string;
-		}
-
-		if (is_type_slice(type)) {
-			Type *elem_type = core_type(type)->Slice.elem;
-			Type *elem_ptr_type = alloc_type_pointer(elem_type);
-
-			i64 esz = type_size_of(elem_type);
-			i64 eal = type_align_of(elem_type);
-
-			irValue *elem_size  = ir_const_int(a, esz);
-			irValue *elem_align = ir_const_int(a, eal);
-
-			irValue *len = ir_emit_conv(proc, ir_build_expr(proc, ce->args[1]), t_int);
-
-			ir_emit_slice_bounds_check(proc, ast_node_token(ce->args[1]), v_zero, len, len, false);
-
-			irValue *slice_size = len;
-			if (esz != 1) {
-				slice_size = ir_emit_arith(proc, Token_Mul, elem_size, len, t_int);
-			}
-
-			TokenPos pos = ast_node_token(ce->args[0]).pos;
-
-			auto args = array_make<irValue *>(proc->module->allocator, 3);
-			args[0] = slice_size;
-			args[1] = elem_align;
-			args[2] = ir_emit_source_code_location(proc, proc_name, pos);
-			irValue *call = ir_emit_global_call(proc, "alloc", args);
-
-			irValue *ptr = ir_emit_conv(proc, call, elem_ptr_type);
-
-			if (ir_type_has_default_values(elem_type)) {
-				ir_init_data_with_defaults(proc, ptr, len, expr);
-			}
-
-			irValue *slice = ir_add_local_generated(proc, type);
-			ir_fill_slice(proc, slice, ptr, len);
-			return ir_emit_load(proc, slice);
-		} else if (is_type_map(type)) {
-			irValue *int_16 = ir_const_int(a, 16);
-			irValue *cap = int_16;
-			if (ce->args.count == 2) {
-				cap = ir_emit_conv(proc, ir_build_expr(proc, ce->args[1]), t_int);
-			}
-
-			irValue *cond = ir_emit_comp(proc, Token_Gt, cap, v_zero);
-			cap = ir_emit_select(proc, cond, cap, int_16);
-
-			irValue *map = ir_add_local_generated(proc, type);
-			irValue *header = ir_gen_map_header(proc, map, base_type(type));
-
-			auto args = array_make<irValue *>(proc->module->allocator, 3);
-			args[0] = header;
-			args[1] = cap;
-			args[2] = ir_emit_source_code_location(proc, ce->args[0]);
-			ir_emit_global_call(proc, "__dynamic_map_reserve", args);
-
-			return ir_emit_load(proc, map);
-		} else if (is_type_dynamic_array(type)) {
-			Type *elem_type = base_type(type)->DynamicArray.elem;
-			irValue *len = v_zero;
-			if (ce->args.count > 1) {
-				len = ir_emit_conv(proc, ir_build_expr(proc, ce->args[1]), t_int);
-			}
-			irValue *cap = len;
-			if (ce->args.count > 2) {
-				cap = ir_emit_conv(proc, ir_build_expr(proc, ce->args[2]), t_int);
-			}
-
-			ir_emit_dynamic_array_bounds_check(proc, ast_node_token(ce->args[0]), v_zero, len, cap);
-
-			irValue *array = ir_add_local_generated(proc, type);
-
-			auto args = array_make<irValue *>(proc->module->allocator, 6);
-			args[0] = ir_emit_conv(proc, array, t_rawptr);
-			args[1] = ir_const_int(a, type_size_of(elem_type));
-			args[2] = ir_const_int(a, type_align_of(elem_type));
-			args[3] = len;
-			args[4] = cap;
-			args[5] = ir_emit_source_code_location(proc, ce->args[0]);
-			ir_emit_global_call(proc, "__dynamic_array_make", args);
-
-			if (ir_type_has_default_values(elem_type)) {
-				ir_init_data_with_defaults(proc, ir_dynamic_array_elem(proc, ir_emit_load(proc, array)), len, expr);
-			}
-
-			return ir_emit_load(proc, array);
-		}
-		break;
-	}
-
-	#if 0
-	case BuiltinProc_free: {
-		ir_emit_comment(proc, str_lit("free"));
-
-		gbAllocator a = proc->module->allocator;
-
-		AstNode *node = ce->args[0];
-		TypeAndValue tav = type_and_value_of_expr(proc->module->info, node);
-		Type *type = base_type(tav.type);
-
-		if (is_type_dynamic_array(type)) {
-			irValue *val = ir_build_expr(proc, node);
-			irValue *da_allocator = ir_emit_struct_ev(proc, val, 3);
-
-			irValue *ptr = ir_emit_struct_ev(proc, val, 0);
-			ptr = ir_emit_conv(proc, ptr, t_rawptr);
-
-			irValue **args = gb_alloc_array(a, irValue *, 1);
-			args[0] = da_allocator;
-			args[1] = ptr;
-			return ir_emit_global_call(proc, "free_ptr_with_allocator", args, 2);
-		} else if (is_type_map(type)) {
-			irValue *map = ir_build_expr(proc, node);
-			irValue *map_ptr = ir_address_from_load_or_generate_local(proc, map);
-
-			{
-				irValue *array = ir_emit_struct_ep(proc, map_ptr, 0);
-
-				irValue *da_allocator = ir_emit_load(proc, ir_emit_struct_ep(proc, array, 3));
-				irValue *da_ptr = ir_emit_load(proc, ir_emit_struct_ep(proc, array, 0));
-				da_ptr = ir_emit_conv(proc, da_ptr, t_rawptr);
-
-				irValue **args = gb_alloc_array(a, irValue *, 1);
-				args[0] = da_allocator;
-				args[1] = da_ptr;
-				ir_emit_global_call(proc, "free_ptr_with_allocator", args, 2);
-			}
-			{
-				irValue *array = ir_emit_struct_ep(proc, map_ptr, 1);
-
-				irValue *da_allocator = ir_emit_load(proc, ir_emit_struct_ep(proc, array, 3));
-				irValue *da_ptr = ir_emit_load(proc, ir_emit_struct_ep(proc, array, 0));
-				da_ptr = ir_emit_conv(proc, da_ptr, t_rawptr);
-
-				irValue **args = gb_alloc_array(a, irValue *, 1);
-				args[0] = da_allocator;
-				args[1] = da_ptr;
-				ir_emit_global_call(proc, "free_ptr_with_allocator", args, 2);
-			}
-			return nullptr;
-		}
-
-		irValue *val = ir_build_expr(proc, node);
-		irValue *ptr = nullptr;
-		if (is_type_pointer(type)) {
-			ptr = val;
-		} else if (is_type_slice(type)) {
-			ptr = ir_slice_elem(proc, val);
-		} else if (is_type_string(type)) {
-			ptr = ir_string_elem(proc, val);
-		} else {
-			GB_PANIC("Invalid type to 'free'");
-		}
-
-		if (ptr == nullptr) {
-			return nullptr;
-		}
-
-		ptr = ir_emit_conv(proc, ptr, t_rawptr);
-
-		irValue **args = gb_alloc_array(a, irValue *, 1);
-		args[0] = ptr;
-		return ir_emit_global_call(proc, "free_ptr", args, 1);
-		break;
-	}
-	#endif
-	#if 0
-	case BuiltinProc_reserve: {
-		ir_emit_comment(proc, str_lit("reserve"));
-		gbAllocator a = proc->module->allocator;
-
-		irValue *ptr = ir_build_addr_ptr(proc, ce->args[0]);
-		Type *type = ir_type(ptr);
-		GB_ASSERT(is_type_pointer(type));
-		type = base_type(type_deref(type));
-
-		irValue *capacity = ir_emit_conv(proc, ir_build_expr(proc, ce->args[1]), t_int);
-
-		if (is_type_dynamic_array(type)) {
-			Type *elem = type->DynamicArray.elem;
-
-			irValue *elem_size  = ir_const_int(a, type_size_of(elem));
-			irValue *elem_align = ir_const_int(a, type_align_of(elem));
-
-			ptr = ir_emit_conv(proc, ptr, t_rawptr);
-
-			irValue **args = gb_alloc_array(a, irValue *, 4);
-			args[0] = ptr;
-			args[1] = elem_size;
-			args[2] = elem_align;
-			args[3] = capacity;
-			return ir_emit_global_call(proc, "__dynamic_array_reserve", args, 4);
-		} else if (is_type_map(type)) {
-			irValue **args = gb_alloc_array(a, irValue *, 2);
-			args[0] = ir_gen_map_header(proc, ptr, type);
-			args[1] = capacity;
-			return ir_emit_global_call(proc, "__dynamic_map_reserve", args, 2);
-		} else {
-			GB_PANIC("Unknown type for 'reserve'");
-		}
-		break;
-	}
-	#endif
-	#if 0
-	case BuiltinProc_clear: {
-		ir_emit_comment(proc, str_lit("clear"));
-		Type *original_type = type_of_expr(proc->module->info, ce->args[0]);
-		irAddr const &addr = ir_build_addr(proc, ce->args[0]);
-		irValue *ptr = addr.addr;
-		if (is_double_pointer(ir_type(ptr))) {
-			ptr = ir_addr_load(proc, addr);
-		}
-		Type *t = base_type(type_deref(original_type));
-		if (is_type_dynamic_array(t)) {
-			irValue *count_ptr = ir_emit_struct_ep(proc, ptr, 1);
-			ir_emit_store(proc, count_ptr, v_zero);
-		} else if (is_type_map(t)) {
-			irValue *ha = ir_emit_struct_ep(proc, ptr, 0);
-			irValue *ea = ir_emit_struct_ep(proc, ptr, 1);
-			ir_emit_store(proc, ir_emit_struct_ep(proc, ha, 1), v_zero);
-			ir_emit_store(proc, ir_emit_struct_ep(proc, ea, 1), v_zero);
-		} else if (is_type_slice(t)) {
-			irValue *count_ptr = ir_emit_struct_ep(proc, ptr, 1);
-			ir_emit_store(proc, count_ptr, v_zero);
-		} else {
-			GB_PANIC("TODO(bill): ir clear for '%s'", type_to_string(t));
-		}
-		return nullptr;
-		break;
-	}
-	#endif
-	#if 0
-	case BuiltinProc_append: {
-		ir_emit_comment(proc, str_lit("append"));
-		gbAllocator a = proc->module->allocator;
-
-		Type *value_type = type_of_expr(proc->module->info, ce->args[0]);
-		irAddr array_addr = ir_build_addr(proc, ce->args[0]);
-		irValue *array_ptr = array_addr.addr;
-		if (is_double_pointer(ir_type(array_ptr))) {
-			array_ptr = ir_addr_load(proc, array_addr);
-		}
-		Type *type = ir_type(array_ptr);
-		{
-			TokenPos pos = ast_node_token(ce->args[0]).pos;
-			GB_ASSERT_MSG(is_type_pointer(type), "%.*s(%td) %s",
-			              LIT(pos.file), pos.line,
-			              type_to_string(type));
-		}
-		type = base_type(type_deref(type));
-		Type *elem_type = nullptr;
-		bool is_slice = false;
-		if (is_type_dynamic_array(type)) {
-			elem_type = type->DynamicArray.elem;
-		} else if (is_type_slice(type)) {
-			is_slice = true;
-			elem_type = type->Slice.elem;
-		} else {
-			GB_PANIC("Invalid type to append");
-		}
-
-		irValue *elem_size  = ir_const_int(a, type_size_of(elem_type));
-		irValue *elem_align = ir_const_int(a, type_align_of(elem_type));
-
-		array_ptr = ir_emit_conv(proc, array_ptr, t_rawptr);
-
-		isize arg_index = 0;
-		isize arg_count = 0;
-		for_array(i, ce->args) {
-			AstNode *a = ce->args[i];
-			Type *at = base_type(type_of_expr(proc->module->info, a));
-			if (at->kind == Type_Tuple) {
-				arg_count += at->Tuple.variable_count;
-			} else {
-				arg_count++;
-			}
-		}
-
-		irValue **args = gb_alloc_array(proc->module->allocator, irValue *, arg_count);
-		bool vari_expand = ce->ellipsis.pos.line != 0;
-
-		for_array(i, ce->args) {
-			irValue *a = ir_build_expr(proc, ce->args[i]);
-			Type *at = ir_type(a);
-			if (at->kind == Type_Tuple) {
-				for (isize i = 0; i < at->Tuple.variable_count; i++) {
-					Entity *e = at->Tuple.variables[i];
-					irValue *v = ir_emit_struct_ev(proc, a, i);
-					args[arg_index++] = v;
-				}
-			} else {
-				args[arg_index++] = a;
-			}
-		}
-
-		if (!vari_expand) {
-			for (isize i = 1; i < arg_count; i++) {
-				args[i] = ir_emit_conv(proc, args[i], elem_type);
-			}
-		}
-
-		if (!vari_expand) {
-			ir_emit_comment(proc, str_lit("variadic call argument generation"));
-			Type *slice_type = alloc_type_slice(elem_type);
-			irValue *slice = ir_add_local_generated(proc, slice_type);
-			isize slice_len = arg_count-1;
-
-			if (slice_len > 0) {
-				irValue *base_array = ir_add_local_generated(proc, alloc_type_array(elem_type, slice_len));
-
-				for (isize i = 1; i < arg_count; i++) {
-					irValue *addr = ir_emit_array_epi(proc, base_array, i-1);
-					ir_emit_store(proc, addr, args[i]);
-				}
-
-				irValue *base_elem  = ir_emit_array_epi(proc, base_array, 0);
-				irValue *len = ir_const_int(a, slice_len);
-				ir_fill_slice(proc, slice, base_elem, len, len);
-			}
-
-			arg_count = 2;
-			args[arg_count-1] = ir_emit_load(proc, slice);
-		}
-
-		irValue *item_slice = args[1];
-		irValue *items = ir_slice_elem(proc, item_slice);
-		irValue *item_count = ir_slice_len(proc, item_slice);
-
-		irValue **daa_args = gb_alloc_array(a, irValue *, 5);
-		daa_args[0] = array_ptr;
-		daa_args[1] = elem_size;
-		daa_args[2] = elem_align;
-		daa_args[3] = ir_emit_conv(proc, items, t_rawptr);
-		daa_args[4] = ir_emit_conv(proc, item_count, t_int);
-
-		if (is_slice) {
-		return ir_emit_global_call(proc, "__slice_append", daa_args, 5);
-		}
-		return ir_emit_global_call(proc, "__dynamic_array_append", daa_args, 5);
-		break;
-	}
-	#endif
-	#if 0
-	case BuiltinProc_delete: {
-		ir_emit_comment(proc, str_lit("delete"));
-		irValue *map = ir_build_expr(proc, ce->args[0]);
-		irValue *key = ir_build_expr(proc, ce->args[1]);
-		Type *map_type = ir_type(map);
-		GB_ASSERT(is_type_map(map_type));
-		Type *key_type = base_type(map_type)->Map.key;
-
-		irValue *addr = ir_address_from_load_or_generate_local(proc, map);
-
-		gbAllocator a = proc->module->allocator;
-		irValue **args = gb_alloc_array(a, irValue *, 2);
-		args[0] = ir_gen_map_header(proc, addr, map_type);
-		args[1] = ir_gen_map_key(proc, key, key_type);
-		return ir_emit_global_call(proc, "__dynamic_map_delete", args, 2);
-		break;
-	}
-	#endif
-
 	case BuiltinProc_swizzle: {
 		ir_emit_comment(proc, str_lit("swizzle.begin"));
 		irAddr const &addr = ir_build_addr(proc, ce->args[0]);
@@ -4720,11 +4539,11 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		irValue *dst = ir_add_local_generated(proc, tv.type);
 
 		for (i32 i = 1; i < ce->args.count; i++) {
-			TypeAndValue tv = type_and_value_of_expr(proc->module->info, ce->args[i]);
+			TypeAndValue tv = type_and_value_of_expr(ce->args[i]);
 			GB_ASSERT(is_type_integer(tv.type));
 			GB_ASSERT(tv.value.kind == ExactValue_Integer);
 
-			i32 src_index = cast(i32)tv.value.value_integer;
+			i32 src_index = cast(i32)big_int_to_i64(&tv.value.value_integer);
 			i32 dst_index = i-1;
 
 			irValue *src_elem = ir_emit_array_epi(proc, src, src_index);
@@ -4786,56 +4605,82 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 
 	case BuiltinProc_expand_to_tuple: {
 		ir_emit_comment(proc, str_lit("expand_to_tuple"));
-		irValue *s = ir_build_expr(proc, ce->args[0]);
-		Type *t = base_type(ir_type(s));
+		irValue *val = ir_build_expr(proc, ce->args[0]);
+		Type *t = base_type(ir_type(val));
 
-		GB_ASSERT(t->kind == Type_Struct);
 		GB_ASSERT(is_type_tuple(tv.type));
-
 		irValue *tuple = ir_add_local_generated(proc, tv.type);
-		for_array(src_index, t->Struct.fields) {
-			Entity *field = t->Struct.fields[src_index];
-			i32 field_index = field->Variable.field_index;
-			irValue *f = ir_emit_struct_ev(proc, s, field_index);
-			irValue *ep = ir_emit_struct_ep(proc, tuple, cast(i32)src_index);
-			ir_emit_store(proc, ep, f);
+		if (t->kind == Type_Struct) {
+			for_array(src_index, t->Struct.fields) {
+				Entity *field = t->Struct.fields[src_index];
+				i32 field_index = field->Variable.field_index;
+				irValue *f = ir_emit_struct_ev(proc, val, field_index);
+				irValue *ep = ir_emit_struct_ep(proc, tuple, cast(i32)src_index);
+				ir_emit_store(proc, ep, f);
+			}
+		} else if (t->kind == Type_Array) {
+			// TODO(bill): Clean-up this code
+			irValue *ap = ir_address_from_load_or_generate_local(proc, val);
+			for (i32 i = 0; i < cast(i32)t->Array.count; i++) {
+				irValue *f = ir_emit_load(proc, ir_emit_array_epi(proc, ap, i));
+				irValue *ep = ir_emit_struct_ep(proc, tuple, i);
+				ir_emit_store(proc, ep, f);
+			}
+		} else {
+			GB_PANIC("Unknown type of expand_to_tuple");
 		}
 		return ir_emit_load(proc, tuple);
 	}
 
 	case BuiltinProc_min: {
 		ir_emit_comment(proc, str_lit("min"));
-		Type *t = type_of_expr(proc->module->info, expr);
-		return ir_emit_min(proc, t, ir_build_expr(proc, ce->args[0]), ir_build_expr(proc, ce->args[1]));
+		Type *t = type_of_expr(expr);
+		if (ce->args.count == 2) {
+			return ir_emit_min(proc, t, ir_build_expr(proc, ce->args[0]), ir_build_expr(proc, ce->args[1]));
+		} else {
+			irValue *x = ir_build_expr(proc, ce->args[0]);
+			for (isize i = 1; i < ce->args.count; i++) {
+				x = ir_emit_min(proc, t, x, ir_build_expr(proc, ce->args[i]));
+			}
+			return x;
+		}
 	}
 
 	case BuiltinProc_max: {
 		ir_emit_comment(proc, str_lit("max"));
-		Type *t = type_of_expr(proc->module->info, expr);
-		return ir_emit_max(proc, t, ir_build_expr(proc, ce->args[0]), ir_build_expr(proc, ce->args[1]));
+		Type *t = type_of_expr(expr);
+		if (ce->args.count == 2) {
+			return ir_emit_max(proc, t, ir_build_expr(proc, ce->args[0]), ir_build_expr(proc, ce->args[1]));
+		} else {
+			irValue *x = ir_build_expr(proc, ce->args[0]);
+			for (isize i = 1; i < ce->args.count; i++) {
+				x = ir_emit_max(proc, t, x, ir_build_expr(proc, ce->args[i]));
+			}
+			return x;
+		}
 	}
 
 	case BuiltinProc_abs: {
 		ir_emit_comment(proc, str_lit("abs"));
-		gbAllocator a = proc->module->allocator;
+		gbAllocator a = ir_allocator();
 		irValue *x = ir_build_expr(proc, ce->args[0]);
 		Type *t = ir_type(x);
 		if (is_type_complex(t)) {
 			i64 sz = 8*type_size_of(t);
-			auto args = array_make<irValue *>(proc->module->allocator, 1);
+			auto args = array_make<irValue *>(ir_allocator(), 1);
 			args[0] = x;
 			switch (sz) {
-			case 64:  return ir_emit_global_call(proc, "__abs_complex64",  args);
-			case 128: return ir_emit_global_call(proc, "__abs_complex128", args);
+			case 64:  return ir_emit_runtime_call(proc, "__abs_complex64",  args);
+			case 128: return ir_emit_runtime_call(proc, "__abs_complex128", args);
 			}
 			GB_PANIC("Unknown complex type");
 		} else if (is_type_float(t)) {
 			i64 sz = 8*type_size_of(t);
-			auto args = array_make<irValue *>(proc->module->allocator, 1);
+			auto args = array_make<irValue *>(ir_allocator(), 1);
 			args[0] = x;
 			switch (sz) {
-			case 32: return ir_emit_global_call(proc, "__abs_f32", args);
-			case 64: return ir_emit_global_call(proc, "__abs_f64", args);
+			case 32: return ir_emit_runtime_call(proc, "__abs_f32", args);
+			case 64: return ir_emit_runtime_call(proc, "__abs_f64", args);
 			}
 			GB_PANIC("Unknown float type");
 		}
@@ -4847,7 +4692,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 
 	case BuiltinProc_clamp: {
 		ir_emit_comment(proc, str_lit("clamp"));
-		Type *t = type_of_expr(proc->module->info, expr);
+		Type *t = type_of_expr(expr);
 		return ir_emit_clamp(proc, t,
 		                     ir_build_expr(proc, ce->args[0]),
 		                     ir_build_expr(proc, ce->args[1]),
@@ -4859,18 +4704,18 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 	return nullptr;
 }
 
-irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr);
+irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr);
 
-irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
+irValue *ir_build_expr(irProcedure *proc, Ast *expr) {
 	irValue *v = ir_build_expr_internal(proc, expr);
 	ir_add_debug_location_to_value(proc, v, expr);
 	return v;
 }
 
-irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
+irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 	expr = unparen_expr(expr);
 
-	TypeAndValue tv = type_and_value_of_expr(proc->module->info, expr);
+	TypeAndValue tv = type_and_value_of_expr(expr);
 	GB_ASSERT(tv.mode != Addressing_Invalid);
 	GB_ASSERT(tv.mode != Addressing_Type);
 
@@ -4882,11 +4727,11 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 		if (entry_index >= 0) {
 			return ir_get_type_info_ptr(proc, tv.type);
 			// i32 id = entry_index+1;
-			// return ir_value_constant(proc->module->allocator, t_int, exact_value_i64(id));
+			// return ir_value_constant(t_int, exact_value_i64(id));
 		}
 		#endif
 		// return v_raw_nil;
-		return ir_value_nil(proc->module->allocator, tv.type);
+		return ir_value_nil(tv.type);
 	}
 	#endif
 
@@ -4923,20 +4768,20 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(u, Undef, expr);
-		return ir_value_undef(proc->module->allocator, tv.type);
+		return ir_value_undef(tv.type);
 	case_end;
 
 	case_ast_node(i, Ident, expr);
-		Entity *e = entity_of_ident(proc->module->info, expr);
+		Entity *e = entity_of_ident(expr);
 		GB_ASSERT_MSG(e != nullptr, "%s", expr_to_string(expr));
 		if (e->kind == Entity_Builtin) {
-			Token token = ast_node_token(expr);
+			Token token = ast_token(expr);
 			GB_PANIC("TODO(bill): ir_build_expr Entity_Builtin '%.*s'\n"
 			         "\t at %.*s(%td:%td)", LIT(builtin_procs[e->Builtin.id].name),
 			         LIT(token.pos.file), token.pos.line, token.pos.column);
 			return nullptr;
 		} else if (e->kind == Entity_Nil) {
-			return ir_value_nil(proc->module->allocator, tv.type);
+			return ir_value_nil(tv.type);
 		}
 
 		irValue **found = map_get(&proc->module->values, hash_entity(e));
@@ -4966,7 +4811,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(se, SelectorExpr, expr);
-		TypeAndValue tav = type_and_value_of_expr(proc->module->info, expr);
+		TypeAndValue tav = type_and_value_of_expr(expr);
 		GB_ASSERT(tav.mode != Addressing_Invalid);
 		return ir_addr_load(proc, ir_build_addr(proc, expr));
 	case_end;
@@ -4974,7 +4819,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 	case_ast_node(te, TernaryExpr, expr);
 		ir_emit_comment(proc, str_lit("TernaryExpr"));
 
-		auto edges = array_make<irValue *>(proc->module->allocator, 0, 2);
+		auto edges = array_make<irValue *>(ir_allocator(), 0, 2);
 
 		GB_ASSERT(te->y != nullptr);
 		irBlock *then  = ir_new_block(proc, nullptr, "if.then");
@@ -4984,7 +4829,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 		irValue *cond = ir_build_cond(proc, te->cond, then, else_);
 		ir_start_block(proc, then);
 
-		Type *type = type_of_expr(proc->module->info, expr);
+		Type *type = type_of_expr(expr);
 
 		ir_open_scope(proc);
 		array_add(&edges, ir_emit_conv(proc, ir_build_expr(proc, te->x), type));
@@ -5004,7 +4849,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(ta, TypeAssertion, expr);
-		TokenPos pos = ast_node_token(expr).pos;
+		TokenPos pos = ast_token(expr).pos;
 		Type *type = tv.type;
 		irValue *e = ir_build_expr(proc, ta->expr);
 		Type *t = type_deref(ir_type(e));
@@ -5037,16 +4882,14 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
 		case Token_And: {
-			AstNode *ue_expr = unparen_expr(ue->expr);
-			if (ue_expr->kind == AstNode_TypeAssertion) {
-				gbAllocator a = proc->module->allocator;
-
-
+			Ast *ue_expr = unparen_expr(ue->expr);
+			if (ue_expr->kind == Ast_TypeAssertion) {
+				gbAllocator a = ir_allocator();
 				GB_ASSERT(is_type_pointer(tv.type));
 
 				ast_node(ta, TypeAssertion, ue_expr);
-				TokenPos pos = ast_node_token(expr).pos;
-				Type *type = type_of_expr(proc->module->info, ue_expr);
+				TokenPos pos = ast_token(expr).pos;
+				Type *type = type_of_expr(ue_expr);
 				GB_ASSERT(!is_type_tuple(type));
 
 				irValue *e = ir_build_expr(proc, ta->expr);
@@ -5060,19 +4903,19 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 					Type *dst_type = type;
 
 					irValue *src_tag = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, v));
-					irValue *dst_tag = ir_const_union_tag(a, src_type, dst_type);
+					irValue *dst_tag = ir_const_union_tag(src_type, dst_type);
 
 					irValue *ok = ir_emit_comp(proc, Token_CmpEq, src_tag, dst_tag);
-					auto args = array_make<irValue *>(proc->module->allocator, 6);
+					auto args = array_make<irValue *>(ir_allocator(), 6);
 					args[0] = ok;
 
 					args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
-					args[2] = ir_const_int(a, pos.line);
-					args[3] = ir_const_int(a, pos.column);
+					args[2] = ir_const_int(pos.line);
+					args[3] = ir_const_int(pos.column);
 
 					args[4] = ir_typeid(proc->module, src_type);
 					args[5] = ir_typeid(proc->module, dst_type);
-					ir_emit_global_call(proc, "__type_assertion_check", args);
+					ir_emit_runtime_call(proc, "type_assertion_check", args);
 
 					irValue *data_ptr = v;
 					return ir_emit_conv(proc, data_ptr, tv.type);
@@ -5088,25 +4931,40 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 
 
 					irValue *ok = ir_emit_comp(proc, Token_CmpEq, any_id, id);
-					auto args = array_make<irValue *>(proc->module->allocator, 6);
+					auto args = array_make<irValue *>(ir_allocator(), 6);
 					args[0] = ok;
 
 					args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
-					args[2] = ir_const_int(a, pos.line);
-					args[3] = ir_const_int(a, pos.column);
+					args[2] = ir_const_int(pos.line);
+					args[3] = ir_const_int(pos.column);
 
 					args[4] = any_id;
 					args[5] = id;
-					ir_emit_global_call(proc, "__type_assertion_check", args);
+					ir_emit_runtime_call(proc, "type_assertion_check", args);
 
 					return ir_emit_conv(proc, data_ptr, tv.type);
 				} else {
 					GB_PANIC("TODO(bill): type assertion %s", type_to_string(type));
 				}
-
+			} else if (ue_expr->kind == Ast_IndexExpr) {
+			#if 0
+				ast_node(ie, IndexExpr, ue_expr);
+				if (is_type_slice(ie->expr->tav.type)) {
+					auto tav = ie->index->tav;
+					if (tav.mode == Addressing_Constant) {
+						if (exact_value_to_i64(tav.value) == 0) {
+							irValue *s = ir_build_expr(proc, ie->expr);
+							if (is_type_pointer(ir_type(s))) {
+								s = ir_emit_load(proc, s);
+							}
+							return ir_slice_elem(proc, s);
+						}
+					}
+				}
+			#endif
 			}
 
-			return ir_emit_ptr_offset(proc, ir_build_addr_ptr(proc, ue->expr), v_zero); // Make a copy of the pointer
+			return ir_build_addr_ptr(proc, ue->expr);
 		}
 		default:
 			return ir_emit_unary_arith(proc, ue->op.kind, ir_build_expr(proc, ue->expr), tv.type);
@@ -5151,6 +5009,55 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 		case Token_CmpOr:
 			return ir_emit_logical_binary_expr(proc, expr);
 
+
+		case Token_in: {
+			irValue *right = ir_build_expr(proc, be->right);
+			Type *rt = base_type(ir_type(right));
+			switch (rt->kind) {
+			case Type_Map:
+				{
+					ir_emit_comment(proc, str_lit("map in"));
+
+					irValue *addr = ir_address_from_load_or_generate_local(proc, right);
+					irValue *h = ir_gen_map_header(proc, addr, rt);
+					irValue *key = ir_gen_map_key(proc, left, rt->Map.key);
+
+					auto args = array_make<irValue *>(ir_allocator(), 2);
+					args[0] = h;
+					args[1] = key;
+
+					irValue *ptr = ir_emit_runtime_call(proc, "__dynamic_map_get", args);
+					return ir_emit_conv(proc, ir_emit_comp(proc, Token_NotEq, ptr, v_raw_nil), t_bool);
+				}
+				break;
+			case Type_BitSet:
+				{
+					ir_emit_comment(proc, str_lit("bit_set in"));
+
+					Type *key_type = rt->BitSet.elem;
+					GB_ASSERT(are_types_identical(ir_type(left), key_type));
+
+					Type *it = bit_set_to_int(rt);
+					left = ir_emit_conv(proc, left, it);
+
+					irValue *lower = ir_value_constant(it, exact_value_i64(rt->BitSet.lower));
+					irValue *key = ir_emit_arith(proc, Token_Sub, left, lower, it);
+					irValue *bit = ir_emit_arith(proc, Token_Shl, v_one, key, it);
+
+
+					irValue *old_value = ir_emit_bitcast(proc, right, it);
+					irValue *new_value = ir_emit_arith(proc, Token_And, old_value, bit, it);
+
+					return ir_emit_conv(proc, ir_emit_comp(proc, Token_NotEq, new_value, v_zero), t_bool);
+				}
+				break;
+			default:
+				GB_PANIC("Invalid 'in' type");
+			}
+			break;
+
+		}
+
 		default:
 			GB_PANIC("Invalid binary expression");
 			break;
@@ -5168,7 +5075,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 
 
 	case_ast_node(ce, CallExpr, expr);
-		TypeAndValue proc_tv = type_and_value_of_expr(proc->module->info, ce->proc);
+		TypeAndValue proc_tv = type_and_value_of_expr(ce->proc);
 		AddressingMode proc_mode = proc_tv.mode;
 		if (proc_mode == Addressing_Type) {
 			GB_ASSERT(ce->args.count == 1);
@@ -5177,9 +5084,9 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 			return y;
 		}
 
-		AstNode *p = unparen_expr(ce->proc);
+		Ast *p = unparen_expr(ce->proc);
 		if (proc_mode == Addressing_Builtin) {
-			Entity *e = entity_of_ident(proc->module->info, p);
+			Entity *e = entity_of_ident(p);
 			BuiltinProcId id = BuiltinProc_Invalid;
 			if (e != nullptr) {
 				id = cast(BuiltinProcId)e->Builtin.id;
@@ -5197,18 +5104,18 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 		TypeProc *pt = &proc_type_->Proc;
 
 		if (is_call_expr_field_value(ce)) {
-			auto args = array_make<irValue *>(proc->module->allocator, pt->param_count);
+			auto args = array_make<irValue *>(ir_allocator(), pt->param_count);
 
 			for_array(arg_index, ce->args) {
-				AstNode *arg = ce->args[arg_index];
+				Ast *arg = ce->args[arg_index];
 				ast_node(fv, FieldValue, arg);
-				GB_ASSERT(fv->field->kind == AstNode_Ident);
+				GB_ASSERT(fv->field->kind == Ast_Ident);
 				String name = fv->field->Ident.token.string;
 				isize index = lookup_procedure_parameter(pt, name);
 				GB_ASSERT(index >= 0);
-				TypeAndValue tav = type_and_value_of_expr(proc->module->info, fv->value);
+				TypeAndValue tav = type_and_value_of_expr(fv->value);
 				if (tav.mode == Addressing_Type) {
-					args[index] = ir_value_nil(proc->module->allocator, tav.type);
+					args[index] = ir_value_nil(tav.type);
 				} else {
 					args[index] = ir_build_expr(proc, fv->value);
 				}
@@ -5217,16 +5124,26 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 			for (isize i = 0; i < args.count; i++) {
 				Entity *e = params->variables[i];
 				if (e->kind == Entity_TypeName) {
-					args[i] = ir_value_nil(proc->module->allocator, e->type);
+					args[i] = ir_value_nil(e->type);
 				} else if (e->kind == Entity_Constant) {
 					continue;
 				} else {
 					GB_ASSERT(e->kind == Entity_Variable);
 					if (args[i] == nullptr) {
-						if (e->Variable.default_value.kind != ExactValue_Invalid) {
-							args[i] = ir_value_constant(proc->module->allocator, e->type, e->Variable.default_value);
-						} else {
-							args[i] = ir_value_nil(proc->module->allocator, e->type);
+						switch (e->Variable.param_value.kind) {
+						case ParameterValue_Constant:
+							args[i] = ir_value_constant(e->type, e->Variable.param_value.value);
+							break;
+						case ParameterValue_Nil:
+							args[i] = ir_value_nil(e->type);
+							break;
+						case ParameterValue_Location:
+							// args[i] =
+							GB_PANIC("TODO ParameterValue_Location");
+							break;
+						case ParameterValue_Value:
+							args[i] = ir_build_expr(proc, e->Variable.param_value.ast_value);
+							break;
 						}
 					} else {
 						args[i] = ir_emit_conv(proc, args[i], e->type);
@@ -5240,9 +5157,9 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 
 		isize arg_count = 0;
 		for_array(i, ce->args) {
-			AstNode *arg = ce->args[i];
-			TypeAndValue tav = type_and_value_of_expr(proc->module->info, arg);
-			GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s", expr_to_string(arg));
+			Ast *arg = ce->args[i];
+			TypeAndValue tav = type_and_value_of_expr(arg);
+			GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s", expr_to_string(arg), expr_to_string(expr));
 			GB_ASSERT_MSG(tav.mode != Addressing_ProcGroup, "%s", expr_to_string(arg));
 			Type *at = tav.type;
 			if (at->kind == Type_Tuple) {
@@ -5252,13 +5169,13 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 			}
 		}
 
-		i64 param_count = 0;
+		isize param_count = 0;
 		if (pt->params) {
 			GB_ASSERT(pt->params->kind == Type_Tuple);
 			param_count = pt->params->Tuple.variables.count;
 		}
 
-		auto args = array_make<irValue *>(proc->module->allocator, gb_max(param_count, arg_count));
+		auto args = array_make<irValue *>(ir_allocator(), cast(isize)gb_max(param_count, arg_count));
 		isize variadic_index = pt->variadic_index;
 		bool variadic = pt->variadic && variadic_index >= 0;
 		bool vari_expand = ce->ellipsis.pos.line != 0;
@@ -5268,7 +5185,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 		if (proc->entity != nullptr) {
 			proc_name = proc->entity->token.string;
 		}
-		TokenPos pos = ast_node_token(ce->proc).pos;
+		TokenPos pos = ast_token(ce->proc).pos;
 
 		TypeTuple *param_tuple = nullptr;
 		if (pt->params) {
@@ -5277,10 +5194,10 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 		}
 
 		for_array(i, ce->args) {
-			AstNode *arg = ce->args[i];
-			TypeAndValue arg_tv = type_and_value_of_expr(proc->module->info, arg);
+			Ast *arg = ce->args[i];
+			TypeAndValue arg_tv = type_and_value_of_expr(arg);
 			if (arg_tv.mode == Addressing_Type) {
-				args[arg_index++] = ir_value_nil(proc->module->allocator, arg_tv.type);
+				args[arg_index++] = ir_value_nil(arg_tv.type);
 			} else {
 				irValue *a = ir_build_expr(proc, arg);
 				Type *at = ir_type(a);
@@ -5302,19 +5219,27 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 			GB_ASSERT(param_count < 1000000);
 
 			if (arg_count < param_count) {
-				isize end = param_count;
+				isize end = cast(isize)param_count;
 				if (variadic) {
 					end = variadic_index;
 				}
 				while (arg_index < end) {
 					Entity *e = param_tuple->variables[arg_index];
 					GB_ASSERT(e->kind == Entity_Variable);
-					if (e->Variable.default_value.kind != ExactValue_Invalid) {
-						args[arg_index++] = ir_value_constant(proc->module->allocator, e->type, e->Variable.default_value);
-					} else if (e->Variable.default_is_location) {
+
+					switch (e->Variable.param_value.kind) {
+					case ParameterValue_Constant:
+						args[arg_index++] = ir_value_constant(e->type, e->Variable.param_value.value);
+						break;
+					case ParameterValue_Nil:
+						args[arg_index++] = ir_value_nil(e->type);
+						break;
+					case ParameterValue_Location:
 						args[arg_index++] = ir_emit_source_code_location(proc, proc_name, pos);
-					} else {
-						args[arg_index++] = ir_value_nil(proc->module->allocator, e->type);
+						break;
+					case ParameterValue_Value:
+						args[arg_index++] = ir_build_expr(proc, e->Variable.param_value.ast_value);
+						break;
 					}
 				}
 			}
@@ -5358,7 +5283,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 					}
 				}
 			} else {
-				for (i64 i = 0; i < param_count; i++) {
+				for (isize i = 0; i < param_count; i++) {
 					Entity *e = param_tuple->variables[i];
 					if (e->kind == Entity_Variable) {
 						GB_ASSERT(args[i] != nullptr);
@@ -5369,7 +5294,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 
 			if (variadic && !vari_expand && !is_c_vararg) {
 				ir_emit_comment(proc, str_lit("variadic call argument generation"));
-				gbAllocator allocator = proc->module->allocator;
+				gbAllocator allocator = ir_allocator();
 				Type *slice_type = param_tuple->variables[variadic_index]->type;
 				Type *elem_type  = base_type(slice_type)->Slice.elem;
 				irValue *slice = ir_add_local_generated(proc, slice_type);
@@ -5384,7 +5309,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 					}
 
 					irValue *base_elem = ir_emit_array_epi(proc, base_array, 0);
-					irValue *len = ir_const_int(allocator, slice_len);
+					irValue *len = ir_const_int(slice_len);
 					ir_fill_slice(proc, slice, base_elem, len);
 				}
 
@@ -5396,17 +5321,24 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 		if (variadic && variadic_index+1 < param_count) {
 			for (isize i = variadic_index+1; i < param_count; i++) {
 				Entity *e = param_tuple->variables[i];
-				if (e->Variable.default_value.kind != ExactValue_Invalid) {
-					args[i] = ir_value_constant(proc->module->allocator, e->type, e->Variable.default_value);
-				} else if (e->Variable.default_is_location) {
+				switch (e->Variable.param_value.kind) {
+				case ParameterValue_Constant:
+					args[i] = ir_value_constant(e->type, e->Variable.param_value.value);
+					break;
+				case ParameterValue_Nil:
+					args[i] = ir_value_nil(e->type);
+					break;
+				case ParameterValue_Location:
 					args[i] = ir_emit_source_code_location(proc, proc_name, pos);
-				} else {
-					args[i] = ir_value_nil(proc->module->allocator, e->type);
+					break;
+				case ParameterValue_Value:
+					args[i] = ir_build_expr(proc, e->Variable.param_value.ast_value);
+					break;
 				}
 			}
 		}
 
-		i64 final_count = param_count;
+		isize final_count = param_count;
 		if (is_c_vararg) {
 			final_count = arg_count;
 		}
@@ -5424,7 +5356,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, AstNode *expr) {
 	case_end;
 	}
 
-	GB_PANIC("Unexpected expression: %.*s", LIT(ast_node_strings[expr->kind]));
+	GB_PANIC("Unexpected expression: %.*s", LIT(ast_strings[expr->kind]));
 	return nullptr;
 }
 
@@ -5447,19 +5379,19 @@ irValue *ir_get_using_variable(irProcedure *proc, Entity *e) {
 	return ir_emit_deep_field_gep(proc, v, sel);
 }
 
-bool ir_is_elem_const(irModule *m, AstNode *elem, Type *elem_type) {
+bool ir_is_elem_const(irModule *m, Ast *elem, Type *elem_type) {
 	if (!elem_type_can_be_constant(elem_type)) {
 		return false;
 	}
-	if (elem->kind == AstNode_FieldValue) {
+	if (elem->kind == Ast_FieldValue) {
 		elem = elem->FieldValue.value;
 	}
-	TypeAndValue tav = type_and_value_of_expr(m->info, elem);
+	TypeAndValue tav = type_and_value_of_expr(elem);
 	GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s", expr_to_string(elem), type_to_string(tav.type));
 	return tav.value.kind != ExactValue_Invalid;
 }
 
-irAddr ir_build_addr_from_entity(irProcedure *proc, Entity *e, AstNode *expr) {
+irAddr ir_build_addr_from_entity(irProcedure *proc, Entity *e, Ast *expr) {
 	GB_ASSERT(e != nullptr);
 	GB_ASSERT(e->kind != Entity_Constant);
 
@@ -5482,7 +5414,7 @@ irAddr ir_build_addr_from_entity(irProcedure *proc, Entity *e, AstNode *expr) {
 	return ir_addr(v);
 }
 
-irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
+irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 	switch (expr->kind) {
 	case_ast_node(i, Implicit, expr);
 		irValue *v = nullptr;
@@ -5493,7 +5425,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		}
 
 		GB_ASSERT(v != nullptr);
-		return ir_addr(v);
+		return ir_addr_context(v);
 	case_end;
 
 	case_ast_node(i, Ident, expr);
@@ -5502,7 +5434,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			return val;
 		}
 		String name = i->token.string;
-		Entity *e = entity_of_ident(proc->module->info, expr);
+		Entity *e = entity_of_ident(expr);
 		// GB_ASSERT(name == e->token.string);
 		return ir_build_addr_from_entity(proc, e, expr);
 	case_end;
@@ -5513,14 +5445,14 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 	case_ast_node(se, SelectorExpr, expr);
 		ir_emit_comment(proc, str_lit("SelectorExpr"));
-		AstNode *sel = unparen_expr(se->selector);
-		if (sel->kind == AstNode_Ident) {
+		Ast *sel = unparen_expr(se->selector);
+		if (sel->kind == Ast_Ident) {
 			String selector = sel->Ident.token.string;
-			TypeAndValue tav = type_and_value_of_expr(proc->module->info, se->expr);
+			TypeAndValue tav = type_and_value_of_expr(se->expr);
 
 			if (tav.mode == Addressing_Invalid) {
 				// NOTE(bill): Imports
-				Entity *imp = entity_of_ident(proc->module->info, se->expr);
+				Entity *imp = entity_of_ident(se->expr);
 				if (imp != nullptr) {
 					GB_ASSERT(imp->kind == Entity_ImportName);
 				}
@@ -5581,11 +5513,11 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			}
 		} else {
 			// NOTE(bill): x.0
-			Type *type = type_deref(type_of_expr(proc->module->info, se->expr));
-			Type *selector_type = base_type(type_of_expr(proc->module->info, se->selector));
+			Type *type = type_deref(type_of_expr(se->expr));
+			Type *selector_type = base_type(type_of_expr(se->selector));
 			GB_ASSERT_MSG(is_type_integer(selector_type), "%s", type_to_string(selector_type));
-			ExactValue val = type_and_value_of_expr(proc->module->info, sel).value;
-			i64 index = val.value_integer;
+			ExactValue val = type_and_value_of_expr(sel).value;
+			i64 index = big_int_to_i64(&val.value_integer);
 
 			Selection sel = lookup_field_from_index(type, index);
 			GB_ASSERT(sel.entity != nullptr);
@@ -5597,19 +5529,19 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(ta, TypeAssertion, expr);
-		gbAllocator a = proc->module->allocator;
-		TokenPos pos = ast_node_token(expr).pos;
+		gbAllocator a = ir_allocator();
+		TokenPos pos = ast_token(expr).pos;
 		irValue *e = ir_build_expr(proc, ta->expr);
 		Type *t = type_deref(ir_type(e));
 		if (is_type_union(t)) {
-			Type *type = type_of_expr(proc->module->info, expr);
+			Type *type = type_of_expr(expr);
 			irValue *v = ir_add_local_generated(proc, type);
 			ir_emit_comment(proc, str_lit("cast - union_cast"));
 			ir_emit_store(proc, v, ir_emit_union_cast(proc, ir_build_expr(proc, ta->expr), type, pos));
 			return ir_addr(v);
 		} else if (is_type_any(t)) {
 			ir_emit_comment(proc, str_lit("cast - any_cast"));
-			Type *type = type_of_expr(proc->module->info, expr);
+			Type *type = type_of_expr(expr);
 			return ir_emit_any_cast_addr(proc, ir_build_expr(proc, ta->expr), type, pos);
 		} else {
 			GB_PANIC("TODO(bill): type assertion %s", type_to_string(ir_type(e)));
@@ -5635,8 +5567,8 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 	case_ast_node(ie, IndexExpr, expr);
 		ir_emit_comment(proc, str_lit("IndexExpr"));
-		Type *t = base_type(type_of_expr(proc->module->info, ie->expr));
-		gbAllocator a = proc->module->allocator;
+		Type *t = base_type(type_of_expr(ie->expr));
+		gbAllocator a = ir_allocator();
 
 		bool deref = is_type_pointer(t);
 		t = base_type(type_deref(t));
@@ -5651,7 +5583,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			irValue *key = ir_build_expr(proc, ie->index);
 			key = ir_emit_conv(proc, key, t->Map.key);
 
-			Type *result_type = type_of_expr(proc->module->info, expr);
+			Type *result_type = type_of_expr(expr);
 			return ir_addr_map(map_val, key, t, result_type);
 		}
 
@@ -5671,10 +5603,10 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			irValue *index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
 			irValue *elem = ir_emit_array_ep(proc, array, index);
 
-			auto index_tv = type_and_value_of_expr(proc->module->info, ie->index);
+			auto index_tv = type_and_value_of_expr(ie->index);
 			if (index_tv.mode != Addressing_Constant) {
-				irValue *len = ir_const_int(a, t->Array.count);
-				ir_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
+				irValue *len = ir_const_int(t->Array.count);
+				ir_emit_bounds_check(proc, ast_token(ie->index), index, len);
 			}
 			return ir_addr(elem);
 			break;
@@ -5693,7 +5625,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			irValue *elem = ir_slice_elem(proc, slice);
 			irValue *index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
 			irValue *len = ir_slice_len(proc, slice);
-			ir_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
+			ir_emit_bounds_check(proc, ast_token(ie->index), index, len);
 			irValue *v = ir_emit_ptr_offset(proc, elem, index);
 			return ir_addr(v);
 			break;
@@ -5712,7 +5644,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			irValue *elem = ir_dynamic_array_elem(proc, dynamic_array);
 			irValue *len = ir_dynamic_array_len(proc, dynamic_array);
 			irValue *index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
-			ir_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
+			ir_emit_bounds_check(proc, ast_token(ie->index), index, len);
 			irValue *v = ir_emit_ptr_offset(proc, elem, index);
 			return ir_addr(v);
 			break;
@@ -5737,7 +5669,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			len = ir_string_len(proc, str);
 
 			index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
-			ir_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
+			ir_emit_bounds_check(proc, ast_token(ie->index), index, len);
 
 			return ir_addr(ir_emit_ptr_offset(proc, elem, index));
 			break;
@@ -5747,16 +5679,12 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 	case_ast_node(se, SliceExpr, expr);
 		ir_emit_comment(proc, str_lit("SliceExpr"));
-		gbAllocator a = proc->module->allocator;
+		gbAllocator a = ir_allocator();
 		irValue *low  = v_zero;
 		irValue *high = nullptr;
 
 		if (se->low  != nullptr) low  = ir_build_expr(proc, se->low);
 		if (se->high != nullptr) high = ir_build_expr(proc, se->high);
-
-		if (high != nullptr && se->interval.kind == Token_Ellipsis) {
-			high = ir_emit_arith(proc, Token_Add, high, v_one, t_int);
-		}
 
 		irValue *addr = ir_build_addr_ptr(proc, se->expr);
 		irValue *base = ir_emit_load(proc, addr);
@@ -5809,8 +5737,8 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 			if (high == nullptr) high = len;
 
-			bool low_const  = type_and_value_of_expr(proc->module->info, se->low).mode  == Addressing_Constant;
-			bool high_const = type_and_value_of_expr(proc->module->info, se->high).mode == Addressing_Constant;
+			bool low_const  = type_and_value_of_expr(se->low).mode  == Addressing_Constant;
+			bool high_const = type_and_value_of_expr(se->high).mode == Addressing_Constant;
 
 			if (!low_const || !high_const) {
 				ir_emit_slice_bounds_check(proc, se->open, low, high, len, false);
@@ -5860,7 +5788,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 	case_ast_node(cl, CompoundLit, expr);
 		ir_emit_comment(proc, str_lit("CompoundLit"));
-		Type *type = type_of_expr(proc->module->info, expr);
+		Type *type = type_of_expr(expr);
 		Type *bt = base_type(type);
 
 		irValue *v = ir_add_local_generated(proc, type, true);
@@ -5869,13 +5797,14 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		switch (bt->kind) {
 		case Type_Array:  et = bt->Array.elem;  break;
 		case Type_Slice:  et = bt->Slice.elem;  break;
+		case Type_BitSet: et = bt->BitSet.elem; break;
 		}
 
 		String proc_name = {};
 		if (proc->entity) {
 			proc_name = proc->entity->token.string;
 		}
-		TokenPos pos = ast_node_token(expr).pos;
+		TokenPos pos = ast_token(expr).pos;
 
 		switch (bt->kind) {
 		default: GB_PANIC("Unknown CompoundLit type: %s", type_to_string(type)); break;
@@ -5890,20 +5819,20 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			if (cl->elems.count > 0) {
 				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
 				for_array(field_index, cl->elems) {
-					AstNode *elem = cl->elems[field_index];
+					Ast *elem = cl->elems[field_index];
 
 					irValue *field_expr = nullptr;
 					Entity *field = nullptr;
 					isize index = field_index;
 
-					if (elem->kind == AstNode_FieldValue) {
+					if (elem->kind == Ast_FieldValue) {
 						ast_node(fv, FieldValue, elem);
 						String name = fv->field->Ident.token.string;
 						Selection sel = lookup_field(bt, name, false);
 						index = sel.index[0];
 						elem = fv->value;
 					} else {
-						TypeAndValue tav = type_and_value_of_expr(proc->module->info, elem);
+						TypeAndValue tav = type_and_value_of_expr(elem);
 						Selection sel = lookup_field_from_index(bt, st->fields[field_index]->Variable.field_src_index);
 						index = sel.index[0];
 					}
@@ -5930,16 +5859,16 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			if (cl->elems.count == 0) {
 				break;
 			}
-			gbAllocator a = proc->module->allocator;
+			gbAllocator a = ir_allocator();
 			{
 				auto args = array_make<irValue *>(a, 3);
 				args[0] = ir_gen_map_header(proc, v, type);
-				args[1] = ir_const_int(a, 2*cl->elems.count);
+				args[1] = ir_const_int(2*cl->elems.count);
 				args[2] = ir_emit_source_code_location(proc, proc_name, pos);
-				ir_emit_global_call(proc, "__dynamic_map_reserve", args);
+				ir_emit_runtime_call(proc, "__dynamic_map_reserve", args);
 			}
 			for_array(field_index, cl->elems) {
-				AstNode *elem = cl->elems[field_index];
+				Ast *elem = cl->elems[field_index];
 				ast_node(fv, FieldValue, elem);
 
 				irValue *key   = ir_build_expr(proc, fv->field);
@@ -5954,24 +5883,24 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 				break;
 			}
 			Type *elem = bt->DynamicArray.elem;
-			gbAllocator a = proc->module->allocator;
-			irValue *size  = ir_const_int(a, type_size_of(elem));
-			irValue *align = ir_const_int(a, type_align_of(elem));
+			gbAllocator a = ir_allocator();
+			irValue *size  = ir_const_int(type_size_of(elem));
+			irValue *align = ir_const_int(type_align_of(elem));
 			{
 				auto args = array_make<irValue *>(a, 5);
 				args[0] = ir_emit_conv(proc, v, t_rawptr);
 				args[1] = size;
 				args[2] = align;
-				args[3] = ir_const_int(a, 2*cl->elems.count);
+				args[3] = ir_const_int(2*cl->elems.count);
 				args[4] = ir_emit_source_code_location(proc, proc_name, pos);
-				ir_emit_global_call(proc, "__dynamic_array_reserve", args);
+				ir_emit_runtime_call(proc, "__dynamic_array_reserve", args);
 			}
 
 			i64 item_count = cl->elems.count;
 			irValue *items = ir_generate_array(proc->module, elem, item_count, str_lit("__dacl$"), cast(i64)cast(intptr)expr);
 
 			for_array(field_index, cl->elems) {
-				AstNode *f = cl->elems[field_index];
+				Ast *f = cl->elems[field_index];
 				irValue *value = ir_emit_conv(proc, ir_build_expr(proc, f), elem);
 				irValue *ep = ir_emit_array_epi(proc, items, cast(i32)field_index);
 				ir_emit_store(proc, ep, value);
@@ -5983,9 +5912,9 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 				args[1] = size;
 				args[2] = align;
 				args[3] = ir_emit_conv(proc, items, t_rawptr);
-				args[4] = ir_const_int(a, item_count);
+				args[4] = ir_const_int(item_count);
 				args[5] = ir_emit_source_code_location(proc, proc_name, pos);
-				ir_emit_global_call(proc, "__dynamic_array_append", args);
+				ir_emit_runtime_call(proc, "__dynamic_array_append", args);
 			}
 			break;
 		}
@@ -5994,7 +5923,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			if (cl->elems.count > 0) {
 				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
 				for_array(i, cl->elems) {
-					AstNode *elem = cl->elems[i];
+					Ast *elem = cl->elems[i];
 					if (ir_is_elem_const(proc->module, elem, et)) {
 						continue;
 					}
@@ -6019,7 +5948,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 				irValue *data = ir_emit_array_ep(proc, slice->ConstantSlice.backing_array, v_zero32);
 
 				for_array(i, cl->elems) {
-					AstNode *elem = cl->elems[i];
+					Ast *elem = cl->elems[i];
 					if (ir_is_elem_const(proc->module, elem, et)) {
 						continue;
 					}
@@ -6028,11 +5957,11 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 					Type *t = ir_type(field_expr);
 					GB_ASSERT(t->kind != Type_Tuple);
 					irValue *ev = ir_emit_conv(proc, field_expr, elem_type);
-					irValue *offset = ir_emit_ptr_offset(proc, data, ir_const_int(proc->module->allocator, i));
+					irValue *offset = ir_emit_ptr_offset(proc, data, ir_const_int(i));
 					ir_emit_store(proc, offset, ev);
 				}
 
-				irValue *count = ir_const_int(proc->module->allocator, slice->ConstantSlice.count);
+				irValue *count = ir_const_int(slice->ConstantSlice.count);
 				ir_fill_slice(proc, v, data, count);
 			}
 			break;
@@ -6044,7 +5973,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
 				String field_names[2] = {
 					str_lit("data"),
-					str_lit("typeid"),
+					str_lit("id"),
 				};
 				Type *field_types[2] = {
 					t_rawptr,
@@ -6052,18 +5981,18 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 				};
 
 				for_array(field_index, cl->elems) {
-					AstNode *elem = cl->elems[field_index];
+					Ast *elem = cl->elems[field_index];
 
 					irValue *field_expr = nullptr;
 					isize index = field_index;
 
-					if (elem->kind == AstNode_FieldValue) {
+					if (elem->kind == Ast_FieldValue) {
 						ast_node(fv, FieldValue, elem);
 						Selection sel = lookup_field(bt, fv->field->Ident.token.string, false);
 						index = sel.index[0];
 						elem = fv->value;
 					} else {
-						TypeAndValue tav = type_and_value_of_expr(proc->module->info, elem);
+						TypeAndValue tav = type_and_value_of_expr(elem);
 						Selection sel = lookup_field(bt, field_names[field_index], false);
 						index = sel.index[0];
 					}
@@ -6078,14 +6007,49 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 					ir_emit_store(proc, gep, fv);
 				}
 			}
+
+			break;
 		}
+
+		case Type_BitSet: {
+
+			i64 sz = type_size_of(type);
+			if (cl->elems.count > 0 && sz > 0) {
+				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
+
+				irValue *lower = ir_value_constant(t_int, exact_value_i64(bt->BitSet.lower));
+				for_array(i, cl->elems) {
+					Ast *elem = cl->elems[i];
+					GB_ASSERT(elem->kind != Ast_FieldValue);
+
+					if (ir_is_elem_const(proc->module, elem, et)) {
+						continue;
+					}
+
+					irValue *expr = ir_build_expr(proc, elem);
+					GB_ASSERT(ir_type(expr)->kind != Type_Tuple);
+
+					Type *it = bit_set_to_int(bt);
+					irValue *e = ir_emit_conv(proc, expr, it);
+					e = ir_emit_arith(proc, Token_Sub, e, lower, it);
+					e = ir_emit_arith(proc, Token_Shl, v_one, e, it);
+
+					irValue *old_value = ir_emit_bitcast(proc, ir_emit_load(proc, v), it);
+					irValue *new_value = ir_emit_arith(proc, Token_Or, old_value, e, it);
+					new_value = ir_emit_bitcast(proc, new_value, type);
+					ir_emit_store(proc, v, new_value);
+				}
+			}
+			break;
+		}
+
 		}
 
 		return ir_addr(v);
 	case_end;
 
 	case_ast_node(tc, TypeCast, expr);
-		Type *type = type_of_expr(proc->module->info, expr);
+		Type *type = type_of_expr(expr);
 		irValue *x = ir_build_expr(proc, tc->expr);
 		irValue *e = nullptr;
 		switch (tc->token.kind) {
@@ -6108,11 +6072,11 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 	case_end;
 	}
 
-	TokenPos token_pos = ast_node_token(expr).pos;
+	TokenPos token_pos = ast_token(expr).pos;
 	GB_PANIC("Unexpected address expression\n"
-	         "\tAstNode: %.*s @ "
+	         "\tAst: %.*s @ "
 	         "%.*s(%td:%td)\n",
-	         LIT(ast_node_strings[expr->kind]),
+	         LIT(ast_strings[expr->kind]),
 	         LIT(token_pos.file), token_pos.line, token_pos.column);
 
 
@@ -6133,7 +6097,7 @@ void ir_build_assign_op(irProcedure *proc, irAddr const &lhs, irValue *value, To
 	ir_addr_store(proc, lhs, new_value);
 }
 
-irValue *ir_build_cond(irProcedure *proc, AstNode *cond, irBlock *true_block, irBlock *false_block) {
+irValue *ir_build_cond(irProcedure *proc, Ast *cond, irBlock *true_block, irBlock *false_block) {
 	switch (cond->kind) {
 	case_ast_node(pe, ParenExpr, cond);
 		return ir_build_cond(proc, pe->expr, true_block, false_block);
@@ -6166,7 +6130,7 @@ irValue *ir_build_cond(irProcedure *proc, AstNode *cond, irBlock *true_block, ir
 	return v;
 }
 
-void ir_build_poly_proc(irProcedure *proc, AstNodeProcLit *pd, Entity *e) {
+void ir_build_nested_proc(irProcedure *proc, AstProcLit *pd, Entity *e) {
 	GB_ASSERT(pd->body != nullptr);
 
 	if (ir_min_dep_entity(proc->module, e) == false) {
@@ -6183,14 +6147,14 @@ void ir_build_poly_proc(irProcedure *proc, AstNodeProcLit *pd, Entity *e) {
 	}
 
 	isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
-	u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
+	u8 *name_text = gb_alloc_array(ir_allocator(), u8, name_len);
+
 	i32 guid = cast(i32)proc->children.count;
 	name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
 	String name = make_string(name_text, name_len-1);
 
 
-	irValue *value = ir_value_procedure(proc->module->allocator,
-	                                    proc->module, e, e->type, pd->type, pd->body, name);
+	irValue *value = ir_value_procedure(proc->module, e, e->type, pd->type, pd->body, name);
 
 	value->Proc.tags = pd->tags;
 	value->Proc.inlining = pd->inlining;
@@ -6202,15 +6166,15 @@ void ir_build_poly_proc(irProcedure *proc, AstNodeProcLit *pd, Entity *e) {
 }
 
 
-void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
+void ir_build_constant_value_decl(irProcedure *proc, AstValueDecl *vd) {
 	if (vd == nullptr || vd->is_mutable) {
 		return;
 	}
 
 	for_array(i, vd->names) {
-		AstNode *ident = vd->names[i];
-		GB_ASSERT(ident->kind == AstNode_Ident);
-		Entity *e = entity_of_ident(proc->module->info, ident);
+		Ast *ident = vd->names[i];
+		GB_ASSERT(ident->kind == Ast_Ident);
+		Entity *e = entity_of_ident(ident);
 		GB_ASSERT(e != nullptr);
 		switch (e->kind) {
 		case Entity_TypeName:
@@ -6223,7 +6187,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 		if (e->kind == Entity_TypeName) {
 			bool polymorphic_struct = false;
 			if (e->type != nullptr && e->kind == Entity_TypeName) {
-				Type *bt = base_type(e->type);
+			Type *bt = base_type(e->type);
 				if (bt->kind == Type_Struct) {
 					polymorphic_struct = bt->Struct.is_polymorphic;
 				}
@@ -6239,17 +6203,18 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 
 			irModule *m = proc->module;
 			isize name_len = proc->name.len + 1 + ts_name.len + 1 + 10 + 1;
-			u8 *name_text = gb_alloc_array(m->allocator, u8, name_len);
+			u8 *name_text = gb_alloc_array(ir_allocator(), u8, name_len);
 			i32 guid = cast(i32)m->members.entries.count;
 			name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(ts_name), guid);
+
 			String name = make_string(name_text, name_len-1);
 
-			irValue *value = ir_value_type_name(m->allocator, name, e->type);
+			irValue *value = ir_value_type_name(name, e->type);
 			ir_add_entity_name(m, e, name);
 			ir_gen_global_type_name(m, e, name);
 		} else if (e->kind == Entity_Procedure) {
 			CheckerInfo *info = proc->module->info;
-			DeclInfo *decl = decl_info_of_entity(info, e);
+			DeclInfo *decl = decl_info_of_entity(e);
 			ast_node(pl, ProcLit, decl->proc_lit);
 			if (pl->body != nullptr) {
 				auto *found = map_get(&info->gen_procs, hash_pointer(ident));
@@ -6260,11 +6225,11 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 						if (!ir_min_dep_entity(proc->module, e)) {
 							continue;
 						}
-						DeclInfo *d = decl_info_of_entity(info, e);
-						ir_build_poly_proc(proc, &d->proc_lit->ProcLit, e);
+						DeclInfo *d = decl_info_of_entity(e);
+						ir_build_nested_proc(proc, &d->proc_lit->ProcLit, e);
 					}
 				} else {
-					ir_build_poly_proc(proc, pl, e);
+					ir_build_nested_proc(proc, pl, e);
 				}
 			} else {
 
@@ -6280,8 +6245,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 					name = e->Procedure.link_name;
 				}
 
-				irValue *value = ir_value_procedure(proc->module->allocator,
-				                                    proc->module, e, e->type, pl->type, pl->body, name);
+				irValue *value = ir_value_procedure(proc->module, e, e->type, pl->type, pl->body, name);
 
 				value->Proc.tags = pl->tags;
 				value->Proc.inlining = pl->inlining;
@@ -6304,16 +6268,17 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 	}
 }
 
-void ir_build_stmt_list(irProcedure *proc, Array<AstNode *> stmts) {
+void ir_build_stmt_list(irProcedure *proc, Array<Ast *> stmts) {
 	// NOTE(bill): Precollect constant entities
 	for_array(i, stmts) {
-		AstNode *stmt = stmts[i];
+		Ast *stmt = stmts[i];
 		switch (stmt->kind) {
 		case_ast_node(vd, ValueDecl, stmt);
 			ir_build_constant_value_decl(proc, vd);
 		case_end;
 		case_ast_node(fb, ForeignBlockDecl, stmt);
-			ir_build_stmt_list(proc, fb->decls);
+			ast_node(block, BlockStmt, fb->body);
+			ir_build_stmt_list(proc, block->stmts);
 		case_end;
 		}
 	}
@@ -6322,8 +6287,8 @@ void ir_build_stmt_list(irProcedure *proc, Array<AstNode *> stmts) {
 	}
 }
 
-void ir_build_stmt_internal(irProcedure *proc, AstNode *node);
-void ir_build_stmt(irProcedure *proc, AstNode *node) {
+void ir_build_stmt_internal(irProcedure *proc, Ast *node);
+void ir_build_stmt(irProcedure *proc, Ast *node) {
 	u64 prev_stmt_state_flags = proc->module->stmt_state_flags;
 
 	if (node->stmt_state_flags != 0) {
@@ -6346,7 +6311,7 @@ void ir_build_stmt(irProcedure *proc, AstNode *node) {
 	proc->module->stmt_state_flags = prev_stmt_state_flags;
 }
 
-void ir_build_when_stmt(irProcedure *proc, AstNodeWhenStmt *ws) {
+void ir_build_when_stmt(irProcedure *proc, AstWhenStmt *ws) {
 	irValue *cond = ir_build_expr(proc, ws->cond);
 	GB_ASSERT(cond->kind == irValue_Constant &&
 	          is_type_boolean(ir_type(cond)));
@@ -6356,10 +6321,10 @@ void ir_build_when_stmt(irProcedure *proc, AstNodeWhenStmt *ws) {
 		ir_build_stmt_list(proc, ws->body->BlockStmt.stmts);
 	} else if (ws->else_stmt) {
 		switch (ws->else_stmt->kind) {
-		case AstNode_BlockStmt:
+		case Ast_BlockStmt:
 			ir_build_stmt_list(proc, ws->else_stmt->BlockStmt.stmts);
 			break;
-		case AstNode_WhenStmt:
+		case Ast_WhenStmt:
 			ir_build_when_stmt(proc, &ws->else_stmt->WhenStmt);
 			break;
 		default:
@@ -6377,7 +6342,7 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 	Type *expr_type = base_type(type_deref(ir_type(expr)));
 	switch (expr_type->kind) {
 	case Type_Array:
-		count = ir_const_int(proc->module->allocator, expr_type->Array.count);
+		count = ir_const_int(expr_type->Array.count);
 		break;
 	}
 
@@ -6389,7 +6354,7 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 
 
 	irValue *index = ir_add_local_generated(proc, t_int);
-	ir_emit_store(proc, index, ir_const_int(proc->module->allocator, -1));
+	ir_emit_store(proc, index, ir_const_int(-1));
 
 	loop = ir_new_block(proc, nullptr, "for.index.loop");
 	ir_emit_jump(proc, loop);
@@ -6507,9 +6472,9 @@ void ir_build_range_string(irProcedure *proc, irValue *expr, Type *val_type,
 
 	irValue *str_elem = ir_emit_ptr_offset(proc, ir_string_elem(proc, expr), offset);
 	irValue *str_len  = ir_emit_arith(proc, Token_Sub, count, offset, t_int);
-	auto args = array_make<irValue *>(proc->module->allocator, 1);
+	auto args = array_make<irValue *>(ir_allocator(), 1);
 	args[0] = ir_emit_string(proc, str_elem, str_len);
-	irValue *rune_and_len = ir_emit_global_call(proc, "__string_decode_rune", args);
+	irValue *rune_and_len = ir_emit_runtime_call(proc, "__string_decode_rune", args);
 	irValue *len  = ir_emit_struct_ev(proc, rune_and_len, 1);
 	ir_emit_store(proc, offset_, ir_emit_arith(proc, Token_Add, offset, len, t_int));
 
@@ -6525,8 +6490,9 @@ void ir_build_range_string(irProcedure *proc, irValue *expr, Type *val_type,
 	if (done_) *done_ = done;
 }
 
-void ir_build_range_interval(irProcedure *proc, AstNodeBinaryExpr *node, Type *val_type,
-                              irValue **val_, irValue **idx_, irBlock **loop_, irBlock **done_) {
+
+void ir_build_range_interval(irProcedure *proc, AstBinaryExpr *node, Type *val_type,
+                             irValue **val_, irValue **idx_, irBlock **loop_, irBlock **done_) {
 	// TODO(bill): How should the behaviour work for lower and upper bounds checking for iteration?
 	// If 'lower' is changed, should 'val' do so or is that not typical behaviour?
 
@@ -6546,7 +6512,7 @@ void ir_build_range_interval(irProcedure *proc, AstNodeBinaryExpr *node, Type *v
 	ir_emit_store(proc, value, lower);
 
 	irValue *index = ir_add_local_generated(proc, t_int);
-	ir_emit_store(proc, index, ir_const_int(proc->module->allocator, 0));
+	ir_emit_store(proc, index, ir_const_int(0));
 
 	loop = ir_new_block(proc, nullptr, "for.interval.loop");
 	ir_emit_jump(proc, loop);
@@ -6558,8 +6524,7 @@ void ir_build_range_interval(irProcedure *proc, AstNodeBinaryExpr *node, Type *v
 
 	TokenKind op = Token_Lt;
 	switch (node->op.kind) {
-	case Token_Ellipsis:   op = Token_LtEq; break;
-	case Token_HalfClosed: op = Token_Lt;   break;
+	case Token_Ellipsis: op = Token_LtEq;   break;
 	default: GB_PANIC("Invalid interval operator"); break;
 	}
 
@@ -6583,14 +6548,66 @@ void ir_build_range_interval(irProcedure *proc, AstNodeBinaryExpr *node, Type *v
 	if (done_) *done_ = done;
 }
 
-void ir_store_type_case_implicit(irProcedure *proc, AstNode *clause, irValue *value) {
-	Entity *e = implicit_entity_of_node(proc->module->info, clause);
+void ir_build_range_enum(irProcedure *proc, Type *enum_type, Type *val_type, irValue **val_, irValue **idx_, irBlock **loop_, irBlock **done_) {
+	Type *t = enum_type;
+	GB_ASSERT(is_type_enum(t));
+	Type *enum_ptr = alloc_type_pointer(t);
+	t = base_type(t);
+	Type *core_elem = core_type(t);
+	GB_ASSERT(t->kind == Type_Enum);
+	i64 enum_count = t->Enum.fields.count;
+	irValue *max_count = ir_const_int(enum_count);
+
+	irValue *ti          = ir_type_info(proc, t);
+	irValue *variant     = ir_emit_struct_ep(proc, ti, 3);
+	irValue *eti_ptr     = ir_emit_conv(proc, variant, t_type_info_enum_ptr);
+	irValue *values      = ir_emit_load(proc, ir_emit_struct_ep(proc, eti_ptr, 2));
+	irValue *values_data = ir_slice_elem(proc, values);
+
+	irValue *offset_ = ir_add_local_generated(proc, t_int);
+	ir_emit_store(proc, offset_, v_zero);
+
+	irBlock *loop = ir_new_block(proc, nullptr, "for.enum.loop");
+	ir_emit_jump(proc, loop);
+	ir_start_block(proc, loop);
+
+	irBlock *body = ir_new_block(proc, nullptr, "for.enum.body");
+	irBlock *done = ir_new_block(proc, nullptr, "for.enum.done");
+
+	irValue *offset = ir_emit_load(proc, offset_);
+	irValue *cond = ir_emit_comp(proc, Token_Lt, offset, max_count);
+	ir_emit_if(proc, cond, body, done);
+	ir_start_block(proc, body);
+
+	irValue *val_ptr = ir_emit_ptr_offset(proc, values_data, offset);
+	ir_emit_increment(proc, offset_);
+
+	irValue *val = nullptr;
+	if (val_type != nullptr) {
+		GB_ASSERT(are_types_identical(enum_type, val_type));
+
+		if (is_type_integer(core_elem)) {
+			irValue *i = ir_emit_load(proc, ir_emit_conv(proc, val_ptr, t_i64_ptr));
+			val = ir_emit_conv(proc, i, t);
+		} else {
+			GB_PANIC("TODO(bill): enum core type %s", type_to_string(core_elem));
+		}
+	}
+
+	if (val_)  *val_  = val;
+	if (idx_)  *idx_  = offset;
+	if (loop_) *loop_ = loop;
+	if (done_) *done_ = done;
+}
+
+void ir_store_type_case_implicit(irProcedure *proc, Ast *clause, irValue *value) {
+	Entity *e = implicit_entity_of_node(clause);
 	GB_ASSERT(e != nullptr);
 	irValue *x = ir_add_local(proc, e, nullptr, false);
 	ir_emit_store(proc, x, value);
 }
 
-void ir_type_case_body(irProcedure *proc, AstNode *label, AstNode *clause, irBlock *body, irBlock *done) {
+void ir_type_case_body(irProcedure *proc, Ast *label, Ast *clause, irBlock *body, irBlock *done) {
 	ast_node(cc, CaseClause, clause);
 
 	ir_push_target_list(proc, label, done, nullptr, nullptr);
@@ -6602,38 +6619,18 @@ void ir_type_case_body(irProcedure *proc, AstNode *label, AstNode *clause, irBlo
 	ir_emit_jump(proc, done);
 }
 
-void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
+
+void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 	switch (node->kind) {
 	case_ast_node(bs, EmptyStmt, node);
 	case_end;
 
-	// case_ast_node(fb, ForeignBlockDecl, node);
-	// 	ir_build_stmt_list(proc, fb->decls);
-	// case_end;
-
 	case_ast_node(us, UsingStmt, node);
-		for_array(i, us->list) {
-			AstNode *decl = unparen_expr(us->list[i]);
-			// if (decl->kind == AstNode_GenDecl) {
-				// ir_build_stmt(proc, decl);
-			// }
-		}
 	case_end;
 
 	case_ast_node(ws, WhenStmt, node);
 		ir_build_when_stmt(proc, ws);
 	case_end;
-
-	#if 0
-	case_ast_node(s, IncDecStmt, node);
-		TokenKind op = Token_Add;
-		if (s->op.kind == Token_Dec) {
-			op = Token_Sub;
-		}
-		irAddr const &addr = ir_build_addr(proc, s->expr);
-		ir_build_assign_op(proc, addr, v_one, op);
-	case_end;
-	#endif
 
 	case_ast_node(vd, ValueDecl, node);
 		if (vd->is_mutable) {
@@ -6643,7 +6640,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 			if (vd->values.count == 0) { // declared and zero-initialized
 				for_array(i, vd->names) {
-					AstNode *name = vd->names[i];
+					Ast *name = vd->names[i];
 					if (!is_blank_ident(name)) {
 						ir_add_local_for_identifier(proc, name, true);
 					}
@@ -6653,15 +6650,13 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				auto inits = array_make<irValue *>(m->tmp_allocator, 0, vd->names.count);
 
 				for_array(i, vd->names) {
-					AstNode *name = vd->names[i];
+					Ast *name = vd->names[i];
 					irAddr lval = ir_addr(nullptr);
 					if (!is_blank_ident(name)) {
 						ir_add_local_for_identifier(proc, name, false);
 						lval = ir_build_addr(proc, name);
 					}
 					array_add(&lvals, lval);
-
-					ir_check_type_and_gen_for_proc_lit(proc, ir_addr_type(lval));
 				}
 
 				for_array(i, vd->values) {
@@ -6697,7 +6692,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			auto lvals = array_make<irAddr>(m->tmp_allocator);
 
 			for_array(i, as->lhs) {
-				AstNode *lhs = as->lhs[i];
+				Ast *lhs = as->lhs[i];
 				irAddr lval = {};
 				if (!is_blank_ident(lhs)) {
 					lval = ir_build_addr(proc, lhs);
@@ -6707,7 +6702,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 			if (as->lhs.count == as->rhs.count) {
 				if (as->lhs.count == 1) {
-					AstNode *rhs = as->rhs[0];
+					Ast *rhs = as->rhs[0];
 					irValue *init = ir_build_expr(proc, rhs);
 					ir_addr_store(proc, lvals[0], init);
 				} else {
@@ -6778,7 +6773,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		ir_emit_comment(proc, str_lit("DeferStmt"));
 		isize scope_index = proc->scope_index;
 		// TODO(bill): What was the original rationale behind this line?
-		// if (ds->stmt->kind == AstNode_BlockStmt) scope_index--;
+		// if (ds->stmt->kind == Ast_BlockStmt) scope_index--;
 		ir_add_defer_node(proc, scope_index, ds->stmt);
 	case_end;
 
@@ -6852,9 +6847,12 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 	case_ast_node(is, IfStmt, node);
 		ir_emit_comment(proc, str_lit("IfStmt"));
 		if (is->init != nullptr) {
+			// TODO(bill): Should this have a separate block to begin with?
+		#if 1
 			irBlock *init = ir_new_block(proc, node, "if.init");
 			ir_emit_jump(proc, init);
 			ir_start_block(proc, init);
+		#endif
 			ir_build_stmt(proc, is->init);
 		}
 		irBlock *then = ir_new_block(proc, node, "if.then");
@@ -6890,9 +6888,11 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		ir_emit_comment(proc, str_lit("ForStmt"));
 
 		if (fs->init != nullptr) {
+		#if 1
 			irBlock *init = ir_new_block(proc, node, "for.init");
 			ir_emit_jump(proc, init);
 			ir_start_block(proc, init);
+		#endif
 			ir_build_stmt(proc, fs->init);
 		}
 		irBlock *body = ir_new_block(proc, node, "for.body");
@@ -6941,10 +6941,10 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		Type *val0_type = nullptr;
 		Type *val1_type = nullptr;
 		if (rs->val0 != nullptr && !is_blank_ident(rs->val0)) {
-			val0_type = type_of_expr(proc->module->info, rs->val0);
+			val0_type = type_of_expr(rs->val0);
 		}
 		if (rs->val1 != nullptr && !is_blank_ident(rs->val1)) {
-			val1_type = type_of_expr(proc->module->info, rs->val1);
+			val1_type = type_of_expr(rs->val1);
 		}
 
 		if (val0_type != nullptr) {
@@ -6958,67 +6958,22 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		irValue *key = nullptr;
 		irBlock *loop = nullptr;
 		irBlock *done = nullptr;
-		AstNode *expr = unparen_expr(rs->expr);
+		Ast *expr = unparen_expr(rs->expr);
 		bool is_map = false;
 
-		TypeAndValue tav = type_and_value_of_expr(proc->module->info, expr);
+		TypeAndValue tav = type_and_value_of_expr(expr);
 
-		if (is_ast_node_a_range(expr)) {
+		if (is_ast_range(expr)) {
 			ir_build_range_interval(proc, &expr->BinaryExpr, val0_type, &val, &key, &loop, &done);
 		} else if (tav.mode == Addressing_Type) {
-			TokenPos pos = ast_node_token(expr).pos;
-			gbAllocator a = proc->module->allocator;
-			Type *t = tav.type;
-			GB_ASSERT(is_type_enum(t));
-			Type *enum_ptr = alloc_type_pointer(t);
-			t = base_type(t);
-			Type *core_elem = core_type(t);
-			i64 enum_count = t->Enum.fields.count;
-			irValue *max_count = ir_const_int(a, enum_count);
-
-			irValue *ti          = ir_type_info(proc, t);
-			irValue *variant     = ir_emit_struct_ep(proc, ti, 2);
-			irValue *eti_ptr     = ir_emit_conv(proc, variant, t_type_info_enum_ptr);
-			irValue *values      = ir_emit_load(proc, ir_emit_struct_ep(proc, eti_ptr, 2));
-			irValue *values_data = ir_slice_elem(proc, values);
-
-			irValue *offset_ = ir_add_local_generated(proc, t_int);
-			ir_emit_store(proc, offset_, v_zero);
-
-			loop = ir_new_block(proc, nullptr, "for.enum.loop");
-			ir_emit_jump(proc, loop);
-			ir_start_block(proc, loop);
-
-			irBlock *body = ir_new_block(proc, nullptr, "for.enum.body");
-			done = ir_new_block(proc, nullptr, "for.enum.done");
-
-			irValue *offset = ir_emit_load(proc, offset_);
-			irValue *cond = ir_emit_comp(proc, Token_Lt, offset, max_count);
-			ir_emit_if(proc, cond, body, done);
-			ir_start_block(proc, body);
-
-			irValue *val_ptr = ir_emit_ptr_offset(proc, values_data, offset);
-			ir_emit_increment(proc, offset_);
-
-			key = offset;
-			if (val0_type != nullptr) {
-				if (is_type_float(core_elem)) {
-					irValue *f = ir_emit_load(proc, ir_emit_conv(proc, val_ptr, t_f64_ptr));
-					val = ir_emit_conv(proc, f, t);
-				} else if (is_type_integer(core_elem)) {
-					irValue *i = ir_emit_load(proc, ir_emit_conv(proc, val_ptr, t_i64_ptr));
-					val = ir_emit_conv(proc, i, t);
-				} else {
-					GB_PANIC("TODO(bill): enum core type %s", type_to_string(core_elem));
-				}
-			}
+			ir_build_range_enum(proc, type_deref(tav.type), val0_type, &val, &key, &loop, &done);
 		} else {
-			Type *expr_type = type_of_expr(proc->module->info, rs->expr);
+			Type *expr_type = type_of_expr(rs->expr);
 			Type *et = base_type(type_deref(expr_type));
 			switch (et->kind) {
 			case Type_Map: {
 				is_map = true;
-				gbAllocator a = proc->module->allocator;
+				gbAllocator a = ir_allocator();
 				irAddr const &addr = ir_build_addr(proc, rs->expr);
 				irValue *map = ir_addr_get_ptr(proc, addr);
 				if (is_type_pointer(type_deref(ir_addr_type(addr)))) {
@@ -7036,7 +6991,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					array = ir_emit_load(proc, array);
 				}
 				count_ptr = ir_add_local_generated(proc, t_int);
-				ir_emit_store(proc, count_ptr, ir_const_int(proc->module->allocator, et->Array.count));
+				ir_emit_store(proc, count_ptr, ir_const_int(et->Array.count));
 				ir_build_range_indexed(proc, array, val0_type, count_ptr, &val, &key, &loop, &done);
 				break;
 			}
@@ -7069,10 +7024,12 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					string = ir_emit_load(proc, string);
 				}
 				if (is_type_untyped(expr_type)) {
-					irValue *s = ir_add_local_generated(proc, t_string);
+					irValue *s = ir_add_local_generated(proc, default_type(ir_type(string)));
 					ir_emit_store(proc, s, string);
 					string = ir_emit_load(proc, s);
 				}
+				Type *t = base_type(ir_type(string));
+				GB_ASSERT(!is_type_cstring(t));
 				ir_build_range_string(proc, string, val0_type, &val, &key, &loop, &done);
 				break;
 			}
@@ -7120,7 +7077,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 		ast_node(body, BlockStmt, ss->body);
 
-		Array<AstNode *> default_stmts = {};
+		Array<Ast *> default_stmts = {};
 		irBlock *default_fall = nullptr;
 		irBlock *default_block = nullptr;
 
@@ -7129,7 +7086,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 		isize case_count = body->stmts.count;
 		for_array(i, body->stmts) {
-			AstNode *clause = body->stmts[i];
+			Ast *clause = body->stmts[i];
 			irBlock *body = fall;
 
 			ast_node(cc, CaseClause, clause);
@@ -7161,15 +7118,14 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 			irBlock *next_cond = nullptr;
 			for_array(j, cc->list) {
-				AstNode *expr = unparen_expr(cc->list[j]);
+				Ast *expr = unparen_expr(cc->list[j]);
 				next_cond = ir_new_block(proc, clause, "switch.case.next");
 				irValue *cond = v_false;
-				if (is_ast_node_a_range(expr)) {
+				if (is_ast_range(expr)) {
 					ast_node(ie, BinaryExpr, expr);
 					TokenKind op = Token_Invalid;
 					switch (ie->op.kind) {
-					case Token_Ellipsis:   op = Token_LtEq; break;
-					case Token_HalfClosed: op = Token_Lt;   break;
+					case Token_Ellipsis: op = Token_LtEq; break;
 					default: GB_PANIC("Invalid interval operator"); break;
 					}
 					irValue *lhs = ir_build_expr(proc, ie->left);
@@ -7215,7 +7171,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 	case_ast_node(ss, TypeSwitchStmt, node);
 		ir_emit_comment(proc, str_lit("TypeSwitchStmt"));
-		gbAllocator allocator = proc->module->allocator;
+		gbAllocator allocator = ir_allocator();
 
 		ast_node(as, AssignStmt, ss->tag);
 		GB_ASSERT(as->lhs.count == 1);
@@ -7249,14 +7205,14 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 		// NOTE(bill): Append this later
 		irBlock *done = ir_new_block(proc, node, "typeswitch.done");
-		AstNode *default_ = nullptr;
+		Ast *default_ = nullptr;
 
 		ast_node(body, BlockStmt, ss->body);
 
 		gb_local_persist i32 weird_count = 0;
 
 		for_array(i, body->stmts) {
-			AstNode *clause = body->stmts[i];
+			Ast *clause = body->stmts[i];
 			ast_node(cc, CaseClause, clause);
 			if (cc->list.count == 0) {
 				default_ = clause;
@@ -7268,11 +7224,11 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			Type *case_type = nullptr;
 			for_array(type_index, cc->list) {
 				next = ir_new_block(proc, nullptr, "typeswitch.next");
-				case_type = type_of_expr(proc->module->info, cc->list[type_index]);
+				case_type = type_of_expr(cc->list[type_index]);
 				irValue *cond = nullptr;
 				if (switch_kind == TypeSwitch_Union) {
 					Type *ut = base_type(type_deref(parent_type));
-					irValue *variant_tag = ir_const_union_tag(proc->module->allocator, ut, case_type);
+					irValue *variant_tag = ir_const_union_tag(ut, case_type);
 					cond = ir_emit_comp(proc, Token_CmpEq, tag_index, variant_tag);
 				} else if (switch_kind == TypeSwitch_Any) {
 					irValue *any_typeid  = ir_emit_load(proc, ir_emit_struct_ep(proc, parent_ptr, 1));
@@ -7285,7 +7241,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				ir_start_block(proc, next);
 			}
 
-			Entity *case_entity = implicit_entity_of_node(proc->module->info, clause);
+			Entity *case_entity = implicit_entity_of_node(clause);
 
 			irValue *value = parent_value;
 
@@ -7358,32 +7314,6 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		ir_emit_jump(proc, block);
 		ir_emit_unreachable(proc);
 	case_end;
-
-
-	case_ast_node(pc, PushContext, node);
-		ir_emit_comment(proc, str_lit("push_context"));
-		irValue *new_context = ir_build_expr(proc, pc->expr);
-
-		ir_open_scope(proc);
-
-		irValue *prev = ir_find_or_generate_context_ptr(proc);
-		irValue *next = ir_add_local_generated(proc, t_context);
-		ir_emit_store(proc, next, new_context);
-
-		Selection sel = lookup_field(t_context, str_lit("parent"), false);
-		GB_ASSERT(sel.entity != nullptr);
-		irValue *parent_ptr = ir_emit_deep_field_gep(proc, next, sel);
-		ir_emit_store(proc, parent_ptr, prev);
-
-		array_add(&proc->context_stack, next);
-		defer (array_pop(&proc->context_stack));
-
-		ir_build_stmt(proc, pc->body);
-
-		ir_close_scope(proc, irDeferExit_Default, nullptr);
-	case_end;
-
-
 	}
 }
 
@@ -7420,7 +7350,7 @@ void ir_number_proc_registers(irProcedure *proc) {
 }
 
 void ir_begin_procedure_body(irProcedure *proc) {
-	gbAllocator a = proc->module->allocator;
+	gbAllocator a = ir_allocator();
 	array_add(&proc->module->procs, proc);
 
 	array_init(&proc->blocks,           heap_allocator());
@@ -7429,7 +7359,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	array_init(&proc->branch_blocks,    heap_allocator());
 	array_init(&proc->context_stack,    heap_allocator());
 
-	DeclInfo *decl = decl_info_of_entity(proc->module->info, proc->entity);
+	DeclInfo *decl = decl_info_of_entity(proc->entity);
 	if (decl != nullptr) {
 		for_array(i, decl->labels) {
 			BlockLabel bl = decl->labels[i];
@@ -7449,7 +7379,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 		Entity *e = alloc_entity_param(nullptr, make_token_ident(str_lit("agg.result")), ptr_type, false, false);
 		e->flags |= EntityFlag_Sret | EntityFlag_NoAlias;
 
-		irValue *param = ir_value_param(a, proc, e, ptr_type);
+		irValue *param = ir_value_param(proc, e, ptr_type);
 		param->Param.kind = irParamPass_Pointer;
 
 		ir_module_add_value(proc->module, e, param);
@@ -7468,13 +7398,13 @@ void ir_begin_procedure_body(irProcedure *proc) {
 			for_array(i, params->variables) {
 				ast_node(fl, FieldList, pt->params);
 				GB_ASSERT(fl->list.count > 0);
-				GB_ASSERT(fl->list[0]->kind == AstNode_Field);
+				GB_ASSERT(fl->list[0]->kind == Ast_Field);
 				if (q_index == fl->list[param_index]->Field.names.count) {
 					q_index = 0;
 					param_index++;
 				}
 				ast_node(field, Field, fl->list[param_index]);
-				AstNode *name = field->names[q_index++];
+				Ast *name = field->names[q_index++];
 
 				Entity *e = params->variables[i];
 				if (e->kind != Entity_Variable) {
@@ -7519,8 +7449,20 @@ void ir_begin_procedure_body(irProcedure *proc) {
 			if (e->token.string != "") {
 				GB_ASSERT(!is_blank_ident(e->token));
 				irValue *res = ir_add_local(proc, e, e->identifier, true);
-				if (e->Variable.default_value.kind != ExactValue_Invalid) {
-					irValue *c = ir_value_constant(a, e->type, e->Variable.default_value);
+
+				irValue *c = nullptr;
+				switch (e->Variable.param_value.kind) {
+				case ParameterValue_Constant:
+					c = ir_value_constant(e->type, e->Variable.param_value.value);
+					break;
+				case ParameterValue_Nil:
+					c = ir_value_nil(e->type);
+					break;
+				case ParameterValue_Location:
+					GB_PANIC("ParameterValue_Location");
+					break;
+				}
+				if (c != nullptr) {
 					ir_emit_store(proc, res, c);
 				}
 			}
@@ -7531,9 +7473,10 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	if (proc->type->Proc.calling_convention == ProcCC_Odin) {
 		Entity *e = alloc_entity_param(nullptr, make_token_ident(str_lit("__.context_ptr")), t_context_ptr, false, false);
 		e->flags |= EntityFlag_NoAlias;
-		irValue *param = ir_value_param(a, proc, e, e->type);
+		irValue *param = ir_value_param(proc, e, e->type);
 		ir_module_add_value(proc->module, e, param);
-		array_add(&proc->context_stack, param);
+		irContextData ctx = {param, proc->scope_index};
+		array_add(&proc->context_stack, ctx);
 	}
 }
 
@@ -7618,17 +7561,29 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 
 	if (proc->type->Proc.has_proc_default_values) {
 		auto *p = &proc->type->Proc;
-		for_array(i, p->params->Tuple.variables) {
+		if (p->params != nullptr) for_array(i, p->params->Tuple.variables) {
 			Entity *f = p->params->Tuple.variables[i];
 			if (f->kind == Entity_Variable) {
-				if (f->Variable.default_value.kind == ExactValue_Procedure) {
-					AstNode *expr = f->Variable.default_value.value_procedure;
+				ParameterValue pv = f->Variable.param_value;
+				if (pv.kind ==  ParameterValue_Constant && pv.value.kind == ExactValue_Procedure) {
+					Ast *expr = f->Variable.param_value.value.value_procedure;
 					GB_ASSERT(expr != nullptr);
-					if (expr->kind == AstNode_ProcLit) {
+					if (expr->kind == Ast_ProcLit) {
 						ir_gen_anonymous_proc_lit(proc->module, proc->name, expr, proc);
 					}
-				} else {
-					ir_check_type_and_gen_for_proc_lit(proc, f->type);
+				}
+			}
+		}
+		if (p->results != nullptr) for_array(i, p->results->Tuple.variables) {
+			Entity *f = p->results->Tuple.variables[i];
+			if (f->kind == Entity_Variable) {
+				ParameterValue pv = f->Variable.param_value;
+				if (pv.kind ==  ParameterValue_Constant && pv.value.kind == ExactValue_Procedure) {
+					Ast *expr = f->Variable.param_value.value.value_procedure;
+					GB_ASSERT(expr != nullptr);
+					if (expr->kind == Ast_ProcLit) {
+						ir_gen_anonymous_proc_lit(proc->module, proc->name, expr, proc);
+					}
 				}
 			}
 		}
@@ -7658,10 +7613,8 @@ void ir_init_module(irModule *m, Checker *c) {
 	// TODO(bill): Determine a decent size for the arena
 	isize token_count = c->parser->total_token_count;
 	isize arena_size = 4 * token_count * gb_size_of(irValue);
-	gb_arena_init_from_allocator(&m->arena,     heap_allocator(), arena_size);
 	gb_arena_init_from_allocator(&m->tmp_arena, heap_allocator(), arena_size);
-	// m->allocator     = gb_arena_allocator(&m->arena);
-	m->allocator     = heap_allocator();
+	ir_allocator() = ir_allocator();
 	m->tmp_allocator = gb_arena_allocator(&m->tmp_arena);
 	m->info = &c->info;
 
@@ -7691,7 +7644,7 @@ void ir_init_module(irModule *m, Checker *c) {
 
 			String name = str_lit(IR_TYPE_INFO_DATA_NAME);
 			Entity *e = alloc_entity_variable(nullptr, make_token_ident(name), alloc_type_array(t_type_info, max_type_info_count), false);
-			irValue *g = ir_value_global(m->allocator, e, nullptr);
+			irValue *g = ir_value_global(e, nullptr);
 			g->Global.is_private = true;
 			ir_module_add_value(m, e, g);
 			map_set(&m->members, hash_string(name), g);
@@ -7729,7 +7682,7 @@ void ir_init_module(irModule *m, Checker *c) {
 					String name = str_lit(IR_TYPE_INFO_TYPES_NAME);
 					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
 					                                  alloc_type_array(t_type_info_ptr, count), false);
-					irValue *g = ir_value_global(m->allocator, e, nullptr);
+					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
 					map_set(&m->members, hash_string(name), g);
 					ir_global_type_info_member_types = g;
@@ -7738,7 +7691,7 @@ void ir_init_module(irModule *m, Checker *c) {
 					String name = str_lit(IR_TYPE_INFO_NAMES_NAME);
 					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
 					                                  alloc_type_array(t_string, count), false);
-					irValue *g = ir_value_global(m->allocator, e, nullptr);
+					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
 					map_set(&m->members, hash_string(name), g);
 					ir_global_type_info_member_names = g;
@@ -7747,7 +7700,7 @@ void ir_init_module(irModule *m, Checker *c) {
 					String name = str_lit(IR_TYPE_INFO_OFFSETS_NAME);
 					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
 					                                  alloc_type_array(t_uintptr, count), false);
-					irValue *g = ir_value_global(m->allocator, e, nullptr);
+					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
 					map_set(&m->members, hash_string(name), g);
 					ir_global_type_info_member_offsets = g;
@@ -7757,7 +7710,7 @@ void ir_init_module(irModule *m, Checker *c) {
 					String name = str_lit(IR_TYPE_INFO_USINGS_NAME);
 					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
 					                                  alloc_type_array(t_bool, count), false);
-					irValue *g = ir_value_global(m->allocator, e, nullptr);
+					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
 					map_set(&m->members, hash_string(name), g);
 					ir_global_type_info_member_usings = g;
@@ -7767,7 +7720,7 @@ void ir_init_module(irModule *m, Checker *c) {
 	}
 
 	{
-		irDebugInfo *di = ir_alloc_debug_info(m->allocator, irDebugInfo_CompileUnit);
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompileUnit);
 		di->CompileUnit.file = m->info->files.entries[0].value; // Zeroth is the init file
 		di->CompileUnit.producer = str_lit("odin");
 
@@ -7787,7 +7740,7 @@ void ir_destroy_module(irModule *m) {
 	array_free(&m->procs);
 	array_free(&m->procs_to_generate);
 	array_free(&m->foreign_library_paths);
-	gb_arena_free(&m->arena);
+	gb_arena_free(&m->tmp_arena);
 }
 
 
@@ -7809,13 +7762,16 @@ bool ir_gen_init(irGen *s, Checker *c) {
 		return false;
 	}
 
+	arena_init(&global_ir_arena, heap_allocator());
+
 	ir_init_module(&s->module, c);
 	// s->module.generate_debug_info = false;
 
 	String init_fullpath = c->parser->init_fullpath;
 
 	if (build_context.out_filepath.len == 0) {
-		s->output_name = filename_from_path(init_fullpath);
+		// s->output_name = filename_from_path(init_fullpath);
+		s->output_name = str_lit("main");
 		s->output_base = s->output_name;
 	} else {
 		s->output_name = build_context.out_filepath;
@@ -7887,14 +7843,14 @@ irValue *ir_type_info_member_usings_offset(irProcedure *proc, isize count) {
 
 void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info data
 	irModule *m = proc->module;
-	gbAllocator a = m->allocator;
+	gbAllocator a = ir_allocator();
 	CheckerInfo *info = m->info;
 
 	if (true) {
-		irValue *global_type_table = ir_find_global_variable(proc, str_lit("__type_table"));
+		irValue *global_type_table = ir_find_global_variable(proc, str_lit("type_table"));
 		Type *type = base_type(type_deref(ir_type(ir_global_type_info_data)));
 		GB_ASSERT(is_type_array(type));
-		irValue *len = ir_const_int(proc->module->allocator, type->Array.count);
+		irValue *len = ir_const_int(type->Array.count);
 		ir_fill_slice(proc, global_type_table,
 		              ir_emit_array_epi(proc, ir_global_type_info_data, 0),
 		              len);
@@ -7925,8 +7881,8 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 		irValue *ti_ptr = ir_emit_array_epi(proc, ir_global_type_info_data, cast(i32)entry_index);
 		irValue *variant_ptr = ir_emit_struct_ep(proc, ti_ptr, 3);
 
-		ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 0), ir_const_int(a, type_size_of(t)));
-		ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 1), ir_const_int(a, type_align_of(t)));
+		ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 0), ir_const_int(type_size_of(t)));
+		ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 1), ir_const_int(type_align_of(t)));
 		ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 2), ir_typeid(proc->module, t));
 
 
@@ -7936,7 +7892,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_named_ptr);
 
 			// TODO(bill): Which is better? The mangled name or actual name?
-			irValue *name = ir_const_string(a, t->Named.type_name->token.string);
+			irValue *name = ir_const_string(t->Named.type_name->token.string);
 			irValue *gtip = ir_get_type_info_ptr(proc, t->Named.base);
 
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), name);
@@ -7967,7 +7923,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			case Basic_uint:
 			case Basic_uintptr: {
 				tag = ir_emit_conv(proc, variant_ptr, t_type_info_integer_ptr);
-				irValue *is_signed = ir_const_bool(a, (t->Basic.flags & BasicFlag_Unsigned) == 0);
+				irValue *is_signed = ir_const_bool((t->Basic.flags & BasicFlag_Unsigned) == 0);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), is_signed);
 				break;
 			}
@@ -8024,12 +7980,12 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			irValue *gep = ir_get_type_info_ptr(proc, t->Array.elem);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 
-			isize ez = type_size_of(t->Array.elem);
+			i64 ez = type_size_of(t->Array.elem);
 			irValue *elem_size = ir_emit_struct_ep(proc, tag, 1);
-			ir_emit_store(proc, elem_size, ir_const_int(a, ez));
+			ir_emit_store(proc, elem_size, ir_const_int(ez));
 
 			irValue *count = ir_emit_struct_ep(proc, tag, 2);
-			ir_emit_store(proc, count, ir_const_int(a, t->Array.count));
+			ir_emit_store(proc, count, ir_const_int(t->Array.count));
 
 			break;
 		}
@@ -8039,9 +7995,9 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			irValue *gep = ir_get_type_info_ptr(proc, t->DynamicArray.elem);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 
-			isize ez = type_size_of(t->DynamicArray.elem);
+			i64 ez = type_size_of(t->DynamicArray.elem);
 			irValue *elem_size = ir_emit_struct_ep(proc, tag, 1);
-			ir_emit_store(proc, elem_size, ir_const_int(a, ez));
+			ir_emit_store(proc, elem_size, ir_const_int(ez));
 			break;
 		}
 		case Type_Slice: {
@@ -8050,9 +8006,9 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			irValue *gep = ir_get_type_info_ptr(proc, t->Slice.elem);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 
-			isize ez = type_size_of(t->Slice.elem);
+			i64 ez = type_size_of(t->Slice.elem);
 			irValue *elem_size = ir_emit_struct_ep(proc, tag, 1);
-			ir_emit_store(proc, elem_size, ir_const_int(a, ez));
+			ir_emit_store(proc, elem_size, ir_const_int(ez));
 			break;
 		}
 		case Type_Proc: {
@@ -8070,8 +8026,8 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			if (t->Proc.results != nullptr) {
 				ir_emit_store(proc, results, ir_get_type_info_ptr(proc, t->Proc.results));
 			}
-			ir_emit_store(proc, variadic, ir_const_bool(a, t->Proc.variadic));
-			ir_emit_store(proc, convention, ir_const_int(a, t->Proc.calling_convention));
+			ir_emit_store(proc, variadic, ir_const_bool(t->Proc.variadic));
+			ir_emit_store(proc, convention, ir_const_int(t->Proc.calling_convention));
 
 			// TODO(bill): TypeInfo for procedures
 			break;
@@ -8087,17 +8043,17 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				// NOTE(bill): offset is not used for tuples
 				Entity *f = t->Tuple.variables[i];
 
-				irValue *index     = ir_const_int(a, i);
+				irValue *index     = ir_const_int(i);
 				irValue *type_info = ir_emit_ptr_offset(proc, memory_types, index);
 
 				ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
 				if (f->token.string.len > 0) {
 					irValue *name = ir_emit_ptr_offset(proc, memory_names, index);
-					ir_emit_store(proc, name, ir_const_string(a, f->token.string));
+					ir_emit_store(proc, name, ir_const_string(f->token.string));
 				}
 			}
 
-			irValue *count = ir_const_int(a, t->Tuple.variables.count);
+			irValue *count = ir_const_int(t->Tuple.variables.count);
 			ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types, count);
 			ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names, count);
 			break;
@@ -8110,9 +8066,6 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				irValue *base = ir_type_info(proc, t->Enum.base_type);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), base);
 
-				// is_export
-				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), ir_const_bool(a, t->Enum.is_export));
-
 				if (t->Enum.fields.count > 0) {
 					auto fields = t->Enum.fields;
 					irValue *name_array  = ir_generate_array(m, t_string, fields.count,
@@ -8120,23 +8073,20 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 					irValue *value_array = ir_generate_array(m, t_type_info_enum_value, fields.count,
 					                                         str_lit("__$enum_values"), cast(i64)entry_index);
 
-					bool is_value_int = is_type_integer(t->Enum.base_type);
-					if (!is_value_int) {
-						GB_ASSERT(is_type_float(t->Enum.base_type));
-					}
+					GB_ASSERT(is_type_integer(t->Enum.base_type));
 
 					for_array(i, fields) {
 						irValue *name_ep  = ir_emit_array_epi(proc, name_array, cast(i32)i);
 						irValue *value_ep = ir_emit_array_epi(proc, value_array, cast(i32)i);
 
 						ExactValue value = fields[i]->Constant.value;
-						irValue *v = ir_value_constant(a, t->Enum.base_type, value);
+						irValue *v = ir_value_constant(t->Enum.base_type, value);
 
 						ir_emit_store_union_variant(proc, value_ep, v, ir_type(v));
-						ir_emit_store(proc, name_ep, ir_const_string(a, fields[i]->token.string));
+						ir_emit_store(proc, name_ep, ir_const_string(fields[i]->token.string));
 					}
 
-					irValue *v_count = ir_const_int(a, fields.count);
+					irValue *v_count = ir_const_int(fields.count);
 
 					irValue *names = ir_emit_struct_ep(proc, tag, 1);
 					irValue *name_array_elem = ir_array_elem(proc, name_array);
@@ -8166,19 +8116,19 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 					Type *vt = t->Union.variants[variant_index];
 					irValue *tip = ir_get_type_info_ptr(proc, vt);
 
-					irValue *index     = ir_const_int(a, variant_index);
+					irValue *index     = ir_const_int(variant_index);
 					irValue *type_info = ir_emit_ptr_offset(proc, memory_types, index);
 					ir_emit_store(proc, type_info, ir_type_info(proc, vt));
 				}
 
-				irValue *count = ir_const_int(a, variant_count);
+				irValue *count = ir_const_int(variant_count);
 				ir_fill_slice(proc, variant_types, memory_types, count);
 
 				i64 tag_size   = union_tag_size(t);
 				i64 tag_offset = align_formula(t->Union.variant_block_size, tag_size);
 
 				if (tag_size > 0) {
-					ir_emit_store(proc, tag_offset_ptr, ir_const_uintptr(a, tag_offset));
+					ir_emit_store(proc, tag_offset_ptr, ir_const_uintptr(tag_offset));
 					ir_emit_store(proc, tag_type_ptr,   ir_type_info(proc, union_tag_type(t)));
 				}
 			}
@@ -8191,51 +8141,52 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_struct_ptr);
 
 			{
-				irValue *is_packed       = ir_const_bool(a, t->Struct.is_packed);
-				irValue *is_raw_union    = ir_const_bool(a, t->Struct.is_raw_union);
-				irValue *is_custom_align = ir_const_bool(a, t->Struct.custom_align != 0);
+				irValue *is_packed       = ir_const_bool(t->Struct.is_packed);
+				irValue *is_raw_union    = ir_const_bool(t->Struct.is_raw_union);
+				irValue *is_custom_align = ir_const_bool(t->Struct.custom_align != 0);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 4), is_packed);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 5), is_raw_union);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 6), is_custom_align);
 			}
 
 			isize count = t->Struct.fields.count;
+			if (count > 0) {
+				irValue *memory_types   = ir_type_info_member_types_offset  (proc, count);
+				irValue *memory_names   = ir_type_info_member_names_offset  (proc, count);
+				irValue *memory_offsets = ir_type_info_member_offsets_offset(proc, count);
+				irValue *memory_usings  = ir_type_info_member_usings_offset (proc, count);
 
-			irValue *memory_types   = ir_type_info_member_types_offset  (proc, count);
-			irValue *memory_names   = ir_type_info_member_names_offset  (proc, count);
-			irValue *memory_offsets = ir_type_info_member_offsets_offset(proc, count);
-			irValue *memory_usings  = ir_type_info_member_usings_offset (proc, count);
+				type_set_offsets(t); // NOTE(bill): Just incase the offsets have not been set yet
+				for (isize source_index = 0; source_index < count; source_index++) {
+					// TODO(bill): Order fields in source order not layout order
+					Entity *f = t->Struct.fields[source_index];
+					irValue *tip = ir_get_type_info_ptr(proc, f->type);
+					i64 foffset = 0;
+					if (!t->Struct.is_raw_union) {
+						foffset = t->Struct.offsets[f->Variable.field_index];
+					}
+					GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 
-			type_set_offsets(t); // NOTE(bill): Just incase the offsets have not been set yet
-			for (isize source_index = 0; source_index < count; source_index++) {
-				// TODO(bill): Order fields in source order not layout order
-				Entity *f = t->Struct.fields[source_index];
-				irValue *tip = ir_get_type_info_ptr(proc, f->type);
-				i64 foffset = 0;
-				if (!t->Struct.is_raw_union) {
-					foffset = t->Struct.offsets[f->Variable.field_index];
+					irValue *index     = ir_const_int(source_index);
+					irValue *type_info = ir_emit_ptr_offset(proc, memory_types,   index);
+					irValue *offset    = ir_emit_ptr_offset(proc, memory_offsets, index);
+					irValue *is_using  = ir_emit_ptr_offset(proc, memory_usings, index);
+
+					ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
+					if (f->token.string.len > 0) {
+						irValue *name = ir_emit_ptr_offset(proc, memory_names,   index);
+						ir_emit_store(proc, name, ir_const_string(f->token.string));
+					}
+					ir_emit_store(proc, offset, ir_const_uintptr(foffset));
+					ir_emit_store(proc, is_using, ir_const_bool((f->flags&EntityFlag_Using) != 0));
 				}
-				GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 
-				irValue *index     = ir_const_int(a, source_index);
-				irValue *type_info = ir_emit_ptr_offset(proc, memory_types,   index);
-				irValue *offset    = ir_emit_ptr_offset(proc, memory_offsets, index);
-				irValue *is_using  = ir_emit_ptr_offset(proc, memory_usings, index);
-
-				ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
-				if (f->token.string.len > 0) {
-					irValue *name = ir_emit_ptr_offset(proc, memory_names,   index);
-					ir_emit_store(proc, name, ir_const_string(a, f->token.string));
-				}
-				ir_emit_store(proc, offset, ir_const_uintptr(a, foffset));
-				ir_emit_store(proc, is_using, ir_const_bool(a, (f->flags&EntityFlag_Using) != 0));
+				irValue *cv = ir_const_int(count);
+				ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   cv);
+				ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   cv);
+				ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, cv);
+				ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 3), memory_usings,  cv);
 			}
-
-			irValue *cv = ir_const_int(a, count);
-			ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   cv);
-			ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   cv);
-			ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, cv);
-			ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 3), memory_usings,  cv);
 			break;
 		}
 		case Type_Map: {
@@ -8274,13 +8225,13 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 					irValue *bit_ep    = ir_emit_array_epi(proc, bit_array,    cast(i32)i);
 					irValue *offset_ep = ir_emit_array_epi(proc, offset_array, cast(i32)i);
 
-					ir_emit_store(proc, name_ep, ir_const_string(a, f->token.string));
-					ir_emit_store(proc, bit_ep, ir_const_i32(a, f->type->BitFieldValue.bits));
-					ir_emit_store(proc, offset_ep, ir_const_i32(a, t->BitField.offsets[i]));
+					ir_emit_store(proc, name_ep, ir_const_string(f->token.string));
+					ir_emit_store(proc, bit_ep, ir_const_i32(f->type->BitFieldValue.bits));
+					ir_emit_store(proc, offset_ep, ir_const_i32(t->BitField.offsets[i]));
 
 				}
 
-				irValue *v_count = ir_const_int(a, count);
+				irValue *v_count = ir_const_int(count);
 
 				irValue *names = ir_emit_struct_ep(proc, tag, 0);
 				irValue *name_array_elem = ir_array_elem(proc, name_array);
@@ -8296,8 +8247,23 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			}
 			break;
 		}
-		}
 
+		case Type_BitSet:
+			ir_emit_comment(proc, str_lit("Type_Info_Bit_Set"));
+			tag = ir_emit_conv(proc, variant_ptr, t_type_info_bit_set_ptr);
+
+			GB_ASSERT(is_type_typed(t->BitSet.elem));
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->BitSet.elem));
+			if (t->BitSet.underlying != nullptr) {
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), ir_get_type_info_ptr(proc, t->BitSet.underlying));
+			}
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), ir_const_i64(t->BitSet.lower));
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), ir_const_i64(t->BitSet.upper));
+			break;
+
+
+
+		}
 
 		if (tag != nullptr) {
 			Type *tag_type = type_deref(ir_type(tag));
@@ -8314,17 +8280,17 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 void ir_gen_tree(irGen *s) {
 	irModule *m = &s->module;
 	CheckerInfo *info = m->info;
-	gbAllocator a = m->allocator;
+	gbAllocator a = ir_allocator();
 
 	if (v_zero == nullptr) {
-		v_zero    = ir_const_int (m->allocator, 0);
-		v_one     = ir_const_int (m->allocator, 1);
-		v_zero32  = ir_const_i32 (m->allocator, 0);
-		v_one32   = ir_const_i32 (m->allocator, 1);
-		v_two32   = ir_const_i32 (m->allocator, 2);
-		v_false   = ir_const_bool(m->allocator, false);
-		v_true    = ir_const_bool(m->allocator, true);
-		v_raw_nil = ir_value_constant(m->allocator, t_rawptr, exact_value_pointer(0));
+		v_zero    = ir_const_int (0);
+		v_one     = ir_const_int (1);
+		v_zero32  = ir_const_i32 (0);
+		v_one32   = ir_const_i32 (1);
+		v_two32   = ir_const_i32 (2);
+		v_false   = ir_const_bool(false);
+		v_true    = ir_const_bool(true);
+		v_raw_nil = ir_value_constant(t_rawptr, exact_value_pointer(0));
 	}
 
 	isize global_variable_max_count = 0;
@@ -8335,16 +8301,19 @@ void ir_gen_tree(irGen *s) {
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
 		String name = e->token.string;
+
+		bool is_global = e->pkg != nullptr;
+
 		if (e->kind == Entity_Variable) {
 			global_variable_max_count++;
-		} else if (e->kind == Entity_Procedure && !e->scope->is_global) {
-			if (e->scope->is_init && name == "main") {
+		} else if (e->kind == Entity_Procedure && !is_global) {
+			if ((e->scope->flags&ScopeFlag_Init) && name == "main") {
 				GB_ASSERT(e == entry_point);
 				// entry_point = e;
 			}
 			if (e->Procedure.is_export ||
 			    (e->Procedure.link_name.len > 0) ||
-			    (e->scope->is_file && e->Procedure.link_name.len > 0)) {
+			    ((e->scope->flags&ScopeFlag_File) && e->Procedure.link_name.len > 0)) {
 				if (!has_dll_main && name == "DllMain") {
 					has_dll_main = true;
 				} else if (!has_win_main && name == "WinMain") {
@@ -8369,72 +8338,55 @@ void ir_gen_tree(irGen *s) {
 	for_array(i, info->variable_init_order) {
 		DeclInfo *d = info->variable_init_order[i];
 
-		for (isize j = 0; j < d->entity_count; j++) {
-			Entity *e = d->entities[j];
+		Entity *e = d->entity;
 
-			if (!e->scope->is_file) {
-				continue;
-			}
-
-			if (!ir_min_dep_entity(m, e)) {
-				continue;
-			}
-			DeclInfo *decl = decl_info_of_entity(info, e);
-			if (decl == nullptr) {
-				continue;
-			}
-			GB_ASSERT(e->kind == Entity_Variable);
-
-
-			bool is_foreign = e->Variable.is_foreign;
-			bool is_export  = e->Variable.is_export;
-			bool no_name_mangle = e->scope->is_global || e->Variable.link_name.len > 0 || is_foreign || is_export;
-
-			String name = e->token.string;
-			if (!no_name_mangle) {
-				name = ir_mangle_name(s, e->token.pos.file, e);
-			}
-			ir_add_entity_name(m, e, name);
-
-			irValue *g = ir_value_global(a, e, nullptr);
-			g->Global.name = name;
-			g->Global.thread_local_model = e->Variable.thread_local_model;
-			g->Global.is_foreign = is_foreign;
-			g->Global.is_export  = is_export;
-
-			irGlobalVariable var = {};
-			var.var = g;
-			var.decl = decl;
-
-
-			if (e->type->kind == Type_Struct && e->type->Struct.has_proc_default_values) {
-				for_array(i, e->type->Struct.fields) {
-					Entity *f = e->type->Struct.fields[i];
-					if (f->kind == Entity_Variable && f->Variable.default_value.kind == ExactValue_Procedure) {
-						AstNode *expr = f->Variable.default_value.value_procedure;
-						GB_ASSERT(expr != nullptr);
-						if (expr->kind == AstNode_ProcLit) {
-							ir_gen_anonymous_proc_lit(m, e->token.string, expr);
-						}
-					}
-				}
-			}
-
-			if (decl->init_expr != nullptr && !is_type_any(e->type)) {
-				TypeAndValue tav = type_and_value_of_expr(info, decl->init_expr);
-				if (tav.mode != Addressing_Invalid) {
-					if (tav.value.kind != ExactValue_Invalid) {
-						ExactValue v = tav.value;
-						g->Global.value = ir_add_module_constant(m, tav.type, v);
-					}
-				}
-			}
-
-			array_add(&global_variables, var);
-
-			ir_module_add_value(m, e, g);
-			map_set(&m->members, hash_string(name), g);
+		if ((e->scope->flags & ScopeFlag_File) == 0) {
+			continue;
 		}
+
+		if (!ir_min_dep_entity(m, e)) {
+			continue;
+		}
+		DeclInfo *decl = decl_info_of_entity(e);
+		if (decl == nullptr) {
+			continue;
+		}
+		GB_ASSERT(e->kind == Entity_Variable);
+
+		bool is_foreign = e->Variable.is_foreign;
+		bool is_export  = e->Variable.is_export;
+		bool no_name_mangle = e->Variable.link_name.len > 0 || is_foreign || is_export;
+
+		String name = e->token.string;
+		if (!no_name_mangle) {
+			name = ir_mangle_name(s, e);
+		}
+		ir_add_entity_name(m, e, name);
+
+		irValue *g = ir_value_global(e, nullptr);
+		g->Global.name = name;
+		g->Global.thread_local_model = e->Variable.thread_local_model;
+		g->Global.is_foreign = is_foreign;
+		g->Global.is_export  = is_export;
+
+		irGlobalVariable var = {};
+		var.var = g;
+		var.decl = decl;
+
+		if (decl->init_expr != nullptr && !is_type_any(e->type)) {
+			TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
+			if (tav.mode != Addressing_Invalid) {
+				if (tav.value.kind != ExactValue_Invalid) {
+					ExactValue v = tav.value;
+					g->Global.value = ir_add_module_constant(m, tav.type, v);
+				}
+			}
+		}
+
+		array_add(&global_variables, var);
+
+		ir_module_add_value(m, e, g);
+		map_set(&m->members, hash_string(name), g);
 	}
 
 	for_array(i, info->entities) {
@@ -8443,9 +8395,12 @@ void ir_gen_tree(irGen *s) {
 		DeclInfo *decl  = e->decl_info;
 		Scope *   scope = e->scope;
 
-		if (!scope->is_file) {
+		if ((scope->flags & ScopeFlag_File) == 0) {
 			continue;
 		}
+
+		Scope *package_scope = scope->parent;
+		GB_ASSERT(package_scope->flags & ScopeFlag_Pkg);
 
 		switch (e->kind) {
 		case Entity_Variable:
@@ -8470,14 +8425,25 @@ void ir_gen_tree(irGen *s) {
 
 		String original_name = name;
 
-		if (!scope->is_global || polymorphic_struct || is_type_polymorphic(e->type)) {
+	#if 0
+		if (!package_scope->is_global || polymorphic_struct || is_type_polymorphic(e->type)) {
 			if (e->kind == Entity_Procedure && e->Procedure.is_export) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
 			} else {
-				name = ir_mangle_name(s, e->token.pos.file, e);
+				name = ir_mangle_name(s, e);
 			}
 		}
+	#else
+			if (e->kind == Entity_Procedure && e->Procedure.is_export) {
+				// Okay
+			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
+				// Handle later
+			} else {
+				name = ir_mangle_name(s, e);
+			}
+	#endif
+
 		ir_add_entity_name(m, e, name);
 
 		switch (e->kind) {
@@ -8488,7 +8454,7 @@ void ir_gen_tree(irGen *s) {
 		case Entity_Procedure: {
 			ast_node(pl, ProcLit, decl->proc_lit);
 			String original_name = name;
-			AstNode *body = pl->body;
+			Ast *body = pl->body;
 
 			if (e->Procedure.is_foreign) {
 				name = e->token.string; // NOTE(bill): Don't use the mangled name
@@ -8498,9 +8464,9 @@ void ir_gen_tree(irGen *s) {
 				name = e->Procedure.link_name;
 			}
 
-			AstNode *type_expr = pl->type;
+			Ast *type_expr = pl->type;
 
-			irValue *p = ir_value_procedure(a, m, e, e->type, type_expr, body, name);
+			irValue *p = ir_value_procedure(m, e, e->type, type_expr, body, name);
 			p->Proc.tags = pl->tags;
 			p->Proc.inlining = pl->inlining;
 
@@ -8524,7 +8490,7 @@ void ir_gen_tree(irGen *s) {
 
 	irDebugInfo *compile_unit = m->debug_info.entries[0].value;
 	GB_ASSERT(compile_unit->kind == irDebugInfo_CompileUnit);
-	irDebugInfo *all_procs = ir_alloc_debug_info(m->allocator, irDebugInfo_AllProcs);
+	irDebugInfo *all_procs = ir_alloc_debug_info(irDebugInfo_AllProcs);
 
 	isize all_proc_max_count = 0;
 	for_array(i, m->debug_info.entries) {
@@ -8534,7 +8500,7 @@ void ir_gen_tree(irGen *s) {
 		}
 	}
 
-	array_init(&all_procs->AllProcs.procs, m->allocator, 0, all_proc_max_count);
+	array_init(&all_procs->AllProcs.procs, ir_allocator(), 0, all_proc_max_count);
 	map_set(&m->debug_info, hash_pointer(all_procs), all_procs); // NOTE(bill): This doesn't need to be mapped
 	compile_unit->CompileUnit.all_procs = all_procs;
 
@@ -8578,9 +8544,9 @@ void ir_gen_tree(irGen *s) {
 		}
 		proc_type->Proc.abi_compat_result_type = proc_results->Tuple.variables[0]->type;
 
-		AstNode *body = gb_alloc_item(a, AstNode);
+		Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
 		Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
-		irValue *p = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
+		irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
 
 		map_set(&m->values, hash_entity(e), p);
 		map_set(&m->members, hash_string(name), p);
@@ -8656,9 +8622,9 @@ void ir_gen_tree(irGen *s) {
 		}
 		proc_type->Proc.abi_compat_result_type = proc_results->Tuple.variables[0]->type;
 
-		AstNode *body = gb_alloc_item(a, AstNode);
+		Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
 		Entity *e     = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
-		irValue *p    = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
+		irValue *p    = ir_value_procedure(m, e, proc_type, nullptr, body, name);
 
 		map_set(&m->values, hash_entity(e), p);
 		map_set(&m->members, hash_string(name), p);
@@ -8677,7 +8643,7 @@ void ir_gen_tree(irGen *s) {
 		irValue *argc = ir_emit_load(proc, *map_get(&proc->module->values, hash_entity(proc_params->Tuple.variables[0])));
 		irValue *argv = ir_emit_load(proc, *map_get(&proc->module->values, hash_entity(proc_params->Tuple.variables[1])));
 
-		irValue *global_args = ir_find_global_variable(proc, str_lit("__args__"));
+		irValue *global_args = ir_find_global_variable(proc, str_lit("args__"));
 
 		ir_fill_slice(proc, global_args, argv, ir_emit_conv(proc, argc, t_int));
 
@@ -8693,51 +8659,91 @@ void ir_gen_tree(irGen *s) {
 		ir_emit_return(proc, v_zero32);
 	}
 
-#if 0 && defined(GB_SYSTEM_WINDOWS)
-	if (!m->build_context->is_dll && !has_win_main) {
-		// proc WinMain(inst, prev: rawptr, cmd_line: ^byte, cmd_show: i32) -> i32
-		String name = str_lit("WinMain");
-		Type *proc_params = alloc_type_tuple();
-		Type *proc_results = alloc_type_tuple();
+#if defined(GB_SYSTEM_WINDOWS)
+	// if (!m->build_context->is_dll && !has_win_main) {
+	// 	// proc WinMain(inst, prev: rawptr, cmd_line: ^byte, cmd_show: i32) -> i32
+	// 	String name = str_lit("WinMain");
+	// 	Type *proc_params = alloc_type_tuple();
+	// 	Type *proc_results = alloc_type_tuple();
 
-		Scope *proc_scope = gb_alloc_item(a, Scope);
+	// 	Scope *proc_scope = gb_alloc_item(a, Scope);
 
-		proc_params->Tuple.variables = gb_alloc_array(a, Entity *, 4);
-		proc_params->Tuple.variable_count = 4;
+	// 	proc_params->Tuple.variables = gb_alloc_array(a, Entity *, 4);
+	// 	proc_params->Tuple.variable_count = 4;
 
-		proc_results->Tuple.variables = gb_alloc_array(a, Entity *, 1);
-		proc_results->Tuple.variable_count = 1;
+	// 	proc_results->Tuple.variables = gb_alloc_array(a, Entity *, 1);
+	// 	proc_results->Tuple.variable_count = 1;
 
-		proc_params->Tuple.variables[0] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false);
-		proc_params->Tuple.variables[1] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false);
-		proc_params->Tuple.variables[2] = alloc_entity_param(proc_scope, blank_token, t_u8_ptr, false);
-		proc_params->Tuple.variables[3] = alloc_entity_param(proc_scope, blank_token, t_i32,    false);
+	// 	proc_params->Tuple.variables[0] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false);
+	// 	proc_params->Tuple.variables[1] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false);
+	// 	proc_params->Tuple.variables[2] = alloc_entity_param(proc_scope, blank_token, t_u8_ptr, false);
+	// 	proc_params->Tuple.variables[3] = alloc_entity_param(proc_scope, blank_token, t_i32,    false);
 
-		proc_results->Tuple.variables[0] = alloc_entity_param(proc_scope, empty_token, t_i32, false);
+	// 	proc_results->Tuple.variables[0] = alloc_entity_param(proc_scope, empty_token, t_i32, false);
 
 
-		Type *proc_type = alloc_type_proc(a, proc_scope,
-		                                 proc_params, 4,
-		                                 proc_results, 1, false, ProcCC_Std);
+	// 	Type *proc_type = alloc_type_proc(a, proc_scope,
+	// 	                                 proc_params, 4,
+	// 	                                 proc_results, 1, false, ProcCC_Std);
 
-		AstNode *body = gb_alloc_item(a, AstNode);
-		Entity *e = alloc_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
-		irValue *p = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
+	// 	Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
+	// 	Entity *e = alloc_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
+	// 	irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
 
-		m->entry_point_entity = e;
+	// 	m->entry_point_entity = e;
 
-		map_set(&m->values, hash_entity(e), p);
-		map_set(&m->members, hash_string(name), p);
+	// 	map_set(&m->values, hash_entity(e), p);
+	// 	map_set(&m->members, hash_string(name), p);
 
-		irProcedure *proc = &p->Proc;
-		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
-		e->Procedure.link_name = name;
+	// 	irProcedure *proc = &p->Proc;
+	// 	proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
+	// 	e->Procedure.link_name = name;
 
-		ir_begin_procedure_body(proc);
-		ir_emit_global_call(proc, "main", nullptr, 0);
-		ir_emit_return(proc, v_one32);
-		ir_end_procedure_body(proc);
+	// 	ir_begin_procedure_body(proc);
+	// 	ir_emit_runtime_call(proc, "main", nullptr, 0);
+	// 	ir_emit_return(proc, v_one32);
+	// 	ir_end_procedure_body(proc);
+	// }
+	if (!build_context.is_dll && build_context.no_crt) {
+		s->print_chkstk = true;
+
+		{
+			// void mainCRTStartup(void)
+			String name = str_lit("mainCRTStartup");
+			Type *proc_params = alloc_type_tuple();
+			Type *proc_results = alloc_type_tuple();
+
+
+			Type *proc_type = alloc_type_proc(nullptr,
+			                                  nullptr, 0,
+			                                  nullptr, 0,
+			                                  false,
+			                                  ProcCC_StdCall);
+
+			Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
+			Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
+			irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
+
+			m->entry_point_entity = e;
+
+			map_set(&m->values, hash_entity(e), p);
+			map_set(&m->members, hash_string(name), p);
+
+			irProcedure *proc = &p->Proc;
+			// proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
+			e->Procedure.link_name = name;
+
+			ir_begin_procedure_body(proc);
+			ir_emit(proc, ir_alloc_instr(proc, irInstr_StartupRuntime));
+			irValue **found = map_get(&proc->module->values, hash_entity(entry_point));
+			if (found != nullptr) {
+				Array<irValue *> args = {};
+				ir_emit_call(proc, *found, args);
+			}
+			ir_end_procedure_body(proc);
+		}
 	}
+
 #endif
 	{ // Startup Runtime
 		// Cleanup(bill): probably better way of doing code insertion
@@ -8746,9 +8752,9 @@ void ir_gen_tree(irGen *s) {
 		                                  nullptr, 0,
 		                                  nullptr, 0, false,
 		                                  ProcCC_Contextless);
-		AstNode *body = gb_alloc_item(a, AstNode);
+		Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
 		Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
-		irValue *p = ir_value_procedure(a, m, e, proc_type, nullptr, body, name);
+		irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
 
 		map_set(&m->values, hash_entity(e), p);
 		map_set(&m->members, hash_string(name), p);

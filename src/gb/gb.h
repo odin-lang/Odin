@@ -1,4 +1,4 @@
-/* gb.h - v0.32  - Ginger Bill's C Helper Library - public domain
+/* gb.h - v0.33  - Ginger Bill's C Helper Library - public domain
                  - no warranty implied; use at your own risk
 
 	This is a single header file with a bunch of useful stuff
@@ -58,6 +58,7 @@ TODOS
 	- More date & time functions
 
 VERSION HISTORY
+	0.33  - Minor fixes
 	0.32  - Minor fixes
 	0.31  - Add gb_file_remove
 	0.30  - Changes to gbThread (and gbMutex on Windows)
@@ -936,6 +937,7 @@ typedef struct gbMutex {
 	CRITICAL_SECTION win32_critical_section;
 #else
 	pthread_mutex_t pthread_mutex;
+	pthread_mutexattr_t pthread_mutexattr;
 #endif
 } gbMutex;
 
@@ -3673,7 +3675,8 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 		return NULL;
 	}
 
-	__asm__ __volatile__("rep movsb" : "+D"(dest), "+S"(source), "+c"(n) : : "memory");
+	void *dest_copy = dest;
+	__asm__ __volatile__("rep movsb" : "+D"(dest_copy), "+S"(source), "+c"(n) : : "memory");
 #else
 	u8 *d = cast(u8 *)dest;
 	u8 const *s = cast(u8 const *)source;
@@ -3798,12 +3801,15 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 			*d++ = *s++; *d++ = *s++; *d++ = *s++; *d++ = *s++;
 			*d++ = *s++; *d++ = *s++; *d++ = *s++; *d++ = *s++;
 		}
-		if (n & 4)
+		if (n & 4) {
 			*d++ = *s++; *d++ = *s++; *d++ = *s++; *d++ = *s++;
-		if (n & 2)
+		}
+		if (n & 2) {
 			*d++ = *s++; *d++ = *s++;
-		if (n & 1)
+		}
+		if (n & 1) {
 			*d = *s;
+		}
 	}
 
 #endif
@@ -4027,10 +4033,10 @@ gb_inline void *gb_resize      (gbAllocator a, void *ptr, isize old_size, isize 
 gb_inline void *gb_resize_align(gbAllocator a, void *ptr, isize old_size, isize new_size, isize alignment) { return a.proc(a.data, gbAllocation_Resize, new_size, alignment, ptr, old_size, GB_DEFAULT_ALLOCATOR_FLAGS); }
 
 gb_inline void *gb_alloc_copy      (gbAllocator a, void const *src, isize size) {
-	return gb_memmove(gb_alloc(a, size), src, size);
+	return gb_memcopy(gb_alloc(a, size), src, size);
 }
 gb_inline void *gb_alloc_copy_align(gbAllocator a, void const *src, isize size, isize alignment) {
-	return gb_memmove(gb_alloc_align(a, size, alignment), src, size);
+	return gb_memcopy(gb_alloc_align(a, size, alignment), src, size);
 }
 
 gb_inline char *gb_alloc_str(gbAllocator a, char const *str) {
@@ -4039,8 +4045,7 @@ gb_inline char *gb_alloc_str(gbAllocator a, char const *str) {
 
 gb_inline char *gb_alloc_str_len(gbAllocator a, char const *str, isize len) {
 	char *result;
-	result = cast(char *)gb_alloc(a, len+1);
-	gb_memmove(result, str, len);
+	result = cast(char *)gb_alloc_copy(a, str, len+1);
 	result[len] = '\0';
 	return result;
 }
@@ -4605,7 +4610,9 @@ gb_inline void gb_mutex_init(gbMutex *m) {
 #if defined(GB_SYSTEM_WINDOWS)
 	InitializeCriticalSection(&m->win32_critical_section);
 #else
-	pthread_mutex_init(&m->pthread_mutex, NULL);
+	pthread_mutexattr_init(&m->pthread_mutexattr);
+	pthread_mutexattr_settype(&m->pthread_mutexattr, PTHREAD_MUTEX_RECURSIVE);
+	pthread_mutex_init(&m->pthread_mutex, &m->pthread_mutexattr);
 #endif
 }
 
@@ -6548,7 +6555,7 @@ gbString gb_string_make_length(gbAllocator a, void const *init_str, isize num_by
 	header->allocator = a;
 	header->length    = num_bytes;
 	header->capacity  = num_bytes;
-	if (num_bytes > 0 && init_str) {
+	if (num_bytes && init_str) {
 		gb_memcopy(str, init_str, num_bytes);
 	}
 	str[num_bytes] = '\0';
@@ -6881,8 +6888,6 @@ gb_global gbUtf8AcceptRange const gb__utf8_accept_ranges[] = {
 
 
 isize gb_utf8_decode(u8 const *str, isize str_len, Rune *codepoint_out) {
-
-
 	isize width = 0;
 	Rune codepoint = GB_RUNE_INVALID;
 
@@ -6891,8 +6896,8 @@ isize gb_utf8_decode(u8 const *str, isize str_len, Rune *codepoint_out) {
 		u8 x = gb__utf8_first[s0], sz;
 		u8 b1, b2, b3;
 		gbUtf8AcceptRange accept;
-		if (x > 0xf0) {
-			Rune mask = (cast(Rune)x >> 31) << 31;
+		if (x >= 0xf0) {
+			Rune mask = (cast(Rune)x << 31) >> 31;
 			codepoint = (cast(Rune)s0 & (~mask)) | (GB_RUNE_INVALID & mask);
 			width = 1;
 			goto end;
@@ -8480,9 +8485,9 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 			int width = va_arg(va, int);
 			if (width < 0) {
 				info.flags |= gbFmt_Minus;
-				info.width = -info.width;
+				info.width = -width;
 			} else {
-				info.width = -info.width;
+				info.width = width;
 			}
 			fmt++;
 		} else {
@@ -10813,4 +10818,3 @@ GB_COMPARE_PROC(gb_video_mode_dsc_cmp) {
 #endif
 
 #endif // GB_IMPLEMENTATION
-

@@ -3,6 +3,10 @@
 #include <xmmintrin.h>
 #endif
 
+#if defined(GB_COMPILER_MSVC)
+#include <intrin.h>
+#endif
+
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
@@ -40,13 +44,13 @@ GB_ALLOCATOR_PROC(heap_allocator_proc);
 gbAllocator heap_allocator(void) {
 	gbAllocator a;
 	a.proc = heap_allocator_proc;
-	a.data = NULL;
+	a.data = nullptr;
 	return a;
 }
 
 
 GB_ALLOCATOR_PROC(heap_allocator_proc) {
-	void *ptr = NULL;
+	void *ptr = nullptr;
 	gb_unused(allocator_data);
 	gb_unused(old_size);
 
@@ -200,7 +204,7 @@ u64 u64_from_string(String string) {
 }
 
 String u64_to_string(u64 v, char *out_buf, isize out_buf_len) {
-	char buf[200] = {0};
+	char buf[32] = {0};
 	isize i = gb_size_of(buf);
 
 	u64 b = 10;
@@ -211,11 +215,11 @@ String u64_to_string(u64 v, char *out_buf, isize out_buf_len) {
 	buf[--i] = gb__num_to_char_table[v%b];
 
 	isize len = gb_min(gb_size_of(buf)-i, out_buf_len);
-	gb_memcopy(out_buf, &buf[i], len);
+	gb_memmove(out_buf, &buf[i], len);
 	return make_string(cast(u8 *)out_buf, len);
 }
 String i64_to_string(i64 a, char *out_buf, isize out_buf_len) {
-	char buf[200] = {0};
+	char buf[32] = {0};
 	isize i = gb_size_of(buf);
 	bool negative = false;
 	if (a < 0) {
@@ -236,7 +240,7 @@ String i64_to_string(i64 a, char *out_buf, isize out_buf_len) {
 	}
 
 	isize len = gb_min(gb_size_of(buf)-i, out_buf_len);
-	gb_memcopy(out_buf, &buf[i], len);
+	gb_memmove(out_buf, &buf[i], len);
 	return make_string(cast(u8 *)out_buf, len);
 }
 
@@ -276,6 +280,44 @@ gb_global u64 const unsigned_integer_maxs[] = {
 };
 
 
+bool add_overflow_u64(u64 x, u64 y, u64 *result) {
+   *result = x + y;
+   return *result < x || *result < y;
+}
+
+bool sub_overflow_u64(u64 x, u64 y, u64 *result) {
+   *result = x - y;
+   return *result > x;
+}
+
+void mul_overflow_u64(u64 x, u64 y, u64 *lo, u64 *hi) {
+#if defined(GB_COMPILER_MSVC)
+	*lo = _umul128(x, y, hi);
+#else
+	// URL(bill): https://stackoverflow.com/questions/25095741/how-can-i-multiply-64-bit-operands-and-get-128-bit-result-portably#25096197
+	u64 u1, v1, w1, t, w3, k;
+
+	u1 = (x & 0xffffffff);
+	v1 = (y & 0xffffffff);
+	t = (u1 * v1);
+	w3 = (t & 0xffffffff);
+	k = (t >> 32);
+
+	x >>= 32;
+	t = (x * v1) + k;
+	k = (t & 0xffffffff);
+	w1 = (t >> 32);
+
+	y >>= 32;
+	t = (u1 * y) + k;
+	k = (t >> 32);
+
+	*hi = (x * y) + w1 + k;
+	*lo = (t << 32) + w3;
+#endif
+}
+
+
 
 #include "map.cpp"
 #include "ptr_set.cpp"
@@ -287,158 +329,118 @@ gb_global u64 const unsigned_integer_maxs[] = {
 gb_global String global_module_path = {0};
 gb_global bool global_module_path_set = false;
 
-gb_global gbScratchMemory scratch_memory = {0};
+// Arena from Per Vognsen
+#define ALIGN_DOWN(n, a)     ((n) & ~((a) - 1))
+#define ALIGN_UP(n, a)       ALIGN_DOWN((n) + (a) - 1, (a))
+#define ALIGN_DOWN_PTR(p, a) (cast(void *)ALIGN_DOWN(cast(uintptr)(p), (a)))
+#define ALIGN_UP_PTR(p, a)   (cast(void *)ALIGN_UP(cast(uintptr)(p), (a)))
 
-void init_scratch_memory(isize size) {
-	void *memory = gb_alloc(heap_allocator(), size);
-	gb_scratch_memory_init(&scratch_memory, memory, size);
+typedef struct Arena {
+	u8 *        ptr;
+	u8 *        end;
+	u8 *        prev;
+	Array<u8 *> blocks;
+	gbAllocator backing;
+	isize       block_size;
+	gbMutex     mutex;
+
+	isize total_used;
+} Arena;
+
+#define ARENA_MIN_ALIGNMENT 16
+#define ARENA_DEFAULT_BLOCK_SIZE (8*1024*1024)
+
+void arena_init(Arena *arena, gbAllocator backing, isize block_size=ARENA_DEFAULT_BLOCK_SIZE) {
+	arena->backing = backing;
+	arena->block_size = block_size;
+	array_init(&arena->blocks, backing);
+	gb_mutex_init(&arena->mutex);
 }
 
-gbAllocator scratch_allocator(void) {
-	return gb_scratch_allocator(&scratch_memory);
+void arena_grow(Arena *arena, isize min_size) {
+	gb_mutex_lock(&arena->mutex);
+	defer (gb_mutex_unlock(&arena->mutex));
+
+	isize size = gb_max(arena->block_size, min_size);
+	size = ALIGN_UP(size, ARENA_MIN_ALIGNMENT);
+	void *new_ptr = gb_alloc(arena->backing, size);
+	arena->ptr = cast(u8 *)new_ptr;
+	gb_zero_size(arena->ptr, size);
+	GB_ASSERT(arena->ptr == ALIGN_DOWN_PTR(arena->ptr, ARENA_MIN_ALIGNMENT));
+	arena->end = arena->ptr + size;
+	array_add(&arena->blocks, arena->ptr);
 }
 
-struct Pool {
-	isize       memblock_size;
-	isize       out_of_band_size;
-	isize       alignment;
+void *arena_alloc(Arena *arena, isize size, isize alignment) {
+	gb_mutex_lock(&arena->mutex);
+	defer (gb_mutex_unlock(&arena->mutex));
 
-	Array<u8 *> unused_memblock;
-	Array<u8 *> used_memblock;
-	Array<u8 *> out_of_band_allocations;
+	arena->total_used += size;
 
-	u8 *        current_memblock;
-	u8 *        current_pos;
-	isize       bytes_left;
+	if (size > (arena->end - arena->ptr)) {
+		arena_grow(arena, size);
+		GB_ASSERT(size <= (arena->end - arena->ptr));
+	}
 
-	gbAllocator block_allocator;
-};
-
-enum {
-	POOL_BUCKET_SIZE_DEFAULT      = 65536,
-	POOL_OUT_OF_BAND_SIZE_DEFAULT = 6554,
-};
-
-void pool_init(Pool *pool,
-               isize memblock_size = POOL_BUCKET_SIZE_DEFAULT,
-               isize out_of_band_size = POOL_OUT_OF_BAND_SIZE_DEFAULT,
-               isize alignment = 8,
-               gbAllocator block_allocator = heap_allocator(),
-               gbAllocator array_allocator = heap_allocator()) {
-	pool->memblock_size = memblock_size;
-	pool->out_of_band_size = out_of_band_size;
-	pool->alignment = alignment;
-	pool->block_allocator = block_allocator;
-
-	array_init(&pool->unused_memblock,         array_allocator);
-	array_init(&pool->used_memblock,           array_allocator);
-	array_init(&pool->out_of_band_allocations, array_allocator);
+	isize align = gb_max(alignment, ARENA_MIN_ALIGNMENT);
+	void *ptr = arena->ptr;
+	arena->prev = arena->ptr;
+	arena->ptr = cast(u8 *)ALIGN_UP_PTR(arena->ptr + size, align);
+	GB_ASSERT(arena->ptr <= arena->end);
+	GB_ASSERT(ptr == ALIGN_DOWN_PTR(ptr, align));
+	gb_zero_size(ptr, size);
+	return ptr;
 }
 
-void pool_free_all(Pool *p) {
-	if (p->current_memblock != nullptr) {
-		array_add(&p->unused_memblock, p->current_memblock);
-		p->current_memblock = nullptr;
+void arena_free_all(Arena *arena) {
+	gb_mutex_lock(&arena->mutex);
+	defer (gb_mutex_unlock(&arena->mutex));
+
+	for_array(i, arena->blocks) {
+		gb_free(arena->backing, arena->blocks[i]);
 	}
-
-	for_array(i, p->used_memblock) {
-		array_add(&p->unused_memblock, p->used_memblock[i]);
-	}
-	array_clear(&p->unused_memblock);
-
-	for_array(i, p->out_of_band_allocations) {
-		gb_free(p->block_allocator, p->out_of_band_allocations[i]);
-	}
-	array_clear(&p->out_of_band_allocations);
-}
-
-void pool_destroy(Pool *p) {
-	pool_free_all(p);
-
-	for_array(i, p->unused_memblock) {
-		gb_free(p->block_allocator, p->unused_memblock[i]);
-	}
-}
-
-void pool_cycle_new_block(Pool *p) {
-	GB_ASSERT_MSG(p->block_allocator.proc != nullptr,
-	              "You must call pool_init on a Pool before using it!");
-
-	if (p->current_memblock != nullptr) {
-		array_add(&p->used_memblock, p->current_memblock);
-	}
-
-	u8 *new_block = nullptr;
-
-	if (p->unused_memblock.count > 0) {
-		new_block = array_pop(&p->unused_memblock);
-	} else {
-		GB_ASSERT(p->block_allocator.proc != nullptr);
-		new_block = cast(u8 *)gb_alloc_align(p->block_allocator, p->memblock_size, p->alignment);
-	}
-
-	p->bytes_left       = p->memblock_size;
-	p->current_memblock = new_block;
-	p->current_memblock = new_block;
-}
-
-void *pool_get(Pool *p,
-               isize size, isize alignment = 0) {
-	if (alignment <= 0) alignment = p->alignment;
-
-	isize extra = alignment - (size & alignment);
-	size += extra;
-	if (size >= p->out_of_band_size) {
-		GB_ASSERT(p->block_allocator.proc != nullptr);
-		u8 *memory = cast(u8 *)gb_alloc_align(p->block_allocator, p->memblock_size, alignment);
-		if (memory != nullptr) {
-			array_add(&p->out_of_band_allocations, memory);
-		}
-		return memory;
-	}
-
-	if (p->bytes_left < size) {
-		pool_cycle_new_block(p);
-		if (p->current_memblock != nullptr) {
-			return nullptr;
-		}
-	}
-
-	u8 *res = p->current_pos;
-	p->current_pos += size;
-	p->bytes_left  -= size;
-	return res;
+	array_clear(&arena->blocks);
+	arena->ptr = nullptr;
+	arena->end = nullptr;
 }
 
 
-gbAllocator pool_allocator(Pool *pool);
 
-GB_ALLOCATOR_PROC(pool_allocator_procedure) {
-	Pool *p = cast(Pool *)allocator_data;
+
+GB_ALLOCATOR_PROC(arena_allocator_proc);
+
+gbAllocator arena_allocator(Arena *arena) {
+	gbAllocator a;
+	a.proc = arena_allocator_proc;
+	a.data = arena;
+	return a;
+}
+
+
+GB_ALLOCATOR_PROC(arena_allocator_proc) {
 	void *ptr = nullptr;
+	Arena *arena = cast(Arena *)allocator_data;
+	GB_ASSERT_NOT_NULL(arena);
 
 	switch (type) {
 	case gbAllocation_Alloc:
-		return pool_get(p, size, alignment);
-	case gbAllocation_Free:
-		// Does nothing
+		ptr = arena_alloc(arena, size, alignment);
 		break;
-	case gbAllocation_FreeAll:
-		pool_free_all(p);
+	case gbAllocation_Free:
+		GB_PANIC("gbAllocation_Free not supported");
 		break;
 	case gbAllocation_Resize:
-		return gb_default_resize_align(pool_allocator(p), old_memory, old_size, size, alignment);
+		GB_PANIC("gbAllocation_Resize: not supported");
+		break;
+	case gbAllocation_FreeAll:
+		arena_free_all(arena);
+		break;
 	}
 
 	return ptr;
 }
 
-gbAllocator pool_allocator(Pool *pool) {
-	gbAllocator allocator;
-	allocator.proc = pool_allocator_procedure;
-	allocator.data = pool;
-	return allocator;
-}
+
 
 
 
@@ -734,3 +736,201 @@ String path_to_full_path(gbAllocator a, String path) {
 	char *fullpath = gb_path_get_full_name(a, path_c);
 	return make_string_c(fullpath);
 }
+
+
+
+struct FileInfo {
+	String name;
+	String fullpath;
+	i64    size;
+	bool   is_dir;
+};
+
+enum ReadDirectoryError {
+	ReadDirectory_None,
+
+	ReadDirectory_InvalidPath,
+	ReadDirectory_NotExists,
+	ReadDirectory_Permission,
+	ReadDirectory_NotDir,
+	ReadDirectory_Empty,
+	ReadDirectory_Unknown,
+
+	ReadDirectory_COUNT,
+};
+
+i64 get_file_size(String path) {
+	char *c_str = alloc_cstring(heap_allocator(), path);
+	defer (gb_free(heap_allocator(), c_str));
+
+	gbFile f = {};
+	gbFileError err = gb_file_open(&f, c_str);
+	defer (gb_file_close(&f));
+	if (err != gbFileError_None) {
+		return -1;
+	}
+	return gb_file_size(&f);
+}
+
+
+#if defined(GB_SYSTEM_WINDOWS)
+ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
+	GB_ASSERT(fi != nullptr);
+
+	gbAllocator a = heap_allocator();
+
+	while (path.len > 0) {
+		Rune end = path[path.len-1];
+		if (end == '/') {
+			path.len -= 1;
+		} else if (end == '\\') {
+			path.len -= 1;
+		} else {
+			break;
+		}
+	}
+
+	if (path.len == 0) {
+		return ReadDirectory_InvalidPath;
+	}
+	{
+		char *c_str = alloc_cstring(a, path);
+		defer (gb_free(a, c_str));
+
+		gbFile f = {};
+		gbFileError file_err = gb_file_open(&f, c_str);
+		defer (gb_file_close(&f));
+
+		switch (file_err) {
+		case gbFileError_Invalid:    return ReadDirectory_InvalidPath;
+		case gbFileError_NotExists:  return ReadDirectory_NotExists;
+		// case gbFileError_Permission: return ReadDirectory_Permission;
+		}
+	}
+
+	if (!path_is_directory(path)) {
+		return ReadDirectory_NotDir;
+	}
+
+
+	char *new_path = gb_alloc_array(a, char, path.len+3);
+	defer (gb_free(a, new_path));
+
+	gb_memmove(new_path, path.text, path.len);
+	gb_memmove(new_path+path.len, "/*", 2);
+	new_path[path.len+2] = 0;
+
+	String np = make_string(cast(u8 *)new_path, path.len+2);
+	String16 wstr = string_to_string16(a, np);
+	defer (gb_free(a, wstr.text));
+
+	WIN32_FIND_DATAW file_data = {};
+	HANDLE find_file = FindFirstFileW(wstr.text, &file_data);
+	if (find_file == INVALID_HANDLE_VALUE) {
+		return ReadDirectory_Unknown;
+	}
+	defer (FindClose(find_file));
+
+	array_init(fi, a, 0, 100);
+
+	do {
+		wchar_t *filename_w = file_data.cFileName;
+		i64 size = cast(i64)file_data.nFileSizeLow;
+		size |= (cast(i64)file_data.nFileSizeHigh) << 32;
+		String name = string16_to_string(a, make_string16_c(filename_w));
+		if (name == "." || name == "..") {
+			gb_free(a, name.text);
+			continue;
+		}
+
+		String filepath = {};
+		filepath.len = path.len+1+name.len;
+		filepath.text = gb_alloc_array(a, u8, filepath.len+1);
+		defer (gb_free(a, filepath.text));
+		gb_memmove(filepath.text, path.text, path.len);
+		gb_memmove(filepath.text+path.len, "/", 1);
+		gb_memmove(filepath.text+path.len+1, name.text, name.len);
+
+		FileInfo info = {};
+		info.name = name;
+		info.fullpath = path_to_full_path(a, filepath);
+		info.size = size;
+		info.is_dir = (file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+		array_add(fi, info);
+
+	} while (FindNextFileW(find_file, &file_data));
+
+	if (fi->count == 0) {
+		return ReadDirectory_Empty;
+	}
+
+	return ReadDirectory_None;
+}
+#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX)
+
+#include <dirent.h>
+
+ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
+	GB_ASSERT(fi != nullptr);
+
+	gbAllocator a = heap_allocator();
+
+	char *c_path = alloc_cstring(a, path);
+	defer (gb_free(a, c_path));
+
+	DIR *dir = opendir(c_path);
+	if (!dir) {
+		return ReadDirectory_NotDir;
+	}
+
+	array_init(fi, a, 0, 100);
+
+	for (;;) {
+		struct dirent *entry = readdir(dir);
+		if (entry == nullptr) {
+			break;
+		}
+
+		String name = make_string_c(entry->d_name);
+		if (name == "." || name == "..") {
+			continue;
+		}
+
+		String filepath = {};
+		filepath.len = path.len+1+name.len;
+		filepath.text = gb_alloc_array(a, u8, filepath.len+1);
+		defer (gb_free(a, filepath.text));
+		gb_memmove(filepath.text, path.text, path.len);
+		gb_memmove(filepath.text+path.len, "/", 1);
+		gb_memmove(filepath.text+path.len+1, name.text, name.len);
+		filepath.text[filepath.len] = 0;
+
+
+		struct stat dir_stat = {};
+
+		if (stat((char *)filepath.text, &dir_stat)) {
+			continue;
+		}
+
+		if (S_ISDIR(dir_stat.st_mode)) {
+			continue;
+		}
+
+		i64 size = dir_stat.st_size;
+
+		FileInfo info = {};
+		info.name = name;
+		info.fullpath = path_to_full_path(a, filepath);
+		info.size = size;
+		array_add(fi, info);
+	}
+
+	if (fi->count == 0) {
+		return ReadDirectory_Empty;
+	}
+
+	return ReadDirectory_None;
+}
+#else
+#error Implement read_directory
+#endif

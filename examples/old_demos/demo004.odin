@@ -32,7 +32,7 @@ main :: proc() {
 
 		/*
 			push_allocator x {
-				...
+				..
 			}
 
 			is equivalent to:
@@ -42,7 +42,7 @@ main :: proc() {
 				__context.allocator = x
 				defer __context.allocator = prev_allocator
 
-				...
+				..
 			}
 		*/
 
