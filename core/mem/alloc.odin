@@ -78,7 +78,7 @@ delete :: proc[
 ];
 
 
-new :: inline proc(T: type, allocator := context.allocator, loc := #caller_location) -> ^T {
+new :: inline proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> ^T {
 	ptr := (^T)(alloc(size_of(T), align_of(T), allocator, loc));
 	if ptr != nil do ptr^ = T{};
 	return ptr;
@@ -90,25 +90,25 @@ new_clone :: inline proc(data: $T, allocator := context.allocator, loc := #calle
 }
 
 
-make_slice :: proc(T: type/[]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
+make_slice :: proc($T: typeid/[]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
 	runtime.make_slice_error_loc(loc, len);
 	data := alloc(size_of(E)*len, align_of(E), allocator, loc);
 	s := Raw_Slice{data, len};
 	return transmute(T)s;
 }
-make_dynamic_array :: proc(T: type/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> T {
+make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> T {
 	return make_dynamic_array_len_cap(T, 0, 16, allocator, loc);
 }
-make_dynamic_array_len :: proc(T: type/[dynamic]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
+make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
 	return make_dynamic_array_len_cap(T, len, len, allocator, loc);
 }
-make_dynamic_array_len_cap :: proc(T: type/[dynamic]$E, auto_cast len: int, auto_cast cap: int, allocator := context.allocator, loc := #caller_location) -> T {
+make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, auto_cast len: int, auto_cast cap: int, allocator := context.allocator, loc := #caller_location) -> T {
 	runtime.make_dynamic_array_error_loc(loc, len, cap);
 	data := alloc(size_of(E)*cap, align_of(E), allocator, loc);
 	s := Raw_Dynamic_Array{data, len, cap, allocator};
 	return transmute(T)s;
 }
-make_map :: proc(T: type/map[$K]$E, auto_cast cap: int = 16, allocator := context.allocator, loc := #caller_location) -> T {
+make_map :: proc($T: typeid/map[$K]$E, auto_cast cap: int = 16, allocator := context.allocator, loc := #caller_location) -> T {
 	runtime.make_map_expr_error_loc(loc, cap);
 
 	c := context;

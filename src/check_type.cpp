@@ -374,18 +374,20 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 					type_expr = type_expr->Ellipsis.expr;
 					error(param, "A polymorphic parameter cannot be variadic");
 				}
-				if (type_expr->kind == Ast_TypeType) {
+				if (type_expr->kind == Ast_TypeidType) {
+					is_type_param = true;
+					Type *specialization = nullptr;
+					if (type_expr->TypeidType.specialization != nullptr) {
+						Ast *s = type_expr->TypeidType.specialization;
+						specialization = check_type(ctx, s);
+					}
+					type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
+				} else if (type_expr->kind == Ast_TypeType) {
 					is_type_param = true;
 					Type *specialization = nullptr;
 					if (type_expr->TypeType.specialization != nullptr) {
 						Ast *s = type_expr->TypeType.specialization;
 						specialization = check_type(ctx, s);
-						// if (!is_type_polymorphic_struct(specialization)) {
-						// 	gbString str = type_to_string(specialization);
-						// 	defer (gb_string_free(str));
-						// 	error(s, "Expected a polymorphic struct, got %s", str);
-						// 	specialization = nullptr;
-						// }
 					}
 					type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
 				} else {
@@ -1159,7 +1161,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			continue;
 		}
 		ast_node(p, Field, param);
-		Ast *type_expr = p->type;
+		Ast *type_expr = unparen_expr(p->type);
 		Type *type = nullptr;
 		Ast *default_value = unparen_expr(p->default_value);
 		ParameterValue param_value = {};
@@ -1183,7 +1185,24 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 					success = false;
 				}
 			}
-			if (type_expr->kind == Ast_TypeType) {
+			if (type_expr->kind == Ast_TypeidType)  {
+				ast_node(tt, TypeidType, type_expr);
+				if (tt->specialization) {
+					specialization = check_type(ctx, tt->specialization);
+					if (specialization == t_invalid){
+						specialization = nullptr;
+					}
+
+					if (operands != nullptr) {
+						detemine_type_from_operand = true;
+						type = t_invalid;
+					} else {
+						type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
+					}
+				} else {
+					type = t_typeid;
+				}
+			} else if (type_expr->kind == Ast_TypeType) {
 				ast_node(tt, TypeType, type_expr);
 				is_type_param = true;
 				specialization = check_type(ctx, tt->specialization);
@@ -1213,7 +1232,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			}
 
 			if (default_value != nullptr) {
-				if (type_expr != nullptr && type_expr->kind == Ast_TypeType) {
+				if (type_expr != nullptr && (type_expr->kind == Ast_TypeType || type_expr->kind == Ast_TypeidType)) {
 					error(type_expr, "A type parameter may not have a default value");
 				} else {
 					param_value = handle_parameter_value(ctx, type, nullptr, default_value, true);
@@ -1281,7 +1300,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			}
 
 			if (is_poly_name) {
-				if (type != nullptr && is_type_typeid(type)) {
+				if (type != nullptr && type_expr->kind == Ast_TypeidType) {
 					is_type_param = true;
 				} else {
 					error(name, "Polymorphic names are not yet supported for non-typeid parameters");
@@ -1324,7 +1343,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 				}
 
 				if (p->flags&FieldFlag_auto_cast) {
-					error(name, "'auto_cast' can only be applied variable fields");
+					error(name, "'auto_cast' can only be applied to variable fields");
 					p->flags &= ~FieldFlag_auto_cast;
 				}
 

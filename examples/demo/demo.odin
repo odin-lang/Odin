@@ -187,7 +187,7 @@ union_type :: proc() {
 		}
 
 		// See `parametric_polymorphism` procedure for details
-		new_entity :: proc(T: type) -> ^Entity {
+		new_entity :: proc($T: typeid) -> ^Entity {
 			t := new(T);
 			t.derived = t^;
 			return t;
@@ -231,7 +231,7 @@ union_type :: proc() {
 		}
 
 		// See `parametric_polymorphism` procedure for details
-		new_entity :: proc(T: type) -> ^Entity {
+		new_entity :: proc($T: typeid) -> ^Entity {
 			t := new(Entity);
 			t.derived = T{entity = t};
 			return t;
@@ -318,7 +318,7 @@ parametric_polymorphism :: proc() {
 	fmt.printf("b: %T = %v\n", b, b);
 
 	// This is how `new` is implemented
-	alloc_type :: proc(T: type) -> ^T {
+	alloc_type :: proc($T: typeid) -> ^T {
 		t := cast(^T)alloc(size_of(T), align_of(T));
 		t^ = T{}; // Use default initialization value
 		return t;
@@ -341,21 +341,21 @@ parametric_polymorphism :: proc() {
 
 
 	{ // Polymorphic Types and Type Specialization
-		Table_Slot :: struct(Key, Value: type) {
+		Table_Slot :: struct(Key, Value: typeid) {
 			occupied: bool,
 			hash:     u32,
 			key:      Key,
 			value:    Value,
 		}
 		TABLE_SIZE_MIN :: 32;
-		Table :: struct(Key, Value: type) {
+		Table :: struct(Key, Value: typeid) {
 			count:     int,
 			allocator: mem.Allocator,
 			slots:     []Table_Slot(Key, Value),
 		}
 
 		// Only allow types that are specializations of a (polymorphic) slice
-		make_slice :: proc(T: type/[]$E, len: int) -> T {
+		make_slice :: proc($T: typeid/[]$E, len: int) -> T {
 			return make(T, len);
 		}
 
@@ -766,6 +766,7 @@ bit_set_type :: proc() {
 		assert(2 in y);
 	}
 }
+
 
 main :: proc() {
 	when true {
