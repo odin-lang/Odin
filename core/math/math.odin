@@ -192,7 +192,7 @@ norm0 :: proc(v: $T/[$N]$E) -> T {
 
 
 
-identity :: proc(T: type/[$N][N]$E) -> T {
+identity :: proc($T: typeid/[$N][N]$E) -> T {
 	m: T;
 	for i in 0..N-1 do m[i][i] = E(1);
 	return m;

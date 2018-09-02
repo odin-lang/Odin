@@ -2435,6 +2435,7 @@ Ast *parse_value_decl(AstFile *f, Array<Ast *> names, CommentGroup *docs) {
 
 	if (f->curr_token.kind == Token_type) {
 		type = ast_type_type(f, advance_token(f), nullptr);
+		warning(type, "'type' is deprecated");
 		is_mutable = false;
 	} else {
 		type = parse_type_or_ident(f);
@@ -2718,6 +2719,19 @@ Ast *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_type_token) {
 			specialization = parse_type(f);
 		}
 		type = ast_type_type(f, token, specialization);
+		if (specialization) {
+			warning(type, "'type' is deprecated, please use something like '$T: typeid/[]$E'");
+		} else {
+			warning(type, "'type' is deprecated, please use something like '$T: typeid'");
+		}
+	} else if (allow_type_token &&
+	    f->curr_token.kind == Token_typeid) {
+		Token token = expect_token(f, Token_typeid);
+		Ast *specialization = nullptr;
+		if (allow_token(f, Token_Quo)) {
+			specialization = parse_type(f);
+		}
+		type = ast_typeid_type(f, token, specialization);
 	} else {
 		type = parse_type(f);
 	}
@@ -2855,7 +2869,7 @@ Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> list, bool ign
 		case Ast_PolyType:
 			if (allow_poly_names) {
 				if (ident->PolyType.specialization == nullptr) {
-					syntax_error(ident, "Polymorphic identifiers are not yet supported");
+					// syntax_error(ident, "Polymorphic identifiers are not yet supported");
 					break;
 				} else {
 					syntax_error(ident, "Expected a polymorphic identifier without any specialization");
@@ -2925,6 +2939,36 @@ Ast *parse_struct_field_list(AstFile *f, isize *name_count_) {
 	return params;
 }
 
+
+// Returns true if any are polymorphic names
+bool check_procedure_name_list(Array<Ast *> const &names) {
+	if (names.count == 0) {
+		return false;
+	}
+	bool first_is_polymorphic = names[0]->kind == Ast_PolyType;
+	bool any_polymorphic_names = first_is_polymorphic;
+	for (isize i = 1; i < names.count; i++) {
+		Ast *name = names[i];
+		if (first_is_polymorphic) {
+			if (name->kind == Ast_PolyType) {
+				any_polymorphic_names = true;
+			} else {
+				syntax_error(name, "Mixture of polymorphic and non-polymorphic identifiers");
+				return any_polymorphic_names;
+			}
+		} else {
+			if (name->kind == Ast_PolyType) {
+				any_polymorphic_names = true;
+				syntax_error(name, "Mixture of polymorphic and non-polymorphic identifiers");
+				return any_polymorphic_names;
+			} else {
+				// Okay
+			}
+		}
+	}
+	return any_polymorphic_names;
+}
+
 Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_type_token) {
 	Token start_token = f->curr_token;
 
@@ -2965,6 +3009,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 		if (names.count == 0) {
 			syntax_error(f->curr_token, "Empty field declaration");
 		}
+		bool any_polymorphic_names = check_procedure_name_list(names);
 		u32 set_flags = 0;
 		if (list.count > 0) {
 			set_flags = list[0].flags;
@@ -2978,6 +3023,10 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 		expect_token_after(f, Token_Colon, "field list");
 		if (f->curr_token.kind != Token_Eq) {
 			type = parse_var_type(f, allow_ellipsis, allow_type_token);
+			Ast *tt = unparen_expr(type);
+			if (!any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
+				syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
+			}
 		}
 
 		if (allow_token(f, Token_Eq)) {
@@ -3022,6 +3071,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 				syntax_error(f->curr_token, "Empty field declaration");
 				break;
 			}
+			bool any_polymorphic_names = check_procedure_name_list(names);
 			set_flags = check_field_prefixes(f, names.count, allowed_flags, set_flags);
 			total_name_count += names.count;
 
@@ -3030,6 +3080,10 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 			expect_token_after(f, Token_Colon, "field list");
 			if (f->curr_token.kind != Token_Eq) {
 				type = parse_var_type(f, allow_ellipsis, allow_type_token);
+				Ast *tt = unparen_expr(type);
+				if (!any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
+					syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
+				}
 			}
 
 			if (allow_token(f, Token_Eq)) {
