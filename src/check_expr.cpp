@@ -3200,10 +3200,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		add_type_info_type(c, t);
 
 		t = base_type(t);
-		if (is_operand_value(o) && are_types_identical(t, t_type_info_ptr)) {
-			add_package_dependency(c, "runtime", "__typeid_of");
-		} else if (o.mode != Addressing_Type) {
-			error(expr, "Expected a type or type info for 'typeid_of'");
+		if (o.mode != Addressing_Type) {
+			error(expr, "Expected a type for 'typeid_of'");
 			return false;
 		}
 
@@ -6069,6 +6067,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		}
 	case_end;
 
+	case Ast_TypeidType:
 	case Ast_TypeType:
 	case Ast_PolyType:
 	case Ast_ProcType:
@@ -6077,7 +6076,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case Ast_DynamicArrayType:
 	case Ast_StructType:
 	case Ast_UnionType:
-	// case Ast_RawUnionType:
 	case Ast_EnumType:
 	case Ast_MapType:
 		o->mode = Addressing_Type;
@@ -6506,6 +6504,14 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 
 	case_ast_node(tt, TypeType, node);
 		str = gb_string_appendc(str, "type");
+		if (tt->specialization) {
+			str = gb_string_appendc(str, "/");
+			str = write_expr_to_string(str, tt->specialization);
+		}
+	case_end;
+
+	case_ast_node(tt, TypeidType, node);
+		str = gb_string_appendc(str, "typeid");
 		if (tt->specialization) {
 			str = gb_string_appendc(str, "/");
 			str = write_expr_to_string(str, tt->specialization);

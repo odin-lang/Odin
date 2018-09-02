@@ -1367,7 +1367,6 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
-		// if (e->scope->is_global && !is_type_poly_proc(e->type)) { // TODO(bill): is the check enough?
 		if (e->scope == builtin_pkg->scope) { // TODO(bill): is the check enough?
 			if (e->type == nullptr) {
 				add_dependency_to_set(c, e);
@@ -1806,6 +1805,14 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 	return false;
 }
 
+DECL_ATTRIBUTE_PROC(const_decl_attribute) {
+	if (name == "private") {
+		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
+		return true;
+	}
+	return false;
+}
+
 
 
 
@@ -2025,6 +2032,49 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 	ast_node(vd, ValueDecl, decl);
 
+	bool entity_is_private = false;
+	for_array(i, vd->attributes) {
+		Ast *attr = vd->attributes[i];
+		if (attr->kind != Ast_Attribute) continue;
+		auto *elems = &attr->Attribute.elems;
+		for (isize j = 0; j < elems->count; j++) {
+			Ast *elem = (*elems)[j];
+			String name = {};
+			Ast *value = nullptr;
+			switch (elem->kind) {
+			case_ast_node(i, Ident, elem);
+				name = i->token.string;
+			case_end;
+			case_ast_node(fv, FieldValue, elem);
+				GB_ASSERT(fv->field->kind == Ast_Ident);
+				name = fv->field->Ident.token.string;
+				value = fv->value;
+			case_end;
+			default:
+				continue;
+			}
+
+			if (name == "private") {
+				if (value != nullptr) {
+					error(value, "'%.*s' does not expect a value", LIT(name));
+				}
+
+				if (entity_is_private) {
+					error(elem, "Previous declaration of '%.*s'", LIT(name));
+				} else {
+					entity_is_private = true;
+				}
+				array_unordered_remove(elems, j);
+				j -= 1;
+			}
+		}
+	}
+
+	if (entity_is_private && !(c->scope->flags&ScopeFlag_File)) {
+		error(decl, "Attribute 'private' is not allowed on a non file scope entity");
+	}
+
+
 	if (vd->is_mutable) {
 		if (!(c->scope->flags&ScopeFlag_File)) {
 			// NOTE(bill): local scope -> handle later and in order
@@ -2043,6 +2093,10 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			}
 			Entity *e = alloc_entity_variable(c->scope, name->Ident.token, nullptr, false);
 			e->identifier = name;
+
+			if (entity_is_private) {
+				e->flags |= EntityFlag_NotExported;
+			}
 
 			if (vd->is_using) {
 				vd->is_using = false; // NOTE(bill): This error will be only caught once
@@ -2144,6 +2198,10 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				d->init_expr = init;
 			}
 			e->identifier = name;
+
+			if (entity_is_private) {
+				e->flags |= EntityFlag_NotExported;
+			}
 
 			if (vd->is_using) {
 				if (e->kind == Entity_TypeName && init->kind == Ast_EnumType) {

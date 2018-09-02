@@ -418,6 +418,10 @@ AST_KIND(_DeclEnd,   "", bool) \
 		Ast *list; \
 	}) \
 AST_KIND(_TypeBegin, "", bool) \
+	AST_KIND(TypeidType, "typeid", struct { \
+		Token token; \
+		Ast *specialization; \
+	}) \
 	AST_KIND(TypeType, "type", struct { \
 		Token token; \
 		Ast *specialization; \

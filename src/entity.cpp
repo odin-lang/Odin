@@ -47,6 +47,7 @@ enum EntityFlag {
 	EntityFlag_PolyConst     = 1<<13,
 	EntityFlag_NotExported   = 1<<14,
 
+
 	EntityFlag_CVarArg       = 1<<20,
 	EntityFlag_AutoCast      = 1<<21,
 };
@@ -113,9 +114,6 @@ struct Entity {
 			String     link_prefix;
 			bool       is_foreign;
 			bool       is_export;
-
-			// bool       default_is_nil;
-			// bool       default_is_location;
 			bool       is_immutable;
 		} Variable;
 		struct {

@@ -78,6 +78,7 @@ Token ast_token(Ast *node) {
 		return ast_token(node->UnionField.name);
 
 	case Ast_TypeType:         return node->TypeType.token;
+	case Ast_TypeidType:       return node->TypeidType.token;
 	case Ast_HelperType:       return node->HelperType.token;
 	case Ast_DistinctType:     return node->DistinctType.token;
 	case Ast_PolyType:         return node->PolyType.token;
@@ -307,6 +308,9 @@ Ast *clone_ast(Ast *node) {
 		n->UnionField.list = clone_ast(n->UnionField.list);
 		break;
 
+	case Ast_TypeidType:
+		n->TypeidType.specialization = clone_ast(n->TypeidType.specialization);
+		break;
 	case Ast_TypeType:
 		n->TypeType.specialization = clone_ast(n->TypeType.specialization);
 		break;
@@ -409,7 +413,7 @@ void syntax_error(Ast *node, char *fmt, ...) {
 
 bool ast_node_expect(Ast *node, AstKind kind) {
 	if (node->kind != kind) {
-		syntax_error(node, "Expected %.*s, got %.*s", LIT(ast_strings[node->kind]));
+		error(node, "Expected %.*s, got %.*s", LIT(ast_strings[kind]), LIT(ast_strings[node->kind]));
 		return false;
 	}
 	return true;
@@ -823,6 +827,13 @@ Ast *ast_union_field(AstFile *f, Ast *name, Ast *list) {
 	return result;
 }
 
+
+Ast *ast_typeid_type(AstFile *f, Token token, Ast *specialization) {
+	Ast *result = alloc_ast_node(f, Ast_TypeidType);
+	result->TypeidType.token = token;
+	result->TypeidType.specialization = specialization;
+	return result;
+}
 
 Ast *ast_type_type(AstFile *f, Token token, Ast *specialization) {
 	Ast *result = alloc_ast_node(f, Ast_TypeType);
@@ -1354,10 +1365,14 @@ Ast *        parse_block_stmt(AstFile *f, b32 is_when);
 
 
 
-Ast *parse_ident(AstFile *f) {
+Ast *parse_ident(AstFile *f, bool allow_poly_names=false) {
 	Token token = f->curr_token;
 	if (token.kind == Token_Ident) {
 		advance_token(f);
+	} else if (allow_poly_names && token.kind == Token_Dollar) {
+		Token dollar = token;
+		Ast *name = ast_ident(f, expect_token(f, Token_Ident));
+		return ast_poly_type(f, dollar, name, nullptr);
 	} else {
 		token.string = str_lit("_");
 		expect_token(f, Token_Ident);
@@ -1750,6 +1765,15 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			specialization = parse_type(f);
 		}
 		return ast_poly_type(f, token, type, specialization);
+	} break;
+
+	case Token_typeid: {
+		Token token = expect_token(f, Token_typeid);
+		// Ast *specialization = nullptr;
+		// if (allow_token(f, Token_Quo)) {
+		// 	specialization = parse_type(f);
+		// }
+		return ast_typeid_type(f, token, nullptr);
 	} break;
 
 	case Token_type_of: {
@@ -2324,11 +2348,11 @@ Array<Ast *> parse_rhs_expr_list(AstFile *f) {
 	return parse_expr_list(f, false);
 }
 
-Array<Ast *> parse_ident_list(AstFile *f) {
+Array<Ast *> parse_ident_list(AstFile *f, bool allow_poly_names) {
 	auto list = array_make<Ast *>(heap_allocator());
 
 	for (;;) {
-		array_add(&list, parse_ident(f));
+		array_add(&list, parse_ident(f, allow_poly_names));
 		if (f->curr_token.kind != Token_Comma ||
 		    f->curr_token.kind == Token_EOF) {
 		    break;
@@ -2660,12 +2684,18 @@ Ast *parse_proc_type(AstFile *f, Token proc_token) {
 		    if (field->type->kind == Ast_TypeType ||
 		        field->type->kind == Ast_PolyType) {
 				is_generic = true;
-				break;
+				goto end;
+			}
+			for_array(j, field->names) {
+				Ast *name = field->names[j];
+				if (name->kind == Ast_PolyType) {
+					is_generic = true;
+					goto end;
+				}
 			}
 		}
 	}
-
-
+end:
 	return ast_proc_type(f, proc_token, params, results, tags, cc, is_generic);
 }
 
@@ -2805,7 +2835,7 @@ struct AstAndFlags {
 	u32      flags;
 };
 
-Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> list, bool ignore_flags) {
+Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> list, bool ignore_flags, bool allow_poly_names) {
 	auto idents = array_make<Ast *>(heap_allocator(), 0, list.count);
 	// Convert to ident list
 	for_array(i, list) {
@@ -2821,6 +2851,20 @@ Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> list, bool ign
 		case Ast_Ident:
 		case Ast_BadExpr:
 			break;
+
+		case Ast_PolyType:
+			if (allow_poly_names) {
+				if (ident->PolyType.specialization == nullptr) {
+					syntax_error(ident, "Polymorphic identifiers are not yet supported");
+					break;
+				} else {
+					syntax_error(ident, "Expected a polymorphic identifier without any specialization");
+				}
+			} else {
+				syntax_error(ident, "Expected a non-polymorphic identifier");
+			}
+			/*fallthrough*/
+
 		default:
 			syntax_error(ident, "Expected an identifier");
 			ident = ast_ident(f, blank_token);
@@ -2891,6 +2935,8 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 	auto list = array_make<AstAndFlags>(heap_allocator());
 	defer (array_free(&list));
 
+	bool allow_poly_names = allow_type_token;
+
 	isize total_name_count = 0;
 	bool allow_ellipsis = allowed_flags&FieldFlag_ellipsis;
 	bool seen_ellipsis = false;
@@ -2915,7 +2961,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 
 
 	if (f->curr_token.kind == Token_Colon) {
-		Array<Ast *> names = convert_to_ident_list(f, list, true); // Copy for semantic reasons
+		Array<Ast *> names = convert_to_ident_list(f, list, true, allow_poly_names); // Copy for semantic reasons
 		if (names.count == 0) {
 			syntax_error(f->curr_token, "Empty field declaration");
 		}
@@ -2971,7 +3017,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 			CommentGroup *docs = f->lead_comment;
 
 			u32 set_flags = parse_field_prefixes(f);
-			Array<Ast *> names = parse_ident_list(f);
+			Array<Ast *> names = parse_ident_list(f, allow_poly_names);
 			if (names.count == 0) {
 				syntax_error(f->curr_token, "Empty field declaration");
 				break;
