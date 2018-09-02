@@ -64,7 +64,7 @@ delete_slice :: proc(array: $T/[]$E, allocator := context.allocator, loc := #cal
 }
 delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
 	raw := transmute(Raw_Map)m;
-	delete_dynamic_array(raw.hashes, loc);
+	delete_slice(raw.hashes);
 	free(raw.entries.data, raw.entries.allocator, loc);
 }
 
