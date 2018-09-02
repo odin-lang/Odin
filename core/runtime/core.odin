@@ -780,8 +780,6 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 	if m.entries.allocator.procedure != nil {
 		c.allocator = m.entries.allocator;
 	}
-	__print_u64(os.stdout, u64(uintptr(c.allocator.data))); os.write_byte(os.stdout, '\n');
-	__print_u64(os.stdout, u64(uintptr(m.entries.allocator.data))); os.write_byte(os.stdout, '\n');
 	context = c;
 
 	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len, loc);
