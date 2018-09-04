@@ -1370,7 +1370,7 @@ Ast *parse_ident(AstFile *f, bool allow_poly_names=false) {
 	if (token.kind == Token_Ident) {
 		advance_token(f);
 	} else if (allow_poly_names && token.kind == Token_Dollar) {
-		Token dollar = token;
+		Token dollar = expect_token(f, Token_Dollar);
 		Ast *name = ast_ident(f, expect_token(f, Token_Ident));
 		return ast_poly_type(f, dollar, name, nullptr);
 	} else {
