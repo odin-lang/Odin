@@ -519,6 +519,36 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 	}
 }
 
+void ir_print_debug_encoding(irFileBuffer *f, irDebugInfoKind kind, irDebugEncoding encoding) {
+	switch (kind) {
+	case irDebugInfo_BasicType:
+		switch (encoding) {
+		case irDebugBasicEncoding_address:       ir_write_str_lit(f, "DW_ATE_address");       return;
+		case irDebugBasicEncoding_boolean:       ir_write_str_lit(f, "DW_ATE_boolean");       return;
+		case irDebugBasicEncoding_float:         ir_write_str_lit(f, "DW_ATE_float");         return;
+		case irDebugBasicEncoding_signed:        ir_write_str_lit(f, "DW_ATE_signed");        return;
+		case irDebugBasicEncoding_signed_char:   ir_write_str_lit(f, "DW_ATE_signed_char");   return;
+		case irDebugBasicEncoding_unsigned:      ir_write_str_lit(f, "DW_ATE_unsigned");      return;
+		case irDebugBasicEncoding_unsigned_char: ir_write_str_lit(f, "DW_ATE_unsigned_char"); return;
+		}
+	case irDebugInfo_DerivedType:
+		switch (encoding) {
+		case irDebugBasicEncoding_member:       ir_write_str_lit(f, "DW_TAG_member");       return;
+		case irDebugBasicEncoding_pointer_type: ir_write_str_lit(f, "DW_TAG_pointer_type"); return;
+		case irDebugBasicEncoding_typedef:      ir_write_str_lit(f, "DW_TAG_typedef");      return;
+		}
+	case irDebugInfo_CompositeType:
+		switch (encoding) {
+		case irDebugBasicEncoding_array_type:       ir_write_str_lit(f, "DW_TAG_array_type");       return;
+		case irDebugBasicEncoding_enumeration_type: ir_write_str_lit(f, "DW_TAG_enumeration_type"); return;
+		case irDebugBasicEncoding_structure_type:   ir_write_str_lit(f, "DW_TAG_structure_type");   return;
+		case irDebugBasicEncoding_union_type:       ir_write_str_lit(f, "DW_TAG_union_type");       return;
+		}
+	}
+
+	GB_PANIC("Unreachable");
+}
+
 void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *type);
 
 void ir_print_compound_element(irFileBuffer *f, irModule *m, ExactValue v, Type *elem_type) {
@@ -1518,16 +1548,17 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		String name = e->token.string;
 		TokenPos pos = e->token.pos;
 
+		irDebugInfo **lookup_di = map_get(&m->debug_info, hash_entity(e));
+		GB_ASSERT_NOT_NULL(*lookup_di);
+		irDebugInfo* local_var_di = *lookup_di;
+		
 		ir_write_str_lit(f, "call void @llvm.dbg.declare(");
 		ir_write_str_lit(f, "metadata ");
 		ir_print_type(f, m, vt);
 		ir_write_byte(f, ' ');
 		ir_print_value(f, m, dd->value, vt);
-		ir_write_str_lit(f, ", metadata !DILocalVariable(name: \"");
-		ir_print_escape_string(f, name, false, false);
-		ir_fprintf(f, "\", scope: !%d, line: %td)", di->id, pos.line);
-		ir_write_str_lit(f, ", metadata !DIExpression()");
-		ir_write_byte(f, ')');
+		ir_fprintf(f, ", metadata !%d", local_var_di->id);
+		ir_write_str_lit(f, ", metadata !DIExpression())"); 
 		ir_fprintf(f, ", !dbg !DILocation(line: %td, column: %td, scope: !%d)", pos.line, pos.column, di->id);
 		break;
 	}
@@ -1764,7 +1795,7 @@ void print_llvm_ir(irGen *ir) {
 	ir_print_type(f, m, t_typeid);
 	ir_write_str_lit(f, "} ; Basic_any\n");
 
-	ir_write_str_lit(f, "declare void @llvm.dbg.declare(metadata, metadata, metadata) nounwind readnone \n");
+	ir_write_str_lit(f, "declare void @llvm.dbg.declare(metadata, metadata, metadata) #3 \n");
 	ir_write_byte(f, '\n');
 
 
@@ -1875,9 +1906,11 @@ void print_llvm_ir(irGen *ir) {
 		ir_write_byte(f, '\n');
 	}
 
+	// TODO(lachsinc): Attribute map inside ir module?
 	ir_fprintf(f, "attributes #0 = {nounwind uwtable}\n");
 	ir_fprintf(f, "attributes #1 = {nounwind alwaysinline uwtable}\n");
 	ir_fprintf(f, "attributes #2 = {nounwind noinline optnone uwtable}\n");
+	ir_fprintf(f, "attributes #3 = {nounwind readnone}\n");
 
 	if (m->generate_debug_info) {
 		ir_write_byte(f, '\n');
@@ -1909,7 +1942,7 @@ void print_llvm_ir(irGen *ir) {
 				              "language: DW_LANG_C_plus_plus" // Is this good enough?
 				            ", file: !%d"
 				            ", producer: \"Odin %.*s\""
-				            ", flags: \"\""
+				            // ", flags: \"\"" // TODO(lachsinc): Removed for now, check if correct
 				            ", runtimeVersion: 0"
 				            ", isOptimized: false"
 				            ", emissionKind: FullDebug"
@@ -1938,13 +1971,104 @@ void print_llvm_ir(irGen *ir) {
 				            ", flags: DIFlagPrototyped"
 				            ", isOptimized: false"
 				            ", unit: !%d"
-				            ")",
+				            ", type: !DISubroutineType(types: !{",
 				            LIT(di->Proc.entity->token.string),
 				            LIT(di->Proc.name),
-				            di->Proc.file->id, di->Proc.pos.line,
+				            di->Proc.file->id,
+				            di->Proc.pos.line,
 				            m->debug_compile_unit->id);
+				if (di->Proc.return_types.count == 0) {
+					ir_fprintf(f, "null})");
+				} else {
+					for_array(return_type_index, di->Proc.return_types) {
+						ir_fprintf(f, "%s!%d",
+						           return_type_index > 0 ? ", " : "",
+						           di->Proc.return_types[return_type_index]->id);
+					}
+					ir_write_str_lit(f, "})");
+				}
+				ir_write_byte(f, ')');
 				break;
-
+			case irDebugInfo_LocalVariable: {
+				ir_fprintf(f, "!DILocalVariable("
+				              "name: \"%.*s\""
+				            ", scope: !%d"
+				            ", file: !%d"
+				            ", line: %d"
+				            ", type: !%d",
+				            LIT(di->LocalVariable.name),
+				            di->LocalVariable.scope->id,
+				            di->LocalVariable.file->id,
+				            di->LocalVariable.pos.line,
+				            di->LocalVariable.type->id);
+				if (di->LocalVariable.arg > 0) {
+					GB_ASSERT(false); // TODO(lachsinc): "Arg" debug info not implemented yet
+					ir_fprintf(f, ", arg: %d", di->LocalVariable.arg);
+				}
+				ir_write_byte(f, ')');
+				break;
+			}
+			case irDebugInfo_BasicType:
+				ir_fprintf(f, "!DIBasicType("
+				              "name: \"%.*s\""
+				            ", size: %d"
+				            ", encoding: ",
+				            LIT(di->BasicType.name),
+				            di->BasicType.size);
+				ir_print_debug_encoding(f, irDebugInfo_BasicType, di->BasicType.encoding);
+				ir_write_byte(f, ')');
+				break;
+			case irDebugInfo_DerivedType:
+				GB_ASSERT(di->DerivedType.base_type);
+				ir_fprintf(f, "!DIDerivedType("
+				              "name: \"%.*s\""
+				            ", baseType: !%d"
+				            ", size: %d"
+				            ", align: %d"
+				            ", tag: ",
+				            LIT(di->DerivedType.name),
+				            di->DerivedType.base_type->id,
+				            di->DerivedType.size,
+				            di->DerivedType.align);
+				ir_print_debug_encoding(f, irDebugInfo_DerivedType, di->DerivedType.tag);
+				if (di->DerivedType.offset > 0) {
+					ir_fprintf(f, ", offset: %d",
+					           di->DerivedType.offset);
+				}
+				ir_write_byte(f, ')');
+				break;
+			case irDebugInfo_CompositeType: {
+				ir_fprintf(f, "!DICompositeType("
+				              "name: \"%.*s\""
+				            ", scope: !%d"
+				            ", file: !%d"
+				            ", line: %td"
+				            ", size: %d"
+				            ", align: %d"
+				            ", tag: ",
+				            LIT(di->CompositeType.name),
+				            di->CompositeType.scope->id,
+				            di->CompositeType.file->id,
+				            di->CompositeType.pos.line,
+				            di->CompositeType.size,
+				            di->CompositeType.align);
+				ir_print_debug_encoding(f, irDebugInfo_CompositeType, di->CompositeType.tag);
+				if (di->CompositeType.base_type) {
+					GB_ASSERT(di->CompositeType.tag == irDebugBasicEncoding_enumeration_type);
+					ir_fprintf(f, ", baseType: !%d", di->CompositeType.base_type->id);
+				}
+				if (di->CompositeType.elements.count > 0) {
+					ir_write_str_lit(f, ", elements: !{");
+					for_array(element_index, di->CompositeType.elements) {
+						ir_fprintf(f, "%s!%d",
+						           element_index > 0 ? ", " : "",
+						           di->CompositeType.elements[element_index]->id);
+					}
+					ir_write_byte(f, '}');
+				}
+				ir_write_byte(f, ')');
+				break;
+			}
 			case irDebugInfo_AllProcs:
 				ir_fprintf(f, "!{");
 				for_array(proc_index, di->AllProcs.procs) {

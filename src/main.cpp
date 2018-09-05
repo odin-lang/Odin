@@ -661,6 +661,9 @@ void remove_temp_files(String output_base) {
 }
 
 i32 exec_llvm_opt(String output_base) {
+    // NOTE(lachsinc): See note below in exec_llvm_llc.
+	if (build_context.ODIN_DEBUG == true) return 0;
+
 #if defined(GB_SYSTEM_WINDOWS)
 	// For more passes arguments: http://llvm.org/docs/Passes.html
 	return system_exec_command_line_app("llvm-opt", false,
@@ -687,15 +690,21 @@ i32 exec_llvm_opt(String output_base) {
 }
 
 i32 exec_llvm_llc(String output_base) {
+	// NOTE(lachsinc): HACK!! opt.exe seems to strip away CodeView/PDB symbols regardless of
+	// To get around this we will use the non-optimized (.ll) version during debug build.
+	// There's probably better way to deal with this involving arguments or passing
+	// additional things (.ll file) into llc.
+
 #if defined(GB_SYSTEM_WINDOWS)
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	return system_exec_command_line_app("llvm-llc", false,
-		"\"%.*sbin\\llc\" \"%.*s.bc\" -filetype=obj -O%d "
+		"\"%.*sbin\\llc\" \"%.*s%s\" -filetype=obj -O%d "
 		"-o \"%.*s.obj\" "
 		"%.*s "
 		"",
 		LIT(build_context.ODIN_ROOT),
 		LIT(output_base),
+		build_context.ODIN_DEBUG ? ".ll" : ".bc",
 		build_context.optimization_level,
 		LIT(output_base),
 		LIT(build_context.llc_flags));
@@ -703,11 +712,12 @@ i32 exec_llvm_llc(String output_base) {
 	// NOTE(zangent): Linux / Unix is unfinished and not tested very well.
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	return system_exec_command_line_app("llc", false,
-		"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
+		"llc \"%.*s%s\" -filetype=obj -relocation-model=pic -O%d "
 		"%.*s "
 		"%s"
 		"",
 		LIT(output_base),
+		build_context.ODIN_DEBUG ? ".ll" : ".bc",
 		build_context.optimization_level,
 		LIT(build_context.llc_flags),
 		str_eq_ignore_case(cross_compile_target, str_lit("Essence")) ? "-mtriple=x86_64-pc-none-elf" : "");
