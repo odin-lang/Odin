@@ -1475,6 +1475,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		}
 		ir_write_str_lit(f, ")");
 
+		if (proc_type->Proc.no_return) {
+			ir_write_str_lit(f, " noreturn");
+		}
 		ir_print_debug_location(f, m, value, instr->block->proc);
 
 		break;
@@ -1622,6 +1625,10 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 		ir_write_str_lit(f, "noinline ");
 		ir_fprintf(f, "#2 ");
 		break;
+	}
+
+	if (proc_type->no_return) {
+		ir_write_str_lit(f, "noreturn ");
 	}
 
 	if (m->generate_debug_info && proc->entity != nullptr && proc->body != nullptr) {

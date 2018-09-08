@@ -1213,12 +1213,16 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		GB_ASSERT(proc_type->kind == Type_Proc);
 		// Type *proc_type = c->proc_stack[c->proc_stack.count-1];
 		TypeProc *pt = &proc_type->Proc;
+		if (pt->no_return) {
+			error(rs->token, "Diverging procedures may not return");
+			break;
+		}
+
 		isize result_count = 0;
 		bool has_named_results = pt->has_named_results;
 		if (pt->results) {
 			result_count = proc_type->Proc.results->Tuple.variables.count;
 		}
-
 
 		auto operands = array_make<Operand>(heap_allocator(), 0, 2*rs->results.count);
 		defer (array_free(&operands));

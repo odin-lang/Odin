@@ -299,7 +299,7 @@ foreign {
 	debug_trap :: proc() ---;
 
 	@(link_name="llvm.trap")
-	trap :: proc() ---;
+	trap :: proc() -> ! ---;
 
 	@(link_name="llvm.readcyclecounter")
 	read_cycle_counter :: proc() -> u64 ---;

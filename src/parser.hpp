@@ -446,6 +446,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		u64 tags;    \
 		ProcCallingConvention calling_convention; \
 		bool generic; \
+		bool no_return; \
 	}) \
 	AST_KIND(PointerType, "pointer type", struct { \
 		Token token; \
