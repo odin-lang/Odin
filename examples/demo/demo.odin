@@ -785,6 +785,15 @@ bit_set_type :: proc() {
 	}
 }
 
+diverging_procedures :: proc() {
+	// Diverging procedures may never return
+	foo :: proc() -> ! {
+		fmt.println("I'm a diverging procedure");
+	}
+
+	foo();
+}
+
 
 main :: proc() {
 	when true {
@@ -800,5 +809,6 @@ main :: proc() {
 		cstring_example();
 		deprecated_attribute();
 		bit_set_type();
+		diverging_procedures();
 	}
 }

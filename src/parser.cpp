@@ -866,7 +866,7 @@ Ast *ast_poly_type(AstFile *f, Token token, Ast *type, Ast *specialization) {
 }
 
 
-Ast *ast_proc_type(AstFile *f, Token token, Ast *params, Ast *results, u64 tags, ProcCallingConvention calling_convention, bool generic) {
+Ast *ast_proc_type(AstFile *f, Token token, Ast *params, Ast *results, u64 tags, ProcCallingConvention calling_convention, bool generic, bool no_return) {
 	Ast *result = alloc_ast_node(f, Ast_ProcType);
 	result->ProcType.token = token;
 	result->ProcType.params = params;
@@ -874,6 +874,7 @@ Ast *ast_proc_type(AstFile *f, Token token, Ast *params, Ast *results, u64 tags,
 	result->ProcType.tags = tags;
 	result->ProcType.calling_convention = calling_convention;
 	result->ProcType.generic = generic;
+	result->ProcType.no_return = no_return;
 	return result;
 }
 
@@ -2620,8 +2621,13 @@ Ast *parse_block_stmt(AstFile *f, b32 is_when) {
 
 
 
-Ast *parse_results(AstFile *f) {
+Ast *parse_results(AstFile *f, bool *no_return) {
 	if (!allow_token(f, Token_ArrowRight)) {
+		return nullptr;
+	}
+
+	if (allow_token(f, Token_Not)) {
+		if (no_return) *no_return = true;
 		return nullptr;
 	}
 
@@ -2661,6 +2667,7 @@ ProcCallingConvention string_to_calling_convention(String s) {
 Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	Ast *params = nullptr;
 	Ast *results = nullptr;
+	bool no_return = false;
 
 	ProcCallingConvention cc = ProcCC_Invalid;
 	if (f->curr_token.kind == Token_String) {
@@ -2684,7 +2691,7 @@ Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	expect_token(f, Token_OpenParen);
 	params = parse_field_list(f, nullptr, FieldFlag_Signature, Token_CloseParen, true, true);
 	expect_token_after(f, Token_CloseParen, "parameter list");
-	results = parse_results(f);
+	results = parse_results(f, &no_return);
 
 	u64 tags = 0;
 	parse_proc_tags(f, &tags);
@@ -2710,7 +2717,7 @@ Ast *parse_proc_type(AstFile *f, Token proc_token) {
 		}
 	}
 end:
-	return ast_proc_type(f, proc_token, params, results, tags, cc, is_generic);
+	return ast_proc_type(f, proc_token, params, results, tags, cc, is_generic, no_return);
 }
 
 Ast *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_type_token) {
