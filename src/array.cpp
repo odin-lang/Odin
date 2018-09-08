@@ -211,7 +211,7 @@ template <typename T>
 void array_ordered_remove(Array<T> *array, isize index) {
 	GB_ASSERT(0 <= index && index < array->count);
 
-	isize bytes = (gb_size_of(T)*n) * (array->count-(index+1));
+	isize bytes = gb_size_of(T) * (array->count-(index+1));
 	gb_memmove(array->data+index, array->data+index+1, bytes);
 	array->count -= 1;
 }
