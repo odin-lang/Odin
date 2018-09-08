@@ -471,6 +471,24 @@ parametric_polymorphism :: proc() {
 		// and let the user specify the hashing function or make the user store
 		// the hashing procedure with the table
 	}
+
+	{ // Parametric polymorphic union
+		Error :: enum {
+			Foo0,
+			Foo1,
+			Foo2,
+			Foo3,
+		}
+		Para_Union :: union(T: typeid) {T, Error};
+		r: Para_Union(int);
+		fmt.println(typeid_of(type_of(r)));
+
+		fmt.println(r);
+		r = 123;
+		fmt.println(r);
+		r = Error.Foo0;
+		fmt.println(r);
+	}
 }
 
 

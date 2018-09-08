@@ -241,13 +241,13 @@ bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_) {
 }
 
 
-Entity *find_polymorphic_struct_entity(CheckerContext *ctx, Type *original_type, isize param_count, Array<Operand> ordered_operands) {
+Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *original_type, isize param_count, Array<Operand> ordered_operands) {
 	auto *found_gen_types = map_get(&ctx->checker->info.gen_types, hash_pointer(original_type));
 	if (found_gen_types != nullptr) {
 		for_array(i, *found_gen_types) {
 			Entity *e = (*found_gen_types)[i];
 			Type *t = base_type(e->type);
-			TypeTuple *tuple = &t->Struct.polymorphic_params->Tuple;
+			TypeTuple *tuple = get_record_polymorphic_params(t);
 			bool ok = true;
 			GB_ASSERT(param_count == tuple->variables.count);
 			for (isize j = 0; j < param_count; j++) {
@@ -281,7 +281,7 @@ Entity *find_polymorphic_struct_entity(CheckerContext *ctx, Type *original_type,
 }
 
 
-void add_polymorphic_struct_entity(CheckerContext *ctx, Ast *node, Type *named_type, Type *original_type) {
+void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_type, Type *original_type) {
 	GB_ASSERT(is_type_named(named_type));
 	gbAllocator a = heap_allocator();
 	Scope *s = ctx->scope->parent;
@@ -472,7 +472,7 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 
 		if (original_type_for_poly != nullptr) {
 			GB_ASSERT(named_type != nullptr);
-			add_polymorphic_struct_entity(ctx, node, named_type, original_type_for_poly);
+			add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
 		}
 	}
 
@@ -517,7 +517,7 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 		}
 	}
 }
-void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node) {
+void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly) {
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
@@ -528,6 +528,170 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node) {
 	auto variants = array_make<Type *>(ctx->allocator, 0, variant_count);
 
 	union_type->Union.scope = ctx->scope;
+
+	Type *polymorphic_params     = nullptr;
+	bool is_polymorphic          = false;
+	bool can_check_fields        = true;
+	bool is_poly_specialized     = false;
+
+	if (ut->polymorphic_params != nullptr) {
+		ast_node(field_list, FieldList, ut->polymorphic_params);
+		Array<Ast *> params = field_list->list;
+		if (params.count != 0) {
+			isize variable_count = 0;
+			for_array(i, params) {
+				Ast *field = params[i];
+				if (ast_node_expect(field, Ast_Field)) {
+					ast_node(f, Field, field);
+					variable_count += gb_max(f->names.count, 1);
+				}
+			}
+
+			auto entities = array_make<Entity *>(ctx->allocator, 0, variable_count);
+
+			for_array(i, params) {
+				Ast *param = params[i];
+				if (param->kind != Ast_Field) {
+					continue;
+				}
+				ast_node(p, Field, param);
+				Ast *type_expr = p->type;
+				Type *type = nullptr;
+				bool is_type_param = false;
+				bool is_type_polymorphic_type = false;
+				if (type_expr == nullptr) {
+					error(param, "Expected a type for this parameter");
+					continue;
+				}
+				if (type_expr->kind == Ast_Ellipsis) {
+					type_expr = type_expr->Ellipsis.expr;
+					error(param, "A polymorphic parameter cannot be variadic");
+				}
+				if (type_expr->kind == Ast_TypeidType) {
+					is_type_param = true;
+					Type *specialization = nullptr;
+					if (type_expr->TypeidType.specialization != nullptr) {
+						Ast *s = type_expr->TypeidType.specialization;
+						specialization = check_type(ctx, s);
+					}
+					type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
+				} else if (type_expr->kind == Ast_TypeType) {
+					is_type_param = true;
+					Type *specialization = nullptr;
+					if (type_expr->TypeType.specialization != nullptr) {
+						Ast *s = type_expr->TypeType.specialization;
+						specialization = check_type(ctx, s);
+					}
+					type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
+				} else {
+					type = check_type(ctx, type_expr);
+					if (is_type_polymorphic(type)) {
+						is_type_polymorphic_type = true;
+					}
+				}
+
+				if (type == nullptr) {
+					error(params[i], "Invalid parameter type");
+					type = t_invalid;
+				}
+				if (is_type_untyped(type)) {
+					if (is_type_untyped_undef(type)) {
+						error(params[i], "Cannot determine parameter type from ---");
+					} else {
+						error(params[i], "Cannot determine parameter type from a nil");
+					}
+					type = t_invalid;
+				}
+
+				if (is_type_polymorphic_type) {
+					gbString str = type_to_string(type);
+					error(params[i], "Parameter types cannot be polymorphic, got %s", str);
+					gb_string_free(str);
+					type = t_invalid;
+				}
+
+				if (!is_type_param && !is_type_constant_type(type)) {
+					gbString str = type_to_string(type);
+					error(params[i], "A parameter must be a valid constant type, got %s", str);
+					gb_string_free(str);
+				}
+
+				Scope *scope = ctx->scope;
+				for_array(j, p->names) {
+					Ast *name = p->names[j];
+					if (!ast_node_expect(name, Ast_Ident)) {
+						continue;
+					}
+					Entity *e = nullptr;
+
+					Token token = name->Ident.token;
+
+					if (poly_operands != nullptr) {
+						Operand operand = (*poly_operands)[entities.count];
+						if (is_type_param) {
+							GB_ASSERT(operand.mode == Addressing_Type ||
+							          operand.mode == Addressing_Invalid);
+							if (is_type_polymorphic(base_type(operand.type))) {
+								is_polymorphic = true;
+								can_check_fields = false;
+							}
+							e = alloc_entity_type_name(scope, token, operand.type);
+							e->TypeName.is_type_alias = true;
+						} else {
+							GB_ASSERT(operand.mode == Addressing_Constant);
+							e = alloc_entity_constant(scope, token, operand.type, operand.value);
+						}
+					} else {
+						if (is_type_param) {
+							e = alloc_entity_type_name(scope, token, type);
+							e->TypeName.is_type_alias = true;
+						} else {
+							e = alloc_entity_constant(scope, token, type, empty_exact_value);
+						}
+					}
+
+					e->state = EntityState_Resolved;
+					add_entity(ctx->checker, scope, name, e);
+					array_add(&entities, e);
+				}
+			}
+
+			if (entities.count > 0) {
+				Type *tuple = alloc_type_tuple();
+				tuple->Tuple.variables = entities;
+				polymorphic_params = tuple;
+			}
+		}
+
+		if (original_type_for_poly != nullptr) {
+			GB_ASSERT(named_type != nullptr);
+			add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
+		}
+	}
+
+	if (!is_polymorphic) {
+		is_polymorphic = polymorphic_params != nullptr && poly_operands == nullptr;
+	}
+	if (poly_operands != nullptr) {
+		is_poly_specialized = true;
+		for (isize i = 0; i < poly_operands->count; i++) {
+			Operand o = (*poly_operands)[i];
+			if (is_type_polymorphic(o.type)) {
+				is_poly_specialized = false;
+				break;
+			}
+			if (union_type == o.type) {
+				// NOTE(bill): Cycle
+				is_poly_specialized = false;
+				break;
+			}
+		}
+	}
+
+	union_type->Union.scope                   = ctx->scope;
+	union_type->Union.polymorphic_params      = polymorphic_params;
+	union_type->Union.is_polymorphic          = is_polymorphic;
+	union_type->Union.is_poly_specialized     = is_poly_specialized;
 
 	for_array(i, ut->variants) {
 		Ast *node = ut->variants[i];
@@ -2021,7 +2185,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 			*type = o.type;
 			if (!ctx->in_polymorphic_specialization) {
 				Type *t = base_type(o.type);
-				if (t != nullptr && is_type_polymorphic_struct_unspecialized(t)) {
+				if (t != nullptr && is_type_polymorphic_record_unspecialized(t)) {
 					err_str = expr_to_string(e);
 					error(e, "Invalid use of a non-specialized polymorphic type '%s'", err_str);
 					return true;
@@ -2209,7 +2373,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 		*type = alloc_type_union();
 		set_base_type(named_type, *type);
 		check_open_scope(&c, e);
-		check_union_type(&c, *type, e);
+		check_union_type(&c, *type, e, nullptr, named_type);
 		check_close_scope(&c);
 		(*type)->Union.node = e;
 		return true;
