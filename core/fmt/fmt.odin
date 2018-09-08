@@ -353,7 +353,13 @@ write_type :: proc(buf: ^String_Buffer, ti: ^runtime.Type_Info) {
 		write_byte(buf, '}');
 
 	case runtime.Type_Info_Union:
-		write_string(buf, "union {");
+		write_string(buf, "union ");
+		if info.custom_align {
+			write_string(buf, "#align ");
+			write_i64(buf, i64(ti.align), 10);
+			write_byte(buf, ' ');
+		}
+		write_byte(buf, '{');
 		for variant, i in info.variants {
 			if i > 0 do write_string(buf, ", ");
 			write_type(buf, variant);

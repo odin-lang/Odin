@@ -341,6 +341,7 @@ Ast *clone_ast(Ast *node) {
 		break;
 	case Ast_UnionType:
 		n->UnionType.variants = clone_ast_array(n->UnionType.variants);
+		n->UnionType.polymorphic_params = clone_ast(n->UnionType.polymorphic_params);
 		break;
 	case Ast_EnumType:
 		n->EnumType.base_type = clone_ast(n->EnumType.base_type);
@@ -900,8 +901,8 @@ Ast *ast_dynamic_array_type(AstFile *f, Token token, Ast *elem) {
 }
 
 Ast *ast_struct_type(AstFile *f, Token token, Array<Ast *> fields, isize field_count,
-                         Ast *polymorphic_params, bool is_packed, bool is_raw_union,
-                         Ast *align) {
+                     Ast *polymorphic_params, bool is_packed, bool is_raw_union,
+                     Ast *align) {
 	Ast *result = alloc_ast_node(f, Ast_StructType);
 	result->StructType.token              = token;
 	result->StructType.fields             = fields;
@@ -914,11 +915,12 @@ Ast *ast_struct_type(AstFile *f, Token token, Array<Ast *> fields, isize field_c
 }
 
 
-Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> variants, Ast *align) {
+Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> variants, Ast *polymorphic_params, Ast *align) {
 	Ast *result = alloc_ast_node(f, Ast_UnionType);
-	result->UnionType.token        = token;
-	result->UnionType.variants     = variants;
-	result->UnionType.align = align;
+	result->UnionType.token              = token;
+	result->UnionType.variants           = variants;
+	result->UnionType.polymorphic_params = polymorphic_params;
+	result->UnionType.align              = align;
 	return result;
 }
 
@@ -1827,8 +1829,8 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 	case Token_struct: {
 		Token    token = expect_token(f, Token_struct);
 		Ast *polymorphic_params = nullptr;
-		bool     is_packed          = false;
-		bool     is_raw_union       = false;
+		bool is_packed          = false;
+		bool is_raw_union       = false;
 		Ast *align              = nullptr;
 
 		if (allow_token(f, Token_OpenParen)) {
@@ -1890,12 +1892,22 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_union: {
 		Token token = expect_token(f, Token_union);
-		Token open = expect_token_after(f, Token_OpenBrace, "union");
 		auto variants = array_make<Ast *>(heap_allocator());
+		Ast *polymorphic_params = nullptr;
 		Ast *align = nullptr;
 
 		CommentGroup *docs = f->lead_comment;
 		Token start_token = f->curr_token;
+
+		if (allow_token(f, Token_OpenParen)) {
+			isize param_count = 0;
+			polymorphic_params = parse_field_list(f, &param_count, 0, Token_CloseParen, false, true);
+			if (param_count == 0) {
+				syntax_error(polymorphic_params, "Expected at least 1 polymorphic parametric");
+				polymorphic_params = nullptr;
+			}
+			expect_token_after(f, Token_CloseParen, "parameter list");
+		}
 
 		while (allow_token(f, Token_Hash)) {
 			Token tag = expect_token_after(f, Token_Ident, "#");
@@ -1909,6 +1921,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			}
 		}
 
+		Token open = expect_token_after(f, Token_OpenBrace, "union");
 
 		while (f->curr_token.kind != Token_CloseBrace &&
 		       f->curr_token.kind != Token_EOF) {
@@ -1923,7 +1936,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		Token close = expect_token(f, Token_CloseBrace);
 
-		return ast_union_type(f, token, variants, align);
+		return ast_union_type(f, token, variants, polymorphic_params, align);
 	} break;
 
 	case Token_enum: {

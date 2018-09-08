@@ -470,9 +470,10 @@ AST_KIND(_TypeBegin, "", bool) \
 		bool is_raw_union;        \
 	}) \
 	AST_KIND(UnionType, "union type", struct { \
-		Token        token;    \
-		Array<Ast *> variants; \
-		Ast *        align;    \
+		Token        token;      \
+		Array<Ast *> variants;   \
+		Ast *polymorphic_params; \
+		Ast *        align;      \
 	}) \
 	AST_KIND(EnumType, "enum type", struct { \
 		Token        token; \

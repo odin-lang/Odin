@@ -60,7 +60,7 @@ Type *   make_optional_ok_type          (Type *value);
 void     check_type_decl                (CheckerContext *c, Entity *e, Ast *type_expr, Type *def);
 Entity * check_selector                 (CheckerContext *c, Operand *operand, Ast *node, Type *type_hint);
 Entity * check_ident                    (CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name);
-Entity * find_polymorphic_struct_entity (CheckerContext *c, Type *original_type, isize param_count, Array<Operand> ordered_operands);
+Entity * find_polymorphic_record_entity (CheckerContext *c, Type *original_type, isize param_count, Array<Operand> ordered_operands);
 void     check_not_tuple                (CheckerContext *c, Operand *operand);
 void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type);
 gbString expr_to_string                 (Ast *expression);
@@ -77,6 +77,9 @@ bool     check_representable_as_constant(CheckerContext *c, ExactValue in_value,
 bool     check_procedure_type           (CheckerContext *c, Type *type, Ast *proc_type_node, Array<Operand> *operands = nullptr);
 void     check_struct_type              (CheckerContext *c, Type *struct_type, Ast *node, Array<Operand> *poly_operands,
                                          Type *named_type = nullptr, Type *original_type_for_poly = nullptr);
+void     check_union_type               (CheckerContext *c, Type *union_type, Ast *node, Array<Operand> *poly_operands,
+                                         Type *named_type = nullptr, Type *original_type_for_poly = nullptr);
+
 CallArgumentData check_call_arguments   (CheckerContext *c, Operand *operand, Type *proc_type, Ast *call);
 Type *           check_init_variable    (CheckerContext *c, Entity *e, Operand *operand, String context_name);
 
@@ -4562,10 +4565,15 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 }
 
 
-isize lookup_polymorphic_struct_parameter(TypeStruct *st, String parameter_name) {
-	if (!st->is_polymorphic) return -1;
+isize lookup_polymorphic_record_parameter(Type *t, String parameter_name) {
+	if (!is_type_polymorphic_record(t)) {
+		return -1;
+	}
 
-	TypeTuple *params = &st->polymorphic_params->Tuple;
+	TypeTuple *params = get_record_polymorphic_params(t);
+	if (params == nullptr) {
+		return -1;
+	}
 	for_array(i, params->variables) {
 		Entity *e = params->variables[i];
 		String name = e->token.string;
@@ -4580,14 +4588,12 @@ isize lookup_polymorphic_struct_parameter(TypeStruct *st, String parameter_name)
 }
 
 
-CallArgumentError check_polymorphic_struct_type(CheckerContext *c, Operand *operand, Ast *call) {
+CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *operand, Ast *call) {
 	ast_node(ce, CallExpr, call);
 
 	Type *original_type = operand->type;
 	Type *struct_type = base_type(operand->type);
-	GB_ASSERT(struct_type->kind == Type_Struct);
-	TypeStruct *st = &struct_type->Struct;
-	GB_ASSERT(st->is_polymorphic);
+	GB_ASSERT(is_type_polymorphic_record(original_type));
 
 	bool show_error = true;
 
@@ -4617,7 +4623,7 @@ CallArgumentError check_polymorphic_struct_type(CheckerContext *c, Operand *oper
 
 	CallArgumentError err = CallArgumentError_None;
 
-	TypeTuple *tuple = &st->polymorphic_params->Tuple;
+	TypeTuple *tuple = get_record_polymorphic_params(original_type);
 	isize param_count = tuple->variables.count;
 
 	Array<Operand> ordered_operands = operands;
@@ -4640,7 +4646,7 @@ CallArgumentError check_polymorphic_struct_type(CheckerContext *c, Operand *oper
 				continue;
 			}
 			String name = fv->field->Ident.token.string;
-			isize index = lookup_polymorphic_struct_parameter(st, name);
+			isize index = lookup_polymorphic_record_parameter(original_type, name);
 			if (index < 0) {
 				if (show_error) {
 					error(arg, "No parameter named '%.*s' for this polymorphic type", LIT(name));
@@ -4740,10 +4746,9 @@ CallArgumentError check_polymorphic_struct_type(CheckerContext *c, Operand *oper
 	}
 
 	{
-		// TODO(bill): Check for previous types
 		gbAllocator a = c->allocator;
 
-		Entity *found_entity = find_polymorphic_struct_entity(c, original_type, param_count, ordered_operands);
+		Entity *found_entity = find_polymorphic_record_entity(c, original_type, param_count, ordered_operands);
 		if (found_entity) {
 			operand->mode = Addressing_Type;
 			operand->type = found_entity->type;
@@ -4753,21 +4758,38 @@ CallArgumentError check_polymorphic_struct_type(CheckerContext *c, Operand *oper
 		String generated_name = make_string_c(expr_to_string(call));
 
 		Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
-		Ast *node = clone_ast(st->node);
-		Type *struct_type = alloc_type_struct();
-		struct_type->Struct.node = node;
-		struct_type->Struct.polymorphic_parent = original_type;
-		set_base_type(named_type, struct_type);
+		Type *bt = base_type(original_type);
+		if (bt->kind == Type_Struct) {
+			Ast *node = clone_ast(bt->Struct.node);
+			Type *struct_type = alloc_type_struct();
+			struct_type->Struct.node = node;
+			struct_type->Struct.polymorphic_parent = original_type;
+			set_base_type(named_type, struct_type);
 
-		check_open_scope(c, node);
-		check_struct_type(c, struct_type, node, &ordered_operands, named_type, original_type);
-		check_close_scope(c);
+			check_open_scope(c, node);
+			check_struct_type(c, struct_type, node, &ordered_operands, named_type, original_type);
+			check_close_scope(c);
+		} else if (bt->kind == Type_Union) {
+			Ast *node = clone_ast(bt->Union.node);
+			Type *union_type = alloc_type_union();
+			union_type->Union.node = node;
+			union_type->Union.polymorphic_parent = original_type;
+			set_base_type(named_type, union_type);
+
+			check_open_scope(c, node);
+			check_union_type(c, union_type, node, &ordered_operands, named_type, original_type);
+			check_close_scope(c);
+		} else {
+			GB_PANIC("Unsupported parametric polymorphic record type");
+		}
 
 		operand->mode = Addressing_Type;
 		operand->type = named_type;
 	}
 	return err;
 }
+
+
 
 
 ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call) {
@@ -4828,8 +4850,8 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call) {
 
 	if (operand->mode == Addressing_Type) {
 		Type *t = operand->type;
-		if (is_type_polymorphic_struct(t)) {
-			auto err = check_polymorphic_struct_type(c, operand, call);
+		if (is_type_polymorphic_record(t)) {
+			auto err = check_polymorphic_record_type(c, operand, call);
 			if (err == 0) {
 				Ast *ident = operand->expr;
 				while (ident->kind == Ast_SelectorExpr) {

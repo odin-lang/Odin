@@ -99,6 +99,20 @@ struct TypeStruct {
 	Entity * names;
 };
 
+struct TypeUnion {
+	Array<Type *> variants;
+	Ast *         node;
+	Scope *       scope;
+	i64           variant_block_size;
+	i64           custom_align;
+	i64           tag_size;
+
+	bool       is_polymorphic;
+	bool       is_poly_specialized;
+	Type *     polymorphic_params; // Type_Tuple
+	Type *     polymorphic_parent;
+};
+
 #define TYPE_KINDS                                        \
 	TYPE_KIND(Basic, BasicType)                           \
 	TYPE_KIND(Named, struct {                             \
@@ -129,20 +143,13 @@ struct TypeStruct {
 		Type *lookup_result_type;                         \
 	})                                                    \
 	TYPE_KIND(Struct,  TypeStruct)                        \
+	TYPE_KIND(Union,   TypeUnion)                         \
 	TYPE_KIND(Enum, struct {                              \
 		Array<Entity *> fields;                           \
 		Ast *node;                                        \
 		Scope *  scope;                                   \
 		Entity * names;                                   \
 		Type *   base_type;                               \
-	})                                                    \
-	TYPE_KIND(Union, struct {                             \
-		Array<Type *> variants;                           \
-		Ast *node;                                    \
-		Scope *  scope;                                   \
-		i64      variant_block_size;                      \
-		i64      custom_align;                            \
-		i64      tag_size;                                \
 	})                                                    \
 	TYPE_KIND(Tuple, struct {                             \
 		Array<Entity *> variables; /* Entity_Variable */  \
@@ -1026,28 +1033,51 @@ bool is_type_indexable(Type *t) {
 	return false;
 }
 
-bool is_type_polymorphic_struct(Type *t) {
+bool is_type_polymorphic_record(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
 		return t->Struct.is_polymorphic;
+	} else if (t->kind == Type_Union) {
+		return t->Union.is_polymorphic;
 	}
 	return false;
 }
 
-bool is_type_polymorphic_struct_specialized(Type *t) {
+bool is_type_polymorphic_record_specialized(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
 		return t->Struct.is_polymorphic && t->Struct.is_poly_specialized;
+	} else if (t->kind == Type_Union) {
+		return t->Union.is_polymorphic && t->Union.is_poly_specialized;
 	}
 	return false;
 }
 
-bool is_type_polymorphic_struct_unspecialized(Type *t) {
+bool is_type_polymorphic_record_unspecialized(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
 		return t->Struct.is_polymorphic && !t->Struct.is_poly_specialized;
+	} else if (t->kind == Type_Struct) {
+		return t->Struct.is_polymorphic && !t->Struct.is_poly_specialized;
 	}
 	return false;
+}
+
+TypeTuple *get_record_polymorphic_params(Type *t) {
+	t = base_type(t);
+	switch (t->kind) {
+	case Type_Struct:
+		if (t->Struct.polymorphic_params) {
+			return &t->Struct.polymorphic_params->Tuple;
+		}
+		break;
+	case Type_Union:
+		if (t->Union.polymorphic_params) {
+			return &t->Union.polymorphic_params->Tuple;
+		}
+		break;
+	}
+	return nullptr;
 }
 
 
@@ -1057,7 +1087,7 @@ bool is_type_polymorphic(Type *t) {
 		return true;
 
 	case Type_Named:
-		return is_type_polymorphic_struct(t->Named.base);
+		return is_type_polymorphic_record(t->Named.base);
 
 	case Type_Pointer:
 		return is_type_polymorphic(t->Pointer.elem);
