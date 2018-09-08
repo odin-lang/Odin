@@ -583,7 +583,7 @@ assert :: proc "contextless" (condition: bool, message := "", loc := #caller_loc
 }
 
 @(builtin)
-panic :: proc "contextless" (message: string, loc := #caller_location) {
+panic :: proc "contextless" (message: string, loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc;
 	if p == nil {
 		p = default_assertion_failure_proc;
