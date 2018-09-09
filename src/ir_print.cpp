@@ -1475,7 +1475,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		}
 		ir_write_str_lit(f, ")");
 
-		if (proc_type->Proc.no_return) {
+		if (proc_type->Proc.diverging) {
 			ir_write_str_lit(f, " noreturn");
 		}
 		ir_print_debug_location(f, m, value, instr->block->proc);
@@ -1627,7 +1627,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 		break;
 	}
 
-	if (proc_type->no_return) {
+	if (proc_type->diverging) {
 		ir_write_str_lit(f, "noreturn ");
 	}
 

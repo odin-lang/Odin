@@ -1951,7 +1951,7 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	type->Proc.calling_convention   = cc;
 	type->Proc.is_polymorphic       = pt->generic;
 	type->Proc.specialization_count = specialization_count;
-	type->Proc.no_return            = pt->no_return;
+	type->Proc.diverging            = pt->diverging;
 
 	if (param_count > 0) {
 		Entity *end = params->Tuple.variables[param_count-1];

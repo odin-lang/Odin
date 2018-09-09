@@ -157,7 +157,7 @@ struct TypeUnion {
 		bool            are_offsets_set;                  \
 	})                                                    \
 	TYPE_KIND(Proc, struct {                              \
-		Ast *node;                                    \
+		Ast *node;                                        \
 		Scope *  scope;                                   \
 		Type *   params;  /* Type_Tuple */                \
 		Type *   results; /* Type_Tuple */                \
@@ -174,7 +174,7 @@ struct TypeUnion {
 		bool     is_poly_specialized;                     \
 		bool     has_proc_default_values;                 \
 		bool     has_named_results;                       \
-		bool     no_return;                               \
+		bool     diverging; /* no return */               \
 		isize    specialization_count;                    \
 		ProcCallingConvention calling_convention;         \
 	})                                                    \
@@ -1405,8 +1405,9 @@ bool are_types_identical(Type *x, Type *y) {
 	case Type_Proc:
 		if (y->kind == Type_Proc) {
 			return x->Proc.calling_convention == y->Proc.calling_convention &&
-			       x->Proc.c_vararg == y->Proc.c_vararg &&
-			       x->Proc.variadic == y->Proc.variadic &&
+			       x->Proc.c_vararg  == y->Proc.c_vararg  &&
+			       x->Proc.variadic  == y->Proc.variadic  &&
+			       x->Proc.diverging == y->Proc.diverging &&
 			       are_types_identical(x->Proc.params, y->Proc.params) &&
 			       are_types_identical(x->Proc.results, y->Proc.results);
 		}
