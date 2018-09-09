@@ -3344,7 +3344,7 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
-	TIME_SECTION("check for type cycles");
+	TIME_SECTION("check for type cycles and inline cycles");
 	// NOTE(bill): Check for illegal cyclic type declarations
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
@@ -3353,6 +3353,18 @@ void check_parsed_files(Checker *c) {
 			i64 align = type_align_of(e->type);
 			if (align > 0 && ptr_set_exists(&c->info.minimum_dependency_set, e)) {
 				add_type_info_type(&c->init_ctx, e->type);
+			}
+		} else if (e->kind == Entity_Procedure) {
+			DeclInfo *decl = e->decl_info;
+			ast_node(pl, ProcLit, decl->proc_lit);
+			if (pl->inlining == ProcInlining_inline) {
+				for_array(j, decl->deps.entries) {
+					Entity *dep = decl->deps.entries[j].ptr;
+					if (dep == e) {
+						error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
+						break;
+					}
+				}
 			}
 		}
 	}
