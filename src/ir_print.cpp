@@ -1478,6 +1478,10 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		if (proc_type->Proc.diverging) {
 			ir_write_str_lit(f, " noreturn");
 		}
+		switch (call->inlining) {
+		case ProcInlining_inline:    ir_write_str_lit(f, " alwaysinline"); break;
+		case ProcInlining_no_inline: ir_write_str_lit(f, " noinline");     break;
+		}
 		ir_print_debug_location(f, m, value, instr->block->proc);
 
 		break;

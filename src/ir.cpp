@@ -250,6 +250,7 @@ gbAllocator ir_allocator(void) {
 		irValue * return_ptr;                                         \
 		Array<irValue *> args;                                        \
 		irValue * context_ptr;                                        \
+		ProcInlining inlining;                                        \
 	})                                                                \
 	IR_INSTR_KIND(StartupRuntime, i32)                                \
 	IR_INSTR_KIND(DebugDeclare, struct {                              \
@@ -1075,13 +1076,14 @@ irValue *ir_instr_select(irProcedure *p, irValue *cond, irValue *t, irValue *f) 
 	return v;
 }
 
-irValue *ir_instr_call(irProcedure *p, irValue *value, irValue *return_ptr, Array<irValue *> args, Type *result_type, irValue *context_ptr) {
+irValue *ir_instr_call(irProcedure *p, irValue *value, irValue *return_ptr, Array<irValue *> args, Type *result_type, irValue *context_ptr, ProcInlining inlining) {
 	irValue *v = ir_alloc_instr(p, irInstr_Call);
 	v->Instr.Call.value       = value;
 	v->Instr.Call.return_ptr  = return_ptr;
 	v->Instr.Call.args        = args;
 	v->Instr.Call.type        = result_type;
 	v->Instr.Call.context_ptr = context_ptr;
+	v->Instr.Call.inlining    = inlining;
 	return v;
 }
 
@@ -1684,7 +1686,7 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 }
 
 
-irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args) {
+irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, ProcInlining inlining = ProcInlining_none) {
 	Type *pt = base_type(ir_type(value));
 	GB_ASSERT(pt->kind == Type_Proc);
 	Type *results = pt->Proc.results;
@@ -1726,16 +1728,20 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args) {
 		}
 	}
 
+	if (inlining == ProcInlining_none) {
+		inlining = p->inlining;
+	}
+
 	Type *abi_rt = pt->Proc.abi_compat_result_type;
 	Type *rt = reduce_tuple_to_single_type(results);
 	if (pt->Proc.return_by_pointer) {
 		irValue *return_ptr = ir_add_local_generated(p, rt);
 		GB_ASSERT(is_type_pointer(ir_type(return_ptr)));
-		ir_emit(p, ir_instr_call(p, value, return_ptr, args, nullptr, context_ptr));
+		ir_emit(p, ir_instr_call(p, value, return_ptr, args, nullptr, context_ptr, inlining));
 		return ir_emit_load(p, return_ptr);
 	}
 
-	irValue *result = ir_emit(p, ir_instr_call(p, value, nullptr, args, abi_rt, context_ptr));
+	irValue *result = ir_emit(p, ir_instr_call(p, value, nullptr, args, abi_rt, context_ptr, inlining));
 	if (abi_rt != results) {
 		result = ir_emit_transmute(p, result, rt);
 	}
@@ -5150,7 +5156,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					}
 				}
 			}
-			return ir_emit_call(proc, value, args);
+			return ir_emit_call(proc, value, args, ce->inlining);
 		}
 
 		isize arg_index = 0;
@@ -5344,7 +5350,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		}
 
 		auto call_args = array_slice(args, 0, final_count);
-		return ir_emit_call(proc, value, call_args);
+		return ir_emit_call(proc, value, call_args, ce->inlining);
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);

@@ -252,6 +252,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		Token        open; \
 		Token        close; \
 		Token        ellipsis; \
+		ProcInlining inlining; \
 	}) \
 	AST_KIND(FieldValue,    "field value",         struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(TernaryExpr,   "ternary expression",  struct { Ast *cond, *x, *y; }) \

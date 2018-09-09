@@ -1553,6 +1553,7 @@ Ast *        parse_type             (AstFile *f);
 Ast *        parse_call_expr        (AstFile *f, Ast *operand);
 Ast *        parse_struct_field_list(AstFile *f, isize *name_count_);
 Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_type_token);
+Ast *parse_unary_expr(AstFile *f, bool lhs);
 
 
 Ast *convert_stmt_to_expr(AstFile *f, Ast *statement, String kind) {
@@ -1673,9 +1674,10 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 	case Token_no_inline:
 	{
 		Token token = advance_token(f);
-		Ast *expr = parse_operand(f, false);
-		if (expr->kind != Ast_ProcLit) {
-			syntax_error(expr, "%.*s must be followed by a procedure literal, got %.*s", LIT(token.string), LIT(ast_strings[expr->kind]));
+		Ast *expr = parse_unary_expr(f, false);
+		Ast *e = unparen_expr(expr);
+		if (e->kind != Ast_ProcLit && e->kind != Ast_CallExpr) {
+			syntax_error(expr, "%.*s must be followed by a procedure literal or call, got %.*s", LIT(token.string), LIT(ast_strings[expr->kind]));
 			return ast_bad_expr(f, token, f->curr_token);
 		}
 		ProcInlining pi = ProcInlining_none;
@@ -1685,11 +1687,19 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			pi = ProcInlining_no_inline;
 		}
 		if (pi != ProcInlining_none) {
-			if (expr->ProcLit.inlining != ProcInlining_none &&
-			    expr->ProcLit.inlining != pi) {
-				syntax_error(expr, "You cannot apply both 'inline' and 'no_inline' to a procedure literal");
+			if (e->kind == Ast_ProcLit) {
+				if (expr->ProcLit.inlining != ProcInlining_none &&
+				    expr->ProcLit.inlining != pi) {
+					syntax_error(expr, "You cannot apply both 'inline' and 'no_inline' to a procedure literal");
+				}
+				expr->ProcLit.inlining = pi;
+			} else if (e->kind == Ast_CallExpr) {
+				if (expr->CallExpr.inlining != ProcInlining_none &&
+				    expr->CallExpr.inlining != pi) {
+					syntax_error(expr, "You cannot apply both 'inline' and 'no_inline' to a procedure literal");
+				}
+				expr->CallExpr.inlining = pi;
 			}
-			expr->ProcLit.inlining = pi;
 		}
 
 		return expr;
@@ -3657,7 +3667,9 @@ Ast *parse_stmt(AstFile *f) {
 	Token token = f->curr_token;
 	switch (token.kind) {
 	// Operands
-	case Token_context: // Also allows for `context <-`
+	case Token_context: // Also allows for `context =`
+	case Token_inline:
+	case Token_no_inline:
 	case Token_Ident:
 	case Token_Integer:
 	case Token_Float:
