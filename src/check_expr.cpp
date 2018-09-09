@@ -85,6 +85,17 @@ Type *           check_init_variable    (CheckerContext *c, Entity *e, Operand *
 
 
 
+Entity *entity_from_expr(Ast *expr) {
+	expr = unparen_expr(expr);
+	switch (expr->kind) {
+	case Ast_Ident:
+		return expr->Ident.entity;
+	case Ast_SelectorExpr:
+		return entity_from_expr(expr->SelectorExpr.selector);
+	}
+	return nullptr;
+}
+
 void error_operand_not_expression(Operand *o) {
 	if (o->mode == Addressing_Type) {
 		gbString err = expr_to_string(o->expr);
@@ -2862,6 +2873,10 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 
 bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id) {
 	ast_node(ce, CallExpr, call);
+	if (ce->inlining != ProcInlining_none) {
+		error(call, "Inlining operators are not allowed on built-in procedures");
+	}
+
 	BuiltinProc *bp = &builtin_procs[id];
 	{
 		char *err = nullptr;
@@ -4807,6 +4822,9 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call) {
 		} else {
 			GB_PANIC("Unhandled #%.*s", LIT(name));
 		}
+		if (ce->inlining != ProcInlining_none) {
+			error(call, "Inlining operators are not allowed on built-in procedures");
+		}
 	} else {
 		check_expr_or_type(c, operand, ce->proc);
 	}
@@ -4962,6 +4980,25 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call) {
 			operand->type = result_type;
 			break;
 		}
+	}
+
+	switch (ce->inlining) {
+		case ProcInlining_inline: {
+			Entity *e = entity_from_expr(ce->proc);
+			if (e != nullptr && e->kind == Entity_Procedure) {
+				DeclInfo *decl = e->decl_info;
+				if (decl->proc_lit) {
+					ast_node(pl, ProcLit, decl->proc_lit);
+					if (pl->inlining == ProcInlining_no_inline) {
+						error(call, "'inline' cannot be applied to a procedure that has be marked as 'no_inline'");
+					}
+			}
+			}
+			break;
+		}
+
+		case ProcInlining_no_inline:
+			break;
 	}
 
 	operand->expr = call;
@@ -6511,6 +6548,15 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 	case_end;
 
 	case_ast_node(ce, CallExpr, node);
+		switch (ce->inlining) {
+		case ProcInlining_inline:
+			str = gb_string_appendc(str, "inline ");
+			break;
+		case ProcInlining_no_inline:
+			str = gb_string_appendc(str, "no_inline ");
+			break;
+		}
+
 		str = write_expr_to_string(str, ce->proc);
 		str = gb_string_appendc(str, "(");
 
