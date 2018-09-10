@@ -203,6 +203,9 @@ Ast *clone_ast(Ast *node) {
 		n->TypeCast.type = clone_ast(n->TypeCast.type);
 		n->TypeCast.expr = clone_ast(n->TypeCast.expr);
 		break;
+	case Ast_AutoCast:
+		n->AutoCast.expr = clone_ast(n->AutoCast.expr);
+		break;
 
 	case Ast_BadStmt:   break;
 	case Ast_EmptyStmt: break;
