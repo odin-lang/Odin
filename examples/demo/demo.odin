@@ -489,6 +489,23 @@ parametric_polymorphism :: proc() {
 		r = Error.Foo0;
 		fmt.println(r);
 	}
+
+	{ // Polymorphic names
+		foo :: proc($N: $I, $T: typeid) -> (res: [N]T) {
+			fmt.printf("Generating an array of type %v from the value %v of type %v\n",
+			           typeid_of(type_of(res)), N, typeid_of(I));
+			for i in 0..N-1 {
+				res[i] = i*i;
+			}
+			return;
+		}
+
+		T :: int;
+		array := foo(4, T);
+		for v, i in array {
+			assert(v == T(i*i));
+		}
+	}
 }
 
 
@@ -793,7 +810,6 @@ diverging_procedures :: proc() {
 
 	foo();
 }
-
 
 main :: proc() {
 	when true {

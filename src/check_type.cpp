@@ -1467,7 +1467,10 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 				if (type != nullptr && type_expr->kind == Ast_TypeidType) {
 					is_type_param = true;
 				} else {
-					error(name, "Polymorphic names are not yet supported for non-typeid parameters");
+					if (param_value.kind != ParameterValue_Invalid)  {
+						error(default_value, "Constant parameters cannot have a default value");
+						param_value.kind = ParameterValue_Invalid;
+					}
 				}
 			}
 
@@ -1514,15 +1517,25 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 				param = alloc_entity_type_name(scope, name->Ident.token, type, EntityState_Resolved);
 				param->TypeName.is_type_alias = true;
 			} else {
+				ExactValue poly_const = {};
+
 				if (operands != nullptr && variables.count < operands->count) {
+
+					Operand op = (*operands)[variables.count];
 					if (is_type_polymorphic_type) {
-						Operand op = (*operands)[variables.count];
 						type = determine_type_from_polymorphic(ctx, type, op);
 						if (type == t_invalid) {
 							success = false;
 						} else if (!ctx->no_polymorphic_errors) {
 							// NOTE(bill): The type should be determined now and thus, no need to determine the type any more
 							is_type_polymorphic_type = false;
+						}
+					}
+					if (is_poly_name) {
+						if (op.mode == Addressing_Constant) {
+							poly_const = op.value;
+						} else {
+							success = false;
 						}
 					}
 				}
@@ -1533,9 +1546,21 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
 				}
+				if (is_poly_name) {
+					if (p->flags&FieldFlag_no_alias) {
+						error(name, "'#no_alias' can only be applied to non constant values");
+						p->flags &= ~FieldFlag_no_alias; // Remove the flag
+					}
+					if (p->flags&FieldFlag_auto_cast) {
+						error(name, "'auto_cast' can only be applied to variable fields");
+						p->flags &= ~FieldFlag_auto_cast;
+					}
 
-				param = alloc_entity_param(scope, name->Ident.token, type, is_using, is_in);
-				param->Variable.param_value = param_value;
+					param = alloc_entity_const_param(scope, name->Ident.token, type, poly_const, is_type_polymorphic(type));
+				} else {
+					param = alloc_entity_param(scope, name->Ident.token, type, is_using, is_in);
+					param->Variable.param_value = param_value;
+				}
 			}
 			if (p->flags&FieldFlag_no_alias) {
 				param->flags |= EntityFlag_NoAlias;
