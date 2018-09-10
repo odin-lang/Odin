@@ -445,7 +445,6 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 							e = alloc_entity_type_name(scope, token, operand.type);
 							e->TypeName.is_type_alias = true;
 						} else {
-							GB_ASSERT(operand.mode == Addressing_Constant);
 							e = alloc_entity_constant(scope, token, operand.type, operand.value);
 						}
 					} else {
