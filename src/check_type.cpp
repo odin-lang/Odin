@@ -1372,7 +1372,6 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 				if (specialization == t_invalid){
 					specialization = nullptr;
 				}
-				// warning(type_expr, "'type' parameters are deprecated, please use a polymorphic identifier with a type of 'typeid'. For example, '$T: typeid'");
 
 				if (operands != nullptr) {
 					detemine_type_from_operand = true;
@@ -1553,6 +1552,12 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 					if (p->flags&FieldFlag_auto_cast) {
 						error(name, "'auto_cast' can only be applied to variable fields");
 						p->flags &= ~FieldFlag_auto_cast;
+					}
+
+					if (!is_type_constant_type(type) && !is_type_polymorphic(type)) {
+						gbString str = type_to_string(type);
+						error(params[i], "A parameter must be a valid constant type, got %s", str);
+						gb_string_free(str);
 					}
 
 					param = alloc_entity_const_param(scope, name->Ident.token, type, poly_const, is_type_polymorphic(type));

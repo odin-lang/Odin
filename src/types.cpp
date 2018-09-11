@@ -1396,6 +1396,10 @@ bool are_types_identical(Type *x, Type *y) {
 					if (xe->kind != ye->kind || !are_types_identical(xe->type, ye->type)) {
 						return false;
 					}
+					if (xe->kind == Entity_Constant && !compare_exact_values(Token_CmpEq, xe->Constant.value, ye->Constant.value)) {
+						// NOTE(bill): This is needed for polymorphic procedures
+						return false;
+					}
 				}
 				return true;
 			}
