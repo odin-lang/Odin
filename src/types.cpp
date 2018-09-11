@@ -1325,7 +1325,10 @@ bool are_types_identical(Type *x, Type *y) {
 
 	case Type_BitSet:
 		if (y->kind == Type_BitSet) {
-			return are_types_identical(x->BitSet.elem, y->BitSet.elem);
+			return are_types_identical(x->BitSet.elem, y->BitSet.elem) &&
+			       are_types_identical(x->BitSet.underlying, y->BitSet.underlying) &&
+			       x->BitSet.lower == y->BitSet.lower &&
+			       x->BitSet.upper == y->BitSet.upper;
 		}
 		break;
 
@@ -1358,6 +1361,9 @@ bool are_types_identical(Type *x, Type *y) {
 				for_array(i, x->Struct.fields) {
 					Entity *xf = x->Struct.fields[i];
 					Entity *yf = y->Struct.fields[i];
+					if (xf->kind != yf->kind) {
+						return false;
+					}
 					if (!are_types_identical(xf->type, yf->type)) {
 						return false;
 					}
