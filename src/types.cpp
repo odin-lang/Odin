@@ -1778,7 +1778,11 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 					return sel;
 				}
 			}
+		} else if (type->kind == Type_BitSet) {
+			return lookup_field_with_selection(type->BitSet.elem, field_name, true, sel);
 		}
+
+
 		if (type->kind == Type_Generic && type->Generic.specialized != nullptr) {
 			Type *specialized = type->Generic.specialized;
 			return lookup_field_with_selection(specialized, field_name, is_type, sel);

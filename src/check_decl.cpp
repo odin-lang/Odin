@@ -242,7 +242,6 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) 
 	e->type = t_invalid;
 	String name = e->token.string;
 	Type *named = alloc_type_named(name, nullptr, e);
-	named->Named.type_name = e;
 	if (def != nullptr && def->kind == Type_Named) {
 		def->Named.base = named;
 	}
