@@ -931,7 +931,7 @@ bool is_type_valid_bit_set_range(Type *t) {
 	return false;
 }
 
-void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
+void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *node) {
 	ast_node(bs, BitSetType, node);
 	GB_ASSERT(type->kind == Type_BitSet);
 
@@ -1044,6 +1044,24 @@ void check_bit_set_type(CheckerContext *c, Type *type, Ast *node) {
 		type->BitSet.upper = upper;
 	} else {
 		Type *elem = check_type_expr(c, bs->elem, nullptr);
+
+		#if 1
+		if (named_type != nullptr && named_type->kind == Type_Named &&
+		    elem->kind == Type_Enum) {
+			// NOTE(bill): Anonymous enumeration
+
+			String prefix = named_type->Named.name;
+			String enum_name = concatenate_strings(heap_allocator(), prefix, str_lit(".enum"));
+
+			Token token = make_token_ident(enum_name);
+
+			Entity *e = alloc_entity_type_name(nullptr, token, nullptr, EntityState_Resolved);
+			Type *named = alloc_type_named(enum_name, elem, e);
+			e->type = named;
+			e->TypeName.is_type_alias = true;
+			elem = named;
+		}
+		#endif
 
 		type->BitSet.elem = elem;
 		if (!is_type_valid_bit_set_elem(elem)) {
@@ -2436,7 +2454,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 	case_ast_node(bs, BitSetType, e);
 		*type = alloc_type_bit_set();
 		set_base_type(named_type, *type);
-		check_bit_set_type(ctx, *type, e);
+		check_bit_set_type(ctx, *type, named_type, e);
 		return true;
 	case_end;
 
