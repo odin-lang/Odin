@@ -1211,23 +1211,25 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		Type *proc_type = ctx->curr_proc_sig;
 		GB_ASSERT(proc_type != nullptr);
 		GB_ASSERT(proc_type->kind == Type_Proc);
-		// Type *proc_type = c->proc_stack[c->proc_stack.count-1];
+
 		TypeProc *pt = &proc_type->Proc;
 		if (pt->diverging) {
 			error(rs->token, "Diverging procedures may not return");
 			break;
 		}
 
+		Entity **result_entities = nullptr;
 		isize result_count = 0;
 		bool has_named_results = pt->has_named_results;
 		if (pt->results) {
+			result_entities = proc_type->Proc.results->Tuple.variables.data;
 			result_count = proc_type->Proc.results->Tuple.variables.count;
 		}
 
 		auto operands = array_make<Operand>(heap_allocator(), 0, 2*rs->results.count);
 		defer (array_free(&operands));
 
-		check_unpack_arguments(ctx, nullptr, -1, &operands, rs->results, false);
+		check_unpack_arguments(ctx, result_entities, result_count, &operands, rs->results, true);
 
 		if (result_count == 0 && rs->results.count > 0) {
 			error(rs->results[0], "No return values expected");

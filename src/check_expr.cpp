@@ -3920,7 +3920,8 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 				Operand ok = o;
 				val.mode = Addressing_Value;
 				ok.mode  = Addressing_Value;
-				ok.type  = t_bool;
+				// ok.type  = t_bool;
+				ok.type  = t_untyped_bool;
 				array_add(operands, val);
 				array_add(operands, ok);
 
