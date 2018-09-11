@@ -1593,6 +1593,28 @@ Ast *convert_stmt_to_body(AstFile *f, Ast *stmt) {
 }
 
 
+void check_polymorphic_params_for_type(AstFile *f, Ast *polymorphic_params, Token token) {
+	if (polymorphic_params == nullptr) {
+		return;
+	}
+	if (polymorphic_params->kind != Ast_FieldList) {
+		return;
+	}
+	ast_node(fl, FieldList, polymorphic_params);
+	for_array(fi, fl->list) {
+		Ast *field = fl->list[fi];
+		if (field->kind != Ast_Field) {
+			continue;
+		}
+		for_array(i, field->Field.names) {
+			Ast *name = field->Field.names[i];
+			if (name->kind == Ast_PolyType) {
+				error(name, "Polymorphic names are not needed for %.*s parameters", LIT(token.string));
+				return; // TODO(bill): Err multiple times or just the once?
+			}
+		}
+	}
+}
 
 
 Ast *parse_operand(AstFile *f, bool lhs) {
@@ -1855,6 +1877,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 				polymorphic_params = nullptr;
 			}
 			expect_token_after(f, Token_CloseParen, "parameter list");
+			check_polymorphic_params_for_type(f, polymorphic_params, token);
 		}
 
 		isize prev_level = f->expr_level;
@@ -1921,6 +1944,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 				polymorphic_params = nullptr;
 			}
 			expect_token_after(f, Token_CloseParen, "parameter list");
+			check_polymorphic_params_for_type(f, polymorphic_params, token);
 		}
 
 		while (allow_token(f, Token_Hash)) {
