@@ -724,7 +724,7 @@ __get_map_key :: proc "contextless" (key: $K) -> Map_Key {
 		}
 	case Type_Info_String:
 		str := (^string)(&key)^;
-		map_key.hash = __default_hash_string(str);
+		map_key.hash = default_hash_string(str);
 		map_key.str  = str;
 	case:
 		panic("Unhandled map key type");
@@ -924,15 +924,20 @@ __dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) #no_bounds
 		prev.next = curr.next;
 	}
 	if (fr.entry_index == m.entries.len-1) {
-		m.entries.len -= 1;
-		return;
+		// NOTE(bill): No need to do anything else, just pop
+	} else {
+		old := __dynamic_map_get_entry(h, fr.entry_index);
+		end := __dynamic_map_get_entry(h, m.entries.len-1);
+		mem.copy(old, end, entry_size);
+
+		if last := __dynamic_map_find(h, old.key); last.entry_prev >= 0 {
+			last_entry := __dynamic_map_get_entry(h, last.entry_prev);
+			last_entry.next = fr.entry_index;
+		} else {
+			m.hashes[last.hash_index] = fr.entry_index;
+		}
 	}
 
-	last := __dynamic_map_find(h, __dynamic_map_get_entry(h, fr.entry_index).key);
-	if last.entry_prev >= 0 {
-		last_entry := __dynamic_map_get_entry(h, last.entry_prev);
-		last_entry.next = fr.entry_index;
-	} else {
-		m.hashes[last.hash_index] = fr.entry_index;
-	}
+	// TODO(bill): Is this correct behaviour?
+	m.entries.len -= 1;
 }
