@@ -1304,7 +1304,7 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 
 		isize max_len = 7+8+1;
 		u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
-		isize len = gb_snprintf(cast(char *)str, max_len, "__csba$%x", m->global_array_index);
+		isize len = gb_snprintf(cast(char *)str, max_len, "csba$%x", m->global_array_index);
 		m->global_array_index++;
 
 		String name = make_string(str, len-1);
@@ -1323,7 +1323,7 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 irValue *ir_add_global_string_array(irModule *m, String string) {
 	isize max_len = 6+8+1;
 	u8 *str = cast(u8 *)gb_alloc_array(ir_allocator(), u8, max_len);
-	isize len = gb_snprintf(cast(char *)str, max_len, "__str$%x", m->global_string_index);
+	isize len = gb_snprintf(cast(char *)str, max_len, "str$%x", m->global_string_index);
 	m->global_string_index++;
 
 	String name = make_string(str, len-1);
@@ -1448,7 +1448,7 @@ irValue *ir_add_global_generated(irModule *m, Type *type, irValue *value) {
 
 	isize max_len = 7+8+1;
 	u8 *str = cast(u8 *)gb_alloc_array(ir_allocator(), u8, max_len);
-	isize len = gb_snprintf(cast(char *)str, max_len, "__ggv$%x", m->global_generated_index);
+	isize len = gb_snprintf(cast(char *)str, max_len, "ggv$%x", m->global_generated_index);
 	m->global_generated_index++;
 	String name = make_string(str, len-1);
 
@@ -1944,7 +1944,7 @@ irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 		} else {
 			auto args = array_make<irValue *>(ir_allocator(), 1);
 			args[0] = str;
-			hashed_str = ir_emit_runtime_call(proc, "__default_hash_string", args);
+			hashed_str = ir_emit_runtime_call(proc, "default_hash_string", args);
 		}
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), hashed_str);
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 1), str);
@@ -2430,7 +2430,21 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 
 	if (is_type_complex(t_left)) {
 		ir_emit_comment(proc, str_lit("complex.arith.begin"));
+		defer (ir_emit_comment(proc, str_lit("complex.arith.end")));
+
 		Type *ft = base_complex_elem_type(t_left);
+
+		if (op == Token_Quo) {
+			auto args = array_make<irValue *>(heap_allocator(), 2);
+			args[0] = left;
+			args[1] = right;
+
+			switch (type_size_of(ft)) {
+			case 4: return ir_emit_runtime_call(proc, "quo_complex64", args);
+			case 8: return ir_emit_runtime_call(proc, "quo_complex128", args);
+			default: GB_PANIC("Unknown float type"); break;
+			}
+		}
 
 		irValue *res = ir_add_local_generated(proc, type);
 		irValue *a = ir_emit_struct_ev(proc, left,  0);
@@ -2459,28 +2473,11 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 			imag = ir_emit_arith(proc, Token_Add, z, w, ft);
 			break;
 		}
-		case Token_Quo: {
-			irValue *s1 = ir_emit_arith(proc, Token_Mul, c, c, ft);
-			irValue *s2 = ir_emit_arith(proc, Token_Mul, d, d, ft);
-			irValue *s  = ir_emit_arith(proc, Token_Add, s1, s2, ft);
-
-			irValue *x = ir_emit_arith(proc, Token_Mul, a, c, ft);
-			irValue *y = ir_emit_arith(proc, Token_Mul, b, d, ft);
-			real = ir_emit_arith(proc, Token_Add, x, y, ft);
-			real = ir_emit_arith(proc, Token_Quo, real, s, ft);
-
-			irValue *z = ir_emit_arith(proc, Token_Mul, b, c, ft);
-			irValue *w = ir_emit_arith(proc, Token_Mul, a, d, ft);
-			imag = ir_emit_arith(proc, Token_Sub, z, w, ft);
-			imag = ir_emit_arith(proc, Token_Quo, imag, s, ft);
-			break;
-		}
 		}
 
 		ir_emit_store(proc, ir_emit_struct_ep(proc, res, 0), real);
 		ir_emit_store(proc, ir_emit_struct_ep(proc, res, 1), imag);
 
-		ir_emit_comment(proc, str_lit("complex.end.begin"));
 		return ir_emit_load(proc, res);
 	}
 
@@ -2710,12 +2707,12 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 	if (is_type_string(a)) {
 		char *runtime_proc = nullptr;
 		switch (op_kind) {
-		case Token_CmpEq: runtime_proc = "__string_eq"; break;
-		case Token_NotEq: runtime_proc = "__string_ne"; break;
-		case Token_Lt:    runtime_proc = "__string_lt"; break;
-		case Token_Gt:    runtime_proc = "__string_gt"; break;
-		case Token_LtEq:  runtime_proc = "__string_le"; break;
-		case Token_GtEq:  runtime_proc = "__string_gt"; break;
+		case Token_CmpEq: runtime_proc = "string_eq"; break;
+		case Token_NotEq: runtime_proc = "string_ne"; break;
+		case Token_Lt:    runtime_proc = "string_lt"; break;
+		case Token_Gt:    runtime_proc = "string_gt"; break;
+		case Token_LtEq:  runtime_proc = "string_le"; break;
+		case Token_GtEq:  runtime_proc = "string_gt"; break;
 		}
 		GB_ASSERT(runtime_proc != nullptr);
 
@@ -2731,14 +2728,14 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 		switch (sz) {
 		case 64:
 			switch (op_kind) {
-			case Token_CmpEq: runtime_proc = "__complex64_eq"; break;
-			case Token_NotEq: runtime_proc = "__complex64_ne"; break;
+			case Token_CmpEq: runtime_proc = "complex64_eq"; break;
+			case Token_NotEq: runtime_proc = "complex64_ne"; break;
 			}
 			break;
 		case 128:
 			switch (op_kind) {
-			case Token_CmpEq: runtime_proc = "__complex128_eq"; break;
-			case Token_NotEq: runtime_proc = "__complex128_ne"; break;
+			case Token_CmpEq: runtime_proc = "complex128_eq"; break;
+			case Token_NotEq: runtime_proc = "complex128_ne"; break;
 			}
 			break;
 		}
@@ -3068,7 +3065,7 @@ irValue *ir_cstring_len(irProcedure *proc, irValue *value) {
 	GB_ASSERT(is_type_cstring(ir_type(value)));
 	auto args = array_make<irValue *>(ir_allocator(), 1);
 	args[0] = ir_emit_conv(proc, value, t_cstring);
-	return ir_emit_runtime_call(proc, "__cstring_len", args);
+	return ir_emit_runtime_call(proc, "cstring_len", args);
 }
 
 
@@ -3313,7 +3310,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		irValue *c = ir_emit_conv(proc, value, t_cstring);
 		auto args = array_make<irValue *>(ir_allocator(), 1);
 		args[0] = c;
-		irValue *s = ir_emit_runtime_call(proc, "__cstring_to_string", args);
+		irValue *s = ir_emit_runtime_call(proc, "cstring_to_string", args);
 		return ir_emit_conv(proc, s, dst);
 	}
 
@@ -3334,13 +3331,13 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		// 	case 4: {
 		// 		auto args = array_make<irValue *>(ir_allocator(), 1);
 		// 		args[0] = value;
-		// 		return ir_emit_runtime_call(proc, "__gnu_h2f_ieee", args);
+		// 		return ir_emit_runtime_call(proc, "gnu_h2f_ieee", args);
 		// 		break;
 		// 	}
 		// 	case 8: {
 		// 		auto args = array_make<irValue *>(ir_allocator(), 1);
 		// 		args[0] = value;
-		// 		return ir_emit_runtime_call(proc, "__f16_to_f64", args);
+		// 		return ir_emit_runtime_call(proc, "f16_to_f64", args);
 		// 		break;
 		// 	}
 		// 	}
@@ -3350,13 +3347,13 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		// 	case 4: {
 		// 		auto args = array_make<irValue *>(ir_allocator(), 1);
 		// 		args[0] = value;
-		// 		return ir_emit_runtime_call(proc, "__gnu_f2h_ieee", args);
+		// 		return ir_emit_runtime_call(proc, "gnu_f2h_ieee", args);
 		// 		break;
 		// 	}
 		// 	case 8: {
 		// 		auto args = array_make<irValue *>(ir_allocator(), 1);
 		// 		args[0] = value;
-		// 		return ir_emit_runtime_call(proc, "__truncdfhf2", args);
+		// 		return ir_emit_runtime_call(proc, "truncdfhf2", args);
 		// 		break;
 		// 	}
 		// 	}
@@ -4306,8 +4303,8 @@ irValue *ir_emit_min(irProcedure *proc, Type *t, irValue *x, irValue *y) {
 		args[0] = x;
 		args[1] = y;
 		switch (sz) {
-		case 32: return ir_emit_runtime_call(proc, "__min_f32", args);
-		case 64: return ir_emit_runtime_call(proc, "__min_f64", args);
+		case 32: return ir_emit_runtime_call(proc, "min_f32", args);
+		case 64: return ir_emit_runtime_call(proc, "min_f64", args);
 		}
 		GB_PANIC("Unknown float type");
 	}
@@ -4324,8 +4321,8 @@ irValue *ir_emit_max(irProcedure *proc, Type *t, irValue *x, irValue *y) {
 		args[0] = x;
 		args[1] = y;
 		switch (sz) {
-		case 32: return ir_emit_runtime_call(proc, "__max_f32", args);
-		case 64: return ir_emit_runtime_call(proc, "__max_f64", args);
+		case 32: return ir_emit_runtime_call(proc, "max_f32", args);
+		case 64: return ir_emit_runtime_call(proc, "max_f64", args);
 		}
 		GB_PANIC("Unknown float type");
 	}
@@ -4676,8 +4673,8 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 			auto args = array_make<irValue *>(ir_allocator(), 1);
 			args[0] = x;
 			switch (sz) {
-			case 64:  return ir_emit_runtime_call(proc, "__abs_complex64",  args);
-			case 128: return ir_emit_runtime_call(proc, "__abs_complex128", args);
+			case 64:  return ir_emit_runtime_call(proc, "abs_complex64",  args);
+			case 128: return ir_emit_runtime_call(proc, "abs_complex128", args);
 			}
 			GB_PANIC("Unknown complex type");
 		} else if (is_type_float(t)) {
@@ -4685,8 +4682,8 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 			auto args = array_make<irValue *>(ir_allocator(), 1);
 			args[0] = x;
 			switch (sz) {
-			case 32: return ir_emit_runtime_call(proc, "__abs_f32", args);
-			case 64: return ir_emit_runtime_call(proc, "__abs_f64", args);
+			case 32: return ir_emit_runtime_call(proc, "abs_f32", args);
+			case 64: return ir_emit_runtime_call(proc, "abs_f64", args);
 			}
 			GB_PANIC("Unknown float type");
 		}
@@ -5903,7 +5900,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			}
 
 			i64 item_count = cl->elems.count;
-			irValue *items = ir_generate_array(proc->module, elem, item_count, str_lit("__dacl$"), cast(i64)cast(intptr)expr);
+			irValue *items = ir_generate_array(proc->module, elem, item_count, str_lit("dacl$"), cast(i64)cast(intptr)expr);
 
 			for_array(field_index, cl->elems) {
 				Ast *f = cl->elems[field_index];
@@ -6480,7 +6477,7 @@ void ir_build_range_string(irProcedure *proc, irValue *expr, Type *val_type,
 	irValue *str_len  = ir_emit_arith(proc, Token_Sub, count, offset, t_int);
 	auto args = array_make<irValue *>(ir_allocator(), 1);
 	args[0] = ir_emit_string(proc, str_elem, str_len);
-	irValue *rune_and_len = ir_emit_runtime_call(proc, "__string_decode_rune", args);
+	irValue *rune_and_len = ir_emit_runtime_call(proc, "string_decode_rune", args);
 	irValue *len  = ir_emit_struct_ev(proc, rune_and_len, 1);
 	ir_emit_store(proc, offset_, ir_emit_arith(proc, Token_Add, offset, len, t_int));
 
@@ -8075,9 +8072,9 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				if (t->Enum.fields.count > 0) {
 					auto fields = t->Enum.fields;
 					irValue *name_array  = ir_generate_array(m, t_string, fields.count,
-					                                         str_lit("__$enum_names"), cast(i64)entry_index);
+					                                         str_lit("$enum_names"), cast(i64)entry_index);
 					irValue *value_array = ir_generate_array(m, t_type_info_enum_value, fields.count,
-					                                         str_lit("__$enum_values"), cast(i64)entry_index);
+					                                         str_lit("$enum_values"), cast(i64)entry_index);
 
 					GB_ASSERT(is_type_integer(t->Enum.base_type));
 
@@ -8223,9 +8220,9 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			isize count = t->BitField.fields.count;
 			if (count > 0) {
 				auto fields = t->BitField.fields;
-				irValue *name_array   = ir_generate_array(m, t_string, count, str_lit("__$bit_field_names"),   cast(i64)entry_index);
-				irValue *bit_array    = ir_generate_array(m, t_i32,    count, str_lit("__$bit_field_bits"),    cast(i64)entry_index);
-				irValue *offset_array = ir_generate_array(m, t_i32,    count, str_lit("__$bit_field_offsets"), cast(i64)entry_index);
+				irValue *name_array   = ir_generate_array(m, t_string, count, str_lit("$bit_field_names"),   cast(i64)entry_index);
+				irValue *bit_array    = ir_generate_array(m, t_i32,    count, str_lit("$bit_field_bits"),    cast(i64)entry_index);
+				irValue *offset_array = ir_generate_array(m, t_i32,    count, str_lit("$bit_field_offsets"), cast(i64)entry_index);
 
 				for (isize i = 0; i < count; i++) {
 					Entity *f = fields[i];

@@ -331,7 +331,7 @@ init_global_temporary_allocator :: proc(data: []byte, backup_allocator := contex
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) {
 	fd := os.stderr;
-	__print_caller_location(fd, loc);
+	print_caller_location(fd, loc);
 	os.write_string(fd, " ");
 	os.write_string(fd, prefix);
 	if len(message) > 0 {

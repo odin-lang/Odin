@@ -1398,7 +1398,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					if (is_type_string(t) && t->Basic.kind != Basic_cstring) {
 						val0 = t_rune;
 						val1 = t_int;
-						add_package_dependency(ctx, "runtime", "__string_decode_rune");
+						add_package_dependency(ctx, "runtime", "string_decode_rune");
 					}
 					break;
 				case Type_Array:
