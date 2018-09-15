@@ -2090,16 +2090,8 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 	} else if (addr.kind == irAddr_Context) {
 		irValue *new_context = ir_emit_conv(proc, value, ir_addr_type(addr));
 
-		irValue *prev = ir_find_or_generate_context_ptr(proc);
-		GB_ASSERT(addr.addr == prev);
-
 		irValue *next = ir_add_local_generated(proc, t_context);
 		ir_emit_store(proc, next, new_context);
-
-		Selection sel = lookup_field(t_context, str_lit("parent"), false);
-		GB_ASSERT(sel.entity != nullptr);
-		irValue *parent_ptr = ir_emit_deep_field_gep(proc, next, sel);
-		ir_emit_store(proc, parent_ptr, prev);
 
 		ir_push_context_onto_stack(proc, next);
 

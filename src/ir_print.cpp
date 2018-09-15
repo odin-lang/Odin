@@ -959,6 +959,11 @@ void ir_print_calling_convention(irFileBuffer *f, irModule *m, ProcCallingConven
 	}
 }
 
+void ir_print_context_parameter_prefix(irFileBuffer *f, irModule *m) {
+	ir_print_type(f, m, t_context_ptr);
+	ir_write_str_lit(f, " noalias nonnull nocapture inreg ");
+}
+
 void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	GB_ASSERT(value->kind == irValue_Instr);
 	irInstr *instr = &value->Instr;
@@ -1469,8 +1474,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		if (proc_type->Proc.calling_convention == ProcCC_Odin) {
 			if (param_index > 0) ir_write_str_lit(f, ", ");
 
-			ir_print_type(f, m, t_context_ptr);
-			ir_write_str_lit(f, " noalias nonnull ");
+			ir_print_context_parameter_prefix(f, m);
 			ir_print_value(f, m, call->context_ptr, t_context_ptr);
 		}
 		ir_write_str_lit(f, ")");
@@ -1611,8 +1615,8 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	if (proc_type->calling_convention == ProcCC_Odin) {
 		if (param_index > 0) ir_write_str_lit(f, ", ");
 
-		ir_print_type(f, m, t_context_ptr);
-		ir_write_str_lit(f, " noalias nonnull %__.context_ptr");
+		ir_print_context_parameter_prefix(f, m);
+		ir_write_str_lit(f, "%__.context_ptr");
 	}
 
 	ir_write_str_lit(f, ") ");
