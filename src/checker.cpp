@@ -1318,6 +1318,9 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("Type_Info"),
 		str_lit("Source_Code_Location"),
 		str_lit("Context"),
+
+		str_lit("quo_complex64"),
+		str_lit("quo_complex128"),
 	};
 	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
 		add_dependency_to_set(c, scope_lookup(c->info.runtime_package->scope, required_runtime_entities[i]));

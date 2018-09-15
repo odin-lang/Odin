@@ -110,10 +110,7 @@ make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, auto_cast len: int, a
 }
 make_map :: proc($T: typeid/map[$K]$E, auto_cast cap: int = 16, allocator := context.allocator, loc := #caller_location) -> T {
 	runtime.make_map_expr_error_loc(loc, cap);
-
-	c := context;
-	c.allocator = allocator;
-	context = c;
+	context.allocator = allocator;
 
 	m: T;
 	reserve_map(&m, cap);
