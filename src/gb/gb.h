@@ -5022,7 +5022,8 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 
 #elif defined(GB_SYSTEM_OSX)
 void gb_affinity_init(gbAffinity *a) {
-	usize count, count_size = gb_size_of(count);
+	usize count = 0;
+	usize count_size = sizeof(count);
 
 	a->is_accurate      = false;
 	a->thread_count     = 1;
