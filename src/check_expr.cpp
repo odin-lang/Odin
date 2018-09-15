@@ -2069,7 +2069,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 			Type *yt = base_type(y->type);
 			check_assignment(c, x, yt->Map.key, str_lit("map 'in'"));
 
-			add_package_dependency(c, "runtime", "dynamic_map_get");
+			add_package_dependency(c, "runtime", "__dynamic_map_get");
 		} else if (is_type_bit_set(y->type)) {
 			Type *yt = base_type(y->type);
 			check_assignment(c, x, yt->BitSet.elem, str_lit("bit_set 'in'"));
@@ -5517,8 +5517,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				context_name = str_lit("dynamic array literal");
 				is_constant = false;
 
-				add_package_dependency(c, "runtime", "dynamic_array_reserve");
-				add_package_dependency(c, "runtime", "dynamic_array_append");
+				add_package_dependency(c, "runtime", "__dynamic_array_reserve");
+				add_package_dependency(c, "runtime", "__dynamic_array_append");
 			} else {
 				GB_PANIC("unreachable");
 			}
@@ -5677,8 +5677,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				}
 			}
 
-			add_package_dependency(c, "runtime", "dynamic_map_reserve");
-			add_package_dependency(c, "runtime", "dynamic_map_set");
+			add_package_dependency(c, "runtime", "__dynamic_map_reserve");
+			add_package_dependency(c, "runtime", "__dynamic_map_set");
 			break;
 		}
 
@@ -5959,8 +5959,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			o->type = t->Map.value;
 			o->expr = node;
 
-			add_package_dependency(c, "runtime", "dynamic_map_get");
-			add_package_dependency(c, "runtime", "dynamic_map_set");
+			add_package_dependency(c, "runtime", "__dynamic_map_get");
+			add_package_dependency(c, "runtime", "__dynamic_map_set");
 			return Expr_Expr;
 		}
 

@@ -196,7 +196,6 @@ Context :: struct {
 	user_data:  any,
 	user_index: int,
 
-	parent:     ^Context,
 	derived:    any, // May be used for derived data types
 }
 
@@ -734,7 +733,7 @@ __get_map_key :: proc "contextless" (key: $K) -> Map_Key {
 }
 
 
-__default_hash :: proc(data: []byte) -> u64 {
+default_hash :: proc(data: []byte) -> u64 {
 	fnv64a :: proc(data: []byte) -> u64 {
 		h: u64 = 0xcbf29ce484222325;
 		for b in data {
@@ -744,7 +743,8 @@ __default_hash :: proc(data: []byte) -> u64 {
 	}
 	return fnv64a(data);
 }
-__default_hash_string :: proc(s: string) -> u64 do return __default_hash(([]byte)(s));
+default_hash_string :: proc(s: string) -> u64 do return default_hash(([]byte)(s));
+
 
 __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: mem.Allocator, loc := #caller_location) -> bool {
 	array := (^mem.Raw_Slice)(array_);

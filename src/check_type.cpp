@@ -2199,7 +2199,7 @@ void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	type->Map.value = value;
 
 	if (is_type_string(key)) {
-		add_package_dependency(ctx, "runtime", "__default_hash_string");
+		add_package_dependency(ctx, "runtime", "default_hash_string");
 	}
 
 
