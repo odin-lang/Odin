@@ -588,13 +588,13 @@ struct irDebugInfo {
 			// TODO(lachsinc): Do derived types even need scope/file/line etc. info?
 			irDebugEncoding tag;
 			String          name;
-			irDebugInfo *   scope;
-			irDebugInfo *   file;
-			TokenPos        pos;
+			irDebugInfo *   scope;  // Optional
+			irDebugInfo *   file;   // Optional
+			TokenPos        pos;    // Optional
 			irDebugInfo *   base_type;
 			i32             size;
-			i32             align;
-			i32             offset;
+			i32             align;  // Optional
+			i32             offset; // Optional
 		} DerivedType;
 		struct {
 			irDebugEncoding      tag;
@@ -1623,13 +1623,13 @@ irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entit
 	}
 
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
-	di->DerivedType.name = e->token.string;
-	di->DerivedType.scope = scope;
+	di->DerivedType.name = e ? e->token.string : str_lit("todo_member_type");
 	di->DerivedType.tag = irDebugBasicEncoding_member;
+	di->DerivedType.scope = scope;
+	di->DerivedType.file = file;
 	di->DerivedType.size = 8*cast(i32)type_size_of(type);
 	di->DerivedType.align = 8*cast(i32)type_align_of(type);
 	di->DerivedType.offset = 8*cast(i32)type_offset_of(type, index); // TODO(lachsinc): Confirm correct
-	di->DerivedType.file = file;
 	di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, type, file);
 	GB_ASSERT_NOT_NULL(di->DerivedType.base_type);
 
@@ -1663,7 +1663,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 		return *existing;
 	}
 
-	if (type->kind == Type_Basic && !is_type_complex(type) && !is_type_string(type)) {
+	if (type->kind == Type_Basic && !is_type_complex(type) && !is_type_string(type) && !is_type_cstring(type)) {
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_BasicType);
 		di->BasicType.encoding = ir_debug_encoding_for_basic(type->Basic.kind);
 		di->BasicType.name = type->Basic.name;
@@ -1740,7 +1740,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 		di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
 		di->DerivedType.scope = scope;
 		di->DerivedType.file = file;
-		di->DerivedType.pos = e->token.pos;
+		di->DerivedType.pos = e ? e->token.pos : di->DerivedType.pos;
 		di->DerivedType.size = 8*cast(i32)type_size_of(type);
 		di->DerivedType.align = 8*cast(i32)type_align_of(type);
 		di->DerivedType.offset = 0; // TODO(lachsinc)
@@ -1767,10 +1767,10 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 		di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
 		di->DerivedType.scope = scope;
 		di->DerivedType.file = file;
-		di->DerivedType.pos = e->token.pos;
+		di->DerivedType.pos = e ? e->token.pos : di->DerivedType.pos;
 		di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, elem_type, file);
-		di->DerivedType.size = 64; // TODO(lachsinc): HACK
-		di->DerivedType.align = 0; // TODO(lachsinc): HACK
+		di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr); // TODO(lachsinc): HACK
+		di->DerivedType.align = 8*cast(i32)type_align_of(t_rawptr); // TODO(lachsinc): HACK
 
 		GB_ASSERT(base->kind != Type_Named);
 		map_set(&module->debug_info, hash_type(type), di);
@@ -1779,8 +1779,8 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 	}
 
 	if (is_type_array(type)) {
-
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+
 		di->CompositeType.size = 8*cast(i32)type_size_of(type); // TODO(lachsinc): Confirm correct array sizing. llvm expects size in bits!
 		di->CompositeType.align = 8*cast(i32)type_align_of(type);
 		di->CompositeType.base_type = ir_add_debug_info_type(module, scope, e, type->Array.elem, file);
@@ -1788,6 +1788,69 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 		di->CompositeType.array_count = (i32)type->Array.count;
 
 		GB_ASSERT(base->kind != Type_Named);
+		map_set(&module->debug_info, hash_type(type), di);
+
+		return di;
+	}
+
+	if (is_type_cstring(type)) {
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+		auto elem_type = type->DynamicArray.elem;
+		di->DerivedType.name = type->Basic.name;
+		di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
+		di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, t_i8, file); // TODO(lachsinc): Is i8 cstring platform agnostic?
+		di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr); // TODO(lachsinc): HACK
+		di->DerivedType.align = 8*cast(i32)type_align_of(t_rawptr); // TODO(lachsinc): HACK
+
+		GB_ASSERT(base->kind != Type_Named);
+		map_set(&module->debug_info, hash_type(type), di);
+
+		return di;
+	}
+
+	if (is_type_string(type)) {
+		// TODO(lach): Is there a cleaner way to set up these types without hardcoding values ??
+		// Also we may want to just create hardcoded "base type" for things like strings etc.
+		// and just create a derived (named) type to "inherit" from. That way we can look them up directly
+		// inside irModule, and avoid lots of map lookups and array creations for their elements.
+		// In theory this should only occur once, as we hash the type t_string once and return it.
+
+		GB_ASSERT(type->kind == Type_Basic);
+		GB_ASSERT(type->Basic.kind == Basic_string);
+
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		di->CompositeType.name = type->Basic.name;
+		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+		di->CompositeType.size = 8*cast(i32)type_size_of(t_string);
+		di->CompositeType.align = 8*cast(i32)type_align_of(t_string);
+
+		array_init(&di->CompositeType.elements, ir_allocator(), 0, 2);
+
+		irDebugInfo *str_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+		str_di->DerivedType.name = str_lit("data"); // TODO(lachsinc):
+		str_di->DerivedType.tag = irDebugBasicEncoding_member;
+		str_di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
+		str_di->DerivedType.offset = 0;
+		str_di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, t_cstring, file);
+
+		// NOTE(lach): This isn't particularly robust, it assumes all strings will be caught
+		// by the map lookup (ie this will only be created once).
+		map_set(&module->debug_info, hash_pointer(str_di), str_di);
+
+		irDebugInfo *len_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+		len_di->DerivedType.name = str_lit("len"); // TODO(lachsinc):
+		len_di->DerivedType.tag = irDebugBasicEncoding_member;
+		len_di->DerivedType.size = 8*cast(i32)type_size_of(t_i64);
+		len_di->DerivedType.offset = 8*cast(i32)type_size_of(t_rawptr);
+		len_di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, t_i64, file);
+
+		// NOTE(lach): This isn't particularly robust, it assumes all strings will be caught
+		// by the map lookup (ie this will only be created once).
+		map_set(&module->debug_info, hash_pointer(len_di), len_di);
+
+		array_add(&di->CompositeType.elements, len_di);
+		array_add(&di->CompositeType.elements, str_di);
+
 		map_set(&module->debug_info, hash_type(type), di);
 
 		return di;

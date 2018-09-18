@@ -2067,19 +2067,21 @@ void print_llvm_ir(irGen *ir) {
 				} else {
 					ir_fprintf(f, "!DICompositeType("
 					              "name: \"%.*s\""
-					            ", scope: !%d"
-					            ", file: !%d"
-					            ", line: %td"
 					            ", size: %d"
 					            ", align: %d"
 					            ", tag: ",
 					            LIT(di->CompositeType.name),
-					            di->CompositeType.scope->id,
-					            di->CompositeType.file->id,
-					            di->CompositeType.pos.line,
 					            di->CompositeType.size,
 					            di->CompositeType.align);
 					ir_print_debug_encoding(f, irDebugInfo_CompositeType, di->CompositeType.tag);
+					if (di->CompositeType.scope) {
+						ir_fprintf(f, ", scope: !%d"
+						              ", file: !%d"
+						              ", line: %td",
+						              di->CompositeType.scope->id,
+						              di->CompositeType.file->id,
+						              di->CompositeType.pos.line);
+					}
 					if (di->CompositeType.base_type) {
 						GB_ASSERT(di->CompositeType.tag == irDebugBasicEncoding_enumeration_type);
 						ir_fprintf(f, ", baseType: !%d", di->CompositeType.base_type->id);
