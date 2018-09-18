@@ -2074,6 +2074,15 @@ void print_llvm_ir(irGen *ir) {
 				ir_write_byte(f, ')');
 				break;
 			}
+			case irDebugInfo_Enumerator: {
+				ir_fprintf(f, "!DIEnumerator("
+				              "name: \"%.*s\""
+				            ", value: %d", // TODO(lachsinc): PRId64 equiv?
+				            LIT(di->Enumerator.name),
+				            di->Enumerator.value);
+				ir_write_byte(f, ')');
+				break;
+			}
 			case irDebugInfo_AllProcs:
 				ir_fprintf(f, "!{");
 				for_array(proc_index, di->AllProcs.procs) {
