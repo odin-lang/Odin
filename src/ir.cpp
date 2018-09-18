@@ -566,7 +566,7 @@ struct irDebugInfo {
 			String               name;
 			irDebugInfo *        file;
 			TokenPos             pos;
-			Array<irDebugInfo *> return_types;
+			Array<irDebugInfo *> types; // !{return, return, param, param, param.. etc.}
 			// TODO(lachsinc): variables / retainedNodes ?
 		} Proc;
 		struct {
@@ -1794,19 +1794,41 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 	di->Proc.file = file;
 	di->Proc.pos = entity->token.pos;
 
-	isize return_count = proc->type->Proc.result_count;
-	array_init(&di->Proc.return_types, ir_allocator(), 0, return_count); // TODO(lachsinc): ir_allocator() safe to use?
-	if (return_count >= 1) {
-		TypeTuple *tuple  = &proc->type->Proc.results->Tuple;
-		for_array(i, tuple->variables) {
-			Entity *e = tuple->variables[i];
+	isize result_count = proc->type->Proc.result_count;
+	isize param_count = proc->type->Proc.param_count;
+	array_init(&di->Proc.types, ir_allocator(), 0, gb_max(result_count, 1) + param_count); // TODO(lachsinc): ir_allocator() safe to use?
+
+	// Result/return types
+	if (result_count >= 1) {
+		TypeTuple *results_tuple = &proc->type->Proc.results->Tuple;
+		for_array(i, results_tuple->variables) {
+			Entity *e = results_tuple->variables[i];
 			if (e->kind != Entity_Variable) {
 				continue; // TODO(lachsinc): Confirm correct?
 			}
 
 			irDebugInfo *type_di = ir_add_debug_info_type(proc->module, di, e, e->type, file);
 			GB_ASSERT_NOT_NULL(type_di);
-			array_add(&di->Proc.return_types, type_di);
+			array_add(&di->Proc.types, type_di);
+		}
+	} else {
+		// llvm expects "!{null}" for a function without return type, use nullptr to represent it.
+		// TODO(lachsinc): Is there a specific "void" type we should refer to?
+		array_add(&di->Proc.types, (irDebugInfo*)nullptr);
+	}
+
+	// Param types
+	if (param_count >= 1) {
+		TypeTuple *params_tuple = &proc->type->Proc.params->Tuple;
+		for_array(i, params_tuple->variables) {
+			Entity *e = params_tuple->variables[i];
+			if (e->kind != Entity_Variable) {
+				continue; // TODO(lachsinc): Confirm correct?
+			}
+			// TODO(lach): Could technically be a local?
+			irDebugInfo *type_di = ir_add_debug_info_type(proc->module, di, e, e->type, file);
+			GB_ASSERT_NOT_NULL(type_di);
+			array_add(&di->Proc.types, type_di);
 		}
 	}
 	
