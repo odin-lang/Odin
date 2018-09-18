@@ -1951,31 +1951,36 @@ void print_llvm_ir(irGen *ir) {
 				            ", globals: !0"
 				            ")",
 				            file->id, LIT(build_context.ODIN_VERSION));
-
 				break;
 			}
 			case irDebugInfo_File:
+				// TODO(lachsinc): Does windows debug info expect '/' or '\5C' path separators ??
 				ir_fprintf(f, "!DIFile(filename: \""); ir_print_escape_path(f, di->File.filename);
 				ir_fprintf(f, "\", directory: \""); ir_print_escape_path(f, di->File.directory);
 				ir_fprintf(f, "\"");
 				ir_fprintf(f, ")");
 				break;
 			case irDebugInfo_Proc:
+				// TODO(lach): We need to store scope info inside di, not just file info, for procs.
 				ir_fprintf(f, "distinct !DISubprogram("
 				              "name: \"%.*s\""
 				            ", linkageName: \"%.*s\""
+				            ", scope: !%d"
 				            ", file: !%d"
 				            ", line: %td"
+				            ", scopeLine: %td"
 				            ", isDefinition: true"
-				            ", isLocal: true"
+				            ", isLocal: false" // TODO(lach): This used to be always set to true, pretend no local for now. We need to check if scope == file.
 				            ", flags: DIFlagPrototyped"
 				            ", isOptimized: false"
 				            ", unit: !%d"
 				            ", type: !DISubroutineType(types: !{",
 				            LIT(di->Proc.entity->token.string),
 				            LIT(di->Proc.name),
+				            di->Proc.file->id, // TODO(lachsinc): HACK For now lets pretend all procs scope's == file.
 				            di->Proc.file->id,
 				            di->Proc.pos.line,
+				            di->Proc.pos.line, // NOTE(lachsinc): Assume scopeLine always same as line.
 				            m->debug_compile_unit->id);
 				if (di->Proc.return_types.count == 0) {
 					ir_fprintf(f, "null})");
