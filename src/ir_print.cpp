@@ -1982,16 +1982,21 @@ void print_llvm_ir(irGen *ir) {
 				            di->Proc.pos.line,
 				            di->Proc.pos.line, // NOTE(lachsinc): Assume scopeLine always same as line.
 				            m->debug_compile_unit->id);
-				if (di->Proc.return_types.count == 0) {
-					ir_fprintf(f, "null})");
-				} else {
-					for_array(return_type_index, di->Proc.return_types) {
-						ir_fprintf(f, "%s!%d",
-						           return_type_index > 0 ? ", " : "",
-						           di->Proc.return_types[return_type_index]->id);
+				if (di->Proc.types.count > 0) {
+					for_array(type_index, di->Proc.types) {
+						if (type_index > 0) {
+							ir_write_byte(f, ',');
+						}
+						if (di->Proc.types[type_index]) {
+							ir_fprintf(f, "!%d", di->Proc.types[type_index]->id);
+						} else {
+							ir_write_str_lit(f, "null");
+						}
 					}
-					ir_write_str_lit(f, "})");
+				} else {
+					ir_write_str_lit(f, "null");
 				}
+				ir_write_str_lit(f, "})"); // !DISubroutineTypes close
 				ir_write_byte(f, ')');
 				break;
 			case irDebugInfo_LocalVariable: {
