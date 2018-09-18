@@ -585,6 +585,7 @@ struct irDebugInfo {
 			Array<irDebugInfo *> param_types;
 		} ProcType; // TODO(lachsinc): Unused?
 		struct {
+			// TODO(lachsinc): Do derived types even need scope/file/line etc. info?
 			irDebugEncoding tag;
 			String          name;
 			irDebugInfo *   scope;
@@ -606,6 +607,7 @@ struct irDebugInfo {
 			i32                  size;
 			i32                  align;
 			Array<irDebugInfo *> elements;
+			i32                  array_count; // TODO(lach): We could define a new !DISubrange and place ptr to it inside above elements array instead.
 		} CompositeType;
 		struct {
 			String name;
@@ -1752,6 +1754,45 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 		return di;
 	}
 	
+	// TODO(lachsinc): Not sure if correct.. Also cleanup
+	// NOTE(lachsinc): For now dynamic arrays are just a pointer to their data.
+	// We could get fancy and use a composite type along with
+	// DW_TAG_class_type / template debug stuff eventually.
+	if (is_type_dynamic_array(type)) {
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+
+		auto elem_type = type->DynamicArray.elem;
+
+		di->DerivedType.name = str_lit("dynamic_array_todo");
+		di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
+		di->DerivedType.scope = scope;
+		di->DerivedType.file = file;
+		di->DerivedType.pos = e->token.pos;
+		di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, elem_type, file);
+		di->DerivedType.size = 64; // TODO(lachsinc): HACK
+		di->DerivedType.align = 0; // TODO(lachsinc): HACK
+
+		GB_ASSERT(base->kind != Type_Named);
+		map_set(&module->debug_info, hash_type(type), di);
+
+		return di;
+	}
+
+	if (is_type_array(type)) {
+
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		di->CompositeType.size = 8*cast(i32)type_size_of(type); // TODO(lachsinc): Confirm correct array sizing. llvm expects size in bits!
+		di->CompositeType.align = 8*cast(i32)type_align_of(type);
+		di->CompositeType.base_type = ir_add_debug_info_type(module, scope, e, type->Array.elem, file);
+		di->CompositeType.tag = irDebugBasicEncoding_array_type;
+		di->CompositeType.array_count = (i32)type->Array.count;
+
+		GB_ASSERT(base->kind != Type_Named);
+		map_set(&module->debug_info, hash_type(type), di);
+
+		return di;
+	}
+
 	//
 	// TODO(lachsinc): HACK For now any remaining types interpreted as a rawptr.
 	//
