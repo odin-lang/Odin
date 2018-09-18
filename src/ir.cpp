@@ -1635,6 +1635,22 @@ irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entit
 	return di;
 }
 
+irDebugInfo *ir_add_debug_info_enumerator(irModule *module, Entity *e) {
+	irDebugInfo **existing = map_get(&module->debug_info, hash_entity(e));
+	if (existing != nullptr) {
+		return *existing;
+	}
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Enumerator);
+	di->Enumerator.name = e->token.string;
+	GB_ASSERT(e->kind == Entity_Constant);
+	GB_ASSERT(e->Constant.value.kind == ExactValue_Integer);
+	di->Enumerator.value = big_int_to_i64(&e->Constant.value.value_integer);
+
+	map_set(&module->debug_info, hash_entity(e), di);
+	return di;
+}
+
 irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity *e, Type *type, irDebugInfo *file) {
 	// if (!proc->module->generate_debug_info) {
 	// 	return nullptr;
@@ -1656,16 +1672,17 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 		return di;
 	}
 	
-	// NOTE(lachsinc): Types are into debug_info map as their named, not base_type()'d counterpart.
+	// NOTE(lachsinc): Types are inserted into debug_info map as their named, not base_type()'d counterpart.
 	Type *base = base_type(type);
 
-	if (is_type_struct(type) || is_type_union(type)) {
+	if (is_type_struct(type) || is_type_union(type) || is_type_enum(type)) {
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
 		di->CompositeType.scope = scope;
 		di->CompositeType.file = file;
 		di->CompositeType.pos = e->token.pos;
 		di->CompositeType.size = 8*cast(i32)type_size_of(type);
 		di->CompositeType.align = 8*cast(i32)type_align_of(type);
+		di->CompositeType.base_type = nullptr;
 
 		// NOTE(lachsinc): Set map value before resolving field types to avoid circular dependencies.
 		map_set(&module->debug_info, hash_type(type), di);
@@ -1688,6 +1705,16 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 			array_init(&di->CompositeType.elements, ir_allocator(), 0, 0);
 			// TODO(lachsinc): Add elements for union
 			di->CompositeType.tag = irDebugBasicEncoding_union_type;
+		} else if (is_type_enum(type)) {
+			GB_ASSERT(type->kind == Type_Named);
+			di->CompositeType.name = type->Named.name;
+			di->CompositeType.base_type = ir_add_debug_info_type(module, scope, e, type->Named.base->Enum.base_type, file);
+			array_init(&di->CompositeType.elements, ir_allocator(), 0, base->Enum.fields.capacity);
+			for_array(field_index, base->Enum.fields) {
+				array_add(&di->CompositeType.elements,
+				          ir_add_debug_info_enumerator(module, base->Enum.fields[field_index]));
+			}
+			di->CompositeType.tag = irDebugBasicEncoding_enumeration_type;
 		}
 
 		return di;
