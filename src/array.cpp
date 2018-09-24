@@ -45,6 +45,16 @@ template <typename T> void array_ordered_remove  (Array<T> *array, isize index);
 template <typename T> void array_unordered_remove(Array<T> *array, isize index);
 
 
+template <typename T>
+void array_copy(Array<T> *array, Array<T> const &data, isize offset) {
+	gb_memmove(array->data+offset, data.data, gb_size_of(T)*data.count);
+}
+template <typename T>
+void array_copy(Array<T> *array, Array<T> const &data, isize offset, isize count) {
+	gb_memmove(array->data+offset, data.data, gb_size_of(T)*gb_min(data.count, count));
+}
+
+
 
 template <typename T>
 T *array_end_ptr(Array<T> *array) {
