@@ -1024,6 +1024,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 	}
 
 	ast_node(bs, BlockStmt, body);
+	// check_open_scope(ctx, body);
 	check_stmt_list(ctx, bs->stmts, Stmt_CheckScopeDecls);
 	if (type->Proc.result_count > 0) {
 		if (!check_is_terminating(body)) {
@@ -1035,6 +1036,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 			}
 		}
 	}
+	// check_close_scope(ctx);
 
 	check_scope_usage(ctx->checker, ctx->scope);
 

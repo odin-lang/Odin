@@ -492,6 +492,9 @@ parametric_polymorphism :: proc() {
 
 	{ // Polymorphic names
 		foo :: proc($N: $I, $T: typeid) -> (res: [N]T) {
+			// `N` is the constant value passed
+			// `I` is the type of N
+			// `T` is the type passed
 			fmt.printf("Generating an array of type %v from the value %v of type %v\n",
 			           typeid_of(type_of(res)), N, typeid_of(I));
 			for i in 0..N-1 {
@@ -790,7 +793,7 @@ bit_set_type :: proc() {
 		assert(size_of(x) == size_of(u32));
 		y: bit_set[0..8; u16];
 		fmt.println(typeid_of(type_of(x))); // bit_set[A..Z]
-		fmt.println(typeid_of(type_of(y))); // bit_set[0..8l u16]
+		fmt.println(typeid_of(type_of(y))); // bit_set[0..8; u16]
 
 		incl(&x, 'F');
 		assert('F' in x);

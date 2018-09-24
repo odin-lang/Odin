@@ -76,7 +76,7 @@ TOKEN_KIND(Token__ComparisonEnd, ""), \
 	TOKEN_KIND(Token_Semicolon,     ";"),   \
 	TOKEN_KIND(Token_Period,        "."),   \
 	TOKEN_KIND(Token_Comma,         ","),   \
-	TOKEN_KIND(Token_Ellipsis,    ".."),  \
+	TOKEN_KIND(Token_Ellipsis,      ".."),  \
 	TOKEN_KIND(Token_BackSlash,     "\\"),  \
 TOKEN_KIND(Token__OperatorEnd, ""), \
 \
