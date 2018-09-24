@@ -465,6 +465,9 @@ struct irAddr {
 		struct {
 			i32      bit_field_value_index;
 		};
+		struct {
+			Selection sel;
+		} ctx;
 	};
 };
 
@@ -482,8 +485,9 @@ irAddr ir_addr_map(irValue *addr, irValue *map_key, Type *map_type, Type *map_re
 }
 
 
-irAddr ir_addr_context(irValue *addr) {
+irAddr ir_addr_context(irValue *addr, Selection sel = {}) {
 	irAddr v = {irAddr_Context, addr};
+	v.ctx.sel = sel;
 	return v;
 }
 
@@ -2088,10 +2092,16 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 			return;
 		}
 	} else if (addr.kind == irAddr_Context) {
-		irValue *new_context = ir_emit_conv(proc, value, ir_addr_type(addr));
-
 		irValue *next = ir_add_local_generated(proc, t_context);
-		ir_emit_store(proc, next, new_context);
+		if (addr.ctx.sel.index.count > 0) {
+			irValue *lhs = ir_emit_deep_field_gep(proc, next, addr.ctx.sel);
+			irValue *rhs = ir_emit_conv(proc, value, type_deref(ir_type(lhs)));
+			ir_emit_store(proc, lhs, rhs);
+		} else {
+			irValue *lhs = next;
+			irValue *rhs = ir_emit_conv(proc, value, ir_addr_type(addr));
+			ir_emit_store(proc, lhs, rhs);
+		}
 
 		ir_push_context_onto_stack(proc, next);
 
@@ -2198,6 +2208,12 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 		remaining_bytes = ir_emit_arith(proc, Token_Shl, remaining_bytes, shift_amount, int_type);
 		return ir_emit_arith(proc, Token_Or, res, remaining_bytes, int_type);
 
+	} else if (addr.kind == irAddr_Context) {
+		if (addr.ctx.sel.index.count > 0) {
+			irValue *a = addr.addr;
+			irValue *b = ir_emit_deep_field_gep(proc, a, addr.ctx.sel);
+			return ir_emit_load(proc, b);
+		}
 	}
 
 	Type *t = base_type(ir_type(addr.addr));
@@ -2220,6 +2236,9 @@ irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr) {
 		irValue *v = ir_addr_load(proc, addr);
 		return ir_address_from_load_or_generate_local(proc, v);
 	}
+
+	case irAddr_Context:
+		GB_PANIC("irAddr_Context should be handled elsewhere");
 	}
 
 	return addr.addr;
@@ -5502,24 +5521,22 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 					return ir_addr_bit_field(a, index);
 				}
 			} else {
-				irValue *a = ir_build_addr_ptr(proc, se->expr);
+				irAddr addr = ir_build_addr(proc, se->expr);
+				if (addr.kind == irAddr_Context) {
+					GB_ASSERT(sel.index.count > 0);
+					if (addr.ctx.sel.index.count >= 0) {
+						sel = selection_combine(addr.ctx.sel, sel);
+					}
+					addr.ctx.sel = sel;
+
+					return addr;
+				}
+				irValue *a = ir_addr_get_ptr(proc, addr);
 				a = ir_emit_deep_field_gep(proc, a, sel);
 				return ir_addr(a);
 			}
 		} else {
-			// NOTE(bill): x.0
-			Type *type = type_deref(type_of_expr(se->expr));
-			Type *selector_type = base_type(type_of_expr(se->selector));
-			GB_ASSERT_MSG(is_type_integer(selector_type), "%s", type_to_string(selector_type));
-			ExactValue val = type_and_value_of_expr(sel).value;
-			i64 index = big_int_to_i64(&val.value_integer);
-
-			Selection sel = lookup_field_from_index(type, index);
-			GB_ASSERT(sel.entity != nullptr);
-
-			irValue *a = ir_build_addr_ptr(proc, se->expr);
-			a = ir_emit_deep_field_gep(proc, a, sel);
-			return ir_addr(a);
+			GB_PANIC("Unsupported selector expression");
 		}
 	case_end;
 
@@ -6684,7 +6701,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 		switch (as->op.kind) {
 		case Token_Eq: {
-			auto lvals = array_make<irAddr>(m->tmp_allocator);
+			auto lvals = array_make<irAddr>(m->tmp_allocator, 0, as->lhs.count);
 
 			for_array(i, as->lhs) {
 				Ast *lhs = as->lhs[i];
@@ -6709,7 +6726,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 					}
 
 					for_array(i, inits) {
-						ir_addr_store(proc, lvals[i], inits[i]);
+						auto lval = lvals[i];
+						ir_addr_store(proc, lval, inits[i]);
 					}
 				}
 			} else {

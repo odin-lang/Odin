@@ -254,6 +254,15 @@ void selection_add_index(Selection *s, isize index) {
 	array_add(&s->index, cast(i32)index);
 }
 
+Selection selection_combine(Selection const &lhs, Selection const &rhs) {
+	Selection new_sel = lhs;
+	new_sel.indirect = lhs.indirect || rhs.indirect;
+	new_sel.index = array_make<i32>(heap_allocator(), lhs.index.count+rhs.index.count);
+	array_copy(&new_sel.index, lhs.index, 0);
+	array_copy(&new_sel.index, rhs.index, lhs.index.count);
+	return new_sel;
+}
+
 
 
 gb_global Type basic_types[] = {
