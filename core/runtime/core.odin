@@ -363,7 +363,7 @@ pop :: proc "contextless" (array: ^$T/[dynamic]$E) -> E {
 
 @(builtin)
 unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
-	runtime.bounds_check_error_loc(loc, index, len(array));
+	bounds_check_error_loc(loc, index, len(array));
 	n := len(array)-1;
 	if index != n {
 		array[index] = array[n];
@@ -373,7 +373,7 @@ unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_loca
 
 @(builtin)
 ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
-	runtime.bounds_check_error_loc(loc, index, len(array));
+	bounds_check_error_loc(loc, index, len(array));
 	copy(array[index:], array[index+1:]);
 	pop(array);
 }
