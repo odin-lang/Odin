@@ -1337,7 +1337,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			}
 
 			Type *type = x.type;
-			if (!is_type_integer(type) && !is_type_float(type) && !is_type_pointer(type)) {
+			if (!is_type_integer(type) && !is_type_float(type) && !is_type_pointer(type) && !is_type_enum(type)) {
 				error(ie->op, "Only numerical and pointer types are allowed within interval expressions");
 				goto skip_expr;
 			}
