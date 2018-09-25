@@ -1974,30 +1974,16 @@ void print_llvm_ir(irGen *ir) {
 				            ", flags: DIFlagPrototyped"
 				            ", isOptimized: false"
 				            ", unit: !%d"
-				            ", type: !DISubroutineType(types: !{",
+				            ", type: !DISubroutineType(types: !%d)",
 				            LIT(di->Proc.entity->token.string),
 				            LIT(di->Proc.name),
 				            di->Proc.file->id, // TODO(lachsinc): HACK For now lets pretend all procs scope's == file.
 				            di->Proc.file->id,
 				            di->Proc.pos.line,
 				            di->Proc.pos.line, // NOTE(lachsinc): Assume scopeLine always same as line.
-				            m->debug_compile_unit->id);
-				if (di->Proc.types.count > 0) {
-					for_array(type_index, di->Proc.types) {
-						if (type_index > 0) {
-							ir_write_byte(f, ',');
-						}
-						if (di->Proc.types[type_index]) {
-							ir_fprintf(f, "!%d", di->Proc.types[type_index]->id);
-						} else {
-							ir_write_str_lit(f, "null");
-						}
-					}
-				} else {
-					ir_write_str_lit(f, "null");
-				}
-				ir_write_str_lit(f, "})"); // !DISubroutineTypes close
-				ir_write_byte(f, ')');
+				            m->debug_compile_unit->id,
+							di->Proc.types->id);
+				ir_write_byte(f, ')'); // !DISubprogram(
 				break;
 			case irDebugInfo_LocalVariable: {
 				ir_fprintf(f, "!DILocalVariable("
@@ -2074,7 +2060,7 @@ void print_llvm_ir(irGen *ir) {
 					            di->CompositeType.size,
 					            di->CompositeType.align);
 					ir_print_debug_encoding(f, irDebugInfo_CompositeType, di->CompositeType.tag);
-					if (di->CompositeType.scope) {
+					if (di->CompositeType.scope != nullptr) {
 						ir_fprintf(f, ", scope: !%d"
 						              ", file: !%d"
 						              ", line: %td",
@@ -2082,18 +2068,12 @@ void print_llvm_ir(irGen *ir) {
 						              di->CompositeType.file->id,
 						              di->CompositeType.pos.line);
 					}
-					if (di->CompositeType.base_type) {
+					if (di->CompositeType.base_type != nullptr) {
 						GB_ASSERT(di->CompositeType.tag == irDebugBasicEncoding_enumeration_type);
 						ir_fprintf(f, ", baseType: !%d", di->CompositeType.base_type->id);
 					}
-					if (di->CompositeType.elements.count > 0) {
-						ir_write_str_lit(f, ", elements: !{");
-						for_array(element_index, di->CompositeType.elements) {
-							ir_fprintf(f, "%s!%d",
-							           element_index > 0 ? ", " : "",
-							           di->CompositeType.elements[element_index]->id);
-						}
-						ir_write_byte(f, '}');
+					if (di->CompositeType.elements != nullptr) {
+						ir_fprintf(f, ", elements: !%d", di->CompositeType.elements->id);
 					}
 					ir_write_byte(f, ')');
 				}
@@ -2108,12 +2088,26 @@ void print_llvm_ir(irGen *ir) {
 				ir_write_byte(f, ')');
 				break;
 			}
+			// TODO(lach): Merge w/ DebugInfoArray
 			case irDebugInfo_AllProcs:
 				ir_fprintf(f, "!{");
 				for_array(proc_index, di->AllProcs.procs) {
 					irDebugInfo *p = di->AllProcs.procs[proc_index];
 					if (proc_index > 0) {ir_fprintf(f, ",");}
 					ir_fprintf(f, "!%d", p->id);
+				}
+				ir_write_byte(f, '}');
+				break;
+			case irDebugInfo_DebugInfoArray:
+				ir_fprintf(f, "!{");
+				for_array(element_index, di->DebugInfoArray.elements) {
+					irDebugInfo *elem = di->DebugInfoArray.elements[element_index];
+					if (element_index > 0) {ir_write_str_lit(f, ", ");}
+					if (elem) {
+						ir_fprintf(f, "!%d", elem->id);
+					} else {
+						ir_fprintf(f, "null"); // NOTE(lachsinc): Proc's can contain "nullptr" entries to represent void return values.
+					}
 				}
 				ir_write_byte(f, '}');
 				break;
