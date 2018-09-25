@@ -1679,13 +1679,17 @@ irDebugInfo *ir_add_debug_info_enumerator(irModule *module, Entity *e) {
 	return di;
 }
 
+irDebugInfo *ir_add_debug_info_field_custom(irModule *module, irDebugInfo *scope, Entity *e, String name, Type *type, i32 offset, irDebugInfo *file) {
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+	di->DerivedType.name = name;
+	di->DerivedType.tag = irDebugBasicEncoding_member;
+	di->DerivedType.size = 8*cast(i32)type_size_of(type);
+	di->DerivedType.offset = offset;
+	di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, type, file);
+	return di;
+}
+
 irDebugInfo *ir_add_debug_info_dynamic_array(irModule *module, irDebugInfo *scope, Entity *e, Type *type, irDebugInfo *file) {
-	// TODO(lachsinc): Cleanup hardcode.
-
-	// TODO(lachsinc): SPEED? I assume this will create a bunch of new debug infos for _every single_
-	// dynamic array type. Maybe that's what we want, but with ability to refer to the _same_
-	// derived types for the len/cap/allocator fields.
-
 	// TODO(lachsinc): HACK named should be handled as derived types, see above.
 	Type *named = nullptr;
 	if (is_type_named(type)) {
@@ -1694,116 +1698,117 @@ irDebugInfo *ir_add_debug_info_dynamic_array(irModule *module, irDebugInfo *scop
 	}
 	GB_ASSERT(type->kind == Type_DynamicArray);
 
-	// if (!module->debug_dynamic_array_type) {
-		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
-		di->CompositeType.name = named ? named->Named.name : str_lit("dynamic array");
-		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+	// TODO(lachsinc): We should insert "type" into map and look it up, and just create a derived type
+	// for each required dynamic array, named or unnamed.
 
-		// TODO(lachsinc): Necessary ?
-		di->CompositeType.size = 8*cast(i32)(type_size_of(t_rawptr) +
-		                                     type_size_of(t_int) +
-		                                     type_size_of(t_int) +
-		                                     type_size_of(t_allocator)); // TODO(lachsinc): Allocator is correct size??
-		di->CompositeType.align = 8*cast(i32)type_align_of(t_rawptr);
-		di->CompositeType.elements = ir_add_debug_info_array(module, 0, 4);
+	// TODO(lachsinc): Look up in map if dynamic array for type already exists ??
 
-		// Data pointer type
-		irDebugInfo *data_ptr_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
-		data_ptr_di->DerivedType.name = str_lit("ptr_type_name_todo");
-		data_ptr_di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
-		data_ptr_di->DerivedType.size = 8*cast(i32)type_size_of(type->DynamicArray.elem);
-		data_ptr_di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, type->DynamicArray.elem, file);
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+	di->CompositeType.name = named ? named->Named.name : str_lit("dynamic array");
+	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+	di->CompositeType.size = 8*cast(i32)(type_size_of(t_rawptr) +
+	                                     type_size_of(t_int) +
+	                                     type_size_of(t_int) +
+	                                     type_size_of(t_allocator)); // TODO(lachsinc): Allocator is correct size??
+	di->CompositeType.align = 8*cast(i32)type_align_of(t_rawptr);
 
-		// Field "data"
-		irDebugInfo *data_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
-		data_di->DerivedType.name = str_lit("data");
-		data_di->DerivedType.tag = irDebugBasicEncoding_member;
-		data_di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
-		data_di->DerivedType.offset = 0;
-		data_di->DerivedType.base_type = data_ptr_di;
+	// Data pointer type
+	irDebugInfo *data_ptr_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+	data_ptr_di->DerivedType.name = str_lit("ptr_type_name_todo");
+	data_ptr_di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
+	data_ptr_di->DerivedType.size = 8*cast(i32)type_size_of(type->DynamicArray.elem);
+	data_ptr_di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, type->DynamicArray.elem, file);
 
-		// Field "len"
-		irDebugInfo *len_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
-		len_di->DerivedType.name = str_lit("len");
-		len_di->DerivedType.tag = irDebugBasicEncoding_member;
-		len_di->DerivedType.size = 8*cast(i32)type_size_of(t_int);
-		len_di->DerivedType.offset = data_di->DerivedType.size;
-		len_di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, t_int, file);
+	// Field "data"
+	irDebugInfo *data_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+	data_di->DerivedType.name = str_lit("data");
+	data_di->DerivedType.tag = irDebugBasicEncoding_member;
+	data_di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
+	data_di->DerivedType.offset = 0;
+	data_di->DerivedType.base_type = data_ptr_di;
 
-		// Field "cap"
-		irDebugInfo *cap_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
-		cap_di->DerivedType.name = str_lit("cap");
-		cap_di->DerivedType.tag = irDebugBasicEncoding_member;
-		cap_di->DerivedType.size = 8*cast(i32)type_size_of(t_int);
-		cap_di->DerivedType.offset = data_di->DerivedType.size + len_di->DerivedType.size;
-		cap_di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, t_int, file);
+	// TODO(lachsinc): The following member types could theoretically be shared by all dynamic array di's,
+	// we could store each inside module, creating them if we haven't already.
 
-		// Field "allocator"
-		irDebugInfo *alloc_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
-		alloc_di->DerivedType.name = str_lit("allocator");
-		alloc_di->DerivedType.tag = irDebugBasicEncoding_member;
-		alloc_di->DerivedType.size = 8*cast(i32)type_size_of(t_allocator);
-		alloc_di->DerivedType.offset = data_di->DerivedType.size + len_di->DerivedType.size + alloc_di->DerivedType.size;
-		alloc_di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, t_allocator, file); // TODO(lachsinc): Highly doubtful t_allocator creates correct debug info!
+	// Field "len"
+	irDebugInfo *len_di = ir_add_debug_info_field_custom(module, scope, e, str_lit("len"), t_int,
+	                                                     data_di->DerivedType.size,
+	                                                     file);
 
-		array_add(&di->CompositeType.elements->DebugInfoArray.elements, data_di);
-		array_add(&di->CompositeType.elements->DebugInfoArray.elements, len_di);
-		array_add(&di->CompositeType.elements->DebugInfoArray.elements, cap_di);
-		array_add(&di->CompositeType.elements->DebugInfoArray.elements, alloc_di);
+	// Field "cap"
+	irDebugInfo *cap_di = ir_add_debug_info_field_custom(module, scope, e, str_lit("cap"), t_int,
+	                                                     data_di->DerivedType.size +
+	                                                     len_di->DerivedType.size,
+	                                                     file);
 
-		// NOTE(lachsinc): This isn't particularly robust; we create a new one for every type. A potential workaround
-		// is to store a pointer for each of these "custom" types inside irModule, creating if not exists
-		// (and either adding to debug_info map, or assigning id's manually to them).
-		map_set(&module->debug_info, hash_pointer(data_ptr_di), data_ptr_di);
-		map_set(&module->debug_info, hash_pointer(data_di), data_di);
-		map_set(&module->debug_info, hash_pointer(len_di), len_di);
-		map_set(&module->debug_info, hash_pointer(cap_di), cap_di);
-		map_set(&module->debug_info, hash_pointer(alloc_di), alloc_di);
+	// Field "allocator"
+	irDebugInfo *alloc_di = ir_add_debug_info_field_custom(module, scope, e, str_lit("allocator"), t_allocator,
+	                                                       data_di->DerivedType.size +
+	                                                       len_di->DerivedType.size +
+	                                                       cap_di->DerivedType.size,
+	                                                       file);
 
-		map_set(&module->debug_info, hash_type(named ? named : type), di);
-	// }
+	irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 4);
+	array_add(&elements_di->DebugInfoArray.elements, data_di);
+	array_add(&elements_di->DebugInfoArray.elements, len_di);
+	array_add(&elements_di->DebugInfoArray.elements, cap_di);
+	array_add(&elements_di->DebugInfoArray.elements, alloc_di);
+
+	di->CompositeType.elements = elements_di;
+
+	map_set(&module->debug_info, hash_pointer(data_ptr_di), data_ptr_di);
+	map_set(&module->debug_info, hash_pointer(data_di), data_di);
+	map_set(&module->debug_info, hash_pointer(len_di), len_di);
+	map_set(&module->debug_info, hash_pointer(cap_di), cap_di);
+	map_set(&module->debug_info, hash_pointer(alloc_di), alloc_di);
+
+	map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+	map_set(&module->debug_info, hash_type(named ? named : type), di);
 
 	return di;
 }
 
 irDebugInfo *ir_add_debug_info_string(irModule *module, irDebugInfo *scope, Entity *e, Type *type, irDebugInfo *file) {
-	// TODO(lachsinc): Cleanup hardcode.
-
 	GB_ASSERT(type->kind == Type_Basic);
 	GB_ASSERT(type->Basic.kind == Basic_string);
 
-	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
-	di->CompositeType.name = type->Basic.name;
-	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
-	di->CompositeType.size = 8*cast(i32)type_size_of(t_string);
-	di->CompositeType.align = 8*cast(i32)type_align_of(t_string);
-	di->CompositeType.elements = ir_add_debug_info_array(module, 0, 2);
+	// Get or create string composite type (hashed via t_string ptr)
+	// alternatively we could just store a pointer to it inside irModule.
+	irDebugInfo **existing = map_get(&module->debug_info, hash_type(t_string));
+	if (existing != nullptr) {
+		GB_ASSERT((*existing)->kind == irDebugInfo_CompositeType);
+		return *existing;
+	} else {
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		di->CompositeType.name = type->Basic.name;
+		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+		di->CompositeType.size = 8*cast(i32)type_size_of(t_string);
+		di->CompositeType.align = 8*cast(i32)type_align_of(t_string);
 
-	irDebugInfo *data_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
-	data_di->DerivedType.name = str_lit("data"); // TODO(lachsinc):
-	data_di->DerivedType.tag = irDebugBasicEncoding_member;
-	data_di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
-	data_di->DerivedType.offset = 0;
-	data_di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, t_cstring, file);
+		// Field "data"
+		irDebugInfo *data_di = ir_add_debug_info_field_custom(module, scope, e, str_lit("data"), t_cstring, 0, file);
 
-	irDebugInfo *len_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
-	len_di->DerivedType.name = str_lit("len"); // TODO(lachsinc):
-	len_di->DerivedType.tag = irDebugBasicEncoding_member;
-	len_di->DerivedType.size = 8*cast(i32)type_size_of(t_i64);
-	len_di->DerivedType.offset = data_di->DerivedType.size;
-	len_di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, t_i64, file);
+		// Field "len"
+		irDebugInfo *len_di = ir_add_debug_info_field_custom(module, scope, e, str_lit("len"), t_i64,
+	                                                         data_di->DerivedType.size, file);
 
-	array_add(&di->CompositeType.elements->DebugInfoArray.elements, data_di);
-	array_add(&di->CompositeType.elements->DebugInfoArray.elements, len_di);
+		irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 2);
 
-	// NOTE(lachsinc): This isn't particularly robust, it assumes all strings will be caught
-	// by the map lookup (ie this will only be created once).
-	map_set(&module->debug_info, hash_pointer(data_di), data_di);
-	map_set(&module->debug_info, hash_pointer(len_di), len_di);
+		array_add(&elements_di->DebugInfoArray.elements, data_di);
+		array_add(&elements_di->DebugInfoArray.elements, len_di);
 
-	map_set(&module->debug_info, hash_type(type), di);
+		di->CompositeType.elements = elements_di;
 
-	return di;
+		map_set(&module->debug_info, hash_pointer(data_di), data_di);
+		map_set(&module->debug_info, hash_pointer(len_di), len_di);
+
+		map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+		map_set(&module->debug_info, hash_type(type), di);
+
+		return di;
+	}
 }
 
 irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity *e, Type *type, irDebugInfo *file) {
