@@ -26,6 +26,8 @@ struct irModule {
 	Map<irValue *>        anonymous_proc_lits; // Key: Ast *
 
 	irDebugInfo *         debug_compile_unit;
+	irDebugInfo *         debug_all_enums;   // irDebugInfoArray
+	irDebugInfo *         debug_all_globals; // irDebugInfoArray
 
 
 
@@ -517,7 +519,6 @@ enum irDebugEncoding {
 	irDebugBasicEncoding_enumeration_type = 4,
 	irDebugBasicEncoding_structure_type   = 19,
 	irDebugBasicEncoding_union_type       = 23,
-
 };
 
 enum irDebugInfoKind {
@@ -534,6 +535,7 @@ enum irDebugInfoKind {
 	irDebugInfo_DerivedType,    // pointer, typedef
 	irDebugInfo_CompositeType,  // array, struct, enum, (raw_)union
 	irDebugInfo_Enumerator,     // For irDebugInfo_CompositeType if enum
+	irDebugInfo_GlobalVariableExpression, // for describe if global is const or not
 	irDebugInfo_GlobalVariable,
 	irDebugInfo_LocalVariable,
 
@@ -618,13 +620,17 @@ struct irDebugInfo {
 			i64    value;
 		} Enumerator;
 		struct {
+			irDebugInfo *var;
+		} GlobalVariableExpression;
+		struct {
 			String       name;
 			String       linkage_name;
 			irDebugInfo *scope;
 			irDebugInfo *file;
 			TokenPos     pos;
+			irDebugInfo *type;
 			irValue     *variable;
-			irDebugInfo *declaration;
+			// irDebugInfo *declaration;
 		} GlobalVariable;
 		struct {
 			String       name;
@@ -1543,10 +1549,16 @@ irDebugInfo *ir_add_debug_info_array(irModule *module, isize count, isize capaci
 	return di;
 }
 
-irDebugInfo *ir_add_debug_info_file(irProcedure *proc, AstFile *file) {
+irDebugInfo *ir_add_debug_info_file(irModule *module, AstFile *file) {
 	// if (!proc->module->generate_debug_info) {
 	// 	return nullptr;
 	// }
+
+	irDebugInfo **existing = map_get(&module->debug_info, hash_ast_file(file));
+	if (existing != nullptr) {
+		GB_ASSERT((*existing)->kind == irDebugInfo_File);
+		return *existing;
+	}
 
 	GB_ASSERT(file != nullptr);
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_File);
@@ -1570,7 +1582,7 @@ irDebugInfo *ir_add_debug_info_file(irProcedure *proc, AstFile *file) {
 	di->File.filename = filename;
 	di->File.directory = directory;
 
-	map_set(&proc->module->debug_info, hash_ast_file(file), di);
+	map_set(&module->debug_info, hash_ast_file(file), di);
 	return di;
 }
 
@@ -1612,12 +1624,12 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 
 	case Basic_any:
 	case Basic_rawptr:
-	case Basic_cstring: // TODO(lachsinc)
 		return irDebugBasicEncoding_address;
 
 	// case Basic_complex32:
 	case Basic_complex64:
 	case Basic_complex128: 
+	case Basic_cstring:
 	case Basic_string:
 		break; // not a "DIBasicType"
 	}
@@ -1692,9 +1704,9 @@ irDebugInfo *ir_add_debug_info_dynamic_array(irModule *module, irDebugInfo *scop
 
 		// TODO(lachsinc): Necessary ?
 		di->CompositeType.size = 8*cast(i32)(type_size_of(t_rawptr) +
-											type_size_of(t_int) +
-											type_size_of(t_int) +
-											type_size_of(t_allocator)); // TODO(lachsinc): Allocator is correct size??
+		                                     type_size_of(t_int) +
+		                                     type_size_of(t_int) +
+		                                     type_size_of(t_allocator)); // TODO(lachsinc): Allocator is correct size??
 		di->CompositeType.align = 8*cast(i32)type_align_of(t_rawptr);
 		di->CompositeType.elements = ir_add_debug_info_array(module, 0, 4);
 
@@ -1847,7 +1859,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 			for_array(field_index, base->Struct.fields) {
 				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
 				          ir_add_debug_info_field(module, di, base->Struct.fields[field_index], cast(i32)field_index,
-						                          base->Struct.fields[field_index]->type, file));
+				                                  base->Struct.fields[field_index]->type, file));
 			}
 			di->CompositeType.tag = irDebugBasicEncoding_structure_type;
 		} else if (is_type_union(type)) {
@@ -1865,6 +1877,10 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 				          ir_add_debug_info_enumerator(module, base->Enum.fields[field_index]));
 			}
 			di->CompositeType.tag = irDebugBasicEncoding_enumeration_type;
+
+			// TODO(lachsinc): Do we want to ensure this is an enum in the global scope before
+			// adding it into the modules enum array ??
+			array_add(&module->debug_all_enums->DebugInfoArray.elements, di);
 		}
 
 		return di;
@@ -1902,10 +1918,6 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 		return di;
 	}
 	
-	// TODO(lachsinc): Not sure if correct.. Also cleanup
-	// NOTE(lachsinc): For now dynamic arrays are just a pointer to their data.
-	// We could get fancy and use a composite type along with
-	// DW_TAG_class_type / template debug stuff eventually.
 	if (is_type_dynamic_array(type)) {
 		return ir_add_debug_info_dynamic_array(module, scope, e, type, file);
 	}
@@ -1958,6 +1970,36 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 
 		return di;
 	}
+}
+
+irDebugInfo *ir_add_debug_info_global(irModule *module, irDebugInfo *scope, irValue *v) {
+	// if (!proc->module->generate_debug_info) {
+	// 	return nullptr;
+	// }
+
+	Entity *e = v->Global.entity;
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_GlobalVariableExpression);
+
+	irDebugInfo *var_di = ir_alloc_debug_info(irDebugInfo_GlobalVariable);
+	var_di->GlobalVariable.name = e->token.string;
+	var_di->GlobalVariable.scope = scope;
+	var_di->GlobalVariable.file = scope;
+	var_di->GlobalVariable.pos = e->token.pos;
+	var_di->GlobalVariable.type = ir_add_debug_info_type(module, scope, e, e->type, scope);
+	var_di->GlobalVariable.variable = v;
+
+	// NOTE(lachsinc): The "DIGlobalVariableExpression" owns us, and is what we refer to from other
+	// locations in the ir source, so we will reserve the "e" hash for it, and use something else
+	// unique for the DIGlobalVariable's hash.
+	map_set(&module->debug_info, hash_pointer(var_di), var_di);
+
+	di->GlobalVariableExpression.var = var_di;
+	map_set(&module->debug_info, hash_entity(e), di);
+
+	array_add(&module->debug_all_globals->DebugInfoArray.elements, di);
+
+	return di;
 }
 
 irDebugInfo *ir_add_debug_info_local(irProcedure *proc, irDebugInfo *scope, Entity *e, i32 arg_id) {
@@ -7997,16 +8039,7 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 		proc->is_export = e->Procedure.is_export;
 		proc->is_foreign = e->Procedure.is_foreign;
 
-		irDebugInfo *di_file = nullptr;
-
-		irDebugInfo **di_file_found = map_get(&m->debug_info, hash_ast_file(f));
-		if (di_file_found) {
-			di_file = *di_file_found;
-			GB_ASSERT(di_file->kind == irDebugInfo_File);
-		} else {
-			di_file = ir_add_debug_info_file(proc, f);
-		}
-
+		irDebugInfo *di_file = ir_add_debug_info_file(m, f);
 		ir_add_debug_info_proc(proc, e, proc->name, di_file);
 	}
 
@@ -8083,6 +8116,17 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 
 void ir_module_add_value(irModule *m, Entity *e, irValue *v) {
 	map_set(&m->values, hash_entity(e), v);
+	// TODO(lachsinc): This may not be the most sensible place to do this!
+	// it may be more sensible to look for more specific locations that call ir_value_global and assign it a value? maybe?
+	// ir_value_global itself doesn't have access to module and I'm trying to minimise changes to non-debug ir stuff.
+	if (v->kind == irValue_Global && v->Global.value != nullptr && e->state == EntityState_Resolved) {
+		CheckerInfo *info = m->info;
+		String filename = e->token.pos.file;
+		AstFile *f = ast_file_of_filename(info, filename);
+		GB_ASSERT(f);
+		irDebugInfo *di_file = ir_add_debug_info_file(m, f);
+		ir_add_debug_info_global(m, di_file, v);
+	}
 }
 
 void ir_init_module(irModule *m, Checker *c) {
@@ -8203,6 +8247,16 @@ void ir_init_module(irModule *m, Checker *c) {
 		map_set(&m->debug_info, hash_pointer(m), di);
 
 		m->debug_compile_unit = di;
+
+		irDebugInfo *enums_di = ir_alloc_debug_info(irDebugInfo_DebugInfoArray);
+		array_init(&enums_di->DebugInfoArray.elements, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
+		map_set(&m->debug_info, hash_pointer(enums_di), enums_di); // TODO(lachsinc): Safe to hash this pointer for key?
+		m->debug_all_enums = enums_di;
+
+		irDebugInfo *globals_di = ir_alloc_debug_info(irDebugInfo_DebugInfoArray);
+		array_init(&globals_di->DebugInfoArray.elements, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
+		map_set(&m->debug_info, hash_pointer(globals_di), globals_di); // TODO(lachsinc): Safe to hash this pointer for key?
+		m->debug_all_globals = globals_di;
 	}
 }
 

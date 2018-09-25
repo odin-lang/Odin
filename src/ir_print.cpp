@@ -1902,6 +1902,15 @@ void print_llvm_ir(irGen *ir) {
 			} else {
 				ir_write_string(f, str_lit("zeroinitializer"));
 			}
+			if (m->generate_debug_info) {
+				irDebugInfo **di_lookup = map_get(&m->debug_info, hash_entity(g->entity));
+				if (di_lookup != nullptr) {
+					irDebugInfo *di = *di_lookup;
+					GB_ASSERT(di);
+					GB_ASSERT(di->kind == irDebugInfo_GlobalVariableExpression);
+					ir_fprintf(f, ", !dbg !%d", di->id);
+				}
+			}
 		}
 		ir_write_byte(f, '\n');
 	}
@@ -1946,11 +1955,14 @@ void print_llvm_ir(irGen *ir) {
 				            ", runtimeVersion: 0"
 				            ", isOptimized: false"
 				            ", emissionKind: FullDebug"
-				            ", retainedTypes: !0"
-				            ", enums: !0"
-				            ", globals: !0"
+				            ", retainedTypes: !0"    // TODO(lachsinc)
+				            ", enums: !%d"
+				            ", globals: !%d"
 				            ")",
-				            file->id, LIT(build_context.ODIN_VERSION));
+				            file->id,
+				            LIT(build_context.ODIN_VERSION),
+				            m->debug_all_enums->id,
+				            m->debug_all_globals->id);
 				break;
 			}
 			case irDebugInfo_File:
@@ -1961,7 +1973,7 @@ void print_llvm_ir(irGen *ir) {
 				ir_fprintf(f, ")");
 				break;
 			case irDebugInfo_Proc:
-				// TODO(lach): We need to store scope info inside di, not just file info, for procs.
+				// TODO(lachsinc): We need to store scope info inside di, not just file info, for procs.
 				ir_fprintf(f, "distinct !DISubprogram("
 				              "name: \"%.*s\""
 				            ", linkageName: \"%.*s\""
@@ -1970,7 +1982,7 @@ void print_llvm_ir(irGen *ir) {
 				            ", line: %td"
 				            ", scopeLine: %td"
 				            ", isDefinition: true"
-				            ", isLocal: false" // TODO(lach): This used to be always set to true, pretend no local for now. We need to check if scope == file.
+				            ", isLocal: false" // TODO(lachsinc): This used to be always set to true, pretend no local for now. We need to check if scope == file.
 				            ", flags: DIFlagPrototyped"
 				            ", isOptimized: false"
 				            ", unit: !%d"
@@ -1985,6 +1997,39 @@ void print_llvm_ir(irGen *ir) {
 							di->Proc.types->id);
 				ir_write_byte(f, ')'); // !DISubprogram(
 				break;
+			case irDebugInfo_GlobalVariableExpression: {
+				ir_fprintf(f, "!DIGlobalVariableExpression("
+				              "var: !%d"
+				            ", expr: !DIExpression(",
+				           di->GlobalVariableExpression.var->id);
+				if (di->GlobalVariableExpression.var->GlobalVariable.variable->Global.is_constant) {
+					ir_write_str_lit(f, "DW_OP_constu, ");
+					// TODO(lachsinc): Confirm this prints the type as llvm expects eg. hex representation for float is safe etc.
+					ir_print_value(f, m, di->GlobalVariable.variable, ir_type(di->GlobalVariable.variable));
+					ir_write_str_lit(f, ", DW_OP_stack_value");
+				} else {
+					// NOTE(lachsinc): non-const globals expect empty "!DIExpression()"
+				}
+				ir_write_byte(f, ')'); // !DIExpression(
+				ir_write_byte(f, ')'); // !DIGlobalVariableExpression(
+				break;
+			}
+			case irDebugInfo_GlobalVariable: {
+				ir_fprintf(f, "distinct !DIGlobalVariable("
+				              "name: \"%.*s\""
+				            ", scope: !%d"
+				            ", file: !%d"
+				            ", line: %d"
+				            ", type: !%d"
+				            ", isLocal: true"        // TODO(lachsinc): Check is_foreign ??
+				            ", isDefinition: true)", // TODO(lachsinc): Check is_foreign ??
+				            LIT(di->GlobalVariable.name),
+				            di->GlobalVariable.scope->id,
+				            di->GlobalVariable.file->id,
+				            di->GlobalVariable.pos.line,
+				            di->GlobalVariable.type->id);
+				break;
+			}
 			case irDebugInfo_LocalVariable: {
 				ir_fprintf(f, "!DILocalVariable("
 				              "name: \"%.*s\""
@@ -2082,13 +2127,12 @@ void print_llvm_ir(irGen *ir) {
 			case irDebugInfo_Enumerator: {
 				ir_fprintf(f, "!DIEnumerator("
 				              "name: \"%.*s\""
-				            ", value: %d", // TODO(lachsinc): PRId64 equiv?
+				            ", value: %d)", // TODO(lachsinc): PRId64 equiv?
 				            LIT(di->Enumerator.name),
 				            di->Enumerator.value);
-				ir_write_byte(f, ')');
 				break;
 			}
-			// TODO(lach): Merge w/ DebugInfoArray
+			// TODO(lachsinc): Merge w/ DebugInfoArray
 			case irDebugInfo_AllProcs:
 				ir_fprintf(f, "!{");
 				for_array(proc_index, di->AllProcs.procs) {
