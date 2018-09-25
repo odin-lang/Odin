@@ -2058,17 +2058,19 @@ void print_llvm_ir(irGen *ir) {
 				ir_write_byte(f, ')');
 				break;
 			case irDebugInfo_DerivedType:
-				GB_ASSERT(di->DerivedType.base_type);
 				ir_fprintf(f, "!DIDerivedType("
 				              "name: \"%.*s\""
-				            ", baseType: !%d"
 				            ", size: %d"
 				            ", tag: ",
 				            LIT(di->DerivedType.name),
-				            di->DerivedType.base_type->id,
 				            di->DerivedType.size,
 				            di->DerivedType.align);
 				ir_print_debug_encoding(f, irDebugInfo_DerivedType, di->DerivedType.tag);
+				if (di->DerivedType.base_type != nullptr) {
+					ir_fprintf(f, ", baseType: !%d", di->DerivedType.base_type->id);
+				} else {
+					ir_write_str_lit(f, ", baseType: null"); // Valid/required for rawptr
+				}
 				if (di->DerivedType.align > 0) {
 					ir_fprintf(f, ", align: %d",
 					           di->DerivedType.align);
