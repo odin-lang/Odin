@@ -1636,7 +1636,8 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	return irDebugBasicEncoding_Invalid;
 }
 
-irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entity *e, i32 index, Type *type, irDebugInfo *file) {
+// TODO(lachsinc): Cleanup params.
+irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entity *e, Type *struct_type, i32 index, Type *type, irDebugInfo *file) {
 	Type *named = type;
 	type = base_type(type);
 	GB_ASSERT(type->kind != Type_Named);
@@ -1653,7 +1654,11 @@ irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entit
 	di->DerivedType.file = file;
 	di->DerivedType.size = 8*cast(i32)type_size_of(type);
 	di->DerivedType.align = 8*cast(i32)type_align_of(type);
-	di->DerivedType.offset = 8*cast(i32)type_offset_of(type, index); // TODO(lachsinc): Confirm correct
+	if (struct_type && struct_type->Struct.are_offsets_set) {
+		di->DerivedType.offset = 8*cast(i32)struct_type->Struct.offsets[index];
+	} else {
+		di->DerivedType.offset = 8*cast(i32)type_offset_of(type, index); // TODO(lachsinc): Confirm correct
+	}
 	di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, type, file);
 	GB_ASSERT_NOT_NULL(di->DerivedType.base_type);
 
@@ -1910,8 +1915,8 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Struct.fields.count);
 			for_array(field_index, base->Struct.fields) {
 				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
-				          ir_add_debug_info_field(module, di, base->Struct.fields[field_index], cast(i32)field_index,
-				                                  base->Struct.fields[field_index]->type, file));
+				          ir_add_debug_info_field(module, di, base->Struct.fields[field_index], type,
+				                                  cast(i32)field_index, base->Struct.fields[field_index]->type, file));
 			}
 			di->CompositeType.tag = irDebugBasicEncoding_structure_type;
 		} else if (is_type_union(type)) {
@@ -1993,14 +1998,20 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 		// NOTE(lachsinc): Every slice type has its own composite type / field debug infos created. This is wasteful!!
 
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
-		di->CompositeType.name = type->Basic.name;
+		di->CompositeType.name = str_lit("slice");
 		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
 		di->CompositeType.size = 8*cast(i32)type_size_of(type); // TODO(lachsinc): Correct ??
 		di->CompositeType.align = 8*cast(i32)type_align_of(type);
 
 		// Data pointer type
 		irDebugInfo *data_ptr_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
-		data_ptr_di->DerivedType.name = str_lit("slice_type_todo");
+		if (type->Slice.elem->kind == Type_Named) {
+			data_ptr_di->DerivedType.name = type->Slice.elem->Named.name; // TODO(lachsinc): Ptr??
+		} else if (type->Slice.elem->kind == Type_Basic) {
+			data_ptr_di->DerivedType.name = type->Slice.elem->Basic.name; // TODO(lachsinc): Ptr??
+		} else {
+			data_ptr_di->DerivedType.name = str_lit("slice_ptr_type_todo");
+		}
 		data_ptr_di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
 		data_ptr_di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
 		data_ptr_di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, type->Slice.elem, file);
@@ -2028,6 +2039,10 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 		map_set(&module->debug_info, hash_type(type), di);
 
 		return di;
+	}
+
+	if (is_type_map(type)) {
+		return ir_add_debug_info_type(module, scope, e, type->Map.generated_struct_type, file);
 	}
 
 	//
