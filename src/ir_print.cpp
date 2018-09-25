@@ -1955,7 +1955,7 @@ void print_llvm_ir(irGen *ir) {
 				            ", runtimeVersion: 0"
 				            ", isOptimized: false"
 				            ", emissionKind: FullDebug"
-				            ", retainedTypes: !0"    // TODO(lachsinc)
+				            ", retainedTypes: !0" // TODO(lachsinc)
 				            ", enums: !%d"
 				            ", globals: !%d"
 				            ")",
@@ -1966,7 +1966,6 @@ void print_llvm_ir(irGen *ir) {
 				break;
 			}
 			case irDebugInfo_File:
-				// TODO(lachsinc): Does windows debug info expect '/' or '\5C' path separators ??
 				ir_fprintf(f, "!DIFile(filename: \""); ir_print_escape_path(f, di->File.filename);
 				ir_fprintf(f, "\", directory: \""); ir_print_escape_path(f, di->File.directory);
 				ir_fprintf(f, "\"");
@@ -2004,7 +2003,6 @@ void print_llvm_ir(irGen *ir) {
 				           di->GlobalVariableExpression.var->id);
 				if (di->GlobalVariableExpression.var->GlobalVariable.variable->Global.is_constant) {
 					ir_write_str_lit(f, "DW_OP_constu, ");
-					// TODO(lachsinc): Confirm this prints the type as llvm expects eg. hex representation for float is safe etc.
 					ir_print_value(f, m, di->GlobalVariable.variable, ir_type(di->GlobalVariable.variable));
 					ir_write_str_lit(f, ", DW_OP_stack_value");
 				} else {
@@ -2043,7 +2041,7 @@ void print_llvm_ir(irGen *ir) {
 				            di->LocalVariable.pos.line,
 				            di->LocalVariable.type->id);
 				if (di->LocalVariable.arg > 0) {
-					GB_ASSERT(false); // TODO(lachsinc): "Arg" debug info not implemented yet
+					GB_PANIC("Param 'Arg' debug info not yet implemented"); // TODO(lachsinc):
 					ir_fprintf(f, ", arg: %d", di->LocalVariable.arg);
 				}
 				ir_write_byte(f, ')');
@@ -2127,7 +2125,7 @@ void print_llvm_ir(irGen *ir) {
 			case irDebugInfo_Enumerator: {
 				ir_fprintf(f, "!DIEnumerator("
 				              "name: \"%.*s\""
-				            ", value: %d)", // TODO(lachsinc): PRId64 equiv?
+				            ", value: %lld)",
 				            LIT(di->Enumerator.name),
 				            di->Enumerator.value);
 				break;
