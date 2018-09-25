@@ -1622,15 +1622,13 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	case Basic_f64:
 		return irDebugBasicEncoding_float;
 
-	case Basic_any:
-	case Basic_rawptr:
-		return irDebugBasicEncoding_address;
-
 	// case Basic_complex32:
 	case Basic_complex64:
 	case Basic_complex128: 
 	case Basic_cstring:
 	case Basic_string:
+	case Basic_any:
+	case Basic_rawptr:
 		break; // not a "DIBasicType"
 	}
 
@@ -1761,9 +1759,7 @@ irDebugInfo *ir_add_debug_info_dynamic_array(irModule *module, irDebugInfo *scop
 	map_set(&module->debug_info, hash_pointer(len_di), len_di);
 	map_set(&module->debug_info, hash_pointer(cap_di), cap_di);
 	map_set(&module->debug_info, hash_pointer(alloc_di), alloc_di);
-
 	map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
-
 	map_set(&module->debug_info, hash_type(named ? named : type), di);
 
 	return di;
@@ -1790,22 +1786,49 @@ irDebugInfo *ir_add_debug_info_string(irModule *module, irDebugInfo *scope, Enti
 		irDebugInfo *data_di = ir_add_debug_info_field_custom(module, scope, e, str_lit("data"), t_cstring, 0, file);
 
 		// Field "len"
-		irDebugInfo *len_di = ir_add_debug_info_field_custom(module, scope, e, str_lit("len"), t_i64,
-	                                                         data_di->DerivedType.size, file);
+		irDebugInfo *len_di = ir_add_debug_info_field_custom(module, scope, e, str_lit("len"), t_i64, data_di->DerivedType.size, file);
 
 		irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 2);
-
 		array_add(&elements_di->DebugInfoArray.elements, data_di);
 		array_add(&elements_di->DebugInfoArray.elements, len_di);
-
 		di->CompositeType.elements = elements_di;
 
 		map_set(&module->debug_info, hash_pointer(data_di), data_di);
 		map_set(&module->debug_info, hash_pointer(len_di), len_di);
-
 		map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
-
 		map_set(&module->debug_info, hash_type(type), di);
+
+		return di;
+	}
+}
+
+irDebugInfo *ir_add_debug_info_any(irModule *module) {
+	irDebugInfo **existing = map_get(&module->debug_info, hash_type(t_any));
+	if (existing != nullptr) {
+		GB_ASSERT((*existing)->kind == irDebugInfo_CompositeType);
+		return *existing;
+	} else {
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		di->CompositeType.name = t_any->Basic.name;
+		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+		di->CompositeType.size = 8*cast(i32)type_size_of(t_any); // TODO(lachsinc): Correct ??
+		di->CompositeType.align = 8*cast(i32)type_align_of(t_any);
+
+		// Field "data"
+		irDebugInfo *data_di = ir_add_debug_info_field_custom(module, nullptr, nullptr, str_lit("data"), t_rawptr, 0, nullptr);
+
+		// Field "len"
+		irDebugInfo *len_di = ir_add_debug_info_field_custom(module, nullptr, nullptr, str_lit("id"), t_typeid, data_di->DerivedType.size, nullptr);
+
+		irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 2);
+		array_add(&elements_di->DebugInfoArray.elements, data_di);
+		array_add(&elements_di->DebugInfoArray.elements, len_di);
+		di->CompositeType.elements = elements_di;
+
+		map_set(&module->debug_info, hash_pointer(data_di), data_di);
+		map_set(&module->debug_info, hash_pointer(len_di), len_di);
+		map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+		map_set(&module->debug_info, hash_type(t_any), di);
 
 		return di;
 	}
@@ -1821,19 +1844,50 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 		return *existing;
 	}
 
-	if (type->kind == Type_Basic && !is_type_complex(type) && !is_type_string(type) && !is_type_cstring(type)) {
-		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_BasicType);
-		di->BasicType.encoding = ir_debug_encoding_for_basic(type->Basic.kind);
-		di->BasicType.name = type->Basic.name;
-		di->BasicType.size = 8*cast(i32)type_size_of(type);
-		di->BasicType.align = 8*cast(i32)type_align_of(type);
-
-		map_set(&module->debug_info, hash_type(type), di);
-		return di;
-	}
-	
 	// NOTE(lachsinc): Types are inserted into debug_info map as their named, not base_type()'d counterpart.
 	Type *base = base_type(type);
+
+	// TODO(lachsinc): Are all "named" types just able to be DIDerivedTypes?
+
+	// TODO(lachsinc): switch ??
+	if (type->kind == Type_Basic) {
+		if (is_type_rawptr(type))  {
+			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+			di->DerivedType.name = t_rawptr->Basic.name;
+			di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
+			di->DerivedType.base_type = nullptr; // NOTE(lachsinc): llvm expects "null", use nullptr
+			di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
+			di->DerivedType.align = 8*cast(i32)type_align_of(t_rawptr);
+			GB_ASSERT(base->kind != Type_Named);
+			map_set(&module->debug_info, hash_type(type), di);
+			return di;
+		} else if (is_type_cstring(type)) {
+			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+			auto elem_type = type->DynamicArray.elem;
+			di->DerivedType.name = type->Basic.name;
+			di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
+			di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, t_i8, file); // TODO(lachsinc): Is i8 cstring platform agnostic?
+			di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
+			di->DerivedType.align = 8*cast(i32)type_align_of(t_rawptr);
+			GB_ASSERT(base->kind != Type_Named);
+			map_set(&module->debug_info, hash_type(type), di);
+			return di;
+		} else if (is_type_string(type)) {
+			return ir_add_debug_info_string(module, scope, e, type, file);
+		} else if (is_type_any(type)) {
+			return ir_add_debug_info_any(module);
+		} else if (is_type_complex(type)) {
+			// TODO(lachsinc):
+		} else {
+			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_BasicType);
+			di->BasicType.encoding = ir_debug_encoding_for_basic(type->Basic.kind);
+			di->BasicType.name = type->Basic.name;
+			di->BasicType.size = 8*cast(i32)type_size_of(type);
+			di->BasicType.align = 8*cast(i32)type_align_of(type);
+			map_set(&module->debug_info, hash_type(type), di);
+			return di;
+		}
+	}
 
 	if (is_type_struct(type) || is_type_union(type) || is_type_enum(type)) {
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
@@ -1933,25 +1987,6 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 		map_set(&module->debug_info, hash_type(type), di);
 
 		return di;
-	}
-
-	if (is_type_cstring(type)) {
-		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
-		auto elem_type = type->DynamicArray.elem;
-		di->DerivedType.name = type->Basic.name;
-		di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
-		di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, t_i8, file); // TODO(lachsinc): Is i8 cstring platform agnostic?
-		di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
-		di->DerivedType.align = 8*cast(i32)type_align_of(t_rawptr);
-
-		GB_ASSERT(base->kind != Type_Named);
-		map_set(&module->debug_info, hash_type(type), di);
-
-		return di;
-	}
-
-	if (is_type_string(type)) {
-		return ir_add_debug_info_string(module, scope, e, type, file);
 	}
 
 	//
