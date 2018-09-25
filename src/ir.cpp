@@ -1714,7 +1714,7 @@ irDebugInfo *ir_add_debug_info_dynamic_array(irModule *module, irDebugInfo *scop
 	irDebugInfo *data_ptr_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
 	data_ptr_di->DerivedType.name = str_lit("ptr_type_name_todo");
 	data_ptr_di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
-	data_ptr_di->DerivedType.size = 8*cast(i32)type_size_of(type->DynamicArray.elem);
+	data_ptr_di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
 	data_ptr_di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, type->DynamicArray.elem, file);
 
 	// Field "data"
@@ -1984,6 +1984,47 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, irDebugInfo *scope, Entity
 		di->CompositeType.array_count = (i32)type->Array.count;
 
 		GB_ASSERT(base->kind != Type_Named);
+		map_set(&module->debug_info, hash_type(type), di);
+
+		return di;
+	}
+
+	if (is_type_slice(type)) {
+		// NOTE(lachsinc): Every slice type has its own composite type / field debug infos created. This is wasteful!!
+
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		di->CompositeType.name = type->Basic.name;
+		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+		di->CompositeType.size = 8*cast(i32)type_size_of(type); // TODO(lachsinc): Correct ??
+		di->CompositeType.align = 8*cast(i32)type_align_of(type);
+
+		// Data pointer type
+		irDebugInfo *data_ptr_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+		data_ptr_di->DerivedType.name = str_lit("slice_type_todo");
+		data_ptr_di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
+		data_ptr_di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
+		data_ptr_di->DerivedType.base_type = ir_add_debug_info_type(module, scope, e, type->Slice.elem, file);
+
+		// Field "data"
+		irDebugInfo *data_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+		data_di->DerivedType.name = str_lit("data");
+		data_di->DerivedType.tag = irDebugBasicEncoding_member;
+		data_di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
+		data_di->DerivedType.offset = 0;
+		data_di->DerivedType.base_type = data_ptr_di;
+
+		// Field "len"
+		irDebugInfo *len_di = ir_add_debug_info_field_custom(module, nullptr, nullptr, str_lit("len"), t_int, data_di->DerivedType.size, nullptr);
+
+		irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 2);
+		array_add(&elements_di->DebugInfoArray.elements, data_di);
+		array_add(&elements_di->DebugInfoArray.elements, len_di);
+		di->CompositeType.elements = elements_di;
+
+		map_set(&module->debug_info, hash_pointer(data_ptr_di), data_ptr_di);
+		map_set(&module->debug_info, hash_pointer(data_di), data_di);
+		map_set(&module->debug_info, hash_pointer(len_di), len_di);
+		map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
 		map_set(&module->debug_info, hash_type(type), di);
 
 		return di;
