@@ -577,7 +577,7 @@ struct irDebugInfo {
 		} Proc;
 		struct {
 			Array<irDebugInfo *> procs;
-		} AllProcs; // TODO(lach): Redundant w/ DebugInfoArray. Merge.
+		} AllProcs; // TODO(lachsinc): Redundant w/ DebugInfoArray. Merge.
 
 		// NOTE(lachsinc): Many of the following fields could be removed/resolved as we print it?
 		struct {
@@ -613,7 +613,7 @@ struct irDebugInfo {
 			i32                  size;
 			i32                  align;
 			irDebugInfo *        elements;
-			i32                  array_count; // TODO(lach): We could define a new !DISubrange and place ptr to it inside above elements array instead.
+			i32                  array_count; // for DISubrange
 		} CompositeType;
 		struct {
 			String name;
@@ -1680,16 +1680,13 @@ irDebugInfo *ir_add_debug_info_enumerator(irModule *module, Entity *e) {
 }
 
 irDebugInfo *ir_add_debug_info_dynamic_array(irModule *module, irDebugInfo *scope, Entity *e, Type *type, irDebugInfo *file) {
-	//
-	// TODO(lachsinc): Hardcode McGee.
-	//
+	// TODO(lachsinc): Cleanup hardcode.
 
 	// TODO(lachsinc): SPEED? I assume this will create a bunch of new debug infos for _every single_
 	// dynamic array type. Maybe that's what we want, but with ability to refer to the _same_
 	// derived types for the len/cap/allocator fields.
 
-	// TODO(lachsinc): HACK we should handle named's as derived types to
-	// minimise duplication of work / ir output
+	// TODO(lachsinc): HACK named should be handled as derived types, see above.
 	Type *named = nullptr;
 	if (is_type_named(type)) {
 		named = type;
@@ -1754,7 +1751,7 @@ irDebugInfo *ir_add_debug_info_dynamic_array(irModule *module, irDebugInfo *scop
 		array_add(&di->CompositeType.elements->DebugInfoArray.elements, cap_di);
 		array_add(&di->CompositeType.elements->DebugInfoArray.elements, alloc_di);
 
-		// NOTE(lach): This isn't particularly robust; we create a new one for every type. A potential workaround
+		// NOTE(lachsinc): This isn't particularly robust; we create a new one for every type. A potential workaround
 		// is to store a pointer for each of these "custom" types inside irModule, creating if not exists
 		// (and either adding to debug_info map, or assigning id's manually to them).
 		map_set(&module->debug_info, hash_pointer(data_ptr_di), data_ptr_di);
@@ -1770,11 +1767,7 @@ irDebugInfo *ir_add_debug_info_dynamic_array(irModule *module, irDebugInfo *scop
 }
 
 irDebugInfo *ir_add_debug_info_string(irModule *module, irDebugInfo *scope, Entity *e, Type *type, irDebugInfo *file) {
-	// TODO(lach): Is there a cleaner way to set up these types without hardcoding values ??
-	// Also we may want to just create hardcoded "base type" for things like strings etc.
-	// and just create a derived (named) type to "inherit" from. That way we can look them up directly
-	// inside irModule, and avoid lots of map lookups and array creations for their elements.
-	// In theory this should only occur once, as we hash the type t_string once and return it.
+	// TODO(lachsinc): Cleanup hardcode.
 
 	GB_ASSERT(type->kind == Type_Basic);
 	GB_ASSERT(type->Basic.kind == Basic_string);
@@ -1803,7 +1796,7 @@ irDebugInfo *ir_add_debug_info_string(irModule *module, irDebugInfo *scope, Enti
 	array_add(&di->CompositeType.elements->DebugInfoArray.elements, data_di);
 	array_add(&di->CompositeType.elements->DebugInfoArray.elements, len_di);
 
-	// NOTE(lach): This isn't particularly robust, it assumes all strings will be caught
+	// NOTE(lachsinc): This isn't particularly robust, it assumes all strings will be caught
 	// by the map lookup (ie this will only be created once).
 	map_set(&module->debug_info, hash_pointer(data_di), data_di);
 	map_set(&module->debug_info, hash_pointer(len_di), len_di);
@@ -2062,7 +2055,7 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 			if (e->kind != Entity_Variable) {
 				continue; // TODO(lachsinc): Confirm correct?
 			}
-			// TODO(lach): Could technically be a local?
+			// TODO(lachsinc): Could technically be a local?
 			irDebugInfo *type_di = ir_add_debug_info_type(proc->module, di, e, e->type, file);
 			GB_ASSERT_NOT_NULL(type_di);
 			array_add(&di->Proc.types->DebugInfoArray.elements, type_di);
