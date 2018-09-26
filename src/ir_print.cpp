@@ -2058,32 +2058,30 @@ void print_llvm_ir(irGen *ir) {
 				ir_write_byte(f, ')');
 				break;
 			case irDebugInfo_DerivedType:
-				ir_fprintf(f, "!DIDerivedType("
-				              "name: \"%.*s\""
-				            ", size: %d"
-				            ", tag: ",
-				            LIT(di->DerivedType.name),
-				            di->DerivedType.size,
-				            di->DerivedType.align);
+				ir_write_str_lit(f, "!DIDerivedType(tag: ");
 				ir_print_debug_encoding(f, irDebugInfo_DerivedType, di->DerivedType.tag);
+				if (di->DerivedType.name.len > 0) {
+					ir_fprintf(f, ", name: \"%.*s\"", LIT(di->DerivedType.name));
+				}
 				if (di->DerivedType.base_type != nullptr) {
 					ir_fprintf(f, ", baseType: !%d", di->DerivedType.base_type->id);
 				} else {
 					ir_write_str_lit(f, ", baseType: null"); // Valid/required for rawptr
 				}
+				if (di->DerivedType.size > 0) {
+					ir_fprintf(f, ", size: %d", di->DerivedType.size);
+				}
 				if (di->DerivedType.align > 0) {
-					ir_fprintf(f, ", align: %d",
-					           di->DerivedType.align);
+					ir_fprintf(f, ", align: %d", di->DerivedType.align);
 				}
 				if (di->DerivedType.offset > 0) {
-					ir_fprintf(f, ", offset: %d",
-					           di->DerivedType.offset);
+					ir_fprintf(f, ", offset: %d", di->DerivedType.offset);
 				}
 				ir_write_byte(f, ')');
 				break;
 			case irDebugInfo_CompositeType: {
 				if (di->CompositeType.tag == irDebugBasicEncoding_array_type) {
-					GB_ASSERT(di->CompositeType.base_type);
+					GB_ASSERT_NOT_NULL(di->CompositeType.base_type);
 					ir_fprintf(f, "!DICompositeType("
 					              "tag: DW_TAG_array_type"
 					            ", size: %d"
@@ -2106,10 +2104,11 @@ void print_llvm_ir(irGen *ir) {
 					            di->CompositeType.align);
 					ir_print_debug_encoding(f, irDebugInfo_CompositeType, di->CompositeType.tag);
 					if (di->CompositeType.scope != nullptr) {
-						ir_fprintf(f, ", scope: !%d"
-						              ", file: !%d"
+						ir_fprintf(f, ", scope: !%d", di->CompositeType.scope->id);
+					}
+					if (di->CompositeType.file != nullptr) {
+						ir_fprintf(f, ", file: !%d"
 						              ", line: %td",
-						              di->CompositeType.scope->id,
 						              di->CompositeType.file->id,
 						              di->CompositeType.pos.line);
 					}
