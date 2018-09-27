@@ -2082,45 +2082,44 @@ void print_llvm_ir(irGen *ir) {
 			case irDebugInfo_CompositeType: {
 				if (di->CompositeType.tag == irDebugBasicEncoding_array_type) {
 					GB_ASSERT_NOT_NULL(di->CompositeType.base_type);
-					ir_fprintf(f, "!DICompositeType("
-					              "tag: DW_TAG_array_type"
-					            ", size: %d"
-					            ", align: %d"
-					            ", baseType: !%d"
-					            ", elements: !{!DISubrange(count: %d)}"
-					            ")",
-					            di->CompositeType.size,
-					            di->CompositeType.align,
-					            di->CompositeType.base_type->id,
-					            di->CompositeType.array_count);
+					GB_ASSERT(di->CompositeType.array_count > 0);
+					GB_ASSERT(di->CompositeType.name.len == 0);
+					GB_ASSERT(di->CompositeType.size > 0);
+				}
+
+				ir_write_str_lit(f, "!DICompositeType(tag: ");
+				ir_print_debug_encoding(f, irDebugInfo_CompositeType, di->CompositeType.tag);
+				if (di->CompositeType.name.len > 0) {
+					ir_fprintf(f, ", name: \"%.*s\"", LIT(di->CompositeType.name));
+				}
+				if (di->CompositeType.scope != nullptr) {
+					ir_fprintf(f, ", scope: !%d", di->CompositeType.scope->id);
+				}
+				if (di->CompositeType.file != nullptr) {
+					ir_fprintf(f, ", file: !%d"
+					              ", line: %td",
+					              di->CompositeType.file->id,
+					              di->CompositeType.pos.line);
+				}
+				if (di->CompositeType.size > 0) {
+					ir_fprintf(f, ", size: %d", di->CompositeType.size);
+				}
+				if (di->CompositeType.align > 0) {
+					ir_fprintf(f, ", align: %d", di->CompositeType.align);
+				}
+				if (di->CompositeType.base_type != nullptr) {
+					GB_ASSERT(di->CompositeType.tag != irDebugBasicEncoding_structure_type);
+					GB_ASSERT(di->CompositeType.tag != irDebugBasicEncoding_union_type);
+					ir_fprintf(f, ", baseType: !%d", di->CompositeType.base_type->id);
+				}
+				if (di->CompositeType.tag == irDebugBasicEncoding_array_type) {
+					ir_fprintf(f, ", elements: !{!DISubrange(count: %d)}", di->CompositeType.array_count);
 				} else {
-					ir_fprintf(f, "!DICompositeType("
-					              "name: \"%.*s\""
-					            ", size: %d"
-					            ", align: %d"
-					            ", tag: ",
-					            LIT(di->CompositeType.name),
-					            di->CompositeType.size,
-					            di->CompositeType.align);
-					ir_print_debug_encoding(f, irDebugInfo_CompositeType, di->CompositeType.tag);
-					if (di->CompositeType.scope != nullptr) {
-						ir_fprintf(f, ", scope: !%d", di->CompositeType.scope->id);
-					}
-					if (di->CompositeType.file != nullptr) {
-						ir_fprintf(f, ", file: !%d"
-						              ", line: %td",
-						              di->CompositeType.file->id,
-						              di->CompositeType.pos.line);
-					}
-					if (di->CompositeType.base_type != nullptr) {
-						GB_ASSERT(di->CompositeType.tag == irDebugBasicEncoding_enumeration_type);
-						ir_fprintf(f, ", baseType: !%d", di->CompositeType.base_type->id);
-					}
 					if (di->CompositeType.elements != nullptr) {
 						ir_fprintf(f, ", elements: !%d", di->CompositeType.elements->id);
 					}
-					ir_write_byte(f, ')');
 				}
+				ir_write_byte(f, ')');
 				break;
 			}
 			case irDebugInfo_Enumerator: {
