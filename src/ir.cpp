@@ -1666,32 +1666,53 @@ irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Typ
 	return di;
 }
 
-// TODO(lachsinc): Cleanup params.
-irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entity *e, Type *struct_type, i32 index, Type *type, irDebugInfo *file) {
-	GB_ASSERT_NOT_NULL(e);
-
-	Type *named = type;
-	type = base_type(type);
-	GB_ASSERT(type->kind != Type_Named);
-
-	irDebugInfo **existing = map_get(&module->debug_info, hash_entity(e));
-	if (existing != nullptr) {
-		return *existing;
+// TODO(lachsinc): Cleanup params, either scope or scope_type, not both.
+// Pass name, file, pos in manually? Would be much cleaner.
+irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entity *e, Type *scope_type, i32 index, Type *type, irDebugInfo *file) {
+	// NOTE(lachsinc): This lookup will only work for struct fields!!
+	// TODO(lachsinc): Do we even need to do this?
+	if (e) {
+		irDebugInfo **existing = map_get(&module->debug_info, hash_entity(e));
+		if (existing != nullptr) {
+			return *existing;
+		}
 	}
 
-	i32 offset = 0;
-	if (struct_type && struct_type->Struct.are_offsets_set) {
-		offset = ir_debug_info_bits(struct_type->Struct.offsets[index]);
-	} else {
-		offset = ir_debug_info_bits(type_offset_of(type, index));
+	// TODO(lachsinc): Cleanup
+	irDebugInfo *di = ir_add_debug_info_field_internal(module, make_string(nullptr, 0), type, 0, scope);
+	void *ptr_to_hash = nullptr;
+	if (scope_type) {
+		Type *scope_base = base_type(scope_type);
+		if (is_type_struct(scope_type)) {
+			if (scope_base->Struct.are_offsets_set) {
+				di->DerivedType.offset = ir_debug_info_bits(scope_base->Struct.offsets[index]);
+			} else {
+				di->DerivedType.offset = ir_debug_info_bits(type_offset_of(scope_base, index));
+			}
+			if (e) {
+				ptr_to_hash = e;
+				di->DerivedType.name = e->token.string;
+				di->DerivedType.pos = e->token.pos;
+			} else {
+				GB_PANIC("Unreachable"); // struct field Entity's should be provided.
+			}
+		} else if (is_type_union(scope_base)) {
+			// TODO(lachsinc): Handle this in a more generic manner/pass in??...
+			// Token token = base_type(scope_base)->Union.node->UnionType.token;
+			// di->DerivedType.name = token.string;
+			// di->DerivedType.pos = token.pos;
+			if (is_type_named(type)) {
+				di->DerivedType.name = type->kind == Type_Named ? type->Named.name : type->Basic.name;
+			}
+			ptr_to_hash = di; // TODO(lachsinc): Correct ?? I don't think unions have individual entities for their fields?? idk.
+		}
 	}
 
-	irDebugInfo *di = ir_add_debug_info_field_internal(module, e->token.string, type, offset, scope);
-	map_set(&module->debug_info, hash_entity(e), di);
-	// di->DerivedType.align = ir_debug_align_bits(type);
 	di->DerivedType.file = file;
-	di->DerivedType.pos = e->token.pos;
-	// di->DerivedType.base_type = ir_add_debug_info_type(module, type, e, scope, file);
+	// di->DerivedType.align = ir_debug_align_bits(type);
+
+	GB_ASSERT_NOT_NULL(ptr_to_hash);
+	map_set(&module->debug_info, hash_pointer(ptr_to_hash), di);
 
 	return di;
 }
@@ -1869,13 +1890,16 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		}
 	}
 
-	// NOTE(lachsinc): Types are inserted into debug_info map as their named, not base_type()'d, counterpart.
+	// NOTE(lachsinc): Types should be inserted into debug_info map as their named, not base_type()'d, counterpart.
 	Type *base = base_type(type);
 
 	if (type->kind == Type_Named) {
 		Type *named_base = type->Named.base;
 		// TODO(lachsinc): Better way to determine distinct etc. or just handle structs, enums before we reach here.
-		if (named_base->kind != Type_Struct && named_base->kind != Type_Enum) { 
+		// ir_is_type_aggregate() except with no call to base_type().
+		if (named_base->kind != Type_Struct &&
+		    named_base->kind != Type_Union &&
+			named_base->kind != Type_Enum) {
 			// distinct / typedef etc.
 			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
 			if (type->kind == Type_Named) {
@@ -1947,24 +1971,28 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		return di;
 	}
 
-	if (is_type_struct(type) || is_type_enum(type)) { // || is_type_union(type)   TODO(lachsinc):
+	if (is_type_struct(type) || is_type_union(type) || is_type_enum(type)) {
+		if (type->kind == Type_Named) {
+			// Named named's should be handled prior as typedefs.
+			GB_ASSERT(type->Named.base->kind != Type_Named);
+		}
+
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		// NOTE(lachsinc): Set map value before resolving field types to avoid circular dependencies.
+		map_set(&module->debug_info, hash_type(type), di);
+		if (is_type_named(type)) {
+			di->CompositeType.name = type->kind == Type_Named ? type->Named.name : type->Basic.name;
+		}
 		if (e) {
 			di->CompositeType.file = file;
 			di->CompositeType.scope = scope;
 			di->CompositeType.pos = e->token.pos;
 		}
 		di->CompositeType.size = ir_debug_size_bits(type);
-		di->CompositeType.align = ir_debug_align_bits(type);
-		di->CompositeType.base_type = nullptr;
-
-		// NOTE(lachsinc): Set map value before resolving field types to avoid circular dependencies.
-		map_set(&module->debug_info, hash_type(type), di);
+		di->CompositeType.align = ir_debug_align_bits(type); // TODO(lachsinc): Necessary?
 
 		if (is_type_struct(type)) {
-			if (is_type_named(type)) {
-				di->CompositeType.name = type->kind == Type_Named ? type->Named.name : type->Basic.name;
-			}
+			GB_ASSERT(base->kind == Type_Struct);
 			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Struct.fields.count);
 			for_array(field_index, base->Struct.fields) {
 				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
@@ -1973,15 +2001,22 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 			}
 			di->CompositeType.tag = irDebugBasicEncoding_structure_type;
 		} else if (is_type_union(type)) {
-			di->CompositeType.name = str_lit("union_name_todo");
-			di->CompositeType.elements = nullptr; // ir_add_debug_info_array(module, 0, 0);
-			// TODO(lachsinc): Add elements for union
+			GB_ASSERT(base->kind == Type_Union);
 			di->CompositeType.tag = irDebugBasicEncoding_union_type;
-		} else if (is_type_enum(type)) {
-			if (type->kind == Type_Named) {
-				di->CompositeType.name = type->Named.name;
+			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Union.variants.count);
+			// TODO(lachsinc): Cleanup; this should be handled in a more generic manner for all types.
+			file = ir_add_debug_info_file(module, base->Union.node->file);
+			GB_ASSERT_NOT_NULL(file); // Union debug info requires file info
+			di->CompositeType.file = file;
+			di->CompositeType.pos = base->Union.node->UnionType.token.pos;
+			for_array(field_index, base->Union.variants) {
+				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
+				          ir_add_debug_info_field(module, di, nullptr, type, cast(i32)field_index,
+				                                  base->Union.variants[field_index], file));
 			}
-			di->CompositeType.base_type = ir_add_debug_info_type(module, type->Named.base->Enum.base_type, e, scope, file);
+		} else if (is_type_enum(type)) {
+			GB_ASSERT(base->kind == Type_Enum);
+			di->CompositeType.base_type = ir_add_debug_info_type(module, base->Enum.base_type, e, scope, file);
 			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Enum.fields.count);
 			for_array(field_index, base->Enum.fields) {
 				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
@@ -2061,7 +2096,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		// TODO(lachsinc): Looks like "generated_struct_type" map.entries.data is just a u8*, we could
 		// always look at the map header and create the debug info manually (if we 
 		// want struct members to be interpreted as the correct type).
-		// Also; are hashes meant to be interpreted as bool*'s ??
+		// Also; are hashes meant to be interpreted as bool*'s ?? or is that simply slot occupied data?
 		return ir_add_debug_info_type(module, type->Map.generated_struct_type, e, scope, file);
 	}
 
