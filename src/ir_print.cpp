@@ -2087,6 +2087,10 @@ void print_llvm_ir(irGen *ir) {
 					GB_ASSERT(di->CompositeType.size > 0);
 				}
 
+				if (di->CompositeType.tag == irDebugBasicEncoding_union_type) {
+					GB_ASSERT_NOT_NULL(di->CompositeType.file); // Union _requires_ file to be valid.
+				}
+
 				ir_write_str_lit(f, "!DICompositeType(tag: ");
 				ir_print_debug_encoding(f, irDebugInfo_CompositeType, di->CompositeType.tag);
 				if (di->CompositeType.name.len > 0) {
