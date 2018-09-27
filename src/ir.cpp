@@ -1636,6 +1636,18 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	return irDebugBasicEncoding_Invalid;
 }
 
+i32 ir_debug_info_bits(i64 size) {
+	return 8*cast(i32)size;
+}
+
+i32 ir_debug_size_bits(Type *type) {
+	return ir_debug_info_bits(type_size_of(type));
+}
+
+i32 ir_debug_align_bits(Type *type) {
+	return ir_debug_info_bits(type_align_of(type));
+}
+
 irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Type *type, i32 offset, irDebugInfo *scope) {
 	// NOTE(lachsinc): Caller is expected to insert the returned value into map themselves.
 	// "scope", if set, should be inserted into map prior to calling to ensure no cyclical dependencies.
@@ -1643,7 +1655,7 @@ irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Typ
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
 	di->DerivedType.name = name;
 	di->DerivedType.tag = irDebugBasicEncoding_member;
-	di->DerivedType.size = 8*cast(i32)type_size_of(type);
+	di->DerivedType.size = ir_debug_size_bits(type);
 	di->DerivedType.offset = offset;
 	di->DerivedType.scope = scope;
 
@@ -1669,14 +1681,14 @@ irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entit
 
 	i32 offset = 0;
 	if (struct_type && struct_type->Struct.are_offsets_set) {
-		offset = 8*cast(i32)struct_type->Struct.offsets[index];
+		offset = ir_debug_info_bits(struct_type->Struct.offsets[index]);
 	} else {
-		offset = 8*cast(i32)type_offset_of(type, index); // TODO(lachsinc): Confirm correct
+		offset = ir_debug_info_bits(type_offset_of(type, index));
 	}
 
 	irDebugInfo *di = ir_add_debug_info_field_internal(module, e->token.string, type, offset, scope);
 	map_set(&module->debug_info, hash_entity(e), di);
-	// di->DerivedType.align = 8*cast(i32)type_align_of(type);
+	// di->DerivedType.align = ir_debug_align_bits(type);
 	di->DerivedType.file = file;
 	di->DerivedType.pos = e->token.pos;
 	// di->DerivedType.base_type = ir_add_debug_info_type(module, type, e, scope, file);
@@ -1703,34 +1715,26 @@ irDebugInfo *ir_add_debug_info_enumerator(irModule *module, Entity *e) {
 
 // TODO(lachsinc): Cleanup params.
 irDebugInfo *ir_add_debug_info_type_dynamic_array(irModule *module, Type *type, Entity *e, irDebugInfo *scope, irDebugInfo *file) {
-	// TODO(lachsinc): HACK named should be handled as derived types, see above.
-	Type *named = nullptr;
-	if (is_type_named(type)) {
-		named = type;
-		type = base_type(type);
-	}
 	GB_ASSERT(type->kind == Type_DynamicArray);
 
 	// TODO(lachsinc): We should insert "type" into map and look it up, and just create a derived type
 	// for each required dynamic array, named or unnamed.
 
-	// TODO(lachsinc): Look up in map if dynamic array for type already exists ??
-
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
-	di->CompositeType.name = named ? named->Named.name : str_lit("dynamic array");
+	di->CompositeType.name = str_lit("dynamic array"); // TODO(lachsinc): [dynamic] .. type->DynamicArray.elem name
 	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
-	di->CompositeType.size = 8*cast(i32)(type_size_of(t_rawptr) +
-	                                     type_size_of(t_int) +
-	                                     type_size_of(t_int) +
-	                                     type_size_of(t_allocator)); // TODO(lachsinc): Allocator is correct size??
-	di->CompositeType.align = 8*cast(i32)type_align_of(t_rawptr);
-	map_set(&module->debug_info, hash_type(named ? named : type), di);
+	di->CompositeType.size = ir_debug_size_bits(t_rawptr) +
+	                         ir_debug_size_bits(t_int) +
+	                         ir_debug_size_bits(t_int) +
+	                         ir_debug_size_bits(t_allocator);
+	di->CompositeType.align = ir_debug_align_bits(t_rawptr);
+	map_set(&module->debug_info, hash_type(type), di);
 
 	// Data pointer type
 	irDebugInfo *data_ptr_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
-	data_ptr_di->DerivedType.name = str_lit("ptr_type_name_todo");
+	// data_ptr_di->DerivedType.name = str_lit("ptr_type_name_todo");
 	data_ptr_di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
-	data_ptr_di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
+	data_ptr_di->DerivedType.size = ir_debug_size_bits(t_rawptr);
 	map_set(&module->debug_info, hash_pointer(data_ptr_di), data_ptr_di);
 	data_ptr_di->DerivedType.base_type = ir_add_debug_info_type(module, type->DynamicArray.elem, e, scope, file);
 
@@ -1771,9 +1775,6 @@ irDebugInfo *ir_add_debug_info_type_dynamic_array(irModule *module, Type *type, 
 
 // TODO(lachsinc): Cleanup params.
 irDebugInfo *ir_add_debug_info_type_string(irModule *module, irDebugInfo *scope, Entity *e, Type *type, irDebugInfo *file) {
-	GB_ASSERT(type->kind == Type_Basic);
-	GB_ASSERT(type->Basic.kind == Basic_string);
-
 	// TODO(lachsinc): Does this only occur once ??
 	irDebugInfo **existing = map_get(&module->debug_info, hash_type(t_string));
 	if (existing != nullptr) {
@@ -1783,8 +1784,8 @@ irDebugInfo *ir_add_debug_info_type_string(irModule *module, irDebugInfo *scope,
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
 		di->CompositeType.name = type->Basic.name;
 		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
-		di->CompositeType.size = 8*cast(i32)type_size_of(t_string);
-		di->CompositeType.align = 8*cast(i32)type_align_of(t_string);
+		di->CompositeType.size = ir_debug_size_bits(t_string);
+		di->CompositeType.align = ir_debug_align_bits(t_string);
 
 		map_set(&module->debug_info, hash_type(type), di);
 
@@ -1819,8 +1820,8 @@ irDebugInfo *ir_add_debug_info_type_any(irModule *module) {
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
 		di->CompositeType.name = t_any->Basic.name;
 		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
-		di->CompositeType.size = 8*cast(i32)type_size_of(t_any); // TODO(lachsinc): Correct ??
-		di->CompositeType.align = 8*cast(i32)type_align_of(t_any);
+		di->CompositeType.size = ir_debug_size_bits(t_any); // TODO(lachsinc): Correct ??
+		di->CompositeType.align = ir_debug_align_bits(t_any);
 
 		map_set(&module->debug_info, hash_type(t_any), di);
 
@@ -1873,7 +1874,8 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 
 	if (type->kind == Type_Named) {
 		Type *named_base = type->Named.base;
-		if (named_base->kind == Type_Named || named_base->kind == Type_Basic) {
+		// TODO(lachsinc): Better way to determine distinct etc. or just handle structs, enums before we reach here.
+		if (named_base->kind != Type_Struct && named_base->kind != Type_Enum) { 
 			// distinct / typedef etc.
 			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
 			if (type->kind == Type_Named) {
@@ -1907,8 +1909,8 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
 			di->DerivedType.name = type->Basic.name;
 			di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
-			di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
-			di->DerivedType.align = 8*cast(i32)type_align_of(t_rawptr); // TODO(lachsinc): Not sure if align is required.
+			di->DerivedType.size = ir_debug_size_bits(t_rawptr);
+			di->DerivedType.align = ir_debug_align_bits(t_rawptr); // TODO(lachsinc): Not sure if align is required.
 			map_set(&module->debug_info, hash_type(type), di);
 			// NOTE(lachsinc): llvm expects "null" for rawptr/voidptr
 			if (type->Basic.kind == Basic_cstring) {
@@ -1922,8 +1924,8 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_BasicType);
 			di->BasicType.encoding = ir_debug_encoding_for_basic(type->Basic.kind);
 			di->BasicType.name = type->Basic.name;
-			di->BasicType.size = 8*cast(i32)type_size_of(type);
-			di->BasicType.align = 8*cast(i32)type_align_of(type);
+			di->BasicType.size = ir_debug_size_bits(type);
+			di->BasicType.align = ir_debug_align_bits(type);
 			map_set(&module->debug_info, hash_type(type), di);
 			return di;
 		}
@@ -1935,7 +1937,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		Type *deref = type_deref(base);
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
 		di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
-		di->DerivedType.size = 8*cast(i32)type_size_of(type);
+		di->DerivedType.size = ir_debug_size_bits(type);
 		// NOTE(lachsinc): Set in map before creative base_type to avoid circular dependency issues.
 		map_set(&module->debug_info, hash_type(type), di);
 		if (is_type_struct(deref)) {
@@ -1952,8 +1954,8 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 			di->CompositeType.scope = scope;
 			di->CompositeType.pos = e->token.pos;
 		}
-		di->CompositeType.size = 8*cast(i32)type_size_of(type);
-		di->CompositeType.align = 8*cast(i32)type_align_of(type);
+		di->CompositeType.size = ir_debug_size_bits(type);
+		di->CompositeType.align = ir_debug_align_bits(type);
 		di->CompositeType.base_type = nullptr;
 
 		// NOTE(lachsinc): Set map value before resolving field types to avoid circular dependencies.
@@ -2003,8 +2005,8 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 	if (is_type_array(type)) {
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
 
-		di->CompositeType.size = 8*cast(i32)type_size_of(type); // TODO(lachsinc): Confirm correct array sizing. llvm expects size in bits!
-		di->CompositeType.align = 8*cast(i32)type_align_of(type);
+		di->CompositeType.size = ir_debug_size_bits(type); // TODO(lachsinc): Confirm correct array sizing. llvm expects size in bits!
+		di->CompositeType.align = ir_debug_align_bits(type);
 		di->CompositeType.tag = irDebugBasicEncoding_array_type;
 		di->CompositeType.array_count = (i32)type->Array.count;
 
@@ -2021,8 +2023,8 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
 		di->CompositeType.name = str_lit("slice");
 		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
-		di->CompositeType.size = 8*cast(i32)type_size_of(type); // TODO(lachsinc): Correct ??
-		di->CompositeType.align = 8*cast(i32)type_align_of(type);
+		di->CompositeType.size = ir_debug_size_bits(type); // TODO(lachsinc): Correct ??
+		di->CompositeType.align = ir_debug_align_bits(type);
 		map_set(&module->debug_info, hash_type(type), di);
 
 		// Data pointer type
@@ -2035,7 +2037,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 			data_ptr_di->DerivedType.name = str_lit("slice_ptr_type_todo");
 		}
 		data_ptr_di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
-		data_ptr_di->DerivedType.size = 8*cast(i32)type_size_of(t_rawptr);
+		data_ptr_di->DerivedType.size = ir_debug_size_bits(t_rawptr);
 		map_set(&module->debug_info, hash_pointer(data_ptr_di), data_ptr_di);
 		data_ptr_di->DerivedType.base_type = ir_add_debug_info_type(module, type->Slice.elem, e, scope, file);
 
@@ -2068,10 +2070,10 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 	//
 	{
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_BasicType);
-		di->BasicType.align = 8*cast(i32)type_align_of(type);
+		di->BasicType.align = ir_debug_align_bits(type);
 		di->BasicType.encoding = irDebugBasicEncoding_address;
 		di->BasicType.name = str_lit("type_todo");
-		di->BasicType.size = 8*cast(i32)type_size_of(type);
+		di->BasicType.size = ir_debug_size_bits(type);
 
 		map_set(&module->debug_info, hash_type(type), di);
 
