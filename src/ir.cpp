@@ -1648,7 +1648,7 @@ i32 ir_debug_align_bits(Type *type) {
 	return ir_debug_info_bits(type_align_of(type));
 }
 
-irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Type *type, i32 offset, irDebugInfo *scope) {
+irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Type *type, i32 offset_bits, irDebugInfo *scope) {
 	// NOTE(lachsinc): Caller is expected to insert the returned value into map themselves.
 	// "scope", if set, should be inserted into map prior to calling to ensure no cyclical dependencies.
 
@@ -1656,7 +1656,7 @@ irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Typ
 	di->DerivedType.name = name;
 	di->DerivedType.tag = irDebugBasicEncoding_member;
 	di->DerivedType.size = ir_debug_size_bits(type);
-	di->DerivedType.offset = offset;
+	di->DerivedType.offset = offset_bits;
 	di->DerivedType.scope = scope;
 
 	// NOTE(lachsinc): It is "safe" to overwrite this base_type after a call to this function,
@@ -1731,8 +1731,8 @@ irDebugInfo *ir_add_debug_info_type_dynamic_array(irModule *module, Type *type, 
 	map_set(&module->debug_info, hash_type(type), di);
 
 	// Data pointer type
+	// TODO(lachsinc): Perhaps lookup/alloc-a-fake Type_Pointer type and go via ir_add_debug_info_type() with it.
 	irDebugInfo *data_ptr_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
-	// data_ptr_di->DerivedType.name = str_lit("ptr_type_name_todo");
 	data_ptr_di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
 	data_ptr_di->DerivedType.size = ir_debug_size_bits(t_rawptr);
 	map_set(&module->debug_info, hash_pointer(data_ptr_di), data_ptr_di);
@@ -1857,8 +1857,8 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		return *existing;
 	}
 
-	// Reset entity info if applicable for every type we try add.
-	// TODO(lachsinc): Confirm this doesn't mess up struct field scope's.
+	// Reset entity/location info, if applicable, for every type we try add.
+	// TODO(lachsinc): Confirm this doesn't mess up field's scopes etc.
 	if (type->kind == Type_Named) {
 		e = type->Named.type_name;
 		if (e) {
@@ -1962,10 +1962,8 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		map_set(&module->debug_info, hash_type(type), di);
 
 		if (is_type_struct(type)) {
-			if (type->kind == Type_Named) {
-				di->CompositeType.name = type->Named.name;
-			} else {
-				di->CompositeType.name = str_lit("struct_name_todo");
+			if (is_type_named(type)) {
+				di->CompositeType.name = type->kind == Type_Named ? type->Named.name : type->Basic.name;
 			}
 			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Struct.fields.count);
 			for_array(field_index, base->Struct.fields) {
@@ -1980,8 +1978,9 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 			// TODO(lachsinc): Add elements for union
 			di->CompositeType.tag = irDebugBasicEncoding_union_type;
 		} else if (is_type_enum(type)) {
-			GB_ASSERT(type->kind == Type_Named);
-			di->CompositeType.name = type->Named.name;
+			if (type->kind == Type_Named) {
+				di->CompositeType.name = type->Named.name;
+			}
 			di->CompositeType.base_type = ir_add_debug_info_type(module, type->Named.base->Enum.base_type, e, scope, file);
 			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Enum.fields.count);
 			for_array(field_index, base->Enum.fields) {
@@ -2029,17 +2028,14 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 
 		// Data pointer type
 		irDebugInfo *data_ptr_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
-		if (type->Slice.elem->kind == Type_Named) {
-			data_ptr_di->DerivedType.name = type->Slice.elem->Named.name; // TODO(lachsinc): Ptr??
-		} else if (type->Slice.elem->kind == Type_Basic) {
-			data_ptr_di->DerivedType.name = type->Slice.elem->Basic.name; // TODO(lachsinc): Ptr??
-		} else {
-			data_ptr_di->DerivedType.name = str_lit("slice_ptr_type_todo");
+		Type *elem_type = type->Slice.elem;
+		if (is_type_named(elem_type)) {
+			data_ptr_di->DerivedType.name = elem_type->kind == Type_Named ? elem_type->Named.name : elem_type->Basic.name;
 		}
 		data_ptr_di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
 		data_ptr_di->DerivedType.size = ir_debug_size_bits(t_rawptr);
 		map_set(&module->debug_info, hash_pointer(data_ptr_di), data_ptr_di);
-		data_ptr_di->DerivedType.base_type = ir_add_debug_info_type(module, type->Slice.elem, e, scope, file);
+		data_ptr_di->DerivedType.base_type = ir_add_debug_info_type(module, elem_type, e, scope, file);
 
 		irDebugInfo *data_di = ir_add_debug_info_field_internal(module, str_lit("data"), t_rawptr,
 		                                                        0,
@@ -2062,6 +2058,10 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 	}
 
 	if (is_type_map(type)) {
+		// TODO(lachsinc): Looks like "generated_struct_type" map.entries.data is just a u8*, we could
+		// always look at the map header and create the debug info manually (if we 
+		// want struct members to be interpreted as the correct type).
+		// Also; are hashes meant to be interpreted as bool*'s ??
 		return ir_add_debug_info_type(module, type->Map.generated_struct_type, e, scope, file);
 	}
 
