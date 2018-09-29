@@ -8,6 +8,7 @@ foreign _ {
 swap :: proc[swap16, swap32, swap64];
 
 
+
 set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	if data == nil do return nil;
 	if len < 0 do return data;
@@ -26,6 +27,13 @@ set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	return set(data, 0, len);
 }
+zero_slice :: proc "contextless" (data: $T/[]$E) {
+	if n := len(data); n > 0 {
+		zero(&data[0], size_of(E)*n);
+	}
+}
+
+
 copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memmove
