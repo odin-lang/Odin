@@ -28,6 +28,7 @@ struct irModule {
 	irDebugInfo *         debug_compile_unit;
 	irDebugInfo *         debug_all_enums;   // TODO(lachsinc): Move into irDebugInfo_CompileUnit
 	irDebugInfo *         debug_all_globals; // TODO(lachsinc): Move into irDebugInfo_CompileUnit
+	irDebugInfo *         curr_debug_loc;    // TODO(lachsinc): Temporary, remove me.
 	Array<irDebugInfo *>  debug_location_stack; 
 
 
@@ -807,6 +808,8 @@ Array<irValue *> *ir_value_referrers(irValue *v) {
 ////////////////////////////////////////////////////////////////
 
 void     ir_module_add_value    (irModule *m, Entity *e, irValue *v);
+void     ir_module_push_debug_location(irModule *m, Ast *node, irDebugInfo *scope);
+void     ir_module_pop_debug_location (irModule *m);
 void     ir_emit_zero_init      (irProcedure *p, irValue *address, Ast *expr);
 irValue *ir_emit_comment        (irProcedure *p, String text);
 irValue *ir_emit_store          (irProcedure *p, irValue *address, irValue *value);
@@ -1507,6 +1510,12 @@ irValue *ir_add_global_generated(irModule *m, Type *type, irValue *value) {
 irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type) {
 	irValue *v = ir_value_param(proc, e, abi_type);
 	irValueParam *p = &v->Param;
+
+	// TODO(lachsinc): Correct? Params we want or dont want debug info output ??
+	// if so we should save/restore stack or something.
+	GB_ASSERT_NOT_NULL(proc->debug_scope);
+	ir_module_push_debug_location(proc->module, e->identifier, proc->debug_scope);
+	defer (ir_module_pop_debug_location(proc->module)); // TODO(lachsinc): does this happen after return value calculated ??
 
 	switch (p->kind) {
 	case irParamPass_Value: {
@@ -7016,7 +7025,9 @@ void ir_build_stmt(irProcedure *proc, Ast *node) {
 		proc->module->stmt_state_flags = out;
 	}
 
+	ir_module_push_debug_location(proc->module, node, proc->debug_scope);
 	ir_build_stmt_internal(proc, node);
+	ir_module_pop_debug_location(proc->module);
 
 	proc->module->stmt_state_flags = prev_stmt_state_flags;
 }
@@ -8078,6 +8089,11 @@ void ir_begin_procedure_body(irProcedure *proc) {
 		}
 	}
 
+	if (proc->entity) { // TODO(lachsinc): Necessary ??
+		GB_ASSERT_NOT_NULL(proc->debug_scope);
+		ir_module_push_debug_location(proc->module, proc->entity->identifier, proc->debug_scope); 
+	}
+
 	proc->decl_block  = ir_new_block(proc, proc->type_expr, "decls");
 	ir_start_block(proc, proc->decl_block);
 	proc->entry_block = ir_new_block(proc, proc->type_expr, "entry");
@@ -8205,6 +8221,10 @@ void ir_end_procedure_body(irProcedure *proc) {
 	proc->curr_block = nullptr;
 
 	ir_number_proc_registers(proc);
+
+	if (proc->entity) {
+		ir_module_pop_debug_location(proc->module);
+	}
 }
 
 
@@ -8328,6 +8348,8 @@ void ir_module_push_debug_location(irModule *m, Ast *node, irDebugInfo *scope) {
 	// TODO(lachsinc): Assert the stack is empty when we finish ir gen process ??
 	GB_ASSERT_NOT_NULL(node);
 	irDebugInfo *debug_location = ir_add_debug_info_location(m, node, scope);
+	// TODO(lachsinc): Ensure validity? if not valid we should push a nullptr on to ensure
+	// calls to pop are safe.
 	array_add(&m->debug_location_stack, debug_location);
 }
 
