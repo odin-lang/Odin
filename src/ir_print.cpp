@@ -1550,7 +1550,6 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 		irInstrDebugDeclare *dd = &instr->DebugDeclare;
 		Type *vt = ir_type(dd->value);
-		irDebugInfo *di = dd->scope;
 		Entity *e = dd->entity;
 		String name = e->token.string;
 		TokenPos pos = e->token.pos;
@@ -1565,8 +1564,8 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_write_byte(f, ' ');
 		ir_print_value(f, m, dd->value, vt);
 		ir_fprintf(f, ", metadata !%d", local_var_di->id);
-		ir_write_str_lit(f, ", metadata !DIExpression())"); 
-		ir_fprintf(f, ", !dbg !DILocation(line: %td, column: %td, scope: !%d)", pos.line, pos.column, di->id);
+		ir_write_str_lit(f, ", metadata !DIExpression())");
+		ir_print_debug_location(f, m, value);
 		break;
 	}
 	}
