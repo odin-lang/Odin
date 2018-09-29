@@ -212,31 +212,38 @@ void ir_print_encoded_global(irFileBuffer *f, String name, bool remove_prefix) {
 }
 
 
-bool ir_print_debug_location(irFileBuffer *f, irModule *m, irValue *v, irProcedure *proc = nullptr) {
-#if 1
-	if (m->generate_debug_info && v != nullptr) {
-		TokenPos pos = v->loc.pos;
-		irDebugInfo *scope = v->loc.debug_scope;
-		i32 id = 0;
-		if (scope != nullptr) {
-			id = scope->id;
-		} else if (proc != nullptr) {
-			if (proc->debug_scope != nullptr) {
-				id = proc->debug_scope->id;
-				pos = proc->entity->token.pos;
+bool ir_print_debug_location(irFileBuffer *f, irModule *m, irValue *v) {
+	if (!m->generate_debug_info) {
+		return false;
+	}
+
+	GB_ASSERT_NOT_NULL(v);
+
+	if (v->loc) {
+		// Update curr_debug_loc
+		m->curr_debug_loc = v->loc;
+	}
+	if (m->curr_debug_loc != nullptr) {
+		GB_ASSERT(m->curr_debug_loc->kind == irDebugInfo_Location);
+		ir_fprintf(f, ", !dbg !%d", m->curr_debug_loc->id);
+		return true;
+	}
+	// TODO(lachsinc): HACK HACK HACK
+	// For now, since inlinable call instructions _require_ a valid !dbg attachment. If there is no valid
+	// we just set to first line of the containing procedure (like before). This is not great,
+	// and continues to exhibit bad stepping behabiour, but now should occur much less often
+	// thanks to above. The proper fix is to, in ir.cpp, set valid loc for all irValues that require
+	// it.
+	if (v->kind == irValue_Instr) {
+		if (v->Instr.kind == irInstr_Call) {
+			if (v->Instr.Call.inlining == ProcInlining_no_inline) {
+				return false;
 			}
-		}
-		if (id > 0 && pos.line > 0) {
-			ir_fprintf(f, ", !dbg !DILocation(line: %td, column: %td, scope: !%d)", pos.line, pos.column, id);
-			return true;
+			GB_PANIC("Inlinable 'call' instructions in a debuggable proc must have !dbg metadata attachment");
 		}
 	}
 	return false;
-#else
-	return true;
-#endif
 }
-
 
 void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct = false);
 void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hint);
@@ -1516,7 +1523,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		case ProcInlining_inline:    ir_write_str_lit(f, " alwaysinline"); break;
 		case ProcInlining_no_inline: ir_write_str_lit(f, " noinline");     break;
 		}
-		ir_print_debug_location(f, m, value, instr->block->proc);
+		ir_print_debug_location(f, m, value);
 
 		break;
 	}

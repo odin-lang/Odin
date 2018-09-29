@@ -26,9 +26,9 @@ struct irModule {
 	Map<irValue *>        anonymous_proc_lits; // Key: Ast *
 
 	irDebugInfo *         debug_compile_unit;
-	irDebugInfo *         debug_all_enums;   // irDebugInfoArray
-	irDebugInfo *         debug_all_globals; // irDebugInfoArray
-
+	irDebugInfo *         debug_all_enums;   // TODO(lachsinc): Move into irDebugInfo_CompileUnit
+	irDebugInfo *         debug_all_globals; // TODO(lachsinc): Move into irDebugInfo_CompileUnit
+	Array<irDebugInfo *>  debug_location_stack; 
 
 
 	i32                   global_string_index;
@@ -111,11 +111,6 @@ struct irBranchBlocks {
 	irBlock *continue_;
 };
 
-
-struct irDebugLocation {
-	TokenPos     pos;
-	irDebugInfo *debug_scope;
-};
 
 struct irContextData {
 	irValue *value;
@@ -257,7 +252,6 @@ gbAllocator ir_allocator(void) {
 	})                                                                \
 	IR_INSTR_KIND(StartupRuntime, i32)                                \
 	IR_INSTR_KIND(DebugDeclare, struct {                              \
-		irDebugInfo *scope;                                           \
 		Ast *        expr;                                            \
 		Entity *     entity;                                          \
 		bool         is_addr;                                         \
@@ -424,7 +418,7 @@ struct irValue {
 	irValueKind     kind;
 	i32             index;
 	bool            index_set;
-	irDebugLocation loc;
+	irDebugInfo *   loc;
 	union {
 		irValueConstant      Constant;
 		irValueConstantSlice ConstantSlice;
@@ -528,6 +522,7 @@ enum irDebugInfoKind {
 	irDebugInfo_File,
 	irDebugInfo_Scope,
 	irDebugInfo_Proc,
+	irDebugInfo_Location,
 	irDebugInfo_AllProcs,
 
 	irDebugInfo_BasicType,      // basic types
@@ -575,6 +570,10 @@ struct irDebugInfo {
 			irDebugInfo * types; // !{return, return, param, param, param.. etc.}
 			// TODO(lachsinc): variables / retainedNodes ?
 		} Proc;
+		struct {
+			TokenPos     pos;
+			irDebugInfo *scope;
+		} Location;
 		struct {
 			Array<irDebugInfo *> procs;
 		} AllProcs; // TODO(lachsinc): Redundant w/ DebugInfoArray. Merge.
@@ -641,7 +640,7 @@ struct irDebugInfo {
 			irDebugInfo *type;
 		} LocalVariable;
 		struct {
-			Array<irDebugInfo *> elements;
+			Array<irDebugInfo *> elements; // TODO(lachsinc): Never cleaned up?
 		} DebugInfoArray;
 	};
 };
@@ -824,7 +823,8 @@ irAddr   ir_build_addr          (irProcedure *proc, Ast *expr);
 void     ir_build_proc          (irValue *value, irProcedure *parent);
 void     ir_gen_global_type_name(irModule *m, Entity *e, String name);
 irValue *ir_get_type_info_ptr   (irProcedure *proc, Type *type);
-
+void     ir_value_set_debug_location(irProcedure *proc, irValue *v);
+irDebugInfo *ir_add_debug_info_local(irModule *module, Entity *e, i32 arg_id, irDebugInfo *scope, irDebugInfo *file);
 
 
 
@@ -1134,7 +1134,7 @@ irValue *ir_instr_comment(irProcedure *p, String text) {
 
 irValue *ir_instr_debug_declare(irProcedure *p, irDebugInfo *scope, Ast *expr, Entity *entity, bool is_addr, irValue *value) {
 	irValue *v = ir_alloc_instr(p, irInstr_DebugDeclare);
-	v->Instr.DebugDeclare.scope      = scope;
+	// TODO(lachsinc): Set v->loc ??
 	v->Instr.DebugDeclare.expr       = expr;
 	v->Instr.DebugDeclare.entity     = entity;
 	v->Instr.DebugDeclare.is_addr    = is_addr;
@@ -1163,6 +1163,7 @@ irValue *ir_value_constant_slice(Type *type, irValue *backing_array, i64 count) 
 
 irValue *ir_emit(irProcedure *proc, irValue *instr) {
 	GB_ASSERT(instr->kind == irValue_Instr);
+	irModule *m = proc->module;
 	irBlock *b = proc->curr_block;
 	instr->Instr.block = b;
 	if (b != nullptr) {
@@ -1172,6 +1173,9 @@ irValue *ir_emit(irProcedure *proc, irValue *instr) {
 		}
 	} else if (instr->Instr.kind != irInstr_Unreachable) {
 		GB_PANIC("ir_emit: Instruction missing parent block");
+	}
+	if (m->generate_debug_info) {
+		ir_value_set_debug_location(proc, instr);
 	}
 	return instr;
 }
@@ -1426,6 +1430,8 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initial
 	}
 
 	if (expr != nullptr && proc->entity != nullptr) {
+		// TODO(lachsinc): push location ?? or just check current stack top is == expr loc info.
+		
 		irDebugInfo *di = *map_get(&proc->module->debug_info, hash_entity(proc->entity));
 		ir_emit(proc, ir_instr_debug_declare(proc, di, expr, e, true, instr));
 
@@ -2229,6 +2235,21 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 	return di;
 }
 
+irDebugInfo *ir_add_debug_info_location(irModule *m, Ast *node, irDebugInfo *scope) {
+	GB_ASSERT_NOT_NULL(node);
+	// TODO(lachsinc): Should we traverse the node/children until we find one with
+	// valid token/pos and use that instead??
+	// OR, check that the node already contains valid location data.
+	irDebugInfo **existing = map_get(&m->debug_info, hash_node(node));
+	if (existing != nullptr) {
+		return *existing;
+	}
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Location);
+	di->Location.pos = ast_token(node).pos; 
+	di->Location.scope = scope;
+	map_set(&m->debug_info, hash_node(node), di);
+	return di;
+}
 
 ////////////////////////////////////////////////////////////////
 //
@@ -2266,11 +2287,31 @@ irValue *ir_emit_select(irProcedure *p, irValue *cond, irValue *t, irValue *f) {
 	return ir_emit(p, ir_instr_select(p, cond, t, f));
 }
 
-void ir_add_debug_location_to_value(irProcedure *proc, irValue *v, Ast *e) {
-	if (v != nullptr && e != nullptr) {
-		v->loc.debug_scope = proc->debug_scope;
-		v->loc.pos = ast_token(e).pos;
+void ir_value_set_debug_location(irProcedure *proc, irValue *v) {
+	GB_ASSERT_NOT_NULL(proc);
+	GB_ASSERT_NOT_NULL(v);
+	if (v->loc != nullptr) {
+		return; // Already set
 	}
+
+	// TODO(lachsinc): Read from debug_location_stack.
+	irModule *m = proc->module;
+	GB_ASSERT(m->debug_location_stack.count > 0);
+	// TODO(lachsinc): Assert scope info contained in stack top is appropriate against proc.
+	v->loc = *array_end_ptr(&m->debug_location_stack);
+	
+	// TODO(lachsinc): HACK; This shouldn't be done here. Proc's debug info should be created prior
+	// to adding proc-values. 
+	// TODO(lachsinc): Handle arbitrary files/proc/scope irDebugInfo's so this function works on globals etc. ?
+	/*
+	if (proc->debug_scope == nullptr) {
+		irDebugInfo *di_file = ir_add_debug_info_file(proc->module, expr->file);
+		ir_add_debug_info_proc(proc, proc->entity, proc->name, di_file, di_file);
+	}
+	GB_ASSERT_NOT_NULL(proc->debug_scope);
+	v->loc = ir_add_debug_info_location(proc->module, expr, proc->debug_scope);
+	GB_ASSERT_MSG(v->loc != nullptr, "Unable to set debug location for irValue.");
+	*/
 }
 
 void ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
@@ -2434,7 +2475,6 @@ irValue *ir_emit_runtime_call(irProcedure *proc, char const *name_, Array<irValu
 	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
 	irValue *gp = *found;
 	irValue *call = ir_emit_call(proc, gp, args);
-	ir_add_debug_location_to_value(proc, call, expr);
 	return call;
 }
 irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char const *name_, Array<irValue *> args, Ast *expr) {
@@ -2447,7 +2487,6 @@ irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char
 	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
 	irValue *gp = *found;
 	irValue *call = ir_emit_call(proc, gp, args);
-	ir_add_debug_location_to_value(proc, call, expr);
 	return call;
 }
 
@@ -5380,7 +5419,6 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr);
 
 irValue *ir_build_expr(irProcedure *proc, Ast *expr) {
 	irValue *v = ir_build_expr_internal(proc, expr);
-	ir_add_debug_location_to_value(proc, v, expr);
 	return v;
 }
 
@@ -8286,6 +8324,18 @@ void ir_module_add_value(irModule *m, Entity *e, irValue *v) {
 	}
 }
 
+void ir_module_push_debug_location(irModule *m, Ast *node, irDebugInfo *scope) {
+	// TODO(lachsinc): Assert the stack is empty when we finish ir gen process ??
+	GB_ASSERT_NOT_NULL(node);
+	irDebugInfo *debug_location = ir_add_debug_info_location(m, node, scope);
+	array_add(&m->debug_location_stack, debug_location);
+}
+
+void ir_module_pop_debug_location(irModule *m) {
+	GB_ASSERT_MSG(m->debug_location_stack.count > 0, "Attempt to pop debug location stack too many times");
+	array_pop(&m->debug_location_stack);
+}
+
 void ir_init_module(irModule *m, Checker *c) {
 	// TODO(bill): Determine a decent size for the arena
 	isize token_count = c->parser->total_token_count;
@@ -8414,6 +8464,8 @@ void ir_init_module(irModule *m, Checker *c) {
 		array_init(&globals_di->DebugInfoArray.elements, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
 		map_set(&m->debug_info, hash_pointer(globals_di), globals_di); // TODO(lachsinc): Safe to hash this pointer for key?
 		m->debug_all_globals = globals_di;
+
+		array_init(&m->debug_location_stack, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
 	}
 }
 
@@ -8427,6 +8479,7 @@ void ir_destroy_module(irModule *m) {
 	array_free(&m->procs);
 	array_free(&m->procs_to_generate);
 	array_free(&m->foreign_library_paths);
+	array_free(&m->debug_location_stack);
 	gb_arena_free(&m->tmp_arena);
 }
 
