@@ -299,7 +299,16 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 	Scope *found_scope = nullptr;
 	Entity *found_entity = nullptr;
 	scope_lookup_parent(original_entity->scope, original_name, &found_scope, &found_entity);
-	GB_ASSERT(found_entity == original_entity);
+
+	// IMPORTANT TODO(bill)
+	// Date: 2018-09-29
+	// This assert fails on `using import` if the name of the alias is the same. What should be the expected behaviour?
+	// Namespace collision or override? Overridding is the current behaviour
+	//
+	//     using import "foo"
+	//     bar :: foo.bar;
+
+	// GB_ASSERT_MSG(found_entity == original_entity, "%.*s == %.*s", LIT(found_entity->token.string), LIT(new_entity->token.string));
 
 	map_set(&found_scope->elements, hash_string(original_name), new_entity);
 }
