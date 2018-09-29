@@ -364,20 +364,20 @@ make_map_expr_error_loc :: inline proc "contextless" (using loc := #caller_locat
 
 @(default_calling_convention = "c")
 foreign {
-	@(link_name="llvm.sqrt.f32") sqrt_f32 :: proc(x: f32) -> f32 ---
-	@(link_name="llvm.sqrt.f64") sqrt_f64 :: proc(x: f64) -> f64 ---
+	@(link_name="llvm.sqrt.f32") _sqrt_f32 :: proc(x: f32) -> f32 ---
+	@(link_name="llvm.sqrt.f64") _sqrt_f64 :: proc(x: f64) -> f64 ---
 
-	@(link_name="llvm.sin.f32") sin_f32  :: proc(θ: f32) -> f32 ---
-	@(link_name="llvm.sin.f64") sin_f64  :: proc(θ: f64) -> f64 ---
+	@(link_name="llvm.sin.f32") _sin_f32  :: proc(θ: f32) -> f32 ---
+	@(link_name="llvm.sin.f64") _sin_f64  :: proc(θ: f64) -> f64 ---
 
-	@(link_name="llvm.cos.f32") cos_f32  :: proc(θ: f32) -> f32 ---
-	@(link_name="llvm.cos.f64") cos_f64  :: proc(θ: f64) -> f64 ---
+	@(link_name="llvm.cos.f32") _cos_f32  :: proc(θ: f32) -> f32 ---
+	@(link_name="llvm.cos.f64") _cos_f64  :: proc(θ: f64) -> f64 ---
 
-	@(link_name="llvm.pow.f32") pow_f32  :: proc(x, power: f32) -> f32 ---
-	@(link_name="llvm.pow.f64") pow_f64  :: proc(x, power: f64) -> f64 ---
+	@(link_name="llvm.pow.f32") _pow_f32  :: proc(x, power: f32) -> f32 ---
+	@(link_name="llvm.pow.f64") _pow_f64  :: proc(x, power: f64) -> f64 ---
 
-	@(link_name="llvm.fmuladd.f32") fmuladd32  :: proc(a, b, c: f32) -> f32 ---
-	@(link_name="llvm.fmuladd.f64") fmuladd64  :: proc(a, b, c: f64) -> f64 ---
+	@(link_name="llvm.fmuladd.f32") _fmuladd32  :: proc(a, b, c: f32) -> f32 ---
+	@(link_name="llvm.fmuladd.f64") _fmuladd64  :: proc(a, b, c: f64) -> f64 ---
 }
 abs_f32 :: inline proc "contextless" (x: f32) -> f32 {
 	foreign {
@@ -419,11 +419,11 @@ max_f64 :: proc(a, b: f64) -> f64 {
 
 abs_complex64 :: inline proc "contextless" (x: complex64) -> f32 {
 	r, i := real(x), imag(x);
-	return sqrt_f32(r*r + i*i);
+	return _sqrt_f32(r*r + i*i);
 }
 abs_complex128 :: inline proc "contextless" (x: complex128) -> f64 {
 	r, i := real(x), imag(x);
-	return sqrt_f64(r*r + i*i);
+	return _sqrt_f64(r*r + i*i);
 }
 
 
