@@ -218,29 +218,15 @@ bool ir_print_debug_location(irFileBuffer *f, irModule *m, irValue *v) {
 	}
 
 	GB_ASSERT_NOT_NULL(v);
+	GB_ASSERT(v->kind == irValue_Instr);
 
-	if (v->loc) {
-		// Update curr_debug_loc
-		m->curr_debug_loc = v->loc;
-	}
-	if (m->curr_debug_loc != nullptr) {
-		GB_ASSERT(m->curr_debug_loc->kind == irDebugInfo_Location);
-		ir_fprintf(f, ", !dbg !%d", m->curr_debug_loc->id);
+	if (v->loc != nullptr) {
+		GB_ASSERT(v->loc->kind == irDebugInfo_Location);
+		ir_fprintf(f, ", !dbg !%d", v->loc->id);
 		return true;
-	}
-	// TODO(lachsinc): HACK HACK HACK
-	// For now, since inlinable call instructions _require_ a valid !dbg attachment. If there is no valid
-	// we just set to first line of the containing procedure (like before). This is not great,
-	// and continues to exhibit bad stepping behabiour, but now should occur much less often
-	// thanks to above. The proper fix is to, in ir.cpp, set valid loc for all irValues that require
-	// it.
-	if (v->kind == irValue_Instr) {
-		if (v->Instr.kind == irInstr_Call) {
-			if (v->Instr.Call.inlining == ProcInlining_no_inline) {
-				return false;
-			}
-			GB_PANIC("Inlinable 'call' instructions in a debuggable proc must have !dbg metadata attachment");
-		}
+	} else {
+		irProcedure *proc = v->Instr.block->proc;
+		GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
 	}
 	return false;
 }
@@ -1681,7 +1667,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 		if (di_ != nullptr) {
 			irDebugInfo *di = *di_;
 			GB_ASSERT(di->kind == irDebugInfo_Proc);
-			ir_fprintf(f, "!dbg !%d ", di->id);
+			ir_fprintf(f, "!dbg !%d ", di->id); // TODO(lachsinc): !dbg
 		}
 	}
 
@@ -2002,6 +1988,19 @@ void print_llvm_ir(irGen *ir) {
 							di->Proc.types->id);
 				ir_write_byte(f, ')'); // !DISubprogram(
 				break;
+			case irDebugInfo_Location: {
+				GB_ASSERT_NOT_NULL(di->Location.scope);
+				// TODO(lachsinc): Temporary.
+				GB_ASSERT(di->Location.pos.line >= 0 && di->Location.pos.line < 65536);
+				GB_ASSERT(di->Location.pos.column >= 0 && di->Location.pos.column < 65536);
+				ir_fprintf(f, "!DILocation("
+				              "line: %td"
+				            ", column: %td"
+				            ", scope: !%d)",
+				            di->Location.pos.line,
+				            di->Location.pos.column,
+				            di->Location.scope->id);
+				break;}
 			case irDebugInfo_GlobalVariableExpression: {
 				ir_fprintf(f, "!DIGlobalVariableExpression("
 				              "var: !%d"
