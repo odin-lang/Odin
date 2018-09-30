@@ -1943,7 +1943,6 @@ void print_llvm_ir(irGen *ir) {
 				              "language: DW_LANG_C_plus_plus" // Is this good enough?
 				            ", file: !%d"
 				            ", producer: \"Odin %.*s\""
-				            // ", flags: \"\"" // TODO(lachsinc): Removed for now, check if correct
 				            ", runtimeVersion: 0"
 				            ", isOptimized: false"
 				            ", emissionKind: FullDebug"
@@ -1973,7 +1972,7 @@ void print_llvm_ir(irGen *ir) {
 				            ", line: %td"
 				            ", scopeLine: %td"
 				            ", isDefinition: true"
-				            ", isLocal: false" // TODO(lachsinc): This used to be always set to true, pretend no local for now. We need to check if scope == file.
+				            ", isLocal: false" // TODO(lachsinc): Is this fine?
 				            ", flags: DIFlagPrototyped"
 				            ", isOptimized: false"
 				            ", unit: !%d"
@@ -1990,9 +1989,6 @@ void print_llvm_ir(irGen *ir) {
 				break;
 			case irDebugInfo_Location: {
 				GB_ASSERT_NOT_NULL(di->Location.scope);
-				// TODO(lachsinc): Temporary.
-				GB_ASSERT(di->Location.pos.line >= 0 && di->Location.pos.line < 65536);
-				GB_ASSERT(di->Location.pos.column >= 0 && di->Location.pos.column < 65536);
 				ir_fprintf(f, "!DILocation("
 				              "line: %td"
 				            ", column: %td"
@@ -2024,8 +2020,8 @@ void print_llvm_ir(irGen *ir) {
 				            ", file: !%d"
 				            ", line: %d"
 				            ", type: !%d"
-				            ", isLocal: true"        // TODO(lachsinc): Check is_foreign ??
-				            ", isDefinition: true)", // TODO(lachsinc): Check is_foreign ??
+				            ", isLocal: true"        // TODO(lachsinc): Check locality ??
+				            ", isDefinition: true)", // TODO(lachsinc): ??
 				            LIT(di->GlobalVariable.name),
 				            di->GlobalVariable.scope->id,
 				            di->GlobalVariable.file->id,
@@ -2046,7 +2042,7 @@ void print_llvm_ir(irGen *ir) {
 				            di->LocalVariable.pos.line,
 				            di->LocalVariable.type->id);
 				if (di->LocalVariable.arg > 0) {
-					GB_PANIC("Param 'Arg' debug info not yet implemented"); // TODO(lachsinc):
+					GB_PANIC("Param 'Arg' debug info not yet implemented"); // TODO(lachsinc): Proper param index support.
 					ir_fprintf(f, ", arg: %d", di->LocalVariable.arg);
 				}
 				ir_write_byte(f, ')');

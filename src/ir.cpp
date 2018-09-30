@@ -28,7 +28,6 @@ struct irModule {
 	irDebugInfo *         debug_compile_unit;
 	irDebugInfo *         debug_all_enums;   // TODO(lachsinc): Move into irDebugInfo_CompileUnit
 	irDebugInfo *         debug_all_globals; // TODO(lachsinc): Move into irDebugInfo_CompileUnit
-	irDebugInfo *         curr_debug_loc;    // TODO(lachsinc): Temporary, remove me.
 	Array<irDebugInfo *>  debug_location_stack; 
 
 
@@ -599,7 +598,6 @@ struct irDebugInfo {
 		struct {
 			irDebugEncoding      tag;
 			String               name;
-			String               identifier; // TODO(lachsinc): Unused?
 			irDebugInfo *        scope;
 			irDebugInfo *        file;
 			TokenPos             pos;
@@ -624,7 +622,6 @@ struct irDebugInfo {
 			TokenPos     pos;
 			irDebugInfo *type;
 			irValue     *variable;
-			// irDebugInfo *declaration;
 		} GlobalVariable;
 		struct {
 			String       name;
@@ -1612,6 +1609,7 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	case Basic_i64: 
 	case Basic_int:
 	case Basic_rune: // TODO(lachsinc) signed or unsigned?
+	case Basic_typeid:
 		return irDebugBasicEncoding_signed;
 
 	case Basic_u16:
@@ -1619,7 +1617,6 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	case Basic_u64:
 	case Basic_uint:
 	case Basic_uintptr: // TODO(lachsinc) unsigned or address?
-	case Basic_typeid:  // TODO(lachsinc) underlying type?
 		return irDebugBasicEncoding_unsigned;
 
 	// case Basic_f16:
