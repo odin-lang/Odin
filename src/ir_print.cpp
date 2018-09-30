@@ -2073,15 +2073,9 @@ void print_llvm_ir(irGen *ir) {
 				} else {
 					ir_write_str_lit(f, ", baseType: null"); // Valid/required for rawptr
 				}
-				if (di->DerivedType.size > 0) {
-					ir_fprintf(f, ", size: %d", di->DerivedType.size);
-				}
-				if (di->DerivedType.align > 0) {
-					ir_fprintf(f, ", align: %d", di->DerivedType.align);
-				}
-				if (di->DerivedType.offset > 0) {
-					ir_fprintf(f, ", offset: %d", di->DerivedType.offset);
-				}
+				if (di->DerivedType.size > 0)   ir_fprintf(f, ", size: %d", di->DerivedType.size);
+				if (di->DerivedType.align > 0)  ir_fprintf(f, ", align: %d", di->DerivedType.align);
+				if (di->DerivedType.offset > 0) ir_fprintf(f, ", offset: %d", di->DerivedType.offset);
 				ir_write_byte(f, ')');
 				break;
 			case irDebugInfo_CompositeType: {
@@ -2110,12 +2104,8 @@ void print_llvm_ir(irGen *ir) {
 					              di->CompositeType.file->id,
 					              di->CompositeType.pos.line);
 				}
-				if (di->CompositeType.size > 0) {
-					ir_fprintf(f, ", size: %d", di->CompositeType.size);
-				}
-				if (di->CompositeType.align > 0) {
-					ir_fprintf(f, ", align: %d", di->CompositeType.align);
-				}
+				if (di->CompositeType.size > 0)  ir_fprintf(f, ", size: %d", di->CompositeType.size);
+				if (di->CompositeType.align > 0) ir_fprintf(f, ", align: %d", di->CompositeType.align);
 				if (di->CompositeType.base_type != nullptr) {
 					GB_ASSERT(di->CompositeType.tag != irDebugBasicEncoding_structure_type);
 					GB_ASSERT(di->CompositeType.tag != irDebugBasicEncoding_union_type);
@@ -2153,8 +2143,8 @@ void print_llvm_ir(irGen *ir) {
 				ir_fprintf(f, "!{");
 				for_array(element_index, di->DebugInfoArray.elements) {
 					irDebugInfo *elem = di->DebugInfoArray.elements[element_index];
-					if (element_index > 0) {ir_write_str_lit(f, ", ");}
-					if (elem) {
+					if (element_index > 0) ir_write_str_lit(f, ", ");
+					if (elem != nullptr) {
 						ir_fprintf(f, "!%d", elem->id);
 					} else {
 						ir_fprintf(f, "null"); // NOTE(lachsinc): Proc's can contain "nullptr" entries to represent void return values.

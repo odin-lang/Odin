@@ -503,7 +503,7 @@ enum irDebugEncoding {
 	irDebugBasicEncoding_unsigned      = 6,
 	irDebugBasicEncoding_unsigned_char = 7,
 
-	// NOTE(lachsinc): Should the following be renamed from basic -> tag to mirror their DW_TAG_*
+	// TODO(lachsinc): Should the following be renamed from basic -> tag to mirror their DW_TAG_*
 	// counterparts? Perhaps separate out if they truly have different meaning.
 
 	irDebugBasicEncoding_member       = 13,
@@ -527,7 +527,6 @@ enum irDebugInfoKind {
 	irDebugInfo_AllProcs,
 
 	irDebugInfo_BasicType,      // basic types
-	irDebugInfo_ProcType,
 	irDebugInfo_DerivedType,    // pointer, typedef
 	irDebugInfo_CompositeType,  // array, struct, enum, (raw_)union
 	irDebugInfo_Enumerator,     // For irDebugInfo_CompositeType if enum
@@ -579,17 +578,12 @@ struct irDebugInfo {
 			Array<irDebugInfo *> procs;
 		} AllProcs; // TODO(lachsinc): Redundant w/ DebugInfoArray. Merge.
 
-		// NOTE(lachsinc): Many of the following fields could be removed/resolved as we print it?
 		struct {
 			String          name;
 			i32             size;
 			i32             align;
 			irDebugEncoding encoding;
 		} BasicType;
-		struct {
-			irDebugInfo *        return_type;
-			Array<irDebugInfo *> param_types;
-		} ProcType; // TODO(lachsinc): Unused?
 		struct {
 			// TODO(lachsinc): Do derived types even need scope/file/line etc. info?
 			irDebugEncoding tag;
@@ -641,7 +635,7 @@ struct irDebugInfo {
 			irDebugInfo *type;
 		} LocalVariable;
 		struct {
-			Array<irDebugInfo *> elements; // TODO(lachsinc): Never cleaned up?
+			Array<irDebugInfo *> elements; // TODO(lachsinc): Leak?
 		} DebugInfoArray;
 	};
 };
@@ -1439,9 +1433,6 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initial
 		ir_emit(proc, ir_instr_debug_declare(proc, expr, e, true, instr));
 
 		// TODO(lachsinc): "Arg" is not used yet but should be eventually, if applicable, set to param index
-		// NOTE(lachsinc): The following call recurses through a type creating or finding the necessary debug info.
-		// This approach may be quite detrimental to perf?
-		// This may not be the most appropriate place to place this? (for proc non-value params etc.)
 		irDebugInfo *di = *map_get(&proc->module->debug_info, hash_entity(proc->entity)); // TODO(lachsinc): Cleanup; lookup di for proc inside ir_add_debug_info_local() ?
 		ir_add_debug_info_local(proc->module, e, 0, di, di->Proc.file);
 		ir_pop_debug_location(proc->module);
@@ -2235,7 +2226,7 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 			if (e->kind != Entity_Variable) {
 				continue; // TODO(lachsinc): Confirm correct?
 			}
-			
+
 			irDebugInfo *type_di = ir_add_debug_info_type(proc->module, e->type, nullptr, nullptr, nullptr);
 			GB_ASSERT_NOT_NULL(type_di);
 			array_add(&di->Proc.types->DebugInfoArray.elements, type_di);
