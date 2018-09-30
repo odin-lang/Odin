@@ -820,7 +820,7 @@ void     ir_push_debug_location (irModule *m, Ast *node, irDebugInfo *scope);
 void     ir_pop_debug_location  (irModule *m);
 irDebugInfo *ir_add_debug_info_local(irModule *module, Entity *e, i32 arg_id, irDebugInfo *scope, irDebugInfo *file);
 irDebugInfo *ir_add_debug_info_file(irModule *module, AstFile *file);
-irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String name, irDebugInfo *scope, irDebugInfo *file);
+irDebugInfo *ir_add_debug_info_proc(irProcedure *proc);
 
 
 irValue *ir_alloc_value(irValueKind kind) {
@@ -2180,14 +2180,26 @@ irDebugInfo *ir_add_debug_info_local(irModule *module, Entity *e, i32 arg_id, ir
 	return di;
 }
 
-irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String name, irDebugInfo *scope, irDebugInfo *file) {
+irDebugInfo *ir_add_debug_info_proc(irProcedure *proc) {
 	// if (!proc->module->generate_debug_info) {
 	// 	return nullptr;
 	// }
 
+	Entity *entity = proc->entity;
+
+	// Add / retrieve debug info for file.
+	CheckerInfo *info = proc->module->info;
+	String filename = proc->entity->token.pos.file;
+	AstFile *f = ast_file_of_filename(info, filename);
+	irDebugInfo *file = nullptr; 
+	if (f) {
+		file = ir_add_debug_info_file(proc->module, f);
+	}
+	irDebugInfo *scope = file; // TODO(lachsinc): Should scope be made separate to file?
+
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Proc);
 	di->Proc.entity = entity;
-	di->Proc.name = name;
+	di->Proc.name = proc->name;
 	di->Proc.file = file;
 	di->Proc.pos = entity->token.pos;
 
@@ -2308,29 +2320,14 @@ void ir_value_set_debug_location(irProcedure *proc, irValue *v) {
 		return; // Already set
 	}
 
-	// TODO(lachsinc): Read from debug_location_stack.
 	irModule *m = proc->module;
 	GB_ASSERT(m->debug_location_stack.count > 0);
-	// TODO(lachsinc): Assert scope info contained in stack top is appropriate against proc.
+	// TODO(lachsinc): Assert scope info contained in stack top is appropriate against proc ??
 	v->loc = *array_end_ptr(&m->debug_location_stack);
 	if (v->loc == nullptr) {
-		// NOTE(lachsinc): Entry point (main()) and runtime_startup don't have entity set;
-		// they are the only ones where null debug info is considered valid.
-		GB_ASSERT(proc->entity != nullptr);
+		// NOTE(lachsinc): Entry point (main()) and runtime_startup are the only ones where null location is considered valid.
+		GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
 	}
-	
-	// TODO(lachsinc): HACK; This shouldn't be done here. Proc's debug info should be created prior
-	// to adding proc-values. 
-	// TODO(lachsinc): Handle arbitrary files/proc/scope irDebugInfo's so this function works on globals etc. ?
-	/*
-	if (proc->debug_scope == nullptr) {
-		irDebugInfo *di_file = ir_add_debug_info_file(proc->module, expr->file);
-		ir_add_debug_info_proc(proc, proc->entity, proc->name, di_file, di_file);
-	}
-	GB_ASSERT_NOT_NULL(proc->debug_scope);
-	v->loc = ir_add_debug_info_location(proc->module, expr, proc->debug_scope);
-	GB_ASSERT_MSG(v->loc != nullptr, "Unable to set debug location for irValue.");
-	*/
 }
 
 void ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
@@ -8102,15 +8099,9 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	// NOTE(lachsinc): This is somewhat of a fallback/catch-all; We use the procedure's identifer as a debug location..
 	// Additional debug locations should be pushed for the procedures statements/expressions themselves.
 	if (proc->entity && proc->entity->identifier) { // TODO(lachsinc): Better way to determine if these procs are main/runtime_startup.
-		// TODO(lachsinc): Cleanup file stuff, move inside ir_add_debug_info_proc().
-		CheckerInfo *info = proc->module->info;
-		String filename = proc->entity->token.pos.file;
-		AstFile *f = ast_file_of_filename(info, filename);
-		GB_ASSERT_NOT_NULL(f);
-		irDebugInfo *di_file = ir_add_debug_info_file(proc->module, f);
 		// TODO(lachsinc): Passing the file for the scope may not be correct for nested procedures? This should probably be
 		// handled all inside push_debug_location, with just the Ast * we can pull out everything we need to construct scope/file debug info etc.
-		ir_add_debug_info_proc(proc, proc->entity, proc->name, di_file, di_file); 
+		ir_add_debug_info_proc(proc); 
 		ir_push_debug_location(proc->module, proc->entity->identifier, proc->debug_scope);
 		GB_ASSERT_NOT_NULL(proc->debug_scope);
 	} else {
