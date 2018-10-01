@@ -2058,7 +2058,11 @@ void print_llvm_ir(irGen *ir) {
 				ir_print_debug_encoding(f, irDebugInfo_BasicType, di->BasicType.encoding);
 				ir_write_byte(f, ')');
 				break;
-			case irDebugInfo_DerivedType:
+			case irDebugInfo_DerivedType: {
+				if (di->DerivedType.tag == irDebugBasicEncoding_member) {
+					// NOTE(lachsinc): We crash llvm super hard if we don't specify a name :)
+					GB_ASSERT(di->DerivedType.name.len > 0);
+				}
 				ir_write_str_lit(f, "!DIDerivedType(tag: ");
 				ir_print_debug_encoding(f, irDebugInfo_DerivedType, di->DerivedType.tag);
 				if (di->DerivedType.name.len > 0) {
@@ -2072,8 +2076,13 @@ void print_llvm_ir(irGen *ir) {
 				if (di->DerivedType.size > 0)   ir_fprintf(f, ", size: %d", di->DerivedType.size);
 				if (di->DerivedType.align > 0)  ir_fprintf(f, ", align: %d", di->DerivedType.align);
 				if (di->DerivedType.offset > 0) ir_fprintf(f, ", offset: %d", di->DerivedType.offset);
+				if (di->DerivedType.flags > 0) {
+					// TODO(lachsinc): Handle in a more generic manner.
+					if (di->DerivedType.flags & irDebugInfoFlag_Bitfield) ir_write_str_lit(f, ", flags: DIFlagBitField, extraData: i64 0");
+				}
 				ir_write_byte(f, ')');
 				break;
+			}
 			case irDebugInfo_CompositeType: {
 				if (di->CompositeType.tag == irDebugBasicEncoding_array_type) {
 					GB_ASSERT_NOT_NULL(di->CompositeType.base_type);
