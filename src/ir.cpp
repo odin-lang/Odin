@@ -515,6 +515,10 @@ enum irDebugEncoding {
 	irDebugBasicEncoding_union_type       = 23,
 };
 
+enum irDebugInfoFlags {
+	irDebugInfoFlag_Bitfield = (1 << 19),
+};
+
 enum irDebugInfoKind {
 	irDebugInfo_Invalid,
 
@@ -585,15 +589,16 @@ struct irDebugInfo {
 		} BasicType;
 		struct {
 			// TODO(lachsinc): Do derived types even need scope/file/line etc. info?
-			irDebugEncoding tag;
-			irDebugInfo *   base_type;
-			String          name;   // Optional
-			irDebugInfo *   scope;  // Optional TODO(lachsinc): Is this used??
-			irDebugInfo *   file;   // Optional TODO(lachsinc): Is this used??
-			TokenPos        pos;    // Optional TODO(lachsinc): Is this used??
-			i32             size;   // Optional
-			i32             align;  // Optional
-			i32             offset; // Optional
+			irDebugEncoding  tag;
+			irDebugInfo *    base_type;
+			String           name;   // Optional
+			irDebugInfo *    scope;  // Optional
+			irDebugInfo *    file;   // Optional
+			TokenPos         pos;    // Optional
+			i32              size;   // Optional
+			i32              align;  // Optional
+			i32              offset; // Optional
+			irDebugInfoFlags flags;  // Optional; used only for DIFlagBitField atm.
 		} DerivedType;
 		struct {
 			irDebugEncoding      tag;
@@ -1409,8 +1414,6 @@ void ir_push_context_onto_stack(irProcedure *proc, irValue *ctx) {
 	array_add(&proc->context_stack, cd);
 }
 
-irDebugInfo *ir_add_debug_info_local(irModule *module, Entity *e, i32 arg_id, irDebugInfo *scope, irDebugInfo *file);
-
 irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initialized) {
 	irBlock *b = proc->decl_block; // all variables must be in the first block
 	irValue *instr = ir_instr_local(proc, e, true);
@@ -1652,7 +1655,7 @@ i32 ir_debug_align_bits(Type *type) {
 
 irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Type *type, i32 offset_bits, irDebugInfo *scope) {
 	// NOTE(lachsinc): Caller is expected to insert the returned value into map themselves.
-	// "scope", if set, should be inserted into map prior to calling to ensure no cyclical dependencies.
+	// "scope", if set, should be inserted into map prior to calling to ensure no cyclical dependency issues.
 
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
 	di->DerivedType.name = name;
@@ -1719,7 +1722,6 @@ irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entit
 	return di;
 }
 
-// TODO(lachsinc): Cleanup params.
 irDebugInfo *ir_add_debug_info_enumerator(irModule *module, Entity *e) {
 	irDebugInfo **existing = map_get(&module->debug_info, hash_entity(e));
 	if (existing != nullptr) {
@@ -1744,7 +1746,7 @@ irDebugInfo *ir_add_debug_info_type_dynamic_array(irModule *module, Type *type, 
 	// for each required dynamic array, named or unnamed.
 
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
-	di->CompositeType.name = str_lit("dynamic array"); // TODO(lachsinc): [dynamic] .. type->DynamicArray.elem name
+	di->CompositeType.name = str_lit("dynamic_array"); // TODO(lachsinc): [dynamic] .. type->DynamicArray.elem name
 	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
 	di->CompositeType.size = ir_debug_size_bits(t_rawptr) +
 	                         ir_debug_size_bits(t_int) +
@@ -1793,6 +1795,100 @@ irDebugInfo *ir_add_debug_info_type_dynamic_array(irModule *module, Type *type, 
 	di->CompositeType.elements = elements_di;
 	map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
 
+	return di;
+}
+
+// TODO(lachsinc): Cleanup params.
+irDebugInfo *ir_add_debug_info_type_bit_field(irModule *module, Type *type, Entity *e, irDebugInfo *scope, irDebugInfo *file) {
+	GB_ASSERT(type->kind == Type_BitField || (type->kind == Type_Named && type->Named.base->kind == Type_BitField));
+
+	Type *bf_type = base_type(type);
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+	di->CompositeType.name = is_type_named(type) ? type->Named.name : str_lit("bit_field");
+	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+	di->CompositeType.size = ir_debug_size_bits(bf_type);
+	// di->CompositeType.align = ir_debug_align_bits(bf_type);
+	map_set(&module->debug_info, hash_type(type), di);
+
+	GB_ASSERT(bf_type->BitField.fields.count == bf_type->BitField.offsets.count &&
+	          bf_type->BitField.fields.count == bf_type->BitField.sizes.count);
+
+	irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, bf_type->BitField.fields.count);
+	di->CompositeType.elements = elements_di;
+	map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+	for_array(field_index, bf_type->BitField.fields) {
+		Entity *field = bf_type->BitField.fields[field_index];
+		u32 offset    = bf_type->BitField.offsets[field_index];
+		u32 size      = bf_type->BitField.sizes[field_index];
+		String name = str_lit("field_todo");
+		if (field != nullptr && field->token.string.len > 0) {
+			name = field->token.string;
+		}
+		irDebugInfo *field_di = ir_add_debug_info_field_internal(module, name, t_i64, // TODO(lachsinc): Safe to use i64 for all bitfields?
+		                                                         0,
+		                                                         di);
+		// NOTE(lachsinc): Above calls BitFieldValues type_size_of() which returns size in bits, replace with its true bit value here..
+		field_di->DerivedType.size = size;
+		field_di->DerivedType.offset = offset; // Offset stored in bits already, no need to convert
+		field_di->DerivedType.flags = irDebugInfoFlag_Bitfield;
+		map_set(&module->debug_info, hash_pointer(field_di), field_di);
+		array_add(&elements_di->DebugInfoArray.elements, field_di);
+	}
+
+	return di;
+}
+
+// TODO(lachsinc): Cleanup params.
+irDebugInfo *ir_add_debug_info_type_bit_set(irModule *module, Type *type, Entity *e, irDebugInfo *scope, irDebugInfo *file) {
+	GB_ASSERT(type->kind == Type_BitSet || type->kind == Type_Named);
+
+	Type *base = base_type(type);
+
+	Type *named = nullptr;
+	if (type->kind == Type_Named) {
+		named = type;
+	}
+
+	Type *elem_type = nullptr;
+	if (base->BitSet.elem != nullptr) {
+		// TODO(lachsinc): Do bitsets have integration with other types other than enums? (except ints ofcourse, 
+		// but we can't name those fields..)
+		elem_type = base->BitSet.elem;
+		if (elem_type->kind == Type_Enum) {
+			GB_ASSERT(elem_type->Enum.fields.count == base->BitSet.upper + 1);
+		}
+	}
+	
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+	di->CompositeType.name = named != nullptr ? named->Named.name : str_lit("bit_set");
+	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+	di->CompositeType.size = ir_debug_size_bits(base);
+	// di->CompositeType.align = ir_debug_align_bits(base);
+	map_set(&module->debug_info, hash_type(type), di);
+
+	irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, base->BitSet.upper + 1);
+	di->CompositeType.elements = elements_di;
+	map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+	for (i64 i = 0; i <= base->BitSet.upper; ++i) {
+		u32 offset = cast(u32)i;
+		// TODO(lachsinc): Maybe name these fields numbered ascending?
+		String name = str_lit("field_todo");
+		if (elem_type != nullptr && is_type_enum(elem_type)) {
+			name = base_type(elem_type)->Enum.fields[i]->token.string;
+		}
+		irDebugInfo *field_di = ir_add_debug_info_field_internal(module, name, t_u32, // TODO(lachsinc): u32 fine??
+		                                                         0,
+		                                                         di);
+		field_di->DerivedType.size   = 1;
+		field_di->DerivedType.offset = offset; // Offset stored in bits already, no need to convert
+		field_di->DerivedType.flags  = irDebugInfoFlag_Bitfield;
+		map_set(&module->debug_info, hash_pointer(field_di), field_di);
+		array_add(&elements_di->DebugInfoArray.elements, field_di);
+	}
+	
 	return di;
 }
 
@@ -1892,6 +1988,9 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		}
 	}
 
+	// TODO(lachsinc): Reorder if tests, "unique" types, like basic etc. should go last, they are most likely to hit the existing hashed type
+	// and no point checking them for the rest of the types. Or just use a massive switch...
+
 	// NOTE(lachsinc): Types should be inserted into debug_info map as their named, not base_type()'d, counterpart.
 	Type *base = base_type(type);
 
@@ -1900,8 +1999,10 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		// TODO(lachsinc): Better way to determine distinct etc. or just handle structs, enums before we reach here.
 		// ir_is_type_aggregate() except with no call to base_type().
 		if (named_base->kind != Type_Struct &&
-		    named_base->kind != Type_Union &&
-			named_base->kind != Type_Enum) {
+			named_base->kind != Type_Union &&
+			named_base->kind != Type_Enum &&
+			named_base->kind != Type_BitField) {
+			// named_base->kind != Type_BitSet) {
 			// distinct / typedef etc.
 			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
 			if (type->kind == Type_Named) {
@@ -2100,6 +2201,27 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		// want struct members to be interpreted as the correct type).
 		// Also; are hashes meant to be interpreted as bool*'s ?? or is that simply slot occupied data?
 		return ir_add_debug_info_type(module, type->Map.generated_struct_type, e, scope, file);
+	}
+
+	// NOTE(lachsinc): For now we just interpret all BitFieldValues as i64 inside ir_add_debug_info_type_bit_field().
+	/*
+	if (is_type_bit_field_value(type)) {
+		// NOTE(Lachsinc): Suboptimal; creates a new type for each unique bit field value type
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_BasicType);
+		di->BasicType.encoding = irDebugBasicEncoding_unsigned;
+		// di->BasicType.name = str_lit("todo");
+		di->BasicType.size = base->BitFieldValue.bits; 
+		map_set(&module->debug_info, hash_type(type), di);
+		return di;
+	}
+	*/
+
+	if (is_type_bit_field(type)) {
+		return ir_add_debug_info_type_bit_field(module, type, e, scope, file);
+	}
+
+	if (is_type_bit_set(type)) {
+		return ir_add_debug_info_type_bit_set(module, type, e, scope, file);
 	}
 
 	//
