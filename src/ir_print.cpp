@@ -1987,7 +1987,7 @@ void print_llvm_ir(irGen *ir) {
 							di->Proc.types->id);
 				ir_write_byte(f, ')'); // !DISubprogram(
 				break;
-			case irDebugInfo_Location: {
+			case irDebugInfo_Location:
 				GB_ASSERT_NOT_NULL(di->Location.scope);
 				ir_fprintf(f, "!DILocation("
 				              "line: %td"
@@ -1996,7 +1996,20 @@ void print_llvm_ir(irGen *ir) {
 				            di->Location.pos.line,
 				            di->Location.pos.column,
 				            di->Location.scope->id);
-				break;}
+				break;
+			case irDebugInfo_LexicalBlock:
+				GB_ASSERT_NOT_NULL(di->LexicalBlock.file);
+				GB_ASSERT_NOT_NULL(di->LexicalBlock.scope);
+				ir_fprintf(f, "distinct !DILexicalBlock("
+				              "line: %td"
+				            ", column: %td"
+				            ", file: !%d"
+				            ", scope: !%d)",
+				            di->LexicalBlock.pos.line,
+				            di->LexicalBlock.pos.column,
+				            di->LexicalBlock.file->id,
+				            di->LexicalBlock.scope->id);
+				break;
 			case irDebugInfo_GlobalVariableExpression: {
 				ir_fprintf(f, "!DIGlobalVariableExpression("
 				              "var: !%d"

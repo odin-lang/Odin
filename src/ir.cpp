@@ -527,6 +527,7 @@ enum irDebugInfoKind {
 	irDebugInfo_Scope,
 	irDebugInfo_Proc,
 	irDebugInfo_Location,
+	irDebugInfo_LexicalBlock,
 	irDebugInfo_AllProcs,
 
 	irDebugInfo_BasicType,      // basic types
@@ -577,6 +578,11 @@ struct irDebugInfo {
 			TokenPos     pos;
 			irDebugInfo *scope;
 		} Location;
+		struct {
+			TokenPos     pos;
+			irDebugInfo *file;
+			irDebugInfo *scope;
+		} LexicalBlock;
 		struct {
 			Array<irDebugInfo *> procs;
 		} AllProcs; // TODO(lachsinc): Redundant w/ DebugInfoArray. Merge.
@@ -823,7 +829,7 @@ irValue *ir_get_type_info_ptr   (irProcedure *proc, Type *type);
 void     ir_value_set_debug_location(irProcedure *proc, irValue *v);
 void     ir_push_debug_location (irModule *m, Ast *node, irDebugInfo *scope);
 void     ir_pop_debug_location  (irModule *m);
-irDebugInfo *ir_add_debug_info_local(irModule *module, Entity *e, i32 arg_id, irDebugInfo *scope, irDebugInfo *file);
+irDebugInfo *ir_add_debug_info_local(irProcedure *proc, Entity *e, i32 arg_id);
 irDebugInfo *ir_add_debug_info_file(irModule *module, AstFile *file);
 irDebugInfo *ir_add_debug_info_proc(irProcedure *proc);
 
@@ -1433,8 +1439,8 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initial
 		ir_emit(proc, ir_instr_debug_declare(proc, expr, e, true, instr));
 
 		// TODO(lachsinc): "Arg" is not used yet but should be eventually, if applicable, set to param index
-		irDebugInfo *di = *map_get(&proc->module->debug_info, hash_entity(proc->entity)); // TODO(lachsinc): Cleanup; lookup di for proc inside ir_add_debug_info_local() ?
-		ir_add_debug_info_local(proc->module, e, 0, di, di->Proc.file);
+		// irDebugInfo *di = *map_get(&proc->module->debug_info, hash_entity(proc->entity)); // TODO(lachsinc): Cleanup; lookup di for proc inside ir_add_debug_info_local() ?
+		ir_add_debug_info_local(proc, e, 0); // TODO(lachsinc): Cleanup, lookup file / di scope inside.
 		ir_pop_debug_location(proc->module);
 	}
 
@@ -1853,8 +1859,7 @@ irDebugInfo *ir_add_debug_info_type_bit_set(irModule *module, Type *type, Entity
 
 	Type *elem_type = nullptr;
 	if (base->BitSet.elem != nullptr) {
-		// TODO(lachsinc): Do bitsets have integration with other types other than enums? (except ints ofcourse, 
-		// but we can't name those fields..)
+		// TODO(lachsinc): Do bitsets have integration with non-primitive types other than enums?
 		elem_type = base->BitSet.elem;
 		if (elem_type->kind == Type_Enum) {
 			GB_ASSERT(elem_type->Enum.fields.count == base->BitSet.upper + 1);
@@ -2285,15 +2290,46 @@ irDebugInfo *ir_add_debug_info_global(irModule *module, irValue *v) {
 	return di;
 }
 
-irDebugInfo *ir_add_debug_info_local(irModule *module, Entity *e, i32 arg_id, irDebugInfo *scope, irDebugInfo *file) {
-	// if (!proc->module->generate_debug_info) {
-	// 	return nullptr;
-	// }
+irDebugInfo *ir_add_debug_info_block(irProcedure *proc, Scope *scope) {
+	// GB_ASSERT(block->kind == Ast_BlockStmt);
+
+	irModule *module = proc->module;
+
+	irDebugInfo **existing = map_get(&module->debug_info, hash_pointer(scope));
+	if (existing != nullptr) {
+		GB_ASSERT((*existing)->kind == irDebugInfo_LexicalBlock);
+		return *existing;
+	}
+
+	Ast *block = scope->node;
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_LexicalBlock);
+	di->LexicalBlock.file = proc->debug_scope->Proc.file;
+	di->LexicalBlock.scope = proc->debug_scope;
+	di->LexicalBlock.pos = ast_token(block).pos;
+	map_set(&module->debug_info, hash_pointer(scope), di);
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_local(irProcedure *proc, Entity *e, i32 arg_id) {
+	irModule *module = proc->module;
+
+	irDebugInfo *scope = nullptr;
+	irDebugInfo *file = nullptr;
+	if (e->scope->node->kind == Ast_ProcType) {
+		scope = proc->debug_scope;
+		file = proc->debug_scope->Proc.file;
+	} else {
+		scope = ir_add_debug_info_block(proc, e->scope);
+		file = scope->LexicalBlock.file;
+	}
+	GB_ASSERT_NOT_NULL(scope);
+	GB_ASSERT_NOT_NULL(file);
 
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_LocalVariable);
 	di->LocalVariable.name = e->token.string;
 	di->LocalVariable.scope = scope;
-	di->LocalVariable.file = scope->Proc.file;
+	di->LocalVariable.file = file;
 	di->LocalVariable.pos = e->token.pos;
 	di->LocalVariable.arg = arg_id;
 	di->LocalVariable.type = ir_add_debug_info_type(module, e->type, nullptr, nullptr, nullptr);
@@ -2375,6 +2411,7 @@ irDebugInfo *ir_add_debug_info_location(irModule *m, Ast *node, irDebugInfo *sco
 		// GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
 		return nullptr;
 	}
+	// GB_ASSERT(node->kind != Ast_BlockStmt);
 	// TODO(lachsinc): Should we traverse the node/children until we find one with
 	// valid token/pos and use that instead??
 	irDebugInfo **existing = map_get(&m->debug_info, hash_node(node));
@@ -5562,6 +5599,8 @@ irValue *ir_build_expr(irProcedure *proc, Ast *expr) {
 
 irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 	expr = unparen_expr(expr);
+	// ir_push_debug_location(proc->module, expr, proc->debug_scope);
+	// defer (ir_pop_debug_location(proc->module));
 
 	TypeAndValue tv = type_and_value_of_expr(expr);
 	GB_ASSERT(tv.mode != Addressing_Invalid);
