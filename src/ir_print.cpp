@@ -1952,8 +1952,8 @@ void print_llvm_ir(irGen *ir) {
 				            ")",
 				            file->id,
 				            LIT(build_context.ODIN_VERSION),
-				            m->debug_all_enums->id,
-				            m->debug_all_globals->id);
+				            m->debug_compile_unit->CompileUnit.enums->id,
+				            m->debug_compile_unit->CompileUnit.globals->id);
 				break;
 			}
 			case irDebugInfo_File:

@@ -26,8 +26,6 @@ struct irModule {
 	Map<irValue *>        anonymous_proc_lits; // Key: Ast *
 
 	irDebugInfo *         debug_compile_unit;
-	irDebugInfo *         debug_all_enums;   // TODO(lachsinc): Move into irDebugInfo_CompileUnit
-	irDebugInfo *         debug_all_globals; // TODO(lachsinc): Move into irDebugInfo_CompileUnit
 	Array<irDebugInfo *>  debug_location_stack; 
 
 
@@ -1438,9 +1436,8 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initial
 
 		ir_emit(proc, ir_instr_debug_declare(proc, expr, e, true, instr));
 
-		// TODO(lachsinc): "Arg" is not used yet but should be eventually, if applicable, set to param index
-		// irDebugInfo *di = *map_get(&proc->module->debug_info, hash_entity(proc->entity)); // TODO(lachsinc): Cleanup; lookup di for proc inside ir_add_debug_info_local() ?
-		ir_add_debug_info_local(proc, e, 0); // TODO(lachsinc): Cleanup, lookup file / di scope inside.
+		// TODO(lachsinc): "Arg" is not used yet but should be eventually, if applicable, set to param index.
+		ir_add_debug_info_local(proc, e, 0);
 		ir_pop_debug_location(proc->module);
 	}
 
@@ -1511,7 +1508,7 @@ irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type) {
 	irValueParam *p = &v->Param;
 
 	ir_push_debug_location(proc->module, e ? e->identifier : nullptr, proc->debug_scope);
-	defer (ir_pop_debug_location(proc->module)); // TODO(lachsinc): This happens after the return calls to ir_emit_xxx right??
+	defer (ir_pop_debug_location(proc->module));
 
 	switch (p->kind) {
 	case irParamPass_Value: {
@@ -1625,7 +1622,7 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	case Basic_u32:
 	case Basic_u64:
 	case Basic_uint:
-	case Basic_uintptr: // TODO(lachsinc) unsigned or address?
+	case Basic_uintptr:
 		return irDebugBasicEncoding_unsigned;
 
 	// case Basic_f16:
@@ -1996,7 +1993,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 	// TODO(lachsinc): Reorder if tests, "unique" types, like basic etc. should go last, they are most likely to hit the existing hashed type
 	// and no point checking them for the rest of the types. Or just use a massive switch...
 
-	// NOTE(lachsinc): Types should be inserted into debug_info map as their named, not base_type()'d, counterpart.
+	// NOTE(lachsinc): Types should be inserted into debug_info map as their named, not base_type()'d counterparts.
 	Type *base = base_type(type);
 
 	if (type->kind == Type_Named) {
@@ -2007,7 +2004,6 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 			named_base->kind != Type_Union &&
 			named_base->kind != Type_Enum &&
 			named_base->kind != Type_BitField) {
-			// named_base->kind != Type_BitSet) {
 			// distinct / typedef etc.
 			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
 			if (type->kind == Type_Named) {
@@ -2044,9 +2040,10 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 			di->DerivedType.size = ir_debug_size_bits(t_rawptr);
 			di->DerivedType.align = ir_debug_align_bits(t_rawptr); // TODO(lachsinc): Not sure if align is required.
 			map_set(&module->debug_info, hash_type(type), di);
-			// NOTE(lachsinc): llvm expects "null" for rawptr/voidptr
 			if (type->Basic.kind == Basic_cstring) {
 				di->DerivedType.base_type = ir_add_debug_info_type(module, t_i8, e, scope, file);
+			} else {
+				// NOTE(lachsinc): llvm expects "null" for rawptr/voidptr
 			}
 			return di;
 		}
@@ -2065,12 +2062,12 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 	}
 
 	if (is_type_pointer(type)) {
-		// TODO(lachsinc): Ensure this handles pointers to pointers of same type etc. correctly.
+		// TODO(lachsinc): Ensure this handles pointer-to-pointer of same type etc. correctly.
 		Type *deref = type_deref(base);
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
 		di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
 		di->DerivedType.size = ir_debug_size_bits(type);
-		// NOTE(lachsinc): Set in map before creative base_type to avoid circular dependency issues.
+		// NOTE(lachsinc): Map set before creating base_type to avoid circular dependency issues.
 		map_set(&module->debug_info, hash_type(type), di);
 		if (is_type_struct(deref)) {
 			int i = 123;
@@ -2081,7 +2078,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 
 	if (is_type_struct(type) || is_type_union(type) || is_type_enum(type)) {
 		if (type->kind == Type_Named) {
-			// Named named's should be handled prior as typedefs.
+			// NOTE(lachsinc): Named named's should always be handled prior as typedefs.
 			GB_ASSERT(type->Named.base->kind != Type_Named);
 		}
 
@@ -2134,7 +2131,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 
 			// TODO(lachsinc): Do we want to ensure this is an enum in the global scope before
 			// adding it into the modules enum array ??
-			array_add(&module->debug_all_enums->DebugInfoArray.elements, di);
+			array_add(&module->debug_compile_unit->CompileUnit.enums->DebugInfoArray.elements, di);
 		}
 
 		return di;
@@ -2146,8 +2143,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 
 	if (is_type_array(type)) {
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
-
-		di->CompositeType.size = ir_debug_size_bits(type); // TODO(lachsinc): Confirm correct array sizing. llvm expects size in bits!
+		di->CompositeType.size = ir_debug_size_bits(type);
 		di->CompositeType.align = ir_debug_align_bits(type);
 		di->CompositeType.tag = irDebugBasicEncoding_array_type;
 		di->CompositeType.array_count = (i32)type->Array.count;
@@ -2160,7 +2156,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 	}
 
 	if (is_type_slice(type)) {
-		// NOTE(lachsinc): Every slice type has its own composite type / field debug infos created. This is wasteful!!
+		// NOTE(lachsinc): Every slice type has its own composite type / field debug infos created. This is sorta wasteful.
 
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
 		di->CompositeType.name = str_lit("slice");
@@ -2285,7 +2281,7 @@ irDebugInfo *ir_add_debug_info_global(irModule *module, irValue *v) {
 
 	di->GlobalVariableExpression.var = var_di;
 
-	array_add(&module->debug_all_globals->DebugInfoArray.elements, di);
+	array_add(&module->debug_compile_unit->CompileUnit.globals->DebugInfoArray.elements, di);
 
 	return di;
 }
@@ -8439,7 +8435,7 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 		proc->module->stmt_state_flags = prev_stmt_state_flags;
 	}
 
-	// TODO(lachsinc): For now we pop the debug location inside ir_end_procedure_body(). 
+	// NOTE(lachsinc): For now we pop the debug location inside ir_end_procedure_body(). 
 	// This may result in debug info being missing for below.
 
 	if (proc->type->Proc.has_proc_default_values) {
@@ -8620,12 +8616,12 @@ void ir_init_module(irModule *m, Checker *c) {
 		irDebugInfo *enums_di = ir_alloc_debug_info(irDebugInfo_DebugInfoArray);
 		array_init(&enums_di->DebugInfoArray.elements, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
 		map_set(&m->debug_info, hash_pointer(enums_di), enums_di); // TODO(lachsinc): Safe to hash this pointer for key?
-		m->debug_all_enums = enums_di;
+		m->debug_compile_unit->CompileUnit.enums = enums_di;
 
 		irDebugInfo *globals_di = ir_alloc_debug_info(irDebugInfo_DebugInfoArray);
 		array_init(&globals_di->DebugInfoArray.elements, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
 		map_set(&m->debug_info, hash_pointer(globals_di), globals_di); // TODO(lachsinc): Safe to hash this pointer for key?
-		m->debug_all_globals = globals_di;
+		m->debug_compile_unit->CompileUnit.globals = globals_di;
 
 		array_init(&m->debug_location_stack, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
 	}
