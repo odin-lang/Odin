@@ -523,6 +523,7 @@ enum irDebugInfoKind {
 	irDebugInfo_CompileUnit,
 	irDebugInfo_File,
 	irDebugInfo_Proc,
+	irDebugInfo_ProcType,
 	irDebugInfo_Location,
 	irDebugInfo_LexicalBlock,
 	irDebugInfo_AllProcs,
@@ -561,9 +562,12 @@ struct irDebugInfo {
 			String        name;
 			irDebugInfo * file;
 			TokenPos      pos;
-			irDebugInfo * types; // !{return, return, param, param, param.. etc.}
+			irDebugInfo * type;
 			// TODO(lachsinc): variables / retainedNodes ?
 		} Proc;
+		struct {
+			irDebugInfo * types; // !{return, return, param, param, param.. etc.}
+		} ProcType;
 		struct {
 			TokenPos     pos;
 			irDebugInfo *scope;
@@ -1968,10 +1972,76 @@ irDebugInfo *ir_add_debug_info_type_any(irModule *module) {
 	}
 }
 
+irDebugInfo *ir_add_debug_info_proc_type(irModule *module, Type *type) {
+	GB_ASSERT(type->kind == Type_Proc);
+
+	irDebugInfo **existing = map_get(&module->debug_info, hash_type(type));
+	if (existing != nullptr) {
+		GB_ASSERT((*existing)->kind == irDebugInfo_ProcType);
+		return *existing;
+	}
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_ProcType);
+	map_set(&module->debug_info, hash_type(type), di);
+
+	isize result_count = type->Proc.result_count;
+	isize param_count = type->Proc.param_count;
+	// gb_max(result_count, 1) because llvm expects explicit "null" return type
+	di->ProcType.types = ir_add_debug_info_array(module, 0, gb_max(result_count, 1) + param_count);
+
+	// Result/return types
+	if (result_count >= 1) {
+		TypeTuple *results_tuple = &type->Proc.results->Tuple;
+		for_array(i, results_tuple->variables) {
+			Entity *e = results_tuple->variables[i];
+			if (e->kind != Entity_Variable) {
+				continue; // TODO(lachsinc): Confirm correct?
+			}
+
+			irDebugInfo *type_di = ir_add_debug_info_type(module, e->type, e, nullptr, nullptr);
+			GB_ASSERT_NOT_NULL(type_di);
+			array_add(&di->ProcType.types->DebugInfoArray.elements, type_di);
+		}
+	} else {
+		// llvm expects "!{null}" for a function without return type, use nullptr to represent it.
+		// TODO(lachsinc): Is there a specific "void" type we should refer to?
+		array_add(&di->ProcType.types->DebugInfoArray.elements, (irDebugInfo*)nullptr);
+	}
+
+	// Param types
+	if (param_count >= 1) {
+		TypeTuple *params_tuple = &type->Proc.params->Tuple;
+		for_array(i, params_tuple->variables) {
+			Entity *e = params_tuple->variables[i];
+			if (e->kind != Entity_Variable) {
+				continue; // TODO(lachsinc): Confirm correct?
+			}
+
+			irDebugInfo *type_di = ir_add_debug_info_type(module, e->type, e, nullptr, nullptr);
+			GB_ASSERT_NOT_NULL(type_di);
+			array_add(&di->ProcType.types->DebugInfoArray.elements, type_di);
+		}
+	}
+
+	return di;
+}
+
 irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irDebugInfo *scope, irDebugInfo *file) {
-	// if (!proc->module->generate_debug_info) {
-	// 	return nullptr;
-	// }
+	// NOTE(lachsinc): Special handling for procedure pointers - we hash their types directly into DISubroutineType's
+	// but we need them interpreted as pointers when we use them as variables.
+	if (type->kind == Type_Proc) {
+		if (e->kind == Entity_Variable || e->kind == Entity_TypeName) {
+			// TODO(lachsinc): Wasteful (maybe?). Create a derived type for _every_ different proc ptr type
+			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+			map_set(&module->debug_info, hash_pointer(di), di);
+			di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
+			di->DerivedType.size = ir_debug_size_bits(t_rawptr);
+			di->DerivedType.base_type = ir_add_debug_info_proc_type(module, type);
+			return di;
+		} else {
+			GB_PANIC("Proc definitions should have their type created manually (not through this function)");
+		}
+	}
 
 	irDebugInfo **existing = map_get(&module->debug_info, hash_type(type));
 	if (existing != nullptr) {
@@ -2258,10 +2328,6 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		return ir_add_debug_info_type_bit_set(module, type, e, scope);
 	}
 
-	if (is_type_tuple(type)) {
-		int i = 0;
-	}
-
 	//
 	// TODO(lachsinc): HACK For now any remaining types interpreted as a rawptr.
 	//
@@ -2396,53 +2462,14 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc) {
 	irDebugInfo *scope = file; // TODO(lachsinc): Should scope be made separate to file?
 
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Proc);
+	map_set(&proc->module->debug_info, hash_entity(entity), di);
 	di->Proc.entity = entity;
 	di->Proc.name = proc->name;
 	di->Proc.file = file;
 	di->Proc.pos = entity->token.pos;
-
-	isize result_count = proc->type->Proc.result_count;
-	isize param_count = proc->type->Proc.param_count;
-	// gb_max(result_count, 1) because llvm expects explicit "null" return type
-	di->Proc.types = ir_add_debug_info_array(proc->module, 0, gb_max(result_count, 1) + param_count);
-
-	// Result/return types
-	if (result_count >= 1) {
-		TypeTuple *results_tuple = &proc->type->Proc.results->Tuple;
-		for_array(i, results_tuple->variables) {
-			Entity *e = results_tuple->variables[i];
-			if (e->kind != Entity_Variable) {
-				continue; // TODO(lachsinc): Confirm correct?
-			}
-
-			irDebugInfo *type_di = ir_add_debug_info_type(proc->module, e->type, e, nullptr, nullptr);
-			GB_ASSERT_NOT_NULL(type_di);
-			array_add(&di->Proc.types->DebugInfoArray.elements, type_di);
-		}
-	} else {
-		// llvm expects "!{null}" for a function without return type, use nullptr to represent it.
-		// TODO(lachsinc): Is there a specific "void" type we should refer to?
-		array_add(&di->Proc.types->DebugInfoArray.elements, (irDebugInfo*)nullptr);
-	}
-
-	// Param types
-	if (param_count >= 1) {
-		TypeTuple *params_tuple = &proc->type->Proc.params->Tuple;
-		for_array(i, params_tuple->variables) {
-			Entity *e = params_tuple->variables[i];
-			if (e->kind != Entity_Variable) {
-				continue; // TODO(lachsinc): Confirm correct?
-			}
-
-			irDebugInfo *type_di = ir_add_debug_info_type(proc->module, e->type, e, nullptr, nullptr);
-			GB_ASSERT_NOT_NULL(type_di);
-			array_add(&di->Proc.types->DebugInfoArray.elements, type_di);
-		}
-	}
+	di->Proc.type = ir_add_debug_info_proc_type(proc->module, proc->type);
 
 	proc->debug_scope = di;
-
-	map_set(&proc->module->debug_info, hash_entity(entity), di);
 	return di;
 }
 

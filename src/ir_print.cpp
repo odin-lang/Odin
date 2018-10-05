@@ -1964,6 +1964,7 @@ void print_llvm_ir(irGen *ir) {
 				break;
 			case irDebugInfo_Proc:
 				// TODO(lachsinc): We need to store scope info inside di, not just file info, for procs.
+				// Should all subprograms have distinct ??
 				ir_fprintf(f, "distinct !DISubprogram("
 				              "name: \"%.*s\""
 				            ", linkageName: \"%.*s\""
@@ -1976,7 +1977,7 @@ void print_llvm_ir(irGen *ir) {
 				            ", flags: DIFlagPrototyped"
 				            ", isOptimized: false"
 				            ", unit: !%d"
-				            ", type: !DISubroutineType(types: !%d)",
+				            ", type: !%d",
 				            LIT(di->Proc.entity->token.string),
 				            LIT(di->Proc.name),
 				            di->Proc.file->id, // TODO(lachsinc): HACK For now lets pretend all procs scope's == file.
@@ -1984,8 +1985,12 @@ void print_llvm_ir(irGen *ir) {
 				            di->Proc.pos.line,
 				            di->Proc.pos.line, // NOTE(lachsinc): Assume scopeLine always same as line.
 				            m->debug_compile_unit->id,
-							di->Proc.types->id);
+							di->Proc.type->id);
 				ir_write_byte(f, ')'); // !DISubprogram(
+				break;
+			case irDebugInfo_ProcType:
+				ir_fprintf(f, "!DISubroutineType(types: !%d)",
+				            di->ProcType.types->id);
 				break;
 			case irDebugInfo_Location:
 				GB_ASSERT_NOT_NULL(di->Location.scope);
