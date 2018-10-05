@@ -595,26 +595,26 @@ struct irDebugInfo {
 			// TODO(lachsinc): Do derived types even need scope/file/line etc. info?
 			irDebugEncoding  tag;
 			irDebugInfo *    base_type;
-			String           name;   // Optional
-			irDebugInfo *    scope;  // Optional
-			irDebugInfo *    file;   // Optional
-			TokenPos         pos;    // Optional
-			i32              size;   // Optional
-			i32              align;  // Optional
-			i32              offset; // Optional
-			irDebugInfoFlags flags;  // Optional; used only for DIFlagBitField atm.
+			String           name;
+			irDebugInfo *    scope;
+			irDebugInfo *    file;
+			TokenPos         pos;
+			i32              size;
+			i32              align;
+			i32              offset;
+			irDebugInfoFlags flags; // Used only for DIFlagBitField.
 		} DerivedType;
 		struct {
-			irDebugEncoding      tag;
-			String               name;
-			irDebugInfo *        scope;
-			irDebugInfo *        file;
-			TokenPos             pos;
-			irDebugInfo *        base_type; // optional, used for enumeration_type.
-			i32                  size;
-			i32                  align;
-			irDebugInfo *        elements;
-			i32                  array_count; // for DISubrange
+			irDebugEncoding tag;
+			String          name;
+			irDebugInfo *   scope;
+			irDebugInfo *   file;
+			TokenPos        pos;
+			irDebugInfo *   base_type; // optional, used for enumeration_type.
+			i32             size;
+			i32             align;
+			irDebugInfo *   elements;
+			i32             array_count; // for DISubrange
 		} CompositeType;
 		struct {
 			String name;
@@ -1656,7 +1656,7 @@ i32 ir_debug_align_bits(Type *type) {
 	return ir_debug_info_bits(type_align_of(type));
 }
 
-irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Type *type, i32 offset_bits, irDebugInfo *scope) {
+irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Type *type, i32 offset_bits, Entity *e, irDebugInfo *scope) {
 	// NOTE(lachsinc): Caller is expected to insert the returned value into map themselves.
 	// "scope", if set, should be inserted into map prior to calling to ensure no cyclical dependency issues.
 
@@ -1669,7 +1669,7 @@ irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Typ
 
 	// NOTE(lachsinc): It is "safe" to overwrite this base_type after a call to this function,
 	// if you need to set a specific type for this field.
-	di->DerivedType.base_type = ir_add_debug_info_type(module, type, nullptr, nullptr, nullptr);
+	di->DerivedType.base_type = ir_add_debug_info_type(module, type, e, scope, nullptr);
 	GB_ASSERT_NOT_NULL(di->DerivedType.base_type);
 	return di;
 }
@@ -1687,7 +1687,7 @@ irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entit
 	}
 
 	// TODO(lachsinc): Cleanup
-	irDebugInfo *di = ir_add_debug_info_field_internal(module, make_string(nullptr, 0), type, 0, scope);
+	irDebugInfo *di = ir_add_debug_info_field_internal(module, make_string(nullptr, 0), type, 0, e, scope);
 	void *ptr_to_hash = nullptr;
 	if (scope_type) {
 		Type *scope_base = base_type(scope_type);
@@ -1768,18 +1768,21 @@ irDebugInfo *ir_add_debug_info_type_dynamic_array(irModule *module, Type *type, 
 
 	irDebugInfo *data_di = ir_add_debug_info_field_internal(module, str_lit("data"), t_rawptr,
 	                                                        0,
+	                                                        nullptr,
 	                                                        di);
 	data_di->DerivedType.base_type = data_ptr_di;
 	map_set(&module->debug_info, hash_pointer(data_di), data_di);
 
 	irDebugInfo *len_di = ir_add_debug_info_field_internal(module, str_lit("len"), t_int,
 	                                                       data_di->DerivedType.size,
+	                                                       nullptr,
 	                                                       di);
 	map_set(&module->debug_info, hash_pointer(len_di), len_di);
 
 	irDebugInfo *cap_di = ir_add_debug_info_field_internal(module, str_lit("cap"), t_int,
 	                                                       data_di->DerivedType.size +
 	                                                       len_di->DerivedType.size,
+	                                                       nullptr,
 	                                                       di);
 	map_set(&module->debug_info, hash_pointer(cap_di), cap_di);
 
@@ -1787,6 +1790,7 @@ irDebugInfo *ir_add_debug_info_type_dynamic_array(irModule *module, Type *type, 
 	                                                         data_di->DerivedType.size +
 	                                                         len_di->DerivedType.size +
 	                                                         cap_di->DerivedType.size,
+	                                                         nullptr,
 	                                                         di);
 	map_set(&module->debug_info, hash_pointer(alloc_di), alloc_di);
 
@@ -1831,6 +1835,7 @@ irDebugInfo *ir_add_debug_info_type_bit_field(irModule *module, Type *type, Enti
 		}
 		irDebugInfo *field_di = ir_add_debug_info_field_internal(module, name, t_i64, // TODO(lachsinc): Safe to use i64 for all bitfields?
 		                                                         0,
+		                                                         nullptr,
 		                                                         di);
 		// NOTE(lachsinc): Above calls BitFieldValues type_size_of() which returns size in bits, replace with its true bit value here..
 		field_di->DerivedType.size = size;
@@ -1883,6 +1888,7 @@ irDebugInfo *ir_add_debug_info_type_bit_set(irModule *module, Type *type, Entity
 		}
 		irDebugInfo *field_di = ir_add_debug_info_field_internal(module, name, t_u32, // TODO(lachsinc): u32 fine??
 		                                                         0,
+		                                                         nullptr,
 		                                                         di);
 		field_di->DerivedType.size   = 1;
 		field_di->DerivedType.offset = offset; // Offset stored in bits already, no need to convert
@@ -1913,12 +1919,14 @@ irDebugInfo *ir_add_debug_info_type_string(irModule *module, irDebugInfo *scope,
 		// Field "data"
 		irDebugInfo *data_di = ir_add_debug_info_field_internal(module, str_lit("data"), t_cstring,
 		                                                        0,
+		                                                        nullptr,
 		                                                        di);
 		map_set(&module->debug_info, hash_pointer(data_di), data_di);
 
 		// Field "len"
 		irDebugInfo *len_di = ir_add_debug_info_field_internal(module, str_lit("len"), t_i64,
 		                                                       data_di->DerivedType.size,
+		                                                       nullptr,
 		                                                       di);
 		map_set(&module->debug_info, hash_pointer(len_di), len_di);
 
@@ -1949,12 +1957,14 @@ irDebugInfo *ir_add_debug_info_type_any(irModule *module) {
 		// Field "data"
 		irDebugInfo *data_di = ir_add_debug_info_field_internal(module, str_lit("data"), t_rawptr,
 		                                                        0,
+		                                                        nullptr,
 		                                                        di);
 		map_set(&module->debug_info, hash_pointer(data_di), data_di);
 
 		// Field "id"
 		irDebugInfo *id_di = ir_add_debug_info_field_internal(module, str_lit("id"), t_typeid,
 		                                                      data_di->DerivedType.size,
+		                                                      nullptr,
 		                                                      di);
 		map_set(&module->debug_info, hash_pointer(id_di), id_di);
 
@@ -2098,6 +2108,11 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 
 		if (is_type_struct(type)) {
 			GB_ASSERT(base->kind == Type_Struct);
+			if (!is_type_named(type)) {
+				di->CompositeType.name = str_lit("struct");
+				GB_ASSERT_NOT_NULL(scope);
+				di->CompositeType.scope = scope;
+			}
 			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Struct.fields.count);
 			for_array(field_index, base->Struct.fields) {
 				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
@@ -2107,6 +2122,11 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 			di->CompositeType.tag = irDebugBasicEncoding_structure_type;
 		} else if (is_type_union(type)) {
 			GB_ASSERT(base->kind == Type_Union);
+			if (!is_type_named(type)) {
+				di->CompositeType.name = str_lit("union");
+				GB_ASSERT_NOT_NULL(scope);
+				di->CompositeType.scope = scope;
+			}
 			di->CompositeType.tag = irDebugBasicEncoding_union_type;
 			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Union.variants.count);
 			// TODO(lachsinc): Cleanup; this should be handled in a more generic manner for all types.
@@ -2121,6 +2141,11 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 			}
 		} else if (is_type_enum(type)) {
 			GB_ASSERT(base->kind == Type_Enum);
+			if (!is_type_named(type)) {
+				di->CompositeType.name = str_lit("enum");
+				GB_ASSERT_NOT_NULL(scope);
+				di->CompositeType.scope = scope;
+			}
 			di->CompositeType.base_type = ir_add_debug_info_type(module, base->Enum.base_type, e, scope, file);
 			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Enum.fields.count);
 			for_array(field_index, base->Enum.fields) {
@@ -2178,12 +2203,14 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 
 		irDebugInfo *data_di = ir_add_debug_info_field_internal(module, str_lit("data"), t_rawptr,
 		                                                        0,
+		                                                        nullptr,
 		                                                        di);
 		data_di->DerivedType.base_type = data_ptr_di;
 		map_set(&module->debug_info, hash_pointer(data_di), data_di);
 
 		irDebugInfo *len_di = ir_add_debug_info_field_internal(module, str_lit("len"), t_int,
 		                                                       data_di->DerivedType.size,
+		                                                       nullptr,
 		                                                       di);
 		map_set(&module->debug_info, hash_pointer(len_di), len_di);
 
@@ -2328,7 +2355,7 @@ irDebugInfo *ir_add_debug_info_local(irProcedure *proc, Entity *e, i32 arg_id) {
 	di->LocalVariable.file = file;
 	di->LocalVariable.pos = e->token.pos;
 	di->LocalVariable.arg = arg_id;
-	di->LocalVariable.type = ir_add_debug_info_type(module, e->type, nullptr, nullptr, nullptr);
+	di->LocalVariable.type = ir_add_debug_info_type(module, e->type, e, scope, file); // TODO(lachsinc): Is this the correct entity to pass? Or do we want TypeName ??
 	
 	map_set(&module->debug_info, hash_entity(e), di);
 	return di;
@@ -2371,7 +2398,7 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc) {
 				continue; // TODO(lachsinc): Confirm correct?
 			}
 
-			irDebugInfo *type_di = ir_add_debug_info_type(proc->module, e->type, nullptr, nullptr, nullptr);
+			irDebugInfo *type_di = ir_add_debug_info_type(proc->module, e->type, e, nullptr, nullptr);
 			GB_ASSERT_NOT_NULL(type_di);
 			array_add(&di->Proc.types->DebugInfoArray.elements, type_di);
 		}
@@ -2390,7 +2417,7 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc) {
 				continue; // TODO(lachsinc): Confirm correct?
 			}
 
-			irDebugInfo *type_di = ir_add_debug_info_type(proc->module, e->type, nullptr, nullptr, nullptr);
+			irDebugInfo *type_di = ir_add_debug_info_type(proc->module, e->type, e, nullptr, nullptr);
 			GB_ASSERT_NOT_NULL(type_di);
 			array_add(&di->Proc.types->DebugInfoArray.elements, type_di);
 		}
