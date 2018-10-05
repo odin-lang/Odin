@@ -522,17 +522,16 @@ enum irDebugInfoKind {
 
 	irDebugInfo_CompileUnit,
 	irDebugInfo_File,
-	irDebugInfo_Scope,
 	irDebugInfo_Proc,
 	irDebugInfo_Location,
 	irDebugInfo_LexicalBlock,
 	irDebugInfo_AllProcs,
 
-	irDebugInfo_BasicType,      // basic types
-	irDebugInfo_DerivedType,    // pointer, typedef
-	irDebugInfo_CompositeType,  // array, struct, enum, (raw_)union
+	irDebugInfo_BasicType,      // primitive types
+	irDebugInfo_DerivedType,    // pointer, distinct etc.
+	irDebugInfo_CompositeType,  // array, struct, enum, union etc.
 	irDebugInfo_Enumerator,     // For irDebugInfo_CompositeType if enum
-	irDebugInfo_GlobalVariableExpression, // for describe if global is const or not
+	irDebugInfo_GlobalVariableExpression, // used to describe if global is const or not
 	irDebugInfo_GlobalVariable,
 	irDebugInfo_LocalVariable,
 
@@ -558,12 +557,6 @@ struct irDebugInfo {
 			String   directory;
 		} File;
 		struct {
-			irDebugInfo *parent;
-			irDebugInfo *file;
-			TokenPos     pos;
-			Scope *      scope; // Actual scope
-		} Scope;
-		struct {
 			Entity *      entity;
 			String        name;
 			irDebugInfo * file;
@@ -588,7 +581,6 @@ struct irDebugInfo {
 			irDebugEncoding encoding;
 		} BasicType;
 		struct {
-			// TODO(lachsinc): Do derived types even need scope/file/line etc. info?
 			irDebugEncoding  tag;
 			irDebugInfo *    base_type;
 			String           name;
@@ -1610,7 +1602,7 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	case Basic_i32:
 	case Basic_i64: 
 	case Basic_int:
-	case Basic_rune: // TODO(lachsinc) signed or unsigned?
+	case Basic_rune:
 	case Basic_typeid:
 		return irDebugBasicEncoding_signed;
 
@@ -1670,8 +1662,6 @@ irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Typ
 	return di;
 }
 
-// TODO(lachsinc): Cleanup params, either scope or scope_type, not both.
-// Pass name, file, pos in manually? Would be much cleaner.
 irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entity *e, Type *scope_type, i32 index, Type *type, irDebugInfo *file) {
 	// NOTE(lachsinc): This lookup will only work for struct fields!!
 	// TODO(lachsinc): Do we even need to do this?
@@ -1682,7 +1672,6 @@ irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entit
 		}
 	}
 
-	// TODO(lachsinc): Cleanup
 	irDebugInfo *di = ir_add_debug_info_field_internal(module, make_string(nullptr, 0), type, 0, e, scope);
 	void *ptr_to_hash = nullptr;
 	if (scope_type) {
@@ -1722,7 +1711,6 @@ irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entit
 	}
 
 	di->DerivedType.file = file;
-	// di->DerivedType.align = ir_debug_align_bits(type);
 
 	GB_ASSERT_NOT_NULL(ptr_to_hash);
 	map_set(&module->debug_info, hash_pointer(ptr_to_hash), di);
@@ -1746,7 +1734,6 @@ irDebugInfo *ir_add_debug_info_enumerator(irModule *module, Entity *e) {
 	return di;
 }
 
-// TODO(lachsinc): Cleanup params.
 irDebugInfo *ir_add_debug_info_type_dynamic_array(irModule *module, Type *type, Entity *e, irDebugInfo *scope, irDebugInfo *file) {
 	GB_ASSERT(type->kind == Type_DynamicArray);
 
@@ -1810,8 +1797,7 @@ irDebugInfo *ir_add_debug_info_type_dynamic_array(irModule *module, Type *type, 
 	return di;
 }
 
-// TODO(lachsinc): Cleanup params.
-irDebugInfo *ir_add_debug_info_type_bit_field(irModule *module, Type *type, Entity *e, irDebugInfo *scope, irDebugInfo *file) {
+irDebugInfo *ir_add_debug_info_type_bit_field(irModule *module, Type *type, Entity *e, irDebugInfo *scope) {
 	GB_ASSERT(type->kind == Type_BitField || (type->kind == Type_Named && type->Named.base->kind == Type_BitField));
 
 	Type *bf_type = base_type(type);
@@ -1838,7 +1824,8 @@ irDebugInfo *ir_add_debug_info_type_bit_field(irModule *module, Type *type, Enti
 		if (field != nullptr && field->token.string.len > 0) {
 			name = field->token.string;
 		}
-		irDebugInfo *field_di = ir_add_debug_info_field_internal(module, name, t_i64, // TODO(lachsinc): Safe to use i64 for all bitfields?
+		// TODO(lachsinc): t_i64 may not be safe to use for all bitfields?
+		irDebugInfo *field_di = ir_add_debug_info_field_internal(module, name, t_i64,
 		                                                         0,
 		                                                         nullptr,
 		                                                         di);
@@ -1853,8 +1840,7 @@ irDebugInfo *ir_add_debug_info_type_bit_field(irModule *module, Type *type, Enti
 	return di;
 }
 
-// TODO(lachsinc): Cleanup params.
-irDebugInfo *ir_add_debug_info_type_bit_set(irModule *module, Type *type, Entity *e, irDebugInfo *scope, irDebugInfo *file) {
+irDebugInfo *ir_add_debug_info_type_bit_set(irModule *module, Type *type, Entity *e, irDebugInfo *scope) {
 	GB_ASSERT(type->kind == Type_BitSet || type->kind == Type_Named);
 
 	Type *base = base_type(type);
@@ -1905,8 +1891,7 @@ irDebugInfo *ir_add_debug_info_type_bit_set(irModule *module, Type *type, Entity
 	return di;
 }
 
-// TODO(lachsinc): Cleanup params.
-irDebugInfo *ir_add_debug_info_type_string(irModule *module, irDebugInfo *scope, Entity *e, Type *type, irDebugInfo *file) {
+irDebugInfo *ir_add_debug_info_type_string(irModule *module, irDebugInfo *scope, Entity *e, Type *type) {
 	// TODO(lachsinc): Does this only occur once ??
 	irDebugInfo **existing = map_get(&module->debug_info, hash_type(t_string));
 	if (existing != nullptr) {
@@ -2044,7 +2029,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 			// TODO(lachsinc):
 			break;
 		}
-		case Basic_string: return ir_add_debug_info_type_string(module, scope, e, type, file);
+		case Basic_string: return ir_add_debug_info_type_string(module, scope, e, type);
 		case Basic_any:    return ir_add_debug_info_type_any(module);
 
 		// Derived basic types
@@ -2266,11 +2251,11 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 	*/
 
 	if (is_type_bit_field(type)) {
-		return ir_add_debug_info_type_bit_field(module, type, e, scope, file);
+		return ir_add_debug_info_type_bit_field(module, type, e, scope);
 	}
 
 	if (is_type_bit_set(type)) {
-		return ir_add_debug_info_type_bit_set(module, type, e, scope, file);
+		return ir_add_debug_info_type_bit_set(module, type, e, scope);
 	}
 
 	if (is_type_tuple(type)) {
