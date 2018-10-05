@@ -549,7 +549,6 @@ struct irDebugInfo {
 		struct {
 			AstFile *    file;
 			String       producer;
-			irDebugInfo *all_procs;
 			irDebugInfo *enums;   // DebugInfoArray
 			irDebugInfo *globals; // DebugInfoArray
 		} CompileUnit;
@@ -581,10 +580,7 @@ struct irDebugInfo {
 			irDebugInfo *file;
 			irDebugInfo *scope;
 		} LexicalBlock;
-		struct {
-			Array<irDebugInfo *> procs;
-		} AllProcs; // TODO(lachsinc): Redundant w/ DebugInfoArray. Merge.
-
+		
 		struct {
 			String          name;
 			i32             size;
@@ -8678,12 +8674,12 @@ void ir_init_module(irModule *m, Checker *c) {
 
 		irDebugInfo *enums_di = ir_alloc_debug_info(irDebugInfo_DebugInfoArray);
 		array_init(&enums_di->DebugInfoArray.elements, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
-		map_set(&m->debug_info, hash_pointer(enums_di), enums_di); // TODO(lachsinc): Safe to hash this pointer for key?
+		map_set(&m->debug_info, hash_pointer(enums_di), enums_di);
 		m->debug_compile_unit->CompileUnit.enums = enums_di;
 
 		irDebugInfo *globals_di = ir_alloc_debug_info(irDebugInfo_DebugInfoArray);
 		array_init(&globals_di->DebugInfoArray.elements, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
-		map_set(&m->debug_info, hash_pointer(globals_di), globals_di); // TODO(lachsinc): Safe to hash this pointer for key?
+		map_set(&m->debug_info, hash_pointer(globals_di), globals_di);
 		m->debug_compile_unit->CompileUnit.globals = globals_di;
 
 		array_init(&m->debug_location_stack, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
@@ -9455,27 +9451,6 @@ void ir_gen_tree(irGen *s) {
 
 	irDebugInfo *compile_unit = m->debug_info.entries[0].value;
 	GB_ASSERT(compile_unit->kind == irDebugInfo_CompileUnit);
-	irDebugInfo *all_procs = ir_alloc_debug_info(irDebugInfo_AllProcs);
-
-	isize all_proc_max_count = 0;
-	for_array(i, m->debug_info.entries) {
-		irDebugInfo *di = m->debug_info.entries[i].value;
-		if (di->kind == irDebugInfo_Proc) {
-			all_proc_max_count++;
-		}
-	}
-
-	array_init(&all_procs->AllProcs.procs, ir_allocator(), 0, all_proc_max_count);
-	map_set(&m->debug_info, hash_pointer(all_procs), all_procs); // NOTE(bill): This doesn't need to be mapped
-	compile_unit->CompileUnit.all_procs = all_procs;
-
-
-	for_array(i, m->debug_info.entries) {
-		irDebugInfo *di = m->debug_info.entries[i].value;
-		if (di->kind == irDebugInfo_Proc) {
-			array_add(&all_procs->AllProcs.procs, di);
-		}
-	}
 
 
 #if defined(GB_SYSTEM_WINDOWS)
