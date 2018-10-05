@@ -1668,7 +1668,6 @@ irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Typ
 
 irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entity *e, Type *scope_type, i32 index, Type *type, irDebugInfo *file) {
 	// NOTE(lachsinc): This lookup will only work for struct fields!!
-	// TODO(lachsinc): Do we even need to do this?
 	if (e) {
 		irDebugInfo **existing = map_get(&module->debug_info, hash_entity(e));
 		if (existing != nullptr) {
@@ -1710,7 +1709,7 @@ irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entit
 			if (is_type_named(type)) {
 				di->DerivedType.name = type->kind == Type_Named ? type->Named.name : type->Basic.name;
 			}
-			ptr_to_hash = di; // TODO(lachsinc): Correct ?? I don't think unions have individual entities for their fields?? idk.
+			ptr_to_hash = di;
 		}
 	}
 
@@ -1740,9 +1739,6 @@ irDebugInfo *ir_add_debug_info_enumerator(irModule *module, Entity *e) {
 
 irDebugInfo *ir_add_debug_info_type_dynamic_array(irModule *module, Type *type, Entity *e, irDebugInfo *scope, irDebugInfo *file) {
 	GB_ASSERT(type->kind == Type_DynamicArray);
-
-	// TODO(lachsinc): We should insert "type" into map and look it up, and just create a derived type
-	// for each required dynamic array, named or unnamed.
 
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
 	di->CompositeType.name = str_lit("dynamic_array"); // TODO(lachsinc): [dynamic] .. type->DynamicArray.elem name
@@ -1810,7 +1806,6 @@ irDebugInfo *ir_add_debug_info_type_bit_field(irModule *module, Type *type, Enti
 	di->CompositeType.name = is_type_named(type) ? type->Named.name : str_lit("bit_field");
 	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
 	di->CompositeType.size = ir_debug_size_bits(bf_type);
-	// di->CompositeType.align = ir_debug_align_bits(bf_type);
 	map_set(&module->debug_info, hash_type(type), di);
 
 	GB_ASSERT(bf_type->BitField.fields.count == bf_type->BitField.offsets.count &&
@@ -1833,7 +1828,8 @@ irDebugInfo *ir_add_debug_info_type_bit_field(irModule *module, Type *type, Enti
 		                                                         0,
 		                                                         nullptr,
 		                                                         di);
-		// NOTE(lachsinc): Above calls BitFieldValues type_size_of() which returns size in bits, replace with its true bit value here..
+		// NOTE(lachsinc): Above calls BitFieldValues type_size_of() which returns size in bits, 
+		// replace with its true bit value here..
 		field_di->DerivedType.size = size;
 		field_di->DerivedType.offset = offset; // Offset stored in bits already, no need to convert
 		field_di->DerivedType.flags = irDebugInfoFlag_Bitfield;
@@ -1867,7 +1863,6 @@ irDebugInfo *ir_add_debug_info_type_bit_set(irModule *module, Type *type, Entity
 	di->CompositeType.name = named != nullptr ? named->Named.name : str_lit("bit_set");
 	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
 	di->CompositeType.size = ir_debug_size_bits(base);
-	// di->CompositeType.align = ir_debug_align_bits(base);
 	map_set(&module->debug_info, hash_type(type), di);
 
 	irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, base->BitSet.upper + 1);
@@ -1943,7 +1938,7 @@ irDebugInfo *ir_add_debug_info_type_any(irModule *module) {
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
 		di->CompositeType.name = t_any->Basic.name;
 		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
-		di->CompositeType.size = ir_debug_size_bits(t_any); // TODO(lachsinc): Correct ??
+		di->CompositeType.size = ir_debug_size_bits(t_any);
 		di->CompositeType.align = ir_debug_align_bits(t_any);
 
 		map_set(&module->debug_info, hash_type(t_any), di);
@@ -2013,6 +2008,7 @@ irDebugInfo *ir_add_debug_info_type_complex(irModule *module, Type *type) {
 
 	return di;
 }
+
 irDebugInfo *ir_add_debug_info_proc_type(irModule *module, Type *type) {
 	GB_ASSERT(type->kind == Type_Proc);
 
@@ -2036,7 +2032,7 @@ irDebugInfo *ir_add_debug_info_proc_type(irModule *module, Type *type) {
 		for_array(i, results_tuple->variables) {
 			Entity *e = results_tuple->variables[i];
 			if (e->kind != Entity_Variable) {
-				continue; // TODO(lachsinc): Confirm correct?
+				continue;
 			}
 
 			irDebugInfo *type_di = ir_add_debug_info_type(module, e->type, e, nullptr, nullptr);
@@ -2045,7 +2041,6 @@ irDebugInfo *ir_add_debug_info_proc_type(irModule *module, Type *type) {
 		}
 	} else {
 		// llvm expects "!{null}" for a function without return type, use nullptr to represent it.
-		// TODO(lachsinc): Is there a specific "void" type we should refer to?
 		array_add(&di->ProcType.types->DebugInfoArray.elements, (irDebugInfo*)nullptr);
 	}
 
@@ -2055,7 +2050,7 @@ irDebugInfo *ir_add_debug_info_proc_type(irModule *module, Type *type) {
 		for_array(i, params_tuple->variables) {
 			Entity *e = params_tuple->variables[i];
 			if (e->kind != Entity_Variable) {
-				continue; // TODO(lachsinc): Confirm correct?
+				continue;
 			}
 
 			irDebugInfo *type_di = ir_add_debug_info_type(module, e->type, e, nullptr, nullptr);
@@ -2296,7 +2291,6 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 
 	if (is_type_slice(type)) {
 		// NOTE(lachsinc): Every slice type has its own composite type / field debug infos created. This is sorta wasteful.
-
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
 		di->CompositeType.name = str_lit("slice");
 		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
@@ -2416,8 +2410,6 @@ irDebugInfo *ir_add_debug_info_global(irModule *module, irValue *v) {
 }
 
 irDebugInfo *ir_add_debug_info_block(irProcedure *proc, Scope *scope) {
-	// GB_ASSERT(block->kind == Ast_BlockStmt);
-
 	irModule *module = proc->module;
 
 	irDebugInfo **existing = map_get(&module->debug_info, hash_pointer(scope));
@@ -2438,7 +2430,7 @@ irDebugInfo *ir_add_debug_info_block(irProcedure *proc, Scope *scope) {
 
 irDebugInfo *ir_add_debug_info_local(irProcedure *proc, Entity *e, i32 arg_id) {
 	// TODO(lachsinc): Not sure if this handles generated locals properly as they may not have
-	// enough information inside "e".
+	// enough information contained inside "e".
 
 	irModule *module = proc->module;
 	if (!module->generate_debug_info) {
@@ -2463,7 +2455,7 @@ irDebugInfo *ir_add_debug_info_local(irProcedure *proc, Entity *e, i32 arg_id) {
 	di->LocalVariable.file = file;
 	di->LocalVariable.pos = e->token.pos;
 	di->LocalVariable.arg = arg_id;
-	di->LocalVariable.type = ir_add_debug_info_type(module, e->type, e, scope, file); // TODO(lachsinc): Is this the correct entity to pass? Or do we want TypeName ??
+	di->LocalVariable.type = ir_add_debug_info_type(module, e->type, e, scope, file); // TODO(lachsinc): Is this the correct entity to pass? Or do we want a TypeName ??
 	
 	map_set(&module->debug_info, hash_entity(e), di);
 	return di;
@@ -2485,7 +2477,8 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc) {
 	if (f) {
 		file = ir_add_debug_info_file(proc->module, f);
 	}
-	irDebugInfo *scope = file; // TODO(lachsinc): Should scope be made separate to file?
+	// TODO(lachsinc): Should scope be made separate to file?
+	irDebugInfo *scope = file; 
 
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Proc);
 	map_set(&proc->module->debug_info, hash_entity(entity), di);
@@ -2501,10 +2494,8 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc) {
 
 irDebugInfo *ir_add_debug_info_location(irModule *m, Ast *node, irDebugInfo *scope) {
 	if (node == nullptr || scope == nullptr) {
-		// GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
 		return nullptr;
 	}
-	// GB_ASSERT(node->kind != Ast_BlockStmt);
 	// TODO(lachsinc): Should we traverse the node/children until we find one with
 	// valid token/pos and use that instead??
 	irDebugInfo **existing = map_get(&m->debug_info, hash_node(node));
@@ -2574,7 +2565,6 @@ void ir_value_set_debug_location(irProcedure *proc, irValue *v) {
 
 	irModule *m = proc->module;
 	GB_ASSERT(m->debug_location_stack.count > 0);
-	// TODO(lachsinc): Assert scope info contained in stack top is appropriate against proc ??
 	v->loc = *array_end_ptr(&m->debug_location_stack);
 	if (v->loc == nullptr) {
 		// NOTE(lachsinc): Entry point (main()) and runtime_startup are the only ones where null location is considered valid.
@@ -8585,7 +8575,7 @@ void ir_module_add_value(irModule *m, Entity *e, irValue *v) {
 	map_set(&m->values, hash_entity(e), v);
 	// TODO(lachsinc): This may not be the most sensible place to do this!
 	// it may be more sensible to look for more specific locations that call ir_value_global and assign it a value? maybe?
-	// ir_value_global itself doesn't have access to module and I'm trying to minimise changes to non-debug ir stuff.
+	// ir_value_global itself doesn't have access to module though.
 	if (v->kind == irValue_Global && v->Global.value != nullptr && e->state == EntityState_Resolved) {
 		ir_add_debug_info_global(m, v);
 	}
