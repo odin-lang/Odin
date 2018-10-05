@@ -1432,13 +1432,11 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initial
 
 	if (expr != nullptr && proc->entity != nullptr) {	
 		GB_ASSERT_NOT_NULL(proc->debug_scope);
-		ir_push_debug_location(proc->module, expr, proc->debug_scope);
-
+		
 		ir_emit(proc, ir_instr_debug_declare(proc, expr, e, true, instr));
 
 		// TODO(lachsinc): "Arg" is not used yet but should be eventually, if applicable, set to param index.
 		ir_add_debug_info_local(proc, e, 0);
-		ir_pop_debug_location(proc->module);
 	}
 
 	return instr;
