@@ -2055,7 +2055,6 @@ void print_llvm_ir(irGen *ir) {
 				            di->LocalVariable.pos.line,
 				            di->LocalVariable.type->id);
 				if (di->LocalVariable.arg > 0) {
-					GB_PANIC("Param 'Arg' debug info not yet implemented"); // TODO(lachsinc): Proper param index support.
 					ir_fprintf(f, ", arg: %d", di->LocalVariable.arg);
 				}
 				ir_write_byte(f, ')');
