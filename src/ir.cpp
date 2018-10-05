@@ -1418,7 +1418,7 @@ void ir_push_context_onto_stack(irProcedure *proc, irValue *ctx) {
 	array_add(&proc->context_stack, cd);
 }
 
-irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initialized) {
+irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initialized, i32 param_index = 0) {
 	irBlock *b = proc->decl_block; // all variables must be in the first block
 	irValue *instr = ir_instr_local(proc, e, true);
 	instr->Instr.block = b;
@@ -1436,7 +1436,7 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initial
 		ir_emit(proc, ir_instr_debug_declare(proc, expr, e, true, instr));
 
 		// TODO(lachsinc): "Arg" is not used yet but should be eventually, if applicable, set to param index.
-		ir_add_debug_info_local(proc, e, 0);
+		ir_add_debug_info_local(proc, e, param_index);
 	}
 
 	return instr;
@@ -1501,7 +1501,7 @@ irValue *ir_add_global_generated(irModule *m, Type *type, irValue *value) {
 }
 
 
-irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type) {
+irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type, i32 index) {
 	irValue *v = ir_value_param(proc, e, abi_type);
 	irValueParam *p = &v->Param;
 
@@ -1510,7 +1510,7 @@ irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type) {
 
 	switch (p->kind) {
 	case irParamPass_Value: {
-		irValue *l = ir_add_local(proc, e, expr, false);
+		irValue *l = ir_add_local(proc, e, expr, false, index);
 		irValue *x = v;
 		if (abi_type == t_llvm_bool) {
 			x = ir_emit_conv(proc, x, t_bool);
@@ -1523,7 +1523,7 @@ irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type) {
 		return ir_emit_load(proc, v);
 
 	case irParamPass_Integer: {
-		irValue *l = ir_add_local(proc, e, expr, false);
+		irValue *l = ir_add_local(proc, e, expr, false, index);
 		irValue *iptr = ir_emit_conv(proc, l, alloc_type_pointer(p->type));
 		ir_emit_store(proc, iptr, v);
 		return ir_emit_load(proc, l);
@@ -8336,7 +8336,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 
 				Type *abi_type = proc->type->Proc.abi_compat_params[i];
 				if (e->token.string != "" && !is_blank_ident(e->token)) {
-					irValue *param = ir_add_param(proc, e, name, abi_type);
+					irValue *param = ir_add_param(proc, e, name, abi_type, cast(i32)(i+1));
 					array_add(&proc->params, param);
 				}
 			}
@@ -8353,7 +8353,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 					abi_type = abi_types[i];
 				}
 				if (e->token.string != "" && !is_blank_ident(e->token)) {
-					irValue *param = ir_add_param(proc, e, nullptr, abi_type);
+					irValue *param = ir_add_param(proc, e, nullptr, abi_type, cast(i32)(i+1));
 					array_add(&proc->params, param);
 				}
 			}
