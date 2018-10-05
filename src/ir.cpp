@@ -2368,21 +2368,6 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 
 	GB_PANIC("Unreachable");
 	return nullptr;
-
-	//
-	// TODO(lachsinc): HACK For now any remaining types interpreted as a rawptr.
-	//
-	// {
-	// 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_BasicType);
-	// 	di->BasicType.align = ir_debug_align_bits(type);
-	// 	di->BasicType.encoding = irDebugBasicEncoding_address;
-	// 	di->BasicType.name = str_lit("type_todo");
-	// 	di->BasicType.size = ir_debug_size_bits(type);
-
-	// 	map_set(&module->debug_info, hash_type(type), di);
-
-	// 	return di;
-	// }
 }
 
 irDebugInfo *ir_add_debug_info_global(irModule *module, irValue *v) {
