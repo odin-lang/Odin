@@ -2044,16 +2044,17 @@ void print_llvm_ir(irGen *ir) {
 			}
 			case irDebugInfo_LocalVariable: {
 				ir_fprintf(f, "!DILocalVariable("
-				              "name: \"%.*s\""
-				            ", scope: !%d"
+				              "scope: !%d"
 				            ", file: !%d"
 				            ", line: %d"
 				            ", type: !%d",
-				            LIT(di->LocalVariable.name),
 				            di->LocalVariable.scope->id,
 				            di->LocalVariable.file->id,
 				            di->LocalVariable.pos.line,
 				            di->LocalVariable.type->id);
+				if (di->DerivedType.name.len > 0) {
+					ir_fprintf(f, ", name: \"%.*s\"", LIT(di->LocalVariable.name));
+				}
 				if (di->LocalVariable.arg > 0) {
 					ir_fprintf(f, ", arg: %d", di->LocalVariable.arg);
 				}
