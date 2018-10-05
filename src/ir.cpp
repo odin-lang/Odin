@@ -1430,13 +1430,15 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initial
 		ir_emit_zero_init(proc, instr, expr);
 	}
 
-	if (expr != nullptr && proc->entity != nullptr) {	
-		GB_ASSERT_NOT_NULL(proc->debug_scope);
-		
-		ir_emit(proc, ir_instr_debug_declare(proc, expr, e, true, instr));
-
-		// TODO(lachsinc): "Arg" is not used yet but should be eventually, if applicable, set to param index.
-		ir_add_debug_info_local(proc, e, param_index);
+	// if (proc->module->generate_debug_info && expr != nullptr && proc->entity != nullptr) {
+	if (proc->module->generate_debug_info && proc->entity != nullptr) {
+		// GB_ASSERT_NOT_NULL(proc->debug_scope);
+		if (expr != nullptr) {
+			ir_emit(proc, ir_instr_debug_declare(proc, expr, e, true, instr));
+		}
+		if (e->scope != nullptr && proc->debug_scope != nullptr) {
+			irDebugInfo *di_local = ir_add_debug_info_local(proc, e, param_index);
+		}
 	}
 
 	return instr;
@@ -1689,15 +1691,24 @@ irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entit
 	void *ptr_to_hash = nullptr;
 	if (scope_type) {
 		Type *scope_base = base_type(scope_type);
-		if (is_type_struct(scope_type)) {
-			if (scope_base->Struct.are_offsets_set) {
+		if (is_type_struct(scope_type) || is_type_tuple(scope_type)) {
+			if (is_type_struct(scope_type) && scope_base->Struct.are_offsets_set) {
 				di->DerivedType.offset = ir_debug_info_bits(scope_base->Struct.offsets[index]);
+			} else if (is_type_tuple(scope_type) && scope_base->Tuple.are_offsets_set) {
+				di->DerivedType.offset = ir_debug_info_bits(scope_base->Tuple.offsets[index]);
 			} else {
 				di->DerivedType.offset = ir_debug_info_bits(type_offset_of(scope_base, index));
 			}
 			if (e) {
 				ptr_to_hash = e;
 				di->DerivedType.name = e->token.string;
+				if (e->token.string.len == 0) {
+					// If no name available for field, use its field index as its name.
+					isize max_len = 8;
+					u8 *str = cast(u8 *)gb_alloc_array(heap_allocator(), u8, max_len);
+					isize len = gb_snprintf(cast(char *)str, 8, "%d", index);
+					di->DerivedType.name = make_string(str, len-1);
+				}
 				di->DerivedType.pos = e->token.pos;
 			} else {
 				GB_PANIC("Unreachable"); // struct field Entity's should be provided.
@@ -2011,7 +2022,8 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		if (named_base->kind != Type_Struct &&
 			named_base->kind != Type_Union &&
 			named_base->kind != Type_Enum &&
-			named_base->kind != Type_BitField) {
+			named_base->kind != Type_BitField &&
+			named_base->kind != Type_Tuple) {
 			// distinct / typedef etc.
 			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
 			if (type->kind == Type_Named) {
@@ -2084,7 +2096,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		return di;
 	}
 
-	if (is_type_struct(type) || is_type_union(type) || is_type_enum(type)) {
+	if (is_type_struct(type) || is_type_union(type) || is_type_enum(type) || is_type_tuple(type)) {
 		if (type->kind == Type_Named) {
 			// NOTE(lachsinc): Named named's should always be handled prior as typedefs.
 			GB_ASSERT(type->Named.base->kind != Type_Named);
@@ -2111,13 +2123,13 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 				GB_ASSERT_NOT_NULL(scope);
 				di->CompositeType.scope = scope;
 			}
+			di->CompositeType.tag = irDebugBasicEncoding_structure_type;
 			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Struct.fields.count);
 			for_array(field_index, base->Struct.fields) {
 				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
 				          ir_add_debug_info_field(module, di, base->Struct.fields[field_index], type,
 				                                  cast(i32)field_index, base->Struct.fields[field_index]->type, file));
 			}
-			di->CompositeType.tag = irDebugBasicEncoding_structure_type;
 		} else if (is_type_union(type)) {
 			GB_ASSERT(base->kind == Type_Union);
 			if (!is_type_named(type)) {
@@ -2144,17 +2156,32 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 				GB_ASSERT_NOT_NULL(scope);
 				di->CompositeType.scope = scope;
 			}
+			di->CompositeType.tag = irDebugBasicEncoding_enumeration_type;
 			di->CompositeType.base_type = ir_add_debug_info_type(module, base->Enum.base_type, e, scope, file);
 			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Enum.fields.count);
 			for_array(field_index, base->Enum.fields) {
 				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
 				          ir_add_debug_info_enumerator(module, base->Enum.fields[field_index]));
 			}
-			di->CompositeType.tag = irDebugBasicEncoding_enumeration_type;
 
 			// TODO(lachsinc): Do we want to ensure this is an enum in the global scope before
 			// adding it into the modules enum array ??
 			array_add(&module->debug_compile_unit->CompileUnit.enums->DebugInfoArray.elements, di);
+		} else if (is_type_tuple(type)) {
+			GB_ASSERT(base->kind == Type_Tuple);
+			if (!is_type_named(type)) {
+				di->CompositeType.name = str_lit("tuple");
+				GB_ASSERT_NOT_NULL(scope);
+				di->CompositeType.scope = scope;
+			}
+			di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Tuple.variables.count);
+			// TODO(lachsinc): Ensure offsets are set properly?
+			for_array(var_index, base->Tuple.variables) {
+				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
+				          ir_add_debug_info_field(module, di, base->Tuple.variables[var_index], type,
+				                                  cast(i32)var_index, base->Tuple.variables[var_index]->type, file));
+			}
 		}
 
 		return di;
@@ -2250,6 +2277,10 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		return ir_add_debug_info_type_bit_set(module, type, e, scope, file);
 	}
 
+	if (is_type_tuple(type)) {
+		int i = 0;
+	}
+
 	//
 	// TODO(lachsinc): HACK For now any remaining types interpreted as a rawptr.
 	//
@@ -2267,9 +2298,9 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 }
 
 irDebugInfo *ir_add_debug_info_global(irModule *module, irValue *v) {
-	// if (!proc->module->generate_debug_info) {
-	// 	return nullptr;
-	// }
+	if (!module->generate_debug_info) {
+		return nullptr;
+	}
 
 	Entity *e = v->Global.entity;
 
@@ -2333,11 +2364,17 @@ irDebugInfo *ir_add_debug_info_block(irProcedure *proc, Scope *scope) {
 }
 
 irDebugInfo *ir_add_debug_info_local(irProcedure *proc, Entity *e, i32 arg_id) {
+	// TODO(lachsinc): Not sure if this handles generated locals properly as they may not have
+	// enough information inside "e".
+
 	irModule *module = proc->module;
+	if (!module->generate_debug_info) {
+		return nullptr;
+	}
 
 	irDebugInfo *scope = nullptr;
 	irDebugInfo *file = nullptr;
-	if (e->scope->node->kind == Ast_ProcType) {
+	if (e->scope && e->scope->node->kind == Ast_ProcType) {
 		scope = proc->debug_scope;
 		file = proc->debug_scope->Proc.file;
 	} else {
@@ -2360,9 +2397,10 @@ irDebugInfo *ir_add_debug_info_local(irProcedure *proc, Entity *e, i32 arg_id) {
 }
 
 irDebugInfo *ir_add_debug_info_proc(irProcedure *proc) {
-	// if (!proc->module->generate_debug_info) {
-	// 	return nullptr;
-	// }
+	irModule *module = proc->module;
+	if (!module->generate_debug_info) {
+		return nullptr;
+	}
 
 	Entity *entity = proc->entity;
 
@@ -8280,14 +8318,14 @@ void ir_begin_procedure_body(irProcedure *proc) {
 
 	// NOTE(lachsinc): This is somewhat of a fallback/catch-all; We use the procedure's identifer as a debug location..
 	// Additional debug locations should be pushed for the procedures statements/expressions themselves.
-	if (proc->entity && proc->entity->identifier) { // TODO(lachsinc): Better way to determine if these procs are main/runtime_startup.
+	if (proc->module->generate_debug_info && proc->entity && proc->entity->identifier) { // TODO(lachsinc): Better way to determine if these procs are main/runtime_startup.
 		// TODO(lachsinc): Passing the file for the scope may not be correct for nested procedures? This should probably be
 		// handled all inside push_debug_location, with just the Ast * we can pull out everything we need to construct scope/file debug info etc.
 		ir_add_debug_info_proc(proc); 
 		ir_push_debug_location(proc->module, proc->entity->identifier, proc->debug_scope);
 		GB_ASSERT_NOT_NULL(proc->debug_scope);
 	} else {
-		GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
+		// GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
 		ir_push_debug_location(proc->module, nullptr, nullptr);
 	}
 
