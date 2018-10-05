@@ -1972,6 +1972,47 @@ irDebugInfo *ir_add_debug_info_type_any(irModule *module) {
 	}
 }
 
+irDebugInfo *ir_add_debug_info_type_complex(irModule *module, Type *type) {
+	GB_ASSERT(type->kind == Type_Basic && is_type_complex(type));
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+	map_set(&module->debug_info, hash_type(type), di);
+
+	di->CompositeType.name = type->Basic.name;
+	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+	di->CompositeType.size = ir_debug_size_bits(type);
+	
+	Type *field_type = nullptr;
+	if (type->Basic.kind == Basic_complex64) {
+		field_type = t_f32;
+	} else if (type->Basic.kind == Basic_complex128) {
+		field_type = t_f64;
+	} else {
+		GB_PANIC("Unreachable");
+	}
+
+	// Field "real"
+	irDebugInfo *real_di = ir_add_debug_info_field_internal(module, str_lit("real"), field_type,
+															0,
+															nullptr,
+															di);
+	map_set(&module->debug_info, hash_pointer(real_di), real_di);
+
+	// Field "imag"
+	irDebugInfo *imag_di = ir_add_debug_info_field_internal(module, str_lit("imag"), field_type,
+															real_di->DerivedType.size,
+															nullptr,
+															di);
+	map_set(&module->debug_info, hash_pointer(imag_di), imag_di);
+
+	irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 2);
+	array_add(&elements_di->DebugInfoArray.elements, real_di);
+	array_add(&elements_di->DebugInfoArray.elements, imag_di);
+	di->CompositeType.elements = elements_di;
+	map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+	return di;
+}
 irDebugInfo *ir_add_debug_info_proc_type(irModule *module, Type *type) {
 	GB_ASSERT(type->kind == Type_Proc);
 
@@ -2095,12 +2136,9 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		switch (type->Basic.kind) {
 		// Composite basic types
 		case Basic_complex64:
-		case Basic_complex128: {
-			// TODO(lachsinc):
-			break;
-		}
-		case Basic_string: return ir_add_debug_info_type_string(module, scope, e, type);
-		case Basic_any:    return ir_add_debug_info_type_any(module);
+		case Basic_complex128: return ir_add_debug_info_type_complex(module, type);
+		case Basic_string:     return ir_add_debug_info_type_string(module, scope, e, type);
+		case Basic_any:        return ir_add_debug_info_type_any(module);
 
 		// Derived basic types
 		case Basic_cstring:
@@ -2165,7 +2203,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 			di->CompositeType.pos = e->token.pos;
 		}
 		di->CompositeType.size = ir_debug_size_bits(type);
-		di->CompositeType.align = ir_debug_align_bits(type); // TODO(lachsinc): Necessary?
+		// di->CompositeType.align = ir_debug_align_bits(type); // TODO(lachsinc): Necessary?
 
 		if (is_type_struct(type)) {
 			GB_ASSERT(base->kind == Type_Struct);
@@ -2328,20 +2366,23 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		return ir_add_debug_info_type_bit_set(module, type, e, scope);
 	}
 
+	GB_PANIC("Unreachable");
+	return nullptr;
+
 	//
 	// TODO(lachsinc): HACK For now any remaining types interpreted as a rawptr.
 	//
-	{
-		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_BasicType);
-		di->BasicType.align = ir_debug_align_bits(type);
-		di->BasicType.encoding = irDebugBasicEncoding_address;
-		di->BasicType.name = str_lit("type_todo");
-		di->BasicType.size = ir_debug_size_bits(type);
+	// {
+	// 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_BasicType);
+	// 	di->BasicType.align = ir_debug_align_bits(type);
+	// 	di->BasicType.encoding = irDebugBasicEncoding_address;
+	// 	di->BasicType.name = str_lit("type_todo");
+	// 	di->BasicType.size = ir_debug_size_bits(type);
 
-		map_set(&module->debug_info, hash_type(type), di);
+	// 	map_set(&module->debug_info, hash_type(type), di);
 
-		return di;
-	}
+	// 	return di;
+	// }
 }
 
 irDebugInfo *ir_add_debug_info_global(irModule *module, irValue *v) {
