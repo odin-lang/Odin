@@ -2147,16 +2147,6 @@ void print_llvm_ir(irGen *ir) {
 				            di->Enumerator.value);
 				break;
 			}
-			// TODO(lachsinc): Merge w/ DebugInfoArray
-			case irDebugInfo_AllProcs:
-				ir_fprintf(f, "!{");
-				for_array(proc_index, di->AllProcs.procs) {
-					irDebugInfo *p = di->AllProcs.procs[proc_index];
-					if (proc_index > 0) {ir_fprintf(f, ",");}
-					ir_fprintf(f, "!%d", p->id);
-				}
-				ir_write_byte(f, '}');
-				break;
 			case irDebugInfo_DebugInfoArray:
 				ir_fprintf(f, "!{");
 				for_array(element_index, di->DebugInfoArray.elements) {
