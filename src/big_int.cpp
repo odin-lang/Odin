@@ -735,7 +735,7 @@ u64 leading_zeros_u64(u64 x) {
 #if defined(GB_COMPILER_MSVC)
 	return __lzcnt64(x);
 #else
-	return cast(u64)__builtin_clz(cast(unsigned long long)x);
+	return cast(u64)__builtin_clzll(cast(unsigned long long)x);
 #endif
 }
 
