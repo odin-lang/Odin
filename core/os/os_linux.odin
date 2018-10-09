@@ -219,7 +219,7 @@ access :: inline proc(path: string, mask: int) -> bool {
 }
 
 heap_alloc :: proc(size: int) -> rawptr {
-	assert(size > 0);
+	assert(size >= 0);
 	return _unix_calloc(1, size);
 }
 
