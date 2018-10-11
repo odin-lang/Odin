@@ -1,6 +1,8 @@
 package os
 
 import "core:mem"
+import "core:strconv"
+import "core:unicode/utf8"
 
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, cast([]byte)str);
@@ -8,6 +10,44 @@ write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 
 write_byte :: proc(fd: Handle, b: byte) -> (int, Errno) {
 	return write(fd, []byte{b});
+}
+
+write_rune :: proc(fd: Handle, r: rune) -> (int, Errno) {
+	if r < utf8.RUNE_SELF {
+		return write_byte(fd, byte(r));
+	}
+
+	b, n := utf8.encode_rune(r);
+	return write(fd, b[:n]);
+}
+
+write_encoded_rune :: proc(fd: Handle, r: rune) {
+	write_byte(fd, '\'');
+
+	switch r {
+	case '\a': write_string(fd, "\\a");
+	case '\b': write_string(fd, "\\b");
+	case '\e': write_string(fd, "\\e");
+	case '\f': write_string(fd, "\\f");
+	case '\n': write_string(fd, "\\n");
+	case '\r': write_string(fd, "\\r");
+	case '\t': write_string(fd, "\\t");
+	case '\v': write_string(fd, "\\v");
+	case:
+		if r < 32 {
+			write_string(fd, "\\x");
+			b: [2]byte;
+			s := strconv.append_bits(b[:], u64(r), 16, true, 64, strconv.digits, nil);
+			switch len(s) {
+			case 0: write_string(fd, "00");
+			case 1: write_rune(fd, '0');
+			case 2: write_string(fd, s);
+			}
+		} else {
+			write_rune(fd, r);
+		}
+	}
+	write_byte(fd, '\'');
 }
 
 

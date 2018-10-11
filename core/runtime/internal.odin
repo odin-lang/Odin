@@ -204,6 +204,27 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 			print_u64(fd, u64(info.bits[i]));
 		}
 		os.write_string(fd, "}");
+
+	case Type_Info_Bit_Set:
+		os.write_string(fd, "bit_set[");
+
+		switch elem in type_info_base(info.elem).variant {
+		case Type_Info_Enum:
+			print_type(fd, info.elem);
+		case Type_Info_Rune:
+			os.write_encoded_rune(fd, rune(info.lower));
+			os.write_string(fd, "..");
+			os.write_encoded_rune(fd, rune(info.upper));
+		case:
+			print_i64(fd, info.lower);
+			os.write_string(fd, "..");
+			print_i64(fd, info.upper);
+		}
+		if info.underlying != nil {
+			os.write_string(fd, "; ");
+			print_type(fd, info.underlying);
+		}
+		os.write_byte(fd, ']');
 	}
 }
 
@@ -264,7 +285,6 @@ bounds_check_error :: proc "contextless" (file: string, line, column: int, index
 
 slice_expr_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
 	if 0 <= lo && lo <= hi && hi <= len do return;
-
 
 	fd := os.stderr;
 	print_caller_location(fd, Source_Code_Location{file, line, column, ""});
@@ -366,18 +386,6 @@ make_map_expr_error_loc :: inline proc "contextless" (using loc := #caller_locat
 foreign {
 	@(link_name="llvm.sqrt.f32") _sqrt_f32 :: proc(x: f32) -> f32 ---
 	@(link_name="llvm.sqrt.f64") _sqrt_f64 :: proc(x: f64) -> f64 ---
-
-	@(link_name="llvm.sin.f32") _sin_f32  :: proc(θ: f32) -> f32 ---
-	@(link_name="llvm.sin.f64") _sin_f64  :: proc(θ: f64) -> f64 ---
-
-	@(link_name="llvm.cos.f32") _cos_f32  :: proc(θ: f32) -> f32 ---
-	@(link_name="llvm.cos.f64") _cos_f64  :: proc(θ: f64) -> f64 ---
-
-	@(link_name="llvm.pow.f32") _pow_f32  :: proc(x, power: f32) -> f32 ---
-	@(link_name="llvm.pow.f64") _pow_f64  :: proc(x, power: f64) -> f64 ---
-
-	@(link_name="llvm.fmuladd.f32") _fmuladd32  :: proc(a, b, c: f32) -> f32 ---
-	@(link_name="llvm.fmuladd.f64") _fmuladd64  :: proc(a, b, c: f64) -> f64 ---
 }
 abs_f32 :: inline proc "contextless" (x: f32) -> f32 {
 	foreign {
