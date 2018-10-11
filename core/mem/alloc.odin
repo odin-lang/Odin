@@ -294,6 +294,12 @@ pool_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		pool_free_all(pool);
 	case Allocator_Mode.Resize:
 		panic("Allocator_Mode.Resize is not supported for a pool");
+		if old_size >= size {
+			return old_memory;
+		}
+		ptr := pool_alloc(pool, size);
+		copy(ptr, old_memory, old_size);
+		return ptr;
 	}
 	return nil;
 }

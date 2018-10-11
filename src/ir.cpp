@@ -4582,7 +4582,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		ir_emit_store(proc, ir_emit_struct_ep(proc, dst, 1), imag);
 
 		return ir_emit_load(proc, dst);
-		break;
 	}
 
 	case BuiltinProc_real: {
@@ -4590,14 +4589,12 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		irValue *val = ir_build_expr(proc, ce->args[0]);
 		irValue *real = ir_emit_struct_ev(proc, val, 0);
 		return ir_emit_conv(proc, real, tv.type);
-		break;
 	}
 	case BuiltinProc_imag: {
 		ir_emit_comment(proc, str_lit("imag"));
 		irValue *val = ir_build_expr(proc, ce->args[0]);
 		irValue *imag = ir_emit_struct_ev(proc, val, 1);
 		return ir_emit_conv(proc, imag, tv.type);
-		break;
 	}
 
 	case BuiltinProc_conj: {
@@ -4614,7 +4611,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 			ir_emit_store(proc, ir_emit_struct_ep(proc, res, 1), imag);
 		}
 		return ir_emit_load(proc, res);
-		break;
 	}
 
 	case BuiltinProc_expand_to_tuple: {
@@ -4675,10 +4671,13 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 	}
 
 	case BuiltinProc_abs: {
-		ir_emit_comment(proc, str_lit("abs"));
 		gbAllocator a = ir_allocator();
 		irValue *x = ir_build_expr(proc, ce->args[0]);
 		Type *t = ir_type(x);
+		if (is_type_unsigned(t)) {
+			return x;
+		}
+		ir_emit_comment(proc, str_lit("abs"));
 		if (is_type_complex(t)) {
 			i64 sz = 8*type_size_of(t);
 			auto args = array_make<irValue *>(ir_allocator(), 1);
@@ -4704,14 +4703,12 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		return ir_emit_select(proc, cond, neg, x);
 	}
 
-	case BuiltinProc_clamp: {
+	case BuiltinProc_clamp:
 		ir_emit_comment(proc, str_lit("clamp"));
-		Type *t = type_of_expr(expr);
-		return ir_emit_clamp(proc, t,
+		return ir_emit_clamp(proc, type_of_expr(expr),
 		                     ir_build_expr(proc, ce->args[0]),
 		                     ir_build_expr(proc, ce->args[1]),
 		                     ir_build_expr(proc, ce->args[2]));
-	}
 	}
 
 	GB_PANIC("Unhandled built-in procedure");
