@@ -239,8 +239,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^runtime.Type_Info) {
 	case runtime.Type_Info_Named:
 		write_string(buf, info.name);
 	case runtime.Type_Info_Integer:
-		a := any{id = ti.id};
-		switch in a {
+		switch ti.id {
 		case int:     write_string(buf, "int");
 		case uint:    write_string(buf, "uint");
 		case uintptr: write_string(buf, "uintptr");
@@ -263,8 +262,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^runtime.Type_Info) {
 			write_string(buf, "string");
 		}
 	case runtime.Type_Info_Boolean:
-		a := any{id = ti.id};
-		switch in a {
+		switch ti.id {
 		case bool: write_string(buf, "bool");
 		case:
 			write_byte(buf, 'b');

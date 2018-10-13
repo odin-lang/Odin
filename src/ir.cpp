@@ -7145,7 +7145,14 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 					irValue *cond_rhs = ir_emit_comp(proc, op, tag, rhs);
 					cond = ir_emit_arith(proc, Token_And, cond_lhs, cond_rhs, t_bool);
 				} else {
-					cond = ir_emit_comp(proc, Token_CmpEq, tag, ir_build_expr(proc, expr));
+					if (expr->tav.mode == Addressing_Type) {
+						GB_ASSERT(is_type_typeid(ir_type(tag)));
+						irValue *e = ir_typeid(proc->module, expr->tav.type);
+						e = ir_emit_conv(proc, e, ir_type(tag));
+						cond = ir_emit_comp(proc, Token_CmpEq, tag, e);
+					} else {
+						cond = ir_emit_comp(proc, Token_CmpEq, tag, ir_build_expr(proc, expr));
+					}
 				}
 				ir_emit_if(proc, cond, body, next_cond);
 				ir_start_block(proc, next_cond);
