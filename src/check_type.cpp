@@ -382,14 +382,6 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 						specialization = check_type(ctx, s);
 					}
 					type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
-				} else if (type_expr->kind == Ast_TypeType) {
-					is_type_param = true;
-					Type *specialization = nullptr;
-					if (type_expr->TypeType.specialization != nullptr) {
-						Ast *s = type_expr->TypeType.specialization;
-						specialization = check_type(ctx, s);
-					}
-					type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
 				} else {
 					type = check_type(ctx, type_expr);
 					if (is_type_polymorphic(type)) {
@@ -571,14 +563,6 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 					Type *specialization = nullptr;
 					if (type_expr->TypeidType.specialization != nullptr) {
 						Ast *s = type_expr->TypeidType.specialization;
-						specialization = check_type(ctx, s);
-					}
-					type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
-				} else if (type_expr->kind == Ast_TypeType) {
-					is_type_param = true;
-					Type *specialization = nullptr;
-					if (type_expr->TypeType.specialization != nullptr) {
-						Ast *s = type_expr->TypeType.specialization;
 						specialization = check_type(ctx, s);
 					}
 					type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
@@ -1383,20 +1367,6 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 				} else {
 					type = t_typeid;
 				}
-			} else if (type_expr->kind == Ast_TypeType) {
-				ast_node(tt, TypeType, type_expr);
-				is_type_param = true;
-				specialization = check_type(ctx, tt->specialization);
-				if (specialization == t_invalid){
-					specialization = nullptr;
-				}
-
-				if (operands != nullptr) {
-					detemine_type_from_operand = true;
-					type = t_invalid;
-				} else {
-					type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
-				}
 			} else {
 				bool prev = ctx->allow_polymorphic_types;
 				if (operands != nullptr) {
@@ -1412,7 +1382,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			}
 
 			if (default_value != nullptr) {
-				if (type_expr != nullptr && (type_expr->kind == Ast_TypeType || type_expr->kind == Ast_TypeidType)) {
+				if (type_expr != nullptr && type_expr->kind == Ast_TypeidType) {
 					error(type_expr, "A type parameter may not have a default value");
 				} else {
 					param_value = handle_parameter_value(ctx, type, nullptr, default_value, true);

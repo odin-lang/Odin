@@ -423,10 +423,6 @@ AST_KIND(_TypeBegin, "", bool) \
 		Token token; \
 		Ast *specialization; \
 	}) \
-	AST_KIND(TypeType, "type", struct { \
-		Token token; \
-		Ast *specialization; \
-	}) \
 	AST_KIND(HelperType, "helper type", struct { \
 		Token token; \
 		Ast *type; \
