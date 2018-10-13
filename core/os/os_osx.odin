@@ -255,7 +255,7 @@ getenv :: proc(name: string) -> (string, bool) {
 	return string(cstr), true;
 }
 
-exit :: inline proc(code: int) {
+exit :: inline proc(code: int) -> ! {
 	_unix_exit(code);
 }
 

@@ -1645,6 +1645,10 @@ irValue *ir_emit_bitcast(irProcedure *proc, irValue *data, Type *type) {
 	return ir_emit(proc, ir_instr_conv(proc, irConv_bitcast, data, ir_type(data), type));
 }
 
+void ir_emit_unreachable(irProcedure *proc) {
+	ir_emit(proc, ir_instr_unreachable(proc));
+}
+
 irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t);
 irValue *ir_address_from_load_or_generate_local(irProcedure *proc, irValue *val);
 irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index);
@@ -1749,6 +1753,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 	if (abi_rt != results) {
 		result = ir_emit_transmute(p, result, rt);
 	}
+
 	return result;
 }
 
@@ -1837,10 +1842,6 @@ void ir_close_scope(irProcedure *proc, irDeferExitKind kind, irBlock *block) {
 }
 
 
-
-void ir_emit_unreachable(irProcedure *proc) {
-	ir_emit(proc, ir_instr_unreachable(proc));
-}
 
 void ir_emit_return(irProcedure *proc, irValue *v) {
 	ir_emit_defer_stmts(proc, irDeferExit_Return, nullptr);

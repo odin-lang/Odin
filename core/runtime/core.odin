@@ -590,6 +590,28 @@ panic :: proc "contextless" (message: string, loc := #caller_location) -> ! {
 	p("Panic", message, loc);
 }
 
+@(builtin)
+unimplemented :: proc "contextless" (message := "", loc := #caller_location) -> ! {
+	p := context.assertion_failure_proc;
+	if p == nil {
+		p = default_assertion_failure_proc;
+	}
+	p("not yet implemented", message, loc);
+}
+
+@(builtin)
+unreachable :: proc "contextless" (message := "", loc := #caller_location) -> ! {
+	p := context.assertion_failure_proc;
+	if p == nil {
+		p = default_assertion_failure_proc;
+	}
+	if message != "" {
+		p("internal error", message, loc);
+	} else {
+		p("internal error", "entered unreachable code", loc);
+	}
+}
+
 
 // Dynamic Array
 
