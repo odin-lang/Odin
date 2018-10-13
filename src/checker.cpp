@@ -2150,8 +2150,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 			d->attributes = vd->attributes;
 
-			if (is_ast_type(init) ||
-				(vd->type != nullptr && vd->type->kind == Ast_TypeType)) {
+			if (is_ast_type(init)) {
 				e = alloc_entity_type_name(d->scope, token, nullptr);
 				if (vd->type != nullptr) {
 					error(name, "A type declaration cannot have an type parameter");

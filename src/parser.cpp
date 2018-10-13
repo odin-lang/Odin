@@ -77,7 +77,6 @@ Token ast_token(Ast *node) {
 	case Ast_UnionField:
 		return ast_token(node->UnionField.name);
 
-	case Ast_TypeType:         return node->TypeType.token;
 	case Ast_TypeidType:       return node->TypeidType.token;
 	case Ast_HelperType:       return node->HelperType.token;
 	case Ast_DistinctType:     return node->DistinctType.token;
@@ -313,9 +312,6 @@ Ast *clone_ast(Ast *node) {
 
 	case Ast_TypeidType:
 		n->TypeidType.specialization = clone_ast(n->TypeidType.specialization);
-		break;
-	case Ast_TypeType:
-		n->TypeType.specialization = clone_ast(n->TypeType.specialization);
 		break;
 	case Ast_HelperType:
 		n->HelperType.type = clone_ast(n->HelperType.type);
@@ -836,13 +832,6 @@ Ast *ast_typeid_type(AstFile *f, Token token, Ast *specialization) {
 	Ast *result = alloc_ast_node(f, Ast_TypeidType);
 	result->TypeidType.token = token;
 	result->TypeidType.specialization = specialization;
-	return result;
-}
-
-Ast *ast_type_type(AstFile *f, Token token, Ast *specialization) {
-	Ast *result = alloc_ast_node(f, Ast_TypeType);
-	result->TypeType.token = token;
-	result->TypeType.specialization = specialization;
 	return result;
 }
 
@@ -2740,8 +2729,7 @@ Ast *parse_proc_type(AstFile *f, Token proc_token) {
 		Ast *param = params->FieldList.list[i];
 		ast_node(field, Field, param);
 		if (field->type != nullptr) {
-		    if (field->type->kind == Ast_TypeType ||
-		        field->type->kind == Ast_PolyType) {
+		    if (field->type->kind == Ast_PolyType) {
 				is_generic = true;
 				goto end;
 			}

@@ -6130,7 +6130,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case_end;
 
 	case Ast_TypeidType:
-	case Ast_TypeType:
 	case Ast_PolyType:
 	case Ast_ProcType:
 	case Ast_PointerType:
@@ -6571,14 +6570,6 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 			str = write_expr_to_string(str, arg);
 		}
 		str = gb_string_appendc(str, ")");
-	case_end;
-
-	case_ast_node(tt, TypeType, node);
-		str = gb_string_appendc(str, "type");
-		if (tt->specialization) {
-			str = gb_string_appendc(str, "/");
-			str = write_expr_to_string(str, tt->specialization);
-		}
 	case_end;
 
 	case_ast_node(tt, TypeidType, node);
