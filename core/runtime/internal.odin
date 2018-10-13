@@ -63,8 +63,7 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 	case Type_Info_Named:
 		os.write_string(fd, info.name);
 	case Type_Info_Integer:
-		a := any{id = ti.id};
-		switch _ in a {
+		switch ti.id {
 		case int:     os.write_string(fd, "int");
 		case uint:    os.write_string(fd, "uint");
 		case uintptr: os.write_string(fd, "uintptr");
@@ -83,8 +82,7 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 	case Type_Info_String:
 		os.write_string(fd, "string");
 	case Type_Info_Boolean:
-		a := any{id = ti.id};
-		switch _ in a {
+		switch ti.id {
 		case bool: os.write_string(fd, "bool");
 		case:
 			os.write_byte(fd, 'b');

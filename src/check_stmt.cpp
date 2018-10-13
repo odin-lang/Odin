@@ -729,32 +729,46 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				add_constant_switch_case(ctx, &seen, rhs);
 			} else {
 				Operand y = {};
-				check_expr(ctx, &y, expr);
+				if (is_type_typeid(x.type)) {
+					check_expr_or_type(ctx, &y, expr, x.type);
+				} else {
+					check_expr(ctx, &y, expr);
+				}
 
 				if (x.mode == Addressing_Invalid ||
 				    y.mode == Addressing_Invalid) {
 					continue;
 				}
 
-				convert_to_typed(ctx, &y, x.type);
-				if (y.mode == Addressing_Invalid) {
-					continue;
-				}
-
-				// NOTE(bill): the ordering here matters
-				Operand z = y;
-				check_comparison(ctx, &z, &x, Token_CmpEq);
-				if (z.mode == Addressing_Invalid) {
-					continue;
-				}
-				if (y.mode != Addressing_Constant) {
-					if (complete) {
-						error(y.expr, "#complete switch statement only allows constant case clauses");
+				if (y.mode == Addressing_Type) {
+					Type *t = y.type;
+					if (t == nullptr || t == t_invalid || is_type_polymorphic(t)) {
+						error(y.expr, "Invalid type for case clause");
+						continue;
 					}
-					continue;
-				}
+					t = default_type(t);
+					add_type_info_type(ctx, t);
+				} else {
+					convert_to_typed(ctx, &y, x.type);
+					if (y.mode == Addressing_Invalid) {
+						continue;
+					}
 
-				add_constant_switch_case(ctx, &seen, y);
+					// NOTE(bill): the ordering here matters
+					Operand z = y;
+					check_comparison(ctx, &z, &x, Token_CmpEq);
+					if (z.mode == Addressing_Invalid) {
+						continue;
+					}
+					if (y.mode != Addressing_Constant) {
+						if (complete) {
+							error(y.expr, "#complete switch statement only allows constant case clauses");
+						}
+						continue;
+					}
+
+					add_constant_switch_case(ctx, &seen, y);
+				}
 			}
 		}
 
