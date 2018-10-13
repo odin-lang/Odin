@@ -1555,7 +1555,7 @@ Ast *        parse_simple_stmt      (AstFile *f, u32 flags);
 Ast *        parse_type             (AstFile *f);
 Ast *        parse_call_expr        (AstFile *f, Ast *operand);
 Ast *        parse_struct_field_list(AstFile *f, isize *name_count_);
-Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_type_token);
+Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_typeid_token);
 Ast *parse_unary_expr(AstFile *f, bool lhs);
 
 
@@ -1667,11 +1667,10 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_Hash: {
 		Token token = expect_token(f, Token_Hash);
-		if (allow_token(f, Token_type)) {
-			return ast_helper_type(f, token, parse_type(f));
-		}
 		Token name = expect_token(f, Token_Ident);
-		if (name.string == "run") {
+		if (name.string == "type") {
+			return ast_helper_type(f, token, parse_type(f));
+		} else if (name.string == "run") {
 			Ast *expr = parse_expr(f, false);
 			operand = ast_run_expr(f, token, name, expr);
 			if (unparen_expr(expr)->kind != Ast_CallExpr) {
@@ -2491,16 +2490,8 @@ Ast *parse_foreign_block(AstFile *f, Token token) {
 Ast *parse_value_decl(AstFile *f, Array<Ast *> names, CommentGroup *docs) {
 	bool is_mutable = true;
 
-	Ast *type = nullptr;
 	Array<Ast *> values = {};
-
-	if (f->curr_token.kind == Token_type) {
-		type = ast_type_type(f, advance_token(f), nullptr);
-		warning(type, "'type' is deprecated");
-		is_mutable = false;
-	} else {
-		type = parse_type_or_ident(f);
-	}
+	Ast *type = parse_type_or_ident(f);
 
 	if (f->curr_token.kind == Token_Eq ||
 	    f->curr_token.kind == Token_Colon) {
@@ -2767,7 +2758,7 @@ end:
 	return ast_proc_type(f, proc_token, params, results, tags, cc, is_generic, diverging);
 }
 
-Ast *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_type_token) {
+Ast *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_typeid_token) {
 	if (allow_ellipsis && f->curr_token.kind == Token_Ellipsis) {
 		Token tok = advance_token(f);
 		Ast *type = parse_type_or_ident(f);
@@ -2778,20 +2769,7 @@ Ast *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_type_token) {
 		return ast_ellipsis(f, tok, type);
 	}
 	Ast *type = nullptr;
-	if (allow_type_token &&
-	    f->curr_token.kind == Token_type) {
-		Token token = expect_token(f, Token_type);
-		Ast *specialization = nullptr;
-		if (allow_token(f, Token_Quo)) {
-			specialization = parse_type(f);
-		}
-		type = ast_type_type(f, token, specialization);
-		if (specialization) {
-			warning(type, "'type' is deprecated, please use something like '$T: typeid/[]$E'");
-		} else {
-			warning(type, "'type' is deprecated, please use something like '$T: typeid'");
-		}
-	} else if (allow_type_token &&
+	if (allow_typeid_token &&
 	    f->curr_token.kind == Token_typeid) {
 		Token token = expect_token(f, Token_typeid);
 		Ast *specialization = nullptr;
@@ -3036,7 +3014,7 @@ bool check_procedure_name_list(Array<Ast *> const &names) {
 	return any_polymorphic_names;
 }
 
-Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_type_token) {
+Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_typeid_token) {
 	Token start_token = f->curr_token;
 
 	CommentGroup *docs = f->lead_comment;
@@ -3046,7 +3024,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 	auto list = array_make<AstAndFlags>(heap_allocator());
 	defer (array_free(&list));
 
-	bool allow_poly_names = allow_type_token;
+	bool allow_poly_names = allow_typeid_token;
 
 	isize total_name_count = 0;
 	bool allow_ellipsis = allowed_flags&FieldFlag_ellipsis;
@@ -3056,7 +3034,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 	       f->curr_token.kind != Token_Colon &&
 	       f->curr_token.kind != Token_EOF) {
 		u32 flags = parse_field_prefixes(f);
-		Ast *param = parse_var_type(f, allow_ellipsis, allow_type_token);
+		Ast *param = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 		if (param->kind == Ast_Ellipsis) {
 			if (seen_ellipsis) syntax_error(param, "Extra variadic parameter after ellipsis");
 			seen_ellipsis = true;
@@ -3089,7 +3067,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 
 		expect_token_after(f, Token_Colon, "field list");
 		if (f->curr_token.kind != Token_Eq) {
-			type = parse_var_type(f, allow_ellipsis, allow_type_token);
+			type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 			Ast *tt = unparen_expr(type);
 			if (!any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
 				syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
@@ -3146,7 +3124,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 			Ast *default_value = nullptr;
 			expect_token_after(f, Token_Colon, "field list");
 			if (f->curr_token.kind != Token_Eq) {
-				type = parse_var_type(f, allow_ellipsis, allow_type_token);
+				type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 				Ast *tt = unparen_expr(type);
 				if (!any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
 					syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
