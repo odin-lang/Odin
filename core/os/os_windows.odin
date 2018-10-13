@@ -245,7 +245,7 @@ heap_free :: proc(ptr: rawptr) {
 }
 
 
-exit :: proc(code: int) {
+exit :: proc(code: int) -> ! {
 	win32.exit_process(u32(code));
 }
 
