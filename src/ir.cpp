@@ -7788,8 +7788,8 @@ bool ir_gen_init(irGen *s, Checker *c) {
 	String init_fullpath = c->parser->init_fullpath;
 
 	if (build_context.out_filepath.len == 0) {
-		// s->output_name = filename_from_path(init_fullpath);
-		s->output_name = str_lit("main");
+		s->output_name = remove_directory_from_path(init_fullpath);
+		s->output_name = remove_extension_from_path(s->output_name);
 		s->output_base = s->output_name;
 	} else {
 		s->output_name = build_context.out_filepath;
