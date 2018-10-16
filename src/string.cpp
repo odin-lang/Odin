@@ -276,6 +276,15 @@ String filename_from_path(String s) {
 	return make_string(nullptr, 0);
 }
 
+String remove_extension_from_path(String const &s) {
+	for (isize i = s.len-1; i >= 0; i--) {
+		if (s[i] == '.') {
+			return substring(s, 0, i);
+		}
+	}
+	return s;
+}
+
 String remove_directory_from_path(String const &s) {
 	isize len = 0;
 	for (isize i = s.len-1; i >= 0; i--) {
@@ -287,6 +296,7 @@ String remove_directory_from_path(String const &s) {
 	}
 	return substring(s, s.len-len, s.len);
 }
+
 String directory_from_path(String const &s) {
 	isize i = s.len-1;
 	for (; i >= 0; i--) {
