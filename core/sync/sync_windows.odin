@@ -1,7 +1,6 @@
 package sync
 
 import "core:sys/win32"
-import "core:atomics"
 
 Semaphore :: struct {
 	_handle: win32.Handle,

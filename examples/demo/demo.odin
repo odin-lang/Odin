@@ -17,7 +17,6 @@ import "core:c"
 import "core:runtime"
 
 when os.OS == "windows" {
-	import "core:atomics"
 	import "core:sync"
 	import "core:thread"
 	import "core:sys/win32"
