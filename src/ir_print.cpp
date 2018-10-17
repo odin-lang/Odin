@@ -1040,6 +1040,275 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_debug_location(f, m, value);
 		break;
 	}
+
+	case irInstr_AtomicFence:
+		ir_write_str_lit(f, "fence ");
+		switch (instr->AtomicFence.id) {
+		case BuiltinProc_atomic_fence:        ir_write_str_lit(f, "seq_cst"); break;
+		case BuiltinProc_atomic_fence_acq:    ir_write_str_lit(f, "acquire"); break;
+		case BuiltinProc_atomic_fence_rel:    ir_write_str_lit(f, "release"); break;
+		case BuiltinProc_atomic_fence_acqrel: ir_write_str_lit(f, "acq_rel"); break;
+		default: GB_PANIC("Unknown atomic fence"); break;
+		}
+		break;
+
+	case irInstr_AtomicStore: {
+		Type *type = type_deref(ir_type(instr->AtomicStore.address));
+		ir_write_str_lit(f, "store atomic ");
+		ir_print_type(f, m, type);
+		ir_write_byte(f, ' ');
+		ir_print_value(f, m, instr->AtomicStore.value, type);
+		ir_write_str_lit(f, ", ");
+		ir_print_type(f, m, type);
+		ir_write_str_lit(f, "* ");
+		ir_print_value(f, m, instr->AtomicStore.address, type);
+
+		switch (instr->AtomicStore.id) {
+		case BuiltinProc_atomic_store:           ir_write_str_lit(f, " seq_cst ");  break;
+		case BuiltinProc_atomic_store_rel:       ir_write_str_lit(f, " release");   break;
+		case BuiltinProc_atomic_store_relaxed:   ir_write_str_lit(f, " monotonic"); break;
+		case BuiltinProc_atomic_store_unordered: ir_write_str_lit(f, " unordered"); break;
+		default: GB_PANIC("Unknown atomic store"); break;
+		}
+
+		ir_fprintf(f, ", align %lld", type_align_of(type));
+
+		ir_print_debug_location(f, m, value);
+		break;
+	}
+
+	case irInstr_AtomicLoad: {
+		Type *type = instr->AtomicLoad.type;
+		ir_fprintf(f, "%%%d = load atomic ", value->index);
+		ir_print_type(f, m, type);
+		ir_write_str_lit(f, ", ");
+		ir_print_type(f, m, type);
+		ir_write_str_lit(f, "* ");
+		ir_print_value(f, m, instr->AtomicLoad.address, type);
+
+		switch (instr->AtomicLoad.id) {
+		case BuiltinProc_atomic_load:           ir_fprintf(f, " seq_cst");   break;
+		case BuiltinProc_atomic_load_acq:       ir_fprintf(f, " acquire");   break;
+		case BuiltinProc_atomic_load_relaxed:   ir_fprintf(f, " monotonic"); break;
+		case BuiltinProc_atomic_load_unordered: ir_fprintf(f, " unordered"); break;
+		default: GB_PANIC("Unknown atomic load"); break;
+		}
+
+		ir_fprintf(f, ", align %lld", type_align_of(type));
+		ir_print_debug_location(f, m, value);
+		break;
+	}
+
+	case irInstr_AtomicRmw: {
+		String operation = {};
+		String ordering = {};
+		switch (instr->AtomicRmw.id) {
+		case BuiltinProc_atomic_add:
+		case BuiltinProc_atomic_add_acq:
+		case BuiltinProc_atomic_add_rel:
+		case BuiltinProc_atomic_add_acqrel:
+		case BuiltinProc_atomic_add_relaxed:
+			operation = str_lit("add");
+			break;
+		case BuiltinProc_atomic_sub:
+		case BuiltinProc_atomic_sub_acq:
+		case BuiltinProc_atomic_sub_rel:
+		case BuiltinProc_atomic_sub_acqrel:
+		case BuiltinProc_atomic_sub_relaxed:
+			operation = str_lit("sub");
+			break;
+		case BuiltinProc_atomic_and:
+		case BuiltinProc_atomic_and_acq:
+		case BuiltinProc_atomic_and_rel:
+		case BuiltinProc_atomic_and_acqrel:
+		case BuiltinProc_atomic_and_relaxed:
+			operation = str_lit("and");
+			break;
+		case BuiltinProc_atomic_nand:
+		case BuiltinProc_atomic_nand_acq:
+		case BuiltinProc_atomic_nand_rel:
+		case BuiltinProc_atomic_nand_acqrel:
+		case BuiltinProc_atomic_nand_relaxed:
+			operation = str_lit("nand");
+			break;
+		case BuiltinProc_atomic_or:
+		case BuiltinProc_atomic_or_acq:
+		case BuiltinProc_atomic_or_rel:
+		case BuiltinProc_atomic_or_acqrel:
+		case BuiltinProc_atomic_or_relaxed:
+			operation = str_lit("or");
+			break;
+		case BuiltinProc_atomic_xor:
+		case BuiltinProc_atomic_xor_acq:
+		case BuiltinProc_atomic_xor_rel:
+		case BuiltinProc_atomic_xor_acqrel:
+		case BuiltinProc_atomic_xor_relaxed:
+			operation = str_lit("xor");
+			break;
+		case BuiltinProc_atomic_xchg:
+		case BuiltinProc_atomic_xchg_acq:
+		case BuiltinProc_atomic_xchg_rel:
+		case BuiltinProc_atomic_xchg_acqrel:
+		case BuiltinProc_atomic_xchg_relaxed:
+			operation = str_lit("xchg");
+			break;
+		}
+
+		switch (instr->AtomicRmw.id) {
+		case BuiltinProc_atomic_add:
+		case BuiltinProc_atomic_sub:
+		case BuiltinProc_atomic_and:
+		case BuiltinProc_atomic_nand:
+		case BuiltinProc_atomic_or:
+		case BuiltinProc_atomic_xor:
+		case BuiltinProc_atomic_xchg:
+			ordering = str_lit("seq_cst");
+			break;
+		case BuiltinProc_atomic_add_acq:
+		case BuiltinProc_atomic_sub_acq:
+		case BuiltinProc_atomic_and_acq:
+		case BuiltinProc_atomic_nand_acq:
+		case BuiltinProc_atomic_or_acq:
+		case BuiltinProc_atomic_xor_acq:
+		case BuiltinProc_atomic_xchg_acq:
+			ordering = str_lit("acquire");
+			break;
+		case BuiltinProc_atomic_add_rel:
+		case BuiltinProc_atomic_sub_rel:
+		case BuiltinProc_atomic_and_rel:
+		case BuiltinProc_atomic_nand_rel:
+		case BuiltinProc_atomic_or_rel:
+		case BuiltinProc_atomic_xor_rel:
+		case BuiltinProc_atomic_xchg_rel:
+			ordering = str_lit("release");
+			break;
+		case BuiltinProc_atomic_add_acqrel:
+		case BuiltinProc_atomic_sub_acqrel:
+		case BuiltinProc_atomic_and_acqrel:
+		case BuiltinProc_atomic_nand_acqrel:
+		case BuiltinProc_atomic_or_acqrel:
+		case BuiltinProc_atomic_xor_acqrel:
+		case BuiltinProc_atomic_xchg_acqrel:
+			ordering = str_lit("acq_rel");
+			break;
+		case BuiltinProc_atomic_add_relaxed:
+		case BuiltinProc_atomic_sub_relaxed:
+		case BuiltinProc_atomic_and_relaxed:
+		case BuiltinProc_atomic_nand_relaxed:
+		case BuiltinProc_atomic_or_relaxed:
+		case BuiltinProc_atomic_xor_relaxed:
+		case BuiltinProc_atomic_xchg_relaxed:
+			ordering = str_lit("monotonic");
+			break;
+		}
+
+		Type *type = type_deref(ir_type(instr->AtomicRmw.address));
+		ir_write_str_lit(f, "atomicrmw ");
+		ir_write_string(f, operation);
+		ir_write_byte(f, ' ');
+		ir_print_type(f, m, type);
+		ir_write_str_lit(f, "* ");
+		ir_print_value(f, m, instr->AtomicRmw.address, type);
+		ir_write_str_lit(f, ", ");
+		ir_print_type(f, m, type);
+		ir_write_byte(f, ' ');
+		ir_print_value(f, m, instr->AtomicRmw.value, type);
+
+		ir_write_byte(f, ' ');
+		ir_write_string(f, ordering);
+
+		ir_print_debug_location(f, m, value);
+		break;
+	}
+
+	case irInstr_AtomicCxchg: {
+		Type *type = type_deref(ir_type(instr->AtomicCxchg.address));
+		bool weak = false;
+		String success = {};
+		String failure = {};
+
+		switch (instr->AtomicCxchg.id) {
+		case BuiltinProc_atomic_cxchgweak:
+		case BuiltinProc_atomic_cxchgweak_acq:
+		case BuiltinProc_atomic_cxchgweak_rel:
+		case BuiltinProc_atomic_cxchgweak_acqrel:
+		case BuiltinProc_atomic_cxchgweak_relaxed:
+		case BuiltinProc_atomic_cxchgweak_failrelaxed:
+		case BuiltinProc_atomic_cxchgweak_failacq:
+		case BuiltinProc_atomic_cxchgweak_acq_failrelaxed:
+		case BuiltinProc_atomic_cxchgweak_acqrel_failrelaxed:
+			weak = true;
+			break;
+		}
+
+		switch (instr->AtomicCxchg.id) {
+		case BuiltinProc_atomic_cxchg:
+		case BuiltinProc_atomic_cxchgweak:
+			success = str_lit("seq_cst");
+			failure = str_lit("seq_cst");
+			break;
+		case BuiltinProc_atomic_cxchg_acq:
+		case BuiltinProc_atomic_cxchgweak_acq:
+			success = str_lit("acquire");
+			failure = str_lit("seq_cst");
+			break;
+		case BuiltinProc_atomic_cxchg_rel:
+		case BuiltinProc_atomic_cxchgweak_rel:
+			success = str_lit("release");
+			failure = str_lit("seq_cst");
+			break;
+		case BuiltinProc_atomic_cxchg_acqrel:
+		case BuiltinProc_atomic_cxchgweak_acqrel:
+			success = str_lit("acq_rel");
+			failure = str_lit("seq_cst");
+			break;
+		case BuiltinProc_atomic_cxchg_relaxed:
+		case BuiltinProc_atomic_cxchgweak_relaxed:
+			success = str_lit("monotonic");
+			failure = str_lit("monotonic");
+			break;
+		case BuiltinProc_atomic_cxchg_failrelaxed:
+		case BuiltinProc_atomic_cxchgweak_failrelaxed:
+			success = str_lit("seq_cst");
+			failure = str_lit("monotonic");
+			break;
+		case BuiltinProc_atomic_cxchg_failacq:
+		case BuiltinProc_atomic_cxchgweak_failacq:
+			success = str_lit("seq_cst");
+			failure = str_lit("acquire");
+			break;
+		case BuiltinProc_atomic_cxchg_acq_failrelaxed:
+		case BuiltinProc_atomic_cxchgweak_acq_failrelaxed:
+			success = str_lit("acquire");
+			failure = str_lit("monotonic");
+			break;
+		case BuiltinProc_atomic_cxchg_acqrel_failrelaxed:
+		case BuiltinProc_atomic_cxchgweak_acqrel_failrelaxed:
+			success = str_lit("acq_rel");
+			failure = str_lit("monotonic");
+			break;
+		}
+
+		ir_fprintf(f, "%%%d = cmpxchg ", value->index);
+		if (weak) {
+			ir_write_str_lit(f, "weak ");
+		}
+		ir_print_type(f, m, type);
+		ir_write_str_lit(f, "* ");
+		ir_print_value(f, m, instr->AtomicCxchg.address, type);
+		ir_write_str_lit(f, ", ");
+		ir_print_type(f, m, type); ir_write_str_lit(f, " ");
+		ir_print_value(f, m, instr->AtomicCxchg.old_value, type);
+		ir_write_str_lit(f, ", ");
+		ir_print_type(f, m, type); ir_write_str_lit(f, " ");
+		ir_print_value(f, m, instr->AtomicCxchg.new_value, type);
+		ir_write_str_lit(f, " ");
+		ir_write_string(f, success);
+		ir_write_str_lit(f, " ");
+		ir_write_string(f, failure);
+		break;
+	}
+
 	case irInstr_ArrayElementPtr: {
 		Type *et = ir_type(instr->ArrayElementPtr.address);
 		ir_fprintf(f, "%%%d = getelementptr inbounds ", value->index);

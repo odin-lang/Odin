@@ -2068,6 +2068,7 @@ i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 }
 
 Type *make_optional_ok_type(Type *value) {
+	// LEAK TODO(bill): probably don't reallocate everything here and reuse the same one for the same type if possible
 	gbAllocator a = heap_allocator();
 	bool typed = true;
 	Type *t = alloc_type_tuple();

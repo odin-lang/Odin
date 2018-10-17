@@ -494,13 +494,14 @@ void add_declaration_dependency(CheckerContext *c, Entity *e) {
 
 Entity *add_global_entity(Entity *entity) {
 	String name = entity->token.string;
+	defer (entity->state = EntityState_Resolved);
+
 	if (gb_memchr(name.text, ' ', name.len)) {
-		return entity; // NOTE(bill): 'untyped thing'
+		return entity; // NOTE(bill): Usually an 'untyped thing'
 	}
 	if (scope_insert(builtin_scope, entity)) {
 		compiler_error("double declaration");
 	}
-	entity->state = EntityState_Resolved;
 	return entity;
 }
 

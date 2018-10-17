@@ -2872,6 +2872,18 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 	return entity;
 }
 
+bool is_type_normal_pointer(Type *ptr, Type **elem) {
+	ptr = base_type(ptr);
+	if (is_type_pointer(ptr)) {
+		if (is_type_rawptr(ptr)) {
+			return false;
+		}
+		if (elem) *elem = ptr->Pointer.elem;
+		return true;
+	}
+	return false;
+}
+
 
 bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id) {
 	ast_node(ce, CallExpr, call);
@@ -2914,6 +2926,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
+	String builtin_name = builtin_procs[id].name;
+
 
 	if (ce->args.count > 0) {
 		if (ce->args[0]->kind == Ast_FieldValue) {
@@ -2924,7 +2938,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	switch (id) {
 	default:
-		GB_PANIC("Implement built-in procedure: %.*s", LIT(builtin_procs[id].name));
+		GB_PANIC("Implement built-in procedure: %.*s", LIT(builtin_name));
 		break;
 
 	case BuiltinProc_DIRECTIVE: {
@@ -3023,9 +3037,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 
 		if (mode == Addressing_Invalid) {
-			String name = builtin_procs[id].name;
 			gbString t = type_to_string(operand->type);
-			error(call, "'%.*s' is not supported for '%s'", LIT(name), t);
+			error(call, "'%.*s' is not supported for '%s'", LIT(builtin_name), t);
 			return false;
 		}
 
@@ -3805,6 +3818,133 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
+	case BuiltinProc_atomic_fence:
+	case BuiltinProc_atomic_fence_acq:
+	case BuiltinProc_atomic_fence_rel:
+	case BuiltinProc_atomic_fence_acqrel:
+		operand->mode = Addressing_NoValue;
+		break;
+
+	case BuiltinProc_atomic_store:
+	case BuiltinProc_atomic_store_rel:
+	case BuiltinProc_atomic_store_relaxed:
+	case BuiltinProc_atomic_store_unordered:
+		{
+			Type *elem = nullptr;
+			if (!is_type_normal_pointer(operand->type, &elem)) {
+				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			Operand x = {};
+			check_expr_with_type_hint(c, &x, ce->args[1], elem);
+			check_assignment(c, &x, elem, builtin_name);
+
+			operand->type = nullptr;
+			operand->mode = Addressing_NoValue;
+			break;
+		}
+	case BuiltinProc_atomic_load:
+	case BuiltinProc_atomic_load_acq:
+	case BuiltinProc_atomic_load_relaxed:
+	case BuiltinProc_atomic_load_unordered:
+		{
+			Type *elem = nullptr;
+			if (!is_type_normal_pointer(operand->type, &elem)) {
+				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			operand->type = elem;
+			operand->mode = Addressing_Value;
+			break;
+		}
+
+	case BuiltinProc_atomic_add:
+	case BuiltinProc_atomic_add_acq:
+	case BuiltinProc_atomic_add_rel:
+	case BuiltinProc_atomic_add_acqrel:
+	case BuiltinProc_atomic_add_relaxed:
+	case BuiltinProc_atomic_sub:
+	case BuiltinProc_atomic_sub_acq:
+	case BuiltinProc_atomic_sub_rel:
+	case BuiltinProc_atomic_sub_acqrel:
+	case BuiltinProc_atomic_sub_relaxed:
+	case BuiltinProc_atomic_and:
+	case BuiltinProc_atomic_and_acq:
+	case BuiltinProc_atomic_and_rel:
+	case BuiltinProc_atomic_and_acqrel:
+	case BuiltinProc_atomic_and_relaxed:
+	case BuiltinProc_atomic_nand:
+	case BuiltinProc_atomic_nand_acq:
+	case BuiltinProc_atomic_nand_rel:
+	case BuiltinProc_atomic_nand_acqrel:
+	case BuiltinProc_atomic_nand_relaxed:
+	case BuiltinProc_atomic_or:
+	case BuiltinProc_atomic_or_acq:
+	case BuiltinProc_atomic_or_rel:
+	case BuiltinProc_atomic_or_acqrel:
+	case BuiltinProc_atomic_or_relaxed:
+	case BuiltinProc_atomic_xor:
+	case BuiltinProc_atomic_xor_acq:
+	case BuiltinProc_atomic_xor_rel:
+	case BuiltinProc_atomic_xor_acqrel:
+	case BuiltinProc_atomic_xor_relaxed:
+	case BuiltinProc_atomic_xchg:
+	case BuiltinProc_atomic_xchg_acq:
+	case BuiltinProc_atomic_xchg_rel:
+	case BuiltinProc_atomic_xchg_acqrel:
+	case BuiltinProc_atomic_xchg_relaxed:
+		{
+			Type *elem = nullptr;
+			if (!is_type_normal_pointer(operand->type, &elem)) {
+				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			Operand x = {};
+			check_expr_with_type_hint(c, &x, ce->args[1], elem);
+			check_assignment(c, &x, elem, builtin_name);
+
+			operand->type = elem;
+			operand->mode = Addressing_Value;
+			break;
+		}
+
+	case BuiltinProc_atomic_cxchg:
+	case BuiltinProc_atomic_cxchg_acq:
+	case BuiltinProc_atomic_cxchg_rel:
+	case BuiltinProc_atomic_cxchg_acqrel:
+	case BuiltinProc_atomic_cxchg_relaxed:
+	case BuiltinProc_atomic_cxchg_failrelaxed:
+	case BuiltinProc_atomic_cxchg_failacq:
+	case BuiltinProc_atomic_cxchg_acq_failrelaxed:
+	case BuiltinProc_atomic_cxchg_acqrel_failrelaxed:
+
+	case BuiltinProc_atomic_cxchgweak:
+	case BuiltinProc_atomic_cxchgweak_acq:
+	case BuiltinProc_atomic_cxchgweak_rel:
+	case BuiltinProc_atomic_cxchgweak_acqrel:
+	case BuiltinProc_atomic_cxchgweak_relaxed:
+	case BuiltinProc_atomic_cxchgweak_failrelaxed:
+	case BuiltinProc_atomic_cxchgweak_failacq:
+	case BuiltinProc_atomic_cxchgweak_acq_failrelaxed:
+	case BuiltinProc_atomic_cxchgweak_acqrel_failrelaxed:
+		{
+			Type *elem = nullptr;
+			if (!is_type_normal_pointer(operand->type, &elem)) {
+				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			Operand x = {};
+			Operand y = {};
+			check_expr_with_type_hint(c, &x, ce->args[1], elem);
+			check_expr_with_type_hint(c, &y, ce->args[2], elem);
+			check_assignment(c, &x, elem, builtin_name);
+			check_assignment(c, &y, elem, builtin_name);
+
+			operand->mode = Addressing_Value;
+			operand->type = make_optional_ok_type(elem);
+			break;
+		}
+		break;
 	}
 
 	return true;

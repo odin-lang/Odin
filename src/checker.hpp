@@ -81,6 +81,79 @@ enum BuiltinProcId {
 
 	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
 
+	// "Intrinsics"
+	BuiltinProc_atomic_fence,
+	BuiltinProc_atomic_fence_acq,
+	BuiltinProc_atomic_fence_rel,
+	BuiltinProc_atomic_fence_acqrel,
+
+	BuiltinProc_atomic_store,
+	BuiltinProc_atomic_store_rel,
+	BuiltinProc_atomic_store_relaxed,
+	BuiltinProc_atomic_store_unordered,
+
+	BuiltinProc_atomic_load,
+	BuiltinProc_atomic_load_acq,
+	BuiltinProc_atomic_load_relaxed,
+	BuiltinProc_atomic_load_unordered,
+
+	BuiltinProc_atomic_add,
+	BuiltinProc_atomic_add_acq,
+	BuiltinProc_atomic_add_rel,
+	BuiltinProc_atomic_add_acqrel,
+	BuiltinProc_atomic_add_relaxed,
+	BuiltinProc_atomic_sub,
+	BuiltinProc_atomic_sub_acq,
+	BuiltinProc_atomic_sub_rel,
+	BuiltinProc_atomic_sub_acqrel,
+	BuiltinProc_atomic_sub_relaxed,
+	BuiltinProc_atomic_and,
+	BuiltinProc_atomic_and_acq,
+	BuiltinProc_atomic_and_rel,
+	BuiltinProc_atomic_and_acqrel,
+	BuiltinProc_atomic_and_relaxed,
+	BuiltinProc_atomic_nand,
+	BuiltinProc_atomic_nand_acq,
+	BuiltinProc_atomic_nand_rel,
+	BuiltinProc_atomic_nand_acqrel,
+	BuiltinProc_atomic_nand_relaxed,
+	BuiltinProc_atomic_or,
+	BuiltinProc_atomic_or_acq,
+	BuiltinProc_atomic_or_rel,
+	BuiltinProc_atomic_or_acqrel,
+	BuiltinProc_atomic_or_relaxed,
+	BuiltinProc_atomic_xor,
+	BuiltinProc_atomic_xor_acq,
+	BuiltinProc_atomic_xor_rel,
+	BuiltinProc_atomic_xor_acqrel,
+	BuiltinProc_atomic_xor_relaxed,
+
+	BuiltinProc_atomic_xchg,
+	BuiltinProc_atomic_xchg_acq,
+	BuiltinProc_atomic_xchg_rel,
+	BuiltinProc_atomic_xchg_acqrel,
+	BuiltinProc_atomic_xchg_relaxed,
+
+	BuiltinProc_atomic_cxchg,
+	BuiltinProc_atomic_cxchg_acq,
+	BuiltinProc_atomic_cxchg_rel,
+	BuiltinProc_atomic_cxchg_acqrel,
+	BuiltinProc_atomic_cxchg_relaxed,
+	BuiltinProc_atomic_cxchg_failrelaxed,
+	BuiltinProc_atomic_cxchg_failacq,
+	BuiltinProc_atomic_cxchg_acq_failrelaxed,
+	BuiltinProc_atomic_cxchg_acqrel_failrelaxed,
+
+	BuiltinProc_atomic_cxchgweak,
+	BuiltinProc_atomic_cxchgweak_acq,
+	BuiltinProc_atomic_cxchgweak_rel,
+	BuiltinProc_atomic_cxchgweak_acqrel,
+	BuiltinProc_atomic_cxchgweak_relaxed,
+	BuiltinProc_atomic_cxchgweak_failrelaxed,
+	BuiltinProc_atomic_cxchgweak_failacq,
+	BuiltinProc_atomic_cxchgweak_acq_failrelaxed,
+	BuiltinProc_atomic_cxchgweak_acqrel_failrelaxed,
+
 	BuiltinProc_COUNT,
 };
 gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
@@ -111,6 +184,80 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("clamp"),            3, false, Expr_Expr},
 
 	{STR_LIT(""),                 0, true,  Expr_Expr}, // DIRECTIVE
+
+
+	// "Intrinsics"
+	{STR_LIT("__atomic_fence"),        0, false, Expr_Stmt},
+	{STR_LIT("__atomic_fence_acq"),    0, false, Expr_Stmt},
+	{STR_LIT("__atomic_fence_rel"),    0, false, Expr_Stmt},
+	{STR_LIT("__atomic_fence_acqrel"), 0, false, Expr_Stmt},
+
+	{STR_LIT("__atomic_store"),           2, false, Expr_Stmt},
+	{STR_LIT("__atomic_store_rel"),       2, false, Expr_Stmt},
+	{STR_LIT("__atomic_store_relaxed"),   2, false, Expr_Stmt},
+	{STR_LIT("__atomic_store_unordered"), 2, false, Expr_Stmt},
+
+	{STR_LIT("__atomic_load"),            1, false, Expr_Expr},
+	{STR_LIT("__atomic_load_acq"),        1, false, Expr_Expr},
+	{STR_LIT("__atomic_load_relaxed"),    1, false, Expr_Expr},
+	{STR_LIT("__atomic_load_unordered"),  1, false, Expr_Expr},
+
+	{STR_LIT("__atomic_add"),             2, false, Expr_Expr},
+	{STR_LIT("__atomic_add_acq"),         2, false, Expr_Expr},
+	{STR_LIT("__atomic_add_rel"),         2, false, Expr_Expr},
+	{STR_LIT("__atomic_add_acqrel"),      2, false, Expr_Expr},
+	{STR_LIT("__atomic_add_relaxed"),     2, false, Expr_Expr},
+	{STR_LIT("__atomic_sub"),             2, false, Expr_Expr},
+	{STR_LIT("__atomic_sub_acq"),         2, false, Expr_Expr},
+	{STR_LIT("__atomic_sub_rel"),         2, false, Expr_Expr},
+	{STR_LIT("__atomic_sub_acqrel"),      2, false, Expr_Expr},
+	{STR_LIT("__atomic_sub_relaxed"),     2, false, Expr_Expr},
+	{STR_LIT("__atomic_and"),             2, false, Expr_Expr},
+	{STR_LIT("__atomic_and_acq"),         2, false, Expr_Expr},
+	{STR_LIT("__atomic_and_rel"),         2, false, Expr_Expr},
+	{STR_LIT("__atomic_and_acqrel"),      2, false, Expr_Expr},
+	{STR_LIT("__atomic_and_relaxed"),     2, false, Expr_Expr},
+	{STR_LIT("__atomic_nand"),            2, false, Expr_Expr},
+	{STR_LIT("__atomic_nand_acq"),        2, false, Expr_Expr},
+	{STR_LIT("__atomic_nand_rel"),        2, false, Expr_Expr},
+	{STR_LIT("__atomic_nand_acqrel"),     2, false, Expr_Expr},
+	{STR_LIT("__atomic_nand_relaxed"),    2, false, Expr_Expr},
+	{STR_LIT("__atomic_or"),              2, false, Expr_Expr},
+	{STR_LIT("__atomic_or_acq"),          2, false, Expr_Expr},
+	{STR_LIT("__atomic_or_rel"),          2, false, Expr_Expr},
+	{STR_LIT("__atomic_or_acqrel"),       2, false, Expr_Expr},
+	{STR_LIT("__atomic_or_relaxed"),      2, false, Expr_Expr},
+	{STR_LIT("__atomic_xor"),             2, false, Expr_Expr},
+	{STR_LIT("__atomic_xor_acq"),         2, false, Expr_Expr},
+	{STR_LIT("__atomic_xor_rel"),         2, false, Expr_Expr},
+	{STR_LIT("__atomic_xor_acqrel"),      2, false, Expr_Expr},
+	{STR_LIT("__atomic_xor_relaxed"),     2, false, Expr_Expr},
+
+	{STR_LIT("__atomic_xchg"),            2, false, Expr_Expr},
+	{STR_LIT("__atomic_xchg_acq"),        2, false, Expr_Expr},
+	{STR_LIT("__atomic_xchg_rel"),        2, false, Expr_Expr},
+	{STR_LIT("__atomic_xchg_acqrel"),     2, false, Expr_Expr},
+	{STR_LIT("__atomic_xchg_relaxed"),    2, false, Expr_Expr},
+
+	{STR_LIT("__atomic_cxchg"),                    3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchg_acq"),                3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchg_rel"),                3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchg_acqrel"),             3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchg_relaxed"),            3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchg_failrelaxed"),        3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchg_failacq"),            3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchg_acq_failrelaxed"),    3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchg_acqrel_failrelaxed"), 3, false, Expr_Expr},
+
+	{STR_LIT("__atomic_cxchgweak"),                    3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchgweak_acq"),                3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchgweak_rel"),                3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchgweak_acqrel"),             3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchgweak_relaxed"),            3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchgweak_failrelaxed"),        3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchgweak_failacq"),            3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchgweak_acq_failrelaxed"),    3, false, Expr_Expr},
+	{STR_LIT("__atomic_cxchgweak_acqrel_failrelaxed"), 3, false, Expr_Expr},
 };
 
 
@@ -250,7 +397,7 @@ struct ImportGraphNode {
 
 
 struct ForeignContext {
-	Ast *             curr_library;
+	Ast *                 curr_library;
 	ProcCallingConvention default_cc;
 	String                link_prefix;
 	bool                  in_export;
