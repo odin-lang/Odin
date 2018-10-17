@@ -122,13 +122,13 @@ struct Entity {
 			String ir_mangled_name;
 		} TypeName;
 		struct {
-			u64          tags;
-			Entity *     foreign_library;
-			Ast *    foreign_library_ident;
-			String       link_name;
-			String       link_prefix;
-			bool         is_foreign;
-			bool         is_export;
+			u64     tags;
+			Entity *foreign_library;
+			Ast *   foreign_library_ident;
+			String  link_name;
+			String  link_prefix;
+			bool    is_foreign;
+			bool    is_export;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;

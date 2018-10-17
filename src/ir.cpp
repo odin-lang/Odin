@@ -184,10 +184,27 @@ gbAllocator ir_allocator(void) {
 		i64          alignment;                                       \
 	})                                                                \
 	IR_INSTR_KIND(ZeroInit, struct { irValue *address; })             \
-	IR_INSTR_KIND(Store,    struct {                                  \
-		irValue *address, *value; bool atomic;                        \
-	})                                                                \
+	IR_INSTR_KIND(Store,    struct { irValue *address, *value; })     \
 	IR_INSTR_KIND(Load,     struct { Type *type; irValue *address; }) \
+	IR_INSTR_KIND(AtomicFence, struct { BuiltinProcId id; })          \
+	IR_INSTR_KIND(AtomicStore, struct {                               \
+		irValue *address, *value;                                     \
+		BuiltinProcId id;                                             \
+	})                                                                \
+	IR_INSTR_KIND(AtomicLoad, struct {                                \
+		Type *type; irValue *address;                                 \
+		BuiltinProcId id;                                             \
+	})                                                                \
+	IR_INSTR_KIND(AtomicRmw, struct {                                 \
+		Type *type; irValue *address;                                 \
+		irValue *value;                                               \
+		BuiltinProcId id;                                             \
+	})                                                                \
+	IR_INSTR_KIND(AtomicCxchg, struct {                               \
+		Type *type; irValue *address;                                 \
+		irValue *old_value; irValue *new_value;                       \
+		BuiltinProcId id;                                             \
+	})                                                                \
 	IR_INSTR_KIND(PtrOffset, struct {                                 \
 		irValue *address;                                             \
 		irValue *offset;                                              \
@@ -485,7 +502,7 @@ irAddr ir_addr_map(irValue *addr, irValue *map_key, Type *map_type, Type *map_re
 }
 
 
-irAddr ir_addr_context(irValue *addr, Selection sel = {}) {
+irAddr ir_addr_context(irValue *addr, Selection sel = empty_selection) {
 	irAddr v = {irAddr_Context, addr};
 	v.ctx.sel = sel;
 	return v;
@@ -644,6 +661,12 @@ Type *ir_instr_type(irInstr *instr) {
 		return instr->Local.type;
 	case irInstr_Load:
 		return instr->Load.type;
+	case irInstr_AtomicLoad:
+		return instr->AtomicLoad.type;
+	case irInstr_AtomicRmw:
+		return instr->AtomicRmw.type;
+	case irInstr_AtomicCxchg:
+		return instr->AtomicCxchg.type;
 	case irInstr_StructElementPtr:
 		return instr->StructElementPtr.result_type;
 	case irInstr_ArrayElementPtr:
@@ -925,12 +948,11 @@ irValue *ir_instr_zero_init(irProcedure *p, irValue *address) {
 	return v;
 }
 
-irValue *ir_instr_store(irProcedure *p, irValue *address, irValue *value, bool atomic) {
+irValue *ir_instr_store(irProcedure *p, irValue *address, irValue *value) {
 	irValue *v = ir_alloc_instr(p, irInstr_Store);
 	irInstr *i = &v->Instr;
 	i->Store.address = address;
 	i->Store.value = value;
-	i->Store.atomic = atomic;
 	return v;
 }
 
@@ -939,6 +961,68 @@ irValue *ir_instr_load(irProcedure *p, irValue *address) {
 	irInstr *i = &v->Instr;
 	i->Load.address = address;
 	i->Load.type = type_deref(ir_type(address));
+	return v;
+}
+
+irValue *ir_instr_atomic_fence(irProcedure *p, BuiltinProcId id) {
+	irValue *v = ir_alloc_instr(p, irInstr_AtomicFence);
+	irInstr *i = &v->Instr;
+	i->AtomicFence.id = id;
+	return v;
+}
+
+irValue *ir_instr_atomic_store(irProcedure *p, irValue *address, irValue *value, BuiltinProcId id) {
+	irValue *v = ir_alloc_instr(p, irInstr_AtomicStore);
+	irInstr *i = &v->Instr;
+	i->AtomicStore.address = address;
+	i->AtomicStore.value = value;
+	i->AtomicStore.id = id;
+	return v;
+}
+
+irValue *ir_instr_atomic_load(irProcedure *p, irValue *address, BuiltinProcId id) {
+	irValue *v = ir_alloc_instr(p, irInstr_AtomicLoad);
+	irInstr *i = &v->Instr;
+	i->AtomicLoad.address = address;
+	i->AtomicLoad.type = type_deref(ir_type(address));
+	i->AtomicLoad.id = id;
+	return v;
+}
+
+irValue *ir_instr_atomic_rmw(irProcedure *p, irValue *address, irValue *value, BuiltinProcId id) {
+	irValue *v = ir_alloc_instr(p, irInstr_AtomicRmw);
+	irInstr *i = &v->Instr;
+	i->AtomicRmw.type = type_deref(ir_type(address));
+	i->AtomicRmw.address = address;
+	i->AtomicRmw.value = value;
+	i->AtomicRmw.id = id;
+	return v;
+}
+
+
+irValue *ir_instr_atomic_cxchg(irProcedure *p, Type *type, irValue *address, irValue *old_value, irValue *new_value, BuiltinProcId id) {
+	irValue *v = ir_alloc_instr(p, irInstr_AtomicCxchg);
+	irInstr *i = &v->Instr;
+
+
+	if (type->kind == Type_Tuple) {
+		GB_ASSERT(type->Tuple.variables.count == 2);
+		Type *elem = type->Tuple.variables[0]->type;
+		// LEAK TODO(bill): LLVM returns {T, i1} whilst Odin does {T, bool}, fix this mapping hack
+		gbAllocator a = heap_allocator();
+		Type *llvm_type = alloc_type_tuple();
+		array_init(&llvm_type->Tuple.variables, a, 0, 2);
+		array_add (&llvm_type->Tuple.variables, alloc_entity_field(nullptr, blank_token, elem, false, 0));
+		array_add (&llvm_type->Tuple.variables, alloc_entity_field(nullptr, blank_token, t_llvm_bool, false, 1));
+
+		type = llvm_type;
+	}
+	i->AtomicCxchg.type = type;
+
+	i->AtomicCxchg.address = address;
+	i->AtomicCxchg.old_value = old_value;
+	i->AtomicCxchg.new_value = new_value;
+	i->AtomicCxchg.id = id;
 	return v;
 }
 
@@ -1579,7 +1663,7 @@ irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
 	if (!is_type_untyped(b)) {
 		GB_ASSERT_MSG(are_types_identical(core_type(a), core_type(b)), "%s %s", type_to_string(a), type_to_string(b));
 	}
-	return ir_emit(p, ir_instr_store(p, address, value, false));
+	return ir_emit(p, ir_instr_store(p, address, value));
 }
 irValue *ir_emit_load(irProcedure *p, irValue *address) {
 	GB_ASSERT(address != nullptr);
@@ -4710,6 +4794,106 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		                     ir_build_expr(proc, ce->args[0]),
 		                     ir_build_expr(proc, ce->args[1]),
 		                     ir_build_expr(proc, ce->args[2]));
+
+
+
+	// "Intrinsics"
+	case BuiltinProc_atomic_fence:
+	case BuiltinProc_atomic_fence_acq:
+	case BuiltinProc_atomic_fence_rel:
+	case BuiltinProc_atomic_fence_acqrel:
+		return ir_emit(proc, ir_instr_atomic_fence(proc, id));
+
+	case BuiltinProc_atomic_store:
+	case BuiltinProc_atomic_store_rel:
+	case BuiltinProc_atomic_store_relaxed:
+	case BuiltinProc_atomic_store_unordered: {
+		irValue *dst = ir_build_expr(proc, ce->args[0]);
+		irValue *val = ir_build_expr(proc, ce->args[1]);
+		val = ir_emit_conv(proc, val, type_deref(ir_type(dst)));
+		return ir_emit(proc, ir_instr_atomic_store(proc, dst, val, id));
+	}
+
+	case BuiltinProc_atomic_load:
+	case BuiltinProc_atomic_load_acq:
+	case BuiltinProc_atomic_load_relaxed:
+	case BuiltinProc_atomic_load_unordered: {
+		irValue *dst = ir_build_expr(proc, ce->args[0]);
+		return ir_emit(proc, ir_instr_atomic_load(proc, dst, id));
+	}
+
+	case BuiltinProc_atomic_add:
+	case BuiltinProc_atomic_add_acq:
+	case BuiltinProc_atomic_add_rel:
+	case BuiltinProc_atomic_add_acqrel:
+	case BuiltinProc_atomic_add_relaxed:
+	case BuiltinProc_atomic_sub:
+	case BuiltinProc_atomic_sub_acq:
+	case BuiltinProc_atomic_sub_rel:
+	case BuiltinProc_atomic_sub_acqrel:
+	case BuiltinProc_atomic_sub_relaxed:
+	case BuiltinProc_atomic_and:
+	case BuiltinProc_atomic_and_acq:
+	case BuiltinProc_atomic_and_rel:
+	case BuiltinProc_atomic_and_acqrel:
+	case BuiltinProc_atomic_and_relaxed:
+	case BuiltinProc_atomic_nand:
+	case BuiltinProc_atomic_nand_acq:
+	case BuiltinProc_atomic_nand_rel:
+	case BuiltinProc_atomic_nand_acqrel:
+	case BuiltinProc_atomic_nand_relaxed:
+	case BuiltinProc_atomic_or:
+	case BuiltinProc_atomic_or_acq:
+	case BuiltinProc_atomic_or_rel:
+	case BuiltinProc_atomic_or_acqrel:
+	case BuiltinProc_atomic_or_relaxed:
+	case BuiltinProc_atomic_xor:
+	case BuiltinProc_atomic_xor_acq:
+	case BuiltinProc_atomic_xor_rel:
+	case BuiltinProc_atomic_xor_acqrel:
+	case BuiltinProc_atomic_xor_relaxed:
+	case BuiltinProc_atomic_xchg:
+	case BuiltinProc_atomic_xchg_acq:
+	case BuiltinProc_atomic_xchg_rel:
+	case BuiltinProc_atomic_xchg_acqrel:
+	case BuiltinProc_atomic_xchg_relaxed: {
+		irValue *dst = ir_build_expr(proc, ce->args[0]);
+		irValue *val = ir_build_expr(proc, ce->args[1]);
+		val = ir_emit_conv(proc, val, type_deref(ir_type(dst)));
+		return ir_emit(proc, ir_instr_atomic_rmw(proc, dst, val, id));
+	}
+
+	case BuiltinProc_atomic_cxchg:
+	case BuiltinProc_atomic_cxchg_acq:
+	case BuiltinProc_atomic_cxchg_rel:
+	case BuiltinProc_atomic_cxchg_acqrel:
+	case BuiltinProc_atomic_cxchg_relaxed:
+	case BuiltinProc_atomic_cxchg_failrelaxed:
+	case BuiltinProc_atomic_cxchg_failacq:
+	case BuiltinProc_atomic_cxchg_acq_failrelaxed:
+	case BuiltinProc_atomic_cxchg_acqrel_failrelaxed:
+	case BuiltinProc_atomic_cxchgweak:
+	case BuiltinProc_atomic_cxchgweak_acq:
+	case BuiltinProc_atomic_cxchgweak_rel:
+	case BuiltinProc_atomic_cxchgweak_acqrel:
+	case BuiltinProc_atomic_cxchgweak_relaxed:
+	case BuiltinProc_atomic_cxchgweak_failrelaxed:
+	case BuiltinProc_atomic_cxchgweak_failacq:
+	case BuiltinProc_atomic_cxchgweak_acq_failrelaxed:
+	case BuiltinProc_atomic_cxchgweak_acqrel_failrelaxed: {
+		Type *type = expr->tav.type;
+
+		irValue *address = ir_build_expr(proc, ce->args[0]);
+		Type *elem = type_deref(ir_type(address));
+		irValue *old_value = ir_build_expr(proc, ce->args[1]);
+		irValue *new_value = ir_build_expr(proc, ce->args[2]);
+		old_value = ir_emit_conv(proc, old_value, elem);
+		new_value = ir_emit_conv(proc, new_value, elem);
+
+		return ir_emit(proc, ir_instr_atomic_cxchg(proc, type, address, old_value, new_value, id));
+	}
+
+
 	}
 
 	GB_PANIC("Unhandled built-in procedure");
@@ -8430,6 +8614,9 @@ void ir_gen_tree(irGen *s) {
 			continue;
 		case Entity_ProcGroup:
 			continue;
+
+		case Entity_Procedure:
+			break;
 		}
 
 		bool polymorphic_struct = false;
