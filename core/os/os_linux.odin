@@ -139,9 +139,9 @@ foreign libc {
 	@(link_name="calloc")  _unix_calloc  :: proc(num, size: int) -> rawptr ---;
 	@(link_name="free")    _unix_free    :: proc(ptr: rawptr) ---;
 	@(link_name="realloc") _unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr ---;
-	@(link_name="getenv")  _unix_getenv  :: proc(cstring) -> cstring --- -> !;
+	@(link_name="getenv")  _unix_getenv  :: proc(cstring) -> cstring ---;
 
-	@(link_name="exit")    _unix_exit    :: proc(status: int) ---;
+	@(link_name="exit")    _unix_exit    :: proc(status: int) -> ! ---;
 }
 foreign dl {
 	@(link_name="dlopen")  _unix_dlopen  :: proc(filename: cstring, flags: int) -> rawptr ---;

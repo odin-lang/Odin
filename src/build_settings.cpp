@@ -18,6 +18,15 @@ enum TargetArchKind {
 	TargetArch_COUNT,
 };
 
+enum TargetEndianKind {
+	TargetEndian_Invalid,
+
+	TargetEndian_Little,
+	TargetEndian_Big,
+
+	TargetEndian_COUNT,
+};
+
 String target_os_names[TargetOs_COUNT] = {
 	str_lit(""),
 	str_lit("windows"),
@@ -32,11 +41,18 @@ String target_arch_names[TargetArch_COUNT] = {
 	str_lit("386"),
 };
 
-String target_arch_endian[TargetArch_COUNT] = {
+String target_endian_names[TargetEndian_COUNT] = {
 	str_lit(""),
 	str_lit("little"),
-	str_lit("little"),
+	str_lit("big"),
 };
+
+TargetEndianKind target_endians[TargetArch_COUNT] = {
+	TargetEndian_Invalid,
+	TargetEndian_Little,
+	TargetEndian_Little,
+};
+
 
 
 String const ODIN_VERSION = str_lit("0.9.0");
@@ -521,7 +537,7 @@ void init_build_context(void) {
 	bc->metrics = metrics;
 	bc->ODIN_OS     = target_os_names[metrics.os];
 	bc->ODIN_ARCH   = target_arch_names[metrics.arch];
-	bc->ODIN_ENDIAN = target_arch_endian[metrics.arch];
+	bc->ODIN_ENDIAN = target_endian_names[target_endians[metrics.arch]];
 	bc->word_size   = metrics.word_size;
 	bc->max_align   = metrics.max_align;
 	bc->link_flags  = str_lit(" ");
