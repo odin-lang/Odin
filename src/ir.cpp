@@ -5282,7 +5282,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 
 		Ast *p = unparen_expr(ce->proc);
 		if (proc_mode == Addressing_Builtin) {
-			Entity *e = entity_of_ident(p);
+			Entity *e = entity_of_node(p);
 			BuiltinProcId id = BuiltinProc_Invalid;
 			if (e != nullptr) {
 				id = cast(BuiltinProcId)e->Builtin.id;

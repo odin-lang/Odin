@@ -512,7 +512,7 @@ AstFile *    ast_file_of_filename   (CheckerInfo *i, String   filename);
 isize        type_info_index        (CheckerInfo *i, Type *   type, bool error_on_failure = true);
 
 // Will return nullptr if not found
-Entity *entity_of_node(CheckerInfo *i, Ast *expr);
+Entity *entity_of_node(Ast *expr);
 
 
 Entity *scope_lookup_current(Scope *s, String name);
