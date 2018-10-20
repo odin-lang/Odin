@@ -4185,6 +4185,12 @@ bool determine_path_from_string(Parser *p, Ast *node, String base_dir, String or
 		return false;
 	}
 
+
+	if (is_package_name_reserved(file_str)) {
+		*path = file_str;
+		return true;
+	}
+
 	gb_mutex_lock(&p->file_decl_mutex);
 	defer (gb_mutex_unlock(&p->file_decl_mutex));
 
@@ -4223,12 +4229,9 @@ bool determine_path_from_string(Parser *p, Ast *node, String base_dir, String or
 #endif
 	}
 
-	if (is_package_name_reserved(file_str)) {
-		*path = file_str;
-	} else {
-		String fullpath = string_trim_whitespace(get_fullpath_relative(a, base_dir, file_str));
-		*path = fullpath;
-	}
+
+	String fullpath = string_trim_whitespace(get_fullpath_relative(a, base_dir, file_str));
+	*path = fullpath;
 
 	return true;
 }
