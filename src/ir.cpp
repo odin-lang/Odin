@@ -1767,6 +1767,7 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 	// 1 will be handled later
 	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 2), ir_emit_package_call(proc, "os", "current_thread_id", args));
 	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 3), ir_get_package_value(proc->module, str_lit("runtime"), str_lit("default_assertion_failure_proc")));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 4), ir_emit_package_call(proc, "log", "nil_logger", args));
 
 	array_init(&args, heap_allocator(), 1);
 	args[0] = ir_get_package_value(proc->module, str_lit("runtime"), str_lit("global_scratch_allocator_data"));

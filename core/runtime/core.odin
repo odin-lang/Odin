@@ -5,6 +5,7 @@ package runtime
 
 import "core:os"
 import "core:mem"
+import "core:log"
 
 // Naming Conventions:
 // In general, Ada_Case for types and snake_case for values
@@ -193,6 +194,8 @@ Context :: struct {
 
 	assertion_failure_proc:  Assertion_Failure_Proc,
 
+	logger: log.Logger,
+
 	user_data:  any,
 	user_index: int,
 
@@ -321,6 +324,7 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.temp_allocator = mem.scratch_allocator(&global_scratch_allocator_data);
 	c.thread_id = os.current_thread_id();
 	c.assertion_failure_proc = default_assertion_failure_proc;
+	c.logger = log.nil_logger();
 }
 
 @(builtin)
