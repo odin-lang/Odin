@@ -714,8 +714,7 @@ Entity *implicit_entity_of_node(Ast *clause) {
 	return nullptr;
 }
 
-// Will return nullptr if not found
-Entity *entity_of_node(CheckerInfo *i, Ast *expr) {
+Entity *entity_of_node(Ast *expr) {
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
 	case_ast_node(ident, Ident, expr);

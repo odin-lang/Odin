@@ -22,7 +22,7 @@ strongest_failure_ordering :: inline proc "contextless" (order: Ordering) -> Ord
 	return Relaxed;
 }
 
-fence :: proc "contextless" (order: Ordering) {
+fence :: inline proc "contextless" (order: Ordering) {
 	using Ordering;
 	#complete switch order {
 	case Relaxed:                 panic("there is no such thing as a relaxed fence");
@@ -35,7 +35,7 @@ fence :: proc "contextless" (order: Ordering) {
 }
 
 
-atomic_store :: proc "contextless" (dst: ^$T, val: T, order: Ordering) {
+atomic_store :: inline proc "contextless" (dst: ^$T, val: T, order: Ordering) {
 	using Ordering;
 	#complete switch order {
 	case Relaxed:                 intrinsics.atomic_store_relaxed(dst, val);
@@ -47,7 +47,7 @@ atomic_store :: proc "contextless" (dst: ^$T, val: T, order: Ordering) {
 	}
 }
 
-atomic_load :: proc "contextless" (dst: ^$T, order: Ordering) -> T {
+atomic_load :: inline proc "contextless" (dst: ^$T, order: Ordering) -> T {
 	using Ordering;
 	#complete switch order {
 	case Relaxed:                 return intrinsics.atomic_load_relaxed(dst);
@@ -60,7 +60,7 @@ atomic_load :: proc "contextless" (dst: ^$T, order: Ordering) -> T {
 	return T{};
 }
 
-atomic_swap :: proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
+atomic_swap :: inline proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
 	using Ordering;
 	#complete switch order {
 	case Relaxed:                 return intrinsics.atomic_xchg_relaxed(dst, val);
@@ -73,12 +73,11 @@ atomic_swap :: proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
 	return T{};
 }
 
-atomic_compare_exchange :: proc "contextless" (dst: ^$T, old, new: T, success, failure: Ordering) -> (val: T, ok: bool) {
+atomic_compare_exchange :: inline proc "contextless" (dst: ^$T, old, new: T, success, failure: Ordering) -> (val: T, ok: bool) {
 	using Ordering;
 	switch failure {
 	case Relaxed:
 		switch success {
-		case Release:                 return intrinsics.atomic_cxchg_rel_failrelaxed(dst, old, new);
 		case Relaxed:                 return intrinsics.atomic_cxchg_relaxed(dst, old, new);
 		case Acquire:                 return intrinsics.atomic_cxchg_acq_failrelaxed(dst, old, new);
 		case Acquire_Release:         return intrinsics.atomic_cxchg_acqrel_failrelaxed(dst, old, new);
@@ -88,8 +87,6 @@ atomic_compare_exchange :: proc "contextless" (dst: ^$T, old, new: T, success, f
 	case Acquire:
 		switch success {
 		case Acquire:                 return intrinsics.atomic_cxchg_acq(dst, old, new);
-		case Acquire_Release:         return intrinsics.atomic_cxchg_acqrel_failacq(dst, old, new);
-		case Sequentially_Consistent: return intrinsics.atomic_acqrel_failacq(dst, old, new);
 		case: panic("an unknown ordering combination");
 		}
 	case Sequentially_Consistent:
@@ -102,12 +99,12 @@ atomic_compare_exchange :: proc "contextless" (dst: ^$T, old, new: T, success, f
 	case Release:
 		panic("there is not such thing as an release failure ordering");
 	}
-
 	return T{}, false;
+
 }
 
 
-atomic_add :: proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
+atomic_add :: inline proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
 	using Ordering;
 	#complete switch order {
 	case Relaxed:                 return intrinsics.atomic_add_relaxed(dst, val);
@@ -120,7 +117,7 @@ atomic_add :: proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
 	return T{};
 }
 
-atomic_sub :: proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
+atomic_sub :: inline proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
 	using Ordering;
 	#complete switch order {
 	case Relaxed:                 return intrinsics.atomic_sub_relaxed(dst, val);
@@ -133,7 +130,7 @@ atomic_sub :: proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
 	return T{};
 }
 
-atomic_and :: proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
+atomic_and :: inline proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
 	using Ordering;
 	#complete switch order {
 	case Relaxed:                 return intrinsics.atomic_and_relaxed(dst, val);
@@ -146,7 +143,7 @@ atomic_and :: proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
 	return T{};
 }
 
-atomic_nand :: proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
+atomic_nand :: inline proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
 	using Ordering;
 	#complete switch order {
 	case Relaxed:                 return intrinsics.atomic_nand_relaxed(dst, val);
@@ -159,7 +156,7 @@ atomic_nand :: proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
 	return T{};
 }
 
-atomic_or :: proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
+atomic_or :: inline proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
 	using Ordering;
 	#complete switch order {
 	case Relaxed:                 return intrinsics.atomic_or_relaxed(dst, val);
@@ -172,7 +169,7 @@ atomic_or :: proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
 	return T{};
 }
 
-atomic_xor :: proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
+atomic_xor :: inline proc "contextless" (dst: ^$T, val: T, order: Ordering) -> T {
 	using Ordering;
 	#complete switch order {
 	case Relaxed:                 return intrinsics.atomic_xor_relaxed(dst, val);
