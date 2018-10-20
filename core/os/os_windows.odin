@@ -251,7 +251,7 @@ exit :: proc(code: int) -> ! {
 
 
 
-current_thread_id :: proc() -> int {
+current_thread_id :: proc "contextless" () -> int {
 	return int(win32.get_current_thread_id());
 }
 
