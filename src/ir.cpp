@@ -1759,22 +1759,7 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 	irValue *c = ir_add_local_generated(proc, t_context);
 	ir_push_context_onto_stack(proc, c);
 	ir_emit_store(proc, c, ir_emit_load(proc, proc->module->global_default_context));
-
-
-#if 1
-	Array<irValue *> args = {};
-	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 0), ir_emit_package_call(proc, "os", "heap_allocator", args));
-	// 1 will be handled later
-	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 2), ir_emit_package_call(proc, "os", "current_thread_id", args));
-	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 3), ir_get_package_value(proc->module, str_lit("runtime"), str_lit("default_assertion_failure_proc")));
-	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 4), ir_emit_package_call(proc, "log", "nil_logger", args));
-
-	array_init(&args, heap_allocator(), 1);
-	args[0] = ir_get_package_value(proc->module, str_lit("runtime"), str_lit("global_scratch_allocator_data"));
-	ir_emit_store(proc, ir_emit_struct_ep(proc, c, 1), ir_emit_package_call(proc, "mem", "scratch_allocator", args));
-#else
 	ir_emit_init_context(proc, c);
-#endif
 	return c;
 }
 
@@ -2178,7 +2163,11 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 			return;
 		}
 	} else if (addr.kind == irAddr_Context) {
+		irValue *old = ir_emit_load(proc, ir_find_or_generate_context_ptr(proc));
 		irValue *next = ir_add_local_generated(proc, t_context);
+		ir_emit_store(proc, next, old);
+		ir_push_context_onto_stack(proc, next);
+
 		if (addr.ctx.sel.index.count > 0) {
 			irValue *lhs = ir_emit_deep_field_gep(proc, next, addr.ctx.sel);
 			irValue *rhs = ir_emit_conv(proc, value, type_deref(ir_type(lhs)));
@@ -2188,8 +2177,6 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 			irValue *rhs = ir_emit_conv(proc, value, ir_addr_type(addr));
 			ir_emit_store(proc, lhs, rhs);
 		}
-
-		ir_push_context_onto_stack(proc, next);
 
 		return;
 	}

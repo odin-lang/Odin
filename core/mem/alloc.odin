@@ -25,6 +25,7 @@ Allocator :: struct {
 
 alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
 	if size == 0 do return nil;
+	if allocator.procedure == nil do return nil;
 	return allocator.procedure(allocator.data, Allocator_Mode.Alloc, size, alignment, nil, 0, 0, loc);
 }
 
@@ -35,11 +36,15 @@ free :: inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_
 }
 
 free_all :: inline proc(allocator := context.allocator, loc := #caller_location) {
-	allocator.procedure(allocator.data, Allocator_Mode.Free_All, 0, 0, nil, 0, 0, loc);
+	if allocator.procedure != nil {
+		allocator.procedure(allocator.data, Allocator_Mode.Free_All, 0, 0, nil, 0, 0, loc);
+	}
 }
 
 resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
-	assert(allocator.procedure != nil);
+	if allocator.procedure == nil {
+		return nil;
+	}
 	if new_size == 0 {
 		free(ptr, allocator, loc);
 		return nil;

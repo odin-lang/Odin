@@ -190,11 +190,10 @@ Assertion_Failure_Proc :: #type proc(prefix, message: string, loc: Source_Code_L
 Context :: struct {
 	allocator:      mem.Allocator,
 	temp_allocator: mem.Allocator,
-	thread_id:  int,
-
-	assertion_failure_proc:  Assertion_Failure_Proc,
-
+	assertion_failure_proc: Assertion_Failure_Proc,
 	logger: log.Logger,
+
+	thread_id:  int,
 
 	user_data:  any,
 	user_index: int,
@@ -320,11 +319,17 @@ __init_context_from_ptr :: proc "contextless" (c: ^Context, other: ^Context) {
 __init_context :: proc "contextless" (c: ^Context) {
 	if c == nil do return;
 
-	c.allocator = os.heap_allocator();
-	c.temp_allocator = mem.scratch_allocator(&global_scratch_allocator_data);
-	c.thread_id = os.current_thread_id();
+	c.allocator.procedure = os.heap_allocator_proc;
+	c.allocator.data = nil;
+
+	c.temp_allocator.procedure = mem.scratch_allocator_proc;
+	c.temp_allocator.data = &global_scratch_allocator_data;
+
+	c.thread_id = os.current_thread_id(); // NOTE(bill): This is "contextless" so it is okay to call
 	c.assertion_failure_proc = default_assertion_failure_proc;
-	c.logger = log.nil_logger();
+
+	c.logger.procedure = log.nil_logger_proc;
+	c.logger.data = nil;
 }
 
 @(builtin)

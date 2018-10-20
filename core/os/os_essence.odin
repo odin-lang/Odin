@@ -71,7 +71,7 @@ stdin  := Handle(-1); // Not implemented
 stdout := Handle(0);
 stderr := Handle(0);
 
-current_thread_id :: proc() -> int {
+current_thread_id :: proc "contextless" () -> int {
 	return OSGetThreadID(Handle(0x1000));
 }
 
