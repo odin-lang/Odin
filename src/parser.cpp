@@ -4142,6 +4142,17 @@ bool is_import_path_valid(String path) {
 	return false;
 }
 
+
+bool is_package_name_reserved(String const &name) {
+	if (name == "builtin") {
+		return true;
+	} else if (name == "intrinsics") {
+		return true;
+	}
+	return false;
+}
+
+
 bool determine_path_from_string(Parser *p, Ast *node, String base_dir, String original_string, String *path) {
 	GB_ASSERT(path != nullptr);
 
@@ -4212,9 +4223,8 @@ bool determine_path_from_string(Parser *p, Ast *node, String base_dir, String or
 #endif
 	}
 
-
-	if (file_str == "builtin") {
-		*path = str_lit("builtin");
+	if (is_package_name_reserved(file_str)) {
+		*path = file_str;
 	} else {
 		String fullpath = string_trim_whitespace(get_fullpath_relative(a, base_dir, file_str));
 		*path = fullpath;
@@ -4278,7 +4288,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<Ast *>
 			import_path = string_trim_whitespace(import_path);
 
 			id->fullpath = import_path;
-			if (import_path == "builtin") {
+			if (is_package_name_reserved(import_path)) {
 				continue;
 			}
 			try_add_import_path(p, import_path, original_string, ast_token(node).pos);
@@ -4425,7 +4435,7 @@ bool parse_file(Parser *p, AstFile *f) {
 			error(package_name, "Invalid package name '_'");
 		} else if (f->pkg->kind != Package_Runtime && package_name.string == "runtime") {
 			error(package_name, "Use of reserved package name '%.*s'", LIT(package_name.string));
-		} else if (package_name.string == "builtin") {
+		} else if (is_package_name_reserved(package_name.string)) {
 			error(package_name, "Use of reserved package name '%.*s'", LIT(package_name.string));
 		}
 	}

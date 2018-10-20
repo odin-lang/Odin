@@ -153,9 +153,10 @@ struct Entity {
 	};
 };
 
-bool is_entity_kind_exported(EntityKind kind) {
+bool is_entity_kind_exported(EntityKind kind, bool allow_builtin = false) {
 	switch (kind) {
 	case Entity_Builtin:
+		return allow_builtin;
 	case Entity_ImportName:
 	case Entity_LibraryName:
 	case Entity_Nil:
@@ -164,10 +165,10 @@ bool is_entity_kind_exported(EntityKind kind) {
 	return true;
 }
 
-bool is_entity_exported(Entity *e) {
+bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 	// TODO(bill): Determine the actual exportation rules for imports of entities
 	GB_ASSERT(e != nullptr);
-	if (!is_entity_kind_exported(e->kind)) {
+	if (!is_entity_kind_exported(e->kind, allow_builtin)) {
 		return false;
 	}
 

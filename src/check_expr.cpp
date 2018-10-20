@@ -2704,11 +2704,12 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 			check_op_expr = false;
 			entity = scope_lookup_current(import_scope, entity_name);
 			bool is_declared = entity != nullptr;
+			bool allow_builtin = false;
 			if (is_declared) {
 				if (entity->kind == Entity_Builtin) {
 					// NOTE(bill): Builtin's are in the universal scope which is part of every scopes hierarchy
 					// This means that we should just ignore the found result through it
-					is_declared = false;
+					allow_builtin = entity->scope == import_scope;
 				} else if ((entity->scope->flags&ScopeFlag_Global) == ScopeFlag_Global && (import_scope->flags&ScopeFlag_Global) == 0) {
 					is_declared = false;
 				}
@@ -2723,7 +2724,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 			check_entity_decl(c, entity, nullptr, nullptr);
 			GB_ASSERT(entity->type != nullptr);
 
-			if (!is_entity_exported(entity)) {
+			if (!is_entity_exported(entity, allow_builtin)) {
 				gbString sel_str = expr_to_string(selector);
 				error(op_expr, "'%s' is not exported by '%.*s'", sel_str, LIT(import_name));
 				gb_string_free(sel_str);
