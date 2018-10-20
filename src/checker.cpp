@@ -252,7 +252,7 @@ Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg) {
 		decl_count += pkg->files[i]->decls.count;
 	}
 	isize init_elements_capacity = 2*decl_count;
-	Scope *s = create_scope(builtin_scope, c->allocator, init_elements_capacity);
+	Scope *s = create_scope(builtin_pkg->scope, c->allocator, init_elements_capacity);
 
 	s->flags |= ScopeFlag_Pkg;
 	s->pkg = pkg;
@@ -492,14 +492,14 @@ void add_declaration_dependency(CheckerContext *c, Entity *e) {
 }
 
 
-Entity *add_global_entity(Entity *entity) {
+Entity *add_global_entity(Entity *entity, Scope *scope=builtin_pkg->scope) {
 	String name = entity->token.string;
 	defer (entity->state = EntityState_Resolved);
 
 	if (gb_memchr(name.text, ' ', name.len)) {
 		return entity; // NOTE(bill): Usually an 'untyped thing'
 	}
-	if (scope_insert(builtin_scope, entity)) {
+	if (scope_insert(scope, entity)) {
 		compiler_error("double declaration");
 	}
 	return entity;
@@ -532,12 +532,17 @@ void init_universal(void) {
 	builtin_pkg->name = str_lit("builtin");
 	builtin_pkg->kind = Package_Normal;
 
-	builtin_scope = create_scope(nullptr, a);
-	builtin_scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global;
-	builtin_scope->pkg = builtin_pkg;
-	builtin_pkg->scope = builtin_scope;
+	builtin_pkg->scope = create_scope(nullptr, a);
+	builtin_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global;
+	builtin_pkg->scope->pkg = builtin_pkg;
 
+	intrinsics_pkg = gb_alloc_item(a, AstPackage);
+	intrinsics_pkg->name = str_lit("intrinsics");
+	intrinsics_pkg->kind = Package_Normal;
 
+	intrinsics_pkg->scope = create_scope(nullptr, a);
+	intrinsics_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global;
+	intrinsics_pkg->scope->pkg = intrinsics_pkg;
 
 
 // Types
@@ -566,7 +571,15 @@ void init_universal(void) {
 		if (name != "") {
 			Entity *entity = alloc_entity(Entity_Builtin, nullptr, make_token_ident(name), t_invalid);
 			entity->Builtin.id = id;
-			add_global_entity(entity);
+			switch (builtin_procs[i].pkg) {
+			case BuiltinProcPkg_builtin:
+				add_global_entity(entity, builtin_pkg->scope);
+				break;
+			case BuiltinProcPkg_intrinsics:
+				add_global_entity(entity, intrinsics_pkg->scope);
+				GB_ASSERT(scope_lookup_current(intrinsics_pkg->scope, name) != nullptr);
+				break;
+			}
 		}
 	}
 
@@ -2006,8 +2019,8 @@ void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<Ast *> *attr
 			}
 
 			if (name == "builtin") {
-				add_entity(ctx->checker, builtin_scope, nullptr, e);
-				GB_ASSERT(scope_lookup(builtin_scope, e->token.string) != nullptr);
+				add_entity(ctx->checker, builtin_pkg->scope, nullptr, e);
+				GB_ASSERT(scope_lookup(builtin_pkg->scope, e->token.string) != nullptr);
 				if (value != nullptr) {
 					error(value, "'builtin' cannot have a field value");
 				}
@@ -2448,7 +2461,7 @@ void add_import_dependency_node(Checker *c, Ast *decl, Map<ImportGraphNode *> *M
 	switch (decl->kind) {
 	case_ast_node(id, ImportDecl, decl);
 		String path = id->fullpath;
-		if (path == "builtin") {
+		if (is_package_name_reserved(path)) {
 			return;
 		}
 		HashKey key = hash_string(path);
@@ -2620,6 +2633,8 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 
 	if (id->fullpath == "builtin") {
 		scope = builtin_pkg->scope;
+	} else if (id->fullpath == "intrinsics") {
+		scope = intrinsics_pkg->scope;
 	} else {
 		HashKey key = hash_string(id->fullpath);
 		AstPackage **found = map_get(pkgs, key);

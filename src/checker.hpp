@@ -46,12 +46,19 @@ enum StmtFlag {
 	Stmt_CheckScopeDecls    = 1<<5,
 };
 
+enum BuiltinProcPkg {
+	BuiltinProcPkg_builtin,
+	BuiltinProcPkg_intrinsics,
+};
+
 struct BuiltinProc {
 	String   name;
 	isize    arg_count;
 	bool     variadic;
 	ExprKind kind;
+	BuiltinProcPkg pkg;
 };
+
 enum BuiltinProcId {
 	BuiltinProc_Invalid,
 
@@ -157,107 +164,107 @@ enum BuiltinProcId {
 	BuiltinProc_COUNT,
 };
 gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
-	{STR_LIT(""),                 0, false, Expr_Stmt},
+	{STR_LIT(""),                 0, false, Expr_Stmt, BuiltinProcPkg_builtin},
 
-	{STR_LIT("len"),              1, false, Expr_Expr},
-	{STR_LIT("cap"),              1, false, Expr_Expr},
+	{STR_LIT("len"),              1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("cap"),              1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
-	{STR_LIT("size_of"),          1, false, Expr_Expr},
-	{STR_LIT("align_of"),         1, false, Expr_Expr},
-	{STR_LIT("offset_of"),        2, false, Expr_Expr},
-	{STR_LIT("type_of"),          1, false, Expr_Expr},
-	{STR_LIT("type_info_of"),     1, false, Expr_Expr},
-	{STR_LIT("typeid_of"),        1, false, Expr_Expr},
+	{STR_LIT("size_of"),          1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("align_of"),         1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("offset_of"),        2, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("type_of"),          1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("type_info_of"),     1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("typeid_of"),        1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
-	{STR_LIT("swizzle"),          1, true,  Expr_Expr},
+	{STR_LIT("swizzle"),          1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 
-	{STR_LIT("complex"),          2, false, Expr_Expr},
-	{STR_LIT("real"),             1, false, Expr_Expr},
-	{STR_LIT("imag"),             1, false, Expr_Expr},
-	{STR_LIT("conj"),             1, false, Expr_Expr},
+	{STR_LIT("complex"),          2, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("real"),             1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("imag"),             1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("conj"),             1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
-	{STR_LIT("expand_to_tuple"),  1, false, Expr_Expr},
+	{STR_LIT("expand_to_tuple"),  1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
-	{STR_LIT("min"),              2, true,  Expr_Expr},
-	{STR_LIT("max"),              2, true,  Expr_Expr},
-	{STR_LIT("abs"),              1, false, Expr_Expr},
-	{STR_LIT("clamp"),            3, false, Expr_Expr},
+	{STR_LIT("min"),              2, true,  Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("max"),              2, true,  Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("abs"),              1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("clamp"),            3, false, Expr_Expr, BuiltinProcPkg_builtin},
 
-	{STR_LIT(""),                 0, true,  Expr_Expr}, // DIRECTIVE
+	{STR_LIT(""),                 0, true,  Expr_Expr, BuiltinProcPkg_builtin}, // DIRECTIVE
 
 
 	// "Intrinsics"
-	{STR_LIT("__atomic_fence"),        0, false, Expr_Stmt},
-	{STR_LIT("__atomic_fence_acq"),    0, false, Expr_Stmt},
-	{STR_LIT("__atomic_fence_rel"),    0, false, Expr_Stmt},
-	{STR_LIT("__atomic_fence_acqrel"), 0, false, Expr_Stmt},
+	{STR_LIT("atomic_fence"),        0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_fence_acq"),    0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_fence_rel"),    0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_fence_acqrel"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("__atomic_store"),           2, false, Expr_Stmt},
-	{STR_LIT("__atomic_store_rel"),       2, false, Expr_Stmt},
-	{STR_LIT("__atomic_store_relaxed"),   2, false, Expr_Stmt},
-	{STR_LIT("__atomic_store_unordered"), 2, false, Expr_Stmt},
+	{STR_LIT("atomic_store"),           2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_store_rel"),       2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_store_relaxed"),   2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_store_unordered"), 2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("__atomic_load"),            1, false, Expr_Expr},
-	{STR_LIT("__atomic_load_acq"),        1, false, Expr_Expr},
-	{STR_LIT("__atomic_load_relaxed"),    1, false, Expr_Expr},
-	{STR_LIT("__atomic_load_unordered"),  1, false, Expr_Expr},
+	{STR_LIT("atomic_load"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_load_acq"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_load_relaxed"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_load_unordered"),  1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("__atomic_add"),             2, false, Expr_Expr},
-	{STR_LIT("__atomic_add_acq"),         2, false, Expr_Expr},
-	{STR_LIT("__atomic_add_rel"),         2, false, Expr_Expr},
-	{STR_LIT("__atomic_add_acqrel"),      2, false, Expr_Expr},
-	{STR_LIT("__atomic_add_relaxed"),     2, false, Expr_Expr},
-	{STR_LIT("__atomic_sub"),             2, false, Expr_Expr},
-	{STR_LIT("__atomic_sub_acq"),         2, false, Expr_Expr},
-	{STR_LIT("__atomic_sub_rel"),         2, false, Expr_Expr},
-	{STR_LIT("__atomic_sub_acqrel"),      2, false, Expr_Expr},
-	{STR_LIT("__atomic_sub_relaxed"),     2, false, Expr_Expr},
-	{STR_LIT("__atomic_and"),             2, false, Expr_Expr},
-	{STR_LIT("__atomic_and_acq"),         2, false, Expr_Expr},
-	{STR_LIT("__atomic_and_rel"),         2, false, Expr_Expr},
-	{STR_LIT("__atomic_and_acqrel"),      2, false, Expr_Expr},
-	{STR_LIT("__atomic_and_relaxed"),     2, false, Expr_Expr},
-	{STR_LIT("__atomic_nand"),            2, false, Expr_Expr},
-	{STR_LIT("__atomic_nand_acq"),        2, false, Expr_Expr},
-	{STR_LIT("__atomic_nand_rel"),        2, false, Expr_Expr},
-	{STR_LIT("__atomic_nand_acqrel"),     2, false, Expr_Expr},
-	{STR_LIT("__atomic_nand_relaxed"),    2, false, Expr_Expr},
-	{STR_LIT("__atomic_or"),              2, false, Expr_Expr},
-	{STR_LIT("__atomic_or_acq"),          2, false, Expr_Expr},
-	{STR_LIT("__atomic_or_rel"),          2, false, Expr_Expr},
-	{STR_LIT("__atomic_or_acqrel"),       2, false, Expr_Expr},
-	{STR_LIT("__atomic_or_relaxed"),      2, false, Expr_Expr},
-	{STR_LIT("__atomic_xor"),             2, false, Expr_Expr},
-	{STR_LIT("__atomic_xor_acq"),         2, false, Expr_Expr},
-	{STR_LIT("__atomic_xor_rel"),         2, false, Expr_Expr},
-	{STR_LIT("__atomic_xor_acqrel"),      2, false, Expr_Expr},
-	{STR_LIT("__atomic_xor_relaxed"),     2, false, Expr_Expr},
+	{STR_LIT("atomic_add"),             2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_add_acq"),         2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_add_rel"),         2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_add_acqrel"),      2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_add_relaxed"),     2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_sub"),             2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_sub_acq"),         2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_sub_rel"),         2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_sub_acqrel"),      2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_sub_relaxed"),     2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_and"),             2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_and_acq"),         2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_and_rel"),         2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_and_acqrel"),      2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_and_relaxed"),     2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_nand"),            2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_nand_acq"),        2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_nand_rel"),        2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_nand_acqrel"),     2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_nand_relaxed"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_or"),              2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_or_acq"),          2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_or_rel"),          2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_or_acqrel"),       2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_or_relaxed"),      2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_xor"),             2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_xor_acq"),         2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_xor_rel"),         2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_xor_acqrel"),      2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_xor_relaxed"),     2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("__atomic_xchg"),            2, false, Expr_Expr},
-	{STR_LIT("__atomic_xchg_acq"),        2, false, Expr_Expr},
-	{STR_LIT("__atomic_xchg_rel"),        2, false, Expr_Expr},
-	{STR_LIT("__atomic_xchg_acqrel"),     2, false, Expr_Expr},
-	{STR_LIT("__atomic_xchg_relaxed"),    2, false, Expr_Expr},
+	{STR_LIT("atomic_xchg"),            2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_xchg_acq"),        2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_xchg_rel"),        2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_xchg_acqrel"),     2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_xchg_relaxed"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("__atomic_cxchg"),                    3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchg_acq"),                3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchg_rel"),                3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchg_acqrel"),             3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchg_relaxed"),            3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchg_failrelaxed"),        3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchg_failacq"),            3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchg_acq_failrelaxed"),    3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchg_acqrel_failrelaxed"), 3, false, Expr_Expr},
+	{STR_LIT("atomic_cxchg"),                    3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchg_acq"),                3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchg_rel"),                3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchg_acqrel"),             3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchg_relaxed"),            3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchg_failrelaxed"),        3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchg_failacq"),            3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchg_acq_failrelaxed"),    3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchg_acqrel_failrelaxed"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("__atomic_cxchgweak"),                    3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchgweak_acq"),                3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchgweak_rel"),                3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchgweak_acqrel"),             3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchgweak_relaxed"),            3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchgweak_failrelaxed"),        3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchgweak_failacq"),            3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchgweak_acq_failrelaxed"),    3, false, Expr_Expr},
-	{STR_LIT("__atomic_cxchgweak_acqrel_failrelaxed"), 3, false, Expr_Expr},
+	{STR_LIT("atomic_cxchgweak"),                    3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchgweak_acq"),                3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchgweak_rel"),                3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchgweak_acqrel"),             3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchgweak_relaxed"),            3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchgweak_failrelaxed"),        3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchgweak_failacq"),            3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchgweak_acq_failrelaxed"),    3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_cxchgweak_acqrel_failrelaxed"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 };
 
 
@@ -480,9 +487,8 @@ struct Checker {
 
 
 
-gb_global AstPackage *builtin_pkg   = nullptr;
-gb_global Scope *     builtin_scope = nullptr;
-
+gb_global AstPackage *builtin_pkg    = nullptr;
+gb_global AstPackage *intrinsics_pkg = nullptr;
 
 
 HashKey hash_node     (Ast *node)  { return hash_pointer(node); }
