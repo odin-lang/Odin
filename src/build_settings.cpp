@@ -590,12 +590,14 @@ void init_build_context(void) {
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
 
 	gbString opt_flags = gb_string_make_reserve(heap_allocator(), 64);
-	opt_flags = gb_string_append_fmt(opt_flags, "-O%d ", bc->optimization_level);
 	if (bc->optimization_level != 0) {
+		opt_flags = gb_string_append_fmt(opt_flags, "-O%d ", bc->optimization_level);
 		// NOTE(lachsinc): The following options were previously passed during call
 		// to opt in main.cpp:exec_llvm_opt().
 		//   -die:       Dead instruction elimination
 		//   -memcpyopt: MemCpy optimization
+	}
+	if (bc->ODIN_DEBUG == false) {
 		opt_flags = gb_string_appendc(opt_flags, "-memcpyopt -die ");
 	}
 
