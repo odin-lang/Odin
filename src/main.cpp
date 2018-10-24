@@ -665,9 +665,6 @@ i32 exec_llvm_opt(String output_base) {
 	// For more passes arguments: http://llvm.org/docs/Passes.html
 	return system_exec_command_line_app("llvm-opt", false,
 		"\"%.*sbin/opt\" \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
-		"-mem2reg "
-		"-memcpyopt "
-		"-die "
 		"",
 		LIT(build_context.ODIN_ROOT),
 		LIT(output_base), LIT(output_base),
@@ -677,9 +674,6 @@ i32 exec_llvm_opt(String output_base) {
 	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
 	return system_exec_command_line_app("llvm-opt", false,
 		"opt \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
-		"-mem2reg "
-		"-memcpyopt "
-		"-die "
 		"",
 		LIT(output_base), LIT(output_base),
 		LIT(build_context.opt_flags));
