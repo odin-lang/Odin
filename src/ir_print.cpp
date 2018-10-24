@@ -212,31 +212,24 @@ void ir_print_encoded_global(irFileBuffer *f, String name, bool remove_prefix) {
 }
 
 
-bool ir_print_debug_location(irFileBuffer *f, irModule *m, irValue *v, irProcedure *proc = nullptr) {
-#if 1
-	if (m->generate_debug_info && v != nullptr) {
-		TokenPos pos = v->loc.pos;
-		irDebugInfo *scope = v->loc.debug_scope;
-		i32 id = 0;
-		if (scope != nullptr) {
-			id = scope->id;
-		} else if (proc != nullptr) {
-			if (proc->debug_scope != nullptr) {
-				id = proc->debug_scope->id;
-				pos = proc->entity->token.pos;
-			}
-		}
-		if (id > 0 && pos.line > 0) {
-			ir_fprintf(f, ", !dbg !DILocation(line: %td, column: %td, scope: !%d)", pos.line, pos.column, id);
-			return true;
-		}
+bool ir_print_debug_location(irFileBuffer *f, irModule *m, irValue *v) {
+	if (!m->generate_debug_info) {
+		return false;
+	}
+
+	GB_ASSERT_NOT_NULL(v);
+	GB_ASSERT(v->kind == irValue_Instr);
+
+	if (v->loc != nullptr) {
+		GB_ASSERT(v->loc->kind == irDebugInfo_Location);
+		ir_fprintf(f, ", !dbg !%d", v->loc->id);
+		return true;
+	} else {
+		irProcedure *proc = v->Instr.block->proc;
+		GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
 	}
 	return false;
-#else
-	return true;
-#endif
 }
-
 
 void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct = false);
 void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hint);
@@ -517,6 +510,36 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		return;
 	}
 	}
+}
+
+void ir_print_debug_encoding(irFileBuffer *f, irDebugInfoKind kind, irDebugEncoding encoding) {
+	switch (kind) {
+	case irDebugInfo_BasicType:
+		switch (encoding) {
+		case irDebugBasicEncoding_address:       ir_write_str_lit(f, "DW_ATE_address");       return;
+		case irDebugBasicEncoding_boolean:       ir_write_str_lit(f, "DW_ATE_boolean");       return;
+		case irDebugBasicEncoding_float:         ir_write_str_lit(f, "DW_ATE_float");         return;
+		case irDebugBasicEncoding_signed:        ir_write_str_lit(f, "DW_ATE_signed");        return;
+		case irDebugBasicEncoding_signed_char:   ir_write_str_lit(f, "DW_ATE_signed_char");   return;
+		case irDebugBasicEncoding_unsigned:      ir_write_str_lit(f, "DW_ATE_unsigned");      return;
+		case irDebugBasicEncoding_unsigned_char: ir_write_str_lit(f, "DW_ATE_unsigned_char"); return;
+		}
+	case irDebugInfo_DerivedType:
+		switch (encoding) {
+		case irDebugBasicEncoding_member:       ir_write_str_lit(f, "DW_TAG_member");       return;
+		case irDebugBasicEncoding_pointer_type: ir_write_str_lit(f, "DW_TAG_pointer_type"); return;
+		case irDebugBasicEncoding_typedef:      ir_write_str_lit(f, "DW_TAG_typedef");      return;
+		}
+	case irDebugInfo_CompositeType:
+		switch (encoding) {
+		case irDebugBasicEncoding_array_type:       ir_write_str_lit(f, "DW_TAG_array_type");       return;
+		case irDebugBasicEncoding_enumeration_type: ir_write_str_lit(f, "DW_TAG_enumeration_type"); return;
+		case irDebugBasicEncoding_structure_type:   ir_write_str_lit(f, "DW_TAG_structure_type");   return;
+		case irDebugBasicEncoding_union_type:       ir_write_str_lit(f, "DW_TAG_union_type");       return;
+		}
+	}
+
+	GB_PANIC("Unreachable");
 }
 
 void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *type);
@@ -1755,7 +1778,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		case ProcInlining_inline:    ir_write_str_lit(f, " alwaysinline"); break;
 		case ProcInlining_no_inline: ir_write_str_lit(f, " noinline");     break;
 		}
-		ir_print_debug_location(f, m, value, instr->block->proc);
+		ir_print_debug_location(f, m, value);
 
 		break;
 	}
@@ -1782,22 +1805,22 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 		irInstrDebugDeclare *dd = &instr->DebugDeclare;
 		Type *vt = ir_type(dd->value);
-		irDebugInfo *di = dd->scope;
 		Entity *e = dd->entity;
 		String name = e->token.string;
 		TokenPos pos = e->token.pos;
 
+		irDebugInfo **lookup_di = map_get(&m->debug_info, hash_entity(e));
+		GB_ASSERT_NOT_NULL(*lookup_di);
+		irDebugInfo* local_var_di = *lookup_di;
+		
 		ir_write_str_lit(f, "call void @llvm.dbg.declare(");
 		ir_write_str_lit(f, "metadata ");
 		ir_print_type(f, m, vt);
 		ir_write_byte(f, ' ');
 		ir_print_value(f, m, dd->value, vt);
-		ir_write_str_lit(f, ", metadata !DILocalVariable(name: \"");
-		ir_print_escape_string(f, name, false, false);
-		ir_fprintf(f, "\", scope: !%d, line: %td)", di->id, pos.line);
-		ir_write_str_lit(f, ", metadata !DIExpression()");
-		ir_write_byte(f, ')');
-		ir_fprintf(f, ", !dbg !DILocation(line: %td, column: %td, scope: !%d)", pos.line, pos.column, di->id);
+		ir_fprintf(f, ", metadata !%d", local_var_di->id);
+		ir_write_str_lit(f, ", metadata !DIExpression())");
+		ir_print_debug_location(f, m, value);
 		break;
 	}
 	}
@@ -1913,7 +1936,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 		if (di_ != nullptr) {
 			irDebugInfo *di = *di_;
 			GB_ASSERT(di->kind == irDebugInfo_Proc);
-			ir_fprintf(f, "!dbg !%d ", di->id);
+			ir_fprintf(f, "!dbg !%d ", di->id); // TODO(lachsinc): !dbg
 		}
 	}
 
@@ -2033,7 +2056,7 @@ void print_llvm_ir(irGen *ir) {
 	ir_print_type(f, m, t_typeid);
 	ir_write_str_lit(f, "} ; Basic_any\n");
 
-	ir_write_str_lit(f, "declare void @llvm.dbg.declare(metadata, metadata, metadata) nounwind readnone \n");
+	ir_write_str_lit(f, "declare void @llvm.dbg.declare(metadata, metadata, metadata) #3 \n");
 	ir_write_byte(f, '\n');
 
 
@@ -2140,13 +2163,24 @@ void print_llvm_ir(irGen *ir) {
 			} else {
 				ir_write_string(f, str_lit("zeroinitializer"));
 			}
+			if (m->generate_debug_info) {
+				irDebugInfo **di_lookup = map_get(&m->debug_info, hash_entity(g->entity));
+				if (di_lookup != nullptr) {
+					irDebugInfo *di = *di_lookup;
+					GB_ASSERT(di);
+					GB_ASSERT(di->kind == irDebugInfo_GlobalVariableExpression);
+					ir_fprintf(f, ", !dbg !%d", di->id);
+				}
+			}
 		}
 		ir_write_byte(f, '\n');
 	}
 
+	// TODO(lachsinc): Attribute map inside ir module?
 	ir_fprintf(f, "attributes #0 = {nounwind uwtable}\n");
 	ir_fprintf(f, "attributes #1 = {nounwind alwaysinline uwtable}\n");
 	ir_fprintf(f, "attributes #2 = {nounwind noinline optnone uwtable}\n");
+	ir_fprintf(f, "attributes #3 = {nounwind readnone}\n");
 
 	if (m->generate_debug_info) {
 		ir_write_byte(f, '\n');
@@ -2178,16 +2212,17 @@ void print_llvm_ir(irGen *ir) {
 				              "language: DW_LANG_C_plus_plus" // Is this good enough?
 				            ", file: !%d"
 				            ", producer: \"Odin %.*s\""
-				            ", flags: \"\""
 				            ", runtimeVersion: 0"
 				            ", isOptimized: false"
 				            ", emissionKind: FullDebug"
-				            ", retainedTypes: !0"
-				            ", enums: !0"
-				            ", globals: !0"
+				            ", retainedTypes: !0" // TODO(lachsinc)
+				            ", enums: !%d"
+				            ", globals: !%d"
 				            ")",
-				            file->id, LIT(build_context.ODIN_VERSION));
-
+				            file->id,
+				            LIT(build_context.ODIN_VERSION),
+				            m->debug_compile_unit->CompileUnit.enums->id,
+				            m->debug_compile_unit->CompileUnit.globals->id);
 				break;
 			}
 			case irDebugInfo_File:
@@ -2197,29 +2232,205 @@ void print_llvm_ir(irGen *ir) {
 				ir_fprintf(f, ")");
 				break;
 			case irDebugInfo_Proc:
+				// TODO(lachsinc): We need to store scope info inside di, not just file info, for procs.
+				// Should all subprograms have distinct ??
 				ir_fprintf(f, "distinct !DISubprogram("
 				              "name: \"%.*s\""
 				            ", linkageName: \"%.*s\""
+				            ", scope: !%d"
 				            ", file: !%d"
 				            ", line: %td"
+				            ", scopeLine: %td"
 				            ", isDefinition: true"
-				            ", isLocal: true"
+				            ", isLocal: false" // TODO(lachsinc): Is this fine?
 				            ", flags: DIFlagPrototyped"
 				            ", isOptimized: false"
 				            ", unit: !%d"
-				            ")",
+				            ", type: !%d",
 				            LIT(di->Proc.entity->token.string),
 				            LIT(di->Proc.name),
-				            di->Proc.file->id, di->Proc.pos.line,
-				            m->debug_compile_unit->id);
+				            di->Proc.file->id, // TODO(lachsinc): HACK For now lets pretend all procs scope's == file.
+				            di->Proc.file->id,
+				            di->Proc.pos.line,
+				            di->Proc.pos.line, // NOTE(lachsinc): Assume scopeLine always same as line.
+				            m->debug_compile_unit->id,
+							di->Proc.type->id);
+				ir_write_byte(f, ')'); // !DISubprogram(
 				break;
+			case irDebugInfo_ProcType:
+				ir_fprintf(f, "!DISubroutineType(types: !%d)",
+				            di->ProcType.types->id);
+				break;
+			case irDebugInfo_Location:
+				GB_ASSERT_NOT_NULL(di->Location.scope);
+				ir_fprintf(f, "!DILocation("
+				              "line: %td"
+				            ", column: %td"
+				            ", scope: !%d)",
+				            di->Location.pos.line,
+				            di->Location.pos.column,
+				            di->Location.scope->id);
+				break;
+			case irDebugInfo_LexicalBlock:
+				GB_ASSERT_NOT_NULL(di->LexicalBlock.file);
+				GB_ASSERT_NOT_NULL(di->LexicalBlock.scope);
+				ir_fprintf(f, "distinct !DILexicalBlock("
+				              "line: %td"
+				            ", column: %td"
+				            ", file: !%d"
+				            ", scope: !%d)",
+				            di->LexicalBlock.pos.line,
+				            di->LexicalBlock.pos.column,
+				            di->LexicalBlock.file->id,
+				            di->LexicalBlock.scope->id);
+				break;
+			case irDebugInfo_GlobalVariableExpression: {
+				ir_fprintf(f, "!DIGlobalVariableExpression("
+				              "var: !%d"
+				            ", expr: !DIExpression(",
+				           di->GlobalVariableExpression.var->id);
+				if (di->GlobalVariableExpression.var->GlobalVariable.variable->Global.is_constant) {
+					ir_write_str_lit(f, "DW_OP_constu, ");
+					ir_print_value(f, m, di->GlobalVariable.variable, ir_type(di->GlobalVariable.variable));
+					ir_write_str_lit(f, ", DW_OP_stack_value");
+				} else {
+					// NOTE(lachsinc): non-const globals expect empty "!DIExpression()"
+				}
+				ir_write_byte(f, ')'); // !DIExpression(
+				ir_write_byte(f, ')'); // !DIGlobalVariableExpression(
+				break;
+			}
+			case irDebugInfo_GlobalVariable: {
+				ir_fprintf(f, "distinct !DIGlobalVariable("
+				              "name: \"%.*s\""
+				            ", scope: !%d"
+				            ", file: !%d"
+				            ", line: %d"
+				            ", type: !%d"
+				            ", isLocal: true"        // TODO(lachsinc): Check locality ??
+				            ", isDefinition: true)", // TODO(lachsinc): ??
+				            LIT(di->GlobalVariable.name),
+				            di->GlobalVariable.scope->id,
+				            di->GlobalVariable.file->id,
+				            di->GlobalVariable.pos.line,
+				            di->GlobalVariable.type->id);
+				break;
+			}
+			case irDebugInfo_LocalVariable: {
+				ir_fprintf(f, "!DILocalVariable("
+				              "scope: !%d"
+				            ", file: !%d"
+				            ", line: %d"
+				            ", type: !%d",
+				            di->LocalVariable.scope->id,
+				            di->LocalVariable.file->id,
+				            di->LocalVariable.pos.line,
+				            di->LocalVariable.type->id);
+				if (di->DerivedType.name.len > 0) {
+					ir_fprintf(f, ", name: \"%.*s\"", LIT(di->LocalVariable.name));
+				}
+				if (di->LocalVariable.arg > 0) {
+					ir_fprintf(f, ", arg: %d", di->LocalVariable.arg);
+				}
+				ir_write_byte(f, ')');
+				break;
+			}
+			case irDebugInfo_BasicType:
+				ir_fprintf(f, "!DIBasicType("
+				              "name: \"%.*s\""
+				            ", size: %d"
+				            ", encoding: ",
+				            LIT(di->BasicType.name),
+				            di->BasicType.size);
+				ir_print_debug_encoding(f, irDebugInfo_BasicType, di->BasicType.encoding);
+				ir_write_byte(f, ')');
+				break;
+			case irDebugInfo_DerivedType: {
+				if (di->DerivedType.tag == irDebugBasicEncoding_member) {
+					// NOTE(lachsinc): We crash llvm super hard if we don't specify a name :)
+					GB_ASSERT(di->DerivedType.name.len > 0);
+				}
+				ir_write_str_lit(f, "!DIDerivedType(tag: ");
+				ir_print_debug_encoding(f, irDebugInfo_DerivedType, di->DerivedType.tag);
+				if (di->DerivedType.name.len > 0) {
+					ir_fprintf(f, ", name: \"%.*s\"", LIT(di->DerivedType.name));
+				}
+				if (di->DerivedType.base_type != nullptr) {
+					ir_fprintf(f, ", baseType: !%d", di->DerivedType.base_type->id);
+				} else {
+					ir_write_str_lit(f, ", baseType: null"); // Valid/required for rawptr
+				}
+				if (di->DerivedType.size > 0)   ir_fprintf(f, ", size: %d", di->DerivedType.size);
+				if (di->DerivedType.align > 0)  ir_fprintf(f, ", align: %d", di->DerivedType.align);
+				if (di->DerivedType.offset > 0) ir_fprintf(f, ", offset: %d", di->DerivedType.offset);
+				if (di->DerivedType.flags > 0) {
+					// TODO(lachsinc): Handle in a more generic manner.
+					if (di->DerivedType.flags & irDebugInfoFlag_Bitfield) ir_write_str_lit(f, ", flags: DIFlagBitField, extraData: i64 0");
+				}
+				ir_write_byte(f, ')');
+				break;
+			}
+			case irDebugInfo_CompositeType: {
+				if (di->CompositeType.tag == irDebugBasicEncoding_array_type) {
+					GB_ASSERT_NOT_NULL(di->CompositeType.base_type);
+					GB_ASSERT(di->CompositeType.array_count > 0);
+					GB_ASSERT(di->CompositeType.name.len == 0);
+					GB_ASSERT(di->CompositeType.size > 0);
+				}
 
-			case irDebugInfo_AllProcs:
+				if (di->CompositeType.tag == irDebugBasicEncoding_union_type) {
+					GB_ASSERT_NOT_NULL(di->CompositeType.file); // Union _requires_ file to be valid.
+				}
+
+				ir_write_str_lit(f, "!DICompositeType(tag: ");
+				ir_print_debug_encoding(f, irDebugInfo_CompositeType, di->CompositeType.tag);
+				if (di->CompositeType.name.len > 0) {
+					ir_fprintf(f, ", name: \"%.*s\"", LIT(di->CompositeType.name));
+				}
+				if (di->CompositeType.scope != nullptr) {
+					ir_fprintf(f, ", scope: !%d", di->CompositeType.scope->id);
+				}
+				if (di->CompositeType.file != nullptr) {
+					ir_fprintf(f, ", file: !%d"
+					              ", line: %td",
+					              di->CompositeType.file->id,
+					              di->CompositeType.pos.line);
+				}
+				if (di->CompositeType.size > 0)  ir_fprintf(f, ", size: %d", di->CompositeType.size);
+				if (di->CompositeType.align > 0) ir_fprintf(f, ", align: %d", di->CompositeType.align);
+				if (di->CompositeType.base_type != nullptr) {
+					GB_ASSERT(di->CompositeType.tag != irDebugBasicEncoding_structure_type);
+					GB_ASSERT(di->CompositeType.tag != irDebugBasicEncoding_union_type);
+					ir_fprintf(f, ", baseType: !%d", di->CompositeType.base_type->id);
+				}
+				if (di->CompositeType.tag == irDebugBasicEncoding_array_type) {
+					ir_fprintf(f, ", elements: !{!DISubrange(count: %d)}", di->CompositeType.array_count);
+				} else {
+					if (di->CompositeType.elements != nullptr) {
+						ir_fprintf(f, ", elements: !%d", di->CompositeType.elements->id);
+					}
+				}
+				ir_write_byte(f, ')');
+				break;
+			}
+			case irDebugInfo_Enumerator: {
+				ir_fprintf(f, "!DIEnumerator("
+				              "name: \"%.*s\""
+				            ", value: %lld)",
+				            LIT(di->Enumerator.name),
+				            di->Enumerator.value);
+				break;
+			}
+			case irDebugInfo_DebugInfoArray:
 				ir_fprintf(f, "!{");
-				for_array(proc_index, di->AllProcs.procs) {
-					irDebugInfo *p = di->AllProcs.procs[proc_index];
-					if (proc_index > 0) {ir_fprintf(f, ",");}
-					ir_fprintf(f, "!%d", p->id);
+				for_array(element_index, di->DebugInfoArray.elements) {
+					irDebugInfo *elem = di->DebugInfoArray.elements[element_index];
+					if (element_index > 0) ir_write_str_lit(f, ", ");
+					if (elem != nullptr) {
+						ir_fprintf(f, "!%d", elem->id);
+					} else {
+						ir_fprintf(f, "null"); // NOTE(lachsinc): Proc's can contain "nullptr" entries to represent void return values.
+					}
 				}
 				ir_write_byte(f, '}');
 				break;

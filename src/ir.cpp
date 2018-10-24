@@ -26,6 +26,7 @@ struct irModule {
 	Map<irValue *>        anonymous_proc_lits; // Key: Ast *
 
 	irDebugInfo *         debug_compile_unit;
+	Array<irDebugInfo *>  debug_location_stack; 
 
 
 	i32                   global_string_index;
@@ -108,11 +109,6 @@ struct irBranchBlocks {
 	irBlock *continue_;
 };
 
-
-struct irDebugLocation {
-	TokenPos     pos;
-	irDebugInfo *debug_scope;
-};
 
 struct irContextData {
 	irValue *value;
@@ -271,8 +267,7 @@ gbAllocator ir_allocator(void) {
 	})                                                                \
 	IR_INSTR_KIND(StartupRuntime, i32)                                \
 	IR_INSTR_KIND(DebugDeclare, struct {                              \
-		irDebugInfo *scope;                                           \
-		Ast *    expr;                                            \
+		Ast *        expr;                                            \
 		Entity *     entity;                                          \
 		bool         is_addr;                                         \
 		irValue *    value;                                           \
@@ -438,7 +433,7 @@ struct irValue {
 	irValueKind     kind;
 	i32             index;
 	bool            index_set;
-	irDebugLocation loc;
+	irDebugInfo *   loc;
 	union {
 		irValueConstant      Constant;
 		irValueConstantSlice ConstantSlice;
@@ -526,6 +521,9 @@ enum irDebugEncoding {
 	irDebugBasicEncoding_unsigned      = 6,
 	irDebugBasicEncoding_unsigned_char = 7,
 
+	// TODO(lachsinc): Should the following be renamed from basic -> tag to mirror their DW_TAG_*
+	// counterparts? Perhaps separate out if they truly have different meaning.
+
 	irDebugBasicEncoding_member       = 13,
 	irDebugBasicEncoding_pointer_type = 15,
 	irDebugBasicEncoding_typedef      = 22,
@@ -534,7 +532,10 @@ enum irDebugEncoding {
 	irDebugBasicEncoding_enumeration_type = 4,
 	irDebugBasicEncoding_structure_type   = 19,
 	irDebugBasicEncoding_union_type       = 23,
+};
 
+enum irDebugInfoFlags {
+	irDebugInfoFlag_Bitfield = (1 << 19),
 };
 
 enum irDebugInfoKind {
@@ -542,18 +543,21 @@ enum irDebugInfoKind {
 
 	irDebugInfo_CompileUnit,
 	irDebugInfo_File,
-	irDebugInfo_Scope,
 	irDebugInfo_Proc,
+	irDebugInfo_ProcType,
+	irDebugInfo_Location,
+	irDebugInfo_LexicalBlock,
 	irDebugInfo_AllProcs,
 
-	irDebugInfo_BasicType,      // basic types
-	irDebugInfo_ProcType,
-	irDebugInfo_DerivedType,    // pointer, typedef
-	irDebugInfo_CompositeType,  // array, struct, enum, (raw_)union
+	irDebugInfo_BasicType,      // primitive types
+	irDebugInfo_DerivedType,    // pointer, distinct etc.
+	irDebugInfo_CompositeType,  // array, struct, enum, union etc.
 	irDebugInfo_Enumerator,     // For irDebugInfo_CompositeType if enum
+	irDebugInfo_GlobalVariableExpression, // used to describe if global is const or not
 	irDebugInfo_GlobalVariable,
 	irDebugInfo_LocalVariable,
 
+	irDebugInfo_DebugInfoArray, // array of irDebugInfo *'s
 
 	irDebugInfo_Count,
 };
@@ -566,7 +570,8 @@ struct irDebugInfo {
 		struct {
 			AstFile *    file;
 			String       producer;
-			irDebugInfo *all_procs;
+			irDebugInfo *enums;   // DebugInfoArray
+			irDebugInfo *globals; // DebugInfoArray
 		} CompileUnit;
 		struct {
 			AstFile *file;
@@ -574,21 +579,26 @@ struct irDebugInfo {
 			String   directory;
 		} File;
 		struct {
-			irDebugInfo *parent;
-			irDebugInfo *file;
-			TokenPos     pos;
-			Scope *      scope; // Actual scope
-		} Scope;
-		struct {
-			Entity *     entity;
-			String       name;
-			irDebugInfo *file;
-			TokenPos     pos;
+			Entity *      entity;
+			String        name;
+			irDebugInfo * file;
+			TokenPos      pos;
+			irDebugInfo * type;
+			// TODO(lachsinc): variables / retainedNodes ?
 		} Proc;
 		struct {
-			Array<irDebugInfo *> procs;
-		} AllProcs;
-
+			irDebugInfo * types; // !{return, return, param, param, param.. etc.}
+		} ProcType;
+		struct {
+			TokenPos     pos;
+			irDebugInfo *scope;
+		} Location;
+		struct {
+			TokenPos     pos;
+			irDebugInfo *file;
+			irDebugInfo *scope;
+		} LexicalBlock;
+		
 		struct {
 			String          name;
 			i32             size;
@@ -596,35 +606,44 @@ struct irDebugInfo {
 			irDebugEncoding encoding;
 		} BasicType;
 		struct {
-			irDebugInfo *        return_type;
-			Array<irDebugInfo *> param_types;
-		} ProcType;
-		struct {
-			irDebugInfo *   base_type;
-			irDebugEncoding encoding;
+			irDebugEncoding  tag;
+			irDebugInfo *    base_type;
+			String           name;
+			irDebugInfo *    scope;
+			irDebugInfo *    file;
+			TokenPos         pos;
+			i32              size;
+			i32              align;
+			i32              offset;
+			irDebugInfoFlags flags; // Used only for DIFlagBitField.
 		} DerivedType;
 		struct {
-			irDebugEncoding      encoding;
-			String               name;
-			String               identifier;
-			irDebugInfo *        file;
-			TokenPos             pos;
-			i32                  size;
-			i32                  align;
-			Array<irDebugInfo *> elements;
+			irDebugEncoding tag;
+			String          name;
+			irDebugInfo *   scope;
+			irDebugInfo *   file;
+			TokenPos        pos;
+			irDebugInfo *   base_type; // optional, used for enumeration_type.
+			i32             size;
+			i32             align;
+			irDebugInfo *   elements;
+			i32             array_count; // for DISubrange
 		} CompositeType;
 		struct {
 			String name;
 			i64    value;
 		} Enumerator;
 		struct {
+			irDebugInfo *var;
+		} GlobalVariableExpression;
+		struct {
 			String       name;
 			String       linkage_name;
 			irDebugInfo *scope;
 			irDebugInfo *file;
 			TokenPos     pos;
+			irDebugInfo *type;
 			irValue     *variable;
-			irDebugInfo *declaration;
 		} GlobalVariable;
 		struct {
 			String       name;
@@ -634,6 +653,9 @@ struct irDebugInfo {
 			i32          arg; // Non-zero if proc parameter
 			irDebugInfo *type;
 		} LocalVariable;
+		struct {
+			Array<irDebugInfo *> elements; // TODO(lachsinc): Leak?
+		} DebugInfoArray;
 	};
 };
 
@@ -821,8 +843,12 @@ irAddr   ir_build_addr          (irProcedure *proc, Ast *expr);
 void     ir_build_proc          (irValue *value, irProcedure *parent);
 void     ir_gen_global_type_name(irModule *m, Entity *e, String name);
 irValue *ir_get_type_info_ptr   (irProcedure *proc, Type *type);
-
-
+void     ir_value_set_debug_location(irProcedure *proc, irValue *v);
+void     ir_push_debug_location (irModule *m, Ast *node, irDebugInfo *scope);
+void     ir_pop_debug_location  (irModule *m);
+irDebugInfo *ir_add_debug_info_local(irProcedure *proc, Entity *e, i32 arg_id);
+irDebugInfo *ir_add_debug_info_file(irModule *module, AstFile *file);
+irDebugInfo *ir_add_debug_info_proc(irProcedure *proc);
 
 
 irValue *ir_alloc_value(irValueKind kind) {
@@ -1190,15 +1216,13 @@ irValue *ir_instr_comment(irProcedure *p, String text) {
 	return v;
 }
 
-irValue *ir_instr_debug_declare(irProcedure *p, irDebugInfo *scope, Ast *expr, Entity *entity, bool is_addr, irValue *value) {
+irValue *ir_instr_debug_declare(irProcedure *p, Ast *expr, Entity *entity, bool is_addr, irValue *value) {
 	irValue *v = ir_alloc_instr(p, irInstr_DebugDeclare);
-	v->Instr.DebugDeclare.scope      = scope;
 	v->Instr.DebugDeclare.expr       = expr;
 	v->Instr.DebugDeclare.entity     = entity;
 	v->Instr.DebugDeclare.is_addr    = is_addr;
 	v->Instr.DebugDeclare.value      = value;
 	return v;
-
 }
 
 
@@ -1222,6 +1246,7 @@ irValue *ir_value_constant_slice(Type *type, irValue *backing_array, i64 count) 
 
 irValue *ir_emit(irProcedure *proc, irValue *instr) {
 	GB_ASSERT(instr->kind == irValue_Instr);
+	irModule *m = proc->module;
 	irBlock *b = proc->curr_block;
 	instr->Instr.block = b;
 	if (b != nullptr) {
@@ -1231,6 +1256,9 @@ irValue *ir_emit(irProcedure *proc, irValue *instr) {
 		}
 	} else if (instr->Instr.kind != irInstr_Unreachable) {
 		GB_PANIC("ir_emit: Instruction missing parent block");
+	}
+	if (m->generate_debug_info) {
+		ir_value_set_debug_location(proc, instr);
 	}
 	return instr;
 }
@@ -1470,7 +1498,7 @@ void ir_push_context_onto_stack(irProcedure *proc, irValue *ctx) {
 	array_add(&proc->context_stack, cd);
 }
 
-irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initialized) {
+irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initialized, i32 param_index = 0) {
 	irBlock *b = proc->decl_block; // all variables must be in the first block
 	irValue *instr = ir_instr_local(proc, e, true);
 	instr->Instr.block = b;
@@ -1482,9 +1510,15 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initial
 		ir_emit_zero_init(proc, instr, expr);
 	}
 
-	if (expr != nullptr && proc->entity != nullptr) {
-		irDebugInfo *di = *map_get(&proc->module->debug_info, hash_entity(proc->entity));
-		ir_emit(proc, ir_instr_debug_declare(proc, di, expr, e, true, instr));
+	// if (proc->module->generate_debug_info && expr != nullptr && proc->entity != nullptr) {
+	if (proc->module->generate_debug_info && proc->entity != nullptr) {
+		// GB_ASSERT_NOT_NULL(proc->debug_scope);
+		if (expr != nullptr) {
+			ir_emit(proc, ir_instr_debug_declare(proc, expr, e, true, instr));
+		}
+		if (e->scope != nullptr && proc->debug_scope != nullptr) {
+			irDebugInfo *di_local = ir_add_debug_info_local(proc, e, param_index);
+		}
 	}
 
 	return instr;
@@ -1549,13 +1583,16 @@ irValue *ir_add_global_generated(irModule *m, Type *type, irValue *value) {
 }
 
 
-irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type) {
+irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type, i32 index) {
 	irValue *v = ir_value_param(proc, e, abi_type);
 	irValueParam *p = &v->Param;
 
+	ir_push_debug_location(proc->module, e ? e->identifier : nullptr, proc->debug_scope);
+	defer (ir_pop_debug_location(proc->module));
+
 	switch (p->kind) {
 	case irParamPass_Value: {
-		irValue *l = ir_add_local(proc, e, expr, false);
+		irValue *l = ir_add_local(proc, e, expr, false, index);
 		irValue *x = v;
 		if (abi_type == t_llvm_bool) {
 			x = ir_emit_conv(proc, x, t_bool);
@@ -1568,7 +1605,7 @@ irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type) {
 		return ir_emit_load(proc, v);
 
 	case irParamPass_Integer: {
-		irValue *l = ir_add_local(proc, e, expr, false);
+		irValue *l = ir_add_local(proc, e, expr, false, index);
 		irValue *iptr = ir_emit_conv(proc, l, alloc_type_pointer(p->type));
 		ir_emit_store(proc, iptr, v);
 		return ir_emit_load(proc, l);
@@ -1591,10 +1628,25 @@ irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type) {
 //
 ////////////////////////////////////////////////////////////////
 
-irDebugInfo *ir_add_debug_info_file(irProcedure *proc, AstFile *file) {
+irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irDebugInfo *scope, irDebugInfo *file);
+
+irDebugInfo *ir_add_debug_info_array(irModule *module, isize count, isize capacity) {
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DebugInfoArray);
+	array_init(&di->DebugInfoArray.elements, ir_allocator(), count, capacity);
+	map_set(&module->debug_info, hash_pointer(di), di);
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_file(irModule *module, AstFile *file) {
 	// if (!proc->module->generate_debug_info) {
 	// 	return nullptr;
 	// }
+
+	irDebugInfo **existing = map_get(&module->debug_info, hash_ast_file(file));
+	if (existing != nullptr) {
+		GB_ASSERT((*existing)->kind == irDebugInfo_File);
+		return *existing;
+	}
 
 	GB_ASSERT(file != nullptr);
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_File);
@@ -1618,27 +1670,941 @@ irDebugInfo *ir_add_debug_info_file(irProcedure *proc, AstFile *file) {
 	di->File.filename = filename;
 	di->File.directory = directory;
 
-	map_set(&proc->module->debug_info, hash_ast_file(file), di);
+	map_set(&module->debug_info, hash_ast_file(file), di);
 	return di;
 }
 
+irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
+	switch (kind) {
+	case Basic_llvm_bool:
+	case Basic_bool:
+	case Basic_b8:
+	case Basic_b16:
+	case Basic_b32:
+	case Basic_b64:
+		return irDebugBasicEncoding_boolean;
 
-irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String name, irDebugInfo *file) {
-	// if (!proc->module->generate_debug_info) {
-	// 	return nullptr;
-	// }
+	case Basic_i8:
+		return irDebugBasicEncoding_signed_char;
 
-	GB_ASSERT(entity != nullptr);
+	case Basic_u8:
+		return irDebugBasicEncoding_unsigned_char;
+
+	case Basic_i16:
+	case Basic_i32:
+	case Basic_i64: 
+	case Basic_int:
+	case Basic_rune:
+	case Basic_typeid:
+		return irDebugBasicEncoding_signed;
+
+	case Basic_u16:
+	case Basic_u32:
+	case Basic_u64:
+	case Basic_uint:
+	case Basic_uintptr:
+		return irDebugBasicEncoding_unsigned;
+
+	// case Basic_f16:
+	case Basic_f32:
+	case Basic_f64:
+		return irDebugBasicEncoding_float;
+
+	// case Basic_complex32:
+	case Basic_complex64:
+	case Basic_complex128: 
+	case Basic_cstring:
+	case Basic_string:
+	case Basic_any:
+	case Basic_rawptr:
+		break; // not a "DIBasicType"
+	}
+
+	GB_PANIC("Unreachable");
+	return irDebugBasicEncoding_Invalid;
+}
+
+i32 ir_debug_info_bits(i64 size) {
+	return 8*cast(i32)size;
+}
+
+i32 ir_debug_size_bits(Type *type) {
+	return ir_debug_info_bits(type_size_of(type));
+}
+
+i32 ir_debug_align_bits(Type *type) {
+	return ir_debug_info_bits(type_align_of(type));
+}
+
+irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Type *type, i32 offset_bits, Entity *e, irDebugInfo *scope) {
+	// NOTE(lachsinc): Caller is expected to insert the returned value into map themselves.
+	// "scope", if set, should be inserted into map prior to calling to ensure no cyclical dependency issues.
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+	di->DerivedType.name = name;
+	di->DerivedType.tag = irDebugBasicEncoding_member;
+	di->DerivedType.size = ir_debug_size_bits(type);
+	di->DerivedType.offset = offset_bits;
+	di->DerivedType.scope = scope;
+
+	// NOTE(lachsinc): It is "safe" to overwrite this base_type after a call to this function,
+	// if you need to set a specific type for this field.
+	di->DerivedType.base_type = ir_add_debug_info_type(module, type, e, scope, nullptr);
+	GB_ASSERT_NOT_NULL(di->DerivedType.base_type);
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_field(irModule *module, irDebugInfo *scope, Entity *e, Type *scope_type, i32 index, Type *type, irDebugInfo *file) {
+	// NOTE(lachsinc): This lookup will only work for struct fields!!
+	if (e) {
+		irDebugInfo **existing = map_get(&module->debug_info, hash_entity(e));
+		if (existing != nullptr) {
+			return *existing;
+		}
+	}
+
+	irDebugInfo *di = ir_add_debug_info_field_internal(module, make_string(nullptr, 0), type, 0, e, scope);
+	void *ptr_to_hash = nullptr;
+	if (scope_type) {
+		Type *scope_base = base_type(scope_type);
+		if (is_type_struct(scope_type) || is_type_tuple(scope_type)) {
+			if (is_type_struct(scope_type) && scope_base->Struct.are_offsets_set) {
+				di->DerivedType.offset = ir_debug_info_bits(scope_base->Struct.offsets[index]);
+			} else if (is_type_tuple(scope_type) && scope_base->Tuple.are_offsets_set) {
+				di->DerivedType.offset = ir_debug_info_bits(scope_base->Tuple.offsets[index]);
+			} else {
+				di->DerivedType.offset = ir_debug_info_bits(type_offset_of(scope_base, index));
+			}
+			if (e) {
+				ptr_to_hash = e;
+				di->DerivedType.name = e->token.string;
+				if (e->token.string.len == 0) {
+					// If no name available for field, use its field index as its name.
+					isize max_len = 8;
+					u8 *str = cast(u8 *)gb_alloc_array(heap_allocator(), u8, max_len);
+					isize len = gb_snprintf(cast(char *)str, 8, "%d", index);
+					di->DerivedType.name = make_string(str, len-1);
+				}
+				di->DerivedType.pos = e->token.pos;
+			} else {
+				GB_PANIC("Unreachable"); // struct field Entity's should be provided.
+			}
+		} else if (is_type_union(scope_base)) {
+			// TODO(lachsinc): Handle this in a more generic manner/pass in??...
+			// Token token = base_type(scope_base)->Union.node->UnionType.token;
+			// di->DerivedType.name = token.string;
+			// di->DerivedType.pos = token.pos;
+			if (is_type_named(type)) {
+				di->DerivedType.name = type->kind == Type_Named ? type->Named.name : type->Basic.name;
+			}
+			ptr_to_hash = di;
+		}
+	}
+
+	di->DerivedType.file = file;
+
+	GB_ASSERT_NOT_NULL(ptr_to_hash);
+	map_set(&module->debug_info, hash_pointer(ptr_to_hash), di);
+
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_enumerator(irModule *module, Entity *e) {
+	irDebugInfo **existing = map_get(&module->debug_info, hash_entity(e));
+	if (existing != nullptr) {
+		return *existing;
+	}
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Enumerator);
+	di->Enumerator.name = e->token.string;
+	GB_ASSERT(e->kind == Entity_Constant);
+	GB_ASSERT(e->Constant.value.kind == ExactValue_Integer);
+	di->Enumerator.value = big_int_to_i64(&e->Constant.value.value_integer);
+
+	map_set(&module->debug_info, hash_entity(e), di);
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_type_dynamic_array(irModule *module, Type *type, Entity *e, irDebugInfo *scope, irDebugInfo *file) {
+	GB_ASSERT(type->kind == Type_DynamicArray);
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+	di->CompositeType.name = str_lit("dynamic_array"); // TODO(lachsinc): [dynamic] .. type->DynamicArray.elem name
+	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+	di->CompositeType.size = ir_debug_size_bits(t_rawptr) +
+	                         ir_debug_size_bits(t_int) +
+	                         ir_debug_size_bits(t_int) +
+	                         ir_debug_size_bits(t_allocator);
+	di->CompositeType.align = ir_debug_align_bits(t_rawptr);
+	map_set(&module->debug_info, hash_type(type), di);
+
+	// Data pointer type
+	// TODO(lachsinc): Perhaps lookup/alloc-a-fake Type_Pointer type and go via ir_add_debug_info_type() with it.
+	irDebugInfo *data_ptr_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+	data_ptr_di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
+	data_ptr_di->DerivedType.size = ir_debug_size_bits(t_rawptr);
+	map_set(&module->debug_info, hash_pointer(data_ptr_di), data_ptr_di);
+	data_ptr_di->DerivedType.base_type = ir_add_debug_info_type(module, type->DynamicArray.elem, e, scope, file);
+
+	irDebugInfo *data_di = ir_add_debug_info_field_internal(module, str_lit("data"), t_rawptr,
+	                                                        0,
+	                                                        nullptr,
+	                                                        di);
+	data_di->DerivedType.base_type = data_ptr_di;
+	map_set(&module->debug_info, hash_pointer(data_di), data_di);
+
+	irDebugInfo *len_di = ir_add_debug_info_field_internal(module, str_lit("len"), t_int,
+	                                                       data_di->DerivedType.size,
+	                                                       nullptr,
+	                                                       di);
+	map_set(&module->debug_info, hash_pointer(len_di), len_di);
+
+	irDebugInfo *cap_di = ir_add_debug_info_field_internal(module, str_lit("cap"), t_int,
+	                                                       data_di->DerivedType.size +
+	                                                       len_di->DerivedType.size,
+	                                                       nullptr,
+	                                                       di);
+	map_set(&module->debug_info, hash_pointer(cap_di), cap_di);
+
+	irDebugInfo *alloc_di = ir_add_debug_info_field_internal(module, str_lit("allocator"), t_allocator,
+	                                                         data_di->DerivedType.size +
+	                                                         len_di->DerivedType.size +
+	                                                         cap_di->DerivedType.size,
+	                                                         nullptr,
+	                                                         di);
+	map_set(&module->debug_info, hash_pointer(alloc_di), alloc_di);
+
+	irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 4);
+	array_add(&elements_di->DebugInfoArray.elements, data_di);
+	array_add(&elements_di->DebugInfoArray.elements, len_di);
+	array_add(&elements_di->DebugInfoArray.elements, cap_di);
+	array_add(&elements_di->DebugInfoArray.elements, alloc_di);
+	di->CompositeType.elements = elements_di;
+	map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_type_bit_field(irModule *module, Type *type, Entity *e, irDebugInfo *scope) {
+	GB_ASSERT(type->kind == Type_BitField || (type->kind == Type_Named && type->Named.base->kind == Type_BitField));
+
+	Type *bf_type = base_type(type);
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+	di->CompositeType.name = is_type_named(type) ? type->Named.name : str_lit("bit_field");
+	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+	di->CompositeType.size = ir_debug_size_bits(bf_type);
+	map_set(&module->debug_info, hash_type(type), di);
+
+	GB_ASSERT(bf_type->BitField.fields.count == bf_type->BitField.offsets.count &&
+	          bf_type->BitField.fields.count == bf_type->BitField.sizes.count);
+
+	irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, bf_type->BitField.fields.count);
+	di->CompositeType.elements = elements_di;
+	map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+	for_array(field_index, bf_type->BitField.fields) {
+		Entity *field = bf_type->BitField.fields[field_index];
+		u32 offset    = bf_type->BitField.offsets[field_index];
+		u32 size      = bf_type->BitField.sizes[field_index];
+		String name = str_lit("field_todo");
+		if (field != nullptr && field->token.string.len > 0) {
+			name = field->token.string;
+		}
+		// TODO(lachsinc): t_i64 may not be safe to use for all bitfields?
+		irDebugInfo *field_di = ir_add_debug_info_field_internal(module, name, t_i64,
+		                                                         0,
+		                                                         nullptr,
+		                                                         di);
+		// NOTE(lachsinc): Above calls BitFieldValues type_size_of() which returns size in bits, 
+		// replace with its true bit value here..
+		field_di->DerivedType.size = size;
+		field_di->DerivedType.offset = offset; // Offset stored in bits already, no need to convert
+		field_di->DerivedType.flags = irDebugInfoFlag_Bitfield;
+		map_set(&module->debug_info, hash_pointer(field_di), field_di);
+		array_add(&elements_di->DebugInfoArray.elements, field_di);
+	}
+
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_type_bit_set(irModule *module, Type *type, Entity *e, irDebugInfo *scope) {
+	GB_ASSERT(type->kind == Type_BitSet || type->kind == Type_Named);
+
+	Type *base = base_type(type);
+
+	Type *named = nullptr;
+	if (type->kind == Type_Named) {
+		named = type;
+	}
+
+	Type *elem_type = nullptr;
+	if (base->BitSet.elem != nullptr) {
+		// TODO(lachsinc): Do bitsets have integration with non-primitive types other than enums?
+		elem_type = base->BitSet.elem;
+		if (elem_type->kind == Type_Enum) {
+			GB_ASSERT(elem_type->Enum.fields.count == base->BitSet.upper + 1);
+		}
+	}
+	
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+	di->CompositeType.name = named != nullptr ? named->Named.name : str_lit("bit_set");
+	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+	di->CompositeType.size = ir_debug_size_bits(base);
+	map_set(&module->debug_info, hash_type(type), di);
+
+	irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, base->BitSet.upper + 1);
+	di->CompositeType.elements = elements_di;
+	map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+	for (i64 i = 0; i <= base->BitSet.upper; ++i) {
+		u32 offset = cast(u32)i;
+		// TODO(lachsinc): Maybe name these fields numbered ascending?
+		String name = str_lit("field_todo");
+		if (elem_type != nullptr && is_type_enum(elem_type)) {
+			name = base_type(elem_type)->Enum.fields[i]->token.string;
+		}
+		irDebugInfo *field_di = ir_add_debug_info_field_internal(module, name, t_u32, // TODO(lachsinc): u32 fine??
+		                                                         0,
+		                                                         nullptr,
+		                                                         di);
+		field_di->DerivedType.size   = 1;
+		field_di->DerivedType.offset = offset; // Offset stored in bits already, no need to convert
+		field_di->DerivedType.flags  = irDebugInfoFlag_Bitfield;
+		map_set(&module->debug_info, hash_pointer(field_di), field_di);
+		array_add(&elements_di->DebugInfoArray.elements, field_di);
+	}
+	
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_type_string(irModule *module, irDebugInfo *scope, Entity *e, Type *type) {
+	// TODO(lachsinc): Does this only occur once ??
+	irDebugInfo **existing = map_get(&module->debug_info, hash_type(t_string));
+	if (existing != nullptr) {
+		GB_ASSERT((*existing)->kind == irDebugInfo_CompositeType);
+		return *existing;
+	} else {
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		di->CompositeType.name = type->Basic.name;
+		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+		di->CompositeType.size = ir_debug_size_bits(t_string);
+		di->CompositeType.align = ir_debug_align_bits(t_string);
+
+		map_set(&module->debug_info, hash_type(type), di);
+
+		// Field "data"
+		irDebugInfo *data_di = ir_add_debug_info_field_internal(module, str_lit("data"), t_cstring,
+		                                                        0,
+		                                                        nullptr,
+		                                                        di);
+		map_set(&module->debug_info, hash_pointer(data_di), data_di);
+
+		// Field "len"
+		irDebugInfo *len_di = ir_add_debug_info_field_internal(module, str_lit("len"), t_i64,
+		                                                       data_di->DerivedType.size,
+		                                                       nullptr,
+		                                                       di);
+		map_set(&module->debug_info, hash_pointer(len_di), len_di);
+
+		irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 2);
+		array_add(&elements_di->DebugInfoArray.elements, data_di);
+		array_add(&elements_di->DebugInfoArray.elements, len_di);
+		di->CompositeType.elements = elements_di;
+		map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+		return di;
+	}
+}
+
+irDebugInfo *ir_add_debug_info_type_any(irModule *module) {
+	irDebugInfo **existing = map_get(&module->debug_info, hash_type(t_any));
+	if (existing != nullptr) {
+		GB_ASSERT((*existing)->kind == irDebugInfo_CompositeType);
+		return *existing;
+	} else {
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		di->CompositeType.name = t_any->Basic.name;
+		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+		di->CompositeType.size = ir_debug_size_bits(t_any);
+		di->CompositeType.align = ir_debug_align_bits(t_any);
+
+		map_set(&module->debug_info, hash_type(t_any), di);
+
+		// Field "data"
+		irDebugInfo *data_di = ir_add_debug_info_field_internal(module, str_lit("data"), t_rawptr,
+		                                                        0,
+		                                                        nullptr,
+		                                                        di);
+		map_set(&module->debug_info, hash_pointer(data_di), data_di);
+
+		// Field "id"
+		irDebugInfo *id_di = ir_add_debug_info_field_internal(module, str_lit("id"), t_typeid,
+		                                                      data_di->DerivedType.size,
+		                                                      nullptr,
+		                                                      di);
+		map_set(&module->debug_info, hash_pointer(id_di), id_di);
+
+		irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 2);
+		array_add(&elements_di->DebugInfoArray.elements, data_di);
+		array_add(&elements_di->DebugInfoArray.elements, id_di);
+		di->CompositeType.elements = elements_di;
+		map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+		return di;
+	}
+}
+
+irDebugInfo *ir_add_debug_info_type_complex(irModule *module, Type *type) {
+	GB_ASSERT(type->kind == Type_Basic && is_type_complex(type));
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+	map_set(&module->debug_info, hash_type(type), di);
+
+	di->CompositeType.name = type->Basic.name;
+	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+	di->CompositeType.size = ir_debug_size_bits(type);
+	
+	Type *field_type = nullptr;
+	if (type->Basic.kind == Basic_complex64) {
+		field_type = t_f32;
+	} else if (type->Basic.kind == Basic_complex128) {
+		field_type = t_f64;
+	} else {
+		GB_PANIC("Unreachable");
+	}
+
+	// Field "real"
+	irDebugInfo *real_di = ir_add_debug_info_field_internal(module, str_lit("real"), field_type,
+															0,
+															nullptr,
+															di);
+	map_set(&module->debug_info, hash_pointer(real_di), real_di);
+
+	// Field "imag"
+	irDebugInfo *imag_di = ir_add_debug_info_field_internal(module, str_lit("imag"), field_type,
+															real_di->DerivedType.size,
+															nullptr,
+															di);
+	map_set(&module->debug_info, hash_pointer(imag_di), imag_di);
+
+	irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 2);
+	array_add(&elements_di->DebugInfoArray.elements, real_di);
+	array_add(&elements_di->DebugInfoArray.elements, imag_di);
+	di->CompositeType.elements = elements_di;
+	map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_proc_type(irModule *module, Type *type) {
+	GB_ASSERT(type->kind == Type_Proc);
+
+	irDebugInfo **existing = map_get(&module->debug_info, hash_type(type));
+	if (existing != nullptr) {
+		GB_ASSERT((*existing)->kind == irDebugInfo_ProcType);
+		return *existing;
+	}
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_ProcType);
+	map_set(&module->debug_info, hash_type(type), di);
+
+	isize result_count = type->Proc.result_count;
+	isize param_count = type->Proc.param_count;
+	// gb_max(result_count, 1) because llvm expects explicit "null" return type
+	di->ProcType.types = ir_add_debug_info_array(module, 0, gb_max(result_count, 1) + param_count);
+
+	// Result/return types
+	if (result_count >= 1) {
+		TypeTuple *results_tuple = &type->Proc.results->Tuple;
+		for_array(i, results_tuple->variables) {
+			Entity *e = results_tuple->variables[i];
+			if (e->kind != Entity_Variable) {
+				continue;
+			}
+
+			irDebugInfo *type_di = ir_add_debug_info_type(module, e->type, e, nullptr, nullptr);
+			GB_ASSERT_NOT_NULL(type_di);
+			array_add(&di->ProcType.types->DebugInfoArray.elements, type_di);
+		}
+	} else {
+		// llvm expects "!{null}" for a function without return type, use nullptr to represent it.
+		array_add(&di->ProcType.types->DebugInfoArray.elements, (irDebugInfo*)nullptr);
+	}
+
+	// Param types
+	if (param_count >= 1) {
+		TypeTuple *params_tuple = &type->Proc.params->Tuple;
+		for_array(i, params_tuple->variables) {
+			Entity *e = params_tuple->variables[i];
+			if (e->kind != Entity_Variable) {
+				continue;
+			}
+
+			irDebugInfo *type_di = ir_add_debug_info_type(module, e->type, e, nullptr, nullptr);
+			GB_ASSERT_NOT_NULL(type_di);
+			array_add(&di->ProcType.types->DebugInfoArray.elements, type_di);
+		}
+	}
+
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irDebugInfo *scope, irDebugInfo *file) {
+	// NOTE(lachsinc): Special handling for procedure pointers - we hash their types directly into DISubroutineType's
+	// but we need them interpreted as pointers when we use them as variables.
+	if (type->kind == Type_Proc) {
+		if (e->kind == Entity_Variable || e->kind == Entity_TypeName) {
+			// TODO(lachsinc): Wasteful (maybe?). Create a derived type for _every_ different proc ptr type
+			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+			map_set(&module->debug_info, hash_pointer(di), di);
+			di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
+			di->DerivedType.size = ir_debug_size_bits(t_rawptr);
+			di->DerivedType.base_type = ir_add_debug_info_proc_type(module, type);
+			return di;
+		} else {
+			GB_PANIC("Proc definitions should have their type created manually (not through this function)");
+		}
+	}
+
+	irDebugInfo **existing = map_get(&module->debug_info, hash_type(type));
+	if (existing != nullptr) {
+		return *existing;
+	}
+
+	// Reset entity/location info, if applicable, for every type we try add.
+	// TODO(lachsinc): Confirm this doesn't mess up field's scopes etc.
+	if (type->kind == Type_Named) {
+		e = type->Named.type_name;
+		if (e) {
+			CheckerInfo *info = module->info;
+			file = ir_add_debug_info_file(module, ast_file_of_filename(info, e->token.pos.file));
+			// TODO(lachsinc): Determine proper scope for type declaration location stuff.
+			scope = file;
+		}
+	}
+
+	// TODO(lachsinc): Reorder if tests, "unique" types, like basic etc. should go last, they are most likely to hit the existing hashed type
+	// and no point checking them for the rest of the types. Or just use a massive switch...
+
+	// NOTE(lachsinc): Types should be inserted into debug_info map as their named, not base_type()'d counterparts.
+	Type *base = base_type(type);
+
+	if (type->kind == Type_Named) {
+		Type *named_base = type->Named.base;
+		// TODO(lachsinc): Better way to determine distinct etc. or just handle structs, enums before we reach here.
+		// ir_is_type_aggregate() except with no call to base_type().
+		if (named_base->kind != Type_Struct &&
+			named_base->kind != Type_Union &&
+			named_base->kind != Type_Enum &&
+			named_base->kind != Type_BitField &&
+			named_base->kind != Type_Tuple) {
+			// distinct / typedef etc.
+			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+			if (type->kind == Type_Named) {
+				di->DerivedType.name = type->Named.name;
+			} else if (named_base->kind == Type_Basic) {
+				di->DerivedType.name = named_base->Basic.name;
+			}
+			di->DerivedType.tag = irDebugBasicEncoding_typedef;
+			map_set(&module->debug_info, hash_type(type), di);
+			// TODO(lachsinc): Do we need to try and resolve a new entity/scope for the base type?
+			// Maybe we also want to pull out type->Named.type_name ?? in the case it is a Named
+			di->DerivedType.base_type = ir_add_debug_info_type(module, named_base, e, scope, file);
+			return di;
+		}
+	}
+
+	if (type->kind == Type_Basic) {
+		switch (type->Basic.kind) {
+		// Composite basic types
+		case Basic_complex64:
+		case Basic_complex128: return ir_add_debug_info_type_complex(module, type);
+		case Basic_string:     return ir_add_debug_info_type_string(module, scope, e, type);
+		case Basic_any:        return ir_add_debug_info_type_any(module);
+
+		// Derived basic types
+		case Basic_cstring:
+		case Basic_rawptr: {
+			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+			di->DerivedType.name = type->Basic.name;
+			di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
+			di->DerivedType.size = ir_debug_size_bits(t_rawptr);
+			di->DerivedType.align = ir_debug_align_bits(t_rawptr); // TODO(lachsinc): Not sure if align is required.
+			map_set(&module->debug_info, hash_type(type), di);
+			if (type->Basic.kind == Basic_cstring) {
+				di->DerivedType.base_type = ir_add_debug_info_type(module, t_i8, e, scope, file);
+			} else {
+				// NOTE(lachsinc): llvm expects "null" for rawptr/voidptr
+			}
+			return di;
+		}
+
+		// Basic basic types
+		default: {
+			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_BasicType);
+			di->BasicType.encoding = ir_debug_encoding_for_basic(type->Basic.kind);
+			di->BasicType.name = type->Basic.name;
+			di->BasicType.size = ir_debug_size_bits(type);
+			di->BasicType.align = ir_debug_align_bits(type);
+			map_set(&module->debug_info, hash_type(type), di);
+			return di;
+		}
+		}
+	}
+
+	if (is_type_pointer(type)) {
+		// TODO(lachsinc): Ensure this handles pointer-to-pointer of same type etc. correctly.
+		Type *deref = type_deref(base);
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+		di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
+		di->DerivedType.size = ir_debug_size_bits(type);
+		// NOTE(lachsinc): Map set before creating base_type to avoid circular dependency issues.
+		map_set(&module->debug_info, hash_type(type), di);
+		if (is_type_struct(deref)) {
+			int i = 123;
+		}
+		di->DerivedType.base_type = ir_add_debug_info_type(module, deref, e, scope, file);
+		return di;
+	}
+
+	if (is_type_struct(type) || is_type_union(type) || is_type_enum(type) || is_type_tuple(type)) {
+		if (type->kind == Type_Named) {
+			// NOTE(lachsinc): Named named's should always be handled prior as typedefs.
+			GB_ASSERT(type->Named.base->kind != Type_Named);
+		}
+
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		// NOTE(lachsinc): Set map value before resolving field types to avoid circular dependencies.
+		map_set(&module->debug_info, hash_type(type), di);
+		if (is_type_named(type)) {
+			di->CompositeType.name = type->kind == Type_Named ? type->Named.name : type->Basic.name;
+		}
+		if (e) {
+			di->CompositeType.file = file;
+			di->CompositeType.scope = scope;
+			di->CompositeType.pos = e->token.pos;
+		}
+		di->CompositeType.size = ir_debug_size_bits(type);
+		// di->CompositeType.align = ir_debug_align_bits(type); // TODO(lachsinc): Necessary?
+
+		if (is_type_struct(type)) {
+			GB_ASSERT(base->kind == Type_Struct);
+			if (!is_type_named(type)) {
+				di->CompositeType.name = str_lit("struct");
+				GB_ASSERT_NOT_NULL(scope);
+				di->CompositeType.scope = scope;
+			}
+			di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Struct.fields.count);
+			for_array(field_index, base->Struct.fields) {
+				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
+				          ir_add_debug_info_field(module, di, base->Struct.fields[field_index], type,
+				                                  cast(i32)field_index, base->Struct.fields[field_index]->type, file));
+			}
+		} else if (is_type_union(type)) {
+			GB_ASSERT(base->kind == Type_Union);
+			if (!is_type_named(type)) {
+				di->CompositeType.name = str_lit("union");
+				GB_ASSERT_NOT_NULL(scope);
+				di->CompositeType.scope = scope;
+			}
+			di->CompositeType.tag = irDebugBasicEncoding_union_type;
+			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Union.variants.count);
+			// TODO(lachsinc): Cleanup; this should be handled in a more generic manner for all types.
+			file = ir_add_debug_info_file(module, base->Union.node->file);
+			GB_ASSERT_NOT_NULL(file); // Union debug info requires file info
+			di->CompositeType.file = file;
+			di->CompositeType.pos = base->Union.node->UnionType.token.pos;
+			for_array(field_index, base->Union.variants) {
+				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
+				          ir_add_debug_info_field(module, di, nullptr, type, cast(i32)field_index,
+				                                  base->Union.variants[field_index], file));
+			}
+		} else if (is_type_enum(type)) {
+			GB_ASSERT(base->kind == Type_Enum);
+			if (!is_type_named(type)) {
+				di->CompositeType.name = str_lit("enum");
+				GB_ASSERT_NOT_NULL(scope);
+				di->CompositeType.scope = scope;
+			}
+			di->CompositeType.tag = irDebugBasicEncoding_enumeration_type;
+			di->CompositeType.base_type = ir_add_debug_info_type(module, base->Enum.base_type, e, scope, file);
+			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Enum.fields.count);
+			for_array(field_index, base->Enum.fields) {
+				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
+				          ir_add_debug_info_enumerator(module, base->Enum.fields[field_index]));
+			}
+
+			// TODO(lachsinc): Do we want to ensure this is an enum in the global scope before
+			// adding it into the modules enum array ??
+			array_add(&module->debug_compile_unit->CompileUnit.enums->DebugInfoArray.elements, di);
+		} else if (is_type_tuple(type)) {
+			GB_ASSERT(base->kind == Type_Tuple);
+			if (!is_type_named(type)) {
+				di->CompositeType.name = str_lit("tuple");
+				GB_ASSERT_NOT_NULL(scope);
+				di->CompositeType.scope = scope;
+			}
+			di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+			di->CompositeType.elements = ir_add_debug_info_array(module, 0, base->Tuple.variables.count);
+			// TODO(lachsinc): Ensure offsets are set properly?
+			for_array(var_index, base->Tuple.variables) {
+				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
+				          ir_add_debug_info_field(module, di, base->Tuple.variables[var_index], type,
+				                                  cast(i32)var_index, base->Tuple.variables[var_index]->type, file));
+			}
+		}
+
+		return di;
+	}
+
+	if (is_type_dynamic_array(type)) {
+		return ir_add_debug_info_type_dynamic_array(module, type, e, scope, file);
+	}
+
+	if (is_type_array(type)) {
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		di->CompositeType.size = ir_debug_size_bits(type);
+		di->CompositeType.align = ir_debug_align_bits(type);
+		di->CompositeType.tag = irDebugBasicEncoding_array_type;
+		di->CompositeType.array_count = (i32)type->Array.count;
+
+		map_set(&module->debug_info, hash_type(type), di);
+		di->CompositeType.base_type = ir_add_debug_info_type(module, type->Array.elem, e, scope, file);
+		GB_ASSERT(base->kind != Type_Named);
+
+		return di;
+	}
+
+	if (is_type_slice(type)) {
+		// NOTE(lachsinc): Every slice type has its own composite type / field debug infos created. This is sorta wasteful.
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		di->CompositeType.name = str_lit("slice");
+		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+		di->CompositeType.size = ir_debug_size_bits(type); // TODO(lachsinc): Correct ??
+		di->CompositeType.align = ir_debug_align_bits(type);
+		map_set(&module->debug_info, hash_type(type), di);
+
+		// Data pointer type
+		irDebugInfo *data_ptr_di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+		Type *elem_type = type->Slice.elem;
+		if (is_type_named(elem_type)) {
+			data_ptr_di->DerivedType.name = elem_type->kind == Type_Named ? elem_type->Named.name : elem_type->Basic.name;
+		}
+		data_ptr_di->DerivedType.tag = irDebugBasicEncoding_pointer_type;
+		data_ptr_di->DerivedType.size = ir_debug_size_bits(t_rawptr);
+		map_set(&module->debug_info, hash_pointer(data_ptr_di), data_ptr_di);
+		data_ptr_di->DerivedType.base_type = ir_add_debug_info_type(module, elem_type, e, scope, file);
+
+		irDebugInfo *data_di = ir_add_debug_info_field_internal(module, str_lit("data"), t_rawptr,
+		                                                        0,
+		                                                        nullptr,
+		                                                        di);
+		data_di->DerivedType.base_type = data_ptr_di;
+		map_set(&module->debug_info, hash_pointer(data_di), data_di);
+
+		irDebugInfo *len_di = ir_add_debug_info_field_internal(module, str_lit("len"), t_int,
+		                                                       data_di->DerivedType.size,
+		                                                       nullptr,
+		                                                       di);
+		map_set(&module->debug_info, hash_pointer(len_di), len_di);
+
+		irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 2);
+		array_add(&elements_di->DebugInfoArray.elements, data_di);
+		array_add(&elements_di->DebugInfoArray.elements, len_di);
+		di->CompositeType.elements = elements_di;
+		map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+		return di;
+	}
+
+	if (is_type_map(type)) {
+		// TODO(lachsinc): Looks like "generated_struct_type" map.entries.data is just a u8*, we could
+		// always look at the map header and create the debug info manually (if we 
+		// want struct members to be interpreted as the correct type).
+		// Also; are hashes meant to be interpreted as bool*'s ?? or is that simply slot occupied data?
+		return ir_add_debug_info_type(module, type->Map.generated_struct_type, e, scope, file);
+	}
+
+	// NOTE(lachsinc): For now we just interpret all BitFieldValues as i64 inside ir_add_debug_info_type_bit_field().
+	/*
+	if (is_type_bit_field_value(type)) {
+		// NOTE(Lachsinc): Suboptimal; creates a new type for each unique bit field value type
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_BasicType);
+		di->BasicType.encoding = irDebugBasicEncoding_unsigned;
+		// di->BasicType.name = str_lit("todo");
+		di->BasicType.size = base->BitFieldValue.bits; 
+		map_set(&module->debug_info, hash_type(type), di);
+		return di;
+	}
+	*/
+
+	if (is_type_bit_field(type)) {
+		return ir_add_debug_info_type_bit_field(module, type, e, scope);
+	}
+
+	if (is_type_bit_set(type)) {
+		return ir_add_debug_info_type_bit_set(module, type, e, scope);
+	}
+
+	GB_PANIC("Unreachable");
+	return nullptr;
+}
+
+irDebugInfo *ir_add_debug_info_global(irModule *module, irValue *v) {
+	if (!module->generate_debug_info) {
+		return nullptr;
+	}
+
+	Entity *e = v->Global.entity;
+
+	// NOTE(lachsinc): Just to be safe/robust; globals are likely added once only?
+	irDebugInfo **existing = map_get(&module->debug_info, hash_entity(e));
+	if (existing != nullptr) {
+		return *existing;
+	}
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_GlobalVariableExpression);
+	map_set(&module->debug_info, hash_entity(e), di);
+
+	// Create or fetch file debug info.
+	CheckerInfo *info = module->info;
+	String filename = e->token.pos.file;
+	AstFile *f = ast_file_of_filename(info, filename);
+	GB_ASSERT_NOT_NULL(f);
+	irDebugInfo *scope = ir_add_debug_info_file(module, f);
+
+	irDebugInfo *var_di = ir_alloc_debug_info(irDebugInfo_GlobalVariable);
+	var_di->GlobalVariable.name = e->token.string;
+	var_di->GlobalVariable.scope = scope;
+	var_di->GlobalVariable.file = scope;
+	var_di->GlobalVariable.pos = e->token.pos;
+	var_di->GlobalVariable.variable = v;
+
+	// NOTE(lachsinc): The "DIGlobalVariableExpression" owns us, and is what we refer to from other
+	// locations in the ir source, so we will reserve the "e" hash for it, and use something else
+	// unique for the DIGlobalVariable's hash.
+	map_set(&module->debug_info, hash_pointer(var_di), var_di);
+
+	var_di->GlobalVariable.type = ir_add_debug_info_type(module, e->type, nullptr, nullptr, nullptr);
+	GB_ASSERT_NOT_NULL(var_di->GlobalVariable.type);
+
+	di->GlobalVariableExpression.var = var_di;
+
+	array_add(&module->debug_compile_unit->CompileUnit.globals->DebugInfoArray.elements, di);
+
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_block(irProcedure *proc, Scope *scope) {
+	irModule *module = proc->module;
+
+	irDebugInfo **existing = map_get(&module->debug_info, hash_pointer(scope));
+	if (existing != nullptr) {
+		GB_ASSERT((*existing)->kind == irDebugInfo_LexicalBlock);
+		return *existing;
+	}
+
+	Ast *block = scope->node;
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_LexicalBlock);
+	di->LexicalBlock.file = proc->debug_scope->Proc.file;
+	di->LexicalBlock.scope = proc->debug_scope;
+	di->LexicalBlock.pos = ast_token(block).pos;
+	map_set(&module->debug_info, hash_pointer(scope), di);
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_local(irProcedure *proc, Entity *e, i32 arg_id) {
+	// TODO(lachsinc): Not sure if this handles generated locals properly as they may not have
+	// enough information contained inside "e".
+
+	irModule *module = proc->module;
+	if (!module->generate_debug_info) {
+		return nullptr;
+	}
+
+	irDebugInfo *scope = nullptr;
+	irDebugInfo *file = nullptr;
+	if (e->scope && e->scope->node->kind == Ast_ProcType) {
+		scope = proc->debug_scope;
+		file = proc->debug_scope->Proc.file;
+	} else {
+		scope = ir_add_debug_info_block(proc, e->scope);
+		file = scope->LexicalBlock.file;
+	}
+	GB_ASSERT_NOT_NULL(scope);
+	GB_ASSERT_NOT_NULL(file);
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_LocalVariable);
+	di->LocalVariable.name = e->token.string;
+	di->LocalVariable.scope = scope;
+	di->LocalVariable.file = file;
+	di->LocalVariable.pos = e->token.pos;
+	di->LocalVariable.arg = arg_id;
+	di->LocalVariable.type = ir_add_debug_info_type(module, e->type, e, scope, file); // TODO(lachsinc): Is this the correct entity to pass? Or do we want a TypeName ??
+	
+	map_set(&module->debug_info, hash_entity(e), di);
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_proc(irProcedure *proc) {
+	irModule *module = proc->module;
+	if (!module->generate_debug_info) {
+		return nullptr;
+	}
+
+	Entity *entity = proc->entity;
+
+	// Add / retrieve debug info for file.
+	CheckerInfo *info = proc->module->info;
+	String filename = proc->entity->token.pos.file;
+	AstFile *f = ast_file_of_filename(info, filename);
+	irDebugInfo *file = nullptr; 
+	if (f) {
+		file = ir_add_debug_info_file(proc->module, f);
+	}
+	// TODO(lachsinc): Should scope be made separate to file?
+	irDebugInfo *scope = file; 
+
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Proc);
+	map_set(&proc->module->debug_info, hash_entity(entity), di);
 	di->Proc.entity = entity;
-	di->Proc.name = name;
+	di->Proc.name = proc->name;
 	di->Proc.file = file;
 	di->Proc.pos = entity->token.pos;
+	di->Proc.type = ir_add_debug_info_proc_type(proc->module, proc->type);
 
 	proc->debug_scope = di;
-
-	map_set(&proc->module->debug_info, hash_entity(entity), di);
 	return di;
+}
+
+irDebugInfo *ir_add_debug_info_location(irModule *m, Ast *node, irDebugInfo *scope) {
+	if (node == nullptr || scope == nullptr) {
+		return nullptr;
+	}
+	// TODO(lachsinc): Should we traverse the node/children until we find one with
+	// valid token/pos and use that instead??
+	irDebugInfo **existing = map_get(&m->debug_info, hash_node(node));
+	if (existing != nullptr) {
+		return *existing;
+	}
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Location);
+	di->Location.pos = ast_token(node).pos; 
+	di->Location.scope = scope;
+	map_set(&m->debug_info, hash_node(node), di);
+	return di;
+}
+
+void ir_push_debug_location(irModule *m, Ast *node, irDebugInfo *scope) {
+	irDebugInfo *debug_location = ir_add_debug_info_location(m, node, scope);
+	array_add(&m->debug_location_stack, debug_location);
+}
+
+void ir_pop_debug_location(irModule *m) {
+	GB_ASSERT_MSG(m->debug_location_stack.count > 0, "Attempt to pop debug location stack too many times");
+	array_pop(&m->debug_location_stack);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -1647,7 +2613,7 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 //
 ////////////////////////////////////////////////////////////////
 
-irValue *ir_emit_runtime_call (irProcedure *proc,                            char const *name_, Array<irValue *> args, Ast *expr = nullptr);
+irValue *ir_emit_runtime_call(irProcedure *proc,                            char const *name_, Array<irValue *> args, Ast *expr = nullptr);
 irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char const *name_, Array<irValue *> args, Ast *expr = nullptr);
 
 
@@ -1677,10 +2643,20 @@ irValue *ir_emit_select(irProcedure *p, irValue *cond, irValue *t, irValue *f) {
 	return ir_emit(p, ir_instr_select(p, cond, t, f));
 }
 
-void ir_add_debug_location_to_value(irProcedure *proc, irValue *v, Ast *e) {
-	if (v != nullptr && e != nullptr) {
-		v->loc.debug_scope = proc->debug_scope;
-		v->loc.pos = ast_token(e).pos;
+void ir_value_set_debug_location(irProcedure *proc, irValue *v) {
+	GB_ASSERT_NOT_NULL(proc);
+	GB_ASSERT_NOT_NULL(v);
+
+	if (v->loc != nullptr) {
+		return; // Already set
+	}
+
+	irModule *m = proc->module;
+	GB_ASSERT(m->debug_location_stack.count > 0);
+	v->loc = *array_end_ptr(&m->debug_location_stack);
+	if (v->loc == nullptr) {
+		// NOTE(lachsinc): Entry point (main()) and runtime_startup are the only ones where null location is considered valid.
+		GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
 	}
 }
 
@@ -1836,7 +2812,6 @@ irValue *ir_emit_runtime_call(irProcedure *proc, char const *name_, Array<irValu
 	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
 	irValue *gp = *found;
 	irValue *call = ir_emit_call(proc, gp, args);
-	ir_add_debug_location_to_value(proc, call, expr);
 	return call;
 }
 irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char const *name_, Array<irValue *> args, Ast *expr) {
@@ -1849,7 +2824,6 @@ irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char
 	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
 	irValue *gp = *found;
 	irValue *call = ir_emit_call(proc, gp, args);
-	ir_add_debug_location_to_value(proc, call, expr);
 	return call;
 }
 
@@ -4892,12 +5866,13 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr);
 
 irValue *ir_build_expr(irProcedure *proc, Ast *expr) {
 	irValue *v = ir_build_expr_internal(proc, expr);
-	ir_add_debug_location_to_value(proc, v, expr);
 	return v;
 }
 
 irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 	expr = unparen_expr(expr);
+	// ir_push_debug_location(proc->module, expr, proc->debug_scope);
+	// defer (ir_pop_debug_location(proc->module));
 
 	TypeAndValue tv = type_and_value_of_expr(expr);
 	GB_ASSERT(tv.mode != Addressing_Invalid);
@@ -6488,7 +7463,9 @@ void ir_build_stmt(irProcedure *proc, Ast *node) {
 		proc->module->stmt_state_flags = out;
 	}
 
+	ir_push_debug_location(proc->module, node, proc->debug_scope);
 	ir_build_stmt_internal(proc, node);
+	ir_pop_debug_location(proc->module);
 
 	proc->module->stmt_state_flags = prev_stmt_state_flags;
 }
@@ -7558,6 +8535,19 @@ void ir_begin_procedure_body(irProcedure *proc) {
 		}
 	}
 
+	// NOTE(lachsinc): This is somewhat of a fallback/catch-all; We use the procedure's identifer as a debug location..
+	// Additional debug locations should be pushed for the procedures statements/expressions themselves.
+	if (proc->module->generate_debug_info && proc->entity && proc->entity->identifier) { // TODO(lachsinc): Better way to determine if these procs are main/runtime_startup.
+		// TODO(lachsinc): Passing the file for the scope may not be correct for nested procedures? This should probably be
+		// handled all inside push_debug_location, with just the Ast * we can pull out everything we need to construct scope/file debug info etc.
+		ir_add_debug_info_proc(proc); 
+		ir_push_debug_location(proc->module, proc->entity->identifier, proc->debug_scope);
+		GB_ASSERT_NOT_NULL(proc->debug_scope);
+	} else {
+		// GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
+		ir_push_debug_location(proc->module, nullptr, nullptr);
+	}
+
 	proc->decl_block  = ir_new_block(proc, proc->type_expr, "decls");
 	ir_start_block(proc, proc->decl_block);
 	proc->entry_block = ir_new_block(proc, proc->type_expr, "entry");
@@ -7603,7 +8593,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 
 				Type *abi_type = proc->type->Proc.abi_compat_params[i];
 				if (e->token.string != "" && !is_blank_ident(e->token)) {
-					irValue *param = ir_add_param(proc, e, name, abi_type);
+					irValue *param = ir_add_param(proc, e, name, abi_type, cast(i32)(i+1));
 					array_add(&proc->params, param);
 				}
 			}
@@ -7620,7 +8610,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 					abi_type = abi_types[i];
 				}
 				if (e->token.string != "" && !is_blank_ident(e->token)) {
-					irValue *param = ir_add_param(proc, e, nullptr, abi_type);
+					irValue *param = ir_add_param(proc, e, nullptr, abi_type, cast(i32)(i+1));
 					array_add(&proc->params, param);
 				}
 			}
@@ -7685,6 +8675,8 @@ void ir_end_procedure_body(irProcedure *proc) {
 	proc->curr_block = nullptr;
 
 	ir_number_proc_registers(proc);
+
+	ir_pop_debug_location(proc->module);
 }
 
 
@@ -7700,29 +8692,6 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 	irProcedure *proc = &value->Proc;
 
 	proc->parent = parent;
-
-	if (proc->entity != nullptr) {
-		irModule *m = proc->module;
-		CheckerInfo *info = m->info;
-		Entity *e = proc->entity;
-		String filename = e->token.pos.file;
-		AstFile *f = ast_file_of_filename(info, filename);
-
-		proc->is_export = e->Procedure.is_export;
-		proc->is_foreign = e->Procedure.is_foreign;
-
-		irDebugInfo *di_file = nullptr;
-
-		irDebugInfo **di_file_found = map_get(&m->debug_info, hash_ast_file(f));
-		if (di_file_found) {
-			di_file = *di_file_found;
-			GB_ASSERT(di_file->kind == irDebugInfo_File);
-		} else {
-			di_file = ir_add_debug_info_file(proc, f);
-		}
-
-		ir_add_debug_info_proc(proc, e, proc->name, di_file);
-	}
 
 	if (proc->body != nullptr) {
 		u64 prev_stmt_state_flags = proc->module->stmt_state_flags;
@@ -7748,6 +8717,8 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 		proc->module->stmt_state_flags = prev_stmt_state_flags;
 	}
 
+	// NOTE(lachsinc): For now we pop the debug location inside ir_end_procedure_body(). 
+	// This may result in debug info being missing for below.
 
 	if (proc->type->Proc.has_proc_default_values) {
 		auto *p = &proc->type->Proc;
@@ -7797,6 +8768,12 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 
 void ir_module_add_value(irModule *m, Entity *e, irValue *v) {
 	map_set(&m->values, hash_entity(e), v);
+	// TODO(lachsinc): This may not be the most sensible place to do this!
+	// it may be more sensible to look for more specific locations that call ir_value_global and assign it a value? maybe?
+	// ir_value_global itself doesn't have access to module though.
+	if (v->kind == irValue_Global && v->Global.value != nullptr && e->state == EntityState_Resolved) {
+		ir_add_debug_info_global(m, v);
+	}
 }
 
 void ir_init_module(irModule *m, Checker *c) {
@@ -7917,6 +8894,18 @@ void ir_init_module(irModule *m, Checker *c) {
 		map_set(&m->debug_info, hash_pointer(m), di);
 
 		m->debug_compile_unit = di;
+
+		irDebugInfo *enums_di = ir_alloc_debug_info(irDebugInfo_DebugInfoArray);
+		array_init(&enums_di->DebugInfoArray.elements, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
+		map_set(&m->debug_info, hash_pointer(enums_di), enums_di);
+		m->debug_compile_unit->CompileUnit.enums = enums_di;
+
+		irDebugInfo *globals_di = ir_alloc_debug_info(irDebugInfo_DebugInfoArray);
+		array_init(&globals_di->DebugInfoArray.elements, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
+		map_set(&m->debug_info, hash_pointer(globals_di), globals_di);
+		m->debug_compile_unit->CompileUnit.globals = globals_di;
+
+		array_init(&m->debug_location_stack, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
 	}
 }
 
@@ -7930,6 +8919,7 @@ void ir_destroy_module(irModule *m) {
 	array_free(&m->procs);
 	array_free(&m->procs_to_generate);
 	array_free(&m->foreign_library_paths);
+	array_free(&m->debug_location_stack);
 	gb_arena_free(&m->tmp_arena);
 }
 
@@ -8687,27 +9677,6 @@ void ir_gen_tree(irGen *s) {
 
 	irDebugInfo *compile_unit = m->debug_info.entries[0].value;
 	GB_ASSERT(compile_unit->kind == irDebugInfo_CompileUnit);
-	irDebugInfo *all_procs = ir_alloc_debug_info(irDebugInfo_AllProcs);
-
-	isize all_proc_max_count = 0;
-	for_array(i, m->debug_info.entries) {
-		irDebugInfo *di = m->debug_info.entries[i].value;
-		if (di->kind == irDebugInfo_Proc) {
-			all_proc_max_count++;
-		}
-	}
-
-	array_init(&all_procs->AllProcs.procs, ir_allocator(), 0, all_proc_max_count);
-	map_set(&m->debug_info, hash_pointer(all_procs), all_procs); // NOTE(bill): This doesn't need to be mapped
-	compile_unit->CompileUnit.all_procs = all_procs;
-
-
-	for_array(i, m->debug_info.entries) {
-		irDebugInfo *di = m->debug_info.entries[i].value;
-		if (di->kind == irDebugInfo_Proc) {
-			array_add(&all_procs->AllProcs.procs, di);
-		}
-	}
 
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -9007,6 +9976,8 @@ void ir_gen_tree(irGen *s) {
 		irValue *p = m->procs_to_generate[i];
 		ir_build_proc(p, p->Proc.parent);
 	}
+
+	GB_ASSERT_MSG(m->debug_location_stack.count == 0, "Debug location stack contains unpopped entries.");
 
 	// Number debug info
 	for_array(i, m->debug_info.entries) {
