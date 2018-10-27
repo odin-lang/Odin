@@ -26,7 +26,7 @@ struct irModule {
 	Map<irValue *>        anonymous_proc_lits; // Key: Ast *
 
 	irDebugInfo *         debug_compile_unit;
-	Array<irDebugInfo *>  debug_location_stack; 
+	Array<irDebugInfo *>  debug_location_stack;
 
 
 	i32                   global_string_index;
@@ -598,7 +598,7 @@ struct irDebugInfo {
 			irDebugInfo *file;
 			irDebugInfo *scope;
 		} LexicalBlock;
-		
+
 		struct {
 			String          name;
 			i32             size;
@@ -658,6 +658,8 @@ struct irDebugInfo {
 		} DebugInfoArray;
 	};
 };
+
+static irDebugInfo IR_DEBUG_INFO_EMPTY = {};
 
 
 struct irGen {
@@ -1692,7 +1694,7 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 
 	case Basic_i16:
 	case Basic_i32:
-	case Basic_i64: 
+	case Basic_i64:
 	case Basic_int:
 	case Basic_rune:
 	case Basic_typeid:
@@ -1712,7 +1714,7 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 
 	// case Basic_complex32:
 	case Basic_complex64:
-	case Basic_complex128: 
+	case Basic_complex128:
 	case Basic_cstring:
 	case Basic_string:
 	case Basic_any:
@@ -1916,7 +1918,7 @@ irDebugInfo *ir_add_debug_info_type_bit_field(irModule *module, Type *type, Enti
 		                                                         0,
 		                                                         nullptr,
 		                                                         di);
-		// NOTE(lachsinc): Above calls BitFieldValues type_size_of() which returns size in bits, 
+		// NOTE(lachsinc): Above calls BitFieldValues type_size_of() which returns size in bits,
 		// replace with its true bit value here..
 		field_di->DerivedType.size = size;
 		field_di->DerivedType.offset = offset; // Offset stored in bits already, no need to convert
@@ -1946,7 +1948,7 @@ irDebugInfo *ir_add_debug_info_type_bit_set(irModule *module, Type *type, Entity
 			GB_ASSERT(elem_type->Enum.fields.count == base->BitSet.upper + 1);
 		}
 	}
-	
+
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
 	di->CompositeType.name = named != nullptr ? named->Named.name : str_lit("bit_set");
 	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
@@ -1974,7 +1976,7 @@ irDebugInfo *ir_add_debug_info_type_bit_set(irModule *module, Type *type, Entity
 		map_set(&module->debug_info, hash_pointer(field_di), field_di);
 		array_add(&elements_di->DebugInfoArray.elements, field_di);
 	}
-	
+
 	return di;
 }
 
@@ -2064,7 +2066,7 @@ irDebugInfo *ir_add_debug_info_type_complex(irModule *module, Type *type) {
 	di->CompositeType.name = type->Basic.name;
 	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
 	di->CompositeType.size = ir_debug_size_bits(type);
-	
+
 	Type *field_type = nullptr;
 	if (type->Basic.kind == Basic_complex64) {
 		field_type = t_f32;
@@ -2421,7 +2423,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 
 	if (is_type_map(type)) {
 		// TODO(lachsinc): Looks like "generated_struct_type" map.entries.data is just a u8*, we could
-		// always look at the map header and create the debug info manually (if we 
+		// always look at the map header and create the debug info manually (if we
 		// want struct members to be interpreted as the correct type).
 		// Also; are hashes meant to be interpreted as bool*'s ?? or is that simply slot occupied data?
 		return ir_add_debug_info_type(module, type->Map.generated_struct_type, e, scope, file);
@@ -2434,7 +2436,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_BasicType);
 		di->BasicType.encoding = irDebugBasicEncoding_unsigned;
 		// di->BasicType.name = str_lit("todo");
-		di->BasicType.size = base->BitFieldValue.bits; 
+		di->BasicType.size = base->BitFieldValue.bits;
 		map_set(&module->debug_info, hash_type(type), di);
 		return di;
 	}
@@ -2544,7 +2546,7 @@ irDebugInfo *ir_add_debug_info_local(irProcedure *proc, Entity *e, i32 arg_id) {
 	di->LocalVariable.pos = e->token.pos;
 	di->LocalVariable.arg = arg_id;
 	di->LocalVariable.type = ir_add_debug_info_type(module, e->type, e, scope, file); // TODO(lachsinc): Is this the correct entity to pass? Or do we want a TypeName ??
-	
+
 	map_set(&module->debug_info, hash_entity(e), di);
 	return di;
 }
@@ -2561,12 +2563,12 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc) {
 	CheckerInfo *info = proc->module->info;
 	String filename = proc->entity->token.pos.file;
 	AstFile *f = ast_file_of_filename(info, filename);
-	irDebugInfo *file = nullptr; 
+	irDebugInfo *file = nullptr;
 	if (f) {
 		file = ir_add_debug_info_file(proc->module, f);
 	}
 	// TODO(lachsinc): Should scope be made separate to file?
-	irDebugInfo *scope = file; 
+	irDebugInfo *scope = file;
 
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Proc);
 	map_set(&proc->module->debug_info, hash_entity(entity), di);
@@ -2591,7 +2593,7 @@ irDebugInfo *ir_add_debug_info_location(irModule *m, Ast *node, irDebugInfo *sco
 		return *existing;
 	}
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Location);
-	di->Location.pos = ast_token(node).pos; 
+	di->Location.pos = ast_token(node).pos;
 	di->Location.scope = scope;
 	map_set(&m->debug_info, hash_node(node), di);
 	return di;
@@ -2613,8 +2615,8 @@ void ir_pop_debug_location(irModule *m) {
 //
 ////////////////////////////////////////////////////////////////
 
-irValue *ir_emit_runtime_call(irProcedure *proc,                            char const *name_, Array<irValue *> args, Ast *expr = nullptr);
-irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char const *name_, Array<irValue *> args, Ast *expr = nullptr);
+irValue *ir_emit_runtime_call(irProcedure *proc,                            char const *name_, Array<irValue *> args, Ast *expr = nullptr, ProcInlining inlining = ProcInlining_none);
+irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char const *name_, Array<irValue *> args, Ast *expr = nullptr, ProcInlining inlining = ProcInlining_none);
 
 
 irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
@@ -2668,7 +2670,8 @@ void ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
 	args[1] = ir_const_int(type_size_of(t));
 	AstPackage *pkg = get_core_package(p->module->info, str_lit("mem"));
 	if (p->entity != nullptr && p->entity->token.string != "zero" && p->entity->pkg != pkg) {
-		ir_emit_package_call(p, "mem", "zero", args, expr);
+		irValue *v = ir_emit_package_call(p, "mem", "zero", args, expr, ProcInlining_no_inline);
+		// v->loc = &IR_DEBUG_INFO_EMPTY; // NOTE(bill): remove debug location
 	}
 	ir_emit(p, ir_instr_zero_init(p, address));
 }
@@ -2803,7 +2806,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 	return result;
 }
 
-irValue *ir_emit_runtime_call(irProcedure *proc, char const *name_, Array<irValue *> args, Ast *expr) {
+irValue *ir_emit_runtime_call(irProcedure *proc, char const *name_, Array<irValue *> args, Ast *expr, ProcInlining inlining) {
 	String name = make_string_c(cast(char *)name_);
 
 	AstPackage *p = proc->module->info->runtime_package;
@@ -2811,10 +2814,10 @@ irValue *ir_emit_runtime_call(irProcedure *proc, char const *name_, Array<irValu
 	irValue **found = map_get(&proc->module->values, hash_entity(e));
 	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
 	irValue *gp = *found;
-	irValue *call = ir_emit_call(proc, gp, args);
+	irValue *call = ir_emit_call(proc, gp, args, inlining);
 	return call;
 }
-irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char const *name_, Array<irValue *> args, Ast *expr) {
+irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char const *name_, Array<irValue *> args, Ast *expr, ProcInlining inlining) {
 	String name = make_string_c(cast(char *)name_);
 	String package_name = make_string_c(cast(char *)package_name_);
 
@@ -2823,7 +2826,7 @@ irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char
 	irValue **found = map_get(&proc->module->values, hash_entity(e));
 	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
 	irValue *gp = *found;
-	irValue *call = ir_emit_call(proc, gp, args);
+	irValue *call = ir_emit_call(proc, gp, args, inlining);
 	return call;
 }
 
@@ -6766,7 +6769,6 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 				ir_emit_bounds_check(proc, ast_token(ie->index), index, len);
 			}
 			return ir_addr(elem);
-			break;
 		}
 
 		case Type_Slice: {
@@ -6785,7 +6787,6 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			ir_emit_bounds_check(proc, ast_token(ie->index), index, len);
 			irValue *v = ir_emit_ptr_offset(proc, elem, index);
 			return ir_addr(v);
-			break;
 		}
 
 		case Type_DynamicArray: {
@@ -6804,7 +6805,6 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			ir_emit_bounds_check(proc, ast_token(ie->index), index, len);
 			irValue *v = ir_emit_ptr_offset(proc, elem, index);
 			return ir_addr(v);
-			break;
 		}
 
 
@@ -6829,7 +6829,6 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			ir_emit_bounds_check(proc, ast_token(ie->index), index, len);
 
 			return ir_addr(ir_emit_ptr_offset(proc, elem, index));
-			break;
 		}
 		}
 	case_end;
@@ -8540,7 +8539,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	if (proc->module->generate_debug_info && proc->entity && proc->entity->identifier) { // TODO(lachsinc): Better way to determine if these procs are main/runtime_startup.
 		// TODO(lachsinc): Passing the file for the scope may not be correct for nested procedures? This should probably be
 		// handled all inside push_debug_location, with just the Ast * we can pull out everything we need to construct scope/file debug info etc.
-		ir_add_debug_info_proc(proc); 
+		ir_add_debug_info_proc(proc);
 		ir_push_debug_location(proc->module, proc->entity->identifier, proc->debug_scope);
 		GB_ASSERT_NOT_NULL(proc->debug_scope);
 	} else {
@@ -8717,7 +8716,7 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 		proc->module->stmt_state_flags = prev_stmt_state_flags;
 	}
 
-	// NOTE(lachsinc): For now we pop the debug location inside ir_end_procedure_body(). 
+	// NOTE(lachsinc): For now we pop the debug location inside ir_end_procedure_body().
 	// This may result in debug info being missing for below.
 
 	if (proc->type->Proc.has_proc_default_values) {

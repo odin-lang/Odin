@@ -221,9 +221,10 @@ bool ir_print_debug_location(irFileBuffer *f, irModule *m, irValue *v) {
 	GB_ASSERT(v->kind == irValue_Instr);
 
 	if (v->loc != nullptr) {
-		GB_ASSERT(v->loc->kind == irDebugInfo_Location);
-		ir_fprintf(f, ", !dbg !%d", v->loc->id);
-		return true;
+		if (v->loc->kind == irDebugInfo_Location) {
+			ir_fprintf(f, ", !dbg !%d", v->loc->id);
+			return true;
+		}
 	} else {
 		irProcedure *proc = v->Instr.block->proc;
 		GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
@@ -1812,7 +1813,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		irDebugInfo **lookup_di = map_get(&m->debug_info, hash_entity(e));
 		GB_ASSERT_NOT_NULL(*lookup_di);
 		irDebugInfo* local_var_di = *lookup_di;
-		
+
 		ir_write_str_lit(f, "call void @llvm.dbg.declare(");
 		ir_write_str_lit(f, "metadata ");
 		ir_print_type(f, m, vt);

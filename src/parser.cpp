@@ -1677,6 +1677,9 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		} else if (name.string == "assert") {
 			Ast *tag = ast_basic_directive(f, token, name.string);
 			return parse_call_expr(f, tag);
+		} else if (name.string == "defined") {
+			Ast *tag = ast_basic_directive(f, token, name.string);
+			return parse_call_expr(f, tag);
 		} else {
 			operand = ast_tag_expr(f, token, name, parse_expr(f, false));
 		}
