@@ -2885,6 +2885,36 @@ bool is_type_normal_pointer(Type *ptr, Type **elem) {
 	return false;
 }
 
+bool check_identifier_exists(Scope *s, Ast *node, bool nested = false, Scope **out_scope = nullptr) {
+	switch (node->kind) {
+	case_ast_node(i, Ident, node);
+		String name = i->token.string;
+		if (nested) {
+			Entity *e = scope_lookup_current(s, name);
+			if (e != nullptr) {
+				if (out_scope) *out_scope = e->scope;
+				return true;
+			}
+		} else {
+			Entity *e = scope_lookup(s, name);
+			if (e != nullptr) {
+				if (out_scope) *out_scope = e->scope;
+				return true;
+			}
+		}
+	case_end;
+	case_ast_node(se, SelectorExpr, node);
+		Ast *lhs = se->expr;
+		Ast *rhs = se->selector;
+		Scope *lhs_scope = nullptr;
+		if (check_identifier_exists(s, lhs, nested, &lhs_scope)) {
+			return check_identifier_exists(lhs_scope, rhs, true);
+		}
+	case_end;
+	}
+	return false;
+}
+
 
 bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id) {
 	ast_node(ce, CallExpr, call);
@@ -2920,6 +2950,15 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_len:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
+
+	case BuiltinProc_DIRECTIVE: {
+		ast_node(bd, BasicDirective, ce->proc);
+		String name = bd->name;
+		if (name == "defined") {
+			break;
+		}
+		/*fallthrough*/
+	}
 	default:
 		if (ce->args.count > 0) {
 			check_multi_expr(c, operand, ce->args[0]);
@@ -2984,6 +3023,22 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			operand->type = t_untyped_bool;
 			operand->mode = Addressing_Constant;
+		} else if (name == "defined") {
+			if (ce->args.count != 1) {
+				error(call, "'#defined' expects 1 argument, got %td", ce->args.count);
+				return false;
+			}
+			Ast *arg = unparen_expr(ce->args[0]);
+			if (arg->kind != Ast_Ident && arg->kind != Ast_SelectorExpr) {
+				error(call, "'#defined' expects an identifier or selector expression, got %s", LIT(ast_strings[arg->kind]));
+				return false;
+			}
+
+			bool is_defined = check_identifier_exists(c->scope, arg);
+			operand->type = t_untyped_bool;
+			operand->mode = Addressing_Constant;
+			operand->value = exact_value_bool(is_defined);
+
 		} else {
 			GB_PANIC("Unhandled #%.*s", LIT(name));
 		}
@@ -4957,7 +5012,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call) {
 	    ce->proc->kind == Ast_BasicDirective) {
 		ast_node(bd, BasicDirective, ce->proc);
 		String name = bd->name;
-		if (name == "location" || name == "assert") {
+		if (name == "location" || name == "assert" || name == "defined") {
 			operand->mode = Addressing_Builtin;
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
 			operand->expr = ce->proc;

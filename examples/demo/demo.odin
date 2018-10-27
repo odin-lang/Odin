@@ -110,6 +110,20 @@ general_stuff :: proc() {
 		My_Struct :: struct{x: int};
 		#assert(My_Struct != struct{x: int});
 	}
+
+	{
+		X :: 123;
+		when #defined(X) {
+			fmt.println("X is defined");
+		} else {
+			fmt.println("X is not defined");
+		}
+		when #defined(Y) {
+			fmt.println("Y is defined");
+		} else {
+			fmt.println("Y is not defined");
+		}
+	}
 }
 
 
