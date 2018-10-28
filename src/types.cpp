@@ -712,6 +712,8 @@ bool is_type_numeric(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Numeric) != 0;
+	} else if (t->kind == Type_Enum) {
+		return is_type_numeric(t->Enum.base_type);
 	}
 	// TODO(bill): Should this be here?
 	if (t->kind == Type_Array) {
