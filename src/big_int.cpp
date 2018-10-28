@@ -554,6 +554,16 @@ void big_int_sub(BigInt *dst, BigInt const *x, BigInt const *y) {
 void big_int_shl(BigInt *dst, BigInt const *x, BigInt const *y) {
 	GB_ASSERT(!y->neg);
 
+	if (x->len == 0) {
+		big_int_from_u64(dst, 0);
+		return;
+	}
+
+	if (x->len == 1 && x->d.word == 0) {
+		big_int_from_u64(dst, 0);
+		return;
+	}
+
 	if (y->len == 0) {
 		big_int_init(dst, x);
 		return;
@@ -602,6 +612,10 @@ void big_int_shr(BigInt *dst, BigInt const *x, BigInt const *y) {
 	GB_ASSERT(!y->neg);
 
 	if (x->len == 0) {
+		big_int_from_u64(dst, 0);
+		return;
+	}
+	if (x->len == 1 && x->d.word == 0) {
 		big_int_from_u64(dst, 0);
 		return;
 	}
