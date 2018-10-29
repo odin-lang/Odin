@@ -2270,7 +2270,8 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		return di;
 	}
 
-	if (is_type_struct(type) || is_type_union(type) || is_type_enum(type) || is_type_tuple(type)) {
+	if (is_type_struct(type) ||
+	    is_type_union(type) || is_type_enum(type) || is_type_tuple(type)) {
 		if (type->kind == Type_Named) {
 			// NOTE(lachsinc): Named named's should always be handled prior as typedefs.
 			GB_ASSERT(type->Named.base->kind != Type_Named);
@@ -2450,7 +2451,7 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		return ir_add_debug_info_type_bit_set(module, type, e, scope);
 	}
 
-	GB_PANIC("Unreachable");
+	GB_PANIC("Unreachable %s", type_to_string(type));
 	return nullptr;
 }
 

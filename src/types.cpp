@@ -912,7 +912,7 @@ Type *base_complex_elem_type(Type *t) {
 
 bool is_type_struct(Type *t) {
 	t = base_type(t);
-	return (t->kind == Type_Struct && !t->Struct.is_raw_union);
+	return t->kind == Type_Struct;
 }
 bool is_type_union(Type *t) {
 	t = base_type(t);
