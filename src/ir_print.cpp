@@ -2374,9 +2374,9 @@ void print_llvm_ir(irGen *ir) {
 			case irDebugInfo_CompositeType: {
 				if (di->CompositeType.tag == irDebugBasicEncoding_array_type) {
 					GB_ASSERT_NOT_NULL(di->CompositeType.base_type);
-					GB_ASSERT(di->CompositeType.array_count > 0);
+					GB_ASSERT(di->CompositeType.array_count >= 0);
 					GB_ASSERT(di->CompositeType.name.len == 0);
-					GB_ASSERT(di->CompositeType.size > 0);
+					GB_ASSERT(di->CompositeType.size >= 0);
 				}
 
 				if (di->CompositeType.tag == irDebugBasicEncoding_union_type) {
