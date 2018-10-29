@@ -1964,7 +1964,7 @@ irDebugInfo *ir_add_debug_info_type_bit_set(irModule *module, Type *type, Entity
 		// TODO(lachsinc): Maybe name these fields numbered ascending?
 		String name = str_lit("field_todo");
 		if (elem_type != nullptr && is_type_enum(elem_type)) {
-			name = base_type(elem_type)->Enum.fields[i]->token.string;
+			// name = base_type(elem_type)->Enum.fields[i]->token.string;
 		}
 		irDebugInfo *field_di = ir_add_debug_info_field_internal(module, name, t_u32, // TODO(lachsinc): u32 fine??
 		                                                         0,
