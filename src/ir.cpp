@@ -3767,6 +3767,11 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 	}
 
 	if (is_type_string(a)) {
+		if (is_type_cstring(a)) {
+			left  = ir_emit_conv(proc, left, t_string);
+			right = ir_emit_conv(proc, right, t_string);
+		}
+
 		char *runtime_proc = nullptr;
 		switch (op_kind) {
 		case Token_CmpEq: runtime_proc = "string_eq"; break;

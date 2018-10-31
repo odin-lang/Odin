@@ -394,6 +394,9 @@ clear :: proc[clear_dynamic_array, clear_map];
 @(builtin)
 reserve :: proc[reserve_dynamic_array, reserve_map];
 
+@(builtin)
+resize :: proc[resize_dynamic_array];
+
 
 @(builtin)
 new :: proc[mem.new];
@@ -536,6 +539,38 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 	a.cap = capacity;
 	return true;
 }
+
+@(builtin)
+resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller_location) -> bool {
+	if array == nil do return false;
+	a := (^mem.Raw_Dynamic_Array)(array);
+
+	if length <= a.cap {
+		a.len = max(length, 0);
+		return true;
+	}
+
+	if a.allocator.procedure == nil {
+		a.allocator = context.allocator;
+	}
+	assert(a.allocator.procedure != nil);
+
+	old_size  := a.cap * size_of(E);
+	new_size  := length * size_of(E);
+	allocator := a.allocator;
+
+	new_data := allocator.procedure(
+		allocator.data, mem.Allocator_Mode.Resize, new_size, align_of(E),
+		a.data, old_size, 0, loc,
+	);
+	if new_data == nil do return false;
+
+	a.data = new_data;
+	a.len = length;
+	a.cap = length;
+	return true;
+}
+
 
 
 @(builtin)
