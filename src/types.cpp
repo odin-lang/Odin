@@ -1238,8 +1238,10 @@ bool is_type_comparable(Type *t) {
 			return false;
 		case Basic_rune:
 			return true;
+		case Basic_string:
+			return true;
 		case Basic_cstring:
-			return false;
+			return true;
 		case Basic_typeid:
 			return true;
 		}
