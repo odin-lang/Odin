@@ -30,23 +30,26 @@ Default_File_Logger_Opts :: Options{
 File_Console_Logger_Data :: struct {
     lowest_level: Level,
     file_handle:  os.Handle,
+    ident : string,
 }
 
 file_logger :: proc(h: os.Handle, lowest := Level.Debug, opt := Default_File_Logger_Opts, ident := "") -> Logger {
     data := new(File_Console_Logger_Data);
     data.lowest_level = lowest;
     data.file_handle = h;
-    return Logger{file_console_logger_proc, data, opt, ident};
+    data.ident = ident;
+    return Logger{file_console_logger_proc, data, opt};
 }
  
 console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logger_Opts, ident := "") -> Logger {
     data := new(File_Console_Logger_Data);
     data.lowest_level = lowest;
     data.file_handle = os.INVALID_HANDLE;
-    return Logger{file_console_logger_proc, data, opt, ident};
+    data.ident = ident;
+    return Logger{file_console_logger_proc, data, opt};
 }
 
-file_console_logger_proc :: proc(logger_data: rawptr, level: Level, ident: string, text: string, options: Options, location := #caller_location) {
+file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
     data := cast(^File_Console_Logger_Data)logger_data;
     if level < data.lowest_level do return;
 
@@ -67,7 +70,7 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, ident: strin
 */
     do_location_header(options, &buf, location);
 
-    if ident != "" do fmt.sbprintf(&buf, "[%s] ", ident);
+    if data.ident != "" do fmt.sbprintf(&buf, "[%s] ", data.ident);
     //TODO(Hoej): When we have better atomics and such, make this thread-safe
     fmt.fprintf(h, "%s %s\n", fmt.to_string(buf), text); 
 }
