@@ -657,7 +657,6 @@ void init_checker(Checker *c, Parser *parser) {
 	init_checker_info(&c->info);
 
 	array_init(&c->procs_to_check, a);
-	ptr_set_init(&c->checked_packages, a);
 
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
@@ -673,7 +672,6 @@ void destroy_checker(Checker *c) {
 	destroy_checker_info(&c->info);
 
 	array_free(&c->procs_to_check);
-	ptr_set_destroy(&c->checked_packages);
 
 	destroy_checker_context(&c->init_ctx);
 }
@@ -2370,6 +2368,10 @@ void check_all_global_entities(Checker *c) {
 		GB_ASSERT(ctx.pkg != nullptr);
 		GB_ASSERT(e->pkg != nullptr);
 
+		if (!e->pkg->used) {
+			continue;
+		}
+
 		if (pkg->kind == Package_Init) {
 			if (e->kind != Entity_Procedure && e->token.string == "main") {
 				error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
@@ -2635,8 +2637,10 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 
 	if (id->fullpath == "builtin") {
 		scope = builtin_pkg->scope;
+		builtin_pkg->used = true;
 	} else if (id->fullpath == "intrinsics") {
 		scope = intrinsics_pkg->scope;
+		intrinsics_pkg->used = true;
 	} else {
 		HashKey key = hash_string(id->fullpath);
 		AstPackage **found = map_get(pkgs, key);
@@ -2649,7 +2653,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 			GB_PANIC("Unable to find scope for package: %.*s", LIT(id->fullpath));
 		} else {
 			AstPackage *pkg = *found;
-			ptr_set_add(&ctx->checker->checked_packages, pkg);
+			pkg->used = true;
 			scope = pkg->scope;
 		}
 	}
@@ -2765,9 +2769,9 @@ bool collect_checked_packages_from_decl_list(Checker *c, Array<Ast *> const &dec
 				continue;
 			}
 			AstPackage *pkg = *found;
-			if (!ptr_set_exists(&c->checked_packages, pkg)) {
+			if (!pkg->used) {
 				new_files = true;
-				ptr_set_add(&c->checked_packages, pkg);
+				pkg->used = true;
 			}
 		case_end;
 		}
@@ -2996,7 +3000,7 @@ void check_import_entities(Checker *c) {
 		switch (pkg->kind) {
 		case Package_Init:
 		case Package_Runtime:
-			ptr_set_add(&c->checked_packages, pkg);
+			pkg->used = true;
 			break;
 		}
 	}
@@ -3007,7 +3011,7 @@ void check_import_entities(Checker *c) {
 			ImportGraphNode *node = package_order[i];
 			GB_ASSERT(node->scope->flags&ScopeFlag_Pkg);
 			AstPackage *pkg = node->scope->pkg;
-			if (!ptr_set_exists(&c->checked_packages, pkg)) {
+			if (!pkg->used) {
 				continue;
 			}
 
@@ -3028,7 +3032,7 @@ void check_import_entities(Checker *c) {
 		ImportGraphNode *node = package_order[pkg_index];
 		AstPackage *pkg = node->pkg;
 
-		if (!ptr_set_exists(&c->checked_packages, pkg)) {
+		if (!pkg->used) {
 			continue;
 		}
 

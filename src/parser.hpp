@@ -122,8 +122,10 @@ struct AstPackage {
 	String           fullpath;
 	Array<AstFile *> files;
 
-	Scope *   scope;       // NOTE(bill): Created in checker
-	DeclInfo *decl_info;   // NOTE(bill): Created in checker
+	// NOTE(bill): Created/set in checker
+	Scope *   scope;
+	DeclInfo *decl_info;
+	bool      used;
 };
 
 
