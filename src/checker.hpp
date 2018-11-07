@@ -477,7 +477,6 @@ struct Checker {
 	CheckerInfo info;
 
 	Array<ProcInfo> procs_to_check;
-	PtrSet<AstPackage *> checked_packages;
 
 	gbAllocator    allocator;
 	CheckerContext init_ctx;
@@ -496,7 +495,6 @@ HashKey hash_ast_file (AstFile *file)  { return hash_pointer(file); }
 HashKey hash_entity   (Entity *e)      { return hash_pointer(e); }
 HashKey hash_type     (Type *t)        { return hash_pointer(t); }
 HashKey hash_decl_info(DeclInfo *decl) { return hash_pointer(decl); }
-
 
 
 // CheckerInfo API
