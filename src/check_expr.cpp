@@ -1911,6 +1911,13 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	if (is_type_opaque(src)) {
+		return are_types_identical(dst, src->Opaque.elem);
+	}
+	if (is_type_opaque(dst)) {
+		return are_types_identical(dst->Opaque.elem, src);
+	}
+
 	return false;
 }
 
@@ -6599,6 +6606,11 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 
 	case_ast_node(ht, DistinctType, node);
 		str = gb_string_appendc(str, "distinct ");
+		str = write_expr_to_string(str, ht->type);
+	case_end;
+
+	case_ast_node(ht, OpaqueType, node);
+		str = gb_string_appendc(str, "opaque ");
 		str = write_expr_to_string(str, ht->type);
 	case_end;
 

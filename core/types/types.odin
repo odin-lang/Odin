@@ -154,11 +154,15 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 		y, ok := b.variant.(rt.Type_Info_Bit_Set);
 		if !ok do return false;
 		return x.elem == y.elem && x.lower == y.lower && x.upper == y.upper;
+
+	case rt.Type_Info_Opaque:
+		y, ok := b.variant.(rt.Type_Info_Opaque);
+		if !ok do return false;
+		return x.elem == y.elem;
 	}
 
 	return false;
 }
-
 
 is_signed :: proc(info: ^rt.Type_Info) -> bool {
 	if info == nil do return false;
@@ -256,5 +260,10 @@ is_union :: proc(info: ^rt.Type_Info) -> bool {
 is_enum :: proc(info: ^rt.Type_Info) -> bool {
 	if info == nil do return false;
 	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Enum);
+	return ok;
+}
+is_opaque :: proc(info: ^rt.Type_Info) -> bool {
+	if info == nil do return false;
+	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Opaque);
 	return ok;
 }

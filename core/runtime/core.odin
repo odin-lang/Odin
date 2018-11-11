@@ -107,6 +107,10 @@ Type_Info_Bit_Set :: struct {
 	upper:      i64,
 };
 
+Type_Info_Opaque :: struct {
+	elem: ^Type_Info,
+}
+
 Type_Info :: struct {
 	size:  int,
 	align: int,
@@ -134,6 +138,7 @@ Type_Info :: struct {
 		Type_Info_Map,
 		Type_Info_Bit_Field,
 		Type_Info_Bit_Set,
+		Type_Info_Opaque,
 	},
 }
 
@@ -160,6 +165,7 @@ Typeid_Kind :: enum u8 {
 	Map,
 	Bit_Field,
 	Bit_Set,
+	Opaque,
 }
 
 Typeid_Bit_Field :: bit_field #align align_of(uintptr) {

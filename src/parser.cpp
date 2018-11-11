@@ -80,6 +80,7 @@ Token ast_token(Ast *node) {
 	case Ast_TypeidType:       return node->TypeidType.token;
 	case Ast_HelperType:       return node->HelperType.token;
 	case Ast_DistinctType:     return node->DistinctType.token;
+	case Ast_OpaqueType:       return node->OpaqueType.token;
 	case Ast_PolyType:         return node->PolyType.token;
 	case Ast_ProcType:         return node->ProcType.token;
 	case Ast_PointerType:      return node->PointerType.token;
@@ -318,6 +319,9 @@ Ast *clone_ast(Ast *node) {
 		break;
 	case Ast_DistinctType:
 		n->DistinctType.type = clone_ast(n->DistinctType.type);
+		break;
+	case Ast_OpaqueType:
+		n->OpaqueType.type = clone_ast(n->OpaqueType.type);
 		break;
 	case Ast_ProcType:
 		n->ProcType.params  = clone_ast(n->ProcType.params);
@@ -846,6 +850,13 @@ Ast *ast_distinct_type(AstFile *f, Token token, Ast *type) {
 	Ast *result = alloc_ast_node(f, Ast_DistinctType);
 	result->DistinctType.token = token;
 	result->DistinctType.type  = type;
+	return result;
+}
+
+Ast *ast_opaque_type(AstFile *f, Token token, Ast *type) {
+	Ast *result = alloc_ast_node(f, Ast_OpaqueType);
+	result->OpaqueType.token = token;
+	result->OpaqueType.type  = type;
 	return result;
 }
 
@@ -1652,6 +1663,12 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Token token = expect_token(f, Token_distinct);
 		Ast *type = parse_type(f);
 		return ast_distinct_type(f, token, type);
+	}
+
+	case Token_opaque: {
+		Token token = expect_token(f, Token_opaque);
+		Ast *type = parse_type(f);
+		return ast_opaque_type(f, token, type);
 	}
 
 	case Token_Hash: {
