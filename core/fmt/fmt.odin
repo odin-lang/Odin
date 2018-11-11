@@ -958,11 +958,15 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 			if hash	do write_byte(fi.buf, '\n');
 
-			for _, i in b.names {
-				if !hash && i > 0 do write_string(fi.buf, ", ");
+			field_count := -1;
+			for name, i in b.names {
+				// if len(name) > 0 && name[0] == '_' do continue;
+				field_count += 1;
+
+				if !hash && field_count > 0 do write_string(fi.buf, ", ");
 				if hash do for in 0..fi.indent-1 do write_byte(fi.buf, '\t');
 
-				write_string(fi.buf, b.names[i]);
+				write_string(fi.buf, name);
 				write_string(fi.buf, " = ");
 
 				if t := b.types[i]; types.is_any(t) {

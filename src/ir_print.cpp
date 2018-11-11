@@ -227,7 +227,9 @@ bool ir_print_debug_location(irFileBuffer *f, irModule *m, irValue *v) {
 		}
 	} else {
 		irProcedure *proc = v->Instr.block->proc;
-		GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
+		if (proc->entity != nullptr) {
+			GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
+		}
 	}
 	return false;
 }

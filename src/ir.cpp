@@ -2116,6 +2116,9 @@ irDebugInfo *ir_add_debug_info_proc_type(irModule *module, Type *type) {
 	// gb_max(result_count, 1) because llvm expects explicit "null" return type
 	di->ProcType.types = ir_add_debug_info_array(module, 0, gb_max(result_count, 1) + param_count);
 
+	// TODO(bill): Is this even correct?!
+	irDebugInfo *scope = di;
+
 	// Result/return types
 	if (result_count >= 1) {
 		TypeTuple *results_tuple = &type->Proc.results->Tuple;
@@ -2125,7 +2128,7 @@ irDebugInfo *ir_add_debug_info_proc_type(irModule *module, Type *type) {
 				continue;
 			}
 
-			irDebugInfo *type_di = ir_add_debug_info_type(module, e->type, e, nullptr, nullptr);
+			irDebugInfo *type_di = ir_add_debug_info_type(module, e->type, e, scope, nullptr);
 			GB_ASSERT_NOT_NULL(type_di);
 			array_add(&di->ProcType.types->DebugInfoArray.elements, type_di);
 		}
@@ -2143,7 +2146,7 @@ irDebugInfo *ir_add_debug_info_proc_type(irModule *module, Type *type) {
 				continue;
 			}
 
-			irDebugInfo *type_di = ir_add_debug_info_type(module, e->type, e, nullptr, nullptr);
+			irDebugInfo *type_di = ir_add_debug_info_type(module, e->type, e, scope, nullptr);
 			GB_ASSERT_NOT_NULL(type_di);
 			array_add(&di->ProcType.types->DebugInfoArray.elements, type_di);
 		}
@@ -2490,7 +2493,7 @@ irDebugInfo *ir_add_debug_info_global(irModule *module, irValue *v) {
 	// unique for the DIGlobalVariable's hash.
 	map_set(&module->debug_info, hash_pointer(var_di), var_di);
 
-	var_di->GlobalVariable.type = ir_add_debug_info_type(module, e->type, nullptr, nullptr, nullptr);
+	var_di->GlobalVariable.type = ir_add_debug_info_type(module, e->type, nullptr, scope, nullptr);
 	GB_ASSERT_NOT_NULL(var_di->GlobalVariable.type);
 
 	di->GlobalVariableExpression.var = var_di;
@@ -2657,9 +2660,11 @@ void ir_value_set_debug_location(irProcedure *proc, irValue *v) {
 	irModule *m = proc->module;
 	GB_ASSERT(m->debug_location_stack.count > 0);
 	v->loc = *array_end_ptr(&m->debug_location_stack);
-	if (v->loc == nullptr) {
+
+	if (v->loc == nullptr && proc->entity != nullptr) {
 		// NOTE(lachsinc): Entry point (main()) and runtime_startup are the only ones where null location is considered valid.
-		GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
+		GB_ASSERT_MSG(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0),
+		              "%.*s %p", LIT(proc->name), proc->entity);
 	}
 }
 
