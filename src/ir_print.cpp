@@ -512,6 +512,10 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		ir_print_type(f, m, bit_set_to_int(t));
 		return;
 	}
+
+	case Type_Opaque:
+		ir_print_type(f, m, strip_opaque_type(t));
+		return;
 	}
 }
 

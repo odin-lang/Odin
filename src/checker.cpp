@@ -1064,6 +1064,10 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		add_type_info_type(c, bt->BitSet.elem);
 		break;
 
+	case Type_Opaque:
+		add_type_info_type(c, bt->Opaque.elem);
+		break;
+
 	case Type_Union:
 		add_type_info_type(c, t_int);
 		add_type_info_type(c, t_type_info_ptr);
@@ -1626,6 +1630,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_map           = find_core_type(c, str_lit("Type_Info_Map"));
 	t_type_info_bit_field     = find_core_type(c, str_lit("Type_Info_Bit_Field"));
 	t_type_info_bit_set       = find_core_type(c, str_lit("Type_Info_Bit_Set"));
+	t_type_info_opaque        = find_core_type(c, str_lit("Type_Info_Opaque"));
 
 	t_type_info_named_ptr         = alloc_type_pointer(t_type_info_named);
 	t_type_info_integer_ptr       = alloc_type_pointer(t_type_info_integer);
@@ -1648,6 +1653,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_map_ptr           = alloc_type_pointer(t_type_info_map);
 	t_type_info_bit_field_ptr     = alloc_type_pointer(t_type_info_bit_field);
 	t_type_info_bit_set_ptr       = alloc_type_pointer(t_type_info_bit_set);
+	t_type_info_opaque_ptr        = alloc_type_pointer(t_type_info_opaque);
 }
 
 void init_mem_allocator(Checker *c) {

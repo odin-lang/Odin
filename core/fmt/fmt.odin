@@ -409,6 +409,11 @@ write_type :: proc(buf: ^String_Buffer, ti: ^runtime.Type_Info) {
 			write_type(buf, info.underlying);
 		}
 		write_byte(buf, ']');
+
+	case runtime.Type_Info_Opaque:
+		write_string(buf, "opaque ");
+		write_type(buf, info.elem);
+
 	}
 }
 
@@ -927,6 +932,47 @@ fmt_bit_field :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
 	}
 }
 
+fmt_opaque :: proc(fi: ^Fmt_Info, v: any) {
+	is_nil :: proc(data: rawptr, n: int) -> bool {
+		if data == nil do return true;
+		if n == 0 do return true;
+
+		a := (^byte)(data);
+		for i in 0..n-1 do if mem.ptr_offset(a, i)^ != 0 {
+			return false;
+		}
+		return true;
+	}
+
+	rt :: runtime;
+
+	type_info := type_info_of(v.id);
+
+	if is_nil(v.data, type_info.size) {
+		write_string(fi.buf, "nil");
+		return;
+	}
+
+	if ot, ok := rt.type_info_base(type_info).variant.(rt.Type_Info_Opaque); ok {
+		elem := rt.type_info_base(ot.elem);
+		if elem == nil do return;
+		write_type(fi.buf, type_info);
+		write_byte(fi.buf, '{');
+		defer write_byte(fi.buf, '}');
+
+		switch in elem.variant {
+		case rt.Type_Info_Integer, rt.Type_Info_Pointer, rt.Type_Info_Float:
+			fmt_value(fi, any{v.data, elem.id}, 'v');
+		case:
+			// Okay
+		}
+	} else {
+		write_type(fi.buf, type_info);
+		write_byte(fi.buf, '{');
+		defer write_byte(fi.buf, '}');
+	}
+}
+
 fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	if v.data == nil || v.id == nil {
 		write_string(fi.buf, "<nil>");
@@ -986,6 +1032,8 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			fmt_bit_set(fi, v);
 		case runtime.Type_Info_Bit_Field:
 			fmt_bit_field(fi, v);
+		case runtime.Type_Info_Opaque:
+			fmt_opaque(fi, v);
 		case:
 			fmt_value(fi, any{v.data, info.base.id}, verb);
 		}
@@ -1158,6 +1206,9 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 	case runtime.Type_Info_Bit_Set:
 		fmt_bit_set(fi, v);
+
+	case runtime.Type_Info_Opaque:
+		fmt_opaque(fi, v);
 	}
 }
 

@@ -434,6 +434,10 @@ AST_KIND(_TypeBegin, "", bool) \
 		Token token; \
 		Ast *type; \
 	}) \
+	AST_KIND(OpaqueType, "opaque type", struct { \
+		Token token; \
+		Ast *type; \
+	}) \
 	AST_KIND(PolyType, "polymorphic type", struct { \
 		Token token; \
 		Ast * type;  \
