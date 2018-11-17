@@ -1126,7 +1126,7 @@ bool is_type_polymorphic(Type *t) {
 		return true;
 
 	case Type_Named:
-		return is_type_polymorphic_record(t->Named.base);
+		return is_type_polymorphic(t->Named.base);
 
 	case Type_Pointer:
 		return is_type_polymorphic(t->Pointer.elem);
