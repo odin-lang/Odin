@@ -5191,12 +5191,24 @@ void ir_mangle_add_sub_type_name(irModule *m, Entity *field, String parent) {
 	}
 
 	String cn = field->token.string;
-	isize len = parent.len + 1 + 16 + 1 + cn.len;
-	u8 *text = gb_alloc_array(ir_allocator(), u8, len);
-	isize new_name_len = gb_snprintf(cast(char *)text, len,
+	isize max_len = parent.len + 1 + 16 + 1 + cn.len;
+	bool require_suffix_id = is_type_polymorphic(field->type);
+	if (require_suffix_id) {
+		max_len += 21;
+	}
+
+	u8 *new_name = gb_alloc_array(ir_allocator(), u8, max_len);
+	isize new_name_len = gb_snprintf(cast(char *)new_name, max_len,
 	                                 "%.*s.%.*s", LIT(parent), LIT(cn));
 
-	String child = {text, new_name_len-1};
+	if (require_suffix_id) {
+		char *str = cast(char *)new_name + new_name_len-1;
+		isize len = max_len-new_name_len;
+		isize extra = gb_snprintf(str, len, "-%llu", cast(unsigned long long)field->id);
+		new_name_len += extra-1;
+	}
+
+	String child = {new_name, new_name_len-1};
 	GB_ASSERT(child.len > 0);
 	ir_add_entity_name(m, field, child);
 	ir_gen_global_type_name(m, field, child);
@@ -5308,7 +5320,7 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 		if (found != nullptr) {
 			for_array(i, *found) {
 				Entity *sub = (*found)[i];
-				// gb_printf_err("--> %.*s\n", LIT(sub->token.string));
+				// gb_printf_err("--> %.*s %p\n", LIT(sub->token.string), sub);
 				if (ir_min_dep_entity(m, sub)) {
 					ir_mangle_add_sub_type_name(m, sub, name);
 				}
@@ -5323,16 +5335,6 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	irValue *t = ir_value_type_name(name, e->type);
 	ir_module_add_value(m, e, t);
 	map_set(&m->members, hash_string(name), t);
-
-	#if 0
-	if (is_type_union(e->type)) {
-		Type *bt = base_type(e->type);
-		// NOTE(bill): Zeroth entry is null (for 'match type' stmts)
-		for (isize j = 1; j < bt->Struct.variant_count; j++) {
-			ir_mangle_add_sub_type_name(m, bt->Struct.variants[j], name);
-		}
-	}
-	#endif
 
 	// if (bt->kind == Type_Struct) {
 	// 	Scope *s = bt->Struct.scope;
