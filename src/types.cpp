@@ -1127,7 +1127,8 @@ bool is_type_polymorphic(Type *t) {
 
 	case Type_Named:
 		return is_type_polymorphic(t->Named.base);
-
+	case Type_Opaque:
+		return is_type_polymorphic(t->Opaque.elem);
 	case Type_Pointer:
 		return is_type_polymorphic(t->Pointer.elem);
 	case Type_Array:
@@ -2569,6 +2570,11 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_Pointer:
 		str = gb_string_append_rune(str, '^');
 		str = write_type_to_string(str, type->Pointer.elem);
+		break;
+
+	case Type_Opaque:
+		str = gb_string_appendc(str, "opaque ");
+		str = write_type_to_string(str, type->Opaque.elem);
 		break;
 
 	case Type_Array:

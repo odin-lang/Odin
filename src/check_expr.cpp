@@ -803,6 +803,11 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 		}
 		return true;
 	}
+	case Type_Opaque:
+		if (source->kind == Type_Opaque) {
+			return is_polymorphic_type_assignable(c, poly->Opaque.elem, source->Opaque.elem, true, modify_type);
+		}
+		return false;
 	case Type_Pointer:
 		if (source->kind == Type_Pointer) {
 			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Pointer.elem, true, modify_type);
