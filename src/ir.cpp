@@ -4684,6 +4684,14 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 		return ir_emit_ptr_to_uintptr(proc, value, t);
 	}
 
+	if (is_type_integer(src) && (is_type_pointer(dst) || is_type_cstring(dst))) {
+		Type *vt = core_type(ir_type(value));
+		return ir_emit(proc, ir_instr_conv(proc, irConv_inttoptr, value, vt, t));
+	}else if ((is_type_pointer(src) || is_type_cstring(src)) && is_type_integer(dst)) {
+		Type *vt = core_type(ir_type(value));
+		return ir_emit(proc, ir_instr_conv(proc, irConv_ptrtoint, value, vt, t));
+	}
+
 	if (ir_is_type_aggregate(src) || ir_is_type_aggregate(dst)) {
 		irValue *s = ir_address_from_load_or_generate_local(proc, value);
 		irValue *d = ir_emit_bitcast(proc, s, alloc_type_pointer(t));
