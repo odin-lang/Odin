@@ -5099,60 +5099,6 @@ String ir_mangle_name(irGen *s, Entity *e) {
 	CheckerInfo *info = m->info;
 	gbAllocator a = ir_allocator();
 
-#if 0
-	// NOTE(bill): prefix names not in the init scope
-	// TODO(bill): make robust and not just rely on the file's name
-	String path = e->token.pos.file;
-	String name = e->token.string;
-	AstFile *file = ast_file_of_filename(info, path);
-
-	char *str = gb_alloc_array(a, char, path.len+1);
-	gb_memmove(str, path.text, path.len);
-	str[path.len] = 0;
-	for (isize i = 0; i < path.len; i++) {
-		if (str[i] == '\\') {
-			str[i] = '/';
-		}
-	}
-
-	char const *base = gb_path_base_name(str);
-	char const *ext = gb_path_extension(base);
-	isize base_len = ext-1-base;
-
-	isize max_len = base_len + 1 + 1 + 10 + 1 + name.len;
-	bool require_suffix_id = is_type_polymorphic(e->type);
-	if (require_suffix_id) {
-		max_len += 21;
-	}
-
-	u8 *new_name = gb_alloc_array(a, u8, max_len);
-	isize new_name_len = 0;
-	if ((base_len > 0 && gb_char_is_digit(base[0])) ||
-	    base_len == 0) {
-		new_name_len = gb_snprintf(
-			cast(char *)new_name, max_len,
-			"_%.*s-%u.%.*s",
-			cast(int)base_len, base,
-			cast(u32)file->id,
-			LIT(name));
-	} else {
-		new_name_len = gb_snprintf(
-			cast(char *)new_name, max_len,
-			"%.*s-%u.%.*s",
-			cast(int)base_len, base,
-			cast(u32)file->id,
-			LIT(name));
-	}
-	if (require_suffix_id) {
-		char *str = cast(char *)new_name + new_name_len-1;
-		isize len = max_len-new_name_len;
-		isize extra = gb_snprintf(str, len, "-%llu", cast(unsigned long long)e->id);
-		new_name_len += extra-1;
-	}
-
-	return make_string(new_name, new_name_len-1);
-
-#else
 	String name = e->token.string;
 
 	AstPackage *pkg = e->pkg;
@@ -5181,7 +5127,6 @@ String ir_mangle_name(irGen *s, Entity *e) {
 	}
 
 	return make_string(new_name, new_name_len-1);
-#endif
 }
 
 
