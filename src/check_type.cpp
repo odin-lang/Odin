@@ -108,10 +108,11 @@ bool does_field_type_allow_using(Type *t) {
 }
 
 void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields, Array<Ast *> const &params,
-                         isize init_field_capacity, Type *named_type, String context) {
+                         isize init_field_capacity, Type *struct_type, String context) {
 	*fields = array_make<Entity *>(heap_allocator(), 0, init_field_capacity);
 
 	GB_ASSERT(node->kind == Ast_StructType);
+	GB_ASSERT(struct_type->kind == Type_Struct);
 
 	isize variable_count = 0;
 	for_array(i, params) {
@@ -137,6 +138,7 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields
 		if (type_expr != nullptr) {
 			type = check_type_expr(ctx, type_expr, nullptr);
 			if (is_type_polymorphic(type)) {
+				struct_type->Struct.is_polymorphic = true;
 				type = nullptr;
 			}
 		}
@@ -336,10 +338,12 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 		context = str_lit("struct #raw_union");
 	}
 
-	Type *polymorphic_params     = nullptr;
-	bool is_polymorphic          = false;
-	bool can_check_fields        = true;
-	bool is_poly_specialized     = false;
+	// NOTE(bill): Yes I know it's a non-const reference, what you gonna do?
+	bool &is_polymorphic = struct_type->Struct.is_polymorphic;
+
+	Type *polymorphic_params = nullptr;
+	bool can_check_fields    = true;
+	bool is_poly_specialized = false;
 
 	if (st->polymorphic_params != nullptr) {
 		ast_node(field_list, FieldList, st->polymorphic_params);
@@ -489,12 +493,11 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 	struct_type->Struct.scope                   = ctx->scope;
 	struct_type->Struct.is_packed               = st->is_packed;
 	struct_type->Struct.polymorphic_params      = polymorphic_params;
-	struct_type->Struct.is_polymorphic          = is_polymorphic;
 	struct_type->Struct.is_poly_specialized     = is_poly_specialized;
 
 
 	if (!is_polymorphic) {
-		check_struct_fields(ctx, node, &struct_type->Struct.fields, st->fields, min_field_count, named_type, context);
+		check_struct_fields(ctx, node, &struct_type->Struct.fields, st->fields, min_field_count, struct_type, context);
 	}
 
 	if (st->align != nullptr) {
