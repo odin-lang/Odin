@@ -5270,8 +5270,6 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 					ir_mangle_add_sub_type_name(m, sub, name);
 				}
 			}
-		} else {
-			GB_PANIC("Unknown poly type %s %p", type_to_string(e->type), e);
 		}
 		return;
 	}
