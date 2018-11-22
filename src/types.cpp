@@ -1120,30 +1120,30 @@ TypeTuple *get_record_polymorphic_params(Type *t) {
 }
 
 
-bool is_type_polymorphic(Type *t) {
+bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 	switch (t->kind) {
 	case Type_Generic:
 		return true;
 
 	case Type_Named:
-		return is_type_polymorphic(t->Named.base);
+		return is_type_polymorphic(t->Named.base, or_specialized);
 	case Type_Opaque:
-		return is_type_polymorphic(t->Opaque.elem);
+		return is_type_polymorphic(t->Opaque.elem, or_specialized);
 	case Type_Pointer:
-		return is_type_polymorphic(t->Pointer.elem);
+		return is_type_polymorphic(t->Pointer.elem, or_specialized);
 	case Type_Array:
 		if (t->Array.generic_count != nullptr) {
 			return true;
 		}
-		return is_type_polymorphic(t->Array.elem);
+		return is_type_polymorphic(t->Array.elem, or_specialized);
 	case Type_DynamicArray:
-		return is_type_polymorphic(t->DynamicArray.elem);
+		return is_type_polymorphic(t->DynamicArray.elem, or_specialized);
 	case Type_Slice:
-		return is_type_polymorphic(t->Slice.elem);
+		return is_type_polymorphic(t->Slice.elem, or_specialized);
 
 	case Type_Tuple:
 		for_array(i, t->Tuple.variables) {
-			if (is_type_polymorphic(t->Tuple.variables[i]->type)) {
+			if (is_type_polymorphic(t->Tuple.variables[i]->type, or_specialized)) {
 				return true;
 			}
 		}
@@ -1155,11 +1155,11 @@ bool is_type_polymorphic(Type *t) {
 		}
 		#if 1
 		if (t->Proc.param_count > 0 &&
-		    is_type_polymorphic(t->Proc.params)) {
+		    is_type_polymorphic(t->Proc.params, or_specialized)) {
 			return true;
 		}
 		if (t->Proc.result_count > 0 &&
-		    is_type_polymorphic(t->Proc.results)) {
+		    is_type_polymorphic(t->Proc.results, or_specialized)) {
 			return true;
 		}
 		#endif
@@ -1168,14 +1168,20 @@ bool is_type_polymorphic(Type *t) {
 	case Type_Enum:
 		if (t->kind == Type_Enum) {
 			if (t->Enum.base_type != nullptr) {
-				return is_type_polymorphic(t->Enum.base_type);
+				return is_type_polymorphic(t->Enum.base_type, or_specialized);
 			}
 			return false;
 		}
 		break;
 	case Type_Union:
+		if (t->Union.is_polymorphic) {
+			return true;
+		}
+		if (or_specialized && t->Union.is_poly_specialized) {
+			return true;
+		}
 		for_array(i, t->Union.variants) {
-		    if (is_type_polymorphic(t->Union.variants[i])) {
+		    if (is_type_polymorphic(t->Union.variants[i], or_specialized)) {
 		    	return true;
 		    }
 		}
@@ -1184,18 +1190,16 @@ bool is_type_polymorphic(Type *t) {
 		if (t->Struct.is_polymorphic) {
 			return true;
 		}
-		for_array(i, t->Struct.fields) {
-		    if (is_type_polymorphic(t->Struct.fields[i]->type)) {
-		    	return true;
-		    }
+		if (or_specialized && t->Struct.is_poly_specialized) {
+			return true;
 		}
 		break;
 
 	case Type_Map:
-		if (is_type_polymorphic(t->Map.key)) {
+		if (is_type_polymorphic(t->Map.key, or_specialized)) {
 			return true;
 		}
-		if (is_type_polymorphic(t->Map.value)) {
+		if (is_type_polymorphic(t->Map.value, or_specialized)) {
 			return true;
 		}
 		break;

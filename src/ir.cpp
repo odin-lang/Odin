@@ -5163,7 +5163,7 @@ String ir_mangle_name(irGen *s, Entity *e) {
 
 
 	isize max_len = pkgn.len + 1 + name.len + 1;
-	bool require_suffix_id = is_type_polymorphic(e->type);
+	bool require_suffix_id = is_type_polymorphic(e->type, true);
 	if (require_suffix_id) {
 		max_len += 21;
 	}
@@ -5192,7 +5192,7 @@ void ir_mangle_add_sub_type_name(irModule *m, Entity *field, String parent) {
 
 	String cn = field->token.string;
 	isize max_len = parent.len + 1 + 16 + 1 + cn.len;
-	bool require_suffix_id = is_type_polymorphic(field->type);
+	bool require_suffix_id = is_type_polymorphic(field->type, true);
 	if (require_suffix_id) {
 		max_len += 21;
 	}
@@ -5325,6 +5325,8 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 					ir_mangle_add_sub_type_name(m, sub, name);
 				}
 			}
+		} else {
+			GB_PANIC("Unknown poly type %s %p", type_to_string(e->type), e);
 		}
 		return;
 	}
