@@ -2593,21 +2593,20 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc) {
 
 irDebugInfo *ir_add_debug_info_location(irModule *m, Ast *node, irDebugInfo *scope, Entity *e) {
 	if (node == nullptr || scope == nullptr) {
-		if (e == nullptr) {
-			return nullptr;
-		} else if (scope != nullptr) {
-			irDebugInfo **existing = map_get(&m->debug_info, hash_entity(e));
-			if (existing != nullptr) {
-				return *existing;
-			}
+		if (e != nullptr && scope != nullptr) {
+			// irDebugInfo **existing = map_get(&m->debug_info, hash_entity(e));
+			// if (existing != nullptr) {
+			// 	return *existing;
+			// }
 
-			// TODO HACK(bill): This is a little dirty but it is should do for the weird edge cases
-			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Location);
-			di->Location.pos = e->token.pos;
-			di->Location.scope = scope;
-			map_set(&m->debug_info, hash_entity(e), di);
-			return di;
+			// // TODO HACK(bill): This is a little dirty but it is should do for the weird edge cases
+			// irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Location);
+			// di->Location.pos = e->token.pos;
+			// di->Location.scope = scope;
+			// map_set(&m->debug_info, hash_entity(e), di);
+			// return di;
 		}
+		return nullptr;
 	}
 	// TODO(lachsinc): Should we traverse the node/children until we find one with
 	// valid token/pos and use that instead??

@@ -278,7 +278,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		return false;
 	}
 
-
 	auto *found_gen_procs = map_get(&nctx.info->gen_procs, hash_pointer(base_entity->identifier));
 	if (found_gen_procs) {
 		auto procs = *found_gen_procs;
@@ -304,12 +303,13 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		// NOTE(bill): Reset scope from the failed procedure type
 		scope_reset(scope);
 
-		success = check_procedure_type(&nctx, final_proc_type, pt->node, &operands);
+		// LEAK TODO(bill): Cloning this AST may be leaky
+		Ast *cloned_proc_type_node = clone_ast(pt->node);
+		success = check_procedure_type(&nctx, final_proc_type, cloned_proc_type_node, &operands);
 
 		if (!success) {
 			return false;
 		}
-
 
 		if (found_gen_procs) {
 			auto procs = *found_gen_procs;
