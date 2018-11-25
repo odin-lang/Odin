@@ -226,9 +226,9 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	case Allocator_Mode.Free:
 		last_ptr := rawptr(&scratch.data[scratch.prev_offset]);
 		if old_memory == last_ptr {
-			size := scratch.curr_offset - scratch.prev_offset;
+			full_size := scratch.curr_offset - scratch.prev_offset;
 			scratch.curr_offset = scratch.prev_offset;
-			zero(last_ptr, size);
+			zero(last_ptr, full_size);
 			return nil;
 		}
 		// NOTE(bill): It's scratch memory, don't worry about freeing

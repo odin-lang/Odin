@@ -843,7 +843,6 @@ fmt_bit_set :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
 	case runtime.Type_Info_Bit_Set:
 		bits: u64;
 		bit_size := u64(8*type_info.size);
-		verb := 'b';
 
 		switch bit_size {
 		case  0: bits = 0;
@@ -886,7 +885,7 @@ fmt_bit_set :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
 		}
 	}
 }
-fmt_bit_field :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
+fmt_bit_field :: proc(fi: ^Fmt_Info, v: any, bit_field_name: string = "") {
 	type_info := type_info_of(v.id);
 	switch info in type_info.variant {
 	case runtime.Type_Info_Named:
@@ -902,8 +901,8 @@ fmt_bit_field :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
 		case 8: data = cast(u64)(^u64)(v.data)^;
 		}
 
-		if name != "" {
-			write_string(fi.buf, name);
+		if bit_field_name != "" {
+			write_string(fi.buf, bit_field_name);
 			write_byte(fi.buf, '{');
 		} else {
 			write_string(fi.buf, "bit_field{");

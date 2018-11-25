@@ -320,6 +320,8 @@ void check_open_scope(CheckerContext *c, Ast *node) {
 	case Ast_StructType:
 	case Ast_EnumType:
 	case Ast_UnionType:
+	case Ast_BitFieldType:
+	case Ast_BitSetType:
 		scope->flags |= ScopeFlag_Type;
 		break;
 	}
@@ -413,41 +415,160 @@ GB_COMPARE_PROC(entity_variable_pos_cmp) {
 }
 
 
+enum VettedEntityKind {
+	VettedEntity_Invalid,
+
+	VettedEntity_Unused,
+	VettedEntity_Shadowed,
+};
+struct VettedEntity {
+	VettedEntityKind kind;
+	Entity *entity;
+	Entity *other;
+};
+void init_vetted_entity(VettedEntity *ve, VettedEntityKind kind, Entity *entity, Entity *other=nullptr)  {
+	ve->kind = kind;
+	ve->entity = entity;
+	ve->other = other;
+}
+
+
+GB_COMPARE_PROC(vetted_entity_variable_pos_cmp) {
+	Entity *x = (*cast(VettedEntity **)a)->entity;
+	Entity *y = (*cast(VettedEntity **)b)->entity;
+
+	return token_pos_cmp(x->token.pos, y->token.pos);
+}
+
+
+
+bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
+	if (e->kind != Entity_Variable) {
+		return false;
+	}
+	String name = e->token.string;
+	if (name == "_") {
+		return false;
+	}
+	if (e->flags & EntityFlag_Param) {
+		return false;
+	}
+
+	if (e->scope->flags & (ScopeFlag_Global|ScopeFlag_File|ScopeFlag_Proc)) {
+		return false;
+	}
+
+	Scope *parent = e->scope->parent;
+	if (parent->flags & (ScopeFlag_Global|ScopeFlag_File)) {
+		return false;
+	}
+
+	Entity *shadowed = scope_lookup(parent, name);
+	if (shadowed == nullptr) {
+		return false;
+	}
+	if (shadowed->kind != Entity_Variable) {
+		return false;
+	}
+
+	if (shadowed->scope->flags & (ScopeFlag_Global|ScopeFlag_File)) {
+		// return false;
+	}
+
+	// NOTE(bill): The entities must be in the same file
+	if (e->token.pos.file != shadowed->token.pos.file) {
+		return false;
+	}
+	// NOTE(bill): The shaded identifier must appear before this one to be an
+	// instance of shadowing
+	if (token_pos_cmp(shadowed->token.pos, e->token.pos) > 0) {
+		return false;
+	}
+	// NOTE(bill): If the types differ, don't complain
+	if (are_types_identical(e->type, shadowed->type)) {
+		gb_zero_item(ve);
+		ve->kind = VettedEntity_Shadowed;
+		ve->entity = e;
+		ve->other = shadowed;
+		return true;
+	}
+
+	return false;
+}
+
+bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
+	if ((e->flags&EntityFlag_Used) == 0) {
+		switch (e->kind) {
+		case Entity_Variable:
+		case Entity_ImportName:
+		case Entity_LibraryName:
+		gb_zero_item(ve);
+			ve->kind = VettedEntity_Unused;
+			ve->entity = e;
+			return true;
+		}
+	}
+	return false;
+}
+
 void check_scope_usage(Checker *c, Scope *scope) {
-	// TODO(bill): Use this?
-#if 0
-	Array<Entity *> unused = {};
-	array_init(&unused, heap_allocator());
-	defer (array_free(&unused));
+	if (!build_context.vet) {
+		return;
+	}
+
+	bool vet_unused = true;
+	bool vet_shadowing = true;
+
+	Array<VettedEntity> vetted_entities = {};
+	array_init(&vetted_entities, heap_allocator());
 
 	for_array(i, scope->elements.entries) {
 		Entity *e = scope->elements.entries[i].value;
-		if (e != nullptr && (e->flags&EntityFlag_Used) == 0) {
-			switch (e->kind) {
-			case Entity_Variable:
-			case Entity_ImportName:
-			case Entity_LibraryName:
-				array_add(&unused, e);
-				break;
-			}
+		if (e == nullptr) continue;
+		VettedEntity ve = {};
+		if (vet_unused && check_vet_unused(c, e, &ve)) {
+			array_add(&vetted_entities, ve);
+		}
+		if (vet_shadowing && check_vet_shadowing(c, e, &ve)) {
+			array_add(&vetted_entities, ve);
 		}
 	}
 
-	gb_sort_array(unused.data, unused.count, entity_variable_pos_cmp);
+	gb_sort_array(vetted_entities.data, vetted_entities.count, vetted_entity_variable_pos_cmp);
 
-	for_array(i, unused) {
-		Entity *e = unused[i];
-		error(e->token, "'%.*s' declared but not used", LIT(e->token.string));
+	for_array(i, vetted_entities) {
+		auto ve = vetted_entities[i];
+		Entity *e = ve.entity;
+		Entity *other = ve.other;
+		String name = e->token.string;
+
+		switch (ve.kind) {
+		case VettedEntity_Unused:
+			error(e->token, "'%.*s' declared but not used", LIT(name));
+			break;
+		case VettedEntity_Shadowed:
+			if (e->flags&EntityFlag_Using) {
+				error(e->token, "Declaration of '%.*s' from 'using' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
+			} else {
+				error(e->token, "Declaration of '%.*s' shadows declaration at line %lld", LIT(name), cast(long long)other->token.pos.line);
+			}
+			break;
+		default:
+			break;
+		}
 	}
+
+	array_free(&vetted_entities);
 
 	for (Scope *child = scope->first_child;
 	     child != nullptr;
 	     child = child->next) {
-		if (!child->is_proc && !child->is_struct && !child->is_file) {
+		if (child->flags & (ScopeFlag_Proc|ScopeFlag_Type|ScopeFlag_File)) {
+			// Ignore these
+		} else {
 			check_scope_usage(c, child);
 		}
 	}
-#endif
 }
 
 
