@@ -408,7 +408,6 @@ parametric_polymorphism :: proc() {
 				}
 				assert(table.count <= len(table.slots));
 
-				hash := get_hash(key);
 				index = int(hash % u32(len(table.slots)));
 
 				for table.slots[index].occupied {

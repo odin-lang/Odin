@@ -214,6 +214,7 @@ enum BuildFlagKind {
 	BuildFlag_NoBoundsCheck,
 	BuildFlag_NoCRT,
 	BuildFlag_UseLLD,
+	BuildFlag_Vet,
 
 	BuildFlag_COUNT,
 };
@@ -256,6 +257,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),          BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),             BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),             BuildFlagParam_None);
 
 	GB_ASSERT(args.count >= 3);
 	Array<String> flag_args = array_slice(args, 3, args.count);
@@ -562,6 +564,10 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_UseLLD:
 							build_context.use_lld = true;
+							break;
+
+						case BuildFlag_Vet:
+							build_context.vet = true;
 							break;
 						}
 					}

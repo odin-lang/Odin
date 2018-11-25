@@ -349,7 +349,6 @@ enum ScopeFlag {
 	ScopeFlag_Proc   = 1<<5,
 	ScopeFlag_Type   = 1<<6,
 
-
 	ScopeFlag_HasBeenImported = 1<<10, // This is only applicable to file scopes
 };
 
