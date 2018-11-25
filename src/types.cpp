@@ -215,6 +215,11 @@ String const type_strings[] = {
 	TYPE_KINDS
 #undef TYPE_KIND
 
+enum TypeFlag : u32 {
+	TypeFlag_Polymorphic     = 1<<1,
+	TypeFlag_PolySpecialized = 1<<2,
+};
+
 struct Type {
 	TypeKind kind;
 	union {
@@ -226,6 +231,7 @@ struct Type {
 	// NOTE(bill): These need to be at the end to not affect the unionized data
 	i64  cached_size;
 	i64  cached_align;
+	u32  flags; // TypeFlag
 	bool failure;
 };
 
@@ -1072,6 +1078,7 @@ bool is_type_indexable(Type *t) {
 	return false;
 }
 
+
 bool is_type_polymorphic_record(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
@@ -1080,6 +1087,18 @@ bool is_type_polymorphic_record(Type *t) {
 		return t->Union.is_polymorphic;
 	}
 	return false;
+}
+
+Scope *polymorphic_record_parent_scope(Type *t) {
+	t = base_type(t);
+	if (is_type_polymorphic_record(t)) {
+		if (t->kind == Type_Struct) {
+			return t->Struct.scope->parent;
+		} else if (t->kind == Type_Union) {
+			return t->Union.scope->parent;
+		}
+	}
+	return nullptr;
 }
 
 bool is_type_polymorphic_record_specialized(Type *t) {

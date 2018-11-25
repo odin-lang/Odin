@@ -27,7 +27,7 @@ struct CallArgumentData {
 };
 
 struct PolyProcData {
-	Entity *      gen_entity;
+	Entity * gen_entity;
 	ProcInfo proc_info;
 };
 
@@ -4818,7 +4818,6 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 	ast_node(ce, CallExpr, call);
 
 	Type *original_type = operand->type;
-	Type *struct_type = base_type(operand->type);
 	GB_ASSERT(is_type_polymorphic_record(original_type));
 
 	bool show_error = true;
@@ -4983,6 +4982,11 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 
 		String generated_name = make_string_c(expr_to_string(call));
 
+		CheckerContext ctx = *c;
+		// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
+		ctx.scope = polymorphic_record_parent_scope(original_type);
+		GB_ASSERT(ctx.scope != nullptr);
+
 		Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
 		Type *bt = base_type(original_type);
 		if (bt->kind == Type_Struct) {
@@ -4992,9 +4996,9 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 			struct_type->Struct.polymorphic_parent = original_type;
 			set_base_type(named_type, struct_type);
 
-			check_open_scope(c, node);
-			check_struct_type(c, struct_type, node, &ordered_operands, named_type, original_type);
-			check_close_scope(c);
+			check_open_scope(&ctx, node);
+			check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type);
+			check_close_scope(&ctx);
 		} else if (bt->kind == Type_Union) {
 			Ast *node = clone_ast(bt->Union.node);
 			Type *union_type = alloc_type_union();
@@ -5002,9 +5006,9 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 			union_type->Union.polymorphic_parent = original_type;
 			set_base_type(named_type, union_type);
 
-			check_open_scope(c, node);
-			check_union_type(c, union_type, node, &ordered_operands, named_type, original_type);
-			check_close_scope(c);
+			check_open_scope(&ctx, node);
+			check_union_type(&ctx, union_type, node, &ordered_operands, named_type, original_type);
+			check_close_scope(&ctx);
 		} else {
 			GB_PANIC("Unsupported parametric polymorphic record type");
 		}
