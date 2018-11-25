@@ -2521,6 +2521,12 @@ Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type) {
 		type->Named.base = t_invalid;
 	}
 
+	if (is_type_polymorphic(type)) {
+		type->flags |= TypeFlag_Polymorphic;
+	} else if (is_type_polymorphic(type, true)) {
+		type->flags |= TypeFlag_PolySpecialized;
+	}
+
 	#if 0
 	if (!ctx->allow_polymorphic_types && is_type_polymorphic(type)) {
 		gbString str = type_to_string(type);
