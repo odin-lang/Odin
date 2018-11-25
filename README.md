@@ -72,6 +72,8 @@ main :: proc() {
 
 ## Requirements to build and run
 
+Please read the [Getting Started Guide](https://github.com/odin-lang/Odin/wiki#getting-started-with-odin).
+
 - Windows
 	* x86-64
 	* MSVC 2010 installed (C++11 support)
