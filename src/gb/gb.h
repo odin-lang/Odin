@@ -763,7 +763,7 @@ extern "C++" {
 #ifndef GB_ASSERT_MSG
 #define GB_ASSERT_MSG(cond, msg, ...) do { \
 	if (!(cond)) { \
-		gb_assert_handler(#cond, __FILE__, cast(i64)__LINE__, msg, ##__VA_ARGS__); \
+		gb_assert_handler("Assertion Failure", #cond, __FILE__, cast(i64)__LINE__, msg, ##__VA_ARGS__); \
 		GB_DEBUG_TRAP(); \
 	} \
 } while (0)
@@ -779,10 +779,13 @@ extern "C++" {
 
 // NOTE(bill): Things that shouldn't happen with a message!
 #ifndef GB_PANIC
-#define GB_PANIC(msg, ...) GB_ASSERT_MSG(0, msg, ##__VA_ARGS__)
+#define GB_PANIC(msg, ...) do { \
+	gb_assert_handler("Panic", NULL, __FILE__, cast(i64)__LINE__, msg, ##__VA_ARGS__); \
+	GB_DEBUG_TRAP(); \
+} while (0)
 #endif
 
-GB_DEF void gb_assert_handler(char const *condition, char const *file, i32 line, char const *msg, ...);
+GB_DEF void gb_assert_handler(char const *prefix, char const *condition, char const *file, i32 line, char const *msg, ...);
 
 
 
@@ -3613,8 +3616,8 @@ extern "C" {
 #pragma warning(disable:4127) // Conditional expression is constant
 #endif
 
-void gb_assert_handler(char const *condition, char const *file, i32 line, char const *msg, ...) {
-	gb_printf_err("%s(%d): Assert Failure: ", file, line);
+void gb_assert_handler(char const *prefix, char const *condition, char const *file, i32 line, char const *msg, ...) {
+	gb_printf_err("%s(%d): %s: ", file, line, prefix);
 	if (condition)
 		gb_printf_err( "`%s` ", condition);
 	if (msg) {
