@@ -846,7 +846,7 @@ void     ir_build_proc          (irValue *value, irProcedure *parent);
 void     ir_gen_global_type_name(irModule *m, Entity *e, String name);
 irValue *ir_get_type_info_ptr   (irProcedure *proc, Type *type);
 void     ir_value_set_debug_location(irProcedure *proc, irValue *v);
-void     ir_push_debug_location (irModule *m, Ast *node, irDebugInfo *scope);
+void     ir_push_debug_location (irModule *m, Ast *node, irDebugInfo *scope, Entity *e=nullptr);
 void     ir_pop_debug_location  (irModule *m);
 irDebugInfo *ir_add_debug_info_local(irProcedure *proc, Entity *e, i32 arg_id);
 irDebugInfo *ir_add_debug_info_file(irModule *module, AstFile *file);
@@ -1513,7 +1513,8 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initial
 	}
 
 	// if (proc->module->generate_debug_info && expr != nullptr && proc->entity != nullptr) {
-	if (proc->module->generate_debug_info && proc->entity != nullptr) {
+	// if (proc->module->generate_debug_info && proc->entity != nullptr) {
+	if (proc->module->generate_debug_info) {
 		// GB_ASSERT_NOT_NULL(proc->debug_scope);
 		if (expr != nullptr) {
 			ir_emit(proc, ir_instr_debug_declare(proc, expr, e, true, instr));
@@ -1589,7 +1590,7 @@ irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type, i
 	irValue *v = ir_value_param(proc, e, abi_type);
 	irValueParam *p = &v->Param;
 
-	ir_push_debug_location(proc->module, e ? e->identifier : nullptr, proc->debug_scope);
+	ir_push_debug_location(proc->module, e ? e->identifier : nullptr, proc->debug_scope, e);
 	defer (ir_pop_debug_location(proc->module));
 
 	switch (p->kind) {
@@ -2590,9 +2591,23 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc) {
 	return di;
 }
 
-irDebugInfo *ir_add_debug_info_location(irModule *m, Ast *node, irDebugInfo *scope) {
+irDebugInfo *ir_add_debug_info_location(irModule *m, Ast *node, irDebugInfo *scope, Entity *e) {
 	if (node == nullptr || scope == nullptr) {
-		return nullptr;
+		if (e == nullptr) {
+			return nullptr;
+		} else if (scope != nullptr) {
+			irDebugInfo **existing = map_get(&m->debug_info, hash_entity(e));
+			if (existing != nullptr) {
+				return *existing;
+			}
+
+			// TODO HACK(bill): This is a little dirty but it is should do for the weird edge cases
+			irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_Location);
+			di->Location.pos = e->token.pos;
+			di->Location.scope = scope;
+			map_set(&m->debug_info, hash_entity(e), di);
+			return di;
+		}
 	}
 	// TODO(lachsinc): Should we traverse the node/children until we find one with
 	// valid token/pos and use that instead??
@@ -2607,8 +2622,8 @@ irDebugInfo *ir_add_debug_info_location(irModule *m, Ast *node, irDebugInfo *sco
 	return di;
 }
 
-void ir_push_debug_location(irModule *m, Ast *node, irDebugInfo *scope) {
-	irDebugInfo *debug_location = ir_add_debug_info_location(m, node, scope);
+void ir_push_debug_location(irModule *m, Ast *node, irDebugInfo *scope, Entity *e) {
+	irDebugInfo *debug_location = ir_add_debug_info_location(m, node, scope, e);
 	array_add(&m->debug_location_stack, debug_location);
 }
 
@@ -2666,9 +2681,18 @@ void ir_value_set_debug_location(irProcedure *proc, irValue *v) {
 	v->loc = *array_end_ptr(&m->debug_location_stack);
 
 	if (v->loc == nullptr && proc->entity != nullptr) {
-		// NOTE(lachsinc): Entry point (main()) and runtime_startup are the only ones where null location is considered valid.
-		GB_ASSERT_MSG(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0),
-		              "%.*s %p", LIT(proc->name), proc->entity);
+		if (proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0)) {
+			// NOTE(lachsinc): Entry point (main()) and runtime_startup are the only ones where null location is considered valid.
+		} else {
+			if (v->kind == irValue_Instr) {
+				auto *instr = &v->Instr;
+				gb_printf_err("Instruction kind: %.*s\n", LIT(ir_instr_strings[instr->kind]));
+				if (instr->kind == irInstr_DebugDeclare) {
+					gb_printf_err("\t%.*s\n", LIT(instr->DebugDeclare.entity->token.string));
+				}
+			}
+			GB_PANIC("Value wihout debug location: %.*s %p; %p", LIT(proc->name), proc->entity, v);
+		}
 	}
 }
 
@@ -8543,7 +8567,6 @@ void ir_begin_procedure_body(irProcedure *proc) {
 		ir_push_debug_location(proc->module, proc->entity->identifier, proc->debug_scope);
 		GB_ASSERT_NOT_NULL(proc->debug_scope);
 	} else {
-		// GB_ASSERT(proc->is_entry_point || (string_compare(proc->name, str_lit(IR_STARTUP_RUNTIME_PROC_NAME)) == 0));
 		ir_push_debug_location(proc->module, nullptr, nullptr);
 	}
 
