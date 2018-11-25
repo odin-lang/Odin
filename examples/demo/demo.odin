@@ -814,6 +814,21 @@ bit_set_type :: proc() {
 		y |= {1, 4, 2};
 		assert(2 in y);
 	}
+	{
+		Letters :: bit_set['A'..'Z'];
+		a := Letters{'A', 'B'};
+		b := Letters{'A', 'B', 'C', 'D', 'F'};
+		c := Letters{'A', 'B'};
+
+
+		assert(a <= b); // 'a' is a subset of 'b'
+		assert(b >= a); // 'b' is a superset of 'a'
+		assert(a < b);  // 'a' is a strict subset of 'b'
+		assert(b > a);  // 'b' is a strict superset of 'a'
+
+		assert(!(a < c)); // 'a' is a not strict subset of 'c'
+		assert(!(c > a)); // 'c' is a not strict superset of 'a'
+	}
 }
 
 diverging_procedures :: proc() {

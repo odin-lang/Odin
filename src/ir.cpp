@@ -3823,6 +3823,37 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 		return ir_emit_runtime_call(proc, runtime_proc, args);
 	}
 
+	if (is_type_bit_set(a)) {
+		switch (op_kind) {
+		case Token_Lt:
+		case Token_LtEq:
+		case Token_Gt:
+		case Token_GtEq:
+			{
+				Type *it = bit_set_to_int(a);
+				irValue *lhs = ir_emit_bitcast(proc, left, it);
+				irValue *rhs = ir_emit_bitcast(proc, right, it);
+				irValue *res = ir_emit_arith(proc, Token_And, lhs, rhs, it);
+
+				if (op_kind == Token_Lt || op_kind == Token_LtEq) {
+					// (lhs & rhs) == lhs
+					res = ir_emit(proc, ir_instr_binary_op(proc, Token_CmpEq, res, lhs, t_llvm_bool));
+				} else if (op_kind == Token_Gt || op_kind == Token_GtEq) {
+					// (lhs & rhs) == rhs
+					res = ir_emit(proc, ir_instr_binary_op(proc, Token_CmpEq, res, rhs, t_llvm_bool));
+				}
+
+				// NOTE(bill): Strict subsets
+				if (op_kind == Token_Lt || op_kind == Token_Gt) {
+					// res &~ (lhs == rhs)
+					irValue *eq = ir_emit(proc, ir_instr_binary_op(proc, Token_CmpEq, lhs, rhs, t_llvm_bool));
+					res = ir_emit_arith(proc, Token_AndNot, res, eq, t_llvm_bool);
+				}
+
+				return res;
+			}
+		}
+	}
 
 	return ir_emit(proc, ir_instr_binary_op(proc, op_kind, left, right, t_llvm_bool));
 }
@@ -6168,7 +6199,6 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 
 					Type *key_type = rt->BitSet.elem;
 					GB_ASSERT(are_types_identical(ir_type(left), key_type));
-
 					Type *it = bit_set_to_int(rt);
 					left = ir_emit_conv(proc, left, it);
 

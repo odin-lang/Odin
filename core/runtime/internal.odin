@@ -22,13 +22,13 @@ print_u64 :: proc(fd: os.Handle, u: u64) {
 
 print_i64 :: proc(fd: os.Handle, u: i64) {
 	digits := "0123456789";
+	b :: i64(10);
 
 	neg := u < 0;
 	u = abs(u);
 
 	a: [129]byte;
 	i := len(a);
-	b := i64(10);
 	for u >= b {
 		i -= 1; a[i] = digits[u % b];
 		u /= b;

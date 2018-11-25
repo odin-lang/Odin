@@ -85,14 +85,14 @@ struct Entity {
 	Token       token;
 	Scope *     scope;
 	Type *      type;
-	Ast *   identifier; // Can be nullptr
+	Ast *       identifier; // Can be nullptr
 	DeclInfo *  decl_info;
 	DeclInfo *  parent_proc_decl; // nullptr if in file/global scope
 	AstPackage *pkg;
 
 	// TODO(bill): Cleanup how `using` works for entities
 	Entity *    using_parent;
-	Ast *   using_expr;
+	Ast *       using_expr;
 
 	isize       order_in_src;
 	String      deprecated_message;
@@ -109,7 +109,7 @@ struct Entity {
 
 			String     thread_local_model;
 			Entity *   foreign_library;
-			Ast *  foreign_library_ident;
+			Ast *      foreign_library_ident;
 			String     link_name;
 			String     link_prefix;
 			bool       is_foreign;
@@ -117,9 +117,9 @@ struct Entity {
 			bool       is_immutable;
 		} Variable;
 		struct {
-			bool   is_type_alias;
 			Type * type_parameter_specialization;
 			String ir_mangled_name;
+			bool   is_type_alias;
 		} TypeName;
 		struct {
 			u64     tags;
