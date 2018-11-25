@@ -1558,7 +1558,11 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 		case Token_Gt:
 		case Token_LtEq:
 		case Token_GtEq:
-			defined = is_type_ordered(x->type) && is_type_ordered(y->type);
+			if (are_types_identical(x->type, y->type) && is_type_bit_set(x->type)) {
+				defined = true;
+			} else {
+				defined = is_type_ordered(x->type) && is_type_ordered(y->type);
+			}
 			break;
 		}
 
@@ -1596,7 +1600,42 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 		if (x->mode == Addressing_Constant &&
 		    y->mode == Addressing_Constant) {
 			if (is_type_constant_type(x->type)) {
-				x->value = exact_value_bool(compare_exact_values(op, x->value, y->value));
+				if (is_type_bit_set(x->type)) {
+					switch (op) {
+					case Token_CmpEq:
+					case Token_NotEq:
+						x->value = exact_value_bool(compare_exact_values(op, x->value, y->value));
+						break;
+					case Token_Lt:
+					case Token_LtEq:
+						{
+							ExactValue lhs = x->value;
+							ExactValue rhs = y->value;
+							ExactValue res = exact_binary_operator_value(Token_And, lhs, rhs);
+							res = exact_value_bool(compare_exact_values(op, res, lhs));
+							if (op == Token_Lt) {
+								res = exact_binary_operator_value(Token_And, res, exact_value_bool(compare_exact_values(op, lhs, rhs)));
+							}
+							x->value = res;
+							break;
+						}
+					case Token_Gt:
+					case Token_GtEq:
+						{
+							ExactValue lhs = x->value;
+							ExactValue rhs = y->value;
+							ExactValue res = exact_binary_operator_value(Token_And, lhs, rhs);
+							res = exact_value_bool(compare_exact_values(op, res, rhs));
+							if (op == Token_Gt) {
+								res = exact_binary_operator_value(Token_And, res, exact_value_bool(compare_exact_values(op, lhs, rhs)));
+							}
+							x->value = res;
+							break;
+						}
+					}
+				} else {
+					x->value = exact_value_bool(compare_exact_values(op, x->value, y->value));
+				}
 			} else {
 				x->mode = Addressing_Value;
 			}
@@ -2084,8 +2123,8 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 			add_package_dependency(c, "runtime", "__dynamic_map_get");
 		} else if (is_type_bit_set(y->type)) {
 			Type *yt = base_type(y->type);
-			check_assignment(c, x, yt->BitSet.elem, str_lit("bit_set 'in'"));
 
+			check_assignment(c, x, yt->BitSet.elem, str_lit("bit_set 'in'"));
 			if (x->mode == Addressing_Constant && y->mode == Addressing_Constant) {
 				ExactValue k = exact_value_to_integer(x->value);
 				ExactValue v = exact_value_to_integer(y->value);
@@ -2109,7 +2148,6 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 					x->mode = Addressing_Invalid;
 				}
 			}
-
 		} else {
 			gbString t = type_to_string(y->type);
 			error(x->expr, "expected either a map or bitset for 'in', got %s", t);

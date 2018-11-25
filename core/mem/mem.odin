@@ -67,12 +67,41 @@ copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawpt
 compare :: proc "contextless" (a, b: []byte) -> int {
 	return compare_byte_ptrs(&a[0], &b[0], min(len(a), len(b)));
 }
-compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int {
-	pa :: ptr_offset;
-	for i in 0..n-1 do switch {
-	case pa(a, i)^ < pa(b, i)^: return -1;
-	case pa(a, i)^ > pa(b, i)^: return +1;
+compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int #no_bounds_check {
+	ptr_idx :: inline proc(ptr: $P/^$T, n: int) -> T {
+		return ptr_offset(ptr, n)^;
 	}
+
+	x := slice_ptr(a, n);
+	y := slice_ptr(b, n);
+
+	SU :: size_of(uintptr);
+	fast := n/SU + 1;
+	offset := (fast-1)*SU;
+	curr_block := 0;
+	if n < SU {
+		fast = 0;
+	}
+
+	la := slice_ptr((^uintptr)(a), fast);
+	lb := slice_ptr((^uintptr)(b), fast);
+
+	for /**/; curr_block < fast; curr_block += 1 {
+		if la[curr_block] ~ lb[curr_block] != 0 {
+			for pos := curr_block*SU; pos < n; pos += 1 {
+				if x[pos] ~ y[pos] != 0 {
+					return (int(x[pos]) - int(y[pos])) < 0 ? -1 : +1;
+				}
+			}
+		}
+	}
+
+	for /**/; offset < n; offset += 1 {
+		if x[offset] ~ y[offset] != 0 {
+			return (int(x[offset]) - int(y[offset])) < 0 ? -1 : +1;
+		}
+	}
+
 	return 0;
 }
 
