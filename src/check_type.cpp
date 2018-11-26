@@ -1566,6 +1566,9 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
 
 			add_entity(ctx->checker, scope, name, param);
+			if (is_using) {
+				add_entity_use(ctx, name, param);
+			}
 			array_add(&variables, param);
 		}
 	}
