@@ -1199,11 +1199,11 @@ bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		if (or_specialized && t->Union.is_poly_specialized) {
 			return true;
 		}
-		for_array(i, t->Union.variants) {
-		    if (is_type_polymorphic(t->Union.variants[i], or_specialized)) {
-		    	return true;
-		    }
-		}
+		// for_array(i, t->Union.variants) {
+		//     if (is_type_polymorphic(t->Union.variants[i], or_specialized)) {
+		//     	return true;
+		//     }
+		// }
 		break;
 	case Type_Struct:
 		if (t->Struct.is_polymorphic) {
