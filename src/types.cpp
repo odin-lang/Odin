@@ -1632,11 +1632,26 @@ i64 union_tag_size(Type *u) {
 		return 0;
 	}
 
+#if 1
+	// TODO(bill): Is this an okay approach?
+	i64 max_align = 1;
+	for_array(i, u->Union.variants) {
+		Type *variant_type = u->Union.variants[i];
+		i64 align = type_align_of(variant_type);
+		if (max_align < align) {
+			max_align = align;
+		}
+	}
+
+	u->Union.tag_size = gb_min(max_align, build_context.max_align);
+	return max_align;
+#else
 	i64 bytes = next_pow2(cast(i64)(floor_log2(n)/8 + 1));
 	i64 tag_size = gb_max(bytes, 1);
 
 	u->Union.tag_size = tag_size;
 	return tag_size;
+#endif
 }
 
 Type *union_tag_type(Type *u) {
