@@ -333,7 +333,7 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 
 	scope_reserve(ctx->scope, min_field_count);
 
-	if (st->is_raw_union) {
+	if (st->is_raw_union && min_field_count > 1) {
 		struct_type->Struct.is_raw_union = true;
 		context = str_lit("struct #raw_union");
 	}
