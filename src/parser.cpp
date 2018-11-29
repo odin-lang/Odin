@@ -4567,7 +4567,10 @@ GB_THREAD_PROC(parse_worker_file_proc) {
 	if (thread == nullptr) return 0;
 	auto *p = cast(Parser *)thread->user_data;
 	isize index = thread->user_index;
-	ParseFileError err = process_imported_file(p, p->files_to_process[index]);
+	gb_mutex_lock(&p->file_add_mutex);
+	auto file_to_process = p->files_to_process[index];
+	gb_mutex_unlock(&p->file_add_mutex);
+	ParseFileError err = process_imported_file(p, file_to_process);
 	return cast(isize)err;
 }
 
