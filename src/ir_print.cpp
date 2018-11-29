@@ -238,6 +238,32 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct = false
 void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hint);
 
 
+void ir_print_alignment_prefix_hack(irFileBuffer *f, i64 alignment) {
+	// NOTE(bill): This is written like this as it may need to
+	// changed for specific alignments
+	switch (alignment) {
+	case 1:
+		ir_write_string(f, str_lit("[0 x i8]"));
+		break;
+	case 2:
+		ir_write_string(f, str_lit("[0 x i16]"));
+		break;
+	case 4:
+		ir_write_string(f, str_lit("[0 x i32]"));
+		break;
+	case 8:
+		ir_write_string(f, str_lit("[0 x i64]"));
+		break;
+	case 16:
+		ir_write_string(f, str_lit("[0 x <4 x i32>]"));
+		break;
+	default:
+		GB_PANIC("Invalid alignment");
+		break;
+	}
+}
+
+
 void ir_print_proc_results(irFileBuffer *f, irModule *m, Type *t) {
 	GB_ASSERT(is_type_proc(t));
 	t = base_type(t);
@@ -398,8 +424,9 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 			i64 align = type_align_of(t);
 			i64 block_size =  t->Union.variant_block_size;
 
-			ir_fprintf(f, "{[0 x <%lld x i8>], ", align);
-			ir_fprintf(f, "[%lld x i8], ", block_size);
+			ir_write_byte(f, '{');
+			ir_print_alignment_prefix_hack(f, align);
+			ir_fprintf(f, ", [%lld x i8], ", block_size);
 			// ir_print_type(f, m, t_type_info_ptr);
 			ir_print_type(f, m, union_tag_type(t));
 			ir_write_byte(f, '}');
@@ -412,7 +439,9 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 			// LLVM takes the first element's alignment as the entire alignment (like C)
 			i64 size_of_union  = type_size_of(t);
 			i64 align_of_union = type_align_of(t);
-			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align_of_union, size_of_union);
+			ir_write_byte(f, '{');
+			ir_print_alignment_prefix_hack(f, align_of_union);
+			ir_fprintf(f, ", [%lld x i8]}", align_of_union, size_of_union);
 			return;
 		} else {
 			if (t->Struct.is_packed) {
@@ -420,7 +449,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 			}
 			ir_write_byte(f, '{');
 			if (t->Struct.custom_align > 0) {
-				ir_fprintf(f, "[0 x <%lld x i8>]", t->Struct.custom_align);
+				ir_print_alignment_prefix_hack(f, t->Struct.custom_align);
 				if (t->Struct.fields.count > 0) {
 					ir_write_string(f, str_lit(", "));
 				}
@@ -499,7 +528,9 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 	case Type_BitField: {
 		i64 align = type_align_of(t);
 		i64 size  = type_size_of(t);
-		ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align, size);
+		ir_write_byte(f, '{');
+		ir_print_alignment_prefix_hack(f, align);
+		ir_fprintf(f, ", [%lld x i8]}", size);
 		break;
 	}
 
@@ -1975,6 +2006,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	}
 }
 
+
 void ir_print_type_name(irFileBuffer *f, irModule *m, irValue *v) {
 	GB_ASSERT(v->kind == irValue_TypeName);
 	Type *t = base_type(v->TypeName.type);
@@ -1998,7 +2030,7 @@ void ir_print_type_name(irFileBuffer *f, irModule *m, irValue *v) {
 			}
 			ir_write_byte(f, '{');
 			if (t->Struct.custom_align > 0) {
-				ir_fprintf(f, "[0 x <%lld x i8>]", t->Struct.custom_align);
+				ir_print_alignment_prefix_hack(f, t->Struct.custom_align);
 			}
 			ir_write_byte(f, '}');
 			if (t->Struct.is_packed) {
