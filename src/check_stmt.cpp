@@ -1008,7 +1008,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	}
 
 	if (complete) {
-		Type *ut = base_type(x.type);
+		Type *ut = base_type(type_deref(x.type));
 		GB_ASSERT(is_type_union(ut));
 		auto variants = ut->Union.variants;
 
