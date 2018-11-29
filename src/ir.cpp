@@ -7027,9 +7027,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 					Type *fet = ir_type(field_expr);
 					// HACK TODO(bill): THIS IS A MASSIVE HACK!!!!
-					if (is_type_union(ft) && !are_types_identical(fet, ft)) {
-						GB_ASSERT(union_variant_index(ft, fet) > 0);
-
+					if (is_type_union(ft) && !are_types_identical(fet, ft) && !is_type_untyped(fet)) {
 						irValue *gep = ir_emit_struct_ep(proc, v, cast(i32)index);
 						ir_emit_store_union_variant(proc, gep, field_expr, fet);
 					} else {
