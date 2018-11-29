@@ -982,7 +982,7 @@ typedef struct gbThread {
 
 	gbSemaphore   semaphore;
 	isize         stack_size;
-	b32           is_running;
+	b32 volatile  is_running;
 } gbThread;
 
 GB_DEF void gb_thread_init            (gbThread *t);

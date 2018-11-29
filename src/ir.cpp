@@ -4330,7 +4330,6 @@ void ir_emit_store_union_variant(irProcedure *proc, irValue *parent, irValue *va
 	gbAllocator a = ir_allocator();
 	irValue *underlying = ir_emit_conv(proc, parent, alloc_type_pointer(variant_type));
 
-	irValue *v = variant;
 	ir_emit_store(proc, underlying, variant);
 
 	Type *t = type_deref(ir_type(parent));
@@ -7026,9 +7025,18 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 					GB_ASSERT(ir_type(field_expr)->kind != Type_Tuple);
 
-					irValue *fv = ir_emit_conv(proc, field_expr, ft);
-					irValue *gep = ir_emit_struct_ep(proc, v, cast(i32)index);
-					ir_emit_store(proc, gep, fv);
+					Type *fet = ir_type(field_expr);
+					// HACK TODO(bill): THIS IS A MASSIVE HACK!!!!
+					if (is_type_union(ft) && !are_types_identical(fet, ft)) {
+						GB_ASSERT(union_variant_index(ft, fet) > 0);
+
+						irValue *gep = ir_emit_struct_ep(proc, v, cast(i32)index);
+						ir_emit_store_union_variant(proc, gep, field_expr, fet);
+					} else {
+						irValue *fv = ir_emit_conv(proc, field_expr, ft);
+						irValue *gep = ir_emit_struct_ep(proc, v, cast(i32)index);
+						ir_emit_store(proc, gep, fv);
+					}
 				}
 			}
 			break;
