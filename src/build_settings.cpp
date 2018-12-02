@@ -80,6 +80,8 @@ struct BuildContext {
 	String ODIN_ROOT;    // Odin ROOT
 	bool   ODIN_DEBUG;   // Odin in debug mode
 
+	TargetEndianKind endian_kind;
+
 	// In bytes
 	i64    word_size; // Size of a pointer, must be >= 4
 	i64    max_align; // max alignment, must be >= 1 (and typically >= word_size)
@@ -539,6 +541,7 @@ void init_build_context(void) {
 	bc->ODIN_OS     = target_os_names[metrics.os];
 	bc->ODIN_ARCH   = target_arch_names[metrics.arch];
 	bc->ODIN_ENDIAN = target_endian_names[target_endians[metrics.arch]];
+	bc->endian_kind = target_endians[metrics.arch];
 	bc->word_size   = metrics.word_size;
 	bc->max_align   = metrics.max_align;
 	bc->link_flags  = str_lit(" ");

@@ -1304,6 +1304,13 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 		case Basic_i32:
 		case Basic_i64:
 		case Basic_int:
+
+		case Basic_i16le:
+		case Basic_i32le:
+		case Basic_i64le:
+		case Basic_i16be:
+		case Basic_i32be:
+		case Basic_i64be:
 			{
 				// return imin <= i && i <= imax;
 				int a = big_int_cmp(&imin, &i);
@@ -1318,6 +1325,12 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 		case Basic_uint:
 		case Basic_uintptr:
 
+		case Basic_u16le:
+		case Basic_u32le:
+		case Basic_u64le:
+		case Basic_u16be:
+		case Basic_u32be:
+		case Basic_u64be:
 			{
 				// return 0ull <= i && i <= umax;
 				int b = big_int_cmp(&i, &umax);

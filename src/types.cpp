@@ -40,6 +40,22 @@ enum BasicKind {
 
 	Basic_typeid,
 
+	// Endian Specific Types
+	Basic_i16le,
+	Basic_u16le,
+	Basic_i32le,
+	Basic_u32le,
+	Basic_i64le,
+	Basic_u64le,
+
+	Basic_i16be,
+	Basic_u16be,
+	Basic_i32be,
+	Basic_u32be,
+	Basic_i64be,
+	Basic_u64be,
+
+	// Untyped types
 	Basic_UntypedBool,
 	Basic_UntypedInteger,
 	Basic_UntypedFloat,
@@ -66,6 +82,9 @@ enum BasicFlag {
 	BasicFlag_Untyped     = GB_BIT(8),
 
 	BasicFlag_LLVM        = GB_BIT(10),
+
+	BasicFlag_EndianLittle = GB_BIT(13),
+	BasicFlag_EndianBig    = GB_BIT(14),
 
 	BasicFlag_Numeric        = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Complex,
 	BasicFlag_Ordered        = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
@@ -313,6 +332,22 @@ gb_global Type basic_types[] = {
 
 	{Type_Basic, {Basic_typeid,            0,                                         -1, STR_LIT("typeid")}},
 
+	// Endian
+	{Type_Basic, {Basic_i16le, BasicFlag_Integer |                      BasicFlag_EndianBig, 2, STR_LIT("i16le")}},
+	{Type_Basic, {Basic_u16le, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig, 2, STR_LIT("u16le")}},
+	{Type_Basic, {Basic_i32le, BasicFlag_Integer |                      BasicFlag_EndianBig, 4, STR_LIT("i32le")}},
+	{Type_Basic, {Basic_u32le, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig, 4, STR_LIT("u32le")}},
+	{Type_Basic, {Basic_i64le, BasicFlag_Integer |                      BasicFlag_EndianBig, 8, STR_LIT("i64le")}},
+	{Type_Basic, {Basic_u64le, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig, 8, STR_LIT("u64le")}},
+
+	{Type_Basic, {Basic_i16be, BasicFlag_Integer |                      BasicFlag_EndianBig, 2, STR_LIT("i16be")}},
+	{Type_Basic, {Basic_u16be, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig, 2, STR_LIT("u16be")}},
+	{Type_Basic, {Basic_i32be, BasicFlag_Integer |                      BasicFlag_EndianBig, 4, STR_LIT("i32be")}},
+	{Type_Basic, {Basic_u32be, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig, 4, STR_LIT("u32be")}},
+	{Type_Basic, {Basic_i64be, BasicFlag_Integer |                      BasicFlag_EndianBig, 8, STR_LIT("i64be")}},
+	{Type_Basic, {Basic_u64be, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig, 8, STR_LIT("u64be")}},
+
+	// Untyped types
 	{Type_Basic, {Basic_UntypedBool,       BasicFlag_Boolean    | BasicFlag_Untyped,   0, STR_LIT("untyped bool")}},
 	{Type_Basic, {Basic_UntypedInteger,    BasicFlag_Integer    | BasicFlag_Untyped,   0, STR_LIT("untyped integer")}},
 	{Type_Basic, {Basic_UntypedFloat,      BasicFlag_Float      | BasicFlag_Untyped,   0, STR_LIT("untyped float")}},
@@ -977,6 +1012,75 @@ bool is_type_map(Type *t) {
 	return t->kind == Type_Map;
 }
 
+
+bool is_type_integer_endian_big(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		if (t->Basic.flags & BasicFlag_EndianBig) {
+			return true;
+		} else if (t->Basic.flags & BasicFlag_EndianLittle) {
+			return false;
+		}
+	} else if (t->kind == Type_BitSet) {
+		return is_type_integer_endian_big(t->BitSet.elem);
+	} else {
+		GB_PANIC("Unsupported type: %s", type_to_string);
+	}
+	return build_context.endian_kind == TargetEndian_Big;
+}
+
+bool is_type_integer_endian_little(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		if (t->Basic.flags & BasicFlag_EndianLittle) {
+			return true;
+		} else if (t->Basic.flags & BasicFlag_EndianBig) {
+			return false;
+		}
+	} else if (t->kind == Type_BitSet) {
+		return is_type_integer_endian_little(t->BitSet.elem);
+	} else {
+		GB_PANIC("Unsupported type: %s", type_to_string);
+	}
+	return build_context.endian_kind == TargetEndian_Little;
+}
+
+bool is_type_different_to_arch_endianness(Type *t) {
+	switch (build_context.endian_kind) {
+	case TargetEndian_Little:
+		return !is_type_integer_endian_little(t);
+	case TargetEndian_Big:
+		return !is_type_integer_endian_big(t);
+	}
+	return false;
+}
+
+Type *integer_endian_type_to_platform_type(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_BitSet) {
+		t = core_type(t->BitSet.elem);
+	}
+	GB_ASSERT(t->kind == Type_Basic);
+
+	switch (t->Basic.kind) {
+	// Endian Specific Types
+	case Basic_i16le: return t_i16;
+	case Basic_u16le: return t_u16;
+	case Basic_i32le: return t_i32;
+	case Basic_u32le: return t_u32;
+	case Basic_i64le: return t_i64;
+	case Basic_u64le: return t_u64;
+
+	case Basic_i16be: return t_i16;
+	case Basic_u16be: return t_u16;
+	case Basic_i32be: return t_i32;
+	case Basic_u32be: return t_u32;
+	case Basic_i64be: return t_i64;
+	case Basic_u64be: return t_u64;
+	}
+
+	return t;
+}
 
 
 

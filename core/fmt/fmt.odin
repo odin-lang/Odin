@@ -3,6 +3,7 @@ package fmt
 import "core:runtime"
 import "core:os"
 import "core:mem"
+import "core:bits"
 import "core:unicode/utf8"
 import "core:types"
 import "core:strconv"
@@ -1278,6 +1279,20 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	case cstring: fmt_cstring(fi, a, verb);
 
 	case typeid:  write_typeid(fi.buf, a);
+
+	case i16le:     fmt_int(fi, u64(a), true,  16, verb);
+	case u16le:     fmt_int(fi, u64(a), false, 16, verb);
+	case i32le:     fmt_int(fi, u64(a), true,  32, verb);
+	case u32le:     fmt_int(fi, u64(a), false, 32, verb);
+	case i64le:     fmt_int(fi, u64(a), true,  64, verb);
+	case u64le:     fmt_int(fi, u64(a), false, 64, verb);
+
+	case i16be:     fmt_int(fi, u64(a), true,  16, verb);
+	case u16be:     fmt_int(fi, u64(a), false, 16, verb);
+	case i32be:     fmt_int(fi, u64(a), true,  32, verb);
+	case u32be:     fmt_int(fi, u64(a), false, 32, verb);
+	case i64be:     fmt_int(fi, u64(a), true,  64, verb);
+	case u64be:     fmt_int(fi, u64(a), false, 64, verb);
 
 	case: fmt_value(fi, arg, verb);
 	}
