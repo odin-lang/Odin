@@ -4372,6 +4372,9 @@ irValue *ir_emit_uintptr_to_ptr(irProcedure *proc, irValue *value, Type *t) {
 
 irValue *ir_emit_byte_swap(irProcedure *proc, irValue *value, Type *t) {
 	Type *vt = core_type(ir_type(value));
+	if (is_type_untyped(vt)) {
+		return value;
+	}
 	GB_ASSERT(type_size_of(vt) == type_size_of(t));
 	return ir_emit(proc, ir_instr_conv(proc, irConv_byteswap, value, vt, t));
 }
