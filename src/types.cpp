@@ -333,19 +333,19 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_typeid,            0,                                         -1, STR_LIT("typeid")}},
 
 	// Endian
-	{Type_Basic, {Basic_i16le, BasicFlag_Integer |                      BasicFlag_EndianBig, 2, STR_LIT("i16le")}},
-	{Type_Basic, {Basic_u16le, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig, 2, STR_LIT("u16le")}},
-	{Type_Basic, {Basic_i32le, BasicFlag_Integer |                      BasicFlag_EndianBig, 4, STR_LIT("i32le")}},
-	{Type_Basic, {Basic_u32le, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig, 4, STR_LIT("u32le")}},
-	{Type_Basic, {Basic_i64le, BasicFlag_Integer |                      BasicFlag_EndianBig, 8, STR_LIT("i64le")}},
-	{Type_Basic, {Basic_u64le, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig, 8, STR_LIT("u64le")}},
+	{Type_Basic, {Basic_i16le, BasicFlag_Integer |                      BasicFlag_EndianLittle, 2, STR_LIT("i16le")}},
+	{Type_Basic, {Basic_u16le, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianLittle, 2, STR_LIT("u16le")}},
+	{Type_Basic, {Basic_i32le, BasicFlag_Integer |                      BasicFlag_EndianLittle, 4, STR_LIT("i32le")}},
+	{Type_Basic, {Basic_u32le, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianLittle, 4, STR_LIT("u32le")}},
+	{Type_Basic, {Basic_i64le, BasicFlag_Integer |                      BasicFlag_EndianLittle, 8, STR_LIT("i64le")}},
+	{Type_Basic, {Basic_u64le, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianLittle, 8, STR_LIT("u64le")}},
 
-	{Type_Basic, {Basic_i16be, BasicFlag_Integer |                      BasicFlag_EndianBig, 2, STR_LIT("i16be")}},
-	{Type_Basic, {Basic_u16be, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig, 2, STR_LIT("u16be")}},
-	{Type_Basic, {Basic_i32be, BasicFlag_Integer |                      BasicFlag_EndianBig, 4, STR_LIT("i32be")}},
-	{Type_Basic, {Basic_u32be, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig, 4, STR_LIT("u32be")}},
-	{Type_Basic, {Basic_i64be, BasicFlag_Integer |                      BasicFlag_EndianBig, 8, STR_LIT("i64be")}},
-	{Type_Basic, {Basic_u64be, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig, 8, STR_LIT("u64be")}},
+	{Type_Basic, {Basic_i16be, BasicFlag_Integer |                      BasicFlag_EndianBig,    2, STR_LIT("i16be")}},
+	{Type_Basic, {Basic_u16be, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig,    2, STR_LIT("u16be")}},
+	{Type_Basic, {Basic_i32be, BasicFlag_Integer |                      BasicFlag_EndianBig,    4, STR_LIT("i32be")}},
+	{Type_Basic, {Basic_u32be, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig,    4, STR_LIT("u32be")}},
+	{Type_Basic, {Basic_i64be, BasicFlag_Integer |                      BasicFlag_EndianBig,    8, STR_LIT("i64be")}},
+	{Type_Basic, {Basic_u64be, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig,    8, STR_LIT("u64be")}},
 
 	// Untyped types
 	{Type_Basic, {Basic_UntypedBool,       BasicFlag_Boolean    | BasicFlag_Untyped,   0, STR_LIT("untyped bool")}},
@@ -395,6 +395,20 @@ gb_global Type *t_cstring         = &basic_types[Basic_cstring];
 gb_global Type *t_any             = &basic_types[Basic_any];
 
 gb_global Type *t_typeid          = &basic_types[Basic_typeid];
+
+gb_global Type *t_i16le           = &basic_types[Basic_i16le];
+gb_global Type *t_u16le           = &basic_types[Basic_u16le];
+gb_global Type *t_i32le           = &basic_types[Basic_i32le];
+gb_global Type *t_u32le           = &basic_types[Basic_u32le];
+gb_global Type *t_i64le           = &basic_types[Basic_i64le];
+gb_global Type *t_u64le           = &basic_types[Basic_u64le];
+
+gb_global Type *t_i16be           = &basic_types[Basic_i16be];
+gb_global Type *t_u16be           = &basic_types[Basic_u16be];
+gb_global Type *t_i32be           = &basic_types[Basic_i32be];
+gb_global Type *t_u32be           = &basic_types[Basic_u32be];
+gb_global Type *t_i64be           = &basic_types[Basic_i64be];
+gb_global Type *t_u64be           = &basic_types[Basic_u64be];
 
 gb_global Type *t_untyped_bool       = &basic_types[Basic_UntypedBool];
 gb_global Type *t_untyped_integer    = &basic_types[Basic_UntypedInteger];
@@ -1021,6 +1035,7 @@ bool is_type_integer_endian_big(Type *t) {
 		} else if (t->Basic.flags & BasicFlag_EndianLittle) {
 			return false;
 		}
+		return build_context.endian_kind == TargetEndian_Big;
 	} else if (t->kind == Type_BitSet) {
 		return is_type_integer_endian_big(t->BitSet.elem);
 	} else {
@@ -1037,6 +1052,7 @@ bool is_type_integer_endian_little(Type *t) {
 		} else if (t->Basic.flags & BasicFlag_EndianBig) {
 			return false;
 		}
+		return build_context.endian_kind == TargetEndian_Little;
 	} else if (t->kind == Type_BitSet) {
 		return is_type_integer_endian_little(t->BitSet.elem);
 	} else {
