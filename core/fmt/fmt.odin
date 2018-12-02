@@ -834,6 +834,25 @@ enum_value_to_u64 :: proc(ev: runtime.Type_Info_Enum_Value) -> u64 {
 }
 
 fmt_bit_set :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
+	is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info, ) -> bool {
+		if ti == nil {
+			return false;
+		}
+		ti = runtime.type_info_base(ti);
+		switch info in ti.variant {
+		case runtime.Type_Info_Integer:
+			using runtime.Type_Info_Endianness;
+			switch info.endianness {
+			case Platform: return false;
+			case Little:   return ODIN_ENDIAN != "little";
+			case Big:      return ODIN_ENDIAN != "big";
+			}
+		}
+		return false;
+	}
+
+	byte_swap :: bits.byte_swap;
+
 	type_info := type_info_of(v.id);
 	switch info in type_info.variant {
 	case runtime.Type_Info_Named:
@@ -845,12 +864,25 @@ fmt_bit_set :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
 		bits: u64;
 		bit_size := u64(8*type_info.size);
 
+		do_byte_swap := is_bit_set_different_endian_to_platform(info.underlying);
+
 		switch bit_size {
 		case  0: bits = 0;
-		case  8: bits = u64( (^u8)(v.data)^);
-		case 16: bits = u64((^u16)(v.data)^);
-		case 32: bits = u64((^u32)(v.data)^);
-		case 64: bits = u64((^u64)(v.data)^);
+		case  8:
+			x := (^u8)(v.data)^;
+			bits = u64(x);
+		case 16:
+			x := (^u16)(v.data)^;
+			if do_byte_swap do x = byte_swap(x);
+			bits = u64(x);
+		case 32:
+			x := (^u32)(v.data)^;
+			if do_byte_swap do x = byte_swap(x);
+			bits = u64(x);
+		case 64:
+			x := (^u64)(v.data)^;
+			if do_byte_swap do x = byte_swap(x);
+			bits = u64(x);
 		case: panic("unknown bit_size size");
 		}
 

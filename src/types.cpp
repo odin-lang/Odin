@@ -500,7 +500,7 @@ i64      type_align_of              (Type *t);
 i64      type_offset_of             (Type *t, i32 index);
 gbString type_to_string             (Type *type);
 void     init_map_internal_types(Type *type);
-
+Type *   bit_set_to_int(Type *t);
 
 
 Type *base_type(Type *t) {
@@ -1037,7 +1037,7 @@ bool is_type_integer_endian_big(Type *t) {
 		}
 		return build_context.endian_kind == TargetEndian_Big;
 	} else if (t->kind == Type_BitSet) {
-		return is_type_integer_endian_big(t->BitSet.elem);
+		return is_type_integer_endian_big(bit_set_to_int(t));
 	} else {
 		GB_PANIC("Unsupported type: %s", type_to_string);
 	}
@@ -1054,7 +1054,7 @@ bool is_type_integer_endian_little(Type *t) {
 		}
 		return build_context.endian_kind == TargetEndian_Little;
 	} else if (t->kind == Type_BitSet) {
-		return is_type_integer_endian_little(t->BitSet.elem);
+		return is_type_integer_endian_little(bit_set_to_int(t));
 	} else {
 		GB_PANIC("Unsupported type: %s", type_to_string);
 	}
@@ -1074,7 +1074,7 @@ bool is_type_different_to_arch_endianness(Type *t) {
 Type *integer_endian_type_to_platform_type(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_BitSet) {
-		t = core_type(t->BitSet.elem);
+		t = bit_set_to_int(t);
 	}
 	GB_ASSERT(t->kind == Type_Basic);
 
@@ -2919,6 +2919,10 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_BitSet:
 		str = gb_string_appendc(str, "bit_set[");
 		str = write_type_to_string(str, type->BitSet.elem);
+		if (type->BitSet.underlying != nullptr) {
+			str = gb_string_appendc(str, "; ");
+			str = write_type_to_string(str, type->BitSet.underlying);
+		}
 		str = gb_string_appendc(str, "]");
 		break;
 	}

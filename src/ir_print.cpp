@@ -890,6 +890,14 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				i64 lower = type->BitSet.lower;
 				bits |= 1ull<<cast(u64)(v-lower);
 			}
+			if (is_type_different_to_arch_endianness(type)) {
+				i64 size = type_size_of(type);
+				switch (size) {
+				case 2: bits = cast(u64)gb_endian_swap16(cast(u16)bits); break;
+				case 4: bits = cast(u64)gb_endian_swap32(cast(u32)bits); break;
+				case 8: bits = cast(u64)gb_endian_swap64(cast(u64)bits); break;
+				}
+			}
 			ir_write_u64(f, bits);
 		} else {
 			ir_write_str_lit(f, "zeroinitializer");
