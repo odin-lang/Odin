@@ -40,9 +40,15 @@ Type_Info_Enum_Value :: union {
 	u8, u16, u32, u64, uint, uintptr,
 };
 
+Type_Info_Endianness :: enum u8 {
+	Platform = 0,
+	Little   = 1,
+	Big      = 2,
+}
+
 // Variant Types
 Type_Info_Named    :: struct {name: string, base: ^Type_Info};
-Type_Info_Integer  :: struct {signed: bool};
+Type_Info_Integer  :: struct {signed: bool, endianness: Type_Info_Endianness};
 Type_Info_Rune     :: struct {};
 Type_Info_Float    :: struct {};
 Type_Info_Complex  :: struct {};

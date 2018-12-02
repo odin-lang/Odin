@@ -299,7 +299,13 @@ gbAllocator ir_allocator(void) {
 	IR_CONV_KIND(sitofp) \
 	IR_CONV_KIND(ptrtoint) \
 	IR_CONV_KIND(inttoptr) \
-	IR_CONV_KIND(bitcast)
+	IR_CONV_KIND(bitcast) \
+	IR_CONV_KIND(byteswap)
+/*
+	Odin specifc conversion
+	byteswap - swap bytes for endian change
+*/
+
 
 enum irInstrKind {
 	irInstr_Invalid,
@@ -852,6 +858,7 @@ irDebugInfo *ir_add_debug_info_local(irProcedure *proc, Entity *e, i32 arg_id);
 irDebugInfo *ir_add_debug_info_file(irModule *module, AstFile *file);
 irDebugInfo *ir_add_debug_info_proc(irProcedure *proc);
 
+irValue *ir_emit_byte_swap(irProcedure *proc, irValue *value, Type *t);
 
 irValue *ir_alloc_value(irValueKind kind) {
 	irValue *v = gb_alloc_item(ir_allocator(), irValue);
@@ -1272,6 +1279,9 @@ irValue *ir_const_int(i64 i) {
 }
 irValue *ir_const_uintptr(u64 i) {
 	return ir_value_constant(t_uintptr, exact_value_i64(i));
+}
+irValue *ir_const_u8(u32 i) {
+	return ir_value_constant(t_u8, exact_value_i64(i));
 }
 irValue *ir_const_i32(i32 i) {
 	return ir_value_constant(t_i32, exact_value_i64(i));
@@ -3476,6 +3486,13 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 		return ir_emit_conv(proc, cmp, type);
 	}
 
+	if (op == Token_Sub && is_type_integer(type) && is_type_different_to_arch_endianness(type)) {
+		Type *platform_type = integer_endian_type_to_platform_type(type);
+		irValue *v = ir_emit_byte_swap(proc, x, platform_type);
+		irValue *res = ir_emit(proc, ir_instr_unary_op(proc, op, v, platform_type));
+		return ir_emit_byte_swap(proc, res, type);
+	}
+
 	return ir_emit(proc, ir_instr_unary_op(proc, op, x, type));
 }
 
@@ -3607,6 +3624,24 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	}
 #endif
 
+	if (is_type_integer(type) && is_type_different_to_arch_endianness(type)) {
+		switch (op) {
+		case Token_AndNot:
+		case Token_And:
+		case Token_Or:
+		case Token_Xor:
+			goto handle_op;
+		}
+		Type *platform_type = integer_endian_type_to_platform_type(type);
+		irValue *x = ir_emit_byte_swap(proc, left, integer_endian_type_to_platform_type(t_left));
+		irValue *y = ir_emit_byte_swap(proc, right, integer_endian_type_to_platform_type(t_right));
+
+		irValue *res = ir_emit_arith(proc, op, x, y, platform_type);
+
+		return ir_emit_byte_swap(proc, res, type);
+	}
+
+handle_op:
 	switch (op) {
 	case Token_Shl:
 	case Token_Shr:
@@ -3875,6 +3910,16 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 
 				return res;
 			}
+		}
+	}
+
+	if (op_kind != Token_CmpEq && op_kind != Token_NotEq) {
+		Type *t = ir_type(left);
+		if (is_type_integer(t) && is_type_different_to_arch_endianness(t)) {
+			Type *platform_type = integer_endian_type_to_platform_type(t);
+			irValue *x = ir_emit_byte_swap(proc, left, platform_type);
+			irValue *y = ir_emit_byte_swap(proc, right, platform_type);
+			return ir_emit(proc, ir_instr_binary_op(proc, op_kind, x, y, t_llvm_bool));
 		}
 	}
 
@@ -4325,6 +4370,12 @@ irValue *ir_emit_uintptr_to_ptr(irProcedure *proc, irValue *value, Type *t) {
 	return ir_emit(proc, ir_instr_conv(proc, irConv_inttoptr, value, vt, t));
 }
 
+irValue *ir_emit_byte_swap(irProcedure *proc, irValue *value, Type *t) {
+	Type *vt = core_type(ir_type(value));
+	GB_ASSERT(type_size_of(vt) == type_size_of(t));
+	return ir_emit(proc, ir_instr_conv(proc, irConv_byteswap, value, vt, t));
+}
+
 
 void ir_emit_store_union_variant(irProcedure *proc, irValue *parent, irValue *variant, Type *variant_type) {
 	gbAllocator a = ir_allocator();
@@ -4397,12 +4448,18 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return ir_emit(proc, ir_instr_conv(proc, irConv_zext, value, src_type, t));
 	}
 
+
 	// integer -> integer
 	if (is_type_integer(src) && is_type_integer(dst)) {
 		GB_ASSERT(src->kind == Type_Basic &&
 		          dst->kind == Type_Basic);
 		i64 sz = type_size_of(default_type(src));
 		i64 dz = type_size_of(default_type(dst));
+
+		if (sz > 1 && is_type_different_to_arch_endianness(src)) {
+			Type *platform_src_type = integer_endian_type_to_platform_type(src);
+			value = ir_emit_byte_swap(proc, value, platform_src_type);
+		}
 		irConvKind kind = irConv_trunc;
 
 		if (dz < sz) {
@@ -4419,7 +4476,13 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 			}
 		}
 
-		return ir_emit(proc, ir_instr_conv(proc, kind, value, src_type, t));
+		if (dz > 1 && is_type_different_to_arch_endianness(dst)) {
+			Type *platform_dst_type = integer_endian_type_to_platform_type(dst);
+			irValue *res = ir_emit(proc, ir_instr_conv(proc, kind, value, src_type, platform_dst_type));
+			return ir_emit_byte_swap(proc, res, t);
+		} else {
+			return ir_emit(proc, ir_instr_conv(proc, kind, value, src_type, t));
+		}
 	}
 
 	// boolean -> boolean/integer
@@ -4454,40 +4517,6 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		gbAllocator a = ir_allocator();
 		i64 sz = type_size_of(src);
 		i64 dz = type_size_of(dst);
-		// if (sz == 2) {
-		// 	switch (dz) {
-		// 	case 2: return value;
-		// 	case 4: {
-		// 		auto args = array_make<irValue *>(ir_allocator(), 1);
-		// 		args[0] = value;
-		// 		return ir_emit_runtime_call(proc, "gnu_h2f_ieee", args);
-		// 		break;
-		// 	}
-		// 	case 8: {
-		// 		auto args = array_make<irValue *>(ir_allocator(), 1);
-		// 		args[0] = value;
-		// 		return ir_emit_runtime_call(proc, "f16_to_f64", args);
-		// 		break;
-		// 	}
-		// 	}
-		// } else if (dz == 2) {
-		// 	switch (sz) {
-		// 	case 2: return value;
-		// 	case 4: {
-		// 		auto args = array_make<irValue *>(ir_allocator(), 1);
-		// 		args[0] = value;
-		// 		return ir_emit_runtime_call(proc, "gnu_f2h_ieee", args);
-		// 		break;
-		// 	}
-		// 	case 8: {
-		// 		auto args = array_make<irValue *>(ir_allocator(), 1);
-		// 		args[0] = value;
-		// 		return ir_emit_runtime_call(proc, "truncdfhf2", args);
-		// 		break;
-		// 	}
-		// 	}
-		// }
-
 		irConvKind kind = irConv_fptrunc;
 		if (dz >= sz) {
 			kind = irConv_fpext;
@@ -9128,12 +9157,36 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			case Basic_u32:
 			case Basic_i64:
 			case Basic_u64:
+
+			case Basic_i16le:
+			case Basic_u16le:
+			case Basic_i32le:
+			case Basic_u32le:
+			case Basic_i64le:
+			case Basic_u64le:
+			case Basic_i16be:
+			case Basic_u16be:
+			case Basic_i32be:
+			case Basic_u32be:
+			case Basic_i64be:
+			case Basic_u64be:
+
+
 			case Basic_int:
 			case Basic_uint:
 			case Basic_uintptr: {
 				tag = ir_emit_conv(proc, variant_ptr, t_type_info_integer_ptr);
 				irValue *is_signed = ir_const_bool((t->Basic.flags & BasicFlag_Unsigned) == 0);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), is_signed);
+				// NOTE(bill): This is matches the runtime layout
+				u8 endianness_value = 0;
+				if (t->Basic.flags & BasicFlag_EndianLittle) {
+					endianness_value = 1;
+				} else if (t->Basic.flags & BasicFlag_EndianBig) {
+					endianness_value = 2;
+				}
+				irValue *endianness = ir_const_u8(endianness_value);
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), endianness);
 				break;
 			}
 

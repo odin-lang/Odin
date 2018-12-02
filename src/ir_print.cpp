@@ -69,12 +69,20 @@ void ir_write_u64(irFileBuffer *f, u64 i) {
 	String str = u64_to_string(i, f->buf, IR_FILE_BUFFER_BUF_LEN-1);
 	ir_write_string(f, str);
 }
-void ir_write_big_int(irFileBuffer *f, BigInt const &x) {
+void ir_write_big_int(irFileBuffer *f, BigInt const &x, Type *type, bool swap_endian) {
 	i64 i = 0;
 	if (x.neg) {
 		i = big_int_to_i64(&x);
 	} else {
 		i = cast(i64)big_int_to_u64(&x);
+	}
+	if (swap_endian) {
+		i64 size = type_size_of(type);
+		switch (size) {
+		case 2: i = cast(i64)cast(i16)gb_endian_swap16(cast(u16)cast(i16)i); break;
+		case 4: i = cast(i64)cast(i32)gb_endian_swap32(cast(u32)cast(i32)i); break;
+		case 8: i = cast(i64)gb_endian_swap64(cast(u64)i); break;
+		}
 	}
 	ir_write_i64(f, i);
 }
@@ -351,6 +359,20 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		case Basic_u32:  ir_write_str_lit(f, "i32"); return;
 		case Basic_i64:  ir_write_str_lit(f, "i64"); return;
 		case Basic_u64:  ir_write_str_lit(f, "i64"); return;
+
+		case Basic_i16le: ir_write_str_lit(f, "i16"); return;
+		case Basic_u16le: ir_write_str_lit(f, "i16"); return;
+		case Basic_i32le: ir_write_str_lit(f, "i32"); return;
+		case Basic_u32le: ir_write_str_lit(f, "i32"); return;
+		case Basic_i64le: ir_write_str_lit(f, "i64"); return;
+		case Basic_u64le: ir_write_str_lit(f, "i64"); return;
+
+		case Basic_i16be: ir_write_str_lit(f, "i16"); return;
+		case Basic_u16be: ir_write_str_lit(f, "i16"); return;
+		case Basic_i32be: ir_write_str_lit(f, "i32"); return;
+		case Basic_u32be: ir_write_str_lit(f, "i32"); return;
+		case Basic_i64be: ir_write_str_lit(f, "i64"); return;
+		case Basic_u64be: ir_write_str_lit(f, "i64"); return;
 
 		case Basic_rune: ir_write_str_lit(f, "i32"); return;
 
@@ -677,13 +699,13 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				ir_write_str_lit(f, "inttoptr (");
 				ir_print_type(f, m, t_int);
 				ir_write_byte(f, ' ');
-				ir_write_big_int(f, value.value_integer);
+				ir_write_big_int(f, value.value_integer, type, is_type_different_to_arch_endianness(type));
 				ir_write_str_lit(f, " to ");
 				ir_print_type(f, m, t_rawptr);
 				ir_write_str_lit(f, ")");
 			}
 		} else {
-			ir_write_big_int(f, value.value_integer);
+			ir_write_big_int(f, value.value_integer, type, is_type_different_to_arch_endianness(type));
 		}
 		break;
 	}
@@ -1550,15 +1572,25 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 	case irInstr_Conv: {
 		irInstrConv *c = &instr->Conv;
-		ir_fprintf(f, "%%%d = ", value->index);
-		ir_write_string(f, ir_conv_strings[c->kind]);
-		ir_write_byte(f, ' ');
-		ir_print_type(f, m, c->from);
-		ir_write_byte(f, ' ');
-		ir_print_value(f, m, c->value, c->from);
-		ir_write_str_lit(f, " to ");
-		ir_print_type(f, m, c->to);
-		ir_print_debug_location(f, m, value);
+		if (c->kind == irConv_byteswap) {
+			int sz = cast(int)(8*type_size_of(c->from));
+			ir_fprintf(f, "%%%d = call i%d @llvm.bswap.i%d(", value->index, sz, sz);
+			ir_print_type(f, m, c->from);
+			ir_write_byte(f, ' ');
+			ir_print_value(f, m, c->value, c->from);
+			ir_write_byte(f, ')');
+			ir_print_debug_location(f, m, value);
+		} else {
+			ir_fprintf(f, "%%%d = ", value->index);
+			ir_write_string(f, ir_conv_strings[c->kind]);
+			ir_write_byte(f, ' ');
+			ir_print_type(f, m, c->from);
+			ir_write_byte(f, ' ');
+			ir_print_value(f, m, c->value, c->from);
+			ir_write_str_lit(f, " to ");
+			ir_print_type(f, m, c->to);
+			ir_print_debug_location(f, m, value);
+		}
 		break;
 	}
 
@@ -2096,6 +2128,9 @@ void print_llvm_ir(irGen *ir) {
 	ir_write_str_lit(f, "} ; Basic_any\n");
 
 	ir_write_str_lit(f, "declare void @llvm.dbg.declare(metadata, metadata, metadata) #3 \n");
+	ir_write_str_lit(f, "declare i16 @llvm.bswap.i16(i16) #3 \n");
+	ir_write_str_lit(f, "declare i32 @llvm.bswap.i32(i32) #3 \n");
+	ir_write_str_lit(f, "declare i64 @llvm.bswap.i64(i64) #3 \n");
 	ir_write_byte(f, '\n');
 
 
