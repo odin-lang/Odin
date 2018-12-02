@@ -6543,12 +6543,12 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 	case_end;
 
 	case_ast_node(pg, ProcGroup, node);
-		str = gb_string_appendc(str, "proc[");
+		str = gb_string_appendc(str, "proc{");
 		for_array(i, pg->args) {
 			if (i > 0) str = gb_string_appendc(str, ", ");
 			str = write_expr_to_string(str, pg->args[i]);
 		}
-		str = gb_string_append_rune(str, ']');
+		str = gb_string_append_rune(str, '}');
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);

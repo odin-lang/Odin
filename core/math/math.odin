@@ -63,7 +63,7 @@ foreign _ {
 	log_f64 :: proc(x: f64) -> f64 ---;
 }
 
-log :: proc[log_f32, log_f64];
+log :: proc{log_f32, log_f64};
 
 tan_f32 :: proc "c" (θ: f32) -> f32 { return sin(θ)/cos(θ); }
 tan_f64 :: proc "c" (θ: f64) -> f64 { return sin(θ)/cos(θ); }
@@ -94,31 +94,31 @@ copy_sign_f64 :: proc(x, y: f64) -> f64 {
 }
 
 
-sqrt      :: proc[sqrt_f32, sqrt_f64];
-sin       :: proc[sin_f32, sin_f64];
-cos       :: proc[cos_f32, cos_f64];
-tan       :: proc[tan_f32, tan_f64];
-pow       :: proc[pow_f32, pow_f64];
-fmuladd   :: proc[fmuladd_f32, fmuladd_f64];
-sign      :: proc[sign_f32, sign_f64];
-copy_sign :: proc[copy_sign_f32, copy_sign_f64];
+sqrt      :: proc{sqrt_f32, sqrt_f64};
+sin       :: proc{sin_f32, sin_f64};
+cos       :: proc{cos_f32, cos_f64};
+tan       :: proc{tan_f32, tan_f64};
+pow       :: proc{pow_f32, pow_f64};
+fmuladd   :: proc{fmuladd_f32, fmuladd_f64};
+sign      :: proc{sign_f32, sign_f64};
+copy_sign :: proc{copy_sign_f32, copy_sign_f64};
 
 
 round_f32 :: proc(x: f32) -> f32 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
 round_f64 :: proc(x: f64) -> f64 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
-round :: proc[round_f32, round_f64];
+round :: proc{round_f32, round_f64};
 
 floor_f32 :: proc(x: f32) -> f32 { return x >= 0 ? f32(i64(x)) : f32(i64(x-0.5)); } // TODO: Get accurate versions
 floor_f64 :: proc(x: f64) -> f64 { return x >= 0 ? f64(i64(x)) : f64(i64(x-0.5)); } // TODO: Get accurate versions
-floor :: proc[floor_f32, floor_f64];
+floor :: proc{floor_f32, floor_f64};
 
 ceil_f32 :: proc(x: f32) -> f32 { return x < 0 ? f32(i64(x)) : f32(i64(x+1)); }// TODO: Get accurate versions
 ceil_f64 :: proc(x: f64) -> f64 { return x < 0 ? f64(i64(x)) : f64(i64(x+1)); }// TODO: Get accurate versions
-ceil :: proc[ceil_f32, ceil_f64];
+ceil :: proc{ceil_f32, ceil_f64};
 
 remainder_f32 :: proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
 remainder_f64 :: proc(x, y: f64) -> f64 { return x - round(x/y) * y; }
-remainder :: proc[remainder_f32, remainder_f64];
+remainder :: proc{remainder_f32, remainder_f64};
 
 mod_f32 :: proc(x, y: f32) -> f32 {
 	result: f32;
@@ -138,7 +138,7 @@ mod_f64 :: proc(x, y: f64) -> f64 {
 	}
 	return copy_sign(result, x);
 }
-mod :: proc[mod_f32, mod_f64];
+mod :: proc{mod_f32, mod_f64};
 
 
 
@@ -148,19 +148,17 @@ to_degrees :: proc(radians: f32) -> f32 { return radians * 360 / TAU; }
 
 
 
-mul :: proc[
+mul :: proc{
 	mat3_mul,
 	mat4_mul, mat4_mul_vec4,
 	quat_mul, quat_mulf,
-];
+};
 
-div :: proc[
-	quat_div, quat_divf,
-];
+div :: proc{quat_div, quat_divf};
 
-inverse :: proc[mat4_inverse, quat_inverse];
-dot     :: proc[vec_dot, quat_dot];
-cross   :: proc[cross2, cross3];
+inverse :: proc{mat4_inverse, quat_inverse};
+dot     :: proc{vec_dot, quat_dot};
+cross   :: proc{cross2, cross3};
 
 vec_dot :: proc(a, b: $T/[$N]$E) -> E {
 	res: E;
@@ -361,7 +359,7 @@ scale_f32 :: proc(m: Mat4, s: f32) -> Mat4 {
 	return m;
 }
 
-scale :: proc[scale_vec3, scale_f32];
+scale :: proc{scale_vec3, scale_f32};
 
 
 look_at :: proc(eye, centre, up: Vec3) -> Mat4 {

@@ -401,44 +401,44 @@ ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_locati
 
 
 @(builtin)
-clear :: proc[clear_dynamic_array, clear_map];
+clear :: proc{clear_dynamic_array, clear_map};
 
 @(builtin)
-reserve :: proc[reserve_dynamic_array, reserve_map];
+reserve :: proc{reserve_dynamic_array, reserve_map};
 
 @(builtin)
-resize :: proc[resize_dynamic_array];
+resize :: proc{resize_dynamic_array};
 
 
 @(builtin)
-new :: proc[mem.new];
+new :: proc{mem.new};
 
 @(builtin)
-new_clone :: proc[mem.new_clone];
+new_clone :: proc{mem.new_clone};
 
 @(builtin)
-free :: proc[mem.free];
+free :: proc{mem.free};
 
 @(builtin)
-free_all :: proc[mem.free_all];
+free_all :: proc{mem.free_all};
 
 @(builtin)
-delete :: proc[
+delete :: proc{
 	mem.delete_string,
 	mem.delete_cstring,
 	mem.delete_dynamic_array,
 	mem.delete_slice,
 	mem.delete_map,
-];
+};
 
 @(builtin)
-make :: proc[
+make :: proc{
 	mem.make_slice,
 	mem.make_dynamic_array,
 	mem.make_dynamic_array_len,
 	mem.make_dynamic_array_len_cap,
 	mem.make_map,
-];
+};
 
 
 
@@ -508,7 +508,7 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 	}
 	return len(array);
 }
-@(builtin) append :: proc[append_elem, append_elems];
+@(builtin) append :: proc{append_elem, append_elems};
 
 
 
@@ -616,8 +616,8 @@ excl_bit_set :: inline proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
 	return s^;
 }
 
-@(builtin) incl :: proc[incl_elem, incl_elems, incl_bit_set];
-@(builtin) excl :: proc[excl_elem, excl_elems, excl_bit_set];
+@(builtin) incl :: proc{incl_elem, incl_elems, incl_bit_set};
+@(builtin) excl :: proc{excl_elem, excl_elems, excl_bit_set};
 
 
 

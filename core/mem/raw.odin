@@ -46,6 +46,6 @@ raw_dynamic_array_data :: inline proc(a: $T/[dynamic]$E) -> ^E {
 	return cast(^E)(^Raw_Dynamic_Array)(&a).data;
 }
 
-raw_data :: proc[raw_string_data, raw_slice_data, raw_dynamic_array_data];
+raw_data :: proc{raw_string_data, raw_slice_data, raw_dynamic_array_data};
 
 
