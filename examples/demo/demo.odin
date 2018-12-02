@@ -56,7 +56,7 @@ general_stuff :: proc() {
 	/*
 	 * Remove *_val_of built-in procedures
 	 * size_of, align_of, offset_of
-	 * type_of, type_info_of
+	 * type_of, type_info_of, typeid_of
 	 */
 
 	{ // `expand_to_tuple` built-in procedure
@@ -108,6 +108,9 @@ general_stuff :: proc() {
 
 		My_Struct :: struct{x: int};
 		#assert(My_Struct != struct{x: int});
+
+		My_Struct2 :: My_Struct;
+		#assert(My_Struct2 == My_Struct);
 	}
 
 	{
@@ -213,6 +216,7 @@ union_type :: proc() {
 		case Monster:
 			if e.is_robot  do fmt.println("Robotic");
 			if e.is_zombie do fmt.println("Grrrr!");
+			fmt.println("I'm a monster");
 		}
 	}
 
@@ -371,7 +375,6 @@ parametric_polymorphism :: proc() {
 			return make(T, len);
 		}
 
-
 		// Only allow types that are specializations of `Table`
 		allocate :: proc(table: ^$T/Table, capacity: int) {
 			c := context;
@@ -509,7 +512,7 @@ parametric_polymorphism :: proc() {
 			fmt.printf("Generating an array of type %v from the value %v of type %v\n",
 			           typeid_of(type_of(res)), N, typeid_of(I));
 			for i in 0..N-1 {
-				res[i] = i*i;
+				res[i] = T(i*i);
 			}
 			return;
 		}
@@ -666,11 +669,6 @@ using_enum :: proc() {
 	f2 := C;
 	fmt.println(f0, f1, f2);
 	fmt.println(len(Foo));
-
-	// Non-comparsion operations are not allowed with enum
-	// You must convert to an integer if you want to do this
-	// x := f0 + f1;
-	y := int(f0) + int(f1);
 }
 
 explicit_procedure_overloading :: proc() {
@@ -692,7 +690,7 @@ explicit_procedure_overloading :: proc() {
 		return x;
 	}
 
-	add :: proc[add_ints, add_floats, add_numbers];
+	add :: proc{add_ints, add_floats, add_numbers};
 
 	add(int(1), int(2));
 	add(f32(1), f32(2));
@@ -737,7 +735,6 @@ complete_switch :: proc() {
 		}
 	}
 }
-
 
 cstring_example :: proc() {
 	W :: "Hellope";
@@ -801,7 +798,7 @@ bit_set_type :: proc() {
 	}
 	{
 		x: bit_set['A'..'Z'];
-		assert(size_of(x) == size_of(u32));
+		#assert(size_of(x) == size_of(u32));
 		y: bit_set[0..8; u16];
 		fmt.println(typeid_of(type_of(x))); // bit_set[A..Z]
 		fmt.println(typeid_of(type_of(y))); // bit_set[0..8; u16]
@@ -819,7 +816,6 @@ bit_set_type :: proc() {
 		a := Letters{'A', 'B'};
 		b := Letters{'A', 'B', 'C', 'D', 'F'};
 		c := Letters{'A', 'B'};
-
 
 		assert(a <= b); // 'a' is a subset of 'b'
 		assert(b >= a); // 'b' is a superset of 'a'

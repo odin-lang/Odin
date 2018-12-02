@@ -66,7 +66,7 @@ byte_swap_int :: proc(i: int) -> int {
 	}
 }
 
-byte_swap :: proc[
+byte_swap :: proc{
 	byte_swap_u16,
 	byte_swap_u32,
 	byte_swap_u64,
@@ -75,7 +75,7 @@ byte_swap :: proc[
 	byte_swap_i64,
 	byte_swap_uint,
 	byte_swap_int,
-];
+};
 
 count_zeros8   :: proc(i:   u8) ->   u8 { return   8 - count_ones8(i); }
 count_zeros16  :: proc(i:  u16) ->  u16 { return  16 - count_ones16(i); }
@@ -150,13 +150,13 @@ overflowing_add_int :: proc(lhs, rhs: int) -> (int, bool) {
 	}
 }
 
-overflowing_add :: proc[
+overflowing_add :: proc{
 	overflowing_add_u8,   overflowing_add_i8,
 	overflowing_add_u16,  overflowing_add_i16,
 	overflowing_add_u32,  overflowing_add_i32,
 	overflowing_add_u64,  overflowing_add_i64,
 	overflowing_add_uint, overflowing_add_int,
-];
+};
 
 foreign {
 	@(link_name="llvm.usub.with.overflow.i8")  overflowing_sub_u8  :: proc(lhs, rhs:  u8) -> (u8, bool)  ---
@@ -187,13 +187,13 @@ overflowing_sub_int :: proc(lhs, rhs: int) -> (int, bool) {
 	}
 }
 
-overflowing_sub :: proc[
+overflowing_sub :: proc{
 	overflowing_sub_u8,   overflowing_sub_i8,
 	overflowing_sub_u16,  overflowing_sub_i16,
 	overflowing_sub_u32,  overflowing_sub_i32,
 	overflowing_sub_u64,  overflowing_sub_i64,
 	overflowing_sub_uint, overflowing_sub_int,
-];
+};
 
 
 foreign {
@@ -225,13 +225,13 @@ overflowing_mul_int :: proc(lhs, rhs: int) -> (int, bool) {
 	}
 }
 
-overflowing_mul :: proc[
+overflowing_mul :: proc{
 	overflowing_mul_u8,   overflowing_mul_i8,
 	overflowing_mul_u16,  overflowing_mul_i16,
 	overflowing_mul_u32,  overflowing_mul_i32,
 	overflowing_mul_u64,  overflowing_mul_i64,
 	overflowing_mul_uint, overflowing_mul_int,
-];
+};
 
 is_power_of_two_u8   :: proc(i:   u8) -> bool { return i > 0 && (i & (i-1)) == 0; }
 is_power_of_two_i8   :: proc(i:   i8) -> bool { return i > 0 && (i & (i-1)) == 0; }
@@ -244,10 +244,10 @@ is_power_of_two_i64  :: proc(i:  i64) -> bool { return i > 0 && (i & (i-1)) == 0
 is_power_of_two_uint :: proc(i: uint) -> bool { return i > 0 && (i & (i-1)) == 0; }
 is_power_of_two_int  :: proc(i:  int) -> bool { return i > 0 && (i & (i-1)) == 0; }
 
-is_power_of_two :: proc[
+is_power_of_two :: proc{
 	is_power_of_two_u8,   is_power_of_two_i8,
 	is_power_of_two_u16,  is_power_of_two_i16,
 	is_power_of_two_u32,  is_power_of_two_i32,
 	is_power_of_two_u64,  is_power_of_two_i64,
 	is_power_of_two_uint, is_power_of_two_int,
-]
+};

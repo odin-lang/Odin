@@ -74,13 +74,13 @@ delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
 }
 
 
-delete :: proc[
+delete :: proc{
 	delete_string,
 	delete_cstring,
 	delete_dynamic_array,
 	delete_slice,
 	delete_map,
-];
+};
 
 
 new :: inline proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> ^T {
@@ -122,13 +122,13 @@ make_map :: proc($T: typeid/map[$K]$E, auto_cast cap: int = 16, allocator := con
 	return m;
 }
 
-make :: proc[
+make :: proc{
 	make_slice,
 	make_dynamic_array,
 	make_dynamic_array_len,
 	make_dynamic_array_len_cap,
 	make_map,
-];
+};
 
 
 
