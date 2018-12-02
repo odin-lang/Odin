@@ -65,6 +65,8 @@ main :: proc() {
 * [Bit Fields, i128 & u128, Syntax Changes](https://www.youtube.com/watch?v=NlTutcLyF64)
 * [Default and Named Arguments; Explicit Parametric Polymorphism](https://www.youtube.com/watch?v=-XQZE6S6zUU)
 * [Loadsachanges](https://www.youtube.com/watch?v=ar0vFMoMtrI)
+* [Packages, Bit Sets, cstring](https://youtu.be/b8bJbjiXZrQ)
+	- [Q&A](https://youtu.be/5jmxyIfyyTk)
 
 ## Documentation
 * [Tutorial](https://odin.handmade.network/wiki/3329-odin_tutorial)
