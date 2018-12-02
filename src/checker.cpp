@@ -1812,11 +1812,23 @@ void init_core_source_code_location(Checker *c) {
 
 void init_core_map_type(Checker *c) {
 	if (t_map_key == nullptr) {
-		t_map_key = find_core_type(c, str_lit("Map_Key"));
+		Entity *e = find_core_entity(c, str_lit("Map_Key"));
+		if (e->state == EntityState_Unresolved) {
+			auto ctx = c->init_ctx;
+			check_entity_decl(&ctx, e, nullptr, nullptr);
+		}
+		t_map_key = e->type;
+		GB_ASSERT(t_map_key != nullptr);
 	}
 
 	if (t_map_header == nullptr) {
-		t_map_header = find_core_type(c, str_lit("Map_Header"));
+		Entity *e = find_core_entity(c, str_lit("Map_Header"));
+		if (e->state == EntityState_Unresolved) {
+			auto ctx = c->init_ctx;
+			check_entity_decl(&ctx, e, nullptr, nullptr);
+		}
+		t_map_header = e->type;
+		GB_ASSERT(t_map_header != nullptr);
 	}
 }
 
