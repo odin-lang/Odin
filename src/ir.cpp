@@ -6250,13 +6250,13 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 
 					Type *key_type = rt->BitSet.elem;
 					GB_ASSERT(are_types_identical(ir_type(left), key_type));
+
 					Type *it = bit_set_to_int(rt);
-					left = ir_emit_conv(proc, left, it);
 
 					irValue *lower = ir_value_constant(it, exact_value_i64(rt->BitSet.lower));
-					irValue *key = ir_emit_arith(proc, Token_Sub, left, lower, it);
-					irValue *bit = ir_emit_arith(proc, Token_Shl, v_one, key, it);
-
+					irValue *key = ir_emit_arith(proc, Token_Sub, left, lower, ir_type(left));
+					irValue *bit = ir_emit_arith(proc, Token_Shl, v_one, key, ir_type(left));
+					bit = ir_emit_conv(proc, bit, it);
 
 					irValue *old_value = ir_emit_bitcast(proc, right, it);
 					irValue *new_value = ir_emit_arith(proc, Token_And, old_value, bit, it);
@@ -7228,7 +7228,6 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 		}
 
 		case Type_BitSet: {
-
 			i64 sz = type_size_of(type);
 			if (cl->elems.count > 0 && sz > 0) {
 				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
