@@ -271,3 +271,4 @@ shared/
 # temp files
 * .ll
 *.bc
+*.ll
