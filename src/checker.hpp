@@ -294,6 +294,7 @@ struct AttributeContext {
 	isize   init_expr_list_count;
 	String  thread_local_model;
 	String  deprecated_message;
+	Entity *deferred_procedure;
 };
 
 AttributeContext make_attribute_context(String link_prefix) {
@@ -302,7 +303,7 @@ AttributeContext make_attribute_context(String link_prefix) {
 	return ac;
 }
 
-#define DECL_ATTRIBUTE_PROC(_name) bool _name(CheckerContext *c, Ast *elem, String name, ExactValue value, AttributeContext *ac)
+#define DECL_ATTRIBUTE_PROC(_name) bool _name(CheckerContext *c, Ast *elem, String name, Ast *value, AttributeContext *ac)
 typedef DECL_ATTRIBUTE_PROC(DeclAttributeProc);
 
 void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, DeclAttributeProc *proc, AttributeContext *ac);
