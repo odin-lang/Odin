@@ -1840,15 +1840,31 @@ void init_preload(Checker *c) {
 	init_core_map_type(c);
 }
 
-
+ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value) {
+	ExactValue ev = {};
+	if (value != nullptr) {
+		Operand op = {};
+		check_expr(c, &op, value);
+		if (op.mode) {
+			if (op.mode == Addressing_Constant) {
+				ev = op.value;
+			} else {
+				error(value, "Expected a constant attribute element");
+			}
+		}
+	}
+	return ev;
+}
 
 
 DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
+	ExactValue ev = check_decl_attribute_value(c, value);
+
 	if (name == "default_calling_convention") {
-		if (value.kind == ExactValue_String) {
-			auto cc = string_to_calling_convention(value.value_string);
+		if (ev.kind == ExactValue_String) {
+			auto cc = string_to_calling_convention(ev.value_string);
 			if (cc == ProcCC_Invalid) {
-				error(elem, "Unknown procedure calling convention: '%.*s'\n", LIT(value.value_string));
+				error(elem, "Unknown procedure calling convention: '%.*s'\n", LIT(ev.value_string));
 			} else {
 				c->foreign_context.default_cc = cc;
 			}
@@ -1857,8 +1873,8 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 		}
 		return true;
 	} else if (name == "link_prefix") {
-		if (value.kind == ExactValue_String) {
-			String link_prefix = value.value_string;
+		if (ev.kind == ExactValue_String) {
+			String link_prefix = ev.value_string;
 			if (!is_foreign_name_valid(link_prefix)) {
 				error(elem, "Invalid link prefix: '%.*s'\n", LIT(link_prefix));
 			} else {
@@ -1874,9 +1890,11 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 }
 
 DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
+	ExactValue ev = check_decl_attribute_value(c, value);
+
 	if (name == "link_name") {
-		if (value.kind == ExactValue_String) {
-			ac->link_name = value.value_string;
+		if (ev.kind == ExactValue_String) {
+			ac->link_name = ev.value_string;
 			if (!is_foreign_name_valid(ac->link_name)) {
 				error(elem, "Invalid link name: %.*s", LIT(ac->link_name));
 			}
@@ -1885,8 +1903,8 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		}
 		return true;
 	} else if (name == "link_prefix") {
-		if (value.kind == ExactValue_String) {
-			ac->link_prefix = value.value_string;
+		if (ev.kind == ExactValue_String) {
+			ac->link_prefix = ev.value_string;
 			if (!is_foreign_name_valid(ac->link_prefix)) {
 				error(elem, "Invalid link prefix: %.*s", LIT(ac->link_prefix));
 			}
@@ -1895,8 +1913,8 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		}
 		return true;
 	} else if (name == "deprecated") {
-		if (value.kind == ExactValue_String) {
-			String msg = value.value_string;
+		if (ev.kind == ExactValue_String) {
+			String msg = ev.value_string;
 			if (msg.len == 0) {
 				error(elem, "Deprecation message cannot be an empty string");
 			} else {
@@ -1911,14 +1929,16 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 }
 
 DECL_ATTRIBUTE_PROC(var_decl_attribute) {
+	ExactValue ev = check_decl_attribute_value(c, value);
+
 	if (c->curr_proc_decl != nullptr) {
 		error(elem, "Only a variable at file scope can have a '%.*s'", LIT(name));
 		return true;
 	}
 
 	if (name == "link_name") {
-		if (value.kind == ExactValue_String) {
-			ac->link_name = value.value_string;
+		if (ev.kind == ExactValue_String) {
+			ac->link_name = ev.value_string;
 			if (!is_foreign_name_valid(ac->link_name)) {
 				error(elem, "Invalid link name: %.*s", LIT(ac->link_name));
 			}
@@ -1927,8 +1947,8 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		}
 		return true;
 	} else if (name == "link_prefix") {
-		if (value.kind == ExactValue_String) {
-			ac->link_prefix = value.value_string;
+		if (ev.kind == ExactValue_String) {
+			ac->link_prefix = ev.value_string;
 			if (!is_foreign_name_valid(ac->link_prefix)) {
 				error(elem, "Invalid link prefix: %.*s", LIT(ac->link_prefix));
 			}
@@ -1941,10 +1961,10 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 			error(elem, "A thread local variable declaration cannot have initialization values");
 		} else if (c->foreign_context.curr_library || c->foreign_context.in_export) {
 			error(elem, "A foreign block variable cannot be thread local");
-		} else if (value.kind == ExactValue_Invalid) {
+		} else if (ev.kind == ExactValue_Invalid) {
 			ac->thread_local_model = str_lit("default");
-		} else if (value.kind == ExactValue_String) {
-			String model = value.value_string;
+		} else if (ev.kind == ExactValue_String) {
+			String model = ev.value_string;
 			if (model == "default" ||
 			    model == "localdynamic" ||
 			    model == "initialexec" ||
@@ -2013,19 +2033,6 @@ void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, De
 				continue;
 			}
 
-			ExactValue ev = {};
-			if (value != nullptr) {
-				Operand op = {};
-				check_expr(c, &op, value);
-				if (op.mode) {
-					if (op.mode != Addressing_Constant) {
-						error(value, "An attribute element must be constant");
-					} else {
-						ev = op.value;
-					}
-				}
-			}
-
 			if (string_set_exists(&set, name)) {
 				error(elem, "Previous declaration of '%.*s'", LIT(name));
 				continue;
@@ -2033,7 +2040,7 @@ void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, De
 				string_set_add(&set, name);
 			}
 
-			if (!proc(c, elem, name, ev, ac)) {
+			if (!proc(c, elem, name, value, ac)) {
 				error(elem, "Unknown attribute element name '%.*s'", LIT(name));
 			}
 		}

@@ -55,7 +55,7 @@ TargetEndianKind target_endians[TargetArch_COUNT] = {
 
 
 
-String const ODIN_VERSION = str_lit("0.9.1");
+String const ODIN_VERSION = str_lit("0.9.2");
 String cross_compile_target = str_lit("");
 String cross_compile_lib_dir = str_lit("");
 
