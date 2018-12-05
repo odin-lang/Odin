@@ -6,6 +6,7 @@ foreign import "system:user32.lib"
 foreign import "system:gdi32.lib"
 foreign import "system:winmm.lib"
 foreign import "system:shell32.lib"
+foreign import "system:ole32.lib"
 
 Handle    :: distinct rawptr;
 Hwnd      :: distinct Handle;
@@ -19,12 +20,14 @@ Hgdiobj   :: distinct Handle;
 Hmodule   :: distinct Handle;
 Hmonitor  :: distinct Handle;
 Hrawinput :: distinct Handle;
+Hresult   :: distinct int;
 HKL       :: distinct Handle;
 Wparam    :: distinct uint;
 Lparam    :: distinct int;
+Lpvoid    :: distinct rawptr;
 Lresult   :: distinct int;
 Wnd_Proc  :: distinct #type proc "c" (Hwnd, u32, Wparam, Lparam) -> Lresult;
-
+Monitor_Enum_Proc :: distinct #type proc "std" (Hmonitor, Hdc, ^Rect, Lparam) -> bool;
 Long_Ptr :: distinct int;
 
 Bool :: distinct b32;
@@ -333,6 +336,34 @@ WS_MAXIMIZE         :: 0x01000000;
 WS_MINIMIZE         :: 0x20000000;
 WS_OVERLAPPEDWINDOW :: WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
 WS_POPUPWINDOW      :: WS_POPUP | WS_BORDER | WS_SYSMENU;
+
+WS_EX_DLGMODALFRAME     	:: 0x00000001;
+WS_EX_NOPARENTNOTIFY    	:: 0x00000004;
+WS_EX_TOPMOST           	:: 0x00000008;
+WS_EX_ACCEPTFILES       	:: 0x00000010;
+WS_EX_TRANSPARENT       	:: 0x00000020;
+WS_EX_MDICHILD          	:: 0x00000040;
+WS_EX_TOOLWINDOW        	:: 0x00000080;
+WS_EX_WINDOWEDGE        	:: 0x00000100;
+WS_EX_CLIENTEDGE        	:: 0x00000200;
+WS_EX_CONTEXTHELP       	:: 0x00000400;
+WS_EX_RIGHT             	:: 0x00001000;
+WS_EX_LEFT              	:: 0x00000000;
+WS_EX_RTLREADING        	:: 0x00002000;
+WS_EX_LTRREADING        	:: 0x00000000;
+WS_EX_LEFTSCROLLBAR     	:: 0x00004000;
+WS_EX_RIGHTSCROLLBAR    	:: 0x00000000;
+WS_EX_CONTROLPARENT     	:: 0x00010000;
+WS_EX_STATICEDGE        	:: 0x00020000;
+WS_EX_APPWINDOW         	:: 0x00040000;
+WS_EX_OVERLAPPEDWINDOW  	:: WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE;
+WS_EX_PALETTEWINDOW     	:: WS_EX_WINDOWEDGE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST;
+WS_EX_LAYERED           	:: 0x00080000;
+WS_EX_NOINHERITLAYOUT   	:: 0x00100000; // Disable inheritence of mirroring by children
+WS_EX_NOREDIRECTIONBITMAP 	:: 0x00200000;
+WS_EX_LAYOUTRTL         	:: 0x00400000; // Right to left mirroring
+WS_EX_COMPOSITED        	:: 0x02000000;
+WS_EX_NOACTIVATE        	:: 0x08000000;
 
 WM_ACTIVATE          :: 0x0006;
 WM_ACTIVATEAPP       :: 0x001C;
@@ -827,7 +858,7 @@ foreign user32 {
 	@(link_name="DestroyWindow")       destroy_window        :: proc(wnd: Hwnd) -> Bool ---;
 	@(link_name="DescribePixelFormat") describe_pixel_format :: proc(dc: Hdc, pixel_format: i32, bytes: u32, pfd: ^Pixel_Format_Descriptor) -> i32 ---;
 
-	@(link_name="GetMonitor_InfoA")  get_monitor_info_a  :: proc(monitor: Hmonitor, mi: ^Monitor_Info) -> Bool ---;
+	@(link_name="GetMonitorInfoA")  get_monitor_info_a  :: proc(monitor: Hmonitor, mi: ^Monitor_Info) -> Bool ---;
 	@(link_name="MonitorFromWindow") monitor_from_window :: proc(wnd: Hwnd, flags: u32) -> Hmonitor ---;
 
 	@(link_name="SetWindowPos") set_window_pos :: proc(wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32) ---;
@@ -872,6 +903,8 @@ foreign user32 {
 
 	@(link_name="MapVirtualKeyExW") map_virtual_key_ex_w :: proc(code, map_type: u32, hkl: HKL) ---;
 	@(link_name="MapVirtualKeyExA") map_virtual_key_ex_a :: proc(code, map_type: u32, hkl: HKL) ---;
+
+	@(link_name="EnumDisplayMonitors") enum_display_monitors :: proc(hdc: Hdc,  rect: ^Rect, enum_proc: Monitor_Enum_Proc, lparam: Lparam) -> bool ---;
 }
 
 @(default_calling_convention = "std")
@@ -902,7 +935,19 @@ foreign winmm {
 	@(link_name="timeGetTime") time_get_time :: proc() -> u32 ---;
 }
 
+//objbase.h
+Com_Init :: enum {
+	MultiThreaded = 0x0,
+	ApartmentThreaded = 0x2,
+	DisableOLE1DDE = 0x4,
+	SpeedOverMemory = 0x8,
+};
 
+@(default_calling_convention = "std")
+foreign ole32 {
+	@(link_name ="CoInitializeEx") com_init_ex :: proc(reserved: Lpvoid, co_init: Com_Init) ->Hresult ---;
+	@(link_name = "CoUninitialize") com_shutdown :: proc() ---;
+}
 
 get_query_performance_frequency :: proc() -> i64 {
 	r: i64;
