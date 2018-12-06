@@ -20,14 +20,14 @@ Hgdiobj   :: distinct Handle;
 Hmodule   :: distinct Handle;
 Hmonitor  :: distinct Handle;
 Hrawinput :: distinct Handle;
-Hresult   :: distinct int;
+Hresult   :: distinct i32;
 HKL       :: distinct Handle;
 Wparam    :: distinct uint;
 Lparam    :: distinct int;
-Lpvoid    :: distinct rawptr;
 Lresult   :: distinct int;
 Wnd_Proc  :: distinct #type proc "c" (Hwnd, u32, Wparam, Lparam) -> Lresult;
 Monitor_Enum_Proc :: distinct #type proc "std" (Hmonitor, Hdc, ^Rect, Lparam) -> bool;
+
 Long_Ptr :: distinct int;
 
 Bool :: distinct b32;
@@ -1064,10 +1064,10 @@ foreign winmm {
 
 //objbase.h
 Com_Init :: enum {
-	MultiThreaded = 0x0,
-	ApartmentThreaded = 0x2,
-	DisableOLE1DDE = 0x4,
-	SpeedOverMemory = 0x8,
+	Multi_Threaded = 0x0,
+	Apartment_Threaded = 0x2,
+	Disable_OLE1_DDE = 0x4,
+	Speed_Over_Memory = 0x8,
 };
 
 @(default_calling_convention = "std")
