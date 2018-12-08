@@ -53,7 +53,7 @@ Multi_Logger_Data :: struct {
 create_multi_logger :: proc(logs: ..Logger) -> Logger {
     data := new(Multi_Logger_Data);
     data.loggers = make([]Logger, len(logs));
-    for log, i in logs do data.loggers[i] = log;
+    copy(data.loggers, logs);
     return Logger{multi_logger_proc, data, nil};
 }
 
