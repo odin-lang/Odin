@@ -9744,6 +9744,7 @@ void ir_gen_tree(irGen *s) {
 			irValue *p = ir_value_procedure(m, e, e->type, type_expr, body, name);
 			p->Proc.tags = pl->tags;
 			p->Proc.inlining = pl->inlining;
+			p->Proc.is_export = e->Procedure.is_export;
 
 			ir_module_add_value(m, e, p);
 			HashKey hash_name = hash_string(name);

@@ -836,8 +836,14 @@ diverging_procedures :: proc() {
 	foo();
 }
 
+foreign export {
+	bar :: proc "c" () -> i32 {
+		return 123;
+	}
+}
+
 main :: proc() {
-	when true {
+	when false {
 		general_stuff();
 		union_type();
 		parametric_polymorphism();
