@@ -283,10 +283,12 @@ AST_KIND(_StmtBegin,     "", bool) \
 AST_KIND(_ComplexStmtBegin, "", bool) \
 	AST_KIND(BlockStmt, "block statement", struct { \
 		Array<Ast *> stmts; \
+		Ast *label;         \
 		Token open, close; \
 	}) \
 	AST_KIND(IfStmt, "if statement", struct { \
 		Token token;     \
+		Ast *label;      \
 		Ast * init;      \
 		Ast * cond;      \
 		Ast * body;      \

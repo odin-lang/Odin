@@ -223,9 +223,11 @@ Ast *clone_ast(Ast *node) {
 		n->IncDecStmt.expr = clone_ast(n->IncDecStmt.expr);
 		break;
 	case Ast_BlockStmt:
+		n->BlockStmt.label = clone_ast(n->BlockStmt.label);
 		n->BlockStmt.stmts = clone_ast_array(n->BlockStmt.stmts);
 		break;
 	case Ast_IfStmt:
+		n->IfStmt.label = clone_ast(n->IfStmt.label);
 		n->IfStmt.init = clone_ast(n->IfStmt.init);
 		n->IfStmt.cond = clone_ast(n->IfStmt.cond);
 		n->IfStmt.body = clone_ast(n->IfStmt.body);
@@ -2637,6 +2639,8 @@ Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 		expect_token_after(f, Token_Colon, "identifier list");
 		if ((flags&StmtAllowFlag_Label) && lhs.count == 1) {
 			switch (f->curr_token.kind) {
+			case Token_OpenBrace: // block statement
+			case Token_if:
 			case Token_for:
 			case Token_switch: {
 				Ast *name = lhs[0];
@@ -2644,6 +2648,8 @@ Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 				Ast *stmt = parse_stmt(f);
 			#define _SET_LABEL(Kind_, label_) case GB_JOIN2(Ast_, Kind_): (stmt->Kind_).label = label_; break
 				switch (stmt->kind) {
+				_SET_LABEL(BlockStmt, label);
+				_SET_LABEL(IfStmt, label);
 				_SET_LABEL(ForStmt, label);
 				_SET_LABEL(RangeStmt, label);
 				_SET_LABEL(SwitchStmt, label);

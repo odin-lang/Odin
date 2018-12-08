@@ -147,8 +147,9 @@ struct Entity {
 		} LibraryName;
 		i32 Nil;
 		struct {
-			String   name;
+			String name;
 			Ast *node;
+			Ast *parent;
 		} Label;
 	};
 };
@@ -318,9 +319,10 @@ Entity *alloc_entity_nil(String name, Type *type) {
 	return entity;
 }
 
-Entity *alloc_entity_label(Scope *scope, Token token, Type *type, Ast *node) {
+Entity *alloc_entity_label(Scope *scope, Token token, Type *type, Ast *node, Ast *parent) {
 	Entity *entity = alloc_entity(Entity_Label, scope, token, type);
 	entity->Label.node = node;
+	entity->Label.parent = parent;
 	entity->state = EntityState_Resolved;
 	return entity;
 }
