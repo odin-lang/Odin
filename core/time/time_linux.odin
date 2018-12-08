@@ -4,7 +4,7 @@ import "core:os";
 import "core:fmt";
 
 // NOTE(Jeroen): The times returned are in UTC
-IS_SUPPORTED :: false;
+IS_SUPPORTED :: true;
 
 now :: proc() -> Time {
 
