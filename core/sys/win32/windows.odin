@@ -6,6 +6,7 @@ foreign import "system:user32.lib"
 foreign import "system:gdi32.lib"
 foreign import "system:winmm.lib"
 foreign import "system:shell32.lib"
+foreign import "system:ole32.lib"
 
 Handle    :: distinct rawptr;
 Hwnd      :: distinct Handle;
@@ -19,11 +20,13 @@ Hgdiobj   :: distinct Handle;
 Hmodule   :: distinct Handle;
 Hmonitor  :: distinct Handle;
 Hrawinput :: distinct Handle;
+Hresult   :: distinct i32;
 HKL       :: distinct Handle;
 Wparam    :: distinct uint;
 Lparam    :: distinct int;
 Lresult   :: distinct int;
 Wnd_Proc  :: distinct #type proc "c" (Hwnd, u32, Wparam, Lparam) -> Lresult;
+Monitor_Enum_Proc :: distinct #type proc "std" (Hmonitor, Hdc, ^Rect, Lparam) -> bool;
 
 Long_Ptr :: distinct int;
 
@@ -303,8 +306,135 @@ MAPVK_VSC_TO_VK    :: 1;
 MAPVK_VK_TO_CHAR   :: 2;
 MAPVK_VSC_TO_VK_EX :: 3;
 
+//WinUser.h
+VK_LBUTTON        :: 0x01;
+VK_RBUTTON        :: 0x02;
+VK_CANCEL         :: 0x03;
+VK_MBUTTON        :: 0x04;    /* NOT contiguous with L & RBUTTON */
+VK_XBUTTON1       :: 0x05;    /* NOT contiguous with L & RBUTTON */
+VK_XBUTTON2       :: 0x06;    /* NOT contiguous with L & RBUTTON */
 
+/*
+ * :: 0x07 : reserved
+ */
 
+VK_BACK           :: 0x08;
+VK_TAB            :: 0x09;
+
+/*
+ * :: 0x0A - :: 0x0B : reserved
+ */
+
+VK_CLEAR          :: 0x0C;
+VK_RETURN         :: 0x0D;
+
+/*
+ * :: 0x0E - :: 0x0F : unassigned
+ */
+
+VK_SHIFT          :: 0x10;
+VK_CONTROL        :: 0x11;
+VK_MENU           :: 0x12;
+VK_PAUSE          :: 0x13;
+VK_CAPITAL        :: 0x14;
+
+VK_KANA           :: 0x15;
+VK_HANGEUL        :: 0x15; /* old name - should be here for compatibility */
+VK_HANGUL         :: 0x15;
+
+/*
+ * :: 0x16 : unassigned
+ */
+
+VK_JUNJA          :: 0x17;
+VK_FINAL          :: 0x18;
+VK_HANJA          :: 0x19;
+VK_KANJI          :: 0x19;
+
+/*
+ * :: 0x1A : unassigned
+ */
+
+VK_ESCAPE         :: 0x1B;
+
+VK_CONVERT        :: 0x1C;
+VK_NONCONVERT     :: 0x1D;
+VK_ACCEPT         :: 0x1E;
+VK_MODECHANGE     :: 0x1F;
+
+VK_SPACE          :: 0x20;
+VK_PRIOR          :: 0x21;
+VK_NEXT           :: 0x22;
+VK_END            :: 0x23;
+VK_HOME           :: 0x24;
+VK_LEFT           :: 0x25;
+VK_UP             :: 0x26;
+VK_RIGHT          :: 0x27;
+VK_DOWN           :: 0x28;
+VK_SELECT         :: 0x29;
+VK_PRINT          :: 0x2A;
+VK_EXECUTE        :: 0x2B;
+VK_SNAPSHOT       :: 0x2C;
+VK_INSERT         :: 0x2D;
+VK_DELETE         :: 0x2E;
+VK_HELP           :: 0x2F;
+
+/*
+ * VK_0 - VK_9 are the same as ASCII '0' - '9' (:: 0x30 - :: 0x39)
+ * :: 0x3A - :: 0x40 : unassigned
+ * VK_A - VK_Z are the same as ASCII 'A' - 'Z' (:: 0x41 - :: 0x5A)
+ */
+
+VK_LWIN           :: 0x5B;
+VK_RWIN           :: 0x5C;
+VK_APPS           :: 0x5D;
+
+/*
+ * :: 0x5E : reserved
+ */
+
+VK_SLEEP          :: 0x5F;
+
+VK_NUMPAD0        :: 0x60;
+VK_NUMPAD1        :: 0x61;
+VK_NUMPAD2        :: 0x62;
+VK_NUMPAD3        :: 0x63;
+VK_NUMPAD4        :: 0x64;
+VK_NUMPAD5        :: 0x65;
+VK_NUMPAD6        :: 0x66;
+VK_NUMPAD7        :: 0x67;
+VK_NUMPAD8        :: 0x68;
+VK_NUMPAD9        :: 0x69;
+VK_MULTIPLY       :: 0x6A;
+VK_ADD            :: 0x6B;
+VK_SEPARATOR      :: 0x6C;
+VK_SUBTRACT       :: 0x6D;
+VK_DECIMAL        :: 0x6E;
+VK_DIVIDE         :: 0x6F;
+VK_F1             :: 0x70;
+VK_F2             :: 0x71;
+VK_F3             :: 0x72;
+VK_F4             :: 0x73;
+VK_F5             :: 0x74;
+VK_F6             :: 0x75;
+VK_F7             :: 0x76;
+VK_F8             :: 0x77;
+VK_F9             :: 0x78;
+VK_F10            :: 0x79;
+VK_F11            :: 0x7A;
+VK_F12            :: 0x7B;
+VK_F13            :: 0x7C;
+VK_F14            :: 0x7D;
+VK_F15            :: 0x7E;
+VK_F16            :: 0x7F;
+VK_F17            :: 0x80;
+VK_F18            :: 0x81;
+VK_F19            :: 0x82;
+VK_F20            :: 0x83;
+VK_F21            :: 0x84;
+VK_F22            :: 0x85;
+VK_F23            :: 0x86;
+VK_F24            :: 0x87;
 
 INVALID_HANDLE :: Handle(~uintptr(0));
 
@@ -333,6 +463,34 @@ WS_MAXIMIZE         :: 0x01000000;
 WS_MINIMIZE         :: 0x20000000;
 WS_OVERLAPPEDWINDOW :: WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
 WS_POPUPWINDOW      :: WS_POPUP | WS_BORDER | WS_SYSMENU;
+
+WS_EX_DLGMODALFRAME     	:: 0x00000001;
+WS_EX_NOPARENTNOTIFY    	:: 0x00000004;
+WS_EX_TOPMOST           	:: 0x00000008;
+WS_EX_ACCEPTFILES       	:: 0x00000010;
+WS_EX_TRANSPARENT       	:: 0x00000020;
+WS_EX_MDICHILD          	:: 0x00000040;
+WS_EX_TOOLWINDOW        	:: 0x00000080;
+WS_EX_WINDOWEDGE        	:: 0x00000100;
+WS_EX_CLIENTEDGE        	:: 0x00000200;
+WS_EX_CONTEXTHELP       	:: 0x00000400;
+WS_EX_RIGHT             	:: 0x00001000;
+WS_EX_LEFT              	:: 0x00000000;
+WS_EX_RTLREADING        	:: 0x00002000;
+WS_EX_LTRREADING        	:: 0x00000000;
+WS_EX_LEFTSCROLLBAR     	:: 0x00004000;
+WS_EX_RIGHTSCROLLBAR    	:: 0x00000000;
+WS_EX_CONTROLPARENT     	:: 0x00010000;
+WS_EX_STATICEDGE        	:: 0x00020000;
+WS_EX_APPWINDOW         	:: 0x00040000;
+WS_EX_OVERLAPPEDWINDOW  	:: WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE;
+WS_EX_PALETTEWINDOW     	:: WS_EX_WINDOWEDGE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST;
+WS_EX_LAYERED           	:: 0x00080000;
+WS_EX_NOINHERITLAYOUT   	:: 0x00100000; // Disable inheritence of mirroring by children
+WS_EX_NOREDIRECTIONBITMAP 	:: 0x00200000;
+WS_EX_LAYOUTRTL         	:: 0x00400000; // Right to left mirroring
+WS_EX_COMPOSITED        	:: 0x02000000;
+WS_EX_NOACTIVATE        	:: 0x08000000;
 
 WM_ACTIVATE          :: 0x0006;
 WM_ACTIVATEAPP       :: 0x001C;
@@ -827,7 +985,7 @@ foreign user32 {
 	@(link_name="DestroyWindow")       destroy_window        :: proc(wnd: Hwnd) -> Bool ---;
 	@(link_name="DescribePixelFormat") describe_pixel_format :: proc(dc: Hdc, pixel_format: i32, bytes: u32, pfd: ^Pixel_Format_Descriptor) -> i32 ---;
 
-	@(link_name="GetMonitor_InfoA")  get_monitor_info_a  :: proc(monitor: Hmonitor, mi: ^Monitor_Info) -> Bool ---;
+	@(link_name="GetMonitorInfoA")  get_monitor_info_a  :: proc(monitor: Hmonitor, mi: ^Monitor_Info) -> Bool ---;
 	@(link_name="MonitorFromWindow") monitor_from_window :: proc(wnd: Hwnd, flags: u32) -> Hmonitor ---;
 
 	@(link_name="SetWindowPos") set_window_pos :: proc(wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32) ---;
@@ -872,6 +1030,8 @@ foreign user32 {
 
 	@(link_name="MapVirtualKeyExW") map_virtual_key_ex_w :: proc(code, map_type: u32, hkl: HKL) ---;
 	@(link_name="MapVirtualKeyExA") map_virtual_key_ex_a :: proc(code, map_type: u32, hkl: HKL) ---;
+
+	@(link_name="EnumDisplayMonitors") enum_display_monitors :: proc(hdc: Hdc,  rect: ^Rect, enum_proc: Monitor_Enum_Proc, lparam: Lparam) -> bool ---;
 }
 
 @(default_calling_convention = "std")
@@ -902,7 +1062,19 @@ foreign winmm {
 	@(link_name="timeGetTime") time_get_time :: proc() -> u32 ---;
 }
 
+//objbase.h
+Com_Init :: enum {
+	Multi_Threaded = 0x0,
+	Apartment_Threaded = 0x2,
+	Disable_OLE1_DDE = 0x4,
+	Speed_Over_Memory = 0x8,
+};
 
+@(default_calling_convention = "std")
+foreign ole32 {
+	@(link_name ="CoInitializeEx") com_init_ex :: proc(reserved: Lpvoid, co_init: Com_Init) ->Hresult ---;
+	@(link_name = "CoUninitialize") com_shutdown :: proc() ---;
+}
 
 get_query_performance_frequency :: proc() -> i64 {
 	r: i64;
