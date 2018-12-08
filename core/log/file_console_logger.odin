@@ -2,6 +2,7 @@ package log
 
 import "core:fmt";
 import "core:os";
+import "core:time";
 
 Level_Headers := []string{
     "[DEBUG] --- ",
@@ -33,20 +34,32 @@ File_Console_Logger_Data :: struct {
     ident : string,
 }
 
-file_logger :: proc(h: os.Handle, lowest := Level.Debug, opt := Default_File_Logger_Opts, ident := "") -> Logger {
+create_file_logger :: proc(h: os.Handle, lowest := Level.Debug, opt := Default_File_Logger_Opts, ident := "") -> Logger {
     data := new(File_Console_Logger_Data);
     data.lowest_level = lowest;
     data.file_handle = h;
     data.ident = ident;
     return Logger{file_console_logger_proc, data, opt};
 }
+
+destroy_file_logger ::proc(log : ^Logger) {
+    data := cast(^File_Console_Logger_Data)log.data;
+    if data.file_handle != os.INVALID_HANDLE do os.close(data.file_handle);
+    free(data);
+    log^ = nil_logger();
+}
  
-console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logger_Opts, ident := "") -> Logger {
+create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logger_Opts, ident := "") -> Logger {
     data := new(File_Console_Logger_Data);
     data.lowest_level = lowest;
     data.file_handle = os.INVALID_HANDLE;
     data.ident = ident;
     return Logger{file_console_logger_proc, data, opt};
+}
+
+destroy_console_logger ::proc(log : ^Logger) {
+    free(log.data);
+    log^ = nil_logger();
 }
 
 file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
@@ -61,13 +74,18 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
     
     do_level_header(options, level, &buf);
 
-
-    /*if Full_Timestamp_Opts & options != nil {
-        time := os.get_current_system_time();
-        if Option.Date in options do fmt.sbprintf(&buf, "%d-%d-%d ", time.year, time.month, time.day);
-        if Option.Time in options do fmt.sbprintf(&buf, "%d:%d:%d ", time.hour, time.minute, time.second);
+    when time.IS_SUPPORTED {
+        if Full_Timestamp_Opts & options != nil {
+            fmt.sbprint(&buf, "[");
+            t := time.now(); 
+            y, m, d := time.date(t);
+            h, min, s := time.clock(t);
+            if Option.Date in options do fmt.sbprintf(&buf, "%d-%02d-%02d ", y, m, d);
+            if Option.Time in options do fmt.sbprintf(&buf, "%02d:%02d:%02d", h, min, s);
+            fmt.sbprint(&buf, "] ");
+        }
     }
-*/
+
     do_location_header(options, &buf, location);
 
     if data.ident != "" do fmt.sbprintf(&buf, "[%s] ", data.ident);
