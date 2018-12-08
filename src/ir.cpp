@@ -4581,15 +4581,14 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		Type *pst = st;
 		st = type_deref(st);
 
-		bool st_is_ptr = st != pst;
+		bool st_is_ptr = is_type_pointer(src_type);
 		st = base_type(st);
 
 		Type *dt = t;
 		bool dt_is_ptr = is_type_pointer(dt);
 
-		GB_ASSERT(is_type_struct(st) || is_type_union(st));
-		String field_name = ir_lookup_subtype_polymorphic_field(proc->module->info, t, st);
-		// gb_printf("field_name: %.*s\n", LIT(field_name));
+		GB_ASSERT(is_type_struct(st) || is_type_raw_union(st));
+		String field_name = ir_lookup_subtype_polymorphic_field(proc->module->info, t, src_type);
 		if (field_name.len > 0) {
 			// NOTE(bill): It can be casted
 			Selection sel = lookup_field(st, field_name, false);
@@ -4614,7 +4613,11 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 					return ir_emit_deep_field_ev(proc, value, sel);
 
 				}
+			} else {
+				GB_PANIC("invalid subtype cast");
 			}
+		} else {
+			GB_PANIC("invalid subtype cast");
 		}
 	}
 
