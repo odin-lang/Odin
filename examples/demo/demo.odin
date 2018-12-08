@@ -126,6 +126,38 @@ general_stuff :: proc() {
 			fmt.println("Y is not defined");
 		}
 	}
+
+	{ // Labelled control blocks
+		block: {
+			if true {
+				fmt.println("break block;");
+				break block;
+			}
+		}
+
+		{
+			branch: if true {
+				fmt.println("break branch;");
+				break branch;
+			}
+		}
+
+		{
+			loop: for true {
+				fmt.println("break loop;");
+				break loop;
+			}
+		}
+
+		{
+			cases: switch {
+			case:
+				fmt.println("break cases;");
+				break cases;
+			}
+		}
+
+	}
 }
 
 
@@ -836,14 +868,8 @@ diverging_procedures :: proc() {
 	foo();
 }
 
-foreign export {
-	bar :: proc "c" () -> i32 {
-		return 123;
-	}
-}
-
 main :: proc() {
-	when false {
+	when true {
 		general_stuff();
 		union_type();
 		parametric_polymorphism();

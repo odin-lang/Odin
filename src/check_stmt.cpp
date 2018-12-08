@@ -396,7 +396,7 @@ void check_when_stmt(CheckerContext *ctx, AstWhenStmt *ws, u32 flags) {
 	}
 }
 
-void check_label(CheckerContext *ctx, Ast *label) {
+void check_label(CheckerContext *ctx, Ast *label, Ast *parent) {
 	if (label == nullptr) {
 		return;
 	}
@@ -428,7 +428,7 @@ void check_label(CheckerContext *ctx, Ast *label) {
 		}
 	}
 
-	Entity *e = alloc_entity_label(ctx->scope, l->name->Ident.token, t_invalid, label);
+	Entity *e = alloc_entity_label(ctx->scope, l->name->Ident.token, t_invalid, label, parent);
 	add_entity(ctx->checker, ctx->scope, l->name, e);
 	e->parent_proc_decl = ctx->curr_proc_decl;
 
@@ -608,7 +608,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	check_open_scope(ctx, node);
 	defer (check_close_scope(ctx));
 
-	check_label(ctx, ss->label); // TODO(bill): What should the label's "scope" be?
+	check_label(ctx, ss->label, node); // TODO(bill): What should the label's "scope" be?
 
 	if (ss->init != nullptr) {
 		check_stmt(ctx, ss->init, 0);
@@ -842,7 +842,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	check_open_scope(ctx, node);
 	defer (check_close_scope(ctx));
 
-	check_label(ctx, ss->label); // TODO(bill): What should the label's "scope" be?
+	check_label(ctx, ss->label, node); // TODO(bill): What should the label's "scope" be?
 
 	if (ss->tag->kind != Ast_AssignStmt) {
 		error(ss->tag, "Expected an 'in' assignment for this type switch statement");
@@ -1176,12 +1176,16 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 	case_ast_node(bs, BlockStmt, node);
 		check_open_scope(ctx, node);
+		check_label(ctx, bs->label, node);
+
 		check_stmt_list(ctx, bs->stmts, flags);
 		check_close_scope(ctx);
 	case_end;
 
 	case_ast_node(is, IfStmt, node);
 		check_open_scope(ctx, node);
+
+		check_label(ctx, is->label, node);
 
 		if (is->init != nullptr) {
 			check_stmt(ctx, is->init, 0);
@@ -1264,7 +1268,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 
 		check_open_scope(ctx, node);
-		check_label(ctx, fs->label); // TODO(bill): What should the label's "scope" be?
+		check_label(ctx, fs->label, node); // TODO(bill): What should the label's "scope" be?
 
 		if (fs->init != nullptr) {
 			check_stmt(ctx, fs->init, 0);
@@ -1293,7 +1297,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 
 		check_open_scope(ctx, node);
-		check_label(ctx, rs->label);
+		check_label(ctx, rs->label, node);
 
 		Type *val0 = nullptr;
 		Type *val1 = nullptr;
@@ -1528,18 +1532,20 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		Token token = bs->token;
 		switch (token.kind) {
 		case Token_break:
-			if ((flags & Stmt_BreakAllowed) == 0) {
+			if ((flags & Stmt_BreakAllowed) == 0 && bs->label == nullptr) {
 				error(token, "'break' only allowed in loops or 'switch' statements");
 			}
 			break;
 		case Token_continue:
-			if ((flags & Stmt_ContinueAllowed) == 0) {
+			if ((flags & Stmt_ContinueAllowed) == 0 && bs->label == nullptr) {
 				error(token, "'continue' only allowed in loops");
 			}
 			break;
 		case Token_fallthrough:
 			if ((flags & Stmt_FallthroughAllowed) == 0) {
 				error(token, "'fallthrough' statement in illegal position, expected at the end of a 'case' block");
+			} else if (bs->label != nullptr) {
+				error(token, "'fallthrough' cannot have a label");
 			}
 			break;
 		default:
@@ -1564,6 +1570,24 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			if (e->kind != Entity_Label) {
 				error(ident, "'%.*s' is not a label", LIT(name));
 				return;
+			}
+			Ast *parent = e->Label.parent;
+			GB_ASSERT(parent != nullptr);
+			switch (parent->kind) {
+			case Ast_BlockStmt:
+			case Ast_IfStmt:
+			case Ast_SwitchStmt:
+				if (token.kind != Token_break) {
+					error(bs->label, "Label '%.*s' can only be used with 'break'", LIT(e->token.string));
+				}
+				break;
+			case Ast_RangeStmt:
+			case Ast_ForStmt:
+				if ((token.kind != Token_break) && (token.kind != Token_continue)) {
+					error(bs->label, "Label '%.*s' can only be used with 'break' and 'continue'", LIT(e->token.string));
+				}
+				break;
+
 			}
 		}
 

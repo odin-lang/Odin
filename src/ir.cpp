@@ -4616,8 +4616,6 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 			} else {
 				GB_PANIC("invalid subtype cast");
 			}
-		} else {
-			GB_PANIC("invalid subtype cast");
 		}
 	}
 
@@ -7988,9 +7986,22 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 	case_end;
 
 	case_ast_node(bs, BlockStmt, node);
-		ir_open_scope(proc);
-		ir_build_stmt_list(proc, bs->stmts);
-		ir_close_scope(proc, irDeferExit_Default, nullptr);
+		if (bs->label != nullptr) {
+			irBlock *done = ir_new_block(proc, node, "block.done");
+			ir_push_target_list(proc, bs->label, done, nullptr, nullptr);
+
+			ir_open_scope(proc);
+			ir_build_stmt_list(proc, bs->stmts);
+			ir_close_scope(proc, irDeferExit_Default, nullptr);
+
+			ir_emit_jump(proc, done);
+			ir_start_block(proc, done);
+
+		} else {
+			ir_open_scope(proc);
+			ir_build_stmt_list(proc, bs->stmts);
+			ir_close_scope(proc, irDeferExit_Default, nullptr);
+		}
 	case_end;
 
 	case_ast_node(ds, DeferStmt, node);
@@ -8088,6 +8099,10 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 		ir_build_cond(proc, is->cond, then, else_);
 		ir_start_block(proc, then);
+
+		if (is->label != nullptr) {
+			ir_push_target_list(proc, is->label, done, nullptr, nullptr);
+		}
 
 		ir_open_scope(proc);
 		ir_build_stmt(proc, is->body);
