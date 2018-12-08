@@ -160,6 +160,10 @@ void big_int_rem_eq(BigInt *dst, BigInt const *x) {
 
 
 void big_int_normalize(BigInt *dst) {
+	if (dst->len == 1 && dst->d.word == 0) {
+		dst->len = 0;
+		return;
+	}
 	u64 const *words = big_int_ptr(dst);
 
 	i32 count_minus_one = -1;
@@ -172,6 +176,10 @@ void big_int_normalize(BigInt *dst) {
 
 	if (count_minus_one < 0) {
 		dst->neg = false;
+		if (words[0] == 0) {
+			dst->len = 0;
+			return;
+		}
 	}
 	dst->len = count_minus_one+1;
 	if (count_minus_one == 0) {
@@ -227,6 +235,7 @@ void big_int_init(BigInt *dst, BigInt const *src) {
 	big_int_alloc(dst, src->len, src->len);
 	u64 const *s = big_int_ptr(src);
 	gb_memmove(dst->d.words, s, gb_size_of(u64)*dst->len);
+	big_int_normalize(dst);
 }
 
 BigInt big_int_make(BigInt const *b, bool abs) {
@@ -258,10 +267,6 @@ BigInt big_int_make_i64(i64 x) {
 
 
 void big_int_from_string(BigInt *dst, String const &s) {
-#if 0
-	u64 u = u64_from_string(s);
-	big_int_from_u64(dst, u);
-#else
 	u64 base = 10;
 	bool has_prefix = false;
 	if (s.len > 2 && s[0] == '0') {
@@ -299,7 +304,7 @@ void big_int_from_string(BigInt *dst, String const &s) {
 		big_int_mul_eq(dst, &b);
 		big_int_add_eq(dst, &val);
 	}
-#endif
+	big_int_normalize(dst);
 }
 
 
@@ -547,6 +552,7 @@ void big_int_sub(BigInt *dst, BigInt const *x, BigInt const *y) {
 	BigInt neg_y = {};
 	big_int_neg(&neg_y, y);
 	big_int_add(dst, x, &neg_y);
+	big_int_normalize(dst);
 	return;
 }
 
@@ -585,6 +591,7 @@ void big_int_shl(BigInt *dst, BigInt const *x, BigInt const *y) {
 		if (dst->d.word > xd[0]) {
 			dst->len = 1;
 			dst->neg = x->neg;
+			big_int_normalize(dst);
 			return;
 		}
 	}
@@ -606,6 +613,7 @@ void big_int_shl(BigInt *dst, BigInt const *x, BigInt const *y) {
 			carry = 0;
 		}
 	}
+	big_int_normalize(dst);
 }
 
 void big_int_shr(BigInt *dst, BigInt const *x, BigInt const *y) {
@@ -662,6 +670,7 @@ void big_int_shr(BigInt *dst, BigInt const *x, BigInt const *y) {
 
 		carry = v << (64ull - remaining_shift_len);
 	}
+	big_int_normalize(dst);
 }
 
 void big_int_mul_u64(BigInt *dst, BigInt const *x, u64 y) {
@@ -690,6 +699,7 @@ void big_int_mul_u64(BigInt *dst, BigInt const *x, u64 y) {
 		big_int_add(&tmp, &shifted, &carry_shifted);
 		big_int_add(dst, &tmp, &result);
 	}
+	big_int_normalize(dst);
 }
 
 
@@ -1139,11 +1149,13 @@ void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) {
 
 			big_int__and_not_abs(dst, &y1, &x1);
 			dst->neg = false;
+			big_int_normalize(dst);
 			return;
 		}
 
 		big_int__and_not_abs(dst, x, y);
 		dst->neg = false;
+		big_int_normalize(dst);
 		return;
 	}
 
@@ -1157,6 +1169,7 @@ void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) {
 		big_int_or(&z1, &x1, &y1);
 		big_int_add(dst, &z1, &BIG_INT_ONE);
 		dst->neg = true;
+		big_int_normalize(dst);
 		return;
 	}
 
@@ -1166,6 +1179,7 @@ void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) {
 	big_int_sub_eq(&y1, &BIG_INT_ONE);
 	big_int_and(dst, &x1, &y1);
 	dst->neg = false;
+	big_int_normalize(dst);
 	return;
 }
 
@@ -1177,6 +1191,7 @@ void big_int__xor_abs(BigInt *dst, BigInt const *x, BigInt const *y) {
 	if (x->len == 1 && y->len == 1) {
 		dst->len = 1;
 		dst->d.word = xd[0] ^ yd[0];
+		big_int_normalize(dst);
 		return;
 	}
 

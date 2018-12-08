@@ -553,7 +553,7 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		case Token_Shr:    big_int_shr(&c, a, b);     break;
 		default: goto error;
 		}
-
+		big_int_normalize(&c);
 		ExactValue res = {ExactValue_Integer};
 		res.value_integer = c;
 		return res;

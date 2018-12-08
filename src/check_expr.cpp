@@ -1647,6 +1647,13 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 						}
 					}
 				} else {
+					if (is_type_integer(x->type)) {
+						i64 i = exact_value_to_i64(x->value);
+						if (i == 0) {
+							auto bi = x->value.value_integer;
+							gb_printf_err("%s %d %lld\n", expr_to_string(x->expr), bi.len, bi.d.word);
+						}
+					}
 					x->value = exact_value_bool(compare_exact_values(op, x->value, y->value));
 				}
 			} else {
