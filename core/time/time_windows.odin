@@ -2,6 +2,8 @@ package time
 
 import "core:sys/win32"
 
+IS_SUPPORTED :: true;
+
 now :: proc() -> Time {
 	file_time: win32.Filetime;
 
@@ -18,5 +20,5 @@ now :: proc() -> Time {
 
 
 sleep :: proc(d: Duration) {
-	win32.Sleep(u32(d/Millisecond));
+	win32.sleep(i32(d/Millisecond));
 }
