@@ -12,6 +12,7 @@ Handle    :: distinct i32;
 File_Time :: distinct u64;
 Errno     :: distinct i32;
 
+INVALID_HANDLE :: ~Handle(0);
 
 O_RDONLY   :: 0x00000;
 O_WRONLY   :: 0x00001;
