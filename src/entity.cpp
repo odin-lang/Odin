@@ -127,6 +127,7 @@ struct Entity {
 			Ast *   foreign_library_ident;
 			String  link_name;
 			String  link_prefix;
+			Entity *deferred_procedure;
 			bool    is_foreign;
 			bool    is_export;
 		} Procedure;
@@ -182,6 +183,14 @@ bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 		return false;
 	}
 	return name[0] != '_';
+}
+
+bool entity_has_deferred_procedure(Entity *e) {
+	GB_ASSERT(e != nullptr);
+	if (e->kind == Entity_Procedure) {
+		return e->Procedure.deferred_procedure != nullptr;
+	}
+	return false;
 }
 
 

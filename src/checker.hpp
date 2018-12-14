@@ -477,6 +477,7 @@ struct Checker {
 	CheckerInfo info;
 
 	Array<ProcInfo> procs_to_check;
+	Array<Entity *> procs_with_deferred_to_check;
 
 	gbAllocator    allocator;
 	CheckerContext init_ctx;
