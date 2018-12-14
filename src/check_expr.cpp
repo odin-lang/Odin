@@ -4970,6 +4970,18 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 		return err;
 	}
 
+	if (param_count < ordered_operands.count) {
+		error(call, "Too many polymorphic type arguments, expected %td, got %td", param_count, ordered_operands.count);
+		err = CallArgumentError_TooManyArguments;
+	} else if (param_count > ordered_operands.count) {
+		error(call, "Too few polymorphic type arguments, expected %td, got %td", param_count, ordered_operands.count);
+		err = CallArgumentError_TooFewArguments;
+	}
+
+	if (err != 0) {
+		return err;
+	}
+
 	i64 score = 0;
 	for (isize i = 0; i < param_count; i++) {
 		Operand *o = &ordered_operands[i];
