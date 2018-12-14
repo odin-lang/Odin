@@ -1706,6 +1706,12 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	case Basic_i16:
 	case Basic_i32:
 	case Basic_i64:
+	case Basic_i16le:
+	case Basic_i32le:
+	case Basic_i64le:
+	case Basic_i16be:
+	case Basic_i32be:
+	case Basic_i64be:
 	case Basic_int:
 	case Basic_rune:
 	case Basic_typeid:
@@ -1714,6 +1720,12 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	case Basic_u16:
 	case Basic_u32:
 	case Basic_u64:
+	case Basic_u16le:
+	case Basic_u32le:
+	case Basic_u64le:
+	case Basic_u16be:
+	case Basic_u32be:
+	case Basic_u64be:
 	case Basic_uint:
 	case Basic_uintptr:
 		return irDebugBasicEncoding_unsigned;
