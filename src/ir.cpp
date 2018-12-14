@@ -4597,7 +4597,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		st = base_type(st);
 
 		Type *dt = t;
-		bool dt_is_ptr = is_type_pointer(dt);
+		bool dt_is_ptr = type_deref(dt) != dt;
 
 		GB_ASSERT(is_type_struct(st) || is_type_raw_union(st));
 		String field_name = ir_lookup_subtype_polymorphic_field(proc->module->info, t, src_type);
@@ -4608,13 +4608,15 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 				ir_emit_comment(proc, str_lit("cast - polymorphism"));
 				if (st_is_ptr) {
 					irValue *res = ir_emit_deep_field_gep(proc, value, sel);
-					if (!dt_is_ptr) {
+					Type *rt = ir_type(res);
+					if (!are_types_identical(rt, dt) && are_types_identical(type_deref(rt), dt)) {
 						res = ir_emit_load(proc, res);
 					}
 					return res;
 				} else {
 					if (is_type_pointer(ir_type(value))) {
-						if (!dt_is_ptr) {
+						Type *rt = ir_type(value);
+						if (!are_types_identical(rt, dt) && are_types_identical(type_deref(rt), dt)) {
 							value = ir_emit_load(proc, value);
 						} else {
 							value = ir_emit_deep_field_gep(proc, value, sel);
