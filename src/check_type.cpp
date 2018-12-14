@@ -327,6 +327,9 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 		case_ast_node(f, ValueDecl, field);
 			min_field_count += f->names.count;
 		case_end;
+		case_ast_node(f, Field, field);
+			min_field_count += f->names.count;
+		case_end;
 		}
 	}
 	struct_type->Struct.names = make_names_field_for_struct(ctx, ctx->scope);
