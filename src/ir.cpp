@@ -2712,7 +2712,7 @@ void ir_value_set_debug_location(irProcedure *proc, irValue *v) {
 					gb_printf_err("\t%.*s\n", LIT(instr->DebugDeclare.entity->token.string));
 				}
 			}
-			GB_PANIC("Value wihout debug location: %.*s %p; %p", LIT(proc->name), proc->entity, v);
+			GB_PANIC("Value without debug location: %.*s %p; %p :: %s", LIT(proc->name), proc->entity, v, type_to_string(proc->type));
 		}
 	}
 }
