@@ -1926,11 +1926,11 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 
-	// []byte/[]u8 <-> string
-	if (is_type_u8_slice(src) && is_type_string(dst)) {
+	// []byte/[]u8 <-> string (not cstring)
+	if (is_type_u8_slice(src) && (is_type_string(dst) && !is_type_cstring(dst))) {
 		return true;
 	}
-	if (is_type_string(src) && is_type_u8_slice(dst)) {
+	if ((is_type_string(src) && !is_type_cstring(src)) && is_type_u8_slice(dst)) {
 		// if (is_type_typed(src)) {
 			return true;
 		// }

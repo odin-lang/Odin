@@ -1686,7 +1686,14 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 				operand = ast_bad_expr(f, token, f->curr_token);
 			}
 			warning(token, "#run is not yet implemented");
-		} else if (name.string == "file") { return ast_basic_directive(f, token, name.string);
+		} /* else if (name.string == "no_deferred") {
+			operand = parse_expr(f, false);
+			if (unparen_expr(operand)->kind != Ast_CallExpr) {
+				syntax_error(operand, "#no_deferred can only be applied to procedure calls");
+				operand = ast_bad_expr(f, token, f->curr_token);
+			}
+			operand->stmt_state_flags |= StmtStateFlag_no_deferred;
+		} */ else if (name.string == "file") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "line") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "procedure") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "caller_location") { return ast_basic_directive(f, token, name.string);
@@ -3887,7 +3894,10 @@ Ast *parse_stmt(AstFile *f) {
 		} else if (tag == "assert") {
 			Ast *t = ast_basic_directive(f, hash_token, tag);
 			return ast_expr_stmt(f, parse_call_expr(f, t));
-		}
+		} /* else if (name.string == "no_deferred") {
+			s = parse_stmt(f);
+			s->stmt_state_flags |= StmtStateFlag_no_deferred;
+		} */
 
 		if (tag == "include") {
 			syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");

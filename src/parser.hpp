@@ -173,6 +173,8 @@ enum ProcCallingConvention {
 enum StmtStateFlag {
 	StmtStateFlag_bounds_check    = 1<<0,
 	StmtStateFlag_no_bounds_check = 1<<1,
+
+	StmtStateFlag_no_deferred = 1<<5,
 };
 
 enum FieldFlag {
