@@ -633,6 +633,11 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		e->Procedure.link_name = ac.link_name;
 	}
 
+	if (ac.deferred_procedure != nullptr) {
+		e->Procedure.deferred_procedure = ac.deferred_procedure;
+		array_add(&ctx->checker->procs_with_deferred_to_check, e);
+	}
+
 	if (is_foreign) {
 		String name = e->token.string;
 		if (e->Procedure.link_name.len > 0) {

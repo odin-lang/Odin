@@ -859,6 +859,10 @@ void     ir_pop_debug_location  (irModule *m);
 irDebugInfo *ir_add_debug_info_local(irProcedure *proc, Entity *e, i32 arg_id);
 irDebugInfo *ir_add_debug_info_file(irModule *module, AstFile *file);
 irDebugInfo *ir_add_debug_info_proc(irProcedure *proc);
+void ir_emit_increment(irProcedure *proc, irValue *addr);
+irValue *ir_emit_array_ep(irProcedure *proc, irValue *s, irValue *index);
+irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index);
+irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index);
 
 irValue *ir_emit_byte_swap(irProcedure *proc, irValue *value, Type *t);
 
@@ -1271,6 +1275,17 @@ irValue *ir_emit(irProcedure *proc, irValue *instr) {
 	if (m->generate_debug_info) {
 		ir_value_set_debug_location(proc, instr);
 	}
+	return instr;
+}
+
+irValue *ir_de_emit(irProcedure *proc, irValue *instr) {
+	GB_ASSERT(instr->kind == irValue_Instr);
+	irModule *m = proc->module;
+	irBlock *b = proc->curr_block;
+	GB_ASSERT(b != nullptr);
+	irInstr *i = ir_get_last_instr(b);
+	GB_ASSERT(i == &instr->Instr);
+	array_pop(&b->instrs);
 	return instr;
 }
 
@@ -2800,6 +2815,28 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 	return c;
 }
 
+Array<irValue *> ir_value_to_array(irProcedure *p, irValue *value) {
+	Array<irValue *> array = {};
+	Type *t = base_type(ir_type(value));
+	if (t == nullptr) {
+		// Do nothing
+	} else if (is_type_tuple(t)) {
+		GB_ASSERT(t->kind == Type_Tuple);
+		auto *rt = &t->Tuple;
+		if (rt->variables.count > 0) {
+			array = array_make<irValue *>(ir_allocator(), rt->variables.count);
+			for_array(i, rt->variables) {
+				irValue *elem = ir_emit_struct_ev(p, value, cast(i32)i);
+				array[i] = elem;
+			}
+		}
+	} else {
+		array = array_make<irValue *>(ir_allocator(), 1);
+		array[0] = value;
+	}
+	return array;
+}
+
 
 irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, ProcInlining inlining = ProcInlining_none) {
 	Type *pt = base_type(ir_type(value));
@@ -2847,18 +2884,36 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 		inlining = p->inlining;
 	}
 
+	irValue *result = nullptr;
+
 	Type *abi_rt = pt->Proc.abi_compat_result_type;
 	Type *rt = reduce_tuple_to_single_type(results);
 	if (pt->Proc.return_by_pointer) {
 		irValue *return_ptr = ir_add_local_generated(p, rt);
 		GB_ASSERT(is_type_pointer(ir_type(return_ptr)));
 		ir_emit(p, ir_instr_call(p, value, return_ptr, args, nullptr, context_ptr, inlining));
-		return ir_emit_load(p, return_ptr);
+		result = ir_emit_load(p, return_ptr);
+	} else {
+		result = ir_emit(p, ir_instr_call(p, value, nullptr, args, abi_rt, context_ptr, inlining));
+		if (abi_rt != results) {
+			result = ir_emit_transmute(p, result, rt);
+		}
 	}
 
-	irValue *result = ir_emit(p, ir_instr_call(p, value, nullptr, args, abi_rt, context_ptr, inlining));
-	if (abi_rt != results) {
-		result = ir_emit_transmute(p, result, rt);
+	if (value->kind == irValue_Proc) {
+		irProcedure *the_proc = &value->Proc;
+		Entity *e = the_proc->entity;
+		if (entity_has_deferred_procedure(e)) {
+			Entity *deferred_entity = e->Procedure.deferred_procedure;
+			irValue **deferred_found = map_get(&p->module->values, hash_entity(deferred_entity));
+			GB_ASSERT(deferred_found != nullptr);
+			irValue *deferred = *deferred_found;
+
+			Array<irValue *> result_as_args = ir_value_to_array(p, result);
+
+			irValue *deferred_call = ir_de_emit(p, ir_emit_call(p, deferred, result_as_args));
+			ir_add_defer_instr(p, p->scope_index, deferred_call);
+		}
 	}
 
 	return result;
@@ -3396,10 +3451,6 @@ irValue *ir_map_cap(irProcedure *proc, irValue *value) {
 }
 
 
-void ir_emit_increment(irProcedure *proc, irValue *addr);
-irValue *ir_emit_array_ep(irProcedure *proc, irValue *s, irValue *index);
-irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index);
-irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index);
 
 struct irLoopData {
 	irValue *idx_addr;

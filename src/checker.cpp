@@ -778,6 +778,7 @@ void init_checker(Checker *c, Parser *parser) {
 	init_checker_info(&c->info);
 
 	array_init(&c->procs_to_check, a);
+	array_init(&c->procs_with_deferred_to_check, a);
 
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
@@ -793,6 +794,7 @@ void destroy_checker(Checker *c) {
 	destroy_checker_info(&c->info);
 
 	array_free(&c->procs_to_check);
+	array_free(&c->procs_with_deferred_to_check);
 
 	destroy_checker_context(&c->init_ctx);
 }
@@ -1030,6 +1032,10 @@ void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
 	}
 	entity->flags |= EntityFlag_Used;
 	add_declaration_dependency(c, entity);
+	if (entity_has_deferred_procedure(entity)) {
+		Entity *deferred = entity->Procedure.deferred_procedure;
+		add_entity_use(c, nullptr, deferred);
+	}
 }
 
 
@@ -1890,9 +1896,24 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 }
 
 DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
-	ExactValue ev = check_decl_attribute_value(c, value);
+	ExactValue ev = {};
+	if (name != "deferred") {
+		ev = check_decl_attribute_value(c, value);
+	}
 
-	if (name == "link_name") {
+	if (name == "deferred") {
+		if (value != nullptr) {
+			Operand o = {};
+			check_expr(c, &o, value);
+			Entity *e = entity_of_ident(o.expr);
+			if (e != nullptr && e->kind == Entity_Procedure) {
+				ac->deferred_procedure = e;
+				return true;
+			}
+		}
+		error(elem, "Expected a procedure entity for '%.*s'", LIT(name));
+		return false;
+	} else if (name == "link_name") {
 		if (ev.kind == ExactValue_String) {
 			ac->link_name = ev.value_string;
 			if (!is_foreign_name_valid(ac->link_name)) {
@@ -3538,6 +3559,56 @@ void check_parsed_files(Checker *c) {
 			}
 		}
 	}
+
+	TIME_SECTION("check deferred procedures");
+	for_array(i, c->procs_with_deferred_to_check) {
+		Entity *src = c->procs_with_deferred_to_check[i];
+		GB_ASSERT(src->kind == Entity_Procedure);
+
+		Entity *dst = src->Procedure.deferred_procedure;
+		GB_ASSERT(dst != nullptr);
+		GB_ASSERT(dst->kind == Entity_Procedure);
+
+		if (is_type_polymorphic(src->type) || is_type_polymorphic(dst->type)) {
+			error(src->token, "'deferred' cannot be used with a polymorphic procedure");
+			continue;
+		}
+
+		GB_ASSERT(is_type_proc(src->type));
+		GB_ASSERT(is_type_proc(dst->type));
+		Type *src_results = base_type(src->type)->Proc.results;
+		Type *dst_params = base_type(dst->type)->Proc.params;
+		if (src_results == nullptr && dst_params == nullptr) {
+			// Okay
+			continue;
+		}
+		if ((src_results == nullptr && dst_params != nullptr) ||
+		    (src_results != nullptr && dst_params == nullptr)) {
+			error(src->token, "Deferred procedure '%.*s' parameters do not match the results of initial procedure '%.*s'", LIT(src->token.string), LIT(dst->token.string));
+			continue;
+		}
+
+		GB_ASSERT(src_results->kind == Type_Tuple);
+		GB_ASSERT(dst_params->kind == Type_Tuple);
+
+		auto const &sv = src_results->Tuple.variables;
+		auto const &dv = dst_params->Tuple.variables;
+
+		if (are_types_identical(src_results, dst_params)) {
+			// Okay!
+		} else {
+			gbString s = type_to_string(src_results);
+			gbString d = type_to_string(dst_params);
+			error(src->token, "Deferred procedure '%.*s' parameters do not match the results of initial procedure '%.*s':\n\t(%s) =/= (%s)",
+			      LIT(src->token.string), LIT(dst->token.string),
+			      s, d
+			);
+			gb_string_free(d);
+			gb_string_free(s);
+			continue;
+		}
+	}
+
 
 	TIME_SECTION("check entry point");
 	if (!build_context.is_dll) {
