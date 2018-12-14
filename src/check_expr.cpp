@@ -5356,6 +5356,8 @@ bool ternary_compare_types(Type *x, Type *y) {
 	return are_types_identical(x, y);
 }
 
+
+
 ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = Expr_Stmt;
 
@@ -5646,112 +5648,111 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				break;
 			}
 
-			if (is_type_struct(t)) { // Checker values
-				isize field_count = t->Struct.fields.count;
-				isize min_field_count = t->Struct.fields.count;
-				for (isize i = min_field_count-1; i >= 0; i--) {
-					Entity *e = t->Struct.fields[i];
-					GB_ASSERT(e->kind == Entity_Variable);
-					if (e->Variable.param_value.kind != ParameterValue_Invalid) {
-						min_field_count--;
-					} else {
+
+			isize field_count = t->Struct.fields.count;
+			isize min_field_count = t->Struct.fields.count;
+			for (isize i = min_field_count-1; i >= 0; i--) {
+				Entity *e = t->Struct.fields[i];
+				GB_ASSERT(e->kind == Entity_Variable);
+				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
+					min_field_count--;
+				} else {
+					break;
+				}
+			}
+
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				bool *fields_visited = gb_alloc_array(c->allocator, bool, field_count);
+
+				for_array(i, cl->elems) {
+					Ast *elem = cl->elems[i];
+					if (elem->kind != Ast_FieldValue) {
+						error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+						continue;
+					}
+					ast_node(fv, FieldValue, elem);
+					if (fv->field->kind != Ast_Ident) {
+						gbString expr_str = expr_to_string(fv->field);
+						error(elem, "Invalid field name '%s' in structure literal", expr_str);
+						gb_string_free(expr_str);
+						continue;
+					}
+					String name = fv->field->Ident.token.string;
+
+					Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
+					bool is_unknown = sel.entity == nullptr;
+					if (is_unknown) {
+						error(elem, "Unknown field '%.*s' in structure literal", LIT(name));
+						continue;
+					}
+
+					if (sel.index.count > 1) {
+						error(elem, "Cannot assign to an anonymous field '%.*s' in a structure literal (at the moment)", LIT(name));
+						continue;
+					}
+
+					Entity *field = t->Struct.fields[sel.index[0]];
+					add_entity_use(c, fv->field, field);
+
+					if (fields_visited[sel.index[0]]) {
+						error(elem, "Duplicate field '%.*s' in structure literal", LIT(name));
+						continue;
+					}
+
+					fields_visited[sel.index[0]] = true;
+					check_expr_with_type_hint(c, o, fv->value, field->type);
+
+					if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type)) {
+						is_constant = false;
+					}
+					if (is_constant) {
+						is_constant = o->mode == Addressing_Constant;
+					}
+
+
+					check_assignment(c, o, field->type, str_lit("structure literal"));
+				}
+			} else {
+				bool seen_field_value = false;
+
+				for_array(index, cl->elems) {
+					Entity *field = nullptr;
+					Ast *elem = cl->elems[index];
+					if (elem->kind == Ast_FieldValue) {
+						seen_field_value = true;
+						error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+						continue;
+					} else if (seen_field_value) {
+						error(elem, "Value elements cannot be used after a 'field = value'");
+						continue;
+					}
+					if (index >= field_count) {
+						error(o->expr, "Too many values in structure literal, expected %td, got %td", field_count, cl->elems.count);
 						break;
 					}
+
+					if (field == nullptr) {
+						field = t->Struct.fields[index];
+					}
+
+					check_expr_with_type_hint(c, o, elem, field->type);
+
+					if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type)) {
+						is_constant = false;
+					}
+					if (is_constant) {
+						is_constant = o->mode == Addressing_Constant;
+					}
+
+					check_assignment(c, o, field->type, str_lit("structure literal"));
 				}
-
-				if (cl->elems[0]->kind == Ast_FieldValue) {
-					bool *fields_visited = gb_alloc_array(c->allocator, bool, field_count);
-
-					for_array(i, cl->elems) {
-						Ast *elem = cl->elems[i];
-						if (elem->kind != Ast_FieldValue) {
-							error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
-							continue;
-						}
-						ast_node(fv, FieldValue, elem);
-						if (fv->field->kind != Ast_Ident) {
-							gbString expr_str = expr_to_string(fv->field);
-							error(elem, "Invalid field name '%s' in structure literal", expr_str);
-							gb_string_free(expr_str);
-							continue;
-						}
-						String name = fv->field->Ident.token.string;
-
-						Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
-						bool is_unknown = sel.entity == nullptr;
-						if (is_unknown) {
-							error(elem, "Unknown field '%.*s' in structure literal", LIT(name));
-							continue;
-						}
-
-						if (sel.index.count > 1) {
-							error(elem, "Cannot assign to an anonymous field '%.*s' in a structure literal (at the moment)", LIT(name));
-							continue;
-						}
-
-						Entity *field = t->Struct.fields[sel.index[0]];
-						add_entity_use(c, fv->field, field);
-
-						if (fields_visited[sel.index[0]]) {
-							error(elem, "Duplicate field '%.*s' in structure literal", LIT(name));
-							continue;
-						}
-
-						fields_visited[sel.index[0]] = true;
-						check_expr_with_type_hint(c, o, fv->value, field->type);
-
-						if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type)) {
-							is_constant = false;
-						}
-						if (is_constant) {
-							is_constant = o->mode == Addressing_Constant;
-						}
-
-
-						check_assignment(c, o, field->type, str_lit("structure literal"));
-					}
-				} else {
-					bool seen_field_value = false;
-
-					for_array(index, cl->elems) {
-						Entity *field = nullptr;
-						Ast *elem = cl->elems[index];
-						if (elem->kind == Ast_FieldValue) {
-							seen_field_value = true;
-							// error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
-							// continue;
-						} else if (seen_field_value) {
-							error(elem, "Value elements cannot be used after a 'field = value'");
-							continue;
-						}
-						if (index >= field_count) {
-							error(o->expr, "Too many values in structure literal, expected %td, got %td", field_count, cl->elems.count);
-							break;
-						}
-
-						if (field == nullptr) {
-							field = t->Struct.fields[index];
-						}
-
-						check_expr_with_type_hint(c, o, elem, field->type);
-
-						if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type)) {
-							is_constant = false;
-						}
-						if (is_constant) {
-							is_constant = o->mode == Addressing_Constant;
-						}
-
-						check_assignment(c, o, field->type, str_lit("structure literal"));
-					}
-					if (cl->elems.count < field_count) {
-						if (min_field_count < field_count) {
-						    if (cl->elems.count < min_field_count) {
-								error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, cl->elems.count);
-						    }
-						} else {
-							error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
-						}
+				if (cl->elems.count < field_count) {
+					if (min_field_count < field_count) {
+					    if (cl->elems.count < min_field_count) {
+							error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, cl->elems.count);
+					    }
+					} else {
+						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
 					}
 				}
 			}
