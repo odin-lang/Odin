@@ -868,6 +868,22 @@ diverging_procedures :: proc() {
 	foo();
 }
 
+deferred_procedure_associations :: proc() {
+	@(deferred=closure)
+	open :: proc(s: string) -> bool {
+		fmt.println(s);
+		return true;
+	}
+
+	closure :: proc(ok: bool) {
+		fmt.println("Goodbye?", ok);
+	}
+
+	if open("Welcome") {
+		fmt.println("Something in the middle, mate.");
+	}
+}
+
 main :: proc() {
 	when true {
 		general_stuff();
@@ -883,5 +899,6 @@ main :: proc() {
 		deprecated_attribute();
 		bit_set_type();
 		diverging_procedures();
+		deferred_procedure_associations();
 	}
 }
