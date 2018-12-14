@@ -265,7 +265,6 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	}
 
 
-	bool generate_type_again = nctx.no_polymorphic_errors;
 
 	auto *pt = &src->Proc;
 
@@ -293,8 +292,12 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 		}
 	}
 
-
+#if 0
+	bool generate_type_again = nctx.no_polymorphic_errors;
 	if (generate_type_again) {
+#else
+	{
+#endif
 		// LEAK TODO(bill): This is technically a memory leak as it has to generate the type twice
 		bool prev_no_polymorphic_errors = nctx.no_polymorphic_errors;
 		defer (nctx.no_polymorphic_errors = prev_no_polymorphic_errors);
@@ -5004,7 +5007,11 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 			}
 		} else {
 			i64 s = 0;
-			if (!check_is_assignable_to_with_score(c, o, e->type, &s)) {
+			if (is_type_generic(o->type)) {
+				// Polymorphic name!
+				score += assign_score_function(0);
+				continue;
+			} else if (!check_is_assignable_to_with_score(c, o, e->type, &s)) {
 				if (show_error) {
 					check_assignment(c, o, e->type, str_lit("polymorphic type argument"));
 				}
