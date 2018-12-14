@@ -2437,7 +2437,8 @@ void print_llvm_ir(irGen *ir) {
 			case irDebugInfo_DerivedType: {
 				if (di->DerivedType.tag == irDebugBasicEncoding_member) {
 					// NOTE(lachsinc): We crash llvm super hard if we don't specify a name :)
-					GB_ASSERT(di->DerivedType.name.len > 0);
+					Type *t = di->DerivedType.type;
+					GB_ASSERT_MSG(di->DerivedType.name.len > 0, "%s", type_to_string(di->DerivedType.type));
 				}
 				ir_write_str_lit(f, "!DIDerivedType(tag: ");
 				ir_print_debug_encoding(f, irDebugInfo_DerivedType, di->DerivedType.tag);

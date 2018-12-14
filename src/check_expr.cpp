@@ -775,6 +775,7 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 	}
 }
 
+
 bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source, bool compound, bool modify_type) {
 	Operand o = {Addressing_Value};
 	o.type = source;
@@ -984,6 +985,7 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 	o->mode = Addressing_Invalid;
 	o->expr = n;
 	String name = n->Ident.token.string;
+
 
 	Entity *e = scope_lookup(c->scope, name);
 	if (e == nullptr) {
@@ -5007,9 +5009,9 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 			}
 		} else {
 			i64 s = 0;
-			if (is_type_generic(o->type)) {
+			if (o->type->kind == Type_Generic) {
 				// Polymorphic name!
-				score += assign_score_function(0);
+				score += assign_score_function(1);
 				continue;
 			} else if (!check_is_assignable_to_with_score(c, o, e->type, &s)) {
 				if (show_error) {
@@ -5026,18 +5028,6 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 			}
 			score += s;
 		}
-	}
-
-	if (param_count < ordered_operands.count) {
-		error(call, "Too many polymorphic type arguments, expected %td, got %td", param_count, ordered_operands.count);
-		err = CallArgumentError_TooManyArguments;
-	} else if (param_count > ordered_operands.count) {
-		error(call, "Too few polymorphic type arguments, expected %td, got %td", param_count, ordered_operands.count);
-		err = CallArgumentError_TooFewArguments;
-	}
-
-	if (err != 0) {
-		return err;
 	}
 
 	{

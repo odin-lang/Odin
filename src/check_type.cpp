@@ -627,7 +627,7 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 							e = alloc_entity_type_name(scope, token, operand.type);
 							e->TypeName.is_type_alias = true;
 						} else {
-							GB_ASSERT(operand.mode == Addressing_Constant);
+							// GB_ASSERT(operand.mode == Addressing_Constant);
 							e = alloc_entity_constant(scope, token, operand.type, operand.value);
 						}
 					} else {
@@ -1117,9 +1117,8 @@ bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Typ
 	if (t->kind != s->kind) {
 		return false;
 	}
-	// gb_printf_err("#1 %s %s\n", type_to_string(type), type_to_string(specialization));
-	if (t->kind == Type_Struct) {
 
+	if (t->kind == Type_Struct) {
 		if (t->Struct.polymorphic_parent == specialization) {
 			return true;
 		}
@@ -1136,7 +1135,58 @@ bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Typ
 				Entity *t_e = t_tuple->variables[i];
 				Type *st = s_e->type;
 				Type *tt = t_e->type;
-				bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
+
+				// NOTE(bill, 2018-12-14): This is needed to override polymorphic named constants in types
+				if (st->kind == Type_Generic && t_e->kind == Entity_Constant) {
+					Entity *e = scope_lookup(st->Generic.scope, st->Generic.name);
+					GB_ASSERT(e != nullptr);
+					if (modify_type) {
+						e->kind = Entity_Constant;
+						e->Constant.value = t_e->Constant.value;
+						e->type = t_e->type;
+					}
+				} else {
+					bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
+				}
+			}
+
+			if (modify_type) {
+				// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it
+				gb_memmove(specialization, type, gb_size_of(Type));
+			}
+
+			return true;
+		}
+	} else if (t->kind == Type_Union) {
+		if (t->Union.polymorphic_parent == specialization) {
+			return true;
+		}
+
+		if (t->Union.polymorphic_parent == s->Union.polymorphic_parent &&
+		    s->Union.polymorphic_params != nullptr &&
+		    t->Union.polymorphic_params != nullptr) {
+
+			TypeTuple *s_tuple = &s->Union.polymorphic_params->Tuple;
+			TypeTuple *t_tuple = &t->Union.polymorphic_params->Tuple;
+			GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
+			for_array(i, s_tuple->variables) {
+				Entity *s_e = s_tuple->variables[i];
+				Entity *t_e = t_tuple->variables[i];
+				Type *st = s_e->type;
+				Type *tt = t_e->type;
+
+				// NOTE(bill, 2018-12-14): This is needed to override polymorphic named constants in types
+				if (st->kind == Type_Generic && t_e->kind == Entity_Constant) {
+					Entity *e = scope_lookup(st->Generic.scope, st->Generic.name);
+					GB_ASSERT(e != nullptr);
+					if (modify_type) {
+						e->kind = Entity_Constant;
+						e->Constant.value = t_e->Constant.value;
+						e->type = t_e->type;
+					}
+				} else {
+					bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
+				}
 			}
 
 			if (modify_type) {
@@ -1168,6 +1218,7 @@ Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Oper
 		}
 		return t_invalid;
 	}
+
 	if (is_polymorphic_type_assignable(ctx, poly_type, operand.type, false, modify_type)) {
 		return poly_type;
 	}
@@ -2290,6 +2341,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 				entity_scope = ps;
 			}
 			Entity *e = alloc_entity_type_name(entity_scope, token, t);
+			t->Generic.entity = e;
 			e->TypeName.is_type_alias = true;
 			e->state = EntityState_Resolved;
 			add_entity(ctx->checker, ps, ident, e);
