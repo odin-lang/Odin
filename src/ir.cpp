@@ -606,12 +606,14 @@ struct irDebugInfo {
 		} LexicalBlock;
 
 		struct {
+			Type *          type;
 			String          name;
 			i32             size;
 			i32             align;
 			irDebugEncoding encoding;
 		} BasicType;
 		struct {
+			Type *           type;
 			irDebugEncoding  tag;
 			irDebugInfo *    base_type;
 			String           name;
@@ -1766,6 +1768,7 @@ irDebugInfo *ir_add_debug_info_field_internal(irModule *module, String name, Typ
 	// "scope", if set, should be inserted into map prior to calling to ensure no cyclical dependency issues.
 
 	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_DerivedType);
+	// GB_ASSERT_MSG(name.len > 0, "%s", type_to_string(type));
 	di->DerivedType.name = name;
 	di->DerivedType.tag = irDebugBasicEncoding_member;
 	di->DerivedType.size = ir_debug_size_bits(type);
@@ -2350,9 +2353,9 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 			di->CompositeType.file = file;
 			di->CompositeType.pos = base->Union.node->UnionType.token.pos;
 			for_array(field_index, base->Union.variants) {
-				array_add(&di->CompositeType.elements->DebugInfoArray.elements,
-				          ir_add_debug_info_field(module, di, nullptr, type, cast(i32)field_index,
-				                                  base->Union.variants[field_index], file));
+				// TODO(bill): Union pseudo-"fields"
+				// irDebugInfo *di = ir_add_debug_info_field(module, di, nullptr, type, cast(i32)field_index, base->Union.variants[field_index], file);
+				// array_add(&di->CompositeType.elements->DebugInfoArray.elements, di);
 			}
 		} else if (is_type_enum(type)) {
 			GB_ASSERT(base->kind == Type_Enum);

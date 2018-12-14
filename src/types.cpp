@@ -140,10 +140,11 @@ struct TypeUnion {
 		Entity *type_name; /* Entity_TypeName */          \
 	})                                                    \
 	TYPE_KIND(Generic, struct {                           \
-		i64    id;                                        \
-		String name;                                      \
-		Type * specialized;                               \
-		Scope *scope;                                     \
+		i64     id;                                       \
+		String  name;                                     \
+		Type *  specialized;                              \
+		Scope * scope;                                    \
+		Entity *entity;                                   \
 	})                                                    \
 	TYPE_KIND(Pointer, struct { Type *elem; })            \
 	TYPE_KIND(Opaque,  struct { Type *elem; })            \
@@ -1981,6 +1982,15 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 
 		if (type->kind == Type_Struct) {
 			Scope *s = type->Struct.scope;
+			if (s != nullptr) {
+				Entity *found = scope_lookup_current(s, field_name);
+				if (found != nullptr && found->kind != Entity_Variable) {
+					sel.entity = found;
+					return sel;
+				}
+			}
+		} else if (type->kind == Type_Union) {
+			Scope *s = type->Union.scope;
 			if (s != nullptr) {
 				Entity *found = scope_lookup_current(s, field_name);
 				if (found != nullptr && found->kind != Entity_Variable) {
