@@ -4603,7 +4603,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		String field_name = ir_lookup_subtype_polymorphic_field(proc->module->info, t, src_type);
 		if (field_name.len > 0) {
 			// NOTE(bill): It can be casted
-			Selection sel = lookup_field(st, field_name, false);
+			Selection sel = lookup_field(st, field_name, false, true);
 			if (sel.entity != nullptr) {
 				ir_emit_comment(proc, str_lit("cast - polymorphism"));
 				if (st_is_ptr) {
@@ -4628,7 +4628,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 				}
 			} else {
-				GB_PANIC("invalid subtype cast");
+				GB_PANIC("invalid subtype cast  %s.%.*s", type_to_string(src_type), LIT(field_name));
 			}
 		}
 	}

@@ -1870,10 +1870,10 @@ ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 
 
 
-Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel);
+Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel, bool allow_blank_ident=false);
 
-Selection lookup_field(Type *type_, String field_name, bool is_type) {
-	return lookup_field_with_selection(type_, field_name, is_type, empty_selection);
+Selection lookup_field(Type *type_, String field_name, bool is_type, bool allow_blank_ident=false) {
+	return lookup_field_with_selection(type_, field_name, is_type, empty_selection, allow_blank_ident);
 }
 
 Selection lookup_field_from_index(Type *type, i64 index) {
@@ -1931,10 +1931,10 @@ Selection lookup_field_from_index(Type *type, i64 index) {
 
 Entity *scope_lookup_current(Scope *s, String name);
 
-Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel) {
+Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel, bool allow_blank_ident) {
 	GB_ASSERT(type_ != nullptr);
 
-	if (is_blank_ident(field_name)) {
+	if (!allow_blank_ident && is_blank_ident(field_name)) {
 		return empty_selection;
 	}
 
@@ -1989,13 +1989,13 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 				}
 			}
 		} else if (type->kind == Type_BitSet) {
-			return lookup_field_with_selection(type->BitSet.elem, field_name, true, sel);
+			return lookup_field_with_selection(type->BitSet.elem, field_name, true, sel, allow_blank_ident);
 		}
 
 
 		if (type->kind == Type_Generic && type->Generic.specialized != nullptr) {
 			Type *specialized = type->Generic.specialized;
-			return lookup_field_with_selection(specialized, field_name, is_type, sel);
+			return lookup_field_with_selection(specialized, field_name, is_type, sel, allow_blank_ident);
 		}
 
 	} else if (type->kind == Type_Union) {
@@ -2017,7 +2017,7 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 				isize prev_count = sel.index.count;
 				selection_add_index(&sel, i); // HACK(bill): Leaky memory
 
-				sel = lookup_field_with_selection(f->type, field_name, is_type, sel);
+				sel = lookup_field_with_selection(f->type, field_name, is_type, sel, allow_blank_ident);
 
 				if (sel.entity != nullptr) {
 					if (is_type_pointer(f->type)) {
