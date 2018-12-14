@@ -467,8 +467,8 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) {
 
 
 @(builtin)
-append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> int {
-	if array == nil do return 0;
+append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
+	if array == nil do return;
 
 	arg_len := 1;
 
@@ -484,14 +484,13 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> 
 		mem.copy(mem.ptr_offset(data, a.len), &arg, size_of(E));
 		a.len += arg_len;
 	}
-	return len(array);
 }
 @(builtin)
-append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location) -> int {
-	if array == nil do return 0;
+append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)  {
+	if array == nil do return;
 
 	arg_len := len(args);
-	if arg_len <= 0 do return len(array);
+	if arg_len <= 0 do return;
 
 
 	if cap(array) <= len(array)+arg_len {
@@ -506,18 +505,16 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 		mem.copy(mem.ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
 		a.len += arg_len;
 	}
-	return len(array);
 }
 @(builtin) append :: proc{append_elem, append_elems};
 
 
 
 @(builtin)
-append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_location) -> int {
+append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_location) {
 	for arg in args {
 		append(array = array, args = ([]E)(arg), loc = loc);
 	}
-	return len(array);
 }
 
 @(builtin)
