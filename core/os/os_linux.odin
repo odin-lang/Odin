@@ -125,29 +125,49 @@ X_OK :: 1; // Test for execute permission
 W_OK :: 2; // Test for write permission
 R_OK :: 4; // Test for read permission
 
+TimeSpec :: struct {
+	tv_sec  : i64,  /* seconds */
+	tv_nsec : i64,  /* nanoseconds */
+};
+
+CLOCK_REALTIME           :: 0;
+CLOCK_MONOTONIC          :: 1;
+CLOCK_PROCESS_CPUTIME_ID :: 2;
+CLOCK_THREAD_CPUTIME_ID  :: 3;
+CLOCK_MONOTONIC_RAW      :: 4;
+CLOCK_REALTIME_COARSE    :: 5;
+CLOCK_MONOTONIC_COARSE   :: 6;
+CLOCK_BOOTTIME           :: 7;
+CLOCK_REALTIME_ALARM     :: 8;
+CLOCK_BOOTTIME_ALARM     :: 9;
+
 foreign libc {
-	@(link_name="open")    _unix_open    :: proc(path: cstring, mode: int) -> Handle ---;
-	@(link_name="close")   _unix_close   :: proc(fd: Handle) -> i32 ---;
-	@(link_name="read")    _unix_read    :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
-	@(link_name="write")   _unix_write   :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
-	@(link_name="lseek64") _unix_seek    :: proc(fd: Handle, offset: i64, whence: i32) -> i64 ---;
-	@(link_name="gettid")  _unix_gettid  :: proc() -> u64 ---;
-	@(link_name="stat")    _unix_stat    :: proc(path: cstring, stat: ^Stat) -> i32 ---;
-	@(link_name="access")  _unix_access  :: proc(path: cstring, mask: int) -> i32 ---;
+	@(link_name="open")             _unix_open          :: proc(path: cstring, mode: int) -> Handle ---;
+	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> i32 ---;
+	@(link_name="read")             _unix_read          :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
+	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
+	@(link_name="lseek64")          _unix_seek          :: proc(fd: Handle, offset: i64, whence: i32) -> i64 ---;
+	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---;
+	@(link_name="stat")             _unix_stat          :: proc(path: cstring, stat: ^Stat) -> i32 ---;
+	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> i32 ---;
 
-	@(link_name="malloc")  _unix_malloc  :: proc(size: int) -> rawptr ---;
-	@(link_name="calloc")  _unix_calloc  :: proc(num, size: int) -> rawptr ---;
-	@(link_name="free")    _unix_free    :: proc(ptr: rawptr) ---;
-	@(link_name="realloc") _unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr ---;
-	@(link_name="getenv")  _unix_getenv  :: proc(cstring) -> cstring ---;
+	@(link_name="malloc")           _unix_malloc        :: proc(size: int) -> rawptr ---;
+	@(link_name="calloc")           _unix_calloc        :: proc(num, size: int) -> rawptr ---;
+	@(link_name="free")             _unix_free          :: proc(ptr: rawptr) ---;
+	@(link_name="realloc")          _unix_realloc       :: proc(ptr: rawptr, size: int) -> rawptr ---;
+	@(link_name="getenv")           _unix_getenv        :: proc(cstring) -> cstring ---;
 
-	@(link_name="exit")    _unix_exit    :: proc(status: int) -> ! ---;
+	@(link_name="clock_gettime")    _unix_clock_gettime :: proc(clock_id: u64, timespec: ^TimeSpec) ---;
+	@(link_name="nanosleep")        _unix_nanosleep     :: proc(requested: ^TimeSpec, remaining: ^TimeSpec) -> int ---;
+	@(link_name="sleep")            _unix_sleep         :: proc(seconds: u64) -> int ---;
+
+	@(link_name="exit")             _unix_exit          :: proc(status: int) -> ! ---;
 }
 foreign dl {
-	@(link_name="dlopen")  _unix_dlopen  :: proc(filename: cstring, flags: int) -> rawptr ---;
-	@(link_name="dlsym")   _unix_dlsym   :: proc(handle: rawptr, symbol: cstring) -> rawptr ---;
-	@(link_name="dlclose") _unix_dlclose :: proc(handle: rawptr) -> int ---;
-	@(link_name="dlerror") _unix_dlerror :: proc() -> cstring ---;
+	@(link_name="dlopen")           _unix_dlopen        :: proc(filename: cstring, flags: int) -> rawptr ---;
+	@(link_name="dlsym")            _unix_dlsym         :: proc(handle: rawptr, symbol: cstring) -> rawptr ---;
+	@(link_name="dlclose")          _unix_dlclose       :: proc(handle: rawptr) -> int ---;
+	@(link_name="dlerror")          _unix_dlerror       :: proc() -> cstring ---;
 }
 
 // TODO(zangent): Change this to just `open` when Bill fixes overloading.
@@ -243,6 +263,25 @@ getenv :: proc(name: string) -> (string, bool) {
 
 exit :: proc(code: int) -> ! {
 	_unix_exit(code);
+}
+
+clock_gettime :: proc(clock_id: u64) -> TimeSpec {
+	ts : TimeSpec;
+	_unix_clock_gettime(clock_id, &ts);
+	return ts;
+}
+
+sleep :: proc(seconds: u64) -> int {
+
+	return _unix_sleep(seconds);
+}
+
+nanosleep :: proc(nanoseconds: i64) -> int {
+	assert(nanoseconds <= 999999999);
+	requested, remaining : TimeSpec;
+	requested = TimeSpec{tv_nsec = nanoseconds};
+
+	return _unix_nanosleep(&requested, &remaining);
 }
 
 current_thread_id :: proc "contextless" () -> int {
