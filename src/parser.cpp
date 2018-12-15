@@ -2078,32 +2078,21 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_bit_set: {
 		Token token = expect_token(f, Token_bit_set);
+		expect_token(f, Token_OpenBracket);
 
-		if (f->curr_token.kind == Token_OpenBrace) {
-			Token open = expect_token(f, Token_OpenBrace);
+		Ast *elem = nullptr;
+		Ast *underlying = nullptr;
 
-			Array<Ast *> values = parse_element_list(f);
-			Token close = expect_token(f, Token_CloseBrace);
-			Ast *enum_type = ast_enum_type(f, token, nullptr, values);
-
-			return ast_bit_set_type(f, token, enum_type, nullptr);
-		} else {
-			expect_token(f, Token_OpenBracket);
-
-			Ast *elem = nullptr;
-			Ast *underlying = nullptr;
-
-			bool prev_allow_range = f->allow_range;
-			f->allow_range = true;
-			elem = parse_expr(f, false);
-			f->allow_range = prev_allow_range;
-			if (allow_token(f, Token_Semicolon)) {
-				underlying = parse_type(f);
-			}
-
-			expect_token(f, Token_CloseBracket);
-			return ast_bit_set_type(f, token, elem, underlying);
+		bool prev_allow_range = f->allow_range;
+		f->allow_range = true;
+		elem = parse_expr(f, false);
+		f->allow_range = prev_allow_range;
+		if (allow_token(f, Token_Semicolon)) {
+			underlying = parse_type(f);
 		}
+
+		expect_token(f, Token_CloseBracket);
+		return ast_bit_set_type(f, token, elem, underlying);
 	}
 
 	default: {

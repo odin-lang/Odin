@@ -2109,7 +2109,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 	case Token_NotEq: {
 		// NOTE(bill): Allow comparisons between types
 		check_expr_or_type(c, x, be->left);
-		check_expr_or_type(c, y, be->right);
+		check_expr_or_type(c, y, be->right, x->type);
 		bool xt = x->mode == Addressing_Type;
 		bool yt = y->mode == Addressing_Type;
 		// If only one is a type, this is an error
@@ -6194,7 +6194,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 
 	case_ast_node(be, BinaryExpr, node);
-		check_binary_expr(c, o, node);
+		check_binary_expr(c, o, node, true);
 		if (o->mode == Addressing_Invalid) {
 			o->expr = node;
 			return kind;
