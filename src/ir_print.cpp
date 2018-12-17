@@ -1609,7 +1609,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 	case irInstr_UnaryOp: {
 		irInstrUnaryOp *uo = &value->Instr.UnaryOp;
-		Type *type = base_type(ir_type(uo->expr));
+		Type *type =  base_type(ir_type(uo->expr));
 		Type *elem_type = type;
 
 		ir_fprintf(f, "%%%d = ", value->index);
@@ -1623,7 +1623,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			break;
 		case Token_Xor:
 		case Token_Not:
-			GB_ASSERT(is_type_integer(type) || is_type_boolean(type));
+			GB_ASSERT(is_type_integer(type) || is_type_boolean(type) || is_type_bit_set(type));
 			ir_write_str_lit(f, "xor");
 			break;
 		default:
@@ -1644,7 +1644,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			break;
 		case Token_Xor:
 		case Token_Not:
-			GB_ASSERT(is_type_integer(type) || is_type_boolean(type));
+			GB_ASSERT(is_type_integer(type) || is_type_boolean(type) || is_type_bit_set(type));
 			ir_write_str_lit(f, "-1");
 			break;
 		}
