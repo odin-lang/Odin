@@ -8149,6 +8149,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 	case_ast_node(is, IfStmt, node);
 		ir_emit_comment(proc, str_lit("IfStmt"));
+		ir_open_scope(proc); // Open scope here
+
 		if (is->init != nullptr) {
 			// TODO(bill): Should this have a separate block to begin with?
 		#if 1
@@ -8172,7 +8174,6 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			ir_push_target_list(proc, is->label, done, nullptr, nullptr);
 		}
 
-		ir_open_scope(proc);
 		ir_build_stmt(proc, is->body);
 		ir_close_scope(proc, irDeferExit_Default, nullptr);
 
@@ -8193,6 +8194,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 	case_ast_node(fs, ForStmt, node);
 		ir_emit_comment(proc, str_lit("ForStmt"));
+		ir_open_scope(proc); // Open Scope here
 
 		if (fs->init != nullptr) {
 		#if 1
@@ -8224,7 +8226,6 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 		ir_push_target_list(proc, fs->label, done, post, nullptr);
 
-		ir_open_scope(proc);
 		ir_build_stmt(proc, fs->body);
 		ir_close_scope(proc, irDeferExit_Default, nullptr);
 
@@ -8244,6 +8245,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 	case_ast_node(rs, RangeStmt, node);
 		ir_emit_comment(proc, str_lit("RangeStmt"));
+		ir_open_scope(proc); // Open scope here
 
 		Type *val0_type = nullptr;
 		Type *val1_type = nullptr;
@@ -8362,7 +8364,6 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 		ir_push_target_list(proc, rs->label, done, loop, nullptr);
 
-		ir_open_scope(proc);
 		ir_build_stmt(proc, rs->body);
 		ir_close_scope(proc, irDeferExit_Default, nullptr);
 
@@ -8477,7 +8478,6 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			ir_close_scope(proc, irDeferExit_Default, default_block);
 			ir_pop_target_list(proc);
 		}
-
 		ir_emit_jump(proc, done);
 		ir_start_block(proc, done);
 	case_end;
