@@ -108,12 +108,38 @@ round_f32 :: proc(x: f32) -> f32 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5
 round_f64 :: proc(x: f64) -> f64 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
 round :: proc{round_f32, round_f64};
 
-floor_f32 :: proc(x: f32) -> f32 { return x >= 0 ? f32(i64(x)) : f32(i64(x-0.5)); } // TODO: Get accurate versions
-floor_f64 :: proc(x: f64) -> f64 { return x >= 0 ? f64(i64(x)) : f64(i64(x-0.5)); } // TODO: Get accurate versions
+floor_f32 :: proc(x: f32) -> f32 {
+	if x == 0 || is_nan(x) || is_inf(x) {
+		return x;
+	}
+	if x < 0 {
+		d, fract := modf(-x);
+		if fract != 0.0 {
+			d = d + 1;
+		}
+		return -d;
+	}
+	d, _ := modf(x);
+	return d;
+}
+floor_f64 :: proc(x: f64) -> f64 {
+	if x == 0 || is_nan(x) || is_inf(x) {
+		return x;
+	}
+	if x < 0 {
+		d, fract := modf(-x);
+		if fract != 0.0 {
+			d = d + 1;
+		}
+		return -d;
+	}
+	d, _ := modf(x);
+	return d;
+}
 floor :: proc{floor_f32, floor_f64};
 
-ceil_f32 :: proc(x: f32) -> f32 { return x < 0 ? f32(i64(x)) : f32(i64(x+1)); }// TODO: Get accurate versions
-ceil_f64 :: proc(x: f64) -> f64 { return x < 0 ? f64(i64(x)) : f64(i64(x+1)); }// TODO: Get accurate versions
+ceil_f32 :: proc(x: f32) -> f32 { return -floor_f32(-x); }
+ceil_f64 :: proc(x: f64) -> f64 { return -floor_f64(-x); }
 ceil :: proc{ceil_f32, ceil_f64};
 
 remainder_f32 :: proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
@@ -139,6 +165,80 @@ mod_f64 :: proc(x, y: f64) -> f64 {
 	return copy_sign(result, x);
 }
 mod :: proc{mod_f32, mod_f64};
+
+// TODO(bill): These need to implemented with the actual instructions
+modf_f32 :: proc(x: f32) -> (int: f32, frac: f32) {
+	shift :: 32 - 8 - 1;
+	mask  :: 0xff;
+	bias  :: 127;
+
+	if x < 1 {
+		switch {
+		case x < 0:
+			int, frac = modf(-x);
+			return -int, -frac;
+		case x == 0:
+			return x, x;
+		}
+		return 0, x;
+	}
+
+	i := transmute(u32)x;
+	e := uint(i>>shift)&mask - bias;
+
+	if e < 32-12 {
+		i &~= 1<<(32-12-e) - 1;
+	}
+	int = transmute(f32)i;
+	frac = x - int;
+	return;
+}
+modf_f64 :: proc(x: f64) -> (int: f64, frac: f64) {
+	shift :: 64 - 11 - 1;
+	mask  :: 0x7ff;
+	bias  :: 1023;
+
+	if x < 1 {
+		switch {
+		case x < 0:
+			int, frac = modf(-x);
+			return -int, -frac;
+		case x == 0:
+			return x, x;
+		}
+		return 0, x;
+	}
+
+	i := transmute(u64)x;
+	e := uint(i>>shift)&mask - bias;
+
+	if e < 64-12 {
+		i &~= 1<<(64-12-e) - 1;
+	}
+	int = transmute(f64)i;
+	frac = x - int;
+	return;
+}
+modf :: proc{modf_f32, modf_f64};
+
+is_nan_f32 :: inline proc(x: f32) -> bool { return x != x; }
+is_nan_f64 :: inline proc(x: f64) -> bool { return x != x; }
+is_nan :: proc{is_nan_f32, is_nan_f64};
+
+is_finite_f32 :: inline proc(x: f32) -> bool { return !is_nan(x-x); }
+is_finite_f64 :: inline proc(x: f64) -> bool { return !is_nan(x-x); }
+is_finite :: proc{is_finite_f32, is_finite_f64};
+
+is_inf_f32 :: proc(x: f32, sign := 0) -> bool {
+	return sign >= 0 && x > F32_MAX || sign <= 0 && x < -F32_MAX;
+}
+is_inf_f64 :: proc(x: f64, sign := 0) -> bool {
+	return sign >= 0 && x > F64_MAX || sign <= 0 && x < -F64_MAX;
+}
+// If sign > 0,  is_inf reports whether f is positive infinity
+// If sign < 0,  is_inf reports whether f is negative infinity
+// If sign == 0, is_inf reports whether f is either   infinity
+is_inf :: proc{is_inf_f32, is_inf_f64};
 
 
 
