@@ -186,8 +186,8 @@ modf_f32 :: proc(x: f32) -> (int: f32, frac: f32) {
 	i := transmute(u32)x;
 	e := uint(i>>shift)&mask - bias;
 
-	if e < 32-12 {
-		i &~= 1<<(32-12-e) - 1;
+	if e < 32-9 {
+		i &~= 1<<(32-9-e) - 1;
 	}
 	int = transmute(f32)i;
 	frac = x - int;
