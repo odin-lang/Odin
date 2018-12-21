@@ -2123,6 +2123,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 	}
 
 	case Token_in:
+	case Token_notin:
 		check_expr(c, x, be->left);
 		check_expr(c, y, be->right);
 		if (x->mode == Addressing_Invalid) {
@@ -2136,13 +2137,21 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 
 		if (is_type_map(y->type)) {
 			Type *yt = base_type(y->type);
-			check_assignment(c, x, yt->Map.key, str_lit("map 'in'"));
+			if (op.kind == Token_in) {
+				check_assignment(c, x, yt->Map.key, str_lit("map 'in'"));
+			} else {
+				check_assignment(c, x, yt->Map.key, str_lit("map 'notin'"));
+			}
 
 			add_package_dependency(c, "runtime", "__dynamic_map_get");
 		} else if (is_type_bit_set(y->type)) {
 			Type *yt = base_type(y->type);
 
-			check_assignment(c, x, yt->BitSet.elem, str_lit("bit_set 'in'"));
+			if (op.kind == Token_in) {
+				check_assignment(c, x, yt->BitSet.elem, str_lit("bit_set 'in'"));
+			} else {
+				check_assignment(c, x, yt->BitSet.elem, str_lit("bit_set 'notin'"));
+			}
 			if (x->mode == Addressing_Constant && y->mode == Addressing_Constant) {
 				ExactValue k = exact_value_to_integer(x->value);
 				ExactValue v = exact_value_to_integer(y->value);
@@ -2158,7 +2167,11 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 
 					x->mode = Addressing_Constant;
 					x->type = t_untyped_bool;
-					x->value = exact_value_bool((bit & bits) != 0);
+					if (op.kind == Token_in) {
+						x->value = exact_value_bool((bit & bits) != 0);
+					} else {
+						x->value = exact_value_bool((bit & bits) == 0);
+					}
 					x->expr = node;
 					return;
 				} else {

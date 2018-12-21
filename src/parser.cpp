@@ -1158,7 +1158,7 @@ Token expect_token_after(AstFile *f, TokenKind kind, char *msg) {
 
 Token expect_operator(AstFile *f) {
 	Token prev = f->curr_token;
-	if (prev.kind == Token_in && (f->expr_level >= 0 || f->allow_in_expr)) {
+	if ((prev.kind == Token_in || prev.kind == Token_notin) && (f->expr_level >= 0 || f->allow_in_expr)) {
 		// okay
 	} else if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
 		syntax_error(f->curr_token, "Expected an operator, got '%.*s'",
@@ -2355,6 +2355,7 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_GtEq:
 		return 5;
 	case Token_in:
+	case Token_notin:
 		if (f->expr_level >= 0 || f->allow_in_expr) {
 			return 6;
 		}
