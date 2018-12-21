@@ -827,6 +827,7 @@ bit_set_type :: proc() {
 		}
 		X :: Saturday in WEEKEND; // Constant evaluation
 		fmt.println(X);
+		fmt.println("Cardinality:", card(e));
 	}
 	{
 		x: bit_set['A'..'Z'];
