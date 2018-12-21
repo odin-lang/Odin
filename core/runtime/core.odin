@@ -617,6 +617,26 @@ excl_bit_set :: inline proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
 @(builtin) excl :: proc{excl_elem, excl_elems, excl_bit_set};
 
 
+@(builtin)
+card :: proc(s: $S/bit_set[$E; $U]) -> int {
+	when size_of(S) == 1 {
+		foreign { @(link_name="llvm.ctpop.i8")  count_ones :: proc(i: u8) -> u8 --- }
+		return int(count_ones(transmute(u8)s));
+	} else when size_of(S) == 2 {
+		foreign { @(link_name="llvm.ctpop.i16") count_ones :: proc(i: u16) -> u16 --- }
+		return int(count_ones(transmute(u16)s));
+	} else when size_of(S) == 4 {
+		foreign { @(link_name="llvm.ctpop.i32") count_ones :: proc(i: u32) -> u32 --- }
+		return int(count_ones(transmute(u32)s));
+	} else when size_of(S) == 8 {
+		foreign { @(link_name="llvm.ctpop.i64") count_ones :: proc(i: u64) -> u64 --- }
+		return int(count_ones(transmute(u64)s));
+	} else {
+		#assert(false);
+		return 0;
+	}
+}
+
 
 
 
