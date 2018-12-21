@@ -6296,13 +6296,18 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 			return ir_emit_logical_binary_expr(proc, expr);
 
 
-		case Token_in: {
+		case Token_in:
+		case Token_notin: {
 			irValue *right = ir_build_expr(proc, be->right);
 			Type *rt = base_type(ir_type(right));
 			switch (rt->kind) {
 			case Type_Map:
 				{
-					ir_emit_comment(proc, str_lit("map in"));
+					if (be->op.kind == Token_in) {
+						ir_emit_comment(proc, str_lit("map in"));
+					} else {
+						ir_emit_comment(proc, str_lit("map notin"));
+					}
 
 					irValue *addr = ir_address_from_load_or_generate_local(proc, right);
 					irValue *h = ir_gen_map_header(proc, addr, rt);
@@ -6313,12 +6318,20 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					args[1] = key;
 
 					irValue *ptr = ir_emit_runtime_call(proc, "__dynamic_map_get", args);
-					return ir_emit_conv(proc, ir_emit_comp(proc, Token_NotEq, ptr, v_raw_nil), t_bool);
+					if (be->op.kind == Token_in) {
+						return ir_emit_conv(proc, ir_emit_comp(proc, Token_NotEq, ptr, v_raw_nil), t_bool);
+					} else {
+						return ir_emit_conv(proc, ir_emit_comp(proc, Token_CmpEq, ptr, v_raw_nil), t_bool);
+					}
 				}
 				break;
 			case Type_BitSet:
 				{
-					ir_emit_comment(proc, str_lit("bit_set in"));
+					if (be->op.kind == Token_in) {
+						ir_emit_comment(proc, str_lit("bit_set in"));
+					} else {
+						ir_emit_comment(proc, str_lit("bit_set notin"));
+					}
 
 					Type *key_type = rt->BitSet.elem;
 					GB_ASSERT(are_types_identical(ir_type(left), key_type));
@@ -6333,7 +6346,11 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					irValue *old_value = ir_emit_bitcast(proc, right, it);
 					irValue *new_value = ir_emit_arith(proc, Token_And, old_value, bit, it);
 
-					return ir_emit_conv(proc, ir_emit_comp(proc, Token_NotEq, new_value, v_zero), t_bool);
+					if (be->op.kind == Token_in) {
+						return ir_emit_conv(proc, ir_emit_comp(proc, Token_NotEq, new_value, v_zero), t_bool);
+					} else {
+						return ir_emit_conv(proc, ir_emit_comp(proc, Token_CmpEq, new_value, v_zero), t_bool);
+					}
 				}
 				break;
 			default:

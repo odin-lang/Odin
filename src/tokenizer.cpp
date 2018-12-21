@@ -92,6 +92,7 @@ TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_for,         "for"),         \
 	TOKEN_KIND(Token_switch,      "switch"),      \
 	TOKEN_KIND(Token_in,          "in"),          \
+	TOKEN_KIND(Token_notin,       "notin"),       \
 	TOKEN_KIND(Token_do,          "do"),          \
 	TOKEN_KIND(Token_case,        "case"),        \
 	TOKEN_KIND(Token_break,       "break"),       \
