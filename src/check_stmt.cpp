@@ -1452,15 +1452,15 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		}
 
 	skip_expr:; // NOTE(zhiayang): again, declaring a variable immediately after a label... weird.
-		Ast *lhs[2] = {rs->val0, rs->val1};
-		Type *   rhs[2] = {val0, val1};
+		Ast * lhs[2] = {rs->val0, rs->val1};
+		Type *rhs[2] = {val0, val1};
 
 		for (isize i = 0; i < 2; i++) {
 			if (lhs[i] == nullptr) {
 				continue;
 			}
-			Ast *name = lhs[i];
-			Type *   type = rhs[i];
+			Ast * name = lhs[i];
+			Type *type = rhs[i];
 
 			Entity *entity = nullptr;
 			if (name->kind == Ast_Ident) {
@@ -1472,8 +1472,9 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					found = scope_lookup_current(ctx->scope, str);
 				}
 				if (found == nullptr) {
-					bool is_immutable = true;
+					bool is_immutable = false;
 					entity = alloc_entity_variable(ctx->scope, token, type, is_immutable, EntityState_Resolved);
+					entity->flags |= EntityFlag_Value;
 					add_entity_definition(&ctx->checker->info, name, entity);
 				} else {
 					TokenPos pos = found->token.pos;
