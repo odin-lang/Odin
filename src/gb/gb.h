@@ -4702,6 +4702,7 @@ gb_inline void gb_thread_start_with_stack(gbThread *t, gbThreadProc *proc, void 
 	t->proc = proc;
 	t->user_data = user_data;
 	t->stack_size = stack_size;
+	t->is_running = true;
 
 #if defined(GB_SYSTEM_WINDOWS)
 	t->win32_handle = CreateThread(NULL, stack_size, gb__thread_proc, t, 0, NULL);
@@ -4719,7 +4720,6 @@ gb_inline void gb_thread_start_with_stack(gbThread *t, gbThreadProc *proc, void 
 	}
 #endif
 
-	t->is_running = true;
 	gb_semaphore_wait(&t->semaphore);
 }
 
