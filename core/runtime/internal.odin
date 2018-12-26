@@ -326,7 +326,7 @@ type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column
 }
 
 string_decode_rune :: inline proc "contextless" (s: string) -> (rune, int) {
-	return utf8.decode_rune_from_string(s);
+	return utf8.decode_rune_in_string(s);
 }
 
 bounds_check_error_loc :: inline proc "contextless" (using loc := #caller_location, index, count: int) {

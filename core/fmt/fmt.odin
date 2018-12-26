@@ -640,7 +640,7 @@ _pad :: proc(fi: ^Fmt_Info, s: string) {
 	}
 
 
-	width := fi.width - utf8.rune_count_from_string(s);
+	width := fi.width - utf8.rune_count_in_string(s);
 	if fi.minus { // right pad
 		write_string(fi.buf, s);
 		fmt_write_padding(fi, width);
@@ -905,16 +905,16 @@ fmt_bit_set :: proc(fi: ^Fmt_Info, v: any, name: string = "") {
 
 			if commas > 0 do write_string(fi.buf, ", ");
 
-			defer commas += 1;
-
 			if is_enum do for ev, evi in e.values {
 				v := enum_value_to_u64(ev);
 				if v == i {
 					write_string(fi.buf, e.names[evi]);
+					commas += 1;
 					continue loop;
 				}
 			}
 			write_i64(fi.buf, i64(i), 10);
+			commas += 1;
 		}
 	}
 }
@@ -1464,7 +1464,7 @@ sbprintf :: proc(b: ^String_Buffer, fmt: string, args: ..any) -> string {
 			break loop;
 		}
 
-		verb, w := utf8.decode_rune_from_string(fmt[i:]);
+		verb, w := utf8.decode_rune_in_string(fmt[i:]);
 		i += w;
 
 		switch {

@@ -94,7 +94,7 @@ encode_rune :: proc(r: rune) -> ([4]u8, int) {
 	return buf, 4;
 }
 
-decode_rune_from_string :: inline proc(s: string) -> (rune, int) do return decode_rune(cast([]u8)s);
+decode_rune_in_string :: inline proc(s: string) -> (rune, int) do return decode_rune(cast([]u8)s);
 decode_rune :: proc(s: []u8) -> (rune, int) {
 	n := len(s);
 	if n < 1 {
@@ -134,7 +134,7 @@ decode_rune :: proc(s: []u8) -> (rune, int) {
 
 
 
-decode_last_rune_from_string :: inline proc(s: string) -> (rune, int) do return decode_last_rune(cast([]u8)s);
+decode_last_rune_in_string :: inline proc(s: string) -> (rune, int) do return decode_last_rune(cast([]u8)s);
 decode_last_rune :: proc(s: []u8) -> (rune, int) {
 	r: rune;
 	size: int;
@@ -215,7 +215,7 @@ valid_string :: proc(s: string) -> bool {
 
 rune_start :: inline proc(b: u8) -> bool do return b&0xc0 != 0x80;
 
-rune_count_from_string :: inline proc(s: string) -> int do return rune_count(cast([]u8)s);
+rune_count_in_string :: inline proc(s: string) -> int do return rune_count(cast([]u8)s);
 rune_count :: proc(s: []u8) -> int {
 	count := 0;
 	n := len(s);
