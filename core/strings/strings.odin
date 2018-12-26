@@ -103,7 +103,7 @@ join :: proc(a: []string, sep: string, allocator := context.allocator) -> string
 		n += len(s);
 	}
 
-	b := make([]byte, n);
+	b := make([]byte, n, allocator);
 	i := copy(b, cast([]byte)a[0]);
 	for s in a[1:] {
 		i += copy(b[i:], cast([]byte)sep);
@@ -121,7 +121,7 @@ concatenate :: proc(a: []string, allocator := context.allocator) -> string {
 	for s in a {
 		n += len(s);
 	}
-	b := make([]byte, n);
+	b := make([]byte, n, allocator);
 	i := 0;
 	for s in a {
 		i += copy(b[i:], cast([]byte)s);
