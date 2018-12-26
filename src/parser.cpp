@@ -3710,6 +3710,47 @@ Ast *parse_foreign_decl(AstFile *f) {
 	return ast_bad_decl(f, token, f->curr_token);
 }
 
+Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind close_kind) {
+	Array<Ast *> elems = {};
+	Token open = expect_token(f, open_kind);
+	f->expr_level++;
+	if (f->curr_token.kind != close_kind) {
+		elems = array_make<Ast *>(heap_allocator());
+		while (f->curr_token.kind != close_kind &&
+		       f->curr_token.kind != Token_EOF) {
+			Ast *elem = nullptr;
+			elem = parse_ident(f);
+			if (f->curr_token.kind == Token_Eq) {
+				Token eq = expect_token(f, Token_Eq);
+				Ast *value = parse_value(f);
+				elem = ast_field_value(f, elem, value, eq);
+			}
+
+			array_add(&elems, elem);
+
+			if (!allow_token(f, Token_Comma)) {
+				break;
+			}
+		}
+	}
+	f->expr_level--;
+	Token close = expect_closing(f, close_kind, str_lit("attribute"));
+
+	Ast *attribute = ast_attribute(f, token, open, close, elems);
+
+	Ast *decl = parse_stmt(f);
+	if (decl->kind == Ast_ValueDecl) {
+		array_add(&decl->ValueDecl.attributes, attribute);
+	} else if (decl->kind == Ast_ForeignBlockDecl) {
+		array_add(&decl->ForeignBlockDecl.attributes, attribute);
+	} else {
+		syntax_error(decl, "Expected a value or foreign declaration after an attribute, got %.*s", LIT(ast_strings[decl->kind]));
+		return ast_bad_stmt(f, token, f->curr_token);
+	}
+
+	return decl;
+}
+
 
 Ast *parse_stmt(AstFile *f) {
 	Ast *s = nullptr;
@@ -3805,101 +3846,67 @@ Ast *parse_stmt(AstFile *f) {
 	} break;
 
 	case Token_At: {
-		advance_token(f);
-
-		Array<Ast *> elems = {};
-		Token open = expect_token(f, Token_OpenParen);
-		f->expr_level++;
-		if (f->curr_token.kind != Token_CloseParen) {
-			elems = array_make<Ast *>(heap_allocator());
-			while (f->curr_token.kind != Token_CloseParen &&
-			       f->curr_token.kind != Token_EOF) {
-				Ast *elem = nullptr;
-				elem = parse_ident(f);
-				if (f->curr_token.kind == Token_Eq) {
-					Token eq = expect_token(f, Token_Eq);
-					Ast *value = parse_value(f);
-					elem = ast_field_value(f, elem, value, eq);
-				}
-
-				array_add(&elems, elem);
-
-				if (!allow_token(f, Token_Comma)) {
-					break;
-				}
-			}
-		}
-		f->expr_level--;
-		Token close = expect_closing(f, Token_CloseParen, str_lit("attribute"));
-
-		Ast *attribute = ast_attribute(f, token, open, close, elems);
-
-		Ast *decl = parse_stmt(f);
-		if (decl->kind == Ast_ValueDecl) {
-			array_add(&decl->ValueDecl.attributes, attribute);
-		} else if (decl->kind == Ast_ForeignBlockDecl) {
-			array_add(&decl->ForeignBlockDecl.attributes, attribute);
-		} else {
-			syntax_error(decl, "Expected a value or foreign declaration after an attribute, got %.*s", LIT(ast_strings[decl->kind]));
-			return ast_bad_stmt(f, token, f->curr_token);
-		}
-
-		return decl;
+		Token token = expect_token(f, Token_At);
+		return parse_attribute(f, token, Token_OpenParen, Token_CloseParen);
 	}
 
 	case Token_Hash: {
-		Ast *s = nullptr;
 		Token hash_token = expect_token(f, Token_Hash);
-		Token name = expect_token(f, Token_Ident);
-		String tag = name.string;
-
-		if (tag == "bounds_check") {
-			s = parse_stmt(f);
-			s->stmt_state_flags |= StmtStateFlag_bounds_check;
-			if ((s->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
-				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
-			}
-			return s;
-		} else if (tag == "no_bounds_check") {
-			s = parse_stmt(f);
-			s->stmt_state_flags |= StmtStateFlag_no_bounds_check;
-			if ((s->stmt_state_flags & StmtStateFlag_bounds_check) != 0) {
-				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
-			}
-			return s;
-		} else if (tag == "complete") {
-			s = parse_stmt(f);
-			switch (s->kind) {
-			case Ast_SwitchStmt:
-				s->SwitchStmt.complete = true;
-				break;
-			case Ast_TypeSwitchStmt:
-				s->TypeSwitchStmt.complete = true;
-				break;
-			default:
-				syntax_error(token, "#complete can only be applied to a switch statement");
-				break;
-			}
-			return s;
-		} else if (tag == "assert") {
-			Ast *t = ast_basic_directive(f, hash_token, tag);
-			return ast_expr_stmt(f, parse_call_expr(f, t));
-		} /* else if (name.string == "no_deferred") {
-			s = parse_stmt(f);
-			s->stmt_state_flags |= StmtStateFlag_no_deferred;
-		} */
-
-		if (tag == "include") {
-			syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");
-			s = ast_bad_stmt(f, token, f->curr_token);
+		if (f->curr_token.kind == Token_OpenBracket) {
+			return parse_attribute(f, hash_token, Token_OpenBracket, Token_CloseBracket);
 		} else {
-			syntax_error(token, "Unknown tag directive used: '%.*s'", LIT(tag));
-			s = ast_bad_stmt(f, token, f->curr_token);
+			Ast *s = nullptr;
+			Token name = expect_token(f, Token_Ident);
+			String tag = name.string;
+
+			if (tag == "bounds_check") {
+				s = parse_stmt(f);
+				s->stmt_state_flags |= StmtStateFlag_bounds_check;
+				if ((s->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
+					syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
+				}
+				return s;
+			} else if (tag == "no_bounds_check") {
+				s = parse_stmt(f);
+				s->stmt_state_flags |= StmtStateFlag_no_bounds_check;
+				if ((s->stmt_state_flags & StmtStateFlag_bounds_check) != 0) {
+					syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
+				}
+				return s;
+			} else if (tag == "complete") {
+				s = parse_stmt(f);
+				switch (s->kind) {
+				case Ast_SwitchStmt:
+					s->SwitchStmt.complete = true;
+					break;
+				case Ast_TypeSwitchStmt:
+					s->TypeSwitchStmt.complete = true;
+					break;
+				default:
+					syntax_error(token, "#complete can only be applied to a switch statement");
+					break;
+				}
+				return s;
+			} else if (tag == "assert") {
+				Ast *t = ast_basic_directive(f, hash_token, tag);
+				return ast_expr_stmt(f, parse_call_expr(f, t));
+			} /* else if (name.string == "no_deferred") {
+				s = parse_stmt(f);
+				s->stmt_state_flags |= StmtStateFlag_no_deferred;
+			} */
+
+			if (tag == "include") {
+				syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");
+				s = ast_bad_stmt(f, token, f->curr_token);
+			} else {
+				syntax_error(token, "Unknown tag directive used: '%.*s'", LIT(tag));
+				s = ast_bad_stmt(f, token, f->curr_token);
+			}
+
+			fix_advance_to_next_stmt(f);
+
+			return s;
 		}
-
-		fix_advance_to_next_stmt(f);
-
-		return s;
 	} break;
 
 	case Token_OpenBrace:
