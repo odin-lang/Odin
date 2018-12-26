@@ -946,7 +946,6 @@ Token tokenizer_get_token(Tokenizer *t) {
 			break;
 		case '~': token.kind = token_kind_variant2(t, Token_Xor, Token_XorEq);                                        break;
 		case '!': token.kind = token_kind_variant2(t, Token_Not, Token_NotEq);                                        break;
-		// case '+': token.kind = token_kind_variant3(t, Token_Add, Token_AddEq, '+', Token_Inc);                        break;
 		case '+': token.kind = token_kind_variant2(t, Token_Add, Token_AddEq);                                        break;
 		case '-':
 			token.kind = Token_Sub;
