@@ -776,50 +776,6 @@ gb_inline TokenKind token_kind_dub_eq(Tokenizer *t, Rune sing_rune, TokenKind si
 	return sing;
 }
 
-void tokenizer__fle_update(Tokenizer *t) {
-	t->curr_rune = '/';
-	t->curr      = t->curr-1;
-	t->read_curr = t->curr+1;
-	advance_to_next_rune(t);
-}
-
-// NOTE(bill): needed if comment is straight after a "semicolon"
-bool tokenizer_find_line_end(Tokenizer *t) {
-	while (t->curr_rune == '/' || t->curr_rune == '*') {
-		if (t->curr_rune == '/') {
-			tokenizer__fle_update(t);
-			return true;
-		}
-
-		advance_to_next_rune(t);
-		while (t->curr_rune >= 0) {
-			Rune r = t->curr_rune;
-			if (r == '\n') {
-				tokenizer__fle_update(t);
-				return true;
-			}
-			advance_to_next_rune(t);
-			if (r == '*' && t->curr_rune == '/') {
-				advance_to_next_rune(t);
-				break;
-			}
-		}
-
-		tokenizer_skip_whitespace(t);
-		if (t->curr_rune < 0 || t->curr_rune == '\n') {
-			tokenizer__fle_update(t);
-			return true;
-		}
-		if (t->curr_rune != '/') {
-			tokenizer__fle_update(t);
-			return false;
-		}
-		advance_to_next_rune(t);
-	}
-
-	tokenizer__fle_update(t);
-	return false;
-}
 
 Token tokenizer_get_token(Tokenizer *t) {
 	tokenizer_skip_whitespace(t);
@@ -956,7 +912,6 @@ Token tokenizer_get_token(Tokenizer *t) {
 			}
 			break;
 
-		case '#':  token.kind = Token_Hash;         break;
 		case '@':  token.kind = Token_At;           break;
 		case '$':  token.kind = Token_Dollar;       break;
 		case '?':  token.kind = Token_Question;     break;
@@ -1010,6 +965,18 @@ Token tokenizer_get_token(Tokenizer *t) {
 				token.kind = Token_ArrowRight;
 			}
 			break;
+
+		case '#':
+			if (t->curr_rune == '!') {
+				while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
+					advance_to_next_rune(t);
+				}
+				token.kind = Token_Comment;
+			} else {
+				token.kind = Token_Hash;
+			}
+			break;
+
 
 		case '/': {
 			if (t->curr_rune == '/') {
