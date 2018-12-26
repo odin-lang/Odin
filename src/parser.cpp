@@ -3851,62 +3851,58 @@ Ast *parse_stmt(AstFile *f) {
 	}
 
 	case Token_Hash: {
+		Ast *s = nullptr;
 		Token hash_token = expect_token(f, Token_Hash);
-		if (f->curr_token.kind == Token_OpenBracket) {
-			return parse_attribute(f, hash_token, Token_OpenBracket, Token_CloseBracket);
-		} else {
-			Ast *s = nullptr;
-			Token name = expect_token(f, Token_Ident);
-			String tag = name.string;
+		Token name = expect_token(f, Token_Ident);
+		String tag = name.string;
 
-			if (tag == "bounds_check") {
-				s = parse_stmt(f);
-				s->stmt_state_flags |= StmtStateFlag_bounds_check;
-				if ((s->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
-					syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
-				}
-				return s;
-			} else if (tag == "no_bounds_check") {
-				s = parse_stmt(f);
-				s->stmt_state_flags |= StmtStateFlag_no_bounds_check;
-				if ((s->stmt_state_flags & StmtStateFlag_bounds_check) != 0) {
-					syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
-				}
-				return s;
-			} else if (tag == "complete") {
-				s = parse_stmt(f);
-				switch (s->kind) {
-				case Ast_SwitchStmt:
-					s->SwitchStmt.complete = true;
-					break;
-				case Ast_TypeSwitchStmt:
-					s->TypeSwitchStmt.complete = true;
-					break;
-				default:
-					syntax_error(token, "#complete can only be applied to a switch statement");
-					break;
-				}
-				return s;
-			} else if (tag == "assert") {
-				Ast *t = ast_basic_directive(f, hash_token, tag);
-				return ast_expr_stmt(f, parse_call_expr(f, t));
-			} /* else if (name.string == "no_deferred") {
-				s = parse_stmt(f);
-				s->stmt_state_flags |= StmtStateFlag_no_deferred;
-			} */
-
-			if (tag == "include") {
-				syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");
-				s = ast_bad_stmt(f, token, f->curr_token);
-			} else {
-				syntax_error(token, "Unknown tag directive used: '%.*s'", LIT(tag));
-				s = ast_bad_stmt(f, token, f->curr_token);
+		if (tag == "bounds_check") {
+			s = parse_stmt(f);
+			s->stmt_state_flags |= StmtStateFlag_bounds_check;
+			if ((s->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
+				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
-
-			fix_advance_to_next_stmt(f);
-
 			return s;
+		} else if (tag == "no_bounds_check") {
+			s = parse_stmt(f);
+			s->stmt_state_flags |= StmtStateFlag_no_bounds_check;
+			if ((s->stmt_state_flags & StmtStateFlag_bounds_check) != 0) {
+				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
+			}
+			return s;
+		} else if (tag == "complete") {
+			s = parse_stmt(f);
+			switch (s->kind) {
+			case Ast_SwitchStmt:
+				s->SwitchStmt.complete = true;
+				break;
+			case Ast_TypeSwitchStmt:
+				s->TypeSwitchStmt.complete = true;
+				break;
+			default:
+				syntax_error(token, "#complete can only be applied to a switch statement");
+				break;
+			}
+			return s;
+		} else if (tag == "assert") {
+			Ast *t = ast_basic_directive(f, hash_token, tag);
+			return ast_expr_stmt(f, parse_call_expr(f, t));
+		} /* else if (name.string == "no_deferred") {
+			s = parse_stmt(f);
+			s->stmt_state_flags |= StmtStateFlag_no_deferred;
+		} */
+
+		if (tag == "include") {
+			syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");
+			s = ast_bad_stmt(f, token, f->curr_token);
+		} else {
+			syntax_error(token, "Unknown tag directive used: '%.*s'", LIT(tag));
+			s = ast_bad_stmt(f, token, f->curr_token);
 		}
+
+		fix_advance_to_next_stmt(f);
+
+		return s;
 	} break;
 
 	case Token_OpenBrace:
