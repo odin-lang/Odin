@@ -51,6 +51,7 @@ typedef CALL_ARGUMENT_CHECKER(CallArgumentCheckerType);
 
 void     check_expr                     (CheckerContext *c, Operand *operand, Ast *expression);
 void     check_multi_expr               (CheckerContext *c, Operand *operand, Ast *expression);
+void     check_multi_expr_or_type       (CheckerContext *c, Operand *operand, Ast *expression);
 void     check_expr_or_type             (CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint = nullptr);
 ExprKind check_expr_base                (CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint);
 void     check_expr_with_type_hint      (CheckerContext *c, Operand *o, Ast *e, Type *t);
@@ -3029,6 +3030,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_info_of:
 	case BuiltinProc_typeid_of:
 	case BuiltinProc_len:
+	case BuiltinProc_min:
+	case BuiltinProc_max:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 
@@ -3602,7 +3605,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	case BuiltinProc_min: {
-		// min :: proc(a, b: ordered) -> ordered
+		// min :: proc($T: typeid) -> ordered
+		// min :: proc(a: ..ordered) -> ordered
+
+		check_multi_expr_or_type(c, operand, ce->args[0]);
+
 		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
@@ -3611,6 +3618,55 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			gb_string_free(type_str);
 			return false;
 		}
+
+		if (operand->mode == Addressing_Type) {
+			if (is_type_boolean(type)) {
+				operand->mode  = Addressing_Constant;
+				operand->type  = original_type;
+				operand->value = exact_value_bool(false);
+				return true;
+			} else if (is_type_integer(type)) {
+				operand->mode  = Addressing_Constant;
+				operand->type  = original_type;
+				if (is_type_unsigned(type)) {
+					operand->value = exact_value_u64(0);
+					return true;
+				} else {
+					i64 sz = 8*type_size_of(type);
+					ExactValue a = exact_value_i64(1);
+					ExactValue b = exact_value_i64(sz-1);
+					ExactValue v = exact_binary_operator_value(Token_Shl, a, b);
+					v = exact_unary_operator_value(Token_Sub, v, cast(i32)sz, false);
+					operand->value = v;
+					return true;
+				}
+			} else if (is_type_float(type)) {
+				operand->mode  = Addressing_Constant;
+				operand->type  = original_type;
+				switch (type_size_of(type)) {
+				case 4:
+					operand->value = exact_value_float(-3.402823466e+38f);
+					break;
+				case 8:
+					operand->value = exact_value_float(-1.7976931348623158e+308);
+					break;
+				default:
+					GB_PANIC("Unhandled float type");
+					break;
+				}
+				return true;
+			} else if (is_type_enum(type)) {
+				operand->mode  = Addressing_Constant;
+				operand->type  = original_type;
+				operand->value = type->Enum.min_value;
+				return true;
+			}
+			gbString type_str = type_to_string(original_type);
+			error(call, "Invalid type for 'min', got %s", type_str);
+			gb_string_free(type_str);
+			return false;
+		}
+
 
 		bool all_constant = operand->mode == Addressing_Constant;
 
@@ -3705,12 +3761,69 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	case BuiltinProc_max: {
-		// max :: proc(a, b: ordered) -> ordered
+		// max :: proc($T: typeid) -> ordered
+		// max :: proc(a: ..ordered) -> ordered
+
+		check_multi_expr_or_type(c, operand, ce->args[0]);
+
 		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(original_type);
 			error(call, "Expected a ordered numeric type to 'max', got '%s'", type_str);
+			gb_string_free(type_str);
+			return false;
+		}
+
+		if (operand->mode == Addressing_Type) {
+			if (is_type_boolean(type)) {
+				operand->mode  = Addressing_Constant;
+				operand->type  = original_type;
+				operand->value = exact_value_bool(true);
+				return true;
+			} else if (is_type_integer(type)) {
+				operand->mode  = Addressing_Constant;
+				operand->type  = original_type;
+				if (is_type_unsigned(type)) {
+					i64 sz = 8*type_size_of(type);
+					ExactValue a = exact_value_i64(1);
+					ExactValue b = exact_value_i64(sz);
+					ExactValue v = exact_binary_operator_value(Token_Shl, a, b);
+					v = exact_binary_operator_value(Token_Sub, v, a);
+					operand->value = v;
+					return true;
+				} else {
+					i64 sz = 8*type_size_of(type);
+					ExactValue a = exact_value_i64(1);
+					ExactValue b = exact_value_i64(sz-1);
+					ExactValue v = exact_binary_operator_value(Token_Shl, a, b);
+					v = exact_binary_operator_value(Token_Sub, v, a);
+					operand->value = v;
+					return true;
+				}
+			} else if (is_type_float(type)) {
+				operand->mode  = Addressing_Constant;
+				operand->type  = original_type;
+				switch (type_size_of(type)) {
+				case 4:
+					operand->value = exact_value_float(3.402823466e+38f);
+					break;
+				case 8:
+					operand->value = exact_value_float(1.7976931348623158e+308);
+					break;
+				default:
+					GB_PANIC("Unhandled float type");
+					break;
+				}
+				return true;
+			} else if (is_type_enum(type)) {
+				operand->mode  = Addressing_Constant;
+				operand->type  = original_type;
+				operand->value = type->Enum.max_value;
+				return true;
+			}
+			gbString type_str = type_to_string(original_type);
+			error(call, "Invalid type for 'max', got %s", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -6464,6 +6577,17 @@ ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, Type *type_hi
 }
 
 
+void check_multi_expr_or_type(CheckerContext *c, Operand *o, Ast *e) {
+	check_expr_base(c, o, e, nullptr);
+	switch (o->mode) {
+	default:
+		return; // NOTE(bill): Valid
+	case Addressing_NoValue:
+		error_operand_no_value(o);
+		break;
+	}
+	o->mode = Addressing_Invalid;
+}
 
 void check_multi_expr(CheckerContext *c, Operand *o, Ast *e) {
 	check_expr_base(c, o, e, nullptr);
