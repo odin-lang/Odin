@@ -171,6 +171,8 @@ struct TypeUnion {
 		Scope *  scope;                                   \
 		Entity * names;                                   \
 		Type *   base_type;                               \
+		ExactValue min_value;                             \
+		ExactValue max_value;                             \
 	})                                                    \
 	TYPE_KIND(Tuple, struct {                             \
 		Array<Entity *> variables; /* Entity_Variable */  \

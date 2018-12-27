@@ -833,6 +833,8 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 
 	enum_type->Enum.fields = fields;
 	enum_type->Enum.names = make_names_field_for_struct(ctx, ctx->scope);
+	enum_type->Enum.min_value = min_value;
+	enum_type->Enum.max_value = max_value;
 }
 
 
