@@ -1236,8 +1236,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_defer:
 		case Token_asm:
 		case Token_using:
-		// case Token_thread_local:
-		// case Token_no_alias:
+		case Token_static:
 
 		case Token_break:
 		case Token_continue:
