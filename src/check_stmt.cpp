@@ -1667,6 +1667,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					if (!is_blank_ident(str)) {
 						found = scope_lookup_current(ctx->scope, str);
 						new_name_count += 1;
+					} else if (vd->is_static) {
+						error(name, "'static' is now allowed to be applied to '_'");
 					}
 					if (found == nullptr) {
 						entity = alloc_entity_variable(ctx->scope, token, nullptr, false);
@@ -1677,6 +1679,9 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 							GB_ASSERT(fl->kind == Ast_Ident);
 							entity->Variable.is_foreign = true;
 							entity->Variable.foreign_library_ident = fl;
+						}
+						if (vd->is_static) {
+							entity->flags |= EntityFlag_Static;
 						}
 					} else {
 						TokenPos pos = found->token.pos;
@@ -1779,6 +1784,17 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						}
 					} else {
 						map_set(fp, key, e);
+					}
+				} else if (e->flags & EntityFlag_Static) {
+					if (vd->values.count > 0) {
+						if (entity_count != vd->values.count) {
+							error(e->token, "A static variable declaration with a default value must be constant");
+						} else {
+							Ast *value = vd->values[i];
+							if (value->tav.mode != Addressing_Constant) {
+								error(e->token, "A static variable declaration with a default value must be constant");
+							}
+						}
 					}
 				}
 				add_entity(ctx->checker, ctx->scope, e->identifier, e);

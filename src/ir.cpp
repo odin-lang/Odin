@@ -405,6 +405,7 @@ struct irValueGlobal {
 	bool          is_constant;
 	bool          is_export;
 	bool          is_private;
+	bool          is_internal;
 	String        thread_local_model;
 	bool          is_foreign;
 	bool          is_unnamed_addr;
@@ -7941,6 +7942,44 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 	case_ast_node(vd, ValueDecl, node);
 		if (vd->is_mutable) {
 			irModule *m = proc->module;
+
+			if (vd->is_static) {
+				for_array(i, vd->names) {
+					irValue *value = nullptr;
+					if (vd->values.count > 0) {
+						GB_ASSERT(vd->names.count == vd->values.count);
+						Ast *ast_value = vd->values[i];
+						GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
+						          ast_value->tav.mode == Addressing_Invalid);
+
+						value = ir_add_module_constant(m, ast_value->tav.type, ast_value->tav.value);
+					}
+
+					Ast *ident = vd->names[i];
+					GB_ASSERT(!is_blank_ident(ident));
+					Entity *e = entity_of_ident(ident);
+					GB_ASSERT(e->flags & EntityFlag_Static);
+					String name = e->token.string;
+					HashKey key = hash_string(name);
+
+					String mangled_name = {};
+					{
+						gbString str = gb_string_make_length(heap_allocator(), proc->name.text, proc->name.len);
+						str = gb_string_appendc(str, "-");
+						str = gb_string_append_fmt(str, ".%.*s-%llu", LIT(name), cast(long long)e->id);
+						mangled_name.text = cast(u8 *)str;
+						mangled_name.len = gb_string_length(str);
+					}
+
+					irValue *g = ir_value_global(e, value);
+					g->Global.name = mangled_name;
+					g->Global.is_internal = true;
+					ir_module_add_value(proc->module, e, g);
+					map_set(&proc->module->members, key, g);
+				}
+				return;
+			}
+
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
 			defer (gb_temp_arena_memory_end(tmp));
 
@@ -10141,6 +10180,10 @@ void ir_gen_tree(irGen *s) {
 			if (e->Variable.is_foreign) {
 				Entity *fl = e->Procedure.foreign_library;
 				ir_add_foreign_library_path(m, fl);
+			}
+
+			if (e->flags & EntityFlag_Static) {
+				var->var->Global.is_internal = true;
 			}
 
 			if (var->init != nullptr) {
