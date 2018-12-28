@@ -47,6 +47,7 @@ enum EntityFlag {
 	EntityFlag_PolyConst     = 1<<13,
 	EntityFlag_NotExported   = 1<<14,
 
+	EntityFlag_Static        = 1<<16,
 
 	EntityFlag_CVarArg       = 1<<20,
 	EntityFlag_AutoCast      = 1<<21,

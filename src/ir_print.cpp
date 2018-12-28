@@ -2233,6 +2233,8 @@ void print_llvm_ir(irGen *ir) {
 
 		if (g->is_private) {
 			ir_write_string(f, str_lit("private "));
+		} else if (g->is_internal) {
+			ir_write_string(f, str_lit("internal "));
 		}
 		if (g->is_constant) {
 			if (g->is_unnamed_addr) {
