@@ -27,6 +27,9 @@ set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	return set(data, 0, len);
 }
+zero_item :: proc "contextless" (item: $P/^$T) {
+	set(item, 0, size_of(T));
+}
 zero_slice :: proc "contextless" (data: $T/[]$E) {
 	if n := len(data); n > 0 {
 		zero(&data[0], size_of(E)*n);

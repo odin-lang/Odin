@@ -1327,7 +1327,7 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 	}
 
 	if (in_type) {
-		check_is_assignable_to(ctx, &o, in_type);
+		check_assignment(ctx, &o, in_type, str_lit("parameter value"));
 	}
 
 	if (out_type_) *out_type_ = default_type(o.type);
