@@ -7960,7 +7960,6 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 					Entity *e = entity_of_ident(ident);
 					GB_ASSERT(e->flags & EntityFlag_Static);
 					String name = e->token.string;
-					HashKey key = hash_string(name);
 
 					String mangled_name = {};
 					{
@@ -7970,6 +7969,9 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 						mangled_name.text = cast(u8 *)str;
 						mangled_name.len = gb_string_length(str);
 					}
+
+					HashKey key = hash_string(mangled_name);
+					ir_add_entity_name(m, e, mangled_name);
 
 					irValue *g = ir_value_global(e, value);
 					g->Global.name = mangled_name;
