@@ -2776,7 +2776,9 @@ Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start, AstPackage
 				} else {
 					continue;
 				}
-				GB_ASSERT(pkg != nullptr && pkg->scope != nullptr);
+				if (pkg == nullptr || pkg->scope == nullptr) {
+					continue;
+				}
 
 				if (pkg->kind == Package_Runtime) {
 					// NOTE(bill): Allow cyclic imports within the runtime package for the time being
