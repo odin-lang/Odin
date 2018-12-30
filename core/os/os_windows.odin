@@ -32,6 +32,7 @@ ERROR_NONE:                   Errno : 0;
 ERROR_FILE_NOT_FOUND:         Errno : 2;
 ERROR_PATH_NOT_FOUND:         Errno : 3;
 ERROR_ACCESS_DENIED:          Errno : 5;
+ERROR_INVALID_HANDLE:         Errno : 6;
 ERROR_NO_MORE_FILES:          Errno : 18;
 ERROR_HANDLE_EOF:             Errno : 38;
 ERROR_NETNAME_DELETED:        Errno : 64;
@@ -106,8 +107,11 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 	return INVALID_HANDLE, err;
 }
 
-close :: proc(fd: Handle) {
-	win32.close_handle(win32.Handle(fd));
+close :: proc(fd: Handle) -> Errno {
+	if !win32.close_handle(win32.Handle(fd)) {
+		return Errno(win32.get_last_error());
+	}
+	return ERROR_NONE;
 }
 
 
@@ -203,25 +207,27 @@ get_std_handle :: proc(h: int) -> Handle {
 
 
 
-last_write_time :: proc(fd: Handle) -> File_Time {
+last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
 	file_info: win32.By_Handle_File_Information;
-	win32.get_file_information_by_handle(win32.Handle(fd), &file_info);
+	if !win32.get_file_information_by_handle(win32.Handle(fd), &file_info) {
+		return 0, Errno(win32.get_last_error());
+	}
 	lo := File_Time(file_info.last_write_time.lo);
 	hi := File_Time(file_info.last_write_time.hi);
-	return lo | hi << 32;
+	return lo | hi << 32, ERROR_NONE;
 }
 
-last_write_time_by_name :: proc(name: string) -> File_Time {
+last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 	last_write_time: win32.Filetime;
 	data: win32.File_Attribute_Data;
 
 	wide_path := win32.utf8_to_wstring(name);
-	if win32.get_file_attributes_ex_w(wide_path, win32.GetFileExInfoStandard, &data) {
-		last_write_time = data.last_write_time;
+	if !win32.get_file_attributes_ex_w(wide_path, win32.GetFileExInfoStandard, &data) {
+		return 0, Errno(win32.get_last_error());
 	}
 
-	l := File_Time(last_write_time.lo);
-	h := File_Time(last_write_time.hi);
+	l := File_Time(data.last_write_time.lo);
+	h := File_Time(data.last_write_time.hi);
 	return l | h << 32;
 }
 
