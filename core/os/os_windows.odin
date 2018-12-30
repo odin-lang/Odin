@@ -108,7 +108,7 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 }
 
 close :: proc(fd: Handle) -> Errno {
-	if !win32.close_handle(win32.Handle(fd)) {
+	if win32.close_handle(win32.Handle(fd)) == 0 {
 		return Errno(win32.get_last_error());
 	}
 	return ERROR_NONE;
@@ -228,7 +228,7 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 
 	l := File_Time(data.last_write_time.lo);
 	h := File_Time(data.last_write_time.hi);
-	return l | h << 32;
+	return l | h << 32, ERROR_NONE;
 }
 
 
