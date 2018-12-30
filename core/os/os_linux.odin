@@ -11,8 +11,41 @@ OS :: "linux";
 Handle    :: distinct i32;
 File_Time :: distinct u64;
 Errno     :: distinct i32;
+Syscall   :: distinct int;
 
 INVALID_HANDLE :: ~Handle(0);
+
+ERROR_NONE:    Errno : 0;
+EPERM:         Errno : 1;
+ENOENT:        Errno : 2;
+EINTR:         Errno : 4;
+EIO:           Errno : 5;
+ENXIO:         Errno : 6;
+EBADF:         Errno : 9;
+EAGAIN:        Errno : 11;
+EWOULDBLOCK:   Errno : EAGAIN;
+ENOMEM:        Errno : 12;
+EACCES:        Errno : 13;
+EFAULT:        Errno : 14;
+EEXIST:        Errno : 17;
+ENODEV:        Errno : 19;
+ENOTDIR:       Errno : 20;
+EISDIR:        Errno : 21;
+EINVAL:        Errno : 22;
+ENFILE:        Errno : 23;
+EMFILE:        Errno : 24;
+ETXTBSY:       Errno : 26;
+EFBIG:         Errno : 27;
+ENOSPC:        Errno : 28;
+ESPIPE:        Errno : 29;
+EROFS:         Errno : 30;
+EPIPE:         Errno : 32;
+ENAMETOOLONG:  Errno : 36;
+ELOOP:         Errno : 40;
+EOVERFLOW:     Errno : 75;
+EDESTADDRREQ:  Errno : 89;
+EOPNOTSUPP:    Errno : 95;
+EDQUOT:        Errno : 122;
 
 O_RDONLY   :: 0x00000;
 O_WRONLY   :: 0x00001;
@@ -47,18 +80,13 @@ args := _alloc_command_line_arguments();
 
 _File_Time :: struct {
 	seconds:     i64,
-	nanoseconds: i32,
-	reserved:    i32,
+	nanoseconds: i64,
 }
-
-// Translated from
-//  https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.7-4.6/+/jb-dev/sysroot/usr/include/bits/stat.h
-// Validity is not guaranteed.
 
 Stat :: struct {
 	device_id:     u64, // ID of device containing file
 	serial:        u64, // File serial number
-	nlink:         u32, // Number of hard links
+	nlink:         u64, // Number of hard links
 	mode:          u32, // Mode of the file
 	uid:           u32, // User ID of the file's owner
 	gid:           u32, // Group ID of the file's group
@@ -75,8 +103,6 @@ Stat :: struct {
 	_reserve1,
 	_reserve2,
 	_reserve3:     i64,
-	serial_numbe:  u64, // File serial number..? Maybe.
-	_reserve4:     i64,
 };
 
 // File type
@@ -142,15 +168,21 @@ CLOCK_BOOTTIME           :: 7;
 CLOCK_REALTIME_ALARM     :: 8;
 CLOCK_BOOTTIME_ALARM     :: 9;
 
+SYS_GETTID: Syscall : 186;
+
 foreign libc {
+	@(link_name="__errno_location") __errno_location    :: proc() -> ^int ---;
+	@(link_name="syscall")          syscall             :: proc(number: Syscall, #c_vararg args: ..any) -> int ---;
+
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: int, #c_vararg mode: ..any) -> Handle ---;
-	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> i32 ---;
+	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> int ---;
 	@(link_name="read")             _unix_read          :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
 	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
 	@(link_name="lseek64")          _unix_seek          :: proc(fd: Handle, offset: i64, whence: i32) -> i64 ---;
 	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---;
-	@(link_name="stat")             _unix_stat          :: proc(path: cstring, stat: ^Stat) -> i32 ---;
-	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> i32 ---;
+	@(link_name="stat")             _unix_stat          :: proc(path: cstring, stat: ^Stat) -> int ---;
+	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^Stat) -> int ---;
+	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> int ---;
 
 	@(link_name="malloc")           _unix_malloc        :: proc(size: int) -> rawptr ---;
 	@(link_name="calloc")           _unix_calloc        :: proc(num, size: int) -> rawptr ---;
@@ -171,40 +203,58 @@ foreign dl {
 	@(link_name="dlerror")          _unix_dlerror       :: proc() -> cstring ---;
 }
 
+get_last_error :: proc() -> int {
+	return __errno_location()^;
+}
+
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
 	cstr := strings.new_cstring(path);
 	handle := _unix_open(cstr, flags, mode);
 	delete(cstr);
 	if handle == -1 {
-		return 0, 1;
+		return INVALID_HANDLE, Errno(get_last_error());
 	}
-	return handle, 0;
+	return handle, ERROR_NONE;
 }
 
-close :: proc(fd: Handle) {
-	_unix_close(fd);
+close :: proc(fd: Handle) -> Errno {
+	result := _unix_close(fd);
+	if result == -1 {
+		return Errno(get_last_error());
+	}
+	return ERROR_NONE;
 }
 
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	sz := _unix_read(fd, &data[0], len(data));
-	return sz, 0;
+	bytes_read := _unix_read(fd, &data[0], len(data));
+	if bytes_read == -1 {
+		return -1, Errno(get_last_error());
+	}
+	return bytes_read, ERROR_NONE;
 }
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	sz := _unix_write(fd, &data[0], len(data));
-	return sz, 0;
+	bytes_written := _unix_write(fd, &data[0], len(data));
+	if bytes_written == -1 {
+		return -1, Errno(get_last_error());
+	}
+	return bytes_written, ERROR_NONE;
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	res := _unix_seek(fd, offset, i32(whence));
-	return res, 0;
+	if res == -1 {
+		return -1, Errno(get_last_error());
+	}
+	return res, ERROR_NONE;
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
-	prev, _   := seek(fd, 0, SEEK_CUR);
-	size, err := seek(fd, 0, SEEK_END);
-	seek(fd, prev, SEEK_SET);
-	return size, err;
+	s, err := fstat(fd);
+	if err != ERROR_NONE {
+		return -1, err;
+	}
+	return s.size, ERROR_NONE;
 }
 
 
@@ -218,20 +268,51 @@ stderr: Handle = 2;
 last_write_time :: proc(fd: Handle) -> File_Time {}
 last_write_time_by_name :: proc(name: string) -> File_Time {}
 */
+last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
+	s, err := fstat(fd);
+	if err != ERROR_NONE {
+		return 0, err;
+	}
+	return File_Time(s.modified.nanoseconds), ERROR_NONE;
+}
 
-stat :: inline proc(path: string) -> (Stat, int) {
+last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
+	s, err := stat(name);
+	if err != ERROR_NONE {
+		return 0, err;
+	}
+	return File_Time(s.modified.nanoseconds), ERROR_NONE;
+}
+
+stat :: inline proc(path: string) -> (Stat, Errno) {
 	cstr := strings.new_cstring(path);
 	defer delete(cstr);
 
 	s: Stat;
-	ret_int := _unix_stat(cstr, &s);
-	return s, int(ret_int);
+	result := _unix_stat(cstr, &s);
+	if result == -1 {
+		return s, Errno(get_last_error());
+	}
+	return s, ERROR_NONE;
 }
 
-access :: inline proc(path: string, mask: int) -> bool {
+fstat :: inline proc(fd: Handle) -> (Stat, Errno) {
+	s: Stat;
+	result := _unix_fstat(fd, &s);
+	if result == -1 {
+		return s, Errno(get_last_error());
+	}
+	return s, ERROR_NONE;
+}
+
+access :: inline proc(path: string, mask: int) -> (bool, Errno) {
 	cstr := strings.new_cstring(path);
 	defer delete(cstr);
-	return _unix_access(cstr, mask) == 0;
+	result := _unix_access(cstr, mask);
+	if result == -1 {
+		return false, Errno(get_last_error());
+	}
+	return true, ERROR_NONE;
 }
 
 heap_alloc :: proc(size: int) -> rawptr {
@@ -281,8 +362,7 @@ nanosleep :: proc(nanoseconds: i64) -> int {
 }
 
 current_thread_id :: proc "contextless" () -> int {
-	// return int(_unix_gettid());
-	return 0;
+	return syscall(SYS_GETTID);
 }
 
 dlopen :: inline proc(filename: string, flags: int) -> rawptr {
