@@ -157,7 +157,7 @@ open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Err
 	handle := _unix_open(cstr, flags, mode);
 	delete(cstr);
 	if handle == -1 {
-		return 0, 1;
+		return INVALID_HANDLE, 1;
 	}
 	return handle, 0;
 }
