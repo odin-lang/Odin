@@ -201,11 +201,11 @@ valid_string :: proc(s: string) -> bool {
 			return false;
 		} else if size == 2 {
 			// Okay
-		} else if b := s[i+2]; b < 0x80 || 0xbf < b {
+		} else if c := s[i+2]; c < 0x80 || 0xbf < c {
 			return false;
 		} else if size == 3 {
 			// Okay
-		} else if b := s[i+3]; b < 0x80 || 0xbf < b {
+		} else if d := s[i+3]; b < 0x80 || 0xbf < d {
 			return false;
 		}
 		i += size;
@@ -242,11 +242,11 @@ rune_count :: proc(s: []u8) -> int {
 			size = 1;
 		} else if size == 2 {
 			// Okay
-		} else if b := s[i+2]; b < 0x80 || 0xbf < b {
+		} else if c := s[i+2]; c < 0x80 || 0xbf < c {
 			size = 1;
 		} else if size == 3 {
 			// Okay
-		} else if b := s[i+3]; b < 0x80 || 0xbf < b {
+		} else if d := s[i+3]; d < 0x80 || 0xbf < d {
 			size = 1;
 		}
 		i += size;

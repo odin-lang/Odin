@@ -218,7 +218,6 @@ last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
 }
 
 last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
-	last_write_time: win32.Filetime;
 	data: win32.File_Attribute_Data;
 
 	wide_path := win32.utf8_to_wstring(name);
