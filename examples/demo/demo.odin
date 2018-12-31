@@ -756,6 +756,8 @@ complete_switch :: proc() {
 		case D: fmt.println("D");
 		case:   fmt.println("?");
 		}
+
+		_ = b;
 	}
 	{ // union
 		Foo :: union {int, bool};
@@ -774,6 +776,7 @@ cstring_example :: proc() {
 	Y :: string(X);
 
 	w := W;
+	_ = w;
 	x: cstring = X;
 	y: string = Y;
 	z := string(x);
@@ -815,7 +818,6 @@ bit_set_type :: proc() {
 
 		d: Days;
 		d = {Sunday, Monday};
-		x := Tuesday;
 		e := d | WEEKEND;
 		e |= {Monday};
 		fmt.println(d, e);
