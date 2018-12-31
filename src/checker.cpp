@@ -434,8 +434,10 @@ void init_vetted_entity(VettedEntity *ve, VettedEntityKind kind, Entity *entity,
 
 
 GB_COMPARE_PROC(vetted_entity_variable_pos_cmp) {
-	Entity *x = (*cast(VettedEntity **)a)->entity;
-	Entity *y = (*cast(VettedEntity **)b)->entity;
+	Entity *x = (cast(VettedEntity *)a)->entity;
+	Entity *y = (cast(VettedEntity *)b)->entity;
+	GB_ASSERT(x != nullptr);
+	GB_ASSERT(y != nullptr);
 
 	return token_pos_cmp(x->token.pos, y->token.pos);
 }
@@ -500,9 +502,12 @@ bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 	if ((e->flags&EntityFlag_Used) == 0) {
 		switch (e->kind) {
 		case Entity_Variable:
+			if (e->scope->flags & (ScopeFlag_Global|ScopeFlag_Type|ScopeFlag_File)) {
+				return false;
+			}
 		case Entity_ImportName:
 		case Entity_LibraryName:
-		gb_zero_item(ve);
+			gb_zero_item(ve);
 			ve->kind = VettedEntity_Unused;
 			ve->entity = e;
 			return true;
@@ -534,7 +539,7 @@ void check_scope_usage(Checker *c, Scope *scope) {
 		}
 	}
 
-	gb_sort_array(vetted_entities.data, vetted_entities.count, vetted_entity_variable_pos_cmp);
+	gb_sort(vetted_entities.data, vetted_entities.count, gb_size_of(VettedEntity), vetted_entity_variable_pos_cmp);
 
 	for_array(i, vetted_entities) {
 		auto ve = vetted_entities[i];
