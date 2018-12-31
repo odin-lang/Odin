@@ -283,8 +283,8 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator) -> 
 		j := start;
 		if len(old) == 0 {
 			if i > 0 {
-				_, w := utf8.decode_rune_in_string(s[start:]);
-				j += w;
+				_, width := utf8.decode_rune_in_string(s[start:]);
+				j += width;
 			}
 		} else {
 			j += index(s[start:], old);
@@ -381,8 +381,8 @@ index_rune :: proc(s: string, r: rune) -> int {
 		return index_byte(s, byte(r));
 
 	case r == utf8.RUNE_ERROR:
-		for r, i in s {
-			if r == utf8.RUNE_ERROR {
+		for c, i in s {
+			if c == utf8.RUNE_ERROR {
 				return i;
 			}
 		}
