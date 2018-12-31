@@ -4544,7 +4544,20 @@ bool parse_file(Parser *p, AstFile *f) {
 		return false;
 	}
 
-	f->decls = parse_stmt_list(f);
+	f->decls = array_make<Ast *>(heap_allocator());
+
+	while (f->curr_token.kind != Token_EOF) {
+		Ast *stmt = parse_stmt(f);
+		if (stmt && stmt->kind != Ast_EmptyStmt) {
+			array_add(&f->decls, stmt);
+			if (stmt->kind == Ast_ExprStmt &&
+			    stmt->ExprStmt.expr != nullptr &&
+			    stmt->ExprStmt.expr->kind == Ast_ProcLit) {
+				syntax_error(stmt, "Procedure literal evaluated but not used");
+			}
+		}
+	}
+
 	parse_setup_file_decls(p, f, base_dir, f->decls);
 
 	return true;
