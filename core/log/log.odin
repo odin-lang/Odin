@@ -1,7 +1,6 @@
 package log
 
-import "core:fmt";
-import "core:runtime";
+import "core:fmt"
 
 Level :: enum {
 	Debug,
@@ -62,7 +61,7 @@ destroy_multi_logger ::proc(log : ^Logger) {
     log^ = nil_logger();
 }
 
-multi_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, 
+multi_logger_proc :: proc(logger_data: rawptr, level: Level, text: string,
                           options: Options, location := #caller_location) {
     data := cast(^Multi_Logger_Data)logger_data;
     if data.loggers == nil || len(data.loggers) == 0 do return;
