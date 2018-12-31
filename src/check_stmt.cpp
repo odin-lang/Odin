@@ -1835,6 +1835,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 								}
 							}
 						}
+
+						add_entity_use(ctx, nullptr, e);
 					} else {
 						// NOTE(bill): skip the rest to remove extra errors
 						error(token, "'using' can only be applied to variables of type struct or raw_union");
