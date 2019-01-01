@@ -15,6 +15,7 @@ Hinstance :: distinct Handle;
 Hicon     :: distinct Handle;
 Hcursor   :: distinct Handle;
 Hmenu     :: distinct Handle;
+Hbitmap   :: distinct Handle;
 Hbrush    :: distinct Handle;
 Hgdiobj   :: distinct Handle;
 Hmodule   :: distinct Handle;
@@ -28,6 +29,7 @@ Lresult   :: distinct int;
 Wnd_Proc  :: distinct #type proc "c" (Hwnd, u32, Wparam, Lparam) -> Lresult;
 Monitor_Enum_Proc :: distinct #type proc "std" (Hmonitor, Hdc, ^Rect, Lparam) -> bool;
 
+Uint_Ptr :: distinct uint;
 Long_Ptr :: distinct int;
 
 Bool :: distinct b32;
@@ -511,6 +513,7 @@ WM_SYSKEYDOWN        :: 0x0104;
 WM_SYSKEYUP          :: 0x0105;
 WM_USER              :: 0x0400;
 WM_WINDOWPOSCHANGED  :: 0x0047;
+WM_COMMAND           :: 0x0111;
 
 WM_MOUSEWHEEL    :: 0x020A;
 WM_MOUSEMOVE     :: 0x0200;
@@ -1033,6 +1036,134 @@ foreign user32 {
 
 	@(link_name="EnumDisplayMonitors") enum_display_monitors :: proc(hdc: Hdc,  rect: ^Rect, enum_proc: Monitor_Enum_Proc, lparam: Lparam) -> bool ---;
 }
+
+@(default_calling_convention = "c")
+foreign user32 {
+	@(link_name="CreateMenu")      create_menu   :: proc() -> Hmenu ---
+	@(link_name="CreatePopupMenu") create_popup_menu :: proc() -> Hmenu ---
+	@(link_name="DestroyMenu")     destroy_menu :: proc(menu: Hmenu) -> Bool ---
+	@(link_name="DeleteMenu")      delete_menu :: proc(menu: Hmenu, position: u32, flags: u32) -> Bool ---
+
+	@(link_name="EnableMenuItem")  enable_menu_item :: proc(menu: Hmenu, id_enable_itme: i32, enable: u32) -> Bool ---
+	@(link_name="EndMenu")         end_menu :: proc() -> Bool ---
+	@(link_name="GetMenu")         get_menu :: proc(wnd: Hwnd) -> Hmenu ---
+	@(link_name="GetMenuBarInfo")  get_menu_bar_info :: proc(wnd: Hwnd, id_object, id_item: u32, mbi: ^Menu_Bar_Info) -> Hmenu ---
+	@(link_name="GetMenuStringA")  get_menu_string_a :: proc(menu: Hmenu, id_item: u32, s: string,  cch_max: i32, flags: u32) -> i32 ---
+	@(link_name="GetMenuStringW")  get_menu_string_w :: proc(menu: Hmenu, id_item: u32, s: Wstring, cch_max: i32, flags: u32) -> i32 ---
+	@(link_name="GetMenuState")    get_menu_state :: proc(menu: Hmenu, id: u32, flags: u32) -> u32 ---
+	@(link_name="GetMenuItemRect") get_menu_item_rect :: proc(wnd: Hwnd, menu: Hmenu, id_item: u32, item: ^Rect) -> Bool ---
+
+	@(link_name="SetMenu")         set_menu :: proc(wnd: Hwnd, menu: Hmenu) -> Hmenu ---
+
+	@(link_name="DrawMenuBar")     draw_menu_bar :: proc(wnd: Hwnd) -> Bool ---
+	@(link_name="InsertMenuA")     insert_menu_a :: proc(menu: Hmenu, position: u32, flags: u32, id_new_item: Uint_Ptr, new_item: cstring) -> Bool ---
+	@(link_name="InsertMenuW")     insert_menu_w :: proc(menu: Hmenu, position: u32, flags: u32, id_new_item: Uint_Ptr, new_item: Wstring) -> Bool ---
+
+	@(link_name="InsertMenuItemA") insert_menu_item_a :: proc(menu: Hmenu, item: u32, by_position: bool, mi: ^Menu_Item_Info_A) -> Bool ---
+	@(link_name="InsertMenuItemW") insert_menu_item_w :: proc(menu: Hmenu, item: u32, by_position: bool, mi: ^Menu_Item_Info_W) -> Bool ---
+
+	@(link_name="AppendMenuA") append_menu_a :: proc(menu: Hmenu, flags: u32, id_new_item: Uint_Ptr, new_item: cstring) -> Bool ---
+	@(link_name="AppendMenuW") append_menu_w :: proc(menu: Hmenu, flags: u32, id_new_item: Uint_Ptr, new_item: Wstring) -> Bool ---
+
+	@(link_name="CheckMenuItem") check_menu_item :: proc(menu: Hmenu, id_check_item: u32, check: u32) -> u32 ---
+	@(link_name="CheckMenuRadioItem") check_menu_radio_item :: proc(menu: Hmenu, first, last: u32, check: u32, flags: u32) -> Bool ---
+
+	@(link_name="GetPropA") get_prop_a :: proc(wnd: Hwnd, s: cstring) -> Handle ---
+	@(link_name="GetPropW") get_prop_w :: proc(wnd: Hwnd, s: Wstring) -> Handle ---
+
+
+	@(link_name="MessageBoxExA") message_box_ex_a :: proc(wnd: Hwnd, text, caption: cstring, type: u32, language_id: u16) -> i32 ---
+	@(link_name="MessageBoxExW") message_box_ex_w :: proc(wnd: Hwnd, text, caption: Wstring, type: u32, language_id: u16) -> i32 ---
+}
+
+Menu_Bar_Info :: struct {
+	size: u32,
+	bar: Rect,
+	menu: Hmenu,
+	wnd_menu: Hwnd,
+	using fields: bit_field {
+		bar_focused: 1,
+		focuses:     1,
+	},
+}
+
+Menu_Item_Info_A :: struct {
+	size:          u32,
+	mask:          u32,
+	type:          u32,
+	state:         u32,
+	id:            u32,
+	submenu:       Hmenu,
+	bmp_checked:   Hbitmap,
+	bmp_unchecked: Hbitmap,
+	item_data:     u32,
+	type_data:     cstring,
+	cch:           u32,
+}
+Menu_Item_Info_W :: struct {
+	size:          u32,
+	mask:          u32,
+	type:          u32,
+	state:         u32,
+	id:            u32,
+	submenu:       Hmenu,
+	bmp_checked:   Hbitmap,
+	bmp_unchecked: Hbitmap,
+	item_data:     u32,
+	type_data:     Wstring,
+	cch:           u32,
+}
+
+MF_BYCOMMAND    :: 0x00000000;
+MF_BYPOSITION   :: 0x00000400;
+MF_BITMAP       :: 0x00000004;
+MF_CHECKED      :: 0x00000008;
+MF_DISABLED     :: 0x00000002;
+MF_ENABLED      :: 0x00000000;
+MF_GRAYED       :: 0x00000001;
+MF_MENUBARBREAK :: 0x00000020;
+MF_MENUBREAK    :: 0x00000040;
+MF_OWNERDRAW    :: 0x00000100;
+MF_POPUP        :: 0x00000010;
+MF_SEPARATOR    :: 0x00000800;
+MF_STRING       :: 0x00000000;
+MF_UNCHECKED    :: 0x00000000;
+
+MB_ABORTRETRYIGNORE     :: 0x00000002;
+MB_CANCELTRYCONTINUE    :: 0x00000006;
+MB_HELP                 :: 0x00004000;
+MB_OK                   :: 0x00000000;
+MB_OKCANCEL             :: 0x00000001;
+MB_RETRYCANCEL          :: 0x00000005;
+MB_YESNO                :: 0x00000004;
+MB_YESNOCANCEL          :: 0x00000003;
+
+MB_ICONEXCLAMATION      :: 0x00000030;
+MB_ICONWARNING          :: 0x00000030;
+MB_ICONINFORMATION      :: 0x00000040;
+MB_ICONASTERISK         :: 0x00000040;
+MB_ICONQUESTION         :: 0x00000020;
+MB_ICONSTOP             :: 0x00000010;
+MB_ICONERROR            :: 0x00000010;
+MB_ICONHAND             :: 0x00000010;
+
+MB_DEFBUTTON1           :: 0x00000000;
+MB_DEFBUTTON2           :: 0x00000100;
+MB_DEFBUTTON3           :: 0x00000200;
+MB_DEFBUTTON4           :: 0x00000300;
+
+MB_APPLMODAL            :: 0x00000000;
+MB_SYSTEMMODAL          :: 0x00001000;
+MB_TASKMODAL            :: 0x00002000;
+
+MB_DEFAULT_DESKTOP_ONLY :: 0x00020000;
+MB_RIGHT                :: 0x00080000;
+MB_RTLREADING           :: 0x00100000;
+MB_SETFOREGROUND        :: 0x00010000;
+MB_TOPMOST              :: 0x00040000;
+MB_SERVICE_NOTIFICATION :: 0x00200000;
+
+
 
 @(default_calling_convention = "std")
 foreign gdi32 {
