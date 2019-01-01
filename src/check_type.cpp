@@ -40,7 +40,7 @@ void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field
 			GB_ASSERT(f->kind == Entity_Variable);
 			String name = f->token.string;
 			Entity *e = scope_lookup_current(ctx->scope, name);
-			if (e != nullptr && name != "_") {
+			if (e != nullptr && name != "_" && e != f) {
 				// TODO(bill): Better type error
 				if (str != nullptr) {
 					error(e->token, "'%.*s' is already declared in '%s'", LIT(name), str);
@@ -59,7 +59,7 @@ void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field
 			Entity *f = t->BitField.fields[i];
 			String name = f->token.string;
 			Entity *e = scope_lookup_current(ctx->scope, name);
-			if (e != nullptr && name != "_") {
+			if (e != nullptr && name != "_" && e != f) {
 				// TODO(bill): Better type error
 				if (str != nullptr) {
 					error(e->token, "'%.*s' is already declared in '%s'", LIT(name), str);
