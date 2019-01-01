@@ -2967,7 +2967,7 @@ void ir_emit_defer_stmts(irProcedure *proc, irDeferExitKind kind, irBlock *block
 			ir_build_defer_stmt(proc, d);
 		} else if (kind == irDeferExit_Branch) {
 			GB_ASSERT(block != nullptr);
-			isize lower_limit = block->scope_index+1;
+			isize lower_limit = block->scope_index;
 			if (lower_limit < d.scope_index) {
 				ir_build_defer_stmt(proc, d);
 			}

@@ -523,7 +523,7 @@ fmt_write_padding :: proc(fi: ^Fmt_Info, width: int) {
 	pad_byte: byte = '0';
 	if fi.space do pad_byte = ' ';
 
-	for _ in 0..width-1 {
+	for i := 0; i < width; i += 1 {
 		write_byte(fi.buf, pad_byte);
 	}
 }
