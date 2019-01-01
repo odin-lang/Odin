@@ -22,9 +22,12 @@ The Odin programming language is fast, concise, readable, pragmatic and open sou
 * high performance
 * built for modern systems
 * joy of programming
-* metaprogramming
 
 Website: [https://odin.handmade.network/](https://odin.handmade.network/)
+
+## Documentation
+* [Tutorial](https://odin.handmade.network/wiki/3329-odin_tutorial)
+* [Frequently Asked Questions](https://github.com/odin-lang/Odin/wiki/Frequently-Asked-Questions-(FAQ))
 
 ```go
 package main
@@ -51,9 +54,6 @@ main :: proc() {
 }
 
 ```
-## Documentation
-* [Tutorial](https://odin.handmade.network/wiki/3329-odin_tutorial)
-* [Frequently Asked Questions](https://github.com/odin-lang/Odin/wiki/Frequently-Asked-Questions-(FAQ))
 
 ## Setup
 
