@@ -676,7 +676,7 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 			str[0] = ' ';
 		}
 
-		if len(str) > 1 && str[1] == 'N' && str[1] == 'I' {
+		if len(str) > 1 && (str[1] == 'N' || str[1] == 'I') {
 			write_string(fi.buf, str);
 			return;
 		}
