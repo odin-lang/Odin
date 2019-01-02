@@ -489,6 +489,10 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 		}
 	}
 
+	if ok {
+		new_arg_index += 1;
+	}
+
 	return num, new_arg_index, ok;
 }
 
