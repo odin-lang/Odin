@@ -1,6 +1,9 @@
 // +build windows
 package win32
 
+Uint_Ptr :: distinct uint;
+Long_Ptr :: distinct int;
+
 Handle    :: distinct rawptr;
 Hwnd      :: distinct Handle;
 Hdc       :: distinct Handle;
@@ -16,18 +19,17 @@ Hmonitor  :: distinct Handle;
 Hrawinput :: distinct Handle;
 Hresult   :: distinct i32;
 HKL       :: distinct Handle;
-Wparam    :: distinct uint;
-Lparam    :: distinct int;
-Lresult   :: distinct int;
+Wparam    :: distinct Uint_Ptr;
+Lparam    :: distinct Long_Ptr;
+Lresult   :: distinct Long_Ptr;
 Wnd_Proc  :: distinct #type proc "c" (Hwnd, u32, Wparam, Lparam) -> Lresult;
 Monitor_Enum_Proc :: distinct #type proc "std" (Hmonitor, Hdc, ^Rect, Lparam) -> bool;
 
-Uint_Ptr :: distinct uint;
-Long_Ptr :: distinct int;
+
 
 Bool :: distinct b32;
 
-Wstring :: ^u16;
+Wstring :: distinct ^u16;
 
 Point :: struct {
 	x, y: i32,
@@ -720,7 +722,7 @@ utf8_to_ucs2 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 
 	text := make([]u16, n+1, allocator);
 
-	n1 := multi_byte_to_wide_char(CP_UTF8, MB_ERR_INVALID_CHARS, cstring(&s[0]), i32(len(s)), &text[0], i32(n));
+	n1 := multi_byte_to_wide_char(CP_UTF8, MB_ERR_INVALID_CHARS, cstring(&s[0]), i32(len(s)), Wstring(&text[0]), i32(n));
 	if n1 == 0 {
 		delete(text, allocator);
 		return nil;
@@ -732,7 +734,7 @@ utf8_to_ucs2 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 }
 utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> Wstring {
 	if res := utf8_to_ucs2(s, allocator); res != nil {
-		return &res[0];
+		return Wstring(&res[0]);
 	}
 	return nil;
 }
@@ -742,14 +744,14 @@ ucs2_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
 		return "";
 	}
 
-	n := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, &s[0], i32(len(s)), nil, 0, nil, nil);
+	n := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, Wstring(&s[0]), i32(len(s)), nil, 0, nil, nil);
 	if n == 0 {
 		return "";
 	}
 
 	text := make([]byte, n+1, allocator);
 
-	n1 := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, &s[0], i32(len(s)), cstring(&text[0]), n, nil, nil);
+	n1 := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, Wstring(&s[0]), i32(len(s)), cstring(&text[0]), n, nil, nil);
 	if n1 == 0 {
 		delete(text, allocator);
 		return "";
