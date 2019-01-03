@@ -1338,6 +1338,9 @@ bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		break;
 
 	case Type_Map:
+		if (t->Map.key == nullptr || t->Map.value == nullptr) {
+			return false;
+		}
 		if (is_type_polymorphic(t->Map.key, or_specialized)) {
 			return true;
 		}
