@@ -1677,14 +1677,6 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Token name = expect_token(f, Token_Ident);
 		if (name.string == "type") {
 			return ast_helper_type(f, token, parse_type(f));
-		} else if (name.string == "run") {
-			Ast *expr = parse_expr(f, false);
-			operand = ast_run_expr(f, token, name, expr);
-			if (unparen_expr(expr)->kind != Ast_CallExpr) {
-				syntax_error(expr, "#run can only be applied to procedure calls");
-				operand = ast_bad_expr(f, token, f->curr_token);
-			}
-			warning(token, "#run is not yet implemented");
 		} /* else if (name.string == "no_deferred") {
 			operand = parse_expr(f, false);
 			if (unparen_expr(operand)->kind != Ast_CallExpr) {
