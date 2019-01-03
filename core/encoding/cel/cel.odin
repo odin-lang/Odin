@@ -205,7 +205,7 @@ unquote_char :: proc(s: string, quote: byte) -> (r: rune, multiple_bytes: bool, 
 	if s[0] == quote && quote == '"' {
 		return;
 	} else if s[0] >= 0x80 {
-		r, w := utf8.decode_rune_from_string(s);
+		r, w := utf8.decode_rune_in_string(s);
 		return r, true, s[w:], true;
 	} else if s[0] != '\\' {
 		return rune(s[0]), false, s[1:], true;
