@@ -6441,8 +6441,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 							args[i] = ir_value_nil(e->type);
 							break;
 						case ParameterValue_Location:
-							// args[i] =
-							GB_PANIC("TODO ParameterValue_Location");
+							args[i] = ir_emit_source_code_location(proc, proc->entity->token.string, ast_token(expr).pos);
 							break;
 						case ParameterValue_Value:
 							args[i] = ir_build_expr(proc, e->Variable.param_value.ast_value);

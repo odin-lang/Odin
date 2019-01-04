@@ -1888,17 +1888,19 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		TokenPos pos = e->token.pos;
 
 		irDebugInfo **lookup_di = map_get(&m->debug_info, hash_entity(e));
-		GB_ASSERT_NOT_NULL(*lookup_di);
-		irDebugInfo* local_var_di = *lookup_di;
+		if (lookup_di != nullptr) {
+			GB_ASSERT_NOT_NULL(*lookup_di);
+			irDebugInfo* local_var_di = *lookup_di;
 
-		ir_write_str_lit(f, "call void @llvm.dbg.declare(");
-		ir_write_str_lit(f, "metadata ");
-		ir_print_type(f, m, vt);
-		ir_write_byte(f, ' ');
-		ir_print_value(f, m, dd->value, vt);
-		ir_fprintf(f, ", metadata !%d", local_var_di->id);
-		ir_write_str_lit(f, ", metadata !DIExpression())");
-		ir_print_debug_location(f, m, value);
+			ir_write_str_lit(f, "call void @llvm.dbg.declare(");
+			ir_write_str_lit(f, "metadata ");
+			ir_print_type(f, m, vt);
+			ir_write_byte(f, ' ');
+			ir_print_value(f, m, dd->value, vt);
+			ir_fprintf(f, ", metadata !%d", local_var_di->id);
+			ir_write_str_lit(f, ", metadata !DIExpression())");
+			ir_print_debug_location(f, m, value);
+		}
 		break;
 	}
 	}
