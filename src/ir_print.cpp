@@ -1127,7 +1127,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, type);
 		ir_write_str_lit(f, "* ");
 		ir_print_value(f, m, instr->Load.address, type);
-		// ir_fprintf(f, ", align %lld", type_align_of(type));
+		ir_fprintf(f, ", align %lld", type_align_of(type));
 		ir_print_debug_location(f, m, value);
 		break;
 	}
