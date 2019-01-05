@@ -4567,6 +4567,12 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	if (is_type_u8_ptr(src) && is_type_cstring(dst)) {
 		return ir_emit_bitcast(proc, value, dst);
 	}
+	if (is_type_cstring(src) && is_type_rawptr(dst)) {
+		return ir_emit_bitcast(proc, value, dst);
+	}
+	if (is_type_rawptr(src) && is_type_cstring(dst)) {
+		return ir_emit_bitcast(proc, value, dst);
+	}
 
 	if (are_types_identical(src, t_cstring) && are_types_identical(dst, t_string)) {
 		irValue *c = ir_emit_conv(proc, value, t_cstring);
@@ -4842,7 +4848,7 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 	if (is_type_integer(src) && (is_type_pointer(dst) || is_type_cstring(dst))) {
 		Type *vt = core_type(ir_type(value));
 		return ir_emit(proc, ir_instr_conv(proc, irConv_inttoptr, value, vt, t));
-	}else if ((is_type_pointer(src) || is_type_cstring(src)) && is_type_integer(dst)) {
+	} else if ((is_type_pointer(src) || is_type_cstring(src)) && is_type_integer(dst)) {
 		Type *vt = core_type(ir_type(value));
 		return ir_emit(proc, ir_instr_conv(proc, irConv_ptrtoint, value, vt, t));
 	}
@@ -5014,7 +5020,7 @@ isize ir_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=tr
 		}
 	}
 	if (err_on_not_found) {
-		GB_PANIC("NOT FOUND ir_type_info_index %s", type_to_string(type));
+		GB_PANIC("NOT FOUND ir_type_info_index %s @ index %td", type_to_string(type), index);
 	}
 	return -1;
 }
