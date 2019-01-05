@@ -182,6 +182,7 @@ foreign user32 {
     @(link_name="DestroyIcon")      destroy_icon        :: proc(icon: Hicon) -> Bool ---;
 
     @(link_name="LoadCursorA")      load_cursor_a       :: proc(instance: Hinstance, cursor_name: cstring) -> Hcursor ---;
+    @(link_name="LoadCursorW")      load_cursor_w       :: proc(instance: Hinstance, cursor_name: cstring) -> Hcursor ---;
 	@(link_name="GetCursor")        get_cursor          :: proc() -> Hcursor ---;
 	@(link_name="SetCursor")        set_cursor          :: proc(cursor: Hcursor) -> Hcursor ---;
 
@@ -233,3 +234,37 @@ foreign user32 {
 	@(link_name="MessageBoxExA") message_box_ex_a :: proc(wnd: Hwnd, text, caption: cstring, type: u32, language_id: u16) -> i32 ---
 	@(link_name="MessageBoxExW") message_box_ex_w :: proc(wnd: Hwnd, text, caption: Wstring, type: u32, language_id: u16) -> i32 ---
 }
+
+
+_IDC_APPSTARTING := rawptr(uintptr(32650));
+_IDC_ARROW       := rawptr(uintptr(32512));
+_IDC_CROSS       := rawptr(uintptr(32515));
+_IDC_HAND        := rawptr(uintptr(32649));
+_IDC_HELP        := rawptr(uintptr(32651));
+_IDC_IBEAM       := rawptr(uintptr(32513));
+_IDC_ICON        := rawptr(uintptr(32641));
+_IDC_NO          := rawptr(uintptr(32648));
+_IDC_SIZE        := rawptr(uintptr(32640));
+_IDC_SIZEALL     := rawptr(uintptr(32646));
+_IDC_SIZENESW    := rawptr(uintptr(32643));
+_IDC_SIZENS      := rawptr(uintptr(32645));
+_IDC_SIZENWSE    := rawptr(uintptr(32642));
+_IDC_SIZEWE      := rawptr(uintptr(32644));
+_IDC_UPARROW     := rawptr(uintptr(32516));
+_IDC_WAIT        := rawptr(uintptr(32514));
+IDC_APPSTARTING := cstring(_IDC_APPSTARTING);
+IDC_ARROW       := cstring(_IDC_ARROW);
+IDC_CROSS       := cstring(_IDC_CROSS);
+IDC_HAND        := cstring(_IDC_HAND);
+IDC_HELP        := cstring(_IDC_HELP);
+IDC_IBEAM       := cstring(_IDC_IBEAM);
+IDC_ICON        := cstring(_IDC_ICON);
+IDC_NO          := cstring(_IDC_NO);
+IDC_SIZE        := cstring(_IDC_SIZE);
+IDC_SIZEALL     := cstring(_IDC_SIZEALL);
+IDC_SIZENESW    := cstring(_IDC_SIZENESW);
+IDC_SIZENS      := cstring(_IDC_SIZENS);
+IDC_SIZENWSE    := cstring(_IDC_SIZENWSE);
+IDC_SIZEWE      := cstring(_IDC_SIZEWE);
+IDC_UPARROW     := cstring(_IDC_UPARROW);
+IDC_WAIT        := cstring(_IDC_WAIT);
