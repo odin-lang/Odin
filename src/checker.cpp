@@ -1143,6 +1143,8 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 	add_type_info_type(c, bt);
 
 	switch (bt->kind) {
+	case Type_Invalid:
+		break;
 	case Type_Basic:
 		switch (bt->Basic.kind) {
 		case Basic_string:
@@ -1194,6 +1196,7 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 
 	case Type_BitSet:
 		add_type_info_type(c, bt->BitSet.elem);
+		add_type_info_type(c, bt->BitSet.underlying);
 		break;
 
 	case Type_Opaque:
@@ -1238,6 +1241,10 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 	case Type_Proc:
 		add_type_info_type(c, bt->Proc.params);
 		add_type_info_type(c, bt->Proc.results);
+		break;
+
+	default:
+		GB_PANIC("Unhandled type: %*.s", LIT(type_strings[bt->kind]));
 		break;
 	}
 }
@@ -1304,6 +1311,8 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 	add_min_dep_type_info(c, bt);
 
 	switch (bt->kind) {
+	case Type_Invalid:
+		break;
 	case Type_Basic:
 		switch (bt->Basic.kind) {
 		case Basic_string:
@@ -1311,8 +1320,8 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 			add_min_dep_type_info(c, t_int);
 			break;
 		case Basic_any:
-			add_min_dep_type_info(c, t_type_info_ptr);
 			add_min_dep_type_info(c, t_rawptr);
+			add_min_dep_type_info(c, t_typeid);
 			break;
 
 		case Basic_complex64:
@@ -1324,6 +1333,15 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 			add_min_dep_type_info(c, t_f64);
 			break;
 		}
+		break;
+
+	case Type_Opaque:
+		add_min_dep_type_info(c, bt->Opaque.elem);
+		break;
+
+	case Type_BitSet:
+		add_min_dep_type_info(c, bt->BitSet.elem);
+		add_min_dep_type_info(c, bt->BitSet.underlying);
 		break;
 
 	case Type_Pointer:
@@ -1389,6 +1407,10 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 	case Type_Proc:
 		add_min_dep_type_info(c, bt->Proc.params);
 		add_min_dep_type_info(c, bt->Proc.results);
+		break;
+
+	default:
+		GB_PANIC("Unhandled type: %*.s", LIT(type_strings[bt->kind]));
 		break;
 	}
 }
@@ -3518,6 +3540,12 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("generate minimum dependency set");
 	generate_minimum_dependency_set(c, c->info.entry_point);
+	for_array(i, c->info.minimum_dependency_set.entries) {
+		Entity *e = c->info.minimum_dependency_set.entries[i].ptr;
+		if (is_type_bit_set(e->type)) {
+			gb_printf("%.*s\n", LIT(e->token.string));
+		}
+	}
 
 
 	TIME_SECTION("calculate global init order");
