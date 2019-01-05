@@ -34,6 +34,7 @@ Fmt_Info :: struct {
 	arg: any, // Temporary
 }
 
+
 string_buffer_from_slice :: proc(backing: []byte) -> String_Buffer {
 	s := transmute(mem.Raw_Slice)backing;
 	d := mem.Raw_Dynamic_Array{
@@ -1279,6 +1280,20 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 		}
 		write_type(fi.buf, ti);
 		return;
+	}
+
+
+	custom_types: switch a in arg {
+	case runtime.Source_Code_Location:
+		if fi.hash && verb == 'v' {
+			write_string(fi.buf, a.file_path);
+			write_byte(fi.buf, '(');
+			write_i64(fi.buf, i64(a.line), 10);
+			write_byte(fi.buf, ':');
+			write_i64(fi.buf, i64(a.column), 10);
+			write_byte(fi.buf, ')');
+			return;
+		}
 	}
 
 	base_arg := arg;

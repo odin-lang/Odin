@@ -433,6 +433,7 @@ struct irValueSourceCodeLocation {
 	irValue *line;
 	irValue *column;
 	irValue *procedure;
+	u64      hash;
 };
 
 
@@ -3084,6 +3085,9 @@ irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 	key = ir_emit_conv(proc, key, key_type);
 	if (is_type_integer(t)) {
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, key, hash_type));
+	} else if (is_type_typeid(t)) {
+		irValue *i = ir_emit_bitcast(proc, key, t_uint);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, i, hash_type));
 	} else if (is_type_pointer(t)) {
 		irValue *p = ir_emit_conv(proc, key, t_uintptr);
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, p, hash_type));
@@ -5554,6 +5558,16 @@ bool is_double_pointer(Type *t) {
 }
 
 
+u64 ir_generate_source_code_location_hash(TokenPos pos) {
+	u64 h = 0xcbf29ce484222325;
+	for (isize i = 0; i < pos.file.len; i++) {
+		h = (h ^ u64(pos.file[i])) * 0x100000001b3;
+	}
+	h = h ^ (u64(pos.line) * 0x100000001b3);
+	h = h ^ (u64(pos.column) * 0x100000001b3);
+	return h;
+}
+
 irValue *ir_emit_source_code_location(irProcedure *proc, String procedure, TokenPos pos) {
 	gbAllocator a = ir_allocator();
 	irValue *v = ir_alloc_value(irValue_SourceCodeLocation);
@@ -5561,6 +5575,7 @@ irValue *ir_emit_source_code_location(irProcedure *proc, String procedure, Token
 	v->SourceCodeLocation.line      = ir_const_int(pos.line);
 	v->SourceCodeLocation.column    = ir_const_int(pos.column);
 	v->SourceCodeLocation.procedure = ir_find_or_add_entity_string(proc->module, procedure);
+	v->SourceCodeLocation.hash      = ir_generate_source_code_location_hash(pos);
 	return v;
 }
 

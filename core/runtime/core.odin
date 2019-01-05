@@ -196,6 +196,7 @@ Source_Code_Location :: struct {
 	file_path:    string,
 	line, column: int,
 	procedure:    string,
+	hash:         u64,
 }
 
 Assertion_Failure_Proc :: #type proc(prefix, message: string, loc: Source_Code_Location);
@@ -249,8 +250,6 @@ Map_Header :: struct {
 	value_offset:  uintptr,
 	value_size:    int,
 }
-
-
 
 
 
@@ -840,6 +839,23 @@ default_hash :: proc(data: []byte) -> u64 {
 	return fnv64a(data);
 }
 default_hash_string :: proc(s: string) -> u64 do return default_hash(([]byte)(s));
+
+
+source_code_location_hash :: proc(s: Source_Code_Location) -> u64 {
+	fnv64a :: proc(data: []byte, seed: u64 = 0xcbf29ce484222325) -> u64 {
+		h: u64 = seed;
+		for b in data {
+			h = (h ~ u64(b)) * 0x100000001b3;
+		}
+		return h;
+	}
+	hash := fnv64a(cast([]byte)s.file_path);
+	hash = hash ~ (u64(s.line) * 0x100000001b3);
+	hash = hash ~ (u64(s.column) * 0x100000001b3);
+	return hash;
+}
+
+
 
 
 __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: mem.Allocator, loc := #caller_location) -> bool {
