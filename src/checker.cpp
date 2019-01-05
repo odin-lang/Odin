@@ -3550,13 +3550,6 @@ void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("generate minimum dependency set");
 	generate_minimum_dependency_set(c, c->info.entry_point);
-	for_array(i, c->info.minimum_dependency_set.entries) {
-		Entity *e = c->info.minimum_dependency_set.entries[i].ptr;
-		if (is_type_bit_set(e->type)) {
-			gb_printf("%.*s\n", LIT(e->token.string));
-		}
-	}
-
 
 	TIME_SECTION("calculate global init order");
 	// Calculate initialization order of global variables
