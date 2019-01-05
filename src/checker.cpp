@@ -1199,6 +1199,11 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		add_type_info_type(c, bt->BitSet.underlying);
 		break;
 
+	case Type_BitFieldValue:
+		break;
+	case Type_BitField:
+		break;
+
 	case Type_Opaque:
 		add_type_info_type(c, bt->Opaque.elem);
 		break;
@@ -1244,7 +1249,7 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		break;
 
 	default:
-		GB_PANIC("Unhandled type: %*.s", LIT(type_strings[bt->kind]));
+		GB_PANIC("Unhandled type: %*.s %d", LIT(type_strings[bt->kind]), bt->kind);
 		break;
 	}
 }
@@ -1388,6 +1393,11 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 			Entity *f = bt->Struct.fields[i];
 			add_min_dep_type_info(c, f->type);
 		}
+		break;
+
+	case Type_BitFieldValue:
+		break;
+	case Type_BitField:
 		break;
 
 	case Type_Map:
