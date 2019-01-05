@@ -1151,6 +1151,9 @@ bool is_type_valid_for_keys(Type *t) {
 	if (is_type_pointer(t)) {
 		return true;
 	}
+	if (is_type_typeid(t)) {
+		return true;
+	}
 
 	return false;
 }
