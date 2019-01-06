@@ -2,6 +2,11 @@ package json
 
 import "core:strconv"
 
+Specification :: enum {
+	JSON,
+	JSON5,
+}
+
 Null    :: distinct rawptr;
 Integer :: i64;
 Float   :: f64;
