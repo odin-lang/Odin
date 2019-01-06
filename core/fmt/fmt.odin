@@ -864,8 +864,6 @@ fmt_bit_field :: proc(fi: ^Info, v: any, bit_field_name: string = "") {
 
 		}
 		strings.write_byte(fi.buf, '}');
-	case:
-		strings.write_string(fi.buf, "HERE");
 	}
 }
 
@@ -1276,6 +1274,12 @@ write_type :: proc(buf: ^strings.Builder, ti: ^runtime.Type_Info) {
 		case:
 			write_byte(buf, info.signed ? 'i' : 'u');
 			write_i64(buf, i64(8*ti.size), 10);
+			switch info.endianness {
+			case runtime.Type_Info_Endianness.Little:
+				write_string(buf, "le");
+			case runtime.Type_Info_Endianness.Big:
+				write_string(buf, "be");
+			}
 		}
 	case runtime.Type_Info_Rune:
 		write_string(buf, "rune");
