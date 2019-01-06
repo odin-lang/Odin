@@ -61,6 +61,31 @@ write_bytes :: proc(b: ^Builder, x: []byte) {
 	append(&b.buf, ..x);
 }
 
+@(private)
+static DIGITS_LOWER := "0123456789abcdefx";
+
+write_quoted_string :: proc(b: ^Builder, s: string, quote: byte = '"') {
+	write_byte(b, quote);
+	for width := 0; len(s) > 0; s = s[width:] {
+		r := rune(s[0]);
+		width = 1;
+		if r >= utf8.RUNE_SELF {
+			r, width = utf8.decode_rune_in_string(s);
+		}
+		if width == 1 && r == utf8.RUNE_ERROR {
+			write_byte(b, '\\');
+			write_byte(b, 'x');
+			write_byte(b, DIGITS_LOWER[s[0]>>4]);
+			write_byte(b, DIGITS_LOWER[s[0]&0xf]);
+			continue;
+		}
+
+		write_escaped_rune(b, r, quote);
+
+	}
+	write_byte(b, quote);
+}
+
 
 write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) {
 	if write_quote do write_byte(b, '\'');
@@ -93,8 +118,6 @@ write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) {
 
 
 write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte) {
-	static DIGITS_LOWER := "0123456789abcdefx";
-
 	is_printable :: proc(r: rune) -> bool {
 		if r <= 0xff {
 			switch r {
