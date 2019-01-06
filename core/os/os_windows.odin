@@ -61,6 +61,10 @@ ERROR_FILE_IS_PIPE:           Errno : 1<<29 + 0;
 args := _alloc_command_line_arguments();
 
 
+is_path_separator :: proc(r: rune) -> bool {
+	return r == '/' || r == '\\';
+}
+
 open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) {
 	if len(path) == 0 do return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
 

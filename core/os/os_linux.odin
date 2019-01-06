@@ -203,6 +203,10 @@ foreign dl {
 	@(link_name="dlerror")          _unix_dlerror       :: proc() -> cstring ---;
 }
 
+is_path_separator :: proc(r: rune) -> bool {
+	return r == '/';
+}
+
 get_last_error :: proc() -> int {
 	return __errno_location()^;
 }

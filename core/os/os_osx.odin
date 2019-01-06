@@ -215,6 +215,10 @@ last_write_time :: proc(fd: Handle) -> File_Time {}
 last_write_time_by_name :: proc(name: string) -> File_Time {}
 */
 
+is_path_separator :: proc(r: rune) -> bool {
+	return r == '/';
+}
+
 stat :: inline proc(path: string) -> (Stat, bool) {
 	s: Stat;
 	cstr := strings.new_cstring(path);

@@ -1,6 +1,7 @@
 package log
 
 import "core:fmt";
+import "core:strings";
 import "core:os";
 import "core:time";
 
@@ -13,18 +14,18 @@ Level_Headers := []string{
 };
 
 Default_Console_Logger_Opts :: Options{
-    Option.Level, 
+    Option.Level,
     Option.Terminal_Color,
     Option.Short_File_Path,
-    Option.Line, 
-    Option.Procedure, 
+    Option.Line,
+    Option.Procedure,
 } | Full_Timestamp_Opts;
 
 Default_File_Logger_Opts :: Options{
-    Option.Level, 
+    Option.Level,
     Option.Short_File_Path,
-    Option.Line, 
-    Option.Procedure, 
+    Option.Line,
+    Option.Procedure,
 } | Full_Timestamp_Opts;
 
 
@@ -48,7 +49,7 @@ destroy_file_logger ::proc(log : ^Logger) {
     free(data);
     log^ = nil_logger();
 }
- 
+
 create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logger_Opts, ident := "") -> Logger {
     data := new(File_Console_Logger_Data);
     data.lowest_level = lowest;
@@ -70,14 +71,14 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
     if(data.file_handle != os.INVALID_HANDLE) do h = data.file_handle;
     else                                      do h = level <= Level.Error ? os.stdout : os.stderr;
     backing: [1024]byte; //NOTE(Hoej): 1024 might be too much for a header backing, unless somebody has really long paths.
-    buf := fmt.string_buffer_from_slice(backing[:]);
-    
+    buf := strings.builder_from_slice(backing[:]);
+
     do_level_header(options, level, &buf);
 
     when time.IS_SUPPORTED {
         if Full_Timestamp_Opts & options != nil {
             fmt.sbprint(&buf, "[");
-            t := time.now(); 
+            t := time.now();
             y, m, d := time.date(t);
             h, min, s := time.clock(t);
             if Option.Date in options do fmt.sbprintf(&buf, "%d-%02d-%02d ", y, m, d);
@@ -90,10 +91,10 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 
     if data.ident != "" do fmt.sbprintf(&buf, "[%s] ", data.ident);
     //TODO(Hoej): When we have better atomics and such, make this thread-safe
-    fmt.fprintf(h, "%s %s\n", fmt.to_string(buf), text); 
+    fmt.fprintf(h, "%s %s\n", strings.to_string(buf), text);
 }
 
-do_level_header :: proc(opts : Options, level : Level, buf : ^fmt.String_Buffer) {
+do_level_header :: proc(opts : Options, level : Level, str : ^strings.Builder) {
 
     RESET     :: "\x1b[0m";
     RED       :: "\x1b[31m";
@@ -109,18 +110,18 @@ do_level_header :: proc(opts : Options, level : Level, buf : ^fmt.String_Buffer)
     }
 
     if Option.Level in opts {
-        if Option.Terminal_Color in opts do fmt.sbprint(buf, col);
-        fmt.sbprint(buf, Level_Headers[level]);
-        if Option.Terminal_Color in opts do fmt.sbprint(buf, RESET);
+        if Option.Terminal_Color in opts do fmt.sbprint(str, col);
+        fmt.sbprint(str, Level_Headers[level]);
+        if Option.Terminal_Color in opts do fmt.sbprint(str, RESET);
     }
 }
 
-do_location_header :: proc(opts : Options, buf : ^fmt.String_Buffer, location := #caller_location) {
+do_location_header :: proc(opts : Options, buf : ^strings.Builder, location := #caller_location) {
     if Location_Header_Opts & opts != nil do fmt.sbprint(buf, "["); else do return;
 
     file := location.file_path;
     if Option.Short_File_Path in opts {
-        when os.OS == "windows" do delimiter := '\\'; else do delimiter := '/'; 
+        when os.OS == "windows" do delimiter := '\\'; else do delimiter := '/';
         last := 0;
         for r, i in location.file_path do if r == delimiter do last = i+1;
         file = location.file_path[last:];
