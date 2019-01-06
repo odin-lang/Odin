@@ -7,20 +7,27 @@ import "core:strconv"
 Parser :: struct {
 	tok:        Tokenizer,
 	curr_token: Token,
+	spec:       Specification,
 	allocator:  mem.Allocator,
 }
 
-make_parser :: proc(data: string, allocator := context.allocator) -> Parser {
+make_parser :: proc(data: string, spec := Specification.JSON, allocator := context.allocator) -> Parser {
 	p: Parser;
-	p.tok = make_tokenizer(data);
+	p.tok = make_tokenizer(data, spec);
+	p.spec = spec;
 	p.allocator = allocator;
 	assert(p.allocator.procedure != nil);
 	advance_token(&p);
 	return p;
 }
 
-parse :: proc(data: string, allocator := context.allocator) -> (Value, Error) {
-	p := make_parser(data, allocator);
+parse :: proc(data: string, spec := Specification.JSON, allocator := context.allocator) -> (Value, Error) {
+	context.allocator = allocator;
+	p := make_parser(data, spec, allocator);
+
+	if p.spec == Specification.JSON5 {
+		return parse_value(&p);
+	}
 	return parse_object(&p);
 }
 
@@ -77,7 +84,7 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		advance_token(p);
 		return;
 	case Kind.String:
-		value.value = String(unquote_string(token, p.allocator));
+		value.value = String(unquote_string(token, p.spec, p.allocator));
 		advance_token(p);
 		return;
 
@@ -132,6 +139,34 @@ parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	return;
 }
 
+clone_string :: proc(s: string, allocator: mem.Allocator) -> string {
+	n := len(s);
+	b := make([]byte, n+1, allocator);
+	copy(b, cast([]byte)s);
+	b[n] = 0;
+	return string(b[:n]);
+}
+
+parse_object_key :: proc(p: ^Parser) -> (key: string, err: Error) {
+	tok := p.curr_token;
+	if p.spec == Specification.JSON5 {
+		if tok.kind == Kind.String {
+			expect_token(p, Kind.String);
+			key = unquote_string(tok, p.spec, p.allocator);
+			return;
+		} else if tok.kind == Kind.Ident {
+			expect_token(p, Kind.Ident);
+			key = clone_string(tok.text, p.allocator);
+			return;
+		}
+	}
+	if tok_err := expect_token(p, Kind.String); tok_err != Error.None {
+		err = Error.Expected_String_For_Object_Key;
+		return;
+	}
+	key = unquote_string(tok, p.spec, p.allocator);
+	return;
+}
 
 parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	value.pos = p.curr_token.pos;
@@ -144,20 +179,20 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	obj.allocator = p.allocator;
 	defer if err != Error.None {
 		for key, elem in obj {
-			delete(key);
+			delete(key, p.allocator);
 			destroy_value(elem);
 		}
 		delete(obj);
 	}
 
 	for p.curr_token.kind != Kind.Close_Brace {
-		tok := p.curr_token;
-		if tok_err := expect_token(p, Kind.String); tok_err != Error.None {
-			err = Error.Expected_String_For_Object_Key;
+		key: string;
+		key, err = parse_object_key(p);
+		if err != Error.None {
+			delete(key, p.allocator);
 			value.pos = p.curr_token.pos;
 			return;
 		}
-		key := unquote_string(tok, p.allocator);
 
 		if colon_err := expect_token(p, Kind.Colon); colon_err != Error.None {
 			err = Error.Expected_Colon_After_Key;
@@ -175,17 +210,24 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		if key in obj {
 			err = Error.Duplicate_Object_Key;
 			value.pos = p.curr_token.pos;
-			delete(key);
+			delete(key, p.allocator);
 			return;
 		}
 
 		obj[key] = elem;
 
-		// Disallow trailing commas for the time being
-		if allow_token(p, Kind.Comma) {
-			continue;
+		if p.spec == Specification.JSON5 {
+			// Allow trailing commas
+			if allow_token(p, Kind.Comma) {
+				continue;
+			}
 		} else {
-			break;
+			// Disallow trailing commas
+			if allow_token(p, Kind.Comma) {
+				continue;
+			} else {
+				break;
+			}
 		}
 	}
 
@@ -200,7 +242,25 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 
 
 // IMPORTANT NOTE(bill): unquote_string assumes a mostly valid string
-unquote_string :: proc(token: Token, allocator := context.allocator) -> string {
+unquote_string :: proc(token: Token, spec: Specification, allocator := context.allocator) -> string {
+	get_u2_rune :: proc(s: string) -> rune {
+		if len(s) < 4 || s[0] != '\\' || s[1] != 'x' {
+			return -1;
+		}
+
+		r: rune;
+		for c in s[2:4] {
+			x: rune;
+			switch c {
+			case '0'..'9': x = c - '0';
+			case 'a'..'f': x = c - 'a' + 10;
+			case 'A'..'F': x = c - 'A' + 10;
+			case: return -1;
+			}
+			r = r*16 + x;
+		}
+		return r;
+	}
 	get_u4_rune :: proc(s: string) -> rune {
 		if len(s) < 6 || s[0] != '\\' || s[1] != 'u' {
 			return -1;
@@ -227,12 +287,17 @@ unquote_string :: proc(token: Token, allocator := context.allocator) -> string {
 	if len(s) <= 2 {
 		return "";
 	}
+	quote := s[0];
+	if s[0] != s[len(s)-1] {
+		// Invalid string
+		return "";
+	}
 	s = s[1:len(s)-1];
 
 	i := 0;
 	for i < len(s) {
 		c := s[i];
-		if c == '\\' || c == '"' || c < ' ' {
+		if c == '\\' || c == quote || c < ' ' {
 			break;
 		}
 		if c < utf8.RUNE_SELF {
@@ -246,9 +311,7 @@ unquote_string :: proc(token: Token, allocator := context.allocator) -> string {
 		i += w;
 	}
 	if i == len(s) {
-		b := make([]byte, len(s), allocator);
-		copy(b, cast([]byte)s);
-		return string(b);
+		return clone_string(s, allocator);
 	}
 
 	b := make([]byte, len(s) + 2*utf8.UTF_MAX, allocator);
@@ -299,9 +362,43 @@ unquote_string :: proc(token: Token, allocator := context.allocator) -> string {
 				buf, buf_width := utf8.encode_rune(r);
 				copy(b[w:], buf[:buf_width]);
 				w += buf_width;
+
+
+			case '0':
+				if spec == Specification.JSON5 {
+					b[w] = '\x00';
+					i += 1;
+					w += 1;
+				} else {
+					break loop;
+				}
+			case 'v':
+				if spec == Specification.JSON5 {
+					b[w] = '\v';
+					i += 1;
+					w += 1;
+				} else {
+					break loop;
+				}
+
+			case 'x':
+				if spec == Specification.JSON5 {
+					i -= 1; // Include the \x in the check for sanity sake
+					r := get_u2_rune(s[i:]);
+					if r < 0 {
+						break loop;
+					}
+					i += 4;
+
+					buf, buf_width := utf8.encode_rune(r);
+					copy(b[w:], buf[:buf_width]);
+					w += buf_width;
+				} else {
+					break loop;
+				}
 			}
 
-		case c == '"', c < ' ':
+		case c == quote, c < ' ':
 			break loop;
 
 		case c < utf8.RUNE_SELF:
