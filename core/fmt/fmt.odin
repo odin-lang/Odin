@@ -593,10 +593,34 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		fmt_bad_verb(fi, verb);
 	}
 }
+
+
 fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 	switch verb {
 	case 's', 'v':
 		strings.write_string(fi.buf, s);
+
+	case 'q': // quoted string
+		quote: byte = '"';
+		strings.write_byte(fi.buf, quote);
+		for width := 0; len(s) > 0; s = s[width:] {
+			r := rune(s[0]);
+			width = 1;
+			if r >= utf8.RUNE_SELF {
+				r, width = utf8.decode_rune_in_string(s);
+			}
+			if width == 1 && r == utf8.RUNE_ERROR {
+				strings.write_byte(fi.buf, '\\');
+				strings.write_byte(fi.buf, 'x');
+				strings.write_byte(fi.buf, __DIGITS_LOWER[s[0]>>4]);
+				strings.write_byte(fi.buf, __DIGITS_LOWER[s[0]&0xf]);
+				continue;
+			}
+
+			strings.write_escaped_rune(fi.buf, r, quote);
+
+		}
+		strings.write_byte(fi.buf, quote);
 
 	case 'x', 'X':
 		space := fi.space;

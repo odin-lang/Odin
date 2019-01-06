@@ -62,25 +62,25 @@ write_bytes :: proc(b: ^Builder, x: []byte) {
 }
 
 
-write_encoded_rune :: proc(b: ^Builder, r: rune) {
-	write_byte(b, '\'');
+write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) {
+	if write_quote do write_byte(b, '\'');
 	switch r {
-	case '\a': write_string(b, "\\a");
-	case '\b': write_string(b, "\\b");
-	case '\e': write_string(b, "\\e");
-	case '\f': write_string(b, "\\f");
-	case '\n': write_string(b, "\\n");
-	case '\r': write_string(b, "\\r");
-	case '\t': write_string(b, "\\t");
-	case '\v': write_string(b, "\\v");
+	case '\a': write_string(b, `\a"`);
+	case '\b': write_string(b, `\b"`);
+	case '\e': write_string(b, `\e"`);
+	case '\f': write_string(b, `\f"`);
+	case '\n': write_string(b, `\n"`);
+	case '\r': write_string(b, `\r"`);
+	case '\t': write_string(b, `\t"`);
+	case '\v': write_string(b, `\v"`);
 	case:
 		if r < 32 {
-			write_string(b, "\\x");
+			write_string(b, `\x`);
 			buf: [2]byte;
 			s := strconv.append_bits(buf[:], u64(r), 16, true, 64, strconv.digits, nil);
 			switch len(s) {
 			case 0: write_string(b, "00");
-			case 1: write_rune(b, '0');
+			case 1: write_byte(b, '0');
 			case 2: write_string(b, s);
 			}
 		} else {
@@ -88,7 +88,69 @@ write_encoded_rune :: proc(b: ^Builder, r: rune) {
 		}
 
 	}
-	write_byte(b, '\'');
+	if write_quote do write_byte(b, '\'');
+}
+
+
+write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte) {
+	static DIGITS_LOWER := "0123456789abcdefx";
+
+	is_printable :: proc(r: rune) -> bool {
+		if r <= 0xff {
+			switch r {
+			case 0x20..0x7e:
+				return true;
+			case 0xa1..0xff: // ¡ through ÿ except for the soft hyphen
+				return r != 0xad; //
+			}
+		}
+
+		// TODO(bill): A proper unicode library will be needed!
+		return false;
+	}
+
+	if r == rune(quote) || r == '\\' {
+		write_byte(b, '\\');
+		write_byte(b, byte(r));
+		return;
+	} else if is_printable(r) {
+		write_encoded_rune(b, r, false);
+		return;
+	}
+	switch r {
+	case '\a': write_string(b, `\a`);
+	case '\b': write_string(b, `\b`);
+	case '\e': write_string(b, `\e`);
+	case '\f': write_string(b, `\f`);
+	case '\n': write_string(b, `\n`);
+	case '\r': write_string(b, `\r`);
+	case '\t': write_string(b, `\t`);
+	case '\v': write_string(b, `\v`);
+	case:
+		switch {
+		case r < ' ':
+			write_byte(b, '\\');
+			write_byte(b, 'x');
+			write_byte(b, DIGITS_LOWER[byte(r)>>4]);
+			write_byte(b, DIGITS_LOWER[byte(r)&0xf]);
+
+		case r > utf8.MAX_RUNE:
+			r = 0xfffd;
+			fallthrough;
+		case r < 0x10000:
+			write_byte(b, '\\');
+			write_byte(b, 'u');
+			for s := 12; s >= 0; s -= 4 {
+				write_byte(b, DIGITS_LOWER[r>>uint(s) & 0xf]);
+			}
+		case:
+			write_byte(b, '\\');
+			write_byte(b, 'U');
+			for s := 28; s >= 0; s -= 4 {
+				write_byte(b, DIGITS_LOWER[r>>uint(s) & 0xf]);
+			}
+		}
+	}
 }
 
 
