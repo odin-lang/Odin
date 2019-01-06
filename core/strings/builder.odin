@@ -117,7 +117,7 @@ write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) {
 }
 
 
-write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte) {
+write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false) {
 	is_printable :: proc(r: rune) -> bool {
 		if r <= 0xff {
 			switch r {
@@ -130,6 +130,18 @@ write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte) {
 
 		// TODO(bill): A proper unicode library will be needed!
 		return false;
+	}
+
+	if html_safe {
+		switch r {
+		case '<', '>', '&':
+			write_byte(b, '\\');
+			write_byte(b, 'u');
+			for s := 12; s >= 0; s -= 4 {
+				write_byte(b, DIGITS_LOWER[r>>uint(s) & 0xf]);
+			}
+			return;
+		}
 	}
 
 	if r == rune(quote) || r == '\\' {
