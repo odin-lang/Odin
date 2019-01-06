@@ -41,6 +41,10 @@ Weekday :: enum int {
 	Saturday,
 }
 
+diff :: proc(start, end: Time) -> Duration {
+	d := end._nsec - start._nsec;
+	return Duration(d);
+}
 
 duration_nanoseconds :: proc(d: Duration) -> i64 {
 	return i64(d);
