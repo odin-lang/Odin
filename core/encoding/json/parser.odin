@@ -93,6 +93,28 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 
 	case Kind.Open_Bracket:
 		return parse_array(p);
+
+	case:
+		if p.spec == Specification.JSON5 {
+			switch token.kind {
+			case Kind.Infinity:
+				inf: u64 = 0x7ff0000000000000;
+				if token.text[0] == '-' {
+					inf = 0xfff0000000000000;
+				}
+				value.value = transmute(f64)inf;
+				advance_token(p);
+				return;
+			case Kind.NaN:
+				nan: u64 = 0x7ff7ffffffffffff;
+				if token.text[0] == '-' {
+					nan = 0xfff7ffffffffffff;
+				}
+				value.value = transmute(f64)nan;
+				advance_token(p);
+				return;
+			}
+		}
 	}
 
 	err = Error.Unexpected_Token;

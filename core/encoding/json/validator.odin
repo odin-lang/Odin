@@ -90,31 +90,33 @@ validate_array :: proc(p: ^Parser) -> bool {
 
 validate_value :: proc(p: ^Parser) -> bool {
 	token := p.curr_token;
+
+	using Kind;
 	switch token.kind {
-	case Kind.Null:
+	case Null, False, True:
 		advance_token(p);
 		return true;
-	case Kind.False:
+	case Integer, Float:
 		advance_token(p);
 		return true;
-	case Kind.True:
-		advance_token(p);
-		return true;
-	case Kind.Integer:
-		advance_token(p);
-		return true;
-	case Kind.Float:
-		advance_token(p);
-		return true;
-	case Kind.String:
+	case String:
 		advance_token(p);
 		return is_valid_string_literal(token.text, p.spec);
 
-	case Kind.Open_Brace:
+	case Open_Brace:
 		return validate_object(p);
 
-	case Kind.Open_Bracket:
+	case Open_Bracket:
 		return validate_array(p);
+
+	case:
+		if p.spec == Specification.JSON5 {
+			switch token.kind {
+			case Infinity, NaN:
+				advance_token(p);
+				return true;
+			}
+		}
 	}
 
 	return false;
