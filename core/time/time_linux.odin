@@ -1,7 +1,6 @@
 package time
 
 import "core:os";
-import "core:fmt";
 
 // NOTE(Jeroen): The times returned are in UTC
 IS_SUPPORTED :: true;
