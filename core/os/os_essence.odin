@@ -71,6 +71,10 @@ stdin  := Handle(-1); // Not implemented
 stdout := Handle(0);
 stderr := Handle(0);
 
+is_path_separator :: proc(r: rune) -> bool {
+	return r == '/';
+}
+
 current_thread_id :: proc "contextless" () -> int {
 	return OSGetThreadID(Handle(0x1000));
 }
