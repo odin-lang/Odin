@@ -12,6 +12,11 @@ make_builder :: proc(allocator := context.allocator) -> Builder {
 	return Builder{make([dynamic]byte)};
 }
 
+destroy_builder :: proc(b: ^Builder) {
+	delete(b.buf);
+	clear(&b.buf);
+}
+
 builder_from_slice :: proc(backing: []byte) -> Builder {
 	s := transmute(mem.Raw_Slice)backing;
 	d := mem.Raw_Dynamic_Array{
