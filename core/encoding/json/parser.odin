@@ -3,7 +3,6 @@ package json
 import "core:mem"
 import "core:unicode/utf8"
 import "core:strconv"
-import "core:strings"
 
 Parser :: struct {
 	tok:        Tokenizer,
@@ -247,7 +246,9 @@ unquote_string :: proc(token: Token, allocator := context.allocator) -> string {
 		i += w;
 	}
 	if i == len(s) {
-		return strings.new_string(s, allocator);
+		b := make([]byte, len(s), allocator);
+		copy(b, cast([]byte)s);
+		return string(b);
 	}
 
 	b := make([]byte, len(s) + 2*utf8.UTF_MAX, allocator);
