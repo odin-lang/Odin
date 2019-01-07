@@ -1,6 +1,7 @@
 package json
 
 import "core:mem"
+import "core:bits"
 import "core:runtime"
 import "core:strconv"
 import "core:strings"
@@ -20,7 +21,10 @@ marshal :: proc(v: any, allocator := context.allocator) -> ([]byte, Marshal_Erro
 		strings.destroy_builder(&b);
 		return nil, err;
 	}
-
+	if len(b.buf) == 0 {
+		strings.destroy_builder(&b);
+		return nil, err;
+	}
 	return b.buf[:], err;
 }
 
@@ -242,7 +246,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		}
 
 	case Type_Info_Enum:
-		return Marshal_Error.Unsupported_Type;
+		return marshal_arg(b, any{v.data, info.base.id});
 
 	case Type_Info_Bit_Field:
 		data: u64 = 0;
@@ -273,6 +277,50 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		write_byte(b, '}');
 
 	case Type_Info_Bit_Set:
+		is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
+			if ti == nil {
+				return false;
+			}
+			ti = runtime.type_info_base(ti);
+			switch info in ti.variant {
+			case runtime.Type_Info_Integer:
+				using runtime.Type_Info_Endianness;
+				switch info.endianness {
+				case Platform: return false;
+				case Little:   return ODIN_ENDIAN != "little";
+				case Big:      return ODIN_ENDIAN != "big";
+				}
+			}
+			return false;
+		}
+
+		bit_data: u64;
+		bit_size := u64(8*ti.size);
+
+		do_byte_swap := is_bit_set_different_endian_to_platform(info.underlying);
+
+		switch bit_size {
+		case  0: bit_data = 0;
+		case  8:
+			x := (^u8)(v.data)^;
+			bit_data = u64(x);
+		case 16:
+			x := (^u16)(v.data)^;
+			if do_byte_swap do x = bits.byte_swap(x);
+			bit_data = u64(x);
+		case 32:
+			x := (^u32)(v.data)^;
+			if do_byte_swap do x = bits.byte_swap(x);
+			bit_data = u64(x);
+		case 64:
+			x := (^u64)(v.data)^;
+			if do_byte_swap do x = bits.byte_swap(x);
+			bit_data = u64(x);
+		case: panic("unknown bit_size size");
+		}
+		write_u64(b, bit_data);
+
+
 		return Marshal_Error.Unsupported_Type;
 
 	case Type_Info_Opaque:
