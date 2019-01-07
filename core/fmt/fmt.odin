@@ -739,7 +739,7 @@ enum_value_to_u64 :: proc(ev: runtime.Type_Info_Enum_Value) -> u64 {
 }
 
 fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
-	is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info, ) -> bool {
+	is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
 		if ti == nil {
 			return false;
 		}

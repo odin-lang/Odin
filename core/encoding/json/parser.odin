@@ -11,7 +11,7 @@ Parser :: struct {
 	allocator:  mem.Allocator,
 }
 
-make_parser :: proc(data: string, spec := Specification.JSON, allocator := context.allocator) -> Parser {
+make_parser :: proc(data: []byte, spec := Specification.JSON, allocator := context.allocator) -> Parser {
 	p: Parser;
 	p.tok = make_tokenizer(data, spec);
 	p.spec = spec;
@@ -21,7 +21,7 @@ make_parser :: proc(data: string, spec := Specification.JSON, allocator := conte
 	return p;
 }
 
-parse :: proc(data: string, spec := Specification.JSON, allocator := context.allocator) -> (Value, Error) {
+parse :: proc(data: []byte, spec := Specification.JSON, allocator := context.allocator) -> (Value, Error) {
 	context.allocator = allocator;
 	p := make_parser(data, spec, allocator);
 

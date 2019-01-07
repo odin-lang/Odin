@@ -35,17 +35,17 @@ Kind :: enum {
 }
 
 Tokenizer :: struct {
-	using pos: Pos,
-	data: string,
-	r: rune, // current rune
-	w: int,  // current rune width in bytes
+	using pos:        Pos,
+	data:             []byte,
+	r:                rune, // current rune
+	w:                int,  // current rune width in bytes
 	curr_line_offset: int,
-	spec: Specification,
+	spec:             Specification,
 }
 
 
 
-make_tokenizer :: proc(data: string, spec := Specification.JSON) -> Tokenizer {
+make_tokenizer :: proc(data: []byte, spec := Specification.JSON) -> Tokenizer {
 	t := Tokenizer{pos = {line=1}, data = data, spec = spec};
 	next_rune(&t);
 	if t.r == utf8.RUNE_BOM {
@@ -59,7 +59,7 @@ next_rune :: proc(t: ^Tokenizer) -> rune #no_bounds_check {
 		return utf8.RUNE_EOF;
 	}
 	t.offset += t.w;
-	t.r, t.w = utf8.decode_rune_in_string(t.data[t.offset:]);
+	t.r, t.w = utf8.decode_rune(t.data[t.offset:]);
 	t.pos.column = t.offset - t.curr_line_offset;
 	return t.r;
 }
@@ -174,7 +174,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 		skip_alphanum(t);
 
-		switch str := t.data[token.offset:t.offset]; str {
+		switch str := string(t.data[token.offset:t.offset]); str {
 		case "null":  token.kind = Kind.Null;
 		case "false": token.kind = Kind.False;
 		case "true":  token.kind = Kind.True;
@@ -204,7 +204,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 				if t.r == 'I' || t.r == 'N' {
 					skip_alphanum(t);
 				}
-				switch t.data[token.offset:t.offset] {
+				switch string(t.data[token.offset:t.offset]) {
 				case "-Infinity": token.kind = Kind.Infinity;
 				case "-NaN":      token.kind = Kind.NaN;
 				}
@@ -224,7 +224,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 				}
 				skip_digits(t);
 			}
-			str := t.data[token.offset:t.offset];
+			str := string(t.data[token.offset:t.offset]);
 			if !is_valid_number(str, t.spec) {
 				err = Error.Invalid_Number;
 			}
@@ -254,7 +254,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			skip_digits(t);
 		}
 
-		str := t.data[token.offset:t.offset];
+		str := string(t.data[token.offset:t.offset]);
 		if !is_valid_number(str, t.spec) {
 			err = Error.Invalid_Number;
 		}
@@ -284,7 +284,8 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			}
 		}
 
-		if !is_valid_string_literal(t.data[token.offset : t.offset], t.spec) {
+		str := string(t.data[token.offset : t.offset]);
+		if !is_valid_string_literal(str, t.spec) {
 			err = Error.Invalid_String;
 		}
 
@@ -323,7 +324,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	case: err = Error.Illegal_Character;
 	}
 
-	token.text = t.data[token.offset : t.offset];
+	token.text = string(t.data[token.offset : t.offset]);
 
 	return;
 }
