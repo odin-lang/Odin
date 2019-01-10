@@ -962,9 +962,9 @@ void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *ty
 void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
 	GB_ASSERT(identifier != nullptr);
 	GB_ASSERT(identifier->kind == Ast_Ident);
-	if (is_blank_ident(identifier)) {
-		return;
-	}
+	// if (is_blank_ident(identifier)) {
+		// return;
+	// }
 	if (identifier->Ident.entity != nullptr) {
 		// NOTE(bill): Identifier has already been handled
 		return;

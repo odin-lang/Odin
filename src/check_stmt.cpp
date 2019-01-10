@@ -1845,7 +1845,19 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				}
 			}
 		} else {
-			// constant value declarations
+			// constant value declaration
+			// NOTE(bill): Check `_` declarations
+			for_array(i, vd->names) {
+				Ast *name = vd->names[i];
+				if (is_blank_ident(name)) {
+					Entity *e = name->Ident.entity;
+					DeclInfo *d = decl_info_of_entity(e);
+					if (d != nullptr) {
+						check_entity_decl(ctx, e, d, nullptr);
+					}
+				}
+			}
+
 		}
 	case_end;
 	}
