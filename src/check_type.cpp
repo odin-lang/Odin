@@ -1752,6 +1752,8 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 				param->Variable.param_value = param_value;
 				array_add(&variables, param);
 				add_entity(ctx->checker, scope, name, param);
+				// NOTE(bill): Removes `declared but not used` when using -vet
+				add_entity_use(ctx, name, param);
 			}
 		}
 	}
