@@ -2905,12 +2905,24 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 		irProcedure *the_proc = &value->Proc;
 		Entity *e = the_proc->entity;
 		if (entity_has_deferred_procedure(e)) {
-			Entity *deferred_entity = e->Procedure.deferred_procedure;
+			DeferredProcedureKind kind = e->Procedure.deferred_procedure.kind;
+			Entity *deferred_entity = e->Procedure.deferred_procedure.entity;
 			irValue **deferred_found = map_get(&p->module->values, hash_entity(deferred_entity));
 			GB_ASSERT(deferred_found != nullptr);
 			irValue *deferred = *deferred_found;
 
-			Array<irValue *> result_as_args = ir_value_to_array(p, result);
+
+			auto in_args = args;
+			Array<irValue *> result_as_args = {};
+			switch (kind) {
+			case DeferredProcedure_none:
+				break;
+			case DeferredProcedure_in:
+				result_as_args = in_args;
+			case DeferredProcedure_out:
+				result_as_args = ir_value_to_array(p, result);
+				break;
+			}
 
 			irValue *deferred_call = ir_de_emit(p, ir_emit_call(p, deferred, result_as_args));
 			ir_add_defer_instr(p, p->scope_index, deferred_call);

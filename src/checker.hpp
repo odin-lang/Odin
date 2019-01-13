@@ -288,13 +288,24 @@ struct BlockLabel {
 	Ast *label; //  Ast_Label;
 };
 
+enum DeferredProcedureKind {
+	DeferredProcedure_none,
+	DeferredProcedure_in,
+	DeferredProcedure_out,
+};
+struct DeferredProcedure {
+	DeferredProcedureKind kind;
+	Entity *entity;
+};
+
+
 struct AttributeContext {
 	String  link_name;
 	String  link_prefix;
 	isize   init_expr_list_count;
 	String  thread_local_model;
 	String  deprecated_message;
-	Entity *deferred_procedure;
+	DeferredProcedure deferred_procedure;
 };
 
 AttributeContext make_attribute_context(String link_prefix) {
