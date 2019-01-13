@@ -77,6 +77,7 @@ struct ParameterValue {
 };
 
 
+
 // An Entity is a named "thing" in the language
 struct Entity {
 	EntityKind  kind;
@@ -128,7 +129,7 @@ struct Entity {
 			Ast *   foreign_library_ident;
 			String  link_name;
 			String  link_prefix;
-			Entity *deferred_procedure;
+			DeferredProcedure deferred_procedure;
 			bool    is_foreign;
 			bool    is_export;
 		} Procedure;
@@ -189,7 +190,7 @@ bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 bool entity_has_deferred_procedure(Entity *e) {
 	GB_ASSERT(e != nullptr);
 	if (e->kind == Entity_Procedure) {
-		return e->Procedure.deferred_procedure != nullptr;
+		return e->Procedure.deferred_procedure.entity != nullptr;
 	}
 	return false;
 }

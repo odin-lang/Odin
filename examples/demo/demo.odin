@@ -872,7 +872,7 @@ diverging_procedures :: proc() {
 }
 
 deferred_procedure_associations :: proc() {
-	@(deferred=closure)
+	@(deferred_out=closure)
 	open :: proc(s: string) -> bool {
 		fmt.println(s);
 		return true;
