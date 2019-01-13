@@ -2888,7 +2888,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 
 	String import_name = path_to_entity_name(id->import_name.string, id->fullpath, false);
 	// String import_name = id->import_name.string;
-	if (import_name.len == 0) {
+	if (import_name.len == 0 || import_name == "_") {
 		import_name = scope->pkg->name;
 	}
 	if (is_blank_ident(import_name)) {
