@@ -8239,7 +8239,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 	case_ast_node(is, IfStmt, node);
 		ir_emit_comment(proc, str_lit("IfStmt"));
-		ir_open_scope(proc); // Open scope here
+		ir_open_scope(proc); // Scope #1
+		defer (ir_close_scope(proc, irDeferExit_Default, nullptr));
 
 		if (is->init != nullptr) {
 			// TODO(bill): Should this have a separate block to begin with?
@@ -8265,7 +8266,6 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		}
 
 		ir_build_stmt(proc, is->body);
-		ir_close_scope(proc, irDeferExit_Default, nullptr);
 
 		ir_emit_jump(proc, done);
 
@@ -8905,6 +8905,8 @@ void ir_end_procedure_body(irProcedure *proc) {
 	if (proc->curr_block->instrs.count == 0) {
 		ir_emit_unreachable(proc);
 	}
+
+	GB_ASSERT(proc->scope_index == 0);
 
 	proc->curr_block = proc->decl_block;
 	ir_emit_jump(proc, proc->entry_block);
