@@ -2631,7 +2631,7 @@ bool is_string_an_identifier(String s) {
 	return offset == s.len;
 }
 
-String path_to_entity_name(String name, String fullpath) {
+String path_to_entity_name(String name, String fullpath, bool strip_extension=true) {
 	if (name.len != 0) {
 		return name;
 	}
@@ -2650,16 +2650,18 @@ String path_to_entity_name(String name, String fullpath) {
 
 	filename = substring(filename, slash, filename.len);
 
-	dot = filename.len;
-	while (dot --> 0) {
-		u8 c = filename[dot];
-		if (c == '.') {
-			break;
+	if (strip_extension) {
+		dot = filename.len;
+		while (dot --> 0) {
+			u8 c = filename[dot];
+			if (c == '.') {
+				break;
+			}
 		}
-	}
 
-	if (dot > 0) {
-		filename = substring(filename, 0, dot);
+		if (dot > 0) {
+			filename = substring(filename, 0, dot);
+		}
 	}
 
 	if (is_string_an_identifier(filename)) {
@@ -2884,8 +2886,8 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		ptr_set_add(&parent_scope->imported, scope);
 	}
 
-
-	String import_name = id->import_name.string;
+	String import_name = path_to_entity_name(id->import_name.string, id->fullpath, false);
+	// String import_name = id->import_name.string;
 	if (import_name.len == 0) {
 		import_name = scope->pkg->name;
 	}
