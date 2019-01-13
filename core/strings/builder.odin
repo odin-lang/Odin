@@ -190,12 +190,12 @@ write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false
 
 
 write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) {
-	buf: [129]byte;
+	buf: [32]byte;
 	s := strconv.append_bits(buf[:], u64(i), base, false, 64, strconv.digits, nil);
 	write_string(b, s);
 }
 write_i64 :: proc(b: ^Builder, i: i64, base: int = 10) {
-	buf: [129]byte;
+	buf: [32]byte;
 	s := strconv.append_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil);
 	write_string(b, s);
 }
