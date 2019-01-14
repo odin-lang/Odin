@@ -40,7 +40,7 @@ token_end_pos :: proc(tok: Token) -> Pos {
 
 advance_token :: proc(p: ^Parser) -> (Token, Error) {
 	err: Error;
-	p.prev_token := p.curr_token;
+	p.prev_token = p.curr_token;
 	p.curr_token, err = get_token(&p.tok);
 	return p.prev_token, err;
 }
