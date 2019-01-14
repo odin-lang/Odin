@@ -16,7 +16,7 @@ Array   :: distinct [dynamic]Value;
 Object  :: distinct map[string]Value;
 
 Value :: struct {
-	pos: Pos,
+	pos, end: Pos,
 	value: union {
 		Null,
 		Integer,
