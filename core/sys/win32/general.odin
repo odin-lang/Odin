@@ -298,6 +298,22 @@ File_Notify_Information :: struct {
   file_name:         [1]u16,
 }
 
+
+// https://docs.microsoft.com/en-us/windows/desktop/api/winnt/ns-winnt-_osversioninfoexa
+OS_Version_Info_Ex_A :: struct {
+  os_version_info_size: u32,
+  major_version:        u32,
+  minor_version:        u32,
+  build_number:         u32,
+  platform_id :         u32,
+  service_pack_string:  [128]u8,
+  service_pack_major:   u16,
+  service_pack_minor:   u16,
+  suite_mask:           u16,
+  product_type:         u8,
+  reserved:             u8
+}
+
 MAPVK_VK_TO_VSC    :: 0;
 MAPVK_VSC_TO_VK    :: 1;
 MAPVK_VK_TO_CHAR   :: 2;

@@ -287,4 +287,39 @@ _alloc_command_line_arguments :: proc() -> []string {
 	return arg_list;
 }
 
+get_windows_version_ansi :: proc() -> win32.OS_Version_Info_Ex_A {
+	osvi : win32.OS_Version_Info_Ex_A;
+	osvi.os_version_info_size = size_of(win32.OS_Version_Info_Ex_A);
+    win32.get_version(&osvi);
+    return osvi;
+}
 
+is_windows_xp :: proc() -> bool {
+	osvi := get_windows_version_ansi();
+	return (osvi.major_version == 5 && osvi.minor_version == 1);
+}
+
+is_windows_vista :: proc() -> bool {
+	osvi := get_windows_version_ansi();
+	return (osvi.major_version == 6 && osvi.minor_version == 0);
+}
+
+is_windows_7 :: proc() -> bool {
+	osvi := get_windows_version_ansi();
+	return (osvi.major_version == 6 && osvi.minor_version == 1);
+}
+
+is_windows_8 :: proc() -> bool {
+	osvi := get_windows_version_ansi();
+	return (osvi.major_version == 6 && osvi.minor_version == 2);
+}
+
+is_windows_8_1 :: proc() -> bool {
+	osvi := get_windows_version_ansi();
+	return (osvi.major_version == 6 && osvi.minor_version == 3);
+}
+
+is_windows_10 :: proc() -> bool {
+	osvi := get_windows_version_ansi();
+	return (osvi.major_version == 10 && osvi.minor_version == 0);
+}
