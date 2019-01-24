@@ -144,11 +144,12 @@ void check_scope_decls(CheckerContext *c, Array<Ast *> const &nodes, isize reser
 }
 
 
-bool check_is_assignable_to_using_subtype(Type *src, Type *dst) {
-	bool src_is_ptr = false;
+isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isize level = 0, bool src_is_ptr = false) {
 	Type *prev_src = src;
 	src = type_deref(src);
-	src_is_ptr = src != prev_src;
+	if (!src_is_ptr) {
+		src_is_ptr = src != prev_src;
+	}
 	src = base_type(src);
 
 	if (!is_type_struct(src)) {
@@ -162,20 +163,20 @@ bool check_is_assignable_to_using_subtype(Type *src, Type *dst) {
 		}
 
 		if (are_types_identical(f->type, dst)) {
-			return true;
+			return level+1;
 		}
 		if (src_is_ptr && is_type_pointer(dst)) {
 			if (are_types_identical(f->type, type_deref(dst))) {
-				return true;
+				return level+1;
 			}
 		}
-		bool ok = check_is_assignable_to_using_subtype(f->type, dst);
-		if (ok) {
-			return true;
+		isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr);
+		if (nested_level > 0) {
+			return nested_level;
 		}
 	}
 
-	return false;
+	return 0;
 }
 
 bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_entity, Type *type,
@@ -534,8 +535,11 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 	}
 
 
-	if (check_is_assignable_to_using_subtype(operand->type, type)) {
-		return 4;
+	{
+		isize subtype_level = check_is_assignable_to_using_subtype(operand->type, type);
+		if (subtype_level > 0) {
+			return 4 + subtype_level;
+		}
 	}
 
 	// ^T <- rawptr
