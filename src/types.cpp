@@ -1041,6 +1041,8 @@ bool is_type_integer_endian_big(Type *t) {
 		return build_context.endian_kind == TargetEndian_Big;
 	} else if (t->kind == Type_BitSet) {
 		return is_type_integer_endian_big(bit_set_to_int(t));
+	} else if (t->kind == Type_Pointer) {
+		return is_type_integer_endian_big(&basic_types[Basic_uintptr]);
 	} else {
 		GB_PANIC("Unsupported type: %s", type_to_string(t));
 	}
@@ -1058,6 +1060,8 @@ bool is_type_integer_endian_little(Type *t) {
 		return build_context.endian_kind == TargetEndian_Little;
 	} else if (t->kind == Type_BitSet) {
 		return is_type_integer_endian_little(bit_set_to_int(t));
+	} else if (t->kind == Type_Pointer) {
+		return is_type_integer_endian_little(&basic_types[Basic_uintptr]);
 	} else {
 		GB_PANIC("Unsupported type: %s", type_to_string(t));
 	}

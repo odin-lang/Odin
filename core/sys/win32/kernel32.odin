@@ -5,38 +5,39 @@ foreign import "system:kernel32.lib"
 
 @(default_calling_convention = "std")
 foreign kernel32 {
-	@(link_name="GetLastError")              get_last_error              :: proc() -> i32 ---;
-	@(link_name="CreateProcessA")		     create_process_a		     :: proc(application_name, command_line: cstring,
+	@(link_name="GetLastError")              get_last_error               :: proc() -> i32 ---;
+	@(link_name="CreateProcessA")		     create_process_a		      :: proc(application_name, command_line: cstring,
 	                                                              				 process_attributes, thread_attributes: ^Security_Attributes,
 	                                                              				 inherit_handle: Bool, creation_flags: u32, environment: rawptr,
 	                                                              				 current_direcotry: cstring, startup_info: ^Startup_Info,
 	                                                              				 process_information: ^Process_Information) -> Bool ---;
-    @(link_name="CreateProcessW")            create_process_w            :: proc(application_name, command_line: Wstring,
+    @(link_name="CreateProcessW")            create_process_w             :: proc(application_name, command_line: Wstring,
                                                                                  process_attributes, thread_attributes: ^Security_Attributes,
                                                                                  inherit_handle: Bool, creation_flags: u32, environment: rawptr,
                                                                                  current_direcotry: cstring, startup_info: ^Startup_Info,
                                                                                  process_information: ^Process_Information) -> Bool ---;
-	@(link_name="GetExitCodeProcess")		 get_exit_code_process       :: proc(process: Handle, exit: ^u32) -> Bool ---;
-	@(link_name="ExitProcess")               exit_process                :: proc(exit_code: u32) ---;
-	@(link_name="GetModuleHandleA")          get_module_handle_a         :: proc(module_name: cstring) -> Hinstance ---;
-	@(link_name="GetModuleHandleW")          get_module_handle_w         :: proc(module_name: Wstring) -> Hinstance ---;
-	@(link_name="Sleep")                     sleep                       :: proc(ms: i32) -> i32 ---;
-	@(link_name="QueryPerformanceFrequency") query_performance_frequency :: proc(result: ^i64) -> i32 ---;
-	@(link_name="QueryPerformanceCounter")   query_performance_counter   :: proc(result: ^i64) -> i32 ---;
-	@(link_name="OutputDebugStringA")        output_debug_string_a       :: proc(c_str: cstring) ---;
+	@(link_name="GetExitCodeProcess")		 get_exit_code_process        :: proc(process: Handle, exit: ^u32) -> Bool ---;
+	@(link_name="ExitProcess")               exit_process                 :: proc(exit_code: u32) ---;
+	@(link_name="GetModuleHandleA")          get_module_handle_a          :: proc(module_name: cstring) -> Hinstance ---;
+	@(link_name="GetModuleHandleW")          get_module_handle_w          :: proc(module_name: Wstring) -> Hinstance ---;
+	@(link_name="Sleep")                     sleep                        :: proc(ms: i32) -> i32 ---;
+	@(link_name="QueryPerformanceFrequency") query_performance_frequency  :: proc(result: ^i64) -> i32 ---;
+	@(link_name="QueryPerformanceCounter")   query_performance_counter    :: proc(result: ^i64) -> i32 ---;
+	@(link_name="OutputDebugStringA")        output_debug_string_a        :: proc(c_str: cstring) ---;
 
-	@(link_name="GetCommandLineA")    get_command_line_a    :: proc() -> cstring ---;
-	@(link_name="GetCommandLineW")    get_command_line_w    :: proc() -> Wstring ---;
-	@(link_name="GetSystemMetrics")   get_system_metrics    :: proc(index: i32) -> i32 ---;
-	@(link_name="GetCurrentThreadId") get_current_thread_id :: proc() -> u32 ---;
+	@(link_name="GetCommandLineA")           get_command_line_a           :: proc() -> cstring ---;
+	@(link_name="GetCommandLineW")           get_command_line_w           :: proc() -> Wstring ---;
+	@(link_name="GetSystemMetrics")          get_system_metrics           :: proc(index: i32) -> i32 ---;
+	@(link_name="GetVersionExA")             get_version                  :: proc(osvi: ^OS_Version_Info_Ex_A) ---;
+	@(link_name="GetCurrentThreadId")        get_current_thread_id        :: proc() -> u32 ---;
 
-	@(link_name="GetSystemTimeAsFileTime") get_system_time_as_file_time :: proc(system_time_as_file_time: ^Filetime) ---;
-	@(link_name="FileTimeToLocalFileTime") file_time_to_local_file_time :: proc(file_time: ^Filetime, local_file_time: ^Filetime) -> Bool ---;
-	@(link_name="FileTimeToSystemTime")    file_time_to_system_time     :: proc(file_time: ^Filetime, system_time: ^Systemtime) -> Bool ---;
-	@(link_name="SystemTimeToFileTime")    system_time_to_file_time     :: proc(system_time: ^Systemtime, file_time: ^Filetime) -> Bool ---;
+	@(link_name="GetSystemTimeAsFileTime")   get_system_time_as_file_time :: proc(system_time_as_file_time: ^Filetime) ---;
+	@(link_name="FileTimeToLocalFileTime")   file_time_to_local_file_time :: proc(file_time: ^Filetime, local_file_time: ^Filetime) -> Bool ---;
+	@(link_name="FileTimeToSystemTime")      file_time_to_system_time     :: proc(file_time: ^Filetime, system_time: ^Systemtime) -> Bool ---;
+	@(link_name="SystemTimeToFileTime")      system_time_to_file_time     :: proc(system_time: ^Systemtime, file_time: ^Filetime) -> Bool ---;
 
-	@(link_name="CloseHandle")  close_handle   :: proc(h: Handle) -> i32 ---;
-	@(link_name="GetStdHandle") get_std_handle :: proc(h: i32) -> Handle ---;
+	@(link_name="CloseHandle")               close_handle                 :: proc(h: Handle) -> i32 ---;
+	@(link_name="GetStdHandle")              get_std_handle               :: proc(h: i32) -> Handle ---;
 
 	@(link_name="CreateFileA")
 	create_file_a :: proc(filename: cstring, desired_access, share_module: u32,
