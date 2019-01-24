@@ -6957,13 +6957,6 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 		}
 	case_end;
 
-	case_ast_node(f, UnionField, node);
-		str = write_expr_to_string(str, f->name);
-		str = gb_string_append_rune(str, '{');
-		str = write_expr_to_string(str, f->list);
-		str = gb_string_append_rune(str, '}');
-	case_end;
-
 	case_ast_node(ce, CallExpr, node);
 		switch (ce->inlining) {
 		case ProcInlining_inline:
