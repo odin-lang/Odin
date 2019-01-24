@@ -1,5 +1,7 @@
 package rand
 
+import "core:mem"; // for offset_ptr in 'fill'
+
 Rand :: struct {
 	state: u64,
 	inc:   u64,
@@ -61,18 +63,18 @@ int63_max :: proc(r: ^Rand, n: i64) -> i64 {
 float64 :: proc(r: ^Rand) -> f64 { return f64(int63_max(r, 1<<53)) / (1 << 53); }
 float32 :: proc(r: ^Rand) -> f32 { return f32(float64(r)); }
 
-fill :: proc(rng: ^rand.Rand, buf: []$T) {
+fill :: proc(rng: ^Rand, buf: []$T) {
     ptr := cast(^u8) &buf[0];
     total_bytes := len(buf) * size_of(T);
     count := total_bytes;
     for i := 0; i < count-1; {
         if total_bytes-i >= size_of(u32) {
             ptr32 := cast(^u32) ptr;
-            ptr32^ = rand.uint32(rng);
+            ptr32^ = uint32(rng);
             ptr = mem.ptr_offset(ptr, size_of(u32));
             i += size_of(u32);
         } else {
-            ptr^ = cast(u8) rand.uint32(rng);
+            ptr^ = cast(u8) uint32(rng);
             ptr = mem.ptr_offset(ptr, 1);
             i += 1;
         }
