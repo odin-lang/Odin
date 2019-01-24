@@ -40,7 +40,6 @@ Token ast_token(Ast *node) {
 	case Ast_ExprStmt:           return ast_token(node->ExprStmt.expr);
 	case Ast_TagStmt:            return node->TagStmt.token;
 	case Ast_AssignStmt:         return node->AssignStmt.op;
-	case Ast_IncDecStmt:         return ast_token(node->IncDecStmt.expr);
 	case Ast_BlockStmt:          return node->BlockStmt.open;
 	case Ast_IfStmt:             return node->IfStmt.token;
 	case Ast_WhenStmt:           return node->WhenStmt.token;
@@ -74,8 +73,6 @@ Token ast_token(Ast *node) {
 		return ast_token(node->Field.type);
 	case Ast_FieldList:
 		return node->FieldList.token;
-	case Ast_UnionField:
-		return ast_token(node->UnionField.name);
 
 	case Ast_TypeidType:       return node->TypeidType.token;
 	case Ast_HelperType:       return node->HelperType.token;
@@ -219,9 +216,6 @@ Ast *clone_ast(Ast *node) {
 		n->AssignStmt.lhs = clone_ast_array(n->AssignStmt.lhs);
 		n->AssignStmt.rhs = clone_ast_array(n->AssignStmt.rhs);
 		break;
-	case Ast_IncDecStmt:
-		n->IncDecStmt.expr = clone_ast(n->IncDecStmt.expr);
-		break;
 	case Ast_BlockStmt:
 		n->BlockStmt.label = clone_ast(n->BlockStmt.label);
 		n->BlockStmt.stmts = clone_ast_array(n->BlockStmt.stmts);
@@ -307,10 +301,6 @@ Ast *clone_ast(Ast *node) {
 		break;
 	case Ast_FieldList:
 		n->FieldList.list = clone_ast_array(n->FieldList.list);
-		break;
-	case Ast_UnionField:
-		n->UnionField.name = clone_ast(n->UnionField.name);
-		n->UnionField.list = clone_ast(n->UnionField.list);
 		break;
 
 	case Ast_TypeidType:
@@ -684,15 +674,6 @@ Ast *ast_assign_stmt(AstFile *f, Token op, Array<Ast *> lhs, Array<Ast *> rhs) {
 }
 
 
-Ast *ast_inc_dec_stmt(AstFile *f, Token op, Ast *expr) {
-	Ast *result = alloc_ast_node(f, Ast_IncDecStmt);
-	result->IncDecStmt.op = op;
-	result->IncDecStmt.expr = expr;
-	return result;
-}
-
-
-
 Ast *ast_block_stmt(AstFile *f, Array<Ast *> stmts, Token open, Token close) {
 	Ast *result = alloc_ast_node(f, Ast_BlockStmt);
 	result->BlockStmt.stmts = stmts;
@@ -825,14 +806,6 @@ Ast *ast_field_list(AstFile *f, Token token, Array<Ast *> list) {
 	result->FieldList.list  = list;
 	return result;
 }
-
-Ast *ast_union_field(AstFile *f, Ast *name, Ast *list) {
-	Ast *result = alloc_ast_node(f, Ast_UnionField);
-	result->UnionField.name = name;
-	result->UnionField.list = list;
-	return result;
-}
-
 
 Ast *ast_typeid_type(AstFile *f, Token token, Ast *specialization) {
 	Ast *result = alloc_ast_node(f, Ast_TypeidType);

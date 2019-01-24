@@ -1283,8 +1283,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		if (fs->post != nullptr) {
 			check_stmt(ctx, fs->post, 0);
 
-			if (fs->post->kind != Ast_AssignStmt &&
-			    fs->post->kind != Ast_IncDecStmt) {
+			if (fs->post->kind != Ast_AssignStmt) {
 				error(fs->post, "'for' statement post statement must be a simple statement");
 			}
 		}

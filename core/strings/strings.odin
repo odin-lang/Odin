@@ -26,6 +26,10 @@ string_from_ptr :: proc(ptr: ^byte, len: int) -> string {
 	return transmute(string)mem.Raw_String{ptr, len};
 }
 
+compare :: proc(lhs, rhs: string) -> int {
+	return mem.compare(cast([]byte)lhs, cast([]byte)rhs);
+}
+
 contains_rune :: proc(s: string, r: rune) -> int {
 	for c, offset in s {
 		if c == r do return offset;
@@ -40,6 +44,7 @@ contains :: proc(s, substr: string) -> bool {
 contains_any :: proc(s, chars: string) -> bool {
 	return index_any(s, chars) >= 0;
 }
+
 
 
 equal_fold :: proc(s, t: string) -> bool {

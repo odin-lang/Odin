@@ -406,7 +406,6 @@ AST_KIND(_DeclBegin,      "", bool) \
 AST_KIND(_DeclEnd,   "", bool) \
 	AST_KIND(Attribute, "attribute", struct { \
 		Token token;        \
-		Ast *type;          \
 		Array<Ast *> elems; \
 		Token open, close;  \
 	}) \
@@ -421,10 +420,6 @@ AST_KIND(_DeclEnd,   "", bool) \
 	AST_KIND(FieldList, "field list", struct { \
 		Token token;       \
 		Array<Ast *> list; \
-	}) \
-	AST_KIND(UnionField, "union field", struct { \
-		Ast *name; \
-		Ast *list; \
 	}) \
 AST_KIND(_TypeBegin, "", bool) \
 	AST_KIND(TypeidType, "typeid", struct { \
