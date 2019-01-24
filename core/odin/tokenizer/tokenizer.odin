@@ -9,20 +9,22 @@ Error_Handler :: #type proc(pos: token.Pos, fmt: string, args: ..any);
 
 Tokenizer :: struct {
 	// Immutable data
-	dir: string,
-	src: []byte,
-	err: Error_Handler,
+	path: string,
+	src:  []byte,
+	err:  Error_Handler,
 
+	// Tokenizing state
 	ch:          rune,
 	offset:      int,
 	read_offset: int,
 	line_offset: int,
 	line_count:  int,
 
+	// Mutable data
 	error_count: int,
 }
 
-init :: proc(t: ^Tokenizer, src: []byte, err: Error_Handler = default_error_handler) {
+init :: proc(t: ^Tokenizer, src: []byte, path: string, err: Error_Handler = default_error_handler) {
 	t.src = src;
 	t.err = err;
 	t.ch = ' ';
@@ -31,6 +33,7 @@ init :: proc(t: ^Tokenizer, src: []byte, err: Error_Handler = default_error_hand
 	t.line_offset = 0;
 	t.line_count = len(src) > 0 ? 1 : 0;
 	t.error_count = 0;
+	t.path = path;
 
 	advance_rune(t);
 	if t.ch == utf8.RUNE_BOM {
@@ -44,6 +47,7 @@ offset_to_pos :: proc(t: ^Tokenizer, offset: int) -> token.Pos {
 	column := offset - t.line_offset + 1;
 
 	return token.Pos {
+		file = t.path,
 		offset = offset,
 		line = line,
 		column = column,
@@ -435,7 +439,7 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (token.Kind, str
 }
 
 
-next_token :: proc(t: ^Tokenizer) -> token.Token {
+scan :: proc(t: ^Tokenizer) -> token.Token {
 	switch2 :: proc(t: ^Tokenizer, tok0, tok1: token.Kind) -> token.Kind {
 		if t.ch == '=' {
 			advance_rune(t);
@@ -482,6 +486,7 @@ next_token :: proc(t: ^Tokenizer) -> token.Token {
 	switch ch := t.ch; true {
 	case is_letter(ch):
 		lit = scan_identifier(t);
+		kind = token.Ident;
 		if len(lit) > 1 {
 			// TODO(bill): Maybe have a hash table lookup rather than this linear search
 			for i in token.B_Keyword_Begin .. token.B_Keyword_End {
@@ -490,8 +495,6 @@ next_token :: proc(t: ^Tokenizer) -> token.Token {
 					break;
 				}
 			}
-		} else {
-			kind = token.Ident;
 		}
 	case '0' <= ch && ch <= '9':
 		kind, lit = scan_number(t, false);
