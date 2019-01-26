@@ -1,4 +1,4 @@
-package tokenizer
+package odin_tokenizer
 
 import "core:fmt"
 import "core:odin/token"
@@ -137,7 +137,7 @@ scan_comment :: proc(t: ^Tokenizer) -> string {
 	offset := t.offset-1;
 	next := -1;
 	general: {
-		if t.ch == '/' {
+		if t.ch == '/' || t.ch == '!' { // // #! comments
 			advance_rune(t);
 			for t.ch != '\n' && t.ch >= 0 {
 				advance_rune(t);
@@ -519,8 +519,14 @@ scan :: proc(t: ^Tokenizer) -> token.Token {
 			} else {
 				kind = switch2(t, token.Eq, token.Cmp_Eq);
 			}
-		case '!': kind = switch2(t, token.Eq, token.Not_Eq);
-		case '#': kind = token.Hash;
+		case '!': kind = switch2(t, token.Not, token.Not_Eq);
+		case '#':
+			kind = token.Hash;
+			if t.ch == '!' {
+				kind = token.Comment;
+				lit = scan_comment(t);
+			}
+		case '?': kind = token.Question;
 		case '@': kind = token.At;
 		case '$': kind = token.Dollar;
 		case '^': kind = token.Pointer;
@@ -559,9 +565,9 @@ scan :: proc(t: ^Tokenizer) -> token.Token {
 				advance_rune(t);
 				kind = token.Arrow_Left;
 			} else {
-				kind = token.Lt;
+				kind = switch4(t, token.Lt, token.Lt_Eq, '<', token.Shl, token.Shl_Eq);
 			}
-		case '>': kind = token.Gt;
+		case '>': kind = switch4(t, token.Gt, token.Gt_Eq, '>', token.Shr,token.Shr_Eq);
 
 		case '≠': kind = token.Not_Eq;
 		case '≤': kind = token.Lt_Eq;
@@ -588,7 +594,7 @@ scan :: proc(t: ^Tokenizer) -> token.Token {
 		case '}': kind = token.Close_Brace;
 		case:
 			if ch != utf8.RUNE_BOM {
-				error(t, t.offset, "illegal character %d", ch);
+				error(t, t.offset, "illegal character '%r': %d", ch, ch);
 			}
 			kind = token.Invalid;
 		}

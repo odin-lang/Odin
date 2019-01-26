@@ -1,4 +1,4 @@
-package token
+package odin_token
 
 import "core:strings"
 
@@ -161,7 +161,6 @@ using Kind :: enum i32 {
 	B_Keyword_End,
 };
 
-
 tokens := [len(Kind)]string {
 	"Invalid",
 	"EOF",
@@ -295,6 +294,24 @@ tokens := [len(Kind)]string {
 	"",
 };
 
-is_literal  :: proc(kind: Kind) -> bool do return B_Literal_Begin  < kind && kind < B_Literal_End;
-is_operator :: proc(kind: Kind) -> bool do return B_Operator_Begin < kind && kind < B_Operator_End;
-is_keyword  :: proc(kind: Kind) -> bool do return B_Keyword_Begin  < kind && kind < B_Keyword_End;
+to_string :: proc(kind: Kind) -> string {
+	if min(Kind) <= kind && kind <= max(Kind) {
+		return tokens[kind];
+	}
+	return "Invalid";
+}
+
+is_literal  :: proc(kind: Kind) -> bool { return B_Literal_Begin  < kind && kind < B_Literal_End;  }
+is_operator :: proc(kind: Kind) -> bool {
+	switch kind {
+	case B_Operator_Begin..B_Operator_End:
+		return true;
+	case In, Notin:
+		return true;
+	}
+	return false;
+}
+is_assignment_operator :: proc(kind: Kind) -> bool {
+	return B_Assign_Op_Begin < kind && kind < B_Assign_Op_End || kind == Eq;
+}
+is_keyword :: proc(kind: Kind) -> bool { return B_Keyword_Begin  < kind && kind < B_Keyword_End;  }
