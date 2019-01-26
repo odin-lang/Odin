@@ -8652,7 +8652,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			ir_start_block(proc, body);
 
 			if (cc->list.count == 1) {
-				bool any_or_not_ptr = is_type_any(type_deref(parent_type)) || !is_parent_ptr;
+				// bool any_or_not_ptr = is_type_any(type_deref(parent_type)) || !is_parent_ptr;
+				bool any_or_not_ptr = !is_parent_ptr;
 
 				Type *ct = case_entity->type;
 				if (any_or_not_ptr) {

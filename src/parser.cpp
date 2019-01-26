@@ -1877,7 +1877,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			isize param_count = 0;
 			polymorphic_params = parse_field_list(f, &param_count, 0, Token_CloseParen, false, true);
 			if (param_count == 0) {
-				syntax_error(polymorphic_params, "Expected at least 1 polymorphic parametric");
+				syntax_error(polymorphic_params, "Expected at least 1 polymorphic parameter");
 				polymorphic_params = nullptr;
 			}
 			expect_token_after(f, Token_CloseParen, "parameter list");
@@ -2089,6 +2089,8 @@ bool is_literal_type(Ast *node) {
 	case Ast_EnumType:
 	case Ast_DynamicArrayType:
 	case Ast_MapType:
+	case Ast_BitFieldType:
+	case Ast_BitSetType:
 	case Ast_CallExpr:
 		return true;
 	}
@@ -2854,7 +2856,7 @@ u32 parse_field_prefixes(AstFile *f) {
 	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple '#no_alias' in this field list");
 	if (c_vararg_count  > 1) syntax_error(f->curr_token, "Multiple '#c_vararg' in this field list");
 	if (in_count        > 1) syntax_error(f->curr_token, "Multiple 'in' in this field list");
-	if (auto_cast_count > 1) syntax_error(f->curr_token, "Multiple 'auto_cast_count' in this field list");
+	if (auto_cast_count > 1) syntax_error(f->curr_token, "Multiple 'auto_cast' in this field list");
 
 
 	u32 field_flags = 0;
@@ -2912,7 +2914,6 @@ Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> list, bool ign
 		case Ast_PolyType:
 			if (allow_poly_names) {
 				if (ident->PolyType.specialization == nullptr) {
-					// syntax_error(ident, "Polymorphic identifiers are not yet supported");
 					break;
 				} else {
 					syntax_error(ident, "Expected a polymorphic identifier without any specialization");
@@ -2945,29 +2946,6 @@ bool parse_expect_field_separator(AstFile *f, Ast *param) {
 	}
 	return false;
 }
-
-bool parse_expect_struct_separator(AstFile *f, Ast *param) {
-	Token token = f->curr_token;
-	if (allow_token(f, Token_Semicolon)) {
-		return true;
-	}
-
-	if (token.kind == Token_Colon) {
-		syntax_error(f->curr_token, "Expected a semicolon, got a comma");
-		advance_token(f);
-		return true;
-	}
-
-	if (token.kind == Token_CloseBrace) {
-		if (token.pos.line == f->prev_token.pos.line) {
-			return true;
-		}
-	}
-	expect_token_after(f, Token_Semicolon, "field list");
-
-	return false;
-}
-
 
 Ast *parse_struct_field_list(AstFile *f, isize *name_count_) {
 	CommentGroup *docs = f->lead_comment;
@@ -3291,10 +3269,7 @@ Ast *parse_when_stmt(AstFile *f) {
 	Ast *else_stmt = nullptr;
 
 	isize prev_level = f->expr_level;
-	isize when_level = f->when_level;
-	defer (f->when_level = when_level);
 	f->expr_level = -1;
-	f->when_level += 1;
 
 	cond = parse_expr(f, false);
 
@@ -3334,16 +3309,17 @@ Ast *parse_when_stmt(AstFile *f) {
 
 
 Ast *parse_return_stmt(AstFile *f) {
+	Token token = expect_token(f, Token_return);
+
 	if (f->curr_proc == nullptr) {
 		syntax_error(f->curr_token, "You cannot use a return statement in the file scope");
-		return ast_bad_stmt(f, f->curr_token, f->curr_token);
+		return ast_bad_stmt(f, token, f->curr_token);
 	}
 	if (f->expr_level > 0) {
 		syntax_error(f->curr_token, "You cannot use a return statement within an expression");
-		return ast_bad_stmt(f, f->curr_token, f->curr_token);
+		return ast_bad_stmt(f, token, f->curr_token);
 	}
 
-	Token token = expect_token(f, Token_return);
 	auto results = array_make<Ast *>(heap_allocator());
 
 	while (f->curr_token.kind != Token_Semicolon) {
@@ -3511,7 +3487,7 @@ Ast *parse_switch_stmt(AstFile *f) {
 			blank_ident.string = str_lit("_");
 			Ast *blank = ast_ident(f, blank_ident);
 			array_add(&lhs, blank);
-			array_add(&rhs, parse_expr(f, false));
+			array_add(&rhs, parse_expr(f, true));
 
 			tag = ast_assign_stmt(f, token, lhs, rhs);
 			is_type_switch = true;
@@ -3519,13 +3495,11 @@ Ast *parse_switch_stmt(AstFile *f) {
 			tag = parse_simple_stmt(f, StmtAllowFlag_In);
 			if (tag->kind == Ast_AssignStmt && tag->AssignStmt.op.kind == Token_in) {
 				is_type_switch = true;
-			} else {
-				if (allow_token(f, Token_Semicolon)) {
-					init = tag;
-					tag = nullptr;
-					if (f->curr_token.kind != Token_OpenBrace) {
-						tag = parse_simple_stmt(f, StmtAllowFlag_None);
-					}
+			} else if (allow_token(f, Token_Semicolon)) {
+				init = tag;
+				tag = nullptr;
+				if (f->curr_token.kind != Token_OpenBrace) {
+					tag = parse_simple_stmt(f, StmtAllowFlag_None);
 				}
 			}
 		}
