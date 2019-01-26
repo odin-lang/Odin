@@ -980,7 +980,6 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		}
 
 		if (is_ptr &&
-		    !is_type_any(type_deref(x.type)) &&
 		    cc->list.count == 1 &&
 		    case_type != nullptr) {
 			case_type = alloc_type_pointer(case_type);

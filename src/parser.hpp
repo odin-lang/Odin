@@ -93,7 +93,6 @@ struct AstFile {
 	bool         allow_in_expr; // NOTE(bill): in expression are only allowed in certain cases
 	bool         in_foreign_block;
 	bool         allow_type;
-	isize        when_level;
 
 	Array<Ast *> decls;
 	Array<Ast *> imports; // 'import' 'using import'
