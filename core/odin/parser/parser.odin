@@ -4,7 +4,6 @@ import "core:odin/ast"
 import "core:odin/token"
 import "core:odin/tokenizer"
 
-import "core:strings"
 import "core:fmt"
 
 Warning_Handler :: #type proc(pos: token.Pos, fmt: string, args: ..any);
@@ -145,8 +144,8 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 		if stmt != nil {
 			if _, ok := stmt.derived.(ast.Empty_Stmt); !ok {
 				append(&p.file.decls, stmt);
-				if es, ok := stmt.derived.(ast.Expr_Stmt); ok && es.expr != nil {
-					if _, ok := es.expr.derived.(ast.Proc_Lit); ok {
+				if es, es_ok := stmt.derived.(ast.Expr_Stmt); es_ok && es.expr != nil {
+					if _, pl_ok := es.expr.derived.(ast.Proc_Lit); pl_ok {
 						error(p, stmt.pos, "procedure literal evaluated but not used");
 					}
 				}
@@ -180,7 +179,7 @@ consume_comment :: proc(p: ^Parser) -> (tok: token.Token, end_line: int) {
 		}
 	}
 
-	end := next_token0(p);
+	_ = next_token0(p);
 	if p.curr_tok.pos.line > tok.pos.line {
 		end_line += 1;
 	}
@@ -417,8 +416,8 @@ parse_stmt_list :: proc(p: ^Parser) -> []^ast.Stmt {
 		if stmt != nil {
 			if _, ok := stmt.derived.(ast.Empty_Stmt); !ok {
 				append(&list, stmt);
-				if es, ok := stmt.derived.(ast.Expr_Stmt); ok && es.expr != nil {
-					if _, ok := es.expr.derived.(ast.Proc_Lit); ok {
+				if es, es_ok := stmt.derived.(ast.Expr_Stmt); es_ok && es.expr != nil {
+					if _, pl_ok := es.expr.derived.(ast.Proc_Lit); pl_ok {
 						error(p, stmt.pos, "procedure literal evaluated but not used");
 					}
 				}
@@ -930,8 +929,7 @@ parse_foreign_decl :: proc(p: ^Parser) -> ^ast.Decl {
 
 
 parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
-	tok := p.curr_tok;
-	switch tok.kind {
+	switch p.curr_tok.kind {
 	// Operands
 	case token.Context, // Also allows for 'context = '
 	     token.Inline, token.No_Inline,
@@ -1116,12 +1114,12 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		return parse_block_stmt(p, false);
 
 	case token.Semicolon:
+		tok := advance_token(p);
 		s := ast.new(ast.Empty_Stmt, tok.pos, end_pos(tok));
-		advance_token(p);
 		return s;
 	}
 
-	advance_token(p);
+	tok := advance_token(p);
 	error(p, tok.pos, "expected a statement, got %s", token.to_string(tok.kind));
 	s := ast.new(ast.Bad_Stmt, tok.pos, end_pos(tok));
 	return s;
@@ -1542,8 +1540,8 @@ parse_field_list :: proc(p: ^Parser, follow: token.Kind, allowed_flags: ast.Fiel
 			type = parse_var_type(p, allowed_flags);
 			tt := ast.unparen_expr(type);
 			if !any_polymorphic_names {
-				if ti, ok := type.derived.(ast.Typeid_Type); ok && ti.specialization != nil {
-					error(p, type.pos, "specialization of typeid is not allowed without polymorphic names");
+				if ti, ok := tt.derived.(ast.Typeid_Type); ok && ti.specialization != nil {
+					error(p, tt.pos, "specialization of typeid is not allowed without polymorphic names");
 				}
 			}
 		}
@@ -1657,9 +1655,9 @@ parse_field_list :: proc(p: ^Parser, follow: token.Kind, allowed_flags: ast.Fiel
 		handle_field(p, &seen_ellipsis, &fields, docs, names, allowed_flags, set_flags);
 
 		for p.curr_tok.kind != follow && p.curr_tok.kind != token.EOF {
-			docs := p.lead_comment;
-			set_flags := parse_field_prefixes(p);
-			names := parse_ident_list(p, allow_poly_names);
+			docs = p.lead_comment;
+			set_flags = parse_field_prefixes(p);
+			names = parse_ident_list(p, allow_poly_names);
 
 			total_name_count += len(names);
 			ok := handle_field(p, &seen_ellipsis, &fields, docs, names, allowed_flags, set_flags);
@@ -1866,6 +1864,8 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case token.Inline, token.No_Inline:
 		tok := advance_token(p);
+		_ = tok;
+		// TODO(bill): Handle `inline` and `no_inline`
 
 	case token.Proc:
 		tok := expect_token(p, token.Proc);
@@ -1956,10 +1956,10 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		i.tok = tok;
 		type: ^ast.Expr = parse_call_expr(p, i);
 		for p.curr_tok.kind == token.Period {
-			tok := advance_token(p);
+			period := advance_token(p);
 
 			field := parse_ident(p);
-			sel := ast.new(ast.Selector_Expr, tok.pos, field.end);
+			sel := ast.new(ast.Selector_Expr, period.pos, field.end);
 			sel.expr = type;
 			sel.field = field;
 
@@ -2011,9 +2011,9 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case token.Map:
 		tok := expect_token(p, token.Map);
-		open := expect_token(p, token.Open_Bracket);
+		expect_token(p, token.Open_Bracket);
 		key := parse_type(p);
-		close := expect_token(p, token.Close_Bracket);
+		expect_token(p, token.Close_Bracket);
 		value := parse_type(p);
 
 		mt := ast.new(ast.Map_Type, tok.pos, value.end);
@@ -2068,7 +2068,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			error(p, tok.pos, "'#raw_union' cannot also be '#packed");
 		}
 
-		open := expect_token(p, token.Open_Brace);
+		expect_token(p, token.Open_Brace);
 		fields, name_count = parse_field_list(p, token.Close_Brace, ast.Field_Flags_Struct);
 		close := expect_token(p, token.Close_Brace);
 
@@ -2113,7 +2113,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 		variants: [dynamic]^ast.Expr;
 
-		open := expect_token_after(p, token.Open_Brace, "union");
+		expect_token_after(p, token.Open_Brace, "union");
 
 		for p.curr_tok.kind != token.Close_Brace && p.curr_tok.kind != token.EOF {
 			type := parse_type(p);

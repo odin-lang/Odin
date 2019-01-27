@@ -10,6 +10,7 @@ new :: proc($T: typeid, pos, end: token.Pos) -> ^T {
 	n.end = end;
 	n.derived = n^;
 	base: ^Node = n; // dummy check
+	_ = base; // "Use" type to make -vet happy
 	return n;
 }
 
