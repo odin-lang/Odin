@@ -2,7 +2,6 @@ package odin_tokenizer
 
 import "core:fmt"
 import "core:odin/token"
-import "core:strconv"
 import "core:unicode/utf8"
 
 Error_Handler :: #type proc(pos: token.Pos, fmt: string, args: ..any);
