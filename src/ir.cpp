@@ -6894,8 +6894,10 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 	case_ast_node(be, BinaryExpr, expr);
 		irValue *v = ir_build_expr(proc, expr);
 		Type *t = ir_type(v);
-		GB_ASSERT(is_type_pointer(t));
-		return ir_addr(v);
+		if (is_type_pointer(t)) {
+			return ir_addr(v);
+		}
+		return ir_addr(ir_address_from_load_or_generate_local(proc, v));
 	case_end;
 
 	case_ast_node(ie, IndexExpr, expr);
