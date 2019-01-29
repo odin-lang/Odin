@@ -78,10 +78,26 @@ error :: proc(p: ^Parser, pos: token.Pos, msg: string, args: ..any) {
 
 
 end_pos :: proc(tok: token.Token) -> token.Pos {
-	// TODO(bill): Correct this for multiline tokens (comments)
 	pos := tok.pos;
 	pos.offset += len(tok.text);
-	pos.column += len(tok.text);
+
+	if tok.kind == token.Comment {
+		if tok.text[:2] != "/*" {
+			pos.column += len(tok.text);
+		} else {
+			for i := 0; i < len(tok.text); i += 1 {
+				c := tok.text[i];
+				if c == '\n' {
+					pos.line += 1;
+					pos.column = 1;
+				} else {
+					pos.column += 1;
+				}
+			}
+		}
+	} else {
+		pos.column += len(tok.text);
+	}
 	return pos;
 }
 
@@ -120,7 +136,6 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 		if is_blank_ident(pkg_name) {
 			error(p, pkg_name.pos, "invalid package name '_'");
 		}
-		// TODO(bill): Reserved package names
 	}
 	p.file.pkg_name = pkg_name.text;
 
@@ -248,9 +263,6 @@ expect_token :: proc(p: ^Parser, kind: token.Kind) -> token.Token {
 		e := token.to_string(kind);
 		g := token.to_string(prev.kind);
 		error(p, prev.pos, "expected '%s', got '%s'", e, g);
-		if prev.kind == token.EOF {
-			// TODO(bill): Handle catastropic errors?
-		}
 	}
 	advance_token(p);
 	return prev;
@@ -1081,14 +1093,20 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 		switch name {
 		case "bounds_check", "no_bounds_check":
-			// TODO(bill): Handle stmt state flags
-			return parse_stmt(p);
+			stmt := parse_stmt(p);
+			switch name {
+			case "bounds_check":
+				stmt.state_flags |= {ast.Node_State_Flag.Bounds_Check};
+			case "no_bounds_check":
+				stmt.state_flags |= {ast.Node_State_Flag.No_Bounds_Check};
+			}
+			return stmt;
 		case "complete":
 			stmt := parse_stmt(p);
 			switch s in &stmt.derived {
 			case ast.Switch_Stmt:      s.complete = true;
 			case ast.Type_Switch_Stmt: s.complete = true;
-			case: error(p, stmt.pos, "#complete can only be applied to a swtich statement");
+			case: error(p, stmt.pos, "#complete can only be applied to a switch statement");
 			}
 			return stmt;
 		case "assert":
@@ -1747,7 +1765,16 @@ parse_proc_type :: proc(p: ^Parser, tok: token.Token) -> ^ast.Proc_Type {
 
 	loop: for param in params.list {
 		if param.type != nil {
-
+			if _, ok := param.type.derived.(ast.Poly_Type); ok {
+				is_generic = true;
+				break loop;
+			}
+			for name in param.names {
+				if _, ok := name.derived.(ast.Poly_Type); ok {
+					is_generic = true;
+					break loop;
+				}
+			}
 		}
 	}
 
@@ -1763,7 +1790,18 @@ parse_proc_type :: proc(p: ^Parser, tok: token.Token) -> ^ast.Proc_Type {
 }
 
 check_poly_params_for_type :: proc(p: ^Parser, poly_params: ^ast.Field_List, tok: token.Token) {
-
+	if poly_params == nil {
+		return;
+	}
+	for field in poly_params.list {
+		for name in field.names {
+			if name == nil do continue;
+			if _, ok := name.derived.(ast.Poly_Type); ok {
+				error(p, name.pos, "polymorphic names are not needed for %s parameters", tok.text);
+				return;
+			}
+		}
+	}
 }
 
 
@@ -1864,8 +1902,31 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case token.Inline, token.No_Inline:
 		tok := advance_token(p);
-		_ = tok;
-		// TODO(bill): Handle `inline` and `no_inline`
+		expr := parse_unary_expr(p, false);
+
+		pi := ast.Proc_Inlining.None;
+		switch tok.kind {
+		case token.Inline:
+			pi = ast.Proc_Inlining.Inline;
+		case token.No_Inline:
+			pi = ast.Proc_Inlining.No_Inline;
+		}
+
+		switch e in &ast.unparen_expr(expr).derived {
+		case ast.Proc_Lit:
+			if e.inlining != ast.Proc_Inlining.None && e.inlining != pi {
+				error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure literal");
+			}
+			e.inlining = pi;
+		case ast.Call_Expr:
+			if e.inlining != ast.Proc_Inlining.None && e.inlining != pi {
+				error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure call");
+			}
+			e.inlining = pi;
+		case:
+			error(p, tok.pos, "'%s' must be followed by a procedure literal or call", tok.text);
+			return ast.new(ast.Bad_Expr, tok.pos, expr.end);
+		}
 
 	case token.Proc:
 		tok := expect_token(p, token.Proc);
