@@ -318,13 +318,33 @@ String concatenate_strings(gbAllocator a, String const &x, String const &y) {
 	return make_string(data, len);
 }
 
+String string_join_and_quote(gbAllocator a, Array<String> strings) {
+	if (!strings.count) {
+		return make_string(nullptr, 0);
+	}
+
+	isize str_len = 0;
+	for (isize i = 0; i < strings.count; i++) {
+		str_len += strings[i].len;
+	}
+
+	gbString s = gb_string_make_reserve(a, str_len+strings.count); // +strings.count for spaces after args.
+	for (isize i = 0; i < strings.count; i++) {
+		if (i > 0) {
+			s = gb_string_append_fmt(s, " ");
+		}
+		s = gb_string_append_fmt(s, "\"%.*s\" ", LIT(strings[i]));
+	}
+
+	return make_string(cast(u8 *) s, gb_string_length(s));
+}
+
 String copy_string(gbAllocator a, String const &s) {
 	u8 *data = gb_alloc_array(a, u8, s.len+1);
 	gb_memmove(data, s.text, s.len);
 	data[s.len] = 0;
 	return make_string(data, s.len);
 }
-
 
 
 
