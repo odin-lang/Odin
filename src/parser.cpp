@@ -1702,7 +1702,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			} else if (e->kind == Ast_CallExpr) {
 				if (expr->CallExpr.inlining != ProcInlining_none &&
 				    expr->CallExpr.inlining != pi) {
-					syntax_error(expr, "You cannot apply both 'inline' and 'no_inline' to a procedure literal");
+					syntax_error(expr, "You cannot apply both 'inline' and 'no_inline' to a procedure call");
 				}
 				expr->CallExpr.inlining = pi;
 			}
