@@ -9,7 +9,7 @@ swap :: proc{swap16, swap32, swap64};
 
 
 
-set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
+set :: inline proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	if data == nil do return nil;
 	if len < 0 do return data;
 	foreign _ {
@@ -24,20 +24,20 @@ set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	llvm_memset(data, byte(value), len, 1, false);
 	return data;
 }
-zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
+zero :: inline proc "contextless" (data: rawptr, len: int) -> rawptr {
 	return set(data, 0, len);
 }
-zero_item :: proc "contextless" (item: $P/^$T) {
+zero_item :: inline proc "contextless" (item: $P/^$T) {
 	set(item, 0, size_of(T));
 }
-zero_slice :: proc "contextless" (data: $T/[]$E) {
+zero_slice :: inline proc "contextless" (data: $T/[]$E) {
 	if n := len(data); n > 0 {
 		zero(&data[0], size_of(E)*n);
 	}
 }
 
 
-copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
+copy :: inline proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memmove
 	foreign _ {
@@ -52,7 +52,7 @@ copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	llvm_memmove(dst, src, len, 1, false);
 	return dst;
 }
-copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
+copy_non_overlapping :: inline proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memcpy
 	foreign _ {
@@ -67,7 +67,7 @@ copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawpt
 	llvm_memcpy(dst, src, len, 1, false);
 	return dst;
 }
-compare :: proc "contextless" (a, b: []byte) -> int {
+compare :: inline proc "contextless" (a, b: []byte) -> int {
 	return compare_byte_ptrs(&a[0], &b[0], min(len(a), len(b)));
 }
 compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int #no_bounds_check {
@@ -112,29 +112,29 @@ compare_ptrs :: inline proc "contextless" (a, b: rawptr, n: int) -> int {
 	return compare_byte_ptrs((^byte)(a), (^byte)(b), n);
 }
 
-ptr_offset :: proc "contextless" (ptr: $P/^$T, n: int) -> P {
+ptr_offset :: inline proc "contextless" (ptr: $P/^$T, n: int) -> P {
 	new := int(uintptr(ptr)) + size_of(T)*n;
 	return P(uintptr(new));
 }
 
-ptr_sub :: proc "contextless" (a, b: $P/^$T) -> int {
+ptr_sub :: inline proc "contextless" (a, b: $P/^$T) -> int {
 	return (int(uintptr(a)) - int(uintptr(b)))/size_of(T);
 }
 
-slice_ptr :: proc "contextless" (ptr: ^$T, len: int) -> []T {
+slice_ptr :: inline proc "contextless" (ptr: ^$T, len: int) -> []T {
 	assert(len >= 0);
 	slice := Raw_Slice{data = ptr, len = len};
 	return transmute([]T)slice;
 }
 
-slice_to_bytes :: proc "contextless" (slice: $E/[]$T) -> []byte {
+slice_to_bytes :: inline proc "contextless" (slice: $E/[]$T) -> []byte {
 	s := transmute(Raw_Slice)slice;
 	s.len *= size_of(T);
 	return transmute([]byte)s;
 }
 
 
-buffer_from_slice :: proc(backing: $T/[]$E) -> [dynamic]E {
+buffer_from_slice :: inline proc(backing: $T/[]$E) -> [dynamic]E {
 	s := transmute(Raw_Slice)backing;
 	d := Raw_Dynamic_Array{
 		data      = s.data,
@@ -145,12 +145,12 @@ buffer_from_slice :: proc(backing: $T/[]$E) -> [dynamic]E {
 	return transmute([dynamic]E)d;
 }
 
-ptr_to_bytes :: proc "contextless" (ptr: ^$T, len := 1) -> []byte {
+ptr_to_bytes :: inline proc "contextless" (ptr: ^$T, len := 1) -> []byte {
 	assert(len >= 0);
 	return transmute([]byte)Raw_Slice{ptr, len*size_of(T)};
 }
 
-any_to_bytes :: proc "contextless" (val: any) -> []byte {
+any_to_bytes :: inline proc "contextless" (val: any) -> []byte {
 	ti := type_info_of(val.id);
 	size := ti != nil ? ti.size : 0;
 	return transmute([]byte)Raw_Slice{val.data, size};
@@ -162,7 +162,7 @@ megabytes :: inline proc "contextless" (x: int) -> int do return kilobytes(x) * 
 gigabytes :: inline proc "contextless" (x: int) -> int do return megabytes(x) * 1024;
 terabytes :: inline proc "contextless" (x: int) -> int do return gigabytes(x) * 1024;
 
-is_power_of_two :: proc(x: uintptr) -> bool {
+is_power_of_two :: inline proc(x: uintptr) -> bool {
 	if x <= 0 do return false;
 	return (x & (x-1)) == 0;
 }
@@ -189,9 +189,9 @@ align_forward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
 
 
 
-AllocationHeader :: struct {size: int};
+Allocation_Header :: struct {size: int};
 
-allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: int) {
+allocation_header_fill :: proc(header: ^Allocation_Header, data: rawptr, size: int) {
 	header.size = size;
 	ptr := cast(^uint)(ptr_offset(header, 1));
 	n := ptr_sub(cast(^uint)data, ptr);
@@ -200,11 +200,11 @@ allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: in
 		ptr_offset(ptr, i)^ = ~uint(0);
 	}
 }
-allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
+allocation_header :: proc(data: rawptr) -> ^Allocation_Header {
 	if data == nil do return nil;
 	p := cast(^uint)data;
 	for ptr_offset(p, -1)^ == ~uint(0) do p = ptr_offset(p, -1);
-	return (^AllocationHeader)(ptr_offset(p, -1));
+	return (^Allocation_Header)(ptr_offset(p, -1));
 }
 
 
