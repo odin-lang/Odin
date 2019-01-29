@@ -738,14 +738,32 @@ int main(int arg_count, char **arg_ptr) {
 	Array<String> args = setup_args(arg_count, arg_ptr);
 
 	String command = args[1];
-
 	String init_filename = {};
+	String run_args_string = {};
+
 	bool run_output = false;
 	if (command == "run") {
 		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
 		}
+
+		Array<String> run_args = array_make<String>(heap_allocator(), 0, arg_count);
+		defer (array_free(&run_args));
+
+		isize last_non_run_arg = args.count;
+		for_array(i, args) {
+			if (args[i] == "--") {
+				last_non_run_arg = i;
+			}
+			if (i <= last_non_run_arg) {
+				continue;
+			}
+			array_add(&run_args, args[i]);
+		}
+
+		args = array_slice(args, 0, last_non_run_arg);
+		run_args_string = string_join_and_quote(heap_allocator(), run_args);
 		init_filename = args[2];
 		run_output = true;
 	} else if (command == "build") {
@@ -974,7 +992,7 @@ int main(int arg_count, char **arg_ptr) {
 		remove_temp_files(output_base);
 
 		if (run_output) {
-			system_exec_command_line_app("odin run", false, "%.*s.exe", LIT(output_base));
+			system_exec_command_line_app("odin run", false, "%.*s.exe %.*s", LIT(output_base), LIT(run_args_string));
 		}
 	#else
 		timings_start_section(&timings, str_lit("ld-link"));
@@ -1111,7 +1129,7 @@ int main(int arg_count, char **arg_ptr) {
 
 		if (run_output) {
 			output_base = path_to_full_path(heap_allocator(), output_base);
-			system_exec_command_line_app("odin run", false, "\"%.*s\"", LIT(output_base));
+			system_exec_command_line_app("odin run", false, "\"%.*s\" %.*s", LIT(output_base), LIT(run_args_string));
 		}
 	#endif
 #endif
