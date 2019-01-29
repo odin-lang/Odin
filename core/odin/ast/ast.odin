@@ -27,15 +27,22 @@ Proc_Calling_Convention :: enum i32 {
 	Foreign_Block_Default = -1,
 }
 
+Node_State_Flag :: enum {
+	Bounds_Check,
+	No_Bounds_Check,
+}
+Node_State_Flags :: distinct bit_set[Node_State_Flag];
+
 
 Comment_Group :: struct {
 	list: []token.Token,
 }
 
 Node :: struct {
-	pos:     token.Pos,
-	end:     token.Pos,
-	derived: any,
+	pos:         token.Pos,
+	end:         token.Pos,
+	derived:     any,
+	state_flags: Node_State_Flags,
 }
 
 
