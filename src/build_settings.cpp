@@ -101,6 +101,7 @@ struct BuildContext {
 	i32    optimization_level;
 	bool   show_timings;
 	bool   keep_temp_files;
+	bool   ignore_unknown_attributes;
 	bool   no_bounds_check;
 	bool   no_output_files;
 	bool   no_crt;

@@ -3650,30 +3650,38 @@ Ast *parse_foreign_decl(AstFile *f) {
 
 Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind close_kind) {
 	Array<Ast *> elems = {};
-	Token open = expect_token(f, open_kind);
-	f->expr_level++;
-	if (f->curr_token.kind != close_kind) {
-		elems = array_make<Ast *>(heap_allocator());
-		while (f->curr_token.kind != close_kind &&
-		       f->curr_token.kind != Token_EOF) {
-			Ast *elem = nullptr;
-			elem = parse_ident(f);
-			if (f->curr_token.kind == Token_Eq) {
-				Token eq = expect_token(f, Token_Eq);
-				Ast *value = parse_value(f);
-				elem = ast_field_value(f, elem, value, eq);
-			}
+	Token open = {};
+	Token close = {};
 
-			array_add(&elems, elem);
+	if (f->curr_token.kind == Token_Ident) {
+		elems = array_make<Ast *>(heap_allocator(), 0, 1);
+		Ast *elem = parse_ident(f);
+		array_add(&elems, elem);
+	} else {
+		open = expect_token(f, open_kind);
+		f->expr_level++;
+		if (f->curr_token.kind != close_kind) {
+			elems = array_make<Ast *>(heap_allocator());
+			while (f->curr_token.kind != close_kind &&
+			       f->curr_token.kind != Token_EOF) {
+				Ast *elem = nullptr;
+				elem = parse_ident(f);
+				if (f->curr_token.kind == Token_Eq) {
+					Token eq = expect_token(f, Token_Eq);
+					Ast *value = parse_value(f);
+					elem = ast_field_value(f, elem, value, eq);
+				}
 
-			if (!allow_token(f, Token_Comma)) {
-				break;
+				array_add(&elems, elem);
+
+				if (!allow_token(f, Token_Comma)) {
+					break;
+				}
 			}
 		}
+		f->expr_level--;
+		close = expect_closing(f, close_kind, str_lit("attribute"));
 	}
-	f->expr_level--;
-	Token close = expect_closing(f, close_kind, str_lit("attribute"));
-
 	Ast *attribute = ast_attribute(f, token, open, close, elems);
 
 	Ast *decl = parse_stmt(f);

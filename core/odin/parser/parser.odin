@@ -774,31 +774,37 @@ parse_switch_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 parse_attribute :: proc(p: ^Parser, tok: token.Token, open_kind, close_kind: token.Kind) -> ^ast.Stmt {
 	elems: [dynamic]^ast.Expr;
 
-	open := expect_token(p, open_kind);
-	p.expr_level += 1;
-	for p.curr_tok.kind != close_kind &&
-		p.curr_tok.kind != token.EOF {
-		elem: ^ast.Expr;
-		elem = parse_ident(p);
-		if p.curr_tok.kind == token.Eq {
-			eq := expect_token(p, token.Eq);
-			value := parse_value(p);
-			fv := ast.new(ast.Field_Value, elem.pos, value.end);
-			fv.field = elem;
-			fv.sep   = eq.pos;
-			fv.value = value;
+	open, close: token.Token;
 
-			elem = fv;
-		}
+	if p.curr_tok.kind == token.Ident {
+		elem := parse_ident(p);
 		append(&elems, elem);
+	} else {
+		open = expect_token(p, open_kind);
+		p.expr_level += 1;
+		for p.curr_tok.kind != close_kind &&
+			p.curr_tok.kind != token.EOF {
+			elem: ^ast.Expr;
+			elem = parse_ident(p);
+			if p.curr_tok.kind == token.Eq {
+				eq := expect_token(p, token.Eq);
+				value := parse_value(p);
+				fv := ast.new(ast.Field_Value, elem.pos, value.end);
+				fv.field = elem;
+				fv.sep   = eq.pos;
+				fv.value = value;
 
-		if !allow_token(p, token.Comma) {
-			break;
+				elem = fv;
+			}
+			append(&elems, elem);
+
+			if !allow_token(p, token.Comma) {
+				break;
+			}
 		}
+		p.expr_level -= 1;
+		close = expect_token_after(p, close_kind, "attribute");
 	}
-
-	p.expr_level -= 1;
-	close := expect_token_after(p, close_kind, "attribute");
 
 	attribute := ast.new(ast.Attribute, tok.pos, end_pos(close));
 	attribute.tok   = tok.kind;
