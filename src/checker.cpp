@@ -2150,7 +2150,9 @@ void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, De
 			}
 
 			if (!proc(c, elem, name, value, ac)) {
-				error(elem, "Unknown attribute element name '%.*s'", LIT(name));
+				if (!build_context.ignore_unknown_attributes) {
+					error(elem, "Unknown attribute element name '%.*s'", LIT(name));
+				}
 			}
 		}
 	}

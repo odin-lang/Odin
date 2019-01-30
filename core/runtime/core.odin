@@ -344,7 +344,7 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.logger.data = nil;
 }
 
-@(builtin)
+@builtin
 init_global_temporary_allocator :: proc(data: []byte, backup_allocator := context.allocator) {
 	mem.scratch_allocator_init(&global_scratch_allocator_data, data, backup_allocator);
 }
@@ -364,7 +364,7 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 
 
 
-@(builtin)
+@builtin
 copy :: proc "contextless" (dst, src: $T/[]$E) -> int {
 	n := max(0, min(len(dst), len(src)));
 	if n > 0 do mem.copy(&dst[0], &src[0], n*size_of(E));
@@ -373,7 +373,7 @@ copy :: proc "contextless" (dst, src: $T/[]$E) -> int {
 
 
 
-@(builtin)
+@builtin
 pop :: proc "contextless" (array: ^$T/[dynamic]$E) -> E {
 	if array == nil do return E{};
 	assert(len(array) > 0);
@@ -382,7 +382,7 @@ pop :: proc "contextless" (array: ^$T/[dynamic]$E) -> E {
 	return res;
 }
 
-@(builtin)
+@builtin
 unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
 	bounds_check_error_loc(loc, index, len(array));
 	n := len(array)-1;
@@ -392,7 +392,7 @@ unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_loca
 	pop(array);
 }
 
-@(builtin)
+@builtin
 ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
 	bounds_check_error_loc(loc, index, len(array));
 	copy(array[index:], array[index+1:]);
@@ -400,29 +400,29 @@ ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_locati
 }
 
 
-@(builtin)
+@builtin
 clear :: proc{clear_dynamic_array, clear_map};
 
-@(builtin)
+@builtin
 reserve :: proc{reserve_dynamic_array, reserve_map};
 
-@(builtin)
+@builtin
 resize :: proc{resize_dynamic_array};
 
 
-@(builtin)
+@builtin
 new :: proc{mem.new};
 
-@(builtin)
+@builtin
 new_clone :: proc{mem.new_clone};
 
-@(builtin)
+@builtin
 free :: proc{mem.free};
 
-@(builtin)
+@builtin
 free_all :: proc{mem.free_all};
 
-@(builtin)
+@builtin
 delete :: proc{
 	mem.delete_string,
 	mem.delete_cstring,
@@ -431,7 +431,7 @@ delete :: proc{
 	mem.delete_map,
 };
 
-@(builtin)
+@builtin
 make :: proc{
 	mem.make_slice,
 	mem.make_dynamic_array,
@@ -443,7 +443,7 @@ make :: proc{
 
 
 
-@(builtin)
+@builtin
 clear_map :: inline proc "contextless" (m: ^$T/map[$K]$V) {
 	if m == nil do return;
 	raw_map := (^mem.Raw_Map)(m);
@@ -454,19 +454,19 @@ clear_map :: inline proc "contextless" (m: ^$T/map[$K]$V) {
 	}
 }
 
-@(builtin)
+@builtin
 reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int) {
 	if m != nil do __dynamic_map_reserve(__get_map_header(m), capacity);
 }
 
-@(builtin)
+@builtin
 delete_key :: proc(m: ^$T/map[$K]$V, key: K) {
 	if m != nil do __dynamic_map_delete_key(__get_map_header(m), __get_map_key(key));
 }
 
 
 
-@(builtin)
+@builtin
 append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 	if array == nil do return;
 
@@ -485,7 +485,7 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 		a.len += arg_len;
 	}
 }
-@(builtin)
+@builtin
 append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)  {
 	if array == nil do return;
 
@@ -506,23 +506,23 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 		a.len += arg_len;
 	}
 }
-@(builtin) append :: proc{append_elem, append_elems};
+@builtin append :: proc{append_elem, append_elems};
 
 
 
-@(builtin)
+@builtin
 append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_location) {
 	for arg in args {
 		append(array = array, args = ([]E)(arg), loc = loc);
 	}
 }
 
-@(builtin)
+@builtin
 clear_dynamic_array :: inline proc "contextless" (array: ^$T/[dynamic]$E) {
 	if array != nil do (^mem.Raw_Dynamic_Array)(array).len = 0;
 }
 
-@(builtin)
+@builtin
 reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #caller_location) -> bool {
 	if array == nil do return false;
 	a := (^mem.Raw_Dynamic_Array)(array);
@@ -549,7 +549,7 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 	return true;
 }
 
-@(builtin)
+@builtin
 resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller_location) -> bool {
 	if array == nil do return false;
 	a := (^mem.Raw_Dynamic_Array)(array);
@@ -582,42 +582,42 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 
 
 
-@(builtin)
+@builtin
 incl_elem :: inline proc(s: ^$S/bit_set[$E; $U], elem: E) -> S {
 	s^ |= {elem};
 	return s^;
 }
-@(builtin)
+@builtin
 incl_elems :: inline proc(s: ^$S/bit_set[$E; $U], elems: ..E) -> S {
 	for elem in elems do s^ |= {elem};
 	return s^;
 }
-@(builtin)
+@builtin
 incl_bit_set :: inline proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
 	s^ |= other;
 	return s^;
 }
-@(builtin)
+@builtin
 excl_elem :: inline proc(s: ^$S/bit_set[$E; $U], elem: E) -> S {
 	s^ &~= {elem};
 	return s^;
 }
-@(builtin)
+@builtin
 excl_elems :: inline proc(s: ^$S/bit_set[$E; $U], elems: ..E) -> S {
 	for elem in elems do s^ &~= {elem};
 	return s^;
 }
-@(builtin)
+@builtin
 excl_bit_set :: inline proc(s: ^$S/bit_set[$E; $U], other: S) -> S {
 	s^ &~= other;
 	return s^;
 }
 
-@(builtin) incl :: proc{incl_elem, incl_elems, incl_bit_set};
-@(builtin) excl :: proc{excl_elem, excl_elems, excl_bit_set};
+@builtin incl :: proc{incl_elem, incl_elems, incl_bit_set};
+@builtin excl :: proc{excl_elem, excl_elems, excl_bit_set};
 
 
-@(builtin)
+@builtin
 card :: proc(s: $S/bit_set[$E; $U]) -> int {
 	when size_of(S) == 1 {
 		foreign { @(link_name="llvm.ctpop.i8")  count_ones :: proc(i: u8) -> u8 --- }
@@ -642,7 +642,7 @@ card :: proc(s: $S/bit_set[$E; $U]) -> int {
 
 
 
-@(builtin)
+@builtin
 assert :: proc "contextless" (condition: bool, message := "", loc := #caller_location) -> bool {
 	if !condition {
 		p := context.assertion_failure_proc;
@@ -654,7 +654,7 @@ assert :: proc "contextless" (condition: bool, message := "", loc := #caller_loc
 	return condition;
 }
 
-@(builtin)
+@builtin
 panic :: proc "contextless" (message: string, loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc;
 	if p == nil {
@@ -663,7 +663,7 @@ panic :: proc "contextless" (message: string, loc := #caller_location) -> ! {
 	p("Panic", message, loc);
 }
 
-@(builtin)
+@builtin
 unimplemented :: proc "contextless" (message := "", loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc;
 	if p == nil {
@@ -672,7 +672,7 @@ unimplemented :: proc "contextless" (message := "", loc := #caller_location) -> 
 	p("not yet implemented", message, loc);
 }
 
-@(builtin)
+@builtin
 unreachable :: proc "contextless" (message := "", loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc;
 	if p == nil {

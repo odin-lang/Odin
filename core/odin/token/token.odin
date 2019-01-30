@@ -159,9 +159,11 @@ using Kind :: enum i32 {
 		Yield,
 		Await,
 	B_Keyword_End,
+
+	COUNT,
 };
 
-tokens := [len(Kind)]string {
+tokens := [Kind.COUNT]string {
 	"Invalid",
 	"EOF",
 	"Comment",
