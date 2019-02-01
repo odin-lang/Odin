@@ -1056,21 +1056,29 @@ int main(int arg_count, char **arg_ptr) {
 
 		// Unlike the Win32 linker code, the output_ext includes the dot, because
 		// typically executable files on *NIX systems don't have extensions.
-		char *output_ext = "";
+		String output_ext = {};
 		char *link_settings = "";
 		char *linker;
 		if (build_context.is_dll) {
 			// Shared libraries are .dylib on MacOS and .so on Linux.
 			#if defined(GB_SYSTEM_OSX)
-				output_ext = ".dylib";
+				output_ext = STR_LIT(".dylib");
 			#else
-				output_ext = ".so";
+				output_ext = STR_LIT(".so");
 			#endif
 
 			link_settings = "-shared";
 		} else {
 			// TODO: Do I need anything here?
 			link_settings = "";
+		}
+
+		if (build_context.out_filepath.len > 0) {
+			//NOTE(thebirk): We have a custom -out arguments, so we should use the extension from that
+			isize pos = string_extension_position(build_context.out_filepath);
+			if (pos > 0) {
+				output_ext = substring(build_context.out_filepath, pos, build_context.out_filepath.len);
+			}
 		}
 
 		#if defined(GB_SYSTEM_OSX)
@@ -1088,7 +1096,7 @@ int main(int arg_count, char **arg_ptr) {
 		#endif
 
 		exit_code = system_exec_command_line_app("ld-link", true,
-			"%s \"%.*s.o\" -o \"%.*s%s\" %s "
+			"%s \"%.*s.o\" -o \"%.*s%.*s\" %s "
 			" %s "
 			" %.*s "
 			" %s "
@@ -1101,7 +1109,7 @@ int main(int arg_count, char **arg_ptr) {
 				// This points the linker to where the entry point is
 				" -e _main "
 			#endif
-			, linker, LIT(output_base), LIT(output_base), output_ext,
+			, linker, LIT(output_base), LIT(output_base), LIT(output_ext),
 			lib_str,
 			str_eq_ignore_case(cross_compile_target, str_lit("Essence")) ? "-lfreetype -lglue" : "-lc -lm",
 			LIT(build_context.link_flags),
@@ -1134,8 +1142,10 @@ int main(int arg_count, char **arg_ptr) {
 		remove_temp_files(output_base);
 
 		if (run_output) {
-			output_base = path_to_full_path(heap_allocator(), output_base);
-			system_exec_command_line_app("odin run", false, "\"%.*s\" %.*s", LIT(output_base), LIT(run_args_string));
+			//NOTE(thebirk): This whole thing is a little leaky
+			String complete_path = concatenate_strings(heap_allocator(), output_base, output_ext);
+			complete_path = path_to_full_path(heap_allocator(), complete_path);
+			system_exec_command_line_app("odin run", false, "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
 		}
 	#endif
 #endif
