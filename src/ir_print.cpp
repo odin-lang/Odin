@@ -25,6 +25,11 @@ void ir_file_buffer_destroy(irFileBuffer *f) {
 
 void ir_file_buffer_write(irFileBuffer *f, void const *data, isize len) {
 	if (len > f->vm.size) {
+		//NOTE(thebirk): Flush the vm data before we print this directly
+		//               otherwise we get out of order printing which is no good
+		gb_file_write(f->output, f->vm.data, f->offset);
+		f->offset = 0;
+
 		gb_file_write(f->output, data, len);
 		return;
 	}
