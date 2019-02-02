@@ -1125,7 +1125,7 @@ int main(int arg_count, char **arg_ptr) {
 			// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
 			// to the symbols in the object file
 			exit_code = system_exec_command_line_app("dsymutil", true,
-				"dsymutil %.*s%s", LIT(output_base), output_ext
+				"dsymutil %.*s%.*s", LIT(output_base), LIT(output_ext)
 			);
 
 			if (exit_code != 0) {
