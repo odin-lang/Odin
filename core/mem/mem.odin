@@ -9,7 +9,7 @@ swap :: proc{swap16, swap32, swap64};
 
 
 
-set :: inline proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
+set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	if data == nil do return nil;
 	if len < 0 do return data;
 	foreign _ {
@@ -30,14 +30,14 @@ zero :: inline proc "contextless" (data: rawptr, len: int) -> rawptr {
 zero_item :: inline proc "contextless" (item: $P/^$T) {
 	set(item, 0, size_of(T));
 }
-zero_slice :: inline proc "contextless" (data: $T/[]$E) {
+zero_slice :: proc "contextless" (data: $T/[]$E) {
 	if n := len(data); n > 0 {
 		zero(&data[0], size_of(E)*n);
 	}
 }
 
 
-copy :: inline proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
+copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memmove
 	foreign _ {
@@ -52,7 +52,7 @@ copy :: inline proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	llvm_memmove(dst, src, len, 1, false);
 	return dst;
 }
-copy_non_overlapping :: inline proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
+copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memcpy
 	foreign _ {
@@ -71,7 +71,7 @@ compare :: inline proc "contextless" (a, b: []byte) -> int {
 	return compare_byte_ptrs(&a[0], &b[0], min(len(a), len(b)));
 }
 compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int #no_bounds_check {
-	ptr_idx :: inline proc(ptr: $P/^$T, n: int) -> T {
+	ptr_idx :: proc(ptr: $P/^$T, n: int) -> T {
 		return ptr_offset(ptr, n)^;
 	}
 
