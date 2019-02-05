@@ -1,0 +1,18 @@
+language: cpp
+git:
+  depth: false
+
+os:
+  - linux
+  - osx
+
+compiler:
+  - clang
+
+script: 
+  - make release
+  - ./odin run examples/demo/demo.odin
+  - ./odin check examples/demo/demo.odin -vet
+
+notifications:
+  email: false
