@@ -14,11 +14,11 @@
         <img src="https://img.shields.io/github/license/odin-lang/odin.svg">
     </a>
     <br>
-    <a href="https://ci.appveyor.com/project/ThisDrunkDane/odin">
-        <img src="https://ci.appveyor.com/api/projects/status/4q58fsv7bubmgcla?svg=true">
+    <a href="https://ci.appveyor.com/project/ThisDrunkDane/odin-vf0ap">
+        <img src="https://ci.appveyor.com/api/projects/status/qss6l921c0eu85u6/branch/master?svg=true">
     </a>
-    <a href="https://travis-ci.org/ThisDrunkDane/Odin">
-        <img src="https://travis-ci.org/ThisDrunkDane/Odin.svg?branch=travis">
+    <a href="https://travis-ci.org/odin-lang/Odin">
+        <img src="https://travis-ci.org/odin-lang/Odin.svg?branch=master">
     </a>
 </p>
 

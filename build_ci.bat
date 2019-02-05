@@ -1,10 +1,7 @@
 @echo off
 
-:: Make sure this is a decent name and not generic
 set exe_name=odin.exe
 
-:: Debug = 0, Release = 1
-set release_mode=1
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -GS- -EHsc- -GR- -O2 -MT -Z7 -DNO_ARRAY_BOUNDS_CHECK
 set compiler_warnings= ^
     -W4 -WX ^
