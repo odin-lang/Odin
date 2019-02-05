@@ -1,24 +1,12 @@
 package main
 
 import "core:fmt"
-import "core:strconv"
 import "core:mem"
-import "core:bits"
-import "core:hash"
-import "core:math"
-import "core:math/rand"
 import "core:os"
-import "core:sort"
-import "core:strings"
-import "core:types"
-import "core:unicode/utf16"
-import "core:unicode/utf8"
-import "core:c"
-import "core:runtime"
 
 when os.OS == "windows" {
+	import "core:runtime"
 	import "core:thread"
-	import "core:sys/win32"
 }
 
 @(link_name="general_stuff")
