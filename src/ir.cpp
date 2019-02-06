@@ -2740,12 +2740,16 @@ void ir_value_set_debug_location(irProcedure *proc, irValue *v) {
 void ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
 	gbAllocator a = ir_allocator();
 	Type *t = type_deref(ir_type(address));
-	auto args = array_make<irValue *>(a, 2);
-	args[0] = ir_emit_conv(p, address, t_rawptr);
-	args[1] = ir_const_int(type_size_of(t));
-	AstPackage *pkg = get_core_package(p->module->info, str_lit("mem"));
-	if (p->entity != nullptr && p->entity->token.string != "zero" && p->entity->pkg != pkg) {
-		irValue *v = ir_emit_package_call(p, "mem", "zero", args, expr, ProcInlining_no_inline);
+	isize sz = type_size_of(t);
+	if (!(gb_is_power_of_two(sz) && sz <= build_context.max_align)) {
+		// TODO(bill): Is this a good idea?
+		auto args = array_make<irValue *>(a, 2);
+		args[0] = ir_emit_conv(p, address, t_rawptr);
+		args[1] = ir_const_int(type_size_of(t));
+		AstPackage *pkg = get_core_package(p->module->info, str_lit("mem"));
+		if (p->entity != nullptr && p->entity->token.string != "zero" && p->entity->pkg != pkg) {
+			irValue *v = ir_emit_package_call(p, "mem", "zero", args, expr, ProcInlining_no_inline);
+		}
 	}
 	ir_emit(p, ir_instr_zero_init(p, address));
 }

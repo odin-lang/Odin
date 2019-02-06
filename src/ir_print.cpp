@@ -1109,7 +1109,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_exact_value(f, m, empty_exact_value, type);
 		ir_write_str_lit(f, ", ");
 		ir_print_type(f, m, type);
-		ir_fprintf(f, "* %%%d", instr->ZeroInit.address->index);
+		ir_fprintf(f, "* %%%d, align 1", instr->ZeroInit.address->index);
 		break;
 	}
 
