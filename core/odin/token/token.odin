@@ -28,7 +28,7 @@ pos_compare :: proc(lhs, rhs: Pos) -> int {
 	return strings.compare(lhs.file, rhs.file);
 }
 
-using Kind :: enum i32 {
+using Kind :: enum u16 {
 	Invalid,
 	EOF,
 	Comment,
