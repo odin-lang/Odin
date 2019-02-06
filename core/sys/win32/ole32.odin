@@ -3,9 +3,7 @@ package win32
 
 foreign import "system:ole32.lib"
 
-import "core:sys/win32"
-
-succeeded :: proc (hr: win32.Hresult) -> bool {
+succeeded :: proc (hr: Hresult) -> bool {
 	return hr >= 0;
 }
 
@@ -25,7 +23,7 @@ I_Unknown :: struct {
 }
 
 I_Unknown_Vtbl :: struct(T: typeid) {
-	query_interface: proc "std" (^T, ^Iid, rawptr) -> win32.Hresult,
+	query_interface: proc "std" (^T, ^Iid, rawptr) -> Hresult,
 	add_ref: proc "std" (^T) -> u32,
 	release: proc "std" (^T) -> u32,
 }
@@ -78,9 +76,9 @@ Luid :: struct {
 
 @(default_calling_convention = "std")
 foreign ole32 {
-	@(link_name = "ProgIDFromCLSID") com_get_prog_id_from_clsid :: proc(clsid_addr: ^Clsid, prog_id: ^win32.Wstring) -> win32.Hresult ---;
-	@(link_name = "CLSIDFromProgID") com_get_clsid_from_prog_id :: proc(prog_id: ^u16, out_clsid: ^Clsid) -> win32.Hresult ---;
-	@(link_name ="CoInitializeEx") com_init_ex :: proc(reserved: rawptr, co_init: Com_Init) ->win32.Hresult ---;
+	@(link_name = "ProgIDFromCLSID") com_get_prog_id_from_clsid :: proc(clsid_addr: ^Clsid, prog_id: ^Wstring) -> Hresult ---;
+	@(link_name = "CLSIDFromProgID") com_get_clsid_from_prog_id :: proc(prog_id: ^u16, out_clsid: ^Clsid) -> Hresult ---;
+	@(link_name ="CoInitializeEx") com_init_ex :: proc(reserved: rawptr, co_init: Com_Init) ->Hresult ---;
 	@(link_name = "CoUninitialize") com_shutdown :: proc() ---;
-	@(link_name = "CoCreateInstance") com_create :: proc(clsid_addr: ^Clsid, outer_unk: ^I_Unknown, ctx: Com_Class_Ctx, riid_addr: ^Iid, ppv: ^rawptr) -> win32.Hresult ---;
+	@(link_name = "CoCreateInstance") com_create :: proc(clsid_addr: ^Clsid, outer_unk: ^I_Unknown, ctx: Com_Class_Ctx, riid_addr: ^Iid, ppv: ^rawptr) -> Hresult ---;
 }
