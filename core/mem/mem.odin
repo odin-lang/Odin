@@ -71,10 +71,6 @@ compare :: inline proc "contextless" (a, b: []byte) -> int {
 	return compare_byte_ptrs(&a[0], &b[0], min(len(a), len(b)));
 }
 compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int #no_bounds_check {
-	ptr_idx :: proc(ptr: $P/^$T, n: int) -> T {
-		return ptr_offset(ptr, n)^;
-	}
-
 	x := slice_ptr(a, n);
 	y := slice_ptr(b, n);
 

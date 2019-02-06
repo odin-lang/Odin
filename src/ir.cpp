@@ -1583,7 +1583,7 @@ irValue *ir_add_local_for_identifier(irProcedure *proc, Ast *ident, bool zero_in
 	return nullptr;
 }
 
-irValue *ir_add_local_generated(irProcedure *proc, Type *type, bool zero_initialized = true) {
+irValue *ir_add_local_generated(irProcedure *proc, Type *type, bool zero_initialized) {
 	GB_ASSERT(type != nullptr);
 	type = default_type(type);
 
@@ -2809,7 +2809,7 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 
 	defer (proc->curr_block = tmp_block);
 
-	irValue *c = ir_add_local_generated(proc, t_context);
+	irValue *c = ir_add_local_generated(proc, t_context, true);
 	ir_push_context_onto_stack(proc, c);
 	ir_emit_store(proc, c, ir_emit_load(proc, proc->module->global_default_context));
 	ir_emit_init_context(proc, c);
@@ -2890,7 +2890,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 	Type *abi_rt = pt->Proc.abi_compat_result_type;
 	Type *rt = reduce_tuple_to_single_type(results);
 	if (pt->Proc.return_by_pointer) {
-		irValue *return_ptr = ir_add_local_generated(p, rt);
+		irValue *return_ptr = ir_add_local_generated(p, rt, true);
 		GB_ASSERT(is_type_pointer(ir_type(return_ptr)));
 		ir_emit(p, ir_instr_call(p, value, return_ptr, args, nullptr, context_ptr, inlining));
 		result = ir_emit_load(p, return_ptr);
@@ -3061,7 +3061,7 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_type) {
 	GB_ASSERT_MSG(is_type_pointer(ir_type(map_val_ptr)), "%s", type_to_string(ir_type(map_val_ptr)));
 	gbAllocator a = ir_allocator();
-	irValue *h = ir_add_local_generated(proc, t_map_header);
+	irValue *h = ir_add_local_generated(proc, t_map_header, false); // all the values will be initialzed later
 	map_type = base_type(map_type);
 
 	Type *key_type = map_type->Map.key;
@@ -3072,9 +3072,7 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_ty
 	irValue *m = ir_emit_conv(proc, map_val_ptr, type_deref(ir_type(gep0)));
 	ir_emit_store(proc, gep0, m);
 
-	if (is_type_string(key_type)) {
-		ir_emit_store(proc, ir_emit_struct_ep(proc, h, 1), v_true);
-	}
+	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 1), ir_const_bool(is_type_string(key_type)));
 
 	i64 entry_size   = type_size_of  (map_type->Map.entry_type);
 	i64 entry_align  = type_align_of (map_type->Map.entry_type);
@@ -3092,7 +3090,7 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_ty
 
 irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 	Type *hash_type = t_u64;
-	irValue *v = ir_add_local_generated(proc, t_map_key);
+	irValue *v = ir_add_local_generated(proc, t_map_key, true);
 	Type *t = base_type(ir_type(key));
 	key = ir_emit_conv(proc, key, key_type);
 	if (is_type_integer(t)) {
@@ -3300,7 +3298,7 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 	if (addr.kind == irAddr_Map) {
 		// TODO(bill): map lookup
 		Type *map_type = base_type(addr.map_type);
-		irValue *v = ir_add_local_generated(proc, map_type->Map.lookup_result_type);
+		irValue *v = ir_add_local_generated(proc, map_type->Map.lookup_result_type, true);
 		irValue *h = ir_gen_map_header(proc, addr.addr, map_type);
 		irValue *key = ir_gen_map_key(proc, addr.map_key, map_type->Map.key);
 
@@ -3481,7 +3479,7 @@ irLoopData ir_loop_start(irProcedure *proc, isize count) {
 
 	irValue *max = ir_const_int(count);
 
-	data.idx_addr = ir_add_local_generated(proc, t_int);
+	data.idx_addr = ir_add_local_generated(proc, t_int, true);
 
 	data.body = ir_new_block(proc, nullptr, "loop.body");
 	data.done = ir_new_block(proc, nullptr, "loop.done");
@@ -3536,7 +3534,8 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 		GB_ASSERT(is_type_array(type));
 		Type *elem_type = base_array_type(type);
 
-		irValue *res = ir_add_local_generated(proc, type);
+		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
+		irValue *res = ir_add_local_generated(proc, type, false);
 
 		bool inline_array_arith = type_size_of(type) <= build_context.max_align;
 
@@ -3594,8 +3593,8 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 		GB_ASSERT(is_type_array(type));
 		Type *elem_type = base_array_type(type);
 
-		// TODO(bill): Should this be zero initialized?
-		irValue *res = ir_add_local_generated(proc, type);
+		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
+		irValue *res = ir_add_local_generated(proc, type, false);
 		i64 count = base_type(type)->Array.count;
 
 		bool inline_array_arith = type_size_of(type) <= build_context.max_align;
@@ -4754,7 +4753,8 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	if (is_type_array(dst)) {
 		Type *elem = dst->Array.elem;
 		irValue *e = ir_emit_conv(proc, value, elem);
-		irValue *v = ir_add_local_generated(proc, t);
+		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
+		irValue *v = ir_add_local_generated(proc, t, false);
 		isize index_count = cast(isize)dst->Array.count;
 
 		for (i32 i = 0; i < index_count; i++) {
@@ -4765,7 +4765,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	}
 
 	if (is_type_any(dst)) {
-		irValue *result = ir_add_local_generated(proc, t_any);
+		irValue *result = ir_add_local_generated(proc, t_any, true);
 
 		if (is_type_untyped_nil(src)) {
 			return ir_emit_load(proc, result);
@@ -4894,7 +4894,7 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 		tuple = make_optional_ok_type(type);
 	}
 
-	irValue *v = ir_add_local_generated(proc, tuple);
+	irValue *v = ir_add_local_generated(proc, tuple, true);
 
 	if (is_ptr) {
 		value = ir_emit_load(proc, value);
@@ -4964,7 +4964,7 @@ irAddr ir_emit_any_cast_addr(irProcedure *proc, irValue *value, Type *type, Toke
 	}
 	Type *dst_type = tuple->Tuple.variables[0]->type;
 
-	irValue *v = ir_add_local_generated(proc, tuple);
+	irValue *v = ir_add_local_generated(proc, tuple, true);
 
 	irValue *dst_typeid = ir_typeid(proc->module, dst_type);
 	irValue *any_typeid = ir_emit_struct_ev(proc, value, 1);
@@ -5615,7 +5615,7 @@ void ir_init_data_with_defaults(irProcedure *proc, irValue *ptr, irValue *count,
 	Type *elem_type = type_deref(ir_type(ptr));
 	GB_ASSERT(is_type_struct(elem_type) || is_type_array(elem_type));
 
-	irValue *index = ir_add_local_generated(proc, t_int);
+	irValue *index = ir_add_local_generated(proc, t_int, false);
 	ir_emit_store(proc, index, ir_const_int(0));
 
 	irBlock *loop = nullptr;
@@ -5634,7 +5634,8 @@ void ir_init_data_with_defaults(irProcedure *proc, irValue *ptr, irValue *count,
 	ir_start_block(proc, body);
 
 	irValue *offset_ptr = ir_emit_ptr_offset(proc, ptr, ir_emit_load(proc, index));
-	ir_emit_zero_init(proc, offset_ptr, expr);
+	ir_emit(proc, ir_instr_zero_init(proc, offset_ptr)); // Use simple zero for this
+	// ir_emit_zero_init(proc, offset_ptr, expr);
 
 	ir_emit_increment(proc, index);
 
@@ -5758,7 +5759,8 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 			return ir_addr_load(proc, addr);
 		}
 		irValue *src = ir_addr_get_ptr(proc, addr);
-		irValue *dst = ir_add_local_generated(proc, tv.type);
+		// TODO(bill): Should this be zeroed or not?
+		irValue *dst = ir_add_local_generated(proc, tv.type, true);
 
 		for (i32 i = 1; i < ce->args.count; i++) {
 			TypeAndValue tv = type_and_value_of_expr(ce->args[i]);
@@ -5781,7 +5783,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		ir_emit_comment(proc, str_lit("complex"));
 		irValue *real = ir_build_expr(proc, ce->args[0]);
 		irValue *imag = ir_build_expr(proc, ce->args[1]);
-		irValue *dst = ir_add_local_generated(proc, tv.type);
+		irValue *dst = ir_add_local_generated(proc, tv.type, false);
 
 		Type *ft = base_complex_elem_type(tv.type);
 		real = ir_emit_conv(proc, real, ft);
@@ -5811,7 +5813,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		irValue *res = nullptr;
 		Type *t = ir_type(val);
 		if (is_type_complex(t)) {
-			res = ir_add_local_generated(proc, tv.type);
+			res = ir_add_local_generated(proc, tv.type, false);
 			irValue *real = ir_emit_struct_ev(proc, val, 0);
 			irValue *imag = ir_emit_struct_ev(proc, val, 1);
 			imag = ir_emit_unary_arith(proc, Token_Sub, imag, ir_type(imag));
@@ -5827,7 +5829,8 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		Type *t = base_type(ir_type(val));
 
 		GB_ASSERT(is_type_tuple(tv.type));
-		irValue *tuple = ir_add_local_generated(proc, tv.type);
+		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
+		irValue *tuple = ir_add_local_generated(proc, tv.type, false);
 		if (t->kind == Type_Struct) {
 			for_array(src_index, t->Struct.fields) {
 				Entity *field = t->Struct.fields[src_index];
@@ -6632,11 +6635,11 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 				gbAllocator allocator = ir_allocator();
 				Type *slice_type = param_tuple->variables[variadic_index]->type;
 				Type *elem_type  = base_type(slice_type)->Slice.elem;
-				irValue *slice = ir_add_local_generated(proc, slice_type);
+				irValue *slice = ir_add_local_generated(proc, slice_type, true);
 				isize slice_len = arg_count+1 - (variadic_index+1);
 
 				if (slice_len > 0) {
-					irValue *base_array = ir_add_local_generated(proc, alloc_type_array(elem_type, slice_len));
+					irValue *base_array = ir_add_local_generated(proc, alloc_type_array(elem_type, slice_len), true);
 
 					for (isize i = variadic_index, j = 0; i < arg_count; i++, j++) {
 						irValue *addr = ir_emit_array_epi(proc, base_array, cast(i32)j);
@@ -6868,7 +6871,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 		Type *t = type_deref(ir_type(e));
 		if (is_type_union(t)) {
 			Type *type = type_of_expr(expr);
-			irValue *v = ir_add_local_generated(proc, type);
+			irValue *v = ir_add_local_generated(proc, type, false);
 			ir_emit_comment(proc, str_lit("cast - union_cast"));
 			ir_emit_store(proc, v, ir_emit_union_cast(proc, ir_build_expr(proc, ta->expr), type, pos));
 			return ir_addr(v);
@@ -7039,7 +7042,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			irValue *elem   = ir_emit_ptr_offset(proc, ir_slice_elem(proc, base), low);
 			irValue *new_len = ir_emit_arith(proc, Token_Sub, high, low, t_int);
 
-			irValue *slice = ir_add_local_generated(proc, slice_type);
+			irValue *slice = ir_add_local_generated(proc, slice_type, false);
 			ir_fill_slice(proc, slice, elem, new_len);
 			return ir_addr(slice);
 		}
@@ -7056,7 +7059,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			irValue *elem    = ir_emit_ptr_offset(proc, ir_dynamic_array_elem(proc, base), low);
 			irValue *new_len = ir_emit_arith(proc, Token_Sub, high, low, t_int);
 
-			irValue *slice = ir_add_local_generated(proc, slice_type);
+			irValue *slice = ir_add_local_generated(proc, slice_type, false);
 			ir_fill_slice(proc, slice, elem, new_len);
 			return ir_addr(slice);
 		}
@@ -7077,7 +7080,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			irValue *elem    = ir_emit_ptr_offset(proc, ir_array_elem(proc, addr), low);
 			irValue *new_len = ir_emit_arith(proc, Token_Sub, high, low, t_int);
 
-			irValue *slice = ir_add_local_generated(proc, slice_type);
+			irValue *slice = ir_add_local_generated(proc, slice_type, false);
 			ir_fill_slice(proc, slice, elem, new_len);
 			return ir_addr(slice);
 		}
@@ -7093,7 +7096,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			irValue *elem    = ir_emit_ptr_offset(proc, ir_string_elem(proc, base), low);
 			irValue *new_len = ir_emit_arith(proc, Token_Sub, high, low, t_int);
 
-			irValue *str = ir_add_local_generated(proc, t_string);
+			irValue *str = ir_add_local_generated(proc, t_string, false);
 			ir_fill_string(proc, str, elem, new_len);
 			return ir_addr(str);
 		}
@@ -7112,7 +7115,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 	case_ast_node(ce, CallExpr, expr);
 		// NOTE(bill): This is make sure you never need to have an 'array_ev'
 		irValue *e = ir_build_expr(proc, expr);
-		irValue *v = ir_add_local_generated(proc, ir_type(e));
+		irValue *v = ir_add_local_generated(proc, ir_type(e), false);
 		ir_emit_store(proc, v, e);
 		return ir_addr(v);
 	case_end;
@@ -7401,7 +7404,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 		default:
 			GB_PANIC("Invalid AST TypeCast");
 		}
-		irValue *v = ir_add_local_generated(proc, type);
+		irValue *v = ir_add_local_generated(proc, type, false);
 		ir_emit_store(proc, v, e);
 		return ir_addr(v);
 	case_end;
@@ -7694,7 +7697,7 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 	irBlock *body = nullptr;
 
 
-	irValue *index = ir_add_local_generated(proc, t_int);
+	irValue *index = ir_add_local_generated(proc, t_int, false);
 	ir_emit_store(proc, index, ir_const_int(-1));
 
 	loop = ir_new_block(proc, nullptr, "for.index.loop");
@@ -7738,7 +7741,7 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 		break;
 	}
 	case Type_Map: {
-		irValue *key = ir_add_local_generated(proc, expr_type->Map.key);
+		irValue *key = ir_add_local_generated(proc, expr_type->Map.key, true);
 
 		irValue *entries = ir_map_entries_ptr(proc, expr);
 		irValue *elem = ir_emit_struct_ep(proc, entries, 0);
@@ -7793,7 +7796,7 @@ void ir_build_range_string(irProcedure *proc, irValue *expr, Type *val_type,
 	irBlock *body = nullptr;
 
 
-	irValue *offset_ = ir_add_local_generated(proc, t_int);
+	irValue *offset_ = ir_add_local_generated(proc, t_int, false);
 	ir_emit_store(proc, offset_, v_zero);
 
 	loop = ir_new_block(proc, nullptr, "for.string.loop");
@@ -8224,7 +8227,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			GB_ASSERT(results.count == return_count);
 
 			Type *ret_type = proc->type->Proc.results;
-			v = ir_add_local_generated(proc, ret_type);
+			// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
+			v = ir_add_local_generated(proc, ret_type, false);
 			for_array(i, results) {
 				Entity *e = tuple->variables[i];
 				irValue *res = ir_emit_conv(proc, results[i], e->type);
