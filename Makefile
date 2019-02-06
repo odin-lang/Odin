@@ -6,7 +6,7 @@ CC=clang
 OS=$(shell uname)
 
 ifeq ($(OS), Darwin)
-	LDFLAGS=$(LDFLAGS) -liconv
+	LDFLAGS:=$(LDFLAGS) -liconv
 endif
 
 all: debug demo
