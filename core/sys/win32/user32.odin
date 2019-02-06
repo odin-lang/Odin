@@ -104,7 +104,10 @@ foreign user32 {
 	@(link_name="SetWindowTextA")   set_window_text_a   :: proc(hwnd: Hwnd, c_string: cstring) -> Bool ---;
 	@(link_name="SetWindowTextW")   set_window_text_w   :: proc(hwnd: Hwnd, c_string: Wstring) -> Bool ---;
 	@(link_name="RegisterClassExA") register_class_ex_a :: proc(wc: ^Wnd_Class_Ex_A) -> i16 ---;
+	@(link_name="UnregisterClassA") unregister_class_a  :: proc(class_name: cstring, hinst: Hinstance) -> Bool ---;
 	@(link_name="RegisterClassExW") register_class_ex_w :: proc(wc: ^Wnd_Class_Ex_W) -> i16 ---;
+	@(link_name="UnregisterClassW") unregister_class_w  :: proc(class_name: Wstring, hinst: Hinstance) -> Bool ---;
+
 
 	@(link_name="CreateWindowExA")
 	create_window_ex_a :: proc(ex_style: u32,
@@ -141,6 +144,8 @@ foreign user32 {
 	@(link_name="DefWindowProcW") def_window_proc_w :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult ---;
 
 	@(link_name="AdjustWindowRect") adjust_window_rect :: proc(rect: ^Rect, style: u32, menu: Bool) -> Bool ---;
+	@(link_name="AdjustWindowRectEx") adjust_window_rect_ex :: proc(rect: ^Rect, style: u32, menu: Bool, ex_style: u32) -> Bool ---;
+
 	@(link_name="GetActiveWindow")  get_active_window  :: proc() -> Hwnd ---;
 
 	@(link_name="DestroyWindow")       destroy_window        :: proc(wnd: Hwnd) -> Bool ---;
@@ -268,3 +273,23 @@ IDC_SIZENWSE    := cstring(_IDC_SIZENWSE);
 IDC_SIZEWE      := cstring(_IDC_SIZEWE);
 IDC_UPARROW     := cstring(_IDC_UPARROW);
 IDC_WAIT        := cstring(_IDC_WAIT);
+
+_IDI_APPLICATION    := rawptr(uintptr(32512));
+_IDI_HAND           := rawptr(uintptr(32513));
+_IDI_QUESTION       := rawptr(uintptr(32514));
+_IDI_EXCLAMATION    := rawptr(uintptr(32515));
+_IDI_ASTERISK       := rawptr(uintptr(32516));
+_IDI_WINLOGO        := rawptr(uintptr(32517));
+_IDI_SHIELD         := rawptr(uintptr(32518));
+
+IDI_APPLICATION     := cstring(_IDI_APPLICATION);
+IDI_HAND            := cstring(_IDI_HAND);
+IDI_QUESTION        := cstring(_IDI_QUESTION);
+IDI_EXCLAMATION     := cstring(_IDI_EXCLAMATION);
+IDI_ASTERISK        := cstring(_IDI_ASTERISK);			
+IDI_WINLOGO         := cstring(_IDI_WINLOGO);
+IDI_SHIELD          := cstring(_IDI_SHIELD);
+
+IDI_WARNING         := IDI_EXCLAMATION;
+IDI_ERROR           := IDI_HAND;
+IDI_INFORMATION     := IDI_ASTERISK;
