@@ -237,7 +237,7 @@ consume_comment_groups :: proc(p: ^Parser, prev: token.Token) {
 		for p.curr_tok.kind == token.Comment {
 			comment, end_line = consume_comment_group(p, 1);
 		}
-		if end_line+1 == p.curr_tok.pos.line || end_line < 0 {
+		if end_line+1 >= p.curr_tok.pos.line || end_line < 0 {
 			p.lead_comment = comment;
 		}
 
@@ -2727,7 +2727,6 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 				return stmt;
 			}
 		}
-
 		return parse_value_decl(p, lhs, docs);
 	}
 
