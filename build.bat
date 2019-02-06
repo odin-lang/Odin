@@ -47,4 +47,3 @@ cl %compiler_settings% "src\main.cpp" ^
 del *.obj > NUL 2> NUL
 
 :end_of_build
-

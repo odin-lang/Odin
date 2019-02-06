@@ -13,6 +13,13 @@
     <a href="https://github.com/odin-lang/odin/blob/master/LICENSE">
         <img src="https://img.shields.io/github/license/odin-lang/odin.svg">
     </a>
+    <br>
+    <a href="https://ci.appveyor.com/project/ThisDrunkDane/odin-vf0ap">
+        <img src="https://ci.appveyor.com/api/projects/status/qss6l921c0eu85u6/branch/master?svg=true">
+    </a>
+    <a href="https://travis-ci.org/odin-lang/Odin">
+        <img src="https://travis-ci.org/odin-lang/Odin.svg?branch=master">
+    </a>
 </p>
 
 # The Odin Programming Language
