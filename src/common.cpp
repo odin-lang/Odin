@@ -365,7 +365,7 @@ void arena_grow(Arena *arena, isize min_size) {
 	size = ALIGN_UP(size, ARENA_MIN_ALIGNMENT);
 	void *new_ptr = gb_alloc(arena->backing, size);
 	arena->ptr = cast(u8 *)new_ptr;
-	gb_zero_size(arena->ptr, size);
+	// gb_zero_size(arena->ptr, size); // NOTE(bill): This should already be zeroed
 	GB_ASSERT(arena->ptr == ALIGN_DOWN_PTR(arena->ptr, ARENA_MIN_ALIGNMENT));
 	arena->end = arena->ptr + size;
 	array_add(&arena->blocks, arena->ptr);

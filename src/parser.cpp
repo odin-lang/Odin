@@ -1028,7 +1028,7 @@ Token consume_comment(AstFile *f, isize *end_line_) {
 	GB_ASSERT(tok.kind == Token_Comment);
 	isize end_line = tok.pos.line;
 	if (tok.string[1] == '*') {
-		for (isize i = 0; i < tok.string.len; i++) {
+		for (isize i = 2; i < tok.string.len; i++) {
 			if (tok.string[i] == '\n') {
 				end_line++;
 			}
