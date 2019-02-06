@@ -5,7 +5,7 @@ CC=clang
 
 OS=$(shell uname)
 
-ifeq ($(OS), DARWIN)
+ifeq ($(OS), Darwin)
 	LDFLAGS=$(LDFLAGS) -liconv
 endif
 
