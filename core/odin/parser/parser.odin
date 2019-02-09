@@ -545,7 +545,7 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 	if allow_token(p, token.Else) {
 		switch p.curr_tok.kind {
 		case token.If:
-			else_stmt = parse_when_stmt(p);
+			else_stmt = parse_if_stmt(p);
 		case token.Open_Brace:
 			else_stmt = parse_block_stmt(p, false);
 		case token.Do:
@@ -771,7 +771,7 @@ parse_switch_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	}
 }
 
-parse_attribute :: proc(p: ^Parser, tok: token.Token, open_kind, close_kind: token.Kind) -> ^ast.Stmt {
+parse_attribute :: proc(p: ^Parser, tok: token.Token, open_kind, close_kind: token.Kind, docs: ^ast.Comment_Group) -> ^ast.Stmt {
 	elems: [dynamic]^ast.Expr;
 
 	open, close: token.Token;
@@ -815,8 +815,10 @@ parse_attribute :: proc(p: ^Parser, tok: token.Token, open_kind, close_kind: tok
 	decl := parse_stmt(p);
 	switch d in &decl.derived {
 	case ast.Value_Decl:
+		if d.docs == nil do d.docs = docs;
 		append(&d.attributes, attribute);
 	case ast.Foreign_Block_Decl:
+		if d.docs == nil do d.docs = docs;
 		append(&d.attributes, attribute);
 	case:
 		error(p, decl.pos, "expected a value or foreign declaration after an attribute");
@@ -1089,8 +1091,9 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		return ast.new(ast.Bad_Stmt, tok.pos, end_pos(p.prev_tok));
 
 	case token.At:
+		docs := p.lead_comment;
 		tok := advance_token(p);
-		return parse_attribute(p, tok, token.Open_Paren, token.Close_Paren);
+		return parse_attribute(p, tok, token.Open_Paren, token.Close_Paren, docs);
 
 	case token.Hash:
 		tok := expect_token(p, token.Hash);
@@ -1729,6 +1732,10 @@ parse_results :: proc(p: ^Parser) -> (list: ^ast.Field_List, diverging: bool) {
 
 string_to_calling_convention :: proc(s: string) -> ast.Proc_Calling_Convention {
 	using ast.Proc_Calling_Convention;
+	if s[0] != '"' && s[0] != '`' {
+		return Invalid;
+	}
+	s = s[1:len(s)-1];
 	switch s {
 	case "odin":
 		return Odin;
@@ -1908,7 +1915,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case token.Inline, token.No_Inline:
 		tok := advance_token(p);
-		expr := parse_unary_expr(p, false);
+		expr := parse_unary_expr(p, lhs);
 
 		pi := ast.Proc_Inlining.None;
 		switch tok.kind {
@@ -1933,6 +1940,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			error(p, tok.pos, "'%s' must be followed by a procedure literal or call", tok.text);
 			return ast.new(ast.Bad_Expr, tok.pos, expr.end);
 		}
+		return expr;
 
 	case token.Proc:
 		tok := expect_token(p, token.Proc);

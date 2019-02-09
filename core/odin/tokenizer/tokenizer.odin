@@ -557,7 +557,7 @@ scan :: proc(t: ^Tokenizer) -> token.Token {
 			} else {
 				kind = switch3(t, token.And, token.And_Eq, '&', token.Cmp_And);
 			}
-		case '|': kind = switch3(t, token.Or, token.Or_Eq, '&', token.Cmp_Or);
+		case '|': kind = switch3(t, token.Or, token.Or_Eq, '|', token.Cmp_Or);
 		case '~': kind = token.Xor;
 		case '<':
 			if t.ch == '-' {
