@@ -88,7 +88,7 @@ copy_sign_f32 :: proc(x, y: f32) -> f32 {
 copy_sign_f64 :: proc(x, y: f64) -> f64 {
 	ix := transmute(u64)x;
 	iy := transmute(u64)y;
-	ix &= 0x7fff_ffff_ffff_ff;
+	ix &= 0x7fff_ffff_ffff_ffff;
 	ix |= iy & 0x8000_0000_0000_0000;
 	return transmute(f64)ix;
 }
