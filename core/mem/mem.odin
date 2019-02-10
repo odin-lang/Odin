@@ -326,3 +326,294 @@ align_formula :: proc(size, align: int) -> int {
 	result := size + align-1;
 	return result - result%align;
 }
+
+calc_padding_with_header :: proc(ptr: uintptr, align: uintptr, header_size: int) -> int {
+	p := uintptr(ptr);
+	a := uintptr(align);
+	modulo := p & (a-1);
+
+	padding := uintptr(0);
+	if modulo != 0 do padding = a - modulo;
+
+	needed_space := uintptr(header_size);
+	if padding < needed_space {
+		needed_space -= padding;
+
+		if needed_space & (a-1) > 0 {
+			padding += align * (1+(needed_space/align));
+		} else {
+			padding += align * (needed_space/align);
+		}
+	}
+
+	return int(padding);
+}
+
+
+
+
+Stack_Allocation_Header :: struct {
+	prev_offset: int,
+	padding:     int,
+}
+
+// Stack is a stack-like allocator which has a strict memory freeing order
+Stack :: struct {
+	data: []byte,
+	prev_offset: int,
+	curr_offset: int,
+	peak_used: int,
+}
+
+init_stack :: proc(s: ^Stack, data: []byte) {
+	s.data = data;
+	s.prev_offset = 0;
+	s.curr_offset = 0;
+	s.peak_used = 0;
+}
+
+stack_allocator :: proc(stack: ^Stack) -> Allocator {
+	return Allocator{
+		procedure = stack_allocator_proc,
+		data = stack,
+	};
+}
+
+
+stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
+                             size, alignment: int,
+                             old_memory: rawptr, old_size: int, flags: u64, location := #caller_location) -> rawptr {
+	using Allocator_Mode;
+	s := cast(^Stack)allocator_data;
+
+	if s.data == nil {
+		return nil;
+	}
+
+	raw_alloc :: proc(s: ^Stack, size, alignment: int) -> rawptr {
+		curr_addr := uintptr(&s.data[0]) + uintptr(s.curr_offset);
+		padding := calc_padding_with_header(curr_addr, uintptr(alignment), size_of(Stack_Allocation_Header));
+		if s.curr_offset + padding + size > len(s.data) {
+			return nil;
+		}
+		s.prev_offset = s.curr_offset;
+		s.curr_offset += padding;
+
+		next_addr := curr_addr + uintptr(padding);
+		header := (^Stack_Allocation_Header)(next_addr - size_of(Stack_Allocation_Header));
+		header.padding = auto_cast padding;
+		header.prev_offset = auto_cast s.prev_offset;
+
+		s.curr_offset += size;
+
+		s.peak_used = max(s.peak_used, s.curr_offset);
+
+		return zero(rawptr(next_addr), size);
+	}
+
+	switch mode {
+	case Alloc:
+		return raw_alloc(s, size, alignment);
+	case Free:
+		if old_memory == nil {
+			return nil;
+		}
+		start := uintptr(&s.data[0]);
+		end := start + uintptr(len(s.data));
+		curr_addr := uintptr(old_memory);
+
+		if !(start <= curr_addr && curr_addr < end) {
+			panic("Out of bounds memory address passed to stack allocator (free)");
+			return nil;
+		}
+
+		if curr_addr >= start+uintptr(s.curr_offset) {
+			// NOTE(bill): Allow double frees
+			return nil;
+		}
+
+		header := (^Stack_Allocation_Header)(curr_addr - size_of(Stack_Allocation_Header));
+		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(&s.data[0]));
+
+		if old_offset != int(header.prev_offset) {
+			panic("Out of order stack allocator free");
+			return nil;
+		}
+
+		s.curr_offset = int(old_offset);
+		s.prev_offset = int(header.prev_offset);
+
+
+	case Free_All:
+		s.prev_offset = 0;
+		s.curr_offset = 0;
+
+	case Resize:
+		if old_memory == nil {
+			return raw_alloc(s, size, alignment);
+		}
+		if size == 0 {
+			return nil;
+		}
+
+		start := uintptr(&s.data[0]);
+		end := start + uintptr(len(s.data));
+		curr_addr := uintptr(old_memory);
+		if !(start <= curr_addr && curr_addr < end) {
+			panic("Out of bounds memory address passed to stack allocator (resize)");
+			return nil;
+		}
+
+		if curr_addr >= start+uintptr(s.curr_offset) {
+			// NOTE(bill): Allow double frees
+			return nil;
+		}
+
+		if old_size == size {
+			return old_memory;
+		}
+
+		header := (^Stack_Allocation_Header)(curr_addr - size_of(Stack_Allocation_Header));
+		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(&s.data[0]));
+
+		if old_offset != int(header.prev_offset) {
+			ptr := raw_alloc(s, size, alignment);
+			copy(ptr, old_memory, min(old_size, size));
+			return ptr;
+		}
+
+		old_memory_size := uintptr(s.curr_offset) - (curr_addr - start);
+		assert(old_memory_size == uintptr(old_size));
+
+		diff := size - old_size;
+		s.curr_offset += diff; // works for smaller sizes too
+		if diff > 0 {
+			zero(rawptr(curr_addr + uintptr(diff)), diff);
+		}
+
+		return old_memory;
+	}
+
+	return nil;
+}
+
+
+
+
+
+
+
+Small_Stack_Allocation_Header :: struct {
+	padding: u8,
+}
+
+// Small_Stack is a stack-like allocator which uses the smallest possible header but at the cost of non-strict memory freeing order
+Small_Stack :: struct {
+	data: []byte,
+	offset: int,
+	peak_used: int,
+}
+
+init_small_stack :: proc(s: ^Small_Stack, data: []byte) {
+	s.data = data;
+	s.offset = 0;
+	s.peak_used = 0;
+}
+
+small_stack_allocator :: proc(stack: ^Small_Stack) -> Allocator {
+	return Allocator{
+		procedure = small_stack_allocator_proc,
+		data = stack,
+	};
+}
+
+small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
+                                   size, alignment: int,
+                                   old_memory: rawptr, old_size: int, flags: u64, location := #caller_location) -> rawptr {
+	using Allocator_Mode;
+	s := cast(^Small_Stack)allocator_data;
+
+	if s.data == nil {
+		return nil;
+	}
+
+	raw_alloc :: proc(s: ^Small_Stack, size, alignment: int) -> rawptr {
+		curr_addr := uintptr(&s.data[0]) + uintptr(s.offset);
+		padding := calc_padding_with_header(curr_addr, uintptr(alignment), size_of(Small_Stack_Allocation_Header));
+		if s.offset + padding + size > len(s.data) {
+			return nil;
+		}
+		s.offset += padding;
+
+		next_addr := curr_addr + uintptr(padding);
+		header := (^Small_Stack_Allocation_Header)(next_addr - size_of(Small_Stack_Allocation_Header));
+		header.padding = auto_cast padding;
+
+		s.offset += size;
+
+		s.peak_used = max(s.peak_used, s.offset);
+
+		return zero(rawptr(next_addr), size);
+	}
+
+	switch mode {
+	case Alloc:
+		return raw_alloc(s, size, alignment);
+	case Free:
+		if old_memory == nil {
+			return nil;
+		}
+		start := uintptr(&s.data[0]);
+		end := start + uintptr(len(s.data));
+		curr_addr := uintptr(old_memory);
+
+		if !(start <= curr_addr && curr_addr < end) {
+			panic("Out of bounds memory address passed to stack allocator (free)");
+			return nil;
+		}
+
+		if curr_addr >= start+uintptr(s.offset) {
+			// NOTE(bill): Allow double frees
+			return nil;
+		}
+
+		header := (^Small_Stack_Allocation_Header)(curr_addr - size_of(Small_Stack_Allocation_Header));
+		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(&s.data[0]));
+
+		s.offset = int(old_offset);
+
+	case Free_All:
+		s.offset = 0;
+
+	case Resize:
+		if old_memory == nil {
+			return raw_alloc(s, size, alignment);
+		}
+		if size == 0 {
+			return nil;
+		}
+
+		start := uintptr(&s.data[0]);
+		end := start + uintptr(len(s.data));
+		curr_addr := uintptr(old_memory);
+		if !(start <= curr_addr && curr_addr < end) {
+			panic("Out of bounds memory address passed to stack allocator (resize)");
+			return nil;
+		}
+
+		if curr_addr >= start+uintptr(s.offset) {
+			// NOTE(bill): Treat as a double free
+			return nil;
+		}
+
+		if old_size == size {
+			return old_memory;
+		}
+
+		ptr := raw_alloc(s, size, alignment);
+		copy(ptr, old_memory, min(old_size, size));
+		return ptr;
+	}
+
+	return nil;
+}
