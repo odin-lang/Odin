@@ -1945,11 +1945,11 @@ bool abi_compat_return_by_value(gbAllocator a, ProcCallingConvention cc, Type *a
 	if (abi_return_type == nullptr) {
 		return false;
 	}
-	switch (cc) {
-	case ProcCC_Odin:
-	case ProcCC_Contextless:
-		return false;
-	}
+	// switch (cc) {
+	// case ProcCC_Odin:
+	// case ProcCC_Contextless:
+	// 	return false;
+	// }
 
 
 	if (build_context.ODIN_OS == "windows") {
