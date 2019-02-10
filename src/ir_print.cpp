@@ -1780,19 +1780,18 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 		bool return_by_pointer = proc_type->Proc.return_by_pointer;
 
+		isize param_index = 0;
+
 		ir_write_byte(f, '(');
 		if (return_by_pointer) {
 			GB_ASSERT(call->return_ptr != nullptr);
 			ir_print_type(f, m, proc_type->Proc.results);
 			ir_write_str_lit(f, "* ");
 			ir_print_value(f, m, call->return_ptr, ir_type(call->return_ptr));
-			if (call->args.count > 0) {
-				ir_write_str_lit(f, ", ");
-			}
+			param_index += 1;
 		}
 
 
-		isize param_index = 0;
 		if (call->args.count > 0) {
 			TypeTuple *params = &proc_type->Proc.params->Tuple;
 			if (proc_type->Proc.c_vararg) {
@@ -1850,7 +1849,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			}
 		}
 		if (proc_type->Proc.calling_convention == ProcCC_Odin) {
-			if (param_index > 0 || return_by_pointer) ir_write_str_lit(f, ", ");
+			if (param_index > 0) ir_write_str_lit(f, ", ");
 
 			ir_print_context_parameter_prefix(f, m);
 			ir_print_value(f, m, call->context_ptr, t_context_ptr);
@@ -1951,17 +1950,17 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 #endif
 	ir_print_encoded_global(f, proc->name, ir_print_is_proc_global(m, proc));
 
+
+	isize param_index = 0;
+
 	ir_write_byte(f, '(');
 	if (proc_type->return_by_pointer) {
 		ir_print_type(f, m, reduce_tuple_to_single_type(proc_type->results));
 		ir_write_str_lit(f, "* sret noalias ");
 		ir_write_str_lit(f, "%agg.result");
-		if (param_count > 0) {
-			ir_write_string(f, str_lit(", "));
-		}
+		param_index += 1;
 	}
 
-	isize param_index = 0;
 	if (param_count > 0) {
 		TypeTuple *params = &proc_type->params->Tuple;
 		for (isize i = 0; i < param_count; i++) {
@@ -1992,7 +1991,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 		}
 	}
 	if (proc_type->calling_convention == ProcCC_Odin) {
-		if (param_index > 0 || proc_type->return_by_pointer) ir_write_str_lit(f, ", ");
+		if (param_index > 0) ir_write_str_lit(f, ", ");
 
 		ir_print_context_parameter_prefix(f, m);
 		ir_write_str_lit(f, "%__.context_ptr");
