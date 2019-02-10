@@ -1243,7 +1243,7 @@ irValue *ir_instr_phi(irProcedure *p, Array<irValue *> edges, Type *type) {
 	i->Phi.type = type;
 
 	for_array(j, edges) {
-		edges[j]->uses += 1;
+		if (edges[j]) edges[j]->uses += 1;
 	}
 	return v;
 }
@@ -1287,7 +1287,7 @@ irValue *ir_instr_call(irProcedure *p, irValue *value, irValue *return_ptr, Arra
 	if (value) value->uses += 1;
 	if (return_ptr) return_ptr->uses += 1;
 	for_array(i, args) {
-		args[i]->uses += 1;
+		if (args[i]) args[i]->uses += 1;
 	}
 	if (context_ptr) context_ptr->uses += 1;
 
@@ -2776,8 +2776,8 @@ irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value, bool is
 		value = ir_emit_conv(p, value, a);
 	}
 
-	address->uses += 1;
-	value->uses += 1;
+	if (address) address->uses += 1;
+	if (value) value->uses += 1;
 
 
 	Type *b = ir_type(value);
@@ -2792,13 +2792,13 @@ irValue *ir_emit_load(irProcedure *p, irValue *address) {
 	// if (is_type_boolean(t)) {
 		// return ir_emit(p, ir_instr_load_bool(p, address));
 	// }
-	address->uses += 1;
+	if (address) address->uses += 1;
 	return ir_emit(p, ir_instr_load(p, address));
 }
 irValue *ir_emit_select(irProcedure *p, irValue *cond, irValue *t, irValue *f) {
-	cond->uses += 1;
-	t->uses += 1;
-	f->uses += 1;
+	if (cond) cond->uses += 1;
+	if (t) t->uses += 1;
+	if (f) f->uses += 1;
 
 	return ir_emit(p, ir_instr_select(p, cond, t, f));
 }
@@ -2836,7 +2836,7 @@ void ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
 	Type *t = type_deref(ir_type(address));
 	isize sz = type_size_of(t);
 
-	address->uses += 1;
+	if (address) address->uses += 1;
 
 	if (!(gb_is_power_of_two(sz) && sz <= build_context.max_align)) {
 		// TODO(bill): Is this a good idea?
@@ -2879,13 +2879,12 @@ irValue *ir_copy_value_to_ptr(irProcedure *proc, irValue *val, Type *new_type, i
 	ptr->Instr.Local.alignment = alignment;
 	ir_emit_store(proc, ptr, val);
 
-	val->uses += 1;
+	if (val) val->uses += 1;
 
 	return ptr;
 }
 
 irValue *ir_emit_bitcast(irProcedure *proc, irValue *data, Type *type) {
-	data->uses += 1;
 	return ir_emit(proc, ir_instr_conv(proc, irConv_bitcast, data, ir_type(data), type));
 }
 
@@ -2998,7 +2997,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 	Type *rt = reduce_tuple_to_single_type(results);
 	if (pt->Proc.return_by_pointer) {
 		irValue *return_ptr = nullptr;
-		if (use_return_ptr_hint) {
+		if (use_return_ptr_hint && p->return_ptr_hint_value != nullptr) {
 			if (are_types_identical(type_deref(ir_type(p->return_ptr_hint_value)), rt)) {
 				return_ptr = p->return_ptr_hint_value;
 				p->return_ptr_hint_used = true;
@@ -3147,6 +3146,8 @@ void ir_emit_return(irProcedure *proc, irValue *v) {
 
 		ir_emit(proc, ir_instr_return(proc, v));
 	}
+
+	if (v) v->uses += 1;
 }
 
 void ir_emit_jump(irProcedure *proc, irBlock *target_block) {
@@ -3168,6 +3169,8 @@ void ir_emit_if(irProcedure *proc, irValue *cond, irBlock *true_block, irBlock *
 	ir_add_edge(b, true_block);
 	ir_add_edge(b, false_block);
 	ir_start_block(proc, nullptr);
+
+	if (cond) cond->uses += 1;
 }
 
 
@@ -3200,7 +3203,6 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_ty
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 3), ir_const_int(entry_align));
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 4), ir_const_uintptr(value_offset));
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 5), ir_const_int(value_size));
-
 
 	return ir_emit_load(proc, h);
 }
@@ -9079,21 +9081,93 @@ void ir_begin_procedure_body(irProcedure *proc) {
 }
 
 
-void ir_remove_dead_instr(irProcedure *proc) {
+bool ir_remove_dead_instr(irProcedure *proc) {
+	isize elimination_count = 0;
+retry:
+#if 1
 	for_array(i, proc->blocks) {
 		irBlock *b = proc->blocks[i];
 		b->index = cast(i32)i;
-		for (isize j = 0; j < b->instrs.count; j += 1) {
+		for (isize j = 0; j < b->instrs.count; /**/) {
 			irValue *value = b->instrs[j];
 			GB_ASSERT_MSG(value->kind == irValue_Instr, "%.*s", LIT(proc->name));
 			irInstr *instr = &value->Instr;
-			if (instr->kind == irInstr_Load && value->uses == 0) {
-				gb_memmove(b->instrs.data+j, b->instrs.data+j+1, gb_size_of(irValue *)*(b->instrs.count-j-1));
-				b->instrs.count -= 1;
-				continue;
+			if (value->uses == 0) {
+				switch (instr->kind) {
+				case irInstr_Load:
+					instr->Load.address->uses -= 1;
+					array_ordered_remove(&b->instrs, j);
+					elimination_count += 1;
+					continue;
+				case irInstr_Local:
+					array_ordered_remove(&b->instrs, j);
+					elimination_count += 1;
+					continue;
+				case irInstr_AtomicLoad:
+					instr->AtomicLoad.address->uses -= 1;
+					array_ordered_remove(&b->instrs, j);
+					elimination_count += 1;
+					continue;
+				case irInstr_PtrOffset:
+					instr->PtrOffset.address->uses -= 1;
+					instr->PtrOffset.offset->uses -= 1;
+					array_ordered_remove(&b->instrs, j);
+					elimination_count += 1;
+					continue;
+				case irInstr_ArrayElementPtr:
+					instr->ArrayElementPtr.address->uses -= 1;
+					instr->ArrayElementPtr.elem_index->uses -= 1;
+					array_ordered_remove(&b->instrs, j);
+					elimination_count += 1;
+					continue;
+				case irInstr_StructElementPtr:
+					instr->StructElementPtr.address->uses -= 1;
+					array_ordered_remove(&b->instrs, j);
+					elimination_count += 1;
+					continue;
+				case irInstr_StructExtractValue:
+					instr->StructExtractValue.address->uses -= 1;
+					array_ordered_remove(&b->instrs, j);
+					elimination_count += 1;
+					continue;
+				case irInstr_UnionTagPtr:
+					instr->UnionTagPtr.address->uses -= 1;
+					array_ordered_remove(&b->instrs, j);
+					elimination_count += 1;
+					continue;
+				case irInstr_UnionTagValue:
+					instr->UnionTagValue.address->uses -= 1;
+					array_ordered_remove(&b->instrs, j);
+					elimination_count += 1;
+					continue;
+				// case irInstr_Conv:
+				// 	// instr->Conv.value->uses -= 1;
+				// 	array_ordered_remove(&b->instrs, j);
+				// 	elimination_count += 1;
+				// 	continue;
+				// case irInstr_UnaryOp:
+				// 	// instr->UnaryOp.expr->uses -= 1;
+				// 	array_ordered_remove(&b->instrs, j);
+				// 	elimination_count += 1;
+				// 	continue;
+				// case irInstr_BinaryOp:
+				// 	// instr->BinaryOp.left->uses -= 1;
+				// 	// instr->BinaryOp.right->uses -= 1;
+				// 	array_ordered_remove(&b->instrs, j);
+				// 	elimination_count += 1;
+				// 	continue;
+				}
 			}
+			j += 1;
 		}
 	}
+#endif
+	if (elimination_count > 0) {
+		// gb_printf_err("Retry ir_remove_dead_instr, count: %td; %.*s\n", elimination_count, LIT(proc->name));
+		elimination_count = 0;
+		goto retry;
+	}
+	return elimination_count > 0;
 }
 
 void ir_end_procedure_body(irProcedure *proc) {
