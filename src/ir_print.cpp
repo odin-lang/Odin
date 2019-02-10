@@ -676,7 +676,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_write_str_lit(f, "* ");
 			ir_print_encoded_global(f, str_array->Global.entity->token.string, false);
 			ir_write_str_lit(f, ", ");
-			ir_print_type(f, m, t_int);
+			ir_print_type(f, m, t_i32);
 			ir_write_str_lit(f, " 0, i32 0)");
 		} else {
 			// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
@@ -689,7 +689,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_write_str_lit(f, "* ");
 			ir_print_encoded_global(f, str_array->Global.entity->token.string, false);
 			ir_write_str_lit(f, ", ");
-			ir_print_type(f, m, t_int);
+			ir_print_type(f, m, t_i32);
 			ir_write_str_lit(f, " 0, i32 0), ");
 			ir_print_type(f, m, t_int);
 			ir_fprintf(f, " %lld}", cast(i64)str.len);
@@ -985,9 +985,7 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 			ir_print_type(f, m, at);
 			ir_write_str_lit(f, "* ");
 			ir_print_value(f, m, cs->backing_array, at);
-			ir_write_str_lit(f, ", ");
-			ir_print_type(f, m, t_int);
-			ir_write_str_lit(f, " 0, i32 0), ");
+			ir_write_str_lit(f, ", i32 0, i32 0), ");
 			ir_print_type(f, m, t_int);
 			ir_fprintf(f, " %lld}", cs->count);
 		}
@@ -1061,6 +1059,7 @@ void ir_print_calling_convention(irFileBuffer *f, irModule *m, ProcCallingConven
 void ir_print_context_parameter_prefix(irFileBuffer *f, irModule *m) {
 	ir_print_type(f, m, t_context_ptr);
 	ir_write_str_lit(f, " noalias nonnull nocapture inreg ");
+	// ir_write_str_lit(f, " noalias nonnull nocapture ");
 }
 
 void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
@@ -1103,6 +1102,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 	case irInstr_ZeroInit: {
 		Type *type = type_deref(ir_type(instr->ZeroInit.address));
+		ir_write_str_lit(f, "; ZeroInit\n\t");
 		ir_write_str_lit(f, "store ");
 		ir_print_type(f, m, type);
 		ir_write_byte(f, ' ');
@@ -1116,6 +1116,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	case irInstr_Store: {
 		Type *type = type_deref(ir_type(instr->Store.address));
 		ir_write_str_lit(f, "store ");
+		if (instr->Store.is_volatile) {
+			ir_write_str_lit(f, "volatile ");
+		}
 		ir_print_type(f, m, type);
 		ir_write_byte(f, ' ');
 		ir_print_value(f, m, instr->Store.value, type);
@@ -1417,9 +1420,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, et);
 		ir_write_byte(f, ' ');
 		ir_print_value(f, m, instr->ArrayElementPtr.address, et);
-		ir_write_str_lit(f, ", ");
-		ir_print_type(f, m, t_int);
-		ir_write_str_lit(f, " 0, ");
+		ir_write_str_lit(f, ", i32 0, ");
 
 		irValue *index =instr->ArrayElementPtr.elem_index;
 		Type *t = ir_type(index);
@@ -1447,9 +1448,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, et);
 		ir_write_byte(f, ' ');
 		ir_print_value(f, m, instr->StructElementPtr.address, et);
-		ir_write_str_lit(f, ", ");
-		ir_print_type(f, m, t_int);
-		ir_write_str_lit(f, " 0, ");
+		ir_write_str_lit(f, ", i32 0, ");
 		ir_print_type(f, m, t_i32);
 		ir_fprintf(f, " %d", index);
 		break;
@@ -1779,9 +1778,10 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_write_byte(f, ' ');
 		ir_print_value(f, m, call->value, call->type);
 
+		bool return_by_pointer = proc_type->Proc.return_by_pointer;
 
 		ir_write_byte(f, '(');
-		if (proc_type->Proc.return_by_pointer) {
+		if (return_by_pointer) {
 			GB_ASSERT(call->return_ptr != nullptr);
 			ir_print_type(f, m, proc_type->Proc.results);
 			ir_write_str_lit(f, "* ");
@@ -1850,7 +1850,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			}
 		}
 		if (proc_type->Proc.calling_convention == ProcCC_Odin) {
-			if (param_index > 0) ir_write_str_lit(f, ", ");
+			if (param_index > 0 || return_by_pointer) ir_write_str_lit(f, ", ");
 
 			ir_print_context_parameter_prefix(f, m);
 			ir_print_value(f, m, call->context_ptr, t_context_ptr);
@@ -1952,7 +1952,6 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	ir_print_encoded_global(f, proc->name, ir_print_is_proc_global(m, proc));
 
 	ir_write_byte(f, '(');
-
 	if (proc_type->return_by_pointer) {
 		ir_print_type(f, m, reduce_tuple_to_single_type(proc_type->results));
 		ir_write_str_lit(f, "* sret noalias ");
@@ -1993,7 +1992,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 		}
 	}
 	if (proc_type->calling_convention == ProcCC_Odin) {
-		if (param_index > 0) ir_write_str_lit(f, ", ");
+		if (param_index > 0 || proc_type->return_by_pointer) ir_write_str_lit(f, ", ");
 
 		ir_print_context_parameter_prefix(f, m);
 		ir_write_str_lit(f, "%__.context_ptr");
@@ -2098,10 +2097,6 @@ void ir_print_type_name(irFileBuffer *f, irModule *m, irValue *v) {
 	ir_write_byte(f, '\n');
 }
 
-void foo_bar(void) {
-
-}
-
 void print_llvm_ir(irGen *ir) {
 	irModule *m = &ir->module;
 
@@ -2115,6 +2110,9 @@ void print_llvm_ir(irGen *ir) {
 		ir_write_str_lit(f, "target triple = \"x86_64-apple-macosx10.8\"\n\n");
 	} else if (build_context.ODIN_OS == "windows") {
 		ir_fprintf(f, "target triple = \"x86%s-pc-windows-msvc\"\n\n", word_bits == 64 ? "_64" : "");
+		if (word_bits == 64 && build_context.metrics.arch == TargetArch_amd64) {
+			ir_fprintf(f, "target datalayout = \"e-m:w-i64:64-f80:128-n8:16:32:64-S128\"\n\n");
+		}
 	}
 
 	ir_print_encoded_local(f, str_lit("..opaque"));

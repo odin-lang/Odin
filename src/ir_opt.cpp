@@ -284,6 +284,7 @@ void ir_opt_build_referrers(irProcedure *proc) {
 			irValue *instr = b->instrs[j];
 			array_clear(&ops);
 			ir_opt_add_operands(&ops, &instr->Instr);
+
 			for_array(k, ops) {
 				irValue *op = ops[k];
 				if (op == nullptr) {
