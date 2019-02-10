@@ -101,6 +101,13 @@ end_pos :: proc(tok: token.Token) -> token.Pos {
 	return pos;
 }
 
+default_parser :: proc() -> Parser {
+	return Parser {
+		err  = default_error_handler,
+		warn = default_warning_handler,
+	};
+}
+
 parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	zero_parser: {
 		p.prev_tok         = {};
