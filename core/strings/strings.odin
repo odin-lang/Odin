@@ -476,3 +476,152 @@ trim_right_space :: proc(s: string) -> string {
 trim_space :: proc(s: string) -> string {
 	return trim_right_space(trim_left_space(s));
 }
+
+
+// returns a slice of sub-strings into `s`
+// `allocator` is used only for the slice
+// `skip_empty=true` does not return zero-length substrings
+split :: proc{split_single, split_multi};
+
+split_single :: proc(s, substr: string, skip_empty := false, allocator := context.temp_allocator) -> []string #no_bounds_check {
+    if s == "" || substr == "" do return nil;
+
+    sublen := len(substr);
+    shared := len(s) - sublen;
+
+    if shared <= 0 {
+        return nil;
+    }
+
+    // number, index, last
+    n, i, l := 0, 0, 0;
+
+    // count results
+	first_pass: for i <= shared {
+        if s[i:i+sublen] == substr {
+            if !skip_empty || i - l > 0 {
+                n += 1;
+            }
+
+            i += sublen;
+            l  = i;
+        } else {
+            _, skip := utf8.decode_rune_in_string(s[i:]);
+            i += skip;
+        }
+    }
+
+    if !skip_empty || len(s) - l > 0 { 
+        n += 1;
+    }
+
+    if n < 1 {
+    	// no results
+        return nil;
+    }
+
+    buf := make([]string, n, allocator);
+
+    n, i, l = 0, 0, 0;
+
+    // slice results
+    second_pass: for i <= shared {
+        if s[i:i+sublen] == substr {
+            if !skip_empty || i - l > 0 {
+                buf[n] = s[l:i];
+                n += 1;
+            }
+
+            i += sublen;
+            l  = i;
+        } else {
+            _, skip := utf8.decode_rune_in_string(s[i:]);
+            i += skip;
+        }
+    }
+
+    if !skip_empty || len(s) - l > 0 {
+        buf[n] = s[l:];
+    }
+
+    return buf;
+}
+
+split_multi :: proc(s: string, substrs: []string, skip_empty := false, allocator := context.temp_allocator) -> []string #no_bounds_check {
+    if s == "" || len(substrs) <= 0 {
+    	return nil;
+    }
+
+    sublen := len(substrs[0]);
+    
+    for substr in substrs[1:] {
+    	sublen = min(sublen, len(substr));
+    }
+
+    shared := len(s) - sublen;
+
+    if shared <= 0 {
+        return nil;
+    }
+
+    // number, index, last
+    n, i, l := 0, 0, 0;
+
+    // count results
+    first_pass: for i <= shared {
+    	for substr in substrs {
+		    if s[i:i+sublen] == substr {
+		        if !skip_empty || i - l > 0 {
+		            n += 1;
+		        }
+
+		        i += sublen;
+		        l  = i;
+
+		        continue first_pass;
+		    }
+    	}
+	    
+	    _, skip := utf8.decode_rune_in_string(s[i:]);
+        i += skip;
+    }
+
+    if !skip_empty || len(s) - l > 0 { 
+        n += 1;
+    }
+
+    if n < 1 {
+    	// no results
+        return nil;
+    }
+
+    buf := make([]string, n, allocator);
+
+    n, i, l = 0, 0, 0;
+
+    // slice results
+    second_pass: for i <= shared {
+    	for substr in substrs {
+		    if s[i:i+sublen] == substr {
+		        if !skip_empty || i - l > 0 {
+		            buf[n] = s[l:i];
+		            n += 1;
+		        }
+
+		        i += sublen;
+		        l  = i;
+
+		        continue second_pass;
+		    }
+    	}
+
+	    _, skip := utf8.decode_rune_in_string(s[i:]);
+	    i += skip;
+    }
+
+    if !skip_empty || len(s) - l > 0 {
+        buf[n] = s[l:];
+    }
+
+    return buf;
+}
