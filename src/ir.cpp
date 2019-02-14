@@ -4644,6 +4644,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	}
 
 
+
 	// bool <-> llvm bool
 	if (is_type_boolean(src) && dst == t_llvm_bool) {
 		return ir_emit(proc, ir_instr_conv(proc, irConv_trunc, value, src_type, t));
@@ -4906,7 +4907,13 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return ir_emit_load(proc, result);
 	}
 
-
+	if (is_type_untyped(src)) {
+		if (is_type_string(src) && is_type_string(dst)) {
+			irValue *result = ir_add_local_generated(proc, t, false);
+			ir_emit_store(proc, result, value);
+			return ir_emit_load(proc, result);
+		}
+	}
 
 	gb_printf_err("ir_emit_conv: src -> dst\n");
 	gb_printf_err("Not Identical %s != %s\n", type_to_string(src_type), type_to_string(t));
