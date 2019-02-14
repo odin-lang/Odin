@@ -381,6 +381,8 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		return nil;
 	}
 
+	alignment = clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2);
+
 	raw_alloc :: proc(s: ^Small_Stack, size, alignment: int) -> rawptr {
 		curr_addr := uintptr(&s.data[0]) + uintptr(s.offset);
 		padding := calc_padding_with_header(curr_addr, uintptr(alignment), size_of(Small_Stack_Allocation_Header));
