@@ -5778,7 +5778,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (cl->elems.count == 0) {
 				break; // NOTE(bill): No need to init
 			}
-			if (!is_type_struct(t)) {
+			if (t->Struct.is_raw_union) {
 				if (cl->elems.count != 0) {
 					gbString type_str = type_to_string(type);
 					error(node, "Illegal compound literal type '%s'", type_str);
