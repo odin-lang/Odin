@@ -721,6 +721,44 @@ void init_universal(void) {
 		add_global_entity(entity, intrinsics_pkg->scope);
 	}
 
+	bool defined_values_double_declaration = true;
+	for_array(i, bc->defined_values.entries) {
+		String name = bc->defined_values.entries[i].key.string;
+		ExactValue value = bc->defined_values.entries[i].value;
+		GB_ASSERT(value.kind != ExactValue_Invalid);
+
+		Type *type = nullptr;
+		switch (value.kind) {
+		case ExactValue_Bool:
+			type = t_untyped_bool;
+			break;
+		case ExactValue_String:
+			type = t_untyped_string;
+			break;
+		case ExactValue_Integer:
+			type = t_untyped_integer;
+			break;
+		case ExactValue_Float:
+			type = t_untyped_float;
+			break;
+		}
+		GB_ASSERT(type != nullptr);
+
+
+
+		Entity *entity = alloc_entity_constant(nullptr, make_token_ident(name), type, value);
+		entity->state = EntityState_Resolved;
+		if (scope_insert(builtin_pkg->scope, entity)) {
+			error(entity->token, "'%.*s' defined as an argument is already declared at the global scope", LIT(name));
+			defined_values_double_declaration = true;
+			// NOTE(bill): Just exit early before anything, even though the compiler will do that anyway
+		}
+	}
+
+	if (defined_values_double_declaration) {
+		gb_exit(1);
+	}
+
 
 	t_u8_ptr       = alloc_type_pointer(t_u8);
 	t_int_ptr      = alloc_type_pointer(t_int);
