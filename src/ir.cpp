@@ -3035,6 +3035,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 				break;
 			case DeferredProcedure_in:
 				result_as_args = in_args;
+				break;
 			case DeferredProcedure_out:
 				result_as_args = ir_value_to_array(p, result);
 				break;
