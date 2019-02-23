@@ -305,6 +305,7 @@ struct DeferredProcedure {
 
 
 struct AttributeContext {
+	bool    is_export;
 	String  link_name;
 	String  link_prefix;
 	isize   init_expr_list_count;
@@ -423,7 +424,6 @@ struct ForeignContext {
 	Ast *                 curr_library;
 	ProcCallingConvention default_cc;
 	String                link_prefix;
-	bool                  in_export;
 };
 
 typedef Array<Entity *> CheckerTypePath;

@@ -1241,6 +1241,14 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 			error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
 			return false;
 		}
+		if (is_type_simd_vector(o->type)) {
+			switch (op.kind) {
+			case Token_ModMod:
+			case Token_ModModEq:
+				error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
+				return false;
+			}
+		}
 		break;
 
 	case Token_AndNot:
@@ -1248,6 +1256,14 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 		if (!is_type_integer(ct) && !is_type_bit_set(ct)) {
 			error(op, "Operator '%.*s' is only allowed with integers and bit sets", LIT(op.string));
 			return false;
+		}
+		if (is_type_simd_vector(o->type)) {
+			switch (op.kind) {
+			case Token_AndNot:
+			case Token_AndNotEq:
+				error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
+				return false;
+			}
 		}
 		break;
 

@@ -1783,7 +1783,11 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 	Type *new_type = original_type;
 
 	if (is_type_boolean(original_type)) {
-		return t_llvm_bool;
+		Type *t = core_type(base_type(new_type));
+		if (t == t_bool) {
+			return t_llvm_bool;
+		}
+		return new_type;
 	}
 
 	if (build_context.ODIN_ARCH == "386") {

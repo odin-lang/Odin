@@ -1199,7 +1199,6 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_package:
 		case Token_foreign:
 		case Token_import:
-		case Token_export:
 
 		case Token_if:
 		case Token_for:
@@ -2452,9 +2451,7 @@ void parse_foreign_block_decl(AstFile *f, Array<Ast *> *decls) {
 Ast *parse_foreign_block(AstFile *f, Token token) {
 	CommentGroup *docs = f->lead_comment;
 	Ast *foreign_library = nullptr;
-	if (f->curr_token.kind == Token_export) {
-		foreign_library = ast_implicit(f, expect_token(f, Token_export));
-	} else if (f->curr_token.kind == Token_OpenBrace) {
+	if (f->curr_token.kind == Token_OpenBrace) {
 		foreign_library = ast_ident(f, blank_token);
 	} else {
 		foreign_library = parse_ident(f);
@@ -3590,7 +3587,6 @@ Ast *parse_foreign_decl(AstFile *f) {
 	Token token = expect_token(f, Token_foreign);
 
 	switch (f->curr_token.kind) {
-	case Token_export:
 	case Token_Ident:
 	case Token_OpenBrace:
 		return parse_foreign_block(f, token);
@@ -3667,6 +3663,7 @@ Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind clo
 			       f->curr_token.kind != Token_EOF) {
 				Ast *elem = nullptr;
 				elem = parse_ident(f);
+
 				if (f->curr_token.kind == Token_Eq) {
 					Token eq = expect_token(f, Token_Eq);
 					Ast *value = parse_value(f);
@@ -3731,9 +3728,6 @@ Ast *parse_stmt(AstFile *f) {
 
 	case Token_import:
 		return parse_import_decl(f, ImportDecl_Standard);
-
-	// case Token_export:
-	// 	return parse_export_decl(f);
 
 
 	case Token_if:     return parse_if_stmt(f);
