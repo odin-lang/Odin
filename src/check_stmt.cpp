@@ -1665,8 +1665,6 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					if (!is_blank_ident(str)) {
 						found = scope_lookup_current(ctx->scope, str);
 						new_name_count += 1;
-					} else if (vd->is_static) {
-						error(name, "'static' is now allowed to be applied to '_'");
 					}
 					if (found == nullptr) {
 						entity = alloc_entity_variable(ctx->scope, token, nullptr, false);
@@ -1677,9 +1675,6 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 							GB_ASSERT(fl->kind == Ast_Ident);
 							entity->Variable.is_foreign = true;
 							entity->Variable.foreign_library_ident = fl;
-						}
-						if (vd->is_static) {
-							entity->flags |= EntityFlag_Static;
 						}
 					} else {
 						TokenPos pos = found->token.pos;
@@ -1744,6 +1739,16 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				if (ac.link_name.len > 0) {
 					e->Variable.link_name = ac.link_name;
 				}
+
+				e->flags &= ~EntityFlag_Static;
+				if (ac.is_static) {
+					String name = e->token.string;
+					if (name == "_") {
+						error(e->token, "The 'static' attribute is not allowed to be applied to '_'");
+					} else {
+						e->flags |= EntityFlag_Static;
+					}
+				}
 			}
 
 			check_arity_match(ctx, vd);
@@ -1751,6 +1756,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 			for (isize i = 0; i < entity_count; i++) {
 				Entity *e = entities[i];
+
 				if (e->Variable.is_foreign) {
 					if (vd->values.count > 0) {
 						error(e->token, "A foreign variable declaration cannot have a default value");
@@ -1842,6 +1848,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					}
 				}
 			}
+
 		} else {
 			// constant value declaration
 			// NOTE(bill): Check `_` declarations
