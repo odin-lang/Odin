@@ -112,9 +112,14 @@ Type_Info_Bit_Set :: struct {
 	lower:      i64,
 	upper:      i64,
 };
-
 Type_Info_Opaque :: struct {
 	elem: ^Type_Info,
+};
+Type_Info_Simd_Vector :: struct {
+	elem:       ^Type_Info,
+	elem_size:  int,
+	count:      int,
+	is_x86_mmx: bool,
 }
 
 Type_Info :: struct {
@@ -145,6 +150,7 @@ Type_Info :: struct {
 		Type_Info_Bit_Field,
 		Type_Info_Bit_Set,
 		Type_Info_Opaque,
+		Type_Info_Simd_Vector,
 	},
 }
 

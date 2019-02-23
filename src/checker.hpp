@@ -89,6 +89,8 @@ enum BuiltinProcId {
 	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
 
 	// "Intrinsics"
+	BuiltinProc_vector,
+
 	BuiltinProc_atomic_fence,
 	BuiltinProc_atomic_fence_acq,
 	BuiltinProc_atomic_fence_rel,
@@ -194,6 +196,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 
 	// "Intrinsics"
+	{STR_LIT("vector"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
+
+
 	{STR_LIT("atomic_fence"),        0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_fence_acq"),    0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_fence_rel"),    0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},

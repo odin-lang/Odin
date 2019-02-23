@@ -574,6 +574,16 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 	case Type_Opaque:
 		ir_print_type(f, m, strip_opaque_type(t));
 		return;
+
+	case Type_SimdVector:
+		if (t->SimdVector.is_x86_mmx) {
+			ir_write_str_lit(f, "x86_mmx");
+		} else {
+			ir_fprintf(f, "<%lld x ", t->SimdVector.count);;
+			ir_print_type(f, m, t->SimdVector.elem);
+			ir_write_byte(f, '>');
+		}
+		return;
 	}
 }
 
@@ -802,6 +812,31 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			}
 
 			ir_write_byte(f, ']');
+		} else if (is_type_simd_vector(type)) {
+			ast_node(cl, CompoundLit, value.value_compound);
+
+			Type *elem_type = type->SimdVector.elem;
+			isize elem_count = cl->elems.count;
+			if (elem_count == 0) {
+				ir_write_str_lit(f, "zeroinitializer");
+				break;
+			}
+			GB_ASSERT_MSG(elem_count == type->SimdVector.count, "%td != %td", elem_count, type->SimdVector.count);
+
+			ir_write_byte(f, '<');
+
+			for (isize i = 0; i < elem_count; i++) {
+				if (i > 0) ir_write_str_lit(f, ", ");
+				TypeAndValue tav = cl->elems[i]->tav;
+				GB_ASSERT(tav.mode != Addressing_Invalid);
+				ir_print_compound_element(f, m, tav.value, elem_type);
+			}
+			for (isize i = elem_count; i < type->SimdVector.count; i++) {
+				if (i >= elem_count) ir_write_str_lit(f, ", ");
+				ir_print_compound_element(f, m, empty_exact_value, elem_type);
+			}
+
+			ir_write_byte(f, '>');
 		} else if (is_type_struct(type)) {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
 			defer (gb_temp_arena_memory_end(tmp));
