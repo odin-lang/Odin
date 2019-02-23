@@ -365,7 +365,6 @@ Value_Decl :: struct {
 	type:       ^Expr,
 	values:     []^Expr,
 	comment:    ^Comment_Group,
-	is_static:  bool,
 	is_using:   bool,
 	is_mutable: bool,
 }

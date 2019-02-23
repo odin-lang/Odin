@@ -505,6 +505,71 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						}
 
+						case BuildFlag_Collection: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String str = value.value_string;
+							isize eq_pos = -1;
+							for (isize i = 0; i < str.len; i++) {
+								if (str[i] == '=') {
+									eq_pos = i;
+									break;
+								}
+							}
+							if (eq_pos < 0) {
+								gb_printf_err("Expected 'name=path', got '%.*s'\n", LIT(param));
+								bad_flags = true;
+								break;
+							}
+							String name = substring(str, 0, eq_pos);
+							String path = substring(str, eq_pos+1, str.len);
+							if (name.len == 0 || path.len == 0) {
+								gb_printf_err("Expected 'name=path', got '%.*s'\n", LIT(param));
+								bad_flags = true;
+								break;
+							}
+
+							if (!string_is_valid_identifier(name)) {
+								gb_printf_err("Library collection name '%.*s' must be a valid identifier\n", LIT(name));
+								bad_flags = true;
+								break;
+							}
+
+							if (name == "_") {
+								gb_printf_err("Library collection name cannot be an underscore\n");
+								bad_flags = true;
+								break;
+							}
+
+							if (name == "system") {
+								gb_printf_err("Library collection name 'system' is reserved\n");
+								bad_flags = true;
+								break;
+							}
+
+							String prev_path = {};
+							bool found = find_library_collection_path(name, &prev_path);
+							if (found) {
+								gb_printf_err("Library collection '%.*s' already exists with path '%.*s'\n", LIT(name), LIT(prev_path));
+								bad_flags = true;
+								break;
+							}
+
+							gbAllocator a = heap_allocator();
+							String fullpath = path_to_fullpath(a, path);
+							if (!path_is_directory(fullpath)) {
+								gb_printf_err("Library collection '%.*s' path must be a directory, got '%.*s'\n", LIT(name), LIT(fullpath));
+								gb_free(a, fullpath.text);
+								bad_flags = true;
+								break;
+							}
+
+							add_library_collection(name, path);
+
+							// NOTE(bill): Allow for multiple library collections
+							continue;
+						}
+
+
 						case BuildFlag_Define: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String str = value.value_string;
