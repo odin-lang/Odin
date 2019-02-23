@@ -721,7 +721,7 @@ void init_universal(void) {
 		add_global_entity(entity, intrinsics_pkg->scope);
 	}
 
-	bool defined_values_double_declaration = true;
+	bool defined_values_double_declaration = false;
 	for_array(i, bc->defined_values.entries) {
 		String name = bc->defined_values.entries[i].key.string;
 		ExactValue value = bc->defined_values.entries[i].value;
