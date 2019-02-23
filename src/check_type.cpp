@@ -1790,6 +1790,10 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		return new_type;
 	}
 
+	if (is_type_simd_vector(original_type)) {
+		return new_type;
+	}
+
 	if (build_context.ODIN_OS == "windows") {
 		// NOTE(bill): Changing the passing parameter value type is to match C's ABI
 		// IMPORTANT TODO(bill): This only matches the ABI on MSVC at the moment
@@ -1893,7 +1897,11 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 	}
 	GB_ASSERT(is_type_tuple(original_type));
 
+	Type *single_type = reduce_tuple_to_single_type(original_type);
 
+	if (is_type_simd_vector(single_type)) {
+		return new_type;
+	}
 
 	if (build_context.ODIN_OS == "windows") {
 		Type *bt = core_type(reduce_tuple_to_single_type(original_type));
@@ -1941,15 +1949,16 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 	return new_type;
 }
 
-bool abi_compat_return_by_value(gbAllocator a, ProcCallingConvention cc, Type *abi_return_type) {
+bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type *abi_return_type) {
 	if (abi_return_type == nullptr) {
 		return false;
 	}
-	// switch (cc) {
-	// case ProcCC_Odin:
-	// case ProcCC_Contextless:
-	// 	return false;
-	// }
+
+	Type *single_type = reduce_tuple_to_single_type(abi_return_type);
+
+	if (is_type_simd_vector(single_type)) {
+		return false;
+	}
 
 
 	if (build_context.ODIN_OS == "windows") {
@@ -2075,7 +2084,7 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 
 	// NOTE(bill): The types are the same
 	type->Proc.abi_compat_result_type = type_to_abi_compat_result_type(c->allocator, type->Proc.results);
-	type->Proc.return_by_pointer = abi_compat_return_by_value(c->allocator, pt->calling_convention, type->Proc.abi_compat_result_type);
+	type->Proc.return_by_pointer = abi_compat_return_by_pointer(c->allocator, pt->calling_convention, type->Proc.abi_compat_result_type);
 
 	return success;
 }
