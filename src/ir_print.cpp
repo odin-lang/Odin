@@ -1052,6 +1052,7 @@ void ir_print_calling_convention(irFileBuffer *f, irModule *m, ProcCallingConven
 	case ProcCC_CDecl:       ir_write_str_lit(f, "ccc ");   break;
 	case ProcCC_StdCall:     ir_write_str_lit(f, "cc 64 "); break;
 	case ProcCC_FastCall:    ir_write_str_lit(f, "cc 65 "); break;
+	case ProcCC_None:        ir_write_str_lit(f, "");       break;
 	default: GB_PANIC("unknown calling convention: %d", cc);
 	}
 }

@@ -166,6 +166,9 @@ enum ProcCallingConvention {
 	// ProcCC_VectorCall,
 	// ProcCC_ClrCall,
 
+	ProcCC_None,
+
+
 	ProcCC_ForeignBlockDefault = -1,
 };
 
