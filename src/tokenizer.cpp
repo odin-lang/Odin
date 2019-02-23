@@ -82,7 +82,6 @@ TOKEN_KIND(Token__OperatorEnd, ""), \
 \
 TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_import,      "import"),      \
-	TOKEN_KIND(Token_export,      "export"),      \
 	TOKEN_KIND(Token_foreign,     "foreign"),     \
 	TOKEN_KIND(Token_package,     "package"),     \
 	TOKEN_KIND(Token_typeid,      "typeid"),      \

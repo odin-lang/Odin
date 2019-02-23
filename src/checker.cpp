@@ -1952,7 +1952,18 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 }
 
 DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
-	if (name == "deferred") {
+	if (name == "export") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Invalid) {
+			ac->is_export = true;
+		} else if (ev.kind == ExactValue_Bool) {
+			ac->is_export = ev.value_bool;
+		} else {
+			error(value, "Expected either a boolean or no parameter for 'export'");
+			return false;
+		}
+		return true;
+	} else if (name == "deferred") {
 		if (value != nullptr) {
 			Operand o = {};
 			check_expr(c, &o, value);
@@ -2064,7 +2075,20 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		return true;
 	}
 
-	if (name == "link_name") {
+	if (name == "export") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Invalid) {
+			ac->is_export = true;
+		} else if (ev.kind == ExactValue_Bool) {
+			ac->is_export = ev.value_bool;
+		} else {
+			error(value, "Expected either a boolean or no parameter for 'export'");
+			return false;
+		}
+		if (ac->thread_local_model != "") {
+			error(elem, "An exported variable cannot be thread local");
+		}
+	} else if (name == "link_name") {
 		if (ev.kind == ExactValue_String) {
 			ac->link_name = ev.value_string;
 			if (!is_foreign_name_valid(ac->link_name)) {
@@ -2087,8 +2111,10 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 	} else if (name == "thread_local") {
 		if (ac->init_expr_list_count > 0) {
 			error(elem, "A thread local variable declaration cannot have initialization values");
-		} else if (c->foreign_context.curr_library || c->foreign_context.in_export) {
+		} else if (c->foreign_context.curr_library) {
 			error(elem, "A foreign block variable cannot be thread local");
+		} else if (ac->is_export) {
+			error(elem, "An exported variable cannot be thread local");
 		} else if (ev.kind == ExactValue_Invalid) {
 			ac->thread_local_model = str_lit("default");
 		} else if (ev.kind == ExactValue_String) {
@@ -2151,9 +2177,17 @@ void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, De
 			case_ast_node(i, Ident, elem);
 				name = i->token.string;
 			case_end;
+			case_ast_node(i, Implicit, elem);
+				name = i->string;
+			case_end;
 			case_ast_node(fv, FieldValue, elem);
-				GB_ASSERT(fv->field->kind == Ast_Ident);
-				name = fv->field->Ident.token.string;
+				if (fv->field->kind == Ast_Ident) {
+					name = fv->field->Ident.token.string;
+				} else if (fv->field->kind == Ast_Implicit) {
+					name = fv->field->Implicit.string;
+				} else {
+					GB_PANIC("Unknown Field Value name");
+				}
 				value = fv->value;
 			case_end;
 			default:
@@ -2407,9 +2441,6 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				e->Variable.foreign_library_ident = fl;
 
 				e->Variable.link_prefix = c->foreign_context.link_prefix;
-
-			} else if (c->foreign_context.in_export) {
-				e->Variable.is_export = true;
 			}
 
 			Ast *init_expr = value;
@@ -2475,9 +2506,6 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 					GB_ASSERT(cc != ProcCC_Invalid);
 					pl->type->ProcType.calling_convention = cc;
-
-				} else if (c->foreign_context.in_export) {
-					e->Procedure.is_export = true;
 				}
 				d->proc_lit = init;
 				d->type_expr = pl->type;
@@ -2516,7 +2544,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			}
 
 			if (e->kind != Entity_Procedure) {
-				if (fl != nullptr || c->foreign_context.in_export) {
+				if (fl != nullptr) {
 					AstKind kind = init->kind;
 					error(name, "Only procedures and variables are allowed to be in a foreign block, got %.*s", LIT(ast_strings[kind]));
 					if (kind == Ast_ProcType) {
@@ -2544,8 +2572,6 @@ void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
 	CheckerContext c = *ctx;
 	if (foreign_library->kind == Ast_Ident) {
 		c.foreign_context.curr_library = foreign_library;
-	} else if (foreign_library->kind == Ast_Implicit && foreign_library->Implicit.kind == Token_export) {
-		c.foreign_context.in_export = true;
 	} else {
 		error(foreign_library, "Foreign block name must be an identifier or 'export'");
 		c.foreign_context.curr_library = nullptr;

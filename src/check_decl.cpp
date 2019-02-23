@@ -551,19 +551,19 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	check_procedure_type(&tmp_ctx, proc_type, pl->type);
 
 	TypeProc *pt = &proc_type->Proc;
-
-	bool is_foreign         = e->Procedure.is_foreign;
-	bool is_export          = e->Procedure.is_export;
-	bool is_require_results = (pl->tags & ProcTag_require_results) != 0;
-
 	AttributeContext ac = make_attribute_context(e->Procedure.link_prefix);
 
 	if (d != nullptr) {
 		check_decl_attributes(ctx, d->attributes, proc_decl_attribute, &ac);
 	}
 
+	e->Procedure.is_export = ac.is_export;
 	e->deprecated_message = ac.deprecated_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
+
+	bool is_foreign         = e->Procedure.is_foreign;
+	bool is_export          = e->Procedure.is_export;
+	bool is_require_results = (pl->tags & ProcTag_require_results) != 0;
 
 	if (e->pkg != nullptr && e->token.string == "main") {
 		if (pt->param_count != 0 ||
@@ -718,6 +718,7 @@ void check_var_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_ex
 		check_decl_attributes(ctx, decl->attributes, var_decl_attribute, &ac);
 	}
 
+	e->Variable.is_export = ac.is_export;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
 	e->Variable.thread_local_model = ac.thread_local_model;
 
