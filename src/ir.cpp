@@ -7268,6 +7268,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 		case Type_Array:  et = bt->Array.elem;  break;
 		case Type_Slice:  et = bt->Slice.elem;  break;
 		case Type_BitSet: et = bt->BitSet.elem; break;
+		case Type_SimdVector: et = bt->SimdVector.elem; break;
 		}
 
 		String proc_name = {};
@@ -9994,6 +9995,18 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			ir_emit_comment(proc, str_lit("Type_Opaque"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_opaque_ptr);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->Opaque.elem));
+			break;
+
+		case Type_SimdVector:
+			ir_emit_comment(proc, str_lit("Type_SimdVector"));
+			tag = ir_emit_conv(proc, variant_ptr, t_type_info_simd_vector_ptr);
+			if (t->SimdVector.is_x86_mmx) {
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), v_true);
+			} else {
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->SimdVector.elem));
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), ir_const_int(type_size_of(t->SimdVector.elem)));
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), ir_const_int(t->SimdVector.count));
+			}
 			break;
 		}
 

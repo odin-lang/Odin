@@ -712,6 +712,15 @@ void init_universal(void) {
 		}
 	}
 
+	// TODO(bill): Set the correct arch for this
+	if (bc->metrics.arch == TargetArch_amd64 || bc->metrics.arch == TargetArch_386) {
+		t_vector_x86_mmx = alloc_type(Type_SimdVector);
+		t_vector_x86_mmx->SimdVector.is_x86_mmx = true;
+
+		Entity *entity = alloc_entity(Entity_TypeName, nullptr, make_token_ident(str_lit("x86_mmx")), t_vector_x86_mmx);
+		add_global_entity(entity, intrinsics_pkg->scope);
+	}
+
 
 	t_u8_ptr       = alloc_type_pointer(t_u8);
 	t_int_ptr      = alloc_type_pointer(t_int);
@@ -1248,6 +1257,10 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		add_type_info_type(c, bt->Proc.results);
 		break;
 
+	case Type_SimdVector:
+		add_type_info_type(c, bt->SimdVector.elem);
+		break;
+
 	default:
 		GB_PANIC("Unhandled type: %*.s %d", LIT(type_strings[bt->kind]), bt->kind);
 		break;
@@ -1417,6 +1430,10 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 	case Type_Proc:
 		add_min_dep_type_info(c, bt->Proc.params);
 		add_min_dep_type_info(c, bt->Proc.results);
+		break;
+
+	case Type_SimdVector:
+		add_min_dep_type_info(c, bt->SimdVector.elem);
 		break;
 
 	default:
@@ -1795,6 +1812,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_bit_field     = find_core_type(c, str_lit("Type_Info_Bit_Field"));
 	t_type_info_bit_set       = find_core_type(c, str_lit("Type_Info_Bit_Set"));
 	t_type_info_opaque        = find_core_type(c, str_lit("Type_Info_Opaque"));
+	t_type_info_simd_vector   = find_core_type(c, str_lit("Type_Info_Simd_Vector"));
 
 	t_type_info_named_ptr         = alloc_type_pointer(t_type_info_named);
 	t_type_info_integer_ptr       = alloc_type_pointer(t_type_info_integer);
@@ -1818,6 +1836,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_bit_field_ptr     = alloc_type_pointer(t_type_info_bit_field);
 	t_type_info_bit_set_ptr       = alloc_type_pointer(t_type_info_bit_set);
 	t_type_info_opaque_ptr        = alloc_type_pointer(t_type_info_opaque);
+	t_type_info_simd_vector_ptr   = alloc_type_pointer(t_type_info_simd_vector);
 }
 
 void init_mem_allocator(Checker *c) {

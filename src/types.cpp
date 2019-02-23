@@ -215,6 +215,12 @@ struct TypeUnion {
 		i64   lower;                                      \
 		i64   upper;                                      \
 	})                                                    \
+	TYPE_KIND(SimdVector, struct {                        \
+		i64   count;                                      \
+		Type *elem;                                       \
+		bool is_x86_mmx;                                  \
+	})                                                    \
+
 
 
 
@@ -460,13 +466,13 @@ gb_global Type *t_type_info_map               = nullptr;
 gb_global Type *t_type_info_bit_field         = nullptr;
 gb_global Type *t_type_info_bit_set           = nullptr;
 gb_global Type *t_type_info_opaque            = nullptr;
+gb_global Type *t_type_info_simd_vector       = nullptr;
 
 gb_global Type *t_type_info_named_ptr         = nullptr;
 gb_global Type *t_type_info_integer_ptr       = nullptr;
 gb_global Type *t_type_info_rune_ptr          = nullptr;
 gb_global Type *t_type_info_float_ptr         = nullptr;
 gb_global Type *t_type_info_complex_ptr       = nullptr;
-gb_global Type *t_type_info_quaternion_ptr    = nullptr;
 gb_global Type *t_type_info_any_ptr           = nullptr;
 gb_global Type *t_type_info_typeid_ptr        = nullptr;
 gb_global Type *t_type_info_string_ptr        = nullptr;
@@ -484,6 +490,7 @@ gb_global Type *t_type_info_map_ptr           = nullptr;
 gb_global Type *t_type_info_bit_field_ptr     = nullptr;
 gb_global Type *t_type_info_bit_set_ptr       = nullptr;
 gb_global Type *t_type_info_opaque_ptr        = nullptr;
+gb_global Type *t_type_info_simd_vector_ptr   = nullptr;
 
 gb_global Type *t_allocator                   = nullptr;
 gb_global Type *t_allocator_ptr               = nullptr;
@@ -495,6 +502,8 @@ gb_global Type *t_source_code_location_ptr    = nullptr;
 
 gb_global Type *t_map_key                     = nullptr;
 gb_global Type *t_map_header                  = nullptr;
+
+gb_global Type *t_vector_x86_mmx              = nullptr;
 
 
 
@@ -721,6 +730,13 @@ Type *alloc_type_bit_set() {
 }
 
 
+
+Type *alloc_type_simd_vector(i64 count, Type *elem) {
+	Type *t = alloc_type(Type_SimdVector);
+	t->SimdVector.count = count;
+	t->SimdVector.elem = elem;
+	return t;
+}
 
 
 
@@ -971,6 +987,11 @@ bool is_type_generic(Type *t) {
 	return t->kind == Type_Generic;
 }
 
+bool is_type_simd_vector(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_SimdVector;
+}
+
 
 Type *core_array_type(Type *t) {
 	for (;;) {
@@ -1191,6 +1212,25 @@ Type *bit_set_to_int(Type *t) {
 	}
 	GB_PANIC("Unknown bit_set size");
 	return nullptr;
+}
+
+bool is_type_valid_vector_elem(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
+		if (t->Basic.flags & BasicFlag_EndianLittle) {
+			return false;
+		}
+		if (t->Basic.flags & BasicFlag_EndianBig) {
+			return false;
+		}
+		if (is_type_integer(t)) {
+			return true;
+		}
+		if (is_type_float(t)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 
@@ -1637,6 +1677,18 @@ bool are_types_identical(Type *x, Type *y) {
 			       are_types_identical(x->Map.value, y->Map.value);
 		}
 		break;
+
+	case Type_SimdVector:
+		if (y->kind == Type_SimdVector) {
+			if (x->SimdVector.is_x86_mmx == y->SimdVector.is_x86_mmx) {
+				if (x->SimdVector.is_x86_mmx) {
+					return true;
+				} else if (x->SimdVector.count == y->SimdVector.count) {
+					return are_types_identical(x->SimdVector.elem, y->SimdVector.elem);
+				}
+			}
+		}
+		break;
 	}
 
 	return false;
@@ -1681,65 +1733,6 @@ Type *default_type(Type *type) {
 	return type;
 }
 
-/*
-// NOTE(bill): Valid Compile time execution #run type
-bool is_type_cte_safe(Type *type) {
-	type = default_type(base_type(type));
-	switch (type->kind) {
-	case Type_Basic:
-		switch (type->Basic.kind) {
-		case Basic_rawptr:
-		case Basic_any:
-			return false;
-		}
-		return true;
-
-	case Type_Pointer:
-		return false;
-
-	case Type_Array:
-		return is_type_cte_safe(type->Array.elem);
-
-	case Type_DynamicArray:
-		return false;
-	case Type_Map:
-		return false;
-
-	case Type_Slice:
-		return false;
-
-	case Type_Struct: {
-		if (type->Struct.is_raw_union) {
-			return false;
-		}
-		for_array(i, type->Struct.fields) {
-			Entity *v = type->Struct.fields[i];
-			if (!is_type_cte_safe(v->type)) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	case Type_Tuple: {
-		for_array(i, type->Tuple.variables) {
-			Entity *v = type->Tuple.variables[i];
-			if (!is_type_cte_safe(v->type)) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	case Type_Proc:
-		// TODO(bill): How should I handle procedures in the CTE stage?
-		// return type->Proc.calling_convention == ProcCC_Odin;
-		return false;
-	}
-
-	return false;
-}
- */
 i64 union_variant_index(Type *u, Type *v) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
@@ -2389,7 +2382,18 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		if (bits <= 32) return 4;
 		if (bits <= 64) return 8;
 		return 8; // NOTE(bill): Could be an invalid range so limit it for now
+	}
 
+	case Type_SimdVector: {
+		if (t->SimdVector.is_x86_mmx) {
+			return 8;
+		}
+		// align of
+		i64 count = t->SimdVector.count;
+		Type *elem = t->SimdVector.elem;
+		i64 size = count * type_size_of_internal(elem, path);
+		// IMPORTANT TODO(bill): Figure out the alignment of vector types
+		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
 	}
 	}
 
@@ -2621,6 +2625,15 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 		if (bits <= 32) return 4;
 		if (bits <= 64) return 8;
 		return 8; // NOTE(bill): Could be an invalid range so limit it for now
+	}
+
+	case Type_SimdVector: {
+		if (t->SimdVector.is_x86_mmx) {
+			return 8;
+		}
+		i64 count = t->SimdVector.count;
+		Type *elem = t->SimdVector.elem;
+		return count * type_size_of_internal(elem, path);
 	}
 	}
 
@@ -2949,6 +2962,17 @@ gbString write_type_to_string(gbString str, Type *type) {
 			str = write_type_to_string(str, type->BitSet.underlying);
 		}
 		str = gb_string_appendc(str, "]");
+		break;
+
+	case Type_SimdVector:
+		if (type->SimdVector.is_x86_mmx) {
+			return "intrinsics.x86_mmx";
+		} else {
+			str = gb_string_appendc(str, "intrinsics.vector(");
+			str = gb_string_append_fmt(str, "%d, ", cast(int)type->SimdVector.count);
+			str = write_type_to_string(str, type->SimdVector.elem);
+			str = gb_string_appendc(str, ")");
+		}
 		break;
 	}
 

@@ -4072,6 +4072,46 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
+	case BuiltinProc_vector: {
+		Operand x = {};
+		Operand y = {};
+		x = *operand;
+		if (!is_type_integer(x.type) || x.mode != Addressing_Constant) {
+			error(call, "Expected a constant integer for 'intrinsics.vector'");
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
+		if (x.value.value_integer.neg) {
+			error(call, "Negative vector element length");
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
+		i64 count = big_int_to_i64(&x.value.value_integer);
+
+		check_expr_or_type(c, &y, ce->args[1]);
+		if (y.mode != Addressing_Type) {
+			error(call, "Expected a type 'intrinsics.vector'");
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
+		Type *elem = y.type;
+		if (!is_type_valid_vector_elem(elem)) {
+			gbString str = type_to_string(elem);
+			error(call, "Invalid element type for 'intrinsics.vector', expected an integer or float with no specific endianness, got '%s'", str);
+			gb_string_free(str);
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
+
+		operand->mode = Addressing_Type;
+		operand->type = alloc_type_simd_vector(count, elem);
+		break;
+	}
+
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
 	case BuiltinProc_atomic_fence_rel:
@@ -5902,6 +5942,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		case Type_Slice:
 		case Type_Array:
 		case Type_DynamicArray:
+		case Type_SimdVector:
 		{
 			Type *elem_type = nullptr;
 			String context_name = {};
@@ -5922,6 +5963,10 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 				add_package_dependency(c, "runtime", "__dynamic_array_reserve");
 				add_package_dependency(c, "runtime", "__dynamic_array_append");
+			} else if (t->kind == Type_SimdVector) {
+				elem_type = t->SimdVector.elem;
+				context_name = str_lit("simd vector literal");
+				max_type_count = t->SimdVector.count;
 			} else {
 				GB_PANIC("unreachable");
 			}
@@ -5970,6 +6015,15 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					t->Array.count = max;
 				} else if (0 < max && max < t->Array.count) {
 					error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
+				}
+			}
+
+			if (t->kind == Type_SimdVector) {
+				if (!is_constant) {
+					error(node, "Expected all constant elements for a simd vector");
+				}
+				if (t->SimdVector.is_x86_mmx) {
+					error(node, "Compound literals are not allowed with intrinsics.x86_mmx");
 				}
 			}
 			break;

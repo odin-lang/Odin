@@ -1008,6 +1008,20 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
 		}
 
+	case runtime.Type_Info_Simd_Vector:
+		if info.is_x86_mmx {
+			strings.write_string(fi.buf, "intrinsics.x86_mmx<>");
+		}
+		strings.write_byte(fi.buf, '<');
+		defer strings.write_byte(fi.buf, '>');
+		for i in 0..info.count-1 {
+			if i > 0 do strings.write_string(fi.buf, ", ");
+
+			data := uintptr(v.data) + uintptr(i*info.elem_size);
+			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
+		}
+
+
 	case runtime.Type_Info_Slice:
 		strings.write_byte(fi.buf, '[');
 		defer strings.write_byte(fi.buf, ']');
@@ -1448,5 +1462,15 @@ write_type :: proc(buf: ^strings.Builder, ti: ^runtime.Type_Info) {
 		write_string(buf, "opaque ");
 		write_type(buf, info.elem);
 
+	case runtime.Type_Info_Simd_Vector:
+		if info.is_x86_mmx {
+			write_string(buf, "intrinsics.x86_mmx");
+		} else {
+			write_string(buf, "intrinsics.vector(");
+			write_i64(buf, i64(info.count));
+			write_string(buf, ", ");
+			write_type(buf, info.elem);
+			write_byte(buf, ')');
+		}
 	}
 }
