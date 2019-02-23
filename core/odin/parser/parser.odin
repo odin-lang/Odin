@@ -1033,37 +1033,6 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		expect_semicolon(p, s);
 		return s;
 
-	case token.Static:
-		docs := p.lead_comment;
-		tok := expect_token(p, token.Static);
-
-		list := parse_lhs_expr_list(p);
-		if len(list) == 0 {
-			error(p, tok.pos, "illegal use of 'static' statement");
-			expect_semicolon(p, nil);
-			return ast.new(ast.Bad_Stmt, tok.pos, end_pos(p.prev_tok));
-		}
-
-		expect_token_after(p, token.Colon, "identifier list");
-		decl := parse_value_decl(p, list, docs);
-		if decl != nil do switch d in &decl.derived {
-		case ast.Value_Decl:
-			if d.is_mutable {
-				d.is_static = true;
-			} else {
-				error(p, tok.pos, "'static' may only be currently used with variable declarations");
-			}
-		case:
-			error(p, tok.pos, "illegal use of 'static' statement");
-		}
-
-		error(p, tok.pos, "illegal use of 'static' statement");
-		if decl != nil {
-			return decl;
-		}
-
-		return ast.new(ast.Bad_Stmt, tok.pos, end_pos(p.prev_tok));
-
 	case token.Using:
 		docs := p.lead_comment;
 		tok := expect_token(p, token.Using);
