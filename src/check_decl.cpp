@@ -718,9 +718,14 @@ void check_var_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_ex
 		check_decl_attributes(ctx, decl->attributes, var_decl_attribute, &ac);
 	}
 
-	e->Variable.is_export = ac.is_export;
-	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
 	e->Variable.thread_local_model = ac.thread_local_model;
+	e->Variable.is_export = ac.is_export;
+	if (ac.is_static) {
+		e->flags |= EntityFlag_Static;
+	} else {
+		e->flags &= ~EntityFlag_Static;
+	}
+	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
 
 	String context_name = str_lit("variable declaration");
 

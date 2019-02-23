@@ -2070,6 +2070,14 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 	ExactValue ev = check_decl_attribute_value(c, value);
 
+	if (name == "static") {
+		if (value != nullptr) {
+			error(elem, "'static' does not have any parameters");
+		}
+		ac->is_static = true;
+		return true;
+	}
+
 	if (c->curr_proc_decl != nullptr) {
 		error(elem, "Only a variable at file scope can have a '%.*s'", LIT(name));
 		return true;
@@ -2425,10 +2433,6 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				e->flags |= EntityFlag_NotExported;
 			}
 
-			if (vd->is_static) {
-				e->flags |= EntityFlag_Static;
-			}
-
 			if (vd->is_using) {
 				vd->is_using = false; // NOTE(bill): This error will be only caught once
 				error(name, "'using' is not allowed at the file scope");
@@ -2525,14 +2529,6 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 			if (entity_is_private) {
 				e->flags |= EntityFlag_NotExported;
-			}
-
-			if (vd->is_static) {
-				if (e->kind == Entity_Constant) {
-					e->flags |= EntityFlag_Static;
-				} else {
-					error(name, "'static' is not allowed on this constant value declaration");
-				}
 			}
 
 			if (vd->is_using) {

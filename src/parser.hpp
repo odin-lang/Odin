@@ -376,7 +376,6 @@ AST_KIND(_DeclBegin,      "", bool) \
 		Array<Ast *> attributes;  \
 		CommentGroup *docs;       \
 		CommentGroup *comment;    \
-		bool          is_static;  \
 		bool          is_using;   \
 		bool          is_mutable; \
 	}) \

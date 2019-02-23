@@ -1208,7 +1208,6 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_defer:
 		case Token_asm:
 		case Token_using:
-		case Token_static:
 
 		case Token_break:
 		case Token_continue:
@@ -3751,33 +3750,33 @@ Ast *parse_stmt(AstFile *f) {
 		return s;
 	}
 
-	case Token_static: {
-		CommentGroup *docs = f->lead_comment;
-		Token token = expect_token(f, Token_static);
+	// case Token_static: {
+	// 	CommentGroup *docs = f->lead_comment;
+	// 	Token token = expect_token(f, Token_static);
 
-		Ast *decl = nullptr;
-		Array<Ast *> list = parse_lhs_expr_list(f);
-		if (list.count == 0) {
-			syntax_error(token, "Illegal use of 'static' statement");
-			expect_semicolon(f, nullptr);
-			return ast_bad_stmt(f, token, f->curr_token);
-		}
+	// 	Ast *decl = nullptr;
+	// 	Array<Ast *> list = parse_lhs_expr_list(f);
+	// 	if (list.count == 0) {
+	// 		syntax_error(token, "Illegal use of 'static' statement");
+	// 		expect_semicolon(f, nullptr);
+	// 		return ast_bad_stmt(f, token, f->curr_token);
+	// 	}
 
-		expect_token_after(f, Token_Colon, "identifier list");
-		decl = parse_value_decl(f, list, docs);
+	// 	expect_token_after(f, Token_Colon, "identifier list");
+	// 	decl = parse_value_decl(f, list, docs);
 
-		if (decl != nullptr && decl->kind == Ast_ValueDecl) {
-			if (decl->ValueDecl.is_mutable) {
-				decl->ValueDecl.is_static = true;
-			} else {
-				error(token, "'static' may only be currently used with variable declaration");
-			}
-			return decl;
-		}
+	// 	if (decl != nullptr && decl->kind == Ast_ValueDecl) {
+	// 		if (decl->ValueDecl.is_mutable) {
+	// 			decl->ValueDecl.is_static = true;
+	// 		} else {
+	// 			error(token, "'static' may only be currently used with variable declaration");
+	// 		}
+	// 		return decl;
+	// 	}
 
-		syntax_error(token, "Illegal use of 'static' statement");
-		return ast_bad_stmt(f, token, f->curr_token);
-	} break;
+	// 	syntax_error(token, "Illegal use of 'static' statement");
+	// 	return ast_bad_stmt(f, token, f->curr_token);
+	// } break;
 
 	case Token_using: {
 		CommentGroup *docs = f->lead_comment;

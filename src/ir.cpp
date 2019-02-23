@@ -8166,7 +8166,16 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		if (vd->is_mutable) {
 			irModule *m = proc->module;
 
-			if (vd->is_static) {
+			bool is_static = false;
+			if (vd->names.count > 0) {
+				Entity *e = entity_of_ident(vd->names[0]);
+				if (e->flags & EntityFlag_Static) {
+					// NOTE(bill): If one of the entities is static, they all are
+					is_static = true;
+				}
+			}
+
+			if (is_static) {
 				for_array(i, vd->names) {
 					irValue *value = nullptr;
 					if (vd->values.count > 0) {
