@@ -1700,7 +1700,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	case irInstr_BinaryOp: {
 		irInstrBinaryOp *bo = &value->Instr.BinaryOp;
 		Type *type = base_type(ir_type(bo->left));
-		Type *elem_type = type;
+		Type *elem_type = base_array_type(type);
 
 		ir_fprintf(f, "%%%d = ", value->index);
 

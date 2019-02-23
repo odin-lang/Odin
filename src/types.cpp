@@ -974,10 +974,19 @@ bool is_type_poly_proc(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Proc && t->Proc.is_polymorphic;
 }
+bool is_type_simd_vector(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_SimdVector;
+}
+
 Type *base_array_type(Type *t) {
 	if (is_type_array(t)) {
 		t = base_type(t);
 		return t->Array.elem;
+	}
+	if (is_type_simd_vector(t)) {
+		t = base_type(t);
+		return t->SimdVector.elem;
 	}
 	return t;
 }
@@ -987,10 +996,6 @@ bool is_type_generic(Type *t) {
 	return t->kind == Type_Generic;
 }
 
-bool is_type_simd_vector(Type *t) {
-	t = base_type(t);
-	return t->kind == Type_SimdVector;
-}
 
 
 Type *core_array_type(Type *t) {
