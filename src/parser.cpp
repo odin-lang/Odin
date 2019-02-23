@@ -2700,6 +2700,7 @@ ProcCallingConvention string_to_calling_convention(String s) {
 	if (s == "std")         return ProcCC_StdCall;
 	if (s == "fastcall")    return ProcCC_FastCall;
 	if (s == "fast")        return ProcCC_FastCall;
+	if (s == "none")        return ProcCC_None;
 	return ProcCC_Invalid;
 }
 

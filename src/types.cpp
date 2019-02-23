@@ -2894,6 +2894,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 		case ProcCC_FastCall:
 			str = gb_string_appendc(str, " \"fastcall\" ");
 			break;
+		case ProcCC_None:
+			str = gb_string_appendc(str, " \"none\" ");
+			break;
 		// case ProcCC_VectorCall:
 		// 	str = gb_string_appendc(str, " \"vectorcall\" ");
 		// 	break;
