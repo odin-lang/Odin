@@ -7360,7 +7360,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 		case Type_Array: {
 			if (cl->elems.count > 0) {
-				// ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
+				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
 
 				auto temp_data = array_make<irCompoundLitElemTempData>(heap_allocator(), 0, cl->elems.count);
 				defer (array_free(&temp_data));
