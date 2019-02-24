@@ -316,8 +316,11 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 	if (t->Proc.return_by_pointer) {
 		ir_print_type(f, m, reduce_tuple_to_single_type(t->Proc.results));
 		// ir_fprintf(f, "* sret noalias ");
-		ir_write_string(f, str_lit("* noalias "));
-		if (param_count > 0) ir_write_string(f, str_lit(", "));
+		// ir_write_string(f, str_lit("* noalias "));
+		ir_write_string(f, str_lit("*"));
+		if (param_count > 0 || t->Proc.calling_convention == ProcCC_Odin)  {
+			ir_write_string(f, str_lit(", "));
+		}
 	}
 	isize param_index = 0;
 	for (isize i = 0; i < param_count; i++) {
