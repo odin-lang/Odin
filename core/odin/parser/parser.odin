@@ -857,10 +857,6 @@ parse_foreign_block :: proc(p: ^Parser, tok: token.Token) -> ^ast.Foreign_Block_
 
 	foreign_library: ^ast.Expr;
 	switch p.curr_tok.kind {
-	case token.Export:
-		i := ast.new(ast.Implicit, tok.pos, end_pos(tok));
-		i.tok = expect_token(p, token.Export);
-		foreign_library = i;
 	case token.Open_Brace:
 		i := ast.new(ast.Ident, tok.pos, end_pos(tok));
 		i.name = "_";
@@ -903,7 +899,7 @@ parse_foreign_decl :: proc(p: ^Parser) -> ^ast.Decl {
 	tok := expect_token(p, token.Foreign);
 
 	switch p.curr_tok.kind {
-	case token.Export, token.Ident, token.Open_Brace:
+	case token.Ident, token.Open_Brace:
 		return parse_foreign_block(p, tok);
 
 	case token.Import:
