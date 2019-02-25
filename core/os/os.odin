@@ -51,6 +51,20 @@ write_encoded_rune :: proc(fd: Handle, r: rune) {
 }
 
 
+file_size_from_path :: proc(path: string) -> i64 {
+	fd, err := open(path, O_RDONLY, 0);
+	if err != 0 {
+		return -1;
+	}
+	defer close(fd);
+
+	length: i64;
+	if length, err = file_size(fd); err != 0 {
+		return -1;
+	}
+	return length;
+}
+
 read_entire_file :: proc(name: string) -> (data: []byte, success: bool) {
 	fd, err := open(name, O_RDONLY, 0);
 	if err != 0 {
