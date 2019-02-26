@@ -3215,6 +3215,9 @@ irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 	key = ir_emit_conv(proc, key, key_type);
 	if (is_type_integer(t)) {
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, key, hash_type));
+	} else if (is_type_enum(t)) {
+		irValue *e = ir_emit_bitcast(proc, key, t_uint);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, e, hash_type));
 	} else if (is_type_typeid(t)) {
 		irValue *i = ir_emit_bitcast(proc, key, t_uint);
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, i, hash_type));
