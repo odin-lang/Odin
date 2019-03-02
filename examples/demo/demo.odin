@@ -703,9 +703,9 @@ map_type :: proc() {
 		A = 0,
 		B = 1 << 64 - 1,
 	}
-	Enum_i32 :: enum i32 {
+	Enum_i8 :: enum i8 {
 		A = 0,
-		B = -(1 << 31),
+		B = -(1 << 7),
 	}
 	Enum_i64 :: enum i64 {
 		A = 0,
