@@ -164,7 +164,7 @@ foreign kernel32 {
 
 	@(link_name="LoadLibraryA")   load_library_a   :: proc(c_str: cstring)  -> Hmodule ---;
 	@(link_name="LoadLibraryW")   load_library_w   :: proc(c_str: Wstring) -> Hmodule ---;
-	@(link_name="FreeLibrary")    free_library     :: proc(h: Hmodule) ---;
+	@(link_name="FreeLibrary")    free_library     :: proc(h: Hmodule) -> Bool ---;
 	@(link_name="GetProcAddress") get_proc_address :: proc(h: Hmodule, c_str: cstring) -> rawptr ---;
 
 }
