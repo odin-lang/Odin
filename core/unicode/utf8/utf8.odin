@@ -90,7 +90,7 @@ encode_rune :: proc(r: rune) -> ([4]u8, int) {
 	buf[0] = 0xf0 | u8(r>>18);
 	buf[1] = 0x80 | u8(r>>12) & mask;
 	buf[2] = 0x80 | u8(r>>6)  & mask;
-	buf[3] = 0x80 | u8(r)       & mask;
+	buf[3] = 0x80 | u8(r)     & mask;
 	return buf, 4;
 }
 
