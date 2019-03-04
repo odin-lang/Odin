@@ -78,7 +78,7 @@ Token :: struct {
 }
 
 Tokenizer :: struct {
-	src: []byte,
+	src:         []byte,
 
 	file:        string, // May not be used
 
@@ -281,7 +281,7 @@ digit_value :: proc(r: rune) -> int {
 }
 
 scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Kind, string) {
-	scan_manitissa :: proc(t: ^Tokenizer, base: int) {
+	scan_mantissa :: proc(t: ^Tokenizer, base: int) {
 		for digit_value(t.curr_rune) < base || t.curr_rune == '_' {
 			advance_to_next_rune(t);
 		}
@@ -294,7 +294,7 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Kind, string) {
 				advance_to_next_rune(t);
 			}
 			if digit_value(t.curr_rune) < 10 {
-				scan_manitissa(t, 10);
+				scan_mantissa(t, 10);
 			} else {
 				token_error(t, "Illegal floating point exponent");
 			}
@@ -305,7 +305,7 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Kind, string) {
 		if t.curr_rune == '.' {
 			tok = Float;
 			advance_to_next_rune(t);
-			scan_manitissa(t, 10);
+			scan_mantissa(t, 10);
 		}
 
 		return scan_exponent(t, tok, offset);
@@ -317,7 +317,7 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Kind, string) {
 	if seen_decimal_point {
 		offset -= 1;
 		tok = Float;
-		scan_manitissa(t, 10);
+		scan_mantissa(t, 10);
 		return scan_exponent(t, tok, offset);
 	}
 
@@ -327,24 +327,24 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Kind, string) {
 		switch t.curr_rune {
 		case 'b', 'B':
 			advance_to_next_rune(t);
-			scan_manitissa(t, 2);
+			scan_mantissa(t, 2);
 			if t.offset - offset <= 2 {
 				token_error(t, "Illegal binary number");
 			}
 		case 'o', 'O':
 			advance_to_next_rune(t);
-			scan_manitissa(t, 8);
+			scan_mantissa(t, 8);
 			if t.offset - offset <= 2 {
 				token_error(t, "Illegal octal number");
 			}
 		case 'x', 'X':
 			advance_to_next_rune(t);
-			scan_manitissa(t, 16);
+			scan_mantissa(t, 16);
 			if t.offset - offset <= 2 {
 				token_error(t, "Illegal hexadecimal number");
 			}
 		case:
-			scan_manitissa(t, 10);
+			scan_mantissa(t, 10);
 			switch t.curr_rune {
 			case '.', 'e', 'E':
 				return scan_fraction(t, tok, offset);
@@ -354,7 +354,7 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Kind, string) {
 		return tok, string(t.src[offset:t.offset]);
 	}
 
-	scan_manitissa(t, 10);
+	scan_mantissa(t, 10);
 
 	return scan_fraction(t, tok, offset);
 }
