@@ -6473,7 +6473,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 		if (is_type_map(t)) {
 			Operand key = {};
-			check_expr(c, &key, ie->index);
+			check_expr_with_type_hint(c, &key, ie->index, t->Map.key);
 			check_assignment(c, &key, t->Map.key, str_lit("map index"));
 			if (key.mode == Addressing_Invalid) {
 				o->mode = Addressing_Invalid;
