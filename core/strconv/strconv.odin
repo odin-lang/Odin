@@ -475,7 +475,7 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 	}
 	i-=1; a[i] = digits[u % b];
 
-	if Int_Flag.Prefix in flags {
+	if .Prefix in flags {
 		ok := true;
 		switch base {
 		case  2: i-=1; a[i] = 'b';
@@ -493,9 +493,9 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 	switch {
 	case neg:
 		i-=1; a[i] = '-';
-	case Int_Flag.Plus in flags:
+	case .Plus in flags:
 		i-=1; a[i] = '+';
-	case Int_Flag.Space in flags:
+	case .Space in flags:
 		i-=1; a[i] = ' ';
 	}
 
