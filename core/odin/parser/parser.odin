@@ -2581,6 +2581,13 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		ue.expr = expr;
 		return ue;
 
+	case token.Period:
+		op := advance_token(p);
+		field := parse_ident(p);
+		ise := ast.new(ast.Implicit_Selector_Expr, op.pos, field.end);
+		ise.field = field;
+		return ise;
+
 	}
 	return parse_atom_expr(p, parse_operand(p, lhs), lhs);
 }

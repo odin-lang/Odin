@@ -991,7 +991,6 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 	o->expr = n;
 	String name = n->Ident.token.string;
 
-
 	Entity *e = scope_lookup(c->scope, name);
 	if (e == nullptr) {
 		if (is_blank_ident(name)) {
@@ -6177,7 +6176,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						continue;
 					}
 
-					check_expr(c, o, elem);
+					check_expr_with_type_hint(c, o, elem, et);
 
 					if (is_constant) {
 						is_constant = o->mode == Addressing_Constant;
@@ -6407,6 +6406,47 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		check_selector(c, o, node, type_hint);
 	case_end;
 
+
+	case_ast_node(ise, ImplicitSelectorExpr, node);
+		o->type = t_invalid;
+		o->expr = node;
+		o->mode = Addressing_Invalid;
+
+		if (type_hint == nullptr) {
+			gbString str = expr_to_string(node);
+			error(node, "Cannot determine type for implicit selector expression '%s'", str);
+			gb_string_free(str);
+			return Expr_Expr;
+		}
+		o->type = type_hint;
+		if (!is_type_enum(type_hint)) {
+			gbString typ = type_to_string(type_hint);
+			gbString str = expr_to_string(node);
+			error(node, "Invalid type '%s' for implicit selector expression '%s'", typ, str);
+			gb_string_free(str);
+			gb_string_free(typ);
+			return Expr_Expr;
+		}
+		GB_ASSERT(ise->selector->kind == Ast_Ident);
+		String name = ise->selector->Ident.token.string;
+
+		Type *enum_type = base_type(type_hint);
+		GB_ASSERT(enum_type->kind == Type_Enum);
+		Entity *e = scope_lookup_current(enum_type->Enum.scope, name);
+		if (e == nullptr) {
+			gbString typ = type_to_string(type_hint);
+			error(node, "Undeclared name %.*s for type '%s'", LIT(name), typ);
+			gb_string_free(typ);
+			return Expr_Expr;
+		}
+		GB_ASSERT(are_types_identical(base_type(e->type), base_type(type_hint)));
+		GB_ASSERT(e->kind == Entity_Constant);
+		o->value = e->Constant.value;
+		o->mode = Addressing_Constant;
+		o->type = e->type;
+
+		return Expr_Expr;
+	case_end;
 
 	case_ast_node(ie, IndexExpr, node);
 		check_expr(c, o, ie->expr);
@@ -6828,6 +6868,11 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 
 	case_ast_node(se, SelectorExpr, node);
 		str = write_expr_to_string(str, se->expr);
+		str = gb_string_append_rune(str, '.');
+		str = write_expr_to_string(str, se->selector);
+	case_end;
+
+	case_ast_node(se, ImplicitSelectorExpr, node);
 		str = gb_string_append_rune(str, '.');
 		str = write_expr_to_string(str, se->selector);
 	case_end;
