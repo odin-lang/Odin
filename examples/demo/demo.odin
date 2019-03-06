@@ -746,6 +746,34 @@ map_type :: proc() {
 
 }
 
+implicit_selector_expression :: proc() {
+	fmt.println("# implicit selector expression");
+
+	Foo :: enum {A, B, C};
+
+	f: Foo;
+	f = .A;
+
+	BAR :: bit_set[Foo]{.B, .C};
+
+	switch f {
+	case .A:
+		fmt.println("HERE");
+	case .B:
+		fmt.println("NEVER");
+	case .C:
+		fmt.println("FOREVER");
+	}
+
+	my_map := make(map[Foo]int);
+	defer delete(my_map);
+
+	my_map[.A] = 123;
+	my_map[Foo.B] = 345;
+
+	fmt.println(my_map[.A] + my_map[Foo.B] + my_map[.C]);
+}
+
 explicit_procedure_overloading :: proc() {
 	fmt.println("# explicit procedure overloading");
 
@@ -940,6 +968,7 @@ main :: proc() {
 		named_proc_return_parameters();
 		using_enum();
 		map_type();
+		implicit_selector_expression();
 		explicit_procedure_overloading();
 		complete_switch();
 		cstring_example();
