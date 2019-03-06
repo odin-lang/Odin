@@ -2679,7 +2679,7 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 		return stmt;
 
 	case op.kind == token.In:
-		if Stmt_Allow_Flag.In in flags {
+		if .In in flags {
 			allow_token(p, token.In);
 			prev_allow_range := p.allow_range;
 			p.allow_range = true;
@@ -2697,7 +2697,7 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 		}
 	case op.kind == token.Colon:
 		expect_token_after(p, token.Colon, "identifier list");
-		if Stmt_Allow_Flag.Label in flags && len(lhs) == 1 {
+		if .Label in flags && len(lhs) == 1 {
 			switch p.curr_tok.kind {
 			case token.Open_Brace, token.If, token.For, token.Switch:
 				label := lhs[0];
