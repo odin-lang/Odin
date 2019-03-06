@@ -468,11 +468,10 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	buf: [256]byte;
 	start := 0;
 
-	using strconv.Int_Flag;
 	flags: strconv.Int_Flags;
-	if fi.hash && !fi.zero do flags |= {Prefix};
-	if fi.plus             do flags |= {Plus};
-	if fi.space            do flags |= {Space};
+	if fi.hash && !fi.zero do flags |= {.Prefix};
+	if fi.plus             do flags |= {.Plus};
+	if fi.space            do flags |= {.Space};
 	s := strconv.append_bits(buf[start:], u, base, is_signed, bit_size, digits, flags);
 
 	if fi.hash && fi.zero {
@@ -746,11 +745,10 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 		ti = runtime.type_info_base(ti);
 		switch info in ti.variant {
 		case runtime.Type_Info_Integer:
-			using runtime.Type_Info_Endianness;
 			switch info.endianness {
-			case Platform: return false;
-			case Little:   return ODIN_ENDIAN != "little";
-			case Big:      return ODIN_ENDIAN != "big";
+			case .Platform: return false;
+			case .Little:   return ODIN_ENDIAN != "little";
+			case .Big:      return ODIN_ENDIAN != "big";
 			}
 		}
 		return false;
