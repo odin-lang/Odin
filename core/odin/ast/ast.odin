@@ -144,6 +144,10 @@ Selector_Expr :: struct {
 	field: ^Ident,
 }
 
+Implicit_Selector_Expr :: struct {
+	using node: Expr,
+	field: ^Ident,
+}
 
 Index_Expr :: struct {
 	using node: Expr,

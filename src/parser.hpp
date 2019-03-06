@@ -245,6 +245,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BinaryExpr,   "binary expression",      struct { Token op; Ast *left, *right; } ) \
 	AST_KIND(ParenExpr,    "parentheses expression", struct { Ast *expr; Token open, close; }) \
 	AST_KIND(SelectorExpr, "selector expression",    struct { Token token; Ast *expr, *selector; }) \
+	AST_KIND(ImplicitSelectorExpr, "implicit selector expression",    struct { Token token; Ast *selector; }) \
 	AST_KIND(IndexExpr,    "index expression",       struct { Ast *expr, *index; Token open, close; }) \
 	AST_KIND(DerefExpr,    "dereference expression", struct { Token op; Ast *expr; }) \
 	AST_KIND(SliceExpr,    "slice expression", struct { \

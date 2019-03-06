@@ -25,6 +25,11 @@ Token ast_token(Ast *node) {
 			return ast_token(node->SelectorExpr.selector);
 		}
 		return node->SelectorExpr.token;
+	case Ast_ImplicitSelectorExpr:
+		if (node->ImplicitSelectorExpr.selector != nullptr) {
+			return ast_token(node->ImplicitSelectorExpr.selector);
+		}
+		return node->ImplicitSelectorExpr.token;
 	case Ast_IndexExpr:          return node->IndexExpr.open;
 	case Ast_SliceExpr:          return node->SliceExpr.open;
 	case Ast_Ellipsis:           return node->Ellipsis.token;
@@ -164,6 +169,9 @@ Ast *clone_ast(Ast *node) {
 	case Ast_SelectorExpr:
 		n->SelectorExpr.expr = clone_ast(n->SelectorExpr.expr);
 		n->SelectorExpr.selector = clone_ast(n->SelectorExpr.selector);
+		break;
+	case Ast_ImplicitSelectorExpr:
+		n->ImplicitSelectorExpr.selector = clone_ast(n->ImplicitSelectorExpr.selector);
 		break;
 	case Ast_IndexExpr:
 		n->IndexExpr.expr  = clone_ast(n->IndexExpr.expr);
@@ -504,10 +512,19 @@ Ast *ast_call_expr(AstFile *f, Ast *proc, Array<Ast *> args, Token open, Token c
 
 Ast *ast_selector_expr(AstFile *f, Token token, Ast *expr, Ast *selector) {
 	Ast *result = alloc_ast_node(f, Ast_SelectorExpr);
+	result->SelectorExpr.token = token;
 	result->SelectorExpr.expr = expr;
 	result->SelectorExpr.selector = selector;
 	return result;
 }
+
+Ast *ast_implicit_selector_expr(AstFile *f, Token token, Ast *selector) {
+	Ast *result = alloc_ast_node(f, Ast_ImplicitSelectorExpr);
+	result->ImplicitSelectorExpr.token = token;
+	result->ImplicitSelectorExpr.selector = selector;
+	return result;
+}
+
 
 Ast *ast_index_expr(AstFile *f, Ast *expr, Ast *index, Token open, Token close) {
 	Ast *result = alloc_ast_node(f, Ast_IndexExpr);
@@ -1612,7 +1629,6 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 	case Token_offset_of:
 		return parse_call_expr(f, ast_implicit(f, advance_token(f)));
 
-
 	case Token_String:
 		return ast_basic_lit(f, advance_token(f));
 
@@ -2276,6 +2292,12 @@ Ast *parse_unary_expr(AstFile *f, bool lhs) {
 		Token token = advance_token(f);
 		Ast *expr = parse_unary_expr(f, lhs);
 		return ast_unary_expr(f, token, expr);
+	}
+
+	case Token_Period: {
+		Token token = expect_token(f, Token_Period);
+		Ast *ident = parse_ident(f);
+		return ast_implicit_selector_expr(f, token, ident);
 	}
 	}
 

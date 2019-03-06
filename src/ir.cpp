@@ -6268,6 +6268,13 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		return ir_addr_load(proc, ir_build_addr(proc, expr));
 	case_end;
 
+	case_ast_node(ise, ImplicitSelectorExpr, expr);
+		TypeAndValue tav = type_and_value_of_expr(expr);
+		GB_ASSERT(tav.mode == Addressing_Constant);
+
+		return ir_add_module_constant(proc->module, tv.type, tv.value);
+	case_end;
+
 	case_ast_node(te, TernaryExpr, expr);
 		ir_emit_comment(proc, str_lit("TernaryExpr"));
 
