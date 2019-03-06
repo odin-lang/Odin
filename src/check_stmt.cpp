@@ -686,14 +686,14 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				ast_node(ie, BinaryExpr, expr);
 				Operand lhs = {};
 				Operand rhs = {};
-				check_expr(ctx, &lhs, ie->left);
+				check_expr_with_type_hint(ctx, &lhs, ie->left, x.type);
 				if (x.mode == Addressing_Invalid) {
 					continue;
 				}
 				if (lhs.mode == Addressing_Invalid) {
 					continue;
 				}
-				check_expr(ctx, &rhs, ie->right);
+				check_expr_with_type_hint(ctx, &rhs, ie->right, x.type);
 				if (rhs.mode == Addressing_Invalid) {
 					continue;
 				}
@@ -732,7 +732,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				if (is_type_typeid(x.type)) {
 					check_expr_or_type(ctx, &y, expr, x.type);
 				} else {
-					check_expr(ctx, &y, expr);
+					check_expr_with_type_hint(ctx, &y, expr, x.type);
 				}
 
 				if (x.mode == Addressing_Invalid ||
