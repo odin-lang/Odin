@@ -2144,8 +2144,20 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 
 	case Token_in:
 	case Token_notin:
-		check_expr(c, x, be->left);
+		// IMPORTANT NOTE(bill): This uses right-left evaluation in type checking only no in
+
 		check_expr(c, y, be->right);
+
+		if (is_type_bit_set(y->type)) {
+			Type *elem = base_type(y->type)->BitSet.elem;
+			check_expr_with_type_hint(c, x, be->left, elem);
+		} else if (is_type_map(y->type)) {
+			Type *key = base_type(y->type)->Map.key;
+			check_expr_with_type_hint(c, x, be->left, key);
+		} else {
+			check_expr(c, x, be->left);
+		}
+
 		if (x->mode == Addressing_Invalid) {
 			return;
 		}
