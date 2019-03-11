@@ -1077,9 +1077,9 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			stmt := parse_stmt(p);
 			switch name {
 			case "bounds_check":
-				stmt.state_flags |= {ast.Node_State_Flag.Bounds_Check};
+				stmt.state_flags |= {.Bounds_Check};
 			case "no_bounds_check":
-				stmt.state_flags |= {ast.Node_State_Flag.No_Bounds_Check};
+				stmt.state_flags |= {.No_Bounds_Check};
 			}
 			return stmt;
 		case "complete":
@@ -1721,6 +1721,29 @@ string_to_calling_convention :: proc(s: string) -> ast.Proc_Calling_Convention {
 		return Fast_Call;
 	}
 	return Invalid;
+}
+
+parse_proc_tags :: proc(p: ^Parser) -> (tags: Proc_Tags) {
+	for p.curr_tok.kind == token.Hash {
+		tok := expect_token(p, token.Hash);
+		ident := expect_token(p, token.Ident);
+
+		switch ident.text {
+		case "require_results":
+			tags |= {.Require_Results};
+		case "bounds_check":
+			tags |= {.Bounds_Check};
+		case "no_bounds_check":
+			tags |= {.No_Bounds_Check};
+		case:
+		}
+	}
+
+	if .Bounds_Check in tags && .No_Bounds_Check in tags {
+		p.err(p.curr_tok.pos, "#bounds_check and #no_bounds_check applied to the same procedure type");
+	}
+
+	return;
 }
 
 parse_proc_type :: proc(p: ^Parser, tok: token.Token) -> ^ast.Proc_Type {

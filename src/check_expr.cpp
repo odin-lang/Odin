@@ -5439,7 +5439,8 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call) {
 		operand->mode = Addressing_NoValue;
 	} else {
 		GB_ASSERT(is_type_tuple(result_type));
-		switch (result_type->Tuple.variables.count) {
+		isize count = result_type->Tuple.variables.count;
+		switch (count) {
 		case 0:
 			operand->mode = Addressing_NoValue;
 			break;
