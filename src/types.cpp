@@ -198,6 +198,7 @@ struct TypeUnion {
 		bool     has_proc_default_values;                 \
 		bool     has_named_results;                       \
 		bool     diverging; /* no return */               \
+		u64      tags;                                    \
 		isize    specialization_count;                    \
 		ProcCallingConvention calling_convention;         \
 	})                                                    \

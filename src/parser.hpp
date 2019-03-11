@@ -151,7 +151,6 @@ enum ProcTag {
 	ProcTag_bounds_check    = 1<<0,
 	ProcTag_no_bounds_check = 1<<1,
 	ProcTag_require_results = 1<<4,
-	ProcTag_no_context      = 1<<6,
 };
 
 enum ProcCallingConvention {
