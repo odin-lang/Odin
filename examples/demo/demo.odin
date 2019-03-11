@@ -856,7 +856,7 @@ cstring_example :: proc() {
 	fmt.println(len(W), len(X), len(Y));
 	// IMPORTANT NOTE for cstring variables
 	// len(cstring) is O(N)
-	// cast(cstring)string is O(N)
+	// cast(string)cstring is O(N)
 }
 
 deprecated_attribute :: proc() {
