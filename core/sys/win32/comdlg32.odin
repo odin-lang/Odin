@@ -75,14 +75,15 @@ SAVE_TITLE :: "Select file to save";
 SAVE_FLAGS :: u32(OFN_OVERWRITEPROMPT | OFN_EXPLORER);
 SAVE_EXT   :: "txt";
 
-OpenSaveMode :: enum{
+Open_Save_Mode :: enum {
 	Open = 0,
 	Save = 1,
 }
 
-_open_file_dialog :: proc(title: string, dir: string, filters: []string, default_filter: u32, flags: u32, default_ext: string, mode: OpenSaveMode, allocator := context.temp_allocator) -> (path: string, ok: bool) {
-	ok = true;
-
+_open_file_dialog :: proc(title: string, dir: string,
+                          filters: []string, default_filter: u32,
+                          flags: u32, default_ext: string,
+                          mode: Open_Save_Mode, allocator := context.temp_allocator) -> (path: string, ok: bool = true) {
 	file_buf := make([]u16, MAX_PATH_WIDE, allocator);
 
 	// Filters need to be passed as a pair of strings (title, filter)
@@ -90,28 +91,31 @@ _open_file_dialog :: proc(title: string, dir: string, filters: []string, default
 	if filter_len % 2 != 0 do return "", false;
 	default_filter = clamp(default_filter, 1, filter_len / 2);
 
-	filter   := strings.join(filters, "\u0000", context.temp_allocator);
-	filter    = strings.concatenate({filter, "\u0000"}, context.temp_allocator);
-	filter_w := utf8_to_wstring(filter, context.temp_allocator);
+	filter: string;
+	filter = strings.join(filters, "\u0000", context.temp_allocator);
+	filter = strings.concatenate({filter, "\u0000"}, context.temp_allocator);
 
 	ofn := Open_File_Name_W{
-		struct_size = size_of(Open_File_Name_W),
-		file = Wstring(&file_buf[0]),
-		max_file = MAX_PATH_WIDE,
-		title = utf8_to_wstring(title, context.temp_allocator),
-		filter = filter_w,
-		initial_dir = utf8_to_wstring(dir, context.temp_allocator),
+		struct_size  = size_of(Open_File_Name_W),
+		file         = Wstring(&file_buf[0]),
+		max_file     = MAX_PATH_WIDE,
+		title        = utf8_to_wstring(title, context.temp_allocator),
+		filter       = utf8_to_wstring(filter, context.temp_allocator),
+		initial_dir  = utf8_to_wstring(dir, context.temp_allocator),
 		filter_index = u32(default_filter),
-		def_ext = utf8_to_wstring(default_ext, context.temp_allocator),
-		flags = u32(flags),
+		def_ext      = utf8_to_wstring(default_ext, context.temp_allocator),
+		flags        = u32(flags),
 	};
 
-	if mode == OpenSaveMode.Open {
-		ok = bool(get_open_file_name_w(&ofn));	
-	} else if mode == OpenSaveMode.Save {
+	switch mode {
+	case .Open:
+		ok = bool(get_open_file_name_w(&ofn));
+	case .Save:
 		ok = bool(get_save_file_name_w(&ofn));
-	} else do ok = false;
-	
+	case:
+		ok = false;
+	}
+
 	if !ok {
 		delete(file_buf);
 		return "", false;
@@ -122,15 +126,20 @@ _open_file_dialog :: proc(title: string, dir: string, filters: []string, default
 	return;
 }
 
-select_file_to_open :: proc(title := OPEN_TITLE, dir := ".", filters := []string{"All Files", "*.*"}, default_filter := u32(1), flags := OPEN_FLAGS, allocator := context.temp_allocator) -> (path: string, ok: bool) {
+select_file_to_open :: proc(title := OPEN_TITLE, dir := ".",
+                            filters := []string{"All Files", "*.*"}, default_filter := u32(1),
+                            flags := OPEN_FLAGS, allocator := context.temp_allocator) -> (path: string, ok: bool) {
 
-	path, ok = _open_file_dialog(title, dir, filters, default_filter, flags, "", OpenSaveMode.Open, allocator);
+	path, ok = _open_file_dialog(title, dir, filters, default_filter, flags, "", Open_Save_Mode.Open, allocator);
 	return;
 }
 
-select_file_to_save :: proc(title := SAVE_TITLE, dir := ".", filters := []string{"All Files", "*.*"}, default_filter := u32(1), flags := SAVE_FLAGS, default_ext := SAVE_EXT, allocator := context.temp_allocator) -> (path: string, ok: bool) {
+select_file_to_save :: proc(title := SAVE_TITLE, dir := ".",
+							filters := []string{"All Files", "*.*"}, default_filter := u32(1),
+							flags := SAVE_FLAGS, default_ext := SAVE_EXT,
+							allocator := context.temp_allocator) -> (path: string, ok: bool) {
 
-	path, ok = _open_file_dialog(title, dir, filters, default_filter, flags, default_ext, OpenSaveMode.Save, allocator);
+	path, ok = _open_file_dialog(title, dir, filters, default_filter, flags, default_ext, Open_Save_Mode.Save, allocator);
 	return;
 }
 
