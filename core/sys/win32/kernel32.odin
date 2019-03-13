@@ -174,7 +174,7 @@ foreign kernel32 {
 	@(link_name="GetShortPathNameA") get_short_path_name_a :: proc(long, short: cstring, len: u32) -> u32 ---;
 	@(link_name="GetShortPathNameW") get_short_path_name_w :: proc(long, short: Wstring, len: u32) -> u32 ---;
 
-	@(link_name="GetCurrentDirectorya") get_current_directory_a :: proc(buffer_length: u32, buffer: cstring) -> u32 ---;
+	@(link_name="GetCurrentDirectoryA") get_current_directory_a :: proc(buffer_length: u32, buffer: cstring) -> u32 ---;
 	@(link_name="GetCurrentDirectoryW") get_current_directory_w :: proc(buffer_length: u32, buffer: Wstring) -> u32 ---;
 }
 
