@@ -11,78 +11,62 @@ SEPARATOR_STRING :: "\\";
 
 
 long :: proc(path: string, allocator := context.temp_allocator) -> string {
-    foreign kernel32 {
-        GetLongPathNameW :: proc "std" (short, long: win32.Wstring, len: u32) -> u32 ---;
-    }
-
     c_path := win32.utf8_to_wstring(path, context.temp_allocator);
     length := GetLongPathNameW(c_path, nil, 0);
 
-    if length > 0 {
-        buf := make([]u16, length-1, context.temp_allocator);
+    if length == 0 do return "";
 
-        GetLongPathNameW(c_path, win32.Wstring(&buf[0]), length);
+    buf := make([]u16, length, context.temp_allocator);
 
-        return win32.ucs2_to_utf8(buf[:length-1], allocator);
-    }
+    GetLongPathNameW(c_path, win32.Wstring(&buf[0]), length);
 
-    return "";
+    res := win32.ucs2_to_utf8(buf[:length], allocator);
+
+    return strings.trim_null(res);
 }
 
 short :: proc(path: string, allocator := context.temp_allocator) -> string {
-    foreign kernel32 {
-        GetShortPathNameW :: proc "std" (long, short: win32.Wstring, len: u32) -> u32 ---;
-    }
-
     c_path := win32.utf8_to_wstring(path, context.temp_allocator);
     length := GetShortPathNameW(c_path, nil, 0);
 
-    if length > 0 {
-        buf := make([]u16, length-1, context.temp_allocator);
+    if length == 0 do return "";
+    
+    buf := make([]u16, length, context.temp_allocator);
 
-        GetShortPathNameW(c_path, win32.Wstring(&buf[0]), length);
+    GetShortPathNameW(c_path, win32.Wstring(&buf[0]), length);
 
-        return win32.ucs2_to_utf8(buf[:length-1], allocator);
-    }
+    res := win32.ucs2_to_utf8(buf[:length], allocator);
 
-    return "";
+    return strings.trim_null(res);
 }
 
 full :: proc(path: string, allocator := context.temp_allocator) -> string {
-    foreign kernel32 {
-        GetFullPathNameW :: proc "std" (filename: win32.Wstring, buffer_length: u32, buffer: win32.Wstring, file_part: ^win32.Wstring) -> u32 ---;
-    }
-
     c_path := win32.utf8_to_wstring(path, context.temp_allocator);
     length := GetFullPathNameW(c_path, 0, nil, nil);
 
-    if length > 0 {
-        buf := make([]u16, length, context.temp_allocator);
+    if length == 0 do return "";
 
-        GetFullPathNameW(c_path, length, win32.Wstring(&buf[0]), nil);
+    buf := make([]u16, length, context.temp_allocator);
 
-        return win32.ucs2_to_utf8(buf[:len(buf)-1], allocator);
-    }
+    GetFullPathNameW(c_path, length, win32.Wstring(&buf[0]), nil);
 
-    return "";
+    res := win32.ucs2_to_utf8(buf[:length], allocator);
+
+    return strings.trim_null(res);
 }
 
 current :: proc(allocator := context.temp_allocator) -> string {
-    foreign kernel32 {
-        GetCurrentDirectoryW :: proc "std" (buffer_length: u32, buffer: win32.Wstring) -> u32 ---;
-    }
-
     length := GetCurrentDirectoryW(0, nil);
 
-    if length > 0 {
-        buf := make([]u16, length, context.temp_allocator);
+    if length == 0 do return "";
 
-        GetCurrentDirectoryW(length, win32.Wstring(&buf[0]));
+    buf := make([]u16, length, context.temp_allocator);
 
-        return win32.ucs2_to_utf8(buf[:length-1], allocator);
-    }
+    GetCurrentDirectoryW(length, win32.Wstring(&buf[0]));
 
-    return "";
+    res := win32.ucs2_to_utf8(buf[:length], allocator);
+
+    return strings.trim_null(res);
 }
 
 
