@@ -81,7 +81,7 @@ ext :: proc(path: string, new := false, allocator := context.allocator) -> strin
 rel :: proc{rel_between, rel_current};
 
 // returns the relative path from one path to another
-rel_between :: proc(from, to: string, allocator := context.temp_allocator) -> string {
+rel_between :: proc(from, to: string, allocator := context.allocator) -> string {
     if from == "" || to == "" do return "";
 
     from = full(from, context.temp_allocator);
@@ -190,7 +190,7 @@ rel_between :: proc(from, to: string, allocator := context.temp_allocator) -> st
 
 // returns the relative path from the current directory to another path
 rel_current :: proc(to: string, allocator := context.temp_allocator) -> string {
-    return inline rel_between(current(allocator), to);
+    return inline rel_between(current(context.temp_allocator), to, allocator);
 }
 
 
