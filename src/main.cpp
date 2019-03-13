@@ -2,10 +2,10 @@
 
 #include "common.cpp"
 #include "timings.cpp"
-#include "build_settings.cpp"
 #include "tokenizer.cpp"
 #include "big_int.cpp"
 #include "exact_value.cpp"
+#include "build_settings.cpp"
 
 #include "parser.hpp"
 #include "checker.hpp"
@@ -207,6 +207,7 @@ enum BuildFlagKind {
 	BuildFlag_ThreadCount,
 	BuildFlag_KeepTempFiles,
 	BuildFlag_Collection,
+	BuildFlag_Define,
 	BuildFlag_BuildMode,
 	BuildFlag_Debug,
 	BuildFlag_CrossCompile,
@@ -242,6 +243,41 @@ void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, Bu
 	array_add(build_flags, flag);
 }
 
+ExactValue build_param_to_exact_value(String name, String param) {
+	ExactValue value = {};
+	if (str_eq_ignore_case(param, str_lit("t")) ||
+	    str_eq_ignore_case(param, str_lit("true"))) {
+		value = exact_value_bool(true);
+	} else if (str_eq_ignore_case(param, str_lit("f")) ||
+	           str_eq_ignore_case(param, str_lit("false"))) {
+		value = exact_value_bool(false);
+	} else if (param.len > 0) {
+		if (param[0] == '"') {
+			value = exact_value_string(param);
+			if (value.kind == ExactValue_String) {
+				String s = value.value_string;
+				if (s.len > 1 && s[0] == '"' && s[s.len-1] == '"') {
+					value.value_string = substring(s, 1, s.len-1);
+				}
+			}
+		} else if (param[0] == '-' || param[0] == '+' || gb_is_between(param[0], '0', '9')) {
+			if (string_contains_char(param, '.')) {
+				value = exact_value_float_from_string(param);
+			} else {
+				value = exact_value_integer_from_string(param);
+			}
+			if (value.kind == ExactValue_Invalid) {
+				gb_printf_err("Invalid flag parameter for '%.*s' = '%.*s'\n", LIT(name), LIT(param));
+			}
+		}
+	} else {
+		gb_printf_err("Invalid flag parameter for '%.*s' = '%.*s'\n", LIT(name), LIT(param));
+	}
+
+	return value;
+}
+
+
 bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),             BuildFlagParam_String);
@@ -251,6 +287,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),    BuildFlagParam_Integer);
 	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),      BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_Define,            str_lit("define"),          BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),      BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),           BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_CrossCompile,      str_lit("cross-compile"),   BuildFlagParam_String);
@@ -276,7 +313,8 @@ bool parse_build_flags(Array<String> args) {
 		String name = substring(flag, 1, flag.len);
 		isize end = 0;
 		for (; end < name.len; end++) {
-			if (name[end] == '=') break;
+			if (name[end] == ':') break;
+			if (name[end] == '=') break; // IMPORTANT TODO(bill): DEPRECATE THIS!!!!
 		}
 		name = substring(name, 0, end);
 		String param = {};
@@ -306,7 +344,9 @@ bool parse_build_flags(Array<String> args) {
 					} else {
 						ok = true;
 						switch (bf.param_kind) {
-						default: ok = false; break;
+						default:
+							ok = false;
+							break;
 						case BuildFlagParam_Boolean: {
 							if (str_eq_ignore_case(param, str_lit("t")) ||
 							    str_eq_ignore_case(param, str_lit("true")) ||
@@ -529,6 +569,62 @@ bool parse_build_flags(Array<String> args) {
 							continue;
 						}
 
+
+						case BuildFlag_Define: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String str = value.value_string;
+							isize eq_pos = -1;
+							for (isize i = 0; i < str.len; i++) {
+								if (str[i] == '=') {
+									eq_pos = i;
+									break;
+								}
+							}
+							if (eq_pos < 0) {
+								gb_printf_err("Expected 'name=value', got '%.*s'\n", LIT(param));
+								bad_flags = true;
+								break;
+							}
+							String name = substring(str, 0, eq_pos);
+							String value = substring(str, eq_pos+1, str.len);
+							if (name.len == 0 || value.len == 0) {
+								gb_printf_err("Expected 'name=value', got '%.*s'\n", LIT(param));
+								bad_flags = true;
+								break;
+							}
+
+							if (!string_is_valid_identifier(name)) {
+								gb_printf_err("Defined constant name '%.*s' must be a valid identifier\n", LIT(name));
+								bad_flags = true;
+								break;
+							}
+
+							if (name == "_") {
+								gb_printf_err("Defined constant name cannot be an underscore\n");
+								bad_flags = true;
+								break;
+							}
+
+							HashKey key = hash_string(name);
+
+							if (map_get(&build_context.defined_values, key) != nullptr) {
+								gb_printf_err("Defined constant '%.*s' already exists\n", LIT(name));
+								bad_flags = true;
+								break;
+							}
+
+							ExactValue v = build_param_to_exact_value(name, value);
+							if (v.kind != ExactValue_Invalid) {
+								map_set(&build_context.defined_values, key, v);
+							} else {
+								bad_flags = true;
+							}
+
+							break;
+						}
+
+
+
 						case BuildFlag_BuildMode: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String str = value.value_string;
@@ -599,8 +695,13 @@ void show_timings(Checker *c, Timings *t) {
 	isize tokens   = p->total_token_count;
 	isize files    = 0;
 	isize packages = p->packages.count;
+	isize total_file_size = 0;
 	for_array(i, p->packages) {
 		files += p->packages[i]->files.count;
+		for_array(j, p->packages[i]->files) {
+			AstFile *file = p->packages[i]->files[j];
+			total_file_size += file->tokenizer.end - file->tokenizer.start;
+		}
 	}
 #if 1
 	timings_print_all(t);
@@ -608,10 +709,11 @@ void show_timings(Checker *c, Timings *t) {
 	{
 		timings_print_all(t);
 		gb_printf("\n");
-		gb_printf("Total Lines    - %td\n", lines);
-		gb_printf("Total Tokens   - %td\n", tokens);
-		gb_printf("Total Files    - %td\n", files);
-		gb_printf("Total Packages - %td\n", packages);
+		gb_printf("Total Lines     - %td\n", lines);
+		gb_printf("Total Tokens    - %td\n", tokens);
+		gb_printf("Total Files     - %td\n", files);
+		gb_printf("Total Packages  - %td\n", packages);
+		gb_printf("Total File Size - %td\n", total_file_size);
 		gb_printf("\n");
 	}
 	{
@@ -623,6 +725,9 @@ void show_timings(Checker *c, Timings *t) {
 		gb_printf("us/LOC       - %.3f\n", 1.0e6*parse_time/cast(f64)lines);
 		gb_printf("Tokens/s     - %.3f\n", cast(f64)tokens/parse_time);
 		gb_printf("us/Token     - %.3f\n", 1.0e6*parse_time/cast(f64)tokens);
+		gb_printf("bytes/s      - %.3f\n", cast(f64)total_file_size/parse_time);
+		gb_printf("us/bytes     - %.3f\n", 1.0e6*parse_time/cast(f64)total_file_size);
+
 		gb_printf("\n");
 	}
 	{
@@ -634,6 +739,8 @@ void show_timings(Checker *c, Timings *t) {
 		gb_printf("us/LOC       - %.3f\n", 1.0e6*parse_time/cast(f64)lines);
 		gb_printf("Tokens/s     - %.3f\n", cast(f64)tokens/parse_time);
 		gb_printf("us/Token     - %.3f\n", 1.0e6*parse_time/cast(f64)tokens);
+		gb_printf("bytes/s      - %.3f\n", cast(f64)total_file_size/parse_time);
+		gb_printf("us/bytes     - %.3f\n", 1.0e6*parse_time/cast(f64)total_file_size);
 		gb_printf("\n");
 	}
 	{
@@ -643,6 +750,8 @@ void show_timings(Checker *c, Timings *t) {
 		gb_printf("us/LOC       - %.3f\n", 1.0e6*total_time/cast(f64)lines);
 		gb_printf("Tokens/s     - %.3f\n", cast(f64)tokens/total_time);
 		gb_printf("us/Token     - %.3f\n", 1.0e6*total_time/cast(f64)tokens);
+		gb_printf("bytes/s      - %.3f\n", cast(f64)total_file_size/total_time);
+		gb_printf("us/bytes     - %.3f\n", 1.0e6*total_time/cast(f64)total_file_size);
 		gb_printf("\n");
 	}
 #endif
@@ -740,6 +849,8 @@ int main(int arg_count, char **arg_ptr) {
 	array_init(&library_collections, heap_allocator());
 	// NOTE(bill): 'core' cannot be (re)defined by the user
 	add_library_collection(str_lit("core"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("core")));
+
+	map_init(&build_context.defined_values, heap_allocator());
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
 

@@ -47,12 +47,10 @@ arena_allocator :: proc(arena: ^Arena) -> Allocator {
 arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int, flags: u64, location := #caller_location) -> rawptr {
-	using Allocator_Mode;
 	arena := cast(^Arena)allocator_data;
 
-
 	switch mode {
-	case Alloc:
+	case .Alloc:
 		total_size := size + alignment;
 
 		if arena.offset + total_size > len(arena.data) {
@@ -66,14 +64,14 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		arena.peak_used = max(arena.peak_used, arena.offset);
 		return zero(ptr, size);
 
-	case Free:
+	case .Free:
 		// NOTE(bill): Free all at once
 		// Use Arena_Temp_Memory if you want to free a block
 
-	case Free_All:
+	case .Free_All:
 		arena.offset = 0;
 
-	case Resize:
+	case .Resize:
 		return default_resize_align(old_memory, old_size, size, alignment, arena_allocator(arena));
 	}
 
@@ -227,7 +225,6 @@ stack_allocator :: proc(stack: ^Stack) -> Allocator {
 stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int, flags: u64, location := #caller_location) -> rawptr {
-	using Allocator_Mode;
 	s := cast(^Stack)allocator_data;
 
 	if s.data == nil {
@@ -256,9 +253,9 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	}
 
 	switch mode {
-	case Alloc:
+	case .Alloc:
 		return raw_alloc(s, size, alignment);
-	case Free:
+	case .Free:
 		if old_memory == nil {
 			return nil;
 		}
@@ -288,11 +285,11 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		s.prev_offset = int(header.prev_offset);
 
 
-	case Free_All:
+	case .Free_All:
 		s.prev_offset = 0;
 		s.curr_offset = 0;
 
-	case Resize:
+	case .Resize:
 		if old_memory == nil {
 			return raw_alloc(s, size, alignment);
 		}
@@ -374,12 +371,13 @@ small_stack_allocator :: proc(stack: ^Small_Stack) -> Allocator {
 small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                    size, alignment: int,
                                    old_memory: rawptr, old_size: int, flags: u64, location := #caller_location) -> rawptr {
-	using Allocator_Mode;
 	s := cast(^Small_Stack)allocator_data;
 
 	if s.data == nil {
 		return nil;
 	}
+
+	alignment = clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2);
 
 	raw_alloc :: proc(s: ^Small_Stack, size, alignment: int) -> rawptr {
 		curr_addr := uintptr(&s.data[0]) + uintptr(s.offset);
@@ -401,9 +399,9 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	}
 
 	switch mode {
-	case Alloc:
+	case .Alloc:
 		return raw_alloc(s, size, alignment);
-	case Free:
+	case .Free:
 		if old_memory == nil {
 			return nil;
 		}
@@ -426,10 +424,10 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 		s.offset = int(old_offset);
 
-	case Free_All:
+	case .Free_All:
 		s.offset = 0;
 
-	case Resize:
+	case .Resize:
 		if old_memory == nil {
 			return raw_alloc(s, size, alignment);
 		}

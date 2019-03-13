@@ -144,6 +144,10 @@ Selector_Expr :: struct {
 	field: ^Ident,
 }
 
+Implicit_Selector_Expr :: struct {
+	using node: Expr,
+	field: ^Ident,
+}
 
 Index_Expr :: struct {
 	using node: Expr,
@@ -365,7 +369,6 @@ Value_Decl :: struct {
 	type:       ^Expr,
 	values:     []^Expr,
 	comment:    ^Comment_Group,
-	is_static:  bool,
 	is_using:   bool,
 	is_mutable: bool,
 }

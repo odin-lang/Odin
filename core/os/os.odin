@@ -51,6 +51,20 @@ write_encoded_rune :: proc(fd: Handle, r: rune) {
 }
 
 
+file_size_from_path :: proc(path: string) -> i64 {
+	fd, err := open(path, O_RDONLY, 0);
+	if err != 0 {
+		return -1;
+	}
+	defer close(fd);
+
+	length: i64;
+	if length, err = file_size(fd); err != 0 {
+		return -1;
+	}
+	return length;
+}
+
 read_entire_file :: proc(name: string) -> (data: []byte, success: bool) {
 	fd, err := open(name, O_RDONLY, 0);
 	if err != 0 {
@@ -109,20 +123,18 @@ read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
 heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                             size, alignment: int,
                             old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
-	using mem.Allocator_Mode;
-
 	switch mode {
-	case Alloc:
+	case .Alloc:
 		return heap_alloc(size);
 
-	case Free:
+	case .Free:
 		heap_free(old_memory);
 		return nil;
 
-	case Free_All:
+	case .Free_All:
 		// NOTE(bill): Does nothing
 
-	case Resize:
+	case .Resize:
 		if old_memory == nil {
 			return heap_alloc(size);
 		}

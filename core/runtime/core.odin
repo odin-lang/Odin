@@ -112,9 +112,14 @@ Type_Info_Bit_Set :: struct {
 	lower:      i64,
 	upper:      i64,
 };
-
 Type_Info_Opaque :: struct {
 	elem: ^Type_Info,
+};
+Type_Info_Simd_Vector :: struct {
+	elem:       ^Type_Info,
+	elem_size:  int,
+	count:      int,
+	is_x86_mmx: bool,
 }
 
 Type_Info :: struct {
@@ -145,6 +150,7 @@ Type_Info :: struct {
 		Type_Info_Bit_Field,
 		Type_Info_Bit_Set,
 		Type_Info_Opaque,
+		Type_Info_Simd_Vector,
 	},
 }
 
@@ -245,8 +251,10 @@ Map_Entry_Header :: struct {
 Map_Header :: struct {
 	m:             ^mem.Raw_Map,
 	is_key_string: bool,
+
 	entry_size:    int,
 	entry_align:   int,
+
 	value_offset:  uintptr,
 	value_size:    int,
 }
@@ -827,34 +835,27 @@ __get_map_key :: proc "contextless" (key: $K) -> Map_Key {
 	return map_key;
 }
 
+_fnv64a :: proc(data: []byte, seed: u64 = 0xcbf29ce484222325) -> u64 {
+	h: u64 = seed;
+	for b in data {
+		h = (h ~ u64(b)) * 0x100000001b3;
+	}
+	return h;
+}
+
 
 default_hash :: proc(data: []byte) -> u64 {
-	fnv64a :: proc(data: []byte) -> u64 {
-		h: u64 = 0xcbf29ce484222325;
-		for b in data {
-			h = (h ~ u64(b)) * 0x100000001b3;
-		}
-		return h;
-	}
-	return fnv64a(data);
+	return _fnv64a(data);
 }
 default_hash_string :: proc(s: string) -> u64 do return default_hash(([]byte)(s));
 
 
 source_code_location_hash :: proc(s: Source_Code_Location) -> u64 {
-	fnv64a :: proc(data: []byte, seed: u64 = 0xcbf29ce484222325) -> u64 {
-		h: u64 = seed;
-		for b in data {
-			h = (h ~ u64(b)) * 0x100000001b3;
-		}
-		return h;
-	}
-	hash := fnv64a(cast([]byte)s.file_path);
+	hash := _fnv64a(cast([]byte)s.file_path);
 	hash = hash ~ (u64(s.line) * 0x100000001b3);
 	hash = hash ~ (u64(s.column) * 0x100000001b3);
 	return hash;
 }
-
 
 
 
@@ -936,7 +937,6 @@ __dynamic_map_get :: proc(h: Map_Header, key: Map_Key) -> rawptr {
 }
 
 __dynamic_map_set :: proc(h: Map_Header, key: Map_Key, value: rawptr, loc := #caller_location) #no_bounds_check {
-
 	index: int;
 	assert(value != nil);
 

@@ -267,3 +267,8 @@ is_opaque :: proc(info: ^rt.Type_Info) -> bool {
 	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Opaque);
 	return ok;
 }
+is_simd_vector :: proc(info: ^rt.Type_Info) -> bool {
+	if info == nil do return false;
+	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Simd_Vector);
+	return ok;
+}

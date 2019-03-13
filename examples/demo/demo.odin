@@ -530,7 +530,7 @@ parametric_polymorphism :: proc() {
 			// `I` is the type of N
 			// `T` is the type passed
 			fmt.printf("Generating an array of type %v from the value %v of type %v\n",
-			           typeid_of(type_of(res)), N, typeid_of(I));
+					   typeid_of(type_of(res)), N, typeid_of(I));
 			for i in 0..N-1 {
 				res[i] = T(i*i);
 			}
@@ -691,6 +691,89 @@ using_enum :: proc() {
 	fmt.println(len(Foo));
 }
 
+map_type :: proc() {
+	fmt.println("# map type");
+
+	// enums of type u16, u32, i16 & i32 also work
+	Enum_u8 :: enum u8 {
+		A = 0,
+		B = 1 << 8 - 1,
+	}
+	Enum_u64 :: enum u64 {
+		A = 0,
+		B = 1 << 64 - 1,
+	}
+	Enum_i8 :: enum i8 {
+		A = 0,
+		B = -(1 << 7),
+	}
+	Enum_i64 :: enum i64 {
+		A = 0,
+		B = -(1 << 63),
+	}
+
+	map_u8: map[Enum_u8]u8;
+	map_u8[Enum_u8.A] = u8(Enum_u8.B);
+	assert(map_u8[Enum_u8.A] == u8(Enum_u8.B));
+	fmt.println(map_u8);
+
+	map_u64: map[Enum_u64]u64;
+	map_u64[Enum_u64.A] = u64(Enum_u64.B);
+	assert(map_u64[Enum_u64.A] == u64(Enum_u64.B));
+	fmt.println(map_u64);
+
+	map_i8: map[Enum_i8]i8;
+	map_i8[Enum_i8.A] = i8(Enum_i8.B);
+	assert(map_i8[Enum_i8.A] == i8(Enum_i8.B));
+	fmt.println(map_i8);
+
+	map_i64: map[Enum_i64]i64;
+	map_i64[Enum_i64.A] = i64(Enum_i64.B);
+	assert(map_i64[Enum_i64.A] == i64(Enum_i64.B));
+	fmt.println(map_i64);
+
+	demo_struct :: struct {
+		member: Enum_i64,
+	}
+
+	map_string: map[string]demo_struct;
+	map_string["Hellope!"] = demo_struct{Enum_i64.B};
+	assert(map_string["Hellope!"].member == Enum_i64.B);
+	assert("Hellope?" notin map_string);
+	fmt.println(map_string);
+	fmt.println("Hellope! in map_string:", "Hellope!" in map_string);
+	fmt.println("Hellope? in map_string:", "Hellope?" in map_string);
+
+}
+
+implicit_selector_expression :: proc() {
+	fmt.println("# implicit selector expression");
+
+	Foo :: enum {A, B, C};
+
+	f: Foo;
+	f = .A;
+
+	BAR :: bit_set[Foo]{.B, .C};
+
+	switch f {
+	case .A:
+		fmt.println("HERE");
+	case .B:
+		fmt.println("NEVER");
+	case .C:
+		fmt.println("FOREVER");
+	}
+
+	my_map := make(map[Foo]int);
+	defer delete(my_map);
+
+	my_map[.A] = 123;
+	my_map[Foo.B] = 345;
+
+	fmt.println(my_map[.A] + my_map[Foo.B] + my_map[.C]);
+}
+
 explicit_procedure_overloading :: proc() {
 	fmt.println("# explicit procedure overloading");
 
@@ -773,7 +856,7 @@ cstring_example :: proc() {
 	fmt.println(len(W), len(X), len(Y));
 	// IMPORTANT NOTE for cstring variables
 	// len(cstring) is O(N)
-	// cast(cstring)string is O(N)
+	// cast(string)cstring is O(N)
 }
 
 deprecated_attribute :: proc() {
@@ -884,6 +967,8 @@ main :: proc() {
 		array_programming();
 		named_proc_return_parameters();
 		using_enum();
+		map_type();
+		implicit_selector_expression();
 		explicit_procedure_overloading();
 		complete_switch();
 		cstring_example();

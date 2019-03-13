@@ -82,7 +82,6 @@ TOKEN_KIND(Token__OperatorEnd, ""), \
 \
 TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_import,      "import"),      \
-	TOKEN_KIND(Token_export,      "export"),      \
 	TOKEN_KIND(Token_foreign,     "foreign"),     \
 	TOKEN_KIND(Token_package,     "package"),     \
 	TOKEN_KIND(Token_typeid,      "typeid"),      \
@@ -101,14 +100,12 @@ TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_defer,       "defer"),       \
 	TOKEN_KIND(Token_return,      "return"),      \
 	TOKEN_KIND(Token_proc,        "proc"),        \
-	TOKEN_KIND(Token_macro,       "macro"),       \
 	TOKEN_KIND(Token_struct,      "struct"),      \
 	TOKEN_KIND(Token_union,       "union"),       \
 	TOKEN_KIND(Token_enum,        "enum"),        \
 	TOKEN_KIND(Token_bit_field,   "bit_field"),   \
 	TOKEN_KIND(Token_bit_set,     "bit_set"),     \
 	TOKEN_KIND(Token_map,         "map"),         \
-	TOKEN_KIND(Token_static,      "static"),     \
 	TOKEN_KIND(Token_dynamic,     "dynamic"),     \
 	TOKEN_KIND(Token_auto_cast,   "auto_cast"),   \
 	TOKEN_KIND(Token_cast,        "cast"),        \
@@ -123,6 +120,7 @@ TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_align_of,    "align_of"),    \
 	TOKEN_KIND(Token_offset_of,   "offset_of"),   \
 	TOKEN_KIND(Token_type_of,     "type_of"),     \
+	TOKEN_KIND(Token_macro,       "macro"),       \
 	TOKEN_KIND(Token_const,       "const"),       \
 	TOKEN_KIND(Token_asm,         "asm"),         \
 	TOKEN_KIND(Token_yield,       "yield"),       \

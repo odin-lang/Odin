@@ -56,8 +56,8 @@ foreign kernel32 {
 	@(link_name="GetFileSizeEx")              get_file_size_ex               :: proc(file_handle: Handle, file_size: ^i64) -> Bool ---;
 	@(link_name="GetFileAttributesA")         get_file_attributes_a          :: proc(filename: cstring) -> u32 ---;
 	@(link_name="GetFileAttributesW")         get_file_attributes_w          :: proc(filename: Wstring) -> u32 ---;
-	@(link_name="GetFileAttributesExA")       get_file_attributes_ex_a       :: proc(filename: cstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool ---;
-	@(link_name="GetFileAttributesExW")       get_file_attributes_ex_w       :: proc(filename: Wstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool ---;
+	@(link_name="GetFileAttributesExA")       get_file_attributes_ex_a       :: proc(filename: cstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: ^File_Attribute_Data) -> Bool ---;
+	@(link_name="GetFileAttributesExW")       get_file_attributes_ex_w       :: proc(filename: Wstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: ^File_Attribute_Data) -> Bool ---;
 	@(link_name="GetFileInformationByHandle") get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool ---;
 
 	@(link_name="CreateDirectoryA") 		  create_directory_a			 :: proc(path: cstring, security_attributes: ^Security_Attributes) -> Bool ---;
@@ -164,7 +164,7 @@ foreign kernel32 {
 
 	@(link_name="LoadLibraryA")   load_library_a   :: proc(c_str: cstring)  -> Hmodule ---;
 	@(link_name="LoadLibraryW")   load_library_w   :: proc(c_str: Wstring) -> Hmodule ---;
-	@(link_name="FreeLibrary")    free_library     :: proc(h: Hmodule) ---;
+	@(link_name="FreeLibrary")    free_library     :: proc(h: Hmodule) -> Bool ---;
 	@(link_name="GetProcAddress") get_proc_address :: proc(h: Hmodule, c_str: cstring) -> rawptr ---;
 
 	@(link_name="GetFullPathNameA")  get_full_path_name_a  :: proc(filename: cstring, buffer_length: u32, buffer: cstring, file_part: ^Wstring) -> u32 ---;
@@ -177,3 +177,44 @@ foreign kernel32 {
 	@(link_name="GetCurrentDirectorya") get_current_directory_a :: proc(buffer_length: u32, buffer: cstring) -> u32 ---;
 	@(link_name="GetCurrentDirectoryW") get_current_directory_w :: proc(buffer_length: u32, buffer: Wstring) -> u32 ---;
 }
+
+Memory_Basic_Information :: struct {
+	base_address:       rawptr,
+	allocation_base:    rawptr,
+	allocation_protect: u32,
+	region_size:        uint,
+	state:              u32,
+	protect:            u32,
+	type:               u32,
+}
+
+@(default_calling_convention = "std")
+foreign kernel32 {
+	@(link_name="VirtualAlloc")   virtual_alloc    :: proc(address: rawptr, size: uint, allocation_type: u32, protect: u32) -> rawptr ---
+	@(link_name="VirtualAllocEx") virtual_alloc_ex :: proc(process: Handle, address: rawptr, size: uint, allocation_type: u32, protect: u32) -> rawptr ---
+	@(link_name="VirtualFree")    virtual_free     :: proc(address: rawptr, size: uint, free_type: u32) -> Bool ---
+	@(link_name="VirtualLock")    virtual_lock     :: proc(address: rawptr, size: uint) -> Bool ---
+	@(link_name="VirtualProtect") virtual_protect  :: proc(address: rawptr, size: uint, new_protect: u32, old_protect: ^u32) -> Bool ---
+	@(link_name="VirtualQuery")   virtual_query    :: proc(address: rawptr, buffer: ^Memory_Basic_Information, length: uint) -> uint ---
+}
+
+MEM_COMMIT      :: 0x00001000;
+MEM_RESERVE     :: 0x00002000;
+MEM_DECOMMIT    :: 0x00004000;
+MEM_RELEASE     :: 0x00008000;
+MEM_RESET       :: 0x00080000;
+MEM_RESET_UNDO  :: 0x01000000;
+
+MEM_LARGE_PAGES :: 0x20000000;
+MEM_PHYSICAL    :: 0x00400000;
+MEM_TOP_DOWN    :: 0x00100000;
+MEM_WRITE_WATCH :: 0x00200000;
+
+PAGE_NOACCESS           :: 0x01;
+PAGE_READONLY           :: 0x02;
+PAGE_READWRITE          :: 0x04;
+PAGE_WRITECOPY          :: 0x08;
+PAGE_EXECUTE            :: 0x10;
+PAGE_EXECUTE_READ       :: 0x20;
+PAGE_EXECUTE_READWRITE  :: 0x40;
+PAGE_EXECUTE_WRITECOPY  :: 0x80;

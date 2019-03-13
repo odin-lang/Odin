@@ -329,6 +329,10 @@ is_space :: proc(r: rune) -> bool {
 	return false;
 }
 
+is_null :: proc(r: rune) -> bool {
+	return r == 0x0000;
+}
+
 index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> int {
 	for r, i in s {
 		if p(r) == truth {
@@ -475,6 +479,19 @@ trim_right_space :: proc(s: string) -> string {
 
 trim_space :: proc(s: string) -> string {
 	return trim_right_space(trim_left_space(s));
+}
+
+
+trim_left_null :: proc(s: string) -> string {
+	return trim_left_proc(s, is_null);
+}
+
+trim_right_null :: proc(s: string) -> string {
+	return trim_right_proc(s, is_null);
+}
+
+trim_null :: proc(s: string) -> string {
+	return trim_right_null(trim_left_null(s));
 }
 
 

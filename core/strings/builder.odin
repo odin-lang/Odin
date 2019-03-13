@@ -61,8 +61,8 @@ write_bytes :: proc(b: ^Builder, x: []byte) {
 	append(&b.buf, ..x);
 }
 
-@(private)
-static DIGITS_LOWER := "0123456789abcdefx";
+@(private, static)
+DIGITS_LOWER := "0123456789abcdefx";
 
 write_quoted_string :: proc(b: ^Builder, s: string, quote: byte = '"') {
 	write_byte(b, quote);
