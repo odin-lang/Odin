@@ -25,6 +25,11 @@ Token ast_token(Ast *node) {
 			return ast_token(node->SelectorExpr.selector);
 		}
 		return node->SelectorExpr.token;
+	case Ast_ImplicitSelectorExpr:
+		if (node->ImplicitSelectorExpr.selector != nullptr) {
+			return ast_token(node->ImplicitSelectorExpr.selector);
+		}
+		return node->ImplicitSelectorExpr.token;
 	case Ast_IndexExpr:          return node->IndexExpr.open;
 	case Ast_SliceExpr:          return node->SliceExpr.open;
 	case Ast_Ellipsis:           return node->Ellipsis.token;
@@ -164,6 +169,9 @@ Ast *clone_ast(Ast *node) {
 	case Ast_SelectorExpr:
 		n->SelectorExpr.expr = clone_ast(n->SelectorExpr.expr);
 		n->SelectorExpr.selector = clone_ast(n->SelectorExpr.selector);
+		break;
+	case Ast_ImplicitSelectorExpr:
+		n->ImplicitSelectorExpr.selector = clone_ast(n->ImplicitSelectorExpr.selector);
 		break;
 	case Ast_IndexExpr:
 		n->IndexExpr.expr  = clone_ast(n->IndexExpr.expr);
@@ -504,10 +512,19 @@ Ast *ast_call_expr(AstFile *f, Ast *proc, Array<Ast *> args, Token open, Token c
 
 Ast *ast_selector_expr(AstFile *f, Token token, Ast *expr, Ast *selector) {
 	Ast *result = alloc_ast_node(f, Ast_SelectorExpr);
+	result->SelectorExpr.token = token;
 	result->SelectorExpr.expr = expr;
 	result->SelectorExpr.selector = selector;
 	return result;
 }
+
+Ast *ast_implicit_selector_expr(AstFile *f, Token token, Ast *selector) {
+	Ast *result = alloc_ast_node(f, Ast_ImplicitSelectorExpr);
+	result->ImplicitSelectorExpr.token = token;
+	result->ImplicitSelectorExpr.selector = selector;
+	return result;
+}
+
 
 Ast *ast_index_expr(AstFile *f, Ast *expr, Ast *index, Token open, Token close) {
 	Ast *result = alloc_ast_node(f, Ast_IndexExpr);
@@ -1199,7 +1216,6 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_package:
 		case Token_foreign:
 		case Token_import:
-		case Token_export:
 
 		case Token_if:
 		case Token_for:
@@ -1209,7 +1225,6 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_defer:
 		case Token_asm:
 		case Token_using:
-		case Token_static:
 
 		case Token_break:
 		case Token_continue:
@@ -1613,7 +1628,6 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 	case Token_align_of:
 	case Token_offset_of:
 		return parse_call_expr(f, ast_implicit(f, advance_token(f)));
-
 
 	case Token_String:
 		return ast_basic_lit(f, advance_token(f));
@@ -2279,6 +2293,12 @@ Ast *parse_unary_expr(AstFile *f, bool lhs) {
 		Ast *expr = parse_unary_expr(f, lhs);
 		return ast_unary_expr(f, token, expr);
 	}
+
+	case Token_Period: {
+		Token token = expect_token(f, Token_Period);
+		Ast *ident = parse_ident(f);
+		return ast_implicit_selector_expr(f, token, ident);
+	}
 	}
 
 	return parse_atom_expr(f, parse_operand(f, lhs), lhs);
@@ -2452,9 +2472,7 @@ void parse_foreign_block_decl(AstFile *f, Array<Ast *> *decls) {
 Ast *parse_foreign_block(AstFile *f, Token token) {
 	CommentGroup *docs = f->lead_comment;
 	Ast *foreign_library = nullptr;
-	if (f->curr_token.kind == Token_export) {
-		foreign_library = ast_implicit(f, expect_token(f, Token_export));
-	} else if (f->curr_token.kind == Token_OpenBrace) {
+	if (f->curr_token.kind == Token_OpenBrace) {
 		foreign_library = ast_ident(f, blank_token);
 	} else {
 		foreign_library = parse_ident(f);
@@ -2700,6 +2718,7 @@ ProcCallingConvention string_to_calling_convention(String s) {
 	if (s == "std")         return ProcCC_StdCall;
 	if (s == "fastcall")    return ProcCC_FastCall;
 	if (s == "fast")        return ProcCC_FastCall;
+	if (s == "none")        return ProcCC_None;
 	return ProcCC_Invalid;
 }
 
@@ -3589,7 +3608,6 @@ Ast *parse_foreign_decl(AstFile *f) {
 	Token token = expect_token(f, Token_foreign);
 
 	switch (f->curr_token.kind) {
-	case Token_export:
 	case Token_Ident:
 	case Token_OpenBrace:
 		return parse_foreign_block(f, token);
@@ -3666,6 +3684,7 @@ Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind clo
 			       f->curr_token.kind != Token_EOF) {
 				Ast *elem = nullptr;
 				elem = parse_ident(f);
+
 				if (f->curr_token.kind == Token_Eq) {
 					Token eq = expect_token(f, Token_Eq);
 					Ast *value = parse_value(f);
@@ -3731,9 +3750,6 @@ Ast *parse_stmt(AstFile *f) {
 	case Token_import:
 		return parse_import_decl(f, ImportDecl_Standard);
 
-	// case Token_export:
-	// 	return parse_export_decl(f);
-
 
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);
@@ -3756,33 +3772,33 @@ Ast *parse_stmt(AstFile *f) {
 		return s;
 	}
 
-	case Token_static: {
-		CommentGroup *docs = f->lead_comment;
-		Token token = expect_token(f, Token_static);
+	// case Token_static: {
+	// 	CommentGroup *docs = f->lead_comment;
+	// 	Token token = expect_token(f, Token_static);
 
-		Ast *decl = nullptr;
-		Array<Ast *> list = parse_lhs_expr_list(f);
-		if (list.count == 0) {
-			syntax_error(token, "Illegal use of 'static' statement");
-			expect_semicolon(f, nullptr);
-			return ast_bad_stmt(f, token, f->curr_token);
-		}
+	// 	Ast *decl = nullptr;
+	// 	Array<Ast *> list = parse_lhs_expr_list(f);
+	// 	if (list.count == 0) {
+	// 		syntax_error(token, "Illegal use of 'static' statement");
+	// 		expect_semicolon(f, nullptr);
+	// 		return ast_bad_stmt(f, token, f->curr_token);
+	// 	}
 
-		expect_token_after(f, Token_Colon, "identifier list");
-		decl = parse_value_decl(f, list, docs);
+	// 	expect_token_after(f, Token_Colon, "identifier list");
+	// 	decl = parse_value_decl(f, list, docs);
 
-		if (decl != nullptr && decl->kind == Ast_ValueDecl) {
-			if (decl->ValueDecl.is_mutable) {
-				decl->ValueDecl.is_static = true;
-			} else {
-				error(token, "'static' may only be currently used with variable declaration");
-			}
-			return decl;
-		}
+	// 	if (decl != nullptr && decl->kind == Ast_ValueDecl) {
+	// 		if (decl->ValueDecl.is_mutable) {
+	// 			decl->ValueDecl.is_static = true;
+	// 		} else {
+	// 			error(token, "'static' may only be currently used with variable declaration");
+	// 		}
+	// 		return decl;
+	// 	}
 
-		syntax_error(token, "Illegal use of 'static' statement");
-		return ast_bad_stmt(f, token, f->curr_token);
-	} break;
+	// 	syntax_error(token, "Illegal use of 'static' statement");
+	// 	return ast_bad_stmt(f, token, f->curr_token);
+	// } break;
 
 	case Token_using: {
 		CommentGroup *docs = f->lead_comment;

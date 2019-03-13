@@ -28,7 +28,7 @@ pos_compare :: proc(lhs, rhs: Pos) -> int {
 	return strings.compare(lhs.file, rhs.file);
 }
 
-using Kind :: enum u16 {
+using Kind :: enum u32 {
 	Invalid,
 	EOF,
 	Comment,
@@ -113,7 +113,6 @@ using Kind :: enum u16 {
 
 	B_Keyword_Begin,
 		Import,
-		Export,
 		Foreign,
 		Package,
 		Typeid,
@@ -139,7 +138,6 @@ using Kind :: enum u16 {
 		Bit_Field,
 		Bit_Set,
 		Map,
-		Static,
 		Dynamic,
 		Auto_Cast,
 		Cast,
@@ -161,6 +159,9 @@ using Kind :: enum u16 {
 	B_Keyword_End,
 
 	COUNT,
+
+	B_Custom_Keyword_Begin = COUNT+1,
+	// ... Custom keywords
 };
 
 tokens := [Kind.COUNT]string {
@@ -248,7 +249,6 @@ tokens := [Kind.COUNT]string {
 
 	"",
 	"import",
-	"export",
 	"foreign",
 	"package",
 	"typeid",
@@ -274,7 +274,6 @@ tokens := [Kind.COUNT]string {
 	"bit_field",
 	"bit_set",
 	"map",
-	"static",
 	"dynamic",
 	"auto_cast",
 	"cast",
@@ -296,10 +295,19 @@ tokens := [Kind.COUNT]string {
 	"",
 };
 
+custom_keyword_tokens: []string;
+
 to_string :: proc(kind: Kind) -> string {
-	if min(Kind) <= kind && kind <= max(Kind) {
+	if Invalid <= kind && kind < COUNT {
 		return tokens[kind];
 	}
+	if B_Custom_Keyword_Begin < kind {
+		n := int(u16(kind)-u16(B_Custom_Keyword_Begin));
+		if n < len(custom_keyword_tokens) {
+			return custom_keyword_tokens[n];
+		}
+	}
+
 	return "Invalid";
 }
 
@@ -316,4 +324,12 @@ is_operator :: proc(kind: Kind) -> bool {
 is_assignment_operator :: proc(kind: Kind) -> bool {
 	return B_Assign_Op_Begin < kind && kind < B_Assign_Op_End || kind == Eq;
 }
-is_keyword :: proc(kind: Kind) -> bool { return B_Keyword_Begin  < kind && kind < B_Keyword_End;  }
+is_keyword :: proc(kind: Kind) -> bool {
+	switch {
+	case B_Keyword_Begin < kind && kind < B_Keyword_End:
+		return true;
+	case B_Custom_Keyword_Begin < kind:
+		return true;
+	}
+	return false;
+}

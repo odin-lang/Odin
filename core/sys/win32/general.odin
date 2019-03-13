@@ -108,6 +108,8 @@ File_Attribute_Data :: struct {
 	file_size_low:    u32,
 }
 
+// NOTE(Jeroen): The widechar version might want at least the 32k MAX_PATH_WIDE
+// https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-findfirstfilew#parameters
 Find_Data_W :: struct{
     file_attributes:     u32,
     creation_time:       Filetime,
@@ -798,6 +800,7 @@ is_key_down :: inline proc(key: Key_Code) -> bool { return get_async_key_state(i
 
 
 MAX_PATH :: 0x00000104;
+MAX_PATH_WIDE :: 0x8000;
 
 HANDLE_FLAG_INHERIT :: 1;
 HANDLE_FLAG_PROTECT_FROM_CLOSE :: 2;

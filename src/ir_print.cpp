@@ -316,8 +316,11 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 	if (t->Proc.return_by_pointer) {
 		ir_print_type(f, m, reduce_tuple_to_single_type(t->Proc.results));
 		// ir_fprintf(f, "* sret noalias ");
-		ir_write_string(f, str_lit("* noalias "));
-		if (param_count > 0) ir_write_string(f, str_lit(", "));
+		// ir_write_string(f, str_lit("* noalias "));
+		ir_write_string(f, str_lit("*"));
+		if (param_count > 0 || t->Proc.calling_convention == ProcCC_Odin)  {
+			ir_write_string(f, str_lit(", "));
+		}
 	}
 	isize param_index = 0;
 	for (isize i = 0; i < param_count; i++) {
@@ -574,6 +577,16 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 	case Type_Opaque:
 		ir_print_type(f, m, strip_opaque_type(t));
 		return;
+
+	case Type_SimdVector:
+		if (t->SimdVector.is_x86_mmx) {
+			ir_write_str_lit(f, "x86_mmx");
+		} else {
+			ir_fprintf(f, "<%lld x ", t->SimdVector.count);;
+			ir_print_type(f, m, t->SimdVector.elem);
+			ir_write_byte(f, '>');
+		}
+		return;
 	}
 }
 
@@ -802,6 +815,31 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			}
 
 			ir_write_byte(f, ']');
+		} else if (is_type_simd_vector(type)) {
+			ast_node(cl, CompoundLit, value.value_compound);
+
+			Type *elem_type = type->SimdVector.elem;
+			isize elem_count = cl->elems.count;
+			if (elem_count == 0) {
+				ir_write_str_lit(f, "zeroinitializer");
+				break;
+			}
+			GB_ASSERT_MSG(elem_count == type->SimdVector.count, "%td != %td", elem_count, type->SimdVector.count);
+
+			ir_write_byte(f, '<');
+
+			for (isize i = 0; i < elem_count; i++) {
+				if (i > 0) ir_write_str_lit(f, ", ");
+				TypeAndValue tav = cl->elems[i]->tav;
+				GB_ASSERT(tav.mode != Addressing_Invalid);
+				ir_print_compound_element(f, m, tav.value, elem_type);
+			}
+			for (isize i = elem_count; i < type->SimdVector.count; i++) {
+				if (i >= elem_count) ir_write_str_lit(f, ", ");
+				ir_print_compound_element(f, m, empty_exact_value, elem_type);
+			}
+
+			ir_write_byte(f, '>');
 		} else if (is_type_struct(type)) {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
 			defer (gb_temp_arena_memory_end(tmp));
@@ -1052,6 +1090,7 @@ void ir_print_calling_convention(irFileBuffer *f, irModule *m, ProcCallingConven
 	case ProcCC_CDecl:       ir_write_str_lit(f, "ccc ");   break;
 	case ProcCC_StdCall:     ir_write_str_lit(f, "cc 64 "); break;
 	case ProcCC_FastCall:    ir_write_str_lit(f, "cc 65 "); break;
+	case ProcCC_None:        ir_write_str_lit(f, "");       break;
 	default: GB_PANIC("unknown calling convention: %d", cc);
 	}
 }
@@ -1664,7 +1703,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	case irInstr_BinaryOp: {
 		irInstrBinaryOp *bo = &value->Instr.BinaryOp;
 		Type *type = base_type(ir_type(bo->left));
-		Type *elem_type = type;
+		Type *elem_type = base_array_type(type);
 
 		ir_fprintf(f, "%%%d = ", value->index);
 

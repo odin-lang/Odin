@@ -857,10 +857,6 @@ parse_foreign_block :: proc(p: ^Parser, tok: token.Token) -> ^ast.Foreign_Block_
 
 	foreign_library: ^ast.Expr;
 	switch p.curr_tok.kind {
-	case token.Export:
-		i := ast.new(ast.Implicit, tok.pos, end_pos(tok));
-		i.tok = expect_token(p, token.Export);
-		foreign_library = i;
 	case token.Open_Brace:
 		i := ast.new(ast.Ident, tok.pos, end_pos(tok));
 		i.name = "_";
@@ -903,7 +899,7 @@ parse_foreign_decl :: proc(p: ^Parser) -> ^ast.Decl {
 	tok := expect_token(p, token.Foreign);
 
 	switch p.curr_tok.kind {
-	case token.Export, token.Ident, token.Open_Brace:
+	case token.Ident, token.Open_Brace:
 		return parse_foreign_block(p, tok);
 
 	case token.Import:
@@ -1033,37 +1029,6 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		expect_semicolon(p, s);
 		return s;
 
-	case token.Static:
-		docs := p.lead_comment;
-		tok := expect_token(p, token.Static);
-
-		list := parse_lhs_expr_list(p);
-		if len(list) == 0 {
-			error(p, tok.pos, "illegal use of 'static' statement");
-			expect_semicolon(p, nil);
-			return ast.new(ast.Bad_Stmt, tok.pos, end_pos(p.prev_tok));
-		}
-
-		expect_token_after(p, token.Colon, "identifier list");
-		decl := parse_value_decl(p, list, docs);
-		if decl != nil do switch d in &decl.derived {
-		case ast.Value_Decl:
-			if d.is_mutable {
-				d.is_static = true;
-			} else {
-				error(p, tok.pos, "'static' may only be currently used with variable declarations");
-			}
-		case:
-			error(p, tok.pos, "illegal use of 'static' statement");
-		}
-
-		error(p, tok.pos, "illegal use of 'static' statement");
-		if decl != nil {
-			return decl;
-		}
-
-		return ast.new(ast.Bad_Stmt, tok.pos, end_pos(p.prev_tok));
-
 	case token.Using:
 		docs := p.lead_comment;
 		tok := expect_token(p, token.Using);
@@ -1112,9 +1077,9 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			stmt := parse_stmt(p);
 			switch name {
 			case "bounds_check":
-				stmt.state_flags |= {ast.Node_State_Flag.Bounds_Check};
+				stmt.state_flags |= {.Bounds_Check};
 			case "no_bounds_check":
-				stmt.state_flags |= {ast.Node_State_Flag.No_Bounds_Check};
+				stmt.state_flags |= {.No_Bounds_Check};
 			}
 			return stmt;
 		case "complete":
@@ -1756,6 +1721,29 @@ string_to_calling_convention :: proc(s: string) -> ast.Proc_Calling_Convention {
 		return Fast_Call;
 	}
 	return Invalid;
+}
+
+parse_proc_tags :: proc(p: ^Parser) -> (tags: Proc_Tags) {
+	for p.curr_tok.kind == token.Hash {
+		tok := expect_token(p, token.Hash);
+		ident := expect_token(p, token.Ident);
+
+		switch ident.text {
+		case "require_results":
+			tags |= {.Require_Results};
+		case "bounds_check":
+			tags |= {.Bounds_Check};
+		case "no_bounds_check":
+			tags |= {.No_Bounds_Check};
+		case:
+		}
+	}
+
+	if .Bounds_Check in tags && .No_Bounds_Check in tags {
+		p.err(p.curr_tok.pos, "#bounds_check and #no_bounds_check applied to the same procedure type");
+	}
+
+	return;
 }
 
 parse_proc_type :: proc(p: ^Parser, tok: token.Token) -> ^ast.Proc_Type {
@@ -2616,6 +2604,13 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		ue.expr = expr;
 		return ue;
 
+	case token.Period:
+		op := advance_token(p);
+		field := parse_ident(p);
+		ise := ast.new(ast.Implicit_Selector_Expr, op.pos, field.end);
+		ise.field = field;
+		return ise;
+
 	}
 	return parse_atom_expr(p, parse_operand(p, lhs), lhs);
 }
@@ -2707,7 +2702,7 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 		return stmt;
 
 	case op.kind == token.In:
-		if Stmt_Allow_Flag.In in flags {
+		if .In in flags {
 			allow_token(p, token.In);
 			prev_allow_range := p.allow_range;
 			p.allow_range = true;
@@ -2725,7 +2720,7 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 		}
 	case op.kind == token.Colon:
 		expect_token_after(p, token.Colon, "identifier list");
-		if Stmt_Allow_Flag.Label in flags && len(lhs) == 1 {
+		if .Label in flags && len(lhs) == 1 {
 			switch p.curr_tok.kind {
 			case token.Open_Brace, token.If, token.For, token.Switch:
 				label := lhs[0];

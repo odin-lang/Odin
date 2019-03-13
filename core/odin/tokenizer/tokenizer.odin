@@ -486,12 +486,18 @@ scan :: proc(t: ^Tokenizer) -> token.Token {
 	case is_letter(ch):
 		lit = scan_identifier(t);
 		kind = token.Ident;
-		if len(lit) > 1 {
+		check_keyword: if len(lit) > 1 {
 			// TODO(bill): Maybe have a hash table lookup rather than this linear search
 			for i in token.B_Keyword_Begin .. token.B_Keyword_End {
 				if lit == token.tokens[i] {
 					kind = token.Kind(i);
-					break;
+					break check_keyword;
+				}
+			}
+			for keyword, i in token.custom_keyword_tokens {
+				if lit == keyword {
+					kind = token.Kind(i+1)+token.B_Custom_Keyword_Begin;
+					break check_keyword;
 				}
 			}
 		}

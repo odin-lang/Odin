@@ -183,6 +183,14 @@ align_forward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
 	return uintptr(p);
 }
 
+
+align_forward_int :: inline proc(ptr, align: int) -> int {
+	return int(align_forward_uintptr(uintptr(ptr), uintptr(align)));
+}
+align_forward_uint :: inline proc(ptr, align: uint) -> uint {
+	return uint(align_forward_uintptr(uintptr(ptr), uintptr(align)));
+}
+
 context_from_allocator :: proc(a: Allocator) -> type_of(context) {
 	context.allocator = a;
 	return context;

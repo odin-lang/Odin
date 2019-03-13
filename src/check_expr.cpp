@@ -991,7 +991,6 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 	o->expr = n;
 	String name = n->Ident.token.string;
 
-
 	Entity *e = scope_lookup(c->scope, name);
 	if (e == nullptr) {
 		if (is_blank_ident(name)) {
@@ -1241,6 +1240,14 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 			error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
 			return false;
 		}
+		if (is_type_simd_vector(o->type)) {
+			switch (op.kind) {
+			case Token_ModMod:
+			case Token_ModModEq:
+				error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
+				return false;
+			}
+		}
 		break;
 
 	case Token_AndNot:
@@ -1248,6 +1255,14 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 		if (!is_type_integer(ct) && !is_type_bit_set(ct)) {
 			error(op, "Operator '%.*s' is only allowed with integers and bit sets", LIT(op.string));
 			return false;
+		}
+		if (is_type_simd_vector(o->type)) {
+			switch (op.kind) {
+			case Token_AndNot:
+			case Token_AndNotEq:
+				error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
+				return false;
+			}
 		}
 		break;
 
@@ -2129,8 +2144,20 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 
 	case Token_in:
 	case Token_notin:
-		check_expr(c, x, be->left);
+		// IMPORTANT NOTE(bill): This uses right-left evaluation in type checking only no in
+
 		check_expr(c, y, be->right);
+
+		if (is_type_bit_set(y->type)) {
+			Type *elem = base_type(y->type)->BitSet.elem;
+			check_expr_with_type_hint(c, x, be->left, elem);
+		} else if (is_type_map(y->type)) {
+			Type *key = base_type(y->type)->Map.key;
+			check_expr_with_type_hint(c, x, be->left, key);
+		} else {
+			check_expr(c, x, be->left);
+		}
+
 		if (x->mode == Addressing_Invalid) {
 			return;
 		}
@@ -4072,6 +4099,46 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
+	case BuiltinProc_vector: {
+		Operand x = {};
+		Operand y = {};
+		x = *operand;
+		if (!is_type_integer(x.type) || x.mode != Addressing_Constant) {
+			error(call, "Expected a constant integer for 'intrinsics.vector'");
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
+		if (x.value.value_integer.neg) {
+			error(call, "Negative vector element length");
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
+		i64 count = big_int_to_i64(&x.value.value_integer);
+
+		check_expr_or_type(c, &y, ce->args[1]);
+		if (y.mode != Addressing_Type) {
+			error(call, "Expected a type 'intrinsics.vector'");
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
+		Type *elem = y.type;
+		if (!is_type_valid_vector_elem(elem)) {
+			gbString str = type_to_string(elem);
+			error(call, "Invalid element type for 'intrinsics.vector', expected an integer or float with no specific endianness, got '%s'", str);
+			gb_string_free(str);
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
+
+		operand->mode = Addressing_Type;
+		operand->type = alloc_type_simd_vector(count, elem);
+		break;
+	}
+
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
 	case BuiltinProc_atomic_fence_rel:
@@ -5372,7 +5439,8 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call) {
 		operand->mode = Addressing_NoValue;
 	} else {
 		GB_ASSERT(is_type_tuple(result_type));
-		switch (result_type->Tuple.variables.count) {
+		isize count = result_type->Tuple.variables.count;
+		switch (count) {
 		case 0:
 			operand->mode = Addressing_NoValue;
 			break;
@@ -5778,7 +5846,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (cl->elems.count == 0) {
 				break; // NOTE(bill): No need to init
 			}
-			if (!is_type_struct(t)) {
+			if (t->Struct.is_raw_union) {
 				if (cl->elems.count != 0) {
 					gbString type_str = type_to_string(type);
 					error(node, "Illegal compound literal type '%s'", type_str);
@@ -5902,6 +5970,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		case Type_Slice:
 		case Type_Array:
 		case Type_DynamicArray:
+		case Type_SimdVector:
 		{
 			Type *elem_type = nullptr;
 			String context_name = {};
@@ -5922,6 +5991,10 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 				add_package_dependency(c, "runtime", "__dynamic_array_reserve");
 				add_package_dependency(c, "runtime", "__dynamic_array_append");
+			} else if (t->kind == Type_SimdVector) {
+				elem_type = t->SimdVector.elem;
+				context_name = str_lit("simd vector literal");
+				max_type_count = t->SimdVector.count;
 			} else {
 				GB_PANIC("unreachable");
 			}
@@ -5970,6 +6043,15 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					t->Array.count = max;
 				} else if (0 < max && max < t->Array.count) {
 					error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
+				}
+			}
+
+			if (t->kind == Type_SimdVector) {
+				if (!is_constant) {
+					error(node, "Expected all constant elements for a simd vector");
+				}
+				if (t->SimdVector.is_x86_mmx) {
+					error(node, "Compound literals are not allowed with intrinsics.x86_mmx");
 				}
 			}
 			break;
@@ -6107,7 +6189,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						continue;
 					}
 
-					check_expr(c, o, elem);
+					check_expr_with_type_hint(c, o, elem, et);
 
 					if (is_constant) {
 						is_constant = o->mode == Addressing_Constant;
@@ -6338,6 +6420,47 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case_end;
 
 
+	case_ast_node(ise, ImplicitSelectorExpr, node);
+		o->type = t_invalid;
+		o->expr = node;
+		o->mode = Addressing_Invalid;
+
+		if (type_hint == nullptr) {
+			gbString str = expr_to_string(node);
+			error(node, "Cannot determine type for implicit selector expression '%s'", str);
+			gb_string_free(str);
+			return Expr_Expr;
+		}
+		o->type = type_hint;
+		if (!is_type_enum(type_hint)) {
+			gbString typ = type_to_string(type_hint);
+			gbString str = expr_to_string(node);
+			error(node, "Invalid type '%s' for implicit selector expression '%s'", typ, str);
+			gb_string_free(str);
+			gb_string_free(typ);
+			return Expr_Expr;
+		}
+		GB_ASSERT(ise->selector->kind == Ast_Ident);
+		String name = ise->selector->Ident.token.string;
+
+		Type *enum_type = base_type(type_hint);
+		GB_ASSERT(enum_type->kind == Type_Enum);
+		Entity *e = scope_lookup_current(enum_type->Enum.scope, name);
+		if (e == nullptr) {
+			gbString typ = type_to_string(type_hint);
+			error(node, "Undeclared name %.*s for type '%s'", LIT(name), typ);
+			gb_string_free(typ);
+			return Expr_Expr;
+		}
+		GB_ASSERT(are_types_identical(base_type(e->type), base_type(type_hint)));
+		GB_ASSERT(e->kind == Entity_Constant);
+		o->value = e->Constant.value;
+		o->mode = Addressing_Constant;
+		o->type = e->type;
+
+		return Expr_Expr;
+	case_end;
+
 	case_ast_node(ie, IndexExpr, node);
 		check_expr(c, o, ie->expr);
 		if (o->mode == Addressing_Invalid) {
@@ -6351,7 +6474,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 		if (is_type_map(t)) {
 			Operand key = {};
-			check_expr(c, &key, ie->index);
+			check_expr_with_type_hint(c, &key, ie->index, t->Map.key);
 			check_assignment(c, &key, t->Map.key, str_lit("map index"));
 			if (key.mode == Addressing_Invalid) {
 				o->mode = Addressing_Invalid;
@@ -6758,6 +6881,11 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 
 	case_ast_node(se, SelectorExpr, node);
 		str = write_expr_to_string(str, se->expr);
+		str = gb_string_append_rune(str, '.');
+		str = write_expr_to_string(str, se->selector);
+	case_end;
+
+	case_ast_node(se, ImplicitSelectorExpr, node);
 		str = gb_string_append_rune(str, '.');
 		str = write_expr_to_string(str, se->selector);
 	case_end;

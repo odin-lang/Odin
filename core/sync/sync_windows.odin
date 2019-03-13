@@ -2,6 +2,11 @@ package sync
 
 import "core:sys/win32"
 
+foreign {
+	@(link_name="llvm.x86.sse2.pause")
+	yield_processor :: proc() ---
+}
+
 Semaphore :: struct {
 	_handle: win32.Handle,
 }
@@ -13,6 +18,12 @@ Mutex :: struct {
 Condition :: struct {
 	event: win32.Handle,
 }
+
+Ticket_Mutex :: struct {
+	ticket:  u64,
+	serving: u64,
+}
+
 
 current_thread_id :: proc() -> i32 {
 	return i32(win32.get_current_thread_id());
@@ -80,4 +91,21 @@ condition_destroy :: proc(using c: ^Condition) {
 	if event != nil {
 		win32.close_handle(event);
 	}
+}
+
+
+ticket_mutex_init :: proc(m: ^Ticket_Mutex) {
+	atomic_store(&m.ticket,  0, Ordering.Relaxed);
+	atomic_store(&m.serving, 0, Ordering.Relaxed);
+}
+
+ticket_mutex_lock :: inline proc(m: ^Ticket_Mutex) {
+	ticket := atomic_add(&m.ticket, 1, Ordering.Relaxed);
+	for ticket != m.serving {
+		yield_processor();
+	}
+}
+
+ticket_mutex_unlock :: inline proc(m: ^Ticket_Mutex) {
+	atomic_add(&m.serving, 1, Ordering.Relaxed);
 }

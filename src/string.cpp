@@ -308,7 +308,6 @@ String directory_from_path(String const &s) {
 	return substring(s, 0, i);
 }
 
-
 String concatenate_strings(gbAllocator a, String const &x, String const &y) {
 	isize len = x.len+y.len;
 	u8 *data = gb_alloc_array(a, u8, len+1);

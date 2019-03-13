@@ -151,7 +151,6 @@ enum ProcTag {
 	ProcTag_bounds_check    = 1<<0,
 	ProcTag_no_bounds_check = 1<<1,
 	ProcTag_require_results = 1<<4,
-	ProcTag_no_context      = 1<<6,
 };
 
 enum ProcCallingConvention {
@@ -165,6 +164,9 @@ enum ProcCallingConvention {
 	// TODO(bill): Add extra calling conventions
 	// ProcCC_VectorCall,
 	// ProcCC_ClrCall,
+
+	ProcCC_None,
+
 
 	ProcCC_ForeignBlockDefault = -1,
 };
@@ -242,6 +244,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BinaryExpr,   "binary expression",      struct { Token op; Ast *left, *right; } ) \
 	AST_KIND(ParenExpr,    "parentheses expression", struct { Ast *expr; Token open, close; }) \
 	AST_KIND(SelectorExpr, "selector expression",    struct { Token token; Ast *expr, *selector; }) \
+	AST_KIND(ImplicitSelectorExpr, "implicit selector expression",    struct { Token token; Ast *selector; }) \
 	AST_KIND(IndexExpr,    "index expression",       struct { Ast *expr, *index; Token open, close; }) \
 	AST_KIND(DerefExpr,    "dereference expression", struct { Token op; Ast *expr; }) \
 	AST_KIND(SliceExpr,    "slice expression", struct { \
@@ -373,7 +376,6 @@ AST_KIND(_DeclBegin,      "", bool) \
 		Array<Ast *> attributes;  \
 		CommentGroup *docs;       \
 		CommentGroup *comment;    \
-		bool          is_static;  \
 		bool          is_using;   \
 		bool          is_mutable; \
 	}) \

@@ -3035,6 +3035,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 				break;
 			case DeferredProcedure_in:
 				result_as_args = in_args;
+				break;
 			case DeferredProcedure_out:
 				result_as_args = ir_value_to_array(p, result);
 				break;
@@ -3213,6 +3214,8 @@ irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 	Type *t = base_type(ir_type(key));
 	key = ir_emit_conv(proc, key, key_type);
 	if (is_type_integer(t)) {
+		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, key, hash_type));
+	} else if (is_type_enum(t)) {
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, key, hash_type));
 	} else if (is_type_typeid(t)) {
 		irValue *i = ir_emit_bitcast(proc, key, t_uint);
@@ -4644,6 +4647,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	}
 
 
+
 	// bool <-> llvm bool
 	if (is_type_boolean(src) && dst == t_llvm_bool) {
 		return ir_emit(proc, ir_instr_conv(proc, irConv_trunc, value, src_type, t));
@@ -4906,7 +4910,13 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return ir_emit_load(proc, result);
 	}
 
-
+	if (is_type_untyped(src)) {
+		if (is_type_string(src) && is_type_string(dst)) {
+			irValue *result = ir_add_local_generated(proc, t, false);
+			ir_emit_store(proc, result, value);
+			return ir_emit_load(proc, result);
+		}
+	}
 
 	gb_printf_err("ir_emit_conv: src -> dst\n");
 	gb_printf_err("Not Identical %s != %s\n", type_to_string(src_type), type_to_string(t));
@@ -6258,6 +6268,13 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		return ir_addr_load(proc, ir_build_addr(proc, expr));
 	case_end;
 
+	case_ast_node(ise, ImplicitSelectorExpr, expr);
+		TypeAndValue tav = type_and_value_of_expr(expr);
+		GB_ASSERT(tav.mode == Addressing_Constant);
+
+		return ir_add_module_constant(proc->module, tv.type, tv.value);
+	case_end;
+
 	case_ast_node(te, TernaryExpr, expr);
 		ir_emit_comment(proc, str_lit("TernaryExpr"));
 
@@ -7260,6 +7277,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 		case Type_Array:  et = bt->Array.elem;  break;
 		case Type_Slice:  et = bt->Slice.elem;  break;
 		case Type_BitSet: et = bt->BitSet.elem; break;
+		case Type_SimdVector: et = bt->SimdVector.elem; break;
 		}
 
 		String proc_name = {};
@@ -7351,7 +7369,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 		case Type_Array: {
 			if (cl->elems.count > 0) {
-				// ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
+				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
 
 				auto temp_data = array_make<irCompoundLitElemTempData>(heap_allocator(), 0, cl->elems.count);
 				defer (array_free(&temp_data));
@@ -8157,7 +8175,16 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		if (vd->is_mutable) {
 			irModule *m = proc->module;
 
-			if (vd->is_static) {
+			bool is_static = false;
+			if (vd->names.count > 0) {
+				Entity *e = entity_of_ident(vd->names[0]);
+				if (e->flags & EntityFlag_Static) {
+					// NOTE(bill): If one of the entities is static, they all are
+					is_static = true;
+				}
+			}
+
+			if (is_static) {
 				for_array(i, vd->names) {
 					irValue *value = nullptr;
 					if (vd->values.count > 0) {
@@ -9986,6 +10013,18 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			ir_emit_comment(proc, str_lit("Type_Opaque"));
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_opaque_ptr);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->Opaque.elem));
+			break;
+
+		case Type_SimdVector:
+			ir_emit_comment(proc, str_lit("Type_SimdVector"));
+			tag = ir_emit_conv(proc, variant_ptr, t_type_info_simd_vector_ptr);
+			if (t->SimdVector.is_x86_mmx) {
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), v_true);
+			} else {
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->SimdVector.elem));
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), ir_const_int(type_size_of(t->SimdVector.elem)));
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), ir_const_int(t->SimdVector.count));
+			}
 			break;
 		}
 
