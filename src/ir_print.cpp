@@ -471,7 +471,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 			i64 align_of_union = type_align_of(t);
 			ir_write_byte(f, '{');
 			ir_print_alignment_prefix_hack(f, align_of_union);
-			ir_fprintf(f, ", [%lld x i8]}", align_of_union, size_of_union);
+			ir_fprintf(f, ", [%lld x i8]}", size_of_union);
 			return;
 		} else {
 			if (t->Struct.is_packed) {
