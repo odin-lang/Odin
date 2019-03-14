@@ -92,6 +92,7 @@ struct BuildContext {
 
 	String out_filepath;
 	String resource_filepath;
+	String pdb_filepath;
 	bool   has_resource;
 	String opt_flags;
 	String llc_flags;
