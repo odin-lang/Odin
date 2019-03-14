@@ -18,7 +18,7 @@
 #include "ir_print.cpp"
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
-i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
+i32 system_exec_command_line_app(char *name, char *fmt, ...) {
 #if defined(GB_SYSTEM_WINDOWS)
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
@@ -201,7 +201,6 @@ enum BuildFlagKind {
 	BuildFlag_Invalid,
 
 	BuildFlag_OutFile,
-	BuildFlag_ResourceFile,
 	BuildFlag_OptimizationLevel,
 	BuildFlag_ShowTimings,
 	BuildFlag_ThreadCount,
@@ -217,6 +216,11 @@ enum BuildFlagKind {
 	BuildFlag_UseLLD,
 	BuildFlag_Vet,
 	BuildFlag_IgnoreUnknownAttributes,
+
+#if defined(GB_SYSTEM_WINDOWS)
+	BuildFlag_ResourceFile,
+	BuildFlag_WindowsPdbName,
+#endif
 
 	BuildFlag_COUNT,
 };
@@ -281,7 +285,6 @@ ExactValue build_param_to_exact_value(String name, String param) {
 bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),             BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_ResourceFile,      str_lit("resource"),        BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),             BuildFlagParam_Integer);
 	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),    BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),    BuildFlagParam_Integer);
@@ -297,6 +300,11 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),             BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),             BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("-ignore-unknown-attributes"), BuildFlagParam_None);
+
+#if defined(GB_SYSTEM_WINDOWS)
+	add_flag(&build_flags, BuildFlag_ResourceFile,   str_lit("resource"), BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_WindowsPdbName, str_lit("pdb-name"), BuildFlagParam_String);
+#endif
 
 	GB_ASSERT(args.count >= 3);
 	Array<String> flag_args = array_slice(args, 3, args.count);
@@ -432,24 +440,6 @@ bool parse_build_flags(Array<String> args) {
 								build_context.out_filepath = path;
 							} else {
 								gb_printf_err("Invalid -out path, got %.*s\n", LIT(path));
-								bad_flags = true;
-							}
-							break;
-						}
-						case BuildFlag_ResourceFile: {
-							GB_ASSERT(value.kind == ExactValue_String);
-							String path = value.value_string;
-							path = string_trim_whitespace(path);
-							if (is_import_path_valid(path)) {
-								if(!string_ends_with(path, str_lit(".rc"))) {
-									gb_printf_err("Invalid -resource path %.*s, missing .rc\n", LIT(path));
-									bad_flags = true;
-									break;
-								}
-								build_context.resource_filepath = substring(path, 0, string_extension_position(path));
-								build_context.has_resource = true;
-							} else {
-								gb_printf_err("Invalid -resource path, got %.*s\n", LIT(path));
 								bad_flags = true;
 							}
 							break;
@@ -671,6 +661,48 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_IgnoreUnknownAttributes:
 							build_context.ignore_unknown_attributes = true;
 							break;
+
+					#if defined(GB_SYSTEM_WINDOWS)
+						case BuildFlag_ResourceFile: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String path = value.value_string;
+							path = string_trim_whitespace(path);
+							if (is_import_path_valid(path)) {
+								if(!string_ends_with(path, str_lit(".rc"))) {
+									gb_printf_err("Invalid -resource path %.*s, missing .rc\n", LIT(path));
+									bad_flags = true;
+									break;
+								}
+								build_context.resource_filepath = substring(path, 0, string_extension_position(path));
+								build_context.has_resource = true;
+							} else {
+								gb_printf_err("Invalid -resource path, got %.*s\n", LIT(path));
+								bad_flags = true;
+							}
+							break;
+						}
+						case BuildFlag_WindowsPdbName: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String path = value.value_string;
+							path = string_trim_whitespace(path);
+							if (is_import_path_valid(path)) {
+								// #if defined(GB_SYSTEM_WINDOWS)
+								// 	String ext = path_extension(path);
+								// 	if (ext != ".pdb") {
+								// 		path = substring(path, 0, string_extension_position(path));
+								// 	}
+								// #endif
+								build_context.pdb_filepath = path;
+							} else {
+								gb_printf_err("Invalid -pdb-name path, got %.*s\n", LIT(path));
+								bad_flags = true;
+							}
+							break;
+
+							break;
+						}
+					#endif
+
 						}
 					}
 
@@ -784,7 +816,7 @@ void remove_temp_files(String output_base) {
 i32 exec_llvm_opt(String output_base) {
 #if defined(GB_SYSTEM_WINDOWS)
 	// For more passes arguments: http://llvm.org/docs/Passes.html
-	return system_exec_command_line_app("llvm-opt", false,
+	return system_exec_command_line_app("llvm-opt",
 		"\"%.*sbin/opt\" \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
 		"",
 		LIT(build_context.ODIN_ROOT),
@@ -804,10 +836,10 @@ i32 exec_llvm_opt(String output_base) {
 i32 exec_llvm_llc(String output_base) {
 #if defined(GB_SYSTEM_WINDOWS)
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
-	return system_exec_command_line_app("llvm-llc", false,
+	return system_exec_command_line_app("llvm-llc",
 		"\"%.*sbin\\llc\" \"%.*s.bc\" -filetype=obj -O%d "
 		"-o \"%.*s.obj\" "
-		"%.*s "
+		"%.*s"
 		"",
 		LIT(build_context.ODIN_ROOT),
 		LIT(output_base),
@@ -817,7 +849,7 @@ i32 exec_llvm_llc(String output_base) {
 #else
 	// NOTE(zangent): Linux / Unix is unfinished and not tested very well.
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
-	return system_exec_command_line_app("llc", false,
+	return system_exec_command_line_app("llc",
 		"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
 		"%.*s "
 		"%s"
@@ -1041,6 +1073,11 @@ int main(int arg_count, char **arg_ptr) {
 		} else {
 			link_settings = gb_string_append_fmt(link_settings, "/ENTRY:mainCRTStartup");
 		}
+
+		if (build_context.pdb_filepath != "") {
+			link_settings = gb_string_append_fmt(link_settings, " /PDB:%.*s", LIT(build_context.pdb_filepath));
+		}
+
 		if (build_context.no_crt) {
 			link_settings = gb_string_append_fmt(link_settings, " /nodefaultlib");
 		} else {
@@ -1052,7 +1089,7 @@ int main(int arg_count, char **arg_ptr) {
 		}
 		if (!build_context.use_lld) { // msvc
 			if (build_context.has_resource) {
-				exit_code = system_exec_command_line_app("msvc-link", true,
+				exit_code = system_exec_command_line_app("msvc-link",
 					"rc /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
 					LIT(output_base),
 					LIT(build_context.resource_filepath)
@@ -1062,7 +1099,7 @@ int main(int arg_count, char **arg_ptr) {
 					return exit_code;
 				}
 
-				exit_code = system_exec_command_line_app("msvc-link", true,
+				exit_code = system_exec_command_line_app("msvc-link",
 					"link \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 					" %.*s "
@@ -1073,7 +1110,7 @@ int main(int arg_count, char **arg_ptr) {
 					link_settings
 				);
 			} else {
-				exit_code = system_exec_command_line_app("msvc-link", true,
+				exit_code = system_exec_command_line_app("msvc-link",
 					"link \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 					" %.*s "
@@ -1085,7 +1122,7 @@ int main(int arg_count, char **arg_ptr) {
 				);
 			}
 		} else { // lld
-			exit_code = system_exec_command_line_app("msvc-link", true,
+			exit_code = system_exec_command_line_app("msvc-link",
 				"\"%.*s\\bin\\lld-link\" \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 				"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 				" %.*s "
@@ -1109,7 +1146,7 @@ int main(int arg_count, char **arg_ptr) {
 		remove_temp_files(output_base);
 
 		if (run_output) {
-			system_exec_command_line_app("odin run", false, "%.*s.exe %.*s", LIT(output_base), LIT(run_args_string));
+			system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(output_base), LIT(run_args_string));
 		}
 	#else
 		timings_start_section(&timings, str_lit("ld-link"));
@@ -1206,7 +1243,7 @@ int main(int arg_count, char **arg_ptr) {
 			}
 		#endif
 
-		exit_code = system_exec_command_line_app("ld-link", true,
+		exit_code = system_exec_command_line_app("ld-link",
 			"%s \"%.*s.o\" -o \"%.*s%.*s\" %s "
 			" %s "
 			" %.*s "
@@ -1235,7 +1272,7 @@ int main(int arg_count, char **arg_ptr) {
 		if (build_context.ODIN_DEBUG) {
 			// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
 			// to the symbols in the object file
-			exit_code = system_exec_command_line_app("dsymutil", true,
+			exit_code = system_exec_command_line_app("dsymutil",
 				"dsymutil %.*s%.*s", LIT(output_base), LIT(output_ext)
 			);
 
@@ -1256,7 +1293,7 @@ int main(int arg_count, char **arg_ptr) {
 			//NOTE(thebirk): This whole thing is a little leaky
 			String complete_path = concatenate_strings(heap_allocator(), output_base, output_ext);
 			complete_path = path_to_full_path(heap_allocator(), complete_path);
-			system_exec_command_line_app("odin run", false, "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
+			system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
 		}
 	#endif
 #endif
