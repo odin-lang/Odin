@@ -673,13 +673,20 @@ fmt_cstring :: proc(fi: ^Info, s: cstring, verb: rune) {
 }
 
 fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
+	u := u64(uintptr(p));
 	switch verb {
 	case 'p', 'v':
-		u := u64(uintptr(p));
 		if !fi.hash || verb == 'v' {
 			strings.write_string(fi.buf, "0x");
 		}
 		_fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
+
+	case 'b': _fmt_int(fi, u,  2, false, 8*size_of(rawptr), __DIGITS_UPPER);
+	case 'o': _fmt_int(fi, u,  8, false, 8*size_of(rawptr), __DIGITS_UPPER);
+	case 'd': _fmt_int(fi, u, 10, false, 8*size_of(rawptr), __DIGITS_UPPER);
+	case 'x': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
+	case 'X': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
+
 	case:
 		fmt_bad_verb(fi, verb);
 	}
@@ -1046,14 +1053,19 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 
 	case runtime.Type_Info_Dynamic_Array:
-		strings.write_byte(fi.buf, '[');
-		defer strings.write_byte(fi.buf, ']');
-		array := cast(^mem.Raw_Dynamic_Array)v.data;
-		for i in 0..array.len-1 {
-			if i > 0 do strings.write_string(fi.buf, ", ");
+		if verb == 'p' {
+			slice := cast(^mem.Raw_Dynamic_Array)v.data;
+			fmt_pointer(fi, slice.data, 'p');
+		} else {
+			strings.write_byte(fi.buf, '[');
+			defer strings.write_byte(fi.buf, ']');
+			array := cast(^mem.Raw_Dynamic_Array)v.data;
+			for i in 0..array.len-1 {
+				if i > 0 do strings.write_string(fi.buf, ", ");
 
-			data := uintptr(array.data) + uintptr(i*info.elem_size);
-			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
+				data := uintptr(array.data) + uintptr(i*info.elem_size);
+				fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
+			}
 		}
 
 	case runtime.Type_Info_Simd_Vector:
@@ -1071,16 +1083,20 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 
 	case runtime.Type_Info_Slice:
-		strings.write_byte(fi.buf, '[');
-		defer strings.write_byte(fi.buf, ']');
-		slice := cast(^mem.Raw_Slice)v.data;
-		for i in 0..slice.len-1 {
-			if i > 0 do strings.write_string(fi.buf, ", ");
+		if verb == 'p' {
+			slice := cast(^mem.Raw_Slice)v.data;
+			fmt_pointer(fi, slice.data, 'p');
+		} else {
+			strings.write_byte(fi.buf, '[');
+			defer strings.write_byte(fi.buf, ']');
+			slice := cast(^mem.Raw_Slice)v.data;
+			for i in 0..slice.len-1 {
+				if i > 0 do strings.write_string(fi.buf, ", ");
 
-			data := uintptr(slice.data) + uintptr(i*info.elem_size);
-			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
+				data := uintptr(slice.data) + uintptr(i*info.elem_size);
+				fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
+			}
 		}
-
 	case runtime.Type_Info_Map:
 		if verb != 'v' {
 			fmt_bad_verb(fi, verb);
