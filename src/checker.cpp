@@ -2005,7 +2005,7 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		if (value != nullptr) {
 			Operand o = {};
 			check_expr(c, &o, value);
-			Entity *e = entity_of_ident(o.expr);
+			Entity *e = entity_of_node(o.expr);
 			if (e != nullptr && e->kind == Entity_Procedure) {
 				warning(elem, "'%.*s' is deprecated, please use one of the following instead: 'deferred_none', 'deferred_in', 'deferred_out'", LIT(name));
 				if (ac->deferred_procedure.entity != nullptr) {
@@ -2022,7 +2022,7 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		if (value != nullptr) {
 			Operand o = {};
 			check_expr(c, &o, value);
-			Entity *e = entity_of_ident(o.expr);
+			Entity *e = entity_of_node(o.expr);
 			if (e != nullptr && e->kind == Entity_Procedure) {
 				ac->deferred_procedure.kind = DeferredProcedure_none;
 				ac->deferred_procedure.entity = e;
@@ -2035,7 +2035,7 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		if (value != nullptr) {
 			Operand o = {};
 			check_expr(c, &o, value);
-			Entity *e = entity_of_ident(o.expr);
+			Entity *e = entity_of_node(o.expr);
 			if (e != nullptr && e->kind == Entity_Procedure) {
 				if (ac->deferred_procedure.entity != nullptr) {
 					error(elem, "Previous usage of a 'deferred_*' attribute");
@@ -2051,7 +2051,7 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		if (value != nullptr) {
 			Operand o = {};
 			check_expr(c, &o, value);
-			Entity *e = entity_of_ident(o.expr);
+			Entity *e = entity_of_node(o.expr);
 			if (e != nullptr && e->kind == Entity_Procedure) {
 				if (ac->deferred_procedure.entity != nullptr) {
 					error(elem, "Previous usage of a 'deferred_*' attribute");
