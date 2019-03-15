@@ -299,7 +299,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),          BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),             BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),             BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("-ignore-unknown-attributes"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_ResourceFile,   str_lit("resource"), BuildFlagParam_String);
