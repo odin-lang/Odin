@@ -825,7 +825,7 @@ i32 exec_llvm_opt(String output_base) {
 #else
 	// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
 	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
-	return system_exec_command_line_app("llvm-opt", false,
+	return system_exec_command_line_app("llvm-opt",
 		"opt \"%.*s.ll\" -o \"%.*s.bc\" %.*s "
 		"",
 		LIT(output_base), LIT(output_base),
