@@ -388,8 +388,7 @@ Entity *scope_lookup(Scope *s, String name) {
 
 
 
-Entity *scope_insert(Scope *s, Entity *entity) {
-	String name = entity->token.string;
+Entity *scope_insert_with_name(Scope *s, String name, Entity *entity) {
 	if (name == "") {
 		return nullptr;
 	}
@@ -404,6 +403,11 @@ Entity *scope_insert(Scope *s, Entity *entity) {
 		entity->scope = s;
 	}
 	return nullptr;
+}
+
+Entity *scope_insert(Scope *s, Entity *entity) {
+	String name = entity->token.string;
+	return scope_insert_with_name(s, name, entity);
 }
 
 
@@ -1023,11 +1027,10 @@ void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
 	array_add(&i->definitions, entity);
 }
 
-bool add_entity(Checker *c, Scope *scope, Ast *identifier, Entity *entity) {
+bool add_entity_with_name(Checker *c, Scope *scope, Ast *identifier, Entity *entity, String name) {
 	if (scope == nullptr) {
 		return false;
 	}
-	String name = entity->token.string;
 	if (!is_blank_ident(name)) {
 		Entity *ie = scope_insert(scope, entity);
 		if (ie != nullptr) {
@@ -1062,6 +1065,9 @@ bool add_entity(Checker *c, Scope *scope, Ast *identifier, Entity *entity) {
 		add_entity_definition(&c->info, identifier, entity);
 	}
 	return true;
+}
+bool add_entity(Checker *c, Scope *scope, Ast *identifier, Entity *entity) {
+	return add_entity_with_name(c, scope, identifier, entity, entity->token.string);
 }
 
 void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
@@ -3050,12 +3056,13 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 
 		// NOTE(bill): Add imported entities to this file's scope
 		for_array(elem_index, scope->elements.entries) {
+			String name = scope->elements.entries[elem_index].key.string;
 			Entity *e = scope->elements.entries[elem_index].value;
 			if (e->scope == parent_scope) continue;
 
 			if (is_entity_exported(e)) {
-				Entity *prev = scope_lookup(parent_scope, e->token.string);
-				add_entity(ctx->checker, parent_scope, e->identifier, e);
+				Entity *prev = scope_lookup(parent_scope, name);
+				add_entity_with_name(ctx->checker, parent_scope, e->identifier, e, name);
 			}
 		}
 	}

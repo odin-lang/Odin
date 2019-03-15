@@ -474,10 +474,11 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 	case Entity_ImportName: {
 		Scope *scope = e->ImportName.scope;
 		for_array(i, scope->elements.entries) {
+			String name = scope->elements.entries[i].key.string;
 			Entity *decl = scope->elements.entries[i].value;
 			if (!is_entity_exported(decl)) continue;
 
-			Entity *found = scope_insert(ctx->scope, decl);
+			Entity *found = scope_insert_with_name(ctx->scope, name, decl);
 			if (found != nullptr) {
 				gbString expr_str = expr_to_string(expr);
 				error(us->token,

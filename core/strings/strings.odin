@@ -3,6 +3,21 @@ package strings
 import "core:mem"
 import "core:unicode/utf8"
 
+clone :: proc(s: string, allocator := context.allocator) -> string {
+	c := make([]byte, len(s)+1, allocator);
+	copy(c, cast([]byte)s);
+	c[len(s)] = 0;
+	return string(c[:len(s)]);
+}
+
+clone_to_cstring :: proc(s: string, allocator := context.allocator) -> cstring {
+	c := make([]byte, len(s)+1, allocator);
+	copy(c, cast([]byte)s);
+	c[len(s)] = 0;
+	return cstring(&c[0]);
+}
+
+@(deprecated="Please use 'strings.clone'")
 new_string :: proc(s: string, allocator := context.allocator) -> string {
 	c := make([]byte, len(s)+1, allocator);
 	copy(c, cast([]byte)s);
@@ -10,6 +25,7 @@ new_string :: proc(s: string, allocator := context.allocator) -> string {
 	return string(c[:len(s)]);
 }
 
+@(deprecated="Please use 'strings.clone_to_cstring'")
 new_cstring :: proc(s: string, allocator := context.allocator) -> cstring {
 	c := make([]byte, len(s)+1, allocator);
 	copy(c, cast([]byte)s);
@@ -45,6 +61,10 @@ contains_any :: proc(s, chars: string) -> bool {
 	return index_any(s, chars) >= 0;
 }
 
+
+rune_count :: proc(s: string) -> int {
+	return utf8.rune_count_in_string(s);
+}
 
 
 equal_fold :: proc(s, t: string) -> bool {
@@ -209,7 +229,7 @@ last_index_any :: proc(s, chars: string) -> int {
 
 count :: proc(s, substr: string) -> int {
 	if len(substr) == 0 { // special case
-		return utf8.rune_count_in_string(s) + 1;
+		return rune_count(s) + 1;
 	}
 	if len(substr) == 1 {
 		c := substr[0];
@@ -493,3 +513,181 @@ trim_null :: proc(s: string) -> string {
 	return trim_right_null(trim_left_null(s));
 }
 
+// scrub scruvs invalid utf-8 characters and replaces them with the replacement string
+// Adjacent invalid bytes are only replaced once
+scrub :: proc(str: string, replacement: string, allocator := context.allocator) -> string {
+	b := make_builder(allocator);;
+	grow_builder(&b, len(str));
+
+	has_error := false;
+	cursor := 0;
+	origin := str;
+
+	for len(str) > 0 {
+		r, w := utf8.decode_rune_in_string(str);
+
+		if r == utf8.RUNE_ERROR {
+			if !has_error {
+				has_error = true;
+				write_string(&b, origin[:cursor]);
+			}
+		} else if has_error {
+			has_error = false;
+			write_string(&b, replacement);
+
+			origin = origin[cursor:];
+			cursor = 0;
+		}
+
+		cursor += w;
+		str = str[w:];
+	}
+
+	return to_string(b);
+}
+
+
+reverse :: proc(str: string, allocator := context.allocator) -> string {
+	n := len(str);
+	buf := make([]byte, n);
+	i := 0;
+
+	for len(str) > 0 {
+		_, w := utf8.decode_rune_in_string(str);
+		copy(buf[i:], cast([]byte)str[:w]);
+		str = str[w:];
+	}
+	return string(buf);
+}
+
+expand_tabs :: proc(str: string, tab_size: int, allocator := context.allocator) -> string {
+	if tab_size <= 0 {
+		panic("tab size must be positive");
+	}
+
+	if str == "" {
+		return "";
+	}
+
+	b := make_builder(allocator);
+
+	column: int;
+
+	for len(str) > 0 {
+		r, w := utf8.decode_rune_in_string(str);
+
+		if r == '\t' {
+			expand := tab_size - column%tab_size;
+
+			for i := 0; i < expand; i += 1 {
+				write_byte(&b, ' ');
+			}
+
+			column += expand;
+		} else {
+			if r == '\n' {
+				column = 0;
+			} else {
+				column += w;
+			}
+
+			write_rune(&b, r);
+		}
+
+		str = str[w:];
+	}
+
+	return to_string(b);
+}
+
+
+partition :: proc(str, sep: string) -> (head, match, tail: string) {
+	i := index(str, sep);
+	if i == -1 {
+		head = str;
+		return;
+	}
+
+	head = str[:i];
+	match = str[i:i+len(sep)];
+	tail = str[i+len(sep):];
+	return;
+}
+
+center_justify :: centre_justify; // NOTE(bill): Because Americans exist
+
+// centre_justify returns a string with a pad string at boths sides if the str's rune length is smaller than length
+centre_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
+	n := rune_count(str);
+	if n >= length || pad == "" {
+		return clone(str, allocator);
+	}
+
+	remains := length-1;
+	pad_len := rune_count(pad);
+
+	b := make_builder(allocator);
+	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
+
+	write_pad_string(&b, pad, pad_len, remains/2);
+	write_string(&b, str);
+	write_pad_string(&b, pad, pad_len, (remains+1)/2);
+
+	return to_string(b);
+}
+
+// left_justify returns a string with a pad string at left side if the str's rune length is smaller than length
+left_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
+	n := rune_count(str);
+	if n >= length || pad == "" {
+		return clone(str, allocator);
+	}
+
+	remains := length-1;
+	pad_len := rune_count(pad);
+
+	b := make_builder(allocator);
+	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
+
+	write_string(&b, str);
+	write_pad_string(&b, pad, pad_len, remains);
+
+	return to_string(b);
+}
+
+// right_justify returns a string with a pad string at right side if the str's rune length is smaller than length
+right_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
+	n := rune_count(str);
+	if n >= length || pad == "" {
+		return clone(str, allocator);
+	}
+
+	remains := length-1;
+	pad_len := rune_count(pad);
+
+	b := make_builder(allocator);
+	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
+
+	write_pad_string(&b, pad, pad_len, remains);
+	write_string(&b, str);
+
+	return to_string(b);
+}
+
+
+@private
+write_pad_string :: proc(b: ^Builder, pad: string, pad_len, remains: int) {
+	repeats := remains / pad_len;
+
+	for i := 0; i < repeats; i += 1 {
+		write_string(b, pad);
+	}
+
+	remains = remains % pad_len;
+
+	if remains != 0 do for i := 0; i < remains; i += 1 {
+		r, w := utf8.decode_rune_in_string(pad);
+		write_rune(b, r);
+		pad = pad[w:];
+	}
+}
