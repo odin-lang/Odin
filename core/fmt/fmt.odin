@@ -551,15 +551,46 @@ _pad :: proc(fi: ^Info, s: string) {
 
 fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 	switch verb {
-	// case 'e', 'E', 'f', 'F', 'g', 'G', 'v':
-	// case 'f', 'F', 'v':
-
 	case 'f', 'F', 'v':
 		prec: int = 3;
 		if fi.prec_set do prec = fi.prec;
 		buf: [386]byte;
 
 		str := strconv.append_float(buf[1:], v, 'f', prec, bit_size);
+		str = string(buf[:len(str)+1]);
+		if str[1] == '+' || str[1] == '-' {
+			str = str[1:];
+		} else {
+			str[0] = '+';
+		}
+
+		if fi.space && !fi.plus && str[0] == '+' {
+			str[0] = ' ';
+		}
+
+		if len(str) > 1 && (str[1] == 'N' || str[1] == 'I') {
+			strings.write_string(fi.buf, str);
+			return;
+		}
+
+		if fi.plus || str[0] != '+' {
+			if fi.zero && fi.width_set && fi.width > len(str) {
+				strings.write_byte(fi.buf, str[0]);
+				fmt_write_padding(fi, fi.width - len(str));
+				strings.write_string(fi.buf, str[1:]);
+			} else {
+				_pad(fi, str);
+			}
+		} else {
+			_pad(fi, str[1:]);
+		}
+
+	case 'e', 'E':
+		prec: int = 3;
+		if fi.prec_set do prec = fi.prec;
+		buf: [386]byte;
+
+		str := strconv.append_float(buf[1:], v, 'e', prec, bit_size);
 		str = string(buf[:len(str)+1]);
 		if str[1] == '+' || str[1] == '-' {
 			str = str[1:];
