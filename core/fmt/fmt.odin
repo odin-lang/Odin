@@ -619,6 +619,25 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 			_pad(fi, str[1:]);
 		}
 
+	case 'h', 'H':
+		prev_fi := fi^;
+		defer fi^ = prev_fi;
+		fi.hash = false;
+		fi.width = bit_size;
+		fi.zero = true;
+		fi.plus = false;
+
+		u: u64;
+		switch bit_size {
+		case 32: u = u64(transmute(u32)f32(v));
+		case 64: u = transmute(u64)v;
+		case: panic("Unhandled float size");
+		}
+
+		strings.write_string(fi.buf, "0h");
+		_fmt_int(fi, u, 16, false, bit_size, verb == 'h' ? __DIGITS_LOWER : __DIGITS_UPPER);
+
+
 	case:
 		fmt_bad_verb(fi, verb);
 	}
