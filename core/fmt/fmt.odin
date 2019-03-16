@@ -31,6 +31,7 @@ Info :: struct {
 
 	buf: ^strings.Builder,
 	arg: any, // Temporary
+	record_level: int,
 }
 
 fprint :: proc(fd: os.Handle, args: ..any) -> int {
@@ -1039,6 +1040,32 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		if v.id == typeid_of(^runtime.Type_Info) {
 			write_type(fi.buf, (^^runtime.Type_Info)(v.data)^);
 		} else {
+			if verb != 'p' {
+				elem := runtime.type_info_base(info.elem);
+				if elem != nil do switch e in elem.variant {
+				case runtime.Type_Info_Array,
+				     runtime.Type_Info_Slice,
+				     runtime.Type_Info_Dynamic_Array,
+				     runtime.Type_Info_Map:
+				     if fi.record_level == 0 {
+				     	fi.record_level += 1;
+						defer fi.record_level -= 1;
+						strings.write_byte(fi.buf, '&');
+						fmt_value(fi, any{(^rawptr)(v.data)^, info.elem.id}, verb);
+						return;
+					}
+
+				case runtime.Type_Info_Struct,
+				     runtime.Type_Info_Union:
+					if fi.record_level == 0 {
+						fi.record_level += 1;
+						defer fi.record_level -= 1;
+						strings.write_byte(fi.buf, '&');
+						fmt_value(fi, any{(^rawptr)(v.data)^, info.elem.id}, verb);
+						return;
+					}
+				}
+			}
 			fmt_pointer(fi, (^rawptr)(v.data)^, verb);
 		}
 
