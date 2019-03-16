@@ -10,7 +10,7 @@ import "core:strconv"
 import "core:strings"
 
 
-@(private)
+@private
 DEFAULT_BUFFER_SIZE :: 1<<12;
 
 Info :: struct {
@@ -1041,27 +1041,38 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			write_type(fi.buf, (^^runtime.Type_Info)(v.data)^);
 		} else {
 			if verb != 'p' {
+				ptr := (^rawptr)(v.data)^;
+				a := any{ptr, info.elem.id};
+
 				elem := runtime.type_info_base(info.elem);
 				if elem != nil do switch e in elem.variant {
 				case runtime.Type_Info_Array,
 				     runtime.Type_Info_Slice,
 				     runtime.Type_Info_Dynamic_Array,
 				     runtime.Type_Info_Map:
-				     if fi.record_level == 0 {
-				     	fi.record_level += 1;
+					if ptr == nil {
+						strings.write_string(fi.buf, "<nil>");
+						return;
+					}
+					if fi.record_level < 1 {
+					  	fi.record_level += 1;
 						defer fi.record_level -= 1;
 						strings.write_byte(fi.buf, '&');
-						fmt_value(fi, any{(^rawptr)(v.data)^, info.elem.id}, verb);
+						fmt_value(fi, a, verb);
 						return;
 					}
 
 				case runtime.Type_Info_Struct,
 				     runtime.Type_Info_Union:
-					if fi.record_level == 0 {
+					if ptr == nil {
+						strings.write_string(fi.buf, "<nil>");
+						return;
+					}
+					if fi.record_level < 1 {
 						fi.record_level += 1;
 						defer fi.record_level -= 1;
 						strings.write_byte(fi.buf, '&');
-						fmt_value(fi, any{(^rawptr)(v.data)^, info.elem.id}, verb);
+						fmt_value(fi, a, verb);
 						return;
 					}
 				}
@@ -1254,7 +1265,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 fmt_complex :: proc(fi: ^Info, c: complex128, bits: int, verb: rune) {
 	switch verb {
-	case 'f', 'F', 'v':
+	case 'f', 'F', 'v', 'h', 'H':
 		r, i := real(c), imag(c);
 		fmt_float(fi, r, bits/2, verb);
 		if !fi.plus && i >= 0 {
