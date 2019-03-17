@@ -2507,7 +2507,9 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 	case_ast_node(et, BitFieldType, e);
 		*type = alloc_type_bit_field();
 		set_base_type(named_type, *type);
+		check_open_scope(ctx, e);
 		check_bit_field_type(ctx, *type, e);
+		check_close_scope(ctx);
 		return true;
 	case_end;
 
