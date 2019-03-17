@@ -3064,7 +3064,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 			if (e->scope == parent_scope) continue;
 
 			if (is_entity_exported(e)) {
-				Entity *found = scope_lookup(parent_scope, name);
+				Entity *found = scope_lookup_current(parent_scope, name);
 				if (found != nullptr) {
 					// NOTE(bill):
 					// Date: 2019-03-17
