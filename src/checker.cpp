@@ -1027,6 +1027,33 @@ void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
 	array_add(&i->definitions, entity);
 }
 
+bool redeclaration_error(String name, Entity *prev, Entity *found) {
+	TokenPos pos = found->token.pos;
+	Entity *up = found->using_parent;
+	if (up != nullptr) {
+		if (pos == up->token.pos) {
+			// NOTE(bill): Error should have been handled already
+			return false;
+		}
+		error(prev->token,
+		      "Redeclaration of '%.*s' in this scope through 'using'\n"
+		      "\tat %.*s(%td:%td)",
+		      LIT(name),
+		      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
+	} else {
+		if (pos == prev->token.pos) {
+			// NOTE(bill): Error should have been handled already
+			return false;
+		}
+		error(prev->token,
+		      "Redeclaration of '%.*s' in this scope\n"
+		      "\tat %.*s(%td:%td)",
+		      LIT(name),
+		      LIT(pos.file), pos.line, pos.column);
+	}
+	return false;
+}
+
 bool add_entity_with_name(Checker *c, Scope *scope, Ast *identifier, Entity *entity, String name) {
 	if (scope == nullptr) {
 		return false;
@@ -1034,31 +1061,7 @@ bool add_entity_with_name(Checker *c, Scope *scope, Ast *identifier, Entity *ent
 	if (!is_blank_ident(name)) {
 		Entity *ie = scope_insert(scope, entity);
 		if (ie != nullptr) {
-			TokenPos pos = ie->token.pos;
-			Entity *up = ie->using_parent;
-			if (up != nullptr) {
-				if (pos == up->token.pos) {
-					// NOTE(bill): Error should have been handled already
-					return false;
-				}
-				error(entity->token,
-				      "Redeclaration of '%.*s' in this scope through 'using'\n"
-				      "\tat %.*s(%td:%td)",
-				      LIT(name),
-				      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
-				return false;
-			} else {
-				if (pos == entity->token.pos) {
-					// NOTE(bill): Error should have been handled already
-					return false;
-				}
-				error(entity->token,
-				      "Redeclaration of '%.*s' in this scope\n"
-				      "\tat %.*s(%td:%td)",
-				      LIT(name),
-				      LIT(pos.file), pos.line, pos.column);
-				return false;
-			}
+			return redeclaration_error(name, entity, ie);
 		}
 	}
 	if (identifier != nullptr) {
@@ -3061,8 +3064,16 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 			if (e->scope == parent_scope) continue;
 
 			if (is_entity_exported(e)) {
-				Entity *prev = scope_lookup(parent_scope, name);
-				add_entity_with_name(ctx->checker, parent_scope, e->identifier, e, name);
+				Entity *found = scope_lookup(parent_scope, name);
+				if (found != nullptr) {
+					// NOTE(bill):
+					// Date: 2019-03-17
+					// The order has to be the other way around as `using` adds the entity into the that
+					// file scope otherwise the error would be the wrong way around
+					redeclaration_error(name, found, e);
+				} else {
+					add_entity_with_name(ctx->checker, parent_scope, e->identifier, e, name);
+				}
 			}
 		}
 	}
