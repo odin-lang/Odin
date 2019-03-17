@@ -5,7 +5,6 @@ foreign import "system:kernel32.lib"
 
 @(default_calling_convention = "std")
 foreign kernel32 {
-	@(link_name="GetLastError")              get_last_error               :: proc() -> i32 ---;
 	@(link_name="CreateProcessA")		     create_process_a		      :: proc(application_name, command_line: cstring,
 	                                                              				 process_attributes, thread_attributes: ^Security_Attributes,
 	                                                              				 inherit_handle: Bool, creation_flags: u32, environment: rawptr,
@@ -119,6 +118,8 @@ foreign kernel32 {
 
 @(default_calling_convention = "c")
 foreign kernel32 {
+	@(link_name="GetLastError")              get_last_error               :: proc() -> i32 ---;
+
 	@(link_name="GetFileAttributesA")         get_file_attributes_a          :: proc(filename: cstring) -> u32 ---;
 	@(link_name="GetFileAttributesW")         get_file_attributes_w          :: proc(filename: Wstring) -> u32 ---;
 	@(link_name="GetFileAttributesExA")       get_file_attributes_ex_a       :: proc(filename: cstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: ^File_Attribute_Data) -> Bool ---;

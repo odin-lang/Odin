@@ -212,6 +212,8 @@ void warning_va(Token token, char *fmt, va_list va) {
 	gb_mutex_unlock(&global_error_collector.mutex);
 }
 
+#define MAX_ERROR_COLLECTOR_COUNT (36)
+
 void error_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
@@ -225,7 +227,7 @@ void error_va(Token token, char *fmt, va_list va) {
 		              gb_bprintf_va(fmt, va));
 	}
 	gb_mutex_unlock(&global_error_collector.mutex);
-	if (global_error_collector.count > 20) {
+	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT) {
 		gb_exit(1);
 	}
 }
@@ -243,7 +245,7 @@ void error_no_newline_va(Token token, char *fmt, va_list va) {
 		              gb_bprintf_va(fmt, va));
 	}
 	gb_mutex_unlock(&global_error_collector.mutex);
-	if (global_error_collector.count > 20) {
+	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT) {
 		gb_exit(1);
 	}
 }
@@ -263,7 +265,7 @@ void syntax_error_va(Token token, char *fmt, va_list va) {
 	}
 
 	gb_mutex_unlock(&global_error_collector.mutex);
-	if (global_error_collector.count > 20) {
+	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT) {
 		gb_exit(1);
 	}
 }
