@@ -130,10 +130,15 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 }
 
 shift_left :: proc(a: ^Decimal, k: uint) {
-	delta := int(k/4);
+	// NOTE(bill): used to determine buffer size required for the decimal from the binary shift
+	// 'k' means `1<<k` == `2^k` which equates to roundup(k*log10(2)) digits required
+	log10_2 :: 0.301029995663981195213738894724493026768189881462108541310;
+	capacity := int(f64(k)*log10_2 + 1);
 
-	r := a.count;       // read index
-	w := a.count+delta; // write index
+	r := a.count;          // read index
+	w := a.count+capacity; // write index
+
+	d := len(a.digits);
 
 	n: uint;
 	for r -= 1; r >= 0; r -= 1 {
@@ -141,7 +146,7 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 		quo := n/10;
 		rem := n - 10*quo;
 		w -= 1;
-		if w < len(a.digits) {
+		if w < d {
 			a.digits[w] = byte('0' + rem);
 		} else if rem != 0 {
 			a.trunc = true;
@@ -153,7 +158,7 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 		quo := n/10;
 		rem := n - 10*quo;
 		w -= 1;
-		if 0 <= w && w < len(a.digits) {
+		if w < d {
 			a.digits[w] = byte('0' + rem);
 		} else if rem != 0 {
 			a.trunc = true;
@@ -161,9 +166,12 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 		n = quo;
 	}
 
-	a.count += delta;
-	a.count = min(a.count, len(a.digits));
-	a.decimal_point += delta;
+	// NOTE(bill): Remove unused buffer size
+	assert(w >= 0);
+	capacity -= w;
+
+	a.count = min(a.count+capacity, d);
+	a.decimal_point += capacity;
 	trim(a);
 }
 
@@ -253,3 +261,4 @@ rounded_integer :: proc(a: ^Decimal) -> u64 {
 	}
 	return n;
 }
+

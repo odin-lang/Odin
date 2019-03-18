@@ -5,7 +5,6 @@ foreign import "system:kernel32.lib"
 
 @(default_calling_convention = "std")
 foreign kernel32 {
-	@(link_name="GetLastError")              get_last_error               :: proc() -> i32 ---;
 	@(link_name="CreateProcessA")		     create_process_a		      :: proc(application_name, command_line: cstring,
 	                                                              				 process_attributes, thread_attributes: ^Security_Attributes,
 	                                                              				 inherit_handle: Bool, creation_flags: u32, environment: rawptr,
@@ -18,8 +17,12 @@ foreign kernel32 {
                                                                                  process_information: ^Process_Information) -> Bool ---;
 	@(link_name="GetExitCodeProcess")		 get_exit_code_process        :: proc(process: Handle, exit: ^u32) -> Bool ---;
 	@(link_name="ExitProcess")               exit_process                 :: proc(exit_code: u32) ---;
-	@(link_name="GetModuleHandleA")          get_module_handle_a          :: proc(module_name: cstring) -> Hinstance ---;
-	@(link_name="GetModuleHandleW")          get_module_handle_w          :: proc(module_name: Wstring) -> Hinstance ---;
+	@(link_name="GetModuleHandleA")          get_module_handle_a          :: proc(module_name: cstring) -> Hmodule ---;
+	@(link_name="GetModuleHandleW")          get_module_handle_w          :: proc(module_name: Wstring) -> Hmodule ---;
+
+	@(link_name="GetModuleFileNameA")        get_module_file_name_a       :: proc(module: Hmodule, filename: cstring, size: u32) -> u32 ---;
+	@(link_name="GetModuleFileNameW")        get_module_file_name_w       :: proc(module: Hmodule, filename: Wstring, size: u32) -> u32 ---;
+
 	@(link_name="Sleep")                     sleep                        :: proc(ms: i32) -> i32 ---;
 	@(link_name="QueryPerformanceFrequency") query_performance_frequency  :: proc(result: ^i64) -> i32 ---;
 	@(link_name="QueryPerformanceCounter")   query_performance_counter    :: proc(result: ^i64) -> i32 ---;
@@ -54,10 +57,6 @@ foreign kernel32 {
 	@(link_name="WriteFile") write_file :: proc(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool ---;
 
 	@(link_name="GetFileSizeEx")              get_file_size_ex               :: proc(file_handle: Handle, file_size: ^i64) -> Bool ---;
-	@(link_name="GetFileAttributesA")         get_file_attributes_a          :: proc(filename: cstring) -> u32 ---;
-	@(link_name="GetFileAttributesW")         get_file_attributes_w          :: proc(filename: Wstring) -> u32 ---;
-	@(link_name="GetFileAttributesExA")       get_file_attributes_ex_a       :: proc(filename: cstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: ^File_Attribute_Data) -> Bool ---;
-	@(link_name="GetFileAttributesExW")       get_file_attributes_ex_w       :: proc(filename: Wstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: ^File_Attribute_Data) -> Bool ---;
 	@(link_name="GetFileInformationByHandle") get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool ---;
 
 	@(link_name="CreateDirectoryA") 		  create_directory_a			 :: proc(path: cstring, security_attributes: ^Security_Attributes) -> Bool ---;
@@ -115,6 +114,17 @@ foreign kernel32 {
 	@(link_name="CreateSemaphoreW")    create_semaphore_w     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: cstring) -> Handle ---;
 	@(link_name="ReleaseSemaphore")    release_semaphore      :: proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool ---;
 	@(link_name="WaitForSingleObject") wait_for_single_object :: proc(handle: Handle, milliseconds: u32) -> u32 ---;
+}
+
+@(default_calling_convention = "c")
+foreign kernel32 {
+	@(link_name="GetLastError")              get_last_error               :: proc() -> i32 ---;
+
+	@(link_name="GetFileAttributesA")         get_file_attributes_a          :: proc(filename: cstring) -> u32 ---;
+	@(link_name="GetFileAttributesW")         get_file_attributes_w          :: proc(filename: Wstring) -> u32 ---;
+	@(link_name="GetFileAttributesExA")       get_file_attributes_ex_a       :: proc(filename: cstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: ^File_Attribute_Data) -> Bool ---;
+	@(link_name="GetFileAttributesExW")       get_file_attributes_ex_w       :: proc(filename: Wstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: ^File_Attribute_Data) -> Bool ---;
+	@(link_name="CompareFileTime")            compare_file_time              :: proc(a, b: ^Filetime) -> i32 ---;
 }
 
 @(default_calling_convention = "c")

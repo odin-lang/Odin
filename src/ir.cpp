@@ -2875,11 +2875,11 @@ irValue *ir_copy_value_to_ptr(irProcedure *proc, irValue *val, Type *new_type, i
 	if (alignment < type_alignment) {
 		alignment = type_alignment;
 	}
+	GB_ASSERT_MSG(are_types_identical(new_type, ir_type(val)), "%s %s", type_to_string(new_type), type_to_string(ir_type(val)));
+
 	irValue *ptr = ir_add_local_generated(proc, new_type, false);
 	ptr->Instr.Local.alignment = alignment;
 	ir_emit_store(proc, ptr, val);
-
-	if (val) val->uses += 1;
 
 	return ptr;
 }
@@ -2972,11 +2972,15 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 
 		Type *original_type = e->type;
 		Type *new_type = pt->Proc.abi_compat_params[i];
-		if (original_type != new_type) {
-			if (is_type_pointer(new_type)) {
+		Type *arg_type = ir_type(args[i]);
+		if (are_types_identical(arg_type, new_type)) {
+			// NOTE(bill): Done
+		} else if (!are_types_identical(original_type, new_type)) {
+
+			if (is_type_pointer(new_type) && !is_type_pointer(original_type)) {
 				if (e->flags&EntityFlag_Value) {
 					args[i] = ir_address_from_load_or_generate_local(p, args[i]);
-				} else {
+				} else if (!is_type_pointer(arg_type)) {
 					args[i] = ir_copy_value_to_ptr(p, args[i], original_type, 16);
 				}
 			} else if (is_type_integer(new_type)) {
