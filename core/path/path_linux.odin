@@ -23,7 +23,7 @@ null_term :: proc(str: string) -> string {
 }
 
 
-full :: proc(path: string, allocator := context.allocator) -> string {
+full :: proc(path: string, allocator := context.temp_allocator) -> string {
     cpath := strings.clone_to_cstring(path, context.temp_allocator);
     
     foreign libc {
@@ -41,7 +41,7 @@ full :: proc(path: string, allocator := context.allocator) -> string {
     return null_term(string(buf[:]));
 }
 
-current :: proc(allocator := context.allocator) -> string {
+current :: proc(allocator := context.temp_allocator) -> string {
     foreign libc{
         getcwd :: proc(buf: ^u8, size: int) -> cstring ---;
     }
