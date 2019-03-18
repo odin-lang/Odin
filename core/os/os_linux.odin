@@ -212,7 +212,7 @@ get_last_error :: proc() -> int {
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
-	cstr := strings.new_cstring(path);
+	cstr := strings.clone_to_cstring(path);
 	handle := _unix_open(cstr, flags, mode);
 	delete(cstr);
 	if handle == -1 {
@@ -289,7 +289,7 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 }
 
 stat :: inline proc(path: string) -> (Stat, Errno) {
-	cstr := strings.new_cstring(path);
+	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
 
 	s: Stat;
@@ -310,7 +310,7 @@ fstat :: inline proc(fd: Handle) -> (Stat, Errno) {
 }
 
 access :: inline proc(path: string, mask: int) -> (bool, Errno) {
-	cstr := strings.new_cstring(path);
+	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
 	result := _unix_access(cstr, mask);
 	if result == -1 {
@@ -333,7 +333,7 @@ heap_free :: proc(ptr: rawptr) {
 }
 
 getenv :: proc(name: string) -> (string, bool) {
-	path_str := strings.new_cstring(name);
+	path_str := strings.clone_to_cstring(name);
 	defer delete(path_str);
 	cstr := _unix_getenv(path_str);
 	if cstr == nil {
@@ -370,14 +370,14 @@ current_thread_id :: proc "contextless" () -> int {
 }
 
 dlopen :: inline proc(filename: string, flags: int) -> rawptr {
-	cstr := strings.new_cstring(filename);
+	cstr := strings.clone_to_cstring(filename);
 	defer delete(cstr);
 	handle := _unix_dlopen(cstr, flags);
 	return handle;
 }
 dlsym :: inline proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil);
-	cstr := strings.new_cstring(symbol);
+	cstr := strings.clone_to_cstring(symbol);
 	defer delete(cstr);
 	proc_handle := _unix_dlsym(handle, cstr);
 	return proc_handle;

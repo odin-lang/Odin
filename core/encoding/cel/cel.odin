@@ -2,8 +2,6 @@ package cel;
 
 import "core:fmt"
 import "core:strconv"
-import "core:os"
-import "core:mem"
 import "core:unicode/utf8"
 import "core:strings"
 
@@ -34,7 +32,7 @@ Parser :: struct {
 
 print_value :: proc(value: Value, pretty := true, indent := 0) {
 	print_indent :: proc(indent: int) {
-		for i in 0..indent-1 do fmt.print("\t");
+		for _ in 0..indent-1 do fmt.print("\t");
 	}
 
 	switch v in value {
@@ -62,16 +60,16 @@ print_value :: proc(value: Value, pretty := true, indent := 0) {
 		if pretty do fmt.println();
 
 		i := 0;
-		for name, value in v {
+		for name, val in v {
 			if pretty {
 				print_indent(indent+1);
 				fmt.printf("%s = ", name);
-				print_value(value, pretty, indent+1);
+				print_value(val, pretty, indent+1);
 				fmt.println(",");
 			} else {
 				if i > 0 do fmt.print(", ");
 				fmt.printf("%s = ", name);
-				print_value(value, pretty, indent+1);
+				print_value(val, pretty, indent+1);
 				i += 1;
 			}
 		}
@@ -155,7 +153,7 @@ destroy :: proc(p: ^Parser) {
 			delete(v);
 
 		case Dict:
-			for key, value in v do destroy_value(value);
+			for _, dv in v do destroy_value(dv);
 			delete(v);
 		}
 	}
@@ -201,11 +199,12 @@ unquote_char :: proc(s: string, quote: byte) -> (r: rune, multiple_bytes: bool, 
 		}
 		return -1;
 	}
+	w: int;
 
 	if s[0] == quote && quote == '"' {
 		return;
 	} else if s[0] >= 0x80 {
-		r, w := utf8.decode_rune_in_string(s);
+		r, w = utf8.decode_rune_in_string(s);
 		return r, true, s[w:], true;
 	} else if s[0] != '\\' {
 		return rune(s[0]), false, s[1:], true;
@@ -291,7 +290,6 @@ unquote_string :: proc(p: ^Parser, t: Token) -> (string, bool) {
 		return t.lit, true;
 	}
 	s := t.lit;
-	n := len(s);
 	quote := '"';
 
 	if s == `""` {
@@ -442,7 +440,7 @@ parse_operand :: proc(p: ^Parser) -> (Value, Pos) {
 
 	case Kind.Open_Paren:
 		expect_token(p, Kind.Open_Paren);
-		expr, pos := parse_expr(p);
+		expr, _ := parse_expr(p);
 		expect_token(p, Kind.Close_Paren);
 		return expr, tok.pos;
 
@@ -451,7 +449,7 @@ parse_operand :: proc(p: ^Parser) -> (Value, Pos) {
 		elems := make([dynamic]Value, 0, 4);
 		for p.curr_token.kind != Kind.Close_Bracket &&
 		    p.curr_token.kind != Kind.EOF {
-			elem, pos := parse_expr(p);
+			elem, _ := parse_expr(p);
 			append(&elems, elem);
 
 			if p.curr_token.kind == Kind.Semicolon && p.curr_token.lit == "\n" {
@@ -481,9 +479,9 @@ parse_operand :: proc(p: ^Parser) -> (Value, Pos) {
 			name, ok := unquote_string(p, name_tok);
 			if !ok do error(p, tok.pos, "Unable to unquote string");
 		    expect_token(p, Kind.Assign);
-			elem, pos := parse_expr(p);
+			elem, _ := parse_expr(p);
 
-			if _, ok := dict[name]; ok {
+			if _, ok2 := dict[name]; ok2 {
 				error(p, name_tok.pos, "Previous declaration of %s in this scope", name);
 			} else {
 				dict[name] = elem;
@@ -533,9 +531,9 @@ parse_atom_expr :: proc(p: ^Parser, operand: Value, pos: Pos) -> (Value, Pos) {
 			}
 
 		case Kind.Open_Bracket:
-			open := expect_token(p, Kind.Open_Bracket);
+			expect_token(p, Kind.Open_Bracket);
 			index, index_pos := parse_expr(p);
-			close := expect_token(p, Kind.Close_Bracket);
+			expect_token(p, Kind.Close_Bracket);
 
 
 			switch a in operand {
@@ -613,7 +611,7 @@ parse_unary_expr :: proc(p: ^Parser) -> (Value, Pos) {
 
 	case Kind.Not:
 		next_token(p);
-		expr, pos := parse_unary_expr(p);
+		expr, _ := parse_unary_expr(p);
 		if v, ok := expr.(bool); ok {
 			return !v, op.pos;
 		}
@@ -757,9 +755,9 @@ parse_binary_expr :: proc(p: ^Parser, prec_in: int) -> (Value, Pos) {
 
 			if op.kind == Kind.Question {
 				cond := expr;
-				x, x_pos := parse_expr(p);
+				x, _ := parse_expr(p);
 				expect_token(p, Kind.Colon);
-				y, y_pos := parse_expr(p);
+				y, _ := parse_expr(p);
 
 				if t, ok := cond.(bool); ok {
 					expr = t ? x : y;
@@ -824,9 +822,9 @@ parse_assignment :: proc(p: ^Parser) -> bool {
 		expect_token(p, Kind.Assign);
 		name, ok := unquote_string(p, tok);
 		if !ok do error(p, tok.pos, "Unable to unquote string");
-		expr, pos := parse_expr(p);
+		expr, _ := parse_expr(p);
 		d := top_dict(p);
-		if _, ok := d[name]; ok {
+		if _, ok2 := d[name]; ok2 {
 			error(p, tok.pos, "Previous declaration of %s", name);
 		} else {
 			d[name] = expr;

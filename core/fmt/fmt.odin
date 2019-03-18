@@ -10,7 +10,7 @@ import "core:strconv"
 import "core:strings"
 
 
-@(private)
+@private
 DEFAULT_BUFFER_SIZE :: 1<<12;
 
 Info :: struct {
@@ -31,6 +31,7 @@ Info :: struct {
 
 	buf: ^strings.Builder,
 	arg: any, // Temporary
+	record_level: int,
 }
 
 fprint :: proc(fd: os.Handle, args: ..any) -> int {
@@ -551,9 +552,6 @@ _pad :: proc(fi: ^Info, s: string) {
 
 fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 	switch verb {
-	// case 'e', 'E', 'f', 'F', 'g', 'G', 'v':
-	// case 'f', 'F', 'v':
-
 	case 'f', 'F', 'v':
 		prec: int = 3;
 		if fi.prec_set do prec = fi.prec;
@@ -587,6 +585,59 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		} else {
 			_pad(fi, str[1:]);
 		}
+
+	case 'e', 'E':
+		prec: int = 3;
+		if fi.prec_set do prec = fi.prec;
+		buf: [386]byte;
+
+		str := strconv.append_float(buf[1:], v, 'e', prec, bit_size);
+		str = string(buf[:len(str)+1]);
+		if str[1] == '+' || str[1] == '-' {
+			str = str[1:];
+		} else {
+			str[0] = '+';
+		}
+
+		if fi.space && !fi.plus && str[0] == '+' {
+			str[0] = ' ';
+		}
+
+		if len(str) > 1 && (str[1] == 'N' || str[1] == 'I') {
+			strings.write_string(fi.buf, str);
+			return;
+		}
+
+		if fi.plus || str[0] != '+' {
+			if fi.zero && fi.width_set && fi.width > len(str) {
+				strings.write_byte(fi.buf, str[0]);
+				fmt_write_padding(fi, fi.width - len(str));
+				strings.write_string(fi.buf, str[1:]);
+			} else {
+				_pad(fi, str);
+			}
+		} else {
+			_pad(fi, str[1:]);
+		}
+
+	case 'h', 'H':
+		prev_fi := fi^;
+		defer fi^ = prev_fi;
+		fi.hash = false;
+		fi.width = bit_size;
+		fi.zero = true;
+		fi.plus = false;
+
+		u: u64;
+		switch bit_size {
+		case 32: u = u64(transmute(u32)f32(v));
+		case 64: u = transmute(u64)v;
+		case: panic("Unhandled float size");
+		}
+
+		strings.write_string(fi.buf, "0h");
+		_fmt_int(fi, u, 16, false, bit_size, verb == 'h' ? __DIGITS_LOWER : __DIGITS_UPPER);
+
 
 	case:
 		fmt_bad_verb(fi, verb);
@@ -623,13 +674,20 @@ fmt_cstring :: proc(fi: ^Info, s: cstring, verb: rune) {
 }
 
 fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
+	u := u64(uintptr(p));
 	switch verb {
 	case 'p', 'v':
-		u := u64(uintptr(p));
 		if !fi.hash || verb == 'v' {
 			strings.write_string(fi.buf, "0x");
 		}
 		_fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
+
+	case 'b': _fmt_int(fi, u,  2, false, 8*size_of(rawptr), __DIGITS_UPPER);
+	case 'o': _fmt_int(fi, u,  8, false, 8*size_of(rawptr), __DIGITS_UPPER);
+	case 'd': _fmt_int(fi, u, 10, false, 8*size_of(rawptr), __DIGITS_UPPER);
+	case 'x': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
+	case 'X': _fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
+
 	case:
 		fmt_bad_verb(fi, verb);
 	}
@@ -982,6 +1040,43 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		if v.id == typeid_of(^runtime.Type_Info) {
 			write_type(fi.buf, (^^runtime.Type_Info)(v.data)^);
 		} else {
+			if verb != 'p' {
+				ptr := (^rawptr)(v.data)^;
+				a := any{ptr, info.elem.id};
+
+				elem := runtime.type_info_base(info.elem);
+				if elem != nil do switch e in elem.variant {
+				case runtime.Type_Info_Array,
+				     runtime.Type_Info_Slice,
+				     runtime.Type_Info_Dynamic_Array,
+				     runtime.Type_Info_Map:
+					if ptr == nil {
+						strings.write_string(fi.buf, "<nil>");
+						return;
+					}
+					if fi.record_level < 1 {
+					  	fi.record_level += 1;
+						defer fi.record_level -= 1;
+						strings.write_byte(fi.buf, '&');
+						fmt_value(fi, a, verb);
+						return;
+					}
+
+				case runtime.Type_Info_Struct,
+				     runtime.Type_Info_Union:
+					if ptr == nil {
+						strings.write_string(fi.buf, "<nil>");
+						return;
+					}
+					if fi.record_level < 1 {
+						fi.record_level += 1;
+						defer fi.record_level -= 1;
+						strings.write_byte(fi.buf, '&');
+						fmt_value(fi, a, verb);
+						return;
+					}
+				}
+			}
 			fmt_pointer(fi, (^rawptr)(v.data)^, verb);
 		}
 
@@ -996,14 +1091,19 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 
 	case runtime.Type_Info_Dynamic_Array:
-		strings.write_byte(fi.buf, '[');
-		defer strings.write_byte(fi.buf, ']');
-		array := cast(^mem.Raw_Dynamic_Array)v.data;
-		for i in 0..array.len-1 {
-			if i > 0 do strings.write_string(fi.buf, ", ");
+		if verb == 'p' {
+			slice := cast(^mem.Raw_Dynamic_Array)v.data;
+			fmt_pointer(fi, slice.data, 'p');
+		} else {
+			strings.write_byte(fi.buf, '[');
+			defer strings.write_byte(fi.buf, ']');
+			array := cast(^mem.Raw_Dynamic_Array)v.data;
+			for i in 0..array.len-1 {
+				if i > 0 do strings.write_string(fi.buf, ", ");
 
-			data := uintptr(array.data) + uintptr(i*info.elem_size);
-			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
+				data := uintptr(array.data) + uintptr(i*info.elem_size);
+				fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
+			}
 		}
 
 	case runtime.Type_Info_Simd_Vector:
@@ -1021,16 +1121,20 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 
 	case runtime.Type_Info_Slice:
-		strings.write_byte(fi.buf, '[');
-		defer strings.write_byte(fi.buf, ']');
-		slice := cast(^mem.Raw_Slice)v.data;
-		for i in 0..slice.len-1 {
-			if i > 0 do strings.write_string(fi.buf, ", ");
+		if verb == 'p' {
+			slice := cast(^mem.Raw_Slice)v.data;
+			fmt_pointer(fi, slice.data, 'p');
+		} else {
+			strings.write_byte(fi.buf, '[');
+			defer strings.write_byte(fi.buf, ']');
+			slice := cast(^mem.Raw_Slice)v.data;
+			for i in 0..slice.len-1 {
+				if i > 0 do strings.write_string(fi.buf, ", ");
 
-			data := uintptr(slice.data) + uintptr(i*info.elem_size);
-			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
+				data := uintptr(slice.data) + uintptr(i*info.elem_size);
+				fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
+			}
 		}
-
 	case runtime.Type_Info_Map:
 		if verb != 'v' {
 			fmt_bad_verb(fi, verb);
@@ -1161,7 +1265,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 fmt_complex :: proc(fi: ^Info, c: complex128, bits: int, verb: rune) {
 	switch verb {
-	case 'f', 'F', 'v':
+	case 'f', 'F', 'v', 'h', 'H':
 		r, i := real(c), imag(c);
 		fmt_float(fi, r, bits/2, verb);
 		if !fi.plus && i >= 0 {

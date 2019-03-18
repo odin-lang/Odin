@@ -213,28 +213,28 @@ append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> str
 
 
 
-DecimalSlice :: struct {
+Decimal_Slice :: struct {
 	digits:        []byte,
 	count:         int,
 	decimal_point: int,
 	neg:           bool,
 }
 
-FloatInfo :: struct {
+Float_Info :: struct {
 	mantbits: uint,
 	expbits:  uint,
 	bias:     int,
 }
 
 
-_f16_info := FloatInfo{10, 5,   -15};
-_f32_info := FloatInfo{23, 8,  -127};
-_f64_info := FloatInfo{52, 11, -1023};
+_f16_info := Float_Info{10, 5,   -15};
+_f32_info := Float_Info{23, 8,  -127};
+_f64_info := Float_Info{52, 11, -1023};
 
 
 generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> []byte {
 	bits: u64;
-	flt: ^FloatInfo;
+	flt: ^Float_Info;
 	switch bit_size {
 	case 32:
 		bits = u64(transmute(u32)f32(val));
@@ -276,11 +276,11 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 	d := &d_;
 	assign(d, mant);
 	shift(d, exp - int(flt.mantbits));
-	digs: DecimalSlice;
+	digs: Decimal_Slice;
 	shortest := prec < 0;
 	if shortest {
 		round_shortest(d, mant, exp, flt);
-		digs = DecimalSlice{digits = d.digits[:], count = d.count, decimal_point = d.decimal_point};
+		digs = Decimal_Slice{digits = d.digits[:], count = d.count, decimal_point = d.decimal_point};
 		switch fmt {
 		case 'e', 'E': prec = digs.count-1;
 		case 'f', 'F': prec = max(digs.count-digs.decimal_point, 0);
@@ -297,14 +297,14 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 			round(d, prec);
 		}
 
-		digs = DecimalSlice{digits = d.digits[:], count = d.count, decimal_point = d.decimal_point};
+		digs = Decimal_Slice{digits = d.digits[:], count = d.count, decimal_point = d.decimal_point};
 	}
 	return format_digits(buf, shortest, neg, digs, prec, fmt);
 }
 
 
 
-format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: DecimalSlice, prec: int, fmt: byte) -> []byte {
+format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, prec: int, fmt: byte) -> []byte {
 	Buffer :: struct {
 		b: []byte,
 		n: int,
@@ -347,12 +347,72 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: DecimalSlice
 		return to_bytes(b);
 
 	case 'e', 'E':
-		panic("strconv: e/E float printing is not yet supported");
-		return to_bytes(b); // TODO
+		add_bytes(&b, neg ? '-' : '+');
+
+		ch := byte('0');
+		if digs.count != 0 {
+			ch = digs.digits[0];
+		}
+		add_bytes(&b, ch);
+
+		if prec > 0 {
+			add_bytes(&b, '.');
+			i := 1;
+			m := min(digs.count, prec+1);
+			if i < m {
+				add_bytes(&b, ..digs.digits[i:m]);
+				i = m;
+			}
+			for ; i <= prec; i += 1 {
+				add_bytes(&b, '0');
+			}
+		}
+
+		add_bytes(&b, fmt);
+		exp := digs.decimal_point-1;
+		if digs.count == 0 {
+			// Zero has exponent of 0
+			exp = 0;
+		}
+
+		ch = '+';
+		if exp < 0 {
+			ch = '-';
+			exp = -exp;
+		}
+		add_bytes(&b, ch);
+
+		switch {
+		case exp < 10:  add_bytes(&b, '0', byte(exp)+'0'); // add prefix 0
+		case exp < 100: add_bytes(&b, byte(exp/10)+'0',  byte(exp%10)+'0');
+		case:           add_bytes(&b, byte(exp/100)+'0', byte(exp/10)%10+'0', byte(exp%10)+'0');
+		}
+
+		return to_bytes(b);
 
 	case 'g', 'G':
-		panic("strconv: g/G float printing is not yet supported");
-		return to_bytes(b); // TODO
+		eprec := prec;
+		if eprec > digs.count && digs.count >= digs.decimal_point {
+			eprec = digs.count;
+		}
+
+		if shortest {
+			eprec = 6;
+		}
+
+		exp := digs.decimal_point - 1;
+		if exp < -4 || exp >= eprec {
+			if prec > digs.count {
+				prec = digs.count;
+			}
+			return format_digits(buf, shortest, neg, digs, prec-1, fmt+'e'-'g'); // keep the same case
+		}
+
+		if prec > digs.decimal_point {
+			prec = digs.count;
+		}
+
+		return format_digits(buf, shortest, neg, digs, max(prec-digs.decimal_point, 0), 'f');
 
 	case:
 		add_bytes(&b, '%', fmt);
@@ -362,7 +422,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: DecimalSlice
 
 }
 
-round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^FloatInfo) {
+round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 	if mant == 0 { // If mantissa is zero, the number is zero
 		d.count = 0;
 		return;

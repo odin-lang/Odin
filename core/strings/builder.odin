@@ -17,6 +17,10 @@ destroy_builder :: proc(b: ^Builder) {
 	clear(&b.buf);
 }
 
+grow_builder :: proc(b: ^Builder, cap: int) {
+	reserve(&b.buf, cap);
+}
+
 builder_from_slice :: proc(backing: []byte) -> Builder {
 	s := transmute(mem.Raw_Slice)backing;
 	d := mem.Raw_Dynamic_Array{
