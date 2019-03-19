@@ -322,7 +322,7 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Kind, string) {
 	}
 
 	if t.curr_rune == '0' {
-		offset := t.offset;
+		offset = t.offset;
 		advance_to_next_rune(t);
 		switch t.curr_rune {
 		case 'b', 'B':
@@ -403,17 +403,17 @@ scan :: proc(t: ^Tokenizer) -> Token {
 			quote := r;
 			tok = String;
 			for {
-				r := t.curr_rune;
-				if r == '\n' || r < 0 {
+				this_r := t.curr_rune;
+				if this_r == '\n' || r < 0 {
 					token_error(t, "String literal not terminated");
 					break;
 				}
 				advance_to_next_rune(t);
-				if r == quote {
+				if this_r == quote {
 					break;
 				}
 				// TODO(bill); Handle properly
-				if r == '\\' && t.curr_rune == quote {
+				if this_r == '\\' && t.curr_rune == quote {
 					advance_to_next_rune(t);
 				}
 			}
