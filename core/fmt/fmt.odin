@@ -1040,8 +1040,8 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		if v.id == typeid_of(^runtime.Type_Info) {
 			write_type(fi.buf, (^^runtime.Type_Info)(v.data)^);
 		} else {
-			if verb != 'p' {
-				ptr := (^rawptr)(v.data)^;
+			ptr := (^rawptr)(v.data)^;
+			if verb != 'p' && info.elem != nil {
 				a := any{ptr, info.elem.id};
 
 				elem := runtime.type_info_base(info.elem);
@@ -1077,7 +1077,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 					}
 				}
 			}
-			fmt_pointer(fi, (^rawptr)(v.data)^, verb);
+			fmt_pointer(fi, ptr, verb);
 		}
 
 	case runtime.Type_Info_Array:
