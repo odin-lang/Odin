@@ -1418,6 +1418,9 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 			return false;
 			// return true;
 		}
+		if (in_value.kind == ExactValue_String) {
+			return false;
+		}
 		if (out_value) *out_value = in_value;
 	} else if (is_type_bit_set(type)) {
 		if (in_value.kind == ExactValue_Integer) {
@@ -1882,6 +1885,8 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	bool is_constant = operand->mode == Addressing_Constant;
+
 	Type *x = operand->type;
 	Type *src = core_type(x);
 	Type *dst = core_type(y);
@@ -1964,20 +1969,20 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	}
 	// cstring -> ^u8
 	if (are_types_identical(src, t_cstring) && is_type_u8_ptr(dst)) {
-		return true;
+		return !is_constant;
 	}
 	// cstring -> rawptr
 	if (are_types_identical(src, t_cstring) && is_type_rawptr(dst)) {
-		return true;
+		return !is_constant;
 	}
 
 	// ^u8 -> cstring
 	if (is_type_u8_ptr(src) && are_types_identical(dst, t_cstring)) {
-		return true;
+		return !is_constant;
 	}
 	// rawptr -> cstring
 	if (is_type_rawptr(src) && are_types_identical(dst, t_cstring)) {
-		return true;
+		return !is_constant;
 	}
 	// proc <-> proc
 	if (is_type_proc(src) && is_type_proc(dst)) {
