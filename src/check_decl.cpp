@@ -40,6 +40,14 @@ Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, Stri
 		return nullptr;
 	}
 
+	if (operand->mode == Addressing_Type) {
+		gbString t = type_to_string(operand->type);
+		error(operand->expr, "Cannot assign a type '%s' to variable '%.*s'", t, LIT(e->token.string));
+		gb_string_free(t);
+		e->type = operand->type;
+		return nullptr;
+	}
+
 
 
 	if (e->type == nullptr) {
