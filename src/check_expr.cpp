@@ -6430,34 +6430,58 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		o->expr = node;
 		o->mode = Addressing_Invalid;
 
-		if (type_hint == nullptr) {
+		Type *th = type_hint;
+
+		if (th == nullptr) {
 			gbString str = expr_to_string(node);
 			error(node, "Cannot determine type for implicit selector expression '%s'", str);
 			gb_string_free(str);
 			return Expr_Expr;
 		}
-		o->type = type_hint;
-		if (!is_type_enum(type_hint)) {
-			gbString typ = type_to_string(type_hint);
-			gbString str = expr_to_string(node);
-			error(node, "Invalid type '%s' for implicit selector expression '%s'", typ, str);
-			gb_string_free(str);
-			gb_string_free(typ);
-			return Expr_Expr;
+		o->type = th;
+		Type *enum_type = th;
+
+		if (!is_type_enum(th)) {
+			bool show_error = true;
+			if (is_type_union(th)) {
+				Type *union_type = base_type(th);
+				isize enum_count = 0;
+				Type *et = nullptr;
+				for_array(i, union_type->Union.variants) {
+					Type *vt = union_type->Union.variants[i];
+					if (is_type_enum(vt)) {
+						enum_count += 1;
+						et = vt;
+					}
+				}
+				if (enum_count == 1) {
+					show_error = false;
+					enum_type = et;
+				}
+			}
+
+			if (show_error) {
+				gbString typ = type_to_string(th);
+				gbString str = expr_to_string(node);
+				error(node, "Invalid type '%s' for implicit selector expression '%s'", typ, str);
+				gb_string_free(str);
+				gb_string_free(typ);
+				return Expr_Expr;
+			}
 		}
 		GB_ASSERT(ise->selector->kind == Ast_Ident);
 		String name = ise->selector->Ident.token.string;
 
-		Type *enum_type = base_type(type_hint);
+		enum_type = base_type(enum_type);
 		GB_ASSERT(enum_type->kind == Type_Enum);
 		Entity *e = scope_lookup_current(enum_type->Enum.scope, name);
 		if (e == nullptr) {
-			gbString typ = type_to_string(type_hint);
+			gbString typ = type_to_string(th);
 			error(node, "Undeclared name %.*s for type '%s'", LIT(name), typ);
 			gb_string_free(typ);
 			return Expr_Expr;
 		}
-		GB_ASSERT(are_types_identical(base_type(e->type), base_type(type_hint)));
+		GB_ASSERT(are_types_identical(base_type(e->type), enum_type));
 		GB_ASSERT(e->kind == Entity_Constant);
 		o->value = e->Constant.value;
 		o->mode = Addressing_Constant;
