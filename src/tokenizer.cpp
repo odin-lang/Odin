@@ -927,13 +927,15 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '}':  token.kind = Token_CloseBrace;   break;
 		case '\\': token.kind = Token_BackSlash;    break;
 
-		case 0x2260:  token.kind = Token_NotEq; break; // '≠'
-		case 0x2264:  token.kind = Token_LtEq;  break; // '≤'
-		case 0x2265:  token.kind = Token_GtEq;  break; // '≥'
+		case 0x2260: token.kind = Token_NotEq; break; // '≠'
+		case 0x2264: token.kind = Token_LtEq;  break; // '≤'
+		case 0x2265: token.kind = Token_GtEq;  break; // '≥'
+		case 0x2208: token.kind = Token_in;    break; // '∈'
+		case 0x2209: token.kind = Token_notin; break; // '∉'
 
-		case '%': token.kind = token_kind_dub_eq(t, '%', Token_Mod, Token_ModEq, Token_ModMod, Token_ModModEq);      break;
+		case '%': token.kind = token_kind_dub_eq(t, '%', Token_Mod, Token_ModEq, Token_ModMod, Token_ModModEq);  break;
 
-		case '*': token.kind = token_kind_variant2(t, Token_Mul, Token_MulEq);                                        break;
+		case '*': token.kind = token_kind_variant2(t, Token_Mul, Token_MulEq); break;
 		case '=':
 			token.kind = Token_Eq;
 			if (t->curr_rune == '>') {
@@ -944,21 +946,18 @@ Token tokenizer_get_token(Tokenizer *t) {
 				token.kind = Token_CmpEq;
 			}
 			break;
-		case '~': token.kind = token_kind_variant2(t, Token_Xor, Token_XorEq);                                        break;
-		case '!': token.kind = token_kind_variant2(t, Token_Not, Token_NotEq);                                        break;
-		case '+': token.kind = token_kind_variant2(t, Token_Add, Token_AddEq);                                        break;
+		case '~': token.kind = token_kind_variant2(t, Token_Xor, Token_XorEq);  break;
+		case '!': token.kind = token_kind_variant2(t, Token_Not, Token_NotEq);  break;
+		case '+': token.kind = token_kind_variant2(t, Token_Add, Token_AddEq);  break;
 		case '-':
 			token.kind = Token_Sub;
 			if (t->curr_rune == '=') {
 				advance_to_next_rune(t);
 				token.kind = Token_SubEq;
-			} else if (t->curr_rune == '-') {
+			} else if (t->curr_rune == '-' && t->read_curr[0] == '-') {
 				advance_to_next_rune(t);
-				token.kind = Token_Invalid;
-				if (t->curr_rune == '-') {
-					advance_to_next_rune(t);
-					token.kind = Token_Undef;
-				}
+				advance_to_next_rune(t);
+				token.kind = Token_Undef;
 			} else if (t->curr_rune == '>') {
 				advance_to_next_rune(t);
 				token.kind = Token_ArrowRight;

@@ -4539,6 +4539,7 @@ ParseFileError process_imported_file(Parser *p, ImportedFile imported_file) {
 
 	TokenPos err_pos = {0};
 	ParseFileError err = init_ast_file(file, fi->fullpath, &err_pos);
+	err_pos.file = fi->fullpath;
 
 	if (err != ParseFile_None) {
 		if (err == ParseFile_EmptyFile) {
@@ -4563,7 +4564,7 @@ ParseFileError process_imported_file(Parser *p, ImportedFile imported_file) {
 			error(pos, "Failed to parse file: %.*s; file cannot be found ('%.*s')", LIT(fi->name), LIT(fi->fullpath));
 			break;
 		case ParseFile_InvalidToken:
-			error(pos, "Failed to parse file: %.*s; invalid token found in file at (%td:%td)", LIT(fi->name), err_pos.line, err_pos.column);
+			error(err_pos, "Failed to parse file: %.*s; invalid token found in file", LIT(fi->name));
 			break;
 		case ParseFile_EmptyFile:
 			error(pos, "Failed to parse file: %.*s; file contains no tokens", LIT(fi->name));
