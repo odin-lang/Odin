@@ -3,7 +3,7 @@ package fmt
 import "core:runtime"
 import "core:os"
 import "core:mem"
-import "core:bits"
+import "core:math/bits"
 import "core:unicode/utf8"
 import "core:types"
 import "core:strconv"
