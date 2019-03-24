@@ -425,6 +425,7 @@ struct ForeignContext {
 	Ast *                 curr_library;
 	ProcCallingConvention default_cc;
 	String                link_prefix;
+	bool                  is_private;
 };
 
 typedef Array<Entity *> CheckerTypePath;

@@ -39,7 +39,6 @@ foreign kernel32 {
 	@(link_name="FileTimeToSystemTime")      file_time_to_system_time     :: proc(file_time: ^Filetime, system_time: ^Systemtime) -> Bool ---;
 	@(link_name="SystemTimeToFileTime")      system_time_to_file_time     :: proc(system_time: ^Systemtime, file_time: ^Filetime) -> Bool ---;
 
-	@(link_name="CloseHandle")               close_handle                 :: proc(h: Handle) -> i32 ---;
 	@(link_name="GetStdHandle")              get_std_handle               :: proc(h: i32) -> Handle ---;
 
 	@(link_name="CreateFileA")
@@ -116,9 +115,10 @@ foreign kernel32 {
 	@(link_name="WaitForSingleObject") wait_for_single_object :: proc(handle: Handle, milliseconds: u32) -> u32 ---;
 }
 
-@(default_calling_convention = "c")
+// @(default_calling_convention = "c")
 foreign kernel32 {
 	@(link_name="GetLastError")              get_last_error               :: proc() -> i32 ---;
+	@(link_name="CloseHandle")               close_handle                 :: proc(h: Handle) -> i32 ---;
 
 	@(link_name="GetFileAttributesA")         get_file_attributes_a          :: proc(filename: cstring) -> u32 ---;
 	@(link_name="GetFileAttributesW")         get_file_attributes_w          :: proc(filename: Wstring) -> u32 ---;

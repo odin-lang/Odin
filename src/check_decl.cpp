@@ -432,6 +432,48 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 }
 
 
+typedef bool TypeCheckSig(Type *t);
+bool sig_compare(TypeCheckSig *a, Type *x, Type *y) {
+	return (a(x) && a(y));
+}
+bool sig_compare(TypeCheckSig *a, TypeCheckSig *b, Type *x, Type *y) {
+	if (a == b) {
+		return sig_compare(a, x, y);
+	}
+	return (a(x) && b(y) || b(x) && a(y));
+}
+
+bool signature_parameter_similar_enough(Type *x, Type *y) {
+	if (sig_compare(is_type_pointer, x, y)) {
+		return true;
+	}
+
+	if (sig_compare(is_type_integer, x, y)) {
+		GB_ASSERT(x->kind == Type_Basic);
+		GB_ASSERT(y->kind == Type_Basic);
+		i64 sx = type_size_of(x);
+		i64 sy = type_size_of(y);
+		if (sx == sy) return true;
+	}
+
+	if (sig_compare(is_type_integer, is_type_boolean, x, y)) {
+		GB_ASSERT(x->kind == Type_Basic);
+		GB_ASSERT(y->kind == Type_Basic);
+		i64 sx = type_size_of(x);
+		i64 sy = type_size_of(y);
+		if (sx == sy) return true;
+	}
+	if (sig_compare(is_type_cstring, is_type_u8_ptr, x, y)) {
+		return true;
+	}
+
+	if (sig_compare(is_type_uintptr, is_type_rawptr, x, y)) {
+		return true;
+	}
+
+	return are_types_identical(x, y);
+}
+
 
 bool are_signatures_similar_enough(Type *a_, Type *b_) {
 	GB_ASSERT(a_->kind == Type_Proc);
@@ -448,36 +490,14 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 	for (isize i = 0; i < a->param_count; i++) {
 		Type *x = core_type(a->params->Tuple.variables[i]->type);
 		Type *y = core_type(b->params->Tuple.variables[i]->type);
-		if (is_type_pointer(x) && is_type_pointer(y)) {
-			continue;
+		if (!signature_parameter_similar_enough(x, y)) {
+			return false;
 		}
-
-		if (is_type_integer(x) && is_type_integer(y)) {
-			GB_ASSERT(x->kind == Type_Basic);
-			GB_ASSERT(y->kind == Type_Basic);
-			i64 sx = type_size_of(x);
-			i64 sy = type_size_of(y);
-			if (sx == sy) continue;
-		}
-
-		if (!are_types_identical(x, y)) return false;
 	}
 	for (isize i = 0; i < a->result_count; i++) {
 		Type *x = base_type(a->results->Tuple.variables[i]->type);
 		Type *y = base_type(b->results->Tuple.variables[i]->type);
-		if (is_type_pointer(x) && is_type_pointer(y)) {
-			continue;
-		}
-
-		if (is_type_integer(x) && is_type_integer(y)) {
-			GB_ASSERT(x->kind == Type_Basic);
-			GB_ASSERT(y->kind == Type_Basic);
-			i64 sx = type_size_of(x);
-			i64 sy = type_size_of(y);
-			if (sx == sy) continue;
-		}
-
-		if (!are_types_identical(x, y)) {
+		if (!signature_parameter_similar_enough(x, y)) {
 			return false;
 		}
 	}

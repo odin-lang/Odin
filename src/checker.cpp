@@ -1993,6 +1993,12 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "private") {
+		if (ev.kind != ExactValue_Invalid) {
+			error(value, "'%.*s' does not expect a value", LIT(name));
+		}
+		c->foreign_context.is_private = true;
+		return true;
 	}
 
 	return false;
@@ -2414,7 +2420,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 	ast_node(vd, ValueDecl, decl);
 
-	bool entity_is_private = false;
+	bool entity_is_private = c->foreign_context.is_private;
 	for_array(i, vd->attributes) {
 		Ast *attr = vd->attributes[i];
 		if (attr->kind != Ast_Attribute) continue;
