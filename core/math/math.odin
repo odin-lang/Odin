@@ -61,9 +61,15 @@ foreign _ {
 	log_f32 :: proc(x: f32) -> f32 ---;
 	@(link_name="llvm.log.f64")
 	log_f64 :: proc(x: f64) -> f64 ---;
+
+	@(link_name="llvm.exp.f32")
+	exp_f32 :: proc(x: f32) -> f32 ---;
+	@(link_name="llvm.exp.f64")
+	exp_f64 :: proc(x: f64) -> f64 ---;
 }
 
 log :: proc{log_f32, log_f64};
+exp :: proc{exp_f32, exp_f64};
 
 tan_f32 :: proc "c" (θ: f32) -> f32 { return sin(θ)/cos(θ); }
 tan_f64 :: proc "c" (θ: f64) -> f64 { return sin(θ)/cos(θ); }
