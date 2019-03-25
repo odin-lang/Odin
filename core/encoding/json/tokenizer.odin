@@ -436,8 +436,8 @@ is_valid_string_literal :: proc(s: string, spec: Specification) -> bool {
 				i += 5;
 
 				for j := 0; j < 4; j += 1 {
-					c := hex[j];
-					switch c {
+					c2 := hex[j];
+					switch c2 {
 					case '0'..'9', 'a'..'z', 'A'..'Z':
 						// Okay
 					case:

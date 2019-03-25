@@ -1,7 +1,7 @@
 package json
 
 import "core:mem"
-import "core:bits"
+import "core:math/bits"
 import "core:runtime"
 import "core:strconv"
 import "core:strings"
