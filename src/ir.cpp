@@ -5352,7 +5352,7 @@ void ir_emit_bounds_check(irProcedure *proc, Token token, irValue *index, irValu
 	ir_emit_runtime_call(proc, "bounds_check_error", args);
 }
 
-void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, irValue *high, irValue *len, bool is_substring) {
+void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, irValue *high, irValue *len, bool lower_value_used) {
 	if (build_context.no_bounds_check) {
 		return;
 	}
@@ -5364,18 +5364,31 @@ void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, ir
 	irValue *file = ir_find_or_add_entity_string(proc->module, token.pos.file);
 	irValue *line = ir_const_int(token.pos.line);
 	irValue *column = ir_const_int(token.pos.column);
-	low  = ir_emit_conv(proc, low,  t_int);
 	high = ir_emit_conv(proc, high, t_int);
 
-	auto args = array_make<irValue *>(ir_allocator(), 6);
-	args[0] = file;
-	args[1] = line;
-	args[2] = column;
-	args[3] = low;
-	args[4] = high;
-	args[5] = len;
+	if (!lower_value_used) {
+		auto args = array_make<irValue *>(ir_allocator(), 5);
+		args[0] = file;
+		args[1] = line;
+		args[2] = column;
+		args[3] = high;
+		args[4] = len;
 
-	ir_emit_runtime_call(proc, "slice_expr_error", args);
+		ir_emit_runtime_call(proc, "slice_expr_error_hi", args);
+	} else {
+		// No need to convert unless used
+		low  = ir_emit_conv(proc, low, t_int);
+
+		auto args = array_make<irValue *>(ir_allocator(), 6);
+		args[0] = file;
+		args[1] = line;
+		args[2] = column;
+		args[3] = low;
+		args[4] = high;
+		args[5] = len;
+
+		ir_emit_runtime_call(proc, "slice_expr_error_lo_hi", args);
+	}
 }
 
 void ir_emit_dynamic_array_bounds_check(irProcedure *proc, Token token, irValue *low, irValue *high, irValue *max) {
@@ -7169,6 +7182,8 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 		if (se->low  != nullptr) low  = ir_build_expr(proc, se->low);
 		if (se->high != nullptr) high = ir_build_expr(proc, se->high);
 
+		bool no_indices = se->low == nullptr && se->high == nullptr;
+
 		irValue *addr = ir_build_addr_ptr(proc, se->expr);
 		irValue *base = ir_emit_load(proc, addr);
 		Type *type = base_type(ir_type(base));
@@ -7186,8 +7201,8 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			irValue *len = ir_slice_len(proc, base);
 			if (high == nullptr) high = len;
 
-			if (se->low != nullptr || se->high != nullptr) {
-				ir_emit_slice_bounds_check(proc, se->open, low, high, len, false);
+			if (!no_indices) {
+				ir_emit_slice_bounds_check(proc, se->open, low, high, len, se->low != nullptr);
 			}
 
 			irValue *elem   = ir_emit_ptr_offset(proc, ir_slice_elem(proc, base), low);
@@ -7205,8 +7220,8 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			irValue *len = ir_dynamic_array_len(proc, base);
 			if (high == nullptr) high = len;
 
-			if (se->low != nullptr || se->high != nullptr) {
-				ir_emit_slice_bounds_check(proc, se->open, low, high, len, false);
+			if (!no_indices) {
+				ir_emit_slice_bounds_check(proc, se->open, low, high, len, se->low != nullptr);
 			}
 
 			irValue *elem    = ir_emit_ptr_offset(proc, ir_dynamic_array_elem(proc, base), low);
@@ -7228,8 +7243,8 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			bool high_const = type_and_value_of_expr(se->high).mode == Addressing_Constant;
 
 			if (!low_const || !high_const) {
-				if (se->low != nullptr || se->high != nullptr) {
-					ir_emit_slice_bounds_check(proc, se->open, low, high, len, false);
+				if (!no_indices) {
+					ir_emit_slice_bounds_check(proc, se->open, low, high, len, se->low != nullptr);
 				}
 			}
 			irValue *elem    = ir_emit_ptr_offset(proc, ir_array_elem(proc, addr), low);
@@ -7244,10 +7259,9 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			GB_ASSERT(type == t_string);
 			irValue *len = ir_string_len(proc, base);
 			if (high == nullptr) high = len;
-			// if (max == nullptr)  max = ir_string_len(proc, base);
 
-			if (se->low != nullptr || se->high != nullptr) {
-				ir_emit_slice_bounds_check(proc, se->open, low, high, len, true);
+			if (!no_indices) {
+				ir_emit_slice_bounds_check(proc, se->open, low, high, len, se->low != nullptr);
 			}
 
 			irValue *elem    = ir_emit_ptr_offset(proc, ir_string_elem(proc, base), low);

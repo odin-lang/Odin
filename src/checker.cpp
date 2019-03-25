@@ -1606,7 +1606,8 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	if (!build_context.no_bounds_check) {
 		String bounds_check_entities[] = {
 			str_lit("bounds_check_error"),
-			str_lit("slice_expr_error"),
+			str_lit("slice_expr_error_hi"),
+			str_lit("slice_expr_error_lo_hi"),
 			str_lit("dynamic_array_expr_error"),
 		};
 		for (isize i = 0; i < gb_count_of(bounds_check_entities); i++) {
