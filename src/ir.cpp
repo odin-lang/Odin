@@ -7186,7 +7186,9 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			irValue *len = ir_slice_len(proc, base);
 			if (high == nullptr) high = len;
 
-			ir_emit_slice_bounds_check(proc, se->open, low, high, len, false);
+			if (se->low != nullptr || se->high != nullptr) {
+				ir_emit_slice_bounds_check(proc, se->open, low, high, len, false);
+			}
 
 			irValue *elem   = ir_emit_ptr_offset(proc, ir_slice_elem(proc, base), low);
 			irValue *new_len = ir_emit_arith(proc, Token_Sub, high, low, t_int);
@@ -7203,7 +7205,9 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			irValue *len = ir_dynamic_array_len(proc, base);
 			if (high == nullptr) high = len;
 
-			ir_emit_slice_bounds_check(proc, se->open, low, high, len, false);
+			if (se->low != nullptr || se->high != nullptr) {
+				ir_emit_slice_bounds_check(proc, se->open, low, high, len, false);
+			}
 
 			irValue *elem    = ir_emit_ptr_offset(proc, ir_dynamic_array_elem(proc, base), low);
 			irValue *new_len = ir_emit_arith(proc, Token_Sub, high, low, t_int);
@@ -7224,7 +7228,9 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			bool high_const = type_and_value_of_expr(se->high).mode == Addressing_Constant;
 
 			if (!low_const || !high_const) {
-				ir_emit_slice_bounds_check(proc, se->open, low, high, len, false);
+				if (se->low != nullptr || se->high != nullptr) {
+					ir_emit_slice_bounds_check(proc, se->open, low, high, len, false);
+				}
 			}
 			irValue *elem    = ir_emit_ptr_offset(proc, ir_array_elem(proc, addr), low);
 			irValue *new_len = ir_emit_arith(proc, Token_Sub, high, low, t_int);
@@ -7240,7 +7246,9 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			if (high == nullptr) high = len;
 			// if (max == nullptr)  max = ir_string_len(proc, base);
 
-			ir_emit_slice_bounds_check(proc, se->open, low, high, len, true);
+			if (se->low != nullptr || se->high != nullptr) {
+				ir_emit_slice_bounds_check(proc, se->open, low, high, len, true);
+			}
 
 			irValue *elem    = ir_emit_ptr_offset(proc, ir_string_elem(proc, base), low);
 			irValue *new_len = ir_emit_arith(proc, Token_Sub, high, low, t_int);
