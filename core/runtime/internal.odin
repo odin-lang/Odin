@@ -286,7 +286,7 @@ bounds_check_error :: proc "contextless" (file: string, line, column: int, index
 }
 
 slice_expr_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
-	if 0 <= lo && lo <= hi && hi <= len do return;
+	if 0 <= lo && lo <= hi && lo < len && hi <= len do return;
 	handle_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
 		fd := os.stderr;
 		print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
@@ -303,7 +303,7 @@ slice_expr_error :: proc "contextless" (file: string, line, column: int, lo, hi:
 }
 
 dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
-	if 0 <= low && low <= high && high <= max do return;
+	if 0 <= low && low <= high && low < max && high <= max do return;
 	handle_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
 		fd := os.stderr;
 		print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
