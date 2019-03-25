@@ -403,7 +403,9 @@ unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_loca
 @builtin
 ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
 	bounds_check_error_loc(loc, index, len(array));
-	copy(array[index:], array[index+1:]);
+	if index+1 < len(array) {
+		copy(array[index:], array[index+1:]);
+	}
 	pop(array);
 }
 
