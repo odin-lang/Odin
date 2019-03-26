@@ -211,8 +211,13 @@ append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> str
 
 quote :: proc(buf: []byte, s: string) -> string {
 	write_byte :: inline proc(buf: []byte, i: ^int, bytes: ..byte) {
+		if i^ >= len(buf) do return;
 		n := copy(buf[i^:], bytes[:]);
 		i^ += n;
+	}
+
+	if buf == nil {
+		return "";
 	}
 
 	c :: '"';
@@ -230,8 +235,10 @@ quote :: proc(buf: []byte, s: string) -> string {
 			write_byte(buf, &i, digits[s[0]>>4]);
 			write_byte(buf, &i, digits[s[0]&0xf]);
 		}
-		s2 := quote_rune(buf[i:], r);
-		i += len(s2);
+		if i < len(buf) {
+			s2 := quote_rune(buf[i:], r);
+			i += len(s2);
+		}
 	}
 	write_byte(buf, &i, c);
 	return string(buf[:i]);
@@ -239,17 +246,27 @@ quote :: proc(buf: []byte, s: string) -> string {
 
 quote_rune :: proc(buf: []byte, r: rune) -> string {
 	write_byte :: inline proc(buf: []byte, i: ^int, bytes: ..byte) {
-		n := copy(buf[i^:], bytes[:]);
-		i^ += n;
+		if i^ < len(buf) {
+			n := copy(buf[i^:], bytes[:]);
+			i^ += n;
+		}
 	}
 	write_string :: inline proc(buf: []byte, i: ^int, s: string) {
-		n := copy(buf[i^:], cast([]byte)s);
-		i^ += n;
+		if i^ < len(buf) {
+			n := copy(buf[i^:], cast([]byte)s);
+			i^ += n;
+		}
 	}
 	write_rune :: inline proc(buf: []byte, i: ^int, r: rune) {
-		b, w := utf8.encode_rune(r);
-		n := copy(buf[i^:], b[:w]);
-		i^ += n;
+		if i^ < len(buf) {
+			b, w := utf8.encode_rune(r);
+			n := copy(buf[i^:], b[:w]);
+			i^ += n;
+		}
+	}
+
+	if buf == nil {
+		return "";
 	}
 
 	i := 0;
