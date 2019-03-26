@@ -5,7 +5,6 @@ import "core:mem"
 import "core:os"
 
 when os.OS == "windows" {
-	import "core:runtime"
 	import "core:thread"
 }
 
