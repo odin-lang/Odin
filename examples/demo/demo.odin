@@ -561,20 +561,6 @@ threading_example :: proc() {
 	when os.OS == "windows" {
 		fmt.println("# threading_example");
 
-		unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
-			runtime.bounds_check_error_loc(loc, index, len(array));
-			n := len(array)-1;
-			if index != n {
-				array[index] = array[n];
-			}
-			pop(array);
-		}
-		ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
-			runtime.bounds_check_error_loc(loc, index, len(array));
-			copy(array[index:], array[index+1:]);
-			pop(array);
-		}
-
 		worker_proc :: proc(t: ^thread.Thread) -> int {
 			for iteration in 1..5 {
 				fmt.printf("Thread %d is on iteration %d\n", t.user_index, iteration);
