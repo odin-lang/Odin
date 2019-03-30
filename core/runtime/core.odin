@@ -366,7 +366,7 @@ init_global_temporary_allocator :: proc(data: []byte, backup_allocator := contex
 }
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) {
-	fd := os.stderr;
+	fd := context.stderr;
 	print_caller_location(fd, loc);
 	os.write_string(fd, " ");
 	os.write_string(fd, prefix);
@@ -661,7 +661,7 @@ card :: proc(s: $S/bit_set[$E; $U]) -> int {
 
 
 @builtin
-assert :: proc "contextless" (condition: bool, message := "", loc := #caller_location) -> bool {
+assert :: proc(condition: bool, message := "", loc := #caller_location) -> bool {
 	if !condition {
 		p := context.assertion_failure_proc;
 		if p == nil {
@@ -673,7 +673,7 @@ assert :: proc "contextless" (condition: bool, message := "", loc := #caller_loc
 }
 
 @builtin
-panic :: proc "contextless" (message: string, loc := #caller_location) -> ! {
+panic :: proc(message: string, loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc;
 	if p == nil {
 		p = default_assertion_failure_proc;
@@ -682,7 +682,7 @@ panic :: proc "contextless" (message: string, loc := #caller_location) -> ! {
 }
 
 @builtin
-unimplemented :: proc "contextless" (message := "", loc := #caller_location) -> ! {
+unimplemented :: proc(message := "", loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc;
 	if p == nil {
 		p = default_assertion_failure_proc;
@@ -691,7 +691,7 @@ unimplemented :: proc "contextless" (message := "", loc := #caller_location) -> 
 }
 
 @builtin
-unreachable :: proc "contextless" (message := "", loc := #caller_location) -> ! {
+unreachable :: proc(message := "", loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc;
 	if p == nil {
 		p = default_assertion_failure_proc;
