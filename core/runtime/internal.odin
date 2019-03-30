@@ -303,7 +303,7 @@ slice_expr_error_hi :: proc "contextless" (file: string, line, column: int, hi: 
 }
 
 slice_expr_error_lo_hi :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
-	if 0 <= lo && lo < len && lo <= hi && hi <= len do return;
+	if 0 <= lo && lo <= len && lo <= hi && hi <= len do return;
 	handle_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
 		fd := os.stderr;
 		print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
