@@ -59,12 +59,12 @@ fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 
 
 // print* procedures return the number of bytes written
-print       :: proc(args: ..any)              -> int { return fprint(os.stdout, ..args); }
-print_err   :: proc(args: ..any)              -> int { return fprint(os.stderr, ..args); }
-println     :: proc(args: ..any)              -> int { return fprintln(os.stdout, ..args); }
-println_err :: proc(args: ..any)              -> int { return fprintln(os.stderr, ..args); }
-printf      :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stdout, fmt, ..args); }
-printf_err  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stderr, fmt, ..args); }
+print       :: proc(args: ..any)              -> int { return fprint(context.stdout, ..args); }
+print_err   :: proc(args: ..any)              -> int { return fprint(context.stderr, ..args); }
+println     :: proc(args: ..any)              -> int { return fprintln(context.stdout, ..args); }
+println_err :: proc(args: ..any)              -> int { return fprintln(context.stderr, ..args); }
+printf      :: proc(fmt: string, args: ..any) -> int { return fprintf(context.stdout, fmt, ..args); }
+printf_err  :: proc(fmt: string, args: ..any) -> int { return fprintf(context.stderr, fmt, ..args); }
 
 
 // aprint* procedures return a string that was allocated with the current context

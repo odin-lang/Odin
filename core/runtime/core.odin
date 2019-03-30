@@ -213,6 +213,10 @@ Context :: struct {
 	assertion_failure_proc: Assertion_Failure_Proc,
 	logger: log.Logger,
 
+	stdin:  os.Handle,
+	stdout: os.Handle,
+	stderr: os.Handle,
+
 	thread_id:  int,
 
 	user_data:  any,
@@ -350,6 +354,10 @@ __init_context :: proc "contextless" (c: ^Context) {
 
 	c.logger.procedure = log.nil_logger_proc;
 	c.logger.data = nil;
+
+	c.stdin  = os.stdin;
+	c.stdout = os.stdout;
+	c.stderr = os.stderr;
 }
 
 @builtin

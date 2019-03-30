@@ -69,7 +69,7 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 
     h : os.Handle;
     if(data.file_handle != os.INVALID_HANDLE) do h = data.file_handle;
-    else                                      do h = level <= Level.Error ? os.stdout : os.stderr;
+    else                                      do h = level <= Level.Error ? context.stdout : context.stderr;
     backing: [1024]byte; //NOTE(Hoej): 1024 might be too much for a header backing, unless somebody has really long paths.
     buf := strings.builder_from_slice(backing[:]);
 
