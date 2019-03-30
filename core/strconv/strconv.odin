@@ -236,8 +236,8 @@ quote :: proc(buf: []byte, s: string) -> string {
 			write_byte(buf, &i, digits[s[0]&0xf]);
 		}
 		if i < len(buf) {
-			s := quote_rune(buf[i:], r);
-			i += len(s);
+			x := quote_rune(buf[i:], r);
+			i += len(x);
 		}
 	}
 	write_byte(buf, &i, c);
