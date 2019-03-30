@@ -5,6 +5,7 @@ enum CallArgumentError {
 	CallArgumentError_NonVariadicExpand,
 	CallArgumentError_VariadicTuple,
 	CallArgumentError_MultipleVariadicExpand,
+	CallArgumentError_AmbiguousPolymorphicVariadic,
 	CallArgumentError_ArgumentCount,
 	CallArgumentError_TooFewArguments,
 	CallArgumentError_TooManyArguments,
@@ -4492,6 +4493,15 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		err = CallArgumentError_NonVariadicExpand;
 	} else if (operands.count == 0 && param_count_excluding_defaults == 0) {
 		err = CallArgumentError_None;
+
+		if (variadic) {
+			GB_ASSERT(param_tuple != nullptr && param_tuple->variables.count > 0);
+			Type *t = param_tuple->variables[0]->type;
+			if (is_type_polymorphic(t)) {
+				error(call, "Ambiguous call to a polymorphic variadic procedure with no variadic input");
+				err = CallArgumentError_AmbiguousPolymorphicVariadic;
+			}
+		}
 	} else {
 		i32 error_code = 0;
 		if (operands.count < param_count_excluding_defaults) {
@@ -4583,6 +4593,12 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				GB_ASSERT(is_type_slice(slice));
 				Type *elem = base_type(slice)->Slice.elem;
 				Type *t = elem;
+
+				if (is_type_polymorphic(t)) {
+					error(call, "Ambiguous call to a polymorphic variadic procedure with no variadic input");
+					err = CallArgumentError_AmbiguousPolymorphicVariadic;
+				}
+
 				for (; operand_index < operands.count; operand_index++) {
 					Operand o = operands[operand_index];
 					if (vari_expand) {
@@ -4761,11 +4777,24 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 
 
 	for (isize i = 0; i < param_count; i++) {
+		Entity *e = pt->params->Tuple.variables[i];
 		Operand *o = &ordered_operands[i];
+		bool param_is_variadic = pt->variadic && pt->variadic_index == i;
+
+
 		if (o->mode == Addressing_Invalid) {
+			if (param_is_variadic) {
+				Type *slice = e->type;
+				GB_ASSERT(is_type_slice(slice));
+				Type *elem = base_type(slice)->Slice.elem;
+				if (is_type_polymorphic(elem)) {
+					error(call, "Ambiguous call to a polymorphic variadic procedure with no variadic input");
+					err = CallArgumentError_AmbiguousPolymorphicVariadic;
+					return err;
+				}
+			}
 			continue;
 		}
-		Entity *e = pt->params->Tuple.variables[i];
 
 		if (e->kind == Entity_TypeName) {
 			GB_ASSERT(pt->is_polymorphic);
@@ -4782,7 +4811,6 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			}
 		} else {
 			i64 s = 0;
-			bool param_is_variadic = pt->variadic && pt->variadic_index == i;
 			if (!check_is_assignable_to_with_score(c, o, e->type, &s, param_is_variadic)) {
 				bool ok = false;
 				if (e->flags & EntityFlag_AutoCast) {
