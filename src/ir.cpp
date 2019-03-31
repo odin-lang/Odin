@@ -1433,11 +1433,13 @@ irValue *ir_value_procedure(irModule *m, Entity *entity, Type *type, Ast *type_e
 irValue *ir_generate_array(irModule *m, Type *elem_type, i64 count, String prefix, i64 id) {
 	gbAllocator a = ir_allocator();
 	Token token = {Token_Ident};
-	isize name_len = prefix.len + 10;
+	isize name_len = prefix.len + 1 + 20;
 
-	char *text = gb_alloc_array(a, char, name_len);
+	auto suffix_id = cast(unsigned long long)id;
+	char *text = gb_alloc_array(a, char, name_len+1);
 	gb_snprintf(text, name_len,
-	            "%.*s-%llx", LIT(prefix), cast(unsigned long long)id);
+	            "%.*s-%llu", LIT(prefix), suffix_id);
+	text[name_len] = 0;
 
 	String s = make_string_c(text);
 
