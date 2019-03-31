@@ -220,6 +220,7 @@ Context :: struct {
 	thread_id:  int,
 
 	user_data:  any,
+	user_ptr:   rawptr,
 	user_index: int,
 
 	derived:    any, // May be used for derived data types
