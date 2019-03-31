@@ -223,6 +223,21 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 			print_type(fd, info.underlying);
 		}
 		os.write_byte(fd, ']');
+
+	case Type_Info_Opaque:
+		os.write_string(fd, "opaque ");
+		print_type(fd, info.elem);
+
+	case Type_Info_Simd_Vector:
+		if info.is_x86_mmx {
+			os.write_string(fd, "intrinsics.x86_mmx");
+		} else {
+			os.write_string(fd, "intrinsics.vector(");
+			print_u64(fd, u64(info.count));
+			os.write_string(fd, ", ");
+			print_type(fd, info.elem);
+			os.write_byte(fd, ')');
+		}
 	}
 }
 
@@ -285,38 +300,27 @@ bounds_check_error :: proc "contextless" (file: string, line, column: int, index
 	handle_error(file, line, column, index, count);
 }
 
+slice_handle_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
+	fd := os.stderr;
+	print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
+	os.write_string(fd, " Invalid slice indices: ");
+	print_i64(fd, i64(lo));
+	os.write_string(fd, ":");
+	print_i64(fd, i64(hi));
+	os.write_string(fd, ":");
+	print_i64(fd, i64(len));
+	os.write_byte(fd, '\n');
+	debug_trap();
+}
+
 slice_expr_error_hi :: proc "contextless" (file: string, line, column: int, hi: int, len: int) {
 	if 0 <= hi && hi <= len do return;
-	handle_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
-		fd := os.stderr;
-		print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
-		os.write_string(fd, " Invalid slice indices: ");
-		print_i64(fd, i64(lo));
-		os.write_string(fd, ":");
-		print_i64(fd, i64(hi));
-		os.write_string(fd, ":");
-		print_i64(fd, i64(len));
-		os.write_byte(fd, '\n');
-		debug_trap();
-	}
-	handle_error(file, line, column, 0, hi, len);
+	slice_handle_error(file, line, column, 0, hi, len);
 }
 
 slice_expr_error_lo_hi :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
-	if 0 <= lo && lo < len && lo <= hi && hi <= len do return;
-	handle_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
-		fd := os.stderr;
-		print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
-		os.write_string(fd, " Invalid slice indices: ");
-		print_i64(fd, i64(lo));
-		os.write_string(fd, ":");
-		print_i64(fd, i64(hi));
-		os.write_string(fd, ":");
-		print_i64(fd, i64(len));
-		os.write_byte(fd, '\n');
-		debug_trap();
-	}
-	handle_error(file, line, column, lo, hi, len);
+	if 0 <= lo && lo <= len && lo <= hi && hi <= len do return;
+	slice_handle_error(file, line, column, lo, hi, len);
 }
 
 dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
