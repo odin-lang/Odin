@@ -3024,6 +3024,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 	isize total_name_count = 0;
 	bool allow_ellipsis = allowed_flags&FieldFlag_ellipsis;
 	bool seen_ellipsis = false;
+	bool is_signature = (allowed_flags & FieldFlag_Signature) == FieldFlag_Signature;
 
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_Colon &&
@@ -3064,7 +3065,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 		if (f->curr_token.kind != Token_Eq) {
 			type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 			Ast *tt = unparen_expr(type);
-			if (!any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
+			if (is_signature && !any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
 				syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
 			}
 		}
@@ -3121,7 +3122,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 			if (f->curr_token.kind != Token_Eq) {
 				type = parse_var_type(f, allow_ellipsis, allow_typeid_token);
 				Ast *tt = unparen_expr(type);
-				if (!any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
+				if (is_signature && !any_polymorphic_names && tt->kind == Ast_TypeidType && tt->TypeidType.specialization != nullptr) {
 					syntax_error(type, "Specialization of typeid is not allowed without polymorphic names");
 				}
 			}

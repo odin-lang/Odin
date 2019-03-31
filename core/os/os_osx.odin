@@ -153,7 +153,7 @@ foreign dl {
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
-	cstr := strings.new_cstring(path);
+	cstr := strings.clone_to_cstring(path);
 	handle := _unix_open(cstr, flags, mode);
 	delete(cstr);
 	if handle == -1 {
@@ -221,14 +221,14 @@ is_path_separator :: proc(r: rune) -> bool {
 
 stat :: inline proc(path: string) -> (Stat, bool) {
 	s: Stat;
-	cstr := strings.new_cstring(path);
+	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
 	ret_int := _unix_stat(cstr, &s);
 	return s, ret_int==0;
 }
 
 access :: inline proc(path: string, mask: int) -> bool {
-	cstr := strings.new_cstring(path);
+	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
 	return _unix_access(cstr, mask) == 0;
 }
@@ -245,7 +245,7 @@ heap_free :: inline proc(ptr: rawptr) {
 }
 
 getenv :: proc(name: string) -> (string, bool) {
-	path_str := strings.new_cstring(name);
+	path_str := strings.clone_to_cstring(name);
 	defer delete(path_str);
 	cstr := _unix_getenv(path_str);
 	if cstr == nil {
@@ -265,14 +265,14 @@ current_thread_id :: proc "contextless" () -> int {
 }
 
 dlopen :: inline proc(filename: string, flags: int) -> rawptr {
-	cstr := strings.new_cstring(filename);
+	cstr := strings.clone_to_cstring(filename);
 	defer delete(cstr);
 	handle := _unix_dlopen(cstr, flags);
 	return handle;
 }
 dlsym :: inline proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil);
-	cstr := strings.new_cstring(symbol);
+	cstr := strings.clone_to_cstring(symbol);
 	defer delete(cstr);
 	proc_handle := _unix_dlsym(handle, cstr);
 	return proc_handle;
