@@ -383,7 +383,7 @@ UTF8PROC_DLLEXPORT int utf8proc_charwidth(utf8proc_int32_t c) {
 }
 
 UTF8PROC_DLLEXPORT utf8proc_category_t utf8proc_category(utf8proc_int32_t c) {
-  return cast(utf8proc_category_t)utf8proc_get_property(c)->category;
+  return (utf8proc_category_t)utf8proc_get_property(c)->category;
 }
 
 UTF8PROC_DLLEXPORT const char *utf8proc_category_string(utf8proc_int32_t c) {
@@ -401,7 +401,7 @@ UTF8PROC_DLLEXPORT utf8proc_ssize_t utf8proc_decompose_char(utf8proc_int32_t uc,
   utf8proc_int32_t hangul_sindex;
   if (uc < 0 || uc >= 0x110000) return UTF8PROC_ERROR_NOTASSIGNED;
   property = unsafe_get_property(uc);
-  category = cast(utf8proc_category_t)property->category;
+  category = (utf8proc_category_t)property->category;
   hangul_sindex = uc - UTF8PROC_HANGUL_SBASE;
   if (options & (UTF8PROC_COMPOSE|UTF8PROC_DECOMPOSE)) {
     if (hangul_sindex >= 0 && hangul_sindex < UTF8PROC_HANGUL_SCOUNT) {
@@ -728,24 +728,24 @@ UTF8PROC_DLLEXPORT utf8proc_ssize_t utf8proc_map_custom(
 
 UTF8PROC_DLLEXPORT utf8proc_uint8_t *utf8proc_NFD(const utf8proc_uint8_t *str) {
   utf8proc_uint8_t *retval;
-  utf8proc_map(str, 0, &retval, cast(utf8proc_option_t)(UTF8PROC_NULLTERM|UTF8PROC_STABLE|UTF8PROC_DECOMPOSE));
+  utf8proc_map(str, 0, &retval, (utf8proc_option_t)(UTF8PROC_NULLTERM|UTF8PROC_STABLE|UTF8PROC_DECOMPOSE));
   return retval;
 }
 
 UTF8PROC_DLLEXPORT utf8proc_uint8_t *utf8proc_NFC(const utf8proc_uint8_t *str) {
   utf8proc_uint8_t *retval;
-  utf8proc_map(str, 0, &retval, cast(utf8proc_option_t)(UTF8PROC_NULLTERM|UTF8PROC_STABLE|UTF8PROC_COMPOSE));
+  utf8proc_map(str, 0, &retval, (utf8proc_option_t)(UTF8PROC_NULLTERM|UTF8PROC_STABLE|UTF8PROC_COMPOSE));
   return retval;
 }
 
 UTF8PROC_DLLEXPORT utf8proc_uint8_t *utf8proc_NFKD(const utf8proc_uint8_t *str) {
   utf8proc_uint8_t *retval;
-  utf8proc_map(str, 0, &retval, cast(utf8proc_option_t)(UTF8PROC_NULLTERM|UTF8PROC_STABLE|UTF8PROC_DECOMPOSE|UTF8PROC_COMPAT));
+  utf8proc_map(str, 0, &retval, (utf8proc_option_t)(UTF8PROC_NULLTERM|UTF8PROC_STABLE|UTF8PROC_DECOMPOSE|UTF8PROC_COMPAT));
   return retval;
 }
 
 UTF8PROC_DLLEXPORT utf8proc_uint8_t *utf8proc_NFKC(const utf8proc_uint8_t *str) {
   utf8proc_uint8_t *retval;
-  utf8proc_map(str, 0, &retval, cast(utf8proc_option_t)(UTF8PROC_NULLTERM|UTF8PROC_STABLE|UTF8PROC_COMPOSE|UTF8PROC_COMPAT));
+  utf8proc_map(str, 0, &retval, (utf8proc_option_t)(UTF8PROC_NULLTERM|UTF8PROC_STABLE|UTF8PROC_COMPOSE|UTF8PROC_COMPAT));
   return retval;
 }
