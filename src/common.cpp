@@ -203,16 +203,22 @@ u64 u64_from_string(String string) {
 	return result;
 }
 
+gb_global char const global_num_to_char_table[] =
+	"0123456789"
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	"abcdefghijklmnopqrstuvwxyz"
+	"@$";
+
 String u64_to_string(u64 v, char *out_buf, isize out_buf_len) {
 	char buf[32] = {0};
 	isize i = gb_size_of(buf);
 
 	u64 b = 10;
 	while (v >= b) {
-		buf[--i] = gb__num_to_char_table[v%b];
+		buf[--i] = global_num_to_char_table[v%b];
 		v /= b;
 	}
-	buf[--i] = gb__num_to_char_table[v%b];
+	buf[--i] = global_num_to_char_table[v%b];
 
 	isize len = gb_min(gb_size_of(buf)-i, out_buf_len);
 	gb_memmove(out_buf, &buf[i], len);
@@ -230,10 +236,10 @@ String i64_to_string(i64 a, char *out_buf, isize out_buf_len) {
 	u64 v = cast(u64)a;
 	u64 b = 10;
 	while (v >= b) {
-		buf[--i] = gb__num_to_char_table[v%b];
+		buf[--i] = global_num_to_char_table[v%b];
 		v /= b;
 	}
-	buf[--i] = gb__num_to_char_table[v%b];
+	buf[--i] = global_num_to_char_table[v%b];
 
 	if (negative) {
 		buf[--i] = '-';

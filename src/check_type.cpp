@@ -759,6 +759,8 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 	ExactValue iota = exact_value_i64(-1);
 	ExactValue min_value = exact_value_i64(0);
 	ExactValue max_value = exact_value_i64(0);
+	bool min_value_set = false;
+	bool max_value_set = false;
 
 	scope_reserve(ctx->scope, et->fields.count);
 
@@ -810,11 +812,21 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 			continue;
 		}
 
-		if (compare_exact_values(Token_Gt, min_value, iota)) {
+		if (min_value_set) {
+			if (compare_exact_values(Token_Gt, min_value, iota)) {
+				min_value = iota;
+			}
+		} else {
 			min_value = iota;
+			min_value_set = true;
 		}
-		if (compare_exact_values(Token_Lt, max_value, iota)) {
+		if (max_value_set) {
+			if (compare_exact_values(Token_Lt, max_value, iota)) {
+				max_value = iota;
+			}
+		} else {
 			max_value = iota;
+			max_value_set = true;
 		}
 
 		Entity *e = alloc_entity_constant(ctx->scope, ident->Ident.token, constant_type, iota);

@@ -122,9 +122,6 @@ TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_type_of,     "type_of"),     \
 	TOKEN_KIND(Token_macro,       "macro"),       \
 	TOKEN_KIND(Token_const,       "const"),       \
-	TOKEN_KIND(Token_asm,         "asm"),         \
-	TOKEN_KIND(Token_yield,       "yield"),       \
-	TOKEN_KIND(Token_await,       "await"),       \
 TOKEN_KIND(Token__KeywordEnd, ""), \
 	TOKEN_KIND(Token_Count, "")
 
