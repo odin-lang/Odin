@@ -4,27 +4,21 @@ package win32
 import "core:strings";
 
 call_external_process :: proc(program, command_line: string) -> bool {
+    si := Startup_Info{ cb=size_of(Startup_Info) };
+    pi := Process_Information{};
 
-	si := Startup_Info{};
-	pi := Process_Information{};
-	si.cb = size_of(si);
-
-	p := utf8_to_wstring(program);
-	c := utf8_to_wstring(command_line);
-
-	ret := create_process_w(
-		p,
-		c,
-		nil,
-		nil,
-		Bool(false),
-		u32(0x10), // Create New Console
-		nil,
-		nil,
-		&si,
-		&pi
-	);
-    return cast(bool)ret;
+    return cast(bool)create_process_w(
+        utf8_to_wstring(program),
+        utf8_to_wstring(command_line),
+        nil, 
+        nil, 
+        Bool(false), 
+        u32(0x10), 
+        nil, 
+        nil, 
+        &si, 
+        &pi
+    );
 }
 
 open_website :: proc(url: string) -> bool {
