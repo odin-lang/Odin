@@ -68,12 +68,12 @@ next_rune :: proc(t: ^Tokenizer) -> rune #no_bounds_check {
 get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	skip_digits :: proc(t: ^Tokenizer) {
 		for t.offset < len(t.data) {
-			next_rune(t);
 			if '0' <= t.r && t.r <= '9' {
 				// Okay
 			} else {
 				return;
 			}
+			next_rune(t);
 		}
 	}
 	skip_hex_digits :: proc(t: ^Tokenizer) {
@@ -158,6 +158,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	skip_whitespace(t);
 
 	token.pos = t.pos;
+
 	token.kind = Kind.Invalid;
 
 	curr_rune := t.r;
@@ -213,23 +214,6 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		}
 		fallthrough;
 
-	case '.':
-		err = Error.Illegal_Character;
-		if t.spec == Specification.JSON5 { // Allow leading decimal point
-			skip_digits(t);
-			if t.r == 'e' || t.r == 'E' {
-				switch r := next_rune(t); r {
-				case '+', '-':
-					next_rune(t);
-				}
-				skip_digits(t);
-			}
-			str := string(t.data[token.offset:t.offset]);
-			if !is_valid_number(str, t.spec) {
-				err = Error.Invalid_Number;
-			}
-		}
-
 	case '0'..'9':
 		token.kind = Kind.Integer;
 		if t.spec == Specification.JSON5 { // Hexadecimal Numbers
@@ -241,6 +225,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		}
 
 		skip_digits(t);
+
 		if t.r == '.' {
 			token.kind = Kind.Float;
 			next_rune(t);
@@ -257,6 +242,23 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		str := string(t.data[token.offset:t.offset]);
 		if !is_valid_number(str, t.spec) {
 			err = Error.Invalid_Number;
+		}
+
+	case '.':
+		err = Error.Illegal_Character;
+		if t.spec == Specification.JSON5 { // Allow leading decimal point
+			skip_digits(t);
+			if t.r == 'e' || t.r == 'E' {
+				switch r := next_rune(t); r {
+				case '+', '-':
+					next_rune(t);
+				}
+				skip_digits(t);
+			}
+			str := string(t.data[token.offset:t.offset]);
+			if !is_valid_number(str, t.spec) {
+				err = Error.Invalid_Number;
+			}
 		}
 
 
@@ -436,8 +438,8 @@ is_valid_string_literal :: proc(s: string, spec: Specification) -> bool {
 				i += 5;
 
 				for j := 0; j < 4; j += 1 {
-					c := hex[j];
-					switch c {
+					c2 := hex[j];
+					switch c2 {
 					case '0'..'9', 'a'..'z', 'A'..'Z':
 						// Okay
 					case:
