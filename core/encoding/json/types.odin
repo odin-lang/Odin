@@ -1,7 +1,5 @@
 package json
 
-import "core:strconv"
-
 Specification :: enum {
 	JSON,
 	JSON5,
