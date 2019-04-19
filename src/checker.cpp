@@ -7,10 +7,12 @@ void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 bool is_operand_value(Operand o) {
 	switch (o.mode) {
 	case Addressing_Value:
-	case Addressing_Variable:
 	case Addressing_Immutable:
+	case Addressing_Context:
+	case Addressing_Variable:
 	case Addressing_Constant:
 	case Addressing_MapIndex:
+	case Addressing_OptionalOk:
 		return true;
 	}
 	return false;
