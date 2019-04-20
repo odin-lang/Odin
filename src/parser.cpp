@@ -4197,6 +4197,8 @@ bool is_package_name_reserved(String const &name) {
 bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir, String original_string, String *path) {
 	GB_ASSERT(path != nullptr);
 
+	// NOTE(bill): if file_mutex == nullptr, this means that the code is used within the semantics stage
+
 	gbAllocator a = heap_allocator();
 	String collection_name = {};
 
@@ -4210,10 +4212,12 @@ bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir,
 
 	bool has_windows_drive = false;
 #if defined(GB_SYSTEM_WINDOWS)
-	if (colon_pos == 1 && original_string.len > 2) {
-		if (original_string[2] == '/' || original_string[2] == '\\') {
-			colon_pos = -1;
-			has_windows_drive = true;
+	if (file_mutex == nullptr) {
+		if (colon_pos == 1 && original_string.len > 2) {
+			if (original_string[2] == '/' || original_string[2] == '\\') {
+				colon_pos = -1;
+				has_windows_drive = true;
+			}
 		}
 	}
 #endif
