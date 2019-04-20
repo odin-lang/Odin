@@ -1525,30 +1525,35 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 	gbAllocator a = ir_allocator();
 
 	if (is_type_slice(type)) {
-		ast_node(cl, CompoundLit, value.value_compound);
+		if (value.kind == ExactValue_String) {
+			GB_ASSERT(is_type_u8_slice(type));
+			return ir_value_constant(type, value);
+		} else {
+			ast_node(cl, CompoundLit, value.value_compound);
 
-		isize count = cl->elems.count;
-		if (count == 0) {
-			return ir_value_nil(type);
+			isize count = cl->elems.count;
+			if (count == 0) {
+				return ir_value_nil(type);
+			}
+			Type *elem = base_type(type)->Slice.elem;
+			Type *t = alloc_type_array(elem, count);
+			irValue *backing_array = ir_add_module_constant(m, t, value);
+
+
+			isize max_len = 7+8+1;
+			u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
+			isize len = gb_snprintf(cast(char *)str, max_len, "csba$%x", m->global_array_index);
+			m->global_array_index++;
+
+			String name = make_string(str, len-1);
+
+			Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
+			irValue *g = ir_value_global(e, backing_array);
+			ir_module_add_value(m, e, g);
+			map_set(&m->members, hash_string(name), g);
+
+			return ir_value_constant_slice(type, g, count);
 		}
-		Type *elem = base_type(type)->Slice.elem;
-		Type *t = alloc_type_array(elem, count);
-		irValue *backing_array = ir_add_module_constant(m, t, value);
-
-
-		isize max_len = 7+8+1;
-		u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
-		isize len = gb_snprintf(cast(char *)str, max_len, "csba$%x", m->global_array_index);
-		m->global_array_index++;
-
-		String name = make_string(str, len-1);
-
-		Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
-		irValue *g = ir_value_global(e, backing_array);
-		ir_module_add_value(m, e, g);
-		map_set(&m->members, hash_string(name), g);
-
-		return ir_value_constant_slice(type, g, count);
 	}
 
 	return ir_value_constant(type, value);

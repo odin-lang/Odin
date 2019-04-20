@@ -1677,6 +1677,9 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		} else if (name.string == "location") {
 			Ast *tag = ast_basic_directive(f, token, name.string);
 			return parse_call_expr(f, tag);
+		} else if (name.string == "load") {
+			Ast *tag = ast_basic_directive(f, token, name.string);
+			return parse_call_expr(f, tag);
 		} else if (name.string == "assert") {
 			Ast *tag = ast_basic_directive(f, token, name.string);
 			return parse_call_expr(f, tag);
@@ -4191,7 +4194,7 @@ bool is_package_name_reserved(String const &name) {
 }
 
 
-bool determine_path_from_string(Parser *p, Ast *node, String base_dir, String original_string, String *path) {
+bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir, String original_string, String *path) {
 	GB_ASSERT(path != nullptr);
 
 	gbAllocator a = heap_allocator();
@@ -4229,8 +4232,8 @@ bool determine_path_from_string(Parser *p, Ast *node, String base_dir, String or
 		return true;
 	}
 
-	gb_mutex_lock(&p->file_decl_mutex);
-	defer (gb_mutex_unlock(&p->file_decl_mutex));
+	if (file_mutex) gb_mutex_lock(file_mutex);
+	defer (if (file_mutex) gb_mutex_unlock(file_mutex));
 
 
 	if (node->kind == Ast_ForeignImportDecl) {
@@ -4321,7 +4324,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<Ast *>
 
 			String original_string = string_trim_whitespace(id->relpath.string);
 			String import_path = {};
-			bool ok = determine_path_from_string(p, node, base_dir, original_string, &import_path);
+			bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, original_string, &import_path);
 			if (!ok) {
 				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
 				continue;
@@ -4344,7 +4347,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<Ast *>
 				String fullpath = file_str;
 
 				String foreign_path = {};
-				bool ok = determine_path_from_string(p, node, base_dir, file_str, &foreign_path);
+				bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, file_str, &foreign_path);
 				if (!ok) {
 					decls[i] = ast_bad_decl(f, fl->filepaths[fp_idx], fl->filepaths[fl->filepaths.count-1]);
 					goto end;
@@ -4444,6 +4447,18 @@ bool parse_build_tag(Token token_for_pos, String s) {
 	return true;
 }
 
+String dir_from_path(String path) {
+	String base_dir = path;
+	for (isize i = path.len-1; i >= 0; i--) {
+		if (base_dir[i] == '\\' ||
+		    base_dir[i] == '/') {
+			break;
+		}
+		base_dir.len--;
+	}
+	return base_dir;
+}
+
 bool parse_file(Parser *p, AstFile *f) {
 	if (f->tokens.count == 0) {
 		return true;
@@ -4453,15 +4468,7 @@ bool parse_file(Parser *p, AstFile *f) {
 	}
 
 	String filepath = f->tokenizer.fullpath;
-	String base_dir = filepath;
-	for (isize i = filepath.len-1; i >= 0; i--) {
-		if (base_dir[i] == '\\' ||
-		    base_dir[i] == '/') {
-			break;
-		}
-		base_dir.len--;
-	}
-
+	String base_dir = dir_from_path(filepath);
 	comsume_comment_groups(f, f->prev_token);
 
 	CommentGroup *docs = f->lead_comment;
