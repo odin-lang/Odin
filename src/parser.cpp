@@ -4208,9 +4208,19 @@ bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir,
 		}
 	}
 
+	bool has_windows_drive = false;
+#if defined(GB_SYSTEM_WINDOWS)
+	if (colon_pos == 1 && original_string.len > 2) {
+		if (original_string[2] == '/' || original_string[2] == '\\') {
+			colon_pos = -1;
+			has_windows_drive = true;
+		}
+	}
+#endif
+
 	String file_str = {};
 	if (colon_pos == 0) {
-		syntax_error(node, "Expected a collection name");
+		error(node, "Expected a collection name");
 		return false;
 	}
 
@@ -4221,8 +4231,15 @@ bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir,
 		file_str = original_string;
 	}
 
-	if (!is_import_path_valid(file_str)) {
-		syntax_error(node, "Invalid import path: '%.*s'", LIT(file_str));
+
+	if (has_windows_drive) {
+		String sub_file_path = substring(file_str, 3, file_str.len);
+		if (!is_import_path_valid(sub_file_path)) {
+			error(node, "Invalid import path: '%.*s'", LIT(file_str));
+			return false;
+		}
+	} else if (!is_import_path_valid(file_str)) {
+		error(node, "Invalid import path: '%.*s'", LIT(file_str));
 		return false;
 	}
 
@@ -4243,7 +4260,7 @@ bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir,
 	if (collection_name.len > 0) {
 		if (collection_name == "system") {
 			if (node->kind != Ast_ForeignImportDecl) {
-				syntax_error(node, "The library collection 'system' is restrict for 'foreign_library'");
+				error(node, "The library collection 'system' is restrict for 'foreign_library'");
 				return false;
 			} else {
 				*path = file_str;
@@ -4251,7 +4268,7 @@ bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir,
 			}
 		} else if (!find_library_collection_path(collection_name, &base_dir)) {
 			// NOTE(bill): It's a naughty name
-			syntax_error(node, "Unknown library collection: '%.*s'", LIT(collection_name));
+			error(node, "Unknown library collection: '%.*s'", LIT(collection_name));
 			return false;
 		}
 	} else {
@@ -4270,10 +4287,12 @@ bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir,
 #endif
 	}
 
-
-	String fullpath = string_trim_whitespace(get_fullpath_relative(a, base_dir, file_str));
-	*path = fullpath;
-
+	if (has_windows_drive) {
+		*path = file_str;
+	} else {
+		String fullpath = string_trim_whitespace(get_fullpath_relative(a, base_dir, file_str));
+		*path = fullpath;
+	}
 	return true;
 }
 
@@ -4616,8 +4635,9 @@ GB_THREAD_PROC(parse_worker_file_proc) {
 ParseFileError parse_packages(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
 
-	char *fullpath_str = gb_path_get_full_name(heap_allocator(), cast(char const *)&init_filename[0]);
-	String init_fullpath = string_trim_whitespace(make_string_c(fullpath_str));
+	// char *fullpath_str = gb_path_get_full_name(heap_allocator(), cast(char const *)&init_filename[0]);
+	// String init_fullpath = string_trim_whitespace(make_string_c(fullpath_str));
+	String init_fullpath = path_to_full_path(heap_allocator(), init_filename);
 	if (!path_is_directory(init_fullpath)) {
 		String const ext = str_lit(".odin");
 		if (!string_ends_with(init_fullpath, ext)) {
