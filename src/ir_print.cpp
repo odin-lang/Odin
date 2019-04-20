@@ -673,7 +673,20 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_write_str_lit(f, "zeroinitializer");
 			break;
 		}
-		if (!is_type_string(type)) {
+		if (is_type_u8_slice(type)) {
+			irValue *str_array = ir_add_global_string_array(m, str);
+			ir_write_str_lit(f, "{i8* getelementptr inbounds (");
+			ir_print_type(f, m, str_array->Global.entity->type);
+			ir_write_str_lit(f, ", ");
+			ir_print_type(f, m, str_array->Global.entity->type);
+			ir_write_str_lit(f, "* ");
+			ir_print_encoded_global(f, str_array->Global.entity->token.string, false);
+			ir_write_str_lit(f, ", ");
+			ir_print_type(f, m, t_i32);
+			ir_write_str_lit(f, " 0, i32 0), ");
+			ir_print_type(f, m, t_int);
+			ir_fprintf(f, " %lld}", cast(i64)str.len);
+		} else if (!is_type_string(type)) {
 			GB_ASSERT(is_type_array(type));
 			ir_write_str_lit(f, "c\"");
 			ir_print_escape_string(f, str, false, false);
