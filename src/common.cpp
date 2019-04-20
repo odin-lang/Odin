@@ -740,7 +740,15 @@ String path_to_full_path(gbAllocator a, String path) {
 	defer (gb_free(ha, path_c));
 
 	char *fullpath = gb_path_get_full_name(a, path_c);
-	return make_string_c(fullpath);
+	String res = string_trim_whitespace(make_string_c(fullpath));
+#if defined(GB_SYSTEM_WINDOWS)
+	for (isize i = 0; i < res.len; i++) {
+		if (res[i] == '\\') {
+			res[i] = '/';
+		}
+	}
+#endif
+	return res;
 }
 
 

@@ -443,6 +443,13 @@ String path_to_fullpath(gbAllocator a, String s) {
 		text[len] = 0;
 		result = string16_to_string(a, make_string16(text, len));
 		result = string_trim_whitespace(result);
+
+		// Replace Windows style separators
+		for (isize i = 0; i < result.len; i++) {
+			if (result[i] == '\\') {
+				result[i] = '/';
+			}
+		}
 	}
 
 	return result;
@@ -470,6 +477,7 @@ String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 	gb_memmove(str+i, "/", 1);                      i += 1;
 	gb_memmove(str+i, path.text,     path.len);     i += path.len;
 	str[i] = 0;
+
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
