@@ -1896,7 +1896,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			bd.tok  = tok;
 			bd.name = name.text;
 			return bd;
-		case "location", "assert", "defined":
+		case "location", "load", "assert", "defined":
 			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(name));
 			bd.tok  = tok;
 			bd.name = name.text;
