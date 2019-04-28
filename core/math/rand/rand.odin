@@ -88,6 +88,9 @@ int_max :: proc(n: int, r: ^Rand = global_rand_ptr) -> int {
 float64 :: proc(r: ^Rand = global_rand_ptr) -> f64 { return f64(int63_max(1<<53, r)) / (1 << 53); }
 float32 :: proc(r: ^Rand = global_rand_ptr) -> f32 { return f32(float64(r)); }
 
+float64_range :: proc(lo, hi: f64, r: ^Rand = global_rand_ptr) -> f64 { return (hi-lo)*float64(r) + lo; }
+float32_range :: proc(lo, hi: f32, r: ^Rand = global_rand_ptr) -> f32 { return (hi-lo)*float32(r) + lo; }
+
 
 read :: proc(p: []byte, r: ^Rand = global_rand_ptr) -> (n: int) {
 	pos := i8(0);
