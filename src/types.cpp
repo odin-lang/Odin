@@ -2409,7 +2409,7 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.word_size);
 }
 
-Array<i64> type_set_offsets_of(Array<Entity *> fields, bool is_packed, bool is_raw_union) {
+Array<i64> type_set_offsets_of(Array<Entity *> const &fields, bool is_packed, bool is_raw_union) {
 	gbAllocator a = heap_allocator();
 	auto offsets = array_make<i64>(a, fields.count);
 	i64 curr_offset = 0;
@@ -2442,6 +2442,7 @@ bool type_set_offsets(Type *t) {
 		if (!t->Struct.are_offsets_set) {
 			t->Struct.are_offsets_being_processed = true;
 			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union);
+			GB_ASSERT(t->Struct.offsets.count == t->Struct.fields.count);
 			t->Struct.are_offsets_being_processed = false;
 			t->Struct.are_offsets_set = true;
 			return true;
@@ -2603,7 +2604,14 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 				type_path_print_illegal_cycle(path, path->path.count-1);
 				return FAILURE_SIZE;
 			}
+			if (t->Struct.are_offsets_set && t->Struct.offsets.count != t->Struct.fields.count) {
+				// TODO(bill, 2019-04-28): Determine exactly why the offsets length is different thatn the field length
+				// Are the the same at some point and then the struct length is increased?
+				// Why is this not handled by the type cycle checker?
+				t->Struct.are_offsets_set = false;
+			}
 			type_set_offsets(t);
+			GB_ASSERT_MSG(t->Struct.offsets.count == t->Struct.fields.count, "%s", type_to_string(t));
 			size = t->Struct.offsets[cast(isize)count-1] + type_size_of_internal(t->Struct.fields[cast(isize)count-1]->type, path);
 			return align_formula(size, align);
 		}

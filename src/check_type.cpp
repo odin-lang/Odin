@@ -2442,7 +2442,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 	case_end;
 
 	case_ast_node(ot, OpaqueType, e);
-		Type *elem = strip_opaque_type(check_type(ctx, ot->type));
+		Type *elem = strip_opaque_type(check_type_expr(ctx, ot->type, nullptr));
 		*type = alloc_type_opaque(elem);
 		set_base_type(named_type, *type);
 		return true;
