@@ -35,8 +35,6 @@ SEEK_DATA  :: 3;
 SEEK_HOLE  :: 4;
 SEEK_MAX   :: SEEK_HOLE;
 
-
-
 // NOTE(zangent): These are OS specific!
 // Do not mix these up!
 RTLD_LAZY     :: 0x1;
@@ -127,6 +125,8 @@ X_OK :: 1; // Test for execute permission
 F_OK :: 0; // Test for file existance
 
 foreign libc {
+    @(link_name="__error") __error :: proc "c" () -> ^int ---;
+
 	@(link_name="open")    _unix_open    :: proc(path: cstring, flags: int, #c_vararg mode: ..any) -> Handle ---;
 	@(link_name="close")   _unix_close   :: proc(handle: Handle) ---;
 	@(link_name="read")    _unix_read    :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---;
@@ -152,12 +152,16 @@ foreign dl {
 	@(link_name="dlerror") _unix_dlerror :: proc() -> cstring ---;
 }
 
+get_last_error :: proc() -> Errno {
+    return Errno(__error()^);
+}
+
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
 	cstr := strings.clone_to_cstring(path);
 	handle := _unix_open(cstr, flags, mode);
 	delete(cstr);
 	if handle == -1 {
-		return INVALID_HANDLE, 1;
+		return INVALID_HANDLE, get_last_error();
 	}
 	return handle, 0;
 }
@@ -171,7 +175,7 @@ write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 
 	bytes_written := _unix_write(fd, &data[0], len(data));
 	if(bytes_written == -1) {
-		return 0, 1;
+		return 0, get_last_error();
 	}
 	return bytes_written, 0;
 }
@@ -181,7 +185,7 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 
 	bytes_read := _unix_read(fd, &data[0], len(data));
 	if bytes_read == -1 {
-		return 0, 1;
+		return 0, get_last_error();
 	}
 	return bytes_read, 0;
 }
@@ -191,7 +195,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 
 	final_offset := i64(_unix_lseek(fd, int(offset), whence));
 	if final_offset == -1 {
-		return 0, 1;
+		return 0, get_last_error();
 	}
 	return final_offset, 0;
 }

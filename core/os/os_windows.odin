@@ -65,6 +65,10 @@ is_path_separator :: proc(r: rune) -> bool {
 	return r == '/' || r == '\\';
 }
 
+get_last_error :: proc() -> Errno {
+    return Errno(win32.get_last_error());
+}
+
 open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) {
 	if len(path) == 0 do return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
 
@@ -107,13 +111,13 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 	handle := Handle(win32.create_file_w(wide_path, access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
 	if handle != INVALID_HANDLE do return handle, ERROR_NONE;
 
-	err := Errno(win32.get_last_error());
+	err := get_last_error();
 	return INVALID_HANDLE, err;
 }
 
 close :: proc(fd: Handle) -> Errno {
 	if win32.close_handle(win32.Handle(fd)) == 0 {
-		return Errno(win32.get_last_error());
+		return get_last_error();
 	}
 	return ERROR_NONE;
 }
@@ -133,7 +137,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 
 		e := win32.write_file(win32.Handle(fd), &data[total_write], to_write, &single_write_length, nil);
 		if single_write_length <= 0 || !e {
-			err := Errno(win32.get_last_error());
+			err := get_last_error();
 			return int(total_write), err;
 		}
 		total_write += i64(single_write_length);
@@ -155,7 +159,7 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 
 		e := win32.read_file(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
 		if single_read_length <= 0 || !e {
-			err := Errno(win32.get_last_error());
+			err := get_last_error();
 			return int(total_read), err;
 		}
 		total_read += i64(single_read_length);
@@ -177,7 +181,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 
 	dw_ptr := win32.set_file_pointer(win32.Handle(fd), lo, &hi, w);
 	if dw_ptr == win32.INVALID_SET_FILE_POINTER {
-		err := Errno(win32.get_last_error());
+		err := get_last_error();
 		return 0, err;
 	}
 	return i64(hi)<<32 + i64(dw_ptr), ERROR_NONE;
@@ -187,7 +191,7 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 	length: i64;
 	err: Errno;
 	if !win32.get_file_size_ex(win32.Handle(fd), &length) {
-		err = Errno(win32.get_last_error());
+		err = get_last_error();
 	}
 	return length, err;
 }
@@ -214,7 +218,7 @@ get_std_handle :: proc(h: int) -> Handle {
 last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
 	file_info: win32.By_Handle_File_Information;
 	if !win32.get_file_information_by_handle(win32.Handle(fd), &file_info) {
-		return 0, Errno(win32.get_last_error());
+		return 0, get_last_error();
 	}
 	lo := File_Time(file_info.last_write_time.lo);
 	hi := File_Time(file_info.last_write_time.hi);
@@ -226,7 +230,7 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 
 	wide_path := win32.utf8_to_wstring(name);
 	if !win32.get_file_attributes_ex_w(wide_path, win32.GetFileExInfoStandard, &data) {
-		return 0, Errno(win32.get_last_error());
+		return 0, get_last_error();
 	}
 
 	l := File_Time(data.last_write_time.lo);

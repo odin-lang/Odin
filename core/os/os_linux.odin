@@ -207,8 +207,8 @@ is_path_separator :: proc(r: rune) -> bool {
 	return r == '/';
 }
 
-get_last_error :: proc() -> int {
-	return __errno_location()^;
+get_last_error :: proc() -> Errno {
+	return Errno(__errno_location()^);
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
