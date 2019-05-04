@@ -558,9 +558,9 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 	case Type_BitField: {
 		i64 align = type_align_of(t);
 		i64 size  = type_size_of(t);
-		ir_write_byte(f, '{');
+		ir_write_string(f, str_lit("<{"));
 		ir_print_alignment_prefix_hack(f, align);
-		ir_fprintf(f, ", [%lld x i8]}", size);
+		ir_fprintf(f, ", [%lld x i8]}>", size);
 		break;
 	}
 
@@ -1190,7 +1190,11 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, type);
 		ir_write_str_lit(f, "* ");
 		ir_print_value(f, m, instr->Load.address, type);
-		ir_fprintf(f, ", align %lld", type_align_of(type));
+		if (instr->Load.custom_align > 0) {
+			ir_fprintf(f, ", align %lld", instr->Load.custom_align);
+		} else {
+			ir_fprintf(f, ", align %lld", type_align_of(type));
+		}
 		ir_print_debug_location(f, m, value);
 		break;
 	}

@@ -264,7 +264,7 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 						}
 
 						BigInt imax = big_int_make_u64(imax_);
-						if (big_int_cmp(&i, &imax) >= 0) {
+						if (big_int_cmp(&i, &imax) <= 0) {
 							return rhs->type;
 						}
 					}
