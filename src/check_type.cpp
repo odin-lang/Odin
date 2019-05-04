@@ -1554,6 +1554,13 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 						success = false;
 						type = t_invalid;
 					}
+					if (is_type_untyped(default_type(type))) {
+						gbString str = type_to_string(type);
+						error(o.expr, "Cannot determine type from the parameter, got '%s'", str);
+						gb_string_free(str);
+						success = false;
+						type = t_invalid;
+					}
 					bool modify_type = !ctx->no_polymorphic_errors;
 
 					if (specialization != nullptr && !check_type_specialization_to(ctx, specialization, type, false, modify_type)) {
@@ -1603,6 +1610,13 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 						} else {
 							success = false;
 						}
+					}
+					if (is_type_untyped(default_type(type))) {
+						gbString str = type_to_string(type);
+						error(op.expr, "Cannot determine type from the parameter, got '%s'", str);
+						gb_string_free(str);
+						success = false;
+						type = t_invalid;
 					}
 				}
 
