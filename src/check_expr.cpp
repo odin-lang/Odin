@@ -4425,7 +4425,7 @@ bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 
 
 
-bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Array<Ast *> const &rhs, bool allow_ok) {
+bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Array<Ast *> const &rhs, bool allow_ok, bool is_variadic) {
 	bool optional_ok = false;
 	isize tuple_index = 0;
 	for_array(i, rhs) {
@@ -4443,6 +4443,25 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 				DeclInfo *decl = decl_info_of_entity(e);
 				if (decl) c->decl = decl;
 				type_hint = e->type;
+				if (e->flags & EntityFlag_Ellipsis) {
+					GB_ASSERT(is_type_slice(e->type));
+					GB_ASSERT(e->type->kind == Type_Slice);
+					type_hint = e->type->Slice.elem;
+				}
+			}
+		}
+		if (lhs != nullptr && tuple_index >= lhs_count && is_variadic) {
+			// NOTE(bill): override DeclInfo for dependency
+			Entity *e = lhs[lhs_count-1];
+			if (e != nullptr) {
+				DeclInfo *decl = decl_info_of_entity(e);
+				if (decl) c->decl = decl;
+				type_hint = e->type;
+				if (e->flags & EntityFlag_Ellipsis) {
+					GB_ASSERT(is_type_slice(e->type));
+					GB_ASSERT(e->type->kind == Type_Slice);
+					type_hint = e->type->Slice.elem;
+				}
 			}
 		}
 
@@ -4939,8 +4958,11 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		operands = array_make<Operand>(heap_allocator(), 0, 2*ce->args.count);
 		Entity **lhs = nullptr;
 		isize lhs_count = -1;
+		bool is_variadic = false;
 		if (proc_type != nullptr && is_type_proc(proc_type)) {
 			TypeProc *pt = &base_type(proc_type)->Proc;
+			is_variadic = pt->variadic;
+
 			if (!pt->is_polymorphic || pt->is_poly_specialized) {
 				if (pt->params != nullptr) {
 					lhs = pt->params->Tuple.variables.data;
@@ -4959,7 +4981,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			}
 		}
 
-		check_unpack_arguments(c, lhs, lhs_count, &operands, ce->args, false);
+		check_unpack_arguments(c, lhs, lhs_count, &operands, ce->args, false, is_variadic);
 	}
 
 	if (operand->mode == Addressing_ProcGroup) {
@@ -5212,7 +5234,7 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 
 	} else {
 		operands = array_make<Operand>(heap_allocator(), 0, 2*ce->args.count);
-		check_unpack_arguments(c, nullptr, -1, &operands, ce->args, false);
+		check_unpack_arguments(c, nullptr, -1, &operands, ce->args, false, false);
 	}
 
 	CallArgumentError err = CallArgumentError_None;
