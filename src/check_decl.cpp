@@ -107,7 +107,7 @@ void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Ar
 	// an extra allocation
 	auto operands = array_make<Operand>(ctx->allocator, 0, 2*lhs_count);
 	defer (array_free(&operands));
-	check_unpack_arguments(ctx, lhs, lhs_count, &operands, inits, true);
+	check_unpack_arguments(ctx, lhs, lhs_count, &operands, inits, true, false);
 
 	isize rhs_count = operands.count;
 	for_array(i, operands) {

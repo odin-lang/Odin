@@ -1247,7 +1247,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		auto operands = array_make<Operand>(heap_allocator(), 0, 2*rs->results.count);
 		defer (array_free(&operands));
 
-		check_unpack_arguments(ctx, result_entities, result_count, &operands, rs->results, true);
+		check_unpack_arguments(ctx, result_entities, result_count, &operands, rs->results, true, false);
 
 		if (result_count == 0 && rs->results.count > 0) {
 			error(rs->results[0], "No return values expected");
