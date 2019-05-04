@@ -1429,7 +1429,6 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 		}
 	}
 
-
 	return false;
 }
 
@@ -4352,12 +4351,14 @@ isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs
 	if (lhs != nullptr) {
 		for (isize j = 0; (tuple_index + j) < lhs_count && j < tuple_count; j++) {
 			Entity *e = lhs[tuple_index + j];
-			DeclInfo *decl = decl_info_of_entity(e);
-			if (decl != nullptr) {
-				c->decl = decl; // will be reset by the 'defer' any way
-				for_array(k, decl->deps.entries) {
-					Entity *dep = decl->deps.entries[k].ptr;
-					add_declaration_dependency(c, dep); // TODO(bill): Should this be here?
+			if (e != nullptr) {
+				DeclInfo *decl = decl_info_of_entity(e);
+				if (decl != nullptr) {
+					c->decl = decl; // will be reset by the 'defer' any way
+					for_array(k, decl->deps.entries) {
+						Entity *dep = decl->deps.entries[k].ptr;
+						add_declaration_dependency(c, dep); // TODO(bill): Should this be here?
+					}
 				}
 			}
 		}
@@ -4438,9 +4439,11 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 		if (lhs != nullptr && tuple_index < lhs_count) {
 			// NOTE(bill): override DeclInfo for dependency
 			Entity *e = lhs[tuple_index];
-			DeclInfo *decl = decl_info_of_entity(e);
-			if (decl) c->decl = decl;
-			type_hint = e->type;
+			if (e != nullptr) {
+				DeclInfo *decl = decl_info_of_entity(e);
+				if (decl) c->decl = decl;
+				type_hint = e->type;
+			}
 		}
 
 		check_expr_base(c, &o, rhs[i], type_hint);
@@ -4942,6 +4945,16 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				if (pt->params != nullptr) {
 					lhs = pt->params->Tuple.variables.data;
 					lhs_count = pt->params->Tuple.variables.count;
+				}
+			} else {
+				// NOTE(bill): Create 'lhs' list in order to ignore parameters which are polymorphic
+				lhs_count = pt->params->Tuple.variables.count;
+				lhs = gb_alloc_array(heap_allocator(), Entity *, lhs_count);
+				for_array(i, pt->params->Tuple.variables) {
+					Entity *e = pt->params->Tuple.variables[i];
+					if (!is_type_polymorphic(e->type)) {
+						lhs[i] = e;
+					}
 				}
 			}
 		}
