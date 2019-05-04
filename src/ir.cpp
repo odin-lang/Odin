@@ -186,7 +186,7 @@ gbAllocator ir_allocator(void) {
 	})                                                                \
 	IR_INSTR_KIND(ZeroInit, struct { irValue *address; })             \
 	IR_INSTR_KIND(Store,    struct { irValue *address, *value; bool is_volatile; }) \
-	IR_INSTR_KIND(Load,     struct { Type *type; irValue *address; }) \
+	IR_INSTR_KIND(Load,     struct { Type *type; irValue *address; i64 custom_align; }) \
 	IR_INSTR_KIND(AtomicFence, struct { BuiltinProcId id; })          \
 	IR_INSTR_KIND(AtomicStore, struct {                               \
 		irValue *address, *value;                                     \
@@ -848,7 +848,7 @@ void     ir_module_add_value    (irModule *m, Entity *e, irValue *v);
 void     ir_emit_zero_init      (irProcedure *p, irValue *address, Ast *expr);
 irValue *ir_emit_comment        (irProcedure *p, String text);
 irValue *ir_emit_store          (irProcedure *p, irValue *address, irValue *value, bool is_volatile=false);
-irValue *ir_emit_load           (irProcedure *p, irValue *address);
+irValue *ir_emit_load           (irProcedure *p, irValue *address, i64 custom_align=0);
 void     ir_emit_jump           (irProcedure *proc, irBlock *block);
 irValue *ir_emit_conv           (irProcedure *proc, irValue *value, Type *t);
 irValue *ir_type_info           (irProcedure *proc, Type *type);
@@ -2793,14 +2793,16 @@ irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value, bool is
 	}
 	return ir_emit(p, ir_instr_store(p, address, value, is_volatile));
 }
-irValue *ir_emit_load(irProcedure *p, irValue *address) {
+irValue *ir_emit_load(irProcedure *p, irValue *address, i64 custom_align) {
 	GB_ASSERT(address != nullptr);
 	Type *t = type_deref(ir_type(address));
 	// if (is_type_boolean(t)) {
 		// return ir_emit(p, ir_instr_load_bool(p, address));
 	// }
 	if (address) address->uses += 1;
-	return ir_emit(p, ir_instr_load(p, address));
+	auto instr = ir_instr_load(p, address);
+	instr->Instr.Load.custom_align = custom_align;
+	return ir_emit(p, instr);
 }
 irValue *ir_emit_select(irProcedure *p, irValue *cond, irValue *t, irValue *f) {
 	if (cond) cond->uses += 1;
@@ -3340,6 +3342,7 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 		i32 offset = bft->BitField.offsets[value_index];
 		i32 size_in_bits = bft->BitField.fields[value_index]->type->BitFieldValue.bits;
 
+
 		i32 byte_index = offset / 8;
 		i32 bit_inset = offset % 8;
 
@@ -3348,6 +3351,9 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 			GB_ASSERT(size_in_bits == 0);
 			return;
 		}
+
+		gb_printf_err("bit_field_size, %d %d %d\n", size_in_bits, byte_index, bit_inset);
+
 
 		Type *int_type = nullptr;
 		switch (size_in_bytes) {
@@ -3373,32 +3379,50 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 				v = ir_emit_arith(proc, Token_Shr, v, shift_amount, int_type);
 			}
 			irValue *ptr = ir_emit_conv(proc, bytes, alloc_type_pointer(int_type));
-			v = ir_emit_arith(proc, Token_Or, ir_emit_load(proc, ptr), v, int_type);
+
+			irValue *sv = ir_emit_load(proc, ptr, 1);
+			// NOTE(bill): Zero out the lower bits that need to be stored to
+			sv = ir_emit_arith(proc, Token_Shr, sv, ir_const_int(size_in_bits), int_type);
+			sv = ir_emit_arith(proc, Token_Shl, sv, ir_const_int(size_in_bits), int_type);
+
+			v = ir_emit_arith(proc, Token_Or, sv, v, int_type);
 			ir_emit_store(proc, ptr, v, true);
 			return;
 		}
 
+		GB_ASSERT(0 < bit_inset && bit_inset < 8);
 
 		// First byte
 		{
-			i32 sa = 8 - bit_inset;
-			irValue *shift_amount = ir_const_int(sa);
+			irValue *shift_amount = ir_const_int(bit_inset);
+
 			irValue *v = ir_emit_conv(proc, value, t_u8);
 			v = ir_emit_arith(proc, Token_Shl, v, shift_amount, int_type);
-			v = ir_emit_arith(proc, Token_Or, ir_emit_load(proc, bytes), v, int_type);
-			ir_emit_store(proc, bytes, v, true);
 
+			irValue *sv = ir_emit_load(proc, bytes, 1);
+			// NOTE(bill): Zero out the upper bits that need to be stored to
+			sv = ir_emit_arith(proc, Token_Shl, sv, ir_const_int(bit_inset), int_type);
+			sv = ir_emit_arith(proc, Token_Shr, sv, ir_const_int(bit_inset), int_type);
+
+			v = ir_emit_arith(proc, Token_Or, sv, v, int_type);
+			ir_emit_store(proc, bytes, v, true);
 		}
 
 		// Remaining bytes
-		{
+		if (bit_inset+size_in_bits > 8) {
 			irValue *shift_amount = ir_const_int(bit_inset);
 			irValue *ptr = ir_emit_conv(proc, ir_emit_ptr_offset(proc, bytes, v_one), alloc_type_pointer(int_type));
 			irValue *v = ir_emit_arith(proc, Token_Shr, value, shift_amount, int_type);
-			v = ir_emit_arith(proc, Token_Or, ir_emit_load(proc, ptr), v, int_type);
+
+			irValue *sv = ir_emit_load(proc, ptr, 1);
+			// NOTE(bill): Zero out the lower bits that need to be stored to
+			sv = ir_emit_arith(proc, Token_Shr, sv, ir_const_int(size_in_bits-bit_inset), int_type);
+			sv = ir_emit_arith(proc, Token_Shl, sv, ir_const_int(size_in_bits-bit_inset), int_type);
+
+			v = ir_emit_arith(proc, Token_Or, sv, v, int_type);
 			ir_emit_store(proc, ptr, v, true);
-			return;
 		}
+		return;
 	} else if (addr.kind == irAddr_Context) {
 		irValue *old = ir_emit_load(proc, ir_find_or_generate_context_ptr(proc));
 		irValue *next = ir_add_local_generated(proc, t_context, true);

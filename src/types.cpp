@@ -2953,7 +2953,6 @@ gbString write_type_to_string(gbString str, Type *type) {
 			Entity *f = type->BitField.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
 			GB_ASSERT(f->type != nullptr && f->type->kind == Type_BitFieldValue);
-			str = gb_string_append_rune(str, '{');
 			if (i > 0) {
 				str = gb_string_appendc(str, ", ");
 			}
