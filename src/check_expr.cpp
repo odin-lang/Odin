@@ -4076,7 +4076,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_clamp: {
 		// clamp :: proc(a, min, max: ordered) -> ordered
-		Type *type = base_type(operand->type);
+		Type *type = operand->type;
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
 			error(call, "Expected a ordered numeric or string type to 'clamp', got '%s'", type_str);
