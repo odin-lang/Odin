@@ -32,9 +32,8 @@ TOKEN_KIND(Token__OperatorBegin, ""), \
 	TOKEN_KIND(Token_AndNot,   "&~"), \
 	TOKEN_KIND(Token_Shl,      "<<"), \
 	TOKEN_KIND(Token_Shr,      ">>"), \
-\
-	TOKEN_KIND(Token_CmpAnd, "&&"), \
-	TOKEN_KIND(Token_CmpOr,  "||"), \
+	TOKEN_KIND(Token_CmpAnd,   "&&"), \
+	TOKEN_KIND(Token_CmpOr,    "||"), \
 \
 TOKEN_KIND(Token__AssignOpBegin, ""), \
 	TOKEN_KIND(Token_AddEq,    "+="), \

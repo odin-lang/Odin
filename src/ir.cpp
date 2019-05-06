@@ -7687,6 +7687,7 @@ void ir_build_assign_op(irProcedure *proc, irAddr const &lhs, irValue *value, To
 	} else {
 		change = ir_emit_conv(proc, value, type);
 	}
+
 	irValue *new_value = ir_emit_arith(proc, op, old_value, change, type);
 	ir_addr_store(proc, lhs, new_value);
 }
@@ -8394,14 +8395,20 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			// +=, -=, etc
 			i32 op = cast(i32)as->op.kind;
 			op += Token_Add - Token_AddEq; // Convert += to +
-			irAddr lhs = ir_build_addr(proc, as->lhs[0]);
-			irValue *value = ir_build_expr(proc, as->rhs[0]);
-			ir_build_assign_op(proc, lhs, value, cast(TokenKind)op);
-			break;
-		}
-		}
+			if (op == Token_CmpAnd || op == Token_CmpOr) {
+				Type *type = as->lhs[0]->tav.type;
+				irValue *new_value = ir_emit_logical_binary_expr(proc, cast(TokenKind)op, as->lhs[0], as->rhs[0], type);
 
-		gb_temp_arena_memory_end(tmp);
+				irAddr lhs = ir_build_addr(proc, as->lhs[0]);
+				ir_addr_store(proc, lhs, new_value);
+			} else {
+				irAddr lhs = ir_build_addr(proc, as->lhs[0]);
+				irValue *value = ir_build_expr(proc, as->rhs[0]);
+				ir_build_assign_op(proc, lhs, value, cast(TokenKind)op);
+			}
+			return;
+		}
+		}
 	case_end;
 
 	case_ast_node(es, ExprStmt, node);
