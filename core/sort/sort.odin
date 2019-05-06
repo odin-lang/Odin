@@ -189,6 +189,14 @@ merge_sort :: proc(array: $A/[]$T) {
 }
 
 
+compare_bools :: proc(a, b: bool) -> int {
+	switch {
+	case !a && b: return -1;
+	case a && !b: return +1;
+	}
+	return 0;
+}
+
 
 compare_ints :: proc(a, b: int) -> int {
 	switch delta := a - b; {

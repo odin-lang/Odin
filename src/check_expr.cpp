@@ -4440,8 +4440,8 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 			// NOTE(bill): override DeclInfo for dependency
 			Entity *e = lhs[tuple_index];
 			if (e != nullptr) {
-				DeclInfo *decl = decl_info_of_entity(e);
-				if (decl) c->decl = decl;
+				// DeclInfo *decl = decl_info_of_entity(e);
+				// if (decl) c->decl = decl;
 				type_hint = e->type;
 				if (e->flags & EntityFlag_Ellipsis) {
 					GB_ASSERT(is_type_slice(e->type));
@@ -4449,13 +4449,12 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 					type_hint = e->type->Slice.elem;
 				}
 			}
-		}
-		if (lhs != nullptr && tuple_index >= lhs_count && is_variadic) {
+		} else if (lhs != nullptr && tuple_index >= lhs_count && is_variadic) {
 			// NOTE(bill): override DeclInfo for dependency
 			Entity *e = lhs[lhs_count-1];
 			if (e != nullptr) {
-				DeclInfo *decl = decl_info_of_entity(e);
-				if (decl) c->decl = decl;
+				// DeclInfo *decl = decl_info_of_entity(e);
+				// if (decl) c->decl = decl;
 				type_hint = e->type;
 				if (e->flags & EntityFlag_Ellipsis) {
 					GB_ASSERT(is_type_slice(e->type));
@@ -4930,6 +4929,40 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	return err;
 }
 
+Entity **populate_proc_parameter_list(CheckerContext *c, Type *proc_type, isize *lhs_count_, bool *is_variadic) {
+	Entity **lhs = nullptr;
+	isize lhs_count = -1;
+
+	if (proc_type == nullptr) {
+		return nullptr;
+	}
+
+	GB_ASSERT(is_type_proc(proc_type));
+	TypeProc *pt = &base_type(proc_type)->Proc;
+	*is_variadic = pt->variadic;
+
+	if (!pt->is_polymorphic || pt->is_poly_specialized) {
+		if (pt->params != nullptr) {
+			lhs = pt->params->Tuple.variables.data;
+			lhs_count = pt->params->Tuple.variables.count;
+		}
+	} else {
+		// NOTE(bill): Create 'lhs' list in order to ignore parameters which are polymorphic
+		lhs_count = pt->params->Tuple.variables.count;
+		lhs = gb_alloc_array(heap_allocator(), Entity *, lhs_count);
+		for_array(i, pt->params->Tuple.variables) {
+			Entity *e = pt->params->Tuple.variables[i];
+			if (!is_type_polymorphic(e->type)) {
+				lhs[i] = e;
+			}
+		}
+	}
+
+	if (lhs_count_) *lhs_count_ = lhs_count;
+
+	return lhs;
+}
+
 CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type *proc_type, Ast *call) {
 	ast_node(ce, CallExpr, call);
 
@@ -4960,28 +4993,11 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		isize lhs_count = -1;
 		bool is_variadic = false;
 		if (proc_type != nullptr && is_type_proc(proc_type)) {
-			TypeProc *pt = &base_type(proc_type)->Proc;
-			is_variadic = pt->variadic;
-
-			if (!pt->is_polymorphic || pt->is_poly_specialized) {
-				if (pt->params != nullptr) {
-					lhs = pt->params->Tuple.variables.data;
-					lhs_count = pt->params->Tuple.variables.count;
-				}
-			} else {
-				// NOTE(bill): Create 'lhs' list in order to ignore parameters which are polymorphic
-				lhs_count = pt->params->Tuple.variables.count;
-				lhs = gb_alloc_array(heap_allocator(), Entity *, lhs_count);
-				for_array(i, pt->params->Tuple.variables) {
-					Entity *e = pt->params->Tuple.variables[i];
-					if (!is_type_polymorphic(e->type)) {
-						lhs[i] = e;
-					}
-				}
-			}
+			lhs = populate_proc_parameter_list(c, proc_type, &lhs_count, &is_variadic);
 		}
-
-		check_unpack_arguments(c, lhs, lhs_count, &operands, ce->args, false, is_variadic);
+		if (operand->mode != Addressing_ProcGroup) {
+			check_unpack_arguments(c, lhs, lhs_count, &operands, ce->args, false, is_variadic);
+		}
 	}
 
 	if (operand->mode == Addressing_ProcGroup) {
@@ -4998,6 +5014,13 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 			Entity *e = procs[0];
 
+			Entity **lhs = nullptr;
+			isize lhs_count = -1;
+			bool is_variadic = false;
+			lhs = populate_proc_parameter_list(c, e->type, &lhs_count, &is_variadic);
+			check_unpack_arguments(c, lhs, lhs_count, &operands, ce->args, false, is_variadic);
+
+
 			CallArgumentData data = {};
 			CallArgumentError err = call_checker(c, call, e->type, e, operands, CallArgumentMode_ShowErrors, &data);
 			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
@@ -5005,6 +5028,8 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 			return data;
 		}
+
+		check_unpack_arguments(c, nullptr, -1, &operands, ce->args, false, false);
 
 		ValidIndexAndScore *valids         = gb_alloc_array(heap_allocator(), ValidIndexAndScore, procs.count);
 		isize               valid_count    = 0;
@@ -5015,7 +5040,6 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 		for_array(i, procs) {
 			Entity *p = procs[i];
-			check_entity_decl(c, p, nullptr, nullptr);
 			Type *pt = base_type(p->type);
 			if (pt != nullptr && is_type_proc(pt)) {
 				CallArgumentError err = CallArgumentError_None;
