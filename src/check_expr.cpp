@@ -526,12 +526,6 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 	}
 
 	if (is_type_bit_field_value(operand->type) && is_type_integer(type)) {
-		Type *bfv = base_type(operand->type);
-		i32 bits = bfv->BitFieldValue.bits;
-		i32 size = next_pow2((bits+7)/8);
-		i32 dst_size = cast(i32)type_size_of(type);
-		i32 diff = gb_abs(dst_size - size);
-		// TODO(bill): figure out a decent rule here
 		return 1;
 	}
 
@@ -1306,6 +1300,9 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 	} else if (is_type_string(type)) {
 		return in_value.kind == ExactValue_String;
 	} else if (is_type_integer(type) || is_type_rune(type)) {
+		if (in_value.kind == ExactValue_Bool) {
+			return false;
+		}
 		ExactValue v = exact_value_to_integer(in_value);
 		if (v.kind != ExactValue_Integer) {
 			return false;
