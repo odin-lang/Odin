@@ -535,6 +535,11 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		return 1;
 	}
 
+	if (is_type_bit_field_value(operand->type) && is_type_bit_field_value(type)) {
+		return 1;
+	}
+
+
 
 	{
 		isize subtype_level = check_is_assignable_to_using_subtype(operand->type, type);

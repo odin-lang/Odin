@@ -3521,9 +3521,9 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 
 		Type *int_ptr = alloc_type_pointer(int_type);
 
+		i32 sa = 8*size_in_bytes - size_in_bits;
 		if (bit_inset == 0) {
-			irValue *v = ir_emit_load(proc, ir_emit_conv(proc, bytes, int_ptr));
-			i32 sa = 8*size_in_bytes - size_in_bits;
+			irValue *v = ir_emit_load(proc, ir_emit_conv(proc, bytes, int_ptr), 1);
 			if (sa > 0) {
 				irValue *shift_amount = ir_const_int(sa);
 				v = ir_emit_arith(proc, Token_Shl, v, shift_amount, int_type);
@@ -3534,14 +3534,15 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 
 		GB_ASSERT(8 > bit_inset);
 
-		irValue *shift_amount = ir_value_constant(int_type, exact_value_i64(bit_inset));
-		irValue *first_byte = ir_emit_load(proc, bytes);
-		irValue *res = ir_emit_arith(proc, Token_Shr, first_byte, shift_amount, int_type);
-
-		irValue *remaining_bytes = ir_emit_load(proc, ir_emit_conv(proc, ir_emit_ptr_offset(proc, bytes, v_one), int_ptr));
-		remaining_bytes = ir_emit_arith(proc, Token_Shl, remaining_bytes, shift_amount, int_type);
-		return ir_emit_arith(proc, Token_Or, res, remaining_bytes, int_type);
-
+		irValue *ptr = ir_emit_conv(proc, bytes, int_ptr);
+		irValue *v = ir_emit_load(proc, ptr, 1);
+		v = ir_emit_arith(proc, Token_Shr, v, ir_const_int(bit_inset), int_type);
+		if (sa > 0) {
+			irValue *shift_amount = ir_const_int(sa);
+			v = ir_emit_arith(proc, Token_Shl, v, shift_amount, int_type);
+			v = ir_emit_arith(proc, Token_Shr, v, shift_amount, int_type);
+		}
+		return v;
 	} else if (addr.kind == irAddr_Context) {
 		if (addr.ctx.sel.index.count > 0) {
 			irValue *a = addr.addr;
@@ -4020,14 +4021,48 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 		right = ir_emit_conv(proc, right, ir_type(left));
 	} else {
 		gbAllocator a = ir_allocator();
-		i64 ls = type_size_of(ir_type(left));
-		i64 rs = type_size_of(ir_type(right));
+
+		Type *lt = ir_type(left);
+		Type *rt = ir_type(right);
+
+		if (is_type_bit_set(lt) && is_type_bit_set(rt)) {
+			Type *blt = base_type(lt);
+			Type *brt = base_type(rt);
+			GB_ASSERT(is_type_bit_field_value(blt));
+			GB_ASSERT(is_type_bit_field_value(brt));
+			i64 bits = gb_max(blt->BitFieldValue.bits, brt->BitFieldValue.bits);
+			i64 bytes = bits / 8;
+			switch (bytes) {
+			case 1:
+				left = ir_emit_conv(proc, left, t_u8);
+				right = ir_emit_conv(proc, right, t_u8);
+				break;
+			case 2:
+				left = ir_emit_conv(proc, left, t_u16);
+				right = ir_emit_conv(proc, right, t_u16);
+				break;
+			case 4:
+				left = ir_emit_conv(proc, left, t_u32);
+				right = ir_emit_conv(proc, right, t_u32);
+				break;
+			case 8:
+				left = ir_emit_conv(proc, left, t_u64);
+				right = ir_emit_conv(proc, right, t_u64);
+				break;
+			default: GB_PANIC("Unknown integer size"); break;
+			}
+		}
+
+		lt = ir_type(left);
+		rt = ir_type(right);
+		i64 ls = type_size_of(lt);
+		i64 rs = type_size_of(rt);
 		if (ls < rs) {
-			left = ir_emit_conv(proc, left, ir_type(right));
+			left = ir_emit_conv(proc, left, rt);
 		} else if (ls > rs) {
-			right = ir_emit_conv(proc, right, ir_type(left));
+			right = ir_emit_conv(proc, right, lt);
 		} else {
-			right = ir_emit_conv(proc, right, ir_type(left));
+			right = ir_emit_conv(proc, right, lt);
 		}
 	}
 
