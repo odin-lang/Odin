@@ -1528,7 +1528,7 @@ parse_field_list :: proc(p: ^Parser, follow: token.Kind, allowed_flags: ast.Fiel
 			return ok;
 		}
 
-		is_signature := (allowed_flags & Field_Flags_Signature_Params) == Field_Flags_Signature_Params;
+		is_signature := (allowed_flags & ast.Field_Flags_Signature_Params) == ast.Field_Flags_Signature_Params;
 
 		any_polymorphic_names := check_procedure_name_list(p, names);
 		set_flags = check_field_flag_prefixes(p, len(names), allowed_flags, set_flags);
@@ -1725,7 +1725,7 @@ string_to_calling_convention :: proc(s: string) -> ast.Proc_Calling_Convention {
 	return Invalid;
 }
 
-parse_proc_tags :: proc(p: ^Parser) -> (tags: Proc_Tags) {
+parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
 	for p.curr_tok.kind == token.Hash {
 		tok := expect_token(p, token.Hash);
 		ident := expect_token(p, token.Ident);
