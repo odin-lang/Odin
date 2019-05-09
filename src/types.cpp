@@ -1490,6 +1490,9 @@ bool is_type_comparable(Type *t) {
 	case Type_BitSet:
 		return true;
 
+	case Type_BitFieldValue:
+		return true;
+
 	case Type_Opaque:
 		return is_type_comparable(t->Opaque.elem);
 	}
