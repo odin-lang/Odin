@@ -2203,6 +2203,13 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			}
 		} break;
 
+		case Token_ArrowRight: {
+			Token token = advance_token(f);
+			syntax_error(token, "Selector expressions use '.' rather than '->'");
+			operand = ast_selector_expr(f, token, operand, parse_ident(f));
+			break;
+		}
+
 		case Token_OpenBracket: {
 			if (lhs) {
 				// TODO(bill): Handle this
