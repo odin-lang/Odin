@@ -661,9 +661,9 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	switch (value.kind) {
 	case ExactValue_Bool:
 		if (value.value_bool) {
-			ir_write_string(f, type == t_llvm_bool ? str_lit("true") : str_lit("1"));
+			ir_write_string(f, are_types_identical(type, t_llvm_bool) ? str_lit("true") : str_lit("1"));
 		} else {
-			ir_write_string(f, type == t_llvm_bool ? str_lit("false") : str_lit("0"));
+			ir_write_string(f, are_types_identical(type, t_llvm_bool) ? str_lit("false") : str_lit("0"));
 		}
 		break;
 	case ExactValue_String: {

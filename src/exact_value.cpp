@@ -280,6 +280,13 @@ ExactValue exact_value_from_basic_literal(Token token) {
 
 ExactValue exact_value_to_integer(ExactValue v) {
 	switch (v.kind) {
+	case ExactValue_Bool: {
+		i64 i = 0;
+		if (v.value_bool) {
+			i = 1;
+		}
+		return exact_value_i64(i);
+	}
 	case ExactValue_Integer:
 		return v;
 	case ExactValue_Float: {
