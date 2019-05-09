@@ -3377,6 +3377,7 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 			}
 			irValue *ptr = ir_emit_conv(proc, bytes, alloc_type_pointer(int_type));
 
+
 			irValue *sv = ir_emit_load(proc, ptr, 1);
 			// NOTE(bill): Zero out the lower bits that need to be stored to
 			sv = ir_emit_arith(proc, Token_Shr, sv, ir_const_int(size_in_bits), int_type);
@@ -3393,23 +3394,25 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 		{
 			irValue *shift_amount = ir_const_int(bit_inset);
 
+			irValue *ptr = ir_emit_conv(proc, bytes, alloc_type_pointer(t_u8));
+
 			irValue *v = ir_emit_conv(proc, value, t_u8);
-			v = ir_emit_arith(proc, Token_Shl, v, shift_amount, int_type);
+			v = ir_emit_arith(proc, Token_Shl, v, shift_amount, t_u8);
 
 			irValue *sv = ir_emit_load(proc, bytes, 1);
 			// NOTE(bill): Zero out the upper bits that need to be stored to
-			sv = ir_emit_arith(proc, Token_Shl, sv, ir_const_int(bit_inset), int_type);
-			sv = ir_emit_arith(proc, Token_Shr, sv, ir_const_int(bit_inset), int_type);
+			sv = ir_emit_arith(proc, Token_Shl, sv, ir_const_int(8-bit_inset), t_u8);
+			sv = ir_emit_arith(proc, Token_Shr, sv, ir_const_int(8-bit_inset), t_u8);
 
-			v = ir_emit_arith(proc, Token_Or, sv, v, int_type);
-			ir_emit_store(proc, bytes, v, true);
+			v = ir_emit_arith(proc, Token_Or, sv, v, t_u8);
+			ir_emit_store(proc, ptr, v, true);
 		}
 
 		// Remaining bytes
 		if (bit_inset+size_in_bits > 8) {
-			irValue *shift_amount = ir_const_int(bit_inset);
 			irValue *ptr = ir_emit_conv(proc, ir_emit_ptr_offset(proc, bytes, v_one), alloc_type_pointer(int_type));
-			irValue *v = ir_emit_arith(proc, Token_Shr, value, shift_amount, int_type);
+			irValue *v = ir_emit_conv(proc, value, int_type);
+			v = ir_emit_arith(proc, Token_Shr, v, ir_const_int(8-bit_inset), int_type);
 
 			irValue *sv = ir_emit_load(proc, ptr, 1);
 			// NOTE(bill): Zero out the lower bits that need to be stored to

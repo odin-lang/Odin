@@ -268,10 +268,19 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 							return rhs->type;
 						}
 					}
+				} else if (rhs->value.kind == ExactValue_Bool) {
+					bool b = rhs->value.value_bool;
+					if (lhs_bits == 1) {
+						return rhs->type;
+					}
 				}
 			} else if (is_type_integer(rhs->type)) {
 				// TODO(bill): Any other checks?
 				return rhs->type;
+			} else if (is_type_boolean(rhs->type)) {
+				if (lhs_bits == 1) {
+					return rhs->type;
+				}
 			}
 			gbString lhs_expr = expr_to_string(lhs->expr);
 			gbString rhs_expr = expr_to_string(rhs->expr);
