@@ -3352,9 +3352,6 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 			return;
 		}
 
-		gb_printf_err("bit_field_size, %d %d %d\n", size_in_bits, byte_index, bit_inset);
-
-
 		Type *int_type = nullptr;
 		switch (size_in_bytes) {
 		case 1:  int_type = t_u8;   break;
