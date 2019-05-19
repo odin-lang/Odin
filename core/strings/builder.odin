@@ -9,7 +9,7 @@ Builder :: struct {
 }
 
 make_builder :: proc(allocator := context.allocator) -> Builder {
-	return Builder{make([dynamic]byte)};
+	return Builder{make([dynamic]byte, allocator)};
 }
 
 destroy_builder :: proc(b: ^Builder) {
