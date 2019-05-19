@@ -3037,11 +3037,13 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	}
 
 	String import_name = path_to_entity_name(id->import_name.string, id->fullpath, false);
-	// String import_name = id->import_name.string;
-	if (import_name.len == 0 || import_name == "_") {
-		import_name = scope->pkg->name;
-	}
-	if (is_blank_ident(import_name)) {
+
+	// NOTE(bill, 2019-05-19): If the directory path is not a valid entity name, force the user to assign a custom one
+	// if (import_name.len == 0 || import_name == "_") {
+	// 	import_name = scope->pkg->name;
+	// }
+
+	if (import_name.len == 0 || is_blank_ident(import_name)) {
 		if (id->is_using) {
 			// TODO(bill): Should this be a warning?
 		} else {
