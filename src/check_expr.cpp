@@ -86,6 +86,11 @@ CallArgumentData check_call_arguments   (CheckerContext *c, Operand *operand, Ty
 Type *           check_init_variable    (CheckerContext *c, Entity *e, Operand *operand, String context_name);
 
 
+Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type);
+Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type);
+bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type *abi_return_type);
+void set_procedure_abi_types(CheckerContext *c, Type *type);
+
 
 Entity *entity_from_expr(Ast *expr) {
 	expr = unparen_expr(expr);
@@ -807,7 +812,7 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 			}
 		}
 		if (modify_type) {
-			Type *ds = default_type(source);
+			Type *ds = default_type(source); // IMPORTANT TODO(bill): IS THIS CORRECT?
 			gb_memmove(poly, ds, gb_size_of(Type));
 		}
 		return true;
@@ -935,6 +940,7 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 			if (x->result_count != y->result_count) {
 				return false;
 			}
+
 			for (isize i = 0; i < x->param_count; i++) {
 				Entity *a = x->params->Tuple.variables[i];
 				Entity *b = y->params->Tuple.variables[i];
@@ -947,7 +953,11 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 				bool ok = is_polymorphic_type_assignable(c, a->type, b->type, false, modify_type);
 				if (!ok) return false;
 			}
-			// TODO(bill): Polymorphic type assignment
+
+			if (modify_type) {
+				set_procedure_abi_types(c, source);
+			}
+
 			return true;
 			#endif
 		}
