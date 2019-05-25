@@ -218,6 +218,7 @@ enum BuildFlagKind {
 	BuildFlag_UseLLD,
 	BuildFlag_Vet,
 	BuildFlag_IgnoreUnknownAttributes,
+	BuildFlag_Compact,
 
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_ResourceFile,
@@ -302,6 +303,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),             BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),             BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_Compact, str_lit("compact"), BuildFlagParam_None);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_ResourceFile,   str_lit("resource"), BuildFlagParam_String);
@@ -662,6 +664,15 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_IgnoreUnknownAttributes:
 							build_context.ignore_unknown_attributes = true;
+							break;
+
+						case BuildFlag_Compact:
+							if (!build_context.print_query_data) {
+								gb_printf_err("Invalid use of -compact flag, only allowed with 'odin query'\n");
+								bad_flags = true;
+							} else {
+								build_context.print_query_data_compact = true;
+							}
 							break;
 
 					#if defined(GB_SYSTEM_WINDOWS)
@@ -1239,7 +1250,7 @@ void generate_and_print_query_data(Checker *c, Timings *timings) {
 	}
 
 
-	print_query_data_as_json(root, true);
+	print_query_data_as_json(root, !build_context.print_query_data_compact);
 	gb_printf("\n");
 }
 

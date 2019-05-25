@@ -106,6 +106,7 @@ struct BuildContext {
 	bool   no_bounds_check;
 	bool   no_output_files;
 	bool   print_query_data;
+	bool   print_query_data_compact;
 	bool   no_crt;
 	bool   use_lld;
 	bool   vet;
