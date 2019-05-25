@@ -105,6 +105,7 @@ struct BuildContext {
 	bool   ignore_unknown_attributes;
 	bool   no_bounds_check;
 	bool   no_output_files;
+	bool   print_query_data;
 	bool   no_crt;
 	bool   use_lld;
 	bool   vet;

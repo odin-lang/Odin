@@ -562,19 +562,20 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 // 0 == failure
 // 1 == original memory
 // 2 == new allocation
-i32 unquote_string(gbAllocator a, String *s_) {
+i32 unquote_string(gbAllocator a, String *s_, u8 quote=0) {
 	String s = *s_;
 	isize n = s.len;
-	u8 quote;
-	if (n < 2) {
-		return 0;
+	if (quote == 0) {
+		if (n < 2) {
+			return 0;
+		}
+		quote = s[0];
+		if (quote != s[n-1]) {
+			return 0;
+		}
+		s.text += 1;
+		s.len -= 2;
 	}
-	quote = s[0];
-	if (quote != s[n-1]) {
-		return 0;
-	}
-	s.text += 1;
-	s.len -= 2;
 
 	if (quote == '`') {
 		if (string_contains_char(s, '`')) {

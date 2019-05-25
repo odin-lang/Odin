@@ -16,6 +16,7 @@
 #include "ir.cpp"
 #include "ir_opt.cpp"
 #include "ir_print.cpp"
+#include "query_data.cpp"
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
 i32 system_exec_command_line_app(char *name, char *fmt, ...) {
@@ -162,6 +163,7 @@ void usage(String argv0) {
 	print_usage_line(1, "build     compile .odin file as executable");
 	print_usage_line(1, "run       compile and run .odin file");
 	print_usage_line(1, "check     parse and type check .odin file");
+	print_usage_line(1, "query     parse, type check, and output a .json file containing information about the program");
 	print_usage_line(1, "docs      generate documentation for a .odin file");
 	print_usage_line(1, "version   print version");
 }
@@ -813,6 +815,437 @@ void remove_temp_files(String output_base) {
 #undef EXT_REMOVE
 }
 
+
+
+int query_data_package_compare(void const *a, void const *b) {
+	AstPackage *x = *cast(AstPackage *const *)a;
+	AstPackage *y = *cast(AstPackage *const *)b;
+
+	if (x == y) {
+		return 0;
+	}
+
+	if (x != nullptr && y != nullptr) {
+		return string_compare(x->name, y->name);
+	} else if (x != nullptr && y == nullptr) {
+		return -1;
+	} else if (x == nullptr && y != nullptr) {
+		return +1;
+	}
+	return 0;
+}
+
+int query_data_definition_compare(void const *a, void const *b) {
+	Entity *x = *cast(Entity *const *)a;
+	Entity *y = *cast(Entity *const *)b;
+
+	if (x == y) {
+		return 0;
+	} else if (x != nullptr && y == nullptr) {
+		return -1;
+	} else if (x == nullptr && y != nullptr) {
+		return +1;
+	}
+
+	if (x->pkg != y->pkg) {
+		i32 res = query_data_package_compare(&x->pkg, &y->pkg);
+		if (res != 0) {
+			return res;
+		}
+	}
+
+	return string_compare(x->token.string, y->token.string);
+}
+
+int entity_name_compare(void const *a, void const *b) {
+	Entity *x = *cast(Entity *const *)a;
+	Entity *y = *cast(Entity *const *)b;
+	if (x == y) {
+		return 0;
+	} else if (x != nullptr && y == nullptr) {
+		return -1;
+	} else if (x == nullptr && y != nullptr) {
+		return +1;
+	}
+	return string_compare(x->token.string, y->token.string);
+}
+
+void generate_and_print_query_data(Checker *c, Timings *timings) {
+	query_value_allocator = heap_allocator();
+
+
+	auto *root = query_value_map();
+
+	if (global_error_collector.errors.count > 0) {
+		auto *errors = query_value_array();
+		root->add("errors", errors);
+		for_array(i, global_error_collector.errors) {
+			String err = string_trim_whitespace(global_error_collector.errors[i]);
+			errors->add(err);
+		}
+
+	}
+
+	{ // Packages
+		auto *packages = query_value_array();
+		root->add("packages", packages);
+
+		auto sorted_packages = array_make<AstPackage *>(query_value_allocator, 0, c->info.packages.entries.count);
+		defer (array_free(&sorted_packages));
+
+		for_array(i, c->info.packages.entries) {
+			AstPackage *pkg = c->info.packages.entries[i].value;
+			if (pkg != nullptr) {
+				array_add(&sorted_packages, pkg);
+			}
+		}
+		gb_sort_array(sorted_packages.data, sorted_packages.count, query_data_package_compare);
+		packages->reserve(sorted_packages.count);
+
+		for_array(i, sorted_packages) {
+			AstPackage *pkg = sorted_packages[i];
+			String name = pkg->name;
+			String fullpath = pkg->fullpath;
+
+			auto *files = query_value_array();
+			files->reserve(pkg->files.count);
+			for_array(j, pkg->files) {
+				AstFile *f = pkg->files[j];
+				files->add(f->fullpath);
+			}
+
+			auto *package = query_value_map();
+			package->reserve(3);
+			packages->add(package);
+
+			package->add("name", pkg->name);
+			package->add("fullpath", pkg->fullpath);
+			package->add("files", files);
+		}
+	}
+
+	if (c->info.definitions.count > 0) {
+		auto *definitions = query_value_array();
+		root->add("definitions", definitions);
+
+		auto sorted_definitions = array_make<Entity *>(query_value_allocator, 0, c->info.definitions.count);
+		defer (array_free(&sorted_definitions));
+
+		for_array(i, c->info.definitions) {
+			Entity *e = c->info.definitions[i];
+			String name = e->token.string;
+			if (is_blank_ident(name)) {
+				continue;
+			}
+			if ((e->scope->flags & (ScopeFlag_Pkg|ScopeFlag_File)) == 0) {
+				continue;
+			}
+			if (e->parent_proc_decl != nullptr) {
+				continue;
+			}
+			switch (e->kind) {
+			case Entity_Builtin:
+			case Entity_Nil:
+			case Entity_Label:
+				continue;
+			}
+			if (e->pkg == nullptr) {
+				continue;
+			}
+			if (e->token.pos.line == 0) {
+				continue;
+			}
+			if (e->kind == Entity_Procedure) {
+				Type *t = base_type(e->type);
+				if (t->kind != Type_Proc) {
+					continue;
+				}
+				if (t->Proc.is_poly_specialized) {
+					continue;
+				}
+			}
+			if (e->kind == Entity_TypeName) {
+				Type *t = base_type(e->type);
+				if (t->kind == Type_Struct) {
+					if (t->Struct.is_poly_specialized) {
+						continue;
+					}
+				}
+				if (t->kind == Type_Union) {
+					if (t->Union.is_poly_specialized) {
+						continue;
+					}
+				}
+			}
+
+			array_add(&sorted_definitions, e);
+		}
+
+		gb_sort_array(sorted_definitions.data, sorted_definitions.count, query_data_definition_compare);
+		definitions->reserve(sorted_definitions.count);
+
+		for_array(i, sorted_definitions) {
+			Entity *e = sorted_definitions[i];
+			String name = e->token.string;
+
+			auto *def = query_value_map();
+			def->reserve(16);
+			definitions->add(def);
+
+			def->add("package",     e->pkg->name);
+			def->add("name",        name);
+			def->add("filepath",    e->token.pos.file);
+			def->add("line",        e->token.pos.line);
+			def->add("column",      e->token.pos.column);
+			def->add("file_offset", e->token.pos.offset);
+
+			switch (e->kind) {
+			case Entity_Constant:    def->add("kind", str_lit("constant"));        break;
+			case Entity_Variable:    def->add("kind", str_lit("variable"));        break;
+			case Entity_TypeName:    def->add("kind", str_lit("type name"));       break;
+			case Entity_Procedure:   def->add("kind", str_lit("procedure"));       break;
+			case Entity_ProcGroup:   def->add("kind", str_lit("procedure group")); break;
+			case Entity_ImportName:  def->add("kind", str_lit("import name"));     break;
+			case Entity_LibraryName: def->add("kind", str_lit("library name"));    break;
+			default: GB_PANIC("Invalid entity kind to be added");
+			}
+
+
+			if (e->type != nullptr && e->type != t_invalid) {
+				Type *t = e->type;
+				Type *bt = t;
+
+				switch (e->kind) {
+				case Entity_TypeName:
+					if (!e->TypeName.is_type_alias) {
+						bt = base_type(t);
+					}
+					break;
+				}
+
+				{
+					gbString str = type_to_string(t);
+					String type_str = make_string(cast(u8 *)str, gb_string_length(str));
+					def->add("type", type_str);
+				}
+				if (t != bt) {
+					gbString str = type_to_string(bt);
+					String type_str = make_string(cast(u8 *)str, gb_string_length(str));
+					def->add("base_type", type_str);
+				}
+				{
+					String type_kind = {};
+					Type *bt = base_type(t);
+					switch (bt->kind) {
+					case Type_Pointer:      type_kind = str_lit("pointer");       break;
+					case Type_Opaque:       type_kind = str_lit("opaque");        break;
+					case Type_Array:        type_kind = str_lit("array");         break;
+					case Type_Slice:        type_kind = str_lit("slice");         break;
+					case Type_DynamicArray: type_kind = str_lit("dynamic array"); break;
+					case Type_Map:          type_kind = str_lit("map");           break;
+					case Type_Struct:       type_kind = str_lit("struct");        break;
+					case Type_Union:        type_kind = str_lit("union");         break;
+					case Type_Enum:         type_kind = str_lit("enum");          break;
+					case Type_Proc:         type_kind = str_lit("procedure");     break;
+					case Type_BitField:     type_kind = str_lit("bit field");     break;
+					case Type_BitSet:       type_kind = str_lit("bit set");       break;
+					case Type_SimdVector:   type_kind = str_lit("simd vector");   break;
+
+					case Type_Generic:
+					case Type_Tuple:
+					case Type_BitFieldValue:
+						GB_PANIC("Invalid definition type");
+						break;
+					}
+					if (type_kind.len > 0) {
+						def->add("type_kind", type_kind);
+					}
+				}
+			}
+
+			if (e->kind == Entity_TypeName) {
+				def->add("size",  type_size_of(e->type));
+				def->add("align", type_align_of(e->type));
+
+
+				if (is_type_struct(e->type)) {
+					auto *data = query_value_map();
+					data->reserve(6);
+
+					def->add("data", data);
+
+					Type *t = base_type(e->type);
+					GB_ASSERT(t->kind == Type_Struct);
+
+					if (t->Struct.is_polymorphic) {
+						data->add("polymorphic", t->Struct.is_polymorphic);
+					}
+					if (t->Struct.is_poly_specialized) {
+						data->add("polymorphic_specialized", t->Struct.is_poly_specialized);
+					}
+					if (t->Struct.is_packed) {
+						data->add("packed", t->Struct.is_packed);
+					}
+					if (t->Struct.is_raw_union) {
+						data->add("raw_union", t->Struct.is_raw_union);
+					}
+
+					auto *fields = query_value_array();
+					data->add("fields", fields);
+					fields->reserve(t->Struct.fields.count);
+					fields->packed = true;
+
+					for_array(j, t->Struct.fields) {
+						Entity *e = t->Struct.fields[j];
+						String name = e->token.string;
+						if (is_blank_ident(name)) {
+							continue;
+						}
+
+						fields->add(name);
+					}
+				} else if (is_type_union(e->type)) {
+					auto *data = query_value_map();
+					data->reserve(4);
+
+					def->add("data", data);
+					Type *t = base_type(e->type);
+					GB_ASSERT(t->kind == Type_Union);
+
+					if (t->Union.is_polymorphic) {
+						data->add("polymorphic", t->Union.is_polymorphic);
+					}
+					if (t->Union.is_poly_specialized) {
+						data->add("polymorphic_specialized", t->Union.is_poly_specialized);
+					}
+
+					auto *variants = query_value_array();
+					variants->reserve(t->Union.variants.count);
+					data->add("variants", variants);
+
+					for_array(j, t->Union.variants) {
+						Type *vt = t->Union.variants[j];
+
+						gbString str = type_to_string(vt);
+						String type_str = make_string(cast(u8 *)str, gb_string_length(str));
+						variants->add(type_str);
+					}
+				}
+			}
+
+			if (e->kind == Entity_Procedure) {
+				Type *t = base_type(e->type);
+				GB_ASSERT(t->kind == Type_Proc);
+
+				bool is_polymorphic = t->Proc.is_polymorphic;
+				bool is_poly_specialized = t->Proc.is_poly_specialized;
+				bool ok = is_polymorphic || is_poly_specialized;
+				if (ok) {
+					auto *data = query_value_map();
+					data->reserve(4);
+
+					def->add("data", data);
+					if (is_polymorphic) {
+						data->add("polymorphic", is_polymorphic);
+					}
+					if (is_poly_specialized) {
+						data->add("polymorphic_specialized", is_poly_specialized);
+					}
+				}
+			}
+
+			if (e->kind == Entity_ProcGroup) {
+				auto *procedures = query_value_array();
+				procedures->reserve(e->ProcGroup.entities.count);
+
+				for_array(j, e->ProcGroup.entities) {
+					Entity *p = e->ProcGroup.entities[j];
+
+					auto *procedure = query_value_map();
+					procedure->reserve(2);
+					procedure->packed = true;
+
+					procedures->add(procedure);
+
+					procedure->add("package", p->pkg->name);
+					procedure->add("name",    p->token.string);
+				}
+				def->add("procedures", procedures);
+			}
+
+			DeclInfo *di = e->decl_info;
+			if (di != nullptr) {
+				if (di->is_using) {
+					def->add("using", query_value_boolean(true));
+				}
+			}
+		}
+	}
+
+	if (build_context.show_timings) {
+		Timings *t = timings;
+		timings__stop_current_section(t);
+		t->total.finish = time_stamp_time_now();
+		isize max_len = gb_min(36, t->total.label.len);
+		for_array(i, t->sections) {
+			TimeStamp ts = t->sections[i];
+			max_len = gb_max(max_len, ts.label.len);
+		}
+		t->total_time_seconds = time_stamp_as_s(t->total, t->freq);
+
+		auto *tims = query_value_map();
+		tims->reserve(8);
+		root->add("timings", tims);
+		tims->add("time_unit", str_lit("s"));
+
+		tims->add(t->total.label, cast(f64)t->total_time_seconds);
+
+
+		Parser *p = c->parser;
+		if (p != nullptr) {
+			isize lines    = p->total_line_count;
+			isize tokens   = p->total_token_count;
+			isize files    = 0;
+			isize packages = p->packages.count;
+			isize total_file_size = 0;
+			for_array(i, p->packages) {
+				files += p->packages[i]->files.count;
+				for_array(j, p->packages[i]->files) {
+					AstFile *file = p->packages[i]->files[j];
+					total_file_size += file->tokenizer.end - file->tokenizer.start;
+				}
+			}
+
+			tims->add("total_lines",     lines);
+			tims->add("total_tokens",    tokens);
+			tims->add("total_files",     files);
+			tims->add("total_packages",  packages);
+			tims->add("total_file_size", total_file_size);
+
+			auto *sections = query_value_map();
+			sections->reserve(t->sections.count);
+			tims->add("sections", sections);
+			for_array(i, t->sections) {
+				TimeStamp ts = t->sections[i];
+				f64 section_time = time_stamp_as_s(ts, t->freq);
+
+				auto *section = query_value_map();
+				section->reserve(2);
+				sections->add(ts.label, section);
+				section->add("time", section_time);
+				section->add("total_fraction", section_time/t->total_time_seconds);
+			}
+		}
+	}
+
+
+	print_query_data_as_json(root, true);
+	gb_printf("\n");
+}
+
+
+
+
 i32 exec_llvm_opt(String output_base) {
 #if defined(GB_SYSTEM_WINDOWS)
 	// For more passes arguments: http://llvm.org/docs/Passes.html
@@ -928,6 +1361,14 @@ int main(int arg_count, char **arg_ptr) {
 		}
 		build_context.no_output_files = true;
 		init_filename = args[2];
+	} else if (command == "query") {
+		if (args.count < 3) {
+			usage(args[0]);
+			return 1;
+		}
+		build_context.no_output_files = true;
+		build_context.print_query_data = true;
+		init_filename = args[2];
 	} else if (command == "docs") {
 		if (args.count < 3) {
 			usage(args[0]);
@@ -988,21 +1429,27 @@ int main(int arg_count, char **arg_ptr) {
 		// generate_documentation(&parser);
 		return 0;
 	}
-
-
 	timings_start_section(&timings, str_lit("type check"));
 
 	Checker checker = {0};
 
-	init_checker(&checker, &parser);
-	defer (destroy_checker(&checker));
+	bool checked_inited = init_checker(&checker, &parser);
+	defer (if (checked_inited) {
+		destroy_checker(&checker);
+	});
 
-	check_parsed_files(&checker);
+	if (checked_inited) {
+		check_parsed_files(&checker);
+	}
 
-#if 1
+
 	if (build_context.no_output_files) {
-		if (build_context.show_timings) {
-			show_timings(&checker, &timings);
+		if (build_context.print_query_data) {
+			generate_and_print_query_data(&checker, &timings);
+		} else {
+			if (build_context.show_timings) {
+				show_timings(&checker, &timings);
+			}
 		}
 
 		if (global_error_collector.count != 0) {
@@ -1010,6 +1457,10 @@ int main(int arg_count, char **arg_ptr) {
 		}
 
 		return 0;
+	}
+
+	if (!checked_inited) {
+		return 1;
 	}
 
 	irGen ir_gen = {0};
@@ -1296,6 +1747,6 @@ int main(int arg_count, char **arg_ptr) {
 			system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
 		}
 	#endif
-#endif
+
 	return 0;
 }

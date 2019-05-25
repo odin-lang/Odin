@@ -809,6 +809,9 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		}
 
 		if (unhandled.count > 0) {
+			begin_error_block();
+			defer (begin_error_block());
+
 			if (unhandled.count == 1) {
 				error_no_newline(node, "Unhandled switch case: ");
 			} else {
@@ -817,11 +820,11 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			for_array(i, unhandled) {
 				Entity *f = unhandled[i];
 				if (i > 0)  {
-					gb_printf_err(", ");
+					error_line(", ");
 				}
-				gb_printf_err("%.*s", LIT(f->token.string));
+				error_line("%.*s", LIT(f->token.string));
 			}
-			gb_printf_err("\n");
+			error_line("\n");
 		}
 	}
 }
@@ -1040,13 +1043,13 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			for_array(i, unhandled) {
 				Type *t = unhandled[i];
 				if (i > 0)  {
-					gb_printf_err(", ");
+					error_line(", ");
 				}
 				gbString s = type_to_string(t);
-				gb_printf_err("%s", s);
+				error_line("%s", s);
 				gb_string_free(s);
 			}
-			gb_printf_err("\n");
+			error_line("\n");
 		}
 	}
 }

@@ -2658,47 +2658,53 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 				target_type = t->Union.variants[first_success_index];
 				break;
 			} else if (valid_count > 1) {
+				begin_error_block();
+				defer (end_error_block());
+
 				GB_ASSERT(first_success_index >= 0);
 				operand->mode = Addressing_Invalid;
 				convert_untyped_error(c, operand, target_type);
 
-				gb_printf_err("Ambiguous type conversion to '%s', which variant did you mean:\n\t", type_str);
+				error_line("Ambiguous type conversion to '%s', which variant did you mean:\n\t", type_str);
 				i32 j = 0;
 				for (i32 i = 0; i < valid_count; i++) {
 					ValidIndexAndScore valid = valids[i];
-					if (j > 0 && valid_count > 2) gb_printf_err(", ");
+					if (j > 0 && valid_count > 2) error_line(", ");
 					if (j == valid_count-1) {
-						if (valid_count == 2) gb_printf_err(" ");
-						gb_printf_err("or ");
+						if (valid_count == 2) error_line(" ");
+						error_line("or ");
 					}
 					gbString str = type_to_string(t->Union.variants[valid.index]);
-					gb_printf_err("'%s'", str);
+					error_line("'%s'", str);
 					gb_string_free(str);
 					j++;
 				}
-				gb_printf_err("\n\n");
+				error_line("\n\n");
 
 				return;
 			} else if (is_type_untyped_undef(operand->type) && type_has_undef(target_type)) {
 				target_type = t_untyped_undef;
 			} else if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
+				begin_error_block();
+				defer (end_error_block());
+
 				operand->mode = Addressing_Invalid;
 				convert_untyped_error(c, operand, target_type);
 				if (count > 0) {
-					gb_printf_err("'%s' is a union which only excepts the following types:\n", type_str);
-					gb_printf_err("\t");
+					error_line("'%s' is a union which only excepts the following types:\n", type_str);
+					error_line("\t");
 					for (i32 i = 0; i < count; i++) {
 						Type *v = t->Union.variants[i];
-						if (i > 0 && count > 2) gb_printf_err(", ");
+						if (i > 0 && count > 2) error_line(", ");
 						if (i == count-1) {
-							if (count == 2) gb_printf_err(" ");
-							gb_printf_err("or ");
+							if (count == 2) error_line(" ");
+							error_line("or ");
 						}
 						gbString str = type_to_string(v);
-						gb_printf_err("'%s'", str);
+						error_line("'%s'", str);
 						gb_string_free(str);
 					}
-					gb_printf_err("\n\n");
+					error_line("\n\n");
 
 				}
 				return;
@@ -5099,19 +5105,22 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				}
 			}
 			if (!all_invalid_type) {
+				begin_error_block();
+				defer (end_error_block());
+
 				error(operand->expr, "No procedures or ambiguous call for procedure group '%s' that match with the given arguments", expr_name);
-				gb_printf_err("\tGiven argument types: (");
+				error_line("\tGiven argument types: (");
 				for_array(i, operands) {
 					Operand o = operands[i];
-					if (i > 0) gb_printf_err(", ");
+					if (i > 0) error_line(", ");
 					gbString type = type_to_string(o.type);
 					defer (gb_string_free(type));
-					gb_printf_err("%s", type);
+					error_line("%s", type);
 				}
-				gb_printf_err(")\n");
+				error_line(")\n");
 
 				if (procs.count > 0) {
-					gb_printf_err("Did you mean to use one of the following:\n");
+					error_line("Did you mean to use one of the following:\n");
 				}
 				for_array(i, procs) {
 					Entity *proc = procs[i];
@@ -5138,25 +5147,28 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 					if (proc->kind == Entity_Variable) {
 						sep = ":=";
 					}
-					// gb_printf_err("\t%.*s %s %s at %.*s(%td:%td) with score %lld\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
-					gb_printf_err("\t%.*s%.*s%.*s %s %s at %.*s(%td:%td)\n", LIT(prefix), LIT(prefix_sep), LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
+					// error_line("\t%.*s %s %s at %.*s(%td:%td) with score %lld\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
+					error_line("\t%.*s%.*s%.*s %s %s at %.*s(%td:%td)\n", LIT(prefix), LIT(prefix_sep), LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
 				}
 				if (procs.count > 0) {
-					gb_printf_err("\n");
+					error_line("\n");
 				}
 			}
 			result_type = t_invalid;
 		} else if (valid_count > 1) {
+			begin_error_block();
+			defer (end_error_block());
+
 			error(operand->expr, "Ambiguous procedure group call '%s' that match with the given arguments", expr_name);
-			gb_printf_err("\tGiven argument types: (");
+			error_line("\tGiven argument types: (");
 			for_array(i, operands) {
 				Operand o = operands[i];
-				if (i > 0) gb_printf_err(", ");
+				if (i > 0) error_line(", ");
 				gbString type = type_to_string(o.type);
 				defer (gb_string_free(type));
-				gb_printf_err("%s", type);
+				error_line("%s", type);
 			}
-			gb_printf_err(")\n");
+			error_line(")\n");
 
 			for (isize i = 0; i < valid_count; i++) {
 				Entity *proc = procs[valids[i].index];
@@ -5174,8 +5186,8 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				if (proc->kind == Entity_Variable) {
 					sep = ":=";
 				}
-				gb_printf_err("\t%.*s %s %s at %.*s(%td:%td)\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
-				// gb_printf_err("\t%.*s %s %s at %.*s(%td:%td) %lld\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column, valids[i].score);
+				error_line("\t%.*s %s %s at %.*s(%td:%td)\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
+				// error_line("\t%.*s %s %s at %.*s(%td:%td) %lld\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column, valids[i].score);
 			}
 			result_type = t_invalid;
 		} else {
