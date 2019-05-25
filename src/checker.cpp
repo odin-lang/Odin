@@ -826,13 +826,14 @@ void destroy_checker_context(CheckerContext *ctx) {
 	destroy_checker_poly_path(ctx->poly_path);
 }
 
-void init_checker(Checker *c, Parser *parser) {
+bool init_checker(Checker *c, Parser *parser) {
+	c->parser = parser;
+
 	if (global_error_collector.count > 0) {
-		gb_exit(1);
+		return false;
 	}
 	gbAllocator a = heap_allocator();
 
-	c->parser = parser;
 	init_checker_info(&c->info);
 
 	array_init(&c->procs_to_check, a);
@@ -846,6 +847,7 @@ void init_checker(Checker *c, Parser *parser) {
 	c->allocator = heap_allocator();
 
 	c->init_ctx = make_checker_context(c);
+	return true;
 }
 
 void destroy_checker(Checker *c) {
@@ -2189,7 +2191,11 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 			    model == "localexec") {
 				ac->thread_local_model = model;
 			} else {
-				error(elem, "Invalid thread local model '%.*s'", LIT(model));
+				error(elem, "Invalid thread local model '%.*s'. Valid models:", LIT(model));
+				error_line("\tdefault\n");
+				error_line("\tlocaldynamic\n");
+				error_line("\tinitialexec\n");
+				error_line("\tlocalexec\n");
 			}
 		} else {
 			error(elem, "Expected either no value or a string for '%.*s'", LIT(name));
@@ -2597,10 +2603,13 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 			if (e->kind != Entity_Procedure) {
 				if (fl != nullptr) {
+					begin_error_block();
+					defer (end_error_block());
+
 					AstKind kind = init->kind;
 					error(name, "Only procedures and variables are allowed to be in a foreign block, got %.*s", LIT(ast_strings[kind]));
 					if (kind == Ast_ProcType) {
-						gb_printf_err("\tDid you forget to append '---' to the procedure?\n");
+						error_line("\tDid you forget to append '---' to the procedure?\n");
 					}
 				}
 			}

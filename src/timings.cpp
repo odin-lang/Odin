@@ -165,8 +165,7 @@ void timings_print_all(Timings *t, TimingUnit unit = TimingUnit_Millisecond) {
 	timings__stop_current_section(t);
 	t->total.finish = time_stamp_time_now();
 
-	max_len = t->total.label.len;
-	max_len = 36;
+	max_len = gb_min(36, t->total.label.len);
 	for_array(i, t->sections) {
 		TimeStamp ts = t->sections[i];
 		max_len = gb_max(max_len, ts.label.len);

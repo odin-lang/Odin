@@ -905,6 +905,9 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) 
 				continue;
 			}
 
+			begin_error_block();
+			defer (end_error_block());
+
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
 			switch (kind) {
 			case ProcOverload_Identical:
@@ -938,7 +941,7 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) 
 			}
 
 			if (is_invalid) {
-				gb_printf_err("\tprevious procedure at %.*s(%td:%td)\n", LIT(pos.file), pos.line, pos.column);
+				error_line("\tprevious procedure at %.*s(%td:%td)\n", LIT(pos.file), pos.line, pos.column);
 				q->type = t_invalid;
 			}
 		}

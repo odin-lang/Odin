@@ -183,13 +183,85 @@ struct ErrorCollector {
 	TokenPos prev;
 	i64     count;
 	i64     warning_count;
+	bool    in_block;
 	gbMutex mutex;
+
+	Array<u8> error_buffer;
+	Array<String> errors;
 };
 
 gb_global ErrorCollector global_error_collector;
 
+#define MAX_ERROR_COLLECTOR_COUNT (36)
+
+
 void init_global_error_collector(void) {
 	gb_mutex_init(&global_error_collector.mutex);
+	array_init(&global_error_collector.errors, heap_allocator());
+	array_init(&global_error_collector.error_buffer, heap_allocator());
+}
+
+
+void begin_error_block(void) {
+	gb_mutex_lock(&global_error_collector.mutex);
+	global_error_collector.in_block = true;
+}
+
+void end_error_block(void) {
+	if (global_error_collector.error_buffer.count > 0) {
+		isize n = global_error_collector.error_buffer.count;
+		u8 *text = gb_alloc_array(heap_allocator(), u8, n+1);
+		gb_memmove(text, global_error_collector.error_buffer.data, n);
+		text[n] = 0;
+		array_add(&global_error_collector.errors, make_string(text, n));
+		global_error_collector.error_buffer.count = 0;
+
+		// gbFile *f = gb_file_get_standard(gbFileStandard_Error);
+		// gb_file_write(f, text, n);
+	}
+
+	global_error_collector.in_block = false;
+	gb_mutex_unlock(&global_error_collector.mutex);
+}
+
+
+#define ERROR_OUT_PROC(name) void name(char *fmt, va_list va)
+typedef ERROR_OUT_PROC(ErrorOutProc);
+
+ERROR_OUT_PROC(default_error_out_va) {
+	gbFile *f = gb_file_get_standard(gbFileStandard_Error);
+
+	char buf[4096] = {};
+	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va);
+	isize n = len-1;
+	if (global_error_collector.in_block) {
+		isize cap = global_error_collector.error_buffer.count + n;
+		array_reserve(&global_error_collector.error_buffer, cap);
+		u8 *data = global_error_collector.error_buffer.data + global_error_collector.error_buffer.count;
+		gb_memmove(data, buf, n);
+		global_error_collector.error_buffer.count += n;
+	} else {
+		gb_mutex_lock(&global_error_collector.mutex);
+		{
+			u8 *text = gb_alloc_array(heap_allocator(), u8, n+1);
+			gb_memmove(text, buf, n);
+			text[n] = 0;
+			array_add(&global_error_collector.errors, make_string(text, n));
+		}
+		gb_mutex_unlock(&global_error_collector.mutex);
+
+	}
+	gb_file_write(f, buf, n);
+}
+
+
+ErrorOutProc *error_out_va = default_error_out_va;
+
+void error_out(char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	error_out_va(fmt, va);
+	va_end(va);
 }
 
 void warning_va(Token token, char *fmt, va_list va) {
@@ -197,30 +269,29 @@ void warning_va(Token token, char *fmt, va_list va) {
 	global_error_collector.warning_count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (token.pos.line == 0) {
-		gb_printf_err("Error: %s\n", gb_bprintf_va(fmt, va));
+		error_out("Warning: %s\n", gb_bprintf_va(fmt, va));
 	} else if (global_error_collector.prev != token.pos) {
 		global_error_collector.prev = token.pos;
-		gb_printf_err("%.*s(%td:%td) Warning: %s\n",
-		              LIT(token.pos.file), token.pos.line, token.pos.column,
-		              gb_bprintf_va(fmt, va));
+		error_out("%.*s(%td:%td) Warning: %s\n",
+		          LIT(token.pos.file), token.pos.line, token.pos.column,
+		          gb_bprintf_va(fmt, va));
 	}
 
 	gb_mutex_unlock(&global_error_collector.mutex);
 }
 
-#define MAX_ERROR_COLLECTOR_COUNT (36)
 
 void error_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (token.pos.line == 0) {
-		gb_printf_err("Error: %s\n", gb_bprintf_va(fmt, va));
+		error_out("Error: %s\n", gb_bprintf_va(fmt, va));
 	} else if (global_error_collector.prev != token.pos) {
 		global_error_collector.prev = token.pos;
-		gb_printf_err("%.*s(%td:%td) %s\n",
-		              LIT(token.pos.file), token.pos.line, token.pos.column,
-		              gb_bprintf_va(fmt, va));
+		error_out("%.*s(%td:%td) %s\n",
+		          LIT(token.pos.file), token.pos.line, token.pos.column,
+		          gb_bprintf_va(fmt, va));
 	}
 	gb_mutex_unlock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT) {
@@ -228,17 +299,23 @@ void error_va(Token token, char *fmt, va_list va) {
 	}
 }
 
+void error_line_va(char *fmt, va_list va) {
+	gb_mutex_lock(&global_error_collector.mutex);
+	error_out_va(fmt, va);
+	gb_mutex_unlock(&global_error_collector.mutex);
+}
+
 void error_no_newline_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (token.pos.line == 0) {
-		gb_printf_err("Error: %s", gb_bprintf_va(fmt, va));
+		error_out("Error: %s", gb_bprintf_va(fmt, va));
 	} else if (global_error_collector.prev != token.pos) {
 		global_error_collector.prev = token.pos;
-		gb_printf_err("%.*s(%td:%td) %s",
-		              LIT(token.pos.file), token.pos.line, token.pos.column,
-		              gb_bprintf_va(fmt, va));
+		error_out("%.*s(%td:%td) %s",
+		          LIT(token.pos.file), token.pos.line, token.pos.column,
+		          gb_bprintf_va(fmt, va));
 	}
 	gb_mutex_unlock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT) {
@@ -253,11 +330,11 @@ void syntax_error_va(Token token, char *fmt, va_list va) {
 	// NOTE(bill): Duplicate error, skip it
 	if (global_error_collector.prev != token.pos) {
 		global_error_collector.prev = token.pos;
-		gb_printf_err("%.*s(%td:%td) Syntax Error: %s\n",
+		error_out("%.*s(%td:%td) Syntax Error: %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
 		              gb_bprintf_va(fmt, va));
 	} else if (token.pos.line == 0) {
-		gb_printf_err("Syntax Error: %s\n", gb_bprintf_va(fmt, va));
+		error_out("Syntax Error: %s\n", gb_bprintf_va(fmt, va));
 	}
 
 	gb_mutex_unlock(&global_error_collector.mutex);
@@ -272,11 +349,11 @@ void syntax_warning_va(Token token, char *fmt, va_list va) {
 	// NOTE(bill): Duplicate error, skip it
 	if (global_error_collector.prev != token.pos) {
 		global_error_collector.prev = token.pos;
-		gb_printf_err("%.*s(%td:%td) Syntax Warning: %s\n",
-		              LIT(token.pos.file), token.pos.line, token.pos.column,
-		              gb_bprintf_va(fmt, va));
+		error_out("%.*s(%td:%td) Syntax Warning: %s\n",
+		          LIT(token.pos.file), token.pos.line, token.pos.column,
+		          gb_bprintf_va(fmt, va));
 	} else if (token.pos.line == 0) {
-		gb_printf_err("Warning: %s\n", gb_bprintf_va(fmt, va));
+		error_out("Warning: %s\n", gb_bprintf_va(fmt, va));
 	}
 
 	gb_mutex_unlock(&global_error_collector.mutex);
@@ -304,6 +381,13 @@ void error(TokenPos pos, char *fmt, ...) {
 	Token token = {};
 	token.pos = pos;
 	error_va(token, fmt, va);
+	va_end(va);
+}
+
+void error_line(char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	error_line_va(fmt, va);
 	va_end(va);
 }
 

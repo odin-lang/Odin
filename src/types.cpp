@@ -2765,7 +2765,13 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_Generic:
 		if (type->Generic.name.len == 0) {
-			str = gb_string_appendc(str, "type");
+			if (type->Generic.entity != nullptr) {
+				String name = type->Generic.entity->token.string;
+				str = gb_string_append_rune(str, '$');
+				str = gb_string_append_length(str, name.text, name.len);
+			} else {
+				str = gb_string_appendc(str, "type");
+			}
 		} else {
 			String name = type->Generic.name;
 			str = gb_string_append_rune(str, '$');

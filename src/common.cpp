@@ -73,16 +73,18 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 		ptr = _aligned_realloc(old_memory, size, alignment);
 		break;
 	#else
-	case gbAllocation_Alloc:
+	case gbAllocation_Alloc: {
+		isize aligned_size = align_formula_isize(size, alignment);
 		// TODO(bill): Make sure this is aligned correctly
-		ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, align_formula_isize(size, alignment));
-		break;
+		ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, aligned_size);
+	} break;
 	case gbAllocation_Free:
 		HeapFree(GetProcessHeap(), 0, old_memory);
 		break;
-	case gbAllocation_Resize:
-		ptr = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, old_memory, align_formula_isize(size, alignment));
-		break;
+	case gbAllocation_Resize: {
+		isize aligned_size = align_formula_isize(size, alignment);
+		ptr = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, old_memory, aligned_size);
+	} break;
 	#endif
 
 #elif defined(GB_SYSTEM_LINUX)
