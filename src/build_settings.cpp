@@ -69,6 +69,19 @@ struct TargetMetrics {
 };
 
 
+enum QueryDataSetKind {
+	QueryDataSet_Invalid,
+	QueryDataSet_GlobalDefinitions,
+	QueryDataSet_GoToDefinitions,
+};
+
+struct QueryDataSetSettings {
+	QueryDataSetKind kind;
+	bool ok;
+	bool compact;
+};
+
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -105,11 +118,11 @@ struct BuildContext {
 	bool   ignore_unknown_attributes;
 	bool   no_bounds_check;
 	bool   no_output_files;
-	bool   print_query_data;
-	bool   print_query_data_compact;
 	bool   no_crt;
 	bool   use_lld;
 	bool   vet;
+
+	QueryDataSetSettings query_data_set_settings;
 
 	gbAffinity affinity;
 	isize      thread_count;
