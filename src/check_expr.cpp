@@ -371,6 +371,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	add_entity_and_decl_info(&nctx, ident, entity, d);
 	// NOTE(bill): Set the scope afterwards as this is not real overloading
 	entity->scope = scope->parent;
+	entity->file = base_entity->file;
 	entity->pkg = base_entity->pkg;
 
 	AstFile *file = nullptr;

@@ -33,6 +33,7 @@ template <typename T> Array<T> array_make          (gbAllocator const &a, isize 
 template <typename T> Array<T> array_make_from_ptr (T *data, isize count, isize capacity);
 template <typename T> void     array_free          (Array<T> *array);
 template <typename T> void     array_add           (Array<T> *array, T const &t);
+template <typename T> void     array_add_elems     (Array<T> *array, T const *elems, isize elem_count);
 template <typename T> T        array_pop           (Array<T> *array);
 template <typename T> void     array_clear         (Array<T> *array);
 template <typename T> void     array_reserve       (Array<T> *array, isize capacity);
@@ -156,6 +157,17 @@ void array_add(Array<T> *array, T const &t) {
 	array->data[array->count] = t;
 	array->count++;
 }
+
+template <typename T>
+void array_add_elems(Array<T> *array, T const *elems, isize elem_count) {
+	GB_ASSERT(elem_count >= 0);
+	if (array->capacity < array->count+elem_count) {
+		array__grow(array, array->count+elem_count);
+	}
+	gb_memmove(array->data + array->count, elems, elem_count * gb_size_of(T));
+	array->count += elem_count;
+}
+
 
 template <typename T>
 gb_inline T array_pop(Array<T> *array) {

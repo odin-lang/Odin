@@ -456,6 +456,10 @@ struct CheckerInfo {
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
 	PtrSet<isize>         minimum_dependency_type_info_set;
+
+
+	bool allow_identifier_uses;
+	Array<Ast *> identifier_uses; // only used by 'odin query'
 };
 
 struct CheckerContext {
@@ -497,6 +501,7 @@ struct Checker {
 	Array<ProcInfo> procs_to_check;
 	Array<Entity *> procs_with_deferred_to_check;
 
+	CheckerContext *curr_ctx;
 	gbAllocator    allocator;
 	CheckerContext init_ctx;
 };

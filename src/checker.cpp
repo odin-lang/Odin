@@ -790,6 +790,11 @@ void init_checker_info(CheckerInfo *i) {
 	map_init(&i->files,           a);
 	map_init(&i->packages,        a);
 	array_init(&i->variable_init_order, a);
+
+	i->allow_identifier_uses = build_context.query_data_set_settings.kind == QueryDataSet_GoToDefinitions;
+	if (i->allow_identifier_uses) {
+		array_init(&i->identifier_uses, a);
+	}
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -804,6 +809,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->files);
 	map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
+	array_free(&i->identifier_uses);
 }
 
 CheckerContext make_checker_context(Checker *c) {
@@ -1025,7 +1031,6 @@ void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
 		return;
 	}
 	GB_ASSERT(entity != nullptr);
-
 	identifier->Ident.entity = entity;
 	entity->identifier = identifier;
 	array_add(&i->definitions, entity);
@@ -1069,6 +1074,10 @@ bool add_entity_with_name(Checker *c, Scope *scope, Ast *identifier, Entity *ent
 		}
 	}
 	if (identifier != nullptr) {
+		if (entity->file == nullptr) {
+			GB_ASSERT(c->curr_ctx != nullptr);
+			entity->file = c->curr_ctx->file;
+		}
 		add_entity_definition(&c->info, identifier, entity);
 	}
 	return true;
@@ -1089,6 +1098,10 @@ void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
 			entity->identifier = identifier;
 		}
 		identifier->Ident.entity = entity;
+
+		if (c->info->allow_identifier_uses) {
+			array_add(&c->info->identifier_uses, identifier);
+		}
 
 		String dmsg = entity->deprecated_message;
 		if (dmsg.len > 0) {
@@ -1342,6 +1355,7 @@ void add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
 		ctx->decl  = file->pkg->decl_info;
 		ctx->scope = file->scope;
 		ctx->pkg   = file->pkg;
+		ctx->checker->curr_ctx = ctx;
 	}
 }
 

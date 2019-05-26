@@ -301,6 +301,7 @@ void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_t
 
 		e = alloc_entity_type_name(s, token, named_type);
 		e->state = EntityState_Resolved;
+		e->file = ctx->file;
 		e->pkg = ctx->pkg;
 		add_entity_use(ctx, node, e);
 	}
