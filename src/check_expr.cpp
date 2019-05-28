@@ -6383,6 +6383,17 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					}
 
 					check_assignment(c, o, t->BitSet.elem, str_lit("bit_set literal"));
+					if (o->mode == Addressing_Constant) {
+						i64 lower = t->BitSet.lower;
+						i64 upper = t->BitSet.upper;
+						i64 v = exact_value_to_i64(o->value);
+						if (lower <= v && v <= upper) {
+							// okay
+						} else {
+							error(elem, "Bit field value out of bounds, %lld not in the range %lld .. %lld", v, lower, upper);
+							continue;
+						}
+					}
 				}
 			}
 			break;

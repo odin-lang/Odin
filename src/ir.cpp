@@ -8156,7 +8156,8 @@ void ir_build_range_interval(irProcedure *proc, AstBinaryExpr *node, Type *val_t
 
 	TokenKind op = Token_Lt;
 	switch (node->op.kind) {
-	case Token_Ellipsis: op = Token_LtEq;   break;
+	case Token_Ellipsis:  op = Token_LtEq; break;
+	case Token_RangeHalf: op = Token_Lt;  break;
 	default: GB_PANIC("Invalid interval operator"); break;
 	}
 
@@ -8832,7 +8833,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 					ast_node(ie, BinaryExpr, expr);
 					TokenKind op = Token_Invalid;
 					switch (ie->op.kind) {
-					case Token_Ellipsis: op = Token_LtEq; break;
+					case Token_Ellipsis:  op = Token_LtEq; break;
+					case Token_RangeHalf: op = Token_Lt;   break;
 					default: GB_PANIC("Invalid interval operator"); break;
 					}
 					irValue *lhs = ir_build_expr(proc, ie->left);

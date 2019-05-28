@@ -1146,6 +1146,19 @@ Token expect_token_after(AstFile *f, TokenKind kind, char *msg) {
 }
 
 
+bool is_token_range(TokenKind kind) {
+	switch (kind) {
+	case Token_Ellipsis:
+	case Token_RangeHalf:
+		return true;
+	}
+	return false;
+}
+bool is_token_range(Token tok) {
+	return is_token_range(tok.kind);
+}
+
+
 Token expect_operator(AstFile *f) {
 	Token prev = f->curr_token;
 	if ((prev.kind == Token_in || prev.kind == Token_notin) && (f->expr_level >= 0 || f->allow_in_expr)) {
@@ -1153,7 +1166,7 @@ Token expect_operator(AstFile *f) {
 	} else if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
 		syntax_error(f->curr_token, "Expected an operator, got '%.*s'",
 		             LIT(token_strings[prev.kind]));
-	} else if (!f->allow_range && (prev.kind == Token_Ellipsis)) {
+	} else if (!f->allow_range && is_token_range(prev)) {
 		syntax_error(f->curr_token, "Expected an non-range operator, got '%.*s'",
 		             LIT(token_strings[prev.kind]));
 	}
@@ -2131,9 +2144,9 @@ Ast *parse_call_expr(AstFile *f, Ast *operand) {
 		}
 
 		bool prefix_ellipsis = false;
-		if (f->curr_token.kind == Token_Ellipsis) {
+		if (is_token_range(f->curr_token)) {
 			prefix_ellipsis = true;
-			ellipsis = expect_token(f, Token_Ellipsis);
+			ellipsis = expect_token(f, f->curr_token.kind);
 		}
 
 		Ast *arg = parse_expr(f, false);
@@ -2320,12 +2333,7 @@ bool is_ast_range(Ast *expr) {
 	if (expr->kind != Ast_BinaryExpr) {
 		return false;
 	}
-	TokenKind op = expr->BinaryExpr.op.kind;
-	switch (op) {
-	case Token_Ellipsis:
-		return true;
-	}
-	return false;
+	return is_token_range(expr->BinaryExpr.op.kind);
 }
 
 // NOTE(bill): result == priority
@@ -2334,6 +2342,7 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_Question:
 		return 1;
 	case Token_Ellipsis:
+	case Token_RangeHalf:
 		if (!f->allow_range) {
 			return 0;
 		}

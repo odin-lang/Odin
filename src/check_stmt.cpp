@@ -693,17 +693,17 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			Ast *expr = unparen_expr(cc->list[j]);
 
 			if (is_ast_range(expr)) {
-				ast_node(ie, BinaryExpr, expr);
+				ast_node(be, BinaryExpr, expr);
 				Operand lhs = {};
 				Operand rhs = {};
-				check_expr_with_type_hint(ctx, &lhs, ie->left, x.type);
+				check_expr_with_type_hint(ctx, &lhs, be->left, x.type);
 				if (x.mode == Addressing_Invalid) {
 					continue;
 				}
 				if (lhs.mode == Addressing_Invalid) {
 					continue;
 				}
-				check_expr_with_type_hint(ctx, &rhs, ie->right, x.type);
+				check_expr_with_type_hint(ctx, &rhs, be->right, x.type);
 				if (rhs.mode == Addressing_Invalid) {
 					continue;
 				}
@@ -715,6 +715,13 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 					continue;
 				}
 
+				TokenKind upper_op = Token_Invalid;
+				switch (be->op.kind) {
+				case Token_Ellipsis:  upper_op = Token_GtEq; break;
+				case Token_RangeHalf: upper_op = Token_Gt;   break;
+				default: GB_PANIC("Invalid range operator"); break;
+				}
+
 
 				Operand a = lhs;
 				Operand b = rhs;
@@ -723,7 +730,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 					continue;
 				}
 
-				check_comparison(ctx, &b, &x, Token_GtEq);
+				check_comparison(ctx, &b, &x, upper_op);
 				if (b.mode == Addressing_Invalid) {
 					continue;
 				}
@@ -736,7 +743,9 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				}
 
 				add_constant_switch_case(ctx, &seen, lhs);
-				add_constant_switch_case(ctx, &seen, rhs);
+				if (upper_op == Token_GtEq) {
+					add_constant_switch_case(ctx, &seen, rhs);
+				}
 			} else {
 				Operand y = {};
 				if (is_type_typeid(x.type)) {
@@ -1380,7 +1389,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 				TokenKind op = Token_Lt;
 				switch (ie->op.kind) {
-				case Token_Ellipsis: op = Token_LtEq; break;
+				case Token_Ellipsis:  op = Token_LtEq; break;
+				case Token_RangeHalf: op = Token_Lt; break;
 				default: error(ie->op, "Invalid range operator"); break;
 				}
 				bool ok = compare_exact_values(op, a, b);

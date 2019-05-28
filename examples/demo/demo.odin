@@ -60,8 +60,10 @@ general_stuff :: proc() {
 
 	{
 		// .. open range
+		// ..< half-closed range
 
 		for in 0..2  {} // 0, 1, 2
+		for in 0..<2 {} // 0, 1
 	}
 
 	{ // Multiple sized booleans
@@ -480,7 +482,7 @@ parametric_polymorphism :: proc() {
 
 		get_hash :: proc(s: string) -> u32 { // fnv32a
 			h: u32 = 0x811c9dc5;
-			for i in 0..len(s)-1 {
+			for i in 0..<len(s) {
 				h = (h ~ u32(s[i])) * 0x01000193;
 			}
 			return h;
@@ -530,7 +532,7 @@ parametric_polymorphism :: proc() {
 			// `T` is the type passed
 			fmt.printf("Generating an array of type %v from the value %v of type %v\n",
 					   typeid_of(type_of(res)), N, typeid_of(I));
-			for i in 0..N-1 {
+			for i in 0..<N {
 				res[i] = T(i*i);
 			}
 			return;

@@ -1044,8 +1044,18 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 			bits = 8*type_size_of(type->BitSet.underlying);
 		}
 
-		if (upper - lower >= bits) {
-			error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, (upper-lower+1));
+		switch (be->op.kind) {
+		case Token_Ellipsis:
+			if (upper - lower >= bits) {
+				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, (upper-lower+1));
+			}
+			break;
+		case Token_RangeHalf:
+			if (upper - lower > bits) {
+				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, (upper-lower));
+			}
+			upper -= 1;
+			break;
 		}
 		type->BitSet.elem  = t;
 		type->BitSet.lower = lower;
