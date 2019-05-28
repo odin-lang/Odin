@@ -98,9 +98,9 @@ advance_rune :: proc(using t: ^Tokenizer) {
 	}
 }
 
-peek_byte :: proc(using t: ^Tokenizer) -> byte {
-	if read_offset < len(src) {
-		return src[read_offset];
+peek_byte :: proc(using t: ^Tokenizer, offset := 0) -> byte {
+	if read_offset+offset < len(src) {
+		return src[read_offset+offset];
 	}
 	return 0;
 }
@@ -577,6 +577,8 @@ scan :: proc(t: ^Tokenizer) -> token.Token {
 		case '≠': kind = token.Not_Eq;
 		case '≤': kind = token.Lt_Eq;
 		case '≥': kind = token.Gt_Eq;
+		case '∈': kind = token.In;
+		case '∉': kind = token.Notin;
 
 		case '.':
 			if '0' <= t.ch && t.ch <= '9' {
@@ -586,6 +588,10 @@ scan :: proc(t: ^Tokenizer) -> token.Token {
 				if t.ch == '.' {
 					advance_rune(t);
 					kind = token.Ellipsis;
+					if t.ch == '<' {
+						advance_rune(t);
+						kind = token.Range_Half;
+					}
 				}
 			}
 		case ':': kind = token.Colon;
@@ -597,6 +603,9 @@ scan :: proc(t: ^Tokenizer) -> token.Token {
 		case ']': kind = token.Close_Bracket;
 		case '{': kind = token.Open_Brace;
 		case '}': kind = token.Close_Brace;
+
+		case '\\': kind = token.Back_Slash;
+
 		case:
 			if ch != utf8.RUNE_BOM {
 				error(t, t.offset, "illegal character '%r': %d", ch, ch);
