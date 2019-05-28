@@ -1848,6 +1848,13 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		// NOTE(bill): Changing the passing parameter value type is to match C's ABI
 		// IMPORTANT TODO(bill): This only matches the ABI on MSVC at the moment
 		// SEE: https://msdn.microsoft.com/en-us/library/zthk2dkh.aspx
+
+		if (build_context.word_size == 8) {
+			if (is_type_integer_128bit(original_type)) {
+				return alloc_type_simd_vector(2, t_u64);
+			}
+		}
+
 		Type *bt = core_type(original_type);
 		switch (bt->kind) {
 		// Okay to pass by value (usually)
@@ -1954,6 +1961,12 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 	}
 
 	if (build_context.ODIN_OS == "windows") {
+		if (build_context.word_size == 8) {
+			if (is_type_integer_128bit(single_type)) {
+				return alloc_type_simd_vector(2, t_u64);
+			}
+		}
+
 		Type *bt = core_type(reduce_tuple_to_single_type(original_type));
 		// NOTE(bill): This is just reversed engineered from LLVM IR output
 		switch (bt->kind) {
@@ -1986,6 +1999,13 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 		// their architectures
 	}
 
+	if (is_type_integer_128bit(single_type)) {
+		if (build_context.word_size == 8) {
+			return original_type;
+		}
+	}
+
+
 	if (new_type != original_type) {
 		Type *tuple = alloc_type_tuple();
 		auto variables = array_make<Entity *>(a, 0, 1);
@@ -2012,6 +2032,12 @@ bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type 
 
 
 	if (build_context.ODIN_OS == "windows") {
+		if (build_context.word_size == 8) {
+			if (is_type_integer_128bit(single_type)) {
+				return false;
+			}
+		}
+
 		i64 size = 8*type_size_of(abi_return_type);
 		switch (size) {
 		case 0:
@@ -2023,7 +2049,14 @@ bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type 
 		default:
 			return true;
 		}
+	} else {
+		if (is_type_integer_128bit(single_type)) {
+			return build_context.word_size < 8;
+		}
 	}
+
+
+
 	return false;
 }
 

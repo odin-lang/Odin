@@ -1332,9 +1332,29 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 		BigInt imin = {};
 		BigInt imax = {};
 
-		big_int_from_u64(&umax, unsigned_integer_maxs[bit_size]);
-		big_int_from_i64(&imin, signed_integer_mins[bit_size]);
-		big_int_from_i64(&imax, signed_integer_maxs[bit_size]);
+		if (bit_size < 16) {
+			big_int_from_u64(&umax, unsigned_integer_maxs[bit_size]);
+			big_int_from_i64(&imin, signed_integer_mins[bit_size]);
+			big_int_from_i64(&imax, signed_integer_maxs[bit_size]);
+		} else {
+			big_int_from_u64(&umax, 1);
+			big_int_from_i64(&imin, 1);
+			big_int_from_i64(&imax, 1);
+
+			BigInt bi128 = {};
+			BigInt bi127 = {};
+			big_int_from_i64(&bi128, 128);
+			big_int_from_i64(&bi127, 127);
+
+			big_int_shl_eq(&umax, &bi128);
+			big_int_sub_eq(&umax, &BIG_INT_ONE);
+
+			big_int_shl_eq(&imin, &bi127);
+			big_int_neg(&imin, &imin);
+
+			big_int_shl_eq(&imax, &bi127);
+			big_int_sub_eq(&imax, &BIG_INT_ONE);
+		}
 
 		switch (type->Basic.kind) {
 		case Basic_rune:
@@ -1342,14 +1362,17 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 		case Basic_i16:
 		case Basic_i32:
 		case Basic_i64:
+		case Basic_i128:
 		case Basic_int:
 
 		case Basic_i16le:
 		case Basic_i32le:
 		case Basic_i64le:
+		case Basic_i128le:
 		case Basic_i16be:
 		case Basic_i32be:
 		case Basic_i64be:
+		case Basic_i128be:
 			{
 				// return imin <= i && i <= imax;
 				int a = big_int_cmp(&imin, &i);
@@ -1361,15 +1384,18 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 		case Basic_u16:
 		case Basic_u32:
 		case Basic_u64:
+		case Basic_u128:
 		case Basic_uint:
 		case Basic_uintptr:
 
 		case Basic_u16le:
 		case Basic_u32le:
 		case Basic_u64le:
+		case Basic_u128le:
 		case Basic_u16be:
 		case Basic_u32be:
 		case Basic_u64be:
+		case Basic_u128be:
 			{
 				// return 0ull <= i && i <= umax;
 				int b = big_int_cmp(&i, &umax);
