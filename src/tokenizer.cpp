@@ -625,6 +625,13 @@ gb_inline void scan_mantissa(Tokenizer *t, i32 base) {
 	}
 }
 
+u8 peek_byte(Tokenizer *t, isize offset=0) {
+	if (t->read_curr+offset < t->end) {
+		return t->read_curr[offset];
+	}
+	return 0;
+}
+
 Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 	Token token = {};
 	token.kind = Token_Integer;
@@ -718,14 +725,12 @@ Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 
 fraction:
 	if (t->curr_rune == '.') {
-		// HACK(bill): This may be inefficient
-		TokenizerState state = save_tokenizer_state(t);
-		advance_to_next_rune(t);
-		if (t->curr_rune == '.') {
-			// TODO(bill): Clean up this shit
-			restore_tokenizer_state(t, &state);
+		if (peek_byte(t) == '.') {
+			// NOTE(bill): this is kind of ellipsis
 			goto end;
 		}
+		advance_to_next_rune(t);
+
 		token.kind = Token_Float;
 		scan_mantissa(t, 10);
 	}
@@ -983,7 +988,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 		} break;
 
 		case '.':
-			if (t->curr_rune == '.') { // Could be an ellipsis
+			if (t->curr_rune == '.') {
 				advance_to_next_rune(t);
 				token.kind = Token_Ellipsis;
 				if (t->curr_rune == '<') {
@@ -1039,7 +1044,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 			if (t->curr_rune == '=') {
 				advance_to_next_rune(t);
 				token.kind = Token_SubEq;
-			} else if (t->curr_rune == '-' && t->read_curr[0] == '-') {
+			} else if (t->curr_rune == '-' && peek_byte(t) == '-') {
 				advance_to_next_rune(t);
 				advance_to_next_rune(t);
 				token.kind = Token_Undef;
