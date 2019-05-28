@@ -946,22 +946,7 @@ deferred_procedure_associations :: proc() {
 }
 
 main :: proc() {
-	x: u128 = 1233456453347654617;
-	y: u128 = 19;
-	z := x * y;
-	w := z / 120;
-
-	assert(z == 23435672613605437723);
-	// assert(w == 195297271780045314);
-
-
-	fmt.println(x);
-	fmt.println(y);
-	fmt.println(z, u128(23435672613605437723));
-	fmt.println(w, u128(195297271780045314));
-	fmt.println(x % 33774564533476546);
-
-	when false {
+	when true {
 		general_stuff();
 		union_type();
 		parametric_polymorphism();

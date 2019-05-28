@@ -912,8 +912,8 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 		fmt_bit_set(fi, val, info.name);
 
 	case runtime.Type_Info_Bit_Set:
-		bits: u64;
-		bit_size := u64(8*type_info.size);
+		bits: u128;
+		bit_size := u128(8*type_info.size);
 
 		do_byte_swap := is_bit_set_different_endian_to_platform(info.underlying);
 
@@ -921,19 +921,23 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 		case  0: bits = 0;
 		case  8:
 			x := (^u8)(v.data)^;
-			bits = u64(x);
+			bits = u128(x);
 		case 16:
 			x := (^u16)(v.data)^;
 			if do_byte_swap do x = byte_swap(x);
-			bits = u64(x);
+			bits = u128(x);
 		case 32:
 			x := (^u32)(v.data)^;
 			if do_byte_swap do x = byte_swap(x);
-			bits = u64(x);
+			bits = u128(x);
 		case 64:
 			x := (^u64)(v.data)^;
 			if do_byte_swap do x = byte_swap(x);
-			bits = u64(x);
+			bits = u128(x);
+		case 128:
+			x := (^u128)(v.data)^;
+			if do_byte_swap do x = byte_swap(x);
+			bits = u128(x);
 		case: panic("unknown bit_size size");
 		}
 
@@ -958,7 +962,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 
 			if is_enum do for ev, evi in e.values {
 				v := enum_value_to_u64(ev);
-				if v == i {
+				if v == u64(i) {
 					strings.write_string(fi.buf, e.names[evi]);
 					commas += 1;
 					continue loop;

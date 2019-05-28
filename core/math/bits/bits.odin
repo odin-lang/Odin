@@ -22,6 +22,7 @@ I16_MAX :: 1 << 15 - 1;
 I32_MAX :: 1 << 31 - 1;
 I64_MAX :: 1 << 63 - 1;
 
+@(default_calling_convention="none")
 foreign {
 	@(link_name="llvm.ctpop.i8")        count_ones8  :: proc(i:  u8) ->  u8 ---
 	@(link_name="llvm.ctpop.i16")       count_ones16 :: proc(i: u16) -> u16 ---
@@ -49,6 +50,8 @@ foreign {
 	@(link_name="llvm.bswap.i16")       byte_swap_i16 :: proc(i16) -> i16 ---
 	@(link_name="llvm.bswap.i32")       byte_swap_i32 :: proc(i32) -> i32 ---
 	@(link_name="llvm.bswap.i64")       byte_swap_i64 :: proc(i64) -> i64 ---
+	@(link_name="llvm.bswap.i128")      byte_swap_u128 :: proc(u128) -> u128 ---
+	@(link_name="llvm.bswap.i128")      byte_swap_i128 :: proc(i128) -> i128 ---
 }
 
 byte_swap_uint :: proc(i: uint) -> uint {
@@ -70,9 +73,11 @@ byte_swap :: proc{
 	byte_swap_u16,
 	byte_swap_u32,
 	byte_swap_u64,
+	byte_swap_u128,
 	byte_swap_i16,
 	byte_swap_i32,
 	byte_swap_i64,
+	byte_swap_i128,
 	byte_swap_uint,
 	byte_swap_int,
 };
@@ -120,6 +125,7 @@ to_le_u64  :: proc(i:  u64) ->  u64 { when os.ENDIAN == "little" { return i; } e
 to_le_uint :: proc(i: uint) -> uint { when os.ENDIAN == "little" { return i; } else { return byte_swap(i); } }
 
 
+@(default_calling_convention="none")
 foreign {
 	@(link_name="llvm.uadd.with.overflow.i8")  overflowing_add_u8  :: proc(lhs, rhs:  u8) -> (u8, bool)  ---
 	@(link_name="llvm.sadd.with.overflow.i8")  overflowing_add_i8  :: proc(lhs, rhs:  i8) -> (i8, bool)  ---
@@ -158,6 +164,7 @@ overflowing_add :: proc{
 	overflowing_add_uint, overflowing_add_int,
 };
 
+@(default_calling_convention="none")
 foreign {
 	@(link_name="llvm.usub.with.overflow.i8")  overflowing_sub_u8  :: proc(lhs, rhs:  u8) -> (u8, bool)  ---
 	@(link_name="llvm.ssub.with.overflow.i8")  overflowing_sub_i8  :: proc(lhs, rhs:  i8) -> (i8, bool)  ---
@@ -195,7 +202,7 @@ overflowing_sub :: proc{
 	overflowing_sub_uint, overflowing_sub_int,
 };
 
-
+@(default_calling_convention="none")
 foreign {
 	@(link_name="llvm.umul.with.overflow.i8")  overflowing_mul_u8  :: proc(lhs, rhs:  u8) -> (u8, bool)  ---
 	@(link_name="llvm.smul.with.overflow.i8")  overflowing_mul_i8  :: proc(lhs, rhs:  i8) -> (i8, bool)  ---
