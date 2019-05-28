@@ -2144,9 +2144,9 @@ Ast *parse_call_expr(AstFile *f, Ast *operand) {
 		}
 
 		bool prefix_ellipsis = false;
-		if (is_token_range(f->curr_token)) {
+		if (f->curr_token.kind == Token_Ellipsis) {
 			prefix_ellipsis = true;
-			ellipsis = expect_token(f, f->curr_token.kind);
+			ellipsis = expect_token(f, Token_Ellipsis);
 		}
 
 		Ast *arg = parse_expr(f, false);

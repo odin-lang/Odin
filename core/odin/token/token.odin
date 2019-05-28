@@ -108,6 +108,7 @@ using Kind :: enum u32 {
 		Period,
 		Comma,
 		Ellipsis,
+		Range_Half,
 		Back_Slash,
 	B_Operator_End,
 
@@ -244,6 +245,7 @@ tokens := [Kind.COUNT]string {
 	".",
 	",",
 	"..",
+	"..<",
 	"\\",
 	"",
 
