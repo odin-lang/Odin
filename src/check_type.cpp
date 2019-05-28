@@ -948,7 +948,8 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 	ast_node(bs, BitSetType, node);
 	GB_ASSERT(type->kind == Type_BitSet);
 
-	i64 const MAX_BITS = 64;
+	i64 const DEFAULT_BITS = cast(i64)(8*build_context.word_size);
+	i64 const MAX_BITS = 128;
 
 	Ast *base = unparen_expr(bs->elem);
 	if (is_ast_range(base)) {
