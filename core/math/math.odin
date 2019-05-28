@@ -268,7 +268,7 @@ cross   :: proc{cross2, cross3};
 
 vec_dot :: proc(a, b: $T/[$N]$E) -> E {
 	res: E;
-	for i in 0..N-1 {
+	for i in 0..<N {
 		res += a[i] * b[i];
 	}
 	return res;
@@ -298,13 +298,13 @@ norm0 :: proc(v: $T/[$N]$E) -> T {
 
 identity :: proc($T: typeid/[$N][N]$E) -> T {
 	m: T;
-	for i in 0..N-1 do m[i][i] = E(1);
+	for i in 0..<N do m[i][i] = E(1);
 	return m;
 }
 
 transpose :: proc(m: $M/[$N][N]f32) -> M {
-	for j in 0..N-1 {
-		for i in 0..N-1 {
+	for j in 0..<N {
+		for i in 0..<N {
 			m[i][j], m[j][i] = m[j][i], m[i][j];
 		}
 	}
@@ -313,8 +313,8 @@ transpose :: proc(m: $M/[$N][N]f32) -> M {
 
 mat3_mul :: proc(a, b: Mat3) -> Mat3 {
 	c: Mat3;
-	for j in 0..2 {
-		for i in 0..2 {
+	for j in 0..<3 {
+		for i in 0..<3 {
 			c[j][i] = a[0][i]*b[j][0] +
 			          a[1][i]*b[j][1] +
 			          a[2][i]*b[j][2];
@@ -325,8 +325,8 @@ mat3_mul :: proc(a, b: Mat3) -> Mat3 {
 
 mat4_mul :: proc(a, b: Mat4) -> Mat4 {
 	c: Mat4;
-	for j in 0..3 {
-		for i in 0..3 {
+	for j in 0..<4 {
+		for i in 0..<4 {
 			c[j][i] = a[0][i]*b[j][0] +
 			          a[1][i]*b[j][1] +
 			          a[2][i]*b[j][2] +

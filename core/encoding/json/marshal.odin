@@ -144,7 +144,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 
 	case Type_Info_Array:
 		write_byte(b, '[');
-		for i in 0..info.count-1 {
+		for i in 0..<info.count {
 			if i > 0 do write_string(b, ", ");
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size);
@@ -155,7 +155,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 	case Type_Info_Dynamic_Array:
 		write_byte(b, '[');
 		array := cast(^mem.Raw_Dynamic_Array)v.data;
-		for i in 0..array.len-1 {
+		for i in 0..<array.len {
 			if i > 0 do write_string(b, ", ");
 
 			data := uintptr(array.data) + uintptr(i*info.elem_size);
@@ -166,7 +166,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 	case Type_Info_Slice:
 		write_byte(b, '[');
 		slice := cast(^mem.Raw_Slice)v.data;
-		for i in 0..slice.len-1 {
+		for i in 0..<slice.len {
 			if i > 0 do write_string(b, ", ");
 
 			data := uintptr(slice.data) + uintptr(i*info.elem_size);
@@ -188,7 +188,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 			entry_type := ed.elem.variant.(Type_Info_Struct);
 			entry_size := ed.elem_size;
 
-			for i in 0..entries.len-1 {
+			for i in 0..<entries.len {
 				if i > 0 do write_string(b, ", ");
 
 				data := uintptr(entries.data) + uintptr(i*entry_size);
