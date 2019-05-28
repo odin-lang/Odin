@@ -1129,7 +1129,7 @@ token_precedence :: proc(p: ^Parser, kind: token.Kind) -> int {
 	switch kind {
 	case token.Question:
 		return 1;
-	case token.Ellipsis:
+	case token.Ellipsis, token.Range_Half:
 		if !p.allow_range {
 			return 0;
 		}
