@@ -892,7 +892,7 @@ __dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller
 
 	old_len := len(m.hashes);
 	__slice_resize(&m.hashes, cap, m.entries.allocator, loc);
-	for i in old_len..len(m.hashes)-1 do m.hashes[i] = -1;
+	for i in old_len..<len(m.hashes) do m.hashes[i] = -1;
 
 }
 __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #caller_location) #no_bounds_check {
@@ -909,9 +909,9 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 
 	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len, loc);
 	__slice_resize(&nm.hashes, new_count, m.entries.allocator, loc);
-	for i in 0 .. new_count-1 do nm.hashes[i] = -1;
+	for i in 0 ..< new_count do nm.hashes[i] = -1;
 
-	for i in 0 .. m.entries.len-1 {
+	for i in 0 ..< m.entries.len {
 		if len(nm.hashes) == 0 do __dynamic_map_grow(new_header, loc);
 
 		entry_header := __dynamic_map_get_entry(header, i);

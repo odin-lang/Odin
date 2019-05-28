@@ -132,7 +132,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 		// fractional part
 		if prec > 0 {
 			add_bytes(&b, '.');
-			for i in 0..prec-1 {
+			for i in 0..<prec {
 				c: byte = '0';
 				if j := digs.decimal_point + i; 0 <= j && j < digs.count {
 					c = digs.digits[j];
@@ -255,7 +255,7 @@ round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 
 	inclusive := mant%2 == 0;
 
-	for i in 0..d.count-1 {
+	for i in 0..<d.count {
 		l: byte = '0'; // lower digit
 		if i < lower.count {
 			l = lower.digits[i];

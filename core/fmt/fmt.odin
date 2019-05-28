@@ -336,7 +336,7 @@ _arg_number :: proc(fi: ^Info, arg_index: int, format: string, offset, arg_count
 	parse_arg_number :: proc(format: string) -> (int, int, bool) {
 		if len(format) < 3 do return 0, 1, false;
 
-		for i in 1..len(format)-1 {
+		for i in 1..<len(format) {
 			if format[i] == ']' {
 				width, new_index, ok := _parse_int(format, 1);
 				if !ok || new_index != i {
@@ -658,7 +658,7 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 		fi.space = false;
 		defer fi.space = space;
 
-		for i in 0..len(s)-1 {
+		for i in 0..<len(s) {
 			if i > 0 && space do strings.write_byte(fi.buf, ' ');
 			char_set := __DIGITS_UPPER;
 			if verb == 'x' do char_set = __DIGITS_LOWER;
@@ -859,7 +859,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 
 		e, is_enum := et.variant.(runtime.Type_Info_Enum);
 		commas := 0;
-		loop: for i in 0 .. bit_size-1 {
+		loop: for i in 0 ..< bit_size {
 			if bits & (1<<i) == 0 {
 				continue loop;
 			}
@@ -929,7 +929,7 @@ fmt_opaque :: proc(fi: ^Info, v: any) {
 		if n == 0 do return true;
 
 		a := (^byte)(data);
-		for i in 0..n-1 do if mem.ptr_offset(a, i)^ != 0 {
+		for i in 0..<n do if mem.ptr_offset(a, i)^ != 0 {
 			return false;
 		}
 		return true;
@@ -1001,7 +1001,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				field_count += 1;
 
 				if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
-				if hash do for in 0..fi.indent-1 do strings.write_byte(fi.buf, '\t');
+				if hash do for in 0..<fi.indent do strings.write_byte(fi.buf, '\t');
 
 				strings.write_string(fi.buf, name);
 				strings.write_string(fi.buf, " = ");
@@ -1016,7 +1016,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				if hash do strings.write_string(fi.buf, ",\n");
 			}
 
-			if hash do for in 0..indent-1 do strings.write_byte(fi.buf, '\t');
+			if hash do for in 0..<indent do strings.write_byte(fi.buf, '\t');
 			strings.write_byte(fi.buf, '}');
 
 		case runtime.Type_Info_Bit_Set:
@@ -1083,7 +1083,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	case runtime.Type_Info_Array:
 		strings.write_byte(fi.buf, '[');
 		defer strings.write_byte(fi.buf, ']');
-		for i in 0..info.count-1 {
+		for i in 0..<info.count {
 			if i > 0 do strings.write_string(fi.buf, ", ");
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size);
@@ -1098,7 +1098,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			strings.write_byte(fi.buf, '[');
 			defer strings.write_byte(fi.buf, ']');
 			array := cast(^mem.Raw_Dynamic_Array)v.data;
-			for i in 0..array.len-1 {
+			for i in 0..<array.len {
 				if i > 0 do strings.write_string(fi.buf, ", ");
 
 				data := uintptr(array.data) + uintptr(i*info.elem_size);
@@ -1112,7 +1112,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 		strings.write_byte(fi.buf, '<');
 		defer strings.write_byte(fi.buf, '>');
-		for i in 0..info.count-1 {
+		for i in 0..<info.count {
 			if i > 0 do strings.write_string(fi.buf, ", ");
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size);
@@ -1128,7 +1128,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			strings.write_byte(fi.buf, '[');
 			defer strings.write_byte(fi.buf, ']');
 			slice := cast(^mem.Raw_Slice)v.data;
-			for i in 0..slice.len-1 {
+			for i in 0..<slice.len {
 				if i > 0 do strings.write_string(fi.buf, ", ");
 
 				data := uintptr(slice.data) + uintptr(i*info.elem_size);
@@ -1155,7 +1155,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			entry_type := ed.elem.variant.(runtime.Type_Info_Struct);
 			entry_size := ed.elem_size;
 
-			for i in 0..entries.len-1 {
+			for i in 0..<entries.len {
 				if i > 0 do strings.write_string(fi.buf, ", ");
 
 				data := uintptr(entries.data) + uintptr(i*entry_size);
@@ -1194,7 +1194,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		for _, i in info.names {
 			if !hash && i > 0 do strings.write_string(fi.buf, ", ");
 			if hash {
-				for in 0..fi.indent-1 {
+				for in 0..<fi.indent {
 					strings.write_byte(fi.buf, '\t');
 				}
 			}
