@@ -746,6 +746,11 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 		return;
 	}
 
+	if (is_type_integer_128bit(base_type)) {
+		error(node, "Base type for enumeration cannot be a 128-bit integer");
+		return;
+	}
+
 	// NOTE(bill): Must be up here for the 'check_init_constant' system
 	enum_type->Enum.base_type = base_type;
 	enum_type->Enum.scope = ctx->scope;
@@ -1825,7 +1830,7 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 	return tuple;
 }
 
-Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
+Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCallingConvention cc) {
 	Type *new_type = original_type;
 
 	if (is_type_boolean(original_type)) {
@@ -1851,7 +1856,11 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 
 		if (build_context.word_size == 8) {
 			if (is_type_integer_128bit(original_type)) {
-				return alloc_type_simd_vector(2, t_u64);
+				if (cc == ProcCC_None) {
+					return original_type;
+				} else {
+					return alloc_type_simd_vector(2, t_u64);
+				}
 			}
 		}
 
@@ -1947,7 +1956,7 @@ Type *reduce_tuple_to_single_type(Type *original_type) {
 	return original_type;
 }
 
-Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
+Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCallingConvention cc) {
 	Type *new_type = original_type;
 	if (new_type == nullptr) {
 		return nullptr;
@@ -1963,7 +1972,11 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 	if (build_context.ODIN_OS == "windows") {
 		if (build_context.word_size == 8) {
 			if (is_type_integer_128bit(single_type)) {
-				return alloc_type_simd_vector(2, t_u64);
+				if (cc == ProcCC_None) {
+					return original_type;
+				} else {
+					return alloc_type_simd_vector(2, t_u64);
+				}
 			}
 		}
 
@@ -2071,13 +2084,13 @@ void set_procedure_abi_types(CheckerContext *c, Type *type) {
 		Entity *e = type->Proc.params->Tuple.variables[i];
 		if (e->kind == Entity_Variable) {
 			Type *original_type = e->type;
-			Type *new_type = type_to_abi_compat_param_type(c->allocator, original_type);
+			Type *new_type = type_to_abi_compat_param_type(c->allocator, original_type, type->Proc.calling_convention);
 			type->Proc.abi_compat_params[i] = new_type;
 		}
 	}
 
 	// NOTE(bill): The types are the same
-	type->Proc.abi_compat_result_type = type_to_abi_compat_result_type(c->allocator, type->Proc.results);
+	type->Proc.abi_compat_result_type = type_to_abi_compat_result_type(c->allocator, type->Proc.results, type->Proc.calling_convention);
 	type->Proc.return_by_pointer = abi_compat_return_by_pointer(c->allocator, type->Proc.calling_convention, type->Proc.abi_compat_result_type);
 }
 

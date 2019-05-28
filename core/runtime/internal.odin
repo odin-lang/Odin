@@ -510,6 +510,7 @@ quo_complex128 :: proc(n, m: complex128) -> complex128 {
 	return complex(e, f);
 }
 
+@(default_calling_convention="none")
 foreign {
 	@(link_name="llvm.cttz.i8")  _ctz_u8  :: proc(i:  u8,  is_zero_undef := false) ->  u8 ---
 	@(link_name="llvm.cttz.i16") _ctz_u16 :: proc(i: u16,  is_zero_undef := false) -> u16 ---
@@ -523,6 +524,7 @@ _ctz :: proc{
 	_ctz_u64,
 };
 
+@(default_calling_convention="none")
 foreign {
 	@(link_name="llvm.ctlz.i8")  _clz_u8  :: proc(i:  u8,  is_zero_undef := false) ->  u8 ---
 	@(link_name="llvm.ctlz.i16") _clz_u16 :: proc(i: u16,  is_zero_undef := false) -> u16 ---
