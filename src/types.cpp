@@ -1238,11 +1238,12 @@ Type *bit_set_to_int(Type *t) {
 
 	i64 sz = type_size_of(t);
 	switch (sz) {
-	case 0: return t_u8;
-	case 1: return t_u8;
-	case 2: return t_u16;
-	case 4: return t_u32;
-	case 8: return t_u64;
+	case 0:  return t_u8;
+	case 1:  return t_u8;
+	case 2:  return t_u16;
+	case 4:  return t_u32;
+	case 8:  return t_u64;
+	case 16: return t_u128;
 	}
 	GB_PANIC("Unknown bit_set size");
 	return nullptr;
@@ -2414,10 +2415,11 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 			return type_align_of(t->BitSet.underlying);
 		}
 		i64 bits = t->BitSet.upper - t->BitSet.lower + 1;
-		if (bits <= 8)  return 1;
-		if (bits <= 16) return 2;
-		if (bits <= 32) return 4;
-		if (bits <= 64) return 8;
+		if (bits <= 8)   return 1;
+		if (bits <= 16)  return 2;
+		if (bits <= 32)  return 4;
+		if (bits <= 64)  return 8;
+		if (bits <= 128) return 16;
 		return 8; // NOTE(bill): Could be an invalid range so limit it for now
 	}
 
@@ -2665,10 +2667,11 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 			return type_size_of(t->BitSet.underlying);
 		}
 		i64 bits = t->BitSet.upper - t->BitSet.lower + 1;
-		if (bits <= 8)  return 1;
-		if (bits <= 16) return 2;
-		if (bits <= 32) return 4;
-		if (bits <= 64) return 8;
+		if (bits <= 8)   return 1;
+		if (bits <= 16)  return 2;
+		if (bits <= 32)  return 4;
+		if (bits <= 64)  return 8;
+		if (bits <= 128) return 16;
 		return 8; // NOTE(bill): Could be an invalid range so limit it for now
 	}
 
