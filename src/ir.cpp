@@ -422,6 +422,7 @@ enum irParamPasskind {
 	irParamPass_Pointer,  // Pass as a pointer rather than by value
 	irParamPass_Integer,  // Pass as an integer of the same size
 	irParamPass_ConstRef, // Pass as a pointer but the value is immutable
+	irParamPass_BitCast,  // Pass by value and bit cast to the correct type
 };
 
 struct irValueParam {
@@ -871,7 +872,7 @@ void ir_emit_increment(irProcedure *proc, irValue *addr);
 irValue *ir_emit_array_ep(irProcedure *proc, irValue *s, irValue *index);
 irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index);
 irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index);
-
+irValue *ir_emit_bitcast(irProcedure *proc, irValue *data, Type *type);
 irValue *ir_emit_byte_swap(irProcedure *proc, irValue *value, Type *t);
 
 irValue *ir_alloc_value(irValueKind kind) {
@@ -930,6 +931,8 @@ irValue *ir_value_param(irProcedure *parent, Entity *e, Type *abi_type) {
 			v->Param.kind = irParamPass_Integer;
 		} else if (abi_type == t_llvm_bool) {
 			v->Param.kind = irParamPass_Value;
+		} else if (is_type_simd_vector(abi_type)) {
+			v->Param.kind = irParamPass_BitCast;
 		} else {
 			GB_PANIC("Invalid abi type pass kind");
 		}
@@ -1738,6 +1741,14 @@ irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type, i
 	case irParamPass_ConstRef:
 		ir_module_add_value(proc->module, e, v);
 		return ir_emit_load(proc, v);
+
+	case irParamPass_BitCast: {
+		irValue *l = ir_add_local(proc, e, expr, false, index);
+		irValue *x = ir_emit_bitcast(proc, v, e->type);
+		ir_emit_store(proc, l, x);
+		return x;
+	}
+
 	}
 
 	GB_PANIC("Unreachable");
@@ -1814,15 +1825,19 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	case Basic_u8:
 		return irDebugBasicEncoding_unsigned_char;
 
+
 	case Basic_i16:
 	case Basic_i32:
 	case Basic_i64:
+	case Basic_i128:
 	case Basic_i16le:
 	case Basic_i32le:
 	case Basic_i64le:
+	case Basic_i128le:
 	case Basic_i16be:
 	case Basic_i32be:
 	case Basic_i64be:
+	case Basic_i128be:
 	case Basic_int:
 	case Basic_rune:
 	case Basic_typeid:
@@ -1831,12 +1846,15 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	case Basic_u16:
 	case Basic_u32:
 	case Basic_u64:
+	case Basic_u128:
 	case Basic_u16le:
 	case Basic_u32le:
 	case Basic_u64le:
+	case Basic_u128le:
 	case Basic_u16be:
 	case Basic_u32be:
 	case Basic_u64be:
+	case Basic_u128be:
 	case Basic_uint:
 	case Basic_uintptr:
 		return irDebugBasicEncoding_unsigned;
@@ -2996,6 +3014,8 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 				args[i] = ir_emit_transmute(p, args[i], new_type);
 			} else if (new_type == t_llvm_bool) {
 				args[i] = ir_emit_conv(p, args[i], new_type);
+			} else if (is_type_simd_vector(new_type)) {
+				args[i] = ir_emit_bitcast(p, args[i], new_type);
 			}
 		}
 	}
@@ -9740,6 +9760,8 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			case Basic_u32:
 			case Basic_i64:
 			case Basic_u64:
+			case Basic_i128:
+			case Basic_u128:
 
 			case Basic_i16le:
 			case Basic_u16le:
@@ -9747,13 +9769,16 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			case Basic_u32le:
 			case Basic_i64le:
 			case Basic_u64le:
+			case Basic_i128le:
+			case Basic_u128le:
 			case Basic_i16be:
 			case Basic_u16be:
 			case Basic_i32be:
 			case Basic_u32be:
 			case Basic_i64be:
 			case Basic_u64be:
-
+			case Basic_i128be:
+			case Basic_u128be:
 
 			case Basic_int:
 			case Basic_uint:

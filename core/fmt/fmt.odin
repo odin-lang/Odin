@@ -495,6 +495,71 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	_pad(fi, s);
 }
 
+_fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
+	_, neg := strconv.is_integer_negative_128(u, is_signed, bit_size);
+
+	BUF_SIZE :: 256;
+	if fi.width_set || fi.prec_set {
+		width := fi.width + fi.prec + 3; // 3 extra bytes for sign and prefix
+		if width > BUF_SIZE {
+			// TODO(bill):????
+			panic("_fmt_int: buffer overrun. Width and precision too big");
+		}
+	}
+
+	prec := 0;
+	if fi.prec_set {
+		prec = fi.prec;
+		if prec == 0 && u == 0 {
+			prev_zero := fi.zero;
+			fi.zero = false;
+			fmt_write_padding(fi, fi.width);
+			fi.zero = prev_zero;
+			return;
+		}
+	} else if fi.zero && fi.width_set {
+		prec = fi.width;
+		if neg || fi.plus || fi.space {
+			// There needs to be space for the "sign"
+			prec -= 1;
+		}
+	}
+
+	switch base {
+	case 2, 8, 10, 12, 16:
+		break;
+	case:
+		panic("_fmt_int: unknown base, whoops");
+	}
+
+	buf: [256]byte;
+	start := 0;
+
+	flags: strconv.Int_Flags;
+	if fi.hash && !fi.zero do flags |= {.Prefix};
+	if fi.plus             do flags |= {.Plus};
+	if fi.space            do flags |= {.Space};
+	s := strconv.append_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags);
+
+	if fi.hash && fi.zero {
+		c: byte = 0;
+		switch base {
+		case 2:  c = 'b';
+		case 8:  c = 'o';
+		case 12: c = 'z';
+		case 16: c = 'x';
+		}
+		if c != 0 {
+			strings.write_byte(fi.buf, '0');
+			strings.write_byte(fi.buf, c);
+		}
+	}
+
+	prev_zero := fi.zero;
+	defer fi.zero = prev_zero;
+	fi.zero = false;
+	_pad(fi, s);
+}
 
 __DIGITS_LOWER := "0123456789abcdefx";
 __DIGITS_UPPER := "0123456789ABCDEFX";
@@ -526,6 +591,31 @@ fmt_int :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, verb: rune) {
 		} else {
 			strings.write_string(fi.buf, "U+");
 			_fmt_int(fi, u, 16, false, bit_size, __DIGITS_UPPER);
+		}
+
+	case:
+		fmt_bad_verb(fi, verb);
+	}
+}
+
+fmt_int_128 :: proc(fi: ^Info, u: u128, is_signed: bool, bit_size: int, verb: rune) {
+	switch verb {
+	case 'v': _fmt_int_128(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
+	case 'b': _fmt_int_128(fi, u,  2, is_signed, bit_size, __DIGITS_LOWER);
+	case 'o': _fmt_int_128(fi, u,  8, is_signed, bit_size, __DIGITS_LOWER);
+	case 'd': _fmt_int_128(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
+	case 'z': _fmt_int_128(fi, u, 12, is_signed, bit_size, __DIGITS_LOWER);
+	case 'x': _fmt_int_128(fi, u, 16, is_signed, bit_size, __DIGITS_LOWER);
+	case 'X': _fmt_int_128(fi, u, 16, is_signed, bit_size, __DIGITS_UPPER);
+	case 'c', 'r':
+		fmt_rune(fi, rune(u), verb);
+	case 'U':
+		r := rune(u);
+		if r < 0 || r > utf8.MAX_RUNE {
+			fmt_bad_verb(fi, verb);
+		} else {
+			strings.write_string(fi.buf, "U+");
+			_fmt_int_128(fi, u, 16, false, bit_size, __DIGITS_UPPER);
 		}
 
 	case:
@@ -1358,6 +1448,15 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case u32be:     fmt_int(fi, u64(a), false, 32, verb);
 	case i64be:     fmt_int(fi, u64(a), true,  64, verb);
 	case u64be:     fmt_int(fi, u64(a), false, 64, verb);
+
+	case i128:     fmt_int_128(fi, u128(a), true,  128, verb);
+	case u128:     fmt_int_128(fi, u128(a), false, 128, verb);
+
+	case i128le:   fmt_int_128(fi, u128(a), true,  128, verb);
+	case u128le:   fmt_int_128(fi, u128(a), false, 128, verb);
+
+	case i128be:   fmt_int_128(fi, u128(a), true,  128, verb);
+	case u128be:   fmt_int_128(fi, u128(a), false, 128, verb);
 
 	case: fmt_value(fi, arg, verb);
 	}
