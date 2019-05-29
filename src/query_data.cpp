@@ -554,9 +554,9 @@ void generate_and_print_query_data_global_definitions(Checker *c, Timings *timin
 			def->add("package",     e->pkg->name);
 			def->add("name",        name);
 			def->add("filepath",    e->token.pos.file);
-			def->add("line",        e->token.pos.line);
-			def->add("column",      e->token.pos.column);
-			def->add("file_offset", e->token.pos.offset);
+			def->add("line",        cast(i64)e->token.pos.line);
+			def->add("column",      cast(i64)e->token.pos.column);
+			def->add("file_offset", cast(i64)e->token.pos.offset);
 
 			switch (e->kind) {
 			case Entity_Constant:    def->add("kind", str_lit("constant"));        break;
@@ -637,16 +637,16 @@ void generate_and_print_query_data_global_definitions(Checker *c, Timings *timin
 					GB_ASSERT(t->kind == Type_Struct);
 
 					if (t->Struct.is_polymorphic) {
-						data->add("polymorphic", t->Struct.is_polymorphic);
+						data->add("polymorphic", cast(bool)t->Struct.is_polymorphic);
 					}
 					if (t->Struct.is_poly_specialized) {
-						data->add("polymorphic_specialized", t->Struct.is_poly_specialized);
+						data->add("polymorphic_specialized", cast(bool)t->Struct.is_poly_specialized);
 					}
 					if (t->Struct.is_packed) {
-						data->add("packed", t->Struct.is_packed);
+						data->add("packed", cast(bool)t->Struct.is_packed);
 					}
 					if (t->Struct.is_raw_union) {
-						data->add("raw_union", t->Struct.is_raw_union);
+						data->add("raw_union", cast(bool)t->Struct.is_raw_union);
 					}
 
 					auto *fields = query_value_array();
@@ -672,10 +672,10 @@ void generate_and_print_query_data_global_definitions(Checker *c, Timings *timin
 					GB_ASSERT(t->kind == Type_Union);
 
 					if (t->Union.is_polymorphic) {
-						data->add("polymorphic", t->Union.is_polymorphic);
+						data->add("polymorphic", cast(bool)t->Union.is_polymorphic);
 					}
 					if (t->Union.is_poly_specialized) {
-						data->add("polymorphic_specialized", t->Union.is_poly_specialized);
+						data->add("polymorphic_specialized", cast(bool)t->Union.is_poly_specialized);
 					}
 
 					auto *variants = query_value_array();
@@ -705,10 +705,10 @@ void generate_and_print_query_data_global_definitions(Checker *c, Timings *timin
 
 					def->add("data", data);
 					if (is_polymorphic) {
-						data->add("polymorphic", is_polymorphic);
+						data->add("polymorphic", cast(bool)is_polymorphic);
 					}
 					if (is_poly_specialized) {
-						data->add("polymorphic_specialized", is_poly_specialized);
+						data->add("polymorphic_specialized", cast(bool)is_poly_specialized);
 					}
 				}
 			}
@@ -775,11 +775,11 @@ void generate_and_print_query_data_global_definitions(Checker *c, Timings *timin
 				}
 			}
 
-			tims->add("total_lines",     lines);
-			tims->add("total_tokens",    tokens);
-			tims->add("total_files",     files);
-			tims->add("total_packages",  packages);
-			tims->add("total_file_size", total_file_size);
+			tims->add("total_lines",     cast(i64)lines);
+			tims->add("total_tokens",    cast(i64)tokens);
+			tims->add("total_files",     cast(i64)files);
+			tims->add("total_packages",  cast(i64)packages);
+			tims->add("total_file_size", cast(i64)total_file_size);
 
 			auto *sections = query_value_map();
 			sections->reserve(t->sections.count);
@@ -791,8 +791,8 @@ void generate_and_print_query_data_global_definitions(Checker *c, Timings *timin
 				auto *section = query_value_map();
 				section->reserve(2);
 				sections->add(ts.label, section);
-				section->add("time", section_time);
-				section->add("total_fraction", section_time/t->total_time_seconds);
+				section->add("time", cast(f64)section_time);
+				section->add("total_fraction", cast(f64)(section_time/t->total_time_seconds));
 			}
 		}
 	}
