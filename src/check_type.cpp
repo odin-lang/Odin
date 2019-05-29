@@ -1842,6 +1842,10 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 		return new_type;
 	}
 
+	if (cc == ProcCC_None) {
+		return new_type;
+	}
+
 	if (build_context.ODIN_ARCH == "386") {
 		return new_type;
 	}
@@ -1849,21 +1853,17 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 	if (is_type_simd_vector(original_type)) {
 		return new_type;
 	}
+	if (build_context.word_size == 8) {
+		if (is_type_integer_128bit(original_type)) {
+			return alloc_type_simd_vector(2, t_u64);
+		}
+	}
 
 	if (build_context.ODIN_OS == "windows") {
 		// NOTE(bill): Changing the passing parameter value type is to match C's ABI
 		// IMPORTANT TODO(bill): This only matches the ABI on MSVC at the moment
 		// SEE: https://msdn.microsoft.com/en-us/library/zthk2dkh.aspx
 
-		if (build_context.word_size == 8) {
-			if (is_type_integer_128bit(original_type)) {
-				if (cc == ProcCC_None) {
-					return original_type;
-				} else {
-					return alloc_type_simd_vector(2, t_u64);
-				}
-			}
-		}
 
 		Type *bt = core_type(original_type);
 		switch (bt->kind) {
@@ -2044,14 +2044,13 @@ bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type 
 		return false;
 	}
 
+	if (build_context.word_size == 8) {
+		if (is_type_integer_128bit(single_type)) {
+			return false;
+		}
+	}
 
 	if (build_context.ODIN_OS == "windows") {
-		if (build_context.word_size == 8) {
-			if (is_type_integer_128bit(single_type)) {
-				return false;
-			}
-		}
-
 		i64 size = 8*type_size_of(abi_return_type);
 		switch (size) {
 		case 0:

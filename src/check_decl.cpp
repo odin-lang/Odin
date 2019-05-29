@@ -440,7 +440,7 @@ bool sig_compare(TypeCheckSig *a, TypeCheckSig *b, Type *x, Type *y) {
 	if (a == b) {
 		return sig_compare(a, x, y);
 	}
-	return (a(x) && b(y) || b(x) && a(y));
+	return ((a(x) && b(y)) || (b(x) && a(y)));
 }
 
 bool signature_parameter_similar_enough(Type *x, Type *y) {
