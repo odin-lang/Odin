@@ -301,7 +301,7 @@ void print_query_data_as_json(QueryValue *value, bool format = true, isize inden
 	}
 	case Query_Integer: {
 		auto v = cast(QueryValueInteger *)value;
-		gb_printf("%lld", v->value);
+		gb_printf("%lld", cast(long long)v->value);
 		return;
 	}
 	case Query_Float: {
