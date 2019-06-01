@@ -1853,9 +1853,13 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 	if (is_type_simd_vector(original_type)) {
 		return new_type;
 	}
-	if (build_context.word_size == 8) {
+	if (build_context.ODIN_ARCH == "amd64") {
 		if (is_type_integer_128bit(original_type)) {
-			return alloc_type_simd_vector(2, t_u64);
+			if (build_context.ODIN_OS == "windows") {
+				return alloc_type_simd_vector(2, t_u64);
+			} else {
+				return original_type;
+			}
 		}
 	}
 
@@ -1971,7 +1975,7 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCal
 	}
 
 	if (build_context.ODIN_OS == "windows") {
-		if (build_context.word_size == 8) {
+		if (build_context.ODIN_ARCH == "amd64") {
 			if (is_type_integer_128bit(single_type)) {
 				if (cc == ProcCC_None) {
 					return original_type;
