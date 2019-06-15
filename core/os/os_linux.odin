@@ -353,7 +353,6 @@ clock_gettime :: proc(clock_id: u64) -> TimeSpec {
 }
 
 sleep :: proc(seconds: u64) -> int {
-
 	return _unix_sleep(seconds);
 }
 
