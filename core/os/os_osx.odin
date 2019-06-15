@@ -132,6 +132,8 @@ TimeSpec :: struct {
 foreign libc {
     @(link_name="__error") __error :: proc "c" () -> ^int ---;
 
+    @(link_name="strerror") _strerror :: proc "c" (errno: i32) -> cstring ---;
+
 	@(link_name="open")    _unix_open    :: proc(path: cstring, flags: int, #c_vararg mode: ..any) -> Handle ---;
 	@(link_name="close")   _unix_close   :: proc(handle: Handle) ---;
 	@(link_name="read")    _unix_read    :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---;
@@ -168,6 +170,10 @@ foreign pthread {
 
 get_last_error :: proc() -> Errno {
     return Errno(__error()^);
+}
+
+strerror :: proc(e: Errno) -> string {
+    return string(_strerror(i32(e)));
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
