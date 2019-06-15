@@ -152,6 +152,11 @@ foreign dl {
 	@(link_name="dlerror") _unix_dlerror :: proc() -> cstring ---;
 }
 
+foreign import pthread "system:pthread"
+foreign pthread {
+    @(link_name="pthread_threadid_np") _thread_id :: proc(h: int, out: ^u64) -> int ---;
+}
+
 get_last_error :: proc() -> Errno {
     return Errno(__error()^);
 }
@@ -264,8 +269,9 @@ exit :: inline proc(code: int) -> ! {
 
 
 current_thread_id :: proc "contextless" () -> int {
-	// return int(_unix_gettid());
-	return 0;
+    out: u64;
+    _thread_id(0, &out);
+	return cast(int) out;
 }
 
 dlopen :: inline proc(filename: string, flags: int) -> rawptr {
