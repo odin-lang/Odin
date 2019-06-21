@@ -5773,9 +5773,7 @@ void check_set_mode_with_indirection(Operand *o, bool indirection) {
 	}
 }
 
-bool check_set_index_data(Operand *o, Type *type, bool indirection, i64 *max_count) {
-	Type *t = base_type(type_deref(type));
-
+bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count) {
 	switch (t->kind) {
 	case Type_Basic:
 		if (t->Basic.kind == Basic_string) {
