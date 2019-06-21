@@ -172,6 +172,9 @@ bool check_is_terminating(Ast *node) {
 	return false;
 }
 
+
+
+
 Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs) {
 	if (rhs->mode == Addressing_Invalid) {
 		return nullptr;
@@ -249,48 +252,19 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 	case Addressing_Invalid:
 		return nullptr;
 
-	case Addressing_Variable: {
+	case Addressing_Variable:
 		if (is_type_bit_field_value(lhs->type)) {
-			Type *lt = base_type(lhs->type);
-			i64 lhs_bits = lt->BitFieldValue.bits;
-			if (rhs->mode == Addressing_Constant) {
-				ExactValue v = exact_value_to_integer(rhs->value);
-				if (v.kind == ExactValue_Integer) {
-					BigInt i = v.value_integer;
-					if (!i.neg) {
-						u64 imax_ = ~cast(u64)0ull;
-						if (lhs_bits < 64) {
-							imax_ = (1ull << cast(u64)lhs_bits) - 1ull;
-						}
-
-						BigInt imax = big_int_make_u64(imax_);
-						if (big_int_cmp(&i, &imax) <= 0) {
-							return rhs->type;
-						}
-					}
-				} else if (rhs->value.kind == ExactValue_Bool) {
-					bool b = rhs->value.value_bool;
-					if (lhs_bits == 1) {
-						return rhs->type;
-					}
-				}
-			} else if (is_type_integer(rhs->type)) {
-				// TODO(bill): Any other checks?
-				return rhs->type;
-			} else if (is_type_boolean(rhs->type)) {
-				if (lhs_bits == 1) {
-					return rhs->type;
-				}
+			Type *res = check_assignment_bit_field(ctx, rhs, lhs->type);
+			if (res == nullptr) {
+				gbString lhs_expr = expr_to_string(lhs->expr);
+				gbString rhs_expr = expr_to_string(rhs->expr);
+				error(rhs->expr, "Cannot assign '%s' to bit field '%s'", rhs_expr, lhs_expr);
+				gb_string_free(rhs_expr);
+				gb_string_free(lhs_expr);
 			}
-			gbString lhs_expr = expr_to_string(lhs->expr);
-			gbString rhs_expr = expr_to_string(rhs->expr);
-			error(rhs->expr, "Cannot assign '%s' to bit field '%s'", rhs_expr, lhs_expr);
-			gb_string_free(rhs_expr);
-			gb_string_free(lhs_expr);
-			return nullptr;
+			return res;
 		}
 		break;
-	}
 
 	case Addressing_MapIndex: {
 		Ast *ln = unparen_expr(lhs->expr);
