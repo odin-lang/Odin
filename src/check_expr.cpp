@@ -2552,6 +2552,45 @@ ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
 	return v;
 }
 
+Type *check_assignment_bit_field(CheckerContext *ctx, Operand *operand, Type *target_type) {
+	if (is_type_bit_field_value(target_type)) {
+		Type *lt = base_type(target_type);
+		i64 lhs_bits = lt->BitFieldValue.bits;
+		if (operand->mode == Addressing_Constant) {
+			ExactValue v = exact_value_to_integer(operand->value);
+			if (v.kind == ExactValue_Integer) {
+				BigInt i = v.value_integer;
+				if (!i.neg) {
+					u64 imax_ = ~cast(u64)0ull;
+					if (lhs_bits < 64) {
+						imax_ = (1ull << cast(u64)lhs_bits) - 1ull;
+					}
+
+					BigInt imax = big_int_make_u64(imax_);
+					if (big_int_cmp(&i, &imax) <= 0) {
+						return operand->type;
+					}
+				}
+			} else if (operand->value.kind == ExactValue_Bool) {
+				bool b = operand->value.value_bool;
+				if (lhs_bits == 1) {
+					return operand->type;
+				}
+			}
+		} else if (is_type_integer(operand->type)) {
+			// TODO(bill): Any other checks?
+			return operand->type;
+		} else if (is_type_boolean(operand->type)) {
+			if (lhs_bits == 1) {
+				return operand->type;
+			}
+		}
+		return nullptr;
+	}
+
+	return nullptr;
+}
+
 void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 	GB_ASSERT_NOT_NULL(target_type);
 	if (operand->mode == Addressing_Invalid ||
@@ -2637,6 +2676,14 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 			return;
 		}
 
+		break;
+	}
+
+	case Type_BitFieldValue: {
+		Type *res = check_assignment_bit_field(c, operand, target_type);
+		if (res == nullptr) {
+			convert_untyped_error(c, operand, target_type);
+		}
 		break;
 	}
 
