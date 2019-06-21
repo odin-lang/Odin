@@ -2591,7 +2591,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 					pl->type->ProcType.calling_convention = cc;
 				}
 				d->proc_lit = init;
-				d->type_expr = pl->type;
+				d->type_expr = vd->type;
 			} else if (init->kind == Ast_ProcGroup) {
 				ast_node(pg, ProcGroup, init);
 				e = alloc_entity_proc_group(d->scope, token, nullptr);
@@ -2599,6 +2599,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 					error(name, "Procedure groups are not allowed within a foreign block");
 				}
 				d->init_expr = init;
+				d->type_expr = vd->type;
 			} else {
 				e = alloc_entity_constant(d->scope, token, nullptr, empty_exact_value);
 				d->type_expr = vd->type;
