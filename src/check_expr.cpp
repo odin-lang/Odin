@@ -5170,19 +5170,13 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 
 		if (valid_count == 0) {
-			bool all_invalid_type = true;
-			for_array(i, operands) {
-				Operand o = operands[i];
-				if (o.type != t_invalid)  {
-					all_invalid_type = false;
-					break;
-				}
-			}
-			if (!all_invalid_type) {
-				begin_error_block();
-				defer (end_error_block());
+			begin_error_block();
+			defer (end_error_block());
 
-				error(operand->expr, "No procedures or ambiguous call for procedure group '%s' that match with the given arguments", expr_name);
+			error(operand->expr, "No procedures or ambiguous call for procedure group '%s' that match with the given arguments", expr_name);
+			if (operands.count == 0) {
+				error_line("\tNo given arguments\n");
+			} else {
 				error_line("\tGiven argument types: (");
 				for_array(i, operands) {
 					Operand o = operands[i];
@@ -5192,42 +5186,43 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 					error_line("%s", type);
 				}
 				error_line(")\n");
-
-				if (procs.count > 0) {
-					error_line("Did you mean to use one of the following:\n");
-				}
-				for_array(i, procs) {
-					Entity *proc = procs[i];
-					TokenPos pos = proc->token.pos;
-					Type *t = base_type(proc->type);
-					if (t == t_invalid) continue;
-					GB_ASSERT(t->kind == Type_Proc);
-					gbString pt;
-					defer (gb_string_free(pt));
-					if (t->Proc.node != nullptr) {
-						pt = expr_to_string(t->Proc.node);
-					} else {
-						pt = type_to_string(t);
-					}
-					String prefix = {};
-					String prefix_sep = {};
-					if (proc->pkg) {
-						prefix = proc->pkg->name;
-						prefix_sep = str_lit(".");
-					}
-					String name = proc->token.string;
-
-					char const *sep = "::";
-					if (proc->kind == Entity_Variable) {
-						sep = ":=";
-					}
-					// error_line("\t%.*s %s %s at %.*s(%td:%td) with score %lld\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
-					error_line("\t%.*s%.*s%.*s %s %s at %.*s(%td:%td)\n", LIT(prefix), LIT(prefix_sep), LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
-				}
-				if (procs.count > 0) {
-					error_line("\n");
-				}
 			}
+
+			if (procs.count > 0) {
+				error_line("Did you mean to use one of the following:\n");
+			}
+			for_array(i, procs) {
+				Entity *proc = procs[i];
+				TokenPos pos = proc->token.pos;
+				Type *t = base_type(proc->type);
+				if (t == t_invalid) continue;
+				GB_ASSERT(t->kind == Type_Proc);
+				gbString pt;
+				defer (gb_string_free(pt));
+				if (t->Proc.node != nullptr) {
+					pt = expr_to_string(t->Proc.node);
+				} else {
+					pt = type_to_string(t);
+				}
+				String prefix = {};
+				String prefix_sep = {};
+				if (proc->pkg) {
+					prefix = proc->pkg->name;
+					prefix_sep = str_lit(".");
+				}
+				String name = proc->token.string;
+
+				char const *sep = "::";
+				if (proc->kind == Entity_Variable) {
+					sep = ":=";
+				}
+				// error_line("\t%.*s %s %s at %.*s(%td:%td) with score %lld\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
+				error_line("\t%.*s%.*s%.*s %s %s at %.*s(%td:%td)\n", LIT(prefix), LIT(prefix_sep), LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
+			}
+			if (procs.count > 0) {
+				error_line("\n");
+			}
+
 			result_type = t_invalid;
 		} else if (valid_count > 1) {
 			begin_error_block();
