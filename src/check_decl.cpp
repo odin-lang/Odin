@@ -338,7 +338,7 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 
 	if (type_expr) {
 		Type *t = check_type(ctx, type_expr);
-		if (!is_type_constant_type(t)) {
+		if (!is_type_constant_type(t) && !is_type_proc(t)) {
 			gbString str = type_to_string(t);
 			error(type_expr, "Invalid constant type '%s'", str);
 			gb_string_free(str);
@@ -392,6 +392,25 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 		}
 
 		if (entity != nullptr) {
+			if (e->type != nullptr) {
+				Operand x = {};
+				x.type = entity->type;
+				x.mode = Addressing_Variable;
+				if (!check_is_assignable_to(ctx, &x, e->type)) {
+					gbString expr_str = expr_to_string(init);
+					gbString op_type_str = type_to_string(entity->type);
+					gbString type_str = type_to_string(e->type);
+					error(e->token,
+					      "Cannot assign '%s' of type '%s' to '%s'",
+					      expr_str,
+					      op_type_str,
+					      type_str);
+
+					gb_string_free(type_str);
+					gb_string_free(op_type_str);
+					gb_string_free(expr_str);
+				}
+			}
 
 			// NOTE(bill): Override aliased entity
 			switch (entity->kind) {
@@ -583,10 +602,44 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	check_open_scope(ctx, pl->type);
 	defer (check_close_scope(ctx));
 
+	Type *decl_type = nullptr;
+
+	if (d->type_expr != nullptr) {
+		decl_type = check_type(ctx, d->type_expr);
+		if (!is_type_proc(decl_type)) {
+			gbString str = type_to_string(decl_type);
+			error(d->type_expr, "Expected a procedure type, got '%s'", str);
+			gb_string_free(str);
+		}
+	}
+
 
 	auto tmp_ctx = *ctx;
 	tmp_ctx.allow_polymorphic_types = true;
+	if (decl_type != nullptr) {
+		tmp_ctx.type_hint = decl_type;
+	}
 	check_procedure_type(&tmp_ctx, proc_type, pl->type);
+
+	if (decl_type != nullptr) {
+		Operand x = {};
+		x.type = e->type;
+		x.mode = Addressing_Variable;
+		if (!check_is_assignable_to(ctx, &x, decl_type)) {
+			gbString expr_str = expr_to_string(d->proc_lit);
+			gbString op_type_str = type_to_string(e->type);
+			gbString type_str = type_to_string(decl_type);
+			error(e->token,
+			      "Cannot assign '%s' of type '%s' to '%s'",
+			      expr_str,
+			      op_type_str,
+			      type_str);
+
+			gb_string_free(type_str);
+			gb_string_free(op_type_str);
+			gb_string_free(expr_str);
+		}
+	}
 
 	TypeProc *pt = &proc_type->Proc;
 	AttributeContext ac = make_attribute_context(e->Procedure.link_prefix);
