@@ -746,6 +746,13 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				if (upper_op == Token_GtEq) {
 					add_constant_switch_case(ctx, &seen, rhs);
 				}
+
+				if (is_type_string(x.type)) {
+					// NOTE(bill): Force dependency for strings here
+					add_package_dependency(ctx, "runtime", "string_le");
+					add_package_dependency(ctx, "runtime", "string_lt");
+				}
+
 			} else {
 				Operand y = {};
 				if (is_type_typeid(x.type)) {
