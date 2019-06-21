@@ -1982,7 +1982,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		while (allow_token(f, Token_Hash)) {
 			Token tag = expect_token_after(f, Token_Ident, "#");
-			 if (tag.string == "align") {
+			if (tag.string == "align") {
 				if (align) {
 					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
 				}
