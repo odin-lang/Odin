@@ -6,8 +6,12 @@ jobs:
     steps:
       - script: | 
           make release
+        displayName: Build
+      - script: |
           ./odin check examples/demo/demo.odin -vet
           ./odin run examples/demo/demo.odin
+        displayName: Test
+        
   - job: BuildMac
     displayName: Linux macOS
     pool: 
@@ -16,5 +20,8 @@ jobs:
       - script: | 
           export PATH="/usr/local/opt/llvm/bin:$PATH" 
           make release
+        displayName: Build
+      - script: | 
           ./odin check examples/demo/demo.odin -vet
           ./odin run examples/demo/demo.odin
+        displayName: Test
