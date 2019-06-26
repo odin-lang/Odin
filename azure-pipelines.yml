@@ -8,10 +8,10 @@ jobs:
           make release
           ./odin check examples/demo/demo.odin -vet
           ./odin run examples/demo/demo.odin
-  - job: BuildLinux
-    displayName: Linux Build
+  - job: BuildMac
+    displayName: Linux macOS
     pool: 
-      vmImage: ubuntu-16.04
+      vmImage: macOS-10.14
     steps:
       - script: | 
           export PATH="/usr/local/opt/llvm/bin:$PATH" 
