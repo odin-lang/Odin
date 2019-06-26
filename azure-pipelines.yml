@@ -24,7 +24,9 @@ jobs:
           brew install llvm
         displayName: Install Deps
       - script: | 
-          export PATH="/usr/local/opt/llvm/bin:$PATH" 
+          export PATH="/usr/local/opt/llvm/bin:$PATH"
+          export LDFLAGS="-L/usr/local/opt/libffi/lib"
+          export CPPFLAGS="-I/usr/local/opt/llvm/include"
           make release
         displayName: Build
       - script: | 
