@@ -1,0 +1,20 @@
+jobs:
+  - job: BuildLinux
+    displayName: Linux Build
+    pool: 
+      vmImage: ubuntu-16.04
+    steps:
+      - script: | 
+          make release
+          ./odin check examples/demo/demo.odin -vet
+          ./odin run examples/demo/demo.odin
+  - job: BuildLinux
+    displayName: Linux Build
+    pool: 
+      vmImage: ubuntu-16.04
+    steps:
+      - script: | 
+          export PATH="/usr/local/opt/llvm/bin:$PATH" 
+          make release
+          ./odin check examples/demo/demo.odin -vet
+          ./odin run examples/demo/demo.odin
