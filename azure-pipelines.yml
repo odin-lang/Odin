@@ -5,6 +5,9 @@ jobs:
       vmImage: ubuntu-16.04
     steps:
       - script: | 
+          apt-get install llvm
+        displayName: Install Deps
+      - script: | 
           make release
         displayName: Build
       - script: |
@@ -17,6 +20,9 @@ jobs:
     pool: 
       vmImage: macOS-10.14
     steps:
+      - script: | 
+          brew install --with-toolchain llvm
+        displayName: Install Deps
       - script: | 
           export PATH="/usr/local/opt/llvm/bin:$PATH" 
           make release
