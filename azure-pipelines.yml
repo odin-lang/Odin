@@ -18,7 +18,7 @@ jobs:
   - job: BuildMac
     displayName: Linux macOS
     pool: 
-      vmImage: macOS-10.14
+      vmImage: macOS-10.13
     steps:
       - script: | 
           brew install llvm
