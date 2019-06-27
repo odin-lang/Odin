@@ -24,12 +24,12 @@ jobs:
           brew install llvm
         displayName: Install Deps
       - script: | 
-          export PATH="/usr/local/opt/llvm/bin:$PATH"
           export LDFLAGS="-L/usr/local/opt/llvm/lib -Wl,-rpath,/usr/local/opt/llvm/lib"
           export CPPFLAGS="-I/usr/local/opt/llvm/include"
           make release
         displayName: Build
       - script: | 
+          export PATH="/usr/local/opt/llvm/bin:$PATH"
           ./odin check examples/demo/demo.odin -vet
           ./odin run examples/demo/demo.odin
         displayName: Test
