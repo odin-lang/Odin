@@ -71,9 +71,9 @@ Instructions for downloading and install the Odin compiler and libraries.
 
 An overview of the Odin programming language.
 
-#### [Frequently Asked Questsions (FAQ)](https://odin-lang.org/docs/faq)
+#### [Frequently Asked Questions (FAQ)](https://odin-lang.org/docs/faq)
 
-Answers to common questsions about Odin.
+Answers to common questions about Odin.
 
 #### [The Odin Wiki](https://github.com/odin-lang/Odin/wiki)
 
