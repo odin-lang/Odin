@@ -1710,11 +1710,6 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					error(vd->type, "Invalid use of a polymorphic type '%s' in variable declaration", str);
 					gb_string_free(str);
 					init_type = t_invalid;
-				} else if (is_type_empty_union(init_type)) {
-					gbString str = type_to_string(init_type);
-					error(vd->type, "An empty union '%s' cannot be instantiated in variable declaration", str);
-					gb_string_free(str);
-					init_type = t_invalid;
 				}
 			}
 

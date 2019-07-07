@@ -4008,8 +4008,12 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 		irValue *len = ir_map_len(proc, x);
 		return ir_emit_comp(proc, op_kind, len, v_zero);
 	} else if (is_type_union(t)) {
-		irValue *tag = ir_emit_union_tag_value(proc, x);
-		return ir_emit_comp(proc, op_kind, tag, v_zero);
+		if (type_size_of(t) == 0) {
+			return ir_emit_comp(proc, op_kind, v_zero, v_zero);
+		} else {
+			irValue *tag = ir_emit_union_tag_value(proc, x);
+			return ir_emit_comp(proc, op_kind, tag, v_zero);
+		}
 	} else if (is_type_typeid(t)) {
 		irValue *invalid_typeid = ir_value_constant(t_typeid, exact_value_i64(0));
 		return ir_emit_comp(proc, op_kind, x, invalid_typeid);

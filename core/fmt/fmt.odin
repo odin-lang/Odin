@@ -1306,6 +1306,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 
 	case runtime.Type_Info_Union:
+		if type_info.size == 0 {
+			strings.write_string(fi.buf, "nil");
+			return;
+		}
+
 		tag_ptr := uintptr(v.data) + info.tag_offset;
 		tag_any := any{rawptr(tag_ptr), info.tag_type.id};
 
