@@ -75,6 +75,7 @@ struct irBlock {
 
 struct irTargetList {
 	irTargetList *prev;
+	bool          is_block;
 	irBlock *     break_;
 	irBlock *     continue_;
 	irBlock *     fallthrough_;
@@ -5598,7 +5599,7 @@ irBranchBlocks ir_lookup_branch_blocks(irProcedure *proc, Ast *ident) {
 }
 
 
-void ir_push_target_list(irProcedure *proc, Ast *label, irBlock *break_, irBlock *continue_, irBlock *fallthrough_) {
+irTargetList *ir_push_target_list(irProcedure *proc, Ast *label, irBlock *break_, irBlock *continue_, irBlock *fallthrough_) {
 	irTargetList *tl = gb_alloc_item(ir_allocator(), irTargetList);
 	tl->prev          = proc->target_list;
 	tl->break_        = break_;
@@ -5616,12 +5617,14 @@ void ir_push_target_list(irProcedure *proc, Ast *label, irBlock *break_, irBlock
 			if (b->label == label) {
 				b->break_    = break_;
 				b->continue_ = continue_;
-				return;
+				return tl;
 			}
 		}
 
 		GB_PANIC("ir_set_label_blocks: Unreachable");
 	}
+
+	return tl;
 }
 
 void ir_pop_target_list(irProcedure *proc) {
@@ -8479,7 +8482,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 	case_ast_node(bs, BlockStmt, node);
 		if (bs->label != nullptr) {
 			irBlock *done = ir_new_block(proc, node, "block.done");
-			ir_push_target_list(proc, bs->label, done, nullptr, nullptr);
+			irTargetList *tl = ir_push_target_list(proc, bs->label, done, nullptr, nullptr);
+			tl->is_block = true;
 
 			ir_open_scope(proc);
 			ir_build_stmt_list(proc, bs->stmts);
@@ -8596,7 +8600,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		ir_start_block(proc, then);
 
 		if (is->label != nullptr) {
-			ir_push_target_list(proc, is->label, done, nullptr, nullptr);
+			irTargetList *tl = ir_push_target_list(proc, is->label, done, nullptr, nullptr);
+			tl->is_block = true;
 		}
 
 		ir_build_stmt(proc, is->body);
@@ -9036,6 +9041,10 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			}
 		} else {
 			for (irTargetList *t = proc->target_list; t != nullptr && block == nullptr; t = t->prev) {
+				if (t->is_block) {
+					continue;
+				}
+
 				switch (bs->token.kind) {
 				case Token_break:       block = t->break_;       break;
 				case Token_continue:    block = t->continue_;    break;
