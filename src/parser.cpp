@@ -1379,6 +1379,9 @@ Ast *parse_ident(AstFile *f, bool allow_poly_names=false) {
 	} else if (allow_poly_names && token.kind == Token_Dollar) {
 		Token dollar = expect_token(f, Token_Dollar);
 		Ast *name = ast_ident(f, expect_token(f, Token_Ident));
+		if (is_blank_ident(name)) {
+			syntax_error(name, "Invalid polymorphic type definition with a blank identifier");
+		}
 		return ast_poly_type(f, dollar, name, nullptr);
 	} else {
 		token.string = str_lit("_");
@@ -1831,6 +1834,9 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 	case Token_Dollar: {
 		Token token = expect_token(f, Token_Dollar);
 		Ast *type = parse_ident(f);
+		if (is_blank_ident(type)) {
+			syntax_error(type, "Invalid polymorphic type definition with a blank identifier");
+		}
 		Ast *specialization = nullptr;
 		if (allow_token(f, Token_Quo)) {
 			specialization = parse_type(f);
