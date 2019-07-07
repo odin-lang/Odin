@@ -1484,6 +1484,9 @@ parse_ident_list :: proc(p: ^Parser, allow_poly_names: bool) -> []^ast.Expr {
 		if allow_poly_names && p.curr_tok.kind == token.Dollar {
 			tok := expect_token(p, token.Dollar);
 			ident := parse_ident(p);
+			if is_blank_ident(ident) {
+				error(p, ident.pos, "invalid polymorphic type definition with a blank identifier");
+			}
 			poly_name := ast.new(ast.Poly_Type, tok.pos, ident.end);
 			poly_name.type = ident;
 			append(&list, poly_name);
@@ -2009,6 +2012,10 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			specialization = parse_type(p);
 			end = specialization.pos;
 		}
+		if is_blank_ident(type) {
+			error(p, type.pos, "invalid polymorphic type definition with a blank identifier");
+		}
+
 		pt := ast.new(ast.Poly_Type, tok.pos, end);
 		pt.dollar = tok.pos;
 		pt.type = type;
