@@ -715,6 +715,7 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 	}
 
 	union_type->Union.variants = variants;
+	union_type->Union.no_nil = ut->no_nil;
 
 	if (ut->align != nullptr) {
 		i64 custom_align = 1;

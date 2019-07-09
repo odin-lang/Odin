@@ -911,12 +911,13 @@ Ast *ast_struct_type(AstFile *f, Token token, Array<Ast *> fields, isize field_c
 }
 
 
-Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> variants, Ast *polymorphic_params, Ast *align) {
+Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> variants, Ast *polymorphic_params, Ast *align, bool no_nil) {
 	Ast *result = alloc_ast_node(f, Ast_UnionType);
 	result->UnionType.token              = token;
 	result->UnionType.variants           = variants;
 	result->UnionType.polymorphic_params = polymorphic_params;
 	result->UnionType.align              = align;
+	result->UnionType.no_nil             = no_nil;
 	return result;
 }
 
@@ -1971,6 +1972,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		auto variants = array_make<Ast *>(heap_allocator());
 		Ast *polymorphic_params = nullptr;
 		Ast *align = nullptr;
+		bool no_nil = false;
 
 		CommentGroup *docs = f->lead_comment;
 		Token start_token = f->curr_token;
@@ -1993,6 +1995,11 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
 				}
 				align = parse_expr(f, true);
+			} else if (tag.string == "no_nil") {
+				if (no_nil) {
+					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
+				}
+				no_nil = true;
 			} else {
 				syntax_error(tag, "Invalid union tag '#%.*s'", LIT(tag.string));
 			}
@@ -2013,7 +2020,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		Token close = expect_token(f, Token_CloseBrace);
 
-		return ast_union_type(f, token, variants, polymorphic_params, align);
+		return ast_union_type(f, token, variants, polymorphic_params, align, no_nil);
 	} break;
 
 	case Token_enum: {

@@ -1326,8 +1326,14 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		case i64:  tag = i64(i);
 		case: panic("Invalid union tag type");
 		}
+		assert(tag >= 0);
 
-		if v.data == nil || tag == 0 {
+		if v.data == nil {
+			strings.write_string(fi.buf, "nil");
+		} else if info.no_nil {
+			id := info.variants[tag].id;
+			fmt_arg(fi, any{v.data, id}, verb);
+		} else if tag == 0 {
 			strings.write_string(fi.buf, "nil");
 		} else {
 			id := info.variants[tag-1].id;
