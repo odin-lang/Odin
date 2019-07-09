@@ -129,6 +129,16 @@ slice_to_bytes :: inline proc "contextless" (slice: $E/[]$T) -> []byte {
 	return transmute([]byte)s;
 }
 
+slice_data_cast :: inline proc "contextless" ($T: typeid/[]$A, slice: $S/[]$B) -> T {
+	when size_of(A) == 0 || size_of(B) == 0 {
+		return nil;
+	} else {
+		s := transmute(Raw_Slice)slice;
+		s.len = (len(slice) * size_of(B)) / size_of(A);
+		return transmute(T)s;
+	}
+}
+
 
 buffer_from_slice :: inline proc(backing: $T/[]$E) -> [dynamic]E {
 	s := transmute(Raw_Slice)backing;
