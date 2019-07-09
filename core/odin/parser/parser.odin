@@ -2482,11 +2482,19 @@ parse_atom_expr :: proc(p: ^Parser, operand: ^ast.Expr, lhs: bool) -> ^ast.Expr 
 			p.expr_level += 1;
 			open := expect_token(p, token.Open_Bracket);
 
-			if p.curr_tok.kind != token.Colon {
+			switch p.curr_tok.kind {
+			case token.Colon, token.Ellipsis, token.Range_Half:
+				// NOTE(bill): Do not err yet
+				break;
+			case:
 				indicies[0] = parse_expr(p, false);
 			}
 
-			if p.curr_tok.kind == token.Colon {
+			switch p.curr.tok.kind {
+			case token.Ellipsis, token.Range_Half:
+				error(p, p.curr_tok.pos, "expected a colon, not a range");
+				fallthrough;
+			case token.Colon:
 				interval = advance_token(p);
 				is_slice_op = true;
 				if (p.curr_tok.kind != token.Close_Bracket && p.curr_tok.kind != token.EOF) {

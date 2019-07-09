@@ -2245,31 +2245,43 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 
 			Token open = {}, close = {}, interval = {};
 			Ast *indices[2] = {};
-			Token ellipsis = {};
-			bool is_ellipsis = false;
+			bool is_interval = false;
 
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
 
-			if (f->curr_token.kind != Token_Colon) {
+			switch (f->curr_token.kind) {
+			case Token_Ellipsis:
+			case Token_RangeHalf:
+				// NOTE(bill): Do not err yet
+			case Token_Colon:
+				break;
+			default:
 				indices[0] = parse_expr(f, false);
+				break;
 			}
 
-			if (f->curr_token.kind == Token_Colon) {
-				ellipsis = advance_token(f);
-				is_ellipsis = true;
+			switch (f->curr_token.kind) {
+			case Token_Ellipsis:
+			case Token_RangeHalf:
+				syntax_error(f->curr_token, "Expected a colon, not a range");
+				/* fallthrough */
+			case Token_Colon:
+				interval = advance_token(f);
+				is_interval = true;
 				if (f->curr_token.kind != Token_CloseBracket &&
 				    f->curr_token.kind != Token_EOF) {
 					indices[1] = parse_expr(f, false);
 				}
+				break;
 			}
 
 
 			f->expr_level--;
 			close = expect_token(f, Token_CloseBracket);
 
-			if (is_ellipsis) {
-				operand = ast_slice_expr(f, operand, open, close, ellipsis, indices[0], indices[1]);
+			if (is_interval) {
+				operand = ast_slice_expr(f, operand, open, close, interval, indices[0], indices[1]);
 			} else {
 				operand = ast_index_expr(f, operand, indices[0], open, close);
 			}
