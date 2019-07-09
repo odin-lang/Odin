@@ -86,10 +86,11 @@ Type_Info_Struct :: struct {
 	custom_align: bool,
 };
 Type_Info_Union :: struct {
-	variants:   []^Type_Info,
-	tag_offset: uintptr,
-	tag_type:   ^Type_Info,
+	variants:     []^Type_Info,
+	tag_offset:   uintptr,
+	tag_type:     ^Type_Info,
 	custom_align: bool,
+	no_nil:       bool,
 };
 Type_Info_Enum :: struct {
 	base:      ^Type_Info,

@@ -480,6 +480,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Array<Ast *> variants;   \
 		Ast *polymorphic_params; \
 		Ast *        align;      \
+		bool         no_nil;     \
 	}) \
 	AST_KIND(EnumType, "enum type", struct { \
 		Token        token; \

@@ -131,6 +131,7 @@ struct TypeUnion {
 	i64           variant_block_size;
 	i64           custom_align;
 	i64           tag_size;
+	bool          no_nil;
 
 	bool       is_polymorphic;
 	bool       is_poly_specialized;
@@ -1468,7 +1469,7 @@ bool type_has_nil(Type *t) {
 	case Type_Map:
 		return true;
 	case Type_Union:
-		return true;
+		return !t->Union.no_nil;
 	case Type_Struct:
 		return false;
 	case Type_Opaque:
@@ -1625,7 +1626,8 @@ bool are_types_identical(Type *x, Type *y) {
 	case Type_Union:
 		if (y->kind == Type_Union) {
 			if (x->Union.variants.count == y->Union.variants.count &&
-			    x->Union.custom_align == y->Union.custom_align) {
+			    x->Union.custom_align == y->Union.custom_align &&
+			    x->Union.no_nil == y->Union.no_nil) {
 				// NOTE(bill): zeroth variant is nullptr
 				for_array(i, x->Union.variants) {
 					if (!are_types_identical(x->Union.variants[i], y->Union.variants[i])) {
@@ -1778,7 +1780,11 @@ i64 union_variant_index(Type *u, Type *v) {
 	for_array(i, u->Union.variants) {
 		Type *vt = u->Union.variants[i];
 		if (are_types_identical(v, vt)) {
-			return cast(i64)(i+1);
+			if (u->Union.no_nil) {
+				return cast(i64)(i+0);
+			} else {
+				return cast(i64)(i+1);
+			}
 		}
 	}
 	return 0;

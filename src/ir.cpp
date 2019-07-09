@@ -9991,6 +9991,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				irValue *tag_offset_ptr   = ir_emit_struct_ep(proc, tag, 1);
 				irValue *tag_type_ptr     = ir_emit_struct_ep(proc, tag, 2);
 				irValue *custom_align_ptr = ir_emit_struct_ep(proc, tag, 3);
+				irValue *no_nil_ptr       = ir_emit_struct_ep(proc, tag, 4);
 
 				isize variant_count = gb_max(0, t->Union.variants.count);
 				irValue *memory_types = ir_type_info_member_types_offset(proc, variant_count);
@@ -10018,6 +10019,8 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 
 				irValue *is_custom_align = ir_const_bool(t->Union.custom_align != 0);
 				ir_emit_store(proc, custom_align_ptr, is_custom_align);
+
+				ir_emit_store(proc, no_nil_ptr, ir_const_bool(t->Union.no_nil));
 			}
 
 			break;
