@@ -5121,7 +5121,72 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			return data;
 		}
 
-		check_unpack_arguments(c, nullptr, -1, &operands, ce->args, false, false);
+		Entity **lhs = nullptr;
+		isize lhs_count = -1;
+
+		{
+			// NOTE(bill, 2019-07-13): This code is used to improve the type inference for procedure groups
+			// where the same positional parameter has the same type value (and ellipsis)
+			bool proc_arg_count_all_equal = true;
+			isize proc_arg_count = -1;
+			for_array(i, procs) {
+				Entity *p = procs[i];
+				Type *pt = base_type(p->type);
+				if (pt != nullptr && is_type_proc(pt)) {
+					if (proc_arg_count < 0) {
+						proc_arg_count = pt->Proc.param_count;
+					} else {
+						if (proc_arg_count != pt->Proc.param_count) {
+							proc_arg_count_all_equal = false;
+							break;
+						}
+					}
+				}
+			}
+
+
+			if (proc_arg_count >= 0 && proc_arg_count_all_equal) {
+				lhs_count = proc_arg_count;
+				if (lhs_count > 0)  {
+					lhs = gb_alloc_array(heap_allocator(), Entity *, lhs_count);
+					for (isize param_index = 0; param_index < lhs_count; param_index++) {
+						Entity *e = nullptr;
+						for_array(j, procs) {
+							Entity *p = procs[j];
+							Type *pt = base_type(p->type);
+							if (pt != nullptr && is_type_proc(pt)) {
+								if (e == nullptr) {
+									e = pt->Proc.params->Tuple.variables[param_index];
+								} else {
+									Entity *f = pt->Proc.params->Tuple.variables[param_index];
+									if (e == f) {
+										continue;
+									}
+									if (are_types_identical(e->type, f->type)) {
+										bool ee = (e->flags & EntityFlag_Ellipsis) != 0;
+										bool fe = (f->flags & EntityFlag_Ellipsis) != 0;
+										if (ee == fe) {
+											continue;
+										}
+									}
+									// NOTE(bill): Entities are not close enough to be used
+									e = nullptr;
+									break;
+								}
+							}
+						}
+						lhs[param_index] = e;
+					}
+				}
+			}
+		}
+
+
+		check_unpack_arguments(c, lhs, lhs_count, &operands, ce->args, false, false);
+
+		if (lhs != nullptr) {
+			gb_free(heap_allocator(), lhs);
+		}
 
 		ValidIndexAndScore *valids         = gb_alloc_array(heap_allocator(), ValidIndexAndScore, procs.count);
 		isize               valid_count    = 0;
