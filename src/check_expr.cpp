@@ -5068,17 +5068,104 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		call_checker = check_named_call_arguments;
 
 		operands = array_make<Operand>(heap_allocator(), ce->args.count);
+
+		// NOTE(bill): This is give type hints for the named parameters
+		// in order to improve the type inference system
+
+		Map<Type *> type_hint_map = {}; // Key: String
+		map_init(&type_hint_map, heap_allocator(), 2*ce->args.count);
+		defer (map_destroy(&type_hint_map));
+
+		Type *ptype = nullptr;
+		bool single_case = true;
+
+		if (operand->mode == Addressing_ProcGroup) {
+			single_case = false;
+			Array<Entity *> procs = proc_group_entities(c, *operand);
+			if (procs.count == 1) {
+				ptype = procs[0]->type;
+				single_case = true;
+			}
+		} else {
+			ptype = proc_type;
+		}
+
+		if (single_case) {
+			Type *bptype = base_type(ptype);
+			if (is_type_proc(bptype)) {
+				TypeProc *pt = &bptype->Proc;
+				TypeTuple *param_tuple = nullptr;
+				if (pt->params != nullptr) {
+					param_tuple = &pt->params->Tuple;
+				}
+				if (param_tuple != nullptr) {
+					for_array(i, param_tuple->variables) {
+						Entity *e = param_tuple->variables[i];
+						if (is_blank_ident(e->token)) {
+							continue;
+						}
+						map_set(&type_hint_map, hash_string(e->token.string), e->type);
+					}
+				}
+			}
+		} else {
+			Array<Entity *> procs = proc_group_entities(c, *operand);
+			for_array(j, procs) {
+				Type *proc_type = base_type(procs[j]->type);
+				if (is_type_proc(proc_type)) {
+					TypeProc *pt = &proc_type->Proc;
+					TypeTuple *param_tuple = nullptr;
+					if (pt->params != nullptr) {
+						param_tuple = &pt->params->Tuple;
+					}
+					if (param_tuple == nullptr) {
+						continue;
+					}
+					for_array(i, param_tuple->variables) {
+						Entity *e = param_tuple->variables[i];
+						if (is_blank_ident(e->token)) {
+							continue;
+						}
+						HashKey key = hash_string(e->token.string);
+						Type **found = map_get(&type_hint_map, key);
+						if (found) {
+							Type *t = *found;
+							if (t == nullptr) {
+								// NOTE(bill): Ambiguous named parameter across all types
+								continue;
+							}
+							if (are_types_identical(t, e->type)) {
+								// NOTE(bill): No need to set again
+							} else {
+								// NOTE(bill): Ambiguous named parameter across all types so set it to a nullptr
+								map_set(&type_hint_map, key, cast(Type *)nullptr);
+							}
+						} else {
+							map_set(&type_hint_map, key, e->type);
+						}
+					}
+				}
+			}
+
+		}
+
+
 		for_array(i, ce->args) {
 			Ast *arg = ce->args[i];
 			ast_node(fv, FieldValue, arg);
-			check_expr_or_type(c, &operands[i], fv->value);
-		}
+			Ast *field = fv->field;
 
-		bool vari_expand = (ce->ellipsis.pos.line != 0);
-		if (vari_expand) {
-			// error(ce->ellipsis, "Invalid use of '..' with 'field = value' call'");
-		}
+			Type *type_hint = nullptr;
 
+			if (field != nullptr && field->kind == Ast_Ident) {
+				String key = field->Ident.token.string;
+				Type **found = map_get(&type_hint_map, hash_string(key));
+				if (found) {
+					type_hint = *found;
+				}
+			}
+			check_expr_or_type(c, &operands[i], fv->value, type_hint);
+		}
 	} else {
 		operands = array_make<Operand>(heap_allocator(), 0, 2*ce->args.count);
 		Entity **lhs = nullptr;
