@@ -4118,18 +4118,23 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 				irValue *cmp = ir_emit_comp(proc, op_kind, x, y);
 				res = ir_emit_arith(proc, cmp_op, res, cmp, t_bool);
 			}
+
+			return ir_emit_conv(proc, res, t_bool);
 		} else {
+			irValue *val = ir_add_local_generated(proc, t_bool, false);
+			ir_emit_store(proc, val, res);
 			auto loop_data = ir_loop_start(proc, count);
-
-			irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, loop_data.idx));
-			irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, loop_data.idx));
-			irValue *cmp = ir_emit_comp(proc, op_kind, x, y);
-			res = ir_emit_arith(proc, cmp_op, res, cmp, t_bool);
-
+			{
+				irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, loop_data.idx));
+				irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, loop_data.idx));
+				irValue *cmp = ir_emit_comp(proc, op_kind, x, y);
+				irValue *new_res = ir_emit_arith(proc, cmp_op, res, cmp, t_bool);
+				ir_emit_store(proc, val, ir_emit_conv(proc, new_res, t_bool));
+			}
 			ir_loop_end(proc, loop_data);
-		}
 
-		return ir_emit_conv(proc, res, t_bool);
+			return ir_emit_load(proc, val);
+		}
 	}
 
 	if (is_type_string(a)) {
