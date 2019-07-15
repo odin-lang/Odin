@@ -286,9 +286,10 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Kind, string) {
 			advance_to_next_rune(t);
 		}
 	}
-	scan_exponent :: proc(t: ^Tokenizer, tok: Kind, offset: int) -> (Kind, string) {
+	scan_exponent :: proc(t: ^Tokenizer, tok: Kind, offset: int) -> (kind: Kind, text: string) {
+		kind = tok;
 		if t.curr_rune == 'e' || t.curr_rune == 'E' {
-			tok = Float;
+			kind = Float;
 			advance_to_next_rune(t);
 			if t.curr_rune == '-' || t.curr_rune == '+' {
 				advance_to_next_rune(t);
@@ -299,16 +300,18 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Kind, string) {
 				token_error(t, "Illegal floating point exponent");
 			}
 		}
-		return tok, string(t.src[offset : t.offset]);
+		text = string(t.src[offset : t.offset]);
+		return;
 	}
-	scan_fraction :: proc(t: ^Tokenizer, tok: Kind, offset: int) -> (Kind, string) {
+	scan_fraction :: proc(t: ^Tokenizer, tok: Kind, offset: int) -> (kind: Kind, text: string)  {
+		kind = tok;
 		if t.curr_rune == '.' {
-			tok = Float;
+			kind = Float;
 			advance_to_next_rune(t);
 			scan_mantissa(t, 10);
 		}
 
-		return scan_exponent(t, tok, offset);
+		return scan_exponent(t, kind, offset);
 	}
 
 	offset := t.offset;

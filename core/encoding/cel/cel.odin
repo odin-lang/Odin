@@ -190,7 +190,7 @@ next_token :: proc(p: ^Parser) -> Token {
 	return prev;
 }
 
-unquote_char :: proc(s: string, quote: byte) -> (r: rune, multiple_bytes: bool, tail_string: string, success: bool) {
+unquote_char :: proc(str: string, quote: byte) -> (r: rune, multiple_bytes: bool, tail_string: string, success: bool) {
 	hex_to_int :: proc(c: byte) -> int {
 		switch c {
 		case '0'..'9': return int(c-'0');
@@ -201,18 +201,19 @@ unquote_char :: proc(s: string, quote: byte) -> (r: rune, multiple_bytes: bool, 
 	}
 	w: int;
 
-	if s[0] == quote && quote == '"' {
+	if str[0] == quote && quote == '"' {
 		return;
-	} else if s[0] >= 0x80 {
-		r, w = utf8.decode_rune_in_string(s);
-		return r, true, s[w:], true;
-	} else if s[0] != '\\' {
-		return rune(s[0]), false, s[1:], true;
+	} else if str[0] >= 0x80 {
+		r, w = utf8.decode_rune_in_string(str);
+		return r, true, str[w:], true;
+	} else if str[0] != '\\' {
+		return rune(str[0]), false, str[1:], true;
 	}
 
-	if len(s) <= 1 {
+	if len(str) <= 1 {
 		return;
 	}
+	s := str;
 	c := s[1];
 	s = s[2:];
 
@@ -502,7 +503,7 @@ parse_operand :: proc(p: ^Parser) -> (Value, Pos) {
 
 parse_atom_expr :: proc(p: ^Parser, operand: Value, pos: Pos) -> (Value, Pos) {
 	loop := true;
-	for loop {
+	for operand := operand; loop;  {
 		switch p.curr_token.kind {
 		case Kind.Period:
 			next_token(p);
@@ -664,8 +665,9 @@ match_values :: proc(left, right: ^Value) -> bool {
 	return false;
 }
 
-calculate_binary_value :: proc(p: ^Parser, op: Kind, x, y: Value) -> (Value, bool) {
+calculate_binary_value :: proc(p: ^Parser, op: Kind, a, b: Value) -> (Value, bool) {
 	// TODO(bill): Calculate value as you go!
+	x, y := a, b;
 	match_values(&x, &y);
 
 

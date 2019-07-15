@@ -415,16 +415,17 @@ Foreign_Import_Decl :: struct {
 
 
 // Other things
-unparen_expr :: proc(expr: ^Expr) -> ^Expr {
+unparen_expr :: proc(expr: ^Expr) -> (val: ^Expr) {
+	val = expr;
 	if expr == nil {
-		return nil;
+		return;
 	}
 	for {
-		e, ok := expr.derived.(Paren_Expr);
+		e, ok := val.derived.(Paren_Expr);
 		if !ok do break;
-		expr = e.expr;
+		val = e.expr;
 	}
-	return expr;
+	return;
 }
 
 Field_Flag :: enum {

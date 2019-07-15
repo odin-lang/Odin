@@ -1378,14 +1378,15 @@ parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
 	return flags;
 }
 
-check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, set_flags: ast.Field_Flags) -> ast.Field_Flags {
-	if name_count > 1 && ast.Field_Flag.Using in set_flags {
+check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, set_flags: ast.Field_Flags) -> (flags: ast.Field_Flags) {
+	flags = set_flags;
+	if name_count > 1 && ast.Field_Flag.Using in flags {
 		error(p, p.curr_tok.pos, "cannot apply 'using' to more than one of the same type");
-		set_flags &~= {ast.Field_Flag.Using};
+		flags &~= {ast.Field_Flag.Using};
 	}
 
 	for flag in ast.Field_Flag {
-		if flag notin allowed_flags && flag in set_flags {
+		if flag notin allowed_flags && flag in flags {
 			using ast.Field_Flag;
 			#complete switch flag {
 			case Using:
@@ -1401,15 +1402,15 @@ check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, se
 			case Ellipsis, Results, Default_Parameters, Typeid_Token:
 				panic("Impossible prefixes");
 			}
-			set_flags &~= {flag};
+			flags &~= {flag};
 		}
 	}
 
-	if ast.Field_Flag.Using in allowed_flags && ast.Field_Flag.Using in set_flags {
-		set_flags &~= {ast.Field_Flag.Using};
+	if ast.Field_Flag.Using in allowed_flags && ast.Field_Flag.Using in flags {
+		flags &~= {ast.Field_Flag.Using};
 	}
 
-	return set_flags;
+	return flags;
 }
 
 parse_var_type :: proc(p: ^Parser, flags: ast.Field_Flags) -> ^ast.Expr {
@@ -1534,7 +1535,7 @@ parse_field_list :: proc(p: ^Parser, follow: token.Kind, allowed_flags: ast.Fiel
 		is_signature := (allowed_flags & ast.Field_Flags_Signature_Params) == ast.Field_Flags_Signature_Params;
 
 		any_polymorphic_names := check_procedure_name_list(p, names);
-		set_flags = check_field_flag_prefixes(p, len(names), allowed_flags, set_flags);
+		flags := check_field_flag_prefixes(p, len(names), allowed_flags, set_flags);
 
 		type:          ^ast.Expr;
 		default_value: ^ast.Expr;
@@ -1581,7 +1582,7 @@ parse_field_list :: proc(p: ^Parser, follow: token.Kind, allowed_flags: ast.Fiel
 
 		field := new_ast_field(names, type, default_value);
 		field.docs    = docs;
-		field.flags   = set_flags;
+		field.flags   = flags;
 		field.comment = p.line_comment;
 		append(fields, field);
 
@@ -1712,8 +1713,7 @@ string_to_calling_convention :: proc(s: string) -> ast.Proc_Calling_Convention {
 	if s[0] != '"' && s[0] != '`' {
 		return Invalid;
 	}
-	s = s[1:len(s)-1];
-	switch s {
+	switch s[1:len(s)-1] {
 	case "odin":
 		return Odin;
 	case "contextless":
@@ -2314,11 +2314,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 }
 
 is_literal_type :: proc(expr: ^ast.Expr) -> bool {
-	expr = ast.unparen_expr(expr);
-	if expr == nil {
+	val := ast.unparen_expr(expr);
+	if val == nil {
 		return false;
 	}
-	switch _ in expr.derived {
+	switch _ in val.derived {
 	case ast.Bad_Expr,
 		ast.Ident,
 		ast.Selector_Expr,
@@ -2452,7 +2452,8 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Call_Expr {
 }
 
 
-parse_atom_expr :: proc(p: ^Parser, operand: ^ast.Expr, lhs: bool) -> ^ast.Expr {
+parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^ast.Expr) {
+	operand = value;
 	if operand == nil {
 		if p.allow_type do return nil;
 		error(p, p.curr_tok.pos, "expected an operand");
@@ -2462,6 +2463,7 @@ parse_atom_expr :: proc(p: ^Parser, operand: ^ast.Expr, lhs: bool) -> ^ast.Expr 
 	}
 
 	loop := true;
+	is_lhs := lhs;
 	for loop {
 		switch p.curr_tok.kind {
 		case:
@@ -2490,7 +2492,7 @@ parse_atom_expr :: proc(p: ^Parser, operand: ^ast.Expr, lhs: bool) -> ^ast.Expr 
 				indicies[0] = parse_expr(p, false);
 			}
 
-			switch p.curr.tok.kind {
+			switch p.curr_tok.kind {
 			case token.Ellipsis, token.Range_Half:
 				error(p, p.curr_tok.pos, "expected a colon, not a range");
 				fallthrough;
@@ -2566,7 +2568,7 @@ parse_atom_expr :: proc(p: ^Parser, operand: ^ast.Expr, lhs: bool) -> ^ast.Expr 
 			operand = deref;
 
 		case token.Open_Brace:
-			if !lhs && is_literal_type(operand) && p.expr_level >= 0 {
+			if !is_lhs && is_literal_type(operand) && p.expr_level >= 0 {
 				operand = parse_literal_value(p, operand);
 			} else {
 				loop = false;
@@ -2574,7 +2576,7 @@ parse_atom_expr :: proc(p: ^Parser, operand: ^ast.Expr, lhs: bool) -> ^ast.Expr 
 
 		}
 
-		lhs = false;
+		is_lhs = false;
 	}
 
 	return operand;
