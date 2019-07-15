@@ -816,7 +816,8 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 	return header;
 }
 
-__get_map_key :: proc "contextless" (key: $K) -> Map_Key {
+__get_map_key :: proc "contextless" (k: $K) -> Map_Key {
+	key := k;
 	map_key: Map_Key;
 	ti := type_info_base_without_enum(type_info_of(K));
 	switch _ in ti.variant {
