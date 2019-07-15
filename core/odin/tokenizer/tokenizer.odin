@@ -98,9 +98,9 @@ advance_rune :: proc(using t: ^Tokenizer) {
 	}
 }
 
-peek_byte :: proc(using t: ^Tokenizer, offset := 0) -> byte {
-	if read_offset+offset < len(src) {
-		return src[read_offset+offset];
+peek_byte :: proc(t: ^Tokenizer, offset := 0) -> byte {
+	if t.read_offset+offset < len(t.src) {
+		return t.src[t.read_offset+offset];
 	}
 	return 0;
 }
@@ -363,8 +363,9 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (token.Kind, str
 
 	offset := t.offset;
 	kind := token.Integer;
+	seen_point := seen_decimal_point;
 
-	if seen_decimal_point {
+	if seen_point {
 		offset -= 1;
 		kind = token.Float;
 		scan_mantissa(t, 10);
@@ -412,10 +413,10 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (token.Kind, str
 				}
 
 			case:
-				seen_decimal_point = false;
+				seen_point = false;
 				scan_mantissa(t, 10);
 				if t.ch == '.' {
-					seen_decimal_point = true;
+					seen_point = true;
 					if scan_fraction(t, &kind) {
 						return kind, string(t.src[offset : t.offset]);
 					}

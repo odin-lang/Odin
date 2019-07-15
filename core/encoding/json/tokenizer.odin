@@ -333,7 +333,8 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 
 
-is_valid_number :: proc(s: string, spec: Specification) -> bool {
+is_valid_number :: proc(str: string, spec: Specification) -> bool {
+	s := str;
 	if s == "" {
 		return false;
 	}
@@ -395,7 +396,8 @@ is_valid_number :: proc(s: string, spec: Specification) -> bool {
 	return s == "";
 }
 
-is_valid_string_literal :: proc(s: string, spec: Specification) -> bool {
+is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
+	s := str;
 	if len(s) < 2 {
 		return false;
 	}

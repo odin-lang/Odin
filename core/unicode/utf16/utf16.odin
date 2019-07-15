@@ -21,7 +21,8 @@ decode_surrogate_pair :: proc(r1, r2: rune) -> rune {
 }
 
 
-encode_surrogate_pair :: proc(r: rune) -> (r1, r2: rune) {
+encode_surrogate_pair :: proc(c: rune) -> (r1, r2: rune) {
+	r := c;
 	if r < _surr_self || r > MAX_RUNE {
 		return REPLACEMENT_CHAR, REPLACEMENT_CHAR;
 	}

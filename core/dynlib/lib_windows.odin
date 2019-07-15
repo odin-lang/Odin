@@ -19,6 +19,6 @@ unload_library :: proc(library: Library) -> bool {
 symbol_address :: proc(library: Library, symbol: string) -> (ptr: rawptr, found: bool) {
 	c_str := strings.clone_to_cstring(symbol, context.temp_allocator);
 	ptr = win32.get_proc_address(cast(win32.Hmodule)library, c_str);
-	found == ptr != nil;
+	found = ptr != nil;
 	return;
 }

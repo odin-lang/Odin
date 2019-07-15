@@ -281,8 +281,8 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 			if ti == nil {
 				return false;
 			}
-			ti = runtime.type_info_base(ti);
-			switch info in ti.variant {
+			t := runtime.type_info_base(ti);
+			switch info in t.variant {
 			case runtime.Type_Info_Integer:
 				using runtime.Type_Info_Endianness;
 				switch info.endianness {

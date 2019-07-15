@@ -152,23 +152,21 @@ remainder_f32 :: proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
 remainder_f64 :: proc(x, y: f64) -> f64 { return x - round(x/y) * y; }
 remainder :: proc{remainder_f32, remainder_f64};
 
-mod_f32 :: proc(x, y: f32) -> f32 {
-	result: f32;
-	y = abs(y);
-	result = remainder(abs(x), y);
-	if sign(result) < 0 {
-		result += y;
+mod_f32 :: proc(x, y: f32) -> (n: f32) {
+	z := abs(y);
+	n = remainder(abs(x), z);
+	if sign(n) < 0 {
+		n += z;
 	}
-	return copy_sign(result, x);
+	return copy_sign(n, x);
 }
-mod_f64 :: proc(x, y: f64) -> f64 {
-	result: f64;
-	y = abs(y);
-	result = remainder(abs(x), y);
-	if sign(result) < 0 {
-		result += y;
+mod_f64 :: proc(x, y: f64) -> (n: f64) {
+	z := abs(y);
+	n = remainder(abs(x), z);
+	if sign(n) < 0 {
+		n += z;
 	}
-	return copy_sign(result, x);
+	return copy_sign(n, x);
 }
 mod :: proc{mod_f32, mod_f64};
 
@@ -452,16 +450,18 @@ mat4_rotate :: proc(v: Vec3, angle_radians: f32) -> Mat4 {
 }
 
 scale_vec3 :: proc(m: Mat4, v: Vec3) -> Mat4 {
-	m[0][0] *= v[0];
-	m[1][1] *= v[1];
-	m[2][2] *= v[2];
+	mm := m;
+	mm[0][0] *= v[0];
+	mm[1][1] *= v[1];
+	mm[2][2] *= v[2];
 	return m;
 }
 
 scale_f32 :: proc(m: Mat4, s: f32) -> Mat4 {
-	m[0][0] *= s;
-	m[1][1] *= s;
-	m[2][2] *= s;
+	mm := m;
+	mm[0][0] *= s;
+	mm[1][1] *= s;
+	mm[2][2] *= s;
 	return m;
 }
 

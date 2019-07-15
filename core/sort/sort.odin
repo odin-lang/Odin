@@ -96,9 +96,9 @@ quick_sort :: proc(array: $A/[]$T) {
 	quick_sort(a[i:n]);
 }
 
-_log2 :: proc(n: int) -> int {
+_log2 :: proc(x: int) -> int {
 	res := 0;
-	for ; n != 0; n >>= 1 do res += 1;
+	for n := x; n != 0; n >>= 1 do res += 1;
 	return res;
 }
 
