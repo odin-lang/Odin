@@ -946,12 +946,7 @@ deferred_procedure_associations :: proc() {
 }
 
 main :: proc() {
-	x: map[int]int;
-	x[123] = 123;
-	fmt.println(x);
-	fmt.println(x[123]);
-
-	when false {
+	when true {
 		general_stuff();
 		union_type();
 		parametric_polymorphism();
