@@ -20,29 +20,29 @@ decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
 
 	// TODO(bill): make this work with a buffer that's not big enough
 	assert(len(buf) >= n);
-	buf = buf[0:n];
+	b := buf[0:n];
 
 	if a.count == 0 {
-		buf[0] = '0';
-		return string(buf[0:1]);
+		b[0] = '0';
+		return string(b[0:1]);
 	}
 
 	w := 0;
 	if a.decimal_point <= 0 {
-		buf[w] = '0'; w += 1;
-		buf[w] = '.'; w += 1;
-		w += digit_zero(buf[w : w-a.decimal_point]);
-		w += copy(buf[w:], a.digits[0:a.count]);
+		b[w] = '0'; w += 1;
+		b[w] = '.'; w += 1;
+		w += digit_zero(b[w : w-a.decimal_point]);
+		w += copy(b[w:], a.digits[0:a.count]);
 	} else if a.decimal_point < a.count {
-		w += copy(buf[w:], a.digits[0:a.decimal_point]);
-		buf[w] = '.'; w += 1;
-		w += copy(buf[w:], a.digits[a.decimal_point : a.count]);
+		w += copy(b[w:], a.digits[0:a.decimal_point]);
+		b[w] = '.'; w += 1;
+		w += copy(b[w:], a.digits[a.decimal_point : a.count]);
 	} else {
-		w += copy(buf[w:], a.digits[0:a.count]);
-		w += digit_zero(buf[w : w+a.decimal_point-a.count]);
+		w += copy(b[w:], a.digits[0:a.count]);
+		w += digit_zero(b[w : w+a.decimal_point-a.count]);
 	}
 
-	return string(buf[0:w]);
+	return string(b[0:w]);
 }
 
 // trim trailing zeros
@@ -56,10 +56,10 @@ trim :: proc(a: ^Decimal) {
 }
 
 
-assign :: proc(a: ^Decimal, i: u64) {
+assign :: proc(a: ^Decimal, idx: u64) {
 	buf: [64]byte;
 	n := 0;
-	for i > 0 {
+	for i := idx; i > 0;  {
 		j := i/10;
 		i -= 10*j;
 		buf[n] = byte('0'+i);
@@ -175,11 +175,11 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 	trim(a);
 }
 
-shift :: proc(a: ^Decimal, k: int) {
+shift :: proc(a: ^Decimal, i: int) {
 	uint_size :: 8*size_of(uint);
 	max_shift :: uint_size-4;
 
-	switch {
+	switch k := i; {
 	case a.count == 0:
 		// no need to update
 	case k > 0:

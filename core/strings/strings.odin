@@ -67,7 +67,8 @@ rune_count :: proc(s: string) -> int {
 }
 
 
-equal_fold :: proc(s, t: string) -> bool {
+equal_fold :: proc(u, v: string) -> bool {
+	s, t := u, v;
 	loop: for s != "" && t != "" {
 		sr, tr: rune;
 		if s[0] < utf8.RUNE_SELF {
@@ -250,13 +251,14 @@ count :: proc(s, substr: string) -> int {
 
 	// TODO(bill): Use a non-brute for approach
 	n := 0;
+	str := s;
 	for {
-		i := index(s, substr);
+		i := index(str, substr);
 		if i == -1 {
 			return n;
 		}
 		n += 1;
-		s = s[i+len(substr):];
+		str = str[i+len(substr):];
 	}
 	return n;
 }
@@ -289,22 +291,22 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator) -> 
 		output = s;
 		return;
 	}
-
+	byte_count := n;
 	if m := count(s, old); m == 0 {
 		was_allocation = false;
 		output = s;
 		return;
 	} else if n < 0 || m < n {
-		n = m;
+		byte_count = m;
 	}
 
 
-	t := make([]byte, len(s) + n*(len(new) - len(old)), allocator);
+	t := make([]byte, len(s) + byte_count*(len(new) - len(old)), allocator);
 	was_allocation = true;
 
 	w := 0;
 	start := 0;
-	for i := 0; i < n; i += 1 {
+	for i := 0; i < byte_count; i += 1 {
 		j := start;
 		if len(old) == 0 {
 			if i > 0 {
@@ -475,14 +477,16 @@ trim_left :: proc(s: string, cutset: string) -> string {
 	if s == "" || cutset == "" {
 		return s;
 	}
-	return trim_left_proc_with_state(s, is_in_cutset, &cutset);
+	state := cutset;
+	return trim_left_proc_with_state(s, is_in_cutset, &state);
 }
 
 trim_right :: proc(s: string, cutset: string) -> string {
 	if s == "" || cutset == "" {
 		return s;
 	}
-	return trim_right_proc_with_state(s, is_in_cutset, &cutset);
+	state := cutset;
+	return trim_right_proc_with_state(s, is_in_cutset, &state);
 }
 
 trim :: proc(s: string, cutset: string) -> string {
@@ -515,7 +519,8 @@ trim_null :: proc(s: string) -> string {
 
 // scrub scruvs invalid utf-8 characters and replaces them with the replacement string
 // Adjacent invalid bytes are only replaced once
-scrub :: proc(str: string, replacement: string, allocator := context.allocator) -> string {
+scrub :: proc(s: string, replacement: string, allocator := context.allocator) -> string {
+	str := s;
 	b := make_builder(allocator);;
 	grow_builder(&b, len(str));
 
@@ -547,7 +552,8 @@ scrub :: proc(str: string, replacement: string, allocator := context.allocator) 
 }
 
 
-reverse :: proc(str: string, allocator := context.allocator) -> string {
+reverse :: proc(s: string, allocator := context.allocator) -> string {
+	str := s;
 	n := len(str);
 	buf := make([]byte, n);
 	i := 0;
@@ -560,17 +566,18 @@ reverse :: proc(str: string, allocator := context.allocator) -> string {
 	return string(buf);
 }
 
-expand_tabs :: proc(str: string, tab_size: int, allocator := context.allocator) -> string {
+expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) -> string {
 	if tab_size <= 0 {
 		panic("tab size must be positive");
 	}
 
-	if str == "" {
+
+	if s == "" {
 		return "";
 	}
 
 	b := make_builder(allocator);
-
+	str := s;
 	column: int;
 
 	for len(str) > 0 {
@@ -683,11 +690,12 @@ write_pad_string :: proc(b: ^Builder, pad: string, pad_len, remains: int) {
 		write_string(b, pad);
 	}
 
-	remains = remains % pad_len;
+	n := remains % pad_len;
+	p := pad;
 
-	if remains != 0 do for i := 0; i < remains; i += 1 {
-		r, w := utf8.decode_rune_in_string(pad);
+	for i := 0; i < n; i += 1 {
+		r, w := utf8.decode_rune_in_string(p);
 		write_rune(b, r);
-		pad = pad[w:];
+		p = p[w:];
 	}
 }

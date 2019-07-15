@@ -2854,7 +2854,6 @@ enum FieldPrefixKind {
 	FieldPrefix_no_alias,
 	FieldPrefix_c_var_arg,
 	FieldPrefix_auto_cast,
-	FieldPrefix_in,
 };
 
 FieldPrefixKind is_token_field_prefix(AstFile *f) {
@@ -2864,9 +2863,6 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 
 	case Token_using:
 		return FieldPrefix_using;
-
-	case Token_in:
-		return FieldPrefix_in;
 
 	case Token_auto_cast:
 		return FieldPrefix_auto_cast;
@@ -2892,7 +2888,6 @@ u32 parse_field_prefixes(AstFile *f) {
 	i32 using_count     = 0;
 	i32 no_alias_count  = 0;
 	i32 c_vararg_count  = 0;
-	i32 in_count        = 0;
 	i32 auto_cast_count = 0;
 
 	for (;;) {
@@ -2910,14 +2905,12 @@ u32 parse_field_prefixes(AstFile *f) {
 		case FieldPrefix_using:     using_count     += 1; advance_token(f); break;
 		case FieldPrefix_no_alias:  no_alias_count  += 1; advance_token(f); break;
 		case FieldPrefix_c_var_arg: c_vararg_count  += 1; advance_token(f); break;
-		case FieldPrefix_in:        in_count        += 1; advance_token(f); break;
 		case FieldPrefix_auto_cast: auto_cast_count += 1; advance_token(f); break;
 		}
 	}
 	if (using_count     > 1) syntax_error(f->curr_token, "Multiple 'using' in this field list");
 	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple '#no_alias' in this field list");
 	if (c_vararg_count  > 1) syntax_error(f->curr_token, "Multiple '#c_vararg' in this field list");
-	if (in_count        > 1) syntax_error(f->curr_token, "Multiple 'in' in this field list");
 	if (auto_cast_count > 1) syntax_error(f->curr_token, "Multiple 'auto_cast' in this field list");
 
 
@@ -2925,7 +2918,6 @@ u32 parse_field_prefixes(AstFile *f) {
 	if (using_count     > 0) field_flags |= FieldFlag_using;
 	if (no_alias_count  > 0) field_flags |= FieldFlag_no_alias;
 	if (c_vararg_count  > 0) field_flags |= FieldFlag_c_vararg;
-	if (in_count        > 0) field_flags |= FieldFlag_in;
 	if (auto_cast_count > 0) field_flags |= FieldFlag_auto_cast;
 	return field_flags;
 }

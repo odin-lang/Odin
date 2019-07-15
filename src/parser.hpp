@@ -186,8 +186,6 @@ enum FieldFlag {
 	FieldFlag_c_vararg  = 1<<3,
 	FieldFlag_auto_cast = 1<<4,
 
-	FieldFlag_in        = 1<<5,
-
 
 	FieldFlag_Results   = 1<<16,
 

@@ -728,7 +728,7 @@ CP_UTF8       :: 65001; // UTF-8 translation
 MB_ERR_INVALID_CHARS :: 8;
 WC_ERR_INVALID_CHARS :: 128;
 
-utf8_to_ucs2 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
+utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 	if len(s) < 1 {
 		return nil;
 	}
@@ -751,13 +751,13 @@ utf8_to_ucs2 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 	return text[:len(text)-1];
 }
 utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> Wstring {
-	if res := utf8_to_ucs2(s, allocator); res != nil {
+	if res := utf8_to_utf16(s, allocator); res != nil {
 		return Wstring(&res[0]);
 	}
 	return nil;
 }
 
-ucs2_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
+utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
 	if len(s) < 1 {
 		return "";
 	}

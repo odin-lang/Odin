@@ -23,7 +23,8 @@ _digit_value :: proc(r: rune) -> int {
 	return v;
 }
 
-parse_i64 :: proc(s: string) -> i64 {
+parse_i64 :: proc(str: string) -> i64 {
+	s := str;
 	neg := false;
 	if len(s) > 1 {
 		switch s[0] {
@@ -66,7 +67,8 @@ parse_i64 :: proc(s: string) -> i64 {
 	return value;
 }
 
-parse_u64 :: proc(s: string) -> u64 {
+parse_u64 :: proc(str: string) -> u64 {
+	s := str;
 	neg := false;
 	if len(s) > 1 && s[0] == '+' {
 		s = s[1:];
@@ -209,7 +211,7 @@ append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> str
 }
 
 
-quote :: proc(buf: []byte, s: string) -> string {
+quote :: proc(buf: []byte, str: string) -> string {
 	write_byte :: inline proc(buf: []byte, i: ^int, bytes: ..byte) {
 		if i^ >= len(buf) do return;
 		n := copy(buf[i^:], bytes[:]);
@@ -222,6 +224,7 @@ quote :: proc(buf: []byte, s: string) -> string {
 
 	c :: '"';
 	i := 0;
+	s := str;
 
 	write_byte(buf, &i, c);
 	for width := 0; len(s) > 0; s = s[width:] {

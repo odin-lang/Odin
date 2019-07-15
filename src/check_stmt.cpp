@@ -303,9 +303,13 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 			}
 		}
 
+		Entity *e = entity_of_ident(lhs->expr);
+
 		gbString str = expr_to_string(lhs->expr);
 		if (lhs->mode == Addressing_Immutable) {
 			error(lhs->expr, "Cannot assign to an immutable: '%s'", str);
+		} else if (e != nullptr && e->flags & EntityFlag_Param) {
+			error(lhs->expr, "Cannot assign to '%s' which is a procedure parameter", str);
 		} else {
 			error(lhs->expr, "Cannot assign to '%s'", str);
 		}
