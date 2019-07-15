@@ -1519,18 +1519,6 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			}
 		}
 
-		if (p->flags&FieldFlag_in) {
-			if (is_type_param) {
-				error(param, "'in' cannot be applied to a type parameter");
-				p->flags &= ~FieldFlag_in;
-			} else if (is_variadic) {
-				error(param, "'in' cannot be applied to a variadic parameter");
-				p->flags &= ~FieldFlag_in;
-			}
-		}
-
-		bool is_in = (p->flags&FieldFlag_in) != 0;
-
 		for_array(j, p->names) {
 			Ast *name = p->names[j];
 
@@ -1670,7 +1658,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 
 					param = alloc_entity_const_param(scope, name->Ident.token, type, poly_const, is_type_polymorphic(type));
 				} else {
-					param = alloc_entity_param(scope, name->Ident.token, type, is_using, is_in);
+					param = alloc_entity_param(scope, name->Ident.token, type, is_using, true);
 					param->Variable.param_value = param_value;
 				}
 			}

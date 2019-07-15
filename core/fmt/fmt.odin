@@ -783,7 +783,8 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 	}
 }
 
-enum_value_to_string :: proc(v: any) -> (string, bool) {
+enum_value_to_string :: proc(val: any) -> (string, bool) {
+	v := val;
 	v.id = runtime.typeid_base(v.id);
 	type_info := type_info_of(v.id);
 
@@ -890,8 +891,8 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 		if ti == nil {
 			return false;
 		}
-		ti = runtime.type_info_base(ti);
-		switch info in ti.variant {
+		t := runtime.type_info_base(ti);
+		switch info in t.variant {
 		case runtime.Type_Info_Integer:
 			switch info.endianness {
 			case .Platform: return false;

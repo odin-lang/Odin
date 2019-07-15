@@ -5,12 +5,13 @@ import "core:os"
 import "core:unicode/utf8"
 
 
-print_u64 :: proc(fd: os.Handle, u: u64) {
+print_u64 :: proc(fd: os.Handle, x: u64) {
 	digits := "0123456789";
 
 	a: [129]byte;
 	i := len(a);
 	b := u64(10);
+	u := x;
 	for u >= b {
 		i -= 1; a[i] = digits[u % b];
 		u /= b;
@@ -20,10 +21,11 @@ print_u64 :: proc(fd: os.Handle, u: u64) {
 	os.write(fd, a[i:]);
 }
 
-print_i64 :: proc(fd: os.Handle, u: i64) {
+print_i64 :: proc(fd: os.Handle, x: i64) {
 	digits := "0123456789";
 	b :: i64(10);
 
+	u := x;
 	neg := u < 0;
 	u = abs(u);
 

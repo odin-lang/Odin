@@ -1533,8 +1533,14 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 			if (ast_node_expect(node, Ast_UnaryExpr)) {
 				ast_node(ue, UnaryExpr, node);
 				gbString str = expr_to_string(ue->expr);
-				error(op, "Cannot take the pointer address of '%s'", str);
-				gb_string_free(str);
+				defer (gb_string_free(str));
+
+				Entity *e = entity_of_ident(o->expr);
+				if (e != nullptr && (e->flags & EntityFlag_Param) != 0) {
+					error(op, "Cannot take the pointer address of '%s' which is a procedure parameter", str);
+				} else {
+					error(op, "Cannot take the pointer address of '%s'", str);
+				}
 			}
 			o->mode = Addressing_Invalid;
 			return;
@@ -5909,17 +5915,6 @@ void check_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e, Type *t) {
 	}
 }
 
-void check_set_mode_with_indirection(Operand *o, bool indirection) {
-	if (o->mode != Addressing_Immutable) {
-		if (indirection) {
-			o->mode = Addressing_Variable;
-		} else if (o->mode != Addressing_Variable &&
-		           o->mode != Addressing_Constant) {
-			o->mode = Addressing_Value;
-		}
-	}
-}
-
 bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count) {
 	switch (t->kind) {
 	case Type_Basic:
@@ -5927,7 +5922,9 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count)
 			if (o->mode == Addressing_Constant) {
 				*max_count = o->value.value_string.len;
 			}
-			check_set_mode_with_indirection(o, indirection);
+			if (o->mode != Addressing_Immutable && o->mode != Addressing_Constant) {
+				o->mode = Addressing_Variable;
+			}
 			o->type = t_u8;
 			return true;
 		}
@@ -5935,20 +5932,29 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count)
 
 	case Type_Array:
 		*max_count = t->Array.count;
-		check_set_mode_with_indirection(o, indirection);
+		if (o->mode != Addressing_Immutable) {
+			if (indirection) {
+				o->mode = Addressing_Variable;
+			} else if (o->mode != Addressing_Variable &&
+			           o->mode != Addressing_Constant) {
+				o->mode = Addressing_Value;
+			}
+		}
 		o->type = t->Array.elem;
 		return true;
 
 	case Type_Slice:
 		o->type = t->Slice.elem;
-		if (o->mode != Addressing_Immutable) {
+		if (o->mode != Addressing_Immutable && o->mode != Addressing_Constant) {
 			o->mode = Addressing_Variable;
 		}
 		return true;
 
 	case Type_DynamicArray:
 		o->type = t->DynamicArray.elem;
-		check_set_mode_with_indirection(o, indirection);
+		if (o->mode != Addressing_Immutable && o->mode != Addressing_Constant) {
+			o->mode = Addressing_Variable;
+		}
 		return true;
 	}
 

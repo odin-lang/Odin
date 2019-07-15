@@ -68,9 +68,9 @@ write_bytes :: proc(b: ^Builder, x: []byte) {
 @(private, static)
 DIGITS_LOWER := "0123456789abcdefx";
 
-write_quoted_string :: proc(b: ^Builder, s: string, quote: byte = '"') {
+write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"') {
 	write_byte(b, quote);
-	for width := 0; len(s) > 0; s = s[width:] {
+	for width, s := 0, str; len(s) > 0; s = s[width:] {
 		r := rune(s[0]);
 		width = 1;
 		if r >= utf8.RUNE_SELF {
@@ -166,27 +166,27 @@ write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false
 	case '\t': write_string(b, `\t`);
 	case '\v': write_string(b, `\v`);
 	case:
-		switch {
-		case r < ' ':
+		switch c := r; {
+		case c < ' ':
 			write_byte(b, '\\');
 			write_byte(b, 'x');
-			write_byte(b, DIGITS_LOWER[byte(r)>>4]);
-			write_byte(b, DIGITS_LOWER[byte(r)&0xf]);
+			write_byte(b, DIGITS_LOWER[byte(c)>>4]);
+			write_byte(b, DIGITS_LOWER[byte(c)&0xf]);
 
-		case r > utf8.MAX_RUNE:
-			r = 0xfffd;
+		case c > utf8.MAX_RUNE:
+			c = 0xfffd;
 			fallthrough;
-		case r < 0x10000:
+		case c < 0x10000:
 			write_byte(b, '\\');
 			write_byte(b, 'u');
 			for s := 12; s >= 0; s -= 4 {
-				write_byte(b, DIGITS_LOWER[r>>uint(s) & 0xf]);
+				write_byte(b, DIGITS_LOWER[c>>uint(s) & 0xf]);
 			}
 		case:
 			write_byte(b, '\\');
 			write_byte(b, 'U');
 			for s := 28; s >= 0; s -= 4 {
-				write_byte(b, DIGITS_LOWER[r>>uint(s) & 0xf]);
+				write_byte(b, DIGITS_LOWER[c>>uint(s) & 0xf]);
 			}
 		}
 	}

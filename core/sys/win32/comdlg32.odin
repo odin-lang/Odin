@@ -89,7 +89,6 @@ _open_file_dialog :: proc(title: string, dir: string,
 	// Filters need to be passed as a pair of strings (title, filter)
 	filter_len := u32(len(filters));
 	if filter_len % 2 != 0 do return "", false;
-	default_filter = clamp(default_filter, 1, filter_len / 2);
 
 	filter: string;
 	filter = strings.join(filters, "\u0000", context.temp_allocator);
@@ -102,7 +101,7 @@ _open_file_dialog :: proc(title: string, dir: string,
 		title        = utf8_to_wstring(title, context.temp_allocator),
 		filter       = utf8_to_wstring(filter, context.temp_allocator),
 		initial_dir  = utf8_to_wstring(dir, context.temp_allocator),
-		filter_index = u32(default_filter),
+		filter_index = u32(clamp(default_filter, 1, filter_len / 2)),
 		def_ext      = utf8_to_wstring(default_ext, context.temp_allocator),
 		flags        = u32(flags),
 	};
@@ -121,7 +120,7 @@ _open_file_dialog :: proc(title: string, dir: string,
 		return "", false;
 	}
 
-	file_name := ucs2_to_utf8(file_buf[:], allocator);
+	file_name := utf16_to_utf8(file_buf[:], allocator);
 	path = strings.trim_right_null(file_name);
 	return;
 }
@@ -143,7 +142,7 @@ select_file_to_save :: proc(title := SAVE_TITLE, dir := ".",
 	return;
 }
 
-// TODO: Implement convenience function for select_file_to_open with ALLOW_MULTI_SELECT that takes 
+// TODO: Implement convenience function for select_file_to_open with ALLOW_MULTI_SELECT that takes
 //       it output of the form "path\u0000\file1u\0000file2" and turns it into []string with the path + file pre-concatenated for you.
 
 OFN_ALLOWMULTISELECT     :: 0x00000200; // NOTE(Jeroen): Without OFN_EXPLORER it uses the Win3 dialog.

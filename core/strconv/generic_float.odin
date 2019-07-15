@@ -28,7 +28,7 @@ _f32_info := Float_Info{23, 8,  -127};
 _f64_info := Float_Info{52, 11, -1023};
 
 
-generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> []byte {
+generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int) -> []byte {
 	bits: u64;
 	flt: ^Float_Info;
 	switch bit_size {
@@ -73,6 +73,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 	assign(d, mant);
 	shift(d, exp - int(flt.mantbits));
 	digs: Decimal_Slice;
+	prec := precision;
 	shortest := prec < 0;
 	if shortest {
 		round_shortest(d, mant, exp, flt);
@@ -100,7 +101,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 
 
 
-format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, prec: int, fmt: byte) -> []byte {
+format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, precision: int, fmt: byte) -> []byte {
 	Buffer :: struct {
 		b: []byte,
 		n: int,
@@ -112,6 +113,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 	}
 
 	b := Buffer{b = buf};
+	prec := precision;
 
 	switch fmt {
 	case 'f', 'F':
@@ -289,7 +291,8 @@ MAX_BASE :: 32;
 digits := "0123456789abcdefghijklmnopqrstuvwxyz";
 
 
-is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned: u64, neg: bool) {
+is_integer_negative :: proc(x: u64, is_signed: bool, bit_size: int) -> (u: u64, neg: bool) {
+	u = x;
 	if is_signed {
 		switch bit_size {
 		case 8:
@@ -312,18 +315,17 @@ is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned
 			panic("is_integer_negative: Unknown integer size");
 		}
 	}
-	return u, neg;
+	return;
 }
 
-append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
+append_bits :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
 	if base < 2 || base > MAX_BASE {
 		panic("strconv: illegal base passed to append_bits");
 	}
 
-	neg: bool;
 	a: [129]byte;
 	i := len(a);
-	u, neg = is_integer_negative(u, is_signed, bit_size);
+	u, neg := is_integer_negative(x, is_signed, bit_size);
 	b := u64(base);
 	for u >= b {
 		i-=1; a[i] = digits[u % b];
@@ -360,7 +362,8 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 	return string(buf[0:len(out)]);
 }
 
-is_integer_negative_128 :: proc(u: u128, is_signed: bool, bit_size: int) -> (unsigned: u128, neg: bool) {
+is_integer_negative_128 :: proc(x: u128, is_signed: bool, bit_size: int) -> (u: u128, neg: bool) {
+	u = x;
 	if is_signed {
 		switch bit_size {
 		case 8:
@@ -387,19 +390,18 @@ is_integer_negative_128 :: proc(u: u128, is_signed: bool, bit_size: int) -> (uns
 			panic("is_integer_negative: Unknown integer size");
 		}
 	}
-	return u, neg;
+	return;
 }
 
 
-append_bits_128 :: proc(buf: []byte, u: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
+append_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
 	if base < 2 || base > MAX_BASE {
 		panic("strconv: illegal base passed to append_bits");
 	}
 
-	neg: bool;
 	a: [140]byte;
 	i := len(a);
-	u, neg = is_integer_negative_128(u, is_signed, bit_size);
+	u, neg := is_integer_negative_128(x, is_signed, bit_size);
 	b := u128(base);
 	for u >= b {
 		i-=1; a[i] = digits[u % b];

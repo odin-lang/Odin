@@ -9,6 +9,6 @@ foreign {
 get_cwd :: proc(allocator := context.temp_allocator) -> string {
 	buffer := make([]u16, MAX_PATH_WIDE, allocator);
 	_get_cwd_wide(Wstring(&buffer[0]), MAX_PATH_WIDE);
-	file := ucs2_to_utf8(buffer[:], allocator);
+	file := utf16_to_utf8(buffer[:], allocator);
 	return strings.trim_right_null(file);
 }

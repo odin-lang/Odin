@@ -501,7 +501,8 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 		a := (^mem.Raw_Dynamic_Array)(array);
 		data := (^E)(a.data);
 		assert(data != nil);
-		mem.copy(mem.ptr_offset(data, a.len), &arg, size_of(E));
+		val := arg;
+		mem.copy(mem.ptr_offset(data, a.len), &val, size_of(E));
 		a.len += arg_len;
 	}
 }

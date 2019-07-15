@@ -377,7 +377,7 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		return nil;
 	}
 
-	alignment = clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2);
+	align := clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2);
 
 	raw_alloc :: proc(s: ^Small_Stack, size, alignment: int) -> rawptr {
 		curr_addr := uintptr(&s.data[0]) + uintptr(s.offset);
@@ -400,7 +400,7 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 	switch mode {
 	case .Alloc:
-		return raw_alloc(s, size, alignment);
+		return raw_alloc(s, size, align);
 	case .Free:
 		if old_memory == nil {
 			return nil;
@@ -429,7 +429,7 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 	case .Resize:
 		if old_memory == nil {
-			return raw_alloc(s, size, alignment);
+			return raw_alloc(s, size, align);
 		}
 		if size == 0 {
 			return nil;
@@ -452,7 +452,7 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			return old_memory;
 		}
 
-		ptr := raw_alloc(s, size, alignment);
+		ptr := raw_alloc(s, size, align);
 		copy(ptr, old_memory, min(old_size, size));
 		return ptr;
 	}
@@ -568,9 +568,10 @@ dynamic_pool_alloc :: proc(using pool: ^Dynamic_Pool, bytes: int) -> rawptr {
 	}
 
 
-	extra := alignment - (bytes % alignment);
-	bytes += extra;
-	if bytes >= out_band_size {
+	n := bytes;
+	extra := alignment - (n % alignment);
+	n += extra;
+	if n >= out_band_size {
 		assert(block_allocator.procedure != nil);
 		memory := block_allocator.procedure(block_allocator.data, Allocator_Mode.Alloc,
 			                                block_size, alignment,
@@ -581,7 +582,7 @@ dynamic_pool_alloc :: proc(using pool: ^Dynamic_Pool, bytes: int) -> rawptr {
 		return memory;
 	}
 
-	if bytes_left < bytes {
+	if bytes_left < n {
 		cycle_new_block(pool);
 		if current_block == nil {
 			return nil;
@@ -589,8 +590,8 @@ dynamic_pool_alloc :: proc(using pool: ^Dynamic_Pool, bytes: int) -> rawptr {
 	}
 
 	memory := current_pos;
-	current_pos = ptr_offset((^byte)(current_pos), bytes);
-	bytes_left -= bytes;
+	current_pos = ptr_offset((^byte)(current_pos), n);
+	bytes_left -= n;
 	return memory;
 }
 
