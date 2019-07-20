@@ -454,7 +454,7 @@ scale_vec3 :: proc(m: Mat4, v: Vec3) -> Mat4 {
 	mm[0][0] *= v[0];
 	mm[1][1] *= v[1];
 	mm[2][2] *= v[2];
-	return m;
+	return mm;
 }
 
 scale_f32 :: proc(m: Mat4, s: f32) -> Mat4 {
@@ -462,7 +462,7 @@ scale_f32 :: proc(m: Mat4, s: f32) -> Mat4 {
 	mm[0][0] *= s;
 	mm[1][1] *= s;
 	mm[2][2] *= s;
-	return m;
+	return mm;
 }
 
 scale :: proc{scale_vec3, scale_f32};
