@@ -400,6 +400,15 @@ Entity *scope_insert_with_name(Scope *s, String name, Entity *entity) {
 	if (found) {
 		return *found;
 	}
+	if (s->parent != nullptr && (s->parent->flags & ScopeFlag_Proc) != 0) {
+		Entity **found = map_get(&s->parent->elements, key);
+		if (found) {
+			if ((*found)->flags & EntityFlag_Result) {
+				return *found;
+			}
+		}
+	}
+
 	map_set(&s->elements, key, entity);
 	if (entity->scope == nullptr) {
 		entity->scope = s;
@@ -1044,21 +1053,37 @@ bool redeclaration_error(String name, Entity *prev, Entity *found) {
 			// NOTE(bill): Error should have been handled already
 			return false;
 		}
-		error(prev->token,
-		      "Redeclaration of '%.*s' in this scope through 'using'\n"
-		      "\tat %.*s(%td:%td)",
-		      LIT(name),
-		      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
+		if (found->flags & EntityFlag_Result) {
+			error(prev->token,
+			      "Direct shadowing of the named return value '%.*s' in this scope through 'using'\n"
+			      "\tat %.*s(%td:%td)",
+			      LIT(name),
+			      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
+		} else {
+			error(prev->token,
+			      "Redeclaration of '%.*s' in this scope through 'using'\n"
+			      "\tat %.*s(%td:%td)",
+			      LIT(name),
+			      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
+		}
 	} else {
 		if (pos == prev->token.pos) {
 			// NOTE(bill): Error should have been handled already
 			return false;
 		}
-		error(prev->token,
-		      "Redeclaration of '%.*s' in this scope\n"
-		      "\tat %.*s(%td:%td)",
-		      LIT(name),
-		      LIT(pos.file), pos.line, pos.column);
+		if (found->flags & EntityFlag_Result) {
+			error(prev->token,
+			      "Direct shadowing of the named return value '%.*s' in this scope\n"
+			      "\tat %.*s(%td:%td)",
+			      LIT(name),
+			      LIT(pos.file), pos.line, pos.column);
+		} else {
+			error(prev->token,
+			      "Redeclaration of '%.*s' in this scope\n"
+			      "\tat %.*s(%td:%td)",
+			      LIT(name),
+			      LIT(pos.file), pos.line, pos.column);
+		}
 	}
 	return false;
 }
