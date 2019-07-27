@@ -767,15 +767,17 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	case ExactValue_Float: {
 		GB_ASSERT_MSG(is_type_float(type), "%s", type_to_string(type));
 		type = core_type(type);
-		u64 u = bit_cast<u64>(value.value_float);
+		u64 u_64 = bit_cast<u64>(value.value_float);
+		u32 u_32 = bit_cast<u32>(cast(f32)value.value_float);
+	#if 0
 		switch (type->Basic.kind) {
 		case Basic_f32:
 			// IMPORTANT NOTE(bill): LLVM requires all floating point constants to be
 			// a 64 bit number if bits_of(float type) <= 64.
 			// https://groups.google.com/forum/#!topic/llvm-dev/IlqV3TbSk6M
-			// 64 bit mantissa: 52 bits
-			// 32 bit mantissa: 23 bits
-			// 16 bit mantissa: 10 bits
+			// 64 bit mantissa: 52 bits ==> 52-52 ==  0
+			// 32 bit mantissa: 23 bits ==> 52-23 == 29
+			// 16 bit mantissa: 10 bits ==> 52=10 == 42
 			// 29 == 52-23
 			u >>= 29;
 			u <<= 29;
@@ -792,6 +794,20 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_fprintf(f, "0x%016llx", u);
 			break;
 		}
+	#else
+		switch (type->Basic.kind) {
+		case Basic_f32: {
+			ir_fprintf(f, "bitcast (i32 %u to float)", u_32);
+			break;
+		}
+		case Basic_f64:
+			ir_fprintf(f, "0x%016llx", u_64);
+			break;
+		default:
+			ir_fprintf(f, "0x%016llx", u_64);
+			break;
+		}
+	#endif
 		break;
 	}
 	case ExactValue_Complex: {
