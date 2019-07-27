@@ -2084,6 +2084,14 @@ void set_procedure_abi_types(CheckerContext *c, Type *type) {
 			Type *original_type = e->type;
 			Type *new_type = type_to_abi_compat_param_type(c->allocator, original_type, type->Proc.calling_convention);
 			type->Proc.abi_compat_params[i] = new_type;
+			switch (type->Proc.calling_convention) {
+			case ProcCC_Odin:
+			case ProcCC_Contextless:
+				if (is_type_pointer(new_type) & !is_type_pointer(e->type)) {
+					e->flags |= EntityFlag_ImplicitReference;
+				}
+				break;
+			}
 		}
 	}
 
