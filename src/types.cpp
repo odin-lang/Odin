@@ -1037,6 +1037,29 @@ Type *core_array_type(Type *t) {
 	return t;
 }
 
+// NOTE(bill): type can be easily compared using memcmp
+bool is_type_simple_compare(Type *t) {
+	t = core_type(t);
+	switch (t->kind) {
+	case Type_Array:
+		return is_type_simple_compare(t->Array.elem);
+
+	case Type_Basic:
+		if (t->Basic.flags & (BasicFlag_Integer|BasicFlag_Float|BasicFlag_Complex|BasicFlag_Rune|BasicFlag_Pointer)) {
+			return true;
+		}
+		return false;
+
+	case Type_Pointer:
+	case Type_Proc:
+	case Type_BitSet:
+	case Type_BitField:
+		return true;
+	}
+
+	return false;
+}
+
 Type *base_complex_elem_type(Type *t) {
 	t = core_type(t);
 	if (is_type_complex(t)) {
