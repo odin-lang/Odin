@@ -3004,9 +3004,8 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 		if (are_types_identical(arg_type, new_type)) {
 			// NOTE(bill): Done
 		} else if (!are_types_identical(original_type, new_type)) {
-
 			if (is_type_pointer(new_type) && !is_type_pointer(original_type)) {
-				if (e->flags&EntityFlag_Value) {
+				if (e->flags&EntityFlag_ImplicitReference) {
 					args[i] = ir_address_from_load_or_generate_local(p, args[i]);
 				} else if (!is_type_pointer(arg_type)) {
 					args[i] = ir_copy_value_to_ptr(p, args[i], original_type, 16);

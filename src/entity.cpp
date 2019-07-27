@@ -48,7 +48,8 @@ enum EntityFlag {
 	EntityFlag_NotExported   = 1<<14,
 
 	EntityFlag_Static        = 1<<16,
-	// EntityFlag_Reference     = 1<<17,
+
+	EntityFlag_ImplicitReference = 1<<17, // NOTE(bill): equivalent to `const &` in C++
 
 	EntityFlag_CVarArg       = 1<<20,
 	EntityFlag_AutoCast      = 1<<21,
