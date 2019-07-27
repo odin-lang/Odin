@@ -243,6 +243,44 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 	}
 }
 
+memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_check {
+	x := uintptr(a);
+	y := uintptr(b);
+	n := uintptr(n);
+
+	SU :: size_of(uintptr);
+	fast := uintptr(n/SU + 1);
+	offset := (fast-1)*SU;
+	curr_block := uintptr(0);
+	if n < SU {
+		fast = 0;
+	}
+
+	for /**/; curr_block < fast; curr_block += 1 {
+		va := (^uintptr)(x + curr_block * size_of(uintptr))^;
+		vb := (^uintptr)(y + curr_block * size_of(uintptr))^;
+		if va ~ vb != 0 {
+			for pos := curr_block*SU; pos < n; pos += 1 {
+				a := (^byte)(x+pos)^;
+				b := (^byte)(y+pos)^;
+				if a ~ b != 0 {
+					return (int(a) - int(b)) < 0 ? -1 : +1;
+				}
+			}
+		}
+	}
+
+	for /**/; offset < n; offset += 1 {
+		a := (^byte)(x+offset)^;
+		b := (^byte)(y+offset)^;
+		if a ~ b != 0 {
+			return (int(a) - int(b)) < 0 ? -1 : +1;
+		}
+	}
+
+	return 0;
+}
+
 string_eq :: proc "contextless" (a, b: string) -> bool {
 	switch {
 	case len(a) != len(b): return false;
@@ -253,7 +291,7 @@ string_eq :: proc "contextless" (a, b: string) -> bool {
 }
 
 string_cmp :: proc "contextless" (a, b: string) -> int {
-	return mem.compare_byte_ptrs(&a[0], &b[0], min(len(a), len(b)));
+	return memory_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
 string_ne :: inline proc "contextless" (a, b: string) -> bool { return !string_eq(a, b); }

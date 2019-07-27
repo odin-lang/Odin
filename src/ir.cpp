@@ -4126,20 +4126,31 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 
 			return ir_emit_load(proc, val);
 		} else {
-			irValue *val = ir_add_local_generated(proc, t_bool, false);
-			ir_emit_store(proc, val, res);
-			auto loop_data = ir_loop_start(proc, count, t_i32);
-			{
-				irValue *i = loop_data.idx;
-				irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, i));
-				irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, i));
-				irValue *cmp = ir_emit_comp(proc, op_kind, x, y);
-				irValue *new_res = ir_emit_arith(proc, cmp_op, ir_emit_load(proc, val), cmp, t_bool);
-				ir_emit_store(proc, val, ir_emit_conv(proc, new_res, t_bool));
-			}
-			ir_loop_end(proc, loop_data);
+			if (is_type_simple_compare(tl) && (op_kind == Token_CmpEq || op_kind == Token_NotEq)) {
+				// TODO(bill): Test to see if this is actually faster!!!!
+				auto args = array_make<irValue *>(heap_allocator(), 3);
+				args[0] = ir_emit_conv(proc, lhs, t_rawptr);
+				args[1] = ir_emit_conv(proc, rhs, t_rawptr);
+				args[2] = ir_const_int(type_size_of(tl));
+				irValue *val = ir_emit_runtime_call(proc, "memory_compare", args);
+				irValue *res = ir_emit_comp(proc, op_kind, val, v_zero);
+				return ir_emit_conv(proc, res, t_bool);
+			} else {
+				irValue *val = ir_add_local_generated(proc, t_bool, false);
+				ir_emit_store(proc, val, res);
+				auto loop_data = ir_loop_start(proc, count, t_i32);
+				{
+					irValue *i = loop_data.idx;
+					irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, i));
+					irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, i));
+					irValue *cmp = ir_emit_comp(proc, op_kind, x, y);
+					irValue *new_res = ir_emit_arith(proc, cmp_op, ir_emit_load(proc, val), cmp, t_bool);
+					ir_emit_store(proc, val, ir_emit_conv(proc, new_res, t_bool));
+				}
+				ir_loop_end(proc, loop_data);
 
-			return ir_emit_load(proc, val);
+				return ir_emit_load(proc, val);
+			}
 		}
 	}
 
