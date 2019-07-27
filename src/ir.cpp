@@ -3652,12 +3652,12 @@ struct irLoopData {
 	irBlock *loop;
 };
 
-irLoopData ir_loop_start(irProcedure *proc, isize count) {
+irLoopData ir_loop_start(irProcedure *proc, isize count, Type *index_type=t_int) {
 	irLoopData data = {};
 
 	irValue *max = ir_const_int(count);
 
-	data.idx_addr = ir_add_local_generated(proc, t_int, true);
+	data.idx_addr = ir_add_local_generated(proc, index_type, true);
 
 	data.body = ir_new_block(proc, nullptr, "loop.body");
 	data.done = ir_new_block(proc, nullptr, "loop.done");
@@ -3727,7 +3727,7 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 				ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
 			}
 		} else {
-			auto loop_data = ir_loop_start(proc, count);
+			auto loop_data = ir_loop_start(proc, count, t_i32);
 
 			irValue *e = ir_emit_load(proc, ir_emit_array_ep(proc, val, loop_data.idx));
 			irValue *z = ir_emit_unary_arith(proc, op, e, elem_type);
@@ -3786,7 +3786,7 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 				ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
 			}
 		} else {
-			auto loop_data = ir_loop_start(proc, count);
+			auto loop_data = ir_loop_start(proc, count, t_i32);
 
 			irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, loop_data.idx));
 			irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, loop_data.idx));
@@ -4104,6 +4104,9 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 		if (op_kind == Token_NotEq) {
 			res = v_false;
 			cmp_op = Token_Or;
+		} else if (op_kind == Token_CmpEq) {
+			res = v_true;
+			cmp_op = Token_And;
 		}
 
 		bool inline_array_arith = type_size_of(tl) <= build_context.max_align;
@@ -4125,12 +4128,13 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 		} else {
 			irValue *val = ir_add_local_generated(proc, t_bool, false);
 			ir_emit_store(proc, val, res);
-			auto loop_data = ir_loop_start(proc, count);
+			auto loop_data = ir_loop_start(proc, count, t_i32);
 			{
-				irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, loop_data.idx));
-				irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, loop_data.idx));
+				irValue *i = loop_data.idx;
+				irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, i));
+				irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, i));
 				irValue *cmp = ir_emit_comp(proc, op_kind, x, y);
-				irValue *new_res = ir_emit_arith(proc, cmp_op, res, ir_emit_load(proc, val), t_bool);
+				irValue *new_res = ir_emit_arith(proc, cmp_op, ir_emit_load(proc, val), cmp, t_bool);
 				ir_emit_store(proc, val, ir_emit_conv(proc, new_res, t_bool));
 			}
 			ir_loop_end(proc, loop_data);
