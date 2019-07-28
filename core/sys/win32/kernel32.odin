@@ -23,7 +23,7 @@ foreign kernel32 {
 	@(link_name="GetModuleFileNameA")        get_module_file_name_a       :: proc(module: Hmodule, filename: cstring, size: u32) -> u32 ---;
 	@(link_name="GetModuleFileNameW")        get_module_file_name_w       :: proc(module: Hmodule, filename: Wstring, size: u32) -> u32 ---;
 
-	@(link_name="Sleep")                     sleep                        :: proc(ms: i32) -> i32 ---;
+	@(link_name="Sleep")                     sleep                        :: proc(ms: u32) ---;
 	@(link_name="QueryPerformanceFrequency") query_performance_frequency  :: proc(result: ^i64) -> i32 ---;
 	@(link_name="QueryPerformanceCounter")   query_performance_counter    :: proc(result: ^i64) -> i32 ---;
 	@(link_name="OutputDebugStringA")        output_debug_string_a        :: proc(c_str: cstring) ---;

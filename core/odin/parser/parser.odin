@@ -955,6 +955,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	switch p.curr_tok.kind {
 	// Operands
 	case token.Context, // Also allows for 'context = '
+	     token.Proc,
 	     token.Inline, token.No_Inline,
 	     token.Ident,
 	     token.Integer, token.Float, token.Imag,
