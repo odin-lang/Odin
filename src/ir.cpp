@@ -3053,7 +3053,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 	if (value->kind == irValue_Proc) {
 		irProcedure *the_proc = &value->Proc;
 		Entity *e = the_proc->entity;
-		if (entity_has_deferred_procedure(e)) {
+		if (e != nullptr && entity_has_deferred_procedure(e)) {
 			DeferredProcedureKind kind = e->Procedure.deferred_procedure.kind;
 			Entity *deferred_entity = e->Procedure.deferred_procedure.entity;
 			irValue **deferred_found = map_get(&p->module->values, hash_entity(deferred_entity));

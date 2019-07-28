@@ -666,11 +666,13 @@ card :: proc(s: $S/bit_set[$E; $U]) -> int {
 @builtin
 assert :: proc(condition: bool, message := "", loc := #caller_location) -> bool {
 	if !condition {
-		p := context.assertion_failure_proc;
-		if p == nil {
-			p = default_assertion_failure_proc;
-		}
-		p("Runtime assertion", message, loc);
+		proc(message: string, loc: Source_Code_Location) {
+			p := context.assertion_failure_proc;
+			if p == nil {
+				p = default_assertion_failure_proc;
+			}
+			p("Runtime assertion", message, loc);
+		}(message, loc);
 	}
 	return condition;
 }

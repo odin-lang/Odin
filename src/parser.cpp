@@ -3759,6 +3759,7 @@ Ast *parse_stmt(AstFile *f) {
 	switch (token.kind) {
 	// Operands
 	case Token_context: // Also allows for `context =`
+	case Token_proc:
 	case Token_inline:
 	case Token_no_inline:
 	case Token_Ident:
