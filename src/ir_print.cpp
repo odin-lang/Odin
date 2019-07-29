@@ -1904,6 +1904,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					if (e->flags&EntityFlag_NoAlias) {
 						ir_write_str_lit(f, " noalias");
 					}
+					if (e->flags&EntityFlag_ImplicitReference) {
+						ir_write_str_lit(f, " nonnull dereferenceable");
+					}
 					ir_write_byte(f, ' ');
 					irValue *arg = call->args[i];
 					if (is_type_boolean(t)) {
