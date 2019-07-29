@@ -1538,7 +1538,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			}
 
 			if (is_poly_name) {
-				if (type != nullptr && type_expr->kind == Ast_TypeidType) {
+				if (type_expr != nullptr && type_expr->kind == Ast_TypeidType) {
 					is_type_param = true;
 				} else {
 					if (param_value.kind != ParameterValue_Invalid)  {
