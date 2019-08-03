@@ -1622,6 +1622,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 						if (op.mode == Addressing_Constant) {
 							poly_const = op.value;
 						} else {
+							error(op.expr, "Expected a constant value for this polymorphic name parameter");
 							success = false;
 						}
 					}
