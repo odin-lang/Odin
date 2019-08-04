@@ -110,6 +110,7 @@ BuiltinProc__type_begin,
 
 	BuiltinProc_type_base_type,
 	BuiltinProc_type_core_type,
+	BuiltinProc_type_elem_type,
 
 	BuiltinProc_type_is_boolean,
 	BuiltinProc_type_is_integer,
@@ -147,8 +148,6 @@ BuiltinProc__type_begin,
 	BuiltinProc_type_is_simd_vector,
 
 	BuiltinProc_type_has_nil,
-
-	BuiltinProc_type_elem_type,
 
 	BuiltinProc_type_proc_parameter_count,
 	BuiltinProc_type_proc_return_count,
@@ -266,6 +265,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_base_type"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_core_type"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_elem_type"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_is_boolean"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_integer"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -303,8 +303,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_simd_vector"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_has_nil"),              1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-
-	{STR_LIT("type_elem_type"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_proc_parameter_count"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_proc_return_count"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},

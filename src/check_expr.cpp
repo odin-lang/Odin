@@ -3131,6 +3131,55 @@ bool check_identifier_exists(Scope *s, Ast *node, bool nested = false, Scope **o
 	return false;
 }
 
+typedef bool (BuiltinTypeIsProc)(Type *t);
+
+BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_end - BuiltinProc__type_begin - 1] = {
+	nullptr, // BuiltinProc_type_base_type
+	nullptr, // BuiltinProc_type_core_type
+	nullptr, // BuiltinProc_type_elem_type
+
+	is_type_boolean,
+	is_type_integer,
+	is_type_rune,
+	is_type_float,
+	is_type_complex,
+	is_type_string,
+	is_type_typeid,
+	is_type_any,
+	is_type_endian_little,
+	is_type_endian_big,
+	is_type_numeric,
+	is_type_ordered,
+	is_type_ordered_numeric,
+	is_type_indexable,
+	is_type_sliceable,
+	is_type_simple_compare,
+	is_type_dereferenceable,
+
+	is_type_named,
+	is_type_pointer,
+	is_type_opaque,
+	is_type_array,
+	is_type_slice,
+	is_type_dynamic_array,
+
+	is_type_map,
+	is_type_struct,
+	is_type_union,
+	is_type_enum,
+	is_type_proc,
+	is_type_bit_field,
+	is_type_bit_field_value,
+	is_type_bit_set,
+	is_type_simd_vector,
+
+	type_has_nil,
+
+	nullptr, // BuiltinProc_type_proc_parameter_count
+	nullptr, // BuiltinProc_type_proc_return_count
+};
+
+
 
 bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id) {
 	ast_node(ce, CallExpr, call);
@@ -4464,349 +4513,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		operand->mode = Addressing_Type;
 		break;
-
-	case BuiltinProc_type_is_boolean:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_boolean(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_integer:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_integer(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_rune:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_rune(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_float:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-		} else {
-
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_complex:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_complex(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_string:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_string(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_typeid:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_typeid(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_any:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_any(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-
-	case BuiltinProc_type_is_endian_little:
-		operand->value = exact_value_bool(false);
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected an integer type for '%.*s'", LIT(builtin_name));
-		} else if (!is_type_integer(operand->type)) {
-			error(operand->expr, "Expected an integer type for '%.*s'", LIT(builtin_name));
-		} else {
-			operand->value = exact_value_bool(is_type_integer_endian_little(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_endian_big:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else if (!is_type_integer(operand->type)) {
-			error(operand->expr, "Expected an integer type for '%.*s'", LIT(builtin_name));
-		} else {
-			operand->value = exact_value_bool(is_type_integer_endian_big(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_numeric:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_numeric(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_ordered:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_ordered(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_ordered_numeric:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_numeric(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_indexable:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_indexable(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_sliceable:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_sliceable(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_simple_compare:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_simple_compare(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_dereferenceable:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			if (is_type_rawptr(operand->type)) {
-				operand->value = exact_value_bool(false);
-			} else if (is_type_pointer(operand->type)) {
-				operand->value = exact_value_bool(true);
-			} else {
-				operand->value = exact_value_bool(false);
-			}
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-
-	case BuiltinProc_type_is_named:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_named(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_pointer:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_pointer(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_opaque:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_opaque(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_array:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_array(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_slice:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_slice(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_dynamic_array:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_dynamic_array(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_map:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_map(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_struct:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_struct(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_union:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_union(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_enum:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_enum(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_proc:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_proc(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_bit_field:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_bit_field(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_bit_field_value:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_bit_field_value(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_bit_set:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_bit_set(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-	case BuiltinProc_type_is_simd_vector:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-			operand->value = exact_value_bool(false);
-		} else {
-			operand->value = exact_value_bool(is_type_simd_vector(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-
-	case BuiltinProc_type_has_nil:
-		if (operand->mode != Addressing_Type) {
-			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
-		} else {
-			operand->value = exact_value_bool(type_has_nil(operand->type));
-		}
-		operand->mode = Addressing_Constant;
-		operand->type = t_untyped_bool;
-		break;
-
 	case BuiltinProc_type_elem_type:
 		if (operand->mode != Addressing_Type) {
 			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
@@ -4827,6 +4533,56 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 		}
 		operand->mode = Addressing_Type;
+		break;
+
+
+	case BuiltinProc_type_is_boolean:
+	case BuiltinProc_type_is_integer:
+	case BuiltinProc_type_is_rune:
+	case BuiltinProc_type_is_float:
+	case BuiltinProc_type_is_complex:
+	case BuiltinProc_type_is_string:
+	case BuiltinProc_type_is_typeid:
+	case BuiltinProc_type_is_any:
+	case BuiltinProc_type_is_endian_little:
+	case BuiltinProc_type_is_endian_big:
+	case BuiltinProc_type_is_numeric:
+	case BuiltinProc_type_is_ordered:
+	case BuiltinProc_type_is_ordered_numeric:
+	case BuiltinProc_type_is_indexable:
+	case BuiltinProc_type_is_sliceable:
+	case BuiltinProc_type_is_simple_compare:
+	case BuiltinProc_type_is_dereferenceable:
+	case BuiltinProc_type_is_named:
+	case BuiltinProc_type_is_pointer:
+	case BuiltinProc_type_is_opaque:
+	case BuiltinProc_type_is_array:
+	case BuiltinProc_type_is_slice:
+	case BuiltinProc_type_is_dynamic_array:
+	case BuiltinProc_type_is_map:
+	case BuiltinProc_type_is_struct:
+	case BuiltinProc_type_is_union:
+	case BuiltinProc_type_is_enum:
+	case BuiltinProc_type_is_proc:
+	case BuiltinProc_type_is_bit_field:
+	case BuiltinProc_type_is_bit_field_value:
+	case BuiltinProc_type_is_bit_set:
+	case BuiltinProc_type_is_simd_vector:
+	case BuiltinProc_type_has_nil:
+		GB_ASSERT(BuiltinProc__type_begin < id && id < BuiltinProc__type_end);
+		operand->value = exact_value_bool(false);
+		if (operand->mode != Addressing_Type) {
+			gbString str = expr_to_string(ce->args[0]);
+			error(operand->expr, "Expected a type for '%.*s', got '%s'", LIT(builtin_name), str);
+			gb_string_free(str);
+		} else {
+			i32 i = id - (BuiltinProc__type_begin+1);
+			auto procedure = builtin_type_is_procs[i];
+			GB_ASSERT_MSG(procedure != nullptr, "%.*s", LIT(builtin_name));
+			operand->value = exact_value_bool(procedure(operand->type));
+		}
+		operand->mode = Addressing_Constant;
+		operand->type = t_untyped_bool;
 		break;
 
 	case BuiltinProc_type_proc_parameter_count:
@@ -7527,6 +7283,9 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case Ast_UnionType:
 	case Ast_EnumType:
 	case Ast_MapType:
+	case Ast_OpaqueType:
+	case Ast_BitSetType:
+	case Ast_BitFieldType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
 		break;
