@@ -1307,6 +1307,19 @@ bool is_type_indexable(Type *t) {
 	return false;
 }
 
+bool is_type_sliceable(Type *t) {
+	Type *bt = base_type(t);
+	switch (bt->kind) {
+	case Type_Basic:
+		return bt->Basic.kind == Basic_string;
+	case Type_Array:
+	case Type_Slice:
+	case Type_DynamicArray:
+		return true;
+	}
+	return false;
+}
+
 
 bool is_type_polymorphic_record(Type *t) {
 	t = base_type(t);
