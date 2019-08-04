@@ -53,14 +53,8 @@ HashKey hash_exact_value(ExactValue v) {
 		return hash_integer(u64(v.value_bool));
 	case ExactValue_String:
 		return hash_string(v.value_string);
-	case ExactValue_Integer: {
-		u64 *d = big_int_ptr(&v.value_integer);
-		u64 x = 0;
-		for (i32 i = 0; i < v.value_integer.len; i++) {
-			x |= d[i];
-		}
-		return hash_integer(x);
-	}
+	case ExactValue_Integer:
+		return hashing_proc(big_int_ptr(&v.value_integer), v.value_integer.len * gb_size_of(u64));
 	case ExactValue_Float:
 		return hash_f64(v.value_float);
 	case ExactValue_Pointer:
