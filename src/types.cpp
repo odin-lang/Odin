@@ -1122,11 +1122,10 @@ bool is_type_integer_endian_big(Type *t) {
 		return is_type_integer_endian_big(bit_set_to_int(t));
 	} else if (t->kind == Type_Pointer) {
 		return is_type_integer_endian_big(&basic_types[Basic_uintptr]);
-	} else {
-		GB_PANIC("Unsupported type: %s", type_to_string(t));
 	}
 	return build_context.endian_kind == TargetEndian_Big;
 }
+
 
 bool is_type_integer_endian_little(Type *t) {
 	t = core_type(t);
@@ -1141,11 +1140,24 @@ bool is_type_integer_endian_little(Type *t) {
 		return is_type_integer_endian_little(bit_set_to_int(t));
 	} else if (t->kind == Type_Pointer) {
 		return is_type_integer_endian_little(&basic_types[Basic_uintptr]);
-	} else {
-		GB_PANIC("Unsupported type: %s", type_to_string(t));
 	}
 	return build_context.endian_kind == TargetEndian_Little;
 }
+bool is_type_endian_big(Type *t) {
+	return is_type_integer_endian_big(t);
+}
+bool is_type_endian_little(Type *t) {
+	return is_type_integer_endian_little(t);
+}
+
+bool is_type_dereferenceable(Type *t) {
+	if (is_type_rawptr(t)) {
+		return false;
+	}
+	return is_type_pointer(t);
+}
+
+
 
 bool is_type_different_to_arch_endianness(Type *t) {
 	switch (build_context.endian_kind) {
