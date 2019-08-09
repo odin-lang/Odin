@@ -955,7 +955,6 @@ struct_field_tags :: proc() {
 		z: bool, // no tag
 	}
 
-	f: Foo;
 	ti := runtime.type_info_base(type_info_of(Foo));
 	s := ti.variant.(runtime.Type_Info_Struct);
 	fmt.println("Foo :: struct {");
