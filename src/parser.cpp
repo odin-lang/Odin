@@ -805,13 +805,14 @@ Ast *ast_bad_decl(AstFile *f, Token begin, Token end) {
 	return result;
 }
 
-Ast *ast_field(AstFile *f, Array<Ast *> names, Ast *type, Ast *default_value, u32 flags,
-                   CommentGroup *docs, CommentGroup *comment) {
+Ast *ast_field(AstFile *f, Array<Ast *> names, Ast *type, Ast *default_value, u32 flags, Token tag,
+               CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_Field);
 	result->Field.names         = names;
 	result->Field.type          = type;
 	result->Field.default_value = default_value;
 	result->Field.flags         = flags;
+	result->Field.tag           = tag;
 	result->Field.docs = docs;
 	result->Field.comment       = comment;
 	return result;
@@ -2740,7 +2741,8 @@ Ast *parse_results(AstFile *f, bool *diverging) {
 		Array<Ast *> empty_names = {};
 		auto list = array_make<Ast *>(heap_allocator(), 0, 1);
 		Ast *type = parse_type(f);
-		array_add(&list, ast_field(f, empty_names, type, nullptr, 0, nullptr, nullptr));
+		Token tag = {};
+		array_add(&list, ast_field(f, empty_names, type, nullptr, 0, tag, nullptr, nullptr));
 		return ast_field_list(f, begin_token, list);
 	}
 
@@ -3095,6 +3097,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 
 		Ast *type = nullptr;
 		Ast *default_value = nullptr;
+		Token tag = {};
 
 		expect_token_after(f, Token_Colon, "field list");
 		if (f->curr_token.kind != Token_Eq) {
@@ -3132,16 +3135,25 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 			syntax_error(f->curr_token, "Extra parameter after ellipsis without a default value");
 		}
 
+		if (type != nullptr && default_value == nullptr) {
+			if (f->curr_token.kind == Token_String) {
+				tag = expect_token(f, Token_String);
+				if ((allowed_flags & FieldFlag_Tags) == 0) {
+					syntax_error(tag, "Field tags are only allowed within structures");
+				}
+			}
+		}
+
 		parse_expect_field_separator(f, type);
-		Ast *param = ast_field(f, names, type, default_value, set_flags, docs, f->line_comment);
+		Ast *param = ast_field(f, names, type, default_value, set_flags, tag, docs, f->line_comment);
 		array_add(&params, param);
 
 
 		while (f->curr_token.kind != follow &&
 		       f->curr_token.kind != Token_EOF) {
 			CommentGroup *docs = f->lead_comment;
-
 			u32 set_flags = parse_field_prefixes(f);
+			Token tag = {};
 			Array<Ast *> names = parse_ident_list(f, allow_poly_names);
 			if (names.count == 0) {
 				syntax_error(f->curr_token, "Empty field declaration");
@@ -3184,9 +3196,18 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 				syntax_error(f->curr_token, "Extra parameter after ellipsis without a default value");
 			}
 
+			if (type != nullptr && default_value == nullptr) {
+				if (f->curr_token.kind == Token_String) {
+					tag = expect_token(f, Token_String);
+					if ((allowed_flags & FieldFlag_Tags) == 0) {
+						syntax_error(tag, "Field tags are only allowed within structures");
+					}
+				}
+			}
+
 
 			bool ok = parse_expect_field_separator(f, param);
-			Ast *param = ast_field(f, names, type, default_value, set_flags, docs, f->line_comment);
+			Ast *param = ast_field(f, names, type, default_value, set_flags, tag, docs, f->line_comment);
 			array_add(&params, param);
 
 			if (!ok) {
@@ -3210,8 +3231,8 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 		token.pos = ast_token(type).pos;
 		names[0] = ast_ident(f, token);
 		u32 flags = check_field_prefixes(f, list.count, allowed_flags, list[i].flags);
-
-		Ast *param = ast_field(f, names, list[i].node, nullptr, flags, docs, f->line_comment);
+		Token tag = {};
+		Ast *param = ast_field(f, names, list[i].node, nullptr, flags, tag, docs, f->line_comment);
 		array_add(&params, param);
 	}
 

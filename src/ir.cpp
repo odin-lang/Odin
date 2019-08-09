@@ -174,6 +174,7 @@ gbAllocator ir_allocator(void) {
 #define IR_TYPE_INFO_NAMES_NAME      "__$type_info_names_data"
 #define IR_TYPE_INFO_OFFSETS_NAME    "__$type_info_offsets_data"
 #define IR_TYPE_INFO_USINGS_NAME     "__$type_info_usings_data"
+#define IR_TYPE_INFO_TAGS_NAME       "__$type_info_tags_data"
 
 
 #define IR_INSTR_KINDS \
@@ -5271,12 +5272,14 @@ gb_global irValue *ir_global_type_info_member_types   = nullptr;
 gb_global irValue *ir_global_type_info_member_names   = nullptr;
 gb_global irValue *ir_global_type_info_member_offsets = nullptr;
 gb_global irValue *ir_global_type_info_member_usings  = nullptr;
+gb_global irValue *ir_global_type_info_member_tags    = nullptr;
 
 gb_global i32      ir_global_type_info_data_index           = 0;
 gb_global i32      ir_global_type_info_member_types_index   = 0;
 gb_global i32      ir_global_type_info_member_names_index   = 0;
 gb_global i32      ir_global_type_info_member_offsets_index = 0;
 gb_global i32      ir_global_type_info_member_usings_index  = 0;
+gb_global i32      ir_global_type_info_member_tags_index    = 0;
 
 isize ir_type_info_count(CheckerInfo *info) {
 	return info->minimum_dependency_type_info_set.entries.count+1;
@@ -9587,6 +9590,16 @@ void ir_init_module(irModule *m, Checker *c) {
 					map_set(&m->members, hash_string(name), g);
 					ir_global_type_info_member_usings = g;
 				}
+
+				{
+					String name = str_lit(IR_TYPE_INFO_TAGS_NAME);
+					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
+					                                  alloc_type_array(t_string, count), false);
+					irValue *g = ir_value_global(e, nullptr);
+					ir_module_add_value(m, e, g);
+					map_set(&m->members, hash_string(name), g);
+					ir_global_type_info_member_tags = g;
+				}
 			}
 		}
 	}
@@ -9718,6 +9731,11 @@ irValue *ir_type_info_member_offsets_offset(irProcedure *proc, isize count) {
 irValue *ir_type_info_member_usings_offset(irProcedure *proc, isize count) {
 	irValue *offset = ir_emit_array_epi(proc, ir_global_type_info_member_usings, ir_global_type_info_member_usings_index);
 	ir_global_type_info_member_usings_index += cast(i32)count;
+	return offset;
+}
+irValue *ir_type_info_member_tags_offset(irProcedure *proc, isize count) {
+	irValue *offset = ir_emit_array_epi(proc, ir_global_type_info_member_tags, ir_global_type_info_member_tags_index);
+	ir_global_type_info_member_tags_index += cast(i32)count;
 	return offset;
 }
 
@@ -10065,9 +10083,9 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				irValue *is_packed       = ir_const_bool(t->Struct.is_packed);
 				irValue *is_raw_union    = ir_const_bool(t->Struct.is_raw_union);
 				irValue *is_custom_align = ir_const_bool(t->Struct.custom_align != 0);
-				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 4), is_packed);
-				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 5), is_raw_union);
-				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 6), is_custom_align);
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 5), is_packed);
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 6), is_raw_union);
+				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 7), is_custom_align);
 			}
 
 			isize count = t->Struct.fields.count;
@@ -10076,6 +10094,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				irValue *memory_names   = ir_type_info_member_names_offset  (proc, count);
 				irValue *memory_offsets = ir_type_info_member_offsets_offset(proc, count);
 				irValue *memory_usings  = ir_type_info_member_usings_offset (proc, count);
+				irValue *memory_tags    = ir_type_info_member_tags_offset   (proc, count);
 
 				type_set_offsets(t); // NOTE(bill): Just incase the offsets have not been set yet
 				for (isize source_index = 0; source_index < count; source_index++) {
@@ -10091,7 +10110,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 					irValue *index     = ir_const_int(source_index);
 					irValue *type_info = ir_emit_ptr_offset(proc, memory_types,   index);
 					irValue *offset    = ir_emit_ptr_offset(proc, memory_offsets, index);
-					irValue *is_using  = ir_emit_ptr_offset(proc, memory_usings, index);
+					irValue *is_using  = ir_emit_ptr_offset(proc, memory_usings,  index);
 
 					ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
 					if (f->token.string.len > 0) {
@@ -10100,6 +10119,15 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 					}
 					ir_emit_store(proc, offset, ir_const_uintptr(foffset));
 					ir_emit_store(proc, is_using, ir_const_bool((f->flags&EntityFlag_Using) != 0));
+
+					if (t->Struct.tags.count > 0) {
+						String tag_string = t->Struct.tags[source_index];
+						if (tag_string.len > 0) {
+							irValue *tag_ptr = ir_emit_ptr_offset(proc, memory_tags, index);
+							ir_emit_store(proc, tag_ptr, ir_const_string(tag_string));
+						}
+					}
+
 				}
 
 				irValue *cv = ir_const_int(count);
@@ -10107,6 +10135,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   cv);
 				ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, cv);
 				ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 3), memory_usings,  cv);
+				ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 4), memory_tags,    cv);
 			}
 			break;
 		}
