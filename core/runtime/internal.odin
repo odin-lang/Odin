@@ -281,6 +281,40 @@ memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_ch
 	return 0;
 }
 
+memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_check {
+	x := uintptr(a);
+	n := uintptr(n);
+
+	SU :: size_of(uintptr);
+	fast := uintptr(n/SU + 1);
+	offset := (fast-1)*SU;
+	curr_block := uintptr(0);
+	if n < SU {
+		fast = 0;
+	}
+
+	for /**/; curr_block < fast; curr_block += 1 {
+		va := (^uintptr)(x + curr_block * size_of(uintptr))^;
+		if va ~ 0 != 0 {
+			for pos := curr_block*SU; pos < n; pos += 1 {
+				a := (^byte)(x+pos)^;
+				if a ~ 0 != 0 {
+					return int(a) < 0 ? -1 : +1;
+				}
+			}
+		}
+	}
+
+	for /**/; offset < n; offset += 1 {
+		a := (^byte)(x+offset)^;
+		if a ~ 0 != 0 {
+			return int(a) < 0 ? -1 : +1;
+		}
+	}
+
+	return 0;
+}
+
 string_eq :: proc "contextless" (a, b: string) -> bool {
 	switch {
 	case len(a) != len(b): return false;
