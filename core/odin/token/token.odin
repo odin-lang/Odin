@@ -154,9 +154,6 @@ using Kind :: enum u32 {
 		Offset_Of,
 		Type_Of,
 		Const,
-		Asm,
-		Yield,
-		Await,
 	B_Keyword_End,
 
 	COUNT,
@@ -291,9 +288,6 @@ tokens := [Kind.COUNT]string {
 	"offset_of",
 	"type_of",
 	"const",
-	"asm",
-	"yield",
-	"await",
 	"",
 };
 
