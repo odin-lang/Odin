@@ -2195,6 +2195,22 @@ void ir_print_type_name(irFileBuffer *f, irModule *m, irValue *v) {
 	ir_write_byte(f, '\n');
 }
 
+bool ir_print_global_type_allowed(Type *t) {
+	if (t == nullptr) {
+		return true;
+	}
+	t = core_type(t);
+	switch (t->kind) {
+	case Type_DynamicArray:
+	case Type_Map:
+	case Type_Union:
+	case Type_BitField:
+		return false;
+	}
+
+	return true;
+}
+
 void print_llvm_ir(irGen *ir) {
 	irModule *m = &ir->module;
 
@@ -2358,7 +2374,7 @@ void print_llvm_ir(irGen *ir) {
 		ir_print_type(f, m, g->entity->type);
 		ir_write_byte(f, ' ');
 		if (!g->is_foreign) {
-			if (g->value != nullptr) {
+			if (g->value != nullptr && ir_print_global_type_allowed(g->entity->type)) {
 				ir_print_value(f, m, g->value, g->entity->type);
 			} else {
 				ir_write_string(f, str_lit("zeroinitializer"));
