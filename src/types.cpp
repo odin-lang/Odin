@@ -1712,6 +1712,12 @@ bool are_types_identical(Type *x, Type *y) {
 					if (xf_is_using ^ yf_is_using) {
 						return false;
 					}
+					if (x->Struct.tags.count != y->Struct.tags.count) {
+						return false;
+					}
+					if (x->Struct.tags.count > 0 && x->Struct.tags[i] != y->Struct.tags[i]) {
+						return false;
+					}
 				}
 				return true;
 			}
