@@ -1388,19 +1388,18 @@ check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, se
 
 	for flag in ast.Field_Flag {
 		if flag notin allowed_flags && flag in flags {
-			using ast.Field_Flag;
 			#complete switch flag {
-			case Using:
+			case .Using:
 				error(p, p.curr_tok.pos, "'using' is not allowed within this field list");
-			case No_Alias:
+			case .No_Alias:
 				error(p, p.curr_tok.pos, "'#no_alias' is not allowed within this field list");
-			case C_Vararg:
+			case .C_Vararg:
 				error(p, p.curr_tok.pos, "'#c_vararg' is not allowed within this field list");
-			case Auto_Cast:
+			case .Auto_Cast:
 				error(p, p.curr_tok.pos, "'auto_cast' is not allowed within this field list");
-			case In:
+			case .In:
 				error(p, p.curr_tok.pos, "'in' is not allowed within this field list");
-			case Ellipsis, Results, Default_Parameters, Typeid_Token:
+			case .Tags, .Ellipsis, .Results, .Default_Parameters, .Typeid_Token:
 				panic("Impossible prefixes");
 			}
 			flags &~= {flag};
@@ -1540,6 +1539,7 @@ parse_field_list :: proc(p: ^Parser, follow: token.Kind, allowed_flags: ast.Fiel
 
 		type:          ^ast.Expr;
 		default_value: ^ast.Expr;
+		tag: token.Token;
 
 		expect_token_after(p, token.Colon, "field list");
 		if p.curr_tok.kind != token.Eq {
@@ -1579,9 +1579,19 @@ parse_field_list :: proc(p: ^Parser, follow: token.Kind, allowed_flags: ast.Fiel
 			error(p, p.curr_tok.pos, "extra parameter after ellipsis without a default value");
 		}
 
+		if type != nil && default_value == nil {
+			if p.curr_tok.kind == token.String {
+				tag = expect_token(p, token.String);
+				if .Tags notin allowed_flags {
+					error(p, tag.pos, "Field tags are only allowed within structures");
+				}
+			}
+		}
+
 		ok := expect_field_separator(p, type);
 
 		field := new_ast_field(names, type, default_value);
+		field.tag     = tag;
 		field.docs    = docs;
 		field.flags   = flags;
 		field.comment = p.line_comment;

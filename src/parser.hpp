@@ -186,11 +186,12 @@ enum FieldFlag {
 	FieldFlag_c_vararg  = 1<<3,
 	FieldFlag_auto_cast = 1<<4,
 
+	FieldFlag_Tags = 1<<10,
 
 	FieldFlag_Results   = 1<<16,
 
 	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast,
-	FieldFlag_Struct    = FieldFlag_using,
+	FieldFlag_Struct    = FieldFlag_using|FieldFlag_Tags,
 };
 
 enum StmtAllowFlag {
@@ -412,6 +413,7 @@ AST_KIND(_DeclEnd,   "", bool) \
 		Array<Ast *> names;         \
 		Ast *        type;          \
 		Ast *        default_value; \
+		Token        tag;           \
 		u32              flags;     \
 		CommentGroup *   docs;      \
 		CommentGroup *   comment;   \

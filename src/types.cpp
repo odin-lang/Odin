@@ -107,6 +107,7 @@ struct BasicType {
 
 struct TypeStruct {
 	Array<Entity *> fields;
+	Array<String>   tags;
 	Ast *node;
 	Scope *  scope;
 

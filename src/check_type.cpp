@@ -110,9 +110,10 @@ bool does_field_type_allow_using(Type *t) {
 	return false;
 }
 
-void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields, Array<Ast *> const &params,
+void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields, Array<String> *tags, Array<Ast *> const &params,
                          isize init_field_capacity, Type *struct_type, String context) {
 	*fields = array_make<Entity *>(heap_allocator(), 0, init_field_capacity);
+	*tags   = array_make<String>(heap_allocator(), 0, init_field_capacity);
 
 	GB_ASSERT(node->kind == Ast_StructType);
 	GB_ASSERT(struct_type->kind == Type_Struct);
@@ -171,6 +172,7 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields
 			Entity *field = alloc_entity_field(ctx->scope, name_token, type, is_using, field_src_index);
 			add_entity(ctx->checker, ctx->scope, name, field);
 			array_add(fields, field);
+			array_add(tags, p->tag.string);
 
 			field_src_index += 1;
 		}
@@ -504,7 +506,7 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 
 
 	if (!is_polymorphic) {
-		check_struct_fields(ctx, node, &struct_type->Struct.fields, st->fields, min_field_count, struct_type, context);
+		check_struct_fields(ctx, node, &struct_type->Struct.fields, &struct_type->Struct.tags, st->fields, min_field_count, struct_type, context);
 	}
 
 	if (st->align != nullptr) {

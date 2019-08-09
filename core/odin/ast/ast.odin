@@ -435,7 +435,9 @@ Field_Flag :: enum {
 	C_Vararg,
 	Auto_Cast,
 	In,
+
 	Results,
+	Tags,
 	Default_Parameters,
 	Typeid_Token,
 }
@@ -443,18 +445,19 @@ Field_Flag :: enum {
 Field_Flags :: distinct bit_set[Field_Flag];
 
 Field_Flags_Struct :: Field_Flags{
-	Field_Flag.Using,
+	.Using,
+	.Tags,
 };
 Field_Flags_Record_Poly_Params :: Field_Flags{
-	Field_Flag.Typeid_Token,
+	.Typeid_Token,
 };
 Field_Flags_Signature :: Field_Flags{
-	Field_Flag.Ellipsis,
-	Field_Flag.Using,
-	Field_Flag.No_Alias,
-	Field_Flag.C_Vararg,
-	Field_Flag.Auto_Cast,
-	Field_Flag.Default_Parameters,
+	.Ellipsis,
+	.Using,
+	.No_Alias,
+	.C_Vararg,
+	.Auto_Cast,
+	.Default_Parameters,
 };
 
 Field_Flags_Signature_Params  :: Field_Flags_Signature | {Field_Flag.Typeid_Token};
@@ -483,6 +486,7 @@ Field :: struct {
 	names:         []^Expr, // Could be polymorphic
 	type:          ^Expr,
 	default_value: ^Expr,
+	tag:           token.Token,
 	flags:         Field_Flags,
 	comment:       ^Comment_Group,
 }

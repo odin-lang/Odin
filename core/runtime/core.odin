@@ -79,8 +79,9 @@ Type_Info_Tuple :: struct { // Only really used for procedures
 Type_Info_Struct :: struct {
 	types:        []^Type_Info,
 	names:        []string,
-	offsets:      []uintptr, // offsets may not be used in tuples
-	usings:       []bool,    // usings may not be used in tuples
+	offsets:      []uintptr,
+	usings:       []bool,
+	tags:         []string,
 	is_packed:    bool,
 	is_raw_union: bool,
 	custom_align: bool,

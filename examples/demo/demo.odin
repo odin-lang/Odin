@@ -3,6 +3,7 @@ package main
 import "core:fmt"
 import "core:mem"
 import "core:os"
+import "core:runtime"
 
 when os.OS == "windows" {
 	import "core:thread"
@@ -945,6 +946,29 @@ deferred_procedure_associations :: proc() {
 	}
 }
 
+struct_field_tags :: proc() {
+	fmt.println("# struct_field_tags");
+
+	Foo :: struct {
+		x: int    `tag1`,
+		y: string `tag2`,
+		z: bool, // no tag
+	}
+
+	f: Foo;
+	ti := runtime.type_info_base(type_info_of(Foo));
+	s := ti.variant.(runtime.Type_Info_Struct);
+	fmt.println("Foo :: struct {");
+	for _, i in s.names {
+		if tag := s.tags[i]; tag != "" {
+			fmt.printf("\t%s: %T `%s`,\n", s.names[i], s.types[i], tag);
+		} else {
+			fmt.printf("\t%s: %T,\n", s.names[i], s.types[i]);
+		}
+	}
+	fmt.println("}");
+}
+
 main :: proc() {
 	when true {
 		general_stuff();
@@ -963,5 +987,6 @@ main :: proc() {
 		bit_set_type();
 		diverging_procedures();
 		deferred_procedure_associations();
+		struct_field_tags();
 	}
 }
