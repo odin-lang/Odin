@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:mem"
 import "core:os"
 import "core:runtime"
+import "core:reflect"
 
 when os.OS == "windows" {
 	import "core:thread"
@@ -946,26 +947,39 @@ deferred_procedure_associations :: proc() {
 	}
 }
 
-struct_field_tags :: proc() {
-	fmt.println("# struct_field_tags");
+reflection :: proc() {
+	fmt.println("# reflection");
 
 	Foo :: struct {
 		x: int    `tag1`,
-		y: string `tag2`,
+		y: string `json:"y_field"`,
 		z: bool, // no tag
 	}
 
-	ti := runtime.type_info_base(type_info_of(Foo));
-	s := ti.variant.(runtime.Type_Info_Struct);
+	id := typeid_of(Foo);
+	names := reflect.struct_field_names(id);
+	types := reflect.struct_field_types(id);
+	tags  := reflect.struct_field_tags(id);
+
+	assert(len(names) == len(types) && len(names) == len(tags));
+
 	fmt.println("Foo :: struct {");
-	for _, i in s.names {
-		if tag := s.tags[i]; tag != "" {
-			fmt.printf("\t%s: %T `%s`,\n", s.names[i], s.types[i], tag);
+	for tag, i in tags {
+		name, type := names[i], types[i];
+		if tag != "" {
+			fmt.printf("\t%s: %T `%s`,\n", name, type, tag);
 		} else {
-			fmt.printf("\t%s: %T,\n", s.names[i], s.types[i]);
+			fmt.printf("\t%s: %T,\n", name, type);
 		}
 	}
 	fmt.println("}");
+
+
+	for tag, i in tags {
+		if val, ok := reflect.struct_tag_lookup(tag, "json"); ok {
+			fmt.printf("json: %s -> %s\n", names[i], val);
+		}
+	}
 }
 
 main :: proc() {
@@ -986,6 +1000,6 @@ main :: proc() {
 		bit_set_type();
 		diverging_procedures();
 		deferred_procedure_associations();
-		struct_field_tags();
+		reflection();
 	}
 }
