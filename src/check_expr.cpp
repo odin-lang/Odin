@@ -7164,7 +7164,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				if (o->mode == Addressing_Constant) {
 					max_count = o->value.value_string.len;
 				}
-				o->type = t_string;
+				o->type = type_deref(o->type);
 			}
 			break;
 

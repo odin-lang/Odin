@@ -1074,6 +1074,11 @@ void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_
 }
 
 
+struct ProcUsingVar {
+	Entity *e;
+	Entity *uvar;
+};
+
 
 void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *type, Ast *body) {
 	if (body == nullptr) {
@@ -1098,58 +1103,85 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 	ctx->curr_proc_decl = decl;
 	ctx->curr_proc_sig  = type;
 
-	GB_ASSERT(type->kind == Type_Proc);
-	if (type->Proc.param_count > 0) {
-		TypeTuple *params = &type->Proc.params->Tuple;
-		for_array(i, params->variables) {
-			Entity *e = params->variables[i];
-			if (e->kind != Entity_Variable) {
-				continue;
-			}
-			if (!(e->flags & EntityFlag_Using)) {
-				continue;
-			}
-			bool is_immutable = e->Variable.is_immutable;
-			bool is_value     = (e->flags & EntityFlag_Value) != 0 && !is_type_pointer(e->type);
-			String name = e->token.string;
-			Type *t = base_type(type_deref(e->type));
-			if (t->kind == Type_Struct) {
-				Scope *scope = t->Struct.scope;
-				if (scope == nullptr) {
-					scope = scope_of_node(t->Struct.node);
-				}
-				GB_ASSERT(scope != nullptr);
-				for_array(i, scope->elements.entries) {
-					Entity *f = scope->elements.entries[i].value;
-					if (f->kind == Entity_Variable) {
-						Entity *uvar = alloc_entity_using_variable(e, f->token, f->type);
-						uvar->Variable.is_immutable = is_immutable;
-						if (is_value) uvar->flags |= EntityFlag_Value;
+	ast_node(bs, BlockStmt, body);
 
-						Entity *prev = scope_insert(ctx->scope, uvar);
-						if (prev != nullptr) {
-							error(e->token, "Namespace collision while 'using' '%.*s' of: %.*s", LIT(name), LIT(prev->token.string));
-							break;
+	Array<ProcUsingVar> using_entities = {};
+	using_entities.allocator = heap_allocator();
+	defer (array_free(&using_entities));
+
+	{
+		GB_ASSERT(type->kind == Type_Proc);
+		if (type->Proc.param_count > 0) {
+			TypeTuple *params = &type->Proc.params->Tuple;
+			for_array(i, params->variables) {
+				Entity *e = params->variables[i];
+				if (e->kind != Entity_Variable) {
+					continue;
+				}
+				if (!(e->flags & EntityFlag_Using)) {
+					continue;
+				}
+				bool is_immutable = e->Variable.is_immutable;
+				bool is_value     = (e->flags & EntityFlag_Value) != 0 && !is_type_pointer(e->type);
+				String name = e->token.string;
+				Type *t = base_type(type_deref(e->type));
+				if (t->kind == Type_Struct) {
+					Scope *scope = t->Struct.scope;
+					if (scope == nullptr) {
+						scope = scope_of_node(t->Struct.node);
+					}
+					GB_ASSERT(scope != nullptr);
+					for_array(i, scope->elements.entries) {
+						Entity *f = scope->elements.entries[i].value;
+						if (f->kind == Entity_Variable) {
+							Entity *uvar = alloc_entity_using_variable(e, f->token, f->type);
+							uvar->Variable.is_immutable = is_immutable;
+							if (is_value) uvar->flags |= EntityFlag_Value;
+
+
+							ProcUsingVar puv = {e, uvar};
+							array_add(&using_entities, puv);
+
 						}
 					}
+				} else {
+					error(e->token, "'using' can only be applied to variables of type struct");
+					break;
 				}
-			} else {
-				error(e->token, "'using' can only be applied to variables of type struct");
-				break;
 			}
 		}
 	}
 
-	ast_node(bs, BlockStmt, body);
+
+	for_array(i, using_entities) {
+		Entity *e = using_entities[i].e;
+		Entity *uvar = using_entities[i].uvar;
+		Entity *prev = scope_insert(ctx->scope, uvar);
+		if (prev != nullptr) {
+			error(e->token, "Namespace collision while 'using' '%.*s' of: %.*s", LIT(e->token.string), LIT(prev->token.string));
+			break;
+		}
+	}
+
 	check_open_scope(ctx, body);
-	check_stmt_list(ctx, bs->stmts, Stmt_CheckScopeDecls);
-	if (type->Proc.result_count > 0) {
-		if (!check_is_terminating(body)) {
-			if (token.kind == Token_Ident) {
-				error(bs->close, "Missing return statement at the end of the procedure '%.*s'", LIT(token.string));
-			} else {
-				// NOTE(bill): Anonymous procedure (lambda)
-				error(bs->close, "Missing return statement at the end of the procedure");
+	{
+		for_array(i, using_entities) {
+			Entity *e = using_entities[i].e;
+			Entity *uvar = using_entities[i].uvar;
+			Entity *prev = scope_insert(ctx->scope, uvar);
+			// NOTE(bill): Don't err here
+		}
+
+		check_stmt_list(ctx, bs->stmts, Stmt_CheckScopeDecls);
+
+		if (type->Proc.result_count > 0) {
+			if (!check_is_terminating(body)) {
+				if (token.kind == Token_Ident) {
+					error(bs->close, "Missing return statement at the end of the procedure '%.*s'", LIT(token.string));
+				} else {
+					// NOTE(bill): Anonymous procedure (lambda)
+					error(bs->close, "Missing return statement at the end of the procedure");
+				}
 			}
 		}
 	}

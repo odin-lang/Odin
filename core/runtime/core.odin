@@ -283,19 +283,21 @@ type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 }
 
 
-type_info_base_without_enum :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
+type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	if info == nil do return nil;
 
 	base := info;
 	loop: for {
 		switch i in base.variant {
-		case Type_Info_Named: base = i.base;
-		case Type_Info_Enum:  base = i.base;
+		case Type_Info_Named:  base = i.base;
+		case Type_Info_Enum:   base = i.base;
+		case Type_Info_Opaque: base = i.elem;
 		case: break loop;
 		}
 	}
 	return base;
 }
+type_info_base_without_enum :: type_info_core;
 
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info {
 	data := transmute(Typeid_Bit_Field)id;
@@ -311,10 +313,11 @@ typeid_base :: proc "contextless" (id: typeid) -> typeid {
 	ti = type_info_base(ti);
 	return ti.id;
 }
-typeid_base_without_enum :: proc "contextless" (id: typeid) -> typeid {
+typeid_core :: proc "contextless" (id: typeid) -> typeid {
 	ti := type_info_base_without_enum(type_info_of(id));
 	return ti.id;
 }
+typeid_base_without_enum :: typeid_core;
 
 
 
