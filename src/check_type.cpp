@@ -2548,7 +2548,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 				generic_type = o.type;
 			}
 			if (count < 0) {
-				error(at->count, "... can only be used in conjuction with compound literals");
+				error(at->count, "? can only be used in conjuction with compound literals");
 				count = 0;
 			}
 			Type *elem = check_type_expr(ctx, at->elem, nullptr);
