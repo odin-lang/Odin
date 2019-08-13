@@ -287,9 +287,9 @@ dlerror :: proc() -> string {
 
 
 _alloc_command_line_arguments :: proc() -> []string {
-	args := make([]string, len(runtime.args__));
+	res := make([]string, len(runtime.args__));
 	for arg, i in runtime.args__ {
-		args[i] = string(arg);
+		res[i] = string(arg);
 	}
-	return args;
+	return res;
 }
