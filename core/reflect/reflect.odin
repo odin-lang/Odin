@@ -116,10 +116,10 @@ is_nil :: proc(v: any) -> bool {
 }
 
 
-index :: proc(v: any, i: int, loc := #caller_location) -> any {
-	if v == nil do return nil;
+index :: proc(val: any, i: int, loc := #caller_location) -> any {
+	if val == nil do return nil;
 
-	v := v;
+	v := val;
 	v.id = runtime.typeid_base(v.id);
 	switch a in v {
 	case runtime.Type_Info_Array:
@@ -238,17 +238,17 @@ struct_tag_get :: proc(tag: Struct_Tag, key: string) -> (value: string) {
 }
 
 struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: string, ok: bool) {
-	for tag := tag; tag != ""; /**/ {
+	for t := tag; t != ""; /**/ {
 		i := 0;
-		for i < len(tag) && tag[i] == ' ' { // Skip whitespace
+		for i < len(t) && t[i] == ' ' { // Skip whitespace
 			i += 1;
 		}
-		tag = tag[i:];
-		if len(tag) == 0 do break;
+		t = t[i:];
+		if len(t) == 0 do break;
 
 		i = 0;
-		loop: for i < len(tag) {
-			switch tag[i] {
+		loop: for i < len(t) {
+			switch t[i] {
 			case ':', '"':
 				break loop;
 			case 0x00 ..< ' ', 0x7f .. 0x9f: // break if control character is found
@@ -258,24 +258,24 @@ struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: string, ok: b
 		}
 
 		if i == 0 do break;
-		if i+1 >= len(tag) do break;
+		if i+1 >= len(t) do break;
 
-		if tag[i] != ':' || tag[i+1] != '"' {
+		if t[i] != ':' || t[i+1] != '"' {
 			break;
 		}
-		name := string(tag[:i]);
-		tag = tag[i+1:];
+		name := string(t[:i]);
+		t = t[i+1:];
 
 		i = 1;
-		for i < len(tag) && tag[i] != '"' { // find closing quote
-			if tag[i] == '\\' do i += 1; // Skip escaped characters
+		for i < len(t) && t[i] != '"' { // find closing quote
+			if t[i] == '\\' do i += 1; // Skip escaped characters
 			i += 1;
 		}
 
-		if i >= len(tag) do break;
+		if i >= len(t) do break;
 
-		val := string(tag[:i+1]);
-		tag = tag[i+1:];
+		val := string(t[:i+1]);
+		t = t[i+1:];
 
 		if key == name {
 			return val[1:i], true;
