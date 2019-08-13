@@ -3368,8 +3368,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 			Ast *arg = unparen_expr(ce->args[0]);
-			if (arg->kind != Ast_Ident && arg->kind != Ast_SelectorExpr) {
-				error(call, "'#defined' expects an identifier or selector expression, got %s", LIT(ast_strings[arg->kind]));
+			if (arg == nullptr || (arg->kind != Ast_Ident && arg->kind != Ast_SelectorExpr)) {
+				error(call, "'#defined' expects an identifier or selector expression, got %.*s", LIT(ast_strings[arg->kind]));
 				return false;
 			}
 
