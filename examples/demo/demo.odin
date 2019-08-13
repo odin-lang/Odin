@@ -3,7 +3,6 @@ package main
 import "core:fmt"
 import "core:mem"
 import "core:os"
-import "core:runtime"
 import "core:reflect"
 
 when os.OS == "windows" {
