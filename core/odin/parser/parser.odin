@@ -1741,7 +1741,7 @@ string_to_calling_convention :: proc(s: string) -> ast.Proc_Calling_Convention {
 
 parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
 	for p.curr_tok.kind == token.Hash {
-		tok := expect_token(p, token.Hash);
+		_ = expect_token(p, token.Hash);
 		ident := expect_token(p, token.Ident);
 
 		switch ident.text {
