@@ -943,7 +943,8 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			if (type->Struct.is_packed) ir_write_byte(f, '<');
 			ir_write_byte(f, '{');
 			if (type->Struct.custom_align > 0) {
-				ir_fprintf(f, "[0 x <%lld x i8>] zeroinitializer", cast(i64)type->Struct.custom_align);
+				ir_print_alignment_prefix_hack(f, cast(i64)type->Struct.custom_align);
+				ir_write_str_lit(f, " zeroinitializer");
 				if (value_count > 0) {
 					ir_write_string(f, str_lit(", "));
 				}
