@@ -761,6 +761,6 @@ gbString write_exact_value_to_string(gbString str, ExactValue const &v, isize st
 	return str;
 };
 
-gbString exact_value_to_string(ExactValue const &v, isize string_limit=35) {
+gbString exact_value_to_string(ExactValue const &v, isize string_limit=36) {
 	return write_exact_value_to_string(gb_string_make(heap_allocator(), ""), v, string_limit);
 }
