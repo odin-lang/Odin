@@ -718,3 +718,49 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 	GB_PANIC("Invalid comparison");
 	return false;
 }
+
+
+gbString write_exact_value_to_string(gbString str, ExactValue const &v, isize string_limit=36) {
+	switch (v.kind) {
+	case ExactValue_Invalid:
+		return str;
+	case ExactValue_Bool:
+		return gb_string_appendc(str, v.value_bool ? "true" : "false");
+	case ExactValue_String: {
+		String s = quote_to_ascii(heap_allocator(), v.value_string);
+		string_limit = gb_max(string_limit, 36);
+		if (s.len <= string_limit) {
+			str = gb_string_append_length(str, s.text, s.len);
+		} else {
+			isize n = string_limit/5;
+			str = gb_string_append_length(str, s.text, n);
+			str = gb_string_append_fmt(str, "\"..%lld chars..\"", s.len-(2*n));
+			str = gb_string_append_length(str, s.text+s.len-n, n);
+		}
+		gb_free(heap_allocator(), s.text);
+		return str;
+	}
+	case ExactValue_Integer: {
+		String s = big_int_to_string(heap_allocator(), &v.value_integer);
+		str = gb_string_append_length(str, s.text, s.len);
+		gb_free(heap_allocator(), s.text);
+		return str;
+	}
+	case ExactValue_Float:
+		return gb_string_append_fmt(str, "%f", v.value_float);
+	case ExactValue_Complex:
+		return gb_string_append_fmt(str, "%f+%fi", v.value_complex.real, v.value_complex.imag);
+
+	case ExactValue_Pointer:
+		return str;
+	case ExactValue_Compound:
+		return str;
+	case ExactValue_Procedure:
+		return str;
+	}
+	return str;
+};
+
+gbString exact_value_to_string(ExactValue const &v, isize string_limit=35) {
+	return write_exact_value_to_string(gb_string_make(heap_allocator(), ""), v, string_limit);
+}
