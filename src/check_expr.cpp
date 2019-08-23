@@ -1767,7 +1767,7 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 
 }
 
-void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node) {
+void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *type_hint) {
 	GB_ASSERT(node->kind == Ast_BinaryExpr);
 	ast_node(be, BinaryExpr, node);
 
@@ -1845,6 +1845,9 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node) {
 				info->is_lhs = true;
 			}
 			x->mode = Addressing_Value;
+			if (type_hint && is_type_integer(type_hint)) {
+				x->type = type_hint;
+			}
 			// x->value = x_val;
 			return;
 		}
@@ -2167,7 +2170,7 @@ bool check_binary_array_expr(CheckerContext *c, Token op, Operand *x, Operand *y
 }
 
 
-void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as_type_hint=false) {
+void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint, bool use_lhs_as_type_hint=false) {
 	GB_ASSERT(node->kind == Ast_BinaryExpr);
 	Operand y_ = {}, *y = &y_;
 
@@ -2178,7 +2181,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 	case Token_CmpEq:
 	case Token_NotEq: {
 		// NOTE(bill): Allow comparisons between types
-		check_expr_or_type(c, x, be->left);
+		check_expr_or_type(c, x, be->left, type_hint);
 		check_expr_or_type(c, y, be->right, x->type);
 		bool xt = x->mode == Addressing_Type;
 		bool yt = y->mode == Addressing_Type;
@@ -2278,11 +2281,11 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 		return;
 
 	default:
-		check_expr(c, x, be->left);
+		check_expr_with_type_hint(c, x, be->left, type_hint);
 		if (use_lhs_as_type_hint) {
 			check_expr_with_type_hint(c, y, be->right, x->type);
 		} else {
-			check_expr(c, y, be->right);
+			check_expr_with_type_hint(c, y, be->right, type_hint);
 		}
 		break;
 	}
@@ -2307,7 +2310,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, bool use_lhs_as
 	}
 
 	if (token_is_shift(op.kind)) {
-		check_shift(c, x, y, node);
+		check_shift(c, x, y, node, type_hint);
 		return;
 	}
 
@@ -7000,7 +7003,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 
 	case_ast_node(be, BinaryExpr, node);
-		check_binary_expr(c, o, node, true);
+		check_binary_expr(c, o, node, type_hint, true);
 		if (o->mode == Addressing_Invalid) {
 			o->expr = node;
 			return kind;
