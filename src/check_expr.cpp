@@ -3360,6 +3360,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (!operand->value.value_bool) {
 				gbString arg = expr_to_string(ce->args[0]);
 				error(call, "Compile time assertion: %s", arg);
+				if (c->proc_name != "") {
+					gbString str = type_to_string(c->curr_proc_sig);
+					error_line("\tCalled within '%.*s' :: %s\n", LIT(c->proc_name), str);
+					gb_string_free(str);
+				}
 				gb_string_free(arg);
 			}
 
@@ -3744,7 +3749,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 
 		if (x.mode == Addressing_Constant && y.mode == Addressing_Constant) {
-			operand->value = exact_binary_operator_value(Token_Add, x.value, y.value);
+			f64 r = exact_value_to_float(x.value).value_float;
+			f64 i = exact_value_to_float(y.value).value_float;
+			operand->value = exact_value_complex(r, i);
 			operand->mode = Addressing_Constant;
 		} else {
 			operand->mode = Addressing_Value;

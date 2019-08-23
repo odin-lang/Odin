@@ -2968,35 +2968,54 @@ gbString write_type_to_string(gbString str, Type *type) {
 			isize comma_index = 0;
 			for_array(i, type->Tuple.variables) {
 				Entity *var = type->Tuple.variables[i];
-				if (var != nullptr) {
-					if (var->kind == Entity_Constant) {
-						// Ignore
-						continue;
-					}
-
-					if (comma_index++ > 0) {
-						str = gb_string_appendc(str, ", ");
-					}
-
-					if (var->kind == Entity_Variable) {
-						if (var->flags&EntityFlag_CVarArg) {
-							str = gb_string_appendc(str, "#c_vararg ");
-						}
-						if (var->flags&EntityFlag_Ellipsis) {
-							Type *slice = base_type(var->type);
-							str = gb_string_appendc(str, "..");
-							GB_ASSERT(var->type->kind == Type_Slice);
-							str = write_type_to_string(str, slice->Slice.elem);
-						} else {
-							str = write_type_to_string(str, var->type);
-						}
+				if (var == nullptr) {
+					continue;
+				}
+				String name = var->token.string;
+				if (var->kind == Entity_Constant) {
+					str = gb_string_appendc(str, "$");
+					str = gb_string_append_length(str, name.text, name.len);
+					if (!is_type_untyped(var->type)) {
+						str = gb_string_appendc(str, ": ");
+						str = write_type_to_string(str, var->type);
+						str = gb_string_appendc(str, " = ");
+						str = write_exact_value_to_string(str, var->Constant.value);
 					} else {
-						GB_ASSERT(var->kind == Entity_TypeName);
-						if (var->type->kind == Type_Generic) {
-							str = gb_string_appendc(str, "type/");
+						str = gb_string_appendc(str, "=");
+						str = write_exact_value_to_string(str, var->Constant.value);
+					}
+					continue;
+				}
+
+				if (comma_index++ > 0) {
+					str = gb_string_appendc(str, ", ");
+				}
+
+				if (var->kind == Entity_Variable) {
+					if (var->flags&EntityFlag_CVarArg) {
+						str = gb_string_appendc(str, "#c_vararg ");
+					}
+					if (var->flags&EntityFlag_Ellipsis) {
+						Type *slice = base_type(var->type);
+						str = gb_string_appendc(str, "..");
+						GB_ASSERT(var->type->kind == Type_Slice);
+						str = write_type_to_string(str, slice->Slice.elem);
+					} else {
+						str = write_type_to_string(str, var->type);
+					}
+				} else {
+					GB_ASSERT(var->kind == Entity_TypeName);
+					if (var->type->kind == Type_Generic) {
+						str = gb_string_appendc(str, "typeid/");
+						str = write_type_to_string(str, var->type);
+					} else {
+						if (var->kind == Entity_TypeName) {
+							str = gb_string_appendc(str, "$");
+							str = gb_string_append_length(str, name.text, name.len);
+							str = gb_string_appendc(str, "=");
 							str = write_type_to_string(str, var->type);
 						} else {
-							str = gb_string_appendc(str, "type");
+							str = gb_string_appendc(str, "typeid");
 						}
 					}
 				}
