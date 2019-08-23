@@ -184,10 +184,11 @@ bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 	}
 
 	String name = e->token.string;
-	if (name.len == 0) {
-		return false;
+	switch (name.len) {
+	case 0: return false;
+	case 1: return name[0] != '_';
 	}
-	return name[0] != '_';
+	return true;
 }
 
 bool entity_has_deferred_procedure(Entity *e) {
