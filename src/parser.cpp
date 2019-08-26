@@ -4789,6 +4789,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 			data->err = ParseFile_None;
 			data->should_exit = false;
 			data->error_available = false;
+			data->is_working = false;
 		}
 		defer(for_array(i, worker_threads_data) {
 			ParserWorkerThreadData *data = &worker_threads_data[i];
@@ -4802,9 +4803,9 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 		for_array(i, worker_threads) {
 			gbThread *t = &worker_threads[i];
 			gb_thread_init(t);
-			char buffer[64];
-			gb_snprintf(buffer, 64, "Parser Worker #%ll", i);
-			gb_thread_set_name(t, buffer);
+			//char buffer[64];
+			//gb_snprintf(buffer, 64, "Parser Worker #%ll", i);
+			//gb_thread_set_name(t, buffer);
 			gb_thread_start(t, parse_worker_file_proc, &worker_threads_data[i]);
 		}
 		defer(for_array(i, worker_threads) {
