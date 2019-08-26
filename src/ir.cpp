@@ -3853,6 +3853,60 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 		return ir_emit_load(proc, res);
 	}
 
+	if (is_type_quaternion(t_left)) {
+		ir_emit_comment(proc, str_lit("complex.arith.begin"));
+		defer (ir_emit_comment(proc, str_lit("complex.arith.end")));
+
+		right = ir_emit_conv(proc, right, t_left);
+
+		Type *ft = base_complex_elem_type(t_left);
+
+		if (op == Token_Add || op == Token_Sub) {
+			irValue *res = ir_add_local_generated(proc, type, false); // NOTE: initialized in full later
+			irValue *x0 = ir_emit_struct_ev(proc, left,  0);
+			irValue *x1 = ir_emit_struct_ev(proc, left,  1);
+			irValue *x2 = ir_emit_struct_ev(proc, left,  2);
+			irValue *x3 = ir_emit_struct_ev(proc, left,  3);
+
+			irValue *y0 = ir_emit_struct_ev(proc, right, 0);
+			irValue *y1 = ir_emit_struct_ev(proc, right, 1);
+			irValue *y2 = ir_emit_struct_ev(proc, right, 2);
+			irValue *y3 = ir_emit_struct_ev(proc, right, 3);
+
+			irValue *z0 = ir_emit_arith(proc, op, x0, y0, ft);
+			irValue *z1 = ir_emit_arith(proc, op, x1, y1, ft);
+			irValue *z2 = ir_emit_arith(proc, op, x2, y2, ft);
+			irValue *z3 = ir_emit_arith(proc, op, x3, y3, ft);
+
+			ir_emit_store(proc, ir_emit_struct_ep(proc, res, 0), z0);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, res, 1), z1);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, res, 2), z2);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, res, 3), z3);
+
+			return ir_emit_load(proc, res);
+		} else if (op == Token_Mul) {
+			auto args = array_make<irValue *>(heap_allocator(), 2);
+			args[0] = left;
+			args[1] = right;
+
+			switch (8*type_size_of(ft)) {
+			case 32: return ir_emit_runtime_call(proc, "mul_quaternion128", args);
+			case 64: return ir_emit_runtime_call(proc, "mul_quaternion256", args);
+			default: GB_PANIC("Unknown float type"); break;
+			}
+		} else if (op == Token_Quo) {
+			auto args = array_make<irValue *>(heap_allocator(), 2);
+			args[0] = left;
+			args[1] = right;
+
+			switch (8*type_size_of(ft)) {
+			case 32: return ir_emit_runtime_call(proc, "quo_quaternion128", args);
+			case 64: return ir_emit_runtime_call(proc, "quo_quaternion256", args);
+			default: GB_PANIC("Unknown float type"); break;
+			}
+		}
+	}
+
 
 #if 0
 	if (op == Token_Add) {
@@ -4188,7 +4242,7 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 	}
 
 	if (is_type_complex(a)) {
-		char *runtime_proc = "";
+		char const *runtime_proc = "";
 		i64 sz = 8*type_size_of(a);
 		switch (sz) {
 		case 64:
@@ -4201,6 +4255,31 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 			switch (op_kind) {
 			case Token_CmpEq: runtime_proc = "complex128_eq"; break;
 			case Token_NotEq: runtime_proc = "complex128_ne"; break;
+			}
+			break;
+		}
+		GB_ASSERT(runtime_proc != nullptr);
+
+		auto args = array_make<irValue *>(ir_allocator(), 2);
+		args[0] = left;
+		args[1] = right;
+		return ir_emit_runtime_call(proc, runtime_proc, args);
+	}
+
+	if (is_type_quaternion(a)) {
+		char const *runtime_proc = "";
+		i64 sz = 8*type_size_of(a);
+		switch (sz) {
+		case 128:
+			switch (op_kind) {
+			case Token_CmpEq: runtime_proc = "quaternion128_eq"; break;
+			case Token_NotEq: runtime_proc = "quaternion128_ne"; break;
+			}
+			break;
+		case 256:
+			switch (op_kind) {
+			case Token_CmpEq: runtime_proc = "quaternion256_eq"; break;
+			case Token_NotEq: runtime_proc = "quaternion256_ne"; break;
 			}
 			break;
 		}
@@ -4295,11 +4374,18 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		case 0: result_type = alloc_type_pointer(ft); break;
 		case 1: result_type = alloc_type_pointer(ft); break;
 		}
+	} else if (is_type_quaternion(t)) {
+		Type *ft = base_complex_elem_type(t);
+		switch (index) {
+		case 0: result_type = alloc_type_pointer(ft); break;
+		case 1: result_type = alloc_type_pointer(ft); break;
+		case 2: result_type = alloc_type_pointer(ft); break;
+		case 3: result_type = alloc_type_pointer(ft); break;
+		}
 	} else if (is_type_slice(t)) {
 		switch (index) {
 		case 0: result_type = alloc_type_pointer(alloc_type_pointer(t->Slice.elem)); break;
 		case 1: result_type = alloc_type_pointer(t_int); break;
-		case 2: result_type = alloc_type_pointer(t_int); break;
 		}
 	} else if (is_type_string(t)) {
 		switch (index) {
@@ -4367,6 +4453,17 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 			switch (index) {
 			case 0: result_type = ft; break;
 			case 1: result_type = ft; break;
+			}
+			break;
+		}
+		case Basic_quaternion128: case Basic_quaternion256:
+		{
+			Type *ft = base_complex_elem_type(t);
+			switch (index) {
+			case 0: result_type = ft; break;
+			case 1: result_type = ft; break;
+			case 2: result_type = ft; break;
+			case 3: result_type = ft; break;
 			}
 			break;
 		}
@@ -4752,6 +4849,8 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 				ev = exact_value_to_float(ev);
 			} else if (is_type_complex(dst)) {
 				ev = exact_value_to_complex(ev);
+			} else if (is_type_quaternion(dst)) {
+				ev = exact_value_to_quaternion(ev);
 			} else if (is_type_string(dst)) {
 				// Handled elsewhere
 				GB_ASSERT_MSG(ev.kind == ExactValue_String, "%d", ev.kind);
@@ -4874,6 +4973,49 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		ir_emit_store(proc, ir_emit_struct_ep(proc, gen, 1), imag);
 		return ir_emit_load(proc, gen);
 	}
+
+	if (is_type_quaternion(src) && is_type_quaternion(dst)) {
+		// @QuaternionLayout
+		Type *ft = base_complex_elem_type(dst);
+		irValue *gen = ir_add_local_generated(proc, dst, false);
+		irValue *q0 = ir_emit_conv(proc, ir_emit_struct_ev(proc, value, 0), ft);
+		irValue *q1 = ir_emit_conv(proc, ir_emit_struct_ev(proc, value, 1), ft);
+		irValue *q2 = ir_emit_conv(proc, ir_emit_struct_ev(proc, value, 2), ft);
+		irValue *q3 = ir_emit_conv(proc, ir_emit_struct_ev(proc, value, 3), ft);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, gen, 0), q0);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, gen, 1), q1);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, gen, 2), q2);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, gen, 3), q3);
+		return ir_emit_load(proc, gen);
+	}
+
+	if (is_type_float(src) && is_type_complex(dst)) {
+		Type *ft = base_complex_elem_type(dst);
+		irValue *gen = ir_add_local_generated(proc, dst, true);
+		irValue *real = ir_emit_conv(proc, value, ft);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, gen, 0), real);
+		return ir_emit_load(proc, gen);
+	}
+	if (is_type_float(src) && is_type_quaternion(dst)) {
+		Type *ft = base_complex_elem_type(dst);
+		irValue *gen = ir_add_local_generated(proc, dst, true);
+		irValue *real = ir_emit_conv(proc, value, ft);
+		// @QuaternionLayout
+		ir_emit_store(proc, ir_emit_struct_ep(proc, gen, 3), real);
+		return ir_emit_load(proc, gen);
+	}
+	if (is_type_complex(src) && is_type_quaternion(dst)) {
+		Type *ft = base_complex_elem_type(dst);
+		irValue *gen = ir_add_local_generated(proc, dst, true);
+		irValue *real = ir_emit_conv(proc, ir_emit_struct_ev(proc, value, 0), ft);
+		irValue *imag = ir_emit_conv(proc, ir_emit_struct_ev(proc, value, 1), ft);
+		// @QuaternionLayout
+		ir_emit_store(proc, ir_emit_struct_ep(proc, gen, 3), real);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, gen, 0), imag);
+		return ir_emit_load(proc, gen);
+	}
+
+
 
 	// float <-> integer
 	if (is_type_float(src) && is_type_integer(dst)) {
@@ -5315,6 +5457,7 @@ enum Typeid_Kind : u8 {
 	Typeid_Rune,
 	Typeid_Float,
 	Typeid_Complex,
+	Typeid_Quaternion,
 	Typeid_String,
 	Typeid_Boolean,
 	Typeid_Any,
@@ -6067,17 +6210,77 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		return ir_emit_load(proc, dst);
 	}
 
+	case BuiltinProc_quaternion: {
+		ir_emit_comment(proc, str_lit("quaternion"));
+		irValue *real = ir_build_expr(proc, ce->args[0]);
+		irValue *imag = ir_build_expr(proc, ce->args[1]);
+		irValue *jmag = ir_build_expr(proc, ce->args[2]);
+		irValue *kmag = ir_build_expr(proc, ce->args[3]);
+
+		// @QuaternionLayout
+		irValue *dst = ir_add_local_generated(proc, tv.type, false);
+		Type *ft = base_complex_elem_type(tv.type);
+		real = ir_emit_conv(proc, real, ft);
+		imag = ir_emit_conv(proc, imag, ft);
+		jmag = ir_emit_conv(proc, jmag, ft);
+		kmag = ir_emit_conv(proc, kmag, ft);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, dst, 3), real);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, dst, 0), imag);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, dst, 1), jmag);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, dst, 2), kmag);
+
+		return ir_emit_load(proc, dst);
+	}
+
 	case BuiltinProc_real: {
 		ir_emit_comment(proc, str_lit("real"));
 		irValue *val = ir_build_expr(proc, ce->args[0]);
-		irValue *real = ir_emit_struct_ev(proc, val, 0);
-		return ir_emit_conv(proc, real, tv.type);
+		if (is_type_complex(ir_type(val))) {
+			irValue *real = ir_emit_struct_ev(proc, val, 0);
+			return ir_emit_conv(proc, real, tv.type);
+		} else if (is_type_quaternion(ir_type(val))) {
+			// @QuaternionLayout
+			irValue *real = ir_emit_struct_ev(proc, val, 3);
+			return ir_emit_conv(proc, real, tv.type);
+		}
+		GB_PANIC("invalid type for real");
+		return nullptr;
 	}
 	case BuiltinProc_imag: {
 		ir_emit_comment(proc, str_lit("imag"));
 		irValue *val = ir_build_expr(proc, ce->args[0]);
-		irValue *imag = ir_emit_struct_ev(proc, val, 1);
-		return ir_emit_conv(proc, imag, tv.type);
+		if (is_type_complex(ir_type(val))) {
+			irValue *imag = ir_emit_struct_ev(proc, val, 1);
+			return ir_emit_conv(proc, imag, tv.type);
+		} else if (is_type_quaternion(ir_type(val))) {
+			// @QuaternionLayout
+			irValue *imag = ir_emit_struct_ev(proc, val, 0);
+			return ir_emit_conv(proc, imag, tv.type);
+		}
+		GB_PANIC("invalid type for imag");
+		return nullptr;
+	}
+	case BuiltinProc_jmag: {
+		ir_emit_comment(proc, str_lit("jmag"));
+		irValue *val = ir_build_expr(proc, ce->args[0]);
+		if (is_type_quaternion(ir_type(val))) {
+			// @QuaternionLayout
+			irValue *imag = ir_emit_struct_ev(proc, val, 1);
+			return ir_emit_conv(proc, imag, tv.type);
+		}
+		GB_PANIC("invalid type for jmag");
+		return nullptr;
+	}
+	case BuiltinProc_kmag: {
+		ir_emit_comment(proc, str_lit("kmag"));
+		irValue *val = ir_build_expr(proc, ce->args[0]);
+		if (is_type_quaternion(ir_type(val))) {
+			// @QuaternionLayout
+			irValue *imag = ir_emit_struct_ev(proc, val, 2);
+			return ir_emit_conv(proc, imag, tv.type);
+		}
+		GB_PANIC("invalid type for kmag");
+		return nullptr;
 	}
 
 	case BuiltinProc_conj: {
@@ -6092,6 +6295,20 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 			imag = ir_emit_unary_arith(proc, Token_Sub, imag, ir_type(imag));
 			ir_emit_store(proc, ir_emit_struct_ep(proc, res, 0), real);
 			ir_emit_store(proc, ir_emit_struct_ep(proc, res, 1), imag);
+		} else if (is_type_quaternion(t)) {
+			// @QuaternionLayout
+			res = ir_add_local_generated(proc, tv.type, false);
+			irValue *real = ir_emit_struct_ev(proc, val, 3);
+			irValue *imag = ir_emit_struct_ev(proc, val, 0);
+			irValue *jmag = ir_emit_struct_ev(proc, val, 1);
+			irValue *kmag = ir_emit_struct_ev(proc, val, 2);
+			imag = ir_emit_unary_arith(proc, Token_Sub, imag, ir_type(imag));
+			jmag = ir_emit_unary_arith(proc, Token_Sub, jmag, ir_type(jmag));
+			kmag = ir_emit_unary_arith(proc, Token_Sub, kmag, ir_type(kmag));
+			ir_emit_store(proc, ir_emit_struct_ep(proc, res, 3), real);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, res, 0), imag);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, res, 1), jmag);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, res, 2), kmag);
 		}
 		return ir_emit_load(proc, res);
 	}
@@ -6162,7 +6379,16 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 			return x;
 		}
 		ir_emit_comment(proc, str_lit("abs"));
-		if (is_type_complex(t)) {
+		if (is_type_quaternion(t)) {
+			i64 sz = 8*type_size_of(t);
+			auto args = array_make<irValue *>(ir_allocator(), 1);
+			args[0] = x;
+			switch (sz) {
+			case 128: return ir_emit_runtime_call(proc, "abs_quaternion128", args);
+			case 256: return ir_emit_runtime_call(proc, "abs_quaternion256", args);
+			}
+			GB_PANIC("Unknown complex type");
+		} else if (is_type_complex(t)) {
 			i64 sz = 8*type_size_of(t);
 			auto args = array_make<irValue *>(ir_allocator(), 1);
 			args[0] = x;
@@ -9874,6 +10100,11 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			case Basic_complex64:
 			case Basic_complex128:
 				tag = ir_emit_conv(proc, variant_ptr, t_type_info_complex_ptr);
+				break;
+
+			case Basic_quaternion128:
+			case Basic_quaternion256:
+				tag = ir_emit_conv(proc, variant_ptr, t_type_info_quaternion_ptr);
 				break;
 
 			case Basic_rawptr:
