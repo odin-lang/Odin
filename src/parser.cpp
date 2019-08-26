@@ -4790,19 +4790,9 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 	try_add_import_path(p, init_fullpath, init_fullpath, init_pos, Package_Init);
 	p->init_fullpath = init_fullpath;
 
-#if 1
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	if (thread_count > 1) {
 		isize volatile curr_import_index = 0;
-		isize initial_file_count = p->files_to_process.count;
-		// NOTE(bill): Make sure that these are in parsed in this order
-		for (isize i = 0; i < initial_file_count; i++) {
-			ParseFileError err = process_imported_file(p, p->files_to_process[i]);
-			if (err != ParseFile_None) {
-				return err;
-			}
-			curr_import_index++;
-		}
 
 		auto worker_threads = array_make<gbThread>(heap_allocator(), thread_count);
 		defer (array_free(&worker_threads));
@@ -4835,6 +4825,9 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 					}
 				}
 			}
+
+			gb_yield();
+
 			if (!are_any_alive && curr_import_index >= p->files_to_process.count) {
 				break;
 			}
@@ -4851,15 +4844,6 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 			}
 		}
 	}
-#else
-	for_array(i, p->files_to_process) {
-		ImportedFile f = p->files_to_process[i];
-		ParseFileError err = process_imported_file(p, f);
-		if (err != ParseFile_None) {
-			return err;
-		}
-	}
-#endif
 
 	return ParseFile_None;
 }
