@@ -139,6 +139,7 @@ struct Parser {
 	isize                  total_line_count;
 	gbMutex                file_add_mutex;
 	gbMutex                file_decl_mutex;
+	gbSemaphore            worker_finished_semaphore;
 };
 
 enum ProcInlining {

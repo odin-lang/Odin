@@ -4062,6 +4062,7 @@ bool init_parser(Parser *p) {
 	array_init(&p->files_to_process, heap_allocator());
 	gb_mutex_init(&p->file_add_mutex);
 	gb_mutex_init(&p->file_decl_mutex);
+	gb_semaphore_init(&p->worker_finished_semaphore);
 	return true;
 }
 
@@ -4087,6 +4088,7 @@ void destroy_parser(Parser *p) {
 	map_destroy(&p->package_map);
 	gb_mutex_destroy(&p->file_add_mutex);
 	gb_mutex_destroy(&p->file_decl_mutex);
+	gb_semaphore_destroy(&p->worker_finished_semaphore);
 }
 
 
@@ -4714,6 +4716,7 @@ GB_THREAD_PROC(parse_worker_file_proc) {
 		data->err = process_imported_file(p, file_to_process);
 
 		data->error_available = true;
+		gb_semaphore_release(&p->worker_finished_semaphore);
 		gb_mutex_unlock(&data->lock);
 	}
 
@@ -4760,6 +4763,8 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	if (thread_count > 1) {
 		isize volatile curr_import_index = 0;
+
+#if 0
 		isize initial_file_count = p->files_to_process.count;
 		// NOTE(bill): Make sure that these are in parsed in this order
 		for (isize i = 0; i < initial_file_count; i++) {
@@ -4769,6 +4774,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 			}
 			curr_import_index++;
 		}
+#endif
 
 		auto worker_threads_data = array_make<ParserWorkerThreadData>(heap_allocator(), thread_count);
 		defer (array_free(&worker_threads_data));
@@ -4795,7 +4801,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 			gbThread *t = &worker_threads[i];
 			gb_thread_init(t);
 			char buffer[64];
-			gb_snprintf(buffer, 64, "Parser Worker #%lld", i);
+			gb_snprintf(buffer, 64, "Parser Worker #%ll", i);
 			gb_thread_set_name(t, buffer);
 			gb_thread_start(t, parse_worker_file_proc, &worker_threads_data[i]);
 		}
@@ -4806,7 +4812,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 		auto errors = array_make<ParseFileError>(heap_allocator(), 0, 16);
 
 		for (;;) {
-			bool are_any_alive = false;
+			int num_alive = 0;
 
 			for_array(i, worker_threads) {
 				gbThread *t = &worker_threads[i];
@@ -4825,7 +4831,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 					if (curr_import_index < p->files_to_process.count) {
 						t->user_index = curr_import_index;
 						curr_import_index++;
-						are_any_alive = true;
+						num_alive += 1;
 
 						gb_semaphore_release(&data->resume_work);
 					}
@@ -4833,14 +4839,28 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 					gb_mutex_unlock(&data->lock);
 				} else {
 					//NOTE(thebirk): If we cant lock a thread it must be working
-					are_any_alive = true;
+					num_alive += 1;
+
 				}
 			}
 
-			//NOTE(thebirk): Everything collapses without this, but it really shouldn't!
-			gb_yield();
+			while (num_alive > 0) {
+				isize prev_files_to_process = p->files_to_process.count;
+				gb_semaphore_wait(&p->worker_finished_semaphore);
+				num_alive -= 1;
 
-			if ((!are_any_alive) && (curr_import_index >= p->files_to_process.count)) {
+				if (prev_files_to_process < p->files_to_process.count) {
+					if (num_alive > 0) {
+						//NOTE(thebirk): Recreate semaphore to avoid overflowing the counter. Only needs to happen when there are more threads alive
+						gb_semaphore_destroy(&p->worker_finished_semaphore);
+						gb_semaphore_init(&p->worker_finished_semaphore);
+					}
+					break;
+				}
+			}
+
+
+			if ((num_alive == 0) && (curr_import_index >= p->files_to_process.count)) {
 				break;
 			}
 		}
