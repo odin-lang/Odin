@@ -132,6 +132,10 @@ bool check_is_terminating(Ast *node) {
 		}
 	case_end;
 
+	case_ast_node(rs, InlineRangeStmt, node);
+		return false;
+	case_end;
+
 	case_ast_node(rs, RangeStmt, node);
 		return false;
 	case_end;
@@ -585,6 +589,236 @@ void add_constant_switch_case(CheckerContext *ctx, Map<TypeAndToken> *seen, Oper
 
 	TypeAndToken tap = {operand.type, ast_token(operand.expr)};
 	multi_map_insert(seen, key, tap);
+}
+
+void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
+	ast_node(irs, InlineRangeStmt, node);
+	check_open_scope(ctx, node);
+
+	Type *val0 = nullptr;
+	Type *val1 = nullptr;
+	Entity *entities[2] = {};
+	isize entity_count = 0;
+
+	Ast *expr = unparen_expr(irs->expr);
+
+	ExactValue inline_for_depth = exact_value_i64(0);
+
+	if (is_ast_range(expr)) {
+		ast_node(ie, BinaryExpr, expr);
+		Operand x = {Addressing_Invalid};
+		Operand y = {Addressing_Invalid};
+
+		check_expr(ctx, &x, ie->left);
+		if (x.mode == Addressing_Invalid) {
+			goto skip_expr;
+		}
+		check_expr(ctx, &y, ie->right);
+		if (y.mode == Addressing_Invalid) {
+			goto skip_expr;
+		}
+
+		convert_to_typed(ctx, &x, y.type);
+		if (x.mode == Addressing_Invalid) {
+			goto skip_expr;
+		}
+		convert_to_typed(ctx, &y, x.type);
+		if (y.mode == Addressing_Invalid) {
+			goto skip_expr;
+		}
+
+		convert_to_typed(ctx, &x, default_type(y.type));
+		if (x.mode == Addressing_Invalid) {
+			goto skip_expr;
+		}
+		convert_to_typed(ctx, &y, default_type(x.type));
+		if (y.mode == Addressing_Invalid) {
+			goto skip_expr;
+		}
+
+		if (!are_types_identical(x.type, y.type)) {
+			if (x.type != t_invalid &&
+			    y.type != t_invalid) {
+				gbString xt = type_to_string(x.type);
+				gbString yt = type_to_string(y.type);
+				gbString expr_str = expr_to_string(x.expr);
+				error(ie->op, "Mismatched types in interval expression '%s' : '%s' vs '%s'", expr_str, xt, yt);
+				gb_string_free(expr_str);
+				gb_string_free(yt);
+				gb_string_free(xt);
+			}
+			goto skip_expr;
+		}
+
+		Type *type = x.type;
+		if (!is_type_integer(type) && !is_type_float(type) && !is_type_pointer(type) && !is_type_enum(type)) {
+			error(ie->op, "Only numerical and pointer types are allowed within interval expressions");
+			goto skip_expr;
+		}
+
+		if (x.mode == Addressing_Constant &&
+		    y.mode == Addressing_Constant) {
+			ExactValue a = x.value;
+			ExactValue b = y.value;
+
+			GB_ASSERT(are_types_identical(x.type, y.type));
+
+			TokenKind op = Token_Lt;
+			switch (ie->op.kind) {
+			case Token_Ellipsis:  op = Token_LtEq; break;
+			case Token_RangeHalf: op = Token_Lt; break;
+			default: error(ie->op, "Invalid range operator"); break;
+			}
+			bool ok = compare_exact_values(op, a, b);
+			if (!ok) {
+				// TODO(bill): Better error message
+				error(ie->op, "Invalid interval range");
+				goto skip_expr;
+			}
+
+			inline_for_depth = exact_value_sub(b, a);
+			if (ie->op.kind == Token_Ellipsis) {
+				inline_for_depth = exact_value_increment_one(inline_for_depth);
+			}
+
+		} else {
+			error(ie->op, "Interval expressions must be constant");
+			goto skip_expr;
+		}
+
+		add_type_and_value(&ctx->checker->info, ie->left,  x.mode, x.type, x.value);
+		add_type_and_value(&ctx->checker->info, ie->right, y.mode, y.type, y.value);
+		val0 = type;
+		val1 = t_int;
+	} else {
+		Operand operand = {Addressing_Invalid};
+		check_expr_or_type(ctx, &operand, irs->expr);
+
+		if (operand.mode == Addressing_Type) {
+			if (!is_type_enum(operand.type)) {
+				gbString t = type_to_string(operand.type);
+				error(operand.expr, "Cannot iterate over the type '%s'", t);
+				gb_string_free(t);
+				goto skip_expr;
+			} else {
+				val0 = operand.type;
+				val1 = t_int;
+				add_type_info_type(ctx, operand.type);
+
+				Type *bt = base_type(operand.type);
+				inline_for_depth = exact_value_i64(bt->Enum.fields.count);
+				goto skip_expr;
+			}
+		} else if (operand.mode != Addressing_Invalid) {
+			Type *t = base_type(operand.type);
+			switch (t->kind) {
+			case Type_Basic:
+				if (is_type_string(t) && t->Basic.kind != Basic_cstring) {
+					val0 = t_rune;
+					val1 = t_int;
+					inline_for_depth = exact_value_i64(operand.value.value_string.len);
+				}
+				break;
+			case Type_Array:
+				val0 = t->Array.elem;
+				val1 = t_int;
+				inline_for_depth = exact_value_i64(t->Array.count);
+				break;
+			}
+		}
+
+		if (val0 == nullptr) {
+			gbString s = expr_to_string(operand.expr);
+			gbString t = type_to_string(operand.type);
+			error(operand.expr, "Cannot iterate over '%s' of type '%s' in an 'inline for' statement", s, t);
+			gb_string_free(t);
+			gb_string_free(s);
+		} else if (operand.mode != Addressing_Constant) {
+			error(operand.expr, "An 'inline for' expression must be known at compile time");
+		}
+	}
+
+	skip_expr:; // NOTE(zhiayang): again, declaring a variable immediately after a label... weird.
+
+	Ast * lhs[2] = {irs->val0, irs->val1};
+	Type *rhs[2] = {val0, val1};
+
+	for (isize i = 0; i < 2; i++) {
+		if (lhs[i] == nullptr) {
+			continue;
+		}
+		Ast * name = lhs[i];
+		Type *type = rhs[i];
+
+		Entity *entity = nullptr;
+		if (name->kind == Ast_Ident) {
+			Token token = name->Ident.token;
+			String str = token.string;
+			Entity *found = nullptr;
+
+			if (!is_blank_ident(str)) {
+				found = scope_lookup_current(ctx->scope, str);
+			}
+			if (found == nullptr) {
+				bool is_immutable = true;
+				entity = alloc_entity_variable(ctx->scope, token, type, is_immutable, EntityState_Resolved);
+				entity->flags |= EntityFlag_Value;
+				add_entity_definition(&ctx->checker->info, name, entity);
+			} else {
+				TokenPos pos = found->token.pos;
+				error(token,
+				      "Redeclaration of '%.*s' in this scope\n"
+				      "\tat %.*s(%td:%td)",
+				      LIT(str), LIT(pos.file), pos.line, pos.column);
+				entity = found;
+			}
+		} else {
+			error(name, "A variable declaration must be an identifier");
+		}
+
+		if (entity == nullptr) {
+			entity = alloc_entity_dummy_variable(builtin_pkg->scope, ast_token(name));
+		}
+
+		entities[entity_count++] = entity;
+
+		if (type == nullptr) {
+			entity->type = t_invalid;
+			entity->flags |= EntityFlag_Used;
+		}
+	}
+
+	for (isize i = 0; i < entity_count; i++) {
+		add_entity(ctx->checker, ctx->scope, entities[i]->identifier, entities[i]);
+	}
+
+
+	// NOTE(bill): Minimize the amount of nesting of an 'inline for'
+	i64 prev_inline_for_depth = ctx->inline_for_depth;
+	defer (ctx->inline_for_depth = prev_inline_for_depth);
+	{
+		i64 v = exact_value_to_i64(inline_for_depth);
+		if (v <= 0) {
+			// Do nothing
+		} else {
+			ctx->inline_for_depth = gb_max(ctx->inline_for_depth, 1) * v;
+		}
+
+		if (ctx->inline_for_depth >= MAX_INLINE_FOR_DEPTH && prev_inline_for_depth < MAX_INLINE_FOR_DEPTH) {
+			if (prev_inline_for_depth > 0) {
+				error(node, "Nested 'inline for' loop cannot be inlined as it exceeds the maximum inline for depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
+			} else {
+				error(node, "'inline for' loop cannot be inlined as it exceeds the maximum inline for depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
+			}
+			error_line("\tUse a normal 'for' loop instead by removing the 'inline' prefix\n");
+			ctx->inline_for_depth = MAX_INLINE_FOR_DEPTH;
+		}
+	}
+
+	check_stmt(ctx, irs->body, mod_flags);
+
+
+	check_close_scope(ctx);
 }
 
 void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
@@ -1298,6 +1532,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		check_close_scope(ctx);
 	case_end;
 
+
 	case_ast_node(rs, RangeStmt, node);
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 
@@ -1320,29 +1555,29 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 			check_expr(ctx, &x, ie->left);
 			if (x.mode == Addressing_Invalid) {
-				goto skip_expr;
+				goto skip_expr_range_stmt;
 			}
 			check_expr(ctx, &y, ie->right);
 			if (y.mode == Addressing_Invalid) {
-				goto skip_expr;
+				goto skip_expr_range_stmt;
 			}
 
 			convert_to_typed(ctx, &x, y.type);
 			if (x.mode == Addressing_Invalid) {
-				goto skip_expr;
+				goto skip_expr_range_stmt;
 			}
 			convert_to_typed(ctx, &y, x.type);
 			if (y.mode == Addressing_Invalid) {
-				goto skip_expr;
+				goto skip_expr_range_stmt;
 			}
 
 			convert_to_typed(ctx, &x, default_type(y.type));
 			if (x.mode == Addressing_Invalid) {
-				goto skip_expr;
+				goto skip_expr_range_stmt;
 			}
 			convert_to_typed(ctx, &y, default_type(x.type));
 			if (y.mode == Addressing_Invalid) {
-				goto skip_expr;
+				goto skip_expr_range_stmt;
 			}
 
 			if (!are_types_identical(x.type, y.type)) {
@@ -1356,13 +1591,13 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					gb_string_free(yt);
 					gb_string_free(xt);
 				}
-				goto skip_expr;
+				goto skip_expr_range_stmt;
 			}
 
 			Type *type = x.type;
 			if (!is_type_integer(type) && !is_type_float(type) && !is_type_pointer(type) && !is_type_enum(type)) {
 				error(ie->op, "Only numerical and pointer types are allowed within interval expressions");
-				goto skip_expr;
+				goto skip_expr_range_stmt;
 			}
 
 			if (x.mode == Addressing_Constant &&
@@ -1382,17 +1617,9 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				if (!ok) {
 					// TODO(bill): Better error message
 					error(ie->op, "Invalid interval range");
-					goto skip_expr;
+					goto skip_expr_range_stmt;
 				}
 			}
-
-			if (x.mode != Addressing_Constant) {
-				x.value = empty_exact_value;
-			}
-			if (y.mode != Addressing_Constant) {
-				y.value = empty_exact_value;
-			}
-
 
 			add_type_and_value(&ctx->checker->info, ie->left,  x.mode, x.type, x.value);
 			add_type_and_value(&ctx->checker->info, ie->right, y.mode, y.type, y.value);
@@ -1407,12 +1634,12 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					gbString t = type_to_string(operand.type);
 					error(operand.expr, "Cannot iterate over the type '%s'", t);
 					gb_string_free(t);
-					goto skip_expr;
+					goto skip_expr_range_stmt;
 				} else {
 					val0 = operand.type;
 					val1 = t_int;
 					add_type_info_type(ctx, operand.type);
-					goto skip_expr;
+					goto skip_expr_range_stmt;
 				}
 			} else if (operand.mode != Addressing_Invalid) {
 				bool is_ptr = is_type_pointer(operand.type);
@@ -1457,7 +1684,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			}
 		}
 
-	skip_expr:; // NOTE(zhiayang): again, declaring a variable immediately after a label... weird.
+		skip_expr_range_stmt:; // NOTE(zhiayang): again, declaring a variable immediately after a label... weird.
+
 		Ast * lhs[2] = {rs->val0, rs->val1};
 		Type *rhs[2] = {val0, val1};
 
@@ -1513,6 +1741,10 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		check_stmt(ctx, rs->body, new_flags);
 
 		check_close_scope(ctx);
+	case_end;
+
+	case_ast_node(irs, InlineRangeStmt, node);
+		check_inline_range_stmt(ctx, node, mod_flags);
 	case_end;
 
 	case_ast_node(ss, SwitchStmt, node);

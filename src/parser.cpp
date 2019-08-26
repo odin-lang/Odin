@@ -51,6 +51,7 @@ Token ast_token(Ast *node) {
 	case Ast_ReturnStmt:         return node->ReturnStmt.token;
 	case Ast_ForStmt:            return node->ForStmt.token;
 	case Ast_RangeStmt:          return node->RangeStmt.token;
+	case Ast_InlineRangeStmt:    return node->InlineRangeStmt.inline_token;
 	case Ast_CaseClause:         return node->CaseClause.token;
 	case Ast_SwitchStmt:         return node->SwitchStmt.token;
 	case Ast_TypeSwitchStmt:     return node->TypeSwitchStmt.token;
@@ -256,6 +257,12 @@ Ast *clone_ast(Ast *node) {
 		n->RangeStmt.val1  = clone_ast(n->RangeStmt.val1);
 		n->RangeStmt.expr  = clone_ast(n->RangeStmt.expr);
 		n->RangeStmt.body  = clone_ast(n->RangeStmt.body);
+		break;
+	case Ast_InlineRangeStmt:
+		n->InlineRangeStmt.val0  = clone_ast(n->InlineRangeStmt.val0);
+		n->InlineRangeStmt.val1  = clone_ast(n->InlineRangeStmt.val1);
+		n->InlineRangeStmt.expr  = clone_ast(n->InlineRangeStmt.expr);
+		n->InlineRangeStmt.body  = clone_ast(n->InlineRangeStmt.body);
 		break;
 	case Ast_CaseClause:
 		n->CaseClause.list  = clone_ast_array(n->CaseClause.list);
@@ -748,6 +755,18 @@ Ast *ast_range_stmt(AstFile *f, Token token, Ast *val0, Ast *val1, Token in_toke
 	return result;
 }
 
+Ast *ast_inline_range_stmt(AstFile *f, Token inline_token, Token for_token, Ast *val0, Ast *val1, Token in_token, Ast *expr, Ast *body) {
+	Ast *result = alloc_ast_node(f, Ast_InlineRangeStmt);
+	result->InlineRangeStmt.inline_token = inline_token;
+	result->InlineRangeStmt.for_token = for_token;
+	result->InlineRangeStmt.val0 = val0;
+	result->InlineRangeStmt.val1 = val1;
+	result->InlineRangeStmt.in_token = in_token;
+	result->InlineRangeStmt.expr  = expr;
+	result->InlineRangeStmt.body  = body;
+	return result;
+}
+
 Ast *ast_switch_stmt(AstFile *f, Token token, Ast *init, Ast *tag, Ast *body) {
 	Ast *result = alloc_ast_node(f, Ast_SwitchStmt);
 	result->SwitchStmt.token = token;
@@ -1117,6 +1136,17 @@ Token advance_token(AstFile *f) {
 	bool ok = next_token0(f);
 	if (ok) comsume_comment_groups(f, prev);
 	return prev;
+}
+
+bool peek_token_kind(AstFile *f, TokenKind kind) {
+	for (isize i = f->curr_token_index+1; i < f->tokens.count; i++) {
+		Token tok = f->tokens[i];
+		if (kind != Token_Comment && tok.kind == Token_Comment) {
+			continue;
+		}
+		return tok.kind == kind;
+	}
+	return false;
 }
 
 Token expect_token(AstFile *f, TokenKind kind) {
@@ -2092,7 +2122,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		bool prev_allow_range = f->allow_range;
 		f->allow_range = true;
-		elem = parse_expr(f, false);
+		elem = parse_expr(f, true);
 		f->allow_range = prev_allow_range;
 		if (allow_token(f, Token_Semicolon)) {
 			underlying = parse_type(f);
@@ -2650,7 +2680,7 @@ Ast *parse_simple_stmt(AstFile *f, u32 flags) {
 			allow_token(f, Token_in);
 			bool prev_allow_range = f->allow_range;
 			f->allow_range = true;
-			Ast *expr = parse_expr(f, false);
+			Ast *expr = parse_expr(f, true);
 			f->allow_range = prev_allow_range;
 
 			auto rhs = array_make<Ast *>(heap_allocator(), 0, 1);
@@ -3779,10 +3809,55 @@ Ast *parse_stmt(AstFile *f) {
 	Token token = f->curr_token;
 	switch (token.kind) {
 	// Operands
+	case Token_inline:
+		if (peek_token_kind(f, Token_for)) {
+			Token inline_token = expect_token(f, Token_inline);
+			Token for_token = expect_token(f, Token_for);
+			Ast *val0 = nullptr;
+			Ast *val1 = nullptr;
+			Token in_token = {};
+			Ast *expr = nullptr;
+			Ast *body = nullptr;
+
+			bool bad_stmt = false;
+
+			if (f->curr_token.kind != Token_in) {
+				Array<Ast *> idents = parse_ident_list(f, false);
+				switch (idents.count) {
+				case 1:
+					val0 = idents[0];
+					break;
+				case 2:
+					val0 = idents[0];
+					val1 = idents[1];
+					break;
+				default:
+					syntax_error(for_token, "Expected either 1 or 2 identifiers");
+					bad_stmt = true;
+					break;
+				}
+			}
+			in_token = expect_token(f, Token_in);
+
+			bool prev_allow_range = f->allow_range;
+			f->allow_range = true;
+			expr = parse_expr(f, true);
+			f->allow_range = prev_allow_range;
+
+			if (allow_token(f, Token_do)) {
+				body = convert_stmt_to_body(f, parse_stmt(f));
+			} else {
+				body = parse_block_stmt(f, false);
+			}
+			if (bad_stmt) {
+				return ast_bad_stmt(f, inline_token, f->curr_token);
+			}
+			return ast_inline_range_stmt(f, inline_token, for_token, val0, val1, in_token, expr, body);
+		}
+		/* fallthrough */
+	case Token_no_inline:
 	case Token_context: // Also allows for `context =`
 	case Token_proc:
-	case Token_inline:
-	case Token_no_inline:
 	case Token_Ident:
 	case Token_Integer:
 	case Token_Float:

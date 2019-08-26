@@ -326,6 +326,15 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Ast *expr; \
 		Ast *body; \
 	}) \
+	AST_KIND(InlineRangeStmt, "inline range statement", struct { \
+		Token inline_token; \
+		Token for_token; \
+		Ast *val0; \
+		Ast *val1; \
+		Token in_token; \
+		Ast *expr; \
+		Ast *body; \
+	}) \
 	AST_KIND(CaseClause, "case clause", struct { \
 		Token token;             \
 		Array<Ast *> list;   \

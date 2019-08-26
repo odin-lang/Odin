@@ -1018,6 +1018,44 @@ quaternions :: proc() {
 		fmt.println(c);
 		fmt.println(q);
 	}
+	{ // Memory layout of Quaternions
+		q := 1 + 2i + 3j + 4k;
+		a := transmute([4]f64)q;
+		fmt.println("Quaternion memory layout: xyzw/(ijkr)");
+		fmt.println(q); // 1.000+2.000i+3.000j+4.000k
+		fmt.println(a); // [2.000, 3.000, 4.000, 1.000]
+	}
+}
+
+inline_for_statement :: proc() {
+	fmt.println("\n#inline for statements");
+
+	fmt.println("Ranges");
+	inline for x, i in 1..<4 {
+		fmt.println(x, i);
+	}
+
+	fmt.println("Strings");
+	inline for r, i in "Hello, 世界" {
+		fmt.println(r, i);
+	}
+
+	fmt.println("Arrays");
+	inline for elem, idx in ([4]int{1, 4, 9, 16}) {
+		fmt.println(elem, idx);
+	}
+
+
+	Foo_Enum :: enum {
+		A = 1,
+		B,
+		C = 6,
+		D,
+	}
+	fmt.println("Enum types");
+	inline for elem, idx in Foo_Enum {
+		fmt.println(elem, idx);
+	}
 }
 
 main :: proc() {
@@ -1040,5 +1078,6 @@ main :: proc() {
 		deferred_procedure_associations();
 		reflection();
 		quaternions();
+		inline_for_statement();
 	}
 }
