@@ -418,20 +418,23 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 			}
 			return;
 
-		// case Basic_f16:    ir_write_str_lit(f, "half");              return;
-		case Basic_f32:    ir_write_str_lit(f, "float");                return;
-		case Basic_f64:    ir_write_str_lit(f, "double");               return;
+		// case Basic_f16:    ir_write_str_lit(f, "half");                 return;
+		case Basic_f32:    ir_write_str_lit(f, "float");                   return;
+		case Basic_f64:    ir_write_str_lit(f, "double");                  return;
 
-		// case Basic_complex32:  ir_write_str_lit(f, "%%..complex32"); return;
-		case Basic_complex64:  ir_write_str_lit(f, "%..complex64");     return;
-		case Basic_complex128: ir_write_str_lit(f, "%..complex128");    return;
+		// case Basic_complex32:  ir_write_str_lit(f, "%%..complex32");    return;
+		case Basic_complex64:  ir_write_str_lit(f, "%..complex64");        return;
+		case Basic_complex128: ir_write_str_lit(f, "%..complex128");       return;
 
-		case Basic_any:     ir_write_str_lit(f, "%..any");              return;
-		case Basic_rawptr:  ir_write_str_lit(f, "%..rawptr");           return;
-		case Basic_string:  ir_write_str_lit(f, "%..string");           return;
-		case Basic_cstring: ir_write_str_lit(f, "i8*");                 return;
+		case Basic_quaternion128: ir_write_str_lit(f, "%..quaternion128"); return;
+		case Basic_quaternion256: ir_write_str_lit(f, "%..quaternion256"); return;
 
-		case Basic_typeid:  ir_write_str_lit(f, "%..typeid");           return;
+		case Basic_any:     ir_write_str_lit(f, "%..any");                 return;
+		case Basic_rawptr:  ir_write_str_lit(f, "%..rawptr");              return;
+		case Basic_string:  ir_write_str_lit(f, "%..string");              return;
+		case Basic_cstring: ir_write_str_lit(f, "i8*");                    return;
+
+		case Basic_typeid:  ir_write_str_lit(f, "%..typeid");              return;
 		}
 		break;
 
@@ -811,6 +814,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		break;
 	}
 	case ExactValue_Complex: {
+		// xy/ri format
 		type = core_type(type);
 		GB_ASSERT_MSG(is_type_complex(type), "%s", type_to_string(type));
 		Type *ft = base_complex_elem_type(type);
@@ -823,6 +827,26 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		ir_write_byte(f, '}');
 		break;
 	}
+
+	case ExactValue_Quaternion: {
+		// xyzw/ijkr format
+		type = core_type(type);
+		GB_ASSERT_MSG(is_type_quaternion(type), "%s", type_to_string(type));
+		Type *ft = base_complex_elem_type(type);
+		ir_write_byte(f, ' ');
+		ir_write_byte(f, '{');
+		ir_print_type(f, m, ft); ir_write_byte(f, ' ');
+		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.imag), ft);
+		ir_write_str_lit(f, ", "); ir_print_type(f, m, ft); ir_write_byte(f, ' ');
+		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.jmag), ft);
+		ir_write_str_lit(f, ", "); ir_print_type(f, m, ft); ir_write_byte(f, ' ');
+		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.kmag), ft);
+		ir_write_str_lit(f, ", "); ir_print_type(f, m, ft); ir_write_byte(f, ' ');
+		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.real), ft);
+		ir_write_byte(f, '}');
+		break;
+	}
+
 	case ExactValue_Pointer:
 		if (value.value_pointer == 0) {
 			if (is_type_typeid(type)) {
@@ -2245,6 +2269,13 @@ void print_llvm_ir(irGen *ir) {
 	ir_write_str_lit(f, " = type {float, float} ; Basic_complex64\n");
 	ir_print_encoded_local(f, str_lit("..complex128"));
 	ir_write_str_lit(f, " = type {double, double} ; Basic_complex128\n");
+
+	ir_print_encoded_local(f, str_lit("..quaternion64"));
+	ir_write_str_lit(f, " = type {half, half, half, half} ; Basic_quaternion64\n");
+	ir_print_encoded_local(f, str_lit("..quaternion128"));
+	ir_write_str_lit(f, " = type {float, float, float, float} ; Basic_quaternion128\n");
+	ir_print_encoded_local(f, str_lit("..quaternion256"));
+	ir_write_str_lit(f, " = type {double, double, double, double} ; Basic_quaternion256\n");
 
 	ir_print_encoded_local(f, str_lit("..typeid"));
 	ir_write_str_lit(f, " = type ");

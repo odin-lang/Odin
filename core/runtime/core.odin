@@ -47,16 +47,17 @@ Type_Info_Endianness :: enum u8 {
 }
 
 // Variant Types
-Type_Info_Named    :: struct {name: string, base: ^Type_Info};
-Type_Info_Integer  :: struct {signed: bool, endianness: Type_Info_Endianness};
-Type_Info_Rune     :: struct {};
-Type_Info_Float    :: struct {};
-Type_Info_Complex  :: struct {};
-Type_Info_String   :: struct {is_cstring: bool};
-Type_Info_Boolean  :: struct {};
-Type_Info_Any      :: struct {};
-Type_Info_Type_Id  :: struct {};
-Type_Info_Pointer  :: struct {
+Type_Info_Named      :: struct {name: string, base: ^Type_Info};
+Type_Info_Integer    :: struct {signed: bool, endianness: Type_Info_Endianness};
+Type_Info_Rune       :: struct {};
+Type_Info_Float      :: struct {};
+Type_Info_Complex    :: struct {};
+Type_Info_Quaternion :: struct {};
+Type_Info_String     :: struct {is_cstring: bool};
+Type_Info_Boolean    :: struct {};
+Type_Info_Any        :: struct {};
+Type_Info_Type_Id    :: struct {};
+Type_Info_Pointer :: struct {
 	elem: ^Type_Info // nil -> rawptr
 };
 Type_Info_Procedure :: struct {
@@ -135,6 +136,7 @@ Type_Info :: struct {
 		Type_Info_Rune,
 		Type_Info_Float,
 		Type_Info_Complex,
+		Type_Info_Quaternion,
 		Type_Info_String,
 		Type_Info_Boolean,
 		Type_Info_Any,
@@ -163,6 +165,7 @@ Typeid_Kind :: enum u8 {
 	Rune,
 	Float,
 	Complex,
+	Quaternion,
 	String,
 	Boolean,
 	Any,

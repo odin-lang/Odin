@@ -1129,6 +1129,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	case runtime.Type_Info_Rune:       fmt_arg(fi, v, verb);
 	case runtime.Type_Info_Float:      fmt_arg(fi, v, verb);
 	case runtime.Type_Info_Complex:    fmt_arg(fi, v, verb);
+	case runtime.Type_Info_Quaternion: fmt_arg(fi, v, verb);
 	case runtime.Type_Info_String:     fmt_arg(fi, v, verb);
 
 	case runtime.Type_Info_Pointer:
@@ -1386,6 +1387,31 @@ fmt_complex :: proc(fi: ^Info, c: complex128, bits: int, verb: rune) {
 	}
 }
 
+fmt_quaternion  :: proc(fi: ^Info, q: quaternion256, bits: int, verb: rune) {
+	switch verb {
+	case 'f', 'F', 'v', 'h', 'H':
+		r, i, j, k := real(q), imag(q), jmag(q), kmag(q);
+
+		fmt_float(fi, r, bits/4, verb);
+
+		if !fi.plus && i >= 0 do strings.write_rune(fi.buf, '+');
+		fmt_float(fi, i, bits/4, verb);
+		strings.write_rune(fi.buf, 'i');
+
+		if !fi.plus && j >= 0 do strings.write_rune(fi.buf, '+');
+		fmt_float(fi, j, bits/4, verb);
+		strings.write_rune(fi.buf, 'j');
+
+		if !fi.plus && k >= 0 do strings.write_rune(fi.buf, '+');
+		fmt_float(fi, k, bits/4, verb);
+		strings.write_rune(fi.buf, 'k');
+
+	case:
+		fmt_bad_verb(fi, verb);
+		return;
+	}
+}
+
 fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	if arg == nil {
 		strings.write_string(fi.buf, "<nil>");
@@ -1433,6 +1459,9 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 
 	case complex64:  fmt_complex(fi, complex128(a), 64, verb);
 	case complex128: fmt_complex(fi, a, 128, verb);
+
+	case quaternion128: fmt_quaternion(fi, quaternion256(a), 128, verb);
+	case quaternion256: fmt_quaternion(fi, a, 256, verb);
 
 	case i8:      fmt_int(fi, u64(a), true,   8, verb);
 	case u8:      fmt_int(fi, u64(a), false,  8, verb);

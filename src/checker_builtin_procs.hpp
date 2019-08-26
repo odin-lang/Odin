@@ -16,8 +16,11 @@ enum BuiltinProcId {
 	BuiltinProc_swizzle,
 
 	BuiltinProc_complex,
+	BuiltinProc_quaternion,
 	BuiltinProc_real,
 	BuiltinProc_imag,
+	BuiltinProc_jmag,
+	BuiltinProc_kmag,
 	BuiltinProc_conj,
 
 	BuiltinProc_expand_to_tuple,
@@ -172,8 +175,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("swizzle"),          1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("complex"),          2, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("quaternion"),       4, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("real"),             1, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("imag"),             1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("jmag"),             1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("kmag"),             1, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("conj"),             1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("expand_to_tuple"),  1, false, Expr_Expr, BuiltinProcPkg_builtin},

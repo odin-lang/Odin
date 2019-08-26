@@ -12,6 +12,7 @@ Type_Kind :: enum {
 	Rune,
 	Float,
 	Complex,
+	Quaternion,
 	String,
 	Boolean,
 	Any,
@@ -42,6 +43,7 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 		case runtime.Type_Info_Rune:          return .Rune;
 		case runtime.Type_Info_Float:         return .Float;
 		case runtime.Type_Info_Complex:       return .Complex;
+		case runtime.Type_Info_Quaternion:    return .Quaternion;
 		case runtime.Type_Info_String:        return .String;
 		case runtime.Type_Info_Boolean:       return .Boolean;
 		case runtime.Type_Info_Any:           return .Any;

@@ -357,6 +357,11 @@ complex128_eq :: inline proc "contextless" (a, b: complex128) -> bool { return r
 complex128_ne :: inline proc "contextless" (a, b: complex128) -> bool { return real(a) != real(b) || imag(a) != imag(b); }
 
 
+quaternion128_eq :: inline proc "contextless"  (a, b: quaternion128)  -> bool { return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b); }
+quaternion128_ne :: inline proc "contextless"  (a, b: quaternion128)  -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b); }
+
+quaternion256_eq :: inline proc "contextless" (a, b: quaternion256) -> bool { return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b); }
+quaternion256_ne :: inline proc "contextless" (a, b: quaternion256) -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b); }
 
 
 bounds_check_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
@@ -546,9 +551,16 @@ abs_complex128 :: inline proc "contextless" (x: complex128) -> f64 {
 	r, i := real(x), imag(x);
 	return _sqrt_f64(r*r + i*i);
 }
+abs_quaternion128 :: inline proc "contextless" (x: quaternion128) -> f32 {
+	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
+	return _sqrt_f32(r*r + i*i + j*j + k*k);
+}
+abs_quaternion256 :: inline proc "contextless" (x: quaternion256) -> f64 {
+	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
+	return _sqrt_f64(r*r + i*i + j*j + k*k);
+}
 
-
-quo_complex64 :: proc(n, m: complex64) -> complex64 {
+quo_complex64 :: proc "contextless" (n, m: complex64) -> complex64 {
 	e, f: f32;
 
 	if abs(real(m)) >= abs(imag(m)) {
@@ -566,7 +578,7 @@ quo_complex64 :: proc(n, m: complex64) -> complex64 {
 	return complex(e, f);
 }
 
-quo_complex128 :: proc(n, m: complex128) -> complex128 {
+quo_complex128 :: proc "contextless" (n, m: complex128) -> complex128 {
 	e, f: f64;
 
 	if abs(real(m)) >= abs(imag(m)) {
@@ -582,4 +594,56 @@ quo_complex128 :: proc(n, m: complex128) -> complex128 {
 	}
 
 	return complex(e, f);
+}
+
+mul_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
+	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q);
+	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r);
+
+	t0 := r0*q0 - r1*q1 - r2*q2 - r3*q3;
+	t1 := r0*q1 + r1*q0 - r2*q3 + r3*q2;
+	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1;
+	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0;
+
+	return quaternion(t0, t1, t2, t3);
+}
+
+mul_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
+	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q);
+	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r);
+
+	t0 := r0*q0 - r1*q1 - r2*q2 - r3*q3;
+	t1 := r0*q1 + r1*q0 - r2*q3 + r3*q2;
+	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1;
+	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0;
+
+	return quaternion(t0, t1, t2, t3);
+}
+
+quo_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
+	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q);
+	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r);
+
+	invmag2 := 1.0 / (r0*r0 + r1*r1 + r2*r2 + r3*r3);
+
+	t0 := (r0*q0 + r1*q1 + r2*q2 + r3*q3) * invmag2;
+	t1 := (r0*q1 - r1*q0 - r2*q3 - r3*q2) * invmag2;
+	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2;
+	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2;
+
+	return quaternion(t0, t1, t2, t3);
+}
+
+quo_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
+	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q);
+	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r);
+
+	invmag2 := 1.0 / (r0*r0 + r1*r1 + r2*r2 + r3*r3);
+
+	t0 := (r0*q0 + r1*q1 + r2*q2 + r3*q3) * invmag2;
+	t1 := (r0*q1 - r1*q0 - r2*q3 - r3*q2) * invmag2;
+	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2;
+	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2;
+
+	return quaternion(t0, t1, t2, t3);
 }

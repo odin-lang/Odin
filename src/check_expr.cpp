@@ -497,6 +497,14 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 							if (is_type_complex(dst)) {
 								return 1;
 							}
+							if (is_type_quaternion(dst)) {
+								return 2;
+							}
+							break;
+						case Basic_UntypedQuaternion:
+							if (is_type_quaternion(dst)) {
+								return 1;
+							}
 							break;
 						}
 					}
@@ -1438,12 +1446,42 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 			ExactValue imag = exact_value_imag(v);
 			if (real.kind != ExactValue_Invalid &&
 			    imag.kind != ExactValue_Invalid) {
-				if (out_value) *out_value = exact_binary_operator_value(Token_Add, real, exact_value_make_imag(imag));
+				if (out_value) *out_value = exact_value_complex(exact_value_to_f64(real), exact_value_to_f64(imag));
 				return true;
 			}
 			break;
 		}
 		case Basic_UntypedComplex:
+			return true;
+
+		default: GB_PANIC("Compiler error: Unknown complex type!"); break;
+		}
+
+		return false;
+	} else if (is_type_quaternion(type)) {
+		ExactValue v = exact_value_to_quaternion(in_value);
+		if (v.kind != ExactValue_Quaternion) {
+			return false;
+		}
+
+		switch (type->Basic.kind) {
+		case Basic_quaternion128:
+		case Basic_quaternion256: {
+			ExactValue real = exact_value_real(v);
+			ExactValue imag = exact_value_imag(v);
+			ExactValue jmag = exact_value_jmag(v);
+			ExactValue kmag = exact_value_kmag(v);
+			if (real.kind != ExactValue_Invalid &&
+			    imag.kind != ExactValue_Invalid) {
+				if (out_value) *out_value = exact_value_quaternion(exact_value_to_f64(real), exact_value_to_f64(imag), exact_value_to_f64(jmag), exact_value_to_f64(kmag));
+				return true;
+			}
+			break;
+		}
+		case Basic_UntypedComplex:
+			if (out_value) *out_value = exact_value_to_quaternion(*out_value);
+			return true;
+		case Basic_UntypedQuaternion:
 			return true;
 
 		default: GB_PANIC("Compiler error: Unknown complex type!"); break;
@@ -1481,10 +1519,14 @@ void check_is_expressible(CheckerContext *c, Operand *o, Type *type) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error(o->expr, "'%s' truncated to '%s'", a, b);
 			} else {
+			#if 0
 				gbAllocator ha = heap_allocator();
 				String str = big_int_to_string(ha, &o->value.value_integer);
 				defer (gb_free(ha, str.text));
 				error(o->expr, "'%s = %.*s' overflows '%s'", a, LIT(str), b);
+			#else
+				error(o->expr, "Cannot convert '%s' to '%s'", a, b);
+			#endif
 			}
 		} else {
 			error(o->expr, "Cannot convert '%s' to '%s'", a, b);
@@ -1759,6 +1801,21 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 					}
 					break;
 				}
+			} else if (is_type_quaternion(x->type) || is_type_quaternion(y->type)) {
+				switch (op) {
+				case Token_CmpEq:
+					switch (8*size) {
+					case 128: add_package_dependency(c, "runtime", "quaternion128_eq");  break;
+					case 256: add_package_dependency(c, "runtime", "quaternion256_eq"); break;
+					}
+					break;
+				case Token_NotEq:
+					switch (8*size) {
+					case 128: add_package_dependency(c, "runtime", "quaternion128_ne");  break;
+					case 256: add_package_dependency(c, "runtime", "quaternion256_ne"); break;
+					}
+					break;
+				}
 			}
 		}
 
@@ -1975,6 +2032,14 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	}
 
 	if (is_type_complex(src) && is_type_complex(dst)) {
+		return true;
+	}
+
+	if (is_type_complex(src) && is_type_quaternion(dst)) {
+		return true;
+	}
+
+	if (is_type_quaternion(src) && is_type_quaternion(dst)) {
 		return true;
 	}
 
@@ -2557,6 +2622,8 @@ ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
 		v = exact_value_to_integer(v);
 	} else if (is_type_complex(t)) {
 		v = exact_value_to_complex(v);
+	} else if (is_type_quaternion(t)) {
+		v = exact_value_to_quaternion(v);
 	}
 	return v;
 }
@@ -2652,6 +2719,7 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 			case Basic_UntypedInteger:
 			case Basic_UntypedFloat:
 			case Basic_UntypedComplex:
+			case Basic_UntypedQuaternion:
 			case Basic_UntypedRune:
 				if (!is_type_numeric(target_type)) {
 					operand->mode = Addressing_Invalid;
@@ -3769,10 +3837,98 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
+	case BuiltinProc_quaternion: {
+		// quaternion :: proc(real, imag, jmag, kmag: float_type) -> complex_type
+		Operand x = *operand;
+		Operand y = {};
+		Operand z = {};
+		Operand w = {};
+
+		// NOTE(bill): Invalid will be the default till fixed
+		operand->type = t_invalid;
+		operand->mode = Addressing_Invalid;
+
+		check_expr(c, &y, ce->args[1]);
+		if (y.mode == Addressing_Invalid) {
+			return false;
+		}
+		check_expr(c, &z, ce->args[2]);
+		if (y.mode == Addressing_Invalid) {
+			return false;
+		}
+		check_expr(c, &w, ce->args[3]);
+		if (y.mode == Addressing_Invalid) {
+			return false;
+		}
+
+		convert_to_typed(c, &x, y.type); if (x.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &z, x.type); if (z.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &w, x.type); if (w.mode == Addressing_Invalid) return false;
+		if (x.mode == Addressing_Constant &&
+		    y.mode == Addressing_Constant &&
+		    z.mode == Addressing_Constant &&
+		    w.mode == Addressing_Constant) {
+			if (is_type_numeric(x.type) && exact_value_imag(x.value).value_float == 0) {
+				x.type = t_untyped_float;
+			}
+			if (is_type_numeric(y.type) && exact_value_imag(y.value).value_float == 0) {
+				y.type = t_untyped_float;
+			}
+			if (is_type_numeric(z.type) && exact_value_imag(z.value).value_float == 0) {
+				z.type = t_untyped_float;
+			}
+			if (is_type_numeric(w.type) && exact_value_imag(w.value).value_float == 0) {
+				w.type = t_untyped_float;
+			}
+		}
+
+		if (!(are_types_identical(x.type, y.type) && are_types_identical(x.type, z.type) && are_types_identical(x.type, w.type))) {
+			gbString tx = type_to_string(x.type);
+			gbString ty = type_to_string(y.type);
+			gbString tz = type_to_string(z.type);
+			gbString tw = type_to_string(w.type);
+			error(call, "Mismatched types to 'quaternion', '%s' vs '%s' vs '%s' vs '%s'", tx, ty, tz, tw);
+			gb_string_free(tw);
+			gb_string_free(tz);
+			gb_string_free(ty);
+			gb_string_free(tx);
+			return false;
+		}
+
+		if (!is_type_float(x.type)) {
+			gbString s = type_to_string(x.type);
+			error(call, "Arguments have type '%s', expected a floating point", s);
+			gb_string_free(s);
+			return false;
+		}
+
+		if (x.mode == Addressing_Constant && y.mode == Addressing_Constant && z.mode == Addressing_Constant && w.mode == Addressing_Constant) {
+			f64 r = exact_value_to_float(x.value).value_float;
+			f64 i = exact_value_to_float(y.value).value_float;
+			f64 j = exact_value_to_float(z.value).value_float;
+			f64 k = exact_value_to_float(w.value).value_float;
+			operand->value = exact_value_quaternion(r, i, j, k);
+			operand->mode = Addressing_Constant;
+		} else {
+			operand->mode = Addressing_Value;
+		}
+
+		BasicKind kind = core_type(x.type)->Basic.kind;
+		switch (kind) {
+		case Basic_f32:          operand->type = t_quaternion128;      break;
+		case Basic_f64:          operand->type = t_quaternion256;      break;
+		case Basic_UntypedFloat: operand->type = t_untyped_quaternion; break;
+		default: GB_PANIC("Invalid type"); break;
+		}
+
+		break;
+	}
+
 	case BuiltinProc_real:
 	case BuiltinProc_imag: {
 		// real :: proc(x: type) -> float_type
-		// proc imag(x: type) -> float_type
+		// imag :: proc(x: type) -> float_type
 
 		Operand *x = operand;
 		if (is_type_untyped(x->type)) {
@@ -3780,7 +3936,12 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				if (is_type_numeric(x->type)) {
 					x->type = t_untyped_complex;
 				}
-			} else {
+			} else if (is_type_quaternion(x->type)) {
+				convert_to_typed(c, x, t_quaternion256);
+				if (x->mode == Addressing_Invalid) {
+					return false;
+				}
+			} else{
 				convert_to_typed(c, x, t_complex128);
 				if (x->mode == Addressing_Invalid) {
 					return false;
@@ -3788,9 +3949,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 		}
 
-		if (!is_type_complex(x->type)) {
+		if (!is_type_complex(x->type) && !is_type_quaternion(x->type)) {
 			gbString s = type_to_string(x->type);
-			error(call, "Argument has type '%s', expected a complex type", s);
+			error(call, "Argument has type '%s', expected a complex or quaternion type", s);
 			gb_string_free(s);
 			return false;
 		}
@@ -3808,7 +3969,57 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		switch (kind) {
 		case Basic_complex64:         x->type = t_f32;           break;
 		case Basic_complex128:        x->type = t_f64;           break;
+		case Basic_quaternion128:     x->type = t_f32;           break;
+		case Basic_quaternion256:     x->type = t_f64;           break;
 		case Basic_UntypedComplex:    x->type = t_untyped_float; break;
+		case Basic_UntypedQuaternion: x->type = t_untyped_float; break;
+		default: GB_PANIC("Invalid type"); break;
+		}
+
+		break;
+	}
+
+	case BuiltinProc_jmag:
+	case BuiltinProc_kmag: {
+		// jmag :: proc(x: type) -> float_type
+		// kmag :: proc(x: type) -> float_type
+
+		Operand *x = operand;
+		if (is_type_untyped(x->type)) {
+			if (x->mode == Addressing_Constant) {
+				if (is_type_numeric(x->type)) {
+					x->type = t_untyped_complex;
+				}
+			} else{
+				convert_to_typed(c, x, t_quaternion256);
+				if (x->mode == Addressing_Invalid) {
+					return false;
+				}
+			}
+		}
+
+		if (!is_type_quaternion(x->type)) {
+			gbString s = type_to_string(x->type);
+			error(call, "Argument has type '%s', expected a quaternion type", s);
+			gb_string_free(s);
+			return false;
+		}
+
+		if (x->mode == Addressing_Constant) {
+			switch (id) {
+			case BuiltinProc_jmag: x->value = exact_value_jmag(x->value); break;
+			case BuiltinProc_kmag: x->value = exact_value_kmag(x->value); break;
+			}
+		} else {
+			x->mode = Addressing_Value;
+		}
+
+		BasicKind kind = core_type(x->type)->Basic.kind;
+		switch (kind) {
+		case Basic_quaternion128:     x->type = t_f32;           break;
+		case Basic_quaternion256:     x->type = t_f64;           break;
+		case Basic_UntypedComplex:    x->type = t_untyped_float; break;
+		case Basic_UntypedQuaternion: x->type = t_untyped_float; break;
 		default: GB_PANIC("Invalid type"); break;
 		}
 
@@ -3822,8 +4033,20 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (x->mode == Addressing_Constant) {
 				ExactValue v = exact_value_to_complex(x->value);
 				f64 r = v.value_complex.real;
-				f64 i = v.value_complex.imag;
+				f64 i = -v.value_complex.imag;
 				x->value = exact_value_complex(r, i);
+				x->mode = Addressing_Constant;
+			} else {
+				x->mode = Addressing_Value;
+			}
+		} else if (is_type_quaternion(x->type)) {
+			if (x->mode == Addressing_Constant) {
+				ExactValue v = exact_value_to_quaternion(x->value);
+				f64 r = v.value_quaternion.real;
+				f64 i = -v.value_quaternion.imag;
+				f64 j = -v.value_quaternion.jmag;
+				f64 k = -v.value_quaternion.kmag;
+				x->value = exact_value_quaternion(r, i, j, k);
 				x->mode = Addressing_Constant;
 			} else {
 				x->mode = Addressing_Value;
@@ -4226,6 +4449,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				if (are_types_identical(bt, t_f64))        add_package_dependency(c, "runtime", "abs_f64");
 				if (are_types_identical(bt, t_complex64))  add_package_dependency(c, "runtime", "abs_complex64");
 				if (are_types_identical(bt, t_complex128)) add_package_dependency(c, "runtime", "abs_complex128");
+				if (are_types_identical(bt, t_quaternion128)) add_package_dependency(c, "runtime", "abs_quaternion128");
+				if (are_types_identical(bt, t_quaternion256)) add_package_dependency(c, "runtime", "abs_quaternion256");
 			}
 		}
 
@@ -6232,8 +6457,11 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		case Token_Imag: {
 			String s = bl->token.string;
 			Rune r = s[s.len-1];
+			// NOTE(bill, 2019-08-25): Allow for quaternions by having j and k imaginary numbers
 			switch (r) {
-			case 'i': t = t_untyped_complex; break;
+			case 'i': t = t_untyped_complex;    break;
+			case 'j': t = t_untyped_quaternion; break;
+			case 'k': t = t_untyped_quaternion; break;
 			}
 
 			break;

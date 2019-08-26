@@ -326,7 +326,7 @@ union_type :: proc() {
 }
 
 parametric_polymorphism :: proc() {
-	fmt.println("# parametric_polymorphism");
+	fmt.println("\n# parametric_polymorphism");
 
 	print_value :: proc(value: $T) {
 		fmt.printf("print_value: %T %v\n", value, value);
@@ -561,7 +561,7 @@ prefix_table := [?]string{
 
 threading_example :: proc() {
 	when os.OS == "windows" {
-		fmt.println("# threading_example");
+		fmt.println("\n# threading_example");
 
 		worker_proc :: proc(t: ^thread.Thread) -> int {
 			for iteration in 1..5 {
@@ -601,7 +601,7 @@ threading_example :: proc() {
 }
 
 array_programming :: proc() {
-	fmt.println("# array_programming");
+	fmt.println("\n# array_programming");
 	{
 		a := [3]f32{1, 2, 3};
 		b := [3]f32{5, 6, 7};
@@ -646,7 +646,7 @@ array_programming :: proc() {
 }
 
 named_proc_return_parameters :: proc() {
-	fmt.println("# named proc return parameters");
+	fmt.println("\n# named proc return parameters");
 
 	foo0 :: proc() -> int {
 		return 123;
@@ -668,7 +668,7 @@ named_proc_return_parameters :: proc() {
 
 
 using_enum :: proc() {
-	fmt.println("# using enum");
+	fmt.println("\n# using enum");
 
 	using Foo :: enum {A, B, C};
 
@@ -680,7 +680,7 @@ using_enum :: proc() {
 }
 
 map_type :: proc() {
-	fmt.println("# map type");
+	fmt.println("\n# map type");
 
 	// enums of type u16, u32, i16 & i32 also work
 	Enum_u8 :: enum u8 {
@@ -735,7 +735,7 @@ map_type :: proc() {
 }
 
 implicit_selector_expression :: proc() {
-	fmt.println("# implicit selector expression");
+	fmt.println("\n# implicit selector expression");
 
 	Foo :: enum {A, B, C};
 
@@ -763,7 +763,7 @@ implicit_selector_expression :: proc() {
 }
 
 explicit_procedure_overloading :: proc() {
-	fmt.println("# explicit procedure overloading");
+	fmt.println("\n# explicit procedure overloading");
 
 	add_ints :: proc(a, b: int) -> int {
 		x := a + b;
@@ -797,7 +797,7 @@ explicit_procedure_overloading :: proc() {
 }
 
 complete_switch :: proc() {
-	fmt.println("# complete_switch");
+	fmt.println("\n# complete_switch");
 	{ // enum
 		using Foo :: enum {
 			A,
@@ -947,7 +947,7 @@ deferred_procedure_associations :: proc() {
 }
 
 reflection :: proc() {
-	fmt.println("# reflection");
+	fmt.println("\n# reflection");
 
 	Foo :: struct {
 		x: int    `tag1`,
@@ -981,6 +981,45 @@ reflection :: proc() {
 	}
 }
 
+quaternions :: proc() {
+	fmt.println("\n# quaternions");
+
+	{ // Quaternion operations
+		q := 1 + 2i + 3j + 4k;
+		r := quaternion(5, 6, 7, 8);
+		t := q * r;
+		fmt.printf("(%v) * (%v) = %v\n", q, r, t);
+		v := q / r;
+		fmt.printf("(%v) / (%v) = %v\n", q, r, v);
+		u := q + r;
+		fmt.printf("(%v) + (%v) = %v\n", q, r, u);
+		s := q - r;
+		fmt.printf("(%v) - (%v) = %v\n", q, r, s);
+	}
+	{ // The quaternion types
+		q128: quaternion128; // 4xf32
+		q256: quaternion256; // 4xf64
+		q128 = quaternion(1, 0, 0, 0);
+		q256 = 1; // quaternion(1, 0, 0, 0);
+	}
+	{ // Built-in procedures
+		q := 1 + 2i + 3j + 4k;
+		fmt.println("q =", q);
+		fmt.println("real(q) =", real(q));
+		fmt.println("imag(q) =", imag(q));
+		fmt.println("jmag(q) =", jmag(q));
+		fmt.println("kmag(q) =", kmag(q));
+		fmt.println("conj(q) =", conj(q));
+		fmt.println("abs(q)  =", abs(q));
+	}
+	{ // Conversion of a complex type to a quaternion type
+		c := 1 + 2i;
+		q := quaternion256(c);
+		fmt.println(c);
+		fmt.println(q);
+	}
+}
+
 main :: proc() {
 	when true {
 		general_stuff();
@@ -1000,5 +1039,6 @@ main :: proc() {
 		diverging_procedures();
 		deferred_procedure_associations();
 		reflection();
+		quaternions();
 	}
 }

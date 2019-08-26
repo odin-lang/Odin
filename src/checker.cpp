@@ -1610,6 +1610,10 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 		str_lit("quo_complex64"),
 		str_lit("quo_complex128"),
+		str_lit("mul_quaternion128"),
+		str_lit("mul_quaternion256"),
+		str_lit("quo_quaternion128"),
+		str_lit("quo_quaternion256"),
 
 		str_lit("umodti3"),
 		str_lit("udivti3"),
@@ -1891,6 +1895,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_integer       = find_core_type(c, str_lit("Type_Info_Integer"));
 	t_type_info_rune          = find_core_type(c, str_lit("Type_Info_Rune"));
 	t_type_info_float         = find_core_type(c, str_lit("Type_Info_Float"));
+	t_type_info_quaternion    = find_core_type(c, str_lit("Type_Info_Quaternion"));
 	t_type_info_complex       = find_core_type(c, str_lit("Type_Info_Complex"));
 	t_type_info_string        = find_core_type(c, str_lit("Type_Info_String"));
 	t_type_info_boolean       = find_core_type(c, str_lit("Type_Info_Boolean"));
@@ -1915,6 +1920,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_integer_ptr       = alloc_type_pointer(t_type_info_integer);
 	t_type_info_rune_ptr          = alloc_type_pointer(t_type_info_rune);
 	t_type_info_float_ptr         = alloc_type_pointer(t_type_info_float);
+	t_type_info_quaternion_ptr    = alloc_type_pointer(t_type_info_quaternion);
 	t_type_info_complex_ptr       = alloc_type_pointer(t_type_info_complex);
 	t_type_info_string_ptr        = alloc_type_pointer(t_type_info_string);
 	t_type_info_boolean_ptr       = alloc_type_pointer(t_type_info_boolean);
