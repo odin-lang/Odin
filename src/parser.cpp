@@ -4690,6 +4690,7 @@ struct ParserWorkerThreadData {
 
 	gbMutex lock; //NOTE(thebirk): All variables below are locked by this mutex
 	bool error_available;
+	bool is_working;
 	bool should_exit;
 };
 
@@ -4716,8 +4717,9 @@ GB_THREAD_PROC(parse_worker_file_proc) {
 		data->err = process_imported_file(p, file_to_process);
 
 		data->error_available = true;
-		gb_semaphore_release(&p->worker_finished_semaphore);
+		data->is_working = false;
 		gb_mutex_unlock(&data->lock);
+		gb_semaphore_release(&p->worker_finished_semaphore);
 	}
 
 	//GB_PANIC("A worker thread should not be able to reach the end!!!");
@@ -4818,7 +4820,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 				gbThread *t = &worker_threads[i];
 				ParserWorkerThreadData *data = &worker_threads_data[i];
 
-				if (gb_mutex_try_lock(&data->lock)) {
+				if (!data->is_working && gb_mutex_try_lock(&data->lock)) {
 					if (data->error_available) {
 						auto curr_err = data->err;
 						if (curr_err != ParseFile_None) {
@@ -4834,6 +4836,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 						num_alive += 1;
 
 						gb_semaphore_release(&data->resume_work);
+						data->is_working = true;
 					}
 
 					gb_mutex_unlock(&data->lock);
@@ -4844,20 +4847,23 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 				}
 			}
 
+			/*
 			while (num_alive > 0) {
 				isize prev_files_to_process = p->files_to_process.count;
 				gb_semaphore_wait(&p->worker_finished_semaphore);
 				num_alive -= 1;
 
-				if (prev_files_to_process < p->files_to_process.count) {
+				if ((prev_files_to_process < p->files_to_process.count)) {
 					if (num_alive > 0) {
 						//NOTE(thebirk): Recreate semaphore to avoid overflowing the counter. Only needs to happen when there are more threads alive
-						gb_semaphore_destroy(&p->worker_finished_semaphore);
-						gb_semaphore_init(&p->worker_finished_semaphore);
+						//gb_semaphore_destroy(&p->worker_finished_semaphore);
+						//gb_semaphore_init(&p->worker_finished_semaphore);
 					}
+					printf("Early out!\n");
 					break;
 				}
 			}
+			*/
 
 
 			if ((num_alive == 0) && (curr_import_index >= p->files_to_process.count)) {
