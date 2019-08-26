@@ -343,7 +343,8 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (token.Kind, str
 		}
 
 		// NOTE(bill): This needs to be here for sanity's sake
-		if t.ch == 'i' {
+		switch t.ch {
+		case 'i', 'j', 'k':
 			kind^ = token.Imag;
 			advance_rune(t);
 		}
