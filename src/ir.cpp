@@ -9061,6 +9061,150 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		ir_start_block(proc, done);
 	case_end;
 
+	case_ast_node(rs, InlineRangeStmt, node);
+		ir_emit_comment(proc, str_lit("InlineRangeStmt"));
+		ir_open_scope(proc); // Open scope here
+
+		Type *val0_type = nullptr;
+		Type *val1_type = nullptr;
+		if (rs->val0 != nullptr && !is_blank_ident(rs->val0)) {
+			val0_type = type_of_expr(rs->val0);
+		}
+		if (rs->val1 != nullptr && !is_blank_ident(rs->val1)) {
+			val1_type = type_of_expr(rs->val1);
+		}
+
+		if (val0_type != nullptr) {
+			ir_add_local_for_identifier(proc, rs->val0, true);
+		}
+		if (val1_type != nullptr) {
+			ir_add_local_for_identifier(proc, rs->val1, true);
+		}
+
+		irValue *val = nullptr;
+		irValue *key = nullptr;
+		irBlock *loop = nullptr;
+		irBlock *done = nullptr;
+		Ast *expr = unparen_expr(rs->expr);
+
+		TypeAndValue tav = type_and_value_of_expr(expr);
+
+		if (is_ast_range(expr)) {
+
+			irAddr val0_addr = {};
+			irAddr val1_addr = {};
+			if (val0_type) val0_addr = ir_build_addr(proc, rs->val0);
+			if (val1_type) val1_addr = ir_build_addr(proc, rs->val1);
+
+			TokenKind op = expr->BinaryExpr.op.kind;
+			Ast *start_expr = expr->BinaryExpr.left;
+			Ast *end_expr   = expr->BinaryExpr.right;
+			GB_ASSERT(start_expr->tav.mode == Addressing_Constant);
+			GB_ASSERT(end_expr->tav.mode == Addressing_Constant);
+
+			ExactValue start = start_expr->tav.value;
+			ExactValue end   = end_expr->tav.value;
+			if (op == Token_Ellipsis) { // .. [start, end]
+				ExactValue index = exact_value_i64(0);
+				for (ExactValue val = start;
+				     compare_exact_values(Token_LtEq, val, end);
+				     val = exact_value_increment_one(val), index = exact_value_increment_one(index)) {
+
+					if (val0_type) ir_addr_store(proc, val0_addr, ir_value_constant(val0_type, val));
+					if (val1_type) ir_addr_store(proc, val1_addr, ir_value_constant(val1_type, index));
+
+					ir_build_stmt(proc, rs->body);
+				}
+			} else if (op == Token_RangeHalf) { // ..< [start, end)
+				ExactValue index = exact_value_i64(0);
+				for (ExactValue val = start;
+				     compare_exact_values(Token_Lt, val, end);
+				     val = exact_value_increment_one(val), index = exact_value_increment_one(index)) {
+
+					if (val0_type) ir_addr_store(proc, val0_addr, ir_value_constant(val0_type, val));
+					if (val1_type) ir_addr_store(proc, val1_addr, ir_value_constant(val1_type, index));
+
+					ir_build_stmt(proc, rs->body);
+				}
+			}
+
+
+		} else if (tav.mode == Addressing_Type) {
+			GB_ASSERT(is_type_enum(type_deref(tav.type)));
+			Type *et = type_deref(tav.type);
+			Type *bet = base_type(et);
+
+			irAddr val0_addr = {};
+			irAddr val1_addr = {};
+			if (val0_type) val0_addr = ir_build_addr(proc, rs->val0);
+			if (val1_type) val1_addr = ir_build_addr(proc, rs->val1);
+
+			for_array(i, bet->Enum.fields) {
+				Entity *field = bet->Enum.fields[i];
+				GB_ASSERT(field->kind == Entity_Constant);
+				if (val0_type) ir_addr_store(proc, val0_addr, ir_value_constant(val0_type, field->Constant.value));
+				if (val1_type) ir_addr_store(proc, val1_addr, ir_value_constant(val1_type, exact_value_i64(i)));
+
+				ir_build_stmt(proc, rs->body);
+			}
+		} else {
+			irAddr val0_addr = {};
+			irAddr val1_addr = {};
+			if (val0_type) val0_addr = ir_build_addr(proc, rs->val0);
+			if (val1_type) val1_addr = ir_build_addr(proc, rs->val1);
+
+			GB_ASSERT(expr->tav.mode == Addressing_Constant);
+
+			Type *t = base_type(expr->tav.type);
+
+
+			switch (t->kind) {
+			case Type_Basic:
+				GB_ASSERT(is_type_string(t));
+				{
+					ExactValue value = expr->tav.value;
+					GB_ASSERT(value.kind == ExactValue_String);
+					String str = value.value_string;
+					Rune codepoint = 0;
+					isize offset = 0;
+					do {
+						isize width = gb_utf8_decode(str.text+offset, str.len-offset, &codepoint);
+						if (val0_type) ir_addr_store(proc, val0_addr, ir_value_constant(val0_type, exact_value_i64(codepoint)));
+						if (val1_type) ir_addr_store(proc, val1_addr, ir_value_constant(val1_type, exact_value_i64(offset)));
+						ir_build_stmt(proc, rs->body);
+
+						offset += width;
+					} while (offset < str.len);
+				}
+				break;
+			case Type_Array:
+				if (t->Array.count > 0) {
+					irValue *val = ir_build_expr(proc, expr);
+					irValue *val_addr = ir_address_from_load_or_generate_local(proc, val);
+
+					for (i64 i = 0; i < t->Array.count; i++) {
+						if (val0_type) {
+							// NOTE(bill): Due to weird legacy issues in LLVM, this needs to be an i32
+							irValue *elem = ir_emit_array_epi(proc, val_addr, cast(i32)i);
+							ir_addr_store(proc, val0_addr, ir_emit_load(proc, elem));
+						}
+						if (val1_type) ir_addr_store(proc, val1_addr, ir_value_constant(val1_type, exact_value_i64(i)));
+
+						ir_build_stmt(proc, rs->body);
+					}
+
+				}
+				break;
+			default:
+				GB_PANIC("Invalid inline for type");
+				break;
+			}
+		}
+
+
+		ir_close_scope(proc, irDeferExit_Default, nullptr);
+	case_end;
+
 	case_ast_node(ss, SwitchStmt, node);
 		ir_emit_comment(proc, str_lit("SwitchStmt"));
 		if (ss->init != nullptr) {

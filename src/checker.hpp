@@ -276,6 +276,9 @@ struct CheckerContext {
 	CheckerPolyPath *poly_path;
 	isize            poly_level; // TODO(bill): Actually handle correctly
 
+#define MAX_INLINE_FOR_DEPTH 1024ll
+	i64 inline_for_depth;
+
 	bool       in_enum_type;
 	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;

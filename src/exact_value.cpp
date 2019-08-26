@@ -813,6 +813,10 @@ gb_inline ExactValue exact_value_shift(TokenKind op, ExactValue const &x, ExactV
 	return exact_binary_operator_value(op, x, y);
 }
 
+gb_inline ExactValue exact_value_increment_one(ExactValue const &x) {
+	return exact_binary_operator_value(Token_Add, x, exact_value_i64(1));
+}
+
 
 i32 cmp_f64(f64 a, f64 b) {
 	return (a > b) - (a < b);
