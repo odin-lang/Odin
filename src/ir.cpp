@@ -1873,10 +1873,12 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	case Basic_string:
 	case Basic_any:
 	case Basic_rawptr:
+	case Basic_quaternion128:
+	case Basic_quaternion256:
 		break; // not a "DIBasicType"
 	}
 
-	GB_PANIC("Unreachable");
+	GB_PANIC("Unreachable %d", kind);
 	return irDebugBasicEncoding_Invalid;
 }
 
@@ -4525,13 +4527,14 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 		if (is_type_pointer(type)) {
 			type = type_deref(type);
 			e = ir_emit_load(proc, e);
-			e = ir_emit_ptr_offset(proc, e, v_zero); // TODO(bill): Do I need these copies?
+			// e = ir_emit_ptr_offset(proc, e, v_zero); // TODO(bill): Do I need these copies?
 		}
 		type = core_type(type);
 
 		if (is_type_raw_union(type)) {
 			type = type->Struct.fields[index]->type;
-			e = ir_emit_conv(proc, e, alloc_type_pointer(type));
+			GB_ASSERT(is_type_pointer(ir_type(e)));
+			e = ir_emit_bitcast(proc, e, alloc_type_pointer(type));
 		} else if (is_type_struct(type)) {
 			type = type->Struct.fields[index]->type;
 			e = ir_emit_struct_ep(proc, e, index);
