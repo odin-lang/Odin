@@ -4681,14 +4681,13 @@ skip:
 	return ParseFile_None;
 }
 
-#if 1
 struct ParserWorkerThreadData {
 	Parser *parser;
-
-	gbSemaphore resume_work; //NOTE(thebirk): Use to signal that the worker thead has a new work to do
 	ParseFileError err;
 
-	gbMutex lock; //NOTE(thebirk): All variables below are locked by this mutex
+	gbSemaphore resume_work;
+	gbMutex lock;
+
 	bool error_available;
 	bool is_working;
 	bool should_exit;
@@ -4724,18 +4723,6 @@ GB_THREAD_PROC(parse_worker_file_proc) {
 
 	//GB_PANIC("A worker thread should not be able to reach the end!!!");
 }
-#else
-GB_THREAD_PROC(parse_worker_file_proc) {
-	if (thread == nullptr) return 0;
-	auto *p = cast(Parser *)thread->user_data;
-	isize index = thread->user_index;
-	gb_mutex_lock(&p->file_add_mutex);
-	auto file_to_process = p->files_to_process[index];
-	gb_mutex_unlock(&p->file_add_mutex);
-	ParseFileError err = process_imported_file(p, file_to_process);
-	return cast(isize)err;
-}
-#endif
 
 ParseFileError parse_packages(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
@@ -4767,6 +4754,8 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 		isize volatile curr_import_index = 0;
 
 #if 0
+		//NOTE(thebirk): Leaving this piece of code behind if it turns out we need it, yes I know git exists
+
 		isize initial_file_count = p->files_to_process.count;
 		// NOTE(bill): Make sure that these are in parsed in this order
 		for (isize i = 0; i < initial_file_count; i++) {
@@ -4803,8 +4792,11 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 		for_array(i, worker_threads) {
 			gbThread *t = &worker_threads[i];
 			gb_thread_init(t);
-			//char buffer[64];
-			//gb_snprintf(buffer, 64, "Parser Worker #%ll", i);
+			//NOTE(thebirk): This crashes on linux. In addition to that the method used on windows does
+			//               not get picked up by a lot of tools look into using SetThreadDescription
+			//               when running on new enough windows 10 builds
+			//char buffer[32];
+			//gb_snprintf(buffer, 32, "Parser Worker #%ll", i);
 			//gb_thread_set_name(t, buffer);
 			gb_thread_start(t, parse_worker_file_proc, &worker_threads_data[i]);
 		}
@@ -4844,32 +4836,14 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 				} else {
 					//NOTE(thebirk): If we cant lock a thread it must be working
 					num_alive += 1;
-
 				}
 			}
-
-			/*
-			while (num_alive > 0) {
-				isize prev_files_to_process = p->files_to_process.count;
-				gb_semaphore_wait(&p->worker_finished_semaphore);
-				num_alive -= 1;
-
-				if ((prev_files_to_process < p->files_to_process.count)) {
-					if (num_alive > 0) {
-						//NOTE(thebirk): Recreate semaphore to avoid overflowing the counter. Only needs to happen when there are more threads alive
-						//gb_semaphore_destroy(&p->worker_finished_semaphore);
-						//gb_semaphore_init(&p->worker_finished_semaphore);
-					}
-					printf("Early out!\n");
-					break;
-				}
-			}
-			*/
-
 
 			if ((num_alive == 0) && (curr_import_index >= p->files_to_process.count)) {
 				break;
 			}
+
+			gb_yield();
 		}
 
 		//NOTE(thebirk): Signal all workers to exit
