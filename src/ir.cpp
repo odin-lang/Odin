@@ -2224,14 +2224,7 @@ irDebugInfo *ir_add_debug_info_type_complex(irModule *module, Type *type) {
 	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
 	di->CompositeType.size = ir_debug_size_bits(type);
 
-	Type *field_type = nullptr;
-	if (type->Basic.kind == Basic_complex64) {
-		field_type = t_f32;
-	} else if (type->Basic.kind == Basic_complex128) {
-		field_type = t_f64;
-	} else {
-		GB_PANIC("Unreachable");
-	}
+	Type *field_type = base_complex_elem_type(type);
 
 	// Field "real"
 	irDebugInfo *real_di = ir_add_debug_info_field_internal(module, str_lit("real"), field_type,
@@ -2250,6 +2243,40 @@ irDebugInfo *ir_add_debug_info_type_complex(irModule *module, Type *type) {
 	irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 2);
 	array_add(&elements_di->DebugInfoArray.elements, real_di);
 	array_add(&elements_di->DebugInfoArray.elements, imag_di);
+	di->CompositeType.elements = elements_di;
+	map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+	return di;
+}
+
+irDebugInfo *ir_add_debug_info_type_quaternion(irModule *module, Type *type) {
+	GB_ASSERT(type->kind == Type_Basic && is_type_quaternion(type));
+
+	irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+	map_set(&module->debug_info, hash_type(type), di);
+
+	di->CompositeType.name = type->Basic.name;
+	di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+	di->CompositeType.size = ir_debug_size_bits(type);
+
+	Type *field_type = base_complex_elem_type(type);
+
+	// @QuaternionLayout
+	irDebugInfo *imag_di = ir_add_debug_info_field_internal(module, str_lit("imag"), field_type, 0*cast(i32)type_size_of(field_type), nullptr, di);
+	irDebugInfo *jmag_di = ir_add_debug_info_field_internal(module, str_lit("jmag"), field_type, 1*cast(i32)type_size_of(field_type), nullptr, di);
+	irDebugInfo *kmag_di = ir_add_debug_info_field_internal(module, str_lit("kmag"), field_type, 2*cast(i32)type_size_of(field_type), nullptr, di);
+	irDebugInfo *real_di = ir_add_debug_info_field_internal(module, str_lit("real"), field_type, 3*cast(i32)type_size_of(field_type), nullptr, di);
+
+	map_set(&module->debug_info, hash_pointer(imag_di), imag_di);
+	map_set(&module->debug_info, hash_pointer(jmag_di), jmag_di);
+	map_set(&module->debug_info, hash_pointer(kmag_di), kmag_di);
+	map_set(&module->debug_info, hash_pointer(real_di), real_di);
+
+	irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 4);
+	array_add(&elements_di->DebugInfoArray.elements, imag_di);
+	array_add(&elements_di->DebugInfoArray.elements, jmag_di);
+	array_add(&elements_di->DebugInfoArray.elements, kmag_di);
+	array_add(&elements_di->DebugInfoArray.elements, real_di);
 	di->CompositeType.elements = elements_di;
 	map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
 
@@ -2380,10 +2407,14 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 	if (type->kind == Type_Basic) {
 		switch (type->Basic.kind) {
 		// Composite basic types
-		case Basic_complex64:
-		case Basic_complex128: return ir_add_debug_info_type_complex(module, type);
-		case Basic_string:     return ir_add_debug_info_type_string(module, scope, e, type);
-		case Basic_any:        return ir_add_debug_info_type_any(module);
+		case Basic_complex64: case Basic_complex128:
+			return ir_add_debug_info_type_complex(module, type);
+		case Basic_quaternion128: case Basic_quaternion256:
+			return ir_add_debug_info_type_quaternion(module, type);
+		case Basic_string:
+			return ir_add_debug_info_type_string(module, scope, e, type);
+		case Basic_any:
+			return ir_add_debug_info_type_any(module);
 
 		// Derived basic types
 		case Basic_cstring:
