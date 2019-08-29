@@ -3214,6 +3214,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_end - BuiltinProc__ty
 	is_type_rune,
 	is_type_float,
 	is_type_complex,
+	is_type_quaternion,
 	is_type_string,
 	is_type_typeid,
 	is_type_any,
@@ -4776,6 +4777,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_is_rune:
 	case BuiltinProc_type_is_float:
 	case BuiltinProc_type_is_complex:
+	case BuiltinProc_type_is_quaternion:
 	case BuiltinProc_type_is_string:
 	case BuiltinProc_type_is_typeid:
 	case BuiltinProc_type_is_any:
