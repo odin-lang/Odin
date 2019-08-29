@@ -4062,7 +4062,6 @@ bool init_parser(Parser *p) {
 	array_init(&p->files_to_process, heap_allocator());
 	gb_mutex_init(&p->file_add_mutex);
 	gb_mutex_init(&p->file_decl_mutex);
-	gb_semaphore_init(&p->worker_finished_semaphore);
 	return true;
 }
 
@@ -4088,7 +4087,6 @@ void destroy_parser(Parser *p) {
 	map_destroy(&p->package_map);
 	gb_mutex_destroy(&p->file_add_mutex);
 	gb_mutex_destroy(&p->file_decl_mutex);
-	gb_semaphore_destroy(&p->worker_finished_semaphore);
 }
 
 
