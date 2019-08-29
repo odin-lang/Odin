@@ -4716,7 +4716,6 @@ GB_THREAD_PROC(parse_worker_file_proc) {
 		data->error_available = true;
 		data->is_working = false;
 		gb_mutex_unlock(&data->lock);
-		gb_semaphore_release(&p->worker_finished_semaphore);
 	}
 
 	//GB_PANIC("A worker thread should not be able to reach the end!!!");
