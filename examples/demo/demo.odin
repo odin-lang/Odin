@@ -544,6 +544,30 @@ parametric_polymorphism :: proc() {
 		for v, i in array {
 			assert(v == T(i*i));
 		}
+
+		// Matrix multiplication
+		mul :: proc(a: [$M][$N]$T, b: [N][$P]T) -> (c: [M][P]T) {
+			for i in 0..<M {
+				for j in 0..<P {
+					for k in 0..<N {
+						c[i][j] += a[i][k] * b[k][j];
+					}
+				}
+			}
+			return;
+		}
+
+		x := [2][3]f32{
+			{1, 2, 3},
+			{3, 2, 1},
+		};
+		y := [3][2]f32{
+			{0, 8},
+			{6, 2},
+			{8, 4},
+		};
+		z := mul(x, y);
+		assert(z == {{36, 24}, {20, 32}});
 	}
 }
 
@@ -830,6 +854,8 @@ complete_switch :: proc() {
 }
 
 cstring_example :: proc() {
+	fmt.println("\n# cstring_example");
+
 	W :: "Hellope";
 	X :: cstring(W);
 	Y :: string(X);
@@ -861,6 +887,8 @@ deprecated_attribute :: proc() {
 }
 
 bit_set_type :: proc() {
+	fmt.println("\n# bit_set_type");
+
 	{
 		using Day :: enum {
 			Sunday,
@@ -922,6 +950,8 @@ bit_set_type :: proc() {
 }
 
 diverging_procedures :: proc() {
+	fmt.println("\n# diverging_procedures");
+
 	// Diverging procedures may never return
 	foo :: proc() -> ! {
 		fmt.println("I'm a diverging procedure");
@@ -931,6 +961,8 @@ diverging_procedures :: proc() {
 }
 
 deferred_procedure_associations :: proc() {
+	fmt.println("\n# deferred_procedure_associations");
+
 	@(deferred_out=closure)
 	open :: proc(s: string) -> bool {
 		fmt.println(s);
@@ -1029,6 +1061,10 @@ quaternions :: proc() {
 
 inline_for_statement :: proc() {
 	fmt.println("\n#inline for statements");
+
+	// 'inline for' works the same as if the 'inline' prefix did not
+	// exist but these ranged loops are explicitly unrolled which can
+	// be very very useful for certain optimizations
 
 	fmt.println("Ranges");
 	inline for x, i in 1..<4 {
