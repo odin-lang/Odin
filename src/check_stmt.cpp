@@ -1735,7 +1735,12 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		}
 
 		for (isize i = 0; i < entity_count; i++) {
-			add_entity(ctx->checker, ctx->scope, entities[i]->identifier, entities[i]);
+			Entity *e = entities[i];
+			DeclInfo *d = decl_info_of_entity(e);
+			GB_ASSERT(d == nullptr);
+			add_entity(ctx->checker, ctx->scope, e->identifier, e);
+			d = make_decl_info(ctx->allocator, ctx->scope, ctx->decl);
+			add_entity_and_decl_info(ctx, e->identifier, e, d);
 		}
 
 		check_stmt(ctx, rs->body, new_flags);

@@ -85,9 +85,13 @@ int entity_graph_node_cmp(EntityGraphNode **data, isize i, isize j) {
 	EntityGraphNode *y = data[j];
 	isize a = x->entity->order_in_src;
 	isize b = y->entity->order_in_src;
-	if (x->dep_count < y->dep_count) return -1;
-	if (x->dep_count > y->dep_count) return +1;
-	return a < b ? -1 : b > a;
+	if (x->dep_count < y->dep_count) {
+		return -1;
+	}
+	if (x->dep_count == y->dep_count) {
+		return a < b ? -1 : b > a;
+	}
+	return +1;
 }
 
 void entity_graph_node_swap(EntityGraphNode **data, isize i, isize j) {
@@ -1164,6 +1168,7 @@ void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, Dec
 	add_entity_definition(&c->checker->info, identifier, e);
 	GB_ASSERT(e->decl_info == nullptr);
 	e->decl_info = d;
+	d->entity = e;
 	array_add(&c->checker->info.entities, e);
 	e->order_in_src = c->checker->info.entities.count;
 	e->pkg = c->pkg;
@@ -1602,6 +1607,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 		str_lit("args__"),
 		str_lit("type_table"),
+		str_lit("__type_info_of"),
 		str_lit("global_scratch_allocator"),
 
 		str_lit("Type_Info"),
@@ -1688,9 +1694,10 @@ bool is_entity_a_dependency(Entity *e) {
 	if (e == nullptr) return false;
 	switch (e->kind) {
 	case Entity_Procedure:
-	case Entity_Variable:
-	case Entity_Constant:
 		return true;
+	case Entity_Constant:
+	case Entity_Variable:
+		return e->pkg != nullptr;
 	}
 	return false;
 }
@@ -1717,18 +1724,17 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		EntityGraphNode *n = M.entries[i].value;
 
 		DeclInfo *decl = decl_info_of_entity(e);
-		if (decl != nullptr) {
-			for_array(j, decl->deps.entries) {
-				auto entry = decl->deps.entries[j];
-				Entity *dep = entry.ptr;
-				if (dep && is_entity_a_dependency(dep)) {
-					EntityGraphNode **m_ = map_get(&M, hash_pointer(dep));
-					if (m_ != nullptr) {
-						EntityGraphNode *m = *m_;
-						entity_graph_node_set_add(&n->succ, m);
-						entity_graph_node_set_add(&m->pred, n);
-					}
-				}
+		GB_ASSERT(decl != nullptr);
+
+		for_array(j, decl->deps.entries) {
+			Entity *dep = decl->deps.entries[j].ptr;
+			GB_ASSERT(dep != nullptr);
+			if (is_entity_a_dependency(dep)) {
+				EntityGraphNode **m_ = map_get(&M, hash_pointer(dep));
+				GB_ASSERT(m_ != nullptr);
+				EntityGraphNode *m = *m_;
+				entity_graph_node_set_add(&n->succ, m);
+				entity_graph_node_set_add(&m->pred, n);
 			}
 		}
 	}
@@ -2562,6 +2568,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 			Ast *init_expr = value;
 			DeclInfo *d = make_decl_info(heap_allocator(), c->scope, c->decl);
+			d->entity    = e;
 			d->type_expr = vd->type;
 			d->init_expr = init_expr;
 			d->attributes = vd->attributes;
@@ -3576,7 +3583,6 @@ void calculate_global_init_order(Checker *c) {
 #define TIME_SECTION(str)
 #endif
 
-
 	CheckerInfo *info = &c->info;
 
 	TIME_SECTION("generate entity dependency graph");
@@ -3618,21 +3624,26 @@ void calculate_global_init_order(Checker *c) {
 
 		for_array(i, n->pred.entries) {
 			EntityGraphNode *p = n->pred.entries[i].ptr;
-			p->dep_count -= gb_max(p->dep_count-1, 0);
+			p->dep_count -= 1;
+			p->dep_count = gb_max(p->dep_count, 0);
 			priority_queue_fix(&pq, p->index);
 		}
 
-		if (e == nullptr || e->kind != Entity_Variable) {
+		DeclInfo *d = decl_info_of_entity(e);
+		if (e->kind != Entity_Variable) {
 			continue;
 		}
-		DeclInfo *d = decl_info_of_entity(e);
-
+		// IMPORTANT NOTE(bill, 2019-08-29): Just add it regardless of the ordering
+		// because it does not need any initialization other than zero
+		// if (!decl_info_has_init(d)) {
+		// 	continue;
+		// }
 		if (ptr_set_exists(&emitted, d)) {
 			continue;
 		}
 		ptr_set_add(&emitted, d);
 
-		d->entity = e;
+
 		array_add(&info->variable_init_order, d);
 	}
 
