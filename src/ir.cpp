@@ -2226,18 +2226,9 @@ irDebugInfo *ir_add_debug_info_type_complex(irModule *module, Type *type) {
 
 	Type *field_type = base_complex_elem_type(type);
 
-	// Field "real"
-	irDebugInfo *real_di = ir_add_debug_info_field_internal(module, str_lit("real"), field_type,
-															0,
-															nullptr,
-															di);
+	irDebugInfo *real_di = ir_add_debug_info_field_internal(module, str_lit("real"), field_type, 0*cast(i32)type_size_of(field_type), nullptr, di);
+	irDebugInfo *imag_di = ir_add_debug_info_field_internal(module, str_lit("imag"), field_type, 1*cast(i32)type_size_of(field_type), nullptr, di);
 	map_set(&module->debug_info, hash_pointer(real_di), real_di);
-
-	// Field "imag"
-	irDebugInfo *imag_di = ir_add_debug_info_field_internal(module, str_lit("imag"), field_type,
-															real_di->DerivedType.size,
-															nullptr,
-															di);
 	map_set(&module->debug_info, hash_pointer(imag_di), imag_di);
 
 	irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 2);

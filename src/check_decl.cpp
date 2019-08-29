@@ -791,7 +791,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 }
 
-void check_var_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_expr) {
+void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_expr) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Variable);
 
@@ -805,6 +805,7 @@ void check_var_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_ex
 	ac.init_expr_list_count = init_expr != nullptr ? 1 : 0;
 
 	DeclInfo *decl = decl_info_of_entity(e);
+	GB_ASSERT(decl == ctx->decl);
 	if (decl != nullptr) {
 		check_decl_attributes(ctx, decl->attributes, var_decl_attribute, &ac);
 	}
@@ -1051,7 +1052,7 @@ void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_
 
 	switch (e->kind) {
 	case Entity_Variable:
-		check_var_decl(&c, e, d->type_expr, d->init_expr);
+		check_global_variable_decl(&c, e, d->type_expr, d->init_expr);
 		break;
 	case Entity_Constant:
 		check_const_decl(&c, e, d->type_expr, d->init_expr, named_type);
