@@ -5470,6 +5470,74 @@ Entity **populate_proc_parameter_list(CheckerContext *c, Type *proc_type, isize 
 	return lhs;
 }
 
+
+bool evaluate_where_clauses(CheckerContext *ctx, DeclInfo *decl, bool print_err) {
+	Ast *proc_lit = decl->proc_lit;
+	GB_ASSERT(proc_lit != nullptr);
+	GB_ASSERT(proc_lit->kind == Ast_ProcLit);
+
+	if (proc_lit->ProcLit.where_token.kind != Token_Invalid) {
+		auto &clauses = proc_lit->ProcLit.where_clauses;
+		for_array(i, clauses) {
+			Ast *clause = clauses[i];
+			Operand o = {};
+			check_expr(ctx, &o, clause);
+			if (o.mode != Addressing_Constant) {
+				if (print_err) error(clause, "'where' clauses expect a constant boolean evaluation");
+				return false;
+			} else if (o.value.kind != ExactValue_Bool) {
+				if (print_err) error(clause, "'where' clauses expect a constant boolean evaluation");
+				return false;
+			} else if (!o.value.value_bool) {
+				if (print_err) {
+					gbString str = expr_to_string(clause);
+					error(clause, "'where' clause evaluated to false:\n\t%s", str);
+					gb_string_free(str);
+
+					if (decl->scope != nullptr) {
+						isize print_count = 0;
+						for_array(j, decl->scope->elements.entries) {
+							Entity *e = decl->scope->elements.entries[j].value;
+							switch (e->kind) {
+							case Entity_TypeName: {
+								if (print_count == 0) error_line("\n\tWith the following definitions:\n");
+
+								gbString str = type_to_string(e->type);
+								error_line("\t\t%.*s :: %s;\n", LIT(e->token.string), str);
+								gb_string_free(str);
+								print_count += 1;
+								break;
+							}
+							case Entity_Constant: {
+								if (print_count == 0) error_line("\n\tWith the following definitions:\n");
+
+								gbString str = exact_value_to_string(e->Constant.value);
+								if (is_type_untyped(e->type)) {
+									error_line("\t\t%.*s :: %s;\n", LIT(e->token.string), str);
+								} else {
+									gbString t = type_to_string(e->type);
+									error_line("\t\t%.*s : %s : %s;\n", LIT(e->token.string), t, str);
+									gb_string_free(t);
+								}
+								gb_string_free(str);
+
+								print_count += 1;
+								break;
+							}
+							}
+						}
+					}
+
+				}
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+
 CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type *proc_type, Ast *call) {
 	ast_node(ce, CallExpr, call);
 
@@ -5710,11 +5778,26 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 				err = call_checker(&ctx, call, pt, p, operands, CallArgumentMode_NoErrors, &data);
 
-				if (err == CallArgumentError_None) {
-					valids[valid_count].index = i;
-					valids[valid_count].score = data.score;
-					valid_count++;
+				if (err != CallArgumentError_None) {
+					continue;
 				}
+				if (data.gen_entity != nullptr) {
+					Entity *e = data.gen_entity;
+					DeclInfo *decl = data.gen_entity->decl_info;
+					ctx.scope = decl->scope;
+					ctx.decl = decl;
+					ctx.proc_name = e->token.string;
+					ctx.curr_proc_decl = decl;
+					ctx.curr_proc_sig  = e->type;
+
+					if (!evaluate_where_clauses(&ctx, decl, false)) {
+						continue;
+					}
+				}
+
+				valids[valid_count].index = i;
+				valids[valid_count].score = data.score;
+				valid_count++;
 			}
 		}
 
@@ -5822,7 +5905,29 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				if (proc->kind == Entity_Variable) {
 					sep = ":=";
 				}
-				error_line("\t%.*s %s %s at %.*s(%td:%td)\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
+				error_line("\t%.*s %s %s ", LIT(name), sep, pt);
+				if (proc->decl_info->proc_lit != nullptr) {
+					GB_ASSERT(proc->decl_info->proc_lit->kind == Ast_ProcLit);
+					auto *pl = &proc->decl_info->proc_lit->ProcLit;
+					if (pl->where_token.kind != Token_Invalid) {
+						error_line("\n\t\twhere ");
+						for_array(j, pl->where_clauses) {
+							Ast *clause = pl->where_clauses[j];
+							if (j != 0) {
+								error_line("\t\t      ");
+							}
+							gbString str = expr_to_string(clause);
+							error_line("%s", str);
+							gb_string_free(str);
+
+							if (j != pl->where_clauses.count-1) {
+								error_line(",");
+							}
+						}
+						error_line("\n\t");
+					}
+				}
+				error_line("at %.*s(%td:%td)\n", LIT(pos.file), pos.line, pos.column);
 				// error_line("\t%.*s %s %s at %.*s(%td:%td) %lld\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column, valids[i].score);
 			}
 			result_type = t_invalid;

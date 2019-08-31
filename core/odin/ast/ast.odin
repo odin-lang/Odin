@@ -99,6 +99,8 @@ Proc_Lit :: struct {
 	body: ^Stmt,
 	tags: Proc_Tags,
 	inlining: Proc_Inlining,
+	where_token: token.Token,
+	where_clauses: []^Expr,
 }
 
 Comp_Lit :: struct {

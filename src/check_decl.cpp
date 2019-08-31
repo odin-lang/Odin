@@ -936,7 +936,6 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) 
 
 	ptr_set_destroy(&entity_set);
 
-
 	for_array(j, pge->entities) {
 		Entity *p = pge->entities[j];
 		if (p->type == t_invalid) {
@@ -962,27 +961,40 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) 
 			defer (end_error_block());
 
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
-			switch (kind) {
+			bool both_have_where_clauses = false;
+			if (p->decl_info->proc_lit != nullptr && q->decl_info->proc_lit != nullptr) {
+				GB_ASSERT(p->decl_info->proc_lit->kind == Ast_ProcLit);
+				GB_ASSERT(q->decl_info->proc_lit->kind == Ast_ProcLit);
+				auto pl = &p->decl_info->proc_lit->ProcLit;
+				auto ql = &q->decl_info->proc_lit->ProcLit;
+
+				// Allow collisions if the procedures both have 'where' clauses and are both polymorphic
+				bool pw = pl->where_token.kind != Token_Invalid && is_type_polymorphic(p->type, true);
+				bool qw = ql->where_token.kind != Token_Invalid && is_type_polymorphic(q->type, true);
+				both_have_where_clauses = pw && qw;
+			}
+
+			if (!both_have_where_clauses) switch (kind) {
 			case ProcOverload_Identical:
-				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
+				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			// case ProcOverload_CallingConvention:
-				// error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
+				// error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				// is_invalid = true;
 				// break;
 			case ProcOverload_ParamVariadic:
-				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
+				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			case ProcOverload_ResultCount:
 			case ProcOverload_ResultTypes:
-				error(p->token, "Overloaded procedure '%.*s' as the same parameters but different results in this scope", LIT(name));
+				error(p->token, "Overloaded procedure '%.*s' as the same parameters but different results in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			case ProcOverload_Polymorphic:
 				#if 0
-				error(p->token, "Overloaded procedure '%.*s' has a polymorphic counterpart in this scope which is not allowed", LIT(name));
+				error(p->token, "Overloaded procedure '%.*s' has a polymorphic counterpart in the procedure group '%.*s' which is not allowed", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				#endif
 				break;
@@ -1161,6 +1173,13 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 			error(e->token, "Namespace collision while 'using' '%.*s' of: %.*s", LIT(e->token.string), LIT(prev->token.string));
 			break;
 		}
+	}
+
+
+	bool where_clause_ok = evaluate_where_clauses(ctx, decl, true);
+	if (!where_clause_ok) {
+		// NOTE(bill, 2019-08-31): Don't check the body as the where clauses failed
+		return;
 	}
 
 	check_open_scope(ctx, body);
