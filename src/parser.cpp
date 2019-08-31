@@ -1855,7 +1855,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		}
 
 		if (tags != 0) {
-			syntax_error(token, "A procedure type cannot have tags");
+			syntax_error(token, "A procedure type cannot have suffix tags");
 		}
 
 		return type;
@@ -2828,6 +2828,10 @@ Ast *parse_proc_type(AstFile *f, Token proc_token) {
 
 	u64 tags = 0;
 	parse_proc_tags(f, &tags);
+	if ((tags & ProcTag_require_results) != 0) {
+		syntax_error(f->curr_token, "#require_results has now been replaced as an attribute @(require_results) on the declaration");
+		tags &= ~ProcTag_require_results;
+	}
 
 	bool is_generic = false;
 

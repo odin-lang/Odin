@@ -654,7 +654,6 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	bool is_foreign         = e->Procedure.is_foreign;
 	bool is_export          = e->Procedure.is_export;
-	bool is_require_results = (pl->tags & ProcTag_require_results) != 0;
 
 	if (e->pkg != nullptr && e->token.string == "main") {
 		if (pt->param_count != 0 ||
@@ -714,10 +713,10 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 	}
 
-	if (pt->result_count == 0 && is_require_results) {
-		error(pl->type, "'#require_results' is not needed on a procedure with no results");
+	if (pt->result_count == 0 && ac.require_results) {
+		error(pl->type, "'require_results' is not needed on a procedure with no results");
 	} else {
-		pt->require_results = is_require_results;
+		pt->require_results = ac.require_results;
 	}
 
 	if (ac.link_name.len > 0) {

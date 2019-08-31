@@ -1745,8 +1745,6 @@ parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
 		ident := expect_token(p, token.Ident);
 
 		switch ident.text {
-		case "require_results":
-			tags |= {.Require_Results};
 		case "bounds_check":
 			tags |= {.Bounds_Check};
 		case "no_bounds_check":
