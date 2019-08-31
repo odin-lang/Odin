@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:mem"
 import "core:os"
 import "core:reflect"
+import "intrinsics"
 
 when os.OS == "windows" {
 	import "core:thread"
@@ -1094,6 +1095,69 @@ inline_for_statement :: proc() {
 	}
 }
 
+procedure_where_clauses :: proc() {
+	fmt.println("\n#procedure 'where' clauses");
+
+	{ // Sanity checks
+		simple_sanity_check :: proc(x: [2]int)
+			where len(x) > 1,
+			      type_of(x) == [2]int {
+			fmt.println(x);
+		}
+	}
+	{ // Parametric polymorphism checks
+		cross_2d :: proc(a, b: $T/[2]$E) -> E
+			where intrinsics.type_is_numeric(E) {
+			return a.x*b.y - a.y*b.x;
+		}
+		cross_3d :: proc(a, b: $T/[3]$E) -> T
+			where intrinsics.type_is_numeric(E) {
+			x := a.y*b.z - a.z*b.y;
+			y := a.z*b.x - a.x*b.z;
+			z := a.x*b.y - a.y*b.z;
+			return T{x, y, z};
+		}
+
+		a := [2]int{1, 2};
+		b := [2]int{5, -3};
+		fmt.println(cross_2d(a, b));
+
+		x := [3]f32{1, 4, 9};
+		y := [3]f32{-5, 0, 3};
+		fmt.println(cross_3d(x, y));
+
+		// Failure case
+		// i := [2]bool{true, false};
+		// j := [2]bool{false, true};
+		// fmt.println(cross_2d(i, j));
+
+	}
+
+	{ // Procedure groups usage
+		foo :: proc(x: [$N]int) -> bool
+			where N > 2 {
+			fmt.println(#procedure, "was called with the parameter", x);
+			return true;
+		}
+
+		bar :: proc(x: [$N]int) -> bool
+			where 0 < N,
+			      N <= 2 {
+			fmt.println(#procedure, "was called with the parameter", x);
+			return false;
+		}
+
+		baz :: proc{foo, bar};
+
+		x := [3]int{1, 2, 3};
+		y := [2]int{4, 9};
+		ok_x := baz(x);
+		ok_y := baz(y);
+		assert(ok_x == true);
+		assert(ok_y == false);
+	}
+}
+
 main :: proc() {
 	when true {
 		general_stuff();
@@ -1115,5 +1179,6 @@ main :: proc() {
 		reflection();
 		quaternions();
 		inline_for_statement();
+		procedure_where_clauses();
 	}
 }

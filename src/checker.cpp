@@ -3697,6 +3697,14 @@ void check_proc_info(Checker *c, ProcInfo pi) {
 		return;
 	}
 
+	if (pt->is_polymorphic && pt->is_poly_specialized) {
+		Entity *e = pi.decl->entity;
+		if ((e->flags & EntityFlag_Used) == 0) {
+			// NOTE(bill, 2019-08-31): It was never used, don't check
+			return;
+		}
+	}
+
 	bool bounds_check    = (pi.tags & ProcTag_bounds_check)    != 0;
 	bool no_bounds_check = (pi.tags & ProcTag_no_bounds_check) != 0;
 

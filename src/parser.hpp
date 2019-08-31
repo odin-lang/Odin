@@ -229,6 +229,8 @@ enum StmtAllowFlag {
 		Ast *body; \
 		u64  tags; \
 		ProcInlining inlining; \
+		Token where_token; \
+		Array<Ast *> where_clauses; \
 	}) \
 	AST_KIND(CompoundLit, "compound literal", struct { \
 		Ast *type; \

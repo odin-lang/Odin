@@ -1985,13 +1985,29 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 		type := parse_proc_type(p, tok);
 
+		where_token: token.Token;
+		where_clauses: []^ast.Expr;
+		if (p.curr_tok.kind == token.Where) {
+			where_token = expect_token(p, token.Where);
+			prev_level := p.expr_level;
+			p.expr_level = -1;
+			where_clauses = parse_rhs_expr_list(p);
+			p.expr_level = prev_level;
+		}
+
 		if p.allow_type && p.expr_level < 0 {
+			if where_token.kind != token.Invalid {
+				error(p, where_token.pos, "'where' clauses are not allowed on procedure types");
+			}
 			return type;
 		}
 		body: ^ast.Stmt;
 
 		if allow_token(p, token.Undef) {
 			// Okay
+			if where_token.kind != token.Invalid {
+				error(p, where_token.pos, "'where' clauses are not allowed on procedure literals without a defined body (replaced with ---");
+			}
 		} else if p.curr_tok.kind == token.Open_Brace {
 			prev_proc := p.curr_proc;
 			p.curr_proc = type;
@@ -2009,6 +2025,8 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		pl := ast.new(ast.Proc_Lit, tok.pos, end_pos(p.prev_tok));
 		pl.type = type;
 		pl.body = body;
+		pl.where_token = where_token;
+		pl.where_clauses = where_clauses;
 		return pl;
 
 	case token.Dollar:

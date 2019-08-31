@@ -144,6 +144,7 @@ Ast *clone_ast(Ast *node) {
 	case Ast_ProcLit:
 		n->ProcLit.type = clone_ast(n->ProcLit.type);
 		n->ProcLit.body = clone_ast(n->ProcLit.body);
+		n->ProcLit.where_clauses = clone_ast_array(n->ProcLit.where_clauses);
 		break;
 	case Ast_CompoundLit:
 		n->CompoundLit.type  = clone_ast(n->CompoundLit.type);
@@ -612,11 +613,13 @@ Ast *ast_proc_group(AstFile *f, Token token, Token open, Token close, Array<Ast 
 	return result;
 }
 
-Ast *ast_proc_lit(AstFile *f, Ast *type, Ast *body, u64 tags) {
+Ast *ast_proc_lit(AstFile *f, Ast *type, Ast *body, u64 tags, Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_ProcLit);
 	result->ProcLit.type = type;
 	result->ProcLit.body = body;
 	result->ProcLit.tags = tags;
+	result->ProcLit.where_token = where_token;
+	result->ProcLit.where_clauses = where_clauses;
 	return result;
 }
 
@@ -1827,15 +1830,41 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		}
 
 		Ast *type = parse_proc_type(f, token);
+		Token where_token = {};
+		Array<Ast *> where_clauses = {};
+		u64 tags = 0;
+
+		if (f->curr_token.kind == Token_where) {
+			where_token = expect_token(f, Token_where);
+			isize prev_level = f->expr_level;
+			f->expr_level = -1;
+			where_clauses = parse_rhs_expr_list(f);
+			f->expr_level = prev_level;
+		}
+
+		parse_proc_tags(f, &tags);
+		if ((tags & ProcTag_require_results) != 0) {
+			syntax_error(f->curr_token, "#require_results has now been replaced as an attribute @(require_results) on the declaration");
+			tags &= ~ProcTag_require_results;
+		}
+		GB_ASSERT(type->kind == Ast_ProcType);
+		type->ProcType.tags = tags;
 
 		if (f->allow_type && f->expr_level < 0) {
+			if (tags != 0) {
+				syntax_error(token, "A procedure type cannot have suffix tags");
+			}
+			if (where_token.kind != Token_Invalid) {
+				syntax_error(where_token, "'where' clauses are not allowed on procedure types");
+			}
 			return type;
 		}
 
-		u64 tags = type->ProcType.tags;
-
 		if (allow_token(f, Token_Undef)) {
-			return ast_proc_lit(f, type, nullptr, tags);
+			if (where_token.kind != Token_Invalid) {
+				syntax_error(where_token, "'where' clauses are not allowed on procedure literals without a defined body (replaced with ---)");
+			}
+			return ast_proc_lit(f, type, nullptr, tags, where_token, where_clauses);
 		} else if (f->curr_token.kind == Token_OpenBrace) {
 			Ast *curr_proc = f->curr_proc;
 			Ast *body = nullptr;
@@ -1843,7 +1872,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			body = parse_body(f);
 			f->curr_proc = curr_proc;
 
-			return ast_proc_lit(f, type, body, tags);
+			return ast_proc_lit(f, type, body, tags, where_token, where_clauses);
 		} else if (allow_token(f, Token_do)) {
 			Ast *curr_proc = f->curr_proc;
 			Ast *body = nullptr;
@@ -1851,11 +1880,14 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			body = convert_stmt_to_body(f, parse_stmt(f));
 			f->curr_proc = curr_proc;
 
-			return ast_proc_lit(f, type, body, tags);
+			return ast_proc_lit(f, type, body, tags, where_token, where_clauses);
 		}
 
 		if (tags != 0) {
 			syntax_error(token, "A procedure type cannot have suffix tags");
+		}
+		if (where_token.kind != Token_Invalid) {
+			syntax_error(where_token, "'where' clauses are not allowed on procedure types");
 		}
 
 		return type;
@@ -2827,12 +2859,6 @@ Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	results = parse_results(f, &diverging);
 
 	u64 tags = 0;
-	parse_proc_tags(f, &tags);
-	if ((tags & ProcTag_require_results) != 0) {
-		syntax_error(f->curr_token, "#require_results has now been replaced as an attribute @(require_results) on the declaration");
-		tags &= ~ProcTag_require_results;
-	}
-
 	bool is_generic = false;
 
 	for_array(i, params->FieldList.list) {
