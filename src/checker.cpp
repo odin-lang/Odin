@@ -1445,6 +1445,14 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 			add_min_dep_type_info(c, t_type_info_float);
 			add_min_dep_type_info(c, t_f64);
 			break;
+		case Basic_quaternion128:
+			add_min_dep_type_info(c, t_type_info_float);
+			add_min_dep_type_info(c, t_f32);
+			break;
+		case Basic_quaternion256:
+			add_min_dep_type_info(c, t_type_info_float);
+			add_min_dep_type_info(c, t_f64);
+			break;
 		}
 		break;
 
@@ -1779,6 +1787,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		EntityGraphNode *n = G[i];
 		n->index = i;
 		n->dep_count = n->succ.entries.count;
+
 		GB_ASSERT(n->dep_count >= 0);
 	}
 

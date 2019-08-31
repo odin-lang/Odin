@@ -4864,7 +4864,7 @@ isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs
 					c->decl = decl; // will be reset by the 'defer' any way
 					for_array(k, decl->deps.entries) {
 						Entity *dep = decl->deps.entries[k].ptr;
-						add_declaration_dependency(c, dep); // TODO(bill): Should this be here?
+     						add_declaration_dependency(c, dep); // TODO(bill): Should this be here?
 					}
 				}
 			}
@@ -6519,6 +6519,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			decl = make_decl_info(ctx.allocator, ctx.scope, ctx.decl);
 			decl->proc_lit  = node;
 			ctx.decl = decl;
+			defer (ctx.decl = ctx.decl->parent);
 
 			if (pl->tags != 0) {
 				error(node, "A procedure literal cannot have tags");
