@@ -2187,6 +2187,12 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "require_results") {
+		if (value != nullptr) {
+			error(elem, "Expected no value for '%.*s'", LIT(name));
+		}
+		ac->require_results = true;
+		return true;
 	}
 	return false;
 }

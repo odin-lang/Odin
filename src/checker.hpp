@@ -97,6 +97,7 @@ struct DeferredProcedure {
 struct AttributeContext {
 	bool    is_export;
 	bool    is_static;
+	bool    require_results;
 	String  link_name;
 	String  link_prefix;
 	isize   init_expr_list_count;

@@ -5,7 +5,6 @@ import "core:odin/token"
 Proc_Tag :: enum {
 	Bounds_Check,
 	No_Bounds_Check,
-	Require_Results,
 }
 Proc_Tags :: distinct bit_set[Proc_Tag; u32];
 
