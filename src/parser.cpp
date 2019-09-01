@@ -4164,7 +4164,6 @@ bool init_parser(Parser *p) {
 	map_init(&p->package_map, heap_allocator());
 	array_init(&p->packages, heap_allocator());
 	array_init(&p->package_imports, heap_allocator());
-	array_init(&p->files_to_process, heap_allocator());
 	gb_mutex_init(&p->file_add_mutex);
 	gb_mutex_init(&p->file_decl_mutex);
 	return true;
@@ -4187,7 +4186,6 @@ void destroy_parser(Parser *p) {
 #endif
 	array_free(&p->packages);
 	array_free(&p->package_imports);
-	array_free(&p->files_to_process);
 	string_set_destroy(&p->imported_files);
 	map_destroy(&p->package_map);
 	gb_mutex_destroy(&p->file_add_mutex);
@@ -4225,11 +4223,10 @@ WORKER_TASK_PROC(parser_worker_proc) {
 
 void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo fi, TokenPos pos) {
 	// TODO(bill): Use a better allocator
-	ImportedFile f = {pkg, fi, pos, p->files_to_process.count};
+	ImportedFile f = {pkg, fi, pos, p->file_to_process_count++};
 	auto wd = gb_alloc_item(heap_allocator(), ParserWorkerData);
 	wd->parser = p;
 	wd->imported_file = f;
-	array_add(&p->files_to_process, f);
 	thread_pool_add_task(&parser_thread_pool, parser_worker_proc, wd);
 }
 
