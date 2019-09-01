@@ -918,7 +918,10 @@ GB_DEF void gb_lfence      (void);
 
 
 #if defined(GB_SYSTEM_WINDOWS)
-typedef struct gbSemaphore { void *win32_handle; }     gbSemaphore;
+typedef struct gbSemaphore {
+	void *win32_handle;
+	LONG count;
+} gbSemaphore;
 #elif defined(GB_SYSTEM_OSX)
 typedef struct gbSemaphore { semaphore_t osx_handle; } gbSemaphore;
 #elif defined(GB_SYSTEM_UNIX)
@@ -930,7 +933,7 @@ typedef struct gbSemaphore { sem_t unix_handle; }      gbSemaphore;
 GB_DEF void gb_semaphore_init   (gbSemaphore *s);
 GB_DEF void gb_semaphore_destroy(gbSemaphore *s);
 GB_DEF void gb_semaphore_post   (gbSemaphore *s, i32 count);
-GB_DEF void gb_semaphore_release(gbSemaphore *s); // NOTE(bill): gb_semaphore_post(s, 1)
+GB_DEF void gb_semaphore_release(gbSemaphore *s);
 GB_DEF void gb_semaphore_wait   (gbSemaphore *s);
 
 
@@ -4588,10 +4591,24 @@ gb_inline void gb_lfence(void) {
 gb_inline void gb_semaphore_release(gbSemaphore *s) { gb_semaphore_post(s, 1); }
 
 #if defined(GB_SYSTEM_WINDOWS)
-	gb_inline void gb_semaphore_init   (gbSemaphore *s)            { s->win32_handle = CreateSemaphoreA(NULL, 0, I32_MAX, NULL); }
-	gb_inline void gb_semaphore_destroy(gbSemaphore *s)            { CloseHandle(s->win32_handle); }
-	gb_inline void gb_semaphore_post   (gbSemaphore *s, i32 count) { ReleaseSemaphore(s->win32_handle, count, NULL); }
-	gb_inline void gb_semaphore_wait   (gbSemaphore *s)            { WaitForSingleObjectEx(s->win32_handle, INFINITE, FALSE); }
+	gb_inline void gb_semaphore_init(gbSemaphore *s) {
+		s->win32_handle = CreateSemaphoreA(NULL, 0, I32_MAX, NULL);
+		s->count = 0;
+	}
+	gb_inline void gb_semaphore_destroy(gbSemaphore *s) {
+		CloseHandle(s->win32_handle);
+	}
+	gb_inline void gb_semaphore_post(gbSemaphore *s, i32 count) {
+		_InterlockedIncrement(&s->count);
+		if (ReleaseSemaphore(s->win32_handle, count, NULL) == FALSE) {
+			_InterlockedDecrement(&s->count);
+		}
+	}
+	gb_inline void gb_semaphore_wait(gbSemaphore *s) {
+		if (WaitForSingleObjectEx(s->win32_handle, INFINITE, FALSE) == WAIT_OBJECT_0) {
+			_InterlockedDecrement(&s->count);
+		}
+	}
 
 #elif defined(GB_SYSTEM_OSX)
 	gb_inline void gb_semaphore_init   (gbSemaphore *s)            { semaphore_create(mach_task_self(), &s->osx_handle, SYNC_POLICY_FIFO, 0); }
@@ -8975,7 +8992,7 @@ gb_inline void gb_exit(u32 code) { exit(code); }
 
 gb_inline void gb_yield(void) {
 #if defined(GB_SYSTEM_WINDOWS)
-	Sleep(0);
+	YieldProcessor();
 #else
 	sched_yield();
 #endif

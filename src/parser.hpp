@@ -134,7 +134,7 @@ struct Parser {
 	Map<AstPackage *>      package_map; // Key: String (package name)
 	Array<AstPackage *>    packages;
 	Array<ImportedPackage> package_imports;
-	Array<ImportedFile>    files_to_process;
+	isize                  file_to_process_count;
 	isize                  total_token_count;
 	isize                  total_line_count;
 	gbMutex                file_add_mutex;
