@@ -4207,16 +4207,30 @@ void parser_add_package(Parser *p, AstPackage *pkg) {
 			error(f->package_token, "Non-unique package name '%.*s'", LIT(pkg->name));
 			GB_ASSERT((*found)->files.count > 0);
 			TokenPos pos = (*found)->files[0]->package_token.pos;
-			gb_printf_err("\tpreviously declared at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
+			error_line("\tpreviously declared at %.*s(%td:%td)\n", LIT(pos.file), pos.line, pos.column);
 		} else {
 			map_set(&p->package_map, key, pkg);
 		}
 	}
 }
 
+ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_file);
+
+WORKER_TASK_PROC(parser_worker_proc) {
+	ParserWorkerData *wd = cast(ParserWorkerData *)data;
+	ParseFileError err = process_imported_file(wd->parser, wd->imported_file);
+	return cast(isize)err;
+}
+
+
 void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo fi, TokenPos pos) {
+	// TODO(bill): Use a better allocator
 	ImportedFile f = {pkg, fi, pos, p->files_to_process.count};
+	auto wd = gb_alloc_item(heap_allocator(), ParserWorkerData);
+	wd->parser = p;
+	wd->imported_file = f;
 	array_add(&p->files_to_process, f);
+	thread_pool_add_task(&parser_thread_pool, parser_worker_proc, wd);
 }
 
 
@@ -4717,9 +4731,9 @@ bool parse_file(Parser *p, AstFile *f) {
 }
 
 
-ParseFileError process_imported_file(Parser *p, ImportedFile imported_file) {
+ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_file) {
 	AstPackage *pkg = imported_file.pkg;
-	FileInfo *fi = &imported_file.fi;
+	FileInfo const *fi = &imported_file.fi;
 	TokenPos pos = imported_file.pos;
 
 	AstFile *file = gb_alloc_item(heap_allocator(), AstFile);
@@ -4737,35 +4751,32 @@ ParseFileError process_imported_file(Parser *p, ImportedFile imported_file) {
 				error(pos, "Initial file is empty - %.*s\n", LIT(p->init_fullpath));
 				gb_exit(1);
 			}
-			goto skip;
-		}
+		} else {
+			switch (err) {
+			case ParseFile_WrongExtension:
+				error(pos, "Failed to parse file: %.*s; invalid file extension: File must have the extension '.odin'", LIT(fi->name));
+				break;
+			case ParseFile_InvalidFile:
+				error(pos, "Failed to parse file: %.*s; invalid file or cannot be found", LIT(fi->name));
+				break;
+			case ParseFile_Permission:
+				error(pos, "Failed to parse file: %.*s; file permissions problem", LIT(fi->name));
+				break;
+			case ParseFile_NotFound:
+				error(pos, "Failed to parse file: %.*s; file cannot be found ('%.*s')", LIT(fi->name), LIT(fi->fullpath));
+				break;
+			case ParseFile_InvalidToken:
+				error(err_pos, "Failed to parse file: %.*s; invalid token found in file", LIT(fi->name));
+				break;
+			case ParseFile_EmptyFile:
+				error(pos, "Failed to parse file: %.*s; file contains no tokens", LIT(fi->name));
+				break;
+			}
 
-		switch (err) {
-		case ParseFile_WrongExtension:
-			error(pos, "Failed to parse file: %.*s; invalid file extension: File must have the extension '.odin'", LIT(fi->name));
-			break;
-		case ParseFile_InvalidFile:
-			error(pos, "Failed to parse file: %.*s; invalid file or cannot be found", LIT(fi->name));
-			break;
-		case ParseFile_Permission:
-			error(pos, "Failed to parse file: %.*s; file permissions problem", LIT(fi->name));
-			break;
-		case ParseFile_NotFound:
-			error(pos, "Failed to parse file: %.*s; file cannot be found ('%.*s')", LIT(fi->name), LIT(fi->fullpath));
-			break;
-		case ParseFile_InvalidToken:
-			error(err_pos, "Failed to parse file: %.*s; invalid token found in file", LIT(fi->name));
-			break;
-		case ParseFile_EmptyFile:
-			error(pos, "Failed to parse file: %.*s; file contains no tokens", LIT(fi->name));
-			break;
+			return err;
 		}
-
-		return err;
 	}
 
-
-skip:
 	if (parse_file(p, file)) {
 		gb_mutex_lock(&p->file_add_mutex);
 		defer (gb_mutex_unlock(&p->file_add_mutex));
@@ -4781,65 +4792,25 @@ skip:
 		p->total_line_count += file->tokenizer.line_count;
 		p->total_token_count += file->tokens.count;
 	}
+
 	return ParseFile_None;
 }
 
-struct ParserWorkerThreadData {
-	Parser *parser;
-	ParseFileError err;
-
-	gbSemaphore resume_work;
-	gbMutex lock;
-
-	bool error_available;
-	bool is_working;
-	bool should_exit;
-};
-
-
-GB_THREAD_PROC(parse_worker_file_proc) {
-	GB_ASSERT(thread != nullptr);
-
-	ParserWorkerThreadData* data = cast(ParserWorkerThreadData*) thread->user_data;
-
-	for(;;) {
-		gb_semaphore_wait(&data->resume_work);
-
-		gb_mutex_lock(&data->lock);
-		if (data->should_exit) {
-			gb_mutex_unlock(&data->lock);
-			return isize(0);
-		}
-
-		Parser *p = data->parser;
-		isize index = thread->user_index;
-		gb_mutex_lock(&p->file_add_mutex);
-		auto file_to_process = p->files_to_process[index];
-		gb_mutex_unlock(&p->file_add_mutex);
-		data->err = process_imported_file(p, file_to_process);
-
-		data->error_available = true;
-		data->is_working = false;
-		gb_mutex_unlock(&data->lock);
-	}
-
-	//GB_PANIC("A worker thread should not be able to reach the end!!!");
-}
 
 ParseFileError parse_packages(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
 
-	// char *fullpath_str = gb_path_get_full_name(heap_allocator(), cast(char const *)&init_filename[0]);
-	// String init_fullpath = string_trim_whitespace(make_string_c(fullpath_str));
+	isize thread_count = gb_max(build_context.thread_count, 1);
+	thread_pool_init(&parser_thread_pool, heap_allocator(), thread_count, "ParserWork");
+
 	String init_fullpath = path_to_full_path(heap_allocator(), init_filename);
 	if (!path_is_directory(init_fullpath)) {
 		String const ext = str_lit(".odin");
 		if (!string_ends_with(init_fullpath, ext)) {
-			gb_printf_err("Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
+			error_line("Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
 			return ParseFile_WrongExtension;
 		}
 	}
-
 
 	TokenPos init_pos = {};
 	if (!build_context.generate_docs) {
@@ -4850,131 +4821,17 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 	try_add_import_path(p, init_fullpath, init_fullpath, init_pos, Package_Init);
 	p->init_fullpath = init_fullpath;
 
-#if 1
-	isize thread_count = gb_max(build_context.thread_count, 1);
-	if (thread_count > 1) {
-		isize volatile curr_import_index = 0;
+	thread_pool_start(&parser_thread_pool);
+	thread_pool_kick_and_wait(&parser_thread_pool);
 
-#if 0
-		//NOTE(thebirk): Leaving this piece of code behind if it turns out we need it, yes I know git exists
-
-		isize initial_file_count = p->files_to_process.count;
-		// NOTE(bill): Make sure that these are in parsed in this order
-		for (isize i = 0; i < initial_file_count; i++) {
-			ParseFileError err = process_imported_file(p, p->files_to_process[i]);
-			if (err != ParseFile_None) {
-				return err;
-			}
-			curr_import_index++;
-		}
-#endif
-
-		auto worker_threads_data = array_make<ParserWorkerThreadData>(heap_allocator(), thread_count);
-		defer (array_free(&worker_threads_data));
-
-		for_array(i, worker_threads_data) {
-			ParserWorkerThreadData *data = &worker_threads_data[i];
-			gb_mutex_init(&data->lock);
-			gb_semaphore_init(&data->resume_work);
-			data->parser = p;
-			data->err = ParseFile_None;
-			data->should_exit = false;
-			data->error_available = false;
-			data->is_working = false;
-		}
-		defer(for_array(i, worker_threads_data) {
-			ParserWorkerThreadData *data = &worker_threads_data[i];
-			gb_mutex_destroy(&data->lock);
-			gb_semaphore_destroy(&data->resume_work);
-		});
-
-		auto worker_threads = array_make<gbThread>(heap_allocator(), thread_count);
-		defer (array_free(&worker_threads));
-
-		for_array(i, worker_threads) {
-			gbThread *t = &worker_threads[i];
-			gb_thread_init(t);
-			//NOTE(thebirk): This crashes on linux. In addition to that the method used on windows does
-			//               not get picked up by a lot of tools look into using SetThreadDescription
-			//               when running on new enough windows 10 builds
-			//char buffer[32];
-			//gb_snprintf(buffer, 32, "Parser Worker #%ll", i);
-			//gb_thread_set_name(t, buffer);
-			gb_thread_start(t, parse_worker_file_proc, &worker_threads_data[i]);
-		}
-		defer(for_array(i, worker_threads) {
-			gb_thread_destroy(&worker_threads[i]);
-		});
-
-		auto errors = array_make<ParseFileError>(heap_allocator(), 0, 16);
-
-		for (;;) {
-			int num_alive = 0;
-
-			for_array(i, worker_threads) {
-				gbThread *t = &worker_threads[i];
-				ParserWorkerThreadData *data = &worker_threads_data[i];
-
-				if (!data->is_working && gb_mutex_try_lock(&data->lock)) {
-					if (data->error_available) {
-						auto curr_err = data->err;
-						if (curr_err != ParseFile_None) {
-							array_add(&errors, curr_err);
-						}
-
-						data->error_available = false;
-					}
-
-					if (curr_import_index < p->files_to_process.count) {
-						t->user_index = curr_import_index;
-						curr_import_index++;
-						num_alive += 1;
-
-						gb_semaphore_release(&data->resume_work);
-						data->is_working = true;
-					}
-
-					gb_mutex_unlock(&data->lock);
-				} else {
-					//NOTE(thebirk): If we cant lock a thread it must be working
-					num_alive += 1;
-				}
-			}
-
-			if ((num_alive == 0) && (curr_import_index >= p->files_to_process.count)) {
-				break;
-			}
-
-			gb_yield();
-		}
-
-		//NOTE(thebirk): Signal all workers to exit
-		for_array(i, worker_threads_data) {
-			ParserWorkerThreadData* data = &worker_threads_data[i];
-			data->should_exit = true;
-			gb_semaphore_release(&data->resume_work);
-		}
-
-		if (errors.count > 0) {
-			return errors[errors.count-1];
-		}
-	} else {
-		for_array(i, p->files_to_process) {
-			ParseFileError err = process_imported_file(p, p->files_to_process[i]);
-			if (err != ParseFile_None) {
-				return err;
-			}
-		}
-	}
-#else
-	for_array(i, p->files_to_process) {
-		ImportedFile f = p->files_to_process[i];
-		ParseFileError err = process_imported_file(p, f);
+	// NOTE(bill): Get the last error and use that
+	for (isize i = parser_thread_pool.threads.count-1; i >= 0; i--) {
+		gbThread *t = &parser_thread_pool.threads[i];
+		ParseFileError err = cast(ParseFileError)t->return_value;
 		if (err != ParseFile_None) {
 			return err;
 		}
 	}
-#endif
 
 	return ParseFile_None;
 }

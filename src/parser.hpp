@@ -141,6 +141,19 @@ struct Parser {
 	gbMutex                file_decl_mutex;
 };
 
+
+gb_global ThreadPool parser_thread_pool = {};
+
+struct ParserWorkerData {
+	Parser *parser;
+	ImportedFile imported_file;
+};
+
+
+
+
+
+
 enum ProcInlining {
 	ProcInlining_none = 0,
 	ProcInlining_inline = 1,

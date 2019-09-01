@@ -4591,7 +4591,7 @@ gb_inline void gb_semaphore_release(gbSemaphore *s) { gb_semaphore_post(s, 1); }
 	gb_inline void gb_semaphore_init   (gbSemaphore *s)            { s->win32_handle = CreateSemaphoreA(NULL, 0, I32_MAX, NULL); }
 	gb_inline void gb_semaphore_destroy(gbSemaphore *s)            { CloseHandle(s->win32_handle); }
 	gb_inline void gb_semaphore_post   (gbSemaphore *s, i32 count) { ReleaseSemaphore(s->win32_handle, count, NULL); }
-	gb_inline void gb_semaphore_wait   (gbSemaphore *s)            { WaitForSingleObject(s->win32_handle, INFINITE); }
+	gb_inline void gb_semaphore_wait   (gbSemaphore *s)            { WaitForSingleObjectEx(s->win32_handle, INFINITE, FALSE); }
 
 #elif defined(GB_SYSTEM_OSX)
 	gb_inline void gb_semaphore_init   (gbSemaphore *s)            { semaphore_create(mach_task_self(), &s->osx_handle, SYNC_POLICY_FIFO, 0); }

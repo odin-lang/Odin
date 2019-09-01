@@ -159,7 +159,7 @@ isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isize level = 0
 	src = base_type(src);
 
 	if (!is_type_struct(src)) {
-		return false;
+		return 0;
 	}
 
 	for_array(i, src->Struct.fields) {

@@ -10,12 +10,10 @@
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
-
 #include <wchar.h>
 #include <stdio.h>
 
 #include <math.h>
-
 
 template <typename U, typename V>
 gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
@@ -331,7 +329,7 @@ void mul_overflow_u64(u64 x, u64 y, u64 *lo, u64 *hi) {
 #include "ptr_set.cpp"
 #include "string_set.cpp"
 #include "priority_queue.cpp"
-
+#include "thread_pool.cpp"
 
 
 gb_global String global_module_path = {0};
@@ -873,7 +871,6 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 		info.size = size;
 		info.is_dir = (file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 		array_add(fi, info);
-
 	} while (FindNextFileW(find_file, &file_data));
 
 	if (fi->count == 0) {
