@@ -52,11 +52,13 @@ void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count
 		gbThread *t = &pool->threads[i];
 		gb_thread_init(t);
 		t->user_index = i;
+		#if 0
 		if (pool->worker_prefix_len > 0) {
 			char worker_name[16] = {};
 			gb_snprintf(worker_name, gb_size_of(worker_name), "%.*s%u", pool->worker_prefix_len, pool->worker_prefix, cast(u16)i);
 			gb_thread_set_name(t, worker_name);
 		}
+		#endif
 	}
 }
 
