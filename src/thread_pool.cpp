@@ -19,22 +19,9 @@ struct ThreadPool {
 	Array<WorkerTask> tasks;
 	Array<gbThread> threads;
 
-	gbAllocator original_allocator;
-
 	char worker_prefix[10];
 	i32 worker_prefix_len;
 };
-
-
-GB_ALLOCATOR_PROC(thread_pool_allocator_proc) {
-	ThreadPool *pool = cast(ThreadPool *)allocator_data;
-	return pool->original_allocator.proc(pool->original_allocator.data, type, size, 256, old_memory, old_size, flags);
-}
-
-gbAllocator thread_pool_allocator(ThreadPool *pool) {
-	gbAllocator a = {thread_pool_allocator_proc, pool};
-	return a;
-}
 
 void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_prefix = nullptr);
 void thread_pool_destroy(ThreadPool *pool);
@@ -46,10 +33,8 @@ void thread_pool_kick_and_wait(ThreadPool *pool);
 GB_THREAD_PROC(worker_thread_internal);
 
 void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_prefix) {
-	pool->original_allocator = a;
-	gbAllocator tpa = thread_pool_allocator(pool);
-	pool->tasks = array_make<WorkerTask>(tpa, 0, 1024);
-	pool->threads = array_make<gbThread>(tpa, thread_count);
+	pool->tasks = array_make<WorkerTask>(a, 0, 1024);
+	pool->threads = array_make<gbThread>(a, thread_count);
 	gb_mutex_init(&pool->task_mutex);
 	gb_mutex_init(&pool->mutex);
 	gb_semaphore_init(&pool->semaphore);
