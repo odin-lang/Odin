@@ -4,14 +4,14 @@
 set exe_name=odin.exe
 
 :: Debug = 0, Release = 1
-set release_mode=1
+set release_mode=0
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -GS- -EHsc- -GR-
 
 if %release_mode% EQU 0 ( rem Debug
-	set compiler_flags=%compiler_flags% -Od -MDd -Zi
+	set compiler_flags=%compiler_flags% -Od -MDd -Z7
 	rem -DDISPLAY_TIMING
 ) else ( rem Release
-	set compiler_flags=%compiler_flags% -O2 -MT -Zi -DNO_ARRAY_BOUNDS_CHECK
+	set compiler_flags=%compiler_flags% -O2 -MT -Z7 -DNO_ARRAY_BOUNDS_CHECK
 )
 
 set compiler_warnings= ^
