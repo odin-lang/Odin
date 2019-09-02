@@ -10937,12 +10937,14 @@ void ir_gen_tree(irGen *s) {
 		// main :: proc(argc: i32, argv: ^^u8) -> i32
 		String name = str_lit("main");
 
+#if 0
 		if (str_eq_ignore_case(cross_compile_target, str_lit("Essence"))) {
 			// This is a bit hacky,
 			// because this makes this function the first function run in the executable
 			// so it won't actually have the argc/argv arguments.
 			name = str_lit("ProgramEntry");
 		}
+#endif
 
 		Type *proc_params = alloc_type_tuple();
 		Type *proc_results = alloc_type_tuple();
