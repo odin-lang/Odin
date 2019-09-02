@@ -40,10 +40,9 @@ del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
 
-rem cl %compiler_settings% "src\main.cpp" ^
-	rem /link %linker_settings% -OUT:%exe_name% ^
-	rem && odin build examples/demo/demo.odin -show-timings
-odin check examples/demo/demo.odin -show-timings
+cl %compiler_settings% "src\main.cpp" ^
+	/link %linker_settings% -OUT:%exe_name% ^
+	&& odin run examples/demo/demo.odin
 
 del *.obj > NUL 2> NUL
 
