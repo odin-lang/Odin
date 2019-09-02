@@ -6967,7 +6967,34 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		}
 
 		// NOTE(bill): Regular call
-		irValue *value = ir_build_expr(proc, ce->proc);
+		irValue *value = nullptr;
+		Ast *proc_expr = unparen_expr(ce->proc);
+		if (proc_expr->tav.mode == Addressing_Constant) {
+			ExactValue v = proc_expr->tav.value;
+			switch (v.kind) {
+			case ExactValue_Integer:
+				{
+					u64 u = big_int_to_u64(&v.value_integer);
+					irValue *x = ir_const_uintptr(u);
+					x = ir_emit_conv(proc, x, t_rawptr);
+					value = ir_emit_conv(proc, x, proc_expr->tav.type);
+					break;
+				}
+			case ExactValue_Pointer:
+				{
+					u64 u = cast(u64)v.value_pointer;
+					irValue *x = ir_const_uintptr(u);
+					x = ir_emit_conv(proc, x, t_rawptr);
+					value = ir_emit_conv(proc, x, proc_expr->tav.type);
+					break;
+				}
+			}
+		}
+
+		if (value == nullptr) {
+			value = ir_build_expr(proc, proc_expr);
+		}
+
 		GB_ASSERT(value != nullptr);
 		Type *proc_type_ = base_type(ir_type(value));
 		GB_ASSERT(proc_type_->kind == Type_Proc);
