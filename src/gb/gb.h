@@ -978,10 +978,10 @@ typedef struct gbThread {
 	pthread_t     posix_handle;
 #endif
 
-	gbThreadProc *proc;
-	void *        user_data;
-	isize         user_index;
-	isize         return_value;
+	gbThreadProc * proc;
+	void *         user_data;
+	isize          user_index;
+	isize volatile return_value;
 
 	gbSemaphore   semaphore;
 	isize         stack_size;

@@ -16,8 +16,14 @@ struct ThreadPool {
 	gbAtomic32  processing_work_count;
 	bool        is_running;
 
-	Array<WorkerTask> tasks;
-	Array<gbThread> threads;
+	gbAllocator allocator;
+
+	WorkerTask *tasks;
+	isize volatile task_count;
+	isize volatile task_capacity;
+
+	gbThread *threads;
+	isize thread_count;
 
 	char worker_prefix[10];
 	i32 worker_prefix_len;
@@ -33,8 +39,12 @@ void thread_pool_kick_and_wait(ThreadPool *pool);
 GB_THREAD_PROC(worker_thread_internal);
 
 void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_prefix) {
-	pool->tasks = array_make<WorkerTask>(a, 0, 1024);
-	pool->threads = array_make<gbThread>(a, thread_count);
+	pool->allocator = a;
+	pool->task_count = 0;
+	pool->task_capacity = 1024;
+	pool->tasks = gb_alloc_array(a, WorkerTask, pool->task_capacity);
+	pool->threads = gb_alloc_array(a, gbThread, thread_count);
+	pool->thread_count = thread_count;
 	gb_mutex_init(&pool->task_mutex);
 	gb_mutex_init(&pool->mutex);
 	gb_semaphore_init(&pool->semaphore);
@@ -48,7 +58,7 @@ void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count
 		pool->worker_prefix_len = worker_prefix_len;
 	}
 
-	for_array(i, pool->threads) {
+	for (isize i = 0; i < pool->thread_count; i++) {
 		gbThread *t = &pool->threads[i];
 		gb_thread_init(t);
 		t->user_index = i;
@@ -63,7 +73,7 @@ void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count
 }
 
 void thread_pool_start(ThreadPool *pool) {
-	for_array(i, pool->threads) {
+	for (isize i = 0; i < pool->thread_count; i++) {
 		gbThread *t = &pool->threads[i];
 		gb_thread_start(t, worker_thread_internal, pool);
 	}
@@ -72,11 +82,11 @@ void thread_pool_start(ThreadPool *pool) {
 void thread_pool_join(ThreadPool *pool) {
 	pool->is_running = false;
 
-	for_array(i, pool->threads) {
+	for (isize i = 0; i < pool->thread_count; i++) {
 		gb_semaphore_release(&pool->semaphore);
 	}
 
-	for_array(i, pool->threads) {
+	for (isize i = 0; i < pool->thread_count; i++) {
 		gbThread *t = &pool->threads[i];
 		gb_thread_join(t);
 	}
@@ -89,18 +99,30 @@ void thread_pool_destroy(ThreadPool *pool) {
 	gb_semaphore_destroy(&pool->semaphore);
 	gb_mutex_destroy(&pool->mutex);
 	gb_mutex_destroy(&pool->task_mutex);
-	array_free(&pool->threads);
-	array_free(&pool->tasks);
+	gb_free(pool->allocator, pool->threads);
+	pool->thread_count = 0;
+	gb_free(pool->allocator, pool->tasks);
+	pool->task_count = 0;
+	pool->task_capacity = 0;
+
 }
 
 
 void thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data) {
 	gb_mutex_lock(&pool->task_mutex);
 
+	if (pool->task_count == pool->task_capacity) {
+		isize new_cap = 2*pool->task_capacity + 8;
+		WorkerTask *new_tasks = gb_alloc_array(pool->allocator, WorkerTask, new_cap);
+		gb_memmove(new_tasks, pool->tasks, pool->task_count*gb_size_of(WorkerTask));
+		pool->tasks = new_tasks;
+		pool->task_capacity = new_cap;
+	}
 	WorkerTask task = {};
 	task.do_work = proc;
 	task.data = data;
-	array_add(&pool->tasks, task);
+
+	pool->tasks[pool->task_count++] = task;
 
 	gb_mutex_unlock(&pool->task_mutex);
 
@@ -108,19 +130,20 @@ void thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data) {
 }
 
 void thread_pool_kick(ThreadPool *pool) {
-	if (pool->tasks.count > 0) {
-		isize count = gb_min(pool->tasks.count, pool->threads.count);
+	gb_mutex_lock(&pool->task_mutex);
+	if (pool->task_count > 0) {
+		isize count = gb_max(pool->task_count, pool->thread_count);
 		for (isize i = 0; i < count; i++) {
 			gb_semaphore_post(&pool->semaphore, 1);
 		}
 	}
-
+	gb_mutex_unlock(&pool->task_mutex);
 }
 void thread_pool_kick_and_wait(ThreadPool *pool) {
 	thread_pool_kick(pool);
 
 	isize return_value = 0;
-	while (pool->tasks.count > 0 || gb_atomic32_load(&pool->processing_work_count) != 0) {
+	while (pool->task_count > 0 || gb_atomic32_load(&pool->processing_work_count) != 0) {
 		gb_yield();
 	}
 
@@ -138,9 +161,9 @@ GB_THREAD_PROC(worker_thread_internal) {
 		bool got_task = false;
 
 		if (gb_mutex_try_lock(&pool->task_mutex)) {
-			if (pool->tasks.count > 0) {
+			if (pool->task_count > 0) {
 				gb_atomic32_fetch_add(&pool->processing_work_count, +1);
-				task = array_pop(&pool->tasks);
+				task = pool->tasks[--pool->task_count];
 				got_task = true;
 			}
 			gb_mutex_unlock(&pool->task_mutex);
