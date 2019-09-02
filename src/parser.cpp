@@ -4822,7 +4822,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 	thread_pool_kick_and_wait(&parser_thread_pool);
 
 	// NOTE(bill): Get the last error and use that
-	for (isize i = parser_thread_pool.threads.count-1; i >= 0; i--) {
+	for (isize i = parser_thread_pool.thread_count-1; i >= 0; i--) {
 		gbThread *t = &parser_thread_pool.threads[i];
 		ParseFileError err = cast(ParseFileError)t->return_value;
 		if (err != ParseFile_None) {
