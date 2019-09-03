@@ -918,10 +918,7 @@ GB_DEF void gb_lfence      (void);
 
 
 #if defined(GB_SYSTEM_WINDOWS)
-typedef struct gbSemaphore {
-	void *win32_handle;
-	LONG count;
-} gbSemaphore;
+typedef struct gbSemaphore { void *win32_handle;}      gbSemaphore;
 #elif defined(GB_SYSTEM_OSX)
 typedef struct gbSemaphore { semaphore_t osx_handle; } gbSemaphore;
 #elif defined(GB_SYSTEM_UNIX)
@@ -4593,21 +4590,15 @@ gb_inline void gb_semaphore_release(gbSemaphore *s) { gb_semaphore_post(s, 1); }
 #if defined(GB_SYSTEM_WINDOWS)
 	gb_inline void gb_semaphore_init(gbSemaphore *s) {
 		s->win32_handle = CreateSemaphoreA(NULL, 0, I32_MAX, NULL);
-		s->count = 0;
 	}
 	gb_inline void gb_semaphore_destroy(gbSemaphore *s) {
 		CloseHandle(s->win32_handle);
 	}
 	gb_inline void gb_semaphore_post(gbSemaphore *s, i32 count) {
-		_InterlockedIncrement(&s->count);
-		if (ReleaseSemaphore(s->win32_handle, count, NULL) == FALSE) {
-			_InterlockedDecrement(&s->count);
-		}
+		ReleaseSemaphore(s->win32_handle, count, NULL);
 	}
 	gb_inline void gb_semaphore_wait(gbSemaphore *s) {
-		if (WaitForSingleObjectEx(s->win32_handle, INFINITE, FALSE) == WAIT_OBJECT_0) {
-			_InterlockedDecrement(&s->count);
-		}
+		WaitForSingleObjectEx(s->win32_handle, INFINITE, FALSE);
 	}
 
 #elif defined(GB_SYSTEM_OSX)

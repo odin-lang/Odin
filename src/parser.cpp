@@ -4798,7 +4798,8 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
 
 	isize thread_count = gb_max(build_context.thread_count, 1);
-	thread_pool_init(&parser_thread_pool, heap_allocator(), thread_count, "ParserWork");
+	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
+	thread_pool_init(&parser_thread_pool, heap_allocator(), worker_count, "ParserWork");
 
 	String init_fullpath = path_to_full_path(heap_allocator(), init_filename);
 	if (!path_is_directory(init_fullpath)) {
@@ -4819,12 +4820,12 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 	p->init_fullpath = init_fullpath;
 
 	thread_pool_start(&parser_thread_pool);
-	thread_pool_kick_and_wait(&parser_thread_pool);
+	thread_pool_wait_to_process(&parser_thread_pool);
 
 	// NOTE(bill): Get the last error and use that
-	for (isize i = parser_thread_pool.thread_count-1; i >= 0; i--) {
-		gbThread *t = &parser_thread_pool.threads[i];
-		ParseFileError err = cast(ParseFileError)t->return_value;
+	for (isize i = parser_thread_pool.task_tail-1; i >= 0; i--) {
+		WorkerTask *task = &parser_thread_pool.tasks[i];
+		ParseFileError err = cast(ParseFileError)task->result;
 		if (err != ParseFile_None) {
 			return err;
 		}
