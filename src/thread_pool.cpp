@@ -124,15 +124,14 @@ void thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data) {
 
 	pool->tasks[pool->task_count++] = task;
 
-	gb_mutex_unlock(&pool->task_mutex);
-
 	gb_semaphore_post(&pool->semaphore, 1);
+	gb_mutex_unlock(&pool->task_mutex);
 }
 
 void thread_pool_kick(ThreadPool *pool) {
 	gb_mutex_lock(&pool->task_mutex);
 	if (pool->task_count > 0) {
-		isize count = gb_max(pool->task_count, pool->thread_count);
+		isize count = gb_min(pool->task_count, pool->thread_count);
 		for (isize i = 0; i < count; i++) {
 			gb_semaphore_post(&pool->semaphore, 1);
 		}
@@ -144,6 +143,14 @@ void thread_pool_kick_and_wait(ThreadPool *pool) {
 
 	isize return_value = 0;
 	while (pool->task_count > 0 || gb_atomic32_load(&pool->processing_work_count) != 0) {
+
+		if (pool->task_count > 0 && gb_atomic32_load(&pool->processing_work_count) == 0) {
+			gb_mutex_lock(&pool->task_mutex);
+			for (isize i = 0; i < pool->task_count; i++) {
+				gb_semaphore_post(&pool->semaphore, 1);
+			}
+			gb_mutex_unlock(&pool->task_mutex);
+		}
 		gb_yield();
 	}
 
