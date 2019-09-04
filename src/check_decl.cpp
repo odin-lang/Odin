@@ -1208,13 +1208,14 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 
 	check_scope_usage(ctx->checker, ctx->scope);
 
-#if 0
+#if 1
 	if (decl->parent != nullptr) {
 		Scope *ps = decl->parent->scope;
 		if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
 			return;
 		} else {
 			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
+			// But only at the procedure level
 			for_array(i, decl->deps.entries) {
 				Entity *e = decl->deps.entries[i].ptr;
 				ptr_set_add(&decl->parent->deps, e);
