@@ -1370,10 +1370,6 @@ void expect_semicolon(AstFile *f, Ast *s) {
 		return;
 	}
 
-	switch (f->curr_token.kind) {
-	case Token_EOF:
-		return;
-	}
 
 	if (s != nullptr) {
 		if (prev_token.pos.line != f->curr_token.pos.line) {
@@ -1386,12 +1382,21 @@ void expect_semicolon(AstFile *f, Ast *s) {
 			case Token_CloseParen:
 			case Token_else:
 				return;
+			case Token_EOF:
+				if (is_semicolon_optional_for_node(f, s)) {
+					return;
+				}
+				break;
 			}
 		}
 		String node_string = ast_strings[s->kind];
 		syntax_error(prev_token, "Expected ';' after %.*s, got %.*s",
-		             LIT(node_string), LIT(token_strings[prev_token.kind]));
+		             LIT(node_string), LIT(token_strings[f->curr_token.kind]));
 	} else {
+		switch (f->curr_token.kind) {
+		case Token_EOF:
+			return;
+		}
 		syntax_error(prev_token, "Expected ';'");
 	}
 	fix_advance_to_next_stmt(f);
