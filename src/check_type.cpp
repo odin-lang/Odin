@@ -503,7 +503,7 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 	struct_type->Struct.is_poly_specialized     = is_poly_specialized;
 
 	if (!is_polymorphic) {
-		if (st->where_clauses.count > 0 && st->polymorphic_params != nullptr) {
+		if (st->where_clauses.count > 0 && st->polymorphic_params == nullptr) {
 			error(st->where_clauses[0], "'where' clauses can only be used on structures with polymorphic parameters");
 		} else {
 			bool where_clause_ok = evaluate_where_clauses(ctx, ctx->scope, &st->where_clauses, true);
@@ -690,7 +690,7 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 	union_type->Union.is_polymorphic          = is_polymorphic;
 	union_type->Union.is_poly_specialized     = is_poly_specialized;
 
-	if (ut->where_clauses.count > 0 && ut->polymorphic_params != nullptr) {
+	if (ut->where_clauses.count > 0 && ut->polymorphic_params == nullptr) {
 		error(ut->where_clauses[0], "'where' clauses can only be used on unions with polymorphic parameters");
 	} else {
 		bool where_clause_ok = evaluate_where_clauses(ctx, ctx->scope, &ut->where_clauses, true);
