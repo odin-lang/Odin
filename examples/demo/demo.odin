@@ -1095,7 +1095,7 @@ inline_for_statement :: proc() {
 	}
 }
 
-procedure_where_clauses :: proc() {
+where_clauses :: proc() {
 	fmt.println("\n#procedure 'where' clauses");
 
 	{ // Sanity checks
@@ -1156,6 +1156,20 @@ procedure_where_clauses :: proc() {
 		assert(ok_x == true);
 		assert(ok_y == false);
 	}
+
+	{ // Record types
+		Foo :: struct(T: typeid, N: int)
+			where intrinsics.type_is_integer(T),
+			      N > 2 {
+			x: [N]T,
+			y: [N-2]T,
+		}
+
+		T :: i32;
+		N :: 5;
+		f: Foo(T, N);
+		#assert(size_of(f) == (N+N-2)*size_of(T));
+	}
 }
 
 main :: proc() {
@@ -1179,6 +1193,6 @@ main :: proc() {
 		reflection();
 		quaternions();
 		inline_for_statement();
-		procedure_where_clauses();
+		where_clauses();
 	}
 }
