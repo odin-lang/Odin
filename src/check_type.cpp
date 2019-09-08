@@ -441,8 +441,6 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 					if (poly_operands != nullptr) {
 						Operand operand = (*poly_operands)[entities.count];
 						if (is_type_param) {
-							GB_ASSERT(operand.mode == Addressing_Type ||
-							          operand.mode == Addressing_Invalid);
 							if (is_type_polymorphic(base_type(operand.type))) {
 								is_polymorphic = true;
 								can_check_fields = false;
