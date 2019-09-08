@@ -1219,7 +1219,7 @@ int main(int arg_count, char **arg_ptr) {
 		remove_temp_files(output_base);
 
 		if (run_output) {
-			system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(output_base), LIT(run_args_string));
+			return system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(output_base), LIT(run_args_string));
 		}
 	#else
 		timings_start_section(&timings, str_lit("ld-link"));
@@ -1366,7 +1366,7 @@ int main(int arg_count, char **arg_ptr) {
 			//NOTE(thebirk): This whole thing is a little leaky
 			String complete_path = concatenate_strings(heap_allocator(), output_base, output_ext);
 			complete_path = path_to_full_path(heap_allocator(), complete_path);
-			system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
+			return system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
 		}
 	#endif
 
