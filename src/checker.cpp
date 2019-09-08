@@ -3157,7 +3157,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 			Entity *e = scope->elements.entries[elem_index].value;
 			if (e->scope == parent_scope) continue;
 
-			if (is_entity_exported(e)) {
+			if (is_entity_exported(e, true)) {
 				Entity *found = scope_lookup_current(parent_scope, name);
 				if (found != nullptr) {
 					// NOTE(bill):

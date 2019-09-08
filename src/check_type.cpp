@@ -504,8 +504,8 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 	struct_type->Struct.polymorphic_params      = polymorphic_params;
 	struct_type->Struct.is_poly_specialized     = is_poly_specialized;
 
-
 	if (!is_polymorphic) {
+		bool where_clause_ok = evaluate_where_clauses(ctx, ctx->scope, &st->where_clauses, true);
 		check_struct_fields(ctx, node, &struct_type->Struct.fields, &struct_type->Struct.tags, st->fields, min_field_count, struct_type, context);
 	}
 
@@ -687,6 +687,9 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 	union_type->Union.polymorphic_params      = polymorphic_params;
 	union_type->Union.is_polymorphic          = is_polymorphic;
 	union_type->Union.is_poly_specialized     = is_poly_specialized;
+
+	bool where_clause_ok = evaluate_where_clauses(ctx, ctx->scope, &ut->where_clauses, true);
+
 
 	for_array(i, ut->variants) {
 		Ast *node = ut->variants[i];

@@ -5471,15 +5471,10 @@ Entity **populate_proc_parameter_list(CheckerContext *c, Type *proc_type, isize 
 }
 
 
-bool evaluate_where_clauses(CheckerContext *ctx, DeclInfo *decl, bool print_err) {
-	Ast *proc_lit = decl->proc_lit;
-	GB_ASSERT(proc_lit != nullptr);
-	GB_ASSERT(proc_lit->kind == Ast_ProcLit);
-
-	if (proc_lit->ProcLit.where_token.kind != Token_Invalid) {
-		auto &clauses = proc_lit->ProcLit.where_clauses;
-		for_array(i, clauses) {
-			Ast *clause = clauses[i];
+bool evaluate_where_clauses(CheckerContext *ctx, Scope *scope, Array<Ast *> *clauses, bool print_err) {
+	if (clauses != nullptr) {
+		for_array(i, *clauses) {
+			Ast *clause = (*clauses)[i];
 			Operand o = {};
 			check_expr(ctx, &o, clause);
 			if (o.mode != Addressing_Constant) {
@@ -5494,10 +5489,10 @@ bool evaluate_where_clauses(CheckerContext *ctx, DeclInfo *decl, bool print_err)
 					error(clause, "'where' clause evaluated to false:\n\t%s", str);
 					gb_string_free(str);
 
-					if (decl->scope != nullptr) {
+					if (scope != nullptr) {
 						isize print_count = 0;
-						for_array(j, decl->scope->elements.entries) {
-							Entity *e = decl->scope->elements.entries[j].value;
+						for_array(j, scope->elements.entries) {
+							Entity *e = scope->elements.entries[j].value;
 							switch (e->kind) {
 							case Entity_TypeName: {
 								if (print_count == 0) error_line("\n\tWith the following definitions:\n");
@@ -5790,7 +5785,8 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 					ctx.curr_proc_decl = decl;
 					ctx.curr_proc_sig  = e->type;
 
-					if (!evaluate_where_clauses(&ctx, decl, false)) {
+					GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
+					if (!evaluate_where_clauses(&ctx, decl->scope, &decl->proc_lit->ProcLit.where_clauses, false)) {
 						continue;
 					}
 				}

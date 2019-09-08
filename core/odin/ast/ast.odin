@@ -568,13 +568,15 @@ Dynamic_Array_Type :: struct {
 
 Struct_Type :: struct {
 	using node: Expr,
-	tok_pos:   token.Pos,
-	poly_params:  ^Field_List,
-	align:        ^Expr,
-	is_packed:    bool,
-	is_raw_union: bool,
-	fields:       ^Field_List,
-	name_count:  int,
+	tok_pos:       token.Pos,
+	poly_params:   ^Field_List,
+	align:         ^Expr,
+	fields:        ^Field_List,
+	name_count:    int,
+	where_token:   token.Token,
+	where_clauses: []^Expr,
+	is_packed:     bool,
+	is_raw_union:  bool,
 }
 
 Union_Type :: struct {
@@ -583,6 +585,8 @@ Union_Type :: struct {
 	poly_params: ^Field_List,
 	align:       ^Expr,
 	variants:    []^Expr,
+	where_token: token.Token,
+	where_clauses: []^Expr,
 }
 
 Enum_Type :: struct {
