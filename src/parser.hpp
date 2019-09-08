@@ -491,20 +491,24 @@ AST_KIND(_TypeBegin, "", bool) \
 		Ast *elem; \
 	}) \
 	AST_KIND(StructType, "struct type", struct { \
-		Token token;              \
-		Array<Ast *> fields;      \
-		isize field_count;        \
-		Ast *polymorphic_params;  \
-		Ast *align;               \
-		bool is_packed;           \
-		bool is_raw_union;        \
+		Token token;                \
+		Array<Ast *> fields;        \
+		isize field_count;          \
+		Ast *polymorphic_params;    \
+		Ast *align;                 \
+		Token where_token;          \
+		Array<Ast *> where_clauses; \
+		bool is_packed;             \
+		bool is_raw_union;          \
 	}) \
 	AST_KIND(UnionType, "union type", struct { \
-		Token        token;      \
-		Array<Ast *> variants;   \
-		Ast *polymorphic_params; \
-		Ast *        align;      \
-		bool         no_nil;     \
+		Token        token;         \
+		Array<Ast *> variants;      \
+		Ast *polymorphic_params;    \
+		Ast *        align;         \
+		bool         no_nil;        \
+		Token where_token;          \
+		Array<Ast *> where_clauses; \
 	}) \
 	AST_KIND(EnumType, "enum type", struct { \
 		Token        token; \

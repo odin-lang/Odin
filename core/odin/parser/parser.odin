@@ -2174,17 +2174,29 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			error(p, tok.pos, "'#raw_union' cannot also be '#packed");
 		}
 
+		where_token: token.Token;
+		where_clauses: []^ast.Expr;
+		if (p.curr_tok.kind == token.Where) {
+			where_token = expect_token(p, token.Where);
+			prev_level := p.expr_level;
+			p.expr_level = -1;
+			where_clauses = parse_rhs_expr_list(p);
+			p.expr_level = prev_level;
+		}
+
 		expect_token(p, token.Open_Brace);
 		fields, name_count = parse_field_list(p, token.Close_Brace, ast.Field_Flags_Struct);
 		close := expect_token(p, token.Close_Brace);
 
 		st := ast.new(ast.Struct_Type, tok.pos, end_pos(close));
-		st.poly_params  = poly_params;
-		st.align        = align;
-		st.is_packed    = is_packed;
-		st.is_raw_union = is_raw_union;
-		st.fields       = fields;
-		st.name_count   = name_count;
+		st.poly_params   = poly_params;
+		st.align         = align;
+		st.is_packed     = is_packed;
+		st.is_raw_union  = is_raw_union;
+		st.fields        = fields;
+		st.name_count    = name_count;
+		st.where_token   = where_token;
+		st.where_clauses = where_clauses;
 		return st;
 
 	case token.Union:
@@ -2217,6 +2229,16 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		}
 		p.expr_level = prev_level;
 
+		where_token: token.Token;
+		where_clauses: []^ast.Expr;
+		if (p.curr_tok.kind == token.Where) {
+			where_token = expect_token(p, token.Where);
+			prev_level := p.expr_level;
+			p.expr_level = -1;
+			where_clauses = parse_rhs_expr_list(p);
+			p.expr_level = prev_level;
+		}
+
 		variants: [dynamic]^ast.Expr;
 
 		expect_token_after(p, token.Open_Brace, "union");
@@ -2234,9 +2256,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		close := expect_token(p, token.Close_Brace);
 
 		ut := ast.new(ast.Union_Type, tok.pos, end_pos(close));
-		ut.poly_params = poly_params;
-		ut.variants    = variants[:];
-		ut.align       = align;
+		ut.poly_params   = poly_params;
+		ut.variants      = variants[:];
+		ut.align         = align;
+		ut.where_token   = where_token;
+		ut.where_clauses = where_clauses;
 
 		return ut;
 
