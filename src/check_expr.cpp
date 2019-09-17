@@ -90,7 +90,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCallingConvention cc);
 bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type *abi_return_type);
 void set_procedure_abi_types(CheckerContext *c, Type *type);
-
+void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type);
 
 Entity *entity_from_expr(Ast *expr) {
 	expr = unparen_expr(expr);
@@ -786,6 +786,7 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 			      op_type_str,
 			      type_str,
 			      LIT(context_name));
+				check_assignment_error_suggestion(c, operand, type);
 			break;
 		}
 		operand->mode = Addressing_Invalid;
@@ -1509,32 +1510,98 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 	return false;
 }
 
+
+void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type) {
+	gbString a = expr_to_string(o->expr);
+	gbString b = type_to_string(type);
+	defer(
+		gb_string_free(b);
+		gb_string_free(a);
+	);
+
+	Type *src = base_type(o->type);
+	Type *dst = base_type(type);
+
+	if (is_type_array(src) && is_type_slice(dst)) {
+		Type *s = src->Array.elem;
+		Type *d = dst->Slice.elem;
+		if (are_types_identical(s, d)) {
+			error_line("\tSuggestion: the array expression may be sliced with %s[:]\n", a);
+		}
+	} else if (are_types_identical(src, dst)) {
+		error_line("\tSuggestion: the expression may be directly casted to type %s\n", b);
+	} else if (are_types_identical(src, t_string) && is_type_u8_slice(dst)) {
+		error_line("\tSuggestion: a string may be casted to %s\n", a, b);
+	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string)) {
+		error_line("\tSuggestion: the expression may be casted to %s\n", b);
+	}
+}
+
+void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type *type) {
+	gbString a = expr_to_string(o->expr);
+	gbString b = type_to_string(type);
+	defer(
+		gb_string_free(b);
+		gb_string_free(a);
+	);
+
+	Type *src = base_type(o->type);
+	Type *dst = base_type(type);
+
+	if (is_type_array(src) && is_type_slice(dst)) {
+		Type *s = src->Array.elem;
+		Type *d = dst->Slice.elem;
+		if (are_types_identical(s, d)) {
+			error_line("\tSuggestion: the array expression may be sliced with %s[:]\n", a);
+		}
+	} else if (is_type_pointer(o->type) && is_type_integer(type)) {
+		if (is_type_uintptr(type)) {
+			error_line("\tSuggestion: a pointer may be directly casted to %s\n", b);
+		} else {
+			error_line("\tSuggestion: for a pointer to be casted to an integer, it must be converted to 'uintptr' first\n");
+			i64 x = type_size_of(o->type);
+			i64 y = type_size_of(type);
+			if (x != y) {
+				error_line("\tNote: the type of expression and the type of the cast have a different size in bytes, %lld vs %lld\n", x, y);
+			}
+		}
+	} else if (is_type_integer(o->type) && is_type_pointer(type)) {
+		if (is_type_uintptr(o->type)) {
+			error_line("\tSuggestion: %a may be directly casted to %s\n", a, b);
+		} else {
+			error_line("\tSuggestion: for an integer to be casted to a pointer, it must be converted to 'uintptr' first\n");
+		}
+	} else if (are_types_identical(src, t_string) && is_type_u8_slice(dst)) {
+		error_line("\tSuggestion: a string may be casted to %s\n", a, b);
+	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string)) {
+		error_line("\tSuggestion: the expression may be casted to %s\n", b);
+	}
+}
+
+
 void check_is_expressible(CheckerContext *c, Operand *o, Type *type) {
 	GB_ASSERT(is_type_constant_type(type));
 	GB_ASSERT(o->mode == Addressing_Constant);
 	if (!check_representable_as_constant(c, o->value, type, &o->value)) {
 		gbString a = expr_to_string(o->expr);
 		gbString b = type_to_string(type);
+		defer(
+			gb_string_free(b);
+			gb_string_free(a);
+			o->mode = Addressing_Invalid;
+		);
+
 		if (is_type_numeric(o->type) && is_type_numeric(type)) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error(o->expr, "'%s' truncated to '%s'", a, b);
 			} else {
-			#if 0
-				gbAllocator ha = heap_allocator();
-				String str = big_int_to_string(ha, &o->value.value_integer);
-				defer (gb_free(ha, str.text));
-				error(o->expr, "'%s = %.*s' overflows '%s'", a, LIT(str), b);
-			#else
 				error(o->expr, "Cannot convert '%s' to '%s'", a, b);
-			#endif
+				check_assignment_error_suggestion(c, o, type);
 			}
 		} else {
 			error(o->expr, "Cannot convert '%s' to '%s'", a, b);
+			check_assignment_error_suggestion(c, o, type);
 		}
-
-		gb_string_free(b);
-		gb_string_free(a);
-		o->mode = Addressing_Invalid;
 	}
 }
 
@@ -2164,6 +2231,8 @@ void check_cast(CheckerContext *c, Operand *x, Type *type) {
 		gb_string_free(from_type);
 		gb_string_free(to_type);
 		gb_string_free(expr_str);
+
+		check_cast_error_suggestion(c, x, type);
 
 		x->mode = Addressing_Invalid;
 		return;
