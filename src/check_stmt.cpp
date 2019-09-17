@@ -1366,7 +1366,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			isize rhs_count = rhs_operands.count;
 			for_array(i, rhs_operands) {
 				if (rhs_operands[i].mode == Addressing_Invalid) {
-					rhs_count--;
+					// TODO(bill): Should I ignore invalid parameters?
+					// rhs_count--;
 				}
 			}
 

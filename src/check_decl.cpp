@@ -112,7 +112,8 @@ void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Ar
 	isize rhs_count = operands.count;
 	for_array(i, operands) {
 		if (operands[i].mode == Addressing_Invalid) {
-			rhs_count--;
+			// TODO(bill): Should I ignore invalid parameters?
+			// rhs_count--;
 		}
 	}
 
