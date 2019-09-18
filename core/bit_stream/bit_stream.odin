@@ -3,12 +3,12 @@ package bs;
 
 import "core:mem"
 
-BITSTREAM_INITIAL_SIZE: int: 128;
-BITSTREAM_GROWTH_RATE:  f64: 2.0;
+BITSTREAM_INITIAL_SIZE :: 128;
+BITSTREAM_GROWTH_RATE  :: 2;
 
 Bit_Stream :: struct {
-    data, head: ^byte,
-    size, cap: int,
+    data: []byte,
+    head, len: int,
     
     readonly: bool,
     allocator: mem.Allocator,
@@ -17,40 +17,44 @@ Bit_Stream :: struct {
 create :: proc{ create_new, create_from_ptr, create_from_ptr_readonly };
 
 // Creates a new bitstream and allocates an initial buffer
-// 0 for initial size == BITSTREAM_INITIAL_SIZE
+// <=0 for initial size == BITSTREAM_INITIAL_SIZE
 create_new :: inline proc(auto_cast initial_size: int = 0,
                    allocator := context.allocator) -> Bit_Stream {
     size := initial_size;
     
-    if size == 0 {
+    if size <= 0 {
         size = BITSTREAM_INITIAL_SIZE;
     }
     
-    head := cast(^byte) mem.alloc(size, mem.DEFAULT_ALIGNMENT, allocator);
+    data := make([]byte, size, allocator);
     
     return Bit_Stream{
-        head, head,
-        0, size,
+        data,
+        0, 0,
         false,
         allocator
     };
 }
 
 // Creates a bitstream from an existing buffer, allocators must be the same
-create_from_ptr :: inline proc "contextless" (auto_cast data: ^byte, auto_cast cap: int,
+create_from_ptr :: inline proc "contextless" (data: ^byte, auto_cast cap: int,
                                               allocator: mem.Allocator) -> Bit_Stream {
+    data := mem.slice_ptr(data, cap);
+    
     return Bit_Stream{
-        data, data,
-        0, cap,
+        data,
+        0, 0,
         false,
         allocator
     };
 }
 
 // Creates a bitstream from an existing buffer that can only be read
-create_from_ptr_readonly :: inline proc "contextless" (auto_cast data: ^byte) -> Bit_Stream {
+create_from_ptr_readonly :: inline proc "contextless" (data: ^byte, auto_cast cap: int) -> Bit_Stream {
+    data := mem.slice_ptr(data, cap);
+    
     return Bit_Stream{
-        data, data,
+        data,
         0, 0,
         true,
         mem.nil_allocator()
@@ -59,7 +63,7 @@ create_from_ptr_readonly :: inline proc "contextless" (auto_cast data: ^byte) ->
 
 // Resets the read/write head back to the base
 reset :: inline proc "contextless" (bs: ^Bit_Stream) {
-    bs.head = bs.data;
+    bs.head = 0;
 }
 
 // Frees the data of the bitstream
@@ -68,21 +72,26 @@ delete :: inline proc(bs: ^Bit_Stream) {
         panic("Can't delete readonly head from a Bit_Stream");
     }
     
-    free(bs.data, bs.allocator);
+    mem.delete(bs.data);
 }
 
 // Reads and returns a type
 read :: inline proc "contextless" (bs: ^Bit_Stream, $T: typeid) -> T {
-    val: T = (cast(^T) bs.head)^;
-    bs.head = mem.ptr_offset(bs.head, size_of(T));
+    assert(bs.head + size_of(T) < len(bs.data), "Trying to read outside of Bit_Stream.data's bounds");
+    
+    val: T = (cast(^T) &bs.data[bs.head])^;
+    bs.head += size_of(T);
     
     return val;
 }
 
 // Reads `size` bytes into the `dest` ptr
-read_into :: inline proc "contextless" (bs: ^Bit_Stream, auto_cast dest: rawptr, size: int) {
-    mem.copy(dest, bs.head, size);
-    bs.head = mem.ptr_offset(bs.head, size);
+read_into :: inline proc "contextless" (bs: ^Bit_Stream, dest: rawptr,
+                                        auto_cast size: int) {
+    assert(bs.head + size < len(bs.data), "Trying to read outside of Bit_Stream.data's bounds");
+    
+    mem.copy(dest, &bs.data[bs.head], size);
+    bs.head += size;
 }
 
 write :: proc{ write_value, write_ptr };
@@ -94,23 +103,29 @@ write_value :: inline proc(bs: ^Bit_Stream, val: $T) {
 }
 
 // Writes `size` bytes of `ptr` into the stream
-write_ptr :: proc(bs: ^Bit_Stream, auto_cast ptr: rawptr, auto_cast size: int) {
+write_ptr :: proc(bs: ^Bit_Stream, ptr: rawptr, auto_cast size: int) {
     if bs.readonly {
         panic("Cannot write into a readonly Bit_Stream");
     }
     
     // Check if we need to grow the buffer
-    if bs.size + size > bs.cap {
-        old_size := bs.cap;
-        bs.cap    = int(f64(bs.cap) * BITSTREAM_GROWTH_RATE);
-        bs.data   = cast(^byte) mem.resize(bs.data, old_size,
-                                           bs.cap,
-                                           mem.DEFAULT_ALIGNMENT, bs.allocator);
+    if bs.len + size > len(bs.data) {
+        // Find a capacity that's able to accomodate the new data
+        new_cap := len(bs.data);
+        for new_cap < bs.len + size {
+            new_cap *= BITSTREAM_GROWTH_RATE;
+        }
         
-        bs.head = mem.ptr_offset(bs.data, size);
+        new_data := mem.resize(mem.raw_slice_data(bs.data), len(bs.data), new_cap,
+                               mem.DEFAULT_ALIGNMENT, bs.allocator);
+        
+        bs.data = transmute([]byte)mem.Raw_Slice{
+            new_data,
+            new_cap
+        };
     }
     
-    mem.copy(bs.head, ptr, size);
-    bs.head = mem.ptr_offset(bs.head, size);
-    bs.size += size;
+    mem.copy(&bs.data[bs.head], ptr, size);
+    bs.head += size;
+    bs.len += size;
 }
