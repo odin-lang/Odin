@@ -1,5 +1,5 @@
 
-package bs;
+package bit_stream;
 
 import "core:mem"
 
@@ -19,7 +19,7 @@ create :: proc{ create_new, create_from_ptr, create_from_ptr_readonly };
 // Creates a new bitstream and allocates an initial buffer
 // <=0 for initial size == BITSTREAM_INITIAL_SIZE
 create_new :: inline proc(auto_cast initial_size: int = 0,
-                   allocator := context.allocator) -> Bit_Stream {
+                          allocator := context.allocator) -> Bit_Stream {
     size := initial_size;
     
     if size <= 0 {
@@ -39,10 +39,8 @@ create_new :: inline proc(auto_cast initial_size: int = 0,
 // Creates a bitstream from an existing buffer, allocators must be the same
 create_from_ptr :: inline proc "contextless" (data: ^byte, auto_cast cap: int,
                                               allocator: mem.Allocator) -> Bit_Stream {
-    data := mem.slice_ptr(data, cap);
-    
     return Bit_Stream{
-        data,
+        mem.slice_ptr(data, cap),
         0, 0,
         false,
         allocator
@@ -51,25 +49,25 @@ create_from_ptr :: inline proc "contextless" (data: ^byte, auto_cast cap: int,
 
 // Creates a bitstream from an existing buffer that can only be read
 create_from_ptr_readonly :: inline proc "contextless" (data: ^byte, auto_cast cap: int) -> Bit_Stream {
-    data := mem.slice_ptr(data, cap);
-    
     return Bit_Stream{
-        data,
+        mem.slice_ptr(data, cap),
         0, 0,
         true,
         mem.nil_allocator()
     };
 }
 
-// Resets the read/write head back to the base
 reset :: inline proc "contextless" (bs: ^Bit_Stream) {
     bs.head = 0;
 }
 
-// Frees the data of the bitstream
+get_data :: inline proc "contextless" (bs: ^Bit_Stream) -> []byte {
+    return bs.data[0:bs.len];
+}
+
 delete :: inline proc(bs: ^Bit_Stream) {
     if bs.readonly {
-        panic("Can't delete readonly head from a Bit_Stream");
+        panic("Can't delete readonly Bit_Stream");
     }
     
     mem.delete(bs.data);
@@ -79,10 +77,8 @@ delete :: inline proc(bs: ^Bit_Stream) {
 read :: inline proc "contextless" (bs: ^Bit_Stream, $T: typeid) -> T {
     assert(bs.head + size_of(T) < len(bs.data), "Trying to read outside of Bit_Stream.data's bounds");
     
-    val: T = (cast(^T) &bs.data[bs.head])^;
     bs.head += size_of(T);
-    
-    return val;
+    return (cast(^T) &bs.data[bs.head])^;
 }
 
 // Reads `size` bytes into the `dest` ptr
@@ -90,8 +86,8 @@ read_into :: inline proc "contextless" (bs: ^Bit_Stream, dest: rawptr,
                                         auto_cast size: int) {
     assert(bs.head + size < len(bs.data), "Trying to read outside of Bit_Stream.data's bounds");
     
-    mem.copy(dest, &bs.data[bs.head], size);
     bs.head += size;
+    mem.copy(dest, &bs.data[bs.head], size);
 }
 
 write :: proc{ write_value, write_ptr };
@@ -127,5 +123,5 @@ write_ptr :: proc(bs: ^Bit_Stream, ptr: rawptr, auto_cast size: int) {
     
     mem.copy(&bs.data[bs.head], ptr, size);
     bs.head += size;
-    bs.len += size;
+    bs.len  += size;
 }
