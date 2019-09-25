@@ -6078,6 +6078,19 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 		for_array(i, ce->args) {
 			Ast *arg = ce->args[i];
 			ast_node(fv, FieldValue, arg);
+
+			if (fv->field->kind == Ast_Ident) {
+				String name = fv->field->Ident.token.string;
+				isize index = lookup_polymorphic_record_parameter(original_type, name);
+				if (index >= 0) {
+					TypeTuple *params = get_record_polymorphic_params(original_type);
+					Entity *e = params->variables[i];
+					if (e->kind == Entity_Constant) {
+						check_expr_with_type_hint(c, &operands[i], fv->value, e->type);
+					}
+				}
+
+			}
 			check_expr_or_type(c, &operands[i], fv->value);
 		}
 
@@ -6088,7 +6101,17 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 
 	} else {
 		operands = array_make<Operand>(heap_allocator(), 0, 2*ce->args.count);
-		check_unpack_arguments(c, nullptr, -1, &operands, ce->args, false, false);
+
+		Entity **lhs = nullptr;
+		isize lhs_count = -1;
+
+		TypeTuple *params = get_record_polymorphic_params(original_type);
+		if (params != nullptr) {
+			lhs = params->variables.data;
+			lhs_count = params->variables.count;
+		}
+
+		check_unpack_arguments(c, lhs, lhs_count, &operands, ce->args, false, false);
 	}
 
 	CallArgumentError err = CallArgumentError_None;
@@ -6217,6 +6240,9 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 			}
 			score += s;
 		}
+
+		// NOTE(bill): Add type info the parameters
+		add_type_info_type(c, o->type);
 	}
 
 	{
