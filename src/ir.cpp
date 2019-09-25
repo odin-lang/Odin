@@ -10028,7 +10028,11 @@ void ir_init_module(irModule *m, Checker *c) {
 
 	{
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompileUnit);
-		di->CompileUnit.file = m->info->files.entries[0].value; // Zeroth is the init file
+
+		GB_ASSERT(m->info->files.entries.count > 0);
+		AstFile *file = m->info->files.entries[0].value;
+
+		di->CompileUnit.file = file; // Zeroth is the init file
 		di->CompileUnit.producer = str_lit("odin");
 
 		map_set(&m->debug_info, hash_pointer(m), di);
@@ -10046,6 +10050,13 @@ void ir_init_module(irModule *m, Checker *c) {
 		m->debug_compile_unit->CompileUnit.globals = globals_di;
 
 		array_init(&m->debug_location_stack, heap_allocator()); // TODO(lachsinc): ir_allocator() ??
+	}
+
+	{
+		for_array(i, m->info->files.entries) {
+			AstFile *file = m->info->files.entries[i].value;
+			ir_add_debug_info_file(m, file);
+		}
 	}
 }
 

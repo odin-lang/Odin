@@ -2450,11 +2450,13 @@ void print_llvm_ir(irGen *ir) {
 
 		for_array(di_index, m->debug_info.entries) {
 			irDebugInfo *di = m->debug_info.entries[di_index].value;
+			GB_ASSERT_MSG(di != nullptr, "Invalid irDebugInfo");
 			ir_fprintf(f, "!%d = ", di->id);
-
 			switch (di->kind) {
 			case irDebugInfo_CompileUnit: {
-				irDebugInfo *file = *map_get(&m->debug_info, hash_pointer(di->CompileUnit.file));
+				irDebugInfo **found = map_get(&m->debug_info, hash_pointer(di->CompileUnit.file));
+				GB_ASSERT_MSG(found != nullptr, "Missing debug info for: %.*s\n", LIT(di->CompileUnit.file->fullpath));
+				irDebugInfo *file = *found;
 				ir_fprintf(f,
 				            "distinct !DICompileUnit("
 				              "language: DW_LANG_C_plus_plus" // Is this good enough?
