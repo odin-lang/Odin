@@ -1242,12 +1242,18 @@ int main(int arg_count, char **arg_ptr) {
 				if (lib.len > 2 && lib[0] == '-' && lib[1] == 'f') {
 					// framework thingie
 					lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
+				} else if (string_ends_with(lib, str_lit(".framework"))) {
+					// framework thingie
+					String lib_name = lib;
+					lib_name = remove_extension_from_path(lib_name);
+					lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", LIT(lib_name));
 				} else if (string_ends_with(lib, str_lit(".a"))) {
 					// static libs, absolute full path relative to the file in which the lib was imported from
 					lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
 				} else if (string_ends_with(lib, str_lit(".dylib"))) {
 					// dynamic lib, relative path to executable
-					lib_str = gb_string_append_fmt(lib_str, " -l:%s/%.*s ", cwd, LIT(lib));
+					// lib_str = gb_string_append_fmt(lib_str, " -l:%s/%.*s ", cwd, LIT(lib));
+					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 				} else {
 					// dynamic or static system lib, just link regularly searching system library paths
 					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
