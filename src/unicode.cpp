@@ -2,7 +2,6 @@
 #pragma warning(disable: 4245)
 
 extern "C" {
-#include "utf8proc/utf8proc.h"
 #include "utf8proc/utf8proc.c"
 }
 #pragma warning(pop)
