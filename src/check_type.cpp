@@ -1915,7 +1915,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 		}
 		}
 	} else if (build_context.ODIN_OS == "linux" ||
-	           build_context.ODIN_OS == "osx") {
+	           build_context.ODIN_OS == "darwin") {
 		Type *bt = core_type(original_type);
 		switch (bt->kind) {
 		// Okay to pass by value (usually)
