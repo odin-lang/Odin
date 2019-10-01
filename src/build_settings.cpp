@@ -2,7 +2,7 @@ enum TargetOsKind {
 	TargetOs_Invalid,
 
 	TargetOs_windows,
-	TargetOs_osx,
+	TargetOs_darwin,
 	TargetOs_linux,
 	TargetOs_essence,
 
@@ -30,7 +30,7 @@ enum TargetEndianKind {
 String target_os_names[TargetOs_COUNT] = {
 	str_lit(""),
 	str_lit("windows"),
-	str_lit("osx"),
+	str_lit("darwin"),
 	str_lit("linux"),
 	str_lit("essence"),
 };
@@ -166,8 +166,8 @@ gb_global TargetMetrics target_linux_amd64 = {
 	str_lit("x86_64-pc-linux-gnu"),
 };
 
-gb_global TargetMetrics target_osx_amd64 = {
-	TargetOs_osx,
+gb_global TargetMetrics target_darwin_amd64 = {
+	TargetOs_darwin,
 	TargetArch_amd64,
 	8,
 	16,
@@ -189,7 +189,7 @@ struct NamedTargetMetrics {
 
 gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("essence_amd64"), &target_essence_amd64 },
-	{ str_lit("macos_amd64"),   &target_osx_amd64 },
+	{ str_lit("darwin_amd64"),   &target_darwin_amd64 },
 	{ str_lit("linux_386"),     &target_linux_386 },
 	{ str_lit("linux_amd64"),   &target_linux_amd64 },
 	{ str_lit("windows_386"),   &target_windows_386 },
@@ -566,7 +566,7 @@ void init_build_context(TargetMetrics *cross_target) {
 		#if defined(GB_SYSTEM_WINDOWS)
 			metrics = target_windows_amd64;
 		#elif defined(GB_SYSTEM_OSX)
-			metrics = target_osx_amd64;
+			metrics = target_darwin_amd64;
 		#else
 			metrics = target_linux_amd64;
 		#endif
@@ -618,7 +618,7 @@ void init_build_context(TargetMetrics *cross_target) {
 		case TargetOs_windows:
 			bc->link_flags = str_lit("/machine:x64 ");
 			break;
-		case TargetOs_osx:
+		case TargetOs_darwin:
 			break;
 		case TargetOs_linux:
 			bc->link_flags = str_lit("-arch x86-64 ");
@@ -631,7 +631,7 @@ void init_build_context(TargetMetrics *cross_target) {
 		case TargetOs_windows:
 			bc->link_flags = str_lit("/machine:x86 ");
 			break;
-		case TargetOs_osx:
+		case TargetOs_darwin:
 			gb_printf_err("Unsupported architecture\n");
 			gb_exit(1);
 			break;

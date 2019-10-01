@@ -1165,7 +1165,8 @@ void ir_print_calling_convention(irFileBuffer *f, irModule *m, ProcCallingConven
 	switch (cc) {
 	case ProcCC_Odin:        ir_write_str_lit(f, "");       break;
 	case ProcCC_Contextless: ir_write_str_lit(f, "");       break;
-	case ProcCC_CDecl:       ir_write_str_lit(f, "ccc ");   break;
+	// case ProcCC_CDecl:       ir_write_str_lit(f, "ccc ");   break;
+	case ProcCC_CDecl:       ir_write_str_lit(f, "");   break;
 	case ProcCC_StdCall:     ir_write_str_lit(f, "cc 64 "); break;
 	case ProcCC_FastCall:    ir_write_str_lit(f, "cc 65 "); break;
 	case ProcCC_None:        ir_write_str_lit(f, "");       break;
@@ -1175,8 +1176,8 @@ void ir_print_calling_convention(irFileBuffer *f, irModule *m, ProcCallingConven
 
 void ir_print_context_parameter_prefix(irFileBuffer *f, irModule *m) {
 	ir_print_type(f, m, t_context_ptr);
-	ir_write_str_lit(f, " noalias nonnull nocapture inreg ");
-	// ir_write_str_lit(f, " noalias nonnull nocapture ");
+	// ir_write_str_lit(f, " noalias nonnull nocapture inreg ");
+	ir_write_str_lit(f, " noalias nonnull nocapture ");
 }
 
 void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
@@ -1227,6 +1228,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_write_str_lit(f, ", ");
 		ir_print_type(f, m, type);
 		ir_fprintf(f, "* %%%d, align 1", instr->ZeroInit.address->index);
+		// ir_fprintf(f, "* %%%d", instr->ZeroInit.address->index);
 		break;
 	}
 
@@ -2244,9 +2246,11 @@ void print_llvm_ir(irGen *ir) {
 	defer (ir_file_buffer_destroy(f));
 
 	i32 word_bits = cast(i32)(8*build_context.word_size);
-	if (build_context.ODIN_OS == "osx" || build_context.ODIN_OS == "macos") {
+	if (build_context.ODIN_OS == "darwin") {
 		GB_ASSERT(word_bits == 64);
-		ir_write_str_lit(f, "target triple = \"x86_64-apple-macosx10.8\"\n\n");
+		ir_write_str_lit(f, "target datalayout = \"e-m:o-i64:64-f80:128-n8:16:32:64-S128\"\n");
+		ir_write_str_lit(f, "target triple = \"x86_64-apple-macosx10.8\"\n");
+		ir_write_str_lit(f, "\n");
 	} else if (build_context.ODIN_OS == "windows") {
 		ir_fprintf(f, "target triple = \"x86%s-pc-windows-msvc\"\n\n", word_bits == 64 ? "_64" : "");
 		if (word_bits == 64 && build_context.metrics.arch == TargetArch_amd64) {
