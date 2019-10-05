@@ -551,7 +551,26 @@ i64      type_offset_of             (Type *t, i32 index);
 gbString type_to_string             (Type *type);
 void     init_map_internal_types(Type *type);
 Type *   bit_set_to_int(Type *t);
+bool are_types_identical(Type *x, Type *y);
 
+
+bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t) {
+	if (ptr_set_exists(s, t)) {
+		return true;
+	}
+
+	// TODO(bill, 2019-10-05): This is very slow and it's probably a lot
+	// faster to cache types correctly
+	for_array(i, s->entries) {
+		Type *f = s->entries[i].ptr;
+		if (are_types_identical(t, f)) {
+			ptr_set_add(s, t);
+			return true;
+		}
+	}
+
+	return false;
+}
 
 Type *base_type(Type *t) {
 	for (;;) {
