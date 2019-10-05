@@ -1580,8 +1580,10 @@ void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type *type) {
 
 
 void check_is_expressible(CheckerContext *c, Operand *o, Type *type) {
-	GB_ASSERT(is_type_constant_type(type));
 	GB_ASSERT(o->mode == Addressing_Constant);
+	if (!is_type_constant_type(type)) {
+		return;
+	}
 	if (!check_representable_as_constant(c, o->value, type, &o->value)) {
 		gbString a = expr_to_string(o->expr);
 		gbString b = type_to_string(type);
