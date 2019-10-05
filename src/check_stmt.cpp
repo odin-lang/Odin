@@ -1205,7 +1205,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 					GB_PANIC("Unknown type to type switch statement");
 				}
 
-				if (ptr_set_exists(&seen, y.type)) {
+				if (type_ptr_set_exists(&seen, y.type)) {
 					TokenPos pos = cc->token.pos;
 					gbString expr_str = expr_to_string(y.expr);
 					error(y.expr,
@@ -1257,7 +1257,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 
 		for_array(i, variants) {
 			Type *t = variants[i];
-			if (!ptr_set_exists(&seen, t)) {
+			if (!type_ptr_set_exists(&seen, t)) {
 				array_add(&unhandled, t);
 			}
 		}
