@@ -51,14 +51,14 @@ Import_Decl_Kind :: enum {
 
 
 default_warning_handler :: proc(pos: token.Pos, msg: string, args: ..any) {
-	fmt.printf_err("%s(%d:%d): Warning: ", pos.file, pos.line, pos.column);
-	fmt.printf_err(msg, ..args);
-	fmt.printf_err("\n");
+	fmt.eprintf("%s(%d:%d): Warning: ", pos.file, pos.line, pos.column);
+	fmt.eprintf(msg, ..args);
+	fmt.eprintf("\n");
 }
 default_error_handler :: proc(pos: token.Pos, msg: string, args: ..any) {
-	fmt.printf_err("%s(%d:%d): ", pos.file, pos.line, pos.column);
-	fmt.printf_err(msg, ..args);
-	fmt.printf_err("\n");
+	fmt.eprintf("%s(%d:%d): ", pos.file, pos.line, pos.column);
+	fmt.eprintf(msg, ..args);
+	fmt.eprintf("\n");
 }
 
 warn :: proc(p: ^Parser, pos: token.Pos, msg: string, args: ..any) {
