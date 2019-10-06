@@ -304,10 +304,8 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 			write_byte(buf, info.signed ? 'i' : 'u');
 			write_i64(buf, i64(8*ti.size), 10);
 			switch info.endianness {
-			case rt.Type_Info_Endianness.Little:
-				write_string(buf, "le");
-			case rt.Type_Info_Endianness.Big:
-				write_string(buf, "be");
+			case .Little: write_string(buf, "le");
+			case .Big:    write_string(buf, "be");
 			}
 		}
 	case rt.Type_Info_Rune:
