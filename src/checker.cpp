@@ -2613,14 +2613,14 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			Entity *e = nullptr;
 
 			d->attributes = vd->attributes;
+			d->type_expr = vd->type;
+			d->init_expr = init;
 
 			if (is_ast_type(init)) {
 				e = alloc_entity_type_name(d->scope, token, nullptr);
-				if (vd->type != nullptr) {
-					error(name, "A type declaration cannot have an type parameter");
-				}
-				d->type_expr = init;
-				d->init_expr = init;
+				// if (vd->type != nullptr) {
+				// 	error(name, "A type declaration cannot have an type parameter");
+				// }
 			} else if (init->kind == Ast_ProcLit) {
 				if (c->scope->flags&ScopeFlag_Type) {
 					error(name, "Procedure declarations are not allowed within a struct");
@@ -2647,19 +2647,15 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 					pl->type->ProcType.calling_convention = cc;
 				}
 				d->proc_lit = init;
-				d->type_expr = vd->type;
+				d->init_expr = init;
 			} else if (init->kind == Ast_ProcGroup) {
 				ast_node(pg, ProcGroup, init);
 				e = alloc_entity_proc_group(d->scope, token, nullptr);
 				if (fl != nullptr) {
 					error(name, "Procedure groups are not allowed within a foreign block");
 				}
-				d->init_expr = init;
-				d->type_expr = vd->type;
 			} else {
 				e = alloc_entity_constant(d->scope, token, nullptr, empty_exact_value);
-				d->type_expr = vd->type;
-				d->init_expr = init;
 			}
 			e->identifier = name;
 

@@ -38,6 +38,7 @@ enum ExactValueKind {
 	ExactValue_Pointer,
 	ExactValue_Compound,  // TODO(bill): Is this good enough?
 	ExactValue_Procedure, // TODO(bill): Is this good enough?
+	ExactValue_Typeid,
 
 	ExactValue_Count,
 };
@@ -54,6 +55,7 @@ struct ExactValue {
 		Quaternion256 value_quaternion;
 		Ast *         value_compound;
 		Ast *         value_procedure;
+		Type *        value_typeid;
 	};
 };
 
@@ -82,6 +84,8 @@ HashKey hash_exact_value(ExactValue v) {
 		return hash_pointer(v.value_compound);
 	case ExactValue_Procedure:
 		return hash_pointer(v.value_procedure);
+	case ExactValue_Typeid:
+		return hash_pointer(v.value_typeid);
 	}
 	return hashing_proc(&v, gb_size_of(ExactValue));
 
@@ -150,6 +154,13 @@ ExactValue exact_value_pointer(i64 ptr) {
 ExactValue exact_value_procedure(Ast *node) {
 	ExactValue result = {ExactValue_Procedure};
 	result.value_procedure = node;
+	return result;
+}
+
+
+ExactValue exact_value_typeid(Type *type) {
+	ExactValue result = {ExactValue_Typeid};
+	result.value_typeid = type;
 	return result;
 }
 
@@ -889,6 +900,13 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 		}
 		break;
 	}
+
+	case ExactValue_Typeid:
+		switch (op) {
+		case Token_CmpEq: return are_types_identical(x.value_typeid, y.value_typeid);
+		case Token_NotEq: return !are_types_identical(x.value_typeid, y.value_typeid);
+		}
+		break;
 	}
 
 	GB_PANIC("Invalid comparison");

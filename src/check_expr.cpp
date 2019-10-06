@@ -442,6 +442,10 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 	}
 
 	if (operand->mode == Addressing_Type) {
+		if (is_type_typeid(type)) {
+			add_type_info_type(c, operand->type);
+			return 4;
+		}
 		return -1;
 	}
 
@@ -755,7 +759,12 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 		return;
 	}
 
-	if (!check_is_assignable_to(c, operand, type)) {
+	if (check_is_assignable_to(c, operand, type)) {
+		if (operand->mode == Addressing_Type && is_type_typeid(type)) {
+			add_type_info_type(c, operand->type);
+			add_type_and_value(c->info, operand->expr, Addressing_Value, type, exact_value_typeid(operand->type));
+		}
+	} else {
 		gbString expr_str    = expr_to_string(operand->expr);
 		gbString op_type_str = type_to_string(operand->type);
 		gbString type_str    = type_to_string(type);
@@ -1734,6 +1743,23 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 		return;
 	}
 
+	if (x->mode == Addressing_Type && is_type_typeid(y->type)) {
+		add_type_info_type(c, x->type);
+		add_type_and_value(c->info, x->expr, Addressing_Value, y->type, exact_value_typeid(x->type));
+
+		x->mode = Addressing_Value;
+		x->type = t_untyped_bool;
+		return;
+	} else if (is_type_typeid(x->type) && y->mode == Addressing_Type) {
+		add_type_info_type(c, y->type);
+		add_type_and_value(c->info, y->expr, Addressing_Value, x->type, exact_value_typeid(y->type));
+
+		x->mode = Addressing_Value;
+		x->type = t_untyped_bool;
+		return;
+	}
+
+
 	gbString err_str = nullptr;
 
 	defer (if (err_str != nullptr) {
@@ -2324,8 +2350,16 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		// If only one is a type, this is an error
 		if (xt ^ yt) {
 			GB_ASSERT(xt != yt);
-			if (xt) error_operand_not_expression(x);
-			if (yt) error_operand_not_expression(y);
+			if (xt) {
+				if (!is_type_typeid(y->type)) {
+					error_operand_not_expression(x);
+				}
+			}
+			if (yt) {
+				if (!is_type_typeid(x->type)) {
+					error_operand_not_expression(y);
+				}
+			}
 		}
 
 		break;
@@ -5254,6 +5288,11 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					}
 				}
 				score += s;
+
+				if (o.mode == Addressing_Type && is_type_typeid(e->type)) {
+					add_type_info_type(c, o.type);
+					add_type_and_value(c->info, o.expr, Addressing_Value, e->type, exact_value_typeid(o.type));
+				}
 			}
 
 			if (variadic) {
@@ -5495,6 +5534,11 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 				}
 			}
 			score += s;
+		}
+
+		if (o->mode == Addressing_Type && is_type_typeid(e->type)) {
+			add_type_info_type(c, o->type);
+			add_type_and_value(c->info, o->expr, Addressing_Value, e->type, exact_value_typeid(o->type));
 		}
 	}
 
@@ -6431,17 +6475,6 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call) {
 			return Expr_Stmt;
 		}
 	}
-
-	// NOTE(bill): Should this be here or on the `add_entity_use`?
-	// if (ce->proc != nullptr) {
-	// 	Entity *e = entity_of_node(&c->info, ce->proc);
-	// 	if (e != nullptr && e->kind == Entity_Procedure) {
-	// 		String msg = e->Procedure.deprecated_message;
-	// 		if (msg.len > 0) {
-	// 			warning(call, "%.*s is deprecated: %.*s", LIT(e->token.string), LIT(msg));
-	// 		}
-	// 	}
-	// }
 
 	CallArgumentData data = check_call_arguments(c, operand, proc_type, call);
 	Type *result_type = data.result_type;
