@@ -10,6 +10,24 @@ when os.OS == "windows" {
 	import "core:thread"
 }
 
+/*
+    The Odin programming language is fast, concise, readable, pragmatic and open sourced. It is designed with the intent of replacing C with the following goals:
+     * simplicity
+     * high performance
+     * built for modern systems
+     * joy of programming
+
+    # Installing Odin
+    Getting Started - https://odin-lang.org/docs/install/
+        Instructions for downloading and install the Odin compiler and libraries.
+
+    # Learning Odin
+    Overview of Odin - https://odin-lang.org/docs/overview/
+        An overview of the Odin programming language.
+    Frequently Asked Questions (FAQ) - https://odin-lang.org/docs/faq/
+        Answers to common questions about Odin.
+*/
+
 @(link_name="general_stuff")
 general_stuff :: proc() {
 	fmt.println("# general_stuff");
@@ -38,8 +56,6 @@ general_stuff :: proc() {
 
 		_ = (^f32)(ptr)^;
 		_ = (cast(^f32)ptr)^;
-
-		// Questions: Should there be two ways to do it?
 	}
 
 	/*
