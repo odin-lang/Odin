@@ -1144,17 +1144,17 @@ token_precedence :: proc(p: ^Parser, kind: token.Kind) -> int {
 	     token.Lt_Eq, token.Gt_Eq:
 		return 5;
 	case token.In, token.Notin:
-		if p.expr_level >= 0 || p.allow_in_expr {
-			return 6;
+		if p.expr_level < 0 && !p.allow_in_expr {
+			return 0;
 		}
-		return 0;
+		fallthrough;
 	case token.Add, token.Sub, token.Or, token.Xor:
-		return 7;
+		return 6;
 	case token.Mul, token.Quo,
 	     token.Mod, token.Mod_Mod,
 	     token.And, token.And_Not,
 	     token.Shl, token.Shr:
-		return 8;
+		return 7;
 	}
 	return 0;
 }

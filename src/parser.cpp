@@ -2479,17 +2479,18 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_LtEq:
 	case Token_GtEq:
 		return 5;
+
 	case Token_in:
 	case Token_notin:
-		if (f->expr_level >= 0 || f->allow_in_expr) {
-			return 6;
+		if (f->expr_level < 0 && !f->allow_in_expr) {
+			return 0;
 		}
-		return 0;
+		/*fallthrough*/
 	case Token_Add:
 	case Token_Sub:
 	case Token_Or:
 	case Token_Xor:
-		return 7;
+		return 6;
 	case Token_Mul:
 	case Token_Quo:
 	case Token_Mod:
@@ -2498,7 +2499,7 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_AndNot:
 	case Token_Shl:
 	case Token_Shr:
-		return 8;
+		return 7;
 	}
 	return 0;
 }
