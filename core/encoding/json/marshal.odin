@@ -284,11 +284,10 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 			t := runtime.type_info_base(ti);
 			switch info in t.variant {
 			case runtime.Type_Info_Integer:
-				using runtime.Type_Info_Endianness;
 				switch info.endianness {
-				case Platform: return false;
-				case Little:   return ODIN_ENDIAN != "little";
-				case Big:      return ODIN_ENDIAN != "big";
+				case .Platform: return false;
+				case .Little:   return ODIN_ENDIAN != "little";
+				case .Big:      return ODIN_ENDIAN != "big";
 				}
 			}
 			return false;

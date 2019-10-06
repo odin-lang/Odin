@@ -1344,7 +1344,8 @@ bool is_semicolon_optional_for_node(AstFile *f, Ast *s) {
 	case Ast_UnionType:
 	case Ast_EnumType:
 	case Ast_BitFieldType:
-		return true;
+		// Require semicolon within a procedure body
+		return f->curr_proc == false;
 	case Ast_ProcLit:
 		return true;
 
