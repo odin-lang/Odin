@@ -69,7 +69,7 @@ general_stuff :: proc() {
 		Foo :: struct {
 			x: int,
 			b: bool,
-		}
+		};
 		f := Foo{137, true};
 		x, b := expand_to_tuple(f);
 		fmt.println(f);
@@ -228,18 +228,18 @@ union_type :: proc() {
 			orientation: Quaternion,
 
 			derived: any,
-		}
+		};
 
 		Frog :: struct {
 			using entity: Entity,
 			jump_height:  f32,
-		}
+		};
 
 		Monster :: struct {
 			using entity: Entity,
 			is_robot:     bool,
 			is_zombie:    bool,
-		}
+		};
 
 		// See `parametric_polymorphism` procedure for details
 		new_entity :: proc($T: typeid) -> ^Entity {
@@ -273,18 +273,18 @@ union_type :: proc() {
 			orientation: Quaternion,
 
 			derived: union {Frog, Monster},
-		}
+		};
 
 		Frog :: struct {
 			using entity: ^Entity,
 			jump_height:  f32,
-		}
+		};
 
 		Monster :: struct {
 			using entity: ^Entity,
 			is_robot:     bool,
 			is_zombie:    bool,
-		}
+		};
 
 		// See `parametric_polymorphism` procedure for details
 		new_entity :: proc($T: typeid) -> ^Entity {
@@ -402,13 +402,13 @@ parametric_polymorphism :: proc() {
 			hash:     u32,
 			key:      Key,
 			value:    Value,
-		}
+		};
 		TABLE_SIZE_MIN :: 32;
 		Table :: struct(Key, Value: typeid) {
 			count:     int,
 			allocator: mem.Allocator,
 			slots:     []Table_Slot(Key, Value),
-		}
+		};
 
 		// Only allow types that are specializations of a (polymorphic) slice
 		make_slice :: proc($T: typeid/[]$E, len: int) -> T {
@@ -532,7 +532,7 @@ parametric_polymorphism :: proc() {
 			Foo1,
 			Foo2,
 			Foo3,
-		}
+		};
 		Para_Union :: union(T: typeid) {T, Error};
 		r: Para_Union(int);
 		fmt.println(typeid_of(type_of(r)));
@@ -728,19 +728,19 @@ map_type :: proc() {
 	Enum_u8 :: enum u8 {
 		A = 0,
 		B = 1 << 8 - 1,
-	}
+	};
 	Enum_u64 :: enum u64 {
 		A = 0,
 		B = 1 << 64 - 1,
-	}
+	};
 	Enum_i8 :: enum i8 {
 		A = 0,
 		B = -(1 << 7),
-	}
+	};
 	Enum_i64 :: enum i64 {
 		A = 0,
 		B = -(1 << 63),
-	}
+	};
 
 	map_u8: map[Enum_u8]u8;
 	map_u8[Enum_u8.A] = u8(Enum_u8.B);
@@ -764,7 +764,7 @@ map_type :: proc() {
 
 	demo_struct :: struct {
 		member: Enum_i64,
-	}
+	};
 
 	map_string: map[string]demo_struct;
 	map_string["Hellope!"] = demo_struct{Enum_i64.B};
@@ -846,7 +846,7 @@ complete_switch :: proc() {
 			B,
 			C,
 			D,
-		}
+		};
 
 		b := Foo.B;
 		f := Foo.A;
@@ -916,7 +916,7 @@ bit_set_type :: proc() {
 			Thursday,
 			Friday,
 			Saturday,
-		}
+		};
 
 		Days :: distinct bit_set[Day];
 		WEEKEND :: Days{Sunday, Saturday};
@@ -1003,7 +1003,7 @@ reflection :: proc() {
 		x: int    `tag1`,
 		y: string `json:"y_field"`,
 		z: bool, // no tag
-	}
+	};
 
 	id := typeid_of(Foo);
 	names := reflect.struct_field_names(id);
@@ -1105,7 +1105,7 @@ inline_for_statement :: proc() {
 		B,
 		C = 6,
 		D,
-	}
+	};
 	fmt.println("Enum types");
 	inline for elem, idx in Foo_Enum {
 		fmt.println(elem, idx);
@@ -1180,7 +1180,7 @@ where_clauses :: proc() {
 			      N > 2 {
 			x: [N]T,
 			y: [N-2]T,
-		}
+		};
 
 		T :: i32;
 		N :: 5;
