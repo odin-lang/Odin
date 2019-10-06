@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:mem"
 import "core:os"
 import "core:reflect"
+import "core:strings"
 import "intrinsics"
 
 when os.OS == "windows" {
@@ -1189,7 +1190,15 @@ where_clauses :: proc() {
 }
 
 main :: proc() {
-	when true {
+    x := "foobarbaz";
+    i : int;
+    i = strings.last_index(x, "foo"); fmt.println(i);
+    i = strings.last_index(x, "bar"); fmt.println(i);
+    i = strings.last_index(x, "baz"); fmt.println(i);
+    i = strings.last_index(x, "asd"); fmt.println(i);
+    i = strings.last_index(x, "a"); fmt.println(i);
+    i = strings.last_index(x, "ba"); fmt.println(i);
+	when false {
 		general_stuff();
 		union_type();
 		parametric_polymorphism();
@@ -1212,3 +1221,4 @@ main :: proc() {
 		where_clauses();
 	}
 }
+

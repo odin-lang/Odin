@@ -205,7 +205,11 @@ itoa :: proc(buf: []byte, i: int) -> string {
 atoi :: proc(s: string) -> int {
 	return parse_int(s);
 }
+atof :: proc(s: string) -> f64 {
+	return parse_f64(s);
+}
 
+ftoa :: append_float;
 append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
 	return string(generic_ftoa(buf, f, fmt, prec, bit_size));
 }

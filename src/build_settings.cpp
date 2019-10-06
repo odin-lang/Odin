@@ -55,7 +55,7 @@ TargetEndianKind target_endians[TargetArch_COUNT] = {
 
 
 
-String const ODIN_VERSION = str_lit("0.10.1");
+String const ODIN_VERSION = str_lit("0.10.2");
 
 
 
