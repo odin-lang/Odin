@@ -6592,6 +6592,11 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 			return ir_emit_conv(proc, x, tv.type);
 		}
 
+		if (tv.value.kind == ExactValue_Typeid) {
+			irValue *v = ir_typeid(proc->module, tv.value.value_typeid);
+			return ir_emit_conv(proc, v, tv.type);
+		}
+
 		return ir_add_module_constant(proc->module, tv.type, tv.value);
 	}
 

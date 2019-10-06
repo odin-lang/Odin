@@ -1923,10 +1923,6 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_typeid: {
 		Token token = expect_token(f, Token_typeid);
-		// Ast *specialization = nullptr;
-		// if (allow_token(f, Token_Quo)) {
-		// 	specialization = parse_type(f);
-		// }
 		return ast_typeid_type(f, token, nullptr);
 	} break;
 

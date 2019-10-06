@@ -41,11 +41,20 @@ Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, Stri
 	}
 
 	if (operand->mode == Addressing_Type) {
-		gbString t = type_to_string(operand->type);
-		error(operand->expr, "Cannot assign a type '%s' to variable '%.*s'", t, LIT(e->token.string));
-		gb_string_free(t);
-		e->type = operand->type;
-		return nullptr;
+		if (e->type != nullptr && is_type_typeid(e->type)) {
+			add_type_info_type(ctx, operand->type);
+			add_type_and_value(ctx->info, operand->expr, Addressing_Value, e->type, exact_value_typeid(operand->type));
+			return e->type;
+		} else {
+			gbString t = type_to_string(operand->type);
+			defer (gb_string_free(t));
+			error(operand->expr, "Cannot assign a type '%s' to variable '%.*s'", t, LIT(e->token.string));
+			if (e->type == nullptr) {
+				error_line("\tThe type of the variable '%.*s' cannot be inferred as a type does not have a type\n", LIT(e->token.string));
+			}
+			e->type = operand->type;
+			return nullptr;
+		}
 	}
 
 
@@ -240,7 +249,7 @@ isize total_attribute_count(DeclInfo *decl) {
 }
 
 
-void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) {
+void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) {
 	GB_ASSERT(e->type == nullptr);
 
 	DeclInfo *decl = decl_info_of_entity(e);
@@ -248,9 +257,8 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) 
 		check_decl_attributes(ctx, decl->attributes, const_decl_attribute, nullptr);
 	}
 
-
-	bool is_distinct = is_type_distinct(type_expr);
-	Ast *te = remove_type_alias_clutter(type_expr);
+	bool is_distinct = is_type_distinct(init_expr);
+	Ast *te = remove_type_alias_clutter(init_expr);
 	e->type = t_invalid;
 	String name = e->token.string;
 	Type *named = alloc_type_named(name, nullptr, e);
@@ -266,7 +274,7 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) 
 	named->Named.base = base_type(bt);
 
 	if (is_distinct && is_type_typeid(e->type)) {
-		error(type_expr, "'distinct' cannot be applied to 'typeid'");
+		error(init_expr, "'distinct' cannot be applied to 'typeid'");
 		is_distinct = false;
 	}
 	if (!is_distinct) {
@@ -274,6 +282,19 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) 
 		named->Named.base = bt;
 		e->TypeName.is_type_alias = true;
 	}
+
+
+	if (decl->type_expr != nullptr) {
+		Type *t = check_type(ctx, decl->type_expr);
+		if (t != nullptr && !is_type_typeid(t)) {
+			Operand operand = {};
+			operand.mode = Addressing_Type;
+			operand.type = e->type;
+			operand.expr = init_expr;
+			check_assignment(ctx, &operand, t, str_lit("constant declaration"));
+		}
+	}
+
 
 	// using decl
 	if (decl->is_using) {
@@ -363,15 +384,14 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 
 		switch (operand.mode) {
 		case Addressing_Type: {
+			if (e->type != nullptr && !is_type_typeid(e->type)) {
+				check_assignment(ctx, &operand, e->type, str_lit("constant declaration"));
+			}
+
 			e->kind = Entity_TypeName;
 			e->type = nullptr;
 
-			DeclInfo *d = ctx->decl;
-			if (d->type_expr != nullptr) {
-				error(e->token, "A type declaration cannot have an type parameter");
-			}
-			d->type_expr = d->init_expr;
-			check_type_decl(ctx, e, d->type_expr, named_type);
+			check_type_decl(ctx, e, ctx->decl->init_expr, named_type);
 			return;
 		}
 
@@ -1070,7 +1090,7 @@ void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_
 		check_const_decl(&c, e, d->type_expr, d->init_expr, named_type);
 		break;
 	case Entity_TypeName: {
-		check_type_decl(&c, e, d->type_expr, named_type);
+		check_type_decl(&c, e, d->init_expr, named_type);
 		break;
 	}
 	case Entity_Procedure:
