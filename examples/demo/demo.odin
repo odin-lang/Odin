@@ -1190,15 +1190,7 @@ where_clauses :: proc() {
 }
 
 main :: proc() {
-    x := "foobarbaz";
-    i : int;
-    i = strings.last_index(x, "foo"); fmt.println(i);
-    i = strings.last_index(x, "bar"); fmt.println(i);
-    i = strings.last_index(x, "baz"); fmt.println(i);
-    i = strings.last_index(x, "asd"); fmt.println(i);
-    i = strings.last_index(x, "a"); fmt.println(i);
-    i = strings.last_index(x, "ba"); fmt.println(i);
-	when false {
+	when true {
 		general_stuff();
 		union_type();
 		parametric_polymorphism();
