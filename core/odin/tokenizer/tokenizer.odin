@@ -1,10 +1,9 @@
 package odin_tokenizer
 
 import "core:fmt"
-import "core:odin/token"
 import "core:unicode/utf8"
 
-Error_Handler :: #type proc(pos: token.Pos, fmt: string, args: ..any);
+Error_Handler :: #type proc(pos: Pos, fmt: string, args: ..any);
 
 Tokenizer :: struct {
 	// Immutable data
@@ -41,11 +40,11 @@ init :: proc(t: ^Tokenizer, src: []byte, path: string, err: Error_Handler = defa
 }
 
 @(private)
-offset_to_pos :: proc(t: ^Tokenizer, offset: int) -> token.Pos {
+offset_to_pos :: proc(t: ^Tokenizer, offset: int) -> Pos {
 	line := t.line_count;
 	column := offset - t.line_offset + 1;
 
-	return token.Pos {
+	return Pos {
 		file = t.path,
 		offset = offset,
 		line = line,
@@ -53,7 +52,7 @@ offset_to_pos :: proc(t: ^Tokenizer, offset: int) -> token.Pos {
 	};
 }
 
-default_error_handler :: proc(pos: token.Pos, msg: string, args: ..any) {
+default_error_handler :: proc(pos: Pos, msg: string, args: ..any) {
 	fmt.eprintf("%s(%d:%d) ", pos.file, pos.line, pos.column);
 	fmt.eprintf(msg, ..args);
 	fmt.eprintf("\n");
@@ -322,15 +321,15 @@ scan_rune :: proc(t: ^Tokenizer) -> string {
 	return string(t.src[offset : t.offset]);
 }
 
-scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (token.Kind, string) {
+scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Token_Kind, string) {
 	scan_mantissa :: proc(t: ^Tokenizer, base: int) {
 		for digit_val(t.ch) < base || t.ch == '_' {
 			advance_rune(t);
 		}
 	}
-	scan_exponent :: proc(t: ^Tokenizer, kind: ^token.Kind) {
+	scan_exponent :: proc(t: ^Tokenizer, kind: ^Token_Kind) {
 		if t.ch == 'e' || t.ch == 'E' {
-			kind^ = token.Float;
+			kind^ = .Float;
 			advance_rune(t);
 			if t.ch == '-' || t.ch == '+' {
 				advance_rune(t);
@@ -345,16 +344,16 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (token.Kind, str
 		// NOTE(bill): This needs to be here for sanity's sake
 		switch t.ch {
 		case 'i', 'j', 'k':
-			kind^ = token.Imag;
+			kind^ = .Imag;
 			advance_rune(t);
 		}
 	}
-	scan_fraction :: proc(t: ^Tokenizer, kind: ^token.Kind) -> (early_exit: bool) {
+	scan_fraction :: proc(t: ^Tokenizer, kind: ^Token_Kind) -> (early_exit: bool) {
 		if t.ch == '.' && peek_byte(t) == '.' {
 			return true;
 		}
 		if t.ch == '.' {
-			kind^ = token.Float;
+			kind^ = .Float;
 			advance_rune(t);
 			scan_mantissa(t, 10);
 		}
@@ -363,22 +362,22 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (token.Kind, str
 
 
 	offset := t.offset;
-	kind := token.Integer;
+	kind := Token_Kind.Integer;
 	seen_point := seen_decimal_point;
 
 	if seen_point {
 		offset -= 1;
-		kind = token.Float;
+		kind = .Float;
 		scan_mantissa(t, 10);
 		scan_exponent(t, &kind);
 	} else {
 		if t.ch == '0' {
-			int_base :: inline proc(t: ^Tokenizer, kind: ^token.Kind, base: int, msg: string) {
+			int_base :: inline proc(t: ^Tokenizer, kind: ^Token_Kind, base: int, msg: string) {
 				prev := t.offset;
 				advance_rune(t);
 				scan_mantissa(t, base);
 				if t.offset - prev <= 1 {
-					kind^ = token.Invalid;
+					kind^ = .Invalid;
 					error(t, t.offset, msg);
 				}
 			}
@@ -395,7 +394,7 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (token.Kind, str
 				advance_rune(t);
 				scan_mantissa(t, 16);
 				if t.offset - prev <= 1 {
-					kind = token.Invalid;
+					kind = .Invalid;
 					error(t, t.offset, "illegal hexadecimal floating-point number");
 				} else {
 					sub := t.src[prev+1 : t.offset];
@@ -440,15 +439,15 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (token.Kind, str
 }
 
 
-scan :: proc(t: ^Tokenizer) -> token.Token {
-	switch2 :: proc(t: ^Tokenizer, tok0, tok1: token.Kind) -> token.Kind {
+scan :: proc(t: ^Tokenizer) -> Token {
+	switch2 :: proc(t: ^Tokenizer, tok0, tok1: Token_Kind) -> Token_Kind {
 		if t.ch == '=' {
 			advance_rune(t);
 			return tok1;
 		}
 		return tok0;
 	}
-	switch3 :: proc(t: ^Tokenizer, tok0, tok1: token.Kind, ch2: rune, tok2: token.Kind) -> token.Kind {
+	switch3 :: proc(t: ^Tokenizer, tok0, tok1: Token_Kind, ch2: rune, tok2: Token_Kind) -> Token_Kind {
 		if t.ch == '=' {
 			advance_rune(t);
 			return tok1;
@@ -459,7 +458,7 @@ scan :: proc(t: ^Tokenizer) -> token.Token {
 		}
 		return tok0;
 	}
-	switch4 :: proc(t: ^Tokenizer, tok0, tok1: token.Kind, ch2: rune, tok2, tok3: token.Kind) -> token.Kind {
+	switch4 :: proc(t: ^Tokenizer, tok0, tok1: Token_Kind, ch2: rune, tok2, tok3: Token_Kind) -> Token_Kind {
 		if t.ch == '=' {
 			advance_rune(t);
 			return tok1;
@@ -480,25 +479,25 @@ scan :: proc(t: ^Tokenizer) -> token.Token {
 
 	offset := t.offset;
 
-	kind: token.Kind;
+	kind: Token_Kind;
 	lit:  string;
 	pos := offset_to_pos(t, offset);
 
 	switch ch := t.ch; true {
 	case is_letter(ch):
 		lit = scan_identifier(t);
-		kind = token.Ident;
+		kind = .Ident;
 		check_keyword: if len(lit) > 1 {
 			// TODO(bill): Maybe have a hash table lookup rather than this linear search
-			for i in token.B_Keyword_Begin .. token.B_Keyword_End {
-				if lit == token.tokens[i] {
-					kind = token.Kind(i);
+			for i in Token_Kind.B_Keyword_Begin .. Token_Kind.B_Keyword_End {
+				if lit == tokens[i] {
+					kind = Token_Kind(i);
 					break check_keyword;
 				}
 			}
-			for keyword, i in token.custom_keyword_tokens {
+			for keyword, i in custom_keyword_tokens {
 				if lit == keyword {
-					kind = token.Kind(i+1)+token.B_Custom_Keyword_Begin;
+					kind = Token_Kind(i+1) + .B_Custom_Keyword_Begin;
 					break check_keyword;
 				}
 			}
@@ -509,115 +508,115 @@ scan :: proc(t: ^Tokenizer) -> token.Token {
 		advance_rune(t);
 		switch ch {
 		case -1:
-			kind = token.EOF;
+			kind = .EOF;
 		case '"':
-			kind = token.String;
+			kind = .String;
 			lit = scan_string(t);
 		case '\'':
-			kind = token.Rune;
+			kind = .Rune;
 			lit = scan_rune(t);
 		case '`':
-			kind = token.String;
+			kind = .String;
 			lit = scan_raw_string(t);
 		case '=':
 			if t.ch == '>' {
 				advance_rune(t);
-				kind = token.Double_Arrow_Right;
+				kind = .Double_Arrow_Right;
 			} else {
-				kind = switch2(t, token.Eq, token.Cmp_Eq);
+				kind = switch2(t, .Eq, .Cmp_Eq);
 			}
-		case '!': kind = switch2(t, token.Not, token.Not_Eq);
+		case '!': kind = switch2(t, .Not, .Not_Eq);
 		case '#':
-			kind = token.Hash;
+			kind = .Hash;
 			if t.ch == '!' {
-				kind = token.Comment;
+				kind = .Comment;
 				lit = scan_comment(t);
 			}
-		case '?': kind = token.Question;
-		case '@': kind = token.At;
-		case '$': kind = token.Dollar;
-		case '^': kind = token.Pointer;
-		case '+': kind = switch2(t, token.Add, token.Add_Eq);
+		case '?': kind = .Question;
+		case '@': kind = .At;
+		case '$': kind = .Dollar;
+		case '^': kind = .Pointer;
+		case '+': kind = switch2(t, .Add, .Add_Eq);
 		case '-':
 			if t.ch == '>' {
 				advance_rune(t);
-				kind = token.Arrow_Right;
+				kind = .Arrow_Right;
 			} else if t.ch == '-' && peek_byte(t) == '-' {
 				advance_rune(t);
 				advance_rune(t);
-				kind = token.Undef;
+				kind = .Undef;
 			} else {
-				kind = switch2(t, token.Sub, token.Sub_Eq);
+				kind = switch2(t, .Sub, .Sub_Eq);
 			}
-		case '*': kind = switch2(t, token.Mul, token.Mul_Eq);
+		case '*': kind = switch2(t, .Mul, .Mul_Eq);
 		case '/':
 			if t.ch == '/' || t.ch == '*' {
-				kind = token.Comment;
+				kind = .Comment;
 				lit = scan_comment(t);
 			} else {
-				kind = switch2(t, token.Quo, token.Quo_Eq);
+				kind = switch2(t, .Quo, .Quo_Eq);
 			}
-		case '%': kind = switch4(t, token.Mod, token.Mod_Eq, '%', token.Mod_Mod, token.Mod_Mod_Eq);
+		case '%': kind = switch4(t, .Mod, .Mod_Eq, '%', .Mod_Mod, .Mod_Mod_Eq);
 		case '&':
 			if t.ch == '~' {
 				advance_rune(t);
-				kind = switch2(t, token.And_Not, token.And_Not_Eq);
+				kind = switch2(t, .And_Not, .And_Not_Eq);
 			} else {
-				kind = switch3(t, token.And, token.And_Eq, '&', token.Cmp_And);
+				kind = switch3(t, .And, .And_Eq, '&', .Cmp_And);
 			}
-		case '|': kind = switch3(t, token.Or, token.Or_Eq, '|', token.Cmp_Or);
-		case '~': kind = token.Xor;
+		case '|': kind = switch3(t, .Or, .Or_Eq, '|', .Cmp_Or);
+		case '~': kind = .Xor;
 		case '<':
 			if t.ch == '-' {
 				advance_rune(t);
-				kind = token.Arrow_Left;
+				kind = .Arrow_Left;
 			} else {
-				kind = switch4(t, token.Lt, token.Lt_Eq, '<', token.Shl, token.Shl_Eq);
+				kind = switch4(t, .Lt, .Lt_Eq, '<', .Shl, .Shl_Eq);
 			}
-		case '>': kind = switch4(t, token.Gt, token.Gt_Eq, '>', token.Shr,token.Shr_Eq);
+		case '>': kind = switch4(t, .Gt, .Gt_Eq, '>', .Shr,.Shr_Eq);
 
-		case '≠': kind = token.Not_Eq;
-		case '≤': kind = token.Lt_Eq;
-		case '≥': kind = token.Gt_Eq;
-		case '∈': kind = token.In;
-		case '∉': kind = token.Notin;
+		case '≠': kind = .Not_Eq;
+		case '≤': kind = .Lt_Eq;
+		case '≥': kind = .Gt_Eq;
+		case '∈': kind = .In;
+		case '∉': kind = .Notin;
 
 		case '.':
 			if '0' <= t.ch && t.ch <= '9' {
 				kind, lit = scan_number(t, true);
 			} else {
-				kind = token.Period;
+				kind = .Period;
 				if t.ch == '.' {
 					advance_rune(t);
-					kind = token.Ellipsis;
+					kind = .Ellipsis;
 					if t.ch == '<' {
 						advance_rune(t);
-						kind = token.Range_Half;
+						kind = .Range_Half;
 					}
 				}
 			}
-		case ':': kind = token.Colon;
-		case ',': kind = token.Comma;
-		case ';': kind = token.Semicolon;
-		case '(': kind = token.Open_Paren;
-		case ')': kind = token.Close_Paren;
-		case '[': kind = token.Open_Bracket;
-		case ']': kind = token.Close_Bracket;
-		case '{': kind = token.Open_Brace;
-		case '}': kind = token.Close_Brace;
+		case ':': kind = .Colon;
+		case ',': kind = .Comma;
+		case ';': kind = .Semicolon;
+		case '(': kind = .Open_Paren;
+		case ')': kind = .Close_Paren;
+		case '[': kind = .Open_Bracket;
+		case ']': kind = .Close_Bracket;
+		case '{': kind = .Open_Brace;
+		case '}': kind = .Close_Brace;
 
-		case '\\': kind = token.Back_Slash;
+		case '\\': kind = .Back_Slash;
 
 		case:
 			if ch != utf8.RUNE_BOM {
 				error(t, t.offset, "illegal character '%r': %d", ch, ch);
 			}
-			kind = token.Invalid;
+			kind = .Invalid;
 		}
 	}
 
 	if lit == "" {
 		lit = string(t.src[offset : t.offset]);
 	}
-	return token.Token{kind, lit, pos};
+	return Token{kind, lit, pos};
 }

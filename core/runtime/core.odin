@@ -814,7 +814,7 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 		key:   Map_Key,
 		next:  int,
 		value: V,
-	}
+	};
 
 	_, is_string := type_info_base(type_info_of(K)).variant.(Type_Info_String);
 	header.is_key_string = is_string;

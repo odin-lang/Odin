@@ -105,7 +105,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 	Buffer :: struct {
 		b: []byte,
 		n: int,
-	}
+	};
 
 	to_bytes :: proc(b: Buffer) -> []byte do return b.b[:b.n];
 	add_bytes :: proc(buf: ^Buffer, bytes: ..byte) {
