@@ -69,8 +69,8 @@ eprintf  :: proc(fmt: string, args: ..any) -> int { return fprintf(context.stder
 
 
 @(deprecated="prefer eprint")   print_err   :: proc(args: ..any)              -> int { return eprint(..args); }
-@(deprecated="prefer eprintf")  println_err :: proc(args: ..any)              -> int { return eprintln(..args); }
-@(deprecated="prefer eprintln") printf_err  :: proc(fmt: string, args: ..any) -> int { return eprintf(fmt, ..args); }
+@(deprecated="prefer eprintf")  printf_err  :: proc(fmt: string, args: ..any) -> int { return eprintf(fmt, ..args); }
+@(deprecated="prefer eprintln") println_err :: proc(args: ..any)              -> int { return eprintln(..args); }
 
 
 // aprint* procedures return a string that was allocated with the current context

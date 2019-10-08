@@ -4,7 +4,6 @@ import "core:fmt"
 import "core:mem"
 import "core:os"
 import "core:reflect"
-import "core:strings"
 import "intrinsics"
 
 when os.OS == "windows" {

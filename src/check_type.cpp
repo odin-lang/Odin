@@ -2016,8 +2016,10 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCal
 			break;
 		}
 		}
-	} else if (build_context.ODIN_OS == "linux") {
-
+	} else if (build_context.ODIN_OS == "linux" || build_context.ODIN_OS == "darwin") {
+		if (build_context.ODIN_ARCH == "amd64") {
+			
+		}
 	} else {
 		// IMPORTANT TODO(bill): figure out the ABI settings for Linux, OSX etc. for
 		// their architectures
