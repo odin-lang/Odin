@@ -169,9 +169,9 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 			n = l;
 		}
 
-		res := make([dynamic]string, n);
+		res := make([dynamic]string, n, allocator);
 		for i := 0; i < n-1; i += 1 {
-			r, w := utf8.decode_rune_in_string(s);
+			_, w := utf8.decode_rune_in_string(s);
 			res[i] = s[:w];
 			s = s[w:];
 		}
@@ -185,7 +185,7 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 		n = count(s, sep) + 1;
 	}
 
-	res := make([dynamic]string, n);
+	res := make([dynamic]string, n, allocator);
 
 	n -= 1;
 
