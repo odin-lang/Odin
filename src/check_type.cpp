@@ -1838,108 +1838,109 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 }
 
 Array<Type *> systemv_distribute_struct_fields(Type *t) {
-	t = base_type(t);
-	GB_ASSERT_MSG(t->kind == Type_Struct, "%s", type_to_string(t));
-	TypeStruct *ts = &t->Struct;
+	Type *bt = core_type(t);
 
-	auto distributed = array_make<Type *>(heap_allocator(), 0, ts->fields.count);
 
-	for_array(field_index, ts->fields) {
-		Entity *f = ts->fields[field_index];
-		Type *bt = core_type(f->type);
-		switch (bt->kind) {
-		case Type_Basic:
-			switch (bt->Basic.kind){
-			case Basic_complex64:
-				array_add(&distributed, t_f32);
-				array_add(&distributed, t_f32);
-				break;
-			case Basic_complex128:
-				array_add(&distributed, t_f64);
-				array_add(&distributed, t_f64);
-				break;
-			case Basic_quaternion128:
-				array_add(&distributed, t_f32);
-				array_add(&distributed, t_f32);
-				array_add(&distributed, t_f32);
-				array_add(&distributed, t_f32);
-				break;
-			case Basic_quaternion256:
-				goto DEFAULT;
-			case Basic_string:
-				array_add(&distributed, t_u8_ptr);
-				array_add(&distributed, t_int);
-				break;
-			case Basic_any:
-				GB_ASSERT(type_size_of(t_uintptr) == type_size_of(t_typeid));
-				array_add(&distributed, t_rawptr);
-				array_add(&distributed, t_uintptr);
-				break;
+	isize distributed_cap = 1;
+	if (bt->kind == Type_Struct) {
+		distributed_cap = bt->Struct.fields.count;
+	}
+	auto distributed = array_make<Type *>(heap_allocator(), 0, distributed_cap);
 
-			case Basic_u128:
-			case Basic_i128:
-				if (build_context.ODIN_OS == "windows") {
-					array_add(&distributed, alloc_type_simd_vector(2, t_u64));
-				} else {
-					array_add(&distributed, bt);
-				}
-				break;
 
-			default:
-				goto DEFAULT;
-			}
+	switch (bt->kind) {
+	case Type_Basic:
+		switch (bt->Basic.kind){
+		case Basic_complex64:
+			array_add(&distributed, t_f32);
+			array_add(&distributed, t_f32);
 			break;
-
-		case Type_Struct:
-			if (bt->Struct.is_raw_union) {
-				goto DEFAULT;
-			} else {
-				// IMPORTANT TOOD(bill): handle #packed structs correctly
-				// IMPORTANT TODO(bill): handle #align structs correctly
-				auto nested = systemv_distribute_struct_fields(f->type);
-				for_array(i, nested) {
-					array_add(&distributed, nested[i]);
-				}
-				array_free(&nested);
-			}
+		case Basic_complex128:
+			array_add(&distributed, t_f64);
+			array_add(&distributed, t_f64);
 			break;
-
-		case Type_Array:
-			for (i64 i = 0; i < bt->Array.count; i++) {
-				array_add(&distributed, bt->Array.elem);
-			}
+		case Basic_quaternion128:
+			array_add(&distributed, t_f32);
+			array_add(&distributed, t_f32);
+			array_add(&distributed, t_f32);
+			array_add(&distributed, t_f32);
 			break;
-
-		case Type_BitSet:
-			array_add(&distributed, bit_set_to_int(bt));
-			break;
-
-		case Type_Tuple:
-			GB_PANIC("Invalid struct field type");
-			break;
-
-		case Type_Slice:
-			array_add(&distributed, t_rawptr);
+		case Basic_quaternion256:
+			goto DEFAULT;
+		case Basic_string:
+			array_add(&distributed, t_u8_ptr);
 			array_add(&distributed, t_int);
 			break;
+		case Basic_any:
+			GB_ASSERT(type_size_of(t_uintptr) == type_size_of(t_typeid));
+			array_add(&distributed, t_rawptr);
+			array_add(&distributed, t_uintptr);
+			break;
 
-		case Type_DynamicArray:
-		case Type_Map:
-		case Type_Union:
-		case Type_BitField: // TODO(bill): Ignore?
-			// NOTE(bill, 2019-10-10): Odin specific, don't worry about C calling convention yet
-			goto DEFAULT;
-
-		case Type_Pointer:
-		case Type_Proc:
-		case Type_SimdVector: // TODO(bill): Is this correct logic?
-		default:
-		DEFAULT:;
-			if (type_size_of(bt) > 0) {
+		case Basic_u128:
+		case Basic_i128:
+			if (build_context.ODIN_OS == "windows") {
+				array_add(&distributed, alloc_type_simd_vector(2, t_u64));
+			} else {
 				array_add(&distributed, bt);
 			}
 			break;
+
+		default:
+			goto DEFAULT;
 		}
+		break;
+
+	case Type_Struct:
+		if (bt->Struct.is_raw_union) {
+			goto DEFAULT;
+		} else {
+			// IMPORTANT TOOD(bill): handle #packed structs correctly
+			// IMPORTANT TODO(bill): handle #align structs correctly
+			for_array(field_index, bt->Struct.fields) {
+				Entity *f = bt->Struct.fields[field_index];
+				auto nested = systemv_distribute_struct_fields(f->type);
+				array_add_elems(&distributed, nested.data, nested.count);
+				array_free(&nested);
+			}
+		}
+		break;
+
+	case Type_Array:
+		for (i64 i = 0; i < bt->Array.count; i++) {
+			array_add(&distributed, bt->Array.elem);
+		}
+		break;
+
+	case Type_BitSet:
+		array_add(&distributed, bit_set_to_int(bt));
+		break;
+
+	case Type_Tuple:
+		GB_PANIC("Invalid struct field type");
+		break;
+
+	case Type_Slice:
+		array_add(&distributed, t_rawptr);
+		array_add(&distributed, t_int);
+		break;
+
+	case Type_DynamicArray:
+	case Type_Map:
+	case Type_Union:
+	case Type_BitField: // TODO(bill): Ignore?
+		// NOTE(bill, 2019-10-10): Odin specific, don't worry about C calling convention yet
+		goto DEFAULT;
+
+	case Type_Pointer:
+	case Type_Proc:
+	case Type_SimdVector: // TODO(bill): Is this correct logic?
+	default:
+	DEFAULT:;
+		if (type_size_of(bt) > 0) {
+			array_add(&distributed, bt);
+		}
+		break;
 	}
 
 	return distributed;
@@ -2002,11 +2003,48 @@ Type *handle_single_distributed_type_parameter(Array<Type *> const &types, bool 
 }
 
 Type *handle_struct_system_v_amd64_abi_type(Type *t) {
-	GB_ASSERT(is_type_struct(t));
+	Type *original_type = t;
 	Type *bt = core_type(t);
+	t = base_type(t);
 	i64 size = type_size_of(bt);
 
-	if (!bt->Struct.is_raw_union) {
+	switch (t->kind) {
+	case Type_Array:
+	case Type_Slice:
+	case Type_DynamicArray:
+	case Type_Struct:
+		break;
+
+	case Type_Basic:
+		switch (bt->Basic.kind) {
+		case Basic_string:
+		case Basic_any:
+		case Basic_complex64:
+		case Basic_complex128:
+		case Basic_quaternion128:
+			break;
+		}
+		return original_type;
+	case Type_Pointer:
+	case Type_Map:
+	case Type_Union:
+	case Type_Enum:
+	case Type_Proc:
+	case Type_BitField:
+	case Type_BitSet:
+	case Type_SimdVector:
+		return original_type;
+	}
+
+	bool is_packed = false;
+	if (is_type_struct(bt)) {
+		is_packed = bt->Struct.is_packed;
+	}
+
+	if (is_type_raw_union(bt)) {
+		// TODO(bill): Handle raw union correctly for
+		return t;
+	} else {
 		auto field_types = systemv_distribute_struct_fields(bt);
 		defer (array_free(&field_types));
 
@@ -2015,21 +2053,21 @@ Type *handle_struct_system_v_amd64_abi_type(Type *t) {
 		Type *final_type = nullptr;
 
 		if (field_types.count == 0) {
-			// Do nothing
+			return t;
 		} else if (field_types.count == 1) {
 			final_type = field_types[0];
 		} else {
 			if (size <= 8) {
 				isize offset = 0;
-				final_type = handle_single_distributed_type_parameter(field_types, bt->Struct.is_packed, &offset);
+				final_type = handle_single_distributed_type_parameter(field_types, is_packed, &offset);
 			} else {
 				isize offset = 0;
 				isize next_offset = 0;
 				Type *two_types[2] = {};
 
-				two_types[0] = handle_single_distributed_type_parameter(field_types, bt->Struct.is_packed, &offset);
+				two_types[0] = handle_single_distributed_type_parameter(field_types, is_packed, &offset);
 				auto remaining = array_slice(field_types, offset, field_types.count);
-				two_types[1] = handle_single_distributed_type_parameter(remaining, bt->Struct.is_packed, &next_offset);
+				two_types[1] = handle_single_distributed_type_parameter(remaining, is_packed, &next_offset);
 				GB_ASSERT(offset + next_offset == field_types.count);
 
 				auto variables = array_make<Entity *>(heap_allocator(), 2);
@@ -2040,8 +2078,6 @@ Type *handle_struct_system_v_amd64_abi_type(Type *t) {
 			}
 		}
 		return final_type;
-	} else {
-		return t;
 	}
 }
 
@@ -2141,29 +2177,17 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 		case Type_Pointer: break;
 		case Type_Proc:    break; // NOTE(bill): Just a pointer
 
-		// Odin specific
-		case Type_Slice:
-		case Type_Array:
-		case Type_DynamicArray:
-		case Type_Map:
-		case Type_Union:
-		// Could be in C too
-		case Type_Struct: {
-			i64 align = type_align_of(original_type);
-			i64 size  = type_size_of(original_type);
+		default: {
+			i64 size = type_size_of(original_type);
 			if (size > 16) {
 				new_type = alloc_type_pointer(original_type);
 			} else if (build_context.ODIN_ARCH == "amd64") {
-				if (is_type_struct(bt)) {
-					// NOTE(bill): System V AMD64 ABI
-					if (bt->Struct.is_raw_union) {
-						// TODO(bill): Handle raw union correctly for
-						break;
-					}
-
-					new_type = handle_struct_system_v_amd64_abi_type(bt);
-					return new_type;
+				// NOTE(bill): System V AMD64 ABI
+				new_type = handle_struct_system_v_amd64_abi_type(bt);
+				if (are_types_identical(core_type(original_type), new_type)) {
+					new_type = original_type;
 				}
+				return new_type;
 			}
 
 			break;
