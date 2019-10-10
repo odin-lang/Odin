@@ -1848,6 +1848,50 @@ Array<Type *> systemv_distribute_struct_fields(Type *t, i32 level=0) {
 		Entity *f = ts->fields[field_index];
 		Type *bt = core_type(f->type);
 		switch (bt->kind) {
+		case Type_Basic:
+			switch (bt->Basic.kind){
+			case Basic_complex64:
+				array_add(&distributed, t_f32);
+				array_add(&distributed, t_f32);
+				break;
+			case Basic_complex128:
+				array_add(&distributed, t_f64);
+				array_add(&distributed, t_f64);
+				break;
+			case Basic_quaternion128:
+				array_add(&distributed, t_f32);
+				array_add(&distributed, t_f32);
+				array_add(&distributed, t_f32);
+				array_add(&distributed, t_f32);
+				break;
+			case Basic_quaternion256:
+				array_add(&distributed, t_f64);
+				array_add(&distributed, t_f64);
+				array_add(&distributed, t_f64);
+				array_add(&distributed, t_f64);
+				break;
+			case Basic_string:
+				array_add(&distributed, t_u8_ptr);
+				array_add(&distributed, t_int);
+				break;
+			case Basic_any:
+				GB_ASSERT(type_size_of(t_uintptr) == type_size_of(t_typeid));
+				array_add(&distributed, t_rawptr);
+				array_add(&distributed, t_uintptr);
+				break;
+
+			case Basic_u128:
+			case Basic_i128:
+				if (build_context.ODIN_OS == "windows") {
+					array_add(&distributed, alloc_type_simd_vector(2, t_u64));
+				} else {
+					array_add(&distributed, bt);
+				}
+			default:
+				goto DEFAULT;
+			}
+			break;
+
 		case Type_Struct:
 			if (bt->Struct.is_raw_union) {
 				goto DEFAULT;
@@ -1877,6 +1921,10 @@ Array<Type *> systemv_distribute_struct_fields(Type *t, i32 level=0) {
 			break;
 
 		case Type_Slice:
+			array_add(&distributed, t_rawptr);
+			array_add(&distributed, t_int);
+			break;
+
 		case Type_DynamicArray:
 		case Type_Map:
 		case Type_Union:
