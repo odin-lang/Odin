@@ -2105,7 +2105,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 		case Type_Struct: {
 			i64 align = type_align_of(original_type);
 			i64 size  = type_size_of(original_type);
-			if (8*size > 16) {
+			if (size > 16) {
 				new_type = alloc_type_pointer(original_type);
 			} else if (build_context.ODIN_ARCH == "amd64") {
 				if (is_type_struct(bt)) {
