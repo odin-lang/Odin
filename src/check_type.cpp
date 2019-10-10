@@ -2003,15 +2003,16 @@ Type *handle_single_distributed_type_parameter(Array<Type *> const &types, bool 
 }
 
 Type *handle_struct_system_v_amd64_abi_type(Type *t) {
+	if (type_size_of(t) > 16) {
+		return alloc_type_pointer(t);
+	}
 	Type *original_type = t;
 	Type *bt = core_type(t);
 	t = base_type(t);
 	i64 size = type_size_of(bt);
 
 	switch (t->kind) {
-	case Type_Array:
 	case Type_Slice:
-	case Type_DynamicArray:
 	case Type_Struct:
 		break;
 
@@ -2023,16 +2024,12 @@ Type *handle_struct_system_v_amd64_abi_type(Type *t) {
 		case Basic_complex128:
 		case Basic_quaternion128:
 			break;
+		default:
+			return original_type;
 		}
-		return original_type;
-	case Type_Pointer:
-	case Type_Map:
-	case Type_Union:
-	case Type_Enum:
-	case Type_Proc:
-	case Type_BitField:
-	case Type_BitSet:
-	case Type_SimdVector:
+		break;
+
+	default:
 		return original_type;
 	}
 
