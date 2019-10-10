@@ -1130,7 +1130,11 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 		break;
 	}
 	case irValue_Param:
-		ir_print_encoded_local(f, value->Param.entity->token.string);
+		if (value->Param.index >= 0) {
+			ir_fprintf(f, "%%_.%d", value->Param.index);
+		} else {
+			ir_print_encoded_local(f, value->Param.entity->token.string);
+		}
 		break;
 	case irValue_SourceCodeLocation: {
 		irValue *file      = value->SourceCodeLocation.file;
@@ -1936,9 +1940,6 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					}
 					ir_write_byte(f, ' ');
 					irValue *arg = call->args[i];
-					if (is_type_boolean(t)) {
-
-					}
 					ir_print_value(f, m, arg, t);
 					param_index++;
 				}
@@ -1953,24 +1954,43 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					param_index++;
 				}
 			} else {
-				GB_ASSERT(call->args.count == params->variables.count);
+				// GB_ASSERT(call->args.count == params->variables.count);
+				isize arg_index = 0;
 				for_array(i, params->variables) {
 					Entity *e = params->variables[i];
 					GB_ASSERT(e != nullptr);
-					if (e->kind != Entity_Variable) continue;
+					if (e->kind != Entity_Variable) {
+						arg_index++;
+						continue;
+					}
 
 					if (param_index > 0) ir_write_str_lit(f, ", ");
 
-					irValue *arg = call->args[i];
 					Type *t = proc_type->Proc.abi_compat_params[i];
+					if (is_type_tuple(t)) {
+						for_array(j, t->Tuple.variables) {
+							if (j > 0) ir_write_str_lit(f, ", ");
 
-					ir_print_type(f, m, t);
-					if (e->flags&EntityFlag_NoAlias) {
-						ir_write_str_lit(f, " noalias");
+							irValue *arg = call->args[arg_index++];
+
+							ir_print_type(f, m, t->Tuple.variables[j]->type);
+							if (e->flags&EntityFlag_NoAlias) {
+								ir_write_str_lit(f, " noalias");
+							}
+							ir_write_byte(f, ' ');
+							ir_print_value(f, m, arg, t);
+							param_index++;
+						}
+					} else {
+						irValue *arg = call->args[arg_index++];
+						ir_print_type(f, m, t);
+						if (e->flags&EntityFlag_NoAlias) {
+							ir_write_str_lit(f, " noalias");
+						}
+						ir_write_byte(f, ' ');
+						ir_print_value(f, m, arg, t);
+						param_index++;
 					}
-					ir_write_byte(f, ' ');
-					ir_print_value(f, m, arg, t);
-					param_index++;
 				}
 			}
 		}
@@ -2089,7 +2109,8 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 
 	if (param_count > 0) {
 		TypeTuple *params = &proc_type->params->Tuple;
-		for (isize i = 0; i < param_count; i++) {
+		isize parameter_index = 0;
+		for (isize i = 0; i < param_count; i++, parameter_index++) {
 			Entity *e = params->variables[i];
 			Type *original_type = e->type;
 			Type *abi_type = proc_type->abi_compat_params[i];
@@ -2099,16 +2120,29 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 			if (i+1 == params->variables.count && proc_type->c_vararg) {
 				ir_write_str_lit(f, " ...");
 			} else {
-				ir_print_type(f, m, abi_type);
-				if (e->flags&EntityFlag_NoAlias) {
-					ir_write_str_lit(f, " noalias");
-				}
-				if (proc->body != nullptr) {
-					if (e->token.string != "" && !is_blank_ident(e->token)) {
-						ir_write_byte(f, ' ');
-						ir_print_encoded_local(f, e->token.string);
-					} else {
-						ir_fprintf(f, " %%_.param_%td", i);
+				if (is_type_tuple(abi_type)) {
+					for_array(j, abi_type->Tuple.variables) {
+						if (j > 0) ir_write_string(f, str_lit(", "));
+
+						Type *tft = abi_type->Tuple.variables[j]->type;
+						ir_print_type(f, m, tft);
+						if (e->flags&EntityFlag_NoAlias) {
+							ir_write_str_lit(f, " noalias");
+						}
+
+						if (proc->body != nullptr) {
+							ir_fprintf(f, " %%_.%td", parameter_index+j);
+						}
+					}
+					parameter_index += abi_type->Tuple.variables.count-1;
+					param_index += abi_type->Tuple.variables.count-1;
+				} else {
+					ir_print_type(f, m, abi_type);
+					if (e->flags&EntityFlag_NoAlias) {
+						ir_write_str_lit(f, " noalias");
+					}
+					if (proc->body != nullptr) {
+						ir_fprintf(f, " %%_.%td", parameter_index);
 					}
 				}
 			}
