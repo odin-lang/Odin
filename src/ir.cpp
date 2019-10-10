@@ -3061,8 +3061,8 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 		Type *new_type = pt->Proc.abi_compat_params[i];
 		Type *arg_type = ir_type(args[i]);
 		if (are_types_identical(arg_type, new_type)) {
-			array_add(&processed_args, args[i]);
 			// NOTE(bill): Done
+			array_add(&processed_args, args[i]);
 		} else if (!are_types_identical(original_type, new_type)) {
 			if (is_type_pointer(new_type) && !is_type_pointer(original_type)) {
 				if (e->flags&EntityFlag_ImplicitReference) {
@@ -3085,6 +3085,9 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 					array_add(&processed_args, xx);
 				}
 			}
+		} else {
+			irValue *x = ir_emit_conv(p, args[i], new_type);
+			array_add(&processed_args, x);
 		}
 	}
 

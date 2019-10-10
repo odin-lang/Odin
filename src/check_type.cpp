@@ -2108,14 +2108,16 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 			if (8*size > 16) {
 				new_type = alloc_type_pointer(original_type);
 			} else if (build_context.ODIN_ARCH == "amd64") {
-				// NOTE(bill): System V AMD64 ABI
-				if (bt->Struct.is_raw_union) {
-					// TODO(bill): Handle raw union correctly for
-					break;
-				}
+				if (is_type_struct(bt)) {
+					// NOTE(bill): System V AMD64 ABI
+					if (bt->Struct.is_raw_union) {
+						// TODO(bill): Handle raw union correctly for
+						break;
+					}
 
-				new_type = handle_struct_system_v_amd64_abi_type(bt);
-				return new_type;
+					new_type = handle_struct_system_v_amd64_abi_type(bt);
+					return new_type;
+				}
 			}
 
 			break;
