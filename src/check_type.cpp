@@ -1837,9 +1837,9 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 	return tuple;
 }
 
-Array<Type *> systemv_distribute_struct_fields(Type *t, i32 level=0) {
+Array<Type *> systemv_distribute_struct_fields(Type *t) {
 	t = base_type(t);
-	GB_ASSERT_MSG(t->kind == Type_Struct, "%s %d", type_to_string(t), level);
+	GB_ASSERT_MSG(t->kind == Type_Struct, "%s", type_to_string(t));
 	TypeStruct *ts = &t->Struct;
 
 	auto distributed = array_make<Type *>(heap_allocator(), 0, ts->fields.count);
@@ -1865,11 +1865,7 @@ Array<Type *> systemv_distribute_struct_fields(Type *t, i32 level=0) {
 				array_add(&distributed, t_f32);
 				break;
 			case Basic_quaternion256:
-				array_add(&distributed, t_f64);
-				array_add(&distributed, t_f64);
-				array_add(&distributed, t_f64);
-				array_add(&distributed, t_f64);
-				break;
+				goto DEFAULT;
 			case Basic_string:
 				array_add(&distributed, t_u8_ptr);
 				array_add(&distributed, t_int);
@@ -1887,6 +1883,8 @@ Array<Type *> systemv_distribute_struct_fields(Type *t, i32 level=0) {
 				} else {
 					array_add(&distributed, bt);
 				}
+				break;
+
 			default:
 				goto DEFAULT;
 			}
@@ -1898,7 +1896,7 @@ Array<Type *> systemv_distribute_struct_fields(Type *t, i32 level=0) {
 			} else {
 				// IMPORTANT TOOD(bill): handle #packed structs correctly
 				// IMPORTANT TODO(bill): handle #align structs correctly
-				auto nested = systemv_distribute_struct_fields(f->type, level+1);
+				auto nested = systemv_distribute_struct_fields(f->type);
 				for_array(i, nested) {
 					array_add(&distributed, nested[i]);
 				}
