@@ -10,8 +10,8 @@
     <a href="https://github.com/odin-lang/odin/releases/latest">
         <img src="https://img.shields.io/badge/platforms-Windows%20|%20Linux%20|%20macOS-green.svg">
     </a>
-    <a href="https://github.com/odin-lang/odin/blob/master/LICENSE">
-        <img src="https://img.shields.io/github/license/odin-lang/odin.svg">
+    <a href="https://discord.gg/hnwN2Rj">
+        <img src="https://img.shields.io/discord/568138951836172421?logo=discord">
     </a>
     <br>
     <a href="https://ci.appveyor.com/project/ThisDrunkDane/odin-vf0ap">
