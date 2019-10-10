@@ -147,6 +147,7 @@ struct irProcedure {
 
 	Array<irContextData>  context_stack;
 
+	i32      parameter_count;
 
 	irValue *return_ptr_hint_value;
 	Ast *    return_ptr_hint_ast;
@@ -425,6 +426,7 @@ enum irParamPasskind {
 	irParamPass_Integer,  // Pass as an integer of the same size
 	irParamPass_ConstRef, // Pass as a pointer but the value is immutable
 	irParamPass_BitCast,  // Pass by value and bit cast to the correct type
+	irParamPass_Tuple,    // Pass across multiple parameters (System V AMD64, up to 2)
 };
 
 struct irValueParam {
@@ -433,6 +435,7 @@ struct irValueParam {
 	Entity *         entity;
 	Type *           type;
 	Type *           original_type;
+	i32              index;
 	Array<irValue *> referrers;
 };
 
@@ -914,15 +917,18 @@ irValue *ir_value_global(Entity *e, irValue *value) {
 	if (value) value->uses += 1;
 	return v;
 }
-irValue *ir_value_param(irProcedure *parent, Entity *e, Type *abi_type) {
+irValue *ir_value_param(irProcedure *parent, Entity *e, Type *abi_type, i32 index) {
 	irValue *v = ir_alloc_value(irValue_Param);
 	v->Param.kind          = irParamPass_Value;
 	v->Param.parent        = parent;
-	v->Param.entity        = e;
-	v->Param.original_type = e->type;
+	if (e != nullptr) {
+		v->Param.entity        = e;
+		v->Param.original_type = e->type;
+	}
 	v->Param.type          = abi_type;
+	v->Param.index         = index;
 
-	if (abi_type != e->type) {
+	if (e != nullptr && abi_type != e->type) {
 		if (is_type_pointer(abi_type)) {
 			GB_ASSERT(e->kind == Entity_Variable);
 			v->Param.kind = irParamPass_Pointer;
@@ -935,8 +941,12 @@ irValue *ir_value_param(irProcedure *parent, Entity *e, Type *abi_type) {
 			v->Param.kind = irParamPass_Value;
 		} else if (is_type_simd_vector(abi_type)) {
 			v->Param.kind = irParamPass_BitCast;
+		} else if (is_type_float(abi_type)) {
+			v->Param.kind = irParamPass_BitCast;
+		} else if (is_type_tuple(abi_type)) {
+			v->Param.kind = irParamPass_Tuple;
 		} else {
-			GB_PANIC("Invalid abi type pass kind");
+			GB_PANIC("Invalid abi type pass kind %s", type_to_string(abi_type));
 		}
 	}
 	array_init(&v->Param.referrers, heap_allocator()); // TODO(bill): Replace heap allocator here
@@ -1429,7 +1439,7 @@ irValue *ir_value_procedure(irModule *m, Entity *entity, Type *type, Ast *type_e
 
 	Type *t = base_type(type);
 	GB_ASSERT(is_type_proc(t));
-	array_init(&v->Proc.params, ir_allocator(), 0, t->Proc.param_count);
+	array_init(&v->Proc.params, heap_allocator(), 0, t->Proc.param_count);
 
 	return v;
 }
@@ -1499,7 +1509,9 @@ void ir_start_block(irProcedure *proc, irBlock *block) {
 }
 
 
-
+irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t);
+irValue *ir_address_from_load_or_generate_local(irProcedure *proc, irValue *val);
+irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index);
 
 
 
@@ -1713,8 +1725,11 @@ irValue *ir_add_global_generated(irModule *m, Type *type, irValue *value) {
 
 
 irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type, i32 index) {
-	irValue *v = ir_value_param(proc, e, abi_type);
+	irValue *v = ir_value_param(proc, e, abi_type, index);
+	array_add(&proc->params, v);
 	irValueParam *p = &v->Param;
+
+	irValue *res = nullptr;
 
 	ir_push_debug_location(proc->module, e ? e->identifier : nullptr, proc->debug_scope, e);
 	defer (ir_pop_debug_location(proc->module));
@@ -1749,6 +1764,24 @@ irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type, i
 		irValue *x = ir_emit_bitcast(proc, v, e->type);
 		ir_emit_store(proc, l, x);
 		return x;
+	}
+	case irParamPass_Tuple: {
+		irValue *l = ir_add_local(proc, e, expr, true, index);
+		Type *st = struct_type_from_systemv_distribute_struct_fields(abi_type);
+		irValue *ptr = ir_emit_bitcast(proc, l, alloc_type_pointer(st));
+		if (abi_type->Tuple.variables.count > 0) {
+			array_pop(&proc->params);
+		}
+		for_array(i, abi_type->Tuple.variables) {
+			Type *t = abi_type->Tuple.variables[i]->type;
+
+			irValue *elem = ir_value_param(proc, nullptr, t, index+cast(i32)i);
+			array_add(&proc->params, elem);
+
+			irValue *dst = ir_emit_struct_ep(proc, ptr, cast(i32)i);
+			ir_emit_store(proc, dst, elem);
+		}
+		return ir_emit_load(proc, l);
 	}
 
 	}
@@ -2945,10 +2978,6 @@ void ir_emit_unreachable(irProcedure *proc) {
 	ir_emit(proc, ir_instr_unreachable(proc));
 }
 
-irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t);
-irValue *ir_address_from_load_or_generate_local(irProcedure *proc, irValue *val);
-irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index);
-
 
 irValue *ir_get_package_value(irModule *m, String package_name, String entity_name) {
 	AstPackage *rt_pkg = get_core_package(m->info, package_name);
@@ -2998,7 +3027,7 @@ Array<irValue *> ir_value_to_array(irProcedure *p, irValue *value) {
 }
 
 
-irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, ProcInlining inlining = ProcInlining_none, bool use_return_ptr_hint = false) {
+irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &args, ProcInlining inlining = ProcInlining_none, bool use_return_ptr_hint = false) {
 	Type *pt = base_type(ir_type(value));
 	GB_ASSERT(pt->kind == Type_Proc);
 	Type *results = pt->Proc.results;
@@ -3008,6 +3037,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 		context_ptr = ir_find_or_generate_context_ptr(p);
 	}
 
+
 	bool is_c_vararg = pt->Proc.c_vararg;
 	isize param_count = pt->Proc.param_count;
 	if (is_c_vararg) {
@@ -3016,9 +3046,13 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 	} else {
 		GB_ASSERT_MSG(param_count == args.count, "%td == %td", param_count, args.count);
 	}
+
+	auto processed_args = array_make<irValue *>(heap_allocator(), 0, args.count);
+
 	for (isize i = 0; i < param_count; i++) {
 		Entity *e = pt->Proc.params->Tuple.variables[i];
 		if (e->kind != Entity_Variable) {
+			array_add(&processed_args, args[i]);
 			continue;
 		}
 		GB_ASSERT(e->flags & EntityFlag_Param);
@@ -3027,20 +3061,29 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 		Type *new_type = pt->Proc.abi_compat_params[i];
 		Type *arg_type = ir_type(args[i]);
 		if (are_types_identical(arg_type, new_type)) {
+			array_add(&processed_args, args[i]);
 			// NOTE(bill): Done
 		} else if (!are_types_identical(original_type, new_type)) {
 			if (is_type_pointer(new_type) && !is_type_pointer(original_type)) {
 				if (e->flags&EntityFlag_ImplicitReference) {
-					args[i] = ir_address_from_load_or_generate_local(p, args[i]);
+					array_add(&processed_args, ir_address_from_load_or_generate_local(p, args[i]));
 				} else if (!is_type_pointer(arg_type)) {
-					args[i] = ir_copy_value_to_ptr(p, args[i], original_type, 16);
+					array_add(&processed_args, ir_copy_value_to_ptr(p, args[i], original_type, 16));
 				}
 			} else if (is_type_integer(new_type)) {
-				args[i] = ir_emit_transmute(p, args[i], new_type);
+				array_add(&processed_args, ir_emit_transmute(p, args[i], new_type));
 			} else if (new_type == t_llvm_bool) {
-				args[i] = ir_emit_conv(p, args[i], new_type);
+				array_add(&processed_args, ir_emit_conv(p, args[i], new_type));
 			} else if (is_type_simd_vector(new_type)) {
-				args[i] = ir_emit_bitcast(p, args[i], new_type);
+				array_add(&processed_args, ir_emit_bitcast(p, args[i], new_type));
+			} else if (is_type_tuple(new_type)) {
+				Type *abi_type = pt->Proc.abi_compat_params[i];
+				Type *st = struct_type_from_systemv_distribute_struct_fields(abi_type);
+				irValue *x = ir_emit_transmute(p, args[i], st);
+				for (isize j = 0; j < new_type->Tuple.variables.count; j++) {
+					irValue *xx = ir_emit_struct_ev(p, x, cast(i32)j);
+					array_add(&processed_args, xx);
+				}
 			}
 		}
 	}
@@ -3066,10 +3109,10 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> args, Pro
 			return_ptr = ir_add_local_generated(p, rt, true);
 		}
 		GB_ASSERT(is_type_pointer(ir_type(return_ptr)));
-		ir_emit(p, ir_instr_call(p, value, return_ptr, args, nullptr, context_ptr, inlining));
+		ir_emit(p, ir_instr_call(p, value, return_ptr, processed_args, nullptr, context_ptr, inlining));
 		result = ir_emit_load(p, return_ptr);
 	} else {
-		result = ir_emit(p, ir_instr_call(p, value, nullptr, args, abi_rt, context_ptr, inlining));
+		result = ir_emit(p, ir_instr_call(p, value, nullptr, processed_args, abi_rt, context_ptr, inlining));
 		if (abi_rt != results) {
 			result = ir_emit_transmute(p, result, rt);
 		}
@@ -9540,6 +9583,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 ////////////////////////////////////////////////////////////////
 
 void ir_number_proc_registers(irProcedure *proc) {
+	// i32 reg_index = proc->parameter_count;
 	i32 reg_index = 0;
 	for_array(i, proc->blocks) {
 		irBlock *b = proc->blocks[i];
@@ -9595,13 +9639,15 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	proc->entry_block = ir_new_block(proc, proc->type_expr, "entry");
 	ir_start_block(proc, proc->entry_block);
 
+	i32 parameter_index = 0;
+
 	if (proc->type->Proc.return_by_pointer) {
 		// NOTE(bill): this must be the first parameter stored
 		Type *ptr_type = alloc_type_pointer(reduce_tuple_to_single_type(proc->type->Proc.results));
 		Entity *e = alloc_entity_param(nullptr, make_token_ident(str_lit("agg.result")), ptr_type, false, false);
 		e->flags |= EntityFlag_Sret | EntityFlag_NoAlias;
 
-		irValue *param = ir_value_param(proc, e, ptr_type);
+		irValue *param = ir_value_param(proc, e, ptr_type, -1);
 		param->Param.kind = irParamPass_Pointer;
 
 		ir_module_add_value(proc->module, e, param);
@@ -9630,13 +9676,19 @@ void ir_begin_procedure_body(irProcedure *proc) {
 
 				Entity *e = params->variables[i];
 				if (e->kind != Entity_Variable) {
+					parameter_index += 1;
 					continue;
 				}
 
 				Type *abi_type = proc->type->Proc.abi_compat_params[i];
 				if (e->token.string != "" && !is_blank_ident(e->token)) {
-					irValue *param = ir_add_param(proc, e, name, abi_type, cast(i32)(i+1));
-					array_add(&proc->params, param);
+					ir_add_param(proc, e, name, abi_type, parameter_index);
+				}
+
+				if (is_type_tuple(abi_type)) {
+					parameter_index += cast(i32)abi_type->Tuple.variables.count;
+				} else {
+					parameter_index += 1;
 				}
 			}
 		} else {
@@ -9645,6 +9697,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 			for_array(i, params->variables) {
 				Entity *e = params->variables[i];
 				if (e->kind != Entity_Variable) {
+					parameter_index += 1;
 					continue;
 				}
 				Type *abi_type = e->type;
@@ -9652,8 +9705,12 @@ void ir_begin_procedure_body(irProcedure *proc) {
 					abi_type = abi_types[i];
 				}
 				if (e->token.string != "" && !is_blank_ident(e->token)) {
-					irValue *param = ir_add_param(proc, e, nullptr, abi_type, cast(i32)(i+1));
-					array_add(&proc->params, param);
+					ir_add_param(proc, e, nullptr, abi_type, parameter_index);
+				}
+				if (is_type_tuple(abi_type)) {
+					parameter_index += cast(i32)abi_type->Tuple.variables.count;
+				} else {
+					parameter_index += 1;
 				}
 			}
 		}
@@ -9695,11 +9752,13 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	if (proc->type->Proc.calling_convention == ProcCC_Odin) {
 		Entity *e = alloc_entity_param(nullptr, make_token_ident(str_lit("__.context_ptr")), t_context_ptr, false, false);
 		e->flags |= EntityFlag_NoAlias;
-		irValue *param = ir_value_param(proc, e, e->type);
+		irValue *param = ir_value_param(proc, e, e->type, -1);
 		ir_module_add_value(proc->module, e, param);
 		irContextData ctx = {param, proc->scope_index};
 		array_add(&proc->context_stack, ctx);
 	}
+
+	proc->parameter_count = parameter_index;
 }
 
 

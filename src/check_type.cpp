@@ -1837,6 +1837,168 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 	return tuple;
 }
 
+Array<Type *> systemv_distribute_struct_fields(Type *t, i32 level=0) {
+	t = base_type(t);
+	GB_ASSERT_MSG(t->kind == Type_Struct, "%s %d", type_to_string(t), level);
+	TypeStruct *ts = &t->Struct;
+
+	auto distributed = array_make<Type *>(heap_allocator(), 0, ts->fields.count);
+
+	for_array(field_index, ts->fields) {
+		Entity *f = ts->fields[field_index];
+		Type *bt = core_type(f->type);
+		switch (bt->kind) {
+		case Type_Struct:
+			if (bt->Struct.is_raw_union) {
+				goto DEFAULT;
+			} else {
+				// IMPORTANT TOOD(bill): handle #packed structs correctly
+				// IMPORTANT TODO(bill): handle #align structs correctly
+				auto nested = systemv_distribute_struct_fields(f->type, level+1);
+				for_array(i, nested) {
+					array_add(&distributed, nested[i]);
+				}
+				array_free(&nested);
+			}
+			break;
+
+		case Type_Array:
+			for (i64 i = 0; i < bt->Array.count; i++) {
+				array_add(&distributed, bt->Array.elem);
+			}
+			break;
+
+		case Type_BitSet:
+			array_add(&distributed, bit_set_to_int(bt));
+			break;
+
+		case Type_Tuple:
+			GB_PANIC("Invalid struct field type");
+			break;
+
+		case Type_Slice:
+		case Type_DynamicArray:
+		case Type_Map:
+		case Type_Union:
+		case Type_BitField: // TODO(bill): Ignore?
+			// NOTE(bill, 2019-10-10): Odin specific, don't worry about C calling convention yet
+			goto DEFAULT;
+
+		case Type_Pointer:
+		case Type_Proc:
+		case Type_SimdVector: // TODO(bill): Is this correct logic?
+		default:
+		DEFAULT:;
+			if (type_size_of(bt) > 0) {
+				array_add(&distributed, bt);
+			}
+			break;
+		}
+	}
+
+	return distributed;
+}
+
+Type *struct_type_from_systemv_distribute_struct_fields(Type *abi_type) {
+	GB_ASSERT(is_type_tuple(abi_type));
+	Type *final_type = alloc_type_struct();
+	final_type->Struct.fields = abi_type->Tuple.variables;
+	return final_type;
+}
+
+
+Type *handle_single_distributed_type_parameter(Array<Type *> const &types, bool packed, isize *offset) {
+	GB_ASSERT(types.count > 0);
+
+	if (types.count == 1) {
+		if (offset) *offset = 1;
+		if (is_type_float(types[0])) {
+			return types[0];
+		} else if (type_size_of(types[0]) == 8) {
+			return types[0];
+		} else {
+			return t_u64;
+		}
+	} else if (types.count >= 2) {
+	    if (types[0] == t_f32 && types[1] == t_f32) {
+	    	if (offset) *offset = 2;
+			return alloc_type_simd_vector(2, t_f32);
+		} else if (type_size_of(types[0]) == 8) {
+	    	if (offset) *offset = 1;
+			return types[0];
+		}
+
+		i64 total_size = 0;
+		isize i = 0;
+		if (packed) {
+			for (; i < types.count && total_size < 8; i += 1) {
+				Type *t = types[i];
+				i64 s = type_size_of(t);
+				total_size += s;
+			}
+		} else {
+			for (; i < types.count && total_size < 8; i += 1) {
+				Type *t = types[i];
+				i64 s = gb_max(type_size_of(t), 0);
+				i64 a = gb_max(type_align_of(t), 1);
+				isize ts = align_formula(total_size, a);
+				if (ts >= 8) {
+					break;
+				}
+				total_size = ts + s;
+			}
+		}
+		if (offset) *offset = i;
+		return t_u64;
+	}
+
+	return nullptr;
+}
+
+Type *handle_struct_system_v_amd64_abi_type(Type *t) {
+	GB_ASSERT(is_type_struct(t));
+	Type *bt = core_type(t);
+	i64 size = type_size_of(bt);
+
+	if (!bt->Struct.is_raw_union) {
+		auto field_types = systemv_distribute_struct_fields(bt);
+		defer (array_free(&field_types));
+
+		GB_ASSERT(field_types.count <= 16);
+
+		Type *final_type = nullptr;
+
+		if (field_types.count == 0) {
+			// Do nothing
+		} else if (field_types.count == 1) {
+			final_type = field_types[0];
+		} else {
+			if (size <= 8) {
+				isize offset = 0;
+				final_type = handle_single_distributed_type_parameter(field_types, bt->Struct.is_packed, &offset);
+			} else {
+				isize offset = 0;
+				isize next_offset = 0;
+				Type *two_types[2] = {};
+
+				two_types[0] = handle_single_distributed_type_parameter(field_types, bt->Struct.is_packed, &offset);
+				auto remaining = array_slice(field_types, offset, field_types.count);
+				two_types[1] = handle_single_distributed_type_parameter(remaining, bt->Struct.is_packed, &next_offset);
+				GB_ASSERT(offset + next_offset == field_types.count);
+
+				auto variables = array_make<Entity *>(heap_allocator(), 2);
+				variables[0] = alloc_entity_param(nullptr, empty_token, two_types[0], false, false);
+				variables[1] = alloc_entity_param(nullptr, empty_token, two_types[1], false, false);
+				final_type = alloc_type_tuple();
+				final_type->Tuple.variables = variables;
+			}
+		}
+		return final_type;
+	} else {
+		return t;
+	}
+}
+
 Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCallingConvention cc) {
 	Type *new_type = original_type;
 
@@ -1901,6 +2063,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 		{
 			i64 align = type_align_of(original_type);
 			i64 size  = type_size_of(original_type);
+
 			switch (8*size) {
 			case 8:  new_type = t_u8;  break;
 			case 16: new_type = t_u16; break;
@@ -1944,6 +2107,15 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 			i64 size  = type_size_of(original_type);
 			if (8*size > 16) {
 				new_type = alloc_type_pointer(original_type);
+			} else if (build_context.ODIN_ARCH == "amd64") {
+				// NOTE(bill): System V AMD64 ABI
+				if (bt->Struct.is_raw_union) {
+					// TODO(bill): Handle raw union correctly for
+					break;
+				}
+
+				new_type = handle_struct_system_v_amd64_abi_type(bt);
+				return new_type;
 			}
 
 			break;
@@ -2018,7 +2190,7 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCal
 		}
 	} else if (build_context.ODIN_OS == "linux" || build_context.ODIN_OS == "darwin") {
 		if (build_context.ODIN_ARCH == "amd64") {
-			
+
 		}
 	} else {
 		// IMPORTANT TODO(bill): figure out the ABI settings for Linux, OSX etc. for
