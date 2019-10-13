@@ -1968,10 +1968,11 @@ Type *handle_single_distributed_type_parameter(Array<Type *> const &types, bool 
 		switch (sz) {
 		case 0:
 			GB_PANIC("Zero sized type found!");
-		case 1:
-		case 2:
-		case 4:
-		case 8:
+		case 1: return t_u8;
+		case 2: return t_u16;
+		case 4: return t_u32;
+		case 8: return t_u64;
+		default:
 			return types[0];
 		}
 		return t_u64;
@@ -2005,6 +2006,12 @@ Type *handle_single_distributed_type_parameter(Array<Type *> const &types, bool 
 			}
 		}
 		if (offset) *offset = i;
+		switch (total_size) {
+		case 1: return t_u8;
+		case 2: return t_u16;
+		case 4: return t_u32;
+		case 8: return t_u64;
+		}
 		return t_u64;
 	}
 
@@ -2094,7 +2101,13 @@ Type *handle_struct_system_v_amd64_abi_type(Type *t) {
 		i64 otsz = type_size_of(original_type);
 		if (ftsz != otsz) {
 			// TODO(bill): Handle this case which will be caused by #packed most likely
-			GB_PANIC("Incorrectly handled case for handle_struct_system_v_amd64_abi_type, %lld vs %lld", ftsz, otsz);
+			switch (otsz) {
+			case 1:
+			case 2:
+			case 4:
+			case 8:
+				GB_PANIC("Incorrectly handled case for handle_struct_system_v_amd64_abi_type, %s %lld vs %s %lld", type_to_string(final_type), ftsz, type_to_string(original_type), otsz);
+			}
 		}
 
 		return final_type;
