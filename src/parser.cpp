@@ -427,7 +427,7 @@ void syntax_error(Ast *node, char *fmt, ...) {
 
 bool ast_node_expect(Ast *node, AstKind kind) {
 	if (node->kind != kind) {
-		error(node, "Expected %.*s, got %.*s", LIT(ast_strings[kind]), LIT(ast_strings[node->kind]));
+		syntax_error(node, "Expected %.*s, got %.*s", LIT(ast_strings[kind]), LIT(ast_strings[node->kind]));
 		return false;
 	}
 	return true;
@@ -1662,7 +1662,7 @@ void check_polymorphic_params_for_type(AstFile *f, Ast *polymorphic_params, Toke
 		for_array(i, field->Field.names) {
 			Ast *name = field->Field.names[i];
 			if (name->kind == Ast_PolyType) {
-				error(name, "Polymorphic names are not needed for %.*s parameters", LIT(token.string));
+				syntax_error(name, "Polymorphic names are not needed for %.*s parameters", LIT(token.string));
 				return; // TODO(bill): Err multiple times or just the once?
 			}
 		}
@@ -4207,7 +4207,7 @@ void parser_add_package(Parser *p, AstPackage *pkg) {
 		if (found) {
 			GB_ASSERT(pkg->files.count > 0);
 			AstFile *f = pkg->files[0];
-			error(f->package_token, "Non-unique package name '%.*s'", LIT(pkg->name));
+			syntax_error(f->package_token, "Non-unique package name '%.*s'", LIT(pkg->name));
 			GB_ASSERT((*found)->files.count > 0);
 			TokenPos pos = (*found)->files[0]->package_token.pos;
 			error_line("\tpreviously declared at %.*s(%td:%td)\n", LIT(pos.file), pos.line, pos.column);
@@ -4283,22 +4283,22 @@ bool try_add_import_path(Parser *p, String const &path, String const &rel_path, 
 
 	switch (rd_err) {
 	case ReadDirectory_InvalidPath:
-		error(pos, "Invalid path: %.*s", LIT(rel_path));
+		syntax_error(pos, "Invalid path: %.*s", LIT(rel_path));
 		return false;
 	case ReadDirectory_NotExists:
-		error(pos, "Path does not exist: %.*s", LIT(rel_path));
+		syntax_error(pos, "Path does not exist: %.*s", LIT(rel_path));
 		return false;
 	case ReadDirectory_Permission:
-		error(pos, "Unknown error whilst reading path %.*s", LIT(rel_path));
+		syntax_error(pos, "Unknown error whilst reading path %.*s", LIT(rel_path));
 		return false;
 	case ReadDirectory_NotDir:
-		error(pos, "Expected a directory for a package, got a file: %.*s", LIT(rel_path));
+		syntax_error(pos, "Expected a directory for a package, got a file: %.*s", LIT(rel_path));
 		return false;
 	case ReadDirectory_Empty:
-		error(pos, "Empty directory: %.*s", LIT(rel_path));
+		syntax_error(pos, "Empty directory: %.*s", LIT(rel_path));
 		return false;
 	case ReadDirectory_Unknown:
-		error(pos, "Unknown error whilst reading path %.*s", LIT(rel_path));
+		syntax_error(pos, "Unknown error whilst reading path %.*s", LIT(rel_path));
 		return false;
 	}
 
@@ -4400,7 +4400,7 @@ bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir,
 
 	String file_str = {};
 	if (colon_pos == 0) {
-		error(node, "Expected a collection name");
+		syntax_error(node, "Expected a collection name");
 		return false;
 	}
 
@@ -4415,11 +4415,11 @@ bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir,
 	if (has_windows_drive) {
 		String sub_file_path = substring(file_str, 3, file_str.len);
 		if (!is_import_path_valid(sub_file_path)) {
-			error(node, "Invalid import path: '%.*s'", LIT(file_str));
+			syntax_error(node, "Invalid import path: '%.*s'", LIT(file_str));
 			return false;
 		}
 	} else if (!is_import_path_valid(file_str)) {
-		error(node, "Invalid import path: '%.*s'", LIT(file_str));
+		syntax_error(node, "Invalid import path: '%.*s'", LIT(file_str));
 		return false;
 	}
 
@@ -4427,7 +4427,7 @@ bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir,
 	if (collection_name.len > 0) {
 		if (collection_name == "system") {
 			if (node->kind != Ast_ForeignImportDecl) {
-				error(node, "The library collection 'system' is restrict for 'foreign_library'");
+				syntax_error(node, "The library collection 'system' is restrict for 'foreign_library'");
 				return false;
 			} else {
 				*path = file_str;
@@ -4435,7 +4435,7 @@ bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir,
 			}
 		} else if (!find_library_collection_path(collection_name, &base_dir)) {
 			// NOTE(bill): It's a naughty name
-			error(node, "Unknown library collection: '%.*s'", LIT(collection_name));
+			syntax_error(node, "Unknown library collection: '%.*s'", LIT(collection_name));
 			return false;
 		}
 	} else {
@@ -4556,7 +4556,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<Ast *>
 				array_add(&fl->fullpaths, fullpath);
 			}
 			if (fl->fullpaths.count == 0) {
-				error(decls[i], "No foreign paths found");
+				syntax_error(decls[i], "No foreign paths found");
 				decls[i] = ast_bad_decl(f, fl->filepaths[0], fl->filepaths[fl->filepaths.count-1]);
 				goto end;
 			}
@@ -4605,7 +4605,7 @@ bool parse_build_tag(Token token_for_pos, String s) {
 			is_notted = true;
 			p = substring(p, 1, p.len);
 			if (p.len == 0) {
-				error(token_for_pos, "Expected a build platform after '!'");
+				syntax_error(token_for_pos, "Expected a build platform after '!'");
 				break;
 			}
 		}
@@ -4634,7 +4634,7 @@ bool parse_build_tag(Token token_for_pos, String s) {
 				}
 			}
 			if (os == TargetOs_Invalid && arch == TargetArch_Invalid) {
-				error(token_for_pos, "Invalid build tag platform: %.*s", LIT(p));
+				syntax_error(token_for_pos, "Invalid build tag platform: %.*s", LIT(p));
 				break;
 			}
 		}
@@ -4680,11 +4680,11 @@ bool parse_file(Parser *p, AstFile *f) {
 	Token package_name = expect_token_after(f, Token_Ident, "package");
 	if (package_name.kind == Token_Ident) {
 		if (package_name.string == "_") {
-			error(package_name, "Invalid package name '_'");
+			syntax_error(package_name, "Invalid package name '_'");
 		} else if (f->pkg->kind != Package_Runtime && package_name.string == "runtime") {
-			error(package_name, "Use of reserved package name '%.*s'", LIT(package_name.string));
+			syntax_error(package_name, "Use of reserved package name '%.*s'", LIT(package_name.string));
 		} else if (is_package_name_reserved(package_name.string)) {
-			error(package_name, "Use of reserved package name '%.*s'", LIT(package_name.string));
+			syntax_error(package_name, "Use of reserved package name '%.*s'", LIT(package_name.string));
 		}
 	}
 	f->package_name = package_name.string;
@@ -4751,28 +4751,28 @@ ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_fil
 	if (err != ParseFile_None) {
 		if (err == ParseFile_EmptyFile) {
 			if (fi->fullpath == p->init_fullpath) {
-				error(pos, "Initial file is empty - %.*s\n", LIT(p->init_fullpath));
+				syntax_error(pos, "Initial file is empty - %.*s\n", LIT(p->init_fullpath));
 				gb_exit(1);
 			}
 		} else {
 			switch (err) {
 			case ParseFile_WrongExtension:
-				error(pos, "Failed to parse file: %.*s; invalid file extension: File must have the extension '.odin'", LIT(fi->name));
+				syntax_error(pos, "Failed to parse file: %.*s; invalid file extension: File must have the extension '.odin'", LIT(fi->name));
 				break;
 			case ParseFile_InvalidFile:
-				error(pos, "Failed to parse file: %.*s; invalid file or cannot be found", LIT(fi->name));
+				syntax_error(pos, "Failed to parse file: %.*s; invalid file or cannot be found", LIT(fi->name));
 				break;
 			case ParseFile_Permission:
-				error(pos, "Failed to parse file: %.*s; file permissions problem", LIT(fi->name));
+				syntax_error(pos, "Failed to parse file: %.*s; file permissions problem", LIT(fi->name));
 				break;
 			case ParseFile_NotFound:
-				error(pos, "Failed to parse file: %.*s; file cannot be found ('%.*s')", LIT(fi->name), LIT(fi->fullpath));
+				syntax_error(pos, "Failed to parse file: %.*s; file cannot be found ('%.*s')", LIT(fi->name), LIT(fi->fullpath));
 				break;
 			case ParseFile_InvalidToken:
-				error(err_pos, "Failed to parse file: %.*s; invalid token found in file", LIT(fi->name));
+				syntax_error(err_pos, "Failed to parse file: %.*s; invalid token found in file", LIT(fi->name));
 				break;
 			case ParseFile_EmptyFile:
-				error(pos, "Failed to parse file: %.*s; file contains no tokens", LIT(fi->name));
+				syntax_error(pos, "Failed to parse file: %.*s; file contains no tokens", LIT(fi->name));
 				break;
 			}
 
@@ -4789,7 +4789,7 @@ ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_fil
 		if (pkg->name.len == 0) {
 			pkg->name = file->package_name;
 		} else if (file->tokens.count > 0 && pkg->name != file->package_name) {
-			error(file->package_token, "Different package name, expected '%.*s', got '%.*s'", LIT(pkg->name), LIT(file->package_name));
+			syntax_error(file->package_token, "Different package name, expected '%.*s', got '%.*s'", LIT(pkg->name), LIT(file->package_name));
 		}
 
 		p->total_line_count += file->tokenizer.line_count;

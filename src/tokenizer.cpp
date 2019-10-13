@@ -401,6 +401,15 @@ void syntax_error(Token token, char *fmt, ...) {
 	va_end(va);
 }
 
+void syntax_error(TokenPos pos, char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	Token token = {};
+	token.pos = pos;
+	syntax_error_va(token, fmt, va);
+	va_end(va);
+}
+
 void syntax_warning(Token token, char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
