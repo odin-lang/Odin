@@ -1975,7 +1975,6 @@ Type *handle_single_distributed_type_parameter(Array<Type *> const &types, bool 
 		default:
 			return types[0];
 		}
-		return t_u64;
 	} else if (types.count >= 2) {
 	    if (types[0] == t_f32 && types[1] == t_f32) {
 	    	if (offset) *offset = 2;
