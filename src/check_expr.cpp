@@ -3071,7 +3071,6 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 	}
 
 	if (selector->kind != Ast_Ident) {
-	// if (selector->kind != Ast_Ident) {
 		error(selector, "Illegal selector kind: '%.*s'", LIT(ast_strings[selector->kind]));
 		operand->mode = Addressing_Invalid;
 		operand->expr = node;
@@ -3544,6 +3543,25 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			operand->type = t_untyped_bool;
 			operand->mode = Addressing_Constant;
+		} else if (name == "panic") {
+			if (ce->args.count != 1) {
+				error(call, "'#panic' expects 1 argument, got %td", ce->args.count);
+				return false;
+			}
+			if (!is_type_string(operand->type) && operand->mode != Addressing_Constant) {
+				gbString str = expr_to_string(ce->args[0]);
+				error(call, "'%s' is not a constant string", str);
+				gb_string_free(str);
+				return false;
+			}
+			error(call, "Compile time panic: %.*s", LIT(operand->value.value_string));
+			if (c->proc_name != "") {
+				gbString str = type_to_string(c->curr_proc_sig);
+				error_line("\tCalled within '%.*s' :: %s\n", LIT(c->proc_name), str);
+				gb_string_free(str);
+			}
+			operand->type = t_invalid;
+			operand->mode = Addressing_NoValue;
 		} else if (name == "defined") {
 			if (ce->args.count != 1) {
 				error(call, "'#defined' expects 1 argument, got %td", ce->args.count);
@@ -6349,7 +6367,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call) {
 	    ce->proc->kind == Ast_BasicDirective) {
 		ast_node(bd, BasicDirective, ce->proc);
 		String name = bd->name;
-		if (name == "location" || name == "assert" || name == "defined" || name == "load") {
+		if (name == "location" || name == "assert" || name == "panic" || name == "defined" || name == "load") {
 			operand->mode = Addressing_Builtin;
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
 			operand->expr = ce->proc;

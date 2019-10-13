@@ -113,21 +113,22 @@ struct BasicType {
 struct TypeStruct {
 	Array<Entity *> fields;
 	Array<String>   tags;
-	Ast *node;
-	Scope *  scope;
+	Array<i64>      offsets;
+	Ast *           node;
+	Scope *         scope;
 
-	Array<i64> offsets;
-	bool       are_offsets_set;
-	bool       are_offsets_being_processed;
-	bool       is_packed;
-	bool       is_raw_union;
-	bool       is_polymorphic;
-	bool       is_poly_specialized;
 	Type *     polymorphic_params; // Type_Tuple
 	Type *     polymorphic_parent;
 
-	i64      custom_align; // NOTE(bill): Only used in structs at the moment
+	i64      custom_align;
 	Entity * names;
+
+	bool are_offsets_set;
+	bool are_offsets_being_processed;
+	bool is_packed;
+	bool is_raw_union;
+	bool is_polymorphic;
+	bool is_poly_specialized;
 };
 
 struct TypeUnion {
@@ -137,12 +138,11 @@ struct TypeUnion {
 	i64           variant_block_size;
 	i64           custom_align;
 	i64           tag_size;
+	Type *        polymorphic_params; // Type_Tuple
+	Type *        polymorphic_parent;
 	bool          no_nil;
-
-	bool       is_polymorphic;
-	bool       is_poly_specialized;
-	Type *     polymorphic_params; // Type_Tuple
-	Type *     polymorphic_parent;
+	bool          is_polymorphic;
+	bool          is_poly_specialized;
 };
 
 #define TYPE_KINDS                                        \
@@ -190,7 +190,9 @@ struct TypeUnion {
 	TYPE_KIND(Tuple, struct {                             \
 		Array<Entity *> variables; /* Entity_Variable */  \
 		Array<i64>      offsets;                          \
+		bool            are_offsets_being_processed;      \
 		bool            are_offsets_set;                  \
+		bool            is_packed;                        \
 	})                                                    \
 	TYPE_KIND(Proc, struct {                              \
 		Ast *node;                                        \
@@ -201,9 +203,8 @@ struct TypeUnion {
 		i32      result_count;                            \
 		Array<Type *> abi_compat_params;                  \
 		Type *   abi_compat_result_type;                  \
-		bool     return_by_pointer;                       \
-		bool     variadic;                                \
 		i32      variadic_index;                          \
+		bool     variadic;                                \
 		bool     require_results;                         \
 		bool     c_vararg;                                \
 		bool     is_polymorphic;                          \
@@ -211,6 +212,7 @@ struct TypeUnion {
 		bool     has_proc_default_values;                 \
 		bool     has_named_results;                       \
 		bool     diverging; /* no return */               \
+		bool     return_by_pointer;                       \
 		u64      tags;                                    \
 		isize    specialization_count;                    \
 		ProcCallingConvention calling_convention;         \
@@ -1782,7 +1784,8 @@ bool are_types_identical(Type *x, Type *y) {
 
 	case Type_Tuple:
 		if (y->kind == Type_Tuple) {
-			if (x->Tuple.variables.count == y->Tuple.variables.count) {
+			if (x->Tuple.variables.count == y->Tuple.variables.count &&
+			    x->Tuple.is_packed == y->Tuple.is_packed) {
 				for_array(i, x->Tuple.variables) {
 					Entity *xe = x->Tuple.variables[i];
 					Entity *ye = y->Tuple.variables[i];
@@ -2231,19 +2234,22 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 		if (type->Array.count <= 4) {
 			// HACK(bill): Memory leak
 			switch (type->Array.count) {
-			#define _ARRAY_FIELD_CASE(_length, _name) \
-			case (_length): \
-				if (field_name == _name) { \
+			#define _ARRAY_FIELD_CASE_IF(_length, _name) \
+				if (field_name == (_name)) { \
 					selection_add_index(&sel, (_length)-1); \
 					sel.entity = alloc_entity_array_elem(nullptr, make_token_ident(str_lit(_name)), type->Array.elem, (_length)-1); \
 					return sel; \
-				} \
+				}
+			#define _ARRAY_FIELD_CASE(_length, _name0, _name1) \
+			case (_length): \
+				_ARRAY_FIELD_CASE_IF(_length, _name0); \
+				_ARRAY_FIELD_CASE_IF(_length, _name1); \
 				/*fallthrough*/
 
-			_ARRAY_FIELD_CASE(4, "w");
-			_ARRAY_FIELD_CASE(3, "z");
-			_ARRAY_FIELD_CASE(2, "y");
-			_ARRAY_FIELD_CASE(1, "x");
+			_ARRAY_FIELD_CASE(4, "w", "a");
+			_ARRAY_FIELD_CASE(3, "z", "b");
+			_ARRAY_FIELD_CASE(2, "y", "g");
+			_ARRAY_FIELD_CASE(1, "x", "r");
 			default: break;
 
 			#undef _ARRAY_FIELD_CASE
@@ -2590,9 +2596,9 @@ bool type_set_offsets(Type *t) {
 		}
 	} else if (is_type_tuple(t)) {
 		if (!t->Tuple.are_offsets_set) {
-			t->Struct.are_offsets_being_processed = true;
-			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, false, false);
-			t->Struct.are_offsets_being_processed = false;
+			t->Tuple.are_offsets_being_processed = true;
+			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, t->Tuple.is_packed, false);
+			t->Tuple.are_offsets_being_processed = false;
 			t->Tuple.are_offsets_set = true;
 			return true;
 		}

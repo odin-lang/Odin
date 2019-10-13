@@ -445,7 +445,7 @@ bool parse_build_flags(Array<String> args) {
 										path = substring(path, 0, string_extension_position(path));
 									}
 								#endif
-								build_context.out_filepath = path;
+								build_context.out_filepath = path_to_full_path(heap_allocator(), path);
 							} else {
 								gb_printf_err("Invalid -out path, got %.*s\n", LIT(path));
 								bad_flags = true;
@@ -624,7 +624,7 @@ bool parse_build_flags(Array<String> args) {
 								break;
 							}
 
-							if (str == "dll") {
+							if (str == "dll" || str == "shared") {
 								build_context.is_dll = true;
 							} else if (str == "exe") {
 								build_context.is_dll = false;
@@ -1112,7 +1112,7 @@ int main(int arg_count, char **arg_ptr) {
 		if (0) {
 #ifdef GB_SYSTEM_UNIX
 		} else if (selected_target_metrics->metrics == &target_essence_amd64) {
-			system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s", 
+			system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s",
 					LIT(output_base), LIT(output_base), LIT(build_context.link_flags));
 #endif
 		} else {
@@ -1239,10 +1239,7 @@ int main(int arg_count, char **arg_ptr) {
 			//   This allows you to specify '-f' in a #foreign_system_library,
 			//   without having to implement any new syntax specifically for MacOS.
 			#if defined(GB_SYSTEM_OSX)
-				if (lib.len > 2 && lib[0] == '-' && lib[1] == 'f') {
-					// framework thingie
-					lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
-				} else if (string_ends_with(lib, str_lit(".framework"))) {
+				if (string_ends_with(lib, str_lit(".framework"))) {
 					// framework thingie
 					String lib_name = lib;
 					lib_name = remove_extension_from_path(lib_name);
@@ -1251,8 +1248,7 @@ int main(int arg_count, char **arg_ptr) {
 					// static libs, absolute full path relative to the file in which the lib was imported from
 					lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
 				} else if (string_ends_with(lib, str_lit(".dylib"))) {
-					// dynamic lib, relative path to executable
-					// lib_str = gb_string_append_fmt(lib_str, " -l:%s/%.*s ", cwd, LIT(lib));
+					// dynamic lib
 					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 				} else {
 					// dynamic or static system lib, just link regularly searching system library paths

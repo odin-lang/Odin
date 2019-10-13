@@ -3367,8 +3367,9 @@ bool collect_file_decls(CheckerContext *ctx, Array<Ast *> const &decls) {
 			if (es->expr->kind == Ast_CallExpr) {
 				ast_node(ce, CallExpr, es->expr);
 				if (ce->proc->kind == Ast_BasicDirective) {
-					Operand o = {};
-					check_expr(ctx, &o, es->expr);
+					if (ctx->collect_delayed_decls) {
+						array_add(&ctx->scope->delayed_directives, es->expr);
+					}
 				}
 			}
 		case_end;
@@ -3525,12 +3526,18 @@ void check_import_entities(Checker *c) {
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 			CheckerContext ctx = c->init_ctx;
-
 			add_curr_ast_file(&ctx, f);
+
 			for_array(j, f->scope->delayed_imports) {
 				Ast *decl = f->scope->delayed_imports[j];
 				check_add_import_decl(&ctx, decl);
 			}
+		}
+		for_array(i, pkg->files) {
+			AstFile *f = pkg->files[i];
+			CheckerContext ctx = c->init_ctx;
+			add_curr_ast_file(&ctx, f);
+
 			for_array(j, f->scope->delayed_directives) {
 				Ast *expr = f->scope->delayed_directives[j];
 				Operand o = {};

@@ -1091,7 +1091,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			case: error(p, stmt.pos, "#complete can only be applied to a switch statement");
 			}
 			return stmt;
-		case "assert":
+		case "assert", "panic":
 			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(tag));
 			bd.tok  = tok;
 			bd.name = name;

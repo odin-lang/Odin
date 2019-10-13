@@ -28,9 +28,9 @@ when os.OS == "windows" {
         Answers to common questions about Odin.
 */
 
-@(link_name="general_stuff")
-general_stuff :: proc() {
-	fmt.println("# general_stuff");
+@(link_name="extra_general_stuff")
+extra_general_stuff :: proc() {
+	fmt.println("# extra_general_stuff");
 	{ // `do` for inline statements rather than block
 		foo :: proc() do fmt.println("Foo!");
 		if   false do foo();
@@ -209,8 +209,8 @@ union_type :: proc() {
 		}
 	}
 
-	Vector3 :: struct {x, y, z: f32};
-	Quaternion :: struct {x, y, z, w: f32};
+	Vector3 :: distinct [3]f32;
+	Quaternion :: distinct quaternion128;
 
 	// More realistic examples
 	{
@@ -320,17 +320,17 @@ union_type :: proc() {
 
 		/*
 			Entity :: struct {
-				..
+				...
 				derived: union{^Frog, ^Monster},
 			}
 
 			Frog :: struct {
 				using entity: Entity,
-				..
+				...
 			}
 			Monster :: struct {
 				using entity: Entity,
-				..
+				...
 
 			}
 			new_entity :: proc(T: type) -> ^Entity {
@@ -539,7 +539,7 @@ parametric_polymorphism :: proc() {
 		fmt.println(r);
 		r = 123;
 		fmt.println(r);
-		r = Error.Foo0;
+		r = Error.Foo0; // r = .Foo0; is allow too, see implicit selector expressions below
 		fmt.println(r);
 	}
 
@@ -1190,7 +1190,7 @@ where_clauses :: proc() {
 
 main :: proc() {
 	when true {
-		general_stuff();
+		extra_general_stuff();
 		union_type();
 		parametric_polymorphism();
 		threading_example();

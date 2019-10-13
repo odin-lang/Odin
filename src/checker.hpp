@@ -222,6 +222,7 @@ struct ForeignContext {
 typedef Array<Entity *> CheckerTypePath;
 typedef Array<Type *>   CheckerPolyPath;
 
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Map<ExprInfo>         untyped; // Key: Ast * | Expression -> ExprInfo
