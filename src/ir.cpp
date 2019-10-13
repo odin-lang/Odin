@@ -8265,24 +8265,27 @@ void ir_build_constant_value_decl(irProcedure *proc, AstValueDecl *vd) {
 					name = e->Procedure.link_name;
 				}
 
+				HashKey key = hash_string(name);
+				irValue **prev_value = map_get(&proc->module->members, key);
+				if (prev_value != nullptr) {
+					// NOTE(bill): Don't do mutliple declarations in the IR
+					return;
+				}
+
+
 				irValue *value = ir_value_procedure(proc->module, e, e->type, pl->type, pl->body, name);
 
 				value->Proc.tags = pl->tags;
 				value->Proc.inlining = pl->inlining;
 
-				ir_module_add_value(proc->module, e, value);
-				ir_build_proc(value, proc);
-
 				if (value->Proc.is_foreign || value->Proc.is_export) {
-					HashKey key = hash_string(name);
-					irValue **prev_value = map_get(&proc->module->members, key);
-					if (prev_value == nullptr) {
-						// NOTE(bill): Don't do mutliple declarations in the IR
-						map_set(&proc->module->members, key, value);
-					}
+					map_set(&proc->module->members, key, value);
 				} else {
 					array_add(&proc->children, &value->Proc);
 				}
+
+				ir_module_add_value(proc->module, e, value);
+				ir_build_proc(value, proc);
 			}
 		}
 	}
