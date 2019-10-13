@@ -1847,7 +1847,7 @@ Array<Type *> systemv_distribute_struct_fields(Type *t) {
 	}
 	auto distributed = array_make<Type *>(heap_allocator(), 0, distributed_cap);
 
-
+	i64 sz = type_size_of(bt);
 	switch (bt->kind) {
 	case Type_Basic:
 		switch (bt->Basic.kind){
@@ -1925,9 +1925,9 @@ Array<Type *> systemv_distribute_struct_fields(Type *t) {
 		array_add(&distributed, t_int);
 		break;
 
+	case Type_Union:
 	case Type_DynamicArray:
 	case Type_Map:
-	case Type_Union:
 	case Type_BitField: // TODO(bill): Ignore?
 		// NOTE(bill, 2019-10-10): Odin specific, don't worry about C calling convention yet
 		goto DEFAULT;
@@ -1937,7 +1937,7 @@ Array<Type *> systemv_distribute_struct_fields(Type *t) {
 	case Type_SimdVector: // TODO(bill): Is this correct logic?
 	default:
 	DEFAULT:;
-		if (type_size_of(bt) > 0) {
+		if (sz > 0) {
 			array_add(&distributed, bt);
 		}
 		break;
@@ -1959,13 +1959,22 @@ Type *handle_single_distributed_type_parameter(Array<Type *> const &types, bool 
 
 	if (types.count == 1) {
 		if (offset) *offset = 1;
+
+		i64 sz = type_size_of(types[0]);
+
 		if (is_type_float(types[0])) {
 			return types[0];
-		} else if (type_size_of(types[0]) == 8) {
-			return types[0];
-		} else {
-			return t_u64;
 		}
+		switch (sz) {
+		case 0:
+			GB_PANIC("Zero sized type found!");
+		case 1:
+		case 2:
+		case 4:
+		case 8:
+			return types[0];
+		}
+		return t_u64;
 	} else if (types.count >= 2) {
 	    if (types[0] == t_f32 && types[1] == t_f32) {
 	    	if (offset) *offset = 2;
@@ -2050,7 +2059,7 @@ Type *handle_struct_system_v_amd64_abi_type(Type *t) {
 		Type *final_type = nullptr;
 
 		if (field_types.count == 0) {
-			return t;
+			final_type = t;
 		} else if (field_types.count == 1) {
 			final_type = field_types[0];
 		} else {
@@ -2072,8 +2081,22 @@ Type *handle_struct_system_v_amd64_abi_type(Type *t) {
 				variables[1] = alloc_entity_param(nullptr, empty_token, two_types[1], false, false);
 				final_type = alloc_type_tuple();
 				final_type->Tuple.variables = variables;
+				if (t->kind == Type_Struct) {
+					// NOTE(bill): Make this packed
+					final_type->Tuple.is_packed = t->Struct.is_packed;
+				}
 			}
 		}
+
+
+		GB_ASSERT(final_type != nullptr);
+		i64 ftsz = type_size_of(final_type);
+		i64 otsz = type_size_of(original_type);
+		if (ftsz != otsz) {
+			// TODO(bill): Handle this case which will be caused by #packed most likely
+			GB_PANIC("Incorrectly handled case for handle_struct_system_v_amd64_abi_type, %lld vs %lld", ftsz, otsz);
+		}
+
 		return final_type;
 	}
 }

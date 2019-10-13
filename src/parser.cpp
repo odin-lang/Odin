@@ -3970,34 +3970,6 @@ Ast *parse_stmt(AstFile *f) {
 		return s;
 	}
 
-	// case Token_static: {
-	// 	CommentGroup *docs = f->lead_comment;
-	// 	Token token = expect_token(f, Token_static);
-
-	// 	Ast *decl = nullptr;
-	// 	Array<Ast *> list = parse_lhs_expr_list(f);
-	// 	if (list.count == 0) {
-	// 		syntax_error(token, "Illegal use of 'static' statement");
-	// 		expect_semicolon(f, nullptr);
-	// 		return ast_bad_stmt(f, token, f->curr_token);
-	// 	}
-
-	// 	expect_token_after(f, Token_Colon, "identifier list");
-	// 	decl = parse_value_decl(f, list, docs);
-
-	// 	if (decl != nullptr && decl->kind == Ast_ValueDecl) {
-	// 		if (decl->ValueDecl.is_mutable) {
-	// 			decl->ValueDecl.is_static = true;
-	// 		} else {
-	// 			error(token, "'static' may only be currently used with variable declaration");
-	// 		}
-	// 		return decl;
-	// 	}
-
-	// 	syntax_error(token, "Illegal use of 'static' statement");
-	// 	return ast_bad_stmt(f, token, f->curr_token);
-	// } break;
-
 	case Token_using: {
 		CommentGroup *docs = f->lead_comment;
 		Token token = expect_token(f, Token_using);
@@ -4071,12 +4043,10 @@ Ast *parse_stmt(AstFile *f) {
 		} else if (tag == "assert") {
 			Ast *t = ast_basic_directive(f, hash_token, tag);
 			return ast_expr_stmt(f, parse_call_expr(f, t));
-		} /* else if (name.string == "no_deferred") {
-			s = parse_stmt(f);
-			s->stmt_state_flags |= StmtStateFlag_no_deferred;
-		} */
-
-		if (tag == "include") {
+		} else if (tag == "panic") {
+			Ast *t = ast_basic_directive(f, hash_token, tag);
+			return ast_expr_stmt(f, parse_call_expr(f, t));
+		} else if (tag == "include") {
 			syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");
 			s = ast_bad_stmt(f, token, f->curr_token);
 		} else {

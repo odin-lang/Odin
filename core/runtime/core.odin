@@ -6,6 +6,7 @@ package runtime
 import "core:os"
 import "core:mem"
 import "core:log"
+import "intrinsics"
 
 // Naming Conventions:
 // In general, Ada_Case for types and snake_case for values
@@ -187,12 +188,13 @@ Typeid_Kind :: enum u8 {
 #assert(len(Typeid_Kind) < 32);
 
 Typeid_Bit_Field :: bit_field #align align_of(uintptr) {
-	index:    8*size_of(align_of(uintptr)) - 8,
+	index:    8*size_of(uintptr) - 8,
 	kind:     5, // Typeid_Kind
 	named:    1,
 	special:  1, // signed, cstring, etc
 	reserved: 1,
 }
+#assert(size_of(Typeid_Bit_Field) == size_of(uintptr));
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
@@ -678,7 +680,7 @@ assert :: proc(condition: bool, message := "", loc := #caller_location) -> bool 
 			if p == nil {
 				p = default_assertion_failure_proc;
 			}
-			p("Runtime assertion", message, loc);
+			p("runtime assertion", message, loc);
 		}(message, loc);
 	}
 	return condition;
@@ -690,7 +692,7 @@ panic :: proc(message: string, loc := #caller_location) -> ! {
 	if p == nil {
 		p = default_assertion_failure_proc;
 	}
-	p("Panic", message, loc);
+	p("panic", message, loc);
 }
 
 @builtin
@@ -816,8 +818,7 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 		value: V,
 	};
 
-	_, is_string := type_info_base(type_info_of(K)).variant.(Type_Info_String);
-	header.is_key_string = is_string;
+	header.is_key_string = intrinsics.type_is_string(K);
 	header.entry_size    = int(size_of(Entry));
 	header.entry_align   = int(align_of(Entry));
 	header.value_offset  = uintptr(offset_of(Entry, value));
@@ -828,33 +829,34 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 __get_map_key :: proc "contextless" (k: $K) -> Map_Key {
 	key := k;
 	map_key: Map_Key;
-	ti := type_info_base_without_enum(type_info_of(K));
-	switch _ in ti.variant {
-	case Type_Info_Integer:
-		switch 8*size_of(key) {
-		case   8: map_key.hash = u64((  ^u8)(&key)^);
-		case  16: map_key.hash = u64(( ^u16)(&key)^);
-		case  32: map_key.hash = u64(( ^u32)(&key)^);
-		case  64: map_key.hash = u64(( ^u64)(&key)^);
-		case: panic("Unhandled integer size");
-		}
-	case Type_Info_Rune:
+
+	T :: intrinsics.type_core_type(K);
+
+	when intrinsics.type_is_integer(T) {
+		sz :: 8*size_of(T);
+		     when sz ==  8 do map_key.hash = u64(( ^u8)(&key)^);
+		else when sz == 16 do map_key.hash = u64((^u16)(&key)^);
+		else when sz == 32 do map_key.hash = u64((^u32)(&key)^);
+		else when sz == 64 do map_key.hash = u64((^u64)(&key)^);
+		else do #assert(false, "Unhandled integer size");
+	} else when intrinsics.type_is_rune(T) {
 		map_key.hash = u64((^rune)(&key)^);
-	case Type_Info_Pointer:
+	} else when intrinsics.type_is_pointer(T) {
 		map_key.hash = u64(uintptr((^rawptr)(&key)^));
-	case Type_Info_Float:
-		switch 8*size_of(key) {
-		case 32: map_key.hash = u64((^u32)(&key)^);
-		case 64: map_key.hash = u64((^u64)(&key)^);
-		case: panic("Unhandled float size");
-		}
-	case Type_Info_String:
+	} else when intrinsics.type_is_float(T) {
+		sz :: 8*size_of(T);
+		     when sz == 32 do map_key.hash = u64((^u32)(&key)^);
+		else when sz == 64 do map_key.hash = u64((^u64)(&key)^);
+		else do #assert(false, "Unhandled float size");
+	} else when intrinsics.type_is_string(T) {
+		#assert(T == string);
 		str := (^string)(&key)^;
 		map_key.hash = default_hash_string(str);
 		map_key.str  = str;
-	case:
-		panic("Unhandled map key type");
+	} else {
+		#assert(false, "Unhandled map key type");
 	}
+
 	return map_key;
 }
 
