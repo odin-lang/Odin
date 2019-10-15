@@ -5339,6 +5339,10 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					if (is_type_any(elem)) {
 						add_type_info_type(c, o.type);
 					}
+					if (o.mode == Addressing_Type && is_type_typeid(t)) {
+						add_type_info_type(c, o.type);
+						add_type_and_value(c->info, o.expr, Addressing_Value, t, exact_value_typeid(o.type));
+					}
 				}
 			}
 		}
