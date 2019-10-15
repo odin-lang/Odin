@@ -676,17 +676,6 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 		return;
 	}
 
-	#if 0
-	if (operand->mode == Addressing_Type) {
-		Type *t = base_type(type);
-		if (t->kind == Type_Pointer &&
-		    t->Pointer.elem == t_type_info) {
-			add_type_info_type(c, type);
-			return;
-		}
-	}
-	#endif
-
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
 		if (type == nullptr || is_type_any(type)) {
@@ -1590,10 +1579,7 @@ void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type *type) {
 
 void check_is_expressible(CheckerContext *c, Operand *o, Type *type) {
 	GB_ASSERT(o->mode == Addressing_Constant);
-	if (!is_type_constant_type(type)) {
-		return;
-	}
-	if (!check_representable_as_constant(c, o->value, type, &o->value)) {
+	if (!is_type_constant_type(type) || !check_representable_as_constant(c, o->value, type, &o->value)) {
 		gbString a = expr_to_string(o->expr);
 		gbString b = type_to_string(type);
 		defer(
