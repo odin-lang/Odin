@@ -3317,6 +3317,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_end - BuiltinProc__ty
 	is_type_sliceable,
 	is_type_simple_compare,
 	is_type_dereferenceable,
+	is_type_valid_for_keys,
 
 	is_type_named,
 	is_type_pointer,
@@ -4899,6 +4900,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_is_sliceable:
 	case BuiltinProc_type_is_simple_compare:
 	case BuiltinProc_type_is_dereferenceable:
+	case BuiltinProc_type_is_valid_map_key:
 	case BuiltinProc_type_is_named:
 	case BuiltinProc_type_is_pointer:
 	case BuiltinProc_type_is_opaque:
