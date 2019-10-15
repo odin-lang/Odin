@@ -134,6 +134,7 @@ BuiltinProc__type_begin,
 	BuiltinProc_type_is_sliceable,
 	BuiltinProc_type_is_simple_compare, // easily compared using memcmp
 	BuiltinProc_type_is_dereferenceable,
+	BuiltinProc_type_is_valid_map_key,
 
 	BuiltinProc_type_is_named,
 	BuiltinProc_type_is_pointer,
@@ -291,8 +292,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_ordered_numeric"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_indexable"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_sliceable"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("type_is_simple_compare"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics,},
+	{STR_LIT("type_is_simple_compare"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_dereferenceable"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_valid_map_key"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_is_named"),             1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_pointer"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
