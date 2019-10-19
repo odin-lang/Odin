@@ -49,6 +49,7 @@ fprintln :: proc(fd: os.Handle, args: ..any) -> int {
 	os.write_string(fd, res);
 	return len(res);
 }
+
 fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := strings.builder_from_slice(data[:]);
@@ -57,6 +58,16 @@ fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 	return len(res);
 }
 
+readln :: proc() -> (success: bool, result: string) {
+	len, err := os.file_size(os.stdin);
+	if len == 0 {
+		return false, "";
+	} else {
+		data := make([]byte, len);
+		os.read(os.stdin, data);
+		return true, cast(string)data;
+	}
+}
 
 // print* procedures return the number of bytes written
 print   :: proc(args: ..any)              -> int { return fprint(context.stdout, ..args); }
