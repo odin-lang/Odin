@@ -62,11 +62,10 @@ readln :: proc() -> (success: bool, result: string) {
 	len, err := os.file_size(os.stdin);
 	if len == 0 {
 		return false, "";
-	} else {
-		data := make([]byte, len);
-		os.read(os.stdin, data);
-		return true, cast(string)data;
 	}
+	data := make([]byte, len);
+	os.read(os.stdin, data);
+	return true, cast(string)data;
 }
 
 // print* procedures return the number of bytes written
