@@ -596,3 +596,19 @@ F64_MIN_10_EXP :: -307;                     // min decimal exponent
 F64_MIN_EXP    :: -1021;                    // min binary exponent
 F64_RADIX      :: 2;                        // exponent radix
 F64_ROUNDS     :: 1;                        // addition rounding: near
+
+Ordering :: enum {
+	Less,
+	Equal,
+	Greater,
+}
+
+compare_value :: inline proc(lhs: $T, rhs: $T2) -> Ordering {
+	if lhs < rhs {
+		return Ordering.Less;
+	} else if lhs == rhs {
+		return Ordering.Equal;
+	} else {
+		return Ordering.Greater;
+	}
+}
