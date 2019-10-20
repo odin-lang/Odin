@@ -7076,7 +7076,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				break;
 			}
 
-			if (cl->elems[0]->kind == Ast_FieldValue) {
+			if (cl->elems.count > 0 && cl->elems[0]->kind == Ast_FieldValue) {
 				if (is_type_simd_vector(t)) {
 					error(cl->elems[0], "'field = value' is not allowed for SIMD vector literals");
 				} else {
@@ -7162,7 +7162,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (t->kind == Type_Array) {
 				if (is_to_be_determined_array_count) {
 					t->Array.count = max;
-				} else if (cl->elems[0]->kind != Ast_FieldValue) {
+				} else if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
 					if (0 < max && max < t->Array.count) {
 						error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
 					}
