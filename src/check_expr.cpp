@@ -7066,7 +7066,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 
 			i64 max = 0;
-			isize index = 0;
 
 			Type *bet = base_type(elem_type);
 			if (!elem_type_can_be_constant(bet)) {
@@ -7077,39 +7076,99 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				break;
 			}
 
-			for (; index < cl->elems.count; index++) {
-				Ast *e = cl->elems[index];
-				if (e == nullptr) {
-					error(node, "Invalid literal element");
-					continue;
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				if (is_type_simd_vector(t)) {
+					error(cl->elems[0], "'field = value' is not allowed for SIMD vector literals");
+				} else {
+					Map<bool> seen = {};
+					map_init(&seen, heap_allocator());
+					defer (map_destroy(&seen));
+
+					for_array(i, cl->elems) {
+						Ast *elem = cl->elems[i];
+						if (elem->kind != Ast_FieldValue) {
+							error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+							continue;
+						}
+						ast_node(fv, FieldValue, elem);
+
+						Operand op_index = {};
+						check_expr(c, &op_index, fv->field);
+
+						if (op_index.mode != Addressing_Constant || !is_type_integer(core_type(op_index.type))) {
+							error(elem, "Expected a constant integer as an array field");
+							continue;
+						}
+
+						i64 index = exact_value_to_i64(op_index.value);
+
+						if (max_type_count >= 0 && (index < 0 || index >= max_type_count)) {
+							error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", index, max_type_count, LIT(context_name));
+							continue;
+						}
+
+						if (map_get(&seen, hash_integer(u64(index))) != nullptr) {
+							error(elem, "Duplicate field index %lld for %.*s", index, LIT(context_name));
+							continue;
+						}
+						map_set(&seen, hash_integer(u64(index)), true);
+
+						if (max < index) {
+							max = index;
+						}
+
+						Operand operand = {};
+						check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+						check_assignment(c, &operand, elem_type, context_name);
+
+						is_constant = is_constant && operand.mode == Addressing_Constant;
+					}
+
+					cl->max_index = max;
 				}
 
-				if (e->kind == Ast_FieldValue) {
-					error(e, "'field = value' is only allowed in struct literals");
-					continue;
+
+			} else {
+				isize index = 0;
+				for (; index < cl->elems.count; index++) {
+					Ast *e = cl->elems[index];
+					if (e == nullptr) {
+						error(node, "Invalid literal element");
+						continue;
+					}
+
+					if (e->kind == Ast_FieldValue) {
+						error(e, "Mixture of 'field = value' and value elements in a literal is not allowed");
+						continue;
+					}
+
+					if (0 <= max_type_count && max_type_count <= index) {
+						error(e, "Index %lld is out of bounds (>= %lld) for %.*s", index, max_type_count, LIT(context_name));
+					}
+
+					Operand operand = {};
+					check_expr_with_type_hint(c, &operand, e, elem_type);
+					check_assignment(c, &operand, elem_type, context_name);
+
+					is_constant = is_constant && operand.mode == Addressing_Constant;
 				}
 
-				if (0 <= max_type_count && max_type_count <= index) {
-					error(e, "Index %lld is out of bounds (>= %lld) for %.*s", index, max_type_count, LIT(context_name));
+				if (max < index) {
+					max = index;
 				}
-
-				Operand operand = {};
-				check_expr_with_type_hint(c, &operand, e, elem_type);
-				check_assignment(c, &operand, elem_type, context_name);
-
-				is_constant = is_constant && operand.mode == Addressing_Constant;
 			}
-			if (max < index) {
-				max = index;
-			}
+
 
 			if (t->kind == Type_Array) {
 				if (is_to_be_determined_array_count) {
 					t->Array.count = max;
-				} else if (0 < max && max < t->Array.count) {
-					error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
+				} else if (cl->elems[0]->kind != Ast_FieldValue) {
+					if (0 < max && max < t->Array.count) {
+						error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
+					}
 				}
 			}
+
 
 			if (t->kind == Type_SimdVector) {
 				if (!is_constant) {
