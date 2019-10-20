@@ -404,7 +404,7 @@ String16 string_to_string16(gbAllocator a, String s) {
 	}
 	text[len] = 0;
 
-	return make_string16(text, len-1);
+	return make_string16(text, len);
 }
 
 
