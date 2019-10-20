@@ -1552,6 +1552,7 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 			if (count == 0) {
 				return ir_value_nil(type);
 			}
+			count = gb_max(cl->max_index+1, count);
 			Type *elem = base_type(type)->Slice.elem;
 			Type *t = alloc_type_array(elem, count);
 			irValue *backing_array = ir_add_module_constant(m, t, value);
@@ -7859,13 +7860,29 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 				// NOTE(bill): Separate value, gep, store into their own chunks
 				for_array(i, cl->elems) {
 					Ast *elem = cl->elems[i];
-					if (ir_is_elem_const(proc->module, elem, et)) {
-						continue;
+					if (elem->kind == Ast_FieldValue) {
+						ast_node(fv, FieldValue, elem);
+						if (ir_is_elem_const(proc->module, fv->value, et)) {
+							continue;
+						}
+						auto tav = fv->field->tav;
+						GB_ASSERT(tav.mode == Addressing_Constant);
+						i64 index = exact_value_to_i64(tav.value);
+
+						irCompoundLitElemTempData data = {};
+						data.expr = fv->value;
+						data.elem_index = cast(i32)index;
+						array_add(&temp_data, data);
+
+					} else {
+						if (ir_is_elem_const(proc->module, elem, et)) {
+							continue;
+						}
+						irCompoundLitElemTempData data = {};
+						data.expr = elem;
+						data.elem_index = cast(i32)i;
+						array_add(&temp_data, data);
 					}
-					irCompoundLitElemTempData data = {};
-					data.expr = elem;
-					data.elem_index = cast(i32)i;
-					array_add(&temp_data, data);
 				}
 
 				for_array(i, temp_data) {
@@ -7881,6 +7898,9 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 					defer (proc->return_ptr_hint_used  = return_ptr_hint_used);
 
 					Ast *expr = temp_data[i].expr;
+					if (expr == nullptr) {
+						continue;
+					}
 
 					proc->return_ptr_hint_value = temp_data[i].gep;
 					proc->return_ptr_hint_ast = unparen_expr(expr);
@@ -7918,18 +7938,40 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 				for_array(i, cl->elems) {
 					Ast *elem = cl->elems[i];
-					if (ir_is_elem_const(proc->module, elem, et)) {
-						continue;
-					}
-					irValue *field_expr = ir_build_expr(proc, elem);
-					Type *t = ir_type(field_expr);
-					GB_ASSERT(t->kind != Type_Tuple);
-					irValue *ev = ir_emit_conv(proc, field_expr, et);
+					if (elem->kind == Ast_FieldValue) {
+						ast_node(fv, FieldValue, elem);
 
-					irCompoundLitElemTempData data = {};
-					data.value = ev;
-					data.elem_index = cast(i32)i;
-					array_add(&temp_data, data);
+						if (ir_is_elem_const(proc->module, fv->value, et)) {
+							continue;
+						}
+
+
+						GB_ASSERT(fv->field->tav.mode == Addressing_Constant);
+						i64 index = exact_value_to_i64(fv->field->tav.value);
+
+						irValue *field_expr = ir_build_expr(proc, fv->value);
+						GB_ASSERT(!is_type_tuple(ir_type(field_expr)));
+
+						irValue *ev = ir_emit_conv(proc, field_expr, et);
+
+						irCompoundLitElemTempData data = {};
+						data.value = ev;
+						data.elem_index = cast(i32)index;
+						array_add(&temp_data, data);
+					} else {
+						if (ir_is_elem_const(proc->module, elem, et)) {
+							continue;
+						}
+						irValue *field_expr = ir_build_expr(proc, elem);
+						GB_ASSERT(!is_type_tuple(ir_type(field_expr)));
+
+						irValue *ev = ir_emit_conv(proc, field_expr, et);
+
+						irCompoundLitElemTempData data = {};
+						data.value = ev;
+						data.elem_index = cast(i32)i;
+						array_add(&temp_data, data);
+					}
 				}
 
 				for_array(i, temp_data) {
@@ -7950,28 +7992,42 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			if (cl->elems.count == 0) {
 				break;
 			}
-			Type *elem = bt->DynamicArray.elem;
+			Type *et = bt->DynamicArray.elem;
 			gbAllocator a = ir_allocator();
-			irValue *size  = ir_const_int(type_size_of(elem));
-			irValue *align = ir_const_int(type_align_of(elem));
+			irValue *size  = ir_const_int(type_size_of(et));
+			irValue *align = ir_const_int(type_align_of(et));
+
+			i64 item_count = gb_max(cl->max_index+1, cl->elems.count);
 			{
+
 				auto args = array_make<irValue *>(a, 5);
 				args[0] = ir_emit_conv(proc, v, t_rawptr);
 				args[1] = size;
 				args[2] = align;
-				args[3] = ir_const_int(2*cl->elems.count);
+				args[3] = ir_const_int(2*item_count); // TODO(bill): Is this too much waste?
 				args[4] = ir_emit_source_code_location(proc, proc_name, pos);
 				ir_emit_runtime_call(proc, "__dynamic_array_reserve", args);
 			}
 
-			i64 item_count = cl->elems.count;
-			irValue *items = ir_generate_array(proc->module, elem, item_count, str_lit("dacl$"), cast(i64)cast(intptr)expr);
+			irValue *items = ir_generate_array(proc->module, et, item_count, str_lit("dacl$"), cast(i64)cast(intptr)expr);
 
-			for_array(field_index, cl->elems) {
-				Ast *f = cl->elems[field_index];
-				irValue *value = ir_emit_conv(proc, ir_build_expr(proc, f), elem);
-				irValue *ep = ir_emit_array_epi(proc, items, cast(i32)field_index);
-				ir_emit_store(proc, ep, value);
+			for_array(i, cl->elems) {
+				Ast *elem = cl->elems[i];
+				if (elem->kind == Ast_FieldValue) {
+					ast_node(fv, FieldValue, elem);
+					GB_ASSERT(fv->field->tav.mode == Addressing_Constant);
+
+					i64 field_index = exact_value_to_i64(fv->field->tav.value);
+
+					irValue *ev = ir_build_expr(proc, fv->value);
+					irValue *value = ir_emit_conv(proc, ev, et);
+					irValue *ep = ir_emit_array_epi(proc, items, cast(i32)field_index);
+					ir_emit_store(proc, ep, value);
+				} else {
+					irValue *value = ir_emit_conv(proc, ir_build_expr(proc, elem), et);
+					irValue *ep = ir_emit_array_epi(proc, items, cast(i32)i);
+					ir_emit_store(proc, ep, value);
+				}
 			}
 
 			{

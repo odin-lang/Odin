@@ -876,22 +876,56 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				ir_write_str_lit(f, "zeroinitializer");
 				break;
 			}
-			GB_ASSERT_MSG(elem_count == type->Array.count, "%td != %td", elem_count, type->Array.count);
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				// TODO(bill): This is O(N*M) and will be quite slow; it should probably be sorted before hand
+				ir_write_byte(f, '[');
+				for (i64 i = 0; i < type->Array.count; i++) {
+					if (i > 0) ir_write_str_lit(f, ", ");
 
-			ir_write_byte(f, '[');
+					bool found = false;
 
-			for (isize i = 0; i < elem_count; i++) {
-				if (i > 0) ir_write_str_lit(f, ", ");
-				TypeAndValue tav = cl->elems[i]->tav;
-				GB_ASSERT(tav.mode != Addressing_Invalid);
-				ir_print_compound_element(f, m, tav.value, elem_type);
+					for (isize j = 0; j < elem_count; j++) {
+						Ast *elem = cl->elems[j];
+						ast_node(fv, FieldValue, elem);
+						TypeAndValue index_tav = fv->field->tav;
+						GB_ASSERT(index_tav.mode == Addressing_Constant);
+						i64 index = exact_value_to_i64(index_tav.value);
+						if (index == i) {
+							TypeAndValue tav = fv->value->tav;
+							if (tav.mode != Addressing_Constant) {
+								break;
+							}
+							ir_print_compound_element(f, m, tav.value, elem_type);
+							found = true;
+							break;
+						}
+					}
+
+					if (!found) {
+						ir_print_type(f, m, elem_type);
+						ir_write_byte(f, ' ');
+						ir_write_str_lit(f, "zeroinitializer");
+					}
+				}
+				ir_write_byte(f, ']');
+			} else {
+				GB_ASSERT_MSG(elem_count == type->Array.count, "%td != %td", elem_count, type->Array.count);
+
+				ir_write_byte(f, '[');
+
+				for (isize i = 0; i < elem_count; i++) {
+					if (i > 0) ir_write_str_lit(f, ", ");
+					TypeAndValue tav = cl->elems[i]->tav;
+					GB_ASSERT(tav.mode != Addressing_Invalid);
+					ir_print_compound_element(f, m, tav.value, elem_type);
+				}
+				for (isize i = elem_count; i < type->Array.count; i++) {
+					if (i >= elem_count) ir_write_str_lit(f, ", ");
+					ir_print_compound_element(f, m, empty_exact_value, elem_type);
+				}
+
+				ir_write_byte(f, ']');
 			}
-			for (isize i = elem_count; i < type->Array.count; i++) {
-				if (i >= elem_count) ir_write_str_lit(f, ", ");
-				ir_print_compound_element(f, m, empty_exact_value, elem_type);
-			}
-
-			ir_write_byte(f, ']');
 		} else if (is_type_simd_vector(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
 
