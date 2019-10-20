@@ -160,8 +160,9 @@ void usage(String argv0) {
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s command [arguments]", LIT(argv0));
 	print_usage_line(0, "Commands:");
-	print_usage_line(1, "build     compile .odin file as executable");
-	print_usage_line(1, "run       compile and run .odin file");
+	print_usage_line(1, "build     compile .odin file, or directory of .odin files, as an executable.");
+	print_usage_line(1, "          one must contain the program's entry point, all must be in the same package.");
+	print_usage_line(1, "run       same as 'build', but also then runs the newly compiled executable.");
 	print_usage_line(1, "check     parse and type check .odin file");
 	print_usage_line(1, "query     parse, type check, and output a .json file containing information about the program");
 	print_usage_line(1, "docs      generate documentation for a .odin file");
