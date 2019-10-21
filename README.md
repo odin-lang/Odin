@@ -17,9 +17,6 @@
     <a href="https://github.com/odin-lang/odin/actions">
         <img src="https://github.com/odin-lang/odin/workflows/CI/badge.svg">
     </a>
-    <a href="https://travis-ci.org/odin-lang/Odin">
-        <img src="https://travis-ci.org/odin-lang/Odin.svg?branch=master">
-    </a>
 </p>
 
 # The Odin Programming Language
