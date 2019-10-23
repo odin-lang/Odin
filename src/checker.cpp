@@ -1628,6 +1628,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("mul_quaternion256"),
 		str_lit("quo_quaternion128"),
 		str_lit("quo_quaternion256"),
+		str_lit("cstring_to_string"),
 
 		str_lit("umodti3"),
 		str_lit("udivti3"),

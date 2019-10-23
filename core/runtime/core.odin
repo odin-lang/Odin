@@ -237,7 +237,22 @@ global_scratch_allocator_data: mem.Scratch_Allocator;
 
 
 
+Raw_Slice :: struct {
+	data: rawptr,
+	len:  int,
+}
 
+Raw_Dynamic_Array :: struct {
+	data:      rawptr,
+	len:       int,
+	cap:       int,
+	allocator: mem.Allocator,
+}
+
+Raw_Map :: struct {
+	hashes:  []int,
+	entries: Raw_Dynamic_Array,
+}
 
 INITIAL_MAP_CAP :: 16;
 
@@ -261,7 +276,7 @@ Map_Entry_Header :: struct {
 }
 
 Map_Header :: struct {
-	m:             ^mem.Raw_Map,
+	m:             ^Raw_Map,
 	is_key_string: bool,
 
 	entry_size:    int,
@@ -394,7 +409,7 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 @builtin
 copy :: proc "contextless" (dst, src: $T/[]$E) -> int {
 	n := max(0, min(len(dst), len(src)));
-	if n > 0 do mem.copy(&dst[0], &src[0], n*size_of(E));
+	if n > 0 do mem_copy(&dst[0], &src[0], n*size_of(E));
 	return n;
 }
 
@@ -405,7 +420,7 @@ pop :: proc "contextless" (array: ^$T/[dynamic]$E) -> E {
 	if array == nil do return E{};
 	assert(len(array) > 0);
 	res := array[len(array)-1];
-	(^mem.Raw_Dynamic_Array)(array).len -= 1;
+	(^Raw_Dynamic_Array)(array).len -= 1;
 	return res;
 }
 
@@ -469,14 +484,11 @@ make :: proc{
 	mem.make_map,
 };
 
-
-
-
 @builtin
 clear_map :: inline proc "contextless" (m: ^$T/map[$K]$V) {
 	if m == nil do return;
-	raw_map := (^mem.Raw_Map)(m);
-	entries := (^mem.Raw_Dynamic_Array)(&raw_map.entries);
+	raw_map := (^Raw_Map)(m);
+	entries := (^Raw_Dynamic_Array)(&raw_map.entries);
 	entries.len = 0;
 	for _, i in raw_map.hashes {
 		raw_map.hashes[i] = -1;
@@ -507,11 +519,11 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 	}
 	arg_len = min(cap(array)-len(array), arg_len);
 	if arg_len > 0 {
-		a := (^mem.Raw_Dynamic_Array)(array);
+		a := (^Raw_Dynamic_Array)(array);
 		data := (^E)(a.data);
 		assert(data != nil);
 		val := arg;
-		mem.copy(mem.ptr_offset(data, a.len), &val, size_of(E));
+		mem_copy(mem.ptr_offset(data, a.len), &val, size_of(E));
 		a.len += arg_len;
 	}
 }
@@ -529,10 +541,10 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 	}
 	arg_len = min(cap(array)-len(array), arg_len);
 	if arg_len > 0 {
-		a := (^mem.Raw_Dynamic_Array)(array);
+		a := (^Raw_Dynamic_Array)(array);
 		data := (^E)(a.data);
 		assert(data != nil);
-		mem.copy(mem.ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
+		mem_copy(mem.ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
 		a.len += arg_len;
 	}
 }
@@ -549,13 +561,13 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 
 @builtin
 clear_dynamic_array :: inline proc "contextless" (array: ^$T/[dynamic]$E) {
-	if array != nil do (^mem.Raw_Dynamic_Array)(array).len = 0;
+	if array != nil do (^Raw_Dynamic_Array)(array).len = 0;
 }
 
 @builtin
 reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #caller_location) -> bool {
 	if array == nil do return false;
-	a := (^mem.Raw_Dynamic_Array)(array);
+	a := (^Raw_Dynamic_Array)(array);
 
 	if capacity <= a.cap do return true;
 
@@ -582,7 +594,7 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 @builtin
 resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller_location) -> bool {
 	if array == nil do return false;
-	a := (^mem.Raw_Dynamic_Array)(array);
+	a := (^Raw_Dynamic_Array)(array);
 
 	if length <= a.cap {
 		a.len = max(length, 0);
@@ -722,7 +734,7 @@ unreachable :: proc(message := "", loc := #caller_location) -> ! {
 
 
 __dynamic_array_make :: proc(array_: rawptr, elem_size, elem_align: int, len, cap: int, loc := #caller_location) {
-	array := (^mem.Raw_Dynamic_Array)(array_);
+	array := (^Raw_Dynamic_Array)(array_);
 	array.allocator = context.allocator;
 	assert(array.allocator.procedure != nil);
 
@@ -733,7 +745,7 @@ __dynamic_array_make :: proc(array_: rawptr, elem_size, elem_align: int, len, ca
 }
 
 __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap: int, loc := #caller_location) -> bool {
-	array := (^mem.Raw_Dynamic_Array)(array_);
+	array := (^Raw_Dynamic_Array)(array_);
 
 	if cap <= array.cap do return true;
 
@@ -755,7 +767,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 }
 
 __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: int, loc := #caller_location) -> bool {
-	array := (^mem.Raw_Dynamic_Array)(array_);
+	array := (^Raw_Dynamic_Array)(array_);
 
 	ok := __dynamic_array_reserve(array_, elem_size, elem_align, len, loc);
 	if ok do array.len = len;
@@ -765,7 +777,7 @@ __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: 
 
 __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
                                items: rawptr, item_count: int, loc := #caller_location) -> int {
-	array := (^mem.Raw_Dynamic_Array)(array_);
+	array := (^Raw_Dynamic_Array)(array_);
 
 	if items == nil    do return 0;
 	if item_count <= 0 do return 0;
@@ -782,13 +794,13 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 	assert(array.data != nil);
 	data := uintptr(array.data) + uintptr(elem_size*array.len);
 
-	mem.copy(rawptr(data), items, elem_size * item_count);
+	mem_copy(rawptr(data), items, elem_size * item_count);
 	array.len += item_count;
 	return array.len;
 }
 
 __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: int, loc := #caller_location) -> int {
-	array := (^mem.Raw_Dynamic_Array)(array_);
+	array := (^Raw_Dynamic_Array)(array_);
 
 	ok := true;
 	if array.cap <= array.len+1 {
@@ -811,7 +823,7 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 // Map
 
 __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
-	header := Map_Header{m = (^mem.Raw_Map)(m)};
+	header := Map_Header{m = (^Raw_Map)(m)};
 	Entry :: struct {
 		key:   Map_Key,
 		next:  int,
@@ -885,7 +897,7 @@ source_code_location_hash :: proc(s: Source_Code_Location) -> u64 {
 
 
 __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: mem.Allocator, loc := #caller_location) -> bool {
-	array := (^mem.Raw_Slice)(array_);
+	array := (^Raw_Slice)(array_);
 
 	if new_count < array.len do return true;
 
@@ -911,7 +923,7 @@ __dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller
 }
 __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #caller_location) #no_bounds_check {
 	new_header: Map_Header = header;
-	nm := mem.Raw_Map{};
+	nm := Raw_Map{};
 	nm.entries.allocator = m.entries.allocator;
 	new_header.m = &nm;
 
@@ -943,7 +955,7 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 		e := __dynamic_map_get_entry(new_header, j);
 		e.next = fr.entry_index;
 		ndata := uintptr(e);
-		mem.copy(rawptr(ndata+value_offset), rawptr(data+value_offset), value_size);
+		mem_copy(rawptr(ndata+value_offset), rawptr(data+value_offset), value_size);
 
 		if __dynamic_map_full(new_header) do __dynamic_map_grow(new_header, loc);
 	}
@@ -986,7 +998,7 @@ __dynamic_map_set :: proc(h: Map_Header, key: Map_Key, value: rawptr, loc := #ca
 		e := __dynamic_map_get_entry(h, index);
 		e.key = key;
 		val := (^byte)(uintptr(e) + h.value_offset);
-		mem.copy(val, value, h.value_size);
+		mem_copy(val, value, h.value_size);
 	}
 
 	if __dynamic_map_full(h) {
@@ -1065,7 +1077,7 @@ __dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) #no_bounds
 	} else {
 		old := __dynamic_map_get_entry(h, fr.entry_index);
 		end := __dynamic_map_get_entry(h, m.entries.len-1);
-		mem.copy(old, end, entry_size);
+		mem_copy(old, end, entry_size);
 
 		if last := __dynamic_map_find(h, old.key); last.entry_prev >= 0 {
 			last_entry := __dynamic_map_get_entry(h, last.entry_prev);
