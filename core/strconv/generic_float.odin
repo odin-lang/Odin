@@ -1,6 +1,6 @@
 package strconv
 
-using import "core:decimal"
+using import "decimal"
 
 Int_Flag :: enum {
 	Prefix,

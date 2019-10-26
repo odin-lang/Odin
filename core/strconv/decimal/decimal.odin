@@ -1,6 +1,6 @@
 // Multiple precision decimal numbers
 // NOTE: This is only for floating point printing and nothing else
-package decimal
+package strconv_decimal
 
 Decimal :: struct {
 	digits:        [384]byte, // big-endian digits
