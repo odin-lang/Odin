@@ -119,16 +119,54 @@ read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
 	return read(fd, s);
 }
 
-
 heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                             size, alignment: int,
                             old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+	//
+	// NOTE(tetra, 2019-11-10): The heap doesn't respect alignment.
+	// HACK: Overallocate, align forwards, and then use the two bytes immediately before
+	// the address we return, to store the padding we inserted.
+	// This allows us to pass the original pointer we got back from the heap to `free` later.
+	//
+
+	align_and_store_padding :: proc(ptr: rawptr, alignment: int) -> rawptr {
+		ptr := mem.ptr_offset(cast(^u8) ptr, 2);
+		new_ptr := cast(^u8) mem.align_forward(ptr, uintptr(alignment));
+		offset := mem.ptr_sub(new_ptr, cast(^u8) ptr) + 2;
+		assert(offset < int(max(u16)));
+		(^[2]u8)(mem.ptr_offset(new_ptr, -2))^ = transmute([2]u8) u16(offset);
+		return new_ptr;
+	}
+
+	recover_original_pointer :: proc(ptr: rawptr) -> rawptr {
+		ptr := cast(^u8) ptr;
+		offset := transmute(u16) (^[2]u8)(mem.ptr_offset(ptr, -2))^;
+		ptr = mem.ptr_offset(ptr, -int(offset));
+		return ptr;
+	}
+
+	aligned_heap_alloc :: proc(size: int, alignment: int) -> rawptr {
+		// NOTE(tetra): Alignment 1 will mean we only have one extra byte.
+		// This is not enough for a u16 - so we ensure there is at least two bytes extra.
+		// This also means that the pointer is always aligned to at least 2.
+		extra := alignment;
+		if extra <= 1 do extra = 2;
+
+		orig := cast(^u8) heap_alloc(size + extra);
+		if orig == nil do return nil;
+		ptr := align_and_store_padding(orig, alignment);
+		assert(recover_original_pointer(ptr) == orig);
+		return ptr;
+	}
+
 	switch mode {
 	case .Alloc:
-		return heap_alloc(size);
+		return aligned_heap_alloc(size, alignment);
 
 	case .Free:
-		heap_free(old_memory);
+		assert(old_memory != nil);
+		ptr := recover_original_pointer(old_memory);
+		heap_free(ptr);
 		return nil;
 
 	case .Free_All:
@@ -136,11 +174,12 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 
 	case .Resize:
 		if old_memory == nil {
-			return heap_alloc(size);
+			return aligned_heap_alloc(size, alignment);
 		}
-		ptr := heap_resize(old_memory, size);
+		ptr := recover_original_pointer(old_memory);
+		ptr = heap_resize(ptr, size);
 		assert(ptr != nil);
-		return ptr;
+		return align_and_store_padding(ptr, alignment);
 	}
 
 	return nil;

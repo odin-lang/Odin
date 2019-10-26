@@ -210,7 +210,6 @@ get_std_handle :: proc(h: int) -> Handle {
 
 
 
-
 last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
 	file_info: win32.By_Handle_File_Information;
 	if !win32.get_file_information_by_handle(win32.Handle(fd), &file_info) {
@@ -251,6 +250,18 @@ heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 heap_free :: proc(ptr: rawptr) {
 	if ptr == nil do return;
 	win32.heap_free(win32.get_process_heap(), 0, ptr);
+}
+
+get_page_size :: proc() -> int {
+	// NOTE(tetra): The page size never changes, so why do anything complicated
+	// if we don't have to.
+	@static page_size := -1;
+	if page_size != -1 do return page_size;
+
+	info: win32.System_Info;
+	win32.get_system_info(&info);
+	page_size = int(info.page_size);
+	return page_size;
 }
 
 
