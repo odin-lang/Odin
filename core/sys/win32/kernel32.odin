@@ -31,6 +31,7 @@ foreign kernel32 {
 	@(link_name="GetCommandLineA")           get_command_line_a           :: proc() -> cstring ---;
 	@(link_name="GetCommandLineW")           get_command_line_w           :: proc() -> Wstring ---;
 	@(link_name="GetSystemMetrics")          get_system_metrics           :: proc(index: i32) -> i32 ---;
+	@(link_name="GetSystemInfo")             get_system_info              :: proc(info: ^System_Info) ---;
 	@(link_name="GetVersionExA")             get_version                  :: proc(osvi: ^OS_Version_Info_Ex_A) ---;
 	@(link_name="GetCurrentThreadId")        get_current_thread_id        :: proc() -> u32 ---;
 
