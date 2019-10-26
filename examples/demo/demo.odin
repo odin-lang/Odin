@@ -50,9 +50,9 @@ extra_general_stuff :: proc() {
 		i := i32(137);
 		ptr := &i;
 
-		_ = (^f32)(ptr);
+		_ = (^f32)(ptr); // Call-based syntax
 		// ^f32(ptr) == ^(f32(ptr))
-		_ = cast(^f32)ptr;
+		_ = cast(^f32)ptr; // Operator-based syntax
 
 		_ = (^f32)(ptr)^;
 		_ = (cast(^f32)ptr)^;
@@ -1188,6 +1188,21 @@ where_clauses :: proc() {
 	}
 }
 
+ranged_fields_for_array_compound_literals :: proc() {
+	fmt.println("\n#ranged fields for array compound literals");
+	{ // Normal Array Literal
+		foo := [?]int{1, 4, 9, 16};
+		fmt.println(foo);
+	}
+	i := 2;
+	foo := [?]int {
+	    0 = 123,
+	    5..9 = 54,
+	    10..<16 = i*3 + (i-1)*2,
+	};
+	fmt.println(foo); // [123, 0, 0, 0, 0, 54, 54, 54, 54, 54, 8, 8, 8, 8, 8]
+}
+
 main :: proc() {
 	when true {
 		extra_general_stuff();
@@ -1210,6 +1225,7 @@ main :: proc() {
 		quaternions();
 		inline_for_statement();
 		where_clauses();
+		ranged_fields_for_array_compound_literals();
 	}
 }
 
