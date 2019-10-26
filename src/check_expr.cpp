@@ -7205,10 +7205,13 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 							i64 lo = exact_value_to_i64(x.value);
 							i64 hi = exact_value_to_i64(y.value);
+							i64 max_index = hi;
 							if (op.kind == Token_RangeHalf) {
 								hi -= 1;
 							}
-							i64 max_index = hi;
+							if (op.kind == Token_Ellipsis) {
+								max_index += 1;
+							}
 
 							bool new_range = range_cache_add_range(&rc, lo, hi);
 							if (!new_range) {
@@ -7257,8 +7260,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 								continue;
 							}
 
-							if (max < index) {
-								max = index;
+							if (max < index+1) {
+								max = index+1;
 							}
 
 							Operand operand = {};
