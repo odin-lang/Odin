@@ -161,19 +161,58 @@ decode_last_rune :: proc(s: []u8) -> (rune, int) {
 	return r, size;
 }
 
-rune_index :: proc(s: string, index: int) -> (r: rune = RUNE_ERROR, ok: bool = false) {
-	if index < 0 {
-		return;
+rune_at_pos :: proc(s: string, pos: int) -> rune {
+	if pos < 0 {
+		return RUNE_ERROR;
 	}
 
 	i := 0;
 	for c in s {
-		if i == index {
-			return r, true;
+		if i == pos {
+			return r;
 		}
 		i += 1;
 	}
-	return;
+	return RUNE_ERROR;
+}
+
+rune_string_at_pos :: proc(s: string, pos: int) -> string {
+	if pos < 0 {
+		return "";
+	}
+
+	i := 0;
+	for c, offset in s {
+		if i == pos {
+			w := rune_size(c);
+			return s[offset:][:w];
+		}
+		i += 1;
+	}
+	return "";
+}
+
+rune_at :: proc(s: string, byte_index: int) -> rune {
+	str := s[byte_index:];
+	r, _ := decode_rune_in_string(s[byte_index:]);
+	return r;
+}
+
+// Returns the byte position of rune at position pos in s with an optional start byte position.
+// Returns -1 if it runs out of the string.
+rune_offset :: proc(s: string, pos: int, start: int = 0) -> int {
+	if pos < 0 {
+		return -1;
+	}
+
+	i := 0;
+	for c, offset in s[start:] {
+		if i == pos {
+			return offset+start;
+		}
+		i += 1;
+	}
+	return -1;
 }
 
 valid_rune :: proc(r: rune) -> bool {
