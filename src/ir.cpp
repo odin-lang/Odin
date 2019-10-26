@@ -1552,7 +1552,7 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 			if (count == 0) {
 				return ir_value_nil(type);
 			}
-			count = gb_max(cl->max_index+1, count);
+			count = gb_max(cl->max_count, count);
 			Type *elem = base_type(type)->Slice.elem;
 			Type *t = alloc_type_array(elem, count);
 			irValue *backing_array = ir_add_module_constant(m, t, value);
@@ -8047,7 +8047,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			irValue *size  = ir_const_int(type_size_of(et));
 			irValue *align = ir_const_int(type_align_of(et));
 
-			i64 item_count = gb_max(cl->max_index+1, cl->elems.count);
+			i64 item_count = gb_max(cl->max_count, cl->elems.count);
 			{
 
 				auto args = array_make<irValue *>(a, 5);

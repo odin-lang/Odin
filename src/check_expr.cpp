@@ -7209,9 +7209,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 							if (op.kind == Token_RangeHalf) {
 								hi -= 1;
 							}
-							if (op.kind == Token_Ellipsis) {
-								max_index += 1;
-							}
 
 							bool new_range = range_cache_add_range(&rc, lo, hi);
 							if (!new_range) {
@@ -7229,7 +7226,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 								continue;
 							}
 
-							if (max < max_index) {
+							if (max < hi) {
 								max = max_index;
 							}
 
@@ -7272,7 +7269,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						}
 					}
 
-					cl->max_index = max;
+					cl->max_count = max;
 				}
 
 
