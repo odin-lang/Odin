@@ -250,7 +250,7 @@ enum StmtAllowFlag {
 		Ast *type; \
 		Array<Ast *> elems; \
 		Token open, close; \
-		i64 max_index; \
+		i64 max_count; \
 	}) \
 AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
