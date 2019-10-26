@@ -9743,7 +9743,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 				}
 
 				Type *abi_type = proc->type->Proc.abi_compat_params[i];
-				if (e->token.string != "" && !is_blank_ident(e->token)) {
+				if (e->token.string != "") {
 					ir_add_param(proc, e, name, abi_type, parameter_index);
 				}
 
@@ -9766,7 +9766,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 				if (abi_types.count > 0) {
 					abi_type = abi_types[i];
 				}
-				if (e->token.string != "" && !is_blank_ident(e->token)) {
+				if (e->token.string != "") {
 					ir_add_param(proc, e, nullptr, abi_type, parameter_index);
 				}
 				if (is_type_tuple(abi_type)) {

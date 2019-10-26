@@ -1167,10 +1167,9 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 					for_array(i, scope->elements.entries) {
 						Entity *f = scope->elements.entries[i].value;
 						if (f->kind == Entity_Variable) {
-							Entity *uvar = alloc_entity_using_variable(e, f->token, f->type);
+							Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
 							uvar->Variable.is_immutable = is_immutable;
 							if (is_value) uvar->flags |= EntityFlag_Value;
-
 
 							ProcUsingVar puv = {e, uvar};
 							array_add(&using_entities, puv);

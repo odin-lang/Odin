@@ -496,8 +496,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 			for_array(i, found->elements.entries) {
 				Entity *f = found->elements.entries[i].value;
 				if (f->kind == Entity_Variable) {
-					Entity *uvar = alloc_entity_using_variable(e, f->token, f->type);
-					uvar->using_expr = expr;
+					Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, expr);
 					Entity *prev = scope_insert(ctx->scope, uvar);
 					if (prev != nullptr) {
 						gbString expr_str = expr_to_string(expr);
@@ -2052,7 +2051,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					// TODO(bill): Should a 'continue' happen here?
 				}
 
-				for (isize entity_index = 0; entity_index < entity_count; entity_index++) {
+				for (isize entity_index = 0; entity_index < 1; entity_index++) {
 					Entity *e = entities[entity_index];
 					if (e == nullptr) {
 						continue;
@@ -2071,7 +2070,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						for_array(i, scope->elements.entries) {
 							Entity *f = scope->elements.entries[i].value;
 							if (f->kind == Entity_Variable) {
-								Entity *uvar = alloc_entity_using_variable(e, f->token, f->type);
+								Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
 								uvar->Variable.is_immutable = is_immutable;
 								Entity *prev = scope_insert(ctx->scope, uvar);
 								if (prev != nullptr) {

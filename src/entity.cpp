@@ -221,12 +221,13 @@ Entity *alloc_entity_variable(Scope *scope, Token token, Type *type, bool is_imm
 	return entity;
 }
 
-Entity *alloc_entity_using_variable(Entity *parent, Token token, Type *type) {
+Entity *alloc_entity_using_variable(Entity *parent, Token token, Type *type, Ast *using_expr) {
 	GB_ASSERT(parent != nullptr);
 	token.pos = parent->token.pos;
 	Entity *entity = alloc_entity(Entity_Variable, parent->scope, token, type);
 	entity->using_parent = parent;
 	entity->parent_proc_decl = parent->parent_proc_decl;
+	entity->using_expr = using_expr;
 	entity->flags |= EntityFlag_Using;
 	entity->flags |= EntityFlag_Used;
 	entity->state = EntityState_Resolved;
