@@ -143,6 +143,9 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 
 #define for_array(index_, array_) for (isize index_ = 0; index_ < (array_).count; index_++)
 
+#include "range_cache.cpp"
+
+
 
 u64 fnv64a(void const *data, isize len) {
 	u8 const *bytes = cast(u8 const *)data;

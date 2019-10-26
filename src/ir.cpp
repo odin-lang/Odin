@@ -7865,14 +7865,40 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 						if (ir_is_elem_const(proc->module, fv->value, et)) {
 							continue;
 						}
-						auto tav = fv->field->tav;
-						GB_ASSERT(tav.mode == Addressing_Constant);
-						i64 index = exact_value_to_i64(tav.value);
+						if (is_ast_range(fv->field)) {
+							ast_node(ie, BinaryExpr, fv->field);
+							TypeAndValue lo_tav = ie->left->tav;
+							TypeAndValue hi_tav = ie->right->tav;
+							GB_ASSERT(lo_tav.mode == Addressing_Constant);
+							GB_ASSERT(hi_tav.mode == Addressing_Constant);
 
-						irCompoundLitElemTempData data = {};
-						data.expr = fv->value;
-						data.elem_index = cast(i32)index;
-						array_add(&temp_data, data);
+							TokenKind op = ie->op.kind;
+							i64 lo = exact_value_to_i64(lo_tav.value);
+							i64 hi = exact_value_to_i64(hi_tav.value);
+							if (op == Token_Ellipsis) {
+								hi += 1;
+							}
+
+							irValue *value = ir_build_expr(proc, fv->value);
+
+							for (i64 k = lo; k < hi; k++) {
+								irCompoundLitElemTempData data = {};
+								data.value = value;
+								data.elem_index = cast(i32)k;
+								array_add(&temp_data, data);
+							}
+
+						} else {
+							auto tav = fv->field->tav;
+							GB_ASSERT(tav.mode == Addressing_Constant);
+							i64 index = exact_value_to_i64(tav.value);
+
+							irCompoundLitElemTempData data = {};
+							data.value = ir_emit_conv(proc, ir_build_expr(proc, fv->value), et);
+							data.expr = fv->value;
+							data.elem_index = cast(i32)index;
+							array_add(&temp_data, data);
+						}
 
 					} else {
 						if (ir_is_elem_const(proc->module, elem, et)) {
@@ -7897,15 +7923,15 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 					defer (proc->return_ptr_hint_value = return_ptr_hint_value);
 					defer (proc->return_ptr_hint_used  = return_ptr_hint_used);
 
+					irValue *field_expr = temp_data[i].value;
 					Ast *expr = temp_data[i].expr;
-					if (expr == nullptr) {
-						continue;
-					}
 
 					proc->return_ptr_hint_value = temp_data[i].gep;
 					proc->return_ptr_hint_ast = unparen_expr(expr);
 
-					irValue *field_expr = ir_build_expr(proc, expr);
+					if (field_expr == nullptr) {
+						field_expr = ir_build_expr(proc, expr);
+					}
 					Type *t = ir_type(field_expr);
 					GB_ASSERT(t->kind != Type_Tuple);
 					irValue *ev = ir_emit_conv(proc, field_expr, et);
@@ -7945,19 +7971,43 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 							continue;
 						}
 
+						if (is_ast_range(fv->field)) {
+							ast_node(ie, BinaryExpr, fv->field);
+							TypeAndValue lo_tav = ie->left->tav;
+							TypeAndValue hi_tav = ie->right->tav;
+							GB_ASSERT(lo_tav.mode == Addressing_Constant);
+							GB_ASSERT(hi_tav.mode == Addressing_Constant);
 
-						GB_ASSERT(fv->field->tav.mode == Addressing_Constant);
-						i64 index = exact_value_to_i64(fv->field->tav.value);
+							TokenKind op = ie->op.kind;
+							i64 lo = exact_value_to_i64(lo_tav.value);
+							i64 hi = exact_value_to_i64(hi_tav.value);
+							if (op == Token_Ellipsis) {
+								hi += 1;
+							}
 
-						irValue *field_expr = ir_build_expr(proc, fv->value);
-						GB_ASSERT(!is_type_tuple(ir_type(field_expr)));
+							irValue *value = ir_emit_conv(proc, ir_build_expr(proc, fv->value), et);
 
-						irValue *ev = ir_emit_conv(proc, field_expr, et);
+							for (i64 k = lo; k < hi; k++) {
+								irCompoundLitElemTempData data = {};
+								data.value = value;
+								data.elem_index = cast(i32)k;
+								array_add(&temp_data, data);
+							}
 
-						irCompoundLitElemTempData data = {};
-						data.value = ev;
-						data.elem_index = cast(i32)index;
-						array_add(&temp_data, data);
+						} else {
+							GB_ASSERT(fv->field->tav.mode == Addressing_Constant);
+							i64 index = exact_value_to_i64(fv->field->tav.value);
+
+							irValue *field_expr = ir_build_expr(proc, fv->value);
+							GB_ASSERT(!is_type_tuple(ir_type(field_expr)));
+
+							irValue *ev = ir_emit_conv(proc, field_expr, et);
+
+							irCompoundLitElemTempData data = {};
+							data.value = ev;
+							data.elem_index = cast(i32)index;
+							array_add(&temp_data, data);
+						}
 					} else {
 						if (ir_is_elem_const(proc->module, elem, et)) {
 							continue;
@@ -8015,14 +8065,36 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 				Ast *elem = cl->elems[i];
 				if (elem->kind == Ast_FieldValue) {
 					ast_node(fv, FieldValue, elem);
-					GB_ASSERT(fv->field->tav.mode == Addressing_Constant);
+					if (is_ast_range(fv->field)) {
+						ast_node(ie, BinaryExpr, fv->field);
+						TypeAndValue lo_tav = ie->left->tav;
+						TypeAndValue hi_tav = ie->right->tav;
+						GB_ASSERT(lo_tav.mode == Addressing_Constant);
+						GB_ASSERT(hi_tav.mode == Addressing_Constant);
 
-					i64 field_index = exact_value_to_i64(fv->field->tav.value);
+						TokenKind op = ie->op.kind;
+						i64 lo = exact_value_to_i64(lo_tav.value);
+						i64 hi = exact_value_to_i64(hi_tav.value);
+						if (op == Token_Ellipsis) {
+							hi += 1;
+						}
 
-					irValue *ev = ir_build_expr(proc, fv->value);
-					irValue *value = ir_emit_conv(proc, ev, et);
-					irValue *ep = ir_emit_array_epi(proc, items, cast(i32)field_index);
-					ir_emit_store(proc, ep, value);
+						irValue *value = ir_emit_conv(proc, ir_build_expr(proc, fv->value), et);
+
+						for (i64 k = lo; k < hi; k++) {
+							irValue *ep = ir_emit_array_epi(proc, items, cast(i32)k);
+							ir_emit_store(proc, ep, value);
+						}
+					} else {
+						GB_ASSERT(fv->field->tav.mode == Addressing_Constant);
+
+						i64 field_index = exact_value_to_i64(fv->field->tav.value);
+
+						irValue *ev = ir_build_expr(proc, fv->value);
+						irValue *value = ir_emit_conv(proc, ev, et);
+						irValue *ep = ir_emit_array_epi(proc, items, cast(i32)field_index);
+						ir_emit_store(proc, ep, value);
+					}
 				} else {
 					irValue *value = ir_emit_conv(proc, ir_build_expr(proc, elem), et);
 					irValue *ep = ir_emit_array_epi(proc, items, cast(i32)i);

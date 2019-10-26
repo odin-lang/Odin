@@ -588,6 +588,7 @@ Ast *ast_undef(AstFile *f, Token token) {
 Ast *ast_basic_lit(AstFile *f, Token basic_lit) {
 	Ast *result = alloc_ast_node(f, Ast_BasicLit);
 	result->BasicLit.token = basic_lit;
+	result->BasicLit.value = exact_value_from_basic_literal(basic_lit);
 	return result;
 }
 
@@ -1509,8 +1510,11 @@ Ast *parse_value(AstFile *f) {
 	if (f->curr_token.kind == Token_OpenBrace) {
 		return parse_literal_value(f, nullptr);
 	}
-
-	Ast *value = parse_expr(f, false);
+	Ast *value;
+	bool prev_allow_range = f->allow_range;
+	f->allow_range = true;
+	value = parse_expr(f, false);
+	f->allow_range = prev_allow_range;
 	return value;
 }
 
@@ -1735,7 +1739,8 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 				operand = ast_bad_expr(f, token, f->curr_token);
 			}
 			operand->stmt_state_flags |= StmtStateFlag_no_deferred;
-		} */ else if (name.string == "file") { return ast_basic_directive(f, token, name.string);
+		} */ else if (name.string == "file") {
+			return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "line") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "procedure") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "caller_location") { return ast_basic_directive(f, token, name.string);

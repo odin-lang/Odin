@@ -2391,6 +2391,9 @@ parse_value :: proc(p: ^Parser) -> ^ast.Expr {
 	if p.curr_tok.kind == .Open_Brace {
 		return parse_literal_value(p, nil);
 	}
+	prev_allow_range = p.allow_range;
+	defer p.allow_range = prev_allow_range;
+	p.allow_range = true;
 	return parse_expr(p, false);
 }
 

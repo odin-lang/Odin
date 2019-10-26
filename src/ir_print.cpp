@@ -887,17 +887,47 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 					for (isize j = 0; j < elem_count; j++) {
 						Ast *elem = cl->elems[j];
 						ast_node(fv, FieldValue, elem);
-						TypeAndValue index_tav = fv->field->tav;
-						GB_ASSERT(index_tav.mode == Addressing_Constant);
-						i64 index = exact_value_to_i64(index_tav.value);
-						if (index == i) {
-							TypeAndValue tav = fv->value->tav;
-							if (tav.mode != Addressing_Constant) {
+						if (is_ast_range(fv->field)) {
+							ast_node(ie, BinaryExpr, fv->field);
+							TypeAndValue lo_tav = ie->left->tav;
+							TypeAndValue hi_tav = ie->right->tav;
+							GB_ASSERT(lo_tav.mode == Addressing_Constant);
+							GB_ASSERT(hi_tav.mode == Addressing_Constant);
+
+							TokenKind op = ie->op.kind;
+							i64 lo = exact_value_to_i64(lo_tav.value);
+							i64 hi = exact_value_to_i64(hi_tav.value);
+							if (op == Token_Ellipsis) {
+								hi += 1;
+							}
+							if (lo == i) {
+								TypeAndValue tav = fv->value->tav;
+								if (tav.mode != Addressing_Constant) {
+									break;
+								}
+								for (i64 k = lo; k < hi; k++) {
+									if (k > lo) ir_write_str_lit(f, ", ");
+
+									ir_print_compound_element(f, m, tav.value, elem_type);
+								}
+
+								found = true;
+								i += (hi-lo-1);
 								break;
 							}
-							ir_print_compound_element(f, m, tav.value, elem_type);
-							found = true;
-							break;
+						} else {
+							TypeAndValue index_tav = fv->field->tav;
+							GB_ASSERT(index_tav.mode == Addressing_Constant);
+							i64 index = exact_value_to_i64(index_tav.value);
+							if (index == i) {
+								TypeAndValue tav = fv->value->tav;
+								if (tav.mode != Addressing_Constant) {
+									break;
+								}
+								ir_print_compound_element(f, m, tav.value, elem_type);
+								found = true;
+								break;
+							}
 						}
 					}
 

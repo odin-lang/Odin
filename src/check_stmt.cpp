@@ -605,89 +605,15 @@ void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 
 	if (is_ast_range(expr)) {
 		ast_node(ie, BinaryExpr, expr);
-		Operand x = {Addressing_Invalid};
-		Operand y = {Addressing_Invalid};
+		Operand x = {};
+		Operand y = {};
 
-		check_expr(ctx, &x, ie->left);
-		if (x.mode == Addressing_Invalid) {
-			goto skip_expr;
-		}
-		check_expr(ctx, &y, ie->right);
-		if (y.mode == Addressing_Invalid) {
+		bool ok = check_range(ctx, expr, &x, &y, &inline_for_depth);
+		if (!ok) {
 			goto skip_expr;
 		}
 
-		convert_to_typed(ctx, &x, y.type);
-		if (x.mode == Addressing_Invalid) {
-			goto skip_expr;
-		}
-		convert_to_typed(ctx, &y, x.type);
-		if (y.mode == Addressing_Invalid) {
-			goto skip_expr;
-		}
-
-		convert_to_typed(ctx, &x, default_type(y.type));
-		if (x.mode == Addressing_Invalid) {
-			goto skip_expr;
-		}
-		convert_to_typed(ctx, &y, default_type(x.type));
-		if (y.mode == Addressing_Invalid) {
-			goto skip_expr;
-		}
-
-		if (!are_types_identical(x.type, y.type)) {
-			if (x.type != t_invalid &&
-			    y.type != t_invalid) {
-				gbString xt = type_to_string(x.type);
-				gbString yt = type_to_string(y.type);
-				gbString expr_str = expr_to_string(x.expr);
-				error(ie->op, "Mismatched types in interval expression '%s' : '%s' vs '%s'", expr_str, xt, yt);
-				gb_string_free(expr_str);
-				gb_string_free(yt);
-				gb_string_free(xt);
-			}
-			goto skip_expr;
-		}
-
-		Type *type = x.type;
-		if (!is_type_integer(type) && !is_type_float(type) && !is_type_pointer(type) && !is_type_enum(type)) {
-			error(ie->op, "Only numerical and pointer types are allowed within interval expressions");
-			goto skip_expr;
-		}
-
-		if (x.mode == Addressing_Constant &&
-		    y.mode == Addressing_Constant) {
-			ExactValue a = x.value;
-			ExactValue b = y.value;
-
-			GB_ASSERT(are_types_identical(x.type, y.type));
-
-			TokenKind op = Token_Lt;
-			switch (ie->op.kind) {
-			case Token_Ellipsis:  op = Token_LtEq; break;
-			case Token_RangeHalf: op = Token_Lt; break;
-			default: error(ie->op, "Invalid range operator"); break;
-			}
-			bool ok = compare_exact_values(op, a, b);
-			if (!ok) {
-				// TODO(bill): Better error message
-				error(ie->op, "Invalid interval range");
-				goto skip_expr;
-			}
-
-			inline_for_depth = exact_value_sub(b, a);
-			if (ie->op.kind == Token_Ellipsis) {
-				inline_for_depth = exact_value_increment_one(inline_for_depth);
-			}
-
-		} else {
-			error(ie->op, "Interval expressions must be constant");
-			goto skip_expr;
-		}
-
-		add_type_and_value(&ctx->checker->info, ie->left,  x.mode, x.type, x.value);
-		add_type_and_value(&ctx->checker->info, ie->right, y.mode, y.type, y.value);
-		val0 = type;
+		val0 = x.type;
 		val1 = t_int;
 	} else {
 		Operand operand = {Addressing_Invalid};

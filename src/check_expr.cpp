@@ -6635,6 +6635,98 @@ bool ternary_compare_types(Type *x, Type *y) {
 }
 
 
+bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValue *inline_for_depth_) {
+	if (!is_ast_range(node)) {
+		return false;
+	}
+
+	ast_node(ie, BinaryExpr, node);
+
+	check_expr(c, x, ie->left);
+	if (x->mode == Addressing_Invalid) {
+		return false;
+	}
+	check_expr(c, y, ie->right);
+	if (y->mode == Addressing_Invalid) {
+		return false;
+	}
+
+	convert_to_typed(c, x, y->type);
+	if (x->mode == Addressing_Invalid) {
+		return false;
+	}
+	convert_to_typed(c, y, x->type);
+	if (y->mode == Addressing_Invalid) {
+		return false;
+	}
+
+	convert_to_typed(c, x, default_type(y->type));
+	if (x->mode == Addressing_Invalid) {
+		return false;
+	}
+	convert_to_typed(c, y, default_type(x->type));
+	if (y->mode == Addressing_Invalid) {
+		return false;
+	}
+
+	if (!are_types_identical(x->type, y->type)) {
+		if (x->type != t_invalid &&
+		    y->type != t_invalid) {
+			gbString xt = type_to_string(x->type);
+			gbString yt = type_to_string(y->type);
+			gbString expr_str = expr_to_string(x->expr);
+			error(ie->op, "Mismatched types in interval expression '%s' : '%s' vs '%s'", expr_str, xt, yt);
+			gb_string_free(expr_str);
+			gb_string_free(yt);
+			gb_string_free(xt);
+		}
+		return false;
+	}
+
+	Type *type = x->type;
+	if (!is_type_integer(type) && !is_type_float(type) && !is_type_pointer(type) && !is_type_enum(type)) {
+		error(ie->op, "Only numerical and pointer types are allowed within interval expressions");
+		return false;
+	}
+
+	if (x->mode == Addressing_Constant &&
+	    y->mode == Addressing_Constant) {
+		ExactValue a = x->value;
+		ExactValue b = y->value;
+
+		GB_ASSERT(are_types_identical(x->type, y->type));
+
+		TokenKind op = Token_Lt;
+		switch (ie->op.kind) {
+		case Token_Ellipsis:  op = Token_LtEq; break;
+		case Token_RangeHalf: op = Token_Lt; break;
+		default: error(ie->op, "Invalid range operator"); break;
+		}
+		bool ok = compare_exact_values(op, a, b);
+		if (!ok) {
+			// TODO(bill): Better error message
+			error(ie->op, "Invalid interval range");
+			return false;
+		}
+
+		ExactValue inline_for_depth = exact_value_sub(b, a);
+		if (ie->op.kind == Token_Ellipsis) {
+			inline_for_depth = exact_value_increment_one(inline_for_depth);
+		}
+
+		if (inline_for_depth_) *inline_for_depth_ = inline_for_depth;
+	} else {
+		error(ie->op, "Interval expressions must be constant");
+		return false;
+	}
+
+	add_type_and_value(&c->checker->info, ie->left,  x->mode, x->type, x->value);
+	add_type_and_value(&c->checker->info, ie->right, y->mode, y->type, y->value);
+
+	return true;
+}
+
+
 
 ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = Expr_Stmt;
@@ -6697,35 +6789,26 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 
 	case_ast_node(bl, BasicLit, node);
-		// NOTE(bill, 2018-06-17): Placing this in the parser is slower than
-		// placing it here for some reason. So don't move it to the parsing
-		// stage if you _think_ it will be faster, only do it if you _know_ it
-		// will be faster.
 		Type *t = t_invalid;
-		switch (bl->token.kind) {
-		case Token_Integer: t = t_untyped_integer; break;
-		case Token_Float:   t = t_untyped_float;   break;
-		case Token_String:  t = t_untyped_string;  break;
-		case Token_Rune:    t = t_untyped_rune;    break;
-		case Token_Imag: {
-			String s = bl->token.string;
-			Rune r = s[s.len-1];
-			// NOTE(bill, 2019-08-25): Allow for quaternions by having j and k imaginary numbers
-			switch (r) {
-			case 'i': t = t_untyped_complex;    break;
-			case 'j': t = t_untyped_quaternion; break;
-			case 'k': t = t_untyped_quaternion; break;
+		switch (bl->value.kind) {
+		case ExactValue_String:     t = t_untyped_string;     break;
+		case ExactValue_Float:      t = t_untyped_float;      break;
+		case ExactValue_Complex:    t = t_untyped_complex;    break;
+		case ExactValue_Quaternion: t = t_untyped_quaternion; break;
+		case ExactValue_Integer:
+			t = t_untyped_integer;
+			if (bl->token.kind == Token_Rune) {
+				t = t_untyped_rune;
 			}
-
 			break;
-		}
 		default:
-			GB_PANIC("Unknown literal");
+			GB_PANIC("Unhandled value type for basic literal");
 			break;
 		}
+
 		o->mode  = Addressing_Constant;
 		o->type  = t;
-		o->value = exact_value_from_basic_literal(bl->token);
+		o->value = bl->value;
 	case_end;
 
 	case_ast_node(bd, BasicDirective, node);
@@ -7090,9 +7173,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				if (is_type_simd_vector(t)) {
 					error(cl->elems[0], "'field = value' is not allowed for SIMD vector literals");
 				} else {
-					Map<bool> seen = {};
-					map_init(&seen, heap_allocator());
-					defer (map_destroy(&seen));
+					RangeCache rc = range_cache_make(heap_allocator());
+					defer (range_cache_destroy(&rc));
 
 					for_array(i, cl->elems) {
 						Ast *elem = cl->elems[i];
@@ -7102,36 +7184,89 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						}
 						ast_node(fv, FieldValue, elem);
 
-						Operand op_index = {};
-						check_expr(c, &op_index, fv->field);
+						if (is_ast_range(fv->field)) {
+							Token op = fv->field->BinaryExpr.op;
 
-						if (op_index.mode != Addressing_Constant || !is_type_integer(core_type(op_index.type))) {
-							error(elem, "Expected a constant integer as an array field");
-							continue;
+							Operand x = {};
+							Operand y = {};
+							bool ok = check_range(c, fv->field, &x, &y, nullptr);
+							if (!ok) {
+								continue;
+							}
+							if (x.mode != Addressing_Constant || !is_type_integer(core_type(x.type))) {
+								error(x.expr, "Expected a constant integer as an array field");
+								continue;
+							}
+
+							if (y.mode != Addressing_Constant || !is_type_integer(core_type(y.type))) {
+								error(y.expr, "Expected a constant integer as an array field");
+								continue;
+							}
+
+							i64 lo = exact_value_to_i64(x.value);
+							i64 hi = exact_value_to_i64(y.value);
+							if (op.kind == Token_RangeHalf) {
+								hi -= 1;
+							}
+							i64 max_index = hi;
+
+							bool new_range = range_cache_add_range(&rc, lo, hi);
+							if (!new_range) {
+								error(elem, "Overlapping field range index %lld %.*s %lld for %.*s", lo, LIT(op.string), hi, LIT(context_name));
+								continue;
+							}
+
+
+							if (max_type_count >= 0 && (lo < 0 || lo >= max_type_count)) {
+								error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", lo, max_type_count, LIT(context_name));
+								continue;
+							}
+							if (max_type_count >= 0 && (hi < 0 || hi >= max_type_count)) {
+								error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", hi, max_type_count, LIT(context_name));
+								continue;
+							}
+
+							if (max < max_index) {
+								max = max_index;
+							}
+
+							Operand operand = {};
+							check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+							check_assignment(c, &operand, elem_type, context_name);
+
+							is_constant = is_constant && operand.mode == Addressing_Constant;
+						} else {
+							Operand op_index = {};
+							check_expr(c, &op_index, fv->field);
+
+							if (op_index.mode != Addressing_Constant || !is_type_integer(core_type(op_index.type))) {
+								error(elem, "Expected a constant integer as an array field");
+								continue;
+							}
+
+							i64 index = exact_value_to_i64(op_index.value);
+
+							if (max_type_count >= 0 && (index < 0 || index >= max_type_count)) {
+								error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", index, max_type_count, LIT(context_name));
+								continue;
+							}
+
+							bool new_index = range_cache_add_index(&rc, index);
+							if (!new_index) {
+								error(elem, "Duplicate field index %lld for %.*s", index, LIT(context_name));
+								continue;
+							}
+
+							if (max < index) {
+								max = index;
+							}
+
+							Operand operand = {};
+							check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+							check_assignment(c, &operand, elem_type, context_name);
+
+							is_constant = is_constant && operand.mode == Addressing_Constant;
 						}
-
-						i64 index = exact_value_to_i64(op_index.value);
-
-						if (max_type_count >= 0 && (index < 0 || index >= max_type_count)) {
-							error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", index, max_type_count, LIT(context_name));
-							continue;
-						}
-
-						if (map_get(&seen, hash_integer(u64(index))) != nullptr) {
-							error(elem, "Duplicate field index %lld for %.*s", index, LIT(context_name));
-							continue;
-						}
-						map_set(&seen, hash_integer(u64(index)), true);
-
-						if (max < index) {
-							max = index;
-						}
-
-						Operand operand = {};
-						check_expr_with_type_hint(c, &operand, fv->value, elem_type);
-						check_assignment(c, &operand, elem_type, context_name);
-
-						is_constant = is_constant && operand.mode == Addressing_Constant;
 					}
 
 					cl->max_index = max;
