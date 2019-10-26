@@ -293,12 +293,12 @@ ExactValue exact_value_from_basic_literal(Token token) {
 		case 'i': return exact_value_complex(0, imag);
 		case 'j': return exact_value_quaternion(0, 0, imag, 0);
 		case 'k': return exact_value_quaternion(0, 0, 0, imag);
+		default: GB_PANIC("Invalid imaginary basic literal");
 		}
 	}
 	case Token_Rune: {
 		Rune r = GB_RUNE_INVALID;
 		gb_utf8_decode(token.string.text, token.string.len, &r);
-		// gb_printf("%.*s rune: %d\n", LIT(token.string), r);
 		return exact_value_i64(r);
 	}
 	default:

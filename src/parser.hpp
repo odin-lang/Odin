@@ -222,6 +222,7 @@ enum StmtAllowFlag {
 	AST_KIND(Undef,          "undef",           Token) \
 	AST_KIND(BasicLit,       "basic literal",   struct { \
 		Token token; \
+		ExactValue value; \
 	}) \
 	AST_KIND(BasicDirective, "basic directive", struct { \
 		Token  token; \
