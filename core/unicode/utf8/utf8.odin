@@ -167,9 +167,20 @@ decode_last_rune :: proc(s: []u8) -> (rune, int) {
 	return r, size;
 }
 
+rune_index :: proc(s: string, index: int) -> (r: rune = RUNE_ERROR, ok: bool = false) {
+	if index < 0 {
+		return;
+	}
 
-
-
+	i := 0;
+	for c in s {
+		if i == index {
+			return r, true;
+		}
+		i += 1;
+	}
+	return;
+}
 
 valid_rune :: proc(r: rune) -> bool {
 	if r < 0 {
