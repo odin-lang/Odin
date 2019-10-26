@@ -1220,7 +1220,7 @@ ranged_fields_for_array_compound_literals :: proc() {
 			5..9 = 54,
 			10..<16 = i*3 + (i-1)*2,
 		};
-		assert(len(foo) == 16);
+		assert(len(foo_slice) == 16);
 		fmt.println(foo_slice); // [123, 0, 0, 0, 0, 54, 54, 54, 54, 54, 8, 8, 8, 8, 8]
 
 		foo_dynamic_array := [dynamic]int {
@@ -1228,7 +1228,7 @@ ranged_fields_for_array_compound_literals :: proc() {
 			5..9 = 54,
 			10..<16 = i*3 + (i-1)*2,
 		};
-		assert(len(foo) == 16);
+		assert(len(foo_dynamic_array) == 16);
 		fmt.println(foo_dynamic_array); // [123, 0, 0, 0, 0, 54, 54, 54, 54, 54, 8, 8, 8, 8, 8]
 	}
 }
