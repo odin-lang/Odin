@@ -1194,13 +1194,43 @@ ranged_fields_for_array_compound_literals :: proc() {
 		foo := [?]int{1, 4, 9, 16};
 		fmt.println(foo);
 	}
-	i := 2;
-	foo := [?]int {
-	    0 = 123,
-	    5..9 = 54,
-	    10..<16 = i*3 + (i-1)*2,
-	};
-	fmt.println(foo); // [123, 0, 0, 0, 0, 54, 54, 54, 54, 54, 8, 8, 8, 8, 8]
+	{ // Indexed
+		foo := [?]int{
+			3 = 16,
+			1 = 4,
+			2 = 9,
+			0 = 1,
+		};
+		fmt.println(foo);
+	}
+	{ // Ranges
+		i := 2;
+		foo := [?]int {
+			0 = 123,
+			5..9 = 54,
+			10..<16 = i*3 + (i-1)*2,
+		};
+		#assert(len(foo) == 16);
+		fmt.println(foo); // [123, 0, 0, 0, 0, 54, 54, 54, 54, 54, 8, 8, 8, 8, 8]
+	}
+	{ // Slice and Dynamic Array support
+		i := 2;
+		foo_slice := []int {
+			0 = 123,
+			5..9 = 54,
+			10..<16 = i*3 + (i-1)*2,
+		};
+		assert(len(foo) == 16);
+		fmt.println(foo_slice); // [123, 0, 0, 0, 0, 54, 54, 54, 54, 54, 8, 8, 8, 8, 8]
+
+		foo_dynamic_array := [dynamic]int {
+			0 = 123,
+			5..9 = 54,
+			10..<16 = i*3 + (i-1)*2,
+		};
+		assert(len(foo) == 16);
+		fmt.println(foo_dynamic_array); // [123, 0, 0, 0, 0, 54, 54, 54, 54, 54, 8, 8, 8, 8, 8]
+	}
 }
 
 main :: proc() {
