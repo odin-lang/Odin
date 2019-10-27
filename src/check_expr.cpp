@@ -5855,6 +5855,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			}
 
 
+
 			if (proc_arg_count >= 0 && proc_arg_count_all_equal) {
 				lhs_count = proc_arg_count;
 				if (lhs_count > 0)  {
@@ -5898,9 +5899,8 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			gb_free(heap_allocator(), lhs);
 		}
 
-		ValidIndexAndScore *valids         = gb_alloc_array(heap_allocator(), ValidIndexAndScore, procs.count);
-		isize               valid_count    = 0;
-		defer (gb_free(heap_allocator(), valids));
+		auto valids = array_make<ValidIndexAndScore>(heap_allocator(), 0, procs.count);
+		defer (array_free(&valids));
 
 		gbString expr_name = expr_to_string(operand->expr);
 		defer (gb_string_free(expr_name));
@@ -5915,12 +5915,14 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 				ctx.no_polymorphic_errors = true;
 				ctx.allow_polymorphic_types = is_type_polymorphic(pt);
+				ctx.hide_polymorphic_errors = true;
 
 				err = call_checker(&ctx, call, pt, p, operands, CallArgumentMode_NoErrors, &data);
 
 				if (err != CallArgumentError_None) {
 					continue;
 				}
+
 				if (data.gen_entity != nullptr) {
 					Entity *e = data.gen_entity;
 					DeclInfo *decl = data.gen_entity->decl_info;
@@ -5936,31 +5938,31 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 					}
 				}
 
-				valids[valid_count].index = i;
-				valids[valid_count].score = data.score;
-				valid_count++;
+				ValidIndexAndScore item = {};
+				item.index = i;
+				item.score = data.score;
+				array_add(&valids, item);
 			}
 		}
 
-		if (valid_count > 1) {
-			gb_sort_array(valids, valid_count, valid_index_and_score_cmp);
+		if (valids.count > 1) {
+			gb_sort_array(valids.data, valids.count, valid_index_and_score_cmp);
 			i64 best_score = valids[0].score;
 			Entity *best_entity = procs[valids[0].index];
-			for (isize i = 1; i < valid_count; i++) {
+			for (isize i = 1; i < valids.count; i++) {
 				if (best_score > valids[i].score) {
-					valid_count = i;
+					valids.count = i;
 					break;
 				}
 				if (best_entity == procs[valids[i].index]) {
-					valid_count = i;
+					valids.count = i;
 					break;
 				}
-				best_score = valids[i].score;
 			}
 		}
 
 
-		if (valid_count == 0) {
+		if (valids.count == 0) {
 			begin_error_block();
 			defer (end_error_block());
 
@@ -6015,7 +6017,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			}
 
 			result_type = t_invalid;
-		} else if (valid_count > 1) {
+		} else if (valids.count > 1) {
 			begin_error_block();
 			defer (end_error_block());
 
@@ -6030,11 +6032,11 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			}
 			error_line(")\n");
 
-			for (isize i = 0; i < valid_count; i++) {
+			for (isize i = 0; i < valids.count; i++) {
 				Entity *proc = procs[valids[i].index];
 				TokenPos pos = proc->token.pos;
 				Type *t = base_type(proc->type); GB_ASSERT(t->kind == Type_Proc);
-				gbString pt;
+				gbString pt = nullptr;
 				defer (gb_string_free(pt));
 				if (t->Proc.node != nullptr) {
 					pt = expr_to_string(t->Proc.node);

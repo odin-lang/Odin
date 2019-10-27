@@ -70,7 +70,7 @@ identity :: proc($T: typeid/[$N][N]$E) -> (m: T) {
 	return m;
 }
 
-transpose :: proc(a: $T/[$N][$M]$E) -> (m: ((M == N) ? T : [M][N]E)) {
+transpose :: proc(a: $T/[$N][$M]$E) -> (m: [M][N]E) {
 	for j in 0..<M {
 		for i in 0..<N {
 			m[j][i] = a[i][j];
@@ -79,9 +79,23 @@ transpose :: proc(a: $T/[$N][$M]$E) -> (m: ((M == N) ? T : [M][N]E)) {
 	return;
 }
 
-mul_matrix :: proc(a: $A/[$I][$J]$E, b: $B/[J][$K]E) -> (c: ((I == J && J == K && A == B) ? A : [I][K]E))
+mul_matrix :: proc(a, b: $M/[$N][N]$E) -> (c: M)
 	where !intrinsics.type_is_array(E),
 	      intrinsics.type_is_numeric(E) {
+	for i in 0..<N {
+		for k in 0..<N {
+			for j in 0..<N {
+				c[i][k] += a[i][j] * b[j][k];
+			}
+		}
+	}
+	return;
+}
+
+mul_matrix_differ :: proc(a: $A/[$I][$J]$E, b: $B/[J][$K]E) -> (c: [I][K]E)
+	where !intrinsics.type_is_array(E),
+	      intrinsics.type_is_numeric(E),
+	      I != J {
 	for i in 0..<I {
 		for k in 0..<K {
 			for j in 0..<J {
@@ -91,6 +105,7 @@ mul_matrix :: proc(a: $A/[$I][$J]$E, b: $B/[J][$K]E) -> (c: ((I == J && J == K &
 	}
 	return;
 }
+
 
 mul_matrix_vector :: proc(a: $A/[$I][$J]$E, b: $B/[I]E) -> (c: B)
 	where !intrinsics.type_is_array(E),
@@ -124,7 +139,13 @@ mul_quaternion256_vector3 :: proc(q: $Q/quaternion256, v: $V/[3]$F/f64) -> V {
 }
 mul_quaternion_vector3 :: proc{mul_quaternion128_vector3, mul_quaternion256_vector3};
 
-mul :: proc{mul_matrix, mul_matrix_vector, mul_quaternion128_vector3, mul_quaternion256_vector3};
+mul :: proc{
+	mul_matrix,
+	mul_matrix_differ,
+	mul_matrix_vector,
+	mul_quaternion128_vector3,
+	mul_quaternion256_vector3,
+};
 
 
 // Specific
