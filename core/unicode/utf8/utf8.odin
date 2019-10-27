@@ -167,7 +167,7 @@ rune_at_pos :: proc(s: string, pos: int) -> rune {
 	}
 
 	i := 0;
-	for c in s {
+	for r in s {
 		if i == pos {
 			return r;
 		}
