@@ -33,10 +33,11 @@ jobs:
       - name: Install cURL
         run: choco install curl
       - name: Download and unpack LLVM bins
+        shell: cmd
+        working-directory: 
         run: |
           cd bin
           curl -sL https://github.com/odin-lang/Odin/releases/download/llvm-windows/llvm-binaries.zip --output llvm-binaries.zip
-          ls
           7z x llvm-binaries.zip > nul
       - name: build Odin
         run: |
