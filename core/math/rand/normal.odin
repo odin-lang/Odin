@@ -128,8 +128,8 @@ norm_float64 :: proc(r: ^Rand = global_rand_ptr) -> f64 {
 
 		if i == 0 {
 			for {
-				x = -math.log(float64(r)) * (1.0/ rn);
-				y := -math.log(float64(r));
+				x = -math.ln(float64(r)) * (1.0/ rn);
+				y := -math.ln(float64(r));
 				if y+y >= x*x {
 					break;
 				}
