@@ -1263,20 +1263,21 @@ bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Typ
 
 Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand operand) {
 	bool modify_type = !ctx->no_polymorphic_errors;
+	bool show_error = modify_type && !ctx->hide_polymorphic_errors;
 	if (!is_operand_value(operand)) {
-		if (modify_type) {
+		if (show_error) {
 			error(operand.expr, "Cannot determine polymorphic type from parameter");
 		}
 		return t_invalid;
 	}
 
 	if (is_polymorphic_type_assignable(ctx, poly_type, operand.type, false, modify_type)) {
-		if (modify_type) {
+		if (show_error) {
 			set_procedure_abi_types(ctx, poly_type);
 		}
 		return poly_type;
 	}
-	if (modify_type) {
+	if (show_error) {
 		gbString pts = type_to_string(poly_type);
 		gbString ots = type_to_string(operand.type);
 		defer (gb_string_free(pts));
