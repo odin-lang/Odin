@@ -1,36 +1,41 @@
 package math
 
+import "intrinsics"
+
+Float_Class :: enum {
+	Normal,    // an ordinary nonzero floating point value
+	Subnormal, // a subnormal floating point value
+	Zero,      // zero
+	Neg_Zero,  // the negative zero
+	NaN,       // Not-A-Number (NaN)
+	Inf,       // positive infinity
+	Neg_Inf    // negative infinity
+};
+
 TAU          :: 6.28318530717958647692528676655900576;
 PI           :: 3.14159265358979323846264338327950288;
 
 E            :: 2.71828182845904523536;
+
+τ :: TAU;
+π :: PI;
+e :: E;
+
 SQRT_TWO     :: 1.41421356237309504880168872420969808;
 SQRT_THREE   :: 1.73205080756887729352744634150587236;
 SQRT_FIVE    :: 2.23606797749978969640917366873127623;
 
-LOG_TWO      :: 0.693147180559945309417232121458176568;
-LOG_TEN      :: 2.30258509299404568401799145468436421;
+LN2          :: 0.693147180559945309417232121458176568;
+LN10         :: 2.30258509299404568401799145468436421;
 
-EPSILON      :: 1.19209290e-7;
+MAX_F64_PRECISION :: 16; // Maximum number of meaningful digits after the decimal point for 'f64'
+MAX_F32_PRECISION ::  8; // Maximum number of meaningful digits after the decimal point for 'f32'
 
-τ :: TAU;
-π :: PI;
-
-Vec2 :: distinct [2]f32;
-Vec3 :: distinct [3]f32;
-Vec4 :: distinct [4]f32;
-
-// Column major
-Mat2 :: distinct [2][2]f32;
-Mat3 :: distinct [3][3]f32;
-Mat4 :: distinct [4][4]f32;
-
-Quat :: struct {x, y, z, w: f32};
-
-QUAT_IDENTITY := Quat{x = 0, y = 0, z = 0, w = 1};
+RAD_PER_DEG :: TAU/360.0;
+DEG_PER_RAD :: 360.0/TAU;
 
 
-@(default_calling_convention="c")
+@(default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.sqrt.f32")
 	sqrt_f32 :: proc(x: f32) -> f32 ---;
@@ -58,9 +63,9 @@ foreign _ {
 	fmuladd_f64 :: proc(a, b, c: f64) -> f64 ---;
 
 	@(link_name="llvm.log.f32")
-	log_f32 :: proc(x: f32) -> f32 ---;
+	ln_f32 :: proc(x: f32) -> f32 ---;
 	@(link_name="llvm.log.f64")
-	log_f64 :: proc(x: f64) -> f64 ---;
+	ln_f64 :: proc(x: f64) -> f64 ---;
 
 	@(link_name="llvm.exp.f32")
 	exp_f32 :: proc(x: f32) -> f32 ---;
@@ -68,20 +73,40 @@ foreign _ {
 	exp_f64 :: proc(x: f64) -> f64 ---;
 }
 
-log :: proc{log_f32, log_f64};
-exp :: proc{exp_f32, exp_f64};
+sqrt      :: proc{sqrt_f32, sqrt_f64};
+sin       :: proc{sin_f32, sin_f64};
+cos       :: proc{cos_f32, cos_f64};
+pow       :: proc{pow_f32, pow_f64};
+fmuladd   :: proc{fmuladd_f32, fmuladd_f64};
+ln        :: proc{ln_f32, ln_f64};
+exp       :: proc{exp_f32, exp_f64};
+
+log_f32 :: proc(x, base: f32) -> f32 { return ln(x) / ln(base); }
+log_f64 :: proc(x, base: f64) -> f64 { return ln(x) / ln(base); }
+log     :: proc{log_f32, log_f64};
+
+log2_f32 :: proc(x: f32) -> f32 { return ln(x)/LN2; }
+log2_f64 :: proc(x: f64) -> f64 { return ln(x)/LN2; }
+log2     :: proc{log2_f32, log2_f64};
+
+log10_f32 :: proc(x: f32) -> f32 { return ln(x)/LN10; }
+log10_f64 :: proc(x: f64) -> f64 { return ln(x)/LN10; }
+log10     :: proc{log10_f32, log10_f64};
+
 
 tan_f32 :: proc "c" (θ: f32) -> f32 { return sin(θ)/cos(θ); }
 tan_f64 :: proc "c" (θ: f64) -> f64 { return sin(θ)/cos(θ); }
+tan     :: proc{tan_f32, tan_f64};
 
 lerp :: proc(a, b: $T, t: $E) -> (x: T) { return a*(1-t) + b*t; }
 
 unlerp_f32 :: proc(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
 unlerp_f64 :: proc(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
+unlerp     :: proc{unlerp_f32, unlerp_f64};
 
-
-sign_f32 :: proc(x: f32) -> f32 { return x >= 0 ? +1 : -1; }
-sign_f64 :: proc(x: f64) -> f64 { return x >= 0 ? +1 : -1; }
+sign_f32 :: proc(x: f32) -> f32 { return f32(int(0 < x) - int(x < 0)); }
+sign_f64 :: proc(x: f64) -> f64 { return f64(int(0 < x) - int(x < 0)); }
+sign     :: proc{sign_f32, sign_f64};
 
 copy_sign_f32 :: proc(x, y: f32) -> f32 {
 	ix := transmute(u32)x;
@@ -90,7 +115,6 @@ copy_sign_f32 :: proc(x, y: f32) -> f32 {
 	ix |= iy & 0x8000_0000;
 	return transmute(f32)ix;
 }
-
 copy_sign_f64 :: proc(x, y: f64) -> f64 {
 	ix := transmute(u64)x;
 	iy := transmute(u64)y;
@@ -98,21 +122,88 @@ copy_sign_f64 :: proc(x, y: f64) -> f64 {
 	ix |= iy & 0x8000_0000_0000_0000;
 	return transmute(f64)ix;
 }
-
-
-sqrt      :: proc{sqrt_f32, sqrt_f64};
-sin       :: proc{sin_f32, sin_f64};
-cos       :: proc{cos_f32, cos_f64};
-tan       :: proc{tan_f32, tan_f64};
-pow       :: proc{pow_f32, pow_f64};
-fmuladd   :: proc{fmuladd_f32, fmuladd_f64};
-sign      :: proc{sign_f32, sign_f64};
 copy_sign :: proc{copy_sign_f32, copy_sign_f64};
 
 
-round_f32 :: proc(x: f32) -> f32 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
-round_f64 :: proc(x: f64) -> f64 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
+to_radians_f32 :: proc(degrees: f32) -> f32 { return degrees * RAD_PER_DEG; }
+to_radians_f64 :: proc(degrees: f64) -> f64 { return degrees * RAD_PER_DEG; }
+to_degrees_f32 :: proc(radians: f32) -> f32 { return radians * DEG_PER_RAD; }
+to_degrees_f64 :: proc(radians: f64) -> f64 { return radians * DEG_PER_RAD; }
+to_radians     :: proc{to_radians_f32, to_radians_f64};
+to_degrees     :: proc{to_degrees_f32, to_degrees_f64};
+
+trunc_f32 :: proc(x: f32) -> f32 {
+	trunc_internal :: proc(f: f32) -> f32 {
+		mask :: 0xff;
+		shift :: 32 - 9;
+		bias :: 0x7f;
+
+		if f < 1 {
+			switch {
+			case f < 0:  return -trunc_internal(-f);
+			case f == 0: return f;
+			case:        return 0;
+			}
+		}
+
+		x := transmute(u32)f;
+		e := (x >> shift) & mask - bias;
+
+		if e < shift {
+			x &= ~(1 << (shift-e)) - 1;
+		}
+		return transmute(f32)x;
+	}
+	switch classify(x) {
+	case .Zero, .Neg_Zero, .NaN, .Inf, .Neg_Inf:
+		return x;
+	}
+	return trunc_internal(x);
+}
+
+trunc_f64 :: proc(x: f64) -> f64 {
+	trunc_internal :: proc(f: f64) -> f64 {
+		mask :: 0x7ff;
+		shift :: 64 - 12;
+		bias :: 0x3ff;
+
+		if f < 1 {
+			switch {
+			case f < 0:  return -trunc_internal(-f);
+			case f == 0: return f;
+			case:        return 0;
+			}
+		}
+
+		x := transmute(u64)f;
+		e := (x >> shift) & mask - bias;
+
+		if e < shift {
+			x &= ~(1 << (shift-e)) - 1;
+		}
+		return transmute(f64)x;
+	}
+	switch classify(x) {
+	case .Zero, .Neg_Zero, .NaN, .Inf, .Neg_Inf:
+		return x;
+	}
+	return trunc_internal(x);
+}
+
+trunc :: proc{trunc_f32, trunc_f64};
+
+round_f32 :: proc(x: f32) -> f32 {
+	return x < 0 ? ceil(x - 0.5) : floor(x + 0.5);
+}
+round_f64 :: proc(x: f64) -> f64 {
+	return x < 0 ? ceil(x - 0.5) : floor(x + 0.5);
+}
 round :: proc{round_f32, round_f64};
+
+
+ceil_f32 :: proc(x: f32) -> f32 { return -floor(-x); }
+ceil_f64 :: proc(x: f64) -> f64 { return -floor(-x); }
+ceil :: proc{ceil_f32, ceil_f64};
 
 floor_f32 :: proc(x: f32) -> f32 {
 	if x == 0 || is_nan(x) || is_inf(x) {
@@ -144,33 +235,27 @@ floor_f64 :: proc(x: f64) -> f64 {
 }
 floor :: proc{floor_f32, floor_f64};
 
-ceil_f32 :: proc(x: f32) -> f32 { return -floor_f32(-x); }
-ceil_f64 :: proc(x: f64) -> f64 { return -floor_f64(-x); }
-ceil :: proc{ceil_f32, ceil_f64};
 
-remainder_f32 :: proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
-remainder_f64 :: proc(x, y: f64) -> f64 { return x - round(x/y) * y; }
-remainder :: proc{remainder_f32, remainder_f64};
-
-mod_f32 :: proc(x, y: f32) -> (n: f32) {
-	z := abs(y);
-	n = remainder(abs(x), z);
-	if sign(n) < 0 {
-		n += z;
+floor_div :: proc(x, y: $T) -> T
+	where intrinsics.type_is_integer(T) {
+	a := x / y;
+	r := x % y;
+	if (r > 0 && y < 0) || (r < 0 && y > 0) {
+		a -= 1;
 	}
-	return copy_sign(n, x);
+	return a;
 }
-mod_f64 :: proc(x, y: f64) -> (n: f64) {
-	z := abs(y);
-	n = remainder(abs(x), z);
-	if sign(n) < 0 {
-		n += z;
-	}
-	return copy_sign(n, x);
-}
-mod :: proc{mod_f32, mod_f64};
 
-// TODO(bill): These need to implemented with the actual instructions
+floor_mod :: proc(x, y: $T) -> T
+	where intrinsics.type_is_integer(T) {
+	r := x % y;
+	if (r > 0 && y < 0) || (r < 0 && y > 0) {
+		r += y;
+	}
+	return r;
+}
+
+
 modf_f32 :: proc(x: f32) -> (int: f32, frac: f32) {
 	shift :: 32 - 8 - 1;
 	mask  :: 0xff;
@@ -190,8 +275,8 @@ modf_f32 :: proc(x: f32) -> (int: f32, frac: f32) {
 	i := transmute(u32)x;
 	e := uint(i>>shift)&mask - bias;
 
-	if e < 32-9 {
-		i &~= 1<<(32-9-e) - 1;
+	if e < shift {
+		i &~= 1<<(shift-e) - 1;
 	}
 	int = transmute(f32)i;
 	frac = x - int;
@@ -216,359 +301,273 @@ modf_f64 :: proc(x: f64) -> (int: f64, frac: f64) {
 	i := transmute(u64)x;
 	e := uint(i>>shift)&mask - bias;
 
-	if e < 64-12 {
-		i &~= 1<<(64-12-e) - 1;
+	if e < shift {
+		i &~= 1<<(shift-e) - 1;
 	}
 	int = transmute(f64)i;
 	frac = x - int;
 	return;
 }
 modf :: proc{modf_f32, modf_f64};
+split_decimal :: modf;
 
-is_nan_f32 :: inline proc(x: f32) -> bool { return x != x; }
-is_nan_f64 :: inline proc(x: f64) -> bool { return x != x; }
+mod_f32 :: proc(x, y: f32) -> (n: f32) {
+	z := abs(y);
+	n = remainder(abs(x), z);
+	if sign(n) < 0 {
+		n += z;
+	}
+	return copy_sign(n, x);
+}
+mod_f64 :: proc(x, y: f64) -> (n: f64) {
+	z := abs(y);
+	n = remainder(abs(x), z);
+	if sign(n) < 0 {
+		n += z;
+	}
+	return copy_sign(n, x);
+}
+mod :: proc{mod_f32, mod_f64};
+
+remainder_f32 :: proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
+remainder_f64 :: proc(x, y: f64) -> f64 { return x - round(x/y) * y; }
+remainder :: proc{remainder_f32, remainder_f64};
+
+
+
+gcd :: proc(x, y: $T) -> T
+	where intrinsics.type_is_ordered_numeric(T) {
+	x, y := x, y;
+	for y != 0 {
+		x %= y;
+		x, y = y, x;
+	}
+	return abs(x);
+}
+
+lcm :: proc(x, y: $T) -> T
+	where intrinsics.type_is_ordered_numeric(T) {
+	return x / gcd(x, y) * y;
+}
+
+frexp_f32 :: proc(x: f32) -> (significand: f32, exponent: int) {
+	switch {
+	case x == 0:
+		return 0, 0;
+	case x < 0:
+		significand, exponent = frexp(-x);
+		return -significand, exponent;
+	}
+	ex := trunc(log2(x));
+	exponent = int(ex);
+	significand = x / pow(2.0, ex);
+	if abs(significand) >= 1 {
+		exponent += 1;
+		significand /= 2;
+	}
+	if exponent == 1024 && significand == 0 {
+		significand = 0.99999999999999988898;
+	}
+	return;
+}
+frexp_f64 :: proc(x: f64) -> (significand: f64, exponent: int) {
+	switch {
+	case x == 0:
+		return 0, 0;
+	case x < 0:
+		significand, exponent = frexp(-x);
+		return -significand, exponent;
+	}
+	ex := trunc(log2(x));
+	exponent = int(ex);
+	significand = x / pow(2.0, ex);
+	if abs(significand) >= 1 {
+		exponent += 1;
+		significand /= 2;
+	}
+	if exponent == 1024 && significand == 0 {
+		significand = 0.99999999999999988898;
+	}
+	return;
+}
+frexp :: proc{frexp_f32, frexp_f64};
+
+
+
+
+binomial :: proc(n, k: int) -> int {
+	switch {
+	case k <= 0:  return 1;
+	case 2*k > n: return binomial(n, n-k);
+	}
+
+	b := n;
+	for i in 2..<k {
+		b = (b * (n+1-i))/i;
+	}
+	return b;
+}
+
+factorial :: proc(n: int) -> int {
+	when size_of(int) == size_of(i64) {
+		@static table := [21]int{
+			1,
+			1,
+			2,
+			6,
+			24,
+			120,
+			720,
+			5_040,
+			40_320,
+			362_880,
+			3_628_800,
+			39_916_800,
+			479_001_600,
+			6_227_020_800,
+			87_178_291_200,
+			1_307_674_368_000,
+			20_922_789_888_000,
+			355_687_428_096_000,
+			6_402_373_705_728_000,
+			121_645_100_408_832_000,
+			2_432_902_008_176_640_000,
+		};
+	} else {
+		@static table := [13]int{
+			1,
+			1,
+			2,
+			6,
+			24,
+			120,
+			720,
+			5_040,
+			40_320,
+			362_880,
+			3_628_800,
+			39_916_800,
+			479_001_600,
+		};
+	}
+
+	assert(n >= 0, "parameter must not be negative");
+	assert(n < len(table), "parameter is too large to lookup in the table");
+	return 0;
+}
+
+classify_f32 :: proc(x: f32) -> Float_Class {
+	switch {
+	case x == 0:
+		i := transmute(i32)x;
+		if i < 0 {
+			return .Neg_Zero;
+		}
+		return .Zero;
+	case x*0.5 == x:
+		if x < 0 {
+			return .Neg_Inf;
+		}
+		return .Inf;
+	case x != x:
+		return .NaN;
+	}
+
+	u := transmute(u32)x;
+	exp := int(u>>23) & (1<<8 - 1);
+	if exp == 0 {
+		return .Subnormal;
+	}
+	return .Normal;
+}
+classify_f64 :: proc(x: f64) -> Float_Class {
+	switch {
+	case x == 0:
+		i := transmute(i64)x;
+		if i < 0 {
+			return .Neg_Zero;
+		}
+		return .Zero;
+	case x*0.5 == x:
+		if x < 0 {
+			return .Neg_Inf;
+		}
+		return .Inf;
+	case x != x:
+		return .NaN;
+	}
+	u := transmute(u64)x;
+	exp := int(u>>52) & (1<<11 - 1);
+	if exp == 0 {
+		return .Subnormal;
+	}
+	return .Normal;
+}
+classify :: proc{classify_f32, classify_f64};
+
+is_nan_f32 :: proc(x: f32) -> bool { return classify(x) == .NaN; }
+is_nan_f64 :: proc(x: f64) -> bool { return classify(x) == .NaN; }
 is_nan :: proc{is_nan_f32, is_nan_f64};
 
-is_finite_f32 :: inline proc(x: f32) -> bool { return !is_nan(x-x); }
-is_finite_f64 :: inline proc(x: f64) -> bool { return !is_nan(x-x); }
-is_finite :: proc{is_finite_f32, is_finite_f64};
-
-is_inf_f32 :: proc(x: f32, sign := 0) -> bool {
-	return sign >= 0 && x > F32_MAX || sign <= 0 && x < -F32_MAX;
-}
-is_inf_f64 :: proc(x: f64, sign := 0) -> bool {
-	return sign >= 0 && x > F64_MAX || sign <= 0 && x < -F64_MAX;
-}
-// If sign > 0,  is_inf reports whether f is positive infinity
-// If sign < 0,  is_inf reports whether f is negative infinity
-// If sign == 0, is_inf reports whether f is either   infinity
+is_inf_f32 :: proc(x: f32) -> bool { return classify(abs(x)) == .Inf; }
+is_inf_f64 :: proc(x: f64) -> bool { return classify(abs(x)) == .Inf; }
 is_inf :: proc{is_inf_f32, is_inf_f64};
 
 
 
-to_radians :: proc(degrees: f32) -> f32 { return degrees * TAU / 360; }
-to_degrees :: proc(radians: f32) -> f32 { return radians * 360 / TAU; }
+is_power_of_two :: proc(x: int) -> bool {
+	return x > 0 && (x & (x-1)) == 0;
+}
 
-
-
-
-mul :: proc{
-	mat3_mul,
-	mat4_mul, mat4_mul_vec4,
-	quat_mul, quat_mulf,
-};
-
-div :: proc{quat_div, quat_divf};
-
-inverse :: proc{mat4_inverse, quat_inverse};
-dot     :: proc{vec_dot, quat_dot};
-cross   :: proc{cross2, cross3};
-
-vec_dot :: proc(a, b: $T/[$N]$E) -> E {
-	res: E;
-	for i in 0..<N {
-		res += a[i] * b[i];
+next_power_of_two :: proc(x: int) -> int {
+	k := x -1;
+	when size_of(int) == 8 {
+		k = k | (k >> 32);
 	}
-	return res;
+	k = k | (k >> 16);
+	k = k | (k >> 8);
+	k = k | (k >> 4);
+	k = k | (k >> 2);
+	k = k | (k >> 1);
+	k += 1 + int(x <= 0);
+	return k;
 }
 
-cross2 :: proc(a, b: $T/[2]$E) -> E {
-	return a[0]*b[1] - a[1]*b[0];
+sum :: proc(x: $T/[]$E) -> (res: E)
+	where intrinsics.BuiltinProc_type_is_numeric(E) {
+	for i in x {
+		res += i;
+	}
+	return;
 }
 
-cross3 :: proc(a, b: $T/[3]$E) -> T {
-	i := swizzle(a, 1, 2, 0) * swizzle(b, 2, 0, 1);
-	j := swizzle(a, 2, 0, 1) * swizzle(b, 1, 2, 0);
-	return T(i - j);
+prod :: proc(x: $T/[]$E) -> (res: E)
+	where intrinsics.BuiltinProc_type_is_numeric(E) {
+	for i in x {
+		res *= i;
+	}
+	return;
+}
+
+cumsum_inplace :: proc(x: $T/[]$E) -> T
+	where intrinsics.BuiltinProc_type_is_numeric(E) {
+	for i in 1..<len(x) {
+		x[i] = x[i-1] + x[i];
+	}
 }
 
 
-length :: proc(v: $T/[$N]$E) -> E { return sqrt(dot(v, v)); }
-
-norm :: proc(v: $T/[$N]$E) -> T { return v / length(v); }
-
-norm0 :: proc(v: $T/[$N]$E) -> T {
-	m := length(v);
-	return m == 0 ? 0 : v/m;
-}
-
-
-
-identity :: proc($T: typeid/[$N][N]$E) -> T {
-	m: T;
-	for i in 0..<N do m[i][i] = E(1);
-	return m;
-}
-
-transpose :: proc(m: $M/[$N][N]f32) -> M {
-	for j in 0..<N {
-		for i in 0..<N {
-			m[i][j], m[j][i] = m[j][i], m[i][j];
+cumsum :: proc(dst, src: $T/[]$E) -> T
+	where intrinsics.BuiltinProc_type_is_numeric(E) {
+	N := min(len(dst), len(src));
+	if N > 0 {
+		dst[0] = src[0];
+		for i in 1..<N {
+			dst[i] = dst[i-1] + src[i];
 		}
 	}
-	return m;
+	return dst[:N];
 }
-
-mat3_mul :: proc(a, b: Mat3) -> Mat3 {
-	c: Mat3;
-	for j in 0..<3 {
-		for i in 0..<3 {
-			c[j][i] = a[0][i]*b[j][0] +
-			          a[1][i]*b[j][1] +
-			          a[2][i]*b[j][2];
-		}
-	}
-	return c;
-}
-
-mat4_mul :: proc(a, b: Mat4) -> Mat4 {
-	c: Mat4;
-	for j in 0..<4 {
-		for i in 0..<4 {
-			c[j][i] = a[0][i]*b[j][0] +
-			          a[1][i]*b[j][1] +
-			          a[2][i]*b[j][2] +
-			          a[3][i]*b[j][3];
-		}
-	}
-	return c;
-}
-
-mat4_mul_vec4 :: proc(m: Mat4, v: Vec4) -> Vec4 {
-	return Vec4{
-		m[0][0]*v[0] + m[1][0]*v[1] + m[2][0]*v[2] + m[3][0]*v[3],
-		m[0][1]*v[0] + m[1][1]*v[1] + m[2][1]*v[2] + m[3][1]*v[3],
-		m[0][2]*v[0] + m[1][2]*v[1] + m[2][2]*v[2] + m[3][2]*v[3],
-		m[0][3]*v[0] + m[1][3]*v[1] + m[2][3]*v[2] + m[3][3]*v[3],
-	};
-}
-
-mat4_inverse :: proc(m: Mat4) -> Mat4 {
-	o: Mat4;
-
-	sf00 := m[2][2] * m[3][3] - m[3][2] * m[2][3];
-	sf01 := m[2][1] * m[3][3] - m[3][1] * m[2][3];
-	sf02 := m[2][1] * m[3][2] - m[3][1] * m[2][2];
-	sf03 := m[2][0] * m[3][3] - m[3][0] * m[2][3];
-	sf04 := m[2][0] * m[3][2] - m[3][0] * m[2][2];
-	sf05 := m[2][0] * m[3][1] - m[3][0] * m[2][1];
-	sf06 := m[1][2] * m[3][3] - m[3][2] * m[1][3];
-	sf07 := m[1][1] * m[3][3] - m[3][1] * m[1][3];
-	sf08 := m[1][1] * m[3][2] - m[3][1] * m[1][2];
-	sf09 := m[1][0] * m[3][3] - m[3][0] * m[1][3];
-	sf10 := m[1][0] * m[3][2] - m[3][0] * m[1][2];
-	sf11 := m[1][1] * m[3][3] - m[3][1] * m[1][3];
-	sf12 := m[1][0] * m[3][1] - m[3][0] * m[1][1];
-	sf13 := m[1][2] * m[2][3] - m[2][2] * m[1][3];
-	sf14 := m[1][1] * m[2][3] - m[2][1] * m[1][3];
-	sf15 := m[1][1] * m[2][2] - m[2][1] * m[1][2];
-	sf16 := m[1][0] * m[2][3] - m[2][0] * m[1][3];
-	sf17 := m[1][0] * m[2][2] - m[2][0] * m[1][2];
-	sf18 := m[1][0] * m[2][1] - m[2][0] * m[1][1];
-
-
-	o[0][0] = +(m[1][1] * sf00 - m[1][2] * sf01 + m[1][3] * sf02);
-	o[0][1] = -(m[1][0] * sf00 - m[1][2] * sf03 + m[1][3] * sf04);
-	o[0][2] = +(m[1][0] * sf01 - m[1][1] * sf03 + m[1][3] * sf05);
-	o[0][3] = -(m[1][0] * sf02 - m[1][1] * sf04 + m[1][2] * sf05);
-
-	o[1][0] = -(m[0][1] * sf00 - m[0][2] * sf01 + m[0][3] * sf02);
-	o[1][1] = +(m[0][0] * sf00 - m[0][2] * sf03 + m[0][3] * sf04);
-	o[1][2] = -(m[0][0] * sf01 - m[0][1] * sf03 + m[0][3] * sf05);
-	o[1][3] = +(m[0][0] * sf02 - m[0][1] * sf04 + m[0][2] * sf05);
-
-	o[2][0] = +(m[0][1] * sf06 - m[0][2] * sf07 + m[0][3] * sf08);
-	o[2][1] = -(m[0][0] * sf06 - m[0][2] * sf09 + m[0][3] * sf10);
-	o[2][2] = +(m[0][0] * sf11 - m[0][1] * sf09 + m[0][3] * sf12);
-	o[2][3] = -(m[0][0] * sf08 - m[0][1] * sf10 + m[0][2] * sf12);
-
-	o[3][0] = -(m[0][1] * sf13 - m[0][2] * sf14 + m[0][3] * sf15);
-	o[3][1] = +(m[0][0] * sf13 - m[0][2] * sf16 + m[0][3] * sf17);
-	o[3][2] = -(m[0][0] * sf14 - m[0][1] * sf16 + m[0][3] * sf18);
-	o[3][3] = +(m[0][0] * sf15 - m[0][1] * sf17 + m[0][2] * sf18);
-
-	ood := 1.0 / (m[0][0] * o[0][0] +
-	              m[0][1] * o[0][1] +
-	              m[0][2] * o[0][2] +
-	              m[0][3] * o[0][3]);
-
-	o[0][0] *= ood;
-	o[0][1] *= ood;
-	o[0][2] *= ood;
-	o[0][3] *= ood;
-	o[1][0] *= ood;
-	o[1][1] *= ood;
-	o[1][2] *= ood;
-	o[1][3] *= ood;
-	o[2][0] *= ood;
-	o[2][1] *= ood;
-	o[2][2] *= ood;
-	o[2][3] *= ood;
-	o[3][0] *= ood;
-	o[3][1] *= ood;
-	o[3][2] *= ood;
-	o[3][3] *= ood;
-
-	return o;
-}
-
-
-mat4_translate :: proc(v: Vec3) -> Mat4 {
-	m := identity(Mat4);
-	m[3][0] = v[0];
-	m[3][1] = v[1];
-	m[3][2] = v[2];
-	m[3][3] = 1;
-	return m;
-}
-
-mat4_rotate :: proc(v: Vec3, angle_radians: f32) -> Mat4 {
-	c := cos(angle_radians);
-	s := sin(angle_radians);
-
-	a := norm(v);
-	t := a * (1-c);
-
-	rot := identity(Mat4);
-
-	rot[0][0] = c + t[0]*a[0];
-	rot[0][1] = 0 + t[0]*a[1] + s*a[2];
-	rot[0][2] = 0 + t[0]*a[2] - s*a[1];
-	rot[0][3] = 0;
-
-	rot[1][0] = 0 + t[1]*a[0] - s*a[2];
-	rot[1][1] = c + t[1]*a[1];
-	rot[1][2] = 0 + t[1]*a[2] + s*a[0];
-	rot[1][3] = 0;
-
-	rot[2][0] = 0 + t[2]*a[0] + s*a[1];
-	rot[2][1] = 0 + t[2]*a[1] - s*a[0];
-	rot[2][2] = c + t[2]*a[2];
-	rot[2][3] = 0;
-
-	return rot;
-}
-
-scale_vec3 :: proc(m: Mat4, v: Vec3) -> Mat4 {
-	mm := m;
-	mm[0][0] *= v[0];
-	mm[1][1] *= v[1];
-	mm[2][2] *= v[2];
-	return mm;
-}
-
-scale_f32 :: proc(m: Mat4, s: f32) -> Mat4 {
-	mm := m;
-	mm[0][0] *= s;
-	mm[1][1] *= s;
-	mm[2][2] *= s;
-	return mm;
-}
-
-scale :: proc{scale_vec3, scale_f32};
-
-
-look_at :: proc(eye, centre, up: Vec3) -> Mat4 {
-	f := norm(centre - eye);
-	s := norm(cross(f, up));
-	u := cross(s, f);
-
-	return Mat4{
-		{+s.x, +u.x, -f.x, 0},
-		{+s.y, +u.y, -f.y, 0},
-		{+s.z, +u.z, -f.z, 0},
-		{-dot(s, eye), -dot(u, eye), dot(f, eye), 1},
-	};
-}
-
-perspective :: proc(fovy, aspect, near, far: f32) -> Mat4 {
-	m: Mat4;
-	tan_half_fovy := tan(0.5 * fovy);
-
-	m[0][0] = 1.0 / (aspect*tan_half_fovy);
-	m[1][1] = 1.0 / (tan_half_fovy);
-	m[2][2] = -(far + near) / (far - near);
-	m[2][3] = -1.0;
-	m[3][2] = -2.0*far*near / (far - near);
-	return m;
-}
-
-
-ortho3d :: proc(left, right, bottom, top, near, far: f32) -> Mat4 {
-	m := identity(Mat4);
-	m[0][0] = +2.0 / (right - left);
-	m[1][1] = +2.0 / (top - bottom);
-	m[2][2] = -2.0 / (far - near);
-	m[3][0] = -(right + left)   / (right - left);
-	m[3][1] = -(top   + bottom) / (top   - bottom);
-	m[3][2] = -(far + near) / (far - near);
-	return m;
-}
-
-
-// Quaternion operations
-
-conj :: proc(q: Quat) -> Quat {
-	return Quat{-q.x, -q.y, -q.z, q.w};
-}
-
-quat_mul :: proc(q0, q1: Quat) -> Quat {
-	d: Quat;
-	d.x = q0.w * q1.x + q0.x * q1.w + q0.y * q1.z - q0.z * q1.y;
-	d.y = q0.w * q1.y - q0.x * q1.z + q0.y * q1.w + q0.z * q1.x;
-	d.z = q0.w * q1.z + q0.x * q1.y - q0.y * q1.x + q0.z * q1.w;
-	d.w = q0.w * q1.w - q0.x * q1.x - q0.y * q1.y - q0.z * q1.z;
-	return d;
-}
-
-quat_mulf :: proc(q: Quat, f: f32) -> Quat { return Quat{q.x*f, q.y*f, q.z*f, q.w*f}; }
-quat_divf :: proc(q: Quat, f: f32) -> Quat { return Quat{q.x/f, q.y/f, q.z/f, q.w/f}; }
-
-quat_div     :: proc(q0, q1: Quat) -> Quat { return mul(q0, quat_inverse(q1)); }
-quat_inverse :: proc(q: Quat) -> Quat { return div(conj(q), dot(q, q)); }
-quat_dot     :: proc(q0, q1: Quat) -> f32 { return q0.x*q1.x + q0.y*q1.y + q0.z*q1.z + q0.w*q1.w; }
-
-quat_norm :: proc(q: Quat) -> Quat {
-	m := sqrt(dot(q, q));
-	return div(q, m);
-}
-
-axis_angle :: proc(axis: Vec3, angle_radians: f32) -> Quat {
-	v := norm(axis) * sin(0.5*angle_radians);
-	w := cos(0.5*angle_radians);
-	return Quat{v.x, v.y, v.z, w};
-}
-
-euler_angles :: proc(pitch, yaw, roll: f32) -> Quat {
-	p := axis_angle(Vec3{1, 0, 0}, pitch);
-	y := axis_angle(Vec3{0, 1, 0}, yaw);
-	r := axis_angle(Vec3{0, 0, 1}, roll);
-	return mul(mul(y, p), r);
-}
-
-quat_to_mat4 :: proc(q: Quat) -> Mat4 {
-	a := quat_norm(q);
-	xx := a.x*a.x; yy := a.y*a.y; zz := a.z*a.z;
-	xy := a.x*a.y; xz := a.x*a.z; yz := a.y*a.z;
-	wx := a.w*a.x; wy := a.w*a.y; wz := a.w*a.z;
-
-	m := identity(Mat4);
-
-	m[0][0] = 1 - 2*(yy + zz);
-	m[0][1] =     2*(xy + wz);
-	m[0][2] =     2*(xz - wy);
-
-	m[1][0] =     2*(xy - wz);
-	m[1][1] = 1 - 2*(xx + zz);
-	m[1][2] =     2*(yz + wx);
-
-	m[2][0] =     2*(xz + wy);
-	m[2][1] =     2*(yz - wx);
-	m[2][2] = 1 - 2*(xx + yy);
-	return m;
-}
-
-
 
 
 F32_DIG        :: 6;

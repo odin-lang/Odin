@@ -3344,7 +3344,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_end - BuiltinProc__ty
 
 
 
-bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id) {
+bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
 	if (ce->inlining != ProcInlining_none) {
 		error(call, "Inlining operators are not allowed on built-in procedures");
@@ -3882,6 +3882,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		operand->mode = Addressing_Value;
 
+		if (type_hint != nullptr && check_is_castable_to(c, operand, type_hint)) {
+			operand->type = type_hint;
+		}
+
 		break;
 	}
 
@@ -3943,6 +3947,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		case Basic_f64:          operand->type = t_complex128;      break;
 		case Basic_UntypedFloat: operand->type = t_untyped_complex; break;
 		default: GB_PANIC("Invalid type"); break;
+		}
+
+		if (type_hint != nullptr && check_is_castable_to(c, operand, type_hint)) {
+			operand->type = type_hint;
 		}
 
 		break;
@@ -4033,6 +4041,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		default: GB_PANIC("Invalid type"); break;
 		}
 
+		if (type_hint != nullptr && check_is_castable_to(c, operand, type_hint)) {
+			operand->type = type_hint;
+		}
+
 		break;
 	}
 
@@ -4087,6 +4099,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		default: GB_PANIC("Invalid type"); break;
 		}
 
+		if (type_hint != nullptr && check_is_castable_to(c, operand, type_hint)) {
+			operand->type = type_hint;
+		}
+
 		break;
 	}
 
@@ -4132,6 +4148,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		case Basic_UntypedComplex:    x->type = t_untyped_float; break;
 		case Basic_UntypedQuaternion: x->type = t_untyped_float; break;
 		default: GB_PANIC("Invalid type"); break;
+		}
+
+		if (type_hint != nullptr && check_is_castable_to(c, operand, type_hint)) {
+			operand->type = type_hint;
 		}
 
 		break;
@@ -6363,7 +6383,7 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 
 
 
-ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call) {
+ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
 	if (ce->proc != nullptr &&
 	    ce->proc->kind == Ast_BasicDirective) {
@@ -6470,7 +6490,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call) {
 
 	if (operand->mode == Addressing_Builtin) {
 		i32 id = operand->builtin_id;
-		if (!check_builtin_procedure(c, operand, call, id)) {
+		if (!check_builtin_procedure(c, operand, call, id, type_hint)) {
 			operand->mode = Addressing_Invalid;
 		}
 		operand->expr = call;
@@ -7930,7 +7950,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 
 	case_ast_node(ce, CallExpr, node);
-		return check_call_expr(c, o, node);
+		return check_call_expr(c, o, node, type_hint);
 	case_end;
 
 	case_ast_node(de, DerefExpr, node);
