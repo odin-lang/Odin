@@ -39,14 +39,17 @@ jobs:
           curl -sL https://github.com/odin-lang/Odin/releases/download/llvm-windows/llvm-binaries.zip --output llvm-binaries.zip
           7z x llvm-binaries.zip > nul
       - name: build Odin
+        shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           ./build_ci.bat
       - name: Odin run
+        shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin run examples/demo/demo.odin
       - name: Odin check
+        shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin check examples/demo/demo.odin -vet
