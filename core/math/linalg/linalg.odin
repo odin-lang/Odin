@@ -1,6 +1,7 @@
 package linalg
 
 import "core:math"
+import "intrinsics"
 
 // Generic
 
@@ -78,9 +79,11 @@ transpose :: proc(a: $T/[$N][$M]$E) -> (m: ((M == N) ? T : [M][N]E)) {
 	return;
 }
 
-mul_matrix :: proc(a: $A/[$I][$J]$E, b: $B/[J][$K]E) -> (c: ((I == J && J == K && A == B) ? A : [I][K]E)) {
+mul_matrix :: proc(a: $A/[$I][$J]$E, b: $B/[J][$K]E) -> (c: ((I == J && J == K && A == B) ? A : [I][K]E))
+	where !intrinsics.type_is_array(E),
+	      intrinsics.type_is_numeric(E) {
 	for i in 0..<I {
-		for K in 0..<K {
+		for k in 0..<K {
 			for j in 0..<J {
 				c[i][k] += a[i][j] * b[j][k];
 			}
@@ -89,7 +92,9 @@ mul_matrix :: proc(a: $A/[$I][$J]$E, b: $B/[J][$K]E) -> (c: ((I == J && J == K &
 	return;
 }
 
-mul_matrix_vector :: proc(a: $A/[$I][$J]$E, b: $B/[I]E) -> (c: B) {
+mul_matrix_vector :: proc(a: $A/[$I][$J]$E, b: $B/[I]E) -> (c: B)
+	where !intrinsics.type_is_array(E),
+	      intrinsics.type_is_numeric(E) {
 	for i in 0..<I {
 		for j in 0..<J {
 			c[i] += a[i][j] * b[i];
