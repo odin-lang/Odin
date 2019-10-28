@@ -193,7 +193,6 @@ rune_string_at_pos :: proc(s: string, pos: int) -> string {
 }
 
 rune_at :: proc(s: string, byte_index: int) -> rune {
-	str := s[byte_index:];
 	r, _ := decode_rune_in_string(s[byte_index:]);
 	return r;
 }
@@ -206,7 +205,7 @@ rune_offset :: proc(s: string, pos: int, start: int = 0) -> int {
 	}
 
 	i := 0;
-	for c, offset in s[start:] {
+	for _, offset in s[start:] {
 		if i == pos {
 			return offset+start;
 		}
