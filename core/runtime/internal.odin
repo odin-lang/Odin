@@ -348,12 +348,12 @@ string_le :: inline proc "contextless" (a, b: string) -> bool { return string_cm
 string_ge :: inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) >= 0; }
 
 cstring_len :: proc "contextless" (s: cstring) -> int {
-	n := 0;
-	p := uintptr((^byte)(s));
+	p0 := uintptr((^byte)(s));
+	p := p0;
 	for p != 0 && (^byte)(p)^ != 0 {
 		p += 1;
 	}
-	return n;
+	return int(p - p0);
 }
 
 cstring_to_string :: proc "contextless" (s: cstring) -> string {
