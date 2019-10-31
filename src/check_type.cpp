@@ -262,25 +262,29 @@ Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *original_type,
 			for (isize j = 0; j < param_count; j++) {
 				Entity *p = tuple->variables[j];
 				Operand o = ordered_operands[j];
+				Entity *oe = entity_of_node(o.expr);
+				if (p == oe) {
+					// NOTE(bill): This is the same type, make sure that it will be be same thing and use that
+					// Saves on a lot of checking too below
+					continue;
+				}
+
 				if (p->kind == Entity_TypeName) {
 					if (is_type_polymorphic(o.type)) {
 						// NOTE(bill): Do not add polymorphic version to the gen_types
 						skip = true;
 						break;
-					} else if (!are_types_identical(o.type, p->type)) {
+					}
+					if (!are_types_identical(o.type, p->type)) {
 						skip = true;
 						break;
 					}
 				} else if (p->kind == Entity_Constant) {
-					if (o.mode != Addressing_Constant) {
-						if (failure) *failure = true;
-						skip = true;
-						break;
-					}
 					if (!compare_exact_values(Token_CmpEq, o.value, p->Constant.value)) {
 						skip = true;
 						break;
-					} else if (!are_types_identical(o.type, p->type)) {
+					}
+					if (!are_types_identical(o.type, p->type)) {
 						skip = true;
 						break;
 					}
