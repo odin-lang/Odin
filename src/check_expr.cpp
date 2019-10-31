@@ -6343,9 +6343,8 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 			operand->type = found_entity->type;
 			return err;
 		}
-		if (failure) {
-			return CallArgumentError_NoneConstantParameter;
-		}
+
+
 
 		String generated_name = make_string_c(expr_to_string(call));
 
@@ -6458,7 +6457,8 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 					Ast *s = ident->SelectorExpr.selector;
 					ident = s;
 				}
-				Type *ot = operand->type; GB_ASSERT(ot->kind == Type_Named);
+				Type *ot = operand->type;
+				GB_ASSERT(ot->kind == Type_Named);
 				Entity *e = ot->Named.type_name;
 				add_entity_use(c, ident, e);
 				add_type_and_value(&c->checker->info, call, Addressing_Type, ot, empty_exact_value);
