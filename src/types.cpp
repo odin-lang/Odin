@@ -205,6 +205,7 @@ struct TypeUnion {
 		Type *   abi_compat_result_type;                  \
 		i32      variadic_index;                          \
 		bool     variadic;                                \
+		bool     abi_types_set;                           \
 		bool     require_results;                         \
 		bool     c_vararg;                                \
 		bool     is_polymorphic;                          \
@@ -2360,7 +2361,9 @@ i64 type_size_of(Type *t) {
 		return 0;
 	}
 	// NOTE(bill): Always calculate the size when it is a Type_Basic
-	if (t->kind != Type_Basic && t->cached_size >= 0) {
+	if (t->kind == Type_Named && t->cached_size >= 0) {
+
+	} else if (t->kind != Type_Basic && t->cached_size >= 0) {
 		return t->cached_size;
 	}
 	TypePath path = {0};
@@ -2375,7 +2378,9 @@ i64 type_align_of(Type *t) {
 		return 1;
 	}
 	// NOTE(bill): Always calculate the size when it is a Type_Basic
-	if (t->kind != Type_Basic && t->cached_align > 0) {
+	if (t->kind == Type_Named && t->cached_align >= 0) {
+
+	} if (t->kind != Type_Basic && t->cached_align > 0) {
 		return t->cached_align;
 	}
 

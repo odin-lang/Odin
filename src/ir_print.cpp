@@ -323,12 +323,15 @@ void ir_print_proc_results(irFileBuffer *f, irModule *m, Type *t) {
 
 
 void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
+	set_procedure_abi_types(heap_allocator(), t);
+
 	i64 word_bits = 8*build_context.word_size;
 	t = base_type(t);
 	GB_ASSERT(is_type_proc(t));
 
 	isize param_count = t->Proc.param_count;
 	isize result_count = t->Proc.result_count;
+
 	ir_print_proc_results(f, m, t);
 	ir_write_string(f, str_lit(" ("));
 	if (t->Proc.return_by_pointer) {
@@ -2125,6 +2128,8 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 
 void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
+	set_procedure_abi_types(heap_allocator(), proc->type);
+
 	if (proc->body == nullptr) {
 		ir_write_str_lit(f, "declare ");
 		// if (proc->tags & ProcTag_dll_import) {
