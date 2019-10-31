@@ -6344,8 +6344,6 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 			return err;
 		}
 
-
-
 		String generated_name = make_string_c(expr_to_string(call));
 
 		CheckerContext ctx = *c;
