@@ -248,38 +248,47 @@ bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_) {
 }
 
 
-Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *original_type, isize param_count, Array<Operand> ordered_operands) {
+Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *original_type, isize param_count, Array<Operand> const &ordered_operands, bool *failure) {
 	auto *found_gen_types = map_get(&ctx->checker->info.gen_types, hash_pointer(original_type));
 	if (found_gen_types != nullptr) {
 		for_array(i, *found_gen_types) {
 			Entity *e = (*found_gen_types)[i];
 			Type *t = base_type(e->type);
 			TypeTuple *tuple = get_record_polymorphic_params(t);
-			bool ok = true;
 			GB_ASSERT(param_count == tuple->variables.count);
+
+			bool skip = false;
+
 			for (isize j = 0; j < param_count; j++) {
 				Entity *p = tuple->variables[j];
 				Operand o = ordered_operands[j];
 				if (p->kind == Entity_TypeName) {
 					if (is_type_polymorphic(o.type)) {
 						// NOTE(bill): Do not add polymorphic version to the gen_types
-						ok = false;
-					}
-					if (!are_types_identical(o.type, p->type)) {
-						ok = false;
+						skip = true;
+						break;
+					} else if (!are_types_identical(o.type, p->type)) {
+						skip = true;
+						break;
 					}
 				} else if (p->kind == Entity_Constant) {
-					if (!are_types_identical(o.type, p->type)) {
-						ok = false;
+					if (o.mode != Addressing_Constant) {
+						if (failure) *failure = true;
+						skip = true;
+						break;
 					}
 					if (!compare_exact_values(Token_CmpEq, o.value, p->Constant.value)) {
-						ok = false;
+						skip = true;
+						break;
+					} else if (!are_types_identical(o.type, p->type)) {
+						skip = true;
+						break;
 					}
 				} else {
 					GB_PANIC("Unknown entity kind");
 				}
 			}
-			if (ok) {
+			if (!skip) {
 				return e;
 			}
 		}

@@ -62,7 +62,7 @@ Type *   make_optional_ok_type          (Type *value);
 void     check_type_decl                (CheckerContext *c, Entity *e, Ast *type_expr, Type *def);
 Entity * check_selector                 (CheckerContext *c, Operand *operand, Ast *node, Type *type_hint);
 Entity * check_ident                    (CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name);
-Entity * find_polymorphic_record_entity (CheckerContext *c, Type *original_type, isize param_count, Array<Operand> ordered_operands);
+Entity * find_polymorphic_record_entity (CheckerContext *c, Type *original_type, isize param_count, Array<Operand> const &ordered_operands, bool *failure);
 void     check_not_tuple                (CheckerContext *c, Operand *operand);
 void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type);
 gbString expr_to_string                 (Ast *expression);
@@ -6336,11 +6336,15 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 	{
 		gbAllocator a = c->allocator;
 
-		Entity *found_entity = find_polymorphic_record_entity(c, original_type, param_count, ordered_operands);
+		bool failure = false;
+		Entity *found_entity = find_polymorphic_record_entity(c, original_type, param_count, ordered_operands, &failure);
 		if (found_entity) {
 			operand->mode = Addressing_Type;
 			operand->type = found_entity->type;
 			return err;
+		}
+		if (failure) {
+			return CallArgumentError_NoneConstantParameter;
 		}
 
 		String generated_name = make_string_c(expr_to_string(call));
