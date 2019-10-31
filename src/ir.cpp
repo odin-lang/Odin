@@ -5647,7 +5647,8 @@ irValue *ir_emit_logical_binary_expr(irProcedure *proc, TokenKind op, Ast *left,
 	}
 
 	ir_start_block(proc, rhs);
-	array_add(&edges, ir_build_expr(proc, right));
+	irValue *edge = ir_build_expr(proc, right);
+	array_add(&edges, edge);
 	ir_emit_jump(proc, done);
 	ir_start_block(proc, done);
 
@@ -5656,8 +5657,6 @@ irValue *ir_emit_logical_binary_expr(irProcedure *proc, TokenKind op, Ast *left,
 
 irValue *ir_emit_logical_binary_expr(irProcedure *proc, Ast *expr) {
 	ast_node(be, BinaryExpr, expr);
-	irBlock *rhs  = ir_new_block(proc, nullptr, "logical.cmp.rhs");
-	irBlock *done = ir_new_block(proc, nullptr, "logical.cmp.done");
 
 	Type *type = type_of_expr(expr);
 	type = default_type(type);
@@ -6879,9 +6878,6 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 	case_end;
 
 	case_ast_node(be, BinaryExpr, expr);
-		irValue *left = ir_build_expr(proc, be->left);
-		Type *type = default_type(tv.type);
-
 		switch (be->op.kind) {
 		case Token_Add:
 		case Token_Sub:
@@ -6895,6 +6891,8 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		case Token_AndNot:
 		case Token_Shl:
 		case Token_Shr: {
+			irValue *left = ir_build_expr(proc, be->left);
+			Type *type = default_type(tv.type);
 			irValue *right = ir_build_expr(proc, be->right);
 			return ir_emit_arith(proc, be->op.kind, left, right, type);
 		}
@@ -6906,10 +6904,11 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		case Token_LtEq:
 		case Token_Gt:
 		case Token_GtEq: {
+			irValue *left = ir_build_expr(proc, be->left);
+			Type *type = default_type(tv.type);
 			irValue *right = ir_build_expr(proc, be->right);
 			irValue *cmp = ir_emit_comp(proc, be->op.kind, left, right);
 			return ir_emit_conv(proc, cmp, type);
-			break;
 		}
 
 		case Token_CmpAnd:
@@ -6919,6 +6918,8 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 
 		case Token_in:
 		case Token_notin: {
+			irValue *left = ir_build_expr(proc, be->left);
+			Type *type = default_type(tv.type);
 			irValue *right = ir_build_expr(proc, be->right);
 			Type *rt = base_type(ir_type(right));
 			switch (rt->kind) {
