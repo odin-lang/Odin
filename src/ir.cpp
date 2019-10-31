@@ -3038,6 +3038,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 		context_ptr = ir_find_or_generate_context_ptr(p);
 	}
 
+	set_procedure_abi_types(heap_allocator(), pt);
 
 	bool is_c_vararg = pt->Proc.c_vararg;
 	isize param_count = pt->Proc.param_count;
@@ -10018,6 +10019,8 @@ void ir_insert_code_before_proc(irProcedure* proc, irProcedure *parent) {
 
 void ir_build_proc(irValue *value, irProcedure *parent) {
 	irProcedure *proc = &value->Proc;
+
+	set_procedure_abi_types(heap_allocator(), proc->type);
 
 	proc->parent = parent;
 

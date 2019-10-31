@@ -1273,7 +1273,7 @@ Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Oper
 
 	if (is_polymorphic_type_assignable(ctx, poly_type, operand.type, false, modify_type)) {
 		if (show_error) {
-			set_procedure_abi_types(ctx, poly_type);
+			set_procedure_abi_types(ctx->allocator, poly_type);
 		}
 		return poly_type;
 	}
@@ -2362,18 +2362,22 @@ bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type 
 	return false;
 }
 
-void set_procedure_abi_types(CheckerContext *c, Type *type) {
+void set_procedure_abi_types(gbAllocator allocator, Type *type) {
 	type = base_type(type);
 	if (type->kind != Type_Proc) {
 		return;
 	}
 
-	type->Proc.abi_compat_params = array_make<Type *>(c->allocator, cast(isize)type->Proc.param_count);
+	if (type->Proc.abi_types_set) {
+		return;
+	}
+
+	type->Proc.abi_compat_params = array_make<Type *>(allocator, cast(isize)type->Proc.param_count);
 	for (i32 i = 0; i < type->Proc.param_count; i++) {
 		Entity *e = type->Proc.params->Tuple.variables[i];
 		if (e->kind == Entity_Variable) {
 			Type *original_type = e->type;
-			Type *new_type = type_to_abi_compat_param_type(c->allocator, original_type, type->Proc.calling_convention);
+			Type *new_type = type_to_abi_compat_param_type(allocator, original_type, type->Proc.calling_convention);
 			type->Proc.abi_compat_params[i] = new_type;
 			switch (type->Proc.calling_convention) {
 			case ProcCC_Odin:
@@ -2387,8 +2391,10 @@ void set_procedure_abi_types(CheckerContext *c, Type *type) {
 	}
 
 	// NOTE(bill): The types are the same
-	type->Proc.abi_compat_result_type = type_to_abi_compat_result_type(c->allocator, type->Proc.results, type->Proc.calling_convention);
-	type->Proc.return_by_pointer = abi_compat_return_by_pointer(c->allocator, type->Proc.calling_convention, type->Proc.abi_compat_result_type);
+	type->Proc.abi_compat_result_type = type_to_abi_compat_result_type(allocator, type->Proc.results, type->Proc.calling_convention);
+	type->Proc.return_by_pointer = abi_compat_return_by_pointer(allocator, type->Proc.calling_convention, type->Proc.abi_compat_result_type);
+
+	type->Proc.abi_types_set = true;
 }
 
 // NOTE(bill): 'operands' is for generating non generic procedure type
@@ -2485,8 +2491,6 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 		}
 	}
 	type->Proc.is_polymorphic = is_polymorphic;
-
-	set_procedure_abi_types(c, type);
 
 	return success;
 }
