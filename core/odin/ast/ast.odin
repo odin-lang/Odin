@@ -410,6 +410,7 @@ Foreign_Import_Decl :: struct {
 	name:            ^Ident,
 	collection_name: string,
 	fullpaths:       []string,
+	attributes:      [dynamic]^Attribute, // dynamic as parsing will add to them lazily
 	comment:         ^Comment_Group,
 }
 
