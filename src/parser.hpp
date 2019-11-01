@@ -426,6 +426,7 @@ AST_KIND(_DeclBegin,      "", bool) \
 		Token    library_name;    \
 		String   collection_name; \
 		Array<String> fullpaths;  \
+		Array<Ast *> attributes;  \
 		CommentGroup *docs;       \
 		CommentGroup *comment;    \
 	}) \

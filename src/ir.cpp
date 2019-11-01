@@ -11335,6 +11335,11 @@ void ir_gen_tree(irGen *s) {
 		}
 	}
 
+	for_array(i, m->info->required_foreign_imports_through_force) {
+		Entity *e = m->info->required_foreign_imports_through_force[i];
+		ir_add_foreign_library_path(m, e);
+	}
+
 #endif
 	{ // Startup Runtime
 		// Cleanup(bill): probably better way of doing code insertion

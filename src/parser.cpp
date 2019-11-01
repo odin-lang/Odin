@@ -1049,6 +1049,8 @@ Ast *ast_foreign_import_decl(AstFile *f, Token token, Array<Token> filepaths, To
 	result->ForeignImportDecl.library_name = library_name;
 	result->ForeignImportDecl.docs         = docs;
 	result->ForeignImportDecl.comment      = comment;
+	result->ForeignImportDecl.attributes.allocator = heap_allocator();
+
 	return result;
 }
 
@@ -3865,7 +3867,9 @@ Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind clo
 		array_add(&decl->ValueDecl.attributes, attribute);
 	} else if (decl->kind == Ast_ForeignBlockDecl) {
 		array_add(&decl->ForeignBlockDecl.attributes, attribute);
-	} else {
+	} else if (decl->kind == Ast_ForeignImportDecl) {
+		array_add(&decl->ForeignImportDecl.attributes, attribute);
+	}else {
 		syntax_error(decl, "Expected a value or foreign declaration after an attribute, got %.*s", LIT(ast_strings[decl->kind]));
 		return ast_bad_stmt(f, token, f->curr_token);
 	}

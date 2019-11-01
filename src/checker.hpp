@@ -98,6 +98,7 @@ struct AttributeContext {
 	bool    is_export;
 	bool    is_static;
 	bool    require_results;
+	bool    force_foreign_import;
 	String  link_name;
 	String  link_prefix;
 	isize   init_expr_list_count;
@@ -248,6 +249,8 @@ struct CheckerInfo {
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
 	PtrSet<isize>         minimum_dependency_type_info_set;
+
+	Array<Entity *>       required_foreign_imports_through_force;
 
 
 	bool allow_identifier_uses;

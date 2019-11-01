@@ -803,6 +803,7 @@ void init_checker_info(CheckerInfo *i) {
 	map_init(&i->files,           a);
 	map_init(&i->packages,        a);
 	array_init(&i->variable_init_order, a);
+	array_init(&i->required_foreign_imports_through_force, a);
 
 	i->allow_identifier_uses = build_context.query_data_set_settings.kind == QueryDataSet_GoToDefinitions;
 	if (i->allow_identifier_uses) {
@@ -823,6 +824,8 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
 	array_free(&i->identifier_uses);
+	array_free(&i->required_foreign_imports_through_force);
+
 }
 
 CheckerContext make_checker_context(Checker *c) {
@@ -1694,6 +1697,11 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		} else if (e->kind == Entity_Variable && e->Procedure.is_export) {
 			add_dependency_to_set(c, e);
 		}
+	}
+
+	for_array(i, c->info.required_foreign_imports_through_force) {
+		Entity *e = c->info.required_foreign_imports_through_force[i];
+		add_dependency_to_set(c, e);
 	}
 
 	add_dependency_to_set(c, start);
@@ -3172,6 +3180,16 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	scope->flags |= ScopeFlag_HasBeenImported;
 }
 
+DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
+	if (name == "force") {
+		if (value != nullptr) {
+			error(elem, "Expected no parameter for '%.*s'", LIT(name));
+		}
+		ac->force_foreign_import = true;
+		return true;
+	}
+	return false;
+}
 
 void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	if (decl->been_handled) return;
@@ -3216,6 +3234,14 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	Entity *e = alloc_entity_library_name(parent_scope, fl->library_name, t_invalid,
 	                                      fl->fullpaths, library_name);
 	add_entity(ctx->checker, parent_scope, nullptr, e);
+
+
+	AttributeContext ac = {};
+	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
+	if (ac.force_foreign_import) {
+		array_add(&ctx->info->required_foreign_imports_through_force, e);
+		add_entity_use(ctx, nullptr, e);
+	}
 }
 
 bool collect_checked_packages_from_decl_list(Checker *c, Array<Ast *> const &decls) {
