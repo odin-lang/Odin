@@ -258,7 +258,6 @@ exit :: inline proc(code: int) -> ! {
 	_unix_exit(code);
 }
 
-
 current_thread_id :: proc "contextless" () -> int {
 	// return int(_unix_gettid());
 	return 0;
