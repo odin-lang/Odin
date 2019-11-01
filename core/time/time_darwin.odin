@@ -1,5 +1,7 @@
 package time
 
+foreign import libc "system:c"
+
 TimeSpec :: struct {
     tv_sec  : i64,  /* seconds */
     tv_nsec : i64,  /* nanoseconds */
