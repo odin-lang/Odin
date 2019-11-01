@@ -75,7 +75,7 @@ i32 system_exec_command_line_app(char *name, char *fmt, ...) {
 	va_end(va);
 	cmd = make_string(cast(u8 *)&cmd_line, cmd_len-1);
 
-	//printf("do: %s\n", cmd_line);
+	// printf("do: %s\n", cmd_line);
 	exit_code = system(&cmd_line[0]);
 
 	// pid_t pid = fork();
@@ -160,8 +160,9 @@ void usage(String argv0) {
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s command [arguments]", LIT(argv0));
 	print_usage_line(0, "Commands:");
-	print_usage_line(1, "build     compile .odin file as executable");
-	print_usage_line(1, "run       compile and run .odin file");
+	print_usage_line(1, "build     compile .odin file, or directory of .odin files, as an executable.");
+	print_usage_line(1, "          one must contain the program's entry point, all must be in the same package.");
+	print_usage_line(1, "run       same as 'build', but also then runs the newly compiled executable.");
 	print_usage_line(1, "check     parse and type check .odin file");
 	print_usage_line(1, "query     parse, type check, and output a .json file containing information about the program");
 	print_usage_line(1, "docs      generate documentation for a .odin file");
@@ -210,9 +211,8 @@ enum BuildFlagKind {
 	BuildFlag_Collection,
 	BuildFlag_Define,
 	BuildFlag_BuildMode,
+	BuildFlag_Target,
 	BuildFlag_Debug,
-	BuildFlag_CrossCompile,
-	BuildFlag_CrossLibDir,
 	BuildFlag_NoBoundsCheck,
 	BuildFlag_NoCRT,
 	BuildFlag_UseLLD,
@@ -298,9 +298,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),      BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_Define,            str_lit("define"),          BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),      BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_Target,            str_lit("target"),          BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),           BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_CrossCompile,      str_lit("cross-compile"),   BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_CrossLibDir,       str_lit("cross-lib-dir"),   BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),          BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),             BuildFlagParam_None);
@@ -447,7 +446,7 @@ bool parse_build_flags(Array<String> args) {
 										path = substring(path, 0, string_extension_position(path));
 									}
 								#endif
-								build_context.out_filepath = path;
+								build_context.out_filepath = path_to_full_path(heap_allocator(), path);
 							} else {
 								gb_printf_err("Invalid -out path, got %.*s\n", LIT(path));
 								bad_flags = true;
@@ -477,33 +476,6 @@ bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.keep_temp_files = true;
 							break;
-
-						case BuildFlag_CrossCompile: {
-							GB_ASSERT(value.kind == ExactValue_String);
-							cross_compile_target = value.value_string;
-						#if defined(GB_SYSTEM_UNIX) && defined(GB_ARCH_64_BIT)
-							if (str_eq_ignore_case(cross_compile_target, str_lit("Essence"))) {
-
-							} else
-						#endif
-							{
-								gb_printf_err("Unsupported cross compilation target '%.*s'\n", LIT(cross_compile_target));
-								gb_printf_err("Currently supported targets: Essence (from 64-bit Unixes only)\n");
-								bad_flags = true;
-							}
-							break;
-						}
-
-						case BuildFlag_CrossLibDir: {
-							GB_ASSERT(value.kind == ExactValue_String);
-							if (cross_compile_lib_dir.len) {
-								gb_printf_err("Multiple cross compilation library directories\n");
-								bad_flags = true;
-							} else {
-								cross_compile_lib_dir = concatenate_strings(heap_allocator(), str_lit("-L"), value.value_string);
-							}
-							break;
-						}
 
 						case BuildFlag_Collection: {
 							GB_ASSERT(value.kind == ExactValue_String);
@@ -623,7 +595,25 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						}
 
+						case BuildFlag_Target: {
+							String str = value.value_string;
+							bool found = false;
 
+							for (int i = 0; i < sizeof(named_targets) / sizeof(named_targets[0]); i++) {
+								if (str_eq_ignore_case(str, named_targets[i].name)) {
+									found = true;
+									selected_target_metrics = named_targets + i;
+									break;
+								}
+							}
+
+							if (!found) {
+								gb_printf_err("Unknown target '%.*s'\n", LIT(str));
+								bad_flags = true;
+							}
+
+							break;
+						}
 
 						case BuildFlag_BuildMode: {
 							GB_ASSERT(value.kind == ExactValue_String);
@@ -635,7 +625,7 @@ bool parse_build_flags(Array<String> args) {
 								break;
 							}
 
-							if (str == "dll") {
+							if (str == "dll" || str == "shared") {
 								build_context.is_dll = true;
 							} else if (str == "exe") {
 								build_context.is_dll = false;
@@ -889,8 +879,8 @@ i32 exec_llvm_opt(String output_base) {
 }
 
 i32 exec_llvm_llc(String output_base) {
-#if defined(GB_SYSTEM_WINDOWS)
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
+#if defined(GB_SYSTEM_WINDOWS)
 	return system_exec_command_line_app("llvm-llc",
 		"\"%.*sbin\\llc\" \"%.*s.bc\" -filetype=obj -O%d "
 		"-o \"%.*s.obj\" "
@@ -903,20 +893,18 @@ i32 exec_llvm_llc(String output_base) {
 		LIT(build_context.llc_flags));
 #else
 	// NOTE(zangent): Linux / Unix is unfinished and not tested very well.
-	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	return system_exec_command_line_app("llc",
 		"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
 		"%.*s "
-		"%s"
-		"",
+		"%s%.*s",
 		LIT(output_base),
 		build_context.optimization_level,
 		LIT(build_context.llc_flags),
-		str_eq_ignore_case(cross_compile_target, str_lit("Essence")) ? "-mtriple=x86_64-pc-none-elf" : "");
+		build_context.cross_compiling ? "-mtriple=" : "",
+		(int) (build_context.cross_compiling ? build_context.target_triplet.len : 0),
+		build_context.target_triplet.text);
 #endif
 }
-
-
 
 int main(int arg_count, char **arg_ptr) {
 	if (arg_count < 2) {
@@ -1026,7 +1014,7 @@ int main(int arg_count, char **arg_ptr) {
 	}
 
 
-	init_build_context();
+	init_build_context(selected_target_metrics ? selected_target_metrics->metrics : nullptr);
 	if (build_context.word_size == 4) {
 		print_usage_line(0, "%s 32-bit is not yet supported", args[0]);
 		return 1;
@@ -1121,6 +1109,17 @@ int main(int arg_count, char **arg_ptr) {
 		return exit_code;
 	}
 
+	if (build_context.cross_compiling) {
+		if (0) {
+#ifdef GB_SYSTEM_UNIX
+		} else if (selected_target_metrics->metrics == &target_essence_amd64) {
+			system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s",
+					LIT(output_base), LIT(output_base), LIT(build_context.link_flags));
+#endif
+		} else {
+			gb_printf_err("Don't know how to cross compile to selected target.\n");
+		}
+	} else {
 	#if defined(GB_SYSTEM_WINDOWS)
 		timings_start_section(&timings, str_lit("msvc-link"));
 
@@ -1219,7 +1218,7 @@ int main(int arg_count, char **arg_ptr) {
 		remove_temp_files(output_base);
 
 		if (run_output) {
-			system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(output_base), LIT(run_args_string));
+			return system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(output_base), LIT(run_args_string));
 		}
 	#else
 		timings_start_section(&timings, str_lit("ld-link"));
@@ -1241,15 +1240,17 @@ int main(int arg_count, char **arg_ptr) {
 			//   This allows you to specify '-f' in a #foreign_system_library,
 			//   without having to implement any new syntax specifically for MacOS.
 			#if defined(GB_SYSTEM_OSX)
-				if (lib.len > 2 && lib[0] == '-' && lib[1] == 'f') {
+				if (string_ends_with(lib, str_lit(".framework"))) {
 					// framework thingie
-					lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
+					String lib_name = lib;
+					lib_name = remove_extension_from_path(lib_name);
+					lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", LIT(lib_name));
 				} else if (string_ends_with(lib, str_lit(".a"))) {
 					// static libs, absolute full path relative to the file in which the lib was imported from
 					lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
 				} else if (string_ends_with(lib, str_lit(".dylib"))) {
-					// dynamic lib, relative path to executable
-					lib_str = gb_string_append_fmt(lib_str, " -l:%s/%.*s ", cwd, LIT(lib));
+					// dynamic lib
+					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 				} else {
 					// dynamic or static system lib, just link regularly searching system library paths
 					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
@@ -1309,11 +1310,7 @@ int main(int arg_count, char **arg_ptr) {
 			//   It probably has to do with including the entire CRT, but
 			//   that's quite a complicated issue to solve while remaining distro-agnostic.
 			//   Clang can figure out linker flags for us, and that's good enough _for now_.
-			if (str_eq_ignore_case(cross_compile_target, str_lit("Essence"))) {
-				linker = "x86_64-elf-gcc -T core/sys/essence_linker_userland64.ld -ffreestanding -nostdlib -lgcc -g -z max-page-size=0x1000 -Wno-unused-command-line-argument";
-			} else {
-				linker = "clang -Wno-unused-command-line-argument";
-			}
+			linker = "clang -Wno-unused-command-line-argument";
 		#endif
 
 		exit_code = system_exec_command_line_app("ld-link",
@@ -1321,7 +1318,6 @@ int main(int arg_count, char **arg_ptr) {
 			" %s "
 			" %.*s "
 			" %s "
-			" %.*s "
 			#if defined(GB_SYSTEM_OSX)
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
@@ -1332,11 +1328,9 @@ int main(int arg_count, char **arg_ptr) {
 			#endif
 			, linker, LIT(output_base), LIT(output_base), LIT(output_ext),
 			lib_str,
-			str_eq_ignore_case(cross_compile_target, str_lit("Essence")) ? "-lfreetype -lglue" : "-lc -lm",
+			"-lc -lm",
 			LIT(build_context.link_flags),
-			link_settings,
-			LIT(cross_compile_lib_dir)
-			);
+			link_settings);
 		if (exit_code != 0) {
 			return exit_code;
 		}
@@ -1366,9 +1360,10 @@ int main(int arg_count, char **arg_ptr) {
 			//NOTE(thebirk): This whole thing is a little leaky
 			String complete_path = concatenate_strings(heap_allocator(), output_base, output_ext);
 			complete_path = path_to_full_path(heap_allocator(), complete_path);
-			system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
+			return system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
 		}
 	#endif
+	}
 
 	return 0;
 }

@@ -20,7 +20,7 @@ bool priority_queue_shift_down(PriorityQueue<T> *pq, isize i0, isize n) {
 		if (j2 < n && pq->cmp(&pq->queue[0], j2, j1) < 0) {
 			j = j2;
 		}
-		if (pq->cmp(&pq->queue[0], i, j) < 0) break;
+		if (pq->cmp(&pq->queue[0], j, i) >= 0) break;
 
 		pq->swap(&pq->queue[0], i, j);
 		i = j;
@@ -32,7 +32,7 @@ template <typename T>
 void priority_queue_shift_up(PriorityQueue<T> *pq, isize j) {
 	while (0 <= j && j < pq->queue.count) {
 		isize i = (j-1)/2;
-		if (i == j || pq->cmp(&pq->queue[0], i, j) < 0) {
+		if (i == j || pq->cmp(&pq->queue[0], j, i) >= 0) {
 			break;
 		}
 		pq->swap(&pq->queue[0], i, j);

@@ -1,6 +1,6 @@
 package odin_ast
 
-import "core:odin/token"
+import "core:odin/tokenizer"
 
 Package_Kind :: enum {
 	Normal,
@@ -26,7 +26,7 @@ File :: struct {
 	src:      []byte,
 
 	pkg_decl:  ^Package_Decl,
-	pkg_token: token.Token,
+	pkg_token: tokenizer.Token,
 	pkg_name:  string,
 
 	decls:   [dynamic]^Stmt,

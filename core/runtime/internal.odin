@@ -1,9 +1,22 @@
 package runtime
 
-import "core:mem"
 import "core:os"
-import "core:unicode/utf8"
 
+mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
+	if src == nil do return dst;
+	// NOTE(bill): This _must_ be implemented like C's memmove
+	foreign _ {
+		when size_of(rawptr) == 8 {
+			@(link_name="llvm.memmove.p0i8.p0i8.i64")
+			llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+		} else {
+			@(link_name="llvm.memmove.p0i8.p0i8.i32")
+			llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+		}
+	}
+	llvm_memmove(dst, src, len, 1, false);
+	return dst;
+}
 
 print_u64 :: proc(fd: os.Handle, x: u64) {
 	digits := "0123456789";
@@ -243,6 +256,78 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 	}
 }
 
+memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_check {
+	x := uintptr(a);
+	y := uintptr(b);
+	n := uintptr(n);
+
+	SU :: size_of(uintptr);
+	fast := uintptr(n/SU + 1);
+	offset := (fast-1)*SU;
+	curr_block := uintptr(0);
+	if n < SU {
+		fast = 0;
+	}
+
+	for /**/; curr_block < fast; curr_block += 1 {
+		va := (^uintptr)(x + curr_block * size_of(uintptr))^;
+		vb := (^uintptr)(y + curr_block * size_of(uintptr))^;
+		if va ~ vb != 0 {
+			for pos := curr_block*SU; pos < n; pos += 1 {
+				a := (^byte)(x+pos)^;
+				b := (^byte)(y+pos)^;
+				if a ~ b != 0 {
+					return (int(a) - int(b)) < 0 ? -1 : +1;
+				}
+			}
+		}
+	}
+
+	for /**/; offset < n; offset += 1 {
+		a := (^byte)(x+offset)^;
+		b := (^byte)(y+offset)^;
+		if a ~ b != 0 {
+			return (int(a) - int(b)) < 0 ? -1 : +1;
+		}
+	}
+
+	return 0;
+}
+
+memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_check {
+	x := uintptr(a);
+	n := uintptr(n);
+
+	SU :: size_of(uintptr);
+	fast := uintptr(n/SU + 1);
+	offset := (fast-1)*SU;
+	curr_block := uintptr(0);
+	if n < SU {
+		fast = 0;
+	}
+
+	for /**/; curr_block < fast; curr_block += 1 {
+		va := (^uintptr)(x + curr_block * size_of(uintptr))^;
+		if va ~ 0 != 0 {
+			for pos := curr_block*SU; pos < n; pos += 1 {
+				a := (^byte)(x+pos)^;
+				if a ~ 0 != 0 {
+					return int(a) < 0 ? -1 : +1;
+				}
+			}
+		}
+	}
+
+	for /**/; offset < n; offset += 1 {
+		a := (^byte)(x+offset)^;
+		if a ~ 0 != 0 {
+			return int(a) < 0 ? -1 : +1;
+		}
+	}
+
+	return 0;
+}
+
 string_eq :: proc "contextless" (a, b: string) -> bool {
 	switch {
 	case len(a) != len(b): return false;
@@ -253,7 +338,7 @@ string_eq :: proc "contextless" (a, b: string) -> bool {
 }
 
 string_cmp :: proc "contextless" (a, b: string) -> int {
-	return mem.compare_byte_ptrs(&a[0], &b[0], min(len(a), len(b)));
+	return memory_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
 string_ne :: inline proc "contextless" (a, b: string) -> bool { return !string_eq(a, b); }
@@ -263,18 +348,23 @@ string_le :: inline proc "contextless" (a, b: string) -> bool { return string_cm
 string_ge :: inline proc "contextless" (a, b: string) -> bool { return string_cmp(a, b) >= 0; }
 
 cstring_len :: proc "contextless" (s: cstring) -> int {
-	n := 0;
-	for p := (^byte)(s); p != nil && p^ != 0; p = mem.ptr_offset(p, 1) {
-		n += 1;
+	p0 := uintptr((^byte)(s));
+	p := p0;
+	for p != 0 && (^byte)(p)^ != 0 {
+		p += 1;
 	}
-	return n;
+	return int(p - p0);
 }
 
 cstring_to_string :: proc "contextless" (s: cstring) -> string {
+	Raw_String :: struct {
+		data: ^byte,
+		len: int,
+	};
 	if s == nil do return "";
 	ptr := (^byte)(s);
 	n := cstring_len(s);
-	return transmute(string)mem.Raw_String{ptr, n};
+	return transmute(string)Raw_String{ptr, n};
 }
 
 
@@ -285,6 +375,11 @@ complex128_eq :: inline proc "contextless" (a, b: complex128) -> bool { return r
 complex128_ne :: inline proc "contextless" (a, b: complex128) -> bool { return real(a) != real(b) || imag(a) != imag(b); }
 
 
+quaternion128_eq :: inline proc "contextless"  (a, b: quaternion128)  -> bool { return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b); }
+quaternion128_ne :: inline proc "contextless"  (a, b: quaternion128)  -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b); }
+
+quaternion256_eq :: inline proc "contextless" (a, b: quaternion256) -> bool { return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b); }
+quaternion256_ne :: inline proc "contextless" (a, b: quaternion256) -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b); }
 
 
 bounds_check_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
@@ -358,8 +453,84 @@ type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column
 	handle_error(file, line, column, from, to);
 }
 
+
 string_decode_rune :: inline proc "contextless" (s: string) -> (rune, int) {
-	return utf8.decode_rune_in_string(s);
+	// NOTE(bill): Duplicated here to remove dependency on package unicode/utf8
+
+	@static accept_sizes := [256]u8{
+		0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x00-0x0f
+		0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x10-0x1f
+		0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x20-0x2f
+		0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x30-0x3f
+		0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x40-0x4f
+		0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x50-0x5f
+		0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x60-0x6f
+		0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x70-0x7f
+
+		0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, // 0x80-0x8f
+		0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, // 0x90-0x9f
+		0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, // 0xa0-0xaf
+		0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, // 0xb0-0xbf
+		0xf1, 0xf1, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, // 0xc0-0xcf
+		0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, // 0xd0-0xdf
+		0x13, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x23, 0x03, 0x03, // 0xe0-0xef
+		0x34, 0x04, 0x04, 0x04, 0x44, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, // 0xf0-0xff
+	};
+	Accept_Range :: struct {lo, hi: u8};
+
+	@static accept_ranges := [5]Accept_Range{
+		{0x80, 0xbf},
+		{0xa0, 0xbf},
+		{0x80, 0x9f},
+		{0x90, 0xbf},
+		{0x80, 0x8f},
+	};
+
+	MASKX :: 0b0011_1111;
+	MASK2 :: 0b0001_1111;
+	MASK3 :: 0b0000_1111;
+	MASK4 :: 0b0000_0111;
+
+	LOCB :: 0b1000_0000;
+	HICB :: 0b1011_1111;
+
+
+	RUNE_ERROR :: '\ufffd';
+
+	n := len(s);
+	if n < 1 {
+		return RUNE_ERROR, 0;
+	}
+	s0 := s[0];
+	x := accept_sizes[s0];
+	if x >= 0xF0 {
+		mask := rune(x) << 31 >> 31; // NOTE(bill): Create 0x0000 or 0xffff.
+		return rune(s[0])&~mask | RUNE_ERROR&mask, 1;
+	}
+	sz := x & 7;
+	accept := accept_ranges[x>>4];
+	if n < int(sz) {
+		return RUNE_ERROR, 1;
+	}
+	b1 := s[1];
+	if b1 < accept.lo || accept.hi < b1 {
+		return RUNE_ERROR, 1;
+	}
+	if sz == 2 {
+		return rune(s0&MASK2)<<6 | rune(b1&MASKX), 2;
+	}
+	b2 := s[2];
+	if b2 < LOCB || HICB < b2 {
+		return RUNE_ERROR, 1;
+	}
+	if sz == 3 {
+		return rune(s0&MASK3)<<12 | rune(b1&MASKX)<<6 | rune(b2&MASKX), 3;
+	}
+	b3 := s[3];
+	if b3 < LOCB || HICB < b3 {
+		return RUNE_ERROR, 1;
+	}
+	return rune(s0&MASK4)<<18 | rune(b1&MASKX)<<12 | rune(b2&MASKX)<<6 | rune(b3&MASKX), 4;
 }
 
 bounds_check_error_loc :: inline proc "contextless" (using loc := #caller_location, index, count: int) {
@@ -474,9 +645,16 @@ abs_complex128 :: inline proc "contextless" (x: complex128) -> f64 {
 	r, i := real(x), imag(x);
 	return _sqrt_f64(r*r + i*i);
 }
+abs_quaternion128 :: inline proc "contextless" (x: quaternion128) -> f32 {
+	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
+	return _sqrt_f32(r*r + i*i + j*j + k*k);
+}
+abs_quaternion256 :: inline proc "contextless" (x: quaternion256) -> f64 {
+	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
+	return _sqrt_f64(r*r + i*i + j*j + k*k);
+}
 
-
-quo_complex64 :: proc(n, m: complex64) -> complex64 {
+quo_complex64 :: proc "contextless" (n, m: complex64) -> complex64 {
 	e, f: f32;
 
 	if abs(real(m)) >= abs(imag(m)) {
@@ -494,7 +672,7 @@ quo_complex64 :: proc(n, m: complex64) -> complex64 {
 	return complex(e, f);
 }
 
-quo_complex128 :: proc(n, m: complex128) -> complex128 {
+quo_complex128 :: proc "contextless" (n, m: complex128) -> complex128 {
 	e, f: f64;
 
 	if abs(real(m)) >= abs(imag(m)) {
@@ -510,4 +688,56 @@ quo_complex128 :: proc(n, m: complex128) -> complex128 {
 	}
 
 	return complex(e, f);
+}
+
+mul_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
+	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q);
+	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r);
+
+	t0 := r0*q0 - r1*q1 - r2*q2 - r3*q3;
+	t1 := r0*q1 + r1*q0 - r2*q3 + r3*q2;
+	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1;
+	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0;
+
+	return quaternion(t0, t1, t2, t3);
+}
+
+mul_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
+	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q);
+	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r);
+
+	t0 := r0*q0 - r1*q1 - r2*q2 - r3*q3;
+	t1 := r0*q1 + r1*q0 - r2*q3 + r3*q2;
+	t2 := r0*q2 + r1*q3 + r2*q0 - r3*q1;
+	t3 := r0*q3 - r1*q2 + r2*q1 + r3*q0;
+
+	return quaternion(t0, t1, t2, t3);
+}
+
+quo_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
+	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q);
+	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r);
+
+	invmag2 := 1.0 / (r0*r0 + r1*r1 + r2*r2 + r3*r3);
+
+	t0 := (r0*q0 + r1*q1 + r2*q2 + r3*q3) * invmag2;
+	t1 := (r0*q1 - r1*q0 - r2*q3 - r3*q2) * invmag2;
+	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2;
+	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2;
+
+	return quaternion(t0, t1, t2, t3);
+}
+
+quo_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
+	q0, q1, q2, q3 := real(q), imag(q), jmag(q), kmag(q);
+	r0, r1, r2, r3 := real(r), imag(r), jmag(r), kmag(r);
+
+	invmag2 := 1.0 / (r0*r0 + r1*r1 + r2*r2 + r3*r3);
+
+	t0 := (r0*q0 + r1*q1 + r2*q2 + r3*q3) * invmag2;
+	t1 := (r0*q1 - r1*q0 - r2*q3 - r3*q2) * invmag2;
+	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2;
+	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2;
+
+	return quaternion(t0, t1, t2, t3);
 }

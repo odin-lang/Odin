@@ -32,6 +32,9 @@ enum BasicKind {
 	Basic_complex64,
 	Basic_complex128,
 
+	Basic_quaternion128,
+	Basic_quaternion256,
+
 	Basic_int,
 	Basic_uint,
 	Basic_uintptr,
@@ -66,6 +69,7 @@ enum BasicKind {
 	Basic_UntypedInteger,
 	Basic_UntypedFloat,
 	Basic_UntypedComplex,
+	Basic_UntypedQuaternion,
 	Basic_UntypedString,
 	Basic_UntypedRune,
 	Basic_UntypedNil,
@@ -82,17 +86,18 @@ enum BasicFlag {
 	BasicFlag_Unsigned    = GB_BIT(2),
 	BasicFlag_Float       = GB_BIT(3),
 	BasicFlag_Complex     = GB_BIT(4),
-	BasicFlag_Pointer     = GB_BIT(5),
-	BasicFlag_String      = GB_BIT(6),
-	BasicFlag_Rune        = GB_BIT(7),
-	BasicFlag_Untyped     = GB_BIT(8),
+	BasicFlag_Quaternion  = GB_BIT(5),
+	BasicFlag_Pointer     = GB_BIT(6),
+	BasicFlag_String      = GB_BIT(7),
+	BasicFlag_Rune        = GB_BIT(8),
+	BasicFlag_Untyped     = GB_BIT(9),
 
-	BasicFlag_LLVM        = GB_BIT(10),
+	BasicFlag_LLVM        = GB_BIT(11),
 
 	BasicFlag_EndianLittle = GB_BIT(13),
 	BasicFlag_EndianBig    = GB_BIT(14),
 
-	BasicFlag_Numeric        = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Complex,
+	BasicFlag_Numeric        = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Complex | BasicFlag_Quaternion,
 	BasicFlag_Ordered        = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
 	BasicFlag_OrderedNumeric = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Rune,
 	BasicFlag_ConstantType   = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
@@ -107,21 +112,23 @@ struct BasicType {
 
 struct TypeStruct {
 	Array<Entity *> fields;
-	Ast *node;
-	Scope *  scope;
+	Array<String>   tags;
+	Array<i64>      offsets;
+	Ast *           node;
+	Scope *         scope;
 
-	Array<i64> offsets;
-	bool       are_offsets_set;
-	bool       are_offsets_being_processed;
-	bool       is_packed;
-	bool       is_raw_union;
-	bool       is_polymorphic;
-	bool       is_poly_specialized;
 	Type *     polymorphic_params; // Type_Tuple
 	Type *     polymorphic_parent;
 
-	i64      custom_align; // NOTE(bill): Only used in structs at the moment
+	i64      custom_align;
 	Entity * names;
+
+	bool are_offsets_set;
+	bool are_offsets_being_processed;
+	bool is_packed;
+	bool is_raw_union;
+	bool is_polymorphic;
+	bool is_poly_specialized;
 };
 
 struct TypeUnion {
@@ -131,12 +138,11 @@ struct TypeUnion {
 	i64           variant_block_size;
 	i64           custom_align;
 	i64           tag_size;
+	Type *        polymorphic_params; // Type_Tuple
+	Type *        polymorphic_parent;
 	bool          no_nil;
-
-	bool       is_polymorphic;
-	bool       is_poly_specialized;
-	Type *     polymorphic_params; // Type_Tuple
-	Type *     polymorphic_parent;
+	bool          is_polymorphic;
+	bool          is_poly_specialized;
 };
 
 #define TYPE_KINDS                                        \
@@ -184,7 +190,9 @@ struct TypeUnion {
 	TYPE_KIND(Tuple, struct {                             \
 		Array<Entity *> variables; /* Entity_Variable */  \
 		Array<i64>      offsets;                          \
+		bool            are_offsets_being_processed;      \
 		bool            are_offsets_set;                  \
+		bool            is_packed;                        \
 	})                                                    \
 	TYPE_KIND(Proc, struct {                              \
 		Ast *node;                                        \
@@ -195,9 +203,9 @@ struct TypeUnion {
 		i32      result_count;                            \
 		Array<Type *> abi_compat_params;                  \
 		Type *   abi_compat_result_type;                  \
-		bool     return_by_pointer;                       \
-		bool     variadic;                                \
 		i32      variadic_index;                          \
+		bool     variadic;                                \
+		bool     abi_types_set;                           \
 		bool     require_results;                         \
 		bool     c_vararg;                                \
 		bool     is_polymorphic;                          \
@@ -205,6 +213,7 @@ struct TypeUnion {
 		bool     has_proc_default_values;                 \
 		bool     has_named_results;                       \
 		bool     diverging; /* no return */               \
+		bool     return_by_pointer;                       \
 		u64      tags;                                    \
 		isize    specialization_count;                    \
 		ProcCallingConvention calling_convention;         \
@@ -341,6 +350,9 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_complex64,         BasicFlag_Complex,                          8, STR_LIT("complex64")}},
 	{Type_Basic, {Basic_complex128,        BasicFlag_Complex,                         16, STR_LIT("complex128")}},
 
+	{Type_Basic, {Basic_quaternion128,     BasicFlag_Quaternion,                      16, STR_LIT("quaternion128")}},
+	{Type_Basic, {Basic_quaternion256,     BasicFlag_Quaternion,                      32, STR_LIT("quaternion256")}},
+
 	{Type_Basic, {Basic_int,               BasicFlag_Integer,                         -1, STR_LIT("int")}},
 	{Type_Basic, {Basic_uint,              BasicFlag_Integer | BasicFlag_Unsigned,    -1, STR_LIT("uint")}},
 	{Type_Basic, {Basic_uintptr,           BasicFlag_Integer | BasicFlag_Unsigned,    -1, STR_LIT("uintptr")}},
@@ -376,6 +388,7 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_UntypedInteger,    BasicFlag_Integer    | BasicFlag_Untyped,   0, STR_LIT("untyped integer")}},
 	{Type_Basic, {Basic_UntypedFloat,      BasicFlag_Float      | BasicFlag_Untyped,   0, STR_LIT("untyped float")}},
 	{Type_Basic, {Basic_UntypedComplex,    BasicFlag_Complex    | BasicFlag_Untyped,   0, STR_LIT("untyped complex")}},
+	{Type_Basic, {Basic_UntypedQuaternion, BasicFlag_Quaternion | BasicFlag_Untyped,   0, STR_LIT("untyped quaternion")}},
 	{Type_Basic, {Basic_UntypedString,     BasicFlag_String     | BasicFlag_Untyped,   0, STR_LIT("untyped string")}},
 	{Type_Basic, {Basic_UntypedRune,       BasicFlag_Integer    | BasicFlag_Untyped,   0, STR_LIT("untyped rune")}},
 	{Type_Basic, {Basic_UntypedNil,        BasicFlag_Untyped,                          0, STR_LIT("untyped nil")}},
@@ -411,6 +424,9 @@ gb_global Type *t_f64             = &basic_types[Basic_f64];
 gb_global Type *t_complex64       = &basic_types[Basic_complex64];
 gb_global Type *t_complex128      = &basic_types[Basic_complex128];
 
+gb_global Type *t_quaternion128   = &basic_types[Basic_quaternion128];
+gb_global Type *t_quaternion256   = &basic_types[Basic_quaternion256];
+
 gb_global Type *t_int             = &basic_types[Basic_int];
 gb_global Type *t_uint            = &basic_types[Basic_uint];
 gb_global Type *t_uintptr         = &basic_types[Basic_uintptr];
@@ -445,6 +461,7 @@ gb_global Type *t_untyped_bool       = &basic_types[Basic_UntypedBool];
 gb_global Type *t_untyped_integer    = &basic_types[Basic_UntypedInteger];
 gb_global Type *t_untyped_float      = &basic_types[Basic_UntypedFloat];
 gb_global Type *t_untyped_complex    = &basic_types[Basic_UntypedComplex];
+gb_global Type *t_untyped_quaternion = &basic_types[Basic_UntypedQuaternion];
 gb_global Type *t_untyped_string     = &basic_types[Basic_UntypedString];
 gb_global Type *t_untyped_rune       = &basic_types[Basic_UntypedRune];
 gb_global Type *t_untyped_nil        = &basic_types[Basic_UntypedNil];
@@ -471,6 +488,7 @@ gb_global Type *t_type_info_integer           = nullptr;
 gb_global Type *t_type_info_rune              = nullptr;
 gb_global Type *t_type_info_float             = nullptr;
 gb_global Type *t_type_info_complex           = nullptr;
+gb_global Type *t_type_info_quaternion        = nullptr;
 gb_global Type *t_type_info_any               = nullptr;
 gb_global Type *t_type_info_typeid            = nullptr;
 gb_global Type *t_type_info_string            = nullptr;
@@ -495,6 +513,7 @@ gb_global Type *t_type_info_integer_ptr       = nullptr;
 gb_global Type *t_type_info_rune_ptr          = nullptr;
 gb_global Type *t_type_info_float_ptr         = nullptr;
 gb_global Type *t_type_info_complex_ptr       = nullptr;
+gb_global Type *t_type_info_quaternion_ptr    = nullptr;
 gb_global Type *t_type_info_any_ptr           = nullptr;
 gb_global Type *t_type_info_typeid_ptr        = nullptr;
 gb_global Type *t_type_info_string_ptr        = nullptr;
@@ -535,7 +554,26 @@ i64      type_offset_of             (Type *t, i32 index);
 gbString type_to_string             (Type *type);
 void     init_map_internal_types(Type *type);
 Type *   bit_set_to_int(Type *t);
+bool are_types_identical(Type *x, Type *y);
 
+
+bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t) {
+	if (ptr_set_exists(s, t)) {
+		return true;
+	}
+
+	// TODO(bill, 2019-10-05): This is very slow and it's probably a lot
+	// faster to cache types correctly
+	for_array(i, s->entries) {
+		Type *f = s->entries[i].ptr;
+		if (are_types_identical(t, f)) {
+			ptr_set_add(s, t);
+			return true;
+		}
+	}
+
+	return false;
+}
 
 Type *base_type(Type *t) {
 	for (;;) {
@@ -923,6 +961,13 @@ bool is_type_complex(Type *t) {
 	}
 	return false;
 }
+bool is_type_quaternion(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		return (t->Basic.flags & BasicFlag_Quaternion) != 0;
+	}
+	return false;
+}
 bool is_type_f32(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {
@@ -1037,14 +1082,40 @@ Type *core_array_type(Type *t) {
 	return t;
 }
 
+// NOTE(bill): type can be easily compared using memcmp
+bool is_type_simple_compare(Type *t) {
+	t = core_type(t);
+	switch (t->kind) {
+	case Type_Array:
+		return is_type_simple_compare(t->Array.elem);
+
+	case Type_Basic:
+		if (t->Basic.flags & (BasicFlag_Integer|BasicFlag_Float|BasicFlag_Complex|BasicFlag_Rune|BasicFlag_Pointer)) {
+			return true;
+		}
+		return false;
+
+	case Type_Pointer:
+	case Type_Proc:
+	case Type_BitSet:
+	case Type_BitField:
+		return true;
+	}
+
+	return false;
+}
+
 Type *base_complex_elem_type(Type *t) {
 	t = core_type(t);
-	if (is_type_complex(t)) {
+	if (t->kind == Type_Basic) {
 		switch (t->Basic.kind) {
-		// case Basic_complex32:      return t_f16;
-		case Basic_complex64:      return t_f32;
-		case Basic_complex128:     return t_f64;
-		case Basic_UntypedComplex: return t_untyped_float;
+		// case Basic_complex32:         return t_f16;
+		case Basic_complex64:         return t_f32;
+		case Basic_complex128:        return t_f64;
+		case Basic_quaternion128:     return t_f32;
+		case Basic_quaternion256:     return t_f64;
+		case Basic_UntypedComplex:    return t_untyped_float;
+		case Basic_UntypedQuaternion: return t_untyped_float;
 		}
 	}
 	GB_PANIC("Invalid complex type");
@@ -1099,11 +1170,10 @@ bool is_type_integer_endian_big(Type *t) {
 		return is_type_integer_endian_big(bit_set_to_int(t));
 	} else if (t->kind == Type_Pointer) {
 		return is_type_integer_endian_big(&basic_types[Basic_uintptr]);
-	} else {
-		GB_PANIC("Unsupported type: %s", type_to_string(t));
 	}
 	return build_context.endian_kind == TargetEndian_Big;
 }
+
 
 bool is_type_integer_endian_little(Type *t) {
 	t = core_type(t);
@@ -1118,11 +1188,24 @@ bool is_type_integer_endian_little(Type *t) {
 		return is_type_integer_endian_little(bit_set_to_int(t));
 	} else if (t->kind == Type_Pointer) {
 		return is_type_integer_endian_little(&basic_types[Basic_uintptr]);
-	} else {
-		GB_PANIC("Unsupported type: %s", type_to_string(t));
 	}
 	return build_context.endian_kind == TargetEndian_Little;
 }
+bool is_type_endian_big(Type *t) {
+	return is_type_integer_endian_big(t);
+}
+bool is_type_endian_little(Type *t) {
+	return is_type_integer_endian_little(t);
+}
+
+bool is_type_dereferenceable(Type *t) {
+	if (is_type_rawptr(t)) {
+		return false;
+	}
+	return is_type_pointer(t);
+}
+
+
 
 bool is_type_different_to_arch_endianness(Type *t) {
 	switch (build_context.endian_kind) {
@@ -1279,6 +1362,19 @@ bool is_type_indexable(Type *t) {
 	case Type_Slice:
 	case Type_DynamicArray:
 	case Type_Map:
+		return true;
+	}
+	return false;
+}
+
+bool is_type_sliceable(Type *t) {
+	Type *bt = base_type(t);
+	switch (bt->kind) {
+	case Type_Basic:
+		return bt->Basic.kind == Basic_string;
+	case Type_Array:
+	case Type_Slice:
+	case Type_DynamicArray:
 		return true;
 	}
 	return false;
@@ -1663,6 +1759,12 @@ bool are_types_identical(Type *x, Type *y) {
 					if (xf_is_using ^ yf_is_using) {
 						return false;
 					}
+					if (x->Struct.tags.count != y->Struct.tags.count) {
+						return false;
+					}
+					if (x->Struct.tags.count > 0 && x->Struct.tags[i] != y->Struct.tags[i]) {
+						return false;
+					}
 				}
 				return true;
 			}
@@ -1683,7 +1785,8 @@ bool are_types_identical(Type *x, Type *y) {
 
 	case Type_Tuple:
 		if (y->kind == Type_Tuple) {
-			if (x->Tuple.variables.count == y->Tuple.variables.count) {
+			if (x->Tuple.variables.count == y->Tuple.variables.count &&
+			    x->Tuple.is_packed == y->Tuple.is_packed) {
 				for_array(i, x->Tuple.variables) {
 					Entity *xe = x->Tuple.variables[i];
 					Entity *ye = y->Tuple.variables[i];
@@ -1763,6 +1866,7 @@ Type *default_type(Type *type) {
 		case Basic_UntypedInteger:    return t_int;
 		case Basic_UntypedFloat:      return t_f64;
 		case Basic_UntypedComplex:    return t_complex128;
+		case Basic_UntypedQuaternion: return t_quaternion256;
 		case Basic_UntypedString:     return t_string;
 		case Basic_UntypedRune:       return t_rune;
 		}
@@ -2131,19 +2235,22 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 		if (type->Array.count <= 4) {
 			// HACK(bill): Memory leak
 			switch (type->Array.count) {
-			#define _ARRAY_FIELD_CASE(_length, _name) \
-			case (_length): \
-				if (field_name == _name) { \
+			#define _ARRAY_FIELD_CASE_IF(_length, _name) \
+				if (field_name == (_name)) { \
 					selection_add_index(&sel, (_length)-1); \
 					sel.entity = alloc_entity_array_elem(nullptr, make_token_ident(str_lit(_name)), type->Array.elem, (_length)-1); \
 					return sel; \
-				} \
+				}
+			#define _ARRAY_FIELD_CASE(_length, _name0, _name1) \
+			case (_length): \
+				_ARRAY_FIELD_CASE_IF(_length, _name0); \
+				_ARRAY_FIELD_CASE_IF(_length, _name1); \
 				/*fallthrough*/
 
-			_ARRAY_FIELD_CASE(4, "w");
-			_ARRAY_FIELD_CASE(3, "z");
-			_ARRAY_FIELD_CASE(2, "y");
-			_ARRAY_FIELD_CASE(1, "x");
+			_ARRAY_FIELD_CASE(4, "w", "a");
+			_ARRAY_FIELD_CASE(3, "z", "b");
+			_ARRAY_FIELD_CASE(2, "y", "g");
+			_ARRAY_FIELD_CASE(1, "x", "r");
 			default: break;
 
 			#undef _ARRAY_FIELD_CASE
@@ -2254,7 +2361,9 @@ i64 type_size_of(Type *t) {
 		return 0;
 	}
 	// NOTE(bill): Always calculate the size when it is a Type_Basic
-	if (t->kind != Type_Basic && t->cached_size >= 0) {
+	if (t->kind == Type_Named && t->cached_size >= 0) {
+
+	} else if (t->kind != Type_Basic && t->cached_size >= 0) {
 		return t->cached_size;
 	}
 	TypePath path = {0};
@@ -2269,7 +2378,9 @@ i64 type_align_of(Type *t) {
 		return 1;
 	}
 	// NOTE(bill): Always calculate the size when it is a Type_Basic
-	if (t->kind != Type_Basic && t->cached_align > 0) {
+	if (t->kind == Type_Named && t->cached_align >= 0) {
+
+	} if (t->kind != Type_Basic && t->cached_align > 0) {
 		return t->cached_align;
 	}
 
@@ -2303,6 +2414,8 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 
 		case Basic_complex64: case Basic_complex128:
 			return type_size_of_internal(t, path) / 2;
+		case Basic_quaternion128: case Basic_quaternion256:
+			return type_size_of_internal(t, path) / 4;
 		}
 	} break;
 
@@ -2488,9 +2601,9 @@ bool type_set_offsets(Type *t) {
 		}
 	} else if (is_type_tuple(t)) {
 		if (!t->Tuple.are_offsets_set) {
-			t->Struct.are_offsets_being_processed = true;
-			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, false, false);
-			t->Struct.are_offsets_being_processed = false;
+			t->Tuple.are_offsets_being_processed = true;
+			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, t->Tuple.is_packed, false);
+			t->Tuple.are_offsets_being_processed = false;
 			t->Tuple.are_offsets_set = true;
 			return true;
 		}
@@ -2913,35 +3026,54 @@ gbString write_type_to_string(gbString str, Type *type) {
 			isize comma_index = 0;
 			for_array(i, type->Tuple.variables) {
 				Entity *var = type->Tuple.variables[i];
-				if (var != nullptr) {
-					if (var->kind == Entity_Constant) {
-						// Ignore
-						continue;
-					}
-
-					if (comma_index++ > 0) {
-						str = gb_string_appendc(str, ", ");
-					}
-
-					if (var->kind == Entity_Variable) {
-						if (var->flags&EntityFlag_CVarArg) {
-							str = gb_string_appendc(str, "#c_vararg ");
-						}
-						if (var->flags&EntityFlag_Ellipsis) {
-							Type *slice = base_type(var->type);
-							str = gb_string_appendc(str, "..");
-							GB_ASSERT(var->type->kind == Type_Slice);
-							str = write_type_to_string(str, slice->Slice.elem);
-						} else {
-							str = write_type_to_string(str, var->type);
-						}
+				if (var == nullptr) {
+					continue;
+				}
+				String name = var->token.string;
+				if (var->kind == Entity_Constant) {
+					str = gb_string_appendc(str, "$");
+					str = gb_string_append_length(str, name.text, name.len);
+					if (!is_type_untyped(var->type)) {
+						str = gb_string_appendc(str, ": ");
+						str = write_type_to_string(str, var->type);
+						str = gb_string_appendc(str, " = ");
+						str = write_exact_value_to_string(str, var->Constant.value);
 					} else {
-						GB_ASSERT(var->kind == Entity_TypeName);
-						if (var->type->kind == Type_Generic) {
-							str = gb_string_appendc(str, "type/");
+						str = gb_string_appendc(str, "=");
+						str = write_exact_value_to_string(str, var->Constant.value);
+					}
+					continue;
+				}
+
+				if (comma_index++ > 0) {
+					str = gb_string_appendc(str, ", ");
+				}
+
+				if (var->kind == Entity_Variable) {
+					if (var->flags&EntityFlag_CVarArg) {
+						str = gb_string_appendc(str, "#c_vararg ");
+					}
+					if (var->flags&EntityFlag_Ellipsis) {
+						Type *slice = base_type(var->type);
+						str = gb_string_appendc(str, "..");
+						GB_ASSERT(var->type->kind == Type_Slice);
+						str = write_type_to_string(str, slice->Slice.elem);
+					} else {
+						str = write_type_to_string(str, var->type);
+					}
+				} else {
+					GB_ASSERT(var->kind == Entity_TypeName);
+					if (var->type->kind == Type_Generic) {
+						str = gb_string_appendc(str, "typeid/");
+						str = write_type_to_string(str, var->type);
+					} else {
+						if (var->kind == Entity_TypeName) {
+							str = gb_string_appendc(str, "$");
+							str = gb_string_append_length(str, name.text, name.len);
+							str = gb_string_appendc(str, "=");
 							str = write_type_to_string(str, var->type);
 						} else {
-							str = gb_string_appendc(str, "type");
+							str = gb_string_appendc(str, "typeid");
 						}
 					}
 				}

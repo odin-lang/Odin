@@ -168,9 +168,9 @@ destroy :: proc(p: ^Parser) {
 }
 
 error :: proc(p: ^Parser, pos: Pos, msg: string, args: ..any) {
-	fmt.printf_err("%s(%d:%d) Error: ", pos.file, pos.line, pos.column);
-	fmt.printf_err(msg, ..args);
-	fmt.println_err();
+	fmt.eprintf("%s(%d:%d) Error: ", pos.file, pos.line, pos.column);
+	fmt.eprintf(msg, ..args);
+	fmt.eprintln();
 
 	p.error_count += 1;
 }

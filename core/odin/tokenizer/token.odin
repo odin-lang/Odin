@@ -1,9 +1,9 @@
-package odin_token
+package odin_tokenizer
 
 import "core:strings"
 
 Token :: struct {
-	kind: Kind,
+	kind: Token_Kind,
 	text: string,
 	pos:  Pos,
 }
@@ -28,7 +28,7 @@ pos_compare :: proc(lhs, rhs: Pos) -> int {
 	return strings.compare(lhs.file, rhs.file);
 }
 
-using Kind :: enum u32 {
+Token_Kind :: enum u32 {
 	Invalid,
 	EOF,
 	Comment,
@@ -118,6 +118,7 @@ using Kind :: enum u32 {
 		Package,
 		Typeid,
 		When,
+		Where,
 		If,
 		Else,
 		For,
@@ -154,9 +155,6 @@ using Kind :: enum u32 {
 		Offset_Of,
 		Type_Of,
 		Const,
-		Asm,
-		Yield,
-		Await,
 	B_Keyword_End,
 
 	COUNT,
@@ -165,7 +163,7 @@ using Kind :: enum u32 {
 	// ... Custom keywords
 };
 
-tokens := [Kind.COUNT]string {
+tokens := [Token_Kind.COUNT]string {
 	"Invalid",
 	"EOF",
 	"Comment",
@@ -255,6 +253,7 @@ tokens := [Kind.COUNT]string {
 	"package",
 	"typeid",
 	"when",
+	"where",
 	"if",
 	"else",
 	"for",
@@ -291,20 +290,17 @@ tokens := [Kind.COUNT]string {
 	"offset_of",
 	"type_of",
 	"const",
-	"asm",
-	"yield",
-	"await",
 	"",
 };
 
 custom_keyword_tokens: []string;
 
-to_string :: proc(kind: Kind) -> string {
-	if Invalid <= kind && kind < COUNT {
+to_string :: proc(kind: Token_Kind) -> string {
+	if Token_Kind.Invalid <= kind && kind < Token_Kind.COUNT {
 		return tokens[kind];
 	}
-	if B_Custom_Keyword_Begin < kind {
-		n := int(u16(kind)-u16(B_Custom_Keyword_Begin));
+	if Token_Kind.B_Custom_Keyword_Begin < kind {
+		n := int(u16(kind)-u16(Token_Kind.B_Custom_Keyword_Begin));
 		if n < len(custom_keyword_tokens) {
 			return custom_keyword_tokens[n];
 		}
@@ -313,24 +309,26 @@ to_string :: proc(kind: Kind) -> string {
 	return "Invalid";
 }
 
-is_literal  :: proc(kind: Kind) -> bool { return B_Literal_Begin  < kind && kind < B_Literal_End;  }
-is_operator :: proc(kind: Kind) -> bool {
+is_literal  :: proc(kind: Token_Kind) -> bool {
+	return Token_Kind.B_Literal_Begin  < kind && kind < Token_Kind.B_Literal_End;
+}
+is_operator :: proc(kind: Token_Kind) -> bool {
 	switch kind {
-	case B_Operator_Begin..B_Operator_End:
+	case .B_Operator_Begin .. .B_Operator_End:
 		return true;
-	case In, Notin:
+	case .In, .Notin:
 		return true;
 	}
 	return false;
 }
-is_assignment_operator :: proc(kind: Kind) -> bool {
-	return B_Assign_Op_Begin < kind && kind < B_Assign_Op_End || kind == Eq;
+is_assignment_operator :: proc(kind: Token_Kind) -> bool {
+	return Token_Kind.B_Assign_Op_Begin < kind && kind < Token_Kind.B_Assign_Op_End || kind == Token_Kind.Eq;
 }
-is_keyword :: proc(kind: Kind) -> bool {
+is_keyword :: proc(kind: Token_Kind) -> bool {
 	switch {
-	case B_Keyword_Begin < kind && kind < B_Keyword_End:
+	case Token_Kind.B_Keyword_Begin < kind && kind < Token_Kind.B_Keyword_End:
 		return true;
-	case B_Custom_Keyword_Begin < kind:
+	case Token_Kind.B_Custom_Keyword_Begin < kind:
 		return true;
 	}
 	return false;

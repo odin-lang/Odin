@@ -48,7 +48,8 @@ enum EntityFlag {
 	EntityFlag_NotExported   = 1<<14,
 
 	EntityFlag_Static        = 1<<16,
-	// EntityFlag_Reference     = 1<<17,
+
+	EntityFlag_ImplicitReference = 1<<17, // NOTE(bill): equivalent to `const &` in C++
 
 	EntityFlag_CVarArg       = 1<<20,
 	EntityFlag_AutoCast      = 1<<21,
@@ -183,10 +184,11 @@ bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 	}
 
 	String name = e->token.string;
-	if (name.len == 0) {
-		return false;
+	switch (name.len) {
+	case 0: return false;
+	case 1: return name[0] != '_';
 	}
-	return name[0] != '_';
+	return true;
 }
 
 bool entity_has_deferred_procedure(Entity *e) {
@@ -219,12 +221,13 @@ Entity *alloc_entity_variable(Scope *scope, Token token, Type *type, bool is_imm
 	return entity;
 }
 
-Entity *alloc_entity_using_variable(Entity *parent, Token token, Type *type) {
+Entity *alloc_entity_using_variable(Entity *parent, Token token, Type *type, Ast *using_expr) {
 	GB_ASSERT(parent != nullptr);
 	token.pos = parent->token.pos;
 	Entity *entity = alloc_entity(Entity_Variable, parent->scope, token, type);
 	entity->using_parent = parent;
 	entity->parent_proc_decl = parent->parent_proc_decl;
+	entity->using_expr = using_expr;
 	entity->flags |= EntityFlag_Using;
 	entity->flags |= EntityFlag_Used;
 	entity->state = EntityState_Resolved;

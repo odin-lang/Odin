@@ -41,11 +41,20 @@ Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, Stri
 	}
 
 	if (operand->mode == Addressing_Type) {
-		gbString t = type_to_string(operand->type);
-		error(operand->expr, "Cannot assign a type '%s' to variable '%.*s'", t, LIT(e->token.string));
-		gb_string_free(t);
-		e->type = operand->type;
-		return nullptr;
+		if (e->type != nullptr && is_type_typeid(e->type)) {
+			add_type_info_type(ctx, operand->type);
+			add_type_and_value(ctx->info, operand->expr, Addressing_Value, e->type, exact_value_typeid(operand->type));
+			return e->type;
+		} else {
+			gbString t = type_to_string(operand->type);
+			defer (gb_string_free(t));
+			error(operand->expr, "Cannot assign a type '%s' to variable '%.*s'", t, LIT(e->token.string));
+			if (e->type == nullptr) {
+				error_line("\tThe type of the variable '%.*s' cannot be inferred as a type does not have a type\n", LIT(e->token.string));
+			}
+			e->type = operand->type;
+			return nullptr;
+		}
 	}
 
 
@@ -112,7 +121,8 @@ void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Ar
 	isize rhs_count = operands.count;
 	for_array(i, operands) {
 		if (operands[i].mode == Addressing_Invalid) {
-			rhs_count--;
+			// TODO(bill): Should I ignore invalid parameters?
+			// rhs_count--;
 		}
 	}
 
@@ -239,7 +249,7 @@ isize total_attribute_count(DeclInfo *decl) {
 }
 
 
-void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) {
+void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) {
 	GB_ASSERT(e->type == nullptr);
 
 	DeclInfo *decl = decl_info_of_entity(e);
@@ -247,9 +257,8 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) 
 		check_decl_attributes(ctx, decl->attributes, const_decl_attribute, nullptr);
 	}
 
-
-	bool is_distinct = is_type_distinct(type_expr);
-	Ast *te = remove_type_alias_clutter(type_expr);
+	bool is_distinct = is_type_distinct(init_expr);
+	Ast *te = remove_type_alias_clutter(init_expr);
 	e->type = t_invalid;
 	String name = e->token.string;
 	Type *named = alloc_type_named(name, nullptr, e);
@@ -265,7 +274,7 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) 
 	named->Named.base = base_type(bt);
 
 	if (is_distinct && is_type_typeid(e->type)) {
-		error(type_expr, "'distinct' cannot be applied to 'typeid'");
+		error(init_expr, "'distinct' cannot be applied to 'typeid'");
 		is_distinct = false;
 	}
 	if (!is_distinct) {
@@ -273,6 +282,19 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Type *def) 
 		named->Named.base = bt;
 		e->TypeName.is_type_alias = true;
 	}
+
+
+	if (decl->type_expr != nullptr) {
+		Type *t = check_type(ctx, decl->type_expr);
+		if (t != nullptr && !is_type_typeid(t)) {
+			Operand operand = {};
+			operand.mode = Addressing_Type;
+			operand.type = e->type;
+			operand.expr = init_expr;
+			check_assignment(ctx, &operand, t, str_lit("constant declaration"));
+		}
+	}
+
 
 	// using decl
 	if (decl->is_using) {
@@ -362,15 +384,14 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 
 		switch (operand.mode) {
 		case Addressing_Type: {
+			if (e->type != nullptr && !is_type_typeid(e->type)) {
+				check_assignment(ctx, &operand, e->type, str_lit("constant declaration"));
+			}
+
 			e->kind = Entity_TypeName;
 			e->type = nullptr;
 
-			DeclInfo *d = ctx->decl;
-			if (d->type_expr != nullptr) {
-				error(e->token, "A type declaration cannot have an type parameter");
-			}
-			d->type_expr = d->init_expr;
-			check_type_decl(ctx, e, d->type_expr, named_type);
+			check_type_decl(ctx, e, ctx->decl->init_expr, named_type);
 			return;
 		}
 
@@ -654,7 +675,6 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	bool is_foreign         = e->Procedure.is_foreign;
 	bool is_export          = e->Procedure.is_export;
-	bool is_require_results = (pl->tags & ProcTag_require_results) != 0;
 
 	if (e->pkg != nullptr && e->token.string == "main") {
 		if (pt->param_count != 0 ||
@@ -714,10 +734,10 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 	}
 
-	if (pt->result_count == 0 && is_require_results) {
-		error(pl->type, "'#require_results' is not needed on a procedure with no results");
+	if (pt->result_count == 0 && ac.require_results) {
+		error(pl->type, "'require_results' is not needed on a procedure with no results");
 	} else {
-		pt->require_results = is_require_results;
+		pt->require_results = ac.require_results;
 	}
 
 	if (ac.link_name.len > 0) {
@@ -791,7 +811,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 }
 
-void check_var_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_expr) {
+void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_expr) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Variable);
 
@@ -805,6 +825,7 @@ void check_var_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init_ex
 	ac.init_expr_list_count = init_expr != nullptr ? 1 : 0;
 
 	DeclInfo *decl = decl_info_of_entity(e);
+	GB_ASSERT(decl == ctx->decl);
 	if (decl != nullptr) {
 		check_decl_attributes(ctx, decl->attributes, var_decl_attribute, &ac);
 	}
@@ -936,7 +957,6 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) 
 
 	ptr_set_destroy(&entity_set);
 
-
 	for_array(j, pge->entities) {
 		Entity *p = pge->entities[j];
 		if (p->type == t_invalid) {
@@ -962,27 +982,40 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) 
 			defer (end_error_block());
 
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
-			switch (kind) {
+			bool both_have_where_clauses = false;
+			if (p->decl_info->proc_lit != nullptr && q->decl_info->proc_lit != nullptr) {
+				GB_ASSERT(p->decl_info->proc_lit->kind == Ast_ProcLit);
+				GB_ASSERT(q->decl_info->proc_lit->kind == Ast_ProcLit);
+				auto pl = &p->decl_info->proc_lit->ProcLit;
+				auto ql = &q->decl_info->proc_lit->ProcLit;
+
+				// Allow collisions if the procedures both have 'where' clauses and are both polymorphic
+				bool pw = pl->where_token.kind != Token_Invalid && is_type_polymorphic(p->type, true);
+				bool qw = ql->where_token.kind != Token_Invalid && is_type_polymorphic(q->type, true);
+				both_have_where_clauses = pw && qw;
+			}
+
+			if (!both_have_where_clauses) switch (kind) {
 			case ProcOverload_Identical:
-				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
+				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			// case ProcOverload_CallingConvention:
-				// error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
+				// error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				// is_invalid = true;
 				// break;
 			case ProcOverload_ParamVariadic:
-				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in this scope", LIT(name));
+				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			case ProcOverload_ResultCount:
 			case ProcOverload_ResultTypes:
-				error(p->token, "Overloaded procedure '%.*s' as the same parameters but different results in this scope", LIT(name));
+				error(p->token, "Overloaded procedure '%.*s' as the same parameters but different results in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			case ProcOverload_Polymorphic:
 				#if 0
-				error(p->token, "Overloaded procedure '%.*s' has a polymorphic counterpart in this scope which is not allowed", LIT(name));
+				error(p->token, "Overloaded procedure '%.*s' has a polymorphic counterpart in the procedure group '%.*s' which is not allowed", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				#endif
 				break;
@@ -1051,13 +1084,13 @@ void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_
 
 	switch (e->kind) {
 	case Entity_Variable:
-		check_var_decl(&c, e, d->type_expr, d->init_expr);
+		check_global_variable_decl(&c, e, d->type_expr, d->init_expr);
 		break;
 	case Entity_Constant:
 		check_const_decl(&c, e, d->type_expr, d->init_expr, named_type);
 		break;
 	case Entity_TypeName: {
-		check_type_decl(&c, e, d->type_expr, named_type);
+		check_type_decl(&c, e, d->init_expr, named_type);
 		break;
 	}
 	case Entity_Procedure:
@@ -1073,6 +1106,11 @@ void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_
 #undef TIME_SECTION
 }
 
+
+struct ProcUsingVar {
+	Entity *e;
+	Entity *uvar;
+};
 
 
 void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *type, Ast *body) {
@@ -1098,76 +1136,117 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 	ctx->curr_proc_decl = decl;
 	ctx->curr_proc_sig  = type;
 
-	GB_ASSERT(type->kind == Type_Proc);
-	if (type->Proc.param_count > 0) {
-		TypeTuple *params = &type->Proc.params->Tuple;
-		for_array(i, params->variables) {
-			Entity *e = params->variables[i];
-			if (e->kind != Entity_Variable) {
-				continue;
-			}
-			if (!(e->flags & EntityFlag_Using)) {
-				continue;
-			}
-			bool is_immutable = e->Variable.is_immutable;
-			bool is_value     = (e->flags & EntityFlag_Value) != 0 && !is_type_pointer(e->type);
-			String name = e->token.string;
-			Type *t = base_type(type_deref(e->type));
-			if (t->kind == Type_Struct) {
-				Scope *scope = t->Struct.scope;
-				if (scope == nullptr) {
-					scope = scope_of_node(t->Struct.node);
-				}
-				GB_ASSERT(scope != nullptr);
-				for_array(i, scope->elements.entries) {
-					Entity *f = scope->elements.entries[i].value;
-					if (f->kind == Entity_Variable) {
-						Entity *uvar = alloc_entity_using_variable(e, f->token, f->type);
-						uvar->Variable.is_immutable = is_immutable;
-						if (is_value) uvar->flags |= EntityFlag_Value;
+	ast_node(bs, BlockStmt, body);
 
-						Entity *prev = scope_insert(ctx->scope, uvar);
-						if (prev != nullptr) {
-							error(e->token, "Namespace collision while 'using' '%.*s' of: %.*s", LIT(name), LIT(prev->token.string));
-							break;
+	Array<ProcUsingVar> using_entities = {};
+	using_entities.allocator = heap_allocator();
+	defer (array_free(&using_entities));
+
+	{
+		GB_ASSERT(type->kind == Type_Proc);
+		if (type->Proc.param_count > 0) {
+			TypeTuple *params = &type->Proc.params->Tuple;
+			for_array(i, params->variables) {
+				Entity *e = params->variables[i];
+				if (e->kind != Entity_Variable) {
+					continue;
+				}
+				if (!(e->flags & EntityFlag_Using)) {
+					continue;
+				}
+				bool is_immutable = e->Variable.is_immutable;
+				bool is_value     = (e->flags & EntityFlag_Value) != 0 && !is_type_pointer(e->type);
+				String name = e->token.string;
+				Type *t = base_type(type_deref(e->type));
+				if (t->kind == Type_Struct) {
+					Scope *scope = t->Struct.scope;
+					if (scope == nullptr) {
+						scope = scope_of_node(t->Struct.node);
+					}
+					GB_ASSERT(scope != nullptr);
+					for_array(i, scope->elements.entries) {
+						Entity *f = scope->elements.entries[i].value;
+						if (f->kind == Entity_Variable) {
+							Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
+							uvar->Variable.is_immutable = is_immutable;
+							if (is_value) uvar->flags |= EntityFlag_Value;
+
+							ProcUsingVar puv = {e, uvar};
+							array_add(&using_entities, puv);
+
 						}
 					}
+				} else {
+					error(e->token, "'using' can only be applied to variables of type struct");
+					break;
 				}
-			} else {
-				error(e->token, "'using' can only be applied to variables of type struct");
-				break;
 			}
 		}
 	}
 
-	ast_node(bs, BlockStmt, body);
-	// check_open_scope(ctx, body);
-	check_stmt_list(ctx, bs->stmts, Stmt_CheckScopeDecls);
-	if (type->Proc.result_count > 0) {
-		if (!check_is_terminating(body)) {
-			if (token.kind == Token_Ident) {
-				error(bs->close, "Missing return statement at the end of the procedure '%.*s'", LIT(token.string));
-			} else {
-				// NOTE(bill): Anonymous procedure (lambda)
-				error(bs->close, "Missing return statement at the end of the procedure");
+
+	for_array(i, using_entities) {
+		Entity *e = using_entities[i].e;
+		Entity *uvar = using_entities[i].uvar;
+		Entity *prev = scope_insert(ctx->scope, uvar);
+		if (prev != nullptr) {
+			error(e->token, "Namespace collision while 'using' '%.*s' of: %.*s", LIT(e->token.string), LIT(prev->token.string));
+			break;
+		}
+	}
+
+
+	bool where_clause_ok = evaluate_where_clauses(ctx, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
+	if (!where_clause_ok) {
+		// NOTE(bill, 2019-08-31): Don't check the body as the where clauses failed
+		return;
+	}
+
+	check_open_scope(ctx, body);
+	{
+		for_array(i, using_entities) {
+			Entity *e = using_entities[i].e;
+			Entity *uvar = using_entities[i].uvar;
+			Entity *prev = scope_insert(ctx->scope, uvar);
+			// NOTE(bill): Don't err here
+		}
+
+		check_stmt_list(ctx, bs->stmts, Stmt_CheckScopeDecls);
+
+		if (type->Proc.result_count > 0) {
+			if (!check_is_terminating(body)) {
+				if (token.kind == Token_Ident) {
+					error(bs->close, "Missing return statement at the end of the procedure '%.*s'", LIT(token.string));
+				} else {
+					// NOTE(bill): Anonymous procedure (lambda)
+					error(bs->close, "Missing return statement at the end of the procedure");
+				}
 			}
 		}
 	}
-	// check_close_scope(ctx);
+	check_close_scope(ctx);
 
 	check_scope_usage(ctx->checker, ctx->scope);
 
+#if 1
 	if (decl->parent != nullptr) {
-		// NOTE(bill): Add the dependencies from the procedure literal (lambda)
-		for_array(i, decl->deps.entries) {
-			Entity *e = decl->deps.entries[i].ptr;
-			ptr_set_add(&decl->parent->deps, e);
-		}
-		for_array(i, decl->type_info_deps.entries) {
-			Type *t = decl->type_info_deps.entries[i].ptr;
-			ptr_set_add(&decl->parent->type_info_deps, t);
+		Scope *ps = decl->parent->scope;
+		if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
+			return;
+		} else {
+			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
+			// But only at the procedure level
+			for_array(i, decl->deps.entries) {
+				Entity *e = decl->deps.entries[i].ptr;
+				ptr_set_add(&decl->parent->deps, e);
+			}
+			for_array(i, decl->type_info_deps.entries) {
+				Type *t = decl->type_info_deps.entries[i].ptr;
+				ptr_set_add(&decl->parent->type_info_deps, t);
+			}
 		}
 	}
+#endif
 }
 
 

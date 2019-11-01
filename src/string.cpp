@@ -404,7 +404,7 @@ String16 string_to_string16(gbAllocator a, String s) {
 	}
 	text[len] = 0;
 
-	return make_string16(text, len-1);
+	return make_string16(text, len);
 }
 
 
@@ -440,12 +440,94 @@ String string16_to_string(gbAllocator a, String16 s) {
 
 
 
+bool is_printable(Rune r) {
+	if (r <= 0xff) {
+		if (0x20 <= r && r <= 0x7e) {
+			return true;
+		}
+		if (0xa1 <= r && r <= 0xff) {
+			return r != 0xad;
+		}
+		return false;
+	}
+	return false;
+}
+
+gb_global char const lower_hex[] = "0123456789abcdef";
+
+String quote_to_ascii(gbAllocator a, String str, u8 quote='"') {
+	u8 *s = str.text;
+	isize n = str.len;
+	auto buf = array_make<u8>(a, 0, n);
+	array_add(&buf, quote);
+	for (isize width = 0; n > 0; s += width, n -= width) {
+		Rune r = cast(Rune)s[0];
+		width = 1;
+		if (r >= 0x80) {
+			width = gb_utf8_decode(s, n, &r);
+		}
+		if (width == 1 && r == GB_RUNE_INVALID) {
+			array_add(&buf, cast(u8)'\\');
+			array_add(&buf, cast(u8)'x');
+			array_add(&buf, cast(u8)lower_hex[s[0]>>4]);
+			array_add(&buf, cast(u8)lower_hex[s[0]&0xf]);
+			continue;
+		}
+
+		if (r == quote || r == '\\') {
+			array_add(&buf, cast(u8)'\\');
+			array_add(&buf, u8(r));
+			continue;
+		}
+		if (r < 0x80 && is_printable(r)) {
+			array_add(&buf, u8(r));
+			continue;
+		}
+		switch (r) {
+		case '\a':
+		case '\b':
+		case '\f':
+		case '\n':
+		case '\r':
+		case '\t':
+		case '\v':
+		default:
+			if (r < ' ') {
+				u8 b = cast(u8)r;
+				array_add(&buf, cast(u8)'\\');
+				array_add(&buf, cast(u8)'x');
+				array_add(&buf, cast(u8)lower_hex[b>>4]);
+				array_add(&buf, cast(u8)lower_hex[b&0xf]);
+			}
+			if (r > GB_RUNE_MAX) {
+				r = 0XFFFD;
+			}
+			if (r < 0x10000) {
+				u8 b = cast(u8)r;
+				array_add(&buf, cast(u8)'\\');
+				array_add(&buf, cast(u8)'u');
+				for (isize i = 12; i >= 0; i -= 4) {
+					array_add(&buf, cast(u8)lower_hex[(r>>i)&0xf]);
+				}
+			} else {
+				u8 b = cast(u8)r;
+				array_add(&buf, cast(u8)'\\');
+				array_add(&buf, cast(u8)'U');
+				for (isize i = 28; i >= 0; i -= 4) {
+					array_add(&buf, cast(u8)lower_hex[(r>>i)&0xf]);
+				}
+			}
+		}
+	}
 
 
 
-
-
-
+	array_add(&buf, quote);
+	String res = {};
+	res.text = buf.data;
+	res.len = buf.count;
+	return res;
+}
 
 
 

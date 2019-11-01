@@ -31,3 +31,5 @@ ssize_t   :: b.int;
 ptrdiff_t :: b.int;
 uintptr_t :: b.uintptr;
 intptr_t  :: b.int;
+
+wchar_t :: (ODIN_OS == "windows") ? b.u16 : b.u32;

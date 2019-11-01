@@ -85,9 +85,13 @@ int entity_graph_node_cmp(EntityGraphNode **data, isize i, isize j) {
 	EntityGraphNode *y = data[j];
 	isize a = x->entity->order_in_src;
 	isize b = y->entity->order_in_src;
-	if (x->dep_count < y->dep_count) return -1;
-	if (x->dep_count > y->dep_count) return +1;
-	return a < b ? -1 : b > a;
+	if (x->dep_count < y->dep_count) {
+		return -1;
+	}
+	if (x->dep_count == y->dep_count) {
+		return a < b ? -1 : b > a;
+	}
+	return +1;
 }
 
 void entity_graph_node_swap(EntityGraphNode **data, isize i, isize j) {
@@ -400,6 +404,15 @@ Entity *scope_insert_with_name(Scope *s, String name, Entity *entity) {
 	if (found) {
 		return *found;
 	}
+	if (s->parent != nullptr && (s->parent->flags & ScopeFlag_Proc) != 0) {
+		Entity **found = map_get(&s->parent->elements, key);
+		if (found) {
+			if ((*found)->flags & EntityFlag_Result) {
+				return *found;
+			}
+		}
+	}
+
 	map_set(&s->elements, key, entity);
 	if (entity->scope == nullptr) {
 		entity->scope = s;
@@ -1044,21 +1057,37 @@ bool redeclaration_error(String name, Entity *prev, Entity *found) {
 			// NOTE(bill): Error should have been handled already
 			return false;
 		}
-		error(prev->token,
-		      "Redeclaration of '%.*s' in this scope through 'using'\n"
-		      "\tat %.*s(%td:%td)",
-		      LIT(name),
-		      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
+		if (found->flags & EntityFlag_Result) {
+			error(prev->token,
+			      "Direct shadowing of the named return value '%.*s' in this scope through 'using'\n"
+			      "\tat %.*s(%td:%td)",
+			      LIT(name),
+			      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
+		} else {
+			error(prev->token,
+			      "Redeclaration of '%.*s' in this scope through 'using'\n"
+			      "\tat %.*s(%td:%td)",
+			      LIT(name),
+			      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
+		}
 	} else {
 		if (pos == prev->token.pos) {
 			// NOTE(bill): Error should have been handled already
 			return false;
 		}
-		error(prev->token,
-		      "Redeclaration of '%.*s' in this scope\n"
-		      "\tat %.*s(%td:%td)",
-		      LIT(name),
-		      LIT(pos.file), pos.line, pos.column);
+		if (found->flags & EntityFlag_Result) {
+			error(prev->token,
+			      "Direct shadowing of the named return value '%.*s' in this scope\n"
+			      "\tat %.*s(%td:%td)",
+			      LIT(name),
+			      LIT(pos.file), pos.line, pos.column);
+		} else {
+			error(prev->token,
+			      "Redeclaration of '%.*s' in this scope\n"
+			      "\tat %.*s(%td:%td)",
+			      LIT(name),
+			      LIT(pos.file), pos.line, pos.column);
+		}
 	}
 	return false;
 }
@@ -1139,6 +1168,7 @@ void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, Dec
 	add_entity_definition(&c->checker->info, identifier, e);
 	GB_ASSERT(e->decl_info == nullptr);
 	e->decl_info = d;
+	d->entity = e;
 	array_add(&c->checker->info.entities, e);
 	e->order_in_src = c->checker->info.entities.count;
 	e->pkg = c->pkg;
@@ -1415,6 +1445,14 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 			add_min_dep_type_info(c, t_type_info_float);
 			add_min_dep_type_info(c, t_f64);
 			break;
+		case Basic_quaternion128:
+			add_min_dep_type_info(c, t_type_info_float);
+			add_min_dep_type_info(c, t_f32);
+			break;
+		case Basic_quaternion256:
+			add_min_dep_type_info(c, t_type_info_float);
+			add_min_dep_type_info(c, t_f64);
+			break;
 		}
 		break;
 
@@ -1577,6 +1615,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 		str_lit("args__"),
 		str_lit("type_table"),
+		str_lit("__type_info_of"),
 		str_lit("global_scratch_allocator"),
 
 		str_lit("Type_Info"),
@@ -1585,9 +1624,17 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 		str_lit("quo_complex64"),
 		str_lit("quo_complex128"),
+		str_lit("mul_quaternion128"),
+		str_lit("mul_quaternion256"),
+		str_lit("quo_quaternion128"),
+		str_lit("quo_quaternion256"),
+		str_lit("cstring_to_string"),
 
 		str_lit("umodti3"),
 		str_lit("udivti3"),
+
+		str_lit("memory_compare"),
+		str_lit("memory_compare_zero"),
 	};
 	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
 		add_dependency_to_set(c, scope_lookup(c->info.runtime_package->scope, required_runtime_entities[i]));
@@ -1656,9 +1703,10 @@ bool is_entity_a_dependency(Entity *e) {
 	if (e == nullptr) return false;
 	switch (e->kind) {
 	case Entity_Procedure:
-	case Entity_Variable:
-	case Entity_Constant:
 		return true;
+	case Entity_Constant:
+	case Entity_Variable:
+		return e->pkg != nullptr;
 	}
 	return false;
 }
@@ -1685,18 +1733,17 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		EntityGraphNode *n = M.entries[i].value;
 
 		DeclInfo *decl = decl_info_of_entity(e);
-		if (decl != nullptr) {
-			for_array(j, decl->deps.entries) {
-				auto entry = decl->deps.entries[j];
-				Entity *dep = entry.ptr;
-				if (dep && is_entity_a_dependency(dep)) {
-					EntityGraphNode **m_ = map_get(&M, hash_pointer(dep));
-					if (m_ != nullptr) {
-						EntityGraphNode *m = *m_;
-						entity_graph_node_set_add(&n->succ, m);
-						entity_graph_node_set_add(&m->pred, n);
-					}
-				}
+		GB_ASSERT(decl != nullptr);
+
+		for_array(j, decl->deps.entries) {
+			Entity *dep = decl->deps.entries[j].ptr;
+			GB_ASSERT(dep != nullptr);
+			if (is_entity_a_dependency(dep)) {
+				EntityGraphNode **m_ = map_get(&M, hash_pointer(dep));
+				GB_ASSERT(m_ != nullptr);
+				EntityGraphNode *m = *m_;
+				entity_graph_node_set_add(&n->succ, m);
+				entity_graph_node_set_add(&m->pred, n);
 			}
 		}
 	}
@@ -1741,6 +1788,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		EntityGraphNode *n = G[i];
 		n->index = i;
 		n->dep_count = n->succ.entries.count;
+
 		GB_ASSERT(n->dep_count >= 0);
 	}
 
@@ -1863,6 +1911,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_integer       = find_core_type(c, str_lit("Type_Info_Integer"));
 	t_type_info_rune          = find_core_type(c, str_lit("Type_Info_Rune"));
 	t_type_info_float         = find_core_type(c, str_lit("Type_Info_Float"));
+	t_type_info_quaternion    = find_core_type(c, str_lit("Type_Info_Quaternion"));
 	t_type_info_complex       = find_core_type(c, str_lit("Type_Info_Complex"));
 	t_type_info_string        = find_core_type(c, str_lit("Type_Info_String"));
 	t_type_info_boolean       = find_core_type(c, str_lit("Type_Info_Boolean"));
@@ -1887,6 +1936,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_integer_ptr       = alloc_type_pointer(t_type_info_integer);
 	t_type_info_rune_ptr          = alloc_type_pointer(t_type_info_rune);
 	t_type_info_float_ptr         = alloc_type_pointer(t_type_info_float);
+	t_type_info_quaternion_ptr    = alloc_type_pointer(t_type_info_quaternion);
 	t_type_info_complex_ptr       = alloc_type_pointer(t_type_info_complex);
 	t_type_info_string_ptr        = alloc_type_pointer(t_type_info_string);
 	t_type_info_boolean_ptr       = alloc_type_pointer(t_type_info_boolean);
@@ -2137,6 +2187,12 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		} else {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
+		return true;
+	} else if (name == "require_results") {
+		if (value != nullptr) {
+			error(elem, "Expected no value for '%.*s'", LIT(name));
+		}
+		ac->require_results = true;
 		return true;
 	}
 	return false;
@@ -2528,6 +2584,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 			Ast *init_expr = value;
 			DeclInfo *d = make_decl_info(heap_allocator(), c->scope, c->decl);
+			d->entity    = e;
 			d->type_expr = vd->type;
 			d->init_expr = init_expr;
 			d->attributes = vd->attributes;
@@ -2557,14 +2614,14 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			Entity *e = nullptr;
 
 			d->attributes = vd->attributes;
+			d->type_expr = vd->type;
+			d->init_expr = init;
 
 			if (is_ast_type(init)) {
 				e = alloc_entity_type_name(d->scope, token, nullptr);
-				if (vd->type != nullptr) {
-					error(name, "A type declaration cannot have an type parameter");
-				}
-				d->type_expr = init;
-				d->init_expr = init;
+				// if (vd->type != nullptr) {
+				// 	error(name, "A type declaration cannot have an type parameter");
+				// }
 			} else if (init->kind == Ast_ProcLit) {
 				if (c->scope->flags&ScopeFlag_Type) {
 					error(name, "Procedure declarations are not allowed within a struct");
@@ -2591,19 +2648,15 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 					pl->type->ProcType.calling_convention = cc;
 				}
 				d->proc_lit = init;
-				d->type_expr = vd->type;
+				d->init_expr = init;
 			} else if (init->kind == Ast_ProcGroup) {
 				ast_node(pg, ProcGroup, init);
 				e = alloc_entity_proc_group(d->scope, token, nullptr);
 				if (fl != nullptr) {
 					error(name, "Procedure groups are not allowed within a foreign block");
 				}
-				d->init_expr = init;
-				d->type_expr = vd->type;
 			} else {
 				e = alloc_entity_constant(d->scope, token, nullptr, empty_exact_value);
-				d->type_expr = vd->type;
-				d->init_expr = init;
 			}
 			e->identifier = name;
 
@@ -3101,7 +3154,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 			Entity *e = scope->elements.entries[elem_index].value;
 			if (e->scope == parent_scope) continue;
 
-			if (is_entity_exported(e)) {
+			if (is_entity_exported(e, true)) {
 				Entity *found = scope_lookup_current(parent_scope, name);
 				if (found != nullptr) {
 					// NOTE(bill):
@@ -3315,8 +3368,9 @@ bool collect_file_decls(CheckerContext *ctx, Array<Ast *> const &decls) {
 			if (es->expr->kind == Ast_CallExpr) {
 				ast_node(ce, CallExpr, es->expr);
 				if (ce->proc->kind == Ast_BasicDirective) {
-					Operand o = {};
-					check_expr(ctx, &o, es->expr);
+					if (ctx->collect_delayed_decls) {
+						array_add(&ctx->scope->delayed_directives, es->expr);
+					}
 				}
 			}
 		case_end;
@@ -3473,12 +3527,18 @@ void check_import_entities(Checker *c) {
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 			CheckerContext ctx = c->init_ctx;
-
 			add_curr_ast_file(&ctx, f);
+
 			for_array(j, f->scope->delayed_imports) {
 				Ast *decl = f->scope->delayed_imports[j];
 				check_add_import_decl(&ctx, decl);
 			}
+		}
+		for_array(i, pkg->files) {
+			AstFile *f = pkg->files[i];
+			CheckerContext ctx = c->init_ctx;
+			add_curr_ast_file(&ctx, f);
+
 			for_array(j, f->scope->delayed_directives) {
 				Ast *expr = f->scope->delayed_directives[j];
 				Operand o = {};
@@ -3542,7 +3602,6 @@ void calculate_global_init_order(Checker *c) {
 #define TIME_SECTION(str)
 #endif
 
-
 	CheckerInfo *info = &c->info;
 
 	TIME_SECTION("generate entity dependency graph");
@@ -3584,21 +3643,26 @@ void calculate_global_init_order(Checker *c) {
 
 		for_array(i, n->pred.entries) {
 			EntityGraphNode *p = n->pred.entries[i].ptr;
-			p->dep_count -= gb_max(p->dep_count-1, 0);
+			p->dep_count -= 1;
+			p->dep_count = gb_max(p->dep_count, 0);
 			priority_queue_fix(&pq, p->index);
 		}
 
-		if (e == nullptr || e->kind != Entity_Variable) {
+		DeclInfo *d = decl_info_of_entity(e);
+		if (e->kind != Entity_Variable) {
 			continue;
 		}
-		DeclInfo *d = decl_info_of_entity(e);
-
+		// IMPORTANT NOTE(bill, 2019-08-29): Just add it regardless of the ordering
+		// because it does not need any initialization other than zero
+		// if (!decl_info_has_init(d)) {
+		// 	continue;
+		// }
 		if (ptr_set_exists(&emitted, d)) {
 			continue;
 		}
 		ptr_set_add(&emitted, d);
 
-		d->entity = e;
+
 		array_add(&info->variable_init_order, d);
 	}
 
@@ -3635,6 +3699,14 @@ void check_proc_info(Checker *c, ProcInfo pi) {
 		}
 		error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
 		return;
+	}
+
+	if (pt->is_polymorphic && pt->is_poly_specialized) {
+		Entity *e = pi.decl->entity;
+		if ((e->flags & EntityFlag_Used) == 0) {
+			// NOTE(bill, 2019-08-31): It was never used, don't check
+			return;
+		}
 	}
 
 	bool bounds_check    = (pi.tags & ProcTag_bounds_check)    != 0;

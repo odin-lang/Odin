@@ -1,11 +1,10 @@
 package odin_ast
 
-import "core:odin/token"
+import "core:odin/tokenizer"
 
 Proc_Tag :: enum {
 	Bounds_Check,
 	No_Bounds_Check,
-	Require_Results,
 }
 Proc_Tags :: distinct bit_set[Proc_Tag; u32];
 
@@ -34,12 +33,12 @@ Node_State_Flags :: distinct bit_set[Node_State_Flag];
 
 
 Comment_Group :: struct {
-	list: []token.Token,
+	list: []tokenizer.Token,
 }
 
 Node :: struct {
-	pos:         token.Pos,
-	end:         token.Pos,
+	pos:         tokenizer.Pos,
+	end:         tokenizer.Pos,
 	derived:     any,
 	state_flags: Node_State_Flags,
 }
@@ -68,29 +67,29 @@ Ident :: struct {
 
 Implicit :: struct {
 	using node: Expr,
-	tok: token.Token,
+	tok: tokenizer.Token,
 }
 
 
 Undef :: struct {
 	using node: Expr,
-	tok:  token.Kind,
+	tok:  tokenizer.Token_Kind,
 }
 
 Basic_Lit :: struct {
 	using node: Expr,
-	tok: token.Token,
+	tok: tokenizer.Token,
 }
 
 Basic_Directive :: struct {
 	using node: Expr,
-	tok:  token.Token,
+	tok:  tokenizer.Token,
 	name: string,
 }
 
 Ellipsis :: struct {
 	using node: Expr,
-	tok:  token.Kind,
+	tok:  tokenizer.Token_Kind,
 	expr: ^Expr,
 }
 
@@ -100,42 +99,44 @@ Proc_Lit :: struct {
 	body: ^Stmt,
 	tags: Proc_Tags,
 	inlining: Proc_Inlining,
+	where_token: tokenizer.Token,
+	where_clauses: []^Expr,
 }
 
 Comp_Lit :: struct {
 	using node: Expr,
 	type: ^Expr,
-	open: token.Pos,
+	open: tokenizer.Pos,
 	elems: []^Expr,
-	close: token.Pos,
+	close: tokenizer.Pos,
 }
 
 
 Tag_Expr :: struct {
 	using node: Expr,
-	op:      token.Token,
+	op:      tokenizer.Token,
 	name:    string,
 	expr:    ^Expr,
 }
 
 Unary_Expr :: struct {
 	using node: Expr,
-	op:   token.Token,
+	op:   tokenizer.Token,
 	expr: ^Expr,
 }
 
 Binary_Expr :: struct {
 	using node: Expr,
 	left:  ^Expr,
-	op:    token.Token,
+	op:    tokenizer.Token,
 	right: ^Expr,
 }
 
 Paren_Expr :: struct {
 	using node: Expr,
-	open:  token.Pos,
+	open:  tokenizer.Pos,
 	expr:  ^Expr,
-	close: token.Pos,
+	close: tokenizer.Pos,
 }
 
 Selector_Expr :: struct {
@@ -152,74 +153,74 @@ Implicit_Selector_Expr :: struct {
 Index_Expr :: struct {
 	using node: Expr,
 	expr:  ^Expr,
-	open:  token.Pos,
+	open:  tokenizer.Pos,
 	index: ^Expr,
-	close: token.Pos,
+	close: tokenizer.Pos,
 }
 
 Deref_Expr :: struct {
 	using node: Expr,
 	expr: ^Expr,
-	op:   token.Token,
+	op:   tokenizer.Token,
 }
 
 Slice_Expr :: struct {
 	using node: Expr,
 	expr:     ^Expr,
-	open:     token.Pos,
+	open:     tokenizer.Pos,
 	low:      ^Expr,
-	interval: token.Token,
+	interval: tokenizer.Token,
 	high:     ^Expr,
-	close:    token.Pos,
+	close:    tokenizer.Pos,
 }
 
 Call_Expr :: struct {
 	using node: Expr,
 	inlining: Proc_Inlining,
 	expr:     ^Expr,
-	open:     token.Pos,
+	open:     tokenizer.Pos,
 	args:     []^Expr,
-	ellipsis: token.Token,
-	close:    token.Pos,
+	ellipsis: tokenizer.Token,
+	close:    tokenizer.Pos,
 }
 
 Field_Value :: struct {
 	using node: Expr,
 	field: ^Expr,
-	sep:   token.Pos,
+	sep:   tokenizer.Pos,
 	value: ^Expr,
 }
 
 Ternary_Expr :: struct {
 	using node: Expr,
 	cond: ^Expr,
-	op1:  token.Token,
+	op1:  tokenizer.Token,
 	x:    ^Expr,
-	op2:  token.Token,
+	op2:  tokenizer.Token,
 	y:    ^Expr,
 }
 
 Type_Assertion :: struct {
 	using node: Expr,
 	expr:  ^Expr,
-	dot:   token.Pos,
-	open:  token.Pos,
+	dot:   tokenizer.Pos,
+	open:  tokenizer.Pos,
 	type:  ^Expr,
-	close: token.Pos,
+	close: tokenizer.Pos,
 }
 
 Type_Cast :: struct {
 	using node: Expr,
-	tok:   token.Token,
-	open:  token.Pos,
+	tok:   tokenizer.Token,
+	open:  tokenizer.Pos,
 	type:  ^Expr,
-	close: token.Pos,
+	close: tokenizer.Pos,
 	expr:  ^Expr,
 }
 
 Auto_Cast :: struct {
 	using node: Expr,
-	op:   token.Token,
+	op:   tokenizer.Token,
 	expr: ^Expr,
 }
 
@@ -234,7 +235,7 @@ Bad_Stmt :: struct {
 
 Empty_Stmt :: struct {
 	using node: Stmt,
-	semicolon: token.Pos, // Position of the following ';'
+	semicolon: tokenizer.Pos, // Position of the following ';'
 }
 
 Expr_Stmt :: struct {
@@ -244,7 +245,7 @@ Expr_Stmt :: struct {
 
 Tag_Stmt :: struct {
 	using node: Stmt,
-	op:      token.Token,
+	op:      tokenizer.Token,
 	name:    string,
 	stmt:    ^Stmt,
 }
@@ -252,7 +253,7 @@ Tag_Stmt :: struct {
 Assign_Stmt :: struct {
 	using node: Stmt,
 	lhs:    []^Expr,
-	op:     token.Token,
+	op:     tokenizer.Token,
 	rhs:    []^Expr,
 }
 
@@ -260,15 +261,15 @@ Assign_Stmt :: struct {
 Block_Stmt :: struct {
 	using node: Stmt,
 	label: ^Expr,
-	open:  token.Pos,
+	open:  tokenizer.Pos,
 	stmts: []^Stmt,
-	close: token.Pos,
+	close: tokenizer.Pos,
 }
 
 If_Stmt :: struct {
 	using node: Stmt,
 	label:     ^Expr,
-	if_pos:    token.Pos,
+	if_pos:    tokenizer.Pos,
 	init:      ^Stmt,
 	cond:      ^Expr,
 	body:      ^Stmt,
@@ -277,7 +278,7 @@ If_Stmt :: struct {
 
 When_Stmt :: struct {
 	using node: Stmt,
-	when_pos:  token.Pos,
+	when_pos:  tokenizer.Pos,
 	cond:      ^Expr,
 	body:      ^Stmt,
 	else_stmt: ^Stmt,
@@ -296,7 +297,7 @@ Defer_Stmt :: struct {
 For_Stmt :: struct {
 	using node: Stmt,
 	label:     ^Expr,
-	for_pos:   token.Pos,
+	for_pos:   tokenizer.Pos,
 	init:      ^Stmt,
 	cond:      ^Expr,
 	post:      ^Stmt,
@@ -306,10 +307,10 @@ For_Stmt :: struct {
 Range_Stmt :: struct {
 	using node: Stmt,
 	label:     ^Expr,
-	for_pos:   token.Pos,
+	for_pos:   tokenizer.Pos,
 	val0:      ^Expr,
 	val1:      ^Expr,
-	in_pos:    token.Pos,
+	in_pos:    tokenizer.Pos,
 	expr:      ^Expr,
 	body:      ^Stmt,
 }
@@ -317,16 +318,16 @@ Range_Stmt :: struct {
 
 Case_Clause :: struct {
 	using node: Stmt,
-	case_pos:   token.Pos,
+	case_pos:   tokenizer.Pos,
 	list:       []^Expr,
-	terminator: token.Token,
+	terminator: tokenizer.Token,
 	body:       []^Stmt,
 }
 
 Switch_Stmt :: struct {
 	using node: Stmt,
 	label:      ^Expr,
-	switch_pos: token.Pos,
+	switch_pos: tokenizer.Pos,
 	init:       ^Stmt,
 	cond:       ^Expr,
 	body:       ^Stmt,
@@ -336,7 +337,7 @@ Switch_Stmt :: struct {
 Type_Switch_Stmt :: struct {
 	using node: Stmt,
 	label:      ^Expr,
-	switch_pos: token.Pos,
+	switch_pos: tokenizer.Pos,
 	tag:        ^Stmt,
 	expr:       ^Expr,
 	body:       ^Stmt,
@@ -345,7 +346,7 @@ Type_Switch_Stmt :: struct {
 
 Branch_Stmt :: struct {
 	using node: Stmt,
-	tok:   token.Token,
+	tok:   tokenizer.Token,
 	label: ^Ident,
 }
 
@@ -376,7 +377,7 @@ Value_Decl :: struct {
 Package_Decl :: struct {
 	using node: Decl,
 	docs:    ^Comment_Group,
-	token:   token.Token,
+	token:   tokenizer.Token,
 	name:    string,
 	comment: ^Comment_Group,
 }
@@ -385,9 +386,9 @@ Import_Decl :: struct {
 	using node: Decl,
 	docs:       ^Comment_Group,
 	is_using:    bool,
-	import_tok:  token.Token,
-	name:        token.Token,
-	relpath:     token.Token,
+	import_tok:  tokenizer.Token,
+	name:        tokenizer.Token,
+	relpath:     tokenizer.Token,
 	fullpath:    string,
 	comment:     ^Comment_Group,
 }
@@ -396,7 +397,7 @@ Foreign_Block_Decl :: struct {
 	using node: Decl,
 	docs:            ^Comment_Group,
 	attributes:      [dynamic]^Attribute, // dynamic as parsing will add to them lazily
-	tok:             token.Token,
+	tok:             tokenizer.Token,
 	foreign_library: ^Expr,
 	body:            ^Stmt,
 }
@@ -404,8 +405,8 @@ Foreign_Block_Decl :: struct {
 Foreign_Import_Decl :: struct {
 	using node: Decl,
 	docs:            ^Comment_Group,
-	foreign_tok:     token.Token,
-	import_tok:      token.Token,
+	foreign_tok:     tokenizer.Token,
+	import_tok:      tokenizer.Token,
 	name:            ^Ident,
 	collection_name: string,
 	fullpaths:       []string,
@@ -435,7 +436,9 @@ Field_Flag :: enum {
 	C_Vararg,
 	Auto_Cast,
 	In,
+
 	Results,
+	Tags,
 	Default_Parameters,
 	Typeid_Token,
 }
@@ -443,18 +446,19 @@ Field_Flag :: enum {
 Field_Flags :: distinct bit_set[Field_Flag];
 
 Field_Flags_Struct :: Field_Flags{
-	Field_Flag.Using,
+	.Using,
+	.Tags,
 };
 Field_Flags_Record_Poly_Params :: Field_Flags{
-	Field_Flag.Typeid_Token,
+	.Typeid_Token,
 };
 Field_Flags_Signature :: Field_Flags{
-	Field_Flag.Ellipsis,
-	Field_Flag.Using,
-	Field_Flag.No_Alias,
-	Field_Flag.C_Vararg,
-	Field_Flag.Auto_Cast,
-	Field_Flag.Default_Parameters,
+	.Ellipsis,
+	.Using,
+	.No_Alias,
+	.C_Vararg,
+	.Auto_Cast,
+	.Default_Parameters,
 };
 
 Field_Flags_Signature_Params  :: Field_Flags_Signature | {Field_Flag.Typeid_Token};
@@ -463,18 +467,18 @@ Field_Flags_Signature_Results :: Field_Flags_Signature;
 
 Proc_Group :: struct {
 	using node: Expr,
-	tok:   token.Token,
-	open:  token.Pos,
+	tok:   tokenizer.Token,
+	open:  tokenizer.Pos,
 	args:  []^Expr,
-	close: token.Pos,
+	close: tokenizer.Pos,
 }
 
 Attribute :: struct {
 	using node: Node,
-	tok:   token.Kind,
-	open:  token.Pos,
+	tok:   tokenizer.Token_Kind,
+	open:  tokenizer.Pos,
 	elems: []^Expr,
-	close: token.Pos,
+	close: tokenizer.Pos,
 }
 
 Field :: struct {
@@ -483,56 +487,57 @@ Field :: struct {
 	names:         []^Expr, // Could be polymorphic
 	type:          ^Expr,
 	default_value: ^Expr,
+	tag:           tokenizer.Token,
 	flags:         Field_Flags,
 	comment:       ^Comment_Group,
 }
 
 Field_List :: struct {
 	using node: Node,
-	open:  token.Pos,
+	open:  tokenizer.Pos,
 	list:  []^Field,
-	close: token.Pos,
+	close: tokenizer.Pos,
 }
 
 
 // Types
 Typeid_Type :: struct {
 	using node: Expr,
-	tok:            token.Kind,
+	tok:            tokenizer.Token_Kind,
 	specialization: ^Expr,
 }
 
 Helper_Type :: struct {
 	using node: Expr,
-	tok:  token.Kind,
+	tok:  tokenizer.Token_Kind,
 	type: ^Expr,
 }
 
 Distinct_Type :: struct {
 	using node: Expr,
-	tok:  token.Kind,
+	tok:  tokenizer.Token_Kind,
 	type: ^Expr,
 }
 
 Opaque_Type :: struct {
 	using node: Expr,
-	tok:  token.Kind,
+	tok:  tokenizer.Token_Kind,
 	type: ^Expr,
 }
 
 Poly_Type :: struct {
 	using node: Expr,
-	dollar:         token.Pos,
+	dollar:         tokenizer.Pos,
 	type:           ^Ident,
 	specialization: ^Expr,
 }
 
 Proc_Type :: struct {
 	using node: Expr,
-	tok:       token.Token,
+	tok:       tokenizer.Token,
 	calling_convention: Proc_Calling_Convention,
 	params:    ^Field_List,
-	arrow:     token.Pos,
+	arrow:     tokenizer.Pos,
 	results:   ^Field_List,
 	tags:      Proc_Tags,
 	generic:   bool,
@@ -541,77 +546,81 @@ Proc_Type :: struct {
 
 Pointer_Type :: struct {
 	using node: Expr,
-	pointer: token.Pos,
+	pointer: tokenizer.Pos,
 	elem:    ^Expr,
 }
 
 Array_Type :: struct {
 	using node: Expr,
-	open:  token.Pos,
+	open:  tokenizer.Pos,
 	len:   ^Expr, // Ellipsis node for [?]T arrray types, nil for slice types
-	close: token.Pos,
+	close: tokenizer.Pos,
 	elem:  ^Expr,
 }
 
 Dynamic_Array_Type :: struct {
 	using node: Expr,
-	open:        token.Pos,
-	dynamic_pos: token.Pos,
-	close:       token.Pos,
+	open:        tokenizer.Pos,
+	dynamic_pos: tokenizer.Pos,
+	close:       tokenizer.Pos,
 	elem:        ^Expr,
 }
 
 Struct_Type :: struct {
 	using node: Expr,
-	tok_pos:   token.Pos,
-	poly_params:  ^Field_List,
-	align:        ^Expr,
-	is_packed:    bool,
-	is_raw_union: bool,
-	fields:       ^Field_List,
-	name_count:  int,
+	tok_pos:       tokenizer.Pos,
+	poly_params:   ^Field_List,
+	align:         ^Expr,
+	fields:        ^Field_List,
+	name_count:    int,
+	where_token:   tokenizer.Token,
+	where_clauses: []^Expr,
+	is_packed:     bool,
+	is_raw_union:  bool,
 }
 
 Union_Type :: struct {
 	using node: Expr,
-	tok_pos:     token.Pos,
+	tok_pos:     tokenizer.Pos,
 	poly_params: ^Field_List,
 	align:       ^Expr,
 	variants:    []^Expr,
+	where_token: tokenizer.Token,
+	where_clauses: []^Expr,
 }
 
 Enum_Type :: struct {
 	using node: Expr,
-	tok_pos:  token.Pos,
+	tok_pos:  tokenizer.Pos,
 	base_type: ^Expr,
-	open:      token.Pos,
+	open:      tokenizer.Pos,
 	fields:    []^Expr,
-	close:     token.Pos,
+	close:     tokenizer.Pos,
 
 	is_using:  bool,
 }
 
 Bit_Field_Type :: struct {
 	using node: Expr,
-	tok_pos: token.Pos,
+	tok_pos: tokenizer.Pos,
 	align:   ^Expr,
-	open:    token.Pos,
+	open:    tokenizer.Pos,
 	fields:  []^Field_Value, // Field_Value with ':' rather than '='
-	close:   token.Pos,
+	close:   tokenizer.Pos,
 }
 
 Bit_Set_Type :: struct {
 	using node: Expr,
-	tok_pos:    token.Pos,
-	open:       token.Pos,
+	tok_pos:    tokenizer.Pos,
+	open:       tokenizer.Pos,
 	elem:       ^Expr,
 	underlying: ^Expr,
-	close:      token.Pos,
+	close:      tokenizer.Pos,
 }
 
 Map_Type :: struct {
 	using node: Expr,
-	tok_pos: token.Pos,
+	tok_pos: tokenizer.Pos,
 	key:     ^Expr,
 	value:   ^Expr,
 }

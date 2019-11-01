@@ -6,6 +6,7 @@ package runtime
 import "core:os"
 import "core:mem"
 import "core:log"
+import "intrinsics"
 
 // Naming Conventions:
 // In general, Ada_Case for types and snake_case for values
@@ -40,23 +41,24 @@ Type_Info_Enum_Value :: union {
 	u8, u16, u32, u64, uint, uintptr,
 };
 
-Type_Info_Endianness :: enum u8 {
+Platform_Endianness :: enum u8 {
 	Platform = 0,
 	Little   = 1,
 	Big      = 2,
 }
 
 // Variant Types
-Type_Info_Named    :: struct {name: string, base: ^Type_Info};
-Type_Info_Integer  :: struct {signed: bool, endianness: Type_Info_Endianness};
-Type_Info_Rune     :: struct {};
-Type_Info_Float    :: struct {};
-Type_Info_Complex  :: struct {};
-Type_Info_String   :: struct {is_cstring: bool};
-Type_Info_Boolean  :: struct {};
-Type_Info_Any      :: struct {};
-Type_Info_Type_Id  :: struct {};
-Type_Info_Pointer  :: struct {
+Type_Info_Named      :: struct {name: string, base: ^Type_Info};
+Type_Info_Integer    :: struct {signed: bool, endianness: Platform_Endianness};
+Type_Info_Rune       :: struct {};
+Type_Info_Float      :: struct {};
+Type_Info_Complex    :: struct {};
+Type_Info_Quaternion :: struct {};
+Type_Info_String     :: struct {is_cstring: bool};
+Type_Info_Boolean    :: struct {};
+Type_Info_Any        :: struct {};
+Type_Info_Type_Id    :: struct {};
+Type_Info_Pointer :: struct {
 	elem: ^Type_Info // nil -> rawptr
 };
 Type_Info_Procedure :: struct {
@@ -79,8 +81,9 @@ Type_Info_Tuple :: struct { // Only really used for procedures
 Type_Info_Struct :: struct {
 	types:        []^Type_Info,
 	names:        []string,
-	offsets:      []uintptr, // offsets may not be used in tuples
-	usings:       []bool,    // usings may not be used in tuples
+	offsets:      []uintptr,
+	usings:       []bool,
+	tags:         []string,
 	is_packed:    bool,
 	is_raw_union: bool,
 	custom_align: bool,
@@ -134,6 +137,7 @@ Type_Info :: struct {
 		Type_Info_Rune,
 		Type_Info_Float,
 		Type_Info_Complex,
+		Type_Info_Quaternion,
 		Type_Info_String,
 		Type_Info_Boolean,
 		Type_Info_Any,
@@ -162,6 +166,7 @@ Typeid_Kind :: enum u8 {
 	Rune,
 	Float,
 	Complex,
+	Quaternion,
 	String,
 	Boolean,
 	Any,
@@ -183,12 +188,13 @@ Typeid_Kind :: enum u8 {
 #assert(len(Typeid_Kind) < 32);
 
 Typeid_Bit_Field :: bit_field #align align_of(uintptr) {
-	index:    8*size_of(align_of(uintptr)) - 8,
+	index:    8*size_of(uintptr) - 8,
 	kind:     5, // Typeid_Kind
 	named:    1,
 	special:  1, // signed, cstring, etc
 	reserved: 1,
 }
+#assert(size_of(Typeid_Bit_Field) == size_of(uintptr));
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
@@ -231,7 +237,22 @@ global_scratch_allocator_data: mem.Scratch_Allocator;
 
 
 
+Raw_Slice :: struct {
+	data: rawptr,
+	len:  int,
+}
 
+Raw_Dynamic_Array :: struct {
+	data:      rawptr,
+	len:       int,
+	cap:       int,
+	allocator: mem.Allocator,
+}
+
+Raw_Map :: struct {
+	hashes:  []int,
+	entries: Raw_Dynamic_Array,
+}
 
 INITIAL_MAP_CAP :: 16;
 
@@ -255,7 +276,7 @@ Map_Entry_Header :: struct {
 }
 
 Map_Header :: struct {
-	m:             ^mem.Raw_Map,
+	m:             ^Raw_Map,
 	is_key_string: bool,
 
 	entry_size:    int,
@@ -282,19 +303,21 @@ type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 }
 
 
-type_info_base_without_enum :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
+type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	if info == nil do return nil;
 
 	base := info;
 	loop: for {
 		switch i in base.variant {
-		case Type_Info_Named: base = i.base;
-		case Type_Info_Enum:  base = i.base;
+		case Type_Info_Named:  base = i.base;
+		case Type_Info_Enum:   base = i.base;
+		case Type_Info_Opaque: base = i.elem;
 		case: break loop;
 		}
 	}
 	return base;
 }
+type_info_base_without_enum :: type_info_core;
 
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info {
 	data := transmute(Typeid_Bit_Field)id;
@@ -310,10 +333,11 @@ typeid_base :: proc "contextless" (id: typeid) -> typeid {
 	ti = type_info_base(ti);
 	return ti.id;
 }
-typeid_base_without_enum :: proc "contextless" (id: typeid) -> typeid {
+typeid_core :: proc "contextless" (id: typeid) -> typeid {
 	ti := type_info_base_without_enum(type_info_of(id));
 	return ti.id;
 }
+typeid_base_without_enum :: typeid_core;
 
 
 
@@ -385,7 +409,7 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 @builtin
 copy :: proc "contextless" (dst, src: $T/[]$E) -> int {
 	n := max(0, min(len(dst), len(src)));
-	if n > 0 do mem.copy(&dst[0], &src[0], n*size_of(E));
+	if n > 0 do mem_copy(&dst[0], &src[0], n*size_of(E));
 	return n;
 }
 
@@ -396,7 +420,7 @@ pop :: proc "contextless" (array: ^$T/[dynamic]$E) -> E {
 	if array == nil do return E{};
 	assert(len(array) > 0);
 	res := array[len(array)-1];
-	(^mem.Raw_Dynamic_Array)(array).len -= 1;
+	(^Raw_Dynamic_Array)(array).len -= 1;
 	return res;
 }
 
@@ -460,14 +484,11 @@ make :: proc{
 	mem.make_map,
 };
 
-
-
-
 @builtin
 clear_map :: inline proc "contextless" (m: ^$T/map[$K]$V) {
 	if m == nil do return;
-	raw_map := (^mem.Raw_Map)(m);
-	entries := (^mem.Raw_Dynamic_Array)(&raw_map.entries);
+	raw_map := (^Raw_Map)(m);
+	entries := (^Raw_Dynamic_Array)(&raw_map.entries);
 	entries.len = 0;
 	for _, i in raw_map.hashes {
 		raw_map.hashes[i] = -1;
@@ -498,11 +519,11 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 	}
 	arg_len = min(cap(array)-len(array), arg_len);
 	if arg_len > 0 {
-		a := (^mem.Raw_Dynamic_Array)(array);
+		a := (^Raw_Dynamic_Array)(array);
 		data := (^E)(a.data);
 		assert(data != nil);
 		val := arg;
-		mem.copy(mem.ptr_offset(data, a.len), &val, size_of(E));
+		mem_copy(mem.ptr_offset(data, a.len), &val, size_of(E));
 		a.len += arg_len;
 	}
 }
@@ -520,10 +541,10 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 	}
 	arg_len = min(cap(array)-len(array), arg_len);
 	if arg_len > 0 {
-		a := (^mem.Raw_Dynamic_Array)(array);
+		a := (^Raw_Dynamic_Array)(array);
 		data := (^E)(a.data);
 		assert(data != nil);
-		mem.copy(mem.ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
+		mem_copy(mem.ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
 		a.len += arg_len;
 	}
 }
@@ -540,13 +561,13 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 
 @builtin
 clear_dynamic_array :: inline proc "contextless" (array: ^$T/[dynamic]$E) {
-	if array != nil do (^mem.Raw_Dynamic_Array)(array).len = 0;
+	if array != nil do (^Raw_Dynamic_Array)(array).len = 0;
 }
 
 @builtin
 reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #caller_location) -> bool {
 	if array == nil do return false;
-	a := (^mem.Raw_Dynamic_Array)(array);
+	a := (^Raw_Dynamic_Array)(array);
 
 	if capacity <= a.cap do return true;
 
@@ -573,7 +594,7 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 @builtin
 resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller_location) -> bool {
 	if array == nil do return false;
-	a := (^mem.Raw_Dynamic_Array)(array);
+	a := (^Raw_Dynamic_Array)(array);
 
 	if length <= a.cap {
 		a.len = max(length, 0);
@@ -666,11 +687,13 @@ card :: proc(s: $S/bit_set[$E; $U]) -> int {
 @builtin
 assert :: proc(condition: bool, message := "", loc := #caller_location) -> bool {
 	if !condition {
-		p := context.assertion_failure_proc;
-		if p == nil {
-			p = default_assertion_failure_proc;
-		}
-		p("Runtime assertion", message, loc);
+		proc(message: string, loc: Source_Code_Location) {
+			p := context.assertion_failure_proc;
+			if p == nil {
+				p = default_assertion_failure_proc;
+			}
+			p("runtime assertion", message, loc);
+		}(message, loc);
 	}
 	return condition;
 }
@@ -681,7 +704,7 @@ panic :: proc(message: string, loc := #caller_location) -> ! {
 	if p == nil {
 		p = default_assertion_failure_proc;
 	}
-	p("Panic", message, loc);
+	p("panic", message, loc);
 }
 
 @builtin
@@ -711,7 +734,7 @@ unreachable :: proc(message := "", loc := #caller_location) -> ! {
 
 
 __dynamic_array_make :: proc(array_: rawptr, elem_size, elem_align: int, len, cap: int, loc := #caller_location) {
-	array := (^mem.Raw_Dynamic_Array)(array_);
+	array := (^Raw_Dynamic_Array)(array_);
 	array.allocator = context.allocator;
 	assert(array.allocator.procedure != nil);
 
@@ -722,7 +745,7 @@ __dynamic_array_make :: proc(array_: rawptr, elem_size, elem_align: int, len, ca
 }
 
 __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap: int, loc := #caller_location) -> bool {
-	array := (^mem.Raw_Dynamic_Array)(array_);
+	array := (^Raw_Dynamic_Array)(array_);
 
 	if cap <= array.cap do return true;
 
@@ -744,7 +767,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 }
 
 __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: int, loc := #caller_location) -> bool {
-	array := (^mem.Raw_Dynamic_Array)(array_);
+	array := (^Raw_Dynamic_Array)(array_);
 
 	ok := __dynamic_array_reserve(array_, elem_size, elem_align, len, loc);
 	if ok do array.len = len;
@@ -754,7 +777,7 @@ __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: 
 
 __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
                                items: rawptr, item_count: int, loc := #caller_location) -> int {
-	array := (^mem.Raw_Dynamic_Array)(array_);
+	array := (^Raw_Dynamic_Array)(array_);
 
 	if items == nil    do return 0;
 	if item_count <= 0 do return 0;
@@ -771,13 +794,13 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 	assert(array.data != nil);
 	data := uintptr(array.data) + uintptr(elem_size*array.len);
 
-	mem.copy(rawptr(data), items, elem_size * item_count);
+	mem_copy(rawptr(data), items, elem_size * item_count);
 	array.len += item_count;
 	return array.len;
 }
 
 __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: int, loc := #caller_location) -> int {
-	array := (^mem.Raw_Dynamic_Array)(array_);
+	array := (^Raw_Dynamic_Array)(array_);
 
 	ok := true;
 	if array.cap <= array.len+1 {
@@ -800,15 +823,14 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 // Map
 
 __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
-	header := Map_Header{m = (^mem.Raw_Map)(m)};
+	header := Map_Header{m = (^Raw_Map)(m)};
 	Entry :: struct {
 		key:   Map_Key,
 		next:  int,
 		value: V,
-	}
+	};
 
-	_, is_string := type_info_base(type_info_of(K)).variant.(Type_Info_String);
-	header.is_key_string = is_string;
+	header.is_key_string = intrinsics.type_is_string(K);
 	header.entry_size    = int(size_of(Entry));
 	header.entry_align   = int(align_of(Entry));
 	header.value_offset  = uintptr(offset_of(Entry, value));
@@ -819,33 +841,34 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 __get_map_key :: proc "contextless" (k: $K) -> Map_Key {
 	key := k;
 	map_key: Map_Key;
-	ti := type_info_base_without_enum(type_info_of(K));
-	switch _ in ti.variant {
-	case Type_Info_Integer:
-		switch 8*size_of(key) {
-		case   8: map_key.hash = u64((  ^u8)(&key)^);
-		case  16: map_key.hash = u64(( ^u16)(&key)^);
-		case  32: map_key.hash = u64(( ^u32)(&key)^);
-		case  64: map_key.hash = u64(( ^u64)(&key)^);
-		case: panic("Unhandled integer size");
-		}
-	case Type_Info_Rune:
+
+	T :: intrinsics.type_core_type(K);
+
+	when intrinsics.type_is_integer(T) {
+		sz :: 8*size_of(T);
+		     when sz ==  8 do map_key.hash = u64(( ^u8)(&key)^);
+		else when sz == 16 do map_key.hash = u64((^u16)(&key)^);
+		else when sz == 32 do map_key.hash = u64((^u32)(&key)^);
+		else when sz == 64 do map_key.hash = u64((^u64)(&key)^);
+		else do #assert(false, "Unhandled integer size");
+	} else when intrinsics.type_is_rune(T) {
 		map_key.hash = u64((^rune)(&key)^);
-	case Type_Info_Pointer:
+	} else when intrinsics.type_is_pointer(T) {
 		map_key.hash = u64(uintptr((^rawptr)(&key)^));
-	case Type_Info_Float:
-		switch 8*size_of(key) {
-		case 32: map_key.hash = u64((^u32)(&key)^);
-		case 64: map_key.hash = u64((^u64)(&key)^);
-		case: panic("Unhandled float size");
-		}
-	case Type_Info_String:
+	} else when intrinsics.type_is_float(T) {
+		sz :: 8*size_of(T);
+		     when sz == 32 do map_key.hash = u64((^u32)(&key)^);
+		else when sz == 64 do map_key.hash = u64((^u64)(&key)^);
+		else do #assert(false, "Unhandled float size");
+	} else when intrinsics.type_is_string(T) {
+		#assert(T == string);
 		str := (^string)(&key)^;
 		map_key.hash = default_hash_string(str);
 		map_key.str  = str;
-	case:
-		panic("Unhandled map key type");
+	} else {
+		#assert(false, "Unhandled map key type");
 	}
+
 	return map_key;
 }
 
@@ -874,7 +897,7 @@ source_code_location_hash :: proc(s: Source_Code_Location) -> u64 {
 
 
 __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: mem.Allocator, loc := #caller_location) -> bool {
-	array := (^mem.Raw_Slice)(array_);
+	array := (^Raw_Slice)(array_);
 
 	if new_count < array.len do return true;
 
@@ -900,7 +923,7 @@ __dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller
 }
 __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #caller_location) #no_bounds_check {
 	new_header: Map_Header = header;
-	nm := mem.Raw_Map{};
+	nm := Raw_Map{};
 	nm.entries.allocator = m.entries.allocator;
 	new_header.m = &nm;
 
@@ -932,7 +955,7 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 		e := __dynamic_map_get_entry(new_header, j);
 		e.next = fr.entry_index;
 		ndata := uintptr(e);
-		mem.copy(rawptr(ndata+value_offset), rawptr(data+value_offset), value_size);
+		mem_copy(rawptr(ndata+value_offset), rawptr(data+value_offset), value_size);
 
 		if __dynamic_map_full(new_header) do __dynamic_map_grow(new_header, loc);
 	}
@@ -975,7 +998,7 @@ __dynamic_map_set :: proc(h: Map_Header, key: Map_Key, value: rawptr, loc := #ca
 		e := __dynamic_map_get_entry(h, index);
 		e.key = key;
 		val := (^byte)(uintptr(e) + h.value_offset);
-		mem.copy(val, value, h.value_size);
+		mem_copy(val, value, h.value_size);
 	}
 
 	if __dynamic_map_full(h) {
@@ -1054,7 +1077,7 @@ __dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) #no_bounds
 	} else {
 		old := __dynamic_map_get_entry(h, fr.entry_index);
 		end := __dynamic_map_get_entry(h, m.entries.len-1);
-		mem.copy(old, end, entry_size);
+		mem_copy(old, end, entry_size);
 
 		if last := __dynamic_map_find(h, old.key); last.entry_prev >= 0 {
 			last_entry := __dynamic_map_get_entry(h, last.entry_prev);

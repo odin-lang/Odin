@@ -1,6 +1,7 @@
 package sort
 
 import "core:mem"
+import "intrinsics"
 
 bubble_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	assert(f != nil);
@@ -26,7 +27,7 @@ bubble_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	}
 }
 
-bubble_sort :: proc(array: $A/[]$T) {
+bubble_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	count := len(array);
 
 	init_j, last_j := 0, count-1;
@@ -73,7 +74,7 @@ quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	quick_sort_proc(a[i:n], f);
 }
 
-quick_sort :: proc(array: $A/[]$T) {
+quick_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	a := array;
 	n := len(a);
 	if n < 2 do return;
@@ -146,7 +147,7 @@ merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	if M & 1 == 0 do copy(arr2, arr1);
 }
 
-merge_sort :: proc(array: $A/[]$T) {
+merge_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	merge_slices :: proc(arr1, arr2, out: A) {
 		N1, N2 := len(arr1), len(arr2);
 		i, j := 0, 0;
