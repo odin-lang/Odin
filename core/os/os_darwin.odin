@@ -126,14 +126,6 @@ W_OK :: 2; // Test for write permission
 X_OK :: 1; // Test for execute permission
 F_OK :: 0; // Test for file existance
 
-TimeSpec :: struct {
-	tv_sec  : i64,  /* seconds */
-	tv_nsec : i64,  /* nanoseconds */
-};
-
-CLOCK_SYSTEM          :: 0;
-CLOCK_CALENDAR        :: 1;
-
 foreign libc {
 	@(link_name="open")    _unix_open    :: proc(path: cstring, flags: int, #c_vararg mode: ..any) -> Handle ---;
 	@(link_name="close")   _unix_close   :: proc(handle: Handle) ---;
@@ -149,10 +141,6 @@ foreign libc {
 	@(link_name="free")    _unix_free    :: proc(ptr: rawptr) ---;
 	@(link_name="realloc") _unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr ---;
 	@(link_name="getenv")  _unix_getenv  :: proc(cstring) -> cstring ---;
-
-	@(link_name="clock_gettime")    _unix_clock_gettime :: proc(clock_id: u64, timespec: ^TimeSpec) ---;
-	@(link_name="nanosleep")        _unix_nanosleep     :: proc(requested: ^TimeSpec, remaining: ^TimeSpec) -> int ---;
-	@(link_name="sleep")            _unix_sleep         :: proc(seconds: u64) -> int ---;
 
 	@(link_name="exit")    _unix_exit    :: proc(status: int) ---;
 }
@@ -269,27 +257,6 @@ getenv :: proc(name: string) -> (string, bool) {
 exit :: inline proc(code: int) -> ! {
 	_unix_exit(code);
 }
-
-
-clock_gettime :: proc(clock_id: u64) -> TimeSpec {
-	ts : TimeSpec;
-	_unix_clock_gettime(clock_id, &ts);
-	return ts;
-}
-
-sleep :: proc(seconds: u64) -> int {
-
-	return _unix_sleep(seconds);
-}
-
-nanosleep :: proc(nanoseconds: i64) -> int {
-	assert(nanoseconds <= 999999999);
-	requested, remaining : TimeSpec;
-	requested = TimeSpec{tv_nsec = nanoseconds};
-
-	return _unix_nanosleep(&requested, &remaining);
-}
-
 
 current_thread_id :: proc "contextless" () -> int {
 	// return int(_unix_gettid());
