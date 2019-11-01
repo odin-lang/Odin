@@ -1,6 +1,7 @@
-package types
+package reflect
 
 import rt "core:runtime"
+import "core:strings"
 
 are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 	if a == b do return true;
@@ -108,9 +109,11 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 		for _, i in x.types {
 			xn, yn := x.names[i], y.names[i];
 			xt, yt := x.types[i], y.types[i];
+			xl, yl := x.tags[i],  y.tags[i];
 
 			if xn != yn do return false;
 			if !are_types_identical(xt, yt) do return false;
+			if xl != yl do return false;
 		}
 		return true;
 
@@ -272,3 +275,216 @@ is_simd_vector :: proc(info: ^rt.Type_Info) -> bool {
 	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Simd_Vector);
 	return ok;
 }
+
+
+
+
+
+
+write_typeid :: proc(buf: ^strings.Builder, id: typeid) {
+	write_type(buf, type_info_of(id));
+}
+
+write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
+	using strings;
+	if ti == nil {
+		write_string(buf, "nil");
+		return;
+	}
+
+	switch info in ti.variant {
+	case rt.Type_Info_Named:
+		write_string(buf, info.name);
+	case rt.Type_Info_Integer:
+		switch ti.id {
+		case int:     write_string(buf, "int");
+		case uint:    write_string(buf, "uint");
+		case uintptr: write_string(buf, "uintptr");
+		case:
+			write_byte(buf, info.signed ? 'i' : 'u');
+			write_i64(buf, i64(8*ti.size), 10);
+			switch info.endianness {
+			case .Little: write_string(buf, "le");
+			case .Big:    write_string(buf, "be");
+			}
+		}
+	case rt.Type_Info_Rune:
+		write_string(buf, "rune");
+	case rt.Type_Info_Float:
+		write_byte(buf, 'f');
+		write_i64(buf, i64(8*ti.size), 10);
+	case rt.Type_Info_Complex:
+		write_string(buf, "complex");
+		write_i64(buf, i64(8*ti.size), 10);
+	case rt.Type_Info_String:
+		if info.is_cstring {
+			write_string(buf, "cstring");
+		} else {
+			write_string(buf, "string");
+		}
+	case rt.Type_Info_Boolean:
+		switch ti.id {
+		case bool: write_string(buf, "bool");
+		case:
+			write_byte(buf, 'b');
+			write_i64(buf, i64(8*ti.size), 10);
+		}
+	case rt.Type_Info_Any:
+		write_string(buf, "any");
+
+	case rt.Type_Info_Type_Id:
+		write_string(buf, "typeid");
+
+	case rt.Type_Info_Pointer:
+		if info.elem == nil {
+			write_string(buf, "rawptr");
+		} else {
+			write_string(buf, "^");
+			write_type(buf, info.elem);
+		}
+	case rt.Type_Info_Procedure:
+		write_string(buf, "proc");
+		if info.params == nil {
+			write_string(buf, "()");
+		} else {
+			t := info.params.variant.(rt.Type_Info_Tuple);
+			write_string(buf, "(");
+			for t, i in t.types {
+				if i > 0 do write_string(buf, ", ");
+				write_type(buf, t);
+			}
+			write_string(buf, ")");
+		}
+		if info.results != nil {
+			write_string(buf, " -> ");
+			write_type(buf, info.results);
+		}
+	case rt.Type_Info_Tuple:
+		count := len(info.names);
+		if count != 1 do write_string(buf, "(");
+		for name, i in info.names {
+			if i > 0 do write_string(buf, ", ");
+
+			t := info.types[i];
+
+			if len(name) > 0 {
+				write_string(buf, name);
+				write_string(buf, ": ");
+			}
+			write_type(buf, t);
+		}
+		if count != 1 do write_string(buf, ")");
+
+	case rt.Type_Info_Array:
+		write_string(buf, "[");
+		write_i64(buf, i64(info.count), 10);
+		write_string(buf, "]");
+		write_type(buf, info.elem);
+	case rt.Type_Info_Dynamic_Array:
+		write_string(buf, "[dynamic]");
+		write_type(buf, info.elem);
+	case rt.Type_Info_Slice:
+		write_string(buf, "[]");
+		write_type(buf, info.elem);
+
+	case rt.Type_Info_Map:
+		write_string(buf, "map[");
+		write_type(buf, info.key);
+		write_byte(buf, ']');
+		write_type(buf, info.value);
+
+	case rt.Type_Info_Struct:
+		write_string(buf, "struct ");
+		if info.is_packed    do write_string(buf, "#packed ");
+		if info.is_raw_union do write_string(buf, "#raw_union ");
+		if info.custom_align {
+			write_string(buf, "#align ");
+			write_i64(buf, i64(ti.align), 10);
+			write_byte(buf, ' ');
+		}
+		write_byte(buf, '{');
+		for name, i in info.names {
+			if i > 0 do write_string(buf, ", ");
+			write_string(buf, name);
+			write_string(buf, ": ");
+			write_type(buf, info.types[i]);
+		}
+		write_byte(buf, '}');
+
+	case rt.Type_Info_Union:
+		write_string(buf, "union ");
+		if info.custom_align {
+			write_string(buf, "#align ");
+			write_i64(buf, i64(ti.align), 10);
+			write_byte(buf, ' ');
+		}
+		write_byte(buf, '{');
+		for variant, i in info.variants {
+			if i > 0 do write_string(buf, ", ");
+			write_type(buf, variant);
+		}
+		write_byte(buf, '}');
+
+	case rt.Type_Info_Enum:
+		write_string(buf, "enum ");
+		write_type(buf, info.base);
+		write_string(buf, " {");
+		for name, i in info.names {
+			if i > 0 do write_string(buf, ", ");
+			write_string(buf, name);
+		}
+		write_byte(buf, '}');
+
+	case rt.Type_Info_Bit_Field:
+		write_string(buf, "bit_field ");
+		if ti.align != 1 {
+			write_string(buf, "#align ");
+			write_i64(buf, i64(ti.align), 10);
+			write_byte(buf, ' ');
+		}
+		write_string(buf, " {");
+		for name, i in info.names {
+			if i > 0 do write_string(buf, ", ");
+			write_string(buf, name);
+			write_string(buf, ": ");
+			write_i64(buf, i64(info.bits[i]), 10);
+		}
+		write_byte(buf, '}');
+
+	case rt.Type_Info_Bit_Set:
+		write_string(buf, "bit_set[");
+		switch {
+		case is_enum(info.elem):
+			write_type(buf, info.elem);
+		case is_rune(info.elem):
+			write_encoded_rune(buf, rune(info.lower));
+			write_string(buf, "..");
+			write_encoded_rune(buf, rune(info.upper));
+		case:
+			write_i64(buf, info.lower, 10);
+			write_string(buf, "..");
+			write_i64(buf, info.upper, 10);
+		}
+		if info.underlying != nil {
+			write_string(buf, "; ");
+			write_type(buf, info.underlying);
+		}
+		write_byte(buf, ']');
+
+	case rt.Type_Info_Opaque:
+		write_string(buf, "opaque ");
+		write_type(buf, info.elem);
+
+	case rt.Type_Info_Simd_Vector:
+		if info.is_x86_mmx {
+			write_string(buf, "intrinsics.x86_mmx");
+		} else {
+			write_string(buf, "intrinsics.vector(");
+			write_i64(buf, i64(info.count));
+			write_string(buf, ", ");
+			write_type(buf, info.elem);
+			write_byte(buf, ')');
+		}
+	}
+}
+

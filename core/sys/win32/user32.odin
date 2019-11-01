@@ -182,7 +182,7 @@ foreign user32 {
     @(link_name="DestroyIcon")      destroy_icon        :: proc(icon: Hicon) -> Bool ---;
 
     @(link_name="LoadCursorA")      load_cursor_a       :: proc(instance: Hinstance, cursor_name: cstring) -> Hcursor ---;
-    @(link_name="LoadCursorW")      load_cursor_w       :: proc(instance: Hinstance, cursor_name: cstring) -> Hcursor ---;
+    @(link_name="LoadCursorW")      load_cursor_w       :: proc(instance: Hinstance, cursor_name: Wstring) -> Hcursor ---;
 	@(link_name="GetCursor")        get_cursor          :: proc() -> Hcursor ---;
 	@(link_name="SetCursor")        set_cursor          :: proc(cursor: Hcursor) -> Hcursor ---;
 

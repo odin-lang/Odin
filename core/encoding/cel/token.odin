@@ -183,9 +183,9 @@ tokenizer_init :: proc(t: ^Tokenizer, src: []byte, file := "") {
 }
 
 token_error :: proc(t: ^Tokenizer, msg: string, args: ..any) {
-	fmt.printf_err("%s(%d:%d) Error: ", t.file, t.line_count, t.read_offset-t.line_offset+1);
-	fmt.printf_err(msg, ..args);
-	fmt.println_err();
+	fmt.eprintf("%s(%d:%d) Error: ", t.file, t.line_count, t.read_offset-t.line_offset+1);
+	fmt.eprintf(msg, ..args);
+	fmt.eprintln();
 	t.error_count += 1;
 }
 

@@ -5,7 +5,7 @@ import "core:math/bits"
 import "core:runtime"
 import "core:strconv"
 import "core:strings"
-import "core:types"
+import "core:reflect"
 
 Marshal_Error :: enum {
 	None,
@@ -194,7 +194,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 				data := uintptr(entries.data) + uintptr(i*entry_size);
 				header := cast(^Map_Entry_Header)data;
 
-				if types.is_string(info.key) {
+				if reflect.is_string(info.key) {
 					marshal_arg(b, header.key.str);
 				} else {
 					marshal_arg(b, any{rawptr(&header.key.hash), info.key.id});
@@ -284,11 +284,10 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 			t := runtime.type_info_base(ti);
 			switch info in t.variant {
 			case runtime.Type_Info_Integer:
-				using runtime.Type_Info_Endianness;
 				switch info.endianness {
-				case Platform: return false;
-				case Little:   return ODIN_ENDIAN != "little";
-				case Big:      return ODIN_ENDIAN != "big";
+				case .Platform: return false;
+				case .Little:   return ODIN_ENDIAN != "little";
+				case .Big:      return ODIN_ENDIAN != "big";
 				}
 			}
 			return false;

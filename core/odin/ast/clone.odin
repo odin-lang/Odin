@@ -2,9 +2,9 @@ package odin_ast
 
 import "core:mem"
 import "core:fmt"
-import "core:odin/token"
+import "core:odin/tokenizer"
 
-new :: proc($T: typeid, pos, end: token.Pos) -> ^T {
+new :: proc($T: typeid, pos, end: tokenizer.Pos) -> ^T {
 	n := mem.new(T);
 	n.pos = pos;
 	n.end = end;

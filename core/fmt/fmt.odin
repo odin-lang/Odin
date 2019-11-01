@@ -5,9 +5,9 @@ import "core:os"
 import "core:mem"
 import "core:math/bits"
 import "core:unicode/utf8"
-import "core:types"
 import "core:strconv"
 import "core:strings"
+import "core:reflect"
 
 
 @private
@@ -59,12 +59,18 @@ fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 
 
 // print* procedures return the number of bytes written
-print       :: proc(args: ..any)              -> int { return fprint(context.stdout, ..args); }
-print_err   :: proc(args: ..any)              -> int { return fprint(context.stderr, ..args); }
-println     :: proc(args: ..any)              -> int { return fprintln(context.stdout, ..args); }
-println_err :: proc(args: ..any)              -> int { return fprintln(context.stderr, ..args); }
-printf      :: proc(fmt: string, args: ..any) -> int { return fprintf(context.stdout, fmt, ..args); }
-printf_err  :: proc(fmt: string, args: ..any) -> int { return fprintf(context.stderr, fmt, ..args); }
+print   :: proc(args: ..any)              -> int { return fprint(context.stdout, ..args); }
+println :: proc(args: ..any)              -> int { return fprintln(context.stdout, ..args); }
+printf  :: proc(fmt: string, args: ..any) -> int { return fprintf(context.stdout, fmt, ..args); }
+
+eprint   :: proc(args: ..any)              -> int { return fprint(context.stderr, ..args); }
+eprintln :: proc(args: ..any)              -> int { return fprintln(context.stderr, ..args); }
+eprintf  :: proc(fmt: string, args: ..any) -> int { return fprintf(context.stderr, fmt, ..args); }
+
+
+@(deprecated="prefer eprint")   print_err   :: proc(args: ..any)              -> int { return eprint(..args); }
+@(deprecated="prefer eprintf")  printf_err  :: proc(fmt: string, args: ..any) -> int { return eprintf(fmt, ..args); }
+@(deprecated="prefer eprintln") println_err :: proc(args: ..any)              -> int { return eprintln(..args); }
 
 
 // aprint* procedures return a string that was allocated with the current context
@@ -143,7 +149,7 @@ panicf :: proc "contextless" (fmt: string, args: ..any, loc := #caller_location)
 fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := strings.builder_from_slice(data[:]);
-	write_type(&buf, info);
+	reflect.write_type(&buf, info);
 	os.write_string(fd, strings.to_string(buf));
 }
 
@@ -156,7 +162,7 @@ sbprint :: proc(buf: ^strings.Builder, args: ..any) -> string {
 	fi.buf = buf;
 
 	for arg, i in args {
-		is_string := arg != nil && types.is_string(type_info_of(arg.id));
+		is_string := arg != nil && reflect.is_string(type_info_of(arg.id));
 		if i > 0 && !is_string && !prev_string {
 			strings.write_byte(buf, ' ');
 		}
@@ -399,7 +405,7 @@ fmt_bad_verb :: proc(using fi: ^Info, verb: rune) {
 	strings.write_rune(buf, verb);
 	strings.write_byte(buf, '(');
 	if arg.id != nil {
-		write_typeid(buf, arg.id);
+		reflect.write_typeid(buf, arg.id);
 		strings.write_byte(buf, '=');
 		fmt_value(fi, arg, 'v');
 	} else {
@@ -792,7 +798,7 @@ enum_value_to_string :: proc(val: any) -> (string, bool) {
 	case: return "", false;
 	case runtime.Type_Info_Enum:
 		get_str :: proc(i: $T, e: runtime.Type_Info_Enum) -> (string, bool) {
-			if types.is_string(e.base) {
+			if reflect.is_string(e.base) {
 				for val, idx in e.values {
 					if v, ok := val.(T); ok && v == i {
 						return e.names[idx], true;
@@ -947,7 +953,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 		if name != "" {
 			strings.write_string(fi.buf, name);
 		} else {
-			write_type(fi.buf, type_info);
+			reflect.write_type(fi.buf, type_info);
 		}
 		strings.write_byte(fi.buf, '{');
 		defer strings.write_byte(fi.buf, '}');
@@ -1042,7 +1048,7 @@ fmt_opaque :: proc(fi: ^Info, v: any) {
 	if ot, ok := rt.type_info_base(type_info).variant.(rt.Type_Info_Opaque); ok {
 		elem := rt.type_info_base(ot.elem);
 		if elem == nil do return;
-		write_type(fi.buf, type_info);
+		reflect.write_type(fi.buf, type_info);
 		strings.write_byte(fi.buf, '{');
 		defer strings.write_byte(fi.buf, '}');
 
@@ -1053,7 +1059,7 @@ fmt_opaque :: proc(fi: ^Info, v: any) {
 			// Okay
 		}
 	} else {
-		write_type(fi.buf, type_info);
+		reflect.write_type(fi.buf, type_info);
 		strings.write_byte(fi.buf, '{');
 		strings.write_byte(fi.buf, '}');
 	}
@@ -1101,7 +1107,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				strings.write_string(fi.buf, name);
 				strings.write_string(fi.buf, " = ");
 
-				if t := b.types[i]; types.is_any(t) {
+				if t := b.types[i]; reflect.is_any(t) {
 					strings.write_string(fi.buf, "any{}");
 				} else {
 					data := rawptr(uintptr(v.data) + b.offsets[i]);
@@ -1129,11 +1135,12 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	case runtime.Type_Info_Rune:       fmt_arg(fi, v, verb);
 	case runtime.Type_Info_Float:      fmt_arg(fi, v, verb);
 	case runtime.Type_Info_Complex:    fmt_arg(fi, v, verb);
+	case runtime.Type_Info_Quaternion: fmt_arg(fi, v, verb);
 	case runtime.Type_Info_String:     fmt_arg(fi, v, verb);
 
 	case runtime.Type_Info_Pointer:
 		if v.id == typeid_of(^runtime.Type_Info) {
-			write_type(fi.buf, (^^runtime.Type_Info)(v.data)^);
+			reflect.write_type(fi.buf, (^^runtime.Type_Info)(v.data)^);
 		} else {
 			ptr := (^rawptr)(v.data)^;
 			if verb != 'p' && info.elem != nil {
@@ -1256,7 +1263,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				data := uintptr(entries.data) + uintptr(i*entry_size);
 				header := cast(^runtime.Map_Entry_Header)data;
 
-				if types.is_string(info.key) {
+				if reflect.is_string(info.key) {
 					strings.write_string(fi.buf, header.key.str);
 				} else {
 					fi := Info{buf = fi.buf};
@@ -1297,7 +1304,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			strings.write_string(fi.buf, info.names[i]);
 			strings.write_string(fi.buf, " = ");
 
-			if t := info.types[i]; types.is_any(t) {
+			if t := info.types[i]; reflect.is_any(t) {
 				strings.write_string(fi.buf, "any{}");
 			} else {
 				data := uintptr(v.data) + info.offsets[i];
@@ -1349,14 +1356,14 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		if ptr == nil {
 			strings.write_string(fi.buf, "nil");
 		} else {
-			write_typeid(fi.buf, v.id);
+			reflect.write_typeid(fi.buf, v.id);
 			strings.write_string(fi.buf, " @ ");
 			fmt_pointer(fi, ptr, 'p');
 		}
 
 	case runtime.Type_Info_Type_Id:
 		id := (^typeid)(v.data)^;
-		write_typeid(fi.buf, id);
+		reflect.write_typeid(fi.buf, id);
 
 	case runtime.Type_Info_Bit_Field:
 		fmt_bit_field(fi, v);
@@ -1386,6 +1393,31 @@ fmt_complex :: proc(fi: ^Info, c: complex128, bits: int, verb: rune) {
 	}
 }
 
+fmt_quaternion  :: proc(fi: ^Info, q: quaternion256, bits: int, verb: rune) {
+	switch verb {
+	case 'f', 'F', 'v', 'h', 'H':
+		r, i, j, k := real(q), imag(q), jmag(q), kmag(q);
+
+		fmt_float(fi, r, bits/4, verb);
+
+		if !fi.plus && i >= 0 do strings.write_rune(fi.buf, '+');
+		fmt_float(fi, i, bits/4, verb);
+		strings.write_rune(fi.buf, 'i');
+
+		if !fi.plus && j >= 0 do strings.write_rune(fi.buf, '+');
+		fmt_float(fi, j, bits/4, verb);
+		strings.write_rune(fi.buf, 'j');
+
+		if !fi.plus && k >= 0 do strings.write_rune(fi.buf, '+');
+		fmt_float(fi, k, bits/4, verb);
+		strings.write_rune(fi.buf, 'k');
+
+	case:
+		fmt_bad_verb(fi, verb);
+		return;
+	}
+}
+
 fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	if arg == nil {
 		strings.write_string(fi.buf, "<nil>");
@@ -1398,7 +1430,7 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 		switch a in arg {
 		case ^runtime.Type_Info: ti = a;
 		}
-		write_type(fi.buf, ti);
+		reflect.write_type(fi.buf, ti);
 		return;
 	}
 
@@ -1434,6 +1466,9 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case complex64:  fmt_complex(fi, complex128(a), 64, verb);
 	case complex128: fmt_complex(fi, a, 128, verb);
 
+	case quaternion128: fmt_quaternion(fi, quaternion256(a), 128, verb);
+	case quaternion256: fmt_quaternion(fi, a, 256, verb);
+
 	case i8:      fmt_int(fi, u64(a), true,   8, verb);
 	case u8:      fmt_int(fi, u64(a), false,  8, verb);
 	case i16:     fmt_int(fi, u64(a), true,  16, verb);
@@ -1449,7 +1484,7 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case string:  fmt_string(fi, a, verb);
 	case cstring: fmt_cstring(fi, a, verb);
 
-	case typeid:  write_typeid(fi.buf, a);
+	case typeid:  reflect.write_typeid(fi.buf, a);
 
 	case i16le:     fmt_int(fi, u64(a), true,  16, verb);
 	case u16le:     fmt_int(fi, u64(a), false, 16, verb);
@@ -1482,212 +1517,3 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 
 
 
-
-write_typeid :: proc(buf: ^strings.Builder, id: typeid) {
-	write_type(buf, type_info_of(id));
-}
-
-write_type :: proc(buf: ^strings.Builder, ti: ^runtime.Type_Info) {
-	using strings;
-	if ti == nil {
-		write_string(buf, "nil");
-		return;
-	}
-
-	switch info in ti.variant {
-	case runtime.Type_Info_Named:
-		write_string(buf, info.name);
-	case runtime.Type_Info_Integer:
-		switch ti.id {
-		case int:     write_string(buf, "int");
-		case uint:    write_string(buf, "uint");
-		case uintptr: write_string(buf, "uintptr");
-		case:
-			write_byte(buf, info.signed ? 'i' : 'u');
-			write_i64(buf, i64(8*ti.size), 10);
-			switch info.endianness {
-			case runtime.Type_Info_Endianness.Little:
-				write_string(buf, "le");
-			case runtime.Type_Info_Endianness.Big:
-				write_string(buf, "be");
-			}
-		}
-	case runtime.Type_Info_Rune:
-		write_string(buf, "rune");
-	case runtime.Type_Info_Float:
-		write_byte(buf, 'f');
-		write_i64(buf, i64(8*ti.size), 10);
-	case runtime.Type_Info_Complex:
-		write_string(buf, "complex");
-		write_i64(buf, i64(8*ti.size), 10);
-	case runtime.Type_Info_String:
-		if info.is_cstring {
-			write_string(buf, "cstring");
-		} else {
-			write_string(buf, "string");
-		}
-	case runtime.Type_Info_Boolean:
-		switch ti.id {
-		case bool: write_string(buf, "bool");
-		case:
-			write_byte(buf, 'b');
-			write_i64(buf, i64(8*ti.size), 10);
-		}
-	case runtime.Type_Info_Any:
-		write_string(buf, "any");
-
-	case runtime.Type_Info_Type_Id:
-		write_string(buf, "typeid");
-
-	case runtime.Type_Info_Pointer:
-		if info.elem == nil {
-			write_string(buf, "rawptr");
-		} else {
-			write_string(buf, "^");
-			write_type(buf, info.elem);
-		}
-	case runtime.Type_Info_Procedure:
-		write_string(buf, "proc");
-		if info.params == nil {
-			write_string(buf, "()");
-		} else {
-			t := info.params.variant.(runtime.Type_Info_Tuple);
-			write_string(buf, "(");
-			for t, i in t.types {
-				if i > 0 do write_string(buf, ", ");
-				write_type(buf, t);
-			}
-			write_string(buf, ")");
-		}
-		if info.results != nil {
-			write_string(buf, " -> ");
-			write_type(buf, info.results);
-		}
-	case runtime.Type_Info_Tuple:
-		count := len(info.names);
-		if count != 1 do write_string(buf, "(");
-		for name, i in info.names {
-			if i > 0 do write_string(buf, ", ");
-
-			t := info.types[i];
-
-			if len(name) > 0 {
-				write_string(buf, name);
-				write_string(buf, ": ");
-			}
-			write_type(buf, t);
-		}
-		if count != 1 do write_string(buf, ")");
-
-	case runtime.Type_Info_Array:
-		write_string(buf, "[");
-		write_i64(buf, i64(info.count), 10);
-		write_string(buf, "]");
-		write_type(buf, info.elem);
-	case runtime.Type_Info_Dynamic_Array:
-		write_string(buf, "[dynamic]");
-		write_type(buf, info.elem);
-	case runtime.Type_Info_Slice:
-		write_string(buf, "[]");
-		write_type(buf, info.elem);
-
-	case runtime.Type_Info_Map:
-		write_string(buf, "map[");
-		write_type(buf, info.key);
-		write_byte(buf, ']');
-		write_type(buf, info.value);
-
-	case runtime.Type_Info_Struct:
-		write_string(buf, "struct ");
-		if info.is_packed    do write_string(buf, "#packed ");
-		if info.is_raw_union do write_string(buf, "#raw_union ");
-		if info.custom_align {
-			write_string(buf, "#align ");
-			write_i64(buf, i64(ti.align), 10);
-			write_byte(buf, ' ');
-		}
-		write_byte(buf, '{');
-		for name, i in info.names {
-			if i > 0 do write_string(buf, ", ");
-			write_string(buf, name);
-			write_string(buf, ": ");
-			write_type(buf, info.types[i]);
-		}
-		write_byte(buf, '}');
-
-	case runtime.Type_Info_Union:
-		write_string(buf, "union ");
-		if info.custom_align {
-			write_string(buf, "#align ");
-			write_i64(buf, i64(ti.align), 10);
-			write_byte(buf, ' ');
-		}
-		write_byte(buf, '{');
-		for variant, i in info.variants {
-			if i > 0 do write_string(buf, ", ");
-			write_type(buf, variant);
-		}
-		write_byte(buf, '}');
-
-	case runtime.Type_Info_Enum:
-		write_string(buf, "enum ");
-		write_type(buf, info.base);
-		write_string(buf, " {");
-		for name, i in info.names {
-			if i > 0 do write_string(buf, ", ");
-			write_string(buf, name);
-		}
-		write_byte(buf, '}');
-
-	case runtime.Type_Info_Bit_Field:
-		write_string(buf, "bit_field ");
-		if ti.align != 1 {
-			write_string(buf, "#align ");
-			write_i64(buf, i64(ti.align), 10);
-			write_byte(buf, ' ');
-		}
-		write_string(buf, " {");
-		for name, i in info.names {
-			if i > 0 do write_string(buf, ", ");
-			write_string(buf, name);
-			write_string(buf, ": ");
-			write_i64(buf, i64(info.bits[i]), 10);
-		}
-		write_byte(buf, '}');
-
-	case runtime.Type_Info_Bit_Set:
-		write_string(buf, "bit_set[");
-		switch {
-		case types.is_enum(info.elem):
-			write_type(buf, info.elem);
-		case types.is_rune(info.elem):
-			write_encoded_rune(buf, rune(info.lower));
-			write_string(buf, "..");
-			write_encoded_rune(buf, rune(info.upper));
-		case:
-			write_i64(buf, info.lower, 10);
-			write_string(buf, "..");
-			write_i64(buf, info.upper, 10);
-		}
-		if info.underlying != nil {
-			write_string(buf, "; ");
-			write_type(buf, info.underlying);
-		}
-		write_byte(buf, ']');
-
-	case runtime.Type_Info_Opaque:
-		write_string(buf, "opaque ");
-		write_type(buf, info.elem);
-
-	case runtime.Type_Info_Simd_Vector:
-		if info.is_x86_mmx {
-			write_string(buf, "intrinsics.x86_mmx");
-		} else {
-			write_string(buf, "intrinsics.vector(");
-			write_i64(buf, i64(info.count));
-			write_string(buf, ", ");
-			write_type(buf, info.elem);
-			write_byte(buf, ')');
-		}
-	}
-}

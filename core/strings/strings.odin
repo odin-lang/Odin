@@ -155,6 +155,73 @@ concatenate :: proc(a: []string, allocator := context.allocator) -> string {
 	return string(b);
 }
 
+@private
+_split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocator) -> []string {
+	s, n := s_, n_;
+
+	if n == 0 {
+		return nil;
+	}
+
+	if sep == "" {
+		l := utf8.rune_count_in_string(s);
+		if n < 0 || n > l {
+			n = l;
+		}
+
+		res := make([dynamic]string, n, allocator);
+		for i := 0; i < n-1; i += 1 {
+			_, w := utf8.decode_rune_in_string(s);
+			res[i] = s[:w];
+			s = s[w:];
+		}
+		if n > 0 {
+			res[n-1] = s;
+		}
+		return res[:];
+	}
+
+	if n < 0 {
+		n = count(s, sep) + 1;
+	}
+
+	res := make([dynamic]string, n, allocator);
+
+	n -= 1;
+
+	i := 0;
+	for ; i < n; i += 1 {
+		m := index(s, sep);
+		if m < 0 {
+			break;
+		}
+		res[i] = s[:m+sep_save];
+		s = s[m+len(sep):];
+	}
+	res[i] = s;
+
+	return res[:i+1];
+}
+
+split :: inline proc(s, sep: string, allocator := context.allocator) -> []string {
+	return _split(s, sep, 0, -1, allocator);
+}
+
+split_n :: inline proc(s, sep: string, n: int, allocator := context.allocator) -> []string {
+	return _split(s, sep, 0, n, allocator);
+}
+
+split_after :: inline proc(s, sep: string, allocator := context.allocator) -> []string {
+	return _split(s, sep, len(sep), -1, allocator);
+}
+
+split_after_n :: inline proc(s, sep: string, n: int, allocator := context.allocator) -> []string {
+	return _split(s, sep, len(sep), n, allocator);
+}
+
+
+
+
 index_byte :: proc(s: string, c: byte) -> int {
 	for i := 0; i < len(s); i += 1 {
 		if s[i] == c do return i;
@@ -170,7 +237,25 @@ last_index_byte :: proc(s: string, c: byte) -> int {
 	return -1;
 }
 
+
+
+@private PRIME_RABIN_KARP :: 16777619;
+
 index :: proc(s, substr: string) -> int {
+	hash_str_rabin_karp :: proc(s: string) -> (hash: u32 = 0, pow: u32 = 1) {
+		for i := 0; i < len(s); i += 1 {
+			hash = hash*PRIME_RABIN_KARP + u32(s[i]);
+		}
+		sq := u32(PRIME_RABIN_KARP);
+		for i := len(s); i > 0; i >>= 1 {
+			if (i & 1) != 0 {
+				pow *= sq;
+			}
+			sq *= sq;
+		}
+		return;
+	}
+
 	n := len(substr);
 	switch {
 	case n == 0:
@@ -186,9 +271,68 @@ index :: proc(s, substr: string) -> int {
 		return -1;
 	}
 
-	for i := 0; i < len(s)-n+1; i += 1 {
-		x := s[i:i+n];
-		if x == substr {
+	hash, pow := hash_str_rabin_karp(substr);
+	h: u32;
+	for i := 0; i < n; i += 1 {
+		h = h*PRIME_RABIN_KARP + u32(s[i]);
+	}
+	if h == hash && s[:n] == substr {
+		return 0;
+	}
+	for i := n; i < len(s); /**/ {
+		h *= PRIME_RABIN_KARP;
+		h += u32(s[i]);
+		h -= pow * u32(s[i-n]);
+		i += 1;
+		if h == hash && s[i-n:i] == substr {
+			return i - n;
+		}
+	}
+	return -1;
+}
+
+last_index :: proc(s, substr: string) -> int {
+	hash_str_rabin_karp_reverse :: proc(s: string) -> (hash: u32 = 0, pow: u32 = 1) {
+		for i := len(s) - 1; i >= 0; i -= 1 {
+			hash = hash*PRIME_RABIN_KARP + u32(s[i]);
+		}
+		sq := u32(PRIME_RABIN_KARP);
+		for i := len(s); i > 0; i >>= 1 {
+			if (i & 1) != 0 {
+				pow *= sq;
+			}
+			sq *= sq;
+		}
+		return;
+	}
+
+	n := len(substr);
+	switch {
+	case n == 0:
+		return len(s);
+	case n == 1:
+		return last_index_byte(s, substr[0]);
+	case n == len(s):
+		return substr == s ? 0 : -1;
+	case n > len(s):
+		return -1;
+	}
+
+	hash, pow := hash_str_rabin_karp_reverse(substr);
+	last := len(s) - n;
+	h: u32;
+	for i := len(s)-1; i >= last; i -= 1 {
+		h = h*PRIME_RABIN_KARP + u32(s[i]);
+	}
+	if h == hash && s[last:] == substr {
+		return last;
+	}
+
+	for i := last-1; i >= 0; i -= 1 {
+		h *= PRIME_RABIN_KARP;
+		h += u32(s[i]);
+		h -= pow * u32(s[i+n]);
+		if h == hash && s[i:i+n] == substr {
 			return i;
 		}
 	}

@@ -86,6 +86,7 @@ TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_package,     "package"),     \
 	TOKEN_KIND(Token_typeid,      "typeid"),      \
 	TOKEN_KIND(Token_when,        "when"),        \
+	TOKEN_KIND(Token_where,       "where"),       \
 	TOKEN_KIND(Token_if,          "if"),          \
 	TOKEN_KIND(Token_else,        "else"),        \
 	TOKEN_KIND(Token_for,         "for"),         \
@@ -396,6 +397,15 @@ void error_line(char *fmt, ...) {
 void syntax_error(Token token, char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
+	syntax_error_va(token, fmt, va);
+	va_end(va);
+}
+
+void syntax_error(TokenPos pos, char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	Token token = {};
+	token.pos = pos;
 	syntax_error_va(token, fmt, va);
 	va_end(va);
 }
@@ -745,9 +755,11 @@ exponent:
 		scan_mantissa(t, 10);
 	}
 
-	if (t->curr_rune == 'i') {
+	switch (t->curr_rune) {
+	case 'i': case 'j': case 'k':
 		token.kind = Token_Imag;
 		advance_to_next_rune(t);
+		break;
 	}
 
 end:

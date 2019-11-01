@@ -3,14 +3,34 @@ package main
 import "core:fmt"
 import "core:mem"
 import "core:os"
+import "core:reflect"
+import "intrinsics"
 
 when os.OS == "windows" {
 	import "core:thread"
 }
 
-@(link_name="general_stuff")
-general_stuff :: proc() {
-	fmt.println("# general_stuff");
+/*
+    The Odin programming language is fast, concise, readable, pragmatic and open sourced. It is designed with the intent of replacing C with the following goals:
+     * simplicity
+     * high performance
+     * built for modern systems
+     * joy of programming
+
+    # Installing Odin
+    Getting Started - https://odin-lang.org/docs/install/
+        Instructions for downloading and install the Odin compiler and libraries.
+
+    # Learning Odin
+    Overview of Odin - https://odin-lang.org/docs/overview/
+        An overview of the Odin programming language.
+    Frequently Asked Questions (FAQ) - https://odin-lang.org/docs/faq/
+        Answers to common questions about Odin.
+*/
+
+@(link_name="extra_general_stuff")
+extra_general_stuff :: proc() {
+	fmt.println("# extra_general_stuff");
 	{ // `do` for inline statements rather than block
 		foo :: proc() do fmt.println("Foo!");
 		if   false do foo();
@@ -30,14 +50,12 @@ general_stuff :: proc() {
 		i := i32(137);
 		ptr := &i;
 
-		_ = (^f32)(ptr);
+		_ = (^f32)(ptr); // Call-based syntax
 		// ^f32(ptr) == ^(f32(ptr))
-		_ = cast(^f32)ptr;
+		_ = cast(^f32)ptr; // Operator-based syntax
 
 		_ = (^f32)(ptr)^;
 		_ = (cast(^f32)ptr)^;
-
-		// Questions: Should there be two ways to do it?
 	}
 
 	/*
@@ -50,7 +68,7 @@ general_stuff :: proc() {
 		Foo :: struct {
 			x: int,
 			b: bool,
-		}
+		};
 		f := Foo{137, true};
 		x, b := expand_to_tuple(f);
 		fmt.println(f);
@@ -191,8 +209,8 @@ union_type :: proc() {
 		}
 	}
 
-	Vector3 :: struct {x, y, z: f32};
-	Quaternion :: struct {x, y, z, w: f32};
+	Vector3 :: distinct [3]f32;
+	Quaternion :: distinct quaternion128;
 
 	// More realistic examples
 	{
@@ -209,18 +227,18 @@ union_type :: proc() {
 			orientation: Quaternion,
 
 			derived: any,
-		}
+		};
 
 		Frog :: struct {
 			using entity: Entity,
 			jump_height:  f32,
-		}
+		};
 
 		Monster :: struct {
 			using entity: Entity,
 			is_robot:     bool,
 			is_zombie:    bool,
-		}
+		};
 
 		// See `parametric_polymorphism` procedure for details
 		new_entity :: proc($T: typeid) -> ^Entity {
@@ -254,18 +272,18 @@ union_type :: proc() {
 			orientation: Quaternion,
 
 			derived: union {Frog, Monster},
-		}
+		};
 
 		Frog :: struct {
 			using entity: ^Entity,
 			jump_height:  f32,
-		}
+		};
 
 		Monster :: struct {
 			using entity: ^Entity,
 			is_robot:     bool,
 			is_zombie:    bool,
-		}
+		};
 
 		// See `parametric_polymorphism` procedure for details
 		new_entity :: proc($T: typeid) -> ^Entity {
@@ -302,17 +320,17 @@ union_type :: proc() {
 
 		/*
 			Entity :: struct {
-				..
+				...
 				derived: union{^Frog, ^Monster},
 			}
 
 			Frog :: struct {
 				using entity: Entity,
-				..
+				...
 			}
 			Monster :: struct {
 				using entity: Entity,
-				..
+				...
 
 			}
 			new_entity :: proc(T: type) -> ^Entity {
@@ -325,7 +343,7 @@ union_type :: proc() {
 }
 
 parametric_polymorphism :: proc() {
-	fmt.println("# parametric_polymorphism");
+	fmt.println("\n# parametric_polymorphism");
 
 	print_value :: proc(value: $T) {
 		fmt.printf("print_value: %T %v\n", value, value);
@@ -383,13 +401,13 @@ parametric_polymorphism :: proc() {
 			hash:     u32,
 			key:      Key,
 			value:    Value,
-		}
+		};
 		TABLE_SIZE_MIN :: 32;
 		Table :: struct(Key, Value: typeid) {
 			count:     int,
 			allocator: mem.Allocator,
 			slots:     []Table_Slot(Key, Value),
-		}
+		};
 
 		// Only allow types that are specializations of a (polymorphic) slice
 		make_slice :: proc($T: typeid/[]$E, len: int) -> T {
@@ -513,7 +531,7 @@ parametric_polymorphism :: proc() {
 			Foo1,
 			Foo2,
 			Foo3,
-		}
+		};
 		Para_Union :: union(T: typeid) {T, Error};
 		r: Para_Union(int);
 		fmt.println(typeid_of(type_of(r)));
@@ -521,7 +539,7 @@ parametric_polymorphism :: proc() {
 		fmt.println(r);
 		r = 123;
 		fmt.println(r);
-		r = Error.Foo0;
+		r = Error.Foo0; // r = .Foo0; is allow too, see implicit selector expressions below
 		fmt.println(r);
 	}
 
@@ -543,6 +561,30 @@ parametric_polymorphism :: proc() {
 		for v, i in array {
 			assert(v == T(i*i));
 		}
+
+		// Matrix multiplication
+		mul :: proc(a: [$M][$N]$T, b: [N][$P]T) -> (c: [M][P]T) {
+			for i in 0..<M {
+				for j in 0..<P {
+					for k in 0..<N {
+						c[i][j] += a[i][k] * b[k][j];
+					}
+				}
+			}
+			return;
+		}
+
+		x := [2][3]f32{
+			{1, 2, 3},
+			{3, 2, 1},
+		};
+		y := [3][2]f32{
+			{0, 8},
+			{6, 2},
+			{8, 4},
+		};
+		z := mul(x, y);
+		assert(z == {{36, 24}, {20, 32}});
 	}
 }
 
@@ -560,7 +602,7 @@ prefix_table := [?]string{
 
 threading_example :: proc() {
 	when os.OS == "windows" {
-		fmt.println("# threading_example");
+		fmt.println("\n# threading_example");
 
 		worker_proc :: proc(t: ^thread.Thread) -> int {
 			for iteration in 1..5 {
@@ -600,7 +642,7 @@ threading_example :: proc() {
 }
 
 array_programming :: proc() {
-	fmt.println("# array_programming");
+	fmt.println("\n# array_programming");
 	{
 		a := [3]f32{1, 2, 3};
 		b := [3]f32{5, 6, 7};
@@ -645,7 +687,7 @@ array_programming :: proc() {
 }
 
 named_proc_return_parameters :: proc() {
-	fmt.println("# named proc return parameters");
+	fmt.println("\n# named proc return parameters");
 
 	foo0 :: proc() -> int {
 		return 123;
@@ -667,7 +709,7 @@ named_proc_return_parameters :: proc() {
 
 
 using_enum :: proc() {
-	fmt.println("# using enum");
+	fmt.println("\n# using enum");
 
 	using Foo :: enum {A, B, C};
 
@@ -679,25 +721,25 @@ using_enum :: proc() {
 }
 
 map_type :: proc() {
-	fmt.println("# map type");
+	fmt.println("\n# map type");
 
 	// enums of type u16, u32, i16 & i32 also work
 	Enum_u8 :: enum u8 {
 		A = 0,
 		B = 1 << 8 - 1,
-	}
+	};
 	Enum_u64 :: enum u64 {
 		A = 0,
 		B = 1 << 64 - 1,
-	}
+	};
 	Enum_i8 :: enum i8 {
 		A = 0,
 		B = -(1 << 7),
-	}
+	};
 	Enum_i64 :: enum i64 {
 		A = 0,
 		B = -(1 << 63),
-	}
+	};
 
 	map_u8: map[Enum_u8]u8;
 	map_u8[Enum_u8.A] = u8(Enum_u8.B);
@@ -721,7 +763,7 @@ map_type :: proc() {
 
 	demo_struct :: struct {
 		member: Enum_i64,
-	}
+	};
 
 	map_string: map[string]demo_struct;
 	map_string["Hellope!"] = demo_struct{Enum_i64.B};
@@ -734,7 +776,7 @@ map_type :: proc() {
 }
 
 implicit_selector_expression :: proc() {
-	fmt.println("# implicit selector expression");
+	fmt.println("\n# implicit selector expression");
 
 	Foo :: enum {A, B, C};
 
@@ -762,7 +804,7 @@ implicit_selector_expression :: proc() {
 }
 
 explicit_procedure_overloading :: proc() {
-	fmt.println("# explicit procedure overloading");
+	fmt.println("\n# explicit procedure overloading");
 
 	add_ints :: proc(a, b: int) -> int {
 		x := a + b;
@@ -796,14 +838,14 @@ explicit_procedure_overloading :: proc() {
 }
 
 complete_switch :: proc() {
-	fmt.println("# complete_switch");
+	fmt.println("\n# complete_switch");
 	{ // enum
 		using Foo :: enum {
 			A,
 			B,
 			C,
 			D,
-		}
+		};
 
 		b := Foo.B;
 		f := Foo.A;
@@ -829,6 +871,8 @@ complete_switch :: proc() {
 }
 
 cstring_example :: proc() {
+	fmt.println("\n# cstring_example");
+
 	W :: "Hellope";
 	X :: cstring(W);
 	Y :: string(X);
@@ -860,6 +904,8 @@ deprecated_attribute :: proc() {
 }
 
 bit_set_type :: proc() {
+	fmt.println("\n# bit_set_type");
+
 	{
 		using Day :: enum {
 			Sunday,
@@ -869,7 +915,7 @@ bit_set_type :: proc() {
 			Thursday,
 			Friday,
 			Saturday,
-		}
+		};
 
 		Days :: distinct bit_set[Day];
 		WEEKEND :: Days{Sunday, Saturday};
@@ -921,6 +967,8 @@ bit_set_type :: proc() {
 }
 
 diverging_procedures :: proc() {
+	fmt.println("\n# diverging_procedures");
+
 	// Diverging procedures may never return
 	foo :: proc() -> ! {
 		fmt.println("I'm a diverging procedure");
@@ -930,6 +978,8 @@ diverging_procedures :: proc() {
 }
 
 deferred_procedure_associations :: proc() {
+	fmt.println("\n# deferred_procedure_associations");
+
 	@(deferred_out=closure)
 	open :: proc(s: string) -> bool {
 		fmt.println(s);
@@ -945,9 +995,247 @@ deferred_procedure_associations :: proc() {
 	}
 }
 
+reflection :: proc() {
+	fmt.println("\n# reflection");
+
+	Foo :: struct {
+		x: int    `tag1`,
+		y: string `json:"y_field"`,
+		z: bool, // no tag
+	};
+
+	id := typeid_of(Foo);
+	names := reflect.struct_field_names(id);
+	types := reflect.struct_field_types(id);
+	tags  := reflect.struct_field_tags(id);
+
+	assert(len(names) == len(types) && len(names) == len(tags));
+
+	fmt.println("Foo :: struct {");
+	for tag, i in tags {
+		name, type := names[i], types[i];
+		if tag != "" {
+			fmt.printf("\t%s: %T `%s`,\n", name, type, tag);
+		} else {
+			fmt.printf("\t%s: %T,\n", name, type);
+		}
+	}
+	fmt.println("}");
+
+
+	for tag, i in tags {
+		if val, ok := reflect.struct_tag_lookup(tag, "json"); ok {
+			fmt.printf("json: %s -> %s\n", names[i], val);
+		}
+	}
+}
+
+quaternions :: proc() {
+	fmt.println("\n# quaternions");
+
+	{ // Quaternion operations
+		q := 1 + 2i + 3j + 4k;
+		r := quaternion(5, 6, 7, 8);
+		t := q * r;
+		fmt.printf("(%v) * (%v) = %v\n", q, r, t);
+		v := q / r;
+		fmt.printf("(%v) / (%v) = %v\n", q, r, v);
+		u := q + r;
+		fmt.printf("(%v) + (%v) = %v\n", q, r, u);
+		s := q - r;
+		fmt.printf("(%v) - (%v) = %v\n", q, r, s);
+	}
+	{ // The quaternion types
+		q128: quaternion128; // 4xf32
+		q256: quaternion256; // 4xf64
+		q128 = quaternion(1, 0, 0, 0);
+		q256 = 1; // quaternion(1, 0, 0, 0);
+	}
+	{ // Built-in procedures
+		q := 1 + 2i + 3j + 4k;
+		fmt.println("q =", q);
+		fmt.println("real(q) =", real(q));
+		fmt.println("imag(q) =", imag(q));
+		fmt.println("jmag(q) =", jmag(q));
+		fmt.println("kmag(q) =", kmag(q));
+		fmt.println("conj(q) =", conj(q));
+		fmt.println("abs(q)  =", abs(q));
+	}
+	{ // Conversion of a complex type to a quaternion type
+		c := 1 + 2i;
+		q := quaternion256(c);
+		fmt.println(c);
+		fmt.println(q);
+	}
+	{ // Memory layout of Quaternions
+		q := 1 + 2i + 3j + 4k;
+		a := transmute([4]f64)q;
+		fmt.println("Quaternion memory layout: xyzw/(ijkr)");
+		fmt.println(q); // 1.000+2.000i+3.000j+4.000k
+		fmt.println(a); // [2.000, 3.000, 4.000, 1.000]
+	}
+}
+
+inline_for_statement :: proc() {
+	fmt.println("\n#inline for statements");
+
+	// 'inline for' works the same as if the 'inline' prefix did not
+	// exist but these ranged loops are explicitly unrolled which can
+	// be very very useful for certain optimizations
+
+	fmt.println("Ranges");
+	inline for x, i in 1..<4 {
+		fmt.println(x, i);
+	}
+
+	fmt.println("Strings");
+	inline for r, i in "Hello, 世界" {
+		fmt.println(r, i);
+	}
+
+	fmt.println("Arrays");
+	inline for elem, idx in ([4]int{1, 4, 9, 16}) {
+		fmt.println(elem, idx);
+	}
+
+
+	Foo_Enum :: enum {
+		A = 1,
+		B,
+		C = 6,
+		D,
+	};
+	fmt.println("Enum types");
+	inline for elem, idx in Foo_Enum {
+		fmt.println(elem, idx);
+	}
+}
+
+where_clauses :: proc() {
+	fmt.println("\n#procedure 'where' clauses");
+
+	{ // Sanity checks
+		simple_sanity_check :: proc(x: [2]int)
+			where len(x) > 1,
+			      type_of(x) == [2]int {
+			fmt.println(x);
+		}
+	}
+	{ // Parametric polymorphism checks
+		cross_2d :: proc(a, b: $T/[2]$E) -> E
+			where intrinsics.type_is_numeric(E) {
+			return a.x*b.y - a.y*b.x;
+		}
+		cross_3d :: proc(a, b: $T/[3]$E) -> T
+			where intrinsics.type_is_numeric(E) {
+			x := a.y*b.z - a.z*b.y;
+			y := a.z*b.x - a.x*b.z;
+			z := a.x*b.y - a.y*b.z;
+			return T{x, y, z};
+		}
+
+		a := [2]int{1, 2};
+		b := [2]int{5, -3};
+		fmt.println(cross_2d(a, b));
+
+		x := [3]f32{1, 4, 9};
+		y := [3]f32{-5, 0, 3};
+		fmt.println(cross_3d(x, y));
+
+		// Failure case
+		// i := [2]bool{true, false};
+		// j := [2]bool{false, true};
+		// fmt.println(cross_2d(i, j));
+
+	}
+
+	{ // Procedure groups usage
+		foo :: proc(x: [$N]int) -> bool
+			where N > 2 {
+			fmt.println(#procedure, "was called with the parameter", x);
+			return true;
+		}
+
+		bar :: proc(x: [$N]int) -> bool
+			where 0 < N,
+			      N <= 2 {
+			fmt.println(#procedure, "was called with the parameter", x);
+			return false;
+		}
+
+		baz :: proc{foo, bar};
+
+		x := [3]int{1, 2, 3};
+		y := [2]int{4, 9};
+		ok_x := baz(x);
+		ok_y := baz(y);
+		assert(ok_x == true);
+		assert(ok_y == false);
+	}
+
+	{ // Record types
+		Foo :: struct(T: typeid, N: int)
+			where intrinsics.type_is_integer(T),
+			      N > 2 {
+			x: [N]T,
+			y: [N-2]T,
+		};
+
+		T :: i32;
+		N :: 5;
+		f: Foo(T, N);
+		#assert(size_of(f) == (N+N-2)*size_of(T));
+	}
+}
+
+ranged_fields_for_array_compound_literals :: proc() {
+	fmt.println("\n#ranged fields for array compound literals");
+	{ // Normal Array Literal
+		foo := [?]int{1, 4, 9, 16};
+		fmt.println(foo);
+	}
+	{ // Indexed
+		foo := [?]int{
+			3 = 16,
+			1 = 4,
+			2 = 9,
+			0 = 1,
+		};
+		fmt.println(foo);
+	}
+	{ // Ranges
+		i := 2;
+		foo := [?]int {
+			0 = 123,
+			5..9 = 54,
+			10..<16 = i*3 + (i-1)*2,
+		};
+		#assert(len(foo) == 16);
+		fmt.println(foo); // [123, 0, 0, 0, 0, 54, 54, 54, 54, 54, 8, 8, 8, 8, 8]
+	}
+	{ // Slice and Dynamic Array support
+		i := 2;
+		foo_slice := []int {
+			0 = 123,
+			5..9 = 54,
+			10..<16 = i*3 + (i-1)*2,
+		};
+		assert(len(foo_slice) == 16);
+		fmt.println(foo_slice); // [123, 0, 0, 0, 0, 54, 54, 54, 54, 54, 8, 8, 8, 8, 8]
+
+		foo_dynamic_array := [dynamic]int {
+			0 = 123,
+			5..9 = 54,
+			10..<16 = i*3 + (i-1)*2,
+		};
+		assert(len(foo_dynamic_array) == 16);
+		fmt.println(foo_dynamic_array); // [123, 0, 0, 0, 0, 54, 54, 54, 54, 54, 8, 8, 8, 8, 8]
+	}
+}
+
 main :: proc() {
 	when true {
-		general_stuff();
+		extra_general_stuff();
 		union_type();
 		parametric_polymorphism();
 		threading_example();
@@ -963,5 +1251,11 @@ main :: proc() {
 		bit_set_type();
 		diverging_procedures();
 		deferred_procedure_associations();
+		reflection();
+		quaternions();
+		inline_for_statement();
+		where_clauses();
+		ranged_fields_for_array_compound_literals();
 	}
 }
+

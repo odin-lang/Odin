@@ -40,7 +40,6 @@
  *  Implementation of libutf8proc.
  */
 
-
 #include "utf8proc.h"
 #include "utf8proc_data.c"
 

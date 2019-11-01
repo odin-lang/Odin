@@ -134,12 +134,25 @@ struct Parser {
 	Map<AstPackage *>      package_map; // Key: String (package name)
 	Array<AstPackage *>    packages;
 	Array<ImportedPackage> package_imports;
-	Array<ImportedFile>    files_to_process;
+	isize                  file_to_process_count;
 	isize                  total_token_count;
 	isize                  total_line_count;
 	gbMutex                file_add_mutex;
 	gbMutex                file_decl_mutex;
 };
+
+
+gb_global ThreadPool parser_thread_pool = {};
+
+struct ParserWorkerData {
+	Parser *parser;
+	ImportedFile imported_file;
+};
+
+
+
+
+
 
 enum ProcInlining {
 	ProcInlining_none = 0,
@@ -186,11 +199,12 @@ enum FieldFlag {
 	FieldFlag_c_vararg  = 1<<3,
 	FieldFlag_auto_cast = 1<<4,
 
+	FieldFlag_Tags = 1<<10,
 
 	FieldFlag_Results   = 1<<16,
 
 	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast,
-	FieldFlag_Struct    = FieldFlag_using,
+	FieldFlag_Struct    = FieldFlag_using|FieldFlag_Tags,
 };
 
 enum StmtAllowFlag {
@@ -208,6 +222,7 @@ enum StmtAllowFlag {
 	AST_KIND(Undef,          "undef",           Token) \
 	AST_KIND(BasicLit,       "basic literal",   struct { \
 		Token token; \
+		ExactValue value; \
 	}) \
 	AST_KIND(BasicDirective, "basic directive", struct { \
 		Token  token; \
@@ -228,11 +243,14 @@ enum StmtAllowFlag {
 		Ast *body; \
 		u64  tags; \
 		ProcInlining inlining; \
+		Token where_token; \
+		Array<Ast *> where_clauses; \
 	}) \
 	AST_KIND(CompoundLit, "compound literal", struct { \
 		Ast *type; \
 		Array<Ast *> elems; \
 		Token open, close; \
+		i64 max_count; \
 	}) \
 AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
@@ -319,6 +337,15 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 	AST_KIND(RangeStmt, "range statement", struct { \
 		Token token; \
 		Ast *label; \
+		Ast *val0; \
+		Ast *val1; \
+		Token in_token; \
+		Ast *expr; \
+		Ast *body; \
+	}) \
+	AST_KIND(InlineRangeStmt, "inline range statement", struct { \
+		Token inline_token; \
+		Token for_token; \
 		Ast *val0; \
 		Ast *val1; \
 		Token in_token; \
@@ -412,6 +439,7 @@ AST_KIND(_DeclEnd,   "", bool) \
 		Array<Ast *> names;         \
 		Ast *        type;          \
 		Ast *        default_value; \
+		Token        tag;           \
 		u32              flags;     \
 		CommentGroup *   docs;      \
 		CommentGroup *   comment;   \
@@ -465,20 +493,24 @@ AST_KIND(_TypeBegin, "", bool) \
 		Ast *elem; \
 	}) \
 	AST_KIND(StructType, "struct type", struct { \
-		Token token;              \
-		Array<Ast *> fields;      \
-		isize field_count;        \
-		Ast *polymorphic_params;  \
-		Ast *align;               \
-		bool is_packed;           \
-		bool is_raw_union;        \
+		Token token;                \
+		Array<Ast *> fields;        \
+		isize field_count;          \
+		Ast *polymorphic_params;    \
+		Ast *align;                 \
+		Token where_token;          \
+		Array<Ast *> where_clauses; \
+		bool is_packed;             \
+		bool is_raw_union;          \
 	}) \
 	AST_KIND(UnionType, "union type", struct { \
-		Token        token;      \
-		Array<Ast *> variants;   \
-		Ast *polymorphic_params; \
-		Ast *        align;      \
-		bool         no_nil;     \
+		Token        token;         \
+		Array<Ast *> variants;      \
+		Ast *polymorphic_params;    \
+		Ast *        align;         \
+		bool         no_nil;        \
+		Token where_token;          \
+		Array<Ast *> where_clauses; \
 	}) \
 	AST_KIND(EnumType, "enum type", struct { \
 		Token        token; \
