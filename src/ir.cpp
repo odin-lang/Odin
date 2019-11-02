@@ -483,6 +483,7 @@ enum irAddrKind {
 	irAddr_Map,
 	irAddr_BitField,
 	irAddr_Context,
+	irAddr_SoaVariable,
 };
 
 struct irAddr {
@@ -500,6 +501,10 @@ struct irAddr {
 		struct {
 			Selection sel;
 		} ctx;
+		struct {
+			irValue *index;
+			Ast *index_expr;
+		} soa;
 	};
 };
 
@@ -529,6 +534,14 @@ irAddr ir_addr_bit_field(irValue *addr, i32 bit_field_value_index) {
 	v.bit_field_value_index = bit_field_value_index;
 	return v;
 }
+
+irAddr ir_addr_soa_variable(irValue *addr, irValue *index, Ast *index_expr) {
+	irAddr v = {irAddr_SoaVariable, addr};
+	v.soa.index = index;
+	v.soa.index_expr = index_expr;
+	return v;
+}
+
 
 enum irDebugEncoding {
 	irDebugBasicEncoding_Invalid       = 0,
@@ -3397,6 +3410,8 @@ irValue *ir_emit_source_code_location(irProcedure *proc, Ast *node);
 irValue *ir_emit_ptr_offset(irProcedure *proc, irValue *ptr, irValue *offset);
 irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *right, Type *type);
 irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel);
+void ir_emit_bounds_check(irProcedure *proc, Token token, irValue *index, irValue *len);
+
 
 irValue *ir_insert_dynamic_map_key_and_value(irProcedure *proc, irValue *addr, Type *map_type,
                                              irValue *map_key, irValue *map_value) {
@@ -3533,6 +3548,28 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 		}
 
 		return;
+	} else if (addr.kind == irAddr_SoaVariable) {
+		Type *t = type_deref(ir_type(addr.addr));
+		t = base_type(t);
+		GB_ASSERT(t->kind == Type_Struct && t->Struct.is_soa);
+		value = ir_emit_conv(proc, value, t->Struct.soa_elem);
+
+		irValue *index = addr.soa.index;
+		if (index->kind != irValue_Constant) {
+			Type *t = base_type(type_deref(ir_type(addr.addr)));
+			GB_ASSERT(t->kind == Type_Struct && t->Struct.is_soa);
+			i64 count = t->Struct.soa_count;
+			irValue *len = ir_const_int(count);
+			ir_emit_bounds_check(proc, ast_token(addr.soa.index_expr), index, len);
+		}
+
+		for_array(i, t->Struct.fields) {
+			irValue *dst = ir_emit_struct_ep(proc, addr.addr, cast(i32)i);
+			dst = ir_emit_array_ep(proc, dst, index);
+			irValue *src = ir_emit_struct_ev(proc, value, cast(i32)i);
+			ir_emit_store(proc, dst, src);
+		}
+		return;
 	}
 
 	irValue *v = ir_emit_conv(proc, value, ir_addr_type(addr));
@@ -3642,6 +3679,35 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 			irValue *b = ir_emit_deep_field_gep(proc, a, addr.ctx.sel);
 			return ir_emit_load(proc, b);
 		}
+	} else if (addr.kind == irAddr_SoaVariable) {
+		Type *t = type_deref(ir_type(addr.addr));
+		t = base_type(t);
+		GB_ASSERT(t->kind == Type_Struct && t->Struct.is_soa);
+		Type *elem = t->Struct.soa_elem;;
+		i32 count = cast(i32)t->Struct.soa_count;
+
+		irValue *res = ir_add_local_generated(proc, elem, true);
+
+		if (addr.soa.index->kind != irValue_Constant) {
+			irValue *len = ir_const_int(count);
+			ir_emit_bounds_check(proc, ast_token(addr.soa.index_expr), addr.soa.index, len);
+		}
+
+		for_array(i, t->Struct.fields) {
+			Entity *field = t->Struct.fields[i];
+			Type *base_type = field->type;
+			GB_ASSERT(base_type->kind == Type_Array);
+			Type *elem = base_type->Array.elem;
+
+
+			irValue *dst = ir_emit_struct_ep(proc, res, cast(i32)i);
+			irValue *src_ptr = ir_emit_struct_ep(proc, addr.addr, cast(i32)i);
+			src_ptr = ir_emit_array_ep(proc, src_ptr, addr.soa.index);
+			irValue *src = ir_emit_load(proc, src_ptr);
+			ir_emit_store(proc, dst, src);
+		}
+
+		return ir_emit_load(proc, res);
 	}
 
 	Type *t = base_type(ir_type(addr.addr));
@@ -7459,6 +7525,28 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 					addr.ctx.sel = sel;
 
 					return addr;
+				} else if (addr.kind == irAddr_SoaVariable) {
+					irValue *index = addr.soa.index;
+					i32 first_index = sel.index[0];
+					Selection sub_sel = sel;
+					sub_sel.index.data += 1;
+					sub_sel.index.count -= 1;
+
+					irValue *arr = ir_emit_struct_ep(proc, addr.addr, first_index);
+
+					if (addr.soa.index->kind != irValue_Constant) {
+						Type *t = base_type(type_deref(ir_type(addr.addr)));
+						GB_ASSERT(t->kind == Type_Struct && t->Struct.is_soa);
+						i64 count = t->Struct.soa_count;
+						irValue *len = ir_const_int(count);
+						ir_emit_bounds_check(proc, ast_token(addr.soa.index_expr), addr.soa.index, len);
+					}
+
+					irValue *item = ir_emit_array_ep(proc, arr, index);
+					if (sub_sel.index.count > 0) {
+						item = ir_emit_deep_field_gep(proc, item, sub_sel);
+					}
+					return ir_addr(item);
 				}
 				irValue *a = ir_addr_get_ptr(proc, addr);
 				a = ir_emit_deep_field_gep(proc, a, sel);
@@ -7515,6 +7603,19 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 		bool deref = is_type_pointer(t);
 		t = base_type(type_deref(t));
+		if (t->kind == Type_Struct && t->Struct.is_soa) {
+			// SOA STRUCTURES!!!!
+			Type *elem = t->Struct.soa_elem;
+
+			irValue *val = ir_build_addr_ptr(proc, ie->expr);
+			if (deref) {
+				val = ir_emit_load(proc, val);
+			}
+
+			irValue *index = ir_build_expr(proc, ie->index);
+			return ir_addr_soa_variable(val, index, ie->index);
+		}
+
 		GB_ASSERT_MSG(is_type_indexable(t), "%s %s", type_to_string(t), expr_to_string(expr));
 
 		if (is_type_map(t)) {

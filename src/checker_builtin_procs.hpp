@@ -34,6 +34,7 @@ enum BuiltinProcId {
 
 	// "Intrinsics"
 	BuiltinProc_vector,
+	BuiltinProc_soa_struct,
 
 	BuiltinProc_atomic_fence,
 	BuiltinProc_atomic_fence_acq,
@@ -159,6 +160,7 @@ BuiltinProc__type_begin,
 
 BuiltinProc__type_end,
 
+
 	BuiltinProc_COUNT,
 };
 gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
@@ -195,7 +197,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 
 	// "Intrinsics"
-	{STR_LIT("vector"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
+	{STR_LIT("vector"),     2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
+	{STR_LIT("soa_struct"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
 
 	{STR_LIT("atomic_fence"),        0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_fence_acq"),    0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},

@@ -129,6 +129,9 @@ struct TypeStruct {
 	bool is_raw_union;
 	bool is_polymorphic;
 	bool is_poly_specialized;
+	bool is_soa;
+	Type *soa_elem;
+	i64   soa_count;
 };
 
 struct TypeUnion {
