@@ -8741,6 +8741,35 @@ void ir_build_range_enum(irProcedure *proc, Type *enum_type, Type *val_type, irV
 	if (done_) *done_ = done;
 }
 
+void ir_build_range_tuple(irProcedure *proc, Ast *expr, Type *val0_type, Type *val1_type,
+                          irValue **val0_, irValue **val1_, irBlock **loop_, irBlock **done_) {
+	irBlock *loop = ir_new_block(proc, nullptr, "for.tuple.loop");
+	ir_emit_jump(proc, loop);
+	ir_start_block(proc, loop);
+
+	irBlock *body = ir_new_block(proc, nullptr, "for.tuple.body");
+	irBlock *done = ir_new_block(proc, nullptr, "for.tuple.done");
+
+	irValue *tuple_value = ir_build_expr(proc, expr);
+	Type *tuple = ir_type(tuple_value);
+	GB_ASSERT(tuple->kind == Type_Tuple);
+	i32 tuple_count = cast(i32)tuple->Tuple.variables.count;
+	i32 cond_index = tuple_count-1;
+
+	irValue *cond = ir_emit_struct_ev(proc, tuple_value, cond_index);
+	ir_emit_if(proc, cond, body, done);
+	ir_start_block(proc, body);
+
+	irValue *val0 = nullptr;
+
+
+	if (val0_) *val0_ = ir_emit_struct_ev(proc, tuple_value, 0);
+	if (val1_) *val1_ = ir_emit_struct_ev(proc, tuple_value, 1);
+	if (loop_) *loop_ = loop;
+	if (done_) *done_ = done;
+}
+
+
 void ir_store_type_case_implicit(irProcedure *proc, Ast *clause, irValue *value) {
 	Entity *e = implicit_entity_of_node(clause);
 	GB_ASSERT(e != nullptr);
@@ -8818,7 +8847,12 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 					irValue *g = ir_value_global(e, value);
 					g->Global.name = mangled_name;
-					g->Global.is_internal = true;
+					g->Global.is_private = true;
+					if (e->Variable.thread_local_model != "") {
+						g->Global.thread_local_model = e->Variable.thread_local_model;
+					} else {
+						g->Global.is_internal = true;
+					}
 					ir_module_add_value(proc->module, e, g);
 					map_set(&proc->module->members, key, g);
 				}
@@ -9252,6 +9286,9 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 				ir_build_range_string(proc, string, val0_type, &val, &key, &loop, &done);
 				break;
 			}
+			case Type_Tuple:
+				ir_build_range_tuple(proc, rs->expr, val0_type, val1_type, &val, &key, &loop, &done);
+				break;
 			default:
 				GB_PANIC("Cannot range over %s", type_to_string(expr_type));
 				break;

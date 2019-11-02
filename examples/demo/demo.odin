@@ -1233,6 +1233,44 @@ ranged_fields_for_array_compound_literals :: proc() {
 	}
 }
 
+range_statements_with_multiple_return_values :: proc() {
+	// IMPORTANT NOTE(bill, 2019-11-02): This feature is subject to be changed/removed
+	fmt.println("\n#range statements with multiple return values");
+	My_Iterator :: struct {
+		index: int,
+		data:  []i32,
+	};
+	make_my_iterator :: proc(data: []i32) -> My_Iterator {
+		return My_Iterator{data = data};
+	}
+	my_iterator :: proc(it: ^My_Iterator) -> (val: i32, idx: int, cond: bool) {
+		if cond = it.index < len(it.data); cond {
+			val = it.data[it.index];
+			idx = it.index;
+			it.index += 1;
+		}
+		return;
+	}
+
+	data := make([]i32, 6);
+	for _, i in data {
+		data[i] = i32(i*i);
+	}
+
+	{
+		it := make_my_iterator(data);
+		for val in my_iterator(&it) {
+			fmt.println(val);
+		}
+	}
+	{
+		it := make_my_iterator(data);
+		for val, idx in my_iterator(&it) {
+			fmt.println(val, idx);
+		}
+	}
+}
+
 main :: proc() {
 	when true {
 		extra_general_stuff();
@@ -1256,6 +1294,7 @@ main :: proc() {
 		inline_for_statement();
 		where_clauses();
 		ranged_fields_for_array_compound_literals();
+		range_statements_with_multiple_return_values();
 	}
 }
 

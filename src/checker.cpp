@@ -2217,6 +2217,33 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		}
 		ac->is_static = true;
 		return true;
+	} else if (name == "thread_local") {
+		if (ac->init_expr_list_count > 0) {
+			error(elem, "A thread local variable declaration cannot have initialization values");
+		} else if (c->foreign_context.curr_library) {
+			error(elem, "A foreign block variable cannot be thread local");
+		} else if (ac->is_export) {
+			error(elem, "An exported variable cannot be thread local");
+		} else if (ev.kind == ExactValue_Invalid) {
+			ac->thread_local_model = str_lit("default");
+		} else if (ev.kind == ExactValue_String) {
+			String model = ev.value_string;
+			if (model == "default" ||
+			    model == "localdynamic" ||
+			    model == "initialexec" ||
+			    model == "localexec") {
+				ac->thread_local_model = model;
+			} else {
+				error(elem, "Invalid thread local model '%.*s'. Valid models:", LIT(model));
+				error_line("\tdefault\n");
+				error_line("\tlocaldynamic\n");
+				error_line("\tinitialexec\n");
+				error_line("\tlocalexec\n");
+			}
+		} else {
+			error(elem, "Expected either no value or a string for '%.*s'", LIT(name));
+		}
+		return true;
 	}
 
 	if (c->curr_proc_decl != nullptr) {
@@ -2255,33 +2282,6 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 			}
 		} else {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
-		}
-		return true;
-	} else if (name == "thread_local") {
-		if (ac->init_expr_list_count > 0) {
-			error(elem, "A thread local variable declaration cannot have initialization values");
-		} else if (c->foreign_context.curr_library) {
-			error(elem, "A foreign block variable cannot be thread local");
-		} else if (ac->is_export) {
-			error(elem, "An exported variable cannot be thread local");
-		} else if (ev.kind == ExactValue_Invalid) {
-			ac->thread_local_model = str_lit("default");
-		} else if (ev.kind == ExactValue_String) {
-			String model = ev.value_string;
-			if (model == "default" ||
-			    model == "localdynamic" ||
-			    model == "initialexec" ||
-			    model == "localexec") {
-				ac->thread_local_model = model;
-			} else {
-				error(elem, "Invalid thread local model '%.*s'. Valid models:", LIT(model));
-				error_line("\tdefault\n");
-				error_line("\tlocaldynamic\n");
-				error_line("\tinitialexec\n");
-				error_line("\tlocalexec\n");
-			}
-		} else {
-			error(elem, "Expected either no value or a string for '%.*s'", LIT(name));
 		}
 		return true;
 	}
