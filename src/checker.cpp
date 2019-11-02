@@ -1033,7 +1033,9 @@ void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *ty
 
 	expr->tav.mode = mode;
 	expr->tav.type = type;
-	expr->tav.value = value;
+	if (mode == Addressing_Constant || mode == Addressing_Invalid) {
+		expr->tav.value = value;
+	}
 }
 
 void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {

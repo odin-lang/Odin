@@ -6739,7 +6739,7 @@ bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValu
 		}
 
 		if (inline_for_depth_) *inline_for_depth_ = inline_for_depth;
-	} else {
+	} else if (inline_for_depth_ != nullptr) {
 		error(ie->op, "Interval expressions must be constant");
 		return false;
 	}

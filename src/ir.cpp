@@ -6613,22 +6613,6 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 	GB_ASSERT(tv.mode != Addressing_Invalid);
 	GB_ASSERT(tv.mode != Addressing_Type);
 
-	#if 0
-	if (tv.mode == Addressing_Type) {
-		// // TODO(bill): Handle this correctly
-		#if 0
-		i32 entry_index = ir_type_info_index(proc->module->info, tv.type, false);
-		if (entry_index >= 0) {
-			return ir_get_type_info_ptr(proc, tv.type);
-			// i32 id = entry_index+1;
-			// return ir_value_constant(t_int, exact_value_i64(id));
-		}
-		#endif
-		// return v_raw_nil;
-		return ir_value_nil(tv.type);
-	}
-	#endif
-
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): Edge case
 		if (tv.value.kind != ExactValue_Compound &&
@@ -8686,7 +8670,8 @@ void ir_build_range_interval(irProcedure *proc, AstBinaryExpr *node, Type *val_t
 
 	upper = ir_build_expr(proc, node->right);
 
-	irValue *cond = ir_emit_comp(proc, op, ir_emit_load(proc, value), upper);
+	irValue *curr_value = ir_emit_load(proc, value);
+	irValue *cond = ir_emit_comp(proc, op, curr_value, upper);
 	ir_emit_if(proc, cond, body, done);
 	ir_start_block(proc, body);
 
