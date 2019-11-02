@@ -13,6 +13,7 @@ bool is_operand_value(Operand o) {
 	case Addressing_Constant:
 	case Addressing_MapIndex:
 	case Addressing_OptionalOk:
+	case Addressing_SoaVariable:
 		return true;
 	}
 	return false;
@@ -1255,6 +1256,9 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		break;
 	case Type_Basic:
 		switch (bt->Basic.kind) {
+		case Basic_cstring:
+			add_type_info_type(c, t_u8_ptr);
+			break;
 		case Basic_string:
 			add_type_info_type(c, t_u8_ptr);
 			add_type_info_type(c, t_int);
@@ -1271,6 +1275,14 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 			add_type_info_type(c, t_f32);
 			break;
 		case Basic_complex128:
+			add_type_info_type(c, t_type_info_float);
+			add_type_info_type(c, t_f64);
+			break;
+		case Basic_quaternion128:
+			add_type_info_type(c, t_type_info_float);
+			add_type_info_type(c, t_f32);
+			break;
+		case Basic_quaternion256:
 			add_type_info_type(c, t_type_info_float);
 			add_type_info_type(c, t_f64);
 			break;
@@ -1328,7 +1340,11 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		if (bt->Struct.scope != nullptr) {
 			for_array(i, bt->Struct.scope->elements.entries) {
 				Entity *e = bt->Struct.scope->elements.entries[i].value;
-				add_type_info_type(c, e->type);
+				if (bt->Struct.is_soa) {
+					add_type_info_type(c, alloc_type_pointer(e->type));
+				} else {
+					add_type_info_type(c, e->type);
+				}
 			}
 		}
 		for_array(i, bt->Struct.fields) {

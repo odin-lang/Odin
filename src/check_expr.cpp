@@ -3216,7 +3216,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 			}
 		} else if (operand->mode == Addressing_MapIndex) {
 			operand->mode = Addressing_Value;
-		} else if (sel.indirect || operand->mode != Addressing_Value) {
+		} else if (sel.indirect || operand->mode != Addressing_Value || operand->mode == Addressing_SoaVariable) {
 			operand->mode = Addressing_Variable;
 		} else {
 			operand->mode = Addressing_Value;
@@ -4732,6 +4732,81 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		operand->mode = Addressing_Type;
 		operand->type = alloc_type_simd_vector(count, elem);
+		break;
+	}
+
+	case BuiltinProc_soa_struct: {
+		Operand x = {};
+		Operand y = {};
+		x = *operand;
+		if (!is_type_integer(x.type) || x.mode != Addressing_Constant) {
+			error(call, "Expected a constant integer for 'intrinsics.soa_struct'");
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
+		if (x.value.value_integer.neg) {
+			error(call, "Negative array element length");
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
+		i64 count = big_int_to_i64(&x.value.value_integer);
+
+		check_expr_or_type(c, &y, ce->args[1]);
+		if (y.mode != Addressing_Type) {
+			error(call, "Expected a type 'intrinsics.soa_struct'");
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
+		Type *elem = y.type;
+		if (!is_type_struct(elem) && !is_type_raw_union(elem)) {
+			gbString str = type_to_string(elem);
+			error(call, "Invalid type for 'intrinsics.soa_struct', expected a struct, got '%s'", str);
+			gb_string_free(str);
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
+
+		operand->mode = Addressing_Type;
+
+		Type *old_struct = base_type(elem);
+		Type *soa_struct = alloc_type_struct();
+		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_struct->Struct.fields.count);
+		soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_struct->Struct.tags.count);
+		soa_struct->Struct.node = operand->expr;
+		soa_struct->Struct.is_soa = true;
+		soa_struct->Struct.soa_elem = elem;
+		soa_struct->Struct.soa_count = count;
+
+		Scope *scope = create_scope(old_struct->Struct.scope->parent, c->allocator);
+		soa_struct->Struct.scope = scope;
+
+		for_array(i, old_struct->Struct.fields) {
+			Entity *old_field = old_struct->Struct.fields[i];
+			if (old_field->kind == Entity_Variable) {
+				Type *array_type = alloc_type_array(old_field->type, count);
+				Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
+				soa_struct->Struct.fields[i] = new_field;
+				add_entity(c->checker, scope, nullptr, new_field);
+			} else {
+				soa_struct->Struct.fields[i] = old_field;
+			}
+
+			soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
+		}
+
+
+		Token token = {};
+		token.string = str_lit("Base_Type");
+		Entity *base_type_entity = alloc_entity_type_name(scope, token, elem, EntityState_Resolved);
+		add_entity(c->checker, scope, nullptr, base_type_entity);
+
+		add_type_info_type(c, soa_struct);
+
+		operand->type = soa_struct;
 		break;
 	}
 
@@ -6640,6 +6715,18 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count)
 			o->mode = Addressing_Variable;
 		}
 		return true;
+	case Type_Struct:
+		if (t->Struct.is_soa) {
+			*max_count = t->Struct.soa_count;
+			o->type = t->Struct.soa_elem;
+			if (o->mode == Addressing_SoaVariable || o->mode == Addressing_Variable) {
+				o->mode = Addressing_SoaVariable;
+			} else {
+				o->mode = Addressing_Value;
+			}
+			return true;
+		}
+		return false;
 	}
 
 	return false;

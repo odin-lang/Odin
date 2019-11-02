@@ -293,6 +293,9 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 		break;
 	}
 
+	case Addressing_SoaVariable:
+		break;
+
 	default: {
 		if (lhs->expr->kind == Ast_SelectorExpr) {
 			// NOTE(bill): Extra error checks
