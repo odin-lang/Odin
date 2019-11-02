@@ -1487,7 +1487,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			val1 = t_int;
 		} else {
 			Operand operand = {Addressing_Invalid};
-			check_expr_or_type(ctx, &operand, rs->expr);
+			check_expr_base(ctx, &operand, expr, nullptr);
+			error_operand_no_value(&operand);
 
 			if (operand.mode == Addressing_Type) {
 				if (!is_type_enum(operand.type)) {
@@ -1532,6 +1533,45 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					val0 = t->Map.key;
 					val1 = t->Map.value;
 					break;
+
+				case Type_Tuple:
+					if (false) {
+						check_not_tuple(ctx, &operand);
+					} else {
+						isize count = t->Tuple.variables.count;
+						if (count < 1 || count > 3) {
+							check_not_tuple(ctx, &operand);
+							error_line("\tMultiple return valued parameters in a range statement are limited to a maximum of 2 usable values with a trailing boolean for the conditional\n");
+							break;
+						}
+						Type *cond_type = t->Tuple.variables[count-1]->type;
+						if (!is_type_boolean(cond_type)) {
+							gbString s = type_to_string(cond_type);
+							error(operand.expr, "The final type of %td-valued tuple must be a boolean, got %s", count, s);
+							gb_string_free(s);
+							break;
+						}
+
+						if (count > 1) val0 = t->Tuple.variables[0]->type;
+						if (count > 2) val1 = t->Tuple.variables[1]->type;
+
+						if (rs->val1 != nullptr && count < 3) {
+							gbString s = type_to_string(t);
+							error(operand.expr, "Expected a 3-value tuple on the rhs, got (%s)", s);
+							gb_string_free(s);
+							break;
+						}
+
+						if (rs->val0 != nullptr && count < 2) {
+							gbString s = type_to_string(t);
+							error(operand.expr, "Expected at least a 2-values tuple on the rhs, got (%s)", s);
+							gb_string_free(s);
+							break;
+						}
+
+					}
+					break;
+
 				}
 			}
 
@@ -1848,6 +1888,19 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					} else {
 						e->flags |= EntityFlag_Static;
 					}
+				}
+				if (ac.thread_local_model != "") {
+					String name = e->token.string;
+					if (name == "_") {
+						error(e->token, "The 'thread_local' attribute is not allowed to be applied to '_'");
+					} else {
+						e->flags |= EntityFlag_Static;
+					}
+					e->Variable.thread_local_model = ac.thread_local_model;
+				}
+
+				if (ac.is_static && ac.thread_local_model != "") {
+					error(e->token, "The 'static' attribute is not needed if 'thread_local' is applied");
 				}
 			}
 
