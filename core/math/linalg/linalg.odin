@@ -85,21 +85,21 @@ mul_matrix :: proc(a, b: $M/[$N][N]$E) -> (c: M)
 	for i in 0..<N {
 		for k in 0..<N {
 			for j in 0..<N {
-				c[i][k] += a[i][j] * b[j][k];
+				c[k][i] += a[j][i] * b[k][j];
 			}
 		}
 	}
 	return;
 }
 
-mul_matrix_differ :: proc(a: $A/[$I][$J]$E, b: $B/[J][$K]E) -> (c: [I][K]E)
+mul_matrix_differ :: proc(a: $A/[$J][$I]$E, b: $B/[$K][J]E) -> (c: [K][I]E)
 	where !intrinsics.type_is_array(E),
 	      intrinsics.type_is_numeric(E),
-	      I != J {
-	for i in 0..<I {
-		for k in 0..<K {
-			for j in 0..<J {
-				c[i][k] += a[i][j] * b[j][k];
+	      I != K {
+	for k in 0..<K {
+		for j in 0..<J {
+			for i in 0..<I {
+				c[k][i] += a[j][i] * b[k][j];
 			}
 		}
 	}
@@ -156,6 +156,11 @@ Vector2 :: distinct [2]Float;
 Vector3 :: distinct [3]Float;
 Vector4 :: distinct [4]Float;
 
+Matrix1x1 :: distinct [1][1]Float;
+Matrix1x2 :: distinct [1][2]Float;
+Matrix1x3 :: distinct [1][3]Float;
+Matrix1x4 :: distinct [1][4]Float;
+
 Matrix2x1 :: distinct [2][1]Float;
 Matrix2x2 :: distinct [2][2]Float;
 Matrix2x3 :: distinct [2][3]Float;
@@ -172,6 +177,7 @@ Matrix4x3 :: distinct [4][3]Float;
 Matrix4x4 :: distinct [4][4]Float;
 
 
+Matrix1 :: Matrix1x1;
 Matrix2 :: Matrix2x2;
 Matrix3 :: Matrix3x3;
 Matrix4 :: Matrix4x4;
