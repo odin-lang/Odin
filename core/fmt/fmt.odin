@@ -1329,8 +1329,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			return;
 		}
 
-		strings.write_byte(fi.buf, '{');
-		defer strings.write_byte(fi.buf, '}');
+		is_soa := info.soa_base_type != nil;
+
+		strings.write_byte(fi.buf, is_soa ? '[' : '{');
+		defer strings.write_byte(fi.buf, is_soa ? '[' : '}');
 
 		fi.indent += 1;  defer fi.indent -= 1;
 		hash := fi.hash; defer fi.hash = hash;
@@ -1339,25 +1341,69 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 		if hash	do strings.write_byte(fi.buf, '\n');
 
-		for _, i in info.names {
-			if !hash && i > 0 do strings.write_string(fi.buf, ", ");
-			if hash {
-				for in 0..<fi.indent {
-					strings.write_byte(fi.buf, '\t');
+		if is_soa {
+			indent := fi.indent; defer fi.indent -= 1;
+			fi.indent += 1;
+
+			base_type_name: string;
+			if v, ok := info.soa_base_type.variant.(runtime.Type_Info_Named); ok {
+				base_type_name = v.name;
+			}
+
+			for index in 0..<uintptr(info.soa_len) {
+				if !hash && index > 0 do strings.write_string(fi.buf, ", ");
+
+				field_count := -1;
+
+				if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
+
+				strings.write_string(fi.buf, base_type_name);
+				strings.write_byte(fi.buf, '{');
+				defer strings.write_byte(fi.buf, '}');
+
+				for name, i in info.names {
+					field_count += 1;
+
+					if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
+					if hash do for in 0..<fi.indent do strings.write_byte(fi.buf, '\t');
+
+					strings.write_string(fi.buf, name);
+					strings.write_string(fi.buf, " = ");
+
+					t := info.types[i].variant.(runtime.Type_Info_Array).elem;
+					t_size := uintptr(t.size);
+					if reflect.is_any(t) {
+						strings.write_string(fi.buf, "any{}");
+					} else {
+						data := rawptr(uintptr(v.data) + info.offsets[i] + index*t_size);
+						fmt_arg(fi, any{data, t.id}, 'v');
+					}
+
+					if hash do strings.write_string(fi.buf, ",\n");
 				}
 			}
+		} else {
+			field_count := -1;
+			for name, i in info.names {
+				field_count += 1;
 
-			strings.write_string(fi.buf, info.names[i]);
-			strings.write_string(fi.buf, " = ");
+				if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
+				if hash do for in 0..<fi.indent do strings.write_byte(fi.buf, '\t');
 
-			if t := info.types[i]; reflect.is_any(t) {
-				strings.write_string(fi.buf, "any{}");
-			} else {
-				data := uintptr(v.data) + info.offsets[i];
-				fmt_arg(fi, any{rawptr(data), t.id}, 'v');
+				strings.write_string(fi.buf, name);
+				strings.write_string(fi.buf, " = ");
+
+				if t := info.types[i]; reflect.is_any(t) {
+					strings.write_string(fi.buf, "any{}");
+				} else {
+					data := rawptr(uintptr(v.data) + info.offsets[i]);
+					fmt_arg(fi, any{data, t.id}, 'v');
+				}
+
+				if hash do strings.write_string(fi.buf, ",\n");
 			}
-			if hash do strings.write_string(fi.buf, ",\n");
 		}
+
 
 	case runtime.Type_Info_Union:
 		if type_info.size == 0 {
