@@ -1350,7 +1350,17 @@ soa_struct_layout :: proc() {
 }
 
 main :: proc() {
-	when true {
+	id: typeid;
+	id = typeid_of(int);
+
+	if id == bool {
+		fmt.println("HERE1");
+	}
+	fmt.println("HERE2");
+
+
+
+	when false {
 		extra_general_stuff();
 		union_type();
 		parametric_polymorphism();
