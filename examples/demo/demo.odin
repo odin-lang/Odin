@@ -1269,6 +1269,14 @@ range_statements_with_multiple_return_values :: proc() {
 			fmt.println(val, idx);
 		}
 	}
+	{
+		it := make_my_iterator(data);
+		for {
+			val, _, cond := my_iterator(&it);
+			if !cond do break;
+			fmt.println(val);
+		}
+	}
 }
 
 main :: proc() {
