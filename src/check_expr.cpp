@@ -4810,6 +4810,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				Entity *new_field = alloc_entity_field(scope, token, array_type, false, cast(i32)i);
 				soa_struct->Struct.fields[i] = new_field;
 				add_entity(c->checker, scope, nullptr, new_field);
+				add_entity_use(c, nullptr, new_field);
 			}
 
 		} else {
