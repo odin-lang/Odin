@@ -1104,8 +1104,8 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			}
 
 			if is_soa {
-				indent := fi.indent; defer fi.indent -= 1;
 				fi.indent += 1;
+				defer fi.indent -= 1;
 
 				base_type_name: string;
 				if v, ok := b.soa_base_type.variant.(runtime.Type_Info_Named); ok {
@@ -1342,8 +1342,8 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		if hash	do strings.write_byte(fi.buf, '\n');
 
 		if is_soa {
-			indent := fi.indent; defer fi.indent -= 1;
 			fi.indent += 1;
+			defer fi.indent -= 1;
 
 			base_type_name: string;
 			if v, ok := info.soa_base_type.variant.(runtime.Type_Info_Named); ok {
