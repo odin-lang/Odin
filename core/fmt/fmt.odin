@@ -1332,7 +1332,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		is_soa := info.soa_base_type != nil;
 
 		strings.write_byte(fi.buf, is_soa ? '[' : '{');
-		defer strings.write_byte(fi.buf, is_soa ? '[' : '}');
+		defer strings.write_byte(fi.buf, is_soa ? ']' : '}');
 
 		fi.indent += 1;  defer fi.indent -= 1;
 		hash := fi.hash; defer fi.hash = hash;
