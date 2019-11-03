@@ -1645,7 +1645,17 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 				if (e != nullptr && (e->flags & EntityFlag_Param) != 0) {
 					error(op, "Cannot take the pointer address of '%s' which is a procedure parameter", str);
 				} else {
-					error(op, "Cannot take the pointer address of '%s'", str);
+					switch (o->mode) {
+					case Addressing_SoaVariable:
+						error(op, "Cannot take the pointer address of '%s' as it is an indirect index of an SOA struct", str);
+						break;
+					case Addressing_Constant:
+						error(op, "Cannot take the pointer address of '%s' which is a constant", str);
+						break;
+					default:
+						error(op, "Cannot take the pointer address of '%s'", str);
+						break;
+					}
 				}
 			}
 			o->mode = Addressing_Invalid;
@@ -1731,12 +1741,14 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 
 	if (x->mode == Addressing_Type && is_type_typeid(y->type)) {
 		add_type_info_type(c, x->type);
+		add_type_info_type(c, y->type);
 		add_type_and_value(c->info, x->expr, Addressing_Value, y->type, exact_value_typeid(x->type));
 
 		x->mode = Addressing_Value;
 		x->type = t_untyped_bool;
 		return;
 	} else if (is_type_typeid(x->type) && y->mode == Addressing_Type) {
+		add_type_info_type(c, x->type);
 		add_type_info_type(c, y->type);
 		add_type_and_value(c->info, y->expr, Addressing_Value, x->type, exact_value_typeid(y->type));
 

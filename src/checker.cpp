@@ -1036,6 +1036,8 @@ void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *ty
 	expr->tav.type = type;
 	if (mode == Addressing_Constant || mode == Addressing_Invalid) {
 		expr->tav.value = value;
+	} else if (mode == Addressing_Value && is_type_typeid(type)) {
+		expr->tav.value = value;
 	}
 }
 
