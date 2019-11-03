@@ -1133,6 +1133,10 @@ bool is_type_union(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Union;
 }
+bool is_type_soa_struct(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_Struct && t->Struct.is_soa;
+}
 
 bool is_type_raw_union(Type *t) {
 	t = base_type(t);
@@ -2194,6 +2198,19 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 				sel.index.count = prev_count;
 			}
 		}
+
+		bool is_soa = type->Struct.is_soa;
+		bool is_soa_of_array = is_soa && is_type_array(type->Struct.soa_elem);
+
+		if (is_soa_of_array) {
+			String mapped_field_name = {};
+			     if (field_name == "r") mapped_field_name = str_lit("x");
+			else if (field_name == "g") mapped_field_name = str_lit("y");
+			else if (field_name == "b") mapped_field_name = str_lit("z");
+			else if (field_name == "a") mapped_field_name = str_lit("w");
+			return lookup_field_with_selection(type, mapped_field_name, is_type, sel, allow_blank_ident);
+		}
+
 	} else if (type->kind == Type_BitField) {
 		for_array(i, type->BitField.fields) {
 			Entity *f = type->BitField.fields[i];
