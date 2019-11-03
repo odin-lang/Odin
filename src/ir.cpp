@@ -4553,6 +4553,8 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		case 0: result_type = alloc_type_pointer(gst->Struct.fields[0]->type); break;
 		case 1: result_type = alloc_type_pointer(gst->Struct.fields[1]->type); break;
 		}
+	} else if (is_type_array(t)) {
+		return ir_emit_array_epi(proc, s, index);
 	} else {
 		GB_PANIC("TODO(bill): struct_gep type: %s, %d", type_to_string(ir_type(s)), index);
 	}
@@ -4632,15 +4634,20 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 		}
 		break;
 
-	case Type_Map: {
-		init_map_internal_types(t);
-		Type *gst = t->Map.generated_struct_type;
-		switch (index) {
-		case 0: result_type = gst->Struct.fields[0]->type; break;
-		case 1: result_type = gst->Struct.fields[1]->type; break;
+	case Type_Map:
+		{
+			init_map_internal_types(t);
+			Type *gst = t->Map.generated_struct_type;
+			switch (index) {
+			case 0: result_type = gst->Struct.fields[0]->type; break;
+			case 1: result_type = gst->Struct.fields[1]->type; break;
+			}
 		}
 		break;
-	}
+
+	case Type_Array:
+		result_type = t->Array.elem;
+		break;
 
 	default:
 		GB_PANIC("TODO(bill): struct_ev type: %s, %d", type_to_string(ir_type(s)), index);
@@ -10849,6 +10856,13 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 5), is_packed);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 6), is_raw_union);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 7), is_custom_align);
+
+				if (t->Struct.is_soa) {
+					irValue *soa_type = ir_type_info(proc, t->Struct.soa_elem);
+					irValue *soa_len = ir_const_int(t->Struct.soa_count);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 8), soa_type);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 9), soa_len);
+				}
 			}
 
 			isize count = t->Struct.fields.count;

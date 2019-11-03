@@ -87,6 +87,9 @@ Type_Info_Struct :: struct {
 	is_packed:    bool,
 	is_raw_union: bool,
 	custom_align: bool,
+	// These are only set iff this structure is an SOA structure
+	soa_base_type: ^Type_Info,
+	soa_len:       int,
 };
 Type_Info_Union :: struct {
 	variants:     []^Type_Info,

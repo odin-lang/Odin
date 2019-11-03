@@ -1085,8 +1085,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				strings.write_string(fi.buf, "{}");
 				return;
 			};
+
+			is_soa := b.soa_base_type != nil;
+
 			strings.write_string(fi.buf, info.name);
-			strings.write_byte(fi.buf, '{');
+			strings.write_byte(fi.buf, is_soa ? '[' : '{');
 
 			hash   := fi.hash;   defer fi.hash = hash;
 			indent := fi.indent; defer fi.indent -= 1;
@@ -1095,30 +1098,73 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			fi.indent += 1;
 
 			if hash	do strings.write_byte(fi.buf, '\n');
-
-			field_count := -1;
-			for name, i in b.names {
-				// if len(name) > 0 && name[0] == '_' do continue;
-				field_count += 1;
-
-				if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
-				if hash do for in 0..<fi.indent do strings.write_byte(fi.buf, '\t');
-
-				strings.write_string(fi.buf, name);
-				strings.write_string(fi.buf, " = ");
-
-				if t := b.types[i]; reflect.is_any(t) {
-					strings.write_string(fi.buf, "any{}");
-				} else {
-					data := rawptr(uintptr(v.data) + b.offsets[i]);
-					fmt_arg(fi, any{data, t.id}, 'v');
-				}
-
-				if hash do strings.write_string(fi.buf, ",\n");
+			defer {
+				if hash do for in 0..<indent do strings.write_byte(fi.buf, '\t');
+				strings.write_byte(fi.buf, is_soa ? ']' : '}');
 			}
 
-			if hash do for in 0..<indent do strings.write_byte(fi.buf, '\t');
-			strings.write_byte(fi.buf, '}');
+			if is_soa {
+				indent := fi.indent; defer fi.indent -= 1;
+				fi.indent += 1;
+
+				base_type_name: string;
+				if v, ok := b.soa_base_type.variant.(runtime.Type_Info_Named); ok {
+					base_type_name = v.name;
+				}
+
+				for index in 0..<uintptr(b.soa_len) {
+					if !hash && index > 0 do strings.write_string(fi.buf, ", ");
+
+					field_count := -1;
+
+					if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
+
+					strings.write_string(fi.buf, base_type_name);
+					strings.write_byte(fi.buf, '{');
+					defer strings.write_byte(fi.buf, '}');
+
+					for name, i in b.names {
+						field_count += 1;
+
+						if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
+						if hash do for in 0..<fi.indent do strings.write_byte(fi.buf, '\t');
+
+						strings.write_string(fi.buf, name);
+						strings.write_string(fi.buf, " = ");
+
+						t := b.types[i].variant.(runtime.Type_Info_Array).elem;
+						t_size := uintptr(t.size);
+						if reflect.is_any(t) {
+							strings.write_string(fi.buf, "any{}");
+						} else {
+							data := rawptr(uintptr(v.data) + b.offsets[i] + index*t_size);
+							fmt_arg(fi, any{data, t.id}, 'v');
+						}
+
+						if hash do strings.write_string(fi.buf, ",\n");
+					}
+				}
+			} else {
+				field_count := -1;
+				for name, i in b.names {
+					field_count += 1;
+
+					if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
+					if hash do for in 0..<fi.indent do strings.write_byte(fi.buf, '\t');
+
+					strings.write_string(fi.buf, name);
+					strings.write_string(fi.buf, " = ");
+
+					if t := b.types[i]; reflect.is_any(t) {
+						strings.write_string(fi.buf, "any{}");
+					} else {
+						data := rawptr(uintptr(v.data) + b.offsets[i]);
+						fmt_arg(fi, any{data, t.id}, 'v');
+					}
+
+					if hash do strings.write_string(fi.buf, ",\n");
+				}
+			}
 
 		case runtime.Type_Info_Bit_Set:
 			fmt_bit_set(fi, v);

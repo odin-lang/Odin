@@ -3616,6 +3616,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			mode  = Addressing_Constant;
 			value = exact_value_i64(bt->Enum.fields.count);
 			type  = t_untyped_integer;
+		} else if (is_type_struct(op_type)) {
+			Type *bt = base_type(op_type);
+			if (bt->Struct.is_soa) {
+				mode  = Addressing_Constant;
+				value = exact_value_i64(bt->Struct.soa_count);
+				type  = t_untyped_integer;
+			}
 		}
 
 		if (mode == Addressing_Invalid) {
@@ -4761,9 +4768,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 		Type *elem = y.type;
-		if (!is_type_struct(elem) && !is_type_raw_union(elem)) {
+		Type *bt_elem = base_type(elem);
+		if (!is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
 			gbString str = type_to_string(elem);
-			error(call, "Invalid type for 'intrinsics.soa_struct', expected a struct, got '%s'", str);
+			error(call, "Invalid type for 'intrinsics.soa_struct', expected a struct or array of length 4 or below, got '%s'", str);
 			gb_string_free(str);
 			operand->mode = Addressing_Type;
 			operand->type = t_invalid;
@@ -4771,33 +4779,68 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 
 		operand->mode = Addressing_Type;
+		Type *soa_struct = nullptr;
+		Scope *scope = nullptr;
 
-		Type *old_struct = base_type(elem);
-		Type *soa_struct = alloc_type_struct();
-		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_struct->Struct.fields.count);
-		soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_struct->Struct.tags.count);
-		soa_struct->Struct.node = operand->expr;
-		soa_struct->Struct.is_soa = true;
-		soa_struct->Struct.soa_elem = elem;
-		soa_struct->Struct.soa_count = count;
+		if (is_type_array(elem)) {
+			Type *old_array = base_type(elem);
+			soa_struct = alloc_type_struct();
+			soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_array->Array.count);
+			soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_array->Array.count);
+			soa_struct->Struct.node = operand->expr;
+			soa_struct->Struct.is_soa = true;
+			soa_struct->Struct.soa_elem = elem;
+			soa_struct->Struct.soa_count = count;
 
-		Scope *scope = create_scope(old_struct->Struct.scope->parent, c->allocator);
-		soa_struct->Struct.scope = scope;
+			scope = create_scope(c->scope, c->allocator);
+			soa_struct->Struct.scope = scope;
 
-		for_array(i, old_struct->Struct.fields) {
-			Entity *old_field = old_struct->Struct.fields[i];
-			if (old_field->kind == Entity_Variable) {
-				Type *array_type = alloc_type_array(old_field->type, count);
-				Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
+			String params_xyzw[4] = {
+				str_lit("x"),
+				str_lit("y"),
+				str_lit("z"),
+				str_lit("w")
+			};
+
+			for (i64 i = 0; i < old_array->Array.count; i++) {
+				Type *array_type = alloc_type_array(old_array->Array.elem, count);
+				Token token = {};
+				token.string = params_xyzw[i];
+
+				Entity *new_field = alloc_entity_field(scope, token, array_type, false, cast(i32)i);
 				soa_struct->Struct.fields[i] = new_field;
 				add_entity(c->checker, scope, nullptr, new_field);
-			} else {
-				soa_struct->Struct.fields[i] = old_field;
 			}
 
-			soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
-		}
+		} else {
+			GB_ASSERT(is_type_struct(elem));
 
+			Type *old_struct = base_type(elem);
+			soa_struct = alloc_type_struct();
+			soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_struct->Struct.fields.count);
+			soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_struct->Struct.tags.count);
+			soa_struct->Struct.node = operand->expr;
+			soa_struct->Struct.is_soa = true;
+			soa_struct->Struct.soa_elem = elem;
+			soa_struct->Struct.soa_count = count;
+
+			scope = create_scope(old_struct->Struct.scope->parent, c->allocator);
+			soa_struct->Struct.scope = scope;
+
+			for_array(i, old_struct->Struct.fields) {
+				Entity *old_field = old_struct->Struct.fields[i];
+				if (old_field->kind == Entity_Variable) {
+					Type *array_type = alloc_type_array(old_field->type, count);
+					Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
+					soa_struct->Struct.fields[i] = new_field;
+					add_entity(c->checker, scope, nullptr, new_field);
+				} else {
+					soa_struct->Struct.fields[i] = old_field;
+				}
+
+				soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
+			}
+		}
 
 		Token token = {};
 		token.string = str_lit("Base_Type");
