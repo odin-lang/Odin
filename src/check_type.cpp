@@ -2507,6 +2507,16 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 			break;
 		}
 	}
+	for (isize i = 0; i < result_count; i++) {
+		Entity *e = results->Tuple.variables[i];
+		if (e->kind != Entity_Variable) {
+			is_polymorphic = true;
+			break;
+		} else if (is_type_polymorphic(e->type)) {
+			is_polymorphic = true;
+			break;
+		}
+	}
 	type->Proc.is_polymorphic = is_polymorphic;
 
 	return success;
