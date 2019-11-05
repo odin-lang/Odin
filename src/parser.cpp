@@ -4585,8 +4585,12 @@ String build_tag_get_token(String s, String *out) {
 	while (n < s.len) {
 		Rune rune = 0;
 		isize width = gb_utf8_decode(&s[n], s.len-n, &rune);
-		if (rune_is_whitespace(rune)) {
-			*out = substring(s, n+width, s.len);
+		if (n == 0 && rune == ',') {
+			*out = substring(s, width, s.len);
+			return substring(s, 0, width);
+		}
+		if (!rune_is_letter(rune) && !rune_is_digit(rune)) {
+			*out = substring(s, n, s.len);
 			return substring(s, 0, n);
 		}
 		n += width;
@@ -4606,54 +4610,52 @@ bool parse_build_tag(Token token_for_pos, String s) {
 
 	bool any_correct = false;
 
-	do {
-		String p = build_tag_get_token(s, &s);
-		if (p.len == 0) break;
-		bool is_notted = false;
-		if (p[0] == '!') {
-			is_notted = true;
-			p = substring(p, 1, p.len);
-			if (p.len == 0) {
-				syntax_error(token_for_pos, "Expected a build platform after '!'");
-				break;
-			}
-		}
+	while (s.len > 0) {
+		bool this_kind_correct = true;
 
-		if (p.len > 0) {
-			TargetOsKind   os   = get_target_os_from_string(p);
-			TargetArchKind arch = get_target_arch_from_string(p);
-			if (os != TargetOs_Invalid) {
-				GB_ASSERT(arch == TargetArch_Invalid);
-				any_correct = true;
-				if (is_notted) {
-					if (os != build_context.metrics.os) {
-						return true;
-					}
-				} else if (os == build_context.metrics.os) {
-					return true;
-				}
-			} else if (arch != TargetArch_Invalid) {
-				any_correct = true;
-				if (is_notted) {
-					if (arch != build_context.metrics.arch) {
-						return true;
-					}
-				} else if (arch == build_context.metrics.arch) {
-					return true;
+		do {
+			String p = build_tag_get_token(s, &s);
+			if (p.len == 0) break;
+			if (p == ",") break;
+
+			bool is_notted = false;
+			if (p[0] == '!') {
+				is_notted = true;
+				p = substring(p, 1, p.len);
+				if (p.len == 0) {
+					syntax_error(token_for_pos, "Expected a build platform after '!'");
+					break;
 				}
 			}
-			if (os == TargetOs_Invalid && arch == TargetArch_Invalid) {
-				syntax_error(token_for_pos, "Invalid build tag platform: %.*s", LIT(p));
-				break;
-			}
-		}
-	} while (s.len > 0);
 
-	if (any_correct) {
-		return false;
+			if (p.len > 0) {
+				TargetOsKind   os   = get_target_os_from_string(p);
+				TargetArchKind arch = get_target_arch_from_string(p);
+				if (os != TargetOs_Invalid) {
+					GB_ASSERT(arch == TargetArch_Invalid);
+					if (is_notted && os == build_context.metrics.os) {
+						this_kind_correct = false;
+					} else if (os != build_context.metrics.os) {
+						this_kind_correct = false;
+					}
+				} else if (arch != TargetArch_Invalid) {
+					if (is_notted && arch == build_context.metrics.arch) {
+						this_kind_correct = false;
+					} else if (arch != build_context.metrics.arch) {
+						this_kind_correct = false;
+					}
+				}
+				if (os == TargetOs_Invalid && arch == TargetArch_Invalid) {
+					syntax_error(token_for_pos, "Invalid build tag platform: %.*s", LIT(p));
+					break;
+				}
+			}
+		} while (s.len > 0);
+
+		any_correct = any_correct || this_kind_correct;
 	}
 
-	return true;
+	return any_correct;
 }
 
 String dir_from_path(String path) {
