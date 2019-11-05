@@ -4585,13 +4585,12 @@ String build_tag_get_token(String s, String *out) {
 	while (n < s.len) {
 		Rune rune = 0;
 		isize width = gb_utf8_decode(&s[n], s.len-n, &rune);
-		if (n == 0 && rune == ',') {
-			*out = substring(s, width, s.len);
-			return substring(s, 0, width);
-		}
-		if (!rune_is_letter(rune) && !rune_is_digit(rune)) {
-			*out = substring(s, n, s.len);
-			return substring(s, 0, n);
+		if (n == 0 && rune == '!') {
+
+		} else if (!rune_is_letter(rune) && !rune_is_digit(rune)) {
+			isize k = gb_max(gb_max(n, width), 1);
+			*out = substring(s, k, s.len);
+			return substring(s, 0, k);
 		}
 		n += width;
 	}
@@ -4614,7 +4613,7 @@ bool parse_build_tag(Token token_for_pos, String s) {
 		bool this_kind_correct = true;
 
 		do {
-			String p = build_tag_get_token(s, &s);
+			String p = string_trim_whitespace(build_tag_get_token(s, &s));
 			if (p.len == 0) break;
 			if (p == ",") break;
 
