@@ -2407,6 +2407,19 @@ void set_procedure_abi_types(gbAllocator allocator, Type *type) {
 		}
 	}
 
+	for (i32 i = 0; i < type->Proc.param_count; i++) {
+		Entity *e = type->Proc.params->Tuple.variables[i];
+		if (e->kind == Entity_Variable) {
+			set_procedure_abi_types(allocator, e->type);
+		}
+	}
+	for (i32 i = 0; i < type->Proc.result_count; i++) {
+		Entity *e = type->Proc.results->Tuple.variables[i];
+		if (e->kind == Entity_Variable) {
+			set_procedure_abi_types(allocator, e->type);
+		}
+	}
+
 	// NOTE(bill): The types are the same
 	type->Proc.abi_compat_result_type = type_to_abi_compat_result_type(allocator, type->Proc.results, type->Proc.calling_convention);
 	type->Proc.return_by_pointer = abi_compat_return_by_pointer(allocator, type->Proc.calling_convention, type->Proc.abi_compat_result_type);
