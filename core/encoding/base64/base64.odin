@@ -91,38 +91,3 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
     }
     return out;
 }
-
-// @note(zh): Test inputs. Taken from RFC4648
-/*
-import "core:fmt"
-main :: proc() {
-    Test :: struct {
-        plain: string,
-        encoded: string,
-    };
-
-    test_vectors := [?]Test {
-        Test{"", ""},
-        Test{"f", "Zg=="},
-        Test{"fo", "Zm8="},
-        Test{"foo", "Zm9v"},
-        Test{"foob", "Zm9vYg=="},
-        Test{"fooba", "Zm9vYmE="},
-        Test{"foobar", "Zm9vYmFy"},
-    };
-
-    // Encode test
-    for v in test_vectors {
-        enc := encode(([]byte)(v.plain));
-        fmt.printf("encode(\"%s\") => \"%s\" \t| want: \"%s\"\n", v.plain, enc, v.encoded);
-        delete(enc);
-    }
-
-    // Decode test
-    for v in test_vectors {
-        dec := decode(v.encoded);
-        fmt.printf("decode(\"%s\") => \"%s\" \t| want: \"%s\"\n", v.encoded, string(dec), v.plain);
-        delete(dec);
-    }
-}
-*/
