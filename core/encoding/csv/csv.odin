@@ -71,11 +71,11 @@ write_raw :: proc(path: string, data: []byte) -> bool {
     return true;
 }
 
-read :: proc(path: string, delimiter := DELIMITER, skip_header := false) -> ([]string, int, bool) {
+read :: proc(path: string, delimiter := DELIMITER, skip_header := false) -> (content: []string, row_count: int, is_ok: bool) {
     if bytes, isOk := os.read_entire_file(path); isOk {
         cols: [dynamic]string;
         defer delete(cols);
-        out: [dynamic]string;
+        content: [dynamic]string;
         row_count := 0;
         prev_index := 0;
         for i := 0; i < len(bytes); i += 1 {
@@ -98,9 +98,9 @@ read :: proc(path: string, delimiter := DELIMITER, skip_header := false) -> ([]s
                 }
             }
         }
-        for col in cols do append(&out, ..strings.split(col, delimiter));
-        if skip_header  do return out[row_count:], row_count - 1, true;
-        else            do return out[:], row_count, true;
+        for col in cols do append(&content, ..strings.split(col, delimiter));
+        if skip_header  do return content[row_count:], row_count - 1, true;
+        else            do return content[:], row_count, true;
     }
     return nil, -1, false;
 }
