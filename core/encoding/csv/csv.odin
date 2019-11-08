@@ -16,16 +16,16 @@ main :: proc() {
 
     // Write file and read with the headers omitted
     if isOkWrite := write(file_name, &ctx); isOkWrite {
-        if content, col_count, isOkRead := read(file_name, DELIMITER, true); isOkRead {
-            fmt.println("Column count(no headers): ", col_count);
+        if content, row_count, isOkRead := read(file_name, DELIMITER, true); isOkRead {
+            fmt.println("Column count(no headers): ", row_count);
             fmt.println(content);
         }
     }
 
     // Write file and read with the headers being read as well
     if isOkWrite := write(file_name, &ctx); isOkWrite {
-        if content, col_count, isOkRead := read(file_name); isOkRead {
-            fmt.println("Column count(with headers): ", col_count);
+        if content, row_count, isOkRead := read(file_name); isOkRead {
+            fmt.println("Column count(with headers): ", row_count);
             fmt.println(content);
         }
     }
@@ -76,31 +76,31 @@ read :: proc(path: string, delimiter := DELIMITER, skip_header := false) -> ([]s
         cols: [dynamic]string;
         defer delete(cols);
         out: [dynamic]string;
-        col_count := 0;
+        row_count := 0;
         prev_index := 0;
         for i := 0; i < len(bytes); i += 1 {
             if bytes[i] == '\n' {
                 append(&cols, string(bytes[prev_index:i]));
                 i += 1;
                 prev_index = i;
-                col_count += 1;
+                row_count += 1;
             } else if bytes[i] == '\r' {
                 if bytes[i + 1] == '\n' {
                     append(&cols, string(bytes[prev_index:i]));
                     i += 2;
                     prev_index = i;
-                    col_count += 1;
+                    row_count += 1;
                 } else {
                     append(&cols, string(bytes[prev_index:i]));
                     i += 1;
                     prev_index = i;
-                    col_count += 1;
+                    row_count += 1;
                 }
             }
         }
         for col in cols do append(&out, ..strings.split(col, delimiter));
-        if skip_header  do return out[col_count:], col_count - 1, true;
-        else            do return out[:], col_count, true;
+        if skip_header  do return out[row_count:], row_count - 1, true;
+        else            do return out[:], row_count, true;
     }
     return nil, -1, false;
 }
