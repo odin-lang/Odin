@@ -17,19 +17,19 @@ ENC_TABLE := [32]byte {
 PADDING :: '=';
 
 DEC_TABLE := [?]u8 {
-	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
      0,  0, 26, 27, 28, 29, 30, 31,  0,  0,  0,  0,  0,  0,  0,  0,
-	 0,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 
+     0,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 
     15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,  0,  0,  0,  0,  0,
-	 0,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 
+     0,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 
     15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,  0,  0,  0,  0,  0,
-	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0
 };
 
@@ -47,7 +47,7 @@ _encode :: inline proc "contextless"(out, data: []byte, ENC_TBL := ENC_TABLE, al
 
     for len(data) > 0 {
         carry: byte;
-		switch len(data) {
+        switch len(data) {
             case:
                 out[7] = ENC_TABLE[data[4] & 0x1f];
                 carry = data[4] >> 5;
@@ -69,23 +69,23 @@ _encode :: inline proc "contextless"(out, data: []byte, ENC_TBL := ENC_TABLE, al
             case 1:
                 out[1] = ENC_TABLE[carry | (data[0] << 2) & 0x1f];
                 out[0] = ENC_TABLE[data[0] >> 3];
-		}
+        }
 
         if len(data) < 5 {
-			out[7] = byte(PADDING);
-			if len(data) < 4 {
-				out[6] = byte(PADDING);
-				out[5] = byte(PADDING);
-				if len(data) < 3 {
-					out[4] = byte(PADDING);
-					if len(data) < 2 {
-						out[3] = byte(PADDING);
-						out[2] = byte(PADDING);
-					}
-				}
-			}
-			break;
-		}
+            out[7] = byte(PADDING);
+            if len(data) < 4 {
+                out[6] = byte(PADDING);
+                out[5] = byte(PADDING);
+                if len(data) < 3 {
+                    out[4] = byte(PADDING);
+                    if len(data) < 2 {
+                        out[3] = byte(PADDING);
+                        out[2] = byte(PADDING);
+                    }
+                }
+            }
+            break;
+        }
         data = data[5:];
         out = out[8:];
     }
@@ -101,29 +101,29 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
     out := make([]byte, len(data) / 8 * 5, allocator);
     end := false;
     for len(data) > 0 && !end {
-		dbuf : [8]byte;
-		dlen := 8;
+        dbuf : [8]byte;
+        dlen := 8;
 
-		for j := 0; j < 8; {
-			if len(data) == 0 {
-				dlen, end = j, true;
-				break;
-			}
-			input := data[0];
-			data = data[1:];
-			if input == byte(PADDING) && j >= 2 && len(data) < 8 {
+        for j := 0; j < 8; {
+            if len(data) == 0 {
+                dlen, end = j, true;
+                break;
+            }
+            input := data[0];
+            data = data[1:];
+            if input == byte(PADDING) && j >= 2 && len(data) < 8 {
                 assert(!(len(data) + j < 8 - 1), "Corrupted input");
-				for k := 0; k < 8-1-j; k +=1 do assert(len(data) < k || data[k] == byte(PADDING), "Corrupted input");
-				dlen, end = j, true;
+                for k := 0; k < 8-1-j; k +=1 do assert(len(data) < k || data[k] == byte(PADDING), "Corrupted input");
+                dlen, end = j, true;
                 assert(dlen != 1 && dlen != 3 && dlen != 6, "Corrupted input");
-				break;
-			}
-			dbuf[j] = DEC_TABLE[input];
+                break;
+            }
+            dbuf[j] = DEC_TABLE[input];
             assert(dbuf[j] != 0xff, "Corrupted input");
-			j += 1;
-		}
+            j += 1;
+        }
 
-		switch dlen {
+        switch dlen {
             case 8:
                 out[outi + 4] = dbuf[6] << 5 | dbuf[7];
                 fallthrough;
@@ -138,8 +138,8 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
                 fallthrough;
             case 2:
                 out[outi + 0] = dbuf[0] << 3 | dbuf[1] >> 2;
-		}
-		outi += 5;
-	}
+        }
+        outi += 5;
+    }
     return out;
 }
