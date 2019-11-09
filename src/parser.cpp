@@ -3914,8 +3914,11 @@ Ast *parse_stmt(AstFile *f) {
 			in_token = expect_token(f, Token_in);
 
 			bool prev_allow_range = f->allow_range;
+			isize prev_level = f->expr_level;
 			f->allow_range = true;
-			expr = parse_expr(f, true);
+			f->expr_level = -1;
+			expr = parse_expr(f, false);
+			f->expr_level = prev_level;
 			f->allow_range = prev_allow_range;
 
 			if (allow_token(f, Token_do)) {
