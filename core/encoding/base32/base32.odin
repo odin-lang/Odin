@@ -95,7 +95,7 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
     if len(data) == 0 do return []byte{};
 
     outi := 0;
-	olen := len(data);
+    olen := len(data);
     data := data;
 
     out := make([]byte, len(data) / 8 * 5, allocator);
