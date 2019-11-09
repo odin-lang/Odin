@@ -3523,12 +3523,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				error(call, "'#assert' expects 1 argument, got %td", ce->args.count);
 				return false;
 			}
-			if (!is_type_boolean(operand->type) && operand->mode != Addressing_Constant) {
+			if (!is_type_boolean(operand->type) || operand->mode != Addressing_Constant) {
 				gbString str = expr_to_string(ce->args[0]);
 				error(call, "'%s' is not a constant boolean", str);
 				gb_string_free(str);
 				return false;
 			}
+			gb_printf_err("%s %d\n", expr_to_string(operand->expr), operand->mode);
 			if (!operand->value.value_bool) {
 				gbString arg = expr_to_string(ce->args[0]);
 				error(call, "Compile time assertion: %s", arg);
