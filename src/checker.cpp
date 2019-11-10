@@ -1755,6 +1755,10 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		}
 	}
 
+#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+
+
+	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 1");
 	// Calculate edges for graph M
 	for_array(i, M.entries) {
 		Entity *   e = cast(Entity *)M.entries[i].key.ptr;
@@ -1776,6 +1780,10 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		}
 	}
 
+	// TODO(bill): This could be multithreaded to improve performance
+	// This means that the entity graph node set will have to be thread safe
+
+	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2");
 	auto G = array_make<EntityGraphNode *>(a, 0, M.entries.count);
 
 	for_array(i, M.entries) {
@@ -1812,6 +1820,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		}
 	}
 
+	TIME_SECTION("generate_entity_dependency_graph: Dependency Count Checker");
 	for_array(i, G) {
 		EntityGraphNode *n = G[i];
 		n->index = i;
@@ -1821,6 +1830,8 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 	}
 
 	return G;
+
+#undef TIME_SECTION
 }
 
 
@@ -3636,21 +3647,11 @@ Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visi
 
 
 void calculate_global_init_order(Checker *c) {
-#if 0
-	Timings timings = {};
-	timings_init(&timings, str_lit("calculate_global_init_order"), 16);
-	defer ({
-		timings_print_all(&timings);
-		timings_destroy(&timings);
-	});
-#define TIME_SECTION(str) timings_start_section(&timings, str_lit(str))
-#else
-#define TIME_SECTION(str)
-#endif
+#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
 	CheckerInfo *info = &c->info;
 
-	TIME_SECTION("generate entity dependency graph");
+	TIME_SECTION("calculate_global_init_order: generate entity dependency graph");
 	Array<EntityGraphNode *> dep_graph = generate_entity_dependency_graph(info);
 	defer ({
 		for_array(i, dep_graph) {
@@ -3659,7 +3660,7 @@ void calculate_global_init_order(Checker *c) {
 		array_free(&dep_graph);
 	});
 
-	TIME_SECTION("priority queue create");
+	TIME_SECTION("calculate_global_init_order: priority queue create");
 	// NOTE(bill): Priority queue
 	auto pq = priority_queue_create(dep_graph, entity_graph_node_cmp, entity_graph_node_swap);
 
@@ -3667,7 +3668,7 @@ void calculate_global_init_order(Checker *c) {
 	ptr_set_init(&emitted, heap_allocator());
 	defer (ptr_set_destroy(&emitted));
 
-	TIME_SECTION("queue sort");
+	TIME_SECTION("calculate_global_init_order: queue sort");
 	while (pq.queue.count > 0) {
 		EntityGraphNode *n = priority_queue_pop(&pq);
 		Entity *e = n->entity;
@@ -3779,17 +3780,7 @@ GB_THREAD_PROC(check_proc_info_worker_proc) {
 
 
 void check_parsed_files(Checker *c) {
-#if 0
-	Timings timings = {};
-	timings_init(&timings, str_lit("check_parsed_files"), 16);
-	defer ({
-		timings_print_all(&timings);
-		timings_destroy(&timings);
-	});
-#define TIME_SECTION(str) timings_start_section(&timings, str_lit(str))
-#else
-#define TIME_SECTION(str)
-#endif
+#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
 	TIME_SECTION("map full filepaths to scope");
 	add_type_info_type(&c->init_ctx, t_invalid);
@@ -3851,6 +3842,7 @@ void check_parsed_files(Checker *c) {
 		check_proc_info(c, pi);
 	}
 
+	TIME_SECTION("check scope usage");
 	for_array(i, c->info.files.entries) {
 		AstFile *f = c->info.files.entries[i].value;
 		check_scope_usage(c, f->scope);

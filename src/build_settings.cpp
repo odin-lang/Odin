@@ -114,6 +114,7 @@ struct BuildContext {
 	bool   generate_docs;
 	i32    optimization_level;
 	bool   show_timings;
+	bool   show_more_timings;
 	bool   keep_temp_files;
 	bool   ignore_unknown_attributes;
 	bool   no_bounds_check;

@@ -1,11 +1,16 @@
 // #define NO_ARRAY_BOUNDS_CHECK
 
+
 #include "common.cpp"
 #include "timings.cpp"
 #include "tokenizer.cpp"
 #include "big_int.cpp"
 #include "exact_value.cpp"
 #include "build_settings.cpp"
+
+
+gb_global Timings global_timings = {0};
+
 
 #include "parser.hpp"
 #include "checker.hpp"
@@ -206,6 +211,7 @@ enum BuildFlagKind {
 	BuildFlag_OutFile,
 	BuildFlag_OptimizationLevel,
 	BuildFlag_ShowTimings,
+	BuildFlag_ShowMoreTimings,
 	BuildFlag_ThreadCount,
 	BuildFlag_KeepTempFiles,
 	BuildFlag_Collection,
@@ -290,20 +296,21 @@ ExactValue build_param_to_exact_value(String name, String param) {
 
 bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
-	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),             BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),             BuildFlagParam_Integer);
-	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),    BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),    BuildFlagParam_Integer);
-	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"), BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),      BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_Define,            str_lit("define"),          BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),      BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_Target,            str_lit("target"),          BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),           BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"), BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),          BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),             BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),             BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),               BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),               BuildFlagParam_Integer);
+	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),      BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_ShowMoreTimings,   str_lit("show-more-timings"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),      BuildFlagParam_Integer);
+	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"),   BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),        BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_Define,            str_lit("define"),            BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),        BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_Target,            str_lit("target"),            BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),             BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"),   BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),            BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),               BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),               BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None);
 
 	add_flag(&build_flags, BuildFlag_Compact, str_lit("compact"), BuildFlagParam_None);
@@ -374,7 +381,7 @@ bool parse_build_flags(Array<String> args) {
 							           param == "0") {
 								value = exact_value_bool(false);
 							} else {
-								gb_printf_err("Invalid flag parameter for '%.*s' = '%.*s'\n", LIT(name), LIT(param));
+								gb_printf_err("Invalid flag parameter for '%.*s' : '%.*s'\n", LIT(name), LIT(param));
 							}
 						} break;
 						case BuildFlagParam_Integer:
@@ -460,6 +467,11 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ShowTimings:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_timings = true;
+							break;
+						case BuildFlag_ShowMoreTimings:
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.show_timings = true;
+							build_context.show_more_timings = true;
 							break;
 						case BuildFlag_ThreadCount: {
 							GB_ASSERT(value.kind == ExactValue_Integer);
@@ -912,9 +924,10 @@ int main(int arg_count, char **arg_ptr) {
 		return 1;
 	}
 
-	Timings timings = {0};
-	timings_init(&timings, str_lit("Total Time"), 128);
-	defer (timings_destroy(&timings));
+	Timings *timings = &global_timings;
+
+	timings_init(timings, str_lit("Total Time"), 128);
+	defer (timings_destroy(timings));
 
 	init_string_buffer_memory();
 	init_global_error_collector();
@@ -1023,7 +1036,7 @@ int main(int arg_count, char **arg_ptr) {
 	init_universal();
 	// TODO(bill): prevent compiling without a linker
 
-	timings_start_section(&timings, str_lit("parse files"));
+	timings_start_section(timings, str_lit("parse files"));
 
 	Parser parser = {0};
 	if (!init_parser(&parser)) {
@@ -1039,7 +1052,7 @@ int main(int arg_count, char **arg_ptr) {
 		// generate_documentation(&parser);
 		return 0;
 	}
-	timings_start_section(&timings, str_lit("type check"));
+	timings_start_section(timings, str_lit("type check"));
 
 	Checker checker = {0};
 
@@ -1055,10 +1068,10 @@ int main(int arg_count, char **arg_ptr) {
 
 	if (build_context.no_output_files) {
 		if (build_context.query_data_set_settings.ok) {
-			generate_and_print_query_data(&checker, &timings);
+			generate_and_print_query_data(&checker, timings);
 		} else {
 			if (build_context.show_timings) {
-				show_timings(&checker, &timings);
+				show_timings(&checker, timings);
 			}
 		}
 
@@ -1080,13 +1093,13 @@ int main(int arg_count, char **arg_ptr) {
 	// defer (ir_gen_destroy(&ir_gen));
 
 
-	timings_start_section(&timings, str_lit("llvm ir gen"));
+	timings_start_section(timings, str_lit("llvm ir gen"));
 	ir_gen_tree(&ir_gen);
 
-	timings_start_section(&timings, str_lit("llvm ir opt tree"));
+	timings_start_section(timings, str_lit("llvm ir opt tree"));
 	ir_opt_tree(&ir_gen);
 
-	timings_start_section(&timings, str_lit("llvm ir print"));
+	timings_start_section(timings, str_lit("llvm ir print"));
 	print_llvm_ir(&ir_gen);
 
 
@@ -1097,13 +1110,13 @@ int main(int arg_count, char **arg_ptr) {
 
 	i32 exit_code = 0;
 
-	timings_start_section(&timings, str_lit("llvm-opt"));
+	timings_start_section(timings, str_lit("llvm-opt"));
 	exit_code = exec_llvm_opt(output_base);
 	if (exit_code != 0) {
 		return exit_code;
 	}
 
-	timings_start_section(&timings, str_lit("llvm-llc"));
+	timings_start_section(timings, str_lit("llvm-llc"));
 	exit_code = exec_llvm_llc(output_base);
 	if (exit_code != 0) {
 		return exit_code;
@@ -1121,7 +1134,7 @@ int main(int arg_count, char **arg_ptr) {
 		}
 	} else {
 	#if defined(GB_SYSTEM_WINDOWS)
-		timings_start_section(&timings, str_lit("msvc-link"));
+		timings_start_section(timings, str_lit("msvc-link"));
 
 		gbString lib_str = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(lib_str));
@@ -1212,7 +1225,7 @@ int main(int arg_count, char **arg_ptr) {
 		}
 
 		if (build_context.show_timings) {
-			show_timings(&checker, &timings);
+			show_timings(&checker, timings);
 		}
 
 		remove_temp_files(output_base);
@@ -1221,7 +1234,7 @@ int main(int arg_count, char **arg_ptr) {
 			return system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(output_base), LIT(run_args_string));
 		}
 	#else
-		timings_start_section(&timings, str_lit("ld-link"));
+		timings_start_section(timings, str_lit("ld-link"));
 
 		// NOTE(vassvik): get cwd, for used for local shared libs linking, since those have to be relative to the exe
 		char cwd[256];
@@ -1351,7 +1364,7 @@ int main(int arg_count, char **arg_ptr) {
 
 
 		if (build_context.show_timings) {
-			show_timings(&checker, &timings);
+			show_timings(&checker, timings);
 		}
 
 		remove_temp_files(output_base);
