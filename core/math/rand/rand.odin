@@ -47,8 +47,17 @@ uint64 :: proc(r: ^Rand = global_rand_ptr) -> u64 {
 	return (a<<32) | b;
 }
 
-int31 :: proc(r: ^Rand = global_rand_ptr) -> i32 { return i32(uint32(r) << 1 >> 1); }
-int63 :: proc(r: ^Rand = global_rand_ptr) -> i64 { return i64(uint64(r) << 1 >> 1); }
+uint128 :: proc(r: ^Rand = global_rand_ptr) -> u128 {
+	a := u128(_random(r));
+	b := u128(_random(r));
+	c := u128(_random(r));
+	d := u128(_random(r));
+	return (a<<96) | (b<<64) | (c<<32) | d;
+}
+
+int31  :: proc(r: ^Rand = global_rand_ptr) -> i32  { return i32(uint32(r) << 1 >> 1); }
+int63  :: proc(r: ^Rand = global_rand_ptr) -> i64  { return i64(uint64(r) << 1 >> 1); }
+int127 :: proc(r: ^Rand = global_rand_ptr) -> i128 { return i128(uint128(r) << 1 >> 1); }
 
 int31_max :: proc(n: i32, r: ^Rand = global_rand_ptr) -> i32 {
 	if n <= 0 do panic("Invalid argument to int31_max");
@@ -72,6 +81,19 @@ int63_max :: proc(n: i64, r: ^Rand = global_rand_ptr) -> i64 {
 	v := int63(r);
 	for v > max {
 		v = int63(r);
+	}
+	return v % n;
+}
+
+int127_max :: proc(n: i128, r: ^Rand = global_rand_ptr) -> i128 {
+	if n <= 0 do panic("Invalid argument to int63_max");
+	if n&(n-1) == 0 {
+		return int127(r) & (n-1);
+	}
+	max := i128((1<<63) - 1 - (1<<63)&u128(n));
+	v := int127(r);
+	for v > max {
+		v = int127(r);
 	}
 	return v % n;
 }
