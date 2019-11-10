@@ -1248,15 +1248,15 @@ void big_int_xor(BigInt *dst, BigInt const *x, BigInt const *y) {
 		x = y;
 		y = tmp;
 	}
-
-	// x ^ (-y) == x ^ ~(y-1) == ~(x ^ (y-1)) == -((x ^ (y-1)) + 1)
-
 	dst->neg = false;
-	BigInt y1 = big_int_make_abs(y);
-	big_int_sub_eq(&y1, &BIG_INT_ONE);
-	big_int__xor_abs(dst, x, &y1);
-	big_int_add_eq(dst, &BIG_INT_ONE);
-	dst->neg = true;
+	if (y->neg) {
+		// x ^ (-y) == x ^ ~(y-1) == ~(x ^ (y-1)) == -((x ^ (y-1)) + 1)
+		BigInt y1 = big_int_make_abs(y);
+		big_int_sub_eq(&y1, &BIG_INT_ONE);
+		big_int__xor_abs(dst, x, &y1);
+		big_int_add_eq(dst, &BIG_INT_ONE);
+		dst->neg = true;
+	}
 	return;
 }
 
@@ -1316,13 +1316,15 @@ void big_int_or(BigInt *dst, BigInt const *x, BigInt const *y) {
 		x = y;
 		y = tmp;
 	}
-
-	// x | (-y) == x | ~(y-1) == ~((y-1) &~ x) == -(~((y-1) &~ x) + 1)
-	BigInt y1 = big_int_make_abs(y);
-	big_int_sub_eq(&y1, &BIG_INT_ONE);
-	big_int__and_not_abs(dst, &y1, x);
-	big_int_add_eq(dst, &BIG_INT_ONE);
-	dst->neg = true;
+	dst->neg = false;
+	if (y->neg) {
+		// x | (-y) == x | ~(y-1) == ~((y-1) &~ x) == -(~((y-1) &~ x) + 1)
+		BigInt y1 = big_int_make_abs(y);
+		big_int_sub_eq(&y1, &BIG_INT_ONE);
+		big_int__and_not_abs(dst, &y1, x);
+		big_int_add_eq(dst, &BIG_INT_ONE);
+		dst->neg = true;
+	}
 	return;
 }
 
