@@ -3322,6 +3322,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_end - BuiltinProc__ty
 	is_type_any,
 	is_type_endian_little,
 	is_type_endian_big,
+	is_type_unsigned,
 	is_type_numeric,
 	is_type_ordered,
 	is_type_ordered_numeric,
@@ -5044,6 +5045,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_is_any:
 	case BuiltinProc_type_is_endian_little:
 	case BuiltinProc_type_is_endian_big:
+	case BuiltinProc_type_is_unsigned:
 	case BuiltinProc_type_is_numeric:
 	case BuiltinProc_type_is_ordered:
 	case BuiltinProc_type_is_ordered_numeric:
