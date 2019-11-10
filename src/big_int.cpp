@@ -499,7 +499,7 @@ void big_int_add(BigInt *dst, BigInt const *x, BigInt const *y) {
 			smaller = &neg_abs;
 			break;
 		default:
-			GB_PANIC("Invalid bit_int_cmp value");
+			GB_PANIC("Invalid big_int_cmp value");
 			return;
 		}
 
@@ -530,6 +530,9 @@ void big_int_add(BigInt *dst, BigInt const *x, BigInt const *y) {
 			if (sub_overflow_u64(v, prev_overflow, &v)) {
 				found_word = true;
 				overflow += 1;
+			} else {
+				// IMPORTANT TODO(bill): Is this mathematics correct here?
+				v += prev_overflow;
 			}
 			dst->d.words[i] = v;
 			i += 1;
