@@ -159,19 +159,21 @@ f64 time_stamp(TimeStamp const &ts, u64 freq, TimingUnit unit) {
 }
 
 void timings_print_all(Timings *t, TimingUnit unit = TimingUnit_Millisecond) {
-	char const SPACES[] = "                                                                ";
-	isize max_len;
+	isize const SPACES_LEN = 256;
+	char SPACES[SPACES_LEN+1] = {0};
+	gb_memset(SPACES, ' ', SPACES_LEN);
+
 
 	timings__stop_current_section(t);
 	t->total.finish = time_stamp_time_now();
 
-	max_len = gb_min(36, t->total.label.len);
+	isize max_len = gb_min(36, t->total.label.len);
 	for_array(i, t->sections) {
 		TimeStamp ts = t->sections[i];
 		max_len = gb_max(max_len, ts.label.len);
 	}
 
-	GB_ASSERT(max_len <= gb_size_of(SPACES)-1);
+	GB_ASSERT(max_len <= SPACES_LEN);
 
 	t->total_time_seconds = time_stamp_as_s(t->total, t->freq);
 
