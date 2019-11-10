@@ -95,6 +95,7 @@ type_is_any        :: proc($T: typeid) -> bool ---
 
 type_is_endian_little   :: proc($T: typeid) -> bool ---
 type_is_endian_big      :: proc($T: typeid) -> bool ---
+type_is_unsigned        :: proc($T: typeid) -> bool ---
 type_is_numeric         :: proc($T: typeid) -> bool ---
 type_is_ordered         :: proc($T: typeid) -> bool ---
 type_is_ordered_numeric :: proc($T: typeid) -> bool ---
