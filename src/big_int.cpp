@@ -532,7 +532,7 @@ void big_int_add(BigInt *dst, BigInt const *x, BigInt const *y) {
 				overflow += 1;
 			} else {
 				// IMPORTANT TODO(bill): Is this mathematics correct here?
-				v += prev_overflow;
+				v += overflow;
 			}
 			dst->d.words[i] = v;
 			i += 1;
