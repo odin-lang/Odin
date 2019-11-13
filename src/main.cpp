@@ -1,6 +1,6 @@
 // #define NO_ARRAY_BOUNDS_CHECK
 
-#if defined(GB_SYSTEM_WINDOWS)
+#if defined(_WIN32) || defined(_WIN64)
 // NOTE(IC): In order to find Visual C++ paths without relying on environment variables.
 #include "microsoft_craziness.h"
 #endif 
