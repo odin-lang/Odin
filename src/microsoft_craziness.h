@@ -13,14 +13,14 @@
 //
 
 
-#include <windows.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
-#include <stdio.h>
-#include <sys/stat.h>
+//#include <windows.h>
+//#include <stdlib.h>
+//#include <string.h>
+//#include <assert.h>
+//#include <stdio.h>
+//#include <sys/stat.h>
 
-#include <stdint.h>
+//#include <stdint.h>
 #include <io.h>         // For _get_osfhandle
 
 #pragma comment(lib, "Advapi32.lib")
@@ -143,57 +143,50 @@ void free_resources(Find_Result_Utf8 *result) {
 // I can work it in here.
 //
 
-// Defer macro/thing.
-
-#define CONCAT_INTERNAL(x,y) x##y
-#define CONCAT(x,y) CONCAT_INTERNAL(x,y)
-
-template<typename T>
-struct ExitScope {
-    T lambda;
-    ExitScope(T lambda):lambda(lambda){}
-    ~ExitScope(){lambda();}
-    ExitScope(const ExitScope&);
-  private:
-    ExitScope& operator =(const ExitScope&);
-};
- 
-class ExitScopeHelp {
-  public:
-    template<typename T>
-        ExitScope<T> operator+(T t){ return t;}
-};
- 
-#define defer const auto& CONCAT(defer__, __LINE__) = ExitScopeHelp() + [&]()
-
 
 // COM objects for the ridiculous Microsoft craziness.
 
+typedef WCHAR* BSTR;
+typedef const WCHAR* LPCOLESTR;
+
+
+struct DECLSPEC_UUID("00000000-0000-0000-C000-000000000046") IUnknown
+{
+    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject) = 0;
+    virtual ULONG STDMETHODCALLTYPE AddRef(void) = 0;
+    virtual ULONG STDMETHODCALLTYPE Release(void) = 0;
+};
+
+extern "C" HRESULT STDAPICALLTYPE CoInitialize(LPVOID pvReserved);
+extern "C" HRESULT STDAPICALLTYPE CoCreateInstance(REFCLSID rclsid, IUnknown * pUnkOuter, DWORD dwClsContext, REFIID riid, LPVOID * ppv);
+extern "C" void STDAPICALLTYPE SysFreeString(BSTR bstrString);
+
+
 struct DECLSPEC_UUID("B41463C3-8866-43B5-BC33-2B0676F7F42E") DECLSPEC_NOVTABLE ISetupInstance : public IUnknown
 {
-    STDMETHOD(GetInstanceId)(_Out_ BSTR* pbstrInstanceId) = 0;
-    STDMETHOD(GetInstallDate)(_Out_ LPFILETIME pInstallDate) = 0;
-    STDMETHOD(GetInstallationName)(_Out_ BSTR* pbstrInstallationName) = 0;
-    STDMETHOD(GetInstallationPath)(_Out_ BSTR* pbstrInstallationPath) = 0;
-    STDMETHOD(GetInstallationVersion)(_Out_ BSTR* pbstrInstallationVersion) = 0;
-    STDMETHOD(GetDisplayName)(_In_ LCID lcid, _Out_ BSTR* pbstrDisplayName) = 0;
-    STDMETHOD(GetDescription)(_In_ LCID lcid, _Out_ BSTR* pbstrDescription) = 0;
-    STDMETHOD(ResolvePath)(_In_opt_z_ LPCOLESTR pwszRelativePath, _Out_ BSTR* pbstrAbsolutePath) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetInstanceId(BSTR* pbstrInstanceId) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetInstallDate(LPFILETIME pInstallDate) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetInstallationName(BSTR* pbstrInstallationName) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetInstallationPath(BSTR* pbstrInstallationPath) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetInstallationVersion(BSTR* pbstrInstallationVersion) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetDisplayName(LCID lcid, BSTR* pbstrDisplayName) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetDescription(LCID lcid, BSTR* pbstrDescription) = 0;
+    virtual HRESULT STDMETHODCALLTYPE ResolvePath(LPCOLESTR pwszRelativePath, BSTR* pbstrAbsolutePath) = 0;
 };
 
 struct DECLSPEC_UUID("6380BCFF-41D3-4B2E-8B2E-BF8A6810C848") DECLSPEC_NOVTABLE IEnumSetupInstances : public IUnknown
 {
-    STDMETHOD(Next)(_In_ ULONG celt, _Out_writes_to_(celt, *pceltFetched) ISetupInstance** rgelt, _Out_opt_ _Deref_out_range_(0, celt) ULONG* pceltFetched) = 0;
-    STDMETHOD(Skip)(_In_ ULONG celt) = 0;
-    STDMETHOD(Reset)(void) = 0;
-    STDMETHOD(Clone)(_Deref_out_opt_ IEnumSetupInstances** ppenum) = 0;
+    virtual HRESULT STDMETHODCALLTYPE Next(ULONG celt, ISetupInstance** rgelt, ULONG* pceltFetched) = 0;
+    virtual HRESULT STDMETHODCALLTYPE Skip(ULONG celt) = 0;
+    virtual HRESULT STDMETHODCALLTYPE Reset(void) = 0;
+    virtual HRESULT STDMETHODCALLTYPE Clone(IEnumSetupInstances** ppenum) = 0;
 };
 
 struct DECLSPEC_UUID("42843719-DB4C-46C2-8E7C-64F1816EFD5B") DECLSPEC_NOVTABLE ISetupConfiguration : public IUnknown
 {
-    STDMETHOD(EnumInstances)(_Out_ IEnumSetupInstances** ppEnumInstances) = 0;
-    STDMETHOD(GetInstanceForCurrentProcess)(_Out_ ISetupInstance** ppInstance) = 0;
-    STDMETHOD(GetInstanceForPath)(_In_z_ LPCWSTR wzPath, _Out_ ISetupInstance** ppInstance) = 0;
+    virtual HRESULT STDMETHODCALLTYPE EnumInstances(IEnumSetupInstances** ppEnumInstances) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetInstanceForCurrentProcess(ISetupInstance** ppInstance) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetInstanceForPath(LPCWSTR wzPath, ISetupInstance** ppInstance) = 0;
 };
 
 
@@ -248,7 +241,7 @@ bool visit_files_w(wchar_t *dir_name, Version_Data *data, Visit_Proc_W proc) {
     // will see if the filename conforms to the expected versioning pattern.
 
     auto wildcard_name = concat(dir_name, L"\\*");
-    defer { free(wildcard_name); };
+    defer (free(wildcard_name));
     
     WIN32_FIND_DATAW find_data;
     auto handle = FindFirstFileW(wildcard_name, &find_data);
@@ -257,7 +250,7 @@ bool visit_files_w(wchar_t *dir_name, Version_Data *data, Visit_Proc_W proc) {
     while (true) {
         if ((find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && (find_data.cFileName[0] != '.')) {
             auto full_name = concat(dir_name, L"\\", find_data.cFileName);
-            defer { free(full_name); };
+            defer (free(full_name));
           
             proc(find_data.cFileName, full_name, data);
         }
@@ -363,16 +356,16 @@ void find_windows_kit_root(Find_Result *result) {
     auto rc = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots",
                             0, KEY_QUERY_VALUE | KEY_WOW64_32KEY | KEY_ENUMERATE_SUB_KEYS, &main_key);
     if (rc != S_OK) return;
-    defer { RegCloseKey(main_key); };
+    defer (RegCloseKey(main_key));
 
     // Look for a Windows 10 entry.
     auto windows10_root = find_windows_kit_root(main_key, L"KitsRoot10");
 
     if (windows10_root) {
-        defer { free(windows10_root); };
+        defer (free(windows10_root));
         Version_Data data = {0};
         auto windows10_lib = concat(windows10_root, L"Lib");
-        defer { free(windows10_lib); };
+        defer (free(windows10_lib));
         
         visit_files_w(windows10_lib, &data, win10_best);
         if (data.best_name) {
@@ -386,10 +379,10 @@ void find_windows_kit_root(Find_Result *result) {
     auto windows8_root = find_windows_kit_root(main_key, L"KitsRoot81");
 
     if (windows8_root) {
-        defer { free(windows8_root); };
+        defer (free(windows8_root));
         
         auto windows8_lib = concat(windows8_root, L"Lib");
-        defer { free(windows8_lib); };
+        defer (free(windows8_lib));
 
         Version_Data data = {0};
         visit_files_w(windows8_lib, &data, win8_best);
@@ -426,17 +419,18 @@ void find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
 
     GUID my_uid                   = {0x42843719, 0xDB4C, 0x46C2, {0x8E, 0x7C, 0x64, 0xF1, 0x81, 0x6E, 0xFD, 0x5B}};
     GUID CLSID_SetupConfiguration = {0x177F0C4A, 0x1CD3, 0x4DE7, {0xA3, 0x2C, 0x71, 0xDB, 0xBB, 0x9F, 0xA3, 0x6D}};
+    DWORD CLSCTX_INPROC_SERVER = 0x1;
 
     ISetupConfiguration *config = NULL;
     auto hr = CoCreateInstance(CLSID_SetupConfiguration, NULL, CLSCTX_INPROC_SERVER, my_uid, (void **)&config);
     if (hr != 0)  return;
-    defer { config->Release(); };
+    defer (config->Release());
 
     IEnumSetupInstances *instances = NULL;
     hr = config->EnumInstances(&instances);
     if (hr != 0)     return;
     if (!instances)  return;
-    defer { instances->Release(); };
+    defer (instances->Release());
 
     while (1) {
         ULONG found = 0;
@@ -444,21 +438,21 @@ void find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
         auto hr = instances->Next(1, &instance, &found);
         if (hr != S_OK) break;
 
-        defer { instance->Release(); };
+        defer (instance->Release());
         
         BSTR bstr_inst_path;
         hr = instance->GetInstallationPath(&bstr_inst_path);
         if (hr != S_OK)  continue;
-        defer { SysFreeString(bstr_inst_path); };
+        defer (SysFreeString(bstr_inst_path));
         
         auto tools_filename = concat(bstr_inst_path, L"\\VC\\Auxiliary\\Build\\Microsoft.VCToolsVersion.default.txt");
-        defer { free(tools_filename); };
+        defer (free(tools_filename));
 
         FILE *f = nullptr;
         auto open_result = _wfopen_s(&f, tools_filename, L"rt");
         if (open_result != 0) continue;
         if (!f) continue;
-        defer { fclose(f); };
+        defer (fclose(f));
 
         LARGE_INTEGER tools_file_size;
         auto file_handle = (HANDLE)_get_osfhandle(_fileno(f));
@@ -469,7 +463,7 @@ void find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
         if (version_bytes > 0x7FFFFFFF) continue;   // Avoid overflow.
 
         wchar_t *version = (wchar_t *)malloc(version_bytes);
-        defer { free(version); };
+        defer (free(version));
 
         auto read_result = fgetws(version, (int)version_bytes, f);
         if (!read_result) continue;
@@ -502,7 +496,7 @@ void find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
     rc = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VS7", 0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &vs7_key);
 
     if (rc != S_OK)  return;
-    defer { RegCloseKey(vs7_key); };
+    defer (RegCloseKey(vs7_key));
 
     // Hardcoded search for 4 prior Visual Studio versions. Is there something better to do here?
     wchar_t *versions[] = { L"14.0", L"12.0", L"11.0", L"10.0" };
@@ -521,7 +515,7 @@ void find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
 
         auto buffer = (wchar_t *)malloc(cb_data);
         if (!buffer)  return;
-        defer { free(buffer); };
+        defer (free(buffer));
         
         rc = RegQueryValueExW(vs7_key, v, NULL, NULL, (LPBYTE)buffer, &cb_data);
         if (rc != 0)  continue;
@@ -532,7 +526,7 @@ void find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
 
         // Check to see whether a vcruntime.lib actually exists here.
         auto vcruntime_filename = concat(lib_path, L"\\vcruntime.lib");
-        defer { free(vcruntime_filename); };
+        defer (free(vcruntime_filename));
 
         if (os_file_exists(vcruntime_filename)) {
             result->vs_exe_path     = concat(buffer, L"VC\\bin");
@@ -576,7 +570,7 @@ static char * ucs2_to_utf8(wchar_t * wstr) {
 Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8() {
 
     Find_Result result = find_visual_studio_and_windows_sdk();
-    defer { free_resources(&result); };
+    defer (free_resources(&result));
 
     Find_Result_Utf8 r;
     r.windows_sdk_version = result.windows_sdk_version;
@@ -589,6 +583,3 @@ Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8() {
 
     return r;
 }
-
-
-#undef defer
