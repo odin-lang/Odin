@@ -1,10 +1,5 @@
 // #define NO_ARRAY_BOUNDS_CHECK
 
-#if defined(_WIN32) || defined(_WIN64)
-// NOTE(IC): In order to find Visual C++ paths without relying on environment variables.
-#include "microsoft_craziness.h"
-#endif 
-
 #include "common.cpp"
 #include "timings.cpp"
 #include "tokenizer.cpp"
@@ -26,6 +21,11 @@ gb_global Timings global_timings = {0};
 #include "ir_opt.cpp"
 #include "ir_print.cpp"
 #include "query_data.cpp"
+
+#if defined(GB_SYSTEM_WINDOWS)
+// NOTE(IC): In order to find Visual C++ paths without relying on environment variables.
+#include "microsoft_craziness.h"
+#endif 
 
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
