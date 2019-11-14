@@ -1775,14 +1775,14 @@ irValue *ir_add_param(irProcedure *proc, Entity *e, Ast *expr, Type *abi_type, i
 
 	case irParamPass_BitCast: {
 		irValue *l = ir_add_local(proc, e, expr, false, index);
-		irValue *x = ir_emit_bitcast(proc, v, e->type);
+		irValue *x = ir_emit_transmute(proc, v, e->type);
 		ir_emit_store(proc, l, x);
 		return x;
 	}
 	case irParamPass_Tuple: {
 		irValue *l = ir_add_local(proc, e, expr, true, index);
 		Type *st = struct_type_from_systemv_distribute_struct_fields(abi_type);
-		irValue *ptr = ir_emit_bitcast(proc, l, alloc_type_pointer(st));
+		irValue *ptr = ir_emit_transmute(proc, l, alloc_type_pointer(st));
 		if (abi_type->Tuple.variables.count > 0) {
 			array_pop(&proc->params);
 		}
@@ -3090,7 +3090,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 			} else if (new_type == t_llvm_bool) {
 				array_add(&processed_args, ir_emit_conv(p, args[i], new_type));
 			} else if (is_type_simd_vector(new_type)) {
-				array_add(&processed_args, ir_emit_bitcast(p, args[i], new_type));
+				array_add(&processed_args, ir_emit_transmute(p, args[i], new_type));
 			} else if (is_type_tuple(new_type)) {
 				Type *abi_type = pt->Proc.abi_compat_params[i];
 				Type *st = struct_type_from_systemv_distribute_struct_fields(abi_type);
@@ -5357,6 +5357,8 @@ bool ir_is_type_aggregate(Type *t) {
 		// case Basic_complex32:
 		case Basic_complex64:
 		case Basic_complex128:
+		case Basic_quaternion128:
+		case Basic_quaternion256:
 			return true;
 		}
 		break;
@@ -5372,6 +5374,7 @@ bool ir_is_type_aggregate(Type *t) {
 	case Type_DynamicArray:
 	case Type_Map:
 	case Type_BitField:
+	case Type_SimdVector:
 		return true;
 
 	case Type_Named:
