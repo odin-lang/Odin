@@ -357,6 +357,8 @@ String odin_root_dir(void) {
 
 #include <mach-o/dyld.h>
 
+String path_to_fullpath(gbAllocator a, String s);
+
 String odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
@@ -390,7 +392,8 @@ String odin_root_dir(void) {
 	text = gb_alloc_array(string_buffer_allocator, u8, len + 1);
 	gb_memmove(text, &path_buf[0], len);
 
-	path = make_string(text, len);
+	path = path_to_fullpath(heap_allocator(), make_string(text, len));
+
 	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path[i];
 		if (c == '/' || c == '\\') {
@@ -451,7 +454,7 @@ String odin_root_dir(void) {
 
 	gb_memmove(text, &path_buf[0], len);
 
-	path = make_string(text, len);
+	path = path_to_fullpath(heap_allocator(), make_string(text, len));
 	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path[i];
 		if (c == '/' || c == '\\') {
