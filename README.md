@@ -15,7 +15,7 @@
         <img src="https://img.shields.io/discord/568138951836172421?logo=discord">
     </a>
     <a href="https://github.com/odin-lang/odin/actions">
-        <img src="https://github.com/odin-lang/odin/workflows/CI/badge.svg">
+        <img src="https://github.com/odin-lang/odin/workflows/CI/badge.svg?branch=master">
     </a>
 </p>
 
