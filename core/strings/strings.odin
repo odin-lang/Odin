@@ -700,10 +700,11 @@ reverse :: proc(s: string, allocator := context.allocator) -> string {
 	str := s;
 	n := len(str);
 	buf := make([]byte, n);
-	i := 0;
+	i := n;
 
 	for len(str) > 0 {
 		_, w := utf8.decode_rune_in_string(str);
+		i -= w;
 		copy(buf[i:], cast([]byte)str[:w]);
 		str = str[w:];
 	}
