@@ -415,6 +415,8 @@ String odin_root_dir(void) {
 // NOTE: Linux / Unix is unfinished and not tested very well.
 #include <sys/stat.h>
 
+String path_to_fullpath(gbAllocator a, String s);
+
 String odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
