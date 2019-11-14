@@ -1,0 +1,21 @@
+{
+	"folders":
+	[
+		{
+			"path": "."
+		}
+	],
+    "settings":
+    {
+        "tab_size": 4,
+        "translate_tabs_to_spaces": false
+    },
+    "build_systems":
+    [
+        {
+            "name": "Build",
+            "working_dir": "$project_path",
+            "shell_cmd": "build_ci.bat"
+        }
+    ]
+}
