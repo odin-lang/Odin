@@ -169,6 +169,9 @@ close :: proc(fd: Handle) {
 write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	assert(fd != -1);
 
+	if len(data) == 0 {
+		return 0, 1;
+	}
 	bytes_written := _unix_write(fd, &data[0], len(data));
 	if(bytes_written == -1) {
 		return 0, 1;
