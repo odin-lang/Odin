@@ -2884,11 +2884,115 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 				count = 0;
 			}
 			Type *elem = check_type_expr(ctx, at->elem, nullptr);
-			*type = alloc_type_array(elem, count, generic_type);
+
+			if (at->tag != nullptr) {
+				GB_ASSERT(at->tag->kind == Ast_BasicDirective);
+				String name = at->tag->BasicDirective.name;
+				if (name == "soa") {
+					Type *bt_elem = base_type(elem);
+					if (!is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
+						gbString str = type_to_string(elem);
+						error(at->elem, "Invalid type for an #soa array, expected a struct or array of length 4 or below, got '%s'", str);
+						gb_string_free(str);
+						*type = alloc_type_array(elem, count, generic_type);
+						goto array_end;
+					}
+
+					Type *soa_struct = nullptr;
+					Scope *scope = nullptr;
+
+					if (is_type_array(elem)) {
+						Type *old_array = base_type(elem);
+						soa_struct = alloc_type_struct();
+						soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_array->Array.count);
+						soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_array->Array.count);
+						soa_struct->Struct.node = e;
+						soa_struct->Struct.is_soa = true;
+						soa_struct->Struct.soa_elem = elem;
+						soa_struct->Struct.soa_count = count;
+
+						scope = create_scope(ctx->scope, ctx->allocator);
+						soa_struct->Struct.scope = scope;
+
+						String params_xyzw[4] = {
+							str_lit("x"),
+							str_lit("y"),
+							str_lit("z"),
+							str_lit("w")
+						};
+
+						for (i64 i = 0; i < old_array->Array.count; i++) {
+							Type *array_type = alloc_type_array(old_array->Array.elem, count);
+							Token token = {};
+							token.string = params_xyzw[i];
+
+							Entity *new_field = alloc_entity_field(scope, token, array_type, false, cast(i32)i);
+							soa_struct->Struct.fields[i] = new_field;
+							add_entity(ctx->checker, scope, nullptr, new_field);
+							add_entity_use(ctx, nullptr, new_field);
+						}
+
+					} else {
+						GB_ASSERT(is_type_struct(elem));
+
+						Type *old_struct = base_type(elem);
+						soa_struct = alloc_type_struct();
+						soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_struct->Struct.fields.count);
+						soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_struct->Struct.tags.count);
+						soa_struct->Struct.node = e;
+						soa_struct->Struct.is_soa = true;
+						soa_struct->Struct.soa_elem = elem;
+						soa_struct->Struct.soa_count = count;
+
+						scope = create_scope(old_struct->Struct.scope->parent, ctx->allocator);
+						soa_struct->Struct.scope = scope;
+
+						for_array(i, old_struct->Struct.fields) {
+							Entity *old_field = old_struct->Struct.fields[i];
+							if (old_field->kind == Entity_Variable) {
+								Type *array_type = alloc_type_array(old_field->type, count);
+								Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
+								soa_struct->Struct.fields[i] = new_field;
+								add_entity(ctx->checker, scope, nullptr, new_field);
+							} else {
+								soa_struct->Struct.fields[i] = old_field;
+							}
+
+							soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
+						}
+					}
+
+					Token token = {};
+					token.string = str_lit("Base_Type");
+					Entity *base_type_entity = alloc_entity_type_name(scope, token, elem, EntityState_Resolved);
+					add_entity(ctx->checker, scope, nullptr, base_type_entity);
+
+					add_type_info_type(ctx, soa_struct);
+
+					*type = soa_struct;
+
+
+				} else if (name == "vector") {
+					if (!is_type_valid_vector_elem(elem)) {
+						gbString str = type_to_string(elem);
+						error(at->elem, "Invalid element type for 'intrinsics.vector', expected an integer or float with no specific endianness, got '%s'", str);
+						gb_string_free(str);
+						*type = alloc_type_array(elem, count, generic_type);
+						goto array_end;
+					}
+
+					*type = alloc_type_simd_vector(count, elem);
+				} else {
+					GB_PANIC("Unhandled array type tag %.*s", LIT(name));
+				}
+			} else {
+				*type = alloc_type_array(elem, count, generic_type);
+			}
 		} else {
 			Type *elem = check_type(ctx, at->elem);
 			*type = alloc_type_slice(elem);
 		}
+	array_end:
 		set_base_type(named_type, *type);
 		return true;
 	case_end;

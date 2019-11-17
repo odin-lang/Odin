@@ -6,170 +6,530 @@ import "core:os"
 import "core:reflect"
 import "intrinsics"
 
-when os.OS == "windows" {
-	import "core:thread"
-}
-
 /*
-    The Odin programming language is fast, concise, readable, pragmatic and open sourced. It is designed with the intent of replacing C with the following goals:
-     * simplicity
-     * high performance
-     * built for modern systems
-     * joy of programming
+	The Odin programming language is fast, concise, readable, pragmatic and open sourced. 
+	It is designed with the intent of replacing C with the following goals:
+	 * simplicity
+	 * high performance
+	 * built for modern systems
+	 * joy of programming
 
-    # Installing Odin
-    Getting Started - https://odin-lang.org/docs/install/
-        Instructions for downloading and install the Odin compiler and libraries.
+	# Installing Odin
+	Getting Started - https://odin-lang.org/docs/install/
+		Instructions for downloading and install the Odin compiler and libraries.
 
-    # Learning Odin
-    Overview of Odin - https://odin-lang.org/docs/overview/
-        An overview of the Odin programming language.
-    Frequently Asked Questions (FAQ) - https://odin-lang.org/docs/faq/
-        Answers to common questions about Odin.
+	# Learning Odin
+	Overview of Odin - https://odin-lang.org/docs/overview/
+		An overview of the Odin programming language.
+	Frequently Asked Questions (FAQ) - https://odin-lang.org/docs/faq/
+		Answers to common questions about Odin.
 */
 
-@(link_name="extra_general_stuff")
-extra_general_stuff :: proc() {
-	fmt.println("# extra_general_stuff");
-	{ // `do` for inline statements rather than block
-		foo :: proc() do fmt.println("Foo!");
-		if   false do foo();
-		for  false do foo();
-		when false do foo();
+the_basics :: proc() {
+	fmt.println("\n# the basics");
 
-		if false do foo();
-		else     do foo();
+	{ // The Basics
+		fmt.println("Hellope");
+
+		// Lexical elements and literals
+		// A comment
+
+		my_integer_variable: int; // A comment for documentaton
+
+		// Multi-line comments begin with /* and end with */. Multi-line comments can 
+		// also be nested (unlike in C):
+		/*
+			You can have any text or code here and
+			have it be commented.
+			/*
+				NOTE: comments can be nested!
+			*/
+		*/
+
+		// String literals are enclosed in double quotes and character literals in single quotes.
+		// Special characters are escaped with a backslash \
+
+		some_string := "This is a string";
+		_ = 'A'; // unicode codepoint literal
+		_ = '\n';
+		_ = "C:\\Windows\\notepad.exe";
+		// Raw string literals are enclosed with single back ticks
+		_ = `C:\Windows\notepad.exe`;
+
+		// The length of a string in bytes can be found using the built-in `len` procedure:
+		_ = len("Foo");
+		_ = len(some_string);
+
+
+		// Numbers
+
+		// Numerical literals are written similar to most other programming languages. 
+		// A useful feature in Odin is that underscores are allowed for better 
+		// readability: 1_000_000_000 (one billion). A number that contains a dot is a 
+		// floating point literal: 1.0e9 (one billion). If a number literal is suffixed 
+		// with i, is an imaginary number literal: 2i (2 multiply the square root of -1).
+
+		// Binary literals are prefixed with 0b, octal literals with 0o, and hexadecimal 
+		// literals 0x. A leading zero does not produce an octal constant (unlike C).
+
+		// In Odin, if a number constant is possible to be represented by a type without 
+		// precision loss, it will automatically convert to that type.
+
+		x: int = 1.0; // A float literal but it can be represented by an integer without precision loss
+		// Constant literals are “untyped” which means that they can implicitly convert to a type.
+
+		y: int; // `y` is typed of type `int`
+		y = 1;  // `1` is an untyped integer literal which can implicitly convert to `int`
+
+		z: f64; // `z` is typed of type `f64` (64-bit floating point number)
+		z = 1;  // `1` is an untyped integer literals which can be implicity conver to `f64`
+				// No need for any suffixes or decimal places like in other languages
+				// CONSTANTS JUST WORK!!!
+
+
+		// Assignment statements
+		h: int = 123; // declares a new variable `h` with type `int` and assigns a value to it
+		h = 637; // assigns a new value to `h`
+
+		// `=` is the assignment operator
+
+		// You can assign multiple variables with it:
+		a, b := 1, "hello"; // declares `a` and `b` and infers the types from the assignments
+		b, a = "byte", 0;
+
+		// Note: `:=` is two tokens, `:` and `=`. The follow are equivalent
+		/*
+			i: int = 123;
+			i:     = 123;
+			i := 123
+		*/
+
+		// Constant declarations
+		// Constants are entities (symbols) which have an assigned value. 
+		// The constant’s value cannot be changed. 
+		// The constant’s value must be able to be evaluated at compile time:
+		X :: "what"; // constant `X` has the untyped string value "what"
+
+		// Constants can be explicitly typed like a variable declaration:
+		Y : int : 123;
+		Z :: Y + 7; // constant computations are possible
 	}
+}
 
-	{ // Removal of `++` and `--` (again)
-		x: int;
-		x += 1;
-		x -= 1;
-	}
-	{ // Casting syntaxes
-		i := i32(137);
-		ptr := &i;
+control_flow :: proc() {
+	fmt.println("\n# control flow");
+	{ // Control flow
+		// For loop
+		// Odin has only one loop statement, the `for` loop
 
-		_ = (^f32)(ptr); // Call-based syntax
-		// ^f32(ptr) == ^(f32(ptr))
-		_ = cast(^f32)ptr; // Operator-based syntax
+		// Basic for loop
+		for i := 0; i < 10; i += 1 {
+			fmt.println(i);
+		}
 
-		_ = (^f32)(ptr)^;
-		_ = (cast(^f32)ptr)^;
-	}
+		// NOTE: Unlike other languages like C, there are no parentheses `( )` surrounding the three components.
+		// Braces `{ }` or a `do` are always required>
+		for i := 0; i < 10; i += 1 { }
+		for i := 0; i < 10; i += 1 do fmt.print();
 
-	/*
-	 * Remove *_val_of built-in procedures
-	 * size_of, align_of, offset_of
-	 * type_of, type_info_of, typeid_of
-	 */
+		// The initial and post statements are optional
+		i := 0;
+		for ; i < 10; {
+			i += 1;
+		}
 
-	{ // `expand_to_tuple` built-in procedure
-		Foo :: struct {
-			x: int,
-			b: bool,
-		};
-		f := Foo{137, true};
-		x, b := expand_to_tuple(f);
-		fmt.println(f);
-		fmt.println(x, b);
-		fmt.println(expand_to_tuple(f));
-	}
+		// These semicolons can be dropped. This `for` loop is equivalent to C's `while` loop
+		i = 0;
+		for i < 10 {
+			i += 1;
+		}
 
-	{
-		// .. open range
-		// ..< half-closed range
+		// If the condition is omitted, this produces an infinite loop:
+		for {
+			break;
+		}
 
-		for in 0..2  {} // 0, 1, 2
-		for in 0..<2 {} // 0, 1
-	}
+		// Range-based for loop
+		// The basic for loop
+		for i := 0; i < 10; i += 1 {
+			fmt.println(i);
+		}
+		// can also be written
+		for i in 0..<10 {
+			fmt.println(i);
+		}
+		for i in 0..9 {
+			fmt.println(i);
+		}
 
-	{ // Multiple sized booleans
+		// Certain built-in types can be iterated over
+		some_string := "Hello, 世界";
+		for character in some_string { // Strings are assumed to be UTF-8
+			fmt.println(character);
+		}
 
-		x0: bool; // default
-		x1: b8  = true;
-		x2: b16 = false;
-		x3: b32 = true;
-		x4: b64 = false;
+		some_array := [3]int{1, 4, 9};
+		for value in some_array {
+			fmt.println(value);
+		}
 
-		fmt.printf("x0: %T = %v;\n", x0, x0);
-		fmt.printf("x1: %T = %v;\n", x1, x1);
-		fmt.printf("x2: %T = %v;\n", x2, x2);
-		fmt.printf("x3: %T = %v;\n", x3, x3);
-		fmt.printf("x4: %T = %v;\n", x4, x4);
+		some_slice := []int{1, 4, 9};
+		for value in some_slice {
+			fmt.println(value);
+		}
 
-		// Having specific sized booleans is very useful when dealing with foreign code
-		// and to enforce specific alignment for a boolean, especially within a struct
-	}
+		some_dynamic_array := [dynamic]int{1, 4, 9};
+		defer delete(some_dynamic_array);
+		for value in some_dynamic_array {
+			fmt.println(value);
+		}
 
-	{ // `distinct` types
-		// Originally, all type declarations would create a distinct type unless #type_alias was present.
-		// Now the behaviour has been reversed. All type declarations create a type alias unless `distinct` is present.
-		// If the type expression is `struct`, `union`, `enum`, `proc`, or `bit_field`, the types will always been distinct.
 
-		Int32 :: i32;
-		#assert(Int32 == i32);
+		some_map := map[string]int{"A" = 1, "C" = 9, "B" = 4};
+		defer delete(some_map);
+		for key in some_map {
+			fmt.println(key);
+		}
 
-		My_Int32 :: distinct i32;
-		#assert(My_Int32 != i32);
+		// Alternatively a second index value can be added
+		for character, index in some_string {
+			fmt.println(index, character);
+		}
+		for value, index in some_array {
+			fmt.println(index, value);
+		}
+		for value, index in some_slice {
+			fmt.println(index, value);
+		}
+		for value, index in some_dynamic_array {
+			fmt.println(index, value);
+		}
+		for key, value in some_map {
+			fmt.println(key, value);
+		}
 
-		My_Struct :: struct{x: int};
-		#assert(My_Struct != struct{x: int});
+		// The iterated values are copies and cannot be written to.
+		// The following idiom is useful for iterating over a container in a by-reference manner:
+		for _, i in some_slice {
+			some_slice[i] = (i+1)*(i+1);
+		}
 
-		My_Struct2 :: My_Struct;
-		#assert(My_Struct2 == My_Struct);
-	}
 
-	{
-		X :: 123;
-		when #defined(X) {
-			fmt.println("X is defined");
+		// If statements
+		x := 123;
+		if x >= 0 {
+			fmt.println("x is positive");
+		}
+
+		if y := -34; y < 0 {
+			fmt.println("y is negative");
+		}
+
+		if y := 123; y < 0 {
+			fmt.println("y is negative");
+		} else if y == 0 {
+			fmt.println("y is zero");
 		} else {
-			fmt.println("X is not defined");
+			fmt.println("y is positive");
 		}
-		when #defined(Y) {
-			fmt.println("Y is defined");
-		} else {
-			fmt.println("Y is not defined");
+
+		// Switch statement
+		// A switch statement is another way to write a sequence of if-else statements. 
+		// In Odin, the default case is denoted as a case without any expression.
+
+		switch arch := ODIN_ARCH; arch {
+		case "386":
+			fmt.println("32-bit");
+		case "amd64":
+			fmt.println("64-bit");
+		case: // default
+			fmt.println("Unsupported architecture");
+		}
+
+		// Odin’s `switch` is like one in C or C++, except that Odin only runs the selected case. 
+		// This means that a `break` statement is not needed at the end of each case. 
+		// Another important difference is that the case values need not be integers nor constants.
+
+		// To achieve a C-like fall through into the next case block, the keyword `fallthrough` can be used.
+		one_angry_dwarf :: proc() -> int { 
+			fmt.println("one_angry_dwarf was called");
+			return 1;
+		}
+
+		switch i := 0; i {
+		case 0:
+		case one_angry_dwarf():
+		}
+
+		// A switch statement without a condition is the same as `switch true`. 
+		// This can be used to write a clean and long if-else chain and have the 
+		// ability to break if needed
+
+		switch {
+		case x < 0:
+			fmt.println("x is negative");
+		case x == 0:
+			fmt.println("x is zero");
+		case:
+			fmt.println("x is positive");
+		}
+
+		// A `switch` statement can also use ranges like a range-based loop:
+		switch c := 'j'; c {
+		case 'A'..'Z', 'a'..'z', '0'..'9':
+			fmt.println("c is alphanumeric");
+		}
+
+		switch x {
+		case 0..<10:
+			fmt.println("units");
+		case 10..<13:
+			fmt.println("pre-teens");
+		case 13..<20:
+			fmt.println("teens");
+		case 20..<30:
+			fmt.println("twenties");
 		}
 	}
 
-	{ // Labelled control blocks
-		block: {
-			if true {
-				fmt.println("break block;");
-				break block;
+	{ // Defer statement
+		// A defer statement defers the execution of a statement until the end of 
+		// the scope it is in.
+
+		// The following will print 4 then 234:
+		{
+			x := 123;
+			defer fmt.println(x);
+			{
+				defer x = 4;
+				x = 2;
 			}
+			fmt.println(x);
+
+			x = 234;
 		}
 
+		// You can defer an entire block too:
 		{
-			branch: if true {
-				fmt.println("break branch;");
-				break branch;
-			}
-		}
+			bar :: proc() {}
 
-		{
-			loop: for true {
-				fmt.println("break loop;");
-				break loop;
+			defer {
+				fmt.println("1");
+				fmt.println("2");
 			}
-		}
 
+			cond := false; 
+			defer if cond {
+				bar();
+			}
+		}	
+
+		// Defer statements are executed in the reverse order that they were declared:
 		{
-			cases: switch {
+			defer fmt.println("1");
+			defer fmt.println("2");
+			defer fmt.println("3");
+		}
+		// Will print 3, 2, and then 1.
+
+		if false {
+			f, err := os.open("my_file.txt");
+			if err != 0 {
+				// handle error
+			}
+			defer os.close(f);
+			// rest of code
+		}
+	}
+
+	{ // When statement
+		/* 
+			The when statement is almost identical to the if statement but with some differences:
+
+			* Each condition must be a constant expression as a when 
+			  statement is evaluated at compile time.
+			* The statements within a branch do not create a new scope
+			* The compiler checks the semantics and code only for statements 
+			  that belong to the first condition that is true
+			* An initial statement is not allowed in a when statement
+			* when statements are allowed at file scope
+		*/
+
+		// Example
+		when ODIN_ARCH == "386" {
+			fmt.println("32 bit");
+		} else when ODIN_ARCH == "amd64" {
+			fmt.println("64 bit");
+		} else {
+			fmt.println("Unsupported architecture");
+		}
+		// The when statement is very useful for writing platform specific code. 
+		// This is akin to the #if construct in C’s preprocessor however, in Odin, 
+		// it is type checked.
+	}
+
+	{ // Branch statements
+		cond, cond1, cond2 := false, false, false;
+		one_step :: proc() { fmt.println("one_step"); }
+		beyond :: proc() { fmt.println("beyond"); }
+
+		// Break statement
+		for cond {
+			switch {
 			case:
-				fmt.println("break cases;");
-				break cases;
+				if cond {
+					break; // break out of the `switch` statement
+				}
+			}
+
+			break; // break out of the `for` statement
+		}
+
+		loop: for cond1 {
+			for cond2 {
+				break loop; // leaves both loops
 			}
 		}
 
+		// Continue statement
+		for cond {
+			if cond2 {
+				continue;
+			}
+			fmt.println("Hellope");
+		}
+
+		// Fallthrough statement
+
+		// Odin’s switch is like one in C or C++, except that Odin only runs the selected 
+		// case. This means that a break statement is not needed at the end of each case. 
+		// Another important difference is that the case values need not be integers nor 
+		// constants.
+
+		// fallthrough can be used to explicitly fall through into the next case block:
+
+		switch i := 0; i {
+		case 0:
+			one_step();
+			fallthrough;
+		case 1:
+			beyond();
+		}
 	}
+}
+
+
+named_proc_return_parameters :: proc() {
+	fmt.println("\n# named proc return parameters");
+
+	foo0 :: proc() -> int {
+		return 123;
+	}
+	foo1 :: proc() -> (a: int) {
+		a = 123;
+		return;
+	}
+	foo2 :: proc() -> (a, b: int) {
+		// Named return values act like variables within the scope
+		a = 321;
+		b = 567;
+		return b, a;
+	}
+	fmt.println("foo0 =", foo0()); // 123
+	fmt.println("foo1 =", foo1()); // 123
+	fmt.println("foo2 =", foo2()); // 567 321
+}
+
+
+explicit_procedure_overloading :: proc() {
+	fmt.println("\n# explicit procedure overloading");
+
+	add_ints :: proc(a, b: int) -> int {
+		x := a + b;
+		fmt.println("add_ints", x);
+		return x;
+	}
+	add_floats :: proc(a, b: f32) -> f32 {
+		x := a + b;
+		fmt.println("add_floats", x);
+		return x;
+	}
+	add_numbers :: proc(a: int, b: f32, c: u8) -> int {
+		x := int(a) + int(b) + int(c);
+		fmt.println("add_numbers", x);
+		return x;
+	}
+
+	add :: proc{add_ints, add_floats, add_numbers};
+
+	add(int(1), int(2));
+	add(f32(1), f32(2));
+	add(int(1), f32(2), u8(3));
+
+	add(1, 2);     // untyped ints coerce to int tighter than f32
+	add(1.0, 2.0); // untyped floats coerce to f32 tighter than int
+	add(1, 2, 3);  // three parameters
+
+	// Ambiguous answers
+	// add(1.0, 2);
+	// add(1, 2.0);
+}
+
+struct_type :: proc() {
+	fmt.println("\n# struct type");
+	// A struct is a record type in Odin. It is a collection of fields. 
+	// Struct fields are accessed by using a dot:	
+	{
+		Vector2 :: struct {
+			x: f32,
+			y: f32,
+		};
+		v := Vector2{1, 2};
+		v.x = 4;
+		fmt.println(v.x);
+
+		// Struct fields can be accessed through a struct pointer:
+
+		v = Vector2{1, 2};
+		p := &v;
+		p.x = 1335;
+		fmt.println(v);
+
+		// We could write p^.x, however, it is to nice abstract the ability 
+		// to not explicitly dereference the pointer. This is very useful when 
+		// refactoring code to use a pointer rather than a value, and vice versa.
+	}
+	{
+		// A struct literal can be denoted by providing the struct’s type 
+		// followed by {}. A struct literal must either provide all the 
+		// arguments or none:
+		Vector3 :: struct {
+			x, y, z: f32,
+		};
+		v: Vector3;
+		v = Vector3{}; // Zero value
+		v = Vector3{1, 4, 9};
+
+		// You can list just a subset of the fields if you specify the 
+		// field by name (the order of the named fields does not matter):
+		v = Vector3{z=1, y=2};
+		assert(v.x == 0);
+		assert(v.y == 2);
+		assert(v.z == 1);		
+	}
+	{
+		// Structs can tagged with different memory layout and alignment requirements:
+
+		a :: struct #align 4   {}; // align to 4 bytes
+		b :: struct #packed    {}; // remove padding between fields
+		c :: struct #raw_union {}; // all fields share the same offset (0). This is the same as C's union
+	}
+
 }
 
 
 union_type :: proc() {
-	fmt.println("\n# union_type");
+	fmt.println("\n# union type");
 	{
 		val: union{int, bool};
 		val = 137;
@@ -342,8 +702,141 @@ union_type :: proc() {
 	}
 }
 
+using_statement :: proc() {
+	fmt.println("\n# using statement");
+	// using can used to bring entities declared in a scope/namespace 
+	// into the current scope. This can be applied to import declarations, 
+	// import names, struct fields, procedure fields, and struct values.
+
+	Vector3 :: struct{x, y, z: f32};
+	{
+		Entity :: struct {
+			position: Vector3,
+			orientation: quaternion128,
+		};
+
+		// It can used like this:
+		foo0 :: proc(entity: ^Entity) {
+			fmt.println(entity.position.x, entity.position.y, entity.position.z);
+		}
+
+		// The entity members can be brought into the procedure scope by using it:
+		foo1 :: proc(entity: ^Entity) {
+			using entity;
+			fmt.println(position.x, position.y, position.z);
+		}
+
+		// The using can be applied to the parameter directly:
+		foo2 :: proc(using entity: ^Entity) {
+			fmt.println(position.x, position.y, position.z);
+		}
+
+		// It can also be applied to sub-fields:
+		foo3 :: proc(entity: ^Entity) {
+			using entity.position;
+			fmt.println(x, y, z);
+		}
+	}
+	{
+		// We can also apply the using statement to the struct fields directly, 
+		// making all the fields of position appear as if they on Entity itself:
+		Entity :: struct {
+			using position: Vector3,
+			orientation: quaternion128,
+		};
+		foo :: proc(entity: ^Entity) {
+			fmt.println(entity.x, entity.y, entity.z);
+		}
+		
+
+		// Subtype polymorphism
+		// It is possible to get subtype polymorphism, similar to inheritance-like 
+		// functionality in C++, but without the requirement of vtables or unknown 
+		// struct layout:
+
+		Colour :: struct {r, g, b, a: u8};
+		Frog :: struct {
+			ribbit_volume: f32,
+			using entity: Entity,
+			colour: Colour,
+		};
+
+		frog: Frog;
+		// Both work
+		foo(&frog.entity);
+		foo(&frog);
+		frog.x = 123;
+
+		// Note: using can be applied to arbitrarily many things, which allows 
+		// the ability to have multiple subtype polymorphism (but also its issues).
+
+		// Note: using’d fields can still be referred by name.
+	}
+	{ // using on an enum declaration
+
+		using Foo :: enum {A, B, C};
+
+		f0 := A;
+		f1 := B;
+		f2 := C;
+		fmt.println(f0, f1, f2);
+		fmt.println(len(Foo));
+	}
+}
+
+
+implicit_context_system :: proc() {
+	fmt.println("\n# implicit context system");
+	// In each scope, there is an implicit value named context. This 
+	// context variable is local to each scope and is implicitly passed 
+	// by pointer to any procedure call in that scope (if the procedure 
+	// has the Odin calling convention).
+
+	// The main purpose of the implicit context system is for the ability 
+	// to intercept third-party code and libraries and modify their 
+	// functionality. One such case is modifying how a library allocates
+	// something or logs something. In C, this was usually achieved with 
+	// the library defining macros which could be overridden so that the 
+	// user could define what he wanted. However, not many libraries 
+	// supported this in many languages by default which meant intercepting 
+	// third-party code to see what it does and to change how it does it is 
+	// not possible.
+
+	c := context; // copy the current scope's context
+
+	context.user_index = 456;
+	{
+		context.allocator = my_custom_allocator();
+		context.user_index = 123;
+		what_a_fool_believes(); // the `context` for this scope is implicitly passed to `what_a_fool_believes`
+	}
+
+	// `context` value is local to the scope it is in
+	assert(context.user_index == 456);
+
+	what_a_fool_believes :: proc() {
+		c := context; // this `context` is the same as the parent procedure that it was called from
+		// From this example, context.user_index == 123
+		// An context.allocator is assigned to the return value of `my_custom_allocator()`
+		assert(context.user_index == 123);
+
+		// The memory management procedure use the `context.allocator` by 
+		// default unless explicitly specified otherwise
+		china_grove := new(int);
+		free(china_grove);
+	}
+
+	my_custom_allocator :: mem.nil_allocator;
+
+	// By default, the context value has default values for its parameters which is 
+	// decided in the package runtime. What the defaults are are compiler specific.
+
+	// To see what the implicit context value contains, please see the following 
+	// definition in package runtime.
+}
+
 parametric_polymorphism :: proc() {
-	fmt.println("\n# parametric_polymorphism");
+	fmt.println("\n# parametric polymorphism");
 
 	print_value :: proc(value: $T) {
 		fmt.printf("print_value: %T %v\n", value, value);
@@ -589,60 +1082,8 @@ parametric_polymorphism :: proc() {
 }
 
 
-
-
-prefix_table := [?]string{
-	"White",
-	"Red",
-	"Green",
-	"Blue",
-	"Octarine",
-	"Black",
-};
-
-threading_example :: proc() {
-	when os.OS == "windows" {
-		fmt.println("\n# threading_example");
-
-		worker_proc :: proc(t: ^thread.Thread) -> int {
-			for iteration in 1..5 {
-				fmt.printf("Thread %d is on iteration %d\n", t.user_index, iteration);
-				fmt.printf("`%s`: iteration %d\n", prefix_table[t.user_index], iteration);
-				// win32.sleep(1);
-			}
-			return 0;
-		}
-
-		threads := make([dynamic]^thread.Thread, 0, len(prefix_table));
-		defer delete(threads);
-
-		for in prefix_table {
-			if t := thread.create(worker_proc); t != nil {
-				t.init_context = context;
-				t.use_init_context = true;
-				t.user_index = len(threads);
-				append(&threads, t);
-				thread.start(t);
-			}
-		}
-
-		for len(threads) > 0 {
-			for i := 0; i < len(threads); /**/ {
-				if t := threads[i]; thread.is_done(t) {
-					fmt.printf("Thread %d is done\n", t.user_index);
-					thread.destroy(t);
-
-					ordered_remove(&threads, i);
-				} else {
-					i += 1;
-				}
-			}
-		}
-	}
-}
-
 array_programming :: proc() {
-	fmt.println("\n# array_programming");
+	fmt.println("\n# array programming");
 	{
 		a := [3]f32{1, 2, 3};
 		b := [3]f32{5, 6, 7};
@@ -686,92 +1127,23 @@ array_programming :: proc() {
 	}
 }
 
-named_proc_return_parameters :: proc() {
-	fmt.println("\n# named proc return parameters");
-
-	foo0 :: proc() -> int {
-		return 123;
-	}
-	foo1 :: proc() -> (a: int) {
-		a = 123;
-		return;
-	}
-	foo2 :: proc() -> (a, b: int) {
-		// Named return values act like variables within the scope
-		a = 321;
-		b = 567;
-		return b, a;
-	}
-	fmt.println("foo0 =", foo0()); // 123
-	fmt.println("foo1 =", foo1()); // 123
-	fmt.println("foo2 =", foo2()); // 567 321
-}
-
-
-using_enum :: proc() {
-	fmt.println("\n# using enum");
-
-	using Foo :: enum {A, B, C};
-
-	f0 := A;
-	f1 := B;
-	f2 := C;
-	fmt.println(f0, f1, f2);
-	fmt.println(len(Foo));
-}
-
 map_type :: proc() {
 	fmt.println("\n# map type");
 
-	// enums of type u16, u32, i16 & i32 also work
-	Enum_u8 :: enum u8 {
-		A = 0,
-		B = 1 << 8 - 1,
-	};
-	Enum_u64 :: enum u64 {
-		A = 0,
-		B = 1 << 64 - 1,
-	};
-	Enum_i8 :: enum i8 {
-		A = 0,
-		B = -(1 << 7),
-	};
-	Enum_i64 :: enum i64 {
-		A = 0,
-		B = -(1 << 63),
-	};
+	m := make(map[string]int);
+	defer delete(m);
 
-	map_u8: map[Enum_u8]u8;
-	map_u8[Enum_u8.A] = u8(Enum_u8.B);
-	assert(map_u8[Enum_u8.A] == u8(Enum_u8.B));
-	fmt.println(map_u8);
+	m["Bob"] = 2; 
+	m["Ted"] = 5;
+	fmt.println(m["Bob"]);
 
-	map_u64: map[Enum_u64]u64;
-	map_u64[Enum_u64.A] = u64(Enum_u64.B);
-	assert(map_u64[Enum_u64.A] == u64(Enum_u64.B));
-	fmt.println(map_u64);
+	delete_key(&m, "Ted");
 
-	map_i8: map[Enum_i8]i8;
-	map_i8[Enum_i8.A] = i8(Enum_i8.B);
-	assert(map_i8[Enum_i8.A] == i8(Enum_i8.B));
-	fmt.println(map_i8);
-
-	map_i64: map[Enum_i64]i64;
-	map_i64[Enum_i64.A] = i64(Enum_i64.B);
-	assert(map_i64[Enum_i64.A] == i64(Enum_i64.B));
-	fmt.println(map_i64);
-
-	demo_struct :: struct {
-		member: Enum_i64,
-	};
-
-	map_string: map[string]demo_struct;
-	map_string["Hellope!"] = demo_struct{Enum_i64.B};
-	assert(map_string["Hellope!"].member == Enum_i64.B);
-	assert("Hellope?" notin map_string);
-	fmt.println(map_string);
-	fmt.println("Hellope! in map_string:", "Hellope!" in map_string);
-	fmt.println("Hellope? in map_string:", "Hellope?" in map_string);
+	// If an element of a key does not exist, the zero value of the 
+	// element will be returned. To check to see if an element exists 
+	// can be done in two ways:
+	elem, ok := m["Bob"];
+	exists := "Bob" in m;
 
 }
 
@@ -781,6 +1153,7 @@ implicit_selector_expression :: proc() {
 	Foo :: enum {A, B, C};
 
 	f: Foo;
+	f = Foo.A;
 	f = .A;
 
 	BAR :: bit_set[Foo]{.B, .C};
@@ -803,61 +1176,25 @@ implicit_selector_expression :: proc() {
 	fmt.println(my_map[.A] + my_map[Foo.B] + my_map[.C]);
 }
 
-explicit_procedure_overloading :: proc() {
-	fmt.println("\n# explicit procedure overloading");
-
-	add_ints :: proc(a, b: int) -> int {
-		x := a + b;
-		fmt.println("add_ints", x);
-		return x;
-	}
-	add_floats :: proc(a, b: f32) -> f32 {
-		x := a + b;
-		fmt.println("add_floats", x);
-		return x;
-	}
-	add_numbers :: proc(a: int, b: f32, c: u8) -> int {
-		x := int(a) + int(b) + int(c);
-		fmt.println("add_numbers", x);
-		return x;
-	}
-
-	add :: proc{add_ints, add_floats, add_numbers};
-
-	add(int(1), int(2));
-	add(f32(1), f32(2));
-	add(int(1), f32(2), u8(3));
-
-	add(1, 2);     // untyped ints coerce to int tighter than f32
-	add(1.0, 2.0); // untyped floats coerce to f32 tighter than int
-	add(1, 2, 3);  // three parameters
-
-	// Ambiguous answers
-	// add(1.0, 2);
-	// add(1, 2.0);
-}
 
 complete_switch :: proc() {
 	fmt.println("\n# complete_switch");
 	{ // enum
-		using Foo :: enum {
+		Foo :: enum {
 			A,
 			B,
 			C,
 			D,
 		};
 
-		b := Foo.B;
 		f := Foo.A;
 		#complete switch f {
-		case A: fmt.println("A");
-		case B: fmt.println("B");
-		case C: fmt.println("C");
-		case D: fmt.println("D");
-		case:   fmt.println("?");
+		case .A: fmt.println("A");
+		case .B: fmt.println("B");
+		case .C: fmt.println("C");
+		case .D: fmt.println("D");
+		case:    fmt.println("?");
 		}
-
-		_ = b;
 	}
 	{ // union
 		Foo :: union {int, bool};
@@ -890,21 +1227,8 @@ cstring_example :: proc() {
 	// cast(string)cstring is O(N)
 }
 
-deprecated_attribute :: proc() {
-	@(deprecated="Use foo_v2 instead")
-	foo_v1 :: proc(x: int) {
-		fmt.println("foo_v1");
-	}
-	foo_v2 :: proc(x: int) {
-		fmt.println("foo_v2");
-	}
-
-	// NOTE: Uncomment to see the warning messages
-	// foo_v1(1);
-}
-
 bit_set_type :: proc() {
-	fmt.println("\n# bit_set_type");
+	fmt.println("\n# bit_set type");
 
 	{
 		using Day :: enum {
@@ -966,19 +1290,8 @@ bit_set_type :: proc() {
 	}
 }
 
-diverging_procedures :: proc() {
-	fmt.println("\n# diverging_procedures");
-
-	// Diverging procedures may never return
-	foo :: proc() -> ! {
-		fmt.println("I'm a diverging procedure");
-	}
-
-	foo();
-}
-
 deferred_procedure_associations :: proc() {
-	fmt.println("\n# deferred_procedure_associations");
+	fmt.println("\n# deferred procedure associations");
 
 	@(deferred_out=closure)
 	open :: proc(s: string) -> bool {
@@ -1031,6 +1344,7 @@ reflection :: proc() {
 }
 
 quaternions :: proc() {
+	// Not just an April Fool's Joke any more, but a fully working thing!
 	fmt.println("\n# quaternions");
 
 	{ // Quaternion operations
@@ -1117,7 +1431,7 @@ where_clauses :: proc() {
 	{ // Sanity checks
 		simple_sanity_check :: proc(x: [2]int)
 			where len(x) > 1,
-			      type_of(x) == [2]int {
+				  type_of(x) == [2]int {
 			fmt.println(x);
 		}
 	}
@@ -1158,7 +1472,7 @@ where_clauses :: proc() {
 
 		bar :: proc(x: [$N]int) -> bool
 			where 0 < N,
-			      N <= 2 {
+				  N <= 2 {
 			fmt.println(#procedure, "was called with the parameter", x);
 			return false;
 		}
@@ -1176,7 +1490,7 @@ where_clauses :: proc() {
 	{ // Record types
 		Foo :: struct(T: typeid, N: int)
 			where intrinsics.type_is_integer(T),
-			      N > 2 {
+				  N > 2 {
 			x: [N]T,
 			y: [N-2]T,
 		};
@@ -1185,6 +1499,48 @@ where_clauses :: proc() {
 		N :: 5;
 		f: Foo(T, N);
 		#assert(size_of(f) == (N+N-2)*size_of(T));
+	}
+}
+
+
+when ODIN_OS == "windows" do foreign import kernel32 "system:kernel32.lib"
+
+foreign_system :: proc() {
+	fmt.println("\n#foreign system");
+	when ODIN_OS == "windows" {
+		// It is sometimes necessarily to interface with foreign code, 
+		// such as a C library. In Odin, this is achieved through the 
+		// foreign system. You can “import” a library into the code 
+		// using the same semantics as a normal import declaration.
+
+		// This foreign import declaration will create a 
+		// “foreign import name” which can then be used to associate 
+		// entities within a foreign block.
+
+		foreign kernel32 {
+			ExitProcess :: proc "stdcall" (exit_code: u32) ---
+		}
+
+		// Foreign procedure declarations have the cdecl/c calling 
+		// convention by default unless specified otherwise. Due to 
+		// foreign procedures do not have a body declared within this 
+		// code, you need append the --- symbol to the end to distinguish 
+		// it as a procedure literal without a body and not a procedure type.
+
+		// The attributes system can be used to change specific properties 
+		// of entities declared within a block:
+
+		@(default_calling_convention = "std")
+		foreign kernel32 {
+			@(link_name="GetLastError") get_last_error :: proc() -> i32 ---
+		}
+
+		// Example using the link_prefix attribute
+		@(default_calling_convention = "std")
+		@(link_prefix = "Get")
+		foreign kernel32 {
+			LastError :: proc() -> i32 ---
+		}
 	}
 }
 
@@ -1231,6 +1587,19 @@ ranged_fields_for_array_compound_literals :: proc() {
 		assert(len(foo_dynamic_array) == 16);
 		fmt.println(foo_dynamic_array); // [123, 0, 0, 0, 0, 54, 54, 54, 54, 54, 8, 8, 8, 8, 8]
 	}
+}
+
+deprecated_attribute :: proc() {
+	@(deprecated="Use foo_v2 instead")
+	foo_v1 :: proc(x: int) {
+		fmt.println("foo_v1");
+	}
+	foo_v2 :: proc(x: int) {
+		fmt.println("foo_v2");
+	}
+
+	// NOTE: Uncomment to see the warning messages
+	// foo_v1(1);
 }
 
 range_statements_with_multiple_return_values :: proc() {
@@ -1281,6 +1650,7 @@ range_statements_with_multiple_return_values :: proc() {
 
 soa_struct_layout :: proc() {
 	// IMPORTANT NOTE(bill, 2019-11-03): This feature is subject to be changed/removed
+	// NOTE(bill): Most likely #soa [N]T
 	fmt.println("\n#SOA Struct Layout");
 
 	{
@@ -1302,7 +1672,7 @@ soa_struct_layout :: proc() {
 		fmt.println(v_aos[1]);
 		fmt.println(v_aos);
 
-		v_soa: intrinsics.soa_struct(N, Vector3);
+		v_soa: #soa[N]Vector3;
 
 		v_soa[0].x = 1;
 		v_soa[0].y = 4;
@@ -1313,6 +1683,7 @@ soa_struct_layout :: proc() {
 		fmt.println(len(v_soa));
 		fmt.println(v_soa[0]);
 		fmt.println(v_soa[0].x);
+		fmt.println(&v_soa[0].x);
 		v_soa[1] = {0, 3, 4};
 		v_soa[1].x = 2;
 		fmt.println(v_soa[1]);
@@ -1341,7 +1712,7 @@ soa_struct_layout :: proc() {
 		v_aos[0].y = 4;
 		v_aos[0].z = 9;
 
-		v_soa: intrinsics.soa_struct(N, Vector3);
+		v_soa: #soa[N]Vector3;
 
 		v_soa[0].x = 1;
 		v_soa[0].y = 4;
@@ -1349,29 +1720,32 @@ soa_struct_layout :: proc() {
 	}
 }
 
+
 main :: proc() {
 	when true {
-		extra_general_stuff();
-		union_type();
-		parametric_polymorphism();
-		threading_example();
-		array_programming();
+		the_basics();
+		control_flow();
 		named_proc_return_parameters();
-		using_enum();
+		explicit_procedure_overloading();
+		struct_type();
+		union_type();
+		using_statement();
+		implicit_context_system();
+		parametric_polymorphism();
+		array_programming();
 		map_type();
 		implicit_selector_expression();
-		explicit_procedure_overloading();
 		complete_switch();
 		cstring_example();
-		deprecated_attribute();
 		bit_set_type();
-		diverging_procedures();
 		deferred_procedure_associations();
 		reflection();
 		quaternions();
 		inline_for_statement();
 		where_clauses();
+		foreign_system();
 		ranged_fields_for_array_compound_literals();
+		deprecated_attribute();
 		range_statements_with_multiple_return_values();
 		soa_struct_layout();
 	}

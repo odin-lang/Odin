@@ -183,6 +183,13 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 		print_type(fd, info.value);
 
 	case Type_Info_Struct:
+		if info.soa_base_type != nil {
+			os.write_string(fd, "#soa[");
+			print_u64(fd, u64(info.soa_len));
+			os.write_byte(fd, ']');
+			print_type(fd, info.soa_base_type);
+			break;
+		}
 		os.write_string(fd, "struct ");
 		if info.is_packed    do os.write_string(fd, "#packed ");
 		if info.is_raw_union do os.write_string(fd, "#raw_union ");
@@ -263,11 +270,10 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 		if info.is_x86_mmx {
 			os.write_string(fd, "intrinsics.x86_mmx");
 		} else {
-			os.write_string(fd, "intrinsics.vector(");
+			os.write_string(fd, "#vector[");
 			print_u64(fd, u64(info.count));
-			os.write_string(fd, ", ");
+			os.write_byte(fd, ']');
 			print_type(fd, info.elem);
-			os.write_byte(fd, ')');
 		}
 	}
 }
