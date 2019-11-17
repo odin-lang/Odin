@@ -1758,6 +1758,17 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		} else if (name.string == "defined") {
 			Ast *tag = ast_basic_directive(f, token, name.string);
 			return parse_call_expr(f, tag);
+		} else if (name.string == "soa" || name.string == "vector") {
+			Ast *tag = ast_basic_directive(f, token, name.string);
+			Ast *type = parse_type(f);
+			switch (type->kind) {
+			case Ast_ArrayType:        type->ArrayType.tag = tag;        break;
+			case Ast_DynamicArrayType: type->DynamicArrayType.tag = tag; break;
+			default:	
+				syntax_error(type, "Expected an array type after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[type->kind]));
+				break;
+			}
+			return type;
 		} else {
 			operand = ast_tag_expr(f, token, name, parse_expr(f, false));
 		}

@@ -394,6 +394,13 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		write_type(buf, info.value);
 
 	case rt.Type_Info_Struct:
+		if info.soa_base_type != nil {
+			write_string(buf, "#soa[");
+			write_i64(buf, i64(info.soa_len));
+			write_byte(buf, ']');
+			write_type(buf, info.soa_base_type);
+			break;
+		}	
 		write_string(buf, "struct ");
 		if info.is_packed    do write_string(buf, "#packed ");
 		if info.is_raw_union do write_string(buf, "#raw_union ");
@@ -479,11 +486,10 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		if info.is_x86_mmx {
 			write_string(buf, "intrinsics.x86_mmx");
 		} else {
-			write_string(buf, "intrinsics.vector(");
+			write_string(buf, "#vector[");
 			write_i64(buf, i64(info.count));
-			write_string(buf, ", ");
+			write_byte(buf, ']');
 			write_type(buf, info.elem);
-			write_byte(buf, ')');
 		}
 	}
 }

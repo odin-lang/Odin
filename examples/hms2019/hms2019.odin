@@ -1674,7 +1674,7 @@ soa_struct_layout :: proc() {
 		fmt.println(v_aos[1]);
 		fmt.println(v_aos);
 
-		v_soa: intrinsics.soa_struct(N, Vector3);
+		v_soa: #soa[N]Vector3;
 
 		v_soa[0].x = 1;
 		v_soa[0].y = 4;
@@ -1713,7 +1713,7 @@ soa_struct_layout :: proc() {
 		v_aos[0].y = 4;
 		v_aos[0].z = 9;
 
-		v_soa: intrinsics.soa_struct(N, Vector3);
+		v_soa: #soa[N]Vector3;
 
 		v_soa[0].x = 1;
 		v_soa[0].y = 4;
