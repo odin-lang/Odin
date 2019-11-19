@@ -137,7 +137,7 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 			os.write_string(fd, "()");
 		} else {
 			t := info.params.variant.(Type_Info_Tuple);
-			os.write_string(fd, "(");
+			os.write_byte(fd, '(');
 			for t, i in t.types {
 				if i > 0 do os.write_string(fd, ", ");
 				print_type(fd, t);
@@ -150,7 +150,7 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 		}
 	case Type_Info_Tuple:
 		count := len(info.names);
-		if count != 1 do os.write_string(fd, "(");
+		if count != 1 do os.write_byte(fd, '(');
 		for name, i in info.names {
 			if i > 0 do os.write_string(fd, ", ");
 
@@ -165,9 +165,9 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 		if count != 1 do os.write_string(fd, ")");
 
 	case Type_Info_Array:
-		os.write_string(fd, "[");
+		os.write_byte(fd, '[');
 		print_u64(fd, u64(info.count));
-		os.write_string(fd, "]");
+		os.write_byte(fd, ']');
 		print_type(fd, info.elem);
 	case Type_Info_Dynamic_Array:
 		os.write_string(fd, "[dynamic]");
@@ -183,13 +183,24 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 		print_type(fd, info.value);
 
 	case Type_Info_Struct:
-		if info.soa_base_type != nil {
+		#complete switch info.soa_kind {
+		case .None: // Ignore
+		case .Fixed:
 			os.write_string(fd, "#soa[");
 			print_u64(fd, u64(info.soa_len));
 			os.write_byte(fd, ']');
 			print_type(fd, info.soa_base_type);
-			break;
+			return;
+		case .Slice:
+			os.write_string(fd, "#soa[]");
+			print_type(fd, info.soa_base_type);
+			return;
+		case .Dynamic:
+			os.write_string(fd, "#soa[dynamic]");
+			print_type(fd, info.soa_base_type);
+			return;
 		}
+
 		os.write_string(fd, "struct ");
 		if info.is_packed    do os.write_string(fd, "#packed ");
 		if info.is_raw_union do os.write_string(fd, "#raw_union ");
@@ -208,7 +219,15 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 		os.write_byte(fd, '}');
 
 	case Type_Info_Union:
-		os.write_string(fd, "union {");
+		os.write_string(fd, "union ");
+		if info.custom_align {
+			os.write_string(fd, "#align ");
+			print_u64(fd, u64(ti.align));
+		}
+		if info.no_nil {
+			os.write_string(fd, "#no_nil ");
+		}
+		os.write_byte(fd, '{');
 		for variant, i in info.variants {
 			if i > 0 do os.write_string(fd, ", ");
 			print_type(fd, variant);

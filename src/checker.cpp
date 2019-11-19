@@ -1342,10 +1342,17 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		if (bt->Struct.scope != nullptr) {
 			for_array(i, bt->Struct.scope->elements.entries) {
 				Entity *e = bt->Struct.scope->elements.entries[i].value;
-				if (bt->Struct.is_soa) {
+				switch (bt->Struct.soa_kind) {
+				case StructSoa_Dynamic:
+					add_type_info_type(c, t_allocator);
+					/*fallthrough*/
+				case StructSoa_Slice:
+				case StructSoa_Fixed:
 					add_type_info_type(c, alloc_type_pointer(e->type));
-				} else {
+					break;
+				default:
 					add_type_info_type(c, e->type);
+					break;
 				}
 			}
 		}

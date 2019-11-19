@@ -3631,10 +3631,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			type  = t_untyped_integer;
 		} else if (is_type_struct(op_type)) {
 			Type *bt = base_type(op_type);
-			if (bt->Struct.is_soa) {
+			if (bt->Struct.soa_kind == StructSoa_Fixed) {
 				mode  = Addressing_Constant;
 				value = exact_value_i64(bt->Struct.soa_count);
 				type  = t_untyped_integer;
+			} else if ((bt->Struct.soa_kind == StructSoa_Slice && id == BuiltinProc_len) ||
+			           bt->Struct.soa_kind == StructSoa_Dynamic) {
+				mode = Addressing_Value;
 			}
 		}
 
@@ -4801,7 +4804,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_array->Array.count);
 			soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_array->Array.count);
 			soa_struct->Struct.node = operand->expr;
-			soa_struct->Struct.is_soa = true;
+			soa_struct->Struct.soa_kind = StructSoa_Fixed;
 			soa_struct->Struct.soa_elem = elem;
 			soa_struct->Struct.soa_count = count;
 
@@ -4834,7 +4837,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_struct->Struct.fields.count);
 			soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_struct->Struct.tags.count);
 			soa_struct->Struct.node = operand->expr;
-			soa_struct->Struct.is_soa = true;
+			soa_struct->Struct.soa_kind = StructSoa_Fixed;
 			soa_struct->Struct.soa_elem = elem;
 			soa_struct->Struct.soa_count = count;
 
@@ -6778,8 +6781,10 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count)
 		}
 		return true;
 	case Type_Struct:
-		if (t->Struct.is_soa) {
-			*max_count = t->Struct.soa_count;
+		if (t->Struct.soa_kind != StructSoa_None) {
+			if (t->Struct.soa_kind == StructSoa_Fixed) {
+				*max_count = t->Struct.soa_count;
+			}
 			o->type = t->Struct.soa_elem;
 			if (o->mode == Addressing_SoaVariable || o->mode == Addressing_Variable) {
 				o->mode = Addressing_SoaVariable;
