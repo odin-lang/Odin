@@ -1955,6 +1955,8 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		irInstrCall *call = &instr->Call;
 		Type *proc_type = base_type(ir_type(call->value));
 		GB_ASSERT(is_type_proc(proc_type));
+		set_procedure_abi_types(heap_allocator(), proc_type);
+
 		bool is_c_vararg = proc_type->Proc.c_vararg;
 		Type *result_type = call->type;
 		if (result_type) {

@@ -3008,7 +3008,13 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_Struct: {
-			str = gb_string_appendc(str, "struct");
+		if (type->Struct.soa_elem != nullptr) {
+			str = gb_string_append_fmt(str, "#soa[%d]", cast(int)type->Struct.soa_count);
+			str = write_type_to_string(str, type->Struct.soa_elem);
+			break;
+		}
+
+		str = gb_string_appendc(str, "struct");
 		if (type->Struct.is_packed)    str = gb_string_appendc(str, " #packed");
 		if (type->Struct.is_raw_union) str = gb_string_appendc(str, " #raw_union");
 		str = gb_string_appendc(str, " {");
@@ -3179,10 +3185,8 @@ gbString write_type_to_string(gbString str, Type *type) {
 		if (type->SimdVector.is_x86_mmx) {
 			return "intrinsics.x86_mmx";
 		} else {
-			str = gb_string_appendc(str, "intrinsics.vector(");
-			str = gb_string_append_fmt(str, "%d, ", cast(int)type->SimdVector.count);
+			str = gb_string_append_fmt(str, "#vector[%d]", cast(int)type->SimdVector.count);
 			str = write_type_to_string(str, type->SimdVector.elem);
-			str = gb_string_appendc(str, ")");
 		}
 		break;
 	}
