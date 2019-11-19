@@ -110,6 +110,13 @@ struct BasicType {
 	String    name;
 };
 
+enum StructSoaKind {
+	StructSoa_None    = 0,
+	StructSoa_Fixed   = 1,
+	StructSoa_Slice   = 2,
+	StructSoa_Dynamic = 3,
+};
+
 struct TypeStruct {
 	Array<Entity *> fields;
 	Array<String>   tags;
@@ -129,9 +136,10 @@ struct TypeStruct {
 	bool is_raw_union;
 	bool is_polymorphic;
 	bool is_poly_specialized;
-	bool is_soa;
-	Type *soa_elem;
-	i64   soa_count;
+
+	StructSoaKind soa_kind;
+	Type *        soa_elem;
+	i64           soa_count;
 };
 
 struct TypeUnion {
@@ -1135,7 +1143,7 @@ bool is_type_union(Type *t) {
 }
 bool is_type_soa_struct(Type *t) {
 	t = base_type(t);
-	return t->kind == Type_Struct && t->Struct.is_soa;
+	return t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None;
 }
 
 bool is_type_raw_union(Type *t) {
@@ -2199,7 +2207,7 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 			}
 		}
 
-		bool is_soa = type->Struct.is_soa;
+		bool is_soa = type->Struct.soa_kind != StructSoa_None;
 		bool is_soa_of_array = is_soa && is_type_array(type->Struct.soa_elem);
 
 		if (is_soa_of_array) {
@@ -3008,8 +3016,13 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_Struct: {
-		if (type->Struct.soa_elem != nullptr) {
-			str = gb_string_append_fmt(str, "#soa[%d]", cast(int)type->Struct.soa_count);
+		if (type->Struct.soa_kind != StructSoa_None) {
+			switch (type->Struct.soa_kind) {
+			case StructSoa_Fixed:   str = gb_string_append_fmt(str, "#soa[%d]", cast(int)type->Struct.soa_count); break;
+			case StructSoa_Slice:   str = gb_string_appendc(str,    "#soa[]");                                    break;
+			case StructSoa_Dynamic: str = gb_string_appendc(str,    "#soa[dynamic]");                             break;
+			default: GB_PANIC("Unknown StructSoaKind"); break;
+			}
 			str = write_type_to_string(str, type->Struct.soa_elem);
 			break;
 		}

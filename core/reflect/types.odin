@@ -162,6 +162,11 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 		y, ok := b.variant.(rt.Type_Info_Opaque);
 		if !ok do return false;
 		return x.elem == y.elem;
+
+	case rt.Type_Info_Simd_Vector:
+		y, ok := b.variant.(rt.Type_Info_Simd_Vector);
+		if !ok do return false;
+		return x.count == y.count && x.elem == y.elem;
 	}
 
 	return false;
@@ -394,13 +399,24 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		write_type(buf, info.value);
 
 	case rt.Type_Info_Struct:
-		if info.soa_base_type != nil {
+		#complete switch info.soa_kind {
+		case .None: // Ignore
+		case .Fixed:
 			write_string(buf, "#soa[");
 			write_i64(buf, i64(info.soa_len));
 			write_byte(buf, ']');
 			write_type(buf, info.soa_base_type);
-			break;
-		}	
+			return;
+		case .Slice:
+			write_string(buf, "#soa[]");
+			write_type(buf, info.soa_base_type);
+			return;
+		case .Dynamic:
+			write_string(buf, "#soa[dynamic]");
+			write_type(buf, info.soa_base_type);
+			return;
+		}
+
 		write_string(buf, "struct ");
 		if info.is_packed    do write_string(buf, "#packed ");
 		if info.is_raw_union do write_string(buf, "#raw_union ");

@@ -47,6 +47,13 @@ Platform_Endianness :: enum u8 {
 	Big      = 2,
 }
 
+Type_Info_Struct_Soa_Kind :: enum u8 {
+	None    = 0,
+	Fixed   = 1,
+	Slice   = 2,
+	Dynamic = 3,
+}
+
 // Variant Types
 Type_Info_Named      :: struct {name: string, base: ^Type_Info};
 Type_Info_Integer    :: struct {signed: bool, endianness: Platform_Endianness};
@@ -88,6 +95,7 @@ Type_Info_Struct :: struct {
 	is_raw_union: bool,
 	custom_align: bool,
 	// These are only set iff this structure is an SOA structure
+	soa_kind:      Type_Info_Struct_Soa_Kind,
 	soa_base_type: ^Type_Info,
 	soa_len:       int,
 };

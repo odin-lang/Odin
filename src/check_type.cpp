@@ -2907,7 +2907,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 						soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_array->Array.count);
 						soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_array->Array.count);
 						soa_struct->Struct.node = e;
-						soa_struct->Struct.is_soa = true;
+						soa_struct->Struct.soa_kind = StructSoa_Fixed;
 						soa_struct->Struct.soa_elem = elem;
 						soa_struct->Struct.soa_count = count;
 
@@ -2940,7 +2940,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 						soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_struct->Struct.fields.count);
 						soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_struct->Struct.tags.count);
 						soa_struct->Struct.node = e;
-						soa_struct->Struct.is_soa = true;
+						soa_struct->Struct.soa_kind = StructSoa_Fixed;
 						soa_struct->Struct.soa_elem = elem;
 						soa_struct->Struct.soa_count = count;
 

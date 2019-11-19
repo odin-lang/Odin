@@ -3564,13 +3564,13 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 	} else if (addr.kind == irAddr_SoaVariable) {
 		Type *t = type_deref(ir_type(addr.addr));
 		t = base_type(t);
-		GB_ASSERT(t->kind == Type_Struct && t->Struct.is_soa);
+		GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
 		value = ir_emit_conv(proc, value, t->Struct.soa_elem);
 
 		irValue *index = addr.soa.index;
 		if (index->kind != irValue_Constant) {
 			Type *t = base_type(type_deref(ir_type(addr.addr)));
-			GB_ASSERT(t->kind == Type_Struct && t->Struct.is_soa);
+			GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
 			i64 count = t->Struct.soa_count;
 			irValue *len = ir_const_int(count);
 			ir_emit_bounds_check(proc, ast_token(addr.soa.index_expr), index, len);
@@ -3695,8 +3695,8 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 	} else if (addr.kind == irAddr_SoaVariable) {
 		Type *t = type_deref(ir_type(addr.addr));
 		t = base_type(t);
-		GB_ASSERT(t->kind == Type_Struct && t->Struct.is_soa);
-		Type *elem = t->Struct.soa_elem;;
+		GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
+		Type *elem = t->Struct.soa_elem;
 		i32 count = cast(i32)t->Struct.soa_count;
 
 		irValue *res = ir_add_local_generated(proc, elem, true);
@@ -7559,7 +7559,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 					if (addr.soa.index->kind != irValue_Constant) {
 						Type *t = base_type(type_deref(ir_type(addr.addr)));
-						GB_ASSERT(t->kind == Type_Struct && t->Struct.is_soa);
+						GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
 						i64 count = t->Struct.soa_count;
 						irValue *len = ir_const_int(count);
 						ir_emit_bounds_check(proc, ast_token(addr.soa.index_expr), addr.soa.index, len);
@@ -7626,7 +7626,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 		bool deref = is_type_pointer(t);
 		t = base_type(type_deref(t));
-		if (t->kind == Type_Struct && t->Struct.is_soa) {
+		if (t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None) {
 			// SOA STRUCTURES!!!!
 			Type *elem = t->Struct.soa_elem;
 
@@ -10873,11 +10873,18 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 6), is_raw_union);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 7), is_custom_align);
 
-				if (t->Struct.is_soa) {
+				if (t->Struct.soa_kind != StructSoa_None) {
+					irValue *kind = ir_emit_struct_ep(proc, tag, 8);
+					Type *kind_type = type_deref(ir_type(kind));
+
+					irValue *soa_kind = ir_value_constant(kind_type, exact_value_i64(t->Struct.soa_kind));
 					irValue *soa_type = ir_type_info(proc, t->Struct.soa_elem);
 					irValue *soa_len = ir_const_int(t->Struct.soa_count);
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 8), soa_type);
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 9), soa_len);
+
+
+					ir_emit_store(proc, kind, soa_kind);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 9), soa_type);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 10), soa_len);
 				}
 			}
 

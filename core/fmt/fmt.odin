@@ -1086,7 +1086,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				return;
 			};
 
-			is_soa := b.soa_base_type != nil;
+			is_soa := b.soa_kind != .None;
 
 			strings.write_string(fi.buf, info.name);
 			strings.write_byte(fi.buf, is_soa ? '[' : '{');
@@ -1329,7 +1329,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			return;
 		}
 
-		is_soa := info.soa_base_type != nil;
+		is_soa := info.soa_kind != .None;
 
 		strings.write_byte(fi.buf, is_soa ? '[' : '{');
 		defer strings.write_byte(fi.buf, is_soa ? ']' : '}');
