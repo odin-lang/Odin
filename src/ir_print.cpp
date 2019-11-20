@@ -669,7 +669,21 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	value = convert_exact_value_for_type(value, type);
 
 	// NOTE(bill): Is this correct? Does this handle all cases regarding arrays?
-	if (is_type_array(type) &&
+	if (is_type_array(type) && value.kind == ExactValue_String && !is_type_u8(core_array_type(type))) {
+		i64 count  = type->Array.count;
+		Type *elem = type->Array.elem;
+		ir_write_byte(f, '[');
+
+		for (i64 i = 0; i < count; i++) {
+			if (i > 0) ir_write_str_lit(f, ", ");
+			ir_print_type(f, m, elem);
+			ir_write_byte(f, ' ');
+			ir_print_exact_value(f, m, value, elem);
+		}
+
+		ir_write_byte(f, ']');
+		return;
+	} else if (is_type_array(type) &&
 	    value.kind != ExactValue_Invalid &&
 	    value.kind != ExactValue_String &&
 	    value.kind != ExactValue_Compound) {
@@ -734,7 +748,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_write_str_lit(f, ", ");
 			ir_print_type(f, m, t_i32);
 			ir_write_str_lit(f, " 0, i32 0)");
-		} else {
+		}else {
 			// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
 			// of the .ll file
 			irValue *str_array = ir_add_global_string_array(m, str);

@@ -1088,7 +1088,9 @@ Type *core_array_type(Type *t) {
 	for (;;) {
 		Type *prev = t;
 		t = base_array_type(t);
-		if (prev == t) break;
+		if (t->kind != Type_Array && t->kind != Type_SimdVector) {
+			break;
+		}
 	}
 	return t;
 }
