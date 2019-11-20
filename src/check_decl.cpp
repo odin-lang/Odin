@@ -902,7 +902,7 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, 
 	}
 
 	Operand o = {};
-	check_expr(ctx, &o, init_expr);
+	check_expr_with_type_hint(ctx, &o, init_expr, e->type);
 	check_init_variable(ctx, e, &o, str_lit("variable declaration"));
 }
 
