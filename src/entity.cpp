@@ -51,8 +51,10 @@ enum EntityFlag {
 
 	EntityFlag_ImplicitReference = 1<<17, // NOTE(bill): equivalent to `const &` in C++
 
-	EntityFlag_CVarArg       = 1<<20,
-	EntityFlag_AutoCast      = 1<<21,
+	EntityFlag_SoaPtrField   = 1<<19, // to allow s.x[0] where `s.x` is a pointer rather than a slice
+
+	EntityFlag_CVarArg       = 1<<21,
+	EntityFlag_AutoCast      = 1<<22,
 };
 
 enum EntityState {

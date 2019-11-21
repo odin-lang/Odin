@@ -1350,7 +1350,25 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				base_type_name = v.name;
 			}
 
-			for index in 0..<uintptr(info.soa_len) {
+			actual_field_count := len(info.names);
+
+			n := uintptr(info.soa_len);
+
+			fields_are_ptrs := false;
+			if info.soa_kind == .Slice {
+				actual_field_count = len(info.names)-1; // len
+
+				n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^);
+
+			} else if info.soa_kind == .Dynamic {
+				actual_field_count = len(info.names)-3; // len, cap, allocator
+
+				n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^);
+			}
+
+
+
+			for index in 0..<n {
 				if !hash && index > 0 do strings.write_string(fi.buf, ", ");
 
 				field_count := -1;
@@ -1361,7 +1379,8 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				strings.write_byte(fi.buf, '{');
 				defer strings.write_byte(fi.buf, '}');
 
-				for name, i in info.names {
+				for i in 0..<actual_field_count {
+					name := info.names[i];
 					field_count += 1;
 
 					if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
@@ -1370,13 +1389,25 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 					strings.write_string(fi.buf, name);
 					strings.write_string(fi.buf, " = ");
 
-					t := info.types[i].variant.(runtime.Type_Info_Array).elem;
-					t_size := uintptr(t.size);
-					if reflect.is_any(t) {
-						strings.write_string(fi.buf, "any{}");
+					if info.soa_kind == .Fixed {
+						t := info.types[i].variant.(runtime.Type_Info_Array).elem;
+						t_size := uintptr(t.size);
+						if reflect.is_any(t) {
+							strings.write_string(fi.buf, "any{}");
+						} else {
+							data := rawptr(uintptr(v.data) + info.offsets[i] + index*t_size);
+							fmt_arg(fi, any{data, t.id}, 'v');
+						}
 					} else {
-						data := rawptr(uintptr(v.data) + info.offsets[i] + index*t_size);
-						fmt_arg(fi, any{data, t.id}, 'v');
+						t := info.types[i].variant.(runtime.Type_Info_Pointer).elem;
+						t_size := uintptr(t.size);
+						if reflect.is_any(t) {
+							strings.write_string(fi.buf, "any{}");
+						} else {
+							field_ptr := (^^byte)(uintptr(v.data) + info.offsets[i])^;
+							data := rawptr(uintptr(field_ptr) + index*t_size);
+							fmt_arg(fi, any{data, t.id}, 'v');
+						}
 					}
 
 					if hash do strings.write_string(fi.buf, ",\n");

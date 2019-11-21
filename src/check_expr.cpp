@@ -92,6 +92,10 @@ bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type 
 void set_procedure_abi_types(gbAllocator a, Type *type);
 void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type);
 
+
+Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem);
+
+
 Entity *entity_from_expr(Ast *expr) {
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
@@ -3228,6 +3232,8 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 			}
 		} else if (operand->mode == Addressing_MapIndex) {
 			operand->mode = Addressing_Value;
+		} else if (entity->flags & EntityFlag_SoaPtrField) {
+			operand->mode = Addressing_SoaVariable;
 		} else if (sel.indirect || operand->mode != Addressing_Value || operand->mode == Addressing_SoaVariable) {
 			operand->mode = Addressing_Variable;
 		} else {
@@ -6739,7 +6745,7 @@ void check_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e, Type *t) {
 	}
 }
 
-bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count) {
+bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count, Type *original_type) {
 	switch (t->kind) {
 	case Type_Basic:
 		if (t->Basic.kind == Basic_string) {
@@ -6794,6 +6800,15 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count)
 			return true;
 		}
 		return false;
+	}
+
+	if (is_type_pointer(original_type) && indirection) {
+		Type *ptr = base_type(original_type);
+		if (ptr->kind == Type_Pointer && o->mode == Addressing_SoaVariable) {
+			o->type = ptr->Pointer.elem;
+			o->mode = Addressing_Value;
+			return true;
+		}
 	}
 
 	return false;
@@ -7973,7 +7988,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		}
 
 		i64 max_count = -1;
-		bool valid = check_set_index_data(o, t, is_ptr, &max_count);
+		bool valid = check_set_index_data(o, t, is_ptr, &max_count, o->type);
 
 		if (is_const) {
 			valid = false;
@@ -8054,6 +8069,13 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		case Type_DynamicArray:
 			valid = true;
 			o->type = alloc_type_slice(t->DynamicArray.elem);
+			break;
+
+		case Type_Struct:
+			if (is_type_soa_struct(t)) {
+				valid = true;
+				o->type = make_soa_struct_slice(c, nullptr, nullptr, t->Struct.soa_elem);
+			}
 			break;
 		}
 

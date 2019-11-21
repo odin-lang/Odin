@@ -811,6 +811,7 @@ Type *alloc_type_simd_vector(i64 count, Type *elem) {
 
 
 
+
 ////////////////////////////////////////////////////////////////
 
 
@@ -1757,7 +1758,10 @@ bool are_types_identical(Type *x, Type *y) {
 			if (x->Struct.is_raw_union == y->Struct.is_raw_union &&
 			    x->Struct.fields.count == y->Struct.fields.count &&
 			    x->Struct.is_packed    == y->Struct.is_packed &&
-			    x->Struct.custom_align == y->Struct.custom_align) {
+			    x->Struct.custom_align == y->Struct.custom_align &&
+			    x->Struct.soa_kind == y->Struct.soa_kind &&
+			    x->Struct.soa_count == y->Struct.soa_count &&
+			    are_types_identical(x->Struct.soa_elem, y->Struct.soa_elem)) {
 				// TODO(bill); Fix the custom alignment rule
 				for_array(i, x->Struct.fields) {
 					Entity *xf = x->Struct.fields[i];
