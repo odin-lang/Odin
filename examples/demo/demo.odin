@@ -7,7 +7,7 @@ import "core:reflect"
 import "intrinsics"
 
 /*
-	The Odin programming language is fast, concise, readable, pragmatic and open sourced. 
+	The Odin programming language is fast, concise, readable, pragmatic and open sourced.
 	It is designed with the intent of replacing C with the following goals:
 	 * simplicity
 	 * high performance
@@ -36,7 +36,7 @@ the_basics :: proc() {
 
 		my_integer_variable: int; // A comment for documentaton
 
-		// Multi-line comments begin with /* and end with */. Multi-line comments can 
+		// Multi-line comments begin with /* and end with */. Multi-line comments can
 		// also be nested (unlike in C):
 		/*
 			You can have any text or code here and
@@ -63,16 +63,16 @@ the_basics :: proc() {
 
 		// Numbers
 
-		// Numerical literals are written similar to most other programming languages. 
-		// A useful feature in Odin is that underscores are allowed for better 
-		// readability: 1_000_000_000 (one billion). A number that contains a dot is a 
-		// floating point literal: 1.0e9 (one billion). If a number literal is suffixed 
+		// Numerical literals are written similar to most other programming languages.
+		// A useful feature in Odin is that underscores are allowed for better
+		// readability: 1_000_000_000 (one billion). A number that contains a dot is a
+		// floating point literal: 1.0e9 (one billion). If a number literal is suffixed
 		// with i, is an imaginary number literal: 2i (2 multiply the square root of -1).
 
-		// Binary literals are prefixed with 0b, octal literals with 0o, and hexadecimal 
+		// Binary literals are prefixed with 0b, octal literals with 0o, and hexadecimal
 		// literals 0x. A leading zero does not produce an octal constant (unlike C).
 
-		// In Odin, if a number constant is possible to be represented by a type without 
+		// In Odin, if a number constant is possible to be represented by a type without
 		// precision loss, it will automatically convert to that type.
 
 		x: int = 1.0; // A float literal but it can be represented by an integer without precision loss
@@ -105,8 +105,8 @@ the_basics :: proc() {
 		*/
 
 		// Constant declarations
-		// Constants are entities (symbols) which have an assigned value. 
-		// The constant’s value cannot be changed. 
+		// Constants are entities (symbols) which have an assigned value.
+		// The constant’s value cannot be changed.
 		// The constant’s value must be able to be evaluated at compile time:
 		X :: "what"; // constant `X` has the untyped string value "what"
 
@@ -234,7 +234,7 @@ control_flow :: proc() {
 		}
 
 		// Switch statement
-		// A switch statement is another way to write a sequence of if-else statements. 
+		// A switch statement is another way to write a sequence of if-else statements.
 		// In Odin, the default case is denoted as a case without any expression.
 
 		switch arch := ODIN_ARCH; arch {
@@ -246,12 +246,12 @@ control_flow :: proc() {
 			fmt.println("Unsupported architecture");
 		}
 
-		// Odin’s `switch` is like one in C or C++, except that Odin only runs the selected case. 
-		// This means that a `break` statement is not needed at the end of each case. 
+		// Odin’s `switch` is like one in C or C++, except that Odin only runs the selected case.
+		// This means that a `break` statement is not needed at the end of each case.
 		// Another important difference is that the case values need not be integers nor constants.
 
 		// To achieve a C-like fall through into the next case block, the keyword `fallthrough` can be used.
-		one_angry_dwarf :: proc() -> int { 
+		one_angry_dwarf :: proc() -> int {
 			fmt.println("one_angry_dwarf was called");
 			return 1;
 		}
@@ -261,8 +261,8 @@ control_flow :: proc() {
 		case one_angry_dwarf():
 		}
 
-		// A switch statement without a condition is the same as `switch true`. 
-		// This can be used to write a clean and long if-else chain and have the 
+		// A switch statement without a condition is the same as `switch true`.
+		// This can be used to write a clean and long if-else chain and have the
 		// ability to break if needed
 
 		switch {
@@ -293,7 +293,7 @@ control_flow :: proc() {
 	}
 
 	{ // Defer statement
-		// A defer statement defers the execution of a statement until the end of 
+		// A defer statement defers the execution of a statement until the end of
 		// the scope it is in.
 
 		// The following will print 4 then 234:
@@ -318,11 +318,11 @@ control_flow :: proc() {
 				fmt.println("2");
 			}
 
-			cond := false; 
+			cond := false;
 			defer if cond {
 				bar();
 			}
-		}	
+		}
 
 		// Defer statements are executed in the reverse order that they were declared:
 		{
@@ -343,13 +343,13 @@ control_flow :: proc() {
 	}
 
 	{ // When statement
-		/* 
+		/*
 			The when statement is almost identical to the if statement but with some differences:
 
-			* Each condition must be a constant expression as a when 
+			* Each condition must be a constant expression as a when
 			  statement is evaluated at compile time.
 			* The statements within a branch do not create a new scope
-			* The compiler checks the semantics and code only for statements 
+			* The compiler checks the semantics and code only for statements
 			  that belong to the first condition that is true
 			* An initial statement is not allowed in a when statement
 			* when statements are allowed at file scope
@@ -363,8 +363,8 @@ control_flow :: proc() {
 		} else {
 			fmt.println("Unsupported architecture");
 		}
-		// The when statement is very useful for writing platform specific code. 
-		// This is akin to the #if construct in C’s preprocessor however, in Odin, 
+		// The when statement is very useful for writing platform specific code.
+		// This is akin to the #if construct in C’s preprocessor however, in Odin,
 		// it is type checked.
 	}
 
@@ -401,9 +401,9 @@ control_flow :: proc() {
 
 		// Fallthrough statement
 
-		// Odin’s switch is like one in C or C++, except that Odin only runs the selected 
-		// case. This means that a break statement is not needed at the end of each case. 
-		// Another important difference is that the case values need not be integers nor 
+		// Odin’s switch is like one in C or C++, except that Odin only runs the selected
+		// case. This means that a break statement is not needed at the end of each case.
+		// Another important difference is that the case values need not be integers nor
 		// constants.
 
 		// fallthrough can be used to explicitly fall through into the next case block:
@@ -477,8 +477,8 @@ explicit_procedure_overloading :: proc() {
 
 struct_type :: proc() {
 	fmt.println("\n# struct type");
-	// A struct is a record type in Odin. It is a collection of fields. 
-	// Struct fields are accessed by using a dot:	
+	// A struct is a record type in Odin. It is a collection of fields.
+	// Struct fields are accessed by using a dot:
 	{
 		Vector2 :: struct {
 			x: f32,
@@ -495,13 +495,13 @@ struct_type :: proc() {
 		p.x = 1335;
 		fmt.println(v);
 
-		// We could write p^.x, however, it is to nice abstract the ability 
-		// to not explicitly dereference the pointer. This is very useful when 
+		// We could write p^.x, however, it is to nice abstract the ability
+		// to not explicitly dereference the pointer. This is very useful when
 		// refactoring code to use a pointer rather than a value, and vice versa.
 	}
 	{
-		// A struct literal can be denoted by providing the struct’s type 
-		// followed by {}. A struct literal must either provide all the 
+		// A struct literal can be denoted by providing the struct’s type
+		// followed by {}. A struct literal must either provide all the
 		// arguments or none:
 		Vector3 :: struct {
 			x, y, z: f32,
@@ -510,12 +510,12 @@ struct_type :: proc() {
 		v = Vector3{}; // Zero value
 		v = Vector3{1, 4, 9};
 
-		// You can list just a subset of the fields if you specify the 
+		// You can list just a subset of the fields if you specify the
 		// field by name (the order of the named fields does not matter):
 		v = Vector3{z=1, y=2};
 		assert(v.x == 0);
 		assert(v.y == 2);
-		assert(v.z == 1);		
+		assert(v.z == 1);
 	}
 	{
 		// Structs can tagged with different memory layout and alignment requirements:
@@ -704,8 +704,8 @@ union_type :: proc() {
 
 using_statement :: proc() {
 	fmt.println("\n# using statement");
-	// using can used to bring entities declared in a scope/namespace 
-	// into the current scope. This can be applied to import declarations, 
+	// using can used to bring entities declared in a scope/namespace
+	// into the current scope. This can be applied to import declarations,
 	// import names, struct fields, procedure fields, and struct values.
 
 	Vector3 :: struct{x, y, z: f32};
@@ -738,7 +738,7 @@ using_statement :: proc() {
 		}
 	}
 	{
-		// We can also apply the using statement to the struct fields directly, 
+		// We can also apply the using statement to the struct fields directly,
 		// making all the fields of position appear as if they on Entity itself:
 		Entity :: struct {
 			using position: Vector3,
@@ -747,11 +747,11 @@ using_statement :: proc() {
 		foo :: proc(entity: ^Entity) {
 			fmt.println(entity.x, entity.y, entity.z);
 		}
-		
+
 
 		// Subtype polymorphism
-		// It is possible to get subtype polymorphism, similar to inheritance-like 
-		// functionality in C++, but without the requirement of vtables or unknown 
+		// It is possible to get subtype polymorphism, similar to inheritance-like
+		// functionality in C++, but without the requirement of vtables or unknown
 		// struct layout:
 
 		Colour :: struct {r, g, b, a: u8};
@@ -767,7 +767,7 @@ using_statement :: proc() {
 		foo(&frog);
 		frog.x = 123;
 
-		// Note: using can be applied to arbitrarily many things, which allows 
+		// Note: using can be applied to arbitrarily many things, which allows
 		// the ability to have multiple subtype polymorphism (but also its issues).
 
 		// Note: using’d fields can still be referred by name.
@@ -787,19 +787,19 @@ using_statement :: proc() {
 
 implicit_context_system :: proc() {
 	fmt.println("\n# implicit context system");
-	// In each scope, there is an implicit value named context. This 
-	// context variable is local to each scope and is implicitly passed 
-	// by pointer to any procedure call in that scope (if the procedure 
+	// In each scope, there is an implicit value named context. This
+	// context variable is local to each scope and is implicitly passed
+	// by pointer to any procedure call in that scope (if the procedure
 	// has the Odin calling convention).
 
-	// The main purpose of the implicit context system is for the ability 
-	// to intercept third-party code and libraries and modify their 
+	// The main purpose of the implicit context system is for the ability
+	// to intercept third-party code and libraries and modify their
 	// functionality. One such case is modifying how a library allocates
-	// something or logs something. In C, this was usually achieved with 
-	// the library defining macros which could be overridden so that the 
-	// user could define what he wanted. However, not many libraries 
-	// supported this in many languages by default which meant intercepting 
-	// third-party code to see what it does and to change how it does it is 
+	// something or logs something. In C, this was usually achieved with
+	// the library defining macros which could be overridden so that the
+	// user could define what he wanted. However, not many libraries
+	// supported this in many languages by default which meant intercepting
+	// third-party code to see what it does and to change how it does it is
 	// not possible.
 
 	c := context; // copy the current scope's context
@@ -820,7 +820,7 @@ implicit_context_system :: proc() {
 		// An context.allocator is assigned to the return value of `my_custom_allocator()`
 		assert(context.user_index == 123);
 
-		// The memory management procedure use the `context.allocator` by 
+		// The memory management procedure use the `context.allocator` by
 		// default unless explicitly specified otherwise
 		china_grove := new(int);
 		free(china_grove);
@@ -828,10 +828,10 @@ implicit_context_system :: proc() {
 
 	my_custom_allocator :: mem.nil_allocator;
 
-	// By default, the context value has default values for its parameters which is 
+	// By default, the context value has default values for its parameters which is
 	// decided in the package runtime. What the defaults are are compiler specific.
 
-	// To see what the implicit context value contains, please see the following 
+	// To see what the implicit context value contains, please see the following
 	// definition in package runtime.
 }
 
@@ -1133,14 +1133,14 @@ map_type :: proc() {
 	m := make(map[string]int);
 	defer delete(m);
 
-	m["Bob"] = 2; 
+	m["Bob"] = 2;
 	m["Ted"] = 5;
 	fmt.println(m["Bob"]);
 
 	delete_key(&m, "Ted");
 
-	// If an element of a key does not exist, the zero value of the 
-	// element will be returned. To check to see if an element exists 
+	// If an element of a key does not exist, the zero value of the
+	// element will be returned. To check to see if an element exists
 	// can be done in two ways:
 	elem, ok := m["Bob"];
 	exists := "Bob" in m;
@@ -1508,26 +1508,26 @@ when ODIN_OS == "windows" do foreign import kernel32 "system:kernel32.lib"
 foreign_system :: proc() {
 	fmt.println("\n#foreign system");
 	when ODIN_OS == "windows" {
-		// It is sometimes necessarily to interface with foreign code, 
-		// such as a C library. In Odin, this is achieved through the 
-		// foreign system. You can “import” a library into the code 
+		// It is sometimes necessarily to interface with foreign code,
+		// such as a C library. In Odin, this is achieved through the
+		// foreign system. You can “import” a library into the code
 		// using the same semantics as a normal import declaration.
 
-		// This foreign import declaration will create a 
-		// “foreign import name” which can then be used to associate 
+		// This foreign import declaration will create a
+		// “foreign import name” which can then be used to associate
 		// entities within a foreign block.
 
 		foreign kernel32 {
 			ExitProcess :: proc "stdcall" (exit_code: u32) ---
 		}
 
-		// Foreign procedure declarations have the cdecl/c calling 
-		// convention by default unless specified otherwise. Due to 
-		// foreign procedures do not have a body declared within this 
-		// code, you need append the --- symbol to the end to distinguish 
+		// Foreign procedure declarations have the cdecl/c calling
+		// convention by default unless specified otherwise. Due to
+		// foreign procedures do not have a body declared within this
+		// code, you need append the --- symbol to the end to distinguish
 		// it as a procedure literal without a body and not a procedure type.
 
-		// The attributes system can be used to change specific properties 
+		// The attributes system can be used to change specific properties
 		// of entities declared within a block:
 
 		@(default_calling_convention = "std")
@@ -1717,6 +1717,26 @@ soa_struct_layout :: proc() {
 		v_soa[0].x = 1;
 		v_soa[0].y = 4;
 		v_soa[0].z = 9;
+	}
+	{
+		// SOA Slices
+		Vector3 :: struct {x, y, z: f32};
+
+		N :: 3;
+		v: #soa[N]Vector3;
+		v[0].x = 1;
+		v[0].y = 4;
+		v[0].z = 9;
+
+		s: #soa[]Vector3;
+		s = v[:];
+		assert(len(s) == N);
+		fmt.println(s);
+		fmt.println(s[0].x);
+
+		a := s[1:2];
+		assert(len(a) == 1);
+		fmt.println(a);
 	}
 }
 

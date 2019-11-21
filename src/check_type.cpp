@@ -2702,6 +2702,108 @@ void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	// error(node, "'map' types are not yet implemented");
 }
 
+Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem) {
+	Type *bt_elem = base_type(elem);
+	if (!is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
+		GB_ASSERT(elem_expr != nullptr);
+
+		gbString str = type_to_string(elem);
+		error(elem_expr, "Invalid type for an #soa array, expected a struct or array of length 4 or below, got '%s'", str);
+		gb_string_free(str);
+		return alloc_type_slice(elem);
+	}
+
+	Type *soa_struct = nullptr;
+	Scope *scope = nullptr;
+
+	if (is_type_array(elem)) {
+		Type *old_array = base_type(elem);
+		isize field_count = old_array->Array.count;
+
+		soa_struct = alloc_type_struct();
+		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), field_count+1);
+		soa_struct->Struct.tags = array_make<String>(heap_allocator(), field_count+1);
+		soa_struct->Struct.node = array_typ_expr;
+		soa_struct->Struct.soa_kind = StructSoa_Slice;
+		soa_struct->Struct.soa_elem = elem;
+		soa_struct->Struct.soa_count = 0;
+
+		scope = create_scope(ctx->scope, ctx->allocator);
+		soa_struct->Struct.scope = scope;
+
+		String params_xyzw[4] = {
+			str_lit("x"),
+			str_lit("y"),
+			str_lit("z"),
+			str_lit("w")
+		};
+
+		for (i64 i = 0; i < field_count; i++) {
+			Type *array_type = alloc_type_pointer(old_array->Array.elem);
+			Token token = {};
+			token.string = params_xyzw[i];
+
+			Entity *new_field = alloc_entity_field(scope, token, array_type, false, cast(i32)i);
+			new_field->flags |= EntityFlag_SoaPtrField;
+			soa_struct->Struct.fields[i] = new_field;
+			add_entity(ctx->checker, scope, nullptr, new_field);
+			add_entity_use(ctx, nullptr, new_field);
+		}
+
+		Entity *len_field = alloc_entity_field(scope, empty_token, t_int, false, cast(i32)field_count);
+		soa_struct->Struct.fields[field_count] = len_field;
+		add_entity(ctx->checker, scope, nullptr, len_field);
+		add_entity_use(ctx, nullptr, len_field);
+
+
+	} else {
+		GB_ASSERT(is_type_struct(elem));
+
+		Type *old_struct = base_type(elem);
+		isize field_count = old_struct->Struct.fields.count;
+
+		soa_struct = alloc_type_struct();
+		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), field_count+1);
+		soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_struct->Struct.tags.count+1);
+		soa_struct->Struct.node = array_typ_expr;
+		soa_struct->Struct.soa_kind = StructSoa_Slice;
+		soa_struct->Struct.soa_elem = elem;
+		soa_struct->Struct.soa_count = 0;
+
+		scope = create_scope(old_struct->Struct.scope->parent, ctx->allocator);
+		soa_struct->Struct.scope = scope;
+
+		for_array(i, old_struct->Struct.fields) {
+			Entity *old_field = old_struct->Struct.fields[i];
+			if (old_field->kind == Entity_Variable) {
+				Type *array_type = alloc_type_pointer(old_field->type);
+				Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
+				new_field->flags |= EntityFlag_SoaPtrField;
+				soa_struct->Struct.fields[i] = new_field;
+				add_entity(ctx->checker, scope, nullptr, new_field);
+			} else {
+				soa_struct->Struct.fields[i] = old_field;
+			}
+
+			soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
+		}
+
+		Entity *len_field = alloc_entity_field(scope, empty_token, t_int, false, cast(i32)field_count);
+		soa_struct->Struct.fields[field_count] = len_field;
+		add_entity(ctx->checker, scope, nullptr, len_field);
+		add_entity_use(ctx, nullptr, len_field);
+	}
+
+	Token token = {};
+	token.string = str_lit("Base_Type");
+	Entity *base_type_entity = alloc_entity_type_name(scope, token, elem, EntityState_Resolved);
+	add_entity(ctx->checker, scope, nullptr, base_type_entity);
+
+	add_type_info_type(ctx, soa_struct);
+
+	return soa_struct;
+}
+
 
 
 bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_type) {
@@ -2983,14 +3085,27 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 
 					*type = alloc_type_simd_vector(count, elem);
 				} else {
-					GB_PANIC("Unhandled array type tag %.*s", LIT(name));
+					error(at->tag, "Invalid tag applied to array, got #%.*s", LIT(name));
+					*type = alloc_type_array(elem, count, generic_type);
 				}
 			} else {
 				*type = alloc_type_array(elem, count, generic_type);
 			}
 		} else {
 			Type *elem = check_type(ctx, at->elem);
-			*type = alloc_type_slice(elem);
+
+			if (at->tag != nullptr) {
+				GB_ASSERT(at->tag->kind == Ast_BasicDirective);
+				String name = at->tag->BasicDirective.name;
+				if (name == "soa") {
+					*type = make_soa_struct_slice(ctx, e, at->elem, elem);
+				} else {
+					error(at->tag, "Invalid tag applied to array, got #%.*s", LIT(name));
+					*type = alloc_type_slice(elem);
+				}
+			} else {
+				*type = alloc_type_slice(elem);
+			}
 		}
 	array_end:
 		set_base_type(named_type, *type);
