@@ -1353,8 +1353,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			actual_field_count := len(info.names);
 
 			n := uintptr(info.soa_len);
-
-			fields_are_ptrs := false;
+			
 			if info.soa_kind == .Slice {
 				actual_field_count = len(info.names)-1; // len
 
