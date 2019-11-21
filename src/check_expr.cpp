@@ -94,6 +94,8 @@ void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type
 
 
 Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem);
+Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem);
+
 
 
 Entity *entity_from_expr(Ast *expr) {
@@ -924,6 +926,30 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 
 	case Type_Struct:
 		if (source->kind == Type_Struct) {
+			if (poly->Struct.soa_kind == source->Struct.soa_kind) {
+				bool ok = is_polymorphic_type_assignable(c, poly->Struct.soa_elem, source->Struct.soa_elem, true, modify_type);
+				if (ok) switch (source->Struct.soa_kind) {
+				case StructSoa_Fixed:
+				default:
+					GB_PANIC("Unhandled SOA Kind");
+					break;
+
+				case StructSoa_Slice:
+					if (modify_type) {
+						Type *type = make_soa_struct_slice(c, nullptr, poly->Struct.node, poly->Struct.soa_elem);
+						gb_memmove(poly, type, gb_size_of(*type));
+					}
+					break;
+				case StructSoa_Dynamic:
+					if (modify_type) {
+						Type *type = make_soa_struct_dynamic_array(c, nullptr, poly->Struct.node, poly->Struct.soa_elem);
+						gb_memmove(poly, type, gb_size_of(*type));
+					}
+					break;
+				}
+				return ok;
+
+			}
 			// return check_is_assignable_to(c, &o, poly);
 		}
 		return false;
