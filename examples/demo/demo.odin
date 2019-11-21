@@ -35,7 +35,7 @@ the_basics :: proc() {
 		// A comment
 
 		my_integer_variable: int; // A comment for documentaton
-
+		
 		// Multi-line comments begin with /* and end with */. Multi-line comments can
 		// also be nested (unlike in C):
 		/*
@@ -113,6 +113,9 @@ the_basics :: proc() {
 		// Constants can be explicitly typed like a variable declaration:
 		Y : int : 123;
 		Z :: Y + 7; // constant computations are possible
+		
+		_ = my_integer_variable;
+		_ = x;
 	}
 }
 
@@ -151,15 +154,15 @@ control_flow :: proc() {
 
 		// Range-based for loop
 		// The basic for loop
-		for i := 0; i < 10; i += 1 {
-			fmt.println(i);
+		for j := 0; j < 10; j += 1 {
+			fmt.println(j);
 		}
 		// can also be written
-		for i in 0..<10 {
-			fmt.println(i);
+		for j in 0..<10 {
+			fmt.println(j);
 		}
-		for i in 0..9 {
-			fmt.println(i);
+		for j in 0..9 {
+			fmt.println(j);
 		}
 
 		// Certain built-in types can be iterated over
@@ -256,7 +259,7 @@ control_flow :: proc() {
 			return 1;
 		}
 
-		switch i := 0; i {
+		switch j := 0; j {
 		case 0:
 		case one_angry_dwarf():
 		}
@@ -827,6 +830,7 @@ implicit_context_system :: proc() {
 	}
 
 	my_custom_allocator :: mem.nil_allocator;
+	_ = c;
 
 	// By default, the context value has default values for its parameters which is
 	// decided in the package runtime. What the defaults are are compiler specific.
@@ -1144,7 +1148,8 @@ map_type :: proc() {
 	// can be done in two ways:
 	elem, ok := m["Bob"];
 	exists := "Bob" in m;
-
+	_ = elem;
+	_ = exists;
 }
 
 implicit_selector_expression :: proc() {
