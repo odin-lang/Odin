@@ -7194,6 +7194,28 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					type = alloc_type_array(check_type(c, cl->type->ArrayType.elem), -1);
 					is_to_be_determined_array_count = true;
 				}
+				if (cl->elems.count > 0) {
+					if (cl->type->ArrayType.tag != nullptr) {
+						Ast *tag = cl->type->ArrayType.tag;
+						GB_ASSERT(tag->kind == Ast_BasicDirective);
+						String name = tag->BasicDirective.name;
+						if (name == "soa") {
+							error(node, "#soa arrays are not supported for compound literals");
+							return kind;
+						}
+					}
+				}
+			}
+			if (cl->type->kind == Ast_DynamicArrayType && cl->type->DynamicArrayType.tag != nullptr) {
+				if (cl->elems.count > 0) {
+					Ast *tag = cl->type->DynamicArrayType.tag;
+					GB_ASSERT(tag->kind == Ast_BasicDirective);
+					String name = tag->BasicDirective.name;
+					if (name == "soa") {
+						error(node, "#soa arrays are not supported for compound literals");
+						return kind;
+					}
+				}
 			}
 
 			if (type == nullptr) {
