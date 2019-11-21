@@ -1727,7 +1727,8 @@ soa_struct_layout :: proc() {
 	}
 	{
 		// SOA Slices
-		Vector3 :: struct {x, y, z: f32};
+		// Vector3 :: struct {x, y, z: f32};
+		Vector3 :: struct {x: i8, y: i16, z: f32};
 
 		N :: 3;
 		v: #soa[N]Vector3;
@@ -1744,6 +1745,14 @@ soa_struct_layout :: proc() {
 		a := s[1:2];
 		assert(len(a) == 1);
 		fmt.println(a);
+
+		d: #soa[dynamic]Vector3;
+
+		append_soa(&d, Vector3{1, 2, 3}, Vector3{4, 5, 9}, Vector3{-4, -4, 3});
+		fmt.println(d);
+		fmt.println(len(d));
+		fmt.println(cap(d));
+		fmt.println(d[:]);
 	}
 }
 

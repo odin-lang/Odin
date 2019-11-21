@@ -8011,8 +8011,19 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 						irValue *new_len = ir_emit_arith(proc, Token_Sub, high, low, t_int);
 						ir_emit_store(proc, len_dst, new_len);
 					}
-				} else {
-					GB_PANIC("TODO #soa[dynamic]T");
+				} else if (type->Struct.soa_kind == StructSoa_Dynamic) {
+					i32 field_count = cast(i32)type->Struct.fields.count - 3;
+					for (i32 i = 0; i < field_count; i++) {
+						irValue *field_dst = ir_emit_struct_ep(proc, dst, i);
+						irValue *field_src = ir_emit_struct_ev(proc, base, i);
+						field_src = ir_emit_ptr_offset(proc, field_src, low);
+						ir_emit_store(proc, field_dst, field_src);
+					}
+
+
+					irValue *len_dst = ir_emit_struct_ep(proc, dst, field_count);
+					irValue *new_len = ir_emit_arith(proc, Token_Sub, high, low, t_int);
+					ir_emit_store(proc, len_dst, new_len);
 				}
 
 				return ir_addr(dst);

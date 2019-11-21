@@ -2702,9 +2702,98 @@ void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	// error(node, "'map' types are not yet implemented");
 }
 
+Type *make_soa_struct_fixed(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem, i64 count, Type *generic_type) {
+	Type *bt_elem = base_type(elem);
+
+	if (!is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
+		gbString str = type_to_string(elem);
+		error(elem_expr, "Invalid type for an #soa array, expected a struct or array of length 4 or below, got '%s'", str);
+		gb_string_free(str);
+		return alloc_type_array(elem, count, generic_type);
+	}
+
+	Type *soa_struct = nullptr;
+	Scope *scope = nullptr;
+
+	if (is_type_array(elem)) {
+		Type *old_array = base_type(elem);
+		soa_struct = alloc_type_struct();
+		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_array->Array.count);
+		soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_array->Array.count);
+		soa_struct->Struct.node = array_typ_expr;
+		soa_struct->Struct.soa_kind = StructSoa_Fixed;
+		soa_struct->Struct.soa_elem = elem;
+		soa_struct->Struct.soa_count = count;
+
+		scope = create_scope(ctx->scope, ctx->allocator);
+		soa_struct->Struct.scope = scope;
+
+		String params_xyzw[4] = {
+			str_lit("x"),
+			str_lit("y"),
+			str_lit("z"),
+			str_lit("w")
+		};
+
+		for (i64 i = 0; i < old_array->Array.count; i++) {
+			Type *array_type = alloc_type_array(old_array->Array.elem, count);
+			Token token = {};
+			token.string = params_xyzw[i];
+
+			Entity *new_field = alloc_entity_field(scope, token, array_type, false, cast(i32)i);
+			soa_struct->Struct.fields[i] = new_field;
+			add_entity(ctx->checker, scope, nullptr, new_field);
+			add_entity_use(ctx, nullptr, new_field);
+		}
+
+	} else {
+		GB_ASSERT(is_type_struct(elem));
+
+		Type *old_struct = base_type(elem);
+		soa_struct = alloc_type_struct();
+		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_struct->Struct.fields.count);
+		soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_struct->Struct.tags.count);
+		soa_struct->Struct.node = array_typ_expr;
+		soa_struct->Struct.soa_kind = StructSoa_Fixed;
+		soa_struct->Struct.soa_elem = elem;
+		soa_struct->Struct.soa_count = count;
+
+		scope = create_scope(old_struct->Struct.scope->parent, ctx->allocator);
+		soa_struct->Struct.scope = scope;
+
+		for_array(i, old_struct->Struct.fields) {
+			Entity *old_field = old_struct->Struct.fields[i];
+			if (old_field->kind == Entity_Variable) {
+				Type *array_type = alloc_type_array(old_field->type, count);
+				Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
+				soa_struct->Struct.fields[i] = new_field;
+				add_entity(ctx->checker, scope, nullptr, new_field);
+				add_entity_use(ctx, nullptr, new_field);
+			} else {
+				soa_struct->Struct.fields[i] = old_field;
+			}
+
+			soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
+		}
+	}
+
+	Token token = {};
+	token.string = str_lit("Base_Type");
+	Entity *base_type_entity = alloc_entity_type_name(scope, token, elem, EntityState_Resolved);
+	add_entity(ctx->checker, scope, nullptr, base_type_entity);
+
+	add_type_info_type(ctx, soa_struct);
+
+	return soa_struct;
+}
+
 Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem) {
 	Type *bt_elem = base_type(elem);
-	if (!is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
+
+
+	bool is_polymorphic = is_type_polymorphic(elem);
+
+	if (!is_polymorphic && !is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
 		GB_ASSERT(elem_expr != nullptr);
 
 		gbString str = type_to_string(elem);
@@ -2716,9 +2805,25 @@ Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_
 	Type *soa_struct = nullptr;
 	Scope *scope = nullptr;
 
-	if (is_type_array(elem)) {
+	isize field_count = 0;
+
+	if (is_polymorphic) {
+		field_count = 0;
+
+		soa_struct = alloc_type_struct();
+		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), field_count+1);
+		soa_struct->Struct.tags = array_make<String>(heap_allocator(), field_count+1);
+		soa_struct->Struct.node = array_typ_expr;
+		soa_struct->Struct.soa_kind = StructSoa_Slice;
+		soa_struct->Struct.soa_elem = elem;
+		soa_struct->Struct.soa_count = 0;
+		soa_struct->Struct.is_polymorphic = true;
+
+		scope = create_scope(ctx->scope, ctx->allocator);
+		soa_struct->Struct.scope = scope;
+	} else if (is_type_array(elem)) {
 		Type *old_array = base_type(elem);
-		isize field_count = old_array->Array.count;
+		field_count = old_array->Array.count;
 
 		soa_struct = alloc_type_struct();
 		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), field_count+1);
@@ -2750,17 +2855,11 @@ Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_
 			add_entity_use(ctx, nullptr, new_field);
 		}
 
-		Entity *len_field = alloc_entity_field(scope, empty_token, t_int, false, cast(i32)field_count);
-		soa_struct->Struct.fields[field_count] = len_field;
-		add_entity(ctx->checker, scope, nullptr, len_field);
-		add_entity_use(ctx, nullptr, len_field);
-
-
 	} else {
 		GB_ASSERT(is_type_struct(elem));
 
 		Type *old_struct = base_type(elem);
-		isize field_count = old_struct->Struct.fields.count;
+		field_count = old_struct->Struct.fields.count;
 
 		soa_struct = alloc_type_struct();
 		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), field_count+1);
@@ -2789,13 +2888,140 @@ Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_
 			soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
 		}
 
-		Entity *len_field = alloc_entity_field(scope, empty_token, t_int, false, cast(i32)field_count);
-		soa_struct->Struct.fields[field_count] = len_field;
-		add_entity(ctx->checker, scope, nullptr, len_field);
-		add_entity_use(ctx, nullptr, len_field);
 	}
+	Entity *len_field = alloc_entity_field(scope, empty_token, t_int, false, cast(i32)field_count);
+	soa_struct->Struct.fields[field_count] = len_field;
+	add_entity(ctx->checker, scope, nullptr, len_field);
+	add_entity_use(ctx, nullptr, len_field);
 
 	Token token = {};
+	token.string = str_lit("Base_Type");
+	Entity *base_type_entity = alloc_entity_type_name(scope, token, elem, EntityState_Resolved);
+	add_entity(ctx->checker, scope, nullptr, base_type_entity);
+
+	add_type_info_type(ctx, soa_struct);
+
+	return soa_struct;
+}
+
+
+Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem) {
+	Type *bt_elem = base_type(elem);
+
+	bool is_polymorphic = is_type_polymorphic(elem);
+
+	if (!is_polymorphic && !is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
+		GB_ASSERT(elem_expr != nullptr);
+
+		gbString str = type_to_string(elem);
+		error(elem_expr, "Invalid type for an #soa array, expected a struct or array of length 4 or below, got '%s'", str);
+		gb_string_free(str);
+		return alloc_type_dynamic_array(elem);
+	}
+
+	Type *soa_struct = nullptr;
+	Scope *scope = nullptr;
+
+	isize field_count = 0;
+
+	if (is_polymorphic) {
+		field_count = 0;
+
+		soa_struct = alloc_type_struct();
+		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), field_count+3);
+		soa_struct->Struct.tags = array_make<String>(heap_allocator(), field_count+3);
+		soa_struct->Struct.node = array_typ_expr;
+		soa_struct->Struct.soa_kind = StructSoa_Dynamic;
+		soa_struct->Struct.soa_elem = elem;
+		soa_struct->Struct.soa_count = 0;
+		soa_struct->Struct.is_polymorphic = true;
+
+		scope = create_scope(ctx->scope, ctx->allocator);
+		soa_struct->Struct.scope = scope;
+	} else if (is_type_array(elem)) {
+		Type *old_array = base_type(elem);
+		field_count = old_array->Array.count;
+
+		soa_struct = alloc_type_struct();
+		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), field_count+3);
+		soa_struct->Struct.tags = array_make<String>(heap_allocator(), field_count+3);
+		soa_struct->Struct.node = array_typ_expr;
+		soa_struct->Struct.soa_kind = StructSoa_Dynamic;
+		soa_struct->Struct.soa_elem = elem;
+		soa_struct->Struct.soa_count = 0;
+
+		scope = create_scope(ctx->scope, ctx->allocator);
+		soa_struct->Struct.scope = scope;
+
+		String params_xyzw[4] = {
+			str_lit("x"),
+			str_lit("y"),
+			str_lit("z"),
+			str_lit("w")
+		};
+
+		for (i64 i = 0; i < field_count; i++) {
+			Type *array_type = alloc_type_pointer(old_array->Array.elem);
+			Token token = {};
+			token.string = params_xyzw[i];
+
+			Entity *new_field = alloc_entity_field(scope, token, array_type, false, cast(i32)i);
+			new_field->flags |= EntityFlag_SoaPtrField;
+			soa_struct->Struct.fields[i] = new_field;
+			add_entity(ctx->checker, scope, nullptr, new_field);
+			add_entity_use(ctx, nullptr, new_field);
+		}
+	} else {
+		GB_ASSERT(is_type_struct(elem));
+
+		Type *old_struct = base_type(elem);
+		field_count = old_struct->Struct.fields.count;
+
+		soa_struct = alloc_type_struct();
+		soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), field_count+3);
+		soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_struct->Struct.tags.count+3);
+		soa_struct->Struct.node = array_typ_expr;
+		soa_struct->Struct.soa_kind = StructSoa_Dynamic;
+		soa_struct->Struct.soa_elem = elem;
+		soa_struct->Struct.soa_count = 0;
+
+		scope = create_scope(old_struct->Struct.scope->parent, ctx->allocator);
+		soa_struct->Struct.scope = scope;
+
+		for_array(i, old_struct->Struct.fields) {
+			Entity *old_field = old_struct->Struct.fields[i];
+			if (old_field->kind == Entity_Variable) {
+				Type *array_type = alloc_type_pointer(old_field->type);
+				Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
+				new_field->flags |= EntityFlag_SoaPtrField;
+				soa_struct->Struct.fields[i] = new_field;
+				add_entity(ctx->checker, scope, nullptr, new_field);
+				add_entity_use(ctx, nullptr, new_field);
+			} else {
+				soa_struct->Struct.fields[i] = old_field;
+			}
+
+			soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
+		}
+	}
+
+	Entity *len_field = alloc_entity_field(scope, empty_token, t_int, false, cast(i32)field_count);
+	soa_struct->Struct.fields[field_count+0] = len_field;
+	add_entity(ctx->checker, scope, nullptr, len_field);
+	add_entity_use(ctx, nullptr, len_field);
+
+	Entity *cap_field = alloc_entity_field(scope, empty_token, t_int, false, cast(i32)field_count);
+	soa_struct->Struct.fields[field_count+1] = cap_field;
+	add_entity(ctx->checker, scope, nullptr, cap_field);
+	add_entity_use(ctx, nullptr, cap_field);
+
+	Token token = {};
+	token.string = str_lit("allocator");
+	Entity *allocator_field = alloc_entity_field(scope, token, t_allocator, false, cast(i32)field_count);
+	soa_struct->Struct.fields[field_count+2] = allocator_field;
+	add_entity(ctx->checker, scope, nullptr, allocator_field);
+	add_entity_use(ctx, nullptr, allocator_field);
+
 	token.string = str_lit("Base_Type");
 	Entity *base_type_entity = alloc_entity_type_name(scope, token, elem, EntityState_Resolved);
 	add_entity(ctx->checker, scope, nullptr, base_type_entity);
@@ -2992,90 +3218,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 				GB_ASSERT(at->tag->kind == Ast_BasicDirective);
 				String name = at->tag->BasicDirective.name;
 				if (name == "soa") {
-					Type *bt_elem = base_type(elem);
-					if (!is_type_struct(elem) && !is_type_raw_union(elem) && !(is_type_array(elem) && bt_elem->Array.count <= 4)) {
-						gbString str = type_to_string(elem);
-						error(at->elem, "Invalid type for an #soa array, expected a struct or array of length 4 or below, got '%s'", str);
-						gb_string_free(str);
-						*type = alloc_type_array(elem, count, generic_type);
-						goto array_end;
-					}
-
-					Type *soa_struct = nullptr;
-					Scope *scope = nullptr;
-
-					if (is_type_array(elem)) {
-						Type *old_array = base_type(elem);
-						soa_struct = alloc_type_struct();
-						soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_array->Array.count);
-						soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_array->Array.count);
-						soa_struct->Struct.node = e;
-						soa_struct->Struct.soa_kind = StructSoa_Fixed;
-						soa_struct->Struct.soa_elem = elem;
-						soa_struct->Struct.soa_count = count;
-
-						scope = create_scope(ctx->scope, ctx->allocator);
-						soa_struct->Struct.scope = scope;
-
-						String params_xyzw[4] = {
-							str_lit("x"),
-							str_lit("y"),
-							str_lit("z"),
-							str_lit("w")
-						};
-
-						for (i64 i = 0; i < old_array->Array.count; i++) {
-							Type *array_type = alloc_type_array(old_array->Array.elem, count);
-							Token token = {};
-							token.string = params_xyzw[i];
-
-							Entity *new_field = alloc_entity_field(scope, token, array_type, false, cast(i32)i);
-							soa_struct->Struct.fields[i] = new_field;
-							add_entity(ctx->checker, scope, nullptr, new_field);
-							add_entity_use(ctx, nullptr, new_field);
-						}
-
-					} else {
-						GB_ASSERT(is_type_struct(elem));
-
-						Type *old_struct = base_type(elem);
-						soa_struct = alloc_type_struct();
-						soa_struct->Struct.fields = array_make<Entity *>(heap_allocator(), old_struct->Struct.fields.count);
-						soa_struct->Struct.tags = array_make<String>(heap_allocator(), old_struct->Struct.tags.count);
-						soa_struct->Struct.node = e;
-						soa_struct->Struct.soa_kind = StructSoa_Fixed;
-						soa_struct->Struct.soa_elem = elem;
-						soa_struct->Struct.soa_count = count;
-
-						scope = create_scope(old_struct->Struct.scope->parent, ctx->allocator);
-						soa_struct->Struct.scope = scope;
-
-						for_array(i, old_struct->Struct.fields) {
-							Entity *old_field = old_struct->Struct.fields[i];
-							if (old_field->kind == Entity_Variable) {
-								Type *array_type = alloc_type_array(old_field->type, count);
-								Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
-								soa_struct->Struct.fields[i] = new_field;
-								add_entity(ctx->checker, scope, nullptr, new_field);
-								add_entity_use(ctx, nullptr, new_field);
-							} else {
-								soa_struct->Struct.fields[i] = old_field;
-							}
-
-							soa_struct->Struct.tags[i] = old_struct->Struct.tags[i];
-						}
-					}
-
-					Token token = {};
-					token.string = str_lit("Base_Type");
-					Entity *base_type_entity = alloc_entity_type_name(scope, token, elem, EntityState_Resolved);
-					add_entity(ctx->checker, scope, nullptr, base_type_entity);
-
-					add_type_info_type(ctx, soa_struct);
-
-					*type = soa_struct;
-
-
+					*type = make_soa_struct_fixed(ctx, e, at->elem, elem, count, generic_type);
 				} else if (name == "vector") {
 					if (!is_type_valid_vector_elem(elem)) {
 						gbString str = type_to_string(elem);
@@ -3116,7 +3259,18 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 
 	case_ast_node(dat, DynamicArrayType, e);
 		Type *elem = check_type(ctx, dat->elem);
-		*type = alloc_type_dynamic_array(elem);
+		if (dat->tag != nullptr) {
+			GB_ASSERT(dat->tag->kind == Ast_BasicDirective);
+			String name = dat->tag->BasicDirective.name;
+			if (name == "soa") {
+				*type = make_soa_struct_dynamic_array(ctx, e, dat->elem, elem);
+			} else {
+				error(dat->tag, "Invalid tag applied to dynamic array, got #%.*s", LIT(name));
+				*type = alloc_type_dynamic_array(elem);
+			}
+		} else {
+			*type = alloc_type_dynamic_array(elem);
+		}
 		set_base_type(named_type, *type);
 		return true;
 	case_end;
