@@ -1148,7 +1148,7 @@ map_type :: proc() {
 	// can be done in two ways:
 	elem, ok := m["Bob"];
 	exists := "Bob" in m;
-	_ = elem;
+	_, _ = elem, ok;
 	_ = exists;
 }
 
