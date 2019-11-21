@@ -2781,6 +2781,7 @@ Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_
 				new_field->flags |= EntityFlag_SoaPtrField;
 				soa_struct->Struct.fields[i] = new_field;
 				add_entity(ctx->checker, scope, nullptr, new_field);
+				add_entity_use(ctx, nullptr, new_field);
 			} else {
 				soa_struct->Struct.fields[i] = old_field;
 			}
@@ -3056,6 +3057,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 								Entity *new_field = alloc_entity_field(scope, old_field->token, array_type, false, old_field->Variable.field_src_index);
 								soa_struct->Struct.fields[i] = new_field;
 								add_entity(ctx->checker, scope, nullptr, new_field);
+								add_entity_use(ctx, nullptr, new_field);
 							} else {
 								soa_struct->Struct.fields[i] = old_field;
 							}
