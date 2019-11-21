@@ -35,7 +35,7 @@ the_basics :: proc() {
 		// A comment
 
 		my_integer_variable: int; // A comment for documentaton
-		
+
 		// Multi-line comments begin with /* and end with */. Multi-line comments can
 		// also be nested (unlike in C):
 		/*
@@ -113,7 +113,7 @@ the_basics :: proc() {
 		// Constants can be explicitly typed like a variable declaration:
 		Y : int : 123;
 		Z :: Y + 7; // constant computations are possible
-		
+
 		_ = my_integer_variable;
 		_ = x;
 	}
@@ -213,8 +213,8 @@ control_flow :: proc() {
 
 		// The iterated values are copies and cannot be written to.
 		// The following idiom is useful for iterating over a container in a by-reference manner:
-		for _, i in some_slice {
-			some_slice[i] = (i+1)*(i+1);
+		for _, idx in some_slice {
+			some_slice[idx] = (idx+1)*(idx+1);
 		}
 
 
@@ -827,6 +827,8 @@ implicit_context_system :: proc() {
 		// default unless explicitly specified otherwise
 		china_grove := new(int);
 		free(china_grove);
+
+		_ = c;
 	}
 
 	my_custom_allocator :: mem.nil_allocator;
