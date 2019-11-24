@@ -238,6 +238,9 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 }
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+	if len(data) == 0 {
+		return 0, ERROR_NONE;
+	}
 	bytes_written := _unix_write(fd, &data[0], len(data));
 	if bytes_written == -1 {
 		return -1, Errno(get_last_error());
