@@ -1,6 +1,5 @@
 // #define NO_ARRAY_BOUNDS_CHECK
 
-
 #include "common.cpp"
 #include "timings.cpp"
 #include "tokenizer.cpp"
@@ -22,6 +21,12 @@ gb_global Timings global_timings = {0};
 #include "ir_opt.cpp"
 #include "ir_print.cpp"
 #include "query_data.cpp"
+
+#if defined(GB_SYSTEM_WINDOWS)
+// NOTE(IC): In order to find Visual C++ paths without relying on environment variables.
+#include "microsoft_craziness.h"
+#endif 
+
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
 i32 system_exec_command_line_app(char *name, char *fmt, ...) {
@@ -1172,10 +1177,27 @@ int main(int arg_count, char **arg_ptr) {
 		if (ir_gen.module.generate_debug_info) {
 			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
 		}
+
+		// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
+		Find_Result_Utf8 result = find_visual_studio_and_windows_sdk_utf8();
+		defer(free_resources(&result));
+
+		if (result.windows_sdk_version == 0) {
+			gb_printf_err("Windows SDK not found.\n");
+			return 1;
+		}
+
+		// Add library search paths.
+		link_settings = gb_string_append_fmt(link_settings, " /LIBPATH:\"%s\"", result.windows_sdk_um_library_path);
+		link_settings = gb_string_append_fmt(link_settings, " /LIBPATH:\"%s\"", result.windows_sdk_ucrt_library_path);
+		link_settings = gb_string_append_fmt(link_settings, " /LIBPATH:\"%s\"", result.vs_library_path);
+
 		if (!build_context.use_lld) { // msvc
+
 			if (build_context.has_resource) {
 				exit_code = system_exec_command_line_app("msvc-link",
-					"rc /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
+					"\"%s\\rc.exe\" /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
+					result.vs_exe_path, 
 					LIT(output_base),
 					LIT(build_context.resource_filepath)
 				);
@@ -1185,23 +1207,23 @@ int main(int arg_count, char **arg_ptr) {
 				}
 
 				exit_code = system_exec_command_line_app("msvc-link",
-					"link \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
+					"\"%s\\link.exe\" \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 					" %.*s "
 					" %s "
 					"",
-					LIT(output_base), LIT(output_base), LIT(output_base), output_ext,
+					result.vs_exe_path, LIT(output_base), LIT(output_base), LIT(output_base), output_ext,
 					lib_str, LIT(build_context.link_flags),
 					link_settings
 				);
 			} else {
 				exit_code = system_exec_command_line_app("msvc-link",
-					"link \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
+					"\"%s\\link.exe\" \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 					" %.*s "
 					" %s "
 					"",
-					LIT(output_base), LIT(output_base), output_ext,
+					result.vs_exe_path, LIT(output_base), LIT(output_base), output_ext,
 					lib_str, LIT(build_context.link_flags),
 					link_settings
 				);
