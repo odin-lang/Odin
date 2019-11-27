@@ -207,6 +207,23 @@ gb_inline bool string_ends_with(String const &s, String const &suffix) {
 	return substring(s, s.len-suffix.len, s.len) == suffix;
 }
 
+gb_inline bool string_starts_with(String const &s, u8 prefix) {
+	if (1 > s.len) {
+		return false;
+	}
+
+	return s[0] == prefix;
+}
+
+
+gb_inline bool string_ends_with(String const &s, u8 suffix) {
+	if (1 > s.len) {
+		return false;
+	}
+
+	return s[s.len-1] == suffix;
+}
+
 gb_inline isize string_extension_position(String const &str) {
 	isize dot_pos = -1;
 	isize i = str.len;

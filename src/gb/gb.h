@@ -291,14 +291,18 @@ extern "C" {
 #if defined(GB_SYSTEM_WINDOWS)
 	#if !defined(GB_NO_WINDOWS_H)
 		#define NOMINMAX            1
+		#if !defined(GB_WINDOWS_H_INCLUDED)
 		#define WIN32_LEAN_AND_MEAN 1
 		#define WIN32_MEAN_AND_LEAN 1
 		#define VC_EXTRALEAN        1
+		#endif
 		#include <windows.h>
 		#undef NOMINMAX
+		#if !defined(GB_WINDOWS_H_INCLUDED)
 		#undef WIN32_LEAN_AND_MEAN
 		#undef WIN32_MEAN_AND_LEAN
 		#undef VC_EXTRALEAN
+		#endif
 	#endif
 
 	#include <malloc.h> // NOTE(bill): _aligned_*()
