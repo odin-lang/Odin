@@ -1916,6 +1916,21 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			bd.tok  = tok;
 			bd.name = name.text;
 			return parse_call_expr(p, bd);
+
+
+		case "soa", "vector":
+			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(name));
+			bd.tok  = tok;
+			bd.name = name.text;
+			original_type := parse_type(p);
+			type := ast.unparen_expr(original_type);
+			switch t in &type.derived {
+			case ast.Array_Type:         t.tag = bd;
+			case ast.Dynamic_Array_Type: t.tag = bd;
+			case:
+				error(p, original_type.pos, "expected an array type after #%s");
+			}
+			return original_type;
 		case:
 			expr := parse_expr(p, lhs);
 			te := ast.new(ast.Tag_Expr, tok.pos, expr.pos);
@@ -2394,7 +2409,7 @@ parse_value :: proc(p: ^Parser) -> ^ast.Expr {
 	if p.curr_tok.kind == .Open_Brace {
 		return parse_literal_value(p, nil);
 	}
-	prev_allow_range = p.allow_range;
+	prev_allow_range := p.allow_range;
 	defer p.allow_range = prev_allow_range;
 	p.allow_range = true;
 	return parse_expr(p, false);
