@@ -13,14 +13,7 @@
 //
 
 
-//#include <windows.h>
-//#include <stdlib.h>
-//#include <string.h>
-//#include <assert.h>
-//#include <stdio.h>
-//#include <sys/stat.h>
-
-//#include <stdint.h>
+#include <wtypesbase.h>
 #include <io.h>         // For _get_osfhandle
 
 #pragma comment(lib, "Advapi32.lib")
@@ -53,26 +46,29 @@
 // Here is the API you need to know about:
 //
 
+
+gb_global gbAllocator mc_allocator = heap_allocator();
+
 struct Find_Result {
     int windows_sdk_version;   // Zero if no Windows SDK found.
 
-    wchar_t *windows_sdk_root              = NULL;
-    wchar_t *windows_sdk_um_library_path   = NULL;
-    wchar_t *windows_sdk_ucrt_library_path = NULL;
-    
-    wchar_t *vs_exe_path = NULL;
-    wchar_t *vs_library_path = NULL;
+    wchar_t *windows_sdk_root;
+    wchar_t *windows_sdk_um_library_path;
+    wchar_t *windows_sdk_ucrt_library_path;
+
+    wchar_t *vs_exe_path;
+    wchar_t *vs_library_path;
 };
 
 struct Find_Result_Utf8 {
     int windows_sdk_version;   // Zero if no Windows SDK found.
 
-    char *windows_sdk_root              = NULL;
-    char *windows_sdk_um_library_path   = NULL;
-    char *windows_sdk_ucrt_library_path = NULL;
-    
-    char *vs_exe_path = NULL;
-    char *vs_library_path = NULL;
+    String windows_sdk_root;
+    String windows_sdk_um_library_path;
+    String windows_sdk_ucrt_library_path;
+
+    String vs_exe_path;
+    String vs_library_path;
 };
 
 
@@ -80,19 +76,20 @@ Find_Result find_visual_studio_and_windows_sdk();
 Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8();
 
 void free_resources(Find_Result *result) {
-    free(result->windows_sdk_root);
-    free(result->windows_sdk_um_library_path);
-    free(result->windows_sdk_ucrt_library_path);
-    free(result->vs_exe_path);
-    free(result->vs_library_path);
+    // free(result->windows_sdk_root);
+    // free(result->windows_sdk_um_library_path);
+    // free(result->windows_sdk_ucrt_library_path);
+    // free(result->vs_exe_path);
+    // free(result->vs_library_path);
 }
 
 void free_resources(Find_Result_Utf8 *result) {
-    free(result->windows_sdk_root);
-    free(result->windows_sdk_um_library_path);
-    free(result->windows_sdk_ucrt_library_path);
-    free(result->vs_exe_path);
-    free(result->vs_library_path);
+    // gbAllocator a = heap_allocator();
+    // gb_free(a, result->windows_sdk_root.text);
+    // gb_free(a, result->windows_sdk_um_library_path.text);
+    // gb_free(a, result->windows_sdk_ucrt_library_path.text);
+    // gb_free(a, result->vs_exe_path.text);
+    // gb_free(a, result->vs_library_path.text);
 }
 
 
@@ -115,10 +112,10 @@ void free_resources(Find_Result_Utf8 *result) {
 // I am not making this up: https://github.com/Microsoft/vswhere
 //
 // Several people have therefore found the need to solve this problem
-// themselves. We referred to some of these other solutions when 
+// themselves. We referred to some of these other solutions when
 // figuring out what to do, most prominently ziglang's version,
 // by Ryan Saunderson.
-// 
+//
 // I hate this kind of code. The fact that we have to do this at all
 // is stupid, and the actual maneuvers we need to go through
 // are just painful. If programming were like this all the time,
@@ -148,18 +145,6 @@ void free_resources(Find_Result_Utf8 *result) {
 
 typedef WCHAR* BSTR;
 typedef const WCHAR* LPCOLESTR;
-
-
-struct DECLSPEC_UUID("00000000-0000-0000-C000-000000000046") IUnknown
-{
-    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject) = 0;
-    virtual ULONG STDMETHODCALLTYPE AddRef(void) = 0;
-    virtual ULONG STDMETHODCALLTYPE Release(void) = 0;
-};
-
-extern "C" HRESULT STDAPICALLTYPE CoInitialize(LPVOID pvReserved);
-extern "C" HRESULT STDAPICALLTYPE CoCreateInstance(REFCLSID rclsid, IUnknown * pUnkOuter, DWORD dwClsContext, REFIID riid, LPVOID * ppv);
-extern "C" void STDAPICALLTYPE SysFreeString(BSTR bstrString);
 
 
 struct DECLSPEC_UUID("B41463C3-8866-43B5-BC33-2B0676F7F42E") DECLSPEC_NOVTABLE ISetupInstance : public IUnknown
@@ -193,13 +178,13 @@ struct DECLSPEC_UUID("42843719-DB4C-46C2-8E7C-64F1816EFD5B") DECLSPEC_NOVTABLE I
 // The beginning of the actual code that does things.
 
 struct Version_Data {
-    int32_t best_version[4];  // For Windows 8 versions, only two of these numbers are used.
+    i32 best_version[4];  // For Windows 8 versions, only two of these numbers are used.
     wchar_t *best_name;
 };
 
 bool os_file_exists(wchar_t *name) {
     // @Robustness: What flags do we really want to check here?
-    
+
     auto attrib = GetFileAttributesW(name);
     if (attrib == INVALID_FILE_ATTRIBUTES) return false;
     if (attrib & FILE_ATTRIBUTE_DIRECTORY) return false;
@@ -211,23 +196,19 @@ wchar_t *concat(wchar_t *a, wchar_t *b, wchar_t *c = nullptr, wchar_t *d = nullp
     // Concatenate up to 4 wide strings together. Allocated with malloc.
     // If you don't like that, use a programming language that actually
     // helps you with using custom allocators. Or just edit the code.
-    
-    auto len_a = wcslen(a);
-    auto len_b = wcslen(b);
 
-    size_t len_c = 0;
-    if (c) len_c = wcslen(c);
-    
-    size_t len_d = 0;
-    if (d) len_d = wcslen(d);
-    
+    isize len_a = string16_len(a);
+    isize len_b = string16_len(b);
+    isize len_c = string16_len(c);
+    isize len_d = string16_len(d);
+
     wchar_t *result = (wchar_t *)malloc((len_a + len_b + len_c + len_d + 1) * 2);
-    memcpy(result, a, len_a*2);
-    memcpy(result + len_a, b, len_b*2);
+    gb_memmove(result, a, len_a*2);
+    gb_memmove(result + len_a, b, len_b*2);
 
-    if (c) memcpy(result + len_a + len_b, c, len_c * 2);
-    if (d) memcpy(result + len_a + len_b + len_c, d, len_d * 2);
-        
+    if (c) gb_memmove(result + len_a + len_b, c, len_c * 2);
+    if (d) gb_memmove(result + len_a + len_b + len_c, d, len_d * 2);
+
     result[len_a + len_b + len_c + len_d] = 0;
 
     return result;
@@ -242,7 +223,7 @@ bool visit_files_w(wchar_t *dir_name, Version_Data *data, Visit_Proc_W proc) {
 
     auto wildcard_name = concat(dir_name, L"\\*");
     defer (free(wildcard_name));
-    
+
     WIN32_FIND_DATAW find_data;
     auto handle = FindFirstFileW(wildcard_name, &find_data);
     if (handle == INVALID_HANDLE_VALUE) return false;
@@ -251,16 +232,16 @@ bool visit_files_w(wchar_t *dir_name, Version_Data *data, Visit_Proc_W proc) {
         if ((find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && (find_data.cFileName[0] != '.')) {
             auto full_name = concat(dir_name, L"\\", find_data.cFileName);
             defer (free(full_name));
-          
+
             proc(find_data.cFileName, full_name, data);
         }
-        
+
         auto success = FindNextFileW(handle, &find_data);
         if (!success) break;
     }
 
     FindClose(handle);
-    
+
     return true;
 }
 
@@ -269,7 +250,7 @@ wchar_t *find_windows_kit_root(HKEY key, wchar_t *version) {
     // Given a key to an already opened registry entry,
     // get the value stored under the 'version' subkey.
     // If that's not the right terminology, hey, I never do registry stuff.
-    
+
     DWORD required_length;
     auto rc = RegQueryValueExW(key, version, NULL, NULL, NULL, &required_length);
     if (rc != 0)  return NULL;
@@ -287,13 +268,13 @@ wchar_t *find_windows_kit_root(HKEY key, wchar_t *version) {
     if (value[length]) {
         value[length+1] = 0;
     }
-    
+
     return value;
 }
 
 void win10_best(wchar_t *short_name, wchar_t *full_name, Version_Data *data) {
     // Find the Windows 10 subdirectory with the highest version number.
-    
+
     int i0, i1, i2, i3;
     auto success = swscanf_s(short_name, L"%d.%d.%d.%d", &i0, &i1, &i2, &i3);
     if (success < 4) return;
@@ -313,7 +294,7 @@ void win10_best(wchar_t *short_name, wchar_t *full_name, Version_Data *data) {
     // after we execute this function, so Win*_Data would contain an invalid pointer.
     if (data->best_name) free(data->best_name);
     data->best_name = _wcsdup(full_name);
-            
+
     if (data->best_name) {
         data->best_version[0] = i0;
         data->best_version[1] = i1;
@@ -350,7 +331,7 @@ void find_windows_kit_root(Find_Result *result) {
     // is stored in the same place in the registry. We open a key
     // to that place, first checking preferntially for a Windows 10 kit,
     // then, if that's not found, a Windows 8 kit.
-    
+
     HKEY main_key;
 
     auto rc = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots",
@@ -361,16 +342,20 @@ void find_windows_kit_root(Find_Result *result) {
     // Look for a Windows 10 entry.
     auto windows10_root = find_windows_kit_root(main_key, L"KitsRoot10");
 
+
     if (windows10_root) {
         defer (free(windows10_root));
+
+
         Version_Data data = {0};
         auto windows10_lib = concat(windows10_root, L"Lib");
         defer (free(windows10_lib));
-        
+
+
         visit_files_w(windows10_lib, &data, win10_best);
         if (data.best_name) {
             result->windows_sdk_version = 10;
-            result->windows_sdk_root = data.best_name;
+            result->windows_sdk_root = concat(data.best_name, L"\\");
             return;
         }
     }
@@ -380,7 +365,7 @@ void find_windows_kit_root(Find_Result *result) {
 
     if (windows8_root) {
         defer (free(windows8_root));
-        
+
         auto windows8_lib = concat(windows8_root, L"Lib");
         defer (free(windows8_lib));
 
@@ -388,7 +373,7 @@ void find_windows_kit_root(Find_Result *result) {
         visit_files_w(windows8_lib, &data, win8_best);
         if (data.best_name) {
             result->windows_sdk_version = 8;
-            result->windows_sdk_root = data.best_name;
+            result->windows_sdk_root = concat(data.best_name, L"\\");
             return;
         }
     }
@@ -397,7 +382,7 @@ void find_windows_kit_root(Find_Result *result) {
 }
 
 
-void find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *result) {
+bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *result) {
     // The name of this procedure is kind of cryptic. Its purpose is
     // to fight through Microsoft craziness. The things that the fine
     // Visual Studio team want you to do, JUST TO FIND A SINGLE FOLDER
@@ -412,39 +397,40 @@ void find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
     //
     // If all this COM object instantiation, enumeration, and querying doesn't give us
     // a useful result, we drop back to the registry-checking method.
-    
+
     auto rc = CoInitialize(NULL);
     // "Subsequent valid calls return false." So ignore false.
-    // if rc != S_OK  return false;
+    if (rc != S_OK)  return false;
 
     GUID my_uid                   = {0x42843719, 0xDB4C, 0x46C2, {0x8E, 0x7C, 0x64, 0xF1, 0x81, 0x6E, 0xFD, 0x5B}};
     GUID CLSID_SetupConfiguration = {0x177F0C4A, 0x1CD3, 0x4DE7, {0xA3, 0x2C, 0x71, 0xDB, 0xBB, 0x9F, 0xA3, 0x6D}};
-    DWORD CLSCTX_INPROC_SERVER = 0x1;
 
     ISetupConfiguration *config = NULL;
-    auto hr = CoCreateInstance(CLSID_SetupConfiguration, NULL, CLSCTX_INPROC_SERVER, my_uid, (void **)&config);
-    if (hr != 0)  return;
+    HRESULT hr = 0;
+    hr = CoCreateInstance(CLSID_SetupConfiguration, NULL, CLSCTX_INPROC_SERVER, my_uid, (void **)&config);
+    if (hr != 0)  return false;
     defer (config->Release());
 
     IEnumSetupInstances *instances = NULL;
     hr = config->EnumInstances(&instances);
-    if (hr != 0)     return;
-    if (!instances)  return;
+    if (hr != 0)     return false;
+    if (!instances)  return false;
     defer (instances->Release());
 
-    while (1) {
+
+    for (;;) {
         ULONG found = 0;
         ISetupInstance *instance = NULL;
         auto hr = instances->Next(1, &instance, &found);
         if (hr != S_OK) break;
 
         defer (instance->Release());
-        
+
         BSTR bstr_inst_path;
         hr = instance->GetInstallationPath(&bstr_inst_path);
         if (hr != S_OK)  continue;
         defer (SysFreeString(bstr_inst_path));
-        
+
         auto tools_filename = concat(bstr_inst_path, L"\\VC\\Auxiliary\\Build\\Microsoft.VCToolsVersion.default.txt");
         defer (free(tools_filename));
 
@@ -471,31 +457,31 @@ void find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
         auto version_tail = wcschr(version, '\n');
         if (version_tail)  *version_tail = 0;  // Stomp the data, because nobody cares about it.
 
-        auto library_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\lib\\x64");
-        auto library_file = concat(library_path, L"\\vcruntime.lib");  // @Speed: Could have library_path point to this string, with a smaller count, to save on memory flailing!
+        auto library_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\lib\\x64\\");
+        auto library_file = concat(library_path, L"vcruntime.lib");  // @Speed: Could have library_path point to this string, with a smaller count, to save on memory flailing!
 
         if (os_file_exists(library_file)) {
-            auto link_exe_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\bin\\Hostx64\\x64");
+            auto link_exe_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\bin\\Hostx64\\x64\\");
             result->vs_exe_path     = link_exe_path;
             result->vs_library_path = library_path;
-            return;
+            return true;
         }
 
         /*
            Ryan Saunderson said:
-           "Clang uses the 'SetupInstance->GetInstallationVersion' / ISetupHelper->ParseVersion to find the newest version 
+           "Clang uses the 'SetupInstance->GetInstallationVersion' / ISetupHelper->ParseVersion to find the newest version
            and then reads the tools file to define the tools path - which is definitely better than what i did."
- 
+
            So... @Incomplete: Should probably pick the newest version...
         */
     }
-    
+
     // If we get here, we didn't find Visual Studio 2017. Try earlier versions.
 
     HKEY vs7_key;
     rc = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VS7", 0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &vs7_key);
 
-    if (rc != S_OK)  return;
+    if (rc != S_OK)  return false;
     defer (RegCloseKey(vs7_key));
 
     // Hardcoded search for 4 prior Visual Studio versions. Is there something better to do here?
@@ -514,14 +500,14 @@ void find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
         }
 
         auto buffer = (wchar_t *)malloc(cb_data);
-        if (!buffer)  return;
+        if (!buffer)  return false;
         defer (free(buffer));
-        
+
         rc = RegQueryValueExW(vs7_key, v, NULL, NULL, (LPBYTE)buffer, &cb_data);
         if (rc != 0)  continue;
 
         // @Robustness: Do the zero-termination thing suggested in the RegQueryValue docs?
-        
+
         auto lib_path = concat(buffer, L"VC\\Lib\\amd64");
 
         // Check to see whether a vcruntime.lib actually exists here.
@@ -531,55 +517,64 @@ void find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
         if (os_file_exists(vcruntime_filename)) {
             result->vs_exe_path     = concat(buffer, L"VC\\bin");
             result->vs_library_path = lib_path;
-            return;
+            return true;
         }
-        
+
         free(lib_path);
     }
 
     // If we get here, we failed to find anything.
+
+    return false;
 }
 
 
 Find_Result find_visual_studio_and_windows_sdk() {
-    Find_Result result;
+    Find_Result result = {};
 
     find_windows_kit_root(&result);
 
+
     if (result.windows_sdk_root) {
-        result.windows_sdk_um_library_path   = concat(result.windows_sdk_root, L"\\um\\x64");
-        result.windows_sdk_ucrt_library_path = concat(result.windows_sdk_root, L"\\ucrt\\x64");
+        result.windows_sdk_um_library_path   = concat(result.windows_sdk_root, L"um\\x64\\");
+        result.windows_sdk_ucrt_library_path = concat(result.windows_sdk_root, L"ucrt\\x64\\");
     }
 
-    find_visual_studio_by_fighting_through_microsoft_craziness(&result);
+    bool ok = find_visual_studio_by_fighting_through_microsoft_craziness(&result);
+
+    if (!ok) {
+        result.vs_exe_path     = concat(L"", L"");
+        result.vs_library_path = concat(L"", L"");
+    }
 
     return result;
 }
 
-static char * ucs2_to_utf8(wchar_t * wstr) {
-
-    int len = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, NULL, 0, NULL, NULL) + 1;
-
-    char * str = (char*)malloc(len);
-
-    WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, len, NULL, NULL);
-
-    return str;
+String mc_wstring_to_string(wchar_t *str) {
+    return string16_to_string(mc_allocator, make_string16_c(str));
 }
 
-Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8() {
 
+Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8() {
     Find_Result result = find_visual_studio_and_windows_sdk();
     defer (free_resources(&result));
 
-    Find_Result_Utf8 r;
+    Find_Result_Utf8 r = {};
     r.windows_sdk_version = result.windows_sdk_version;
 
-    r.windows_sdk_root = ucs2_to_utf8(result.windows_sdk_root);
-    r.windows_sdk_um_library_path = ucs2_to_utf8(result.windows_sdk_um_library_path);
-    r.windows_sdk_ucrt_library_path = ucs2_to_utf8(result.windows_sdk_ucrt_library_path);
-    r.vs_exe_path = ucs2_to_utf8(result.vs_exe_path);
-    r.vs_library_path = ucs2_to_utf8(result.vs_library_path);
+    r.windows_sdk_root              = mc_wstring_to_string(result.windows_sdk_root);
+    r.windows_sdk_um_library_path   = mc_wstring_to_string(result.windows_sdk_um_library_path);
+    r.windows_sdk_ucrt_library_path = mc_wstring_to_string(result.windows_sdk_ucrt_library_path);
+    r.vs_exe_path                   = mc_wstring_to_string(result.vs_exe_path);
+    r.vs_library_path               = mc_wstring_to_string(result.vs_library_path);
+
+    // gb_printf("%.*s\n", LIT(r.windows_sdk_root));
+    // gb_printf("%.*s\n", LIT(r.windows_sdk_um_library_path));
+    // gb_printf("%.*s\n", LIT(r.windows_sdk_ucrt_library_path));
+    // gb_printf("%.*s\n", LIT(r.vs_exe_path));
+    // gb_printf("%.*s\n", LIT(r.vs_library_path));
+
+    // gb_exit(1);
 
     return r;
 }

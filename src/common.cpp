@@ -7,6 +7,13 @@
 #include <intrin.h>
 #endif
 
+#if defined(GB_SYSTEM_WINDOWS)
+#define NOMINMAX            1
+#include <windows.h>
+#undef NOMINMAX
+#endif
+
+#define GB_WINDOWS_H_INCLUDED
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
