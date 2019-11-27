@@ -103,92 +103,152 @@ _log2 :: proc(x: int) -> int {
 	return res;
 }
 
-merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
-	merge_slices :: proc(arr1, arr2, out: A, f: proc(T, T) -> int) {
-		N1, N2 := len(arr1), len(arr2);
-		i, j := 0, 0;
-		for k in 0..<N1+N2 {
-			if j == N2 || i < N1 && j < N2 && f(arr1[i], arr2[j]) < 0 {
-				out[k] = arr1[i];
-				i += 1;
+merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) where intrinsics.type_is_ordered(T) {
+	merge :: proc(a: A, start, mid, end: int, f: proc(T, T) -> int) {
+		s, m := start, mid;
+
+		s2 := m + 1;
+		if f(a[m], a[s2]) <= 0 {
+			return;
+		}
+
+		for s <= m && s2 <= end {
+			if f(a[s], a[s2]) <= 0 {
+				s += 1;
 			} else {
-				out[k] = arr2[j];
-				j += 1;
+				v := a[s2];
+				i := s2;
+
+				for i != s {
+					a[i] = a[i-1];
+					i -= 1;
+				}
+				a[s] = v;
+
+				s  += 1;
+				m  += 1;
+				s2 += 1;
 			}
 		}
 	}
+	internal_sort :: proc(a: A, l, r: int, f: proc(T, T) -> int) {
+		if l < r {
+			m := l + (r - l) / 2;
 
-	assert(f != nil);
-
-	arr1 := array;
-	N := len(arr1);
-	arr2 := make([]T, N);
-	defer free(arr2);
-
-	a, b, m, M := N/2, N, 1, _log2(N);
-
-	for i in 0..M {
-		for j in 0..<a {
-			k := 2*j*m;
-			merge_slices(arr1[k:k+m], arr1[k+m:k+m+m], arr2[k:], f);
+			internal_sort(a, l, m, f);
+			internal_sort(a, m+1, r, f);
+			merge(a, l, m, r, f);
 		}
-		if N-b > m {
-			k := 2*a*m;
-			merge_slices(arr1[k:k+m], arr1[k+m : k+m+(N-b)&(m-1)], arr2[k:], f);
-		} else {
-			copy(arr2[b:N], arr1[b:N]);
-		}
-		arr1, arr2 = arr2, arr1;
-		m <<= 1;
-		a >>= 1;
-		b = a << uint(i) << 2;
 	}
 
-	if M & 1 == 0 do copy(arr2, arr1);
+	internal_sort(array, 0, len(array)-1, f);
 }
 
 merge_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
-	merge_slices :: proc(arr1, arr2, out: A) {
-		N1, N2 := len(arr1), len(arr2);
-		i, j := 0, 0;
-		for k in 0..<N1+N2 {
-			if j == N2 || i < N1 && j < N2 && arr1[i] < arr2[j] {
-				out[k] = arr1[i];
-				i += 1;
+	merge :: proc(a: A, start, mid, end: int) {
+		s, m := start, mid;
+
+		s2 := m + 1;
+		if a[m] <= a[s2] {
+			return;
+		}
+
+		for s <= m && s2 <= end {
+			if a[s] <= a[s2] {
+				s += 1;
 			} else {
-				out[k] = arr2[j];
-				j += 1;
+				v := a[s2];
+				i := s2;
+
+				for i != s {
+					a[i] = a[i-1];
+					i -= 1;
+				}
+				a[s] = v;
+
+				s  += 1;
+				m  += 1;
+				s2 += 1;
 			}
 		}
 	}
+	internal_sort :: proc(a: A, l, r: int) {
+		if l < r {
+			m := l + (r - l) / 2;
 
-	arr1 := array;
-	N := len(arr1);
-	arr2 := make([]T, N);
-	defer free(arr2);
-
-	a, b, m, M := N/2, N, 1, _log2(N);
-
-	for i in 0..M {
-		for j in 0..<a {
-			k := 2*j*m;
-			merge_slices(arr1[k:k+m], arr1[k+m:k+m+m], arr2[k:]);
+			internal_sort(a, l, m);
+			internal_sort(a, m+1, r);
+			merge(a, l, m, r);
 		}
-		if N-b > m {
-			k := 2*a*m;
-			merge_slices(arr1[k:k+m], arr1[k+m : k+m+(N-b)&(m-1)], arr2[k:]);
-		} else {
-			copy(arr2[b:N], arr1[b:N]);
-		}
-		arr1, arr2 = arr2, arr1;
-		m <<= 1;
-		a >>= 1;
-		b = a << uint(i) << 2;
 	}
 
-	if M & 1 == 0 do copy(arr2, arr1);
+	internal_sort(array, 0, len(array)-1);
 }
 
+
+heap_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
+	sift_proc :: proc(a: A, pi: int, n: int, f: proc(T, T) -> int) #no_bounds_check {
+		p := pi;
+		v := a[p];
+		m := p*2 + 1;
+		for m <= n {
+			if (m < n) && f(a[m+1], a[m]) > 0 {
+				m += 1;
+			}
+			if f(v, a[m]) >= 0 {
+				break;
+			}
+			a[p] = a[m];
+			p = m;
+			m += m+1;
+			a[p] = v;
+		}
+	}
+
+	n := len(array);
+	if n == 0 do return;
+
+	for i := n/2; i >= 0; i -= 1 {
+		sift_proc(array, i, n-1, f);
+	}
+
+	for i := n-1; i >= 1; i -= 1 {
+		array[0], array[i] = array[i], array[0];
+		sift_proc(array, 0, i-1, f);
+	}
+}
+
+heap_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
+	sift :: proc(a: A, pi: int, n: int) #no_bounds_check {
+		p := pi;
+		v := a[p];
+		m := p*2 + 1;
+		for m <= n {
+			if (m < n) && (a[m+1] > a[m]) {
+				m += 1;
+			}
+			if v >= a[m] {
+				break;
+			}
+			a[p] = a[m];
+			p = m;
+			m += m+1;
+			a[p] = v;
+		}
+	}
+
+	n := len(array);
+	if n == 0 do return;
+
+	for i := n/2; i >= 0; i -= 1 {
+		sift(array, i, n-1);
+	}
+
+	for i := n-1; i >= 1; i -= 1 {
+		array[0], array[i] = array[i], array[0];
+		sift(array, 0, i-1);
+	}
+}
 
 compare_bools :: proc(a, b: bool) -> int {
 	switch {
