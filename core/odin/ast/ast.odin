@@ -554,6 +554,7 @@ Pointer_Type :: struct {
 Array_Type :: struct {
 	using node: Expr,
 	open:  tokenizer.Pos,
+	tag:   ^Expr,
 	len:   ^Expr, // Ellipsis node for [?]T arrray types, nil for slice types
 	close: tokenizer.Pos,
 	elem:  ^Expr,
@@ -561,6 +562,7 @@ Array_Type :: struct {
 
 Dynamic_Array_Type :: struct {
 	using node: Expr,
+	tag:         ^Expr,
 	open:        tokenizer.Pos,
 	dynamic_pos: tokenizer.Pos,
 	close:       tokenizer.Pos,
