@@ -1188,7 +1188,7 @@ int main(int arg_count, char **arg_ptr) {
 		}
 
 		// Add library search paths.
-		if (find_result.vs_library_path.len > 0) {
+		if (false && find_result.vs_library_path.len > 0) {
 			GB_ASSERT(find_result.windows_sdk_um_library_path.len > 0);
 			GB_ASSERT(find_result.windows_sdk_ucrt_library_path.len > 0);
 
