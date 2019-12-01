@@ -42,6 +42,10 @@ string_from_ptr :: proc(ptr: ^byte, len: int) -> string {
 	return transmute(string)mem.Raw_String{ptr, len};
 }
 
+ptr_from_string :: proc(str: string) -> ^byte {
+	d := transmute(mem.Raw_String)str;
+	return d.data;
+}
 
 unsafe_string_to_cstring :: proc(str: string) -> cstring {
 	d := transmute(mem.Raw_String)str;
