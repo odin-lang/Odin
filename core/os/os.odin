@@ -200,7 +200,7 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		// NOTE(bill): Does nothing
 
 	case .Resize:
-		return heap_resize(ptr, size);
+		return heap_resize(old_memory, size);
 	}
 
 	return nil;
