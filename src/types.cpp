@@ -1585,6 +1585,13 @@ bool type_has_nil(Type *t) {
 	case Type_Union:
 		return !t->Union.no_nil;
 	case Type_Struct:
+		if (is_type_soa_struct(t)) {
+			switch (t->Struct.soa_kind) {
+			case StructSoa_Fixed:   return false;
+			case StructSoa_Slice:   return true;
+			case StructSoa_Dynamic: return true;
+			}
+		}
 		return false;
 	case Type_Opaque:
 		return true;

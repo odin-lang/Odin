@@ -4325,7 +4325,44 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 		irValue *val = ir_emit_runtime_call(proc, "memory_compare_zero", args);
 		irValue *res = ir_emit_comp(proc, op_kind, val, v_zero);
 		return ir_emit_conv(proc, res, t_bool);
+	} else if (is_type_soa_struct(t)) {
+		Type *bt = base_type(t);
+		if (bt->Struct.soa_kind == StructSoa_Slice) {
+			ir_emit_comment(proc, str_lit("soa-slice-nil-comp"));
+			irValue *len  = ir_soa_struct_len(proc, x);
+			if (bt->Struct.fields.count > 1) {
+				irValue *data = ir_emit_struct_ev(proc, x, 0);
+				if (op_kind == Token_CmpEq) {
+					irValue *a = ir_emit_comp(proc, Token_CmpEq, data, v_raw_nil);
+					irValue *b = ir_emit_comp(proc, Token_CmpEq, len, v_zero);
+					return ir_emit_arith(proc, Token_Or, a, b, t_bool);
+				} else if (op_kind == Token_NotEq) {
+					irValue *a = ir_emit_comp(proc, Token_NotEq, data, v_raw_nil);
+					irValue *b = ir_emit_comp(proc, Token_NotEq, len, v_zero);
+					return ir_emit_arith(proc, Token_And, a, b, t_bool);
+				}
+			} else {
+				return ir_emit_comp(proc, op_kind, len, v_zero);
+			}
+		} else if (bt->Struct.soa_kind == StructSoa_Dynamic) {
+			ir_emit_comment(proc, str_lit("soa-dynamic-array-nil-comp"));
 
+			irValue *cap  = ir_soa_struct_len(proc, x);
+			if (bt->Struct.fields.count > 1) {
+				irValue *data = ir_emit_struct_ev(proc, x, 0);
+				if (op_kind == Token_CmpEq) {
+					irValue *a = ir_emit_comp(proc, Token_CmpEq, data, v_raw_nil);
+					irValue *b = ir_emit_comp(proc, Token_CmpEq, cap, v_zero);
+					return ir_emit_arith(proc, Token_Or, a, b, t_bool);
+				} else if (op_kind == Token_NotEq) {
+					irValue *a = ir_emit_comp(proc, Token_NotEq, data, v_raw_nil);
+					irValue *b = ir_emit_comp(proc, Token_NotEq, cap, v_zero);
+					return ir_emit_arith(proc, Token_And, a, b, t_bool);
+				}
+			} else {
+				return ir_emit_comp(proc, op_kind, cap, v_zero);
+			}
+		}
 	}
 	return nullptr;
 }

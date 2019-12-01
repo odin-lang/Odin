@@ -164,9 +164,10 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		return aligned_heap_alloc(size, alignment);
 
 	case .Free:
-		assert(old_memory != nil);
-		ptr := recover_original_pointer(old_memory);
-		heap_free(ptr);
+		if old_memory != nil {
+			ptr := recover_original_pointer(old_memory);
+			heap_free(ptr);
+		}
 		return nil;
 
 	case .Free_All:
