@@ -10,7 +10,6 @@ enum AddressingMode {
 	Addressing_Invalid,       // invalid addressing mode
 	Addressing_NoValue,       // no value (void in C)
 	Addressing_Value,         // computed value (rvalue)
-	Addressing_Immutable,     // immutable computed value (const rvalue)
 	Addressing_Context,       // context value
 	Addressing_Variable,      // addressable variable (lvalue)
 	Addressing_Constant,      // constant

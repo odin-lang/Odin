@@ -1142,9 +1142,6 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 		if (e->flags & EntityFlag_Value) {
 			o->mode = Addressing_Value;
 		}
-		if (e->Variable.is_immutable) {
-			o->mode = Addressing_Immutable;
-		}
 		break;
 
 	case Entity_Procedure:
@@ -3251,9 +3248,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		break;
 	case Entity_Variable:
 		// TODO(bill): Is this the rule I need?
-		if (operand->mode == Addressing_Immutable) {
-			// Okay
-		} else if (operand->mode == Addressing_Context) {
+		if (operand->mode == Addressing_Context) {
 			if (sel.indirect) {
 				operand->mode = Addressing_Variable;
 			}
@@ -6778,8 +6773,7 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count,
 			if (o->mode == Addressing_Constant) {
 				*max_count = o->value.value_string.len;
 			}
-			if (o->mode != Addressing_Immutable && o->mode != Addressing_Constant) {
-				// o->mode = Addressing_Variable;
+			if (o->mode != Addressing_Constant) {
 				o->mode = Addressing_Value;
 			}
 			o->type = t_u8;
@@ -6789,27 +6783,25 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count,
 
 	case Type_Array:
 		*max_count = t->Array.count;
-		if (o->mode != Addressing_Immutable) {
-			if (indirection) {
-				o->mode = Addressing_Variable;
-			} else if (o->mode != Addressing_Variable &&
-			           o->mode != Addressing_Constant) {
-				o->mode = Addressing_Value;
-			}
+		if (indirection) {
+			o->mode = Addressing_Variable;
+		} else if (o->mode != Addressing_Variable &&
+		           o->mode != Addressing_Constant) {
+			o->mode = Addressing_Value;
 		}
 		o->type = t->Array.elem;
 		return true;
 
 	case Type_Slice:
 		o->type = t->Slice.elem;
-		if (o->mode != Addressing_Immutable && o->mode != Addressing_Constant) {
+		if (o->mode != Addressing_Constant) {
 			o->mode = Addressing_Variable;
 		}
 		return true;
 
 	case Type_DynamicArray:
 		o->type = t->DynamicArray.elem;
-		if (o->mode != Addressing_Immutable && o->mode != Addressing_Constant) {
+		if (o->mode != Addressing_Constant) {
 			o->mode = Addressing_Variable;
 		}
 		return true;
@@ -8137,9 +8129,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			return kind;
 		}
 
-		if (o->mode != Addressing_Immutable) {
-			o->mode = Addressing_Value;
-		}
+		o->mode = Addressing_Value;
 
 		if (se->low == nullptr && se->high != nullptr) {
 			// error(se->interval0, "1st index is required if a 2nd index is specified");
@@ -8191,9 +8181,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		} else {
 			Type *t = base_type(o->type);
 			if (t->kind == Type_Pointer && !is_type_empty_union(t->Pointer.elem)) {
-				if (o->mode != Addressing_Immutable) {
-					o->mode = Addressing_Variable;
-				}
+				o->mode = Addressing_Variable;
 				o->type = t->Pointer.elem;
  			} else {
  				gbString str = expr_to_string(o->expr);

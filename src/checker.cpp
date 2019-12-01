@@ -7,7 +7,6 @@ void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
 bool is_operand_value(Operand o) {
 	switch (o.mode) {
 	case Addressing_Value:
-	case Addressing_Immutable:
 	case Addressing_Context:
 	case Addressing_Variable:
 	case Addressing_Constant:
@@ -2607,7 +2606,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_strings[name->kind]));
 				continue;
 			}
-			Entity *e = alloc_entity_variable(c->scope, name->Ident.token, nullptr, false);
+			Entity *e = alloc_entity_variable(c->scope, name->Ident.token, nullptr);
 			e->identifier = name;
 
 			if (entity_is_private) {

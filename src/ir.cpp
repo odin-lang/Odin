@@ -1476,7 +1476,7 @@ irValue *ir_generate_array(irModule *m, Type *elem_type, i64 count, String prefi
 
 	String s = make_string_c(text);
 
-	Entity *e = alloc_entity_variable(nullptr, make_token_ident(s), alloc_type_array(elem_type, count), false);
+	Entity *e = alloc_entity_variable(nullptr, make_token_ident(s), alloc_type_array(elem_type, count));
 	irValue *value = ir_value_global(e, nullptr);
 	value->Global.is_private = true;
 	ir_module_add_value(m, e, value);
@@ -1743,7 +1743,7 @@ irValue *ir_add_local_generated(irProcedure *proc, Type *type, bool zero_initial
 	if (proc->curr_block) {
 		scope = proc->curr_block->scope;
 	}
-	Entity *e = alloc_entity_variable(scope, empty_token, type, false);
+	Entity *e = alloc_entity_variable(scope, empty_token, type);
 	return ir_add_local(proc, e, nullptr, zero_initialized);
 }
 
@@ -1759,7 +1759,7 @@ irValue *ir_add_global_generated(irModule *m, Type *type, irValue *value) {
 	String name = make_string(str, len-1);
 
 	Scope *scope = nullptr;
-	Entity *e = alloc_entity_variable(scope, make_token_ident(name), type, false);
+	Entity *e = alloc_entity_variable(scope, make_token_ident(name), type);
 	irValue *g = ir_value_global(e, value);
 	ir_module_add_value(m, e, g);
 	map_set(&m->members, hash_string(name), g);
@@ -10562,7 +10562,7 @@ void ir_init_module(irModule *m, Checker *c) {
 			isize max_type_info_count = ir_type_info_count(m->info);
 
 			String name = str_lit(IR_TYPE_INFO_DATA_NAME);
-			Entity *e = alloc_entity_variable(nullptr, make_token_ident(name), alloc_type_array(t_type_info, max_type_info_count), false);
+			Entity *e = alloc_entity_variable(nullptr, make_token_ident(name), alloc_type_array(t_type_info, max_type_info_count));
 			irValue *g = ir_value_global(e, nullptr);
 			g->Global.is_private = true;
 			ir_module_add_value(m, e, g);
@@ -10600,7 +10600,7 @@ void ir_init_module(irModule *m, Checker *c) {
 				{
 					String name = str_lit(IR_TYPE_INFO_TYPES_NAME);
 					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
-					                                  alloc_type_array(t_type_info_ptr, count), false);
+					                                  alloc_type_array(t_type_info_ptr, count));
 					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
 					map_set(&m->members, hash_string(name), g);
@@ -10609,7 +10609,7 @@ void ir_init_module(irModule *m, Checker *c) {
 				{
 					String name = str_lit(IR_TYPE_INFO_NAMES_NAME);
 					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
-					                                  alloc_type_array(t_string, count), false);
+					                                  alloc_type_array(t_string, count));
 					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
 					map_set(&m->members, hash_string(name), g);
@@ -10618,7 +10618,7 @@ void ir_init_module(irModule *m, Checker *c) {
 				{
 					String name = str_lit(IR_TYPE_INFO_OFFSETS_NAME);
 					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
-					                                  alloc_type_array(t_uintptr, count), false);
+					                                  alloc_type_array(t_uintptr, count));
 					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
 					map_set(&m->members, hash_string(name), g);
@@ -10628,7 +10628,7 @@ void ir_init_module(irModule *m, Checker *c) {
 				{
 					String name = str_lit(IR_TYPE_INFO_USINGS_NAME);
 					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
-					                                  alloc_type_array(t_bool, count), false);
+					                                  alloc_type_array(t_bool, count));
 					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
 					map_set(&m->members, hash_string(name), g);
@@ -10638,7 +10638,7 @@ void ir_init_module(irModule *m, Checker *c) {
 				{
 					String name = str_lit(IR_TYPE_INFO_TAGS_NAME);
 					Entity *e = alloc_entity_variable(nullptr, make_token_ident(name),
-					                                  alloc_type_array(t_string, count), false);
+					                                  alloc_type_array(t_string, count));
 					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
 					map_set(&m->members, hash_string(name), g);

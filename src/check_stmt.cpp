@@ -313,9 +313,7 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 		Entity *e = entity_of_ident(lhs->expr);
 
 		gbString str = expr_to_string(lhs->expr);
-		if (lhs->mode == Addressing_Immutable) {
-			error(lhs->expr, "Cannot assign to an immutable: '%s'", str);
-		} else if (e != nullptr && e->flags & EntityFlag_Param) {
+		if (e != nullptr && e->flags & EntityFlag_Param) {
 			error(lhs->expr, "Cannot assign to '%s' which is a procedure parameter", str);
 		} else {
 			error(lhs->expr, "Cannot assign to '%s'", str);
@@ -688,8 +686,7 @@ void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				found = scope_lookup_current(ctx->scope, str);
 			}
 			if (found == nullptr) {
-				bool is_immutable = true;
-				entity = alloc_entity_variable(ctx->scope, token, type, is_immutable, EntityState_Resolved);
+				entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
 				entity->flags |= EntityFlag_Value;
 				add_entity_definition(&ctx->checker->info, name, entity);
 			} else {
@@ -1164,7 +1161,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 
 		check_open_scope(ctx, stmt);
 		{
-			Entity *tag_var = alloc_entity_variable(ctx->scope, lhs->Ident.token, case_type, false, EntityState_Resolved);
+			Entity *tag_var = alloc_entity_variable(ctx->scope, lhs->Ident.token, case_type, EntityState_Resolved);
 			tag_var->flags |= EntityFlag_Used;
 			tag_var->flags |= EntityFlag_Value;
 			add_entity(ctx->checker, ctx->scope, lhs, tag_var);
@@ -1609,8 +1606,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					found = scope_lookup_current(ctx->scope, str);
 				}
 				if (found == nullptr) {
-					bool is_immutable = false;
-					entity = alloc_entity_variable(ctx->scope, token, type, is_immutable, EntityState_Resolved);
+					entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
 					entity->flags |= EntityFlag_Value;
 					add_entity_definition(&ctx->checker->info, name, entity);
 				} else {
@@ -1815,7 +1811,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						new_name_count += 1;
 					}
 					if (found == nullptr) {
-						entity = alloc_entity_variable(ctx->scope, token, nullptr, false);
+						entity = alloc_entity_variable(ctx->scope, token, nullptr);
 						entity->identifier = name;
 
 						Ast *fl = ctx->foreign_context.curr_library;
@@ -1975,7 +1971,6 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					if (e->kind != Entity_Variable) {
 						continue;
 					}
-					bool is_immutable = e->Variable.is_immutable;
 					String name = e->token.string;
 					Type *t = base_type(type_deref(e->type));
 
@@ -1987,7 +1982,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 							Entity *f = scope->elements.entries[i].value;
 							if (f->kind == Entity_Variable) {
 								Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
-								uvar->Variable.is_immutable = is_immutable;
+								uvar->flags |= (e->flags & EntityFlag_Value);
 								Entity *prev = scope_insert(ctx->scope, uvar);
 								if (prev != nullptr) {
 									error(token, "Namespace collision while 'using' '%.*s' of: %.*s", LIT(name), LIT(prev->token.string));

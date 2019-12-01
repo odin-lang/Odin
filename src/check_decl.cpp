@@ -1154,7 +1154,6 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				if (!(e->flags & EntityFlag_Using)) {
 					continue;
 				}
-				bool is_immutable = e->Variable.is_immutable;
 				bool is_value     = (e->flags & EntityFlag_Value) != 0 && !is_type_pointer(e->type);
 				String name = e->token.string;
 				Type *t = base_type(type_deref(e->type));
@@ -1168,7 +1167,6 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 						Entity *f = scope->elements.entries[i].value;
 						if (f->kind == Entity_Variable) {
 							Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
-							uvar->Variable.is_immutable = is_immutable;
 							if (is_value) uvar->flags |= EntityFlag_Value;
 
 							ProcUsingVar puv = {e, uvar};
