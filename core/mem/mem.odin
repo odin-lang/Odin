@@ -151,32 +151,42 @@ is_power_of_two :: inline proc(x: uintptr) -> bool {
 	return (x & (x-1)) == 0;
 }
 
-align_forward :: proc(ptr: rawptr, align: uintptr) -> rawptr {
-	assert(is_power_of_two(align));
-
-	a := uintptr(align);
-	p := uintptr(ptr);
-	modulo := p & (a-1);
-	if modulo != 0 do p += a - modulo;
-	return rawptr(p);
+align_forward :: inline proc(ptr: rawptr, align: uintptr) -> rawptr {
+	return rawptr(align_forward_uintptr(uintptr(ptr), align));
 }
 
 align_forward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
 	assert(is_power_of_two(align));
 
-	a := uintptr(align);
-	p := uintptr(ptr);
-	modulo := p & (a-1);
-	if modulo != 0 do p += a - modulo;
-	return uintptr(p);
+	p := ptr;
+	modulo := p & (align-1);
+	if modulo != 0 do p += align - modulo;
+	return p;
 }
-
 
 align_forward_int :: inline proc(ptr, align: int) -> int {
 	return int(align_forward_uintptr(uintptr(ptr), uintptr(align)));
 }
 align_forward_uint :: inline proc(ptr, align: uint) -> uint {
 	return uint(align_forward_uintptr(uintptr(ptr), uintptr(align)));
+}
+
+align_backward :: inline proc(ptr: rawptr, align: uintptr) -> rawptr {
+	return rawptr(align_backward_uintptr(uintptr(ptr), align));
+}
+
+align_backward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
+	assert(is_power_of_two(align));
+
+	ptr := rawptr(ptr - align);
+	return uintptr(align_forward(ptr, align));
+}
+
+align_backward_int :: inline proc(ptr, align: int) -> int {
+	return int(align_backward_uintptr(uintptr(ptr), uintptr(align)));
+}
+align_backward_uint :: inline proc(ptr, align: uint) -> uint {
+	return uint(align_backward_uintptr(uintptr(ptr), uintptr(align)));
 }
 
 context_from_allocator :: proc(a: Allocator) -> type_of(context) {
@@ -226,5 +236,3 @@ calc_padding_with_header :: proc(ptr: uintptr, align: uintptr, header_size: int)
 
 	return int(padding);
 }
-
-

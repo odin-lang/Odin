@@ -1,27 +1,29 @@
 package thread
 
-import "core:runtime"
+import "core:sync"
 import "core:sys/win32"
-
-Thread_Proc :: #type proc(^Thread) -> int;
 
 Thread_Os_Specific :: struct {
 	win32_thread:    win32.Handle,
 	win32_thread_id: u32,
+	done: bool, // see note in `is_done`
 }
 
-Thread :: struct {
-	using specific:   Thread_Os_Specific,
-	procedure:        Thread_Proc,
-	data:             rawptr,
-	user_index:       int,
+THREAD_PRIORITY_IDLE   :: -15;
+THREAD_PRIORITY_LOWEST :: -2;
+THREAD_PRIORITY_BELOW_NORMAL :: -1;
+THREAD_PRIORITY_NORMAL :: 0;
+THREAD_PRIORITY_ABOVE_NORMAL :: 1;
+THREAD_PRIORITY_HIGHEST :: 2;
+THREAD_PRIORITY_TIME_CRITICAL :: 15;
 
-	init_context:     runtime.Context,
-	use_init_context: bool,
+Thread_Priority :: enum i32 {
+	Normal = THREAD_PRIORITY_NORMAL,
+	Low = THREAD_PRIORITY_LOWEST,
+	High = THREAD_PRIORITY_HIGHEST,
 }
 
-
-create :: proc(procedure: Thread_Proc) -> ^Thread {
+create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
 	win32_thread_id: u32;
 
 	__windows_thread_entry_proc :: proc "c" (t: ^Thread) -> i32 {
@@ -31,7 +33,9 @@ create :: proc(procedure: Thread_Proc) -> ^Thread {
 		}
 		context = c;
 
-		return i32(t.procedure(t));
+		t.procedure(t);
+		sync.atomic_store(&t.done, true, .Sequentially_Consistent);
+		return 0;
 	}
 
 
@@ -47,6 +51,9 @@ create :: proc(procedure: Thread_Proc) -> ^Thread {
 	thread.win32_thread    = win32_thread;
 	thread.win32_thread_id = win32_thread_id;
 
+	ok := win32.set_thread_priority(win32_thread, i32(priority));
+	assert(ok == true);
+
 	return thread;
 }
 
@@ -55,8 +62,10 @@ start :: proc(using thread: ^Thread) {
 }
 
 is_done :: proc(using thread: ^Thread) -> bool {
-	res := win32.wait_for_single_object(win32_thread, 0);
-	return res != win32.WAIT_TIMEOUT;
+	// NOTE(tetra, 2019-10-31): Apparently using wait_for_single_object and
+	// checking if it didn't time out immediately, is not good enough,
+	// so we do it this way instead.
+	return sync.atomic_load(&done, .Sequentially_Consistent);
 }
 
 join :: proc(using thread: ^Thread) {

@@ -84,7 +84,10 @@ delete :: proc{
 
 
 new :: inline proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> ^T {
-	ptr := (^T)(alloc(size_of(T), align_of(T), allocator, loc));
+	return new_aligned(T, align_of(T), allocator, loc);
+}
+new_aligned :: inline proc($T: typeid, alignment: int, allocator := context.allocator, loc := #caller_location) -> ^T {
+	ptr := (^T)(alloc(size_of(T), alignment, allocator, loc));
 	if ptr != nil do ptr^ = T{};
 	return ptr;
 }
@@ -95,9 +98,12 @@ new_clone :: inline proc(data: $T, allocator := context.allocator, loc := #calle
 }
 
 
-make_slice :: proc($T: typeid/[]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
+make_slice :: inline proc($T: typeid/[]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
+	return make_aligned(T, len, align_of(E), allocator, loc);
+}
+make_aligned :: proc($T: typeid/[]$E, auto_cast len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> T {
 	runtime.make_slice_error_loc(loc, len);
-	data := alloc(size_of(E)*len, align_of(E), allocator, loc);
+	data := alloc(size_of(E)*len, alignment, allocator, loc);
 	s := Raw_Slice{data, len};
 	return transmute(T)s;
 }

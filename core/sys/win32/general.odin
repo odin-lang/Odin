@@ -300,6 +300,25 @@ File_Notify_Information :: struct {
   file_name:         [1]u16,
 }
 
+// https://docs.microsoft.com/en-gb/windows/win32/api/sysinfoapi/ns-sysinfoapi-system_info
+System_Info :: struct {
+	using _: struct #raw_union {
+		oem_id: u32,
+		using _: struct #raw_union {
+			processor_architecture: u16,
+			_: u16, // reserved
+		},
+	},
+	page_size: u32,
+	minimum_application_address: rawptr,
+	maximum_application_address: rawptr,
+	active_processor_mask: u32,
+	number_of_processors: u32,
+	processor_type: u32,
+	allocation_granularity: u32,
+	processor_level: u16,
+	processor_revision: u16,
+}
 
 // https://docs.microsoft.com/en-us/windows/desktop/api/winnt/ns-winnt-_osversioninfoexa
 OS_Version_Info_Ex_A :: struct {
