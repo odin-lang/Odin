@@ -17,8 +17,6 @@ now :: proc() -> Time {
 	return Time{_nsec=ns};
 }
 
-
-
 sleep :: proc(d: Duration) {
 	win32.sleep(u32(d/Millisecond));
 }

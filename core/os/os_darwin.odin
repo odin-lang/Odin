@@ -14,6 +14,142 @@ Errno     :: distinct int;
 
 INVALID_HANDLE :: ~Handle(0);
 
+ERROR_NONE: Errno : 0;
+EPERM:		Errno : 1;		/* Operation not permitted */
+ENOENT:		Errno : 2;		/* No such file or directory */
+ESRCH:		Errno : 3;		/* No such process */
+EINTR:		Errno : 4;		/* Interrupted system call */
+EIO:		Errno : 5;		/* Input/output error */
+ENXIO:		Errno : 6;		/* Device not configured */
+E2BIG:		Errno : 7;		/* Argument list too long */
+ENOEXEC:	Errno : 8;		/* Exec format error */
+EBADF:		Errno : 9;		/* Bad file descriptor */
+ECHILD:		Errno : 10;		/* No child processes */
+EDEADLK:	Errno : 11;		/* Resource deadlock avoided */
+ENOMEM:		Errno : 12;		/* Cannot allocate memory */
+EACCES:		Errno : 13;		/* Permission denied */
+EFAULT:		Errno : 14;		/* Bad address */
+ENOTBLK:	Errno : 15;		/* Block device required */
+EBUSY:		Errno : 16;		/* Device / Resource busy */
+EEXIST:		Errno : 17;		/* File exists */
+EXDEV:		Errno : 18;		/* Cross-device link */
+ENODEV:		Errno : 19;		/* Operation not supported by device */
+ENOTDIR:	Errno : 20;		/* Not a directory */
+EISDIR:		Errno : 21;		/* Is a directory */
+EINVAL:		Errno : 22;		/* Invalid argument */
+ENFILE:		Errno : 23;		/* Too many open files in system */
+EMFILE:		Errno : 24;		/* Too many open files */
+ENOTTY:		Errno : 25;		/* Inappropriate ioctl for device */
+ETXTBSY:	Errno : 26;		/* Text file busy */
+EFBIG:		Errno : 27;		/* File too large */
+ENOSPC:		Errno : 28;		/* No space left on device */
+ESPIPE:		Errno : 29;		/* Illegal seek */
+EROFS:		Errno : 30;		/* Read-only file system */
+EMLINK:		Errno : 31;		/* Too many links */
+EPIPE:		Errno : 32;		/* Broken pipe */
+
+/* math software */
+EDOM:		Errno : 33;		/* Numerical argument out of domain */
+ERANGE:		Errno : 34;		/* Result too large */
+
+/* non-blocking and interrupt i/o */
+EAGAIN:			Errno : 35;		/* Resource temporarily unavailable */
+EWOULDBLOCK: 	Errno : EAGAIN;		/* Operation would block */
+EINPROGRESS: 	Errno : 36;		/* Operation now in progress */
+EALREADY:		Errno : 37;		/* Operation already in progress */
+
+/* ipc/network software -- argument errors */
+ENOTSOCK:			Errno : 38;		/* Socket operation on non-socket */
+EDESTADDRREQ:		Errno : 39;		/* Destination address required */
+EMSGSIZE:			Errno : 40;		/* Message too long */
+EPROTOTYPE:			Errno : 41;		/* Protocol wrong type for socket */
+ENOPROTOOPT:		Errno : 42;		/* Protocol not available */
+EPROTONOSUPPORT:	Errno : 43;		/* Protocol not supported */
+ESOCKTNOSUPPORT:	Errno : 44;		/* Socket type not supported */
+ENOTSUP:			Errno : 45;		/* Operation not supported */
+EPFNOSUPPORT:		Errno : 46;		/* Protocol family not supported */
+EAFNOSUPPORT:		Errno : 47;		/* Address family not supported by protocol family */
+EADDRINUSE:			Errno : 48;		/* Address already in use */
+EADDRNOTAVAIL:		Errno : 49;		/* Can't assign requested address */
+
+/* ipc/network software -- operational errors */
+ENETDOWN:		Errno : 50;		/* Network is down */
+ENETUNREACH:	Errno : 51;		/* Network is unreachable */
+ENETRESET:		Errno : 52;		/* Network dropped connection on reset */
+ECONNABORTED:	Errno : 53;		/* Software caused connection abort */
+ECONNRESET:		Errno : 54;		/* Connection reset by peer */
+ENOBUFS:		Errno : 55;		/* No buffer space available */
+EISCONN:		Errno : 56;		/* Socket is already connected */
+ENOTCONN:		Errno : 57;		/* Socket is not connected */
+ESHUTDOWN:		Errno : 58;		/* Can't send after socket shutdown */
+ETOOMANYREFS:	Errno : 59;		/* Too many references: can't splice */
+ETIMEDOUT:		Errno : 60;		/* Operation timed out */
+ECONNREFUSED:	Errno : 61;		/* Connection refused */
+
+ELOOP:			Errno : 62;		/* Too many levels of symbolic links */
+ENAMETOOLONG:	Errno : 63;		/* File name too long */
+
+/* should be rearranged */
+EHOSTDOWN:		Errno : 64;		/* Host is down */
+EHOSTUNREACH:	Errno : 65;		/* No route to host */
+ENOTEMPTY:		Errno : 66;		/* Directory not empty */
+
+/* quotas & mush */
+EPROCLIM:		Errno : 67;		/* Too many processes */
+EUSERS:			Errno : 68;		/* Too many users */
+EDQUOT:			Errno : 69;		/* Disc quota exceeded */
+
+/* Network File System */
+ESTALE:			Errno : 70;		/* Stale NFS file handle */
+EREMOTE:		Errno : 71;		/* Too many levels of remote in path */
+EBADRPC:		Errno : 72;		/* RPC struct is bad */
+ERPCMISMATCH:	Errno : 73;		/* RPC version wrong */
+EPROGUNAVAIL:	Errno : 74;		/* RPC prog. not avail */
+EPROGMISMATCH:	Errno : 75;		/* Program version wrong */
+EPROCUNAVAIL:	Errno : 76;		/* Bad procedure for program */
+
+ENOLCK:	Errno : 77;		/* No locks available */
+ENOSYS:	Errno : 78;		/* Function not implemented */
+
+EFTYPE:	Errno : 79;		/* Inappropriate file type or format */
+EAUTH:	Errno : 80;		/* Authentication error */
+ENEEDAUTH:	Errno : 81;		/* Need authenticator */
+
+/* Intelligent device errors */
+EPWROFF:	Errno : 82;	/* Device power is off */
+EDEVERR:	Errno : 83;	/* Device error, e.g. paper out */
+EOVERFLOW:	Errno : 84;		/* Value too large to be stored in data type */
+
+/* Program loading errors */
+EBADEXEC:	Errno : 85;	/* Bad executable */
+EBADARCH:	Errno : 86;	/* Bad CPU type in executable */
+ESHLIBVERS:	Errno : 87;	/* Shared library version mismatch */
+EBADMACHO:	Errno : 88;	/* Malformed Macho file */
+
+ECANCELED:	Errno : 89;		/* Operation canceled */
+
+EIDRM:		Errno : 90;		/* Identifier removed */
+ENOMSG:		Errno : 91;		/* No message of desired type */
+EILSEQ:		Errno : 92;		/* Illegal byte sequence */
+ENOATTR:	Errno : 93;		/* Attribute not found */
+
+EBADMSG:	Errno : 94;		/* Bad message */
+EMULTIHOP:	Errno : 95;		/* Reserved */
+ENODATA:	Errno : 96;		/* No message available on STREAM */
+ENOLINK:	Errno : 97;		/* Reserved */
+ENOSR:		Errno : 98;		/* No STREAM resources */
+ENOSTR:		Errno : 99;		/* Not a STREAM */
+EPROTO:		Errno : 100;		/* Protocol error */
+ETIME:		Errno : 101;		/* STREAM ioctl timeout */
+
+ENOPOLICY:	Errno : 103;		/* No such policy registered */
+
+ENOTRECOVERABLE:	Errno : 104;		/* State not recoverable */
+EOWNERDEAD:			Errno : 105;		/* Previous owner died */
+
+EQFULL:	Errno : 106;		/* Interface output queue is full */
+ELAST:	Errno : 106;		/* Must be equal largest errno */
+
 O_RDONLY   :: 0x00000;
 O_WRONLY   :: 0x00001;
 O_RDWR     :: 0x00002;
@@ -133,6 +269,7 @@ foreign libc {
 	@(link_name="write")   _unix_write   :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---;
 	@(link_name="lseek")   _unix_lseek   :: proc(fs: Handle, offset: int, whence: int) -> int ---;
 	@(link_name="gettid")  _unix_gettid  :: proc() -> u64 ---;
+	@(link_name="getpagesize") _unix_getpagesize :: proc() -> i32 ---;
 	@(link_name="stat")    _unix_stat    :: proc(path: cstring, stat: ^Stat) -> int ---;
 	@(link_name="access")  _unix_access  :: proc(path: cstring, mask: int) -> int ---;
 
@@ -285,6 +422,16 @@ dlclose :: inline proc(handle: rawptr) -> bool {
 }
 dlerror :: proc() -> string {
 	return string(_unix_dlerror());
+}
+
+get_page_size :: proc() -> int {
+	// NOTE(tetra): The page size never changes, so why do anything complicated
+	// if we don't have to.
+	@static page_size := -1;
+	if page_size != -1 do return page_size;
+
+	page_size = int(_unix_getpagesize());
+	return page_size;
 }
 
 
