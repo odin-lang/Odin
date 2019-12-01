@@ -122,6 +122,7 @@ read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
 heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                             size, alignment: int,
                             old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+/*
 	//
 	// NOTE(tetra, 2019-11-10): The heap doesn't respect alignment.
 	// HACK: Overallocate, align forwards, and then use the two bytes immediately before
@@ -181,6 +182,25 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		ptr = heap_resize(ptr, size);
 		assert(ptr != nil);
 		return align_and_store_padding(ptr, alignment);
+	}
+
+	return nil;
+*/
+	switch mode {
+	case .Alloc:
+		return heap_alloc(size);
+
+	case .Free:
+		if old_memory != nil {
+			heap_free(old_memory);
+		}
+		return nil;
+
+	case .Free_All:
+		// NOTE(bill): Does nothing
+
+	case .Resize:
+		return heap_resize(ptr, size);
 	}
 
 	return nil;
