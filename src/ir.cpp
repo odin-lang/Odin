@@ -1614,7 +1614,7 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 	if (global_constant_value == nullptr) {
 		global_constant_value = ir_find_or_add_entity_string_byte_slice(m, string);
 	}
-	Type *type = ir_type(global_constant_value);
+	Type *type = alloc_type_array(t_u8, string.len+1);
 
 
 	isize max_len = 6+8+1;
@@ -5069,7 +5069,7 @@ irValue *ir_find_or_add_entity_string_byte_slice(irModule *m, String str) {
 	if (found != nullptr) {
 		return *found;
 	}
-	Type *t = alloc_type_array(t_u8, str.len+1);
+	Type *t = t_u8_slice;
 	irValue *v = ir_value_constant(t, exact_value_string(str));
 	map_set(&m->const_string_byte_slices, key, v);
 	return v;
