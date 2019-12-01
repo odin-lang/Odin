@@ -282,5 +282,7 @@ compare_f64s :: proc(a, b: f64) -> int {
 	return 0;
 }
 compare_strings :: proc(a, b: string) -> int {
-	return mem.compare_byte_ptrs(&a[0], &b[0], min(len(a), len(b)));
+	x := transmute(mem.Raw_String)a;
+	y := transmute(mem.Raw_String)b;
+	return mem.compare_byte_ptrs(x.data, y.data, min(x.len, y.len));
 }

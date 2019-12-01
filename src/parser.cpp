@@ -379,7 +379,7 @@ Ast *clone_ast(Ast *node) {
 }
 
 
-void error(Ast *node, char *fmt, ...) {
+void error(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	if (node != nullptr) {
 		token = ast_token(node);
@@ -393,7 +393,7 @@ void error(Ast *node, char *fmt, ...) {
 	}
 }
 
-void error_no_newline(Ast *node, char *fmt, ...) {
+void error_no_newline(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	if (node != nullptr) {
 		token = ast_token(node);
@@ -407,14 +407,14 @@ void error_no_newline(Ast *node, char *fmt, ...) {
 	}
 }
 
-void warning(Ast *node, char *fmt, ...) {
+void warning(Ast *node, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	warning_va(ast_token(node), fmt, va);
 	va_end(va);
 }
 
-void syntax_error(Ast *node, char *fmt, ...) {
+void syntax_error(Ast *node, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	syntax_error_va(ast_token(node), fmt, va);
@@ -1178,7 +1178,7 @@ Token expect_token(AstFile *f, TokenKind kind) {
 	return prev;
 }
 
-Token expect_token_after(AstFile *f, TokenKind kind, char *msg) {
+Token expect_token_after(AstFile *f, TokenKind kind, char const *msg) {
 	Token prev = f->curr_token;
 	if (prev.kind != kind) {
 		String p = token_strings[prev.kind];

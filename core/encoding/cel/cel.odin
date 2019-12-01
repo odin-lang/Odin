@@ -91,7 +91,7 @@ print :: proc(p: ^Parser, pretty := false) {
 }
 
 create_from_string :: proc(src: string) -> (^Parser, bool) {
-	return init(cast([]byte)src);
+	return init(transmute([]byte)src);
 }
 
 
@@ -726,8 +726,8 @@ calculate_binary_value :: proc(p: ^Parser, op: Kind, a, b: Value) -> (Value, boo
 		case Kind.Add:
 			n := len(a) + len(b);
 			data := make([]byte, n);
-			copy(data[:], cast([]byte)a);
-			copy(data[len(a):], cast([]byte)b);
+			copy(data[:], a);
+			copy(data[len(a):], b);
 			s := string(data);
 			append(&p.allocated_strings, s);
 			return s, true;

@@ -1559,7 +1559,7 @@ void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type
 	} else if (are_types_identical(src, dst)) {
 		error_line("\tSuggestion: the expression may be directly casted to type %s\n", b);
 	} else if (are_types_identical(src, t_string) && is_type_u8_slice(dst)) {
-		error_line("\tSuggestion: a string may be casted to %s\n", a, b);
+		error_line("\tSuggestion: a string may be transmuted to %s\n", b);
 	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string)) {
 		error_line("\tSuggestion: the expression may be casted to %s\n", b);
 	}
@@ -1600,7 +1600,7 @@ void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type *type) {
 			error_line("\tSuggestion: for an integer to be casted to a pointer, it must be converted to 'uintptr' first\n");
 		}
 	} else if (are_types_identical(src, t_string) && is_type_u8_slice(dst)) {
-		error_line("\tSuggestion: a string may be casted to %s\n", a, b);
+		error_line("\tSuggestion: a string may be transmuted to %s\n", b);
 	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string)) {
 		error_line("\tSuggestion: the expression may be casted to %s\n", b);
 	}
@@ -2193,7 +2193,7 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	}
 	if ((is_type_string(src) && !is_type_cstring(src)) && is_type_u8_slice(dst)) {
 		// if (is_type_typed(src)) {
-			return true;
+			// return true;
 		// }
 	}
 	// cstring -> string
@@ -2726,7 +2726,7 @@ void update_expr_value(CheckerContext *c, Ast *e, ExactValue value) {
 void convert_untyped_error(CheckerContext *c, Operand *operand, Type *target_type) {
 	gbString expr_str = expr_to_string(operand->expr);
 	gbString type_str = type_to_string(target_type);
-	char *extra_text = "";
+	char const *extra_text = "";
 
 	if (operand->mode == Addressing_Constant) {
 		if (big_int_is_zero(&operand->value.value_integer)) {
@@ -3397,7 +3397,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	BuiltinProc *bp = &builtin_procs[id];
 	{
-		char *err = nullptr;
+		char const *err = nullptr;
 		if (ce->args.count < bp->arg_count) {
 			err = "Too few";
 		} else if (ce->args.count > bp->arg_count && !bp->variadic) {
@@ -5408,7 +5408,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		}
 		if (error_code != 0) {
 			err = CallArgumentError_TooManyArguments;
-			char *err_fmt = "Too many arguments for '%s', expected %td arguments";
+			char const *err_fmt = "Too many arguments for '%s', expected %td arguments";
 			if (error_code < 0) {
 				err = CallArgumentError_TooFewArguments;
 				err_fmt = "Too few arguments for '%s', expected %td arguments";
@@ -6181,7 +6181,6 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				if (proc->kind == Entity_Variable) {
 					sep = ":=";
 				}
-				// error_line("\t%.*s %s %s at %.*s(%td:%td) with score %lld\n", LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
 				error_line("\t%.*s%.*s%.*s %s %s at %.*s(%td:%td)\n", LIT(prefix), LIT(prefix_sep), LIT(name), sep, pt, LIT(pos.file), pos.line, pos.column);
 			}
 			if (procs.count > 0) {
@@ -6751,7 +6750,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 void check_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e, Type *t) {
 	check_expr_base(c, o, e, t);
 	check_not_tuple(c, o);
-	char *err_str = nullptr;
+	char const *err_str = nullptr;
 	switch (o->mode) {
 	case Addressing_NoValue:
 		err_str = "used as a value";
@@ -6779,7 +6778,8 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count,
 				*max_count = o->value.value_string.len;
 			}
 			if (o->mode != Addressing_Immutable && o->mode != Addressing_Constant) {
-				o->mode = Addressing_Variable;
+				// o->mode = Addressing_Variable;
+				o->mode = Addressing_Value;
 			}
 			o->type = t_u8;
 			return true;

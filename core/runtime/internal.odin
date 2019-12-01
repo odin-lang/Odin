@@ -369,17 +369,27 @@ memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_
 	return 0;
 }
 
+@private
+Raw_String :: struct {
+	data: ^byte,
+	len: int,
+};
+
 string_eq :: proc "contextless" (a, b: string) -> bool {
+	x := transmute(Raw_String)a;
+	y := transmute(Raw_String)b;
 	switch {
-	case len(a) != len(b): return false;
-	case len(a) == 0:      return true;
-	case &a[0] == &b[0]:   return true;
+	case x.len != y.len: return false;
+	case x.len == 0:      return true;
+	case x.data == y.data:   return true;
 	}
 	return string_cmp(a, b) == 0;
 }
 
 string_cmp :: proc "contextless" (a, b: string) -> int {
-	return memory_compare(&a[0], &b[0], min(len(a), len(b)));
+	x := transmute(Raw_String)a;
+	y := transmute(Raw_String)b;
+	return memory_compare(x.data, y.data, min(x.len, y.len));
 }
 
 string_ne :: inline proc "contextless" (a, b: string) -> bool { return !string_eq(a, b); }
@@ -398,10 +408,6 @@ cstring_len :: proc "contextless" (s: cstring) -> int {
 }
 
 cstring_to_string :: proc "contextless" (s: cstring) -> string {
-	Raw_String :: struct {
-		data: ^byte,
-		len: int,
-	};
 	if s == nil do return "";
 	ptr := (^byte)(s);
 	n := cstring_len(s);

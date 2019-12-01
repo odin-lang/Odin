@@ -654,32 +654,32 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		buf: [386]byte;
 
 		str := strconv.append_float(buf[1:], v, 'f', prec, bit_size);
-		str = string(buf[:len(str)+1]);
-		if str[1] == '+' || str[1] == '-' {
-			str = str[1:];
+		b := buf[:len(str)+1];
+		if b[1] == '+' || b[1] == '-' {
+			b = b[1:];
 		} else {
-			str[0] = '+';
+			b[0] = '+';
 		}
 
-		if fi.space && !fi.plus && str[0] == '+' {
-			str[0] = ' ';
+		if fi.space && !fi.plus && b[0] == '+' {
+			b[0] = ' ';
 		}
 
-		if len(str) > 1 && (str[1] == 'N' || str[1] == 'I') {
-			strings.write_string(fi.buf, str);
+		if len(b) > 1 && (b[1] == 'N' || b[1] == 'I') {
+			strings.write_string(fi.buf, string(b));
 			return;
 		}
 
-		if fi.plus || str[0] != '+' {
-			if fi.zero && fi.width_set && fi.width > len(str) {
-				strings.write_byte(fi.buf, str[0]);
-				fmt_write_padding(fi, fi.width - len(str));
-				strings.write_string(fi.buf, str[1:]);
+		if fi.plus || b[0] != '+' {
+			if fi.zero && fi.width_set && fi.width > len(b) {
+				strings.write_byte(fi.buf, b[0]);
+				fmt_write_padding(fi, fi.width - len(b));
+				strings.write_string(fi.buf, string(b[1:]));
 			} else {
-				_pad(fi, str);
+				_pad(fi, string(b));
 			}
 		} else {
-			_pad(fi, str[1:]);
+			_pad(fi, string(b[1:]));
 		}
 
 	case 'e', 'E':
@@ -688,32 +688,32 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		buf: [386]byte;
 
 		str := strconv.append_float(buf[1:], v, 'e', prec, bit_size);
-		str = string(buf[:len(str)+1]);
-		if str[1] == '+' || str[1] == '-' {
-			str = str[1:];
+		b := buf[:len(str)+1];
+		if b[1] == '+' || b[1] == '-' {
+			b = b[1:];
 		} else {
-			str[0] = '+';
+			b[0] = '+';
 		}
 
-		if fi.space && !fi.plus && str[0] == '+' {
-			str[0] = ' ';
+		if fi.space && !fi.plus && b[0] == '+' {
+			b[0] = ' ';
 		}
 
-		if len(str) > 1 && (str[1] == 'N' || str[1] == 'I') {
-			strings.write_string(fi.buf, str);
+		if len(b) > 1 && (b[1] == 'N' || b[1] == 'I') {
+			strings.write_string(fi.buf, string(b));
 			return;
 		}
 
 		if fi.plus || str[0] != '+' {
-			if fi.zero && fi.width_set && fi.width > len(str) {
-				strings.write_byte(fi.buf, str[0]);
-				fmt_write_padding(fi, fi.width - len(str));
-				strings.write_string(fi.buf, str[1:]);
+			if fi.zero && fi.width_set && fi.width > len(b) {
+				strings.write_byte(fi.buf, b[0]);
+				fmt_write_padding(fi, fi.width - len(b));
+				strings.write_string(fi.buf, string(b[1:]));
 			} else {
-				_pad(fi, str);
+				_pad(fi, string(b));
 			}
 		} else {
-			_pad(fi, str[1:]);
+			_pad(fi, string(b[1:]));
 		}
 
 	case 'h', 'H':
@@ -1353,7 +1353,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			actual_field_count := len(info.names);
 
 			n := uintptr(info.soa_len);
-			
+
 			if info.soa_kind == .Slice {
 				actual_field_count = len(info.names)-1; // len
 

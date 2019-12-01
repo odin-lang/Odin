@@ -493,8 +493,8 @@ String path_to_fullpath(gbAllocator a, String s) {
 
 		// Replace Windows style separators
 		for (isize i = 0; i < result.len; i++) {
-			if (result[i] == '\\') {
-				result[i] = '/';
+			if (result.text[i] == '\\') {
+				result.text[i] = '/';
 			}
 		}
 	}

@@ -752,14 +752,16 @@ utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 		return nil;
 	}
 
-	n := multi_byte_to_wide_char(CP_UTF8, MB_ERR_INVALID_CHARS, cstring(&s[0]), i32(len(s)), nil, 0);
+	b := transmute([]byte)s;
+	cstr := cstring(&b[0]);
+	n := multi_byte_to_wide_char(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, i32(len(s)), nil, 0);
 	if n == 0 {
 		return nil;
 	}
 
 	text := make([]u16, n+1, allocator);
 
-	n1 := multi_byte_to_wide_char(CP_UTF8, MB_ERR_INVALID_CHARS, cstring(&s[0]), i32(len(s)), Wstring(&text[0]), i32(n));
+	n1 := multi_byte_to_wide_char(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, i32(len(s)), Wstring(&text[0]), i32(n));
 	if n1 == 0 {
 		delete(text, allocator);
 		return nil;

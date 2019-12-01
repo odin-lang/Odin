@@ -15,10 +15,10 @@ struct String {
 	u8 *  text;
 	isize len;
 
-	u8 &operator[](isize i) {
-		GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
-		return text[i];
-	}
+	// u8 &operator[](isize i) {
+	// 	GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
+	// 	return text[i];
+	// }
 	u8 const &operator[](isize i) const {
 		GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
 		return text[i];
@@ -48,29 +48,29 @@ struct String16 {
 };
 
 
-gb_inline String make_string(u8 *text, isize len) {
+gb_inline String make_string(u8 const *text, isize len) {
 	String s;
-	s.text = text;
+	s.text = cast(u8 *)text;
 	if (len < 0) {
-		len = gb_strlen(cast(char *)text);
+		len = gb_strlen(cast(char const *)text);
 	}
 	s.len = len;
 	return s;
 }
 
 
-gb_inline String16 make_string16(wchar_t *text, isize len) {
+gb_inline String16 make_string16(wchar_t const *text, isize len) {
 	String16 s;
-	s.text = text;
+	s.text = cast(wchar_t *)text;
 	s.len = len;
 	return s;
 }
 
-isize string16_len(wchar_t *s) {
+isize string16_len(wchar_t const *s) {
 	if (s == nullptr) {
 		return 0;
 	}
-	wchar_t *p = s;
+	wchar_t const *p = s;
 	while (*p) {
 		p++;
 	}
@@ -78,11 +78,11 @@ isize string16_len(wchar_t *s) {
 }
 
 
-gb_inline String make_string_c(char *text) {
+gb_inline String make_string_c(char const *text) {
 	return make_string(cast(u8 *)cast(void *)text, gb_strlen(text));
 }
 
-gb_inline String16 make_string16_c(wchar_t *text) {
+gb_inline String16 make_string16_c(wchar_t const *text) {
 	return make_string16(text, string16_len(text));
 }
 
@@ -366,30 +366,30 @@ String copy_string(gbAllocator a, String const &s) {
 
 
 #if defined(GB_SYSTEM_WINDOWS)
-	int convert_multibyte_to_widechar(char *multibyte_input, int input_length, wchar_t *output, int output_size) {
+	int convert_multibyte_to_widechar(char const *multibyte_input, int input_length, wchar_t *output, int output_size) {
 		return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, multibyte_input, input_length, output, output_size);
 	}
-	int convert_widechar_to_multibyte(wchar_t *widechar_input, int input_length, char *output, int output_size) {
+	int convert_widechar_to_multibyte(wchar_t const *widechar_input, int input_length, char *output, int output_size) {
 		return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, widechar_input, input_length, output, output_size, nullptr, nullptr);
 	}
 #elif defined(GB_SYSTEM_UNIX) || defined(GB_SYSTEM_OSX)
 
 	#include <iconv.h>
 
-	int convert_multibyte_to_widechar(char *multibyte_input, usize input_length, wchar_t *output, usize output_size) {
+	int convert_multibyte_to_widechar(char const *multibyte_input, usize input_length, wchar_t *output, usize output_size) {
 		iconv_t conv = iconv_open("WCHAR_T", "UTF-8");
 		size_t result = iconv(conv, cast(char **)&multibyte_input, &input_length, cast(char **)&output, &output_size);
 		iconv_close(conv);
 
-		return (int) result;
+		return cast(int)result;
 	}
 
-	int convert_widechar_to_multibyte(wchar_t* widechar_input, usize input_length, char* output, usize output_size) {
+	int convert_widechar_to_multibyte(wchar_t const *widechar_input, usize input_length, char* output, usize output_size) {
 		iconv_t conv = iconv_open("UTF-8", "WCHAR_T");
-		size_t result = iconv(conv, (char**) &widechar_input, &input_length, (char**) &output, &output_size);
+		size_t result = iconv(conv, cast(char**) &widechar_input, &input_length, cast(char **)&output, &output_size);
 		iconv_close(conv);
 
-		return (int) result;
+		return cast(int)result;
 	}
 #else
 #error Implement system

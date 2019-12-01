@@ -187,8 +187,8 @@ parse_f64 :: proc(s: string) -> f64 {
 
 append_bool :: proc(buf: []byte, b: bool) -> string {
 	n := 0;
-	if b do n = copy(buf, cast([]byte)"true");
-	else do n = copy(buf, cast([]byte)"false");
+	if b do n = copy(buf, "true");
+	else do n = copy(buf, "false");
 	return string(buf[:n]);
 }
 
@@ -260,7 +260,7 @@ quote_rune :: proc(buf: []byte, r: rune) -> string {
 	}
 	write_string :: inline proc(buf: []byte, i: ^int, s: string) {
 		if i^ < len(buf) {
-			n := copy(buf[i^:], cast([]byte)s);
+			n := copy(buf[i^:], s);
 			i^ += n;
 		}
 	}

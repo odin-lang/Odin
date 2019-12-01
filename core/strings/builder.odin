@@ -62,7 +62,7 @@ write_rune :: proc(b: ^Builder, r: rune) -> int {
 }
 
 write_string :: proc(b: ^Builder, s: string) {
-	write_bytes(b, cast([]byte)s);
+	write_bytes(b, transmute([]byte)s);
 }
 
 write_bytes :: proc(b: ^Builder, x: []byte) {

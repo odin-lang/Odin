@@ -5,7 +5,7 @@ import "core:strconv"
 import "core:unicode/utf8"
 
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
-	return write(fd, cast([]byte)str);
+	return write(fd, transmute([]byte)str);
 }
 
 write_byte :: proc(fd: Handle, b: byte) -> (int, Errno) {

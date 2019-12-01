@@ -44,7 +44,7 @@ void ir_file_buffer_write(irFileBuffer *f, void const *data, isize len) {
 }
 
 
-void ir_fprintf(irFileBuffer *f, char *fmt, ...) {
+void ir_fprintf(irFileBuffer *f, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	isize len = gb_snprintf_va(f->buf, IR_FILE_BUFFER_BUF_LEN-1, fmt, va);

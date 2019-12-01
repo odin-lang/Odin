@@ -1186,7 +1186,12 @@ bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Typ
 		return false;
 	}
 
-	if (t->kind == Type_Struct) {
+	if (is_type_untyped(t)) {
+		Operand o = {Addressing_Value};
+		o.type = default_type(type);
+		bool can_convert = check_cast_internal(ctx, &o, specialization);
+		return can_convert;
+	} else if (t->kind == Type_Struct) {
 		if (t->Struct.polymorphic_parent == specialization) {
 			return true;
 		}

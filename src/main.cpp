@@ -29,7 +29,7 @@ gb_global Timings global_timings = {0};
 
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
-i32 system_exec_command_line_app(char *name, char *fmt, ...) {
+i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 #if defined(GB_SYSTEM_WINDOWS)
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
@@ -121,7 +121,7 @@ i32 system_exec_command_line_app(char *name, char *fmt, ...) {
 
 
 
-Array<String> setup_args(int argc, char **argv) {
+Array<String> setup_args(int argc, char const **argv) {
 	gbAllocator a = heap_allocator();
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -154,7 +154,7 @@ Array<String> setup_args(int argc, char **argv) {
 
 
 
-void print_usage_line(i32 indent, char *fmt, ...) {
+void print_usage_line(i32 indent, char const *fmt, ...) {
 	while (indent --> 0) {
 		gb_printf_err("\t");
 	}
@@ -858,7 +858,7 @@ void remove_temp_files(String output_base) {
 	gb_memmove(data.data, output_base.text, n);
 #define EXT_REMOVE(s) do {                         \
 		gb_memmove(data.data+n, s, gb_size_of(s)); \
-		gb_file_remove(cast(char *)data.data);     \
+		gb_file_remove(cast(char const *)data.data);     \
 	} while (0)
 	EXT_REMOVE(".ll");
 	EXT_REMOVE(".bc");
@@ -923,7 +923,7 @@ i32 exec_llvm_llc(String output_base) {
 #endif
 }
 
-int main(int arg_count, char **arg_ptr) {
+int main(int arg_count, char const **arg_ptr) {
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
 		return 1;
@@ -1153,7 +1153,7 @@ int main(int arg_count, char **arg_ptr) {
 			lib_str = gb_string_appendc(lib_str, lib_str_buf);
 		}
 
-		char *output_ext = "exe";
+		char const *output_ext = "exe";
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 256);
 		defer (gb_string_free(link_settings));
 
@@ -1319,8 +1319,8 @@ int main(int arg_count, char **arg_ptr) {
 		// Unlike the Win32 linker code, the output_ext includes the dot, because
 		// typically executable files on *NIX systems don't have extensions.
 		String output_ext = {};
-		char *link_settings = "";
-		char *linker;
+		char const *link_settings = "";
+		char const *linker;
 		if (build_context.is_dll) {
 			// Shared libraries are .dylib on MacOS and .so on Linux.
 			#if defined(GB_SYSTEM_OSX)

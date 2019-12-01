@@ -95,17 +95,17 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		buf: [386]byte;
 
 		str := strconv.append_float(buf[1:], val, 'f', 2*ti.size, 8*ti.size);
-		str = string(buf[:len(str)+1]);
-		if str[1] == '+' || str[1] == '-' {
-			str = str[1:];
+		s := buf[:len(str)+1];
+		if s[1] == '+' || s[1] == '-' {
+			s = s[1:];
 		} else {
-			str[0] = '+';
+			s[0] = '+';
 		}
-		if str[0] == '+' {
-			str = str[1:];
+		if s[0] == '+' {
+			s = s[1:];
 		}
 
-		write_string(b, str);
+		write_string(b, string(s));
 
 	case Type_Info_Complex:
 		return Marshal_Error.Unsupported_Type;
