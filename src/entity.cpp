@@ -121,7 +121,6 @@ struct Entity {
 			String     link_prefix;
 			bool       is_foreign;
 			bool       is_export;
-			bool       is_immutable;
 		} Variable;
 		struct {
 			Type * type_parameter_specialization;
@@ -216,9 +215,8 @@ Entity *alloc_entity(EntityKind kind, Scope *scope, Token token, Type *type) {
 	return entity;
 }
 
-Entity *alloc_entity_variable(Scope *scope, Token token, Type *type, bool is_immutable, EntityState state = EntityState_Unresolved) {
+Entity *alloc_entity_variable(Scope *scope, Token token, Type *type, EntityState state = EntityState_Unresolved) {
 	Entity *entity = alloc_entity(Entity_Variable, scope, token, type);
-	entity->Variable.is_immutable = is_immutable;
 	entity->state = state;
 	return entity;
 }
@@ -250,8 +248,7 @@ Entity *alloc_entity_type_name(Scope *scope, Token token, Type *type, EntityStat
 }
 
 Entity *alloc_entity_param(Scope *scope, Token token, Type *type, bool is_using, bool is_value) {
-	bool is_immutable = false;
-	Entity *entity = alloc_entity_variable(scope, token, type, is_immutable);
+	Entity *entity = alloc_entity_variable(scope, token, type);
 	entity->flags |= EntityFlag_Used;
 	entity->flags |= EntityFlag_Param;
 	entity->state = EntityState_Resolved;
@@ -271,7 +268,7 @@ Entity *alloc_entity_const_param(Scope *scope, Token token, Type *type, ExactVal
 
 
 Entity *alloc_entity_field(Scope *scope, Token token, Type *type, bool is_using, i32 field_src_index, EntityState state = EntityState_Unresolved) {
-	Entity *entity = alloc_entity_variable(scope, token, type, false);
+	Entity *entity = alloc_entity_variable(scope, token, type);
 	entity->Variable.field_src_index = field_src_index;
 	entity->Variable.field_index = field_src_index;
 	if (is_using) entity->flags |= EntityFlag_Using;
@@ -281,7 +278,7 @@ Entity *alloc_entity_field(Scope *scope, Token token, Type *type, bool is_using,
 }
 
 Entity *alloc_entity_array_elem(Scope *scope, Token token, Type *type, i32 field_src_index) {
-	Entity *entity = alloc_entity_variable(scope, token, type, false);
+	Entity *entity = alloc_entity_variable(scope, token, type);
 	entity->Variable.field_src_index = field_src_index;
 	entity->Variable.field_index = field_src_index;
 	entity->flags |= EntityFlag_Field;
@@ -347,6 +344,6 @@ Entity *alloc_entity_label(Scope *scope, Token token, Type *type, Ast *node, Ast
 
 Entity *alloc_entity_dummy_variable(Scope *scope, Token token) {
 	token.string = str_lit("_");
-	return alloc_entity_variable(scope, token, nullptr, false);
+	return alloc_entity_variable(scope, token, nullptr);
 }
 

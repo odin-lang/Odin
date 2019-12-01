@@ -200,8 +200,8 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields
 
 Entity *make_names_field_for_struct(CheckerContext *ctx, Scope *scope) {
 	Entity *e = alloc_entity_field(scope, make_token_ident(str_lit("names")), t_string_slice, false, 0);
-	e->Variable.is_immutable = true;
 	e->flags |= EntityFlag_TypeField;
+	e->flags |= EntityFlag_Value;
 	return e;
 }
 
@@ -935,7 +935,7 @@ void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type, Ast *node) 
 		u32 bits = cast(u32)bits_;
 
 		Type *value_type = alloc_type_bit_field_value(bits);
-		Entity *e = alloc_entity_variable(bit_field_type->BitField.scope, ident->Ident.token, value_type, false);
+		Entity *e = alloc_entity_variable(bit_field_type->BitField.scope, ident->Ident.token, value_type);
 		e->identifier = ident;
 		e->flags |= EntityFlag_BitFieldValue;
 
