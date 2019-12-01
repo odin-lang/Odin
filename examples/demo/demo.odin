@@ -1833,9 +1833,7 @@ main :: proc() {
 		deprecated_attribute();
 		range_statements_with_multiple_return_values();
 		threading_example();
-
-		// TODO(tetra): When bill fixes SOA array comparison to nil in reserve_soa, we can re-enable this.
-		// soa_struct_layout();
+		soa_struct_layout();
 	}
 }
 
