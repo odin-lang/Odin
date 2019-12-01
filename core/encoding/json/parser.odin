@@ -174,7 +174,7 @@ parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
 clone_string :: proc(s: string, allocator: mem.Allocator) -> string {
 	n := len(s);
 	b := make([]byte, n+1, allocator);
-	copy(b, cast([]byte)s);
+	copy(b, s);
 	b[n] = 0;
 	return string(b[:n]);
 }
@@ -349,7 +349,7 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 	}
 
 	b := make([]byte, len(s) + 2*utf8.UTF_MAX, allocator);
-	w := copy(b, cast([]byte)s[0:i]);
+	w := copy(b, s[0:i]);
 	loop: for i < len(s) {
 		c := s[i];
 		switch {

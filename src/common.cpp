@@ -753,8 +753,8 @@ String path_to_full_path(gbAllocator a, String path) {
 	String res = string_trim_whitespace(make_string_c(fullpath));
 #if defined(GB_SYSTEM_WINDOWS)
 	for (isize i = 0; i < res.len; i++) {
-		if (res[i] == '\\') {
-			res[i] = '/';
+		if (res.text[i] == '\\') {
+			res.text[i] = '/';
 		}
 	}
 #endif

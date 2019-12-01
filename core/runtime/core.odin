@@ -418,11 +418,24 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 
 
 @builtin
-copy :: proc "contextless" (dst, src: $T/[]$E) -> int {
+copy_slice :: proc "contextless" (dst, src: $T/[]$E) -> int {
 	n := max(0, min(len(dst), len(src)));
 	if n > 0 do mem_copy(&dst[0], &src[0], n*size_of(E));
 	return n;
 }
+@builtin
+copy_from_string :: proc "contextless" (dst: $T/[]$E/u8, src: $S/string) -> int {
+	n := max(0, min(len(dst), len(src)));
+	if n > 0 {
+		d := &dst[0];
+		s := (transmute(Raw_String)src).data;
+		mem_copy(d, s, n);
+	}
+	return n;
+}
+@builtin
+copy :: proc{copy_slice, copy_from_string};
+
 
 
 
@@ -558,6 +571,10 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 		mem_copy(mem.ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
 		a.len += arg_len;
 	}
+}
+@builtin
+append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #caller_location) {
+	append_elem(array, transmute([]E)arg, loc);
 }
 
 @builtin
@@ -754,7 +771,7 @@ append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_l
 	}
 }
 
-@builtin append :: proc{append_elem, append_elems};
+@builtin append :: proc{append_elem, append_elems, append_elem_string};
 @builtin append_soa :: proc{append_soa_elem, append_soa_elems};
 
 
@@ -1091,11 +1108,11 @@ _fnv64a :: proc(data: []byte, seed: u64 = 0xcbf29ce484222325) -> u64 {
 default_hash :: proc(data: []byte) -> u64 {
 	return _fnv64a(data);
 }
-default_hash_string :: proc(s: string) -> u64 do return default_hash(([]byte)(s));
+default_hash_string :: proc(s: string) -> u64 do return default_hash(transmute([]byte)(s));
 
 
 source_code_location_hash :: proc(s: Source_Code_Location) -> u64 {
-	hash := _fnv64a(cast([]byte)s.file_path);
+	hash := _fnv64a(transmute([]byte)s.file_path);
 	hash = hash ~ (u64(s.line) * 0x100000001b3);
 	hash = hash ~ (u64(s.column) * 0x100000001b3);
 	return hash;

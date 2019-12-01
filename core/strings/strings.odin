@@ -5,14 +5,14 @@ import "core:unicode/utf8"
 
 clone :: proc(s: string, allocator := context.allocator) -> string {
 	c := make([]byte, len(s)+1, allocator);
-	copy(c, cast([]byte)s);
+	copy(c, s);
 	c[len(s)] = 0;
 	return string(c[:len(s)]);
 }
 
 clone_to_cstring :: proc(s: string, allocator := context.allocator) -> cstring {
 	c := make([]byte, len(s)+1, allocator);
-	copy(c, cast([]byte)s);
+	copy(c, s);
 	c[len(s)] = 0;
 	return cstring(&c[0]);
 }
@@ -20,7 +20,7 @@ clone_to_cstring :: proc(s: string, allocator := context.allocator) -> cstring {
 @(deprecated="Please use 'strings.clone'")
 new_string :: proc(s: string, allocator := context.allocator) -> string {
 	c := make([]byte, len(s)+1, allocator);
-	copy(c, cast([]byte)s);
+	copy(c, s);
 	c[len(s)] = 0;
 	return string(c[:len(s)]);
 }
@@ -28,7 +28,7 @@ new_string :: proc(s: string, allocator := context.allocator) -> string {
 @(deprecated="Please use 'strings.clone_to_cstring'")
 new_cstring :: proc(s: string, allocator := context.allocator) -> cstring {
 	c := make([]byte, len(s)+1, allocator);
-	copy(c, cast([]byte)s);
+	copy(c, s);
 	c[len(s)] = 0;
 	return cstring(&c[0]);
 }
@@ -43,7 +43,7 @@ string_from_ptr :: proc(ptr: ^byte, len: int) -> string {
 }
 
 compare :: proc(lhs, rhs: string) -> int {
-	return mem.compare(cast([]byte)lhs, cast([]byte)rhs);
+	return mem.compare(transmute([]byte)lhs, transmute([]byte)rhs);
 }
 
 contains_rune :: proc(s: string, r: rune) -> int {
@@ -130,10 +130,10 @@ join :: proc(a: []string, sep: string, allocator := context.allocator) -> string
 	}
 
 	b := make([]byte, n, allocator);
-	i := copy(b, cast([]byte)a[0]);
+	i := copy(b, a[0]);
 	for s in a[1:] {
-		i += copy(b[i:], cast([]byte)sep);
-		i += copy(b[i:], cast([]byte)s);
+		i += copy(b[i:], sep);
+		i += copy(b[i:], s);
 	}
 	return string(b);
 }
@@ -150,7 +150,7 @@ concatenate :: proc(a: []string, allocator := context.allocator) -> string {
 	b := make([]byte, n, allocator);
 	i := 0;
 	for s in a {
-		i += copy(b[i:], cast([]byte)s);
+		i += copy(b[i:], s);
 	}
 	return string(b);
 }
@@ -416,7 +416,7 @@ repeat :: proc(s: string, count: int, allocator := context.allocator) -> string 
 	}
 
 	b := make([]byte, len(s)*count, allocator);
-	i := copy(b, cast([]byte)s);
+	i := copy(b, s);
 	for i < len(b) { // 2^N trick to reduce the need to copy
 		copy(b[i:], b[:i]);
 		i *= 2;
@@ -460,11 +460,11 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator) -> 
 		} else {
 			j += index(s[start:], old);
 		}
-		w += copy(t[w:], cast([]byte)s[start:j]);
-		w += copy(t[w:], cast([]byte)new);
+		w += copy(t[w:], s[start:j]);
+		w += copy(t[w:], new);
 		start = j + len(old);
 	}
-	w += copy(t[w:], cast([]byte)s[start:]);
+	w += copy(t[w:], s[start:]);
 	output = string(t[0:w]);
 	return;
 }
@@ -705,7 +705,7 @@ reverse :: proc(s: string, allocator := context.allocator) -> string {
 	for len(str) > 0 {
 		_, w := utf8.decode_rune_in_string(str);
 		i -= w;
-		copy(buf[i:], cast([]byte)str[:w]);
+		copy(buf[i:], str[:w]);
 		str = str[w:];
 	}
 	return string(buf);

@@ -38,6 +38,8 @@ struct irModule {
 	// NOTE(bill): To prevent strings from being copied a lot
 	// Mainly used for file names
 	Map<irValue *>        const_strings; // Key: String
+	Map<irValue *>        const_string_byte_slices; // Key: String
+	Map<irValue *>        constant_value_to_global; // Key: irValue *
 
 
 	Entity *              entry_point_entity;
@@ -892,6 +894,10 @@ irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index);
 irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index);
 irValue *ir_emit_bitcast(irProcedure *proc, irValue *data, Type *type);
 irValue *ir_emit_byte_swap(irProcedure *proc, irValue *value, Type *t);
+irValue *ir_find_or_add_entity_string(irModule *m, String str);
+irValue *ir_find_or_add_entity_string_byte_slice(irModule *m, String str);
+
+
 
 irValue *ir_alloc_value(irValueKind kind) {
 	irValue *v = gb_alloc_item(ir_allocator(), irValue);
@@ -1404,8 +1410,6 @@ irValue *ir_de_emit(irProcedure *proc, irValue *instr) {
 	return instr;
 }
 
-
-
 irValue *ir_const_int(i64 i) {
 	return ir_value_constant(t_int, exact_value_i64(i));
 }
@@ -1436,8 +1440,9 @@ irValue *ir_const_f64(f64 f) {
 irValue *ir_const_bool(bool b) {
 	return ir_value_constant(t_bool, exact_value_bool(b != 0));
 }
-irValue *ir_const_string(String s) {
-	return ir_value_constant(t_string, exact_value_string(s));
+irValue *ir_const_string(irModule *m, String s) {
+	return ir_find_or_add_entity_string(m, s);
+	// return ir_value_constant(t_string, exact_value_string(s));
 }
 
 irValue *ir_value_procedure(irModule *m, Entity *entity, Type *type, Ast *type_expr, Ast *body, String name) {
@@ -1479,7 +1484,7 @@ irValue *ir_generate_array(irModule *m, Type *elem_type, i64 count, String prefi
 	return value;
 }
 
-irBlock *ir_new_block(irProcedure *proc, Ast *node, char *label) {
+irBlock *ir_new_block(irProcedure *proc, Ast *node, char const *label) {
 	Scope *scope = nullptr;
 	if (node != nullptr) {
 		scope = scope_of_node(node);
@@ -1557,7 +1562,7 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 	if (is_type_slice(type)) {
 		if (value.kind == ExactValue_String) {
 			GB_ASSERT(is_type_u8_slice(type));
-			return ir_value_constant(type, value);
+			return ir_find_or_add_entity_string_byte_slice(m, value.value_string);
 		} else {
 			ast_node(cl, CompoundLit, value.value_compound);
 
@@ -1591,6 +1596,27 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 }
 
 irValue *ir_add_global_string_array(irModule *m, String string) {
+
+	irValue *global_constant_value = nullptr;
+	{
+		HashKey key = hash_string(string);
+		irValue **found = map_get(&m->const_string_byte_slices, key);
+		if (found != nullptr) {
+			global_constant_value = *found;
+
+			irValue **global_found = map_get(&m->constant_value_to_global, hash_pointer(global_constant_value));
+			if (global_found != nullptr) {
+				return *global_found;
+			}
+		}
+	}
+
+	if (global_constant_value == nullptr) {
+		global_constant_value = ir_find_or_add_entity_string_byte_slice(m, string);
+	}
+	Type *type = ir_type(global_constant_value);
+
+
 	isize max_len = 6+8+1;
 	u8 *str = cast(u8 *)gb_alloc_array(ir_allocator(), u8, max_len);
 	isize len = gb_snprintf(cast(char *)str, max_len, "str$%x", m->global_string_index);
@@ -1599,13 +1625,16 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 	String name = make_string(str, len-1);
 	Token token = {Token_String};
 	token.string = name;
-	Type *type = alloc_type_array(t_u8, string.len+1);
-	ExactValue ev = exact_value_string(string);
-	Entity *entity = alloc_entity_constant(nullptr, token, type, ev);
-	irValue *g = ir_value_global(entity, ir_add_module_constant(m, type, ev));
+
+	Entity *entity = alloc_entity_constant(nullptr, token, type, exact_value_string(string));
+
+	irValue *g = ir_value_global(entity, global_constant_value);
 	g->Global.is_private      = true;
 	g->Global.is_unnamed_addr = true;
-	// g->Global.is_constant = true;
+	g->Global.is_constant = true;
+
+	map_set(&m->constant_value_to_global, hash_pointer(global_constant_value), g);
+
 
 	ir_module_add_value(m, entity, g);
 	map_set(&m->members, hash_string(name), g);
@@ -4506,7 +4535,7 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 			right = ir_emit_conv(proc, right, t_string);
 		}
 
-		char *runtime_proc = nullptr;
+		char const *runtime_proc = nullptr;
 		switch (op_kind) {
 		case Token_CmpEq: runtime_proc = "string_eq"; break;
 		case Token_NotEq: runtime_proc = "string_ne"; break;
@@ -5023,12 +5052,26 @@ irValue *ir_add_local_slice(irProcedure *proc, Type *slice_type, irValue *base, 
 
 
 irValue *ir_find_or_add_entity_string(irModule *m, String str) {
-	irValue **found = map_get(&m->const_strings, hash_string(str));
+	HashKey key = hash_string(str);
+	irValue **found = map_get(&m->const_strings, key);
 	if (found != nullptr) {
 		return *found;
 	}
-	irValue *v = ir_const_string(str);
-	map_set(&m->const_strings, hash_string(str), v);
+	irValue *v = ir_value_constant(t_string, exact_value_string(str));
+	map_set(&m->const_strings, key, v);
+	return v;
+
+}
+
+irValue *ir_find_or_add_entity_string_byte_slice(irModule *m, String str) {
+	HashKey key = hash_string(str);
+	irValue **found = map_get(&m->const_string_byte_slices, key);
+	if (found != nullptr) {
+		return *found;
+	}
+	Type *t = alloc_type_array(t_u8, str.len+1);
+	irValue *v = ir_value_constant(t, exact_value_string(str));
+	map_set(&m->const_string_byte_slices, key, v);
 	return v;
 
 }
@@ -10497,15 +10540,17 @@ void ir_init_module(irModule *m, Checker *c) {
 		m->generate_debug_info = build_context.ODIN_OS == "windows" && build_context.word_size == 8;
 	}
 
-	map_init(&m->values,                  heap_allocator());
-	map_init(&m->members,                 heap_allocator());
-	map_init(&m->debug_info,              heap_allocator());
-	map_init(&m->entity_names,            heap_allocator());
-	map_init(&m->anonymous_proc_lits,     heap_allocator());
-	array_init(&m->procs,                 heap_allocator());
-	array_init(&m->procs_to_generate,     heap_allocator());
-	array_init(&m->foreign_library_paths, heap_allocator());
-	map_init(&m->const_strings,           heap_allocator());
+	map_init(&m->values,                   heap_allocator());
+	map_init(&m->members,                  heap_allocator());
+	map_init(&m->debug_info,               heap_allocator());
+	map_init(&m->entity_names,             heap_allocator());
+	map_init(&m->anonymous_proc_lits,      heap_allocator());
+	array_init(&m->procs,                  heap_allocator());
+	array_init(&m->procs_to_generate,      heap_allocator());
+	array_init(&m->foreign_library_paths,  heap_allocator());
+	map_init(&m->const_strings,            heap_allocator());
+	map_init(&m->const_string_byte_slices, heap_allocator());
+	map_init(&m->constant_value_to_global, heap_allocator());
 
 	// Default states
 	m->stmt_state_flags = 0;
@@ -10644,6 +10689,8 @@ void ir_destroy_module(irModule *m) {
 	map_destroy(&m->anonymous_proc_lits);
 	map_destroy(&m->debug_info);
 	map_destroy(&m->const_strings);
+	map_destroy(&m->const_string_byte_slices);
+	map_destroy(&m->constant_value_to_global);
 	array_free(&m->procs);
 	array_free(&m->procs_to_generate);
 	array_free(&m->foreign_library_paths);
@@ -10805,7 +10852,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			tag = ir_emit_conv(proc, variant_ptr, t_type_info_named_ptr);
 
 			// TODO(bill): Which is better? The mangled name or actual name?
-			irValue *name = ir_const_string(t->Named.type_name->token.string);
+			irValue *name = ir_const_string(proc->module, t->Named.type_name->token.string);
 			irValue *gtip = ir_get_type_info_ptr(proc, t->Named.base);
 
 			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), name);
@@ -10996,7 +11043,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
 				if (f->token.string.len > 0) {
 					irValue *name = ir_emit_ptr_offset(proc, memory_names, index);
-					ir_emit_store(proc, name, ir_const_string(f->token.string));
+					ir_emit_store(proc, name, ir_const_string(proc->module, f->token.string));
 				}
 			}
 
@@ -11030,7 +11077,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 						irValue *v = ir_value_constant(t->Enum.base_type, value);
 
 						ir_emit_store_union_variant(proc, value_ep, v, ir_type(v));
-						ir_emit_store(proc, name_ep, ir_const_string(fields[i]->token.string));
+						ir_emit_store(proc, name_ep, ir_const_string(proc->module, fields[i]->token.string));
 					}
 
 					irValue *v_count = ir_const_int(fields.count);
@@ -11144,7 +11191,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 					ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
 					if (f->token.string.len > 0) {
 						irValue *name = ir_emit_ptr_offset(proc, memory_names,   index);
-						ir_emit_store(proc, name, ir_const_string(f->token.string));
+						ir_emit_store(proc, name, ir_const_string(proc->module, f->token.string));
 					}
 					ir_emit_store(proc, offset, ir_const_uintptr(foffset));
 					ir_emit_store(proc, is_using, ir_const_bool((f->flags&EntityFlag_Using) != 0));
@@ -11153,7 +11200,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 						String tag_string = t->Struct.tags[source_index];
 						if (tag_string.len > 0) {
 							irValue *tag_ptr = ir_emit_ptr_offset(proc, memory_tags, index);
-							ir_emit_store(proc, tag_ptr, ir_const_string(tag_string));
+							ir_emit_store(proc, tag_ptr, ir_const_string(proc->module, tag_string));
 						}
 					}
 
@@ -11204,7 +11251,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 					irValue *bit_ep    = ir_emit_array_epi(proc, bit_array,    cast(i32)i);
 					irValue *offset_ep = ir_emit_array_epi(proc, offset_array, cast(i32)i);
 
-					ir_emit_store(proc, name_ep, ir_const_string(f->token.string));
+					ir_emit_store(proc, name_ep, ir_const_string(proc->module, f->token.string));
 					ir_emit_store(proc, bit_ep, ir_const_i32(f->type->BitFieldValue.bits));
 					ir_emit_store(proc, offset_ep, ir_const_i32(t->BitField.offsets[i]));
 

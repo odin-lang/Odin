@@ -56,7 +56,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int)
 		} else {
 			s = "+Inf";
 		}
-		n := copy(buf, cast([]byte)s);
+		n := copy(buf, transmute([]byte)s);
 		return buf[:n];
 
 	case 0: // denormalized

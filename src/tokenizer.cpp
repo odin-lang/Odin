@@ -227,7 +227,7 @@ void end_error_block(void) {
 }
 
 
-#define ERROR_OUT_PROC(name) void name(char *fmt, va_list va)
+#define ERROR_OUT_PROC(name) void name(char const *fmt, va_list va)
 typedef ERROR_OUT_PROC(ErrorOutProc);
 
 ERROR_OUT_PROC(default_error_out_va) {
@@ -259,14 +259,14 @@ ERROR_OUT_PROC(default_error_out_va) {
 
 ErrorOutProc *error_out_va = default_error_out_va;
 
-void error_out(char *fmt, ...) {
+void error_out(char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	error_out_va(fmt, va);
 	va_end(va);
 }
 
-void warning_va(Token token, char *fmt, va_list va) {
+void warning_va(Token token, char const *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.warning_count++;
 	// NOTE(bill): Duplicate error, skip it
@@ -283,7 +283,7 @@ void warning_va(Token token, char *fmt, va_list va) {
 }
 
 
-void error_va(Token token, char *fmt, va_list va) {
+void error_va(Token token, char const *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
@@ -301,13 +301,13 @@ void error_va(Token token, char *fmt, va_list va) {
 	}
 }
 
-void error_line_va(char *fmt, va_list va) {
+void error_line_va(char const *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	error_out_va(fmt, va);
 	gb_mutex_unlock(&global_error_collector.mutex);
 }
 
-void error_no_newline_va(Token token, char *fmt, va_list va) {
+void error_no_newline_va(Token token, char const *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
@@ -326,7 +326,7 @@ void error_no_newline_va(Token token, char *fmt, va_list va) {
 }
 
 
-void syntax_error_va(Token token, char *fmt, va_list va) {
+void syntax_error_va(Token token, char const *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
@@ -345,7 +345,7 @@ void syntax_error_va(Token token, char *fmt, va_list va) {
 	}
 }
 
-void syntax_warning_va(Token token, char *fmt, va_list va) {
+void syntax_warning_va(Token token, char const *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 	global_error_collector.warning_count++;
 	// NOTE(bill): Duplicate error, skip it
@@ -363,21 +363,21 @@ void syntax_warning_va(Token token, char *fmt, va_list va) {
 
 
 
-void warning(Token token, char *fmt, ...) {
+void warning(Token token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	warning_va(token, fmt, va);
 	va_end(va);
 }
 
-void error(Token token, char *fmt, ...) {
+void error(Token token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	error_va(token, fmt, va);
 	va_end(va);
 }
 
-void error(TokenPos pos, char *fmt, ...) {
+void error(TokenPos pos, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	Token token = {};
@@ -386,7 +386,7 @@ void error(TokenPos pos, char *fmt, ...) {
 	va_end(va);
 }
 
-void error_line(char *fmt, ...) {
+void error_line(char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	error_line_va(fmt, va);
@@ -394,14 +394,14 @@ void error_line(char *fmt, ...) {
 }
 
 
-void syntax_error(Token token, char *fmt, ...) {
+void syntax_error(Token token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	syntax_error_va(token, fmt, va);
 	va_end(va);
 }
 
-void syntax_error(TokenPos pos, char *fmt, ...) {
+void syntax_error(TokenPos pos, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	Token token = {};
@@ -410,7 +410,7 @@ void syntax_error(TokenPos pos, char *fmt, ...) {
 	va_end(va);
 }
 
-void syntax_warning(Token token, char *fmt, ...) {
+void syntax_warning(Token token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	syntax_warning_va(token, fmt, va);
@@ -418,7 +418,7 @@ void syntax_warning(Token token, char *fmt, ...) {
 }
 
 
-void compiler_error(char *fmt, ...) {
+void compiler_error(char const *fmt, ...) {
 	va_list va;
 
 	va_start(va, fmt);
@@ -506,7 +506,7 @@ void restore_tokenizer_state(Tokenizer *t, TokenizerState *state) {
 }
 
 
-void tokenizer_err(Tokenizer *t, char *msg, ...) {
+void tokenizer_err(Tokenizer *t, char const *msg, ...) {
 	va_list va;
 	isize column = t->read_curr - t->line+1;
 	if (column < 1) {
