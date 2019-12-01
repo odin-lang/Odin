@@ -12,6 +12,7 @@ Handle    :: distinct i32;
 File_Time :: distinct u64;
 Errno     :: distinct i32;
 Syscall   :: distinct int;
+Dir       :: distinct rawptr; // Unix's opaquely typed *DIR (typedef'd *__dirstream)
 
 INVALID_HANDLE :: ~Handle(0);
 
@@ -239,7 +240,6 @@ S_ISUID :: 0o4000; // Set user id on execution
 S_ISGID :: 0o2000; // Set group id on execution
 S_ISVTX :: 0o1000; // Directory restrcted delete
 
-
 S_ISLNK  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFLNK;
 S_ISREG  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFREG;
 S_ISDIR  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFDIR;
@@ -252,6 +252,14 @@ F_OK :: 0; // Test for file existance
 X_OK :: 1; // Test for execute permission
 W_OK :: 2; // Test for write permission
 R_OK :: 4; // Test for read permission
+
+Dirent :: struct {
+	__ino_t     : u64,
+	__off_t     : i64,
+	d_reclen    : u16,
+	d_type      : u8,
+	d_name      : [256]u8,
+};
 
 SYS_GETTID: Syscall : 186;
 
@@ -269,6 +277,17 @@ foreign libc {
 	@(link_name="stat")             _unix_stat          :: proc(path: cstring, stat: ^Stat) -> int ---;
 	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^Stat) -> int ---;
 	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> int ---;
+
+	@(link_name="opendir")          _unix_opendir       :: proc(path: cstring) -> Dir ---;
+	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---;
+	@(link_name="dirfd")            _unix_dirfd         :: proc(dir: Dir) -> int ---;
+	@(link_name="closedir")         _unix_closedir      :: proc(dir: Dir) -> int ---;
+	@(link_name="readdir")          _unix_readdir       :: proc(dir: Dir) -> ^Dirent ---;
+	@(link_name="alphasort")        _unix_alphasort     :: proc(d1: ^^Dirent, d2: ^^Dirent) -> int ---;
+	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dir: Dir) ---;
+	@(link_name="scandir")          _unix_scandir       :: proc(path: cstring, namelist: ^^^Dirent, sel: ^proc(dir: ^Dirent) -> int, compar: ^proc(d1: ^^Dirent, d2: ^^Dirent) -> int) -> int ---;
+	@(link_name="seekdir")          _unix_seekdir       :: proc(dir: Dir, loc: i64) ---;
+	@(link_name="telldir")          _unix_telldir       :: proc(dir: Dir) -> i64 ---;
 
 	@(link_name="malloc")           _unix_malloc        :: proc(size: int) -> rawptr ---;
 	@(link_name="calloc")           _unix_calloc        :: proc(num, size: int) -> rawptr ---;
@@ -402,6 +421,61 @@ access :: inline proc(path: string, mask: int) -> (bool, Errno) {
 		return false, Errno(get_last_error());
 	}
 	return true, ERROR_NONE;
+}
+
+opendir :: proc(path: string) -> (Dir, Errno) {
+	cstr := strings.clone_to_cstring(path);
+	defer delete(cstr);
+	dir := _unix_opendir(cstr);
+	return dir, dir == nil ? Errno(get_last_error()) : ERROR_NONE;
+}
+
+fdopendir :: proc(fd: Handle) -> (Dir, Errno) {
+	dir := _unix_fdopendir(fd);
+	return dir, dir == nil ? Errno(get_last_error()) : ERROR_NONE;
+}
+
+dirfd :: proc(dir: Dir) -> (Handle, Errno) {
+	unix_fd := _unix_dirfd(dir);
+	return Handle(unix_fd), unix_fd == -1 ? Errno(get_last_error()) : ERROR_NONE;
+}
+
+closedir :: proc(dir: Dir) -> Errno {
+	result := _unix_closedir(dir);
+	return result == -1 ? Errno(get_last_error()) : ERROR_NONE;
+}
+
+readdir :: proc(dir: Dir) -> (^Dirent, Errno) {
+	dirent := _unix_readdir(dir); // don't need to nil check as this is a valid return
+	return dirent, Errno(get_last_error());
+}
+
+alphasort :: proc(d1: ^^Dirent, d2: ^^Dirent) -> (int, Errno) {
+	return _unix_alphasort(d1, d2), Errno(get_last_error());
+}
+
+rewinddir :: proc(dir: Dir) -> Errno {
+	_unix_rewinddir(dir);
+	return Errno(get_last_error());
+}
+
+scandir :: proc(path: string, namelist: ^^^Dirent,
+                select: ^proc "c" (dir: ^Dirent) -> int,
+                compare: ^proc "c" (d1: ^^Dirent, d2: ^^Dirent) -> int) -> (int, Errno) {
+	cstr := strings.clone_to_cstring(path);
+	defer delete(cstr);
+	result := _unix_scandir(cstr, namelist, select, compare);
+	return result, result == -1 ? Errno(get_last_error()) : ERROR_NONE;
+}
+
+seekdir :: proc(dir: Dir, loc: i64) -> Errno {
+	_unix_seekdir(dir, loc);
+	return Errno(get_last_error());
+}
+
+telldir :: proc(dir: Dir) -> (i64, Errno) {
+	loc := _unix_telldir(dir);
+	return loc, loc == -1 ? Errno(get_last_error()) : ERROR_NONE;
 }
 
 heap_alloc :: proc(size: int) -> rawptr {
