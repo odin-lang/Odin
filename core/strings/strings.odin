@@ -42,6 +42,12 @@ string_from_ptr :: proc(ptr: ^byte, len: int) -> string {
 	return transmute(string)mem.Raw_String{ptr, len};
 }
 
+
+unsafe_string_to_cstring :: proc(str: string) -> cstring {
+	d := transmute(mem.Raw_String)str;
+	return cstring(d.data);
+}
+
 compare :: proc(lhs, rhs: string) -> int {
 	return mem.compare(transmute([]byte)lhs, transmute([]byte)rhs);
 }
