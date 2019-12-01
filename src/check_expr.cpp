@@ -926,7 +926,8 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 
 	case Type_Struct:
 		if (source->kind == Type_Struct) {
-			if (poly->Struct.soa_kind == source->Struct.soa_kind) {
+			if (poly->Struct.soa_kind == source->Struct.soa_kind &&
+			    poly->Struct.soa_kind != StructSoa_None) {
 				bool ok = is_polymorphic_type_assignable(c, poly->Struct.soa_elem, source->Struct.soa_elem, true, modify_type);
 				if (ok) switch (source->Struct.soa_kind) {
 				case StructSoa_Fixed:
