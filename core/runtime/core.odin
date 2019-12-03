@@ -574,7 +574,8 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 }
 @builtin
 append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #caller_location) {
-	append_elem(array, transmute([]E)arg, loc);
+	args := transmute([]E)arg;
+	append_elems(array, ..args, loc);
 }
 
 @builtin
