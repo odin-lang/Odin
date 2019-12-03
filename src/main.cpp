@@ -483,7 +483,7 @@ bool parse_build_flags(Array<String> args) {
 							isize count = cast(isize)big_int_to_i64(&value.value_integer);
 							if (count <= 0) {
 								gb_printf_err("%.*s expected a positive non-zero number, got %.*s\n", LIT(name), LIT(param));
-								build_context.thread_count = 0;
+								build_context.thread_count = 1;
 							} else {
 								build_context.thread_count = count;
 							}
