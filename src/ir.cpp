@@ -5594,6 +5594,14 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 	if (is_type_pointer(src) && is_type_uintptr(dst)) {
 		return ir_emit_ptr_to_uintptr(proc, value, t);
 	}
+	if (is_type_uintptr(src) && is_type_proc(dst)) {
+		irValue *ptr = ir_emit_uintptr_to_ptr(proc, value, t_rawptr);
+		return ir_emit_bitcast(proc, ptr, dst);
+	}
+	if (is_type_proc(src) && is_type_uintptr(dst)) {
+		irValue *ptr = ir_emit_uintptr_to_ptr(proc, value, t_rawptr);
+		return ir_emit_bitcast(proc, ptr, dst);
+	}
 
 	if (is_type_integer(src) && (is_type_pointer(dst) || is_type_cstring(dst))) {
 		Type *vt = core_type(ir_type(value));
