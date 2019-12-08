@@ -104,7 +104,7 @@ parse_u64 :: proc(str: string) -> u64 {
 parse_int :: proc(s: string) -> int {
 	return int(parse_i64(s));
 }
-parse_uint :: proc(s: string, base: int) -> uint {
+parse_uint :: proc(s: string) -> uint {
 	return uint(parse_u64(s));
 }
 
