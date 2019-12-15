@@ -837,8 +837,8 @@ enum_value_to_string :: proc(val: any) -> (string, bool) {
 }
 
 string_to_enum_value :: proc($T: typeid, s: string) -> (T, bool) {
-	ti := type_info_base(type_info_of(T));
-	if e, ok := ti.variant.(Type_Info_Enum); ok {
+	ti := runtime.type_info_base(type_info_of(T));
+	if e, ok := ti.variant.(runtime.Type_Info_Enum); ok {
 		for str, idx in e.names {
 			if s == str {
 				// NOTE(bill): Unsafe cast
