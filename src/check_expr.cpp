@@ -2364,6 +2364,11 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 
 	ast_node(be, BinaryExpr, node);
 
+	defer({
+		node->viral_state_flags |= be->left->viral_state_flags;
+		node->viral_state_flags |= be->right->viral_state_flags;
+	});
+
 	Token op = be->op;
 	switch (op.kind) {
 	case Token_CmpEq:
@@ -2605,6 +2610,18 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 				return;
 			}
 		}
+		break;
+
+	case Token_CmpAnd:
+	case Token_CmpOr:
+		if (be->left->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
+			error(be->left, "Procedure calls that have an associated deferred procedure are not allowed within logical binary expressions");
+		}
+		if (be->right->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
+			error(be->right, "Procedure calls that have an associated deferred procedure are not allowed within logical binary expressions");
+		}
+		break;
+
 	}
 
 	if (x->mode == Addressing_Constant &&
@@ -5440,6 +5457,8 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				Entity *e = sig_params[operand_index];
 				Type *t = e->type;
 				Operand o = operands[operand_index];
+				call->viral_state_flags |= o.expr->viral_state_flags;
+
 				if (e->kind == Entity_TypeName) {
 					// GB_ASSERT(!variadic);
 					if (o.mode == Addressing_Invalid) {
@@ -5596,6 +5615,12 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	defer (gb_free(c->allocator, visited));
 	auto ordered_operands = array_make<Operand>(c->allocator, param_count);
 	defer (array_free(&ordered_operands));
+	defer ({
+		for_array(i, ordered_operands) {
+			Operand const &o = ordered_operands[i];
+			call->viral_state_flags |= o.expr->viral_state_flags;
+		}
+	});
 
 	for_array(i, ce->args) {
 		Ast *arg = ce->args[i];
@@ -6668,6 +6693,14 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 		return builtin_procs[id].kind;
 	}
 
+	Entity *e = entity_of_ident(operand->expr);
+
+	if (e != nullptr && e->kind == Entity_Procedure) {
+		if (e->Procedure.deferred_procedure.entity != nullptr) {
+			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
+		}
+	}
+
 	Type *proc_type = base_type(operand->type);
 	if (operand->mode != Addressing_ProcGroup) {
 		bool valid_type = (proc_type != nullptr) && is_type_proc(proc_type);
@@ -7097,6 +7130,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case_ast_node(te, TernaryExpr, node);
 		Operand cond = {Addressing_Invalid};
 		check_expr(c, &cond, te->cond);
+		node->viral_state_flags |= te->cond->viral_state_flags;
+
 		if (cond.mode != Addressing_Invalid && !is_type_boolean(cond.type)) {
 			error(te->cond, "Non-boolean condition in if expression");
 		}
@@ -7104,9 +7139,11 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		Operand x = {Addressing_Invalid};
 		Operand y = {Addressing_Invalid};
 		check_expr_or_type(c, &x, te->x, type_hint);
+		node->viral_state_flags |= te->x->viral_state_flags;
 
 		if (te->y != nullptr) {
 			check_expr_or_type(c, &y, te->y, type_hint);
+			node->viral_state_flags |= te->y->viral_state_flags;
 		} else {
 			error(node, "A ternary expression must have an else clause");
 			return kind;
@@ -7761,6 +7798,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 	case_ast_node(pe, ParenExpr, node);
 		kind = check_expr_base(c, o, pe->expr, type_hint);
+		node->viral_state_flags |= pe->expr->viral_state_flags;
 		o->expr = node;
 	case_end;
 
@@ -7769,18 +7807,15 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		error(node, "Unknown tag expression, #%.*s", LIT(name));
 		if (te->expr) {
 			kind = check_expr_base(c, o, te->expr, type_hint);
+			node->viral_state_flags |= te->expr->viral_state_flags;
 		}
-		o->expr = node;
-	case_end;
-
-	case_ast_node(re, RunExpr, node);
-		// TODO(bill): Tag expressions
-		kind = check_expr_base(c, o, re->expr, type_hint);
 		o->expr = node;
 	case_end;
 
 	case_ast_node(ta, TypeAssertion, node);
 		check_expr(c, o, ta->expr);
+		node->viral_state_flags |= ta->expr->viral_state_flags;
+
 		if (o->mode == Addressing_Invalid) {
 			o->expr = node;
 			return kind;
@@ -7874,6 +7909,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		}
 		Type *type = o->type;
 		check_expr_base(c, o, tc->expr, type);
+		node->viral_state_flags |= tc->expr->viral_state_flags;
+
 		if (o->mode != Addressing_Invalid) {
 			switch (tc->token.kind) {
 			case Token_transmute:
@@ -7893,6 +7930,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 	case_ast_node(ac, AutoCast, node);
 		check_expr_base(c, o, ac->expr, type_hint);
+		node->viral_state_flags |= ac->expr->viral_state_flags;
+
 		if (o->mode == Addressing_Invalid) {
 			o->expr = node;
 			return kind;
@@ -7906,6 +7945,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 	case_ast_node(ue, UnaryExpr, node);
 		check_expr_base(c, o, ue->expr, type_hint);
+		node->viral_state_flags |= ue->expr->viral_state_flags;
+
 		if (o->mode == Addressing_Invalid) {
 			o->expr = node;
 			return kind;
@@ -7930,6 +7971,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 	case_ast_node(se, SelectorExpr, node);
 		check_selector(c, o, node, type_hint);
+		node->viral_state_flags |= se->expr->viral_state_flags;
 	case_end;
 
 
@@ -8000,6 +8042,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 	case_ast_node(ie, IndexExpr, node);
 		check_expr(c, o, ie->expr);
+		node->viral_state_flags |= ie->expr->viral_state_flags;
 		if (o->mode == Addressing_Invalid) {
 			o->expr = node;
 			return kind;
@@ -8061,12 +8104,15 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		i64 index = 0;
 		bool ok = check_index_value(c, false, ie->index, max_count, &index);
 
+		node->viral_state_flags |= ie->index->viral_state_flags;
 	case_end;
 
 
 
 	case_ast_node(se, SliceExpr, node);
 		check_expr(c, o, se->expr);
+		node->viral_state_flags |= se->expr->viral_state_flags;
+
 		if (o->mode == Addressing_Invalid) {
 			o->mode = Addressing_Invalid;
 			o->expr = node;
@@ -8148,6 +8194,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				if (check_index_value(c, false, nodes[i], capacity, &j)) {
 					index = j;
 				}
+
+				node->viral_state_flags |= nodes[i]->viral_state_flags;
 			} else if (i == 0) {
 				index = 0;
 			}
@@ -8173,6 +8221,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 	case_ast_node(de, DerefExpr, node);
 		check_expr_or_type(c, o, de->expr);
+		node->viral_state_flags |= de->expr->viral_state_flags;
+
 		if (o->mode == Addressing_Invalid) {
 			o->mode = Addressing_Invalid;
 			o->expr = node;

@@ -14,7 +14,6 @@ Token ast_token(Ast *node) {
 		return node->CompoundLit.open;
 
 	case Ast_TagExpr:       return node->TagExpr.token;
-	case Ast_RunExpr:       return node->RunExpr.token;
 	case Ast_BadExpr:       return node->BadExpr.begin;
 	case Ast_UnaryExpr:     return node->UnaryExpr.op;
 	case Ast_BinaryExpr:    return ast_token(node->BinaryExpr.left);
@@ -154,9 +153,6 @@ Ast *clone_ast(Ast *node) {
 	case Ast_BadExpr: break;
 	case Ast_TagExpr:
 		n->TagExpr.expr = clone_ast(n->TagExpr.expr);
-		break;
-	case Ast_RunExpr:
-		n->RunExpr.expr = clone_ast(n->RunExpr.expr);
 		break;
 	case Ast_UnaryExpr:
 		n->UnaryExpr.expr = clone_ast(n->UnaryExpr.expr);
@@ -457,15 +453,6 @@ Ast *ast_tag_expr(AstFile *f, Token token, Token name, Ast *expr) {
 	result->TagExpr.expr = expr;
 	return result;
 }
-
-Ast *ast_run_expr(AstFile *f, Token token, Token name, Ast *expr) {
-	Ast *result = alloc_ast_node(f, Ast_RunExpr);
-	result->RunExpr.token = token;
-	result->RunExpr.name = name;
-	result->RunExpr.expr = expr;
-	return result;
-}
-
 
 Ast *ast_tag_stmt(AstFile *f, Token token, Token name, Ast *stmt) {
 	Ast *result = alloc_ast_node(f, Ast_TagStmt);
