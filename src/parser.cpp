@@ -1745,7 +1745,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		} else if (name.string == "defined") {
 			Ast *tag = ast_basic_directive(f, token, name.string);
 			return parse_call_expr(f, tag);
-		} else if (name.string == "soa" || name.string == "vector") {
+		} else if (name.string == "soa" || name.string == "simd") {
 			Ast *tag = ast_basic_directive(f, token, name.string);
 			Ast *original_type = parse_type(f);
 			Ast *type = unparen_expr(original_type);

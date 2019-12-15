@@ -4763,12 +4763,12 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
-	case BuiltinProc_vector: {
+	case BuiltinProc_simd_vector: {
 		Operand x = {};
 		Operand y = {};
 		x = *operand;
 		if (!is_type_integer(x.type) || x.mode != Addressing_Constant) {
-			error(call, "Expected a constant integer for 'intrinsics.vector'");
+			error(call, "Expected a constant integer for 'intrinsics.simd_vector'");
 			operand->mode = Addressing_Type;
 			operand->type = t_invalid;
 			return false;
@@ -4783,7 +4783,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		check_expr_or_type(c, &y, ce->args[1]);
 		if (y.mode != Addressing_Type) {
-			error(call, "Expected a type 'intrinsics.vector'");
+			error(call, "Expected a type 'intrinsics.simd_vector'");
 			operand->mode = Addressing_Type;
 			operand->type = t_invalid;
 			return false;
@@ -4791,7 +4791,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		Type *elem = y.type;
 		if (!is_type_valid_vector_elem(elem)) {
 			gbString str = type_to_string(elem);
-			error(call, "Invalid element type for 'intrinsics.vector', expected an integer or float with no specific endianness, got '%s'", str);
+			error(call, "Invalid element type for 'intrinsics.simd_vector', expected an integer or float with no specific endianness, got '%s'", str);
 			gb_string_free(str);
 			operand->mode = Addressing_Type;
 			operand->type = t_invalid;

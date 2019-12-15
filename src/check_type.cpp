@@ -3224,10 +3224,10 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 				String name = at->tag->BasicDirective.name;
 				if (name == "soa") {
 					*type = make_soa_struct_fixed(ctx, e, at->elem, elem, count, generic_type);
-				} else if (name == "vector") {
+				} else if (name == "simd") {
 					if (!is_type_valid_vector_elem(elem)) {
 						gbString str = type_to_string(elem);
-						error(at->elem, "Invalid element type for 'intrinsics.vector', expected an integer or float with no specific endianness, got '%s'", str);
+						error(at->elem, "Invalid element type for 'intrinsics.simd_vector', expected an integer or float with no specific endianness, got '%s'", str);
 						gb_string_free(str);
 						*type = alloc_type_array(elem, count, generic_type);
 						goto array_end;

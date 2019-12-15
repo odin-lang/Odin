@@ -289,7 +289,7 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 		if info.is_x86_mmx {
 			os.write_string(fd, "intrinsics.x86_mmx");
 		} else {
-			os.write_string(fd, "#vector[");
+			os.write_string(fd, "#simd[");
 			print_u64(fd, u64(info.count));
 			os.write_byte(fd, ']');
 			print_type(fd, info.elem);

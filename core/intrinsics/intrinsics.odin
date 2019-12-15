@@ -2,7 +2,9 @@
 package intrinsics
 
 
-vector :: proc() ---
+x86_mmx :: x86_mmx; // Specialized SIMD Vector type
+
+simd_vector :: proc($N: int, $T: typeid) -> type/#simd[N]T
 
 atomic_fence        :: proc() ---
 atomic_fence_acq    :: proc() ---
