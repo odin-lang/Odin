@@ -502,7 +502,7 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		if info.is_x86_mmx {
 			write_string(buf, "intrinsics.x86_mmx");
 		} else {
-			write_string(buf, "#vector[");
+			write_string(buf, "#simd[");
 			write_i64(buf, i64(info.count));
 			write_byte(buf, ']');
 			write_type(buf, info.elem);
