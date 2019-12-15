@@ -55,7 +55,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			return nil;
 		}
 
-		#no_bounds_check end := &arena.data[len(arena.data)];
+		#no_bounds_check end := &arena.data[arena.offset];
 
 		ptr := align_forward(end, uintptr(alignment));
 		arena.offset += total_size;
