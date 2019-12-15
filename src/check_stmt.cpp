@@ -335,27 +335,26 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 
 void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags);
 void check_stmt(CheckerContext *ctx, Ast *node, u32 flags) {
-	u32 prev_stmt_state_flags = ctx->stmt_state_flags;
+	u32 prev_state_flags = ctx->state_flags;
 
-	if (node->stmt_state_flags != 0) {
-		u32 in = node->stmt_state_flags;
-		u32 out = ctx->stmt_state_flags;
+	if (node->state_flags != 0) {
+		u32 in = node->state_flags;
+		u32 out = ctx->state_flags;
 
-		if (in & StmtStateFlag_no_bounds_check) {
-			out |= StmtStateFlag_no_bounds_check;
-			out &= ~StmtStateFlag_bounds_check;
-		} else {
-		// if (in & StmtStateFlag_bounds_check) {
-			out |= StmtStateFlag_bounds_check;
-			out &= ~StmtStateFlag_no_bounds_check;
+		if (in & StateFlag_no_bounds_check) {
+			out |= StateFlag_no_bounds_check;
+			out &= ~StateFlag_bounds_check;
+		} else if (in & StateFlag_bounds_check) {
+			out |= StateFlag_bounds_check;
+			out &= ~StateFlag_no_bounds_check;
 		}
 
-		ctx->stmt_state_flags = out;
+		ctx->state_flags = out;
 	}
 
 	check_stmt_internal(ctx, node, flags);
 
-	ctx->stmt_state_flags = prev_stmt_state_flags;
+	ctx->state_flags = prev_state_flags;
 }
 
 

@@ -12,7 +12,7 @@ struct irModule {
 	gbAllocator   tmp_allocator;
 	bool generate_debug_info;
 
-	u64 stmt_state_flags;
+	u64 state_flags;
 
 	// String source_filename;
 	String layout;
@@ -5968,7 +5968,7 @@ void ir_emit_bounds_check(irProcedure *proc, Token token, irValue *index, irValu
 	if (build_context.no_bounds_check) {
 		return;
 	}
-	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
+	if ((proc->module->state_flags & StateFlag_no_bounds_check) != 0) {
 		return;
 	}
 
@@ -5995,7 +5995,7 @@ void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, ir
 	if (build_context.no_bounds_check) {
 		return;
 	}
-	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
+	if ((proc->module->state_flags & StateFlag_no_bounds_check) != 0) {
 		return;
 	}
 
@@ -6034,7 +6034,7 @@ void ir_emit_dynamic_array_bounds_check(irProcedure *proc, Token token, irValue 
 	if (build_context.no_bounds_check) {
 		return;
 	}
-	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
+	if ((proc->module->state_flags & StateFlag_no_bounds_check) != 0) {
 		return;
 	}
 
@@ -6905,6 +6905,24 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr);
 
 irValue *ir_build_expr(irProcedure *proc, Ast *expr) {
+	u64 prev_state_flags = proc->module->state_flags;
+	defer (proc->module->state_flags = prev_state_flags);
+
+	if (expr->state_flags != 0) {
+		u64 in = expr->state_flags;
+		u64 out = proc->module->state_flags;
+
+		if (in & StateFlag_bounds_check) {
+			out |= StateFlag_bounds_check;
+			out &= ~StateFlag_no_bounds_check;
+		} else if (in & StateFlag_no_bounds_check) {
+			out |= StateFlag_no_bounds_check;
+			out &= ~StateFlag_bounds_check;
+		}
+
+		proc->module->state_flags = out;
+	}
+
 	irValue *v = ir_build_expr_internal(proc, expr);
 	return v;
 }
@@ -8857,28 +8875,28 @@ void ir_build_stmt_list(irProcedure *proc, Array<Ast *> stmts) {
 
 void ir_build_stmt_internal(irProcedure *proc, Ast *node);
 void ir_build_stmt(irProcedure *proc, Ast *node) {
-	u64 prev_stmt_state_flags = proc->module->stmt_state_flags;
+	u64 prev_state_flags = proc->module->state_flags;
+	defer (proc->module->state_flags = prev_state_flags);
 
-	if (node->stmt_state_flags != 0) {
-		u64 in = node->stmt_state_flags;
-		u64 out = proc->module->stmt_state_flags;
+	if (node->state_flags != 0) {
+		u64 in = node->state_flags;
+		u64 out = proc->module->state_flags;
 
-		if (in & StmtStateFlag_bounds_check) {
-			out |= StmtStateFlag_bounds_check;
-			out &= ~StmtStateFlag_no_bounds_check;
-		} else if (in & StmtStateFlag_no_bounds_check) {
-			out |= StmtStateFlag_no_bounds_check;
-			out &= ~StmtStateFlag_bounds_check;
+		if (in & StateFlag_bounds_check) {
+			out |= StateFlag_bounds_check;
+			out &= ~StateFlag_no_bounds_check;
+		} else if (in & StateFlag_no_bounds_check) {
+			out |= StateFlag_no_bounds_check;
+			out &= ~StateFlag_bounds_check;
 		}
 
-		proc->module->stmt_state_flags = out;
+		proc->module->state_flags = out;
 	}
 
 	ir_push_debug_location(proc->module, node, proc->debug_scope);
 	ir_build_stmt_internal(proc, node);
 	ir_pop_debug_location(proc->module);
 
-	proc->module->stmt_state_flags = prev_stmt_state_flags;
 }
 
 void ir_build_when_stmt(irProcedure *proc, AstWhenStmt *ws) {
@@ -10483,19 +10501,19 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 	proc->parent = parent;
 
 	if (proc->body != nullptr) {
-		u64 prev_stmt_state_flags = proc->module->stmt_state_flags;
+		u64 prev_state_flags = proc->module->state_flags;
 
 		if (proc->tags != 0) {
 			u64 in = proc->tags;
-			u64 out = proc->module->stmt_state_flags;
+			u64 out = proc->module->state_flags;
 			if (in & ProcTag_bounds_check) {
-				out |= StmtStateFlag_bounds_check;
-				out &= ~StmtStateFlag_no_bounds_check;
+				out |= StateFlag_bounds_check;
+				out &= ~StateFlag_no_bounds_check;
 			} else if (in & ProcTag_no_bounds_check) {
-				out |= StmtStateFlag_no_bounds_check;
-				out &= ~StmtStateFlag_bounds_check;
+				out |= StateFlag_no_bounds_check;
+				out &= ~StateFlag_bounds_check;
 			}
-			proc->module->stmt_state_flags = out;
+			proc->module->state_flags = out;
 		}
 
 		ir_begin_procedure_body(proc);
@@ -10503,7 +10521,7 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 		ir_build_stmt(proc, proc->body);
 		ir_end_procedure_body(proc);
 
-		proc->module->stmt_state_flags = prev_stmt_state_flags;
+		proc->module->state_flags = prev_state_flags;
 	}
 
 	// NOTE(lachsinc): For now we pop the debug location inside ir_end_procedure_body().
@@ -10592,8 +10610,8 @@ void ir_init_module(irModule *m, Checker *c) {
 	map_init(&m->constant_value_to_global, heap_allocator());
 
 	// Default states
-	m->stmt_state_flags = 0;
-	m->stmt_state_flags |= StmtStateFlag_bounds_check;
+	m->state_flags = 0;
+	m->state_flags |= StateFlag_bounds_check;
 
 	{
 		// Add type info data

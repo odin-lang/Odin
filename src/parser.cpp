@@ -1727,7 +1727,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 				syntax_error(operand, "#no_deferred can only be applied to procedure calls");
 				operand = ast_bad_expr(f, token, f->curr_token);
 			}
-			operand->stmt_state_flags |= StmtStateFlag_no_deferred;
+			operand->state_flags |= StateFlag_no_deferred;
 		} */ else if (name.string == "file") {
 			return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "line") { return ast_basic_directive(f, token, name.string);
@@ -1757,6 +1757,20 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 				break;
 			}
 			return original_type;
+		} else if (name.string == "bounds_check") {
+			Ast *operand = parse_expr(f, lhs);
+			operand->state_flags |= StateFlag_bounds_check;
+			if ((operand->state_flags & StateFlag_no_bounds_check) != 0) {
+				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
+			}
+			return operand;
+		} else if (name.string == "no_bounds_check") {
+			Ast *operand = parse_expr(f, lhs);
+			operand->state_flags |= StateFlag_no_bounds_check;
+			if ((operand->state_flags & StateFlag_bounds_check) != 0) {
+				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
+			}
+			return operand;
 		} else {
 			operand = ast_tag_expr(f, token, name, parse_expr(f, false));
 		}
@@ -4025,15 +4039,15 @@ Ast *parse_stmt(AstFile *f) {
 
 		if (tag == "bounds_check") {
 			s = parse_stmt(f);
-			s->stmt_state_flags |= StmtStateFlag_bounds_check;
-			if ((s->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
+			s->state_flags |= StateFlag_bounds_check;
+			if ((s->state_flags & StateFlag_no_bounds_check) != 0) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
 		} else if (tag == "no_bounds_check") {
 			s = parse_stmt(f);
-			s->stmt_state_flags |= StmtStateFlag_no_bounds_check;
-			if ((s->stmt_state_flags & StmtStateFlag_bounds_check) != 0) {
+			s->state_flags |= StateFlag_no_bounds_check;
+			if ((s->state_flags & StateFlag_bounds_check) != 0) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
