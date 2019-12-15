@@ -7299,7 +7299,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					}
 
 					fields_visited[sel.index[0]] = true;
-					check_expr_with_type_hint(c, o, fv->value, field->type);
+					check_expr_or_type(c, o, fv->value, field->type);
 
 					if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type)) {
 						is_constant = false;
@@ -7307,7 +7307,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					if (is_constant) {
 						is_constant = o->mode == Addressing_Constant;
 					}
-
 
 					check_assignment(c, o, field->type, str_lit("structure literal"));
 				}
@@ -7334,9 +7333,9 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						field = t->Struct.fields[index];
 					}
 
-					check_expr_with_type_hint(c, o, elem, field->type);
+					check_expr_or_type(c, o, elem, field->type);
 
-					if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type)) {
+					if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
 						is_constant = false;
 					}
 					if (is_constant) {

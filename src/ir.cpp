@@ -8184,6 +8184,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 						Selection sel = lookup_field(bt, name, false);
 						index = sel.index[0];
 						elem = fv->value;
+						TypeAndValue tav = type_and_value_of_expr(elem);
 					} else {
 						TypeAndValue tav = type_and_value_of_expr(elem);
 						Selection sel = lookup_field_from_index(bt, st->fields[field_index]->Variable.field_src_index);
@@ -8192,11 +8193,12 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 					field = st->fields[index];
 					Type *ft = field->type;
-					if (!is_raw_union && ir_is_elem_const(proc->module, elem, ft)) {
+					if (!is_raw_union && !is_type_typeid(ft) && ir_is_elem_const(proc->module, elem, ft)) {
 						continue;
 					}
 
 					field_expr = ir_build_expr(proc, elem);
+
 
 					GB_ASSERT(ir_type(field_expr)->kind != Type_Tuple);
 
