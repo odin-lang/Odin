@@ -71,7 +71,12 @@ HashKey hash_exact_value(ExactValue v) {
 	case ExactValue_String:
 		return hash_string(v.value_string);
 	case ExactValue_Integer:
-		return hashing_proc(big_int_ptr(&v.value_integer), v.value_integer.len * gb_size_of(u64));
+		{
+			HashKey key = hashing_proc(big_int_ptr(&v.value_integer), v.value_integer.len * gb_size_of(u64));
+			u8 last = (u8)v.value_integer.neg;
+			key.key = (key.key ^ last) * 0x100000001b3ll;
+			return key;
+		}
 	case ExactValue_Float:
 		return hash_f64(v.value_float);
 	case ExactValue_Pointer:

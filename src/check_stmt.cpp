@@ -550,6 +550,7 @@ struct TypeAndToken {
 	Token token;
 };
 
+
 void add_constant_switch_case(CheckerContext *ctx, Map<TypeAndToken> *seen, Operand operand, bool use_expr = true) {
 	if (operand.mode != Addressing_Constant) {
 		return;
@@ -567,23 +568,25 @@ void add_constant_switch_case(CheckerContext *ctx, Map<TypeAndToken> *seen, Oper
 		multi_map_get_all(seen, key, taps);
 		for (isize i = 0; i < count; i++) {
 			TypeAndToken tap = taps[i];
-			if (are_types_identical(operand.type, tap.type)) {
-				TokenPos pos = tap.token.pos;
-				if (use_expr) {
-					gbString expr_str = expr_to_string(operand.expr);
-					error(operand.expr,
-					      "Duplicate case '%s'\n"
-					      "\tprevious case at %.*s(%td:%td)",
-					      expr_str,
-					      LIT(pos.file), pos.line, pos.column);
-					gb_string_free(expr_str);
-				} else {
-					error(operand.expr,
-					      "Duplicate case found with previous case at %.*s(%td:%td)",
-					      LIT(pos.file), pos.line, pos.column);
-				}
-				return;
+			if (!are_types_identical(operand.type, tap.type)) {
+				continue;
 			}
+
+			TokenPos pos = tap.token.pos;
+			if (use_expr) {
+				gbString expr_str = expr_to_string(operand.expr);
+				error(operand.expr,
+				      "Duplicate case '%s'\n"
+				      "\tprevious case at %.*s(%td:%td)",
+				      expr_str,
+				      LIT(pos.file), pos.line, pos.column);
+				gb_string_free(expr_str);
+			} else {
+				error(operand.expr,
+				      "Duplicate case found with previous case at %.*s(%td:%td)",
+				      LIT(pos.file), pos.line, pos.column);
+			}
+			return;
 		}
 	}
 
