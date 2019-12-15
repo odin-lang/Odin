@@ -184,11 +184,11 @@ enum ProcCallingConvention {
 	ProcCC_ForeignBlockDefault = -1,
 };
 
-enum StmtStateFlag {
-	StmtStateFlag_bounds_check    = 1<<0,
-	StmtStateFlag_no_bounds_check = 1<<1,
+enum StateFlag {
+	StateFlag_bounds_check    = 1<<0,
+	StateFlag_no_bounds_check = 1<<1,
 
-	StmtStateFlag_no_deferred = 1<<5,
+	StateFlag_no_deferred = 1<<5,
 };
 
 enum ViralStateFlag {
@@ -573,7 +573,7 @@ isize const ast_variant_sizes[] = {
 
 struct Ast {
 	AstKind      kind;
-	u32          stmt_state_flags;
+	u32          state_flags;
 	u32          viral_state_flags;
 	bool         been_handled;
 	AstFile *    file;

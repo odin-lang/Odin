@@ -3052,7 +3052,7 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 	}
 
 	if (operand.mode == Addressing_Constant &&
-	    (c->stmt_state_flags & StmtStateFlag_no_bounds_check) == 0) {
+	    (c->state_flags & StateFlag_no_bounds_check) == 0) {
 		BigInt i = exact_value_to_integer(operand.value).value_integer;
 		if (i.neg) {
 			gbString expr_str = expr_to_string(operand.expr);
@@ -6974,6 +6974,24 @@ bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValu
 
 
 ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	u32 prev_state_flags = c->state_flags;
+	defer (c->state_flags = prev_state_flags);
+	if (node->state_flags != 0) {
+		u32 in = node->state_flags;
+		u32 out = c->state_flags;
+
+		if (in & StateFlag_no_bounds_check) {
+			out |= StateFlag_no_bounds_check;
+			out &= ~StateFlag_bounds_check;
+		} else if (in & StateFlag_bounds_check) {
+			out |= StateFlag_bounds_check;
+			out &= ~StateFlag_no_bounds_check;
+		}
+
+		c->state_flags = out;
+	}
+
+
 	ExprKind kind = Expr_Stmt;
 
 	o->mode = Addressing_Invalid;

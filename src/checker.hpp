@@ -265,7 +265,7 @@ struct CheckerContext {
 	Scope *        scope;
 	DeclInfo *     decl;
 
-	u32            stmt_state_flags;
+	u32            state_flags;
 	bool           in_defer; // TODO(bill): Actually handle correctly
 	Type *         type_hint;
 

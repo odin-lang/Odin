@@ -332,7 +332,7 @@ void check_open_scope(CheckerContext *c, Ast *node) {
 		break;
 	}
 	c->scope = scope;
-	c->stmt_state_flags |= StmtStateFlag_bounds_check;
+	c->state_flags |= StateFlag_bounds_check;
 }
 
 void check_close_scope(CheckerContext *c) {
@@ -3766,11 +3766,11 @@ void check_proc_info(Checker *c, ProcInfo pi) {
 	bool no_bounds_check = (pi.tags & ProcTag_no_bounds_check) != 0;
 
 	if (bounds_check) {
-		ctx.stmt_state_flags |= StmtStateFlag_bounds_check;
-		ctx.stmt_state_flags &= ~StmtStateFlag_no_bounds_check;
+		ctx.state_flags |= StateFlag_bounds_check;
+		ctx.state_flags &= ~StateFlag_no_bounds_check;
 	} else if (no_bounds_check) {
-		ctx.stmt_state_flags |= StmtStateFlag_no_bounds_check;
-		ctx.stmt_state_flags &= ~StmtStateFlag_bounds_check;
+		ctx.state_flags |= StateFlag_no_bounds_check;
+		ctx.state_flags &= ~StateFlag_bounds_check;
 	}
 
 	check_proc_body(&ctx, pi.token, pi.decl, pi.type, pi.body);
