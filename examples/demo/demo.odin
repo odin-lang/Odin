@@ -1836,4 +1836,3 @@ main :: proc() {
 		soa_struct_layout();
 	}
 }
-
