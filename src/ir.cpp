@@ -91,6 +91,7 @@ enum irDeferExitKind {
 enum irDeferKind {
 	irDefer_Node,
 	irDefer_Instr,
+	irDefer_Proc,
 };
 
 struct irDefer {
@@ -102,6 +103,10 @@ struct irDefer {
 		Ast *stmt;
 		// NOTE(bill): 'instr' will be copied every time to create a new one
 		irValue *instr;
+		struct {
+			irValue *deferred;
+			Array<irValue *> result_as_args;
+		} proc;
 	};
 };
 
@@ -1553,6 +1558,17 @@ irDefer ir_add_defer_instr(irProcedure *proc, isize scope_index, irValue *instr)
 	array_add(&proc->defer_stmts, d);
 	return d;
 }
+
+irDefer ir_add_defer_proc(irProcedure *proc, isize scope_index, irValue *deferred, Array<irValue *> const &result_as_args) {
+	irDefer d = {irDefer_Proc};
+	d.scope_index = proc->scope_index;
+	d.block = proc->curr_block;
+	d.proc.deferred = deferred;
+	d.proc.result_as_args = result_as_args;
+	array_add(&proc->defer_stmts, d);
+	return d;
+}
+
 
 
 
@@ -3202,8 +3218,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 				break;
 			}
 
-			irValue *deferred_call = ir_de_emit(p, ir_emit_call(p, deferred, result_as_args));
-			ir_add_defer_instr(p, p->scope_index, deferred_call);
+			ir_add_defer_proc(p, p->scope_index, deferred, result_as_args);
 		}
 	}
 
@@ -3271,21 +3286,34 @@ void ir_open_scope(irProcedure *proc) {
 	proc->scope_index++;
 }
 
-void ir_close_scope(irProcedure *proc, irDeferExitKind kind, irBlock *block) {
+void ir_close_scope(irProcedure *proc, irDeferExitKind kind, irBlock *block, bool pop_stack=true) {
 	ir_emit_defer_stmts(proc, kind, block);
 	GB_ASSERT(proc->scope_index > 0);
 
 
 	// NOTE(bill): Remove `context`s made in that scope
+
+	isize end_idx = proc->context_stack.count-1;
+	isize pop_count = 0;
+
 	for (;;) {
-		irContextData *end = array_end_ptr(&proc->context_stack);
+		if (end_idx < 0) {
+			break;
+		}
+		irContextData *end = &proc->context_stack[end_idx];
 		if (end == nullptr) {
 			break;
 		}
 		if (end->scope_index != proc->scope_index) {
 			break;
 		}
-		array_pop(&proc->context_stack);
+		end_idx -= 1;
+		pop_count += 1;
+	}
+	if (pop_stack) {
+		for (isize i = 0; i < pop_count; i++) {
+			array_pop(&proc->context_stack);
+		}
 	}
 
 
@@ -6256,6 +6284,8 @@ void ir_build_defer_stmt(irProcedure *proc, irDefer d) {
 		// NOTE(bill): Need to make a new copy
 		irValue *instr = cast(irValue *)gb_alloc_copy(ir_allocator(), d.instr, gb_size_of(irValue));
 		ir_emit(proc, instr);
+	} else if (d.kind == irDefer_Proc) {
+		ir_emit_call(proc, d.proc.deferred, d.proc.result_as_args);
 	}
 }
 
@@ -6957,11 +6987,6 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		}
 		GB_PANIC("nullptr value for expression from identifier: %.*s : %s @ %p", LIT(i->token.string), type_to_string(e->type), expr);
 		return nullptr;
-	case_end;
-
-	case_ast_node(re, RunExpr, expr);
-		// TODO(bill): Run Expression
-		return ir_build_expr(proc, re->expr);
 	case_end;
 
 	case_ast_node(de, DerefExpr, expr);
@@ -9499,7 +9524,6 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 	case_ast_node(is, IfStmt, node);
 		ir_emit_comment(proc, str_lit("IfStmt"));
 		ir_open_scope(proc); // Scope #1
-		defer (ir_close_scope(proc, irDeferExit_Default, nullptr));
 
 		if (is->init != nullptr) {
 			// TODO(bill): Should this have a separate block to begin with?
@@ -9525,7 +9549,9 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			tl->is_block = true;
 		}
 
+		// ir_open_scope(proc);
 		ir_build_stmt(proc, is->body);
+		// ir_close_scope(proc, irDeferExit_Default, nullptr);
 
 		ir_emit_jump(proc, done);
 
@@ -9539,7 +9565,10 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			ir_emit_jump(proc, done);
 		}
 
+
 		ir_start_block(proc, done);
+		ir_close_scope(proc, irDeferExit_Default, nullptr);
+
 	case_end;
 
 	case_ast_node(fs, ForStmt, node);

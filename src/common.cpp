@@ -443,7 +443,7 @@ GB_ALLOCATOR_PROC(arena_allocator_proc) {
 		ptr = arena_alloc(arena, size, alignment);
 		break;
 	case gbAllocation_Free:
-		GB_PANIC("gbAllocation_Free not supported");
+		// GB_PANIC("gbAllocation_Free not supported");
 		break;
 	case gbAllocation_Resize:
 		GB_PANIC("gbAllocation_Resize: not supported");

@@ -191,6 +191,11 @@ enum StmtStateFlag {
 	StmtStateFlag_no_deferred = 1<<5,
 };
 
+enum ViralStateFlag {
+	ViralStateFlag_ContainsDeferredProcedure = 1<<0,
+};
+
+
 enum FieldFlag {
 	FieldFlag_NONE      = 0,
 	FieldFlag_ellipsis  = 1<<0,
@@ -255,7 +260,6 @@ enum StmtAllowFlag {
 AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
 	AST_KIND(TagExpr,      "tag expression",         struct { Token token, name; Ast *expr; }) \
-	AST_KIND(RunExpr,      "run expression",         struct { Token token, name; Ast *expr; }) \
 	AST_KIND(UnaryExpr,    "unary expression",       struct { Token op; Ast *expr; }) \
 	AST_KIND(BinaryExpr,   "binary expression",      struct { Token op; Ast *left, *right; } ) \
 	AST_KIND(ParenExpr,    "parentheses expression", struct { Ast *expr; Token open, close; }) \
@@ -570,9 +574,10 @@ isize const ast_variant_sizes[] = {
 struct Ast {
 	AstKind      kind;
 	u32          stmt_state_flags;
+	u32          viral_state_flags;
+	bool         been_handled;
 	AstFile *    file;
 	Scope *      scope;
-	bool         been_handled;
 	TypeAndValue tav;
 
 	union {
