@@ -116,8 +116,11 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 	if scratch.data == nil {
 		DEFAULT_SCRATCH_BACKING_SIZE :: 1<<22;
+		// NOTE: This assert will fire if you try to allocate from an as-yet-uninitialized
+		// scratch allocator, when that same scratch is already the set as the context.allocator.
+		// You should initialize the scratch manually before trying to allocate through the context.
 		assert(context.allocator.procedure != scratch_allocator_proc &&
-		       context.allocator.data != allocator_data, "you must initialize the scratch before setting `context.allocator` to it");
+		       context.allocator.data != allocator_data);
 		scratch_allocator_init(scratch, make([]byte, 1<<22));
 	}
 
