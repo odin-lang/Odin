@@ -9,8 +9,32 @@ import "core:sys/win32"
 // Resolves a hostname to exactly one IPv4 and IPv6 address.
 // It's then up to you which one you use.
 //
-// Note that which one you pass to `dial` determines the family of the socket.
-// Note also that this procedure _only_ returns ok=false if something went _wrong_.
+// If hostname is actually a string representation of an IP address, this function
+// behaves like `parse_addr`.
+// This allows you to pass a generic endpoint string to this function end reliably get
+// back the endpoint's IP address.
+//
+// ```
+// 	// Maybe you got this from a config file, so you
+//	// don't know if it's a hostname or address.
+//	ep_string := "localhost:9000";
+//
+//	addr_or_host, port, split_ok := net.split_port(ep_string);
+//	assert(split_ok);
+//	port = (port == 0) ? 9000 : port; // returns zero if no port in the string.
+//
+//	// Resolving an address just returns the address.
+//	addr4, addr6, resolve_ok := net.resolve(addr_or_host);
+//	if !resolve_ok {
+//		printf("error: cannot resolve %v\n", addr_or_host);
+//		return;
+//	}
+//	addr := addr4 != nil ? addr4 : addr6; // preferring ipv4.
+//	assert(addr != nil); // means that we did not resolve it to an addresses.
+// ```
+//
+// Note that which address you pass to `dial` determines the type of the socket.
+// Note also that this procedure _only_ returns ok=false if something went _wrong_ with resolution.
 resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6}) -> (ipv4, ipv6: Address, ok: bool) {
 	if addr := parse_addr(hostname); addr != nil {
 		switch a in addr {
@@ -22,19 +46,30 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6
 		return;
 	}
 
+	// NOTE(tetra): We might not have used temporary storage yet,
+	// and get_dns_records uses it by default.
+	// Rather than required the user initializes it manually first,
+	// we just use a stack-arena here instead.
+	// We can do this because the addresses we return are returned by value,
+	// so we don't return data from within this arena.
+	buf: [1024]byte;
+	arena: mem.Arena;
+	mem.init_arena(&arena, buf[:]);
+	allocator := mem.arena_allocator(&arena);
+
 	if .Ipv4 in addr_types {
-		recs, rec_ok := get_dns_records(hostname, .Ipv4);
+		recs, rec_ok := get_dns_records(hostname, .Ipv4, allocator);
 		if !rec_ok do return;
 		if len(recs) > 0 {
-			ipv4 = recs[0].(Dns_Record_Ipv4).addr;
+			ipv4 = recs[0].(Dns_Record_Ipv4).addr; // address is copied
 		}
 	}
 
 	if .Ipv6 in addr_types {
-		recs, rec_ok := get_dns_records(hostname, .Ipv6);
+		recs, rec_ok := get_dns_records(hostname, .Ipv6, allocator);
 		if !rec_ok do return;
 		if len(recs) > 0 {
-			ipv6 = recs[0].(Dns_Record_Ipv6).addr;
+			ipv6 = recs[0].(Dns_Record_Ipv6).addr; // address is copied
 		}
 	}
 
@@ -74,16 +109,17 @@ Dns_Record :: union {
 	Dns_Record_Text,
 }
 
+
 // Performs a recursive DNS query for records of a particular type for the hostname.
 //
 // This procedure instructs the DNS resolver to recursively perform requests on our behalf,
 // meaning that DNS queries for a hostname will resolve through CNAME records.
 //
-// Returns records in temporary storage.
+// Returns records and their data in temporary storage.
 get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := context.temp_allocator) -> (records: []Dns_Record, ok: bool) {
 	context.allocator = allocator;
 
-	host_cstr := strings.clone_to_cstring(hostname);
+	host_cstr := strings.clone_to_cstring(hostname, allocator);
 	assert(host_cstr != nil);
 
 	rec: ^win32.Dns_Record;
@@ -105,7 +141,7 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 	//
 	// BUG: make(x,0,count) doesn't work here...
 	//
-	recs := make([dynamic]Dns_Record);
+	recs := make([dynamic]Dns_Record, allocator);
 	reserve(&recs, count);
 
 	for r := rec; r != nil; r = r.next {

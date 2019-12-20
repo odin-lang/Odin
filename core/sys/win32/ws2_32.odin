@@ -2,6 +2,8 @@ package win32
 
 foreign import "system:Ws2_32.lib"
 
+import "core:c"
+
 @(default_calling_convention="std")
 foreign Ws2_32 {
 	WSAStartup :: proc(version_requested: u32, data: ^WSADATA) -> i32 ---;
@@ -31,6 +33,9 @@ foreign Ws2_32 {
 	@(link_name="setsockopt")   setsockopt :: proc(socket: SOCKET, level: i32, name: i32, value: rawptr, length: i32) -> i32 ---;
 	@(link_name="getsockopt")   getsockopt :: proc(socket: SOCKET, level: i32, name: i32, value: rawptr, length: ^i32) -> i32 ---;
 	@(link_name="freeaddrinfo") freeaddrinfo :: proc(info: ^addrinfo) ---;
+
+	@(link_name="ioctlsocket")  ioctlsocket :: proc(skt: SOCKET, cmd: c.ulong, value: ^c.ulong) -> i32 ---;
+	@(link_name="select")       select :: proc(ignored: i32, read_fds, write_fds, except_fds: ^fd_set, timeout: ^TIMEVAL) -> i32 ---;
 
 	WSASocket :: proc(family: i32, type: i32, protocol: i32, proto_info: rawptr, group: i32, flags: u32) ---;
 
@@ -285,8 +290,8 @@ SO_EXCLUSIVEADDRUSE :: ~i32(SO_REUSEADDR); // disallow local address reuse
 
 SO_SNDBUF :: 0x1001; // send buffer size
 SO_RCVBUF :: 0x1002; // receive buffer size
-SO_SNDLOWAT :: 0x1003; // send low-water mark
-SO_RCVLOWAT :: 0x1004; // receive low-water mark
+SO_SNDLOWAT :: 0x1003; // read at least this much, or none
+SO_RCVLOWAT :: 0x1004; // write at least this much, or none
 SO_SNDTIMEO :: 0x1005; // send timeout
 SO_RCVTIMEO :: 0x1006; // receive timeout
 SO_ERROR :: 0x1007; // get error status and clear
@@ -309,6 +314,8 @@ SO_RANDOMIZE_PORT :: 0x3005; // randomize assignment of wildcard ports
 SO_PORT_SCALABILITY :: 0x3006; // enable port scalability
 SO_REUSE_UNICASTPORT :: 0x3007; // defer ephemeral port allocation for outbound connections
 SO_REUSE_MULTICASTPORT :: 0x3008; // enable port reuse and disable unicast reception.
+
+SO_MAXDG :: 0x7009; // maximum datagram size.
 
 IP_OPTIONS 					:: 1; // Set/get IP options.
 IP_HDRINCL 					:: 2; // Header is included with data.
@@ -414,4 +421,20 @@ WSAOVERLAPPED :: struct {
 	_, _: u32,
 	_, _: u32,
 	hevent: WSAEVENT,
+}
+
+
+
+FIONBIO :: c.ulong(0x80000000 | ((size_of(c.ulong) & 0x7f) << 16) | (c.ulong('f') << 8) | 126);
+
+FD_SETSIZE :: 64;
+
+fd_set :: struct {
+	count: c.uint,
+	array: [FD_SETSIZE]SOCKET,
+}
+
+TIMEVAL :: struct {
+	tv_sec: c.long,  // seconds
+	tv_usec: c.long, // microseconds
 }
