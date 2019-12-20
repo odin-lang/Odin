@@ -178,8 +178,7 @@ start_dial :: proc(addr: Address, port: int, type := Socket_Type.Tcp) -> (skt: S
 		return;
 	}
 
-	assert(set_option(skt, .Inline_Out_Of_Band, true) == .Ok);
-	assert(set_option(skt, .Write_Buffer_Size, i32(2)) == .Ok);
+	if type != .Udp do assert(set_option(skt, .Inline_Out_Of_Band, true) == .Ok);
 
 	native_addr, native_addr_size := to_socket_address(addr, port);
 	res := win32.connect(skt.handle, &native_addr, native_addr_size);
@@ -693,8 +692,8 @@ Accept_Option :: enum {
 	Wait_For_Client,
 }
 
-try_accept :: proc(skt: Socket, options := Accept_Option.Check_For_Client) -> (peer: Socket, remote_ep: Endpoint, accepted: bool, err: Accept_Error) {
-	if options == .Wait_For_Client {
+try_accept :: proc(skt: Socket, option := Accept_Option.Check_For_Client) -> (peer: Socket, remote_ep: Endpoint, accepted: bool, err: Accept_Error) {
+	if option == .Wait_For_Client {
 		wait_err := wait_for_readable(skt);
 		if wait_err != .Ok {
 			err = Accept_Error(wait_err);
