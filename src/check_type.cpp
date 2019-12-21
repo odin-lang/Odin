@@ -80,15 +80,19 @@ void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field
 		switch (t->Array.count) {
 		case 4:
 			populate_using_array_index(ctx, node, field, t, str_lit("w"), 3);
+			populate_using_array_index(ctx, node, field, t, str_lit("a"), 3);
 			/*fallthrough*/
 		case 3:
 			populate_using_array_index(ctx, node, field, t, str_lit("z"), 2);
+			populate_using_array_index(ctx, node, field, t, str_lit("b"), 2);
 			/*fallthrough*/
 		case 2:
 			populate_using_array_index(ctx, node, field, t, str_lit("y"), 1);
+			populate_using_array_index(ctx, node, field, t, str_lit("g"), 1);
 			/*fallthrough*/
 		case 1:
 			populate_using_array_index(ctx, node, field, t, str_lit("x"), 0);
+			populate_using_array_index(ctx, node, field, t, str_lit("r"), 0);
 			/*fallthrough*/
 		default:
 			break;
