@@ -3771,6 +3771,11 @@ Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 		s = ast_import_decl(f, token, is_using, file_path, import_name, docs, f->line_comment);
 		array_add(&f->imports, s);
 	}
+
+	if (is_using) {
+		syntax_warning(import_name, "'using import' is deprecated, please use the import name explicitly");
+	}
+
 	expect_semicolon(f, s);
 	return s;
 }
