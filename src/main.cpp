@@ -177,6 +177,9 @@ void usage(String argv0) {
 	print_usage_line(1, "query     parse, type check, and output a .json file containing information about the program");
 	print_usage_line(1, "docs      generate documentation for a .odin file");
 	print_usage_line(1, "version   print version");
+	print_usage_line(0, "");
+	print_usage_line(0, "For more information of flags, apply the flag to see what is possible");
+	print_usage_line(1, "-help");
 }
 
 
@@ -212,6 +215,8 @@ bool string_is_valid_identifier(String str) {
 
 enum BuildFlagKind {
 	BuildFlag_Invalid,
+
+	BuildFlag_Help,
 
 	BuildFlag_OutFile,
 	BuildFlag_OptimizationLevel,
@@ -301,6 +306,7 @@ ExactValue build_param_to_exact_value(String name, String param) {
 
 bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
+	add_flag(&build_flags, BuildFlag_Help,              str_lit("help"),              BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),               BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),               BuildFlagParam_Integer);
 	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),      BuildFlagParam_None);
@@ -447,6 +453,10 @@ bool parse_build_flags(Array<String> args) {
 						}
 
 						if (ok) switch (bf.kind) {
+						case BuildFlag_Help:
+							build_context.show_help = true;
+							break;
+
 						case BuildFlag_OutFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
@@ -616,7 +626,7 @@ bool parse_build_flags(Array<String> args) {
 							String str = value.value_string;
 							bool found = false;
 
-							for (int i = 0; i < sizeof(named_targets) / sizeof(named_targets[0]); i++) {
+							for (isize i = 0; i < gb_count_of(named_targets); i++) {
 								if (str_eq_ignore_case(str, named_targets[i].name)) {
 									found = true;
 									selected_target_metrics = named_targets + i;
@@ -1023,6 +1033,131 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
+	if (build_context.show_help) {
+		print_usage_line(0, "%.*s is a tool for managing Odin source code", LIT(args[0]));
+		print_usage_line(0, "Usage");
+		print_usage_line(1, "%.*s %.*s [arguments]", LIT(args[0]), LIT(command));
+		print_usage_line(0, "");
+
+		bool build = command == "build";
+		bool run_or_build = command == "run" || command == "build";
+		bool check = command == "run" || command == "build" || command == "check";
+
+
+		if (run_or_build) {
+			print_usage_line(1, "-out:<filepath>");
+			print_usage_line(2, "Set the file name of the outputted executable");
+			print_usage_line(2, "Example: -out:foo.exe");
+			print_usage_line(0, "");
+
+			print_usage_line(1, "-opt:<integer>");
+			print_usage_line(2, "Set the optimization level for complication");
+			print_usage_line(2, "Accepted values: 0, 1, 2, 3");
+			print_usage_line(2, "Example: -opt:2");
+			print_usage_line(0, "");
+		}
+
+		if (check) {
+			print_usage_line(1, "-show-timings");
+			print_usage_line(2, "Shows basic overview of the timings of different stages within the compiler in milliseconds");
+			print_usage_line(0, "");
+
+			print_usage_line(1, "-show-more-timings");
+			print_usage_line(2, "Shows an advanced overview of the timings of different stages within the compiler in milliseconds");
+			print_usage_line(0, "");
+
+			print_usage_line(1, "-thread-count:<integer>");
+			print_usage_line(2, "Override the number of threads the compiler will use to compile with");
+			print_usage_line(2, "Example: -thread-count:2");
+			print_usage_line(0, "");
+		}
+
+		if (run_or_build) {
+			print_usage_line(1, "-keep-temp-files");
+			print_usage_line(2, "Keeps the temporary files generated during compilation");
+			print_usage_line(0, "");
+		}
+
+		if (check) {
+			print_usage_line(1, "-collection:<name>=<filepath>");
+			print_usage_line(2, "Defines a library collection used for imports");
+			print_usage_line(2, "Example: -collection:shared:dir/to/shared");
+			print_usage_line(2, "Usage in Code:");
+			print_usage_line(3, "import \"shared:foo\"");
+			print_usage_line(0, "");
+
+			print_usage_line(1, "-define:<name>=<expression>");
+			print_usage_line(2, "Defines a global constant with a value");
+			print_usage_line(2, "Example: -define:SPAM=123");
+			print_usage_line(0, "");
+		}
+
+		if (build) {
+			print_usage_line(1, "-build-mode:<mode>");
+			print_usage_line(2, "Sets the build mode");
+			print_usage_line(2, "Available options:");
+			print_usage_line(3, "-build-mode:exe       Build as an executable");
+			print_usage_line(3, "-build-mode:dll       Build as a dynamically linked library");
+			print_usage_line(3, "-build-mode:shared    Build as a dynamically linked library");
+			print_usage_line(0, "");
+		}
+
+		if (check) {
+			print_usage_line(1, "-target:<string>");
+			print_usage_line(2, "Sets the target for the executable to be built in");
+			print_usage_line(0, "");
+		}
+
+		if (run_or_build) {
+			print_usage_line(1, "-debug");
+			print_usage_line(2, "Enabled debug information, and defines the global constant ODIN_DEBUG to be 'true'");
+			print_usage_line(0, "");
+
+			print_usage_line(1, "-no-bounds-check");
+			print_usage_line(2, "Disables bounds checking program wide");
+			print_usage_line(0, "");
+
+			print_usage_line(1, "-no-crt");
+			print_usage_line(2, "Disables automatic linking with the C Run Time");
+			print_usage_line(0, "");
+
+			print_usage_line(1, "-use-lld");
+			print_usage_line(2, "Use the LLD linker rather than the default");
+			print_usage_line(0, "");
+		}
+
+		if (check) {
+			print_usage_line(1, "-vet");
+			print_usage_line(2, "Do extra checks on the code");
+			print_usage_line(2, "Extra checks include:");
+			print_usage_line(3, "Variable shadowing within procedures");
+			print_usage_line(3, "Unused declarations");
+			print_usage_line(0, "");
+
+			print_usage_line(1, "-ignore-unknown-attributes");
+			print_usage_line(2, "Ignores unknown attributes");
+			print_usage_line(2, "This can be used with metaprogramming tools");
+			print_usage_line(0, "");
+		}
+
+		if (run_or_build) {
+			#if defined(GB_SYSTEM_WINDOWS)
+			print_usage_line(1, "-resource:<filepath>");
+			print_usage_line(2, "[Windows only]");
+			print_usage_line(2, "Defines the resource file for the executable");
+			print_usage_line(2, "Example: -resource:path/to/file.rc");
+			print_usage_line(0, "");
+
+			print_usage_line(1, "-pdb-name:<filepath>");
+			print_usage_line(2, "[Windows only]");
+			print_usage_line(2, "Defines the generated PDB name when -debug is enabled");
+			print_usage_line(2, "Example: -pdb-name:different.pdb");
+			print_usage_line(0, "");
+			#endif
+		}
+		return 0;
+	}
+
 
 
 	// NOTE(bill): add 'shared' directory if it is not already set
@@ -1180,7 +1315,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 		// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
 		Find_Result_Utf8 find_result = find_visual_studio_and_windows_sdk_utf8();
-		// defer(free_resources(&find_result));
+		// defer(free_"resource"s(&find_result));
 
 		if (find_result.windows_sdk_version == 0) {
 			gb_printf_err("Windows SDK not found.\n");

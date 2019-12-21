@@ -102,6 +102,8 @@ struct BuildContext {
 
 	TargetMetrics metrics;
 
+	bool show_help;
+
 	String out_filepath;
 	String resource_filepath;
 	String pdb_filepath;
