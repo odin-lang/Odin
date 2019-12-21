@@ -1,6 +1,6 @@
 package strconv
 
-using import "decimal"
+import "decimal"
 
 Decimal_Slice :: struct {
 	digits:        []byte,
@@ -61,10 +61,10 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int)
 
 	exp += flt.bias;
 
-	d_: Decimal;
+	d_: decimal.Decimal;
 	d := &d_;
-	assign(d, mant);
-	shift(d, exp - int(flt.mantbits));
+	decimal.assign(d, mant);
+	decimal.shift(d, exp - int(flt.mantbits));
 	digs: Decimal_Slice;
 	prec := precision;
 	shortest := prec < 0;
@@ -78,13 +78,13 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int)
 		}
 	} else {
 		switch fmt {
-		case 'e', 'E': round(d, prec+1);
-		case 'f', 'F': round(d, d.decimal_point+prec);
+		case 'e', 'E': decimal.round(d, prec+1);
+		case 'f', 'F': decimal.round(d, d.decimal_point+prec);
 		case 'g', 'G':
 			if prec == 0 {
 				prec = 1;
 			}
-			round(d, prec);
+			decimal.round(d, prec);
 		}
 
 		digs = Decimal_Slice{digits = d.digits[:], count = d.count, decimal_point = d.decimal_point};
@@ -213,7 +213,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 
 }
 
-round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
+round_shortest :: proc(d: ^decimal.Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 	if mant == 0 { // If mantissa is zero, the number is zero
 		d.count = 0;
 		return;
@@ -231,9 +231,9 @@ round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 		return;
 	}
 
-	upper_: Decimal; upper := &upper_;
-	assign(upper, 2*mant - 1);
-	shift(upper, exp - int(flt.mantbits) - 1);
+	upper_: decimal.Decimal; upper := &upper_;
+	decimal.assign(upper, 2*mant - 1);
+	decimal.shift(upper, exp - int(flt.mantbits) - 1);
 
 	mantlo: u64;
 	explo:  int;
@@ -244,9 +244,9 @@ round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 		mantlo = 2*mant - 1;
 		explo = exp-1;
 	}
-	lower_: Decimal; lower := &lower_;
-	assign(lower, 2*mantlo + 1);
-	shift(lower, explo - int(flt.mantbits) - 1);
+	lower_: decimal.Decimal; lower := &lower_;
+	decimal.assign(lower, 2*mantlo + 1);
+	decimal.shift(lower, explo - int(flt.mantbits) - 1);
 
 	inclusive := mant%2 == 0;
 
@@ -265,15 +265,15 @@ round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 		ok_round_up   := m != u && (inclusive || m+1 < u || i+1 < upper.count);
 
 		if ok_round_down && ok_round_up {
-			round(d, i+1);
+			decimal.round(d, i+1);
 			return;
 		}
 		if ok_round_down {
-			round_down(d, i+1);
+			decimal.round_down(d, i+1);
 			return;
 		}
 		if ok_round_up {
-			round_up(d, i+1);
+			decimal.round_up(d, i+1);
 			return;
 		}
 	}
