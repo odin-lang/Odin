@@ -330,7 +330,7 @@ DeclInfo *   decl_info_of_ident     (Ast *ident);
 DeclInfo *   decl_info_of_entity    (Entity * e);
 AstFile *    ast_file_of_filename   (CheckerInfo *i, String   filename);
 // IMPORTANT: Only to use once checking is done
-isize        type_info_index        (CheckerInfo *i, Type *   type, bool error_on_failure = true);
+isize        type_info_index        (CheckerInfo *i, Type *type, bool error_on_failure);
 
 // Will return nullptr if not found
 Entity *entity_of_node(Ast *expr);

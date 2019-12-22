@@ -157,6 +157,7 @@ trunc_f32 :: proc(x: f32) -> f32 {
 	switch classify(x) {
 	case .Zero, .Neg_Zero, .NaN, .Inf, .Neg_Inf:
 		return x;
+	case .Normal, .Subnormal: // carry on
 	}
 	return trunc_internal(x);
 }
@@ -186,6 +187,7 @@ trunc_f64 :: proc(x: f64) -> f64 {
 	switch classify(x) {
 	case .Zero, .Neg_Zero, .NaN, .Inf, .Neg_Inf:
 		return x;
+	case .Normal, .Subnormal: // carry on
 	}
 	return trunc_internal(x);
 }
