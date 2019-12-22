@@ -4,7 +4,14 @@
 set exe_name=odin.exe
 
 :: Debug = 0, Release = 1
-set release_mode=0
+if "%1" == "1" (
+	set release_mode=1
+) else if "%1" == "release" (
+	set release_mode=1
+) else (
+	set release_mode=0
+)
+
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -GS- -EHsc- -GR-
 
 if %release_mode% EQU 0 ( rem Debug
