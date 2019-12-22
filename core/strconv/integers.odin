@@ -113,7 +113,7 @@ is_integer_negative_128 :: proc(x: u128, is_signed: bool, bit_size: int) -> (u: 
 	return;
 }
 
-import "core:runtime"
+// import "core:runtime"
 
 append_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
 	if base < 2 || base > MAX_BASE {
