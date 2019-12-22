@@ -313,7 +313,7 @@ is_literal  :: proc(kind: Token_Kind) -> bool {
 	return Token_Kind.B_Literal_Begin  < kind && kind < Token_Kind.B_Literal_End;
 }
 is_operator :: proc(kind: Token_Kind) -> bool {
-	switch kind {
+	#partial switch kind {
 	case .B_Operator_Begin .. .B_Operator_End:
 		return true;
 	case .In, .Notin:

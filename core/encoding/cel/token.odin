@@ -137,7 +137,7 @@ kind_to_string := [len(Kind)]string{
 };
 
 precedence :: proc(op: Kind) -> int {
-	switch op {
+	#partial switch op {
 	case Question:
 		return 1;
 	case Or:

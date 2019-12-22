@@ -37,7 +37,7 @@ Type_Kind :: enum {
 type_kind :: proc(T: typeid) -> Type_Kind {
 	ti := type_info_of(T);
 	if ti != nil {
-		#complete switch _ in ti.variant {
+		switch _ in ti.variant {
 		case runtime.Type_Info_Named:         return .Named;
 		case runtime.Type_Info_Integer:       return .Integer;
 		case runtime.Type_Info_Rune:          return .Rune;

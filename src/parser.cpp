@@ -766,6 +766,7 @@ Ast *ast_switch_stmt(AstFile *f, Token token, Ast *init, Ast *tag, Ast *body) {
 	result->SwitchStmt.init  = init;
 	result->SwitchStmt.tag   = tag;
 	result->SwitchStmt.body  = body;
+	result->SwitchStmt.partial = false;
 	return result;
 }
 
@@ -775,6 +776,7 @@ Ast *ast_type_switch_stmt(AstFile *f, Token token, Ast *tag, Ast *body) {
 	result->TypeSwitchStmt.token = token;
 	result->TypeSwitchStmt.tag   = tag;
 	result->TypeSwitchStmt.body  = body;
+	result->TypeSwitchStmt.partial = false;
 	return result;
 }
 
@@ -4060,13 +4062,29 @@ Ast *parse_stmt(AstFile *f) {
 			s = parse_stmt(f);
 			switch (s->kind) {
 			case Ast_SwitchStmt:
-				s->SwitchStmt.complete = true;
+				s->SwitchStmt.partial = false;
+				syntax_warning(token, "#complete is now the default and has been replaced with its opposite: #partial");
 				break;
 			case Ast_TypeSwitchStmt:
-				s->TypeSwitchStmt.complete = true;
+				s->TypeSwitchStmt.partial = false;
+				syntax_warning(token, "#complete is now the default and has been replaced with its opposite: #partial");
 				break;
 			default:
 				syntax_error(token, "#complete can only be applied to a switch statement");
+				break;
+			}
+			return s;
+		} else if (tag == "partial") {
+			s = parse_stmt(f);
+			switch (s->kind) {
+			case Ast_SwitchStmt:
+				s->SwitchStmt.partial = true;
+				break;
+			case Ast_TypeSwitchStmt:
+				s->TypeSwitchStmt.partial = true;
+				break;
+			default:
+				syntax_error(token, "#partial can only be applied to a switch statement");
 				break;
 			}
 			return s;

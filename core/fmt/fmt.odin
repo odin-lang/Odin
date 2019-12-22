@@ -794,7 +794,7 @@ enum_value_to_string :: proc(val: any) -> (string, bool) {
 	v.id = runtime.typeid_base(v.id);
 	type_info := type_info_of(v.id);
 
-	switch e in type_info.variant {
+	#partial switch e in type_info.variant {
 	case: return "", false;
 	case runtime.Type_Info_Enum:
 		get_str :: proc(i: $T, e: runtime.Type_Info_Enum) -> (string, bool) {
@@ -857,7 +857,7 @@ fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 	}
 
 	type_info := type_info_of(v.id);
-	switch e in type_info.variant {
+	#partial switch e in type_info.variant {
 	case: fmt_bad_verb(fi, verb);
 	case runtime.Type_Info_Enum:
 		switch verb {
@@ -898,7 +898,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 			return false;
 		}
 		t := runtime.type_info_base(ti);
-		switch info in t.variant {
+		#partial switch info in t.variant {
 		case runtime.Type_Info_Integer:
 			switch info.endianness {
 			case .Platform: return false;
@@ -912,7 +912,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 	byte_swap :: bits.byte_swap;
 
 	type_info := type_info_of(v.id);
-	switch info in type_info.variant {
+	#partial switch info in type_info.variant {
 	case runtime.Type_Info_Named:
 		val := v;
 		val.id = info.base.id;
@@ -982,7 +982,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 }
 fmt_bit_field :: proc(fi: ^Info, v: any, bit_field_name: string = "") {
 	type_info := type_info_of(v.id);
-	switch info in type_info.variant {
+	#partial switch info in type_info.variant {
 	case runtime.Type_Info_Named:
 		val := v;
 		val.id = info.base.id;
@@ -1052,7 +1052,7 @@ fmt_opaque :: proc(fi: ^Info, v: any) {
 		strings.write_byte(fi.buf, '{');
 		defer strings.write_byte(fi.buf, '}');
 
-		switch in elem.variant {
+		#partial switch in elem.variant {
 		case rt.Type_Info_Integer, rt.Type_Info_Pointer, rt.Type_Info_Float:
 			fmt_value(fi, any{v.data, elem.id}, 'v');
 		case:
@@ -1073,8 +1073,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	type_info := type_info_of(v.id);
 	switch info in type_info.variant {
+	case runtime.Type_Info_Any:   // Ignore
+	case runtime.Type_Info_Tuple: // Ignore
+
 	case runtime.Type_Info_Named:
-		switch b in info.base.variant {
+		#partial switch b in info.base.variant {
 		case runtime.Type_Info_Struct:
 			if verb != 'v' {
 				fmt_bad_verb(fi, verb);
@@ -1193,7 +1196,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				a := any{ptr, info.elem.id};
 
 				elem := runtime.type_info_base(info.elem);
-				if elem != nil do switch e in elem.variant {
+				if elem != nil do #partial switch e in elem.variant {
 				case runtime.Type_Info_Array,
 				     runtime.Type_Info_Slice,
 				     runtime.Type_Info_Dynamic_Array,

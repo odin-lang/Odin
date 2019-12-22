@@ -390,7 +390,7 @@ expect_semicolon :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 				return true;
 			}
 		} else {
-			switch p.curr_tok.kind {
+			#partial switch p.curr_tok.kind {
 			case .Close_Brace:
 			case .Close_Paren:
 			case .Else:
@@ -475,7 +475,7 @@ parse_when_stmt :: proc(p: ^Parser) -> ^ast.When_Stmt {
 	}
 
 	if allow_token(p, .Else) {
-		switch p.curr_tok.kind {
+		#partial switch p.curr_tok.kind {
 		case .When:
 			else_stmt = parse_when_stmt(p);
 		case .Open_Brace:
@@ -550,7 +550,7 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 	}
 
 	if allow_token(p, .Else) {
-		switch p.curr_tok.kind {
+		#partial switch p.curr_tok.kind {
 		case .If:
 			else_stmt = parse_if_stmt(p);
 		case .Open_Brace:
@@ -859,7 +859,7 @@ parse_foreign_block :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Foreign_Bl
 	docs := p.lead_comment;
 
 	foreign_library: ^ast.Expr;
-	switch p.curr_tok.kind {
+	#partial switch p.curr_tok.kind {
 	case .Open_Brace:
 		i := ast.new(ast.Ident, tok.pos, end_pos(tok));
 		i.name = "_";
@@ -901,7 +901,7 @@ parse_foreign_decl :: proc(p: ^Parser) -> ^ast.Decl {
 	docs := p.lead_comment;
 	tok := expect_token(p, .Foreign);
 
-	switch p.curr_tok.kind {
+	#partial switch p.curr_tok.kind {
 	case .Ident, .Open_Brace:
 		return parse_foreign_block(p, tok);
 
@@ -955,7 +955,7 @@ parse_foreign_decl :: proc(p: ^Parser) -> ^ast.Decl {
 
 
 parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
-	switch p.curr_tok.kind {
+	#partial switch p.curr_tok.kind {
 	// Operands
 	case .Context, // Also allows for 'context = '
 	     .Proc,
@@ -1086,12 +1086,12 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 				stmt.state_flags |= {.No_Bounds_Check};
 			}
 			return stmt;
-		case "complete":
+		case "partial":
 			stmt := parse_stmt(p);
 			switch s in &stmt.derived {
-			case ast.Switch_Stmt:      s.complete = true;
-			case ast.Type_Switch_Stmt: s.complete = true;
-			case: error(p, stmt.pos, "#complete can only be applied to a switch statement");
+			case ast.Switch_Stmt:      s.partial = true;
+			case ast.Type_Switch_Stmt: s.partial = true;
+			case: error(p, stmt.pos, "#partial can only be applied to a switch statement");
 			}
 			return stmt;
 		case "assert", "panic":
@@ -1130,7 +1130,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 
 token_precedence :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> int {
-	switch kind {
+	#partial switch kind {
 	case .Question:
 		return 1;
 	case .Ellipsis, .Range_Half:
@@ -1308,7 +1308,7 @@ convert_to_ident_list :: proc(p: ^Parser, list: []Expr_And_Flags, ignore_flags, 
 
 is_token_field_prefix :: proc(p: ^Parser) -> Field_Prefix {
 	using Field_Prefix;
-	switch p.curr_tok.kind {
+	#partial switch p.curr_tok.kind {
 	case .EOF:
 		return Invalid;
 	case .Using:
@@ -1323,7 +1323,7 @@ is_token_field_prefix :: proc(p: ^Parser) -> Field_Prefix {
 	case .Hash:
 		advance_token(p);
 		defer advance_token(p);
-		switch p.curr_tok.kind {
+		#partial switch p.curr_tok.kind {
 		case .Ident:
 			switch p.curr_tok.text {
 			case "no_alias":
@@ -1359,7 +1359,7 @@ parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
 	for kind in Field_Prefix {
 		count := counts[kind];
 		using Field_Prefix;
-		#complete switch kind {
+		switch kind {
 		case Invalid, Unknown: // Ignore
 		case Using:
 			if count > 1 do error(p, p.curr_tok.pos, "multiple 'using' in this field list");
@@ -1391,7 +1391,7 @@ check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, se
 
 	for flag in ast.Field_Flag {
 		if flag notin allowed_flags && flag in flags {
-			#complete switch flag {
+			switch flag {
 			case .Using:
 				error(p, p.curr_tok.pos, "'using' is not allowed within this field list");
 			case .No_Alias:
@@ -1832,7 +1832,7 @@ check_poly_params_for_type :: proc(p: ^Parser, poly_params: ^ast.Field_List, tok
 
 
 parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
-	switch p.curr_tok.kind {
+	#partial switch p.curr_tok.kind {
 	case .Ident:
 		return parse_ident(p);
 
@@ -1945,7 +1945,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		expr := parse_unary_expr(p, lhs);
 
 		pi := ast.Proc_Inlining.None;
-		switch tok.kind {
+		#partial switch tok.kind {
 		case .Inline:
 			pi = ast.Proc_Inlining.Inline;
 		case .No_Inline:
@@ -2537,7 +2537,7 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 	loop := true;
 	is_lhs := lhs;
 	for loop {
-		switch p.curr_tok.kind {
+		#partial switch p.curr_tok.kind {
 		case:
 			loop = false;
 
@@ -2556,7 +2556,7 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 			p.expr_level += 1;
 			open := expect_token(p, .Open_Bracket);
 
-			switch p.curr_tok.kind {
+			#partial switch p.curr_tok.kind {
 			case .Colon, .Ellipsis, .Range_Half:
 				// NOTE(bill): Do not err yet
 				break;
@@ -2564,7 +2564,7 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 				indicies[0] = parse_expr(p, false);
 			}
 
-			switch p.curr_tok.kind {
+			#partial switch p.curr_tok.kind {
 			case .Ellipsis, .Range_Half:
 				error(p, p.curr_tok.pos, "expected a colon, not a range");
 				fallthrough;
@@ -2602,7 +2602,7 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 
 		case .Period:
 			tok := expect_token(p, .Period);
-			switch p.curr_tok.kind {
+			#partial switch p.curr_tok.kind {
 			case .Ident:
 				field := parse_ident(p);
 
@@ -2659,7 +2659,7 @@ parse_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	return parse_binary_expr(p, lhs, 0+1);
 }
 parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
-	switch p.curr_tok.kind {
+	#partial switch p.curr_tok.kind {
 	case .Transmute, .Cast:
 		tok := advance_token(p);
 		open := expect_token(p, .Open_Paren);
@@ -2812,7 +2812,7 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 	case op.kind == .Colon:
 		expect_token_after(p, .Colon, "identifier list");
 		if .Label in flags && len(lhs) == 1 {
-			switch p.curr_tok.kind {
+			#partial switch p.curr_tok.kind {
 			case .Open_Brace, .If, .For, .Switch:
 				label := lhs[0];
 				stmt := parse_stmt(p);
@@ -2847,7 +2847,7 @@ parse_value_decl :: proc(p: ^Parser, names: []^ast.Expr, docs: ^ast.Comment_Grou
 	values: []^ast.Expr;
 	type := parse_type_or_ident(p);
 
-	switch p.curr_tok.kind {
+	#partial switch p.curr_tok.kind {
 	case .Eq, .Colon:
 		sep := advance_token(p);
 		is_mutable = sep.kind != .Colon;
@@ -2910,7 +2910,7 @@ parse_import_decl :: proc(p: ^Parser, kind := Import_Decl_Kind.Standard) -> ^ast
 	import_name: tokenizer.Token;
 	is_using := kind != Import_Decl_Kind.Standard;
 
-	switch p.curr_tok.kind {
+	#partial switch p.curr_tok.kind {
 	case .Ident:
 		import_name = advance_token(p);
 	case:

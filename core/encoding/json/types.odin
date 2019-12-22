@@ -56,7 +56,7 @@ Error :: enum {
 
 
 destroy_value :: proc(value: Value) {
-	switch v in value.value {
+	#partial switch v in value.value {
 	case Object:
 		for key, elem in v {
 			delete(key);

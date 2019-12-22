@@ -110,6 +110,9 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 	case Type_Info_Complex:
 		os.write_string(fd, "complex");
 		print_u64(fd, u64(8*ti.size));
+	case Type_Info_Quaternion:
+		os.write_string(fd, "quaternion");
+		print_u64(fd, u64(8*ti.size));
 	case Type_Info_String:
 		os.write_string(fd, "string");
 	case Type_Info_Boolean:
@@ -183,7 +186,7 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 		print_type(fd, info.value);
 
 	case Type_Info_Struct:
-		#complete switch info.soa_kind {
+		switch info.soa_kind {
 		case .None: // Ignore
 		case .Fixed:
 			os.write_string(fd, "#soa[");
@@ -263,7 +266,7 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 	case Type_Info_Bit_Set:
 		os.write_string(fd, "bit_set[");
 
-		switch elem in type_info_base(info.elem).variant {
+		#partial switch elem in type_info_base(info.elem).variant {
 		case Type_Info_Enum:
 			print_type(fd, info.elem);
 		case Type_Info_Rune:

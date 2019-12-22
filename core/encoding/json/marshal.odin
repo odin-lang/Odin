@@ -40,7 +40,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 	ti := type_info_base(type_info_of(v.id));
 	a := any{v.data, ti.id};
 
-	switch info in ti.variant {
+	#partial switch info in ti.variant {
 	case Type_Info_Named:
 		panic("Unreachable");
 
@@ -282,7 +282,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 				return false;
 			}
 			t := runtime.type_info_base(ti);
-			switch info in t.variant {
+			#partial switch info in t.variant {
 			case runtime.Type_Info_Integer:
 				switch info.endianness {
 				case .Platform: return false;
