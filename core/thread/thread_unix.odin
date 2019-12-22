@@ -88,10 +88,9 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	low := unix.sched_get_priority_min(policy);
 	high := unix.sched_get_priority_max(policy);
 	switch priority {
-	case .Low:
-		params.sched_priority = low + 1;
-	case .High:
-		params.sched_priority = high;
+	case .Normal: // Okay
+	case .Low:  params.sched_priority = low + 1;
+	case .High: params.sched_priority = high;
 	}
 	fmt.println(low, high, params.sched_priority);
 	res = unix.pthread_attr_setschedparam(&attrs, &params);
