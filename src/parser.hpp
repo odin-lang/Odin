@@ -363,20 +363,20 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Entity *implicit_entity; \
 	}) \
 	AST_KIND(SwitchStmt, "switch statement", struct { \
-		Token token;    \
-		Ast *label;    \
-		Ast *init;     \
-		Ast *tag;      \
-		Ast *body;     \
-		bool complete; \
+		Token token;  \
+		Ast *label;   \
+		Ast *init;    \
+		Ast *tag;     \
+		Ast *body;    \
+		bool partial; \
 	}) \
 	AST_KIND(TypeSwitchStmt, "type switch statement", struct { \
-		Token token;   \
-		Ast *label;    \
-		Ast *tag;      \
-		Ast *body;     \
-		bool complete; \
-	}) \
+		Token token; \
+		Ast *label;  \
+		Ast *tag;    \
+		Ast *body;   \
+		bool partial; \
+}) \
 	AST_KIND(DeferStmt,  "defer statement",  struct { Token token; Ast *stmt; }) \
 	AST_KIND(BranchStmt, "branch statement", struct { Token token; Ast *label; }) \
 	AST_KIND(UsingStmt,  "using statement",  struct { \

@@ -40,6 +40,14 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 		_, ok := b.variant.(rt.Type_Info_Complex);
 		return ok;
 
+	case rt.Type_Info_Quaternion:
+		_, ok := b.variant.(rt.Type_Info_Quaternion);
+		return ok;
+
+	case rt.Type_Info_Type_Id:
+		_, ok := b.variant.(rt.Type_Info_Type_Id);
+		return ok;
+
 	case rt.Type_Info_String:
 		_, ok := b.variant.(rt.Type_Info_String);
 		return ok;
@@ -174,7 +182,7 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 
 is_signed :: proc(info: ^rt.Type_Info) -> bool {
 	if info == nil do return false;
-	switch i in rt.type_info_base(info).variant {
+	#partial switch i in rt.type_info_base(info).variant {
 	case rt.Type_Info_Integer: return i.signed;
 	case rt.Type_Info_Float:   return true;
 	}
@@ -309,6 +317,7 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 			write_byte(buf, info.signed ? 'i' : 'u');
 			write_i64(buf, i64(8*ti.size), 10);
 			switch info.endianness {
+			case .Platform: // Okay
 			case .Little: write_string(buf, "le");
 			case .Big:    write_string(buf, "be");
 			}
@@ -320,6 +329,9 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		write_i64(buf, i64(8*ti.size), 10);
 	case rt.Type_Info_Complex:
 		write_string(buf, "complex");
+		write_i64(buf, i64(8*ti.size), 10);
+	case rt.Type_Info_Quaternion:
+		write_string(buf, "quaternion");
 		write_i64(buf, i64(8*ti.size), 10);
 	case rt.Type_Info_String:
 		if info.is_cstring {
@@ -399,7 +411,7 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		write_type(buf, info.value);
 
 	case rt.Type_Info_Struct:
-		#complete switch info.soa_kind {
+		switch info.soa_kind {
 		case .None: // Ignore
 		case .Fixed:
 			write_string(buf, "#soa[");

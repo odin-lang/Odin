@@ -7,6 +7,7 @@ import "core:thread"
 import "core:reflect"
 import "intrinsics"
 
+
 /*
 	The Odin programming language is fast, concise, readable, pragmatic and open sourced.
 	It is designed with the intent of replacing C with the following goals:
@@ -1233,8 +1234,8 @@ implicit_selector_expression :: proc() {
 }
 
 
-complete_switch :: proc() {
-	fmt.println("\n# complete_switch");
+partial_switch :: proc() {
+	fmt.println("\n# partial_switch");
 	{ // enum
 		Foo :: enum {
 			A,
@@ -1244,21 +1245,30 @@ complete_switch :: proc() {
 		};
 
 		f := Foo.A;
-		#complete switch f {
+		switch f {
 		case .A: fmt.println("A");
 		case .B: fmt.println("B");
 		case .C: fmt.println("C");
 		case .D: fmt.println("D");
 		case:    fmt.println("?");
 		}
+
+		#partial switch f {
+		case .A: fmt.println("A");
+		case .D: fmt.println("D");
+		}
 	}
 	{ // union
 		Foo :: union {int, bool};
 		f: Foo = 123;
-		#complete switch in f {
+		switch in f {
 		case int:  fmt.println("int");
 		case bool: fmt.println("bool");
 		case:
+		}
+
+		#partial switch in f {
+		case bool: fmt.println("bool");
 		}
 	}
 }
@@ -1820,7 +1830,7 @@ main :: proc() {
 		array_programming();
 		map_type();
 		implicit_selector_expression();
-		complete_switch();
+		partial_switch();
 		cstring_example();
 		bit_set_type();
 		deferred_procedure_associations();

@@ -70,7 +70,7 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	defer value.end = token_end_pos(p.prev_token);
 
 	token := p.curr_token;
-	switch token.kind {
+	#partial switch token.kind {
 	case Kind.Null:
 		value.value = Null{};
 		advance_token(p);
@@ -105,7 +105,7 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 
 	case:
 		if p.spec == Specification.JSON5 {
-			switch token.kind {
+			#partial switch token.kind {
 			case Kind.Infinity:
 				inf: u64 = 0x7ff0000000000000;
 				if token.text[0] == '-' {

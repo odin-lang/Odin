@@ -305,7 +305,7 @@ type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 
 	base := info;
 	loop: for {
-		switch i in base.variant {
+		#partial switch i in base.variant {
 		case Type_Info_Named: base = i.base;
 		case: break loop;
 		}
@@ -319,7 +319,7 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 
 	base := info;
 	loop: for {
-		switch i in base.variant {
+		#partial switch i in base.variant {
 		case Type_Info_Named:  base = i.base;
 		case Type_Info_Enum:   base = i.base;
 		case Type_Info_Opaque: base = i.elem;

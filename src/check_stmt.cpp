@@ -807,12 +807,11 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		}
 	}
 
-	bool complete = ss->complete;
+	bool is_partial = ss->partial;
 
-	if (complete) {
+	if (is_partial) {
 		if (!is_type_enum(x.type)) {
-			error(x.expr, "#complete switch statement can be only used with an enum type");
-			complete = false;
+			error(x.expr, "#partial switch statement can be only used with an enum type");
 		}
 	}
 
@@ -877,9 +876,6 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				Operand a1 = lhs;
 				Operand b1 = rhs;
 				check_comparison(ctx, &a1, &b1, Token_LtEq);
-				if (complete) {
-					error(lhs.expr, "#complete switch statement does not allow ranges");
-				}
 
 				add_constant_switch_case(ctx, &seen, lhs);
 				if (upper_op == Token_GtEq) {
@@ -926,9 +922,6 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 						continue;
 					}
 					if (y.mode != Addressing_Constant) {
-						if (complete) {
-							error(y.expr, "#complete switch statement only allows constant case clauses");
-						}
 						continue;
 					}
 
@@ -942,7 +935,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		check_close_scope(ctx);
 	}
 
-	if (complete) {
+	if (!is_partial && is_type_enum(x.type)) {
 		Type *et = base_type(x.type);
 		GB_ASSERT(is_type_enum(et));
 		auto fields = et->Enum.fields;
@@ -968,18 +961,17 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			defer (begin_error_block());
 
 			if (unhandled.count == 1) {
-				error_no_newline(node, "Unhandled switch case: ");
+				error_no_newline(node, "Unhandled switch case: %.*s", LIT(unhandled[0]->token.string));
 			} else {
 				error_no_newline(node, "Unhandled switch cases: ");
-			}
-			for_array(i, unhandled) {
-				Entity *f = unhandled[i];
-				if (i > 0)  {
-					error_line(", ");
+				for_array(i, unhandled) {
+					Entity *f = unhandled[i];
+					error_line("\t%.*s\n", LIT(f->token.string));
 				}
-				error_line("%.*s", LIT(f->token.string));
 			}
 			error_line("\n");
+
+			error_line("\tSuggestion: Was '#partial switch' wanted? This replaces the previous '#complete switch'.\n");
 		}
 	}
 }
@@ -1042,11 +1034,10 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		return;
 	}
 
-	bool complete = ss->complete;
-	if (complete) {
+	bool is_partial = ss->partial;
+	if (is_partial) {
 		if (switch_kind != TypeSwitch_Union) {
-			error(node, "#complete switch statement may only be used with a union");
-			complete = false;
+			error(node, "#partial switch statement may only be used with a union");
 		}
 	}
 
@@ -1174,7 +1165,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		check_close_scope(ctx);
 	}
 
-	if (complete) {
+	if (!is_partial && is_type_union(type_deref(x.type))) {
 		Type *ut = base_type(type_deref(x.type));
 		GB_ASSERT(is_type_union(ut));
 		auto variants = ut->Union.variants;
@@ -1191,20 +1182,20 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 
 		if (unhandled.count > 0) {
 			if (unhandled.count == 1) {
-				error_no_newline(node, "Unhandled switch case: ");
-			} else {
-				error_no_newline(node, "Unhandled switch cases: ");
-			}
-			for_array(i, unhandled) {
-				Type *t = unhandled[i];
-				if (i > 0)  {
-					error_line(", ");
-				}
-				gbString s = type_to_string(t);
-				error_line("%s", s);
+				gbString s = type_to_string(unhandled[0]);
+				error_no_newline(node, "Unhandled switch case: %s", s);
 				gb_string_free(s);
+			} else {
+				error_no_newline(node, "Unhandled switch cases:\n");
+				for_array(i, unhandled) {
+					Type *t = unhandled[i];
+					gbString s = type_to_string(t);
+					error_line("\t%s\n", s);
+					gb_string_free(s);
+				}
 			}
 			error_line("\n");
+			error_line("\tSuggestion: Was '#partial switch' wanted? This replaces the previous '#complete switch'.\n");
 		}
 	}
 }

@@ -331,7 +331,7 @@ Switch_Stmt :: struct {
 	init:       ^Stmt,
 	cond:       ^Expr,
 	body:       ^Stmt,
-	complete:   bool,
+	partial:    bool,
 }
 
 Type_Switch_Stmt :: struct {
@@ -341,7 +341,7 @@ Type_Switch_Stmt :: struct {
 	tag:        ^Stmt,
 	expr:       ^Expr,
 	body:       ^Stmt,
-	complete:   bool,
+	partial:    bool,
 }
 
 Branch_Stmt :: struct {
