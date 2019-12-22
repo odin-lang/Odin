@@ -9674,13 +9674,13 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		} else if (tav.mode == Addressing_Type) {
 			ir_build_range_enum(proc, type_deref(tav.type), val0_type, &val, &key, &loop, &done);
 		} else {
-			Type *expr_type = type_of_expr(rs->expr);
+			Type *expr_type = type_of_expr(expr);
 			Type *et = base_type(type_deref(expr_type));
 			switch (et->kind) {
 			case Type_Map: {
 				is_map = true;
 				gbAllocator a = ir_allocator();
-				irAddr const &addr = ir_build_addr(proc, rs->expr);
+				irAddr const &addr = ir_build_addr(proc, expr);
 				irValue *map = ir_addr_get_ptr(proc, addr);
 				if (is_type_pointer(type_deref(ir_addr_type(addr)))) {
 					map = ir_addr_load(proc, addr);
@@ -9692,7 +9692,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			}
 			case Type_Array: {
 				irValue *count_ptr = nullptr;
-				irValue *array = ir_build_addr_ptr(proc, rs->expr);
+				irValue *array = ir_build_addr_ptr(proc, expr);
 				if (is_type_pointer(type_deref(ir_type(array)))) {
 					array = ir_emit_load(proc, array);
 				}
@@ -9703,7 +9703,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			}
 			case Type_DynamicArray: {
 				irValue *count_ptr = nullptr;
-				irValue *array = ir_build_addr_ptr(proc, rs->expr);
+				irValue *array = ir_build_addr_ptr(proc, expr);
 				if (is_type_pointer(type_deref(ir_type(array)))) {
 					array = ir_emit_load(proc, array);
 				}
@@ -9713,7 +9713,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			}
 			case Type_Slice: {
 				irValue *count_ptr = nullptr;
-				irValue *slice = ir_build_expr(proc, rs->expr);
+				irValue *slice = ir_build_expr(proc, expr);
 				if (is_type_pointer(ir_type(slice))) {
 					count_ptr = ir_emit_struct_ep(proc, slice, 1);
 					slice = ir_emit_load(proc, slice);
@@ -9725,7 +9725,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 				break;
 			}
 			case Type_Basic: {
-				irValue *string = ir_build_expr(proc, rs->expr);
+				irValue *string = ir_build_expr(proc, expr);
 				if (is_type_pointer(ir_type(string))) {
 					string = ir_emit_load(proc, string);
 				}
@@ -9740,7 +9740,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 				break;
 			}
 			case Type_Tuple:
-				ir_build_range_tuple(proc, rs->expr, val0_type, val1_type, &val, &key, &loop, &done);
+				ir_build_range_tuple(proc, expr, val0_type, val1_type, &val, &key, &loop, &done);
 				break;
 			default:
 				GB_PANIC("Cannot range over %s", type_to_string(expr_type));
