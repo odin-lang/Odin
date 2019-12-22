@@ -442,12 +442,13 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		break;
 
 	case Type_Pointer:
-		if (!is_type_named(t->Pointer.elem) && is_type_empty_struct(t->Pointer.elem)) {
-			ir_print_type(f, m, t_rawptr);
-		} else {
+		// TODO(bill, 2019-12-22): Why did I make add this edge case? Is this some weird LLVM issue?
+		// if (!is_type_named(t->Pointer.elem) && is_type_empty_struct(t->Pointer.elem)) {
+		// 	ir_print_type(f, m, t_rawptr);
+		// } else {
 			ir_print_type(f, m, t->Pointer.elem);
 			ir_write_byte(f, '*');
-		}
+		// }
 		return;
 	case Type_Array:
 		ir_write_byte(f, '[');
