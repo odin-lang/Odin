@@ -5800,11 +5800,13 @@ isize ir_type_info_count(CheckerInfo *info) {
 }
 
 isize ir_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
-	isize index = type_info_index(info, type);
-	auto *set = &info->minimum_dependency_type_info_set;
-	for_array(i, set->entries) {
-		if (set->entries[i].ptr == index) {
-			return i+1;
+	isize index = type_info_index(info, type, false);
+	if (index >= 0) {
+		auto *set = &info->minimum_dependency_type_info_set;
+		for_array(i, set->entries) {
+			if (set->entries[i].ptr == index) {
+				return i+1;
+			}
 		}
 	}
 	if (err_on_not_found) {

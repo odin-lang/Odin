@@ -1435,7 +1435,12 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 
 	auto *set = &c->info.minimum_dependency_type_info_set;
 
-	isize ti_index = type_info_index(&c->info, t);
+	isize ti_index = type_info_index(&c->info, t, false);
+	if (ti_index < 0) {
+		add_type_info_type(&c->init_ctx, t); // Missing the type information
+		ti_index = type_info_index(&c->info, t, false);
+	}
+	GB_ASSERT(ti_index >= 0);
 	if (ptr_set_exists(set, ti_index)) {
 		// Type Already exists
 		return;
@@ -1528,15 +1533,15 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		break;
 
 	case Type_Struct:
+		for_array(i, bt->Struct.fields) {
+			Entity *f = bt->Struct.fields[i];
+			add_min_dep_type_info(c, f->type);
+		}
 		if (bt->Struct.scope != nullptr) {
 			for_array(i, bt->Struct.scope->elements.entries) {
 				Entity *e = bt->Struct.scope->elements.entries[i].value;
 				add_min_dep_type_info(c, e->type);
 			}
-		}
-		for_array(i, bt->Struct.fields) {
-			Entity *f = bt->Struct.fields[i];
-			add_min_dep_type_info(c, f->type);
 		}
 		break;
 
