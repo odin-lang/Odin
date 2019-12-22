@@ -3254,7 +3254,18 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		return nullptr;
 	}
 
-
+	if (expr_entity != nullptr && is_type_polymorphic(expr_entity->type)) {
+		gbString op_str   = expr_to_string(op_expr);
+		gbString type_str = type_to_string(operand->type);
+		gbString sel_str  = expr_to_string(selector);
+		error(op_expr, "Cannot access field '%s' from non-specialized polymorphic type '%s'", sel_str, op_str);
+		gb_string_free(sel_str);
+		gb_string_free(type_str);
+		gb_string_free(op_str);
+		operand->mode = Addressing_Invalid;
+		operand->expr = node;
+		return nullptr;
+	}
 
 	add_entity_use(c, selector, entity);
 
