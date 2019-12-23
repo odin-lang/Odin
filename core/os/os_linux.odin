@@ -259,7 +259,7 @@ foreign libc {
 	@(link_name="__errno_location") __errno_location    :: proc() -> ^int ---;
 	@(link_name="syscall")          syscall             :: proc(number: Syscall, #c_vararg args: ..any) -> int ---;
 
-	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: int, #c_vararg mode: ..any) -> Handle ---;
+	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: int, mode: int) -> Handle ---;
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> int ---;
 	@(link_name="read")             _unix_read          :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
 	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
