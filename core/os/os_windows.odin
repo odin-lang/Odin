@@ -65,7 +65,7 @@ is_path_separator :: proc(r: rune) -> bool {
 	return r == '/' || r == '\\';
 }
 
-open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) {
+open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errno) {
 	if len(path) == 0 do return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
 
 	access: u32;

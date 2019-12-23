@@ -933,6 +933,148 @@ i32 exec_llvm_llc(String output_base) {
 #endif
 }
 
+void print_show_help(String const arg0, String const &command) {
+	print_usage_line(0, "%.*s is a tool for managing Odin source code", LIT(arg0));
+	print_usage_line(0, "Usage");
+	print_usage_line(1, "%.*s %.*s [arguments]", LIT(arg0), LIT(command));
+	print_usage_line(0, "");
+
+	if (command == "build") {
+		print_usage_line(1, "build     compile .odin file, or directory of .odin files, as an executable.");
+		print_usage_line(1, "          one must contain the program's entry point, all must be in the same package.");
+	} else if (command == "run") {
+		print_usage_line(1, "run       same as 'build', but also then runs the newly compiled executable.");
+	} else if (command == "check") {
+		print_usage_line(1, "check     parse and type check .odin file");
+	} else if (command == "query") {
+		print_usage_line(1, "query     parse, type check, and output a .json file containing information about the program");
+	} else if (command == "docs") {
+		print_usage_line(1, "docs      generate documentation for a .odin file");
+	} else if (command == "version") {
+		print_usage_line(1, "version   print version");
+	}
+
+	bool build = command == "build";
+	bool run_or_build = command == "run" || command == "build";
+	bool check = command == "run" || command == "build" || command == "check";
+
+	print_usage_line(0, "");
+	print_usage_line(1, "Flags");
+	print_usage_line(0, "");
+
+	if (run_or_build) {
+		print_usage_line(1, "-out:<filepath>");
+		print_usage_line(2, "Set the file name of the outputted executable");
+		print_usage_line(2, "Example: -out:foo.exe");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-opt:<integer>");
+		print_usage_line(2, "Set the optimization level for complication");
+		print_usage_line(2, "Accepted values: 0, 1, 2, 3");
+		print_usage_line(2, "Example: -opt:2");
+		print_usage_line(0, "");
+	}
+
+	if (check) {
+		print_usage_line(1, "-show-timings");
+		print_usage_line(2, "Shows basic overview of the timings of different stages within the compiler in milliseconds");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-show-more-timings");
+		print_usage_line(2, "Shows an advanced overview of the timings of different stages within the compiler in milliseconds");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-thread-count:<integer>");
+		print_usage_line(2, "Override the number of threads the compiler will use to compile with");
+		print_usage_line(2, "Example: -thread-count:2");
+		print_usage_line(0, "");
+	}
+
+	if (run_or_build) {
+		print_usage_line(1, "-keep-temp-files");
+		print_usage_line(2, "Keeps the temporary files generated during compilation");
+		print_usage_line(0, "");
+	}
+
+	if (check) {
+		print_usage_line(1, "-collection:<name>=<filepath>");
+		print_usage_line(2, "Defines a library collection used for imports");
+		print_usage_line(2, "Example: -collection:shared:dir/to/shared");
+		print_usage_line(2, "Usage in Code:");
+		print_usage_line(3, "import \"shared:foo\"");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-define:<name>=<expression>");
+		print_usage_line(2, "Defines a global constant with a value");
+		print_usage_line(2, "Example: -define:SPAM=123");
+		print_usage_line(0, "");
+	}
+
+	if (build) {
+		print_usage_line(1, "-build-mode:<mode>");
+		print_usage_line(2, "Sets the build mode");
+		print_usage_line(2, "Available options:");
+		print_usage_line(3, "-build-mode:exe       Build as an executable");
+		print_usage_line(3, "-build-mode:dll       Build as a dynamically linked library");
+		print_usage_line(3, "-build-mode:shared    Build as a dynamically linked library");
+		print_usage_line(0, "");
+	}
+
+	if (check) {
+		print_usage_line(1, "-target:<string>");
+		print_usage_line(2, "Sets the target for the executable to be built in");
+		print_usage_line(0, "");
+	}
+
+	if (run_or_build) {
+		print_usage_line(1, "-debug");
+		print_usage_line(2, "Enabled debug information, and defines the global constant ODIN_DEBUG to be 'true'");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-no-bounds-check");
+		print_usage_line(2, "Disables bounds checking program wide");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-no-crt");
+		print_usage_line(2, "Disables automatic linking with the C Run Time");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-use-lld");
+		print_usage_line(2, "Use the LLD linker rather than the default");
+		print_usage_line(0, "");
+	}
+
+	if (check) {
+		print_usage_line(1, "-vet");
+		print_usage_line(2, "Do extra checks on the code");
+		print_usage_line(2, "Extra checks include:");
+		print_usage_line(3, "Variable shadowing within procedures");
+		print_usage_line(3, "Unused declarations");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-ignore-unknown-attributes");
+		print_usage_line(2, "Ignores unknown attributes");
+		print_usage_line(2, "This can be used with metaprogramming tools");
+		print_usage_line(0, "");
+	}
+
+	if (run_or_build) {
+		#if defined(GB_SYSTEM_WINDOWS)
+		print_usage_line(1, "-resource:<filepath>");
+		print_usage_line(2, "[Windows only]");
+		print_usage_line(2, "Defines the resource file for the executable");
+		print_usage_line(2, "Example: -resource:path/to/file.rc");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-pdb-name:<filepath>");
+		print_usage_line(2, "[Windows only]");
+		print_usage_line(2, "Defines the generated PDB name when -debug is enabled");
+		print_usage_line(2, "Example: -pdb-name:different.pdb");
+		print_usage_line(0, "");
+		#endif
+	}
+}
+
 int main(int arg_count, char const **arg_ptr) {
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
@@ -1034,145 +1176,7 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.show_help) {
-		print_usage_line(0, "%.*s is a tool for managing Odin source code", LIT(args[0]));
-		print_usage_line(0, "Usage");
-		print_usage_line(1, "%.*s %.*s [arguments]", LIT(args[0]), LIT(command));
-		print_usage_line(0, "");
-
-		if (command == "build") {
-			print_usage_line(1, "build     compile .odin file, or directory of .odin files, as an executable.");
-			print_usage_line(1, "          one must contain the program's entry point, all must be in the same package.");
-		} else if (command == "run") {
-			print_usage_line(1, "run       same as 'build', but also then runs the newly compiled executable.");
-		} else if (command == "check") {
-			print_usage_line(1, "check     parse and type check .odin file");
-		} else if (command == "query") {
-			print_usage_line(1, "query     parse, type check, and output a .json file containing information about the program");
-		} else if (command == "docs") {
-			print_usage_line(1, "docs      generate documentation for a .odin file");
-		} else if (command == "version") {
-			print_usage_line(1, "version   print version");
-		}
-
-		bool build = command == "build";
-		bool run_or_build = command == "run" || command == "build";
-		bool check = command == "run" || command == "build" || command == "check";
-
-		print_usage_line(0, "");
-		print_usage_line(1, "Flags");
-		print_usage_line(0, "");
-
-		if (run_or_build) {
-			print_usage_line(1, "-out:<filepath>");
-			print_usage_line(2, "Set the file name of the outputted executable");
-			print_usage_line(2, "Example: -out:foo.exe");
-			print_usage_line(0, "");
-
-			print_usage_line(1, "-opt:<integer>");
-			print_usage_line(2, "Set the optimization level for complication");
-			print_usage_line(2, "Accepted values: 0, 1, 2, 3");
-			print_usage_line(2, "Example: -opt:2");
-			print_usage_line(0, "");
-		}
-
-		if (check) {
-			print_usage_line(1, "-show-timings");
-			print_usage_line(2, "Shows basic overview of the timings of different stages within the compiler in milliseconds");
-			print_usage_line(0, "");
-
-			print_usage_line(1, "-show-more-timings");
-			print_usage_line(2, "Shows an advanced overview of the timings of different stages within the compiler in milliseconds");
-			print_usage_line(0, "");
-
-			print_usage_line(1, "-thread-count:<integer>");
-			print_usage_line(2, "Override the number of threads the compiler will use to compile with");
-			print_usage_line(2, "Example: -thread-count:2");
-			print_usage_line(0, "");
-		}
-
-		if (run_or_build) {
-			print_usage_line(1, "-keep-temp-files");
-			print_usage_line(2, "Keeps the temporary files generated during compilation");
-			print_usage_line(0, "");
-		}
-
-		if (check) {
-			print_usage_line(1, "-collection:<name>=<filepath>");
-			print_usage_line(2, "Defines a library collection used for imports");
-			print_usage_line(2, "Example: -collection:shared:dir/to/shared");
-			print_usage_line(2, "Usage in Code:");
-			print_usage_line(3, "import \"shared:foo\"");
-			print_usage_line(0, "");
-
-			print_usage_line(1, "-define:<name>=<expression>");
-			print_usage_line(2, "Defines a global constant with a value");
-			print_usage_line(2, "Example: -define:SPAM=123");
-			print_usage_line(0, "");
-		}
-
-		if (build) {
-			print_usage_line(1, "-build-mode:<mode>");
-			print_usage_line(2, "Sets the build mode");
-			print_usage_line(2, "Available options:");
-			print_usage_line(3, "-build-mode:exe       Build as an executable");
-			print_usage_line(3, "-build-mode:dll       Build as a dynamically linked library");
-			print_usage_line(3, "-build-mode:shared    Build as a dynamically linked library");
-			print_usage_line(0, "");
-		}
-
-		if (check) {
-			print_usage_line(1, "-target:<string>");
-			print_usage_line(2, "Sets the target for the executable to be built in");
-			print_usage_line(0, "");
-		}
-
-		if (run_or_build) {
-			print_usage_line(1, "-debug");
-			print_usage_line(2, "Enabled debug information, and defines the global constant ODIN_DEBUG to be 'true'");
-			print_usage_line(0, "");
-
-			print_usage_line(1, "-no-bounds-check");
-			print_usage_line(2, "Disables bounds checking program wide");
-			print_usage_line(0, "");
-
-			print_usage_line(1, "-no-crt");
-			print_usage_line(2, "Disables automatic linking with the C Run Time");
-			print_usage_line(0, "");
-
-			print_usage_line(1, "-use-lld");
-			print_usage_line(2, "Use the LLD linker rather than the default");
-			print_usage_line(0, "");
-		}
-
-		if (check) {
-			print_usage_line(1, "-vet");
-			print_usage_line(2, "Do extra checks on the code");
-			print_usage_line(2, "Extra checks include:");
-			print_usage_line(3, "Variable shadowing within procedures");
-			print_usage_line(3, "Unused declarations");
-			print_usage_line(0, "");
-
-			print_usage_line(1, "-ignore-unknown-attributes");
-			print_usage_line(2, "Ignores unknown attributes");
-			print_usage_line(2, "This can be used with metaprogramming tools");
-			print_usage_line(0, "");
-		}
-
-		if (run_or_build) {
-			#if defined(GB_SYSTEM_WINDOWS)
-			print_usage_line(1, "-resource:<filepath>");
-			print_usage_line(2, "[Windows only]");
-			print_usage_line(2, "Defines the resource file for the executable");
-			print_usage_line(2, "Example: -resource:path/to/file.rc");
-			print_usage_line(0, "");
-
-			print_usage_line(1, "-pdb-name:<filepath>");
-			print_usage_line(2, "[Windows only]");
-			print_usage_line(2, "Defines the generated PDB name when -debug is enabled");
-			print_usage_line(2, "Example: -pdb-name:different.pdb");
-			print_usage_line(0, "");
-			#endif
-		}
+		print_show_help(args[0], command);
 		return 0;
 	}
 
