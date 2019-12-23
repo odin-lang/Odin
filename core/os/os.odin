@@ -99,7 +99,14 @@ write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (succ
 	if truncate {
 		flags |= O_TRUNC;
 	}
-	fd, err := open(name, flags, 0);
+
+    mode: int = 0;
+    when OS == "linux" {
+        // NOTE(justasd): 644 (owner read, write; group read; others read)
+        mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+    }
+
+	fd, err := open(name, flags, mode);
 	if err != 0 {
 		return false;
 	}
