@@ -48,7 +48,7 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6
 
 	// NOTE(tetra): We might not have used temporary storage yet,
 	// and get_dns_records uses it by default.
-	// Rather than required the user initializes it manually first,
+	// Rather than require the user initialize it manually first,
 	// we just use a stack-arena here instead.
 	// We can do this because the addresses we return are returned by value,
 	// so we don't return data from within this arena.
@@ -142,7 +142,7 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 	// BUG: make(x,0,count) doesn't work here...
 	//
 	recs := make([dynamic]Dns_Record, allocator);
-	reserve(&recs, count);
+	if !reserve(&recs, count) do return; // return no records if we are OOM.
 
 	for r := rec; r != nil; r = r.next {
 		if r.type != u16(type) do continue; // NOTE(tetra): Should never happen, but...
