@@ -359,6 +359,7 @@ listen :: proc(bind_addr: Address, port: int, type := Socket_Type.Tcp, accept_qu
 			}
 			return;			
 		}
+	case .Udp: // nothing
 	}
 
 	return;
@@ -373,13 +374,11 @@ listen :: proc(bind_addr: Address, port: int, type := Socket_Type.Tcp, accept_qu
 //              //
 
 try_read :: proc(skt: Socket, buffer: []u8) -> (n: int, err: Read_Error) {
-	if len(buffer) == 0 do return;
-
 	limit := min(len(buffer), int(max(i32)));
 	n = int(win32.recv(win32.SOCKET(skt), &buffer[0], i32(limit), 0));
-	if n >= 0 do return;
+	if n != win32.SOCKET_ERROR do return;
 	
-	assert(n == win32.SOCKET_ERROR);
+	// AUDIT(tetra): panic on weird errors
 	recv_err := win32.WSAGetLastError();
 	switch recv_err {
 	case win32.WSAEWOULDBLOCK:
@@ -394,67 +393,66 @@ try_read :: proc(skt: Socket, buffer: []u8) -> (n: int, err: Read_Error) {
 try_write :: proc(skt: Socket, data: []u8) -> (n: int, err: Write_Error) {
 	limit := min(int(max(i32)), len(data));
 	
-	res := win32.send(win32.SOCKET(skt), &data[0], i32(limit), 0);
-	if res == win32.SOCKET_ERROR {
-		write_err := win32.WSAGetLastError();
-		switch write_err {
-		case win32.WSAECONNABORTED: err = .Aborted; // socket broken - must be reopened.
-		case win32.WSAENETRESET:    err = .Aborted; // keep alive failed
-		case win32.WSAEINVAL:       panic("socket not bound");
-		case win32.WSAEWOULDBLOCK:
-			err = .Ok;
-			n = 0; // TODO(tetra): Verify that this means that no data was sent.
-		case win32.WSAEOPNOTSUPP:   panic("OOB data not implemented");
-		case win32.WSAEACCES:       panic("broadcast not implemented");
-		case:
-			err = Write_Error(write_err);
-		}
+	n = int(win32.send(win32.SOCKET(skt), &data[0], i32(limit), 0));
+	if n != win32.SOCKET_ERROR {
+		assert(n == len(data), "turns out write can sometimes not send it all");
 		return;
 	}
 
-	n = int(res);
-	assert(n == len(data), "turns out write can sometimes not send it all");
+	write_err := win32.WSAGetLastError();
+	switch write_err {
+	case win32.WSAEWOULDBLOCK:
+		err = .Ok;
+		n = 0; // AUDIT(tetra): Verify that this means that no data was sent.
+	case win32.WSAECONNABORTED: err = .Aborted; // socket broken - must be reopened.
+	case win32.WSAENETRESET:    err = .Aborted; // keep alive failed
+	case win32.WSAEINVAL:       panic("socket not bound");
+	case win32.WSAEOPNOTSUPP:   panic("OOB data not implemented");
+	case win32.WSAEACCES:       panic("broadcast not implemented");
+	case:
+		err = Write_Error(write_err);
+	}
 	return;
 }
 
 // Same as `read_all`, but returns 0 immediately instead of blocking.
-// TODO(tetra): Audit that this works.
+// AUDIT(tetra): Does this actually work?
 try_read_all :: proc(skt: Socket, buffer: []u8) -> (n: int, err: Read_Error) {
 	set_min_data_to_read(skt, len(buffer));
 	defer set_min_data_to_read(skt, 1);
 
 	n, err = read(skt, buffer[:n]);
-	assert(n == 0 || n == len(buffer));
+	assert(n == 0 || n == len(buffer)); // NOTE(tetra): Will fail if len(buffer) > max(i32).
 	return;
 }
+
 
 try_read_from :: proc(dgram_skt: Socket, buffer: []u8) -> (n: int, from: Endpoint, err: Read_From_Error) {
 	limit := min(len(buffer), int(max(i32)));
 	
-	native_addr: win32.Socket_Address;
+	native_addr: win32.Socket_Address; // TODO(tetra): Uninitialize this?
 	native_addr_len := i32(size_of(native_addr));
-	res := win32.recvfrom(win32.SOCKET(dgram_skt), &buffer[0], i32(limit), 0, &native_addr, &native_addr_len);
-	if res == win32.SOCKET_ERROR {
-		read_err := win32.WSAGetLastError();
-		switch read_err {
-		case win32.WSAENETRESET, win32.WSAECONNRESET:
-			err = .Unreachable; // TTL expired
-		case win32.WSAENETDOWN:  err = .Offline;
-		case win32.WSAESHUTDOWN: err = .Shutdown;
-		case win32.WSAEMSGSIZE:  err = .Truncated;
-		case win32.WSAETIMEDOUT: err = .Timeout;
-		case win32.WSAEWOULDBLOCK:
-			err = .Ok;
-			n = 0;
-		case win32.WSAEISCONN:  panic("attempt to recv from connected socket");
-		case win32.WSAEINVAL:   panic("socket not bound");
-		case: fmt.panicf("write failed with unhandled error %v\n", Socket_Error(read_err)); // TODO(tetra): remove need for fmt
-		}
+	n = int(win32.recvfrom(win32.SOCKET(dgram_skt), &buffer[0], i32(limit), 0, &native_addr, &native_addr_len));
+	if n != win32.SOCKET_ERROR {
+		from = to_canonical_endpoint(native_addr, native_addr_len);
 		return;
 	}
 
-	from = to_canonical_endpoint(native_addr, native_addr_len);
-	n = int(res);
+	read_err := win32.WSAGetLastError();
+	switch read_err {
+	case win32.WSAEWOULDBLOCK:
+		err = .Ok;
+		n = 0;
+	case win32.WSAEISCONN:   panic("attempt to use try_read_from on connection-oriented socket");
+	case win32.WSAECONNRESET: err = .Unreachable; // For datagrams, this means TTL expired.
+	case win32.WSAENETRESET: err = .Unreachable;
+	case win32.WSAENETDOWN:  err = .Offline;
+	case win32.WSAESHUTDOWN: err = .Shutdown;
+	case win32.WSAEMSGSIZE:  err = .Truncated;
+	case win32.WSAETIMEDOUT: err = .Timeout;
+	case win32.WSAEINVAL:    panic("socket not bound");
+	case: fmt.panicf("read_from failed with unhandled error %v\n", Socket_Error(read_err)); // TODO(tetra): remove need for fmt
+	}
 	return;
 }
 
@@ -462,40 +460,37 @@ try_write_to :: proc(dgram_skt: Socket, data: []u8, to: Endpoint) -> (n: int, er
 	limit := min(int(max(i32)), len(data));
 
 	native_addr, native_addr_len := to_socket_address(to.addr, to.port);
-	res := win32.sendto(win32.SOCKET(dgram_skt), &data[0], i32(limit), 0, &native_addr, native_addr_len); // NOTE(tetra): pass MSG_NOSIGNAL on Unix.
-	if res == win32.SOCKET_ERROR {
-		write_err := win32.WSAGetLastError();
-		switch write_err {
-		case win32.WSAENETUNREACH:  err = .Offline;
-		case win32.WSAENETDOWN:     err = .Offline;
-		case win32.WSAENETRESET:    unreachable(); // because datagram socket.
-		case win32.WSAEAFNOSUPPORT: err = .Bad_Addr;
+	n = int(win32.sendto(win32.SOCKET(dgram_skt), &data[0], i32(limit), 0, &native_addr, native_addr_len)); // NOTE(tetra): pass MSG_NOSIGNAL on Unix.
+	if n != win32.SOCKET_ERROR do return;
 
-		case win32.WSAEINVAL:      panic("socket not bound");
-		case win32.WSAEWOULDBLOCK:
-			err = .Ok;
-			n = 0;
-		case win32.WSAEOPNOTSUPP:  unimplemented(); // TODO(tetra): OOB data.
-		case win32.WSAEACCES:      unimplemented(); // TODO(tetra): broadcast
-		case:
-			err = Write_To_Error(write_err);
-		}
-		return;
+	write_err := win32.WSAGetLastError();
+	switch write_err {
+	case win32.WSAEWOULDBLOCK:
+		err = .Ok;
+		n = 0;
+
+	case win32.WSAENETUNREACH:  err = .Offline;
+	case win32.WSAENETDOWN:     err = .Offline;
+	case win32.WSAENETRESET:    unreachable(); // NOTE(tetra): This should not a connection-oriented socket.
+	case win32.WSAEAFNOSUPPORT: err = .Bad_Addr;
+	case win32.WSAEINVAL:       panic("socket not bound");
+	case win32.WSAEOPNOTSUPP:   unimplemented(); // TODO(tetra): OOB data.
+	case win32.WSAEACCES:       unimplemented(); // TODO(tetra): broadcast
+	case:
+		err = Write_To_Error(write_err);
 	}
-
-	n = int(res);
 	return;
 }
 
 // Same as `read_all`, but returns 0 immediately instead of blocking.
-// TODO(tetra): Audit that this works.
+// AUDIT(tetra): Does this actually work?
 try_read_all_from :: proc(skt: Socket, buffer: []u8) -> (ok: bool, from: Endpoint, err: Read_From_Error) {
 	set_min_data_to_read(skt, len(buffer));
 	defer set_min_data_to_read(skt, 1);
 
 	n: int = ---;
 	n, from, err = read_from(skt, buffer[:n]);
-	assert(n == 0 || n == len(buffer));
+	assert(n == 0 || n == len(buffer)); // NOTE(tetra): Will fail if len(buffer) > max(i32).
 	ok = n == len(buffer);
 	return;
 }
@@ -504,8 +499,18 @@ try_read_all_from :: proc(skt: Socket, buffer: []u8) -> (ok: bool, from: Endpoin
 
 
 
-// Create a blocking socket and connect it to a remote server.
-// For UDP, this still calls connect so that you can use write/recv.
+
+//                  //
+// Creating sockets //
+//                  //
+
+
+// Create a socket and tell it to connect to a remote server, but does not wait
+// for it to complete.
+// Call `finish_dial` to wait for it, or `try_finish_dial` to only check it.
+//
+// For UDP, this still calls connect, which means that you can use write/read on it,
+// which will ignore packets from other peers.
 //
 // TODO(tetra): Fast data?
 start_dial :: proc(addr: Address, port: int, type := Socket_Type.Tcp) -> (skt: Socket, err: Dial_Error) {
@@ -513,16 +518,21 @@ start_dial :: proc(addr: Address, port: int, type := Socket_Type.Tcp) -> (skt: S
 
 	create_err: Create_Error = ---;
 	skt, create_err = create(get_addr_type(addr), type);
-	if err != .Ok {
+	if create_err != .Ok {
 		switch create_err {
 		case .Resources:
 			err = .Resources;
-		case: unreachable();
+
+		case .Offline: fallthrough;
+		case .Bad_Protocol: fallthrough;
+		case .Bad_Type: fallthrough;
+		case .Wrong_Protocol: panic("create failed");
+		case .Ok: unreachable();
 		}
 		return;
 	}
 
-	if type != .Udp do assert(set_option(skt, .Inline_Out_Of_Band, true) == .Ok);
+	if type != .Udp do set_option(skt, .Inline_Out_Of_Band, true);
 
 	native_addr, native_addr_size := to_socket_address(addr, port);
 	res := win32.connect(win32.SOCKET(skt), &native_addr, native_addr_size);
@@ -632,7 +642,7 @@ create :: proc(addr_type: Addr_Type, type: Socket_Type, protocol := Socket_Proto
 	}
 	native_sock_type: i32;
 	native_protocol: i32;
-	#complete switch type {
+	switch type {
 	case .Tcp:
 		native_sock_type = win32.SOCK_STREAM;
 		native_protocol = win32.IPPROTO_TCP;
@@ -718,9 +728,7 @@ wait_for_status :: proc(skt: Socket, timeout_ms := -1, types := bit_set[Event_Ty
 		read_ok = rfd.count == 1;
 		write_ok = wfd.count == 1;
 		if efd.count == 1 {
-			last_err, get_err := get_option(skt, .Error, i32);
-			assert(get_err == .Ok);
-			err = Socket_Error(last_err);
+			err = Socket_Error(get_option(skt, .Error, i32));
 		}
 	}
 	return;
@@ -783,23 +791,17 @@ Socket_Option :: enum i32 {
 	Error					= win32.SO_ERROR,
 }
 
-set_option :: proc(skt: Socket, option: Socket_Option, value: $T) -> (err: Socket_Error) {
+set_option :: proc(skt: Socket, option: Socket_Option, value: $T) {
 	value_ := value;
-	res := win32.setsockopt(win32.SOCKET(skt), win32.SOL_SOCKET, i32(option), &value_, size_of(value_));
-	if res == win32.SOCKET_ERROR {
-		err = Socket_Error(win32.WSAGetLastError());
-	}
-	return;
+	res := win32.setsockopt(win32.SOCKET(skt), win32.SOL_SOCKET, i32(option), &value_, size_of(T));
+	assert(res != win32.SOCKET_ERROR);
 }
 
-get_option :: proc(skt: Socket, option: Socket_Option, $T: typeid) -> (value: T, err: Socket_Error) {
+get_option :: proc(skt: Socket, option: Socket_Option, $T: typeid) -> (value: T) {
 	sz := i32(size_of(T));
 	res := win32.getsockopt(win32.SOCKET(skt), win32.SOL_SOCKET, i32(option), &value, &sz);
-	if res == win32.SOCKET_ERROR {
-		err = Socket_Error(win32.WSAGetLastError());
-	} else {
-		assert(sz == size_of(T));
-	}
+	assert(res != win32.SOCKET_ERROR);
+	assert(sz == size_of(T));
 	return;
 }
 
