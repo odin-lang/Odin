@@ -14,14 +14,13 @@ get_network_interfaces :: proc() -> []Address {
 
 @private
 to_socket_address :: proc(addr: Address, port: int) -> (socket_addr: win32.Socket_Address, addr_size: i32) {
-	#complete switch a in addr {
+	switch a in addr {
 	case Ipv4_Address:
 		socket_addr = win32.make_sockaddr(win32.AF_INET,  transmute(win32.in_addr)  a, u16(port));
 		addr_size = size_of(socket_addr.ipv4);
 	case Ipv6_Address:
 		socket_addr = win32.make_sockaddr(win32.AF_INET6, transmute(win32.in6_addr) a, u16(port));
 		addr_size = size_of(socket_addr.ipv6);
-	case: unreachable();
 	}
 	return;
 }

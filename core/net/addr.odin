@@ -193,7 +193,7 @@ map_to_ipv6 :: proc(addr: Address) -> Address {
 
 // TODO: A way to get the tag without type information that's cleaner than this.
 get_addr_type :: proc(addr: Address) -> Addr_Type {
-	#complete switch v in addr {
+	switch v in addr {
 	case Ipv4_Address: return .Ipv4;
 	case Ipv6_Address: return .Ipv6;
 	}
