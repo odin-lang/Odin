@@ -20,17 +20,17 @@ mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 
 mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil do return dst;
-	// NOTE(bill): This _must_ be implemented like C's memmove
+	// NOTE(bill): This _must_ be implemented like C's memcpy
 	foreign _ {
 		when size_of(rawptr) == 8 {
 			@(link_name="llvm.memmove.p0i8.p0i8.i64")
-			llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+			llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
 		} else {
 			@(link_name="llvm.memmove.p0i8.p0i8.i32")
-			llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+			llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
 		}
 	}
-	llvm_memmove(dst, src, len, 1, false);
+	llvm_memcpy(dst, src, len, 1, false);
 	return dst;
 }
 
