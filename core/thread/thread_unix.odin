@@ -83,7 +83,6 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	assert(res == 0);
 	params: unix.sched_param;
 	res = unix.pthread_attr_getschedparam(&attrs, &params);
-	fmt.println(params.sched_priority);
 	assert(res == 0);
 	low := unix.sched_get_priority_min(policy);
 	high := unix.sched_get_priority_max(policy);
@@ -92,7 +91,6 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	case .Low:  params.sched_priority = low + 1;
 	case .High: params.sched_priority = high;
 	}
-	fmt.println(low, high, params.sched_priority);
 	res = unix.pthread_attr_setschedparam(&attrs, &params);
 	assert(res == 0);
 
@@ -144,7 +142,6 @@ join :: proc(t: ^Thread) {
 	assert(sync.atomic_load(&t.done, .Sequentially_Consistent), "thread not done after join");
 }
 
-import "core:fmt"
 destroy :: proc(t: ^Thread) {
 	join(t);
 	t.unix_thread = {};
