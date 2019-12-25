@@ -571,14 +571,23 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 
 
+// An `Arena` that can grow linearly (not geometrically), seperating large allocations, and grouping small allocations.
+//
+// Allocates in blocks of the same size, only allocating a new block
+// if there's not enough space, or we tried to allocate more than a certain amount at once.
+//
+// All blocks are allocated sequentially using the same allocator, and nothing is freed until you
+// call `destroy_dynamic_pool`, or `free_all` on the pool's allocator.
+//
+// Will, at most, allocate `block_size` bytes; if you ask for more than a block, it returns nil. (See `dynamic_pool_init`)
 Dynamic_Pool :: struct {
 	block_size:    int,
 	out_band_size: int,
 	alignment:     int,
 
-	unused_blocks:        [dynamic]rawptr,
-	used_blocks:          [dynamic]rawptr,
-	out_band_allocations: [dynamic]rawptr,
+	unused_blocks:   [dynamic]rawptr,
+	used_blocks:     [dynamic]rawptr,
+	out_band_blocks: [dynamic]rawptr, // allocations that are bigger than the OOB size, get a block all by themselves.
 
 	current_block: rawptr,
 	current_pos:   rawptr,
@@ -653,9 +662,9 @@ dynamic_pool_init :: proc(pool: ^Dynamic_Pool,
 	pool.out_band_size   = out_band_size
 	pool.alignment       = alignment
 	pool.block_allocator = block_allocator
-	pool.out_band_allocations.allocator = array_allocator
-	pool.       unused_blocks.allocator = array_allocator
-	pool.         used_blocks.allocator = array_allocator
+	pool.out_band_blocks.allocator = array_allocator
+	pool.unused_blocks.allocator = array_allocator
+	pool.used_blocks.allocator = array_allocator
 }
 
 dynamic_pool_destroy :: proc(using pool: ^Dynamic_Pool) {
@@ -706,13 +715,24 @@ dynamic_pool_alloc_bytes :: proc(using pool: ^Dynamic_Pool, bytes: int) -> ([]by
 	if n >= out_band_size {
 		assert(block_allocator.procedure != nil)
 		memory, err := block_allocator.procedure(block_allocator.data, Allocator_Mode.Alloc,
+
+	// NOTE(tetra): If we are asked to allocate more than a certain size,
+	// we allocate it into it's own block, all by itself.
+	if n >= out_band_size {
+		if n > block_size do return nil
+
+		assert(block_allocator.procedure != nil)
+		memory := block_allocator.procedure(block_allocator.data, Allocator_Mode.Alloc,
 			                                block_size, alignment,
 			                                nil, 0)
 		if memory != nil {
-			append(&out_band_allocations, raw_data(memory))
+			append(&out_band_blocks, (^byte)(memory));
 		}
 		return memory, err
 	}
+
+	// .. Otherwise we append it on to the current block (assuming there's space for it),
+	// or make a new block if there is not.
 
 	if bytes_left < n {
 		err := cycle_new_block(pool)
@@ -742,10 +762,10 @@ dynamic_pool_reset :: proc(using pool: ^Dynamic_Pool) {
 	}
 	clear(&used_blocks)
 
-	for a in out_band_allocations {
-		free(a, block_allocator)
+	for a in out_band_blocks {
+		free(a, block_allocator);
 	}
-	clear(&out_band_allocations)
+	clear(&out_band_blocks);
 }
 
 dynamic_pool_free_all :: proc(using pool: ^Dynamic_Pool) {
