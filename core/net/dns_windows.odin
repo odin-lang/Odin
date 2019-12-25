@@ -35,11 +35,11 @@ import "core:sys/win32"
 //
 // Note that which address you pass to `dial` determines the type of the socket.
 // Note also that this procedure _only_ returns ok=false if something went _wrong_ with resolution.
-resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6}) -> (ipv4, ipv6: Address, ok: bool) {
+resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6}) -> (addr4, addr6: Address, ok: bool) {
 	if addr := parse_addr(hostname); addr != nil {
 		switch a in addr {
-		case Ipv4_Address: ipv4 = addr;
-		case Ipv6_Address: ipv6 = addr;
+		case Ipv4_Address: addr4 = addr;
+		case Ipv6_Address: addr6 = addr;
 		case: assert(false);
 		}
 		ok = true;
@@ -61,7 +61,7 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6
 		recs, rec_ok := get_dns_records(hostname, .Ipv4, allocator);
 		if !rec_ok do return;
 		if len(recs) > 0 {
-			ipv4 = recs[0].(Dns_Record_Ipv4).addr; // address is copied
+			addr4 = recs[0].(Dns_Record_Ipv4).addr; // address is copied
 		}
 	}
 
@@ -69,7 +69,7 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6
 		recs, rec_ok := get_dns_records(hostname, .Ipv6, allocator);
 		if !rec_ok do return;
 		if len(recs) > 0 {
-			ipv6 = recs[0].(Dns_Record_Ipv6).addr; // address is copied
+			addr6 = recs[0].(Dns_Record_Ipv6).addr; // address is copied
 		}
 	}
 
