@@ -7,6 +7,8 @@ import "core:strconv"
 import "core:fmt"
 
 Status :: enum {
+	Unknown,
+
 	Ok = 200,
 	Bad_Request = 400,
 	Bad_Response_Header,
@@ -24,8 +26,7 @@ Response :: struct {
 destroy_response :: proc(using r: ^Response) {
 	delete(headers);
 	delete(body);
-	headers = nil;
-	body = "";
+	r^ = {};
 }
 
 get :: proc(url: string, allocator := context.allocator) -> (resp: Response, ok: bool) {
@@ -64,28 +65,21 @@ init_request :: proc(req: ^Request, method: Method, url: string, allocator := co
 	req.headers["Host"] = host;
 }
 
-execute_request :: proc(r: Request, response_allocator := context.allocator) -> (resp: Response, ok: bool) {
+execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Response, ok: bool) {
 	using strings;
-
-	// pool: mem.Dynamic_Pool;
-	// mem.dynamic_pool_init(&pool, allocator, allocator, 1024);
-	// defer mem.dynamic_pool_destroy(&pool);
-	// context.allocator = mem.dynamic_pool_allocator(&pool);
 
 	addr4, addr6, resolve_ok := net.resolve(r.host);
 	if !resolve_ok do return;
 	addr := addr4 != nil ? addr4 : addr6;
 
 
-	// TODO(tetra): Use arena and stack allocate if possible?
-	// Maybe instead of building the string, just write it to the socket incrementally
-	// to avoid allocation.
-	b := make_builder(context.temp_allocator);
-	grow_builder(&b, 1024);
+	b := make_builder(allocator);
+	grow_builder(&b, 8192);
 	defer destroy_builder(&b);
 	
 	write_string(&b, "GET ");
 	write_string(&b, r.path);
+
 	if r.queries != nil {
 		write_rune(&b, '?');
 		for query_name, query_value in r.queries {
@@ -106,16 +100,21 @@ execute_request :: proc(r: Request, response_allocator := context.allocator) -> 
 		write_string(&b, "\r\n");
 	}
 
+	if r.body != "" {
+		write_string(&b, r.body);
+		write_string(&b, "\r\n");
+	}
+
 	write_string(&b, "\r\n");
 	req_str := to_string(b);
 
 	fmt.printf("%q\n", req_str);
 
-	skt, err := net.dial(addr, 80); // TODO(tetra): HTTPS
-	if err != nil do return; // TODO(tetra): return instead?
-	defer net.close(skt);
 
-	write_err := net.write(skt, req_str);
+	skt, err := net.dial(addr, 80);
+	if err != nil do return; // TODO(tetra): return instead?
+
+	write_err := net.write_string(skt, req_str);
 	if write_err != nil do return; // TODO(tetra): return instead?
 
 	read_buf: [4096]byte;
@@ -123,7 +122,6 @@ execute_request :: proc(r: Request, response_allocator := context.allocator) -> 
 	if read_err != nil do return; // TODO(tetra): return instead?
 
 	resp_parts := split(string(read_buf[:n]), "\n");
-
 	assert(len(resp_parts) >= 1);
 
 	status_parts := split(resp_parts[0], " ");
@@ -134,7 +132,7 @@ execute_request :: proc(r: Request, response_allocator := context.allocator) -> 
 
 	resp_parts = resp_parts[1:];
 
-	resp.headers = make(map[string]string, len(resp_parts), response_allocator);
+	resp.headers = make(map[string]string, len(resp_parts), allocator);
 	// NOTE(tetra): conform to the common idiom that ok=false means that the
 	// that the caller does not have to clean up `resp` ... because we already did.
 	defer if !ok do delete(resp.headers);
@@ -145,15 +143,16 @@ execute_request :: proc(r: Request, response_allocator := context.allocator) -> 
 		last_hdr_index = i;
 		if trimmed_part == "" do break; // end of headers. (empty, because we split by newlines.)
 
-		hdr_parts := split(trimmed_part, ":");
-		if len(hdr_parts) < 2 {
+		idx := index(trimmed_part, ":");
+		if idx == -1 {
 			resp.status = .Bad_Response_Header;
 			return;
 		}
-
-		header_name := clone(trim_space(hdr_parts[0]), response_allocator); // the hdr_parts are currently in `read_buf` (stack memory), but we want to return them.
-		header_value := clone(trim_space(hdr_parts[1]), response_allocator);
+		// the header parts are currently in `read_buf` (stack memory), but we want to return them.
+		header_name := clone(trim_space(trimmed_part[:idx]), allocator);
+		header_value := clone(trim_space(trimmed_part[idx+1:]), allocator);
 		resp.headers[header_name] = header_value;
+
 	}
 	if last_hdr_index == -1 {
 		// NOTE(tetra): Should have found the last header.
@@ -164,7 +163,7 @@ execute_request :: proc(r: Request, response_allocator := context.allocator) -> 
 
 	body := resp_parts[last_hdr_index+1];
 	body = trim_space(body);
-	resp.body = clone(body, response_allocator);
+	resp.body = clone(body, allocator);
 
 	ok = true;
 	return;
