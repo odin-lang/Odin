@@ -131,7 +131,7 @@ read :: proc(skt: Socket, buffer: []u8) -> (n: int, err: Read_Error) {
 	return try_read(skt, buffer);
 }
 
-write_bytes :: proc(skt: Socket, data: []u8) -> (err: Write_Error) {
+write :: proc(skt: Socket, data: []u8) -> (err: Write_Error) {
 	n: int = ---;
 	sent := 0;
 	for sent < len(data) {
@@ -150,10 +150,8 @@ write_bytes :: proc(skt: Socket, data: []u8) -> (err: Write_Error) {
 }
 
 write_string :: inline proc(skt: Socket, s: string) -> Write_Error {
-	return write_bytes(skt, transmute([]byte) s); // NOTE(tetra): Safe because we don't mutate the data.
+	return write(skt, transmute([]byte) s); // NOTE(tetra): Safe because we don't mutate the data.
 }
-
-write :: proc{write_bytes, write_string};
 
 read_all :: proc(skt: Socket, buffer: []u8) -> (err: Read_Error) {
 	recvd := 0;
