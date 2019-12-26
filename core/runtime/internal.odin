@@ -23,10 +23,10 @@ mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> r
 	// NOTE(bill): This _must_ be implemented like C's memcpy
 	foreign _ {
 		when size_of(rawptr) == 8 {
-			@(link_name="llvm.memmove.p0i8.p0i8.i64")
+			@(link_name="llvm.memcpy.p0i8.p0i8.i64")
 			llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
 		} else {
-			@(link_name="llvm.memmove.p0i8.p0i8.i32")
+			@(link_name="llvm.memcpy.p0i8.p0i8.i32")
 			llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
 		}
 	}
