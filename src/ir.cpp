@@ -8448,6 +8448,109 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			}
 			break;
 		}
+		case Type_EnumeratedArray: {
+			if (cl->elems.count > 0) {
+				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
+
+				auto temp_data = array_make<irCompoundLitElemTempData>(heap_allocator(), 0, cl->elems.count);
+				defer (array_free(&temp_data));
+
+				// NOTE(bill): Separate value, gep, store into their own chunks
+				for_array(i, cl->elems) {
+					Ast *elem = cl->elems[i];
+					if (elem->kind == Ast_FieldValue) {
+						ast_node(fv, FieldValue, elem);
+						if (ir_is_elem_const(proc->module, fv->value, et)) {
+							continue;
+						}
+						if (is_ast_range(fv->field)) {
+							ast_node(ie, BinaryExpr, fv->field);
+							TypeAndValue lo_tav = ie->left->tav;
+							TypeAndValue hi_tav = ie->right->tav;
+							GB_ASSERT(lo_tav.mode == Addressing_Constant);
+							GB_ASSERT(hi_tav.mode == Addressing_Constant);
+
+							TokenKind op = ie->op.kind;
+							i64 lo = exact_value_to_i64(lo_tav.value);
+							i64 hi = exact_value_to_i64(hi_tav.value);
+							if (op == Token_Ellipsis) {
+								hi += 1;
+							}
+
+							irValue *value = ir_build_expr(proc, fv->value);
+
+							for (i64 k = lo; k < hi; k++) {
+								irCompoundLitElemTempData data = {};
+								data.value = value;
+								data.elem_index = cast(i32)k;
+								array_add(&temp_data, data);
+							}
+
+						} else {
+							auto tav = fv->field->tav;
+							GB_ASSERT(tav.mode == Addressing_Constant);
+							i64 index = exact_value_to_i64(tav.value);
+
+							irCompoundLitElemTempData data = {};
+							data.value = ir_emit_conv(proc, ir_build_expr(proc, fv->value), et);
+							data.expr = fv->value;
+							data.elem_index = cast(i32)index;
+							array_add(&temp_data, data);
+						}
+
+					} else {
+						if (ir_is_elem_const(proc->module, elem, et)) {
+							continue;
+						}
+						irCompoundLitElemTempData data = {};
+						data.expr = elem;
+						data.elem_index = cast(i32)i;
+						array_add(&temp_data, data);
+					}
+				}
+
+
+				i32 index_offset = cast(i32)exact_value_to_i64(bt->EnumeratedArray.min_value);
+
+				for_array(i, temp_data) {
+					i32 index = temp_data[i].elem_index - index_offset;
+					temp_data[i].gep = ir_emit_array_epi(proc, v, index);
+				}
+
+				for_array(i, temp_data) {
+					auto return_ptr_hint_ast   = proc->return_ptr_hint_ast;
+					auto return_ptr_hint_value = proc->return_ptr_hint_value;
+					auto return_ptr_hint_used  = proc->return_ptr_hint_used;
+					defer (proc->return_ptr_hint_ast   = return_ptr_hint_ast);
+					defer (proc->return_ptr_hint_value = return_ptr_hint_value);
+					defer (proc->return_ptr_hint_used  = return_ptr_hint_used);
+
+					irValue *field_expr = temp_data[i].value;
+					Ast *expr = temp_data[i].expr;
+
+					proc->return_ptr_hint_value = temp_data[i].gep;
+					proc->return_ptr_hint_ast = unparen_expr(expr);
+
+					if (field_expr == nullptr) {
+						field_expr = ir_build_expr(proc, expr);
+					}
+					Type *t = ir_type(field_expr);
+					GB_ASSERT(t->kind != Type_Tuple);
+					irValue *ev = ir_emit_conv(proc, field_expr, et);
+
+					if (!proc->return_ptr_hint_used) {
+						temp_data[i].value = ev;
+					}
+				}
+
+				for_array(i, temp_data) {
+					if (temp_data[i].value != nullptr) {
+						ir_emit_store(proc, temp_data[i].gep, temp_data[i].value, false);
+					}
+				}
+			}
+			break;
+		}
 		case Type_Slice: {
 			if (cl->elems.count > 0) {
 				Type *elem_type = bt->Slice.elem;
