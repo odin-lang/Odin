@@ -6978,6 +6978,13 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		return ir_addr_load(proc, ir_build_addr(proc, expr));
 	}
 
+	if (tv.mode == Addressing_Constant) {
+		GB_ASSERT(tv.value.kind == ExactValue_Invalid);
+		// NOTE(bill): Zero value constant
+		return ir_add_module_constant(proc->module, tv.type, tv.value);
+	}
+
+
 	switch (expr->kind) {
 	case_ast_node(bl, BasicLit, expr);
 		TokenPos pos = bl->token.pos;
