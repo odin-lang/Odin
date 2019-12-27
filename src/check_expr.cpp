@@ -5629,7 +5629,9 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	defer ({
 		for_array(i, ordered_operands) {
 			Operand const &o = ordered_operands[i];
-			call->viral_state_flags |= o.expr->viral_state_flags;
+			if (o.expr != nullptr) {
+				call->viral_state_flags |= o.expr->viral_state_flags;
+			}
 		}
 	});
 
