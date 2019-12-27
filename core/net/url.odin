@@ -3,8 +3,10 @@ package net
 import "core:fmt"
 import "core:strings"
 import "core:strconv"
+import "core:unicode/utf8"
+import "core:mem"
 
-split_url :: proc(url: string) -> (scheme, host, path: string, queries: map[string]string) {
+split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host, path: string, queries: map[string]string) {
 	s := url;
 	{
 		i := strings.last_index(s, "://");
@@ -20,7 +22,7 @@ split_url :: proc(url: string) -> (scheme, host, path: string, queries: map[stri
 			s = s[:i];
 			if query_str != "" {
 				queries_parts := strings.split(query_str, "&");
-				queries = make(map[string]string, len(queries_parts));
+				queries = make(map[string]string, len(queries_parts), allocator);
 				for q in queries_parts {
 					parts := strings.split(q, "=");
 					switch len(parts) {
@@ -82,27 +84,16 @@ percent_encode :: proc(s: string, allocator := context.allocator) -> string {
 
 	for ch in s {
 		switch ch {
-		case ' ': write_string(&b, "%20");
-		case '!': write_string(&b, "%21");
-		case '#': write_string(&b, "%23");
-		case '$': write_string(&b, "%24");
-		case '%': write_string(&b, "%25");
-		case '&': write_string(&b, "%26");
-		case '\'': write_string(&b, "%27");
-		case '(': write_string(&b, "%28");
-		case ')': write_string(&b, "%29");
-		case '*': write_string(&b, "%2A");
-		case '+': write_string(&b, "%2B");
-		case ',': write_string(&b, "%2C");
-		case '/': write_string(&b, "%2F");
-		case ':': write_string(&b, "%3A");
-		case ';': write_string(&b, "%3B");
-		case '=': write_string(&b, "%3D");
-		case '?': write_string(&b, "%3F");
-		case '@': write_string(&b, "%40");
-		case '[': write_string(&b, "%5B");
-		case ']': write_string(&b, "%5D");
-		case:     write_rune(&b, ch);
+		case 'A'..'Z', 'a'..'z', '0'..'9', '-', '_', '.', '~':
+			write_rune(&b, ch);
+		case:
+			bytes, n := utf8.encode_rune(ch);
+			for byte in bytes[:n] {
+				buf: [2]u8 = ---;
+				s := strconv.append_int(buf[:], i64(byte), 16);
+				write_rune(&b, '%');
+				write_string(&b, s);
+			}
 		}
 	}
 
@@ -116,11 +107,14 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 	grow_builder(&b, len(encoded_string));
 	defer if !ok do destroy_builder(&b);
 
+	stack_buf: [4]u8;
+	pending := mem.buffer_from_slice(stack_buf[:]);
 	s := encoded_string;
+
 	for len(s) > 0 {
 		i := index_rune(s, '%');
 		if i == -1 {
-			write_string(&b, s); // the string is already decoded
+			write_string(&b, s); // no '%'s; the string is already decoded
 			break;
 		}
 
@@ -162,7 +156,15 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 		case 0x40:  write_rune(&b, '@');
 		case 0x5B:  write_rune(&b, '[');
 		case 0x5D:  write_rune(&b, ']');
-		case:       return; // invalid encoded value
+		case:
+			// utf-8 bytes
+			append(&pending, s[0]);
+			append(&pending, s[1]);
+			if len(pending) == 4 {
+				r, _ := utf8.decode_rune(pending[:]);
+				write_rune(&b, r);
+				clear(&pending);
+			}
 		}
 		s = s[2:];
 	}
