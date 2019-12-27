@@ -9137,6 +9137,17 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 		}
 		break;
 	}
+	case Type_EnumeratedArray: {
+		if (val_type != nullptr) {
+			val = ir_emit_load(proc, ir_emit_array_ep(proc, expr, idx));
+			// NOTE(bill): Override the idx value for the enumeration
+			Type *index_type =expr_type->EnumeratedArray.index;
+			if (compare_exact_values(Token_NotEq, expr_type->EnumeratedArray.min_value, exact_value_u64(0))) {
+				idx = ir_emit_arith(proc, Token_Add, idx, ir_value_constant(index_type, expr_type->EnumeratedArray.min_value), index_type);
+			}
+		}
+		break;
+	}
 	case Type_Slice: {
 		if (val_type != nullptr) {
 			irValue *elem = ir_slice_elem(proc, expr);
@@ -9869,6 +9880,17 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 				ir_build_range_indexed(proc, array, val0_type, count_ptr, &val, &key, &loop, &done);
 				break;
 			}
+			case Type_EnumeratedArray: {
+				irValue *count_ptr = nullptr;
+				irValue *array = ir_build_addr_ptr(proc, expr);
+				if (is_type_pointer(type_deref(ir_type(array)))) {
+					array = ir_emit_load(proc, array);
+				}
+				count_ptr = ir_add_local_generated(proc, t_int, false);
+				ir_emit_store(proc, count_ptr, ir_const_int(et->EnumeratedArray.count));
+				ir_build_range_indexed(proc, array, val0_type, count_ptr, &val, &key, &loop, &done);
+				break;
+			}
 			case Type_DynamicArray: {
 				irValue *count_ptr = nullptr;
 				irValue *array = ir_build_addr_ptr(proc, expr);
@@ -10068,6 +10090,27 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 							ir_addr_store(proc, val0_addr, ir_emit_load(proc, elem));
 						}
 						if (val1_type) ir_addr_store(proc, val1_addr, ir_value_constant(val1_type, exact_value_i64(i)));
+
+						ir_build_stmt(proc, rs->body);
+					}
+
+				}
+				break;
+			case Type_EnumeratedArray:
+				if (t->EnumeratedArray.count > 0) {
+					irValue *val = ir_build_expr(proc, expr);
+					irValue *val_addr = ir_address_from_load_or_generate_local(proc, val);
+
+					for (i64 i = 0; i < t->EnumeratedArray.count; i++) {
+						if (val0_type) {
+							// NOTE(bill): Due to weird legacy issues in LLVM, this needs to be an i32
+							irValue *elem = ir_emit_array_epi(proc, val_addr, cast(i32)i);
+							ir_addr_store(proc, val0_addr, ir_emit_load(proc, elem));
+						}
+						if (val1_type) {
+							ExactValue idx = exact_value_add(exact_value_i64(i), t->EnumeratedArray.min_value);
+							ir_addr_store(proc, val1_addr, ir_value_constant(val1_type, idx));
+						}
 
 						ir_build_stmt(proc, rs->body);
 					}

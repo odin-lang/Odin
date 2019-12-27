@@ -652,6 +652,11 @@ void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 				val1 = t_int;
 				inline_for_depth = exact_value_i64(t->Array.count);
 				break;
+			case Type_EnumeratedArray:
+				val0 = t->EnumeratedArray.elem;
+				val1 = t->EnumeratedArray.index;
+				inline_for_depth = exact_value_i64(t->EnumeratedArray.count);
+				break;
 			}
 		}
 
@@ -1506,6 +1511,12 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						add_package_dependency(ctx, "runtime", "string_decode_rune");
 					}
 					break;
+
+				case Type_EnumeratedArray:
+					val0 = t->EnumeratedArray.elem;
+					val1 = t->EnumeratedArray.index;
+					break;
+
 				case Type_Array:
 					val0 = t->Array.elem;
 					val1 = t_int;
