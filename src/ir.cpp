@@ -6697,6 +6697,19 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		irValue *val = ir_build_expr(proc, ce->args[0]);
 		Type *t = base_type(ir_type(val));
 
+		if (!is_type_tuple(tv.type)) {
+			if (t->kind == Type_Struct) {
+				GB_ASSERT(t->Struct.fields.count == 1);
+				return ir_emit_struct_ev(proc, val, 0);
+			} else if (t->kind == Type_Array) {
+				GB_ASSERT(t->Array.count == 1);
+				return ir_emit_array_epi(proc, val, 0);
+			} else {
+				GB_PANIC("Unknown type of expand_to_tuple");
+			}
+
+		}
+
 		GB_ASSERT(is_type_tuple(tv.type));
 		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
 		irValue *tuple = ir_add_local_generated(proc, tv.type, false);

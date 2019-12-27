@@ -4295,9 +4295,12 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				tuple->Tuple.variables[i] = alloc_entity_array_elem(nullptr, blank_token, type->Array.elem, cast(i32)i);
 			}
 		}
-
 		operand->type = tuple;
 		operand->mode = Addressing_Value;
+
+		if (tuple->Tuple.variables.count == 1) {
+			operand->type = tuple->Tuple.variables[0]->type;
+		}
 
 		break;
 	}
@@ -8360,10 +8363,10 @@ void check_not_tuple(CheckerContext *c, Operand *o) {
 		// NOTE(bill): Tuples are not first class thus never named
 		if (o->type->kind == Type_Tuple) {
 			isize count = o->type->Tuple.variables.count;
-			GB_ASSERT(count != 1);
 			error(o->expr,
 			      "%td-valued tuple found where single value expected", count);
 			o->mode = Addressing_Invalid;
+			GB_ASSERT(count != 1);
 		}
 	}
 }
