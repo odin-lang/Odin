@@ -20,6 +20,7 @@ Type_Kind :: enum {
 	Pointer,
 	Procedure,
 	Array,
+	Enumerated_Array,
 	Dynamic_Array,
 	Slice,
 	Tuple,
@@ -51,6 +52,7 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 		case runtime.Type_Info_Pointer:       return .Pointer;
 		case runtime.Type_Info_Procedure:     return .Procedure;
 		case runtime.Type_Info_Array:         return .Array;
+		case runtime.Type_Info_Enumerated_Array: return .Enumerated_Array;
 		case runtime.Type_Info_Dynamic_Array: return .Dynamic_Array;
 		case runtime.Type_Info_Slice:         return .Slice;
 		case runtime.Type_Info_Tuple:         return .Tuple;

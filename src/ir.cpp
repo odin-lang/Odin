@@ -1148,9 +1148,14 @@ irValue *ir_instr_array_element_ptr(irProcedure *p, irValue *address, irValue *e
 	Type *t = ir_type(address);
 	GB_ASSERT_MSG(is_type_pointer(t), "%s", type_to_string(t));
 	t = base_type(type_deref(t));
-	GB_ASSERT(is_type_array(t));
+	GB_ASSERT(is_type_array(t) || is_type_enumerated_array(t));
 
-	Type *result_type = alloc_type_pointer(t->Array.elem);
+	Type *result_type = nullptr;
+	if (t->kind == Type_Array) {
+		result_type = alloc_type_pointer(t->Array.elem);
+	} else if (t->kind == Type_EnumeratedArray) {
+		result_type = alloc_type_pointer(t->EnumeratedArray.elem);
+	}
 
 	i->ArrayElementPtr.address = address;
 	i->ArrayElementPtr.elem_index = elem_index;
@@ -4680,7 +4685,7 @@ irValue *ir_emit_array_ep(irProcedure *proc, irValue *s, irValue *index) {
 	Type *t = ir_type(s);
 	GB_ASSERT(is_type_pointer(t));
 	Type *st = base_type(type_deref(t));
-	GB_ASSERT_MSG(is_type_array(st), "%s", type_to_string(st));
+	GB_ASSERT_MSG(is_type_array(st) || is_type_enumerated_array(st), "%s", type_to_string(st));
 
 	// NOTE(bill): For some weird legacy reason in LLVM, structure elements must be accessed as an i32
 	index = ir_emit_conv(proc, index, t_i32);
@@ -7956,6 +7961,43 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			return ir_addr(elem);
 		}
 
+		case Type_EnumeratedArray: {
+			irValue *array = nullptr;
+			if (using_addr != nullptr) {
+				array = using_addr;
+			} else {
+				array = ir_build_addr_ptr(proc, ie->expr);
+				if (deref) {
+					array = ir_emit_load(proc, array);
+				}
+			}
+
+			Type *index_type = t->EnumeratedArray.index;
+
+			auto index_tv = type_and_value_of_expr(ie->index);
+
+			irValue *index = nullptr;
+			if (compare_exact_values(Token_NotEq, t->EnumeratedArray.min_value, exact_value_i64(0))) {
+				if (index_tv.mode == Addressing_Constant) {
+					ExactValue idx = exact_value_sub(index_tv.value, t->EnumeratedArray.min_value);
+					index = ir_value_constant(index_type, idx);
+				} else {
+					index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
+					index = ir_emit_arith(proc, Token_Sub, index, ir_value_constant(index_type, t->EnumeratedArray.min_value), index_type);
+				}
+			} else {
+				index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
+			}
+
+			irValue *elem = ir_emit_array_ep(proc, array, index);
+
+			if (index_tv.mode != Addressing_Constant) {
+				irValue *len = ir_const_int(t->EnumeratedArray.count);
+				ir_emit_bounds_check(proc, ast_token(ie->index), index, len);
+			}
+			return ir_addr(elem);
+		}
+
 		case Type_Slice: {
 			irValue *slice = nullptr;
 			if (using_addr != nullptr) {
@@ -11053,6 +11095,32 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			irValue *count = ir_emit_struct_ep(proc, tag, 2);
 			ir_emit_store(proc, count, ir_const_int(t->Array.count));
 
+			break;
+		}
+		case Type_EnumeratedArray: {
+			ir_emit_comment(proc, str_lit("Type_Info_Enumerated_Array"));
+			tag = ir_emit_conv(proc, variant_ptr, t_type_info_enumerated_array_ptr);
+			irValue *elem = ir_get_type_info_ptr(proc, t->EnumeratedArray.elem);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), elem);
+
+			irValue *index = ir_get_type_info_ptr(proc, t->EnumeratedArray.index);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), index);
+
+			i64 ez = type_size_of(t->EnumeratedArray.elem);
+			irValue *elem_size = ir_emit_struct_ep(proc, tag, 2);
+			ir_emit_store(proc, elem_size, ir_const_int(ez));
+
+			irValue *count = ir_emit_struct_ep(proc, tag, 3);
+			ir_emit_store(proc, count, ir_const_int(t->EnumeratedArray.count));
+
+			irValue *min_value = ir_emit_struct_ep(proc, tag, 4);
+			irValue *max_value = ir_emit_struct_ep(proc, tag, 5);
+
+			irValue *min_v = ir_value_constant(core_type(t->EnumeratedArray.index), t->EnumeratedArray.min_value);
+			irValue *max_v = ir_value_constant(core_type(t->EnumeratedArray.index), t->EnumeratedArray.max_value);
+
+			ir_emit_store_union_variant(proc, min_value, min_v, ir_type(min_v));
+			ir_emit_store_union_variant(proc, max_value, max_v, ir_type(max_v));
 			break;
 		}
 		case Type_DynamicArray: {

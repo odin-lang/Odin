@@ -457,6 +457,14 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		ir_print_type(f, m, t->Array.elem);
 		ir_write_byte(f, ']');
 		return;
+	case Type_EnumeratedArray:
+		ir_write_byte(f, '[');
+		ir_write_i64(f, t->EnumeratedArray.count);
+		ir_write_str_lit(f, " x ");
+		ir_print_type(f, m, t->EnumeratedArray.elem);
+		ir_write_byte(f, ']');
+		return;
+
 	case Type_Slice:
 		ir_write_byte(f, '{');
 		ir_print_type(f, m, t->Slice.elem); ir_write_str_lit(f, "*, ");
@@ -968,6 +976,100 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 					ir_print_compound_element(f, m, tav.value, elem_type);
 				}
 				for (isize i = elem_count; i < type->Array.count; i++) {
+					if (i >= elem_count) ir_write_str_lit(f, ", ");
+					ir_print_compound_element(f, m, empty_exact_value, elem_type);
+				}
+
+				ir_write_byte(f, ']');
+			}
+		} else if (is_type_enumerated_array(type)) {
+			ast_node(cl, CompoundLit, value.value_compound);
+
+			Type *index_type = type->EnumeratedArray.elem;
+			Type *elem_type = type->Array.elem;
+			isize elem_count = cl->elems.count;
+			if (elem_count == 0) {
+				ir_write_str_lit(f, "zeroinitializer");
+				break;
+			}
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				// TODO(bill): This is O(N*M) and will be quite slow; it should probably be sorted before hand
+				ir_write_byte(f, '[');
+
+				i64 total_lo = exact_value_to_i64(type->EnumeratedArray.min_value);
+				i64 total_hi = exact_value_to_i64(type->EnumeratedArray.max_value);
+
+				for (i64 i = total_lo; i <= total_hi; i++) {
+					if (i > total_lo) ir_write_str_lit(f, ", ");
+
+					bool found = false;
+
+					for (isize j = 0; j < elem_count; j++) {
+						Ast *elem = cl->elems[j];
+						ast_node(fv, FieldValue, elem);
+						if (is_ast_range(fv->field)) {
+							ast_node(ie, BinaryExpr, fv->field);
+							TypeAndValue lo_tav = ie->left->tav;
+							TypeAndValue hi_tav = ie->right->tav;
+							GB_ASSERT(lo_tav.mode == Addressing_Constant);
+							GB_ASSERT(hi_tav.mode == Addressing_Constant);
+
+							TokenKind op = ie->op.kind;
+							i64 lo = exact_value_to_i64(lo_tav.value);
+							i64 hi = exact_value_to_i64(hi_tav.value);
+							if (op == Token_Ellipsis) {
+								hi += 1;
+							}
+							if (lo == i) {
+								TypeAndValue tav = fv->value->tav;
+								if (tav.mode != Addressing_Constant) {
+									break;
+								}
+								for (i64 k = lo; k < hi; k++) {
+									if (k > lo) ir_write_str_lit(f, ", ");
+
+									ir_print_compound_element(f, m, tav.value, elem_type);
+								}
+
+								found = true;
+								i += (hi-lo-1);
+								break;
+							}
+						} else {
+							TypeAndValue index_tav = fv->field->tav;
+							GB_ASSERT(index_tav.mode == Addressing_Constant);
+							i64 index = exact_value_to_i64(index_tav.value);
+							if (index == i) {
+								TypeAndValue tav = fv->value->tav;
+								if (tav.mode != Addressing_Constant) {
+									break;
+								}
+								ir_print_compound_element(f, m, tav.value, elem_type);
+								found = true;
+								break;
+							}
+						}
+					}
+
+					if (!found) {
+						ir_print_type(f, m, elem_type);
+						ir_write_byte(f, ' ');
+						ir_write_str_lit(f, "zeroinitializer");
+					}
+				}
+				ir_write_byte(f, ']');
+			} else {
+				GB_ASSERT_MSG(elem_count == type->EnumeratedArray.count, "%td != %td", elem_count, type->EnumeratedArray.count);
+
+				ir_write_byte(f, '[');
+
+				for (isize i = 0; i < elem_count; i++) {
+					if (i > 0) ir_write_str_lit(f, ", ");
+					TypeAndValue tav = cl->elems[i]->tav;
+					GB_ASSERT(tav.mode != Addressing_Invalid);
+					ir_print_compound_element(f, m, tav.value, elem_type);
+				}
+				for (isize i = elem_count; i < type->EnumeratedArray.count; i++) {
 					if (i >= elem_count) ir_write_str_lit(f, ", ");
 					ir_print_compound_element(f, m, empty_exact_value, elem_type);
 				}

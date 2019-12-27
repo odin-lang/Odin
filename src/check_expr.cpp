@@ -3029,21 +3029,35 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 	update_expr_type(c, operand->expr, target_type, true);
 }
 
-bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64 max_count, i64 *value) {
+bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64 max_count, i64 *value, Type *type_hint=nullptr) {
 	Operand operand = {Addressing_Invalid};
-	check_expr(c, &operand, index_value);
+	check_expr_with_type_hint(c, &operand, index_value, type_hint);
 	if (operand.mode == Addressing_Invalid) {
 		if (value) *value = 0;
 		return false;
 	}
 
-	convert_to_typed(c, &operand, t_int);
+	Type *index_type = t_int;
+	if (type_hint != nullptr) {
+		index_type = type_hint;
+	}
+	convert_to_typed(c, &operand, index_type);
 	if (operand.mode == Addressing_Invalid) {
 		if (value) *value = 0;
 		return false;
 	}
 
-	if (!is_type_integer(operand.type) && !is_type_enum(operand.type)) {
+	if (type_hint != nullptr) {
+		if (!check_is_assignable_to(c, &operand, type_hint)) {
+			gbString expr_str = expr_to_string(operand.expr);
+			gbString index_type_str = type_to_string(type_hint);
+			error(operand.expr, "Index '%s' must be an enum of type '%s'", expr_str, index_type_str);
+			gb_string_free(index_type_str);
+			gb_string_free(expr_str);
+			if (value) *value = 0;
+			return false;
+		}
+	} else if (!is_type_integer(operand.type) && !is_type_enum(operand.type)) {
 		gbString expr_str = expr_to_string(operand.expr);
 		error(operand.expr, "Index '%s' must be an integer", expr_str);
 		gb_string_free(expr_str);
@@ -3054,7 +3068,7 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 	if (operand.mode == Addressing_Constant &&
 	    (c->state_flags & StateFlag_no_bounds_check) == 0) {
 		BigInt i = exact_value_to_integer(operand.value).value_integer;
-		if (i.neg) {
+		if (i.neg && !is_type_enum(index_type)) {
 			gbString expr_str = expr_to_string(operand.expr);
 			error(operand.expr, "Index '%s' cannot be a negative value", expr_str);
 			gb_string_free(expr_str);
@@ -3062,31 +3076,66 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 			return false;
 		}
 
-		if (max_count >= 0) { // NOTE(bill): Do array bound checking
-			i64 v = -1;
-			if (i.len <= 1) {
-				v = big_int_to_i64(&i);
-			}
-			if (value) *value = v;
-			bool out_of_bounds = false;
-			if (open_range) {
-				out_of_bounds = v >= max_count;
-			} else {
-				out_of_bounds = v >= max_count+1;
-			}
-			if (v < 0) {
-				out_of_bounds = true;
-			}
+		if (max_count >= 0) {
+			if (is_type_enum(index_type)) {
+				Type *bt = base_type(index_type);
+				GB_ASSERT(bt->kind == Type_Enum);
+				ExactValue lo = bt->Enum.min_value;
+				ExactValue hi = bt->Enum.max_value;
+				String lo_str = {};
+				String hi_str = {};
+				if (bt->Enum.fields.count > 0) {
+					lo_str = bt->Enum.fields[bt->Enum.min_value_index]->token.string;
+					hi_str = bt->Enum.fields[bt->Enum.max_value_index]->token.string;
+				}
 
-			if (out_of_bounds) {
-				gbString expr_str = expr_to_string(operand.expr);
-				error(operand.expr, "Index '%s' is out of bounds range 0..<%lld", expr_str, max_count);
-				gb_string_free(expr_str);
-				return false;
+				bool out_of_bounds = false;
+
+				if (compare_exact_values(Token_Lt, operand.value, lo) || compare_exact_values(Token_Gt, operand.value, hi)) {
+					out_of_bounds = true;
+				}
+
+				if (out_of_bounds) {
+					gbString expr_str = expr_to_string(operand.expr);
+					if (lo_str.len > 0) {
+						error(operand.expr, "Index '%s' is out of bounds range %.*s .. %.*s", expr_str, LIT(lo_str), LIT(hi_str));
+					} else {
+						gbString index_type_str = type_to_string(index_type);
+						error(operand.expr, "Index '%s' is out of bounds range of enum type %s", expr_str, index_type_str);
+						gb_string_free(index_type_str);
+					}
+					gb_string_free(expr_str);
+					return false;
+				}
+
+				return true;
+
+			} else { // NOTE(bill): Do array bound checking
+				i64 v = -1;
+				if (i.len <= 1) {
+					v = big_int_to_i64(&i);
+				}
+				if (value) *value = v;
+				bool out_of_bounds = false;
+				if (open_range) {
+					out_of_bounds = v >= max_count;
+				} else {
+					out_of_bounds = v >= max_count+1;
+				}
+				if (v < 0) {
+					out_of_bounds = true;
+				}
+
+				if (out_of_bounds) {
+					gbString expr_str = expr_to_string(operand.expr);
+					error(operand.expr, "Index '%s' is out of bounds range 0..<%lld", expr_str, max_count);
+					gb_string_free(expr_str);
+					return false;
+				}
+
+
+				return true;
 			}
-
-
-			return true;
 		}
 	}
 
@@ -3673,6 +3722,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			Type *at = core_type(op_type);
 			mode = Addressing_Constant;
 			value = exact_value_i64(at->Array.count);
+			type = t_untyped_integer;
+		} else if (is_type_enumerated_array(op_type) && id == BuiltinProc_len) {
+			Type *at = core_type(op_type);
+			mode = Addressing_Constant;
+			value = exact_value_i64(at->EnumeratedArray.count);
 			type = t_untyped_integer;
 		} else if (is_type_slice(op_type) && id == BuiltinProc_len) {
 			mode = Addressing_Value;
@@ -4313,7 +4367,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
-		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
+		if (operand->mode == Addressing_Type && is_type_enumerated_array(type)) {
+			// Okay
+		} else if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(original_type);
 			error(call, "Expected a ordered numeric type to 'min', got '%s'", type_str);
 			gb_string_free(type_str);
@@ -4360,6 +4416,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				operand->mode  = Addressing_Constant;
 				operand->type  = original_type;
 				operand->value = type->Enum.min_value;
+				return true;
+			} else if (is_type_enumerated_array(type)) {
+				Type *bt = base_type(type);
+				GB_ASSERT(bt->kind == Type_EnumeratedArray);
+				operand->mode  = Addressing_Constant;
+				operand->type  = bt->EnumeratedArray.index;
+				operand->value = bt->EnumeratedArray.min_value;
 				return true;
 			}
 			gbString type_str = type_to_string(original_type);
@@ -4471,7 +4534,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		Type *original_type = operand->type;
 		Type *type = base_type(operand->type);
-		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
+
+		if (operand->mode == Addressing_Type && is_type_enumerated_array(type)) {
+			// Okay
+		} else if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(original_type);
 			error(call, "Expected a ordered numeric type to 'max', got '%s'", type_str);
 			gb_string_free(type_str);
@@ -4523,6 +4589,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				operand->mode  = Addressing_Constant;
 				operand->type  = original_type;
 				operand->value = type->Enum.max_value;
+				return true;
+			} else if (is_type_enumerated_array(type)) {
+				Type *bt = base_type(type);
+				GB_ASSERT(bt->kind == Type_EnumeratedArray);
+				operand->mode  = Addressing_Constant;
+				operand->type  = bt->EnumeratedArray.index;
+				operand->value = bt->EnumeratedArray.max_value;
 				return true;
 			}
 			gbString type_str = type_to_string(original_type);
@@ -6841,6 +6914,17 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count,
 		o->type = t->Array.elem;
 		return true;
 
+	case Type_EnumeratedArray:
+		*max_count = t->EnumeratedArray.count;
+		if (indirection) {
+			o->mode = Addressing_Variable;
+		} else if (o->mode != Addressing_Variable &&
+		           o->mode != Addressing_Constant) {
+			o->mode = Addressing_Value;
+		}
+		o->type = t->EnumeratedArray.elem;
+		return true;
+
 	case Type_Slice:
 		o->type = t->Slice.elem;
 		if (o->mode != Addressing_Constant) {
@@ -6896,18 +6980,18 @@ bool ternary_compare_types(Type *x, Type *y) {
 }
 
 
-bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValue *inline_for_depth_) {
+bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValue *inline_for_depth_, Type *type_hint=nullptr) {
 	if (!is_ast_range(node)) {
 		return false;
 	}
 
 	ast_node(ie, BinaryExpr, node);
 
-	check_expr(c, x, ie->left);
+	check_expr_with_type_hint(c, x, ie->left, type_hint);
 	if (x->mode == Addressing_Invalid) {
 		return false;
 	}
-	check_expr(c, y, ie->right);
+	check_expr_with_type_hint(c, y, ie->right, type_hint);
 	if (y->mode == Addressing_Invalid) {
 		return false;
 	}
@@ -7630,6 +7714,218 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			break;
 		}
 
+		case Type_EnumeratedArray:
+		{
+			Type *elem_type = t->EnumeratedArray.elem;
+			Type *index_type = t->EnumeratedArray.index;
+			String context_name = str_lit("enumerated array literal");
+			i64 max_type_count = t->EnumeratedArray.count;
+
+			gbString index_type_str = type_to_string(index_type);
+			defer (gb_string_free(index_type_str));
+
+			i64 total_lo = exact_value_to_i64(t->EnumeratedArray.min_value);
+			i64 total_hi = exact_value_to_i64(t->EnumeratedArray.max_value);
+
+			String total_lo_string = {};
+			String total_hi_string = {};
+			GB_ASSERT(is_type_enum(index_type));
+			{
+				Type *bt = base_type(index_type);
+				GB_ASSERT(bt->kind == Type_Enum);
+				for_array(i, bt->Enum.fields) {
+					Entity *f = bt->Enum.fields[i];
+					if (f->kind != Entity_Constant) {
+						continue;
+					}
+					if (total_lo_string.len == 0 && compare_exact_values(Token_CmpEq, f->Constant.value, t->EnumeratedArray.min_value)) {
+						total_lo_string = f->token.string;
+					}
+					if (total_hi_string.len == 0 && compare_exact_values(Token_CmpEq, f->Constant.value, t->EnumeratedArray.max_value)) {
+						total_hi_string = f->token.string;
+					}
+					if (total_lo_string.len != 0 && total_hi_string.len != 0) {
+						break;
+					}
+				}
+			}
+
+			i64 max = 0;
+
+			Type *bet = base_type(elem_type);
+			if (!elem_type_can_be_constant(bet)) {
+				is_constant = false;
+			}
+
+			if (bet == t_invalid) {
+				break;
+			}
+
+			if (cl->elems.count > 0 && cl->elems[0]->kind == Ast_FieldValue) {
+				RangeCache rc = range_cache_make(heap_allocator());
+				defer (range_cache_destroy(&rc));
+
+				for_array(i, cl->elems) {
+					Ast *elem = cl->elems[i];
+					if (elem->kind != Ast_FieldValue) {
+						error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+						continue;
+					}
+					ast_node(fv, FieldValue, elem);
+
+					if (is_ast_range(fv->field)) {
+						Token op = fv->field->BinaryExpr.op;
+
+						Operand x = {};
+						Operand y = {};
+						bool ok = check_range(c, fv->field, &x, &y, nullptr, index_type);
+						if (!ok) {
+							continue;
+						}
+						if (x.mode != Addressing_Constant || !are_types_identical(x.type, index_type)) {
+							error(x.expr, "Expected a constant enum of type '%s' as an array field", index_type_str);
+							continue;
+						}
+
+						if (y.mode != Addressing_Constant || !are_types_identical(x.type, index_type)) {
+							error(y.expr, "Expected a constant enum of type '%s' as an array field", index_type_str);
+							continue;
+						}
+
+						i64 lo = exact_value_to_i64(x.value);
+						i64 hi = exact_value_to_i64(y.value);
+						i64 max_index = hi;
+						if (op.kind == Token_RangeHalf) {
+							hi -= 1;
+						}
+
+						bool new_range = range_cache_add_range(&rc, lo, hi);
+						if (!new_range) {
+							gbString lo_str = expr_to_string(x.expr);
+							gbString hi_str = expr_to_string(y.expr);
+							error(elem, "Overlapping field range index %s %.*s %s for %.*s", lo_str, LIT(op.string), hi_str, LIT(context_name));
+							gb_string_free(hi_str);
+							gb_string_free(lo_str);
+							continue;
+						}
+
+
+						// NOTE(bill): These are sanity checks for invalid enum values
+						if (max_type_count >= 0 && (lo < total_lo || lo >= total_hi)) {
+							gbString lo_str = expr_to_string(x.expr);
+							error(elem, "Index %s is out of bounds (%.*s .. %.*s) for %.*s", lo_str, LIT(total_lo_string), LIT(total_hi_string), LIT(context_name));
+							gb_string_free(lo_str);
+							continue;
+						}
+						if (max_type_count >= 0 && (hi < 0 || hi >= max_type_count)) {
+							gbString hi_str = expr_to_string(y.expr);
+							error(elem, "Index %s is out of bounds (%.*s .. %.*s) for %.*s", hi_str, LIT(total_lo_string), LIT(total_hi_string), LIT(context_name));
+							gb_string_free(hi_str);
+							continue;
+						}
+
+						if (max < hi) {
+							max = max_index;
+						}
+
+						Operand operand = {};
+						check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+						check_assignment(c, &operand, elem_type, context_name);
+
+						is_constant = is_constant && operand.mode == Addressing_Constant;
+					} else {
+						Operand op_index = {};
+						check_expr_with_type_hint(c, &op_index, fv->field, index_type);
+
+						if (op_index.mode != Addressing_Constant || !are_types_identical(op_index.type, index_type)) {
+							error(op_index.expr, "Expected a constant enum of type '%s' as an array field", index_type_str);
+							continue;
+						}
+
+						i64 index = exact_value_to_i64(op_index.value);
+
+						if (max_type_count >= 0 && (index < total_lo || index >= total_hi)) {
+							gbString idx_str = expr_to_string(op_index.expr);
+							error(elem, "Index %s is out of bounds (%.*s .. %.*s) for %.*s", idx_str, LIT(total_lo_string), LIT(total_hi_string), LIT(context_name));
+							gb_string_free(idx_str);
+							continue;
+						}
+
+						bool new_index = range_cache_add_index(&rc, index);
+						if (!new_index) {
+							gbString idx_str = expr_to_string(op_index.expr);
+							error(elem, "Duplicate field index %s for %.*s", idx_str, LIT(context_name));
+							gb_string_free(idx_str);
+							continue;
+						}
+
+						if (max < index+1) {
+							max = index+1;
+						}
+
+						Operand operand = {};
+						check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+						check_assignment(c, &operand, elem_type, context_name);
+
+						is_constant = is_constant && operand.mode == Addressing_Constant;
+					}
+				}
+
+				cl->max_count = max;
+
+			} else {
+				isize index = 0;
+				for (; index < cl->elems.count; index++) {
+					Ast *e = cl->elems[index];
+					if (e == nullptr) {
+						error(node, "Invalid literal element");
+						continue;
+					}
+
+					if (e->kind == Ast_FieldValue) {
+						error(e, "Mixture of 'field = value' and value elements in a literal is not allowed");
+						continue;
+					}
+
+					if (0 <= max_type_count && max_type_count <= index) {
+						error(e, "Index %lld is out of bounds (>= %lld) for %.*s", index, max_type_count, LIT(context_name));
+					}
+
+					Operand operand = {};
+					check_expr_with_type_hint(c, &operand, e, elem_type);
+					check_assignment(c, &operand, elem_type, context_name);
+
+					is_constant = is_constant && operand.mode == Addressing_Constant;
+				}
+
+				if (max < index) {
+					max = index;
+				}
+			}
+
+
+			if (t->kind == Type_Array) {
+				if (is_to_be_determined_array_count) {
+					t->Array.count = max;
+				} else if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
+					if (0 < max && max < t->Array.count) {
+						error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
+					}
+				}
+			}
+
+
+			if (t->kind == Type_SimdVector) {
+				if (!is_constant) {
+					error(node, "Expected all constant elements for a simd vector");
+				}
+				if (t->SimdVector.is_x86_mmx) {
+					error(node, "Compound literals are not allowed with intrinsics.x86_mmx");
+				}
+			}
+			break;
+		}
+
 		case Type_Basic: {
 			if (!is_type_any(t)) {
 				if (cl->elems.count != 0) {
@@ -8135,8 +8431,15 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			return kind;
 		}
 
+		Type *index_type_hint = nullptr;
+		if (is_type_enumerated_array(t)) {
+			Type *bt = base_type(t);
+			GB_ASSERT(bt->kind == Type_EnumeratedArray);
+			index_type_hint = bt->EnumeratedArray.index;
+		}
+
 		i64 index = 0;
-		bool ok = check_index_value(c, false, ie->index, max_count, &index);
+		bool ok = check_index_value(c, false, ie->index, max_count, &index, index_type_hint);
 
 		node->viral_state_flags |= ie->index->viral_state_flags;
 	case_end;

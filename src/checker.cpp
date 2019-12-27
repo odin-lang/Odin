@@ -1299,6 +1299,14 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		add_type_info_type(c, alloc_type_pointer(bt->Array.elem));
 		add_type_info_type(c, t_int);
 		break;
+
+	case Type_EnumeratedArray:
+		add_type_info_type(c, bt->EnumeratedArray.index);
+		add_type_info_type(c, t_int);
+		add_type_info_type(c, bt->EnumeratedArray.elem);
+		add_type_info_type(c, alloc_type_pointer(bt->EnumeratedArray.elem));
+		break;
+
 	case Type_DynamicArray:
 		add_type_info_type(c, bt->DynamicArray.elem);
 		add_type_info_type(c, alloc_type_pointer(bt->DynamicArray.elem));
@@ -1508,6 +1516,13 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		add_min_dep_type_info(c, alloc_type_pointer(bt->Array.elem));
 		add_min_dep_type_info(c, t_int);
 		break;
+	case Type_EnumeratedArray:
+		add_min_dep_type_info(c, bt->EnumeratedArray.index);
+		add_min_dep_type_info(c, bt->EnumeratedArray.elem);
+		add_min_dep_type_info(c, alloc_type_pointer(bt->EnumeratedArray.elem));
+		add_min_dep_type_info(c, t_int);
+		break;
+
 	case Type_DynamicArray:
 		add_min_dep_type_info(c, bt->DynamicArray.elem);
 		add_min_dep_type_info(c, alloc_type_pointer(bt->DynamicArray.elem));
@@ -1957,55 +1972,57 @@ void init_core_type_info(Checker *c) {
 	Type *tiv_type = type_info_variant->type;
 	GB_ASSERT(is_type_union(tiv_type));
 
-	t_type_info_named         = find_core_type(c, str_lit("Type_Info_Named"));
-	t_type_info_integer       = find_core_type(c, str_lit("Type_Info_Integer"));
-	t_type_info_rune          = find_core_type(c, str_lit("Type_Info_Rune"));
-	t_type_info_float         = find_core_type(c, str_lit("Type_Info_Float"));
-	t_type_info_quaternion    = find_core_type(c, str_lit("Type_Info_Quaternion"));
-	t_type_info_complex       = find_core_type(c, str_lit("Type_Info_Complex"));
-	t_type_info_string        = find_core_type(c, str_lit("Type_Info_String"));
-	t_type_info_boolean       = find_core_type(c, str_lit("Type_Info_Boolean"));
-	t_type_info_any           = find_core_type(c, str_lit("Type_Info_Any"));
-	t_type_info_typeid        = find_core_type(c, str_lit("Type_Info_Type_Id"));
-	t_type_info_pointer       = find_core_type(c, str_lit("Type_Info_Pointer"));
-	t_type_info_procedure     = find_core_type(c, str_lit("Type_Info_Procedure"));
-	t_type_info_array         = find_core_type(c, str_lit("Type_Info_Array"));
-	t_type_info_dynamic_array = find_core_type(c, str_lit("Type_Info_Dynamic_Array"));
-	t_type_info_slice         = find_core_type(c, str_lit("Type_Info_Slice"));
-	t_type_info_tuple         = find_core_type(c, str_lit("Type_Info_Tuple"));
-	t_type_info_struct        = find_core_type(c, str_lit("Type_Info_Struct"));
-	t_type_info_union         = find_core_type(c, str_lit("Type_Info_Union"));
-	t_type_info_enum          = find_core_type(c, str_lit("Type_Info_Enum"));
-	t_type_info_map           = find_core_type(c, str_lit("Type_Info_Map"));
-	t_type_info_bit_field     = find_core_type(c, str_lit("Type_Info_Bit_Field"));
-	t_type_info_bit_set       = find_core_type(c, str_lit("Type_Info_Bit_Set"));
-	t_type_info_opaque        = find_core_type(c, str_lit("Type_Info_Opaque"));
-	t_type_info_simd_vector   = find_core_type(c, str_lit("Type_Info_Simd_Vector"));
+	t_type_info_named            = find_core_type(c, str_lit("Type_Info_Named"));
+	t_type_info_integer          = find_core_type(c, str_lit("Type_Info_Integer"));
+	t_type_info_rune             = find_core_type(c, str_lit("Type_Info_Rune"));
+	t_type_info_float            = find_core_type(c, str_lit("Type_Info_Float"));
+	t_type_info_quaternion       = find_core_type(c, str_lit("Type_Info_Quaternion"));
+	t_type_info_complex          = find_core_type(c, str_lit("Type_Info_Complex"));
+	t_type_info_string           = find_core_type(c, str_lit("Type_Info_String"));
+	t_type_info_boolean          = find_core_type(c, str_lit("Type_Info_Boolean"));
+	t_type_info_any              = find_core_type(c, str_lit("Type_Info_Any"));
+	t_type_info_typeid           = find_core_type(c, str_lit("Type_Info_Type_Id"));
+	t_type_info_pointer          = find_core_type(c, str_lit("Type_Info_Pointer"));
+	t_type_info_procedure        = find_core_type(c, str_lit("Type_Info_Procedure"));
+	t_type_info_array            = find_core_type(c, str_lit("Type_Info_Array"));
+	t_type_info_enumerated_array = find_core_type(c, str_lit("Type_Info_Enumerated_Array"));
+	t_type_info_dynamic_array    = find_core_type(c, str_lit("Type_Info_Dynamic_Array"));
+	t_type_info_slice            = find_core_type(c, str_lit("Type_Info_Slice"));
+	t_type_info_tuple            = find_core_type(c, str_lit("Type_Info_Tuple"));
+	t_type_info_struct           = find_core_type(c, str_lit("Type_Info_Struct"));
+	t_type_info_union            = find_core_type(c, str_lit("Type_Info_Union"));
+	t_type_info_enum             = find_core_type(c, str_lit("Type_Info_Enum"));
+	t_type_info_map              = find_core_type(c, str_lit("Type_Info_Map"));
+	t_type_info_bit_field        = find_core_type(c, str_lit("Type_Info_Bit_Field"));
+	t_type_info_bit_set          = find_core_type(c, str_lit("Type_Info_Bit_Set"));
+	t_type_info_opaque           = find_core_type(c, str_lit("Type_Info_Opaque"));
+	t_type_info_simd_vector      = find_core_type(c, str_lit("Type_Info_Simd_Vector"));
 
-	t_type_info_named_ptr         = alloc_type_pointer(t_type_info_named);
-	t_type_info_integer_ptr       = alloc_type_pointer(t_type_info_integer);
-	t_type_info_rune_ptr          = alloc_type_pointer(t_type_info_rune);
-	t_type_info_float_ptr         = alloc_type_pointer(t_type_info_float);
-	t_type_info_quaternion_ptr    = alloc_type_pointer(t_type_info_quaternion);
-	t_type_info_complex_ptr       = alloc_type_pointer(t_type_info_complex);
-	t_type_info_string_ptr        = alloc_type_pointer(t_type_info_string);
-	t_type_info_boolean_ptr       = alloc_type_pointer(t_type_info_boolean);
-	t_type_info_any_ptr           = alloc_type_pointer(t_type_info_any);
-	t_type_info_typeid_ptr        = alloc_type_pointer(t_type_info_typeid);
-	t_type_info_pointer_ptr       = alloc_type_pointer(t_type_info_pointer);
-	t_type_info_procedure_ptr     = alloc_type_pointer(t_type_info_procedure);
-	t_type_info_array_ptr         = alloc_type_pointer(t_type_info_array);
-	t_type_info_dynamic_array_ptr = alloc_type_pointer(t_type_info_dynamic_array);
-	t_type_info_slice_ptr         = alloc_type_pointer(t_type_info_slice);
-	t_type_info_tuple_ptr         = alloc_type_pointer(t_type_info_tuple);
-	t_type_info_struct_ptr        = alloc_type_pointer(t_type_info_struct);
-	t_type_info_union_ptr         = alloc_type_pointer(t_type_info_union);
-	t_type_info_enum_ptr          = alloc_type_pointer(t_type_info_enum);
-	t_type_info_map_ptr           = alloc_type_pointer(t_type_info_map);
-	t_type_info_bit_field_ptr     = alloc_type_pointer(t_type_info_bit_field);
-	t_type_info_bit_set_ptr       = alloc_type_pointer(t_type_info_bit_set);
-	t_type_info_opaque_ptr        = alloc_type_pointer(t_type_info_opaque);
-	t_type_info_simd_vector_ptr   = alloc_type_pointer(t_type_info_simd_vector);
+	t_type_info_named_ptr            = alloc_type_pointer(t_type_info_named);
+	t_type_info_integer_ptr          = alloc_type_pointer(t_type_info_integer);
+	t_type_info_rune_ptr             = alloc_type_pointer(t_type_info_rune);
+	t_type_info_float_ptr            = alloc_type_pointer(t_type_info_float);
+	t_type_info_quaternion_ptr       = alloc_type_pointer(t_type_info_quaternion);
+	t_type_info_complex_ptr          = alloc_type_pointer(t_type_info_complex);
+	t_type_info_string_ptr           = alloc_type_pointer(t_type_info_string);
+	t_type_info_boolean_ptr          = alloc_type_pointer(t_type_info_boolean);
+	t_type_info_any_ptr              = alloc_type_pointer(t_type_info_any);
+	t_type_info_typeid_ptr           = alloc_type_pointer(t_type_info_typeid);
+	t_type_info_pointer_ptr          = alloc_type_pointer(t_type_info_pointer);
+	t_type_info_procedure_ptr        = alloc_type_pointer(t_type_info_procedure);
+	t_type_info_array_ptr            = alloc_type_pointer(t_type_info_array);
+	t_type_info_enumerated_array_ptr = alloc_type_pointer(t_type_info_enumerated_array);
+	t_type_info_dynamic_array_ptr    = alloc_type_pointer(t_type_info_dynamic_array);
+	t_type_info_slice_ptr            = alloc_type_pointer(t_type_info_slice);
+	t_type_info_tuple_ptr            = alloc_type_pointer(t_type_info_tuple);
+	t_type_info_struct_ptr           = alloc_type_pointer(t_type_info_struct);
+	t_type_info_union_ptr            = alloc_type_pointer(t_type_info_union);
+	t_type_info_enum_ptr             = alloc_type_pointer(t_type_info_enum);
+	t_type_info_map_ptr              = alloc_type_pointer(t_type_info_map);
+	t_type_info_bit_field_ptr        = alloc_type_pointer(t_type_info_bit_field);
+	t_type_info_bit_set_ptr          = alloc_type_pointer(t_type_info_bit_set);
+	t_type_info_opaque_ptr           = alloc_type_pointer(t_type_info_opaque);
+	t_type_info_simd_vector_ptr      = alloc_type_pointer(t_type_info_simd_vector);
 }
 
 void init_mem_allocator(Checker *c) {

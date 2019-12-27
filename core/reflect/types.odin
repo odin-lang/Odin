@@ -82,6 +82,13 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 		if x.count != y.count do return false;
 		return are_types_identical(x.elem, y.elem);
 
+	case rt.Type_Info_Enumerated_Array:
+		y, ok := b.variant.(rt.Type_Info_Enumerated_Array);
+		if !ok do return false;
+		if x.count != y.count do return false;
+		return are_types_identical(x.index, y.index) &&
+		       are_types_identical(x.elem, y.elem);
+
 	case rt.Type_Info_Dynamic_Array:
 		y, ok := b.variant.(rt.Type_Info_Dynamic_Array);
 		if !ok do return false;
@@ -397,6 +404,13 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		write_i64(buf, i64(info.count), 10);
 		write_string(buf, "]");
 		write_type(buf, info.elem);
+
+	case rt.Type_Info_Enumerated_Array:
+		write_string(buf, "[");
+		write_type(buf, info.index);
+		write_string(buf, "]");
+		write_type(buf, info.elem);
+
 	case rt.Type_Info_Dynamic_Array:
 		write_string(buf, "[dynamic]");
 		write_type(buf, info.elem);

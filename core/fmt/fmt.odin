@@ -873,6 +873,49 @@ fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 }
 
 
+stored_enum_value_to_string :: proc(enum_type: ^runtime.Type_Info, ev: runtime.Type_Info_Enum_Value, offset: int = 0) -> (string, bool) {
+	et := runtime.type_info_base(enum_type);
+	#partial switch e in et.variant {
+	case: return "", false;
+	case runtime.Type_Info_Enum:
+		get_str :: proc(i: $T, e: runtime.Type_Info_Enum) -> (string, bool) {
+			if reflect.is_string(e.base) {
+				for val, idx in e.values {
+					if v, ok := val.(T); ok && v == i {
+						return e.names[idx], true;
+					}
+				}
+			} else if len(e.values) == 0 {
+				return "", true;
+			} else {
+				for val, idx in e.values {
+					if v, ok := val.(T); ok && v == i {
+						return e.names[idx], true;
+					}
+				}
+			}
+			return "", false;
+		}
+
+		switch v in ev {
+		case rune:    return get_str(v + auto_cast offset, e);
+		case i8:      return get_str(v + auto_cast offset, e);
+		case i16:     return get_str(v + auto_cast offset, e);
+		case i32:     return get_str(v + auto_cast offset, e);
+		case i64:     return get_str(v + auto_cast offset, e);
+		case int:     return get_str(v + auto_cast offset, e);
+		case u8:      return get_str(v + auto_cast offset, e);
+		case u16:     return get_str(v + auto_cast offset, e);
+		case u32:     return get_str(v + auto_cast offset, e);
+		case u64:     return get_str(v + auto_cast offset, e);
+		case uint:    return get_str(v + auto_cast offset, e);
+		case uintptr: return get_str(v + auto_cast offset, e);
+		}
+	}
+
+	return "", false;
+}
+
 
 enum_value_to_u64 :: proc(ev: runtime.Type_Info_Enum_Value) -> u64 {
 	switch i in ev {
@@ -888,6 +931,24 @@ enum_value_to_u64 :: proc(ev: runtime.Type_Info_Enum_Value) -> u64 {
 	case u64:     return u64(i);
 	case uint:    return u64(i);
 	case uintptr: return u64(i);
+	}
+	return 0;
+}
+
+enum_value_to_i64 :: proc(ev: runtime.Type_Info_Enum_Value) -> i64 {
+	switch i in ev {
+	case rune:    return i64(i);
+	case i8:      return i64(i);
+	case i16:     return i64(i);
+	case i32:     return i64(i);
+	case i64:     return i64(i);
+	case int:     return i64(i);
+	case u8:      return i64(i);
+	case u16:     return i64(i);
+	case u32:     return i64(i);
+	case u64:     return i64(i);
+	case uint:    return i64(i);
+	case uintptr: return i64(i);
 	}
 	return 0;
 }
@@ -1236,6 +1297,25 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		defer strings.write_byte(fi.buf, ']');
 		for i in 0..<info.count {
 			if i > 0 do strings.write_string(fi.buf, ", ");
+
+			data := uintptr(v.data) + uintptr(i*info.elem_size);
+			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
+		}
+
+	case runtime.Type_Info_Enumerated_Array:
+		strings.write_byte(fi.buf, '[');
+		defer strings.write_byte(fi.buf, ']');
+		for i in 0..<info.count {
+			if i > 0 do strings.write_string(fi.buf, ", ");
+
+			idx, ok := stored_enum_value_to_string(info.index, info.min_value, i);
+			if ok {
+				strings.write_byte(fi.buf, '.');
+				strings.write_string(fi.buf, idx);
+			} else {
+				strings.write_i64(fi.buf, enum_value_to_i64(info.min_value)+i64(i));
+			}
+			strings.write_string(fi.buf, " = ");
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size);
 			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);

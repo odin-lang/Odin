@@ -172,6 +172,14 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 		print_u64(fd, u64(info.count));
 		os.write_byte(fd, ']');
 		print_type(fd, info.elem);
+
+	case Type_Info_Enumerated_Array:
+		os.write_byte(fd, '[');
+		print_type(fd, info.index);
+		os.write_byte(fd, ']');
+		print_type(fd, info.elem);
+
+
 	case Type_Info_Dynamic_Array:
 		os.write_string(fd, "[dynamic]");
 		print_type(fd, info.elem);
