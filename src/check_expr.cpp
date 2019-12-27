@@ -8748,7 +8748,9 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 		if (!valid) {
 			gbString str = expr_to_string(o->expr);
-			error(o->expr, "Cannot slice '%s'", str);
+			gbString type_str = type_to_string(o->type);
+			error(o->expr, "Cannot slice '%s' of type '%s'", str, type_str);
+			gb_string_free(type_str);
 			gb_string_free(str);
 			o->mode = Addressing_Invalid;
 			o->expr = node;
