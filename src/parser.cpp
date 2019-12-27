@@ -1759,6 +1759,17 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 				break;
 			}
 			return original_type;
+		} else if (name.string == "partial") {
+			Ast *tag = ast_basic_directive(f, token, name.string);
+			Ast *original_type = parse_type(f);
+			Ast *type = unparen_expr(original_type);
+			switch (type->kind) {
+			case Ast_ArrayType: type->ArrayType.tag = tag; break;
+			default:
+				syntax_error(type, "Expected an enumerated array type after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[type->kind]));
+				break;
+			}
+			return original_type;
 		} else if (name.string == "bounds_check") {
 			Ast *operand = parse_expr(f, lhs);
 			operand->state_flags |= StateFlag_bounds_check;

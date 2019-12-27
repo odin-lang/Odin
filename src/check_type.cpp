@@ -3241,11 +3241,32 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 
 				Type *t = alloc_type_enumerated_array(elem, index, bt->Enum.min_value, bt->Enum.max_value, Token_Invalid);
 
+				bool is_partial = false;
 				if (at->tag != nullptr) {
 					GB_ASSERT(at->tag->kind == Ast_BasicDirective);
 					String name = at->tag->BasicDirective.name;
-					error(at->tag, "Invalid tag applied to an enumerated array, got #%.*s", LIT(name));
+					if (name == "partial") {
+						is_partial = true;
+					} else {
+						error(at->tag, "Invalid tag applied to an enumerated array, got #%.*s", LIT(name));
+					}
 				}
+
+				if (t->EnumeratedArray.count != bt->Enum.fields.count) {
+					if (!is_partial) {
+						error(e, "Non-contiguous enumeration used as an index in an enumerated array");
+						long long ea_count   = cast(long long)t->EnumeratedArray.count;
+						long long enum_count = cast(long long)t->Enum.fields.count;
+						error_line("\tenumerated array length: %lld\n", ea_count);
+						error_line("\tenum field count: %lld\n", enum_count);
+						error_line("\tSuggestion: prepend #partial to the enumerated array to allow for non-named elements\n");
+						if (2*enum_count < ea_count) {
+							error_line("\tWarning: the number of named elements is much smaller than the length of the array, are you sure this is what you want?\n");
+							error_line("\t         this warning will be removed if #partial is applied\n");
+						}
+					}
+				}
+
 				*type = t;
 
 				goto array_end;
