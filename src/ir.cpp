@@ -8255,6 +8255,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 		Type *et = nullptr;
 		switch (bt->kind) {
 		case Type_Array:  et = bt->Array.elem;  break;
+		case Type_EnumeratedArray: et = bt->EnumeratedArray.elem; break;
 		case Type_Slice:  et = bt->Slice.elem;  break;
 		case Type_BitSet: et = bt->BitSet.elem; break;
 		case Type_SimdVector: et = bt->SimdVector.elem; break;
