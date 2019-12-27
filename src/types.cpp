@@ -177,6 +177,14 @@ struct TypeUnion {
 		i64   count;                                      \
 		Type *generic_count;                              \
 	})                                                    \
+	TYPE_KIND(EnumeratedArray, struct {                   \
+		Type *elem;                                       \
+		Type *index;                                      \
+		ExactValue min_value;                             \
+		ExactValue max_value;                             \
+		i64 count;                                        \
+		TokenKind op;                                     \
+	})                                                    \
 	TYPE_KIND(Slice,   struct { Type *elem; })            \
 	TYPE_KIND(DynamicArray, struct { Type *elem; })       \
 	TYPE_KIND(Map, struct {                               \
@@ -197,6 +205,8 @@ struct TypeUnion {
 		Type *   base_type;                               \
 		ExactValue min_value;                             \
 		ExactValue max_value;                             \
+		isize min_value_index;                            \
+		isize max_value_index;                            \
 	})                                                    \
 	TYPE_KIND(Tuple, struct {                             \
 		Array<Entity *> variables; /* Entity_Variable */  \
@@ -489,73 +499,75 @@ gb_global Type *t_string_slice = nullptr;
 
 
 // Type generated for the "preload" file
-gb_global Type *t_type_info                   = nullptr;
-gb_global Type *t_type_info_enum_value        = nullptr;
-gb_global Type *t_type_info_ptr               = nullptr;
-gb_global Type *t_type_info_enum_value_ptr    = nullptr;
+gb_global Type *t_type_info                      = nullptr;
+gb_global Type *t_type_info_enum_value           = nullptr;
+gb_global Type *t_type_info_ptr                  = nullptr;
+gb_global Type *t_type_info_enum_value_ptr       = nullptr;
 
-gb_global Type *t_type_info_named             = nullptr;
-gb_global Type *t_type_info_integer           = nullptr;
-gb_global Type *t_type_info_rune              = nullptr;
-gb_global Type *t_type_info_float             = nullptr;
-gb_global Type *t_type_info_complex           = nullptr;
-gb_global Type *t_type_info_quaternion        = nullptr;
-gb_global Type *t_type_info_any               = nullptr;
-gb_global Type *t_type_info_typeid            = nullptr;
-gb_global Type *t_type_info_string            = nullptr;
-gb_global Type *t_type_info_boolean           = nullptr;
-gb_global Type *t_type_info_pointer           = nullptr;
-gb_global Type *t_type_info_procedure         = nullptr;
-gb_global Type *t_type_info_array             = nullptr;
-gb_global Type *t_type_info_dynamic_array     = nullptr;
-gb_global Type *t_type_info_slice             = nullptr;
-gb_global Type *t_type_info_tuple             = nullptr;
-gb_global Type *t_type_info_struct            = nullptr;
-gb_global Type *t_type_info_union             = nullptr;
-gb_global Type *t_type_info_enum              = nullptr;
-gb_global Type *t_type_info_map               = nullptr;
-gb_global Type *t_type_info_bit_field         = nullptr;
-gb_global Type *t_type_info_bit_set           = nullptr;
-gb_global Type *t_type_info_opaque            = nullptr;
-gb_global Type *t_type_info_simd_vector       = nullptr;
+gb_global Type *t_type_info_named                = nullptr;
+gb_global Type *t_type_info_integer              = nullptr;
+gb_global Type *t_type_info_rune                 = nullptr;
+gb_global Type *t_type_info_float                = nullptr;
+gb_global Type *t_type_info_complex              = nullptr;
+gb_global Type *t_type_info_quaternion           = nullptr;
+gb_global Type *t_type_info_any                  = nullptr;
+gb_global Type *t_type_info_typeid               = nullptr;
+gb_global Type *t_type_info_string               = nullptr;
+gb_global Type *t_type_info_boolean              = nullptr;
+gb_global Type *t_type_info_pointer              = nullptr;
+gb_global Type *t_type_info_procedure            = nullptr;
+gb_global Type *t_type_info_array                = nullptr;
+gb_global Type *t_type_info_enumerated_array     = nullptr;
+gb_global Type *t_type_info_dynamic_array        = nullptr;
+gb_global Type *t_type_info_slice                = nullptr;
+gb_global Type *t_type_info_tuple                = nullptr;
+gb_global Type *t_type_info_struct               = nullptr;
+gb_global Type *t_type_info_union                = nullptr;
+gb_global Type *t_type_info_enum                 = nullptr;
+gb_global Type *t_type_info_map                  = nullptr;
+gb_global Type *t_type_info_bit_field            = nullptr;
+gb_global Type *t_type_info_bit_set              = nullptr;
+gb_global Type *t_type_info_opaque               = nullptr;
+gb_global Type *t_type_info_simd_vector          = nullptr;
 
-gb_global Type *t_type_info_named_ptr         = nullptr;
-gb_global Type *t_type_info_integer_ptr       = nullptr;
-gb_global Type *t_type_info_rune_ptr          = nullptr;
-gb_global Type *t_type_info_float_ptr         = nullptr;
-gb_global Type *t_type_info_complex_ptr       = nullptr;
-gb_global Type *t_type_info_quaternion_ptr    = nullptr;
-gb_global Type *t_type_info_any_ptr           = nullptr;
-gb_global Type *t_type_info_typeid_ptr        = nullptr;
-gb_global Type *t_type_info_string_ptr        = nullptr;
-gb_global Type *t_type_info_boolean_ptr       = nullptr;
-gb_global Type *t_type_info_pointer_ptr       = nullptr;
-gb_global Type *t_type_info_procedure_ptr     = nullptr;
-gb_global Type *t_type_info_array_ptr         = nullptr;
-gb_global Type *t_type_info_dynamic_array_ptr = nullptr;
-gb_global Type *t_type_info_slice_ptr         = nullptr;
-gb_global Type *t_type_info_tuple_ptr         = nullptr;
-gb_global Type *t_type_info_struct_ptr        = nullptr;
-gb_global Type *t_type_info_union_ptr         = nullptr;
-gb_global Type *t_type_info_enum_ptr          = nullptr;
-gb_global Type *t_type_info_map_ptr           = nullptr;
-gb_global Type *t_type_info_bit_field_ptr     = nullptr;
-gb_global Type *t_type_info_bit_set_ptr       = nullptr;
-gb_global Type *t_type_info_opaque_ptr        = nullptr;
-gb_global Type *t_type_info_simd_vector_ptr   = nullptr;
+gb_global Type *t_type_info_named_ptr            = nullptr;
+gb_global Type *t_type_info_integer_ptr          = nullptr;
+gb_global Type *t_type_info_rune_ptr             = nullptr;
+gb_global Type *t_type_info_float_ptr            = nullptr;
+gb_global Type *t_type_info_complex_ptr          = nullptr;
+gb_global Type *t_type_info_quaternion_ptr       = nullptr;
+gb_global Type *t_type_info_any_ptr              = nullptr;
+gb_global Type *t_type_info_typeid_ptr           = nullptr;
+gb_global Type *t_type_info_string_ptr           = nullptr;
+gb_global Type *t_type_info_boolean_ptr          = nullptr;
+gb_global Type *t_type_info_pointer_ptr          = nullptr;
+gb_global Type *t_type_info_procedure_ptr        = nullptr;
+gb_global Type *t_type_info_array_ptr            = nullptr;
+gb_global Type *t_type_info_enumerated_array_ptr = nullptr;
+gb_global Type *t_type_info_dynamic_array_ptr    = nullptr;
+gb_global Type *t_type_info_slice_ptr            = nullptr;
+gb_global Type *t_type_info_tuple_ptr            = nullptr;
+gb_global Type *t_type_info_struct_ptr           = nullptr;
+gb_global Type *t_type_info_union_ptr            = nullptr;
+gb_global Type *t_type_info_enum_ptr             = nullptr;
+gb_global Type *t_type_info_map_ptr              = nullptr;
+gb_global Type *t_type_info_bit_field_ptr        = nullptr;
+gb_global Type *t_type_info_bit_set_ptr          = nullptr;
+gb_global Type *t_type_info_opaque_ptr           = nullptr;
+gb_global Type *t_type_info_simd_vector_ptr      = nullptr;
 
-gb_global Type *t_allocator                   = nullptr;
-gb_global Type *t_allocator_ptr               = nullptr;
-gb_global Type *t_context                     = nullptr;
-gb_global Type *t_context_ptr                 = nullptr;
+gb_global Type *t_allocator                      = nullptr;
+gb_global Type *t_allocator_ptr                  = nullptr;
+gb_global Type *t_context                        = nullptr;
+gb_global Type *t_context_ptr                    = nullptr;
 
-gb_global Type *t_source_code_location        = nullptr;
-gb_global Type *t_source_code_location_ptr    = nullptr;
+gb_global Type *t_source_code_location           = nullptr;
+gb_global Type *t_source_code_location_ptr       = nullptr;
 
-gb_global Type *t_map_key                     = nullptr;
-gb_global Type *t_map_header                  = nullptr;
+gb_global Type *t_map_key                        = nullptr;
+gb_global Type *t_map_header                     = nullptr;
 
-gb_global Type *t_vector_x86_mmx              = nullptr;
+gb_global Type *t_vector_x86_mmx                 = nullptr;
 
 
 
@@ -701,6 +713,19 @@ Type *alloc_type_array(Type *elem, i64 count, Type *generic_count = nullptr) {
 	t->Array.count = count;
 	return t;
 }
+
+Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValue min_value, ExactValue max_value, TokenKind op) {
+	Type *t = alloc_type(Type_EnumeratedArray);
+	t->EnumeratedArray.elem = elem;
+	t->EnumeratedArray.index = index;
+	t->EnumeratedArray.min_value = min_value;
+	t->EnumeratedArray.max_value = max_value;
+	t->EnumeratedArray.op = op;
+
+	t->EnumeratedArray.count = 1 + exact_value_to_i64(exact_value_sub(max_value, min_value));
+	return t;
+}
+
 
 Type *alloc_type_slice(Type *elem) {
 	Type *t = alloc_type(Type_Slice);
@@ -1030,6 +1055,10 @@ bool is_type_u8(Type *t) {
 bool is_type_array(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Array;
+}
+bool is_type_enumerated_array(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_EnumeratedArray;
 }
 bool is_type_dynamic_array(Type *t) {
 	t = base_type(t);
@@ -1381,6 +1410,8 @@ bool is_type_indexable(Type *t) {
 	case Type_DynamicArray:
 	case Type_Map:
 		return true;
+	case Type_EnumeratedArray:
+		return true;
 	}
 	return false;
 }
@@ -1394,6 +1425,8 @@ bool is_type_sliceable(Type *t) {
 	case Type_Slice:
 	case Type_DynamicArray:
 		return true;
+	case Type_EnumeratedArray:
+		return false;
 	}
 	return false;
 }
@@ -1470,6 +1503,12 @@ bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		return is_type_polymorphic(t->Opaque.elem, or_specialized);
 	case Type_Pointer:
 		return is_type_polymorphic(t->Pointer.elem, or_specialized);
+
+	case Type_EnumeratedArray:
+		if (is_type_polymorphic(t->EnumeratedArray.index, or_specialized)) {
+			return true;
+		}
+		return is_type_polymorphic(t->EnumeratedArray.elem, or_specialized);
 	case Type_Array:
 		if (t->Array.generic_count != nullptr) {
 			return true;
@@ -1633,6 +1672,8 @@ bool is_type_comparable(Type *t) {
 		return true;
 	case Type_Enum:
 		return is_type_comparable(core_type(t));
+	case Type_EnumeratedArray:
+		return is_type_comparable(t->EnumeratedArray.elem);
 	case Type_Array:
 		return is_type_comparable(t->Array.elem);
 	case Type_Proc:
@@ -1692,6 +1733,13 @@ bool are_types_identical(Type *x, Type *y) {
 	case Type_Basic:
 		if (y->kind == Type_Basic) {
 			return x->Basic.kind == y->Basic.kind;
+		}
+		break;
+
+	case Type_EnumeratedArray:
+		if (y->kind == Type_EnumeratedArray) {
+			return are_types_identical(x->EnumeratedArray.index, y->EnumeratedArray.index) &&
+			       are_types_identical(x->EnumeratedArray.elem,  y->EnumeratedArray.elem);
 		}
 		break;
 
@@ -2471,6 +2519,17 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		return align;
 	}
 
+	case Type_EnumeratedArray: {
+		Type *elem = t->EnumeratedArray.elem;
+		bool pop = type_path_push(path, elem);
+		if (path->failure) {
+			return FAILURE_ALIGNMENT;
+		}
+		i64 align = type_align_of_internal(t->EnumeratedArray.elem, path);
+		if (pop) type_path_pop(path);
+		return align;
+	}
+
 	case Type_Opaque:
 		return type_align_of_internal(t->Opaque.elem, path);
 
@@ -2705,6 +2764,21 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 			return FAILURE_SIZE;
 		}
 		size  = type_size_of_internal( t->Array.elem, path);
+		alignment = align_formula(size, align);
+		return alignment*(count-1) + size;
+	} break;
+
+	case Type_EnumeratedArray: {
+		i64 count, align, size, alignment;
+		count = t->EnumeratedArray.count;
+		if (count == 0) {
+			return 0;
+		}
+		align = type_align_of_internal(t->EnumeratedArray.elem, path);
+		if (path->failure) {
+			return FAILURE_SIZE;
+		}
+		size  = type_size_of_internal( t->EnumeratedArray.elem, path);
 		alignment = align_formula(size, align);
 		return alignment*(count-1) + size;
 	} break;
@@ -2982,6 +3056,13 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_Opaque:
 		str = gb_string_appendc(str, "opaque ");
 		str = write_type_to_string(str, type->Opaque.elem);
+		break;
+
+	case Type_EnumeratedArray:
+		str = gb_string_append_rune(str, '[');
+		str = write_type_to_string(str, type->EnumeratedArray.index);
+		str = gb_string_append_rune(str, ']');
+		str = write_type_to_string(str, type->EnumeratedArray.elem);
 		break;
 
 	case Type_Array:

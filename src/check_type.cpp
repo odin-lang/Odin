@@ -803,6 +803,8 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 	ExactValue iota = exact_value_i64(-1);
 	ExactValue min_value = exact_value_i64(0);
 	ExactValue max_value = exact_value_i64(0);
+	isize min_value_index = 0;
+	isize max_value_index = 0;
 	bool min_value_set = false;
 	bool max_value_set = false;
 
@@ -858,17 +860,21 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 
 		if (min_value_set) {
 			if (compare_exact_values(Token_Gt, min_value, iota)) {
+				min_value_index = i;
 				min_value = iota;
 			}
 		} else {
+			min_value_index = i;
 			min_value = iota;
 			min_value_set = true;
 		}
 		if (max_value_set) {
 			if (compare_exact_values(Token_Lt, max_value, iota)) {
+				max_value_index = i;
 				max_value = iota;
 			}
 		} else {
+			max_value_index = i;
 			max_value = iota;
 			max_value_set = true;
 		}
@@ -894,6 +900,9 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 	enum_type->Enum.names = make_names_field_for_struct(ctx, ctx->scope);
 	enum_type->Enum.min_value = min_value;
 	enum_type->Enum.max_value = max_value;
+
+	enum_type->Enum.min_value_index = min_value_index;
+	enum_type->Enum.max_value_index = max_value_index;
 }
 
 
@@ -2564,6 +2573,12 @@ i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 			return 0;
 		}
 	}
+	if (o->mode == Addressing_Type) {
+		if (is_type_enum(o->type)) {
+			return -1;
+		}
+	}
+
 	if (o->mode != Addressing_Constant) {
 		if (o->mode != Addressing_Invalid) {
 			o->mode = Addressing_Invalid;
@@ -3214,14 +3229,33 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 			Operand o = {};
 			i64 count = check_array_count(ctx, &o, at->count);
 			Type *generic_type = nullptr;
+
+			Type *elem = check_type_expr(ctx, at->elem, nullptr);
+
 			if (o.mode == Addressing_Type && o.type->kind == Type_Generic) {
 				generic_type = o.type;
+			} else if (is_type_enum(o.type)) {
+				Type *index = o.type;
+				Type *bt = base_type(index);
+				GB_ASSERT(bt->kind == Type_Enum);
+
+				Type *t = alloc_type_enumerated_array(elem, index, bt->Enum.min_value, bt->Enum.max_value, Token_Invalid);
+
+				if (at->tag != nullptr) {
+					GB_ASSERT(at->tag->kind == Ast_BasicDirective);
+					String name = at->tag->BasicDirective.name;
+					error(at->tag, "Invalid tag applied to an enumerated array, got #%.*s", LIT(name));
+				}
+				*type = t;
+
+				goto array_end;
 			}
+
 			if (count < 0) {
 				error(at->count, "? can only be used in conjuction with compound literals");
 				count = 0;
 			}
-			Type *elem = check_type_expr(ctx, at->elem, nullptr);
+
 
 			if (at->tag != nullptr) {
 				GB_ASSERT(at->tag->kind == Ast_BasicDirective);

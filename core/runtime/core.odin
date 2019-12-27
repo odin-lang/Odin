@@ -79,6 +79,14 @@ Type_Info_Array :: struct {
 	elem_size: int,
 	count:     int,
 };
+Type_Info_Enumerated_Array :: struct {
+	elem:      ^Type_Info,
+	index:     ^Type_Info,
+	elem_size: int,
+	count:     int,
+	min_value: Type_Info_Enum_Value,
+	max_value: Type_Info_Enum_Value,
+};
 Type_Info_Dynamic_Array :: struct {elem: ^Type_Info, elem_size: int};
 Type_Info_Slice         :: struct {elem: ^Type_Info, elem_size: int};
 Type_Info_Tuple :: struct { // Only really used for procedures
@@ -156,6 +164,7 @@ Type_Info :: struct {
 		Type_Info_Pointer,
 		Type_Info_Procedure,
 		Type_Info_Array,
+		Type_Info_Enumerated_Array,
 		Type_Info_Dynamic_Array,
 		Type_Info_Slice,
 		Type_Info_Tuple,
