@@ -8717,7 +8717,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		case Type_Array:
 			valid = true;
 			max_count = t->Array.count;
-			if (o->mode != Addressing_Variable) {
+			if (o->mode != Addressing_Variable && !is_type_pointer(o->type)) {
 				gbString str = expr_to_string(node);
 				error(node, "Cannot slice array '%s', value is not addressable", str);
 				gb_string_free(str);
