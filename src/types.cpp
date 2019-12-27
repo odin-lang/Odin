@@ -336,6 +336,14 @@ Selection selection_combine(Selection const &lhs, Selection const &rhs) {
 	return new_sel;
 }
 
+Selection sub_selection(Selection const &sel, isize offset) {
+	Selection res = {};
+	res.index.data = sel.index.data + offset;
+	res.index.count = sel.index.count - offset;
+	res.index.capacity = res.index.count;
+	return res;
+}
+
 
 
 gb_global Type basic_types[] = {

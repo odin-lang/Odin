@@ -107,23 +107,24 @@ type_is_simple_compare  :: proc($T: typeid) -> bool --- // easily compared using
 type_is_dereferenceable :: proc($T: typeid) -> bool ---
 type_is_valid_map_key   :: proc($T: typeid) -> bool ---
 
-type_is_named           :: proc($T: typeid) -> bool ---
-type_is_pointer         :: proc($T: typeid) -> bool ---
-type_is_opaque          :: proc($T: typeid) -> bool ---
-type_is_array           :: proc($T: typeid) -> bool ---
-type_is_slice           :: proc($T: typeid) -> bool ---
-type_is_dynamic_array   :: proc($T: typeid) -> bool ---
-type_is_map             :: proc($T: typeid) -> bool ---
-type_is_struct          :: proc($T: typeid) -> bool ---
-type_is_union           :: proc($T: typeid) -> bool ---
-type_is_enum            :: proc($T: typeid) -> bool ---
-type_is_proc            :: proc($T: typeid) -> bool ---
-type_is_bit_field       :: proc($T: typeid) -> bool ---
-type_is_bit_field_value :: proc($T: typeid) -> bool ---
-type_is_bit_set         :: proc($T: typeid) -> bool ---
-type_is_simd_vector     :: proc($T: typeid) -> bool ---
+type_is_named            :: proc($T: typeid) -> bool ---
+type_is_pointer          :: proc($T: typeid) -> bool ---
+type_is_opaque           :: proc($T: typeid) -> bool ---
+type_is_array            :: proc($T: typeid) -> bool ---
+type_is_enumerated_array :: proc($T: typeid) -> bool ---
+type_is_slice            :: proc($T: typeid) -> bool ---
+type_is_dynamic_array    :: proc($T: typeid) -> bool ---
+type_is_map              :: proc($T: typeid) -> bool ---
+type_is_struct           :: proc($T: typeid) -> bool ---
+type_is_union            :: proc($T: typeid) -> bool ---
+type_is_enum             :: proc($T: typeid) -> bool ---
+type_is_proc             :: proc($T: typeid) -> bool ---
+type_is_bit_field        :: proc($T: typeid) -> bool ---
+type_is_bit_field_value  :: proc($T: typeid) -> bool ---
+type_is_bit_set          :: proc($T: typeid) -> bool ---
+type_is_simd_vector      :: proc($T: typeid) -> bool ---
 
-type_has_nil            :: proc($T: typeid) -> bool ---
+type_has_nil :: proc($T: typeid) -> bool ---
 
 type_proc_parameter_count :: proc($T: typeid) -> int where type_is_proc(T) ---
 type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---

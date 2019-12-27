@@ -3144,6 +3144,74 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 	return true;
 }
 
+
+ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selection sel, bool *success_) {
+	if (operand->mode != Addressing_Constant) {
+		if (success_) *success_ = false;
+		return empty_exact_value;
+	}
+
+	if (sel.indirect) {
+		if (success_) *success_ = false;
+		return empty_exact_value;
+	}
+
+	if (sel.index.count == 0) {
+		if (success_) *success_ = false;
+		return empty_exact_value;
+	}
+
+
+	ExactValue value = operand->value;
+	if (value.kind == ExactValue_Compound) {
+		i32 depth = 0;
+		while (sel.index.count > 0) {
+			i32 index = sel.index[0];
+			sel = sub_selection(sel, 1);
+
+			Ast *node = value.value_compound;
+			switch (node->kind) {
+			case_ast_node(cl, CompoundLit, node);
+				if (cl->elems.count == 0) {
+					if (success_) *success_ = true;
+					return empty_exact_value;
+				}
+
+				if (cl->elems[0]->kind == Ast_FieldValue) {
+					GB_PANIC("TODO");
+				} else {
+					i32 count = (i32)cl->elems.count;
+					if (count < index) {
+						if (success_) *success_ = false;
+						return empty_exact_value;
+					}
+					TypeAndValue tav = cl->elems[index]->tav;
+					if (tav.mode == Addressing_Constant) {
+						value = tav.value;
+					} else {
+						GB_ASSERT(is_type_untyped_nil(tav.type));
+						value = tav.value;
+					}
+				}
+
+			case_end;
+
+			default:
+				if (success_) *success_ = true;
+				return empty_exact_value;
+			}
+
+			depth += 1;
+		}
+
+		if (success_) *success_ = true;
+		return value;
+	}
+
+	if (success_) *success_ = true;
+	return empty_exact_value;
+}
+
 Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *type_hint) {
 	ast_node(se, SelectorExpr, node);
 
@@ -3291,6 +3359,39 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 	}
 
 	if (expr_entity != nullptr && expr_entity->kind == Entity_Constant && entity->kind != Entity_Constant) {
+		bool success = false;
+		ExactValue field_value = get_constant_field(c, operand, sel, &success);
+		if (success) {
+			operand->mode = Addressing_Constant;
+			operand->expr = node;
+			operand->value = field_value;
+			operand->type = entity->type;
+			return entity;
+		}
+
+		gbString op_str   = expr_to_string(op_expr);
+		gbString type_str = type_to_string(operand->type);
+		gbString sel_str  = expr_to_string(selector);
+		error(op_expr, "Cannot access non-constant field '%s' from '%s'", sel_str, op_str);
+		gb_string_free(sel_str);
+		gb_string_free(type_str);
+		gb_string_free(op_str);
+		operand->mode = Addressing_Invalid;
+		operand->expr = node;
+		return nullptr;
+	}
+
+	if (operand->mode == Addressing_Constant && entity->kind != Entity_Constant) {
+		bool success = false;
+		ExactValue field_value = get_constant_field(c, operand, sel, &success);
+		if (success) {
+			operand->mode = Addressing_Constant;
+			operand->expr = node;
+			operand->value = field_value;
+			operand->type = entity->type;
+			return entity;
+		}
+
 		gbString op_str   = expr_to_string(op_expr);
 		gbString type_str = type_to_string(operand->type);
 		gbString sel_str  = expr_to_string(selector);
@@ -3441,6 +3542,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_end - BuiltinProc__ty
 	is_type_pointer,
 	is_type_opaque,
 	is_type_array,
+	is_type_enumerated_array,
 	is_type_slice,
 	is_type_dynamic_array,
 
