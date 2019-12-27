@@ -162,7 +162,7 @@ void check_init_constant(CheckerContext *ctx, Entity *e, Operand *operand) {
 		return;
 	}
 
-#if 1
+#if 0
 	if (!is_type_constant_type(operand->type)) {
 		gbString type_str = type_to_string(operand->type);
 		error(operand->expr, "Invalid constant type: '%s'", type_str);

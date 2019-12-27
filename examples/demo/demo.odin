@@ -1815,6 +1815,60 @@ soa_struct_layout :: proc() {
 	}
 }
 
+constant_literal_expressions :: proc() {
+	fmt.println("\n#constant literal expressions");
+
+	Bar :: struct {x, y: f32};
+	Foo :: struct {a, b: int, using c: Bar};
+
+	FOO_CONST :: Foo{b = 2, a = 1, c = {3, 4}};
+
+
+	fmt.println(FOO_CONST.a);
+	fmt.println(FOO_CONST.b);
+	fmt.println(FOO_CONST.c);
+	fmt.println(FOO_CONST.c.x);
+	fmt.println(FOO_CONST.c.y);
+	fmt.println(FOO_CONST.x); // using works as expected
+	fmt.println(FOO_CONST.y);
+
+	fmt.println("-------");
+
+	ARRAY_CONST :: [3]int{1 = 4, 2 = 9, 0 = 1};
+
+	fmt.println(ARRAY_CONST[0]);
+	fmt.println(ARRAY_CONST[1]);
+	fmt.println(ARRAY_CONST[2]);
+
+	fmt.println("-------");
+
+	FOO_ARRAY_DEFAULTS :: [3]Foo{{}, {}, {}};
+	fmt.println(FOO_ARRAY_DEFAULTS[2].x);
+
+
+
+	fmt.println("-------");
+
+	Baz :: enum{A=5, B, C, D=9};
+	ENUM_ARRAY_CONST :: [Baz]int{.A .. .C = 1, .D = 16};
+
+	fmt.println(ENUM_ARRAY_CONST[.A]);
+	fmt.println(ENUM_ARRAY_CONST[.B]);
+	fmt.println(ENUM_ARRAY_CONST[.C]);
+	fmt.println(ENUM_ARRAY_CONST[.D]);
+
+	fmt.println("-------");
+
+	STRING_CONST :: "Hellope!";
+
+	fmt.println(STRING_CONST[0]);
+	fmt.println(STRING_CONST[2]);
+	fmt.println(STRING_CONST[3]);
+
+	fmt.println(STRING_CONST[0:5]);
+	fmt.println(STRING_CONST[3:][:4]);
+}
+
 
 main :: proc() {
 	when true {
@@ -1844,5 +1898,6 @@ main :: proc() {
 		range_statements_with_multiple_return_values();
 		threading_example();
 		soa_struct_layout();
+		constant_literal_expressions();
 	}
 }

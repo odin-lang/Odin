@@ -3108,6 +3108,8 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 					return false;
 				}
 
+				if (value) *value = exact_value_to_i64(exact_value_sub(operand.value, lo));
+
 				return true;
 
 			} else { // NOTE(bill): Do array bound checking
@@ -3144,6 +3146,140 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 	return true;
 }
 
+ExactValue get_constant_field_single(CheckerContext *c, ExactValue value, i32 index, bool *success_, bool *finish_) {
+	if (value.kind == ExactValue_String) {
+		GB_ASSERT(0 <= index && index < value.value_string.len);
+		u8 val = value.value_string[index];
+		if (success_) *success_ = true;
+		if (finish_) *finish_ = true;
+		return exact_value_u64(val);
+	}
+	if (value.kind != ExactValue_Compound) {
+		if (success_) *success_ = true;
+		if (finish_) *finish_ = true;
+		return value;
+	}
+
+
+	Ast *node = value.value_compound;
+	switch (node->kind) {
+	case_ast_node(cl, CompoundLit, node);
+		if (cl->elems.count == 0) {
+			if (success_) *success_ = true;
+			if (finish_) *finish_ = true;
+			return empty_exact_value;
+		}
+
+		if (cl->elems[0]->kind == Ast_FieldValue) {
+			if (is_type_struct(node->tav.type)) {
+				for_array(i, cl->elems) {
+					Ast *elem = cl->elems[i];
+					if (elem->kind != Ast_FieldValue) {
+						continue;
+					}
+					ast_node(fv, FieldValue, elem);
+					String name = fv->field->Ident.token.string;
+					Selection sub_sel = lookup_field(node->tav.type, name, false);
+					defer (array_free(&sub_sel.index));
+					if (sub_sel.index[0] == index) {
+						value = fv->value->tav.value;
+						break;
+					}
+				}
+			} else if (is_type_array(node->tav.type) || is_type_enumerated_array(node->tav.type)) {
+				for_array(i, cl->elems) {
+					Ast *elem = cl->elems[i];
+					if (elem->kind != Ast_FieldValue) {
+						continue;
+					}
+					ast_node(fv, FieldValue, elem);
+					if (is_ast_range(fv->field)) {
+						ast_node(ie, BinaryExpr, fv->field);
+						TypeAndValue lo_tav = ie->left->tav;
+						TypeAndValue hi_tav = ie->right->tav;
+						GB_ASSERT(lo_tav.mode == Addressing_Constant);
+						GB_ASSERT(hi_tav.mode == Addressing_Constant);
+
+						TokenKind op = ie->op.kind;
+						i64 lo = exact_value_to_i64(lo_tav.value);
+						i64 hi = exact_value_to_i64(hi_tav.value);
+
+						i64 corrected_index = index;
+
+						if (is_type_enumerated_array(node->tav.type)) {
+							Type *bt = base_type(node->tav.type);
+							GB_ASSERT(bt->kind == Type_EnumeratedArray);
+							corrected_index = index + exact_value_to_i64(bt->EnumeratedArray.min_value);
+						}
+						if (op == Token_Ellipsis) {
+							if (lo <= corrected_index && corrected_index <= hi) {
+								TypeAndValue tav = fv->value->tav;
+								if (success_) *success_ = true;
+								if (finish_) *finish_ = false;
+								return tav.value;
+							}
+						} else {
+							if (lo <= corrected_index && corrected_index < hi) {
+								TypeAndValue tav = fv->value->tav;
+								if (success_) *success_ = true;
+								if (finish_) *finish_ = false;
+								return tav.value;
+							}
+						}
+					} else {
+						TypeAndValue index_tav = fv->field->tav;
+						GB_ASSERT(index_tav.mode == Addressing_Constant);
+						ExactValue index_value = index_tav.value;
+						if (is_type_enumerated_array(node->tav.type)) {
+							Type *bt = base_type(node->tav.type);
+							GB_ASSERT(bt->kind == Type_EnumeratedArray);
+							index_value = exact_value_sub(index_value, bt->EnumeratedArray.min_value);
+						}
+
+						i64 field_index = exact_value_to_i64(index_value);
+						if (index == field_index) {
+							TypeAndValue tav = fv->value->tav;
+							value = tav.value;
+							break;
+						}
+					}
+
+				}
+			}
+		} else {
+			i32 count = (i32)cl->elems.count;
+			if (count < index) {
+				if (success_) *success_ = false;
+				if (finish_) *finish_ = true;
+				return empty_exact_value;
+			}
+			TypeAndValue tav = cl->elems[index]->tav;
+			if (tav.mode == Addressing_Constant) {
+				if (success_) *success_ = true;
+				if (finish_) *finish_ = false;
+				return tav.value;
+			} else {
+				GB_ASSERT(is_type_untyped_nil(tav.type));
+				if (success_) *success_ = true;
+				if (finish_) *finish_ = false;
+				return tav.value;
+			}
+		}
+
+	case_end;
+
+	default:
+		// TODO(bill): Should this be a general fallback?
+		if (success_) *success_ = true;
+		if (finish_) *finish_ = true;
+		return empty_exact_value;
+	}
+
+	if (finish_) *finish_ = false;
+	return value;
+}
+
+
 
 ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selection sel, bool *success_) {
 	if (operand->mode != Addressing_Constant) {
@@ -3169,39 +3305,11 @@ ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selecti
 			i32 index = sel.index[0];
 			sel = sub_selection(sel, 1);
 
-			Ast *node = value.value_compound;
-			switch (node->kind) {
-			case_ast_node(cl, CompoundLit, node);
-				if (cl->elems.count == 0) {
-					if (success_) *success_ = true;
-					return empty_exact_value;
-				}
-
-				if (cl->elems[0]->kind == Ast_FieldValue) {
-					GB_PANIC("TODO");
-				} else {
-					i32 count = (i32)cl->elems.count;
-					if (count < index) {
-						if (success_) *success_ = false;
-						return empty_exact_value;
-					}
-					TypeAndValue tav = cl->elems[index]->tav;
-					if (tav.mode == Addressing_Constant) {
-						value = tav.value;
-					} else {
-						GB_ASSERT(is_type_untyped_nil(tav.type));
-						value = tav.value;
-					}
-				}
-
-			case_end;
-
-			default:
-				if (success_) *success_ = true;
-				return empty_exact_value;
+			bool finish = false;
+			value = get_constant_field_single(c, value, index, success_, &finish);
+			if (finish) {
+				return value;
 			}
-
-			depth += 1;
 		}
 
 		if (success_) *success_ = true;
@@ -3366,6 +3474,8 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 			operand->expr = node;
 			operand->value = field_value;
 			operand->type = entity->type;
+			add_entity_use(c, selector, entity);
+			add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
 			return entity;
 		}
 
@@ -3389,6 +3499,8 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 			operand->expr = node;
 			operand->value = field_value;
 			operand->type = entity->type;
+			add_entity_use(c, selector, entity);
+			add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
 			return entity;
 		}
 
@@ -7002,6 +7114,13 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count,
 			}
 			o->type = t_u8;
 			return true;
+		} else if (t->Basic.kind == Basic_UntypedString) {
+			if (o->mode == Addressing_Constant) {
+				*max_count = o->value.value_string.len;
+				o->type = t_u8;
+				return true;
+			}
+			return false;
 		}
 		break;
 
@@ -7733,6 +7852,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 								error(elem, "Expected a constant integer as an array field");
 								continue;
 							}
+							// add_type_and_value(c->info, op_index.expr, op_index.mode, op_index.type, op_index.value);
 
 							i64 index = exact_value_to_i64(op_index.value);
 
@@ -7913,13 +8033,13 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 
 						// NOTE(bill): These are sanity checks for invalid enum values
-						if (max_type_count >= 0 && (lo < total_lo || lo >= total_hi)) {
+						if (max_type_count >= 0 && (lo < total_lo || lo > total_hi)) {
 							gbString lo_str = expr_to_string(x.expr);
 							error(elem, "Index %s is out of bounds (%.*s .. %.*s) for %.*s", lo_str, LIT(total_lo_string), LIT(total_hi_string), LIT(context_name));
 							gb_string_free(lo_str);
 							continue;
 						}
-						if (max_type_count >= 0 && (hi < 0 || hi >= max_type_count)) {
+						if (max_type_count >= 0 && (hi < 0 || hi > total_hi)) {
 							gbString hi_str = expr_to_string(y.expr);
 							error(elem, "Index %s is out of bounds (%.*s .. %.*s) for %.*s", hi_str, LIT(total_lo_string), LIT(total_hi_string), LIT(context_name));
 							gb_string_free(hi_str);
@@ -7946,7 +8066,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 						i64 index = exact_value_to_i64(op_index.value);
 
-						if (max_type_count >= 0 && (index < total_lo || index >= total_hi)) {
+						if (max_type_count >= 0 && (index < total_lo || index > total_hi)) {
 							gbString idx_str = expr_to_string(op_index.expr);
 							error(elem, "Index %s is out of bounds (%.*s .. %.*s) for %.*s", idx_str, LIT(total_lo_string), LIT(total_hi_string), LIT(context_name));
 							gb_string_free(idx_str);
@@ -8506,7 +8626,15 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		bool valid = check_set_index_data(o, t, is_ptr, &max_count, o->type);
 
 		if (is_const) {
-			valid = false;
+			if (is_type_array(t)) {
+				// Okay
+			} else if (is_type_enumerated_array(t)) {
+				// Okay
+			} else if (is_type_string(t)) {
+				// Okay
+			} else {
+				valid = false;
+			}
 		}
 
 		if (!valid) {
@@ -8515,7 +8643,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			defer (gb_string_free(str));
 			defer (gb_string_free(type_str));
 			if (is_const) {
-				error(o->expr, "Cannot index a constant '%s'", str);
+				error(o->expr, "Cannot index constant '%s' of type '%s'", str, type_str);
 			} else {
 				error(o->expr, "Cannot index '%s' of type '%s'", str, type_str);
 			}
@@ -8542,6 +8670,20 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 		i64 index = 0;
 		bool ok = check_index_value(c, false, ie->index, max_count, &index, index_type_hint);
+		if (is_const) {
+			if (index < 0) {
+				gbString str = expr_to_string(o->expr);
+				error(o->expr, "Cannot index a constant '%s'", str);
+				gb_string_free(str);
+				o->mode = Addressing_Invalid;
+				o->expr = node;
+				return kind;
+			} else if (ok) {
+				ExactValue value = type_and_value_of_expr(ie->expr).value;
+				o->mode = Addressing_Constant;
+				o->value = get_constant_field_single(c, value, cast(i32)index, nullptr, nullptr);
+			}
+		}
 
 		node->viral_state_flags |= ie->index->viral_state_flags;
 	case_end;
@@ -8563,7 +8705,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		Type *t = base_type(type_deref(o->type));
 		switch (t->kind) {
 		case Type_Basic:
-			if (t->Basic.kind == Basic_string) {
+			if (t->Basic.kind == Basic_string || t->Basic.kind == Basic_UntypedString) {
 				valid = true;
 				if (o->mode == Addressing_Constant) {
 					max_count = o->value.value_string.len;
@@ -8651,6 +8793,36 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			}
 		}
 
+		if (is_type_string(t) && max_count >= 0) {
+			bool all_constant = true;
+			for (isize i = 0; i < gb_count_of(nodes); i++) {
+				if (nodes[i] != nullptr) {
+					TypeAndValue tav = type_and_value_of_expr(nodes[i]);
+					if (tav.mode != Addressing_Constant) {
+						all_constant = false;
+						break;
+					}
+				}
+			}
+			if (!all_constant) {
+				gbString str = expr_to_string(o->expr);
+				error(o->expr, "Cannot slice '%s' with non-constant indices", str);
+				gb_string_free(str);
+				o->mode = Addressing_Value; // NOTE(bill): Keep subsequent values going without erring
+				o->expr = node;
+				return kind;
+			}
+
+			String s = {};
+			if (o->value.kind == ExactValue_String) {
+				s = o->value.value_string;
+			}
+
+			o->mode = Addressing_Constant;
+			o->type = t;
+			o->value = exact_value_string(substring(s, indices[0], indices[1]));
+		}
+
 	case_end;
 
 
@@ -8729,9 +8901,9 @@ ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, Type *type_hi
 
 	if (type != nullptr && is_type_untyped(type)) {
 		add_untyped(&c->checker->info, node, false, o->mode, type, value);
-	} else {
-		add_type_and_value(&c->checker->info, node, o->mode, type, value);
 	}
+	add_type_and_value(&c->checker->info, node, o->mode, type, value);
+
 	return kind;
 }
 

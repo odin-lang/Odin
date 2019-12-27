@@ -339,7 +339,15 @@ Selection selection_combine(Selection const &lhs, Selection const &rhs) {
 Selection sub_selection(Selection const &sel, isize offset) {
 	Selection res = {};
 	res.index.data = sel.index.data + offset;
-	res.index.count = sel.index.count - offset;
+	res.index.count = gb_max(sel.index.count - offset, 0);
+	res.index.capacity = res.index.count;
+	return res;
+}
+
+Selection sub_selection_with_length(Selection const &sel, isize offset, isize len) {
+	Selection res = {};
+	res.index.data = sel.index.data + offset;
+	res.index.count = gb_max(len, gb_max(sel.index.count - offset, 0));
 	res.index.capacity = res.index.count;
 	return res;
 }
