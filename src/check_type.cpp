@@ -3234,7 +3234,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 
 			if (o.mode == Addressing_Type && o.type->kind == Type_Generic) {
 				generic_type = o.type;
-			} else if (is_type_enum(o.type)) {
+			} else if (o.mode == Addressing_Type && is_type_enum(o.type)) {
 				Type *index = o.type;
 				Type *bt = base_type(index);
 				GB_ASSERT(bt->kind == Type_Enum);
