@@ -71,6 +71,12 @@ foreign _ {
 	exp_f32 :: proc(x: f32) -> f32 ---;
 	@(link_name="llvm.exp.f64")
 	exp_f64 :: proc(x: f64) -> f64 ---;
+
+	@(link_name="llvm.ldexp.f32")
+	ldexp_f32 :: proc(val: f32, exp: i32) -> f32 ---;
+
+	@(link_name="llvm.ldexp.f64")
+	ldexp_f64 :: proc(val: f64, exp: i32) -> f64 ---;
 }
 
 sqrt      :: proc{sqrt_f32, sqrt_f64};
@@ -80,6 +86,8 @@ pow       :: proc{pow_f32, pow_f64};
 fmuladd   :: proc{fmuladd_f32, fmuladd_f64};
 ln        :: proc{ln_f32, ln_f64};
 exp       :: proc{exp_f32, exp_f64};
+
+ldexp :: proc{ldexp_f32, ldexp_f64};
 
 log_f32 :: proc(x, base: f32) -> f32 { return ln(x) / ln(base); }
 log_f64 :: proc(x, base: f64) -> f64 { return ln(x) / ln(base); }
@@ -107,6 +115,14 @@ unlerp     :: proc{unlerp_f32, unlerp_f64};
 sign_f32 :: proc(x: f32) -> f32 { return f32(int(0 < x) - int(x < 0)); }
 sign_f64 :: proc(x: f64) -> f64 { return f64(int(0 < x) - int(x < 0)); }
 sign     :: proc{sign_f32, sign_f64};
+
+sign_bit_f32 :: proc(x: f32) -> bool {
+	return (transmute(u32)x) & (1<<31) != 0;
+}
+sign_bit_f64 :: proc(x: f64) -> bool {
+	return (transmute(u64)x) & (1<<63) != 0;
+}
+sign_bit :: proc{sign_bit_f32, sign_bit_f64};
 
 copy_sign_f32 :: proc(x, y: f32) -> f32 {
 	ix := transmute(u32)x;
@@ -511,8 +527,31 @@ is_nan_f32 :: proc(x: f32) -> bool { return classify(x) == .NaN; }
 is_nan_f64 :: proc(x: f64) -> bool { return classify(x) == .NaN; }
 is_nan :: proc{is_nan_f32, is_nan_f64};
 
-is_inf_f32 :: proc(x: f32) -> bool { return classify(abs(x)) == .Inf; }
-is_inf_f64 :: proc(x: f64) -> bool { return classify(abs(x)) == .Inf; }
+
+// is_inf reports whether f is an infinity, according to sign.
+// If sign > 0, is_inf reports whether f is positive infinity.
+// If sign < 0, is_inf reports whether f is negative infinity.
+// If sign == 0, is_inf reports whether f is either infinity.
+is_inf_f32 :: proc(x: f32, sign: int = 0) -> bool {
+	class := classify(abs(x));
+	switch {
+	case sign > 0:
+		return class == .Inf;
+	case sign < 0:
+		return class == .Neg_Inf;
+	}
+	return class == .Inf || class == .Neg_Inf;
+}
+is_inf_f64 :: proc(x: f64, sign: int = 0) -> bool {
+	class := classify(abs(x));
+	switch {
+	case sign > 0:
+		return class == .Inf;
+	case sign < 0:
+		return class == .Neg_Inf;
+	}
+	return class == .Inf || class == .Neg_Inf;
+}
 is_inf :: proc{is_inf_f32, is_inf_f64};
 
 
@@ -570,6 +609,125 @@ cumsum :: proc(dst, src: $T/[]$E) -> T
 	}
 	return dst[:N];
 }
+
+
+
+atan2_f32 :: proc(y, x: f32) -> f32 {
+	// TODO(bill): Better atan2_f32
+	return f32(atan2_f64(f64(y), f64(x)));
+}
+
+atan2_f64 :: proc(y, x: f64) -> f64 {
+	// TODO(bill): Faster atan2_f64 if possible
+
+	// The original C code:
+	//   Stephen L. Moshier
+	//   moshier@na-net.ornl.gov
+
+	NAN :: 0h7fff_ffff_ffff_ffff;
+	INF :: 0h7FF0_0000_0000_0000;
+	PI  :: 0h4009_21fb_5444_2d18;
+
+	atan :: proc(x: f64) -> f64 {
+		if x == 0 {
+			return x;
+		}
+		if x > 0 {
+			return s_atan(x);
+		}
+		return -s_atan(-x);
+	}
+	// s_atan reduces its argument (known to be positive) to the range [0, 0.66] and calls x_atan.
+	s_atan :: proc(x: f64) -> f64 {
+		MORE_BITS :: 6.123233995736765886130e-17; // pi/2 = PIO2 + MORE_BITS
+		TAN3PI08  :: 2.41421356237309504880;      // tan(3*pi/8)
+		if x <= 0.66 {
+			return x_atan(x);
+		}
+		if x > TAN3PI08 {
+			return PI/2 - x_atan(1/x) + MORE_BITS;
+		}
+		return PI/4 + x_atan((x-1)/(x+1)) + 0.5*MORE_BITS;
+	}
+	// x_atan evaluates a series valid in the range [0, 0.66].
+	x_atan :: proc(x: f64) -> f64 {
+		P0 :: -8.750608600031904122785e-01;
+		P1 :: -1.615753718733365076637e+01;
+		P2 :: -7.500855792314704667340e+01;
+		P3 :: -1.228866684490136173410e+02;
+		P4 :: -6.485021904942025371773e+01;
+		Q0 :: +2.485846490142306297962e+01;
+		Q1 :: +1.650270098316988542046e+02;
+		Q2 :: +4.328810604912902668951e+02;
+		Q3 :: +4.853903996359136964868e+02;
+		Q4 :: +1.945506571482613964425e+02;
+
+		z := x * x;
+		z = z * ((((P0*z+P1)*z+P2)*z+P3)*z + P4) / (((((z+Q0)*z+Q1)*z+Q2)*z+Q3)*z + Q4);
+		z = x*z + x;
+		return z;
+	}
+
+	switch {
+	case is_nan(y) || is_nan(x):
+		return NAN;
+	case y == 0:
+		if x >= 0 && !sign_bit(x) {
+			return copy_sign(0.0, y);
+		}
+		return copy_sign(PI, y);
+	case x == 0:
+		return copy_sign(PI*0.5, y);
+	case is_inf(x, 0):
+		if is_inf(x, 1) {
+			if is_inf(y, 0) {
+				return copy_sign(PI*0.25, y);
+			}
+			return copy_sign(0, y);
+		}
+		if is_inf(y, 0) {
+			return copy_sign(PI*0.75, y);
+		}
+		return copy_sign(PI, y);
+	case is_inf(y, 0):
+		return copy_sign(PI*0.5, y);
+	}
+
+	q := atan(y / x);
+	if x < 0 {
+		if q <= 0 {
+			return q + PI;
+		}
+		return q - PI;
+	}
+	return q;
+}
+
+
+atan2 :: proc{atan2_f32, atan2_f64};
+
+atan_f32 :: proc(x: f32) -> f32 {
+	return atan2_f32(1.0, x);
+}
+atan :: proc{atan_f32};
+
+
+asin_f32 :: proc(x: f32) -> f32 {
+	return atan2_f32(x, sqrt_f32(1 - x*x));
+}
+asin_f64 :: proc(x: f64) -> f64 {
+	return atan2_f64(x, sqrt_f64(1 - x*x));
+}
+asin :: proc{asin_f32};
+
+acos_f32 :: proc(x: f32) -> f32 {
+	return atan2_f32(sqrt_f32(1 - x), sqrt_f32(1 + x));
+}
+acos_f64 :: proc(x: f64) -> f64 {
+	return atan2_f64(sqrt_f64(1 - x), sqrt_f64(1 + x));
+}
+acos :: proc{acos_f32};
+
 
 
 F32_DIG        :: 6;

@@ -64,6 +64,10 @@ length :: proc(v: $T/[$N]$E) -> E {
 	return math.sqrt(dot(v, v));
 }
 
+length2 :: proc(v: $T/[$N]$E) -> E {
+	return dot(v, v);
+}
+
 
 identity :: proc($T: typeid/[$N][N]$E) -> (m: T) {
 	for i in 0..<N do m[i][i] = E(1);
@@ -176,17 +180,51 @@ Matrix4x2 :: distinct [4][2]Float;
 Matrix4x3 :: distinct [4][3]Float;
 Matrix4x4 :: distinct [4][4]Float;
 
-
 Matrix1 :: Matrix1x1;
 Matrix2 :: Matrix2x2;
 Matrix3 :: Matrix3x3;
 Matrix4 :: Matrix4x4;
 
-
 Quaternion :: distinct (size_of(Float) == size_of(f32) ? quaternion128 : quaternion256);
 
+MATRIX1_IDENTITY :: Matrix1{{1}};
+MATRIX2_IDENTITY :: Matrix2{{1, 0}, {0, 1}};
+MATRIX3_IDENTITY :: Matrix3{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+MATRIX4_IDENTITY :: Matrix4{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
 
-translate_matrix4 :: proc(v: Vector3) -> Matrix4 {
+QUATERNION_IDENTITY :: Quaternion(1);
+
+VECTOR3_X_AXIS :: Vector3{1, 0, 0};
+VECTOR3_Y_AXIS :: Vector3{0, 1, 0};
+VECTOR3_Z_AXIS :: Vector3{0, 0, 1};
+
+
+vector3_orthogonal :: proc(v: Vector3) -> Vector3 {
+	x := abs(v.x);
+	y := abs(v.y);
+	z := abs(v.z);
+
+	other: Vector3 = x < y ? (x < z ? {1, 0, 0} : {0, 0, 1}) : (y < z ? {0, 1, 0} : {0, 0, 1});
+
+	return normalize(cross3(v, other));
+}
+
+vector3_reflect :: proc(i, n: Vector3) -> Vector3 {
+	b := n * 2 * dot(n, i);
+	return i - b;
+}
+
+vector3_refract :: proc(i, n: Vector3, eta: Float) -> Vector3 {
+	dv := dot(n, i);
+	k := 1 - eta*eta - (1 - dv*dv);
+	a := i * eta;
+	b := n * eta*dv*math.sqrt(k);
+	return (a - b) * Float(int(k >= 0));
+}
+
+
+translate_matrix4 :: matrix4_translate;
+matrix4_translate :: proc(v: Vector3) -> Matrix4 {
 	m := identity(Matrix4);
 	m[3][0] = v[0];
 	m[3][1] = v[1];
@@ -195,7 +233,8 @@ translate_matrix4 :: proc(v: Vector3) -> Matrix4 {
 }
 
 
-rotate_matrix4 :: proc(v: Vector3, angle_radians: Float) -> Matrix4 {
+rotate_matrix4 :: matrix4_rotate;
+matrix4_rotate :: proc(v: Vector3, angle_radians: Float) -> Matrix4 {
 	c := math.cos(angle_radians);
 	s := math.sin(angle_radians);
 
@@ -222,7 +261,8 @@ rotate_matrix4 :: proc(v: Vector3, angle_radians: Float) -> Matrix4 {
 	return rot;
 }
 
-scale_matrix4 :: proc(m: Matrix4, v: Vector3) -> Matrix4 {
+scale_matrix4 :: matrix4_scale;
+matrix4_scale :: proc(m: Matrix4, v: Vector3) -> Matrix4 {
 	mm := m;
 	mm[0][0] *= v[0];
 	mm[1][1] *= v[1];
@@ -230,8 +270,8 @@ scale_matrix4 :: proc(m: Matrix4, v: Vector3) -> Matrix4 {
 	return mm;
 }
 
-
-look_at :: proc(eye, centre, up: Vector3) -> Matrix4 {
+look_at :: matrix4_look_at;
+matrix4_look_at :: proc(eye, centre, up: Vector3) -> Matrix4 {
 	f := normalize(centre - eye);
 	s := normalize(cross(f, up));
 	u := cross(s, f);
@@ -244,7 +284,8 @@ look_at :: proc(eye, centre, up: Vector3) -> Matrix4 {
 }
 
 
-perspective :: proc(fovy, aspect, near, far: Float) -> (m: Matrix4) {
+perspective :: matrix4_perspective;
+matrix4_perspective :: proc(fovy, aspect, near, far: Float) -> (m: Matrix4) {
 	tan_half_fovy := math.tan(0.5 * fovy);
 	m[0][0] = 1 / (aspect*tan_half_fovy);
 	m[1][1] = 1 / (tan_half_fovy);
@@ -255,7 +296,7 @@ perspective :: proc(fovy, aspect, near, far: Float) -> (m: Matrix4) {
 }
 
 
-ortho3d :: proc(left, right, bottom, top, near, far: Float) -> (m: Matrix4) {
+matrix_ortho3d :: proc(left, right, bottom, top, near, far: Float) -> (m: Matrix4) {
 	m[0][0] = +2 / (right - left);
 	m[1][1] = +2 / (top - bottom);
 	m[2][2] = -2 / (far - near);
@@ -267,23 +308,41 @@ ortho3d :: proc(left, right, bottom, top, near, far: Float) -> (m: Matrix4) {
 }
 
 
-axis_angle :: proc(axis: Vector3, angle_radians: Float) -> Quaternion {
+axis_angle :: quaternion_angle_axis;
+angle_axis :: quaternion_angle_axis;
+quaternion_angle_axis :: proc(angle_radians: Float, axis: Vector3) -> Quaternion {
 	t := angle_radians*0.5;
 	w := math.cos(t);
 	v := normalize(axis) * math.sin(t);
 	return quaternion(w, v.x, v.y, v.z);
 }
 
-angle_axis :: proc(angle_radians: Float, axis: Vector3) -> Quaternion {
-	t := angle_radians*0.5;
-	w := math.cos(t);
-	v := normalize(axis) * math.sin(t);
-	return quaternion(w, v.x, v.y, v.z);
-}
-
-euler_angles :: proc(pitch, yaw, roll: Float) -> Quaternion {
-	p := axis_angle({1, 0, 0}, pitch);
-	y := axis_angle({0, 1, 0}, yaw);
-	r := axis_angle({0, 0, 1}, roll);
+euler_angles :: quaternion_from_euler_angles;
+quaternion_from_euler_angles :: proc(pitch, yaw, roll: Float) -> Quaternion {
+	p := quaternion_angle_axis(pitch, {1, 0, 0});
+	y := quaternion_angle_axis(yaw,   {0, 1, 0});
+	r := quaternion_angle_axis(roll,  {0, 0, 1});
 	return (y * p) * r;
+}
+
+euler_angles_from_quaternion :: proc(q: Quaternion) -> (roll, pitch, yaw: Float) {
+	// roll (x-axis rotation)
+	sinr_cosp: Float = 2 * (real(q)*imag(q) + jmag(q)*kmag(q));
+	cosr_cosp: Float = 1 - 2 * (imag(q)*imag(q) + jmag(q)*jmag(q));
+	roll = Float(math.atan2(sinr_cosp, cosr_cosp));
+
+	// pitch (y-axis rotation)
+	sinp: Float = 2 * (real(q)*kmag(q) - kmag(q)*imag(q));
+	if abs(sinp) >= 1 {
+		pitch = Float(math.copy_sign(math.TAU * 0.25, sinp));
+	} else {
+		pitch = Float(math.asin(sinp));
+	}
+
+	// yaw (z-axis rotation)
+	siny_cosp: Float = 2 * (real(q)*kmag(q) + imag(q)*jmag(q));
+	cosy_cosp: Float = 1 - 2 * (jmag(q)*jmag(q) + kmag(q)*kmag(q));
+	yaw = Float(math.atan2(siny_cosp, cosy_cosp));
+
+	return;
 }
