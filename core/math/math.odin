@@ -112,6 +112,41 @@ unlerp_f32 :: proc(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
 unlerp_f64 :: proc(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
 unlerp     :: proc{unlerp_f32, unlerp_f64};
 
+
+wrap :: proc(x, y: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+	tmp := mod(x, y);
+	return tmp < 0 ? wrap + tmp : tmp;
+}
+angle_diff :: proc(a, b: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+
+	dist := wrap(b - a, TAU);
+	return wrap(dist*2, TAU) - dist;
+}
+
+angle_lerp :: proc(a, b, t: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+	return a + angle_diff(a, b) * t;
+}
+
+step :: proc(edge, x: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+	return x < edge ? 0 : 1;
+}
+
+smoothstep :: proc(edge0, edge1, x: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+	t := clamp((x - edge0) / (edge1 - edge0), 0, 1);
+	return t * t * (3 - 2*t);
+}
+
+bias :: proc(t, b: $T) -> T where intrinsics.type_is_numeric(T) {
+	return t / (((1/b) - 2) * (1 - t) + 1);
+}
+gain :: proc(t, g: $T) -> T where intrinsics.type_is_numeric(T) {
+	if t < 0.5 {
+		return bias(t*2, g)*0.5;
+	}
+	return bias(t*2 - 1, 1 - g)*0.5 + 0.5;
+}
+
+
 sign_f32 :: proc(x: f32) -> f32 { return f32(int(0 < x) - int(x < 0)); }
 sign_f64 :: proc(x: f64) -> f64 { return f64(int(0 < x) - int(x < 0)); }
 sign     :: proc{sign_f32, sign_f64};
@@ -728,6 +763,32 @@ acos_f64 :: proc(x: f64) -> f64 {
 }
 acos :: proc{acos_f32};
 
+
+sinh_f32 :: proc(x: f32) -> f32 {
+	return (exp(x) - exp(-x))*0.5;
+}
+sinh_f64 :: proc(x: f64) -> f64 {
+	return (exp(x) - exp(-x))*0.5;
+}
+sinh :: proc{sinh_f32, sinh_f64};
+
+cosh_f32 :: proc(x: f32) -> f32 {
+	return (exp(x) + exp(-x))*0.5;
+}
+cosh_f64 :: proc(x: f64) -> f64 {
+	return (exp(x) + exp(-x))*0.5;
+}
+cosh :: proc{cosh_f32, cosh_f64};
+
+tanh_f32 :: proc(x: f32) -> f32 {
+	t := exp(2*x);
+	return (t - 1) / (t + 1);
+}
+tanh_f64 :: proc(x: f64) -> f64 {
+	t := exp(2*x);
+	return (t - 1) / (t + 1);
+}
+tanh :: proc{tanh_f32, tanh_f64};
 
 
 F32_DIG        :: 6;
