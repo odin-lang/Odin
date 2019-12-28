@@ -83,6 +83,23 @@ length :: proc{vector_length, quaternion_length};
 length2 :: proc{vector_length2, quaternion_length2};
 
 
+vector_lerp :: proc(x, y, t: $V/[$N]$E) -> V where IS_NUMERIC(E) {
+	s: V;
+	for i in 0..<N {
+		ti := t[i];
+		s[i] = x[i]*(1-ti) + y[i]*ti;
+	}
+	return s;
+}
+
+vector_unlerp :: proc(a, b, x: $V/[$N]$E) -> V where IS_NUMERIC(E) {
+	s: V;
+	for i in 0..<N {
+		ai := a[i];
+		s[i] = (x[i]-ai)/(b[i]-ai);
+	}
+	return s;
+}
 
 vector_sin :: proc(angle: $V/[$N]$E) -> V where IS_NUMERIC(E) {
 	s: V;
