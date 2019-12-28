@@ -9401,8 +9401,13 @@ void ir_build_range_tuple(irProcedure *proc, Ast *expr, Type *val0_type, Type *v
 void ir_store_type_case_implicit(irProcedure *proc, Ast *clause, irValue *value) {
 	Entity *e = implicit_entity_of_node(clause);
 	GB_ASSERT(e != nullptr);
+#if 1
 	irValue *x = ir_add_local(proc, e, nullptr, false);
 	ir_emit_store(proc, x, value);
+#else
+	irValue *x = ir_address_from_load_or_generate_local(proc, value);
+	ir_module_add_value(proc->module, e, x);
+#endif
 }
 
 void ir_type_case_body(irProcedure *proc, Ast *label, Ast *clause, irBlock *body, irBlock *done) {
@@ -10317,9 +10322,9 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 			ir_start_block(proc, body);
 
+			// bool any_or_not_ptr = is_type_any(type_deref(parent_type)) || !is_parent_ptr;
+			bool any_or_not_ptr = !is_parent_ptr;
 			if (cc->list.count == 1) {
-				// bool any_or_not_ptr = is_type_any(type_deref(parent_type)) || !is_parent_ptr;
-				bool any_or_not_ptr = !is_parent_ptr;
 
 				Type *ct = case_entity->type;
 				if (any_or_not_ptr) {
