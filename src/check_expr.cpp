@@ -8126,25 +8126,14 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			}
 
 
-			if (t->kind == Type_Array) {
-				if (is_to_be_determined_array_count) {
-					t->Array.count = max;
-				} else if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
-					if (0 < max && max < t->Array.count) {
-						error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
+			if (t->kind == Type_EnumeratedArray) {
+				if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
+					if (0 < max && max < t->EnumeratedArray.count) {
+						error(node, "Expected %lld values for this enumerated array literal, got %lld", cast(long long)t->EnumeratedArray.count, cast(long long)max);
 					}
 				}
 			}
 
-
-			if (t->kind == Type_SimdVector) {
-				if (!is_constant) {
-					error(node, "Expected all constant elements for a simd vector");
-				}
-				if (t->SimdVector.is_x86_mmx) {
-					error(node, "Compound literals are not allowed with intrinsics.x86_mmx");
-				}
-			}
 			break;
 		}
 
