@@ -3252,18 +3252,16 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 					}
 				}
 
-				if (t->EnumeratedArray.count != bt->Enum.fields.count) {
-					if (!is_partial) {
-						error(e, "Non-contiguous enumeration used as an index in an enumerated array");
-						long long ea_count   = cast(long long)t->EnumeratedArray.count;
-						long long enum_count = cast(long long)t->Enum.fields.count;
-						error_line("\tenumerated array length: %lld\n", ea_count);
-						error_line("\tenum field count: %lld\n", enum_count);
-						error_line("\tSuggestion: prepend #partial to the enumerated array to allow for non-named elements\n");
-						if (2*enum_count < ea_count) {
-							error_line("\tWarning: the number of named elements is much smaller than the length of the array, are you sure this is what you want?\n");
-							error_line("\t         this warning will be removed if #partial is applied\n");
-						}
+				if (!is_partial && t->EnumeratedArray.count > bt->Enum.fields.count) {
+					error(e, "Non-contiguous enumeration used as an index in an enumerated array");
+					long long ea_count   = cast(long long)t->EnumeratedArray.count;
+					long long enum_count = cast(long long)t->Enum.fields.count;
+					error_line("\tenumerated array length: %lld\n", ea_count);
+					error_line("\tenum field count: %lld\n", enum_count);
+					error_line("\tSuggestion: prepend #partial to the enumerated array to allow for non-named elements\n");
+					if (2*enum_count < ea_count) {
+						error_line("\tWarning: the number of named elements is much smaller than the length of the array, are you sure this is what you want?\n");
+						error_line("\t         this warning will be removed if #partial is applied\n");
 					}
 				}
 
