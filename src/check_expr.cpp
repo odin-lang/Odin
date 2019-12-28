@@ -8128,6 +8128,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
 				if (0 < max && max < t->EnumeratedArray.count) {
 					error(node, "Expected %lld values for this enumerated array literal, got %lld", cast(long long)t->EnumeratedArray.count, cast(long long)max);
+				} else {
+					error(node, "Enumerated array literals must only have 'field = value' elements, bare elements are not allowed");
 				}
 			}
 
