@@ -212,12 +212,18 @@ struct ImportGraphNode {
 	isize              dep_count;
 };
 
+enum EntityVisiblityKind {
+	EntityVisiblity_Public,
+	EntityVisiblity_PrivateToPackage,
+	EntityVisiblity_PrivateToFile,
+};
+
 
 struct ForeignContext {
 	Ast *                 curr_library;
 	ProcCallingConvention default_cc;
 	String                link_prefix;
-	bool                  is_private;
+	EntityVisiblityKind   visibility_kind;
 };
 
 typedef Array<Entity *> CheckerTypePath;
@@ -349,7 +355,7 @@ void      add_untyped             (CheckerInfo *i, Ast *expression, bool lhs, Ad
 void      add_type_and_value      (CheckerInfo *i, Ast *expression, AddressingMode mode, Type *type, ExactValue value);
 void      add_entity_use          (CheckerContext *c, Ast *identifier, Entity *entity);
 void      add_implicit_entity     (CheckerContext *c, Ast *node, Entity *e);
-void      add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, DeclInfo *d);
+void      add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, DeclInfo *d, bool is_exported=true);
 void      add_type_info_type      (CheckerContext *c, Type *t);
 
 void check_add_import_decl(CheckerContext *c, Ast *decl);
