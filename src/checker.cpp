@@ -1153,7 +1153,7 @@ void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
 }
 
 
-void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, DeclInfo *d) {
+void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, DeclInfo *d, bool is_exported) {
 	GB_ASSERT(identifier->kind == Ast_Ident);
 	GB_ASSERT(e != nullptr && d != nullptr);
 	GB_ASSERT(identifier->Ident.token.string == e->token.string);
@@ -1162,7 +1162,7 @@ void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, Dec
 		Scope *scope = e->scope;
 
 		if (scope->flags & ScopeFlag_File) {
-			if (is_entity_kind_exported(e->kind)) {
+			if (is_entity_kind_exported(e->kind) && is_exported) {
 				AstPackage *pkg = scope->file->pkg;
 				GB_ASSERT(pkg->scope == scope->parent);
 				GB_ASSERT(c->pkg == pkg);
@@ -2133,10 +2133,22 @@ DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 		}
 		return true;
 	} else if (name == "private") {
-		if (ev.kind != ExactValue_Invalid) {
-			error(value, "'%.*s' does not expect a value", LIT(name));
+		EntityVisiblityKind kind = EntityVisiblity_PrivateToPackage;
+		if (ev.kind == ExactValue_Invalid) {
+			// Okay
+		} else if (ev.kind == ExactValue_String) {
+			String v = ev.value_string;
+			if (v == "file") {
+				kind = EntityVisiblity_PrivateToFile;
+			} else if (v == "package") {
+				kind = EntityVisiblity_PrivateToPackage;
+			} else {
+				error(value, "'%.*s'  expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
+			}
+		} else {
+			error(value, "'%.*s'  expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
 		}
-		c->foreign_context.is_private = true;
+		c->foreign_context.visibility_kind = kind;
 		return true;
 	}
 
@@ -2569,7 +2581,8 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 	ast_node(vd, ValueDecl, decl);
 
-	bool entity_is_private = c->foreign_context.is_private;
+	EntityVisiblityKind entity_visibility_kind = c->foreign_context.visibility_kind;
+
 	for_array(i, vd->attributes) {
 		Ast *attr = vd->attributes[i];
 		if (attr->kind != Ast_Attribute) continue;
@@ -2592,14 +2605,32 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			}
 
 			if (name == "private") {
+				EntityVisiblityKind kind = EntityVisiblity_PrivateToPackage;
+				bool success = false;
 				if (value != nullptr) {
-					error(value, "'%.*s' does not expect a value", LIT(name));
+					if (value->kind == Ast_BasicLit && value->BasicLit.token.kind == Token_String) {
+						String v = value->BasicLit.token.string;
+						if (v == "file") {
+							kind = EntityVisiblity_PrivateToFile;
+							success = true;
+						} else if (v == "package") {
+							kind = EntityVisiblity_PrivateToPackage;
+							success = true;
+						}
+					}
+				} else {
+					success = true;
+				}
+				if (!success) {
+					error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
 				}
 
-				if (entity_is_private) {
+
+
+				if (entity_visibility_kind >= kind) {
 					error(elem, "Previous declaration of '%.*s'", LIT(name));
 				} else {
-					entity_is_private = true;
+					entity_visibility_kind = kind;
 				}
 				array_unordered_remove(elems, j);
 				j -= 1;
@@ -2607,7 +2638,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 		}
 	}
 
-	if (entity_is_private && !(c->scope->flags&ScopeFlag_File)) {
+	if (entity_visibility_kind != EntityVisiblity_Public && !(c->scope->flags&ScopeFlag_File)) {
 		error(decl, "Attribute 'private' is not allowed on a non file scope entity");
 	}
 
@@ -2631,7 +2662,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			Entity *e = alloc_entity_variable(c->scope, name->Ident.token, nullptr);
 			e->identifier = name;
 
-			if (entity_is_private) {
+			if (entity_visibility_kind != EntityVisiblity_Public) {
 				e->flags |= EntityFlag_NotExported;
 			}
 
@@ -2656,7 +2687,8 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			d->init_expr = init_expr;
 			d->attributes = vd->attributes;
 
-			add_entity_and_decl_info(c, name, e, d);
+			bool is_exported = entity_visibility_kind != EntityVisiblity_PrivateToFile;
+			add_entity_and_decl_info(c, name, e, d, is_exported);
 		}
 
 		check_arity_match(c, vd, true);
@@ -2727,7 +2759,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			}
 			e->identifier = name;
 
-			if (entity_is_private) {
+			if (entity_visibility_kind != EntityVisiblity_Public) {
 				e->flags |= EntityFlag_NotExported;
 			}
 
@@ -2754,7 +2786,8 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 			check_builtin_attributes(c, e, &d->attributes);
 
-			add_entity_and_decl_info(c, name, e, d);
+			bool is_exported = entity_visibility_kind != EntityVisiblity_PrivateToFile;
+			add_entity_and_decl_info(c, name, e, d, is_exported);
 		}
 
 		check_arity_match(c, vd, true);
