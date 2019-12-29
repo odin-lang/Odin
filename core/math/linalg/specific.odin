@@ -8,6 +8,8 @@ import "intrinsics"
 
 Float :: f32;
 
+FLOAT_EPSILON :: size_of(Float) == 4 ? 1e-7 : 1e-15;
+
 Vector2 :: distinct [2]Float;
 Vector3 :: distinct [3]Float;
 Vector4 :: distinct [4]Float;
@@ -50,6 +52,14 @@ VECTOR3_X_AXIS :: Vector3{1, 0, 0};
 VECTOR3_Y_AXIS :: Vector3{0, 1, 0};
 VECTOR3_Z_AXIS :: Vector3{0, 0, 1};
 
+
+radians :: proc(degrees: Float) -> Float {
+	return math.TAU * degrees / 360.0;
+}
+
+degrees :: proc(radians: Float) -> Float {
+	return 360.0 * radians / math.TAU;
+}
 
 
 vector2_orthogonal :: proc(v: Vector2) -> Vector2 {
@@ -191,6 +201,20 @@ euler_angles_from_quaternion :: proc(q: Quaternion) -> (roll, pitch, yaw: Float)
 	return;
 }
 
+quaternion_look_at :: proc(eye, centre: Vector3, up: Vector3) -> Quaternion {
+	f := normalize(centre - eye);
+	s := normalize(cross(f, up));
+	u := cross(s, f);
+
+	w := math.sqrt(1 + s.x + u.y - f.z)*0.5;
+	iw4 := 0.25/w;
+	x := (+u.z + f.y)*iw4;
+	y := (-f.x - s.z)*iw4;
+	z := (+s.y - u.x)*iw4;
+	q: Quaternion = quaternion(w, x, y, z);
+	return normalize(q);
+}
+
 
 quaternion_nlerp :: proc(a, b: Quaternion, t: Float) -> Quaternion {
 	c := a + (b-a)*quaternion(t, 0, 0, 0);
@@ -199,7 +223,6 @@ quaternion_nlerp :: proc(a, b: Quaternion, t: Float) -> Quaternion {
 
 
 quaternion_slerp :: proc(x, y: Quaternion, t: Float) -> Quaternion {
-	EPSILON :: size_of(Float) == 4 ? 1e-7 : 1e-15;
 
 	a, b := x, y;
 	cos_angle := dot(a, b);
@@ -207,7 +230,7 @@ quaternion_slerp :: proc(x, y: Quaternion, t: Float) -> Quaternion {
 		b = -b;
 		cos_angle = -cos_angle;
 	}
-	if cos_angle > 1 - EPSILON {
+	if cos_angle > 1 - FLOAT_EPSILON {
 		return a + (b-a)*quaternion(t, 0, 0, 0);
 	}
 
@@ -290,13 +313,11 @@ quaternion_from_matrix4 :: proc(m: Matrix4) -> Quaternion {
 
 
 quaternion_between_two_vector3 :: proc(from, to: Vector3) -> Quaternion {
-	EPSILON :: size_of(Float) == 4 ? 1e-7 : 1e-15;
-
 	x := normalize(from);
 	y := normalize(to);
 
 	cos_theta := dot(x, y);
-	if abs(cos_theta + 1) < 2*EPSILON {
+	if abs(cos_theta + 1) < 2*FLOAT_EPSILON {
 		v := vector3_orthogonal(x);
 		return quaternion(0, v.x, v.y, v.z);
 	}
