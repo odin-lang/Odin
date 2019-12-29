@@ -55,6 +55,9 @@ enum EntityFlag {
 
 	EntityFlag_CVarArg       = 1<<21,
 	EntityFlag_AutoCast      = 1<<22,
+
+	EntityFlag_Disabled      = 1<<24,
+
 };
 
 enum EntityState {

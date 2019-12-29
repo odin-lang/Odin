@@ -922,7 +922,8 @@ card :: proc(s: $S/bit_set[$E; $U]) -> int {
 
 
 @builtin
-assert :: proc(condition: bool, message := "", loc := #caller_location) -> bool {
+@(disabled=ODIN_DISABLE_ASSERT)
+assert :: proc(condition: bool, message := "", loc := #caller_location) {
 	if !condition {
 		proc(message: string, loc: Source_Code_Location) {
 			p := context.assertion_failure_proc;
@@ -932,10 +933,10 @@ assert :: proc(condition: bool, message := "", loc := #caller_location) -> bool 
 			p("runtime assertion", message, loc);
 		}(message, loc);
 	}
-	return condition;
 }
 
 @builtin
+@(disabled=ODIN_DISABLE_ASSERT)
 panic :: proc(message: string, loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc;
 	if p == nil {
@@ -945,6 +946,7 @@ panic :: proc(message: string, loc := #caller_location) -> ! {
 }
 
 @builtin
+@(disabled=ODIN_DISABLE_ASSERT)
 unimplemented :: proc(message := "", loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc;
 	if p == nil {
@@ -954,6 +956,7 @@ unimplemented :: proc(message := "", loc := #caller_location) -> ! {
 }
 
 @builtin
+@(disabled=ODIN_DISABLE_ASSERT)
 unreachable :: proc(message := "", loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc;
 	if p == nil {

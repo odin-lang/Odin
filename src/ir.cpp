@@ -3109,6 +3109,12 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 	GB_ASSERT(pt->kind == Type_Proc);
 	Type *results = pt->Proc.results;
 
+	if (p->entity != nullptr) {
+		if (p->entity->flags & EntityFlag_Disabled) {
+			return nullptr;
+		}
+	}
+
 	irValue *context_ptr = nullptr;
 	if (pt->Proc.calling_convention == ProcCC_Odin) {
 		context_ptr = ir_find_or_generate_context_ptr(p);
