@@ -675,6 +675,16 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	e->Procedure.is_export = ac.is_export;
 	e->deprecated_message = ac.deprecated_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
+	if (ac.has_disabled_proc) {
+		if (ac.disabled_proc) {
+			e->flags |= EntityFlag_Disabled;
+		}
+		Type *t = base_type(e->type);
+		GB_ASSERT(t->kind == Type_Proc);
+		if (t->Proc.result_count != 0) {
+			error(e->token, "Procedure with the 'disabled' attribute may not have any return values");
+		}
+	}
 
 	bool is_foreign         = e->Procedure.is_foreign;
 	bool is_export          = e->Procedure.is_export;

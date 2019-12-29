@@ -99,6 +99,8 @@ struct AttributeContext {
 	bool    is_static;
 	bool    require_results;
 	bool    force_foreign_import;
+	bool    has_disabled_proc;
+	bool    disabled_proc;
 	String  link_name;
 	String  link_prefix;
 	isize   init_expr_list_count;

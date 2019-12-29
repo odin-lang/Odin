@@ -229,6 +229,7 @@ enum BuildFlagKind {
 	BuildFlag_BuildMode,
 	BuildFlag_Target,
 	BuildFlag_Debug,
+	BuildFlag_DisableAssert,
 	BuildFlag_NoBoundsCheck,
 	BuildFlag_NoCRT,
 	BuildFlag_UseLLD,
@@ -318,6 +319,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),        BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_Target,            str_lit("target"),            BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),             BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_DisableAssert,     str_lit("disable-assert"),    BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"),   BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),            BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),               BuildFlagParam_None);
@@ -667,6 +669,10 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_Debug:
 							build_context.ODIN_DEBUG = true;
+							break;
+
+						case BuildFlag_DisableAssert:
+							build_context.ODIN_DISABLE_ASSERT = true;
 							break;
 
 						case BuildFlag_NoBoundsCheck:
@@ -1029,6 +1035,10 @@ void print_show_help(String const arg0, String const &command) {
 	if (run_or_build) {
 		print_usage_line(1, "-debug");
 		print_usage_line(2, "Enabled debug information, and defines the global constant ODIN_DEBUG to be 'true'");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-disable-assert");
+		print_usage_line(2, "Disable the code generation of the built-in run-time 'assert' procedure, and defines the global constant ODIN_DISABLE_ASSERT to be 'true'");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-no-bounds-check");

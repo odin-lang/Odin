@@ -710,6 +710,7 @@ void init_universal(void) {
 	add_global_string_constant(str_lit("ODIN_VERSION"), bc->ODIN_VERSION);
 	add_global_string_constant(str_lit("ODIN_ROOT"),    bc->ODIN_ROOT);
 	add_global_constant(str_lit("ODIN_DEBUG"), t_untyped_bool, exact_value_bool(bc->ODIN_DEBUG));
+	add_global_constant(str_lit("ODIN_DISABLE_ASSERT"), t_untyped_bool, exact_value_bool(bc->ODIN_DISABLE_ASSERT));
 
 
 // Builtin Procedures
@@ -2272,6 +2273,16 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected no value for '%.*s'", LIT(name));
 		}
 		ac->require_results = true;
+		return true;
+	} else if (name == "disabled") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+
+		if (ev.kind == ExactValue_Bool) {
+			ac->has_disabled_proc = true;
+			ac->disabled_proc = ev.value_bool;
+		} else {
+			error(elem, "Expected a boolean value for '%.*s'", LIT(name));
+		}
 		return true;
 	}
 	return false;
