@@ -253,7 +253,10 @@ Context :: struct {
 	derived:    any, // May be used for derived data types
 }
 
-global_scratch_allocator_data: mem.Scratch_Allocator;
+@thread_local global_scratch_allocator_data: mem.Scratch_Allocator;
+global_scratch_allocator_proc :: mem.scratch_allocator_proc;
+global_scratch_allocator_init :: mem.scratch_allocator_init;
+global_scratch_allocator_destroy :: mem.scratch_allocator_destroy;
 
 
 
@@ -392,7 +395,7 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.allocator.procedure = os.heap_allocator_proc;
 	c.allocator.data = nil;
 
-	c.temp_allocator.procedure = mem.scratch_allocator_proc;
+	c.temp_allocator.procedure = global_scratch_allocator_proc;
 	c.temp_allocator.data = &global_scratch_allocator_data;
 
 	c.thread_id = os.current_thread_id(); // NOTE(bill): This is "contextless" so it is okay to call
@@ -408,7 +411,7 @@ __init_context :: proc "contextless" (c: ^Context) {
 
 @builtin
 init_global_temporary_allocator :: proc(data: []byte, backup_allocator := context.allocator) {
-	mem.scratch_allocator_init(&global_scratch_allocator_data, data, backup_allocator);
+	global_scratch_allocator_init(&global_scratch_allocator_data, data, backup_allocator);
 }
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) {

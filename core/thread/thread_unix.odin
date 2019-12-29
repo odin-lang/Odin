@@ -1,8 +1,9 @@
 // +build linux, darwin
 package thread;
 
-import "core:sys/unix"
+import "core:runtime"
 import "core:sync"
+import "core:sys/unix"
 
 // NOTE(tetra): Aligned here because of core/unix/pthread_linux.odin/pthread_t.
 // Also see core/sys/darwin/mach_darwin.odin/semaphore_t.
@@ -62,6 +63,13 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 		context = c;
 
 		t.procedure(t);
+
+		if !t.use_init_context {
+			if context.temp_allocator.data == &runtime.global_scratch_allocator_data {
+				runtime.global_scratch_allocator_destroy(auto_cast context.temp_allocator.data);
+			}
+		}
+
 		sync.atomic_store(&t.done, true, .Sequentially_Consistent);
 		return nil;
 	}

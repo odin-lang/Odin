@@ -108,6 +108,18 @@ scratch_allocator_init :: proc(scratch: ^Scratch_Allocator, data: []byte, backup
 	scratch.backup_allocator = backup_allocator;
 }
 
+scratch_allocator_destroy :: proc(using scratch: ^Scratch_Allocator) {
+	if scratch == nil {
+		return;
+	}
+	for ptr in leaked_allocations {
+		free(ptr, backup_allocator);
+	}
+	delete(leaked_allocations);
+	delete(data, backup_allocator);
+	scratch^ = {};
+}
+
 scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                size, alignment: int,
                                old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
