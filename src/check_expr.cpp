@@ -3119,13 +3119,12 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 				}
 				if (value) *value = v;
 				bool out_of_bounds = false;
-				if (open_range) {
-					out_of_bounds = v >= max_count;
-				} else {
-					out_of_bounds = v >= max_count+1;
-				}
 				if (v < 0) {
 					out_of_bounds = true;
+				} else if (open_range) {
+					out_of_bounds = v > max_count;
+				} else {
+					out_of_bounds = v >= max_count;
 				}
 
 				if (out_of_bounds) {
