@@ -2,6 +2,14 @@ package runtime
 
 foreign import kernel32 "system:Kernel32.lib"
 
+@private
+@(link_name="_tls_index")
+_tls_index: u32;
+
+@private
+@(link_name="_fltused")
+_fltused: i32 = 0x9875;
+
 @(link_name="memcpy")
 memcpy :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 	foreign kernel32 {
