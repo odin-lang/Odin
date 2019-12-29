@@ -1,5 +1,6 @@
 package thread
 
+import "core:runtime"
 import "core:sync"
 import "core:sys/win32"
 
@@ -34,6 +35,13 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 		context = c;
 
 		t.procedure(t);
+
+		if !t.use_init_context {
+			if context.temp_allocator.data == &runtime.global_scratch_allocator_data {
+				runtime.global_scratch_allocator_destroy(auto_cast context.temp_allocator.data);
+			}
+		}
+
 		sync.atomic_store(&t.done, true, .Sequentially_Consistent);
 		return 0;
 	}
@@ -69,9 +77,11 @@ is_done :: proc(using thread: ^Thread) -> bool {
 }
 
 join :: proc(using thread: ^Thread) {
-	win32.wait_for_single_object(win32_thread, win32.INFINITE);
-	win32.close_handle(win32_thread);
-	win32_thread = win32.INVALID_HANDLE;
+	if win32_thread != win32.INVALID_HANDLE {
+		win32.wait_for_single_object(win32_thread, win32.INFINITE);
+		win32.close_handle(win32_thread);
+		win32_thread = win32.INVALID_HANDLE;
+	}
 }
 
 destroy :: proc(thread: ^Thread) {
