@@ -99,11 +99,11 @@ the_basics :: proc() {
 		a, b := 1, "hello"; // declares `a` and `b` and infers the types from the assignments
 		b, a = "byte", 0;
 
-		// Note: `:=` is two tokens, `:` and `=`. The follow are equivalent
+		// Note: `:=` is two tokens, `:` and `=`. The following are equivalent,
 		/*
 			i: int = 123;
 			i:     = 123;
-			i := 123
+			i := 123;
 		*/
 
 		// Constant declarations
