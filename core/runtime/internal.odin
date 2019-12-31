@@ -2,6 +2,57 @@ package runtime
 
 import "core:os"
 
+ptr_offset :: inline proc "contextless" (ptr: $P/^$T, n: int) -> P {
+	new := int(uintptr(ptr)) + size_of(T)*n;
+	return P(uintptr(new));
+}
+
+is_power_of_two_int :: inline proc(x: int) -> bool {
+	if x <= 0 do return false;
+	return (x & (x-1)) == 0;
+}
+
+align_forward_int :: inline proc(ptr, align: int) -> int {
+	assert(is_power_of_two_int(align));
+
+	p := ptr;
+	modulo := p & (align-1);
+	if modulo != 0 do p += align - modulo;
+	return p;
+}
+
+is_power_of_two_uintptr :: inline proc(x: uintptr) -> bool {
+	if x <= 0 do return false;
+	return (x & (x-1)) == 0;
+}
+
+align_forward_uintptr :: inline proc(ptr, align: uintptr) -> uintptr {
+	assert(is_power_of_two_uintptr(align));
+
+	p := ptr;
+	modulo := p & (align-1);
+	if modulo != 0 do p += align - modulo;
+	return p;
+}
+
+mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
+	if data == nil do return nil;
+	if len < 0 do return data;
+	when !#defined(memset) {
+		foreign _ {
+			when size_of(rawptr) == 8 {
+				@(link_name="llvm.memset.p0i8.i64")
+				memset :: proc(dst: rawptr, val: byte, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+			} else {
+				@(link_name="llvm.memset.p0i8.i32")
+				memset :: proc(dst: rawptr, val: byte, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+			}
+		}
+	}
+	memset(data, 0, len);
+	return data;
+}
+
 mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memmove
@@ -33,6 +84,47 @@ mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> r
 	llvm_memcpy(dst, src, len, 1, false);
 	return dst;
 }
+
+DEFAULT_ALIGNMENT :: 2*align_of(rawptr);
+
+mem_alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
+	if size == 0 do return nil;
+	if allocator.procedure == nil do return nil;
+	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, 0, loc);
+}
+
+mem_free :: inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) {
+	if ptr == nil do return;
+	if allocator.procedure == nil do return;
+	allocator.procedure(allocator.data, .Free, 0, 0, ptr, 0, 0, loc);
+}
+
+mem_free_all :: inline proc(allocator := context.allocator, loc := #caller_location) {
+	if allocator.procedure != nil {
+		allocator.procedure(allocator.data, .Free_All, 0, 0, nil, 0, 0, loc);
+	}
+}
+
+mem_resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
+	switch {
+	case allocator.procedure == nil:
+		return nil;
+	case new_size == 0:
+		allocator.procedure(allocator.data, .Free, 0, 0, ptr, 0, 0, loc);
+		return nil;
+	case ptr == nil:
+		return allocator.procedure(allocator.data, .Alloc, new_size, alignment, nil, 0, 0, loc);
+	}
+	return allocator.procedure(allocator.data, .Resize, new_size, alignment, ptr, old_size, 0, loc);
+}
+
+
+
+
+
+
+
+
 
 print_u64 :: proc(fd: os.Handle, x: u64) {
 	digits := "0123456789";
@@ -379,12 +471,6 @@ memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_
 
 	return 0;
 }
-
-@private
-Raw_String :: struct {
-	data: ^byte,
-	len: int,
-};
 
 string_eq :: proc "contextless" (a, b: string) -> bool {
 	x := transmute(Raw_String)a;
