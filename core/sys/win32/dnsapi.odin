@@ -4,13 +4,17 @@ foreign import "system:Dnsapi.lib"
 
 Dns_Status :: u32; // zero is success
 
-DNS_TYPE_A    :: 0x1;
+DNS_TYPE_A     :: 0x1;
+DNS_TYPE_NS    :: 0x2;
 DNS_TYPE_CNAME :: 0x5;
-DNS_TYPE_AAAA :: 0x1c;
-DNS_TYPE_TEXT :: 0x10;
+DNS_TYPE_MX    :: 0xf;
+DNS_TYPE_AAAA  :: 0x1c;
+DNS_TYPE_TEXT  :: 0x10;
 
 DNS_INFO_NO_RECORDS :: 9501;
 DNS_QUERY_NO_RECURSION :: 0x00000004;
+
+ERROR_INVALID_NAME :: 123;
 
 @(default_calling_convention="std")
 foreign Dnsapi {
@@ -33,6 +37,12 @@ Dns_Record :: struct {
         text: struct {
             string_count: u32,
             string_array: cstring,
+        },
+        name_host: cstring,
+        mail_exchange: struct {
+            host: cstring,
+            preference: u16,
+            _: u16, // padding.
         },
     }
 }
