@@ -65,8 +65,8 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 		t.procedure(t);
 
 		if !t.use_init_context {
-			if context.temp_allocator.data == &runtime.global_scratch_allocator_data {
-				runtime.global_scratch_allocator_destroy(auto_cast context.temp_allocator.data);
+			if context.temp_allocator.data == &runtime.global_default_temp_allocator_data {
+				runtime.default_temp_allocator_destroy(auto_cast context.temp_allocator.data);
 			}
 		}
 
