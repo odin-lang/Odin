@@ -12,7 +12,18 @@ swap :: proc{swap16, swap32, swap64};
 
 
 set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
-	return runtime.memset(data, i32(value), len);
+	foreign _ {
+		when size_of(rawptr) == 8 {
+			@(link_name="llvm.memset.p0i8.i64")
+			llvm_memset :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) ---;
+		} else {
+			@(link_name="llvm.memset.p0i8.i32")
+			llvm_memset :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) ---;
+		}
+	}
+
+	llvm_memset(data, value, len, 1, false);
+	return data;
 }
 zero :: inline proc "contextless" (data: rawptr, len: int) -> rawptr {
 	return set(data, 0, len);
