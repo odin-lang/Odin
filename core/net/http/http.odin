@@ -4,8 +4,8 @@ import "core:net"
 
 
 Status :: enum {
-	Unknown,
-	Bad_Response_Header,
+	Unknown = 0,
+	Bad_Response_Header = -1, // NOTE(tetra): Only produced by execute_request.
 
 	Ok = 200,
 	Bad_Request = 400,
@@ -22,13 +22,16 @@ Status :: enum {
 
 
 
+
 Response :: struct {
 	status: Status,
 	headers: map[string]string, // TODO: We don't currently destroy the keys or values.
 	body: string,
 }
 
-destroy_response :: proc(using r: ^Response) {
+response_destroy :: proc(using r: ^Response) {
+	// TODO(tetra): Use arenas for the map data in Requests and Responses so that the memory
+	// can be block-freed.
 	for k, v in headers {
 		delete(k);
 		delete(v);
