@@ -3008,7 +3008,8 @@ void ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
 		args[1] = ir_const_int(type_size_of(t));
 		AstPackage *pkg_runtime = get_core_package(p->module->info, str_lit("runtime"));
 		if (p->entity != nullptr) {
-			if (p->entity->pkg != pkg_runtime && p->entity->token.string != "mem_zero") {
+			String name = p->entity->token.string;
+			if (p->entity->pkg != pkg_runtime && !(name == "mem_zero" || name == "memset")) {
 				ir_emit_comment(p, str_lit("ZeroInit"));
 				irValue *v = ir_emit_package_call(p, "runtime", "mem_zero", args, expr);
 				return;
