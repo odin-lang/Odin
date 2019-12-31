@@ -1,3 +1,4 @@
+// +build windows
 package dynlib
 
 import "core:sys/win32"
