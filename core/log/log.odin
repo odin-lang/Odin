@@ -1,7 +1,13 @@
 package log
 
+import "core:runtime"
 import "core:fmt"
 
+
+// NOTE(bill, 2019-12-31): These are defined in `package runtime` as they are used in the `context`. This is to prevent an import definition cycle.
+
+Level :: runtime.Logger_Level;
+/*
 Level :: enum {
 	Debug,
 	Info,
@@ -9,7 +15,10 @@ Level :: enum {
 	Error,
 	Fatal,
 }
+*/
 
+Option :: runtime.Logger_Option;
+/*
 Option :: enum {
 	Level,
 	Date,
@@ -20,8 +29,13 @@ Option :: enum {
 	Procedure,
 	Terminal_Color
 }
+*/
 
+Options :: runtime.Logger_Options;
+/*
 Options :: bit_set[Option];
+*/
+
 Full_Timestamp_Opts :: Options{
 	.Date,
 	.Time
@@ -37,13 +51,20 @@ Location_File_Opts :: Options{
 	.Long_File_Path
 };
 
-Logger_Proc :: #type proc(data: rawptr, level: Level, text: string, options: Options, location := #caller_location);
 
+Logger_Proc :: runtime.Logger_Proc;
+/*
+Logger_Proc :: #type proc(data: rawptr, level: Level, text: string, options: Options, location := #caller_location);
+*/
+
+Logger :: runtime.Logger;
+/*
 Logger :: struct {
 	procedure: Logger_Proc,
 	data:      rawptr,
 	options:   Options,
 }
+*/
 
 Multi_Logger_Data :: struct {
 	loggers : []Logger,

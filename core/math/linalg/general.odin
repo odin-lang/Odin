@@ -307,6 +307,14 @@ identity :: proc($T: typeid/[$N][N]$E) -> (m: T) {
 	return m;
 }
 
+trace :: proc(m: $T/[$N][N]$E) -> (tr: E) {
+	for i in 0..<N {
+		tr += m[i][i];
+	}
+	return;
+}
+
+
 transpose :: proc(a: $T/[$N][$M]$E) -> (m: T) {
 	for j in 0..<M {
 		for i in 0..<N {

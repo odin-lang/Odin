@@ -4,8 +4,6 @@
 package runtime
 
 import "core:os"
-import "core:mem"
-import "core:log"
 import "intrinsics"
 
 // Naming Conventions:
@@ -234,11 +232,58 @@ Source_Code_Location :: struct {
 
 Assertion_Failure_Proc :: #type proc(prefix, message: string, loc: Source_Code_Location);
 
+
+// Allocation Stuff
+Allocator_Mode :: enum byte {
+	Alloc,
+	Free,
+	Free_All,
+	Resize,
+}
+
+Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
+                             size, alignment: int,
+                             old_memory: rawptr, old_size: int, flags: u64 = 0, location: Source_Code_Location = #caller_location) -> rawptr;
+Allocator :: struct {
+	procedure: Allocator_Proc,
+	data:      rawptr,
+}
+
+// Logging stuff
+
+Logger_Level :: enum {
+	Debug,
+	Info,
+	Warning,
+	Error,
+	Fatal,
+}
+
+Logger_Option :: enum {
+	Level,
+	Date,
+	Time,
+	Short_File_Path,
+	Long_File_Path,
+	Line,
+	Procedure,
+	Terminal_Color
+}
+
+Logger_Options :: bit_set[Logger_Option];
+Logger_Proc :: #type proc(data: rawptr, level: Logger_Level, text: string, options: Logger_Options, location := #caller_location);
+
+Logger :: struct {
+	procedure: Logger_Proc,
+	data:      rawptr,
+	options:   Logger_Options,
+}
+
 Context :: struct {
-	allocator:      mem.Allocator,
-	temp_allocator: mem.Allocator,
+	allocator:      Allocator,
+	temp_allocator: Allocator,
 	assertion_failure_proc: Assertion_Failure_Proc,
-	logger: log.Logger,
+	logger: Logger,
 
 	stdin:  os.Handle,
 	stdout: os.Handle,
@@ -253,12 +298,15 @@ Context :: struct {
 	derived:    any, // May be used for derived data types
 }
 
-@thread_local global_scratch_allocator_data: mem.Scratch_Allocator;
-global_scratch_allocator_proc :: mem.scratch_allocator_proc;
-global_scratch_allocator_init :: mem.scratch_allocator_init;
-global_scratch_allocator_destroy :: mem.scratch_allocator_destroy;
 
 
+
+@thread_local global_default_temp_allocator_data: Default_Temp_Allocator;
+
+Raw_String :: struct {
+	data: ^byte,
+	len:  int,
+}
 
 Raw_Slice :: struct {
 	data: rawptr,
@@ -269,7 +317,7 @@ Raw_Dynamic_Array :: struct {
 	data:      rawptr,
 	len:       int,
 	cap:       int,
-	allocator: mem.Allocator,
+	allocator: Allocator,
 }
 
 Raw_Map :: struct {
@@ -381,6 +429,13 @@ foreign {
 
 
 
+default_logger_proc :: proc(data: rawptr, level: Logger_Level, text: string, options: Logger_Options, location := #caller_location) {
+	// Do nothing
+}
+
+default_logger :: proc() -> Logger {
+	return Logger{default_logger_proc, nil, nil};
+}
 
 
 __init_context_from_ptr :: proc "contextless" (c: ^Context, other: ^Context) {
@@ -392,16 +447,17 @@ __init_context_from_ptr :: proc "contextless" (c: ^Context, other: ^Context) {
 __init_context :: proc "contextless" (c: ^Context) {
 	if c == nil do return;
 
-	c.allocator.procedure = os.heap_allocator_proc;
+	// NOTE(bill): Do not initialize these procedures with a call as they are not defined with the "contexless" calling convention
+	c.allocator.procedure = default_allocator_proc;
 	c.allocator.data = nil;
 
-	c.temp_allocator.procedure = global_scratch_allocator_proc;
-	c.temp_allocator.data = &global_scratch_allocator_data;
+	c.temp_allocator.procedure = default_temp_allocator_proc;
+	c.temp_allocator.data = &global_default_temp_allocator_data;
 
 	c.thread_id = os.current_thread_id(); // NOTE(bill): This is "contextless" so it is okay to call
 	c.assertion_failure_proc = default_assertion_failure_proc;
 
-	c.logger.procedure = log.nil_logger_proc;
+	c.logger.procedure = default_logger_proc;
 	c.logger.data = nil;
 
 	c.stdin  = os.stdin;
@@ -411,7 +467,7 @@ __init_context :: proc "contextless" (c: ^Context) {
 
 @builtin
 init_global_temporary_allocator :: proc(data: []byte, backup_allocator := context.allocator) {
-	global_scratch_allocator_init(&global_scratch_allocator_data, data, backup_allocator);
+	default_temp_allocator_init(&global_default_temp_allocator_data, data, backup_allocator);
 }
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) {
@@ -491,34 +547,111 @@ resize :: proc{resize_dynamic_array};
 
 
 @builtin
-new :: proc{mem.new};
+free :: proc{mem_free};
 
 @builtin
-new_clone :: proc{mem.new_clone};
+free_all :: proc{mem_free_all};
+
+
 
 @builtin
-free :: proc{mem.free};
-
+delete_string :: proc(str: string, allocator := context.allocator, loc := #caller_location) {
+	mem_free((transmute(Raw_String)str).data, allocator, loc);
+}
 @builtin
-free_all :: proc{mem.free_all};
+delete_cstring :: proc(str: cstring, allocator := context.allocator, loc := #caller_location) {
+	mem_free((^byte)(str), allocator, loc);
+}
+@builtin
+delete_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) {
+	mem_free((transmute(Raw_Dynamic_Array)array).data, array.allocator, loc);
+}
+@builtin
+delete_slice :: proc(array: $T/[]$E, allocator := context.allocator, loc := #caller_location) {
+	mem_free((transmute(Raw_Slice)array).data, allocator, loc);
+}
+@builtin
+delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
+	raw := transmute(Raw_Map)m;
+	delete_slice(raw.hashes);
+	mem_free(raw.entries.data, raw.entries.allocator, loc);
+}
+
 
 @builtin
 delete :: proc{
-	mem.delete_string,
-	mem.delete_cstring,
-	mem.delete_dynamic_array,
-	mem.delete_slice,
-	mem.delete_map,
+	delete_string,
+	delete_cstring,
+	delete_dynamic_array,
+	delete_slice,
+	delete_map,
 };
+
+
+@builtin
+new :: inline proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> ^T {
+	ptr := (^T)(mem_alloc(size_of(T), align_of(T), allocator, loc));
+	if ptr != nil do ptr^ = T{};
+	return ptr;
+}
+
+@builtin
+new_clone :: inline proc(data: $T, allocator := context.allocator, loc := #caller_location) -> ^T {
+	ptr := (^T)(mem_alloc(size_of(T), align_of(T), allocator, loc));
+	if ptr != nil do ptr^ = data;
+	return ptr;
+}
+
+make_aligned :: proc($T: typeid/[]$E, auto_cast len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> T {
+	make_slice_error_loc(loc, len);
+	data := mem_alloc(size_of(E)*len, alignment, allocator, loc);
+	s := Raw_Slice{data, len};
+	return transmute(T)s;
+}
+
+@builtin
+make_slice :: inline proc($T: typeid/[]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
+	return make_aligned(T, len, align_of(E), allocator, loc);
+}
+
+@builtin
+make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> T {
+	return make_dynamic_array_len_cap(T, 0, 16, allocator, loc);
+}
+
+@builtin
+make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, auto_cast len: int, allocator := context.allocator, loc := #caller_location) -> T {
+	return make_dynamic_array_len_cap(T, len, len, allocator, loc);
+}
+
+@builtin
+make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, auto_cast len: int, auto_cast cap: int, allocator := context.allocator, loc := #caller_location) -> T {
+	make_dynamic_array_error_loc(loc, len, cap);
+	data := mem_alloc(size_of(E)*cap, align_of(E), allocator, loc);
+	s := Raw_Dynamic_Array{data, len, cap, allocator};
+	return transmute(T)s;
+}
+
+@builtin
+make_map :: proc($T: typeid/map[$K]$E, auto_cast cap: int = 16, allocator := context.allocator, loc := #caller_location) -> T {
+	make_map_expr_error_loc(loc, cap);
+	context.allocator = allocator;
+
+	m: T;
+	reserve_map(&m, cap);
+	return m;
+}
 
 @builtin
 make :: proc{
-	mem.make_slice,
-	mem.make_dynamic_array,
-	mem.make_dynamic_array_len,
-	mem.make_dynamic_array_len_cap,
-	mem.make_map,
+	make_slice,
+	make_dynamic_array,
+	make_dynamic_array_len,
+	make_dynamic_array_len_cap,
+	make_map,
 };
+
+
 
 @builtin
 clear_map :: inline proc "contextless" (m: ^$T/map[$K]$V) {
@@ -559,7 +692,7 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 		data := (^E)(a.data);
 		assert(data != nil);
 		val := arg;
-		mem_copy(mem.ptr_offset(data, a.len), &val, size_of(E));
+		mem_copy(ptr_offset(data, a.len), &val, size_of(E));
 		a.len += arg_len;
 	}
 }
@@ -580,7 +713,7 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 		a := (^Raw_Dynamic_Array)(array);
 		data := (^E)(a.data);
 		assert(data != nil);
-		mem_copy(mem.ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
+		mem_copy(ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
 		a.len += arg_len;
 	}
 }
@@ -625,20 +758,20 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 		type := si.types[i].variant.(Type_Info_Pointer).elem;
 		max_align = max(max_align, type.align);
 
-		old_size = mem.align_forward_int(old_size, type.align);
-		new_size = mem.align_forward_int(new_size, type.align);
+		old_size = align_forward_int(old_size, type.align);
+		new_size = align_forward_int(new_size, type.align);
 
 		old_size += type.size * old_cap;
 		new_size += type.size * capacity;
 	}
 
-	old_size = mem.align_forward_int(old_size, max_align);
-	new_size = mem.align_forward_int(new_size, max_align);
+	old_size = align_forward_int(old_size, max_align);
+	new_size = align_forward_int(new_size, max_align);
 
 	old_data := (^rawptr)(array)^;
 
 	new_data := array.allocator.procedure(
-		array.allocator.data, mem.Allocator_Mode.Alloc, new_size, max_align,
+		array.allocator.data, .Alloc, new_size, max_align,
 		nil, old_size, 0, loc,
 	);
 	if new_data == nil do return false;
@@ -652,8 +785,8 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 		type := si.types[i].variant.(Type_Info_Pointer).elem;
 		max_align = max(max_align, type.align);
 
-		old_offset = mem.align_forward_int(old_offset, type.align);
-		new_offset = mem.align_forward_int(new_offset, type.align);
+		old_offset = align_forward_int(old_offset, type.align);
+		new_offset = align_forward_int(new_offset, type.align);
 
 		new_data_elem := rawptr(uintptr(new_data) + uintptr(new_offset));
 		old_data_elem := rawptr(uintptr(old_data) + uintptr(old_offset));
@@ -667,7 +800,7 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 	}
 
 	array.allocator.procedure(
-		array.allocator.data, mem.Allocator_Mode.Free, 0, max_align,
+		array.allocator.data, .Free, 0, max_align,
 		old_data, old_size, 0, loc,
 	);
 
@@ -711,8 +844,8 @@ append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, arg: E, loc := #caller_locat
 			type := si.types[i].variant.(Type_Info_Pointer).elem;
 			max_align = max(max_align, type.align);
 
-			soa_offset  = mem.align_forward_int(soa_offset, type.align);
-			item_offset = mem.align_forward_int(item_offset, type.align);
+			soa_offset  = align_forward_int(soa_offset, type.align);
+			item_offset = align_forward_int(item_offset, type.align);
 
 			dst := rawptr(uintptr(data) + uintptr(soa_offset) + uintptr(type.size * len_ptr^));
 			src := rawptr(uintptr(arg_ptr) + uintptr(item_offset));
@@ -765,8 +898,8 @@ append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_l
 			type := si.types[i].variant.(Type_Info_Pointer).elem;
 			max_align = max(max_align, type.align);
 
-			soa_offset  = mem.align_forward_int(soa_offset, type.align);
-			item_offset = mem.align_forward_int(item_offset, type.align);
+			soa_offset  = align_forward_int(soa_offset, type.align);
+			item_offset = align_forward_int(item_offset, type.align);
 
 			dst := uintptr(data) + uintptr(soa_offset) + uintptr(type.size * len_ptr^);
 			src := uintptr(args_ptr) + uintptr(item_offset);
@@ -818,7 +951,7 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 	allocator := a.allocator;
 
 	new_data := allocator.procedure(
-		allocator.data, mem.Allocator_Mode.Resize, new_size, align_of(E),
+		allocator.data, .Resize, new_size, align_of(E),
 		a.data, old_size, 0, loc,
 	);
 	if new_data == nil do return false;
@@ -848,7 +981,7 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 	allocator := a.allocator;
 
 	new_data := allocator.procedure(
-		allocator.data, mem.Allocator_Mode.Resize, new_size, align_of(E),
+		allocator.data, .Resize, new_size, align_of(E),
 		a.data, old_size, 0, loc,
 	);
 	if new_data == nil do return false;
@@ -998,7 +1131,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	new_size  := cap * elem_size;
 	allocator := array.allocator;
 
-	new_data := allocator.procedure(allocator.data, mem.Allocator_Mode.Resize, new_size, elem_align, array.data, old_size, 0, loc);
+	new_data := allocator.procedure(allocator.data, .Resize, new_size, elem_align, array.data, old_size, 0, loc);
 	if new_data == nil do return false;
 
 	array.data = new_data;
@@ -1052,7 +1185,7 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 
 	assert(array.data != nil);
 	data := uintptr(array.data) + uintptr(elem_size*array.len);
-	mem.zero(rawptr(data), elem_size);
+	mem_zero(rawptr(data), elem_size);
 	array.len += 1;
 	return array.len;
 }
@@ -1136,7 +1269,7 @@ source_code_location_hash :: proc(s: Source_Code_Location) -> u64 {
 
 
 
-__slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: mem.Allocator, loc := #caller_location) -> bool {
+__slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, loc := #caller_location) -> bool {
 	array := (^Raw_Slice)(array_);
 
 	if new_count < array.len do return true;
@@ -1146,7 +1279,7 @@ __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: mem.Allocato
 	old_size := array.len*size_of(T);
 	new_size := new_count*size_of(T);
 
-	new_data := mem.resize(array.data, old_size, new_size, align_of(T), allocator, loc);
+	new_data := mem_resize(array.data, old_size, new_size, align_of(T), allocator, loc);
 	if new_data == nil do return false;
 	array.data = new_data;
 	array.len = new_count;

@@ -3006,11 +3006,13 @@ void ir_emit_zero_init(irProcedure *p, irValue *address, Ast *expr) {
 		auto args = array_make<irValue *>(a, 2);
 		args[0] = ir_emit_conv(p, address, t_rawptr);
 		args[1] = ir_const_int(type_size_of(t));
-		AstPackage *pkg = get_core_package(p->module->info, str_lit("mem"));
-		if (p->entity != nullptr && p->entity->token.string != "zero" && p->entity->pkg != pkg) {
-			ir_emit_comment(p, str_lit("ZeroInit"));
-			irValue *v = ir_emit_package_call(p, "mem", "zero", args, expr);
-			return;
+		AstPackage *pkg_runtime = get_core_package(p->module->info, str_lit("runtime"));
+		if (p->entity != nullptr) {
+			if (p->entity->pkg != pkg_runtime && p->entity->token.string != "mem_zero") {
+				ir_emit_comment(p, str_lit("ZeroInit"));
+				irValue *v = ir_emit_package_call(p, "runtime", "mem_zero", args, expr);
+				return;
+			}
 		}
 	}
 	ir_emit(p, ir_instr_zero_init(p, address));
@@ -3254,7 +3256,7 @@ irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char
 	AstPackage *p = get_core_package(proc->module->info, package_name);
 	Entity *e = scope_lookup_current(p->scope, name);
 	irValue **found = map_get(&proc->module->values, hash_entity(e));
-	GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
+	GB_ASSERT_MSG(found != nullptr, "%s.%.*s", package_name_, LIT(name));
 	irValue *gp = *found;
 	irValue *call = ir_emit_call(proc, gp, args, inlining);
 	return call;

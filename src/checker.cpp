@@ -1660,13 +1660,21 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	ptr_set_init(&c->info.minimum_dependency_type_info_set, heap_allocator());
 
 	String required_runtime_entities[] = {
+		str_lit("Allocator"),
+		str_lit("Logger"),
+		str_lit("mem_zero"),
+
 		str_lit("__init_context"),
 		str_lit("default_assertion_failure_proc"),
 
 		str_lit("args__"),
 		str_lit("type_table"),
 		str_lit("__type_info_of"),
-		str_lit("global_scratch_allocator"),
+		str_lit("global_default_temp_allocator_data"),
+		str_lit("default_temp_allocator"),
+		str_lit("default_temp_allocator_init"),
+		str_lit("default_temp_allocator_destroy"),
+		str_lit("default_temp_allocator_proc"),
 
 		str_lit("Type_Info"),
 		str_lit("Source_Code_Location"),
@@ -1683,6 +1691,8 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("umodti3"),
 		str_lit("udivti3"),
 
+		str_lit("memset"),
+
 		str_lit("memory_compare"),
 		str_lit("memory_compare_zero"),
 	};
@@ -1695,22 +1705,12 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			// NOTE(bill): Only if these exist
 			str_lit("memcpy"),
 			str_lit("memmove"),
-			str_lit("memset"),
 			str_lit("_tls_index"),
 			str_lit("_fltused"),
 		};
 		for (isize i = 0; i < gb_count_of(required_no_crt_entities); i++) {
 			add_dependency_to_set(c, scope_lookup(c->info.runtime_package->scope, required_no_crt_entities[i]));
 		}
-	}
-
-	AstPackage *mem = get_core_package(&c->info, str_lit("mem"));
-	String required_mem_entities[] = {
-		str_lit("zero"),
-		str_lit("Allocator"),
-	};
-	for (isize i = 0; i < gb_count_of(required_mem_entities); i++) {
-		add_dependency_to_set(c, scope_lookup(mem->scope, required_mem_entities[i]));
 	}
 
 	AstPackage *os = get_core_package(&c->info, str_lit("os"));
@@ -1863,6 +1863,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 }
 
 
+void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d);
 
 
 Entity *find_core_entity(Checker *c, String name) {
@@ -1882,6 +1883,10 @@ Type *find_core_type(Checker *c, String name) {
 , LIT(name));
 		// NOTE(bill): This will exit the program as it's cannot continue without it!
 	}
+	if (e->type == nullptr) {
+		check_single_global_entity(c, e, e->decl_info);
+	}
+	GB_ASSERT(e->type != nullptr);
 	return e->type;
 }
 
@@ -2031,7 +2036,7 @@ void init_mem_allocator(Checker *c) {
 	if (t_allocator != nullptr) {
 		return;
 	}
-	AstPackage *pkg = get_core_package(&c->info, str_lit("mem"));
+	AstPackage *pkg = get_core_package(&c->info, str_lit("runtime"));
 
 	String name = str_lit("Allocator");
 	Entity *e = scope_lookup_current(pkg->scope, name);
@@ -2049,6 +2054,7 @@ void init_core_context(Checker *c) {
 		return;
 	}
 	t_context = find_core_type(c, str_lit("Context"));
+	GB_ASSERT(t_context != nullptr);
 	t_context_ptr = alloc_type_pointer(t_context);
 }
 
@@ -2905,46 +2911,56 @@ void check_collect_entities(CheckerContext *c, Array<Ast *> const &nodes) {
 }
 
 
+void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
+	GB_ASSERT(e != nullptr);
+	GB_ASSERT(d != nullptr);
+
+	if (d->scope != e->scope) {
+		return;
+	}
+	if (e->state == EntityState_Resolved)  {
+		return;
+	}
+
+	CheckerContext ctx = c->init_ctx;
+
+	GB_ASSERT(d->scope->flags&ScopeFlag_File);
+	AstFile *file = d->scope->file;
+	add_curr_ast_file(&ctx, file);
+	AstPackage *pkg = file->pkg;
+
+	GB_ASSERT(ctx.pkg != nullptr);
+	GB_ASSERT(e->pkg != nullptr);
+
+	if (!e->pkg->used) {
+		return;
+	}
+
+
+	if (pkg->kind == Package_Init) {
+		if (e->kind != Entity_Procedure && e->token.string == "main") {
+			error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
+			return;
+		}
+	} else if (pkg->kind == Package_Runtime) {
+		if (e->token.string == "main") {
+			error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
+			return;
+		}
+	}
+
+	ctx.decl = d;
+	ctx.scope = d->scope;
+	check_entity_decl(&ctx, e, d, nullptr);
+}
+
 void check_all_global_entities(Checker *c) {
 	Scope *prev_file = nullptr;
 
 	for_array(i, c->info.entities) {
 		Entity *e = c->info.entities[i];
 		DeclInfo *d = e->decl_info;
-
-		if (d->scope != e->scope) {
-			continue;
-		}
-
-		CheckerContext ctx = c->init_ctx;
-
-		GB_ASSERT(d->scope->flags&ScopeFlag_File);
-		AstFile *file = d->scope->file;
-		add_curr_ast_file(&ctx, file);
-		AstPackage *pkg = file->pkg;
-
-		GB_ASSERT(ctx.pkg != nullptr);
-		GB_ASSERT(e->pkg != nullptr);
-
-		if (!e->pkg->used) {
-			continue;
-		}
-
-		if (pkg->kind == Package_Init) {
-			if (e->kind != Entity_Procedure && e->token.string == "main") {
-				error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
-				continue;
-			}
-		} else if (pkg->kind == Package_Runtime) {
-			if (e->token.string == "main") {
-				error(e->token, "'main' is reserved as the entry point procedure in the initial scope");
-				continue;
-			}
-		}
-
-		ctx.decl = d;
-		ctx.scope = d->scope;
-		check_entity_decl(&ctx, e, d, nullptr);
+		check_single_global_entity(c, e, d);
 	}
 }
 

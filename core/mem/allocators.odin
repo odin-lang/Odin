@@ -99,6 +99,7 @@ Scratch_Allocator :: struct {
 	prev_offset: int,
 	backup_allocator: Allocator,
 	leaked_allocations: [dynamic]rawptr,
+	default_to_default_allocator: bool,
 }
 
 scratch_allocator_init :: proc(scratch: ^Scratch_Allocator, data: []byte, backup_allocator := context.allocator) {
@@ -128,13 +129,15 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 	if scratch.data == nil {
 		DEFAULT_SCRATCH_BACKING_SIZE :: 1<<22;
-		assert(context.allocator.procedure != scratch_allocator_proc &&
-		       context.allocator.data != allocator_data);
+		if !(context.allocator.procedure != scratch_allocator_proc &&
+		     context.allocator.data != allocator_data) {
+			panic("cyclic initialization of the scratch allocator with itself");
+		}
 		scratch_allocator_init(scratch, make([]byte, 1<<22));
 	}
 
 	switch mode {
-	case Allocator_Mode.Alloc:
+	case .Alloc:
 		switch {
 		case scratch.curr_offset+size <= len(scratch.data):
 			offset := align_forward_uintptr(uintptr(scratch.curr_offset), uintptr(alignment));
@@ -166,7 +169,7 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 		return ptr;
 
-	case Allocator_Mode.Free:
+	case .Free:
 		last_ptr := rawptr(&scratch.data[scratch.prev_offset]);
 		if old_memory == last_ptr {
 			full_size := scratch.curr_offset - scratch.prev_offset;
@@ -176,7 +179,7 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		}
 		// NOTE(bill): It's scratch memory, don't worry about freeing
 
-	case Allocator_Mode.Free_All:
+	case .Free_All:
 		scratch.curr_offset = 0;
 		scratch.prev_offset = 0;
 		for ptr in scratch.leaked_allocations {
@@ -184,7 +187,7 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		}
 		clear(&scratch.leaked_allocations);
 
-	case Allocator_Mode.Resize:
+	case .Resize:
 		last_ptr := rawptr(&scratch.data[scratch.prev_offset]);
 		if old_memory == last_ptr && len(scratch.data)-scratch.prev_offset >= size {
 			scratch.curr_offset = scratch.prev_offset+size;
@@ -505,13 +508,13 @@ dynamic_pool_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 	pool := (^Dynamic_Pool)(allocator_data);
 
 	switch mode {
-	case Allocator_Mode.Alloc:
+	case .Alloc:
 		return dynamic_pool_alloc(pool, size);
-	case Allocator_Mode.Free:
+	case .Free:
 		panic("Allocator_Mode.Free is not supported for a pool");
-	case Allocator_Mode.Free_All:
+	case .Free_All:
 		dynamic_pool_free_all(pool);
-	case Allocator_Mode.Resize:
+	case .Resize:
 		panic("Allocator_Mode.Resize is not supported for a pool");
 		if old_size >= size {
 			return old_memory;

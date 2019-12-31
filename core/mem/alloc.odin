@@ -2,26 +2,33 @@ package mem
 
 import "core:runtime"
 
-DEFAULT_ALIGNMENT :: 2*align_of(rawptr);
-
+// NOTE(bill, 2019-12-31): These are defined in `package runtime` as they are used in the `context`. This is to prevent an import definition cycle.
+Allocator_Mode :: runtime.Allocator_Mode;
+/*
 Allocator_Mode :: enum byte {
 	Alloc,
 	Free,
 	Free_All,
 	Resize,
 }
+*/
 
+Allocator_Proc :: runtime.Allocator_Proc;
+/*
 Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
-	                         size, alignment: int,
-	                         old_memory: rawptr, old_size: int, flags: u64 = 0, location := #caller_location) -> rawptr;
+                             size, alignment: int,
+                             old_memory: rawptr, old_size: int, flags: u64 = 0, location := #caller_location) -> rawptr;
+*/
 
-
+Allocator :: runtime.Allocator;
+/*
 Allocator :: struct {
 	procedure: Allocator_Proc,
 	data:      rawptr,
 }
+*/
 
-
+DEFAULT_ALIGNMENT :: 2*align_of(rawptr);
 
 alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
 	if size == 0 do return nil;
