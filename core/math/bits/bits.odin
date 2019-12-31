@@ -1,4 +1,4 @@
-package bits
+package math_bits
 
 import "core:os"
 
