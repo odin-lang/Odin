@@ -1,8 +1,9 @@
-//+build !windows !amd64
+//+build !windows
 package runtime
 
 @(link_name="memset")
 memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {
+when false {
 	b := byte(val);
 
 	p_start := uintptr(ptr);
@@ -12,13 +13,15 @@ memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {
 	}
 
 	return ptr;
-	// when size_of(rawptr) == 8 {
-	// 	@(link_name="llvm.memset.p0i8.i64")
-	// 	llvm_memset :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) ---;
-	// } else {
-	// 	@(link_name="llvm.memset.p0i8.i32")
-	// 	llvm_memset :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) ---;
-	// }
+} else {
+	when size_of(rawptr) == 8 {
+		@(link_name="llvm.memset.p0i8.i64")
+		llvm_memset :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) ---;
+	} else {
+		@(link_name="llvm.memset.p0i8.i32")
+		llvm_memset :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) ---;
+	}
 
-	// return llvm_memset(ptr, byte(val), len, 1, false);
+	return llvm_memset(ptr, byte(val), len, 1, false);
+}
 }
