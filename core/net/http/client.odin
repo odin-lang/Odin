@@ -67,16 +67,17 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Re
 
 	fmt.printf("%q\n", req_str);
 
-
+	// TODO(tetra): SSL/TLS.
 	skt, err := net.dial(addr, 80);
-	if err != nil do return; // TODO(tetra): return instead?
+	if err != .Ok do return; // TODO(tetra): return instead?
 
-	write_err := net.write_string(skt, req_str);
-	if write_err != nil do return; // TODO(tetra): return instead?
+	write_err := net.write(skt, transmute([]byte) req_str);
+	if write_err != .Ok do return; // TODO(tetra): return instead?
 
 	read_buf: [4096]byte;
 	n, read_err := net.read(skt, read_buf[:]);
-	if read_err != nil do return; // TODO(tetra): return instead?
+	assert(n > 0);
+	if read_err != .Ok do return; // TODO(tetra): return instead?
 
 
 	//
@@ -97,7 +98,7 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Re
 	resp.headers = make(map[string]string, len(resp_parts), allocator);
 	// NOTE(tetra): conform to the common idiom that ok=false means that the
 	// that the caller does not have to clean up `resp` ... because we already did.
-	defer if !ok do delete(resp.headers);
+	defer if !ok do response_destroy(&resp);
 
 	last_hdr_index := -1;
 	for part, i in resp_parts {
@@ -123,6 +124,7 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Re
 		return;
 	}
 
+	// TODO(tetra): Use the content-length to slice the body.
 	body := resp_parts[last_hdr_index+1];
 	body = trim_space(body);
 	resp.body = clone(body, allocator);
