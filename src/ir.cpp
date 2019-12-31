@@ -5853,6 +5853,7 @@ enum Typeid_Kind : u8 {
 	Typeid_Pointer,
 	Typeid_Procedure,
 	Typeid_Array,
+	Typeid_Enumerated_Array,
 	Typeid_Dynamic_Array,
 	Typeid_Slice,
 	Typeid_Tuple,
@@ -5890,18 +5891,19 @@ irValue *ir_typeid(irModule *m, Type *type) {
 		if (flags & BasicFlag_String)   kind = Typeid_String;
 		if (flags & BasicFlag_Rune)     kind = Typeid_Rune;
 	} break;
-	case Type_Pointer:      kind = Typeid_Pointer;       break;
-	case Type_Array:        kind = Typeid_Array;         break;
-	case Type_Slice:        kind = Typeid_Slice;         break;
-	case Type_DynamicArray: kind = Typeid_Dynamic_Array; break;
-	case Type_Map:          kind = Typeid_Map;           break;
-	case Type_Struct:       kind = Typeid_Struct;        break;
-	case Type_Enum:         kind = Typeid_Enum;          break;
-	case Type_Union:        kind = Typeid_Union;         break;
-	case Type_Tuple:        kind = Typeid_Tuple;         break;
-	case Type_Proc:         kind = Typeid_Procedure;     break;
-	case Type_BitField:     kind = Typeid_Bit_Field;     break;
-	case Type_BitSet:       kind = Typeid_Bit_Set;       break;
+	case Type_Pointer:         kind = Typeid_Pointer;       break;
+	case Type_Array:           kind = Typeid_Array;         break;
+	case Type_EnumeratedArray: kind = Typeid_Enumerated_Array; break;
+	case Type_Slice:           kind = Typeid_Slice;         break;
+	case Type_DynamicArray:    kind = Typeid_Dynamic_Array; break;
+	case Type_Map:             kind = Typeid_Map;           break;
+	case Type_Struct:          kind = Typeid_Struct;        break;
+	case Type_Enum:            kind = Typeid_Enum;          break;
+	case Type_Union:           kind = Typeid_Union;         break;
+	case Type_Tuple:           kind = Typeid_Tuple;         break;
+	case Type_Proc:            kind = Typeid_Procedure;     break;
+	case Type_BitField:        kind = Typeid_Bit_Field;     break;
+	case Type_BitSet:          kind = Typeid_Bit_Set;       break;
 	}
 
 	if (is_type_cstring(type)) {

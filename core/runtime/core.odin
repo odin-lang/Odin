@@ -192,6 +192,7 @@ Typeid_Kind :: enum u8 {
 	Pointer,
 	Procedure,
 	Array,
+	Enumerated_Array,
 	Dynamic_Array,
 	Slice,
 	Tuple,
@@ -280,10 +281,10 @@ Logger :: struct {
 }
 
 Context :: struct {
-	allocator:      Allocator,
-	temp_allocator: Allocator,
+	allocator:              Allocator,
+	temp_allocator:         Allocator,
 	assertion_failure_proc: Assertion_Failure_Proc,
-	logger: Logger,
+	logger:                 Logger,
 
 	stdin:  os.Handle,
 	stdout: os.Handle,
@@ -294,8 +295,6 @@ Context :: struct {
 	user_data:  any,
 	user_ptr:   rawptr,
 	user_index: int,
-
-	derived:    any, // May be used for derived data types
 }
 
 
@@ -488,14 +487,14 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 @builtin
 copy_slice :: proc "contextless" (dst, src: $T/[]$E) -> int {
 	n := max(0, min(len(dst), len(src)));
-	if n > 0 do mem_copy(&dst[0], &src[0], n*size_of(E));
+	#no_bounds_check if n > 0 do mem_copy(&dst[0], &src[0], n*size_of(E));
 	return n;
 }
 @builtin
 copy_from_string :: proc "contextless" (dst: $T/[]$E/u8, src: $S/string) -> int {
 	n := max(0, min(len(dst), len(src)));
 	if n > 0 {
-		d := &dst[0];
+		d := (transmute(Raw_Slice)dst).data;
 		s := (transmute(Raw_String)src).data;
 		mem_copy(d, s, n);
 	}
@@ -511,7 +510,7 @@ copy :: proc{copy_slice, copy_from_string};
 pop :: proc "contextless" (array: ^$T/[dynamic]$E) -> E {
 	if array == nil do return E{};
 	assert(len(array) > 0);
-	res := array[len(array)-1];
+	res := #no_bounds_check array[len(array)-1];
 	(^Raw_Dynamic_Array)(array).len -= 1;
 	return res;
 }
