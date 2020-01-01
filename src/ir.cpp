@@ -4783,6 +4783,14 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 	// NOTE(bill): For some weird legacy reason in LLVM, structure elements must be accessed as an i32
 
+	if (s->kind == irValue_Instr) {
+		if (s->Instr.kind == irInstr_Load) {
+			irValue *addr = s->Instr.Load.address;
+			irValue *ptr = ir_emit_struct_ep(proc, addr, index);
+			return ir_emit_load(proc, ptr);
+		}
+	}
+
 	gbAllocator a = ir_allocator();
 	Type *t = base_type(ir_type(s));
 	Type *result_type = nullptr;
@@ -4889,7 +4897,9 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 		}
 		type = core_type(type);
 
-		if (is_type_raw_union(type)) {
+		if (is_type_quaternion(type)) {
+			e = ir_emit_struct_ep(proc, e, index);
+		} else if (is_type_raw_union(type)) {
 			type = type->Struct.fields[index]->type;
 			GB_ASSERT(is_type_pointer(ir_type(e)));
 			e = ir_emit_bitcast(proc, e, alloc_type_pointer(type));
@@ -4942,6 +4952,15 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 
 irValue *ir_emit_deep_field_ev(irProcedure *proc, irValue *e, Selection sel) {
 	GB_ASSERT(sel.index.count > 0);
+
+	if (e->kind == irValue_Instr) {
+		if (e->Instr.kind == irInstr_Load) {
+			irValue *addr = e->Instr.Load.address;
+			irValue *ptr = ir_emit_deep_field_gep(proc, addr, sel);
+			return ir_emit_load(proc, ptr);
+		}
+	}
+
 	Type *type = ir_type(e);
 
 	for_array(i, sel.index) {

@@ -172,70 +172,91 @@ quaternion_angle_axis :: proc(angle_radians: Float, axis: Vector3) -> Quaternion
 	return quaternion(w, v.x, v.y, v.z);
 }
 
-quaternion_from_euler_angles :: proc(pitch, yaw, roll: Float) -> Quaternion {
-	p := quaternion_angle_axis(pitch, {1, 0, 0});
-	y := quaternion_angle_axis(yaw,   {0, 1, 0});
-	r := quaternion_angle_axis(roll,  {0, 0, 1});
-	return (y * p) * r;
+
+quaternion_from_euler_angles :: proc(roll, pitch, yaw: Float) -> Quaternion {
+	x, y, z := roll, pitch, yaw;
+	a, b, c := x, y, z;
+
+	ca, sa := math.cos(a*0.5), math.sin(a*0.5);
+	cb, sb := math.cos(b*0.5), math.sin(b*0.5);
+	cc, sc := math.cos(c*0.5), math.sin(c*0.5);
+
+	q: Quaternion;
+	q.x = sa*cb*cc - ca*sb*sc;
+	q.y = ca*sb*cc + sa*cb*sc;
+	q.z = ca*cb*sc - sa*sb*cc;
+	q.w = ca*cb*cc + sa*sb*sc;
+	return q;
 }
 
 euler_angles_from_quaternion :: proc(q: Quaternion) -> (roll, pitch, yaw: Float) {
-	// roll (x-axis rotation)
-	sinr_cosp: Float = 2 * (real(q)*imag(q) + jmag(q)*kmag(q));
-	cosr_cosp: Float = 1 - 2 * (imag(q)*imag(q) + jmag(q)*jmag(q));
-	roll = Float(math.atan2(sinr_cosp, cosr_cosp));
+	// roll, x-axis rotation
+    sinr_cosp: Float = 2 * (q.w * q.x + q.y * q.z);
+    cosr_cosp: Float = 1 - 2 * (q.x * q.x + q.y * q.y);
+    roll = math.atan2(sinr_cosp, cosr_cosp);
 
-	// pitch (y-axis rotation)
-	sinp: Float = 2 * (real(q)*kmag(q) - kmag(q)*imag(q));
-	if abs(sinp) >= 1 {
-		pitch = Float(math.copy_sign(math.TAU * 0.25, sinp));
-	} else {
-		pitch = Float(math.asin(sinp));
-	}
+    // pitch, y-axis rotation
+    sinp: Float = 2 * (q.w * q.y - q.z * q.x);
+    if abs(sinp) >= 1 {
+        pitch = math.copy_sign(math.TAU * 0.25, sinp);
+    } else {
+        pitch = math.asin(sinp);
+    }
 
-	// yaw (z-axis rotation)
-	siny_cosp: Float = 2 * (real(q)*kmag(q) + imag(q)*jmag(q));
-	cosy_cosp: Float = 1 - 2 * (jmag(q)*jmag(q) + kmag(q)*kmag(q));
-	yaw = Float(math.atan2(siny_cosp, cosy_cosp));
+    // yaw, z-axis rotation
+    siny_cosp: Float = 2 * (q.w * q.z + q.x * q.y);
+    cosy_cosp: Float = 1 - 2 * (q.y * q.y + q.z * q.z);
+    yaw = math.atan2(siny_cosp, cosy_cosp);
 
-	return;
+    return;
 }
 
-quaternion_look_at :: proc(eye, centre: Vector3, up: Vector3) -> Quaternion {
-	m := matrix3_look_at(eye, centre, up);
+quaternion_from_forward_and_up :: proc(forward, up: Vector3) -> Quaternion {
+	f := normalize(forward);
+	s := normalize(cross(f, up));
+	u := cross(s, f);
+	m := Matrix3{
+		{+s.x, +u.x, -f.x},
+		{+s.y, +u.y, -f.y},
+		{+s.z, +u.z, -f.z},
+	};
+
 	tr := trace(m);
 
-	w, x, y, z: Float;
+	q: Quaternion;
 
 	switch {
 	case tr > 0:
 		S := 2 * math.sqrt(1 + tr);
-		w = 0.25 * S;
-		x = (m[2][1] - m[1][2]) / S;
-		y = (m[0][2] - m[2][0]) / S;
-		z = (m[1][0] - m[0][1]) / S;
+		q.w = 0.25 * S;
+		q.x = (m[2][1] - m[1][2]) / S;
+		q.y = (m[0][2] - m[2][0]) / S;
+		q.z = (m[1][0] - m[0][1]) / S;
 	case (m[0][0] > m[1][1]) && (m[0][0] > m[2][2]):
 		S := 2 * math.sqrt(1 + m[0][0] - m[1][1] - m[2][2]);
-		w = (m[2][1] - m[1][2]) / S;
-		x = 0.25 * S;
-		y = (m[0][1] + m[1][0]) / S;
-		z = (m[0][2] + m[2][0]) / S;
+		q.w = (m[2][1] - m[1][2]) / S;
+		q.x = 0.25 * S;
+		q.y = (m[0][1] + m[1][0]) / S;
+		q.z = (m[0][2] + m[2][0]) / S;
 	case m[1][1] > m[2][2]:
 		S := 2 * math.sqrt(1 + m[1][1] - m[0][0] - m[2][2]);
-		w = (m[0][2] - m[2][0]) / S;
-		x = (m[0][1] + m[1][0]) / S;
-		y = 0.25 * S;
-		z = (m[1][2] + m[2][1]) / S;
+		q.w = (m[0][2] - m[2][0]) / S;
+		q.x = (m[0][1] + m[1][0]) / S;
+		q.y = 0.25 * S;
+		q.z = (m[1][2] + m[2][1]) / S;
 	case:
 		S := 2 * math.sqrt(1 + m[2][2] - m[0][0] - m[1][1]);
-		w = (m[1][0] - m[0][1]) / S;
-		x = (m[0][2] - m[2][0]) / S;
-		y = (m[1][2] + m[2][1]) / S;
-		z = 0.25 * S;
+		q.w = (m[1][0] - m[0][1]) / S;
+		q.x = (m[0][2] - m[2][0]) / S;
+		q.y = (m[1][2] + m[2][1]) / S;
+		q.z = 0.25 * S;
 	}
 
-	q: Quaternion = quaternion(w, x, y, z);
 	return normalize(q);
+}
+
+quaternion_look_at :: proc(eye, centre: Vector3, up: Vector3) -> Quaternion {
+	return quaternion_from_forward_and_up(centre-eye, up);
 }
 
 
@@ -335,6 +356,73 @@ quaternion_from_matrix4 :: proc(m: Matrix4) -> Quaternion {
 }
 
 
+quaternion_from_matrix3 :: proc(m: Matrix3) -> Quaternion {
+	four_x_squared_minus_1, four_y_squared_minus_1,
+	four_z_squared_minus_1, four_w_squared_minus_1,
+	four_biggest_squared_minus_1: Float;
+
+	/* xyzw */
+	/* 0123 */
+	biggest_index := 3;
+	biggest_value, mult: Float;
+
+	four_x_squared_minus_1 = m[0][0] - m[1][1] - m[2][2];
+	four_y_squared_minus_1 = m[1][1] - m[0][0] - m[2][2];
+	four_z_squared_minus_1 = m[2][2] - m[0][0] - m[1][1];
+	four_w_squared_minus_1 = m[0][0] + m[1][1] + m[2][2];
+
+	four_biggest_squared_minus_1 = four_w_squared_minus_1;
+	if four_x_squared_minus_1 > four_biggest_squared_minus_1 {
+		four_biggest_squared_minus_1 = four_x_squared_minus_1;
+		biggest_index = 0;
+	}
+	if four_y_squared_minus_1 > four_biggest_squared_minus_1 {
+		four_biggest_squared_minus_1 = four_y_squared_minus_1;
+		biggest_index = 1;
+	}
+	if four_z_squared_minus_1 > four_biggest_squared_minus_1 {
+		four_biggest_squared_minus_1 = four_z_squared_minus_1;
+		biggest_index = 2;
+	}
+
+	biggest_value = math.sqrt(four_biggest_squared_minus_1 + 1) * 0.5;
+	mult = 0.25 / biggest_value;
+
+
+	switch biggest_index {
+	case 0:
+		return quaternion(
+			biggest_value,
+			(m[0][1] + m[1][0]) * mult,
+			(m[2][0] + m[0][2]) * mult,
+			(m[1][2] - m[2][1]) * mult,
+		);
+	case 1:
+		return quaternion(
+			(m[0][1] + m[1][0]) * mult,
+			biggest_value,
+			(m[1][2] + m[2][1]) * mult,
+			(m[2][0] - m[0][2]) * mult,
+		);
+	case 2:
+		return quaternion(
+			(m[2][0] + m[0][2]) * mult,
+			(m[1][2] + m[2][1]) * mult,
+			biggest_value,
+			(m[0][1] - m[1][0]) * mult,
+		);
+	case 3:
+		return quaternion(
+			(m[1][2] - m[2][1]) * mult,
+			(m[2][0] - m[0][2]) * mult,
+			(m[0][1] - m[1][0]) * mult,
+			biggest_value,
+		);
+	}
+
+	return 0;
+}
+
 quaternion_between_two_vector3 :: proc(from, to: Vector3) -> Quaternion {
 	x := normalize(from);
 	y := normalize(to);
@@ -385,15 +473,15 @@ matrix2_adjoint :: proc(m: Matrix2) -> Matrix2 {
 
 
 matrix3_from_quaternion :: proc(q: Quaternion) -> Matrix3 {
-	xx := imag(q) * imag(q);
-	xy := imag(q) * jmag(q);
-	xz := imag(q) * kmag(q);
-	xw := imag(q) * real(q);
-	yy := jmag(q) * jmag(q);
-	yz := jmag(q) * kmag(q);
-	yw := jmag(q) * real(q);
-	zz := kmag(q) * kmag(q);
-	zw := kmag(q) * real(q);
+	xx := q.x * q.x;
+	xy := q.x * q.y;
+	xz := q.x * q.z;
+	xw := q.x * q.w;
+	yy := q.y * q.y;
+	yz := q.y * q.z;
+	yw := q.y * q.w;
+	zz := q.z * q.z;
+	zw := q.z * q.w;
 
 	m: Matrix3;
 	m[0][0] = 1 - 2 * (yy + zz);
@@ -498,15 +586,15 @@ matrix3_look_at :: proc(eye, centre, up: Vector3) -> Matrix3 {
 matrix4_from_quaternion :: proc(q: Quaternion) -> Matrix4 {
 	m := identity(Matrix4);
 
-	xx := imag(q) * imag(q);
-	xy := imag(q) * jmag(q);
-	xz := imag(q) * kmag(q);
-	xw := imag(q) * real(q);
-	yy := jmag(q) * jmag(q);
-	yz := jmag(q) * kmag(q);
-	yw := jmag(q) * real(q);
-	zz := kmag(q) * kmag(q);
-	zw := kmag(q) * real(q);
+	xx := q.x * q.x;
+	xy := q.x * q.y;
+	xz := q.x * q.z;
+	xw := q.x * q.w;
+	yy := q.y * q.y;
+	yz := q.y * q.z;
+	yw := q.y * q.w;
+	zz := q.z * q.z;
+	zw := q.z * q.w;
 
 	m[0][0] = 1 - 2 * (yy + zz);
 	m[1][0] = 2 * (xy - zw);
