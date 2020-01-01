@@ -2333,6 +2333,94 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 			}
 		#endif
 		} break;
+
+		case Basic_quaternion128: {
+			// @QuaternionLayout
+			gb_local_persist String w = str_lit("w");
+			gb_local_persist String x = str_lit("x");
+			gb_local_persist String y = str_lit("y");
+			gb_local_persist String z = str_lit("z");
+			gb_local_persist Entity *entity__w = alloc_entity_field(nullptr, make_token_ident(w), t_f32, false, 3);
+			gb_local_persist Entity *entity__x = alloc_entity_field(nullptr, make_token_ident(x), t_f32, false, 0);
+			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f32, false, 1);
+			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f32, false, 2);
+			if (field_name == w) {
+				selection_add_index(&sel, 3);
+				sel.entity = entity__w;
+				return sel;
+			} else if (field_name == x) {
+				selection_add_index(&sel, 0);
+				sel.entity = entity__x;
+				return sel;
+			} else if (field_name == y) {
+				selection_add_index(&sel, 1);
+				sel.entity = entity__y;
+				return sel;
+			} else if (field_name == z) {
+				selection_add_index(&sel, 2);
+				sel.entity = entity__z;
+				return sel;
+			}
+		} break;
+
+		case Basic_quaternion256: {
+			// @QuaternionLayout
+			gb_local_persist String w = str_lit("w");
+			gb_local_persist String x = str_lit("x");
+			gb_local_persist String y = str_lit("y");
+			gb_local_persist String z = str_lit("z");
+			gb_local_persist Entity *entity__w = alloc_entity_field(nullptr, make_token_ident(w), t_f64, false, 3);
+			gb_local_persist Entity *entity__x = alloc_entity_field(nullptr, make_token_ident(x), t_f64, false, 0);
+			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f64, false, 1);
+			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f64, false, 2);
+			if (field_name == w) {
+				selection_add_index(&sel, 3);
+				sel.entity = entity__w;
+				return sel;
+			} else if (field_name == x) {
+				selection_add_index(&sel, 0);
+				sel.entity = entity__x;
+				return sel;
+			} else if (field_name == y) {
+				selection_add_index(&sel, 1);
+				sel.entity = entity__y;
+				return sel;
+			} else if (field_name == z) {
+				selection_add_index(&sel, 2);
+				sel.entity = entity__z;
+				return sel;
+			}
+		} break;
+
+		case Basic_UntypedQuaternion: {
+			// @QuaternionLayout
+			gb_local_persist String w = str_lit("w");
+			gb_local_persist String x = str_lit("x");
+			gb_local_persist String y = str_lit("y");
+			gb_local_persist String z = str_lit("z");
+			gb_local_persist Entity *entity__w = alloc_entity_field(nullptr, make_token_ident(w), t_untyped_float, false, 3);
+			gb_local_persist Entity *entity__x = alloc_entity_field(nullptr, make_token_ident(x), t_untyped_float, false, 0);
+			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_untyped_float, false, 1);
+			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_untyped_float, false, 2);
+			if (field_name == w) {
+				selection_add_index(&sel, 3);
+				sel.entity = entity__w;
+				return sel;
+			} else if (field_name == x) {
+				selection_add_index(&sel, 0);
+				sel.entity = entity__x;
+				return sel;
+			} else if (field_name == y) {
+				selection_add_index(&sel, 1);
+				sel.entity = entity__y;
+				return sel;
+			} else if (field_name == z) {
+				selection_add_index(&sel, 2);
+				sel.entity = entity__z;
+				return sel;
+			}
+		} break;
+
 		}
 
 		return sel;

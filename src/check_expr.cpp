@@ -3313,6 +3313,48 @@ ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selecti
 
 		if (success_) *success_ = true;
 		return value;
+	} else if (value.kind == ExactValue_Quaternion) {
+		// @QuaternionLayout
+		Quaternion256 q = value.value_quaternion;
+		GB_ASSERT(sel.index.count == 1);
+
+		switch (sel.index[0]) {
+		case 3: // w
+			if (success_) *success_ = true;
+			return exact_value_float(q.real);
+
+		case 0: // x
+			if (success_) *success_ = true;
+			return exact_value_float(q.imag);
+
+		case 1: // y
+			if (success_) *success_ = true;
+			return exact_value_float(q.jmag);
+
+		case 2: // z
+			if (success_) *success_ = true;
+			return exact_value_float(q.kmag);
+		}
+
+		if (success_) *success_ = false;
+		return empty_exact_value;
+	} else if (value.kind == ExactValue_Complex) {
+		// @QuaternionLayout
+		Complex128 c = value.value_complex;
+		GB_ASSERT(sel.index.count == 1);
+
+		switch (sel.index[0]) {
+		case 0: // real
+			if (success_) *success_ = true;
+			return exact_value_float(c.real);
+
+		case 1: // imag
+			if (success_) *success_ = true;
+			return exact_value_float(c.imag);
+		}
+
+		if (success_) *success_ = false;
+		return empty_exact_value;
 	}
 
 	if (success_) *success_ = true;

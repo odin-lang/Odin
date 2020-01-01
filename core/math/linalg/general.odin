@@ -17,10 +17,10 @@ vector_dot :: proc(a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) {
 	return;
 }
 quaternion128_dot :: proc(a, b: $T/quaternion128) -> (c: f32) {
-	return real(a)*real(a) + imag(a)*imag(b) + jmag(a)*jmag(b) + kmag(a)*kmag(b);
+	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z;
 }
 quaternion256_dot :: proc(a, b: $T/quaternion256) -> (c: f64) {
-	return real(a)*real(a) + imag(a)*imag(b) + jmag(a)*jmag(b) + kmag(a)*kmag(b);
+	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
 dot :: proc{vector_dot, quaternion128_dot, quaternion256_dot};
