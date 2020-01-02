@@ -924,7 +924,7 @@ append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_l
 @builtin
 append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_location) {
 	for arg in args {
-		append(array = array, args = ([]E)(arg), loc = loc);
+		append(array = array, args = transmute([]E)(arg), loc = loc);
 	}
 }
 
