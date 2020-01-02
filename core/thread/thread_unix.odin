@@ -155,3 +155,8 @@ destroy :: proc(t: ^Thread) {
 	t.unix_thread = {};
 	free(t);
 }
+
+
+yield :: proc() {
+	unix.pthread_yield()
+}

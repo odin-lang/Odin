@@ -737,35 +737,50 @@ matrix4_look_at :: proc(eye, centre, up: Vector3) -> Matrix4 {
 }
 
 
-matrix4_perspective :: proc(fovy, aspect, near, far: Float) -> (m: Matrix4) {
+matrix4_perspective :: proc(fovy, aspect, near, far: Float, flip_z_axis := true) -> (m: Matrix4) {
 	tan_half_fovy := math.tan(0.5 * fovy);
 	m[0][0] = 1 / (aspect*tan_half_fovy);
 	m[1][1] = 1 / (tan_half_fovy);
-	m[2][2] = -(far + near) / (far - near);
-	m[2][3] = -1;
+	m[2][2] = +(far + near) / (far - near);
+	m[2][3] = +1;
 	m[3][2] = -2*far*near / (far - near);
+
+	if flip_z_axis {
+		m[2] = -m[2];
+	}
+
 	return;
 }
 
 
-matrix_ortho3d :: proc(left, right, bottom, top, near, far: Float) -> (m: Matrix4) {
+matrix_ortho3d :: proc(left, right, bottom, top, near, far: Float, flip_z_axis := true) -> (m: Matrix4) {
 	m[0][0] = +2 / (right - left);
 	m[1][1] = +2 / (top - bottom);
-	m[2][2] = -2 / (far - near);
+	m[2][2] = +2 / (far - near);
 	m[3][0] = -(right + left)   / (right - left);
 	m[3][1] = -(top   + bottom) / (top - bottom);
 	m[3][2] = -(far + near) / (far- near);
 	m[3][3] = 1;
+
+	if flip_z_axis {
+		m[2] = -m[2];
+	}
+
 	return;
 }
 
 
-matrix4_infinite_perspective :: proc(fovy, aspect, near: Float) -> (m: Matrix4) {
+matrix4_infinite_perspective :: proc(fovy, aspect, near: Float, flip_z_axis := true) -> (m: Matrix4) {
 	tan_half_fovy := math.tan(0.5 * fovy);
 	m[0][0] = 1 / (aspect*tan_half_fovy);
 	m[1][1] = 1 / (tan_half_fovy);
-	m[2][2] = -1;
-	m[2][3] = -1;
+	m[2][2] = +1;
+	m[2][3] = +1;
 	m[3][2] = -2*near;
+
+	if flip_z_axis {
+		m[2] = -m[2];
+	}
+
 	return;
 }

@@ -1,6 +1,6 @@
-package thread;
+package thread
 
-import "core:runtime";
+import "core:runtime"
 
 Thread_Proc :: #type proc(^Thread);
 
