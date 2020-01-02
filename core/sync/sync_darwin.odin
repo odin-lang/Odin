@@ -28,9 +28,11 @@ semaphore_destroy :: proc(s: ^Semaphore) {
 }
 
 semaphore_post :: proc(s: ^Semaphore, count := 1) {
-	assert(count == 1);
-	res := darwin.semaphore_signal(s.handle);
-	assert(res == 0);
+	// NOTE: SPEED: If there's one syscall to do this, we should use it instead of the loop.
+	for in 0..count-1 {
+		res := darwin.semaphore_signal(s.handle);
+		assert(res == 0);
+	}
 }
 
 semaphore_wait_for :: proc(s: ^Semaphore) {

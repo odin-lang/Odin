@@ -158,5 +158,5 @@ destroy :: proc(t: ^Thread) {
 
 
 yield :: proc() {
-	unix.pthread_yield();
+	unix.sched_yield();
 }
