@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:mem"
 import "core:os"
 import "core:thread"
+import "core:time"
 import "core:reflect"
 import "intrinsics"
 
@@ -1102,38 +1103,65 @@ prefix_table := [?]string{
 threading_example :: proc() {
 	fmt.println("\n# threading_example");
 
-	worker_proc :: proc(t: ^thread.Thread) {
-		for iteration in 1..5 {
-			fmt.printf("Thread %d is on iteration %d\n", t.user_index, iteration);
-			fmt.printf("`%s`: iteration %d\n", prefix_table[t.user_index], iteration);
-			// win32.sleep(1);
-		}
-	}
-
-	threads := make([dynamic]^thread.Thread, 0, len(prefix_table));
-	defer delete(threads);
-
-	for in prefix_table {
-		if t := thread.create(worker_proc); t != nil {
-			t.init_context = context;
-			t.use_init_context = true;
-			t.user_index = len(threads);
-			append(&threads, t);
-			thread.start(t);
-		}
-	}
-
-	for len(threads) > 0 {
-		for i := 0; i < len(threads); /**/ {
-			if t := threads[i]; thread.is_done(t) {
-				fmt.printf("Thread %d is done\n", t.user_index);
-				thread.destroy(t);
-
-				ordered_remove(&threads, i);
-			} else {
-				i += 1;
+	{ // Basic Threads
+		fmt.println("\n## Basic Threads");
+			worker_proc :: proc(t: ^thread.Thread) {
+			for iteration in 1..5 {
+				fmt.printf("Thread %d is on iteration %d\n", t.user_index, iteration);
+				fmt.printf("`%s`: iteration %d\n", prefix_table[t.user_index], iteration);
+				time.sleep(1 * time.Millisecond);
 			}
 		}
+
+		threads := make([dynamic]^thread.Thread, 0, len(prefix_table));
+		defer delete(threads);
+
+		for in prefix_table {
+			if t := thread.create(worker_proc); t != nil {
+				t.init_context = context;
+				t.use_init_context = true;
+				t.user_index = len(threads);
+				append(&threads, t);
+				thread.start(t);
+			}
+		}
+
+		for len(threads) > 0 {
+			for i := 0; i < len(threads); /**/ {
+				if t := threads[i]; thread.is_done(t) {
+					fmt.printf("Thread %d is done\n", t.user_index);
+					thread.destroy(t);
+
+					ordered_remove(&threads, i);
+				} else {
+					i += 1;
+				}
+			}
+		}
+	}
+
+	{ // Thread Pool
+		fmt.println("\n## Thread Pool");
+		task_proc :: proc(t: ^thread.Task) {
+			index := t.user_index % len(prefix_table);
+			for iteration in 1..5 {
+				fmt.printf("Worker Task %d is on iteration %d\n", t.user_index, iteration);
+				fmt.printf("`%s`: iteration %d\n", prefix_table[index], iteration);
+				time.sleep(1 * time.Millisecond);
+			}
+		}
+
+		pool: thread.Pool;
+		thread.pool_init(pool=&pool, thread_count=3);
+		defer thread.pool_destroy(&pool);
+
+
+		for i in 0..<30 {
+			thread.pool_add_task(pool=&pool, procedure=task_proc, data=nil, user_index=i);
+		}
+
+		thread.pool_start(&pool);
+		thread.pool_wait_and_process(&pool);
 	}
 }
 
