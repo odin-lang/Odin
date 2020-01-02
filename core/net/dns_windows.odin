@@ -8,12 +8,16 @@ import "core:sys/win32"
 
 // Resolves a hostname to exactly one IPv4 and IPv6 address.
 // It's then up to you which one you use.
+// Note that which address you pass to `dial` determines the type of the socket you get.
+//
+// Returns `ok = false` if the host name could not be resolved to any addresses.
+//
 //
 // If hostname is actually a string representation of an IP address, this function
-// behaves like `parse_addr`.
-// This allows you to pass a generic endpoint string to this function end reliably get
+// just parses that address and returns it.
+// This allows you to pass a generic endpoint string (i.e: hostname or address) to this function end reliably get
 // back the endpoint's IP address.
-//
+// e.g:
 // ```
 // 	// Maybe you got this from a config file, so you
 //	// don't know if it's a hostname or address.
@@ -30,11 +34,9 @@ import "core:sys/win32"
 //		return;
 //	}
 //	addr := addr4 != nil ? addr4 : addr6; // preferring ipv4.
-//	assert(addr != nil); // means that we did not resolve it to an addresses.
+//	assert(addr != nil); // If resolve_ok, we'll have at least one address.
 // ```
 //
-// Note that which address you pass to `dial` determines the type of the socket.
-// Note also that this procedure _only_ returns ok=false if something went _wrong_ with resolution.
 resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6}) -> (addr4, addr6: Address, ok: bool) {
 	if addr := parse_addr(hostname); addr != nil {
 		switch a in addr {
@@ -76,14 +78,13 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6
 		}
 	}
 
-	ok = true;
+	ok = addr4 != nil || addr6 != nil;
 	return;
 }
 
 
 
-/* TODO: Support CAA, CNAME, MX, NS, TXT, and SRV records. */
-
+// TODO: Support SRV records.
 Dns_Record_Type :: enum u16 {
     Ipv4 = win32.DNS_TYPE_A,    // Ipv4 address.
     Ipv6 = win32.DNS_TYPE_AAAA, // Ipv6 address.
