@@ -104,5 +104,7 @@ foreign pthread {
 	sem_trywait :: proc(sem: ^sem_t) -> c.int ---;
 	// sem_timedwait :: proc(sem: ^sem_t, timeout: time.TimeSpec) -> c.int ---;
 
+	// NOTE: unclear whether pthread_yield is well-supported on Linux systems,
+	// see https://linux.die.net/man/3/pthread_yield
 	pthread_yield :: proc() -> c.int ---;
 }
