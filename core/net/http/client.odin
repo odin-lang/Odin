@@ -23,7 +23,6 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Re
 	if !resolve_ok do return;
 	addr := addr4 != nil ? addr4 : addr6;
 
-
 	//
 	// TODO(tetra): Factor the request serializing out.
 	//
