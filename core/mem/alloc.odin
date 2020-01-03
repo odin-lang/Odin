@@ -111,6 +111,7 @@ make_slice :: inline proc($T: typeid/[]$E, auto_cast len: int, allocator := cont
 make_aligned :: proc($T: typeid/[]$E, auto_cast len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> T {
 	runtime.make_slice_error_loc(loc, len);
 	data := alloc(size_of(E)*len, alignment, allocator, loc);
+	if data == nil do return nil;
 	s := Raw_Slice{data, len};
 	return transmute(T)s;
 }
@@ -123,6 +124,7 @@ make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, auto_cast len: int, alloc
 make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, auto_cast len: int, auto_cast cap: int, allocator := context.allocator, loc := #caller_location) -> T {
 	runtime.make_dynamic_array_error_loc(loc, len, cap);
 	data := alloc(size_of(E)*cap, align_of(E), allocator, loc);
+	if data == nil do return nil;
 	s := Raw_Dynamic_Array{data, len, cap, allocator};
 	return transmute(T)s;
 }
