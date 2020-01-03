@@ -52,7 +52,8 @@ foreign pthread {
 	pthread_attr_setstack :: proc(attrs: ^pthread_attr_t, stack_ptr: rawptr, stack_size: u64) -> c.int ---;
 	pthread_attr_getstack :: proc(attrs: ^pthread_attr_t, stack_ptr: ^rawptr, stack_size: ^u64) -> c.int ---;
 
-	pthread_yield :: proc() -> c.int ---;
+	sched_yield :: proc() -> c.int ---;
+	
 }
 
 @(default_calling_convention="c")
