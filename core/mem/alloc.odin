@@ -124,8 +124,10 @@ make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, auto_cast len: int, alloc
 make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, auto_cast len: int, auto_cast cap: int, allocator := context.allocator, loc := #caller_location) -> T {
 	runtime.make_dynamic_array_error_loc(loc, len, cap);
 	data := alloc(size_of(E)*cap, align_of(E), allocator, loc);
-	if data == nil do return nil;
 	s := Raw_Dynamic_Array{data, len, cap, allocator};
+	if data == nil {
+		s.len, s.cap = 0, 0;
+	}
 	return transmute(T)s;
 }
 make_map :: proc($T: typeid/map[$K]$E, auto_cast cap: int = 16, allocator := context.allocator, loc := #caller_location) -> T {
