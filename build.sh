@@ -2,7 +2,7 @@
 
 release_mode=$1
 
-warnings_to_disable="-std=c++11 -Wno-switch -Wno-pointer-sign -Wno-tautological-constant-out-of-range-compare -Wno-tautological-compare -Wno-macro-redefined -Wno-writable-strings"
+warnings_to_disable="-std=c++11 -Wno-switch -Wno-pointer-sign -Wno-tautological-constant-out-of-range-compare -Wno-tautological-compare -Wno-macro-redefined"
 libraries="-pthread -ldl -lm -lstdc++"
 other_args=""
 compiler="clang"
