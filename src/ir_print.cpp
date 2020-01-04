@@ -296,6 +296,8 @@ void ir_print_alignment_prefix_hack(irFileBuffer *f, i64 alignment) {
 
 
 void ir_print_proc_results(irFileBuffer *f, irModule *m, Type *t) {
+	set_procedure_abi_types(heap_allocator(), t);
+
 	GB_ASSERT(is_type_proc(t));
 	t = base_type(t);
 	isize result_count = t->Proc.result_count;
