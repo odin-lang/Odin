@@ -2361,6 +2361,9 @@ bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type 
 	if (abi_return_type == nullptr) {
 		return false;
 	}
+	if (cc == ProcCC_None) {
+		return false;
+	}
 
 	Type *single_type = reduce_tuple_to_single_type(abi_return_type);
 
