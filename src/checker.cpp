@@ -1665,12 +1665,10 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("mem_zero"),
 
 		str_lit("__init_context"),
-		str_lit("default_assertion_failure_proc"),
 
 		str_lit("args__"),
 		str_lit("type_table"),
 		str_lit("__type_info_of"),
-		str_lit("global_default_temp_allocator_data"),
 		str_lit("default_temp_allocator"),
 		str_lit("default_temp_allocator_init"),
 		str_lit("default_temp_allocator_destroy"),
@@ -1680,13 +1678,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("Source_Code_Location"),
 		str_lit("Context"),
 
-		str_lit("quo_complex64"),
-		str_lit("quo_complex128"),
-		str_lit("mul_quaternion128"),
-		str_lit("mul_quaternion256"),
-		str_lit("quo_quaternion128"),
-		str_lit("quo_quaternion256"),
-		str_lit("cstring_to_string"),
+		str_lit("cstring_to_string"), // Is tihs needed?
 
 		str_lit("umodti3"),
 		str_lit("udivti3"),
