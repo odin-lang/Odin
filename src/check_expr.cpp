@@ -2668,6 +2668,22 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		return;
 	}
 
+	if (op.kind == Token_Quo || op.kind == Token_QuoEq) {
+		Type *bt = base_type(x->type);
+		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
+		case Basic_complex64:     add_package_dependency(c, "runtime", "quo_complex64");     break;
+		case Basic_complex128:    add_package_dependency(c, "runtime", "quo_complex128");    break;
+		case Basic_quaternion128: add_package_dependency(c, "runtime", "quo_quaternion128"); break;
+		case Basic_quaternion256: add_package_dependency(c, "runtime", "quo_quaternion256"); break;
+		}
+	} else if (op.kind == Token_Mul || op.kind == Token_MulEq) {
+		Type *bt = base_type(x->type);
+		if (bt->kind == Type_Basic) switch (bt->Basic.kind) {
+		case Basic_quaternion128: add_package_dependency(c, "runtime", "mul_quaternion128"); break;
+		case Basic_quaternion256: add_package_dependency(c, "runtime", "mul_quaternion256"); break;
+		}
+	}
+
 	x->mode = Addressing_Value;
 }
 
