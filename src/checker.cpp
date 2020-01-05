@@ -1734,7 +1734,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			}
 		} else if (e->kind == Entity_Procedure && e->Procedure.is_export) {
 			add_dependency_to_set(c, e);
-		} else if (e->kind == Entity_Variable && e->Procedure.is_export) {
+		} else if (e->kind == Entity_Variable && e->Variable.is_export) {
 			add_dependency_to_set(c, e);
 		}
 	}
