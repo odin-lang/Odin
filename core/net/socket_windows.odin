@@ -3,28 +3,7 @@ package net
 /*
 	TODO:
 
-	Returning a single error type means that we can name all the errors 'err', but that
-	we have to do things like
-	```
-	n: int;
-	n, err = net.recv(...);
-	if err != .Ok {
-		// ...
-	}
-	```
-
-	With specific errors:
-	```
-	read, read_err := net.recv(...);
-	if read_err != .Ok {
-		// ...
-	}
-	```
-
-	This does seem better, but you still are forced to name the error something
-	specific.
-	I'm not sure I want to _force_ people to have to do this.
-
+	Include subsystem failure in accept, etc, for this is also present on Unix.
 
 	-----
 
@@ -45,8 +24,7 @@ package net
 
 import "core:sys/win32"
 import "core:c"
-import "core:sync"
-
+import "core:mem"
 import "core:fmt" // TODO(tetra): remove
 
 Socket :: distinct win32.SOCKET;
@@ -123,7 +101,7 @@ Write_Error :: enum {
 }
 
 read :: proc(skt: Socket, buffer: []u8) -> (n: int, err: Read_Error) {
-	wait_err := wait_for_readable(skt);
+	wait_err := wait_for_available_data(skt);
 	if wait_err != .Ok {
 		err = Read_Error(wait_err);
 		return;
@@ -154,7 +132,7 @@ write :: proc(skt: Socket, buffer: []u8) -> (err: Write_Error) {
 	sent := 0;
 	n: int = ---;
 	for sent < len(buffer) {
-		wait_err := wait_for_writable(skt);
+		wait_err := wait_for_can_write(skt);
 		if wait_err != .Ok {
 			err = Write_Error(wait_err);
 			return;
@@ -266,7 +244,7 @@ Write_To_Error :: enum {
 }
 
 read_from :: proc(dgram_skt: Socket, buffer: []u8) -> (n: int, from: Endpoint, err: Read_From_Error) {
-	wait_err := wait_for_readable(dgram_skt);
+	wait_err := wait_for_available_data(dgram_skt);
 	if wait_err != .Ok {
 		err = Read_From_Error(wait_err);
 		return;
@@ -292,7 +270,7 @@ try_read_from :: proc(dgram_skt: Socket, buffer: []u8) -> (n: int, from: Endpoin
 		err = .Ok;
 		n = 0;
 	case win32.WSAEISCONN:   panic("attempt to use try_read_from on connection-oriented socket");
-	case win32.WSAECONNRESET: err = .Unreachable; // For datagrams, this means TTL expired.
+	case win32.WSAECONNRESET: err = .Reset; // For datagrams, this means TTL expired.
 	case win32.WSAENETRESET: err = .Unreachable;
 	case win32.WSAENETDOWN:  err = .Offline;
 	case win32.WSAESHUTDOWN: err = .Shutdown;
@@ -308,7 +286,7 @@ write_to :: proc(dgram_skt: Socket, buffer: []u8, to: Endpoint) -> (err: Write_T
 	sent := 0;
 	n: int = ---;
 	for sent < len(buffer) {
-		wait_err := wait_for_writable(dgram_skt);
+		wait_err := wait_for_can_write(dgram_skt);
 		if wait_err != .Ok {
 			err = Write_To_Error(wait_err);
 			return;
@@ -351,7 +329,7 @@ read_all_from :: proc(dgram_skt: Socket, buffer: []u8) -> (from: Endpoint, err: 
 	recvd := 0;
 	n: int = ---;
 	for recvd < len(buffer) {
-		wait_err := wait_for_readable(dgram_skt);
+		wait_err := wait_for_available_data(dgram_skt);
 		if wait_err != .Ok {
 			err = Read_From_Error(wait_err);
 			return;
@@ -508,7 +486,7 @@ try_accept :: proc(skt: Socket) -> (accepted: bool, peer: Socket, remote_ep: End
 }
 
 accept :: proc(skt: Socket) -> (peer: Socket, remote_ep: Endpoint, err: Accept_Error) {
-	wait_err := wait_for_readable(skt);
+	wait_err := wait_for_available_data(skt);
 	if wait_err != .Ok {
 		err = Accept_Error(wait_err);
 		return;
@@ -543,14 +521,12 @@ start_dial :: proc(addr: Address, port: int, type := Socket_Type.Tcp) -> (skt: S
 	create_err: Create_Error = ---;
 	skt, create_err = create(get_addr_type(addr), type);
 	switch create_err {
-	case .Resources:
-		err = .Resources;
-
+	case .Ok: // nothing
+	case .Resources:      err = .Resources;
 	case .Offline:        assert(false);
 	case .Bad_Protocol:   assert(false);
 	case .Bad_Type:       assert(false);
 	case .Wrong_Protocol: assert(false);
-	case .Ok: // nothing
 	}
 
 	if type != .Udp do set_option(skt, .Inline_Out_Of_Band, true);
@@ -581,7 +557,7 @@ start_dial :: proc(addr: Address, port: int, type := Socket_Type.Tcp) -> (skt: S
 
 // See if the dial is finished without blocking.
 try_finish_dial :: proc(skt: Socket, timeout_ms	:= 0) -> (done: bool, err: Dial_Error) {
-	_, w, wait_err := check_for_status(skt, {.Can_Write, .Failed}, timeout_ms);
+	_, w, wait_err := wait_for(skt, {.Can_Write}, timeout_ms);
 	if wait_err != .Ok {
 		err = Dial_Error(wait_err);
 		return;
@@ -591,7 +567,7 @@ try_finish_dial :: proc(skt: Socket, timeout_ms	:= 0) -> (done: bool, err: Dial_
 }
 
 finish_dial :: proc(skt: Socket) -> (err: Dial_Error) {
-	wait_err := wait_for_writable(skt);
+	wait_err := wait_for_can_write(skt);
 	if wait_err != .Ok {
 		err = Dial_Error(wait_err);
 	}
@@ -670,22 +646,25 @@ create :: proc(addr_type: Addr_Type, type: Socket_Type, protocol := Socket_Proto
 
 
 
-Event_Type :: enum {
+Waitable_Status :: enum {
 	Can_Read,
+	Can_Accept,
+
 	Can_Write,
-	Failed,
+	Dial_Complete,
 }
 
 WAIT_FOREVER :: -1;
+DONT_WAIT    :: 0;
 
 // Check if an event has occurred without blocking.
-check_for_status :: inline proc(skt: Socket, statuses := bit_set[Event_Type]{.Can_Read, .Can_Write, .Failed}, timeout_ms := 0) -> (readable, writable: bool, err: Socket_Error) {
-	return wait_for_status(skt, timeout_ms, statuses); // 0 timeout = nonblocking.
+check_for :: inline proc(skt: Socket, statuses := bit_set[Waitable_Status]{.Can_Read, .Can_Write}) -> (readable, writable: bool, err: Socket_Error) {
+	return wait_for(skt, statuses, DONT_WAIT);
 }
 
 // Waits for an event to occur.
 // Returns false for all statuses if we time out.
-wait_for_status :: proc(skt: Socket, timeout_ms := WAIT_FOREVER, statuses := bit_set[Event_Type]{.Can_Read, .Can_Write, .Failed}) -> (readable, writable: bool, err: Socket_Error) {
+wait_for :: proc(skt: Socket, statuses := Wait_Status{.Can_Read, .Can_Write}, timeout_ms := WAIT_FOREVER) -> (readable, writable: bool, err: Socket_Error) {
 	rfd: win32.fd_set = ---;
 	rfd.count = 1;
 	rfd.array[0] = win32.SOCKET(skt);
@@ -707,9 +686,9 @@ wait_for_status :: proc(skt: Socket, timeout_ms := WAIT_FOREVER, statuses := bit
 	// returns 0 if it timed out.
 	res := win32.select(
 		0,
-		.Can_Read in statuses ? &rfd : nil,
-		.Can_Write in statuses ? &wfd : nil,
-		.Failed   in statuses ? &efd : nil,
+		.Can_Read in statuses || .Can_Accept in statuses ? &rfd : nil,
+		.Can_Write in statuses || .Dial_Complete in statuses ? &wfd : nil,
+		&efd,
 		timeout_ms == -1 ? nil : &timeout
 	);
 	assert(res != win32.SOCKET_ERROR);
@@ -723,21 +702,105 @@ wait_for_status :: proc(skt: Socket, timeout_ms := WAIT_FOREVER, statuses := bit
 	return;
 }
 
-wait_for_readable :: inline proc(skt: Socket) -> (err: Socket_Error) {
+Wait_Result :: struct {
+	socket: Socket,
+	status: bit_set[Waitable_Status],
+	error: Socket_Error,
+}
+
+Wait_Status :: bit_set[Waitable_Status];
+
+wait_for_any :: proc(skts: []Socket, statuses := Wait_Status{.Can_Read, .Can_Write}, timeout_ms := WAIT_FOREVER) -> []Wait_Result {
+	results := make([dynamic]Wait_Result, context.temp_allocator);
+
+	rfd: win32.fd_set;
+	rfd.count = u32(len(skts));
+	for s, i in skts do  rfd.array[i] = win32.SOCKET(s);
+
+	// value copy
+	wfd := rfd;
+	efd := rfd;
+
+	timeout: win32.TIMEVAL;
+	if timeout_ms >= 0 {
+		if timeout_ms < 1000 {
+			timeout.tv_usec = i32(timeout_ms * 1000);
+		} else {
+			timeout.tv_sec = i32(timeout_ms / 1000);
+			timeout.tv_usec = i32(timeout_ms % 1000 * 1000);
+		}
+	}
+
+	// returns 0 if it timed out.
+	res := win32.select(
+		0,
+		.Can_Read in statuses || .Can_Accept in statuses ? &rfd : nil,
+		.Can_Write in statuses || .Dial_Complete in statuses ? &wfd : nil,
+		&efd,
+		timeout_ms == WAIT_FOREVER ? nil : &timeout
+	);
+	assert(res != win32.SOCKET_ERROR, "attempt to wait on closed socket");
+
+	for s in skts {
+		st: Wait_Status;
+
+		readers := mem.slice_ptr(&rfd.array[0], int(rfd.count));
+		writers := mem.slice_ptr(&wfd.array[0], int(wfd.count));
+		failed  := mem.slice_ptr(&efd.array[0], int(efd.count));
+
+		// TODO(tetra): SPEED: Really linear search?
+
+		for r in readers {
+			if equal(s, Socket(r)) {
+				if is_listening_socket(s) {
+					incl(&st, Wait_Status.Can_Accept);
+				} else {
+					incl(&st, Wait_Status.Can_Read);
+				}
+				break;
+			}
+		}
+
+		for w in writers {
+			if equal(s, Socket(w)) {
+				incl(&st, Wait_Status.Can_Write);
+				break;
+			}
+		}
+
+		err := Socket_Error.Ok;
+		for f in failed {
+			if equal(s, Socket(f)) {
+				err = Socket_Error(get_option(s, .Last_Error, i32));
+				break;
+			}
+		}
+
+		append(&results, Wait_Result {
+			socket = s,
+			status = st,
+			error = err,
+		});
+	}
+
+	return results[:];
+}
+
+wait_for_available_data :: inline proc(skt: Socket) -> (err: Socket_Error) {
 	readable: bool = ---;
-	readable, _, err = wait_for_status(skt, -1, {.Can_Read, .Failed});
+	readable, _, err = wait_for(skt, {.Can_Read}, WAIT_FOREVER);
 	assert(readable || err != .Ok); // won't be false unless we time out.
 	return;
 }
 
-wait_for_writable :: inline proc(skt: Socket) -> (err: Socket_Error) {
+wait_for_can_write :: inline proc(skt: Socket) -> (err: Socket_Error) {
 	writable: bool = ---;
-	_, writable, err = wait_for_status(skt, -1, {.Can_Write, .Failed});
+	_, writable, err = wait_for(skt, {.Can_Write}, WAIT_FOREVER);
 	assert(writable || err != .Ok); // won't be false unless we time out.
 	return;
 }
 
-wait_for_clients :: wait_for_readable; // if a listening socket reports 'readable', it means a client is ready to accept.
+wait_for_clients :: wait_for_available_data; // if a listening socket reports 'readable', it means a client is ready to accept.
 
 
 
@@ -833,4 +896,8 @@ set_blocking :: proc(skt: Socket, blocking: bool) {
 	mode: c.ulong = blocking ? 0 : 1;
 	res := win32.ioctlsocket(win32.SOCKET(skt), win32.FIONBIO, &mode);
 	assert(res == 0);
+}
+
+is_listening_socket :: inline proc(skt: Socket) -> bool {
+	return get_option(skt, .Can_Accept, bool);
 }
