@@ -69,23 +69,23 @@ parse_ipv6_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Address, 
 			break outer;
 		}
 		n, rest := strconv.parse_uint(part, 16);
-		if rest != "" do return; // NOTE(tetra): Not all of it was an integer.
-		n16 := u16be(n);
-		if n16 >= max(u16be) do return;
-		addr[i] = n16;
+		if rest != "" do return; // NOTE(tetra): Not all of this part was digits.
+		n16 := u16(n);
+		if n16 >= max(u16) do return;
+		addr[i] = u16be(n16);
 	}
 
 	if double_colon do for _, i in parts {
 		part := parts[len(parts)-1-i];
 		switch len(part) {
 		case 3: return;
-		case 0: break; // NOTE(tetra): Only one of these is allowed.
+		case 0: break; // NOTE(tetra): Zero means '::' - only one of these is allowed.
 		}
 		n, rest := strconv.parse_uint(part, 16);
-		if rest != "" do return; // NOTE(tetra): Not all of it was an integer.
-		n16 := u16be(n);
-		if n16 >= max(u16be) do return;
-		addr[len(addr)-1-i] = n16;
+		if rest != "" do return; // NOTE(tetra): Not all of this part was digits.
+		n16 := u16(n);
+		if n16 >= max(u16) do return;
+		addr[len(addr)-1-i] = u16be(n16);
 	}
 	ok = true;
 	return;
@@ -106,28 +106,15 @@ Endpoint :: struct {
 	port: int,
 }
 
-parse_ipv4_endpoint :: proc(address: string) -> (ep: Endpoint, ok: bool) {
-	addr_str, port, split_ok := split_port(address);
-	if !split_ok do return;
-
-	addr, addr_ok := parse_ipv4_addr(addr_str);
-	if !addr_ok do return;
-
-	return Endpoint { addr = addr, port = port }, true;
-}
-
-parse_ipv6_endpoint :: proc(address: string) -> (ep: Endpoint, ok: bool) {
-	addr_str, port, split_ok := split_port(address);
-	if !split_ok do return;
-	addr, addr_ok := parse_ipv6_addr(addr_str);
-	if !addr_ok do return;
-	return Endpoint { addr = addr, port = port }, true;
-}
-
 parse_endpoint :: proc(address: string) -> (ep: Endpoint, ok: bool) {
-	ep, ok = parse_ipv6_endpoint(address);
-	if ok do return;
-	ep, ok = parse_ipv4_endpoint(address);
+	addr_str, port, split_ok := split_port(address);
+	if !split_ok do return;
+
+	addr := parse_addr(addr_str);
+	if addr == nil do return;
+
+	ep = Endpoint { addr = addr, port = port };
+	ok = true;
 	return;
 }
 
@@ -135,33 +122,44 @@ parse_endpoint :: proc(address: string) -> (ep: Endpoint, ok: bool) {
 
 split_port :: proc(addr_or_host_and_port: string) -> (addr_or_host: string, port: int, ok: bool) {
 	rest: string = ---;
+
+	// Ipv6 [addr_or_host]:port
 	if i := strings.last_index(addr_or_host_and_port, "]:"); i != -1 {
-		// Ipv6 [addr_or_host]:port
 		addr_or_host = addr_or_host_and_port[1:i];
 		port, rest = strconv.parse_int(addr_or_host_and_port[i+2:], 10);
 		if rest != "" do return;
+
 		ok = true;
-	} else if n := strings.count(addr_or_host_and_port, ":"); n == 1 {
-		// Ipv4 addr_or_host:port
+		return;
+	}
+
+	// Ipv4 addr_or_host:port
+	if n := strings.count(addr_or_host_and_port, ":"); n == 1 {
 		i := strings.last_index(addr_or_host_and_port, ":");
 		if i == -1 do return;
+
 		addr_or_host = addr_or_host_and_port[:i];
 		port, rest = strconv.parse_int(addr_or_host_and_port[i+1:], 10);
 		if rest != "" do return;
+
 		ok = true;
-	} else {
-		// No port
-		addr_or_host = addr_or_host_and_port;
-		ok = true;
+		return;
 	}
+
+	// No port
+	addr_or_host = addr_or_host_and_port;
+	ok = true;
 	return;
 }
 
 // TODO(tetra): Are we okay with the amount of work this does?
 join_port :: proc(address_or_host: string, port: int, allocator := context.temp_allocator) -> string {
 	addr_or_host, _, ok := split_port(address_or_host);
-	addr := parse_addr(addr_or_host);
+	if !ok do return addr_or_host;
+
 	b := strings.make_builder(allocator);
+
+	addr := parse_addr(addr_or_host);
 	if addr == nil {
 		// hostname
 		fmt.sbprintf(&b, "%v:%v", addr_or_host, port);
