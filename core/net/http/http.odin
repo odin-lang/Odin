@@ -66,5 +66,5 @@ request_init :: proc(req: ^Request, method: Method, url: string, allocator := co
 		queries = queries,
 	};
 	req.headers.allocator = allocator;
-	req.headers["Host"] = host;
+	req.headers["Host"] = host; // NOTE: include port if non-standard; users can't provide this yet anyway though.
 }

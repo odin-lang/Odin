@@ -1,9 +1,5 @@
 package net
 
-import "core:strconv"
-import "core:strings"
-import "core:mem"
-
 import "core:sys/win32"
 
 
