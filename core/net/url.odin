@@ -1,6 +1,5 @@
 package net
 
-import "core:fmt"
 import "core:strings"
 import "core:strconv"
 import "core:unicode/utf8"
@@ -90,9 +89,9 @@ percent_encode :: proc(s: string, allocator := context.allocator) -> string {
 			bytes, n := utf8.encode_rune(ch);
 			for byte in bytes[:n] {
 				buf: [2]u8 = ---;
-				s := strconv.append_int(buf[:], i64(byte), 16);
+				t := strconv.append_int(buf[:], i64(byte), 16);
 				write_rune(&b, '%');
-				write_string(&b, s);
+				write_string(&b, t);
 			}
 		}
 	}

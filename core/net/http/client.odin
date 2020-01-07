@@ -1,10 +1,8 @@
 package http
 
 import "core:net"
-import "core:mem"
 import "core:strings"
 import "core:strconv"
-import "core:sync"
 import "core:fmt"
 
 
@@ -48,7 +46,6 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Re
 	}
 	write_string(&b, " HTTP/1.1\r\n");
 
-
 	for name, value in r.headers {
 		write_string(&b, name);
 		write_string(&b, ": ");
@@ -89,8 +86,8 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Re
 	status_parts := split(resp_parts[0], " ");
 	assert(len(status_parts) >= 3); // NOTE(tetra): 3 for OK, more if status text is more than one word.
 
-	i, _ := strconv.parse_int(status_parts[1]);
-	resp.status = Status(i);
+	status_code, _ := strconv.parse_int(status_parts[1]);
+	resp.status = Status(status_code);
 
 	resp_parts = resp_parts[1:];
 
