@@ -121,9 +121,8 @@ do_location_header :: proc(opts : Options, buf : ^strings.Builder, location := #
 
     file := location.file_path;
     if .Short_File_Path in opts {
-        when os.OS == "windows" do delimiter := '\\'; else do delimiter := '/';
         last := 0;
-        for r, i in location.file_path do if r == delimiter do last = i+1;
+        for r, i in location.file_path do if r == '/' do last = i+1;
         file = location.file_path[last:];
     }
 
