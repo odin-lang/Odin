@@ -4021,6 +4021,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				mode = Addressing_Value;
 			}
 		}
+		if (operand->mode == Addressing_Type && mode != Addressing_Constant) {
+			mode = Addressing_Invalid;
+		}
 
 		if (mode == Addressing_Invalid) {
 			gbString t = type_to_string(operand->type);
