@@ -15,7 +15,6 @@ Default_Temp_Allocator :: struct {
 	prev_offset: int,
 	backup_allocator: Allocator,
 	leaked_allocations: [dynamic]rawptr,
-	default_to_default_allocator: bool,
 }
 
 default_temp_allocator_init :: proc(allocator: ^Default_Temp_Allocator, data: []byte, backup_allocator := context.allocator) {
@@ -23,6 +22,7 @@ default_temp_allocator_init :: proc(allocator: ^Default_Temp_Allocator, data: []
 	allocator.curr_offset = 0;
 	allocator.prev_offset = 0;
 	allocator.backup_allocator = backup_allocator;
+	allocator.leaked_allocations.allocator = backup_allocator;
 }
 
 default_temp_allocator_destroy :: proc(using allocator: ^Default_Temp_Allocator) {
@@ -87,14 +87,33 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 		return ptr;
 
 	case .Free:
+		if len(allocator.data) == 0 {
+			return nil;
+		}
 		last_ptr := rawptr(&allocator.data[allocator.prev_offset]);
 		if old_memory == last_ptr {
 			full_size := allocator.curr_offset - allocator.prev_offset;
 			allocator.curr_offset = allocator.prev_offset;
 			mem_zero(last_ptr, full_size);
 			return nil;
+		} else {
+			#no_bounds_check start, end := &allocator.data[0], &allocator.data[allocator.curr_offset];
+			if start <= old_memory && old_memory < end {
+				// NOTE(bill): Cannot free this pointer
+				return nil;
+			}
+
+			if len(allocator.leaked_allocations) != 0 {
+				for ptr, i in allocator.leaked_allocations {
+					if ptr == old_memory {
+						free(ptr, allocator.backup_allocator);
+						ordered_remove(&allocator.leaked_allocations, i);
+						return nil;
+					}
+				}
+			}
 		}
-		// NOTE(bill): It's allocator memory, don't worry about freeing
+		// NOTE(bill): It's a temporary memory, don't worry about freeing
 
 	case .Free_All:
 		allocator.curr_offset = 0;
