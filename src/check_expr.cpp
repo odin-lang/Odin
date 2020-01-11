@@ -4175,8 +4175,12 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 		Type *t = o.type;
-		if (t == nullptr || t == t_invalid || is_type_polymorphic(operand->type)) {
-			error(ce->args[0], "Invalid argument for 'type_info_of'");
+		if (t == nullptr || t == t_invalid || is_type_polymorphic(t)) {
+			if (is_type_polymorphic(t)) {
+				error(ce->args[0], "Invalid argument for 'type_info_of', unspecialized polymorphic type");
+			} else {
+				error(ce->args[0], "Invalid argument for 'type_info_of'");
+			}
 			return false;
 		}
 		t = default_type(t);
