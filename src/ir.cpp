@@ -6141,6 +6141,9 @@ void ir_mangle_add_sub_type_name(irModule *m, Entity *field, String parent) {
 	if (field->kind != Entity_TypeName) {
 		return;
 	}
+	if (is_type_proc(field->type)) {
+		set_procedure_abi_types(heap_allocator(), field->type);
+	}
 
 	String cn = field->token.string;
 	isize max_len = parent.len + 1 + 16 + 1 + cn.len;
@@ -7413,6 +7416,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		Type *proc_type_ = base_type(ir_type(value));
 		GB_ASSERT(proc_type_->kind == Type_Proc);
 		TypeProc *pt = &proc_type_->Proc;
+		set_procedure_abi_types(heap_allocator(), proc_type_);
 
 		if (is_call_expr_field_value(ce)) {
 			auto args = array_make<irValue *>(ir_allocator(), pt->param_count);
