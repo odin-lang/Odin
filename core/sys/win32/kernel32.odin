@@ -35,6 +35,11 @@ foreign kernel32 {
 	@(link_name="GetVersionExA")             get_version                  :: proc(osvi: ^OS_Version_Info_Ex_A) ---;
 	@(link_name="GetCurrentThreadId")        get_current_thread_id        :: proc() -> u32 ---;
 
+	// NOTE(tetra): Not thread safe with SetCurrentDirectory and GetFullPathName;
+	// The current directory is stored as a global variable in the process.
+	@(link_name="GetCurrentDirectoryW")       get_current_directory_w     :: proc(len: u32, buf: Wstring) -> u32 ---;
+	@(link_name="SetCurrentDirectoryW")       set_current_directory_w     :: proc(buf: Wstring) -> u32 ---;
+
 	@(link_name="GetSystemTimeAsFileTime")   get_system_time_as_file_time :: proc(system_time_as_file_time: ^Filetime) ---;
 	@(link_name="FileTimeToLocalFileTime")   file_time_to_local_file_time :: proc(file_time: ^Filetime, local_file_time: ^Filetime) -> Bool ---;
 	@(link_name="FileTimeToSystemTime")      file_time_to_system_time     :: proc(file_time: ^Filetime, system_time: ^Systemtime) -> Bool ---;

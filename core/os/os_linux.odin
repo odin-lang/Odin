@@ -5,6 +5,7 @@ foreign import libc "system:c"
 
 import "core:runtime"
 import "core:strings"
+import "core:c"
 
 OS :: "linux";
 
@@ -15,94 +16,95 @@ Syscall   :: distinct int;
 
 INVALID_HANDLE :: ~Handle(0);
 
-ERROR_NONE:    	Errno : 0;
-EPERM:         	Errno : 1;
-ENOENT:        	Errno : 2;
-ESRCH:         	Errno : 3;
-EINTR:         	Errno : 4;
-EIO:           	Errno : 5;
-ENXIO:         	Errno : 6;
-EBADF:         	Errno : 9;
-EAGAIN:        	Errno : 11;
-ENOMEM:        	Errno : 12;
-EACCES:        	Errno : 13;
-EFAULT:        	Errno : 14;
-EEXIST:        	Errno : 17;
-ENODEV:        	Errno : 19;
-ENOTDIR:       	Errno : 20;
-EISDIR:        	Errno : 21;
-EINVAL:        	Errno : 22;
-ENFILE:        	Errno : 23;
-EMFILE:        	Errno : 24;
-ETXTBSY:       	Errno : 26;
-EFBIG:         	Errno : 27;
-ENOSPC:        	Errno : 28;
-ESPIPE:        	Errno : 29;
-EROFS:         	Errno : 30;
-EPIPE:         	Errno : 32;
+ERROR_NONE:     Errno : 0;
+EPERM:          Errno : 1;
+ENOENT:         Errno : 2;
+ESRCH:          Errno : 3;
+EINTR:          Errno : 4;
+EIO:            Errno : 5;
+ENXIO:          Errno : 6;
+EBADF:          Errno : 9;
+EAGAIN:         Errno : 11;
+ENOMEM:         Errno : 12;
+EACCES:         Errno : 13;
+EFAULT:         Errno : 14;
+EEXIST:         Errno : 17;
+ENODEV:         Errno : 19;
+ENOTDIR:        Errno : 20;
+EISDIR:         Errno : 21;
+EINVAL:         Errno : 22;
+ENFILE:         Errno : 23;
+EMFILE:         Errno : 24;
+ETXTBSY:        Errno : 26;
+EFBIG:          Errno : 27;
+ENOSPC:         Errno : 28;
+ESPIPE:         Errno : 29;
+EROFS:          Errno : 30;
+EPIPE:          Errno : 32;
 
-EDEADLK: 		Errno :	35;	/* Resource deadlock would occur */
-ENAMETOOLONG: 	Errno : 36;	/* File name too long */
-ENOLCK: 		Errno : 37;	/* No record locks available */
+ERANGE:         Errno : 34; /* Result too large */
+EDEADLK:        Errno : 35; /* Resource deadlock would occur */
+ENAMETOOLONG:   Errno : 36; /* File name too long */
+ENOLCK:         Errno : 37; /* No record locks available */
 
-ENOSYS: Errno : 38;	/* Invalid system call number */
+ENOSYS:         Errno : 38;	/* Invalid system call number */
 
-ENOTEMPTY: 	Errno : 39;	/* Directory not empty */
-ELOOP: 		Errno : 40;	/* Too many symbolic links encountered */
-EWOULDBLOCK: Errno : EAGAIN;	/* Operation would block */
-ENOMSG: 	Errno : 42;	/* No message of desired type */
-EIDRM: 		Errno : 43;	/* Identifier removed */
-ECHRNG: 	Errno : 44;	/* Channel number out of range */
-EL2NSYNC: 	Errno : 45;	/* Level 2 not synchronized */
-EL3HLT: 	Errno : 46;	/* Level 3 halted */
-EL3RST: 	Errno : 47;	/* Level 3 reset */
-ELNRNG: 	Errno : 48;	/* Link number out of range */
-EUNATCH: 	Errno : 49;	/* Protocol driver not attached */
-ENOCSI: 	Errno : 50;	/* No CSI structure available */
-EL2HLT: 	Errno : 51;	/* Level 2 halted */
-EBADE: 		Errno : 52;	/* Invalid exchange */
-EBADR: 		Errno : 53;	/* Invalid request descriptor */
-EXFULL: 	Errno : 54;	/* Exchange full */
-ENOANO: 	Errno : 55;	/* No anode */
-EBADRQC: 	Errno : 56;	/* Invalid request code */
-EBADSLT: 	Errno : 57;	/* Invalid slot */
-EDEADLOCK:  Errno : EDEADLK;
-EBFONT: 	Errno : 59;	/* Bad font file format */
-ENOSTR: 	Errno : 60;	/* Device not a stream */
-ENODATA: 	Errno : 61;	/* No data available */
-ETIME: 		Errno : 62;	/* Timer expired */
-ENOSR: 		Errno : 63;	/* Out of streams resources */
-ENONET: 	Errno : 64;	/* Machine is not on the network */
-ENOPKG: 	Errno : 65;	/* Package not installed */
-EREMOTE: 	Errno : 66;	/* Object is remote */
-ENOLINK: 	Errno : 67;	/* Link has been severed */
-EADV: 		Errno : 68;	/* Advertise error */
-ESRMNT: 	Errno : 69;	/* Srmount error */
-ECOMM: 		Errno : 70;	/* Communication error on send */
-EPROTO: 	Errno : 71;	/* Protocol error */
-EMULTIHOP: 	Errno : 72;	/* Multihop attempted */
-EDOTDOT: 	Errno : 73;	/* RFS specific error */
-EBADMSG: 	Errno : 74;	/* Not a data message */
-EOVERFLOW: 	Errno : 75;	/* Value too large for defined data type */
-ENOTUNIQ: 	Errno : 76;	/* Name not unique on network */
-EBADFD: 	Errno : 77;	/* File descriptor in bad state */
-EREMCHG: 	Errno : 78;	/* Remote address changed */
-ELIBACC: 	Errno : 79;	/* Can not access a needed shared library */
-ELIBBAD: 	Errno : 80;	/* Accessing a corrupted shared library */
-ELIBSCN: 	Errno : 81;	/* .lib section in a.out corrupted */
-ELIBMAX: 	Errno : 82;	/* Attempting to link in too many shared libraries */
-ELIBEXEC: 	Errno : 83;	/* Cannot exec a shared library directly */
-EILSEQ: 	Errno : 84;	/* Illegal byte sequence */
-ERESTART: 	Errno : 85;	/* Interrupted system call should be restarted */
-ESTRPIPE: 	Errno : 86;	/* Streams pipe error */
-EUSERS: 	Errno : 87;	/* Too many users */
-ENOTSOCK: 	Errno : 88;	/* Socket operation on non-socket */
-EDESTADDRREQ: Errno : 89;	/* Destination address required */
-EMSGSIZE: 	Errno : 90;	/* Message too long */
-EPROTOTYPE: Errno : 91;	/* Protocol wrong type for socket */
-ENOPROTOOPT: 	Errno : 92;	/* Protocol not available */
-EPROTONOSUPPORT: Errno : 93;	/* Protocol not supported */
-ESOCKTNOSUPPORT: Errno : 94;	/* Socket type not supported */
+ENOTEMPTY:      Errno : 39;	/* Directory not empty */
+ELOOP:          Errno : 40;	/* Too many symbolic links encountered */
+EWOULDBLOCK:    Errno : EAGAIN; /* Operation would block */
+ENOMSG:         Errno : 42;	/* No message of desired type */
+EIDRM:          Errno : 43;	/* Identifier removed */
+ECHRNG:         Errno : 44;	/* Channel number out of range */
+EL2NSYNC:       Errno : 45;	/* Level 2 not synchronized */
+EL3HLT:         Errno : 46;	/* Level 3 halted */
+EL3RST:         Errno : 47;	/* Level 3 reset */
+ELNRNG:         Errno : 48;	/* Link number out of range */
+EUNATCH:        Errno : 49;	/* Protocol driver not attached */
+ENOCSI:         Errno : 50;	/* No CSI structure available */
+EL2HLT:         Errno : 51;	/* Level 2 halted */
+EBADE:          Errno : 52;	/* Invalid exchange */
+EBADR:          Errno : 53;	/* Invalid request descriptor */
+EXFULL:         Errno : 54;	/* Exchange full */
+ENOANO:         Errno : 55;	/* No anode */
+EBADRQC:        Errno : 56;	/* Invalid request code */
+EBADSLT:        Errno : 57;	/* Invalid slot */
+EDEADLOCK:      Errno : EDEADLK;
+EBFONT:         Errno : 59;	/* Bad font file format */
+ENOSTR:         Errno : 60;	/* Device not a stream */
+ENODATA:        Errno : 61;	/* No data available */
+ETIME:          Errno : 62;	/* Timer expired */
+ENOSR:          Errno : 63;	/* Out of streams resources */
+ENONET:         Errno : 64;	/* Machine is not on the network */
+ENOPKG:         Errno : 65;	/* Package not installed */
+EREMOTE:        Errno : 66;	/* Object is remote */
+ENOLINK:        Errno : 67;	/* Link has been severed */
+EADV:           Errno : 68;	/* Advertise error */
+ESRMNT:         Errno : 69;	/* Srmount error */
+ECOMM:          Errno : 70;	/* Communication error on send */
+EPROTO:         Errno : 71;	/* Protocol error */
+EMULTIHOP:      Errno : 72;	/* Multihop attempted */
+EDOTDOT:        Errno : 73;	/* RFS specific error */
+EBADMSG:        Errno : 74;	/* Not a data message */
+EOVERFLOW:      Errno : 75;	/* Value too large for defined data type */
+ENOTUNIQ:       Errno : 76;	/* Name not unique on network */
+EBADFD:         Errno : 77;	/* File descriptor in bad state */
+EREMCHG:        Errno : 78;	/* Remote address changed */
+ELIBACC:        Errno : 79;	/* Can not access a needed shared library */
+ELIBBAD:        Errno : 80;	/* Accessing a corrupted shared library */
+ELIBSCN:        Errno : 81;	/* .lib section in a.out corrupted */
+ELIBMAX:        Errno : 82;	/* Attempting to link in too many shared libraries */
+ELIBEXEC:       Errno : 83;	/* Cannot exec a shared library directly */
+EILSEQ:         Errno : 84;	/* Illegal byte sequence */
+ERESTART:       Errno : 85;	/* Interrupted system call should be restarted */
+ESTRPIPE:       Errno : 86;	/* Streams pipe error */
+EUSERS:         Errno : 87;	/* Too many users */
+ENOTSOCK:       Errno : 88;	/* Socket operation on non-socket */
+EDESTADDRREQ:   Errno : 89;	/* Destination address required */
+EMSGSIZE:       Errno : 90;	/* Message too long */
+EPROTOTYPE:     Errno : 91;	/* Protocol wrong type for socket */
+ENOPROTOOPT:    Errno : 92;	/* Protocol not available */
+EPROTONOSUPPORT:Errno : 93;	/* Protocol not supported */
+ESOCKTNOSUPPORT:Errno : 94;	/* Socket type not supported */
 EOPNOTSUPP: 	Errno : 95;	/* Operation not supported on transport endpoint */
 EPFNOSUPPORT: 	Errno : 96;	/* Protocol family not supported */
 EAFNOSUPPORT: 	Errno : 97;	/* Address family not supported by protocol */
@@ -259,29 +261,31 @@ foreign libc {
 	@(link_name="__errno_location") __errno_location    :: proc() -> ^int ---;
 	@(link_name="syscall")          syscall             :: proc(number: Syscall, #c_vararg args: ..any) -> int ---;
 
-	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: int, mode: int) -> Handle ---;
-	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> int ---;
-	@(link_name="read")             _unix_read          :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
-	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: int) -> int ---;
-	@(link_name="lseek64")          _unix_seek          :: proc(fd: Handle, offset: i64, whence: i32) -> i64 ---;
+	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---;
+	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---;
+	@(link_name="read")             _unix_read          :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---;
+	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---;
+	@(link_name="lseek64")          _unix_seek          :: proc(fd: Handle, offset: i64, whence: c.int) -> i64 ---;
 	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---;
-	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> i32 ---;
-	@(link_name="stat")             _unix_stat          :: proc(path: cstring, stat: ^Stat) -> int ---;
-	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^Stat) -> int ---;
-	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> int ---;
+	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> c.int ---;
+	@(link_name="stat")             _unix_stat          :: proc(path: cstring, stat: ^Stat) -> c.int ---;
+	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^Stat) -> c.int ---;
+	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: c.int) -> c.int ---;
 
-	@(link_name="malloc")           _unix_malloc        :: proc(size: int) -> rawptr ---;
-	@(link_name="calloc")           _unix_calloc        :: proc(num, size: int) -> rawptr ---;
+	@(link_name="malloc")           _unix_malloc        :: proc(size: c.size_t) -> rawptr ---;
+	@(link_name="calloc")           _unix_calloc        :: proc(num, size: c.size_t) -> rawptr ---;
 	@(link_name="free")             _unix_free          :: proc(ptr: rawptr) ---;
-	@(link_name="realloc")          _unix_realloc       :: proc(ptr: rawptr, size: int) -> rawptr ---;
+	@(link_name="realloc")          _unix_realloc       :: proc(ptr: rawptr, size: c.size_t) -> rawptr ---;
 	@(link_name="getenv")           _unix_getenv        :: proc(cstring) -> cstring ---;
+	@(link_name="getcwd")           _unix_getcwd        :: proc(buf: cstring, len: c.size_t) -> cstring ---;
+	@(link_name="chdir")            _unix_chdir         :: proc(buf: cstring) -> c.int ---;
 
-	@(link_name="exit")             _unix_exit          :: proc(status: int) -> ! ---;
+	@(link_name="exit")             _unix_exit          :: proc(status: c.int) -> ! ---;
 }
 foreign dl {
-	@(link_name="dlopen")           _unix_dlopen        :: proc(filename: cstring, flags: int) -> rawptr ---;
+	@(link_name="dlopen")           _unix_dlopen        :: proc(filename: cstring, flags: c.int) -> rawptr ---;
 	@(link_name="dlsym")            _unix_dlsym         :: proc(handle: rawptr, symbol: cstring) -> rawptr ---;
-	@(link_name="dlclose")          _unix_dlclose       :: proc(handle: rawptr) -> int ---;
+	@(link_name="dlclose")          _unix_dlclose       :: proc(handle: rawptr) -> c.int ---;
 	@(link_name="dlerror")          _unix_dlerror       :: proc() -> cstring ---;
 }
 
@@ -295,7 +299,7 @@ get_last_error :: proc() -> int {
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
 	cstr := strings.clone_to_cstring(path);
-	handle := _unix_open(cstr, flags, mode);
+	handle := _unix_open(cstr, c.int(flags), c.int(mode));
 	delete(cstr);
 	if handle == -1 {
 		return INVALID_HANDLE, Errno(get_last_error());
@@ -312,26 +316,26 @@ close :: proc(fd: Handle) -> Errno {
 }
 
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	bytes_read := _unix_read(fd, &data[0], len(data));
+	bytes_read := _unix_read(fd, &data[0], c.size_t(len(data)));
 	if bytes_read == -1 {
 		return -1, Errno(get_last_error());
 	}
-	return bytes_read, ERROR_NONE;
+	return int(bytes_read), ERROR_NONE;
 }
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;
 	}
-	bytes_written := _unix_write(fd, &data[0], len(data));
+	bytes_written := _unix_write(fd, &data[0], c.size_t(len(data)));
 	if bytes_written == -1 {
 		return -1, Errno(get_last_error());
 	}
-	return bytes_written, ERROR_NONE;
+	return int(bytes_written), ERROR_NONE;
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
-	res := _unix_seek(fd, offset, i32(whence));
+	res := _unix_seek(fd, offset, c.int(whence));
 	if res == -1 {
 		return -1, Errno(get_last_error());
 	}
@@ -397,7 +401,7 @@ fstat :: inline proc(fd: Handle) -> (Stat, Errno) {
 access :: inline proc(path: string, mask: int) -> (bool, Errno) {
 	cstr := strings.clone_to_cstring(path);
 	defer delete(cstr);
-	result := _unix_access(cstr, mask);
+	result := _unix_access(cstr, c.int(mask));
 	if result == -1 {
 		return false, Errno(get_last_error());
 	}
@@ -406,11 +410,11 @@ access :: inline proc(path: string, mask: int) -> (bool, Errno) {
 
 heap_alloc :: proc(size: int) -> rawptr {
 	assert(size >= 0);
-	return _unix_calloc(1, size);
+	return _unix_calloc(1, c.size_t(size));
 }
 
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	return _unix_realloc(ptr, new_size);
+	return _unix_realloc(ptr, c.size_t(new_size));
 }
 
 heap_free :: proc(ptr: rawptr) {
@@ -427,8 +431,35 @@ getenv :: proc(name: string) -> (string, bool) {
 	return string(cstr), true;
 }
 
+get_current_directory :: proc() -> string {
+	// NOTE(tetra): I would use PATH_MAX here, but I was not able to find
+	// an authoritative value for it across all systems.
+	// The largest value I could find was 4096, so might as well use the page size.
+	page_size := get_page_size();
+	buf := make([dynamic]u8, page_size);
+	for {
+		cwd := _unix_getcwd(cstring(#no_bounds_check &buf[0]), c.size_t(len(buf)));
+		if cwd != nil {
+			return string(cwd);
+		}
+		if Errno(get_last_error()) != ERANGE {
+			return "";
+		}
+		resize(&buf, len(buf)+page_size);
+	}
+	unreachable();
+	return "";
+}
+
+set_current_directory :: proc(path: string) -> (err: Errno) {
+	cstr := strings.clone_to_cstring(path, context.temp_allocator);
+	res := _unix_chdir(cstr);
+	if res == -1 do return Errno(get_last_error());
+	return ERROR_NONE;
+}
+
 exit :: proc(code: int) -> ! {
-	_unix_exit(code);
+	_unix_exit(c.int(code));
 }
 
 current_thread_id :: proc "contextless" () -> int {
@@ -438,7 +469,7 @@ current_thread_id :: proc "contextless" () -> int {
 dlopen :: inline proc(filename: string, flags: int) -> rawptr {
 	cstr := strings.clone_to_cstring(filename);
 	defer delete(cstr);
-	handle := _unix_dlopen(cstr, flags);
+	handle := _unix_dlopen(cstr, c.int(flags));
 	return handle;
 }
 dlsym :: inline proc(handle: rawptr, symbol: string) -> rawptr {
