@@ -6231,6 +6231,7 @@ irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, Ast *expr, i
 	String name = make_string(name_text, name_len-1);
 
 	Type *type = type_of_expr(expr);
+	set_procedure_abi_types(heap_allocator(), type);
 	irValue *value = ir_value_procedure(m, nullptr, type, pl->type, pl->body, name);
 
 	value->Proc.tags = pl->tags;
@@ -8934,7 +8935,7 @@ void ir_build_nested_proc(irProcedure *proc, AstProcLit *pd, Entity *e) {
 	name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
 	String name = make_string(name_text, name_len-1);
 
-
+	set_procedure_abi_types(heap_allocator(), e->type);
 	irValue *value = ir_value_procedure(proc->module, e, e->type, pd->type, pd->body, name);
 
 	value->Proc.tags = pd->tags;
@@ -9033,7 +9034,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstValueDecl *vd) {
 					return;
 				}
 
-
+				set_procedure_abi_types(heap_allocator(), e->type);
 				irValue *value = ir_value_procedure(proc->module, e, e->type, pl->type, pl->body, name);
 
 				value->Proc.tags = pl->tags;
@@ -11840,6 +11841,7 @@ void ir_gen_tree(irGen *s) {
 
 			Ast *type_expr = pl->type;
 
+			set_procedure_abi_types(heap_allocator(), e->type);
 			irValue *p = ir_value_procedure(m, e, e->type, type_expr, body, name);
 			p->Proc.tags = pl->tags;
 			p->Proc.inlining = pl->inlining;
