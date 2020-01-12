@@ -1713,6 +1713,7 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initial
 	if (zero_initialized) {
 		ir_emit_zero_init(proc, instr, expr);
 	}
+	set_procedure_abi_types(heap_allocator(), e->type);
 
 	// if (proc->module->generate_debug_info && expr != nullptr && proc->entity != nullptr) {
 	// if (proc->module->generate_debug_info && proc->entity != nullptr) {
