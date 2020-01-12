@@ -354,7 +354,22 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 		if (i+1 == param_count && t->Proc.c_vararg) {
 			ir_write_string(f, str_lit("..."));
 		} else {
-			ir_print_type(f, m, t->Proc.abi_compat_params[i]);
+			Type *et = t->Proc.abi_compat_params[i];
+			if (is_type_tuple(et)) {
+				for_array(j, et->Tuple.variables) {
+					if (j > 0) ir_write_str_lit(f, ", ");
+
+					ir_print_type(f, m, et->Tuple.variables[j]->type);
+					if (e->flags&EntityFlag_NoAlias) {
+						ir_write_str_lit(f, " noalias");
+					}
+					ir_write_byte(f, ' ');
+					param_index++;
+				}
+				continue;
+			} else {
+				ir_print_type(f, m, et);
+			}
 		}
 
 		param_index++;
@@ -2111,30 +2126,50 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			TypeTuple *params = &proc_type->Proc.params->Tuple;
 			if (proc_type->Proc.c_vararg) {
 				isize i = 0;
+				isize arg_index = 0;
 				for (; i < params->variables.count-1; i++) {
 					Entity *e = params->variables[i];
 					GB_ASSERT(e != nullptr);
-					if (e->kind != Entity_Variable) continue;
+					if (e->kind != Entity_Variable) {
+						arg_index++;
+						continue;
+					}
 
 					if (param_index > 0) ir_write_str_lit(f, ", ");
 
 					Type *t = proc_type->Proc.abi_compat_params[i];
-					ir_print_type(f, m, t);
-					if (e->flags&EntityFlag_NoAlias) {
-						ir_write_str_lit(f, " noalias");
+					if (is_type_tuple(t)) {
+						for_array(j, t->Tuple.variables) {
+							if (j > 0) ir_write_str_lit(f, ", ");
+
+							irValue *arg = call->args[arg_index++];
+
+							ir_print_type(f, m, t->Tuple.variables[j]->type);
+							if (e->flags&EntityFlag_NoAlias) {
+								ir_write_str_lit(f, " noalias");
+							}
+							ir_write_byte(f, ' ');
+							ir_print_value(f, m, arg, t);
+							param_index++;
+						}
+					} else {
+						ir_print_type(f, m, t);
+						if (e->flags&EntityFlag_NoAlias) {
+							ir_write_str_lit(f, " noalias");
+						}
+						if (e->flags&EntityFlag_ImplicitReference) {
+							ir_write_str_lit(f, " nonnull dereferenceable");
+						}
+						ir_write_byte(f, ' ');
+						irValue *arg = call->args[arg_index++];
+						ir_print_value(f, m, arg, t);
+						param_index++;
 					}
-					if (e->flags&EntityFlag_ImplicitReference) {
-						ir_write_str_lit(f, " nonnull dereferenceable");
-					}
-					ir_write_byte(f, ' ');
-					irValue *arg = call->args[i];
-					ir_print_value(f, m, arg, t);
-					param_index++;
 				}
-				for (; i < call->args.count; i++) {
+				while (arg_index < call->args.count) {
 					if (param_index > 0) ir_write_str_lit(f, ", ");
 
-					irValue *arg = call->args[i];
+					irValue *arg = call->args[arg_index];
 					Type *t = ir_type(arg);
 					ir_print_type(f, m, t);
 					ir_write_byte(f, ' ');

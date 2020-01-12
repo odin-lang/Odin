@@ -3394,7 +3394,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_SimdVector:
 		if (type->SimdVector.is_x86_mmx) {
-			return "intrinsics.x86_mmx";
+			return gb_string_appendc(str, "intrinsics.x86_mmx");
 		} else {
 			str = gb_string_append_fmt(str, "#simd[%d]", cast(int)type->SimdVector.count);
 			str = write_type_to_string(str, type->SimdVector.elem);
