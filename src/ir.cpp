@@ -4713,6 +4713,10 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 	Type *t = base_type(type_deref(ir_type(s)));
 	Type *result_type = nullptr;
 
+	if (t->kind == Type_Opaque) {
+		t = t->Opaque.elem;
+	}
+
 	if (is_type_struct(t)) {
 		result_type = alloc_type_pointer(t->Struct.fields[index]->type);
 	} else if (is_type_union(t)) {
@@ -4896,6 +4900,9 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 			// e = ir_emit_ptr_offset(proc, e, v_zero); // TODO(bill): Do I need these copies?
 		}
 		type = core_type(type);
+		if (type->kind == Type_Opaque) {
+			type = type->Opaque.elem;
+		}
 
 		if (is_type_quaternion(type)) {
 			e = ir_emit_struct_ep(proc, e, index);
