@@ -4,46 +4,45 @@ import "core:strings"
 import "core:strconv"
 import "core:unicode/utf8"
 import "core:mem"
+import "core:encoding/base64"
 
 split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host, path: string, queries: map[string]string) {
 	s := url;
-	{
-		i := strings.last_index(s, "://");
-		if i != -1 {
-			scheme = s[:i];
-			s = s[i+3:];
-		}
+	
+	i := strings.last_index(s, "://");
+	if i != -1 {
+		scheme = s[:i];
+		s = s[i+3:];
 	}
-	{
-		i := strings.index(s, "?");
-		if i != -1 {
-			query_str := s[i+1:];
-			s = s[:i];
-			if query_str != "" {
-				queries_parts := strings.split(query_str, "&");
-				queries = make(map[string]string, len(queries_parts), allocator);
-				for q in queries_parts {
-					parts := strings.split(q, "=");
-					switch len(parts) {
-					case 1:  queries[parts[0]] = "";
-					case 2:  queries[parts[0]] = parts[1];
-					case:    break;
-					}
+
+	i = strings.index(s, "?");
+	if i != -1 {
+		query_str := s[i+1:];
+		s = s[:i];
+		if query_str != "" {
+			queries_parts := strings.split(query_str, "&");
+			queries = make(map[string]string, len(queries_parts), allocator);
+			for q in queries_parts {
+				parts := strings.split(q, "=");
+				switch len(parts) {
+				case 1:  queries[parts[0]] = "";
+				case 2:  queries[parts[0]] = parts[1];
+				case:    break;
 				}
 			}
 		}
 	}
-	{
-		i := strings.last_index(s, "/");
-		if i == -1 {
-			host = s;
-			path = "/";
-			return;
-		} else {
-			host = s[:i];
-			path = s[i:];
-		}
+	
+	i = strings.last_index(s, "/");
+	if i == -1 {
+		host = s;
+		path = "/";
+		return;
+	} else {
+		host = s[:i];
+		path = s[i:];
 	}
+	
 	return;
 }
 
@@ -133,7 +132,6 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 
 		n: int;
 		n, _ = strconv.parse_int(s[:2], 16);
-		// fmt.printf("%q\n", n);
 		switch n {
 		case 0x20:  write_rune(&b, ' ');
 		case 0x21:  write_rune(&b, '!');
@@ -157,6 +155,7 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 		case 0x5D:  write_rune(&b, ']');
 		case:
 			// utf-8 bytes
+			// TODO(tetra): Audit this - 4 bytes???
 			append(&pending, s[0]);
 			append(&pending, s[1]);
 			if len(pending) == 4 {
@@ -172,3 +171,49 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 	decoded_string = to_string(b);
 	return;
 }
+
+//
+// TODO: encoding/base64 is broken...
+//
+
+// // TODO(tetra): The whole "table" stuff in encoding/base64 is too impenetrable for me to
+// // make a table for this ... sigh - so this'll do for now.
+// base64url_encode :: proc(data: []byte, allocator := context.allocator) -> string {
+// 	out := transmute([]byte) base64.encode(data, base64.ENC_TABLE, allocator);
+// 	for b, i in out {
+// 		switch b {
+// 		case '+': out[i] = '-';
+// 		case '/': out[i] = '_';
+// 		}
+// 	}
+// 	i := len(out)-1;
+// 	for ; i >= 0; i -= 1 {
+// 		if out[i] != '=' do break;
+// 	}
+// 	return string(out[:i+1]);
+// }
+
+// base64url_decode :: proc(s: string, allocator := context.allocator) -> []byte {
+// 	size := len(s);
+// 	padding := 0;
+// 	for size % 4 != 0 {
+// 		size += 1; // TODO: SPEED
+// 		padding += 1;
+// 	}
+
+// 	temp := make([]byte, size, context.temp_allocator);
+// 	copy(temp, transmute([]byte) s);
+
+// 	for b, i in temp {
+// 		switch b {
+// 		case '-': temp[i] = '+';
+// 		case '_': temp[i] = '/';
+// 		}
+// 	}
+
+// 	for in 0..padding-1 {
+// 		temp[len(temp)-1] = '=';
+// 	}
+
+// 	return base64.decode(string(temp), base64.DEC_TABLE, allocator);
+// }
