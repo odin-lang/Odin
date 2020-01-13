@@ -2,7 +2,6 @@ package http
 
 import "core:net"
 
-
 Status :: enum {
 	Unknown = 0,
 	Bad_Response_Header = -1, // NOTE(tetra): Only produced by execute_request.
@@ -20,6 +19,10 @@ Status :: enum {
 	No_Upstream_Response = 504,
 }
 
+Method :: enum u8 {
+	Get,
+	Post,
+}
 
 
 
@@ -43,11 +46,6 @@ response_destroy :: proc(using r: ^Response) {
 
 
 
-Method :: enum u8 {
-	Get,
-	Post,
-}
-
 Request :: struct {
 	method: Method,
 	scheme, host, path: string, // NOTE: _NOT_ percent encoded.
@@ -57,7 +55,6 @@ Request :: struct {
 
 request_init :: proc(req: ^Request, method: Method, url: string, allocator := context.allocator) {
 	scheme, host, path, queries := net.split_url(url, allocator);
-	assert(scheme == "http");
 	req^ = Request {
 		method = method,
 		scheme = scheme,
@@ -66,5 +63,4 @@ request_init :: proc(req: ^Request, method: Method, url: string, allocator := co
 		queries = queries,
 	};
 	req.headers.allocator = allocator;
-	req.headers["Host"] = host; // NOTE: include port if non-standard; users can't provide this yet anyway though.
 }

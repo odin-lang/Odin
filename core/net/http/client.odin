@@ -17,19 +17,40 @@ get :: proc(url: string, allocator := context.allocator) -> (resp: Response, ok:
 execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Response, ok: bool) {
 	using strings;
 
+	assert(r.scheme == "http", "only HTTP is supported at this time");
+
 	addr4, addr6, resolve_ok := net.resolve(r.host);
 	if !resolve_ok do return;
 	addr := addr4 != nil ? addr4 : addr6;
 
-	//
-	// TODO(tetra): Factor the request serializing out.
-	//
+	req_str := serialize_11_request(r, allocator);
+	if req_str == "" do return; // OOM.
+
+	fmt.printf("%q\n", req_str);
+
+	// TODO(tetra): SSL/TLS.
+	skt, err := net.dial(addr, 80);
+	if err != .Ok do return; // TODO(tetra): return instead?
+
+	write_err := net.write(skt, transmute([]byte) req_str);
+	if write_err != .Ok do return; // TODO(tetra): return instead?
+
+	read_err: net.Read_Error;
+	resp, read_err = deserialize_11_response(skt, allocator);
+	if read_err != .Ok do return; // TODO(tetra): return instead?
+
+	ok = true;
+	return;
+}
+
+serialize_11_request :: proc(r: Request, allocator := context.allocator) -> string {
+	using strings;
 
 	b := make_builder(allocator);
 	grow_builder(&b, 8192);
-	defer destroy_builder(&b);
+	if b.buf == nil do return "";
 
-	assert(r.method == .Get);
+	assert(r.method == .Get, "only GET requests are supported at this time");
 	write_string(&b, "GET ");
 
 	write_string(&b, r.path);
@@ -46,6 +67,11 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Re
 	}
 	write_string(&b, " HTTP/1.1\r\n");
 
+	if _, ok := r.headers["Host"]; !ok {
+		write_string(&b, "Host: ");
+		write_string(&b, r.host);
+		write_string(&b, "\r\n");
+	}
 	for name, value in r.headers {
 		write_string(&b, name);
 		write_string(&b, ": ");
@@ -59,26 +85,17 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Re
 	}
 
 	write_string(&b, "\r\n");
-	req_str := to_string(b);
+	return to_string(b);
+}
 
-	fmt.printf("%q\n", req_str);
+deserialize_11_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp: Response, read_err: net.Read_Error) {
+	using strings;
 
-	// TODO(tetra): SSL/TLS.
-	skt, err := net.dial(addr, 80);
-	if err != .Ok do return; // TODO(tetra): return instead?
-
-	write_err := net.write(skt, transmute([]byte) req_str);
-	if write_err != .Ok do return; // TODO(tetra): return instead?
-
+	// TODO(tetra): Handle not receiving the response in one read call.
 	read_buf: [4096]byte;
-	n, read_err := net.read(skt, read_buf[:]);
-	assert(n > 0);
-	if read_err != .Ok do return; // TODO(tetra): return instead?
-
-
-	//
-	// TODO(tetra): Factor the response parsing out.
-	//
+	n: int;
+	n, read_err = net.read(skt, read_buf[:]);
+	assert(n > 0); // TODO
 
 	resp_parts := split(string(read_buf[:n]), "\n");
 	assert(len(resp_parts) >= 1);
@@ -91,10 +108,9 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Re
 
 	resp_parts = resp_parts[1:];
 
+	// TODO(tetra): Use an arena for the response data.
 	resp.headers = make(map[string]string, len(resp_parts), allocator);
-	// NOTE(tetra): conform to the common idiom that ok=false means that the
-	// that the caller does not have to clean up `resp` ... because we already did.
-	defer if !ok do response_destroy(&resp);
+	defer if read_err != .Ok do response_destroy(&resp);
 
 	last_hdr_index := -1;
 	for part, i in resp_parts {
@@ -115,7 +131,6 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Re
 	}
 	if last_hdr_index == -1 {
 		// NOTE(tetra): Should have found the last header.
-		// TODO(tetra): Handle not receiving the response in one read call.
 		resp.status = .Bad_Response_Header;
 		return;
 	}
@@ -124,8 +139,6 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Re
 	body := resp_parts[last_hdr_index+1];
 	body = trim_space(body);
 	resp.body = clone(body, allocator);
-
-	ok = true;
 	return;
 }
 
