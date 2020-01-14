@@ -36,8 +36,8 @@ response_destroy :: proc(using r: ^Response) {
 	// TODO(tetra): Use arenas for the map data in Requests and Responses so that the memory
 	// can be block-freed.
 	for k, v in headers {
-		delete(k);
-		delete(v);
+		delete(k, headers.allocator);
+		delete(v, headers.allocator);
 	}
 	delete(headers);
 	delete(body);
