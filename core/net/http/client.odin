@@ -4,6 +4,7 @@ import "core:net"
 import "core:strings"
 import "core:strconv"
 import "core:fmt"
+import "core:mem"
 
 
 get :: proc(url: string, allocator := context.allocator) -> (resp: Response, ok: bool) {
@@ -19,11 +20,13 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Re
 
 	assert(r.scheme == "http", "only HTTP is supported at this time");
 
+	context.allocator = allocator;
+
 	addr4, addr6, resolve_ok := net.resolve(r.host);
 	if !resolve_ok do return;
 	addr := addr4 != nil ? addr4 : addr6;
 
-	req_str := serialize_11_request(r, allocator);
+	req_str := serialize_11_request(r);
 	if req_str == "" do return; // OOM.
 
 	fmt.printf("%q\n", req_str);
@@ -32,11 +35,11 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Re
 	skt, err := net.dial(addr, 80);
 	if err != .Ok do return; // TODO(tetra): return instead?
 
-	write_err := net.write(skt, transmute([]byte) req_str);
+	write_err := net.write_string(skt, req_str);
 	if write_err != .Ok do return; // TODO(tetra): return instead?
 
 	read_err: net.Read_Error;
-	resp, read_err = deserialize_11_response(skt, allocator);
+	resp, read_err = deserialize_11_response(skt);
 	if read_err != .Ok do return; // TODO(tetra): return instead?
 
 	ok = true;
@@ -91,6 +94,8 @@ serialize_11_request :: proc(r: Request, allocator := context.allocator) -> stri
 deserialize_11_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp: Response, read_err: net.Read_Error) {
 	using strings;
 
+	context.allocator = allocator;
+
 	// TODO(tetra): Handle not receiving the response in one read call.
 	read_buf: [4096]byte;
 	n: int;
@@ -109,7 +114,7 @@ deserialize_11_response :: proc(skt: net.Socket, allocator := context.allocator)
 	resp_parts = resp_parts[1:];
 
 	// TODO(tetra): Use an arena for the response data.
-	resp.headers = make(map[string]string, len(resp_parts), allocator);
+	resp.headers = make(map[string]string, len(resp_parts));
 	defer if read_err != .Ok do response_destroy(&resp);
 
 	last_hdr_index := -1;
@@ -124,8 +129,8 @@ deserialize_11_response :: proc(skt: net.Socket, allocator := context.allocator)
 			return;
 		}
 		// the header parts are currently in `read_buf` (stack memory), but we want to return them.
-		name  := clone(trim_space(trimmed_part[:idx]), allocator);
-		value := clone(trim_space(trimmed_part[idx+1:]), allocator);
+		name  := clone(trim_space(trimmed_part[:idx]));
+		value := clone(trim_space(trimmed_part[idx+1:]));
 		resp.headers[name] = value;
 
 	}
@@ -138,7 +143,7 @@ deserialize_11_response :: proc(skt: net.Socket, allocator := context.allocator)
 	// TODO(tetra): Use the content-length to slice the body.
 	body := resp_parts[last_hdr_index+1];
 	body = trim_space(body);
-	resp.body = clone(body, allocator);
+	resp.body = clone(body);
 	return;
 }
 
