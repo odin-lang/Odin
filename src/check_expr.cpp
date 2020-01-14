@@ -8391,6 +8391,33 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					bits |= bit;
 				}
 				o->value = exact_value_u64(bits);
+			} else if (is_type_constant_type(type) && cl->elems.count == 0) {
+				ExactValue value = exact_value_compound(node);
+				Type *bt = core_type(type);
+				if (bt->kind == Type_Basic) {
+					if (bt->Basic.flags & BasicFlag_Boolean) {
+						value = exact_value_bool(false);
+					} else if (bt->Basic.flags & BasicFlag_Integer) {
+						value = exact_value_i64(0);
+					} else if (bt->Basic.flags & BasicFlag_Unsigned) {
+						value = exact_value_i64(0);
+					} else if (bt->Basic.flags & BasicFlag_Float) {
+						value = exact_value_float(0);
+					} else if (bt->Basic.flags & BasicFlag_Complex) {
+						value = exact_value_complex(0, 0);
+					} else if (bt->Basic.flags & BasicFlag_Quaternion) {
+						value = exact_value_quaternion(0, 0, 0, 0);
+					} else if (bt->Basic.flags & BasicFlag_Pointer) {
+						value = exact_value_pointer(0);
+					} else if (bt->Basic.flags & BasicFlag_String) {
+						String empty_string = {};
+						value = exact_value_string(empty_string);
+					} else if (bt->Basic.flags & BasicFlag_Rune) {
+						value = exact_value_i64(0);
+					}
+				}
+
+				o->value = value;
 			} else {
 				o->value = exact_value_compound(node);
 			}
