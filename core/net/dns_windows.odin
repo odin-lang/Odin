@@ -122,13 +122,9 @@ Dns_Record :: union {
 //
 // Returns records and their data in temporary storage, unless otherwise specified by `allocator`.
 get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := context.temp_allocator) -> (records: []Dns_Record, ok: bool) {
+	context.allocator = allocator;
+
 	host_cstr := strings.clone_to_cstring(hostname, context.temp_allocator);
-
-	// NOTE(tetra): We should not be allocating using this allocator after this.
-	// We can maybe move this up to the top when Bill makes the temp storage always use the default allocator
-	// instead of the context allocator if it hasn't yet been initialized.
-	context.allocator = mem.nil_allocator();
-
 	rec: ^win32.Dns_Record;
 	res := win32.DnsQuery_UTF8(host_cstr, u16(type), 0, nil, &rec, nil);
 	if res == win32.DNS_INFO_NO_RECORDS || res == win32.ERROR_INVALID_NAME {
@@ -145,11 +141,9 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 		count += 1;
 	}
 
-	// TODO(tetra): DEBUG: Using `make([dynamic]Dns_Record, 0, count, allocator)` causes the assert in append to fire.
-	recs := make([dynamic]Dns_Record, allocator);
-	if !reserve(&recs, count) do return;
-	if recs == nil do return; // return no results if OOM.
 
+	recs := make([dynamic]Dns_Record, 0, count);
+	if recs == nil do return; // return no results if OOM.
 
 	for r := rec; r != nil; r = r.next {
 		if r.type != u16(type) do continue; // NOTE(tetra): Should never happen, but...
@@ -165,25 +159,25 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 			new_rec = Dns_Record_Ipv6(addr); // NOTE(tetra): value copy
 		case .Cname:
 			host := string(r.data.cname);
-			new_rec = Dns_Record_Cname(strings.clone(host, allocator));
+			new_rec = Dns_Record_Cname(strings.clone(host));
 		case .Txt:
 			n := r.data.text.string_count;
 			ptr := &r.data.text.string_array;
 			c_strs := mem.slice_ptr(ptr, int(n));
 			for cstr in c_strs {
 				s := string(cstr);
-				new_rec = Dns_Record_Text(strings.clone(s, allocator));
+				new_rec = Dns_Record_Text(strings.clone(s));
 			}
 		case .Ns:
 			host := string(r.data.name_host);
-			new_rec = Dns_Record_Ns(strings.clone(host, allocator));
+			new_rec = Dns_Record_Ns(strings.clone(host));
 		case .Mx:
 			// TODO(tetra): Order by preference priority? (Prefer hosts with lower preference values.)
 			// Or maybe not because you're supposed to just use the first one that works
 			// and which order they're in changes between after every few calls.
 			host := string(r.data.mail_exchange.host);
 			preference := int(r.data.mail_exchange.preference);
-			new_rec = Dns_Record_Mx { host       = strings.clone(host, allocator),
+			new_rec = Dns_Record_Mx { host       = strings.clone(host),
 			                          preference = preference };
 		}
 
