@@ -145,6 +145,10 @@ write :: proc(skt: Socket, buffer: []u8) -> (err: Write_Error) {
 	return;
 }
 
+write_string :: inline proc(skt: Socket, s: string) -> (err: Write_Error) {
+	return write(skt, transmute([]byte) s); // NOTE: Okay, because we don't mutate it.
+}
+
 // Write some data to the socket, or none if the OS's send buffer does not have enough space.
 try_write :: proc(skt: Socket, data: []u8) -> (n: int, err: Write_Error) {
 	limit := min(int(max(i32)), len(data));
