@@ -66,7 +66,7 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6
 		recs, rec_ok := get_dns_records(hostname, .Ipv4, allocator);
 		if !rec_ok do return;
 		if len(recs) > 0 {
-			addr4 = recs[0].(Dns_Record_Ipv4).addr; // address is copied
+			addr4 = cast(Ipv4_Address) recs[0].(Dns_Record_Ipv4); // address is copied
 		}
 	}
 
@@ -74,7 +74,7 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6
 		recs, rec_ok := get_dns_records(hostname, .Ipv6, allocator);
 		if !rec_ok do return;
 		if len(recs) > 0 {
-			addr6 = recs[0].(Dns_Record_Ipv6).addr; // address is copied
+			addr6 = cast(Ipv6_Address) recs[0].(Dns_Record_Ipv6); // address is copied
 		}
 	}
 
@@ -94,25 +94,11 @@ Dns_Record_Type :: enum u16 {
     Mx = win32.DNS_TYPE_MX,     // Address and preference priority of a mail exchange server.
 }
 
-Dns_Record_Ipv4 :: struct {
-	addr: Ipv4_Address,
-}
-
-Dns_Record_Ipv6 :: struct {
-	addr: Ipv6_Address,
-}
-
-Dns_Record_Cname :: struct {
-	host: string,
-}
-
-Dns_Record_Text :: struct {
-	text: string,
-}
-
-Dns_Record_Ns :: struct {
-	host: string,
-}
+Dns_Record_Ipv4  :: distinct Ipv4_Address;
+Dns_Record_Ipv6  :: distinct Ipv6_Address;
+Dns_Record_Cname :: distinct string;
+Dns_Record_Text  :: distinct string;
+Dns_Record_Ns    :: distinct string;
 
 Dns_Record_Mx :: struct {
 	host: string,
@@ -173,24 +159,24 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 		switch Dns_Record_Type(r.type) {
 		case .Ipv4:
 			addr := Ipv4_Address(transmute([4]u8) r.data.ip_address);
-			new_rec = Dns_Record_Ipv4 { addr = addr }; // NOTE(tetra): value copy
+			new_rec = Dns_Record_Ipv4(addr); // NOTE(tetra): value copy
 		case .Ipv6:
 			addr := Ipv6_Address(transmute([8]u16be) r.data.ip6_address);
-			new_rec = Dns_Record_Ipv6 { addr = addr }; // NOTE(tetra): value copy
+			new_rec = Dns_Record_Ipv6(addr); // NOTE(tetra): value copy
 		case .Cname:
 			host := string(r.data.cname);
-			new_rec = Dns_Record_Cname { host = strings.clone(host, allocator) };
+			new_rec = Dns_Record_Cname(strings.clone(host, allocator));
 		case .Txt:
 			n := r.data.text.string_count;
 			ptr := &r.data.text.string_array;
 			c_strs := mem.slice_ptr(ptr, int(n));
 			for cstr in c_strs {
 				s := string(cstr);
-				new_rec = Dns_Record_Text { text = strings.clone(s, allocator) };
+				new_rec = Dns_Record_Text(strings.clone(s, allocator));
 			}
 		case .Ns:
 			host := string(r.data.name_host);
-			new_rec = Dns_Record_Ns { host = strings.clone(host, allocator) };
+			new_rec = Dns_Record_Ns(strings.clone(host, allocator));
 		case .Mx:
 			// TODO(tetra): Order by preference priority? (Prefer hosts with lower preference values.)
 			// Or maybe not because you're supposed to just use the first one that works
