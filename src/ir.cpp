@@ -2664,6 +2664,20 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		return di;
 	}
 
+	if (is_type_enumerated_array(type)) {
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		di->CompositeType.size = ir_debug_size_bits(type);
+		di->CompositeType.align = ir_debug_align_bits(type);
+		di->CompositeType.tag = irDebugBasicEncoding_array_type;
+		di->CompositeType.array_count = (i32)type->EnumeratedArray.count;
+
+		map_set(&module->debug_info, hash_type(type), di);
+		di->CompositeType.base_type = ir_add_debug_info_type(module, type->EnumeratedArray.elem, e, scope, file);
+		GB_ASSERT(base->kind != Type_Named);
+
+		return di;
+	}
+
 	if (is_type_slice(type)) {
 		// NOTE(lachsinc): Every slice type has its own composite type / field debug infos created. This is sorta wasteful.
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
