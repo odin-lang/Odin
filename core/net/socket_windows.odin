@@ -408,7 +408,10 @@ listen :: proc(bind_addr: Address, port: int, type := Socket_Type.Tcp, accept_qu
 	// TODO(tetra): Sub-enums.
 	create_err: Create_Error = ---;
 	skt, create_err = create(get_addr_type(bind_addr), type);
-	if create_err != .Ok do return;
+	if create_err != .Ok {
+		err = Listen_Error(create_err);
+		return;
+	}
 
 	set_blocking(skt, false);
 
@@ -527,7 +530,7 @@ start_dial :: proc(addr: Address, port: int, type := Socket_Type.Tcp) -> (skt: S
 	switch create_err {
 	case .Ok: // nothing
 	case .Resources:      err = .Resources;
-	case .Offline:        assert(false);
+	case .Offline:        err = .Offline;
 	case .Bad_Protocol:   assert(false);
 	case .Bad_Type:       assert(false);
 	case .Wrong_Protocol: assert(false);

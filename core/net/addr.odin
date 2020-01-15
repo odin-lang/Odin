@@ -119,8 +119,7 @@ parse_endpoint :: proc(address: string) -> (ep: Endpoint, ok: bool) {
 }
 
 
-
-split_port :: proc(addr_or_host_and_port: string) -> (addr_or_host: string, port: int, ok: bool) {
+split_port :: proc(addr_or_host_and_port: string, default_port := -1) -> (addr_or_host: string, port: int, ok: bool) {
 	rest: string = ---;
 
 	// Ipv6 [addr_or_host]:port
@@ -148,6 +147,7 @@ split_port :: proc(addr_or_host_and_port: string) -> (addr_or_host: string, port
 
 	// No port
 	addr_or_host = addr_or_host_and_port;
+	port = default_port;
 	ok = true;
 	return;
 }
