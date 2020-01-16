@@ -2397,7 +2397,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 	}
 
 	case Token_in:
-	case Token_notin:
+	case Token_not_in:
 		// IMPORTANT NOTE(bill): This uses right-left evaluation in type checking only no in
 
 		check_expr(c, y, be->right);
@@ -2426,7 +2426,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 			if (op.kind == Token_in) {
 				check_assignment(c, x, yt->Map.key, str_lit("map 'in'"));
 			} else {
-				check_assignment(c, x, yt->Map.key, str_lit("map 'notin'"));
+				check_assignment(c, x, yt->Map.key, str_lit("map 'not_in'"));
 			}
 
 			add_package_dependency(c, "runtime", "__dynamic_map_get");
@@ -2436,7 +2436,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 			if (op.kind == Token_in) {
 				check_assignment(c, x, yt->BitSet.elem, str_lit("bit_set 'in'"));
 			} else {
-				check_assignment(c, x, yt->BitSet.elem, str_lit("bit_set 'notin'"));
+				check_assignment(c, x, yt->BitSet.elem, str_lit("bit_set 'not_in'"));
 			}
 			if (x->mode == Addressing_Constant && y->mode == Addressing_Constant) {
 				ExactValue k = exact_value_to_integer(x->value);

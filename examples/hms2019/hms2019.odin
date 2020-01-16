@@ -1271,7 +1271,7 @@ bit_set_type :: proc() {
 		incl(&x, 'F');
 		assert('F' in x);
 		excl(&x, 'F');
-		assert('F' notin x);
+		assert('F' not_in x);
 
 		y |= {1, 4, 2};
 		assert(2 in y);

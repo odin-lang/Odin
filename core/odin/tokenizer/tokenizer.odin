@@ -501,6 +501,9 @@ scan :: proc(t: ^Tokenizer) -> Token {
 					break check_keyword;
 				}
 			}
+			if kind == .Ident && lit == "notin" {
+				kind = .Not_In;
+			}
 		}
 	case '0' <= ch && ch <= '9':
 		kind, lit = scan_number(t, false);
@@ -574,12 +577,6 @@ scan :: proc(t: ^Tokenizer) -> Token {
 				kind = switch4(t, .Lt, .Lt_Eq, '<', .Shl, .Shl_Eq);
 			}
 		case '>': kind = switch4(t, .Gt, .Gt_Eq, '>', .Shr,.Shr_Eq);
-
-		case '≠': kind = .Not_Eq;
-		case '≤': kind = .Lt_Eq;
-		case '≥': kind = .Gt_Eq;
-		case '∈': kind = .In;
-		case '∉': kind = .Notin;
 
 		case '.':
 			if '0' <= t.ch && t.ch <= '9' {

@@ -7302,7 +7302,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 
 
 		case Token_in:
-		case Token_notin: {
+		case Token_not_in: {
 			irValue *left = ir_build_expr(proc, be->left);
 			Type *type = default_type(tv.type);
 			irValue *right = ir_build_expr(proc, be->right);
@@ -7313,7 +7313,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					if (be->op.kind == Token_in) {
 						ir_emit_comment(proc, str_lit("map in"));
 					} else {
-						ir_emit_comment(proc, str_lit("map notin"));
+						ir_emit_comment(proc, str_lit("map not_in"));
 					}
 
 					irValue *addr = ir_address_from_load_or_generate_local(proc, right);
@@ -7337,7 +7337,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					if (be->op.kind == Token_in) {
 						ir_emit_comment(proc, str_lit("bit_set in"));
 					} else {
-						ir_emit_comment(proc, str_lit("bit_set notin"));
+						ir_emit_comment(proc, str_lit("bit_set not_in"));
 					}
 
 					Type *key_type = rt->BitSet.elem;
