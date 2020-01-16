@@ -8826,7 +8826,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					capacity = max_count;
 				}
 				i64 j = 0;
-				if (check_index_value(c, false, nodes[i], capacity, &j)) {
+				if (check_index_value(c, true, nodes[i], capacity, &j)) {
 					index = j;
 				}
 
