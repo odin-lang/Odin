@@ -1036,7 +1036,8 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 					continue loop;
 				}
 			}
-			strings.write_i64(fi.buf, i64(i), 10);
+			v := i64(i) + info.lower;
+			strings.write_i64(fi.buf, v, 10);
 			commas += 1;
 		}
 	}
