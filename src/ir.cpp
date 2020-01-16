@@ -2664,6 +2664,20 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		return di;
 	}
 
+	if (is_type_enumerated_array(type)) {
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		di->CompositeType.size = ir_debug_size_bits(type);
+		di->CompositeType.align = ir_debug_align_bits(type);
+		di->CompositeType.tag = irDebugBasicEncoding_array_type;
+		di->CompositeType.array_count = (i32)type->EnumeratedArray.count;
+
+		map_set(&module->debug_info, hash_type(type), di);
+		di->CompositeType.base_type = ir_add_debug_info_type(module, type->EnumeratedArray.elem, e, scope, file);
+		GB_ASSERT(base->kind != Type_Named);
+
+		return di;
+	}
+
 	if (is_type_slice(type)) {
 		// NOTE(lachsinc): Every slice type has its own composite type / field debug infos created. This is sorta wasteful.
 		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
@@ -3917,7 +3931,7 @@ irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr) {
 }
 
 irValue *ir_build_addr_ptr(irProcedure *proc, Ast *expr) {
-	irAddr const &addr = ir_build_addr(proc, expr);
+	irAddr addr = ir_build_addr(proc, expr);
 	return ir_addr_get_ptr(proc, addr);
 }
 
@@ -4714,6 +4728,10 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 	Type *t = base_type(type_deref(ir_type(s)));
 	Type *result_type = nullptr;
 
+	if (t->kind == Type_Opaque) {
+		t = t->Opaque.elem;
+	}
+
 	if (is_type_struct(t)) {
 		result_type = alloc_type_pointer(t->Struct.fields[index]->type);
 	} else if (is_type_union(t)) {
@@ -4897,6 +4915,9 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 			// e = ir_emit_ptr_offset(proc, e, v_zero); // TODO(bill): Do I need these copies?
 		}
 		type = core_type(type);
+		if (type->kind == Type_Opaque) {
+			type = type->Opaque.elem;
+		}
 
 		if (is_type_quaternion(type)) {
 			e = ir_emit_struct_ep(proc, e, index);
@@ -6588,7 +6609,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 
 	case BuiltinProc_swizzle: {
 		ir_emit_comment(proc, str_lit("swizzle.begin"));
-		irAddr const &addr = ir_build_addr(proc, ce->args[0]);
+		irAddr addr = ir_build_addr(proc, ce->args[0]);
 		isize index_count = ce->args.count-1;
 		if (index_count == 0) {
 			return ir_addr_load(proc, addr);
@@ -7709,7 +7730,13 @@ bool ir_is_elem_const(irModule *m, Ast *elem, Type *elem_type) {
 
 irAddr ir_build_addr_from_entity(irProcedure *proc, Entity *e, Ast *expr) {
 	GB_ASSERT(e != nullptr);
-	GB_ASSERT(e->kind != Entity_Constant);
+	if (e->kind == Entity_Constant) {
+		Type *t = default_type(type_of_expr(expr));
+		irValue *v = ir_add_module_constant(proc->module, t, e->Constant.value);
+		irValue *g = ir_add_global_generated(proc->module, ir_type(v), v);
+		return ir_addr(g);
+	}
+
 
 	irValue *v = nullptr;
 	irValue **found = map_get(&proc->module->values, hash_entity(e));
@@ -7816,7 +7843,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 
 			if (sel.entity->type->kind == Type_BitFieldValue) {
-				irAddr const &addr = ir_build_addr(proc, se->expr);
+				irAddr addr = ir_build_addr(proc, se->expr);
 				Type *bft = type_deref(ir_addr_type(addr));
 				if (sel.index.count == 1) {
 					GB_ASSERT(is_type_bit_field(bft));
@@ -9900,7 +9927,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			case Type_Map: {
 				is_map = true;
 				gbAllocator a = ir_allocator();
-				irAddr const &addr = ir_build_addr(proc, expr);
+				irAddr addr = ir_build_addr(proc, expr);
 				irValue *map = ir_addr_get_ptr(proc, addr);
 				if (is_type_pointer(type_deref(ir_addr_type(addr)))) {
 					map = ir_addr_load(proc, addr);
