@@ -124,7 +124,7 @@ Token_Kind :: enum u32 {
 		For,
 		Switch,
 		In,
-		Notin,
+		Not_In,
 		Do,
 		Case,
 		Break,
@@ -259,7 +259,7 @@ tokens := [Token_Kind.COUNT]string {
 	"for",
 	"switch",
 	"in",
-	"notin",
+	"not_in",
 	"do",
 	"case",
 	"break",
@@ -316,7 +316,7 @@ is_operator :: proc(kind: Token_Kind) -> bool {
 	#partial switch kind {
 	case .B_Operator_Begin .. .B_Operator_End:
 		return true;
-	case .In, .Notin:
+	case .In, .Not_In:
 		return true;
 	}
 	return false;

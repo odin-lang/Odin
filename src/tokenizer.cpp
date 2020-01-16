@@ -92,7 +92,7 @@ TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_for,         "for"),         \
 	TOKEN_KIND(Token_switch,      "switch"),      \
 	TOKEN_KIND(Token_in,          "in"),          \
-	TOKEN_KIND(Token_notin,       "notin"),       \
+	TOKEN_KIND(Token_not_in,      "not_in"),      \
 	TOKEN_KIND(Token_do,          "do"),          \
 	TOKEN_KIND(Token_case,        "case"),        \
 	TOKEN_KIND(Token_break,       "break"),       \
@@ -902,6 +902,10 @@ Token tokenizer_get_token(Tokenizer *t) {
 					break;
 				}
 			}
+
+			if (token.kind == Token_Ident && token.string == "notin") {
+				token.kind = Token_not_in; 
+			}
 		}
 
 	} else if (gb_is_between(curr_rune, '0', '9')) {
@@ -1029,11 +1033,11 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '}':  token.kind = Token_CloseBrace;   break;
 		case '\\': token.kind = Token_BackSlash;    break;
 
-		case 0x2260: token.kind = Token_NotEq; break; // '≠'
-		case 0x2264: token.kind = Token_LtEq;  break; // '≤'
-		case 0x2265: token.kind = Token_GtEq;  break; // '≥'
-		case 0x2208: token.kind = Token_in;    break; // '∈'
-		case 0x2209: token.kind = Token_notin; break; // '∉'
+		// case 0x2260: token.kind = Token_NotEq;  break; // '≠'
+		// case 0x2264: token.kind = Token_LtEq;   break; // '≤'
+		// case 0x2265: token.kind = Token_GtEq;   break; // '≥'
+		// case 0x2208: token.kind = Token_in;     break; // '∈'
+		// case 0x2209: token.kind = Token_not_in; break; // '∉'
 
 		case '%': token.kind = token_kind_dub_eq(t, '%', Token_Mod, Token_ModEq, Token_ModMod, Token_ModModEq);  break;
 

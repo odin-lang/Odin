@@ -1146,7 +1146,7 @@ token_precedence :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> int {
 	     .Lt, .Gt,
 	     .Lt_Eq, .Gt_Eq:
 		return 5;
-	case .In, .Notin:
+	case .In, .Not_In:
 		if p.expr_level < 0 && !p.allow_in_expr {
 			return 0;
 		}
@@ -1390,7 +1390,7 @@ check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, se
 	}
 
 	for flag in ast.Field_Flag {
-		if flag notin allowed_flags && flag in flags {
+		if flag not_in allowed_flags && flag in flags {
 			switch flag {
 			case .Using:
 				error(p, p.curr_tok.pos, "'using' is not allowed within this field list");
@@ -1557,7 +1557,7 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 
 		if allow_token(p, .Eq) {
 			default_value = parse_expr(p, false);
-			if ast.Field_Flag.Default_Parameters notin allowed_flags {
+			if ast.Field_Flag.Default_Parameters not_in allowed_flags {
 				error(p, p.curr_tok.pos, "default parameters are only allowed for procedures");
 				default_value = nil;
 			}
@@ -1585,7 +1585,7 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 		if type != nil && default_value == nil {
 			if p.curr_tok.kind == .String {
 				tag = expect_token(p, .String);
-				if .Tags notin allowed_flags {
+				if .Tags not_in allowed_flags {
 					error(p, tag.pos, "Field tags are only allowed within structures");
 				}
 			}
@@ -1644,7 +1644,7 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 			type := eaf.expr;
 			tok: tokenizer.Token;
 			tok.pos = type.pos;
-			if ast.Field_Flag.Results notin allowed_flags {
+			if ast.Field_Flag.Results not_in allowed_flags {
 				tok.text = "_";
 			}
 
