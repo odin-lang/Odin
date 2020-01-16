@@ -661,17 +661,19 @@ Waitable_Status :: enum {
 	Dial_Complete,
 }
 
+Waitable_Statuses :: bit_set[Waitable_Status];
+
 WAIT_FOREVER :: -1;
 DONT_WAIT    :: 0;
 
 // Check if an event has occurred without blocking.
-check_for :: inline proc(skt: Socket, statuses := bit_set[Waitable_Status]{.Can_Read, .Can_Write}) -> (readable, writable: bool, err: Socket_Error) {
+check_for :: inline proc(skt: Socket, statuses := Waitable_Statuses{.Can_Read, .Can_Write}) -> (readable, writable: bool, err: Socket_Error) {
 	return wait_for(skt, statuses, DONT_WAIT);
 }
 
 // Waits for an event to occur.
 // Returns false for all statuses if we time out.
-wait_for :: proc(skt: Socket, statuses := Wait_Status{.Can_Read, .Can_Write}, timeout_ms := WAIT_FOREVER) -> (readable, writable: bool, err: Socket_Error) {
+wait_for :: proc(skt: Socket, statuses := Waitable_Statuses{.Can_Read, .Can_Write}, timeout_ms := WAIT_FOREVER) -> (readable, writable: bool, err: Socket_Error) {
 	rfd: win32.fd_set = ---;
 	rfd.count = 1;
 	rfd.array[0] = win32.SOCKET(skt);
@@ -711,13 +713,11 @@ wait_for :: proc(skt: Socket, statuses := Wait_Status{.Can_Read, .Can_Write}, ti
 
 Wait_Result :: struct {
 	socket: Socket,
-	status: bit_set[Waitable_Status],
+	status: Waitable_Statuses,
 	error: Socket_Error,
 }
 
-Wait_Status :: bit_set[Waitable_Status];
-
-wait_for_any :: proc(skts: []Socket, statuses := Wait_Status{.Can_Read, .Can_Write}, timeout_ms := WAIT_FOREVER) -> []Wait_Result {
+wait_for_any :: proc(skts: []Socket, statuses := Waitable_Statuses{.Can_Read, .Can_Write}, timeout_ms := WAIT_FOREVER) -> []Wait_Result {
 	results := make([dynamic]Wait_Result, context.temp_allocator);
 
 	rfd: win32.fd_set;
@@ -749,7 +749,7 @@ wait_for_any :: proc(skts: []Socket, statuses := Wait_Status{.Can_Read, .Can_Wri
 	assert(res != win32.SOCKET_ERROR, "attempt to wait on closed socket");
 
 	for s in skts {
-		st: Wait_Status;
+		st: Waitable_Statuses;
 
 		readers := mem.slice_ptr(&rfd.array[0], int(rfd.count));
 		writers := mem.slice_ptr(&wfd.array[0], int(wfd.count));
@@ -760,9 +760,9 @@ wait_for_any :: proc(skts: []Socket, statuses := Wait_Status{.Can_Read, .Can_Wri
 		for r in readers {
 			if equal(s, Socket(r)) {
 				if is_listening_socket(s) {
-					incl(&st, Wait_Status.Can_Accept);
+					incl(&st, Waitable_Status.Can_Accept);
 				} else {
-					incl(&st, Wait_Status.Can_Read);
+					incl(&st, Waitable_Status.Can_Read);
 				}
 				break;
 			}
@@ -770,7 +770,7 @@ wait_for_any :: proc(skts: []Socket, statuses := Wait_Status{.Can_Read, .Can_Wri
 
 		for w in writers {
 			if equal(s, Socket(w)) {
-				incl(&st, Wait_Status.Can_Write);
+				incl(&st, Waitable_Status.Can_Write);
 				break;
 			}
 		}
