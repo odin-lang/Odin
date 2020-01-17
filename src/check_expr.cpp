@@ -5499,6 +5499,36 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->type = t_untyped_bool;
 		break;
 
+	case BuiltinProc_type_is_specialization_of:
+		{
+			if (operand->mode != Addressing_Type) {
+				error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+			Type *t = operand->type;
+			Type *s = nullptr;
+
+			bool prev_ips = c->in_polymorphic_specialization;
+			c->in_polymorphic_specialization = true;
+			s = check_type(c, ce->args[1]);
+			c->in_polymorphic_specialization = prev_ips;
+
+			if (s == t_invalid) {
+				error(ce->args[1], "Invalid specialization type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_bool;
+			operand->value = exact_value_bool(check_type_specialization_to(c, s, t, false, false));
+
+		}
+		break;
+
 	case BuiltinProc_type_proc_parameter_count:
 		operand->value = exact_value_i64(0);
 		if (operand->mode != Addressing_Type) {

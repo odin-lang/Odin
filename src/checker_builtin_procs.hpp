@@ -155,6 +155,8 @@ BuiltinProc__type_begin,
 	BuiltinProc_type_is_bit_set,
 	BuiltinProc_type_is_simd_vector,
 
+	BuiltinProc_type_is_specialization_of,
+
 	BuiltinProc_type_has_nil,
 
 	BuiltinProc_type_proc_parameter_count,
@@ -318,6 +320,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_bit_field_value"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_bit_set"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_simd_vector"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("type_is_specialization_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_has_nil"),              1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
