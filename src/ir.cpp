@@ -3172,7 +3172,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 				} else if (!is_type_pointer(arg_type)) {
 					array_add(&processed_args, ir_copy_value_to_ptr(p, args[i], original_type, 16));
 				}
-			} else if (is_type_integer(new_type)) {
+			} else if (is_type_integer(new_type) || is_type_float(new_type)) {
 				array_add(&processed_args, ir_emit_transmute(p, args[i], new_type));
 			} else if (new_type == t_llvm_bool) {
 				array_add(&processed_args, ir_emit_conv(p, args[i], new_type));
