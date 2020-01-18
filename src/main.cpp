@@ -1355,13 +1355,20 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 
 		// Add library search paths.
-		if (false && find_result.vs_library_path.len > 0) {
+		if (find_result.vs_library_path.len > 0) {
 			GB_ASSERT(find_result.windows_sdk_um_library_path.len > 0);
 			GB_ASSERT(find_result.windows_sdk_ucrt_library_path.len > 0);
 
-			link_settings = gb_string_append_fmt(link_settings, " /LIBPATH:\"%.*s\"", LIT(find_result.vs_library_path));
-			link_settings = gb_string_append_fmt(link_settings, " /LIBPATH:\"%.*s\"", LIT(find_result.windows_sdk_um_library_path));
-			link_settings = gb_string_append_fmt(link_settings, " /LIBPATH:\"%.*s\"", LIT(find_result.windows_sdk_ucrt_library_path));
+			String path = {};
+			auto add_path = [&](String path) {
+				if (path[path.len-1] == '\\') {
+					path.len -= 1;
+				}
+				link_settings = gb_string_append_fmt(link_settings, " /LIBPATH:\"%.*s\"", LIT(path));
+			};
+			add_path(find_result.windows_sdk_um_library_path);
+			add_path(find_result.windows_sdk_ucrt_library_path);
+			add_path(find_result.vs_library_path);
 		}
 
 		if (!build_context.use_lld) { // msvc

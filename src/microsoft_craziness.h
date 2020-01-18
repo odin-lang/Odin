@@ -457,11 +457,28 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
             auto version_tail = wcschr(version, '\n');
             if (version_tail)  *version_tail = 0;  // Stomp the data, because nobody cares about it.
 
-            auto library_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\lib\\x64\\");
+            wchar_t *library_path = nullptr;
+            if (build_context.metrics.arch == TargetArch_amd64) {
+                library_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\lib\\x64\\");
+            } else if (build_context.metrics.arch == TargetArch_386) {
+                library_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\lib\\x86\\");
+            } else {
+                continue;
+            }
+
             auto library_file = concat(library_path, L"vcruntime.lib");  // @Speed: Could have library_path point to this string, with a smaller count, to save on memory flailing!
 
             if (os_file_exists(library_file)) {
-                auto link_exe_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\bin\\Hostx64\\x64\\");
+                wchar_t *link_exe_path = nullptr;
+                if (build_context.metrics.arch == TargetArch_amd64) {
+                    link_exe_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\bin\\Hostx64\\x64\\");
+                } else if (build_context.metrics.arch == TargetArch_386) {
+                    link_exe_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\bin\\Hostx86\\x86\\");
+                } else {
+                    continue;
+                }
+
+
                 result->vs_exe_path     = link_exe_path;
                 result->vs_library_path = library_path;
                 return true;
@@ -508,7 +525,15 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
 
             // @Robustness: Do the zero-termination thing suggested in the RegQueryValue docs?
 
-            auto lib_path = concat(buffer, L"VC\\Lib\\amd64\\");
+            wchar_t *lib_path = nullptr;
+
+            if (build_context.metrics.arch == TargetArch_amd64) {
+                lib_path = concat(buffer, L"VC\\Lib\\amd64\\");
+            } else if (build_context.metrics.arch == TargetArch_386) {
+                lib_path = concat(buffer, L"VC\\Lib\\386\\");
+            } else {
+                continue;
+            }
 
             // Check to see whether a vcruntime.lib actually exists here.
             auto vcruntime_filename = concat(lib_path, L"vcruntime.lib");
@@ -537,8 +562,13 @@ Find_Result find_visual_studio_and_windows_sdk() {
 
 
     if (result.windows_sdk_root) {
-        result.windows_sdk_um_library_path   = concat(result.windows_sdk_root, L"um\\x64\\");
-        result.windows_sdk_ucrt_library_path = concat(result.windows_sdk_root, L"ucrt\\x64\\");
+        if (build_context.metrics.arch == TargetArch_amd64) {
+            result.windows_sdk_um_library_path   = concat(result.windows_sdk_root, L"um\\x64\\");
+            result.windows_sdk_ucrt_library_path = concat(result.windows_sdk_root, L"ucrt\\x64\\");
+        } else if (build_context.metrics.arch == TargetArch_386) {
+            result.windows_sdk_um_library_path   = concat(result.windows_sdk_root, L"um\\x86\\");
+            result.windows_sdk_ucrt_library_path = concat(result.windows_sdk_root, L"ucrt\\x86\\");
+        }
     }
 
     bool ok = find_visual_studio_by_fighting_through_microsoft_craziness(&result);
@@ -569,5 +599,14 @@ Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8() {
     r.vs_exe_path                   = mc_wstring_to_string(result.vs_exe_path);
     r.vs_library_path               = mc_wstring_to_string(result.vs_library_path);
 
+    // printf("windows_sdk_root:              %.*s\n", LIT(r.windows_sdk_root));
+    // printf("windows_sdk_um_library_path:   %.*s\n", LIT(r.windows_sdk_um_library_path));
+    // printf("windows_sdk_ucrt_library_path: %.*s\n", LIT(r.windows_sdk_ucrt_library_path));
+    // printf("vs_exe_path:                   %.*s\n", LIT(r.vs_exe_path));
+    // printf("vs_library_path:               %.*s\n", LIT(r.vs_library_path));
+
+    // gb_exit(1);
+
     return r;
 }
+
