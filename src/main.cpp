@@ -50,7 +50,7 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	cmd_len = gb_snprintf_va(cmd_line, gb_size_of(cmd_line), fmt, va);
 	va_end(va);
 
-	gb_printf_err("%.*s\n", cast(int)cmd_len, cmd_line);
+	// gb_printf_err("%.*s\n", cast(int)cmd_len, cmd_line);
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
