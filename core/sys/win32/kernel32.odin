@@ -172,13 +172,30 @@ foreign kernel32 {
 	@(link_name="PulseEvent")   pulse_event    :: proc(event: Handle) -> Bool ---;
 	@(link_name="SetEvent")     set_event      :: proc(event: Handle) -> Bool ---;
 	@(link_name="ResetEvent")   reset_event    :: proc(event: Handle) -> Bool ---;
-
-	@(link_name="LoadLibraryA")   load_library_a   :: proc(c_str: cstring)  -> Hmodule ---;
-	@(link_name="LoadLibraryW")   load_library_w   :: proc(c_str: Wstring) -> Hmodule ---;
-	@(link_name="FreeLibrary")    free_library     :: proc(h: Hmodule) -> Bool ---;
-	@(link_name="GetProcAddress") get_proc_address :: proc(h: Hmodule, c_str: cstring) -> rawptr ---;
-
 }
+
+
+@(default_calling_convention = "std")
+foreign kernel32 {
+	@(link_name="LoadLibraryA")   load_library_a    :: proc(c_str: cstring)  -> Hmodule ---;
+	@(link_name="LoadLibraryW")   load_library_w    :: proc(c_str: Wstring) -> Hmodule ---;
+	@(link_name="LoadLibraryExW") load_library_ex_w :: proc(c_str: Wstring, _: Handle, flags: u32) -> Hmodule ---;
+	@(link_name="FreeLibrary")    free_library      :: proc(h: Hmodule) -> Bool ---;
+	@(link_name="GetProcAddress") get_proc_address  :: proc(h: Hmodule, c_str: cstring) -> rawptr ---;
+}
+
+LOAD_LIBRARY_AS_DATAFILE            :: 0x2;
+LOAD_WITH_ALTERED_SEARCH_PATH       :: 0x8;
+LOAD_IGNORE_CODE_AUTHZ_LEVEL        :: 0x10;
+LOAD_LIBRARY_AS_IMAGE_RESOURCE      :: 0x20;
+LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE  :: 0x40;
+LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR    :: 0x100;
+LOAD_LIBRARY_SEARCH_APPLICATION_DIR :: 0x200;
+LOAD_LIBRARY_SEARCH_USER_DIRS       :: 0x400;
+LOAD_LIBRARY_SEARCH_SYSTEM32        :: 0x800;
+LOAD_LIBRARY_SEARCH_DEFAULT_DIRS    :: 0x1000;
+
+
 
 Memory_Basic_Information :: struct {
 	base_address:       rawptr,

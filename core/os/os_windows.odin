@@ -1,6 +1,7 @@
 // +build windows
 package os
 
+import "core:strings"
 import "core:sys/win32"
 
 OS :: "windows";
@@ -277,6 +278,26 @@ current_thread_id :: proc "contextless" () -> int {
 
 
 
+
+dlopen :: proc(filename: string, flags: int) -> rawptr {
+	wstr := win32.utf8_to_wstring(filename, context.temp_allocator);
+	module := win32.load_library_ex_w(wstr, nil, u32(flags));
+	return rawptr(module);
+}
+
+dlsym :: proc(module: rawptr, symbol: string) -> rawptr {
+	cstr := strings.clone_to_cstring(symbol, context.temp_allocator);
+	ptr := win32.get_proc_address(win32.Hmodule(module), cstr);
+	return ptr;
+}
+
+dlclose :: proc(module: rawptr) -> bool {
+	return bool(win32.free_library(win32.Hmodule(module)));
+}
+
+
+
+
 _alloc_command_line_arguments :: proc() -> []string {
 	arg_count: i32;
 	arg_list_ptr := win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
@@ -301,8 +322,8 @@ _alloc_command_line_arguments :: proc() -> []string {
 get_windows_version_ansi :: proc() -> win32.OS_Version_Info_Ex_A {
 	osvi : win32.OS_Version_Info_Ex_A;
 	osvi.os_version_info_size = size_of(win32.OS_Version_Info_Ex_A);
-    win32.get_version(&osvi);
-    return osvi;
+	win32.get_version(&osvi);
+	return osvi;
 }
 
 is_windows_xp :: proc() -> bool {
