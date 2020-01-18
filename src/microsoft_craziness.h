@@ -398,6 +398,7 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
     // If all this COM object instantiation, enumeration, and querying doesn't give us
     // a useful result, we drop back to the registry-checking method.
 
+
     auto rc = CoInitialize(NULL);
     // "Subsequent valid calls return false." So ignore false.
     if (rc != S_OK)  return false;
@@ -408,122 +409,122 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
     ISetupConfiguration *config = NULL;
     HRESULT hr = 0;
     hr = CoCreateInstance(CLSID_SetupConfiguration, NULL, CLSCTX_INPROC_SERVER, my_uid, (void **)&config);
-    if (hr != 0)  return false;
-    defer (config->Release());
+    if (hr == 0) {
+        defer (config->Release());
 
-    IEnumSetupInstances *instances = NULL;
-    hr = config->EnumInstances(&instances);
-    if (hr != 0)     return false;
-    if (!instances)  return false;
-    defer (instances->Release());
+        IEnumSetupInstances *instances = NULL;
+        hr = config->EnumInstances(&instances);
+        if (hr != 0)     return false;
+        if (!instances)  return false;
+        defer (instances->Release());
 
+        for (;;) {
+            ULONG found = 0;
+            ISetupInstance *instance = NULL;
+            auto hr = instances->Next(1, &instance, &found);
+            if (hr != S_OK) break;
 
-    for (;;) {
-        ULONG found = 0;
-        ISetupInstance *instance = NULL;
-        auto hr = instances->Next(1, &instance, &found);
-        if (hr != S_OK) break;
+            defer (instance->Release());
 
-        defer (instance->Release());
+            BSTR bstr_inst_path;
+            hr = instance->GetInstallationPath(&bstr_inst_path);
+            if (hr != S_OK)  continue;
+            defer (SysFreeString(bstr_inst_path));
 
-        BSTR bstr_inst_path;
-        hr = instance->GetInstallationPath(&bstr_inst_path);
-        if (hr != S_OK)  continue;
-        defer (SysFreeString(bstr_inst_path));
+            auto tools_filename = concat(bstr_inst_path, L"\\VC\\Auxiliary\\Build\\Microsoft.VCToolsVersion.default.txt");
+            defer (free(tools_filename));
 
-        auto tools_filename = concat(bstr_inst_path, L"\\VC\\Auxiliary\\Build\\Microsoft.VCToolsVersion.default.txt");
-        defer (free(tools_filename));
+            FILE *f = nullptr;
+            auto open_result = _wfopen_s(&f, tools_filename, L"rt");
+            if (open_result != 0) continue;
+            if (!f) continue;
+            defer (fclose(f));
 
-        FILE *f = nullptr;
-        auto open_result = _wfopen_s(&f, tools_filename, L"rt");
-        if (open_result != 0) continue;
-        if (!f) continue;
-        defer (fclose(f));
+            LARGE_INTEGER tools_file_size;
+            auto file_handle = (HANDLE)_get_osfhandle(_fileno(f));
+            BOOL success = GetFileSizeEx(file_handle, &tools_file_size);
+            if (!success) continue;
 
-        LARGE_INTEGER tools_file_size;
-        auto file_handle = (HANDLE)_get_osfhandle(_fileno(f));
-        BOOL success = GetFileSizeEx(file_handle, &tools_file_size);
-        if (!success) continue;
+            auto version_bytes = (tools_file_size.QuadPart + 1) * 2;  // Warning: This multiplication by 2 presumes there is no variable-length encoding in the wchars (wacky characters in the file could betray this expectation).
+            if (version_bytes > 0x7FFFFFFF) continue;   // Avoid overflow.
 
-        auto version_bytes = (tools_file_size.QuadPart + 1) * 2;  // Warning: This multiplication by 2 presumes there is no variable-length encoding in the wchars (wacky characters in the file could betray this expectation).
-        if (version_bytes > 0x7FFFFFFF) continue;   // Avoid overflow.
+            wchar_t *version = (wchar_t *)malloc(version_bytes);
+            defer (free(version));
 
-        wchar_t *version = (wchar_t *)malloc(version_bytes);
-        defer (free(version));
+            auto read_result = fgetws(version, (int)version_bytes, f);
+            if (!read_result) continue;
 
-        auto read_result = fgetws(version, (int)version_bytes, f);
-        if (!read_result) continue;
+            auto version_tail = wcschr(version, '\n');
+            if (version_tail)  *version_tail = 0;  // Stomp the data, because nobody cares about it.
 
-        auto version_tail = wcschr(version, '\n');
-        if (version_tail)  *version_tail = 0;  // Stomp the data, because nobody cares about it.
+            auto library_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\lib\\x64\\");
+            auto library_file = concat(library_path, L"vcruntime.lib");  // @Speed: Could have library_path point to this string, with a smaller count, to save on memory flailing!
 
-        auto library_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\lib\\x64\\");
-        auto library_file = concat(library_path, L"vcruntime.lib");  // @Speed: Could have library_path point to this string, with a smaller count, to save on memory flailing!
+            if (os_file_exists(library_file)) {
+                auto link_exe_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\bin\\Hostx64\\x64\\");
+                result->vs_exe_path     = link_exe_path;
+                result->vs_library_path = library_path;
+                return true;
+            }
 
-        if (os_file_exists(library_file)) {
-            auto link_exe_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\bin\\Hostx64\\x64\\");
-            result->vs_exe_path     = link_exe_path;
-            result->vs_library_path = library_path;
-            return true;
+            /*
+               Ryan Saunderson said:
+               "Clang uses the 'SetupInstance->GetInstallationVersion' / ISetupHelper->ParseVersion to find the newest version
+               and then reads the tools file to define the tools path - which is definitely better than what i did."
+
+               So... @Incomplete: Should probably pick the newest version...
+            */
         }
-
-        /*
-           Ryan Saunderson said:
-           "Clang uses the 'SetupInstance->GetInstallationVersion' / ISetupHelper->ParseVersion to find the newest version
-           and then reads the tools file to define the tools path - which is definitely better than what i did."
-
-           So... @Incomplete: Should probably pick the newest version...
-        */
     }
 
     // If we get here, we didn't find Visual Studio 2017. Try earlier versions.
+    {
+        HKEY vs7_key;
+        rc = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VS7", 0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &vs7_key);
+        if (rc != S_OK)  return false;
+        defer (RegCloseKey(vs7_key));
 
-    HKEY vs7_key;
-    rc = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VS7", 0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &vs7_key);
+        // Hardcoded search for 4 prior Visual Studio versions. Is there something better to do here?
+        wchar_t *versions[] = { L"14.0", L"13.0",  L"12.0", L"11.0", L"10.0", L"9.0", };
+        const int NUM_VERSIONS = sizeof(versions) / sizeof(versions[0]);
 
-    if (rc != S_OK)  return false;
-    defer (RegCloseKey(vs7_key));
+        for (int i = 0; i < NUM_VERSIONS; i++) {
+            wchar_t *v = versions[i];
 
-    // Hardcoded search for 4 prior Visual Studio versions. Is there something better to do here?
-    wchar_t *versions[] = { L"14.0", L"12.0", L"11.0", L"10.0" };
-    const int NUM_VERSIONS = sizeof(versions) / sizeof(versions[0]);
+            DWORD dw_type;
+            DWORD cb_data;
 
-    for (int i = 0; i < NUM_VERSIONS; i++) {
-        auto v = versions[i];
+            auto rc = RegQueryValueExW(vs7_key, v, NULL, &dw_type, NULL, &cb_data);
+            if ((rc == ERROR_FILE_NOT_FOUND) || (dw_type != REG_SZ)) {
+                continue;
+            }
 
-        DWORD dw_type;
-        DWORD cb_data;
+            auto buffer = (wchar_t *)malloc(cb_data);
+            if (!buffer)  return false;
+            defer (free(buffer));
 
-        auto rc = RegQueryValueExW(vs7_key, v, NULL, &dw_type, NULL, &cb_data);
-        if ((rc == ERROR_FILE_NOT_FOUND) || (dw_type != REG_SZ)) {
-            continue;
+            rc = RegQueryValueExW(vs7_key, v, NULL, NULL, (LPBYTE)buffer, &cb_data);
+            if (rc != 0)  continue;
+
+            // @Robustness: Do the zero-termination thing suggested in the RegQueryValue docs?
+
+            auto lib_path = concat(buffer, L"VC\\Lib\\amd64\\");
+
+            // Check to see whether a vcruntime.lib actually exists here.
+            auto vcruntime_filename = concat(lib_path, L"vcruntime.lib");
+            defer (free(vcruntime_filename));
+
+            if (os_file_exists(vcruntime_filename)) {
+                result->vs_exe_path     = concat(buffer, L"VC\\bin\\");
+                result->vs_library_path = lib_path;
+                return true;
+            }
+
+            free(lib_path);
         }
 
-        auto buffer = (wchar_t *)malloc(cb_data);
-        if (!buffer)  return false;
-        defer (free(buffer));
-
-        rc = RegQueryValueExW(vs7_key, v, NULL, NULL, (LPBYTE)buffer, &cb_data);
-        if (rc != 0)  continue;
-
-        // @Robustness: Do the zero-termination thing suggested in the RegQueryValue docs?
-
-        auto lib_path = concat(buffer, L"VC\\Lib\\amd64");
-
-        // Check to see whether a vcruntime.lib actually exists here.
-        auto vcruntime_filename = concat(lib_path, L"\\vcruntime.lib");
-        defer (free(vcruntime_filename));
-
-        if (os_file_exists(vcruntime_filename)) {
-            result->vs_exe_path     = concat(buffer, L"VC\\bin");
-            result->vs_library_path = lib_path;
-            return true;
-        }
-
-        free(lib_path);
+        // If we get here, we failed to find anything.
     }
-
-    // If we get here, we failed to find anything.
 
     return false;
 }
@@ -567,14 +568,6 @@ Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8() {
     r.windows_sdk_ucrt_library_path = mc_wstring_to_string(result.windows_sdk_ucrt_library_path);
     r.vs_exe_path                   = mc_wstring_to_string(result.vs_exe_path);
     r.vs_library_path               = mc_wstring_to_string(result.vs_library_path);
-
-    // gb_printf("%.*s\n", LIT(r.windows_sdk_root));
-    // gb_printf("%.*s\n", LIT(r.windows_sdk_um_library_path));
-    // gb_printf("%.*s\n", LIT(r.windows_sdk_ucrt_library_path));
-    // gb_printf("%.*s\n", LIT(r.vs_exe_path));
-    // gb_printf("%.*s\n", LIT(r.vs_library_path));
-
-    // gb_exit(1);
 
     return r;
 }
