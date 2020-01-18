@@ -202,7 +202,7 @@ wchar_t *concat(wchar_t *a, wchar_t *b, wchar_t *c = nullptr, wchar_t *d = nullp
     isize len_c = string16_len(c);
     isize len_d = string16_len(d);
 
-    wchar_t *result = (wchar_t *)malloc((len_a + len_b + len_c + len_d + 1) * 2);
+    wchar_t *result = (wchar_t *)calloc(2, (len_a + len_b + len_c + len_d + 1));
     gb_memmove(result, a, len_a*2);
     gb_memmove(result + len_a, b, len_b*2);
 
@@ -256,7 +256,7 @@ wchar_t *find_windows_kit_root(HKEY key, wchar_t *version) {
     if (rc != 0)  return NULL;
 
     DWORD length = required_length + 2;  // The +2 is for the maybe optional zero later on. Probably we are over-allocating.
-    wchar_t *value = (wchar_t *)malloc(length);
+    wchar_t *value = (wchar_t *)calloc(1, length);
     if (!value) return NULL;
 
     rc = RegQueryValueExW(key, version, NULL, NULL, (LPBYTE)value, &length);  // We know that version is zero-terminated...
@@ -448,7 +448,7 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
             auto version_bytes = (tools_file_size.QuadPart + 1) * 2;  // Warning: This multiplication by 2 presumes there is no variable-length encoding in the wchars (wacky characters in the file could betray this expectation).
             if (version_bytes > 0x7FFFFFFF) continue;   // Avoid overflow.
 
-            wchar_t *version = (wchar_t *)malloc(version_bytes);
+            wchar_t *version = (wchar_t *)calloc(1, version_bytes);
             defer (free(version));
 
             auto read_result = fgetws(version, (int)version_bytes, f);
@@ -516,7 +516,7 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
                 continue;
             }
 
-            auto buffer = (wchar_t *)malloc(cb_data);
+            auto buffer = (wchar_t *)calloc(1, cb_data);
             if (!buffer)  return false;
             defer (free(buffer));
 
@@ -530,7 +530,7 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
             if (build_context.metrics.arch == TargetArch_amd64) {
                 lib_path = concat(buffer, L"VC\\Lib\\amd64\\");
             } else if (build_context.metrics.arch == TargetArch_386) {
-                lib_path = concat(buffer, L"VC\\Lib\\386\\");
+                lib_path = concat(buffer, L"VC\\Lib\\");
             } else {
                 continue;
             }
@@ -540,7 +540,15 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
             defer (free(vcruntime_filename));
 
             if (os_file_exists(vcruntime_filename)) {
-                result->vs_exe_path     = concat(buffer, L"VC\\bin\\");
+                if (build_context.metrics.arch == TargetArch_amd64) {
+                    result->vs_exe_path = concat(buffer, L"VC\\bin\\");
+                } else if (build_context.metrics.arch == TargetArch_386) {
+                    // result->vs_exe_path = concat(buffer, L"VC\\bin\\amd64_x86\\");
+                    result->vs_exe_path = concat(buffer, L"VC\\bin\\x86_amd64\\");
+                } else {
+                    continue;
+                }
+
                 result->vs_library_path = lib_path;
                 return true;
             }
@@ -599,13 +607,15 @@ Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8() {
     r.vs_exe_path                   = mc_wstring_to_string(result.vs_exe_path);
     r.vs_library_path               = mc_wstring_to_string(result.vs_library_path);
 
-    // printf("windows_sdk_root:              %.*s\n", LIT(r.windows_sdk_root));
-    // printf("windows_sdk_um_library_path:   %.*s\n", LIT(r.windows_sdk_um_library_path));
-    // printf("windows_sdk_ucrt_library_path: %.*s\n", LIT(r.windows_sdk_ucrt_library_path));
-    // printf("vs_exe_path:                   %.*s\n", LIT(r.vs_exe_path));
-    // printf("vs_library_path:               %.*s\n", LIT(r.vs_library_path));
+#if 0
+    printf("windows_sdk_root:              %.*s\n", LIT(r.windows_sdk_root));
+    printf("windows_sdk_um_library_path:   %.*s\n", LIT(r.windows_sdk_um_library_path));
+    printf("windows_sdk_ucrt_library_path: %.*s\n", LIT(r.windows_sdk_ucrt_library_path));
+    printf("vs_exe_path:                   %.*s\n", LIT(r.vs_exe_path));
+    printf("vs_library_path:               %.*s\n", LIT(r.vs_library_path));
 
-    // gb_exit(1);
+    gb_exit(1);
+#endif
 
     return r;
 }
