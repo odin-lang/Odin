@@ -1471,11 +1471,12 @@ Scope *polymorphic_record_parent_scope(Type *t) {
 }
 
 bool is_type_polymorphic_record_specialized(Type *t) {
+	Type *original_type = t;
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
-		return t->Struct.is_polymorphic && t->Struct.is_poly_specialized;
+		return t->Struct.is_poly_specialized;
 	} else if (t->kind == Type_Union) {
-		return t->Union.is_polymorphic && t->Union.is_poly_specialized;
+		return t->Union.is_poly_specialized;
 	}
 	return false;
 }

@@ -3681,10 +3681,8 @@ bool check_identifier_exists(Scope *s, Ast *node, bool nested = false, Scope **o
 
 typedef bool (BuiltinTypeIsProc)(Type *t);
 
-BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_end - BuiltinProc__type_begin - 1] = {
-	nullptr, // BuiltinProc_type_base_type
-	nullptr, // BuiltinProc_type_core_type
-	nullptr, // BuiltinProc_type_elem_type
+BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - BuiltinProc__type_simple_boolean_begin] = {
+	nullptr, // BuiltinProc__type_simple_boolean_begin
 
 	is_type_boolean,
 	is_type_integer,
@@ -3725,10 +3723,10 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_end - BuiltinProc__ty
 	is_type_bit_set,
 	is_type_simd_vector,
 
-	type_has_nil,
+	is_type_polymorphic_record_specialized,
+	is_type_polymorphic_record_unspecialized,
 
-	nullptr, // BuiltinProc_type_proc_parameter_count
-	nullptr, // BuiltinProc_type_proc_return_count
+	type_has_nil,
 };
 
 
@@ -5482,15 +5480,18 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_is_bit_field_value:
 	case BuiltinProc_type_is_bit_set:
 	case BuiltinProc_type_is_simd_vector:
+	case BuiltinProc_type_is_specialized_polymorphic_record:
+	case BuiltinProc_type_is_unspecialized_polymorphic_record:
 	case BuiltinProc_type_has_nil:
-		GB_ASSERT(BuiltinProc__type_begin < id && id < BuiltinProc__type_end);
+		GB_ASSERT(BuiltinProc__type_simple_boolean_begin < id && id < BuiltinProc__type_simple_boolean_end);
+
 		operand->value = exact_value_bool(false);
 		if (operand->mode != Addressing_Type) {
 			gbString str = expr_to_string(ce->args[0]);
 			error(operand->expr, "Expected a type for '%.*s', got '%s'", LIT(builtin_name), str);
 			gb_string_free(str);
 		} else {
-			i32 i = id - (BuiltinProc__type_begin+1);
+			i32 i = id - cast(i32)BuiltinProc__type_simple_boolean_begin;
 			auto procedure = builtin_type_is_procs[i];
 			GB_ASSERT_MSG(procedure != nullptr, "%.*s", LIT(builtin_name));
 			operand->value = exact_value_bool(procedure(operand->type));
@@ -5554,6 +5555,95 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		operand->mode = Addressing_Constant;
 		operand->type = t_untyped_integer;
+		break;
+
+	case BuiltinProc_type_polymorphic_record_parameter_count:
+		operand->value = exact_value_i64(0);
+		if (operand->mode != Addressing_Type) {
+			error(operand->expr, "Expected a record type for '%.*s'", LIT(builtin_name));
+		} else {
+			Type *bt = base_type(operand->type);
+			if (bt->kind == Type_Struct) {
+				if (bt->Struct.polymorphic_params != nullptr) {
+					operand->value = exact_value_i64(bt->Struct.polymorphic_params->Tuple.variables.count);
+				}
+			} else if (bt->kind == Type_Union) {
+				if (bt->Union.polymorphic_params != nullptr) {
+					operand->value = exact_value_i64(bt->Union.polymorphic_params->Tuple.variables.count);
+				}
+			} else {
+				error(operand->expr, "Expected a record type for '%.*s'", LIT(builtin_name));
+			}
+		}
+		operand->mode = Addressing_Constant;
+		operand->type = t_untyped_integer;
+		break;
+	case BuiltinProc_type_polymorphic_record_parameter_value:
+		if (operand->mode != Addressing_Type) {
+			error(operand->expr, "Expected a record type for '%.*s'", LIT(builtin_name));
+			return false;
+		} else if (!is_type_polymorphic_record_specialized(operand->type)) {
+			error(operand->expr, "Expected a specialized polymorphic record type for '%.*s'", LIT(builtin_name));
+			return false;
+		} else {
+			Operand op = {};
+			check_expr(c, &op, ce->args[1]);
+			if (op.mode != Addressing_Constant && !is_type_integer(op.type)) {
+				error(op.expr, "Execpted a constant integer for the index of record parameter value");
+				return false;
+			}
+
+			i64 index = exact_value_to_i64(op.value);
+			if (index < 0) {
+				error(op.expr, "Execpted a non-negative integer for the index of record parameter value, got %lld", cast(long long)index);
+				return false;
+			}
+
+			Entity *param = nullptr;
+			i64 count = 0;
+
+			Type *bt = base_type(operand->type);
+			if (bt->kind == Type_Struct) {
+				if (bt->Struct.polymorphic_params != nullptr) {
+					count = bt->Struct.polymorphic_params->Tuple.variables.count;
+					if (index < count) {
+						param = bt->Struct.polymorphic_params->Tuple.variables[cast(isize)index];
+					}
+				}
+			} else if (bt->kind == Type_Union) {
+				if (bt->Union.polymorphic_params != nullptr) {
+					count = bt->Union.polymorphic_params->Tuple.variables.count;
+					if (index < count) {
+						param = bt->Union.polymorphic_params->Tuple.variables[cast(isize)index];
+					}
+				}
+			} else {
+				error(operand->expr, "Expected a specialized polymorphic record type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			if (index >= count) {
+				error(op.expr, "Index of record parameter value out of bounds, expected 0..<%lld, got %lld", cast(long long)count, cast(long long)index);
+				return false;
+			}
+			GB_ASSERT(param != nullptr);
+			switch (param->kind) {
+			case Entity_Constant:
+				operand->mode = Addressing_Constant;
+				operand->type = param->type;
+				operand->value = param->Constant.value;
+				break;
+			case Entity_TypeName:
+				operand->mode = Addressing_Type;
+				operand->type = param->type;
+				break;
+			default:
+				GB_PANIC("Unhandle polymorphic record type");
+				break;
+			}
+
+		}
+
 		break;
 	}
 
@@ -7085,6 +7175,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 		i32 id = operand->builtin_id;
 		if (!check_builtin_procedure(c, operand, call, id, type_hint)) {
 			operand->mode = Addressing_Invalid;
+			operand->type = t_invalid;
 		}
 		operand->expr = call;
 		return builtin_procs[id].kind;
