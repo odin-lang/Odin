@@ -110,12 +110,14 @@ enum BuiltinProcId {
 
 
 	// Constant type tests
+
 BuiltinProc__type_begin,
 
 	BuiltinProc_type_base_type,
 	BuiltinProc_type_core_type,
 	BuiltinProc_type_elem_type,
 
+BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_boolean,
 	BuiltinProc_type_is_integer,
 	BuiltinProc_type_is_rune,
@@ -155,12 +157,20 @@ BuiltinProc__type_begin,
 	BuiltinProc_type_is_bit_set,
 	BuiltinProc_type_is_simd_vector,
 
-	BuiltinProc_type_is_specialization_of,
+	BuiltinProc_type_is_specialized_polymorphic_record,
+	BuiltinProc_type_is_unspecialized_polymorphic_record,
 
 	BuiltinProc_type_has_nil,
 
+BuiltinProc__type_simple_boolean_end,
+
+	BuiltinProc_type_is_specialization_of,
+
 	BuiltinProc_type_proc_parameter_count,
 	BuiltinProc_type_proc_return_count,
+
+	BuiltinProc_type_polymorphic_record_parameter_count,
+	BuiltinProc_type_polymorphic_record_parameter_value,
 
 BuiltinProc__type_end,
 
@@ -282,6 +292,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_core_type"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_elem_type"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_boolean"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_integer"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_rune"),              1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -321,11 +332,18 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_bit_set"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_simd_vector"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("type_is_specialization_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_specialized_polymorphic_record"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_unspecialized_polymorphic_record"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_has_nil"),              1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("type_is_specialization_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_proc_parameter_count"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_proc_return_count"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("type_polymorphic_record_parameter_count"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_polymorphic_record_parameter_value"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 };
