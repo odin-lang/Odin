@@ -50,7 +50,7 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	cmd_len = gb_snprintf_va(cmd_line, gb_size_of(cmd_line), fmt, va);
 	va_end(va);
 
-	// gb_printf_err("%.*s\n", cast(int)cmd_len, cmd_line);
+	gb_printf_err("%.*s\n", cast(int)cmd_len, cmd_line);
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -625,6 +625,7 @@ bool parse_build_flags(Array<String> args) {
 						}
 
 						case BuildFlag_Target: {
+							GB_ASSERT(value.kind == ExactValue_String);
 							String str = value.value_string;
 							bool found = false;
 
@@ -1201,7 +1202,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	init_build_context(selected_target_metrics ? selected_target_metrics->metrics : nullptr);
 	if (build_context.word_size == 4) {
-		print_usage_line(0, "%s 32-bit is not yet supported", args[0]);
+		print_usage_line(0, "%.*s 32-bit is not yet supported", LIT(args[0]));
 		return 1;
 	}
 
@@ -1294,16 +1295,13 @@ int main(int arg_count, char const **arg_ptr) {
 		return exit_code;
 	}
 
-	if (build_context.cross_compiling) {
-		if (0) {
+	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
 #ifdef GB_SYSTEM_UNIX
-		} else if (selected_target_metrics->metrics == &target_essence_amd64) {
-			system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s",
-					LIT(output_base), LIT(output_base), LIT(build_context.link_flags));
+		system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s",
+				LIT(output_base), LIT(output_base), LIT(build_context.link_flags));
+#else
+		gb_printf_err("Don't know how to cross compile to selected target.\n");
 #endif
-		} else {
-			gb_printf_err("Don't know how to cross compile to selected target.\n");
-		}
 	} else {
 	#if defined(GB_SYSTEM_WINDOWS)
 		timings_start_section(timings, str_lit("msvc-link"));
@@ -1312,42 +1310,13 @@ int main(int arg_count, char const **arg_ptr) {
 		defer (gb_string_free(lib_str));
 		char lib_str_buf[1024] = {0};
 
-		for_array(i, ir_gen.module.foreign_library_paths) {
-			String lib = ir_gen.module.foreign_library_paths[i];
-			GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
-			isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-			                        " \"%.*s\"", LIT(lib));
-			lib_str = gb_string_appendc(lib_str, lib_str_buf);
-		}
-
 		char const *output_ext = "exe";
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 256);
 		defer (gb_string_free(link_settings));
 
-		if (build_context.is_dll) {
-			output_ext = "dll";
-			link_settings = gb_string_append_fmt(link_settings, "/DLL");
-		} else {
-			link_settings = gb_string_append_fmt(link_settings, "/ENTRY:mainCRTStartup");
-		}
-
-		if (build_context.pdb_filepath != "") {
-			link_settings = gb_string_append_fmt(link_settings, " /PDB:%.*s", LIT(build_context.pdb_filepath));
-		}
-
-		if (build_context.no_crt) {
-			link_settings = gb_string_append_fmt(link_settings, " /nodefaultlib");
-		} else {
-			link_settings = gb_string_append_fmt(link_settings, " /defaultlib:libcmt");
-		}
-
-		if (ir_gen.module.generate_debug_info) {
-			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
-		}
 
 		// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
 		Find_Result_Utf8 find_result = find_visual_studio_and_windows_sdk_utf8();
-		// defer(free_"resource"s(&find_result));
 
 		if (find_result.windows_sdk_version == 0) {
 			gb_printf_err("Windows SDK not found.\n");
@@ -1371,6 +1340,38 @@ int main(int arg_count, char const **arg_ptr) {
 			add_path(find_result.vs_library_path);
 		}
 
+		for_array(i, ir_gen.module.foreign_library_paths) {
+			String lib = ir_gen.module.foreign_library_paths[i];
+			GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
+			isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+			                        " \"%.*s\"", LIT(lib));
+			lib_str = gb_string_appendc(lib_str, lib_str_buf);
+		}
+
+
+
+		if (build_context.is_dll) {
+			output_ext = "dll";
+			link_settings = gb_string_append_fmt(link_settings, "/DLL");
+		} else {
+			link_settings = gb_string_append_fmt(link_settings, "/ENTRY:mainCRTStartup");
+		}
+
+		if (build_context.pdb_filepath != "") {
+			link_settings = gb_string_append_fmt(link_settings, " /PDB:%.*s", LIT(build_context.pdb_filepath));
+		}
+
+		if (build_context.no_crt) {
+			link_settings = gb_string_append_fmt(link_settings, " /nodefaultlib");
+		} else {
+			link_settings = gb_string_append_fmt(link_settings, " /defaultlib:libcmt");
+		}
+
+		if (ir_gen.module.generate_debug_info) {
+			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
+		}
+
+
 		if (!build_context.use_lld) { // msvc
 
 			if (build_context.has_resource) {
@@ -1392,8 +1393,8 @@ int main(int arg_count, char const **arg_ptr) {
 					" %s "
 					"",
 					LIT(find_result.vs_exe_path), LIT(output_base), LIT(output_base), LIT(output_base), output_ext,
-					lib_str, LIT(build_context.link_flags),
-					link_settings
+					link_settings, LIT(build_context.link_flags),
+					lib_str
 				);
 			} else {
 				exit_code = system_exec_command_line_app("msvc-link",
@@ -1403,8 +1404,8 @@ int main(int arg_count, char const **arg_ptr) {
 					" %s "
 					"",
 					LIT(find_result.vs_exe_path), LIT(output_base), LIT(output_base), output_ext,
-					lib_str, LIT(build_context.link_flags),
-					link_settings
+					link_settings, LIT(build_context.link_flags),
+					lib_str
 				);
 			}
 		} else { // lld
@@ -1416,8 +1417,8 @@ int main(int arg_count, char const **arg_ptr) {
 				"",
 				LIT(build_context.ODIN_ROOT),
 				LIT(output_base), LIT(output_base), output_ext,
-				lib_str, LIT(build_context.link_flags),
-				link_settings
+				link_settings, LIT(build_context.link_flags),
+				lib_str
 			);
 		}
 
