@@ -8874,6 +8874,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (index < 0) {
 				gbString str = expr_to_string(o->expr);
 				error(o->expr, "Cannot index a constant '%s'", str);
+				error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
 				gb_string_free(str);
 				o->mode = Addressing_Invalid;
 				o->expr = node;
@@ -9009,6 +9010,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (!all_constant) {
 				gbString str = expr_to_string(o->expr);
 				error(o->expr, "Cannot slice '%s' with non-constant indices", str);
+				error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
 				gb_string_free(str);
 				o->mode = Addressing_Value; // NOTE(bill): Keep subsequent values going without erring
 				o->expr = node;
