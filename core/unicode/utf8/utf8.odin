@@ -128,6 +128,35 @@ decode_rune :: proc(s: []u8) -> (rune, int) {
 	return rune(s0&MASK4)<<18 | rune(b1&MASKX)<<12 | rune(b2&MASKX)<<6 | rune(b3&MASKX), 4;
 }
 
+string_to_runes :: proc(s: string, allocator := context.allocator) -> (runes: []rune) {
+	n := rune_count_in_string(s);
+
+	runes = make([]rune, n, allocator);
+	i := 0;
+	for r in s {
+		runes[i] = r;
+		i += 1;
+	}
+	return;
+}
+
+runes_to_string :: proc(runes: []rune, allocator := context.allocator) -> string {
+	byte_count := 0;
+	for r in runes {
+		_, w := encode_rune(r);
+		byte_count += w;
+	}
+
+	bytes := make([]byte, byte_count);
+	offset := 0;
+	for r in runes {
+		b, w := encode_rune(r);
+		copy(bytes[offset:], b[:w]);
+		offset += w;
+	}
+
+	return string(bytes);
+}
 
 
 decode_last_rune_in_string :: inline proc(s: string) -> (rune, int) do return decode_last_rune(transmute([]u8)s);
