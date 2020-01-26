@@ -147,7 +147,7 @@ runes_to_string :: proc(runes: []rune, allocator := context.allocator) -> string
 		byte_count += w;
 	}
 
-	bytes := make([]byte, byte_count);
+	bytes := make([]byte, byte_count, allocator);
 	offset := 0;
 	for r in runes {
 		b, w := encode_rune(r);
