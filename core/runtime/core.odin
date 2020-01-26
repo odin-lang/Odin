@@ -1125,12 +1125,14 @@ __dynamic_array_make :: proc(array_: rawptr, elem_size, elem_align: int, len, ca
 __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap: int, loc := #caller_location) -> bool {
 	array := (^Raw_Dynamic_Array)(array_);
 
-	if cap <= array.cap do return true;
-
+	// NOTE(tetra, 2020-01-26): We set the allocator before earlying-out below, because user code is usually written
+	// assuming that appending/reserving will set the allocator, if it is not already set.
 	if array.allocator.procedure == nil {
 		array.allocator = context.allocator;
 	}
 	assert(array.allocator.procedure != nil);
+	
+	if cap <= array.cap do return true;
 
 	old_size  := array.cap * elem_size;
 	new_size  := cap * elem_size;
