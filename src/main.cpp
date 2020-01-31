@@ -1180,6 +1180,10 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
+	if (init_filename == "-help") {
+		build_context.show_help = true;
+	}
+
 	build_context.command = command;
 
 	if (!parse_build_flags(args)) {
