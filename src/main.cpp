@@ -17,10 +17,14 @@ gb_global Timings global_timings = {0};
 #include "parser.cpp"
 #include "docs.cpp"
 #include "checker.cpp"
+
+#include "llvm_backend.cpp"
+
 #include "ir.cpp"
 #include "ir_opt.cpp"
 #include "ir_print.cpp"
 #include "query_data.cpp"
+
 
 #if defined(GB_SYSTEM_WINDOWS)
 // NOTE(IC): In order to find Visual C++ paths without relying on environment variables.
@@ -234,6 +238,7 @@ enum BuildFlagKind {
 	BuildFlag_NoCRT,
 	BuildFlag_UseLLD,
 	BuildFlag_Vet,
+	BuildFlag_UseLLVMApi,
 	BuildFlag_IgnoreUnknownAttributes,
 
 	BuildFlag_Compact,
@@ -324,6 +329,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),            BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),               BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),               BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),          BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None);
 
 	add_flag(&build_flags, BuildFlag_Compact, str_lit("compact"), BuildFlagParam_None);
@@ -347,6 +353,7 @@ bool parse_build_flags(Array<String> args) {
 			gb_printf_err("Invalid flag: %.*s\n", LIT(flag));
 			continue;
 		}
+
 		String name = substring(flag, 1, flag.len);
 		isize end = 0;
 		for (; end < name.len; end++) {
@@ -690,6 +697,10 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_Vet:
 							build_context.vet = true;
+							break;
+
+						case BuildFlag_UseLLVMApi:
+							build_context.use_llvm_api = true;
 							break;
 
 						case BuildFlag_IgnoreUnknownAttributes:
@@ -1261,6 +1272,15 @@ int main(int arg_count, char const **arg_ptr) {
 
 	if (!checked_inited) {
 		return 1;
+	}
+
+	if (build_context.use_llvm_api) {
+		lbGenerator gen = {};
+		if (!lb_init_generator(&gen, &checker)) {
+			return 1;
+		}
+		lb_generate_module(&gen);
+		return 0;
 	}
 
 	irGen ir_gen = {0};
