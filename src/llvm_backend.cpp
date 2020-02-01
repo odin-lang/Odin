@@ -4,11 +4,19 @@
 #include "llvm-c/Analysis.h"
 #include "llvm-c/Object.h"
 #include "llvm-c/BitWriter.h"
+#include "llvm-c/Transforms/AggressiveInstCombine.h"
+#include "llvm-c/Transforms/InstCombine.h"
+#include "llvm-c/Transforms/IPO.h"
+
+struct lbValue {
+	LLVMValueRef value;
+	Type *type;
+};
 
 struct lbModule {
 	LLVMModuleRef mod;
 
-	Map<LLVMValueRef> values; // Key: Entity *
+	Map<lbValue> values; // Key: Entity *
 };
 
 struct lbGenerator {
@@ -28,12 +36,14 @@ enum lbAddrKind {
 	lbAddr_SoaVariable,
 };
 
+
+
 struct lbAddr {
 	lbAddrKind kind;
-	LLVMValueRef addr;
+	lbValue addr;
 	union {
 		struct {
-			LLVMValueRef key;
+			lbValue key;
 			Type *type;
 			Type *result;
 		} map;
@@ -44,7 +54,7 @@ struct lbAddr {
 			Selection sel;
 		} ctx;
 		struct {
-			LLVMValueRef index;
+			lbValue index;
 			Ast *index_expr;
 		} soa;
 	};
@@ -76,36 +86,41 @@ struct lbProcedure {
 	LLVMValueRef    value;
 	LLVMBuilderRef  builder;
 
-	LLVMValueRef        return_ptr;
-	Array<LLVMValueRef> params;
-	Array<lbBlock *>    blocks;
-	Scope *             curr_scope;
-	i32                 scope_index;
-	lbBlock *           decl_block;
-	lbBlock *           entry_block;
-	lbBlock *           curr_block;
+	lbValue          return_ptr;
+	Array<lbValue>   params;
+	Array<lbBlock *> blocks;
+	Scope *          curr_scope;
+	i32              scope_index;
+	lbBlock *        decl_block;
+	lbBlock *        entry_block;
+	lbBlock *        curr_block;
 };
 
 lbBlock *    lb_create_block(lbProcedure *p, char const *name);
 LLVMTypeRef  lb_type(Type *type);
 void         lb_build_stmt  (lbProcedure *p, Ast *stmt);
-LLVMValueRef lb_build_expr  (lbProcedure *p, Ast *expr);
+lbValue      lb_build_expr  (lbProcedure *p, Ast *expr);
+lbValue lb_constant_nil(Type *type);
 
-lbAddr lb_addr(LLVMValueRef addr) {
+
+lbAddr lb_addr(lbValue addr) {
 	lbAddr v = {lbAddr_Default, addr};
 	return v;
 }
 
-LLVMTypeRef lb_addr_type(lbAddr const &addr) {
-	return LLVMGetElementType(LLVMTypeOf(addr.addr));
+Type *lb_addr_type(lbAddr const &addr) {
+	return type_deref(addr.addr.type);
+}
+LLVMTypeRef lb_addr_lb_type(lbAddr const &addr) {
+	return LLVMGetElementType(LLVMTypeOf(addr.addr.value));
 }
 
-void lb_addr_store(lbProcedure *p, lbAddr const &addr, LLVMValueRef value) {
-	if (addr.addr == nullptr) {
+void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue const &value) {
+	if (addr.addr.value == nullptr) {
 		return;
 	}
-	GB_ASSERT(value != nullptr);
-	LLVMBuildStore(p->builder, value, addr.addr);
+	GB_ASSERT(value.value != nullptr);
+	LLVMBuildStore(p->builder, value.value, addr.addr.value);
 }
 
 LLVMTypeRef lb_type_internal(Type *type) {
@@ -380,11 +395,15 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr) {
 
 	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
 
+	lbValue val = {};
+	val.value = ptr;
+	val.type = alloc_type_pointer(type);
+
 	if (e != nullptr) {
-		map_set(&p->module->values, hash_entity(e), ptr);
+		map_set(&p->module->values, hash_entity(e), val);
 	}
 
-	return lb_addr(ptr);
+	return lb_addr(val);
 }
 
 
@@ -482,7 +501,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 
 
 		auto addrs = array_make<lbAddr>(heap_allocator(), vd->names.count);
-		auto values = array_make<LLVMValueRef>(heap_allocator(), 0, vd->names.count);
+		auto values = array_make<lbValue>(heap_allocator(), 0, vd->names.count);
 		defer (array_free(&addrs));
 		defer (array_free(&values));
 
@@ -492,13 +511,13 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 				Entity *e = entity_of_ident(name);
 				addrs[i] = lb_add_local(p, e->type, e);
 				if (vd->values.count == 0) {
-					lb_addr_store(p, addrs[i], LLVMConstNull(lb_addr_type(addrs[i])));
+					lb_addr_store(p, addrs[i], lb_constant_nil(lb_addr_type(addrs[i])));
 				}
 			}
 		}
 
 		for_array(i, vd->values) {
-			LLVMValueRef value = lb_build_expr(p, vd->values[i]);
+			lbValue value = lb_build_expr(p, vd->values[i]);
 			array_add(&values, value);
 		}
 
@@ -510,28 +529,78 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 	}
 }
 
-LLVMValueRef lb_value_constant(Type *type, ExactValue const &value) {
+lbValue lb_constant_nil(Type *type) {
+	LLVMValueRef v = LLVMConstNull(lb_type(type));
+	return lbValue{v, type};
+}
+
+LLVMValueRef llvm_const_f32(f32 f, Type *type=t_f32) {
+	u32 u = bit_cast<u32>(f);
+	LLVMValueRef i = LLVMConstInt(LLVMInt32Type(), u, false);
+	return LLVMConstBitCast(i, lb_type(type));
+}
+
+lbValue lb_constant_value(Type *type, ExactValue const &value) {
 
 	switch (value.kind) {
 	case ExactValue_Invalid:
-		return LLVMConstNull(lb_type(type));
+		return lbValue{LLVMConstNull(lb_type(type)), type};
 	case ExactValue_Bool:
-		return LLVMConstInt(lb_type(type), value.value_bool, false);
+		return lbValue{LLVMConstInt(lb_type(type), value.value_bool, false), type};
 	case ExactValue_String:
-		return LLVMConstInt(lb_type(type), value.value_bool, false);
+		return lbValue{LLVMConstInt(lb_type(type), value.value_bool, false), type};
 	case ExactValue_Integer:
-		return LLVMConstIntOfArbitraryPrecision(lb_type(type), cast(unsigned)value.value_integer.len, big_int_ptr(&value.value_integer));
+		return lbValue{LLVMConstIntOfArbitraryPrecision(lb_type(type), cast(unsigned)value.value_integer.len, big_int_ptr(&value.value_integer)), type};
 	case ExactValue_Float:
-		return LLVMConstReal(lb_type(type), value.value_float);
+		if (type_size_of(type) == 4) {
+			f32 f = cast(f32)value.value_float;
+			return lbValue{llvm_const_f32(f, type), type};
+		}
+		return lbValue{LLVMConstReal(lb_type(type), value.value_float), type};
 	case ExactValue_Complex:
-		GB_PANIC("ExactValue_Complex");
+		{
+			LLVMValueRef values[2] = {};
+			switch (8*type_size_of(type)) {
+			case 64:
+				values[0] = llvm_const_f32(cast(f32)value.value_complex.real);
+				values[1] = llvm_const_f32(cast(f32)value.value_complex.imag);
+				break;
+			case 128:
+				values[0] = LLVMConstReal(lb_type(t_f64), value.value_complex.real);
+				values[1] = LLVMConstReal(lb_type(t_f64), value.value_complex.imag);
+				break;
+			}
+
+			return lbValue{LLVMConstStruct(values, 2, false)};
+		}
 		break;
 	case ExactValue_Quaternion:
-		GB_PANIC("ExactValue_Quaternion");
+		{
+			LLVMValueRef values[4] = {};
+			switch (8*type_size_of(type)) {
+			case 128:
+				// @QuaternionLayout
+				values[3] = llvm_const_f32(cast(f32)value.value_quaternion.real);
+				values[0] = llvm_const_f32(cast(f32)value.value_quaternion.imag);
+				values[1] = llvm_const_f32(cast(f32)value.value_quaternion.jmag);
+				values[2] = llvm_const_f32(cast(f32)value.value_quaternion.kmag);
+				break;
+			case 256:
+				// @QuaternionLayout
+				values[3] = LLVMConstReal(lb_type(t_f64), value.value_quaternion.real);
+				values[0] = LLVMConstReal(lb_type(t_f64), value.value_quaternion.imag);
+				values[1] = LLVMConstReal(lb_type(t_f64), value.value_quaternion.jmag);
+				values[2] = LLVMConstReal(lb_type(t_f64), value.value_quaternion.kmag);
+				break;
+			}
+
+			return lbValue{LLVMConstStruct(values, 4, false)};
+		}
 		break;
 
 	case ExactValue_Pointer:
-		return LLVMConstBitCast(LLVMConstInt(lb_type(t_uintptr), value.value_pointer, false), lb_type(type));
+		return lbValue{LLVMConstBitCast(LLVMConstInt(lb_type(t_uintptr), value.value_pointer, false), lb_type(type)), type};
+
 	case ExactValue_Compound:
 		GB_PANIC("ExactValue_Compound");
 		break;
@@ -544,50 +613,88 @@ LLVMValueRef lb_value_constant(Type *type, ExactValue const &value) {
 	}
 
 	GB_PANIC("UNKNOWN ExactValue kind");
-	return nullptr;
+	return lbValue{nullptr, type};
 }
 
-LLVMValueRef lb_add_module_constant(lbModule *m, Type *type, ExactValue const &value) {
+lbValue lb_add_module_constant(lbModule *m, Type *type, ExactValue const &value) {
 	gbAllocator a = heap_allocator();
 
 	if (is_type_slice(type)) {
 		GB_PANIC("lb_add_module_constant -> slice");
 	}
 
-	return lb_value_constant(type, value);
+	return lb_constant_value(type, value);
 }
 
-LLVMValueRef lb_emit_arith(lbProcedure *p, TokenKind op, LLVMValueRef lhs, LLVMValueRef rhs, Type *type) {
+lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type) {
 	switch (op) {
 	case Token_Add:
-		return LLVMBuildAdd(p->builder, lhs, rhs, "");
+		if (is_type_float(type)) {
+			return lbValue{LLVMBuildFAdd(p->builder, lhs.value, rhs.value, ""), type};
+		}
+		return lbValue{LLVMBuildAdd(p->builder, lhs.value, rhs.value, ""), type};
 	case Token_Sub:
-		return LLVMBuildSub(p->builder, lhs, rhs, "");
+		if (is_type_float(type)) {
+			return lbValue{LLVMBuildFSub(p->builder, lhs.value, rhs.value, ""), type};
+		}
+		return lbValue{LLVMBuildSub(p->builder, lhs.value, rhs.value, ""), type};
 	case Token_Mul:
-		return LLVMBuildMul(p->builder, lhs, rhs, "");
+		if (is_type_float(type)) {
+			return lbValue{LLVMBuildFMul(p->builder, lhs.value, rhs.value, ""), type};
+		}
+		return lbValue{LLVMBuildMul(p->builder, lhs.value, rhs.value, ""), type};
 	case Token_Quo:
+		if (is_type_float(type)) {
+			return lbValue{LLVMBuildFDiv(p->builder, lhs.value, rhs.value, ""), type};
+		} else if (is_type_unsigned(type)) {
+			return lbValue{LLVMBuildUDiv(p->builder, lhs.value, rhs.value, ""), type};
+		}
+		return lbValue{LLVMBuildSDiv(p->builder, lhs.value, rhs.value, ""), type};
 	case Token_Mod:
+		if (is_type_float(type)) {
+			return lbValue{LLVMBuildFRem(p->builder, lhs.value, rhs.value, ""), type};
+		} else if (is_type_unsigned(type)) {
+			return lbValue{LLVMBuildURem(p->builder, lhs.value, rhs.value, ""), type};
+		}
+		return lbValue{LLVMBuildSRem(p->builder, lhs.value, rhs.value, ""), type};
 	case Token_ModMod:
-	case Token_And:
-		return LLVMBuildAdd(p->builder, lhs, rhs, "");
-	case Token_Or:
-		return LLVMBuildOr(p->builder, lhs, rhs, "");
-	case Token_Xor:
-		return LLVMBuildXor(p->builder, lhs, rhs, "");
-	case Token_Shl:
-		return LLVMBuildShl(p->builder, lhs, rhs, "");
-	case Token_Shr:
+		if (is_type_unsigned(type)) {
+			return lbValue{LLVMBuildURem(p->builder, lhs.value, rhs.value, ""), type};
+		} else {
+			LLVMValueRef a = LLVMBuildSRem(p->builder, lhs.value, rhs.value, "");
+			LLVMValueRef b = LLVMBuildAdd(p->builder, a, rhs.value, "");
+			LLVMValueRef c = LLVMBuildSRem(p->builder, b, rhs.value, "");
+			return lbValue{c, type};
+		}
 
+	case Token_And:
+		return lbValue{LLVMBuildAnd(p->builder, lhs.value, rhs.value, ""), type};
+	case Token_Or:
+		return lbValue{LLVMBuildOr(p->builder, lhs.value, rhs.value, ""), type};
+	case Token_Xor:
+		return lbValue{LLVMBuildXor(p->builder, lhs.value, rhs.value, ""), type};
+	case Token_Shl:
+		return lbValue{LLVMBuildShl(p->builder, lhs.value, rhs.value, ""), type};
+	case Token_Shr:
+		if (is_type_unsigned(type)) {
+			return lbValue{LLVMBuildLShr(p->builder, lhs.value, rhs.value, ""), type};
+		}
+		return lbValue{LLVMBuildAShr(p->builder, lhs.value, rhs.value, ""), type};
 	case Token_AndNot:
+		{
+			LLVMValueRef all_ones = LLVMConstAllOnes(lb_type(type));
+			LLVMValueRef new_rhs = LLVMBuildXor(p->builder, all_ones, rhs.value, "");
+			return lbValue{LLVMBuildAnd(p->builder, lhs.value, new_rhs, ""), type};
+		}
 		break;
 	}
 
 	GB_PANIC("unhandled operator of lb_emit_arith");
 
-	return nullptr;
+	return {};
 }
 
-LLVMValueRef lb_build_binary_expr(lbProcedure *p, Ast *expr) {
+lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	ast_node(be, BinaryExpr, expr);
 
 	TypeAndValue tv = type_and_value_of_expr(expr);
@@ -606,18 +713,18 @@ LLVMValueRef lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	case Token_Shl:
 	case Token_Shr: {
 		Type *type = default_type(tv.type);
-		LLVMValueRef left = lb_build_expr(p, be->left);
-		LLVMValueRef right = lb_build_expr(p, be->right);
+		lbValue left = lb_build_expr(p, be->left);
+		lbValue right = lb_build_expr(p, be->right);
 		return lb_emit_arith(p, be->op.kind, left, right, type);
 	}
 	default:
 		GB_PANIC("Invalid binary expression");
 		break;
 	}
-	return nullptr;
+	return {};
 }
 
-LLVMValueRef lb_build_expr(lbProcedure *p, Ast *expr) {
+lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	expr = unparen_expr(expr);
 
 	TypeAndValue tv = type_and_value_of_expr(expr);
@@ -659,7 +766,7 @@ LLVMValueRef lb_build_expr(lbProcedure *p, Ast *expr) {
 	// case_end;
 
 	case_ast_node(u, Undef, expr);
-		return LLVMGetUndef(lb_type(tv.type));
+		return lbValue{LLVMGetUndef(lb_type(tv.type)), tv.type};
 	case_end;
 
 	case_ast_node(i, Ident, expr);
@@ -670,24 +777,24 @@ LLVMValueRef lb_build_expr(lbProcedure *p, Ast *expr) {
 			GB_PANIC("TODO(bill): ir_build_expr Entity_Builtin '%.*s'\n"
 			         "\t at %.*s(%td:%td)", LIT(builtin_procs[e->Builtin.id].name),
 			         LIT(token.pos.file), token.pos.line, token.pos.column);
-			return nullptr;
+			return {};
 		} else if (e->kind == Entity_Nil) {
-			return LLVMConstNull(lb_type(tv.type));
+			return lb_constant_nil(tv.type);
 		}
 
 		auto *found = map_get(&p->module->values, hash_entity(e));
 		if (found) {
-			LLVMValueRef v = *found;
-			LLVMTypeKind kind = LLVMGetTypeKind(LLVMTypeOf(v));
+			auto v = *found;
+			LLVMTypeKind kind = LLVMGetTypeKind(LLVMTypeOf(v.value));
 			if (kind == LLVMFunctionTypeKind) {
 				return v;
 			}
-			return LLVMBuildLoad2(p->builder, LLVMGetElementType(LLVMTypeOf(v)), v, "");
+			return lbValue{LLVMBuildLoad2(p->builder, lb_type(type_deref(v.type)), v.value, ""), e->type};
 		// } else if (e != nullptr && e->kind == Entity_Variable) {
 		// 	return ir_addr_load(proc, ir_build_addr(proc, expr));
 		}
 		GB_PANIC("nullptr value for expression from identifier: %.*s : %s @ %p", LIT(i->token.string), type_to_string(e->type), expr);
-		return nullptr;
+		return {};
 	case_end;
 
 	case_ast_node(be, BinaryExpr, expr);
@@ -695,7 +802,7 @@ LLVMValueRef lb_build_expr(lbProcedure *p, Ast *expr) {
 	case_end;
 	}
 
-	return nullptr;
+	return {};
 }
 
 
@@ -718,8 +825,8 @@ void lb_generate_module(lbGenerator *gen) {
 
 
 	for_array(i, info->entities) {
-		arena_free_all(&temp_arena);
-		gbAllocator a = temp_allocator;
+		// arena_free_all(&temp_arena);
+		// gbAllocator a = temp_allocator;
 
 		Entity *e = info->entities[i];
 		String    name  = e->token.string;
@@ -767,6 +874,7 @@ void lb_generate_module(lbGenerator *gen) {
 				lb_build_stmt(p, p->body);
 
 				LLVMBuildRet(p->builder, nullptr);
+				// LLVMBuildRetVoid(p->builder);
 			}
 
 			lb_end_procedure(p);
@@ -794,38 +902,41 @@ void lb_generate_module(lbGenerator *gen) {
 	char *llvm_error = nullptr;
 	defer (LLVMDisposeMessage(llvm_error));
 
+
+	// LLVMPassManagerRef pass_manager = LLVMCreatePassManager();
+	// defer (LLVMDisposePassManager(pass_manager));
+
+	// LLVMAddAggressiveInstCombinerPass(pass_manager);
+	// LLVMAddConstantMergePass(pass_manager);
+	// LLVMAddDeadArgEliminationPass(pass_manager);
+
+	// LLVMRunPassManager(pass_manager, mod);
+
 	LLVMVerifyModule(mod, LLVMAbortProcessAction, &llvm_error);
 	llvm_error = nullptr;
 
 	LLVMDumpModule(mod);
 
+	// LLVMInitializeAllTargetInfos();
+	// LLVMInitializeAllTargets();
+	// LLVMInitializeAllTargetMCs();
+	// LLVMInitializeAllAsmParsers();
+	// LLVMInitializeAllAsmPrinters();
 
-	LLVMPassManagerRef pass_manager = LLVMCreatePassManager();
-	defer (LLVMDisposePassManager(pass_manager));
+	// char const *target_triple = "x86_64-pc-windows-msvc";
+	// char const *target_data_layout = "e-m:w-i64:64-f80:128-n8:16:32:64-S128";
+	// LLVMSetTarget(mod, target_triple);
 
-	LLVMRunPassManager(pass_manager, mod);
-	LLVMFinalizeFunctionPassManager(pass_manager);
+	// LLVMTargetRef target = {};
+	// LLVMGetTargetFromTriple(target_triple, &target, &llvm_error);
+	// GB_ASSERT(target != nullptr);
 
-	LLVMInitializeAllTargetInfos();
-	LLVMInitializeAllTargets();
-	LLVMInitializeAllTargetMCs();
-	LLVMInitializeAllAsmParsers();
-	LLVMInitializeAllAsmPrinters();
+	// LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, target_triple, "generic", "", LLVMCodeGenLevelNone, LLVMRelocDefault, LLVMCodeModelDefault);
+	// defer (LLVMDisposeTargetMachine(target_machine));
 
-	char const *target_triple = "x86_64-pc-windows-msvc";
-	char const *target_data_layout = "e-m:w-i64:64-f80:128-n8:16:32:64-S128";
-	LLVMSetTarget(mod, target_triple);
-
-	LLVMTargetRef target = {};
-	LLVMGetTargetFromTriple(target_triple, &target, &llvm_error);
-	GB_ASSERT(target != nullptr);
-
-	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, target_triple, "generic", "", LLVMCodeGenLevelNone, LLVMRelocDefault, LLVMCodeModelDefault);
-	defer (LLVMDisposeTargetMachine(target_machine));
-
-	LLVMBool ok = LLVMTargetMachineEmitToFile(target_machine, mod, "llvm_demo.obj", LLVMObjectFile, &llvm_error);
-	if (ok) {
-		gb_printf_err("LLVM Error: %s\n", llvm_error);
-		return;
-	}
+	// LLVMBool ok = LLVMTargetMachineEmitToFile(target_machine, mod, "llvm_demo.obj", LLVMObjectFile, &llvm_error);
+	// if (ok) {
+	// 	gb_printf_err("LLVM Error: %s\n", llvm_error);
+	// 	return;
+	// }
 }

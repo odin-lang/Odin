@@ -1275,11 +1275,16 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.use_llvm_api) {
+		timings_start_section(timings, str_lit("LLVM API Code Gen"));
 		lbGenerator gen = {};
 		if (!lb_init_generator(&gen, &checker)) {
 			return 1;
 		}
 		lb_generate_module(&gen);
+
+		if (build_context.show_timings) {
+			show_timings(&checker, timings);
+		}
 		return 0;
 	}
 
