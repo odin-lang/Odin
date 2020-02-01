@@ -127,6 +127,8 @@ struct BuildContext {
 	bool   vet;
 	bool   cross_compiling;
 
+	bool   use_llvm_api;
+
 	QueryDataSetSettings query_data_set_settings;
 
 	gbAffinity affinity;

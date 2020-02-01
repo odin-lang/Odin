@@ -30,7 +30,8 @@ set compiler_warnings= ^
 
 set compiler_includes=
 set libs= ^
-	kernel32.lib
+	kernel32.lib ^
+	bin\llvm\windows\LLVM-C.lib
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console
 
@@ -48,7 +49,9 @@ del *.ilk > NUL 2> NUL
 
 cl %compiler_settings% "src\main.cpp" ^
 	/link %linker_settings% -OUT:%exe_name% ^
-	&& odin run examples/demo/demo.odin
+	&& odin build examples/llvm-demo/demo.odin -llvm-api
+
+	rem && link -nologo llvm_demo.obj kernel32.lib -OUT:llvm_demo.exe
 
 del *.obj > NUL 2> NUL
 
