@@ -111,6 +111,7 @@ Type_Info_Union :: struct {
 	tag_type:     ^Type_Info,
 	custom_align: bool,
 	no_nil:       bool,
+	maybe:        bool,
 };
 Type_Info_Enum :: struct {
 	base:      ^Type_Info,
@@ -1131,7 +1132,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 		array.allocator = context.allocator;
 	}
 	assert(array.allocator.procedure != nil);
-	
+
 	if cap <= array.cap do return true;
 
 	old_size  := array.cap * elem_size;

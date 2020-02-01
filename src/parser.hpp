@@ -515,6 +515,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Array<Ast *> variants;      \
 		Ast *polymorphic_params;    \
 		Ast *        align;         \
+		bool         maybe;         \
 		bool         no_nil;        \
 		Token where_token;          \
 		Array<Ast *> where_clauses; \

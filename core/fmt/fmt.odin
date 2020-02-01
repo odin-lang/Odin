@@ -1525,10 +1525,21 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			return;
 		}
 
+
+		if info.maybe && len(info.variants) == 1 && reflect.is_pointer(info.variants[0]) {
+			if v.data == nil {
+				strings.write_string(fi.buf, "nil");
+			} else {
+				id := info.variants[0].id;
+				fmt_arg(fi, any{v.data, id}, verb);
+			}
+			return;
+		}
+
+		tag: i64 = -1;
 		tag_ptr := uintptr(v.data) + info.tag_offset;
 		tag_any := any{rawptr(tag_ptr), info.tag_type.id};
 
-		tag: i64 = -1;
 		switch i in tag_any {
 		case u8:   tag = i64(i);
 		case i8:   tag = i64(i);

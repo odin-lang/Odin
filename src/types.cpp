@@ -152,6 +152,7 @@ struct TypeUnion {
 	Type *        polymorphic_params; // Type_Tuple
 	Type *        polymorphic_parent;
 	bool          no_nil;
+	bool          maybe;
 	bool          is_polymorphic;
 	bool          is_poly_specialized;
 };
@@ -1219,6 +1220,32 @@ bool is_type_map(Type *t) {
 	return t->kind == Type_Map;
 }
 
+bool is_type_union_maybe_pointer(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Union && t->Union.maybe) {
+		if (t->Union.variants.count == 1) {
+			return is_type_pointer(t->Union.variants[0]);
+		}
+	}
+	return false;
+}
+
+
+bool is_type_union_maybe_pointer_original_alignment(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Union && t->Union.maybe) {
+		if (t->Union.variants.count == 1) {
+			Type *v = t->Union.variants[0];
+			if (is_type_pointer(v)) {
+				return type_align_of(v) == type_align_of(t);
+			}
+		}
+	}
+	return false;
+}
+
+
+
 
 bool is_type_integer_endian_big(Type *t) {
 	t = core_type(t);
@@ -2024,6 +2051,7 @@ i64 union_tag_size(Type *u) {
 Type *union_tag_type(Type *u) {
 	i64 s = union_tag_size(u);
 	switch (s) {
+	case  0: return  t_u8;
 	case  1: return  t_u8;
 	case  2: return  t_u16;
 	case  4: return  t_u32;
@@ -2934,14 +2962,23 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 			}
 		}
 
-		// NOTE(bill): Align to tag
-		i64 tag_size = union_tag_size(t);
-		i64 size = align_formula(max, tag_size);
-		// NOTE(bill): Calculate the padding between the common fields and the tag
-		t->Union.tag_size = tag_size;
-		t->Union.variant_block_size = size - field_size;
+		i64 size = 0;
 
-		return align_formula(size + tag_size, align);
+		if (is_type_union_maybe_pointer(t)) {
+			size = max;
+			t->Union.tag_size = 0;
+			t->Union.variant_block_size = size;
+		} else {
+			// NOTE(bill): Align to tag
+			i64 tag_size = union_tag_size(t);
+			size = align_formula(max, tag_size);
+			// NOTE(bill): Calculate the padding between the common fields and the tag
+			t->Union.tag_size = tag_size;
+			t->Union.variant_block_size = size - field_size;
+
+			size += tag_size;
+		}
+		return align_formula(size, align);
 	} break;
 
 

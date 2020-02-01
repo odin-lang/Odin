@@ -8572,8 +8572,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			o->expr = node;
 			return kind;
 		}
-		Type *t = check_type(c, ta->type);
-
 		if (o->mode == Addressing_Constant) {
 			gbString expr_str = expr_to_string(o->expr);
 			error(o->expr, "A type assertion cannot be applied to a constant expression: '%s'", expr_str);
@@ -8594,54 +8592,80 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 		bool src_is_ptr = is_type_pointer(o->type);
 		Type *src = type_deref(o->type);
-		Type *dst = t;
 		Type *bsrc = base_type(src);
-		Type *bdst = base_type(dst);
 
 
-		if (is_type_union(src)) {
-			bool ok = false;
-			for_array(i, bsrc->Union.variants) {
-				Type *vt = bsrc->Union.variants[i];
-				if (are_types_identical(vt, dst)) {
-					ok = true;
-					break;
-				}
+		if (ta->type != nullptr && ta->type->kind == Ast_UnaryExpr && ta->type->UnaryExpr.op.kind == Token_Question) {
+			if (!is_type_union(src)) {
+				gbString str = type_to_string(o->type);
+				error(o->expr, "Type assertions with .? can only operate on unions with 1 variant, got %s", str);
+				gb_string_free(str);
+				o->mode = Addressing_Invalid;
+				o->expr = node;
+				return kind;
 			}
-
-			if (!ok) {
-				gbString expr_str = expr_to_string(o->expr);
-				gbString dst_type_str = type_to_string(t);
-				defer (gb_string_free(expr_str));
-				defer (gb_string_free(dst_type_str));
-				if (bsrc->Union.variants.count == 0) {
-					error(o->expr, "Cannot type assert '%s' to '%s' as this is an empty union", expr_str, dst_type_str);
-				} else {
-					error(o->expr, "Cannot type assert '%s' to '%s' as it is not a variant of that union", expr_str, dst_type_str);
-				}
+			if (bsrc->Union.variants.count != 1) {
+				error(o->expr, "Type assertions with .? can only operate on unions with 1 variant, got %lld", cast(long long)bsrc->Union.variants.count);
 				o->mode = Addressing_Invalid;
 				o->expr = node;
 				return kind;
 			}
 
 			add_type_info_type(c, o->type);
-			add_type_info_type(c, t);
+			add_type_info_type(c, bsrc->Union.variants[0]);
 
-			o->type = t;
+			o->type = bsrc->Union.variants[0];
 			o->mode = Addressing_OptionalOk;
-		} else if (is_type_any(src)) {
-			o->type = t;
-			o->mode = Addressing_OptionalOk;
-
-			add_type_info_type(c, o->type);
-			add_type_info_type(c, t);
 		} else {
-			gbString str = type_to_string(o->type);
-			error(o->expr, "Type assertions can only operate on unions and 'any', got %s", str);
-			gb_string_free(str);
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
+			Type *t = check_type(c, ta->type);
+			Type *dst = t;
+			Type *bdst = base_type(dst);
+
+
+			if (is_type_union(src)) {
+				bool ok = false;
+				for_array(i, bsrc->Union.variants) {
+					Type *vt = bsrc->Union.variants[i];
+					if (are_types_identical(vt, dst)) {
+						ok = true;
+						break;
+					}
+				}
+
+				if (!ok) {
+					gbString expr_str = expr_to_string(o->expr);
+					gbString dst_type_str = type_to_string(t);
+					defer (gb_string_free(expr_str));
+					defer (gb_string_free(dst_type_str));
+					if (bsrc->Union.variants.count == 0) {
+						error(o->expr, "Cannot type assert '%s' to '%s' as this is an empty union", expr_str, dst_type_str);
+					} else {
+						error(o->expr, "Cannot type assert '%s' to '%s' as it is not a variant of that union", expr_str, dst_type_str);
+					}
+					o->mode = Addressing_Invalid;
+					o->expr = node;
+					return kind;
+				}
+
+				add_type_info_type(c, o->type);
+				add_type_info_type(c, t);
+
+				o->type = t;
+				o->mode = Addressing_OptionalOk;
+			} else if (is_type_any(src)) {
+				o->type = t;
+				o->mode = Addressing_OptionalOk;
+
+				add_type_info_type(c, o->type);
+				add_type_info_type(c, t);
+			} else {
+				gbString str = type_to_string(o->type);
+				error(o->expr, "Type assertions can only operate on unions and 'any', got %s", str);
+				gb_string_free(str);
+				o->mode = Addressing_Invalid;
+				o->expr = node;
+				return kind;
+			}
 		}
 
 		add_package_dependency(c, "runtime", "type_assertion_check");
