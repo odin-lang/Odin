@@ -305,6 +305,34 @@ struct Type {
 	bool failure;
 };
 
+// IMPORTANT NOTE(bill): This must match the same as the in core.odin
+enum Typeid_Kind : u8 {
+	Typeid_Invalid,
+	Typeid_Integer,
+	Typeid_Rune,
+	Typeid_Float,
+	Typeid_Complex,
+	Typeid_Quaternion,
+	Typeid_String,
+	Typeid_Boolean,
+	Typeid_Any,
+	Typeid_Type_Id,
+	Typeid_Pointer,
+	Typeid_Procedure,
+	Typeid_Array,
+	Typeid_Enumerated_Array,
+	Typeid_Dynamic_Array,
+	Typeid_Slice,
+	Typeid_Tuple,
+	Typeid_Struct,
+	Typeid_Union,
+	Typeid_Enum,
+	Typeid_Map,
+	Typeid_Bit_Field,
+	Typeid_Bit_Set,
+};
+
+
 
 
 // TODO(bill): Should I add extra information here specifying the kind of selection?

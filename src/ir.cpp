@@ -5911,34 +5911,6 @@ irValue *ir_type_info(irProcedure *proc, Type *type) {
 	return ir_emit_array_ep(proc, ir_global_type_info_data, ir_const_i32(id));
 }
 
-// IMPORTANT NOTE(bill): This must match the same as the in core.odin
-enum Typeid_Kind : u8 {
-	Typeid_Invalid,
-	Typeid_Integer,
-	Typeid_Rune,
-	Typeid_Float,
-	Typeid_Complex,
-	Typeid_Quaternion,
-	Typeid_String,
-	Typeid_Boolean,
-	Typeid_Any,
-	Typeid_Type_Id,
-	Typeid_Pointer,
-	Typeid_Procedure,
-	Typeid_Array,
-	Typeid_Enumerated_Array,
-	Typeid_Dynamic_Array,
-	Typeid_Slice,
-	Typeid_Tuple,
-	Typeid_Struct,
-	Typeid_Union,
-	Typeid_Enum,
-	Typeid_Map,
-	Typeid_Bit_Field,
-	Typeid_Bit_Set,
-};
-
-
 irValue *ir_typeid(irModule *m, Type *type) {
 	type = default_type(type);
 
