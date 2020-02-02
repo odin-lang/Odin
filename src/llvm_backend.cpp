@@ -103,6 +103,12 @@ lbValue      lb_build_expr  (lbProcedure *p, Ast *expr);
 lbValue lb_constant_nil(Type *type);
 
 
+gb_internal lbModule *global_module = nullptr;
+
+gb_internal LLVMValueRef lb_zero32 = nullptr;
+gb_internal LLVMValueRef lb_one32 = nullptr;
+
+
 lbAddr lb_addr(lbValue addr) {
 	lbAddr v = {lbAddr_Default, addr};
 	return v;
@@ -123,7 +129,36 @@ void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue const &value) {
 	LLVMBuildStore(p->builder, value.value, addr.addr.value);
 }
 
+void lb_clone_struct_type(LLVMTypeRef dst, LLVMTypeRef src) {
+	unsigned field_count = LLVMCountStructElementTypes(src);
+	LLVMTypeRef *fields = gb_alloc_array(heap_allocator(), LLVMTypeRef, field_count);
+	LLVMGetStructElementTypes(src, fields);
+	LLVMStructSetBody(dst, fields, field_count, LLVMIsPackedStruct(src));
+	gb_free(heap_allocator(), fields);
+}
+
+LLVMTypeRef lb_alignment_prefix_type_hack(i64 alignment) {
+	switch (alignment) {
+	case 1:
+		return LLVMArrayType(lb_type(t_u8), 0);
+	case 2:
+		return LLVMArrayType(lb_type(t_u16), 0);
+	case 4:
+		return LLVMArrayType(lb_type(t_u32), 0);
+	case 8:
+		return LLVMArrayType(lb_type(t_u64), 0);
+	case 16:
+		return LLVMArrayType(LLVMVectorType(lb_type(t_u32), 4), 0);
+	default:
+		GB_PANIC("Invalid alignment %d", cast(i32)alignment);
+		break;
+	}
+	return nullptr;
+}
+
 LLVMTypeRef lb_type_internal(Type *type) {
+	i64 size = type_size_of(type); // Check size
+
 	switch (type->kind) {
 	case Type_Basic:
 		switch (type->Basic.kind) {
@@ -154,40 +189,48 @@ LLVMTypeRef lb_type_internal(Type *type) {
 		// Basic_complex32,
 		case Basic_complex64:
 			{
+				LLVMTypeRef type = LLVMStructCreateNamed(LLVMGetGlobalContext(), "..complex64");
 				LLVMTypeRef fields[2] = {
 					lb_type(t_f32),
 					lb_type(t_f32),
 				};
-				return LLVMStructType(fields, 2, false);
+				LLVMStructSetBody(type, fields, 2, false);
+				return type;
 			}
 		case Basic_complex128:
 			{
+				LLVMTypeRef type = LLVMStructCreateNamed(LLVMGetGlobalContext(), "..complex128");
 				LLVMTypeRef fields[2] = {
 					lb_type(t_f64),
 					lb_type(t_f64),
 				};
-				return LLVMStructType(fields, 2, false);
+				LLVMStructSetBody(type, fields, 2, false);
+				return type;
 			}
 
 		case Basic_quaternion128:
 			{
+				LLVMTypeRef type = LLVMStructCreateNamed(LLVMGetGlobalContext(), "..quaternion128");
 				LLVMTypeRef fields[4] = {
 					lb_type(t_f32),
 					lb_type(t_f32),
 					lb_type(t_f32),
 					lb_type(t_f32),
 				};
-				return LLVMStructType(fields, 4, false);
+				LLVMStructSetBody(type, fields, 4, false);
+				return type;
 			}
 		case Basic_quaternion256:
 			{
+				LLVMTypeRef type = LLVMStructCreateNamed(LLVMGetGlobalContext(), "..quaternion256");
 				LLVMTypeRef fields[4] = {
 					lb_type(t_f64),
 					lb_type(t_f64),
 					lb_type(t_f64),
 					lb_type(t_f64),
 				};
-				return LLVMStructType(fields, 4, false);
+				LLVMStructSetBody(type, fields, 4, false);
+				return type;
 			}
 
 		case Basic_int:  return LLVMIntType(8*cast(unsigned)build_context.word_size);
@@ -198,40 +241,44 @@ LLVMTypeRef lb_type_internal(Type *type) {
 		case Basic_rawptr: return LLVMPointerType(LLVMInt8Type(), 0);
 		case Basic_string:
 			{
+				LLVMTypeRef type = LLVMStructCreateNamed(LLVMGetGlobalContext(), "..string");
 				LLVMTypeRef fields[2] = {
 					LLVMPointerType(lb_type(t_u8), 0),
 					lb_type(t_int),
 				};
-				return LLVMStructType(fields, 2, false);
+				LLVMStructSetBody(type, fields, 2, false);
+				return type;
 			}
 		case Basic_cstring: return LLVMPointerType(LLVMInt8Type(), 0);
 		case Basic_any:
 			{
+				LLVMTypeRef type = LLVMStructCreateNamed(LLVMGetGlobalContext(), "..any");
 				LLVMTypeRef fields[2] = {
 					LLVMPointerType(lb_type(t_rawptr), 0),
 					lb_type(t_typeid),
 				};
-				return LLVMStructType(fields, 2, false);
+				LLVMStructSetBody(type, fields, 2, false);
+				return type;
 			}
 
 		case Basic_typeid: return LLVMIntType(8*cast(unsigned)build_context.word_size);
 
 		// Endian Specific Types
-		case Basic_i16le: return LLVMInt16Type();
-		case Basic_u16le: return LLVMInt16Type();
-		case Basic_i32le: return LLVMInt32Type();
-		case Basic_u32le: return LLVMInt32Type();
-		case Basic_i64le: return LLVMInt64Type();
-		case Basic_u64le: return LLVMInt64Type();
+		case Basic_i16le:  return LLVMInt16Type();
+		case Basic_u16le:  return LLVMInt16Type();
+		case Basic_i32le:  return LLVMInt32Type();
+		case Basic_u32le:  return LLVMInt32Type();
+		case Basic_i64le:  return LLVMInt64Type();
+		case Basic_u64le:  return LLVMInt64Type();
 		case Basic_i128le: return LLVMInt128Type();
 		case Basic_u128le: return LLVMInt128Type();
 
-		case Basic_i16be: return LLVMInt16Type();
-		case Basic_u16be: return LLVMInt16Type();
-		case Basic_i32be: return LLVMInt32Type();
-		case Basic_u32be: return LLVMInt32Type();
-		case Basic_i64be: return LLVMInt64Type();
-		case Basic_u64be: return LLVMInt64Type();
+		case Basic_i16be:  return LLVMInt16Type();
+		case Basic_u16be:  return LLVMInt16Type();
+		case Basic_i32be:  return LLVMInt32Type();
+		case Basic_u32be:  return LLVMInt32Type();
+		case Basic_i64be:  return LLVMInt64Type();
+		case Basic_u64be:  return LLVMInt64Type();
 		case Basic_i128be: return LLVMInt128Type();
 		case Basic_u128be: return LLVMInt128Type();
 
@@ -248,16 +295,74 @@ LLVMTypeRef lb_type_internal(Type *type) {
 		}
 		break;
 	case Type_Named:
-		GB_PANIC("Type_Named");
-		return nullptr;
+		{
+			Type *base = base_type(type->Named.base);
+
+			switch (base->kind) {
+			case Type_Basic:
+				return lb_type(base);
+
+			case Type_Named:
+			case Type_Generic:
+			case Type_BitFieldValue:
+				GB_PANIC("INVALID TYPE");
+				break;
+
+			case Type_Pointer:
+			case Type_Opaque:
+			case Type_Array:
+			case Type_EnumeratedArray:
+			case Type_Slice:
+			case Type_DynamicArray:
+			case Type_Map:
+			case Type_Enum:
+			case Type_BitSet:
+			case Type_SimdVector:
+				return lb_type(base);
+
+			// TODO(bill): Deal with this correctly. Can this be named?
+			case Type_Proc:
+				return lb_type(base);
+
+			case Type_Tuple:
+				return lb_type(base);
+			}
+
+			LLVMContextRef ctx = LLVMGetModuleContext(global_module->mod);
+
+			if (base->llvm_type != nullptr) {
+				LLVMTypeKind kind = LLVMGetTypeKind(base->llvm_type);
+				if (kind == LLVMStructTypeKind) {
+					type->llvm_type = LLVMStructCreateNamed(ctx, alloc_cstring(heap_allocator(), type->Named.name));
+					lb_clone_struct_type(type->llvm_type, base->llvm_type);
+				}
+			}
+
+			switch (base->kind) {
+			case Type_Struct:
+			case Type_Union:
+			case Type_BitField:
+				type->llvm_type = LLVMStructCreateNamed(ctx, alloc_cstring(heap_allocator(), type->Named.name));
+				lb_clone_struct_type(type->llvm_type, lb_type(base));
+				return type->llvm_type;
+			}
+
+
+			return lb_type(base);
+		}
+
 	case Type_Pointer:
 		return LLVMPointerType(lb_type(type_deref(type)), 0);
+
 	case Type_Opaque:
 		return lb_type(base_type(type));
+
 	case Type_Array:
 		return LLVMArrayType(lb_type(type->Array.elem), cast(unsigned)type->Array.count);
+
 	case Type_EnumeratedArray:
 		return LLVMArrayType(lb_type(type->EnumeratedArray.elem), cast(unsigned)type->EnumeratedArray.count);
+
 	case Type_Slice:
 		{
 			LLVMTypeRef fields[2] = {
@@ -267,6 +372,7 @@ LLVMTypeRef lb_type_internal(Type *type) {
 			return LLVMStructType(fields, 2, false);
 		}
 		break;
+
 	case Type_DynamicArray:
 		{
 			LLVMTypeRef fields[4] = {
@@ -278,27 +384,160 @@ LLVMTypeRef lb_type_internal(Type *type) {
 			return LLVMStructType(fields, 4, false);
 		}
 		break;
+
 	case Type_Map:
 		return lb_type(type->Map.internal_type);
+
 	case Type_Struct:
-		GB_PANIC("Type_Struct");
+		{
+			if (type->Struct.is_raw_union) {
+				unsigned field_count = 2;
+				LLVMTypeRef *fields = gb_alloc_array(heap_allocator(), LLVMTypeRef, field_count);
+				i64 alignment = type_align_of(type);
+				unsigned size_of_union = cast(unsigned)type_size_of(type);
+				fields[0] = lb_alignment_prefix_type_hack(alignment);
+				fields[1] = LLVMArrayType(lb_type(t_u8), size_of_union);
+				return LLVMStructType(fields, field_count, false);
+			}
+
+			isize offset = 0;
+			if (type->Struct.custom_align > 0) {
+				offset = 1;
+			}
+
+			unsigned field_count = cast(unsigned)(type->Struct.fields.count + offset);
+			LLVMTypeRef *fields = gb_alloc_array(heap_allocator(), LLVMTypeRef, field_count);
+			defer (gb_free(heap_allocator(), fields));
+
+			for_array(i, type->Struct.fields) {
+				Entity *field = type->Struct.fields[i];
+				fields[i+offset] = lb_type(field->type);
+			}
+
+			if (type->Struct.custom_align > 0) {
+				fields[0] = lb_alignment_prefix_type_hack(type->Struct.custom_align);
+			}
+
+			return LLVMStructType(fields, field_count, type->Struct.is_packed);
+		}
 		break;
+
 	case Type_Union:
-		GB_PANIC("Type_Union");
+		if (type->Union.variants.count == 0) {
+			return LLVMStructType(nullptr, 0, false);
+		} else {
+			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
+			// LLVM takes the first element's alignment as the entire alignment (like C)
+			i64 align = type_align_of(type);
+			i64 size = type_size_of(type);
+
+			if (is_type_union_maybe_pointer_original_alignment(type)) {
+				LLVMTypeRef fields[1] = {lb_type(type->Union.variants[0])};
+				return LLVMStructType(fields, 1, false);
+			}
+
+			unsigned block_size = cast(unsigned)type->Union.variant_block_size;
+
+			LLVMTypeRef fields[3] = {};
+			unsigned field_count = 1;
+			fields[0] = lb_alignment_prefix_type_hack(align);
+			if (is_type_union_maybe_pointer(type)) {
+				field_count += 1;
+				fields[1] = lb_type(type->Union.variants[0]);
+			} else {
+				field_count += 2;
+				fields[1] = LLVMArrayType(lb_type(t_u8), block_size);
+				fields[2] = lb_type(union_tag_type(type));
+			}
+
+			return LLVMStructType(fields, field_count, false);
+		}
 		break;
+
 	case Type_Enum:
-		return LLVMIntType(8*cast(unsigned)type_size_of(type));
+		return lb_type(base_enum_type(type));
+
 	case Type_Tuple:
-		GB_PANIC("Type_Tuple");
-		break;
+		{
+			unsigned field_count = cast(unsigned)(type->Tuple.variables.count);
+			LLVMTypeRef *fields = gb_alloc_array(heap_allocator(), LLVMTypeRef, field_count);
+			defer (gb_free(heap_allocator(), fields));
+
+			for_array(i, type->Tuple.variables) {
+				Entity *field = type->Tuple.variables[i];
+				fields[i] = lb_type(field->type);
+			}
+
+			return LLVMStructType(fields, field_count, type->Tuple.is_packed);
+		}
+
 	case Type_Proc:
-		set_procedure_abi_types(heap_allocator(), type);
-		GB_PANIC("Type_Proc");
+		{
+			set_procedure_abi_types(heap_allocator(), type);
+
+			LLVMTypeRef return_type = LLVMVoidType();
+			isize offset = 0;
+			if (type->Proc.return_by_pointer) {
+				offset = 1;
+			} else if (type->Proc.abi_compat_result_type != nullptr) {
+				return_type = lb_type(type->Proc.abi_compat_result_type);
+			}
+
+			isize extra_param_count = offset;
+			if (type->Proc.calling_convention == ProcCC_Odin) {
+				extra_param_count += 1;
+			}
+
+			unsigned param_count = cast(unsigned)(type->Proc.abi_compat_params.count + extra_param_count);
+			LLVMTypeRef *param_types = gb_alloc_array(heap_allocator(), LLVMTypeRef, param_count);
+			defer (gb_free(heap_allocator(), param_types));
+
+			for_array(i, type->Proc.abi_compat_params) {
+				Type *param = type->Proc.abi_compat_params[i];
+				param_types[i+offset] = lb_type(param);
+			}
+			if (type->Proc.return_by_pointer) {
+				param_types[0] = LLVMPointerType(lb_type(type->Proc.abi_compat_result_type), 0);
+			}
+			if (type->Proc.calling_convention == ProcCC_Odin) {
+				param_types[param_count-1] = lb_type(t_context_ptr);
+			}
+
+			LLVMTypeRef t = LLVMFunctionType(return_type, param_types, param_count, type->Proc.c_vararg);
+			return LLVMPointerType(t, 0);
+		}
 		break;
 	case Type_BitFieldValue:
 		return LLVMIntType(type->BitFieldValue.bits);
+
 	case Type_BitField:
-		GB_PANIC("Type_BitField");
+		{
+			LLVMTypeRef internal_type = nullptr;
+			{
+				GB_ASSERT(type->BitField.fields.count == type->BitField.sizes.count);
+				unsigned field_count = cast(unsigned)type->BitField.fields.count;
+				LLVMTypeRef *fields = gb_alloc_array(heap_allocator(), LLVMTypeRef, field_count);
+				defer (gb_free(heap_allocator(), fields));
+
+				for_array(i, type->BitField.sizes) {
+					u32 size = type->BitField.sizes[i];
+					fields[i] = LLVMIntType(size);
+				}
+
+				internal_type = LLVMStructType(fields, field_count, true);
+			}
+			unsigned field_count = 2;
+			LLVMTypeRef *fields = gb_alloc_array(heap_allocator(), LLVMTypeRef, field_count);
+
+			i64 alignment = 1;
+			if (type->BitField.custom_align > 0) {
+				alignment = type->BitField.custom_align;
+			}
+			fields[0] = lb_alignment_prefix_type_hack(alignment);
+			fields[1] = internal_type;
+
+			return LLVMStructType(fields, field_count, true);
+		}
 		break;
 	case Type_BitSet:
 		return LLVMIntType(8*cast(unsigned)type_size_of(type));
@@ -448,6 +687,15 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 	gen->info = &c->info;
 
+	gen->module.mod = LLVMModuleCreateWithName("odin_module");
+	map_init(&gen->module.values, heap_allocator());
+
+	global_module = &gen->module;
+
+	lb_zero32 = LLVMConstInt(lb_type(t_i32), 0, false);
+	lb_one32  = LLVMConstInt(lb_type(t_i32), 1, false);
+
+
 	return true;
 }
 
@@ -468,6 +716,14 @@ void lb_build_stmt_list(lbProcedure *p, Array<Ast *> const &stmts) {
 	for_array(i, stmts) {
 		lb_build_stmt(p, stmts[i]);
 	}
+}
+
+lbValue lb_build_gep(lbProcedure *p, lbValue const &value, i32 index) {
+	Type *elem_type = nullptr;
+
+
+	GB_ASSERT(elem_type != nullptr);
+	return lbValue{LLVMBuildStructGEP2(p->builder, lb_type(elem_type), value.value, index, ""), elem_type};
 }
 
 
@@ -517,7 +773,12 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 		}
 
 		for_array(i, vd->values) {
-			lbValue value = lb_build_expr(p, vd->values[i]);
+			Ast *expr = vd->values[i];
+			lbValue value = lb_build_expr(p, expr);
+			GB_ASSERT_MSG(value.type != nullptr, "%s", expr_to_string(expr));
+			if (is_type_tuple(value.type)) {
+
+			}
 			array_add(&values, value);
 		}
 
@@ -540,23 +801,51 @@ LLVMValueRef llvm_const_f32(f32 f, Type *type=t_f32) {
 	return LLVMConstBitCast(i, lb_type(type));
 }
 
-lbValue lb_constant_value(Type *type, ExactValue const &value) {
+lbValue lb_constant_value(lbModule *m, Type *type, ExactValue const &value) {
+	lbValue res = {};
+	res.type = type;
 
 	switch (value.kind) {
 	case ExactValue_Invalid:
-		return lbValue{LLVMConstNull(lb_type(type)), type};
+		res.value = LLVMConstNull(lb_type(type));
+		return res;
 	case ExactValue_Bool:
-		return lbValue{LLVMConstInt(lb_type(type), value.value_bool, false), type};
+		res.value = LLVMConstInt(lb_type(type), value.value_bool, false);
+		return res;
 	case ExactValue_String:
-		return lbValue{LLVMConstInt(lb_type(type), value.value_bool, false), type};
+		{
+			LLVMValueRef indices[2] = {lb_zero32, lb_zero32};
+			LLVMValueRef data = LLVMConstString(cast(char const *)value.value_string.text,
+			                                    cast(unsigned)value.value_string.len,
+			                                    false);
+			LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), "test_string_data");
+			LLVMSetInitializer(global_data, data);
+
+			LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
+
+			if (is_type_cstring(type)) {
+				res.value = ptr;
+				return res;
+			}
+
+			LLVMValueRef len = LLVMConstInt(lb_type(t_int), value.value_string.len, true);
+			LLVMValueRef values[2] = {ptr, len};
+
+			res.value = LLVMConstNamedStruct(lb_type(type), values, 2);
+			return res;
+		}
+
 	case ExactValue_Integer:
-		return lbValue{LLVMConstIntOfArbitraryPrecision(lb_type(type), cast(unsigned)value.value_integer.len, big_int_ptr(&value.value_integer)), type};
+		res.value = LLVMConstIntOfArbitraryPrecision(lb_type(type), cast(unsigned)value.value_integer.len, big_int_ptr(&value.value_integer));
+		return res;
 	case ExactValue_Float:
 		if (type_size_of(type) == 4) {
 			f32 f = cast(f32)value.value_float;
-			return lbValue{llvm_const_f32(f, type), type};
+			res.value = llvm_const_f32(f, type);
+			return res;
 		}
-		return lbValue{LLVMConstReal(lb_type(type), value.value_float), type};
+		res.value = LLVMConstReal(lb_type(type), value.value_float);
+		return res;
 	case ExactValue_Complex:
 		{
 			LLVMValueRef values[2] = {};
@@ -571,7 +860,8 @@ lbValue lb_constant_value(Type *type, ExactValue const &value) {
 				break;
 			}
 
-			return lbValue{LLVMConstStruct(values, 2, false)};
+			res.value = LLVMConstNamedStruct(lb_type(type), values, 2);
+			return res;
 		}
 		break;
 	case ExactValue_Quaternion:
@@ -594,12 +884,14 @@ lbValue lb_constant_value(Type *type, ExactValue const &value) {
 				break;
 			}
 
-			return lbValue{LLVMConstStruct(values, 4, false)};
+			res.value = LLVMConstNamedStruct(lb_type(type), values, 4);
+			return res;
 		}
 		break;
 
 	case ExactValue_Pointer:
-		return lbValue{LLVMConstBitCast(LLVMConstInt(lb_type(t_uintptr), value.value_pointer, false), lb_type(type)), type};
+		res.value = LLVMConstBitCast(LLVMConstInt(lb_type(t_uintptr), value.value_pointer, false), lb_type(type));
+		return res;
 
 	case ExactValue_Compound:
 		GB_PANIC("ExactValue_Compound");
@@ -613,7 +905,7 @@ lbValue lb_constant_value(Type *type, ExactValue const &value) {
 	}
 
 	GB_PANIC("UNKNOWN ExactValue kind");
-	return lbValue{nullptr, type};
+	return res;
 }
 
 lbValue lb_add_module_constant(lbModule *m, Type *type, ExactValue const &value) {
@@ -623,68 +915,92 @@ lbValue lb_add_module_constant(lbModule *m, Type *type, ExactValue const &value)
 		GB_PANIC("lb_add_module_constant -> slice");
 	}
 
-	return lb_constant_value(type, value);
+	return lb_constant_value(m, type, value);
 }
 
 lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type) {
+	lbValue res = {};
+	res.type = type;
+
 	switch (op) {
 	case Token_Add:
 		if (is_type_float(type)) {
-			return lbValue{LLVMBuildFAdd(p->builder, lhs.value, rhs.value, ""), type};
+			res.value = LLVMBuildFAdd(p->builder, lhs.value, rhs.value, "");
+			return res;
 		}
-		return lbValue{LLVMBuildAdd(p->builder, lhs.value, rhs.value, ""), type};
+		res.value = LLVMBuildAdd(p->builder, lhs.value, rhs.value, "");
+		return res;
 	case Token_Sub:
 		if (is_type_float(type)) {
-			return lbValue{LLVMBuildFSub(p->builder, lhs.value, rhs.value, ""), type};
+			res.value = LLVMBuildFSub(p->builder, lhs.value, rhs.value, "");
+			return res;
 		}
-		return lbValue{LLVMBuildSub(p->builder, lhs.value, rhs.value, ""), type};
+		res.value = LLVMBuildSub(p->builder, lhs.value, rhs.value, "");
+		return res;
 	case Token_Mul:
 		if (is_type_float(type)) {
-			return lbValue{LLVMBuildFMul(p->builder, lhs.value, rhs.value, ""), type};
+			res.value = LLVMBuildFMul(p->builder, lhs.value, rhs.value, "");
+			return res;
 		}
-		return lbValue{LLVMBuildMul(p->builder, lhs.value, rhs.value, ""), type};
+		res.value = LLVMBuildMul(p->builder, lhs.value, rhs.value, "");
+		return res;
 	case Token_Quo:
 		if (is_type_float(type)) {
-			return lbValue{LLVMBuildFDiv(p->builder, lhs.value, rhs.value, ""), type};
+			res.value = LLVMBuildFDiv(p->builder, lhs.value, rhs.value, "");
+			return res;
 		} else if (is_type_unsigned(type)) {
-			return lbValue{LLVMBuildUDiv(p->builder, lhs.value, rhs.value, ""), type};
+			res.value = LLVMBuildUDiv(p->builder, lhs.value, rhs.value, "");
+			return res;
 		}
-		return lbValue{LLVMBuildSDiv(p->builder, lhs.value, rhs.value, ""), type};
+		res.value = LLVMBuildSDiv(p->builder, lhs.value, rhs.value, "");
+		return res;
 	case Token_Mod:
 		if (is_type_float(type)) {
-			return lbValue{LLVMBuildFRem(p->builder, lhs.value, rhs.value, ""), type};
+			res.value = LLVMBuildFRem(p->builder, lhs.value, rhs.value, "");
+			return res;
 		} else if (is_type_unsigned(type)) {
-			return lbValue{LLVMBuildURem(p->builder, lhs.value, rhs.value, ""), type};
+			res.value = LLVMBuildURem(p->builder, lhs.value, rhs.value, "");
+			return res;
 		}
-		return lbValue{LLVMBuildSRem(p->builder, lhs.value, rhs.value, ""), type};
+		res.value = LLVMBuildSRem(p->builder, lhs.value, rhs.value, "");
+		return res;
 	case Token_ModMod:
 		if (is_type_unsigned(type)) {
-			return lbValue{LLVMBuildURem(p->builder, lhs.value, rhs.value, ""), type};
+			res.value = LLVMBuildURem(p->builder, lhs.value, rhs.value, "");
+			return res;
 		} else {
 			LLVMValueRef a = LLVMBuildSRem(p->builder, lhs.value, rhs.value, "");
 			LLVMValueRef b = LLVMBuildAdd(p->builder, a, rhs.value, "");
 			LLVMValueRef c = LLVMBuildSRem(p->builder, b, rhs.value, "");
-			return lbValue{c, type};
+			res.value = c;
+			return res;
 		}
 
 	case Token_And:
-		return lbValue{LLVMBuildAnd(p->builder, lhs.value, rhs.value, ""), type};
+		res.value = LLVMBuildAnd(p->builder, lhs.value, rhs.value, "");
+		return res;
 	case Token_Or:
-		return lbValue{LLVMBuildOr(p->builder, lhs.value, rhs.value, ""), type};
+		res.value = LLVMBuildOr(p->builder, lhs.value, rhs.value, "");
+		return res;
 	case Token_Xor:
-		return lbValue{LLVMBuildXor(p->builder, lhs.value, rhs.value, ""), type};
+		res.value = LLVMBuildXor(p->builder, lhs.value, rhs.value, "");
+		return res;
 	case Token_Shl:
-		return lbValue{LLVMBuildShl(p->builder, lhs.value, rhs.value, ""), type};
+		res.value = LLVMBuildShl(p->builder, lhs.value, rhs.value, "");
+		return res;
 	case Token_Shr:
 		if (is_type_unsigned(type)) {
-			return lbValue{LLVMBuildLShr(p->builder, lhs.value, rhs.value, ""), type};
+			res.value = LLVMBuildLShr(p->builder, lhs.value, rhs.value, "");
+			return res;
 		}
-		return lbValue{LLVMBuildAShr(p->builder, lhs.value, rhs.value, ""), type};
+		res.value = LLVMBuildAShr(p->builder, lhs.value, rhs.value, "");
+		return res;
 	case Token_AndNot:
 		{
 			LLVMValueRef all_ones = LLVMConstAllOnes(lb_type(type));
 			LLVMValueRef new_rhs = LLVMBuildXor(p->builder, all_ones, rhs.value, "");
-			return lbValue{LLVMBuildAnd(p->builder, lhs.value, new_rhs, ""), type};
+			res.value = LLVMBuildAnd(p->builder, lhs.value, new_rhs, "");
+			return res;
 		}
 		break;
 	}
@@ -809,9 +1125,6 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 
 
 void lb_generate_module(lbGenerator *gen) {
-	gen->module.mod = LLVMModuleCreateWithName("odin_module");
-	map_init(&gen->module.values, heap_allocator());
-
 	LLVMModuleRef mod = gen->module.mod;
 	CheckerInfo *info = gen->info;
 
@@ -822,6 +1135,8 @@ void lb_generate_module(lbGenerator *gen) {
 	Entity *entry_point = info->entry_point;
 
 	auto *min_dep_set = &info->minimum_dependency_set;
+
+
 
 
 	for_array(i, info->entities) {
