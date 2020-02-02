@@ -1014,8 +1014,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		} else if (is_type_enumerated_array(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
 
-			Type *index_type = type->EnumeratedArray.elem;
-			Type *elem_type = type->Array.elem;
+			Type *elem_type = type->EnumeratedArray.elem;
 			isize elem_count = cl->elems.count;
 			if (elem_count == 0) {
 				ir_write_str_lit(f, "zeroinitializer");
