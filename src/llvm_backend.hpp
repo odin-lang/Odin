@@ -85,6 +85,134 @@ struct lbBranchBlocks {
 	lbBlock *continue_;
 };
 
+
+struct lbContextData {
+	lbAddr ctx;
+	isize scope_index;
+};
+
+enum lbParamPasskind {
+	lbParamPass_Value,    // Pass by value
+	lbParamPass_Pointer,  // Pass as a pointer rather than by value
+	lbParamPass_Integer,  // Pass as an integer of the same size
+	lbParamPass_ConstRef, // Pass as a pointer but the value is immutable
+	lbParamPass_BitCast,  // Pass by value and bit cast to the correct type
+	lbParamPass_Tuple,    // Pass across multiple parameters (System V AMD64, up to 2)
+};
+
+enum lbDeferExitKind {
+	lbDeferExit_Default,
+	lbDeferExit_Return,
+	lbDeferExit_Branch,
+};
+
+struct lbTargetList {
+	lbTargetList *prev;
+	bool          is_block;
+	lbBlock *     break_;
+	lbBlock *     continue_;
+	lbBlock *     fallthrough_;
+};
+
+
+
+struct lbProcedure {
+	lbProcedure *parent;
+	Array<lbProcedure> children;
+
+	Entity *     entity;
+	lbModule *   module;
+	String       name;
+	Type *       type;
+	Ast *        type_expr;
+	Ast *        body;
+	u64          tags;
+	ProcInlining inlining;
+	bool         is_foreign;
+	bool         is_export;
+	bool         is_entry_point;
+
+
+	LLVMValueRef    value;
+	LLVMBuilderRef  builder;
+
+	lbAddr           return_ptr;
+	Array<lbValue>   params;
+	Array<lbBlock *> blocks;
+	Array<lbBranchBlocks> branch_blocks;
+	Scope *          curr_scope;
+	i32              scope_index;
+	lbBlock *        decl_block;
+	lbBlock *        entry_block;
+	lbBlock *        curr_block;
+	lbTargetList *   target_list;
+
+	Array<lbContextData> context_stack;
+
+	lbValue  return_ptr_hint_value;
+	Ast *    return_ptr_hint_ast;
+	bool     return_ptr_hint_used;
+};
+
+
+
+
+
+bool lb_init_generator(lbGenerator *gen, Checker *c);
+void lb_generate_module(lbGenerator *gen);
+
+String lb_mangle_name(lbModule *m, Entity *e);
+String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
+
+LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value);
+void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value);
+void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name);
+lbProcedure *lb_create_procedure(lbModule *module, Entity *entity);
+void lb_end_procedure(lbProcedure *p);
+
+
+LLVMTypeRef  lb_type(lbModule *m, Type *type);
+
+lbBlock *lb_create_block(lbProcedure *p, char const *name);
+
+lbValue lb_const_nil(lbModule *m, Type *type);
+lbValue lb_const_value(lbModule *m, Type *type, ExactValue value);
+
+
+lbAddr lb_addr(lbValue addr);
+Type *lb_addr_type(lbAddr const &addr);
+LLVMTypeRef lb_addr_lb_type(lbAddr const &addr);
+void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue const &value);
+lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr);
+lbValue lb_emit_load(lbProcedure *p, lbValue v);
+
+void    lb_build_stmt(lbProcedure *p, Ast *stmt);
+lbValue lb_build_expr(lbProcedure *p, Ast *expr);
+lbAddr  lb_build_addr(lbProcedure *p, Ast *expr);
+void lb_build_stmt_list(lbProcedure *p, Array<Ast *> const &stmts);
+
+lbValue lb_build_gep(lbProcedure *p, lbValue const &value, i32 index) ;
+
+lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index);
+lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index);
+lbValue lb_emit_array_epi(lbProcedure *p, lbValue value, i32 index);
+
+
+lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type);
+
+
+
+lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
+lbValue lb_build_call_expr(lbProcedure *p, Ast *expr);
+
+
+lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={});
+
+lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, i32 param_index=0);
+
+lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t);
+
+
 enum lbCallingConventionKind {
     lbCallingConvention_C = 0,
     lbCallingConvention_Fast = 8,
@@ -143,111 +271,3 @@ lbCallingConventionKind const lb_calling_convention_map[ProcCC_MAX] = {
 
 	lbCallingConvention_C,            // ProcCC_None,
 };
-
-struct lbContextData {
-	lbAddr ctx;
-	isize scope_index;
-};
-
-
-struct lbProcedure {
-	lbProcedure *parent;
-	Array<lbProcedure> children;
-
-	Entity *     entity;
-	lbModule *   module;
-	String       name;
-	Type *       type;
-	Ast *        type_expr;
-	Ast *        body;
-	u64          tags;
-	ProcInlining inlining;
-	bool         is_foreign;
-	bool         is_export;
-	bool         is_entry_point;
-
-
-	LLVMValueRef    value;
-	LLVMBuilderRef  builder;
-
-	lbAddr           return_ptr;
-	Array<lbValue>   params;
-	Array<lbBlock *> blocks;
-	Array<lbBranchBlocks> branch_blocks;
-	Scope *          curr_scope;
-	i32              scope_index;
-	lbBlock *        decl_block;
-	lbBlock *        entry_block;
-	lbBlock *        curr_block;
-
-	Array<lbContextData> context_stack;
-
-	lbValue  return_ptr_hint_value;
-	Ast *    return_ptr_hint_ast;
-	bool     return_ptr_hint_used;
-};
-
-enum lbParamPasskind {
-	lbParamPass_Value,    // Pass by value
-	lbParamPass_Pointer,  // Pass as a pointer rather than by value
-	lbParamPass_Integer,  // Pass as an integer of the same size
-	lbParamPass_ConstRef, // Pass as a pointer but the value is immutable
-	lbParamPass_BitCast,  // Pass by value and bit cast to the correct type
-	lbParamPass_Tuple,    // Pass across multiple parameters (System V AMD64, up to 2)
-};
-
-
-
-bool lb_init_generator(lbGenerator *gen, Checker *c);
-void lb_generate_module(lbGenerator *gen);
-
-String lb_mangle_name(lbModule *m, Entity *e);
-String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
-
-LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value);
-void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value);
-void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name);
-lbProcedure *lb_create_procedure(lbModule *module, Entity *entity);
-void lb_end_procedure(lbProcedure *p);
-
-
-LLVMTypeRef  lb_type(lbModule *m, Type *type);
-
-lbBlock *lb_create_block(lbProcedure *p, char const *name);
-
-lbValue lb_const_nil(lbModule *m, Type *type);
-lbValue lb_const_value(lbModule *m, Type *type, ExactValue value);
-
-
-lbAddr lb_addr(lbValue addr);
-Type *lb_addr_type(lbAddr const &addr);
-LLVMTypeRef lb_addr_lb_type(lbAddr const &addr);
-void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue const &value);
-lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr);
-lbValue lb_emit_load(lbProcedure *p, lbValue v);
-
-void    lb_build_stmt(lbProcedure *p, Ast *stmt);
-lbValue lb_build_expr(lbProcedure *p, Ast *expr);
-lbAddr  lb_build_addr(lbProcedure *p, Ast *expr);
-void lb_build_stmt_list(lbProcedure *p, Array<Ast *> const &stmts);
-
-lbValue lb_build_gep(lbProcedure *p, lbValue const &value, i32 index) ;
-
-lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index);
-lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index);
-lbValue lb_emit_array_epi(lbProcedure *p, lbValue value, i32 index);
-
-
-lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type);
-
-
-
-lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
-lbValue lb_build_call_expr(lbProcedure *p, Ast *expr);
-
-
-lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={});
-
-lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, i32 param_index=0);
-
-lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t);

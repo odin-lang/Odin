@@ -897,7 +897,6 @@ void lb_begin_procedure_body(lbProcedure *p) {
 				GB_ASSERT(!is_blank_ident(e->token));
 
 				lbAddr res = lb_add_local(p, e->type, e);
-				gb_printf_err("%.*s\n", LIT(e->token.string));
 
 				lbValue c = {};
 				switch (e->Variable.param_value.kind) {
@@ -964,6 +963,57 @@ lbBlock *lb_create_block(lbProcedure *p, char const *name) {
 	return b;
 }
 
+void lb_start_block(lbProcedure *p, lbBlock *b) {
+	p->curr_block = b;
+	LLVMPositionBuilderAtEnd(p->builder, b->block);
+}
+
+void lb_emit_jump(lbProcedure *p, lbBlock *target_block) {
+	if (p->curr_block == nullptr) {
+		return;
+	}
+	LLVMBuildBr(p->builder, target_block->block);
+	p->curr_block = nullptr;
+}
+
+lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *false_block) {
+	switch (cond->kind) {
+	case_ast_node(pe, ParenExpr, cond);
+		return lb_build_cond(p, pe->expr, true_block, false_block);
+	case_end;
+
+	case_ast_node(ue, UnaryExpr, cond);
+		if (ue->op.kind == Token_Not) {
+			return lb_build_cond(p, ue->expr, false_block, true_block);
+		}
+	case_end;
+
+	case_ast_node(be, BinaryExpr, cond);
+		if (be->op.kind == Token_CmpAnd) {
+			lbBlock *block = lb_create_block(p, "cmp.and");
+			lb_build_cond(p, be->left, block, false_block);
+			lb_start_block(p, block);
+			return lb_build_cond(p, be->right, true_block, false_block);
+		} else if (be->op.kind == Token_CmpOr) {
+			lbBlock *block = lb_create_block(p, "cmp.or");
+			lb_build_cond(p, be->left, true_block, block);
+			lb_start_block(p, block);
+			return lb_build_cond(p, be->right, true_block, false_block);
+		}
+	case_end;
+	}
+
+	lbValue v = lb_build_expr(p, cond);
+	// v = lb_emit_conv(p, v, t_bool);
+	v = lb_emit_conv(p, v, t_llvm_bool);
+
+	LLVMBuildCondBr(p->builder, v.value, true_block->block, false_block->block);
+
+	return v;
+}
+
+
+
 lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 param_index) {
 	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
 
@@ -1021,6 +1071,95 @@ lbValue lb_build_gep(lbProcedure *p, lbValue const &value, i32 index) {
 	return lbValue{LLVMBuildStructGEP2(p->builder, lb_type(p->module, elem_type), value.value, index, ""), elem_type};
 }
 
+
+lbBranchBlocks lb_lookup_branch_blocks(lbProcedure *p, Ast *ident) {
+	GB_ASSERT(ident->kind == Ast_Ident);
+	Entity *e = entity_of_ident(ident);
+	GB_ASSERT(e->kind == Entity_Label);
+	for_array(i, p->branch_blocks) {
+		lbBranchBlocks *b = &p->branch_blocks[i];
+		if (b->label == e->Label.node) {
+			return *b;
+		}
+	}
+
+	GB_PANIC("Unreachable");
+	lbBranchBlocks empty = {};
+	return empty;
+}
+
+
+lbTargetList *lb_push_target_list(lbProcedure *p, Ast *label, lbBlock *break_, lbBlock *continue_, lbBlock *fallthrough_) {
+	lbTargetList *tl = gb_alloc_item(heap_allocator(), lbTargetList);
+	tl->prev = p->target_list;
+	tl->break_ = break_;
+	tl->continue_ = continue_;
+	tl->fallthrough_ = fallthrough_;
+	p->target_list = tl;
+
+	if (label != nullptr) { // Set label blocks
+		GB_ASSERT(label->kind == Ast_Label);
+
+		for_array(i, p->branch_blocks) {
+			lbBranchBlocks *b = &p->branch_blocks[i];
+			GB_ASSERT(b->label != nullptr && label != nullptr);
+			GB_ASSERT(b->label->kind == Ast_Label);
+			if (b->label == label) {
+				b->break_    = break_;
+				b->continue_ = continue_;
+				return tl;
+			}
+		}
+
+		GB_PANIC("Unreachable");
+	}
+
+	return tl;
+}
+
+void lb_pop_target_list(lbProcedure *p) {
+	p->target_list = p->target_list->prev;
+}
+
+
+
+
+void lb_open_scope(lbProcedure *p) {
+	p->scope_index += 1;
+}
+
+void lb_close_scope(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, bool pop_stack=true) {
+	GB_ASSERT(p->scope_index > 0);
+
+	// NOTE(bill): Remove `context`s made in that scope
+
+	isize end_idx = p->context_stack.count-1;
+	isize pop_count = 0;
+
+	for (;;) {
+		if (end_idx < 0) {
+			break;
+		}
+		lbContextData *end = &p->context_stack[end_idx];
+		if (end == nullptr) {
+			break;
+		}
+		if (end->scope_index != p->scope_index) {
+			break;
+		}
+		end_idx -= 1;
+		pop_count += 1;
+	}
+	if (pop_stack) {
+		for (isize i = 0; i < pop_count; i++) {
+			array_pop(&p->context_stack);
+		}
+	}
+
+
+	p->scope_index -= 1;
+}
+
 void lb_build_when_stmt(lbProcedure *p, AstWhenStmt *ws) {
 	TypeAndValue tv = type_and_value_of_expr(ws->cond);
 	GB_ASSERT(is_type_boolean(tv.type));
@@ -1056,7 +1195,22 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 
 
 	case_ast_node(bs, BlockStmt, node);
-		lb_build_stmt_list(p, bs->stmts);
+		if (bs->label != nullptr) {
+			lbBlock *done = lb_create_block(p, "block.done");
+			lbTargetList *tl = lb_push_target_list(p, bs->label, done, nullptr, nullptr);
+			tl->is_block = true;
+
+			lb_open_scope(p);
+			lb_build_stmt_list(p, bs->stmts);
+			lb_close_scope(p, lbDeferExit_Default, nullptr);
+
+			lb_emit_jump(p, done);
+			lb_start_block(p, done);
+		} else {
+			lb_open_scope(p);
+			lb_build_stmt_list(p, bs->stmts);
+			lb_close_scope(p, lbDeferExit_Default, nullptr);
+		}
 	case_end;
 
 	case_ast_node(vd, ValueDecl, node);
@@ -1327,6 +1481,49 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 	case_end;
 
 	case_ast_node(is, IfStmt, node);
+		lb_open_scope(p); // Scope #1
+
+		if (is->init != nullptr) {
+			// TODO(bill): Should this have a separate block to begin with?
+		#if 1
+			lbBlock *init = lb_create_block(p, "if.init");
+			lb_emit_jump(p, init);
+			lb_start_block(p, init);
+		#endif
+			lb_build_stmt(p, is->init);
+		}
+		lbBlock *then = lb_create_block(p, "if.then");
+		lbBlock *done = lb_create_block(p, "if.done");
+		lbBlock *else_ = done;
+		if (is->else_stmt != nullptr) {
+			else_ = lb_create_block(p, "if.else");
+		}
+
+		lb_build_cond(p, is->cond, then, else_);
+		lb_start_block(p, then);
+
+		if (is->label != nullptr) {
+			lbTargetList *tl = lb_push_target_list(p, is->label, done, nullptr, nullptr);
+			tl->is_block = true;
+		}
+
+		lb_build_stmt(p, is->body);
+
+		lb_emit_jump(p, done);
+
+		if (is->else_stmt != nullptr) {
+			lb_start_block(p, else_);
+
+			lb_open_scope(p);
+			lb_build_stmt(p, is->else_stmt);
+			lb_close_scope(p, lbDeferExit_Default, nullptr);
+
+			lb_emit_jump(p, done);
+		}
+
+
+		lb_start_block(p, done);
+		lb_close_scope(p, lbDeferExit_Default, nullptr);
 	case_end;
 
 	case_ast_node(fs, ForStmt, node);
@@ -1345,6 +1542,34 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 	case_end;
 
 	case_ast_node(bs, BranchStmt, node);
+		lbBlock *block = nullptr;
+
+		if (bs->label != nullptr) {
+			lbBranchBlocks bb = lb_lookup_branch_blocks(p, bs->label);
+			switch (bs->token.kind) {
+			case Token_break:    block = bb.break_;    break;
+			case Token_continue: block = bb.continue_; break;
+			case Token_fallthrough:
+				GB_PANIC("fallthrough cannot have a label");
+				break;
+			}
+		} else {
+			for (lbTargetList *t = p->target_list; t != nullptr && block == nullptr; t = t->prev) {
+				if (t->is_block) {
+					continue;
+				}
+
+				switch (bs->token.kind) {
+				case Token_break:       block = t->break_;       break;
+				case Token_continue:    block = t->continue_;    break;
+				case Token_fallthrough: block = t->fallthrough_; break;
+				}
+			}
+		}
+		if (block != nullptr) {
+			// ir_emit_defer_stmts(p, irDeferExit_Branch, block);
+		}
+		lb_emit_jump(p, block);
 	case_end;
 	}
 }
@@ -1353,6 +1578,12 @@ lbValue lb_const_nil(lbModule *m, Type *type) {
 	LLVMValueRef v = LLVMConstNull(lb_type(m, type));
 	return lbValue{v, type};
 }
+
+lbValue lb_const_undef(lbModule *m, Type *type) {
+	LLVMValueRef v = LLVMGetUndef(lb_type(m, type));
+	return lbValue{v, type};
+}
+
 
 lbValue lb_const_int(lbModule *m, Type *type, u64 value) {
 	lbValue res = {};
@@ -2140,8 +2371,397 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 }
 
 lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
-	// TODO(bill): lb_emit_conv
-	return value;
+	lbModule *m = p->module;
+
+	Type *src_type = value.type;
+	if (are_types_identical(t, src_type)) {
+		return value;
+	}
+
+	Type *src = core_type(src_type);
+	Type *dst = core_type(t);
+
+
+	// if (is_type_untyped_nil(src) && type_has_nil(dst)) {
+	if (is_type_untyped_nil(src)) {
+		return lb_const_nil(m, t);
+	}
+	if (is_type_untyped_undef(src)) {
+		return lb_const_undef(m, t);
+	}
+
+	if (LLVMIsConstant(value.value)) {
+		if (is_type_any(dst)) {
+			lbAddr default_value = lb_add_local_generated(p, default_type(src_type), false);
+			lb_addr_store(p, default_value, value);
+			return lb_emit_conv(p, lb_addr_load(p, default_value), t_any);
+		} else if (dst->kind == Type_Basic) {
+			if (is_type_float(dst)) {
+				return value;
+			} else if (is_type_integer(dst)) {
+				return value;
+			}
+			// ExactValue ev = value->Constant.value;
+			// if (is_type_float(dst)) {
+			// 	ev = exact_value_to_float(ev);
+			// } else if (is_type_complex(dst)) {
+			// 	ev = exact_value_to_complex(ev);
+			// } else if (is_type_quaternion(dst)) {
+			// 	ev = exact_value_to_quaternion(ev);
+			// } else if (is_type_string(dst)) {
+			// 	// Handled elsewhere
+			// 	GB_ASSERT_MSG(ev.kind == ExactValue_String, "%d", ev.kind);
+			// } else if (is_type_integer(dst)) {
+			// 	ev = exact_value_to_integer(ev);
+			// } else if (is_type_pointer(dst)) {
+			// 	// IMPORTANT NOTE(bill): LLVM doesn't support pointer constants expect 'null'
+			// 	lbValue i = ir_add_module_constant(p->module, t_uintptr, ev);
+			// 	return ir_emit(p, ir_instr_conv(p, irConv_inttoptr, i, t_uintptr, dst));
+			// }
+			// return lb_const_value(p->module, t, ev);
+		}
+	}
+
+	if (are_types_identical(src, dst)) {
+		if (!are_types_identical(src_type, t)) {
+			return lb_emit_transmute(p, value, t);
+		}
+		return value;
+	}
+
+
+
+	// bool <-> llvm bool
+	if (is_type_boolean(src) && dst == t_llvm_bool) {
+		lbValue res = {};
+		res.value = LLVMBuildTrunc(p->builder, value.value, lb_type(m, dst), "");
+		res.type = dst;
+		return res;
+	}
+	if (src == t_llvm_bool && is_type_boolean(dst)) {
+		lbValue res = {};
+		res.value = LLVMBuildZExt(p->builder, value.value, lb_type(m, dst), "");
+		res.type = dst;
+		return res;
+	}
+
+#if 0
+
+	// integer -> integer
+	if (is_type_integer(src) && is_type_integer(dst)) {
+		GB_ASSERT(src->kind == Type_Basic &&
+		          dst->kind == Type_Basic);
+		i64 sz = type_size_of(default_type(src));
+		i64 dz = type_size_of(default_type(dst));
+
+		if (sz > 1 && is_type_different_to_arch_endianness(src)) {
+			Type *platform_src_type = integer_endian_type_to_platform_type(src);
+			value = ir_emit_byte_swap(p, value, platform_src_type);
+		}
+		irConvKind kind = irConv_trunc;
+
+		if (dz < sz) {
+			kind = irConv_trunc;
+		} else if (dz == sz) {
+			// NOTE(bill): In LLVM, all integers are signed and rely upon 2's compliment
+			// NOTE(bill): Copy the value just for type correctness
+			kind = irConv_bitcast;
+		} else if (dz > sz) {
+			if (is_type_unsigned(src)) {
+				kind = irConv_zext; // zero extent
+			} else {
+				kind = irConv_sext; // sign extent
+			}
+		}
+
+		if (dz > 1 && is_type_different_to_arch_endianness(dst)) {
+			Type *platform_dst_type = integer_endian_type_to_platform_type(dst);
+			lbValue res = ir_emit(p, ir_instr_conv(p, kind, value, src_type, platform_dst_type));
+			return ir_emit_byte_swap(p, res, t);
+		} else {
+			return ir_emit(p, ir_instr_conv(p, kind, value, src_type, t));
+		}
+	}
+
+	// boolean -> boolean/integer
+	if (is_type_boolean(src) && (is_type_boolean(dst) || is_type_integer(dst))) {
+		lbValue b = ir_emit(p, ir_instr_binary_op(p, Token_NotEq, value, v_zero, t_llvm_bool));
+		return ir_emit(p, ir_instr_conv(p, irConv_zext, b, t_llvm_bool, t));
+	}
+
+	if (is_type_cstring(src) && is_type_u8_ptr(dst)) {
+		return ir_emit_bitcast(p, value, dst);
+	}
+	if (is_type_u8_ptr(src) && is_type_cstring(dst)) {
+		return ir_emit_bitcast(p, value, dst);
+	}
+	if (is_type_cstring(src) && is_type_rawptr(dst)) {
+		return ir_emit_bitcast(p, value, dst);
+	}
+	if (is_type_rawptr(src) && is_type_cstring(dst)) {
+		return ir_emit_bitcast(p, value, dst);
+	}
+
+	if (are_types_identical(src, t_cstring) && are_types_identical(dst, t_string)) {
+		lbValue c = ir_emit_conv(p, value, t_cstring);
+		auto args = array_make<lbValue >(ir_allocator(), 1);
+		args[0] = c;
+		lbValue s = ir_emit_runtime_call(p, "cstring_to_string", args);
+		return ir_emit_conv(p, s, dst);
+	}
+
+
+	// integer -> boolean
+	if (is_type_integer(src) && is_type_boolean(dst)) {
+		return ir_emit_comp(p, Token_NotEq, value, v_zero);
+	}
+
+	// float -> float
+	if (is_type_float(src) && is_type_float(dst)) {
+		gbAllocator a = ir_allocator();
+		i64 sz = type_size_of(src);
+		i64 dz = type_size_of(dst);
+		irConvKind kind = irConv_fptrunc;
+		if (dz >= sz) {
+			kind = irConv_fpext;
+		}
+		return ir_emit(p, ir_instr_conv(p, kind, value, src_type, t));
+	}
+
+	if (is_type_complex(src) && is_type_complex(dst)) {
+		Type *ft = base_complex_elem_type(dst);
+		lbValue gen = ir_add_local_generated(p, dst, false);
+		lbValue real = ir_emit_conv(p, ir_emit_struct_ev(p, value, 0), ft);
+		lbValue imag = ir_emit_conv(p, ir_emit_struct_ev(p, value, 1), ft);
+		ir_emit_store(p, ir_emit_struct_ep(p, gen, 0), real);
+		ir_emit_store(p, ir_emit_struct_ep(p, gen, 1), imag);
+		return ir_emit_load(p, gen);
+	}
+
+	if (is_type_quaternion(src) && is_type_quaternion(dst)) {
+		// @QuaternionLayout
+		Type *ft = base_complex_elem_type(dst);
+		lbValue gen = ir_add_local_generated(p, dst, false);
+		lbValue q0 = ir_emit_conv(p, ir_emit_struct_ev(p, value, 0), ft);
+		lbValue q1 = ir_emit_conv(p, ir_emit_struct_ev(p, value, 1), ft);
+		lbValue q2 = ir_emit_conv(p, ir_emit_struct_ev(p, value, 2), ft);
+		lbValue q3 = ir_emit_conv(p, ir_emit_struct_ev(p, value, 3), ft);
+		ir_emit_store(p, ir_emit_struct_ep(p, gen, 0), q0);
+		ir_emit_store(p, ir_emit_struct_ep(p, gen, 1), q1);
+		ir_emit_store(p, ir_emit_struct_ep(p, gen, 2), q2);
+		ir_emit_store(p, ir_emit_struct_ep(p, gen, 3), q3);
+		return ir_emit_load(p, gen);
+	}
+
+	if (is_type_float(src) && is_type_complex(dst)) {
+		Type *ft = base_complex_elem_type(dst);
+		lbValue gen = ir_add_local_generated(p, dst, true);
+		lbValue real = ir_emit_conv(p, value, ft);
+		ir_emit_store(p, ir_emit_struct_ep(p, gen, 0), real);
+		return ir_emit_load(p, gen);
+	}
+	if (is_type_float(src) && is_type_quaternion(dst)) {
+		Type *ft = base_complex_elem_type(dst);
+		lbValue gen = ir_add_local_generated(p, dst, true);
+		lbValue real = ir_emit_conv(p, value, ft);
+		// @QuaternionLayout
+		ir_emit_store(p, ir_emit_struct_ep(p, gen, 3), real);
+		return ir_emit_load(p, gen);
+	}
+	if (is_type_complex(src) && is_type_quaternion(dst)) {
+		Type *ft = base_complex_elem_type(dst);
+		lbValue gen = ir_add_local_generated(p, dst, true);
+		lbValue real = ir_emit_conv(p, ir_emit_struct_ev(p, value, 0), ft);
+		lbValue imag = ir_emit_conv(p, ir_emit_struct_ev(p, value, 1), ft);
+		// @QuaternionLayout
+		ir_emit_store(p, ir_emit_struct_ep(p, gen, 3), real);
+		ir_emit_store(p, ir_emit_struct_ep(p, gen, 0), imag);
+		return ir_emit_load(p, gen);
+	}
+
+
+
+	// float <-> integer
+	if (is_type_float(src) && is_type_integer(dst)) {
+		irConvKind kind = irConv_fptosi;
+		if (is_type_unsigned(dst)) {
+			kind = irConv_fptoui;
+		}
+		return ir_emit(p, ir_instr_conv(p, kind, value, src_type, t));
+	}
+	if (is_type_integer(src) && is_type_float(dst)) {
+		irConvKind kind = irConv_sitofp;
+		if (is_type_unsigned(src)) {
+			kind = irConv_uitofp;
+		}
+		return ir_emit(p, ir_instr_conv(p, kind, value, src_type, t));
+	}
+
+	// Pointer <-> uintptr
+	if (is_type_pointer(src) && is_type_uintptr(dst)) {
+		return ir_emit_ptr_to_uintptr(p, value, t);
+	}
+	if (is_type_uintptr(src) && is_type_pointer(dst)) {
+		return ir_emit_uintptr_to_ptr(p, value, t);
+	}
+
+	if (is_type_union(dst)) {
+		for_array(i, dst->Union.variants) {
+			Type *vt = dst->Union.variants[i];
+			if (are_types_identical(vt, src_type)) {
+				ir_emit_comment(p, str_lit("union - child to parent"));
+				gbAllocator a = ir_allocator();
+				lbValue parent = ir_add_local_generated(p, t, true);
+				ir_emit_store_union_variant(p, parent, value, vt);
+				return ir_emit_load(p, parent);
+			}
+		}
+	}
+
+	// NOTE(bill): This has to be done before 'Pointer <-> Pointer' as it's
+	// subtype polymorphism casting
+	if (check_is_assignable_to_using_subtype(src_type, t)) {
+		Type *st = type_deref(src_type);
+		Type *pst = st;
+		st = type_deref(st);
+
+		bool st_is_ptr = is_type_pointer(src_type);
+		st = base_type(st);
+
+		Type *dt = t;
+		bool dt_is_ptr = type_deref(dt) != dt;
+
+		GB_ASSERT(is_type_struct(st) || is_type_raw_union(st));
+		String field_name = ir_lookup_subtype_polymorphic_field(p->module->info, t, src_type);
+		if (field_name.len > 0) {
+			// NOTE(bill): It can be casted
+			Selection sel = lookup_field(st, field_name, false, true);
+			if (sel.entity != nullptr) {
+				ir_emit_comment(p, str_lit("cast - polymorphism"));
+				if (st_is_ptr) {
+					lbValue res = ir_emit_deep_field_gep(p, value, sel);
+					Type *rt = ir_type(res);
+					if (!are_types_identical(rt, dt) && are_types_identical(type_deref(rt), dt)) {
+						res = ir_emit_load(p, res);
+					}
+					return res;
+				} else {
+					if (is_type_pointer(ir_type(value))) {
+						Type *rt = ir_type(value);
+						if (!are_types_identical(rt, dt) && are_types_identical(type_deref(rt), dt)) {
+							value = ir_emit_load(p, value);
+						} else {
+							value = ir_emit_deep_field_gep(p, value, sel);
+							return ir_emit_load(p, value);
+						}
+					}
+
+					return ir_emit_deep_field_ev(p, value, sel);
+
+				}
+			} else {
+				GB_PANIC("invalid subtype cast  %s.%.*s", type_to_string(src_type), LIT(field_name));
+			}
+		}
+	}
+
+
+
+	// Pointer <-> Pointer
+	if (is_type_pointer(src) && is_type_pointer(dst)) {
+		return ir_emit_bitcast(p, value, t);
+	}
+
+
+
+	// proc <-> proc
+	if (is_type_p(src) && is_type_p(dst)) {
+		return ir_emit_bitcast(p, value, t);
+	}
+
+	// pointer -> proc
+	if (is_type_pointer(src) && is_type_p(dst)) {
+		return ir_emit_bitcast(p, value, t);
+	}
+	// proc -> pointer
+	if (is_type_p(src) && is_type_pointer(dst)) {
+		return ir_emit_bitcast(p, value, t);
+	}
+
+
+
+	// []byte/[]u8 <-> string
+	if (is_type_u8_slice(src) && is_type_string(dst)) {
+		lbValue elem = ir_slice_elem(p, value);
+		lbValue len  = ir_slice_len(p, value);
+		return ir_emit_string(p, elem, len);
+	}
+	if (is_type_string(src) && is_type_u8_slice(dst)) {
+		lbValue elem = ir_string_elem(p, value);
+		lbValue elem_ptr = ir_add_local_generated(p, ir_type(elem), false);
+		ir_emit_store(p, elem_ptr, elem);
+
+		lbValue len  = ir_string_len(p, value);
+		lbValue slice = ir_add_local_slice(p, t, elem_ptr, v_zero, len);
+		return ir_emit_load(p, slice);
+	}
+
+	if (is_type_array(dst)) {
+		Type *elem = dst->Array.elem;
+		lbValue e = ir_emit_conv(p, value, elem);
+		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
+		lbValue v = ir_add_local_generated(p, t, false);
+		isize index_count = cast(isize)dst->Array.count;
+
+		for (i32 i = 0; i < index_count; i++) {
+			lbValue elem = ir_emit_array_epi(p, v, i);
+			ir_emit_store(p, elem, e);
+		}
+		return ir_emit_load(p, v);
+	}
+
+	if (is_type_any(dst)) {
+		lbValue result = ir_add_local_generated(p, t_any, true);
+
+		if (is_type_untyped_nil(src)) {
+			return ir_emit_load(p, result);
+		}
+
+		Type *st = default_type(src_type);
+
+		lbValue data = ir_address_from_load_or_generate_local(p, value);
+		GB_ASSERT_MSG(is_type_pointer(ir_type(data)), type_to_string(ir_type(data)));
+		GB_ASSERT_MSG(is_type_typed(st), "%s", type_to_string(st));
+		data = ir_emit_conv(p, data, t_rawptr);
+
+
+		lbValue id = ir_typeid(p->module, st);
+
+		ir_emit_store(p, ir_emit_struct_ep(p, result, 0), data);
+		ir_emit_store(p, ir_emit_struct_ep(p, result, 1), id);
+
+		return ir_emit_load(p, result);
+	}
+
+	if (is_type_untyped(src)) {
+		if (is_type_string(src) && is_type_string(dst)) {
+			lbValue result = ir_add_local_generated(p, t, false);
+			ir_emit_store(p, result, value);
+			return ir_emit_load(p, result);
+		}
+	}
+#endif
+
+	gb_printf_err("ir_emit_conv: src -> dst\n");
+	gb_printf_err("Not Identical %s != %s\n", type_to_string(src_type), type_to_string(t));
+	gb_printf_err("Not Identical %s != %s\n", type_to_string(src), type_to_string(dst));
+
+
+	GB_PANIC("Invalid type conversion: '%s' to '%s' for procedure '%.*s'",
+	         type_to_string(src_type), type_to_string(t),
+	         LIT(p->name));
+
+	return {};
 }
 
 lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
@@ -3627,7 +4247,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			}
 			gbAllocator a = ir_allocator();
 			{
-				auto args = array_make<irValue *>(a, 3);
+				auto args = array_make<lbValue >(a, 3);
 				args[0] = ir_gen_map_header(proc, v, type);
 				args[1] = ir_const_int(2*cl->elems.count);
 				args[2] = ir_emit_source_code_location(proc, proc_name, pos);
