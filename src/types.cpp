@@ -301,7 +301,6 @@ struct Type {
 	i64  cached_size;
 	i64  cached_align;
 	u32  flags; // TypeFlag
-	LLVMTypeRef llvm_type;
 	bool failure;
 };
 

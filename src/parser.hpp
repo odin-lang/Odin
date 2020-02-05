@@ -174,11 +174,9 @@ enum ProcCallingConvention {
 	ProcCC_StdCall,
 	ProcCC_FastCall,
 
-	// TODO(bill): Add extra calling conventions
-	// ProcCC_VectorCall,
-	// ProcCC_ClrCall,
-
 	ProcCC_None,
+
+	ProcCC_MAX,
 
 
 	ProcCC_ForeignBlockDefault = -1,

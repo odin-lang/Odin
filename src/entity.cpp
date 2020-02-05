@@ -2,6 +2,7 @@ struct Scope;
 struct Checker;
 struct Type;
 struct DeclInfo;
+struct lbModule;
 
 
 #define ENTITY_KINDS \
@@ -103,6 +104,8 @@ struct Entity {
 	// TODO(bill): Cleanup how `using` works for entities
 	Entity *    using_parent;
 	Ast *       using_expr;
+
+	lbModule *  code_gen_module;
 
 	isize       order_in_src;
 	String      deprecated_message;
