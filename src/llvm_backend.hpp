@@ -187,6 +187,16 @@ struct lbProcedure {
 	bool     return_ptr_hint_used;
 };
 
+enum lbParamPasskind {
+	lbParamPass_Value,    // Pass by value
+	lbParamPass_Pointer,  // Pass as a pointer rather than by value
+	lbParamPass_Integer,  // Pass as an integer of the same size
+	lbParamPass_ConstRef, // Pass as a pointer but the value is immutable
+	lbParamPass_BitCast,  // Pass by value and bit cast to the correct type
+	lbParamPass_Tuple,    // Pass across multiple parameters (System V AMD64, up to 2)
+};
+
+
 
 bool lb_init_generator(lbGenerator *gen, Checker *c);
 void lb_generate_module(lbGenerator *gen);
@@ -216,11 +226,16 @@ void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue const &value);
 lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr);
 lbValue lb_emit_load(lbProcedure *p, lbValue v);
 
-void         lb_build_stmt  (lbProcedure *p, Ast *stmt);
-lbValue      lb_build_expr  (lbProcedure *p, Ast *expr);
+void    lb_build_stmt(lbProcedure *p, Ast *stmt);
+lbValue lb_build_expr(lbProcedure *p, Ast *expr);
+lbAddr  lb_build_addr(lbProcedure *p, Ast *expr);
 void lb_build_stmt_list(lbProcedure *p, Array<Ast *> const &stmts);
 
 lbValue lb_build_gep(lbProcedure *p, lbValue const &value, i32 index) ;
+
+lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index);
+lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index);
+lbValue lb_emit_array_epi(lbProcedure *p, lbValue value, i32 index);
 
 
 lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type);
@@ -229,3 +244,10 @@ lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Ty
 
 lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
 lbValue lb_build_call_expr(lbProcedure *p, Ast *expr);
+
+
+lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={});
+
+lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, i32 param_index=0);
+
+lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t);

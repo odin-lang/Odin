@@ -1143,13 +1143,13 @@ bool is_type_simd_vector(Type *t) {
 }
 
 Type *base_array_type(Type *t) {
-	if (is_type_array(t)) {
-		t = base_type(t);
-		return t->Array.elem;
-	}
-	if (is_type_simd_vector(t)) {
-		t = base_type(t);
-		return t->SimdVector.elem;
+	Type *bt = base_type(t);
+	if (is_type_array(bt)) {
+		return bt->Array.elem;
+	} else if (is_type_enumerated_array(bt)) {
+		return bt->EnumeratedArray.elem;
+	} else if (is_type_simd_vector(bt)) {
+		return bt->SimdVector.elem;
 	}
 	return t;
 }
