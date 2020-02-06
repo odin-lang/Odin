@@ -1280,7 +1280,7 @@ int main(int arg_count, char const **arg_ptr) {
 		if (!lb_init_generator(&gen, &checker)) {
 			return 1;
 		}
-		lb_generate_module(&gen);
+		lb_generate_code(&gen);
 
 		if (build_context.show_timings) {
 			show_timings(&checker, timings);
