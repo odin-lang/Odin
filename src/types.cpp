@@ -3421,7 +3421,13 @@ gbString write_type_to_string(gbString str, Type *type) {
 		str = gb_string_appendc(str, ")");
 		if (type->Proc.results) {
 			str = gb_string_appendc(str, " -> ");
+			if (type->Proc.results->Tuple.variables.count > 1) {
+				str = gb_string_appendc(str, "(");
+			}
 			str = write_type_to_string(str, type->Proc.results);
+			if (type->Proc.results->Tuple.variables.count > 1) {
+				str = gb_string_appendc(str, ")");
+			}
 		}
 		break;
 
