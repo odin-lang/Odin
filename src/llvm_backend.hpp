@@ -250,6 +250,9 @@ lbValue lb_typeid(lbModule *m, Type *type, Type *typeid_type=t_typeid);
 
 lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value);
 
+lbDefer lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt);
+
+
 enum lbCallingConventionKind {
     lbCallingConvention_C = 0,
     lbCallingConvention_Fast = 8,
