@@ -64,10 +64,21 @@ lbAddr lb_addr_bit_field(lbValue value, i32 index) {
 }
 
 
-void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue const &value) {
+void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value) {
 	if (addr.addr.value == nullptr) {
 		return;
 	}
+	GB_ASSERT(value.type != nullptr);
+	if (is_type_untyped_nil(value.type)) {
+		Type *t = lb_addr_type(addr);
+		value.type = t;
+		value.value = LLVMConstNull(lb_type(p->module, t));
+	} else if (is_type_untyped_undef(value.type)) {
+		Type *t = lb_addr_type(addr);
+		value.type = t;
+		value.value = LLVMGetUndef(lb_type(p->module, t));
+	}
+
 	GB_ASSERT(value.value != nullptr);
 	LLVMBuildStore(p->builder, value.value, addr.addr.value);
 }
@@ -154,6 +165,10 @@ String lb_mangle_name(lbModule *m, Entity *e) {
 String lb_get_entity_name(lbModule *m, Entity *e, String default_name) {
 	if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
 		return e->TypeName.ir_mangled_name;
+	}
+
+	if (e->pkg == nullptr) {
+		return e->token.string;
 	}
 
 	String name = {};
@@ -640,8 +655,8 @@ void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *nam
 lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	lbProcedure *p = gb_alloc_item(heap_allocator(), lbProcedure);
 
-	entity->code_gen_module = m;
 	p->module = m;
+	entity->code_gen_module = m;
 	p->entity = entity;
 	p->name = lb_get_entity_name(m, entity);
 
@@ -2603,6 +2618,29 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 		lbValue right = lb_build_expr(p, be->right);
 		return lb_emit_arith(p, be->op.kind, left, right, type);
 	}
+
+	case Token_CmpEq:
+	case Token_NotEq:
+	case Token_Lt:
+	case Token_LtEq:
+	case Token_Gt:
+	case Token_GtEq:
+		{
+			lbValue left = lb_build_expr(p, be->left);
+			Type *type = default_type(tv.type);
+			lbValue right = lb_build_expr(p, be->right);
+			lbValue cmp = lb_emit_comp(p, be->op.kind, left, right);
+			return lb_emit_conv(p, cmp, type);
+		}
+
+	case Token_CmpAnd:
+	case Token_CmpOr:
+		GB_PANIC("TODO(bill): && ||");
+		break;
+	case Token_in:
+	case Token_not_in:
+		GB_PANIC("TODO(bill): in/not_in");
+		break;
 	default:
 		GB_PANIC("Invalid binary expression");
 		break;
@@ -3143,7 +3181,7 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	GB_ASSERT_MSG(result_type != nullptr, "%s %d", type_to_string(t), index);
 
 	lbValue res = {};
-	res.value = LLVMBuildStructGEP2(p->builder, lb_type(p->module, result_type), s.value, cast(unsigned)index, "");
+	res.value = LLVMBuildStructGEP2(p->builder, lb_type(p->module, type_deref(s.type)), s.value, cast(unsigned)index, "");
 	res.type = result_type;
 	return res;
 }
@@ -3592,7 +3630,7 @@ lbValue lb_emit_array_epi(lbProcedure *p, lbValue s, i32 index) {
 	GB_ASSERT(0 <= index);
 	Type *ptr = base_array_type(st);
 	lbValue res = {};
-	res.value = LLVMBuildStructGEP2(p->builder, lb_type(p->module, ptr), s.value, index, "");
+	res.value = LLVMBuildStructGEP2(p->builder, lb_type(p->module, st), s.value, index, "");
 	res.type = alloc_type_pointer(ptr);
 	return res;
 }
@@ -3998,6 +4036,135 @@ void lb_loop_end(lbProcedure *p, lbLoopData const &data) {
 	}
 }
 
+lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
+	lbValue res = {};
+	res.type = t_llvm_bool;
+	Type *t = x.type;
+	if (is_type_pointer(t)) {
+		if (op_kind == Token_CmpEq) {
+			res.value = LLVMBuildIsNull(p->builder, x.value, "");
+		} else if (op_kind == Token_NotEq) {
+			res.value = LLVMBuildIsNotNull(p->builder, x.value, "");
+		}
+		return res;
+	} else if (is_type_cstring(t)) {
+		lbValue ptr = lb_emit_conv(p, x, t_u8_ptr);
+		if (op_kind == Token_CmpEq) {
+			res.value = LLVMBuildIsNull(p->builder, ptr.value, "");
+		} else if (op_kind == Token_NotEq) {
+			res.value = LLVMBuildIsNotNull(p->builder, ptr.value, "");
+		}
+		return res;
+	} else if (is_type_any(t)) {
+		lbValue data = lb_emit_struct_ev(p, x, 0);
+		lbValue ti   = lb_emit_struct_ev(p, x, 1);
+		if (op_kind == Token_CmpEq) {
+			LLVMValueRef a =  LLVMBuildIsNull(p->builder, data.value, "");
+			LLVMValueRef b =  LLVMBuildIsNull(p->builder, ti.value, "");
+			res.value = LLVMBuildOr(p->builder, a, b, "");
+			return res;
+		} else if (op_kind == Token_NotEq) {
+			LLVMValueRef a =  LLVMBuildIsNotNull(p->builder, data.value, "");
+			LLVMValueRef b =  LLVMBuildIsNotNull(p->builder, ti.value, "");
+			res.value = LLVMBuildAnd(p->builder, a, b, "");
+			return res;
+		}
+	} else if (is_type_slice(t)) {
+		gb_printf_err("HERE\n");
+		lbValue data = lb_emit_struct_ev(p, x, 0);
+		lbValue cap  = lb_emit_struct_ev(p, x, 1);
+		if (op_kind == Token_CmpEq) {
+			LLVMValueRef a = LLVMBuildIsNull(p->builder, data.value, "");
+			LLVMValueRef b = LLVMBuildIsNull(p->builder, cap.value, "");
+			res.value = LLVMBuildOr(p->builder, a, b, "");
+			return res;
+		} else if (op_kind == Token_NotEq) {
+			LLVMValueRef a = LLVMBuildIsNotNull(p->builder, data.value, "");
+			LLVMValueRef b = LLVMBuildIsNotNull(p->builder, cap.value, "");
+			res.value = LLVMBuildAnd(p->builder, a, b, "");
+			return res;
+		}
+	} else if (is_type_dynamic_array(t)) {
+		lbValue data = lb_emit_struct_ev(p, x, 0);
+		lbValue cap  = lb_emit_struct_ev(p, x, 2);
+		if (op_kind == Token_CmpEq) {
+			LLVMValueRef a = LLVMBuildIsNull(p->builder, data.value, "");
+			LLVMValueRef b = LLVMBuildIsNull(p->builder, cap.value, "");
+			res.value = LLVMBuildOr(p->builder, a, b, "");
+			return res;
+		} else if (op_kind == Token_NotEq) {
+			LLVMValueRef a = LLVMBuildIsNotNull(p->builder, data.value, "");
+			LLVMValueRef b = LLVMBuildIsNotNull(p->builder, cap.value, "");
+			res.value = LLVMBuildAnd(p->builder, a, b, "");
+			return res;
+		}
+	} else if (is_type_map(t)) {
+		GB_PANIC("map nil comparison");
+		// lbValue len = lb_map_len(p, x);
+		// return lb_emit_comp(p, op_kind, len, v_zero);
+	} else if (is_type_union(t)) {
+		if (type_size_of(t) == 0) {
+			if (op_kind == Token_CmpEq) {
+				return lb_const_bool(p->module, t_llvm_bool, true);
+			} else if (op_kind == Token_NotEq) {
+				return lb_const_bool(p->module, t_llvm_bool, false);
+			}
+		} else {
+			GB_PANIC("lb_emit_union_tag_value");
+			// lbValue tag = lb_emit_union_tag_value(p, x);
+			// return lb_emit_comp(p, op_kind, tag, v_zero);
+		}
+	} else if (is_type_typeid(t)) {
+		lbValue invalid_typeid = lb_const_value(p->module, t_typeid, exact_value_i64(0));
+		return lb_emit_comp(p, op_kind, x, invalid_typeid);
+	} else if (is_type_bit_field(t)) {
+		auto args = array_make<lbValue >(heap_allocator(), 2);
+		lbValue lhs = lb_address_from_load_or_generate_local(p, x);
+		args[0] = lb_emit_conv(p, lhs, t_rawptr);
+		args[1] = lb_const_int(p->module, t_int, type_size_of(t));
+		lbValue val = lb_emit_runtime_call(p, "memory_compare_zero", args);
+		lbValue res = lb_emit_comp(p, op_kind, val, lb_const_int(p->module, t_int, 0));
+		return res;
+	} else if (is_type_soa_struct(t)) {
+		GB_PANIC("#soa struct nil comparison");
+		// Type *bt = base_type(t);
+		// if (bt->Struct.soa_kind == StructSoa_Slice) {
+		// 	lbValue len  = lb_soa_struct_len(p, x);
+		// 	if (bt->Struct.fields.count > 1) {
+		// 		lbValue data = lb_emit_struct_ev(p, x, 0);
+		// 		if (op_kind == Token_CmpEq) {
+		// 			lbValue a = lb_emit_comp(p, Token_CmpEq, data, v_raw_nil);
+		// 			lbValue b = lb_emit_comp(p, Token_CmpEq, len, v_zero);
+		// 			return lb_emit_arith(p, Token_Or, a, b, t_bool);
+		// 		} else if (op_kind == Token_NotEq) {
+		// 			lbValue a = lb_emit_comp(p, Token_NotEq, data, v_raw_nil);
+		// 			lbValue b = lb_emit_comp(p, Token_NotEq, len, v_zero);
+		// 			return lb_emit_arith(p, Token_And, a, b, t_bool);
+		// 		}
+		// 	} else {
+		// 		return lb_emit_comp(p, op_kind, len, v_zero);
+		// 	}
+		// } else if (bt->Struct.soa_kind == StructSoa_Dynamic) {
+		// 	lbValue cap  = lb_soa_struct_len(p, x);
+		// 	if (bt->Struct.fields.count > 1) {
+		// 		lbValue data = lb_emit_struct_ev(p, x, 0);
+		// 		if (op_kind == Token_CmpEq) {
+		// 			lbValue a = lb_emit_comp(p, Token_CmpEq, data, v_raw_nil);
+		// 			lbValue b = lb_emit_comp(p, Token_CmpEq, cap, v_zero);
+		// 			return lb_emit_arith(p, Token_Or, a, b, t_bool);
+		// 		} else if (op_kind == Token_NotEq) {
+		// 			lbValue a = lb_emit_comp(p, Token_NotEq, data, v_raw_nil);
+		// 			lbValue b = lb_emit_comp(p, Token_NotEq, cap, v_zero);
+		// 			return lb_emit_arith(p, Token_And, a, b, t_bool);
+		// 		}
+		// 	} else {
+		// 		return lb_emit_comp(p, op_kind, cap, v_zero);
+		// 	}
+		// }
+	}
+	return {};
+}
+
 
 lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right) {
 	Type *a = base_type(left.type);
@@ -4005,15 +4172,15 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 
 	GB_ASSERT(gb_is_between(op_kind, Token__ComparisonBegin+1, Token__ComparisonEnd-1));
 
-	// lbValue nil_check = {};
-	// if (left->kind == irValue_Nil) {
-	// 	nil_check = lb_emit_comp_against_nil(p, op_kind, right);
-	// } else if (right->kind == irValue_Nil) {
-	// 	nil_check = lb_emit_comp_against_nil(p, op_kind, left);
-	// }
-	// if (nil_check.value != nullptr) {
-	// 	return nil_check;
-	// }
+	lbValue nil_check = {};
+	if (is_type_untyped_nil(left.type)) {
+		nil_check = lb_emit_comp_against_nil(p, op_kind, right);
+	} else if (is_type_untyped_nil(right.type)) {
+		nil_check = lb_emit_comp_against_nil(p, op_kind, left);
+	}
+	if (nil_check.value != nullptr) {
+		return nil_check;
+	}
 
 	if (are_types_identical(a, b)) {
 		// NOTE(bill): No need for a conversion
@@ -4293,6 +4460,46 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 }
 
 
+lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent = nullptr) {
+	ast_node(pl, ProcLit, expr);
+
+	// NOTE(bill): Generate a new name
+	// parent$count
+	isize name_len = prefix_name.len + 1 + 8 + 1;
+	char *name_text = gb_alloc_array(heap_allocator(), char, name_len);
+	i32 name_id = cast(i32)m->anonymous_proc_lits.entries.count;
+
+	name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%d", LIT(prefix_name), name_id);
+	String name = make_string((u8 *)name_text, name_len-1);
+
+	Type *type = type_of_expr(expr);
+	set_procedure_abi_types(heap_allocator(), type);
+
+
+	Token token = {};
+	token.pos = ast_token(expr).pos;
+	token.kind = Token_Ident;
+	token.string = name;
+	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
+	e->decl_info = pl->decl;
+	lbProcedure *p = lb_create_procedure(m, e);
+
+	lbValue value = {};
+	value.value = p->value;
+	value.type = p->type;
+
+	array_add(&m->procedures_to_generate, p);
+	if (parent != nullptr) {
+		array_add(&parent->children, p);
+	} else {
+		map_set(&m->members, hash_string(name), value);
+	}
+
+	map_set(&m->anonymous_proc_lits, hash_pointer(expr), p);
+
+	return value;
+}
+
 lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	lbModule *m = p->module;
 
@@ -4320,8 +4527,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(i, Implicit, expr);
-		// return ir_addr_load(p, lb_build_addr(p, expr));
-		GB_PANIC("TODO(bill): Implicit");
+		return lb_addr_load(p, lb_build_addr(p, expr));
 	case_end;
 
 	case_ast_node(u, Undef, expr);
@@ -4338,8 +4544,10 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 			         LIT(token.pos.file), token.pos.line, token.pos.column);
 			return {};
 		} else if (e->kind == Entity_Nil) {
-			GB_PANIC("Entity_Nil");
-			return lb_const_nil(m, tv.type);
+			lbValue res = {};
+			res.value = nullptr;
+			res.type = e->type;
+			return res;
 		}
 
 		auto *found = map_get(&p->module->values, hash_entity(e));
@@ -4530,7 +4738,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(pl, ProcLit, expr);
-		// return lb_gen_anonymous_proc_lit(p->module, p->name, expr, p);
+		return lb_generate_anonymous_proc_lit(p->module, p->name, expr, p);
 	case_end;
 
 	case_ast_node(cl, CompoundLit, expr);
@@ -5784,11 +5992,14 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	gen->module.ctx = LLVMGetGlobalContext();
 	gen->module.mod = LLVMModuleCreateWithNameInContext("odin_module", gen->module.ctx);
 	gb_mutex_init(&gen->module.mutex);
-	map_init(&gen->module.types, heap_allocator());
-	map_init(&gen->module.values, heap_allocator());
-	map_init(&gen->module.members, heap_allocator());
-	map_init(&gen->module.const_strings, heap_allocator());
-	map_init(&gen->module.const_string_byte_slices, heap_allocator());
+	gbAllocator a = heap_allocator();
+	map_init(&gen->module.types, a);
+	map_init(&gen->module.values, a);
+	map_init(&gen->module.members, a);
+	map_init(&gen->module.const_strings, a);
+	map_init(&gen->module.const_string_byte_slices, a);
+	map_init(&gen->module.anonymous_proc_lits, a);
+	array_init(&gen->module.procedures_to_generate, a);
 
 	return true;
 }
@@ -5944,9 +6155,6 @@ void lb_generate_code(lbGenerator *gen) {
 		lb_add_member(m, name, g);
 	}
 
-	Array<lbProcedure *> procedures = {};
-	procedures.allocator = heap_allocator();
-
 
 	for_array(i, info->entities) {
 		// arena_free_all(&temp_arena);
@@ -6009,20 +6217,19 @@ void lb_generate_code(lbGenerator *gen) {
 				}
 
 				lbProcedure *p = lb_create_procedure(m, e);
-				array_add(&procedures, p);
+				array_add(&m->procedures_to_generate, p);
 			}
 			break;
 		}
 	}
 
-	for_array(i, procedures) {
-		lbProcedure *p = procedures[i];
+	for_array(i, m->procedures_to_generate) {
+		lbProcedure *p = m->procedures_to_generate[i];
 		if (p->body != nullptr) { // Build Procedure
 			lb_begin_procedure_body(p);
 			lb_build_stmt(p, p->body);
 			lb_end_procedure_body(p);
 		}
-
 		lb_end_procedure(p);
 	}
 

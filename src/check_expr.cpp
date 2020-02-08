@@ -7643,6 +7643,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				return kind;
 			}
 
+			pl->decl = decl;
 			check_procedure_later(ctx.checker, ctx.file, empty_token, decl, type, pl->body, pl->tags);
 		}
 		check_close_scope(&ctx);
