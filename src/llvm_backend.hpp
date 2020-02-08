@@ -8,6 +8,8 @@
 #include "llvm-c/Transforms/InstCombine.h"
 #include "llvm-c/Transforms/IPO.h"
 
+struct lbProcedure;
+
 struct lbValue {
 	LLVMValueRef value;
 	Type *type;
@@ -59,10 +61,14 @@ struct lbModule {
 	Map<lbValue> const_strings; // Key: String
 	Map<lbValue> const_string_byte_slices; // Key: String
 
+	Map<lbProcedure *> anonymous_proc_lits; // Key: Ast *
+
 	lbAddr global_default_context;
 
 	u32 global_array_index;
 	u32 global_generated_index;
+
+	Array<lbProcedure *> procedures_to_generate;
 };
 
 struct lbGenerator {
@@ -145,7 +151,7 @@ struct lbTargetList {
 
 struct lbProcedure {
 	lbProcedure *parent;
-	Array<lbProcedure> children;
+	Array<lbProcedure *> children;
 
 	Entity *     entity;
 	lbModule *   module;
@@ -213,7 +219,7 @@ lbValue lb_const_int(lbModule *m, Type *type, u64 value);
 lbAddr lb_addr(lbValue addr);
 Type *lb_addr_type(lbAddr const &addr);
 LLVMTypeRef lb_addr_lb_type(lbAddr const &addr);
-void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue const &value);
+void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value);
 lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr);
 lbValue lb_emit_load(lbProcedure *p, lbValue v);
 
