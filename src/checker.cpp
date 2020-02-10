@@ -1625,6 +1625,7 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 	if (decl == nullptr) {
 		return;
 	}
+
 	for_array(i, decl->type_info_deps.entries) {
 		Type *type = decl->type_info_deps.entries[i].ptr;
 		add_min_dep_type_info(c, type);
@@ -1670,8 +1671,8 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("type_table"),
 		str_lit("__type_info_of"),
 		str_lit("default_temp_allocator"),
-		str_lit("default_temp_allocator_init"),
-		str_lit("default_temp_allocator_destroy"),
+		// str_lit("default_temp_allocator_init"),
+		// str_lit("default_temp_allocator_destroy"),
 		str_lit("default_temp_allocator_proc"),
 
 		str_lit("Type_Info"),

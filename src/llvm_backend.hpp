@@ -55,8 +55,9 @@ struct lbModule {
 
 	Map<LLVMTypeRef> types; // Key: Type *
 
-	Map<lbValue> values; // Key: Entity *
-	Map<lbValue> members; // Key: String
+	Map<lbValue>  values;           // Key: Entity *
+	Map<lbValue>  members;          // Key: String
+	Map<Entity *> procedure_values; // Key: LLVMValueRef
 
 	Map<lbValue> const_strings; // Key: String
 	Map<lbValue> const_string_byte_slices; // Key: String
@@ -222,6 +223,8 @@ LLVMTypeRef lb_addr_lb_type(lbAddr const &addr);
 void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value);
 lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr);
 lbValue lb_emit_load(lbProcedure *p, lbValue v);
+void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value);
+
 
 void    lb_build_stmt(lbProcedure *p, Ast *stmt);
 lbValue lb_build_expr(lbProcedure *p, Ast *expr);
@@ -233,30 +236,35 @@ lbValue lb_build_gep(lbProcedure *p, lbValue const &value, i32 index) ;
 lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index);
 lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index);
 lbValue lb_emit_array_epi(lbProcedure *p, lbValue value, i32 index);
-
+lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index);
+lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection sel);
 
 lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type);
-
+lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *platform_type);
 void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block);
-
+lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t);
+lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right);
+lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining = ProcInlining_none, bool use_return_ptr_hint = false);
 lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
+
 lbValue lb_build_call_expr(lbProcedure *p, Ast *expr);
 
 
-lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={});
+lbAddr lb_find_or_generate_context_ptr(lbProcedure *p);
+void lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx);
 
+
+lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={});
 lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, i32 param_index=0);
 
-lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t);
-
-lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right);
-lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining = ProcInlining_none, bool use_return_ptr_hint = false);
 
 lbValue lb_typeid(lbModule *m, Type *type, Type *typeid_type=t_typeid);
 
 lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value);
-
 lbDefer lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt);
+lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_init);
+
+lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> const &args);
 
 
 enum lbCallingConventionKind {
