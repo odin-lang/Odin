@@ -276,9 +276,10 @@ Logger_Options :: bit_set[Logger_Option];
 Logger_Proc :: #type proc(data: rawptr, level: Logger_Level, text: string, options: Logger_Options, location := #caller_location);
 
 Logger :: struct {
-	procedure: Logger_Proc,
-	data:      rawptr,
-	options:   Logger_Options,
+	procedure:    Logger_Proc,
+	data:      	  rawptr,
+	lowest_level: Logger_Level,
+	options:   	  Logger_Options,
 }
 
 Context :: struct {
@@ -434,7 +435,7 @@ default_logger_proc :: proc(data: rawptr, level: Logger_Level, text: string, opt
 }
 
 default_logger :: proc() -> Logger {
-	return Logger{default_logger_proc, nil, nil};
+	return Logger{default_logger_proc, nil, Logger_Level.Debug, nil};
 }
 
 
