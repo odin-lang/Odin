@@ -571,15 +571,16 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 
 
-// An `Arena` that can grow linearly (not geometrically), seperating large allocations, and grouping small allocations.
+// An `Arena` that can grow linearly (not geometrically), seperating over-sized allocations, and grouping nominally-sized allocations.
 //
 // Allocates in blocks of the same size, only allocating a new block
 // if there's not enough space, or we tried to allocate more than a certain amount at once.
 //
 // All blocks are allocated sequentially using the same allocator, and nothing is freed until you
-// call `destroy_dynamic_pool`, or `free_all` on the pool's allocator.
+// call `dynamic_pool_destroy`, `dynamic_pool_reset` (frees over-sized allocation blocks, but reuses nominally-sized allocation blocks),
+// or `free_all` on the pool's allocator.
 //
-// Will, at most, allocate `block_size` bytes; if you ask for more than a block, it returns nil. (See `dynamic_pool_init`)
+// Will, at most, allocate `block_size` bytes; if you ask for more than a block, it returns nil.
 Dynamic_Pool :: struct {
 	block_size:    int,
 	out_band_size: int,
