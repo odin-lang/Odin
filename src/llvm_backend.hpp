@@ -63,6 +63,7 @@ struct lbModule {
 
 	Map<lbValue>  values;           // Key: Entity *
 	Map<lbValue>  members;          // Key: String
+	Map<lbProcedure *> procedures;  // Key: String
 	Map<Entity *> procedure_values; // Key: LLVMValueRef
 
 	Map<lbValue> const_strings; // Key: String
@@ -87,7 +88,6 @@ struct lbGenerator {
 	lbModule module;
 	CheckerInfo *info;
 
-	gbFile   output_file;
 	String   output_base;
 	String   output_name;
 };
@@ -180,6 +180,7 @@ struct lbProcedure {
 
 	LLVMValueRef    value;
 	LLVMBuilderRef  builder;
+	bool            is_done;
 
 	lbAddr           return_ptr;
 	Array<lbValue>   params;
@@ -249,6 +250,7 @@ lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index);
 lbValue lb_emit_array_epi(lbProcedure *p, lbValue value, i32 index);
 lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index);
 lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection sel);
+lbValue lb_emit_deep_field_ev(lbProcedure *p, lbValue e, Selection sel);
 
 lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type);
 lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *platform_type);

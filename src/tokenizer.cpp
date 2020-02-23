@@ -179,6 +179,10 @@ Token make_token_ident(String s) {
 	Token t = {Token_Ident, s};
 	return t;
 }
+Token make_token_ident(char const *s) {
+	Token t = {Token_Ident, make_string_c(s)};
+	return t;
+}
 
 
 struct ErrorCollector {

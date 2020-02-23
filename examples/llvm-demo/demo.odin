@@ -1,24 +1,13 @@
 package demo
 
 import "core:os"
-import "core:sys/win32"
-
-foreign import kernel32 "system:Kernel32.lib"
-foreign import user32 "system:User32.lib"
-
-foreign user32 {
-	MessageBoxA :: proc "c" (hWnd: rawptr, text, caption: cstring, uType: u32) -> i32 ---
-}
-
-foreign kernel32 {
-	FlushFileBuffers :: proc "c" (hFile: win32.Handle) -> b32 ---
-}
-
-
 
 main :: proc() {
-	f := os.get_std_handle(win32.STD_OUTPUT_HANDLE);
-	os.write_string(f, "Hellope!\n");
+	os.write_string(os.stdout, "Hellope\n");
+
+	// BarBar :: struct {x, y: int};
+
+	// foo :: proc(x: int) {}
 
 	// Foo :: enum {A=1, B, C, D};
 	// Foo_Set :: bit_set[Foo];
@@ -36,10 +25,12 @@ main :: proc() {
 	// 	foo(1);
 	// }
 
-	// x := i32(1);
-	// y := i32(2);
-	// z := x + y;
-	// w := z - 2;
+	// {
+	// 	x := i32(1);
+	// 	y := i32(2);
+	// 	z := x + y;
+	// 	w := z - 2;
+	// }
 
 	// f := foo;
 
