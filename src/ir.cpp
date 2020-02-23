@@ -5714,7 +5714,7 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 	}
 
 	// TODO(bill): Actually figure out what the conversion needs to be correctly 'cause LLVM
-	return ir_emit_bitcast(proc, value, dst);
+	return ir_emit_bitcast(proc, value, t);
 }
 
 
