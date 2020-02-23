@@ -742,26 +742,28 @@ atan2_f64 :: proc(y, x: f64) -> f64 {
 atan2 :: proc{atan2_f32, atan2_f64};
 
 atan_f32 :: proc(x: f32) -> f32 {
-	return atan2_f32(1.0, x);
+	return atan2_f32(1, x);
 }
-atan :: proc{atan_f32};
-
+atan_f64 :: proc(x: f64) -> f64 {
+	return atan2_f64(1, x);
+}
+atan :: proc{atan_f32, atan_f64};
 
 asin_f32 :: proc(x: f32) -> f32 {
-	return atan2_f32(x, sqrt_f32(1 - x*x));
+	return atan2_f32(x, 1 + sqrt_f32(1 - x*x));
 }
 asin_f64 :: proc(x: f64) -> f64 {
-	return atan2_f64(x, sqrt_f64(1 - x*x));
+	return atan2_f64(x, 1 + sqrt_f64(1 - x*x));
 }
-asin :: proc{asin_f32};
+asin :: proc{asin_f32, asin_f64};
 
 acos_f32 :: proc(x: f32) -> f32 {
-	return atan2_f32(sqrt_f32(1 - x), sqrt_f32(1 + x));
+	return 2 * atan2_f32(sqrt_f32(1 - x), sqrt_f32(1 + x));
 }
 acos_f64 :: proc(x: f64) -> f64 {
-	return atan2_f64(sqrt_f64(1 - x), sqrt_f64(1 + x));
+	return 2 * atan2_f64(sqrt_f64(1 - x), sqrt_f64(1 + x));
 }
-acos :: proc{acos_f32};
+acos :: proc{acos_f32, acos_f64};
 
 
 sinh_f32 :: proc(x: f32) -> f32 {

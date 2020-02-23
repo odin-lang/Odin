@@ -30,17 +30,15 @@ Default_File_Logger_Opts :: Options{
 
 
 File_Console_Logger_Data :: struct {
-    lowest_level: Level,
     file_handle:  os.Handle,
     ident : string,
 }
 
 create_file_logger :: proc(h: os.Handle, lowest := Level.Debug, opt := Default_File_Logger_Opts, ident := "") -> Logger {
     data := new(File_Console_Logger_Data);
-    data.lowest_level = lowest;
     data.file_handle = h;
     data.ident = ident;
-    return Logger{file_console_logger_proc, data, opt};
+    return Logger{file_console_logger_proc, data, lowest, opt};
 }
 
 destroy_file_logger ::proc(log : ^Logger) {
@@ -52,10 +50,9 @@ destroy_file_logger ::proc(log : ^Logger) {
 
 create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logger_Opts, ident := "") -> Logger {
     data := new(File_Console_Logger_Data);
-    data.lowest_level = lowest;
     data.file_handle = os.INVALID_HANDLE;
     data.ident = ident;
-    return Logger{file_console_logger_proc, data, opt};
+    return Logger{file_console_logger_proc, data, lowest, opt};
 }
 
 destroy_console_logger ::proc(log : ^Logger) {
@@ -65,8 +62,6 @@ destroy_console_logger ::proc(log : ^Logger) {
 
 file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
     data := cast(^File_Console_Logger_Data)logger_data;
-    if level < data.lowest_level do return;
-
     h : os.Handle;
     if(data.file_handle != os.INVALID_HANDLE) do h = data.file_handle;
     else                                      do h = level <= Level.Error ? context.stdout : context.stderr;
