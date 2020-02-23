@@ -4,9 +4,14 @@
 #include "llvm-c/Analysis.h"
 #include "llvm-c/Object.h"
 #include "llvm-c/BitWriter.h"
+#include "llvm-c/DebugInfo.h"
 #include "llvm-c/Transforms/AggressiveInstCombine.h"
 #include "llvm-c/Transforms/InstCombine.h"
 #include "llvm-c/Transforms/IPO.h"
+#include "llvm-c/Transforms/PassManagerBuilder.h"
+#include "llvm-c/Transforms/Scalar.h"
+#include "llvm-c/Transforms/Utils.h"
+#include "llvm-c/Transforms/Vectorize.h"
 
 struct lbProcedure;
 
@@ -49,6 +54,7 @@ struct lbAddr {
 struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
+
 	CheckerInfo *info;
 
 	gbMutex mutex;
@@ -70,6 +76,11 @@ struct lbModule {
 	u32 global_generated_index;
 
 	Array<lbProcedure *> procedures_to_generate;
+
+
+	LLVMDIBuilderRef debug_builder;
+	LLVMMetadataRef debug_compile_unit;
+	Map<LLVMMetadataRef> debug_values; // Key: Pointer
 };
 
 struct lbGenerator {

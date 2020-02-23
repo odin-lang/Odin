@@ -15,14 +15,14 @@ set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	foreign _ {
 		when size_of(rawptr) == 8 {
 			@(link_name="llvm.memset.p0i8.i64")
-			llvm_memset :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) ---;
+			llvm_memset :: proc(dst: rawptr, val: byte, len: int, is_volatile: bool) ---;
 		} else {
 			@(link_name="llvm.memset.p0i8.i32")
-			llvm_memset :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) ---;
+			llvm_memset :: proc(dst: rawptr, val: byte, len: int, is_volatile: bool) ---;
 		}
 	}
 
-	llvm_memset(data, value, len, 1, false);
+	llvm_memset(data, value, len, false);
 	return data;
 }
 zero :: inline proc "contextless" (data: rawptr, len: int) -> rawptr {

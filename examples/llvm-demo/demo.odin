@@ -1,56 +1,62 @@
 package demo
 
 import "core:os"
+import "core:sys/win32"
 
-BarBar :: struct {
-	x, y: int,
-};
-foo :: proc(x: int) -> (b: BarBar) {
-	b = {1, 2};
-	return;
+foreign import kernel32 "system:Kernel32.lib"
+foreign import user32 "system:User32.lib"
+
+foreign user32 {
+	MessageBoxA :: proc "c" (hWnd: rawptr, text, caption: cstring, uType: u32) -> i32 ---
 }
 
+foreign kernel32 {
+	FlushFileBuffers :: proc "c" (hFile: win32.Handle) -> b32 ---
+}
+
+
+
 main :: proc() {
-	Foo :: enum {A=1, B, C, D};
-	Foo_Set :: bit_set[Foo];
-	foo_set := Foo_Set{.A, .C};
+	f := os.get_std_handle(win32.STD_OUTPUT_HANDLE);
+	os.write_string(f, "Hellope!\n");
 
-	array := [4]int{3 = 1, 0 .. 1 = 3, 2 = 9};
-	slice := []int{1, 2, 3, 4};
+	// Foo :: enum {A=1, B, C, D};
+	// Foo_Set :: bit_set[Foo];
+	// foo_set := Foo_Set{.A, .C};
 
-	x: ^int = nil;
-	y := slice != nil;
+	// array := [4]int{3 = 1, 0 .. 1 = 3, 2 = 9};
+	// slice := []int{1, 2, 3, 4};
 
-	@thread_local a: int;
+	// x: ^int = nil;
+	// y := slice != nil;
 
-	if true {
-		foo(1);
-	}
+	// @thread_local a: int;
 
-	x1 := i32(1);
-	y1 := i32(2);
-	z1 := x1 + y1;
-	w1 := z1 - 2;
+	// if true {
+	// 	foo(1);
+	// }
 
-	f := foo;
+	// x := i32(1);
+	// y := i32(2);
+	// z := x + y;
+	// w := z - 2;
 
-	c := 1 + 2i;
-	q := 1 + 2i + 3j + 4k;
+	// f := foo;
 
-	s := "Hellope";
+	// c := 1 + 2i;
+	// q := 1 + 2i + 3j + 4k;
 
-	b := true;
-	aaa := b ? int(123) : int(34);
-	defer aaa = 333;
+	// s := "Hellope";
 
-	p := proc(x: int) {};
+	// b := true;
+	// aaa := b ? int(123) : int(34);
+	// defer aaa = 333;
 
-
-	bb := BarBar{1, 2};
-	pc: proc "contextless" (x: i32) -> BarBar;
-	po: proc "odin" (x: i32) -> BarBar;
-	e: enum{A, B, C};
-	u: union{i32, bool};
-	u1: union{i32};
-	um: union #maybe {^int};
+	// bb := BarBar{1, 2};
+	// pc: proc "contextless" (x: i32) -> BarBar;
+	// po: proc "odin" (x: i32) -> BarBar;
+	// e: enum{A, B, C};
+	// u: union{i32, bool};
+	// u1: union{i32};
+	// um: union #maybe {^int};
 }

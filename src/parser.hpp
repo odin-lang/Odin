@@ -98,7 +98,6 @@ struct AstFile {
 	Array<Ast *> imports; // 'import' 'using import'
 	isize        directive_count;
 
-
 	Ast *        curr_proc;
 	isize        error_count;
 
@@ -111,6 +110,9 @@ struct AstFile {
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;
 	TokenPos fix_prev_pos;
+
+	struct LLVMOpaqueMetadata *llvm_metadata;
+	struct LLVMOpaqueMetadata *llvm_metadata_scope;
 };
 
 
