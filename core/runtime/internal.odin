@@ -42,10 +42,10 @@ mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 		foreign _ {
 			when size_of(rawptr) == 8 {
 				@(link_name="llvm.memset.p0i8.i64")
-				memset :: proc(dst: rawptr, val: byte, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+				memset :: proc(dst: rawptr, val: byte, len: int, is_volatile: bool = false) ---;
 			} else {
 				@(link_name="llvm.memset.p0i8.i32")
-				memset :: proc(dst: rawptr, val: byte, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+				memset :: proc(dst: rawptr, val: byte, len: int, is_volatile: bool = false) ---;
 			}
 		}
 	}
@@ -59,13 +59,13 @@ mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	foreign _ {
 		when size_of(rawptr) == 8 {
 			@(link_name="llvm.memmove.p0i8.p0i8.i64")
-			llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+			llvm_memmove :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
 		} else {
 			@(link_name="llvm.memmove.p0i8.p0i8.i32")
-			llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+			llvm_memmove :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
 		}
 	}
-	llvm_memmove(dst, src, len, 1, false);
+	llvm_memmove(dst, src, len);
 	return dst;
 }
 
@@ -75,13 +75,13 @@ mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> r
 	foreign _ {
 		when size_of(rawptr) == 8 {
 			@(link_name="llvm.memcpy.p0i8.p0i8.i64")
-			llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+			llvm_memcpy :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
 		} else {
 			@(link_name="llvm.memcpy.p0i8.p0i8.i32")
-			llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) ---;
+			llvm_memcpy :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
 		}
 	}
-	llvm_memcpy(dst, src, len, 1, false);
+	llvm_memcpy(dst, src, len);
 	return dst;
 }
 
