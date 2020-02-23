@@ -314,7 +314,11 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 
 		gbString str = expr_to_string(lhs->expr);
 		if (e != nullptr && e->flags & EntityFlag_Param) {
-			error(lhs->expr, "Cannot assign to '%s' which is a procedure parameter", str);
+			if (e->flags & EntityFlag_Using) {
+				error(lhs->expr, "Cannot assign to '%s' which is from a 'using' procedure parameter", str);
+			} else {
+				error(lhs->expr, "Cannot assign to '%s' which is a procedure parameter", str);
+			}
 		} else {
 			error(lhs->expr, "Cannot assign to '%s'", str);
 		}
@@ -497,6 +501,8 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 				Entity *f = found->elements.entries[i].value;
 				if (f->kind == Entity_Variable) {
 					Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, expr);
+					if (e->flags & EntityFlag_Value) uvar->flags |= EntityFlag_Value;
+					if (e->flags & EntityFlag_Param) uvar->flags |= EntityFlag_Param;
 					Entity *prev = scope_insert(ctx->scope, uvar);
 					if (prev != nullptr) {
 						gbString expr_str = expr_to_string(expr);
