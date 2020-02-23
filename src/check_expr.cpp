@@ -2260,6 +2260,8 @@ bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) {
 			x->mode = Addressing_Value;
 		} else if (is_type_slice(type) && is_type_string(x->type)) {
 			x->mode = Addressing_Value;
+		} else if (is_type_union(type)) {
+			x->mode = Addressing_Value;
 		}
 		return true;
 	}
