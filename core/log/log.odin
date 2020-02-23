@@ -60,9 +60,10 @@ Logger_Proc :: #type proc(data: rawptr, level: Level, text: string, options: Opt
 Logger :: runtime.Logger;
 /*
 Logger :: struct {
-	procedure: Logger_Proc,
-	data:      rawptr,
-	options:   Options,
+	procedure:    Logger_Proc,
+	data:      	  rawptr,
+	lowest_level: Level,
+	options:   	  Logger_Options,
 }
 */
 
@@ -74,7 +75,7 @@ create_multi_logger :: proc(logs: ..Logger) -> Logger {
 	data := new(Multi_Logger_Data);
 	data.loggers = make([]Logger, len(logs));
 	copy(data.loggers, logs);
-	return Logger{multi_logger_proc, data, nil};
+	return Logger{multi_logger_proc, data, Level.Debug, nil};
 }
 
 destroy_multi_logger :: proc(log : ^Logger) {
@@ -98,18 +99,32 @@ nil_logger_proc :: proc(data: rawptr, level: Level, text: string, options: Optio
 }
 
 nil_logger :: proc() -> Logger {
-	return Logger{nil_logger_proc, nil, nil};
+	return Logger{nil_logger_proc, nil, Level.Debug, nil};
 }
 
 // TODO(bill): Should these be redesigned so that they are do not rely upon `package fmt`?
-debug :: proc(fmt_str : string, args : ..any, location := #caller_location) do logf(level=Level.Debug,   fmt_str=fmt_str, args=args, location=location);
-info  :: proc(fmt_str : string, args : ..any, location := #caller_location) do logf(level=Level.Info,    fmt_str=fmt_str, args=args, location=location);
-warn  :: proc(fmt_str : string, args : ..any, location := #caller_location) do logf(level=Level.Warning, fmt_str=fmt_str, args=args, location=location);
-error :: proc(fmt_str : string, args : ..any, location := #caller_location) do logf(level=Level.Error,   fmt_str=fmt_str, args=args, location=location);
-fatal :: proc(fmt_str : string, args : ..any, location := #caller_location) do logf(level=Level.Fatal,   fmt_str=fmt_str, args=args, location=location);
+debugf :: proc(fmt_str : string, args : ..any, location := #caller_location) do logf(level=Level.Debug,   fmt_str=fmt_str, args=args, location=location);
+infof  :: proc(fmt_str : string, args : ..any, location := #caller_location) do logf(level=Level.Info,    fmt_str=fmt_str, args=args, location=location);
+warnf  :: proc(fmt_str : string, args : ..any, location := #caller_location) do logf(level=Level.Warning, fmt_str=fmt_str, args=args, location=location);
+errorf :: proc(fmt_str : string, args : ..any, location := #caller_location) do logf(level=Level.Error,   fmt_str=fmt_str, args=args, location=location);
+fatalf :: proc(fmt_str : string, args : ..any, location := #caller_location) do logf(level=Level.Fatal,   fmt_str=fmt_str, args=args, location=location);
+
+debug :: proc(args : ..any, location := #caller_location) do log(level=Level.Debug,   args=args, location=location);
+info  :: proc(args : ..any, location := #caller_location) do log(level=Level.Info,    args=args, location=location);
+warn  :: proc(args : ..any, location := #caller_location) do log(level=Level.Warning, args=args, location=location);
+error :: proc(args : ..any, location := #caller_location) do log(level=Level.Error,   args=args, location=location);
+fatal :: proc(args : ..any, location := #caller_location) do log(level=Level.Fatal,   args=args, location=location);
+
+log :: proc(level : Level, args : ..any, location := #caller_location) {
+	logger := context.logger;
+	if level < logger.lowest_level do return;
+	str := fmt.tprint(..args); //NOTE(Hoej): While tprint isn't thread-safe, no logging is.
+	logger.procedure(logger.data, level, str, logger.options, location);
+}
 
 logf :: proc(level : Level, fmt_str : string, args : ..any, location := #caller_location) {
 	logger := context.logger;
+	if level < logger.lowest_level do return;
 	str := len(args) > 0 ? fmt.tprintf(fmt_str, ..args) : fmt.tprint(fmt_str); //NOTE(Hoej): While tprint isn't thread-safe, no logging is.
 	logger.procedure(logger.data, level, str, logger.options, location);
 }

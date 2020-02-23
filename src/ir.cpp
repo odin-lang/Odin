@@ -5714,7 +5714,7 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 	}
 
 	// TODO(bill): Actually figure out what the conversion needs to be correctly 'cause LLVM
-	return ir_emit_bitcast(proc, value, dst);
+	return ir_emit_bitcast(proc, value, t);
 }
 
 
@@ -7348,10 +7348,11 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					GB_ASSERT(are_types_identical(ir_type(left), key_type));
 
 					Type *it = bit_set_to_int(rt);
+					left = ir_emit_conv(proc, left, it);
 
 					irValue *lower = ir_value_constant(it, exact_value_i64(rt->BitSet.lower));
-					irValue *key = ir_emit_arith(proc, Token_Sub, left, lower, ir_type(left));
-					irValue *bit = ir_emit_arith(proc, Token_Shl, v_one, key, ir_type(left));
+					irValue *key = ir_emit_arith(proc, Token_Sub, left, lower, it);
+					irValue *bit = ir_emit_arith(proc, Token_Shl, v_one, key, it);
 					bit = ir_emit_conv(proc, bit, it);
 
 					irValue *old_value = ir_emit_bitcast(proc, right, it);

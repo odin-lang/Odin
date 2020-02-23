@@ -45,8 +45,18 @@ copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawpt
 	return runtime.mem_copy_non_overlapping(dst, src, len);
 }
 compare :: inline proc "contextless" (a, b: []byte) -> int {
-	return compare_byte_ptrs(&a[0], &b[0], min(len(a), len(b)));
+	// NOTE(tetra): no-abc is okay here because if the slices are empty, `&a[0]` is just nil+0 == nil, which
+	// compare_byte_ptrs handles fine when the passed length is also zero.
+	res := #no_bounds_check compare_byte_ptrs(&a[0], &b[0], min(len(a), len(b)));
+	if res == 0 && len(a) != len(b) {
+		return len(a) <= len(b) ? -1 : +1;
+	} else if len(a) == 0 && len(b) == 0 {
+		return 0;
+	} else {
+		return res;
+	}
 }
+
 compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int #no_bounds_check {
 	x := slice_ptr(a, n);
 	y := slice_ptr(b, n);

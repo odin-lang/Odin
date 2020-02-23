@@ -1529,11 +1529,11 @@ int main(int arg_count, char const **arg_ptr) {
 			// Shared libraries are .dylib on MacOS and .so on Linux.
 			#if defined(GB_SYSTEM_OSX)
 				output_ext = STR_LIT(".dylib");
+				link_settings = "-dylib -dynamic";
 			#else
 				output_ext = STR_LIT(".so");
+				link_settings = "-shared";
 			#endif
-
-			link_settings = "-shared";
 		} else {
 			// TODO: Do I need anything here?
 			link_settings = "";
