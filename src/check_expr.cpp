@@ -5942,7 +5942,9 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				Entity *e = sig_params[operand_index];
 				Type *t = e->type;
 				Operand o = operands[operand_index];
-				call->viral_state_flags |= o.expr->viral_state_flags;
+				if (o.expr != nullptr) {
+					call->viral_state_flags |= o.expr->viral_state_flags;
+				}
 
 				if (e->kind == Entity_TypeName) {
 					// GB_ASSERT(!variadic);
