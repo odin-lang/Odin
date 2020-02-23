@@ -5,6 +5,7 @@ foreign import libc "system:c"
 
 import "core:runtime"
 import "core:strings"
+import "core:c"
 
 OS :: "darwin";
 
@@ -263,6 +264,8 @@ X_OK :: 1; // Test for execute permission
 F_OK :: 0; // Test for file existance
 
 foreign libc {
+	@(link_name="__error") __error :: proc() -> ^int ---;
+
 	@(link_name="open")    _unix_open    :: proc(path: cstring, flags: int, #c_vararg mode: ..any) -> Handle ---;
 	@(link_name="close")   _unix_close   :: proc(handle: Handle) ---;
 	@(link_name="read")    _unix_read    :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---;
@@ -278,6 +281,8 @@ foreign libc {
 	@(link_name="free")    _unix_free    :: proc(ptr: rawptr) ---;
 	@(link_name="realloc") _unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr ---;
 	@(link_name="getenv")  _unix_getenv  :: proc(cstring) -> cstring ---;
+	@(link_name="getcwd")  _unix_getcwd  :: proc(buf: cstring, len: c.size_t) -> cstring ---;
+	@(link_name="chdir")   _unix_chdir   :: proc(buf: cstring) -> c.int ---;
 
 	@(link_name="exit")    _unix_exit    :: proc(status: int) ---;
 }
@@ -287,6 +292,10 @@ foreign dl {
 	@(link_name="dlsym")   _unix_dlsym   :: proc(handle: rawptr, symbol: cstring) -> rawptr ---;
 	@(link_name="dlclose") _unix_dlclose :: proc(handle: rawptr) -> int ---;
 	@(link_name="dlerror") _unix_dlerror :: proc() -> cstring ---;
+}
+
+get_last_error :: proc() -> int {
+	return __error()^;
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
@@ -392,6 +401,30 @@ getenv :: proc(name: string) -> (string, bool) {
 		return "", false;
 	}
 	return string(cstr), true;
+}
+
+get_current_directory :: proc() -> string {
+	page_size := get_page_size(); // NOTE(tetra): See note in os_linux.odin/get_current_directory.
+	buf := make([dynamic]u8, page_size);
+	for {
+		cwd := _unix_getcwd(cstring(#no_bounds_check &buf[0]), c.size_t(len(buf)));
+		if cwd != nil {
+			return string(cwd);
+		}
+		if Errno(get_last_error()) != ERANGE {
+			return "";
+		}
+		resize(&buf, len(buf)+page_size);
+	}
+	unreachable();
+	return "";
+}
+
+set_current_directory :: proc(path: string) -> (err: Errno) {
+	cstr := strings.clone_to_cstring(path, context.temp_allocator);
+	res := _unix_chdir(cstr);
+	if res == -1 do return Errno(get_last_error());
+	return ERROR_NONE;
 }
 
 exit :: inline proc(code: int) -> ! {
