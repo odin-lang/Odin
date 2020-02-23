@@ -6300,7 +6300,7 @@ Entity **populate_proc_parameter_list(CheckerContext *c, Type *proc_type, isize 
 }
 
 
-bool evaluate_where_clauses(CheckerContext *ctx, Scope *scope, Array<Ast *> *clauses, bool print_err) {
+bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Scope *scope, Array<Ast *> *clauses, bool print_err) {
 	if (clauses != nullptr) {
 		for_array(i, *clauses) {
 			Ast *clause = (*clauses)[i];
@@ -6308,9 +6308,11 @@ bool evaluate_where_clauses(CheckerContext *ctx, Scope *scope, Array<Ast *> *cla
 			check_expr(ctx, &o, clause);
 			if (o.mode != Addressing_Constant) {
 				if (print_err) error(clause, "'where' clauses expect a constant boolean evaluation");
+				if (print_err && call_expr) error(call_expr, "at caller location");
 				return false;
 			} else if (o.value.kind != ExactValue_Bool) {
 				if (print_err) error(clause, "'where' clauses expect a constant boolean evaluation");
+				if (print_err && call_expr) error(call_expr, "at caller location");
 				return false;
 			} else if (!o.value.value_bool) {
 				if (print_err) {
@@ -6352,6 +6354,7 @@ bool evaluate_where_clauses(CheckerContext *ctx, Scope *scope, Array<Ast *> *cla
 						}
 					}
 
+					if (call_expr) error(call_expr, "at caller location");
 				}
 				return false;
 			}
@@ -6617,7 +6620,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 					ctx.curr_proc_sig  = e->type;
 
 					GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
-					if (!evaluate_where_clauses(&ctx, decl->scope, &decl->proc_lit->ProcLit.where_clauses, false)) {
+					if (!evaluate_where_clauses(&ctx, operand->expr, decl->scope, &decl->proc_lit->ProcLit.where_clauses, false)) {
 						continue;
 					}
 				}
