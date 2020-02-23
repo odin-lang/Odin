@@ -4405,6 +4405,12 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 	} else if (is_type_union(t)) {
 		if (type_size_of(t) == 0) {
 			return ir_emit_comp(proc, op_kind, v_zero, v_zero);
+		} else if (is_type_union_maybe_pointer(t)) {
+			Type *bt = base_type(t);
+			irValue *ptr = ir_address_from_load_or_generate_local(proc, x);
+			ptr = ir_emit_bitcast(proc, ptr, alloc_type_pointer(bt->Union.variants[0]));
+			irValue *data = ir_emit_load(proc, ptr);
+			return ir_emit_comp_against_nil(proc, op_kind, data);
 		} else {
 			irValue *tag = ir_emit_union_tag_value(proc, x);
 			return ir_emit_comp(proc, op_kind, tag, v_zero);
