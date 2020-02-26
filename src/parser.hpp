@@ -203,12 +203,13 @@ enum FieldFlag {
 	FieldFlag_no_alias  = 1<<2,
 	FieldFlag_c_vararg  = 1<<3,
 	FieldFlag_auto_cast = 1<<4,
+	FieldFlag_const     = 1<<5,
 
 	FieldFlag_Tags = 1<<10,
 
 	FieldFlag_Results   = 1<<16,
 
-	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast,
+	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast|FieldFlag_const,
 	FieldFlag_Struct    = FieldFlag_using|FieldFlag_Tags,
 };
 
