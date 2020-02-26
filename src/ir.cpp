@@ -197,6 +197,7 @@ gbAllocator ir_allocator(void) {
 	IR_INSTR_KIND(ZeroInit, struct { irValue *address; })             \
 	IR_INSTR_KIND(Store,    struct { irValue *address, *value; bool is_volatile; }) \
 	IR_INSTR_KIND(Load,     struct { Type *type; irValue *address; i64 custom_align; }) \
+	IR_INSTR_KIND(InlineCode, struct { BuiltinProcId id; Array<irValue *> operands; }) \
 	IR_INSTR_KIND(AtomicFence, struct { BuiltinProcId id; })          \
 	IR_INSTR_KIND(AtomicStore, struct {                               \
 		irValue *address, *value;                                     \
@@ -1060,6 +1061,14 @@ irValue *ir_instr_load(irProcedure *p, irValue *address) {
 
 	if (address) address->uses += 1;
 
+	return v;
+}
+
+irValue *ir_instr_inline_code(irProcedure *p, BuiltinProcId id, Array<irValue *> operands) {
+	irValue *v = ir_alloc_instr(p, irInstr_InlineCode);
+	irInstr *i = &v->Instr;
+	i->InlineCode.id = id;
+	i->InlineCode.operands = operands;
 	return v;
 }
 
@@ -6914,6 +6923,9 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 
 
 	// "Intrinsics"
+	case BuiltinProc_cpu_relax:
+		return ir_emit(proc, ir_instr_inline_code(proc, id, {}));
+
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
 	case BuiltinProc_atomic_fence_rel:

@@ -1483,6 +1483,18 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		break;
 	}
 
+	case irInstr_InlineCode:
+		{
+			switch (instr->InlineCode.id) {
+			case BuiltinProc_cpu_relax:
+				ir_write_str_lit(f, "call void asm sideeffect \"pause\", \"\"()");
+				break;
+			default: GB_PANIC("Unknown inline code %d", instr->InlineCode.id); break;
+			}
+		}
+		break;
+
+
 	case irInstr_AtomicFence:
 		ir_write_str_lit(f, "fence ");
 		switch (instr->AtomicFence.id) {
