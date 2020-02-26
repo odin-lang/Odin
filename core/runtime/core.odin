@@ -1141,9 +1141,12 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	allocator := array.allocator;
 
 	new_data := allocator.procedure(allocator.data, .Resize, new_size, elem_align, array.data, old_size, 0, loc);
-	array.data = new_data;
-	array.cap = cap;
-	return new_data != nil || elem_size == 0;
+	if new_data != nil || elem_size == 0 {
+		array.data = new_data;
+		array.cap = cap;
+		return true;
+	}
+	return false;
 }
 
 __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: int, loc := #caller_location) -> bool {
