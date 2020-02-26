@@ -15,7 +15,7 @@ struct irModule {
 	u64 state_flags;
 
 	// String source_filename;
-	String layout;
+	// String layout;
 	// String triple;
 
 	PtrSet<Entity *>      min_dep_set;
