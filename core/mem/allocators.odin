@@ -636,3 +636,173 @@ dynamic_pool_free_all :: proc(using pool: ^Dynamic_Pool) {
 	}
 	clear(&unused_blocks);
 }
+
+
+
+// An `Arena`, but which allocates multiple blocks over time, instead of being limited to only one.
+//
+// Can be reset, which does not free any memory and causes the previously allocated
+// blocks to be reused, in the same order, when you allocate from the arena again.
+//
+// Will not allocate more than the block size in bytes; if you ask for more than a block, it returns nil.
+Dynamic_Arena :: struct {
+	block_size: int,
+
+	blocks:        [dynamic]rawptr,
+	unused_blocks: [dynamic]rawptr,
+	cursor:        rawptr,
+
+	block_allocator: Allocator,
+}
+
+
+DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT :: 65535;
+
+dynamic_arena_init :: proc(arena: ^Dynamic_Arena,
+                           allocator := context.allocator,
+                           block_size := DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT) {
+	arena.block_allocator  = allocator;
+	arena.blocks.allocator = allocator;
+	arena.unused_blocks.allocator = allocator;
+	arena.block_size = block_size;
+	arena.cursor = nil;
+}
+
+dynamic_arena_alloc :: proc(using arena: ^Dynamic_Arena, size, alignment: int) -> rawptr {
+	alloc_new_block :: proc(using arena: ^Dynamic_Arena) -> bool {
+		ptr: rawptr;
+
+		// NOTE(tetra): We don't to want to realloc this any more than necessary,
+		// since the block allocator may be an arena, etc.
+		if !reserve(&blocks, 16) do return false;
+
+		// NOTE(tetra): If the arena has been reset, the blocks that were previously
+		// used can be reused (we didn't free them before.)
+		// If this is the case, pop one off and use it, rather than allocating a new one.
+		if len(unused_blocks) > 0 {
+			block := unused_blocks[0];
+
+			// NOTE(tetra): SPEED: We ideally wouldn't do an ordered remove here, but
+			// we want to preserve the usage order from the first time through in order
+			// to help the prefetcher. Especially if the block allocator is actually an
+			// arena and we allocated a bunch of blocks, in which case, the blocks are
+			// sequential in memory and we want reuse them in the same way.
+			ordered_remove(&unused_blocks, 0);
+
+			ptr = block;
+			assert(ptr != nil);
+		} else {
+			ptr = alloc(size=block_size, allocator=block_allocator);
+			if ptr == nil do return false;
+		}
+
+
+		zero(ptr, block_size);
+
+		append(&blocks, ptr);
+		cursor = ptr;
+		return true;
+	}
+
+	// TODO(tetra): Not sure if we should allocate a big block
+	// just for this allocation or not, but it seems overcomplicating
+	// to do so.
+	if size > block_size do return nil;
+
+	if len(blocks) == 0 {
+		if !alloc_new_block(arena) do return nil;
+		assert(cursor != nil);
+	}
+
+	for {
+		block := cast(^u8) #no_bounds_check blocks[len(blocks)-1];
+		block_end := ptr_offset(block, block_size);
+		assert(cursor >= block && cursor <= block_end);
+
+		ptr := cast(^u8) align_forward(cursor, uintptr(alignment));
+
+		if ptr_offset(ptr, size) > block_end {
+			if !alloc_new_block(arena) do return nil;
+			assert(cursor != nil);
+			continue;
+		}
+
+		cursor = ptr_offset(ptr, size);
+		return ptr;
+	}
+}
+
+dynamic_arena_resize :: proc(using arena: ^Dynamic_Arena, old_memory: rawptr, old_size, new_size, alignment: int) -> rawptr {
+	if new_size > block_size do return nil;
+
+	// NOTE(tetra): If this was the last allocation, we can resize in place.
+	if uintptr(old_memory) + uintptr(old_size) == uintptr(cursor) {
+		block_ptr := cast(^u8) blocks[len(blocks)-1];
+		block_end := ptr_offset(block_ptr, block_size);
+
+		if uintptr(old_memory) + uintptr(new_size) <= uintptr(block_end) {
+			cursor = ptr_offset(cast(^u8) cursor, -old_size + new_size);
+			return old_memory;
+		}
+	}
+
+	ptr := dynamic_arena_alloc(arena, new_size, alignment);
+	copy(ptr, old_memory, old_size);
+	return ptr;
+}
+
+dynamic_arena_destroy :: proc(using arena: ^Dynamic_Arena) {
+	dynamic_arena_free_all(arena);
+	delete(blocks);
+	block_size = 0;
+	block_allocator = {};
+	blocks.allocator = {};
+}
+
+dynamic_arena_free_all :: proc(using arena: ^Dynamic_Arena) {
+	for b in blocks {
+		free(b, block_allocator);
+	}
+	for b in unused_blocks {
+		free(b, block_allocator);
+	}
+	clear(&blocks);
+	clear(&unused_blocks);
+	cursor = nil;
+}
+
+dynamic_arena_reset :: proc(using arena: ^Dynamic_Arena) {
+	reserve(&unused_blocks, len(unused_blocks) + len(blocks));
+	for b in blocks {
+		append(&unused_blocks, b);
+	}
+	clear(&blocks);
+	cursor = nil;
+}
+
+dynamic_arena_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
+                             size, alignment: int,
+                             old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+	arena := cast(^Dynamic_Arena) allocator_data;
+
+	switch mode {
+	case .Alloc:
+		return dynamic_arena_alloc(arena, size, alignment);
+	case .Free:
+		// do nothing
+	case .Free_All:
+		dynamic_arena_free_all(arena);
+		return nil;
+	case .Resize:
+		return dynamic_arena_resize(arena, old_memory, old_size, size, alignment);
+	}
+
+	return nil;
+}
+
+dynamic_arena_allocator :: proc(using arena: ^Dynamic_Arena) -> Allocator {
+	return {
+		procedure = dynamic_arena_proc,
+		data = arena,
+	};
+}
