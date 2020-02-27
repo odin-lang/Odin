@@ -13,19 +13,19 @@ Client_Request :: struct {
 
 
 Client :: struct {
-	pool:      mem.Dynamic_Pool, // TODO(tetra): use a pool here instead?
+	pool:      mem.Dynamic_Arena,
 	requests:  [dynamic]^Client_Request,
-	lock:      sync.Ticket_Mutex;
+	lock:      sync.Ticket_Mutex,
 }
 
 client_init :: proc(using c: ^Client, allocator := context.allocator) {
-	mem.dynamic_pool_init(&pool, allocator, allocator);
-	requests.allocator = mem.dynamic_pool_allocator(&pool);
+	mem.dynamic_arena_init(&pool, allocator);
+	requests.allocator = mem.dynamic_arena_allocator(&pool);
 	sync.ticket_mutex_init(&lock);
 }
 
 client_destroy :: proc(using c: Client) {
-	mem.dynamic_pool_destroy(&pool);
+	mem.dynamic_arena_destroy(&pool);
 }
 
 client_submit_request :: proc(using c: ^Client, req: Request) {
