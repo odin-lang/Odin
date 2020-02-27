@@ -656,7 +656,6 @@ create :: proc(addr_type: Addr_Type, type: Socket_Type, protocol := Socket_Proto
 Waitable_Status :: enum {
 	Can_Read,
 	Can_Accept,
-
 	Can_Write,
 	Dial_Complete,
 }
@@ -738,43 +737,50 @@ wait_for_any :: proc(skts: []Socket, statuses := Waitable_Statuses{.Can_Read, .C
 		}
 	}
 
+	should_read  := .Can_Accept in statuses || .Can_Read in statuses;
+	should_write := .Can_Write in statuses  || .Dial_Complete in statuses;
+
 	// returns 0 if it timed out.
 	res := win32.select(
 		0,
-		.Can_Read in statuses || .Can_Accept in statuses ? &rfd : nil,
-		.Can_Write in statuses || .Dial_Complete in statuses ? &wfd : nil,
+		should_read  ? &rfd : nil,
+		should_write ? &wfd : nil,
 		&efd,
 		timeout_ms == WAIT_FOREVER ? nil : &timeout
 	);
 	assert(res != win32.SOCKET_ERROR, "attempt to wait on closed socket");
 
-	for s in skts {
+	for s, i in skts {
 		st: Waitable_Statuses;
 
-		readers := mem.slice_ptr(&rfd.array[0], int(rfd.count));
-		writers := mem.slice_ptr(&wfd.array[0], int(wfd.count));
-		failed  := mem.slice_ptr(&efd.array[0], int(efd.count));
 
 		// TODO(tetra): SPEED: Really linear search?
 
-		for r in readers {
-			if equal(s, Socket(r)) {
-				if is_listening_socket(s) {
-					incl(&st, Waitable_Status.Can_Accept);
-				} else {
-					incl(&st, Waitable_Status.Can_Read);
+		if .Can_Read in statuses {
+			readers := mem.slice_ptr(&rfd.array[0], int(rfd.count));
+			for r in readers {
+				if equal(s, Socket(r)) {
+					if is_listening_socket(s) {
+						incl(&st, Waitable_Status.Can_Accept);
+					} else {
+						incl(&st, Waitable_Status.Can_Read);
+					}
+					break;
 				}
-				break;
 			}
 		}
 
-		for w in writers {
-			if equal(s, Socket(w)) {
-				incl(&st, Waitable_Status.Can_Write);
-				break;
+		if .Can_Write in statuses {
+			writers := mem.slice_ptr(&wfd.array[0], int(wfd.count));
+			for w in writers {
+				if equal(s, Socket(w)) {
+					incl(&st, Waitable_Status.Can_Write);
+					break;
+				}
 			}
 		}
 
+		failed := mem.slice_ptr(&efd.array[0], int(efd.count));
 		err := Socket_Error.Ok;
 		for f in failed {
 			if equal(s, Socket(f)) {
