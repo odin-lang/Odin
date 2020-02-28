@@ -69,9 +69,9 @@ Memory_Protection_Flag :: enum i32 {
 Memory_Protection_Flags :: bit_set[Memory_Protection_Flag; i32];
 
 
-alloc :: proc(desired_base: rawptr, size: int, protections: Memory_Protection_Flags = {.Read | .Write}) -> (memory: []u8, ok: bool) {
+alloc :: proc(size: int, protections: Memory_Protection_Flags = {.Read | .Write}, desired_base: rawptr = nil) -> (memory: []u8, ok: bool) {
 	ptr := _unix_mmap(desired_base, u64(size), transmute(i32) protections, MAP_PRIVATE | MAP_ANONYMOUS, os.INVALID_HANDLE, 0);
-	
+
 	// NOTE: returns -1 on failure, and sets errno.
 	ok = int(uintptr(ptr)) != -1;
 	if !ok do return;
@@ -80,13 +80,12 @@ alloc :: proc(desired_base: rawptr, size: int, protections: Memory_Protection_Fl
 	return;
 }
 
-// Frees a page of virtual memory.
-free :: proc(page: []u8) {
+// Frees a region of virtual memory.
+free :: proc(memory: []u8) {
 	// NOTE: returns -1 on failure, and sets errno.
 	page_size := os.get_page_size();
-	assert(uintptr(&page[0]) % uintptr(page_size) == 0, "must start at page boundary");
-	assert(len(page) % page_size == 0, "must be an entire page");
-	assert(_unix_munmap(&page[0], u64(len(page))) != -1);
+	assert(uintptr(&memory[0]) % uintptr(page_size) == 0, "must start at memory boundary");
+	assert(_unix_munmap(&memory[0], u64(len(memory))) != -1);
 }
 
 commit :: proc(memory: []u8) -> bool {
