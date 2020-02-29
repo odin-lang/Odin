@@ -24,23 +24,12 @@ Memory_Access_Flags :: bit_set[Memory_Access_Flag; i32]; // NOTE: For PROT_NONE,
 
 access_to_flags :: proc(access: Memory_Access_Flags) -> u32 {
 	flags: u32 = PAGE_NOACCESS;
-	// if .Write in access {
-	// 	flags |= PAGE_READWRITE;
-	// 	assert(.Read in access, "Windows cannot set memory to be write-only");
-	// }
-	// if .Read in access {
-	// 	flags |= PAGE_READONLY;
-	// }
-	// if .Execute in access {
-	// 	flags |= PAGE_EXECUTE;
-	// }
-
-	assert(.Read in access, "Windows cannot set memory to write-only");
 
 	if .Write in access {
 		if .Execute in access {
 			flags = PAGE_EXECUTE_READWRITE;
 		} else {
+			assert(.Read in access, "Windows cannot set memory to write-only");
 			flags = PAGE_READWRITE;
 		}
 	} else if .Read in access {
@@ -54,34 +43,27 @@ access_to_flags :: proc(access: Memory_Access_Flags) -> u32 {
 	return flags;
 }
 
-reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte, ok: bool) {
+reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
 	ptr := win32.virtual_alloc(desired_base, uint(size), win32.MEM_RESERVE, win32.PAGE_NOACCESS);
-
-	ok = ptr != nil;
-	if !ok do return;
-
-	memory = mem.slice_ptr(cast(^u8) ptr, size);
-	return;
+	return mem.slice_ptr(cast(^byte)ptr, size);
 }
 
-alloc :: proc(size: int, access := Memory_Access_Flags{.Read, .Write}, desired_base: rawptr = nil) -> (memory: []byte, ok: bool) {
+alloc :: proc(size: int, access := Memory_Access_Flags{.Read, .Write}, desired_base: rawptr = nil) -> (memory: []byte) {
 	flags := access_to_flags(access);
 	ptr := win32.virtual_alloc(desired_base, uint(size), win32.MEM_RESERVE | win32.MEM_COMMIT, flags);
-
-	ok = ptr != nil;
-	if !ok do return;
-
-	memory = mem.slice_ptr(cast(^u8) ptr, size);
-	return;
+	return mem.slice_ptr(cast(^byte)ptr, size);
 }
 
-// Frees all pages that overlap the given memory block.
+// Frees the entire page that the given pointer is in.
 free :: proc(memory: []byte) {
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 
-	ret := win32.virtual_free(&memory[0], 0, win32.MEM_RELEASE);
-	assert(bool(ret));
+	// NOTE(tetra): On Windows, freeing virtual memory doesn't use lengths; the system
+	// simply frees the block that was reserved originally.
+	// For portability, we just ignore the length here, but still ask for the slice.
+	ok := bool(win32.virtual_free(&memory[0], 0, win32.MEM_RELEASE));
+	assert(ok);
 }
 
 // Commits pages that overlap the given memory block.
@@ -90,25 +72,27 @@ free :: proc(memory: []byte) {
 // commit the memory; that only happens when you write to the pages.
 commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> bool {
 	flags := access_to_flags(access);
+	page_size := os.get_page_size();
+	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 	ptr := win32.virtual_alloc(&memory[0], uint(len(memory)), win32.MEM_COMMIT, flags);
 	return ptr != nil;
 }
 
-decommit :: proc(memory: []byte) -> bool {
+// Decommits pages that overlap the given memory block.
+decommit :: proc(memory: []byte) {
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 
-	ret := win32.virtual_free(&memory[0], 0, win32.MEM_DECOMMIT);
-	return bool(ret);
+	ok := bool(win32.virtual_free(&memory[0], uint(len(memory)), win32.MEM_DECOMMIT));
+	assert(ok);
 }
 
-set_access :: proc(memory: []byte, access: Memory_Access_Flags) -> bool {
+set_access :: proc(memory: []byte, access: Memory_Access_Flags) {
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 
 	flags := access_to_flags(access);
-	unused: u32;
-	ret := win32.virtual_protect(&memory[0], uint(len(memory)), u32(flags), &unused);
-
-	return bool(ret);
+	unused: u32 = ---;
+	ok := bool(win32.virtual_protect(&memory[0], uint(len(memory)), u32(flags), &unused));
+	assert(ok);
 }
