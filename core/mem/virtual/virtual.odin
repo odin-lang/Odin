@@ -99,7 +99,7 @@ arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 // You may resize the last allocation requested using this procedure, in which case, no data will be copied.
 arena_resize :: proc(va: ^Arena, old_memory: rawptr, old_size, size, alignment: int) -> rawptr {
 	old_region_end := mem.ptr_offset(cast(^byte)old_memory, old_size);
-	if old_region_end != va.cursor {
+	if old_memory == nil || old_region_end != va.cursor {
 		ptr := arena_alloc(va, size, alignment);
 		if ptr == nil do return nil;
 
