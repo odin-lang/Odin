@@ -162,27 +162,25 @@ arena_allocator :: proc(arena: ^Arena) -> mem.Allocator {
 }
 
 
-Arena_Temporary_Mark :: struct {
+Arena_Temporary_Memory :: struct {
 	arena:  ^Arena,
 	cursor: rawptr,
 }
 
-arena_get_mark :: proc(using va: ^Arena) -> Arena_Temporary_Mark {
+arena_begin_temporary_memory :: proc(using va: ^Arena) -> Arena_Temporary_Memory {
 	return {
 		arena = va,
 		cursor = cursor,
 	};
 }
 
-arena_reset_to_mark :: proc(mark: Arena_Temporary_Mark) {
+arena_end_temporary_memory :: proc(mark: Arena_Temporary_Memory) {
 	using mark := mark;
-
+	
 	if cursor == nil {
 		cursor = arena.base;
 	}
 	if arena.cursor == nil do return;
-
-	page_size := os.get_page_size();
 
 	start := next_page(cursor);
 	if arena.cursor > start {

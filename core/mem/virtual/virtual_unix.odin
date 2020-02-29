@@ -69,23 +69,22 @@ Memory_Access_Flag :: enum i32 {
 Memory_Access_Flags :: bit_set[Memory_Access_Flag; i32]; // NOTE: For PROT_NONE, use `{}`.
 
 
-reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte, ok: bool) {
+reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
 	flags: i32 = MAP_PRIVATE | MAP_ANONYMOUS;
 	if desired_base != nil do flags |= MAP_FIXED_NOREPLACE;
 
 	ptr := _unix_mmap(desired_base, u64(size), PROT_NONE, flags, os.INVALID_HANDLE, 0);
 
 	// NOTE: returns -1 on failure, and sets errno.
-	ok = int(uintptr(ptr)) != -1;
-	if !ok do return;
+	if int(uintptr(ptr)) == -1 do return;
 
 	memory = mem.slice_ptr(cast(^u8) ptr, size);
 	return;
 }
 
 alloc :: proc(size: int, access := Memory_Access_Flags{.Read, .Write}, desired_base: rawptr = nil) -> (memory: []byte, ok: bool) {
-	memory, ok = reserve(size, desired_base);
-	if !ok do return;
+	memory = reserve(size, desired_base);
+	if memory == nil do return;
 
 	ok = commit(memory, access);
 	return;
@@ -108,9 +107,9 @@ commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> 
 
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
-	ok := set_access(memory, access);
+	set_access(memory, access);
 	_ = _unix_madvise(&memory[0], u64(len(memory)), MADV_WILLNEED) == 0; // ignored, since advisory is not required
-	return ok;
+	return true; // TODO: maybe inline call to mprotect?; on Windows it's part of the virtualalloc call.
 }
 
 decommit :: proc(memory: []byte) {
@@ -119,8 +118,7 @@ decommit :: proc(memory: []byte) {
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 	_ = _unix_madvise(&memory[0], u64(len(memory)), MADV_DONTNEED) == 0; // ignored, since advisory is not required
-	ok := set_access(memory, {});
-	assert(ok);
+	set_access(memory, {});
 }
 
 set_access :: proc(memory: []byte, access: Memory_Access_Flags) {
