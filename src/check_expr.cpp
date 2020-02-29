@@ -5280,6 +5280,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
+	case BuiltinProc_cpu_relax:
+		operand->mode = Addressing_NoValue;
+		break;
+
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
 	case BuiltinProc_atomic_fence_rel:
@@ -5987,6 +5991,15 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				}
 				score += s;
 
+				if (e->flags & EntityFlag_ConstInput) {
+					if (o.mode != Addressing_Constant) {
+						if (show_error) {
+							error(o.expr, "Expected a constant value for the argument '%.*s'", LIT(e->token.string));
+						}
+						err = CallArgumentError_NoneConstantParameter;
+					}
+				}
+
 				if (o.mode == Addressing_Type && is_type_typeid(e->type)) {
 					add_type_info_type(c, o.type);
 					add_type_and_value(c->info, o.expr, Addressing_Value, e->type, exact_value_typeid(o.type));
@@ -6241,6 +6254,15 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 						check_assignment(c, o, e->type, str_lit("procedure argument"));
 					}
 					err = CallArgumentError_WrongTypes;
+				}
+
+				if (e->flags & EntityFlag_ConstInput) {
+					if (o->mode != Addressing_Constant) {
+						if (show_error) {
+							error(o->expr, "Expected a constant value for the argument '%.*s'", LIT(e->token.string));
+						}
+						err = CallArgumentError_NoneConstantParameter;
+					}
 				}
 			}
 			score += s;

@@ -1722,8 +1722,11 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			if (p->flags&FieldFlag_auto_cast) {
 				param->flags |= EntityFlag_AutoCast;
 			}
-			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
+			if (p->flags&FieldFlag_const) {
+				param->flags |= EntityFlag_ConstInput;
+			}
 
+			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
 			add_entity(ctx->checker, scope, name, param);
 			if (is_using) {
 				add_entity_use(ctx, name, param);
