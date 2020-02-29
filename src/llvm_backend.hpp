@@ -280,6 +280,29 @@ lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_init);
 lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> const &args);
 
 
+lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue index);
+lbValue lb_string_elem(lbProcedure *p, lbValue string);
+lbValue lb_string_len(lbProcedure *p, lbValue string);
+lbValue lb_cstring_len(lbProcedure *p, lbValue value);
+lbValue lb_array_elem(lbProcedure *p, lbValue array_ptr);
+lbValue lb_slice_elem(lbProcedure *p, lbValue slice);
+lbValue lb_slice_len(lbProcedure *p, lbValue slice);
+lbValue lb_dynamic_array_elem(lbProcedure *p, lbValue da);
+lbValue lb_dynamic_array_len(lbProcedure *p, lbValue da);
+lbValue lb_dynamic_array_cap(lbProcedure *p, lbValue da);
+lbValue lb_dynamic_array_allocator(lbProcedure *p, lbValue da);
+lbValue lb_map_entries(lbProcedure *p, lbValue value);
+lbValue lb_map_entries_ptr(lbProcedure *p, lbValue value);
+lbValue lb_map_len(lbProcedure *p, lbValue value);
+lbValue lb_map_cap(lbProcedure *p, lbValue value);
+lbValue lb_soa_struct_len(lbProcedure *p, lbValue value);
+
+void lb_emit_increment(lbProcedure *p, lbValue addr);
+
+
+lbValue lb_type_info(lbModule *m, Type *type);
+
+
 #define LB_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"
 #define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"
 #define LB_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"
