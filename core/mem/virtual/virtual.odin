@@ -146,7 +146,7 @@ arena_allocator_proc :: proc(data: rawptr, mode: mem.Allocator_Mode,
 	case .Free:
 		// do nothing
 	case .Free_All:
-		arena_destroy(arena);
+		arena_reset(arena);
 	case .Resize:
 		return arena_resize(arena, old_memory, old_size, size, alignment);
 	}
@@ -162,19 +162,19 @@ arena_allocator :: proc(arena: ^Arena) -> mem.Allocator {
 }
 
 
-Arena_Temporary_Memory :: struct {
+Arena_Temp_Memory :: struct {
 	arena:  ^Arena,
 	cursor: rawptr,
 }
 
-arena_begin_temporary_memory :: proc(using va: ^Arena) -> Arena_Temporary_Memory {
+arena_begin_temp_memory :: proc(using va: ^Arena) -> Arena_Temp_Memory {
 	return {
 		arena = va,
 		cursor = cursor,
 	};
 }
 
-arena_end_temporary_memory :: proc(mark: Arena_Temporary_Memory) {
+arena_end_temp_memory :: proc(mark: Arena_Temp_Memory) {
 	using mark := mark;
 	
 	if cursor == nil {
