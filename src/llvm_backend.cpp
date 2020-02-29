@@ -1,6 +1,19 @@
 #include "llvm_backend.hpp"
 
-gb_global lbValue lb_global_type_info_data = {};
+gb_global lbAddr lb_global_type_info_data           = {};
+gb_global lbAddr lb_global_type_info_member_types   = {};
+gb_global lbAddr lb_global_type_info_member_names   = {};
+gb_global lbAddr lb_global_type_info_member_offsets = {};
+gb_global lbAddr lb_global_type_info_member_usings  = {};
+gb_global lbAddr lb_global_type_info_member_tags    = {};
+
+gb_global isize lb_global_type_info_data_index           = 0;
+gb_global isize lb_global_type_info_member_types_index   = 0;
+gb_global isize lb_global_type_info_member_names_index   = 0;
+gb_global isize lb_global_type_info_member_offsets_index = 0;
+gb_global isize lb_global_type_info_member_usings_index  = 0;
+gb_global isize lb_global_type_info_member_tags_index    = 0;
+
 
 struct lbLoopData {
 	lbAddr idx_addr;
@@ -139,8 +152,12 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		// NOTE(bill): There are multiple sized booleans, thus force a conversion (if necessarily)
 		value = lb_emit_conv(p, value, a);
 	}
-
-	GB_ASSERT(are_types_identical(a, value.type));
+	Type *ca = core_type(a);
+	if (ca->kind == Type_Basic) {
+		GB_ASSERT_MSG(are_types_identical(ca, core_type(value.type)), "%s != %s", type_to_string(a), type_to_string(value.type));
+	} else {
+		GB_ASSERT_MSG(are_types_identical(a, value.type), "%s != %s", type_to_string(a), type_to_string(value.type));
+	}
 
 	LLVMValueRef v = LLVMBuildStore(p->builder, value.value, ptr.value);
 }
@@ -206,6 +223,41 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		return addr.addr;
 	}
 	return lb_emit_load(p, addr.addr);
+}
+
+lbValue lb_const_union_tag(lbModule *m, Type *u, Type *v) {
+	return lb_const_value(m, union_tag_type(u), exact_value_i64(union_variant_index(u, v)));
+}
+
+lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
+	Type *t = u.type;
+	GB_ASSERT_MSG(is_type_pointer(t) &&
+	              is_type_union(type_deref(t)), "%s", type_to_string(t));
+	Type *ut = type_deref(t);
+	GB_ASSERT(!is_type_union_maybe_pointer(ut));
+	GB_ASSERT(type_size_of(ut) > 0);
+	Type *tag_type = union_tag_type(ut);
+
+	lbValue tag_ptr = {};
+	tag_ptr.value = LLVMBuildStructGEP2(p->builder, lb_type(p->module, type_deref(u.type)), u.value, 2, "");
+	tag_ptr.type = alloc_type_pointer(tag_type);
+	return tag_ptr;
+}
+
+void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbValue variant, Type *variant_type) {
+	gbAllocator a = heap_allocator();
+	lbValue underlying = lb_emit_conv(p, parent, alloc_type_pointer(variant_type));
+
+	lb_emit_store(p, underlying, variant);
+
+	Type *t = type_deref(parent.type);
+
+	if (is_type_union_maybe_pointer(t) || type_size_of(t) == 0) {
+		// No tag needed!
+	} else {
+		lbValue tag_ptr = lb_emit_union_tag_ptr(p, parent);
+		lb_emit_store(p, tag_ptr, lb_const_union_tag(p->module, t, variant_type));
+	}
 }
 
 
@@ -1523,7 +1575,7 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 				String name = original_name;
 
 				if (e->Procedure.is_foreign) {
-					// lb_add_foreign_library_path(proc->module, e->Procedure.foreign_library);
+					// lb_add_foreign_library_path(p->module, e->Procedure.foreign_library);
 				}
 
 				if (e->Procedure.link_name.len > 0) {
@@ -2297,6 +2349,11 @@ lbValue lb_const_int(lbModule *m, Type *type, unsigned long long value) {
 	return res;
 }
 
+lbValue lb_const_string(lbModule *m, String const &value) {
+	return lb_const_value(m, t_string, exact_value_string(value));
+}
+
+
 lbValue lb_const_bool(lbModule *m, Type *type, bool value) {
 	lbValue res = {};
 	res.value = LLVMConstInt(lb_type(m, type), value, false);
@@ -2467,8 +2524,21 @@ lbValue lb_typeid(lbModule *m, Type *type, Type *typeid_type) {
 }
 
 lbValue lb_type_info(lbModule *m, Type *type) {
-	GB_PANIC("TODO(bill): lb_type_info");
-	return {};
+	type = default_type(type);
+
+	isize index = lb_type_info_index(m->info, type);
+	GB_ASSERT(index >= 0);
+
+	LLVMTypeRef it = lb_type(m, t_int);
+	LLVMValueRef indices[2] = {
+		LLVMConstInt(it, 0, false),
+		LLVMConstInt(it, index, true),
+	};
+
+	lbValue value = {};
+	value.value = LLVMConstGEP(lb_global_type_info_data.addr.value, indices, gb_count_of(indices));
+	value.type = t_type_info_ptr;
+	return value;
 }
 
 
@@ -3586,15 +3656,14 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		return res;
 	}
 
-#if 0
+#if 1
 	if (is_type_union(dst)) {
 		for_array(i, dst->Union.variants) {
 			Type *vt = dst->Union.variants[i];
 			if (are_types_identical(vt, src_type)) {
-				gbAllocator a = heap_allocator();
-				lbValue parent = lb_add_local_generated(p, t, true);
-				lb_emit_store_union_variant(p, parent, value, vt);
-				return lb_emit_load(p, parent);
+				lbAddr parent = lb_add_local_generated(p, t, true);
+				lb_emit_store_union_variant(p, parent.addr, value, vt);
+				return lb_addr_load(p, parent);
 			}
 		}
 	}
@@ -4490,7 +4559,7 @@ lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index) {
 	return res;
 }
 
-lbValue lb_emit_array_epi(lbProcedure *p, lbValue s, i32 index) {
+lbValue lb_emit_array_epi(lbProcedure *p, lbValue s, isize index) {
 	Type *t = s.type;
 	GB_ASSERT(is_type_pointer(t));
 	Type *st = base_type(type_deref(t));
@@ -4498,8 +4567,15 @@ lbValue lb_emit_array_epi(lbProcedure *p, lbValue s, i32 index) {
 
 	GB_ASSERT(0 <= index);
 	Type *ptr = base_array_type(st);
+
+
+	LLVMValueRef indices[2] = {
+		LLVMConstInt(lb_type(p->module, t_int), 0, false),
+		LLVMConstInt(lb_type(p->module, t_int), index, true),
+	};
+
 	lbValue res = {};
-	res.value = LLVMBuildStructGEP(p->builder, s.value, index, "");
+	res.value = LLVMBuildGEP(p->builder, s.value, indices, gb_count_of(indices), "");
 	res.type = alloc_type_pointer(ptr);
 	return res;
 }
@@ -6376,7 +6452,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 				GB_ASSERT(e->flags & EntityFlag_TypeField);
 				String name = e->token.string;
 				/*if (name == "names") {
-					lbValue ti_ptr = lb_type_info(p, type);
+					lbValue ti_ptr = lb_type_info(m, type);
 					lbValue variant = lb_emit_struct_ep(p, ti_ptr, 2);
 
 					lbValue names_ptr = nullptr;
@@ -6940,8 +7016,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 						GB_ASSERT_MSG(union_variant_index(ft, fet) > 0, "%s", type_to_string(fet));
 
 						lbValue gep = lb_emit_struct_ep(p, lb_addr_get_ptr(p, v), cast(i32)index);
-						// TODO(bill): lb_emit_store_union_variant
-						// lb_emit_store_union_variant(p, gep, field_expr, fet);
+						lb_emit_store_union_variant(p, gep, field_expr, fet);
 					} else {
 						lbValue fv = lb_emit_conv(p, field_expr, ft);
 						lbValue gep = lb_emit_struct_ep(p, lb_addr_get_ptr(p, v), cast(i32)index);
@@ -7553,29 +7628,95 @@ lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value) {
 	return lb_addr(g);
 }
 
-lbValue lb_find_global_variable(lbModule *m, String const &name) {
-	lbValue *found = map_get(&m->values, hash_string(name));
-	GB_ASSERT_MSG(found != nullptr, "Unable to find global variable '%.*s'", LIT(name));
+lbValue lb_find_runtime_value(lbModule *m, String const &name) {
+	AstPackage *p = m->info->runtime_package;
+	Entity *e = scope_lookup_current(p->scope, name);
+	lbValue *found = map_get(&m->values, hash_entity(e));
+	GB_ASSERT_MSG(found != nullptr, "Unable to find runtime value '%.*s'", LIT(name));
 	lbValue value = *found;
 	return value;
+}
+
+lbValue lb_get_type_info_ptr(lbProcedure *p, Type *type) {
+	i32 index = cast(i32)lb_type_info_index(p->module->info, type);
+	// gb_printf_err("%d %s\n", index, type_to_string(type));
+	lbValue ptr = lb_emit_array_epi(p, lb_global_type_info_data.addr, index);
+	return lb_emit_transmute(p, ptr, t_type_info_ptr);
+}
+
+
+lbValue lb_type_info_member_types_offset(lbProcedure *p, isize count) {
+	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_types.addr, lb_global_type_info_member_types_index);
+	lb_global_type_info_member_types_index += cast(i32)count;
+	return offset;
+}
+lbValue lb_type_info_member_names_offset(lbProcedure *p, isize count) {
+	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_names.addr, lb_global_type_info_member_names_index);
+	lb_global_type_info_member_names_index += cast(i32)count;
+	return offset;
+}
+lbValue lb_type_info_member_offsets_offset(lbProcedure *p, isize count) {
+	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_offsets.addr, lb_global_type_info_member_offsets_index);
+	lb_global_type_info_member_offsets_index += cast(i32)count;
+	return offset;
+}
+lbValue lb_type_info_member_usings_offset(lbProcedure *p, isize count) {
+	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_usings.addr, lb_global_type_info_member_usings_index);
+	lb_global_type_info_member_usings_index += cast(i32)count;
+	return offset;
+}
+lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count) {
+	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_tags.addr, lb_global_type_info_member_tags_index);
+	lb_global_type_info_member_tags_index += cast(i32)count;
+	return offset;
+}
+
+
+lbValue lb_generate_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id) {
+	gbAllocator a = heap_allocator();
+	Token token = {Token_Ident};
+	isize name_len = prefix.len + 1 + 20;
+
+	auto suffix_id = cast(unsigned long long)id;
+	char *text = gb_alloc_array(a, char, name_len+1);
+	gb_snprintf(text, name_len,
+	            "%.*s-%llu", LIT(prefix), suffix_id);
+	text[name_len] = 0;
+
+	String s = make_string_c(text);
+
+	Type *t = alloc_type_array(elem_type, count);
+	lbValue g = {};
+	g.value = LLVMAddGlobal(m->mod, lb_type(m, t), text);
+	g.type = alloc_type_pointer(t);
+	LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, t)));
+	LLVMSetLinkage(g.value, LLVMInternalLinkage);
+	map_set(&m->members, hash_string(s), g);
+	return g;
 }
 
 
 
 void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info data
 	lbModule *m = p->module;
+	LLVMContextRef ctx = m->ctx;
 	gbAllocator a = heap_allocator();
 	CheckerInfo *info = m->info;
 
-#if 0
-	if (true) {
-		lbValue global_type_table = lb_find_global_variable(m, str_lit("runtime.type_table"));
-		Type *type = base_type(type_deref(lb_global_type_info_data.type));
+	{
+		// NOTE(bill): Set the type_table slice with the global backing array
+		lbValue global_type_table = lb_find_runtime_value(m, str_lit("type_table"));
+		Type *type = base_type(lb_addr_type(lb_global_type_info_data));
 		GB_ASSERT(is_type_array(type));
-		lbValue len = ir_const_int(type->Array.count);
-		ir_fill_slice(p, global_type_table,
-		              ir_emit_array_epi(p, lb_global_type_info_data, 0),
-		              len);
+
+		LLVMValueRef indices[2] = {llvm_zero32(m), llvm_zero32(m)};
+		LLVMValueRef values[2] = {
+			LLVMConstInBoundsGEP(lb_global_type_info_data.addr.value, indices, gb_count_of(indices)),
+			LLVMConstInt(lb_type(m, t_int), type->Array.count, true),
+		};
+		LLVMValueRef slice = LLVMConstStructInContext(ctx, values, gb_count_of(values), false);
+
+		LLVMSetInitializer(global_type_table.value, slice);
 	}
 
 
@@ -7594,43 +7735,41 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			continue;
 		}
 
-		isize entry_index = ir_type_info_index(info, t, false);
+		isize entry_index = lb_type_info_index(info, t, false);
 		if (entry_index <= 0) {
 			continue;
 		}
+		gb_printf_err("%s @ %td | %.*s\n", type_to_string(t), entry_index, LIT(type_strings[t->kind]));
 
-		lbValue tag = nullptr;
-		lbValue ti_ptr = ir_emit_array_epi(p, lb_global_type_info_data, cast(i32)entry_index);
-		lbValue variant_ptr = ir_emit_struct_ep(p, ti_ptr, 3);
+		lbValue tag = {};
+		lbValue ti_ptr = lb_emit_array_epi(p, lb_global_type_info_data.addr, cast(i32)entry_index);
+		lbValue variant_ptr = lb_emit_struct_ep(p, ti_ptr, 3);
 
-		ir_emit_store(p, ir_emit_struct_ep(p, ti_ptr, 0), ir_const_int(type_size_of(t)));
-		ir_emit_store(p, ir_emit_struct_ep(p, ti_ptr, 1), ir_const_int(type_align_of(t)));
-		ir_emit_store(p, ir_emit_struct_ep(p, ti_ptr, 2), ir_typeid(proc->module, t));
+		lb_emit_store(p, lb_emit_struct_ep(p, ti_ptr, 0), lb_const_int(m, t_int, type_size_of(t)));
+		lb_emit_store(p, lb_emit_struct_ep(p, ti_ptr, 1), lb_const_int(m, t_int, type_align_of(t)));
+		lb_emit_store(p, lb_emit_struct_ep(p, ti_ptr, 2), lb_typeid(m, t));
 
 
 		switch (t->kind) {
 		case Type_Named: {
-			ir_emit_comment(p, str_lit("Type_Info_Named"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_named_ptr);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_named_ptr);
 
-			// TODO(bill): Which is better? The mangled name or actual name?
-			lbValue name = ir_const_string(proc->module, t->Named.type_name->token.string);
-			lbValue gtip = ir_get_type_info_ptr(p, t->Named.base);
+			lbValue name = lb_const_string(p->module, t->Named.type_name->token.string);
+			lbValue gtip = lb_get_type_info_ptr(p, t->Named.base);
 
-			ir_emit_store(p, ir_emit_struct_ep(p, tag, 0), name);
-			ir_emit_store(p, ir_emit_struct_ep(p, tag, 1), gtip);
+			lb_emit_store(p, lb_emit_struct_ep(p, tag, 0), name);
+			lb_emit_store(p, lb_emit_struct_ep(p, tag, 1), gtip);
 			break;
 		}
 
 		case Type_Basic:
-			ir_emit_comment(p, str_lit("Type_Info_Basic"));
 			switch (t->Basic.kind) {
 			case Basic_bool:
 			case Basic_b8:
 			case Basic_b16:
 			case Basic_b32:
 			case Basic_b64:
-				tag = ir_emit_conv(p, variant_ptr, t_type_info_boolean_ptr);
+				tag = lb_emit_conv(p, variant_ptr, t_type_info_boolean_ptr);
 				break;
 
 			case Basic_i8:
@@ -7664,9 +7803,9 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			case Basic_int:
 			case Basic_uint:
 			case Basic_uintptr: {
-				tag = ir_emit_conv(p, variant_ptr, t_type_info_integer_ptr);
-				lbValue is_signed = ir_const_bool((t->Basic.flags & BasicFlag_Unsigned) == 0);
-				ir_emit_store(p, ir_emit_struct_ep(p, tag, 0), is_signed);
+				tag = lb_emit_conv(p, variant_ptr, t_type_info_integer_ptr);
+				lbValue is_signed = lb_const_bool(m, t_bool, (t->Basic.flags & BasicFlag_Unsigned) == 0);
+				lb_emit_store(p, lb_emit_struct_ep(p, tag, 0), is_signed);
 				// NOTE(bill): This is matches the runtime layout
 				u8 endianness_value = 0;
 				if (t->Basic.flags & BasicFlag_EndianLittle) {
@@ -7674,440 +7813,425 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				} else if (t->Basic.flags & BasicFlag_EndianBig) {
 					endianness_value = 2;
 				}
-				lbValue endianness = ir_const_u8(endianness_value);
-				ir_emit_store(p, ir_emit_struct_ep(p, tag, 1), endianness);
+				lbValue endianness = lb_const_int(m, t_u8, endianness_value);
+				lb_emit_store(p, lb_emit_struct_ep(p, tag, 1), endianness);
 				break;
 			}
 
 			case Basic_rune:
-				tag = ir_emit_conv(p, variant_ptr, t_type_info_rune_ptr);
+				tag = lb_emit_conv(p, variant_ptr, t_type_info_rune_ptr);
 				break;
 
 			// case Basic_f16:
 			case Basic_f32:
 			case Basic_f64:
-				tag = ir_emit_conv(p, variant_ptr, t_type_info_float_ptr);
+				tag = lb_emit_conv(p, variant_ptr, t_type_info_float_ptr);
 				break;
 
 			// case Basic_complex32:
 			case Basic_complex64:
 			case Basic_complex128:
-				tag = ir_emit_conv(p, variant_ptr, t_type_info_complex_ptr);
+				tag = lb_emit_conv(p, variant_ptr, t_type_info_complex_ptr);
 				break;
 
 			case Basic_quaternion128:
 			case Basic_quaternion256:
-				tag = ir_emit_conv(p, variant_ptr, t_type_info_quaternion_ptr);
+				tag = lb_emit_conv(p, variant_ptr, t_type_info_quaternion_ptr);
 				break;
 
 			case Basic_rawptr:
-				tag = ir_emit_conv(p, variant_ptr, t_type_info_pointer_ptr);
+				tag = lb_emit_conv(p, variant_ptr, t_type_info_pointer_ptr);
 				break;
 
 			case Basic_string:
-				tag = ir_emit_conv(p, variant_ptr, t_type_info_string_ptr);
+				tag = lb_emit_conv(p, variant_ptr, t_type_info_string_ptr);
 				break;
 
 			case Basic_cstring:
-				tag = ir_emit_conv(p, variant_ptr, t_type_info_string_ptr);
-				ir_emit_store(p, ir_emit_struct_ep(p, tag, 0), v_true); // is_cstring
+				tag = lb_emit_conv(p, variant_ptr, t_type_info_string_ptr);
+				lb_emit_store(p, lb_emit_struct_ep(p, tag, 0), lb_const_bool(m, t_bool, true)); // is_cstring
 				break;
 
 			case Basic_any:
-				tag = ir_emit_conv(p, variant_ptr, t_type_info_any_ptr);
+				tag = lb_emit_conv(p, variant_ptr, t_type_info_any_ptr);
 				break;
 
 			case Basic_typeid:
-				tag = ir_emit_conv(p, variant_ptr, t_type_info_typeid_ptr);
+				tag = lb_emit_conv(p, variant_ptr, t_type_info_typeid_ptr);
 				break;
 			}
 			break;
 
 		case Type_Pointer: {
-			ir_emit_comment(p, str_lit("Type_Info_Pointer"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_pointer_ptr);
-			lbValue gep = ir_get_type_info_ptr(p, t->Pointer.elem);
-			ir_emit_store(p, ir_emit_struct_ep(p, tag, 0), gep);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_pointer_ptr);
+			lbValue gep = lb_get_type_info_ptr(p, t->Pointer.elem);
+			lb_emit_store(p, lb_emit_struct_ep(p, tag, 0), gep);
 			break;
 		}
 		case Type_Array: {
-			ir_emit_comment(p, str_lit("Type_Info_Array"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_array_ptr);
-			lbValue gep = ir_get_type_info_ptr(p, t->Array.elem);
-			ir_emit_store(p, ir_emit_struct_ep(p, tag, 0), gep);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_array_ptr);
+			lbValue gep = lb_get_type_info_ptr(p, t->Array.elem);
+			lb_emit_store(p, lb_emit_struct_ep(p, tag, 0), gep);
 
 			i64 ez = type_size_of(t->Array.elem);
-			lbValue elem_size = ir_emit_struct_ep(p, tag, 1);
-			ir_emit_store(p, elem_size, ir_const_int(ez));
+			lbValue elem_size = lb_emit_struct_ep(p, tag, 1);
+			lb_emit_store(p, elem_size, lb_const_int(m, t_int, ez));
 
-			lbValue count = ir_emit_struct_ep(p, tag, 2);
-			ir_emit_store(p, count, ir_const_int(t->Array.count));
+			lbValue count = lb_emit_struct_ep(p, tag, 2);
+			lb_emit_store(p, count, lb_const_int(m, t_int, t->Array.count));
 
 			break;
 		}
 		case Type_EnumeratedArray: {
-			ir_emit_comment(p, str_lit("Type_Info_Enumerated_Array"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_enumerated_array_ptr);
-			lbValue elem = ir_get_type_info_ptr(p, t->EnumeratedArray.elem);
-			ir_emit_store(p, ir_emit_struct_ep(p, tag, 0), elem);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_enumerated_array_ptr);
+			lbValue elem = lb_get_type_info_ptr(p, t->EnumeratedArray.elem);
+			lb_emit_store(p, lb_emit_struct_ep(p, tag, 0), elem);
 
-			lbValue index = ir_get_type_info_ptr(p, t->EnumeratedArray.index);
-			ir_emit_store(p, ir_emit_struct_ep(p, tag, 1), index);
+			lbValue index = lb_get_type_info_ptr(p, t->EnumeratedArray.index);
+			lb_emit_store(p, lb_emit_struct_ep(p, tag, 1), index);
 
 			i64 ez = type_size_of(t->EnumeratedArray.elem);
-			lbValue elem_size = ir_emit_struct_ep(p, tag, 2);
-			ir_emit_store(p, elem_size, ir_const_int(ez));
+			lbValue elem_size = lb_emit_struct_ep(p, tag, 2);
+			lb_emit_store(p, elem_size, lb_const_int(m, t_int, ez));
 
-			lbValue count = ir_emit_struct_ep(p, tag, 3);
-			ir_emit_store(p, count, ir_const_int(t->EnumeratedArray.count));
+			lbValue count = lb_emit_struct_ep(p, tag, 3);
+			lb_emit_store(p, count, lb_const_int(m, t_int, t->EnumeratedArray.count));
 
-			lbValue min_value = ir_emit_struct_ep(p, tag, 4);
-			lbValue max_value = ir_emit_struct_ep(p, tag, 5);
+			lbValue min_value = lb_emit_struct_ep(p, tag, 4);
+			lbValue max_value = lb_emit_struct_ep(p, tag, 5);
 
-			lbValue min_v = ir_value_constant(core_type(t->EnumeratedArray.index), t->EnumeratedArray.min_value);
-			lbValue max_v = ir_value_constant(core_type(t->EnumeratedArray.index), t->EnumeratedArray.max_value);
+			lbValue min_v = lb_const_value(m, core_type(t->EnumeratedArray.index), t->EnumeratedArray.min_value);
+			lbValue max_v = lb_const_value(m, core_type(t->EnumeratedArray.index), t->EnumeratedArray.max_value);
 
-			ir_emit_store_union_variant(p, min_value, min_v, ir_type(min_v));
-			ir_emit_store_union_variant(p, max_value, max_v, ir_type(max_v));
+			lb_emit_store_union_variant(p, min_value, min_v, min_v.type);
+			lb_emit_store_union_variant(p, max_value, max_v, max_v.type);
 			break;
 		}
 		case Type_DynamicArray: {
-			ir_emit_comment(p, str_lit("Type_Info_Dynamic_Array"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_dynamic_array_ptr);
-			lbValue gep = ir_get_type_info_ptr(p, t->DynamicArray.elem);
-			ir_emit_store(p, ir_emit_struct_ep(p, tag, 0), gep);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_dynamic_array_ptr);
+			lbValue gep = lb_get_type_info_ptr(p, t->DynamicArray.elem);
+			lb_emit_store(p, lb_emit_struct_ep(p, tag, 0), gep);
 
 			i64 ez = type_size_of(t->DynamicArray.elem);
-			lbValue elem_size = ir_emit_struct_ep(p, tag, 1);
-			ir_emit_store(p, elem_size, ir_const_int(ez));
+			lbValue elem_size = lb_emit_struct_ep(p, tag, 1);
+			lb_emit_store(p, elem_size, lb_const_int(m, t_int, ez));
 			break;
 		}
 		case Type_Slice: {
-			ir_emit_comment(p, str_lit("Type_Info_Slice"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_slice_ptr);
-			lbValue gep = ir_get_type_info_ptr(p, t->Slice.elem);
-			ir_emit_store(p, ir_emit_struct_ep(p, tag, 0), gep);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_slice_ptr);
+			lbValue gep = lb_get_type_info_ptr(p, t->Slice.elem);
+			lb_emit_store(p, lb_emit_struct_ep(p, tag, 0), gep);
 
 			i64 ez = type_size_of(t->Slice.elem);
-			lbValue elem_size = ir_emit_struct_ep(p, tag, 1);
-			ir_emit_store(p, elem_size, ir_const_int(ez));
+			lbValue elem_size = lb_emit_struct_ep(p, tag, 1);
+			lb_emit_store(p, elem_size, lb_const_int(m, t_int, ez));
 			break;
 		}
 		case Type_Proc: {
-			ir_emit_comment(p, str_lit("Type_Info_Proc"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_procedure_ptr);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_procedure_ptr);
 
-			lbValue params     = ir_emit_struct_ep(p, tag, 0);
-			lbValue results    = ir_emit_struct_ep(p, tag, 1);
-			lbValue variadic   = ir_emit_struct_ep(p, tag, 2);
-			lbValue convention = ir_emit_struct_ep(p, tag, 3);
+			lbValue params     = lb_emit_struct_ep(p, tag, 0);
+			lbValue results    = lb_emit_struct_ep(p, tag, 1);
+			lbValue variadic   = lb_emit_struct_ep(p, tag, 2);
+			lbValue convention = lb_emit_struct_ep(p, tag, 3);
 
 			if (t->Proc.params != nullptr) {
-				ir_emit_store(p, params, ir_get_type_info_ptr(p, t->Proc.params));
+				lb_emit_store(p, params, lb_get_type_info_ptr(p, t->Proc.params));
 			}
 			if (t->Proc.results != nullptr) {
-				ir_emit_store(p, results, ir_get_type_info_ptr(p, t->Proc.results));
+				lb_emit_store(p, results, lb_get_type_info_ptr(p, t->Proc.results));
 			}
-			ir_emit_store(p, variadic, ir_const_bool(t->Proc.variadic));
-			ir_emit_store(p, convention, ir_const_int(t->Proc.calling_convention));
+			lb_emit_store(p, variadic, lb_const_bool(m, t_bool, t->Proc.variadic));
+			lb_emit_store(p, convention, lb_const_int(m, t_u8, t->Proc.calling_convention));
 
 			// TODO(bill): TypeInfo for procedures
 			break;
 		}
 		case Type_Tuple: {
-			ir_emit_comment(p, str_lit("Type_Info_Tuple"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_tuple_ptr);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_tuple_ptr);
 
-			lbValue memory_types = ir_type_info_member_types_offset(p, t->Tuple.variables.count);
-			lbValue memory_names = ir_type_info_member_names_offset(p, t->Tuple.variables.count);
+			lbValue memory_types = lb_type_info_member_types_offset(p, t->Tuple.variables.count);
+			lbValue memory_names = lb_type_info_member_names_offset(p, t->Tuple.variables.count);
 
 			for_array(i, t->Tuple.variables) {
 				// NOTE(bill): offset is not used for tuples
 				Entity *f = t->Tuple.variables[i];
 
-				lbValue index     = ir_const_int(i);
-				lbValue type_info = ir_emit_ptr_offset(p, memory_types, index);
+				lbValue index     = lb_const_int(m, t_int, i);
+				lbValue type_info = lb_emit_ptr_offset(p, memory_types, index);
 
-				ir_emit_store(p, type_info, ir_type_info(p, f->type));
+				lb_emit_store(p, type_info, lb_type_info(m, f->type));
 				if (f->token.string.len > 0) {
-					lbValue name = ir_emit_ptr_offset(p, memory_names, index);
-					ir_emit_store(p, name, ir_const_string(proc->module, f->token.string));
+					lbValue name = lb_emit_ptr_offset(p, memory_names, index);
+					lb_emit_store(p, name, lb_const_string(m, f->token.string));
 				}
 			}
 
-			lbValue count = ir_const_int(t->Tuple.variables.count);
-			ir_fill_slice(p, ir_emit_struct_ep(p, tag, 0), memory_types, count);
-			ir_fill_slice(p, ir_emit_struct_ep(p, tag, 1), memory_names, count);
+			lbValue count = lb_const_int(m, t_int, t->Tuple.variables.count);
+			lb_fill_slice(p, lb_addr(lb_emit_struct_ep(p, tag, 0)), memory_types, count);
+			lb_fill_slice(p, lb_addr(lb_emit_struct_ep(p, tag, 1)), memory_names, count);
 			break;
 		}
+
 		case Type_Enum:
-			ir_emit_comment(p, str_lit("Type_Info_Enum"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_enum_ptr);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_enum_ptr);
 			{
 				GB_ASSERT(t->Enum.base_type != nullptr);
-				lbValue base = ir_type_info(p, t->Enum.base_type);
-				ir_emit_store(p, ir_emit_struct_ep(p, tag, 0), base);
+				lbValue base = lb_type_info(m, t->Enum.base_type);
+				lb_emit_store(p, lb_emit_struct_ep(p, tag, 0), base);
 
 				if (t->Enum.fields.count > 0) {
 					auto fields = t->Enum.fields;
-					lbValue name_array  = ir_generate_array(m, t_string, fields.count,
-					                                         str_lit("$enum_names"), cast(i64)entry_index);
-					lbValue value_array = ir_generate_array(m, t_type_info_enum_value, fields.count,
-					                                         str_lit("$enum_values"), cast(i64)entry_index);
+					lbValue name_array  = lb_generate_array(m, t_string, fields.count,
+					                                        str_lit("$enum_names"), cast(i64)entry_index);
+					lbValue value_array = lb_generate_array(m, t_type_info_enum_value, fields.count,
+					                                        str_lit("$enum_values"), cast(i64)entry_index);
 
 					GB_ASSERT(is_type_integer(t->Enum.base_type));
 
 					for_array(i, fields) {
-						lbValue name_ep  = ir_emit_array_epi(p, name_array, cast(i32)i);
-						lbValue value_ep = ir_emit_array_epi(p, value_array, cast(i32)i);
+						lbValue name_ep  = lb_emit_array_epi(p, name_array, i);
+						lbValue value_ep = lb_emit_array_epi(p, value_array, i);
 
 						ExactValue value = fields[i]->Constant.value;
-						lbValue v = ir_value_constant(t->Enum.base_type, value);
+						lbValue v = lb_const_value(m, t->Enum.base_type, value);
 
-						ir_emit_store_union_variant(p, value_ep, v, ir_type(v));
-						ir_emit_store(p, name_ep, ir_const_string(proc->module, fields[i]->token.string));
+						lb_emit_store_union_variant(p, value_ep, v, v.type);
+						lb_emit_store(p, name_ep, lb_const_string(m, fields[i]->token.string));
 					}
 
-					lbValue v_count = ir_const_int(fields.count);
+					lbValue v_count = lb_const_int(m, t_int, fields.count);
 
-					lbValue names = ir_emit_struct_ep(p, tag, 1);
-					lbValue name_array_elem = ir_array_elem(p, name_array);
-					ir_fill_slice(p, names, name_array_elem, v_count);
+					lbValue names = lb_emit_struct_ep(p, tag, 1);
+					lbValue name_array_elem = lb_array_elem(p, name_array);
+					lb_fill_slice(p, lb_addr(names), name_array_elem, v_count);
 
-					lbValue values = ir_emit_struct_ep(p, tag, 2);
-					lbValue value_array_elem = ir_array_elem(p, value_array);
-					ir_fill_slice(p, values, value_array_elem, v_count);
+					lbValue values = lb_emit_struct_ep(p, tag, 2);
+					lbValue value_array_elem = lb_array_elem(p, value_array);
+					lb_fill_slice(p, lb_addr(values), value_array_elem, v_count);
 				}
 			}
 			break;
 
 		case Type_Union: {
-			ir_emit_comment(p, str_lit("Type_Info_Union"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_union_ptr);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_union_ptr);
 
 			{
-				lbValue variant_types    = ir_emit_struct_ep(p, tag, 0);
-				lbValue tag_offset_ptr   = ir_emit_struct_ep(p, tag, 1);
-				lbValue tag_type_ptr     = ir_emit_struct_ep(p, tag, 2);
-				lbValue custom_align_ptr = ir_emit_struct_ep(p, tag, 3);
-				lbValue no_nil_ptr       = ir_emit_struct_ep(p, tag, 4);
-				lbValue maybe_ptr        = ir_emit_struct_ep(p, tag, 5);
+				lbValue variant_types    = lb_emit_struct_ep(p, tag, 0);
+				lbValue tag_offset_ptr   = lb_emit_struct_ep(p, tag, 1);
+				lbValue tag_type_ptr     = lb_emit_struct_ep(p, tag, 2);
+				lbValue custom_align_ptr = lb_emit_struct_ep(p, tag, 3);
+				lbValue no_nil_ptr       = lb_emit_struct_ep(p, tag, 4);
+				lbValue maybe_ptr        = lb_emit_struct_ep(p, tag, 5);
 
 				isize variant_count = gb_max(0, t->Union.variants.count);
-				lbValue memory_types = ir_type_info_member_types_offset(p, variant_count);
+				lbValue memory_types = lb_type_info_member_types_offset(p, variant_count);
 
 				// NOTE(bill): Zeroth is nil so ignore it
 				for (isize variant_index = 0; variant_index < variant_count; variant_index++) {
 					Type *vt = t->Union.variants[variant_index];
-					lbValue tip = ir_get_type_info_ptr(p, vt);
+					lbValue tip = lb_get_type_info_ptr(p, vt);
 
-					lbValue index     = ir_const_int(variant_index);
-					lbValue type_info = ir_emit_ptr_offset(p, memory_types, index);
-					ir_emit_store(p, type_info, ir_type_info(p, vt));
+					lbValue index     = lb_const_int(m, t_int, variant_index);
+					lbValue type_info = lb_emit_ptr_offset(p, memory_types, index);
+					lb_emit_store(p, type_info, lb_type_info(m, vt));
 				}
 
-				lbValue count = ir_const_int(variant_count);
-				ir_fill_slice(p, variant_types, memory_types, count);
+				lbValue count = lb_const_int(m, t_int, variant_count);
+				lb_fill_slice(p, lb_addr(variant_types), memory_types, count);
 
 				i64 tag_size   = union_tag_size(t);
 				i64 tag_offset = align_formula(t->Union.variant_block_size, tag_size);
 
 				if (tag_size > 0) {
-					ir_emit_store(p, tag_offset_ptr, ir_const_uintptr(tag_offset));
-					ir_emit_store(p, tag_type_ptr,   ir_type_info(p, union_tag_type(t)));
+					lb_emit_store(p, tag_offset_ptr, lb_const_int(m, t_uintptr, tag_offset));
+					lb_emit_store(p, tag_type_ptr,   lb_type_info(m, union_tag_type(t)));
 				}
 
-				lbValue is_custom_align = ir_const_bool(t->Union.custom_align != 0);
-				ir_emit_store(p, custom_align_ptr, is_custom_align);
+				lbValue is_custom_align = lb_const_bool(m, t_bool, t->Union.custom_align != 0);
+				lb_emit_store(p, custom_align_ptr, is_custom_align);
 
-				ir_emit_store(p, no_nil_ptr, ir_const_bool(t->Union.no_nil));
-				ir_emit_store(p, maybe_ptr, ir_const_bool(t->Union.maybe));
+				lb_emit_store(p, no_nil_ptr, lb_const_bool(m, t_bool, t->Union.no_nil));
+				lb_emit_store(p, maybe_ptr, lb_const_bool(m, t_bool, t->Union.maybe));
 			}
 
 			break;
 		}
 
 		case Type_Struct: {
-			ir_emit_comment(p, str_lit("Type_Info_Struct"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_struct_ptr);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_struct_ptr);
 
 			{
-				lbValue is_packed       = ir_const_bool(t->Struct.is_packed);
-				lbValue is_raw_union    = ir_const_bool(t->Struct.is_raw_union);
-				lbValue is_custom_align = ir_const_bool(t->Struct.custom_align != 0);
-				ir_emit_store(p, ir_emit_struct_ep(p, tag, 5), is_packed);
-				ir_emit_store(p, ir_emit_struct_ep(p, tag, 6), is_raw_union);
-				ir_emit_store(p, ir_emit_struct_ep(p, tag, 7), is_custom_align);
+				lbValue is_packed       = lb_const_bool(m, t_bool, t->Struct.is_packed);
+				lbValue is_raw_union    = lb_const_bool(m, t_bool, t->Struct.is_raw_union);
+				lbValue is_custom_align = lb_const_bool(m, t_bool, t->Struct.custom_align != 0);
+				lb_emit_store(p, lb_emit_struct_ep(p, tag, 5), is_packed);
+				lb_emit_store(p, lb_emit_struct_ep(p, tag, 6), is_raw_union);
+				lb_emit_store(p, lb_emit_struct_ep(p, tag, 7), is_custom_align);
 
 				if (t->Struct.soa_kind != StructSoa_None) {
-					lbValue kind = ir_emit_struct_ep(p, tag, 8);
-					Type *kind_type = type_deref(ir_type(kind));
+					lbValue kind = lb_emit_struct_ep(p, tag, 8);
+					Type *kind_type = type_deref(kind.type);
 
-					lbValue soa_kind = ir_value_constant(kind_type, exact_value_i64(t->Struct.soa_kind));
-					lbValue soa_type = ir_type_info(p, t->Struct.soa_elem);
-					lbValue soa_len = ir_const_int(t->Struct.soa_count);
+					lbValue soa_kind = lb_const_value(m, kind_type, exact_value_i64(t->Struct.soa_kind));
+					lbValue soa_type = lb_type_info(m, t->Struct.soa_elem);
+					lbValue soa_len = lb_const_int(m, t_int, t->Struct.soa_count);
 
 
-					ir_emit_store(p, kind, soa_kind);
-					ir_emit_store(p, ir_emit_struct_ep(p, tag, 9), soa_type);
-					ir_emit_store(p, ir_emit_struct_ep(p, tag, 10), soa_len);
+					lb_emit_store(p, kind, soa_kind);
+					lb_emit_store(p, lb_emit_struct_ep(p, tag, 9), soa_type);
+					lb_emit_store(p, lb_emit_struct_ep(p, tag, 10), soa_len);
 				}
 			}
 
 			isize count = t->Struct.fields.count;
 			if (count > 0) {
-				lbValue memory_types   = ir_type_info_member_types_offset  (p, count);
-				lbValue memory_names   = ir_type_info_member_names_offset  (p, count);
-				lbValue memory_offsets = ir_type_info_member_offsets_offset(p, count);
-				lbValue memory_usings  = ir_type_info_member_usings_offset (p, count);
-				lbValue memory_tags    = ir_type_info_member_tags_offset   (p, count);
+				lbValue memory_types   = lb_type_info_member_types_offset  (p, count);
+				lbValue memory_names   = lb_type_info_member_names_offset  (p, count);
+				lbValue memory_offsets = lb_type_info_member_offsets_offset(p, count);
+				lbValue memory_usings  = lb_type_info_member_usings_offset (p, count);
+				lbValue memory_tags    = lb_type_info_member_tags_offset   (p, count);
 
 				type_set_offsets(t); // NOTE(bill): Just incase the offsets have not been set yet
 				for (isize source_index = 0; source_index < count; source_index++) {
 					// TODO(bill): Order fields in source order not layout order
 					Entity *f = t->Struct.fields[source_index];
-					lbValue tip = ir_get_type_info_ptr(p, f->type);
+					lbValue tip = lb_get_type_info_ptr(p, f->type);
 					i64 foffset = 0;
 					if (!t->Struct.is_raw_union) {
 						foffset = t->Struct.offsets[f->Variable.field_index];
 					}
 					GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 
-					lbValue index     = ir_const_int(source_index);
-					lbValue type_info = ir_emit_ptr_offset(p, memory_types,   index);
-					lbValue offset    = ir_emit_ptr_offset(p, memory_offsets, index);
-					lbValue is_using  = ir_emit_ptr_offset(p, memory_usings,  index);
+					lbValue index     = lb_const_int(m, t_int, source_index);
+					lbValue type_info = lb_emit_ptr_offset(p, memory_types,   index);
+					lbValue offset    = lb_emit_ptr_offset(p, memory_offsets, index);
+					lbValue is_using  = lb_emit_ptr_offset(p, memory_usings,  index);
 
-					ir_emit_store(p, type_info, ir_type_info(p, f->type));
+					lb_emit_store(p, type_info, lb_type_info(m, f->type));
 					if (f->token.string.len > 0) {
-						lbValue name = ir_emit_ptr_offset(p, memory_names,   index);
-						ir_emit_store(p, name, ir_const_string(proc->module, f->token.string));
+						lbValue name = lb_emit_ptr_offset(p, memory_names,   index);
+						lb_emit_store(p, name, lb_const_string(m, f->token.string));
 					}
-					ir_emit_store(p, offset, ir_const_uintptr(foffset));
-					ir_emit_store(p, is_using, ir_const_bool((f->flags&EntityFlag_Using) != 0));
+					lb_emit_store(p, offset, lb_const_int(m, t_uintptr, foffset));
+					lb_emit_store(p, is_using, lb_const_bool(m, t_bool, (f->flags&EntityFlag_Using) != 0));
 
 					if (t->Struct.tags.count > 0) {
 						String tag_string = t->Struct.tags[source_index];
 						if (tag_string.len > 0) {
-							lbValue tag_ptr = ir_emit_ptr_offset(p, memory_tags, index);
-							ir_emit_store(p, tag_ptr, ir_const_string(proc->module, tag_string));
+							lbValue tag_ptr = lb_emit_ptr_offset(p, memory_tags, index);
+							lb_emit_store(p, tag_ptr, lb_const_string(m, tag_string));
 						}
 					}
 
 				}
 
-				lbValue cv = ir_const_int(count);
-				ir_fill_slice(p, ir_emit_struct_ep(p, tag, 0), memory_types,   cv);
-				ir_fill_slice(p, ir_emit_struct_ep(p, tag, 1), memory_names,   cv);
-				ir_fill_slice(p, ir_emit_struct_ep(p, tag, 2), memory_offsets, cv);
-				ir_fill_slice(p, ir_emit_struct_ep(p, tag, 3), memory_usings,  cv);
-				ir_fill_slice(p, ir_emit_struct_ep(p, tag, 4), memory_tags,    cv);
+				lbValue cv = lb_const_int(m, t_int, count);
+				lb_fill_slice(p, lb_addr(lb_emit_struct_ep(p, tag, 0)), memory_types,   cv);
+				lb_fill_slice(p, lb_addr(lb_emit_struct_ep(p, tag, 1)), memory_names,   cv);
+				lb_fill_slice(p, lb_addr(lb_emit_struct_ep(p, tag, 2)), memory_offsets, cv);
+				lb_fill_slice(p, lb_addr(lb_emit_struct_ep(p, tag, 3)), memory_usings,  cv);
+				lb_fill_slice(p, lb_addr(lb_emit_struct_ep(p, tag, 4)), memory_tags,    cv);
 			}
 			break;
 		}
+
 		case Type_Map: {
-			ir_emit_comment(p, str_lit("Type_Info_Map"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_map_ptr);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_map_ptr);
 			init_map_internal_types(t);
 
-			lbValue key              = ir_emit_struct_ep(p, tag, 0);
-			lbValue value            = ir_emit_struct_ep(p, tag, 1);
-			lbValue generated_struct = ir_emit_struct_ep(p, tag, 2);
+			lbValue key              = lb_emit_struct_ep(p, tag, 0);
+			lbValue value            = lb_emit_struct_ep(p, tag, 1);
+			lbValue generated_struct = lb_emit_struct_ep(p, tag, 2);
 
-			ir_emit_store(p, key,              ir_get_type_info_ptr(p, t->Map.key));
-			ir_emit_store(p, value,            ir_get_type_info_ptr(p, t->Map.value));
-			ir_emit_store(p, generated_struct, ir_get_type_info_ptr(p, t->Map.generated_struct_type));
+			lb_emit_store(p, key,              lb_get_type_info_ptr(p, t->Map.key));
+			lb_emit_store(p, value,            lb_get_type_info_ptr(p, t->Map.value));
+			lb_emit_store(p, generated_struct, lb_get_type_info_ptr(p, t->Map.generated_struct_type));
 			break;
 		}
 
 		case Type_BitField: {
-			ir_emit_comment(p, str_lit("Type_Info_Bit_Field"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_bit_field_ptr);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_bit_field_ptr);
 			// names:   []string;
 			// bits:    []u32;
 			// offsets: []u32;
 			isize count = t->BitField.fields.count;
 			if (count > 0) {
 				auto fields = t->BitField.fields;
-				lbValue name_array   = ir_generate_array(m, t_string, count, str_lit("$bit_field_names"),   cast(i64)entry_index);
-				lbValue bit_array    = ir_generate_array(m, t_i32,    count, str_lit("$bit_field_bits"),    cast(i64)entry_index);
-				lbValue offset_array = ir_generate_array(m, t_i32,    count, str_lit("$bit_field_offsets"), cast(i64)entry_index);
+				lbValue name_array   = lb_generate_array(m, t_string, count, str_lit("$bit_field_names"),   cast(i64)entry_index);
+				lbValue bit_array    = lb_generate_array(m, t_i32,    count, str_lit("$bit_field_bits"),    cast(i64)entry_index);
+				lbValue offset_array = lb_generate_array(m, t_i32,    count, str_lit("$bit_field_offsets"), cast(i64)entry_index);
 
 				for (isize i = 0; i < count; i++) {
 					Entity *f = fields[i];
 					GB_ASSERT(f->type != nullptr);
 					GB_ASSERT(f->type->kind == Type_BitFieldValue);
-					lbValue name_ep   = ir_emit_array_epi(p, name_array,   cast(i32)i);
-					lbValue bit_ep    = ir_emit_array_epi(p, bit_array,    cast(i32)i);
-					lbValue offset_ep = ir_emit_array_epi(p, offset_array, cast(i32)i);
+					lbValue name_ep   = lb_emit_array_epi(p, name_array,   cast(i32)i);
+					lbValue bit_ep    = lb_emit_array_epi(p, bit_array,    cast(i32)i);
+					lbValue offset_ep = lb_emit_array_epi(p, offset_array, cast(i32)i);
 
-					ir_emit_store(p, name_ep, ir_const_string(proc->module, f->token.string));
-					ir_emit_store(p, bit_ep, ir_const_i32(f->type->BitFieldValue.bits));
-					ir_emit_store(p, offset_ep, ir_const_i32(t->BitField.offsets[i]));
+					lb_emit_store(p, name_ep,   lb_const_string(m, f->token.string));
+					lb_emit_store(p, bit_ep,    lb_const_int(m, t_i32, f->type->BitFieldValue.bits));
+					lb_emit_store(p, offset_ep, lb_const_int(m, t_i32, t->BitField.offsets[i]));
 
 				}
 
-				lbValue v_count = ir_const_int(count);
+				lbValue v_count = lb_const_int(m, t_int, count);
 
-				lbValue names = ir_emit_struct_ep(p, tag, 0);
-				lbValue name_array_elem = ir_array_elem(p, name_array);
-				ir_fill_slice(p, names, name_array_elem, v_count);
+				lbValue names = lb_emit_struct_ep(p, tag, 0);
+				lbValue name_array_elem = lb_array_elem(p, name_array);
+				lb_fill_slice(p, lb_addr(names), name_array_elem, v_count);
 
-				lbValue bits = ir_emit_struct_ep(p, tag, 1);
-				lbValue bit_array_elem = ir_array_elem(p, bit_array);
-				ir_fill_slice(p, bits, bit_array_elem, v_count);
+				lbValue bits = lb_emit_struct_ep(p, tag, 1);
+				lbValue bit_array_elem = lb_array_elem(p, bit_array);
+				lb_fill_slice(p, lb_addr(bits), bit_array_elem, v_count);
 
-				lbValue offsets = ir_emit_struct_ep(p, tag, 2);
-				lbValue offset_array_elem = ir_array_elem(p, offset_array);
-				ir_fill_slice(p, offsets, offset_array_elem, v_count);
+				lbValue offsets = lb_emit_struct_ep(p, tag, 2);
+				lbValue offset_array_elem = lb_array_elem(p, offset_array);
+				lb_fill_slice(p, lb_addr(offsets), offset_array_elem, v_count);
 			}
 			break;
 		}
 
 		case Type_BitSet:
-			ir_emit_comment(p, str_lit("Type_Info_Bit_Set"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_bit_set_ptr);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_bit_set_ptr);
 
 			GB_ASSERT(is_type_typed(t->BitSet.elem));
-			ir_emit_store(p, ir_emit_struct_ep(p, tag, 0), ir_get_type_info_ptr(p, t->BitSet.elem));
+			lb_emit_store(p, lb_emit_struct_ep(p, tag, 0), lb_get_type_info_ptr(p, t->BitSet.elem));
 			if (t->BitSet.underlying != nullptr) {
-				ir_emit_store(p, ir_emit_struct_ep(p, tag, 1), ir_get_type_info_ptr(p, t->BitSet.underlying));
+				lb_emit_store(p, lb_emit_struct_ep(p, tag, 1), lb_get_type_info_ptr(p, t->BitSet.underlying));
 			}
-			ir_emit_store(p, ir_emit_struct_ep(p, tag, 2), ir_const_i64(t->BitSet.lower));
-			ir_emit_store(p, ir_emit_struct_ep(p, tag, 3), ir_const_i64(t->BitSet.upper));
+			lb_emit_store(p, lb_emit_struct_ep(p, tag, 2), lb_const_int(m, t_i64, t->BitSet.lower));
+			lb_emit_store(p, lb_emit_struct_ep(p, tag, 3), lb_const_int(m, t_i64, t->BitSet.upper));
 			break;
 
 		case Type_Opaque:
-			ir_emit_comment(p, str_lit("Type_Opaque"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_opaque_ptr);
-			ir_emit_store(p, ir_emit_struct_ep(p, tag, 0), ir_get_type_info_ptr(p, t->Opaque.elem));
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_opaque_ptr);
+			lb_emit_store(p, lb_emit_struct_ep(p, tag, 0), lb_get_type_info_ptr(p, t->Opaque.elem));
 			break;
-
 		case Type_SimdVector:
-			ir_emit_comment(p, str_lit("Type_SimdVector"));
-			tag = ir_emit_conv(p, variant_ptr, t_type_info_simd_vector_ptr);
+			tag = lb_emit_conv(p, variant_ptr, t_type_info_simd_vector_ptr);
 			if (t->SimdVector.is_x86_mmx) {
-				ir_emit_store(p, ir_emit_struct_ep(p, tag, 3), v_true);
+				lb_emit_store(p, lb_emit_struct_ep(p, tag, 3), lb_const_bool(m, t_bool, true));
 			} else {
-				ir_emit_store(p, ir_emit_struct_ep(p, tag, 0), ir_get_type_info_ptr(p, t->SimdVector.elem));
-				ir_emit_store(p, ir_emit_struct_ep(p, tag, 1), ir_const_int(type_size_of(t->SimdVector.elem)));
-				ir_emit_store(p, ir_emit_struct_ep(p, tag, 2), ir_const_int(t->SimdVector.count));
+				lb_emit_store(p, lb_emit_struct_ep(p, tag, 0), lb_get_type_info_ptr(p, t->SimdVector.elem));
+				lb_emit_store(p, lb_emit_struct_ep(p, tag, 1), lb_const_int(m, t_int, type_size_of(t->SimdVector.elem)));
+				lb_emit_store(p, lb_emit_struct_ep(p, tag, 2), lb_const_int(m, t_int, t->SimdVector.count));
 			}
 			break;
 		}
 
 
-		if (tag != nullptr) {
-			Type *tag_type = type_deref(ir_type(tag));
+		if (tag.value != nullptr) {
+			Type *tag_type = type_deref(tag.type);
 			GB_ASSERT(is_type_named(tag_type));
-			ir_emit_store_union_variant(p, variant_ptr, ir_emit_load(p, tag), tag_type);
+			lb_emit_store_union_variant(p, variant_ptr, lb_emit_load(p, tag), tag_type);
 		} else {
 			if (t != t_llvm_bool) {
 				GB_PANIC("Unhandled Type_Info variant: %s", type_to_string(t));
 			}
 		}
 	}
-#endif
 }
 
 
@@ -8146,7 +8270,92 @@ void lb_generate_code(lbGenerator *gen) {
 			LLVMDWARFEmissionFull, 0, true,
 			true
 		);
+	}
 
+	{
+		{ // Add type info data
+			isize max_type_info_count = info->minimum_dependency_type_info_set.entries.count+1;
+			Type *t = alloc_type_array(t_type_info, max_type_info_count);
+			LLVMValueRef g = LLVMAddGlobal(mod, lb_type(m, t), LB_TYPE_INFO_DATA_NAME);
+			LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+			LLVMSetLinkage(g, LLVMInternalLinkage);
+
+			lbValue value = {};
+			value.value = g;
+			value.type = alloc_type_pointer(t);
+			lb_global_type_info_data = lb_addr(value);
+		}
+		{ // Type info member buffer
+			// NOTE(bill): Removes need for heap allocation by making it global memory
+			isize count = 0;
+
+			for_array(entry_index, m->info->type_info_types) {
+				Type *t = m->info->type_info_types[entry_index];
+
+				isize index = lb_type_info_index(m->info, t, false);
+				if (index < 0) {
+					continue;
+				}
+
+				switch (t->kind) {
+				case Type_Union:
+					count += t->Union.variants.count;
+					break;
+				case Type_Struct:
+					count += t->Struct.fields.count;
+					break;
+				case Type_Tuple:
+					count += t->Tuple.variables.count;
+					break;
+				}
+			}
+
+			if (count > 0) {
+				{
+					char const *name = LB_TYPE_INFO_TYPES_NAME;
+					Type *t = alloc_type_array(t_type_info_ptr, count);
+					LLVMValueRef g = LLVMAddGlobal(mod, lb_type(m, t), name);
+					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+					LLVMSetLinkage(g, LLVMInternalLinkage);
+					lb_global_type_info_member_types = lb_addr({g, alloc_type_pointer(t)});
+
+				}
+				{
+					char const *name = LB_TYPE_INFO_NAMES_NAME;
+					Type *t = alloc_type_array(t_string, count);
+					LLVMValueRef g = LLVMAddGlobal(mod, lb_type(m, t), name);
+					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+					LLVMSetLinkage(g, LLVMInternalLinkage);
+					lb_global_type_info_member_names = lb_addr({g, alloc_type_pointer(t)});
+				}
+				{
+					char const *name = LB_TYPE_INFO_OFFSETS_NAME;
+					Type *t = alloc_type_array(t_uintptr, count);
+					LLVMValueRef g = LLVMAddGlobal(mod, lb_type(m, t), name);
+					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+					LLVMSetLinkage(g, LLVMInternalLinkage);
+					lb_global_type_info_member_offsets = lb_addr({g, alloc_type_pointer(t)});
+				}
+
+				{
+					char const *name = LB_TYPE_INFO_USINGS_NAME;
+					Type *t = alloc_type_array(t_bool, count);
+					LLVMValueRef g = LLVMAddGlobal(mod, lb_type(m, t), name);
+					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+					LLVMSetLinkage(g, LLVMInternalLinkage);
+					lb_global_type_info_member_usings = lb_addr({g, alloc_type_pointer(t)});
+				}
+
+				{
+					char const *name = LB_TYPE_INFO_TAGS_NAME;
+					Type *t = alloc_type_array(t_string, count);
+					LLVMValueRef g = LLVMAddGlobal(mod, lb_type(m, t), name);
+					LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
+					LLVMSetLinkage(g, LLVMInternalLinkage);
+					lb_global_type_info_member_tags = lb_addr({g, alloc_type_pointer(t)});
+				}
+			}
+		}
 	}
 
 
@@ -8384,12 +8593,12 @@ void lb_generate_code(lbGenerator *gen) {
 
 		Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
 
-		lbProcedure *p = lb_create_dummy_procedure(m, str_lit("__$startup_runtime"), proc_type);
+		lbProcedure *p = lb_create_dummy_procedure(m, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
 		startup_runtime = p;
 
 		lb_begin_procedure_body(p);
 
-		lb_emit_init_context(p);
+		lb_emit_init_context(p, {});
 
 		lb_setup_type_info_data(p);
 

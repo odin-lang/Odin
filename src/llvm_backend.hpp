@@ -247,7 +247,7 @@ lbValue lb_build_gep(lbProcedure *p, lbValue const &value, i32 index) ;
 
 lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index);
 lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index);
-lbValue lb_emit_array_epi(lbProcedure *p, lbValue value, i32 index);
+lbValue lb_emit_array_epi(lbProcedure *p, lbValue value, isize index);
 lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index);
 lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection sel);
 lbValue lb_emit_deep_field_ev(lbProcedure *p, lbValue e, Selection sel);
@@ -278,6 +278,16 @@ lbDefer lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt);
 lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_init);
 
 lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> const &args);
+
+
+#define LB_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"
+#define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"
+#define LB_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"
+#define LB_TYPE_INFO_NAMES_NAME      "__$type_info_names_data"
+#define LB_TYPE_INFO_OFFSETS_NAME    "__$type_info_offsets_data"
+#define LB_TYPE_INFO_USINGS_NAME     "__$type_info_usings_data"
+#define LB_TYPE_INFO_TAGS_NAME       "__$type_info_tags_data"
+
 
 
 enum lbCallingConventionKind {
