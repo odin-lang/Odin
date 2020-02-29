@@ -129,85 +129,66 @@ read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
 heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                             size, alignment: int,
                             old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
-/*
+
 	//
-	// NOTE(tetra, 2019-11-10): The heap doesn't respect alignment.
-	// HACK: Overallocate, align forwards, and then use the two bytes immediately before
-	// the address we return, to store the padding we inserted.
-	// This allows us to pass the original pointer we got back from the heap to `free` later.
+	// NOTE(tetra, 2020-01-14): The heap doesn't respect alignment.
+	// Instead, we overallocate by `alignment + size_of(rawptr) - 1`, and insert
+	// padding. We also store the original pointer returned by heap_alloc right before
+	// the pointer we return to the user.
 	//
 
-	align_and_store_padding :: proc(ptr: rawptr, alignment: int) -> rawptr {
-		ptr := mem.ptr_offset(cast(^u8) ptr, 2);
-		new_ptr := cast(^u8) mem.align_forward(ptr, uintptr(alignment));
-		offset := mem.ptr_sub(new_ptr, cast(^u8) ptr) + 2;
-		assert(offset < int(max(u16)));
-		(^[2]u8)(mem.ptr_offset(new_ptr, -2))^ = transmute([2]u8) u16(offset);
-		return new_ptr;
+	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr = nil) -> rawptr {
+		a := max(alignment, align_of(rawptr));
+		space := size + a - 1;
+
+		allocated_mem: rawptr;
+		if old_ptr != nil {
+			original_old_ptr := mem.ptr_offset((^rawptr)(old_ptr), -1)^;
+			allocated_mem = heap_resize(original_old_ptr, space+size_of(rawptr));
+		} else {
+			allocated_mem = heap_alloc(space+size_of(rawptr));
+		}
+		aligned_mem := rawptr(mem.ptr_offset((^u8)(allocated_mem), size_of(rawptr)));
+
+		ptr := uintptr(aligned_mem);
+		aligned_ptr := (ptr - 1 + uintptr(a)) & -uintptr(a);
+		diff := int(aligned_ptr - ptr);
+		if (size + diff) > space {
+			return nil;
+		}
+
+		aligned_mem = rawptr(aligned_ptr);
+		mem.ptr_offset((^rawptr)(aligned_mem), -1)^ = allocated_mem;
+
+		return aligned_mem;
 	}
 
-	recover_original_pointer :: proc(ptr: rawptr) -> rawptr {
-		ptr := cast(^u8) ptr;
-		offset := transmute(u16) (^[2]u8)(mem.ptr_offset(ptr, -2))^;
-		ptr = mem.ptr_offset(ptr, -int(offset));
-		return ptr;
+	aligned_free :: proc(p: rawptr) {
+		if p != nil {
+			heap_free(mem.ptr_offset((^rawptr)(p), -1)^);
+		}
 	}
 
-	aligned_heap_alloc :: proc(size: int, alignment: int) -> rawptr {
-		// NOTE(tetra): Alignment 1 will mean we only have one extra byte.
-		// This is not enough for a u16 - so we ensure there is at least two bytes extra.
-		// This also means that the pointer is always aligned to at least 2.
-		extra := alignment;
-		if extra <= 1 do extra = 2;
-
-		orig := cast(^u8) heap_alloc(size + extra);
-		if orig == nil do return nil;
-		ptr := align_and_store_padding(orig, alignment);
-		assert(recover_original_pointer(ptr) == orig);
-		return ptr;
+	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int) -> rawptr {
+		if p == nil do return nil;
+		return aligned_alloc(new_size, new_alignment, p);
 	}
 
 	switch mode {
 	case .Alloc:
-		return aligned_heap_alloc(size, alignment);
+		return aligned_alloc(size, alignment);
 
 	case .Free:
-		if old_memory != nil {
-			ptr := recover_original_pointer(old_memory);
-			heap_free(ptr);
-		}
-		return nil;
+		aligned_free(old_memory);
 
 	case .Free_All:
-		// NOTE(bill): Does nothing
+		// NOTE(tetra): Do nothing.
 
 	case .Resize:
 		if old_memory == nil {
-			return aligned_heap_alloc(size, alignment);
+			return aligned_alloc(size, alignment);
 		}
-		ptr := recover_original_pointer(old_memory);
-		ptr = heap_resize(ptr, size);
-		assert(ptr != nil);
-		return align_and_store_padding(ptr, alignment);
-	}
-
-	return nil;
-*/
-	switch mode {
-	case .Alloc:
-		return heap_alloc(size);
-
-	case .Free:
-		if old_memory != nil {
-			heap_free(old_memory);
-		}
-		return nil;
-
-	case .Free_All:
-		// NOTE(bill): Does nothing
-
-	case .Resize:
-		return heap_resize(old_memory, size);
+		return aligned_resize(old_memory, old_size, size, alignment);
 	}
 
 	return nil;
