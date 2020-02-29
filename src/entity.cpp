@@ -47,6 +47,7 @@ enum EntityFlag {
 	EntityFlag_BitFieldValue = 1<<12,
 	EntityFlag_PolyConst     = 1<<13,
 	EntityFlag_NotExported   = 1<<14,
+	EntityFlag_ConstInput    = 1<<15,
 
 	EntityFlag_Static        = 1<<16,
 
