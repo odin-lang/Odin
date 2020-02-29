@@ -59,18 +59,19 @@ MADV_KEEPONFORK :: 19;	/* Undo MADV_WIPEONFORK.  */
 MADV_HWPOISON :: 100;	/* Poison a page for testing.  */
 
 
-Memory_Protection_Flag :: enum i32 {
+Memory_Access_Flag :: enum i32 {
+	// NOTE(tetra): Order is important here.
 	Read,
 	Write,
 	Execute,
 }
+Memory_Access_Flags :: bit_set[Memory_Access_Flag; i32]; // NOTE: For PROT_NONE, use `{}`.
 
-// NOTE: For PROT_NONE, use `{}`.
-Memory_Protection_Flags :: bit_set[Memory_Protection_Flag; i32];
+reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte, ok: bool) {
+	flags: i32 = MAP_PRIVATE | MAP_ANONYMOUS;
+	if desired_base != nil do flags |= MAP_FIXED_NOREPLACE;
 
-
-alloc :: proc(size: int, protections: Memory_Protection_Flags = {.Read | .Write}, desired_base: rawptr = nil) -> (memory: []u8, ok: bool) {
-	ptr := _unix_mmap(desired_base, u64(size), transmute(i32) protections, MAP_PRIVATE | MAP_ANONYMOUS, os.INVALID_HANDLE, 0);
+	ptr := _unix_mmap(desired_base, u64(size), PROT_NONE, flags, os.INVALID_HANDLE, 0);
 
 	// NOTE: returns -1 on failure, and sets errno.
 	ok = int(uintptr(ptr)) != -1;
@@ -80,49 +81,63 @@ alloc :: proc(size: int, protections: Memory_Protection_Flags = {.Read | .Write}
 	return;
 }
 
-// Frees a region of virtual memory.
-free :: proc(memory: []u8) {
-	// NOTE: returns -1 on failure, and sets errno.
+alloc :: proc(size: int, access := Memory_Access_Flags{.Read, .Write}, desired_base: rawptr = nil) -> (memory: []byte, ok: bool) {
+	memory, ok = reserve(size, desired_base);
+	if !ok do return;
+
+	ok = commit(memory, access);
+	return;
+}
+
+// Frees all pages that overlap the given memory block.
+free :: proc(memory: []byte) {
 	page_size := os.get_page_size();
-	assert(uintptr(&memory[0]) % uintptr(page_size) == 0, "must start at memory boundary");
+	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
+	// NOTE: returns -1 on failure, and sets errno.
 	assert(_unix_munmap(&memory[0], u64(len(memory))) != -1);
 }
 
-commit :: proc(memory: []u8) -> bool {
-	assert(uintptr(&memory[0]) % uintptr(os.get_page_size()) == 0, "must start at page boundary");
-	ok := _unix_madvise(&memory[0], u64(len(memory)), MADV_WILLNEED) == 0;
-	mem.set(&memory[0], 0, len(memory));
+// Commits pages that overlap the given memory block.
+//
+// NOTE(tetra): On Linux, presumably with overcommit on, this doesn't actually
+// commit the memory; that only happens when you write to the pages.
+commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> bool {
+	page_size := os.get_page_size();
+	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
+	ok := set_access(memory, access);
+	_ = _unix_madvise(&memory[0], u64(len(memory)), MADV_WILLNEED) == 0; // ignored, since advisory is not required
 	return ok;
 }
 
-decommit :: proc(memory: []u8) -> bool {
-	assert(uintptr(&memory[0]) % uintptr(os.get_page_size()) == 0, "must start at page boundary");
-	return _unix_madvise(&memory[0], u64(len(memory)), MADV_DONTNEED) == 0;
+decommit :: proc(memory: []byte) -> bool {
+	page_size := os.get_page_size();
+	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
+	_ = _unix_madvise(&memory[0], u64(len(memory)), MADV_DONTNEED) == 0; // ignored, since advisory is not required
+	ok := set_access(memory, {});
+	return ok;
 }
 
-enclosing_page :: proc(ptr: rawptr) -> []u8 {
+set_access :: proc(memory: []byte, access: Memory_Access_Flags) -> bool {
 	page_size := os.get_page_size();
-	start := cast(^u8) mem.align_backward(ptr, uintptr(page_size));
+	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
+	ret := _unix_mprotect(&memory[0], u64(len(memory)), transmute(i32) access);
+	return ret == 0;
+}
+
+enclosing_page :: proc(ptr: rawptr) -> []byte {
+	page_size := os.get_page_size();
+	start := cast(^byte) mem.align_backward(ptr, uintptr(page_size));
 	return mem.slice_ptr(start, page_size);
 }
 
-next_page :: proc(page: []u8) -> []u8 {
+next_page :: proc(page: []byte) -> []byte {
 	page_size := os.get_page_size();
-	assert(uintptr(&page[0]) % uintptr(page_size) == 0, "must start at page boundary");
-	ptr := cast(^u8) &page[len(page)-1];
-	return mem.slice_ptr(mem.ptr_offset(ptr, 1), page_size);
+	ptr := mem.align_forward(&page[0], uintptr(page_size));
+	return mem.slice_ptr(cast(^byte) ptr, page_size);
 }
 
-previous_page :: proc(page: []u8) -> []u8 {
+previous_page :: proc(page: []byte) -> []byte {
 	page_size := os.get_page_size();
-	assert(uintptr(&page[0]) % uintptr(page_size) == 0, "must start at page boundary");
-	ptr := cast(^u8) &page[0];
-	return mem.slice_ptr(mem.ptr_offset(ptr, -page_size), page_size);
-}
-
-protect :: proc(memory: []u8, protections: Memory_Protection_Flags) {
-	page_size := os.get_page_size();
-	assert(uintptr(&memory[0]) % uintptr(page_size) == 0, "must start at page boundary");
-	ret := _unix_mprotect(&memory[0], u64(len(memory)), transmute(i32) protections);
-	assert(ret == 0, "memory could not be protected as requested");
+	ptr := mem.align_backward(&page[0], uintptr(page_size));
+	return mem.slice_ptr(cast(^byte) ptr, page_size);
 }
