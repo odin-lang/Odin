@@ -13,15 +13,15 @@ enclosing_page :: inline proc(ptr: rawptr) -> rawptr {
 // Returns a pointer to the first byte of the page after the one the given pointer is in.
 next_page :: inline proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
-	ptr := mem.align_forward(rawptr(uintptr(ptr)+1), uintptr(page_size));
-	return ptr;
+	start := mem.align_forward(rawptr(uintptr(ptr)+1), uintptr(page_size));
+	return start;
 }
 
 // Returns a pointer to the first byte of the page before the one the given pointer is in.
 previous_page :: inline proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
-	ptr := mem.align_backward(rawptr(uintptr(ptr)-1), uintptr(page_size));
-	return ptr;
+	start := mem.align_backward(rawptr(uintptr(ptr)-1), uintptr(page_size));
+	return start;
 }
 
 // Given a number of bytes, returns the number of pages needed to contain it.
@@ -174,8 +174,8 @@ arena_begin_temp_memory :: proc(using va: ^Arena) -> Arena_Temp_Memory {
 	};
 }
 
-arena_end_temp_memory :: proc(mark: Arena_Temp_Memory) {
-	using mark := mark;
+arena_end_temp_memory :: proc(mark_: Arena_Temp_Memory) {
+	using mark := mark_;
 	
 	if cursor == nil {
 		cursor = arena.base;
