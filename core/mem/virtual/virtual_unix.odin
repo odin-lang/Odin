@@ -1,3 +1,4 @@
+//+build linux, darwin
 package virtual;
 
 import "core:os"
@@ -67,6 +68,7 @@ Memory_Access_Flag :: enum i32 {
 }
 Memory_Access_Flags :: bit_set[Memory_Access_Flag; i32]; // NOTE: For PROT_NONE, use `{}`.
 
+
 reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte, ok: bool) {
 	flags: i32 = MAP_PRIVATE | MAP_ANONYMOUS;
 	if desired_base != nil do flags |= MAP_FIXED_NOREPLACE;
@@ -122,22 +124,4 @@ set_access :: proc(memory: []byte, access: Memory_Access_Flags) -> bool {
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 	ret := _unix_mprotect(&memory[0], u64(len(memory)), transmute(i32) access);
 	return ret == 0;
-}
-
-enclosing_page :: proc(ptr: rawptr) -> []byte {
-	page_size := os.get_page_size();
-	start := cast(^byte) mem.align_backward(ptr, uintptr(page_size));
-	return mem.slice_ptr(start, page_size);
-}
-
-next_page :: proc(page: []byte) -> []byte {
-	page_size := os.get_page_size();
-	ptr := mem.align_forward(&page[0], uintptr(page_size));
-	return mem.slice_ptr(cast(^byte) ptr, page_size);
-}
-
-previous_page :: proc(page: []byte) -> []byte {
-	page_size := os.get_page_size();
-	ptr := mem.align_backward(&page[0], uintptr(page_size));
-	return mem.slice_ptr(cast(^byte) ptr, page_size);
 }
