@@ -1108,6 +1108,12 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			if (type_expr != nullptr) { // Otherwise it's a default expression
 				Operand y = {};
 				check_expr_or_type(ctx, &y, type_expr);
+				if (y.mode != Addressing_Type) {
+					gbString str = expr_to_string(type_expr);
+					error(type_expr, "Expected a type as a case, got %s", str);
+					gb_string_free(str);
+					continue;
+				}
 
 				if (switch_kind == TypeSwitch_Union) {
 					GB_ASSERT(is_type_union(bt));
