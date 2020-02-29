@@ -160,3 +160,35 @@ arena_allocator :: proc(arena: ^Arena) -> mem.Allocator {
 		data = arena,
 	};
 }
+
+
+Arena_Temporary_Mark :: struct {
+	arena:  ^Arena,
+	cursor: rawptr,
+}
+
+arena_get_mark :: proc(using va: ^Arena) -> Arena_Temporary_Mark {
+	return {
+		arena = va,
+		cursor = cursor,
+	};
+}
+
+arena_reset_to_mark :: proc(mark: Arena_Temporary_Mark) {
+	using mark := mark;
+
+	if cursor == nil {
+		cursor = arena.base;
+	}
+	if arena.cursor == nil do return;
+
+	page_size := os.get_page_size();
+
+	start := next_page(cursor);
+	if arena.cursor > start {
+		n := int(uintptr(arena.cursor) - uintptr(cursor));
+		decommit(mem.slice_ptr(cast(^byte)start, n));
+	}
+
+	arena.cursor = cursor;
+}

@@ -104,6 +104,8 @@ free :: proc(memory: []byte) {
 // NOTE(tetra): On Linux, presumably with overcommit on, this doesn't actually
 // commit the memory; that only happens when you write to the pages.
 commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> bool {
+	assert(memory != nil);
+
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 	ok := set_access(memory, access);
@@ -111,17 +113,21 @@ commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> 
 	return ok;
 }
 
-decommit :: proc(memory: []byte) -> bool {
+decommit :: proc(memory: []byte) {
+	assert(memory != nil);
+
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 	_ = _unix_madvise(&memory[0], u64(len(memory)), MADV_DONTNEED) == 0; // ignored, since advisory is not required
 	ok := set_access(memory, {});
-	return ok;
+	assert(ok);
 }
 
-set_access :: proc(memory: []byte, access: Memory_Access_Flags) -> bool {
+set_access :: proc(memory: []byte, access: Memory_Access_Flags) {
+	assert(memory != nil);
+
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 	ret := _unix_mprotect(&memory[0], u64(len(memory)), transmute(i32) access);
-	return ret == 0;
+	assert(ret == 0);
 }

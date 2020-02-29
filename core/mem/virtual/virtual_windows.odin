@@ -71,6 +71,8 @@ free :: proc(memory: []byte) {
 // NOTE(tetra): On Linux, presumably with overcommit on, this doesn't actually
 // commit the memory; that only happens when you write to the pages.
 commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> bool {
+	assert(memory != nil);
+
 	flags := access_to_flags(access);
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
@@ -80,6 +82,8 @@ commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> 
 
 // Decommits pages that overlap the given memory block.
 decommit :: proc(memory: []byte) {
+	assert(memory != nil);
+
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 
@@ -88,6 +92,8 @@ decommit :: proc(memory: []byte) {
 }
 
 set_access :: proc(memory: []byte, access: Memory_Access_Flags) {
+	assert(memory != nil);
+
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 
