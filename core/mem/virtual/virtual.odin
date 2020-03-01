@@ -128,10 +128,7 @@ arena_resize :: proc(va: ^Arena, old_memory: rawptr, old_size, size, alignment: 
 // Afterwards, the arena can be initialized again with `arena_init`.
 arena_destroy :: proc(using va: ^Arena) {
 	free(mem.slice_ptr(base, max_size));
-	base = nil;
-	cursor = nil;
-	max_size = 0;
-	desired_base_ptr = nil;
+	va^ = {};
 }
 
 arena_allocator_proc :: proc(data: rawptr, mode: mem.Allocator_Mode,
