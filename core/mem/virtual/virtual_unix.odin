@@ -50,7 +50,7 @@ reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
 	// NOTE: sets errno.
 	if int(uintptr(ptr)) == MAP_FAILED do return;
 
-	memory = mem.slice_ptr(cast(^u8) ptr, size);
+	memory = mem.slice_ptr(cast(^byte) ptr, size);
 	return;
 }
 
@@ -72,14 +72,11 @@ free :: proc(memory: []byte) {
 }
 
 // Commit pages to physical memory so they can be used.
-//
-// NOTE(tetra): On Linux, presumably with overcommit on, this doesn't actually
-// commit the memory; that only happens when you write to the pages.
+// The pages still do not take up system resources until they are written to.
+// If you fail to do this before accessing the memory, it will segfault.
 commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> bool {
 	assert(memory != nil);
 
-	page_size := os.get_page_size();
-	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 	set_access(memory, access);
 	_ = _unix_madvise(&memory[0], u64(len(memory)), MADV_WILLNEED); // ignored, since advisory is not required
 	return true; // TODO: maybe inline call to mprotect?; on Windows it's part of the virtualalloc call.
@@ -91,10 +88,8 @@ commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> 
 decommit :: proc(memory: []byte) {
 	assert(memory != nil);
 
-	page_size := os.get_page_size();
-	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
-	_ = _unix_madvise(&memory[0], u64(len(memory)), MADV_DONTNEED); // ignored, since advisory is not required
 	set_access(memory, {});
+	_ = _unix_madvise(&memory[0], u64(len(memory)), MADV_DONTNEED); // ignored, since advisory is not required
 }
 
 set_access :: proc(memory: []byte, access: Memory_Access_Flags) {

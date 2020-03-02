@@ -67,9 +67,8 @@ free :: proc(memory: []byte) {
 }
 
 // Commits pages that overlap the given memory block.
-//
-// NOTE(tetra): On Linux, presumably with overcommit on, this doesn't actually
-// commit the memory; that only happens when you write to the pages.
+// The pages still do not take up system resources until they are written to.
+// If you fail to do this before accessing the memory, it will segfault.
 commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> bool {
 	assert(memory != nil);
 
