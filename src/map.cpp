@@ -55,12 +55,14 @@ gb_inline HashKey hash_string(String s) {
 gb_inline HashKey hash_pointer(void *ptr) {
 	HashKey h = {HashKey_Ptr};
 	h.key = cast(u64)cast(uintptr)ptr;
+	// h.key = gb_fnv64a(&ptr, gb_size_of(void *));
 	h.ptr = ptr;
 	return h;
 }
 gb_inline HashKey hash_ptr_and_id(void *ptr, u64 id) {
 	HashKey h = {HashKey_PtrAndId};
 	h.key = cast(u64)cast(uintptr)ptr;
+	// h.key = gb_fnv64a(&ptr, gb_size_of(void *));
 	h.ptr_and_id.ptr = ptr;
 	h.ptr_and_id.id  = id;
 	return h;
