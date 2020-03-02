@@ -243,6 +243,7 @@ enum BuildFlagKind {
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_ResourceFile,
 	BuildFlag_WindowsPdbName,
+	BuildFlag_Subsystem,
 #endif
 
 	BuildFlag_COUNT,
@@ -331,8 +332,9 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_GoToDefinitions, str_lit("go-to-definitions"), BuildFlagParam_None);
 
 #if defined(GB_SYSTEM_WINDOWS)
-	add_flag(&build_flags, BuildFlag_ResourceFile,   str_lit("resource"), BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_WindowsPdbName, str_lit("pdb-name"), BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_ResourceFile,   str_lit("resource"),  BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_WindowsPdbName, str_lit("pdb-name"),  BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_Subsystem,      str_lit("subsystem"), BuildFlagParam_String);
 #endif
 
 	GB_ASSERT(args.count >= 3);
@@ -764,7 +766,19 @@ bool parse_build_flags(Array<String> args) {
 								bad_flags = true;
 							}
 							break;
+						}
 
+						case BuildFlag_Subsystem: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String subsystem = value.value_string;
+							if (str_eq_ignore_case(subsystem, str_lit("console"))) {
+								build_context.use_subsystem_windows = false;
+							} else  if (str_eq_ignore_case(subsystem, str_lit("windows"))) {
+								build_context.use_subsystem_windows = true;
+							} else {
+								gb_printf_err("Invalid -subsystem string, got %.*s, expected either 'console' or 'windows'\n", LIT(subsystem));
+								bad_flags = true;
+							}
 							break;
 						}
 					#endif
@@ -1376,8 +1390,8 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 
 
+		char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
 		if (!build_context.use_lld) { // msvc
-
 			if (build_context.has_resource) {
 				exit_code = system_exec_command_line_app("msvc-link",
 					"\"%.*src.exe\" /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
@@ -1392,36 +1406,42 @@ int main(int arg_count, char const **arg_ptr) {
 
 				exit_code = system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
+					"/nologo /incremental:no /opt:ref /subsystem:%s "
 					" %.*s "
 					" %s "
 					"",
 					LIT(find_result.vs_exe_path), LIT(output_base), LIT(output_base), LIT(output_base), output_ext,
-					link_settings, LIT(build_context.link_flags),
+					link_settings,
+					subsystem_str,
+					LIT(build_context.link_flags),
 					lib_str
 				);
 			} else {
 				exit_code = system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
+					"/nologo /incremental:no /opt:ref /subsystem:%s "
 					" %.*s "
 					" %s "
 					"",
 					LIT(find_result.vs_exe_path), LIT(output_base), LIT(output_base), output_ext,
-					link_settings, LIT(build_context.link_flags),
+					link_settings,
+					subsystem_str,
+					LIT(build_context.link_flags),
 					lib_str
 				);
 			}
 		} else { // lld
 			exit_code = system_exec_command_line_app("msvc-link",
 				"\"%.*s\\bin\\lld-link\" \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
-				"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
+				"/nologo /incremental:no /opt:ref /subsystem:%s "
 				" %.*s "
 				" %s "
 				"",
 				LIT(build_context.ODIN_ROOT),
 				LIT(output_base), LIT(output_base), output_ext,
-				link_settings, LIT(build_context.link_flags),
+				link_settings,
+				subsystem_str,
+				LIT(build_context.link_flags),
 				lib_str
 			);
 		}
