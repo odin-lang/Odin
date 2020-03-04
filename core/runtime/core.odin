@@ -277,9 +277,9 @@ Logger_Proc :: #type proc(data: rawptr, level: Logger_Level, text: string, optio
 
 Logger :: struct {
 	procedure:    Logger_Proc,
-	data:      	  rawptr,
+	data:         rawptr,
 	lowest_level: Logger_Level,
-	options:   	  Logger_Options,
+	options:      Logger_Options,
 }
 
 Context :: struct {

@@ -126,6 +126,7 @@ struct BuildContext {
 	bool   use_lld;
 	bool   vet;
 	bool   cross_compiling;
+	bool   use_subsystem_windows;
 
 	bool   use_llvm_api;
 
