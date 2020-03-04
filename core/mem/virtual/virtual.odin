@@ -44,9 +44,10 @@ bytes_to_pages :: inline proc(size: int) -> int {
 // `arena_alloc` after `arena_reset` has been called, will segfault.
 // Attempting to modify data in the arena's buffer before it has been returned from `arena_alloc` will also do this.
 Arena :: struct {
-	base:     ^byte,
-	max_size: int,
-	cursor:   rawptr,
+	base:            ^byte,
+	max_size:        int,
+	cursor:          rawptr,
+	pages_committed: int,
 
 	desired_base_ptr: rawptr, // may be nil
 }
@@ -69,7 +70,8 @@ arena_reset :: proc(using va: ^Arena) {
 
 arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 	if va.base == nil {
-		assert(va.max_size > 0, "arena not initialized");
+		if va.max_size == 0 do return nil; // NOTE(tetra): Size specified as zero, or arena not initialized
+
 		base_ptr := reserve(va.max_size, va.desired_base_ptr);
 		if base_ptr == nil do return nil;
 
@@ -88,9 +90,12 @@ arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 		return nil; // TODO: Expand?
 	}
 
-	pages_needed := bytes_to_pages(mem.ptr_sub(region_end, cast(^byte)va.base));
-	ok := commit(mem.slice_ptr(va.base, max(pages_needed, 1) * os.get_page_size()));
-	assert(ok);
+	total_pages_needed := bytes_to_pages(mem.ptr_sub(region_end, cast(^byte)va.base));
+	if total_pages_needed > va.pages_committed {
+		ok := commit(mem.slice_ptr(va.base, max(total_pages_needed, 1) * os.get_page_size()));
+		assert(ok);
+		va.pages_committed = total_pages_needed;
+	}
 
 	va.cursor = region_end;
 	return region;
@@ -116,9 +121,12 @@ arena_resize :: proc(va: ^Arena, old_memory: rawptr, old_size, size, alignment: 
 		return nil; // TODO: Expand?
 	}
 
-	pages_needed := bytes_to_pages(mem.ptr_sub(new_region_end, cast(^byte)va.base));
-	ok := commit(mem.slice_ptr(va.base, max(pages_needed, 1) * os.get_page_size()));
-	assert(ok);
+	total_pages_needed := bytes_to_pages(mem.ptr_sub(new_region_end, cast(^byte)va.base));
+	if total_pages_needed > va.pages_committed {
+		ok := commit(mem.slice_ptr(va.base, max(total_pages_needed, 1) * os.get_page_size()));
+		assert(ok);
+		va.pages_committed = total_pages_needed;
+	}
 
 	va.cursor = new_region_end;
 	return old_memory;
