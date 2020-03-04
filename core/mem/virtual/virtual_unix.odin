@@ -66,6 +66,8 @@ alloc :: proc(size: int, access := Memory_Access_Flags{.Read, .Write}, desired_b
 
 // Frees all pages that overlap the given memory block.
 free :: proc(memory: []byte) {
+	if memory == nil do return;
+
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 	assert(_unix_munmap(&memory[0], u64(len(memory))) != MAP_FAILED);
