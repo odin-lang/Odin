@@ -1196,12 +1196,16 @@ lbValue lb_add_param(lbProcedure *p, Entity *e, Ast *expr, Type *abi_type, i32 i
 	return {};
 }
 
-
 void lb_start_block(lbProcedure *p, lbBlock *b) {
 	GB_ASSERT(b != nullptr);
-	p->curr_block = b;
+	if (!b->appended) {
+		b->appended = true;
+		LLVMAppendExistingBasicBlock(p->value, b->block);
+	}
 	LLVMPositionBuilderAtEnd(p->builder, b->block);
+	p->curr_block = b;
 }
+
 
 void lb_begin_procedure_body(lbProcedure *p) {
 	DeclInfo *decl = decl_info_of_entity(p->entity);
@@ -1215,8 +1219,8 @@ void lb_begin_procedure_body(lbProcedure *p) {
 
 	p->builder = LLVMCreateBuilder();
 
-	p->decl_block = lb_create_block(p, "decls");
-	p->entry_block = lb_create_block(p, "entry");
+	p->decl_block  = lb_create_block(p, "decls", true);
+	p->entry_block = lb_create_block(p, "entry", true);
 	lb_start_block(p, p->entry_block);
 
 	GB_ASSERT(p->type != nullptr);
@@ -1391,9 +1395,15 @@ void lb_add_edge(lbBlock *from, lbBlock *to) {
 }
 
 
-lbBlock *lb_create_block(lbProcedure *p, char const *name) {
+lbBlock *lb_create_block(lbProcedure *p, char const *name, bool append) {
 	lbBlock *b = gb_alloc_item(heap_allocator(), lbBlock);
-	b->block = LLVMAppendBasicBlockInContext(p->module->ctx, p->value, name);
+	b->block = LLVMCreateBasicBlockInContext(p->module->ctx, name);
+	b->appended = false;
+	if (append) {
+		b->appended = true;
+		LLVMAppendExistingBasicBlock(p->value, b->block);
+	}
+
 	b->scope = p->curr_scope;
 	b->scope_index = p->scope_index;
 
@@ -1431,7 +1441,10 @@ void lb_emit_if(lbProcedure *p, lbValue cond, lbBlock *true_block, lbBlock *fals
 
 	lb_add_edge(b, true_block);
 	lb_add_edge(b, false_block);
-	LLVMBuildCondBr(p->builder, cond.value, true_block->block, false_block->block);
+
+	LLVMValueRef cv = cond.value;
+	cv = LLVMBuildTruncOrBitCast(p->builder, cv, lb_type(p->module, t_llvm_bool), "");
+	LLVMBuildCondBr(p->builder, cv, true_block->block, false_block->block);
 }
 
 lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *false_block) {
@@ -2689,8 +2702,9 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 
 	lb_start_block(p, rhs);
 	lbValue edge = lb_build_expr(p, right);
+
 	incoming_values[done->preds.count] = edge.value;
-	incoming_blocks[done->preds.count] = rhs->block;
+	incoming_blocks[done->preds.count] = p->curr_block->block;
 
 	lb_emit_jump(p, done);
 	lb_start_block(p, done);
@@ -2698,10 +2712,10 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 	lbValue res = {};
 	res.type = type;
 	res.value = LLVMBuildPhi(p->builder, lb_type(m, type), "");
-
+	GB_ASSERT(incoming_values.count == incoming_blocks.count);
 	LLVMAddIncoming(res.value, incoming_values.data, incoming_blocks.data, cast(unsigned)incoming_values.count);
 
-	return res;
+	return short_circuit;
 }
 
 
@@ -4031,11 +4045,8 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 
 	switch (op) {
 	case Token_Not: // Boolean not
-		res.value = LLVMBuildNot(p->builder, x.value, "");
-		res.type = x.type;
-		return res;
 	case Token_Xor: // Bitwise not
-		res.value = LLVMBuildXor(p->builder, x.value, LLVMConstAllOnes(lb_type(p->module, x.type)), "");
+		res.value = LLVMBuildNot(p->builder, x.value, "");
 		res.type = x.type;
 		return res;
 	case Token_Sub: // Number negation
@@ -4058,13 +4069,171 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type) {
 	lbModule *m = p->module;
 
+	if (is_type_array(lhs.type) || is_type_array(rhs.type)) {
+		lhs = lb_emit_conv(p, lhs, type);
+		rhs = lb_emit_conv(p, rhs, type);
 
+		lbValue x = lb_address_from_load_or_generate_local(p, lhs);
+		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
+
+		GB_ASSERT(is_type_array(type));
+		Type *elem_type = base_array_type(type);
+
+		lbAddr res = lb_add_local_generated(p, type, false);
+
+		i64 count = base_type(type)->Array.count;
+
+		bool inline_array_arith = type_size_of(type) <= build_context.max_align;
+
+		if (inline_array_arith) {
+			for (i64 i = 0; i < count; i++) {
+				lbValue a = lb_emit_load(p, lb_emit_array_epi(p, x, i));
+				lbValue b = lb_emit_load(p, lb_emit_array_epi(p, y, i));
+				lbValue c = lb_emit_arith(p, op, a, b, elem_type);
+				lb_emit_store(p, lb_emit_array_epi(p, res.addr, i), c);
+			}
+		} else {
+			auto loop_data = lb_loop_start(p, count);
+
+			lbValue a = lb_emit_load(p, lb_emit_array_ep(p, x, loop_data.idx));
+			lbValue b = lb_emit_load(p, lb_emit_array_ep(p, y, loop_data.idx));
+			lbValue c = lb_emit_arith(p, op, a, b, elem_type);
+			lb_emit_store(p, lb_emit_array_ep(p, res.addr, loop_data.idx), c);
+
+			lb_loop_end(p, loop_data);
+		}
+
+		return lb_addr_load(p, res);
+	} else if (is_type_complex(type)) {
+		lhs = lb_emit_conv(p, lhs, type);
+		rhs = lb_emit_conv(p, rhs, type);
+
+		Type *ft = base_complex_elem_type(type);
+
+		if (op == Token_Quo) {
+			auto args = array_make<lbValue>(heap_allocator(), 2);
+			args[0] = lhs;
+			args[1] = rhs;
+
+			switch (type_size_of(ft)) {
+			case 4: return lb_emit_runtime_call(p, "quo_complex64", args);
+			case 8: return lb_emit_runtime_call(p, "quo_complex128", args);
+			default: GB_PANIC("Unknown float type"); break;
+			}
+		}
+
+		lbAddr res = lb_add_local_generated(p, type, false); // NOTE: initialized in full later
+		lbValue a = lb_emit_struct_ev(p, lhs, 0);
+		lbValue b = lb_emit_struct_ev(p, lhs, 1);
+		lbValue c = lb_emit_struct_ev(p, rhs, 0);
+		lbValue d = lb_emit_struct_ev(p, rhs, 1);
+
+		lbValue real = {};
+		lbValue imag = {};
+
+		switch (op) {
+		case Token_Add:
+			real = lb_emit_arith(p, Token_Add, a, c, ft);
+			imag = lb_emit_arith(p, Token_Add, b, d, ft);
+			break;
+		case Token_Sub:
+			real = lb_emit_arith(p, Token_Sub, a, c, ft);
+			imag = lb_emit_arith(p, Token_Sub, b, d, ft);
+			break;
+		case Token_Mul: {
+			lbValue x = lb_emit_arith(p, Token_Mul, a, c, ft);
+			lbValue y = lb_emit_arith(p, Token_Mul, b, d, ft);
+			real = lb_emit_arith(p, Token_Sub, x, y, ft);
+			lbValue z = lb_emit_arith(p, Token_Mul, b, c, ft);
+			lbValue w = lb_emit_arith(p, Token_Mul, a, d, ft);
+			imag = lb_emit_arith(p, Token_Add, z, w, ft);
+			break;
+		}
+		}
+
+		lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 0), real);
+		lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 1), imag);
+
+		return lb_addr_load(p, res);
+	} else if (is_type_quaternion(type)) {
+		lhs = lb_emit_conv(p, lhs, type);
+		rhs = lb_emit_conv(p, rhs, type);
+
+		Type *ft = base_complex_elem_type(type);
+
+		if (op == Token_Add || op == Token_Sub) {
+			lbAddr res = lb_add_local_generated(p, type, false); // NOTE: initialized in full later
+			lbValue x0 = lb_emit_struct_ev(p, lhs, 0);
+			lbValue x1 = lb_emit_struct_ev(p, lhs, 1);
+			lbValue x2 = lb_emit_struct_ev(p, lhs, 2);
+			lbValue x3 = lb_emit_struct_ev(p, lhs, 3);
+
+			lbValue y0 = lb_emit_struct_ev(p, rhs, 0);
+			lbValue y1 = lb_emit_struct_ev(p, rhs, 1);
+			lbValue y2 = lb_emit_struct_ev(p, rhs, 2);
+			lbValue y3 = lb_emit_struct_ev(p, rhs, 3);
+
+			lbValue z0 = lb_emit_arith(p, op, x0, y0, ft);
+			lbValue z1 = lb_emit_arith(p, op, x1, y1, ft);
+			lbValue z2 = lb_emit_arith(p, op, x2, y2, ft);
+			lbValue z3 = lb_emit_arith(p, op, x3, y3, ft);
+
+			lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 0), z0);
+			lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 1), z1);
+			lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 2), z2);
+			lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 3), z3);
+
+			return lb_addr_load(p, res);
+		} else if (op == Token_Mul) {
+			auto args = array_make<lbValue>(heap_allocator(), 2);
+			args[0] = lhs;
+			args[1] = rhs;
+
+			switch (8*type_size_of(ft)) {
+			case 32: return lb_emit_runtime_call(p, "mul_quaternion128", args);
+			case 64: return lb_emit_runtime_call(p, "mul_quaternion256", args);
+			default: GB_PANIC("Unknown float type"); break;
+			}
+		} else if (op == Token_Quo) {
+			auto args = array_make<lbValue>(heap_allocator(), 2);
+			args[0] = lhs;
+			args[1] = rhs;
+
+			switch (8*type_size_of(ft)) {
+			case 32: return lb_emit_runtime_call(p, "quo_quaternion128", args);
+			case 64: return lb_emit_runtime_call(p, "quo_quaternion256", args);
+			default: GB_PANIC("Unknown float type"); break;
+			}
+		}
+	}
+
+	if (is_type_integer(type) && is_type_different_to_arch_endianness(type)) {
+		switch (op) {
+		case Token_AndNot:
+		case Token_And:
+		case Token_Or:
+		case Token_Xor:
+			goto handle_op;
+		}
+
+		Type *platform_type = integer_endian_type_to_platform_type(type);
+		lbValue x = lb_emit_byte_swap(p, lhs, integer_endian_type_to_platform_type(lhs.type));
+		lbValue y = lb_emit_byte_swap(p, rhs, integer_endian_type_to_platform_type(rhs.type));
+
+		lbValue res = lb_emit_arith(p, op, x, y, platform_type);
+
+		return lb_emit_byte_swap(p, res, type);
+	}
+
+
+
+handle_op:
 	lhs = lb_emit_conv(p, lhs, type);
 	rhs = lb_emit_conv(p, rhs, type);
 
-
 	lbValue res = {};
 	res.type = type;
+
 
 	switch (op) {
 	case Token_Add:
@@ -4143,8 +4312,7 @@ lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Ty
 		return res;
 	case Token_AndNot:
 		{
-			LLVMValueRef all_ones = LLVMConstAllOnes(lb_type(m, type));
-			LLVMValueRef new_rhs = LLVMBuildXor(p->builder, all_ones, rhs.value, "");
+			LLVMValueRef new_rhs = LLVMBuildNot(p->builder, rhs.value, "");
 			res.value = LLVMBuildAnd(p->builder, lhs.value, new_rhs, "");
 			return res;
 		}
@@ -4852,7 +5020,7 @@ void lb_emit_init_context(lbProcedure *p, lbValue c) {
 	gbAllocator a = heap_allocator();
 	auto args = array_make<lbValue>(a, 1);
 	args[0] = c.value != nullptr ? c : m->global_default_context.addr;
-	// lb_emit_runtime_call(p, "__init_context", args);
+	lb_emit_runtime_call(p, "__init_context", args);
 }
 
 void lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx) {
@@ -4865,10 +5033,6 @@ lbAddr lb_find_or_generate_context_ptr(lbProcedure *p) {
 	if (p->context_stack.count > 0) {
 		return p->context_stack[p->context_stack.count-1].ctx;
 	}
-
-	// lbBlock *tmp_block = p->curr_block;
-	// p->curr_block = p->blocks[0];
-	// defer (p->curr_block = tmp_block);
 
 	lbAddr c = lb_add_local_generated(p, t_context, false);
 	c.kind = lbAddr_Context;
@@ -6495,10 +6659,29 @@ void lb_emit_increment(lbProcedure *p, lbValue addr) {
 lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *platform_type) {
 	Type *vt = core_type(value.type);
 	GB_ASSERT(type_size_of(vt) == type_size_of(platform_type));
+	GB_ASSERT(is_type_integer(vt));
+
 	// TODO(bill): lb_emit_byte_swap
 	lbValue res = {};
 	res.type = platform_type;
 	res.value = value.value;
+
+	// int sz = cast(int)type_size_of(vt);
+	// if (sz > 1) {
+	// 	char buf[32] = {};
+	// 	gb_snprintf(buf, gb_count_of(buf), "llvm.bswap.i%d", sz*8);
+	// 	unsigned id = LLVMLookupIntrinsicID(buf, gb_strlen(buf));
+	// 	gb_printf(">>> %s %u\n", buf, id);
+
+	// 	LLVMTypeRef types[2] = {};
+	// 	types[0] = lb_type(p->module, value.type);
+	// 	types[1] = lb_type(p->module, value.type);
+
+	// 	LLVMValueRef fn = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+	// 	res.value = LLVMBuildCall(p->builder, fn, &value.value, 1, "");
+	// }
+
 	return res;
 }
 
