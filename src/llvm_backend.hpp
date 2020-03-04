@@ -97,6 +97,7 @@ struct lbBlock {
 	LLVMBasicBlockRef block;
 	Scope *scope;
 	isize scope_index;
+	bool appended;
 
 	Array<lbBlock *> preds;
 	Array<lbBlock *> succs;
@@ -220,7 +221,7 @@ void lb_end_procedure(lbProcedure *p);
 
 LLVMTypeRef  lb_type(lbModule *m, Type *type);
 
-lbBlock *lb_create_block(lbProcedure *p, char const *name);
+lbBlock *lb_create_block(lbProcedure *p, char const *name, bool append=false);
 
 lbValue lb_const_nil(lbModule *m, Type *type);
 lbValue lb_const_undef(lbModule *m, Type *type);

@@ -1,9 +1,11 @@
 package demo
 
 import "core:os"
+import "core:fmt"
 
 main :: proc() {
-	os.write_string(os.stdout, "Hellope\n");
+	fmt.fprintln(os.stdout, "Hellope!", 123, true, 1.3);
+}
 
 	// BarBar :: struct {x, y: int};
 
