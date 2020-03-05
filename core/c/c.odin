@@ -14,8 +14,8 @@ ushort :: b.u16;
 int    :: b.i32;
 uint   :: b.u32;
 
-long  :: (ODIN_OS == "windows" || size_of(b.rawptr) == 4) ? b.i32 : b.i64;
-ulong :: (ODIN_OS == "windows" || size_of(b.rawptr) == 4) ? b.u32 : b.u64;
+long  :: b.i32 when (ODIN_OS == "windows" || size_of(b.rawptr) == 4) else b.i64;
+ulong :: b.u32 when (ODIN_OS == "windows" || size_of(b.rawptr) == 4) else b.u64;
 
 longlong       :: b.i64;
 ulonglong      :: b.u64;
@@ -32,4 +32,4 @@ ptrdiff_t :: b.int;
 uintptr_t :: b.uintptr;
 intptr_t  :: b.int;
 
-wchar_t :: (ODIN_OS == "windows") ? b.u16 : b.u32;
+wchar_t :: b.u16 when (ODIN_OS == "windows") else b.u32;

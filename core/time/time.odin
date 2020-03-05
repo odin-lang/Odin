@@ -92,7 +92,7 @@ duration_round :: proc(d, m: Duration) -> Duration {
 	return MAX_DURATION;
 }
 duration_truncate :: proc(d, m: Duration) -> Duration {
-	return m <= 0 ? d : d - d%m;
+	return d if m <= 0 else d - d%m;
 }
 
 
