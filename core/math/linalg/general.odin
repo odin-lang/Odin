@@ -54,11 +54,11 @@ normalize :: proc{vector_normalize, quaternion_normalize};
 
 vector_normalize0 :: proc(v: $T/[$N]$E) -> T where IS_NUMERIC(E) {
 	m := length(v);
-	return m == 0 ? 0 : v/m;
+	return 0 if m == 0 else v/m;
 }
 quaternion_normalize0 :: proc(q: $Q) -> Q  where IS_QUATERNION(Q) {
 	m := abs(q);
-	return m == 0 ? 0 : q/m;
+	return 0 if m == 0 else q/m;
 }
 normalize0 :: proc{vector_normalize0, quaternion_normalize0};
 
@@ -258,7 +258,7 @@ vector_mix :: proc(x, y, a: $V/[$N]$E) -> V where IS_NUMERIC(E) {
 vector_step :: proc(edge, x: $V/[$N]$E) -> V where IS_NUMERIC(E) {
 	s: V;
 	for i in 0..<N {
-		s[i] = x[i] < edge[i] ? 0 : 1;
+		s[i] = 0 if x[i] < edge[i] else 1;
 	}
 	return s;
 }

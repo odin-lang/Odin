@@ -200,6 +200,24 @@ Ternary_Expr :: struct {
 	y:    ^Expr,
 }
 
+Ternary_If_Expr :: struct {
+	using node: Expr,
+	x: ^Expr,
+	op1:  tokenizer.Token,
+	cond:    ^Expr,
+	op2:  tokenizer.Token,
+	y:    ^Expr,
+}
+
+Ternary_When_Expr :: struct {
+	using node: Expr,
+	x: ^Expr,
+	op1:  tokenizer.Token,
+	cond:    ^Expr,
+	op2:  tokenizer.Token,
+	y:    ^Expr,
+}
+
 Type_Assertion :: struct {
 	using node: Expr,
 	expr:  ^Expr,

@@ -115,7 +115,7 @@ unlerp     :: proc{unlerp_f32, unlerp_f64};
 
 wrap :: proc(x, y: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
 	tmp := mod(x, y);
-	return tmp < 0 ? wrap + tmp : tmp;
+	return wrap + tmp if tmp < 0 else tmp;
 }
 angle_diff :: proc(a, b: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
 
@@ -128,7 +128,7 @@ angle_lerp :: proc(a, b, t: $T) -> T where intrinsics.type_is_numeric(T), !intri
 }
 
 step :: proc(edge, x: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
-	return x < edge ? 0 : 1;
+	return 0 if x < edge else 1;
 }
 
 smoothstep :: proc(edge0, edge1, x: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
@@ -246,10 +246,10 @@ trunc_f64 :: proc(x: f64) -> f64 {
 trunc :: proc{trunc_f32, trunc_f64};
 
 round_f32 :: proc(x: f32) -> f32 {
-	return x < 0 ? ceil(x - 0.5) : floor(x + 0.5);
+	return ceil(x - 0.5) if x < 0 else floor(x + 0.5);
 }
 round_f64 :: proc(x: f64) -> f64 {
-	return x < 0 ? ceil(x - 0.5) : floor(x + 0.5);
+	return ceil(x - 0.5) if x < 0 else floor(x + 0.5);
 }
 round :: proc{round_f32, round_f64};
 

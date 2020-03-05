@@ -3454,6 +3454,26 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 			return true;
 		}
 	case_end;
+
+	case_ast_node(te, TernaryIfExpr, e);
+		Operand o = {};
+		check_expr_or_type(ctx, &o, e);
+		if (o.mode == Addressing_Type) {
+			*type = o.type;
+			set_base_type(named_type, *type);
+			return true;
+		}
+	case_end;
+
+	case_ast_node(te, TernaryWhenExpr, e);
+		Operand o = {};
+		check_expr_or_type(ctx, &o, e);
+		if (o.mode == Addressing_Type) {
+			*type = o.type;
+			set_base_type(named_type, *type);
+			return true;
+		}
+	case_end;
 	}
 
 	*type = t_invalid;
