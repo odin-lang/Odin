@@ -43,6 +43,10 @@ access_to_flags :: proc(access: Memory_Access_Flags) -> u32 {
 	return flags;
 }
 
+//
+// TODO(tetra): We should probably return errors on failure. Probably an enum rather than an Errno though?
+//
+
 reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
 	ptr := win32.virtual_alloc(desired_base, uint(size), win32.MEM_RESERVE, win32.PAGE_NOACCESS);
 	return mem.slice_ptr(cast(^byte)ptr, size);

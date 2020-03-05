@@ -42,11 +42,11 @@ bytes_to_pages :: inline proc(size: int) -> int {
 //
 // WARNING: attempting to write to a pointer within this arena that was returned by
 // `arena_alloc` after `arena_reset` has been called, will segfault.
-// Attempting to modify data in the arena's buffer before it has been returned from `arena_alloc` will also do this.
+// Attempting to modify data in the arena's buffer before it has been returned from `arena_alloc` may also segfault.
 Arena :: struct {
 	base:            ^byte,
 	max_size:        int,
-	cursor:          rawptr,
+	cursor:          rawptr, // next location that's valid to return to the user
 	pages_committed: int,
 
 	desired_base_ptr: rawptr, // may be nil
@@ -179,6 +179,8 @@ arena_begin_temp_memory :: proc(using va: ^Arena) -> Arena_Temp_Memory {
 	};
 }
 
+// TODO: Don't decommit every single time we end temp memory
+//       Maybe achieve this by committing/decommitting in chunks rather than pages.
 arena_end_temp_memory :: proc(mark_: Arena_Temp_Memory) {
 	using mark := mark_;
 	
@@ -187,10 +189,19 @@ arena_end_temp_memory :: proc(mark_: Arena_Temp_Memory) {
 	}
 	if arena.cursor == nil do return;
 
-	start := next_page(cursor);
+	// NOTE(tetra): The cursor is the next location that's valid to return to the user.
+	// If it's part way into a page (not at the start of a page), then we cannot decommit that page.
+	// We can therefore only decommit the pages after it.
+	start := enclosing_page(cursor);
+	if start < cursor {
+		start = next_page(start);
+	}
+
 	if arena.cursor > start {
-		n := int(uintptr(arena.cursor) - uintptr(cursor));
+		n := int(uintptr(arena.cursor) - uintptr(start));
 		decommit(mem.slice_ptr(cast(^byte)start, n));
+		pages := bytes_to_pages(n);
+		arena.pages_committed -= pages;
 	}
 
 	arena.cursor = cursor;
