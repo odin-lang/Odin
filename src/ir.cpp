@@ -3103,10 +3103,6 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 		return proc->context_stack[proc->context_stack.count-1].value;
 	}
 
-	// irBlock *tmp_block = proc->curr_block;
-	// proc->curr_block = proc->blocks[0];
-	// defer (proc->curr_block = tmp_block);
-
 	irValue *c = ir_add_local_generated(proc, t_context, true);
 	ir_push_context_onto_stack(proc, c);
 	ir_emit_store(proc, c, ir_emit_load(proc, proc->module->global_default_context));
@@ -3300,9 +3296,11 @@ void ir_emit_defer_stmts(irProcedure *proc, irDeferExitKind kind, irBlock *block
 	isize i = count;
 	while (i --> 0) {
 		irDefer d = proc->defer_stmts[i];
-		if (proc->context_stack.count >= d.context_stack_count) {
-			proc->context_stack.count = d.context_stack_count;
-		}
+
+		// TODO(bill, 2020-03-05): Why was this added?
+		// if (proc->context_stack.count >= d.context_stack_count) {
+		// 	proc->context_stack.count = d.context_stack_count;
+		// }
 
 		if (kind == irDeferExit_Default) {
 			if (proc->scope_index == d.scope_index &&
