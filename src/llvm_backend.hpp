@@ -260,6 +260,11 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t);
 lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right);
 lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining = ProcInlining_none, bool use_return_ptr_hint = false);
 lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
+lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x);
+
+void lb_emit_jump(lbProcedure *p, lbBlock *target_block);
+void lb_emit_if(lbProcedure *p, lbValue cond, lbBlock *true_block, lbBlock *false_block);
+void lb_start_block(lbProcedure *p, lbBlock *b);
 
 lbValue lb_build_call_expr(lbProcedure *p, Ast *expr);
 
@@ -302,6 +307,18 @@ void lb_emit_increment(lbProcedure *p, lbValue addr);
 
 
 lbValue lb_type_info(lbModule *m, Type *type);
+
+lbValue lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type, lbValue map_key, lbValue map_value);
+
+
+bool lb_is_const(lbValue value);
+bool lb_is_const_nil(lbValue value);
+String lb_get_const_string(lbModule *m, lbValue value);
+
+lbValue lb_generate_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id);
+lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type);
+lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type);
+lbValue lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type, lbValue map_key, lbValue map_value);
 
 
 #define LB_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"

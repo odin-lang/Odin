@@ -3762,7 +3762,6 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 	}
 
 	if (addr.kind == irAddr_Map) {
-		// TODO(bill): map lookup
 		Type *map_type = base_type(addr.map_type);
 		irValue *v = ir_add_local_generated(proc, map_type->Map.lookup_result_type, true);
 		irValue *h = ir_gen_map_header(proc, addr.addr, map_type);
