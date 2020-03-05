@@ -9829,19 +9829,6 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
-	defer (LLVMDisposePassManager(module_pass_manager));
-	LLVMAddAlwaysInlinerPass(module_pass_manager);
-	LLVMAddStripDeadPrototypesPass(module_pass_manager);
-
-	LLVMPassManagerBuilderRef pass_manager_builder = LLVMPassManagerBuilderCreate();
-	defer (LLVMPassManagerBuilderDispose(pass_manager_builder));
-	LLVMPassManagerBuilderSetOptLevel(pass_manager_builder, 0);
-	LLVMPassManagerBuilderSetSizeLevel(pass_manager_builder, 0);
-
-	LLVMPassManagerBuilderPopulateLTOPassManager(pass_manager_builder, module_pass_manager, false, false);
-	LLVMRunPassManager(module_pass_manager, mod);
-
 
 	lbProcedure *startup_runtime = nullptr;
 	{ // Startup Runtime
@@ -9943,8 +9930,24 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 
 		LLVMRunFunctionPassManager(function_pass_manager, p->value);
-
 	}
+
+
+	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
+	defer (LLVMDisposePassManager(module_pass_manager));
+	LLVMAddAlwaysInlinerPass(module_pass_manager);
+	LLVMAddStripDeadPrototypesPass(module_pass_manager);
+
+	LLVMPassManagerBuilderRef pass_manager_builder = LLVMPassManagerBuilderCreate();
+	defer (LLVMPassManagerBuilderDispose(pass_manager_builder));
+	LLVMPassManagerBuilderSetOptLevel(pass_manager_builder, 3);
+	LLVMPassManagerBuilderSetSizeLevel(pass_manager_builder, 3);
+
+	LLVMPassManagerBuilderPopulateLTOPassManager(pass_manager_builder, module_pass_manager, false, false);
+	LLVMRunPassManager(module_pass_manager, mod);
+
+
+
 
 	char *llvm_error = nullptr;
 	defer (LLVMDisposeMessage(llvm_error));
@@ -9958,7 +9961,7 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMDIBuilderFinalize(m->debug_builder);
 	LLVMVerifyModule(mod, LLVMAbortProcessAction, &llvm_error);
 	llvm_error = nullptr;
-	LLVMBool failure = LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error);
+	// LLVMBool failure = LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error);
 
 	LLVMInitializeAllTargetInfos();
 	LLVMInitializeAllTargets();
