@@ -35,6 +35,8 @@ Token ast_token(Ast *node) {
 	case Ast_FieldValue:         return node->FieldValue.eq;
 	case Ast_DerefExpr:          return node->DerefExpr.op;
 	case Ast_TernaryExpr:        return ast_token(node->TernaryExpr.cond);
+	case Ast_TernaryIfExpr:      return ast_token(node->TernaryIfExpr.x);
+	case Ast_TernaryWhenExpr:    return ast_token(node->TernaryWhenExpr.x);
 	case Ast_TypeAssertion:      return ast_token(node->TypeAssertion.expr);
 	case Ast_TypeCast:           return node->TypeCast.token;
 	case Ast_AutoCast:           return node->AutoCast.token;
@@ -197,6 +199,16 @@ Ast *clone_ast(Ast *node) {
 		n->TernaryExpr.cond = clone_ast(n->TernaryExpr.cond);
 		n->TernaryExpr.x    = clone_ast(n->TernaryExpr.x);
 		n->TernaryExpr.y    = clone_ast(n->TernaryExpr.y);
+		break;
+	case Ast_TernaryIfExpr:
+		n->TernaryIfExpr.x    = clone_ast(n->TernaryIfExpr.x);
+		n->TernaryIfExpr.cond = clone_ast(n->TernaryIfExpr.cond);
+		n->TernaryIfExpr.y    = clone_ast(n->TernaryIfExpr.y);
+		break;
+	case Ast_TernaryWhenExpr:
+		n->TernaryWhenExpr.x    = clone_ast(n->TernaryWhenExpr.x);
+		n->TernaryWhenExpr.cond = clone_ast(n->TernaryWhenExpr.cond);
+		n->TernaryWhenExpr.y    = clone_ast(n->TernaryWhenExpr.y);
 		break;
 	case Ast_TypeAssertion:
 		n->TypeAssertion.expr = clone_ast(n->TypeAssertion.expr);
@@ -638,6 +650,21 @@ Ast *ast_ternary_expr(AstFile *f, Ast *cond, Ast *x, Ast *y) {
 	result->TernaryExpr.y = y;
 	return result;
 }
+Ast *ast_ternary_if_expr(AstFile *f, Ast *x, Ast *cond, Ast *y) {
+	Ast *result = alloc_ast_node(f, Ast_TernaryIfExpr);
+	result->TernaryIfExpr.x = x;
+	result->TernaryIfExpr.cond = cond;
+	result->TernaryIfExpr.y = y;
+	return result;
+}
+Ast *ast_ternary_when_expr(AstFile *f, Ast *x, Ast *cond, Ast *y) {
+	Ast *result = alloc_ast_node(f, Ast_TernaryWhenExpr);
+	result->TernaryWhenExpr.x = x;
+	result->TernaryWhenExpr.cond = cond;
+	result->TernaryWhenExpr.y = y;
+	return result;
+}
+
 Ast *ast_type_assertion(AstFile *f, Ast *expr, Token dot, Ast *type) {
 	Ast *result = alloc_ast_node(f, Ast_TypeAssertion);
 	result->TypeAssertion.expr = expr;
@@ -1198,6 +1225,8 @@ bool is_token_range(Token tok) {
 Token expect_operator(AstFile *f) {
 	Token prev = f->curr_token;
 	if ((prev.kind == Token_in || prev.kind == Token_not_in) && (f->expr_level >= 0 || f->allow_in_expr)) {
+		// okay
+	} else if (prev.kind == Token_if || prev.kind == Token_when) {
 		// okay
 	} else if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
 		syntax_error(f->curr_token, "Expected an operator, got '%.*s'",
@@ -2512,6 +2541,8 @@ bool is_ast_range(Ast *expr) {
 i32 token_precedence(AstFile *f, TokenKind t) {
 	switch (t) {
 	case Token_Question:
+	case Token_if:
+	case Token_when:
 		return 1;
 	case Token_Ellipsis:
 	case Token_RangeHalf:
@@ -2565,6 +2596,14 @@ Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 				// NOTE(bill): This will also catch operators that are not valid "binary" operators
 				break;
 			}
+			if (op.kind == Token_if || op.kind == Token_when) {
+				Token prev = f->prev_token;
+				if (prev.pos.line < op.pos.line) {
+					// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
+					break;
+				}
+			}
+
 			expect_operator(f); // NOTE(bill): error checks too
 
 			if (op.kind == Token_Question) {
@@ -2574,6 +2613,20 @@ Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 				Token token_c = expect_token(f, Token_Colon);
 				Ast *y = parse_expr(f, lhs);
 				expr = ast_ternary_expr(f, cond, x, y);
+			} else if (op.kind == Token_if) {
+				Ast *x = expr;
+				// Token_if
+				Ast *cond = parse_expr(f, lhs);
+				Token tok_else = expect_token(f, Token_else);
+				Ast *y = parse_expr(f, lhs);
+				expr = ast_ternary_if_expr(f, x, cond, y);
+			} else if (op.kind == Token_when) {
+				Ast *x = expr;
+				// Token_when
+				Ast *cond = parse_expr(f, lhs);
+				Token tok_else = expect_token(f, Token_else);
+				Ast *y = parse_expr(f, lhs);
+				expr = ast_ternary_when_expr(f, x, cond, y);
 			} else {
 				Ast *right = parse_binary_expr(f, false, prec+1);
 				if (right == nullptr) {

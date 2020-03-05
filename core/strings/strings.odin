@@ -325,7 +325,7 @@ last_index :: proc(s, substr: string) -> int {
 	case n == 1:
 		return last_index_byte(s, substr[0]);
 	case n == len(s):
-		return substr == s ? 0 : -1;
+		return 0 if substr == s else -1;
 	case n > len(s):
 		return -1;
 	}

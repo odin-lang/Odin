@@ -7189,6 +7189,49 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		return ir_emit(proc, ir_instr_phi(proc, edges, type));
 	case_end;
 
+	case_ast_node(te, TernaryIfExpr, expr);
+		ir_emit_comment(proc, str_lit("TernaryIfExpr"));
+
+		auto edges = array_make<irValue *>(ir_allocator(), 0, 2);
+
+		GB_ASSERT(te->y != nullptr);
+		irBlock *then  = ir_new_block(proc, nullptr, "if.then");
+		irBlock *done  = ir_new_block(proc, nullptr, "if.done"); // NOTE(bill): Append later
+		irBlock *else_ = ir_new_block(proc, nullptr, "if.else");
+
+		irValue *cond = ir_build_cond(proc, te->cond, then, else_);
+		ir_start_block(proc, then);
+
+		Type *type = type_of_expr(expr);
+
+		ir_open_scope(proc);
+		array_add(&edges, ir_emit_conv(proc, ir_build_expr(proc, te->x), type));
+		ir_close_scope(proc, irDeferExit_Default, nullptr);
+
+		ir_emit_jump(proc, done);
+		ir_start_block(proc, else_);
+
+		ir_open_scope(proc);
+		array_add(&edges, ir_emit_conv(proc, ir_build_expr(proc, te->y), type));
+		ir_close_scope(proc, irDeferExit_Default, nullptr);
+
+		ir_emit_jump(proc, done);
+		ir_start_block(proc, done);
+
+		return ir_emit(proc, ir_instr_phi(proc, edges, type));
+	case_end;
+
+	case_ast_node(te, TernaryWhenExpr, expr);
+		TypeAndValue tav = type_and_value_of_expr(te->cond);
+		GB_ASSERT(tav.mode == Addressing_Constant);
+		GB_ASSERT(tav.value.kind == ExactValue_Bool);
+		if (tav.value.value_bool) {
+			return ir_build_expr(proc, te->x);
+		} else {
+			return ir_build_expr(proc, te->y);
+		}
+	case_end;
+
 	case_ast_node(ta, TypeAssertion, expr);
 		TokenPos pos = ast_token(expr).pos;
 		Type *type = tv.type;

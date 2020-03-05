@@ -1028,7 +1028,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		if tok.kind != .Fallthrough && p.curr_tok.kind == .Ident {
 			label = parse_ident(p);
 		}
-		end := label != nil ? label.end : end_pos(tok);
+		end := label.end if label != nil else end_pos(tok);
 		s := ast.new(ast.Branch_Stmt, tok.pos, end);
 		expect_semicolon(p, s);
 		return s;
@@ -1132,6 +1132,8 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 token_precedence :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> int {
 	#partial switch kind {
 	case .Question:
+	case .If:
+	case .When:
 		return 1;
 	case .Ellipsis, .Range_Half:
 		if !p.allow_range {
@@ -2453,7 +2455,7 @@ parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) -> ^ast.Comp_Lit {
 
 	close := expect_token_after(p, .Close_Brace, "compound literal");
 
-	pos := type != nil ? type.pos : open.pos;
+	pos := type.pos if type != nil else open.pos;
 	lit := ast.new(ast.Comp_Lit, pos, end_pos(close));
 	lit.type  = type;
 	lit.open  = open.pos;
@@ -2714,6 +2716,13 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 			if op_prec != prec {
 				break;
 			}
+			if op.kind == .If || op.kind == .When {
+				if p.prev_tok.pos.line < op.pos.line {
+					// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
+					break;
+				}
+			}
+
 			expect_operator(p);
 
 			if op.kind == .Question {
@@ -2726,6 +2735,32 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 				te.op1  = op;
 				te.x    = x;
 				te.op2  = colon;
+				te.y    = y;
+
+				expr = te;
+			} else if op.kind == .If {
+				x := expr;
+				cond := parse_expr(p, lhs);
+				else_tok := expect_token(p, .Else);
+				y := parse_expr(p, lhs);
+				te := ast.new(ast.Ternary_If_Expr, expr.pos, end_pos(p.prev_tok));
+				te.x    = x;
+				te.op1  = op;
+				te.cond = cond;
+				te.op2  = else_tok;
+				te.y    = y;
+
+				expr = te;
+			} else if op.kind == .When {
+				x := expr;
+				cond := parse_expr(p, lhs);
+				op2 := expect_token(p, .Else);
+				y := parse_expr(p, lhs);
+				te := ast.new(ast.Ternary_When_Expr, expr.pos, end_pos(p.prev_tok));
+				te.x    = x;
+				te.op1  = op;
+				te.cond = cond;
+				te.op2  = else_tok;
 				te.y    = y;
 
 				expr = te;
