@@ -7763,6 +7763,99 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 	case_end;
 
+	case_ast_node(te, TernaryIfExpr, node);
+		Operand cond = {Addressing_Invalid};
+		check_expr(c, &cond, te->cond);
+		node->viral_state_flags |= te->cond->viral_state_flags;
+
+		if (cond.mode != Addressing_Invalid && !is_type_boolean(cond.type)) {
+			error(te->cond, "Non-boolean condition in ternary if expression");
+		}
+
+		Operand x = {Addressing_Invalid};
+		Operand y = {Addressing_Invalid};
+		check_expr_or_type(c, &x, te->x, type_hint);
+		node->viral_state_flags |= te->x->viral_state_flags;
+
+		if (te->y != nullptr) {
+			check_expr_or_type(c, &y, te->y, type_hint);
+			node->viral_state_flags |= te->y->viral_state_flags;
+		} else {
+			error(node, "A ternary expression must have an else clause");
+			return kind;
+		}
+
+		if (x.type == nullptr || x.type == t_invalid ||
+		    y.type == nullptr || y.type == t_invalid) {
+			return kind;
+		}
+
+		convert_to_typed(c, &x, y.type);
+		if (x.mode == Addressing_Invalid) {
+			return kind;
+		}
+		convert_to_typed(c, &y, x.type);
+		if (y.mode == Addressing_Invalid) {
+			x.mode = Addressing_Invalid;
+			return kind;
+		}
+
+		if (!ternary_compare_types(x.type, y.type)) {
+			gbString its = type_to_string(x.type);
+			gbString ets = type_to_string(y.type);
+			error(node, "Mismatched types in ternary if expression, %s vs %s", its, ets);
+			gb_string_free(ets);
+			gb_string_free(its);
+			return kind;
+		}
+
+		Type *type = x.type;
+		if (is_type_untyped_nil(type) || is_type_untyped_undef(type)) {
+			type = y.type;
+		}
+
+		o->type = type;
+		o->mode = Addressing_Value;
+
+		// if (cond.mode == Addressing_Constant && is_type_boolean(cond.type) &&
+		//     x.mode == Addressing_Constant &&
+		//     y.mode == Addressing_Constant) {
+
+		// 	o->mode = Addressing_Constant;
+
+		// 	if (cond.value.value_bool) {
+		// 		o->value = x.value;
+		// 	} else {
+		// 		o->value = y.value;
+		// 	}
+		// }
+
+	case_end;
+
+	case_ast_node(te, TernaryWhenExpr, node);
+		Operand cond = {};
+		check_expr(c, &cond, te->cond);
+		node->viral_state_flags |= te->cond->viral_state_flags;
+
+		if (cond.mode != Addressing_Constant || !is_type_boolean(cond.type)) {
+			error(te->cond, "Expected a constant boolean condition in ternary when expression");
+			return kind;
+		}
+
+		if (cond.value.value_bool) {
+			check_expr_or_type(c, o, te->x, type_hint);
+			node->viral_state_flags |= te->x->viral_state_flags;
+		} else {
+			if (te->y != nullptr) {
+				check_expr_or_type(c, o, te->y, type_hint);
+				node->viral_state_flags |= te->y->viral_state_flags;
+			} else {
+				error(node, "A ternary when expression must have an else clause");
+				return kind;
+			}
+		}
+	case_end;
+
 	case_ast_node(cl, CompoundLit, node);
 		Type *type = type_hint;
 		bool is_to_be_determined_array_count = false;
@@ -9331,6 +9424,22 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 		str = gb_string_appendc(str, " ? ");
 		str = write_expr_to_string(str, te->x);
 		str = gb_string_appendc(str, " : ");
+		str = write_expr_to_string(str, te->y);
+	case_end;
+
+	case_ast_node(te, TernaryIfExpr, node);
+		str = write_expr_to_string(str, te->x);
+		str = gb_string_appendc(str, " if ");
+		str = write_expr_to_string(str, te->cond);
+		str = gb_string_appendc(str, " else ");
+		str = write_expr_to_string(str, te->y);
+	case_end;
+
+	case_ast_node(te, TernaryWhenExpr, node);
+		str = write_expr_to_string(str, te->x);
+		str = gb_string_appendc(str, " when ");
+		str = write_expr_to_string(str, te->cond);
+		str = gb_string_appendc(str, " else ");
 		str = write_expr_to_string(str, te->y);
 	case_end;
 

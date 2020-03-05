@@ -321,7 +321,7 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		case uint:    write_string(buf, "uint");
 		case uintptr: write_string(buf, "uintptr");
 		case:
-			write_byte(buf, info.signed ? 'i' : 'u');
+			write_byte(buf, 'i' if info.signed else 'u');
 			write_i64(buf, i64(8*ti.size), 10);
 			switch info.endianness {
 			case .Platform: // Okay

@@ -3103,11 +3103,6 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 		return proc->context_stack[proc->context_stack.count-1].value;
 	}
 
-	irBlock *tmp_block = proc->curr_block;
-	proc->curr_block = proc->blocks[0];
-
-	defer (proc->curr_block = tmp_block);
-
 	irValue *c = ir_add_local_generated(proc, t_context, true);
 	ir_push_context_onto_stack(proc, c);
 	ir_emit_store(proc, c, ir_emit_load(proc, proc->module->global_default_context));
@@ -3301,9 +3296,11 @@ void ir_emit_defer_stmts(irProcedure *proc, irDeferExitKind kind, irBlock *block
 	isize i = count;
 	while (i --> 0) {
 		irDefer d = proc->defer_stmts[i];
-		if (proc->context_stack.count >= d.context_stack_count) {
-			proc->context_stack.count = d.context_stack_count;
-		}
+
+		// TODO(bill, 2020-03-05): Why was this added?
+		// if (proc->context_stack.count >= d.context_stack_count) {
+		// 	proc->context_stack.count = d.context_stack_count;
+		// }
 
 		if (kind == irDeferExit_Default) {
 			if (proc->scope_index == d.scope_index &&
@@ -7159,6 +7156,49 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		ir_start_block(proc, done);
 
 		return ir_emit(proc, ir_instr_phi(proc, edges, type));
+	case_end;
+
+	case_ast_node(te, TernaryIfExpr, expr);
+		ir_emit_comment(proc, str_lit("TernaryIfExpr"));
+
+		auto edges = array_make<irValue *>(ir_allocator(), 0, 2);
+
+		GB_ASSERT(te->y != nullptr);
+		irBlock *then  = ir_new_block(proc, nullptr, "if.then");
+		irBlock *done  = ir_new_block(proc, nullptr, "if.done"); // NOTE(bill): Append later
+		irBlock *else_ = ir_new_block(proc, nullptr, "if.else");
+
+		irValue *cond = ir_build_cond(proc, te->cond, then, else_);
+		ir_start_block(proc, then);
+
+		Type *type = type_of_expr(expr);
+
+		ir_open_scope(proc);
+		array_add(&edges, ir_emit_conv(proc, ir_build_expr(proc, te->x), type));
+		ir_close_scope(proc, irDeferExit_Default, nullptr);
+
+		ir_emit_jump(proc, done);
+		ir_start_block(proc, else_);
+
+		ir_open_scope(proc);
+		array_add(&edges, ir_emit_conv(proc, ir_build_expr(proc, te->y), type));
+		ir_close_scope(proc, irDeferExit_Default, nullptr);
+
+		ir_emit_jump(proc, done);
+		ir_start_block(proc, done);
+
+		return ir_emit(proc, ir_instr_phi(proc, edges, type));
+	case_end;
+
+	case_ast_node(te, TernaryWhenExpr, expr);
+		TypeAndValue tav = type_and_value_of_expr(te->cond);
+		GB_ASSERT(tav.mode == Addressing_Constant);
+		GB_ASSERT(tav.value.kind == ExactValue_Bool);
+		if (tav.value.value_bool) {
+			return ir_build_expr(proc, te->x);
+		} else {
+			return ir_build_expr(proc, te->y);
+		}
 	case_end;
 
 	case_ast_node(ta, TypeAssertion, expr);
