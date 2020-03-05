@@ -3103,10 +3103,9 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 		return proc->context_stack[proc->context_stack.count-1].value;
 	}
 
-	irBlock *tmp_block = proc->curr_block;
-	proc->curr_block = proc->blocks[0];
-
-	defer (proc->curr_block = tmp_block);
+	// irBlock *tmp_block = proc->curr_block;
+	// proc->curr_block = proc->blocks[0];
+	// defer (proc->curr_block = tmp_block);
 
 	irValue *c = ir_add_local_generated(proc, t_context, true);
 	ir_push_context_onto_stack(proc, c);
