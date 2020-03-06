@@ -2260,6 +2260,8 @@ bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) {
 			x->mode = Addressing_Value;
 		} else if (is_type_slice(type) && is_type_string(x->type)) {
 			x->mode = Addressing_Value;
+		} else if (is_type_union(type)) {
+			x->mode = Addressing_Value;
 		}
 		return true;
 	}
@@ -5278,6 +5280,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
+	case BuiltinProc_cpu_relax:
+		operand->mode = Addressing_NoValue;
+		break;
+
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
 	case BuiltinProc_atomic_fence_rel:
@@ -5942,7 +5948,9 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				Entity *e = sig_params[operand_index];
 				Type *t = e->type;
 				Operand o = operands[operand_index];
-				call->viral_state_flags |= o.expr->viral_state_flags;
+				if (o.expr != nullptr) {
+					call->viral_state_flags |= o.expr->viral_state_flags;
+				}
 
 				if (e->kind == Entity_TypeName) {
 					// GB_ASSERT(!variadic);
@@ -5982,6 +5990,15 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					}
 				}
 				score += s;
+
+				if (e->flags & EntityFlag_ConstInput) {
+					if (o.mode != Addressing_Constant) {
+						if (show_error) {
+							error(o.expr, "Expected a constant value for the argument '%.*s'", LIT(e->token.string));
+						}
+						err = CallArgumentError_NoneConstantParameter;
+					}
+				}
 
 				if (o.mode == Addressing_Type && is_type_typeid(e->type)) {
 					add_type_info_type(c, o.type);
@@ -6238,6 +6255,15 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 					}
 					err = CallArgumentError_WrongTypes;
 				}
+
+				if (e->flags & EntityFlag_ConstInput) {
+					if (o->mode != Addressing_Constant) {
+						if (show_error) {
+							error(o->expr, "Expected a constant value for the argument '%.*s'", LIT(e->token.string));
+						}
+						err = CallArgumentError_NoneConstantParameter;
+					}
+				}
 			}
 			score += s;
 		}
@@ -6296,7 +6322,7 @@ Entity **populate_proc_parameter_list(CheckerContext *c, Type *proc_type, isize 
 }
 
 
-bool evaluate_where_clauses(CheckerContext *ctx, Scope *scope, Array<Ast *> *clauses, bool print_err) {
+bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Scope *scope, Array<Ast *> *clauses, bool print_err) {
 	if (clauses != nullptr) {
 		for_array(i, *clauses) {
 			Ast *clause = (*clauses)[i];
@@ -6304,9 +6330,11 @@ bool evaluate_where_clauses(CheckerContext *ctx, Scope *scope, Array<Ast *> *cla
 			check_expr(ctx, &o, clause);
 			if (o.mode != Addressing_Constant) {
 				if (print_err) error(clause, "'where' clauses expect a constant boolean evaluation");
+				if (print_err && call_expr) error(call_expr, "at caller location");
 				return false;
 			} else if (o.value.kind != ExactValue_Bool) {
 				if (print_err) error(clause, "'where' clauses expect a constant boolean evaluation");
+				if (print_err && call_expr) error(call_expr, "at caller location");
 				return false;
 			} else if (!o.value.value_bool) {
 				if (print_err) {
@@ -6348,6 +6376,7 @@ bool evaluate_where_clauses(CheckerContext *ctx, Scope *scope, Array<Ast *> *cla
 						}
 					}
 
+					if (call_expr) error(call_expr, "at caller location");
 				}
 				return false;
 			}
@@ -6613,7 +6642,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 					ctx.curr_proc_sig  = e->type;
 
 					GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
-					if (!evaluate_where_clauses(&ctx, decl->scope, &decl->proc_lit->ProcLit.where_clauses, false)) {
+					if (!evaluate_where_clauses(&ctx, operand->expr, decl->scope, &decl->proc_lit->ProcLit.where_clauses, false)) {
 						continue;
 					}
 				}
@@ -8572,8 +8601,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			o->expr = node;
 			return kind;
 		}
-		Type *t = check_type(c, ta->type);
-
 		if (o->mode == Addressing_Constant) {
 			gbString expr_str = expr_to_string(o->expr);
 			error(o->expr, "A type assertion cannot be applied to a constant expression: '%s'", expr_str);
@@ -8594,54 +8621,80 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 		bool src_is_ptr = is_type_pointer(o->type);
 		Type *src = type_deref(o->type);
-		Type *dst = t;
 		Type *bsrc = base_type(src);
-		Type *bdst = base_type(dst);
 
 
-		if (is_type_union(src)) {
-			bool ok = false;
-			for_array(i, bsrc->Union.variants) {
-				Type *vt = bsrc->Union.variants[i];
-				if (are_types_identical(vt, dst)) {
-					ok = true;
-					break;
-				}
+		if (ta->type != nullptr && ta->type->kind == Ast_UnaryExpr && ta->type->UnaryExpr.op.kind == Token_Question) {
+			if (!is_type_union(src)) {
+				gbString str = type_to_string(o->type);
+				error(o->expr, "Type assertions with .? can only operate on unions with 1 variant, got %s", str);
+				gb_string_free(str);
+				o->mode = Addressing_Invalid;
+				o->expr = node;
+				return kind;
 			}
-
-			if (!ok) {
-				gbString expr_str = expr_to_string(o->expr);
-				gbString dst_type_str = type_to_string(t);
-				defer (gb_string_free(expr_str));
-				defer (gb_string_free(dst_type_str));
-				if (bsrc->Union.variants.count == 0) {
-					error(o->expr, "Cannot type assert '%s' to '%s' as this is an empty union", expr_str, dst_type_str);
-				} else {
-					error(o->expr, "Cannot type assert '%s' to '%s' as it is not a variant of that union", expr_str, dst_type_str);
-				}
+			if (bsrc->Union.variants.count != 1) {
+				error(o->expr, "Type assertions with .? can only operate on unions with 1 variant, got %lld", cast(long long)bsrc->Union.variants.count);
 				o->mode = Addressing_Invalid;
 				o->expr = node;
 				return kind;
 			}
 
 			add_type_info_type(c, o->type);
-			add_type_info_type(c, t);
+			add_type_info_type(c, bsrc->Union.variants[0]);
 
-			o->type = t;
+			o->type = bsrc->Union.variants[0];
 			o->mode = Addressing_OptionalOk;
-		} else if (is_type_any(src)) {
-			o->type = t;
-			o->mode = Addressing_OptionalOk;
-
-			add_type_info_type(c, o->type);
-			add_type_info_type(c, t);
 		} else {
-			gbString str = type_to_string(o->type);
-			error(o->expr, "Type assertions can only operate on unions and 'any', got %s", str);
-			gb_string_free(str);
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
+			Type *t = check_type(c, ta->type);
+			Type *dst = t;
+			Type *bdst = base_type(dst);
+
+
+			if (is_type_union(src)) {
+				bool ok = false;
+				for_array(i, bsrc->Union.variants) {
+					Type *vt = bsrc->Union.variants[i];
+					if (are_types_identical(vt, dst)) {
+						ok = true;
+						break;
+					}
+				}
+
+				if (!ok) {
+					gbString expr_str = expr_to_string(o->expr);
+					gbString dst_type_str = type_to_string(t);
+					defer (gb_string_free(expr_str));
+					defer (gb_string_free(dst_type_str));
+					if (bsrc->Union.variants.count == 0) {
+						error(o->expr, "Cannot type assert '%s' to '%s' as this is an empty union", expr_str, dst_type_str);
+					} else {
+						error(o->expr, "Cannot type assert '%s' to '%s' as it is not a variant of that union", expr_str, dst_type_str);
+					}
+					o->mode = Addressing_Invalid;
+					o->expr = node;
+					return kind;
+				}
+
+				add_type_info_type(c, o->type);
+				add_type_info_type(c, t);
+
+				o->type = t;
+				o->mode = Addressing_OptionalOk;
+			} else if (is_type_any(src)) {
+				o->type = t;
+				o->mode = Addressing_OptionalOk;
+
+				add_type_info_type(c, o->type);
+				add_type_info_type(c, t);
+			} else {
+				gbString str = type_to_string(o->type);
+				error(o->expr, "Type assertions can only operate on unions and 'any', got %s", str);
+				gb_string_free(str);
+				o->mode = Addressing_Invalid;
+				o->expr = node;
+				return kind;
+			}
 		}
 
 		add_package_dependency(c, "runtime", "type_assertion_check");

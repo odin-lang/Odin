@@ -126,6 +126,7 @@ struct BuildContext {
 	bool   use_lld;
 	bool   vet;
 	bool   cross_compiling;
+	bool   use_subsystem_windows;
 
 	QueryDataSetSettings query_data_set_settings;
 

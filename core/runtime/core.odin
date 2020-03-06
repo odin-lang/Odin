@@ -111,6 +111,7 @@ Type_Info_Union :: struct {
 	tag_type:     ^Type_Info,
 	custom_align: bool,
 	no_nil:       bool,
+	maybe:        bool,
 };
 Type_Info_Enum :: struct {
 	base:      ^Type_Info,
@@ -275,9 +276,10 @@ Logger_Options :: bit_set[Logger_Option];
 Logger_Proc :: #type proc(data: rawptr, level: Logger_Level, text: string, options: Logger_Options, location := #caller_location);
 
 Logger :: struct {
-	procedure: Logger_Proc,
-	data:      rawptr,
-	options:   Logger_Options,
+	procedure:    Logger_Proc,
+	data:         rawptr,
+	lowest_level: Logger_Level,
+	options:      Logger_Options,
 }
 
 Context :: struct {
@@ -433,7 +435,7 @@ default_logger_proc :: proc(data: rawptr, level: Logger_Level, text: string, opt
 }
 
 default_logger :: proc() -> Logger {
-	return Logger{default_logger_proc, nil, nil};
+	return Logger{default_logger_proc, nil, Logger_Level.Debug, nil};
 }
 
 
@@ -1131,7 +1133,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 		array.allocator = context.allocator;
 	}
 	assert(array.allocator.procedure != nil);
-	
+
 	if cap <= array.cap do return true;
 
 	old_size  := array.cap * elem_size;
@@ -1139,11 +1141,12 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	allocator := array.allocator;
 
 	new_data := allocator.procedure(allocator.data, .Resize, new_size, elem_align, array.data, old_size, 0, loc);
-	if new_data == nil do return false;
-
-	array.data = new_data;
-	array.cap = cap;
-	return true;
+	if new_data != nil || elem_size == 0 {
+		array.data = new_data;
+		array.cap = cap;
+		return true;
+	}
+	return false;
 }
 
 __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: int, loc := #caller_location) -> bool {

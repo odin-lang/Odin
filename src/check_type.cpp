@@ -527,7 +527,7 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 		if (st->where_clauses.count > 0 && st->polymorphic_params == nullptr) {
 			error(st->where_clauses[0], "'where' clauses can only be used on structures with polymorphic parameters");
 		} else {
-			bool where_clause_ok = evaluate_where_clauses(ctx, ctx->scope, &st->where_clauses, true);
+			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &st->where_clauses, true);
 		}
 		check_struct_fields(ctx, node, &struct_type->Struct.fields, &struct_type->Struct.tags, st->fields, min_field_count, struct_type, context);
 	}
@@ -714,7 +714,7 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 	if (ut->where_clauses.count > 0 && ut->polymorphic_params == nullptr) {
 		error(ut->where_clauses[0], "'where' clauses can only be used on unions with polymorphic parameters");
 	} else {
-		bool where_clause_ok = evaluate_where_clauses(ctx, ctx->scope, &ut->where_clauses, true);
+		bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &ut->where_clauses, true);
 	}
 
 
@@ -748,9 +748,15 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 
 	union_type->Union.variants = variants;
 	union_type->Union.no_nil = ut->no_nil;
+	union_type->Union.maybe = ut->maybe;
 	if (union_type->Union.no_nil) {
 		if (variants.count < 2) {
 			error(ut->align, "A union with #no_nil must have at least 2 variants");
+		}
+	}
+	if (union_type->Union.maybe) {
+		if (variants.count != 1) {
+			error(ut->align, "A union with #maybe must have at 1 variant, got %lld", cast(long long)variants.count);
 		}
 	}
 
@@ -1716,8 +1722,11 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			if (p->flags&FieldFlag_auto_cast) {
 				param->flags |= EntityFlag_AutoCast;
 			}
-			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
+			if (p->flags&FieldFlag_const) {
+				param->flags |= EntityFlag_ConstInput;
+			}
 
+			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
 			add_entity(ctx->checker, scope, name, param);
 			if (is_using) {
 				add_entity_use(ctx, name, param);

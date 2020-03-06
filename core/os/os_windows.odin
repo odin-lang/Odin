@@ -2,6 +2,7 @@
 package os
 
 import "core:sys/win32"
+import "core:intrinsics"
 
 OS :: "windows";
 
@@ -263,6 +264,40 @@ get_page_size :: proc() -> int {
 	page_size = int(info.page_size);
 	return page_size;
 }
+
+
+
+// NOTE(tetra): GetCurrentDirectory is not thread safe with SetCurrentDirectory and GetFullPathName;
+// The current directory is stored as a global variable in the process.
+@private cwd_gate := false;
+
+get_current_directory :: proc() -> string {
+	for intrinsics.atomic_xchg(&cwd_gate, true) {}
+
+	sz_utf16 := win32.get_current_directory_w(0, nil);
+	dir_buf_wstr := make([]u16, sz_utf16, context.temp_allocator); // the first time, it _includes_ the NUL.
+
+	sz_utf16 = win32.get_current_directory_w(u32(len(dir_buf_wstr)), cast(win32.Wstring) &dir_buf_wstr[0]);
+	assert(int(sz_utf16)+1 == len(dir_buf_wstr)); // the second time, it _excludes_ the NUL.
+
+	intrinsics.atomic_store(&cwd_gate, false);
+
+	dir_utf8 := win32.utf16_to_utf8(dir_buf_wstr);
+	return dir_utf8[:len(dir_utf8)-1]; // NOTE(tetra): Remove the NUL.
+}
+
+set_current_directory :: proc(path: string) -> (err: Errno) {
+	wstr := win32.utf8_to_wstring(path);
+
+	for intrinsics.atomic_xchg(&cwd_gate, true) {}
+	defer intrinsics.atomic_store(&cwd_gate, false);
+
+	res := win32.set_current_directory_w(wstr);
+	if res == 0 do return Errno(win32.get_last_error());
+
+	return;
+}
+
 
 
 exit :: proc(code: int) -> ! {

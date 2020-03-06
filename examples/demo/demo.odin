@@ -1907,6 +1907,28 @@ constant_literal_expressions :: proc() {
 	fmt.println(STRING_CONST[3:][:4]);
 }
 
+union_maybe :: proc() {
+	fmt.println("\n#union #maybe");
+
+	Maybe :: union(T: typeid) #maybe {T};
+
+	i: Maybe(u8);
+	p: Maybe(^u8); // No tag is stored for pointers, nil is the sentinel value
+
+	#assert(size_of(i) == size_of(u8) + size_of(u8));
+	#assert(size_of(p) == size_of(^u8));
+
+	i = 123;
+	x := i.?;
+	y, y_ok := p.?;
+	p = &x;
+	z, z_ok := p.?;
+
+	fmt.println(i, p);
+	fmt.println(x, &x);
+	fmt.println(y, y_ok);
+	fmt.println(z, z_ok);
+}
 
 main :: proc() {
 	when true {
@@ -1937,5 +1959,6 @@ main :: proc() {
 		threading_example();
 		soa_struct_layout();
 		constant_literal_expressions();
+		union_maybe();
 	}
 }

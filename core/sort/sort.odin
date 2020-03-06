@@ -103,7 +103,7 @@ _log2 :: proc(x: int) -> int {
 	return res;
 }
 
-merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) where intrinsics.type_is_ordered(T) {
+merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	merge :: proc(a: A, start, mid, end: int, f: proc(T, T) -> int) {
 		s, m := start, mid;
 

@@ -52,6 +52,8 @@ unsafe_string_to_cstring :: proc(str: string) -> cstring {
 	return cstring(d.data);
 }
 
+// Compares two strings, returning a value representing which one comes first lexiographically.
+// -1 for `a`; 1 for `b`, or 0 if they are equal.
 compare :: proc(lhs, rhs: string) -> int {
 	return mem.compare(transmute([]byte)lhs, transmute([]byte)rhs);
 }

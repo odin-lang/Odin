@@ -197,6 +197,7 @@ gbAllocator ir_allocator(void) {
 	IR_INSTR_KIND(ZeroInit, struct { irValue *address; })             \
 	IR_INSTR_KIND(Store,    struct { irValue *address, *value; bool is_volatile; }) \
 	IR_INSTR_KIND(Load,     struct { Type *type; irValue *address; i64 custom_align; }) \
+	IR_INSTR_KIND(InlineCode, struct { BuiltinProcId id; Array<irValue *> operands; }) \
 	IR_INSTR_KIND(AtomicFence, struct { BuiltinProcId id; })          \
 	IR_INSTR_KIND(AtomicStore, struct {                               \
 		irValue *address, *value;                                     \
@@ -1063,6 +1064,14 @@ irValue *ir_instr_load(irProcedure *p, irValue *address) {
 	return v;
 }
 
+irValue *ir_instr_inline_code(irProcedure *p, BuiltinProcId id, Array<irValue *> operands) {
+	irValue *v = ir_alloc_instr(p, irInstr_InlineCode);
+	irInstr *i = &v->Instr;
+	i->InlineCode.id = id;
+	i->InlineCode.operands = operands;
+	return v;
+}
+
 irValue *ir_instr_atomic_fence(irProcedure *p, BuiltinProcId id) {
 	irValue *v = ir_alloc_instr(p, irInstr_AtomicFence);
 	irInstr *i = &v->Instr;
@@ -1222,7 +1231,11 @@ irValue *ir_instr_union_tag_ptr(irProcedure *p, irValue *address) {
 
 	// i->UnionTagPtr.type = alloc_type_pointer(t_type_info_ptr);
 	Type *u = type_deref(ir_type(address));
+	if (is_type_union_maybe_pointer(u)) {
+		GB_PANIC("union #maybe UnionTagPtr");
+	}
 	i->UnionTagPtr.type = alloc_type_pointer(union_tag_type(u));
+
 	return v;
 }
 
@@ -1234,6 +1247,9 @@ irValue *ir_instr_union_tag_value(irProcedure *p, irValue *address) {
 	if (address) address->uses += 1;
 
 	Type *u = type_deref(ir_type(address));
+	if (is_type_union_maybe_pointer(u)) {
+		GB_PANIC("union #maybe UnionTagValue");
+	}
 	i->UnionTagPtr.type = union_tag_type(u);
 	return v;
 }
@@ -4351,7 +4367,9 @@ irValue *ir_emit_union_tag_value(irProcedure *proc, irValue *u) {
 
 irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue *x) {
 	Type *t = ir_type(x);
-	if (is_type_cstring(t)) {
+	if (is_type_pointer(t)) {
+		return ir_emit_comp(proc, op_kind, x, v_raw_nil);
+	} else if (is_type_cstring(t)) {
 		irValue *ptr = ir_emit_conv(proc, x, t_u8_ptr);
 		return ir_emit_comp(proc, op_kind, ptr, v_raw_nil);
 	} else if (is_type_any(t)) {
@@ -4396,6 +4414,12 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 	} else if (is_type_union(t)) {
 		if (type_size_of(t) == 0) {
 			return ir_emit_comp(proc, op_kind, v_zero, v_zero);
+		} else if (is_type_union_maybe_pointer(t)) {
+			Type *bt = base_type(t);
+			irValue *ptr = ir_address_from_load_or_generate_local(proc, x);
+			ptr = ir_emit_bitcast(proc, ptr, alloc_type_pointer(bt->Union.variants[0]));
+			irValue *data = ir_emit_load(proc, ptr);
+			return ir_emit_comp_against_nil(proc, op_kind, data);
 		} else {
 			irValue *tag = ir_emit_union_tag_value(proc, x);
 			return ir_emit_comp(proc, op_kind, tag, v_zero);
@@ -5232,8 +5256,12 @@ void ir_emit_store_union_variant(irProcedure *proc, irValue *parent, irValue *va
 
 	Type *t = type_deref(ir_type(parent));
 
-	irValue *tag_ptr = ir_emit_union_tag_ptr(proc, parent);
-	ir_emit_store(proc, tag_ptr, ir_const_union_tag(t, variant_type));
+	if (is_type_union_maybe_pointer(t)) {
+		// No tag needed!
+	} else {
+		irValue *tag_ptr = ir_emit_union_tag_ptr(proc, parent);
+		ir_emit_store(proc, tag_ptr, ir_const_union_tag(t, variant_type));
+	}
 }
 
 irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
@@ -5701,7 +5729,7 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 	}
 
 	// TODO(bill): Actually figure out what the conversion needs to be correctly 'cause LLVM
-	return ir_emit_bitcast(proc, value, dst);
+	return ir_emit_bitcast(proc, value, t);
 }
 
 
@@ -5728,22 +5756,41 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 	GB_ASSERT_MSG(is_type_union(src), "%s", type_to_string(src_type));
 	Type *dst = tuple->Tuple.variables[0]->type;
 
-
 	irValue *value_  = ir_address_from_load_or_generate_local(proc, value);
-	irValue *tag     = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, value_));
-	irValue *dst_tag = ir_const_union_tag(src, dst);
 
-
-	irBlock *ok_block = ir_new_block(proc, nullptr, "union_cast.ok");
-	irBlock *end_block = ir_new_block(proc, nullptr, "union_cast.end");
-	irValue *cond = ir_emit_comp(proc, Token_CmpEq, tag, dst_tag);
-	ir_emit_if(proc, cond, ok_block, end_block);
-	ir_start_block(proc, ok_block);
+	irValue *tag = nullptr;
+	irValue *dst_tag = nullptr;
+	irValue *cond = nullptr;
+	irValue *data = nullptr;
 
 	irValue *gep0 = ir_emit_struct_ep(proc, v, 0);
 	irValue *gep1 = ir_emit_struct_ep(proc, v, 1);
 
-	irValue *data = ir_emit_load(proc, ir_emit_conv(proc, value_, ir_type(gep0)));
+	if (is_type_union_maybe_pointer(src)) {
+		data = ir_emit_load(proc, ir_emit_conv(proc, value_, ir_type(gep0)));
+	} else {
+		tag     = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, value_));
+		dst_tag = ir_const_union_tag(src, dst);
+	}
+
+	irBlock *ok_block = ir_new_block(proc, nullptr, "union_cast.ok");
+	irBlock *end_block = ir_new_block(proc, nullptr, "union_cast.end");
+
+	if (data != nullptr) {
+		GB_ASSERT(is_type_union_maybe_pointer(src));
+		cond = ir_emit_comp_against_nil(proc, Token_NotEq, data);
+	} else {
+		cond = ir_emit_comp(proc, Token_CmpEq, tag, dst_tag);
+	}
+
+	ir_emit_if(proc, cond, ok_block, end_block);
+	ir_start_block(proc, ok_block);
+
+
+
+	if (data == nullptr) {
+		data = ir_emit_load(proc, ir_emit_conv(proc, value_, ir_type(gep0)));
+	}
 	ir_emit_store(proc, gep0, data);
 	ir_emit_store(proc, gep1, v_true);
 
@@ -6876,6 +6923,9 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 
 
 	// "Intrinsics"
+	case BuiltinProc_cpu_relax:
+		return ir_emit(proc, ir_instr_inline_code(proc, id, {}));
+
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:
 	case BuiltinProc_atomic_fence_rel:
@@ -7344,10 +7394,11 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 					GB_ASSERT(are_types_identical(ir_type(left), key_type));
 
 					Type *it = bit_set_to_int(rt);
+					left = ir_emit_conv(proc, left, it);
 
 					irValue *lower = ir_value_constant(it, exact_value_i64(rt->BitSet.lower));
-					irValue *key = ir_emit_arith(proc, Token_Sub, left, lower, ir_type(left));
-					irValue *bit = ir_emit_arith(proc, Token_Shl, v_one, key, ir_type(left));
+					irValue *key = ir_emit_arith(proc, Token_Sub, left, lower, it);
+					irValue *bit = ir_emit_arith(proc, Token_Shl, v_one, key, it);
 					bit = ir_emit_conv(proc, bit, it);
 
 					irValue *old_value = ir_emit_bitcast(proc, right, it);
@@ -11465,6 +11516,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				irValue *tag_type_ptr     = ir_emit_struct_ep(proc, tag, 2);
 				irValue *custom_align_ptr = ir_emit_struct_ep(proc, tag, 3);
 				irValue *no_nil_ptr       = ir_emit_struct_ep(proc, tag, 4);
+				irValue *maybe_ptr        = ir_emit_struct_ep(proc, tag, 5);
 
 				isize variant_count = gb_max(0, t->Union.variants.count);
 				irValue *memory_types = ir_type_info_member_types_offset(proc, variant_count);
@@ -11494,6 +11546,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				ir_emit_store(proc, custom_align_ptr, is_custom_align);
 
 				ir_emit_store(proc, no_nil_ptr, ir_const_bool(t->Union.no_nil));
+				ir_emit_store(proc, maybe_ptr, ir_const_bool(t->Union.maybe));
 			}
 
 			break;

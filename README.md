@@ -29,7 +29,7 @@ The Odin programming language is fast, concise, readable, pragmatic and open sou
 
 Website: [https://odin-lang.org/](https://odin-lang.org/)
 
-```go
+```odin
 package main
 
 import "core:fmt"

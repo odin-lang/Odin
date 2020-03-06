@@ -357,7 +357,7 @@ matrix_mul_vector :: proc(a: $A/[$I][$J]$E, b: $B/[I]E) -> (c: B)
 		  IS_NUMERIC(E) {
 	for i in 0..<I {
 		for j in 0..<J {
-			c[i] += a[i][j] * b[i];
+			c[j] += a[i][j] * b[i];
 		}
 	}
 	return;
