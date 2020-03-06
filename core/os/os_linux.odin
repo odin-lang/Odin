@@ -267,13 +267,13 @@ foreign libc {
 	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---;
 	@(link_name="lseek64")          _unix_seek          :: proc(fd: Handle, offset: i64, whence: c.int) -> i64 ---;
 	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---;
-	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> i32 ---;
-	@(link_name="stat64")           _unix_stat          :: proc(path: cstring, stat: ^Stat) -> int ---;
-	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^Stat) -> int ---;
-	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: int) -> int ---;
+	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> c.int ---;
+	@(link_name="stat64")           _unix_stat          :: proc(path: cstring, stat: ^Stat) -> c.int ---;
+	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^Stat) -> c.int ---;
+	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: c.int) -> c.int ---;
 
-	@(link_name="malloc")           _unix_malloc        :: proc(size: int) -> rawptr ---;
-	@(link_name="calloc")           _unix_calloc        :: proc(num, size: int) -> rawptr ---;
+	@(link_name="malloc")           _unix_malloc        :: proc(size: c.size_t) -> rawptr ---;
+	@(link_name="calloc")           _unix_calloc        :: proc(num, size: c.size_t) -> rawptr ---;
 	@(link_name="free")             _unix_free          :: proc(ptr: rawptr) ---;
 	@(link_name="realloc")          _unix_realloc       :: proc(ptr: rawptr, size: c.size_t) -> rawptr ---;
 	@(link_name="getenv")           _unix_getenv        :: proc(cstring) -> cstring ---;
