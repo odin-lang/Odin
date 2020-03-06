@@ -17,13 +17,13 @@ Pos :: struct {
 
 pos_compare :: proc(lhs, rhs: Pos) -> int {
 	if lhs.offset != rhs.offset {
-		return (lhs.offset < rhs.offset) ? -1 : +1;
+		return -1 if (lhs.offset < rhs.offset) else +1;
 	}
 	if lhs.line != rhs.line {
-		return (lhs.line < rhs.line) ? -1 : +1;
+		return -1 if (lhs.line < rhs.line) else +1;
 	}
 	if lhs.column != rhs.column {
-		return (lhs.column < rhs.column) ? -1 : +1;
+		return -1 if (lhs.column < rhs.column) else +1;
 	}
 	return strings.compare(lhs.file, rhs.file);
 }

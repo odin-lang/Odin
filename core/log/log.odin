@@ -125,6 +125,6 @@ log :: proc(level : Level, args : ..any, location := #caller_location) {
 logf :: proc(level : Level, fmt_str : string, args : ..any, location := #caller_location) {
 	logger := context.logger;
 	if level < logger.lowest_level do return;
-	str := len(args) > 0 ? fmt.tprintf(fmt_str, ..args) : fmt.tprint(fmt_str); //NOTE(Hoej): While tprint isn't thread-safe, no logging is.
+	str := fmt.tprintf(fmt_str, ..args) if len(args) > 0 else fmt.tprint(fmt_str); //NOTE(Hoej): While tprint isn't thread-safe, no logging is.
 	logger.procedure(logger.data, level, str, logger.options, location);
 }
