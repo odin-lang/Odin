@@ -732,7 +732,7 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		}
 
 		strings.write_string(fi.buf, "0h");
-		_fmt_int(fi, u, 16, false, bit_size, verb == 'h' ? __DIGITS_LOWER : __DIGITS_UPPER);
+		_fmt_int(fi, u, 16, false, bit_size, __DIGITS_LOWER if verb == 'h' else __DIGITS_UPPER);
 
 
 	case:
@@ -1154,7 +1154,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			is_soa := b.soa_kind != .None;
 
 			strings.write_string(fi.buf, info.name);
-			strings.write_byte(fi.buf, is_soa ? '[' : '{');
+			strings.write_byte(fi.buf, '[' if is_soa else '{');
 
 			hash   := fi.hash;   defer fi.hash = hash;
 			indent := fi.indent; defer fi.indent -= 1;
@@ -1165,7 +1165,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			if hash	do strings.write_byte(fi.buf, '\n');
 			defer {
 				if hash do for in 0..<indent do strings.write_byte(fi.buf, '\t');
-				strings.write_byte(fi.buf, is_soa ? ']' : '}');
+				strings.write_byte(fi.buf, ']' if is_soa else '}');
 			}
 
 			if is_soa {
@@ -1415,8 +1415,8 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 		is_soa := info.soa_kind != .None;
 
-		strings.write_byte(fi.buf, is_soa ? '[' : '{');
-		defer strings.write_byte(fi.buf, is_soa ? ']' : '}');
+		strings.write_byte(fi.buf, '[' if is_soa else '{');
+		defer strings.write_byte(fi.buf, ']' if is_soa else '}');
 
 		fi.indent += 1;  defer fi.indent -= 1;
 		hash := fi.hash; defer fi.hash = hash;

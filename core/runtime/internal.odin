@@ -191,7 +191,7 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 		case uint:    os.write_string(fd, "uint");
 		case uintptr: os.write_string(fd, "uintptr");
 		case:
-			os.write_byte(fd, info.signed ? 'i' : 'u');
+			os.write_byte(fd, 'i' if info.signed else 'u');
 			print_u64(fd, u64(8*ti.size));
 		}
 	case Type_Info_Rune:
@@ -421,7 +421,7 @@ memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_ch
 				a := (^byte)(x+pos)^;
 				b := (^byte)(y+pos)^;
 				if a ~ b != 0 {
-					return (int(a) - int(b)) < 0 ? -1 : +1;
+					return -1 if (int(a) - int(b)) < 0 else +1;
 				}
 			}
 		}
@@ -431,7 +431,7 @@ memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_ch
 		a := (^byte)(x+offset)^;
 		b := (^byte)(y+offset)^;
 		if a ~ b != 0 {
-			return (int(a) - int(b)) < 0 ? -1 : +1;
+			return -1 if (int(a) - int(b)) < 0 else +1;
 		}
 	}
 
@@ -456,7 +456,7 @@ memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_
 			for pos := curr_block*SU; pos < n; pos += 1 {
 				a := (^byte)(x+pos)^;
 				if a ~ 0 != 0 {
-					return int(a) < 0 ? -1 : +1;
+					return -1 if int(a) < 0 else +1;
 				}
 			}
 		}
@@ -465,7 +465,7 @@ memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_
 	for /**/; offset < n; offset += 1 {
 		a := (^byte)(x+offset)^;
 		if a ~ 0 != 0 {
-			return int(a) < 0 ? -1 : +1;
+			return -1 if int(a) < 0 else +1;
 		}
 	}
 

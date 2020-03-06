@@ -110,7 +110,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 
 	switch fmt {
 	case 'f', 'F':
-		add_bytes(&b, neg ? '-' : '+');
+		add_bytes(&b, '-' if neg else '+');
 
 		// integer, padded with zeros when needed
 		if digs.decimal_point > 0 {
@@ -138,7 +138,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 		return to_bytes(b);
 
 	case 'e', 'E':
-		add_bytes(&b, neg ? '-' : '+');
+		add_bytes(&b, '-' if neg else '+');
 
 		ch := byte('0');
 		if digs.count != 0 {
