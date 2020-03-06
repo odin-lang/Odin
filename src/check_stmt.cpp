@@ -314,7 +314,11 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 
 		gbString str = expr_to_string(lhs->expr);
 		if (e != nullptr && e->flags & EntityFlag_Param) {
-			error(lhs->expr, "Cannot assign to '%s' which is a procedure parameter", str);
+			if (e->flags & EntityFlag_Using) {
+				error(lhs->expr, "Cannot assign to '%s' which is from a 'using' procedure parameter", str);
+			} else {
+				error(lhs->expr, "Cannot assign to '%s' which is a procedure parameter", str);
+			}
 		} else {
 			error(lhs->expr, "Cannot assign to '%s'", str);
 		}
@@ -497,6 +501,8 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 				Entity *f = found->elements.entries[i].value;
 				if (f->kind == Entity_Variable) {
 					Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, expr);
+					if (e->flags & EntityFlag_Value) uvar->flags |= EntityFlag_Value;
+					if (e->flags & EntityFlag_Param) uvar->flags |= EntityFlag_Param;
 					Entity *prev = scope_insert(ctx->scope, uvar);
 					if (prev != nullptr) {
 						gbString expr_str = expr_to_string(expr);
@@ -1102,6 +1108,12 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			if (type_expr != nullptr) { // Otherwise it's a default expression
 				Operand y = {};
 				check_expr_or_type(ctx, &y, type_expr);
+				if (y.mode != Addressing_Type) {
+					gbString str = expr_to_string(type_expr);
+					error(type_expr, "Expected a type as a case, got %s", str);
+					gb_string_free(str);
+					continue;
+				}
 
 				if (switch_kind == TypeSwitch_Union) {
 					GB_ASSERT(is_type_union(bt));

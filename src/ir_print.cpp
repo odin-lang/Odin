@@ -508,13 +508,25 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
 			// LLVM takes the first element's alignment as the entire alignment (like C)
 			i64 align = type_align_of(t);
+
+			if (is_type_union_maybe_pointer_original_alignment(t)) {
+				ir_write_byte(f, '{');
+				ir_print_type(f, m, t->Union.variants[0]);
+				ir_write_byte(f, '}');
+				return;
+			}
+
 			i64 block_size =  t->Union.variant_block_size;
 
 			ir_write_byte(f, '{');
 			ir_print_alignment_prefix_hack(f, align);
-			ir_fprintf(f, ", [%lld x i8], ", block_size);
-			// ir_print_type(f, m, t_type_info_ptr);
-			ir_print_type(f, m, union_tag_type(t));
+			if (is_type_union_maybe_pointer(t)) {
+				ir_fprintf(f, ", ");
+				ir_print_type(f, m, t->Union.variants[0]);
+			} else {
+				ir_fprintf(f, ", [%lld x i8], ", block_size);
+				ir_print_type(f, m, union_tag_type(t));
+			}
 			ir_write_byte(f, '}');
 		}
 		return;
@@ -1471,6 +1483,18 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		break;
 	}
 
+	case irInstr_InlineCode:
+		{
+			switch (instr->InlineCode.id) {
+			case BuiltinProc_cpu_relax:
+				ir_write_str_lit(f, "call void asm sideeffect \"pause\", \"\"()");
+				break;
+			default: GB_PANIC("Unknown inline code %d", instr->InlineCode.id); break;
+			}
+		}
+		break;
+
+
 	case irInstr_AtomicFence:
 		ir_write_str_lit(f, "fence ");
 		switch (instr->AtomicFence.id) {
@@ -1850,6 +1874,12 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 	case irInstr_UnionTagPtr: {
 		Type *et = ir_type(instr->UnionTagPtr.address);
+
+		Type *ut = type_deref(et);
+		if (is_type_union_maybe_pointer(ut)) {
+			GB_PANIC("union #maybe UnionTagPtr");
+		}
+
 		ir_fprintf(f, "%%%d = getelementptr inbounds ", value->index);
 		Type *t = base_type(type_deref(et));
 		GB_ASSERT(is_type_union(t));
@@ -1869,9 +1899,15 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 	case irInstr_UnionTagValue: {
 		Type *et = ir_type(instr->UnionTagValue.address);
-		ir_fprintf(f, "%%%d = extractvalue ", value->index);
 		Type *t = base_type(et);
+
+		if (is_type_union_maybe_pointer(t)) {
+			GB_PANIC("union #maybe UnionTagValue");
+		}
+
+		ir_fprintf(f, "%%%d = extractvalue ", value->index);
 		GB_ASSERT(is_type_union(t));
+
 
 		ir_print_type(f, m, et);
 		ir_write_byte(f, ' ');

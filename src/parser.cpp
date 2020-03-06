@@ -929,7 +929,7 @@ Ast *ast_struct_type(AstFile *f, Token token, Array<Ast *> fields, isize field_c
 }
 
 
-Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> variants, Ast *polymorphic_params, Ast *align, bool no_nil,
+Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> variants, Ast *polymorphic_params, Ast *align, bool no_nil, bool maybe,
                     Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_UnionType);
 	result->UnionType.token              = token;
@@ -937,6 +937,7 @@ Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> variants, Ast *polymor
 	result->UnionType.polymorphic_params = polymorphic_params;
 	result->UnionType.align              = align;
 	result->UnionType.no_nil             = no_nil;
+	result->UnionType.maybe             = maybe;
 	result->UnionType.where_token        = where_token;
 	result->UnionType.where_clauses      = where_clauses;
 	return result;
@@ -2091,6 +2092,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Ast *polymorphic_params = nullptr;
 		Ast *align = nullptr;
 		bool no_nil = false;
+		bool maybe = false;
 
 		CommentGroup *docs = f->lead_comment;
 		Token start_token = f->curr_token;
@@ -2118,10 +2120,19 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
 				}
 				no_nil = true;
-			} else {
+			} else if (tag.string == "maybe") {
+				if (maybe) {
+					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
+				}
+				maybe = true;
+			}else {
 				syntax_error(tag, "Invalid union tag '#%.*s'", LIT(tag.string));
 			}
 		}
+		if (no_nil && maybe) {
+			syntax_error(f->curr_token, "#maybe and #no_nil cannot be applied together");
+		}
+
 
 		Token where_token = {};
 		Array<Ast *> where_clauses = {};
@@ -2150,7 +2161,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		Token close = expect_token(f, Token_CloseBrace);
 
-		return ast_union_type(f, token, variants, polymorphic_params, align, no_nil, where_token, where_clauses);
+		return ast_union_type(f, token, variants, polymorphic_params, align, no_nil, maybe, where_token, where_clauses);
 	} break;
 
 	case Token_enum: {
@@ -2347,6 +2358,12 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 				Token open = expect_token(f, Token_OpenParen);
 				Ast *type = parse_type(f);
 				Token close = expect_token(f, Token_CloseParen);
+				operand = ast_type_assertion(f, operand, token, type);
+			} break;
+
+			case Token_Question: {
+				Token question = expect_token(f, Token_Question);
+				Ast *type = ast_unary_expr(f, question, nullptr);
 				operand = ast_type_assertion(f, operand, token, type);
 			} break;
 
@@ -2981,6 +2998,7 @@ enum FieldPrefixKind {
 	FieldPrefix_Invalid = 0,
 
 	FieldPrefix_using,
+	FieldPrefix_const,
 	FieldPrefix_no_alias,
 	FieldPrefix_c_var_arg,
 	FieldPrefix_auto_cast,
@@ -3007,6 +3025,9 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 				return FieldPrefix_c_var_arg;
 			}
 			break;
+
+		case Token_const:
+			return FieldPrefix_const;
 		}
 		return FieldPrefix_Unknown;
 	}
@@ -3019,6 +3040,7 @@ u32 parse_field_prefixes(AstFile *f) {
 	i32 no_alias_count  = 0;
 	i32 c_vararg_count  = 0;
 	i32 auto_cast_count = 0;
+	i32 const_count     = 0;
 
 	for (;;) {
 		FieldPrefixKind kind = is_token_field_prefix(f);
@@ -3036,12 +3058,14 @@ u32 parse_field_prefixes(AstFile *f) {
 		case FieldPrefix_no_alias:  no_alias_count  += 1; advance_token(f); break;
 		case FieldPrefix_c_var_arg: c_vararg_count  += 1; advance_token(f); break;
 		case FieldPrefix_auto_cast: auto_cast_count += 1; advance_token(f); break;
+		case FieldPrefix_const:     const_count     += 1; advance_token(f); break;
 		}
 	}
 	if (using_count     > 1) syntax_error(f->curr_token, "Multiple 'using' in this field list");
 	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple '#no_alias' in this field list");
 	if (c_vararg_count  > 1) syntax_error(f->curr_token, "Multiple '#c_vararg' in this field list");
 	if (auto_cast_count > 1) syntax_error(f->curr_token, "Multiple 'auto_cast' in this field list");
+	if (const_count     > 1) syntax_error(f->curr_token, "Multiple '#const' in this field list");
 
 
 	u32 field_flags = 0;
@@ -3049,6 +3073,7 @@ u32 parse_field_prefixes(AstFile *f) {
 	if (no_alias_count  > 0) field_flags |= FieldFlag_no_alias;
 	if (c_vararg_count  > 0) field_flags |= FieldFlag_c_vararg;
 	if (auto_cast_count > 0) field_flags |= FieldFlag_auto_cast;
+	if (const_count     > 0) field_flags |= FieldFlag_const;
 	return field_flags;
 }
 
