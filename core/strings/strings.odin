@@ -25,8 +25,8 @@ clone_to_cstring :: proc(s: string, allocator := context.allocator) -> (str: cst
 
 @(deprecated="Please use 'strings.clone'")
 new_string :: proc(s: string, allocator := context.allocator) -> string {
-	s, _ := clone(s, allocator);
-	return s;
+	str, _ := clone(s, allocator);
+	return str;
 }
 
 @(deprecated="Please use 'strings.clone_to_cstring'")

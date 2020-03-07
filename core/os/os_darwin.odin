@@ -299,9 +299,8 @@ get_last_error :: proc() -> int {
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
-	cstr := strings.clone_to_cstring(path);
+	cstr, _ := strings.clone_to_cstring(path, context.temp_allocator);
 	handle := _unix_open(cstr, flags, mode);
-	delete(cstr);
 	if handle == -1 {
 		return INVALID_HANDLE, 1;
 	}
@@ -370,15 +369,13 @@ is_path_separator :: proc(r: rune) -> bool {
 
 stat :: inline proc(path: string) -> (Stat, bool) {
 	s: Stat;
-	cstr := strings.clone_to_cstring(path);
-	defer delete(cstr);
+	cstr, _ := strings.clone_to_cstring(path, context.temp_allocator);
 	ret_int := _unix_stat(cstr, &s);
 	return s, ret_int==0;
 }
 
 access :: inline proc(path: string, mask: int) -> bool {
-	cstr := strings.clone_to_cstring(path);
-	defer delete(cstr);
+	cstr, _ := strings.clone_to_cstring(path, context.temp_allocator);
 	return _unix_access(cstr, mask) == 0;
 }
 
@@ -394,8 +391,7 @@ heap_free :: inline proc(ptr: rawptr) {
 }
 
 getenv :: proc(name: string) -> (string, bool) {
-	path_str := strings.clone_to_cstring(name);
-	defer delete(path_str);
+	path_str, _ := strings.clone_to_cstring(name, context.temp_allocator);
 	cstr := _unix_getenv(path_str);
 	if cstr == nil {
 		return "", false;
@@ -421,7 +417,7 @@ get_current_directory :: proc() -> string {
 }
 
 set_current_directory :: proc(path: string) -> (err: Errno) {
-	cstr := strings.clone_to_cstring(path, context.temp_allocator);
+	cstr, _ := strings.clone_to_cstring(path, context.temp_allocator);
 	res := _unix_chdir(cstr);
 	if res == -1 do return Errno(get_last_error());
 	return ERROR_NONE;
@@ -437,15 +433,13 @@ current_thread_id :: proc "contextless" () -> int {
 }
 
 dlopen :: inline proc(filename: string, flags: int) -> rawptr {
-	cstr := strings.clone_to_cstring(filename);
-	defer delete(cstr);
+	cstr, _ := strings.clone_to_cstring(filename, context.temp_allocator);
 	handle := _unix_dlopen(cstr, flags);
 	return handle;
 }
 dlsym :: inline proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil);
-	cstr := strings.clone_to_cstring(symbol);
-	defer delete(cstr);
+	cstr, _ := strings.clone_to_cstring(symbol, context.temp_allocator);
 	proc_handle := _unix_dlsym(handle, cstr);
 	return proc_handle;
 }
