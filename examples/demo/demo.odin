@@ -1245,7 +1245,7 @@ implicit_selector_expression :: proc() {
 
 	switch f {
 	case .A:
-		fmt.println("HERE");
+		fmt.println("HITHER");
 	case .B:
 		fmt.println("NEVER");
 	case .C:
@@ -1742,6 +1742,7 @@ range_statements_with_multiple_return_values :: proc() {
 	}
 }
 
+
 soa_struct_layout :: proc() {
 	// IMPORTANT NOTE(bill, 2019-11-03): This feature is subject to be changed/removed
 	// NOTE(bill): Most likely #soa [N]T
@@ -1933,22 +1934,22 @@ union_maybe :: proc() {
 main :: proc() {
 	when true {
 		the_basics();
-		control_flow();
+		// control_flow();
 		named_proc_return_parameters();
 		explicit_procedure_overloading();
 		struct_type();
 		union_type();
 		using_statement();
-		implicit_context_system();
+		// implicit_context_system();
 		parametric_polymorphism();
 		array_programming();
-		map_type();
-		implicit_selector_expression();
+		// map_type();
+		// implicit_selector_expression();
 		partial_switch();
 		cstring_example();
 		bit_set_type();
 		deferred_procedure_associations();
-		reflection();
+		// reflection();
 		quaternions();
 		inline_for_statement();
 		where_clauses();
@@ -1957,7 +1958,7 @@ main :: proc() {
 		deprecated_attribute();
 		range_statements_with_multiple_return_values();
 		threading_example();
-		soa_struct_layout();
+		// soa_struct_layout();
 		constant_literal_expressions();
 		union_maybe();
 	}

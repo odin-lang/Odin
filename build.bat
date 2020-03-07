@@ -49,7 +49,8 @@ del *.ilk > NUL 2> NUL
 
 cl %compiler_settings% "src\main.cpp" ^
 	/link %linker_settings% -OUT:%exe_name% ^
-	&& odin build examples/llvm-demo/demo.odin -llvm-api -show-timings
+	&& odin build examples/demo/demo.odin -llvm-api -show-timings
+	rem && odin build examples/llvm-demo/demo.odin -llvm-api -show-timings
 if %errorlevel% neq 0 (
 	goto end_of_build
 )

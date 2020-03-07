@@ -66,8 +66,7 @@ struct lbModule {
 	Map<lbProcedure *> procedures;  // Key: String
 	Map<Entity *> procedure_values; // Key: LLVMValueRef
 
-	Map<lbValue> const_strings; // Key: String
-	Map<lbValue> const_string_byte_slices; // Key: String
+	Map<LLVMValueRef> const_strings; // Key: String
 
 	Map<lbProcedure *> anonymous_proc_lits; // Key: Ast *
 
@@ -75,8 +74,11 @@ struct lbModule {
 
 	u32 global_array_index;
 	u32 global_generated_index;
+	u32 nested_type_name_guid;
 
 	Array<lbProcedure *> procedures_to_generate;
+	Array<String> foreign_library_paths;
+
 
 
 	LLVMDIBuilderRef debug_builder;
