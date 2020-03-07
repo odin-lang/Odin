@@ -5,6 +5,7 @@ import "core:unicode/utf8"
 
 clone :: proc(s: string, allocator := context.allocator) -> string {
 	c := make([]byte, len(s)+1, allocator);
+	if c == nil do return "";
 	copy(c, s);
 	c[len(s)] = 0;
 	return string(c[:len(s)]);
@@ -12,6 +13,7 @@ clone :: proc(s: string, allocator := context.allocator) -> string {
 
 clone_to_cstring :: proc(s: string, allocator := context.allocator) -> cstring {
 	c := make([]byte, len(s)+1, allocator);
+	if c == nil do return nil;
 	copy(c, s);
 	c[len(s)] = 0;
 	return cstring(&c[0]);
@@ -19,18 +21,12 @@ clone_to_cstring :: proc(s: string, allocator := context.allocator) -> cstring {
 
 @(deprecated="Please use 'strings.clone'")
 new_string :: proc(s: string, allocator := context.allocator) -> string {
-	c := make([]byte, len(s)+1, allocator);
-	copy(c, s);
-	c[len(s)] = 0;
-	return string(c[:len(s)]);
+	return clone(s, allocator);
 }
 
 @(deprecated="Please use 'strings.clone_to_cstring'")
 new_cstring :: proc(s: string, allocator := context.allocator) -> cstring {
-	c := make([]byte, len(s)+1, allocator);
-	copy(c, s);
-	c[len(s)] = 0;
-	return cstring(&c[0]);
+	return clone_to_cstring(s, allocator);
 }
 
 @(deprecated="Please use a standard cast for cstring to string")
