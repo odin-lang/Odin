@@ -136,6 +136,16 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		r.cond = clone(r.cond);
 		r.x    = clone(r.x);
 		r.y    = clone(r.y);
+	case Ternary_If_Expr:
+		r := cast(^Ternary_If_Expr)res;
+		r.x    = clone(r.x);
+		r.cond = clone(r.cond);
+		r.y    = clone(r.y);
+	case Ternary_When_Expr:
+		r := cast(^Ternary_When_Expr)res;
+		r.x    = clone(r.x);
+		r.cond = clone(r.cond);
+		r.y    = clone(r.y);
 	case Type_Assertion:
 		r := cast(^Type_Assertion)res;
 		r.expr = clone(r.expr);
