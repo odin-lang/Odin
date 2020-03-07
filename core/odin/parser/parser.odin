@@ -2754,7 +2754,7 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 			} else if op.kind == .When {
 				x := expr;
 				cond := parse_expr(p, lhs);
-				op2 := expect_token(p, .Else);
+				else_tok := expect_token(p, .Else);
 				y := parse_expr(p, lhs);
 				te := ast.new(ast.Ternary_When_Expr, expr.pos, end_pos(p.prev_tok));
 				te.x    = x;
