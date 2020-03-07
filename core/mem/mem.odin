@@ -186,9 +186,7 @@ align_backward :: inline proc(ptr: rawptr, align: uintptr) -> rawptr {
 
 align_backward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
 	assert(is_power_of_two(align));
-
-	ptr := rawptr(ptr - align);
-	return uintptr(align_forward(ptr, align));
+	return align_forward_uintptr(ptr - align + 1, align);
 }
 
 align_backward_int :: inline proc(ptr, align: int) -> int {
