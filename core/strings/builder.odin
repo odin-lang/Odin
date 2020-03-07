@@ -17,8 +17,8 @@ destroy_builder :: proc(b: ^Builder) {
 	clear(&b.buf);
 }
 
-grow_builder :: proc(b: ^Builder, cap: int) {
-	reserve(&b.buf, cap);
+grow_builder :: proc(b: ^Builder, cap: int) -> bool {
+	return reserve(&b.buf, cap);
 }
 
 reset_builder :: proc(b: ^Builder) {

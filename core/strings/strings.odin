@@ -3,30 +3,36 @@ package strings
 import "core:mem"
 import "core:unicode/utf8"
 
-clone :: proc(s: string, allocator := context.allocator) -> string {
+clone :: proc(s: string, allocator := context.allocator) -> (str: string, ok: bool) {
 	c := make([]byte, len(s)+1, allocator);
-	if c == nil do return "";
+	if c == nil {
+		return;
+	}
 	copy(c, s);
 	c[len(s)] = 0;
-	return string(c[:len(s)]);
+	return string(c[:len(s)]), true;
 }
 
-clone_to_cstring :: proc(s: string, allocator := context.allocator) -> cstring {
+clone_to_cstring :: proc(s: string, allocator := context.allocator) -> (str: cstring, ok: bool) {
 	c := make([]byte, len(s)+1, allocator);
-	if c == nil do return nil;
+	if c == nil {
+		return;
+	}
 	copy(c, s);
 	c[len(s)] = 0;
-	return cstring(&c[0]);
+	return cstring(&c[0]), true;
 }
 
 @(deprecated="Please use 'strings.clone'")
 new_string :: proc(s: string, allocator := context.allocator) -> string {
-	return clone(s, allocator);
+	s, _ := clone(s, allocator);
+	return s;
 }
 
 @(deprecated="Please use 'strings.clone_to_cstring'")
 new_cstring :: proc(s: string, allocator := context.allocator) -> cstring {
-	return clone_to_cstring(s, allocator);
+	s, _ := clone_to_cstring(s, allocator);
+	return s;
 }
 
 @(deprecated="Please use a standard cast for cstring to string")
@@ -777,7 +783,7 @@ partition :: proc(str, sep: string) -> (head, match, tail: string) {
 center_justify :: centre_justify; // NOTE(bill): Because Americans exist
 
 // centre_justify returns a string with a pad string at boths sides if the str's rune length is smaller than length
-centre_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
+centre_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> (res: string, ok: bool) {
 	n := rune_count(str);
 	if n >= length || pad == "" {
 		return clone(str, allocator);
@@ -787,17 +793,18 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 	pad_len := rune_count(pad);
 
 	b := make_builder(allocator);
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
+	if !grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad)) {
+		return;
+	}
 
 	write_pad_string(&b, pad, pad_len, remains/2);
 	write_string(&b, str);
 	write_pad_string(&b, pad, pad_len, (remains+1)/2);
-
-	return to_string(b);
+	return to_string(b), true; // NOTE(tetra): assumes the math above is right
 }
 
 // left_justify returns a string with a pad string at left side if the str's rune length is smaller than length
-left_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
+left_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> (res: string, ok: bool) {
 	n := rune_count(str);
 	if n >= length || pad == "" {
 		return clone(str, allocator);
@@ -807,16 +814,17 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 	pad_len := rune_count(pad);
 
 	b := make_builder(allocator);
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
+	if !grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad)) {
+		return;
+	}
 
 	write_string(&b, str);
 	write_pad_string(&b, pad, pad_len, remains);
-
-	return to_string(b);
+	return to_string(b), true; // NOTE(tetra): assumes the math above is right
 }
 
 // right_justify returns a string with a pad string at right side if the str's rune length is smaller than length
-right_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
+right_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> (res: string, ok: bool) {
 	n := rune_count(str);
 	if n >= length || pad == "" {
 		return clone(str, allocator);
@@ -826,12 +834,13 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 	pad_len := rune_count(pad);
 
 	b := make_builder(allocator);
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad));
+	if !grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad)) {
+		return;
+	}
 
 	write_pad_string(&b, pad, pad_len, remains);
 	write_string(&b, str);
-
-	return to_string(b);
+	return to_string(b), true; // NOTE(tetra): assumes the math above is right
 }
 
 
