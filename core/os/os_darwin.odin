@@ -202,10 +202,10 @@ Stat :: struct {
 	gid:           u32, // Group ID of the file's group
 	rdev:          i32, // Device ID, if device
 
-	last_access:   File_Time, // Time of last access
-	modified:      File_Time, // Time of last modification
-	status_change: File_Time, // Time of last status change
-	created:       File_Time, // Time of creation
+	last_access:   _File_Time, // Time of last access
+	modified:      _File_Time, // Time of last modification
+	status_change: _File_Time, // Time of last status change
+	created:       _File_Time, // Time of creation
 
 	size:          i64,  // Size of the file, in bytes
 	blocks:        i64,  // Number of blocks allocated for the file
@@ -273,7 +273,7 @@ foreign libc {
 	@(link_name="lseek")   _unix_lseek   :: proc(fs: Handle, offset: int, whence: int) -> int ---;
 	@(link_name="gettid")  _unix_gettid  :: proc() -> u64 ---;
 	@(link_name="getpagesize") _unix_getpagesize :: proc() -> i32 ---;
-	@(link_name="stat")    _unix_stat    :: proc(path: cstring, stat: ^Stat) -> int ---;
+	@(link_name="stat64")    _unix_stat    :: proc(path: cstring, stat: ^Stat) -> int ---;
 	@(link_name="access")  _unix_access  :: proc(path: cstring, mask: int) -> int ---;
 
 	@(link_name="malloc")  _unix_malloc  :: proc(size: int) -> rawptr ---;

@@ -199,9 +199,9 @@ Stat :: struct {
 	block_size:    i64, // Optimal bllocksize for I/O
 	blocks:        i64, // Number of 512-byte blocks allocated
 
-	last_access:   _File_Time, // Time of last access
-	modified:      _File_Time, // Time of last modification
-	status_change: _File_Time, // Time of last status change
+	last_access:   File_Time, // Time of last access
+	status_change: File_Time, // Time of last status change
+	modified:      File_Time, // Time of last modification
 
 	_reserve1,
 	_reserve2,
@@ -268,7 +268,7 @@ foreign libc {
 	@(link_name="lseek64")          _unix_seek          :: proc(fd: Handle, offset: i64, whence: c.int) -> i64 ---;
 	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---;
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> c.int ---;
-	@(link_name="stat")             _unix_stat          :: proc(path: cstring, stat: ^Stat) -> c.int ---;
+	@(link_name="stat64")           _unix_stat          :: proc(path: cstring, stat: ^Stat) -> c.int ---;
 	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^Stat) -> c.int ---;
 	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: c.int) -> c.int ---;
 
@@ -366,7 +366,7 @@ last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
 	if err != ERROR_NONE {
 		return 0, err;
 	}
-	return File_Time(s.modified.nanoseconds), ERROR_NONE;
+	return File_Time(s.modified), ERROR_NONE;
 }
 
 last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
@@ -374,7 +374,7 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 	if err != ERROR_NONE {
 		return 0, err;
 	}
-	return File_Time(s.modified.nanoseconds), ERROR_NONE;
+	return File_Time(s.modified), ERROR_NONE;
 }
 
 stat :: inline proc(path: string) -> (Stat, Errno) {
