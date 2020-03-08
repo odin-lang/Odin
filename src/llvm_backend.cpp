@@ -1137,8 +1137,8 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	p->body           = pl->body;
 	p->tags           = pt->Proc.tags;
 	p->inlining       = ProcInlining_none;
-	p->is_foreign     = false;
-	p->is_export      = false;
+	p->is_foreign     = entity->Procedure.is_foreign;
+	p->is_export      = entity->Procedure.is_export;
 	p->is_entry_point = false;
 
 	gbAllocator a = heap_allocator();
@@ -1205,6 +1205,12 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 		lb_add_proc_attribute_at_index(p, offset+parameter_index, "nonnull");
 		lb_add_proc_attribute_at_index(p, offset+parameter_index, "nocapture");
 	}
+
+
+	if (entity->Procedure.is_foreign) {
+		lb_add_foreign_library_path(p->module, entity->Procedure.foreign_library);
+	}
+
 
 	{ // Debug Information
 		unsigned line = cast(unsigned)entity->token.pos.line;
@@ -1379,7 +1385,7 @@ lbValue lb_add_param(lbProcedure *p, Entity *e, Ast *expr, Type *abi_type, i32 i
 
 	case lbParamPass_Integer: {
 		lbAddr l = lb_add_local(p, e->type, e, false, index);
-		lbValue iptr = lb_emit_conv(p, l.addr, alloc_type_pointer(p->type));
+		lbValue iptr = lb_emit_conv(p, l.addr, alloc_type_pointer(abi_type));
 		lb_emit_store(p, iptr, v);
 		return lb_addr_load(p, l);
 	}
