@@ -310,7 +310,6 @@ void lb_emit_increment(lbProcedure *p, lbValue addr);
 
 lbValue lb_type_info(lbModule *m, Type *type);
 
-lbValue lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type, lbValue map_key, lbValue map_value);
 
 
 bool lb_is_const(lbValue value);
@@ -320,7 +319,7 @@ String lb_get_const_string(lbModule *m, lbValue value);
 lbValue lb_generate_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id);
 lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type);
 lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type);
-lbValue lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type, lbValue map_key, lbValue map_value);
+void    lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type, lbValue map_key, lbValue map_value);
 
 
 #define LB_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"
