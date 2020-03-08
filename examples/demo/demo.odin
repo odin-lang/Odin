@@ -1940,7 +1940,7 @@ main :: proc() {
 		struct_type();
 		union_type();
 		using_statement();
-		// implicit_context_system();
+		implicit_context_system();
 		parametric_polymorphism();
 		array_programming();
 		map_type();
