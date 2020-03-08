@@ -182,6 +182,7 @@ struct Scope {
 	union {
 		AstPackage *pkg;
 		AstFile *   file;
+		Entity *    procedure_entity;
 	};
 };
 

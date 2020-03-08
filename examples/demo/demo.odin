@@ -1958,7 +1958,7 @@ main :: proc() {
 		deprecated_attribute();
 		range_statements_with_multiple_return_values();
 		threading_example();
-		// soa_struct_layout();
+		soa_struct_layout();
 		constant_literal_expressions();
 		union_maybe();
 	}
