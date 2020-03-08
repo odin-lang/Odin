@@ -303,6 +303,8 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			lbValue a = addr.addr;
 			lbValue b = lb_emit_deep_field_gep(p, a, addr.ctx.sel);
 			return lb_emit_load(p, b);
+		} else {
+			return lb_emit_load(p, addr.addr);
 		}
 	} else if (addr.kind == lbAddr_SoaVariable) {
 		Type *t = type_deref(addr.addr.type);
@@ -2002,30 +2004,15 @@ void lb_close_scope(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, bool p
 	GB_ASSERT(p->scope_index > 0);
 
 	// NOTE(bill): Remove `context`s made in that scope
-
-	isize end_idx = p->context_stack.count-1;
-	isize pop_count = 0;
-
-	for (;;) {
-		if (end_idx < 0) {
-			break;
-		}
-		lbContextData *end = &p->context_stack[end_idx];
-		if (end == nullptr) {
-			break;
-		}
-		if (end->scope_index != p->scope_index) {
-			break;
-		}
-		end_idx -= 1;
-		pop_count += 1;
-	}
-	if (pop_stack) {
-		for (isize i = 0; i < pop_count; i++) {
+	while (p->context_stack.count > 0) {
+		lbContextData *ctx = &p->context_stack[p->context_stack.count-1];
+		if (ctx->scope_index >= p->scope_index) {
 			array_pop(&p->context_stack);
+		} else {
+			break;
 		}
-	}
 
+	}
 
 	p->scope_index -= 1;
 }
@@ -5292,15 +5279,19 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 }
 
 
-void lb_emit_init_context(lbProcedure *p, lbValue c) {
+void lb_emit_init_context(lbProcedure *p, lbAddr addr) {
+	GB_ASSERT(addr.kind == lbAddr_Context);
+	GB_ASSERT(addr.ctx.sel.index.count == 0);
+
 	lbModule *m = p->module;
 	gbAllocator a = heap_allocator();
 	auto args = array_make<lbValue>(a, 1);
-	args[0] = c.value != nullptr ? c : m->global_default_context.addr;
+	args[0] = addr.addr;
 	lb_emit_runtime_call(p, "__init_context", args);
 }
 
 void lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx) {
+	ctx.kind = lbAddr_Context;
 	lbContextData cd = {ctx, p->scope_index};
 	array_add(&p->context_stack, cd);
 }
@@ -5315,7 +5306,7 @@ lbAddr lb_find_or_generate_context_ptr(lbProcedure *p) {
 	c.kind = lbAddr_Context;
 	lb_push_context_onto_stack(p, c);
 	lb_addr_store(p, c, lb_addr_load(p, p->module->global_default_context));
-	lb_emit_init_context(p, c.addr);
+	lb_emit_init_context(p, c);
 	return c;
 }
 
@@ -8307,7 +8298,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 						sel = selection_combine(addr.ctx.sel, sel);
 					}
 					addr.ctx.sel = sel;
-
+					addr.kind = lbAddr_Context;
 					return addr;
 				} else if (addr.kind == lbAddr_SoaVariable) {
 					lbValue index = addr.soa.index;
@@ -10042,6 +10033,10 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 
 void lb_generate_code(lbGenerator *gen) {
+	#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+
+	TIME_SECTION("LLVM Global Variables");
+
 	lbModule *m = &gen->module;
 	LLVMModuleRef mod = gen->module.mod;
 	CheckerInfo *info = gen->info;
@@ -10051,7 +10046,7 @@ void lb_generate_code(lbGenerator *gen) {
 	gbAllocator temp_allocator = arena_allocator(&temp_arena);
 
 	gen->module.global_default_context = lb_add_global_generated(m, t_context, {});
-
+	gen->module.global_default_context.kind = lbAddr_Context;
 
 	auto *min_dep_set = &info->minimum_dependency_set;
 
@@ -10278,6 +10273,7 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 
+	TIME_SECTION("LLVM Global Procedures and Types");
 	for_array(i, info->entities) {
 		// arena_free_all(&temp_arena);
 		// gbAllocator a = temp_allocator;
@@ -10335,6 +10331,7 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	TIME_SECTION("LLVM Procedure Generation");
 	for_array(i, m->procedures_to_generate) {
 		lbProcedure *p = m->procedures_to_generate[i];
 		if (p->is_done) {
@@ -10350,14 +10347,14 @@ void lb_generate_code(lbGenerator *gen) {
 
 		if (LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
 			gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
-			// LLVMDumpValue(p->value);
-			// gb_printf_err("\n\n\n\n");
-			// LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
-			exit(1);
+			LLVMDumpValue(p->value);
+			gb_printf_err("\n\n\n\n");
+			LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
 		}
 	}
 
 
+	TIME_SECTION("LLVM Function Pass");
 
 	LLVMPassRegistryRef pass_registry = LLVMGetGlobalPassRegistry();
 	LLVMPassManagerRef function_pass_manager = LLVMCreateFunctionPassManagerForModule(mod);
@@ -10432,7 +10429,7 @@ void lb_generate_code(lbGenerator *gen) {
 			}
 		}
 
-		lb_emit_init_context(p, {});
+		lb_emit_init_context(p, p->module->global_default_context);
 
 		lb_end_procedure_body(p);
 
@@ -10483,6 +10480,8 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 
+	TIME_SECTION("LLVM Module Pass");
+
 	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
 	defer (LLVMDisposePassManager(module_pass_manager));
 	LLVMAddAlwaysInlinerPass(module_pass_manager);
@@ -10490,8 +10489,8 @@ void lb_generate_code(lbGenerator *gen) {
 
 	LLVMPassManagerBuilderRef pass_manager_builder = LLVMPassManagerBuilderCreate();
 	defer (LLVMPassManagerBuilderDispose(pass_manager_builder));
-	LLVMPassManagerBuilderSetOptLevel(pass_manager_builder, 3);
-	LLVMPassManagerBuilderSetSizeLevel(pass_manager_builder, 3);
+	LLVMPassManagerBuilderSetOptLevel(pass_manager_builder, build_context.optimization_level);
+	LLVMPassManagerBuilderSetSizeLevel(pass_manager_builder, build_context.optimization_level);
 
 	LLVMPassManagerBuilderPopulateLTOPassManager(pass_manager_builder, module_pass_manager, false, false);
 	LLVMRunPassManager(module_pass_manager, mod);
@@ -10513,6 +10512,8 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMVerifyModule(mod, LLVMAbortProcessAction, &llvm_error);
 	llvm_error = nullptr;
 
+	TIME_SECTION("LLVM Initializtion");
+
 	LLVMInitializeAllTargetInfos();
 	LLVMInitializeAllTargets();
 	LLVMInitializeAllTargetMCs();
@@ -10520,6 +10521,8 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMInitializeAllAsmParsers();
 	LLVMInitializeAllDisassemblers();
 	LLVMInitializeNativeTarget();
+
+	timings_start_section(&global_timings, str_lit("LLVM Object Generation"));
 
 	char const *target_triple = "x86_64-pc-windows-msvc";
 	char const *target_data_layout = "e-m:w-i64:64-f80:128-n8:16:32:64-S128";
@@ -10539,4 +10542,5 @@ void lb_generate_code(lbGenerator *gen) {
 		return;
 	}
 
+#undef TIME_SECTION
 }

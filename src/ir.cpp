@@ -11445,7 +11445,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				ir_emit_store(proc, results, ir_get_type_info_ptr(proc, t->Proc.results));
 			}
 			ir_emit_store(proc, variadic, ir_const_bool(t->Proc.variadic));
-			ir_emit_store(proc, convention, ir_const_int(t->Proc.calling_convention));
+			ir_emit_store(proc, convention, ir_const_u8(t->Proc.calling_convention));
 
 			// TODO(bill): TypeInfo for procedures
 			break;

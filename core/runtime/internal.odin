@@ -57,12 +57,22 @@ mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memmove
 	foreign _ {
-		when size_of(rawptr) == 8 {
-			@(link_name="llvm.memmove.p0i8.p0i8.i64")
-			llvm_memmove :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
+		when ODIN_USE_LLVM_API {
+			when size_of(rawptr) == 8 {
+				@(link_name="llvm.memmove.p0i8.p0i8.i64")
+				llvm_memmove :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
+			} else {
+				@(link_name="llvm.memmove.p0i8.p0i8.i32")
+				llvm_memmove :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
+			}
 		} else {
-			@(link_name="llvm.memmove.p0i8.p0i8.i32")
-			llvm_memmove :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
+			when size_of(rawptr) == 8 {
+				@(link_name="llvm.memmove.p0i8.p0i8.i64")
+				llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+			} else {
+				@(link_name="llvm.memmove.p0i8.p0i8.i32")
+				llvm_memmove :: proc(dst, src: rawptr, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+			}
 		}
 	}
 	llvm_memmove(dst, src, len);
@@ -73,12 +83,22 @@ mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> r
 	if src == nil do return dst;
 	// NOTE(bill): This _must_ be implemented like C's memcpy
 	foreign _ {
-		when size_of(rawptr) == 8 {
-			@(link_name="llvm.memcpy.p0i8.p0i8.i64")
-			llvm_memcpy :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
+		when ODIN_USE_LLVM_API {
+			when size_of(rawptr) == 8 {
+				@(link_name="llvm.memcpy.p0i8.p0i8.i64")
+				llvm_memcpy :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
+			} else {
+				@(link_name="llvm.memcpy.p0i8.p0i8.i32")
+				llvm_memcpy :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
+			}
 		} else {
-			@(link_name="llvm.memcpy.p0i8.p0i8.i32")
-			llvm_memcpy :: proc(dst, src: rawptr, len: int, is_volatile: bool = false) ---;
+			when size_of(rawptr) == 8 {
+				@(link_name="llvm.memcpy.p0i8.p0i8.i64")
+				llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+			} else {
+				@(link_name="llvm.memcpy.p0i8.p0i8.i32")
+				llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+			}
 		}
 	}
 	llvm_memcpy(dst, src, len);
