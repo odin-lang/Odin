@@ -279,6 +279,7 @@ void lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx);
 lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={});
 lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, i32 param_index=0);
 
+void lb_add_foreign_library_path(lbModule *m, Entity *e);
 
 lbValue lb_typeid(lbModule *m, Type *type, Type *typeid_type=t_typeid);
 
