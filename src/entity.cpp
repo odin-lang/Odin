@@ -3,6 +3,7 @@ struct Checker;
 struct Type;
 struct DeclInfo;
 struct lbModule;
+struct lbProcedure;
 
 
 #define ENTITY_KINDS \
@@ -106,7 +107,8 @@ struct Entity {
 	Entity *    using_parent;
 	Ast *       using_expr;
 
-	lbModule *  code_gen_module;
+	lbModule *   code_gen_module;
+	lbProcedure *code_gen_procedure;
 
 	isize       order_in_src;
 	String      deprecated_message;

@@ -485,16 +485,66 @@ String lb_mangle_name(lbModule *m, Entity *e) {
 		new_name_len += extra-1;
 	}
 
-	return make_string((u8 const *)new_name, new_name_len-1);
+	String mangled_name = make_string((u8 const *)new_name, new_name_len-1);
+	return mangled_name;
 }
+
+String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedure *p) {
+	// NOTE(bill, 2020-03-08): A polymorphic procedure may take a nested type declaration
+	// and as a result, the declaration does not have time to determine what it should be
+
+	GB_ASSERT(e != nullptr && e->kind == Entity_TypeName);
+	if (e->TypeName.ir_mangled_name.len != 0)  {
+		return e->TypeName.ir_mangled_name;
+	}
+	GB_ASSERT((e->scope->flags & ScopeFlag_File) == 0);
+
+	if (p == nullptr) {
+		Entity *proc = nullptr;
+		if (e->parent_proc_decl != nullptr) {
+			proc = e->parent_proc_decl->entity;
+		} else {
+			Scope *scope = e->scope;
+			while (scope != nullptr && (scope->flags & ScopeFlag_Proc) == 0) {
+				scope = scope->parent;
+			}
+			GB_ASSERT(scope != nullptr);
+			GB_ASSERT(scope->flags & ScopeFlag_Proc);
+			proc = scope->procedure_entity;
+		}
+		GB_ASSERT(proc->kind == Entity_Procedure);
+		GB_ASSERT(proc->code_gen_procedure != nullptr);
+		p = proc->code_gen_procedure;
+	}
+
+	// NOTE(bill): Generate a new name
+	// parent_proc.name-guid
+	String ts_name = e->token.string;
+
+	lbModule *m = p->module;
+	isize name_len = p->name.len + 1 + ts_name.len + 1 + 10 + 1;
+	char *name_text = gb_alloc_array(heap_allocator(), char, name_len);
+	u32 guid = ++p->module->nested_type_name_guid;
+	name_len = gb_snprintf(name_text, name_len, "%.*s.%.*s-%u", LIT(p->name), LIT(ts_name), guid);
+
+	String name = make_string(cast(u8 *)name_text, name_len-1);
+	e->TypeName.ir_mangled_name = name;
+	return name;
+}
+
 
 String lb_get_entity_name(lbModule *m, Entity *e, String default_name) {
 	if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
 		return e->TypeName.ir_mangled_name;
 	}
+	GB_ASSERT(e != nullptr);
 
 	if (e->pkg == nullptr) {
 		return e->token.string;
+	}
+
+	if (e->kind == Entity_TypeName && (e->scope->flags & ScopeFlag_File) == 0) {
+		return lb_set_nested_type_name_ir_mangled_name(e, nullptr);
 	}
 
 	String name = {};
@@ -521,9 +571,13 @@ String lb_get_entity_name(lbModule *m, Entity *e, String default_name) {
 		name = e->token.string;
 	}
 
-	if (e != nullptr && e->kind == Entity_TypeName) {
+	if (e->kind == Entity_TypeName) {
+		if ((e->scope->flags & ScopeFlag_File) == 0) {
+			gb_printf_err("<<< %.*s %.*s %p\n", LIT(e->token.string), LIT(name), e);
+		}
+
 		e->TypeName.ir_mangled_name = name;
-	} else if (e != nullptr && e->kind == Entity_Procedure) {
+	} else if (e->kind == Entity_Procedure) {
 		e->Procedure.link_name = name;
 	}
 
@@ -1064,6 +1118,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 
 	p->module = m;
 	entity->code_gen_module = m;
+	entity->code_gen_procedure = p;
 	p->entity = entity;
 	p->name = link_name;
 
@@ -1792,22 +1847,12 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 			continue;
 		}
 
-		// NOTE(bill): Generate a new name
-		// parent_proc.name-guid
-		String ts_name = e->token.string;
+		if (e->TypeName.ir_mangled_name.len != 0) {
+			// NOTE(bill): Already set
+			continue;
+		}
 
-		lbModule *m = p->module;
-		isize name_len = p->name.len + 1 + ts_name.len + 1 + 10 + 1;
-		char *name_text = gb_alloc_array(heap_allocator(), char, name_len);
-		u32 guid = ++p->module->nested_type_name_guid;
-		name_len = gb_snprintf(name_text, name_len, "%.*s.%.*s-%u", LIT(p->name), LIT(ts_name), guid);
-
-		String name = make_string(cast(u8 *)name_text, name_len-1);
-		e->TypeName.ir_mangled_name = name;
-
-		// lbValue value = ir_value_type_name(name, e->type);
-		// ir_add_entity_name(m, e, name);
-		// ir_gen_global_type_name(m, e, name);
+		lb_set_nested_type_name_ir_mangled_name(e, p);
 	}
 
 	for_array(i, vd->names) {
@@ -10305,9 +10350,10 @@ void lb_generate_code(lbGenerator *gen) {
 
 		if (LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
 			gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
-			LLVMDumpValue(p->value);
-			gb_printf_err("\n\n\n\n");
-			LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
+			// LLVMDumpValue(p->value);
+			// gb_printf_err("\n\n\n\n");
+			// LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
+			exit(1);
 		}
 	}
 
