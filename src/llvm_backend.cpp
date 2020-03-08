@@ -3543,8 +3543,9 @@ lbValue lb_find_or_add_entity_string(lbModule *m, String const &str) {
 		res.value = LLVMConstNamedStruct(lb_type(m, t_string), values, 2);
 		res.type = t_string;
 		return res;
+	} else {
+		return lb_const_value(m, t_string, exact_value_string(str));
 	}
-	return lb_const_value(m, t_string, exact_value_string(str));
 }
 
 lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) {
@@ -3559,8 +3560,37 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 		res.value = LLVMConstNamedStruct(lb_type(m, t_u8_slice), values, 2);
 		res.type = t_u8_slice;
 		return res;
+	} else {
+		LLVMValueRef indices[2] = {llvm_zero32(m), llvm_zero32(m)};
+		LLVMValueRef data = LLVMConstStringInContext(m->ctx,
+			cast(char const *)str.text,
+			cast(unsigned)str.len,
+			false);
+
+
+		isize max_len = 7+8+1;
+		char *name = gb_alloc_array(heap_allocator(), char, max_len);
+		isize len = gb_snprintf(name, max_len, "csbs$%x", m->global_array_index);
+		len -= 1;
+		m->global_array_index++;
+
+		LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
+		LLVMSetInitializer(global_data, data);
+
+		LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
+
+		LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), str.len, true);
+		LLVMValueRef values[2] = {ptr, str_len};
+
+		Type *original_type = t_u8_slice;
+		lbValue res = {};
+		res.value = LLVMConstNamedStruct(lb_type(m, original_type), values, 2);
+		res.type = default_type(original_type);
+
+		map_set(&m->const_strings, key, ptr);
+
+		return res;
 	}
-	return lb_const_value(m, t_u8_slice, exact_value_string(str));
 }
 
 isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
