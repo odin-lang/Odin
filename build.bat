@@ -49,14 +49,14 @@ del *.ilk > NUL 2> NUL
 
 cl %compiler_settings% "src\main.cpp" ^
 	/link %linker_settings% -OUT:%exe_name% ^
-	&& odin build examples/demo/demo.odin -llvm-api -show-more-timings
+	&& odin run examples/demo/demo.odin -llvm-api
 if %errorlevel% neq 0 (
 	goto end_of_build
 )
 
-link demo.obj kernel32.lib user32.lib /OUT:llvm_demo.exe ^
-	/nologo /incremental:no /opt:ref /subsystem:CONSOLE /defaultlib:libcmt -debug
-	rem && llvm_demo
+rem link demo.obj kernel32.lib user32.lib /OUT:llvm_demo.exe ^
+rem 	/nologo /incremental:no /opt:ref /subsystem:CONSOLE /defaultlib:libcmt -debug
+rem 	rem && llvm_demo
 
 del *.obj > NUL 2> NUL
 

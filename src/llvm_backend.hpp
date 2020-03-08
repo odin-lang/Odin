@@ -90,6 +90,7 @@ struct lbGenerator {
 	lbModule module;
 	CheckerInfo *info;
 
+	Array<String> output_object_paths;
 	String   output_base;
 	String   output_name;
 };

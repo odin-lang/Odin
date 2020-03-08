@@ -125,6 +125,303 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 
 
 
+
+i32 linker_stage(lbGenerator *gen) {
+	i32 exit_code = 0;
+
+	Timings *timings = &global_timings;
+
+	String output_base = gen->output_base;
+
+	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
+#ifdef GB_SYSTEM_UNIX
+		system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s",
+				LIT(output_base), LIT(output_base), LIT(build_context.link_flags));
+#else
+		gb_printf_err("Don't know how to cross compile to selected target.\n");
+#endif
+	} else {
+	#if defined(GB_SYSTEM_WINDOWS)
+		timings_start_section(timings, str_lit("msvc-link"));
+
+		gbString lib_str = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(lib_str));
+		char lib_str_buf[1024] = {0};
+
+		char const *output_ext = "exe";
+		gbString link_settings = gb_string_make_reserve(heap_allocator(), 256);
+		defer (gb_string_free(link_settings));
+
+
+		// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
+		Find_Result_Utf8 find_result = find_visual_studio_and_windows_sdk_utf8();
+
+		if (find_result.windows_sdk_version == 0) {
+			gb_printf_err("Windows SDK not found.\n");
+			return 1;
+		}
+
+		// Add library search paths.
+		if (find_result.vs_library_path.len > 0) {
+			GB_ASSERT(find_result.windows_sdk_um_library_path.len > 0);
+			GB_ASSERT(find_result.windows_sdk_ucrt_library_path.len > 0);
+
+			String path = {};
+			auto add_path = [&](String path) {
+				if (path[path.len-1] == '\\') {
+					path.len -= 1;
+				}
+				link_settings = gb_string_append_fmt(link_settings, " /LIBPATH:\"%.*s\"", LIT(path));
+			};
+			add_path(find_result.windows_sdk_um_library_path);
+			add_path(find_result.windows_sdk_ucrt_library_path);
+			add_path(find_result.vs_library_path);
+		}
+
+		for_array(i, gen->module.foreign_library_paths) {
+			String lib = gen->module.foreign_library_paths[i];
+			GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
+			isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+			                        " \"%.*s\"", LIT(lib));
+			lib_str = gb_string_appendc(lib_str, lib_str_buf);
+		}
+
+
+
+		if (build_context.is_dll) {
+			output_ext = "dll";
+			link_settings = gb_string_append_fmt(link_settings, "/DLL");
+		} else {
+			link_settings = gb_string_append_fmt(link_settings, "/ENTRY:mainCRTStartup");
+		}
+
+		if (build_context.pdb_filepath != "") {
+			link_settings = gb_string_append_fmt(link_settings, " /PDB:%.*s", LIT(build_context.pdb_filepath));
+		}
+
+		if (build_context.no_crt) {
+			link_settings = gb_string_append_fmt(link_settings, " /nodefaultlib");
+		} else {
+			link_settings = gb_string_append_fmt(link_settings, " /defaultlib:libcmt");
+		}
+
+		if (build_context.ODIN_DEBUG) {
+			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
+		}
+
+		gbString object_files = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(object_files));
+		for_array(i, gen->output_object_paths) {
+			String object_path = gen->output_object_paths[i];
+			object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
+		}
+
+		char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
+		if (!build_context.use_lld) { // msvc
+			if (build_context.has_resource) {
+				exit_code = system_exec_command_line_app("msvc-link",
+					"\"%.*src.exe\" /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
+					LIT(find_result.vs_exe_path),
+					LIT(output_base),
+					LIT(build_context.resource_filepath)
+				);
+
+	            if (exit_code != 0) {
+					return exit_code;
+				}
+
+				exit_code = system_exec_command_line_app("msvc-link",
+					"\"%.*slink.exe\" %s \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
+					"/nologo /incremental:no /opt:ref /subsystem:%s "
+					" %.*s "
+					" %s "
+					"",
+					LIT(find_result.vs_exe_path), object_files, LIT(output_base), LIT(output_base), output_ext,
+					link_settings,
+					subsystem_str,
+					LIT(build_context.link_flags),
+					lib_str
+				);
+			} else {
+				exit_code = system_exec_command_line_app("msvc-link",
+					"\"%.*slink.exe\" %s -OUT:\"%.*s.%s\" %s "
+					"/nologo /incremental:no /opt:ref /subsystem:%s "
+					" %.*s "
+					" %s "
+					"",
+					LIT(find_result.vs_exe_path), object_files, LIT(output_base), output_ext,
+					link_settings,
+					subsystem_str,
+					LIT(build_context.link_flags),
+					lib_str
+				);
+			}
+		} else { // lld
+			exit_code = system_exec_command_line_app("msvc-link",
+				"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s.%s\" %s "
+				"/nologo /incremental:no /opt:ref /subsystem:%s "
+				" %.*s "
+				" %s "
+				"",
+				LIT(build_context.ODIN_ROOT),
+				LIT(output_base), object_files, output_ext,
+				link_settings,
+				subsystem_str,
+				LIT(build_context.link_flags),
+				lib_str
+			);
+		}
+	#else
+		timings_start_section(timings, str_lit("ld-link"));
+
+		// NOTE(vassvik): get cwd, for used for local shared libs linking, since those have to be relative to the exe
+		char cwd[256];
+		getcwd(&cwd[0], 256);
+		//printf("%s\n", cwd);
+
+		// NOTE(vassvik): needs to add the root to the library search paths, so that the full filenames of the library
+		//                files can be passed with -l:
+		gbString lib_str = gb_string_make(heap_allocator(), "-L/");
+		defer (gb_string_free(lib_str));
+
+		for_array(i, ir_gen.module.foreign_library_paths) {
+			String lib = ir_gen.module.foreign_library_paths[i];
+
+			// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
+			//   This allows you to specify '-f' in a #foreign_system_library,
+			//   without having to implement any new syntax specifically for MacOS.
+			#if defined(GB_SYSTEM_OSX)
+				if (string_ends_with(lib, str_lit(".framework"))) {
+					// framework thingie
+					String lib_name = lib;
+					lib_name = remove_extension_from_path(lib_name);
+					lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", LIT(lib_name));
+				} else if (string_ends_with(lib, str_lit(".a"))) {
+					// static libs, absolute full path relative to the file in which the lib was imported from
+					lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
+				} else if (string_ends_with(lib, str_lit(".dylib"))) {
+					// dynamic lib
+					lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
+				} else {
+					// dynamic or static system lib, just link regularly searching system library paths
+					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
+				}
+			#else
+				// NOTE(vassvik): static libraries (.a files) in linux can be linked to directly using the full path,
+				//                since those are statically linked to at link time. shared libraries (.so) has to be
+				//                available at runtime wherever the executable is run, so we make require those to be
+				//                local to the executable (unless the system collection is used, in which case we search
+				//                the system library paths for the library file).
+				if (string_ends_with(lib, str_lit(".a"))) {
+					// static libs, absolute full path relative to the file in which the lib was imported from
+					lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
+				} else if (string_ends_with(lib, str_lit(".so"))) {
+					// dynamic lib, relative path to executable
+					// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
+					//                at runtimeto the executable
+					lib_str = gb_string_append_fmt(lib_str, " -l:\"%s/%.*s\" ", cwd, LIT(lib));
+				} else {
+					// dynamic or static system lib, just link regularly searching system library paths
+					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
+				}
+			#endif
+		}
+
+		gbString object_files = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(object_files));
+		for_array(i, gen->output_object_paths) {
+			String object_path = gen->output_object_paths[i];
+			object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
+		}
+
+		// Unlike the Win32 linker code, the output_ext includes the dot, because
+		// typically executable files on *NIX systems don't have extensions.
+		String output_ext = {};
+		char const *link_settings = "";
+		char const *linker;
+		if (build_context.is_dll) {
+			// Shared libraries are .dylib on MacOS and .so on Linux.
+			#if defined(GB_SYSTEM_OSX)
+				output_ext = STR_LIT(".dylib");
+				link_settings = "-dylib -dynamic";
+			#else
+				output_ext = STR_LIT(".so");
+				link_settings = "-shared";
+			#endif
+		} else {
+			// TODO: Do I need anything here?
+			link_settings = "";
+		}
+
+		if (build_context.out_filepath.len > 0) {
+			//NOTE(thebirk): We have a custom -out arguments, so we should use the extension from that
+			isize pos = string_extension_position(build_context.out_filepath);
+			if (pos > 0) {
+				output_ext = substring(build_context.out_filepath, pos, build_context.out_filepath.len);
+			}
+		}
+
+		#if defined(GB_SYSTEM_OSX)
+			linker = "ld";
+		#else
+			// TODO(zangent): Figure out how to make ld work on Linux.
+			//   It probably has to do with including the entire CRT, but
+			//   that's quite a complicated issue to solve while remaining distro-agnostic.
+			//   Clang can figure out linker flags for us, and that's good enough _for now_.
+			linker = "clang -Wno-unused-command-line-argument";
+		#endif
+
+		exit_code = system_exec_command_line_app("ld-link",
+			"%s %s -o \"%.*s%.*s\" %s "
+			" %s "
+			" %.*s "
+			" %s "
+			#if defined(GB_SYSTEM_OSX)
+				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
+				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
+				//       make sure to also change the 'mtriple' param passed to 'opt'
+				" -macosx_version_min 10.8.0 "
+				// This points the linker to where the entry point is
+				" -e _main "
+			#endif
+			, linker, object_files, LIT(output_base), LIT(output_ext),
+			lib_str,
+			"-lc -lm",
+			LIT(build_context.link_flags),
+			link_settings);
+		if (exit_code != 0) {
+			return exit_code;
+		}
+
+	#if defined(GB_SYSTEM_OSX)
+		if (build_context.ODIN_DEBUG) {
+			// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
+			// to the symbols in the object file
+			exit_code = system_exec_command_line_app("dsymutil",
+				"dsymutil %.*s%.*s", LIT(output_base), LIT(output_ext)
+			);
+
+			if (exit_code != 0) {
+				return exit_code;
+			}
+		}
+	#endif
+
+
+		if (build_context.show_timings) {
+			show_timings(&checker, timings);
+		}
+
+		remove_temp_files(output_base);
+
+
+	#endif
+	}
+
+	return exit_code;
+}
+
+
 Array<String> setup_args(int argc, char const **argv) {
 	gbAllocator a = heap_allocator();
 
@@ -1296,9 +1593,28 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 		lb_generate_code(&gen);
 
+		i32 linker_stage_exit_count = linker_stage(&gen);
+		if (linker_stage_exit_count != 0) {
+			return linker_stage_exit_count;
+		}
+
 		if (build_context.show_timings) {
 			show_timings(&checker, timings);
 		}
+
+		remove_temp_files(gen.output_base);
+
+		if (run_output) {
+		#if defined(GB_SYSTEM_WINDOWS)
+			return system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(gen.output_base), LIT(run_args_string));
+		#else
+			//NOTE(thebirk): This whole thing is a little leaky
+			String complete_path = concatenate_strings(heap_allocator(), output_base, output_ext);
+			complete_path = path_to_full_path(heap_allocator(), complete_path);
+			return system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
+		#endif
+		}
+
 		return 0;
 	} else {
 		irGen ir_gen = {0};

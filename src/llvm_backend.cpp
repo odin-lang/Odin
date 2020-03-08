@@ -9384,6 +9384,8 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 		}
 	}
 	gbAllocator ha = heap_allocator();
+	array_init(&gen->output_object_paths, ha);
+
 	gen->output_base = path_to_full_path(ha, gen->output_base);
 
 	gbString output_file_path = gb_string_make_length(ha, gen->output_base.text, gen->output_base.len);
@@ -9393,6 +9395,7 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	gen->info = &c->info;
 
 	lb_init_module(&gen->module, c);
+
 
 	return true;
 }
@@ -10362,6 +10365,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	LLVMAddPromoteMemoryToRegisterPass(function_pass_manager);
 	LLVMAddMergedLoadStoreMotionPass(function_pass_manager);
+	LLVMAddDeadStoreEliminationPass(function_pass_manager);
 	LLVMAddAggressiveInstCombinerPass(function_pass_manager);
 	LLVMAddConstantPropagationPass(function_pass_manager);
 	LLVMAddAggressiveDCEPass(function_pass_manager);
@@ -10376,6 +10380,7 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	TIME_SECTION("LLVM Runtime Creation");
 
 	lbProcedure *startup_runtime = nullptr;
 	{ // Startup Runtime
@@ -10502,12 +10507,15 @@ void lb_generate_code(lbGenerator *gen) {
 	defer (LLVMDisposeMessage(llvm_error));
 
 	String filepath_ll  = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".ll"));
-	String filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".obj"));
 	defer (gb_free(heap_allocator(), filepath_ll.text));
-	defer (gb_free(heap_allocator(), filepath_obj.text));
+
+	String filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".obj"));
 
 
-	LLVMBool failure = LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error);
+	if (build_context.keep_temp_files) {
+		TIME_SECTION("LLVM Print Module to File");
+		LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error);
+	}
 	LLVMDIBuilderFinalize(m->debug_builder);
 	LLVMVerifyModule(mod, LLVMAbortProcessAction, &llvm_error);
 	llvm_error = nullptr;
@@ -10522,7 +10530,6 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMInitializeAllDisassemblers();
 	LLVMInitializeNativeTarget();
 
-	timings_start_section(&global_timings, str_lit("LLVM Object Generation"));
 
 	char const *target_triple = "x86_64-pc-windows-msvc";
 	char const *target_data_layout = "e-m:w-i64:64-f80:128-n8:16:32:64-S128";
@@ -10532,8 +10539,12 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMGetTargetFromTriple(target_triple, &target, &llvm_error);
 	GB_ASSERT(target != nullptr);
 
+	TIME_SECTION("LLVM Create Target Machine");
+
 	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, target_triple, "generic", "", LLVMCodeGenLevelNone, LLVMRelocDefault, LLVMCodeModelDefault);
 	defer (LLVMDisposeTargetMachine(target_machine));
+
+	TIME_SECTION("LLVM Object Generation");
 
 	LLVMBool ok = LLVMTargetMachineEmitToFile(target_machine, mod, cast(char *)filepath_obj.text, LLVMObjectFile, &llvm_error);
 	if (ok) {
@@ -10541,6 +10552,8 @@ void lb_generate_code(lbGenerator *gen) {
 		gb_exit(1);
 		return;
 	}
+
+	array_add(&gen->output_object_paths, filepath_obj);
 
 #undef TIME_SECTION
 }
