@@ -312,7 +312,8 @@ void lb_emit_increment(lbProcedure *p, lbValue addr);
 
 lbValue lb_type_info(lbModule *m, Type *type);
 
-
+lbValue lb_find_or_add_entity_string(lbModule *m, String const &str);
+lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent = nullptr);
 
 bool lb_is_const(lbValue value);
 bool lb_is_const_nil(lbValue value);

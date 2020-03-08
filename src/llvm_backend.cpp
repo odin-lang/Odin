@@ -40,6 +40,12 @@ LLVMValueRef llvm_one32(lbModule *m) {
 	return LLVMConstInt(lb_type(m, t_i32), 1, false);
 }
 
+LLVMValueRef llvm_cstring(lbModule *m, String const &str) {
+	lbValue v = lb_find_or_add_entity_string(m, str);
+	unsigned indices[1] = {0};
+	return LLVMConstExtractValue(v.value, indices, gb_count_of(indices));
+}
+
 
 lbAddr lb_addr(lbValue addr) {
 	lbAddr v = {lbAddr_Default, addr};
@@ -2135,7 +2141,7 @@ void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValu
 			lb_addr_store(p, key, lb_emit_load(p, str));
 		} else {
 			lbValue hash_ptr = lb_emit_struct_ep(p, hash, 0);
-			hash_ptr = lb_emit_conv(p, hash_ptr, lb_addr_type(key));
+			hash_ptr = lb_emit_conv(p, hash_ptr, key.addr.type);
 			lb_addr_store(p, key, lb_emit_load(p, hash_ptr));
 		}
 
@@ -3544,7 +3550,34 @@ lbValue lb_find_or_add_entity_string(lbModule *m, String const &str) {
 		res.type = t_string;
 		return res;
 	} else {
-		return lb_const_value(m, t_string, exact_value_string(str));
+		LLVMValueRef indices[2] = {llvm_zero32(m), llvm_zero32(m)};
+		LLVMValueRef data = LLVMConstStringInContext(m->ctx,
+			cast(char const *)str.text,
+			cast(unsigned)str.len,
+			false);
+
+
+		isize max_len = 7+8+1;
+		char *name = gb_alloc_array(heap_allocator(), char, max_len);
+		isize len = gb_snprintf(name, max_len, "csbs$%x", m->global_array_index);
+		len -= 1;
+		m->global_array_index++;
+
+		LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
+		LLVMSetInitializer(global_data, data);
+
+		LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
+
+		LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), str.len, true);
+		LLVMValueRef values[2] = {ptr, str_len};
+
+		lbValue res = {};
+		res.value = LLVMConstNamedStruct(lb_type(m, t_string), values, 2);
+		res.type = t_string;
+
+		map_set(&m->const_strings, key, ptr);
+
+		return res;
 	}
 }
 
@@ -3582,10 +3615,9 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 		LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), str.len, true);
 		LLVMValueRef values[2] = {ptr, str_len};
 
-		Type *original_type = t_u8_slice;
 		lbValue res = {};
-		res.value = LLVMConstNamedStruct(lb_type(m, original_type), values, 2);
-		res.type = default_type(original_type);
+		res.value = LLVMConstNamedStruct(lb_type(m, t_u8_slice), values, 2);
+		res.type = t_u8_slice;
 
 		map_set(&m->const_strings, key, ptr);
 
@@ -4132,7 +4164,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 			ast_node(cl, CompoundLit, value.value_compound);
 
 			if (cl->elems.count == 0) {
-				return lb_const_nil(m, type);
+				return lb_const_nil(m, original_type);
 			}
 
 			isize offset = 0;
@@ -4232,7 +4264,13 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 		}
 		break;
 	case ExactValue_Procedure:
-		GB_PANIC("TODO(bill): ExactValue_Procedure");
+		{
+			Ast *expr = value.value_procedure;
+			GB_ASSERT(expr != nullptr);
+			if (expr->kind == Ast_ProcLit) {
+				return lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
+			}
+		}
 		break;
 	case ExactValue_Typeid:
 		return lb_typeid(m, value.value_typeid, original_type);
@@ -4805,7 +4843,7 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 				String str = lb_get_const_string(m, value);
 				lbValue res = {};
 				res.type = t;
-				res.value = LLVMConstString(cast(char const *)str.text, cast(unsigned)str.len, false);
+				res.value = llvm_cstring(m, str);
 				return res;
 			}
 			// if (is_type_float(dst)) {
@@ -5354,6 +5392,8 @@ lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value) {
 		return res;
 	}
 
+	GB_ASSERT(is_type_typed(value.type));
+
 	lbAddr res = lb_add_local_generated(p, value.type, false);
 	lb_addr_store(p, res, value);
 	return res.addr;
@@ -5833,6 +5873,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 		Type *original_type = e->type;
 		Type *new_type = pt->Proc.abi_compat_params[i];
 		Type *arg_type = args[i].type;
+
 		if (are_types_identical(arg_type, new_type)) {
 			// NOTE(bill): Done
 			array_add(&processed_args, args[i]);
@@ -6507,6 +6548,11 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 
 	// "Intrinsics"
+	case BuiltinProc_cpu_relax:
+		// TODO(bill): BuiltinProc_cpu_relax
+		// ir_write_str_lit(f, "call void asm sideeffect \"pause\", \"\"()");
+		return {};
+
 	case BuiltinProc_atomic_fence:
 		LLVMBuildFence(p->builder, LLVMAtomicOrderingSequentiallyConsistent, false, "");
 		return {};
@@ -6709,8 +6755,6 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 		return {};
 	}
-
-
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));
@@ -6829,6 +6873,17 @@ lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 				} else {
 					args[i] = lb_emit_conv(p, args[i], e->type);
 				}
+			}
+		}
+
+		for (isize i = 0; i < args.count; i++) {
+			Entity *e = params->variables[i];
+			if (args[i].type == nullptr) {
+				continue;
+			} else if (is_type_untyped_nil(args[i].type)) {
+				args[i] = lb_const_nil(m, e->type);
+			} else if (is_type_untyped_undef(args[i].type)) {
+				args[i] = lb_const_undef(m, e->type);
 			}
 		}
 
@@ -7026,6 +7081,19 @@ lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 	isize final_count = param_count;
 	if (is_c_vararg) {
 		final_count = arg_count;
+	}
+
+	if (param_tuple != nullptr) {
+		for (isize i = 0; i < gb_min(args.count, param_tuple->variables.count); i++) {
+			Entity *e = param_tuple->variables[i];
+			if (args[i].type == nullptr) {
+				continue;
+			} else if (is_type_untyped_nil(args[i].type)) {
+				args[i] = lb_const_nil(m, e->type);
+			} else if (is_type_untyped_undef(args[i].type)) {
+				args[i] = lb_const_undef(m, e->type);
+			}
+		}
 	}
 
 	auto call_args = array_slice(args, 0, final_count);
@@ -7577,7 +7645,7 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 }
 
 
-lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent = nullptr) {
+lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
 	ast_node(pl, ProcLit, expr);
 
 	// NOTE(bill): Generate a new name
@@ -7872,7 +7940,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		lbValue cond = lb_build_cond(p, te->cond, then, else_);
 		lb_start_block(p, then);
 
-		Type *type = type_of_expr(expr);
+		Type *type = default_type(type_of_expr(expr));
 
 		lb_open_scope(p);
 		incoming_values[0] = lb_emit_conv(p, lb_build_expr(p, te->x), type).value;
@@ -7913,7 +7981,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		lbValue cond = lb_build_cond(p, te->cond, then, else_);
 		lb_start_block(p, then);
 
-		Type *type = type_of_expr(expr);
+		Type *type = default_type(type_of_expr(expr));
 
 		lb_open_scope(p);
 		incoming_values[0] = lb_emit_conv(p, lb_build_expr(p, te->x), type).value;
