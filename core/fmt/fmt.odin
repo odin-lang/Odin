@@ -797,18 +797,15 @@ enum_value_to_string :: proc(val: any) -> (string, bool) {
 	#partial switch e in type_info.variant {
 	case: return "", false;
 	case runtime.Type_Info_Enum:
-		get_str :: proc(i: $T, e: runtime.Type_Info_Enum) -> (string, bool) {
-			if reflect.is_string(e.base) {
-				for val, idx in e.values {
-					if v, ok := val.(T); ok && v == i {
-						return e.names[idx], true;
-					}
-				}
-			} else if len(e.values) == 0 {
+		get_str :: proc(data: rawptr, e: runtime.Type_Info_Enum) -> (string, bool) {
+			if len(e.values) == 0 {
 				return "", true;
 			} else {
-				for val, idx in e.values {
-					if v, ok := val.(T); ok && v == i {
+				for _, idx in e.values {
+					val := &e.values[idx];
+					// NOTE(bill): Removes need for parametric polymorphic check
+					res := mem.compare_ptrs(val, data, e.base.size);
+					if res == 0 {
 						return e.names[idx], true;
 					}
 				}
@@ -816,21 +813,7 @@ enum_value_to_string :: proc(val: any) -> (string, bool) {
 			return "", false;
 		}
 
-		a := any{v.data, runtime.type_info_base(e.base).id};
-		switch v in a {
-		case rune:    return get_str(v, e);
-		case i8:      return get_str(v, e);
-		case i16:     return get_str(v, e);
-		case i32:     return get_str(v, e);
-		case i64:     return get_str(v, e);
-		case int:     return get_str(v, e);
-		case u8:      return get_str(v, e);
-		case u16:     return get_str(v, e);
-		case u32:     return get_str(v, e);
-		case u64:     return get_str(v, e);
-		case uint:    return get_str(v, e);
-		case uintptr: return get_str(v, e);
-		}
+		return get_str(v.data, e);
 	}
 
 	return "", false;
