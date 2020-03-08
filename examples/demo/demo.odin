@@ -1934,7 +1934,7 @@ union_maybe :: proc() {
 main :: proc() {
 	when true {
 		the_basics();
-		// control_flow();
+		control_flow();
 		named_proc_return_parameters();
 		explicit_procedure_overloading();
 		struct_type();
@@ -1943,13 +1943,13 @@ main :: proc() {
 		// implicit_context_system();
 		parametric_polymorphism();
 		array_programming();
-		// map_type();
-		// implicit_selector_expression();
+		map_type();
+		implicit_selector_expression();
 		partial_switch();
 		cstring_example();
 		bit_set_type();
 		deferred_procedure_associations();
-		// reflection();
+		reflection();
 		quaternions();
 		inline_for_statement();
 		where_clauses();

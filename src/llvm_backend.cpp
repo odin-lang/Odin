@@ -2923,7 +2923,7 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 	GB_ASSERT(incoming_values.count == incoming_blocks.count);
 	LLVMAddIncoming(res.value, incoming_values.data, incoming_blocks.data, cast(unsigned)incoming_values.count);
 
-	return short_circuit;
+	return res;
 }
 
 
@@ -4603,7 +4603,6 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	case Token_CmpAnd:
 	case Token_CmpOr:
 		return lb_emit_logical_binary_expr(p, be->op.kind, be->left, be->right, tv.type);
-		break;
 
 	case Token_in:
 	case Token_not_in:
@@ -8074,6 +8073,7 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 	gbAllocator a = heap_allocator();
 	lbAddr h = lb_add_local_generated(p, t_map_header, false); // all the values will be initialzed later
 	map_type = base_type(map_type);
+	GB_ASSERT(map_type->kind == Type_Map);
 
 	Type *key_type = map_type->Map.key;
 	Type *val_type = map_type->Map.value;
@@ -8127,8 +8127,7 @@ lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type) {
 		lbValue str = lb_emit_conv(p, key, t_string);
 		lbValue hashed_str = {};
 
-		if (lb_is_const(str)) {
-
+		if (false && lb_is_const(str)) {
 			String value = lb_get_const_string(p->module, str);
 			u64 hs = fnv64a(value.text, value.len);
 			hashed_str = lb_const_value(p->module, t_u64, exact_value_u64(hs));
@@ -8146,23 +8145,24 @@ lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type) {
 	return lb_addr_load(p, v);
 }
 
-lbValue lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type,
-                                            lbValue map_key, lbValue map_value) {
+void lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type,
+                                         lbValue map_key, lbValue map_value) {
 	map_type = base_type(map_type);
+	GB_ASSERT(map_type->kind == Type_Map);
 
 	lbValue h = lb_gen_map_header(p, addr.addr, map_type);
 	lbValue key = lb_gen_map_key(p, map_key, map_type->Map.key);
 	lbValue v = lb_emit_conv(p, map_value, map_type->Map.value);
 
-	lbAddr ptr = lb_add_local_generated(p, v.type, false);
-	lb_addr_store(p, ptr, v);
+	lbAddr value_addr = lb_add_local_generated(p, v.type, false);
+	lb_addr_store(p, value_addr, v);
 
 	auto args = array_make<lbValue>(heap_allocator(), 4);
 	args[0] = h;
 	args[1] = key;
-	args[2] = lb_emit_conv(p, ptr.addr, t_rawptr);
+	args[2] = lb_emit_conv(p, value_addr.addr, t_rawptr);
 	args[3] = lb_emit_source_code_location(p, nullptr);
-	return lb_emit_runtime_call(p, "__dynamic_map_set", args);
+	lb_emit_runtime_call(p, "__dynamic_map_set", args);
 }
 
 
