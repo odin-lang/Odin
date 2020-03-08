@@ -40,12 +40,22 @@ mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	if len < 0 do return data;
 	when !#defined(memset) {
 		foreign _ {
-			when size_of(rawptr) == 8 {
-				@(link_name="llvm.memset.p0i8.i64")
-				memset :: proc(dst: rawptr, val: byte, len: int, is_volatile: bool = false) ---;
+			when ODIN_USE_LLVM_API {
+				when size_of(rawptr) == 8 {
+					@(link_name="llvm.memset.p0i8.i64")
+					memset :: proc(dst: rawptr, val: byte, len: int, is_volatile: bool = false) ---;
+				} else {
+					@(link_name="llvm.memset.p0i8.i32")
+					memset :: proc(dst: rawptr, val: byte, len: int, is_volatile: bool = false) ---;
+				}
 			} else {
-				@(link_name="llvm.memset.p0i8.i32")
-				memset :: proc(dst: rawptr, val: byte, len: int, is_volatile: bool = false) ---;
+				when size_of(rawptr) == 8 {
+					@(link_name="llvm.memset.p0i8.i64")
+					memset :: proc(dst: rawptr, val: byte, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+				} else {
+					@(link_name="llvm.memset.p0i8.i32")
+					memset :: proc(dst: rawptr, val: byte, len: int, align: i32 = 1, is_volatile: bool = false) ---;
+				}
 			}
 		}
 	}
