@@ -10157,6 +10157,33 @@ void lb_generate_code(lbGenerator *gen) {
 
 	auto *min_dep_set = &info->minimum_dependency_set;
 
+	TIME_SECTION("LLVM Initializtion");
+
+	LLVMInitializeAllTargetInfos();
+	LLVMInitializeAllTargets();
+	LLVMInitializeAllTargetMCs();
+	LLVMInitializeAllAsmPrinters();
+	LLVMInitializeAllAsmParsers();
+	LLVMInitializeAllDisassemblers();
+	LLVMInitializeNativeTarget();
+
+
+	char const *target_triple = "x86_64-pc-windows-msvc";
+	char const *target_data_layout = "e-m:w-i64:64-f80:128-n8:16:32:64-S128";
+	LLVMSetTarget(mod, target_triple);
+
+	LLVMTargetRef target = {};
+	char *llvm_error = nullptr;
+	LLVMGetTargetFromTriple(target_triple, &target, &llvm_error);
+	GB_ASSERT(target != nullptr);
+
+	TIME_SECTION("LLVM Create Target Machine");
+
+	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, target_triple, "generic", "", LLVMCodeGenLevelNone, LLVMRelocDefault, LLVMCodeModelDefault);
+	defer (LLVMDisposeTargetMachine(target_machine));
+
+	LLVMSetModuleDataLayout(mod, LLVMCreateTargetDataLayout(target_machine));
+
 	{ // Debug Info
 		for_array(i, info->files.entries) {
 			AstFile *f = info->files.entries[i].value;
@@ -10467,9 +10494,10 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMPassManagerRef function_pass_manager = LLVMCreateFunctionPassManagerForModule(mod);
 	defer (LLVMDisposePassManager(function_pass_manager));
 
+	LLVMAddMemCpyOptPass(function_pass_manager);
 	LLVMAddPromoteMemoryToRegisterPass(function_pass_manager);
 	LLVMAddMergedLoadStoreMotionPass(function_pass_manager);
-	LLVMAddDeadStoreEliminationPass(function_pass_manager);
+	// LLVMAddDeadStoreEliminationPass(function_pass_manager);
 	LLVMAddAggressiveInstCombinerPass(function_pass_manager);
 	LLVMAddConstantPropagationPass(function_pass_manager);
 	LLVMAddAggressiveDCEPass(function_pass_manager);
@@ -10595,6 +10623,7 @@ void lb_generate_code(lbGenerator *gen) {
 	defer (LLVMDisposePassManager(module_pass_manager));
 	LLVMAddAlwaysInlinerPass(module_pass_manager);
 	LLVMAddStripDeadPrototypesPass(module_pass_manager);
+	// LLVMAddConstantMergePass(module_pass_manager);
 
 	LLVMPassManagerBuilderRef pass_manager_builder = LLVMPassManagerBuilderCreate();
 	defer (LLVMPassManagerBuilderDispose(pass_manager_builder));
@@ -10604,10 +10633,7 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMPassManagerBuilderPopulateLTOPassManager(pass_manager_builder, module_pass_manager, false, false);
 	LLVMRunPassManager(module_pass_manager, mod);
 
-
-
-
-	char *llvm_error = nullptr;
+	llvm_error = nullptr;
 	defer (LLVMDisposeMessage(llvm_error));
 
 	String filepath_ll  = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".ll"));
@@ -10623,30 +10649,6 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMDIBuilderFinalize(m->debug_builder);
 	LLVMVerifyModule(mod, LLVMAbortProcessAction, &llvm_error);
 	llvm_error = nullptr;
-
-	TIME_SECTION("LLVM Initializtion");
-
-	LLVMInitializeAllTargetInfos();
-	LLVMInitializeAllTargets();
-	LLVMInitializeAllTargetMCs();
-	LLVMInitializeAllAsmPrinters();
-	LLVMInitializeAllAsmParsers();
-	LLVMInitializeAllDisassemblers();
-	LLVMInitializeNativeTarget();
-
-
-	char const *target_triple = "x86_64-pc-windows-msvc";
-	char const *target_data_layout = "e-m:w-i64:64-f80:128-n8:16:32:64-S128";
-	LLVMSetTarget(mod, target_triple);
-
-	LLVMTargetRef target = {};
-	LLVMGetTargetFromTriple(target_triple, &target, &llvm_error);
-	GB_ASSERT(target != nullptr);
-
-	TIME_SECTION("LLVM Create Target Machine");
-
-	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, target_triple, "generic", "", LLVMCodeGenLevelNone, LLVMRelocDefault, LLVMCodeModelDefault);
-	defer (LLVMDisposeTargetMachine(target_machine));
 
 	TIME_SECTION("LLVM Object Generation");
 
