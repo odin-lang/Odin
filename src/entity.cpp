@@ -43,14 +43,15 @@ enum EntityFlag {
 	EntityFlag_TypeField     = 1<<9,
 	EntityFlag_Value         = 1<<10,
 	EntityFlag_Sret          = 1<<11,
-	EntityFlag_BitFieldValue = 1<<12,
-	EntityFlag_PolyConst     = 1<<13,
-	EntityFlag_NotExported   = 1<<14,
-	EntityFlag_ConstInput    = 1<<15,
+	EntityFlag_ByVal         = 1<<12,
+	EntityFlag_BitFieldValue = 1<<13,
+	EntityFlag_PolyConst     = 1<<14,
+	EntityFlag_NotExported   = 1<<15,
+	EntityFlag_ConstInput    = 1<<16,
 
-	EntityFlag_Static        = 1<<16,
+	EntityFlag_Static        = 1<<17,
 
-	EntityFlag_ImplicitReference = 1<<17, // NOTE(bill): equivalent to `const &` in C++
+	EntityFlag_ImplicitReference = 1<<18, // NOTE(bill): equivalent to `const &` in C++
 
 	EntityFlag_SoaPtrField   = 1<<19, // to allow s.x[0] where `s.x` is a pointer rather than a slice
 

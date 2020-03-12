@@ -2434,6 +2434,13 @@ void set_procedure_abi_types(gbAllocator allocator, Type *type) {
 				}
 				break;
 			}
+
+			if (build_context.ODIN_OS == "linux" ||
+			    build_context.ODIN_OS == "darwin") {
+				if (is_type_pointer(new_type) & !is_type_pointer(e->type)) {
+					e->flags |= EntityFlag_ByVal;
+				}
+			}
 		}
 	}
 

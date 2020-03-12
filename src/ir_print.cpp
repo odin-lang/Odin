@@ -363,6 +363,9 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 					if (e->flags&EntityFlag_NoAlias) {
 						ir_write_str_lit(f, " noalias");
 					}
+					if (e->flags&EntityFlag_ByVal) {
+						ir_write_str_lit(f, " byval");
+					}
 					ir_write_byte(f, ' ');
 					param_index++;
 				}
@@ -2184,6 +2187,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 							if (e->flags&EntityFlag_NoAlias) {
 								ir_write_str_lit(f, " noalias");
 							}
+							if (e->flags&EntityFlag_ByVal) {
+								ir_write_str_lit(f, " byval");
+							}
 							ir_write_byte(f, ' ');
 							ir_print_value(f, m, arg, t);
 							param_index++;
@@ -2195,6 +2201,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 						}
 						if (e->flags&EntityFlag_ImplicitReference) {
 							ir_write_str_lit(f, " nonnull dereferenceable");
+						}
+						if (e->flags&EntityFlag_ByVal) {
+							ir_write_str_lit(f, " byval");
 						}
 						ir_write_byte(f, ' ');
 						irValue *arg = call->args[arg_index++];
@@ -2236,6 +2245,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 							if (e->flags&EntityFlag_NoAlias) {
 								ir_write_str_lit(f, " noalias");
 							}
+							if (e->flags&EntityFlag_ByVal) {
+								ir_write_str_lit(f, " byval");
+							}
 							ir_write_byte(f, ' ');
 							ir_print_value(f, m, arg, t);
 							param_index++;
@@ -2245,6 +2257,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 						ir_print_type(f, m, t);
 						if (e->flags&EntityFlag_NoAlias) {
 							ir_write_str_lit(f, " noalias");
+						}
+						if (e->flags&EntityFlag_ByVal) {
+							ir_write_str_lit(f, " byval");
 						}
 						ir_write_byte(f, ' ');
 						ir_print_value(f, m, arg, t);
@@ -2390,6 +2405,10 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 						if (e->flags&EntityFlag_NoAlias) {
 							ir_write_str_lit(f, " noalias");
 						}
+						if (e->flags&EntityFlag_ByVal) {
+							ir_write_str_lit(f, " byval");
+						}
+
 
 						if (proc->body != nullptr) {
 							ir_fprintf(f, " %%_.%td", parameter_index+j);
@@ -2401,6 +2420,9 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 					ir_print_type(f, m, abi_type);
 					if (e->flags&EntityFlag_NoAlias) {
 						ir_write_str_lit(f, " noalias");
+					}
+					if (e->flags&EntityFlag_ByVal) {
+						ir_write_str_lit(f, " byval");
 					}
 					if (proc->body != nullptr) {
 						ir_fprintf(f, " %%_.%td", parameter_index);
