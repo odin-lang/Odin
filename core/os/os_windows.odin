@@ -133,7 +133,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 		to_write: u32 = min(u32(remaining), MAX);
 
 		e := win32.write_file(win32.Handle(fd), &data[total_write], to_write, &single_write_length, nil);
-		if single_write_length <= 0 || !e {
+		if single_write_length == 0 || !e {
 			err := Errno(win32.get_last_error());
 			return int(total_write), err;
 		}
@@ -151,11 +151,11 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 
 	for total_read < length {
 		remaining := length - total_read;
-		MAX :: 1<<31-1;
+		MAX :: 1<<32-1;
 		to_read: u32 = min(u32(remaining), MAX);
 
 		e := win32.read_file(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
-		if !e {
+		if single_read_length == 0 || !e {
 			err := Errno(win32.get_last_error());
 			return int(total_read), err;
 		}
