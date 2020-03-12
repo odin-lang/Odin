@@ -10,11 +10,11 @@ foreign kernel32 {
 	                                                              				 inherit_handle: Bool, creation_flags: u32, environment: rawptr,
 	                                                              				 current_direcotry: cstring, startup_info: ^Startup_Info,
 	                                                              				 process_information: ^Process_Information) -> Bool ---;
-    @(link_name="CreateProcessW")            create_process_w             :: proc(application_name, command_line: Wstring,
-                                                                                 process_attributes, thread_attributes: ^Security_Attributes,
-                                                                                 inherit_handle: Bool, creation_flags: u32, environment: rawptr,
-                                                                                 current_direcotry: cstring, startup_info: ^Startup_Info,
-                                                                                 process_information: ^Process_Information) -> Bool ---;
+	@(link_name="CreateProcessW")            create_process_w             :: proc(application_name, command_line: Wstring,
+	                                                                             process_attributes, thread_attributes: ^Security_Attributes,
+	                                                                             inherit_handle: Bool, creation_flags: u32, environment: rawptr,
+	                                                                             current_direcotry: cstring, startup_info: ^Startup_Info,
+	                                                                             process_information: ^Process_Information) -> Bool ---;
 	@(link_name="GetExitCodeProcess")		 get_exit_code_process        :: proc(process: Handle, exit: ^u32) -> Bool ---;
 	@(link_name="ExitProcess")               exit_process                 :: proc(exit_code: u32) ---;
 	@(link_name="GetModuleHandleA")          get_module_handle_a          :: proc(module_name: cstring) -> Hmodule ---;
@@ -58,8 +58,8 @@ foreign kernel32 {
 	                      creation, flags_and_attribs: u32, template_file: Handle) -> Handle ---;
 
 
-	@(link_name="ReadFile")  read_file  :: proc(h: Handle, buf: rawptr, to_read: u32, bytes_read: ^u32, overlapped: rawptr) -> Bool ---;
-	@(link_name="WriteFile") write_file :: proc(h: Handle, buf: rawptr, len: u32, written_result: ^u32, overlapped: rawptr) -> Bool ---;
+	@(link_name="ReadFile")  read_file  :: proc(h: Handle, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> Bool ---;
+	@(link_name="WriteFile") write_file :: proc(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool ---;
 
 	@(link_name="GetFileSizeEx")              get_file_size_ex               :: proc(file_handle: Handle, file_size: ^i64) -> Bool ---;
 	@(link_name="GetFileInformationByHandle") get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool ---;
