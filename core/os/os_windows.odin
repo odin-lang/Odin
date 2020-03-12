@@ -123,14 +123,14 @@ close :: proc(fd: Handle) -> Errno {
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 do return 0, ERROR_NONE;
 
-	single_write_length: i32;
+	single_write_length: u32;
 	total_write: i64;
 	length := i64(len(data));
 
 	for total_write < length {
 		remaining := length - total_write;
 		MAX :: 1<<31-1;
-		to_write: i32 = min(i32(remaining), MAX);
+		to_write: u32 = min(u32(remaining), MAX);
 
 		e := win32.write_file(win32.Handle(fd), &data[total_write], to_write, &single_write_length, nil);
 		if single_write_length <= 0 || !e {
@@ -145,23 +145,21 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 do return 0, ERROR_NONE;
 
-	single_read_length: i32;
-	total_read: i64;
-	length := i64(len(data));
+	read := 0;
+	for {
+		to_read := u32(min(1<<29-1, len(data)-read));
+		if to_read <= 0 do break;
 
-	for total_read < length {
-		remaining := length - total_read;
-		MAX :: 1<<32-1;
-		to_read: u32 = min(u32(remaining), MAX);
-
-		e := win32.read_file(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
-		if single_read_length <= 0 || !e {
-			err := Errno(win32.get_last_error());
-			return int(total_read), err;
+		n: u32;
+		ok := win32.read_file(win32.Handle(fd), &data[to_read], to_read, &n, nil);
+		if !ok {
+			return int(read), Errno(win32.get_last_error());
 		}
-		total_read += i64(single_read_length);
+
+		read += int(n);
 	}
-	return int(total_read), ERROR_NONE;
+
+	return int(read), ERROR_NONE;
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
