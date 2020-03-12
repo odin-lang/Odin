@@ -11844,6 +11844,8 @@ void ir_gen_tree(irGen *s) {
 		if (!ir_min_dep_entity(m, e)) {
 			continue;
 		}
+
+
 		DeclInfo *decl = decl_info_of_entity(e);
 		if (decl == nullptr) {
 			continue;
