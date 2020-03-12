@@ -843,6 +843,11 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, 
 		check_decl_attributes(ctx, decl->attributes, var_decl_attribute, &ac);
 	}
 
+	if (ac.require_declaration) {
+		array_add(&ctx->info->required_global_variables, e);
+	}
+
+
 	e->Variable.thread_local_model = ac.thread_local_model;
 	e->Variable.is_export = ac.is_export;
 	if (ac.is_static) {

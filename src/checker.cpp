@@ -805,6 +805,7 @@ void init_checker_info(CheckerInfo *i) {
 	map_init(&i->packages,        a);
 	array_init(&i->variable_init_order, a);
 	array_init(&i->required_foreign_imports_through_force, a);
+	array_init(&i->required_global_variables, a);
 
 	i->allow_identifier_uses = build_context.query_data_set_settings.kind == QueryDataSet_GoToDefinitions;
 	if (i->allow_identifier_uses) {
@@ -826,6 +827,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->variable_init_order);
 	array_free(&i->identifier_uses);
 	array_free(&i->required_foreign_imports_through_force);
+	array_free(&i->required_global_variables);
 
 }
 
@@ -1744,6 +1746,12 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		add_dependency_to_set(c, e);
 	}
 
+	for_array(i, c->info.required_global_variables) {
+		Entity *e = c->info.required_global_variables[i];
+		e->flags |= EntityFlag_Used;
+		add_dependency_to_set(c, e);
+	}
+
 	add_dependency_to_set(c, start);
 }
 
@@ -2330,7 +2338,13 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		return true;
 	}
 
-	if (name == "export") {
+	if (name == "require") {
+		if (value != nullptr) {
+			error(elem, "'static' does not have any parameters");
+		}
+		ac->require_declaration = true;
+		return true;
+	} else if (name == "export") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_Invalid) {
 			ac->is_export = true;
@@ -3293,11 +3307,11 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 }
 
 DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
-	if (name == "force") {
+	if (name == "force" || name == "require") {
 		if (value != nullptr) {
 			error(elem, "Expected no parameter for '%.*s'", LIT(name));
 		}
-		ac->force_foreign_import = true;
+		ac->require_declaration = true;
 		return true;
 	}
 	return false;
@@ -3350,7 +3364,7 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 
 	AttributeContext ac = {};
 	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
-	if (ac.force_foreign_import) {
+	if (ac.require_declaration) {
 		array_add(&ctx->info->required_foreign_imports_through_force, e);
 		add_entity_use(ctx, nullptr, e);
 	}
