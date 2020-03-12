@@ -145,21 +145,23 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 do return 0, ERROR_NONE;
 
-	read := 0;
-	for {
-		to_read := u32(min(1<<29-1, len(data)-read));
-		if to_read <= 0 do break;
+	single_read_length: u32;
+	total_read: i64;
+	length := i64(len(data));
 
-		n: u32;
-		ok := win32.read_file(win32.Handle(fd), &data[to_read], to_read, &n, nil);
-		if !ok {
-			return int(read), Errno(win32.get_last_error());
+	for total_read < length {
+		remaining := length - total_read;
+		MAX :: 1<<31-1;
+		to_read: u32 = min(u32(remaining), MAX);
+
+		e := win32.read_file(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
+		if !e {
+			err := Errno(win32.get_last_error());
+			return int(total_read), err;
 		}
-
-		read += int(n);
+		total_read += i64(single_read_length);
 	}
-
-	return int(read), ERROR_NONE;
+	return int(total_read), ERROR_NONE;
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
