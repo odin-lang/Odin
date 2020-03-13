@@ -338,13 +338,13 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 	ir_write_string(f, str_lit(" ("));
 	if (t->Proc.return_by_pointer) {
 		ir_print_type(f, m, reduce_tuple_to_single_type(t->Proc.results));
-		ir_fprintf(f, "* sret noalias ");
+		// ir_fprintf(f, "* sret noalias ");
+		// ir_write_string(f, str_lit("* noalias "));
+		ir_write_string(f, str_lit("*"));
 		if (build_context.ODIN_OS == "darwin" ||
 		    build_context.ODIN_OS == "linux") {
-			ir_fprintf(f, "byval ");
+			ir_fprintf(f, " byval");
 		}
-		// ir_write_string(f, str_lit("* noalias "));
-		// ir_write_string(f, str_lit("*"));
 		if (param_count > 0 || t->Proc.calling_convention == ProcCC_Odin)  {
 			ir_write_string(f, str_lit(", "));
 		}
