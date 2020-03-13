@@ -85,6 +85,7 @@ read_entire_file :: proc(name: string) -> (data: []byte, success: bool) {
 	if data == nil {
 		return nil, false;
 	}
+	// defer if !success do delete(data);
 
 	bytes_read, read_err := read(fd, data);
 	if read_err != ERROR_NONE {
