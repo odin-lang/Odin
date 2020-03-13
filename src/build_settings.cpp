@@ -654,7 +654,6 @@ void init_build_context(TargetMetrics *cross_target) {
 		gb_exit(1);
 	}
 
-	bc->llc_flags = make_string_c(llc_flags);
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
 
@@ -667,8 +666,11 @@ void init_build_context(TargetMetrics *cross_target) {
 		//   -memcpyopt: MemCpy optimization
 	}
 	if (bc->ODIN_DEBUG == false) {
-		opt_flags = gb_string_appendc(opt_flags, "-memcpyopt -die ");
+		opt_flags = gb_string_appendc(opt_flags, "-mem2reg -memcpyopt -die ");
 	}
+
+	bc->llc_flags = make_string_c(llc_flags);
+
 
 	// NOTE(lachsinc): This optimization option was previously required to get
 	// around an issue in fmt.odin. Thank bp for tracking it down! Leaving for now until the issue
