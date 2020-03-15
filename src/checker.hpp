@@ -98,7 +98,7 @@ struct AttributeContext {
 	bool    is_export;
 	bool    is_static;
 	bool    require_results;
-	bool    force_foreign_import;
+	bool    require_declaration;
 	bool    has_disabled_proc;
 	bool    disabled_proc;
 	String  link_name;
@@ -260,6 +260,7 @@ struct CheckerInfo {
 	PtrSet<isize>         minimum_dependency_type_info_set;
 
 	Array<Entity *>       required_foreign_imports_through_force;
+	Array<Entity *>       required_global_variables;
 
 
 	bool allow_identifier_uses;

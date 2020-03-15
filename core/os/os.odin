@@ -87,11 +87,11 @@ read_entire_file :: proc(name: string) -> (data: []byte, success: bool) {
 	}
 
 	bytes_read, read_err := read(fd, data);
-	if read_err != 0 {
+	if read_err != ERROR_NONE {
 		delete(data);
 		return nil, false;
 	}
-	return data[0:bytes_read], true;
+	return data[:bytes_read], true;
 }
 
 write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (success: bool) {
@@ -100,11 +100,11 @@ write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (succ
 		flags |= O_TRUNC;
 	}
 
-    mode: int = 0;
-    when OS == "linux" {
-        // NOTE(justasd): 644 (owner read, write; group read; others read)
-        mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-    }
+	mode: int = 0;
+	when OS == "linux" {
+		// NOTE(justasd): 644 (owner read, write; group read; others read)
+		mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+	}
 
 	fd, err := open(name, flags, mode);
 	if err != 0 {
