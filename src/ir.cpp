@@ -10125,6 +10125,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		ir_emit_comment(proc, str_lit("InlineRangeStmt"));
 		ir_open_scope(proc); // Open scope here
 
+		irBlock *done = ir_new_block(proc, node, "inline.for.done");
+
 		Type *val0_type = nullptr;
 		Type *val1_type = nullptr;
 		if (rs->val0 != nullptr && !is_blank_ident(rs->val0)) {
@@ -10143,8 +10145,6 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 		irValue *val = nullptr;
 		irValue *key = nullptr;
-		irBlock *loop = nullptr;
-		irBlock *done = nullptr;
 		Ast *expr = unparen_expr(rs->expr);
 
 		TypeAndValue tav = type_and_value_of_expr(expr);
@@ -10170,8 +10170,12 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 				     compare_exact_values(Token_LtEq, val, end);
 				     val = exact_value_increment_one(val), index = exact_value_increment_one(index)) {
 
+					irBlock *body = ir_new_block(proc, node, "inline.for.body");
+					ir_emit_jump(proc, body);
+
 					if (val0_type) ir_addr_store(proc, val0_addr, ir_value_constant(val0_type, val));
 					if (val1_type) ir_addr_store(proc, val1_addr, ir_value_constant(val1_type, index));
+					ir_start_block(proc, body);
 
 					ir_build_stmt(proc, rs->body);
 				}
@@ -10181,14 +10185,17 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 				     compare_exact_values(Token_Lt, val, end);
 				     val = exact_value_increment_one(val), index = exact_value_increment_one(index)) {
 
+					irBlock *body = ir_new_block(proc, node, "inline.for.body");
+					ir_emit_jump(proc, body);
+					ir_start_block(proc, body);
+
 					if (val0_type) ir_addr_store(proc, val0_addr, ir_value_constant(val0_type, val));
 					if (val1_type) ir_addr_store(proc, val1_addr, ir_value_constant(val1_type, index));
+
 
 					ir_build_stmt(proc, rs->body);
 				}
 			}
-
-
 		} else if (tav.mode == Addressing_Type) {
 			GB_ASSERT(is_type_enum(type_deref(tav.type)));
 			Type *et = type_deref(tav.type);
@@ -10200,6 +10207,10 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			if (val1_type) val1_addr = ir_build_addr(proc, rs->val1);
 
 			for_array(i, bet->Enum.fields) {
+				irBlock *body = ir_new_block(proc, node, "inline.for.body");
+				ir_emit_jump(proc, body);
+				ir_start_block(proc, body);
+
 				Entity *field = bet->Enum.fields[i];
 				GB_ASSERT(field->kind == Entity_Constant);
 				if (val0_type) ir_addr_store(proc, val0_addr, ir_value_constant(val0_type, field->Constant.value));
@@ -10228,6 +10239,10 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 					Rune codepoint = 0;
 					isize offset = 0;
 					do {
+						irBlock *body = ir_new_block(proc, node, "inline.for.body");
+						ir_emit_jump(proc, body);
+						ir_start_block(proc, body);
+
 						isize width = gb_utf8_decode(str.text+offset, str.len-offset, &codepoint);
 						if (val0_type) ir_addr_store(proc, val0_addr, ir_value_constant(val0_type, exact_value_i64(codepoint)));
 						if (val1_type) ir_addr_store(proc, val1_addr, ir_value_constant(val1_type, exact_value_i64(offset)));
@@ -10243,6 +10258,10 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 					irValue *val_addr = ir_address_from_load_or_generate_local(proc, val);
 
 					for (i64 i = 0; i < t->Array.count; i++) {
+						irBlock *body = ir_new_block(proc, node, "inline.for.body");
+						ir_emit_jump(proc, body);
+						ir_start_block(proc, body);
+
 						if (val0_type) {
 							// NOTE(bill): Due to weird legacy issues in LLVM, this needs to be an i32
 							irValue *elem = ir_emit_array_epi(proc, val_addr, cast(i32)i);
@@ -10261,6 +10280,10 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 					irValue *val_addr = ir_address_from_load_or_generate_local(proc, val);
 
 					for (i64 i = 0; i < t->EnumeratedArray.count; i++) {
+						irBlock *body = ir_new_block(proc, node, "inline.for.body");
+						ir_emit_jump(proc, body);
+						ir_start_block(proc, body);
+
 						if (val0_type) {
 							// NOTE(bill): Due to weird legacy issues in LLVM, this needs to be an i32
 							irValue *elem = ir_emit_array_epi(proc, val_addr, cast(i32)i);
@@ -10282,6 +10305,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			}
 		}
 
+		ir_emit_jump(proc, done);
+		ir_start_block(proc, done);
 
 		ir_close_scope(proc, irDeferExit_Default, nullptr);
 	case_end;

@@ -1692,12 +1692,12 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		switch (token.kind) {
 		case Token_break:
 			if ((flags & Stmt_BreakAllowed) == 0 && bs->label == nullptr) {
-				error(token, "'break' only allowed in loops or 'switch' statements");
+				error(token, "'break' only allowed in non-inline loops or 'switch' statements");
 			}
 			break;
 		case Token_continue:
 			if ((flags & Stmt_ContinueAllowed) == 0 && bs->label == nullptr) {
-				error(token, "'continue' only allowed in loops");
+				error(token, "'continue' only allowed in non-inline loops");
 			}
 			break;
 		case Token_fallthrough:
