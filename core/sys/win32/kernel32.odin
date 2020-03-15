@@ -10,11 +10,11 @@ foreign kernel32 {
 	                                                              				 inherit_handle: Bool, creation_flags: u32, environment: rawptr,
 	                                                              				 current_direcotry: cstring, startup_info: ^Startup_Info,
 	                                                              				 process_information: ^Process_Information) -> Bool ---;
-    @(link_name="CreateProcessW")            create_process_w             :: proc(application_name, command_line: Wstring,
-                                                                                 process_attributes, thread_attributes: ^Security_Attributes,
-                                                                                 inherit_handle: Bool, creation_flags: u32, environment: rawptr,
-                                                                                 current_direcotry: cstring, startup_info: ^Startup_Info,
-                                                                                 process_information: ^Process_Information) -> Bool ---;
+	@(link_name="CreateProcessW")            create_process_w             :: proc(application_name, command_line: Wstring,
+	                                                                             process_attributes, thread_attributes: ^Security_Attributes,
+	                                                                             inherit_handle: Bool, creation_flags: u32, environment: rawptr,
+	                                                                             current_direcotry: cstring, startup_info: ^Startup_Info,
+	                                                                             process_information: ^Process_Information) -> Bool ---;
 	@(link_name="GetExitCodeProcess")		 get_exit_code_process        :: proc(process: Handle, exit: ^u32) -> Bool ---;
 	@(link_name="ExitProcess")               exit_process                 :: proc(exit_code: u32) ---;
 	@(link_name="GetModuleHandleA")          get_module_handle_a          :: proc(module_name: cstring) -> Hmodule ---;

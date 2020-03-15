@@ -124,7 +124,7 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 		clear(&allocator.leaked_allocations);
 
 	case .Resize:
-		last_ptr := rawptr(&allocator.data[allocator.prev_offset]);
+		last_ptr := #no_bounds_check rawptr(&allocator.data[allocator.prev_offset]);
 		if old_memory == last_ptr && len(allocator.data)-allocator.prev_offset >= size {
 			allocator.curr_offset = allocator.prev_offset+size;
 			return old_memory;

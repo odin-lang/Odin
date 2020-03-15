@@ -341,6 +341,10 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 		// ir_fprintf(f, "* sret noalias ");
 		// ir_write_string(f, str_lit("* noalias "));
 		ir_write_string(f, str_lit("*"));
+		if (build_context.ODIN_OS == "darwin" ||
+		    build_context.ODIN_OS == "linux") {
+			ir_fprintf(f, " byval");
+		}
 		if (param_count > 0 || t->Proc.calling_convention == ProcCC_Odin)  {
 			ir_write_string(f, str_lit(", "));
 		}
@@ -362,6 +366,9 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 					ir_print_type(f, m, et->Tuple.variables[j]->type);
 					if (e->flags&EntityFlag_NoAlias) {
 						ir_write_str_lit(f, " noalias");
+					}
+					if (e->flags&EntityFlag_ByVal) {
+						ir_write_str_lit(f, " byval");
 					}
 					ir_write_byte(f, ' ');
 					param_index++;
@@ -2183,6 +2190,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 							if (e->flags&EntityFlag_NoAlias) {
 								ir_write_str_lit(f, " noalias");
 							}
+							if (e->flags&EntityFlag_ByVal) {
+								ir_write_str_lit(f, " byval");
+							}
 							ir_write_byte(f, ' ');
 							ir_print_value(f, m, arg, t);
 							param_index++;
@@ -2194,6 +2204,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 						}
 						if (e->flags&EntityFlag_ImplicitReference) {
 							ir_write_str_lit(f, " nonnull dereferenceable");
+						}
+						if (e->flags&EntityFlag_ByVal) {
+							ir_write_str_lit(f, " byval");
 						}
 						ir_write_byte(f, ' ');
 						irValue *arg = call->args[arg_index++];
@@ -2235,6 +2248,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 							if (e->flags&EntityFlag_NoAlias) {
 								ir_write_str_lit(f, " noalias");
 							}
+							if (e->flags&EntityFlag_ByVal) {
+								ir_write_str_lit(f, " byval");
+							}
 							ir_write_byte(f, ' ');
 							ir_print_value(f, m, arg, t);
 							param_index++;
@@ -2244,6 +2260,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 						ir_print_type(f, m, t);
 						if (e->flags&EntityFlag_NoAlias) {
 							ir_write_str_lit(f, " noalias");
+						}
+						if (e->flags&EntityFlag_ByVal) {
+							ir_write_str_lit(f, " byval");
 						}
 						ir_write_byte(f, ' ');
 						ir_print_value(f, m, arg, t);
@@ -2363,6 +2382,10 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	if (proc_type->return_by_pointer) {
 		ir_print_type(f, m, reduce_tuple_to_single_type(proc_type->results));
 		ir_write_str_lit(f, "* sret noalias ");
+		if (build_context.ODIN_OS == "darwin" ||
+		    build_context.ODIN_OS == "linux") {
+			ir_fprintf(f, "byval ");
+		}
 		ir_write_str_lit(f, "%agg.result");
 		param_index += 1;
 	}
@@ -2389,6 +2412,10 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 						if (e->flags&EntityFlag_NoAlias) {
 							ir_write_str_lit(f, " noalias");
 						}
+						if (e->flags&EntityFlag_ByVal) {
+							ir_write_str_lit(f, " byval");
+						}
+
 
 						if (proc->body != nullptr) {
 							ir_fprintf(f, " %%_.%td", parameter_index+j);
@@ -2400,6 +2427,9 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 					ir_print_type(f, m, abi_type);
 					if (e->flags&EntityFlag_NoAlias) {
 						ir_write_str_lit(f, " noalias");
+					}
+					if (e->flags&EntityFlag_ByVal) {
+						ir_write_str_lit(f, " byval");
 					}
 					if (proc->body != nullptr) {
 						ir_fprintf(f, " %%_.%td", parameter_index);
