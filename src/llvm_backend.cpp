@@ -1082,10 +1082,21 @@ void lb_add_procedure_value(lbModule *m, lbProcedure *p) {
 
 
 lbValue lb_emit_string(lbProcedure *p, lbValue str_elem, lbValue str_len) {
-	lbAddr res = lb_add_local_generated(p, t_string, false);
-	lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 0), str_elem);
-	lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 1), str_len);
-	return lb_addr_load(p, res);
+	if (lb_is_const(str_elem) && lb_is_const(str_len)) {
+		LLVMValueRef values[2] = {
+			str_elem.value,
+			str_len.value,
+		};
+		lbValue res = {};
+		res.type = t_string;
+		res.value = LLVMConstNamedStruct(lb_type(p->module, t_string), values, gb_count_of(values));
+		return res;
+	} else {
+		lbAddr res = lb_add_local_generated(p, t_string, false);
+		lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 0), str_elem);
+		lb_emit_store(p, lb_emit_struct_ep(p, res.addr, 1), str_len);
+		return lb_addr_load(p, res);
+	}
 }
 
 LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value) {
@@ -1094,12 +1105,11 @@ LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, 
 }
 
 void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value) {
-	LLVMContextRef ctx = LLVMGetModuleContext(p->module->mod);
-	// LLVMAddAttributeAtIndex(p->value, cast(unsigned)index, lb_create_enum_attribute(ctx, name, value));
+	LLVMAddAttributeAtIndex(p->value, cast(unsigned)index, lb_create_enum_attribute(p->module->ctx, name, value));
 }
 
 void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name) {
-	lb_add_proc_attribute_at_index(p, index, name, true);
+	lb_add_proc_attribute_at_index(p, index, name, cast(u64)true);
 }
 
 
