@@ -1931,35 +1931,74 @@ union_maybe :: proc() {
 	fmt.println(z, z_ok);
 }
 
+icons_texture_data_size := [2]int{0 = 512, 1 = 256};
+
+
 main :: proc() {
-	when true {
-		the_basics();
-		control_flow();
-		named_proc_return_parameters();
-		explicit_procedure_overloading();
-		struct_type();
-		union_type();
-		using_statement();
-		implicit_context_system();
-		parametric_polymorphism();
-		array_programming();
-		map_type();
-		implicit_selector_expression();
-		partial_switch();
-		cstring_example();
-		bit_set_type();
-		deferred_procedure_associations();
-		reflection();
-		quaternions();
-		inline_for_statement();
-		where_clauses();
-		foreign_system();
-		ranged_fields_for_array_compound_literals();
-		deprecated_attribute();
-		range_statements_with_multiple_return_values();
-		threading_example();
-		soa_struct_layout();
-		constant_literal_expressions();
-		union_maybe();
+	// cache size
+	Nx := 512;
+	Ny := 128;
+	Nz := 0;
+	is_array := false;
+
+	// detect target based on input size
+	switch {
+	case Nz > 0 && !is_array: fmt.println("1");
+	case Nz > 0 &&  is_array: fmt.println("2");
+	case Ny > 0 && !is_array: fmt.println("3");
+	case Ny > 0 &&  is_array: fmt.println("4");
+	case:                     fmt.println("5");
+	}
+
+	// fmt.println("(Nz > 0 && !is_array) ==", Nz > 0 && !is_array);
+	// fmt.println("(Nz > 0 &&  is_array) ==", Nz > 0 &&  is_array);
+	// fmt.println("(Ny > 0 && !is_array) ==", Ny > 0 && !is_array);
+	// fmt.println("(Ny > 0 &&  is_array) ==", Ny > 0 &&  is_array);
+
+	c0 := (Nz > 0) && !is_array;
+	c1 := (Nz > 0) &&  is_array;
+	c2 := (Ny > 0) && !is_array;
+	c3 := (Ny > 0) &&  is_array;
+	assert(c0 == false);
+	assert(c1 == false);
+	assert(c2 == true);
+	assert(c3 == false);
+	// switch {
+	// case c0: fmt.println("1");
+	// case c1: fmt.println("2");
+	// case c2: fmt.println("3");
+	// case c3: fmt.println("4");
+	// case:    fmt.println("5");
+	// }
+
+	when false {
+		// the_basics();
+		// control_flow();
+		// named_proc_return_parameters();
+		// explicit_procedure_overloading();
+		// struct_type();
+		// union_type();
+		// using_statement();
+		// implicit_context_system();
+		// parametric_polymorphism();
+		// array_programming();
+		// map_type();
+		// implicit_selector_expression();
+		// partial_switch();
+		// cstring_example();
+		// bit_set_type();
+		// deferred_procedure_associations();
+		// reflection();
+		// quaternions();
+		// inline_for_statement();
+		// where_clauses();
+		// foreign_system();
+		// ranged_fields_for_array_compound_literals();
+		// deprecated_attribute();
+		// range_statements_with_multiple_return_values();
+		// threading_example();
+		// soa_struct_layout();
+		// constant_literal_expressions();
+		// union_maybe();
 	}
 }

@@ -288,9 +288,9 @@ Context :: struct {
 	assertion_failure_proc: Assertion_Failure_Proc,
 	logger:                 Logger,
 
-	stdin:  os.Handle,
-	stdout: os.Handle,
-	stderr: os.Handle,
+	// stdin:  os.Handle,
+	// stdout: os.Handle,
+	// stderr: os.Handle,
 
 	thread_id:  int,
 
@@ -463,9 +463,9 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.logger.procedure = default_logger_proc;
 	c.logger.data = nil;
 
-	c.stdin  = os.stdin;
-	c.stdout = os.stdout;
-	c.stderr = os.stderr;
+	// c.stdin  = os.stdin;
+	// c.stdout = os.stdout;
+	// c.stderr = os.stderr;
 }
 
 @builtin
@@ -474,7 +474,7 @@ init_global_temporary_allocator :: proc(data: []byte, backup_allocator := contex
 }
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) {
-	fd := context.stderr;
+	fd := os.stderr;
 	print_caller_location(fd, loc);
 	os.write_string(fd, " ");
 	os.write_string(fd, prefix);
