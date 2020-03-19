@@ -18,7 +18,10 @@ gb_global Timings global_timings = {0};
 #include "docs.cpp"
 #include "checker.cpp"
 
+
+#if defined(LLVM_BACKEND_SUPPORT)
 #include "llvm_backend.cpp"
+#endif
 
 #include "ir.cpp"
 #include "ir_opt.cpp"
@@ -126,6 +129,7 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 
 
 
+#if defined(LLVM_BACKEND_SUPPORT)
 i32 linker_stage(lbGenerator *gen) {
 	i32 exit_code = 0;
 
@@ -420,7 +424,7 @@ i32 linker_stage(lbGenerator *gen) {
 
 	return exit_code;
 }
-
+#endif
 
 Array<String> setup_args(int argc, char const **argv) {
 	gbAllocator a = heap_allocator();
@@ -1586,6 +1590,8 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.use_llvm_api) {
+#if defined(LLVM_BACKEND_SUPPORT)
+
 		timings_start_section(timings, str_lit("LLVM API Code Gen"));
 		lbGenerator gen = {};
 		if (!lb_init_generator(&gen, &checker)) {
@@ -1616,6 +1622,10 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 
 		return 0;
+#else
+		gb_printf_err("LLVM C API backend is not supported on this platform yet\n");
+		return 1;
+#endif
 	} else {
 		irGen ir_gen = {0};
 		if (!ir_gen_init(&ir_gen, &checker)) {

@@ -13,6 +13,8 @@ if "%1" == "1" (
 )
 
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
+set compiler_defines= -DLLVM_BACKEND_SUPPORT
+
 
 if %release_mode% EQU 0 ( rem Debug
 	set compiler_flags=%compiler_flags% -Od -MDd -Z7
@@ -41,7 +43,7 @@ if %release_mode% EQU 0 ( rem Debug
 	set linker_flags=%linker_flags% -debug
 )
 
-set compiler_settings=%compiler_includes% %compiler_flags% %compiler_warnings%
+set compiler_settings=%compiler_includes% %compiler_flags% %compiler_warnings% %compiler_defines%
 set linker_settings=%libs% %linker_flags%
 
 del *.pdb > NUL 2> NUL
