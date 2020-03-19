@@ -330,7 +330,9 @@ lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type);
 void    lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type, lbValue map_key, lbValue map_value);
 
 
-#define LB_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"
+#define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
+#define LB_STARTUP_CONTEXT_PROC_NAME   "__$startup_context"
+#define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
 #define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"
 #define LB_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"
 #define LB_TYPE_INFO_NAMES_NAME      "__$type_info_names_data"

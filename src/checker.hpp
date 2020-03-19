@@ -382,3 +382,5 @@ void destroy_checker_poly_path(CheckerPolyPath *);
 
 void  check_poly_path_push(CheckerContext *c, Type *t);
 Type *check_poly_path_pop (CheckerContext *c);
+
+void init_core_context(Checker *c);
