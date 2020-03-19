@@ -5667,7 +5667,7 @@ isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs
 					c->decl = decl; // will be reset by the 'defer' any way
 					for_array(k, decl->deps.entries) {
 						Entity *dep = decl->deps.entries[k].ptr;
-     						add_declaration_dependency(c, dep); // TODO(bill): Should this be here?
+						add_declaration_dependency(c, dep); // TODO(bill): Should this be here?
 					}
 				}
 			}
@@ -7249,6 +7249,16 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 	}
 
 	Type *pt = base_type(proc_type);
+
+	#if 0
+	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
+		init_core_context(c->checker);
+		GB_ASSERT(t_context != nullptr);
+		GB_ASSERT(t_context->kind == Type_Named);
+		add_declaration_dependency(c, t_context->Named.type_name);
+	}
+	#endif
+
 	if (result_type == nullptr) {
 		operand->mode = Addressing_NoValue;
 	} else {

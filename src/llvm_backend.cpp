@@ -497,8 +497,8 @@ String lb_mangle_name(lbModule *m, Entity *e) {
 
 	if ((e->scope->flags & (ScopeFlag_File | ScopeFlag_Pkg)) == 0) {
 		require_suffix_id = true;
-	} else {
-		// require_suffix_id = true;
+	} else if (is_blank_ident(e->token)) {
+		require_suffix_id = true;
 	}
 
 	if (require_suffix_id) {
@@ -958,7 +958,11 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				fields[1] = lb_type(m, type->Union.variants[0]);
 			} else {
 				field_count += 2;
-				fields[1] = LLVMArrayType(lb_type(m, t_u8), block_size);
+				if (block_size == align) {
+					fields[1] = LLVMIntTypeInContext(m->ctx, 8*block_size);
+				} else {
+					fields[1] = LLVMArrayType(lb_type(m, t_u8), block_size);
+				}
 				fields[2] = lb_type(m, union_tag_type(type));
 			}
 
@@ -3878,7 +3882,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 		{
 			HashKey key = hash_string(value.value_string);
 			LLVMValueRef *found = map_get(&m->const_strings, key);
-			if (found != nullptr) {
+			if (found != nullptr && false) {
 				LLVMValueRef ptr = *found;
 				lbValue res = {};
 				res.type = default_type(original_type);
@@ -5429,12 +5433,16 @@ lbAddr lb_find_or_generate_context_ptr(lbProcedure *p) {
 		return p->context_stack[p->context_stack.count-1].ctx;
 	}
 
-	lbAddr c = lb_add_local_generated(p, t_context, false);
-	c.kind = lbAddr_Context;
-	lb_push_context_onto_stack(p, c);
-	lb_addr_store(p, c, lb_addr_load(p, p->module->global_default_context));
-	lb_emit_init_context(p, c);
-	return c;
+	if (p->name == LB_STARTUP_RUNTIME_PROC_NAME) {
+		return p->module->global_default_context;
+	} else {
+		lbAddr c = lb_add_local_generated(p, t_context, false);
+		c.kind = lbAddr_Context;
+		lb_push_context_onto_stack(p, c);
+		lb_addr_store(p, c, lb_addr_load(p, p->module->global_default_context));
+		lb_emit_init_context(p, c);
+		return c;
+	}
 }
 
 lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value) {
@@ -10050,6 +10058,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			{
 				GB_ASSERT(t->Enum.base_type != nullptr);
+				GB_ASSERT(type_size_of(t_type_info_enum_value) == 16);
 
 
 				LLVMValueRef vals[3] = {};
@@ -10061,18 +10070,38 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 					lbValue value_array = lb_generate_array(m, t_type_info_enum_value, fields.count,
 					                                        str_lit("$enum_values"), cast(i64)entry_index);
 
+
+					LLVMValueRef *name_values = gb_alloc_array(heap_allocator(), LLVMValueRef, fields.count);
+					LLVMValueRef *value_values = gb_alloc_array(heap_allocator(), LLVMValueRef, fields.count);
+					defer (gb_free(heap_allocator(), name_values));
+					defer (gb_free(heap_allocator(), value_values));
+
 					GB_ASSERT(is_type_integer(t->Enum.base_type));
 
-					for_array(i, fields) {
-						lbValue name_ep  = lb_emit_array_epi(p, name_array, i);
-						lbValue value_ep = lb_emit_array_epi(p, value_array, i);
+					LLVMTypeRef align_type = lb_alignment_prefix_type_hack(m, type_align_of(t));
+					LLVMTypeRef array_type = LLVMArrayType(lb_type(m, t_u8), 8);
+					LLVMTypeRef u64_type = lb_type(m, t_u64);
 
+					for_array(i, fields) {
 						ExactValue value = fields[i]->Constant.value;
 						lbValue v = lb_const_value(m, t->Enum.base_type, value);
+						LLVMValueRef zv = LLVMConstZExt(v.value, u64_type);
+						lbValue tag = lb_const_union_tag(m, t_type_info_enum_value, v.type);
 
-						lb_emit_store_union_variant(p, value_ep, v, v.type);
-						lb_const_store(name_ep, lb_const_string(m, fields[i]->token.string));
+						LLVMValueRef vals[3] = {
+							LLVMConstNull(align_type),
+							zv,
+							tag.value,
+						};
+
+						name_values[i] = lb_const_string(m, fields[i]->token.string).value;
+						value_values[i] = LLVMConstStruct(vals, gb_count_of(vals), false);
 					}
+
+					LLVMValueRef name_init  = LLVMConstArray(lb_type(m, t_string),               name_values,  cast(unsigned)fields.count);
+					LLVMValueRef value_init = LLVMConstArray(lb_type(m, t_type_info_enum_value), value_values, cast(unsigned)fields.count);
+					LLVMSetInitializer(name_array.value,  name_init);
+					LLVMSetInitializer(value_array.value, value_init);
 
 					lbValue v_count = lb_const_int(m, t_int, fields.count);
 
@@ -10082,6 +10111,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 					vals[1] = LLVMConstNull(lb_type(m, base_type(t_type_info_enum)->Struct.fields[1]->type));
 					vals[2] = LLVMConstNull(lb_type(m, base_type(t_type_info_enum)->Struct.fields[2]->type));
 				}
+
 
 				lbValue res = {};
 				res.type = type_deref(tag.type);
@@ -10438,6 +10468,7 @@ void lb_generate_code(lbGenerator *gen) {
 	{
 		{ // Add type info data
 			isize max_type_info_count = info->minimum_dependency_type_info_set.entries.count+1;
+			// gb_printf_err("max_type_info_count: %td\n", max_type_info_count);
 			Type *t = alloc_type_array(t_type_info, max_type_info_count);
 			LLVMValueRef g = LLVMAddGlobal(mod, lb_type(m, t), LB_TYPE_INFO_DATA_NAME);
 			LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
@@ -10770,7 +10801,57 @@ void lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Runtime Creation");
 
+	lbProcedure *startup_type_info = nullptr;
+	lbProcedure *startup_context = nullptr;
 	lbProcedure *startup_runtime = nullptr;
+	{ // Startup Type Info
+		Type *params  = alloc_type_tuple();
+		Type *results = alloc_type_tuple();
+
+		Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
+
+		lbProcedure *p = lb_create_dummy_procedure(m, str_lit(LB_STARTUP_TYPE_INFO_PROC_NAME), proc_type);
+		startup_type_info = p;
+
+		lb_begin_procedure_body(p);
+
+		lb_setup_type_info_data(p);
+
+		lb_end_procedure_body(p);
+
+		if (LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
+			gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
+			LLVMDumpValue(p->value);
+			gb_printf_err("\n\n\n\n");
+			LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
+		}
+
+		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+	}
+	{ // Startup Context
+		Type *params  = alloc_type_tuple();
+		Type *results = alloc_type_tuple();
+
+		Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
+
+		lbProcedure *p = lb_create_dummy_procedure(m, str_lit(LB_STARTUP_CONTEXT_PROC_NAME), proc_type);
+		startup_context = p;
+
+		lb_begin_procedure_body(p);
+
+		lb_emit_init_context(p, p->module->global_default_context);
+
+		lb_end_procedure_body(p);
+
+		if (LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
+			gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
+			LLVMDumpValue(p->value);
+			gb_printf_err("\n\n\n\n");
+			LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
+		}
+
+		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+	}
 	{ // Startup Runtime
 		Type *params  = alloc_type_tuple();
 		Type *results = alloc_type_tuple();
@@ -10781,8 +10862,6 @@ void lb_generate_code(lbGenerator *gen) {
 		startup_runtime = p;
 
 		lb_begin_procedure_body(p);
-
-		lb_setup_type_info_data(p);
 
 		for_array(i, global_variables) {
 			auto *var = &global_variables[i];
@@ -10822,7 +10901,6 @@ void lb_generate_code(lbGenerator *gen) {
 			}
 		}
 
-		lb_emit_init_context(p, p->module->global_default_context);
 
 		lb_end_procedure_body(p);
 
@@ -10875,6 +10953,8 @@ void lb_generate_code(lbGenerator *gen) {
 		lbValue *found = map_get(&m->values, hash_entity(entry_point));
 		GB_ASSERT(found != nullptr);
 
+		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
+		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_context->type)), startup_context->value, nullptr, 0, "");
 		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_runtime->type)), startup_runtime->value, nullptr, 0, "");
 		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, found->type)), found->value, nullptr, 0, "");
 		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 0, false));
