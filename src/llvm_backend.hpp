@@ -164,8 +164,13 @@ struct lbTargetList {
 };
 
 
+enum lbProcedureFlag : u32 {
+	lbProcedureFlag_WithoutMemcpyPass = 1<<0,
+};
 
 struct lbProcedure {
+	u32 flags;
+
 	lbProcedure *parent;
 	Array<lbProcedure *> children;
 

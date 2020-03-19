@@ -3190,6 +3190,14 @@ i64 type_offset_of_from_selection(Type *type, Selection sel) {
 	return offset;
 }
 
+
+Type *get_struct_field_type(Type *t, isize index) {
+	t = base_type(type_deref(t));
+	GB_ASSERT(t->kind == Type_Struct);
+	return t->Struct.fields[index]->type;
+}
+
+
 gbString write_type_to_string(gbString str, Type *type) {
 	if (type == nullptr) {
 		return gb_string_appendc(str, "<no type>");
