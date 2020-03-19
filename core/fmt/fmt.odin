@@ -59,13 +59,13 @@ fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 
 
 // print* procedures return the number of bytes written
-print   :: proc(args: ..any)              -> int { return fprint(context.stdout, ..args); }
-println :: proc(args: ..any)              -> int { return fprintln(context.stdout, ..args); }
-printf  :: proc(fmt: string, args: ..any) -> int { return fprintf(context.stdout, fmt, ..args); }
+print   :: proc(args: ..any)              -> int { return fprint(os.stdout, ..args); }
+println :: proc(args: ..any)              -> int { return fprintln(os.stdout, ..args); }
+printf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stdout, fmt, ..args); }
 
-eprint   :: proc(args: ..any)              -> int { return fprint(context.stderr, ..args); }
-eprintln :: proc(args: ..any)              -> int { return fprintln(context.stderr, ..args); }
-eprintf  :: proc(fmt: string, args: ..any) -> int { return fprintf(context.stderr, fmt, ..args); }
+eprint   :: proc(args: ..any)              -> int { return fprint(os.stderr, ..args); }
+eprintln :: proc(args: ..any)              -> int { return fprintln(os.stderr, ..args); }
+eprintf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stderr, fmt, ..args); }
 
 
 @(deprecated="prefer eprint")   print_err   :: proc(args: ..any)              -> int { return eprint(..args); }

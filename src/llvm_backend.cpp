@@ -2735,29 +2735,20 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss) {
 	lbBlock *default_block = nullptr;
 
 	lbBlock *fall = nullptr;
-	bool append_fall = false;
 
 	isize case_count = body->stmts.count;
 	for_array(i, body->stmts) {
 		Ast *clause = body->stmts[i];
-		lbBlock *body = fall;
-
 		ast_node(cc, CaseClause, clause);
 
+		lbBlock *body = fall;
+
 		if (body == nullptr) {
-			if (cc->list.count == 0) {
-				body = lb_create_block(p, "switch.dflt.body");
-			} else {
-				body = lb_create_block(p, "switch.case.body");
-			}
-		}
-		if (append_fall && body == fall) {
-			append_fall = false;
+			body = lb_create_block(p, "switch.case.body");
 		}
 
 		fall = done;
 		if (i+1 < case_count) {
-			append_fall = true;
 			fall = lb_create_block(p, "switch.fall.body");
 		}
 
@@ -2773,6 +2764,7 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss) {
 		for_array(j, cc->list) {
 			Ast *expr = unparen_expr(cc->list[j]);
 			next_cond = lb_create_block(p, "switch.case.next");
+
 			lbValue cond = lb_const_bool(p->module, t_llvm_bool, false);
 			if (is_ast_range(expr)) {
 				ast_node(ie, BinaryExpr, expr);
@@ -3583,19 +3575,11 @@ lbValue lb_emit_clamp(lbProcedure *p, Type *t, lbValue x, lbValue min, lbValue m
 
 
 
-
-lbValue lb_find_or_add_entity_string(lbModule *m, String const &str) {
+LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
 	HashKey key = hash_string(str);
 	LLVMValueRef *found = map_get(&m->const_strings, key);
 	if (found != nullptr) {
-		LLVMValueRef ptr = *found;
-		LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), str.len, true);
-		LLVMValueRef values[2] = {ptr, str_len};
-
-		lbValue res = {};
-		res.value = LLVMConstNamedStruct(lb_type(m, t_string), values, 2);
-		res.type = t_string;
-		return res;
+		return *found;
 	} else {
 		LLVMValueRef indices[2] = {llvm_zero32(m), llvm_zero32(m)};
 		LLVMValueRef data = LLVMConstStringInContext(m->ctx,
@@ -3614,62 +3598,49 @@ lbValue lb_find_or_add_entity_string(lbModule *m, String const &str) {
 		LLVMSetInitializer(global_data, data);
 
 		LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
-
-		LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), str.len, true);
-		LLVMValueRef values[2] = {ptr, str_len};
-
-		lbValue res = {};
-		res.value = LLVMConstNamedStruct(lb_type(m, t_string), values, 2);
-		res.type = t_string;
-
 		map_set(&m->const_strings, key, ptr);
-
-		return res;
+		return ptr;
 	}
 }
 
+lbValue lb_find_or_add_entity_string(lbModule *m, String const &str) {
+	LLVMValueRef ptr = lb_find_or_add_entity_string_ptr(m, str);
+	LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), str.len, true);
+	LLVMValueRef values[2] = {ptr, str_len};
+
+	lbValue res = {};
+	res.value = LLVMConstNamedStruct(lb_type(m, t_string), values, 2);
+	res.type = t_string;
+	return res;
+}
+
 lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) {
-	HashKey key = hash_string(str);
-	LLVMValueRef *found = map_get(&m->const_strings, key);
-	if (found != nullptr) {
-		LLVMValueRef ptr = *found;
-		LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), str.len, true);
-		LLVMValueRef values[2] = {ptr, len};
-
-		lbValue res = {};
-		res.value = LLVMConstNamedStruct(lb_type(m, t_u8_slice), values, 2);
-		res.type = t_u8_slice;
-		return res;
-	} else {
-		LLVMValueRef indices[2] = {llvm_zero32(m), llvm_zero32(m)};
-		LLVMValueRef data = LLVMConstStringInContext(m->ctx,
-			cast(char const *)str.text,
-			cast(unsigned)str.len,
-			false);
+	LLVMValueRef indices[2] = {llvm_zero32(m), llvm_zero32(m)};
+	LLVMValueRef data = LLVMConstStringInContext(m->ctx,
+		cast(char const *)str.text,
+		cast(unsigned)str.len,
+		false);
 
 
+	char *name = nullptr;
+	{
 		isize max_len = 7+8+1;
-		char *name = gb_alloc_array(heap_allocator(), char, max_len);
+		name = gb_alloc_array(heap_allocator(), char, max_len);
 		isize len = gb_snprintf(name, max_len, "csbs$%x", m->global_array_index);
 		len -= 1;
 		m->global_array_index++;
-
-		LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
-		LLVMSetInitializer(global_data, data);
-
-		LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
-
-		LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), str.len, true);
-		LLVMValueRef values[2] = {ptr, str_len};
-
-		lbValue res = {};
-		res.value = LLVMConstNamedStruct(lb_type(m, t_u8_slice), values, 2);
-		res.type = t_u8_slice;
-
-		map_set(&m->const_strings, key, ptr);
-
-		return res;
 	}
+	LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
+	LLVMSetInitializer(global_data, data);
+
+	LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
+	LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), str.len, true);
+	LLVMValueRef values[2] = {ptr, len};
+
+	lbValue res = {};
+	res.value = LLVMConstNamedStruct(lb_type(m, t_u8_slice), values, 2);
+	res.type = t_u8_slice;
+	return res;
 }
 
 isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
@@ -3880,54 +3851,17 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 		return res;
 	case ExactValue_String:
 		{
-			HashKey key = hash_string(value.value_string);
-			LLVMValueRef *found = map_get(&m->const_strings, key);
-			if (found != nullptr && false) {
-				LLVMValueRef ptr = *found;
-				lbValue res = {};
-				res.type = default_type(original_type);
-				if (is_type_cstring(res.type)) {
-					res.value = ptr;
-				} else {
-					LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), value.value_string.len, true);
-					LLVMValueRef values[2] = {ptr, str_len};
-
-					res.value = LLVMConstNamedStruct(lb_type(m, original_type), values, 2);
-				}
-
-				return res;
-			}
-
-			LLVMValueRef indices[2] = {llvm_zero32(m), llvm_zero32(m)};
-			LLVMValueRef data = LLVMConstStringInContext(ctx,
-				cast(char const *)value.value_string.text,
-				cast(unsigned)value.value_string.len,
-				false);
-
-
-			isize max_len = 7+8+1;
-			char *str = gb_alloc_array(heap_allocator(), char, max_len);
-			isize len = gb_snprintf(str, max_len, "csbs$%x", m->global_array_index);
-			len -= 1;
-			m->global_array_index++;
-
-			LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), str);
-			LLVMSetInitializer(global_data, data);
-
-			LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
-
-			if (is_type_cstring(type)) {
-				res.value = ptr;
-				return res;
-			}
-
-			LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), value.value_string.len, true);
-			LLVMValueRef values[2] = {ptr, str_len};
-
-			res.value = LLVMConstNamedStruct(lb_type(m, original_type), values, 2);
+			LLVMValueRef ptr = lb_find_or_add_entity_string_ptr(m, value.value_string);
+			lbValue res = {};
 			res.type = default_type(original_type);
+			if (is_type_cstring(res.type)) {
+				res.value = ptr;
+			} else {
+				LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), value.value_string.len, true);
+				LLVMValueRef values[2] = {ptr, str_len};
 
-			map_set(&m->const_strings, key, ptr);
+				res.value = LLVMConstNamedStruct(lb_type(m, original_type), values, 2);
+			}
 
 			return res;
 		}
@@ -4413,10 +4347,18 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 
 	}
 
-	if (op == Token_Not) {
+	if (op == Token_Xor) {
 		lbValue cmp = {};
 		cmp.value = LLVMBuildNot(p->builder, x.value, "");
 		cmp.type = x.type;
+		return lb_emit_conv(p, cmp, type);
+	}
+
+	if (op == Token_Not) {
+		lbValue cmp = {};
+		LLVMValueRef zero =  LLVMConstInt(lb_type(p->module, x.type), 0, false);
+		cmp.value = LLVMBuildICmp(p->builder, LLVMIntEQ, x.value, zero, "");
+		cmp.type = t_llvm_bool;
 		return lb_emit_conv(p, cmp, type);
 	}
 
@@ -5433,7 +5375,9 @@ lbAddr lb_find_or_generate_context_ptr(lbProcedure *p) {
 		return p->context_stack[p->context_stack.count-1].ctx;
 	}
 
-	if (p->name == LB_STARTUP_RUNTIME_PROC_NAME) {
+	Type *pt = base_type(p->type);
+	GB_ASSERT(pt->kind == Type_Proc);
+	if (pt->Proc.calling_convention != ProcCC_Odin) {
 		return p->module->global_default_context;
 	} else {
 		lbAddr c = lb_add_local_generated(p, t_context, false);
@@ -6041,10 +5985,11 @@ lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index) {
 	GB_ASSERT(is_type_pointer(t));
 	Type *st = base_type(type_deref(t));
 	GB_ASSERT_MSG(is_type_array(st) || is_type_enumerated_array(st), "%s", type_to_string(st));
+	GB_ASSERT_MSG(is_type_integer(index.type), "%s", type_to_string(index.type));
 
 	LLVMValueRef indices[2] = {};
 	indices[0] = llvm_zero32(p->module);
-	indices[1] = lb_emit_conv(p, index, t_i32).value;
+	indices[1] = lb_emit_conv(p, index, t_int).value;
 
 	Type *ptr = base_array_type(st);
 	lbValue res = {};
@@ -7218,13 +7163,21 @@ String lb_get_const_string(lbModule *m, lbValue value) {
 	Type *t = base_type(value.type);
 	GB_ASSERT(are_types_identical(t, t_string));
 
+
+
 	unsigned     ptr_indices[1] = {0};
 	unsigned     len_indices[1] = {1};
 	LLVMValueRef underlying_ptr = LLVMConstExtractValue(value.value, ptr_indices, gb_count_of(ptr_indices));
 	LLVMValueRef underlying_len = LLVMConstExtractValue(value.value, len_indices, gb_count_of(len_indices));
 
+	GB_ASSERT(LLVMGetConstOpcode(underlying_ptr) == LLVMGetElementPtr);
+	underlying_ptr = LLVMGetOperand(underlying_ptr, 0);
+	GB_ASSERT(LLVMIsAGlobalVariable(underlying_ptr));
+	underlying_ptr = LLVMGetInitializer(underlying_ptr);
+
 	size_t length = 0;
 	char const *text = LLVMGetAsString(underlying_ptr, &length);
+
 	isize real_length = cast(isize)LLVMConstIntGetSExtValue(underlying_len);
 
 	return make_string(cast(u8 const *)text, real_length);
@@ -11000,6 +10953,7 @@ void lb_generate_code(lbGenerator *gen) {
 	if (build_context.keep_temp_files) {
 		TIME_SECTION("LLVM Print Module to File");
 		LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error);
+		// exit(1);
 	}
 	LLVMDIBuilderFinalize(m->debug_builder);
 	LLVMVerifyModule(mod, LLVMAbortProcessAction, &llvm_error);
@@ -11007,8 +10961,8 @@ void lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Object Generation");
 
-	LLVMBool ok = LLVMTargetMachineEmitToFile(target_machine, mod, cast(char *)filepath_obj.text, LLVMObjectFile, &llvm_error);
-	if (ok) {
+	LLVMBool was_an_error = LLVMTargetMachineEmitToFile(target_machine, mod, cast(char *)filepath_obj.text, LLVMObjectFile, &llvm_error);
+	if (was_an_error) {
 		gb_printf_err("LLVM Error: %s\n", llvm_error);
 		gb_exit(1);
 		return;

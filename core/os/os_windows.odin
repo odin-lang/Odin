@@ -201,7 +201,7 @@ stdout := get_std_handle(win32.STD_OUTPUT_HANDLE);
 stderr := get_std_handle(win32.STD_ERROR_HANDLE);
 
 
-get_std_handle :: proc(h: int) -> Handle {
+get_std_handle :: proc "contextless" (h: int) -> Handle {
 	fd := win32.get_std_handle(i32(h));
 	win32.set_handle_information(fd, win32.HANDLE_FLAG_INHERIT, 0);
 	return Handle(fd);
