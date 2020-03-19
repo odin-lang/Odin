@@ -1931,9 +1931,6 @@ union_maybe :: proc() {
 	fmt.println(z, z_ok);
 }
 
-icons_texture_data_size := [2]int{0 = 512, 1 = 256};
-
-
 main :: proc() {
 	when true {
 		the_basics();
