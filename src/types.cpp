@@ -1,5 +1,3 @@
-#include "llvm-c/Types.h"
-
 struct Scope;
 struct Ast;
 
