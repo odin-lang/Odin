@@ -3966,6 +3966,10 @@ irValue *ir_map_entries(irProcedure *proc, irValue *value) {
 irValue *ir_map_entries_ptr(irProcedure *proc, irValue *value) {
 	gbAllocator a = ir_allocator();
 	Type *t = base_type(type_deref(ir_type(value)));
+	if (is_type_pointer(t)) {
+		value = ir_emit_load(proc, value);
+		t = base_type(type_deref(t));
+	}
 	GB_ASSERT_MSG(t->kind == Type_Map, "%s", type_to_string(t));
 	init_map_internal_types(t);
 	Type *gst = t->Map.generated_struct_type;
@@ -9991,7 +9995,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 				gbAllocator a = ir_allocator();
 				irAddr addr = ir_build_addr(proc, expr);
 				irValue *map = ir_addr_get_ptr(proc, addr);
-				if (is_type_pointer(type_deref(ir_addr_type(addr)))) {
+				if (is_type_pointer(ir_addr_type(addr))) {
 					map = ir_addr_load(proc, addr);
 				}
 				irValue *entries_ptr = ir_map_entries_ptr(proc, map);
