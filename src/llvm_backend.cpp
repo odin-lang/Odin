@@ -2823,8 +2823,16 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss) {
 void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value) {
 	Entity *e = implicit_entity_of_node(clause);
 	GB_ASSERT(e != nullptr);
-	lbAddr x = lb_add_local(p, e->type, e, false);
-	lb_addr_store(p, x, value);
+	if (e->flags & EntityFlag_Value) {
+		// by value
+		GB_ASSERT(are_types_identical(e->type, value.type));
+		lbAddr x = lb_add_local(p, e->type, e, false);
+		lb_addr_store(p, x, value);
+	} else {
+		// by reference
+		GB_ASSERT(are_types_identical(e->type, type_deref(value.type)));
+		lb_add_entity(p->module, e, value);
+	}
 }
 
 void lb_type_case_body(lbProcedure *p, Ast *label, Ast *clause, lbBlock *body, lbBlock *done) {
@@ -2917,15 +2925,9 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 
 		lb_start_block(p, body);
 
-		// bool any_or_not_ptr = is_type_any(type_deref(parent.type)) || !is_parent_ptr;
-		bool any_or_not_ptr = !is_parent_ptr;
-		if (cc->list.count == 1) {
+		bool by_reference = (case_entity->flags & EntityFlag_Value) == 0;
 
-			Type *ct = case_entity->type;
-			if (any_or_not_ptr) {
-				ct = alloc_type_pointer(ct);
-			}
-			GB_ASSERT_MSG(is_type_pointer(ct), "%s", type_to_string(ct));
+		if (cc->list.count == 1) {
 			lbValue data = {};
 			if (switch_kind == TypeSwitch_Union) {
 				data = union_data;
@@ -2933,8 +2935,12 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 				lbValue any_data = lb_emit_load(p, lb_emit_struct_ep(p, parent_ptr, 0));
 				data = any_data;
 			}
-			value = lb_emit_conv(p, data, ct);
-			if (any_or_not_ptr) {
+
+			Type *ct = case_entity->type;
+			Type *ct_ptr = alloc_type_pointer(ct);
+
+			value = lb_emit_conv(p, data, ct_ptr);
+			if (!by_reference) {
 				value = lb_emit_load(p, value);
 			}
 		}
