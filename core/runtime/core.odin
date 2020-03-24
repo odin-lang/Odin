@@ -24,7 +24,7 @@ import "intrinsics"
 // implemented within the compiler rather than in this "preload" file
 
 // NOTE(bill): This must match the compiler's
-Calling_Convention :: enum {
+Calling_Convention :: enum u8 {
 	Invalid     = 0,
 	Odin        = 1,
 	Contextless = 2,
