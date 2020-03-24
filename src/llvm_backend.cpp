@@ -2526,17 +2526,12 @@ void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs) {
 	}
 
 
-	lbAddr val0_addr = {};
-	lbAddr val1_addr = {};
-	if (val0_type) val0_addr = lb_build_addr(p, rs->val0);
-	if (val1_type) val1_addr = lb_build_addr(p, rs->val1);
-
 	if (is_map) {
-		if (val0_type) lb_addr_store(p, val0_addr, key);
-		if (val1_type) lb_addr_store(p, val1_addr, val);
+		if (val0_type) lb_store_range_stmt_val(p, rs->val0, key);
+		if (val1_type) lb_store_range_stmt_val(p, rs->val1, val);
 	} else {
-		if (val0_type) lb_addr_store(p, val0_addr, val);
-		if (val1_type) lb_addr_store(p, val1_addr, key);
+		if (val0_type) lb_store_range_stmt_val(p, rs->val0, val);
+		if (val1_type) lb_store_range_stmt_val(p, rs->val1, key);
 	}
 
 	lb_push_target_list(p, rs->label, done, loop, nullptr);
@@ -2833,6 +2828,26 @@ void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value) {
 		GB_ASSERT(are_types_identical(e->type, type_deref(value.type)));
 		lb_add_entity(p->module, e, value);
 	}
+}
+
+lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValue value) {
+	Entity *e = entity_of_node(stmt_val);
+	if (e == nullptr) {
+		return {};
+	}
+
+	if ((e->flags & EntityFlag_Value) == 0) {
+		if (LLVMIsALoadInst(value.value)) {
+			lbValue ptr = lb_address_from_load_or_generate_local(p, value);
+			lb_add_entity(p->module, e, ptr);
+			return lb_addr(ptr);
+		}
+	}
+
+	// by value
+	lbAddr addr = lb_add_local(p, e->type, e, false);
+	lb_addr_store(p, addr, value);
+	return addr;
 }
 
 void lb_type_case_body(lbProcedure *p, Ast *label, Ast *clause, lbBlock *body, lbBlock *done) {
