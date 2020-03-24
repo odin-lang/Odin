@@ -15,7 +15,7 @@ struct irModule {
 	u64 state_flags;
 
 	// String source_filename;
-	String layout;
+	// String layout;
 	// String triple;
 
 	PtrSet<Entity *>      min_dep_set;
@@ -3762,7 +3762,6 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 	}
 
 	if (addr.kind == irAddr_Map) {
-		// TODO(bill): map lookup
 		Type *map_type = base_type(addr.map_type);
 		irValue *v = ir_add_local_generated(proc, map_type->Map.lookup_result_type, true);
 		irValue *h = ir_gen_map_header(proc, addr.addr, map_type);
@@ -5926,34 +5925,6 @@ irValue *ir_type_info(irProcedure *proc, Type *type) {
 	GB_ASSERT(id >= 0);
 	return ir_emit_array_ep(proc, ir_global_type_info_data, ir_const_i32(id));
 }
-
-// IMPORTANT NOTE(bill): This must match the same as the in core.odin
-enum Typeid_Kind : u8 {
-	Typeid_Invalid,
-	Typeid_Integer,
-	Typeid_Rune,
-	Typeid_Float,
-	Typeid_Complex,
-	Typeid_Quaternion,
-	Typeid_String,
-	Typeid_Boolean,
-	Typeid_Any,
-	Typeid_Type_Id,
-	Typeid_Pointer,
-	Typeid_Procedure,
-	Typeid_Array,
-	Typeid_Enumerated_Array,
-	Typeid_Dynamic_Array,
-	Typeid_Slice,
-	Typeid_Tuple,
-	Typeid_Struct,
-	Typeid_Union,
-	Typeid_Enum,
-	Typeid_Map,
-	Typeid_Bit_Field,
-	Typeid_Bit_Set,
-};
-
 
 irValue *ir_typeid(irModule *m, Type *type) {
 	type = default_type(type);
@@ -9559,13 +9530,16 @@ void ir_build_range_tuple(irProcedure *proc, Ast *expr, Type *val0_type, Type *v
 void ir_store_type_case_implicit(irProcedure *proc, Ast *clause, irValue *value) {
 	Entity *e = implicit_entity_of_node(clause);
 	GB_ASSERT(e != nullptr);
-#if 1
-	irValue *x = ir_add_local(proc, e, nullptr, false);
-	ir_emit_store(proc, x, value);
-#else
-	irValue *x = ir_address_from_load_or_generate_local(proc, value);
-	ir_module_add_value(proc->module, e, x);
-#endif
+
+	if (e->flags & EntityFlag_Value) {
+		// by value
+		irValue *x = ir_add_local(proc, e, nullptr, false);
+		GB_ASSERT(are_types_identical(ir_type(value), e->type));
+		ir_emit_store(proc, x, value);
+	} else {
+		// by reference
+		ir_module_add_value(proc->module, e, value);
+	}
 }
 
 void ir_type_case_body(irProcedure *proc, Ast *label, Ast *clause, irBlock *body, irBlock *done) {
@@ -10506,14 +10480,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			ir_start_block(proc, body);
 
 			// bool any_or_not_ptr = is_type_any(type_deref(parent_type)) || !is_parent_ptr;
-			bool any_or_not_ptr = !is_parent_ptr;
 			if (cc->list.count == 1) {
 
-				Type *ct = case_entity->type;
-				if (any_or_not_ptr) {
-					ct = alloc_type_pointer(ct);
-				}
-				GB_ASSERT_MSG(is_type_pointer(ct), "%s", type_to_string(ct));
 				irValue *data = nullptr;
 				if (switch_kind == TypeSwitch_Union) {
 					data = union_data;
@@ -10521,9 +10489,17 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 					irValue *any_data = ir_emit_load(proc, ir_emit_struct_ep(proc, parent_ptr, 0));
 					data = any_data;
 				}
-				value = ir_emit_conv(proc, data, ct);
-				if (any_or_not_ptr) {
+				Type *ct = case_entity->type;
+				Type *ct_ptr = alloc_type_pointer(ct);
+
+
+				value = ir_emit_conv(proc, data, ct_ptr);
+
+				if (case_entity->flags & EntityFlag_Value) {
+					// by value
 					value = ir_emit_load(proc, value);
+				} else {
+					// by reference
 				}
 			}
 
@@ -11503,7 +11479,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				ir_emit_store(proc, results, ir_get_type_info_ptr(proc, t->Proc.results));
 			}
 			ir_emit_store(proc, variadic, ir_const_bool(t->Proc.variadic));
-			ir_emit_store(proc, convention, ir_const_int(t->Proc.calling_convention));
+			ir_emit_store(proc, convention, ir_const_u8(t->Proc.calling_convention));
 
 			// TODO(bill): TypeInfo for procedures
 			break;

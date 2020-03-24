@@ -2,6 +2,8 @@ struct Scope;
 struct Checker;
 struct Type;
 struct DeclInfo;
+struct lbModule;
+struct lbProcedure;
 
 
 #define ENTITY_KINDS \
@@ -30,7 +32,7 @@ String const entity_strings[] = {
 #undef ENTITY_KIND
 };
 
-enum EntityFlag {
+enum EntityFlag : u32 {
 	EntityFlag_Visited       = 1<<0,
 	EntityFlag_Used          = 1<<1,
 	EntityFlag_Using         = 1<<2,
@@ -105,6 +107,9 @@ struct Entity {
 	// TODO(bill): Cleanup how `using` works for entities
 	Entity *    using_parent;
 	Ast *       using_expr;
+
+	lbModule *   code_gen_module;
+	lbProcedure *code_gen_procedure;
 
 	isize       order_in_src;
 	String      deprecated_message;

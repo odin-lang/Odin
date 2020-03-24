@@ -302,6 +302,34 @@ struct Type {
 	bool failure;
 };
 
+// IMPORTANT NOTE(bill): This must match the same as the in core.odin
+enum Typeid_Kind : u8 {
+	Typeid_Invalid,
+	Typeid_Integer,
+	Typeid_Rune,
+	Typeid_Float,
+	Typeid_Complex,
+	Typeid_Quaternion,
+	Typeid_String,
+	Typeid_Boolean,
+	Typeid_Any,
+	Typeid_Type_Id,
+	Typeid_Pointer,
+	Typeid_Procedure,
+	Typeid_Array,
+	Typeid_Enumerated_Array,
+	Typeid_Dynamic_Array,
+	Typeid_Slice,
+	Typeid_Tuple,
+	Typeid_Struct,
+	Typeid_Union,
+	Typeid_Enum,
+	Typeid_Map,
+	Typeid_Bit_Field,
+	Typeid_Bit_Set,
+};
+
+
 
 
 // TODO(bill): Should I add extra information here specifying the kind of selection?
@@ -1113,13 +1141,13 @@ bool is_type_simd_vector(Type *t) {
 }
 
 Type *base_array_type(Type *t) {
-	if (is_type_array(t)) {
-		t = base_type(t);
-		return t->Array.elem;
-	}
-	if (is_type_simd_vector(t)) {
-		t = base_type(t);
-		return t->SimdVector.elem;
+	Type *bt = base_type(t);
+	if (is_type_array(bt)) {
+		return bt->Array.elem;
+	} else if (is_type_enumerated_array(bt)) {
+		return bt->EnumeratedArray.elem;
+	} else if (is_type_simd_vector(bt)) {
+		return bt->SimdVector.elem;
 	}
 	return t;
 }
@@ -3160,6 +3188,14 @@ i64 type_offset_of_from_selection(Type *type, Selection sel) {
 	return offset;
 }
 
+
+Type *get_struct_field_type(Type *t, isize index) {
+	t = base_type(type_deref(t));
+	GB_ASSERT(t->kind == Type_Struct);
+	return t->Struct.fields[index]->type;
+}
+
+
 gbString write_type_to_string(gbString str, Type *type) {
 	if (type == nullptr) {
 		return gb_string_appendc(str, "<no type>");
@@ -3391,7 +3427,13 @@ gbString write_type_to_string(gbString str, Type *type) {
 		str = gb_string_appendc(str, ")");
 		if (type->Proc.results) {
 			str = gb_string_appendc(str, " -> ");
+			if (type->Proc.results->Tuple.variables.count > 1) {
+				str = gb_string_appendc(str, "(");
+			}
 			str = write_type_to_string(str, type->Proc.results);
+			if (type->Proc.results->Tuple.variables.count > 1) {
+				str = gb_string_appendc(str, ")");
+			}
 		}
 		break;
 
@@ -3447,5 +3489,4 @@ gbString write_type_to_string(gbString str, Type *type) {
 gbString type_to_string(Type *type) {
 	return write_type_to_string(gb_string_make(heap_allocator(), ""), type);
 }
-
 
