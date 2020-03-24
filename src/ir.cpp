@@ -3929,7 +3929,20 @@ irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr) {
 	}
 
 	switch (addr.kind) {
-	case irAddr_Map:
+	case irAddr_Map: {
+		Type *map_type = base_type(addr.map_type);
+		irValue *h = ir_gen_map_header(proc, addr.addr, map_type);
+		irValue *key = ir_gen_map_key(proc, addr.map_key, map_type->Map.key);
+
+		auto args = array_make<irValue *>(ir_allocator(), 2);
+		args[0] = h;
+		args[1] = key;
+
+		irValue *ptr = ir_emit_runtime_call(proc, "__dynamic_map_get", args);
+		return ir_emit_conv(proc, ptr, alloc_type_pointer(map_type->Map.value));
+	}
+
+
 	case irAddr_BitField: {
 		irValue *v = ir_addr_load(proc, addr);
 		return ir_address_from_load_or_generate_local(proc, v);
