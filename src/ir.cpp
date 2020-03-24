@@ -9542,6 +9542,29 @@ void ir_store_type_case_implicit(irProcedure *proc, Ast *clause, irValue *value)
 	}
 }
 
+irAddr ir_store_range_stmt_val(irProcedure *proc, Ast *stmt_val, irValue *value) {
+	Entity *e = entity_of_node(stmt_val);
+	if (e == nullptr) {
+		return {};
+	}
+
+	if ((e->flags & EntityFlag_Value) == 0) {
+		if (value->kind == irValue_Instr) {
+			if (value->Instr.kind == irInstr_Load) {
+				irValue *ptr = value->Instr.Load.address;
+				ir_module_add_value(proc->module, e, ptr);
+				return ir_addr(ptr);
+			}
+		}
+	}
+
+	// by value
+	irAddr addr = ir_addr(ir_add_local(proc, e, nullptr, false));
+	GB_ASSERT(are_types_identical(ir_type(value), e->type));
+	ir_addr_store(proc, addr, value);
+	return addr;
+}
+
 void ir_type_case_body(irProcedure *proc, Ast *label, Ast *clause, irBlock *body, irBlock *done) {
 	ast_node(cc, CaseClause, clause);
 
@@ -10076,17 +10099,12 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 		}
 
 
-		irAddr val0_addr = {};
-		irAddr val1_addr = {};
-		if (val0_type) val0_addr = ir_build_addr(proc, rs->val0);
-		if (val1_type) val1_addr = ir_build_addr(proc, rs->val1);
-
 		if (is_map) {
-			if (val0_type) ir_addr_store(proc, val0_addr, key);
-			if (val1_type) ir_addr_store(proc, val1_addr, val);
+			if (val0_type) ir_store_range_stmt_val(proc, rs->val0, key);
+			if (val1_type) ir_store_range_stmt_val(proc, rs->val1, val);
 		} else {
-			if (val0_type) ir_addr_store(proc, val0_addr, val);
-			if (val1_type) ir_addr_store(proc, val1_addr, key);
+			if (val0_type) ir_store_range_stmt_val(proc, rs->val0, val);
+			if (val1_type) ir_store_range_stmt_val(proc, rs->val1, key);
 		}
 
 		ir_push_target_list(proc, rs->label, done, loop, nullptr);
