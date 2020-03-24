@@ -1484,6 +1484,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		Entity *entities[2] = {};
 		isize entity_count = 0;
 		bool is_map = false;
+		bool use_by_reference_for_value = false;
 
 		Ast *expr = unparen_expr(rs->expr);
 
@@ -1529,26 +1530,31 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					break;
 
 				case Type_EnumeratedArray:
+					if (is_ptr) use_by_reference_for_value = true;
 					val0 = t->EnumeratedArray.elem;
 					val1 = t->EnumeratedArray.index;
 					break;
 
 				case Type_Array:
+					if (is_ptr) use_by_reference_for_value = true;
 					val0 = t->Array.elem;
 					val1 = t_int;
 					break;
 
 				case Type_DynamicArray:
+					if (is_ptr) use_by_reference_for_value = true;
 					val0 = t->DynamicArray.elem;
 					val1 = t_int;
 					break;
 
 				case Type_Slice:
+					if (is_ptr) use_by_reference_for_value = true;
 					val0 = t->Slice.elem;
 					val1 = t_int;
 					break;
 
 				case Type_Map:
+					if (is_ptr) use_by_reference_for_value = true;
 					is_map = true;
 					val0 = t->Map.key;
 					val1 = t->Map.value;
@@ -1628,6 +1634,14 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				if (found == nullptr) {
 					entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
 					entity->flags |= EntityFlag_Value;
+					if (use_by_reference_for_value) {
+						if (i == 0 && !is_map) {
+							entity->flags &= ~EntityFlag_Value;
+						} else if (i == 1 && is_map) {
+							entity->flags &= ~EntityFlag_Value;
+						}
+					}
+
 					add_entity_definition(&ctx->checker->info, name, entity);
 				} else {
 					TokenPos pos = found->token.pos;
