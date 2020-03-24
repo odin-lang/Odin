@@ -107,7 +107,19 @@ lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 	}
 
 	switch (addr.kind) {
-	case lbAddr_Map:
+	case lbAddr_Map: {
+		Type *map_type = base_type(addr.map.type);
+		lbValue h = lb_gen_map_header(p, addr.addr, map_type);
+		lbValue key = lb_gen_map_key(p, addr.map.key, map_type->Map.key);
+
+		auto args = array_make<lbValue>(heap_allocator(), 2);
+		args[0] = h;
+		args[1] = key;
+
+		lbValue ptr = lb_emit_runtime_call(p, "__dynamic_map_get", args);
+
+		return lb_emit_conv(p, ptr, alloc_type_pointer(map_type->Map.value));
+	}
 	case lbAddr_BitField: {
 		lbValue v = lb_addr_load(p, addr);
 		return lb_address_from_load_or_generate_local(p, v);
