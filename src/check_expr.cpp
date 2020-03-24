@@ -1648,8 +1648,11 @@ bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 			return false;
 		}
 		return true;
-
 	}
+	if (o->mode == Addressing_MapIndex) {
+		return false;
+	}
+
 	if (o->mode != Addressing_Variable) {
 		return true;
 	}
