@@ -1155,10 +1155,12 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			}
 		}
 
+		bool is_reference = false;
+
 		if (is_ptr &&
 		    cc->list.count == 1 &&
 		    case_type != nullptr) {
-			case_type = alloc_type_pointer(case_type);
+			is_reference = true;
 		}
 
 		if (cc->list.count > 1) {
@@ -1173,7 +1175,9 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		{
 			Entity *tag_var = alloc_entity_variable(ctx->scope, lhs->Ident.token, case_type, EntityState_Resolved);
 			tag_var->flags |= EntityFlag_Used;
-			tag_var->flags |= EntityFlag_Value;
+			if (!is_reference) {
+				tag_var->flags |= EntityFlag_Value;
+			}
 			add_entity(ctx->checker, ctx->scope, lhs, tag_var);
 			add_entity_use(ctx, lhs, tag_var);
 			add_implicit_entity(ctx, stmt, tag_var);

@@ -32,7 +32,7 @@ String const entity_strings[] = {
 #undef ENTITY_KIND
 };
 
-enum EntityFlag {
+enum EntityFlag : u32 {
 	EntityFlag_Visited       = 1<<0,
 	EntityFlag_Used          = 1<<1,
 	EntityFlag_Using         = 1<<2,

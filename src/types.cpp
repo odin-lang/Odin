@@ -3490,4 +3490,3 @@ gbString type_to_string(Type *type) {
 	return write_type_to_string(gb_string_make(heap_allocator(), ""), type);
 }
 
-
