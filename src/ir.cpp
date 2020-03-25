@@ -9282,12 +9282,14 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 	case Type_EnumeratedArray: {
 		if (val_type != nullptr) {
 			val = ir_emit_load(proc, ir_emit_array_ep(proc, expr, idx));
-			// NOTE(bill): Override the idx value for the enumeration
-			Type *index_type =expr_type->EnumeratedArray.index;
-			if (compare_exact_values(Token_NotEq, expr_type->EnumeratedArray.min_value, exact_value_u64(0))) {
-				idx = ir_emit_arith(proc, Token_Add, idx, ir_value_constant(index_type, expr_type->EnumeratedArray.min_value), index_type);
-			}
 		}
+		// NOTE(bill): Override the idx value for the enumeration
+		Type *index_type =expr_type->EnumeratedArray.index;
+		if (compare_exact_values(Token_NotEq, expr_type->EnumeratedArray.min_value, exact_value_u64(0))) {
+			idx = ir_emit_arith(proc, Token_Add, idx, ir_value_constant(index_type, expr_type->EnumeratedArray.min_value), index_type);
+		}
+
+		idx = ir_emit_conv(proc, idx, expr_type->EnumeratedArray.index);
 		break;
 	}
 	case Type_Slice: {
@@ -9565,6 +9567,12 @@ irAddr ir_store_range_stmt_val(irProcedure *proc, Ast *stmt_val, irValue *value)
 		if (value->kind == irValue_Instr) {
 			if (value->Instr.kind == irInstr_Load) {
 				irValue *ptr = value->Instr.Load.address;
+				Type *vt = type_deref(ir_type(ptr));
+				if (!are_types_identical(vt, e->type)) {
+					GB_ASSERT(are_types_identical(base_type(vt), base_type(e->type)));
+					ptr = ir_emit_conv(proc, ptr, alloc_type_pointer(e->type));
+				}
+
 				ir_module_add_value(proc->module, e, ptr);
 				return ir_addr(ptr);
 			}
@@ -9573,7 +9581,19 @@ irAddr ir_store_range_stmt_val(irProcedure *proc, Ast *stmt_val, irValue *value)
 
 	// by value
 	irAddr addr = ir_addr(ir_add_local(proc, e, nullptr, false));
-	GB_ASSERT(are_types_identical(ir_type(value), e->type));
+	Type *vt = ir_type(value);
+	Type *base_et = base_type(e->type);
+	Type *base_vt = base_type(vt);
+	if (!are_types_identical(e->type, vt)) {
+		if (are_types_identical(base_et, base_vt)) {
+			value = ir_emit_conv(proc, value, e->type);
+		} else {
+			// gb_printf_err("%s\n", expr_to_string(stmt_val));
+			// gb_printf_err("Entity: %s -> Value: %s\n", type_to_string(e->type), type_to_string(vt));
+			// Token tok = ast_token(stmt_val);
+			// gb_printf_err("%.*s(%td:%td)\n", LIT(tok.pos.file), tok.pos.line, tok.pos.column);
+		}
+	}
 	ir_addr_store(proc, addr, value);
 	return addr;
 }
