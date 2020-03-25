@@ -3922,7 +3922,7 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 	return ir_emit_load(proc, addr.addr);
 }
 
-irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr) {
+irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr, bool allow_reference=false) {
 	if (addr.addr == nullptr) {
 		GB_PANIC("Illegal addr -> nullptr");
 		return nullptr;
@@ -3930,16 +3930,21 @@ irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr) {
 
 	switch (addr.kind) {
 	case irAddr_Map: {
-		Type *map_type = base_type(addr.map_type);
-		irValue *h = ir_gen_map_header(proc, addr.addr, map_type);
-		irValue *key = ir_gen_map_key(proc, addr.map_key, map_type->Map.key);
+		if (allow_reference) {
+			Type *map_type = base_type(addr.map_type);
+			irValue *h = ir_gen_map_header(proc, addr.addr, map_type);
+			irValue *key = ir_gen_map_key(proc, addr.map_key, map_type->Map.key);
 
-		auto args = array_make<irValue *>(ir_allocator(), 2);
-		args[0] = h;
-		args[1] = key;
+			auto args = array_make<irValue *>(ir_allocator(), 2);
+			args[0] = h;
+			args[1] = key;
 
-		irValue *ptr = ir_emit_runtime_call(proc, "__dynamic_map_get", args);
-		return ir_emit_conv(proc, ptr, alloc_type_pointer(map_type->Map.value));
+			irValue *ptr = ir_emit_runtime_call(proc, "__dynamic_map_get", args);
+			return ir_emit_conv(proc, ptr, alloc_type_pointer(map_type->Map.value));
+		} else {
+			irValue *v = ir_addr_load(proc, addr);
+			return ir_address_from_load_or_generate_local(proc, v);
+		}
 	}
 
 
@@ -7333,7 +7338,9 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 			#endif
 			}
 
-			return ir_build_addr_ptr(proc, ue->expr);
+			bool allow_reference = true;
+			irAddr addr = ir_build_addr(proc, ue->expr);
+			return ir_addr_get_ptr(proc, addr, allow_reference);
 		}
 		default:
 			return ir_emit_unary_arith(proc, ue->op.kind, ir_build_expr(proc, ue->expr), tv.type);
@@ -10053,7 +10060,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 				is_map = true;
 				gbAllocator a = ir_allocator();
 				irAddr addr = ir_build_addr(proc, expr);
-				irValue *map = ir_addr_get_ptr(proc, addr);
+				bool allow_reference = true;
+				irValue *map = ir_addr_get_ptr(proc, addr, allow_reference);
 				if (is_type_pointer(ir_addr_type(addr))) {
 					map = ir_addr_load(proc, addr);
 				}
