@@ -138,6 +138,7 @@ struct irProcedure {
 	bool                  is_foreign;
 	bool                  is_export;
 	bool                  is_entry_point;
+	bool                  is_startup;
 
 	irDebugInfo *         debug_scope;
 
@@ -7257,7 +7258,20 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		switch (ue->op.kind) {
 		case Token_And: {
 			Ast *ue_expr = unparen_expr(ue->expr);
-			if (ue_expr->kind == Ast_TypeAssertion) {
+			if (ue_expr->kind == Ast_CompoundLit) {
+				irValue *v = ir_build_expr(proc, ue->expr);
+
+				Type *type = ir_type(v);
+				irValue *ptr = nullptr;
+				if (proc->is_startup) {
+					ptr = ir_add_global_generated(proc->module, type, v);
+				} else {
+					ptr = ir_add_local_generated(proc, type, false);
+				}
+				ir_emit_store(proc, ptr, v);
+				return ptr;
+
+			} else if (ue_expr->kind == Ast_TypeAssertion) {
 				gbAllocator a = ir_allocator();
 				GB_ASSERT(is_type_pointer(tv.type));
 
@@ -12094,6 +12108,7 @@ void ir_gen_tree(irGen *s) {
 		Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
 		Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
+		p->Proc.is_startup = true;
 
 		map_set(&m->values, hash_entity(e), p);
 		map_set(&m->members, hash_string(name), p);
@@ -12174,6 +12189,7 @@ void ir_gen_tree(irGen *s) {
 		Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
 		Entity *e     = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p    = ir_value_procedure(m, e, proc_type, nullptr, body, name);
+		p->Proc.is_startup = true;
 
 		map_set(&m->values, hash_entity(e), p);
 		map_set(&m->members, hash_string(name), p);
@@ -12272,6 +12288,7 @@ void ir_gen_tree(irGen *s) {
 			Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
 			Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 			irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
+			p->Proc.is_startup = true;
 
 			m->entry_point_entity = e;
 
@@ -12309,6 +12326,7 @@ void ir_gen_tree(irGen *s) {
 		Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
 		Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
+		p->Proc.is_startup = true;
 
 		map_set(&m->values, hash_entity(e), p);
 		map_set(&m->members, hash_string(name), p);
