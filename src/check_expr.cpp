@@ -1653,6 +1653,11 @@ bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 		return false;
 	}
 
+	Ast *expr = unparen_expr(o->expr);
+	if (expr->kind == Ast_CompoundLit) {
+		return false;
+	}
+
 	if (o->mode != Addressing_Variable) {
 		return true;
 	}

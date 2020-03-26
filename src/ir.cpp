@@ -138,6 +138,7 @@ struct irProcedure {
 	bool                  is_foreign;
 	bool                  is_export;
 	bool                  is_entry_point;
+	bool                  is_startup;
 
 	irDebugInfo *         debug_scope;
 
@@ -3922,7 +3923,7 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 	return ir_emit_load(proc, addr.addr);
 }
 
-irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr) {
+irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr, bool allow_reference=false) {
 	if (addr.addr == nullptr) {
 		GB_PANIC("Illegal addr -> nullptr");
 		return nullptr;
@@ -3930,16 +3931,21 @@ irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr) {
 
 	switch (addr.kind) {
 	case irAddr_Map: {
-		Type *map_type = base_type(addr.map_type);
-		irValue *h = ir_gen_map_header(proc, addr.addr, map_type);
-		irValue *key = ir_gen_map_key(proc, addr.map_key, map_type->Map.key);
+		if (allow_reference) {
+			Type *map_type = base_type(addr.map_type);
+			irValue *h = ir_gen_map_header(proc, addr.addr, map_type);
+			irValue *key = ir_gen_map_key(proc, addr.map_key, map_type->Map.key);
 
-		auto args = array_make<irValue *>(ir_allocator(), 2);
-		args[0] = h;
-		args[1] = key;
+			auto args = array_make<irValue *>(ir_allocator(), 2);
+			args[0] = h;
+			args[1] = key;
 
-		irValue *ptr = ir_emit_runtime_call(proc, "__dynamic_map_get", args);
-		return ir_emit_conv(proc, ptr, alloc_type_pointer(map_type->Map.value));
+			irValue *ptr = ir_emit_runtime_call(proc, "__dynamic_map_get", args);
+			return ir_emit_conv(proc, ptr, alloc_type_pointer(map_type->Map.value));
+		} else {
+			irValue *v = ir_addr_load(proc, addr);
+			return ir_address_from_load_or_generate_local(proc, v);
+		}
 	}
 
 
@@ -7252,7 +7258,20 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		switch (ue->op.kind) {
 		case Token_And: {
 			Ast *ue_expr = unparen_expr(ue->expr);
-			if (ue_expr->kind == Ast_TypeAssertion) {
+			if (ue_expr->kind == Ast_CompoundLit) {
+				irValue *v = ir_build_expr(proc, ue->expr);
+
+				Type *type = ir_type(v);
+				irValue *ptr = nullptr;
+				if (proc->is_startup) {
+					ptr = ir_add_global_generated(proc->module, type, v);
+				} else {
+					ptr = ir_add_local_generated(proc, type, false);
+				}
+				ir_emit_store(proc, ptr, v);
+				return ptr;
+
+			} else if (ue_expr->kind == Ast_TypeAssertion) {
 				gbAllocator a = ir_allocator();
 				GB_ASSERT(is_type_pointer(tv.type));
 
@@ -7333,7 +7352,9 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 			#endif
 			}
 
-			return ir_build_addr_ptr(proc, ue->expr);
+			bool allow_reference = true;
+			irAddr addr = ir_build_addr(proc, ue->expr);
+			return ir_addr_get_ptr(proc, addr, allow_reference);
 		}
 		default:
 			return ir_emit_unary_arith(proc, ue->op.kind, ir_build_expr(proc, ue->expr), tv.type);
@@ -9282,12 +9303,14 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 	case Type_EnumeratedArray: {
 		if (val_type != nullptr) {
 			val = ir_emit_load(proc, ir_emit_array_ep(proc, expr, idx));
-			// NOTE(bill): Override the idx value for the enumeration
-			Type *index_type =expr_type->EnumeratedArray.index;
-			if (compare_exact_values(Token_NotEq, expr_type->EnumeratedArray.min_value, exact_value_u64(0))) {
-				idx = ir_emit_arith(proc, Token_Add, idx, ir_value_constant(index_type, expr_type->EnumeratedArray.min_value), index_type);
-			}
 		}
+		// NOTE(bill): Override the idx value for the enumeration
+		Type *index_type =expr_type->EnumeratedArray.index;
+		if (compare_exact_values(Token_NotEq, expr_type->EnumeratedArray.min_value, exact_value_u64(0))) {
+			idx = ir_emit_arith(proc, Token_Add, idx, ir_value_constant(index_type, expr_type->EnumeratedArray.min_value), index_type);
+		}
+
+		idx = ir_emit_conv(proc, idx, expr_type->EnumeratedArray.index);
 		break;
 	}
 	case Type_Slice: {
@@ -9565,6 +9588,12 @@ irAddr ir_store_range_stmt_val(irProcedure *proc, Ast *stmt_val, irValue *value)
 		if (value->kind == irValue_Instr) {
 			if (value->Instr.kind == irInstr_Load) {
 				irValue *ptr = value->Instr.Load.address;
+				Type *vt = type_deref(ir_type(ptr));
+				if (!are_types_identical(vt, e->type)) {
+					GB_ASSERT(are_types_identical(base_type(vt), base_type(e->type)));
+					ptr = ir_emit_conv(proc, ptr, alloc_type_pointer(e->type));
+				}
+
 				ir_module_add_value(proc->module, e, ptr);
 				return ir_addr(ptr);
 			}
@@ -9573,7 +9602,19 @@ irAddr ir_store_range_stmt_val(irProcedure *proc, Ast *stmt_val, irValue *value)
 
 	// by value
 	irAddr addr = ir_addr(ir_add_local(proc, e, nullptr, false));
-	GB_ASSERT(are_types_identical(ir_type(value), e->type));
+	Type *vt = ir_type(value);
+	Type *base_et = base_type(e->type);
+	Type *base_vt = base_type(vt);
+	if (!are_types_identical(e->type, vt)) {
+		if (are_types_identical(base_et, base_vt)) {
+			value = ir_emit_conv(proc, value, e->type);
+		} else {
+			// gb_printf_err("%s\n", expr_to_string(stmt_val));
+			// gb_printf_err("Entity: %s -> Value: %s\n", type_to_string(e->type), type_to_string(vt));
+			// Token tok = ast_token(stmt_val);
+			// gb_printf_err("%.*s(%td:%td)\n", LIT(tok.pos.file), tok.pos.line, tok.pos.column);
+		}
+	}
 	ir_addr_store(proc, addr, value);
 	return addr;
 }
@@ -10033,7 +10074,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 				is_map = true;
 				gbAllocator a = ir_allocator();
 				irAddr addr = ir_build_addr(proc, expr);
-				irValue *map = ir_addr_get_ptr(proc, addr);
+				bool allow_reference = true;
+				irValue *map = ir_addr_get_ptr(proc, addr, allow_reference);
 				if (is_type_pointer(ir_addr_type(addr))) {
 					map = ir_addr_load(proc, addr);
 				}
@@ -12066,6 +12108,7 @@ void ir_gen_tree(irGen *s) {
 		Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
 		Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
+		p->Proc.is_startup = true;
 
 		map_set(&m->values, hash_entity(e), p);
 		map_set(&m->members, hash_string(name), p);
@@ -12146,6 +12189,7 @@ void ir_gen_tree(irGen *s) {
 		Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
 		Entity *e     = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p    = ir_value_procedure(m, e, proc_type, nullptr, body, name);
+		p->Proc.is_startup = true;
 
 		map_set(&m->values, hash_entity(e), p);
 		map_set(&m->members, hash_string(name), p);
@@ -12244,6 +12288,7 @@ void ir_gen_tree(irGen *s) {
 			Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
 			Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 			irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
+			p->Proc.is_startup = true;
 
 			m->entry_point_entity = e;
 
@@ -12281,6 +12326,7 @@ void ir_gen_tree(irGen *s) {
 		Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
 		Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
+		p->Proc.is_startup = true;
 
 		map_set(&m->values, hash_entity(e), p);
 		map_set(&m->members, hash_string(name), p);
