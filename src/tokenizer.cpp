@@ -179,6 +179,10 @@ Token make_token_ident(String s) {
 	Token t = {Token_Ident, s};
 	return t;
 }
+Token make_token_ident(char const *s) {
+	Token t = {Token_Ident, make_string_c(s)};
+	return t;
+}
 
 
 struct ErrorCollector {
@@ -904,7 +908,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 			}
 
 			if (token.kind == Token_Ident && token.string == "notin") {
-				token.kind = Token_not_in; 
+				token.kind = Token_not_in;
 			}
 		}
 

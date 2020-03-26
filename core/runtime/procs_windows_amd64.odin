@@ -2,15 +2,15 @@ package runtime
 
 foreign import kernel32 "system:Kernel32.lib"
 
-@private
-@(link_name="_tls_index")
-_tls_index: u32;
+// @private
+// @(link_name="_tls_index")
+// _tls_index: u32;
 
-@private
-@(link_name="_fltused")
-_fltused: i32 = 0x9875;
+// @private
+// @(link_name="_fltused")
+// _fltused: i32 = 0x9875;
 
-@(link_name="memcpy")
+// @(link_name="memcpy")
 memcpy :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 	foreign kernel32 {
 		RtlCopyMemory :: proc "c" (dst, src: rawptr, len: int) ---
@@ -19,7 +19,7 @@ memcpy :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 	return dst;
 }
 
-@(link_name="memmove")
+// @(link_name="memmove")
 memmove :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 	foreign kernel32 {
 		RtlMoveMemory :: proc "c" (dst, src: rawptr, len: int) ---
@@ -28,7 +28,7 @@ memmove :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 	return dst;
 }
 
-@(link_name="memset")
+// @(link_name="memset")
 memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {
 	foreign kernel32 {
 		RtlFillMemory :: proc "c" (dst: rawptr, len: int, fill: byte) ---

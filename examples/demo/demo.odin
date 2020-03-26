@@ -1245,7 +1245,7 @@ implicit_selector_expression :: proc() {
 
 	switch f {
 	case .A:
-		fmt.println("HERE");
+		fmt.println("HITHER");
 	case .B:
 		fmt.println("NEVER");
 	case .C:
@@ -1741,6 +1741,7 @@ range_statements_with_multiple_return_values :: proc() {
 		}
 	}
 }
+
 
 soa_struct_layout :: proc() {
 	// IMPORTANT NOTE(bill, 2019-11-03): This feature is subject to be changed/removed
