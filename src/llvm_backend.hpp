@@ -185,6 +185,7 @@ struct lbProcedure {
 	bool         is_foreign;
 	bool         is_export;
 	bool         is_entry_point;
+	bool         is_startup;
 
 
 	LLVMValueRef    value;

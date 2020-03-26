@@ -8145,7 +8145,20 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		switch (ue->op.kind) {
 		case Token_And: {
 			Ast *ue_expr = unparen_expr(ue->expr);
-			if (ue_expr->kind == Ast_TypeAssertion) {
+			if (ue_expr->kind == Ast_CompoundLit) {
+				lbValue v = lb_build_expr(p, ue->expr);
+
+				Type *type = v.type;
+				lbAddr addr = {};
+				if (p->is_startup) {
+					addr = lb_add_global_generated(p->module, type, v);
+				} else {
+					addr = lb_add_local_generated(p, type, false);
+				}
+				lb_addr_store(p, addr, v);
+				return addr.addr;
+
+			} else if (ue_expr->kind == Ast_TypeAssertion) {
 				gbAllocator a = heap_allocator();
 				GB_ASSERT(is_type_pointer(tv.type));
 
@@ -10797,6 +10810,7 @@ void lb_generate_code(lbGenerator *gen) {
 		Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
 
 		lbProcedure *p = lb_create_dummy_procedure(m, str_lit(LB_STARTUP_TYPE_INFO_PROC_NAME), proc_type);
+		p->is_startup = true;
 		startup_type_info = p;
 
 		lb_begin_procedure_body(p);
@@ -10821,6 +10835,7 @@ void lb_generate_code(lbGenerator *gen) {
 		Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
 
 		lbProcedure *p = lb_create_dummy_procedure(m, str_lit(LB_STARTUP_CONTEXT_PROC_NAME), proc_type);
+		p->is_startup = true;
 		startup_context = p;
 
 		lb_begin_procedure_body(p);
@@ -10845,6 +10860,7 @@ void lb_generate_code(lbGenerator *gen) {
 		Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
 
 		lbProcedure *p = lb_create_dummy_procedure(m, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
+		p->is_startup = true;
 		startup_runtime = p;
 
 		lb_begin_procedure_body(p);
@@ -10933,6 +10949,7 @@ void lb_generate_code(lbGenerator *gen) {
 		Type *proc_type = alloc_type_proc(nullptr, params, 2, results, 1, false, ProcCC_CDecl);
 
 		lbProcedure *p = lb_create_dummy_procedure(m, str_lit("main"), proc_type);
+		p->is_startup = true;
 
 		lb_begin_procedure_body(p);
 
