@@ -711,6 +711,7 @@ void init_universal(void) {
 	add_global_string_constant(str_lit("ODIN_ROOT"),    bc->ODIN_ROOT);
 	add_global_constant(str_lit("ODIN_DEBUG"), t_untyped_bool, exact_value_bool(bc->ODIN_DEBUG));
 	add_global_constant(str_lit("ODIN_DISABLE_ASSERT"), t_untyped_bool, exact_value_bool(bc->ODIN_DISABLE_ASSERT));
+	add_global_constant(str_lit("ODIN_USE_LLVM_API"), t_untyped_bool, exact_value_bool(bc->use_llvm_api));
 
 
 // Builtin Procedures
@@ -1627,6 +1628,7 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 	if (decl == nullptr) {
 		return;
 	}
+
 	for_array(i, decl->type_info_deps.entries) {
 		Type *type = decl->type_info_deps.entries[i].ptr;
 		add_min_dep_type_info(c, type);
@@ -1672,8 +1674,8 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("type_table"),
 		str_lit("__type_info_of"),
 		str_lit("default_temp_allocator"),
-		str_lit("default_temp_allocator_init"),
-		str_lit("default_temp_allocator_destroy"),
+		// str_lit("default_temp_allocator_init"),
+		// str_lit("default_temp_allocator_destroy"),
 		str_lit("default_temp_allocator_proc"),
 
 		str_lit("Type_Info"),
@@ -1686,6 +1688,8 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("udivti3"),
 
 		str_lit("memset"),
+		str_lit("memcpy"),
+		str_lit("memmove"),
 
 		str_lit("memory_compare"),
 		str_lit("memory_compare_zero"),

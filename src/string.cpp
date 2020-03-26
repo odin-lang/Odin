@@ -101,6 +101,14 @@ char *alloc_cstring(gbAllocator a, String s) {
 	return c_str;
 }
 
+char *cstring_duplicate(gbAllocator a, char const *s) {
+	isize len = gb_strlen(s);
+	char *c_str = gb_alloc_array(a, char, len+1);
+	gb_memmove(c_str, s, len);
+	c_str[len] = '\0';
+	return c_str;
+}
+
 
 
 gb_inline bool str_eq_ignore_case(String const &a, String const &b) {

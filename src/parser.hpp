@@ -98,7 +98,6 @@ struct AstFile {
 	Array<Ast *> imports; // 'import' 'using import'
 	isize        directive_count;
 
-
 	Ast *        curr_proc;
 	isize        error_count;
 
@@ -111,6 +110,9 @@ struct AstFile {
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;
 	TokenPos fix_prev_pos;
+
+	struct LLVMOpaqueMetadata *llvm_metadata;
+	struct LLVMOpaqueMetadata *llvm_metadata_scope;
 };
 
 
@@ -174,11 +176,9 @@ enum ProcCallingConvention {
 	ProcCC_StdCall,
 	ProcCC_FastCall,
 
-	// TODO(bill): Add extra calling conventions
-	// ProcCC_VectorCall,
-	// ProcCC_ClrCall,
-
 	ProcCC_None,
+
+	ProcCC_MAX,
 
 
 	ProcCC_ForeignBlockDefault = -1,
@@ -251,6 +251,7 @@ enum StmtAllowFlag {
 		ProcInlining inlining; \
 		Token where_token; \
 		Array<Ast *> where_clauses; \
+		DeclInfo *decl; \
 	}) \
 	AST_KIND(CompoundLit, "compound literal", struct { \
 		Ast *type; \

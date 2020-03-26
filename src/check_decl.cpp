@@ -625,6 +625,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	check_open_scope(ctx, pl->type);
 	defer (check_close_scope(ctx));
+	ctx->scope->procedure_entity = e;
 
 	Type *decl_type = nullptr;
 
