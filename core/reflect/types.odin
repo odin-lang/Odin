@@ -1,9 +1,8 @@
 package reflect
 
-import rt "core:runtime"
 import "core:strings"
 
-are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
+are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 	if a == b do return true;
 
 	if (a == nil && b != nil) ||
@@ -18,55 +17,55 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 	}
 
 	switch x in a.variant {
-	case rt.Type_Info_Named:
-		y, ok := b.variant.(rt.Type_Info_Named);
+	case Type_Info_Named:
+		y, ok := b.variant.(Type_Info_Named);
 		if !ok do return false;
 		return x.base == y.base;
 
-	case rt.Type_Info_Integer:
-		y, ok := b.variant.(rt.Type_Info_Integer);
+	case Type_Info_Integer:
+		y, ok := b.variant.(Type_Info_Integer);
 		if !ok do return false;
-		return x.signed == y.signed;
+		return x.signed == y.signed && x.endianness == y.endianness;
 
-	case rt.Type_Info_Rune:
-		_, ok := b.variant.(rt.Type_Info_Rune);
+	case Type_Info_Rune:
+		_, ok := b.variant.(Type_Info_Rune);
 		return ok;
 
-	case rt.Type_Info_Float:
-		_, ok := b.variant.(rt.Type_Info_Float);
+	case Type_Info_Float:
+		_, ok := b.variant.(Type_Info_Float);
 		return ok;
 
-	case rt.Type_Info_Complex:
-		_, ok := b.variant.(rt.Type_Info_Complex);
+	case Type_Info_Complex:
+		_, ok := b.variant.(Type_Info_Complex);
 		return ok;
 
-	case rt.Type_Info_Quaternion:
-		_, ok := b.variant.(rt.Type_Info_Quaternion);
+	case Type_Info_Quaternion:
+		_, ok := b.variant.(Type_Info_Quaternion);
 		return ok;
 
-	case rt.Type_Info_Type_Id:
-		_, ok := b.variant.(rt.Type_Info_Type_Id);
+	case Type_Info_Type_Id:
+		_, ok := b.variant.(Type_Info_Type_Id);
 		return ok;
 
-	case rt.Type_Info_String:
-		_, ok := b.variant.(rt.Type_Info_String);
+	case Type_Info_String:
+		_, ok := b.variant.(Type_Info_String);
 		return ok;
 
-	case rt.Type_Info_Boolean:
-		_, ok := b.variant.(rt.Type_Info_Boolean);
+	case Type_Info_Boolean:
+		_, ok := b.variant.(Type_Info_Boolean);
 		return ok;
 
-	case rt.Type_Info_Any:
-		_, ok := b.variant.(rt.Type_Info_Any);
+	case Type_Info_Any:
+		_, ok := b.variant.(Type_Info_Any);
 		return ok;
 
-	case rt.Type_Info_Pointer:
-		y, ok := b.variant.(rt.Type_Info_Pointer);
+	case Type_Info_Pointer:
+		y, ok := b.variant.(Type_Info_Pointer);
 		if !ok do return false;
 		return are_types_identical(x.elem, y.elem);
 
-	case rt.Type_Info_Procedure:
-		y, ok := b.variant.(rt.Type_Info_Procedure);
+	case Type_Info_Procedure:
+		y, ok := b.variant.(Type_Info_Procedure);
 		if !ok do return false;
 		switch {
 		case x.variadic   != y.variadic,
@@ -76,31 +75,31 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 
 		return are_types_identical(x.params, y.params) && are_types_identical(x.results, y.results);
 
-	case rt.Type_Info_Array:
-		y, ok := b.variant.(rt.Type_Info_Array);
+	case Type_Info_Array:
+		y, ok := b.variant.(Type_Info_Array);
 		if !ok do return false;
 		if x.count != y.count do return false;
 		return are_types_identical(x.elem, y.elem);
 
-	case rt.Type_Info_Enumerated_Array:
-		y, ok := b.variant.(rt.Type_Info_Enumerated_Array);
+	case Type_Info_Enumerated_Array:
+		y, ok := b.variant.(Type_Info_Enumerated_Array);
 		if !ok do return false;
 		if x.count != y.count do return false;
 		return are_types_identical(x.index, y.index) &&
 		       are_types_identical(x.elem, y.elem);
 
-	case rt.Type_Info_Dynamic_Array:
-		y, ok := b.variant.(rt.Type_Info_Dynamic_Array);
+	case Type_Info_Dynamic_Array:
+		y, ok := b.variant.(Type_Info_Dynamic_Array);
 		if !ok do return false;
 		return are_types_identical(x.elem, y.elem);
 
-	case rt.Type_Info_Slice:
-		y, ok := b.variant.(rt.Type_Info_Slice);
+	case Type_Info_Slice:
+		y, ok := b.variant.(Type_Info_Slice);
 		if !ok do return false;
 		return are_types_identical(x.elem, y.elem);
 
-	case rt.Type_Info_Tuple:
-		y, ok := b.variant.(rt.Type_Info_Tuple);
+	case Type_Info_Tuple:
+		y, ok := b.variant.(Type_Info_Tuple);
 		if !ok do return false;
 		if len(x.types) != len(y.types) do return false;
 		for _, i in x.types {
@@ -111,14 +110,17 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 		}
 		return true;
 
-	case rt.Type_Info_Struct:
-		y, ok := b.variant.(rt.Type_Info_Struct);
+	case Type_Info_Struct:
+		y, ok := b.variant.(Type_Info_Struct);
 		if !ok do return false;
 	   	switch {
-		case len(x.types)   != len(y.types),
-		     x.is_packed    != y.is_packed,
-		     x.is_raw_union != y.is_raw_union,
-		     x.custom_align != y.custom_align:
+		case len(x.types)    != len(y.types),
+		     x.is_packed     != y.is_packed,
+		     x.is_raw_union  != y.is_raw_union,
+		     x.custom_align  != y.custom_align,
+		     x.soa_kind      != y.soa_kind,
+		     x.soa_base_type != y.soa_base_type,
+		     x.soa_len       != y.soa_len:
 		     return false;
 		}
 		for _, i in x.types {
@@ -132,8 +134,8 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 		}
 		return true;
 
-	case rt.Type_Info_Union:
-		y, ok := b.variant.(rt.Type_Info_Union);
+	case Type_Info_Union:
+		y, ok := b.variant.(Type_Info_Union);
 		if !ok do return false;
 		if len(x.variants) != len(y.variants) do return false;
 
@@ -143,17 +145,17 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 		}
 		return true;
 
-	case rt.Type_Info_Enum:
+	case Type_Info_Enum:
 		// NOTE(bill): Should be handled above
 		return false;
 
-	case rt.Type_Info_Map:
-		y, ok := b.variant.(rt.Type_Info_Map);
+	case Type_Info_Map:
+		y, ok := b.variant.(Type_Info_Map);
 		if !ok do return false;
 		return are_types_identical(x.key, y.key) && are_types_identical(x.value, y.value);
 
-	case rt.Type_Info_Bit_Field:
-		y, ok := b.variant.(rt.Type_Info_Bit_Field);
+	case Type_Info_Bit_Field:
+		y, ok := b.variant.(Type_Info_Bit_Field);
 		if !ok do return false;
 		if len(x.names) != len(y.names) do return false;
 
@@ -168,18 +170,18 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 		}
 		return true;
 
-	case rt.Type_Info_Bit_Set:
-		y, ok := b.variant.(rt.Type_Info_Bit_Set);
+	case Type_Info_Bit_Set:
+		y, ok := b.variant.(Type_Info_Bit_Set);
 		if !ok do return false;
 		return x.elem == y.elem && x.lower == y.lower && x.upper == y.upper;
 
-	case rt.Type_Info_Opaque:
-		y, ok := b.variant.(rt.Type_Info_Opaque);
+	case Type_Info_Opaque:
+		y, ok := b.variant.(Type_Info_Opaque);
 		if !ok do return false;
 		return x.elem == y.elem;
 
-	case rt.Type_Info_Simd_Vector:
-		y, ok := b.variant.(rt.Type_Info_Simd_Vector);
+	case Type_Info_Simd_Vector:
+		y, ok := b.variant.(Type_Info_Simd_Vector);
 		if !ok do return false;
 		return x.count == y.count && x.elem == y.elem;
 	}
@@ -187,114 +189,141 @@ are_types_identical :: proc(a, b: ^rt.Type_Info) -> bool {
 	return false;
 }
 
-is_signed :: proc(info: ^rt.Type_Info) -> bool {
+is_signed :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	#partial switch i in rt.type_info_base(info).variant {
-	case rt.Type_Info_Integer: return i.signed;
-	case rt.Type_Info_Float:   return true;
+	#partial switch i in type_info_base(info).variant {
+	case Type_Info_Integer: return i.signed;
+	case Type_Info_Float:   return true;
 	}
 	return false;
 }
-is_integer :: proc(info: ^rt.Type_Info) -> bool {
+is_unsigned :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Integer);
+	#partial switch i in type_info_base(info).variant {
+	case Type_Info_Integer: return !i.signed;
+	case Type_Info_Float:   return false;
+	}
+	return false;
+}
+
+
+is_integer :: proc(info: ^Type_Info) -> bool {
+	if info == nil do return false;
+	_, ok := type_info_base(info).variant.(Type_Info_Integer);
 	return ok;
 }
-is_rune :: proc(info: ^rt.Type_Info) -> bool {
+is_rune :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Rune);
+	_, ok := type_info_base(info).variant.(Type_Info_Rune);
 	return ok;
 }
-is_float :: proc(info: ^rt.Type_Info) -> bool {
+is_float :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Float);
+	_, ok := type_info_base(info).variant.(Type_Info_Float);
 	return ok;
 }
-is_complex :: proc(info: ^rt.Type_Info) -> bool {
+is_complex :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Complex);
+	_, ok := type_info_base(info).variant.(Type_Info_Complex);
 	return ok;
 }
-is_any :: proc(info: ^rt.Type_Info) -> bool {
+is_quaternion :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Any);
+	_, ok := type_info_base(info).variant.(Type_Info_Quaternion);
 	return ok;
 }
-is_string :: proc(info: ^rt.Type_Info) -> bool {
+is_any :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_String);
+	_, ok := type_info_base(info).variant.(Type_Info_Any);
 	return ok;
 }
-is_boolean :: proc(info: ^rt.Type_Info) -> bool {
+is_string :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Boolean);
+	_, ok := type_info_base(info).variant.(Type_Info_String);
 	return ok;
 }
-is_pointer :: proc(info: ^rt.Type_Info) -> bool {
+is_cstring :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Pointer);
+	v, ok := type_info_base(info).variant.(Type_Info_String);
+	return ok && v.is_cstring;
+}
+is_boolean :: proc(info: ^Type_Info) -> bool {
+	if info == nil do return false;
+	_, ok := type_info_base(info).variant.(Type_Info_Boolean);
 	return ok;
 }
-is_procedure :: proc(info: ^rt.Type_Info) -> bool {
+is_pointer :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Procedure);
+	_, ok := type_info_base(info).variant.(Type_Info_Pointer);
 	return ok;
 }
-is_array :: proc(info: ^rt.Type_Info) -> bool {
+is_procedure :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Array);
+	_, ok := type_info_base(info).variant.(Type_Info_Procedure);
 	return ok;
 }
-is_dynamic_array :: proc(info: ^rt.Type_Info) -> bool {
+is_array :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Dynamic_Array);
+	_, ok := type_info_base(info).variant.(Type_Info_Array);
 	return ok;
 }
-is_dynamic_map :: proc(info: ^rt.Type_Info) -> bool {
+is_enumerated_array :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Map);
+	_, ok := type_info_base(info).variant.(Type_Info_Enumerated_Array);
 	return ok;
 }
-is_slice :: proc(info: ^rt.Type_Info) -> bool {
+is_dynamic_array :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Slice);
+	_, ok := type_info_base(info).variant.(Type_Info_Dynamic_Array);
 	return ok;
 }
-is_tuple :: proc(info: ^rt.Type_Info) -> bool {
+is_dynamic_map :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Tuple);
+	_, ok := type_info_base(info).variant.(Type_Info_Map);
 	return ok;
 }
-is_struct :: proc(info: ^rt.Type_Info) -> bool {
+is_slice :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	s, ok := rt.type_info_base(info).variant.(rt.Type_Info_Struct);
+	_, ok := type_info_base(info).variant.(Type_Info_Slice);
+	return ok;
+}
+is_tuple :: proc(info: ^Type_Info) -> bool {
+	if info == nil do return false;
+	_, ok := type_info_base(info).variant.(Type_Info_Tuple);
+	return ok;
+}
+is_struct :: proc(info: ^Type_Info) -> bool {
+	if info == nil do return false;
+	s, ok := type_info_base(info).variant.(Type_Info_Struct);
 	return ok && !s.is_raw_union;
 }
-is_raw_union :: proc(info: ^rt.Type_Info) -> bool {
+is_raw_union :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	s, ok := rt.type_info_base(info).variant.(rt.Type_Info_Struct);
+	s, ok := type_info_base(info).variant.(Type_Info_Struct);
 	return ok && s.is_raw_union;
 }
-is_union :: proc(info: ^rt.Type_Info) -> bool {
+is_union :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Union);
+	_, ok := type_info_base(info).variant.(Type_Info_Union);
 	return ok;
 }
-is_enum :: proc(info: ^rt.Type_Info) -> bool {
+is_enum :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Enum);
+	_, ok := type_info_base(info).variant.(Type_Info_Enum);
 	return ok;
 }
-is_opaque :: proc(info: ^rt.Type_Info) -> bool {
+is_opaque :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Opaque);
+	_, ok := type_info_base(info).variant.(Type_Info_Opaque);
 	return ok;
 }
-is_simd_vector :: proc(info: ^rt.Type_Info) -> bool {
+is_simd_vector :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
-	_, ok := rt.type_info_base(info).variant.(rt.Type_Info_Simd_Vector);
+	_, ok := type_info_base(info).variant.(Type_Info_Simd_Vector);
 	return ok;
 }
+
+
 
 
 
@@ -305,7 +334,7 @@ write_typeid :: proc(buf: ^strings.Builder, id: typeid) {
 	write_type(buf, type_info_of(id));
 }
 
-write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
+write_type :: proc(buf: ^strings.Builder, ti: ^Type_Info) {
 	using strings;
 	if ti == nil {
 		write_string(buf, "nil");
@@ -313,9 +342,9 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 	}
 
 	switch info in ti.variant {
-	case rt.Type_Info_Named:
+	case Type_Info_Named:
 		write_string(buf, info.name);
-	case rt.Type_Info_Integer:
+	case Type_Info_Integer:
 		switch ti.id {
 		case int:     write_string(buf, "int");
 		case uint:    write_string(buf, "uint");
@@ -329,49 +358,49 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 			case .Big:    write_string(buf, "be");
 			}
 		}
-	case rt.Type_Info_Rune:
+	case Type_Info_Rune:
 		write_string(buf, "rune");
-	case rt.Type_Info_Float:
+	case Type_Info_Float:
 		write_byte(buf, 'f');
 		write_i64(buf, i64(8*ti.size), 10);
-	case rt.Type_Info_Complex:
+	case Type_Info_Complex:
 		write_string(buf, "complex");
 		write_i64(buf, i64(8*ti.size), 10);
-	case rt.Type_Info_Quaternion:
+	case Type_Info_Quaternion:
 		write_string(buf, "quaternion");
 		write_i64(buf, i64(8*ti.size), 10);
-	case rt.Type_Info_String:
+	case Type_Info_String:
 		if info.is_cstring {
 			write_string(buf, "cstring");
 		} else {
 			write_string(buf, "string");
 		}
-	case rt.Type_Info_Boolean:
+	case Type_Info_Boolean:
 		switch ti.id {
 		case bool: write_string(buf, "bool");
 		case:
 			write_byte(buf, 'b');
 			write_i64(buf, i64(8*ti.size), 10);
 		}
-	case rt.Type_Info_Any:
+	case Type_Info_Any:
 		write_string(buf, "any");
 
-	case rt.Type_Info_Type_Id:
+	case Type_Info_Type_Id:
 		write_string(buf, "typeid");
 
-	case rt.Type_Info_Pointer:
+	case Type_Info_Pointer:
 		if info.elem == nil {
 			write_string(buf, "rawptr");
 		} else {
 			write_string(buf, "^");
 			write_type(buf, info.elem);
 		}
-	case rt.Type_Info_Procedure:
+	case Type_Info_Procedure:
 		write_string(buf, "proc");
 		if info.params == nil {
 			write_string(buf, "()");
 		} else {
-			t := info.params.variant.(rt.Type_Info_Tuple);
+			t := info.params.variant.(Type_Info_Tuple);
 			write_string(buf, "(");
 			for t, i in t.types {
 				if i > 0 do write_string(buf, ", ");
@@ -383,7 +412,7 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 			write_string(buf, " -> ");
 			write_type(buf, info.results);
 		}
-	case rt.Type_Info_Tuple:
+	case Type_Info_Tuple:
 		count := len(info.names);
 		if count != 1 do write_string(buf, "(");
 		for name, i in info.names {
@@ -399,32 +428,32 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		}
 		if count != 1 do write_string(buf, ")");
 
-	case rt.Type_Info_Array:
+	case Type_Info_Array:
 		write_string(buf, "[");
 		write_i64(buf, i64(info.count), 10);
 		write_string(buf, "]");
 		write_type(buf, info.elem);
 
-	case rt.Type_Info_Enumerated_Array:
+	case Type_Info_Enumerated_Array:
 		write_string(buf, "[");
 		write_type(buf, info.index);
 		write_string(buf, "]");
 		write_type(buf, info.elem);
 
-	case rt.Type_Info_Dynamic_Array:
+	case Type_Info_Dynamic_Array:
 		write_string(buf, "[dynamic]");
 		write_type(buf, info.elem);
-	case rt.Type_Info_Slice:
+	case Type_Info_Slice:
 		write_string(buf, "[]");
 		write_type(buf, info.elem);
 
-	case rt.Type_Info_Map:
+	case Type_Info_Map:
 		write_string(buf, "map[");
 		write_type(buf, info.key);
 		write_byte(buf, ']');
 		write_type(buf, info.value);
 
-	case rt.Type_Info_Struct:
+	case Type_Info_Struct:
 		switch info.soa_kind {
 		case .None: // Ignore
 		case .Fixed:
@@ -460,7 +489,7 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		}
 		write_byte(buf, '}');
 
-	case rt.Type_Info_Union:
+	case Type_Info_Union:
 		write_string(buf, "union ");
 		if info.custom_align {
 			write_string(buf, "#align ");
@@ -474,7 +503,7 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		}
 		write_byte(buf, '}');
 
-	case rt.Type_Info_Enum:
+	case Type_Info_Enum:
 		write_string(buf, "enum ");
 		write_type(buf, info.base);
 		write_string(buf, " {");
@@ -484,7 +513,7 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		}
 		write_byte(buf, '}');
 
-	case rt.Type_Info_Bit_Field:
+	case Type_Info_Bit_Field:
 		write_string(buf, "bit_field ");
 		if ti.align != 1 {
 			write_string(buf, "#align ");
@@ -500,7 +529,7 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		}
 		write_byte(buf, '}');
 
-	case rt.Type_Info_Bit_Set:
+	case Type_Info_Bit_Set:
 		write_string(buf, "bit_set[");
 		switch {
 		case is_enum(info.elem):
@@ -520,11 +549,11 @@ write_type :: proc(buf: ^strings.Builder, ti: ^rt.Type_Info) {
 		}
 		write_byte(buf, ']');
 
-	case rt.Type_Info_Opaque:
+	case Type_Info_Opaque:
 		write_string(buf, "opaque ");
 		write_type(buf, info.elem);
 
-	case rt.Type_Info_Simd_Vector:
+	case Type_Info_Simd_Vector:
 		if info.is_x86_mmx {
 			write_string(buf, "intrinsics.x86_mmx");
 		} else {

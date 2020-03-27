@@ -3,6 +3,34 @@ package reflect
 import "core:runtime"
 import "core:mem"
 
+Type_Info :: runtime.Type_Info;
+
+Type_Info_Named            :: runtime.Type_Info_Named;
+Type_Info_Integer          :: runtime.Type_Info_Integer;
+Type_Info_Rune             :: runtime.Type_Info_Rune;
+Type_Info_Float            :: runtime.Type_Info_Float;
+Type_Info_Complex          :: runtime.Type_Info_Complex;
+Type_Info_Quaternion       :: runtime.Type_Info_Quaternion;
+Type_Info_String           :: runtime.Type_Info_String;
+Type_Info_Boolean          :: runtime.Type_Info_Boolean;
+Type_Info_Any              :: runtime.Type_Info_Any;
+Type_Info_Type_Id          :: runtime.Type_Info_Type_Id;
+Type_Info_Pointer          :: runtime.Type_Info_Pointer;
+Type_Info_Procedure        :: runtime.Type_Info_Procedure;
+Type_Info_Array            :: runtime.Type_Info_Array;
+Type_Info_Enumerated_Array :: runtime.Type_Info_Enumerated_Array;
+Type_Info_Dynamic_Array    :: runtime.Type_Info_Dynamic_Array;
+Type_Info_Slice            :: runtime.Type_Info_Slice;
+Type_Info_Tuple            :: runtime.Type_Info_Tuple;
+Type_Info_Struct           :: runtime.Type_Info_Struct;
+Type_Info_Union            :: runtime.Type_Info_Union;
+Type_Info_Enum             :: runtime.Type_Info_Enum;
+Type_Info_Map              :: runtime.Type_Info_Map;
+Type_Info_Bit_Field        :: runtime.Type_Info_Bit_Field;
+Type_Info_Bit_Set          :: runtime.Type_Info_Bit_Set;
+Type_Info_Opaque           :: runtime.Type_Info_Opaque;
+Type_Info_Simd_Vector      :: runtime.Type_Info_Simd_Vector;
+
 
 Type_Kind :: enum {
 	Invalid,
@@ -39,31 +67,31 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 	ti := type_info_of(T);
 	if ti != nil {
 		switch _ in ti.variant {
-		case runtime.Type_Info_Named:         return .Named;
-		case runtime.Type_Info_Integer:       return .Integer;
-		case runtime.Type_Info_Rune:          return .Rune;
-		case runtime.Type_Info_Float:         return .Float;
-		case runtime.Type_Info_Complex:       return .Complex;
-		case runtime.Type_Info_Quaternion:    return .Quaternion;
-		case runtime.Type_Info_String:        return .String;
-		case runtime.Type_Info_Boolean:       return .Boolean;
-		case runtime.Type_Info_Any:           return .Any;
-		case runtime.Type_Info_Type_Id:       return .Type_Id;
-		case runtime.Type_Info_Pointer:       return .Pointer;
-		case runtime.Type_Info_Procedure:     return .Procedure;
-		case runtime.Type_Info_Array:         return .Array;
-		case runtime.Type_Info_Enumerated_Array: return .Enumerated_Array;
-		case runtime.Type_Info_Dynamic_Array: return .Dynamic_Array;
-		case runtime.Type_Info_Slice:         return .Slice;
-		case runtime.Type_Info_Tuple:         return .Tuple;
-		case runtime.Type_Info_Struct:        return .Struct;
-		case runtime.Type_Info_Union:         return .Union;
-		case runtime.Type_Info_Enum:          return .Enum;
-		case runtime.Type_Info_Map:           return .Map;
-		case runtime.Type_Info_Bit_Field:     return .Bit_Field;
-		case runtime.Type_Info_Bit_Set:       return .Bit_Set;
-		case runtime.Type_Info_Opaque:        return .Opaque;
-		case runtime.Type_Info_Simd_Vector:   return .Simd_Vector;
+		case Type_Info_Named:            return .Named;
+		case Type_Info_Integer:          return .Integer;
+		case Type_Info_Rune:             return .Rune;
+		case Type_Info_Float:            return .Float;
+		case Type_Info_Complex:          return .Complex;
+		case Type_Info_Quaternion:       return .Quaternion;
+		case Type_Info_String:           return .String;
+		case Type_Info_Boolean:          return .Boolean;
+		case Type_Info_Any:              return .Any;
+		case Type_Info_Type_Id:          return .Type_Id;
+		case Type_Info_Pointer:          return .Pointer;
+		case Type_Info_Procedure:        return .Procedure;
+		case Type_Info_Array:            return .Array;
+		case Type_Info_Enumerated_Array: return .Enumerated_Array;
+		case Type_Info_Dynamic_Array:    return .Dynamic_Array;
+		case Type_Info_Slice:            return .Slice;
+		case Type_Info_Tuple:            return .Tuple;
+		case Type_Info_Struct:           return .Struct;
+		case Type_Info_Union:            return .Union;
+		case Type_Info_Enum:             return .Enum;
+		case Type_Info_Map:              return .Map;
+		case Type_Info_Bit_Field:        return .Bit_Field;
+		case Type_Info_Bit_Set:          return .Bit_Set;
+		case Type_Info_Opaque:           return .Opaque;
+		case Type_Info_Simd_Vector:      return .Simd_Vector;
 		}
 
 	}
@@ -80,6 +108,75 @@ backing_type_kind :: proc(T: typeid) -> Type_Kind {
 	return type_kind(runtime.typeid_core(T));
 }
 
+
+type_info_base :: proc(info: ^runtime.Type_Info) -> ^runtime.Type_Info {
+	if info == nil do return nil;
+
+	base := info;
+	loop: for {
+		#partial switch i in base.variant {
+		case Type_Info_Named: base = i.base;
+		case: break loop;
+		}
+	}
+	return base;
+}
+
+
+type_info_core :: proc(info: ^runtime.Type_Info) -> ^runtime.Type_Info {
+	if info == nil do return nil;
+
+	base := info;
+	loop: for {
+		#partial switch i in base.variant {
+		case Type_Info_Named:  base = i.base;
+		case Type_Info_Enum:   base = i.base;
+		case Type_Info_Opaque: base = i.elem;
+		case: break loop;
+		}
+	}
+	return base;
+}
+type_info_base_without_enum :: type_info_core;
+
+
+typeid_base :: proc(id: typeid) -> typeid {
+	ti := type_info_of(id);
+	ti = type_info_base(ti);
+	return ti.id;
+}
+typeid_core :: proc(id: typeid) -> typeid {
+	ti := type_info_base_without_enum(type_info_of(id));
+	return ti.id;
+}
+typeid_base_without_enum :: typeid_core;
+
+typeid_elem :: proc(id: typeid) -> typeid {
+	ti := type_info_of(id);
+	if ti == nil do return nil;
+
+	bits := 8*ti.size;
+
+	#partial switch v in ti.variant {
+	case Type_Info_Complex:
+		switch bits {
+		case 64:  return f32;
+		case 128: return f64;
+		}
+	case Type_Info_Quaternion:
+		switch bits {
+		case 128: return f32;
+		case 256: return f64;
+		}
+	case Type_Info_Pointer:          return v.elem.id;
+	case Type_Info_Opaque:           return v.elem.id;
+	case Type_Info_Array:            return v.elem.id;
+	case Type_Info_Enumerated_Array: return v.elem.id;
+	case Type_Info_Slice:            return v.elem.id;
+	case Type_Info_Dynamic_Array:    return v.elem.id;
+	}
+	return id;
+}
 
 
 size_of_typeid :: proc(T: typeid) -> int {
@@ -109,6 +206,9 @@ any_data :: inline proc(v: any) -> (data: rawptr, id: typeid) {
 }
 
 is_nil :: proc(v: any) -> bool {
+	if v == nil {
+		return true;
+	}
 	data := to_bytes(v);
 	if data != nil {
 		return true;
@@ -125,21 +225,48 @@ length :: proc(val: any) -> int {
 	v := val;
 	v.id = runtime.typeid_base(v.id);
 	switch a in v {
-	case runtime.Type_Info_Array:
+	case Type_Info_Array:
 		return a.count;
 
-	case runtime.Type_Info_Slice:
+	case Type_Info_Enumerated_Array:
+		return a.count;
+
+	case Type_Info_Slice:
 		return (^mem.Raw_Slice)(v.data).len;
 
-	case runtime.Type_Info_Dynamic_Array:
+	case Type_Info_Dynamic_Array:
 		return (^mem.Raw_Dynamic_Array)(v.data).len;
 
-	case runtime.Type_Info_String:
+	case Type_Info_Map:
+		return (^mem.Raw_Map)(v.data).entries.len;
+
+	case Type_Info_String:
 		if a.is_cstring {
 			return len((^cstring)(v.data)^);
 		} else {
 			return (^mem.Raw_String)(v.data).len;
 		}
+	}
+	return 0;
+}
+
+capacity :: proc(val: any) -> int {
+	if val == nil do return 0;
+
+	v := val;
+	v.id = runtime.typeid_base(v.id);
+	switch a in v {
+	case Type_Info_Array:
+		return a.count;
+
+	case Type_Info_Enumerated_Array:
+		return a.count;
+
+	case Type_Info_Dynamic_Array:
+		return (^mem.Raw_Dynamic_Array)(v.data).cap;
+
+	case Type_Info_Map:
+		return (^mem.Raw_Map)(v.data).entries.cap;
 	}
 	return 0;
 }
@@ -151,27 +278,33 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 	v := val;
 	v.id = runtime.typeid_base(v.id);
 	switch a in v {
-	case runtime.Type_Info_Array:
+	case Type_Info_Array:
 		runtime.bounds_check_error_loc(loc, i, a.count);
 		offset := uintptr(a.elem.size * i);
 		data := rawptr(uintptr(v.data) + offset);
 		return any{data, a.elem.id};
 
-	case runtime.Type_Info_Slice:
+	case Type_Info_Enumerated_Array:
+		runtime.bounds_check_error_loc(loc, i, a.count);
+		offset := uintptr(a.elem.size * i);
+		data := rawptr(uintptr(v.data) + offset);
+		return any{data, a.elem.id};
+
+	case Type_Info_Slice:
 		raw := (^mem.Raw_Slice)(v.data);
 		runtime.bounds_check_error_loc(loc, i, raw.len);
 		offset := uintptr(a.elem.size * i);
 		data := rawptr(uintptr(raw.data) + offset);
 		return any{data, a.elem.id};
 
-	case runtime.Type_Info_Dynamic_Array:
+	case Type_Info_Dynamic_Array:
 		raw := (^mem.Raw_Dynamic_Array)(v.data);
 		runtime.bounds_check_error_loc(loc, i, raw.len);
 		offset := uintptr(a.elem.size * i);
 		data := rawptr(uintptr(raw.data) + offset);
 		return any{data, a.elem.id};
 
-	case runtime.Type_Info_String:
+	case Type_Info_String:
 		if a.is_cstring do return nil;
 
 		raw := (^mem.Raw_String)(v.data);
@@ -290,12 +423,12 @@ struct_field_offsets :: proc(T: typeid) -> []uintptr {
 
 
 
-struct_tag_get :: proc(tag: Struct_Tag, key: string) -> (value: string) {
+struct_tag_get :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag) {
 	value, _ = struct_tag_lookup(tag, key);
 	return;
 }
 
-struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: string, ok: bool) {
+struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: Struct_Tag, ok: bool) {
 	for t := tag; t != ""; /**/ {
 		i := 0;
 		for i < len(t) && t[i] == ' ' { // Skip whitespace
@@ -336,7 +469,7 @@ struct_tag_lookup :: proc(tag: Struct_Tag, key: string) -> (value: string, ok: b
 		t = t[i+1:];
 
 		if key == name {
-			return val[1:i], true;
+			return Struct_Tag(val[1:i]), true;
 		}
 	}
 	return;

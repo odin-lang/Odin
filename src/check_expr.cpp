@@ -5446,13 +5446,16 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				switch (bt->Basic.kind) {
 				case Basic_complex64:  operand->type = t_f32; break;
 				case Basic_complex128: operand->type = t_f64; break;
+				case Basic_quaternion128: operand->type = t_f32; break;
+				case Basic_quaternion256: operand->type = t_f64; break;
 				}
 				break;
-			case Type_Pointer:      operand->type = bt->Pointer.elem;      break;
-			case Type_Opaque:       operand->type = bt->Opaque.elem;       break;
-			case Type_Array:        operand->type = bt->Array.elem;        break;
-			case Type_Slice:        operand->type = bt->Slice.elem;        break;
-			case Type_DynamicArray: operand->type = bt->DynamicArray.elem; break;
+			case Type_Pointer:         operand->type = bt->Pointer.elem;         break;
+			case Type_Opaque:          operand->type = bt->Opaque.elem;          break;
+			case Type_Array:           operand->type = bt->Array.elem;           break;
+			case Type_EnumeratedArray: operand->type = bt->EnumeratedArray.elem; break;
+			case Type_Slice:           operand->type = bt->Slice.elem;           break;
+			case Type_DynamicArray:    operand->type = bt->DynamicArray.elem;    break;
 			}
 		}
 		operand->mode = Addressing_Type;
