@@ -6039,11 +6039,12 @@ irValue *ir_emit_logical_binary_expr(irProcedure *proc, TokenKind op, Ast *left,
 
 	auto edges = array_make<irValue *>(ir_allocator(), 0, done->preds.count+1);
 	for_array(i, done->preds) {
-		array_add(&edges, short_circuit);
+		irValue *edge = ir_emit_conv(proc, short_circuit, type);
+		array_add(&edges, edge);
 	}
 
 	ir_start_block(proc, rhs);
-	irValue *edge = ir_build_expr(proc, right);
+	irValue *edge = ir_emit_conv(proc, ir_build_expr(proc, right), type);
 	array_add(&edges, edge);
 	ir_emit_jump(proc, done);
 	ir_start_block(proc, done);
