@@ -3261,7 +3261,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_Enum:
 		str = gb_string_appendc(str, "enum");
 		if (type->Enum.base_type != nullptr) {
-		str = gb_string_appendc(str, " ");
+			str = gb_string_appendc(str, " ");
 			str = write_type_to_string(str, type->Enum.base_type);
 		}
 		str = gb_string_appendc(str, " {");
@@ -3278,7 +3278,11 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_Union:
-		str = gb_string_appendc(str, "union {");
+		str = gb_string_appendc(str, "union");
+		if (type->Union.no_nil != 0) str = gb_string_appendc(str, " #no_nil");
+		if (type->Union.maybe != 0)  str = gb_string_appendc(str, " #maybe");
+		if (type->Union.custom_align != 0) str = gb_string_append_fmt(str, " #align %d", cast(int)type->Union.custom_align);
+		str = gb_string_appendc(str, " {");
 		for_array(i, type->Union.variants) {
 			Type *t = type->Union.variants[i];
 			if (i > 0) str = gb_string_appendc(str, ", ");
@@ -3302,6 +3306,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 		str = gb_string_appendc(str, "struct");
 		if (type->Struct.is_packed)    str = gb_string_appendc(str, " #packed");
 		if (type->Struct.is_raw_union) str = gb_string_appendc(str, " #raw_union");
+		if (type->Struct.custom_align != 0) str = gb_string_append_fmt(str, " #align %d", cast(int)type->Struct.custom_align);
 		str = gb_string_appendc(str, " {");
 		for_array(i, type->Struct.fields) {
 			Entity *f = type->Struct.fields[i];

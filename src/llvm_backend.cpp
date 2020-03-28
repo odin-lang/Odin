@@ -138,6 +138,11 @@ lbValue lb_build_addr_ptr(lbProcedure *p, Ast *expr) {
 	return lb_addr_get_ptr(p, addr);
 }
 
+void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue len) {
+}
+
+void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValue high, lbValue len, bool lower_value_used) {
+}
 
 
 void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value) {
@@ -207,7 +212,7 @@ void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value) {
 			GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
 			i64 count = t->Struct.soa_count;
 			lbValue len = lb_const_int(p->module, t_int, count);
-			// lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), index, len);
+			lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), index, len);
 		}
 
 		for_array(i, t->Struct.fields) {
@@ -355,7 +360,7 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		lbAddr res = lb_add_local_generated(p, elem, true);
 
 		if (!lb_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed) {
-			// lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
+			lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
 		}
 
 		if (t->Struct.soa_kind == StructSoa_Fixed) {
@@ -5544,6 +5549,9 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 
 	GB_ASSERT_MSG(result_type != nullptr, "%s %d", type_to_string(t), index);
 
+	if (t->kind == Type_Struct && t->Struct.custom_align != 0) {
+		index += 1;
+	}
 	if (lb_is_const(s)) {
 		lbModule *m = p->module;
 		lbValue res = {};
@@ -5661,6 +5669,9 @@ lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 
 	GB_ASSERT_MSG(result_type != nullptr, "%s, %d", type_to_string(s.type), index);
 
+	if (t->kind == Type_Struct && t->Struct.custom_align != 0) {
+		index += 1;
+	}
 
 	lbValue res = {};
 	res.value = LLVMBuildExtractValue(p->builder, s.value, cast(unsigned)index, "");
@@ -8543,7 +8554,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 					// TODO(bill): Bounds check
 					if (!lb_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed) {
 						lbValue len = lb_soa_struct_len(p, addr.addr);
-						// lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
+						lb_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
 					}
 
 					lbValue item = {};
@@ -8629,7 +8640,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 
 			if (!build_context.no_bounds_check) {
-				// // TODO HACK(bill): Clean up this hack to get the length for bounds checking
+				// TODO HACK(bill): Clean up this hack to get the length for bounds checking
 				// GB_ASSERT(LLVMIsALoadInst(field.value));
 
 				// lbValue a = {};
@@ -8757,7 +8768,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			lbValue elem = lb_dynamic_array_elem(p, dynamic_array);
 			lbValue len = lb_dynamic_array_len(p, dynamic_array);
 			lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
-			// lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 			lbValue v = lb_emit_ptr_offset(p, elem, index);
 			return lb_addr(v);
 		}
@@ -8781,7 +8792,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			len = lb_string_len(p, str);
 
 			index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
-			// lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 
 			return lb_addr(lb_emit_ptr_offset(p, elem, index));
 		}
@@ -8807,7 +8818,6 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			addr = base;
 			base = lb_emit_load(p, base);
 		}
-		// TODO(bill): Cleanup like mad!
 
 		switch (type->kind) {
 		case Type_Slice: {
@@ -8816,7 +8826,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			if (high.value == nullptr) high = len;
 
 			if (!no_indices) {
-				// ir_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
+				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 			}
 
 			lbValue elem    = lb_emit_ptr_offset(p, lb_slice_elem(p, base), low);
@@ -8835,7 +8845,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			if (high.value == nullptr) high = len;
 
 			if (!no_indices) {
-				// lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
+				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 			}
 
 			lbValue elem    = lb_emit_ptr_offset(p, lb_dynamic_array_elem(p, base), low);
@@ -8858,7 +8868,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 			if (!low_const || !high_const) {
 				if (!no_indices) {
-					// lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
+					lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 				}
 			}
 			lbValue elem    = lb_emit_ptr_offset(p, lb_array_elem(p, addr), low);
@@ -8875,7 +8885,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			if (high.value == nullptr) high = len;
 
 			if (!no_indices) {
-				// lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
+				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 			}
 
 			lbValue elem    = lb_emit_ptr_offset(p, lb_string_elem(p, base), low);
@@ -8893,7 +8903,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 				if (high.value == nullptr) high = len;
 
 				if (!no_indices) {
-					// lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
+					lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 				}
 				#if 1
 
