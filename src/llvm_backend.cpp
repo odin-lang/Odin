@@ -2459,11 +2459,9 @@ void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs) {
 		switch (et->kind) {
 		case Type_Map: {
 			is_map = true;
-			gbAllocator a = heap_allocator();
-			lbAddr addr = lb_build_addr(p, expr);
-			lbValue map = lb_addr_get_ptr(p, addr);
-			if (is_type_pointer(type_deref(lb_addr_type(addr)))) {
-				map = lb_addr_load(p, addr);
+			lbValue map = lb_build_addr_ptr(p, expr);
+			if (is_type_pointer(type_deref(map.type))) {
+				map = lb_emit_load(p, map);
 			}
 			lbValue entries_ptr = lb_map_entries_ptr(p, map);
 			lbValue count_ptr = lb_emit_struct_ep(p, entries_ptr, 1);
@@ -4420,6 +4418,28 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 			res.value = LLVMBuildNeg(p->builder, x.value, "");
 		} else if (is_type_float(x.type)) {
 			res.value = LLVMBuildFNeg(p->builder, x.value, "");
+		} else if (is_type_complex(x.type)) {
+			LLVMValueRef v0 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 0, ""), "");
+			LLVMValueRef v1 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 1, ""), "");
+
+			lbAddr addr = lb_add_local_generated(p, x.type, false);
+			LLVMBuildStore(p->builder, v0, LLVMBuildStructGEP(p->builder, addr.addr.value, 0, ""));
+			LLVMBuildStore(p->builder, v1, LLVMBuildStructGEP(p->builder, addr.addr.value, 1, ""));
+			return lb_addr_load(p, addr);
+
+		} else if (is_type_quaternion(x.type)) {
+			LLVMValueRef v0 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 0, ""), "");
+			LLVMValueRef v1 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 1, ""), "");
+			LLVMValueRef v2 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 2, ""), "");
+			LLVMValueRef v3 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 3, ""), "");
+
+			lbAddr addr = lb_add_local_generated(p, x.type, false);
+			LLVMBuildStore(p->builder, v0, LLVMBuildStructGEP(p->builder, addr.addr.value, 0, ""));
+			LLVMBuildStore(p->builder, v1, LLVMBuildStructGEP(p->builder, addr.addr.value, 1, ""));
+			LLVMBuildStore(p->builder, v2, LLVMBuildStructGEP(p->builder, addr.addr.value, 2, ""));
+			LLVMBuildStore(p->builder, v3, LLVMBuildStructGEP(p->builder, addr.addr.value, 3, ""));
+			return lb_addr_load(p, addr);
+
 		} else {
 			GB_PANIC("Unhandled type %s", type_to_string(x.type));
 		}
