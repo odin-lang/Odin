@@ -198,9 +198,9 @@ i32 linker_stage(lbGenerator *gen) {
 
 		if (build_context.is_dll) {
 			output_ext = "dll";
-			link_settings = gb_string_append_fmt(link_settings, "/DLL");
+			link_settings = gb_string_append_fmt(link_settings, " /DLL");
 		} else {
-			link_settings = gb_string_append_fmt(link_settings, "/ENTRY:mainCRTStartup");
+			link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");
 		}
 
 		if (build_context.pdb_filepath != "") {
