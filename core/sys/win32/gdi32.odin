@@ -4,7 +4,7 @@ package win32
 foreign import "system:gdi32.lib"
 
 WHITENESS :: 0x00FF0062;
-BLACKNESS :: 0x00FF0062;
+BLACKNESS :: 0x00000042;
 
 @(default_calling_convention = "std")
 foreign gdi32 {
