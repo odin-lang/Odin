@@ -212,7 +212,7 @@ euler_angles_from_quaternion :: proc(q: Quaternion) -> (roll, pitch, yaw: Float)
     if abs(sinp) >= 1 {
         pitch = math.copy_sign(math.TAU * 0.25, sinp);
     } else {
-        pitch = math.asin(sinp);
+        pitch = 2 * math.asin(sinp);
     }
 
     // yaw, z-axis rotation
