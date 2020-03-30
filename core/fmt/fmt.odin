@@ -327,11 +327,11 @@ sbprintf :: proc(b: ^strings.Builder, fmt: string, args: ..any) -> string {
 				} else {
 					strings.write_string(b, "%!(BAD ARGUMENT NUMBER ");
 					// Skip over the bad argument
-					prev_i := i;
+					start_index := i;
 					for i < end && fmt[i] != '}' && fmt[i] != ':' {
 						i += 1;
 					}
-					fmt_arg(&fi, fmt[prev_i:i], 'v');
+					fmt_arg(&fi, fmt[start_index:i], 'v');
 					strings.write_string(b, ")");
 				}
 			}
