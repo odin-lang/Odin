@@ -203,24 +203,24 @@ quaternion_from_euler_angles :: proc(roll, pitch, yaw: Float) -> Quaternion {
 
 euler_angles_from_quaternion :: proc(q: Quaternion) -> (roll, pitch, yaw: Float) {
 	// roll, x-axis rotation
-    sinr_cosp: Float = 2 * (q.w * q.x + q.y * q.z);
-    cosr_cosp: Float = 1 - 2 * (q.x * q.x + q.y * q.y);
-    roll = math.atan2(sinr_cosp, cosr_cosp);
+	sinr_cosp: Float = 2 * (q.w * q.x + q.y * q.z);
+	cosr_cosp: Float = 1 - 2 * (q.x * q.x + q.y * q.y);
+	roll = math.atan2(sinr_cosp, cosr_cosp);
 
-    // pitch, y-axis rotation
-    sinp: Float = 2 * (q.w * q.y - q.z * q.x);
-    if abs(sinp) >= 1 {
-        pitch = math.copy_sign(math.TAU * 0.25, sinp);
-    } else {
-        pitch = 2 * math.asin(sinp);
-    }
+	// pitch, y-axis rotation
+	sinp: Float = 2 * (q.w * q.y - q.z * q.x);
+	if abs(sinp) >= 1 {
+		pitch = math.copy_sign(math.TAU * 0.25, sinp);
+	} else {
+		pitch = 2 * math.asin(sinp);
+	}
 
-    // yaw, z-axis rotation
-    siny_cosp: Float = 2 * (q.w * q.z + q.x * q.y);
-    cosy_cosp: Float = 1 - 2 * (q.y * q.y + q.z * q.z);
-    yaw = math.atan2(siny_cosp, cosy_cosp);
+	// yaw, z-axis rotation
+	siny_cosp: Float = 2 * (q.w * q.z + q.x * q.y);
+	cosy_cosp: Float = 1 - 2 * (q.y * q.y + q.z * q.z);
+	yaw = math.atan2(siny_cosp, cosy_cosp);
 
-    return;
+	return;
 }
 
 quaternion_from_forward_and_up :: proc(forward, up: Vector3) -> Quaternion {
