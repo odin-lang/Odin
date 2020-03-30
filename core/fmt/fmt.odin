@@ -193,10 +193,10 @@ sbprintf :: proc(b: ^strings.Builder, fmt: string, args: ..any) -> string {
 
 
 	loop: for i := 0; i < end; /**/ {
-		fi = Info{buf = b, good_arg_index = true};
+		fi = Info{buf = b, good_arg_index = true, reordered = fi.reordered};
 
 		prev_i := i;
-		for i < end && fmt[i] != '%' {
+		for i < end && !(fmt[i] == '%' || fmt[i] == '{' || fmt[i] == '}') {
 			i += 1;
 		}
 		if i > prev_i {
@@ -206,99 +206,238 @@ sbprintf :: proc(b: ^strings.Builder, fmt: string, args: ..any) -> string {
 			break loop;
 		}
 
-		// Process a "verb"
+		char := fmt[i];
+		// Process a "char"
 		i += 1;
 
-		prefix_loop: for ; i < end; i += 1 {
-			switch fmt[i] {
-			case '+':
-				fi.plus = true;
-			case '-':
-				fi.minus = true;
-				fi.zero = false;
-			case ' ':
-				fi.space = true;
-			case '#':
-				fi.hash = true;
-			case '0':
-				fi.zero = !fi.minus;
-			case:
-				break prefix_loop;
-			}
-		}
-
-		arg_index, i, was_prev_index = _arg_number(&fi, arg_index, fmt, i, len(args));
-
-		// Width
-		if i < end && fmt[i] == '*' {
-			i += 1;
-			fi.width, arg_index, fi.width_set = int_from_arg(args, arg_index);
-			if !fi.width_set {
-				strings.write_string(b, "%!(BAD WIDTH)");
-			}
-
-			if fi.width < 0 {
-				fi.width = -fi.width;
-				fi.minus = true;
-				fi.zero  = false;
-			}
-			was_prev_index = false;
-		} else {
-			fi.width, i, fi.width_set = _parse_int(fmt, i);
-			if was_prev_index && fi.width_set { // %[6]2d
-				fi.good_arg_index = false;
-			}
-		}
-
-		// Precision
-		if i < end && fmt[i] == '.' {
-			i += 1;
-			if was_prev_index { // %[6].2d
-				fi.good_arg_index = false;
-			}
-			if i < end && fmt[i] == '*' {
-				arg_index, i, was_prev_index = _arg_number(&fi, arg_index, fmt, i, len(args));
+		if char == '}' {
+			if i < end && fmt[i] == char {
+				// Skip extra one
 				i += 1;
-				fi.prec, arg_index, fi.prec_set = int_from_arg(args, arg_index);
-				if fi.prec < 0 {
-					fi.prec = 0;
-					fi.prec_set = false;
+			}
+			strings.write_byte(b, char);
+			continue loop;
+		} else if char == '{' {
+			if i < end && fmt[i] == char {
+				// Skip extra one
+				i += 1;
+				strings.write_byte(b, char);
+				continue loop;
+			}
+		}
+
+		if char == '%' {
+			prefix_loop: for ; i < end; i += 1 {
+				switch fmt[i] {
+				case '+':
+					fi.plus = true;
+				case '-':
+					fi.minus = true;
+					fi.zero = false;
+				case ' ':
+					fi.space = true;
+				case '#':
+					fi.hash = true;
+				case '0':
+					fi.zero = !fi.minus;
+				case:
+					break prefix_loop;
 				}
-				if !fi.prec_set {
-					strings.write_string(fi.buf, "%!(BAD PRECISION)");
+			}
+
+			arg_index, i, was_prev_index = _arg_number(&fi, arg_index, fmt, i, len(args));
+
+			// Width
+			if i < end && fmt[i] == '*' {
+				i += 1;
+				fi.width, arg_index, fi.width_set = int_from_arg(args, arg_index);
+				if !fi.width_set {
+					strings.write_string(b, "%!(BAD WIDTH)");
+				}
+
+				if fi.width < 0 {
+					fi.width = -fi.width;
+					fi.minus = true;
+					fi.zero  = false;
 				}
 				was_prev_index = false;
 			} else {
-				fi.prec, i, fi.prec_set = _parse_int(fmt, i);
-				if !fi.prec_set {
-					// fi.prec_set = true;
-					// fi.prec = 0;
+				fi.width, i, fi.width_set = _parse_int(fmt, i);
+				if was_prev_index && fi.width_set { // %[6]2d
+					fi.good_arg_index = false;
 				}
 			}
-		}
 
-		if !was_prev_index {
-			arg_index, i, was_prev_index = _arg_number(&fi, arg_index, fmt, i, len(args));
-		}
+			// Precision
+			if i < end && fmt[i] == '.' {
+				i += 1;
+				if was_prev_index { // %[6].2d
+					fi.good_arg_index = false;
+				}
+				if i < end && fmt[i] == '*' {
+					arg_index, i, was_prev_index = _arg_number(&fi, arg_index, fmt, i, len(args));
+					i += 1;
+					fi.prec, arg_index, fi.prec_set = int_from_arg(args, arg_index);
+					if fi.prec < 0 {
+						fi.prec = 0;
+						fi.prec_set = false;
+					}
+					if !fi.prec_set {
+						strings.write_string(fi.buf, "%!(BAD PRECISION)");
+					}
+					was_prev_index = false;
+				} else {
+					fi.prec, i, fi.prec_set = _parse_int(fmt, i);
+				}
+			}
 
-		if i >= end {
-			strings.write_string(b, "%!(NO VERB)");
-			break loop;
-		}
+			if !was_prev_index {
+				arg_index, i, was_prev_index = _arg_number(&fi, arg_index, fmt, i, len(args));
+			}
 
-		verb, w := utf8.decode_rune_in_string(fmt[i:]);
-		i += w;
+			if i >= end {
+				strings.write_string(b, "%!(NO VERB)");
+				break loop;
+			}
 
-		switch {
-		case verb == '%':
-			strings.write_byte(b, '%');
-		case !fi.good_arg_index:
-			strings.write_string(b, "%!(BAD ARGUMENT NUMBER)");
-		case arg_index >= len(args):
-			strings.write_string(b, "%!(MISSING ARGUMENT)");
-		case:
-			fmt_arg(&fi, args[arg_index], verb);
-			arg_index += 1;
+			verb, w := utf8.decode_rune_in_string(fmt[i:]);
+			i += w;
+
+			switch {
+			case verb == '%':
+				strings.write_byte(b, '%');
+			case !fi.good_arg_index:
+				strings.write_string(b, "%!(BAD ARGUMENT NUMBER)");
+			case arg_index >= len(args):
+				strings.write_string(b, "%!(MISSING ARGUMENT)");
+			case:
+				fmt_arg(&fi, args[arg_index], verb);
+				arg_index += 1;
+			}
+
+
+		} else if char == '{' {
+			if i < end && fmt[i] != '}' && fmt[i] != ':' {
+				new_arg_index, new_i, ok := _parse_int(fmt, i);
+				if ok {
+					fi.reordered = true;
+					was_prev_index = true;
+					arg_index = new_arg_index;
+					i = new_i;
+				} else {
+					strings.write_string(b, "%!(BAD ARGUMENT NUMBER ");
+					// Skip over the bad argument
+					prev_i := i;
+					for i < end && fmt[i] != '}' && fmt[i] != ':' {
+						i += 1;
+					}
+					fmt_arg(&fi, fmt[prev_i:i], 'v');
+					strings.write_string(b, ")");
+				}
+			}
+
+			verb: rune = 'v';
+
+			if i < end && fmt[i] == ':' {
+				i += 1;
+				prefix_loop_percent: for ; i < end; i += 1 {
+					switch fmt[i] {
+					case '+':
+						fi.plus = true;
+					case '-':
+						fi.minus = true;
+						fi.zero = false;
+					case ' ':
+						fi.space = true;
+					case '#':
+						fi.hash = true;
+					case '0':
+						fi.zero = !fi.minus;
+					case:
+						break prefix_loop_percent;
+					}
+				}
+
+				arg_index, i, was_prev_index = _arg_number(&fi, arg_index, fmt, i, len(args));
+
+				// Width
+				if i < end && fmt[i] == '*' {
+					i += 1;
+					fi.width, arg_index, fi.width_set = int_from_arg(args, arg_index);
+					if !fi.width_set {
+						strings.write_string(b, "%!(BAD WIDTH)");
+					}
+
+					if fi.width < 0 {
+						fi.width = -fi.width;
+						fi.minus = true;
+						fi.zero  = false;
+					}
+					was_prev_index = false;
+				} else {
+					fi.width, i, fi.width_set = _parse_int(fmt, i);
+					if was_prev_index && fi.width_set { // %[6]2d
+						fi.good_arg_index = false;
+					}
+				}
+
+				// Precision
+				if i < end && fmt[i] == '.' {
+					i += 1;
+					if was_prev_index { // %[6].2d
+						fi.good_arg_index = false;
+					}
+					if i < end && fmt[i] == '*' {
+						arg_index, i, was_prev_index = _arg_number(&fi, arg_index, fmt, i, len(args));
+						i += 1;
+						fi.prec, arg_index, fi.prec_set = int_from_arg(args, arg_index);
+						if fi.prec < 0 {
+							fi.prec = 0;
+							fi.prec_set = false;
+						}
+						if !fi.prec_set {
+							strings.write_string(fi.buf, "%!(BAD PRECISION)");
+						}
+						was_prev_index = false;
+					} else {
+						fi.prec, i, fi.prec_set = _parse_int(fmt, i);
+					}
+				}
+
+				if !was_prev_index {
+					arg_index, i, was_prev_index = _arg_number(&fi, arg_index, fmt, i, len(args));
+				}
+
+
+				if i >= end {
+					strings.write_string(b, "%!(NO VERB)");
+					break loop;
+				}
+
+				w: int = 1;
+				verb, w = utf8.decode_rune_in_string(fmt[i:]);
+				i += w;
+			}
+
+			if i >= end {
+				strings.write_string(b, "%!(MISSING CLOSE BRACE)");
+				break loop;
+			}
+
+			brace, w := utf8.decode_rune_in_string(fmt[i:]);
+			i += w;
+
+			switch {
+			case brace != '}':
+				strings.write_string(b, "%!(MISSING CLOSE BRACE)");
+			case !fi.good_arg_index:
+				strings.write_string(b, "%!(BAD ARGUMENT NUMBER)");
+			case arg_index >= len(args):
+				strings.write_string(b, "%!(MISSING ARGUMENT)");
+			case:
+				fmt_arg(&fi, args[arg_index], verb);
+				arg_index += 1;
+			}
 		}
 	}
 
