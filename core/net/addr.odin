@@ -43,6 +43,7 @@ parse_ipv4_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv4_Address, 
 	return;
 }
 
+// TODO(tetra): Scopeid?
 parse_ipv6_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Address, ok: bool) {
 	// Rule 1: If the high-byte of any block is zero, it can be omitted. (00XX => XX)
 	// Rule 2: Two or more all-zero blocks in a row can be replaced with '::' (FF00:0000:0000:XXXX => FF00::XXXX)
