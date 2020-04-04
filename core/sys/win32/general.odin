@@ -35,6 +35,28 @@ Point :: struct {
 	x, y: i32,
 }
 
+Wnd_Class_A :: struct {
+	style:                 u32,
+	wnd_proc:              Wnd_Proc,
+	cls_extra, wnd_extra:  i32,
+	instance:              Hinstance,
+	icon:                  Hicon,
+	cursor:                Hcursor,
+	background:            Hbrush,
+	menu_name, class_name: cstring
+}
+
+Wnd_Class_W :: struct {
+	style:                 u32,
+	wnd_proc:              Wnd_Proc,
+	cls_extra, wnd_extra:  i32,
+	instance:              Hinstance,
+	icon:                  Hicon,
+	cursor:                Hcursor,
+	background:            Hbrush,
+	menu_name, class_name: Wstring
+}
+
 Wnd_Class_Ex_A :: struct {
 	size, style:           u32,
 	wnd_proc:              Wnd_Proc,
@@ -532,7 +554,7 @@ WM_CHAR              :: 0x0102;
 WM_CLOSE             :: 0x0010;
 WM_CREATE            :: 0x0001;
 WM_DESTROY           :: 0x0002;
-WM_INPUT             :: 0x00ff;
+WM_INPUT             :: 0x00FF;
 WM_KEYDOWN           :: 0x0100;
 WM_KEYUP             :: 0x0101;
 WM_KILLFOCUS         :: 0x0008;
@@ -546,6 +568,7 @@ WM_SYSKEYUP          :: 0x0105;
 WM_USER              :: 0x0400;
 WM_WINDOWPOSCHANGED  :: 0x0047;
 WM_COMMAND           :: 0x0111;
+WM_PAINT             :: 0x000F;
 
 WM_MOUSEWHEEL    :: 0x020A;
 WM_MOUSEMOVE     :: 0x0200;
@@ -902,6 +925,15 @@ Bitmap_Info_Header :: struct {
 Bitmap_Info :: struct {
 	using header: Bitmap_Info_Header,
 	colors:       [1]Rgb_Quad,
+}
+
+Paint_Struct :: struct {
+	hdc:          Hdc,
+	erase:        Bool,
+	rc_paint:     Rect,
+	restore:      Bool,
+	inc_update:   Bool,
+	rgb_reserved: [32]byte
 }
 
 
