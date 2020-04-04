@@ -5,6 +5,7 @@ package runtime
 
 import "core:os"
 import "intrinsics"
+_ :: intrinsics;
 
 // Naming Conventions:
 // In general, Ada_Case for types and snake_case for values
