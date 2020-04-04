@@ -335,6 +335,9 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 	Scope *found_scope = nullptr;
 	Entity *found_entity = nullptr;
 	scope_lookup_parent(original_entity->scope, original_name, &found_scope, &found_entity);
+	if (found_scope == nullptr) {
+		return;
+	}
 
 	// IMPORTANT TODO(bill)
 	// Date: 2018-09-29
