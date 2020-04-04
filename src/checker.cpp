@@ -1035,12 +1035,22 @@ void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *ty
 		return;
 	}
 
-	expr->tav.mode = mode;
-	expr->tav.type = type;
-	if (mode == Addressing_Constant || mode == Addressing_Invalid) {
-		expr->tav.value = value;
-	} else if (mode == Addressing_Value && is_type_typeid(type)) {
-		expr->tav.value = value;
+	Ast *prev_expr = nullptr;
+	for (;;) {
+		if (prev_expr != expr) {
+			expr->tav.mode = mode;
+			expr->tav.type = type;
+			if (mode == Addressing_Constant || mode == Addressing_Invalid) {
+				expr->tav.value = value;
+			} else if (mode == Addressing_Value && is_type_typeid(type)) {
+				expr->tav.value = value;
+			}
+
+			prev_expr = expr;
+		} else {
+			break;
+		}
+		expr = unparen_expr(expr);
 	}
 }
 

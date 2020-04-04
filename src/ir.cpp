@@ -7046,13 +7046,18 @@ irValue *ir_build_expr(irProcedure *proc, Ast *expr) {
 }
 
 irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
+	Ast *original_expr = expr;
 	expr = unparen_expr(expr);
 	// ir_push_debug_location(proc->module, expr, proc->debug_scope);
 	// defer (ir_pop_debug_location(proc->module));
 
 	TypeAndValue tv = type_and_value_of_expr(expr);
 	GB_ASSERT(tv.mode != Addressing_Invalid);
-	GB_ASSERT(tv.mode != Addressing_Type);
+	if (tv.mode == Addressing_Type) {
+		// HACK TODO(bill): This is hack but it should be safe in virtually all cases
+		irValue *v = ir_typeid(proc->module, tv.type);
+		return ir_emit_conv(proc, v, t_typeid);
+	} 
 
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): Edge case
