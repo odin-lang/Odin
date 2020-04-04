@@ -742,10 +742,10 @@ atan2_f64 :: proc(y, x: f64) -> f64 {
 atan2 :: proc{atan2_f32, atan2_f64};
 
 atan_f32 :: proc(x: f32) -> f32 {
-	return atan2_f32(1, x);
+	return atan2_f32(x, 1);
 }
 atan_f64 :: proc(x: f64) -> f64 {
-	return atan2_f64(1, x);
+	return atan2_f64(x, 1);
 }
 atan :: proc{atan_f32, atan_f64};
 
