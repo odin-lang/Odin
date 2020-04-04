@@ -3,6 +3,8 @@ package win32
 
 foreign import "system:gdi32.lib"
 
+WHITENESS :: 0x00FF0062;
+BLACKNESS :: 0x00000042;
 
 @(default_calling_convention = "std")
 foreign gdi32 {
@@ -20,4 +22,5 @@ foreign gdi32 {
 	@(link_name="ChoosePixelFormat") choose_pixel_format :: proc(hdc: Hdc, pfd: ^Pixel_Format_Descriptor) -> i32 ---;
 	@(link_name="SwapBuffers")       swap_buffers        :: proc(hdc: Hdc) -> Bool ---;
 
+	@(link_name="PatBlt") pat_blt :: proc(hdc: Hdc, x, y, w, h: i32, rop: u32) -> Bool ---;
 }
