@@ -1298,6 +1298,8 @@ irValue *ir_instr_if(irProcedure *p, irValue *cond, irBlock *true_block, irBlock
 
 
 irValue *ir_instr_phi(irProcedure *p, Array<irValue *> edges, Type *type) {
+	GB_ASSERT(is_type_typed(type));
+
 	irValue *v = ir_alloc_instr(p, irInstr_Phi);
 	irInstr *i = &v->Instr;
 	i->Phi.edges = edges;
@@ -7167,7 +7169,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		irValue *cond = ir_build_cond(proc, te->cond, then, else_);
 		ir_start_block(proc, then);
 
-		Type *type = type_of_expr(expr);
+		Type *type = default_type(type_of_expr(expr));
 
 		ir_open_scope(proc);
 		array_add(&edges, ir_emit_conv(proc, ir_build_expr(proc, te->x), type));
@@ -7199,7 +7201,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		irValue *cond = ir_build_cond(proc, te->cond, then, else_);
 		ir_start_block(proc, then);
 
-		Type *type = type_of_expr(expr);
+		Type *type = default_type(type_of_expr(expr));
 
 		ir_open_scope(proc);
 		array_add(&edges, ir_emit_conv(proc, ir_build_expr(proc, te->x), type));
