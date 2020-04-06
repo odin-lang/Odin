@@ -3870,7 +3870,6 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			res = lb_emit_load(p, res);
 		}
 
-		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
 
 		if (p->type->Proc.return_by_pointer) {
 			if (res.value != nullptr) {
@@ -3878,6 +3877,9 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			} else {
 				lb_addr_store(p, p->return_ptr, lb_const_nil(p->module, p->type->Proc.abi_compat_result_type));
 			}
+
+			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+
 			LLVMBuildRetVoid(p->builder);
 		} else {
 			GB_ASSERT_MSG(res.value != nullptr, "%.*s", LIT(p->name));
@@ -3885,6 +3887,9 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			if (!are_types_identical(res.type, abi_rt)) {
 				res = lb_emit_transmute(p, res, abi_rt);
 			}
+
+			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+			
 			LLVMBuildRet(p->builder, res.value);
 		}
 	case_end;
