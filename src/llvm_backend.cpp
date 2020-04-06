@@ -5259,10 +5259,19 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	case Token_Gt:
 	case Token_GtEq:
 		{
-			lbValue left = lb_build_expr(p, be->left);
-			Type *type = default_type(tv.type);
-			lbValue right = lb_build_expr(p, be->right);
+			lbValue left = {};
+			lbValue right = {};
+
+			if (be->left->tav.mode == Addressing_Type) {
+				left = lb_typeid(p->module, be->left->tav.type, t_typeid);
+			}
+			if (be->right->tav.mode == Addressing_Type) {
+				right = lb_typeid(p->module, be->right->tav.type, t_typeid);
+			}
+			if (left.value == nullptr)  left  = lb_build_expr(p, be->left);
+			if (right.value == nullptr) right = lb_build_expr(p, be->right);
 			lbValue cmp = lb_emit_comp(p, be->op.kind, left, right);
+			Type *type = default_type(tv.type);
 			return lb_emit_conv(p, cmp, type);
 		}
 
