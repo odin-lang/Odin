@@ -576,6 +576,16 @@ isize const ast_variant_sizes[] = {
 #undef AST_KIND
 };
 
+struct AstCommonStuff {
+	AstKind      kind;
+	u32          state_flags;
+	u32          viral_state_flags;
+	bool         been_handled;
+	AstFile *    file;
+	Scope *      scope;
+	TypeAndValue tav;
+};
+
 struct Ast {
 	AstKind      kind;
 	u32          state_flags;

@@ -13,7 +13,7 @@ gb_global Timings global_timings = {0};
 #if defined(LLVM_BACKEND_SUPPORT)
 #include "llvm-c/Types.h"
 #endif
-
+#include "psapi.h"
 
 #include "parser.hpp"
 #include "checker.hpp"
@@ -1613,6 +1613,35 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 
 		remove_temp_files(gen.output_base);
+
+		if (false) {
+			PROCESS_MEMORY_COUNTERS_EX pmc;
+			GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+			SIZE_T virtualMemUsedByMe = pmc.PrivateUsage;
+			gb_printf_err("virtual_memory_used:            %tu B\n", virtualMemUsedByMe);
+
+			gb_printf_err("total_allocated_node_memory:    %lld B\n", total_allocated_node_memory);
+			gb_printf_err("total_subtype_node_memory_test: %lld B\n", total_subtype_node_memory_test);
+			gb_printf_err("fraction:                       %.6f\n", (f64)total_subtype_node_memory_test/(f64)total_allocated_node_memory);
+			Parser *p      = checker.parser;
+			isize lines    = p->total_line_count;
+			isize tokens   = p->total_token_count;
+			isize files    = 0;
+			isize packages = p->packages.count;
+			isize total_file_size = 0;
+			for_array(i, p->packages) {
+				files += p->packages[i]->files.count;
+				for_array(j, p->packages[i]->files) {
+					AstFile *file = p->packages[i]->files[j];
+					total_file_size += file->tokenizer.end - file->tokenizer.start;
+				}
+			}
+			gb_printf_err("total_file_size:                %lld B\n", total_file_size);
+			gb_printf_err("lines:                          %lld\n", lines);
+			gb_printf_err("files:                          %lld\n", files);
+			gb_printf_err("tokens:                         %lld\n", tokens);
+			gb_printf_err("packages:                       %lld\n", packages);
+		}
 
 		if (run_output) {
 		#if defined(GB_SYSTEM_WINDOWS)
