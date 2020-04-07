@@ -1613,15 +1613,16 @@ int main(int arg_count, char const **arg_ptr) {
 
 		remove_temp_files(gen.output_base);
 
+	#if defined(GB_COMPILER_MSVC)
 		if (false) {
-			PROCESS_MEMORY_COUNTERS_EX pmc;
+			PROCESS_MEMORY_COUNTERS_EX pmc = {};
 			GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
-			SIZE_T virtualMemUsedByMe = pmc.PrivateUsage;
-			gb_printf_err("virtual_memory_used:            %tu B\n", virtualMemUsedByMe);
+			SIZE_T virtual_mem_used_by_me = pmc.PrivateUsage;
+			gb_printf_err("virtual_memory_used:            %tu B\n", virtual_mem_used_by_me);
 
-			gb_printf_err("total_allocated_node_memory:    %lld B\n", total_allocated_node_memory);
-			gb_printf_err("total_subtype_node_memory_test: %lld B\n", total_subtype_node_memory_test);
-			gb_printf_err("fraction:                       %.6f\n", (f64)total_subtype_node_memory_test/(f64)total_allocated_node_memory);
+			gb_printf_err("total_allocated_node_memory:    %lld B\n", total_allocated_node_memory.value);
+			gb_printf_err("total_subtype_node_memory_test: %lld B\n", total_subtype_node_memory_test.value);
+			gb_printf_err("fraction:                       %.6f\n", (f64)total_subtype_node_memory_test.value/(f64)total_allocated_node_memory.value);
 			Parser *p      = checker.parser;
 			isize lines    = p->total_line_count;
 			isize tokens   = p->total_token_count;
@@ -1641,6 +1642,7 @@ int main(int arg_count, char const **arg_ptr) {
 			gb_printf_err("tokens:                         %lld\n", tokens);
 			gb_printf_err("packages:                       %lld\n", packages);
 		}
+	#endif
 
 		if (run_output) {
 		#if defined(GB_SYSTEM_WINDOWS)

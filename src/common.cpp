@@ -8,10 +8,10 @@
 #endif
 
 #if defined(GB_SYSTEM_WINDOWS)
+
 #define NOMINMAX            1
 #include <windows.h>
 #undef NOMINMAX
-#include <psapi.h>
 #endif
 
 #define GB_WINDOWS_H_INCLUDED
@@ -20,6 +20,10 @@
 
 #include <wchar.h>
 #include <stdio.h>
+
+#if defined(GB_COMPILER_MSVC)
+#include <psapi.h>
+#endif
 
 #include <math.h>
 
