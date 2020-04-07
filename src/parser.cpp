@@ -442,15 +442,15 @@ bool ast_node_expect(Ast *node, AstKind kind) {
 }
 
 
-gb_global isize volatile total_allocated_node_memory = 0;
-gb_global isize volatile total_subtype_node_memory_test = 0;
+gb_global gbAtomic64 total_allocated_node_memory = {0};
+gb_global gbAtomic64 total_subtype_node_memory_test = {0};
 
 // NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
 Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 	gbAllocator a = ast_allocator();
 
-	_InterlockedExchangeAdd64(&total_allocated_node_memory, gb_size_of(Ast));
-	_InterlockedExchangeAdd64(&total_subtype_node_memory_test, gb_size_of(AstCommonStuff) + ast_variant_sizes[kind]);
+	gb_atomic64_fetch_add(&total_allocated_node_memory, cast(i64)(gb_size_of(Ast)));
+	gb_atomic64_fetch_add(&total_subtype_node_memory_test, cast(i64)(gb_size_of(AstCommonStuff) + ast_variant_sizes[kind]));
 
 	Ast *node = gb_alloc_item(a, Ast);
 	node->kind = kind;
