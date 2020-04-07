@@ -11,6 +11,7 @@
 #define NOMINMAX            1
 #include <windows.h>
 #undef NOMINMAX
+#include <psapi.h>
 #endif
 
 #define GB_WINDOWS_H_INCLUDED
