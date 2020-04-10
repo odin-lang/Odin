@@ -65,6 +65,7 @@ struct TargetMetrics {
 	isize          word_size;
 	isize          max_align;
 	String         target_triplet;
+	String         target_data_layout;
 };
 
 
@@ -148,14 +149,15 @@ gb_global TargetMetrics target_windows_386 = {
 	TargetArch_386,
 	4,
 	8,
-	str_lit("i686-pc-windows"),
+	str_lit("i386-pc-windows-msvc"),
 };
 gb_global TargetMetrics target_windows_amd64 = {
 	TargetOs_windows,
 	TargetArch_amd64,
 	8,
 	16,
-	str_lit("x86_64-pc-windows-gnu"),
+	str_lit("x86_64-pc-windows-msvc"),
+	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_linux_386 = {
@@ -163,7 +165,8 @@ gb_global TargetMetrics target_linux_386 = {
 	TargetArch_386,
 	4,
 	8,
-	str_lit("i686-pc-linux-gnu"),
+	str_lit("i386-pc-linux-gnu"),
+
 };
 gb_global TargetMetrics target_linux_amd64 = {
 	TargetOs_linux,
@@ -171,6 +174,7 @@ gb_global TargetMetrics target_linux_amd64 = {
 	8,
 	16,
 	str_lit("x86_64-pc-linux-gnu"),
+	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_darwin_amd64 = {
@@ -179,6 +183,7 @@ gb_global TargetMetrics target_darwin_amd64 = {
 	8,
 	16,
 	str_lit("x86_64-apple-darwin"),
+	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_essence_amd64 = {

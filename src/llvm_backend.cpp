@@ -10985,8 +10985,8 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMInitializeNativeTarget();
 
 
-	char const *target_triple = "x86_64-pc-windows-msvc";
-	char const *target_data_layout = "e-m:w-i64:64-f80:128-n8:16:32:64-S128";
+	char const *target_triple = alloc_cstring(heap_allocator(), build_context.metrics.target_triplet);
+	char const *target_data_layout = alloc_cstring(heap_allocator(), build_context.metrics.target_data_layout);
 	LLVMSetTarget(mod, target_triple);
 
 	LLVMTargetRef target = {};
