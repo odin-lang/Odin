@@ -21,7 +21,7 @@
 
 # The Odin Programming Language
 
-The Odin programming language is fast, concise, readable, pragmatic and open sourced. It is designed with the intent of replacing C with the following goals:
+The Odin programming language is fast, concise, readable, pragmatic and open sourced. It is designed with the intent of being an alternative to C with the following goals:
 * simplicity
 * high performance
 * built for modern systems
