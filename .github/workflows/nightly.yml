@@ -1,5 +1,7 @@
 name:  Nightly
-on: [push]
+on:
+  schedule:
+    - cron: 0 20 * * *
 
 jobs:
   build_windows:
@@ -18,7 +20,7 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          ./build_ci.bat
+          ./ci/build_ci.bat
       - name: Odin run
         shell: cmd
         run: |
@@ -88,6 +90,7 @@ jobs:
     runs-on: [ubuntu-latest]
     needs: [build_windows, build_macos, build_ubuntu]
     steps:
+      - uses: actions/checkout@v1
       - name: Install B2 CLI
         shell: bash
         run: sudo pip install --upgrade b2
@@ -103,14 +106,12 @@ jobs:
         uses: actions/download-artifact@v1
         with:
           name: macos_artifacts
-      - name: List artifacts
-        run: find . -type f -printf "%T@ %p\n" | sort -nr | cut -d\  -f2-
       - name: Create archieves
         run: |
           now=$(date +'%Y-%m-%d')
-          7z a test/odin-windows-amd64-nightly+$now.zip windows_artifacts/*
-          7z a test/odin-ubuntu-amd64-nightly+$now.zip ubuntu_artifacts/*
-          7z a test/odin-macos-amd64-nightly+$now.zip macos_artifacts/*
+          7z a output/odin-windows-amd64-nightly+$now.zip -r windows_artifacts/
+          7z a output/odin-ubuntu-amd64-nightly+$now.zip -r ubuntu_artifacts/
+          7z a output/odin-macos-amd64-nightly+$now.zip -r macos_artifact/
       - name: Upload artifacts to b2
         shell: bash
         env:
@@ -118,6 +119,8 @@ jobs:
           APPKEY: ${{ secrets.B2_APPKEY }}
         run: |
           b2 authorize-account "$APPID" "$APPKEY"
-          b2 sync --delete test b2://odin-binaries/nightly
+          b2 sync --keepDays 7 output b2://odin-binaries/nightly
+          python3 ci/create_nightly_json.py > nightly.json
+          b2 upload-file odin-binaries nightly.json nightly.json
           b2 clear-account
         
