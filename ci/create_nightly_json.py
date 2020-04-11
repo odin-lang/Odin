@@ -1,7 +1,8 @@
 import subprocess
 import sys
 import json
-import datetime;
+import datetime
+import urllib.parse
 
 def main():
     files_by_date = {}
@@ -12,9 +13,9 @@ def main():
         if parts[0]:
             json_str = execute_cli(f"b2 get-file-info {parts[0]}")
             data = json.loads(json_str)
-            url = execute_cli(f"b2 make-url {data['fileId']}").strip()
-            sha1 = data['contentSha1']
             name = remove_prefix(data['fileName'], "nightly/")
+            url = f"https://f001.backblazeb2.com/file/odin-binaries/nightly/{urllib.parse.quote_plus(name)}"
+            sha1 = data['contentSha1']
             ts = int(data['fileInfo']['src_last_modified_millis'])
             date = datetime.datetime.fromtimestamp(ts/1000).strftime('%Y-%m-%d')
             
