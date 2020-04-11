@@ -1,0 +1,48 @@
+name:  Nightly
+on: [push]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v1
+        
+      - name: Install cURL
+        run: choco install curl
+      - name: Download and unpack LLVM bins
+        shell: cmd
+        run: |
+          cd bin
+          curl -sL https://github.com/odin-lang/Odin/releases/download/llvm-windows/llvm-binaries.zip --output llvm-binaries.zip
+          7z x llvm-binaries.zip > nul
+      - name: build Odin
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          ./build_ci.bat
+      - name: Odin run
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          odin run examples/demo/demo.odin
+      - name: upload artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: exe
+          path: odin.exe
+  upload_b2:
+    runs-on: [linux]
+    needs: [build]
+    container:
+      image: python:3.7-alpine
+    steps:
+      - name: Install B2 CLI
+        shell: bash
+        run: sudo pip install --upgrade b2
+      - name: download exe
+        uses: actions/download-artifact@v1
+        with:
+          name: exe
+      - name: List artifact
+        run: find . -type f -printf "%T@ %p\n" | sort -nr | cut -d\  -f2-
+        
