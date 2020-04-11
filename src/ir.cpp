@@ -1756,6 +1756,10 @@ irValue *ir_add_local_for_identifier(irProcedure *proc, Ast *ident, bool zero_in
 		ir_emit_comment(proc, name);
 		if (e->kind == Entity_Variable &&
 		    e->Variable.is_foreign) {
+			if (e->Variable.link_name.len != 0) {
+				name = e->Variable.link_name;
+			}
+
 			HashKey key = hash_string(name);
 			irValue **prev_value = map_get(&proc->module->members, key);
 			if (prev_value == nullptr) {
@@ -11943,6 +11947,9 @@ void ir_gen_tree(irGen *s) {
 		bool no_name_mangle = e->Variable.link_name.len > 0 || is_foreign || is_export;
 
 		String name = e->token.string;
+		if (e->Variable.link_name.len > 0) {
+			name = e->Variable.link_name;
+		}
 		if (!no_name_mangle) {
 			name = ir_mangle_name(s, e);
 		}
