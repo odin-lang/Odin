@@ -64,6 +64,12 @@ enum BasicKind {
 	Basic_i128be,
 	Basic_u128be,
 
+	Basic_f32le,
+	Basic_f64le,
+
+	Basic_f32be,
+	Basic_f64be,
+
 	// Untyped types
 	Basic_UntypedBool,
 	Basic_UntypedInteger,
@@ -448,6 +454,12 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_u64be,  BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig,     8, STR_LIT("u64be")}},
 	{Type_Basic, {Basic_i128be, BasicFlag_Integer                      | BasicFlag_EndianBig,    16, STR_LIT("i128be")}},
 	{Type_Basic, {Basic_u128be, BasicFlag_Integer | BasicFlag_Unsigned | BasicFlag_EndianBig,    16, STR_LIT("u128be")}},
+
+	{Type_Basic, {Basic_f32le, BasicFlag_Float | BasicFlag_EndianLittle, 4, STR_LIT("f32le")}},
+	{Type_Basic, {Basic_f64le, BasicFlag_Float | BasicFlag_EndianLittle, 8, STR_LIT("f64le")}},
+
+	{Type_Basic, {Basic_f32be, BasicFlag_Float | BasicFlag_EndianBig,    4, STR_LIT("f32be")}},
+	{Type_Basic, {Basic_f64be, BasicFlag_Float | BasicFlag_EndianBig,    8, STR_LIT("f64be")}},
 
 	// Untyped types
 	{Type_Basic, {Basic_UntypedBool,       BasicFlag_Boolean    | BasicFlag_Untyped,   0, STR_LIT("untyped bool")}},
@@ -1316,6 +1328,11 @@ bool is_type_endian_little(Type *t) {
 	return is_type_integer_endian_little(t);
 }
 
+bool types_have_same_internal_endian(Type *a, Type *b) {
+	return is_type_endian_little(a) == is_type_endian_little(b);
+}
+
+
 bool is_type_dereferenceable(Type *t) {
 	if (is_type_rawptr(t)) {
 		return false;
@@ -1357,6 +1374,11 @@ Type *integer_endian_type_to_platform_type(Type *t) {
 	case Basic_u32be: return t_u32;
 	case Basic_i64be: return t_i64;
 	case Basic_u64be: return t_u64;
+
+	case Basic_f32le: return t_f32;
+	case Basic_f32be: return t_f32;
+	case Basic_f64le: return t_f64;
+	case Basic_f64be: return t_f64;
 	}
 
 	return t;

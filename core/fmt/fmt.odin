@@ -1802,6 +1802,12 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case f32:        fmt_float(fi, f64(a), 32, verb);
 	case f64:        fmt_float(fi, a,      64, verb);
 
+	case f32le:      fmt_float(fi, f64(a), 32, verb);
+	case f64le:      fmt_float(fi, f64(a), 64, verb);
+
+	case f32be:      fmt_float(fi, f64(a), 32, verb);
+	case f64be:      fmt_float(fi, f64(a), 64, verb);
+
 	case complex64:  fmt_complex(fi, complex128(a), 64, verb);
 	case complex128: fmt_complex(fi, a, 128, verb);
 
