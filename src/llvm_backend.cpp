@@ -7783,6 +7783,23 @@ void lb_emit_increment(lbProcedure *p, lbValue addr) {
 
 }
 
+LLVMValueRef lb_lookup_runtime_procedure(lbModule *m, String const &name) {
+	AstPackage *pkg = m->info->runtime_package;
+	Entity *e = scope_lookup_current(pkg->scope, name);
+
+	lbValue *found = nullptr;
+	if (m != e->code_gen_module) {
+		gb_mutex_lock(&m->mutex);
+	}
+	found = map_get(&e->code_gen_module->values, hash_entity(e));
+	if (m != e->code_gen_module) {
+		gb_mutex_unlock(&m->mutex);
+	}
+	GB_ASSERT(found != nullptr);
+
+	return found->value;
+}
+
 lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *platform_type) {
 	Type *vt = core_type(value.type);
 	GB_ASSERT(type_size_of(vt) == type_size_of(platform_type));
@@ -7793,21 +7810,20 @@ lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *platform_type) {
 	res.type = platform_type;
 	res.value = value.value;
 
-	// int sz = cast(int)type_size_of(vt);
-	// if (sz > 1) {
-	// 	char buf[32] = {};
-	// 	gb_snprintf(buf, gb_count_of(buf), "llvm.bswap.i%d", sz*8);
-	// 	unsigned id = LLVMLookupIntrinsicID(buf, gb_strlen(buf));
-	// 	gb_printf(">>> %s %u\n", buf, id);
+	int sz = cast(int)type_size_of(vt);
+	if (sz > 1) {
+		String name = {};
+		switch (sz) {
+		case 2:  name = str_lit("bswap_16");  break;
+		case 4:  name = str_lit("bswap_32");  break;
+		case 8:  name = str_lit("bswap_64");  break;
+		case 16: name = str_lit("bswap_128"); break;
+		default: GB_PANIC("unhandled byteswap size"); break;
+		}
+		LLVMValueRef fn = lb_lookup_runtime_procedure(p->module, name);
 
-	// 	LLVMTypeRef types[2] = {};
-	// 	types[0] = lb_type(p->module, value.type);
-	// 	types[1] = lb_type(p->module, value.type);
-
-	// 	LLVMValueRef fn = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
-
-	// 	res.value = LLVMBuildCall(p->builder, fn, &value.value, 1, "");
-	// }
+		res.value = LLVMBuildCall(p->builder, fn, &value.value, 1, "");
+	}
 
 	return res;
 }
@@ -7972,8 +7988,8 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 
 
 lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right) {
-	Type *a = base_type(left.type);
-	Type *b = base_type(right.type);
+	Type *a = core_type(left.type);
+	Type *b = core_type(right.type);
 
 	GB_ASSERT(gb_is_between(op_kind, Token__ComparisonBegin+1, Token__ComparisonEnd-1));
 
@@ -8235,14 +8251,17 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 		}
 	}
 
+	a = core_type(left.type);
+	b = core_type(right.type);
+
 
 	lbValue res = {};
 	res.type = t_llvm_bool;
-	if (is_type_integer(left.type) ||
-	    is_type_boolean(left.type) ||
-	    is_type_pointer(left.type) ||
-	    is_type_proc(left.type) ||
-	    is_type_enum(left.type)) {
+	if (is_type_integer(a) ||
+	    is_type_boolean(a) ||
+	    is_type_pointer(a) ||
+	    is_type_proc(a) ||
+	    is_type_enum(a)) {
 		LLVMIntPredicate pred = {};
 		if (is_type_unsigned(left.type)) {
 			switch (op_kind) {
@@ -8264,7 +8283,7 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 		case Token_NotEq: pred = LLVMIntNE;  break;
 		}
 		res.value = LLVMBuildICmp(p->builder, pred, left.value, right.value, "");
-	} else if (is_type_float(left.type)) {
+	} else if (is_type_float(a)) {
 		LLVMRealPredicate pred = {};
 		switch (op_kind) {
 		case Token_CmpEq: pred = LLVMRealOEQ; break;
@@ -8275,7 +8294,7 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 		case Token_NotEq: pred = LLVMRealONE; break;
 		}
 		res.value = LLVMBuildFCmp(p->builder, pred, left.value, right.value, "");
-	} else if (is_type_typeid(left.type)) {
+	} else if (is_type_typeid(a)) {
 		LLVMIntPredicate pred = {};
 		switch (op_kind) {
 		case Token_Gt:   pred = LLVMIntUGT; break;
@@ -8287,7 +8306,7 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 		}
 		res.value = LLVMBuildICmp(p->builder, pred, left.value, right.value, "");
 	} else {
-		GB_PANIC("Unhandled comparison kind %s %.*s %s", type_to_string(left.type), LIT(token_strings[op_kind]), type_to_string(right.type));
+		GB_PANIC("Unhandled comparison kind %s (%s) %.*s %s (%s)", type_to_string(left.type), type_to_string(base_type(left.type)), LIT(token_strings[op_kind]), type_to_string(right.type), type_to_string(base_type(right.type)));
 	}
 
 	return res;

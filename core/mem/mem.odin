@@ -2,15 +2,6 @@ package mem
 
 import "core:runtime"
 
-foreign _ {
-	@(link_name = "llvm.bswap.i16") swap16 :: proc(b: u16) -> u16 ---;
-	@(link_name = "llvm.bswap.i32") swap32 :: proc(b: u32) -> u32 ---;
-	@(link_name = "llvm.bswap.i64") swap64 :: proc(b: u64) -> u64 ---;
-}
-swap :: proc{swap16, swap32, swap64};
-
-
-
 set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	foreign _ {
 		when ODIN_USE_LLVM_API {
