@@ -4124,6 +4124,13 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 		return ir_emit_byte_swap(proc, res, type);
 	}
 
+	if (op == Token_Sub && is_type_float(type) && is_type_different_to_arch_endianness(type)) {
+		Type *platform_type = integer_endian_type_to_platform_type(type);
+		irValue *v = ir_emit_byte_swap(proc, x, platform_type);
+		irValue *res = ir_emit(proc, ir_instr_unary_op(proc, op, v, platform_type));
+		return ir_emit_byte_swap(proc, res, type);
+	}
+
 	return ir_emit(proc, ir_instr_unary_op(proc, op, x, type));
 }
 
@@ -4756,11 +4763,10 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 			irValue *x = ir_emit_byte_swap(proc, left, platform_type);
 			irValue *y = ir_emit_byte_swap(proc, right, platform_type);
 			return ir_emit(proc, ir_instr_binary_op(proc, op_kind, x, y, t_llvm_bool));
-		}
-		if (is_type_float(t) && is_type_different_to_arch_endianness(t)) {
+		} else if (is_type_float(t) && is_type_different_to_arch_endianness(t)) {
 			Type *platform_type = integer_endian_type_to_platform_type(t);
-			irValue *x = ir_emit_byte_swap(proc, left, platform_type);
-			irValue *y = ir_emit_byte_swap(proc, right, platform_type);
+			irValue *x = ir_emit_conv(proc, left, platform_type);
+			irValue *y = ir_emit_conv(proc, right, platform_type);
 			return ir_emit(proc, ir_instr_binary_op(proc, op_kind, x, y, t_llvm_bool));
 		}
 	}

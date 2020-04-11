@@ -681,6 +681,12 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		case Basic_f32: return LLVMFloatTypeInContext(ctx);
 		case Basic_f64: return LLVMDoubleTypeInContext(ctx);
 
+		case Basic_f32le: return LLVMFloatTypeInContext(ctx);
+		case Basic_f64le: return LLVMDoubleTypeInContext(ctx);
+
+		case Basic_f32be: return LLVMFloatTypeInContext(ctx);
+		case Basic_f64be: return LLVMDoubleTypeInContext(ctx);
+
 		// Basic_complex32,
 		case Basic_complex64:
 			{
@@ -4077,7 +4083,11 @@ lbValue lb_const_bool(lbModule *m, Type *type, bool value) {
 }
 
 LLVMValueRef lb_const_f32(lbModule *m, f32 f, Type *type=t_f32) {
+	GB_ASSERT(type_size_of(type) == 4);
 	u32 u = bit_cast<u32>(f);
+	if (is_type_different_to_arch_endianness(type)) {
+		u = gb_endian_swap32(u);
+	}
 	LLVMValueRef i = LLVMConstInt(LLVMInt32TypeInContext(m->ctx), u, false);
 	return LLVMConstBitCast(i, lb_type(m, type));
 }
@@ -4437,7 +4447,13 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 			res.value = lb_const_f32(m, f, type);
 			return res;
 		}
-		res.value = LLVMConstReal(lb_type(m, original_type), value.value_float);
+		if (is_type_different_to_arch_endianness(type)) {
+			u64 u = bit_cast<u64>(value.value_float);
+			u = gb_endian_swap64(u);
+			res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f64>(u));
+		} else {
+			res.value = LLVMConstReal(lb_type(m, original_type), value.value_float);
+		}
 		return res;
 	case ExactValue_Complex:
 		{
@@ -4927,6 +4943,16 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 		return lb_emit_byte_swap(p, res, type);
 	}
 
+	if (op == Token_Sub && is_type_float(type) && is_type_different_to_arch_endianness(type)) {
+		Type *platform_type = integer_endian_type_to_platform_type(type);
+		lbValue v = lb_emit_byte_swap(p, x, platform_type);
+
+		lbValue res = {};
+		res.value = LLVMBuildFNeg(p->builder, v.value, "");
+		res.type = platform_type;
+
+		return lb_emit_byte_swap(p, res, type);
+	}
 
 	lbValue res = {};
 
@@ -5128,6 +5154,16 @@ lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Ty
 		Type *platform_type = integer_endian_type_to_platform_type(type);
 		lbValue x = lb_emit_byte_swap(p, lhs, integer_endian_type_to_platform_type(lhs.type));
 		lbValue y = lb_emit_byte_swap(p, rhs, integer_endian_type_to_platform_type(rhs.type));
+
+		lbValue res = lb_emit_arith(p, op, x, y, platform_type);
+
+		return lb_emit_byte_swap(p, res, type);
+	}
+
+	if (is_type_float(type) && is_type_different_to_arch_endianness(type)) {
+		Type *platform_type = integer_endian_type_to_platform_type(type);
+		lbValue x = lb_emit_conv(p, lhs, integer_endian_type_to_platform_type(lhs.type));
+		lbValue y = lb_emit_conv(p, rhs, integer_endian_type_to_platform_type(rhs.type));
 
 		lbValue res = lb_emit_arith(p, op, x, y, platform_type);
 
@@ -5562,6 +5598,31 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		gbAllocator a = heap_allocator();
 		i64 sz = type_size_of(src);
 		i64 dz = type_size_of(dst);
+
+
+		if (dz == sz) {
+			if (types_have_same_internal_endian(src, dst)) {
+				lbValue res = {};
+				res.type = t;
+				res.value = value.value;
+				return res;
+			} else {
+				return lb_emit_byte_swap(p, value, t);
+			}
+		}
+
+		if (is_type_different_to_arch_endianness(src) || is_type_different_to_arch_endianness(dst)) {
+			Type *platform_src_type = integer_endian_type_to_platform_type(src);
+			Type *platform_dst_type = integer_endian_type_to_platform_type(dst);
+			lbValue res = {};
+			res = lb_emit_conv(p, value, platform_src_type);
+			res = lb_emit_conv(p, res, platform_dst_type);
+			if (is_type_different_to_arch_endianness(dst)) {
+				res = lb_emit_byte_swap(p, res, t);
+			}
+			return lb_emit_conv(p, res, t);
+		}
+
 
 		lbValue res = {};
 		res.type = t;
@@ -7803,7 +7864,6 @@ LLVMValueRef lb_lookup_runtime_procedure(lbModule *m, String const &name) {
 lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *platform_type) {
 	Type *vt = core_type(value.type);
 	GB_ASSERT(type_size_of(vt) == type_size_of(platform_type));
-	GB_ASSERT(is_type_integer(vt));
 
 	// TODO(bill): lb_emit_byte_swap
 	lbValue res = {};
@@ -7812,17 +7872,29 @@ lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *platform_type) {
 
 	int sz = cast(int)type_size_of(vt);
 	if (sz > 1) {
-		String name = {};
-		switch (sz) {
-		case 2:  name = str_lit("bswap_16");  break;
-		case 4:  name = str_lit("bswap_32");  break;
-		case 8:  name = str_lit("bswap_64");  break;
-		case 16: name = str_lit("bswap_128"); break;
-		default: GB_PANIC("unhandled byteswap size"); break;
-		}
-		LLVMValueRef fn = lb_lookup_runtime_procedure(p->module, name);
+		if (is_type_float(platform_type)) {
+			String name = {};
+			switch (sz) {
+			case 4:  name = str_lit("bswap_f32");  break;
+			case 8:  name = str_lit("bswap_f64");  break;
+			default: GB_PANIC("unhandled byteswap size"); break;
+			}
+			LLVMValueRef fn = lb_lookup_runtime_procedure(p->module, name);
+			res.value = LLVMBuildCall(p->builder, fn, &value.value, 1, "");
+		} else {
+			GB_ASSERT(is_type_integer(platform_type));
+			String name = {};
+			switch (sz) {
+			case 2:  name = str_lit("bswap_16");  break;
+			case 4:  name = str_lit("bswap_32");  break;
+			case 8:  name = str_lit("bswap_64");  break;
+			case 16: name = str_lit("bswap_128"); break;
+			default: GB_PANIC("unhandled byteswap size"); break;
+			}
+			LLVMValueRef fn = lb_lookup_runtime_procedure(p->module, name);
 
-		res.value = LLVMBuildCall(p->builder, fn, &value.value, 1, "");
+			res.value = LLVMBuildCall(p->builder, fn, &value.value, 1, "");
+		}
 	}
 
 	return res;
@@ -8246,6 +8318,12 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 			Type *platform_type = integer_endian_type_to_platform_type(t);
 			lbValue x = lb_emit_byte_swap(p, left, platform_type);
 			lbValue y = lb_emit_byte_swap(p, right, platform_type);
+			left = x;
+			right = y;
+		} else if (is_type_float(t) && is_type_different_to_arch_endianness(t)) {
+			Type *platform_type = integer_endian_type_to_platform_type(t);
+			lbValue x = lb_emit_conv(p, left, platform_type);
+			lbValue y = lb_emit_conv(p, right, platform_type);
 			left = x;
 			right = y;
 		}
@@ -10433,7 +10511,31 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			// case Basic_f16:
 			case Basic_f32:
 			case Basic_f64:
-				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_float_ptr);
+			case Basic_f32le:
+			case Basic_f64le:
+			case Basic_f32be:
+			case Basic_f64be:
+				{
+					tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_float_ptr);
+
+					// NOTE(bill): This is matches the runtime layout
+					u8 endianness_value = 0;
+					if (t->Basic.flags & BasicFlag_EndianLittle) {
+						endianness_value = 1;
+					} else if (t->Basic.flags & BasicFlag_EndianBig) {
+						endianness_value = 2;
+					}
+					lbValue endianness = lb_const_int(m, t_u8, endianness_value);
+
+					LLVMValueRef vals[1] = {
+						endianness.value,
+					};
+
+					lbValue res = {};
+					res.type = type_deref(tag.type);
+					res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+					lb_emit_store(p, tag, res);
+				}
 				break;
 
 			// case Basic_complex32:
