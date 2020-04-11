@@ -12088,6 +12088,11 @@ void ir_gen_tree(irGen *s) {
 	irDebugInfo *compile_unit = m->debug_info.entries[0].value;
 	GB_ASSERT(compile_unit->kind == irDebugInfo_CompileUnit);
 
+	for_array(i, m->info->required_foreign_imports_through_force) {
+		Entity *e = m->info->required_foreign_imports_through_force[i];
+		ir_add_foreign_library_path(m, e);
+	}
+
 
 #if defined(GB_SYSTEM_WINDOWS)
 	if (build_context.is_dll && !has_dll_main) {
@@ -12324,13 +12329,8 @@ void ir_gen_tree(irGen *s) {
 			ir_end_procedure_body(proc);
 		}
 	}
-
-	for_array(i, m->info->required_foreign_imports_through_force) {
-		Entity *e = m->info->required_foreign_imports_through_force[i];
-		ir_add_foreign_library_path(m, e);
-	}
-
 #endif
+
 	{ // Startup Runtime
 		// Cleanup(bill): probably better way of doing code insertion
 		String name = str_lit(IR_STARTUP_RUNTIME_PROC_NAME);
