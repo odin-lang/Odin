@@ -2,6 +2,22 @@ package runtime
 
 import "core:os"
 
+bswap_16 :: proc "none" (x: u16) -> u16 {
+	return x>>8 | x<<16;
+}
+
+bswap_32 :: proc "none" (x: u32) -> u32 {
+	return x>>24 | (x>>8)&0xff00 | (x<<8)&0xff0000 | x<<24;
+}
+
+bswap_64 :: proc "none" (x: u64) -> u64 {
+	return u64(bswap_32(u32(x))) | u64(bswap_32(u32(x>>32)));
+}
+
+bswap_128 :: proc "none" (x: u128) -> u128 {
+	return u128(bswap_64(u64(x))) | u128(bswap_64(u64(x>>64)));
+}
+
 ptr_offset :: inline proc "contextless" (ptr: $P/^$T, n: int) -> P {
 	new := int(uintptr(ptr)) + size_of(T)*n;
 	return P(uintptr(new));
