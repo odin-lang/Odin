@@ -3297,7 +3297,6 @@ irValue *ir_emit_package_call(irProcedure *proc, char const *package_name_, char
 }
 
 
-
 void ir_emit_defer_stmts(irProcedure *proc, irDeferExitKind kind, irBlock *block) {
 	isize count = proc->defer_stmts.count;
 	isize i = count;
@@ -4320,8 +4319,18 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 			goto handle_op;
 		}
 		Type *platform_type = integer_endian_type_to_platform_type(type);
-		irValue *x = ir_emit_byte_swap(proc, left, integer_endian_type_to_platform_type(t_left));
-		irValue *y = ir_emit_byte_swap(proc, right, integer_endian_type_to_platform_type(t_right));
+		irValue *x = ir_emit_conv(proc, left, integer_endian_type_to_platform_type(t_left));
+		irValue *y = ir_emit_conv(proc, right, integer_endian_type_to_platform_type(t_right));
+
+		irValue *res = ir_emit_arith(proc, op, x, y, platform_type);
+
+		return ir_emit_byte_swap(proc, res, type);
+	}
+
+	if (is_type_float(type) && is_type_different_to_arch_endianness(type)) {
+		Type *platform_type = integer_endian_type_to_platform_type(type);
+		irValue *x = ir_emit_conv(proc, left, integer_endian_type_to_platform_type(t_left));
+		irValue *y = ir_emit_conv(proc, right, integer_endian_type_to_platform_type(t_right));
 
 		irValue *res = ir_emit_arith(proc, op, x, y, platform_type);
 
@@ -4743,6 +4752,12 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 	if (op_kind != Token_CmpEq && op_kind != Token_NotEq) {
 		Type *t = ir_type(left);
 		if (is_type_integer(t) && is_type_different_to_arch_endianness(t)) {
+			Type *platform_type = integer_endian_type_to_platform_type(t);
+			irValue *x = ir_emit_byte_swap(proc, left, platform_type);
+			irValue *y = ir_emit_byte_swap(proc, right, platform_type);
+			return ir_emit(proc, ir_instr_binary_op(proc, op_kind, x, y, t_llvm_bool));
+		}
+		if (is_type_float(t) && is_type_different_to_arch_endianness(t)) {
 			Type *platform_type = integer_endian_type_to_platform_type(t);
 			irValue *x = ir_emit_byte_swap(proc, left, platform_type);
 			irValue *y = ir_emit_byte_swap(proc, right, platform_type);
@@ -5269,6 +5284,29 @@ irValue *ir_emit_byte_swap(irProcedure *proc, irValue *value, Type *t) {
 		return value;
 	}
 	GB_ASSERT(type_size_of(vt) == type_size_of(t));
+	if (is_type_float(t)) {
+		i64 sz = type_size_of(t);
+
+		auto args = array_make<irValue *>(ir_allocator(), 1);
+		args[0] = value;
+
+		char const *proc_name = nullptr;
+		switch (sz*8) {
+		case 32: proc_name  = "bswap_f32"; break;
+		case 64: proc_name  = "bswap_f64"; break;
+		}
+		GB_ASSERT(proc_name != nullptr);
+
+		String name = make_string_c(proc_name);
+
+		AstPackage *p = proc->module->info->runtime_package;
+		Entity *e = scope_lookup_current(p->scope, name);
+		irValue **found = map_get(&proc->module->values, hash_entity(e));
+		GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(name));
+		irValue *gp = *found;
+
+		return ir_emit(proc, ir_instr_call(proc, gp, nullptr, args, t, nullptr, ProcInlining_none));
+	}
 	return ir_emit(proc, ir_instr_conv(proc, irConv_byteswap, value, vt, t));
 }
 
@@ -5423,13 +5461,34 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 	// float -> float
 	if (is_type_float(src) && is_type_float(dst)) {
+		GB_ASSERT(!are_types_identical(src, dst));
 		gbAllocator a = ir_allocator();
 		i64 sz = type_size_of(src);
 		i64 dz = type_size_of(dst);
 		irConvKind kind = irConv_fptrunc;
+		if (dz == sz) {
+			if (types_have_same_internal_endian(src, dst)) {
+				return ir_emit_transmute(proc, value, t);
+			} else {
+				return ir_emit_byte_swap(proc, value, t);
+			}
+		}
 		if (dz >= sz) {
 			kind = irConv_fpext;
 		}
+		if (is_type_different_to_arch_endianness(src) || is_type_different_to_arch_endianness(dst)) {
+			Type *platform_src_type = integer_endian_type_to_platform_type(src);
+			Type *platform_dst_type = integer_endian_type_to_platform_type(dst);
+			irValue *res = nullptr;
+			res = ir_emit_conv(proc, value, platform_src_type);
+			res = ir_emit_conv(proc, res, platform_dst_type);
+			if (is_type_different_to_arch_endianness(dst)) {
+				res = ir_emit_byte_swap(proc, res, t);
+			}
+			return ir_emit_conv(proc, res, t);
+		}
+
+
 		return ir_emit(proc, ir_instr_conv(proc, kind, value, src_type, t));
 	}
 
@@ -5737,6 +5796,9 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 	if (is_type_proc(src) && is_type_uintptr(dst)) {
 		irValue *ptr = ir_emit_uintptr_to_ptr(proc, value, t_rawptr);
 		return ir_emit_bitcast(proc, ptr, dst);
+	}
+	if (is_type_float(src) && is_type_float(dst)) {
+		return ir_emit_bitcast(proc, value, t);
 	}
 
 	if (is_type_integer(src) && (is_type_pointer(dst) || is_type_cstring(dst))) {
@@ -11441,8 +11503,25 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			// case Basic_f16:
 			case Basic_f32:
 			case Basic_f64:
-				tag = ir_emit_conv(proc, variant_ptr, t_type_info_float_ptr);
+			case Basic_f32le:
+			case Basic_f64le:
+			case Basic_f32be:
+			case Basic_f64be:
+				{	
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_float_ptr);
+
+					// NOTE(bill): This is matches the runtime layout
+					u8 endianness_value = 0;
+					if (t->Basic.flags & BasicFlag_EndianLittle) {
+						endianness_value = 1;
+					} else if (t->Basic.flags & BasicFlag_EndianBig) {
+						endianness_value = 2;
+					}
+					irValue *endianness = ir_const_u8(endianness_value);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), endianness);
+				}
 				break;
+
 
 			// case Basic_complex32:
 			case Basic_complex64:

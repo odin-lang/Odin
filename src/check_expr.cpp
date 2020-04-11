@@ -1455,6 +1455,12 @@ bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Typ
 		case Basic_f64:
 			return true;
 
+		case Basic_f32le:
+		case Basic_f64le:
+		case Basic_f32be:
+		case Basic_f64be:
+			return true;
+
 		case Basic_UntypedFloat:
 			return true;
 

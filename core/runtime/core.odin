@@ -57,7 +57,7 @@ Type_Info_Struct_Soa_Kind :: enum u8 {
 Type_Info_Named      :: struct {name: string, base: ^Type_Info};
 Type_Info_Integer    :: struct {signed: bool, endianness: Platform_Endianness};
 Type_Info_Rune       :: struct {};
-Type_Info_Float      :: struct {};
+Type_Info_Float      :: struct {endianness: Platform_Endianness};
 Type_Info_Complex    :: struct {};
 Type_Info_Quaternion :: struct {};
 Type_Info_String     :: struct {is_cstring: bool};

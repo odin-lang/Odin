@@ -363,6 +363,11 @@ write_type :: proc(buf: ^strings.Builder, ti: ^Type_Info) {
 	case Type_Info_Float:
 		write_byte(buf, 'f');
 		write_i64(buf, i64(8*ti.size), 10);
+		switch info.endianness {
+		case .Platform: // Okay
+		case .Little: write_string(buf, "le");
+		case .Big:    write_string(buf, "be");
+		}
 	case Type_Info_Complex:
 		write_string(buf, "complex");
 		write_i64(buf, i64(8*ti.size), 10);

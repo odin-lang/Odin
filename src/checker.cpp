@@ -1708,6 +1708,9 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("bswap_32"),
 		str_lit("bswap_64"),
 		str_lit("bswap_128"),
+
+		str_lit("bswap_f32"),
+		str_lit("bswap_f64"),
 	};
 	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
 		add_dependency_to_set(c, scope_lookup(c->info.runtime_package->scope, required_runtime_entities[i]));

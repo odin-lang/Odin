@@ -449,6 +449,13 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 		case Basic_f32:    ir_write_str_lit(f, "float");                   return;
 		case Basic_f64:    ir_write_str_lit(f, "double");                  return;
 
+
+		case Basic_f32le:    ir_write_str_lit(f, "float");  return;
+		case Basic_f64le:    ir_write_str_lit(f, "double"); return;
+
+		case Basic_f32be:    ir_write_str_lit(f, "float");   return;
+		case Basic_f64be:    ir_write_str_lit(f, "double");  return;
+
 		// case Basic_complex32:  ir_write_str_lit(f, "%%..complex32");    return;
 		case Basic_complex64:  ir_write_str_lit(f, "%..complex64");        return;
 		case Basic_complex128: ir_write_str_lit(f, "%..complex128");       return;
@@ -834,6 +841,8 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		type = core_type(type);
 		u64 u_64 = bit_cast<u64>(value.value_float);
 		u32 u_32 = bit_cast<u32>(cast(f32)value.value_float);
+
+
 	#if 0
 		switch (type->Basic.kind) {
 		case Basic_f32:
@@ -861,13 +870,38 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		}
 	#else
 		switch (type->Basic.kind) {
-		case Basic_f32: {
+		case Basic_f32:
 			ir_fprintf(f, "bitcast (i32 %u to float)", u_32);
 			break;
-		}
+		case Basic_f32le:
+			if (build_context.endian_kind != TargetEndian_Little) {
+				u_32 = gb_endian_swap32(u_32);
+			}
+			ir_fprintf(f, "bitcast (i32 %u to float)", u_32);
+			break;
+		case Basic_f32be:
+			if (build_context.endian_kind != TargetEndian_Big) {
+				u_32 = gb_endian_swap32(u_32);
+			}
+			ir_fprintf(f, "bitcast (i32 %u to float)", u_32);
+			break;
+
 		case Basic_f64:
 			ir_fprintf(f, "0x%016llx", u_64);
 			break;
+		case Basic_f64le:
+			if (build_context.endian_kind != TargetEndian_Little) {
+				u_64 = gb_endian_swap64(u_64);
+			}
+			ir_fprintf(f, "0x%016llx", u_64);
+			break;
+		case Basic_f64be:
+			if (build_context.endian_kind != TargetEndian_Big) {
+				u_64 = gb_endian_swap64(u_64);
+			}
+			ir_fprintf(f, "0x%016llx", u_64);
+			break;
+
 		default:
 			ir_fprintf(f, "0x%016llx", u_64);
 			break;
