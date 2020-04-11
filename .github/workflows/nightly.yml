@@ -1,0 +1,126 @@
+name:  Nightly
+on:
+  schedule:
+    - cron: 0 20 * * *
+
+jobs:
+  build_windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install cURL
+        run: choco install curl
+      - name: Download and unpack LLVM bins
+        shell: cmd
+        run: |
+          cd bin
+          curl -sL https://github.com/odin-lang/Odin/releases/download/llvm-windows/llvm-binaries.zip --output llvm-binaries.zip
+          7z x llvm-binaries.zip > nul
+      - name: build Odin
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          ./ci/build_ci.bat
+      - name: Odin run
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          odin run examples/demo/demo.odin
+      - name: Copy artifacts
+        run: |
+          mkdir dist
+          cp odin.exe dist
+          cp -r shared dist
+          cp -r core dist
+          cp -r bin dist
+          cp -r examples dist
+      - name: Upload artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: windows_artifacts
+          path: dist
+  build_ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: (Linux) Download LLVM
+        run: sudo apt-get install llvm
+      - name: build odin
+        run: make release
+      - name: Odin run
+        run: ./odin run examples/demo/demo.odin
+      - name: Copy artifacts
+        run: |
+          mkdir dist
+          cp odin dist
+          cp -r shared dist
+          cp -r core dist
+          cp -r examples dist
+      - name: Upload artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: ubuntu_artifacts
+          path: dist
+  build_macos:
+    runs-on: macOS-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Download LLVM and setup PATH
+        run: |
+          brew install llvm
+          echo ::add-path::/usr/local/opt/llvm/bin
+          echo ::set-env name=CPATH::`xcrun --show-sdk-path`/usr/include
+      - name: build odin
+        run: make release
+      - name: Odin run
+        run: ./odin run examples/demo/demo.odin
+      - name: Copy artifacts
+        run: |
+          mkdir dist
+          cp odin dist
+          cp -r shared dist
+          cp -r core dist
+          cp -r examples dist
+      - name: Upload artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: macos_artifacts
+          path: dist
+  upload_b2:
+    runs-on: [ubuntu-latest]
+    needs: [build_windows, build_macos, build_ubuntu]
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install B2 CLI
+        shell: bash
+        run: sudo pip install --upgrade b2
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: windows_artifacts
+      - name: Download Ubuntu artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: ubuntu_artifacts
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: macos_artifacts
+      - name: Create archieves
+        run: |
+          now=$(date +'%Y-%m-%d')
+          7z a output/odin-windows-amd64-nightly+$now.zip -r windows_artifacts/
+          7z a output/odin-ubuntu-amd64-nightly+$now.zip -r ubuntu_artifacts/
+          7z a output/odin-macos-amd64-nightly+$now.zip -r macos_artifact/
+      - name: Upload artifacts to b2
+        shell: bash
+        env:
+          APPID: ${{ secrets.B2_APPID }}
+          APPKEY: ${{ secrets.B2_APPKEY }}
+        run: |
+          b2 authorize-account "$APPID" "$APPKEY"
+          b2 sync --keepDays 7 output b2://odin-binaries/nightly
+          python3 ci/create_nightly_json.py > nightly.json
+          b2 upload-file odin-binaries nightly.json nightly.json
+          b2 clear-account
+        
