@@ -609,7 +609,10 @@ new_clone :: inline proc(data: $T, allocator := context.allocator, loc := #calle
 make_aligned :: proc($T: typeid/[]$E, auto_cast len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> T {
 	make_slice_error_loc(loc, len);
 	data := mem_alloc(size_of(E)*len, alignment, allocator, loc);
-	if data == nil do return nil;
+	if data == nil && size_of(E) != 0 {
+		return nil;
+	}
+	mem_zero(data, size_of(E)*len);
 	s := Raw_Slice{data, len};
 	return transmute(T)s;
 }
@@ -634,9 +637,10 @@ make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, auto_cast len: int, a
 	make_dynamic_array_error_loc(loc, len, cap);
 	data := mem_alloc(size_of(E)*cap, align_of(E), allocator, loc);
 	s := Raw_Dynamic_Array{data, len, cap, allocator};
-	if data == nil {
+	if data == nil && size_of(E) != 0 {
 		s.len, s.cap = 0, 0;
 	}
+	mem_zero(data, size_of(E)*cap);
 	return transmute(T)s;
 }
 
@@ -697,10 +701,12 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 	arg_len = min(cap(array)-len(array), arg_len);
 	if arg_len > 0 {
 		a := (^Raw_Dynamic_Array)(array);
-		data := (^E)(a.data);
-		assert(data != nil);
-		val := arg;
-		mem_copy(ptr_offset(data, a.len), &val, size_of(E));
+		if size_of(E) != 0 {
+			data := (^E)(a.data);
+			assert(data != nil);
+			val := arg;
+			mem_copy(ptr_offset(data, a.len), &val, size_of(E));
+		}
 		a.len += arg_len;
 	}
 }
@@ -719,9 +725,11 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 	arg_len = min(cap(array)-len(array), arg_len);
 	if arg_len > 0 {
 		a := (^Raw_Dynamic_Array)(array);
-		data := (^E)(a.data);
-		assert(data != nil);
-		mem_copy(ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
+		if size_of(E) != 0 {
+			data := (^E)(a.data);
+			assert(data != nil);
+			mem_copy(ptr_offset(data, a.len), &args[0], size_of(E) * arg_len);
+		}
 		a.len += arg_len;
 	}
 }

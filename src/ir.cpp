@@ -4414,6 +4414,7 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 		irValue *ptr = ir_emit_conv(proc, x, t_u8_ptr);
 		return ir_emit_comp(proc, op_kind, ptr, v_raw_nil);
 	} else if (is_type_any(t)) {
+		// TODO(bill): is this correct behaviour for nil comparison for any?
 		irValue *data = ir_emit_struct_ev(proc, x, 0);
 		irValue *ti   = ir_emit_struct_ev(proc, x, 1);
 		if (op_kind == Token_CmpEq) {
@@ -4426,32 +4427,14 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 			return ir_emit_arith(proc, Token_And, a, b, t_bool);
 		}
 	} else if (is_type_slice(t)) {
-		irValue *data = ir_emit_struct_ev(proc, x, 0);
-		irValue *cap  = ir_emit_struct_ev(proc, x, 1);
-		if (op_kind == Token_CmpEq) {
-			irValue *a = ir_emit_comp(proc, Token_CmpEq, data, v_raw_nil);
-			irValue *b = ir_emit_comp(proc, Token_CmpEq, cap, v_zero);
-			return ir_emit_arith(proc, Token_Or, a, b, t_bool);
-		} else if (op_kind == Token_NotEq) {
-			irValue *a = ir_emit_comp(proc, Token_NotEq, data, v_raw_nil);
-			irValue *b = ir_emit_comp(proc, Token_NotEq, cap, v_zero);
-			return ir_emit_arith(proc, Token_And, a, b, t_bool);
-		}
-	} else if (is_type_dynamic_array(t)) {
-		irValue *data = ir_emit_struct_ev(proc, x, 0);
-		irValue *cap  = ir_emit_struct_ev(proc, x, 2);
-		if (op_kind == Token_CmpEq) {
-			irValue *a = ir_emit_comp(proc, Token_CmpEq, data, v_raw_nil);
-			irValue *b = ir_emit_comp(proc, Token_CmpEq, cap, v_zero);
-			return ir_emit_arith(proc, Token_Or, a, b, t_bool);
-		} else if (op_kind == Token_NotEq) {
-			irValue *a = ir_emit_comp(proc, Token_NotEq, data, v_raw_nil);
-			irValue *b = ir_emit_comp(proc, Token_NotEq, cap, v_zero);
-			return ir_emit_arith(proc, Token_And, a, b, t_bool);
-		}
-	} else if (is_type_map(t)) {
-		irValue *len = ir_map_len(proc, x);
+		irValue *len  = ir_emit_struct_ev(proc, x, 1);
 		return ir_emit_comp(proc, op_kind, len, v_zero);
+	} else if (is_type_dynamic_array(t)) {
+		irValue *cap  = ir_emit_struct_ev(proc, x, 2);
+		return ir_emit_comp(proc, op_kind, cap, v_zero);
+	} else if (is_type_map(t)) {
+		irValue *cap = ir_map_cap(proc, x);
+		return ir_emit_comp(proc, op_kind, cap, v_zero);
 	} else if (is_type_union(t)) {
 		if (type_size_of(t) == 0) {
 			return ir_emit_comp(proc, op_kind, v_zero, v_zero);
@@ -4481,38 +4464,12 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 		if (bt->Struct.soa_kind == StructSoa_Slice) {
 			ir_emit_comment(proc, str_lit("soa-slice-nil-comp"));
 			irValue *len  = ir_soa_struct_len(proc, x);
-			if (bt->Struct.fields.count > 1) {
-				irValue *data = ir_emit_struct_ev(proc, x, 0);
-				if (op_kind == Token_CmpEq) {
-					irValue *a = ir_emit_comp(proc, Token_CmpEq, data, v_raw_nil);
-					irValue *b = ir_emit_comp(proc, Token_CmpEq, len, v_zero);
-					return ir_emit_arith(proc, Token_Or, a, b, t_bool);
-				} else if (op_kind == Token_NotEq) {
-					irValue *a = ir_emit_comp(proc, Token_NotEq, data, v_raw_nil);
-					irValue *b = ir_emit_comp(proc, Token_NotEq, len, v_zero);
-					return ir_emit_arith(proc, Token_And, a, b, t_bool);
-				}
-			} else {
-				return ir_emit_comp(proc, op_kind, len, v_zero);
-			}
+			return ir_emit_comp(proc, op_kind, len, v_zero);
 		} else if (bt->Struct.soa_kind == StructSoa_Dynamic) {
 			ir_emit_comment(proc, str_lit("soa-dynamic-array-nil-comp"));
 
-			irValue *cap  = ir_soa_struct_len(proc, x);
-			if (bt->Struct.fields.count > 1) {
-				irValue *data = ir_emit_struct_ev(proc, x, 0);
-				if (op_kind == Token_CmpEq) {
-					irValue *a = ir_emit_comp(proc, Token_CmpEq, data, v_raw_nil);
-					irValue *b = ir_emit_comp(proc, Token_CmpEq, cap, v_zero);
-					return ir_emit_arith(proc, Token_Or, a, b, t_bool);
-				} else if (op_kind == Token_NotEq) {
-					irValue *a = ir_emit_comp(proc, Token_NotEq, data, v_raw_nil);
-					irValue *b = ir_emit_comp(proc, Token_NotEq, cap, v_zero);
-					return ir_emit_arith(proc, Token_And, a, b, t_bool);
-				}
-			} else {
-				return ir_emit_comp(proc, op_kind, cap, v_zero);
-			}
+			irValue *cap  = ir_soa_struct_cap(proc, x);
+			return ir_emit_comp(proc, op_kind, cap, v_zero);
 		}
 	}
 	return nullptr;

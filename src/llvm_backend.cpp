@@ -7952,6 +7952,7 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 		}
 		return res;
 	} else if (is_type_any(t)) {
+		// TODO(bill): is this correct behaviour for nil comparison for any?
 		lbValue data = lb_emit_struct_ev(p, x, 0);
 		lbValue ti   = lb_emit_struct_ev(p, x, 1);
 		if (op_kind == Token_CmpEq) {
@@ -7966,31 +7967,21 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 			return res;
 		}
 	} else if (is_type_slice(t)) {
-		lbValue data = lb_emit_struct_ev(p, x, 0);
-		lbValue cap  = lb_emit_struct_ev(p, x, 1);
+		lbValue len  = lb_emit_struct_ev(p, x, 1);
 		if (op_kind == Token_CmpEq) {
-			LLVMValueRef a = LLVMBuildIsNull(p->builder, data.value, "");
-			LLVMValueRef b = LLVMBuildIsNull(p->builder, cap.value, "");
-			res.value = LLVMBuildOr(p->builder, a, b, "");
+			res.value = LLVMBuildIsNull(p->builder, len.value, "");
 			return res;
 		} else if (op_kind == Token_NotEq) {
-			LLVMValueRef a = LLVMBuildIsNotNull(p->builder, data.value, "");
-			LLVMValueRef b = LLVMBuildIsNotNull(p->builder, cap.value, "");
-			res.value = LLVMBuildAnd(p->builder, a, b, "");
+			res.value = LLVMBuildIsNotNull(p->builder, len.value, "");
 			return res;
 		}
 	} else if (is_type_dynamic_array(t)) {
-		lbValue data = lb_emit_struct_ev(p, x, 0);
 		lbValue cap  = lb_emit_struct_ev(p, x, 2);
 		if (op_kind == Token_CmpEq) {
-			LLVMValueRef a = LLVMBuildIsNull(p->builder, data.value, "");
-			LLVMValueRef b = LLVMBuildIsNull(p->builder, cap.value, "");
-			res.value = LLVMBuildOr(p->builder, a, b, "");
+			res.value = LLVMBuildIsNull(p->builder, cap.value, "");
 			return res;
 		} else if (op_kind == Token_NotEq) {
-			LLVMValueRef a = LLVMBuildIsNotNull(p->builder, data.value, "");
-			LLVMValueRef b = LLVMBuildIsNotNull(p->builder, cap.value, "");
-			res.value = LLVMBuildAnd(p->builder, a, b, "");
+			res.value = LLVMBuildIsNotNull(p->builder, cap.value, "");
 			return res;
 		}
 	} else if (is_type_map(t)) {
@@ -8019,41 +8010,26 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 		lbValue res = lb_emit_comp(p, op_kind, val, lb_const_int(p->module, t_int, 0));
 		return res;
 	} else if (is_type_soa_struct(t)) {
-		GB_PANIC("#soa struct nil comparison");
-		// Type *bt = base_type(t);
-		// if (bt->Struct.soa_kind == StructSoa_Slice) {
-		// 	lbValue len  = lb_soa_struct_len(p, x);
-		// 	if (bt->Struct.fields.count > 1) {
-		// 		lbValue data = lb_emit_struct_ev(p, x, 0);
-		// 		if (op_kind == Token_CmpEq) {
-		// 			lbValue a = lb_emit_comp(p, Token_CmpEq, data, v_raw_nil);
-		// 			lbValue b = lb_emit_comp(p, Token_CmpEq, len, v_zero);
-		// 			return lb_emit_arith(p, Token_Or, a, b, t_bool);
-		// 		} else if (op_kind == Token_NotEq) {
-		// 			lbValue a = lb_emit_comp(p, Token_NotEq, data, v_raw_nil);
-		// 			lbValue b = lb_emit_comp(p, Token_NotEq, len, v_zero);
-		// 			return lb_emit_arith(p, Token_And, a, b, t_bool);
-		// 		}
-		// 	} else {
-		// 		return lb_emit_comp(p, op_kind, len, v_zero);
-		// 	}
-		// } else if (bt->Struct.soa_kind == StructSoa_Dynamic) {
-		// 	lbValue cap  = lb_soa_struct_len(p, x);
-		// 	if (bt->Struct.fields.count > 1) {
-		// 		lbValue data = lb_emit_struct_ev(p, x, 0);
-		// 		if (op_kind == Token_CmpEq) {
-		// 			lbValue a = lb_emit_comp(p, Token_CmpEq, data, v_raw_nil);
-		// 			lbValue b = lb_emit_comp(p, Token_CmpEq, cap, v_zero);
-		// 			return lb_emit_arith(p, Token_Or, a, b, t_bool);
-		// 		} else if (op_kind == Token_NotEq) {
-		// 			lbValue a = lb_emit_comp(p, Token_NotEq, data, v_raw_nil);
-		// 			lbValue b = lb_emit_comp(p, Token_NotEq, cap, v_zero);
-		// 			return lb_emit_arith(p, Token_And, a, b, t_bool);
-		// 		}
-		// 	} else {
-		// 		return lb_emit_comp(p, op_kind, cap, v_zero);
-		// 	}
-		// }
+		Type *bt = base_type(t);
+		if (bt->Struct.soa_kind == StructSoa_Slice) {
+			lbValue len = lb_soa_struct_len(p, x);
+			if (op_kind == Token_CmpEq) {
+				res.value = LLVMBuildIsNull(p->builder, len.value, "");
+				return res;
+			} else if (op_kind == Token_NotEq) {
+				res.value = LLVMBuildIsNotNull(p->builder, len.value, "");
+				return res;
+			}
+		} else if (bt->Struct.soa_kind == StructSoa_Dynamic) {
+			lbValue cap = lb_soa_struct_cap(p, x);
+			if (op_kind == Token_CmpEq) {
+				res.value = LLVMBuildIsNull(p->builder, cap.value, "");
+				return res;
+			} else if (op_kind == Token_NotEq) {
+				res.value = LLVMBuildIsNotNull(p->builder, cap.value, "");
+				return res;
+			}
+		}
 	}
 	return {};
 }
