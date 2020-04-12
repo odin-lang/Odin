@@ -89,7 +89,7 @@ Write_Error :: enum {
 	// the other peer closed their socket.
 	Reset = win32.WSAECONNRESET,
 	// out of buffer space
-	Resources = win32.WSAENOBUFS,
+	Out_Of_Resources = win32.WSAENOBUFS,
 	// you are offline
 	Offline = win32.WSAENETDOWN,
 	// the host is offline
@@ -100,6 +100,7 @@ Write_Error :: enum {
 	Timeout = win32.WSAETIMEDOUT,
 }
 
+// Reads data from a socket. Blocks if none is ready.
 read :: proc(skt: Socket, buffer: []u8) -> (n: int, err: Read_Error) {
 	wait_err := wait_for_available_data(skt);
 	if wait_err != .Ok {
@@ -110,12 +111,14 @@ read :: proc(skt: Socket, buffer: []u8) -> (n: int, err: Read_Error) {
 	return;
 }
 
+// Reads data if available. Does not block.
+// If no data is ready, returns n = 0 and err = Ok.
 try_read :: proc(skt: Socket, buffer: []u8) -> (n: int, err: Read_Error) {
 	limit := min(len(buffer), int(max(i32)));
 	n = int(win32.recv(win32.SOCKET(skt), &buffer[0], i32(limit), 0));
 	if n != win32.SOCKET_ERROR do return;
 
-	// AUDIT(tetra): panic on weird errors
+	// TODO(tetra): AUDIT: panic on weird errors
 	recv_err := win32.WSAGetLastError();
 	switch recv_err {
 	case win32.WSAEWOULDBLOCK:
@@ -127,7 +130,7 @@ try_read :: proc(skt: Socket, buffer: []u8) -> (n: int, err: Read_Error) {
 	return;
 }
 
-// Write some data to a socket and wait for it to all be put into the OS's send buffer.
+// Write data to a socket. Blocks until all is put into the OS's send buffers.
 write :: proc(skt: Socket, buffer: []u8) -> (err: Write_Error) {
 	sent := 0;
 	n: int = ---;
@@ -149,7 +152,12 @@ write_string :: inline proc(skt: Socket, s: string) -> (err: Write_Error) {
 	return write(skt, transmute([]byte) s); // NOTE: Okay, because we don't mutate it.
 }
 
-// Write some data to the socket, or none if the OS's send buffer does not have enough space.
+// Write data to a socket.
+// If the OS's send buffers has insufficient space, returns n = 0.
+//
+// TODO(tetra): AUDIT: Consider what should happen if we are asked to send a large amount of data.
+// The OS buffer will probably not have enough space for it, so will that result in a partial-send or a
+// no-send? If latter, it will never succeed. Verify if this is a reality or not.
 try_write :: proc(skt: Socket, data: []u8) -> (n: int, err: Write_Error) {
 	limit := min(int(max(i32)), len(data));
 
@@ -163,7 +171,7 @@ try_write :: proc(skt: Socket, data: []u8) -> (n: int, err: Write_Error) {
 	switch write_err {
 	case win32.WSAEWOULDBLOCK:
 		err = .Ok;
-		n = 0; // AUDIT(tetra): Verify that this means that no data was sent.
+		n = 0; // TODO(tetra): AUDIT: Verify that this means that no data was sent.
 	case win32.WSAECONNABORTED: err = .Aborted; // socket broken - must be reopened.
 	case win32.WSAENETRESET:    err = .Aborted; // keep alive failed
 	case win32.WSAEINVAL:       panic("socket not bound");
@@ -191,7 +199,7 @@ read_all :: proc(skt: Socket, buffer: []u8) -> (err: Read_Error) {
 //
 // Can be used to read at least a specific amount of data at once.
 //
-// AUDIT(tetra): Does this actually work?
+// TODO(tetra): AUDIT: Does this actually work?
 try_read_all :: proc(skt: Socket, buffer: []u8) -> (n: int, err: Read_Error) {
 	set_min_data_to_read(skt, len(buffer));
 	defer set_min_data_to_read(skt, 1);
@@ -236,7 +244,7 @@ Write_To_Error :: enum {
 	// the other peer closed their socket.
 	Reset = win32.WSAECONNRESET,
 	// out of buffer space
-	Resources = win32.WSAENOBUFS,
+	Out_Of_Resources = win32.WSAENOBUFS,
 	// you are offline
 	Offline = win32.WSAENETDOWN,
 	// the host is offline
@@ -350,7 +358,7 @@ read_all_from :: proc(dgram_skt: Socket, buffer: []u8) -> (from: Endpoint, err: 
 
 
 // Same as `read_all`, but returns 0 immediately instead of blocking.
-// AUDIT(tetra): Does this actually work?
+// TODO(tetra): AUDIT: Does this actually work?
 try_read_all_from :: proc(skt: Socket, buffer: []u8) -> (ok: bool, from: Endpoint, err: Read_From_Error) {
 	set_min_data_to_read(skt, len(buffer));
 	defer set_min_data_to_read(skt, 1);
@@ -366,7 +374,7 @@ try_read_all_from :: proc(skt: Socket, buffer: []u8) -> (ok: bool, from: Endpoin
 Dial_Error :: enum {
 	Ok,
 	// not enough system resources, be it buffers, socket descriptors, or ports.
-	Resources = win32.WSAENOBUFS,
+	Out_Of_Resources = win32.WSAENOBUFS,
 	// the local address is already in use.
 	Addr_Taken = win32.WSAEADDRINUSE,
 	// the remote peer is not listening on this endpoint.
@@ -381,7 +389,7 @@ Dial_Error :: enum {
 Listen_Error :: enum {
 	Ok,
 	// too many connections or not enough memory
-	Resources,
+	Out_Of_Resources,
 	// addr or port are already in use.
 	Addr_Taken = win32.WSAEADDRINUSE,
 }
@@ -429,7 +437,7 @@ listen :: proc(bind_addr: Address, port: int, type := Socket_Type.Tcp, accept_qu
 	if res == win32.SOCKET_ERROR {
 		bind_err := win32.WSAGetLastError();
 		switch bind_err {
-		case win32.WSAENOBUFS: err = .Resources;
+		case win32.WSAENOBUFS: err = .Out_Of_Resources;
 
 		case win32.WSAEADDRNOTAVAIL: panic("binding addr not valid for this machine");
 		case win32.WSAEACCES:   unimplemented(); // TODO(tetra): broadcasting
@@ -447,7 +455,7 @@ listen :: proc(bind_addr: Address, port: int, type := Socket_Type.Tcp, accept_qu
 			listen_err := win32.WSAGetLastError();
 			switch listen_err {
 			case win32.WSAEMFILE, win32.WSAENOBUFS:
-				err = .Resources;
+				err = .Out_Of_Resources;
 			case win32.WSAEOPNOTSUPP: fmt.panicf("socket type %v does not support listen\n", type);
 			case win32.WSAENETDOWN: panic("network subsystem failure");
 			case:
@@ -464,10 +472,11 @@ listen :: proc(bind_addr: Address, port: int, type := Socket_Type.Tcp, accept_qu
 
 Accept_Error :: enum {
 	Ok,
-	Resources,
+	Out_Of_Resources,
 	Reset = win32.WSAECONNRESET,
 }
 
+// Accept a client if there is one. Does not block.
 try_accept :: proc(skt: Socket) -> (accepted: bool, peer: Socket, remote_ep: Endpoint, err: Accept_Error) {
 	s: win32.SOCKET;
 	native_addr: win32.Socket_Address;
@@ -478,8 +487,8 @@ try_accept :: proc(skt: Socket) -> (accepted: bool, peer: Socket, remote_ep: End
 		skt_err := win32.WSAGetLastError();
 		switch skt_err {
 		case win32.WSAECONNRESET: err = .Reset;
-		case win32.WSAEMFILE:     err = .Resources;
-		case win32.WSAENOBUFS:    err = .Resources;
+		case win32.WSAEMFILE:     err = .Out_Of_Resources;
+		case win32.WSAENOBUFS:    err = .Out_Of_Resources;
 		case win32.WSAEWOULDBLOCK: err = .Ok;
 		case: assert(false);
 		}
@@ -492,8 +501,9 @@ try_accept :: proc(skt: Socket) -> (accepted: bool, peer: Socket, remote_ep: End
 	return;
 }
 
+// Waits for a client to connect and accepts them. Blocks.
 accept :: proc(skt: Socket) -> (peer: Socket, remote_ep: Endpoint, err: Accept_Error) {
-	wait_err := wait_for_available_data(skt);
+	wait_err := wait_for_available_data(skt); // NOTE: means that someone connected
 	if wait_err != .Ok {
 		err = Accept_Error(wait_err);
 		return;
@@ -529,7 +539,7 @@ start_dial :: proc(addr: Address, port: int, type := Socket_Type.Tcp) -> (skt: S
 	skt, create_err = create(get_addr_type(addr), type);
 	switch create_err {
 	case .Ok: // nothing
-	case .Resources:      err = .Resources;
+	case .Out_Of_Resources:      err = .Out_Of_Resources;
 	case .Offline:        err = .Offline;
 	case .Bad_Protocol:   assert(false);
 	case .Bad_Type:       assert(false);
@@ -562,7 +572,7 @@ start_dial :: proc(addr: Address, port: int, type := Socket_Type.Tcp) -> (skt: S
 	return;
 }
 
-// See if the dial is finished without blocking.
+// Checks if a previous dial has finished, without blocking.
 try_finish_dial :: proc(skt: Socket, timeout_ms	:= 0) -> (done: bool, err: Dial_Error) {
 	_, w, wait_err := wait_for(skt, {.Can_Write}, timeout_ms);
 	if wait_err != .Ok {
@@ -573,6 +583,8 @@ try_finish_dial :: proc(skt: Socket, timeout_ms	:= 0) -> (done: bool, err: Dial_
 	return;
 }
 
+// Blocks until a previous dial has completed or failed.
+// Returns the result of that dial.
 finish_dial :: proc(skt: Socket) -> (err: Dial_Error) {
 	wait_err := wait_for_can_write(skt);
 	if wait_err != .Ok {
@@ -594,7 +606,7 @@ Create_Error :: enum {
 	// you are offline
 	Offline,
 	// socket descriptors or memory exhausted.
-	Resources,
+	Out_Of_Resources,
 	// socket type not supported on the system.
 	Bad_Type,
 	// protocol not configured on this system, or protocol not implemented on socket type.
@@ -603,6 +615,10 @@ Create_Error :: enum {
 	Wrong_Protocol,
 }
 
+// Creates a socket.
+//
+// TODO: not sure how to handle creation of raw sockets, but probably through this procedure.
+// if so, ensure arguments are friendly.
 create :: proc(addr_type: Addr_Type, type: Socket_Type, protocol := Socket_Protocol.Auto) -> (skt: Socket, err: Create_Error) {
 	win32.ensure_subsystem_started();
 
@@ -632,7 +648,7 @@ create :: proc(addr_type: Addr_Type, type: Socket_Type, protocol := Socket_Proto
 		switch sock_err {
 		case win32.WSAENETDOWN:  err = .Offline;
 		case win32.WSAENOBUFS,
-			 win32.WSAEMFILE:    err = .Resources;
+			 win32.WSAEMFILE:    err = .Out_Of_Resources;
 
 		case win32.WSAESOCKTNOSUPPORT: err = .Bad_Type;
 		case win32.WSAEPROTONOSUPPORT: err = .Bad_Protocol;
