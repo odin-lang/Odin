@@ -195,7 +195,7 @@ i32 linker_stage(lbGenerator *gen) {
 
 
 
-		if (build_context.is_dll) {
+		if (build_context.build_mode == BuildMode_DynamicLibrary) {
 			output_ext = "dll";
 			link_settings = gb_string_append_fmt(link_settings, " /DLL");
 		} else {
@@ -346,7 +346,7 @@ i32 linker_stage(lbGenerator *gen) {
 		String output_ext = {};
 		char const *link_settings = "";
 		char const *linker;
-		if (build_context.is_dll) {
+		if (build_context.build_mode == BuildMode_DynamicLibrary) {
 			// Shared libraries are .dylib on MacOS and .so on Linux.
 			#if defined(GB_SYSTEM_OSX)
 				output_ext = STR_LIT(".dylib");
@@ -969,9 +969,11 @@ bool parse_build_flags(Array<String> args) {
 							}
 
 							if (str == "dll" || str == "shared") {
-								build_context.is_dll = true;
+								build_context.build_mode = BuildMode_DynamicLibrary;
+							} else if (str == "obj" || str == "object") {
+								build_context.build_mode = BuildMode_Object;
 							} else if (str == "exe") {
-								build_context.is_dll = false;
+								build_context.build_mode = BuildMode_Executable;
 							} else {
 								gb_printf_err("Unknown build mode '%.*s'\n", LIT(str));
 								bad_flags = true;
@@ -1208,12 +1210,14 @@ void remove_temp_files(String output_base) {
 	} while (0)
 	EXT_REMOVE(".ll");
 	EXT_REMOVE(".bc");
-#if defined(GB_SYSTEM_WINDOWS)
-	EXT_REMOVE(".obj");
-	EXT_REMOVE(".res");
-#else
-	EXT_REMOVE(".o");
-#endif
+	if (build_context.build_mode != BuildMode_Object) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		EXT_REMOVE(".obj");
+		EXT_REMOVE(".res");
+	#else
+		EXT_REMOVE(".o");
+	#endif
+	}
 
 #undef EXT_REMOVE
 }
@@ -1602,9 +1606,11 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 		lb_generate_code(&gen);
 
-		i32 linker_stage_exit_count = linker_stage(&gen);
-		if (linker_stage_exit_count != 0) {
-			return linker_stage_exit_count;
+		if (build_context.build_mode != BuildMode_Object) {
+			i32 linker_stage_exit_count = linker_stage(&gen);
+			if (linker_stage_exit_count != 0) {
+				return linker_stage_exit_count;
+			}
 		}
 
 		if (build_context.show_timings) {
@@ -1697,6 +1703,16 @@ int main(int arg_count, char const **arg_ptr) {
 			return exit_code;
 		}
 
+		if (build_context.build_mode == BuildMode_Object) {
+			// Ignore the linker
+			if (build_context.show_timings) {
+				show_timings(&checker, timings);
+			}
+
+			remove_temp_files(output_base);
+			return exit_code;
+		}
+
 		if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
 	#ifdef GB_SYSTEM_UNIX
 			system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s",
@@ -1752,7 +1768,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 
 
-			if (build_context.is_dll) {
+			if (build_context.build_mode == BuildMode_DynamicLibrary) {
 				output_ext = "dll";
 				link_settings = gb_string_append_fmt(link_settings, "/DLL");
 			} else {
@@ -1904,7 +1920,7 @@ int main(int arg_count, char const **arg_ptr) {
 			String output_ext = {};
 			char const *link_settings = "";
 			char const *linker;
-			if (build_context.is_dll) {
+			if (build_context.build_mode == BuildMode_DynamicLibrary) {
 				// Shared libraries are .dylib on MacOS and .so on Linux.
 				#if defined(GB_SYSTEM_OSX)
 					output_ext = STR_LIT(".dylib");

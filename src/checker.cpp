@@ -4131,7 +4131,7 @@ void check_parsed_files(Checker *c) {
 
 
 	TIME_SECTION("check entry point");
-	if (!build_context.is_dll) {
+	if (build_context.build_mode == BuildMode_Executable) {
 		Scope *s = c->info.init_scope;
 		GB_ASSERT(s != nullptr);
 		GB_ASSERT(s->flags&ScopeFlag_Init);
