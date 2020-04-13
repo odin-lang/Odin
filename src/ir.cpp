@@ -12137,7 +12137,7 @@ void ir_gen_tree(irGen *s) {
 
 
 #if defined(GB_SYSTEM_WINDOWS)
-	if (build_context.is_dll && !has_dll_main) {
+	if (build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main) {
 		// DllMain :: proc(inst: rawptr, reason: u32, reserved: rawptr) -> i32
 		String name = str_lit("DllMain");
 		Type *proc_params = alloc_type_tuple();
@@ -12208,7 +12208,7 @@ void ir_gen_tree(irGen *s) {
 		ir_emit_return(proc, v_one32);
 	}
 #endif
-	if (!(build_context.is_dll && !has_dll_main)) {
+	if (!(build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main)) {
 		// main :: proc(argc: i32, argv: ^^u8) -> i32
 		String name = str_lit("main");
 
@@ -12287,7 +12287,7 @@ void ir_gen_tree(irGen *s) {
 	}
 
 #if defined(GB_SYSTEM_WINDOWS)
-	// if (!m->build_context->is_dll && !has_win_main) {
+	// if (m->build_context->build_mode != BuildMode_DynamicLibrary && !has_win_main) {
 	// 	// proc WinMain(inst, prev: rawptr, cmd_line: ^byte, cmd_show: i32) -> i32
 	// 	String name = str_lit("WinMain");
 	// 	Type *proc_params = alloc_type_tuple();
@@ -12331,7 +12331,7 @@ void ir_gen_tree(irGen *s) {
 	// 	ir_emit_return(proc, v_one32);
 	// 	ir_end_procedure_body(proc);
 	// }
-	if (!build_context.is_dll && build_context.no_crt) {
+	if (build_context.build_mode != BuildMode_DynamicLibrary && build_context.no_crt) {
 		s->print_chkstk = true;
 
 		{

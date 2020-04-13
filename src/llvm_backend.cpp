@@ -11594,7 +11594,7 @@ void lb_generate_code(lbGenerator *gen) {
 		}*/
 	}
 
-	if (!(build_context.is_dll && !has_dll_main)) {
+	if (!(build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main)) {
 		Type *params  = alloc_type_tuple();
 		Type *results = alloc_type_tuple();
 

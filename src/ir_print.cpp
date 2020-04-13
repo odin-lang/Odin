@@ -2382,10 +2382,8 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	} else {
 		ir_write_byte(f, '\n');
 		ir_write_str_lit(f, "define ");
-		if (build_context.is_dll) {
-			if (proc->is_export) {
-				ir_write_str_lit(f, "dllexport ");
-			}
+		if (proc->is_export) {
+			ir_write_str_lit(f, "dllexport ");
 		}
 		// if (!proc->is_export && !proc->is_foreign && !proc->is_entry_point) {
 			// ir_write_string(f, "internal ");
@@ -2735,10 +2733,8 @@ void print_llvm_ir(irGen *ir) {
 		if (g->is_foreign) {
 			ir_write_string(f, str_lit("external "));
 		}
-		if (build_context.is_dll) {
-			if (g->is_export) {
-				ir_write_string(f, str_lit("dllexport "));
-			}
+		if (g->is_export) {
+			ir_write_string(f, str_lit("dllexport "));
 		}
 
 		if (g->is_private) {

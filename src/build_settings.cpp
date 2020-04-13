@@ -81,6 +81,12 @@ struct QueryDataSetSettings {
 	bool compact;
 };
 
+enum BuildModeKind {
+	BuildMode_Executable,
+	BuildMode_DynamicLibrary,
+	BuildMode_Object,
+};
+
 
 // This stores the information for the specify architecture of this build
 struct BuildContext {
@@ -114,7 +120,7 @@ struct BuildContext {
 	String llc_flags;
 	String target_triplet;
 	String link_flags;
-	bool   is_dll;
+	BuildModeKind build_mode;
 	bool   generate_docs;
 	i32    optimization_level;
 	bool   show_timings;
