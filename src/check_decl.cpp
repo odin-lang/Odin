@@ -1193,7 +1193,6 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 
 							ProcUsingVar puv = {e, uvar};
 							array_add(&using_entities, puv);
-
 						}
 					}
 				} else {
@@ -1221,7 +1220,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 		// NOTE(bill, 2019-08-31): Don't check the body as the where clauses failed
 		return;
 	}
-
+	
 	check_open_scope(ctx, body);
 	{
 		for_array(i, using_entities) {

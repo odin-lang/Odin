@@ -357,3 +357,23 @@ Entity *alloc_entity_dummy_variable(Scope *scope, Token token) {
 	return alloc_entity_variable(scope, token, nullptr);
 }
 
+
+Entity *entity_from_expr(Ast *expr);
+
+Entity *strip_entity_wrapping(Entity *e) {
+	if (e == nullptr) {
+		return nullptr;
+	}
+	if (e->kind != Entity_Constant) {
+		return e;
+	}
+	if (e->Constant.value.kind == ExactValue_Procedure) {
+		return strip_entity_wrapping(e->Constant.value.value_procedure);
+	}
+	return e;
+}
+
+Entity *strip_entity_wrapping(Ast *expr) {
+	Entity *e = entity_from_expr(expr);
+	return strip_entity_wrapping(e);
+}
