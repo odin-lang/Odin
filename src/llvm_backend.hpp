@@ -62,11 +62,11 @@ struct lbModule {
 	Map<LLVMTypeRef> types; // Key: Type *
 
 	Map<lbValue>  values;           // Key: Entity *
-	Map<lbValue>  members;          // Key: String
-	Map<lbProcedure *> procedures;  // Key: String
+	StringMap<lbValue>  members;          
+	StringMap<lbProcedure *> procedures;  
 	Map<Entity *> procedure_values; // Key: LLVMValueRef
 
-	Map<LLVMValueRef> const_strings; // Key: String
+	StringMap<LLVMValueRef> const_strings; 
 
 	Map<lbProcedure *> anonymous_proc_lits; // Key: Ast *
 

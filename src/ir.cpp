@@ -20,7 +20,7 @@ struct irModule {
 
 	PtrSet<Entity *>      min_dep_set;
 	Map<irValue *>        values;              // Key: Entity *
-	Map<irValue *>        members;             // Key: String
+	StringMap<irValue *>  members;             
 	Map<String>           entity_names;        // Key: Entity * of the typename
 	Map<irDebugInfo *>    debug_info;          // Key: Unique pointer
 	Map<irValue *>        anonymous_proc_lits; // Key: Ast *
@@ -37,8 +37,8 @@ struct irModule {
 
 	// NOTE(bill): To prevent strings from being copied a lot
 	// Mainly used for file names
-	Map<irValue *>        const_strings; // Key: String
-	Map<irValue *>        const_string_byte_slices; // Key: String
+	StringMap<irValue *>  const_strings;
+	StringMap<irValue *>  const_string_byte_slices;
 	Map<irValue *>        constant_value_to_global; // Key: irValue *
 
 
@@ -1509,7 +1509,7 @@ irValue *ir_generate_array(irModule *m, Type *elem_type, i64 count, String prefi
 	irValue *value = ir_value_global(e, nullptr);
 	value->Global.is_private = true;
 	ir_module_add_value(m, e, value);
-	map_set(&m->members, hash_string(s), value);
+	string_map_set(&m->members, s, value);
 	return value;
 }
 
@@ -1626,7 +1626,7 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 			Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
 			irValue *g = ir_value_global(e, backing_array);
 			ir_module_add_value(m, e, g);
-			map_set(&m->members, hash_string(name), g);
+			string_map_set(&m->members, name, g);
 
 			return ir_value_constant_slice(type, g, count);
 		}
@@ -1639,8 +1639,7 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 
 	irValue *global_constant_value = nullptr;
 	{
-		HashKey key = hash_string(string);
-		irValue **found = map_get(&m->const_string_byte_slices, key);
+		irValue **found = string_map_get(&m->const_string_byte_slices, string);
 		if (found != nullptr) {
 			global_constant_value = *found;
 
@@ -1677,7 +1676,7 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 
 
 	ir_module_add_value(m, entity, g);
-	map_set(&m->members, hash_string(name), g);
+	string_map_set(&m->members, name, g);
 
 	return g;
 }
@@ -1760,8 +1759,8 @@ irValue *ir_add_local_for_identifier(irProcedure *proc, Ast *ident, bool zero_in
 				name = e->Variable.link_name;
 			}
 
-			HashKey key = hash_string(name);
-			irValue **prev_value = map_get(&proc->module->members, key);
+			StringHashKey key = string_hash_string(name);
+			irValue **prev_value = string_map_get(&proc->module->members, key);
 			if (prev_value == nullptr) {
 				ir_add_foreign_library_path(proc->module, e->Variable.foreign_library);
 				// NOTE(bill): Don't do mutliple declarations in the IR
@@ -1769,7 +1768,7 @@ irValue *ir_add_local_for_identifier(irProcedure *proc, Ast *ident, bool zero_in
 				g->Global.name = name;
 				g->Global.is_foreign = true;
 				ir_module_add_value(proc->module, e, g);
-				map_set(&proc->module->members, key, g);
+				string_map_set(&proc->module->members, key, g);
 				return g;
 			} else {
 				return *prev_value;
@@ -1807,7 +1806,7 @@ irValue *ir_add_global_generated(irModule *m, Type *type, irValue *value) {
 	Entity *e = alloc_entity_variable(scope, make_token_ident(name), type);
 	irValue *g = ir_value_global(e, value);
 	ir_module_add_value(m, e, g);
-	map_set(&m->members, hash_string(name), g);
+	string_map_set(&m->members, name, g);
 	return g;
 }
 
@@ -5162,26 +5161,26 @@ irValue *ir_add_local_slice(irProcedure *proc, Type *slice_type, irValue *base, 
 
 
 irValue *ir_find_or_add_entity_string(irModule *m, String str) {
-	HashKey key = hash_string(str);
-	irValue **found = map_get(&m->const_strings, key);
+	StringHashKey key = string_hash_string(str);
+	irValue **found = string_map_get(&m->const_strings, key);
 	if (found != nullptr) {
 		return *found;
 	}
 	irValue *v = ir_value_constant(t_string, exact_value_string(str));
-	map_set(&m->const_strings, key, v);
+	string_map_set(&m->const_strings, key, v);
 	return v;
 
 }
 
 irValue *ir_find_or_add_entity_string_byte_slice(irModule *m, String str) {
-	HashKey key = hash_string(str);
-	irValue **found = map_get(&m->const_string_byte_slices, key);
+	StringHashKey key = string_hash_string(str);
+	irValue **found = string_map_get(&m->const_string_byte_slices, key);
 	if (found != nullptr) {
 		return *found;
 	}
 	Type *t = t_u8_slice;
 	irValue *v = ir_value_constant(t, exact_value_string(str));
-	map_set(&m->const_string_byte_slices, key, v);
+	string_map_set(&m->const_string_byte_slices, key, v);
 	return v;
 
 }
@@ -6337,7 +6336,7 @@ irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, Ast *expr, i
 	if (proc != nullptr) {
 		array_add(&proc->children, &value->Proc);
 	} else {
-		map_set(&m->members, hash_string(name), value);
+		string_map_set(&m->members, name, value);
 	}
 
 	map_set(&m->anonymous_proc_lits, hash_pointer(expr), value);
@@ -6384,7 +6383,7 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	}
 	irValue *t = ir_value_type_name(name, e->type);
 	ir_module_add_value(m, e, t);
-	map_set(&m->members, hash_string(name), t);
+	string_map_set(&m->members, name, t);
 
 	// if (bt->kind == Type_Struct) {
 	// 	Scope *s = bt->Struct.scope;
@@ -9196,8 +9195,8 @@ void ir_build_constant_value_decl(irProcedure *proc, AstValueDecl *vd) {
 					name = e->Procedure.link_name;
 				}
 
-				HashKey key = hash_string(name);
-				irValue **prev_value = map_get(&proc->module->members, key);
+				StringHashKey key = string_hash_string(name);
+				irValue **prev_value = string_map_get(&proc->module->members, key);
 				if (prev_value != nullptr) {
 					// NOTE(bill): Don't do mutliple declarations in the IR
 					return;
@@ -9210,7 +9209,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstValueDecl *vd) {
 				value->Proc.inlining = pl->inlining;
 
 				if (value->Proc.is_foreign || value->Proc.is_export) {
-					map_set(&proc->module->members, key, value);
+					string_map_set(&proc->module->members, key, value);
 				} else {
 					array_add(&proc->children, &value->Proc);
 				}
@@ -9721,7 +9720,6 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 						mangled_name.len = gb_string_length(str);
 					}
 
-					HashKey key = hash_string(mangled_name);
 					ir_add_entity_name(m, e, mangled_name);
 
 					irValue *g = ir_value_global(e, value);
@@ -9733,7 +9731,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 						g->Global.is_internal = true;
 					}
 					ir_module_add_value(proc->module, e, g);
-					map_set(&proc->module->members, key, g);
+					string_map_set(&proc->module->members, mangled_name, g);
 				}
 				return;
 			}
@@ -11083,15 +11081,15 @@ void ir_init_module(irModule *m, Checker *c) {
 	}
 
 	map_init(&m->values,                   heap_allocator());
-	map_init(&m->members,                  heap_allocator());
+	string_map_init(&m->members,           heap_allocator());
 	map_init(&m->debug_info,               heap_allocator());
 	map_init(&m->entity_names,             heap_allocator());
 	map_init(&m->anonymous_proc_lits,      heap_allocator());
 	array_init(&m->procs,                  heap_allocator());
 	array_init(&m->procs_to_generate,      heap_allocator());
 	array_init(&m->foreign_library_paths,  heap_allocator());
-	map_init(&m->const_strings,            heap_allocator());
-	map_init(&m->const_string_byte_slices, heap_allocator());
+	string_map_init(&m->const_strings,     heap_allocator());
+	string_map_init(&m->const_string_byte_slices, heap_allocator());
 	map_init(&m->constant_value_to_global, heap_allocator());
 
 	// Default states
@@ -11108,7 +11106,7 @@ void ir_init_module(irModule *m, Checker *c) {
 			irValue *g = ir_value_global(e, nullptr);
 			g->Global.is_private = true;
 			ir_module_add_value(m, e, g);
-			map_set(&m->members, hash_string(name), g);
+			string_map_set(&m->members, name, g);
 			ir_global_type_info_data = g;
 		}
 
@@ -11145,7 +11143,7 @@ void ir_init_module(irModule *m, Checker *c) {
 					                                  alloc_type_array(t_type_info_ptr, count));
 					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
-					map_set(&m->members, hash_string(name), g);
+					string_map_set(&m->members, name, g);
 					ir_global_type_info_member_types = g;
 				}
 				{
@@ -11154,7 +11152,7 @@ void ir_init_module(irModule *m, Checker *c) {
 					                                  alloc_type_array(t_string, count));
 					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
-					map_set(&m->members, hash_string(name), g);
+					string_map_set(&m->members, name, g);
 					ir_global_type_info_member_names = g;
 				}
 				{
@@ -11163,7 +11161,7 @@ void ir_init_module(irModule *m, Checker *c) {
 					                                  alloc_type_array(t_uintptr, count));
 					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
-					map_set(&m->members, hash_string(name), g);
+					string_map_set(&m->members, name, g);
 					ir_global_type_info_member_offsets = g;
 				}
 
@@ -11173,7 +11171,7 @@ void ir_init_module(irModule *m, Checker *c) {
 					                                  alloc_type_array(t_bool, count));
 					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
-					map_set(&m->members, hash_string(name), g);
+					string_map_set(&m->members, name, g);
 					ir_global_type_info_member_usings = g;
 				}
 
@@ -11183,7 +11181,7 @@ void ir_init_module(irModule *m, Checker *c) {
 					                                  alloc_type_array(t_string, count));
 					irValue *g = ir_value_global(e, nullptr);
 					ir_module_add_value(m, e, g);
-					map_set(&m->members, hash_string(name), g);
+					string_map_set(&m->members, name, g);
 					ir_global_type_info_member_tags = g;
 				}
 			}
@@ -11226,12 +11224,12 @@ void ir_init_module(irModule *m, Checker *c) {
 
 void ir_destroy_module(irModule *m) {
 	map_destroy(&m->values);
-	map_destroy(&m->members);
+	string_map_destroy(&m->members);
 	map_destroy(&m->entity_names);
 	map_destroy(&m->anonymous_proc_lits);
 	map_destroy(&m->debug_info);
-	map_destroy(&m->const_strings);
-	map_destroy(&m->const_string_byte_slices);
+	string_map_destroy(&m->const_strings);
+	string_map_destroy(&m->const_string_byte_slices);
 	map_destroy(&m->constant_value_to_global);
 	array_free(&m->procs);
 	array_free(&m->procs_to_generate);
@@ -12020,7 +12018,7 @@ void ir_gen_tree(irGen *s) {
 		array_add(&global_variables, var);
 
 		ir_module_add_value(m, e, g);
-		map_set(&m->members, hash_string(name), g);
+		string_map_set(&m->members, name, g);
 	}
 
 	for_array(i, info->entities) {
@@ -12110,9 +12108,9 @@ void ir_gen_tree(irGen *s) {
 			p->Proc.is_export = e->Procedure.is_export;
 
 			ir_module_add_value(m, e, p);
-			HashKey hash_name = hash_string(name);
-			if (map_get(&m->members, hash_name) == nullptr) {
-				map_set(&m->members, hash_name, p);
+			StringHashKey hash_name = string_hash_string(name);
+			if (string_map_get(&m->members, hash_name) == nullptr) {
+				string_map_set(&m->members, hash_name, p);
 			}
 			break;
 		}
@@ -12173,7 +12171,7 @@ void ir_gen_tree(irGen *s) {
 		p->Proc.is_startup = true;
 
 		map_set(&m->values, hash_entity(e), p);
-		map_set(&m->members, hash_string(name), p);
+		string_map_set(&m->members, name, p);
 
 		irProcedure *proc = &p->Proc;
 		proc->inlining = ProcInlining_no_inline; // TODO(bill): is no_inline a good idea?
@@ -12254,7 +12252,7 @@ void ir_gen_tree(irGen *s) {
 		p->Proc.is_startup = true;
 
 		map_set(&m->values, hash_entity(e), p);
-		map_set(&m->members, hash_string(name), p);
+		string_map_set(&m->members, name, p);
 
 		irProcedure *proc = &p->Proc;
 		proc->inlining = ProcInlining_no_inline; // TODO(bill): is no_inline a good idea?
@@ -12355,7 +12353,7 @@ void ir_gen_tree(irGen *s) {
 			m->entry_point_entity = e;
 
 			map_set(&m->values, hash_entity(e), p);
-			map_set(&m->members, hash_string(name), p);
+			string_map_set(&m->members, name, p);
 
 			irProcedure *proc = &p->Proc;
 			// proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
@@ -12386,7 +12384,7 @@ void ir_gen_tree(irGen *s) {
 		p->Proc.is_startup = true;
 
 		map_set(&m->values, hash_entity(e), p);
-		map_set(&m->members, hash_string(name), p);
+		string_map_set(&m->members, name, p);
 
 
 		irProcedure *proc = &p->Proc;

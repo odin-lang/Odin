@@ -1630,17 +1630,17 @@ void lb_add_entity(lbModule *m, Entity *e, lbValue val) {
 }
 void lb_add_member(lbModule *m, String const &name, lbValue val) {
 	if (name.len > 0) {
-		map_set(&m->members, hash_string(name), val);
+		string_map_set(&m->members, name, val);
 	}
 }
-void lb_add_member(lbModule *m, HashKey const &key, lbValue val) {
-	map_set(&m->members, key, val);
+void lb_add_member(lbModule *m, StringHashKey const &key, lbValue val) {
+	string_map_set(&m->members, key, val);
 }
 void lb_add_procedure_value(lbModule *m, lbProcedure *p) {
 	if (p->entity != nullptr) {
 		map_set(&m->procedure_values, hash_pointer(p->value), p->entity);
 	}
-	map_set(&m->procedures, hash_string(p->name), p);
+	string_map_set(&m->procedures, p->name, p);
 }
 
 
@@ -1688,11 +1688,11 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	String link_name = lb_get_entity_name(m, entity);
 
 	{
-		HashKey key = hash_string(link_name);
-		lbValue *found = map_get(&m->members, key);
+		StringHashKey key = string_hash_string(link_name);
+		lbValue *found = string_map_get(&m->members, key);
 		if (found) {
 			lb_add_entity(m, entity, *found);
-			lbProcedure **p_found = map_get(&m->procedures, key);
+			lbProcedure **p_found = string_map_get(&m->procedures, key);
 			GB_ASSERT(p_found != nullptr);
 			return *p_found;
 		}
@@ -1824,8 +1824,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 
 lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type) {
 	{
-		HashKey key = hash_string(link_name);
-		lbValue *found = map_get(&m->members, key);
+		lbValue *found = string_map_get(&m->members, link_name);
 		GB_ASSERT(found == nullptr);
 	}
 
@@ -2493,8 +2492,7 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 				name = e->Procedure.link_name;
 			}
 
-			HashKey key = hash_string(name);
-			lbValue *prev_value = map_get(&p->module->members, key);
+			lbValue *prev_value = string_map_get(&p->module->members, name);
 			if (prev_value != nullptr) {
 				// NOTE(bill): Don't do mutliple declarations in the IR
 				return;
@@ -2513,7 +2511,7 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 			if (p != nullptr) {
 				array_add(&p->children, nested_proc);
 			} else {
-				map_set(&p->module->members, hash_string(name), value);
+				string_map_set(&p->module->members, name, value);
 			}
 		}
 	}
@@ -4140,8 +4138,8 @@ lbValue lb_emit_clamp(lbProcedure *p, Type *t, lbValue x, lbValue min, lbValue m
 
 
 LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
-	HashKey key = hash_string(str);
-	LLVMValueRef *found = map_get(&m->const_strings, key);
+	StringHashKey key = string_hash_string(str);
+	LLVMValueRef *found = string_map_get(&m->const_strings, key);
 	if (found != nullptr) {
 		return *found;
 	} else {
@@ -4162,7 +4160,7 @@ LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
 		LLVMSetInitializer(global_data, data);
 
 		LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
-		map_set(&m->const_strings, key, ptr);
+		string_map_set(&m->const_strings, key, ptr);
 		return ptr;
 	}
 }
@@ -8399,7 +8397,7 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 	if (parent != nullptr) {
 		array_add(&parent->children, p);
 	} else {
-		map_set(&m->members, hash_string(name), value);
+		string_map_set(&m->members, name, value);
 	}
 
 	map_set(&m->anonymous_proc_lits, hash_pointer(expr), p);
@@ -10187,10 +10185,10 @@ void lb_init_module(lbModule *m, Checker *c) {
 	gbAllocator a = heap_allocator();
 	map_init(&m->types, a);
 	map_init(&m->values, a);
-	map_init(&m->members, a);
+	string_map_init(&m->members, a);
 	map_init(&m->procedure_values, a);
-	map_init(&m->procedures, a);
-	map_init(&m->const_strings, a);
+	string_map_init(&m->procedures, a);
+	string_map_init(&m->const_strings, a);
 	map_init(&m->anonymous_proc_lits, a);
 	array_init(&m->procedures_to_generate, a);
 	array_init(&m->foreign_library_paths, a);
@@ -10342,7 +10340,7 @@ lbValue lb_generate_array(lbModule *m, Type *elem_type, i64 count, String prefix
 	g.type = alloc_type_pointer(t);
 	LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, t)));
 	LLVMSetLinkage(g.value, LLVMInternalLinkage);
-	map_set(&m->members, hash_string(s), g);
+	string_map_set(&m->members, s, g);
 	return g;
 }
 

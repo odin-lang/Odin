@@ -2651,16 +2651,16 @@ void print_llvm_ir(irGen *ir) {
 
 	ir_write_str_lit(f, "declare void @llvm.dbg.declare(metadata, metadata, metadata) #3 \n");
 
-	if (map_get(&m->members, hash_string(str_lit("llvm.bswap.i16"))) == nullptr) {
+	if (string_map_get(&m->members, str_lit("llvm.bswap.i16")) == nullptr) {
 		ir_write_str_lit(f, "declare i16 @llvm.bswap.i16(i16) \n");
 	}
-	if (map_get(&m->members, hash_string(str_lit("llvm.bswap.i32"))) == nullptr) {
+	if (string_map_get(&m->members, str_lit("llvm.bswap.i32")) == nullptr) {
 		ir_write_str_lit(f, "declare i32 @llvm.bswap.i32(i32) \n");
 	}
-	if (map_get(&m->members, hash_string(str_lit("llvm.bswap.i64"))) == nullptr) {
+	if (string_map_get(&m->members, str_lit("llvm.bswap.i64")) == nullptr) {
 		ir_write_str_lit(f, "declare i64 @llvm.bswap.i64(i64) \n");
 	}
-	if (map_get(&m->members, hash_string(str_lit("llvm.bswap.i128"))) == nullptr) {
+	if (string_map_get(&m->members, str_lit("llvm.bswap.i128")) == nullptr) {
 		ir_write_str_lit(f, "declare i128 @llvm.bswap.i128(i128) \n");
 	}
 	ir_write_byte(f, '\n');

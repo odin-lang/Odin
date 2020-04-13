@@ -918,7 +918,7 @@ void generate_and_print_query_data_go_to_definitions(Checker *c) {
 		}
 
 
-		AstFile **use_file_found = map_get(&c->info.files, hash_string(pos.file));
+		AstFile **use_file_found = string_map_get(&c->info.files, pos.file);
 		GB_ASSERT(use_file_found != nullptr);
 		AstFile *use_file = *use_file_found;
 		GB_ASSERT(use_file != nullptr);
@@ -1008,7 +1008,7 @@ void generate_and_print_query_data_go_to_definitions(Checker *c) {
 			AstFile *def_file = e->file;
 
 			if (def_file == nullptr) {
-				auto *def_file_found = map_get(&c->info.files, hash_string(e->token.pos.file));
+				auto *def_file_found = string_map_get(&c->info.files, e->token.pos.file);
 				if (def_file_found == nullptr) {
 					continue;
 				}

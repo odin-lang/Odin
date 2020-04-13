@@ -29,14 +29,14 @@ void scope_reset(Scope *scope) {
 
 	scope->first_child = nullptr;
 	scope->last_child  = nullptr;
-	map_clear    (&scope->elements);
+	string_map_clear(&scope->elements);
 	ptr_set_clear(&scope->imported);
 }
 
 void scope_reserve(Scope *scope, isize capacity) {
 	isize cap = 2*capacity;
 	if (cap > scope->elements.hashes.count) {
-		map_rehash(&scope->elements, capacity);
+		string_map_rehash(&scope->elements, capacity);
 	}
 }
 
@@ -221,7 +221,7 @@ bool decl_info_has_init(DeclInfo *d) {
 Scope *create_scope(Scope *parent, gbAllocator allocator, isize init_elements_capacity=16) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
-	map_init(&s->elements, heap_allocator(), init_elements_capacity);
+	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);
 	ptr_set_init(&s->imported, heap_allocator(), 0);
 
 	s->delayed_imports.allocator = heap_allocator();
@@ -295,7 +295,7 @@ void destroy_scope(Scope *scope) {
 		destroy_scope(child);
 	}
 
-	map_destroy(&scope->elements);
+	string_map_destroy(&scope->elements);
 	array_free(&scope->delayed_imports);
 	array_free(&scope->delayed_directives);
 	ptr_set_destroy(&scope->imported);
@@ -340,21 +340,20 @@ void check_close_scope(CheckerContext *c) {
 }
 
 
-Entity *scope_lookup_current(Scope *s, String name) {
-	HashKey key = hash_string(name);
-	Entity **found = map_get(&s->elements, key);
+Entity *scope_lookup_current(Scope *s, String const &name) {
+	Entity **found = string_map_get(&s->elements, name);
 	if (found) {
 		return *found;
 	}
 	return nullptr;
 }
 
-void scope_lookup_parent(Scope *scope, String name, Scope **scope_, Entity **entity_) {
+void scope_lookup_parent(Scope *scope, String const &name, Scope **scope_, Entity **entity_) {
 	bool gone_thru_proc = false;
 	bool gone_thru_package = false;
-	HashKey key = hash_string(name);
+	StringHashKey key = string_hash_string(name);
 	for (Scope *s = scope; s != nullptr; s = s->parent) {
-		Entity **found = map_get(&s->elements, key);
+		Entity **found = string_map_get(&s->elements, key);
 		if (found) {
 			Entity *e = *found;
 			if (gone_thru_proc) {
@@ -386,7 +385,7 @@ void scope_lookup_parent(Scope *scope, String name, Scope **scope_, Entity **ent
 	if (scope_) *scope_ = nullptr;
 }
 
-Entity *scope_lookup(Scope *s, String name) {
+Entity *scope_lookup(Scope *s, String const &name) {
 	Entity *entity = nullptr;
 	scope_lookup_parent(s, name, nullptr, &entity);
 	return entity;
@@ -394,18 +393,18 @@ Entity *scope_lookup(Scope *s, String name) {
 
 
 
-Entity *scope_insert_with_name(Scope *s, String name, Entity *entity) {
+Entity *scope_insert_with_name(Scope *s, String const &name, Entity *entity) {
 	if (name == "") {
 		return nullptr;
 	}
-	HashKey key = hash_string(name);
-	Entity **found = map_get(&s->elements, key);
+	StringHashKey key = string_hash_string(name);
+	Entity **found = string_map_get(&s->elements, key);
 
 	if (found) {
 		return *found;
 	}
 	if (s->parent != nullptr && (s->parent->flags & ScopeFlag_Proc) != 0) {
-		Entity **found = map_get(&s->parent->elements, key);
+		Entity **found = string_map_get(&s->parent->elements, key);
 		if (found) {
 			if ((*found)->flags & EntityFlag_Result) {
 				return *found;
@@ -413,7 +412,7 @@ Entity *scope_insert_with_name(Scope *s, String name, Entity *entity) {
 		}
 	}
 
-	map_set(&s->elements, key, entity);
+	string_map_set(&s->elements, key, entity);
 	if (entity->scope == nullptr) {
 		entity->scope = s;
 	}
@@ -611,8 +610,7 @@ AstPackage *get_core_package(CheckerInfo *info, String name) {
 	gbAllocator a = heap_allocator();
 	String path = get_fullpath_core(a, name);
 	defer (gb_free(a, path.text));
-	HashKey key = hash_string(path);
-	auto found = map_get(&info->packages, key);
+	auto found = string_map_get(&info->packages, path);
 	GB_ASSERT_MSG(found != nullptr, "Missing core package %.*s", LIT(name));
 	return *found;
 }
@@ -744,7 +742,7 @@ void init_universal(void) {
 
 	bool defined_values_double_declaration = false;
 	for_array(i, bc->defined_values.entries) {
-		String name = bc->defined_values.entries[i].key.string;
+		char const *name = cast(char const *)cast(uintptr)bc->defined_values.entries[i].key.key;
 		ExactValue value = bc->defined_values.entries[i].value;
 		GB_ASSERT(value.kind != ExactValue_Invalid);
 
@@ -770,7 +768,7 @@ void init_universal(void) {
 		Entity *entity = alloc_entity_constant(nullptr, make_token_ident(name), type, value);
 		entity->state = EntityState_Resolved;
 		if (scope_insert(builtin_pkg->scope, entity)) {
-			error(entity->token, "'%.*s' defined as an argument is already declared at the global scope", LIT(name));
+			error(entity->token, "'%s' defined as an argument is already declared at the global scope", name);
 			defined_values_double_declaration = true;
 			// NOTE(bill): Just exit early before anything, even though the compiler will do that anyway
 		}
@@ -797,13 +795,13 @@ void init_checker_info(CheckerInfo *i) {
 	array_init(&i->definitions,   a);
 	array_init(&i->entities,      a);
 	map_init(&i->untyped,         a);
-	map_init(&i->foreigns,        a);
+	string_map_init(&i->foreigns, a);
 	map_init(&i->gen_procs,       a);
 	map_init(&i->gen_types,       a);
 	array_init(&i->type_info_types, a);
 	map_init(&i->type_info_map,   a);
-	map_init(&i->files,           a);
-	map_init(&i->packages,        a);
+	string_map_init(&i->files,    a);
+	string_map_init(&i->packages, a);
 	array_init(&i->variable_init_order, a);
 	array_init(&i->required_foreign_imports_through_force, a);
 	array_init(&i->required_global_variables, a);
@@ -818,13 +816,13 @@ void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->definitions);
 	array_free(&i->entities);
 	map_destroy(&i->untyped);
-	map_destroy(&i->foreigns);
+	string_map_destroy(&i->foreigns);
 	map_destroy(&i->gen_procs);
 	map_destroy(&i->gen_types);
 	array_free(&i->type_info_types);
 	map_destroy(&i->type_info_map);
-	map_destroy(&i->files);
-	map_destroy(&i->packages);
+	string_map_destroy(&i->files);
+	string_map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
 	array_free(&i->identifier_uses);
 	array_free(&i->required_foreign_imports_through_force);
@@ -956,7 +954,7 @@ DeclInfo *decl_info_of_ident(Ast *ident) {
 }
 
 AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
-	AstFile **found = map_get(&i->files, hash_string(filename));
+	AstFile **found = string_map_get(&i->files, filename);
 	if (found != nullptr) {
 		return *found;
 	}
@@ -994,7 +992,7 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 		// TODO(bill): This is O(n) and can be very slow
 		for_array(i, info->type_info_map.entries){
 			auto *e = &info->type_info_map.entries[i];
-			Type *prev_type = cast(Type *)e->key.ptr;
+			Type *prev_type = cast(Type *)cast(uintptr)e->key.key;
 			if (are_types_identical(prev_type, type)) {
 				entry_index = e->value;
 				// NOTE(bill): Add it to the search map
@@ -1234,7 +1232,7 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 	isize ti_index = -1;
 	for_array(i, c->info->type_info_map.entries) {
 		auto *e = &c->info->type_info_map.entries[i];
-		Type *prev_type = cast(Type *)e->key.ptr;
+		Type *prev_type = cast(Type *)cast(uintptr)e->key.key;
 		if (are_types_identical(t, prev_type)) {
 			// Duplicate entry
 			ti_index = e->value;
@@ -1811,7 +1809,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 1");
 	// Calculate edges for graph M
 	for_array(i, M.entries) {
-		Entity *   e = cast(Entity *)M.entries[i].key.ptr;
+		Entity *   e = cast(Entity *)cast(uintptr)M.entries[i].key.key;
 		EntityGraphNode *n = M.entries[i].value;
 
 		DeclInfo *decl = decl_info_of_entity(e);
@@ -1838,7 +1836,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 
 	for_array(i, M.entries) {
 		auto *entry = &M.entries[i];
-		auto *e = cast(Entity *)entry->key.ptr;
+		auto *e = cast(Entity *)cast(uintptr)entry->key.key;
 		EntityGraphNode *n = entry->value;
 
 		if (e->kind == Entity_Procedure) {
@@ -3072,8 +3070,7 @@ void add_import_dependency_node(Checker *c, Ast *decl, Map<ImportGraphNode *> *M
 		if (is_package_name_reserved(path)) {
 			return;
 		}
-		HashKey key = hash_string(path);
-		AstPackage **found = map_get(&c->info.packages, key);
+		AstPackage **found = string_map_get(&c->info.packages, path);
 		if (found == nullptr) {
 			for_array(pkg_index, c->info.packages.entries) {
 				AstPackage *pkg = c->info.packages.entries[pkg_index].value;
@@ -3185,8 +3182,7 @@ Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start, AstPackage
 
 
 	String path = start->fullpath;
-	HashKey key = hash_string(path);
-	AstPackage **found = map_get(&c->info.packages, key);
+	AstPackage **found = string_map_get(&c->info.packages, path);
 	if (found) {
 		AstPackage *pkg = *found;
 		GB_ASSERT(pkg != nullptr);
@@ -3248,8 +3244,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		scope = intrinsics_pkg->scope;
 		intrinsics_pkg->used = true;
 	} else {
-		HashKey key = hash_string(id->fullpath);
-		AstPackage **found = map_get(pkgs, key);
+		AstPackage **found = string_map_get(pkgs, id->fullpath);
 		if (found == nullptr) {
 			for_array(pkg_index, pkgs->entries) {
 				AstPackage *pkg = pkgs->entries[pkg_index].value;
@@ -3398,8 +3393,7 @@ bool collect_checked_packages_from_decl_list(Checker *c, Array<Ast *> const &dec
 		Ast *decl = decls[i];
 		switch (decl->kind) {
 		case_ast_node(id, ImportDecl, decl);
-			HashKey key = hash_string(id->fullpath);
-			AstPackage **found = map_get(&c->info.packages, key);
+			AstPackage **found = string_map_get(&c->info.packages, id->fullpath);
 			if (found == nullptr) {
 				continue;
 			}
@@ -3907,8 +3901,7 @@ void check_parsed_files(Checker *c) {
 		AstPackage *p = c->parser->packages[i];
 		Scope *scope = create_scope_from_package(&c->init_ctx, p);
 		p->decl_info = make_decl_info(c->allocator, scope, c->init_ctx.decl);
-		HashKey key = hash_string(p->fullpath);
-		map_set(&c->info.packages, key, p);
+		string_map_set(&c->info.packages, p->fullpath, p);
 
 		if (scope->flags&ScopeFlag_Init) {
 			c->info.init_scope = scope;
@@ -3932,8 +3925,7 @@ void check_parsed_files(Checker *c) {
 		for_array(j, pkg->files) {
 			AstFile *f = pkg->files[j];
 			create_scope_from_file(&ctx, f);
-			HashKey key = hash_string(f->fullpath);
-			map_set(&c->info.files, key, f);
+			string_map_set(&c->info.files, f->fullpath, f);
 
 			add_curr_ast_file(&ctx, f);
 			check_collect_entities(&ctx, f->decls);
@@ -3978,7 +3970,7 @@ void check_parsed_files(Checker *c) {
 	for_array(i, c->info.untyped.entries) {
 		auto *entry = &c->info.untyped.entries[i];
 		HashKey key = entry->key;
-		Ast *expr = cast(Ast *)key.ptr;
+		Ast *expr = cast(Ast *)cast(uintptr)key.key;
 		ExprInfo *info = &entry->value;
 		if (info != nullptr && expr != nullptr) {
 			if (is_type_typed(info->type)) {

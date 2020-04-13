@@ -919,7 +919,7 @@ bool parse_build_flags(Array<String> args) {
 								break;
 							}
 
-							HashKey key = hash_string(name);
+							HashKey key = hash_pointer(string_intern(name));
 
 							if (map_get(&build_context.defined_values, key) != nullptr) {
 								gb_printf_err("Defined constant '%.*s' already exists\n", LIT(name));
@@ -1431,6 +1431,7 @@ int main(int arg_count, char const **arg_ptr) {
 	defer (timings_destroy(timings));
 
 	init_string_buffer_memory();
+	init_string_interner();
 	init_global_error_collector();
 	global_big_int_init();
 	arena_init(&global_ast_arena, heap_allocator());

@@ -5,9 +5,9 @@ struct StringSetFindResult {
 };
 
 struct StringSetEntry {
-	HashKey  key;
-	isize    next;
-	String   value;
+	u64    hash;
+	isize  next;
+	String value;
 };
 
 struct StringSet {
@@ -18,9 +18,9 @@ struct StringSet {
 
 void string_set_init   (StringSet *s, gbAllocator a, isize capacity = 16);
 void string_set_destroy(StringSet *s);
-void string_set_add    (StringSet *s, String str);
-bool string_set_exists (StringSet *s, String str);
-void string_set_remove (StringSet *s, String str);
+void string_set_add    (StringSet *s, String const &str);
+bool string_set_exists (StringSet *s, String const &str);
+void string_set_remove (StringSet *s, String const &str);
 void string_set_clear  (StringSet *s);
 void string_set_grow   (StringSet *s);
 void string_set_rehash (StringSet *s, isize new_count);
@@ -36,22 +36,24 @@ gb_inline void string_set_destroy(StringSet *s) {
 	array_free(&s->hashes);
 }
 
-gb_internal isize string_set__add_entry(StringSet *s, HashKey key) {
+gb_internal isize string_set__add_entry(StringSet *s, StringHashKey const &key) {
 	StringSetEntry e = {};
-	e.key = key;
+	e.hash = key.hash;
 	e.next = -1;
+	e.value = key.string;
 	array_add(&s->entries, e);
 	return s->entries.count-1;
 }
 
-gb_internal StringSetFindResult string_set__find(StringSet *s, HashKey key) {
+gb_internal StringSetFindResult string_set__find(StringSet *s, StringHashKey const &key) {
 	StringSetFindResult fr = {-1, -1, -1};
 	if (s->hashes.count > 0) {
 		// fr.hash_index  = u128_to_i64(key.key % u128_from_i64(s->hashes.count));
-		fr.hash_index = key.key % s->hashes.count;
+		fr.hash_index = key.hash % s->hashes.count;
 		fr.entry_index = s->hashes[fr.hash_index];
 		while (fr.entry_index >= 0) {
-			if (hash_key_equal(s->entries[fr.entry_index].key, key)) {
+			auto const &entry = s->entries[fr.entry_index];
+			if (entry.hash == key.hash && entry.value == key.string) {
 				return fr;
 			}
 			fr.entry_prev = fr.entry_index;
@@ -85,8 +87,9 @@ void string_set_rehash(StringSet *s, isize new_count) {
 		if (ns.hashes.count == 0) {
 			string_set_grow(&ns);
 		}
-		fr = string_set__find(&ns, e->key);
-		j = string_set__add_entry(&ns, e->key);
+		StringHashKey key = {e->hash, e->value};
+		fr = string_set__find(&ns, key);
+		j = string_set__add_entry(&ns, key);
 		if (fr.entry_prev < 0) {
 			ns.hashes[fr.hash_index] = j;
 		} else {
@@ -102,16 +105,16 @@ void string_set_rehash(StringSet *s, isize new_count) {
 	*s = ns;
 }
 
-gb_inline bool string_set_exists(StringSet *s, String str) {
-	HashKey key = hash_string(str);
+gb_inline bool string_set_exists(StringSet *s, String const &str) {
+	StringHashKey key = string_hash_string(str);
 	isize index = string_set__find(s, key).entry_index;
 	return index >= 0;
 }
 
-void string_set_add(StringSet *s, String str) {
+void string_set_add(StringSet *s, String const &str) {
 	isize index;
 	StringSetFindResult fr;
-	HashKey key = hash_string(str);
+	StringHashKey key = string_hash_string(str);
 	if (s->hashes.count == 0) {
 		string_set_grow(s);
 	}
@@ -145,8 +148,10 @@ void string_set__erase(StringSet *s, StringSetFindResult fr) {
 		array_pop(&s->entries);
 		return;
 	}
-	s->entries[fr.entry_index] = s->entries[s->entries.count-1];
-	last = string_set__find(s, s->entries[fr.entry_index].key);
+	auto *entry = &s->entries[fr.entry_index];
+	*entry = s->entries[s->entries.count-1];
+	StringHashKey key = {entry->hash, entry->value};
+	last = string_set__find(s, key);
 	if (last.entry_prev >= 0) {
 		s->entries[last.entry_prev].next = fr.entry_index;
 	} else {
@@ -154,8 +159,8 @@ void string_set__erase(StringSet *s, StringSetFindResult fr) {
 	}
 }
 
-void string_set_remove(StringSet *s, String str) {
-	HashKey key = hash_string(str);
+void string_set_remove(StringSet *s, String const &str) {
+	StringHashKey key = string_hash_string(str);
 	StringSetFindResult fr = string_set__find(s, key);
 	if (fr.entry_index >= 0) {
 		string_set__erase(s, fr);
