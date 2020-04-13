@@ -1959,8 +1959,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					init_entity_foreign_library(ctx, e);
 
 					auto *fp = &ctx->checker->info.foreigns;
-					HashKey key = hash_string(name);
-					Entity **found = map_get(fp, key);
+					StringHashKey key = string_hash_string(name);
+					Entity **found = string_map_get(fp, key);
 					if (found) {
 						Entity *f = *found;
 						TokenPos pos = f->token.pos;
@@ -1973,7 +1973,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 							      LIT(name), LIT(pos.file), pos.line, pos.column);
 						}
 					} else {
-						map_set(fp, key, e);
+						string_map_set(fp, key, e);
 					}
 				} else if (e->flags & EntityFlag_Static) {
 					if (vd->values.count > 0) {

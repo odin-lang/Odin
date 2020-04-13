@@ -69,7 +69,10 @@ HashKey hash_exact_value(ExactValue v) {
 	case ExactValue_Bool:
 		return hash_integer(u64(v.value_bool));
 	case ExactValue_String:
-		return hash_string(v.value_string);
+		{
+			char const *str = string_intern(v.value_string);
+			return hash_pointer(str);
+		}
 	case ExactValue_Integer:
 		{
 			HashKey key = hashing_proc(big_int_ptr(&v.value_integer), v.value_integer.len * gb_size_of(u64));

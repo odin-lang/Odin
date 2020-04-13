@@ -340,13 +340,6 @@ void mul_overflow_u64(u64 x, u64 y, u64 *lo, u64 *hi) {
 
 
 
-#include "map.cpp"
-#include "ptr_set.cpp"
-#include "string_set.cpp"
-#include "priority_queue.cpp"
-#include "thread_pool.cpp"
-
-
 gb_global String global_module_path = {0};
 gb_global bool global_module_path_set = false;
 
@@ -461,6 +454,57 @@ GB_ALLOCATOR_PROC(arena_allocator_proc) {
 	return ptr;
 }
 
+
+
+
+
+
+#include "string_map.cpp"
+#include "map.cpp"
+#include "ptr_set.cpp"
+#include "string_set.cpp"
+#include "priority_queue.cpp"
+#include "thread_pool.cpp"
+
+
+struct StringIntern {
+	isize len;
+	StringIntern *next;
+	char str[1];
+};
+
+Map<StringIntern *> string_intern_map = {}; // Key: u64
+Arena string_intern_arena = {};
+
+char const *string_intern(char const *text, isize len) {
+	u64 hash = gb_fnv64a(text, len);
+	u64 key = hash ? hash : 1;
+	StringIntern **found = map_get(&string_intern_map, hash_integer(key));
+	if (found) {
+		for (StringIntern *it = *found; it != nullptr; it = it->next) {
+			if (it->len == len && gb_strncmp(it->str, (char *)text, len) == 0) {
+				return it->str;
+			}
+		}
+	}
+
+	StringIntern *new_intern = cast(StringIntern *)arena_alloc(&string_intern_arena, gb_offset_of(StringIntern, str) + len + 1, gb_align_of(StringIntern));
+	new_intern->len = len;
+	new_intern->next = found ? *found : nullptr;
+	gb_memmove(new_intern->str, text, len);
+	new_intern->str[len] = 0;
+	map_set(&string_intern_map, hash_integer(key), new_intern);
+	return new_intern->str;
+}
+
+char const *string_intern(String const &string) {
+	return string_intern(cast(char const *)string.text, string.len);
+}
+
+void init_string_interner(void) {
+	map_init(&string_intern_map, heap_allocator());
+	arena_init(&string_intern_arena, heap_allocator());
+}
 
 
 

@@ -349,7 +349,7 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 
 	// GB_ASSERT_MSG(found_entity == original_entity, "%.*s == %.*s", LIT(found_entity->token.string), LIT(new_entity->token.string));
 
-	map_set(&found_scope->elements, hash_string(original_name), new_entity);
+	string_map_set(&found_scope->elements, original_name, new_entity);
 }
 
 
@@ -777,8 +777,8 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		init_entity_foreign_library(ctx, e);
 
 		auto *fp = &ctx->info->foreigns;
-		HashKey key = hash_string(name);
-		Entity **found = map_get(fp, key);
+		StringHashKey key = string_hash_string(name);
+		Entity **found = string_map_get(fp, key);
 		if (found) {
 			Entity *f = *found;
 			TokenPos pos = f->token.pos;
@@ -800,7 +800,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		} else if (name == "main") {
 			error(d->proc_lit, "The link name 'main' is reserved for internal use");
 		} else {
-			map_set(fp, key, e);
+			string_map_set(fp, key, e);
 		}
 	} else {
 		String name = e->token.string;
@@ -809,8 +809,8 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 		if (e->Procedure.link_name.len > 0 || is_export) {
 			auto *fp = &ctx->info->foreigns;
-			HashKey key = hash_string(name);
-			Entity **found = map_get(fp, key);
+			StringHashKey key = string_hash_string(name);
+			Entity **found = string_map_get(fp, key);
 			if (found) {
 				Entity *f = *found;
 				TokenPos pos = f->token.pos;
@@ -822,7 +822,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			} else if (name == "main") {
 				error(d->proc_lit, "The link name 'main' is reserved for internal use");
 			} else {
-				map_set(fp, key, e);
+				string_map_set(fp, key, e);
 			}
 		}
 	}
@@ -898,8 +898,8 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, 
 		}
 
 		auto *fp = &ctx->info->foreigns;
-		HashKey key = hash_string(name);
-		Entity **found = map_get(fp, key);
+		StringHashKey key = string_hash_string(name);
+		Entity **found = string_map_get(fp, key);
 		if (found) {
 			Entity *f = *found;
 			TokenPos pos = f->token.pos;
@@ -912,7 +912,7 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, 
 				      LIT(name), LIT(pos.file), pos.line, pos.column);
 			}
 		} else {
-			map_set(fp, key, e);
+			string_map_set(fp, key, e);
 		}
 	}
 

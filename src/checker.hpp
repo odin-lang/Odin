@@ -172,7 +172,7 @@ struct Scope {
 	Scope *       next;
 	Scope *       first_child;
 	Scope *       last_child;
-	Map<Entity *> elements; // Key: String
+	StringMap<Entity *> elements; 
 
 	Array<Ast *>    delayed_directives;
 	Array<Ast *>    delayed_imports;
@@ -238,9 +238,9 @@ struct CheckerInfo {
 	Map<ExprInfo>         untyped; // Key: Ast * | Expression -> ExprInfo
 	                               // NOTE(bill): This needs to be a map and not on the Ast
 	                               // as it needs to be iterated across
-	Map<AstFile *>        files;           // Key: String (full path)
-	Map<AstPackage *>     packages;        // Key: String (full path)
-	Map<Entity *>         foreigns;        // Key: String
+	StringMap<AstFile *>    files;    // Key (full path)
+	StringMap<AstPackage *> packages; // Key (full path)
+	StringMap<Entity *>     foreigns; 
 	Array<Entity *>       definitions;
 	Array<Entity *>       entities;
 	Array<DeclInfo *>     variable_init_order;
@@ -346,9 +346,9 @@ isize        type_info_index        (CheckerInfo *i, Type *type, bool error_on_f
 Entity *entity_of_node(Ast *expr);
 
 
-Entity *scope_lookup_current(Scope *s, String name);
-Entity *scope_lookup (Scope *s, String name);
-void    scope_lookup_parent (Scope *s, String name, Scope **scope_, Entity **entity_);
+Entity *scope_lookup_current(Scope *s, String const &name);
+Entity *scope_lookup (Scope *s, String const &name);
+void    scope_lookup_parent (Scope *s, String const &name, Scope **scope_, Entity **entity_);
 Entity *scope_insert (Scope *s, Entity *entity);
 
 

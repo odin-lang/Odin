@@ -1065,8 +1065,6 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 		}
 	}
 
-	HashKey key = hash_string(e->token.string);
-
 	if (e->kind == Entity_ProcGroup) {
 		auto *pge = &e->ProcGroup;
 
@@ -6421,9 +6419,9 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		// NOTE(bill): This is give type hints for the named parameters
 		// in order to improve the type inference system
 
-		Map<Type *> type_hint_map = {}; // Key: String
-		map_init(&type_hint_map, heap_allocator(), 2*ce->args.count);
-		defer (map_destroy(&type_hint_map));
+		StringMap<Type *> type_hint_map = {}; // Key: String
+		string_map_init(&type_hint_map, heap_allocator(), 2*ce->args.count);
+		defer (string_map_destroy(&type_hint_map));
 
 		Type *ptype = nullptr;
 		bool single_case = true;
@@ -6453,7 +6451,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 						if (is_blank_ident(e->token)) {
 							continue;
 						}
-						map_set(&type_hint_map, hash_string(e->token.string), e->type);
+						string_map_set(&type_hint_map, e->token.string, e->type);
 					}
 				}
 			}
@@ -6475,8 +6473,8 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 						if (is_blank_ident(e->token)) {
 							continue;
 						}
-						HashKey key = hash_string(e->token.string);
-						Type **found = map_get(&type_hint_map, key);
+						StringHashKey key = string_hash_string(e->token.string);
+						Type **found = string_map_get(&type_hint_map, key);
 						if (found) {
 							Type *t = *found;
 							if (t == nullptr) {
@@ -6487,10 +6485,10 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 								// NOTE(bill): No need to set again
 							} else {
 								// NOTE(bill): Ambiguous named parameter across all types so set it to a nullptr
-								map_set(&type_hint_map, key, cast(Type *)nullptr);
+								string_map_set(&type_hint_map, key, cast(Type *)nullptr);
 							}
 						} else {
-							map_set(&type_hint_map, key, e->type);
+							string_map_set(&type_hint_map, key, e->type);
 						}
 					}
 				}
@@ -6508,7 +6506,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 			if (field != nullptr && field->kind == Ast_Ident) {
 				String key = field->Ident.token.string;
-				Type **found = map_get(&type_hint_map, hash_string(key));
+				Type **found = string_map_get(&type_hint_map, key);
 				if (found) {
 					type_hint = *found;
 				}
