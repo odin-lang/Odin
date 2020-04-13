@@ -1117,6 +1117,9 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 	e->flags |= EntityFlag_Used;
 
 	Type *type = e->type;
+
+	o->type = type;
+
 	switch (e->kind) {
 	case Entity_Constant:
 		if (type == t_invalid) {
@@ -1126,6 +1129,14 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 		o->value = e->Constant.value;
 		if (o->value.kind == ExactValue_Invalid) {
 			return e;
+		}
+		if (o->value.kind == ExactValue_Procedure) {
+			Entity *proc = strip_entity_wrapping(o->value.value_procedure);
+			if (proc != nullptr) {
+				o->mode = Addressing_Value;
+				o->type = proc->type;
+				return proc;
+			}
 		}
 		o->mode = Addressing_Constant;
 		break;
@@ -1144,6 +1155,7 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 
 	case Entity_Procedure:
 		o->mode = Addressing_Value;
+		o->value = exact_value_procedure(n);
 		break;
 
 	case Entity_Builtin:
@@ -1180,7 +1192,6 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 		break;
 	}
 
-	o->type = type;
 	return e;
 }
 
@@ -3602,10 +3613,20 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 
 	add_entity_use(c, selector, entity);
 
+	operand->type = entity->type;
+	operand->expr = node;
+
 	switch (entity->kind) {
 	case Entity_Constant:
-		operand->mode = Addressing_Constant;
 		operand->value = entity->Constant.value;
+		operand->mode = Addressing_Constant;
+		if (operand->value.kind == ExactValue_Procedure) { 
+			Entity *proc = strip_entity_wrapping(operand->value.value_procedure);
+			if (proc != nullptr) {
+				operand->mode = Addressing_Value;
+				operand->type = proc->type;
+			}
+		}
 		break;
 	case Entity_Variable:
 		// TODO(bill): Is this the rule I need?
@@ -3628,6 +3649,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		break;
 	case Entity_Procedure:
 		operand->mode = Addressing_Value;
+		operand->value = exact_value_procedure(node);
 		break;
 	case Entity_Builtin:
 		operand->mode = Addressing_Builtin;
@@ -3645,8 +3667,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		break;
 	}
 
-	operand->type = entity->type;
-	operand->expr = node;
+	add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
 
 	return entity;
 }
@@ -7044,10 +7065,17 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 			}
 			o->type = e->type;
 			if (o->mode != Addressing_Constant) {
-				if (show_error) {
-					error(o->expr, "Expected a constant value for this polymorphic type argument");
+				bool valid = false;
+				if (is_type_proc(o->type)) {
+					Entity *proc_entity = entity_from_expr(o->expr);
+					valid = proc_entity != nullptr;
 				}
-				err = CallArgumentError_NoneConstantParameter;
+				if (!valid) {
+					if (show_error) {
+						error(o->expr, "Expected a constant value for this polymorphic type argument");
+					}
+					err = CallArgumentError_NoneConstantParameter;
+				}
 			}
 			score += s;
 		}
@@ -9257,29 +9285,10 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = check_expr_base_internal(c, o, node, type_hint);
-	Type *type = nullptr;
-	ExactValue value = {ExactValue_Invalid};
-	switch (o->mode) {
-	case Addressing_Invalid:
-		type = t_invalid;
-		break;
-	case Addressing_NoValue:
-		type = nullptr;
-		break;
-	case Addressing_Constant:
-		value = o->value;
-		type = o->type;
-		break;
-	default:
-		type = o->type;
-		break;
+	if (o->type != nullptr && is_type_untyped(o->type)) {
+		add_untyped(&c->checker->info, node, false, o->mode, o->type, o->value);
 	}
-
-	if (type != nullptr && is_type_untyped(type)) {
-		add_untyped(&c->checker->info, node, false, o->mode, type, value);
-	}
-	add_type_and_value(&c->checker->info, node, o->mode, type, value);
-
+	add_type_and_value(&c->checker->info, node, o->mode, o->type, o->value);
 	return kind;
 }
 

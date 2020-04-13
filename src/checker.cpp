@@ -885,6 +885,7 @@ void destroy_checker(Checker *c) {
 
 
 Entity *entity_of_ident(Ast *identifier) {
+	identifier = unparen_expr(identifier);
 	if (identifier->kind == Ast_Ident) {
 		return identifier->Ident.entity;
 	}
@@ -1041,6 +1042,8 @@ void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *ty
 			if (mode == Addressing_Constant || mode == Addressing_Invalid) {
 				expr->tav.value = value;
 			} else if (mode == Addressing_Value && is_type_typeid(type)) {
+				expr->tav.value = value;
+			} else if (mode == Addressing_Value && is_type_proc(type)) {
 				expr->tav.value = value;
 			}
 

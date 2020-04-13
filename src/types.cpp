@@ -1039,6 +1039,9 @@ bool is_type_constant_type(Type *t) {
 	if (t->kind == Type_BitSet) {
 		return true;
 	}
+	if (t->kind == Type_Proc) {
+		return true;
+	}
 	return false;
 }
 bool is_type_float(Type *t) {

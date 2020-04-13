@@ -1984,7 +1984,11 @@ irDebugEncoding ir_debug_encoding_for_basic(BasicKind kind) {
 	// case Basic_f16:
 	case Basic_f32:
 	case Basic_f64:
-		return irDebugBasicEncoding_float;
+	case Basic_f32le:
+	case Basic_f64le:
+	case Basic_f32be:
+	case Basic_f64be:
+			return irDebugBasicEncoding_float;
 
 	// case Basic_complex32:
 	case Basic_complex64:
@@ -7104,6 +7108,29 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 			return ir_emit_conv(proc, v, tv.type);
 		}
 
+		if (tv.value.kind == ExactValue_Procedure) {
+			Ast *expr = tv.value.value_procedure;
+			if (expr->kind == Ast_ProcLit) {
+				return ir_gen_anonymous_proc_lit(proc->module, str_lit("_proclit"), expr);
+			}
+			Entity *e = entity_from_expr(expr);
+			e = strip_entity_wrapping(e);
+			GB_ASSERT(e != nullptr);
+			auto *found = map_get(&proc->module->values, hash_entity(e));
+			if (found) {
+				auto v = *found;
+				// NOTE(bill): This is because pointers are already pointers in LLVM
+				if (is_type_proc(ir_type(v))) {
+					return v;
+				}
+				return ir_emit_load(proc, v);
+			} else if (e != nullptr && e->kind == Entity_Variable) {
+				return ir_addr_load(proc, ir_build_addr(proc, expr));
+			}
+
+			GB_PANIC("Error in: %.*s(%td:%td) %s\n", LIT(proc->name), e->token.pos.line, e->token.pos.column);
+		}
+
 		return ir_add_module_constant(proc->module, tv.type, tv.value);
 	}
 
@@ -7139,6 +7166,8 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 
 	case_ast_node(i, Ident, expr);
 		Entity *e = entity_of_ident(expr);
+		e = strip_entity_wrapping(e);
+
 		GB_ASSERT_MSG(e != nullptr, "%s", expr_to_string(expr));
 		if (e->kind == Entity_Builtin) {
 			Token token = ast_token(expr);

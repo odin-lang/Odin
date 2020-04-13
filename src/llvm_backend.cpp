@@ -8565,6 +8565,30 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	GB_ASSERT(tv.mode != Addressing_Type);
 
 	if (tv.value.kind != ExactValue_Invalid) {
+		if (tv.value.kind == ExactValue_Procedure) {
+			Ast *expr = tv.value.value_procedure;
+			if (expr->kind == Ast_ProcLit) {
+				return lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
+			}
+			Entity *e = entity_from_expr(expr);
+			e = strip_entity_wrapping(e);
+			GB_ASSERT(e != nullptr);
+			auto *found = map_get(&p->module->values, hash_entity(e));
+			if (found) {
+				auto v = *found;
+				// NOTE(bill): This is because pointers are already pointers in LLVM
+				if (is_type_proc(v.type)) {
+					return v;
+				}
+				return lb_emit_load(p, v);
+			} else if (e != nullptr && e->kind == Entity_Variable) {
+				return lb_addr_load(p, lb_build_addr(p, expr));
+			}
+
+			GB_PANIC("Error in: %.*s(%td:%td) %s\n", LIT(p->name), e->token.pos.line, e->token.pos.column);
+			// GB_PANIC("nullptr value for expression from identifier: %.*s.%.*s (%p) : %s @ %p", LIT(e->pkg->name), LIT(e->token.string), e, type_to_string(e->type), expr);
+		}
+
 		// NOTE(bill): Short on constant values
 		return lb_const_value(p->module, tv.type, tv.value);
 	}
@@ -8599,7 +8623,9 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(i, Ident, expr);
-		Entity *e = entity_of_ident(expr);
+		Entity *e = entity_from_expr(expr);
+		e = strip_entity_wrapping(e);
+
 		GB_ASSERT_MSG(e != nullptr, "%s", expr_to_string(expr));
 		if (e->kind == Entity_Builtin) {
 			Token token = ast_token(expr);
@@ -8626,8 +8652,12 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		} else if (e != nullptr && e->kind == Entity_Variable) {
 			return lb_addr_load(p, lb_build_addr(p, expr));
 		}
-		gb_printf_err("Error in: %.*s(%td:%td)\n", LIT(p->name), i->token.pos.line, i->token.pos.column);
-		GB_PANIC("nullptr value for expression from identifier: %.*s.%.*s (%p) : %s @ %p", LIT(e->pkg->name), LIT(e->token.string), e, type_to_string(e->type), expr);
+		gb_printf_err("Error in: %.*s(%td:%td) %s\n", LIT(p->name), i->token.pos.line, i->token.pos.column);
+		String pkg = {};
+		if (e->pkg) {
+			pkg = e->pkg->name;
+		}
+		GB_PANIC("nullptr value for expression from identifier: %.*s.%.*s (%p) : %s @ %p", LIT(pkg), LIT(e->token.string), e, type_to_string(e->type), expr);
 		return {};
 	case_end;
 
@@ -9085,7 +9115,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			if (tav.mode == Addressing_Type) { // Addressing_Type
 				Selection sel = lookup_field(type, selector, true);
 				Entity *e = sel.entity;
-				GB_ASSERT(e->kind == Entity_Variable);
+				GB_ASSERT_MSG(e->kind == Entity_Variable, "Entity_%.*s", LIT(entity_strings[e->kind]));
 				GB_ASSERT(e->flags & EntityFlag_TypeField);
 				String name = e->token.string;
 				/*if (name == "names") {

@@ -469,7 +469,9 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 								is_polymorphic = true;
 								can_check_fields = false;
 							}
-							e = alloc_entity_constant(scope, token, operand.type, operand.value);
+							if (e == nullptr) {
+								e = alloc_entity_constant(scope, token, operand.type, operand.value);
+							}
 						}
 					} else {
 						if (is_type_param) {
@@ -1672,11 +1674,19 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 						}
 					}
 					if (is_poly_name) {
-						if (op.mode == Addressing_Constant) {
-							poly_const = op.value;
-						} else {
-							error(op.expr, "Expected a constant value for this polymorphic name parameter");
-							success = false;
+						bool valid = false;
+						if (is_type_proc(op.type)) {
+							Entity *proc_entity = entity_from_expr(op.expr);
+							valid = proc_entity != nullptr;
+							poly_const = exact_value_procedure(proc_entity->identifier ? proc_entity->identifier : op.expr);
+						}
+						if (!valid) {
+							if (op.mode == Addressing_Constant) {
+								poly_const = op.value;
+							} else {
+								error(op.expr, "Expected a constant value for this polymorphic name parameter");
+								success = false;
+							}
 						}
 					}
 					if (is_type_untyped(default_type(type))) {
