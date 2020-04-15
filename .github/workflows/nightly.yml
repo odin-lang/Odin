@@ -3,7 +3,6 @@ name:  Nightly
 on:
   schedule:
     - cron: 0 20 * * *
-  push:
 
 jobs:
   build_windows:
@@ -123,9 +122,9 @@ jobs:
           b2 authorize-account "$APPID" "$APPKEY"
 
           chmod +x ./ci/upload-create-nightly.sh
-          ./ci/upload-create-nightly.sh "$BUCKET" windows-amd64 windows_artifacts/
-          ./ci/upload-create-nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/
-          ./ci/upload-create-nightly.sh "$BUCKET" macos-amd64 macos_artifacts/
+          ./ci/upload_create_nightly.sh "$BUCKET" windows-amd64 windows_artifacts/
+          ./ci/upload_create_nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/
+          ./ci/upload_create_nightly.sh "$BUCKET" macos-amd64 macos_artifacts/
 
           python3 ci/create_nightly_json.py "$BUCKET" > nightly.json
           b2 upload-file "$BUCKET" nightly.json nightly.json
