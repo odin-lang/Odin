@@ -7,5 +7,7 @@ artifact=$2
 now=$(date +'%Y-%m-%d')
 filename="odin-$platform-nightly+$now.zip"
 
-7z a "output/$filename" -r "$artifact"
-b2 upload-file --noProgress "$bucket" "output/$filename" "$filename"
+echo "Creating archive $filename from $artifact and uploading to $bucket"
+
+7z a -bd "output/$filename" -r "$artifact"
+b2 upload-file --noProgress "$bucket" "output/$filename" "nightly/$filename"
