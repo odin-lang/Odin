@@ -257,9 +257,13 @@ length :: proc(val: any) -> int {
 capacity :: proc(val: any) -> int {
 	if val == nil do return 0;
 
-	v := val;
-	v.id = runtime.typeid_base(v.id);
-	switch a in v {
+	#partial switch a in type_info_of(val.id).variant {
+	case Type_Info_Named:
+		return capacity({val.data, a.base.id});
+
+	case Type_Info_Pointer:
+		return capacity({val.data, a.elem.id});
+
 	case Type_Info_Array:
 		return a.count;
 
@@ -267,10 +271,10 @@ capacity :: proc(val: any) -> int {
 		return a.count;
 
 	case Type_Info_Dynamic_Array:
-		return (^mem.Raw_Dynamic_Array)(v.data).cap;
+		return (^mem.Raw_Dynamic_Array)(val.data).cap;
 
 	case Type_Info_Map:
-		return (^mem.Raw_Map)(v.data).entries.cap;
+		return (^mem.Raw_Map)(val.data).entries.cap;
 	}
 	return 0;
 }
@@ -279,30 +283,38 @@ capacity :: proc(val: any) -> int {
 index :: proc(val: any, i: int, loc := #caller_location) -> any {
 	if val == nil do return nil;
 
-	v := val;
-	v.id = runtime.typeid_base(v.id);
-	switch a in v {
+	#partial switch a in type_info_of(val.id).variant {
+	case Type_Info_Named:
+		return index({val.data, a.base.id}, i, loc);
+
+	case Type_Info_Pointer:
+		ptr := (^rawptr)(val.data)^;
+		if ptr == nil {
+			return nil;
+		}
+		return index({ptr, a.elem.id}, i, loc);
+
 	case Type_Info_Array:
 		runtime.bounds_check_error_loc(loc, i, a.count);
 		offset := uintptr(a.elem.size * i);
-		data := rawptr(uintptr(v.data) + offset);
+		data := rawptr(uintptr(val.data) + offset);
 		return any{data, a.elem.id};
 
 	case Type_Info_Enumerated_Array:
 		runtime.bounds_check_error_loc(loc, i, a.count);
 		offset := uintptr(a.elem.size * i);
-		data := rawptr(uintptr(v.data) + offset);
+		data := rawptr(uintptr(val.data) + offset);
 		return any{data, a.elem.id};
 
 	case Type_Info_Slice:
-		raw := (^mem.Raw_Slice)(v.data);
+		raw := (^mem.Raw_Slice)(val.data);
 		runtime.bounds_check_error_loc(loc, i, raw.len);
 		offset := uintptr(a.elem.size * i);
 		data := rawptr(uintptr(raw.data) + offset);
 		return any{data, a.elem.id};
 
 	case Type_Info_Dynamic_Array:
-		raw := (^mem.Raw_Dynamic_Array)(v.data);
+		raw := (^mem.Raw_Dynamic_Array)(val.data);
 		runtime.bounds_check_error_loc(loc, i, raw.len);
 		offset := uintptr(a.elem.size * i);
 		data := rawptr(uintptr(raw.data) + offset);
@@ -311,7 +323,7 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 	case Type_Info_String:
 		if a.is_cstring do return nil;
 
-		raw := (^mem.Raw_String)(v.data);
+		raw := (^mem.Raw_String)(val.data);
 		runtime.bounds_check_error_loc(loc, i, raw.len);
 		offset := uintptr(size_of(u8) * i);
 		data := rawptr(uintptr(raw.data) + offset);
