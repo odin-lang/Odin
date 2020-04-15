@@ -125,7 +125,7 @@ jobs:
           chmod +x ./ci/upload-create-nightly.sh
           ./ci/upload-create-nightly.sh "$BUCKET" windows-amd64 windows_artifacts/
           ./ci/upload-create-nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/
-          ./ci/upload-create-nightly.sh "$BUCKET" macos-amd64 macos_artifact/
+          ./ci/upload-create-nightly.sh "$BUCKET" macos-amd64 macos_artifacts/
 
           python3 ci/create_nightly_json.py > nightly.json
           b2 upload-file "$BUCKET" nightly.json nightly.json
