@@ -53,7 +53,9 @@ resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEF
 		return nil;
 	}
 	if new_size == 0 {
-		free(ptr, allocator, loc);
+		if ptr != nil {
+			allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, 0, 0, loc);
+		}
 		return nil;
 	} else if ptr == nil {
 		return allocator.procedure(allocator.data, Allocator_Mode.Alloc, new_size, alignment, nil, 0, 0, loc);
