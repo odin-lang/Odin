@@ -516,6 +516,8 @@ String lb_mangle_name(lbModule *m, Entity *e) {
 		require_suffix_id = true;
 	} else if (is_blank_ident(e->token)) {
 		require_suffix_id = true;
+	}if (e->flags & EntityFlag_NotExported) {
+		require_suffix_id = true;
 	}
 
 	if (require_suffix_id) {

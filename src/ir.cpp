@@ -6212,6 +6212,9 @@ String ir_mangle_name(irGen *s, Entity *e) {
 
 	isize max_len = pkgn.len + 1 + name.len + 1;
 	bool require_suffix_id = is_type_polymorphic(e->type, true);
+	if (e->flags & EntityFlag_NotExported) {
+		require_suffix_id = true;
+	}
 	if (require_suffix_id) {
 		max_len += 21;
 	}
