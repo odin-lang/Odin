@@ -222,9 +222,13 @@ is_nil :: proc(v: any) -> bool {
 length :: proc(val: any) -> int {
 	if val == nil do return 0;
 
-	v := val;
-	v.id = runtime.typeid_base(v.id);
-	switch a in v {
+	#partial switch a in type_info_of(val.id).variant {
+	case Type_Info_Named:
+		return length({val.data, a.base.id});
+
+	case Type_Info_Pointer:
+		return length({val.data, a.elem.id});
+
 	case Type_Info_Array:
 		return a.count;
 
@@ -232,19 +236,19 @@ length :: proc(val: any) -> int {
 		return a.count;
 
 	case Type_Info_Slice:
-		return (^mem.Raw_Slice)(v.data).len;
+		return (^mem.Raw_Slice)(val.data).len;
 
 	case Type_Info_Dynamic_Array:
-		return (^mem.Raw_Dynamic_Array)(v.data).len;
+		return (^mem.Raw_Dynamic_Array)(val.data).len;
 
 	case Type_Info_Map:
-		return (^mem.Raw_Map)(v.data).entries.len;
+		return (^mem.Raw_Map)(val.data).entries.len;
 
 	case Type_Info_String:
 		if a.is_cstring {
-			return len((^cstring)(v.data)^);
+			return len((^cstring)(val.data)^);
 		} else {
-			return (^mem.Raw_String)(v.data).len;
+			return (^mem.Raw_String)(val.data).len;
 		}
 	}
 	return 0;
