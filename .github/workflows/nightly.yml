@@ -1,7 +1,9 @@
 name:  Nightly
+
 on:
   schedule:
     - cron: 0 20 * * *
+  push:
 
 jobs:
   build_windows:
@@ -91,36 +93,40 @@ jobs:
     needs: [build_windows, build_macos, build_ubuntu]
     steps:
       - uses: actions/checkout@v1
+      
       - name: Install B2 CLI
         shell: bash
         run: sudo pip install --upgrade b2
+      
       - name: Download Windows artifacts
         uses: actions/download-artifact@v1
         with:
           name: windows_artifacts
+      
       - name: Download Ubuntu artifacts
         uses: actions/download-artifact@v1
         with:
           name: ubuntu_artifacts
+      
       - name: Download macOS artifacts
         uses: actions/download-artifact@v1
         with:
           name: macos_artifacts
-      - name: Create archieves
-        run: |
-          now=$(date +'%Y-%m-%d')
-          7z a output/odin-windows-amd64-nightly+$now.zip -r windows_artifacts/
-          7z a output/odin-ubuntu-amd64-nightly+$now.zip -r ubuntu_artifacts/
-          7z a output/odin-macos-amd64-nightly+$now.zip -r macos_artifact/
-      - name: Upload artifacts to b2
+
+      - name: Create archives and upload
         shell: bash
         env:
           APPID: ${{ secrets.B2_APPID }}
           APPKEY: ${{ secrets.B2_APPKEY }}
+          BUCKET: ${{ secrets.B2_BUCKET }}
         run: |
           b2 authorize-account "$APPID" "$APPKEY"
-          b2 sync --keepDays 7 output b2://odin-binaries/nightly
+
+          ./ci/upload-create-nightly.sh "$BUCKET" windows-amd64 windows_artifacts/
+          ./ci/upload-create-nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/
+          ./ci/upload-create-nightly.sh "$BUCKET" macos-amd64 macos_artifact/
+
           python3 ci/create_nightly_json.py > nightly.json
-          b2 upload-file odin-binaries nightly.json nightly.json
+          b2 upload-file "$BUCKET" nightly.json nightly.json
+
           b2 clear-account
-        
