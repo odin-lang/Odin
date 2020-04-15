@@ -8,4 +8,4 @@ now=$(date +'%Y-%m-%d')
 filename="odin-$platform-nightly+$now.zip"
 
 7z a "output/$filename" -r "$artifact"
-b2 upload-file "$bucket" "$filename" "$filename"
+b2 upload-file --noProgress "$bucket" "output/$filename" "$filename"
