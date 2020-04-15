@@ -127,7 +127,7 @@ jobs:
           ./ci/upload-create-nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/
           ./ci/upload-create-nightly.sh "$BUCKET" macos-amd64 macos_artifacts/
 
-          python3 ci/create_nightly_json.py > nightly.json
+          python3 ci/create_nightly_json.py "$BUCKET" > nightly.json
           b2 upload-file "$BUCKET" nightly.json nightly.json
 
           b2 clear-account
