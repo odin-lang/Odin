@@ -2,7 +2,7 @@
 
 bucket=$1
 platform=$2
-artifact=$2
+artifact=$3
 
 now=$(date +'%Y-%m-%d')
 filename="odin-$platform-nightly+$now.zip"
