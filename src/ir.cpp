@@ -3115,7 +3115,6 @@ irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
 
 	irValue *c = ir_add_local_generated(proc, t_context, true);
 	ir_push_context_onto_stack(proc, c);
-	ir_emit_store(proc, c, ir_emit_load(proc, proc->module->global_default_context));
 	ir_emit_init_context(proc, c);
 	return c;
 }
