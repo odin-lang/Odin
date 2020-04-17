@@ -50,7 +50,7 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 		     context.allocator.data != allocator_data) {
 			a = default_allocator();
 		}
-		default_temp_allocator_init(allocator, make([]byte, 1<<22, a), a);
+		default_temp_allocator_init(allocator, make([]byte, DEFAULT_SCRATCH_BACKING_SIZE, a), a);
 	}
 
 	switch mode {
