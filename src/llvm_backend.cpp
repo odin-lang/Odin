@@ -6039,14 +6039,11 @@ lbAddr lb_find_or_generate_context_ptr(lbProcedure *p) {
 
 	Type *pt = base_type(p->type);
 	GB_ASSERT(pt->kind == Type_Proc);
-	if (pt->Proc.calling_convention != ProcCC_Odin) {
-		return p->module->global_default_context;
-	} else {
+	{
 		lbAddr c = lb_add_local_generated(p, t_context, false);
 		c.kind = lbAddr_Context;
-		lb_push_context_onto_stack(p, c);
-		lb_addr_store(p, c, lb_addr_load(p, p->module->global_default_context));
 		lb_emit_init_context(p, c);
+		lb_push_context_onto_stack(p, c);
 		return c;
 	}
 }
