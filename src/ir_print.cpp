@@ -1287,8 +1287,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		if (expr->kind == Ast_ProcLit) {
 			found = map_get(&m->anonymous_proc_lits, hash_pointer(expr));
 		} else {
-			GB_ASSERT(expr->kind == Ast_Ident);
-			Entity *e = entity_of_ident(expr);
+			Entity *e = strip_entity_wrapping(expr);
 			GB_ASSERT(e != nullptr);
 			found = map_get(&m->values, hash_entity(e));
 		}
