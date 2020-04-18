@@ -282,6 +282,7 @@ Block_Stmt :: struct {
 	open:  tokenizer.Pos,
 	stmts: []^Stmt,
 	close: tokenizer.Pos,
+	uses_do: bool,
 }
 
 If_Stmt :: struct {
