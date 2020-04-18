@@ -101,7 +101,7 @@ write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (succ
 	}
 
 	mode: int = 0;
-	when OS == "linux" {
+	when OS == "linux" || OS == "darwin" {
 		// NOTE(justasd): 644 (owner read, write; group read; others read)
 		mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 	}
