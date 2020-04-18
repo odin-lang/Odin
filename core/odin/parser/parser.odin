@@ -1217,6 +1217,7 @@ convert_stmt_to_body :: proc(p: ^Parser, stmt: ^ast.Stmt) -> ^ast.Stmt {
 	bs.stmts = make([]^ast.Stmt, 1);
 	bs.stmts[0] = stmt;
 	bs.close = stmt.end;
+	bs.uses_do = true;
 	return bs;
 }
 
