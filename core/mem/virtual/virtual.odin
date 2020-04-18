@@ -4,28 +4,28 @@ import "core:mem"
 import "core:os"
 
 // Returns a pointer to the first byte of the page the given pointer is in.
-enclosing_page :: inline proc(ptr: rawptr) -> rawptr {
+enclosing_page :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
 	start := cast(^byte) mem.align_backward(ptr, uintptr(page_size));
 	return start;
 }
 
 // Returns a pointer to the first byte of the page after the one the given pointer is in.
-next_page :: inline proc(ptr: rawptr) -> rawptr {
+next_page :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
 	start := mem.align_forward(rawptr(uintptr(ptr)+1), uintptr(page_size));
 	return start;
 }
 
 // Returns a pointer to the first byte of the page before the one the given pointer is in.
-previous_page :: inline proc(ptr: rawptr) -> rawptr {
+previous_page :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
 	start := mem.align_backward(rawptr(uintptr(ptr)-1), uintptr(page_size));
 	return start;
 }
 
 // Given a number of bytes, returns the number of pages needed to contain it.
-bytes_to_pages :: inline proc(size: int) -> int {
+bytes_to_pages :: proc(size: int) -> int {
 	page_size := os.get_page_size();
 	bytes := mem.align_forward_uintptr(uintptr(size), uintptr(page_size));
 	return int(bytes) / page_size;
@@ -44,12 +44,13 @@ bytes_to_pages :: inline proc(size: int) -> int {
 // `arena_alloc` after `arena_reset` has been called, will segfault.
 // Attempting to modify data in the arena's buffer before it has been returned from `arena_alloc` may also segfault.
 Arena :: struct {
-	base:            ^byte,
+	base:            rawptr,
 	max_size:        int,
 	cursor:          rawptr, // next location that's valid to return to the user
 	pages_committed: int,
+	high_mark:       int, // largest number of bytes allocated
 
-	desired_base_ptr: rawptr, // may be nil
+	desired_base_ptr: rawptr, // may be nil on first allocation
 }
 
 // Initialize an area with the given maximum size and base pointer.
@@ -65,12 +66,16 @@ arena_init :: proc(va: ^Arena, max_size: int, desired_base_ptr: rawptr = nil) {
 // Attempting to read/write the memory in the meantime will segfault.
 arena_reset :: proc(using va: ^Arena) {
 	cursor = base;
-	decommit(mem.slice_ptr(base, max_size));
+	decommit(mem.slice_ptr(cast(^byte) base, max_size));
 }
 
 arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 	if va.base == nil {
 		if va.max_size == 0 do return nil; // NOTE(tetra): Size specified as zero, or arena not initialized
+
+		// NOTE(tetra): Initialize the base ptr if we haven't yet; this is how we avoid reserving any memory
+		// unless any is actually requested.
+		// It's also how we only reserve the first time we're asked to allocate.
 
 		base_ptr := reserve(va.max_size, va.desired_base_ptr);
 		if base_ptr == nil do return nil;
@@ -80,30 +85,34 @@ arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 	}
 
 
-	// Check the new region stays with the arena, commit the pages,
+	// NOTE(tetra): Check the new region stays with the arena, commit the pages,
 	// and shift up the cursor.
 
 	region     := cast(^byte) mem.align_forward(va.cursor, uintptr(alignment));
 	region_end := mem.ptr_offset(region, requested_size);
-	arena_end  := mem.ptr_offset(cast(^byte)va.base, va.max_size);
+	base       := cast(^byte) va.base;
+	arena_end  := mem.ptr_offset(base, va.max_size);
 	if region_end > arena_end {
-		return nil; // TODO: Expand?
+		return nil;
 	}
 
-	total_pages_needed := bytes_to_pages(mem.ptr_sub(region_end, cast(^byte)va.base));
+	total_pages_needed := bytes_to_pages(mem.ptr_sub(region_end, base));
 	if total_pages_needed > va.pages_committed {
-		ok := commit(mem.slice_ptr(va.base, max(total_pages_needed, 1) * os.get_page_size()));
+		ok := commit(mem.slice_ptr(base, max(total_pages_needed, 1) * os.get_page_size()));
 		assert(ok);
 		va.pages_committed = total_pages_needed;
 	}
 
+	va.high_mark = max(va.high_mark, mem.ptr_sub(region_end, base));
 	va.cursor = region_end;
 	return region;
 }
 
 // You may resize the last allocation requested using this procedure, in which case, no data will be copied.
-arena_resize :: proc(va: ^Arena, old_memory: rawptr, old_size, size, alignment: int) -> rawptr {
+arena_realloc :: proc(va: ^Arena, old_memory: rawptr, old_size, size, alignment: int) -> rawptr {
 	old_region_end := mem.ptr_offset(cast(^byte)old_memory, old_size);
+
+	// NOTE(tetra): If we can't resize in place, copy to new allocation instead.
 	if old_memory == nil || old_region_end != va.cursor {
 		ptr := arena_alloc(va, size, alignment);
 		if ptr == nil do return nil;
@@ -113,29 +122,31 @@ arena_resize :: proc(va: ^Arena, old_memory: rawptr, old_size, size, alignment: 
 	}
 
 
-	// We were the last allocation; commit the new pages and shift up the cursor.
+	// NOTE(tetra): We were the last allocation; commit the new pages and shift up the cursor.
 
-	new_region_end := cast(^byte) mem.ptr_offset(cast(^byte)old_memory, size);
-	arena_end  := mem.ptr_offset(cast(^byte)va.base, va.max_size);
+	new_region_end := mem.ptr_offset(cast(^byte)old_memory, size);
+	base           := cast(^byte) va.base;
+	arena_end      := mem.ptr_offset(base, va.max_size);
 	if new_region_end > arena_end {
-		return nil; // TODO: Expand?
+		return nil;
 	}
 
-	total_pages_needed := bytes_to_pages(mem.ptr_sub(new_region_end, cast(^byte)va.base));
+	total_pages_needed := bytes_to_pages(mem.ptr_sub(new_region_end, base));
 	if total_pages_needed > va.pages_committed {
-		ok := commit(mem.slice_ptr(va.base, max(total_pages_needed, 1) * os.get_page_size()));
+		ok := commit(mem.slice_ptr(base, max(total_pages_needed, 1) * os.get_page_size()));
 		assert(ok);
 		va.pages_committed = total_pages_needed;
 	}
 
 	va.cursor = new_region_end;
+	va.high_mark = max(va.high_mark, mem.ptr_sub(new_region_end, base));
 	return old_memory;
 }
 
 // Releases the virtual memory back to the system.
 // Afterwards, the arena can be initialized again with `arena_init`.
 arena_destroy :: proc(using va: ^Arena) {
-	free(mem.slice_ptr(base, max_size));
+	free(mem.slice_ptr(cast(^byte) base, max_size));
 	va^ = {};
 }
 
@@ -153,7 +164,7 @@ arena_allocator_proc :: proc(data: rawptr, mode: mem.Allocator_Mode,
 	case .Free_All:
 		arena_reset(arena);
 	case .Resize:
-		return arena_resize(arena, old_memory, old_size, size, alignment);
+		return arena_realloc(arena, old_memory, old_size, size, alignment);
 	}
 
 	return nil;
@@ -204,5 +215,5 @@ arena_end_temp_memory :: proc(mark_: Arena_Temp_Memory) {
 		arena.pages_committed -= pages;
 	}
 
-	arena.cursor = cursor;
+	arena.cursor = cast(^byte) cursor;
 }
