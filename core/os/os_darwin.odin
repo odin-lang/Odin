@@ -151,19 +151,18 @@ EOWNERDEAD:			Errno : 105;		/* Previous owner died */
 EQFULL:	Errno : 106;		/* Interface output queue is full */
 ELAST:	Errno : 106;		/* Must be equal largest errno */
 
-O_RDONLY   :: 0x00000;
-O_WRONLY   :: 0x00001;
-O_RDWR     :: 0x00002;
-O_CREATE   :: 0x00040;
-O_EXCL     :: 0x00080;
-O_NOCTTY   :: 0x00100;
-O_TRUNC    :: 0x00200;
-O_NONBLOCK :: 0x00800;
-O_APPEND   :: 0x00400;
-O_SYNC     :: 0x01000;
-O_ASYNC    :: 0x02000;
-O_CLOEXEC  :: 0x80000;
-
+O_RDONLY   :: 0x0000;
+O_WRONLY   :: 0x0001;
+O_RDWR     :: 0x0002;
+O_CREATE   :: 0x0200;
+O_EXCL     :: 0x0800;
+O_NOCTTY   :: 0;
+O_TRUNC    :: 0x0400;
+O_NONBLOCK :: 0x0004;
+O_APPEND   :: 0x0008;
+O_SYNC     :: 0x0080;
+O_ASYNC    :: 0x0040;
+O_CLOEXEC  :: 0x1000000;
 
 SEEK_SET   :: 0;
 SEEK_CUR   :: 1;
@@ -266,7 +265,7 @@ F_OK :: 0; // Test for file existance
 foreign libc {
 	@(link_name="__error") __error :: proc() -> ^int ---;
 
-	@(link_name="open")    _unix_open    :: proc(path: cstring, flags: int, #c_vararg mode: ..any) -> Handle ---;
+	@(link_name="open")    _unix_open    :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---;
 	@(link_name="close")   _unix_close   :: proc(handle: Handle) ---;
 	@(link_name="read")    _unix_read    :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---;
 	@(link_name="write")   _unix_write   :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---;
@@ -300,7 +299,7 @@ get_last_error :: proc() -> int {
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
 	cstr := strings.clone_to_cstring(path);
-	handle := _unix_open(cstr, flags, mode);
+	handle := _unix_open(cstr, i32(flags), u16(mode));
 	delete(cstr);
 	if handle == -1 {
 		return INVALID_HANDLE, 1;
