@@ -165,7 +165,9 @@ enum ProcInlining {
 enum ProcTag {
 	ProcTag_bounds_check    = 1<<0,
 	ProcTag_no_bounds_check = 1<<1,
+	
 	ProcTag_require_results = 1<<4,
+	ProcTag_optional_ok     = 1<<5,
 };
 
 enum ProcCallingConvention {
@@ -282,6 +284,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		Token        close; \
 		Token        ellipsis; \
 		ProcInlining inlining; \
+		bool         optional_ok_one; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(TernaryExpr,     "ternary expression",       struct { Ast *cond, *x, *y; }) \

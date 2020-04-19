@@ -2530,6 +2530,22 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	}
 	GB_ASSERT(cc > 0);
 
+	bool optional_ok = (pt->tags & ProcTag_optional_ok) != 0;
+	if (optional_ok) {
+		if (result_count != 2) {
+			error(proc_type_node, "A procedure type with the #optional_ok tag requires 2 return values, got %td", result_count);
+		} else {
+			Entity *second = results->Tuple.variables[1];
+			if (is_type_polymorphic(second->type)) {
+				// ignore
+			} else if (is_type_boolean(second->type)) {
+				// GOOD
+			} else {
+				error(second->token, "Second return value of an #optional_ok procedure must be a boolean, got %s", type_to_string(second->type));
+			}
+		}
+	}
+
 	type->Proc.node                 = proc_type_node;
 	type->Proc.scope                = c->scope;
 	type->Proc.params               = params;
@@ -2542,6 +2558,7 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	type->Proc.is_polymorphic       = pt->generic;
 	type->Proc.specialization_count = specialization_count;
 	type->Proc.diverging            = pt->diverging;
+	type->Proc.optional_ok          = optional_ok;
 	type->Proc.tags                 = pt->tags;
 
 	if (param_count > 0) {
