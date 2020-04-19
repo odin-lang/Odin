@@ -3,18 +3,20 @@ import sys
 import json
 import datetime
 import urllib.parse
+import sys
 
 def main():
     files_by_date = {}
+    bucket = sys.argv[1]
 
-    files_lines = execute_cli("b2 ls --long odin-binaries nightly").split("\n")
+    files_lines = execute_cli(f"b2 ls --long {bucket} nightly").split("\n")
     for x in files_lines:
         parts = x.split(" ", 1)
         if parts[0]:
             json_str = execute_cli(f"b2 get-file-info {parts[0]}")
             data = json.loads(json_str)
             name = remove_prefix(data['fileName'], "nightly/")
-            url = f"https://f001.backblazeb2.com/file/odin-binaries/nightly/{urllib.parse.quote_plus(name)}"
+            url = f"https://f001.backblazeb2.com/file/{bucket}/nightly/{urllib.parse.quote_plus(name)}"
             sha1 = data['contentSha1']
             ts = int(data['fileInfo']['src_last_modified_millis'])
             date = datetime.datetime.fromtimestamp(ts/1000).strftime('%Y-%m-%d')
