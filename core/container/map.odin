@@ -68,7 +68,7 @@ map_delete :: proc(m: $M/Map($Value)) {
 
 
 map_has :: proc(m: $M/Map($Value), key: u64) -> bool {
-	return _map_find_or_fail(m, key) < 0;
+	return _map_find_or_fail(m, key) >= 0;
 }
 
 map_get :: proc(m: $M/Map($Value), key: u64) -> (res: Value, ok: bool) #optional_ok {
@@ -108,7 +108,7 @@ map_set :: proc(m: ^$M/Map($Value), key: u64, value: Value) {
 }
 
 map_remove :: proc(m: ^$M/Map($Value), key: u64) {
-	fr := _map_find_key(m, key);
+	fr := _map_find_key(m^, key);
 	if fr.entry_index >= 0 {
 		_map_erase(m, fr);
 	}
@@ -250,10 +250,10 @@ _map_add_entry :: proc(m: ^$M/Map($Value), key: u64) -> int {
 }
 
 _map_erase :: proc(m: ^$M/Map, fr: Map_Find_Result) {
-	if fr.entry_index < 0 {
-		array_set(&m.hash, fr.hash_index, array_get(&m.entry_index).next);
+	if fr.entry_prev < 0 {
+		array_set(&m.hash, fr.hash_index, array_get(m.entries, fr.entry_index).next);
 	} else {
-		array_get_ptr(m.entries, fr.entry_prev).next = array_get(&m.entry_index).next;
+		array_get_ptr(m.entries, fr.entry_prev).next = array_get(m.entries, fr.entry_index).next;
 	}
 
 	if fr.entry_index == array_len(m.entries)-1 {
@@ -262,7 +262,7 @@ _map_erase :: proc(m: ^$M/Map, fr: Map_Find_Result) {
 	}
 
 	array_set(&m.entries, fr.entry_index, array_get(m.entries, array_len(m.entries)-1));
-	last = _map_find_key(m, array_get(&m.entries, fr.entry_index).key);
+	last := _map_find_key(m^, array_get(m.entries, fr.entry_index).key);
 
 	if last.entry_prev < 0 {
 		array_get_ptr(m.entries, last.entry_prev).next = fr.entry_index;
@@ -305,7 +305,7 @@ _map_find_entry :: proc(m: ^$M/Map($Value), e: ^Map_Entry(Value)) -> Map_Find_Re
 		return fr;
 	}
 
-	fr.hash_index = key % u64(array_len(m.hash));
+	fr.hash_index = int(e.key % u64(array_len(m.hash)));
 	fr.entry_index = array_get(m.hash, fr.hash_index);
 	for fr.entry_index >= 0 {
 		it := array_get_ptr(m.entries, fr.entry_index);
