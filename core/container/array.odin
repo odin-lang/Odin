@@ -1,6 +1,7 @@
 package container
 
 import "core:mem"
+import "core:runtime"
 
 Array :: struct(T: typeid) {
 	data:      ^T,
@@ -79,16 +80,16 @@ array_slice :: proc(a: $A/Array($T)) -> []T {
 
 
 array_get :: proc(a: $A/Array($T), index: int, loc := #caller_location) -> T {
-	assert(condition=0 <= index && index < a.len, loc=loc);
+	runtime.bounds_check_error_loc(loc, index, array_len(a));
 	return (^T)(uintptr(a.data) + size_of(T)*uintptr(index))^;
 }
 array_get_ptr :: proc(a: $A/Array($T), index: int, loc := #caller_location) -> ^T {
-	assert(condition=0 <= index && index < a.len, loc=loc);
+	runtime.bounds_check_error_loc(loc, index, array_len(a));
 	return (^T)(uintptr(a.data) + size_of(T)*uintptr(index));
 }
 
 array_set :: proc(a: ^$A/Array($T), index: int, item: T, loc := #caller_location)  {
-	assert(condition=0 <= index && index < a.len, loc=loc);
+	runtime.bounds_check_error_loc(loc, index, array_len(a^));
 	(^T)(uintptr(a.data) + size_of(T)*uintptr(index))^ = item;
 }
 
@@ -128,15 +129,15 @@ array_push_front :: proc(a: ^$A/Array($T), item: T) {
 	data[0] = item;
 }
 
-array_pop_back :: proc(a: ^$A/Array($T)) -> T {
-	assert(a.len > 0);
+array_pop_back :: proc(a: ^$A/Array($T), loc := #caller_location) -> T {
+	assert(condition=a.len > 0, loc=loc);
 	item := array_get(a^, a.len-1);
 	a.len -= 1;
 	return item;
 }
 
-array_pop_font :: proc(a: ^$A/Array($T)) -> T {
-	assert(a.len > 0);
+array_pop_font :: proc(a: ^$A/Array($T), loc := #caller_location) -> T {
+	assert(condition=a.len > 0, loc=loc);
 	item := array_get(a^, 0);
 	s := array_slice(a^);
 	copy(s[:], s[1:]);
@@ -145,8 +146,8 @@ array_pop_font :: proc(a: ^$A/Array($T)) -> T {
 }
 
 
-array_consume :: proc(a: ^$A/Array($T), count: int) {
-	assert(a.len >= count);
+array_consume :: proc(a: ^$A/Array($T), count: int, loc := #caller_location) {
+	assert(condition=a.len >= count, loc=loc);
 	a.len -= count;
 }
 
@@ -172,10 +173,9 @@ array_push_back_elems :: proc(a: ^$A/Array($T), items: ..T) {
 		array_grow(a, a.len + len(items));
 	}
 	offset := a.len;
-	a.len += len(items);
 	data := array_slice(a^);
-	n := copy(data[offset:], items);
-	a.len = offset + n;
+	n := copy(data[a.len:], items);
+	a.len += n;
 }
 
 array_push   :: proc{array_push_back, array_push_back_elems};
