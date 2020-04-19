@@ -6,6 +6,31 @@ Queue :: struct(T: typeid) {
 	offset: int,
 }
 
+/*
+queue_init :: proc{
+	queue_init_none,
+	queue_init_len,
+	queue_init_len_cap,
+}
+queue_delete
+queue_clear
+queue_len
+queue_cap
+queue_space
+queue_get
+queue_set
+queue_reserve
+queue_resize
+queue_push :: proc{
+	queue_push_back, 
+	queue_push_elems,
+};
+queue_push_front
+queue_pop_front
+queue_pop_back
+queue_consume
+*/
+
 queue_init_none :: proc(q: ^$Q/Queue($T), allocator := context.allocator) {
 	queue_init_len(q, 0, allocator);
 }
@@ -39,7 +64,6 @@ queue_cap :: proc(q: $Q/Queue($T)) -> int {
 queue_space :: proc(q: $Q/Queue($T)) -> int {
 	return array_len(q.data) - q.len;
 }
-
 
 queue_get :: proc(q: $Q/Queue($T), index: int) -> T {
 	i := (index + q.offset) % array_len(q.data);
