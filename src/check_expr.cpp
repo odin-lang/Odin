@@ -5762,36 +5762,34 @@ bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 				val.type = tuple->Tuple.variables[0]->type;
 				val.mode = Addressing_Value;
 				array_add(operands, val);
-				tuple_index += 1;
+				tuple_index += tuple->Tuple.variables.count;
 			} else {
 				array_add(operands, o);
 				tuple_index += 1;
 			}
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
-			if (o.mode == Addressing_OptionalOk) {
+			if (o.mode == Addressing_OptionalOk && lhs.count == 1) {
 				GB_ASSERT(tuple->variables.count == 2);
-				if (lhs.count == 1) {
-					Ast *expr = unparen_expr(o.expr);
-					if (expr->kind == Ast_CallExpr) {
-						expr->CallExpr.optional_ok_one = true;
-					}
-					Operand val = o;
-					val.type = tuple->variables[0]->type;
-					val.mode = Addressing_Value;
-					array_add(operands, val);
-					tuple_index += 1;
-					continue;
+				Ast *expr = unparen_expr(o.expr);
+				if (expr->kind == Ast_CallExpr) {
+					expr->CallExpr.optional_ok_one = true;
 				}
-			}
+				Operand val = o;
+				val.type = tuple->variables[0]->type;
+				val.mode = Addressing_Value;
+				array_add(operands, val);
+				tuple_index += tuple->variables.count;
 
-			for_array(j, tuple->variables) {
-				o.type = tuple->variables[j]->type;
-				array_add(operands, o);
-			}
+				add_type_and_value(c->info, val.expr, val.mode, val.type, val.value);
+			} else {
+				for_array(j, tuple->variables) {
+					o.type = tuple->variables[j]->type;
+					array_add(operands, o);
+				}
 
-			isize count = tuple->variables.count;
-			tuple_index += 2;
+				tuple_index += tuple->variables.count;
+			}
 		}
 	}
 
@@ -5868,29 +5866,30 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 			}
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
-			if (o.mode == Addressing_OptionalOk) {
+			if (o.mode == Addressing_OptionalOk && lhs_count == 1) {
 				GB_ASSERT(tuple->variables.count == 2);
-				if (lhs_count == 1) {
-					Ast *expr = unparen_expr(o.expr);
-					if (expr->kind == Ast_CallExpr) {
-						expr->CallExpr.optional_ok_one = true;
-					}
-					Operand val = o;
-					val.type = tuple->variables[0]->type;
-					val.mode = Addressing_Value;
-					array_add(operands, val);
-					tuple_index += 1;
-					continue;
+				Ast *expr = unparen_expr(o.expr);
+				if (expr->kind == Ast_CallExpr) {
+					expr->CallExpr.optional_ok_one = true;
 				}
-			}
+				Operand val = o;
+				val.type = tuple->variables[0]->type;
+				val.mode = Addressing_Value;
+				array_add(operands, val);
 
-			for_array(j, tuple->variables) {
-				o.type = tuple->variables[j]->type;
-				array_add(operands, o);
-			}
+				isize count = tuple->variables.count;
+				tuple_index += add_dependencies_from_unpacking(c, lhs, lhs_count, tuple_index, count);
+				
+				add_type_and_value(c->info, val.expr, val.mode, val.type, val.value);
+			} else {
+				for_array(j, tuple->variables) {
+					o.type = tuple->variables[j]->type;
+					array_add(operands, o);
+				}
 
-			isize count = tuple->variables.count;
-			tuple_index += add_dependencies_from_unpacking(c, lhs, lhs_count, tuple_index, count);
+				isize count = tuple->variables.count;
+				tuple_index += add_dependencies_from_unpacking(c, lhs, lhs_count, tuple_index, count);
+			}
 		}
 	}
 
