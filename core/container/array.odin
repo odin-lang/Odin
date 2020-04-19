@@ -9,6 +9,38 @@ Array :: struct(T: typeid) {
 	allocator: mem.Allocator,
 }
 
+/*
+array_init :: proc {
+	array_init_none,
+	array_init_len,
+	array_init_len_cap,
+}
+array_init
+array_delete
+array_len
+array_cap
+array_space
+array_slice
+array_get
+array_get_ptr
+array_set
+array_reserve
+array_resize
+array_push = array_append :: proc{
+	array_push_back, 
+	array_push_back_elems,
+}
+array_push_front
+array_pop_back
+array_pop_font
+array_consume
+array_trim
+array_clear
+array_clone
+array_set_capacity
+array_grow
+*/
+
 array_init_none :: proc(a: ^$A/Array, allocator := context.allocator) {
 	array_init_len(a, 0, allocator);
 }
@@ -16,10 +48,10 @@ array_init_len :: proc(a: ^$A/Array, len: int, allocator := context.allocator) {
 	array_init_len_cap(a, 0, 16, allocator);
 }
 array_init_len_cap :: proc(a: ^$A/Array($T), len: int, cap: int, allocator := context.allocator) {
-	a.data = (^T)(mem.alloc(size_of(T)*cap, align_of(T), allocator));
+	a.allocator = allocator;
+	a.data = (^T)(mem.alloc(size_of(T)*cap, align_of(T), a.allocator));
 	a.len = len;
 	a.cap = cap;
-	a.allocator = allocator;
 }
 
 array_init :: proc{array_init_none, array_init_len, array_init_len_cap};
@@ -123,8 +155,15 @@ array_trim :: proc(a: ^$A/Array($T)) {
 	array_set_capacity(a, a.len);
 }
 
-array_clear :: proc(q: ^$Q/Queue($T)) {
-	array_resize(q, 0);
+array_clear :: proc(a: ^$A/Array($T)) {
+	array_resize(a, 0);
+}
+
+array_clone :: proc(a: $A/Array($T), allocator := context.allocator) -> A {
+	res: A;
+	array_init(&res, array_len(a), array_len(a), allocator);
+	copy(array_slice(res), array_slice(a));
+	return res;
 }
 
 
@@ -153,12 +192,15 @@ array_set_capacity :: proc(a: ^$A/Array($T), new_capacity: int) {
 
 	new_data: ^T;
 	if new_capacity > 0 {
+		if a.allocator.procedure == nil {
+			a.allocator = context.allocator;
+		}
 		new_data = (^T)(mem.alloc(size_of(T)*new_capacity, align_of(T), a.allocator));
 		if new_data != nil {
 			mem.copy(new_data, a.data, size_of(T)*a.len);
 		}
 	}
-	mem.free(a.data);
+	mem.free(a.data, a.allocator);
 	a.data = new_data;
 	a.cap = new_capacity;
 }
