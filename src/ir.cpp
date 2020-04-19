@@ -7081,6 +7081,311 @@ irValue *ir_build_expr(irProcedure *proc, Ast *expr) {
 	return v;
 }
 
+
+irValue *ir_build_call_expr(irProcedure *proc, Ast *expr) {
+	ast_node(ce, CallExpr, expr);
+	TypeAndValue tv = type_and_value_of_expr(expr);
+	TypeAndValue proc_tv = type_and_value_of_expr(ce->proc);
+	AddressingMode proc_mode = proc_tv.mode;
+	if (proc_mode == Addressing_Type) {
+		GB_ASSERT(ce->args.count == 1);
+		irValue *x = ir_build_expr(proc, ce->args[0]);
+		irValue *y = ir_emit_conv(proc, x, tv.type);
+		return y;
+	}
+
+	Ast *p = unparen_expr(ce->proc);
+	if (proc_mode == Addressing_Builtin) {
+		Entity *e = entity_of_node(p);
+		BuiltinProcId id = BuiltinProc_Invalid;
+		if (e != nullptr) {
+			id = cast(BuiltinProcId)e->Builtin.id;
+		} else {
+			id = BuiltinProc_DIRECTIVE;
+		}
+		return ir_build_builtin_proc(proc, expr, tv, id);
+	}
+
+	// NOTE(bill): Regular call
+	irValue *value = nullptr;
+	Ast *proc_expr = unparen_expr(ce->proc);
+	if (proc_expr->tav.mode == Addressing_Constant) {
+		ExactValue v = proc_expr->tav.value;
+		switch (v.kind) {
+		case ExactValue_Integer:
+			{
+				u64 u = big_int_to_u64(&v.value_integer);
+				irValue *x = ir_const_uintptr(u);
+				x = ir_emit_conv(proc, x, t_rawptr);
+				value = ir_emit_conv(proc, x, proc_expr->tav.type);
+				break;
+			}
+		case ExactValue_Pointer:
+			{
+				u64 u = cast(u64)v.value_pointer;
+				irValue *x = ir_const_uintptr(u);
+				x = ir_emit_conv(proc, x, t_rawptr);
+				value = ir_emit_conv(proc, x, proc_expr->tav.type);
+				break;
+			}
+		}
+	}
+
+	if (value == nullptr) {
+		value = ir_build_expr(proc, proc_expr);
+	}
+
+	GB_ASSERT(value != nullptr);
+	Type *proc_type_ = base_type(ir_type(value));
+	GB_ASSERT(proc_type_->kind == Type_Proc);
+	TypeProc *pt = &proc_type_->Proc;
+	set_procedure_abi_types(heap_allocator(), proc_type_);
+
+	if (is_call_expr_field_value(ce)) {
+		auto args = array_make<irValue *>(ir_allocator(), pt->param_count);
+
+		for_array(arg_index, ce->args) {
+			Ast *arg = ce->args[arg_index];
+			ast_node(fv, FieldValue, arg);
+			GB_ASSERT(fv->field->kind == Ast_Ident);
+			String name = fv->field->Ident.token.string;
+			isize index = lookup_procedure_parameter(pt, name);
+			GB_ASSERT(index >= 0);
+			TypeAndValue tav = type_and_value_of_expr(fv->value);
+			if (tav.mode == Addressing_Type) {
+				args[index] = ir_value_nil(tav.type);
+			} else {
+				args[index] = ir_build_expr(proc, fv->value);
+			}
+		}
+		TypeTuple *params = &pt->params->Tuple;
+		for (isize i = 0; i < args.count; i++) {
+			Entity *e = params->variables[i];
+			if (e->kind == Entity_TypeName) {
+				args[i] = ir_value_nil(e->type);
+			} else if (e->kind == Entity_Constant) {
+				continue;
+			} else {
+				GB_ASSERT(e->kind == Entity_Variable);
+				if (args[i] == nullptr) {
+					switch (e->Variable.param_value.kind) {
+					case ParameterValue_Constant:
+						args[i] = ir_value_constant(e->type, e->Variable.param_value.value);
+						break;
+					case ParameterValue_Nil:
+						args[i] = ir_value_nil(e->type);
+						break;
+					case ParameterValue_Location:
+						args[i] = ir_emit_source_code_location(proc, proc->entity->token.string, ast_token(expr).pos);
+						break;
+					case ParameterValue_Value:
+						args[i] = ir_build_expr(proc, e->Variable.param_value.ast_value);
+						break;
+					}
+				} else {
+					args[i] = ir_emit_conv(proc, args[i], e->type);
+				}
+			}
+		}
+
+		return ir_emit_call(proc, value, args, ce->inlining, proc->return_ptr_hint_ast == expr);
+	}
+
+	isize arg_index = 0;
+
+	isize arg_count = 0;
+	for_array(i, ce->args) {
+		Ast *arg = ce->args[i];
+		TypeAndValue tav = type_and_value_of_expr(arg);
+		GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s", expr_to_string(arg), expr_to_string(expr));
+		GB_ASSERT_MSG(tav.mode != Addressing_ProcGroup, "%s", expr_to_string(arg));
+		Type *at = tav.type;
+		if (at->kind == Type_Tuple) {
+			arg_count += at->Tuple.variables.count;
+		} else {
+			arg_count++;
+		}
+	}
+
+	isize param_count = 0;
+	if (pt->params) {
+		GB_ASSERT(pt->params->kind == Type_Tuple);
+		param_count = pt->params->Tuple.variables.count;
+	}
+
+	auto args = array_make<irValue *>(ir_allocator(), cast(isize)gb_max(param_count, arg_count));
+	isize variadic_index = pt->variadic_index;
+	bool variadic = pt->variadic && variadic_index >= 0;
+	bool vari_expand = ce->ellipsis.pos.line != 0;
+	bool is_c_vararg = pt->c_vararg;
+
+	String proc_name = {};
+	if (proc->entity != nullptr) {
+		proc_name = proc->entity->token.string;
+	}
+	TokenPos pos = ast_token(ce->proc).pos;
+
+	TypeTuple *param_tuple = nullptr;
+	if (pt->params) {
+		GB_ASSERT(pt->params->kind == Type_Tuple);
+		param_tuple = &pt->params->Tuple;
+	}
+
+	for_array(i, ce->args) {
+		Ast *arg = ce->args[i];
+		TypeAndValue arg_tv = type_and_value_of_expr(arg);
+		if (arg_tv.mode == Addressing_Type) {
+			args[arg_index++] = ir_value_nil(arg_tv.type);
+		} else {
+			irValue *a = ir_build_expr(proc, arg);
+			Type *at = ir_type(a);
+			if (at->kind == Type_Tuple) {
+				for_array(i, at->Tuple.variables) {
+					Entity *e = at->Tuple.variables[i];
+					irValue *v = ir_emit_struct_ev(proc, a, cast(i32)i);
+					args[arg_index++] = v;
+				}
+			} else {
+				args[arg_index++] = a;
+			}
+		}
+	}
+
+
+	if (param_count > 0) {
+		GB_ASSERT_MSG(pt->params != nullptr, "%s %td", expr_to_string(expr), pt->param_count);
+		GB_ASSERT(param_count < 1000000);
+
+		if (arg_count < param_count) {
+			isize end = cast(isize)param_count;
+			if (variadic) {
+				end = variadic_index;
+			}
+			while (arg_index < end) {
+				Entity *e = param_tuple->variables[arg_index];
+				GB_ASSERT(e->kind == Entity_Variable);
+
+				switch (e->Variable.param_value.kind) {
+				case ParameterValue_Constant:
+					args[arg_index++] = ir_value_constant(e->type, e->Variable.param_value.value);
+					break;
+				case ParameterValue_Nil:
+					args[arg_index++] = ir_value_nil(e->type);
+					break;
+				case ParameterValue_Location:
+					args[arg_index++] = ir_emit_source_code_location(proc, proc_name, pos);
+					break;
+				case ParameterValue_Value:
+					args[arg_index++] = ir_build_expr(proc, e->Variable.param_value.ast_value);
+					break;
+				}
+			}
+		}
+
+		if (is_c_vararg) {
+			GB_ASSERT(variadic);
+			GB_ASSERT(!vari_expand);
+			isize i = 0;
+			for (; i < variadic_index; i++) {
+				Entity *e = param_tuple->variables[i];
+				if (e->kind == Entity_Variable) {
+					args[i] = ir_emit_conv(proc, args[i], e->type);
+				}
+			}
+			Type *variadic_type = param_tuple->variables[i]->type;
+			GB_ASSERT(is_type_slice(variadic_type));
+			variadic_type = base_type(variadic_type)->Slice.elem;
+			if (!is_type_any(variadic_type)) {
+				for (; i < arg_count; i++) {
+					args[i] = ir_emit_conv(proc, args[i], variadic_type);
+				}
+			} else {
+				for (; i < arg_count; i++) {
+					args[i] = ir_emit_conv(proc, args[i], default_type(ir_type(args[i])));
+				}
+			}
+		} else if (variadic) {
+			isize i = 0;
+			for (; i < variadic_index; i++) {
+				Entity *e = param_tuple->variables[i];
+				if (e->kind == Entity_Variable) {
+					args[i] = ir_emit_conv(proc, args[i], e->type);
+				}
+			}
+			if (!vari_expand) {
+				Type *variadic_type = param_tuple->variables[i]->type;
+				GB_ASSERT(is_type_slice(variadic_type));
+				variadic_type = base_type(variadic_type)->Slice.elem;
+				for (; i < arg_count; i++) {
+					args[i] = ir_emit_conv(proc, args[i], variadic_type);
+				}
+			}
+		} else {
+			for (isize i = 0; i < param_count; i++) {
+				Entity *e = param_tuple->variables[i];
+				if (e->kind == Entity_Variable) {
+					GB_ASSERT(args[i] != nullptr);
+					args[i] = ir_emit_conv(proc, args[i], e->type);
+				}
+			}
+		}
+
+		if (variadic && !vari_expand && !is_c_vararg) {
+			ir_emit_comment(proc, str_lit("variadic call argument generation"));
+			gbAllocator allocator = ir_allocator();
+			Type *slice_type = param_tuple->variables[variadic_index]->type;
+			Type *elem_type  = base_type(slice_type)->Slice.elem;
+			irValue *slice = ir_add_local_generated(proc, slice_type, true);
+			isize slice_len = arg_count+1 - (variadic_index+1);
+
+			if (slice_len > 0) {
+				irValue *base_array = ir_add_local_generated(proc, alloc_type_array(elem_type, slice_len), true);
+
+				for (isize i = variadic_index, j = 0; i < arg_count; i++, j++) {
+					irValue *addr = ir_emit_array_epi(proc, base_array, cast(i32)j);
+					ir_emit_store(proc, addr, args[i]);
+				}
+
+				irValue *base_elem = ir_emit_array_epi(proc, base_array, 0);
+				irValue *len = ir_const_int(slice_len);
+				ir_fill_slice(proc, slice, base_elem, len);
+			}
+
+			arg_count = param_count;
+			args[variadic_index] = ir_emit_load(proc, slice);
+		}
+	}
+
+	if (variadic && variadic_index+1 < param_count) {
+		for (isize i = variadic_index+1; i < param_count; i++) {
+			Entity *e = param_tuple->variables[i];
+			switch (e->Variable.param_value.kind) {
+			case ParameterValue_Constant:
+				args[i] = ir_value_constant(e->type, e->Variable.param_value.value);
+				break;
+			case ParameterValue_Nil:
+				args[i] = ir_value_nil(e->type);
+				break;
+			case ParameterValue_Location:
+				args[i] = ir_emit_source_code_location(proc, proc_name, pos);
+				break;
+			case ParameterValue_Value:
+				args[i] = ir_build_expr(proc, e->Variable.param_value.ast_value);
+				break;
+			}
+		}
+	}
+
+	isize final_count = param_count;
+	if (is_c_vararg) {
+		final_count = arg_count;
+	}
+
+	auto call_args = array_slice(args, 0, final_count);
+	return ir_emit_call(proc, value, call_args, ce->inlining, proc->return_ptr_hint_ast == expr);
+}
+
+
 irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 	Ast *original_expr = expr;
 	expr = unparen_expr(expr);
@@ -7551,304 +7856,13 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 
 
 	case_ast_node(ce, CallExpr, expr);
-		TypeAndValue proc_tv = type_and_value_of_expr(ce->proc);
-		AddressingMode proc_mode = proc_tv.mode;
-		if (proc_mode == Addressing_Type) {
-			GB_ASSERT(ce->args.count == 1);
-			irValue *x = ir_build_expr(proc, ce->args[0]);
-			irValue *y = ir_emit_conv(proc, x, tv.type);
-			return y;
+		irValue *res = ir_build_call_expr(proc, expr);
+		if (ce->optional_ok_one) { // TODO(bill): Minor hack for #optional_ok procedures
+			GB_ASSERT(is_type_tuple(ir_type(res)));
+			GB_ASSERT(ir_type(res)->Tuple.variables.count == 2);
+			return ir_emit_struct_ev(proc, res, 0);
 		}
-
-		Ast *p = unparen_expr(ce->proc);
-		if (proc_mode == Addressing_Builtin) {
-			Entity *e = entity_of_node(p);
-			BuiltinProcId id = BuiltinProc_Invalid;
-			if (e != nullptr) {
-				id = cast(BuiltinProcId)e->Builtin.id;
-			} else {
-				id = BuiltinProc_DIRECTIVE;
-			}
-			return ir_build_builtin_proc(proc, expr, tv, id);
-		}
-
-		// NOTE(bill): Regular call
-		irValue *value = nullptr;
-		Ast *proc_expr = unparen_expr(ce->proc);
-		if (proc_expr->tav.mode == Addressing_Constant) {
-			ExactValue v = proc_expr->tav.value;
-			switch (v.kind) {
-			case ExactValue_Integer:
-				{
-					u64 u = big_int_to_u64(&v.value_integer);
-					irValue *x = ir_const_uintptr(u);
-					x = ir_emit_conv(proc, x, t_rawptr);
-					value = ir_emit_conv(proc, x, proc_expr->tav.type);
-					break;
-				}
-			case ExactValue_Pointer:
-				{
-					u64 u = cast(u64)v.value_pointer;
-					irValue *x = ir_const_uintptr(u);
-					x = ir_emit_conv(proc, x, t_rawptr);
-					value = ir_emit_conv(proc, x, proc_expr->tav.type);
-					break;
-				}
-			}
-		}
-
-		if (value == nullptr) {
-			value = ir_build_expr(proc, proc_expr);
-		}
-
-		GB_ASSERT(value != nullptr);
-		Type *proc_type_ = base_type(ir_type(value));
-		GB_ASSERT(proc_type_->kind == Type_Proc);
-		TypeProc *pt = &proc_type_->Proc;
-		set_procedure_abi_types(heap_allocator(), proc_type_);
-
-		if (is_call_expr_field_value(ce)) {
-			auto args = array_make<irValue *>(ir_allocator(), pt->param_count);
-
-			for_array(arg_index, ce->args) {
-				Ast *arg = ce->args[arg_index];
-				ast_node(fv, FieldValue, arg);
-				GB_ASSERT(fv->field->kind == Ast_Ident);
-				String name = fv->field->Ident.token.string;
-				isize index = lookup_procedure_parameter(pt, name);
-				GB_ASSERT(index >= 0);
-				TypeAndValue tav = type_and_value_of_expr(fv->value);
-				if (tav.mode == Addressing_Type) {
-					args[index] = ir_value_nil(tav.type);
-				} else {
-					args[index] = ir_build_expr(proc, fv->value);
-				}
-			}
-			TypeTuple *params = &pt->params->Tuple;
-			for (isize i = 0; i < args.count; i++) {
-				Entity *e = params->variables[i];
-				if (e->kind == Entity_TypeName) {
-					args[i] = ir_value_nil(e->type);
-				} else if (e->kind == Entity_Constant) {
-					continue;
-				} else {
-					GB_ASSERT(e->kind == Entity_Variable);
-					if (args[i] == nullptr) {
-						switch (e->Variable.param_value.kind) {
-						case ParameterValue_Constant:
-							args[i] = ir_value_constant(e->type, e->Variable.param_value.value);
-							break;
-						case ParameterValue_Nil:
-							args[i] = ir_value_nil(e->type);
-							break;
-						case ParameterValue_Location:
-							args[i] = ir_emit_source_code_location(proc, proc->entity->token.string, ast_token(expr).pos);
-							break;
-						case ParameterValue_Value:
-							args[i] = ir_build_expr(proc, e->Variable.param_value.ast_value);
-							break;
-						}
-					} else {
-						args[i] = ir_emit_conv(proc, args[i], e->type);
-					}
-				}
-			}
-
-			return ir_emit_call(proc, value, args, ce->inlining, proc->return_ptr_hint_ast == expr);
-		}
-
-		isize arg_index = 0;
-
-		isize arg_count = 0;
-		for_array(i, ce->args) {
-			Ast *arg = ce->args[i];
-			TypeAndValue tav = type_and_value_of_expr(arg);
-			GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s", expr_to_string(arg), expr_to_string(expr));
-			GB_ASSERT_MSG(tav.mode != Addressing_ProcGroup, "%s", expr_to_string(arg));
-			Type *at = tav.type;
-			if (at->kind == Type_Tuple) {
-				arg_count += at->Tuple.variables.count;
-			} else {
-				arg_count++;
-			}
-		}
-
-		isize param_count = 0;
-		if (pt->params) {
-			GB_ASSERT(pt->params->kind == Type_Tuple);
-			param_count = pt->params->Tuple.variables.count;
-		}
-
-		auto args = array_make<irValue *>(ir_allocator(), cast(isize)gb_max(param_count, arg_count));
-		isize variadic_index = pt->variadic_index;
-		bool variadic = pt->variadic && variadic_index >= 0;
-		bool vari_expand = ce->ellipsis.pos.line != 0;
-		bool is_c_vararg = pt->c_vararg;
-
-		String proc_name = {};
-		if (proc->entity != nullptr) {
-			proc_name = proc->entity->token.string;
-		}
-		TokenPos pos = ast_token(ce->proc).pos;
-
-		TypeTuple *param_tuple = nullptr;
-		if (pt->params) {
-			GB_ASSERT(pt->params->kind == Type_Tuple);
-			param_tuple = &pt->params->Tuple;
-		}
-
-		for_array(i, ce->args) {
-			Ast *arg = ce->args[i];
-			TypeAndValue arg_tv = type_and_value_of_expr(arg);
-			if (arg_tv.mode == Addressing_Type) {
-				args[arg_index++] = ir_value_nil(arg_tv.type);
-			} else {
-				irValue *a = ir_build_expr(proc, arg);
-				Type *at = ir_type(a);
-				if (at->kind == Type_Tuple) {
-					for_array(i, at->Tuple.variables) {
-						Entity *e = at->Tuple.variables[i];
-						irValue *v = ir_emit_struct_ev(proc, a, cast(i32)i);
-						args[arg_index++] = v;
-					}
-				} else {
-					args[arg_index++] = a;
-				}
-			}
-		}
-
-
-		if (param_count > 0) {
-			GB_ASSERT_MSG(pt->params != nullptr, "%s %td", expr_to_string(expr), pt->param_count);
-			GB_ASSERT(param_count < 1000000);
-
-			if (arg_count < param_count) {
-				isize end = cast(isize)param_count;
-				if (variadic) {
-					end = variadic_index;
-				}
-				while (arg_index < end) {
-					Entity *e = param_tuple->variables[arg_index];
-					GB_ASSERT(e->kind == Entity_Variable);
-
-					switch (e->Variable.param_value.kind) {
-					case ParameterValue_Constant:
-						args[arg_index++] = ir_value_constant(e->type, e->Variable.param_value.value);
-						break;
-					case ParameterValue_Nil:
-						args[arg_index++] = ir_value_nil(e->type);
-						break;
-					case ParameterValue_Location:
-						args[arg_index++] = ir_emit_source_code_location(proc, proc_name, pos);
-						break;
-					case ParameterValue_Value:
-						args[arg_index++] = ir_build_expr(proc, e->Variable.param_value.ast_value);
-						break;
-					}
-				}
-			}
-
-			if (is_c_vararg) {
-				GB_ASSERT(variadic);
-				GB_ASSERT(!vari_expand);
-				isize i = 0;
-				for (; i < variadic_index; i++) {
-					Entity *e = param_tuple->variables[i];
-					if (e->kind == Entity_Variable) {
-						args[i] = ir_emit_conv(proc, args[i], e->type);
-					}
-				}
-				Type *variadic_type = param_tuple->variables[i]->type;
-				GB_ASSERT(is_type_slice(variadic_type));
-				variadic_type = base_type(variadic_type)->Slice.elem;
-				if (!is_type_any(variadic_type)) {
-					for (; i < arg_count; i++) {
-						args[i] = ir_emit_conv(proc, args[i], variadic_type);
-					}
-				} else {
-					for (; i < arg_count; i++) {
-						args[i] = ir_emit_conv(proc, args[i], default_type(ir_type(args[i])));
-					}
-				}
-			} else if (variadic) {
-				isize i = 0;
-				for (; i < variadic_index; i++) {
-					Entity *e = param_tuple->variables[i];
-					if (e->kind == Entity_Variable) {
-						args[i] = ir_emit_conv(proc, args[i], e->type);
-					}
-				}
-				if (!vari_expand) {
-					Type *variadic_type = param_tuple->variables[i]->type;
-					GB_ASSERT(is_type_slice(variadic_type));
-					variadic_type = base_type(variadic_type)->Slice.elem;
-					for (; i < arg_count; i++) {
-						args[i] = ir_emit_conv(proc, args[i], variadic_type);
-					}
-				}
-			} else {
-				for (isize i = 0; i < param_count; i++) {
-					Entity *e = param_tuple->variables[i];
-					if (e->kind == Entity_Variable) {
-						GB_ASSERT(args[i] != nullptr);
-						args[i] = ir_emit_conv(proc, args[i], e->type);
-					}
-				}
-			}
-
-			if (variadic && !vari_expand && !is_c_vararg) {
-				ir_emit_comment(proc, str_lit("variadic call argument generation"));
-				gbAllocator allocator = ir_allocator();
-				Type *slice_type = param_tuple->variables[variadic_index]->type;
-				Type *elem_type  = base_type(slice_type)->Slice.elem;
-				irValue *slice = ir_add_local_generated(proc, slice_type, true);
-				isize slice_len = arg_count+1 - (variadic_index+1);
-
-				if (slice_len > 0) {
-					irValue *base_array = ir_add_local_generated(proc, alloc_type_array(elem_type, slice_len), true);
-
-					for (isize i = variadic_index, j = 0; i < arg_count; i++, j++) {
-						irValue *addr = ir_emit_array_epi(proc, base_array, cast(i32)j);
-						ir_emit_store(proc, addr, args[i]);
-					}
-
-					irValue *base_elem = ir_emit_array_epi(proc, base_array, 0);
-					irValue *len = ir_const_int(slice_len);
-					ir_fill_slice(proc, slice, base_elem, len);
-				}
-
-				arg_count = param_count;
-				args[variadic_index] = ir_emit_load(proc, slice);
-			}
-		}
-
-		if (variadic && variadic_index+1 < param_count) {
-			for (isize i = variadic_index+1; i < param_count; i++) {
-				Entity *e = param_tuple->variables[i];
-				switch (e->Variable.param_value.kind) {
-				case ParameterValue_Constant:
-					args[i] = ir_value_constant(e->type, e->Variable.param_value.value);
-					break;
-				case ParameterValue_Nil:
-					args[i] = ir_value_nil(e->type);
-					break;
-				case ParameterValue_Location:
-					args[i] = ir_emit_source_code_location(proc, proc_name, pos);
-					break;
-				case ParameterValue_Value:
-					args[i] = ir_build_expr(proc, e->Variable.param_value.ast_value);
-					break;
-				}
-			}
-		}
-
-		isize final_count = param_count;
-		if (is_c_vararg) {
-			final_count = arg_count;
-		}
-
-		auto call_args = array_slice(args, 0, final_count);
-		return ir_emit_call(proc, value, call_args, ce->inlining, proc->return_ptr_hint_ast == expr);
+		return res;
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);

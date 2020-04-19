@@ -5750,12 +5750,41 @@ bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 
 				optional_ok = true;
 				tuple_index += 2;
+			} else if (o.mode == Addressing_OptionalOk) {
+				Type *tuple = o.type;
+				GB_ASSERT(is_type_tuple(tuple));
+				GB_ASSERT(tuple->Tuple.variables.count == 2);
+				Ast *expr = unparen_expr(o.expr);
+				if (expr->kind == Ast_CallExpr) {
+					expr->CallExpr.optional_ok_one = true;
+				}
+				Operand val = o;
+				val.type = tuple->Tuple.variables[0]->type;
+				val.mode = Addressing_Value;
+				array_add(operands, val);
+				tuple_index += 1;
 			} else {
 				array_add(operands, o);
 				tuple_index += 1;
 			}
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
+			if (o.mode == Addressing_OptionalOk) {
+				GB_ASSERT(tuple->variables.count == 2);
+				if (lhs.count == 1) {
+					Ast *expr = unparen_expr(o.expr);
+					if (expr->kind == Ast_CallExpr) {
+						expr->CallExpr.optional_ok_one = true;
+					}
+					Operand val = o;
+					val.type = tuple->variables[0]->type;
+					val.mode = Addressing_Value;
+					array_add(operands, val);
+					tuple_index += 1;
+					continue;
+				}
+			}
+
 			for_array(j, tuple->variables) {
 				o.type = tuple->variables[j]->type;
 				array_add(operands, o);
@@ -5839,6 +5868,22 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 			}
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
+			if (o.mode == Addressing_OptionalOk) {
+				GB_ASSERT(tuple->variables.count == 2);
+				if (lhs_count == 1) {
+					Ast *expr = unparen_expr(o.expr);
+					if (expr->kind == Ast_CallExpr) {
+						expr->CallExpr.optional_ok_one = true;
+					}
+					Operand val = o;
+					val.type = tuple->variables[0]->type;
+					val.mode = Addressing_Value;
+					array_add(operands, val);
+					tuple_index += 1;
+					continue;
+				}
+			}
+
 			for_array(j, tuple->variables) {
 				o.type = tuple->variables[j]->type;
 				array_add(operands, o);
@@ -7332,7 +7377,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 					if (pl->inlining == ProcInlining_no_inline) {
 						error(call, "'inline' cannot be applied to a procedure that has be marked as 'no_inline'");
 					}
-			}
+				}
 			}
 			break;
 		}
@@ -7342,6 +7387,11 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 	}
 
 	operand->expr = call;
+
+	if (pt->kind == Type_Proc && pt->Proc.optional_ok) {
+		operand->mode = Addressing_OptionalOk;
+	}
+
 	return Expr_Expr;
 }
 

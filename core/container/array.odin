@@ -47,10 +47,16 @@ array_slice :: proc(a: $A/Array($T)) -> []T {
 
 
 array_get :: proc(a: $A/Array($T), index: int) -> T {
+	assert(uint(index) < a.len);
 	return (^T)(uintptr(a.data) + size_of(T)*uintptr(index))^;
+}
+array_get_ptr :: proc(a: $A/Array($T), index: int) -> ^T {
+	assert(uint(index) < a.len);
+	return (^T)(uintptr(a.data) + size_of(T)*uintptr(index));
 }
 
 array_set :: proc(a: ^$A/Array($T), index: int, item: T)  {
+	assert(uint(index) < a.len);
 	(^T)(uintptr(a.data) + size_of(T)*uintptr(index))^ = item;
 }
 
@@ -122,7 +128,7 @@ array_clear :: proc(q: ^$Q/Queue($T)) {
 }
 
 
-array_push :: proc(a: ^$A/Array($T), items: ..T) {
+array_push_back_elems :: proc(a: ^$A/Array($T), items: ..T) {
 	if array_space(a^) < len(items) {
 		array_grow(a, a.size + len(items));
 	}
@@ -133,6 +139,8 @@ array_push :: proc(a: ^$A/Array($T), items: ..T) {
 	a.len = offset + n;
 }
 
+array_push   :: proc{array_push_back, array_push_back_elems};
+array_append :: proc{array_push_back, array_push_back_elems};
 
 array_set_capacity :: proc(a: ^$A/Array($T), new_capacity: int) {
 	if new_capacity == a.cap {
