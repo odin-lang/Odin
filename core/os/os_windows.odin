@@ -125,7 +125,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 
 	written := 0;
 	for {
-		to_write := u32(min(1<<29-1, len(data)-written));
+		to_write := u32(min(1<<32-1, len(data)-written));
 		if to_write <= 0 do break;
 
 		n: u32 = ---;
@@ -145,7 +145,7 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 
 	read := 0;
 	for {
-		to_read := u32(min(1<<29-1, len(data)-read));
+		to_read := u32(min(1<<32-1, len(data)-read));
 		if to_read <= 0 do break;
 
 		n: u32 = ---;
