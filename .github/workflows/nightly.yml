@@ -122,7 +122,7 @@ jobs:
         run: |
           b2 authorize-account "$APPID" "$APPKEY"
 
-          chmod +x ./ci/upload-create-nightly.sh
+          chmod +x ./ci/upload_create_nightly.sh
           ./ci/upload_create_nightly.sh "$BUCKET" windows-amd64 windows_artifacts/
           ./ci/upload_create_nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/
           ./ci/upload_create_nightly.sh "$BUCKET" macos-amd64 macos_artifacts/
