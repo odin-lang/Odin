@@ -6,7 +6,7 @@ import "core:os"
 // Returns a pointer to the first byte of the page the given pointer is in.
 enclosing_page :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
-	start := cast(^byte) mem.align_backward(ptr, uintptr(page_size));
+	start := mem.align_backward(ptr, uintptr(page_size));
 	return start;
 }
 
@@ -41,7 +41,7 @@ bytes_to_pages :: proc(size: int) -> int {
 // therefore free up system resources.
 //
 // WARNING: attempting to write to a pointer within this arena that was returned by
-// `arena_alloc` after `arena_reset` has been called, will segfault.
+// `arena_alloc` after `arena_free_all` has been called, will segfault.
 // Attempting to modify data in the arena's buffer before it has been returned from `arena_alloc` may also segfault.
 Arena :: struct {
 	base:            rawptr,
@@ -62,9 +62,7 @@ arena_init :: proc(va: ^Arena, max_size: int, desired_base_ptr: rawptr = nil) {
 	va.desired_base_ptr = desired_base_ptr;
 }
 
-// Decommits the memory and allows it to be returned by `arena_alloc` again.
-// Attempting to read/write the memory in the meantime will segfault.
-arena_reset :: proc(using va: ^Arena) {
+arena_free_all :: proc(using va: ^Arena) {
 	cursor = base;
 	decommit(mem.slice_ptr(cast(^byte) base, max_size));
 }
@@ -162,7 +160,7 @@ arena_allocator_proc :: proc(data: rawptr, mode: mem.Allocator_Mode,
 	case .Free:
 		// do nothing
 	case .Free_All:
-		arena_reset(arena);
+		arena_free_all(arena);
 	case .Resize:
 		return arena_realloc(arena, old_memory, old_size, size, alignment);
 	}
@@ -203,6 +201,7 @@ arena_end_temp_memory :: proc(mark_: Arena_Temp_Memory) {
 	// NOTE(tetra): The cursor is the next location that's valid to return to the user.
 	// If it's part way into a page (not at the start of a page), then we cannot decommit that page.
 	// We can therefore only decommit the pages after it.
+
 	start := enclosing_page(cursor);
 	if start < cursor {
 		start = next_page(start);
