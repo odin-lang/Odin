@@ -46,23 +46,23 @@ array_slice :: proc(a: $A/Array($T)) -> []T {
 }
 
 
-array_get :: proc(a: $A/Array($T), index: int) -> T {
-	assert(uint(index) < a.len);
+array_get :: proc(a: $A/Array($T), index: int, loc := #caller_location) -> T {
+	assert(condition=0 <= index && index < a.len, loc=loc);
 	return (^T)(uintptr(a.data) + size_of(T)*uintptr(index))^;
 }
-array_get_ptr :: proc(a: $A/Array($T), index: int) -> ^T {
-	assert(uint(index) < a.len);
+array_get_ptr :: proc(a: $A/Array($T), index: int, loc := #caller_location) -> ^T {
+	assert(condition=0 <= index && index < a.len, loc=loc);
 	return (^T)(uintptr(a.data) + size_of(T)*uintptr(index));
 }
 
-array_set :: proc(a: ^$A/Array($T), index: int, item: T)  {
-	assert(uint(index) < a.len);
+array_set :: proc(a: ^$A/Array($T), index: int, item: T, loc := #caller_location)  {
+	assert(condition=0 <= index && index < a.len, loc=loc);
 	(^T)(uintptr(a.data) + size_of(T)*uintptr(index))^ = item;
 }
 
 
 array_reserve :: proc(a: ^$A/Array, capacity: int) {
-	if capacity > a.size {
+	if capacity > a.len {
 		array_set_capacity(a, capacity);
 	}
 }
@@ -81,8 +81,8 @@ array_push_back :: proc(a: ^$A/Array($T), item: T) {
 		array_grow(a);
 	}
 
-	a.size += 1;
-	array_set(a, a.size, item);
+	a.len += 1;
+	array_set(a, a.len-1, item);
 }
 
 array_push_front :: proc(a: ^$A/Array($T), item: T) {
@@ -114,8 +114,8 @@ array_pop_font :: proc(a: ^$A/Array($T)) -> T {
 
 
 array_consume :: proc(a: ^$A/Array($T), count: int) {
-	assert(a.size >= count);
-	a.size -= count;
+	assert(a.len >= count);
+	a.len -= count;
 }
 
 
@@ -130,7 +130,7 @@ array_clear :: proc(q: ^$Q/Queue($T)) {
 
 array_push_back_elems :: proc(a: ^$A/Array($T), items: ..T) {
 	if array_space(a^) < len(items) {
-		array_grow(a, a.size + len(items));
+		array_grow(a, a.len + len(items));
 	}
 	offset := a.len;
 	a.len += len(items);
@@ -163,6 +163,6 @@ array_set_capacity :: proc(a: ^$A/Array($T), new_capacity: int) {
 	a.cap = new_capacity;
 }
 array_grow :: proc(a: ^$A/Array, min_capacity: int = 0) {
-	new_capacity := max(len(a.data)*2 + 8, min_capacity);
+	new_capacity := max(array_len(a^)*2 + 8, min_capacity);
 	array_set_capacity(a, new_capacity);
 }
