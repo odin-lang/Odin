@@ -119,6 +119,7 @@ jobs:
           APPID: ${{ secrets.B2_APPID }}
           APPKEY: ${{ secrets.B2_APPKEY }}
           BUCKET: ${{ secrets.B2_BUCKET }}
+          DAYS_TO_KEEP: ${{ secrets.B2_DAYS_TO_KEEP }}
         run: |
           b2 authorize-account "$APPID" "$APPKEY"
 
@@ -126,6 +127,8 @@ jobs:
           ./ci/upload_create_nightly.sh "$BUCKET" windows-amd64 windows_artifacts/
           ./ci/upload_create_nightly.sh "$BUCKET" ubuntu-amd64 ubuntu_artifacts/
           ./ci/upload_create_nightly.sh "$BUCKET" macos-amd64 macos_artifacts/
+
+          python3 ci/delete_old_binaries.py "$BUCKET" "$DAYS_TO_KEEP"
 
           python3 ci/create_nightly_json.py "$BUCKET" > nightly.json
           b2 upload-file "$BUCKET" nightly.json nightly.json
