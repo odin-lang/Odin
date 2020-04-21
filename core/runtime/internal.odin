@@ -235,8 +235,12 @@ print_caller_location :: proc(fd: os.Handle, using loc: Source_Code_Location) {
 	os.write_byte(fd, ')');
 }
 print_typeid :: proc(fd: os.Handle, id: typeid) {
-	ti := type_info_of(id);
-	print_type(fd, ti);
+	if id == nil {
+		os.write_string(fd, "nil");
+	} else {
+		ti := type_info_of(id);
+		print_type(fd, ti);
+	}
 }
 print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 	if ti == nil {
