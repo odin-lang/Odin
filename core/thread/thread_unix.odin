@@ -2,6 +2,7 @@
 package thread;
 
 import "core:runtime"
+import "core:intrinsics"
 import "core:sync"
 import "core:sys/unix"
 
@@ -125,7 +126,7 @@ join :: proc(t: ^Thread) {
 	if sync.atomic_swap(&t.already_joined, true, .Sequentially_Consistent) {
 		for {
 			if sync.atomic_load(&t.done, .Sequentially_Consistent) do return;
-			sync.yield_processor();
+			intrinsics.cpu_relax();
 		}
 	}
 
