@@ -40,15 +40,6 @@ Thread_Priority :: enum {
 // Creates a thread which will run the given procedure.
 // It then waits for `start` to be called.
 //
-// You may provide a slice of bytes to use as the stack for the new thread,
-// but if you do, you are expected to set up the guard pages yourself.
-//
-// The stack must also be aligned appropriately for the platform.
-// We require it's at least 16 bytes aligned to help robustness; other
-// platforms may require page-size alignment.
-// Note also that pthreads requires the stack is at least 6 OS pages in size:
-// 4 are required by pthreads, and two extra for guards pages that will be applied.
-//
 create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
 	__linux_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t);
