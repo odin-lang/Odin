@@ -1,9 +1,5 @@
 package container
 
-import "core:mem"
-import "intrinsics"
-
-
 Set :: struct {
 	hash:    Array(int),
 	entries: Array(Set_Entry),

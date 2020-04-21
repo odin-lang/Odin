@@ -1,8 +1,5 @@
 package container
 
-import "core:mem"
-import "intrinsics"
-
 
 Map :: struct(Value: typeid) {
 	hash: Array(int),
