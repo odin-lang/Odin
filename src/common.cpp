@@ -468,8 +468,8 @@ GB_ALLOCATOR_PROC(arena_allocator_proc) {
 
 
 struct StringIntern {
-	isize len;
 	StringIntern *next;
+	isize len;
 	char str[1];
 };
 
