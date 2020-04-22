@@ -8903,7 +8903,13 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(ce, CallExpr, expr);
-		return lb_build_call_expr(p, expr);
+		lbValue res = lb_build_call_expr(p, expr);
+		if (ce->optional_ok_one) { // TODO(bill): Minor hack for #optional_ok procedures
+			GB_ASSERT(is_type_tuple(res.type));
+			GB_ASSERT(res.type->Tuple.variables.count == 2);
+			return lb_emit_struct_ev(p, res, 0);
+		}
+		return res;
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);

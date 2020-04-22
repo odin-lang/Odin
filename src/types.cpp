@@ -232,6 +232,7 @@ struct TypeUnion {
 		Array<Type *> abi_compat_params;                  \
 		Type *   abi_compat_result_type;                  \
 		i32      variadic_index;                          \
+		/* TODO(bill): Make this a flag set rather than bools */ \
 		bool     variadic;                                \
 		bool     abi_types_set;                           \
 		bool     require_results;                         \
@@ -242,6 +243,7 @@ struct TypeUnion {
 		bool     has_named_results;                       \
 		bool     diverging; /* no return */               \
 		bool     return_by_pointer;                       \
+		bool     optional_ok;                             \
 		u64      tags;                                    \
 		isize    specialization_count;                    \
 		ProcCallingConvention calling_convention;         \
@@ -1979,9 +1981,10 @@ bool are_types_identical(Type *x, Type *y) {
 	case Type_Proc:
 		if (y->kind == Type_Proc) {
 			return x->Proc.calling_convention == y->Proc.calling_convention &&
-			       x->Proc.c_vararg  == y->Proc.c_vararg  &&
-			       x->Proc.variadic  == y->Proc.variadic  &&
-			       x->Proc.diverging == y->Proc.diverging &&
+			       x->Proc.c_vararg    == y->Proc.c_vararg    &&
+			       x->Proc.variadic    == y->Proc.variadic    &&
+			       x->Proc.diverging   == y->Proc.diverging   &&
+			       x->Proc.optional_ok == y->Proc.optional_ok &&
 			       are_types_identical(x->Proc.params, y->Proc.params) &&
 			       are_types_identical(x->Proc.results, y->Proc.results);
 		}

@@ -107,8 +107,12 @@ ptr_sub :: inline proc "contextless" (a, b: $P/^$T) -> int {
 
 slice_ptr :: inline proc "contextless" (ptr: ^$T, len: int) -> []T {
 	assert(len >= 0);
-	slice := Raw_Slice{data = ptr, len = len};
-	return transmute([]T)slice;
+	return transmute([]T)Raw_Slice{data = ptr, len = len};
+}
+
+slice_ptr_to_bytes :: proc "contextless" (ptr: rawptr, len: int) -> []byte {
+	assert(len >= 0);
+	return transmute([]byte)Raw_Slice{data = ptr, len = len};
 }
 
 slice_to_bytes :: inline proc "contextless" (slice: $E/[]$T) -> []byte {
@@ -127,16 +131,19 @@ slice_data_cast :: inline proc "contextless" ($T: typeid/[]$A, slice: $S/[]$B) -
 	}
 }
 
+slice_to_components :: proc "contextless" (slice: $E/[]$T) -> (data: ^T, len: int) {
+	s := transmute(Raw_Slice)slice;
+	return s.data, s.len;
+}
 
 buffer_from_slice :: inline proc(backing: $T/[]$E) -> [dynamic]E {
 	s := transmute(Raw_Slice)backing;
-	d := Raw_Dynamic_Array{
+	return transmute([dynamic]E)Raw_Dynamic_Array{
 		data      = s.data,
 		len       = 0,
 		cap       = s.len,
 		allocator = nil_allocator(),
 	};
-	return transmute([dynamic]E)d;
 }
 
 ptr_to_bytes :: inline proc "contextless" (ptr: ^$T, len := 1) -> []byte {
