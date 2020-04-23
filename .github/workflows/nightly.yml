@@ -3,7 +3,6 @@ name:  Nightly
 on:
   schedule:
     - cron: 0 20 * * *
-  push:
 
 jobs:
   build_windows:
