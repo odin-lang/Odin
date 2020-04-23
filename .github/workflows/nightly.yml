@@ -31,8 +31,11 @@ jobs:
           odin run examples/demo/demo.odin
       - name: Copy artifacts
         run: |
+# We delete the lib here since it's only used for building
+          rm bin/llvm/windows/LLVM-C.lib
           mkdir dist
           cp odin.exe dist
+          cp LLVM-C.dll dist
           cp -r shared dist
           cp -r core dist
           cp -r bin dist
