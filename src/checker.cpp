@@ -2380,6 +2380,7 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		if (ac->thread_local_model != "") {
 			error(elem, "An exported variable cannot be thread local");
 		}
+		return true;
 	} else if (name == "link_name") {
 		if (ev.kind == ExactValue_String) {
 			ac->link_name = ev.value_string;
