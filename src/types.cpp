@@ -1742,7 +1742,7 @@ bool elem_type_can_be_constant(Type *t) {
 	if (t == t_invalid) {
 		return false;
 	}
-	if (is_type_any(t) || is_type_union(t)) {
+	if (is_type_any(t) || is_type_union(t) || is_type_raw_union(t)) {
 		return false;
 	}
 	return true;

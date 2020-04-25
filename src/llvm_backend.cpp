@@ -4525,7 +4525,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 			ast_node(cl, CompoundLit, value.value_compound);
 			Type *elem_type = type->Array.elem;
 			isize elem_count = cl->elems.count;
-			if (elem_count == 0) {
+			if (elem_count == 0 || !elem_type_can_be_constant(elem_type)) {
 				return lb_const_nil(m, original_type);
 			}
 			if (cl->elems[0]->kind == Ast_FieldValue) {
@@ -4614,7 +4614,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 			ast_node(cl, CompoundLit, value.value_compound);
 			Type *elem_type = type->EnumeratedArray.elem;
 			isize elem_count = cl->elems.count;
-			if (elem_count == 0) {
+			if (elem_count == 0 || !elem_type_can_be_constant(elem_type)) {
 				return lb_const_nil(m, original_type);
 			}
 			if (cl->elems[0]->kind == Ast_FieldValue) {
@@ -4711,6 +4711,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 			if (elem_count == 0) {
 				return lb_const_nil(m, original_type);
 			}
+			GB_ASSERT(elem_type_can_be_constant(elem_type));
 
 			isize total_elem_count = type->SimdVector.count;
 			LLVMValueRef *values = gb_alloc_array(heap_allocator(), LLVMValueRef, total_elem_count);
@@ -4759,9 +4760,10 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 
 						Selection sel = lookup_field(type, name, false);
 						Entity *f = type->Struct.fields[sel.index[0]];
-
-						values[offset+f->Variable.field_index] = lb_const_value(m, f->type, tav.value).value;
-						visited[offset+f->Variable.field_index] = true;
+						if (elem_type_can_be_constant(f->type)) {
+							values[offset+f->Variable.field_index] = lb_const_value(m, f->type, tav.value).value;
+							visited[offset+f->Variable.field_index] = true;
+						}
 					}
 				} else {
 					for_array(i, cl->elems) {
@@ -4771,8 +4773,10 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 						if (tav.mode != Addressing_Invalid) {
 							val = tav.value;
 						}
-						values[offset+f->Variable.field_index]  = lb_const_value(m, f->type, val).value;
-						visited[offset+f->Variable.field_index] = true;
+						if (elem_type_can_be_constant(f->type)) {
+							values[offset+f->Variable.field_index]  = lb_const_value(m, f->type, val).value;
+							visited[offset+f->Variable.field_index] = true;
+						}
 					}
 				}
 			}
@@ -11694,7 +11698,7 @@ void lb_generate_code(lbGenerator *gen) {
 	if (build_context.keep_temp_files) {
 		TIME_SECTION("LLVM Print Module to File");
 		LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error);
-		exit(1);
+		// exit(1);
 	}
 	LLVMDIBuilderFinalize(m->debug_builder);
 	LLVMVerifyModule(mod, LLVMAbortProcessAction, &llvm_error);
