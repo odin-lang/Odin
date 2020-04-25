@@ -2224,6 +2224,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		tok := expect_token(p, .Union);
 		poly_params: ^ast.Field_List;
 		align:       ^ast.Expr;
+		is_maybe:    bool;
 
 		if allow_token(p, .Open_Paren) {
 			param_count: int;
@@ -2244,6 +2245,9 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			case "align":
 				if align != nil do error(p, tag.pos, "duplicate union tag '#%s'", tag.text);
 				align = parse_expr(p, true);
+			case "maybe":
+				if is_maybe do error(p, tag.pos, "duplicate union tag '#%s'", tag.text);
+				is_maybe = true;
 			case:
 				error(p, tag.pos, "invalid union tag '#%s", tag.text);
 			}
@@ -2282,6 +2286,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		ut.align         = align;
 		ut.where_token   = where_token;
 		ut.where_clauses = where_clauses;
+		ut.is_maybe      = is_maybe;
 
 		return ut;
 
