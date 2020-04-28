@@ -202,6 +202,8 @@ arena_end_temp_memory :: proc(mark_: Arena_Temp_Memory) {
 	// If it's part way into a page (not at the start of a page), then we cannot decommit that page.
 	// We can therefore only decommit the pages after it.
 
+	// TODO(tetra): Decommit at all? Decommit only in chunks and not pages, to reduce syscall count?
+
 	start := enclosing_page(cursor);
 	if start < cursor {
 		start = next_page(start);
