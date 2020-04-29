@@ -24,9 +24,12 @@ _digit_value :: proc(r: rune) -> int {
 }
 
 // Parses an integer value from a string, in the given base, without a prefix.
+//
+// Returns ok=false if no numeric value of the appropriate base could be found.
+//
 // ```
-// n, rest := strconv.parse_i64_of_base("-1234eeee", 10);
-// assert(n == -1234 && rest == "eeee");
+// n, ok := strconv.parse_i64_of_base("-1234eeee", 10);
+// assert(n == -1234 && ok);
 // ```
 parse_i64_of_base :: proc(str: string, base: int) -> (value: i64, ok: bool) {
 	assert(base <= 16, "base must be 1-16");
@@ -60,12 +63,15 @@ parse_i64_of_base :: proc(str: string, base: int) -> (value: i64, ok: bool) {
 }
 
 // Parses a integer value from a string, in base 10, unless there's a prefix.
-// ```
-// n, rest := strconv.parse_i64_maybe_prefixed("1234");
-// assert(n == 1234 && rest == "");
 //
-// n, rest = strconv.parse_i64_maybe_prefixed("0xeeee");
-// assert(n == 0xeeee && rest == "");
+// Returns ok=false if a base 10 integer could not be found.
+//
+// ```
+// n, ok := strconv.parse_i64_maybe_prefixed("1234");
+// assert(n == 1234 && ok);
+//
+// n, ok = strconv.parse_i64_maybe_prefixed("0xeeee");
+// assert(n == 0xeeee && ok);
 // ```
 parse_i64_maybe_prefixed :: proc(str: string) -> (value: i64, ok: bool) {
 	s := str;
@@ -113,12 +119,15 @@ parse_i64 :: proc{parse_i64_maybe_prefixed, parse_i64_of_base};
 
 // Parses an unsigned integer value from a string, in the given base, and
 // without a prefix.
-// ```
-// n, rest := strconv.parse_u64_of_base("1234eeee", 10);
-// assert(n == 1234 && rest == "eeee");
 //
-// n, rest = strconv.parse_u64_of_base("1234eeee", 16);
-// assert(n == 0x1234eeee && rest == "");
+// Returns ok=false if no numeric value of the appropriate base could be found.
+//
+// ```
+// n, ok := strconv.parse_u64_of_base("1234eeee", 10);
+// assert(n == 1234 && ok);
+//
+// n, ok = strconv.parse_u64_of_base("5678eeee", 16);
+// assert(n == 0x5678eeee && ok);
 // ```
 parse_u64_of_base :: proc(str: string, base: int) -> (value: u64, ok: bool) {
 	assert(base <= 16, "base must be 1-16");
@@ -144,12 +153,16 @@ parse_u64_of_base :: proc(str: string, base: int) -> (value: u64, ok: bool) {
 }
 
 // Parses an unsigned integer value from a string in base 10, unless there's a prefix.
-// ```
-// n, rest := strconv.parse_u64_maybe_prefixed("1234");
-// assert(n == 1234 && rest == "");
 //
-// n, rest = strconv.parse_u64_maybe_prefixed("0xeeee");
-// assert(n == 0xeeee && rest == "");
+// Returns ok=false if a base 10 integer could not be found, or
+// if the value was negative.
+//
+// ```
+// n, ok := strconv.parse_u64_maybe_prefixed("1234");
+// assert(n == 1234 && ok);
+//
+// n, ok = strconv.parse_u64_maybe_prefixed("0xeeee");
+// assert(n == 0xeeee && ok);
 // ```
 parse_u64_maybe_prefixed :: proc(str: string) -> (value: u64, ok: bool) {
 	s := str;
@@ -174,9 +187,7 @@ parse_u64_maybe_prefixed :: proc(str: string) -> (value: u64, ok: bool) {
 		i += 1;
 		if r == '_' do continue;
 		v := u64(_digit_value(r));
-		if v >= base {
-			break;
-		}
+		if v >= base do break;
 		value *= base;
 		value += u64(v);
 	}
@@ -187,18 +198,21 @@ parse_u64_maybe_prefixed :: proc(str: string) -> (value: u64, ok: bool) {
 
 parse_u64 :: proc{parse_u64_maybe_prefixed, parse_u64_of_base};
 
-// Parses an integer value of the given base, or the base implied by a prefix.
-// If base is zero, assumes base 10, unless there's a prefix. e.g. '0x' for hexadecimal.
+// Parses an integer value from a string in the given base, or
+// - if the string has a prefix (e.g: '0x') then that will determine the base;
+// - otherwise, assumes base 10.
+//
+// Returns ok=false if no appropriate value could be found.
 //
 // ```
-// n, rest := strconv.parse_int("1234"); // without prefix, inferred base 10
-// assert(n == 1234 && rest == "");
+// n, ok := strconv.parse_int("1234"); // without prefix, inferred base 10
+// assert(n == 1234 && ok);
 //
-// n, rest = strconv.parse_int("ffff", 16); // without prefix, explicit base
-// assert(n == 0xffff && rest == "");
+// n, ok = strconv.parse_int("ffff", 16); // without prefix, explicit base
+// assert(n == 0xffff && ok);
 //
-// n, rest = strconv.parse_int("0xffff"); // with prefix and inferred base
-// assert(n == 0xffff && rest == "");
+// n, ok = strconv.parse_int("0xffff"); // with prefix and inferred base
+// assert(n == 0xffff && ok);
 // ```
 parse_int :: proc(s: string, base := 0) -> (value: int, ok: bool) {
 	v: i64 = ---;
@@ -209,6 +223,26 @@ parse_int :: proc(s: string, base := 0) -> (value: int, ok: bool) {
 	value = int(v);
 	return;
 }
+
+
+// Parses an unsigned integer value from a string in the given base, or
+// - if the string has a prefix (e.g: '0x') then that will determine the base;
+// - otherwise, assumes base 10.
+//
+// Returns ok=false if:
+// - no appropriate value could be found; or
+// - the value was negative.
+//
+// ```
+// n, ok := strconv.parse_uint("1234"); // without prefix, inferred base 10
+// assert(n == 1234 && ok);
+//
+// n, ok = strconv.parse_uint("ffff", 16); // without prefix, explicit base
+// assert(n == 0xffff && ok);
+//
+// n, ok = strconv.parse_uint("0xffff"); // with prefix and inferred base
+// assert(n == 0xffff && ok);
+// ```
 parse_uint :: proc(s: string, base := 0) -> (value: uint, ok: bool) {
 	v: u64 = ---;
 	switch base {
@@ -220,19 +254,33 @@ parse_uint :: proc(s: string, base := 0) -> (value: uint, ok: bool) {
 }
 
 
+// Parses a 32-bit floating point number from a string.
+//
+// Returns ok=false if a base 10 float could not be found.
+//
+// ```
+// n, ok := strconv.parse_f32("12.34eee");
+// assert(n == 12.34 && ok);
+//
+// n, ok = strconv.parse_f32("12.34");
+// assert(n == 12.34 && ok);
+// ```
 parse_f32 :: proc(s: string) -> (value: f32, ok: bool) {
 	v: f64 = ---;
 	v, ok = parse_f64(s);
 	return f32(v), ok;
 }
 
-// Parses a floating point number from a string.
-// ```
-// n, rest := strconv.parse_f64("12.34eee");
-// assert(n == 12.34 && rest == "eee");
+// Parses a 64-bit floating point number from a string.
 //
-// n, rest = strconv.parse_f64("12.34");
-// assert(n == 12.34 && rest == "");
+// Returns ok=false if a base 10 float could not be found.
+//
+// ```
+// n, ok := strconv.parse_f32("12.34eee");
+// assert(n == 12.34 && ok);
+//
+// n, ok = strconv.parse_f32("12.34");
+// assert(n == 12.34 && ok);
 // ```
 parse_f64 :: proc(s: string) -> (value: f64, ok: bool) {
 	if s == "" {
@@ -265,9 +313,7 @@ parse_f64 :: proc(s: string) -> (value: f64, ok: bool) {
 			if r == '_' do continue;
 
 			v := _digit_value(r);
-			if v >= 10 {
-				break;
-			}
+			if v >= 10 do break;
 			value += f64(v)/pow10;
 			pow10 *= 10;
 		}
@@ -291,9 +337,7 @@ parse_f64 :: proc(s: string) -> (value: f64, ok: bool) {
 				if r == '_' do continue;
 
 				d := u32(_digit_value(r));
-				if d >= 10 {
-					break;
-				}
+				if d >= 10 do break;
 				exp = exp * 10 + d;
 			}
 			if exp > 308 { exp = 308; }
