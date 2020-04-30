@@ -609,6 +609,7 @@ Union_Type :: struct {
 	variants:    []^Expr,
 	where_token: tokenizer.Token,
 	where_clauses: []^Expr,
+	is_maybe:	 bool,
 }
 
 Enum_Type :: struct {
