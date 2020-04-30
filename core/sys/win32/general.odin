@@ -22,7 +22,7 @@ HKL       :: distinct Handle;
 Wparam    :: distinct Uint_Ptr;
 Lparam    :: distinct Long_Ptr;
 Lresult   :: distinct Long_Ptr;
-Wnd_Proc  :: distinct #type proc "c" (Hwnd, u32, Wparam, Lparam) -> Lresult;
+Wnd_Proc  :: distinct #type proc "std" (Hwnd, u32, Wparam, Lparam) -> Lresult;
 Monitor_Enum_Proc :: distinct #type proc "std" (Hmonitor, Hdc, ^Rect, Lparam) -> bool;
 
 

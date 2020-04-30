@@ -53,9 +53,8 @@ compare :: inline proc "contextless" (a, b: []byte) -> int {
 		return len(a) <= len(b) ? -1 : +1;
 	} else if len(a) == 0 && len(b) == 0 {
 		return 0;
-	} else {
-		return res;
 	}
+	return res;
 }
 
 compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int #no_bounds_check {
