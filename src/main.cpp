@@ -1090,7 +1090,9 @@ bool parse_build_flags(Array<String> args) {
 							String subsystem = value.value_string;
 							if (str_eq_ignore_case(subsystem, str_lit("console"))) {
 								build_context.use_subsystem_windows = false;
-							} else  if (str_eq_ignore_case(subsystem, str_lit("windows"))) {
+							} else if (str_eq_ignore_case(subsystem, str_lit("window"))) {
+								build_context.use_subsystem_windows = true;
+							} else if (str_eq_ignore_case(subsystem, str_lit("windows"))) {
 								build_context.use_subsystem_windows = true;
 							} else {
 								gb_printf_err("Invalid -subsystem string, got %.*s, expected either 'console' or 'windows'\n", LIT(subsystem));
@@ -1415,6 +1417,15 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Defines the generated PDB name when -debug is enabled");
 		print_usage_line(2, "Example: -pdb-name:different.pdb");
 		print_usage_line(0, "");
+
+		print_usage_line(1, "-subsystem:<option>")
+		print_usage_line(2, "[Windows only]");
+		print_usage_line(2, "Defines the subsystem for the application");
+		print_usage_line(2, "Available options:");
+		print_usage_line(3, "console");
+		print_usage_line(3, "windows");
+		print_usage_line(0, "");
+
 		#endif
 	}
 }
