@@ -1418,7 +1418,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Example: -pdb-name:different.pdb");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-subsystem:<option>")
+		print_usage_line(1, "-subsystem:<option>");
 		print_usage_line(2, "[Windows only]");
 		print_usage_line(2, "Defines the subsystem for the application");
 		print_usage_line(2, "Available options:");
