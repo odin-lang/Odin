@@ -214,17 +214,17 @@ consume_comment_group :: proc(p: ^Parser, n: int) -> (comments: ^ast.Comment_Gro
 	for p.curr_tok.kind == .Comment &&
 	    p.curr_tok.pos.line <= end_line+n {
 	    comment: tokenizer.Token;
-    	comment, end_line = consume_comment(p);
+		comment, end_line = consume_comment(p);
 		append(&list, comment);
-    }
+	}
 
-    if len(list) > 0 {
-    	comments = new(ast.Comment_Group);
-    	comments.list = list[:];
-    	append(&p.file.comments, comments);
-    }
+	if len(list) > 0 {
+		comments = new(ast.Comment_Group);
+		comments.list = list[:];
+		append(&p.file.comments, comments);
+	}
 
-    return;
+	return;
 }
 
 consume_comment_groups :: proc(p: ^Parser, prev: tokenizer.Token) {
