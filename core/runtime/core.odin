@@ -694,7 +694,7 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 
 	arg_len := 1;
 
-	if cap(array) <= len(array)+arg_len {
+	if cap(array) < len(array)+arg_len {
 		cap := 2 * cap(array) + max(8, arg_len);
 		_ = reserve(array, cap, loc);
 	}
@@ -718,7 +718,7 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 	if arg_len <= 0 do return;
 
 
-	if cap(array) <= len(array)+arg_len {
+	if cap(array) < len(array)+arg_len {
 		cap := 2 * cap(array) + max(8, arg_len);
 		_ = reserve(array, cap, loc);
 	}
