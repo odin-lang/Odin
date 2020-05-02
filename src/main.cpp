@@ -227,8 +227,7 @@ i32 linker_stage(lbGenerator *gen) {
 		if (!build_context.use_lld) { // msvc
 			if (build_context.has_resource) {
 				exit_code = system_exec_command_line_app("msvc-link",
-					"\"%.*src.exe\" /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
-					LIT(find_result.vs_exe_path),
+					"\"rc.exe\" /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
 					LIT(output_base),
 					LIT(build_context.resource_filepath)
 				);
@@ -1806,8 +1805,7 @@ int main(int arg_count, char const **arg_ptr) {
 			if (!build_context.use_lld) { // msvc
 				if (build_context.has_resource) {
 					exit_code = system_exec_command_line_app("msvc-link",
-						"\"%.*src.exe\" /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
-						LIT(find_result.vs_exe_path),
+						"\"rc.exe\" /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
 						LIT(output_base),
 						LIT(build_context.resource_filepath)
 					);
