@@ -168,6 +168,10 @@ i32 linker_stage(lbGenerator *gen) {
 			return 1;
 		}
 
+		if (build_context.ignore_microsoft_magic) {
+			find_result = {};
+		}
+
 		// Add library search paths.
 		if (find_result.vs_library_path.len > 0) {
 			GB_ASSERT(find_result.windows_sdk_um_library_path.len > 0);
@@ -549,6 +553,7 @@ enum BuildFlagKind {
 	BuildFlag_GoToDefinitions,
 
 #if defined(GB_SYSTEM_WINDOWS)
+	BuildFlag_IgnoreVsSearch,
 	BuildFlag_ResourceFile,
 	BuildFlag_WindowsPdbName,
 	BuildFlag_Subsystem,
@@ -641,6 +646,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_GoToDefinitions, str_lit("go-to-definitions"), BuildFlagParam_None);
 
 #if defined(GB_SYSTEM_WINDOWS)
+	add_flag(&build_flags, BuildFlag_IgnoreVsSearch, str_lit("ignore-vs-search"),  BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ResourceFile,   str_lit("resource"),  BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_WindowsPdbName, str_lit("pdb-name"),  BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_Subsystem,      str_lit("subsystem"), BuildFlagParam_String);
@@ -1047,6 +1053,11 @@ bool parse_build_flags(Array<String> args) {
 							break;
 
 					#if defined(GB_SYSTEM_WINDOWS)
+						case BuildFlag_IgnoreVsSearch:
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.ignore_microsoft_magic = true;
+							break;
+
 						case BuildFlag_ResourceFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
@@ -1405,6 +1416,11 @@ void print_show_help(String const arg0, String const &command) {
 
 	if (run_or_build) {
 		#if defined(GB_SYSTEM_WINDOWS)
+		print_usage_line(1, "-ignore-vs-search");
+		print_usage_line(2, "[Windows only]");
+		print_usage_line(2, "Ignores the Visual Studio search for library paths");
+		print_usage_line(0, "");
+
 		print_usage_line(1, "-resource:<filepath>");
 		print_usage_line(2, "[Windows only]");
 		print_usage_line(2, "Defines the resource file for the executable");
@@ -1750,6 +1766,10 @@ int main(int arg_count, char const **arg_ptr) {
 			if (find_result.windows_sdk_version == 0) {
 				gb_printf_err("Windows SDK not found.\n");
 				return 1;
+			}
+
+			if (build_context.ignore_microsoft_magic) {
+				find_result = {};
 			}
 
 			// Add library search paths.
