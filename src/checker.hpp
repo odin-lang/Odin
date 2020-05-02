@@ -107,6 +107,7 @@ struct AttributeContext {
 	String  thread_local_model;
 	String  deprecated_message;
 	DeferredProcedure deferred_procedure;
+	struct TypeAtomOpTable *atom_op_table;
 };
 
 AttributeContext make_attribute_context(String link_prefix) {
@@ -232,6 +233,11 @@ struct ForeignContext {
 typedef Array<Entity *> CheckerTypePath;
 typedef Array<Type *>   CheckerPolyPath;
 
+struct AtomOpMapEntry {
+	u32  kind;
+	Ast *node;
+};
+
 
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
@@ -261,6 +267,8 @@ struct CheckerInfo {
 
 	Array<Entity *>       required_foreign_imports_through_force;
 	Array<Entity *>       required_global_variables;
+
+	Map<AtomOpMapEntry>   atom_op_map; // Key: Ast *
 
 
 	bool allow_identifier_uses;
@@ -301,6 +309,9 @@ struct CheckerContext {
 	bool       hide_polymorphic_errors;
 	bool       in_polymorphic_specialization;
 	Scope *    polymorphic_scope;
+
+	Ast *assignment_lhs_hint;
+	Ast *unary_address_hint;
 };
 
 struct Checker {

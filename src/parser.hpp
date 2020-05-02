@@ -21,6 +21,8 @@ enum AddressingMode {
 	                          // 	rhs: acts like OptionalOk
 	Addressing_OptionalOk,    // rhs: acts like a value with an optional boolean part (for existence check)
 	Addressing_SoaVariable,   // Struct-Of-Arrays indexed variable
+
+	Addressing_AtomOpAssign,  // Specialized for custom atom operations for assignments
 };
 
 struct TypeAndValue {

@@ -256,9 +256,6 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 	GB_ASSERT(e->type == nullptr);
 
 	DeclInfo *decl = decl_info_of_entity(e);
-	if (decl != nullptr) {
-		check_decl_attributes(ctx, decl->attributes, const_decl_attribute, nullptr);
-	}
 
 	bool is_distinct = is_type_distinct(init_expr);
 	Ast *te = remove_type_alias_clutter(init_expr);
@@ -280,6 +277,10 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 		error(init_expr, "'distinct' cannot be applied to 'typeid'");
 		is_distinct = false;
 	}
+	if (is_distinct && is_type_any(e->type)) {
+		error(init_expr, "'distinct' cannot be applied to 'any'");
+		is_distinct = false;
+	}
 	if (!is_distinct) {
 		e->type = bt;
 		named->Named.base = bt;
@@ -295,6 +296,23 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 			operand.type = e->type;
 			operand.expr = init_expr;
 			check_assignment(ctx, &operand, t, str_lit("constant declaration"));
+		}
+	}
+
+	if (decl != nullptr) {
+		AttributeContext ac = {};
+		check_decl_attributes(ctx, decl->attributes, type_decl_attribute, &ac);
+		if (ac.atom_op_table != nullptr) {
+			Type *bt = base_type(e->type);
+			switch (bt->kind) {
+			case Type_Struct:
+				bt->Struct.atom_op_table = ac.atom_op_table;
+				break;
+			default:
+				error(e->token, "Only struct types can have custom atom operations");
+				gb_free(heap_allocator(), ac.atom_op_table);
+				break;
+			}
 		}
 	}
 

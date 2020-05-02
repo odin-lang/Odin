@@ -2,6 +2,7 @@
 #include "types.cpp"
 
 void check_expr(CheckerContext *c, Operand *operand, Ast *expression);
+void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
 
 
 bool is_operand_value(Operand o) {
@@ -810,6 +811,9 @@ void init_checker_info(CheckerInfo *i) {
 	if (i->allow_identifier_uses) {
 		array_init(&i->identifier_uses, a);
 	}
+
+	map_init(&i->atom_op_map, a);
+
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -828,6 +832,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->required_foreign_imports_through_force);
 	array_free(&i->required_global_variables);
 
+	map_destroy(&i->atom_op_map);
 }
 
 CheckerContext make_checker_context(Checker *c) {
@@ -2413,7 +2418,213 @@ DECL_ATTRIBUTE_PROC(const_decl_attribute) {
 	return false;
 }
 
+DECL_ATTRIBUTE_PROC(type_decl_attribute) {
+	if (name == "private") {
+		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
+		return true;
+	} else if (name == "index_get") {
+		if (value != nullptr) {
+			Operand o = {};
+			check_expr_or_type(c, &o, value);
+			Entity *e = entity_of_node(value);
+			if (e != nullptr && e->kind == Entity_Procedure) {
+				if (ac->deferred_procedure.entity != nullptr) {
+					error(elem, "Previous usage of the '%.*s' attribute", LIT(name));
+				}
 
+				bool valid = true;
+
+				{
+					Type *pt = base_type(e->type);
+					GB_ASSERT(pt->kind == Type_Proc);
+
+					if (pt->Proc.result_count == 0) {
+						error(value, "'%s' attribute must return something", LIT(name));
+						valid = false;
+					}
+
+					if (pt->Proc.param_count < 2) {
+						error(value, "'%s' attribute must allow for 2 parameters", LIT(name));
+						valid = false;
+					} else {
+						isize minimum_param_count = 0;
+						for_array(i, pt->Proc.params->Tuple.variables) {
+							Entity *param = pt->Proc.params->Tuple.variables[i];
+							if (param->kind == Entity_Variable) {
+								if (param->Variable.param_value.kind == ParameterValue_Invalid) {
+									minimum_param_count += 1;
+								} else {
+									break;
+								}
+							} else if (param->kind == Entity_Constant) {
+								minimum_param_count += 1;
+							} else {
+								break;
+							}
+						}
+
+						if (minimum_param_count > 2) {
+							error(value, "'%s' attribute must allow for at a minimum 2 parameters", LIT(name));
+							value = false;
+						}
+					}
+				}
+
+				if (valid && build_context.use_llvm_api) {
+					if (ac->atom_op_table == nullptr) {
+						ac->atom_op_table = gb_alloc_item(heap_allocator(), TypeAtomOpTable);
+					}
+					ac->atom_op_table->op[TypeAtomOp_index_get] = e;
+				}
+				return true;
+			}
+		}
+		error(elem, "Expected a procedure entity for '%.*s'", LIT(name));
+		return false;
+	} else if (name == "index_set") {
+		if (value != nullptr) {
+			Operand o = {};
+			check_expr_or_type(c, &o, value);
+			Entity *e = entity_of_node(value);
+			if (e != nullptr && e->kind == Entity_Procedure) {
+				if (ac->deferred_procedure.entity != nullptr) {
+					error(elem, "Previous usage of the '%.*s' attribute", LIT(name));
+				}
+
+				bool valid = true;
+
+				{
+					Type *pt = base_type(e->type);
+					GB_ASSERT(pt->kind == Type_Proc);
+
+					if (pt->Proc.param_count < 3) {
+						error(value, "'%s' attribute must allow for 3 parameters", LIT(name));
+						valid = false;
+					} else {
+						isize minimum_param_count = 0;
+						for_array(i, pt->Proc.params->Tuple.variables) {
+							Entity *param = pt->Proc.params->Tuple.variables[i];
+							if (param->kind == Entity_Variable) {
+								if (param->Variable.param_value.kind == ParameterValue_Invalid) {
+									minimum_param_count += 1;
+								} else {
+									break;
+								}
+							} else if (param->kind == Entity_Constant) {
+								minimum_param_count += 1;
+							} else {
+								break;
+							}
+						}
+
+						if (minimum_param_count > 3) {
+							error(value, "'%s' attribute must allow for at a minimum 3 parameters", LIT(name));
+							value = false;
+						}
+					}
+
+					if (pt->Proc.variadic || pt->Proc.c_vararg) {
+						error(value, "'%s' attribute does not allow variadic procedures", LIT(name));
+						value = false;
+					}
+				}
+
+				if (valid && build_context.use_llvm_api) {
+					if (ac->atom_op_table == nullptr) {
+						ac->atom_op_table = gb_alloc_item(heap_allocator(), TypeAtomOpTable);
+					}
+					ac->atom_op_table->op[TypeAtomOp_index_set] = e;
+				}
+				return true;
+			}
+		}
+		error(elem, "Expected a procedure entity for '%.*s'", LIT(name));
+		return false;
+	} else if (name == "slice") {
+		if (value != nullptr) {
+			Operand o = {};
+			check_expr_or_type(c, &o, value);
+			Entity *e = entity_of_node(value);
+			if (e != nullptr && e->kind == Entity_Procedure) {
+				if (ac->deferred_procedure.entity != nullptr) {
+					error(elem, "Previous usage of the '%.*s' attribute", LIT(name));
+				}
+
+				bool valid = true;
+
+				{
+					Type *pt = base_type(e->type);
+					GB_ASSERT(pt->kind == Type_Proc);
+
+					if (pt->Proc.param_count < 1) {
+						error(value, "'%s' attribute must allow for 1 parameter", LIT(name));
+						valid = false;
+					} else {
+						isize minimum_param_count = 0;
+						for_array(i, pt->Proc.params->Tuple.variables) {
+							Entity *param = pt->Proc.params->Tuple.variables[i];
+							if (param->kind == Entity_Variable) {
+								if (param->Variable.param_value.kind == ParameterValue_Invalid) {
+									minimum_param_count += 1;
+								} else {
+									break;
+								}
+							} else if (param->kind == Entity_Constant) {
+								minimum_param_count += 1;
+							} else {
+								break;
+							}
+						}
+
+						if (minimum_param_count > 1) {
+							error(value, "'%s' attribute must allow for at a minimum 1 parameter", LIT(name));
+							value = false;
+						}
+						{
+							Entity *param = pt->Proc.params->Tuple.variables[0];
+							Type *param_type = base_type(param->type);
+							if (is_type_pointer(param_type) && !is_type_rawptr(param_type)) {
+								// okay
+							} else {
+								error(value, "'%s' attribute's first parameter must be a pointer", LIT(name));
+								value = false;
+							}
+
+						}
+					}
+
+					if (pt->Proc.variadic || pt->Proc.c_vararg) {
+						error(value, "'%s' attribute does not allow variadic procedures", LIT(name));
+						value = false;
+					}
+
+					if (pt->Proc.result_count != 1) {
+						error(value, "'%s' attribute must return 1 result", LIT(name));
+						value = false;
+					} else {
+						Type *rt = pt->Proc.results->Tuple.variables[0]->type;
+						rt = base_type(rt);
+						if (!is_type_slice(rt)) {
+							error(value, "'%s' attribute must return a slice", LIT(name));
+							value = false;
+						}
+					}
+				}
+
+				if (valid && build_context.use_llvm_api) {
+					if (ac->atom_op_table == nullptr) {
+						ac->atom_op_table = gb_alloc_item(heap_allocator(), TypeAtomOpTable);
+					}
+					ac->atom_op_table->op[TypeAtomOp_slice] = e;
+				}
+				return true;
+			}
+		}
+		error(elem, "Expected a procedure entity for '%.*s'", LIT(name));
+		return false;
+	}
+	return false;
+}
 
 
 #include "check_expr.cpp"

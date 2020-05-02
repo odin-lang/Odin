@@ -114,6 +114,8 @@ struct Entity {
 	isize       order_in_src;
 	String      deprecated_message;
 
+	// IMPORTANT NOTE(bill): This must be a discriminated union because of patching
+	// later entity kinds
 	union {
 		struct {
 			ExactValue value;
