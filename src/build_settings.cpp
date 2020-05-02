@@ -137,6 +137,8 @@ struct BuildContext {
 
 	bool   use_llvm_api;
 
+	bool   ignore_microsoft_magic;
+
 	QueryDataSetSettings query_data_set_settings;
 
 	gbAffinity affinity;
