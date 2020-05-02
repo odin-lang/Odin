@@ -1,5 +1,6 @@
 struct Scope;
 struct Ast;
+struct Entity;
 
 enum BasicKind {
 	Basic_Invalid,
@@ -123,6 +124,21 @@ enum StructSoaKind {
 	StructSoa_Dynamic = 3,
 };
 
+enum TypeAtomOpKind {
+	TypeAtomOp_Invalid,
+	
+	TypeAtomOp_index_get,
+	TypeAtomOp_index_set,
+	TypeAtomOp_slice,
+	TypeAtomOp_index_get_ptr,
+
+	TypeAtomOp_COUNT,
+};
+
+struct TypeAtomOpTable {
+	Entity *op[TypeAtomOp_COUNT];
+};
+
 struct TypeStruct {
 	Array<Entity *> fields;
 	Array<String>   tags;
@@ -135,6 +151,12 @@ struct TypeStruct {
 
 	i64      custom_align;
 	Entity * names;
+	
+	TypeAtomOpTable *atom_op_table;
+
+	Type *        soa_elem;
+	i64           soa_count;
+	StructSoaKind soa_kind;
 
 	bool are_offsets_set;
 	bool are_offsets_being_processed;
@@ -142,10 +164,6 @@ struct TypeStruct {
 	bool is_raw_union;
 	bool is_polymorphic;
 	bool is_poly_specialized;
-
-	StructSoaKind soa_kind;
-	Type *        soa_elem;
-	i64           soa_count;
 };
 
 struct TypeUnion {
@@ -157,6 +175,9 @@ struct TypeUnion {
 	i64           tag_size;
 	Type *        polymorphic_params; // Type_Tuple
 	Type *        polymorphic_parent;
+
+	TypeAtomOpTable *atom_op_table;
+
 	bool          no_nil;
 	bool          maybe;
 	bool          is_polymorphic;

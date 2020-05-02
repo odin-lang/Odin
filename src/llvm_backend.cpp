@@ -160,8 +160,83 @@ void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value) {
 		value.value = LLVMConstNull(lb_type(p->module, t));
 	}
 
+	if (addr.kind == lbAddr_AtomOp_index_set) {
+		lbValue ptr = addr.addr;
+		lbValue index = addr.index_set.index;
+		Ast *node = addr.index_set.node;
 
-	if (addr.kind == lbAddr_Map) {
+		ast_node(ce, CallExpr, node);
+		Type *proc_type = type_and_value_of_expr(ce->proc).type;
+		proc_type = base_type(proc_type);
+		GB_ASSERT(is_type_proc(proc_type));
+		TypeProc *pt = &proc_type->Proc;
+
+		isize arg_count = 3;
+		isize param_count = 0;
+		if (pt->params) {
+			GB_ASSERT(pt->params->kind == Type_Tuple);
+			param_count = pt->params->Tuple.variables.count;
+		}
+
+
+		auto args = array_make<lbValue>(heap_allocator(), gb_max(arg_count, param_count));
+		args[0] = ptr;
+		args[1] = index;
+		args[2] = value;
+
+		isize arg_index = arg_count;
+		if (arg_count < param_count) {
+			lbModule *m = p->module;
+			String proc_name = {};
+			if (p->entity != nullptr) {
+				proc_name = p->entity->token.string;
+			}
+			TokenPos pos = ast_token(ce->proc).pos;
+
+			TypeTuple *param_tuple = &pt->params->Tuple;
+
+			isize end = cast(isize)param_count;
+			while (arg_index < end) {
+				Entity *e = param_tuple->variables[arg_index];
+				GB_ASSERT(e->kind == Entity_Variable);
+
+				switch (e->Variable.param_value.kind) {
+				case ParameterValue_Constant:
+					args[arg_index++] = lb_const_value(p->module, e->type, e->Variable.param_value.value);
+					break;
+				case ParameterValue_Nil:
+					args[arg_index++] = lb_const_nil(m, e->type);
+					break;
+				case ParameterValue_Location:
+					args[arg_index++] = lb_emit_source_code_location(p, proc_name, pos);
+					break;
+				case ParameterValue_Value:
+					args[arg_index++] = lb_build_expr(p, e->Variable.param_value.ast_value);
+					break;
+				}
+			}
+		}
+
+		Entity *e = entity_from_expr(ce->proc);
+		GB_ASSERT(e != nullptr);
+		GB_ASSERT(is_type_polymorphic(e->type));
+
+		{
+			lbValue *found = nullptr;
+			if (p->module != e->code_gen_module) {
+				gb_mutex_lock(&p->module->mutex);
+			}
+			found = map_get(&e->code_gen_module->values, hash_entity(e));
+			if (p->module != e->code_gen_module) {
+				gb_mutex_unlock(&p->module->mutex);
+			}
+			GB_ASSERT_MSG(found != nullptr, "%.*s", LIT(e->token.string));
+
+			lb_emit_call(p, *found, args);
+		}
+
+		return;
+	} else if (addr.kind == lbAddr_Map) {
 		lb_insert_dynamic_map_key_and_value(p, addr, addr.map.type, addr.map.key, value);
 		return;
 	} else if (addr.kind == lbAddr_BitField) {
@@ -8587,7 +8662,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	expr = unparen_expr(expr);
 
 	TypeAndValue tv = type_and_value_of_expr(expr);
-	GB_ASSERT(tv.mode != Addressing_Invalid);
+	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "%s", expr_to_string(expr));
 	GB_ASSERT(tv.mode != Addressing_Type);
 
 	if (tv.value.kind != ExactValue_Invalid) {
@@ -9301,6 +9376,27 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			return lb_addr(val);
 		}
 
+		if (!is_type_indexable(t)) {
+			AtomOpMapEntry *found = map_get(&p->module->info->atom_op_map, hash_pointer(expr));
+			if (found != nullptr) {
+				if (found->kind == TypeAtomOp_index_get) {
+					return lb_build_addr(p, found->node);
+				} else if (found->kind == TypeAtomOp_index_get_ptr) {
+					return lb_addr(lb_build_expr(p, found->node));
+				} else if (found->kind == TypeAtomOp_index_set) {
+					lbValue ptr = lb_build_addr_ptr(p, ie->expr);
+					if (deref) {
+						ptr = lb_emit_load(p, ptr);
+					}
+
+					lbAddr addr = {lbAddr_AtomOp_index_set};
+					addr.addr = ptr;
+					addr.index_set.index = lb_build_expr(p, ie->index);
+					addr.index_set.node = found->node;
+					return addr;
+				}
+			}
+		}
 		GB_ASSERT_MSG(is_type_indexable(t), "%s %s", type_to_string(t), expr_to_string(expr));
 
 		if (is_type_map(t)) {
@@ -9449,6 +9545,36 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 		if (se->high != nullptr) high = lb_build_expr(p, se->high);
 
 		bool no_indices = se->low == nullptr && se->high == nullptr;
+
+		{
+			Type *type = base_type(type_of_expr(se->expr));
+			if (type->kind == Type_Struct && !is_type_soa_struct(type)) {
+				TypeAtomOpTable *atom_op_table = type->Struct.atom_op_table;
+				if (atom_op_table != nullptr && atom_op_table->op[TypeAtomOp_slice]) {
+					AtomOpMapEntry *found = map_get(&p->module->info->atom_op_map, hash_pointer(expr));
+					if (found) {
+						lbValue base = lb_build_expr(p, found->node);
+
+						Type *slice_type = base.type;
+						lbValue len = lb_slice_len(p, base);
+						if (high.value == nullptr) high = len;
+
+						if (!no_indices) {
+							lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
+						}
+
+
+						lbValue elem    = lb_emit_ptr_offset(p, lb_slice_elem(p, base), low);
+						lbValue new_len = lb_emit_arith(p, Token_Sub, high, low, t_int);
+
+						lbAddr slice = lb_add_local_generated(p, slice_type, false);
+						lb_fill_slice(p, slice, elem, new_len);
+						return slice;
+					}
+				}
+			}
+		}
+
 
 		lbValue addr = lb_build_addr_ptr(p, se->expr);
 		lbValue base = lb_emit_load(p, addr);

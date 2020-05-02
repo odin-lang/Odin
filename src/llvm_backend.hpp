@@ -27,6 +27,8 @@ enum lbAddrKind {
 	lbAddr_BitField,
 	lbAddr_Context,
 	lbAddr_SoaVariable,
+
+	lbAddr_AtomOp_index_set,
 };
 
 struct lbAddr {
@@ -48,6 +50,10 @@ struct lbAddr {
 			lbValue index;
 			Ast *index_expr;
 		} soa;
+		struct {
+			lbValue index;
+			Ast *node;
+		} index_set;
 	};
 };
 
@@ -333,7 +339,7 @@ void    lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *m
 
 void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value);
 lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValue value);
-
+lbValue lb_emit_source_code_location(lbProcedure *p, String const &procedure, TokenPos const &pos);
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_STARTUP_CONTEXT_PROC_NAME   "__$startup_context"
