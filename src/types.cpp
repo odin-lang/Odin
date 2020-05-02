@@ -163,6 +163,33 @@ struct TypeUnion {
 	bool          is_poly_specialized;
 };
 
+struct TypeProc {
+	Ast *node;
+	Scope *  scope;
+	Type *   params;  // Type_Tuple
+	Type *   results; // Type_Tuple
+	i32      param_count;
+	i32      result_count;
+	u64      tags;
+	isize    specialization_count;
+	ProcCallingConvention calling_convention;
+	i32      variadic_index;
+	Array<Type *> abi_compat_params;
+	Type *        abi_compat_result_type;
+	// TODO(bill): Make this a flag set rather than bools
+	bool     variadic;
+	bool     abi_types_set;
+	bool     require_results;
+	bool     c_vararg;
+	bool     is_polymorphic;
+	bool     is_poly_specialized;
+	bool     has_proc_default_values;
+	bool     has_named_results;
+	bool     diverging; // no return
+	bool     return_by_pointer;
+	bool     optional_ok;
+};
+
 #define TYPE_KINDS                                        \
 	TYPE_KIND(Basic, BasicType)                           \
 	TYPE_KIND(Named, struct {                             \
@@ -222,32 +249,7 @@ struct TypeUnion {
 		bool            are_offsets_set;                  \
 		bool            is_packed;                        \
 	})                                                    \
-	TYPE_KIND(Proc, struct {                              \
-		Ast *node;                                        \
-		Scope *  scope;                                   \
-		Type *   params;  /* Type_Tuple */                \
-		Type *   results; /* Type_Tuple */                \
-		i32      param_count;                             \
-		i32      result_count;                            \
-		Array<Type *> abi_compat_params;                  \
-		Type *   abi_compat_result_type;                  \
-		i32      variadic_index;                          \
-		/* TODO(bill): Make this a flag set rather than bools */ \
-		bool     variadic;                                \
-		bool     abi_types_set;                           \
-		bool     require_results;                         \
-		bool     c_vararg;                                \
-		bool     is_polymorphic;                          \
-		bool     is_poly_specialized;                     \
-		bool     has_proc_default_values;                 \
-		bool     has_named_results;                       \
-		bool     diverging; /* no return */               \
-		bool     return_by_pointer;                       \
-		bool     optional_ok;                             \
-		u64      tags;                                    \
-		isize    specialization_count;                    \
-		ProcCallingConvention calling_convention;         \
-	})                                                    \
+	TYPE_KIND(Proc, TypeProc)                             \
 	TYPE_KIND(BitFieldValue, struct { u32 bits; })        \
 	TYPE_KIND(BitField, struct {                          \
 		Array<Entity *> fields;                           \
