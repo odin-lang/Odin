@@ -2465,7 +2465,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 
 						if (minimum_param_count > 2) {
 							error(value, "'%s' attribute must allow for at a minimum 2 parameters", LIT(name));
-							value = false;
+							valid = false;
 						}
 					}
 				}
@@ -2519,13 +2519,13 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 
 						if (minimum_param_count > 3) {
 							error(value, "'%s' attribute must allow for at a minimum 3 parameters", LIT(name));
-							value = false;
+							valid = false;
 						}
 					}
 
 					if (pt->Proc.variadic || pt->Proc.c_vararg) {
 						error(value, "'%s' attribute does not allow variadic procedures", LIT(name));
-						value = false;
+						valid = false;
 					}
 				}
 
@@ -2578,7 +2578,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 
 						if (minimum_param_count > 1) {
 							error(value, "'%s' attribute must allow for at a minimum 1 parameter", LIT(name));
-							value = false;
+							valid = false;
 						}
 						{
 							Entity *param = pt->Proc.params->Tuple.variables[0];
@@ -2587,7 +2587,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 								// okay
 							} else {
 								error(value, "'%s' attribute's first parameter must be a pointer", LIT(name));
-								value = false;
+								valid = false;
 							}
 
 						}
@@ -2595,18 +2595,18 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 
 					if (pt->Proc.variadic || pt->Proc.c_vararg) {
 						error(value, "'%s' attribute does not allow variadic procedures", LIT(name));
-						value = false;
+						valid = false;
 					}
 
 					if (pt->Proc.result_count != 1) {
 						error(value, "'%s' attribute must return 1 result", LIT(name));
-						value = false;
+						valid = false;
 					} else {
 						Type *rt = pt->Proc.results->Tuple.variables[0]->type;
 						rt = base_type(rt);
 						if (!is_type_slice(rt)) {
 							error(value, "'%s' attribute must return a slice", LIT(name));
-							value = false;
+							valid = false;
 						}
 					}
 				}
