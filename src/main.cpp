@@ -1801,9 +1801,9 @@ int main(int arg_count, char const **arg_ptr) {
 
 			if (build_context.build_mode == BuildMode_DynamicLibrary) {
 				output_ext = "dll";
-				link_settings = gb_string_append_fmt(link_settings, "/DLL");
+				link_settings = gb_string_append_fmt(link_settings, " /DLL");
 			} else {
-				link_settings = gb_string_append_fmt(link_settings, "/ENTRY:mainCRTStartup");
+				link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");
 			}
 
 			if (build_context.pdb_filepath != "") {
@@ -1822,6 +1822,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 
 			char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
+
 			if (!build_context.use_lld) { // msvc
 				if (build_context.has_resource) {
 					exit_code = system_exec_command_line_app("msvc-link",

@@ -3166,7 +3166,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 		GB_ASSERT(param_count-1 <= args.count);
 		param_count -= 1;
 	} else {
-		GB_ASSERT_MSG(param_count == args.count, "%td == %td", param_count, args.count);
+		GB_ASSERT_MSG(param_count == args.count, "%.*s %td == %td", LIT(p->entity->token.string), param_count, args.count);
 	}
 
 	auto processed_args = array_make<irValue *>(heap_allocator(), 0, args.count);
@@ -12330,50 +12330,6 @@ void ir_gen_tree(irGen *s) {
 	}
 
 #if defined(GB_SYSTEM_WINDOWS)
-	// if (m->build_context->build_mode != BuildMode_DynamicLibrary && !has_win_main) {
-	// 	// proc WinMain(inst, prev: rawptr, cmd_line: ^byte, cmd_show: i32) -> i32
-	// 	String name = str_lit("WinMain");
-	// 	Type *proc_params = alloc_type_tuple();
-	// 	Type *proc_results = alloc_type_tuple();
-
-	// 	Scope *proc_scope = gb_alloc_item(a, Scope);
-
-	// 	proc_params->Tuple.variables = gb_alloc_array(a, Entity *, 4);
-	// 	proc_params->Tuple.variable_count = 4;
-
-	// 	proc_results->Tuple.variables = gb_alloc_array(a, Entity *, 1);
-	// 	proc_results->Tuple.variable_count = 1;
-
-	// 	proc_params->Tuple.variables[0] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false);
-	// 	proc_params->Tuple.variables[1] = alloc_entity_param(proc_scope, blank_token, t_rawptr, false);
-	// 	proc_params->Tuple.variables[2] = alloc_entity_param(proc_scope, blank_token, t_u8_ptr, false);
-	// 	proc_params->Tuple.variables[3] = alloc_entity_param(proc_scope, blank_token, t_i32,    false);
-
-	// 	proc_results->Tuple.variables[0] = alloc_entity_param(proc_scope, empty_token, t_i32, false);
-
-
-	// 	Type *proc_type = alloc_type_proc(a, proc_scope,
-	// 	                                 proc_params, 4,
-	// 	                                 proc_results, 1, false, ProcCC_Std);
-
-	// 	Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
-	// 	Entity *e = alloc_entity_procedure(a, nullptr, make_token_ident(name), proc_type, 0);
-	// 	irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
-
-	// 	m->entry_point_entity = e;
-
-	// 	map_set(&m->values, hash_entity(e), p);
-	// 	map_set(&m->members, hash_string(name), p);
-
-	// 	irProcedure *proc = &p->Proc;
-	// 	proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
-	// 	e->Procedure.link_name = name;
-
-	// 	ir_begin_procedure_body(proc);
-	// 	ir_emit_runtime_call(proc, "main", nullptr, 0);
-	// 	ir_emit_return(proc, v_one32);
-	// 	ir_end_procedure_body(proc);
-	// }
 	if (build_context.build_mode != BuildMode_DynamicLibrary && build_context.no_crt) {
 		s->print_chkstk = true;
 
