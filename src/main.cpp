@@ -665,6 +665,10 @@ bool parse_build_flags(Array<String> args) {
 			continue;
 		}
 
+		if (string_starts_with(flag, str_lit("--"))) {
+			flag = substring(flag, 1, flag.len);
+		}
+
 		String name = substring(flag, 1, flag.len);
 		isize end = 0;
 		for (; end < name.len; end++) {
