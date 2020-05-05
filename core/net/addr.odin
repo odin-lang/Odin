@@ -33,8 +33,8 @@ parse_ipv4_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv4_Address, 
 	for part, i in parts {
 		if part == "" do return; // NOTE(tetra): All elements required.
 		if strings.contains(part, ":") do return;
-		n, rest := strconv.parse_uint(part, 10);
-		if rest != "" do return; // NOTE(tetra): Not all of it was an integer.
+		n, ok := strconv.parse_uint(part, 10);
+		if !ok do return; // NOTE(tetra): Not all of it was an integer.
 		if n < 0 || n > uint(max(u8)) do return;
 		addr[i] = byte(n);
 	}
@@ -69,8 +69,8 @@ parse_ipv6_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Address, 
 			double_colon = true;
 			break outer;
 		}
-		n, rest := strconv.parse_uint(part, 16);
-		if rest != "" do return; // NOTE(tetra): Not all of this part was digits.
+		n, ok := strconv.parse_uint(part, 16);
+		if !ok do return; // NOTE(tetra): Not all of this part was digits.
 		n16 := u16(n);
 		if n16 >= max(u16) do return;
 		addr[i] = u16be(n16);
@@ -82,8 +82,8 @@ parse_ipv6_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Address, 
 		case 3: return;
 		case 0: break; // NOTE(tetra): Zero means '::' - only one of these is allowed.
 		}
-		n, rest := strconv.parse_uint(part, 16);
-		if rest != "" do return; // NOTE(tetra): Not all of this part was digits.
+		n, ok := strconv.parse_uint(part, 16);
+		if !ok do return; // NOTE(tetra): Not all of this part was digits.
 		n16 := u16(n);
 		if n16 >= max(u16) do return;
 		addr[len(addr)-1-i] = u16be(n16);
@@ -126,8 +126,8 @@ split_port :: proc(addr_or_host_and_port: string, default_port := -1) -> (addr_o
 	// Ipv6 [addr_or_host]:port
 	if i := strings.last_index(addr_or_host_and_port, "]:"); i != -1 {
 		addr_or_host = addr_or_host_and_port[1:i];
-		port, rest = strconv.parse_int(addr_or_host_and_port[i+2:], 10);
-		if rest != "" do return;
+		port, ok = strconv.parse_int(addr_or_host_and_port[i+2:], 10);
+		if !ok do return;
 
 		ok = true;
 		return;
@@ -139,8 +139,8 @@ split_port :: proc(addr_or_host_and_port: string, default_port := -1) -> (addr_o
 		if i == -1 do return;
 
 		addr_or_host = addr_or_host_and_port[:i];
-		port, rest = strconv.parse_int(addr_or_host_and_port[i+1:], 10);
-		if rest != "" do return;
+		port, ok = strconv.parse_int(addr_or_host_and_port[i+1:], 10);
+		if !ok do return;
 
 		ok = true;
 		return;
