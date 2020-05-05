@@ -23,7 +23,57 @@ _digit_value :: proc(r: rune) -> int {
 	return v;
 }
 
-parse_i64 :: proc(str: string) -> i64 {
+// Parses an integer value from a string, in the given base, without a prefix.
+//
+// Returns ok=false if no numeric value of the appropriate base could be found.
+//
+// ```
+// n, ok := strconv.parse_i64_of_base("-1234eeee", 10);
+// assert(n == -1234 && ok);
+// ```
+parse_i64_of_base :: proc(str: string, base: int) -> (value: i64, ok: bool) {
+	assert(base <= 16, "base must be 1-16");
+	s := str;
+	neg := false;
+	if len(s) > 1 {
+		switch s[0] {
+		case '-':
+			neg = true;
+			s = s[1:];
+		case '+':
+			s = s[1:];
+		}
+	}
+
+	i := 0;
+	for r in s {
+		i += 1;
+		if r == '_' do continue;
+		v := i64(_digit_value(r));
+		if v >= i64(base) {
+			break;
+		}
+		value *= i64(base);
+		value += v;
+	}
+
+	if neg do value = -value;
+	ok = i > 1;
+	return;
+}
+
+// Parses a integer value from a string, in base 10, unless there's a prefix.
+//
+// Returns ok=false if a base 10 integer could not be found.
+//
+// ```
+// n, ok := strconv.parse_i64_maybe_prefixed("1234");
+// assert(n == 1234 && ok);
+//
+// n, ok = strconv.parse_i64_maybe_prefixed("0xeeee");
+// assert(n == 0xeeee && ok);
+// ```
+parse_i64_maybe_prefixed :: proc(str: string) -> (value: i64, ok: bool) {
 	s := str;
 	neg := false;
 	if len(s) > 1 {
@@ -48,13 +98,10 @@ parse_i64 :: proc(str: string) -> i64 {
 		}
 	}
 
-
-	value: i64;
+	i := 0;
 	for r in s {
-		if r == '_' {
-			continue;
-		}
-
+		i += 1;
+		if r == '_' do continue;
 		v := i64(_digit_value(r));
 		if v >= base {
 			break;
@@ -63,13 +110,62 @@ parse_i64 :: proc(str: string) -> i64 {
 		value += v;
 	}
 
-	if neg do return -value;
-	return value;
+	if neg do value = -value;
+	ok = i > 1;
+	return;
 }
 
-parse_u64 :: proc(str: string) -> u64 {
+parse_i64 :: proc{parse_i64_maybe_prefixed, parse_i64_of_base};
+
+// Parses an unsigned integer value from a string, in the given base, and
+// without a prefix.
+//
+// Returns ok=false if no numeric value of the appropriate base could be found.
+//
+// ```
+// n, ok := strconv.parse_u64_of_base("1234eeee", 10);
+// assert(n == 1234 && ok);
+//
+// n, ok = strconv.parse_u64_of_base("5678eeee", 16);
+// assert(n == 0x5678eeee && ok);
+// ```
+parse_u64_of_base :: proc(str: string, base: int) -> (value: u64, ok: bool) {
+	assert(base <= 16, "base must be 1-16");
 	s := str;
-	neg := false;
+	if len(s) > 1 && s[0] == '+' {
+		s = s[1:];
+	}
+
+	i := 0;
+	for r in s {
+		i += 1;
+		if r == '_' do continue;
+		v := u64(_digit_value(r));
+		if v >= u64(base) {
+			break;
+		}
+		value *= u64(base);
+		value += v;
+	}
+
+	ok = i > 1;
+	return;
+}
+
+// Parses an unsigned integer value from a string in base 10, unless there's a prefix.
+//
+// Returns ok=false if a base 10 integer could not be found, or
+// if the value was negative.
+//
+// ```
+// n, ok := strconv.parse_u64_maybe_prefixed("1234");
+// assert(n == 1234 && ok);
+//
+// n, ok = strconv.parse_u64_maybe_prefixed("0xeeee");
+// assert(n == 0xeeee && ok);
+// ```
+parse_u64_maybe_prefixed :: proc(str: string) -> (value: u64, ok: bool) {
+	s := str;
 	if len(s) > 1 && s[0] == '+' {
 		s = s[1:];
 	}
@@ -86,9 +182,9 @@ parse_u64 :: proc(str: string) -> u64 {
 		}
 	}
 
-
-	value: u64;
+	i := 0;
 	for r in s {
+		i += 1;
 		if r == '_' do continue;
 		v := u64(_digit_value(r));
 		if v >= base do break;
@@ -96,26 +192,99 @@ parse_u64 :: proc(str: string) -> u64 {
 		value += u64(v);
 	}
 
-	if neg do return -value;
-	return value;
+	ok = i > 1;
+	return;
+}
+
+parse_u64 :: proc{parse_u64_maybe_prefixed, parse_u64_of_base};
+
+// Parses an integer value from a string in the given base, or
+// - if the string has a prefix (e.g: '0x') then that will determine the base;
+// - otherwise, assumes base 10.
+//
+// Returns ok=false if no appropriate value could be found.
+//
+// ```
+// n, ok := strconv.parse_int("1234"); // without prefix, inferred base 10
+// assert(n == 1234 && ok);
+//
+// n, ok = strconv.parse_int("ffff", 16); // without prefix, explicit base
+// assert(n == 0xffff && ok);
+//
+// n, ok = strconv.parse_int("0xffff"); // with prefix and inferred base
+// assert(n == 0xffff && ok);
+// ```
+parse_int :: proc(s: string, base := 0) -> (value: int, ok: bool) {
+	v: i64 = ---;
+	switch base {
+	case 0:  v, ok = parse_i64_maybe_prefixed(s);
+	case:    v, ok = parse_i64_of_base(s, base);
+	}
+	value = int(v);
+	return;
 }
 
 
-parse_int :: proc(s: string) -> int {
-	return int(parse_i64(s));
-}
-parse_uint :: proc(s: string) -> uint {
-	return uint(parse_u64(s));
+// Parses an unsigned integer value from a string in the given base, or
+// - if the string has a prefix (e.g: '0x') then that will determine the base;
+// - otherwise, assumes base 10.
+//
+// Returns ok=false if:
+// - no appropriate value could be found; or
+// - the value was negative.
+//
+// ```
+// n, ok := strconv.parse_uint("1234"); // without prefix, inferred base 10
+// assert(n == 1234 && ok);
+//
+// n, ok = strconv.parse_uint("ffff", 16); // without prefix, explicit base
+// assert(n == 0xffff && ok);
+//
+// n, ok = strconv.parse_uint("0xffff"); // with prefix and inferred base
+// assert(n == 0xffff && ok);
+// ```
+parse_uint :: proc(s: string, base := 0) -> (value: uint, ok: bool) {
+	v: u64 = ---;
+	switch base {
+	case 0:  v, ok = parse_u64_maybe_prefixed(s);
+	case:    v, ok = parse_u64_of_base(s, base);
+	}
+	value = uint(v);
+	return;
 }
 
-parse_f32 :: proc(s: string) -> f32 {
-	return f32(parse_f64(s));
+
+// Parses a 32-bit floating point number from a string.
+//
+// Returns ok=false if a base 10 float could not be found.
+//
+// ```
+// n, ok := strconv.parse_f32("12.34eee");
+// assert(n == 12.34 && ok);
+//
+// n, ok = strconv.parse_f32("12.34");
+// assert(n == 12.34 && ok);
+// ```
+parse_f32 :: proc(s: string) -> (value: f32, ok: bool) {
+	v: f64 = ---;
+	v, ok = parse_f64(s);
+	return f32(v), ok;
 }
 
-
-parse_f64 :: proc(s: string) -> f64 {
+// Parses a 64-bit floating point number from a string.
+//
+// Returns ok=false if a base 10 float could not be found.
+//
+// ```
+// n, ok := strconv.parse_f32("12.34eee");
+// assert(n == 12.34 && ok);
+//
+// n, ok = strconv.parse_f32("12.34");
+// assert(n == 12.34 && ok);
+// ```
+parse_f64 :: proc(s: string) -> (value: f64, ok: bool) {
 	if s == "" {
-		return 0;
+		return;
 	}
 	i := 0;
 
@@ -125,7 +294,6 @@ parse_f64 :: proc(s: string) -> f64 {
 	case '+': i += 1;
 	}
 
-	value: f64 = 0;
 	for ; i < len(s); i += 1 {
 		r := rune(s[i]);
 		if r == '_' do continue;
@@ -180,8 +348,14 @@ parse_f64 :: proc(s: string) -> f64 {
 		}
 	}
 
-	if frac do return sign * (value/scale);
-	return sign * (value*scale);
+	if frac {
+		value = sign * (value/scale);
+	} else {
+		value = sign * (value*scale);
+	}
+
+	ok = i > 0;
+	return;
 }
 
 
@@ -203,10 +377,12 @@ itoa :: proc(buf: []byte, i: int) -> string {
 	return append_int(buf, i64(i), 10);
 }
 atoi :: proc(s: string) -> int {
-	return parse_int(s);
+	v, _ := parse_int(s);
+	return v;
 }
 atof :: proc(s: string) -> f64 {
-	return parse_f64(s);
+	v, _  := parse_f64(s);
+	return v;
 }
 
 ftoa :: append_float;
