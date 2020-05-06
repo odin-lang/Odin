@@ -47,18 +47,19 @@ parse_i64_of_base :: proc(str: string, base: int) -> (value: i64, ok: bool) {
 
 	i := 0;
 	for r in s {
-		i += 1;
-		if r == '_' do continue;
-		v := i64(_digit_value(r));
-		if v >= i64(base) {
-			break;
+		if r == '_' {
+			i += 1;
+			continue;
 		}
+		v := i64(_digit_value(r));
+		if v >= i64(base) do break;
 		value *= i64(base);
 		value += v;
+		i += 1;
 	}
 
 	if neg do value = -value;
-	ok = i > 1;
+	ok = i > 0;
 	return;
 }
 
@@ -100,18 +101,19 @@ parse_i64_maybe_prefixed :: proc(str: string) -> (value: i64, ok: bool) {
 
 	i := 0;
 	for r in s {
-		i += 1;
-		if r == '_' do continue;
-		v := i64(_digit_value(r));
-		if v >= base {
-			break;
+		if r == '_' {
+			i += 1;
+			continue;
 		}
+		v := i64(_digit_value(r));
+		if v >= base do break;
 		value *= base;
 		value += v;
+		i += 1;
 	}
 
 	if neg do value = -value;
-	ok = i > 1;
+	ok = i > 0;
 	return;
 }
 
@@ -138,17 +140,18 @@ parse_u64_of_base :: proc(str: string, base: int) -> (value: u64, ok: bool) {
 
 	i := 0;
 	for r in s {
-		i += 1;
-		if r == '_' do continue;
-		v := u64(_digit_value(r));
-		if v >= u64(base) {
-			break;
+		if r == '_' {
+			i += 1;
+			continue;
 		}
+		v := u64(_digit_value(r));
+		if v >= u64(base) do break;
 		value *= u64(base);
 		value += v;
+		i += 1;
 	}
 
-	ok = i > 1;
+	ok = i > 0;
 	return;
 }
 
@@ -184,15 +187,18 @@ parse_u64_maybe_prefixed :: proc(str: string) -> (value: u64, ok: bool) {
 
 	i := 0;
 	for r in s {
-		i += 1;
-		if r == '_' do continue;
+		if r == '_' {
+			i += 1;
+			continue;
+		}
 		v := u64(_digit_value(r));
 		if v >= base do break;
 		value *= base;
 		value += u64(v);
+		i += 1;
 	}
 
-	ok = i > 1;
+	ok = i > 0;
 	return;
 }
 
