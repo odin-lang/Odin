@@ -965,6 +965,8 @@ irValue *ir_value_param(irProcedure *parent, Entity *e, Type *abi_type, i32 inde
 			v->Param.kind = irParamPass_Integer;
 		} else if (abi_type == t_llvm_bool) {
 			v->Param.kind = irParamPass_Value;
+		} else if (is_type_boolean(abi_type)) {
+			v->Param.kind = irParamPass_Integer;
 		} else if (is_type_simd_vector(abi_type)) {
 			v->Param.kind = irParamPass_BitCast;
 		} else if (is_type_float(abi_type)) {
@@ -972,7 +974,7 @@ irValue *ir_value_param(irProcedure *parent, Entity *e, Type *abi_type, i32 inde
 		} else if (is_type_tuple(abi_type)) {
 			v->Param.kind = irParamPass_Tuple;
 		} else {
-			GB_PANIC("Invalid abi type pass kind %s", type_to_string(abi_type));
+			GB_PANIC("Invalid abi type pass kind: %s", type_to_string(abi_type));
 		}
 	}
 	array_init(&v->Param.referrers, heap_allocator()); // TODO(bill): Replace heap allocator here
