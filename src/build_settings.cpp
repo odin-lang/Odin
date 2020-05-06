@@ -120,6 +120,7 @@ struct BuildContext {
 	String llc_flags;
 	String target_triplet;
 	String link_flags;
+	String extra_linker_flags;
 	BuildModeKind build_mode;
 	bool   generate_docs;
 	i32    optimization_level;
@@ -133,11 +134,12 @@ struct BuildContext {
 	bool   use_lld;
 	bool   vet;
 	bool   cross_compiling;
-	bool   use_subsystem_windows;
 
 	bool   use_llvm_api;
 
+	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
+	bool   linker_map_file;
 
 	QueryDataSetSettings query_data_set_settings;
 

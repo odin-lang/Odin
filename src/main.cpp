@@ -142,8 +142,8 @@ i32 linker_stage(lbGenerator *gen) {
 
 	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
 #ifdef GB_SYSTEM_UNIX
-		system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s",
-				LIT(output_base), LIT(output_base), LIT(build_context.link_flags));
+		system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
+				LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
 #else
 		gb_printf_err("Don't know how to cross compile to selected target.\n");
 #endif
@@ -244,12 +244,14 @@ i32 linker_stage(lbGenerator *gen) {
 					"\"%.*slink.exe\" %s \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
 					" %.*s "
+					" %.*s "
 					" %s "
 					"",
 					LIT(find_result.vs_exe_path), object_files, LIT(output_base), LIT(output_base), output_ext,
 					link_settings,
 					subsystem_str,
 					LIT(build_context.link_flags),
+					LIT(build_context.extra_linker_flags),
 					lib_str
 				);
 			} else {
@@ -257,12 +259,14 @@ i32 linker_stage(lbGenerator *gen) {
 					"\"%.*slink.exe\" %s -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
 					" %.*s "
+					" %.*s "
 					" %s "
 					"",
 					LIT(find_result.vs_exe_path), object_files, LIT(output_base), output_ext,
 					link_settings,
 					subsystem_str,
 					LIT(build_context.link_flags),
+					LIT(build_context.extra_linker_flags),
 					lib_str
 				);
 			}
@@ -271,6 +275,7 @@ i32 linker_stage(lbGenerator *gen) {
 				"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s.%s\" %s "
 				"/nologo /incremental:no /opt:ref /subsystem:%s "
 				" %.*s "
+				" %.*s "
 				" %s "
 				"",
 				LIT(build_context.ODIN_ROOT),
@@ -278,6 +283,7 @@ i32 linker_stage(lbGenerator *gen) {
 				link_settings,
 				subsystem_str,
 				LIT(build_context.link_flags),
+				LIT(build_context.extra_linker_flags),
 				lib_str
 			);
 		}
@@ -385,6 +391,7 @@ i32 linker_stage(lbGenerator *gen) {
 			"%s %s -o \"%.*s%.*s\" %s "
 			" %s "
 			" %.*s "
+			" %.*s "
 			" %s "
 			#if defined(GB_SYSTEM_OSX)
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
@@ -398,6 +405,7 @@ i32 linker_stage(lbGenerator *gen) {
 			lib_str,
 			"-lc -lm",
 			LIT(build_context.link_flags),
+			LIT(build_context.extra_linker_flags),
 			link_settings);
 		if (exit_code != 0) {
 			return exit_code;
@@ -547,6 +555,7 @@ enum BuildFlagKind {
 	BuildFlag_Vet,
 	BuildFlag_UseLLVMApi,
 	BuildFlag_IgnoreUnknownAttributes,
+	BuildFlag_ExtraLinkerFlags,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -640,10 +649,12 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),               BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),          BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"), BuildFlagParam_String);
 
 	add_flag(&build_flags, BuildFlag_Compact, str_lit("compact"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_GlobalDefinitions, str_lit("global-definitions"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_GoToDefinitions, str_lit("go-to-definitions"), BuildFlagParam_None);
+
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch, str_lit("ignore-vs-search"),  BuildFlagParam_None);
@@ -1022,6 +1033,11 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_IgnoreUnknownAttributes:
 							build_context.ignore_unknown_attributes = true;
+							break;
+
+						case BuildFlag_ExtraLinkerFlags:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.extra_linker_flags = value.value_string;
 							break;
 
 						case BuildFlag_Compact:
@@ -1419,6 +1435,12 @@ void print_show_help(String const arg0, String const &command) {
 	}
 
 	if (run_or_build) {
+		print_usage_line(1, "-extra-linker-flags:<string>");
+		print_usage_line(2, "Adds extra linker specific flags in a string");
+		print_usage_line(0, "");
+	}
+
+	if (run_or_build) {
 		#if defined(GB_SYSTEM_WINDOWS)
 		print_usage_line(1, "-ignore-vs-search");
 		print_usage_line(2, "[Windows only]");
@@ -1746,8 +1768,8 @@ int main(int arg_count, char const **arg_ptr) {
 
 		if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
 	#ifdef GB_SYSTEM_UNIX
-			system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s",
-					LIT(output_base), LIT(output_base), LIT(build_context.link_flags));
+			system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
+					LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
 	#else
 			gb_printf_err("Don't know how to cross compile to selected target.\n");
 	#endif
@@ -1843,12 +1865,14 @@ int main(int arg_count, char const **arg_ptr) {
 						"\"%.*slink.exe\" \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
 						"/nologo /incremental:no /opt:ref /subsystem:%s "
 						" %.*s "
+						" %.*s "
 						" %s "
 						"",
 						LIT(find_result.vs_exe_path), LIT(output_base), LIT(output_base), LIT(output_base), output_ext,
 						link_settings,
 						subsystem_str,
 						LIT(build_context.link_flags),
+						LIT(build_context.extra_linker_flags),
 						lib_str
 					);
 				} else {
@@ -1856,12 +1880,14 @@ int main(int arg_count, char const **arg_ptr) {
 						"\"%.*slink.exe\" \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 						"/nologo /incremental:no /opt:ref /subsystem:%s "
 						" %.*s "
+						" %.*s "
 						" %s "
 						"",
 						LIT(find_result.vs_exe_path), LIT(output_base), LIT(output_base), output_ext,
 						link_settings,
 						subsystem_str,
 						LIT(build_context.link_flags),
+						LIT(build_context.extra_linker_flags),
 						lib_str
 					);
 				}
@@ -1870,6 +1896,7 @@ int main(int arg_count, char const **arg_ptr) {
 					"\"%.*s\\bin\\lld-link\" \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
 					" %.*s "
+					" %.*s "
 					" %s "
 					"",
 					LIT(build_context.ODIN_ROOT),
@@ -1877,6 +1904,7 @@ int main(int arg_count, char const **arg_ptr) {
 					link_settings,
 					subsystem_str,
 					LIT(build_context.link_flags),
+					LIT(build_context.extra_linker_flags),
 					lib_str
 				);
 			}
@@ -1991,6 +2019,7 @@ int main(int arg_count, char const **arg_ptr) {
 				"%s \"%.*s.o\" -o \"%.*s%.*s\" %s "
 				" %s "
 				" %.*s "
+				" %.*s "
 				" %s "
 				#if defined(GB_SYSTEM_OSX)
 					// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
@@ -2004,6 +2033,7 @@ int main(int arg_count, char const **arg_ptr) {
 				lib_str,
 				"-lc -lm",
 				LIT(build_context.link_flags),
+				LIT(build_context.extra_linker_flags),
 				link_settings);
 			if (exit_code != 0) {
 				return exit_code;
