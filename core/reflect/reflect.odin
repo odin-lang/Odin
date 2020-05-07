@@ -510,6 +510,34 @@ enum_string :: proc(a: any) -> string {
 	return "";
 }
 
+// Given a enum type and a value name, get the enum value.
+enum_from_name :: proc($EnumType: typeid, name: string) -> (value: EnumType, ok: bool) {
+    ti := type_info_base(type_info_of(EnumType));
+    if eti, eti_ok := ti.variant.(runtime.Type_Info_Enum); eti_ok {
+        for value_name, i in eti.names {
+            if value_name != name do continue;
+            value_union := eti.values[i];
+            switch v in value_union {
+            case rune: value = EnumType(v); ok = true;
+            case u8:   value = EnumType(v); ok = true;
+            case u16:  value = EnumType(v); ok = true;
+            case u32:  value = EnumType(v); ok = true;
+            case u64:  value = EnumType(v); ok = true;
+            case uint: value = EnumType(v); ok = true;
+            case uintptr: value = EnumType(v); ok = true;
+            case i8:   value = EnumType(v); ok = true;
+            case i16:  value = EnumType(v); ok = true;
+            case i32:  value = EnumType(v); ok = true;
+            case i64:  value = EnumType(v); ok = true;
+            case int:  value = EnumType(v); ok = true;
+            }
+        }
+    } else {
+        panic("expected enum type to reflect.enum_from_name");
+    }
+    return;
+}
+
 union_variant_type_info :: proc(a: any) -> ^runtime.Type_Info {
 	id := union_variant_typeid(a);
 	return type_info_of(id);
