@@ -651,6 +651,8 @@ void match_exact_values(ExactValue *x, ExactValue *y) {
 
 	case ExactValue_Complex:
 		switch (y->kind) {
+		case ExactValue_Complex:
+			return;
 		case ExactValue_Quaternion:
 			*x = exact_value_to_quaternion(*x);
 			return;
