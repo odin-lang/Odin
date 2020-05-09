@@ -427,11 +427,13 @@ parse_operand :: proc(p: ^Parser) -> (Value, Pos) {
 
 	case .Integer:
 		next_token(p);
-		return strconv.parse_i64(tok.lit), tok.pos;
+		i, _ := strconv.parse_i64(tok.lit);
+		return i, tok.pos;
 
 	case .Float:
 		next_token(p);
-		return strconv.parse_f64(tok.lit), tok.pos;
+		f, _ := strconv.parse_f64(tok.lit);
+		return f, tok.pos;
 
 	case .String:
 		next_token(p);

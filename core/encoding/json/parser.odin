@@ -85,11 +85,13 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		return;
 
 	case Kind.Integer:
-		value.value = Integer(strconv.parse_i64(token.text));
+		i, _ := strconv.parse_i64(token.text);
+		value.value = Integer(i);
 		advance_token(p);
 		return;
 	case Kind.Float:
-		value.value = Float(strconv.parse_f64(token.text));
+		f, _ := strconv.parse_f64(token.text);
+		value.value = Float(f);
 		advance_token(p);
 		return;
 	case Kind.String:
