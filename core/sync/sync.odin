@@ -18,7 +18,7 @@ ticket_mutex_init :: proc(m: ^Ticket_Mutex) {
 
 ticket_mutex_lock :: inline proc(m: ^Ticket_Mutex) {
 	ticket := atomic_add(&m.ticket, 1, .Relaxed);
-	for ticket != m.serving {
+	for ticket != atomic_load(&m.serving, .Acquire) {
 		intrinsics.cpu_relax();
 	}
 }
