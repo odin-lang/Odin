@@ -70,6 +70,11 @@ pool_init :: proc(pool: ^Pool, thread_count: int, allocator := context.allocator
 
 pool_destroy :: proc(pool: ^Pool) {
 	delete(pool.tasks);
+
+	for thread in &pool.threads {
+		destroy(thread);
+	}
+
 	delete(pool.threads, pool.allocator);
 
 	sync.mutex_destroy(&pool.mutex);
