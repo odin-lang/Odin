@@ -4495,7 +4495,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 
 		res.value = LLVMConstArray(lb_type(m, elem), elems, cast(unsigned)count);
 		return res;
-	}
+	} 
 
 	switch (value.kind) {
 	case ExactValue_Invalid:
@@ -4631,9 +4631,6 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 							}
 							if (lo == i) {
 								TypeAndValue tav = fv->value->tav;
-								if (tav.mode != Addressing_Constant) {
-									break;
-								}
 								LLVMValueRef val = lb_const_value(m, elem_type, tav.value).value;
 								for (i64 k = lo; k < hi; k++) {
 									values[value_index++] = val;
@@ -4649,9 +4646,6 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 							i64 index = exact_value_to_i64(index_tav.value);
 							if (index == i) {
 								TypeAndValue tav = fv->value->tav;
-								if (tav.mode != Addressing_Constant) {
-									break;
-								}
 								LLVMValueRef val = lb_const_value(m, elem_type, tav.value).value;
 								values[value_index++] = val;
 								found = true;
@@ -4724,9 +4718,6 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 							}
 							if (lo == i) {
 								TypeAndValue tav = fv->value->tav;
-								if (tav.mode != Addressing_Constant) {
-									break;
-								}
 								LLVMValueRef val = lb_const_value(m, elem_type, tav.value).value;
 								for (i64 k = lo; k < hi; k++) {
 									values[value_index++] = val;
@@ -4742,9 +4733,6 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 							i64 index = exact_value_to_i64(index_tav.value);
 							if (index == i) {
 								TypeAndValue tav = fv->value->tav;
-								if (tav.mode != Addressing_Constant) {
-									break;
-								}
 								LLVMValueRef val = lb_const_value(m, elem_type, tav.value).value;
 								values[value_index++] = val;
 								found = true;
