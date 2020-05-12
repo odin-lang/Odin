@@ -310,7 +310,7 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 			}
 		}
 
-		Entity *e = entity_of_ident(lhs->expr);
+		Entity *e = entity_of_node(lhs->expr);
 
 		gbString str = expr_to_string(lhs->expr);
 		if (e != nullptr && e->flags & EntityFlag_Param) {

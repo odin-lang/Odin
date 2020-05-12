@@ -422,7 +422,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 
 bool check_polymorphic_procedure_assignment(CheckerContext *c, Operand *operand, Type *type, Ast *poly_def_node, PolyProcData *poly_proc_data) {
 	if (operand->expr == nullptr) return false;
-	Entity *base_entity = entity_of_ident(operand->expr);
+	Entity *base_entity = entity_of_node(operand->expr);
 	if (base_entity == nullptr) return false;
 	return find_or_generate_polymorphic_procedure(c, base_entity, type, nullptr, poly_def_node, poly_proc_data);
 }
@@ -1692,7 +1692,7 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 				gbString str = expr_to_string(ue->expr);
 				defer (gb_string_free(str));
 
-				Entity *e = entity_of_ident(o->expr);
+				Entity *e = entity_of_node(o->expr);
 				if (e != nullptr && (e->flags & EntityFlag_Param) != 0) {
 					error(op, "Cannot take the pointer address of '%s' which is a procedure parameter", str);
 				} else {
@@ -6885,7 +6885,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			ident = s;
 		}
 
-		Entity *e = entity_of_ident(ident);
+		Entity *e = entity_of_node(ident);
 
 		CallArgumentData data = {};
 		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
@@ -7296,7 +7296,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 		return builtin_procs[id].kind;
 	}
 
-	Entity *e = entity_of_ident(operand->expr);
+	Entity *e = entity_of_node(operand->expr);
 
 	if (e != nullptr && e->kind == Entity_Procedure) {
 		if (e->Procedure.deferred_procedure.entity != nullptr) {

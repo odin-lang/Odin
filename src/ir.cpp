@@ -1751,7 +1751,7 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initial
 }
 
 irValue *ir_add_local_for_identifier(irProcedure *proc, Ast *ident, bool zero_initialized) {
-	Entity *e = entity_of_ident(ident);
+	Entity *e = entity_of_node(ident);
 	if (e != nullptr) {
 		String name = e->token.string;
 		ir_emit_comment(proc, name);
@@ -6271,7 +6271,7 @@ void ir_mangle_add_sub_type_name(irModule *m, Entity *field, String parent) {
 
 irBranchBlocks ir_lookup_branch_blocks(irProcedure *proc, Ast *ident) {
 	GB_ASSERT(ident->kind == Ast_Ident);
-	Entity *e = entity_of_ident(ident);
+	Entity *e = entity_of_node(ident);
 	GB_ASSERT(e->kind == Entity_Label);
 	for_array(i, proc->branch_blocks) {
 		irBranchBlocks *b = &proc->branch_blocks[i];
@@ -6586,7 +6586,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		if (ce->args.count > 0) {
 			Ast *ident = unselector_expr(ce->args[0]);
 			GB_ASSERT(ident->kind == Ast_Ident);
-			Entity *e = entity_of_ident(ident);
+			Entity *e = entity_of_node(ident);
 			GB_ASSERT(e != nullptr);
 
 			if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity != nullptr) {
@@ -7474,7 +7474,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 	case_end;
 
 	case_ast_node(i, Ident, expr);
-		Entity *e = entity_of_ident(expr);
+		Entity *e = entity_of_node(expr);
 		e = strip_entity_wrapping(e);
 
 		GB_ASSERT_MSG(e != nullptr, "%s", expr_to_string(expr));
@@ -7968,7 +7968,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			return val;
 		}
 		String name = i->token.string;
-		Entity *e = entity_of_ident(expr);
+		Entity *e = entity_of_node(expr);
 		// GB_ASSERT(name == e->token.string);
 		return ir_build_addr_from_entity(proc, e, expr);
 	case_end;
@@ -7986,7 +7986,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 			if (tav.mode == Addressing_Invalid) {
 				// NOTE(bill): Imports
-				Entity *imp = entity_of_ident(se->expr);
+				Entity *imp = entity_of_node(se->expr);
 				if (imp != nullptr) {
 					GB_ASSERT(imp->kind == Entity_ImportName);
 				}
@@ -9171,7 +9171,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstValueDecl *vd) {
 	for_array(i, vd->names) {
 		Ast *ident = vd->names[i];
 		GB_ASSERT(ident->kind == Ast_Ident);
-		Entity *e = entity_of_ident(ident);
+		Entity *e = entity_of_node(ident);
 		GB_ASSERT(e != nullptr);
 		switch (e->kind) {
 		case Entity_TypeName:
@@ -9733,7 +9733,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 			bool is_static = false;
 			if (vd->names.count > 0) {
-				Entity *e = entity_of_ident(vd->names[0]);
+				Entity *e = entity_of_node(vd->names[0]);
 				if (e->flags & EntityFlag_Static) {
 					// NOTE(bill): If one of the entities is static, they all are
 					is_static = true;
@@ -9754,7 +9754,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 					Ast *ident = vd->names[i];
 					GB_ASSERT(!is_blank_ident(ident));
-					Entity *e = entity_of_ident(ident);
+					Entity *e = entity_of_node(ident);
 					GB_ASSERT(e->flags & EntityFlag_Static);
 					String name = e->token.string;
 

@@ -2502,7 +2502,7 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 	for_array(i, vd->names) {
 		Ast *ident = vd->names[i];
 		GB_ASSERT(ident->kind == Ast_Ident);
-		Entity *e = entity_of_ident(ident);
+		Entity *e = entity_of_node(ident);
 		GB_ASSERT(e != nullptr);
 		if (e->kind != Entity_TypeName) {
 			continue;
@@ -2531,7 +2531,7 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 	for_array(i, vd->names) {
 		Ast *ident = vd->names[i];
 		GB_ASSERT(ident->kind == Ast_Ident);
-		Entity *e = entity_of_ident(ident);
+		Entity *e = entity_of_node(ident);
 		GB_ASSERT(e != nullptr);
 		if (e->kind != Entity_Procedure) {
 			continue;
@@ -2615,7 +2615,7 @@ void lb_build_stmt_list(lbProcedure *p, Array<Ast *> const &stmts) {
 
 lbBranchBlocks lb_lookup_branch_blocks(lbProcedure *p, Ast *ident) {
 	GB_ASSERT(ident->kind == Ast_Ident);
-	Entity *e = entity_of_ident(ident);
+	Entity *e = entity_of_node(ident);
 	GB_ASSERT(e->kind == Entity_Label);
 	for_array(i, p->branch_blocks) {
 		lbBranchBlocks *b = &p->branch_blocks[i];
@@ -3031,11 +3031,11 @@ void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs) {
 	}
 
 	if (val0_type != nullptr) {
-		Entity *e = entity_of_ident(rs->val0);
+		Entity *e = entity_of_node(rs->val0);
 		lb_add_local(p, e->type, e, true);
 	}
 	if (val1_type != nullptr) {
-		Entity *e = entity_of_ident(rs->val1);
+		Entity *e = entity_of_node(rs->val1);
 		lb_add_local(p, e->type, e, true);
 	}
 
@@ -3168,11 +3168,11 @@ void lb_build_inline_range_stmt(lbProcedure *p, AstInlineRangeStmt *rs) {
 	}
 
 	if (val0_type != nullptr) {
-		Entity *e = entity_of_ident(rs->val0);
+		Entity *e = entity_of_node(rs->val0);
 		lb_add_local(p, e->type, e, true);
 	}
 	if (val1_type != nullptr) {
-		Entity *e = entity_of_ident(rs->val1);
+		Entity *e = entity_of_node(rs->val1);
 		lb_add_local(p, e->type, e, true);
 	}
 
@@ -3679,7 +3679,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 
 		bool is_static = false;
 		if (vd->names.count > 0) {
-			Entity *e = entity_of_ident(vd->names[0]);
+			Entity *e = entity_of_node(vd->names[0]);
 			if (e->flags & EntityFlag_Static) {
 				// NOTE(bill): If one of the entities is static, they all are
 				is_static = true;
@@ -3700,7 +3700,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 
 				Ast *ident = vd->names[i];
 				GB_ASSERT(!is_blank_ident(ident));
-				Entity *e = entity_of_ident(ident);
+				Entity *e = entity_of_node(ident);
 				GB_ASSERT(e->flags & EntityFlag_Static);
 				String name = e->token.string;
 
@@ -3755,7 +3755,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			for_array(i, vd->names) {
 				Ast *name = vd->names[i];
 				if (!is_blank_ident(name)) {
-					Entity *e = entity_of_ident(name);
+					Entity *e = entity_of_node(name);
 					lb_add_local(p, e->type, e, true);
 				}
 			}
@@ -3767,7 +3767,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 				Ast *name = vd->names[i];
 				lbAddr lval = {};
 				if (!is_blank_ident(name)) {
-					Entity *e = entity_of_ident(name);
+					Entity *e = entity_of_node(name);
 					lval = lb_add_local(p, e->type, e, false);
 				}
 				array_add(&lvals, lval);
@@ -6957,7 +6957,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		if (ce->args.count > 0) {
 			Ast *ident = unselector_expr(ce->args[0]);
 			GB_ASSERT(ident->kind == Ast_Ident);
-			Entity *e = entity_of_ident(ident);
+			Entity *e = entity_of_node(ident);
 			GB_ASSERT(e != nullptr);
 
 			if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity != nullptr) {
@@ -9162,7 +9162,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			return val;
 		}
 		String name = i->token.string;
-		Entity *e = entity_of_ident(expr);
+		Entity *e = entity_of_node(expr);
 		return lb_build_addr_from_entity(p, e, expr);
 	case_end;
 
@@ -9174,7 +9174,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 			if (tav.mode == Addressing_Invalid) {
 				// NOTE(bill): Imports
-				Entity *imp = entity_of_ident(se->expr);
+				Entity *imp = entity_of_node(se->expr);
 				if (imp != nullptr) {
 					GB_ASSERT(imp->kind == Entity_ImportName);
 				}
