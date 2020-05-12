@@ -40,6 +40,10 @@ Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, Stri
 		return nullptr;
 	}
 
+	if (e->kind == Entity_Variable) {
+		e->Variable.init_expr = operand->expr;
+	}
+
 	if (operand->mode == Addressing_Type) {
 		if (e->type != nullptr && is_type_typeid(e->type)) {
 			add_type_info_type(ctx, operand->type);

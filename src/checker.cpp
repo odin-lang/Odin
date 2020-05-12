@@ -506,15 +506,30 @@ bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
 		return false;
 	}
 	// NOTE(bill): If the types differ, don't complain
-	if (are_types_identical(e->type, shadowed->type)) {
-		gb_zero_item(ve);
-		ve->kind = VettedEntity_Shadowed;
-		ve->entity = e;
-		ve->other = shadowed;
-		return true;
+	if (!are_types_identical(e->type, shadowed->type)) {
+		return false;
 	}
 
-	return false;
+	// NOTE(bill): Ignore intentional redeclaration
+	// x := x;
+	// Suggested in issue #637 (2020-05-11)
+	if ((e->flags & EntityFlag_Using) == 0 && e->kind == Entity_Variable) {
+		Ast *init = unparen_expr(e->Variable.init_expr);
+		if (init != nullptr && init->kind == Ast_Ident) {
+			// TODO(bill): Which logic is better? Same name or same entity
+			// bool ignore = init->Ident.token.string == name;
+			bool ignore = init->Ident.entity == shadowed;
+			if (ignore) {
+				return false;
+			}
+		}
+	}
+
+	gb_zero_item(ve);
+	ve->kind = VettedEntity_Shadowed;
+	ve->entity = e;
+	ve->other = shadowed;
+	return true;
 }
 
 bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
