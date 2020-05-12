@@ -344,7 +344,6 @@ HashKey hash_decl_info(DeclInfo *decl) { return hash_pointer(decl); }
 // CheckerInfo API
 TypeAndValue type_and_value_of_expr (Ast *expr);
 Type *       type_of_expr           (Ast *expr);
-Entity *     entity_of_ident        (Ast *identifier);
 Entity *     implicit_entity_of_node(Ast *clause);
 Scope *      scope_of_node          (Ast *node);
 DeclInfo *   decl_info_of_ident     (Ast *ident);

@@ -904,15 +904,6 @@ void destroy_checker(Checker *c) {
 }
 
 
-Entity *entity_of_ident(Ast *identifier) {
-	identifier = unparen_expr(identifier);
-	if (identifier->kind == Ast_Ident) {
-		return identifier->Ident.entity;
-	}
-	return nullptr;
-}
-
-
 TypeAndValue type_and_value_of_expr(Ast *expr) {
 	TypeAndValue tav = {};
 	if (expr != nullptr) {
@@ -926,8 +917,8 @@ Type *type_of_expr(Ast *expr) {
 	if (tav.mode != Addressing_Invalid) {
 		return tav.type;
 	}
-	if (expr->kind == Ast_Ident) {
-		Entity *entity = entity_of_ident(expr);
+	{
+		Entity *entity = entity_of_node(expr);
 		if (entity) {
 			return entity->type;
 		}
@@ -947,13 +938,11 @@ Entity *entity_of_node(Ast *expr) {
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
 	case_ast_node(ident, Ident, expr);
-		return entity_of_ident(expr);
+		return ident->entity;
 	case_end;
 	case_ast_node(se, SelectorExpr, expr);
 		Ast *s = unselector_expr(se->selector);
-		if (s->kind == Ast_Ident) {
-			return entity_of_ident(s);
-		}
+		return entity_of_node(s);
 	case_end;
 	case_ast_node(cc, CaseClause, expr);
 		return cc->implicit_entity;
@@ -971,7 +960,7 @@ DeclInfo *decl_info_of_entity(Entity *e) {
 }
 
 DeclInfo *decl_info_of_ident(Ast *ident) {
-	return decl_info_of_entity(entity_of_ident(ident));
+	return decl_info_of_entity(entity_of_node(ident));
 }
 
 AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
