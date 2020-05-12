@@ -121,6 +121,7 @@ struct Entity {
 			ExactValue value;
 		} Constant;
 		struct {
+			Ast *init_expr; // only used for some variables within procedure bodies
 			i32        field_index;
 			i32        field_src_index;
 
