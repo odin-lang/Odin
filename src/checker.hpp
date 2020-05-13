@@ -137,6 +137,7 @@ struct DeclInfo {
 	Ast *         proc_lit;      // Ast_ProcLit
 	Type *        gen_proc_type; // Precalculated
 	bool          is_using;
+	bool          where_clauses_evaluated;
 
 	PtrSet<Entity *>  deps;
 	PtrSet<Type *>    type_info_deps;

@@ -6766,7 +6766,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 					ctx.curr_proc_sig  = e->type;
 
 					GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
-					if (!evaluate_where_clauses(&ctx, operand->expr, decl->scope, &decl->proc_lit->ProcLit.where_clauses, false)) {
+					if (!evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, false)) {
 						continue;
 					}
 				}
@@ -6921,6 +6921,21 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 			add_entity_use(c, ident, entity_to_use);
 
+			if (data.gen_entity != nullptr) {
+				Entity *e = data.gen_entity;
+				DeclInfo *decl = data.gen_entity->decl_info;
+				CheckerContext ctx = *c;
+				ctx.scope = decl->scope;
+				ctx.decl = decl;
+				ctx.proc_name = e->token.string;
+				ctx.curr_proc_decl = decl;
+				ctx.curr_proc_sig  = e->type;
+
+				GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
+				evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
+				decl->where_clauses_evaluated = true;
+			}
+
 			return data;
 		}
 	} else {
@@ -6936,6 +6951,21 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
 		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 		add_entity_use(c, ident, entity_to_use);
+
+		if (data.gen_entity != nullptr) {
+			Entity *e = data.gen_entity;
+			DeclInfo *decl = data.gen_entity->decl_info;
+			CheckerContext ctx = *c;
+			ctx.scope = decl->scope;
+			ctx.decl = decl;
+			ctx.proc_name = e->token.string;
+			ctx.curr_proc_decl = decl;
+			ctx.curr_proc_sig  = e->type;
+
+			GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
+			evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
+			decl->where_clauses_evaluated = true;
+		}
 
 		return data;
 	}
