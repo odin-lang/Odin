@@ -3809,6 +3809,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		if (name == "defined") {
 			break;
 		}
+		if (name == "config") {
+			break;
+		}
 		/*fallthrough*/
 	}
 	default:
@@ -3982,11 +3985,53 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 
+			if (c->curr_proc_decl == nullptr) {
+				error(call, "'#defined' is only allowed within a procedure, prefer the replacement '#config(NAME, default_value)'");
+				return false;
+			}
+
 			bool is_defined = check_identifier_exists(c->scope, arg);
 			operand->type = t_untyped_bool;
 			operand->mode = Addressing_Constant;
-			operand->value = exact_value_bool(is_defined);
+			operand->value = exact_value_bool(false);
 
+		} else if (name == "config") {
+			if (ce->args.count != 2) {
+				error(call, "'#config' expects 2 argument, got %td", ce->args.count);
+				return false;
+			}
+			Ast *arg = unparen_expr(ce->args[0]);
+			if (arg == nullptr || arg->kind != Ast_Ident) {
+				error(call, "'#config' expects an identifier, got %.*s", LIT(ast_strings[arg->kind]));
+				return false;
+			}
+
+			Ast *def_arg = unparen_expr(ce->args[1]);
+
+			Operand def = {};
+			check_expr(c, &def, def_arg);
+			if (def.mode != Addressing_Constant) {
+				error(def_arg, "'#config' default value must be a constant");
+				return false;
+			}
+
+			String name = arg->Ident.token.string;
+
+
+			operand->type = def.type;
+			operand->mode = def.mode;
+			operand->value = def.value;
+
+			Entity *found = scope_lookup_current(config_pkg->scope, name);
+			if (found != nullptr) {
+				if (found->kind != Entity_Constant) {
+					error(arg, "'#config' entity '%.*s' found but expected a constant", LIT(name));
+				} else {
+					operand->type = found->type;
+					operand->mode = Addressing_Constant;
+					operand->value = found->Constant.value;
+				}
+			}
 		} else {
 			GB_PANIC("Unhandled #%.*s", LIT(name));
 		}
@@ -7186,7 +7231,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 	    ce->proc->kind == Ast_BasicDirective) {
 		ast_node(bd, BasicDirective, ce->proc);
 		String name = bd->name;
-		if (name == "location" || name == "assert" || name == "panic" || name == "defined" || name == "load") {
+		if (name == "location" || name == "assert" || name == "panic" || name == "defined" || name == "config" || name == "load") {
 			operand->mode = Addressing_Builtin;
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
 			operand->expr = ce->proc;

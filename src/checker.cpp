@@ -703,6 +703,14 @@ void init_universal(void) {
 	intrinsics_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global;
 	intrinsics_pkg->scope->pkg = intrinsics_pkg;
 
+	config_pkg = gb_alloc_item(a, AstPackage);
+	config_pkg->name = str_lit("config");
+	config_pkg->kind = Package_Normal;
+
+	config_pkg->scope = create_scope(nullptr, a);
+	config_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global;
+	config_pkg->scope->pkg = config_pkg;
+
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
@@ -783,7 +791,7 @@ void init_universal(void) {
 
 		Entity *entity = alloc_entity_constant(nullptr, make_token_ident(name), type, value);
 		entity->state = EntityState_Resolved;
-		if (scope_insert(builtin_pkg->scope, entity)) {
+		if (scope_insert(config_pkg->scope, entity)) {
 			error(entity->token, "'%s' defined as an argument is already declared at the global scope", name);
 			defined_values_double_declaration = true;
 			// NOTE(bill): Just exit early before anything, even though the compiler will do that anyway

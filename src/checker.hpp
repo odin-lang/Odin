@@ -332,6 +332,7 @@ struct Checker {
 
 gb_global AstPackage *builtin_pkg    = nullptr;
 gb_global AstPackage *intrinsics_pkg = nullptr;
+gb_global AstPackage *config_pkg      = nullptr;
 
 
 HashKey hash_node     (Ast *node)  { return hash_pointer(node); }
