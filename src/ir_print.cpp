@@ -1200,8 +1200,8 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 						Selection sel = lookup_field(type, name, false);
 						Entity *f = type->Struct.fields[sel.index[0]];
 
-						values[f->Variable.field_index] = tav.value;
-						visited[f->Variable.field_index] = true;
+						values[f->Variable.field_src_index] = tav.value;
+						visited[f->Variable.field_src_index] = true;
 					}
 				} else {
 					for_array(i, cl->elems) {
@@ -1211,8 +1211,8 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 						if (tav.mode != Addressing_Invalid) {
 							val = tav.value;
 						}
-						values[f->Variable.field_index]  = val;
-						visited[f->Variable.field_index] = true;
+						values[f->Variable.field_src_index]  = val;
+						visited[f->Variable.field_src_index] = true;
 					}
 				}
 			}
@@ -1231,7 +1231,8 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			for (isize i = 0; i < value_count; i++) {
 				if (i > 0) ir_write_string(f, str_lit(", "));
 				Entity *e = type->Struct.fields[i];
-				ir_print_compound_element(f, m, values[i], e->type);
+				GB_ASSERT(e->kind == Entity_Variable);
+				ir_print_compound_element(f, m, values[e->Variable.field_src_index], e->type);
 			}
 
 
