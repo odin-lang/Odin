@@ -4406,7 +4406,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 	}
 
 	if (value.kind == ExactValue_Procedure) {
-		Ast *expr = value.value_procedure;
+		Ast *expr = unparen_expr(value.value_procedure);
 		if (expr->kind == Ast_ProcLit) {
 			return lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
 		}
@@ -11532,40 +11532,8 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-	TIME_SECTION("LLVM Procedure Generation");
-	for_array(i, m->procedures_to_generate) {
-		lbProcedure *p = m->procedures_to_generate[i];
-		if (p->is_done) {
-			continue;
-		}
-		if (p->body != nullptr) { // Build Procedure
-			lb_begin_procedure_body(p);
-			lb_build_stmt(p, p->body);
-			lb_end_procedure_body(p);
-			p->is_done = true;
-		}
-		lb_end_procedure(p);
 
-		// Add Flags
-		if (p->body != nullptr) {
-			if (p->name == "memcpy" || p->name == "memmove" ||
-			    p->name == "runtime.mem_copy" || p->name == "mem_copy_non_overlapping" ||
-			    string_starts_with(p->name, str_lit("llvm.memcpy")) ||
-			    string_starts_with(p->name, str_lit("llvm.memmove"))) {
-				p->flags |= lbProcedureFlag_WithoutMemcpyPass;
-			}
-		}
-
-		if (LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-			gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
-			LLVMDumpValue(p->value);
-			gb_printf_err("\n\n\n\n");
-			LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
-		}
-	}
-
-
-	TIME_SECTION("LLVM Function Pass");
+	TIME_SECTION("LLVM Registry Initializtion");
 
 	LLVMPassRegistryRef pass_registry = LLVMGetGlobalPassRegistry();
 
@@ -11594,17 +11562,6 @@ void lb_generate_code(lbGenerator *gen) {
 		LLVMAddMergedLoadStoreMotionPass(default_function_pass_manager_without_memcpy);
 		LLVMAddPromoteMemoryToRegisterPass(default_function_pass_manager_without_memcpy);
 		// LLVMAddUnifyFunctionExitNodesPass(default_function_pass_manager_without_memcpy);
-	}
-
-	for_array(i, m->procedures_to_generate) {
-		lbProcedure *p = m->procedures_to_generate[i];
-		if (p->body != nullptr) { // Build Procedure
-			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
-				LLVMRunFunctionPassManager(default_function_pass_manager_without_memcpy, p->value);
-			} else {
-				LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
-			}
-		}
 	}
 
 	TIME_SECTION("LLVM Runtime Creation");
@@ -11781,6 +11738,53 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 
 		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+	}
+
+	TIME_SECTION("LLVM Procedure Generation");
+	for_array(i, m->procedures_to_generate) {
+		lbProcedure *p = m->procedures_to_generate[i];
+		if (p->is_done) {
+			continue;
+		}
+		if (p->body != nullptr) { // Build Procedure
+			lb_begin_procedure_body(p);
+			lb_build_stmt(p, p->body);
+			lb_end_procedure_body(p);
+			p->is_done = true;
+		}
+		lb_end_procedure(p);
+
+		// Add Flags
+		if (p->body != nullptr) {
+			if (p->name == "memcpy" || p->name == "memmove" ||
+			    p->name == "runtime.mem_copy" || p->name == "mem_copy_non_overlapping" ||
+			    string_starts_with(p->name, str_lit("llvm.memcpy")) ||
+			    string_starts_with(p->name, str_lit("llvm.memmove"))) {
+				p->flags |= lbProcedureFlag_WithoutMemcpyPass;
+			}
+		}
+
+		if (LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
+			gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
+			LLVMDumpValue(p->value);
+			gb_printf_err("\n\n\n\n");
+			LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
+		}
+	}
+
+
+
+	TIME_SECTION("LLVM Function Pass");
+
+	for_array(i, m->procedures_to_generate) {
+		lbProcedure *p = m->procedures_to_generate[i];
+		if (p->body != nullptr) { // Build Procedure
+			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
+				LLVMRunFunctionPassManager(default_function_pass_manager_without_memcpy, p->value);
+			} else {
+				LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+			}
+		}
 	}
 
 
