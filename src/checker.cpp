@@ -231,6 +231,11 @@ Scope *create_scope(Scope *parent, gbAllocator allocator, isize init_elements_ca
 	if (parent != nullptr && parent != builtin_pkg->scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
 	}
+
+	if (parent != nullptr && parent->flags & ScopeFlag_ContextDefined) {
+		s->flags |= ScopeFlag_ContextDefined;
+	}
+
 	return s;
 }
 

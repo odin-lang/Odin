@@ -440,6 +440,12 @@ default_logger :: proc() -> Logger {
 }
 
 
+default_context :: proc "contextless" () -> Context {
+	c: Context;
+	__init_context(&c);
+	return c;
+}
+
 @private
 __init_context_from_ptr :: proc "contextless" (c: ^Context, other: ^Context) {
 	if c == nil do return;
