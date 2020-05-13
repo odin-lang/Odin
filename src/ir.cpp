@@ -3307,10 +3307,9 @@ void ir_emit_defer_stmts(irProcedure *proc, irDeferExitKind kind, irBlock *block
 	while (i --> 0) {
 		irDefer d = proc->defer_stmts[i];
 
-		// TODO(bill, 2020-03-05): Why was this added?
-		// if (proc->context_stack.count >= d.context_stack_count) {
-		// 	proc->context_stack.count = d.context_stack_count;
-		// }
+		isize prev_context_stack_count = proc->context_stack.count;
+		defer (proc->context_stack.count = prev_context_stack_count);
+		proc->context_stack.count = d.context_stack_count;
 
 		if (kind == irDeferExit_Default) {
 			if (proc->scope_index == d.scope_index &&
