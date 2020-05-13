@@ -17,6 +17,18 @@ void check_stmt_list(CheckerContext *ctx, Array<Ast *> const &stmts, u32 flags) 
 		}
 		max--;
 	}
+	isize max_non_constant_declaration = stmts.count;
+	for (isize i = stmts.count-1; i >= 0; i--) {
+		if (stmts[i]->kind == Ast_EmptyStmt) {
+			// Okay
+		} else if (stmts[i]->kind == Ast_ValueDecl && !stmts[i]->ValueDecl.is_mutable) {
+			// Okay
+		} else {
+			break;
+		}
+		max_non_constant_declaration--;
+	}
+
 	for (isize i = 0; i < max; i++) {
 		Ast *n = stmts[i];
 		if (n->kind == Ast_EmptyStmt) {
@@ -27,10 +39,10 @@ void check_stmt_list(CheckerContext *ctx, Array<Ast *> const &stmts, u32 flags) 
 			new_flags |= Stmt_FallthroughAllowed;
 		}
 
-		if (i+1 < max) {
+		if (i+1 < max_non_constant_declaration) {
 			switch (n->kind) {
 			case Ast_ReturnStmt:
-				error(n, "Statements after this 'return' are never execu");
+				error(n, "Statements after this 'return' are never executed");
 				break;
 
 			case Ast_BranchStmt:
@@ -47,7 +59,11 @@ bool check_is_terminating_list(Array<Ast *> const &stmts) {
 	// Iterate backwards
 	for (isize n = stmts.count-1; n >= 0; n--) {
 		Ast *stmt = stmts[n];
-		if (stmt->kind != Ast_EmptyStmt) {
+		if (stmt->kind == Ast_EmptyStmt) {
+			// Okay
+		} else if (stmt->kind == Ast_ValueDecl && !stmt->ValueDecl.is_mutable) {
+			// Okay
+		} else {
 			return check_is_terminating(stmt);
 		}
 	}
