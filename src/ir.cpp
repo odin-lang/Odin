@@ -7908,7 +7908,7 @@ bool ir_is_elem_const(irModule *m, Ast *elem, Type *elem_type) {
 	}
 	TypeAndValue tav = type_and_value_of_expr(elem);
 	GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s", expr_to_string(elem), type_to_string(tav.type));
-	return tav.value.kind != ExactValue_Invalid;
+	return tav.value.kind != ExactValue_Invalid && tav.value.kind != ExactValue_Procedure;
 }
 
 irAddr ir_build_addr_from_entity(irProcedure *proc, Entity *e, Ast *expr) {
