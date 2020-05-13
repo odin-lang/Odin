@@ -8168,16 +8168,18 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					}
 
 					fields_visited[sel.index[0]] = true;
-					check_expr_or_type(c, o, fv->value, field->type);
+
+					Operand o = {};
+					check_expr_or_type(c, &o, fv->value, field->type);
 
 					if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
 						is_constant = false;
 					}
 					if (is_constant) {
-						is_constant = o->mode == Addressing_Constant;
+						is_constant = o.mode == Addressing_Constant;
 					}
 
-					check_assignment(c, o, field->type, str_lit("structure literal"));
+					check_assignment(c, &o, field->type, str_lit("structure literal"));
 				}
 			} else {
 				bool seen_field_value = false;
@@ -8194,7 +8196,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						continue;
 					}
 					if (index >= field_count) {
-						error(o->expr, "Too many values in structure literal, expected %td, got %td", field_count, cl->elems.count);
+						error(elem, "Too many values in structure literal, expected %td, got %td", field_count, cl->elems.count);
 						break;
 					}
 
@@ -8202,16 +8204,17 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						field = t->Struct.fields[index];
 					}
 
-					check_expr_or_type(c, o, elem, field->type);
+					Operand o = {};
+					check_expr_or_type(c, &o, elem, field->type);
 
 					if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
 						is_constant = false;
 					}
 					if (is_constant) {
-						is_constant = o->mode == Addressing_Constant;
+						is_constant = o.mode == Addressing_Constant;
 					}
 
-					check_assignment(c, o, field->type, str_lit("structure literal"));
+					check_assignment(c, &o, field->type, str_lit("structure literal"));
 				}
 				if (cl->elems.count < field_count) {
 					if (min_field_count < field_count) {
