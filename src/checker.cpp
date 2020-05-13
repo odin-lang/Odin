@@ -1706,6 +1706,11 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 		str_lit("umodti3"),
 		str_lit("udivti3"),
+		str_lit("modti3"),
+		str_lit("divti3"),
+		str_lit("fixdfti"),
+		str_lit("floattidf"),
+
 
 		str_lit("memset"),
 		str_lit("memcpy"),
