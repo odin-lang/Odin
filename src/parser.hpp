@@ -292,7 +292,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(TernaryExpr,     "ternary expression",       struct { Ast *cond, *x, *y; }) \
 	AST_KIND(TernaryIfExpr,   "ternary if expression",    struct { Ast *x, *cond, *y; }) \
 	AST_KIND(TernaryWhenExpr, "ternary when expression",  struct { Ast *x, *cond, *y; }) \
-	AST_KIND(TypeAssertion, "type assertion",      struct { Ast *expr; Token dot; Ast *type; }) \
+	AST_KIND(TypeAssertion, "type assertion",      struct { Ast *expr; Token dot; Ast *type; Type *type_hint; }) \
 	AST_KIND(TypeCast,      "type cast",           struct { Token token; Ast *type, *expr; }) \
 	AST_KIND(AutoCast,      "auto_cast",           struct { Token token; Ast *expr; }) \
 AST_KIND(_ExprEnd,       "", bool) \

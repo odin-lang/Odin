@@ -8897,12 +8897,31 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		if (ta->type != nullptr && ta->type->kind == Ast_UnaryExpr && ta->type->UnaryExpr.op.kind == Token_Question) {
 			if (!is_type_union(src)) {
 				gbString str = type_to_string(o->type);
-				error(o->expr, "Type assertions with .? can only operate on unions with 1 variant, got %s", str);
+				error(o->expr, "Type assertions with .? can only operate on unions, got %s", str);
 				gb_string_free(str);
 				o->mode = Addressing_Invalid;
 				o->expr = node;
 				return kind;
 			}
+
+			if (bsrc->Union.variants.count != 1 && type_hint != nullptr) {
+				bool allowed = false;
+				for_array(i, bsrc->Union.variants) {
+					Type *vt = bsrc->Union.variants[i];
+					if (are_types_identical(vt, type_hint)) {
+						allowed = true;
+						add_type_info_type(c, vt);
+						break;
+					}
+				}
+				if (allowed) {
+					add_type_info_type(c, o->type);
+					o->type = type_hint;
+					o->mode = Addressing_OptionalOk;
+					return kind;
+				}
+			}
+
 			if (bsrc->Union.variants.count != 1) {
 				error(o->expr, "Type assertions with .? can only operate on unions with 1 variant, got %lld", cast(long long)bsrc->Union.variants.count);
 				o->mode = Addressing_Invalid;
