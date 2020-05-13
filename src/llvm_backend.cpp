@@ -6432,6 +6432,11 @@ void lb_build_defer_stmt(lbProcedure *p, lbDefer d) {
 		return;
 	}
 
+	isize prev_context_stack_count = p->context_stack.count;
+	defer (p->context_stack.count = prev_context_stack_count);
+	p->context_stack.count = d.context_stack_count;
+
+
 	lbBlock *b = lb_create_block(p, "defer");
 	if (last_instr == nullptr || !LLVMIsATerminatorInst(last_instr)) {
 		lb_emit_jump(p, b);
