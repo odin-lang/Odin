@@ -2501,6 +2501,19 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	c->curr_proc_sig = type;
 	c->in_proc_sig = true;
 
+	
+	ProcCallingConvention cc = pt->calling_convention;
+	if (cc == ProcCC_ForeignBlockDefault) {
+		cc = ProcCC_CDecl;
+		if (c->foreign_context.default_cc > 0) {
+			cc = c->foreign_context.default_cc;
+		}
+	}
+	GB_ASSERT(cc > 0);
+	if (cc == ProcCC_Odin) {
+		c->scope->flags |= ScopeFlag_ContextDefined;
+	}
+
 	bool variadic = false;
 	isize variadic_index = -1;
 	bool success = true;
@@ -2534,14 +2547,7 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	}
 
 
-	ProcCallingConvention cc = pt->calling_convention;
-	if (cc == ProcCC_ForeignBlockDefault) {
-		cc = ProcCC_CDecl;
-		if (c->foreign_context.default_cc > 0) {
-			cc = c->foreign_context.default_cc;
-		}
-	}
-	GB_ASSERT(cc > 0);
+
 
 	bool optional_ok = (pt->tags & ProcTag_optional_ok) != 0;
 	if (optional_ok) {

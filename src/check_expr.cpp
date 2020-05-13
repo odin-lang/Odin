@@ -7724,6 +7724,15 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				return kind;
 			}
 
+			if (unparen_expr(c->assignment_lhs_hint) == node) {
+				c->scope->flags |= ScopeFlag_ContextDefined;
+			}
+
+			if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
+				error(node, "'context' has not been defined within this scope");
+				// Continue with value
+			}
+
 			init_core_context(c->checker);
 			o->mode = Addressing_Context;
 			o->type = t_context;

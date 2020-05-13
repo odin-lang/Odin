@@ -158,7 +158,7 @@ struct ProcInfo {
 
 
 
-enum ScopeFlag {
+enum ScopeFlag : i32 {
 	ScopeFlag_Pkg    = 1<<1,
 	ScopeFlag_Global = 1<<2,
 	ScopeFlag_File   = 1<<3,
@@ -167,6 +167,8 @@ enum ScopeFlag {
 	ScopeFlag_Type   = 1<<6,
 
 	ScopeFlag_HasBeenImported = 1<<10, // This is only applicable to file scopes
+	
+	ScopeFlag_ContextDefined = 1<<16, 
 };
 
 struct Scope {
