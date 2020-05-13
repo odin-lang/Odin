@@ -43,6 +43,8 @@ enum StmtFlag {
 	Stmt_ContinueAllowed    = 1<<1,
 	Stmt_FallthroughAllowed = 1<<2,
 
+	Stmt_TypeSwitch = 1<<4,
+
 	Stmt_CheckScopeDecls    = 1<<5,
 };
 
