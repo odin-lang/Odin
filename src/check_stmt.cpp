@@ -1025,7 +1025,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(ss, TypeSwitchStmt, node);
 	Operand x = {};
 
-	mod_flags |= Stmt_BreakAllowed;
+	mod_flags |= Stmt_BreakAllowed | Stmt_TypeSwitch;
 	check_open_scope(ctx, node);
 	defer (check_close_scope(ctx));
 
@@ -1791,7 +1791,11 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			break;
 		case Token_fallthrough:
 			if ((flags & Stmt_FallthroughAllowed) == 0) {
-				error(token, "'fallthrough' statement in illegal position, expected at the end of a 'case' block");
+				if ((flags & Stmt_TypeSwitch) != 0) {
+					error(token, "'fallthrough' statement not allowed within a type switch statement");
+				} else {
+					error(token, "'fallthrough' statement in illegal position, expected at the end of a 'case' block");
+				}
 			} else if (bs->label != nullptr) {
 				error(token, "'fallthrough' cannot have a label");
 			}
