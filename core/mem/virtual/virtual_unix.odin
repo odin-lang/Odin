@@ -60,7 +60,8 @@ alloc :: proc(size: int, access := Memory_Access_Flags{.Read, .Write}, desired_b
 	memory = reserve(size, desired_base);
 	if memory == nil do return;
 
-	assert(commit(memory, access));
+	ok := commit(memory, access);
+	assert(ok);
 	return;
 }
 
@@ -70,7 +71,9 @@ free :: proc(memory: []byte) {
 
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
-	assert(_unix_munmap(&memory[0], u64(len(memory))) != MAP_FAILED);
+
+	res := _unix_munmap(&memory[0], u64(len(memory)));
+	assert(res != MAP_FAILED);
 }
 
 // Commit pages to physical memory so they can be used.
@@ -81,7 +84,7 @@ commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> 
 
 	set_access(memory, access);
 	_ = _unix_madvise(&memory[0], u64(len(memory)), MADV_WILLNEED); // ignored, since advisory is not required
-	return true; // TODO: maybe inline call to mprotect?; on Windows it's part of the virtualalloc call.
+	return true;
 }
 
 // Decommit pages that were previously committed, causing them to be removed from physical memory,
