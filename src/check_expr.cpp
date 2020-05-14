@@ -7411,6 +7411,12 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 
 	Type *pt = base_type(proc_type);
 
+	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
+		if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
+			error(call, "'context' has not been defined within this scope, but is required for this procedure call");
+		}
+	}
+
 	#if 0
 	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
 		init_core_context(c->checker);

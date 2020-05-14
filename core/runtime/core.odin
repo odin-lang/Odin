@@ -518,7 +518,7 @@ copy :: proc{copy_slice, copy_from_string};
 
 
 @builtin
-pop :: proc "contextless" (array: ^$T/[dynamic]$E) -> E {
+pop :: proc(array: ^$T/[dynamic]$E) -> E {
 	if array == nil do return E{};
 	assert(len(array) > 0);
 	res := #no_bounds_check array[len(array)-1];
@@ -1270,7 +1270,7 @@ __get_map_key :: proc "contextless" (k: $K) -> Map_Key {
 	return map_key;
 }
 
-_fnv64a :: proc(data: []byte, seed: u64 = 0xcbf29ce484222325) -> u64 {
+_fnv64a :: proc "contextless" (data: []byte, seed: u64 = 0xcbf29ce484222325) -> u64 {
 	h: u64 = seed;
 	for b in data {
 		h = (h ~ u64(b)) * 0x100000001b3;
@@ -1279,10 +1279,10 @@ _fnv64a :: proc(data: []byte, seed: u64 = 0xcbf29ce484222325) -> u64 {
 }
 
 
-default_hash :: proc(data: []byte) -> u64 {
+default_hash :: proc "contextless" (data: []byte) -> u64 {
 	return _fnv64a(data);
 }
-default_hash_string :: proc(s: string) -> u64 do return default_hash(transmute([]byte)(s));
+default_hash_string :: proc "contextless" (s: string) -> u64 do return default_hash(transmute([]byte)(s));
 
 
 source_code_location_hash :: proc(s: Source_Code_Location) -> u64 {

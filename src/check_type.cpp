@@ -2512,6 +2512,8 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	GB_ASSERT(cc > 0);
 	if (cc == ProcCC_Odin) {
 		c->scope->flags |= ScopeFlag_ContextDefined;
+	} else {
+		c->scope->flags &= ~ScopeFlag_ContextDefined;
 	}
 
 	bool variadic = false;

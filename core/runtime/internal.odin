@@ -583,6 +583,7 @@ quaternion256_ne :: inline proc "contextless" (a, b: quaternion256) -> bool { re
 bounds_check_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
 	if 0 <= index && index < count do return;
 	handle_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
+		context = default_context();
 		fd := os.stderr;
 		print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
 		os.write_string(fd, " Index ");
@@ -596,6 +597,7 @@ bounds_check_error :: proc "contextless" (file: string, line, column: int, index
 }
 
 slice_handle_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
+	context = default_context();
 	fd := os.stderr;
 	print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
 	os.write_string(fd, " Invalid slice indices: ");
@@ -621,6 +623,7 @@ slice_expr_error_lo_hi :: proc "contextless" (file: string, line, column: int, l
 dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
 	if 0 <= low && low <= high && high <= max do return;
 	handle_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
+		context = default_context();
 		fd := os.stderr;
 		print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
 		os.write_string(fd, " Invalid dynamic array values: ");
@@ -639,6 +642,7 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int,
 type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: typeid) {
 	if ok do return;
 	handle_error :: proc "contextless" (file: string, line, column: int, from, to: typeid) {
+		context = default_context();
 		fd := os.stderr;
 		print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
 		os.write_string(fd, " Invalid type assertion from ");
@@ -751,6 +755,7 @@ dynamic_array_expr_error_loc :: inline proc "contextless" (using loc := #caller_
 make_slice_error_loc :: inline proc "contextless" (loc := #caller_location, len: int) {
 	if 0 <= len do return;
 	handle_error :: proc "contextless" (loc: Source_Code_Location, len: int) {
+		context = default_context();
 		fd := os.stderr;
 		print_caller_location(fd, loc);
 		os.write_string(fd, " Invalid slice length for make: ");
@@ -764,6 +769,7 @@ make_slice_error_loc :: inline proc "contextless" (loc := #caller_location, len:
 make_dynamic_array_error_loc :: inline proc "contextless" (using loc := #caller_location, len, cap: int) {
 	if 0 <= len && len <= cap do return;
 	handle_error :: proc "contextless" (loc: Source_Code_Location, len, cap: int) {
+		context = default_context();
 		fd := os.stderr;
 		print_caller_location(fd, loc);
 		os.write_string(fd, " Invalid dynamic array parameters for make: ");
@@ -779,6 +785,7 @@ make_dynamic_array_error_loc :: inline proc "contextless" (using loc := #caller_
 make_map_expr_error_loc :: inline proc "contextless" (loc := #caller_location, cap: int) {
 	if 0 <= cap do return;
 	handle_error :: proc "contextless" (loc: Source_Code_Location, cap: int) {
+		context = default_context();
 		fd := os.stderr;
 		print_caller_location(fd, loc);
 		os.write_string(fd, " Invalid map capacity for make: ");
