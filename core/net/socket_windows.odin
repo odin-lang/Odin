@@ -16,7 +16,7 @@ package net
 	because several system error values might map to the same error for us.
 	Like .Unsupported_Address_Family, .Unsupported_Socket_Type, etc... they'd all be .Unsupported.
 
-	
+
 
 */
 
@@ -86,7 +86,7 @@ Write_Error :: enum {
 	Shutdown = win32.WSAESHUTDOWN,
 	// datagram socket and the data is too big.
 	Truncated = win32.WSAEMSGSIZE,                          // TODO(tetra): Seperate Tcp / Udp sockets
-	// the other peer closed their socket.
+	// the other peer closed their socket, or the UDP packet was not received.
 	Reset = win32.WSAECONNRESET,
 	// out of buffer space
 	Out_Of_Resources = win32.WSAENOBUFS,
@@ -101,6 +101,7 @@ Write_Error :: enum {
 }
 
 // Reads data from a socket. Blocks if none is ready.
+// TODO: Verify that it only returns 0 if it's nonblocking.
 read :: proc(skt: Socket, buffer: []u8) -> (n: int, err: Read_Error) {
 	wait_err := wait_for_available_data(skt);
 	if wait_err != .Ok {
@@ -461,7 +462,7 @@ listen :: proc(bind_addr: Address, port: int, type := Socket_Type.Tcp, accept_qu
 			case:
 				err = Listen_Error(listen_err);
 			}
-			return;			
+			return;
 		}
 	case .Udp: // nothing
 	}
@@ -539,11 +540,11 @@ start_dial :: proc(addr: Address, port: int, type := Socket_Type.Tcp) -> (skt: S
 	skt, create_err = create(get_addr_type(addr), type);
 	switch create_err {
 	case .Ok: // nothing
-	case .Out_Of_Resources:      err = .Out_Of_Resources;
-	case .Offline:        err = .Offline;
-	case .Bad_Protocol:   assert(false);
-	case .Bad_Type:       assert(false);
-	case .Wrong_Protocol: assert(false);
+	case .Out_Of_Resources: err = .Out_Of_Resources;
+	case .Offline:          err = .Offline;
+	case .Bad_Protocol:     assert(false);
+	case .Bad_Type:         assert(false);
+	case .Wrong_Protocol:   assert(false);
 	}
 
 	if type != .Udp do set_option(skt, .Inline_Out_Of_Band, true);
