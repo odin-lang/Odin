@@ -281,6 +281,7 @@ Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg) {
 	if (s->flags & (ScopeFlag_Init|ScopeFlag_Global)) {
 		s->flags |= ScopeFlag_HasBeenImported;
 	}
+	s->flags |= ScopeFlag_ContextDefined;
 
 	return s;
 }

@@ -6,6 +6,7 @@ import "core:os"
 import "core:thread"
 import "core:time"
 import "core:reflect"
+import "core:runtime"
 import "intrinsics"
 
 
@@ -1931,6 +1932,16 @@ union_maybe :: proc() {
 	fmt.println(z, z_ok);
 }
 
+dummy_procedure :: proc() {
+	fmt.println("dummy_procedure");
+}
+
+explicit_context_definition :: proc "c" () {
+	// Try commenting the following statement out below
+	context = runtime.default_context(); 
+	dummy_procedure();
+}
+
 main :: proc() {
 	when true {
 		the_basics();
@@ -1961,5 +1972,6 @@ main :: proc() {
 		soa_struct_layout();
 		constant_literal_expressions();
 		union_maybe();
+		explicit_context_definition();
 	}
 }

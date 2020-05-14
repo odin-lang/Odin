@@ -28,7 +28,7 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	win32_thread_id: u32;
 
 	__windows_thread_entry_proc :: proc "c" (t: ^Thread) -> i32 {
-		c := context;
+		c := runtime.default_context();
 		if t.use_init_context {
 			c = t.init_context;
 		}
