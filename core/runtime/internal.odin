@@ -70,15 +70,6 @@ align_forward_uintptr :: inline proc(ptr, align: uintptr) -> uintptr {
 mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	if data == nil do return nil;
 	if len < 0 do return data;
-	when !ODIN_USE_LLVM_API do foreign _ {
-		when size_of(rawptr) == 8 {
-			@(link_name="llvm.memset.p0i8.i64")
-			memset :: proc(dst: rawptr, val: byte, len: int, align: i32 = 1, is_volatile: bool = false) ---;
-		} else {
-			@(link_name="llvm.memset.p0i8.i32")
-			memset :: proc(dst: rawptr, val: byte, len: int, align: i32 = 1, is_volatile: bool = false) ---;
-		}
-	}
 	memset(data, 0, len);
 	return data;
 }

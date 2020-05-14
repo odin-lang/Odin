@@ -3,28 +3,7 @@ package mem
 import "core:runtime"
 
 set :: proc(data: rawptr, value: byte, len: int) -> rawptr {
-	foreign _ {
-		when ODIN_USE_LLVM_API {
-			when size_of(rawptr) == 8 {
-				@(link_name="llvm.memset.p0i8.i64")
-				memset :: proc(dst: rawptr, val: byte, len: int, is_volatile: bool = false) ---;
-			} else {
-				@(link_name="llvm.memset.p0i8.i32")
-				memset :: proc(dst: rawptr, val: byte, len: int, is_volatile: bool = false) ---;
-			}
-		} else {
-			when size_of(rawptr) == 8 {
-				@(link_name="llvm.memset.p0i8.i64")
-				memset :: proc(dst: rawptr, val: byte, len: int, align: i32 = 1, is_volatile: bool = false) ---;
-			} else {
-				@(link_name="llvm.memset.p0i8.i32")
-				memset :: proc(dst: rawptr, val: byte, len: int, align: i32 = 1, is_volatile: bool = false) ---;
-			}
-		}
-	}
-
-	memset(data, value, len);
-	return data;
+	return runtime.memset(data, i32(value), len);
 }
 zero :: inline proc(data: rawptr, len: int) -> rawptr {
 	return set(data, 0, len);
