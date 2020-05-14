@@ -1,5 +1,5 @@
 // #define NO_ARRAY_BOUNDS_CHECK
-alshdkashdkuawhd
+
 #include "common.cpp"
 #include "timings.cpp"
 #include "tokenizer.cpp"
