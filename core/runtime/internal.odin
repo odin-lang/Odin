@@ -442,6 +442,18 @@ print_type :: proc(fd: os.Handle, ti: ^Type_Info) {
 			os.write_byte(fd, ']');
 			print_type(fd, info.elem);
 		}
+
+	case Type_Info_Relative_Pointer:
+		os.write_string(fd, "#relative(");
+		print_type(fd, info.base_integer);
+		os.write_string(fd, ") ");
+		print_type(fd, info.pointer);
+
+	case Type_Info_Relative_Slice:
+		os.write_string(fd, "#relative(");
+		print_type(fd, info.base_integer);
+		os.write_string(fd, ") ");
+		print_type(fd, info.slice);
 	}
 }
 

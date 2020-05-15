@@ -599,6 +599,20 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		}
 	}
 
+	if (is_type_relative_pointer(dst)) {
+		i64 score = check_distance_between_types(c, operand, dst->RelativePointer.pointer_type);
+		if (score >= 0) {
+			return score+2;
+		}
+	}
+
+	if (is_type_relative_slice(dst)) {
+		i64 score = check_distance_between_types(c, operand, dst->RelativeSlice.slice_type);
+		if (score >= 0) {
+			return score+2;
+		}
+	}
+
 	if (is_type_proc(dst)) {
 		if (are_types_identical(src, dst)) {
 			return 3;
@@ -3620,7 +3634,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 	case Entity_Constant:
 		operand->value = entity->Constant.value;
 		operand->mode = Addressing_Constant;
-		if (operand->value.kind == ExactValue_Procedure) { 
+		if (operand->value.kind == ExactValue_Procedure) {
 			Entity *proc = strip_entity_wrapping(operand->value.value_procedure);
 			if (proc != nullptr) {
 				operand->mode = Addressing_Value;
@@ -5923,7 +5937,7 @@ bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, 
 
 				isize count = tuple->variables.count;
 				tuple_index += add_dependencies_from_unpacking(c, lhs, lhs_count, tuple_index, count);
-				
+
 				add_type_and_value(c->info, val.expr, val.mode, val.type, val.value);
 			} else {
 				for_array(j, tuple->variables) {
@@ -9205,7 +9219,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						o->mode = Addressing_Invalid;
 						o->expr = node;
 						return kind;
-					}	
+					}
 
 					GB_ASSERT(e->identifier != nullptr);
 					Ast *proc_ident = clone_ast(e->identifier);
@@ -9480,6 +9494,22 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (t->kind == Type_Pointer && !is_type_empty_union(t->Pointer.elem)) {
 				o->mode = Addressing_Variable;
 				o->type = t->Pointer.elem;
+ 			} else if (t->kind == Type_RelativePointer) {
+ 				if (o->mode != Addressing_Variable) {
+ 					gbString str = expr_to_string(o->expr);
+ 					gbString typ = type_to_string(o->type);
+ 					error(o->expr, "Cannot dereference relative pointer '%s' of type '%s' as it does not have a variable addressing mode", str, typ);
+ 					gb_string_free(typ);
+ 					gb_string_free(str);
+ 				}
+
+ 				// NOTE(bill): This is required because when dereferencing, the original type has been lost
+				add_type_info_type(c, o->type);
+
+ 				Type *ptr_type = base_type(t->RelativePointer.pointer_type);
+ 				GB_ASSERT(ptr_type->kind == Type_Pointer);
+				o->mode = Addressing_Variable;
+				o->type = ptr_type->Pointer.elem;
  			} else {
  				gbString str = expr_to_string(o->expr);
  				gbString typ = type_to_string(o->type);
@@ -10000,6 +10030,12 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 			str = write_expr_to_string(str, et->fields[i]);
 		}
 		str = gb_string_append_rune(str, '}');
+	case_end;
+
+	case_ast_node(rt, RelativeType, node);
+		str = write_expr_to_string(str, rt->tag);
+		str = gb_string_appendc(str, "" );
+		str = write_expr_to_string(str, rt->type);
 	case_end;
 	}
 

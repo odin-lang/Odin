@@ -28,6 +28,8 @@ enum lbAddrKind {
 	lbAddr_Context,
 	lbAddr_SoaVariable,
 
+	lbAddr_RelativePointer,
+
 	lbAddr_AtomOp_index_set,
 };
 
@@ -68,11 +70,11 @@ struct lbModule {
 	Map<LLVMTypeRef> types; // Key: Type *
 
 	Map<lbValue>  values;           // Key: Entity *
-	StringMap<lbValue>  members;          
-	StringMap<lbProcedure *> procedures;  
+	StringMap<lbValue>  members;
+	StringMap<lbProcedure *> procedures;
 	Map<Entity *> procedure_values; // Key: LLVMValueRef
 
-	StringMap<LLVMValueRef> const_strings; 
+	StringMap<LLVMValueRef> const_strings;
 
 	Map<lbProcedure *> anonymous_proc_lits; // Key: Ast *
 

@@ -1430,6 +1430,16 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		add_type_info_type(c, bt->SimdVector.elem);
 		break;
 
+	case Type_RelativePointer:
+		add_type_info_type(c, bt->RelativePointer.pointer_type);
+		add_type_info_type(c, bt->RelativePointer.base_integer);
+		break;
+
+	case Type_RelativeSlice:
+		add_type_info_type(c, bt->RelativeSlice.slice_type);
+		add_type_info_type(c, bt->RelativeSlice.base_integer);
+		break;
+
 	default:
 		GB_PANIC("Unhandled type: %*.s %d", LIT(type_strings[bt->kind]), bt->kind);
 		break;
@@ -1624,6 +1634,16 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 
 	case Type_SimdVector:
 		add_min_dep_type_info(c, bt->SimdVector.elem);
+		break;
+
+	case Type_RelativePointer:
+		add_min_dep_type_info(c, bt->RelativePointer.pointer_type);
+		add_min_dep_type_info(c, bt->RelativePointer.base_integer);
+		break;
+
+	case Type_RelativeSlice:
+		add_min_dep_type_info(c, bt->RelativeSlice.slice_type);
+		add_min_dep_type_info(c, bt->RelativeSlice.base_integer);
 		break;
 
 	default:
@@ -2055,6 +2075,8 @@ void init_core_type_info(Checker *c) {
 	t_type_info_bit_set          = find_core_type(c, str_lit("Type_Info_Bit_Set"));
 	t_type_info_opaque           = find_core_type(c, str_lit("Type_Info_Opaque"));
 	t_type_info_simd_vector      = find_core_type(c, str_lit("Type_Info_Simd_Vector"));
+	t_type_info_relative_pointer = find_core_type(c, str_lit("Type_Info_Relative_Pointer"));
+	t_type_info_relative_slice   = find_core_type(c, str_lit("Type_Info_Relative_Slice"));
 
 	t_type_info_named_ptr            = alloc_type_pointer(t_type_info_named);
 	t_type_info_integer_ptr          = alloc_type_pointer(t_type_info_integer);
@@ -2081,6 +2103,8 @@ void init_core_type_info(Checker *c) {
 	t_type_info_bit_set_ptr          = alloc_type_pointer(t_type_info_bit_set);
 	t_type_info_opaque_ptr           = alloc_type_pointer(t_type_info_opaque);
 	t_type_info_simd_vector_ptr      = alloc_type_pointer(t_type_info_simd_vector);
+	t_type_info_relative_pointer_ptr = alloc_type_pointer(t_type_info_relative_pointer);
+	t_type_info_relative_slice_ptr   = alloc_type_pointer(t_type_info_relative_slice);
 }
 
 void init_mem_allocator(Checker *c) {

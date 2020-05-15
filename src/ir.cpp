@@ -20,7 +20,7 @@ struct irModule {
 
 	PtrSet<Entity *>      min_dep_set;
 	Map<irValue *>        values;              // Key: Entity *
-	StringMap<irValue *>  members;             
+	StringMap<irValue *>  members;
 	Map<String>           entity_names;        // Key: Entity * of the typename
 	Map<irDebugInfo *>    debug_info;          // Key: Unique pointer
 	Map<irValue *>        anonymous_proc_lits; // Key: Ast *
@@ -7399,7 +7399,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		// HACK TODO(bill): This is hack but it should be safe in virtually all cases
 		irValue *v = ir_typeid(proc->module, tv.type);
 		return ir_emit_conv(proc, v, t_typeid);
-	} 
+	}
 
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): Edge case
@@ -11514,7 +11514,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			case Basic_f64le:
 			case Basic_f32be:
 			case Basic_f64be:
-				{	
+				{
 					tag = ir_emit_conv(proc, variant_ptr, t_type_info_float_ptr);
 
 					// NOTE(bill): This is matches the runtime layout

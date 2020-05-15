@@ -126,7 +126,7 @@ enum StructSoaKind {
 
 enum TypeAtomOpKind {
 	TypeAtomOp_Invalid,
-	
+
 	TypeAtomOp_index_get,
 	TypeAtomOp_index_set,
 	TypeAtomOp_slice,
@@ -151,7 +151,7 @@ struct TypeStruct {
 
 	i64      custom_align;
 	Entity * names;
-	
+
 	TypeAtomOpTable *atom_op_table;
 
 	Type *        soa_elem;
@@ -290,8 +290,14 @@ struct TypeProc {
 		Type *elem;                                       \
 		bool is_x86_mmx;                                  \
 	})                                                    \
-
-
+	TYPE_KIND(RelativePointer, struct {                   \
+		Type *pointer_type;                               \
+		Type *base_integer;                               \
+	})                                                    \
+	TYPE_KIND(RelativeSlice, struct {                     \
+		Type *slice_type;                                 \
+		Type *base_integer;                               \
+	})
 
 
 enum TypeKind {
@@ -358,6 +364,10 @@ enum Typeid_Kind : u8 {
 	Typeid_Map,
 	Typeid_Bit_Field,
 	Typeid_Bit_Set,
+	Typeid_Opaque,
+	Typeid_Simd_Vector,
+	Typeid_Relative_Pointer,
+	Typeid_Relative_Slice,
 };
 
 
@@ -611,6 +621,8 @@ gb_global Type *t_type_info_bit_field            = nullptr;
 gb_global Type *t_type_info_bit_set              = nullptr;
 gb_global Type *t_type_info_opaque               = nullptr;
 gb_global Type *t_type_info_simd_vector          = nullptr;
+gb_global Type *t_type_info_relative_pointer     = nullptr;
+gb_global Type *t_type_info_relative_slice       = nullptr;
 
 gb_global Type *t_type_info_named_ptr            = nullptr;
 gb_global Type *t_type_info_integer_ptr          = nullptr;
@@ -637,6 +649,8 @@ gb_global Type *t_type_info_bit_field_ptr        = nullptr;
 gb_global Type *t_type_info_bit_set_ptr          = nullptr;
 gb_global Type *t_type_info_opaque_ptr           = nullptr;
 gb_global Type *t_type_info_simd_vector_ptr      = nullptr;
+gb_global Type *t_type_info_relative_pointer_ptr = nullptr;
+gb_global Type *t_type_info_relative_slice_ptr   = nullptr;
 
 gb_global Type *t_allocator                      = nullptr;
 gb_global Type *t_allocator_ptr                  = nullptr;
@@ -661,6 +675,9 @@ void     init_map_internal_types(Type *type);
 Type *   bit_set_to_int(Type *t);
 bool are_types_identical(Type *x, Type *y);
 
+bool is_type_pointer(Type *t);
+bool is_type_slice(Type *t);
+bool is_type_integer(Type *t);
 
 bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t) {
 	if (ptr_set_exists(s, t)) {
@@ -837,9 +854,23 @@ Type *alloc_type_enum() {
 	return t;
 }
 
+Type *alloc_type_relative_pointer(Type *pointer_type, Type *base_integer) {
+	GB_ASSERT(is_type_pointer(pointer_type));
+	GB_ASSERT(is_type_integer(base_integer));
+	Type *t = alloc_type(Type_RelativePointer);
+	t->RelativePointer.pointer_type = pointer_type;
+	t->RelativePointer.base_integer = base_integer;
+	return t;
+}
 
-
-
+Type *alloc_type_relative_slice(Type *slice_type, Type *base_integer) {
+	GB_ASSERT(is_type_slice(slice_type));
+	GB_ASSERT(is_type_integer(base_integer));
+	Type *t = alloc_type(Type_RelativeSlice);
+	t->RelativeSlice.slice_type   = slice_type;
+	t->RelativeSlice.base_integer = base_integer;
+	return t;
+}
 
 Type *alloc_type_named(String name, Type *base, Entity *type_name) {
 	Type *t = alloc_type(Type_Named);
@@ -1197,6 +1228,14 @@ bool is_type_generic(Type *t) {
 	return t->kind == Type_Generic;
 }
 
+bool is_type_relative_pointer(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_RelativePointer;
+}
+bool is_type_relative_slice(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_RelativeSlice;
+}
 
 
 Type *core_array_type(Type *t) {
@@ -1755,6 +1794,10 @@ bool type_has_nil(Type *t) {
 		}
 		return false;
 	case Type_Opaque:
+		return true;
+
+	case Type_RelativePointer:
+	case Type_RelativeSlice:
 		return true;
 	}
 	return false;
@@ -2865,6 +2908,11 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
 		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
 	}
+
+	case Type_RelativePointer:
+		return type_align_of_internal(t->RelativePointer.base_integer, path);
+	case Type_RelativeSlice:
+		return type_align_of_internal(t->RelativeSlice.base_integer, path);
 	}
 
 	// return gb_clamp(next_pow2(type_size_of(t)), 1, build_context.max_align);
@@ -3138,6 +3186,11 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 		Type *elem = t->SimdVector.elem;
 		return count * type_size_of_internal(elem, path);
 	}
+
+	case Type_RelativePointer:
+		return type_size_of_internal(t->RelativePointer.base_integer, path);
+	case Type_RelativeSlice:
+		return 2*type_size_of_internal(t->RelativeSlice.base_integer, path);
 	}
 
 	// Catch all
@@ -3535,6 +3588,19 @@ gbString write_type_to_string(gbString str, Type *type) {
 			str = gb_string_append_fmt(str, "#simd[%d]", cast(int)type->SimdVector.count);
 			str = write_type_to_string(str, type->SimdVector.elem);
 		}
+		break;
+
+	case Type_RelativePointer:
+		str = gb_string_append_fmt(str, "#relative(");
+		str = write_type_to_string(str, type->RelativePointer.base_integer);
+		str = gb_string_append_fmt(str, ") ");
+		str = write_type_to_string(str, type->RelativePointer.pointer_type);
+		break;
+	case Type_RelativeSlice:
+		str = gb_string_append_fmt(str, "#relative(");
+		str = write_type_to_string(str, type->RelativeSlice.base_integer);
+		str = gb_string_append_fmt(str, ") ");
+		str = write_type_to_string(str, type->RelativeSlice.slice_type);
 		break;
 	}
 

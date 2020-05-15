@@ -143,7 +143,15 @@ Type_Info_Simd_Vector :: struct {
 	elem_size:  int,
 	count:      int,
 	is_x86_mmx: bool,
-}
+};
+Type_Info_Relative_Pointer :: struct {
+	pointer:      ^Type_Info,
+	base_integer: ^Type_Info,
+};
+Type_Info_Relative_Slice :: struct {
+	slice:        ^Type_Info,
+	base_integer: ^Type_Info,
+};
 
 Type_Info :: struct {
 	size:  int,
@@ -176,6 +184,8 @@ Type_Info :: struct {
 		Type_Info_Bit_Set,
 		Type_Info_Opaque,
 		Type_Info_Simd_Vector,
+		Type_Info_Relative_Pointer,
+		Type_Info_Relative_Slice,
 	},
 }
 
@@ -205,6 +215,9 @@ Typeid_Kind :: enum u8 {
 	Bit_Field,
 	Bit_Set,
 	Opaque,
+	Simd_Vector,
+	Relative_Pointer,
+	Relative_Slice,
 }
 #assert(len(Typeid_Kind) < 32);
 
