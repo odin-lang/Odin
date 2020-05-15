@@ -7563,6 +7563,17 @@ bool check_set_index_data(Operand *o, Type *t, bool indirection, i64 *max_count,
 		}
 		return true;
 
+	case Type_RelativeSlice:
+		{
+			Type *slice_type = base_type(t->RelativeSlice.slice_type);
+			GB_ASSERT(slice_type->kind == Type_Slice);
+			o->type = slice_type->Slice.elem;
+			if (o->mode != Addressing_Constant) {
+				o->mode = Addressing_Variable;
+			}
+		}
+		return true;
+
 	case Type_DynamicArray:
 		o->type = t->DynamicArray.elem;
 		if (o->mode != Addressing_Constant) {
@@ -9250,6 +9261,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				// Okay
 			} else if (is_type_string(t)) {
 				// Okay
+			} else if (is_type_relative_slice(t)) {
+				// Okay
 			} else {
 				valid = false;
 			}
@@ -9390,6 +9403,19 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					map_set(&c->info->atom_op_map, hash_pointer(node), entry);
 					valid = true;
 				}
+			}
+			break;
+
+		case Type_RelativeSlice:
+			valid = true;
+			o->type = t->RelativeSlice.slice_type;
+			if (o->mode != Addressing_Variable) {
+				gbString str = expr_to_string(node);
+				error(node, "Cannot relative slice '%s', value is not addressable", str);
+				gb_string_free(str);
+				o->mode = Addressing_Invalid;
+				o->expr = node;
+				return kind;
 			}
 			break;
 		}

@@ -1938,8 +1938,27 @@ dummy_procedure :: proc() {
 
 explicit_context_definition :: proc "c" () {
 	// Try commenting the following statement out below
-	context = runtime.default_context(); 
+	context = runtime.default_context();
+
+	fmt.println("\n#explicit context definition");
 	dummy_procedure();
+}
+
+relative_data_types :: proc() {
+	fmt.println("\n#relative data types");
+
+	x: int = 123;
+	ptr: #relative(i16) ^int;
+	ptr = &x;
+	fmt.println(ptr^);
+
+	arr := [3]int{1, 2, 3};
+	s := arr[:];
+	rel_slice: #relative(i16) []int;
+	rel_slice = s;
+	fmt.println(rel_slice);
+	fmt.println(rel_slice[:]);
+	fmt.println(rel_slice[1]);
 }
 
 main :: proc() {
@@ -1973,5 +1992,6 @@ main :: proc() {
 		constant_literal_expressions();
 		union_maybe();
 		explicit_context_definition();
+		relative_data_types();
 	}
 }

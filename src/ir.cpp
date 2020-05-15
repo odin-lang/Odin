@@ -494,6 +494,7 @@ enum irAddrKind {
 	irAddr_Context,
 	irAddr_SoaVariable,
 	irAddr_RelativePointer,
+	irAddr_RelativeSlice,
 };
 
 struct irAddr {
@@ -525,6 +526,9 @@ irAddr ir_addr(irValue *addr) {
 	if (addr != nullptr && is_type_relative_pointer(type_deref(ir_type(addr)))) {
 		GB_ASSERT(is_type_pointer(ir_type(addr)));
 		v.kind = irAddr_RelativePointer;
+	} else if (addr != nullptr && is_type_relative_slice(type_deref(ir_type(addr)))) {
+		GB_ASSERT(is_type_pointer(ir_type(addr)));
+		v.kind = irAddr_RelativeSlice;
 	}
 	return v;
 }
@@ -912,7 +916,9 @@ irValue *ir_emit_bitcast(irProcedure *proc, irValue *data, Type *type);
 irValue *ir_emit_byte_swap(irProcedure *proc, irValue *value, Type *t);
 irValue *ir_find_or_add_entity_string(irModule *m, String str);
 irValue *ir_find_or_add_entity_string_byte_slice(irModule *m, String str);
-
+irValue *ir_slice_elem(irProcedure *proc, irValue *slice);
+irValue *ir_slice_len(irProcedure *proc, irValue *slice);
+void ir_fill_slice(irProcedure *proc, irValue *slice_ptr, irValue *data, irValue *len);
 
 
 irValue *ir_alloc_value(irValueKind kind) {
@@ -3655,6 +3661,34 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 		ir_emit_store(proc, offset_ptr, offset);
 		return;
 
+	} else if (addr.kind == irAddr_RelativeSlice) {
+		Type *rel_ptr = base_type(ir_addr_type(addr));
+		GB_ASSERT(rel_ptr->kind == Type_RelativeSlice);
+
+		value = ir_emit_conv(proc, value, rel_ptr->RelativeSlice.slice_type);
+
+		GB_ASSERT(is_type_pointer(ir_type(addr.addr)));
+		irValue *ptr = ir_emit_conv(proc, ir_emit_struct_ep(proc, addr.addr, 0), t_uintptr);
+		irValue *val_ptr = ir_emit_conv(proc, ir_slice_elem(proc, value), t_uintptr);
+		irValue *offset = ir_emit_arith(proc, Token_Sub, val_ptr, ptr, t_uintptr);
+
+		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
+			offset = ir_emit_conv(proc, offset, t_i64);
+		}
+		offset = ir_emit_conv(proc, offset, rel_ptr->RelativePointer.base_integer);
+
+
+		irValue *offset_ptr = ir_emit_conv(proc, addr.addr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		ir_emit_store(proc, offset_ptr, offset);
+
+		irValue *len = ir_slice_len(proc, value);
+		len = ir_emit_conv(proc, len, rel_ptr->RelativePointer.base_integer);
+
+		irValue *len_ptr = ir_emit_struct_ep(proc, addr.addr, 1);
+		ir_emit_store(proc, len_ptr, len);
+
+		return;
+
 	} else if (addr.kind == irAddr_Map) {
 		ir_insert_dynamic_map_key_and_value(proc, addr.addr, addr.map_type, addr.map_key, value);
 		return;
@@ -3822,6 +3856,42 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 		irValue *final_ptr = ir_emit_select(proc, cond, nil_ptr, absolute_ptr);
 
 		return ir_emit_load(proc, final_ptr);
+
+	} else if (addr.kind == irAddr_RelativeSlice) {
+		Type *rel_ptr = base_type(ir_addr_type(addr));
+		GB_ASSERT(rel_ptr->kind == Type_RelativeSlice);
+
+		irValue *offset_ptr = ir_emit_struct_ep(proc, addr.addr, 0);
+		irValue *ptr = ir_emit_conv(proc, offset_ptr, t_uintptr);
+		irValue *offset = ir_emit_load(proc, offset_ptr);
+
+
+		if (!is_type_unsigned(rel_ptr->RelativeSlice.base_integer)) {
+			offset = ir_emit_conv(proc, offset, t_i64);
+		}
+		offset = ir_emit_conv(proc, offset, t_uintptr);
+		irValue *absolute_ptr = ir_emit_arith(proc, Token_Add, ptr, offset, t_uintptr);
+
+		Type *slice_type = base_type(rel_ptr->RelativeSlice.slice_type);
+		GB_ASSERT(rel_ptr->RelativeSlice.slice_type->kind == Type_Slice);
+		Type *slice_elem = slice_type->Slice.elem;
+		Type *slice_elem_ptr = alloc_type_pointer(slice_elem);
+
+		absolute_ptr = ir_emit_conv(proc, absolute_ptr, slice_elem_ptr);
+
+		irValue *cond = ir_emit_comp(proc, Token_CmpEq, offset, ir_value_nil(rel_ptr->RelativeSlice.base_integer));
+
+		// NOTE(bill): nil check
+		irValue *nil_ptr = ir_value_nil(slice_elem_ptr);
+		irValue *data = ir_emit_select(proc, cond, nil_ptr, absolute_ptr);
+
+		irValue *len = ir_emit_load(proc, ir_emit_struct_ep(proc, addr.addr, 1));
+		len = ir_emit_conv(proc, len, t_int);
+
+		irValue *slice = ir_add_local_generated(proc, slice_type, false);
+		ir_fill_slice(proc, slice, data, len);
+		return ir_emit_load(proc, slice);
+
 
 	} else if (addr.kind == irAddr_Map) {
 		Type *map_type = base_type(addr.map_type);
@@ -4872,6 +4942,11 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		}
 	} else if (is_type_array(t)) {
 		return ir_emit_array_epi(proc, s, index);
+	} else if (is_type_relative_slice(t)) {
+		switch (index) {
+		case 0: result_type = alloc_type_pointer(t->RelativeSlice.base_integer); break;
+		case 1: result_type = alloc_type_pointer(t->RelativeSlice.base_integer); break;
+		}
 	} else {
 		GB_PANIC("TODO(bill): struct_gep type: %s, %d", type_to_string(ir_type(s)), index);
 	}
@@ -8245,18 +8320,12 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			return ir_addr_map(map_val, key, t, result_type);
 		}
 
-		irValue *using_addr = nullptr;
-
 		switch (t->kind) {
 		case Type_Array: {
 			irValue *array = nullptr;
-			if (using_addr != nullptr) {
-				array = using_addr;
-			} else {
-				array = ir_build_addr_ptr(proc, ie->expr);
-				if (deref) {
-					array = ir_emit_load(proc, array);
-				}
+			array = ir_build_addr_ptr(proc, ie->expr);
+			if (deref) {
+				array = ir_emit_load(proc, array);
 			}
 			irValue *index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
 			irValue *elem = ir_emit_array_ep(proc, array, index);
@@ -8271,15 +8340,10 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 		case Type_EnumeratedArray: {
 			irValue *array = nullptr;
-			if (using_addr != nullptr) {
-				array = using_addr;
-			} else {
-				array = ir_build_addr_ptr(proc, ie->expr);
-				if (deref) {
-					array = ir_emit_load(proc, array);
-				}
+			array = ir_build_addr_ptr(proc, ie->expr);
+			if (deref) {
+				array = ir_emit_load(proc, array);
 			}
-
 			Type *index_type = t->EnumeratedArray.index;
 
 			auto index_tv = type_and_value_of_expr(ie->index);
@@ -8308,14 +8372,26 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 		case Type_Slice: {
 			irValue *slice = nullptr;
-			if (using_addr != nullptr) {
-				slice = ir_emit_load(proc, using_addr);
-			} else {
-				slice = ir_build_expr(proc, ie->expr);
-				if (deref) {
-					slice = ir_emit_load(proc, slice);
-				}
+			slice = ir_build_expr(proc, ie->expr);
+			if (deref) {
+				slice = ir_emit_load(proc, slice);
 			}
+
+			irValue *elem = ir_slice_elem(proc, slice);
+			irValue *index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
+			irValue *len = ir_slice_len(proc, slice);
+			ir_emit_bounds_check(proc, ast_token(ie->index), index, len);
+			irValue *v = ir_emit_ptr_offset(proc, elem, index);
+			return ir_addr(v);
+		}
+
+		case Type_RelativeSlice: {
+			irAddr addr = ir_build_addr(proc, ie->expr);
+			if (deref) {
+				addr = ir_addr(ir_addr_load(proc, addr));
+			}
+			irValue *slice = ir_addr_load(proc, addr);
+
 			irValue *elem = ir_slice_elem(proc, slice);
 			irValue *index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
 			irValue *len = ir_slice_len(proc, slice);
@@ -8326,14 +8402,11 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 		case Type_DynamicArray: {
 			irValue *dynamic_array = nullptr;
-			if (using_addr != nullptr) {
-				dynamic_array = ir_emit_load(proc, using_addr);
-			} else {
-				dynamic_array = ir_build_expr(proc, ie->expr);
-				if (deref) {
-					dynamic_array = ir_emit_load(proc, dynamic_array);
-				}
+			dynamic_array = ir_build_expr(proc, ie->expr);
+			if (deref) {
+				dynamic_array = ir_emit_load(proc, dynamic_array);
 			}
+
 			irValue *elem = ir_dynamic_array_elem(proc, dynamic_array);
 			irValue *len = ir_dynamic_array_len(proc, dynamic_array);
 			irValue *index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
@@ -8349,14 +8422,11 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 			irValue *len;
 			irValue *index;
 
-			if (using_addr != nullptr) {
-				str = ir_emit_load(proc, using_addr);
-			} else {
-				str = ir_build_expr(proc, ie->expr);
-				if (deref) {
-					str = ir_emit_load(proc, str);
-				}
+			str = ir_build_expr(proc, ie->expr);
+			if (deref) {
+				str = ir_emit_load(proc, str);
 			}
+
 			elem = ir_string_elem(proc, str);
 			len = ir_string_len(proc, str);
 
@@ -8379,14 +8449,14 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 		bool no_indices = se->low == nullptr && se->high == nullptr;
 
-		irValue *addr = ir_build_addr_ptr(proc, se->expr);
-		irValue *base = ir_emit_load(proc, addr);
+		irAddr addr = ir_build_addr(proc, se->expr);
+		irValue *base = ir_addr_load(proc, addr);
 		Type *type = base_type(ir_type(base));
 
 		if (is_type_pointer(type)) {
 			type = base_type(type_deref(type));
-			addr = base;
-			base = ir_emit_load(proc, base);
+			addr = ir_addr(base);
+			base = ir_addr_load(proc, addr);
 		}
 		// TODO(bill): Cleanup like mad!
 
@@ -8442,7 +8512,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 					ir_emit_slice_bounds_check(proc, se->open, low, high, len, se->low != nullptr);
 				}
 			}
-			irValue *elem    = ir_emit_ptr_offset(proc, ir_array_elem(proc, addr), low);
+			irValue *elem    = ir_emit_ptr_offset(proc, ir_array_elem(proc, ir_addr_get_ptr(proc, addr)), low);
 			irValue *new_len = ir_emit_arith(proc, Token_Sub, high, low, t_int);
 
 			irValue *slice = ir_add_local_generated(proc, slice_type, false);
@@ -8470,7 +8540,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 		case Type_Struct:
 			if (is_type_soa_struct(type)) {
-				irValue *len = ir_soa_struct_len(proc, addr);
+				irValue *len = ir_soa_struct_len(proc, ir_addr_get_ptr(proc, addr));
 				if (high == nullptr) high = len;
 
 				if (!no_indices) {
@@ -8482,7 +8552,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 					i32 field_count = cast(i32)type->Struct.fields.count;
 					for (i32 i = 0; i < field_count; i++) {
 						irValue *field_dst = ir_emit_struct_ep(proc, dst, i);
-						irValue *field_src = ir_emit_struct_ep(proc, addr, i);
+						irValue *field_src = ir_emit_struct_ep(proc, ir_addr_get_ptr(proc, addr), i);
 						field_src = ir_emit_array_ep(proc, field_src, low);
 						ir_emit_store(proc, field_dst, field_src);
 					}
