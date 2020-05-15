@@ -493,6 +493,7 @@ enum irAddrKind {
 	irAddr_BitField,
 	irAddr_Context,
 	irAddr_SoaVariable,
+	irAddr_RelativePointer,
 };
 
 struct irAddr {
@@ -517,8 +518,14 @@ struct irAddr {
 	};
 };
 
+Type *ir_type(irValue *value);
+
 irAddr ir_addr(irValue *addr) {
 	irAddr v = {irAddr_Default, addr};
+	if (addr != nullptr && is_type_relative_pointer(type_deref(ir_type(addr)))) {
+		GB_ASSERT(is_type_pointer(ir_type(addr)));
+		v.kind = irAddr_RelativePointer;
+	}
 	return v;
 }
 
@@ -722,7 +729,6 @@ gb_inline bool ir_min_dep_entity(irModule *m, Entity *e) {
 	return ptr_set_exists(&m->min_dep_set, e);
 }
 
-Type *ir_type(irValue *value);
 Type *ir_instr_type(irInstr *instr) {
 	switch (instr->kind) {
 	case irInstr_Local:
@@ -772,6 +778,9 @@ Type *ir_instr_type(irInstr *instr) {
 }
 
 Type *ir_type(irValue *value) {
+	if (value == nullptr) {
+		return nullptr;
+	}
 	switch (value->kind) {
 	case irValue_Constant:
 		return value->Constant.type;
@@ -3626,7 +3635,27 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 	if (addr.addr == nullptr) {
 		return;
 	}
-	if (addr.kind == irAddr_Map) {
+	if (addr.kind == irAddr_RelativePointer) {
+		Type *rel_ptr = base_type(ir_addr_type(addr));
+		GB_ASSERT(rel_ptr->kind == Type_RelativePointer);
+
+		value = ir_emit_conv(proc, value, rel_ptr->RelativePointer.pointer_type);
+
+		GB_ASSERT(is_type_pointer(ir_type(addr.addr)));
+		irValue *ptr = ir_emit_conv(proc, addr.addr, t_uintptr);
+		irValue *val_ptr = ir_emit_conv(proc, value, t_uintptr);
+		irValue *offset = offset = ir_emit_arith(proc, Token_Sub, val_ptr, ptr, t_uintptr);
+
+		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
+			offset = ir_emit_conv(proc, offset, t_i64);
+		}
+		offset = ir_emit_conv(proc, offset, rel_ptr->RelativePointer.base_integer);
+
+		irValue *offset_ptr = ir_emit_conv(proc, addr.addr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		ir_emit_store(proc, offset_ptr, offset);
+		return;
+
+	} else if (addr.kind == irAddr_Map) {
 		ir_insert_dynamic_map_key_and_value(proc, addr.addr, addr.map_type, addr.map_key, value);
 		return;
 	} else if (addr.kind == irAddr_BitField) {
@@ -3770,7 +3799,31 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 		return nullptr;
 	}
 
-	if (addr.kind == irAddr_Map) {
+	if (addr.kind == irAddr_RelativePointer) {
+		Type *rel_ptr = base_type(ir_addr_type(addr));
+		GB_ASSERT(rel_ptr->kind == Type_RelativePointer);
+
+		irValue *ptr = ir_emit_conv(proc, addr.addr, t_uintptr);
+		irValue *offset = ir_emit_conv(proc, ptr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		offset = ir_emit_load(proc, offset);
+
+
+		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
+			offset = ir_emit_conv(proc, offset, t_i64);
+		}
+		offset = ir_emit_conv(proc, offset, t_uintptr);
+		irValue *absolute_ptr = ir_emit_arith(proc, Token_Add, ptr, offset, t_uintptr);
+		absolute_ptr = ir_emit_conv(proc, absolute_ptr, rel_ptr->RelativePointer.pointer_type);
+
+		irValue *cond = ir_emit_comp(proc, Token_CmpEq, offset, ir_value_nil(rel_ptr->RelativePointer.base_integer));
+
+		// NOTE(bill): nil check
+		irValue *nil_ptr = ir_value_nil(rel_ptr->RelativePointer.pointer_type);
+		irValue *final_ptr = ir_emit_select(proc, cond, nil_ptr, absolute_ptr);
+
+		return ir_emit_load(proc, final_ptr);
+
+	} else if (addr.kind == irAddr_Map) {
 		Type *map_type = base_type(addr.map_type);
 		irValue *v = ir_add_local_generated(proc, map_type->Map.lookup_result_type, true);
 		irValue *h = ir_gen_map_header(proc, addr.addr, map_type);
@@ -6004,19 +6057,22 @@ irValue *ir_typeid(irModule *m, Type *type) {
 		if (flags & BasicFlag_String)   kind = Typeid_String;
 		if (flags & BasicFlag_Rune)     kind = Typeid_Rune;
 	} break;
-	case Type_Pointer:         kind = Typeid_Pointer;       break;
-	case Type_Array:           kind = Typeid_Array;         break;
+	case Type_Pointer:         kind = Typeid_Pointer;         break;
+	case Type_Array:           kind = Typeid_Array;           break;
 	case Type_EnumeratedArray: kind = Typeid_Enumerated_Array; break;
-	case Type_Slice:           kind = Typeid_Slice;         break;
-	case Type_DynamicArray:    kind = Typeid_Dynamic_Array; break;
-	case Type_Map:             kind = Typeid_Map;           break;
-	case Type_Struct:          kind = Typeid_Struct;        break;
-	case Type_Enum:            kind = Typeid_Enum;          break;
-	case Type_Union:           kind = Typeid_Union;         break;
-	case Type_Tuple:           kind = Typeid_Tuple;         break;
-	case Type_Proc:            kind = Typeid_Procedure;     break;
-	case Type_BitField:        kind = Typeid_Bit_Field;     break;
-	case Type_BitSet:          kind = Typeid_Bit_Set;       break;
+	case Type_Slice:           kind = Typeid_Slice;            break;
+	case Type_DynamicArray:    kind = Typeid_Dynamic_Array;    break;
+	case Type_Map:             kind = Typeid_Map;              break;
+	case Type_Struct:          kind = Typeid_Struct;           break;
+	case Type_Enum:            kind = Typeid_Enum;             break;
+	case Type_Union:           kind = Typeid_Union;            break;
+	case Type_Tuple:           kind = Typeid_Tuple;            break;
+	case Type_Proc:            kind = Typeid_Procedure;        break;
+	case Type_BitField:        kind = Typeid_Bit_Field;        break;
+	case Type_BitSet:          kind = Typeid_Bit_Set;          break;
+	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
+	case Type_RelativePointer: kind = Typeid_Relative_Pointer; break;
+	case Type_RelativeSlice:   kind = Typeid_Relative_Slice;   break;
 	}
 
 	if (is_type_cstring(type)) {
@@ -8476,6 +8532,10 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 	case_end;
 
 	case_ast_node(de, DerefExpr, expr);
+		if (is_type_relative_pointer(type_of_expr(de->expr))) {
+			return ir_build_addr(proc, de->expr);
+		}
+
 		// TODO(bill): Is a ptr copy needed?
 		irValue *addr = ir_build_expr(proc, de->expr);
 		addr = ir_emit_ptr_offset(proc, addr, v_zero);
@@ -11934,6 +11994,20 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), ir_const_int(type_size_of(t->SimdVector.elem)));
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), ir_const_int(t->SimdVector.count));
 			}
+			break;
+
+		case Type_RelativePointer:
+			ir_emit_comment(proc, str_lit("Type_RelativePointer"));
+			tag = ir_emit_conv(proc, variant_ptr, t_type_info_relative_pointer_ptr);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->RelativePointer.pointer_type));
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->RelativePointer.base_integer));
+			break;
+
+		case Type_RelativeSlice:
+			ir_emit_comment(proc, str_lit("Type_RelativeSlice"));
+			tag = ir_emit_conv(proc, variant_ptr, t_type_info_relative_slice_ptr);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->RelativePointer.pointer_type));
+			ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), ir_get_type_info_ptr(proc, t->RelativePointer.base_integer));
 			break;
 		}
 
