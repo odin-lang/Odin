@@ -29,6 +29,7 @@ enum lbAddrKind {
 	lbAddr_SoaVariable,
 
 	lbAddr_RelativePointer,
+	lbAddr_RelativeSlice,
 
 	lbAddr_AtomOp_index_set,
 };
@@ -320,9 +321,9 @@ lbValue lb_map_entries_ptr(lbProcedure *p, lbValue value);
 lbValue lb_map_len(lbProcedure *p, lbValue value);
 lbValue lb_map_cap(lbProcedure *p, lbValue value);
 lbValue lb_soa_struct_len(lbProcedure *p, lbValue value);
-
 void lb_emit_increment(lbProcedure *p, lbValue addr);
 
+void lb_fill_slice(lbProcedure *p, lbAddr const &slice, lbValue base_elem, lbValue len);
 
 lbValue lb_type_info(lbModule *m, Type *type);
 

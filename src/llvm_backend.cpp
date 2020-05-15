@@ -59,6 +59,9 @@ lbAddr lb_addr(lbValue addr) {
 	if (addr.type != nullptr && is_type_relative_pointer(type_deref(addr.type))) {
 		GB_ASSERT(is_type_pointer(addr.type));
 		v.kind = lbAddr_RelativePointer;
+	} else if (addr.type != nullptr && is_type_relative_slice(type_deref(addr.type))) {
+		GB_ASSERT(is_type_pointer(addr.type));
+		v.kind = lbAddr_RelativeSlice;
 	}
 	return v;
 }
@@ -184,6 +187,36 @@ void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value) {
 
 		lbValue offset_ptr = lb_emit_conv(p, addr.addr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
 		LLVMBuildStore(p->builder, offset.value, offset_ptr.value);
+		return;
+
+	} else if (addr.kind == lbAddr_RelativeSlice) {
+		Type *rel_ptr = base_type(lb_addr_type(addr));
+		GB_ASSERT(rel_ptr->kind == Type_RelativeSlice);
+
+		value = lb_emit_conv(p, value, rel_ptr->RelativeSlice.slice_type);
+
+		GB_ASSERT(is_type_pointer(addr.addr.type));
+		lbValue ptr = lb_emit_conv(p, lb_emit_struct_ep(p, addr.addr, 0), t_uintptr);
+		lbValue val_ptr = lb_emit_conv(p, lb_slice_elem(p, value), t_uintptr);
+		lbValue offset = {};
+		offset.value = LLVMBuildSub(p->builder, val_ptr.value, ptr.value, "");
+		offset.type = t_uintptr;
+
+		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
+			offset = lb_emit_conv(p, offset, t_i64);
+		}
+		offset = lb_emit_conv(p, offset, rel_ptr->RelativePointer.base_integer);
+
+
+		lbValue offset_ptr = lb_emit_conv(p, addr.addr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		LLVMBuildStore(p->builder, offset.value, offset_ptr.value);
+
+		lbValue len = lb_slice_len(p, value);
+		len = lb_emit_conv(p, len, rel_ptr->RelativePointer.base_integer);
+
+		lbValue len_ptr = lb_emit_struct_ep(p, addr.addr, 1);
+		LLVMBuildStore(p->builder, len.value, len_ptr.value);
+
 		return;
 
 	} else if (addr.kind == lbAddr_AtomOp_index_set) {
@@ -393,6 +426,44 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		final_ptr.value = LLVMBuildSelect(p->builder, cond.value, nil_ptr.value, absolute_ptr.value, "");
 
 		return lb_emit_load(p, final_ptr);
+
+	} else if (addr.kind == lbAddr_RelativeSlice) {
+		Type *rel_ptr = base_type(lb_addr_type(addr));
+		GB_ASSERT(rel_ptr->kind == Type_RelativeSlice);
+
+		lbValue offset_ptr = lb_emit_struct_ep(p, addr.addr, 0);
+		lbValue ptr = lb_emit_conv(p, offset_ptr, t_uintptr);
+		lbValue offset = lb_emit_load(p, offset_ptr);
+
+
+		if (!is_type_unsigned(rel_ptr->RelativeSlice.base_integer)) {
+			offset = lb_emit_conv(p, offset, t_i64);
+		}
+		offset = lb_emit_conv(p, offset, t_uintptr);
+		lbValue absolute_ptr = lb_emit_arith(p, Token_Add, ptr, offset, t_uintptr);
+
+		Type *slice_type = base_type(rel_ptr->RelativeSlice.slice_type);
+		GB_ASSERT(rel_ptr->RelativeSlice.slice_type->kind == Type_Slice);
+		Type *slice_elem = slice_type->Slice.elem;
+		Type *slice_elem_ptr = alloc_type_pointer(slice_elem);
+
+		absolute_ptr = lb_emit_conv(p, absolute_ptr, slice_elem_ptr);
+
+		lbValue cond = lb_emit_comp(p, Token_CmpEq, offset, lb_const_nil(p->module, rel_ptr->RelativeSlice.base_integer));
+
+		// NOTE(bill): nil check
+		lbValue nil_ptr = lb_const_nil(p->module, slice_elem_ptr);
+		lbValue data = {};
+		data.type = absolute_ptr.type;
+		data.value = LLVMBuildSelect(p->builder, cond.value, nil_ptr.value, absolute_ptr.value, "");
+
+		lbValue len = lb_emit_load(p, lb_emit_struct_ep(p, addr.addr, 1));
+		len = lb_emit_conv(p, len, t_int);
+
+		lbAddr slice = lb_add_local_generated(p, slice_type, false);
+		lb_fill_slice(p, slice, data, len);
+		return lb_addr_load(p, slice);
+
 
 	} else if (addr.kind == lbAddr_Map) {
 		Type *map_type = base_type(addr.map.type);
@@ -6282,6 +6353,11 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		}
 	} else if (is_type_array(t)) {
 		return lb_emit_array_epi(p, s, index);
+	} else if (is_type_relative_slice(t)) {
+		switch (index) {
+		case 0: result_type = t->RelativeSlice.base_integer; break;
+		case 1: result_type = t->RelativeSlice.base_integer; break;
+		}
 	} else {
 		GB_PANIC("TODO(bill): struct_gep type: %s, %d", type_to_string(s.type), index);
 	}
@@ -9476,18 +9552,12 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			return lb_addr_map(map_val, key, t, result_type);
 		}
 
-		lbValue using_addr = {};
-
 		switch (t->kind) {
 		case Type_Array: {
 			lbValue array = {};
-			if (using_addr.value != nullptr) {
-				array = using_addr;
-			} else {
-				array = lb_build_addr_ptr(p, ie->expr);
-				if (deref) {
-					array = lb_emit_load(p, array);
-				}
+			array = lb_build_addr_ptr(p, ie->expr);
+			if (deref) {
+				array = lb_emit_load(p, array);
 			}
 			lbValue index = lb_build_expr(p, ie->index);
 			index = lb_emit_conv(p, index, t_int);
@@ -9503,13 +9573,9 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 		case Type_EnumeratedArray: {
 			lbValue array = {};
-			if (using_addr.value != nullptr) {
-				array = using_addr;
-			} else {
-				array = lb_build_addr_ptr(p, ie->expr);
-				if (deref) {
-					array = lb_emit_load(p, array);
-				}
+			array = lb_build_addr_ptr(p, ie->expr);
+			if (deref) {
+				array = lb_emit_load(p, array);
 			}
 
 			Type *index_type = t->EnumeratedArray.index;
@@ -9540,14 +9606,27 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 		case Type_Slice: {
 			lbValue slice = {};
-			if (using_addr.value != nullptr) {
-				slice = lb_emit_load(p, using_addr);
-			} else {
-				slice = lb_build_expr(p, ie->expr);
-				if (deref) {
-					slice = lb_emit_load(p, slice);
-				}
+			slice = lb_build_expr(p, ie->expr);
+			if (deref) {
+				slice = lb_emit_load(p, slice);
 			}
+			lbValue elem = lb_slice_elem(p, slice);
+			lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
+			lbValue len = lb_slice_len(p, slice);
+			// ir_emit_bounds_check(p, ast_token(ie->index), index, len);
+			lbValue v = lb_emit_ptr_offset(p, elem, index);
+			return lb_addr(v);
+		}
+
+		case Type_RelativeSlice: {
+			lbAddr slice_addr = {};
+			if (deref) {
+				slice_addr = lb_addr(lb_build_expr(p, ie->expr));
+			} else {
+				slice_addr = lb_build_addr(p, ie->expr);
+			}
+			lbValue slice = lb_addr_load(p, slice_addr);
+
 			lbValue elem = lb_slice_elem(p, slice);
 			lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
 			lbValue len = lb_slice_len(p, slice);
@@ -9558,13 +9637,9 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 		case Type_DynamicArray: {
 			lbValue dynamic_array = {};
-			if (using_addr.value != nullptr) {
-				dynamic_array = lb_emit_load(p, using_addr);
-			} else {
-				dynamic_array = lb_build_expr(p, ie->expr);
-				if (deref) {
-					dynamic_array = lb_emit_load(p, dynamic_array);
-				}
+			dynamic_array = lb_build_expr(p, ie->expr);
+			if (deref) {
+				dynamic_array = lb_emit_load(p, dynamic_array);
 			}
 			lbValue elem = lb_dynamic_array_elem(p, dynamic_array);
 			lbValue len = lb_dynamic_array_len(p, dynamic_array);
@@ -9581,13 +9656,9 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			lbValue len;
 			lbValue index;
 
-			if (using_addr.value != nullptr) {
-				str = lb_emit_load(p, using_addr);
-			} else {
-				str = lb_build_expr(p, ie->expr);
-				if (deref) {
-					str = lb_emit_load(p, str);
-				}
+			str = lb_build_expr(p, ie->expr);
+			if (deref) {
+				str = lb_emit_load(p, str);
 			}
 			elem = lb_string_elem(p, str);
 			len = lb_string_len(p, str);
@@ -9640,14 +9711,14 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 		}
 
 
-		lbValue addr = lb_build_addr_ptr(p, se->expr);
-		lbValue base = lb_emit_load(p, addr);
+		lbAddr addr = lb_build_addr(p, se->expr);
+		lbValue base = lb_addr_load(p, addr);
 		Type *type = base_type(base.type);
 
 		if (is_type_pointer(type)) {
 			type = base_type(type_deref(type));
-			addr = base;
-			base = lb_emit_load(p, base);
+			addr = lb_addr(base);
+			base = lb_addr_load(p, addr);
 		}
 
 		switch (type->kind) {
@@ -9667,6 +9738,10 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			lb_fill_slice(p, slice, elem, new_len);
 			return slice;
 		}
+
+		case Type_RelativeSlice:
+			GB_PANIC("TODO(bill): Type_RelativeSlice should be handled above already on the lb_addr_load");
+			break;
 
 		case Type_DynamicArray: {
 			Type *elem_type = type->DynamicArray.elem;
@@ -9702,7 +9777,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 					lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 				}
 			}
-			lbValue elem    = lb_emit_ptr_offset(p, lb_array_elem(p, addr), low);
+			lbValue elem    = lb_emit_ptr_offset(p, lb_array_elem(p, lb_addr_get_ptr(p, addr)), low);
 			lbValue new_len = lb_emit_arith(p, Token_Sub, high, low, t_int);
 
 			lbAddr slice = lb_add_local_generated(p, slice_type, false);
@@ -9730,7 +9805,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 		case Type_Struct:
 			if (is_type_soa_struct(type)) {
-				lbValue len = lb_soa_struct_len(p, addr);
+				lbValue len = lb_soa_struct_len(p, lb_addr_get_ptr(p, addr));
 				if (high.value == nullptr) high = len;
 
 				if (!no_indices) {
@@ -9743,7 +9818,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 					i32 field_count = cast(i32)type->Struct.fields.count;
 					for (i32 i = 0; i < field_count; i++) {
 						lbValue field_dst = lb_emit_struct_ep(p, dst.addr, i);
-						lbValue field_src = lb_emit_struct_ep(p, addr, i);
+						lbValue field_src = lb_emit_struct_ep(p, lb_addr_get_ptr(p, addr), i);
 						field_src = lb_emit_array_ep(p, field_src, low);
 						lb_emit_store(p, field_dst, field_src);
 					}
