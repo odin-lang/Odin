@@ -28,12 +28,12 @@ array_set
 array_reserve
 array_resize
 array_push = array_append :: proc{
-	array_push_back, 
+	array_push_back,
 	array_push_back_elems,
 }
 array_push_front
 array_pop_back
-array_pop_font
+array_pop_front
 array_consume
 array_trim
 array_clear
@@ -78,6 +78,10 @@ array_slice :: proc(a: $A/Array($T)) -> []T {
 	return transmute([]T)s;
 }
 
+array_cap_slice :: proc(a: $A/Array($T)) -> []T {
+	s := mem.Raw_Slice{a.data, a.cap};
+	return transmute([]T)s;
+}
 
 array_get :: proc(a: $A/Array($T), index: int, loc := #caller_location) -> T {
 	runtime.bounds_check_error_loc(loc, index, array_len(a));
@@ -136,7 +140,7 @@ array_pop_back :: proc(a: ^$A/Array($T), loc := #caller_location) -> T {
 	return item;
 }
 
-array_pop_font :: proc(a: ^$A/Array($T), loc := #caller_location) -> T {
+array_pop_front :: proc(a: ^$A/Array($T), loc := #caller_location) -> T {
 	assert(condition=a.len > 0, loc=loc);
 	item := array_get(a^, 0);
 	s := array_slice(a^);
@@ -167,13 +171,12 @@ array_clone :: proc(a: $A/Array($T), allocator := context.allocator) -> A {
 	return res;
 }
 
-
 array_push_back_elems :: proc(a: ^$A/Array($T), items: ..T) {
 	if array_space(a^) < len(items) {
 		array_grow(a, a.len + len(items));
 	}
 	offset := a.len;
-	data := array_slice(a^);
+	data := array_cap_slice(a^);
 	n := copy(data[a.len:], items);
 	a.len += n;
 }
