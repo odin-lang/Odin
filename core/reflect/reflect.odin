@@ -30,6 +30,8 @@ Type_Info_Bit_Field        :: runtime.Type_Info_Bit_Field;
 Type_Info_Bit_Set          :: runtime.Type_Info_Bit_Set;
 Type_Info_Opaque           :: runtime.Type_Info_Opaque;
 Type_Info_Simd_Vector      :: runtime.Type_Info_Simd_Vector;
+Type_Info_Relative_Pointer :: runtime.Type_Info_Relative_Pointer;
+Type_Info_Relative_Slice   :: runtime.Type_Info_Relative_Slice;
 
 
 Type_Kind :: enum {
@@ -60,6 +62,8 @@ Type_Kind :: enum {
 	Bit_Set,
 	Opaque,
 	Simd_Vector,
+	Relative_Pointer,
+	Relative_Slice,
 }
 
 
@@ -92,6 +96,8 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 		case Type_Info_Bit_Set:          return .Bit_Set;
 		case Type_Info_Opaque:           return .Opaque;
 		case Type_Info_Simd_Vector:      return .Simd_Vector;
+		case Type_Info_Relative_Pointer: return .Relative_Pointer;
+		case Type_Info_Relative_Slice:   return .Relative_Slice;
 		}
 
 	}

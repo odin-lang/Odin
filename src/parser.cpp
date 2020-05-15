@@ -87,6 +87,7 @@ Token ast_token(Ast *node) {
 	case Ast_OpaqueType:       return node->OpaqueType.token;
 	case Ast_PolyType:         return node->PolyType.token;
 	case Ast_ProcType:         return node->ProcType.token;
+	case Ast_RelativeType:     return ast_token(node->RelativeType.tag);
 	case Ast_PointerType:      return node->PointerType.token;
 	case Ast_ArrayType:        return node->ArrayType.token;
 	case Ast_DynamicArrayType: return node->DynamicArrayType.token;
@@ -342,6 +343,10 @@ Ast *clone_ast(Ast *node) {
 	case Ast_ProcType:
 		n->ProcType.params  = clone_ast(n->ProcType.params);
 		n->ProcType.results = clone_ast(n->ProcType.results);
+		break;
+	case Ast_RelativeType:
+		n->RelativeType.tag  = clone_ast(n->RelativeType.tag);
+		n->RelativeType.type = clone_ast(n->RelativeType.type);
 		break;
 	case Ast_PointerType:
 		n->PointerType.type = clone_ast(n->PointerType.type);
@@ -922,7 +927,12 @@ Ast *ast_proc_type(AstFile *f, Token token, Ast *params, Ast *results, u64 tags,
 	return result;
 }
 
-
+Ast *ast_relative_type(AstFile *f, Ast *tag, Ast *type) {
+	Ast *result = alloc_ast_node(f, Ast_RelativeType);
+	result->RelativeType.tag  = tag;
+	result->RelativeType.type = type;
+	return result;
+}
 Ast *ast_pointer_type(AstFile *f, Token token, Ast *type) {
 	Ast *result = alloc_ast_node(f, Ast_PointerType);
 	result->PointerType.token = token;
@@ -1825,6 +1835,11 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return operand;
+		} else if (name.string == "relative") {
+			Ast *tag = ast_basic_directive(f, token, name.string);
+			tag = parse_call_expr(f, tag);
+			Ast *type = parse_type(f);
+			return ast_relative_type(f, tag, type);
 		} else {
 			operand = ast_tag_expr(f, token, name, parse_expr(f, false));
 		}

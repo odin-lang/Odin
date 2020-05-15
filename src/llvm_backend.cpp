@@ -56,6 +56,10 @@ LLVMValueRef llvm_cstring(lbModule *m, String const &str) {
 
 lbAddr lb_addr(lbValue addr) {
 	lbAddr v = {lbAddr_Default, addr};
+	if (is_type_relative_pointer(type_deref(addr.type))) {
+		GB_ASSERT(is_type_pointer(addr.type));
+		v.kind = lbAddr_RelativePointer;
+	}
 	return v;
 }
 
@@ -160,7 +164,29 @@ void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value) {
 		value.value = LLVMConstNull(lb_type(p->module, t));
 	}
 
-	if (addr.kind == lbAddr_AtomOp_index_set) {
+	if (addr.kind == lbAddr_RelativePointer) {
+		Type *rel_ptr = base_type(lb_addr_type(addr));
+		GB_ASSERT(rel_ptr->kind == Type_RelativePointer);
+
+		value = lb_emit_conv(p, value, rel_ptr->RelativePointer.pointer_type);
+
+		GB_ASSERT(is_type_pointer(addr.addr.type));
+		lbValue ptr = lb_emit_conv(p, addr.addr, t_uintptr);
+		lbValue val_ptr = lb_emit_conv(p, value, t_uintptr);
+		lbValue offset = {};
+		offset.value = LLVMBuildSub(p->builder, val_ptr.value, ptr.value, "");
+		offset.type = t_uintptr;
+
+		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
+			offset = lb_emit_conv(p, offset, t_i64);
+		}
+		offset = lb_emit_conv(p, offset, rel_ptr->RelativePointer.base_integer);
+
+		lbValue offset_ptr = lb_emit_conv(p, addr.addr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		LLVMBuildStore(p->builder, offset.value, offset_ptr.value);
+		return;
+
+	} else if (addr.kind == lbAddr_AtomOp_index_set) {
 		lbValue ptr = addr.addr;
 		lbValue index = addr.index_set.index;
 		Ast *node = addr.index_set.node;
@@ -341,7 +367,34 @@ lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 	GB_ASSERT(addr.addr.value != nullptr);
 
-	if (addr.kind == lbAddr_Map) {
+
+	if (addr.kind == lbAddr_RelativePointer) {
+		Type *rel_ptr = base_type(lb_addr_type(addr));
+		GB_ASSERT(rel_ptr->kind == Type_RelativePointer);
+
+		lbValue ptr = lb_emit_conv(p, addr.addr, t_uintptr);
+		lbValue offset = lb_emit_conv(p, ptr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		offset = lb_emit_load(p, offset);
+
+
+		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
+			offset = lb_emit_conv(p, offset, t_i64);
+		}
+		offset = lb_emit_conv(p, offset, t_uintptr);
+		lbValue absolute_ptr = lb_emit_arith(p, Token_Add, ptr, offset, t_uintptr);
+		absolute_ptr = lb_emit_conv(p, absolute_ptr, rel_ptr->RelativePointer.pointer_type);
+
+		lbValue cond = lb_emit_comp(p, Token_CmpEq, offset, lb_const_nil(p->module, rel_ptr->RelativePointer.base_integer));
+
+		// NOTE(bill): nil check
+		lbValue nil_ptr = lb_const_nil(p->module, rel_ptr->RelativePointer.pointer_type);
+		lbValue final_ptr = {};
+		final_ptr.type = absolute_ptr.type;
+		final_ptr.value = LLVMBuildSelect(p->builder, cond.value, nil_ptr.value, absolute_ptr.value, "");
+
+		return lb_emit_load(p, final_ptr);
+
+	} else if (addr.kind == lbAddr_Map) {
 		Type *map_type = base_type(addr.map.type);
 		lbAddr v = lb_add_local_generated(p, map_type->Map.lookup_result_type, true);
 		lbValue h = lb_gen_map_header(p, addr.addr, map_type);
@@ -1181,6 +1234,20 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			return LLVMX86MMXTypeInContext(ctx);
 		}
 		return LLVMVectorType(lb_type(m, type->SimdVector.elem), cast(unsigned)type->SimdVector.count);
+
+	case Type_RelativePointer:
+		return lb_type_internal(m, type->RelativePointer.base_integer);
+
+	case Type_RelativeSlice:
+		{
+			LLVMTypeRef base_integer = lb_type_internal(m, type->RelativeSlice.base_integer);
+
+			unsigned field_count = 2;
+			LLVMTypeRef *fields = gb_alloc_array(heap_allocator(), LLVMTypeRef, field_count);
+			fields[0] = base_integer;
+			fields[1] = base_integer;
+			return LLVMStructTypeInContext(ctx, fields, field_count, false);
+		}
 	}
 
 	GB_PANIC("Invalid type %s", type_to_string(type));
@@ -3970,7 +4037,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			}
 
 			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-			
+
 			LLVMBuildRet(p->builder, res.value);
 		}
 	case_end;
@@ -4323,19 +4390,23 @@ lbValue lb_typeid(lbModule *m, Type *type, Type *typeid_type) {
 		if (flags & BasicFlag_String)   kind = Typeid_String;
 		if (flags & BasicFlag_Rune)     kind = Typeid_Rune;
 	} break;
-	case Type_Pointer:         kind = Typeid_Pointer;       break;
-	case Type_Array:           kind = Typeid_Array;         break;
+	case Type_Pointer:         kind = Typeid_Pointer;          break;
+	case Type_Array:           kind = Typeid_Array;            break;
 	case Type_EnumeratedArray: kind = Typeid_Enumerated_Array; break;
-	case Type_Slice:           kind = Typeid_Slice;         break;
-	case Type_DynamicArray:    kind = Typeid_Dynamic_Array; break;
-	case Type_Map:             kind = Typeid_Map;           break;
-	case Type_Struct:          kind = Typeid_Struct;        break;
-	case Type_Enum:            kind = Typeid_Enum;          break;
-	case Type_Union:           kind = Typeid_Union;         break;
-	case Type_Tuple:           kind = Typeid_Tuple;         break;
-	case Type_Proc:            kind = Typeid_Procedure;     break;
-	case Type_BitField:        kind = Typeid_Bit_Field;     break;
-	case Type_BitSet:          kind = Typeid_Bit_Set;       break;
+	case Type_Slice:           kind = Typeid_Slice;            break;
+	case Type_DynamicArray:    kind = Typeid_Dynamic_Array;    break;
+	case Type_Map:             kind = Typeid_Map;              break;
+	case Type_Struct:          kind = Typeid_Struct;           break;
+	case Type_Enum:            kind = Typeid_Enum;             break;
+	case Type_Union:           kind = Typeid_Union;            break;
+	case Type_Tuple:           kind = Typeid_Tuple;            break;
+	case Type_Proc:            kind = Typeid_Procedure;        break;
+	case Type_BitField:        kind = Typeid_Bit_Field;        break;
+	case Type_BitSet:          kind = Typeid_Bit_Set;          break;
+	case Type_Opaque:          kind = Typeid_Opaque;           break;
+	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
+	case Type_RelativePointer: kind = Typeid_Relative_Pointer; break;
+	case Type_RelativeSlice:   kind = Typeid_Relative_Slice;   break;
 	}
 
 	if (is_type_cstring(type)) {
@@ -4495,7 +4566,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 
 		res.value = LLVMConstArray(lb_type(m, elem), elems, cast(unsigned)count);
 		return res;
-	} 
+	}
 
 	switch (value.kind) {
 	case ExactValue_Invalid:
@@ -9723,6 +9794,10 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(de, DerefExpr, expr);
+		if (is_type_relative_pointer(type_of_expr(de->expr))) {
+			lbAddr addr = lb_build_addr(p, de->expr);
+			return addr;
+		}
 		lbValue addr = lb_build_expr(p, de->expr);
 		return lb_addr(addr);
 	case_end;
@@ -11192,6 +11267,36 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				lb_emit_store(p, tag, res);
 			}
 			break;
+
+		case Type_RelativePointer:
+			{
+				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_relative_pointer_ptr);
+				LLVMValueRef vals[2] = {
+					lb_get_type_info_ptr(m, t->RelativePointer.pointer_type).value,
+					lb_get_type_info_ptr(m, t->RelativePointer.base_integer).value,
+				};
+
+				lbValue res = {};
+				res.type = type_deref(tag.type);
+				res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+				lb_emit_store(p, tag, res);
+			}
+			break;
+		case Type_RelativeSlice:
+			{
+				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_relative_slice_ptr);
+				LLVMValueRef vals[2] = {
+					lb_get_type_info_ptr(m, t->RelativeSlice.slice_type).value,
+					lb_get_type_info_ptr(m, t->RelativeSlice.base_integer).value,
+				};
+
+				lbValue res = {};
+				res.type = type_deref(tag.type);
+				res.value = LLVMConstNamedStruct(lb_type(m, res.type), vals, gb_count_of(vals));
+				lb_emit_store(p, tag, res);
+			}
+			break;
+
 		}
 
 
@@ -11554,6 +11659,25 @@ void lb_generate_code(lbGenerator *gen) {
 		LLVMAddMergedLoadStoreMotionPass(default_function_pass_manager);
 		LLVMAddPromoteMemoryToRegisterPass(default_function_pass_manager);
 		// LLVMAddUnifyFunctionExitNodesPass(default_function_pass_manager);
+		if (build_context.optimization_level >= 2) {
+			LLVMAddAggressiveInstCombinerPass(default_function_pass_manager);
+			LLVMAddEarlyCSEPass(default_function_pass_manager);
+			LLVMAddEarlyCSEMemSSAPass(default_function_pass_manager);
+			LLVMAddLowerExpectIntrinsicPass(default_function_pass_manager);
+
+			LLVMAddAlignmentFromAssumptionsPass(default_function_pass_manager);
+			LLVMAddLoopRotatePass(default_function_pass_manager);
+			LLVMAddDeadStoreEliminationPass(default_function_pass_manager);
+			LLVMAddScalarizerPass(default_function_pass_manager);
+			LLVMAddReassociatePass(default_function_pass_manager);
+			LLVMAddAddDiscriminatorsPass(default_function_pass_manager);
+			LLVMAddPromoteMemoryToRegisterPass(default_function_pass_manager);
+			LLVMAddCorrelatedValuePropagationPass(default_function_pass_manager);
+
+			LLVMAddSLPVectorizePass(default_function_pass_manager);
+			LLVMAddLoopVectorizePass(default_function_pass_manager);
+
+		}
 	}
 
 	LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(mod);
@@ -11784,10 +11908,12 @@ void lb_generate_code(lbGenerator *gen) {
 	for_array(i, m->procedures_to_generate) {
 		lbProcedure *p = m->procedures_to_generate[i];
 		if (p->body != nullptr) { // Build Procedure
-			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
-				LLVMRunFunctionPassManager(default_function_pass_manager_without_memcpy, p->value);
-			} else {
-				LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+			for (i32 i = 0; i <= build_context.optimization_level; i++) {
+				if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
+					LLVMRunFunctionPassManager(default_function_pass_manager_without_memcpy, p->value);
+				} else {
+					LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+				}
 			}
 		}
 	}
@@ -11799,7 +11925,12 @@ void lb_generate_code(lbGenerator *gen) {
 	defer (LLVMDisposePassManager(module_pass_manager));
 	LLVMAddAlwaysInlinerPass(module_pass_manager);
 	LLVMAddStripDeadPrototypesPass(module_pass_manager);
-	// LLVMAddConstantMergePass(module_pass_manager);
+	// if (build_context.optimization_level >= 2) {
+	// 	LLVMAddArgumentPromotionPass(module_pass_manager);
+	// 	LLVMAddConstantMergePass(module_pass_manager);
+	// 	LLVMAddGlobalDCEPass(module_pass_manager);
+	// 	LLVMAddDeadArgEliminationPass(module_pass_manager);
+	// }
 
 	LLVMPassManagerBuilderRef pass_manager_builder = LLVMPassManagerBuilderCreate();
 	defer (LLVMPassManagerBuilderDispose(pass_manager_builder));

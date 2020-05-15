@@ -497,6 +497,10 @@ AST_KIND(_TypeBegin, "", bool) \
 		Token token; \
 		Ast *type; \
 	}) \
+	AST_KIND(RelativeType, "relative type", struct { \
+		Ast *tag; \
+		Ast *type; \
+	}) \
 	AST_KIND(ArrayType, "array type", struct { \
 		Token token; \
 		Ast *count; \

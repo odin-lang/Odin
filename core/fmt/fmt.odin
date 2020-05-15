@@ -8,6 +8,7 @@ import "core:unicode/utf8"
 import "core:strconv"
 import "core:strings"
 import "core:reflect"
+import "intrinsics"
 
 
 @private
@@ -1712,6 +1713,117 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	case runtime.Type_Info_Opaque:
 		fmt_opaque(fi, v);
+
+	case runtime.Type_Info_Relative_Pointer:
+		ptr_any := any{v.data, info.base_integer.id};
+		ptr: rawptr;
+		switch i in &ptr_any {
+		case u8:    ptr = handle_relative_pointer(&i);
+		case u16:   ptr = handle_relative_pointer(&i);
+		case u32:   ptr = handle_relative_pointer(&i);
+		case u64:   ptr = handle_relative_pointer(&i);
+		case i8:    ptr = handle_relative_pointer(&i);
+		case i16:   ptr = handle_relative_pointer(&i);
+		case i32:   ptr = handle_relative_pointer(&i);
+		case i64:   ptr = handle_relative_pointer(&i);
+		case u16le: ptr = handle_relative_pointer(&i);
+		case u32le: ptr = handle_relative_pointer(&i);
+		case u64le: ptr = handle_relative_pointer(&i);
+		case i16le: ptr = handle_relative_pointer(&i);
+		case i32le: ptr = handle_relative_pointer(&i);
+		case i64le: ptr = handle_relative_pointer(&i);
+		case u16be: ptr = handle_relative_pointer(&i);
+		case u32be: ptr = handle_relative_pointer(&i);
+		case u64be: ptr = handle_relative_pointer(&i);
+		case i16be: ptr = handle_relative_pointer(&i);
+		case i32be: ptr = handle_relative_pointer(&i);
+		case i64be: ptr = handle_relative_pointer(&i);
+		}
+		absolute_ptr := any{ptr, info.pointer.id};
+
+		fmt_value(fi, absolute_ptr, verb);
+
+	case runtime.Type_Info_Relative_Slice:
+		ptr_any := any{v.data, info.base_integer.id};
+		ptr: rawptr;
+		switch i in &ptr_any {
+		case u8:    ptr = handle_relative_pointer(&i);
+		case u16:   ptr = handle_relative_pointer(&i);
+		case u32:   ptr = handle_relative_pointer(&i);
+		case u64:   ptr = handle_relative_pointer(&i);
+		case i8:    ptr = handle_relative_pointer(&i);
+		case i16:   ptr = handle_relative_pointer(&i);
+		case i32:   ptr = handle_relative_pointer(&i);
+		case i64:   ptr = handle_relative_pointer(&i);
+		case u16le: ptr = handle_relative_pointer(&i);
+		case u32le: ptr = handle_relative_pointer(&i);
+		case u64le: ptr = handle_relative_pointer(&i);
+		case i16le: ptr = handle_relative_pointer(&i);
+		case i32le: ptr = handle_relative_pointer(&i);
+		case i64le: ptr = handle_relative_pointer(&i);
+		case u16be: ptr = handle_relative_pointer(&i);
+		case u32be: ptr = handle_relative_pointer(&i);
+		case u64be: ptr = handle_relative_pointer(&i);
+		case i16be: ptr = handle_relative_pointer(&i);
+		case i32be: ptr = handle_relative_pointer(&i);
+		case i64be: ptr = handle_relative_pointer(&i);
+		}
+
+		if verb == 'p' {
+			fmt_pointer(fi, ptr, 'p');
+		} else if ptr == nil {
+			strings.write_string(fi.buf, "[]");
+		} else {
+			len_ptr := uintptr(v.data) + uintptr(info.base_integer.size);
+			len_any := any{rawptr(len_ptr), info.base_integer.id};
+			len: int = 0;
+			switch i in len_any {
+			case u8:    len = int(i);
+			case u16:   len = int(i);
+			case u32:   len = int(i);
+			case u64:   len = int(i);
+			case i8:    len = int(i);
+			case i16:   len = int(i);
+			case i32:   len = int(i);
+			case i64:   len = int(i);
+			case u16le: len = int(i);
+			case u32le: len = int(i);
+			case u64le: len = int(i);
+			case i16le: len = int(i);
+			case i32le: len = int(i);
+			case i64le: len = int(i);
+			case u16be: len = int(i);
+			case u32be: len = int(i);
+			case u64be: len = int(i);
+			case i16be: len = int(i);
+			case i32be: len = int(i);
+			case i64be: len = int(i);
+			}
+
+			slice_type := reflect.type_info_base(info.slice).variant.(runtime.Type_Info_Slice);
+
+			strings.write_byte(fi.buf, '[');
+			defer strings.write_byte(fi.buf, ']');
+
+			for i in 0..<len {
+				if i > 0 do strings.write_string(fi.buf, ", ");
+
+				data := uintptr(ptr) + uintptr(i*slice_type.elem_size);
+				fmt_arg(fi, any{rawptr(data), slice_type.elem.id}, verb);
+			}
+		}
+
+	}
+
+	handle_relative_pointer :: proc(ptr: ^$T) -> rawptr where intrinsics.type_is_integer(T) {
+		if ptr^ == 0 {
+			return nil;
+		}
+		when intrinsics.type_is_unsigned(T) {
+			return rawptr(uintptr(ptr) + uintptr(ptr^));
+		} else {
+			return rawptr(uintptr(ptr) + uintptr(i64(ptr^)));
+		}
 	}
 }
 

@@ -184,6 +184,16 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		y, ok := b.variant.(Type_Info_Simd_Vector);
 		if !ok do return false;
 		return x.count == y.count && x.elem == y.elem;
+
+	case Type_Info_Relative_Pointer:
+		y, ok := b.variant.(Type_Info_Relative_Pointer);
+		if !ok do return false;
+		return x.base_integer == y.base_integer && x.pointer == y.pointer;
+
+	case Type_Info_Relative_Slice:
+		y, ok := b.variant.(Type_Info_Relative_Slice);
+		if !ok do return false;
+		return x.base_integer == y.base_integer && x.slice == y.slice;
 	}
 
 	return false;
@@ -320,6 +330,16 @@ is_opaque :: proc(info: ^Type_Info) -> bool {
 is_simd_vector :: proc(info: ^Type_Info) -> bool {
 	if info == nil do return false;
 	_, ok := type_info_base(info).variant.(Type_Info_Simd_Vector);
+	return ok;
+}
+is_relative_pointer :: proc(info: ^Type_Info) -> bool {
+	if info == nil do return false;
+	_, ok := type_info_base(info).variant.(Type_Info_Relative_Pointer);
+	return ok;
+}
+is_relative_slice :: proc(info: ^Type_Info) -> bool {
+	if info == nil do return false;
+	_, ok := type_info_base(info).variant.(Type_Info_Relative_Slice);
 	return ok;
 }
 
@@ -567,6 +587,19 @@ write_type :: proc(buf: ^strings.Builder, ti: ^Type_Info) {
 			write_byte(buf, ']');
 			write_type(buf, info.elem);
 		}
+
+	case Type_Info_Relative_Pointer:
+		write_string(buf, "#relative(");
+		write_type(buf, info.base_integer);
+		write_string(buf, ") ");
+		write_type(buf, info.pointer);
+
+	case Type_Info_Relative_Slice:
+		write_string(buf, "#relative(");
+		write_type(buf, info.base_integer);
+		write_string(buf, ") ");
+		write_type(buf, info.slice);
+
 	}
 }
 
