@@ -56,7 +56,7 @@ LLVMValueRef llvm_cstring(lbModule *m, String const &str) {
 
 lbAddr lb_addr(lbValue addr) {
 	lbAddr v = {lbAddr_Default, addr};
-	if (is_type_relative_pointer(type_deref(addr.type))) {
+	if (addr.type != nullptr && is_type_relative_pointer(type_deref(addr.type))) {
 		GB_ASSERT(is_type_pointer(addr.type));
 		v.kind = lbAddr_RelativePointer;
 	}

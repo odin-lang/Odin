@@ -669,6 +669,18 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t, bool in_struct) {
 			ir_write_byte(f, '>');
 		}
 		return;
+
+	case Type_RelativePointer:
+		ir_print_type(f, m, t->RelativePointer.base_integer);
+		return;
+
+	case Type_RelativeSlice:
+		ir_write_byte(f, '{');
+		ir_print_type(f, m, t->RelativePointer.base_integer);
+		ir_write_str_lit(f, ", ");
+		ir_print_type(f, m, t->RelativePointer.base_integer);
+		ir_write_byte(f, '}');
+		return;
 	}
 }
 
