@@ -64,6 +64,8 @@ struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
 
+	u64 state_flags;
+
 	CheckerInfo *info;
 
 	gbMutex mutex;
