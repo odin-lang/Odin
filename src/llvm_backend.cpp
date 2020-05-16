@@ -146,11 +146,61 @@ lbValue lb_build_addr_ptr(lbProcedure *p, Ast *expr) {
 }
 
 void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue len) {
+	if (build_context.no_bounds_check) {
+		return;
+	}
+
+	index = lb_emit_conv(p, index, t_int);
+	len = lb_emit_conv(p, len, t_int);
+
+	lbValue file = lb_find_or_add_entity_string(p->module, token.pos.file);
+	lbValue line = lb_const_int(p->module, t_int, token.pos.line);
+	lbValue column = lb_const_int(p->module, t_int, token.pos.column);
+
+	auto args = array_make<lbValue>(heap_allocator(), 5);
+	args[0] = file;
+	args[1] = line;
+	args[2] = column;
+	args[3] = index;
+	args[4] = len;
+
+	lb_emit_runtime_call(p, "bounds_check_error", args);
 }
 
 void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValue high, lbValue len, bool lower_value_used) {
-}
+	if (build_context.no_bounds_check) {
+		return;
+	}
 
+	lbValue file = lb_find_or_add_entity_string(p->module, token.pos.file);
+	lbValue line = lb_const_int(p->module, t_int, token.pos.line);
+	lbValue column = lb_const_int(p->module, t_int, token.pos.column);
+	high = lb_emit_conv(p, high, t_int);
+
+	if (!lower_value_used) {
+		auto args = array_make<lbValue>(heap_allocator(), 5);
+		args[0] = file;
+		args[1] = line;
+		args[2] = column;
+		args[3] = high;
+		args[4] = len;
+
+		lb_emit_runtime_call(p, "slice_expr_error_hi", args);
+	} else {
+		// No need to convert unless used
+		low  = lb_emit_conv(p, low, t_int);
+
+		auto args = array_make<lbValue>(heap_allocator(), 6);
+		args[0] = file;
+		args[1] = line;
+		args[2] = column;
+		args[3] = low;
+		args[4] = high;
+		args[5] = len;
+
+		lb_emit_runtime_call(p, "slice_expr_error_lo_hi", args);
+	}
+}
 
 void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value) {
 	if (addr.addr.value == nullptr) {
@@ -9509,7 +9559,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 				// GB_ASSERT(is_type_soa_struct(type_deref(ir_type(base_struct))));
 				// lbValue len = ir_soa_struct_len(p, base_struct);
-				// ir_emit_bounds_check(p, ast_token(ie->index), index, len);
+				// lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 			}
 
 			lbValue val = lb_emit_ptr_offset(p, field, index);
@@ -9565,8 +9615,8 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 			auto index_tv = type_and_value_of_expr(ie->index);
 			if (index_tv.mode != Addressing_Constant) {
-				// lbValue len = lb_const_int(p->module, t_int, t->Array.count);
-				// ir_emit_bounds_check(p, ast_token(ie->index), index, len);
+				lbValue len = lb_const_int(p->module, t_int, t->Array.count);
+				lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 			}
 			return lb_addr(elem);
 		}
@@ -9598,8 +9648,8 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			lbValue elem = lb_emit_array_ep(p, array, index);
 
 			if (index_tv.mode != Addressing_Constant) {
-				// lbValue len = ir_const_int(t->EnumeratedArray.count);
-				// ir_emit_bounds_check(p, ast_token(ie->index), index, len);
+				lbValue len = lb_const_int(p->module, t_int, t->EnumeratedArray.count);
+				lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 			}
 			return lb_addr(elem);
 		}
@@ -9613,7 +9663,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			lbValue elem = lb_slice_elem(p, slice);
 			lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
 			lbValue len = lb_slice_len(p, slice);
-			// ir_emit_bounds_check(p, ast_token(ie->index), index, len);
+			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 			lbValue v = lb_emit_ptr_offset(p, elem, index);
 			return lb_addr(v);
 		}
@@ -9630,7 +9680,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			lbValue elem = lb_slice_elem(p, slice);
 			lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
 			lbValue len = lb_slice_len(p, slice);
-			// ir_emit_bounds_check(p, ast_token(ie->index), index, len);
+			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 			lbValue v = lb_emit_ptr_offset(p, elem, index);
 			return lb_addr(v);
 		}
