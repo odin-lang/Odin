@@ -516,6 +516,9 @@ struct irAddr {
 			irValue *index;
 			Ast *index_expr;
 		} soa;
+		struct {
+			bool deref;
+		} relative;
 	};
 };
 
@@ -3523,6 +3526,15 @@ irValue *ir_address_from_load_or_generate_local(irProcedure *proc, irValue *val)
 	ir_emit_store(proc, local, val);
 	return local;
 }
+irValue *ir_address_from_load(irProcedure *proc, irValue *val) {
+	if (val->kind == irValue_Instr) {
+		if (val->Instr.kind == irInstr_Load) {
+			return val->Instr.Load.address;
+		}
+	}
+	GB_PANIC("ir_address_from_load");
+	return nullptr;
+}
 
 
 Type *ir_addr_type(irAddr const &addr) {
@@ -3636,11 +3648,16 @@ irValue *ir_soa_struct_cap(irProcedure *proc, irValue *value) {
 }
 
 
+irValue *ir_addr_load(irProcedure *proc, irAddr const &addr);
 
-void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
+void ir_addr_store(irProcedure *proc, irAddr addr, irValue *value) {
 	if (addr.addr == nullptr) {
 		return;
 	}
+	if (addr.kind == irAddr_RelativePointer && addr.relative.deref) {
+		addr = ir_addr(ir_address_from_load(proc, ir_addr_load(proc, addr)));
+	}
+
 	if (addr.kind == irAddr_RelativePointer) {
 		Type *rel_ptr = base_type(ir_addr_type(addr));
 		GB_ASSERT(rel_ptr->kind == Type_RelativePointer);
@@ -3658,6 +3675,11 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 		offset = ir_emit_conv(proc, offset, rel_ptr->RelativePointer.base_integer);
 
 		irValue *offset_ptr = ir_emit_conv(proc, addr.addr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		offset = ir_emit_select(proc,
+			ir_emit_comp(proc, Token_CmpEq, val_ptr, ir_value_nil(t_uintptr)),
+			ir_value_nil(rel_ptr->RelativePointer.base_integer),
+			offset
+		);
 		ir_emit_store(proc, offset_ptr, offset);
 		return;
 
@@ -3677,8 +3699,12 @@ void ir_addr_store(irProcedure *proc, irAddr const &addr, irValue *value) {
 		}
 		offset = ir_emit_conv(proc, offset, rel_ptr->RelativePointer.base_integer);
 
-
 		irValue *offset_ptr = ir_emit_conv(proc, addr.addr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		offset = ir_emit_select(proc,
+			ir_emit_comp(proc, Token_CmpEq, val_ptr, ir_value_nil(t_uintptr)),
+			ir_value_nil(rel_ptr->RelativePointer.base_integer),
+			offset
+		);
 		ir_emit_store(proc, offset_ptr, offset);
 
 		irValue *len = ir_slice_len(proc, value);
@@ -8603,7 +8629,9 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 	case_ast_node(de, DerefExpr, expr);
 		if (is_type_relative_pointer(type_of_expr(de->expr))) {
-			return ir_build_addr(proc, de->expr);
+			irAddr addr = ir_build_addr(proc, de->expr);
+			addr.relative.deref = true;
+			return addr;
 		}
 
 		// TODO(bill): Is a ptr copy needed?
