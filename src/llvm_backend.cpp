@@ -208,7 +208,7 @@ void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValu
 	}
 }
 
-void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value) {
+void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	if (addr.addr.value == nullptr) {
 		return;
 	}
@@ -221,6 +221,10 @@ void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value) {
 		Type *t = lb_addr_type(addr);
 		value.type = t;
 		value.value = LLVMConstNull(lb_type(p->module, t));
+	}
+
+	if (addr.kind == lbAddr_RelativePointer && addr.relative.deref) {
+		addr = lb_addr(lb_address_from_load(p, lb_addr_load(p, addr)));
 	}
 
 	if (addr.kind == lbAddr_RelativePointer) {
@@ -242,6 +246,11 @@ void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value) {
 		offset = lb_emit_conv(p, offset, rel_ptr->RelativePointer.base_integer);
 
 		lbValue offset_ptr = lb_emit_conv(p, addr.addr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		offset = lb_emit_select(p,
+			lb_emit_comp(p, Token_CmpEq, val_ptr, lb_const_nil(p->module, t_uintptr)),
+			lb_const_nil(p->module, rel_ptr->RelativePointer.base_integer),
+			offset
+		);
 		LLVMBuildStore(p->builder, offset.value, offset_ptr.value);
 		return;
 
@@ -265,6 +274,11 @@ void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value) {
 
 
 		lbValue offset_ptr = lb_emit_conv(p, addr.addr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		offset = lb_emit_select(p,
+			lb_emit_comp(p, Token_CmpEq, val_ptr, lb_const_nil(p->module, t_uintptr)),
+			lb_const_nil(p->module, rel_ptr->RelativePointer.base_integer),
+			offset
+		);
 		LLVMBuildStore(p->builder, offset.value, offset_ptr.value);
 
 		lbValue len = lb_slice_len(p, value);
@@ -6358,6 +6372,17 @@ lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value) {
 	lb_addr_store(p, res, value);
 	return res.addr;
 }
+lbValue lb_address_from_load(lbProcedure *p, lbValue value) {
+	if (LLVMIsALoadInst(value.value)) {
+		lbValue res = {};
+		res.value = LLVMGetOperand(value.value, 0);
+		res.type = alloc_type_pointer(value.type);
+		return res;
+	}
+
+	GB_PANIC("lb_address_from_load");
+	return {};
+}
 
 lbValue lb_copy_value_to_ptr(lbProcedure *p, lbValue val, Type *new_type, i64 alignment) {
 	i64 type_alignment = type_align_of(new_type);
@@ -9976,6 +10001,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	case_ast_node(de, DerefExpr, expr);
 		if (is_type_relative_pointer(type_of_expr(de->expr))) {
 			lbAddr addr = lb_build_addr(p, de->expr);
+			addr.relative.deref = true;
 			return addr;
 		}
 		lbValue addr = lb_build_expr(p, de->expr);

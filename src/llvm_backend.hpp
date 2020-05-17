@@ -57,6 +57,9 @@ struct lbAddr {
 			lbValue index;
 			Ast *node;
 		} index_set;
+		struct {
+			bool deref;
+		} relative;
 	};
 };
 
@@ -253,7 +256,7 @@ lbValue lb_const_int(lbModule *m, Type *type, u64 value);
 lbAddr lb_addr(lbValue addr);
 Type *lb_addr_type(lbAddr const &addr);
 LLVMTypeRef lb_addr_lb_type(lbAddr const &addr);
-void lb_addr_store(lbProcedure *p, lbAddr const &addr, lbValue value);
+void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value);
 lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr);
 lbValue lb_emit_load(lbProcedure *p, lbValue v);
 void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value);
@@ -301,6 +304,7 @@ void lb_add_foreign_library_path(lbModule *m, Entity *e);
 lbValue lb_typeid(lbModule *m, Type *type, Type *typeid_type=t_typeid);
 
 lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value);
+lbValue lb_address_from_load(lbProcedure *p, lbValue value);
 lbDefer lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt);
 lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_init);
 
@@ -324,6 +328,7 @@ lbValue lb_map_len(lbProcedure *p, lbValue value);
 lbValue lb_map_cap(lbProcedure *p, lbValue value);
 lbValue lb_soa_struct_len(lbProcedure *p, lbValue value);
 void lb_emit_increment(lbProcedure *p, lbValue addr);
+lbValue lb_emit_select(lbProcedure *p, lbValue cond, lbValue x, lbValue y);
 
 void lb_fill_slice(lbProcedure *p, lbAddr const &slice, lbValue base_elem, lbValue len);
 
