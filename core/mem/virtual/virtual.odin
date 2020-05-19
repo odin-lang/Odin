@@ -154,6 +154,9 @@ arena_allocator_proc :: proc(data: rawptr, mode: mem.Allocator_Mode,
 						     flags: u64 = 0, loc := #caller_location) -> rawptr {
 	arena := cast(^Arena) data;
 
+	if old_memory != nil && !(arena.base <= old_memory && old_memory <= arena.cursor) do
+		panic("memory does not belong to this allocator", loc);
+
 	switch mode {
 	case .Alloc:
 		return arena_alloc(arena, size, alignment);
@@ -192,7 +195,7 @@ arena_begin_temp_memory :: proc(using va: ^Arena) -> Arena_Temp_Memory {
 //       Maybe achieve this by committing/decommitting in chunks rather than pages.
 arena_end_temp_memory :: proc(mark_: Arena_Temp_Memory) {
 	using mark := mark_;
-	
+
 	if cursor == nil {
 		cursor = arena.base;
 	}
