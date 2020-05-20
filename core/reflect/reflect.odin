@@ -583,7 +583,7 @@ union_variant_typeid :: proc(a: any) -> typeid {
 union_type_compare :: proc( a, b : any ) -> bool
 {
 	if a == nil || b == nil do return b == nil && a == nil;
-	if a.id != b.id do return reflect.union_variant_typeid(a) == reflect.union_variant_typeid(b);
+	if a.id != b.id do return union_variant_typeid(a) == union_variant_typeid(b);
 	
 	ti := runtime.type_info_base(type_info_of(a.id));
 	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
