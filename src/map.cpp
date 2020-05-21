@@ -89,8 +89,11 @@ template <typename T> void  multi_map_remove_all(Map<T> *h, HashKey const &key);
 
 template <typename T>
 gb_inline void map_init(Map<T> *h, gbAllocator a, isize capacity) {
-	array_init(&h->hashes,  a, 0, capacity);
+	array_init(&h->hashes,  a, capacity);
 	array_init(&h->entries, a, 0, capacity);
+	for (isize i = 0; i < capacity; i++) {
+		h->hashes.data[i] = -1;
+	}
 }
 
 template <typename T>
@@ -161,7 +164,7 @@ template <typename T>
 void map_rehash(Map<T> *h, isize new_count) {
 	isize i, j;
 	Map<T> nh = {};
-	map_init(&nh, h->hashes.allocator);
+	map_init(&nh, h->hashes.allocator, new_count);
 	array_resize(&nh.hashes, new_count);
 	array_reserve(&nh.entries, h->entries.count);
 	for (i = 0; i < new_count; i++) {
