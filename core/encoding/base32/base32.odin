@@ -2,34 +2,34 @@ package base32
 
 // @note(zh): Encoding utility for Base32
 // A secondary param can be used to supply a custom alphabet to
-// @link(encode) and a matching decoding table to @link(decode). 
+// @link(encode) and a matching decoding table to @link(decode).
 // If none is supplied it just uses the standard Base32 alphabet.
 // Incase your specific version does not use padding, you may
 // truncate it from the encoded output.
 
 ENC_TABLE := [32]byte {
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
-    'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 
-    'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 
+    'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+    'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
     'Y', 'Z', '2', '3', '4', '5', '6', '7'
 };
 
 PADDING :: '=';
 
 DEC_TABLE := [?]u8 {
-     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0, 26, 27, 28, 29, 30, 31,  0,  0,  0,  0,  0,  0,  0,  0,
-     0,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 
+     0,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
     15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,  0,  0,  0,  0,  0,
-     0,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 
+     0,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
     15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,  0,  0,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0
 };
 
@@ -41,7 +41,7 @@ encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocato
 }
 
 @private
-_encode :: inline proc "contextless"(out, data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) {
+_encode :: proc(out, data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) {
     out := out;
     data := data;
 

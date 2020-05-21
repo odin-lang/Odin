@@ -4405,6 +4405,7 @@ void check_parsed_files(Checker *c) {
 			error(token, "Undefined entry point procedure 'main'");
 		}
 	}
+	TIME_SECTION("type check finish");
 
 #undef TIME_SECTION
 }
