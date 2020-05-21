@@ -167,9 +167,11 @@ enum ScopeFlag : i32 {
 	ScopeFlag_Type   = 1<<6,
 
 	ScopeFlag_HasBeenImported = 1<<10, // This is only applicable to file scopes
-	
-	ScopeFlag_ContextDefined = 1<<16, 
+
+	ScopeFlag_ContextDefined = 1<<16,
 };
+
+enum { DEFAULT_SCOPE_CAPACITY = 29 };
 
 struct Scope {
 	Ast *         node;
@@ -178,7 +180,7 @@ struct Scope {
 	Scope *       next;
 	Scope *       first_child;
 	Scope *       last_child;
-	StringMap<Entity *> elements; 
+	StringMap<Entity *> elements;
 
 	Array<Ast *>    delayed_directives;
 	Array<Ast *>    delayed_imports;
@@ -251,7 +253,7 @@ struct CheckerInfo {
 	                               // as it needs to be iterated across
 	StringMap<AstFile *>    files;    // Key (full path)
 	StringMap<AstPackage *> packages; // Key (full path)
-	StringMap<Entity *>     foreigns; 
+	StringMap<Entity *>     foreigns;
 	Array<Entity *>       definitions;
 	Array<Entity *>       entities;
 	Array<DeclInfo *>     variable_init_order;

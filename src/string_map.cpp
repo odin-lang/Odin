@@ -7,7 +7,7 @@ struct StringMapFindResult {
 
 struct StringHashKey {
 	u64    hash;
-	String string; 
+	String string;
 };
 
 StringHashKey string_hashing_proc(void const *data, isize len) {
@@ -65,8 +65,11 @@ template <typename T> void string_map_rehash           (StringMap<T> *h, isize n
 
 template <typename T>
 gb_inline void string_map_init(StringMap<T> *h, gbAllocator a, isize capacity) {
-	array_init(&h->hashes,  a, 0, capacity);
+	array_init(&h->hashes,  a, capacity);
 	array_init(&h->entries, a, 0, capacity);
+	for (isize i = 0; i < capacity; i++) {
+		h->hashes.data[i] = -1;
+	}
 }
 
 template <typename T>
@@ -136,7 +139,7 @@ template <typename T>
 void string_map_rehash(StringMap<T> *h, isize new_count) {
 	isize i, j;
 	StringMap<T> nh = {};
-	string_map_init(&nh, h->hashes.allocator);
+	string_map_init(&nh, h->hashes.allocator, new_count);
 	array_resize(&nh.hashes, new_count);
 	array_reserve(&nh.entries, h->entries.count);
 	for (i = 0; i < new_count; i++) {

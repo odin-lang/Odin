@@ -219,7 +219,7 @@ bool decl_info_has_init(DeclInfo *d) {
 
 
 
-Scope *create_scope(Scope *parent, gbAllocator allocator, isize init_elements_capacity=16) {
+Scope *create_scope(Scope *parent, gbAllocator allocator, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
 	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);

@@ -7,8 +7,8 @@ struct PtrSetFindResult {
 
 template <typename T>
 struct PtrSetEntry {
-	T       ptr;
-	isize   next;
+	T     ptr;
+	isize next;
 };
 
 template <typename T>
@@ -29,8 +29,11 @@ template <typename T> void ptr_set_rehash (PtrSet<T> *s, isize new_count);
 
 template <typename T>
 void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
-	array_init(&s->hashes,  a, 0, capacity);
+	array_init(&s->hashes,  a, capacity);
 	array_init(&s->entries, a, 0, capacity);
+	for (isize i = 0; i < capacity; i++) {
+		s->hashes.data[i] = -1;
+	}
 }
 
 template <typename T>
@@ -53,29 +56,12 @@ template <typename T>
 gb_internal PtrSetFindResult ptr_set__find(PtrSet<T> *s, T ptr) {
 	PtrSetFindResult fr = {-1, -1, -1};
 	if (s->hashes.count > 0) {
-		uintptr p = cast(uintptr)ptr;
-		uintptr n = cast(uintptr)s->hashes.count;
-		fr.hash_index = cast(isize)(p % n);
+		u64 hash = 0xcbf29ce484222325ull ^ cast(u64)cast(uintptr)ptr;
+		u64 n = cast(u64)s->hashes.count;
+		fr.hash_index = cast(isize)(hash % n);
 		fr.entry_index = s->hashes[fr.hash_index];
 		while (fr.entry_index >= 0) {
 			if (s->entries[fr.entry_index].ptr == ptr) {
-				return fr;
-			}
-			fr.entry_prev = fr.entry_index;
-			fr.entry_index = s->entries[fr.entry_index].next;
-		}
-	}
-	return fr;
-}
-
-template <typename T>
-gb_internal PtrSetFindResult ptr_set__find_from_entry(PtrSet<T> *s, PtrSetEntry<T> *e) {
-	PtrSetFindResult fr = {-1, -1, -1};
-	if (s->hashes.count > 0) {
-		fr.hash_index  = e->key.key % s->hashes.count;
-		fr.entry_index = s->hashes[fr.hash_index];
-		while (fr.entry_index >= 0) {
-			if (&s->entries[fr.entry_index] == e) {
 				return fr;
 			}
 			fr.entry_prev = fr.entry_index;
