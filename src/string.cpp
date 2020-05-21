@@ -170,12 +170,7 @@ GB_COMPARE_PROC(string_cmp_proc) {
 
 gb_inline bool str_eq(String const &a, String const &b) {
 	if (a.len != b.len) return false;
-	for (isize i = 0; i < a.len; i++) {
-		if (a.text[i] != b.text[i]) {
-			return false;
-		}
-	}
-	return true;
+	return memcmp(a.text, b.text, a.len) == 0;
 }
 gb_inline bool str_ne(String const &a, String const &b) { return !str_eq(a, b);                }
 gb_inline bool str_lt(String const &a, String const &b) { return string_compare(a, b) < 0;     }
