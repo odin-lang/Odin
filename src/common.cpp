@@ -26,6 +26,7 @@
 #endif
 
 #include <math.h>
+#include <string.h>
 
 template <typename U, typename V>
 gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
