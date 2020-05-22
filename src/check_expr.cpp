@@ -6525,7 +6525,7 @@ bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Scope *scope, A
 }
 
 
-CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type *proc_type, Ast *call) {
+CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type *proc_type, Ast *call, Array<Ast *> const &args) {
 	ast_node(ce, CallExpr, call);
 
 	CallArgumentCheckerType *call_checker = check_call_arguments_internal;
@@ -6537,13 +6537,13 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 	if (is_call_expr_field_value(ce)) {
 		call_checker = check_named_call_arguments;
 
-		operands = array_make<Operand>(heap_allocator(), ce->args.count);
+		operands = array_make<Operand>(heap_allocator(), args.count);
 
 		// NOTE(bill): This is give type hints for the named parameters
 		// in order to improve the type inference system
 
 		StringMap<Type *> type_hint_map = {}; // Key: String
-		string_map_init(&type_hint_map, heap_allocator(), 2*ce->args.count);
+		string_map_init(&type_hint_map, heap_allocator(), 2*args.count);
 		defer (string_map_destroy(&type_hint_map));
 
 		Type *ptype = nullptr;
@@ -6620,8 +6620,8 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		}
 
 
-		for_array(i, ce->args) {
-			Ast *arg = ce->args[i];
+		for_array(i, args) {
+			Ast *arg = args[i];
 			ast_node(fv, FieldValue, arg);
 			Ast *field = fv->field;
 
@@ -6637,7 +6637,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			check_expr_or_type(c, &operands[i], fv->value, type_hint);
 		}
 	} else {
-		operands = array_make<Operand>(heap_allocator(), 0, 2*ce->args.count);
+		operands = array_make<Operand>(heap_allocator(), 0, 2*args.count);
 		Entity **lhs = nullptr;
 		isize lhs_count = -1;
 		bool is_variadic = false;
@@ -6645,7 +6645,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			lhs = populate_proc_parameter_list(c, proc_type, &lhs_count, &is_variadic);
 		}
 		if (operand->mode != Addressing_ProcGroup) {
-			check_unpack_arguments(c, lhs, lhs_count, &operands, ce->args, false, is_variadic);
+			check_unpack_arguments(c, lhs, lhs_count, &operands, args, false, is_variadic);
 		}
 	}
 
@@ -6667,7 +6667,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			isize lhs_count = -1;
 			bool is_variadic = false;
 			lhs = populate_proc_parameter_list(c, e->type, &lhs_count, &is_variadic);
-			check_unpack_arguments(c, lhs, lhs_count, &operands, ce->args, false, is_variadic);
+			check_unpack_arguments(c, lhs, lhs_count, &operands, args, false, is_variadic);
 
 
 			CallArgumentData data = {};
@@ -6740,7 +6740,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		}
 
 
-		check_unpack_arguments(c, lhs, lhs_count, &operands, ce->args, false, false);
+		check_unpack_arguments(c, lhs, lhs_count, &operands, args, false, false);
 
 		if (lhs != nullptr) {
 			gb_free(heap_allocator(), lhs);
@@ -7269,33 +7269,36 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 
 
 
-ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint) {
-	ast_node(ce, CallExpr, call);
-	if (ce->proc != nullptr &&
-	    ce->proc->kind == Ast_BasicDirective) {
-		ast_node(bd, BasicDirective, ce->proc);
+ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *proc, Array<Ast *> const &args, ProcInlining inlining, Type *type_hint) {
+	if (proc != nullptr &&
+	    proc->kind == Ast_BasicDirective) {
+		ast_node(bd, BasicDirective, proc);
 		String name = bd->name;
 		if (name == "location" || name == "assert" || name == "panic" || name == "defined" || name == "config" || name == "load") {
 			operand->mode = Addressing_Builtin;
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
-			operand->expr = ce->proc;
+			operand->expr = proc;
 			operand->type = t_invalid;
-			add_type_and_value(&c->checker->info, ce->proc, operand->mode, operand->type, operand->value);
+			add_type_and_value(&c->checker->info, proc, operand->mode, operand->type, operand->value);
 		} else {
 			GB_PANIC("Unhandled #%.*s", LIT(name));
 		}
-		if (ce->inlining != ProcInlining_none) {
+		if (inlining != ProcInlining_none) {
 			error(call, "Inlining operators are not allowed on built-in procedures");
 		}
 	} else {
-		check_expr_or_type(c, operand, ce->proc);
+		if (proc != nullptr) {
+			check_expr_or_type(c, operand, proc);
+		} else {
+			GB_ASSERT(operand->expr != nullptr);
+		}
 	}
 
-	if (ce->args.count > 0) {
+	if (args.count > 0) {
 		bool fail = false;
-		bool first_is_field_value = (ce->args[0]->kind == Ast_FieldValue);
-		for_array(i, ce->args) {
-			Ast *arg = ce->args[i];
+		bool first_is_field_value = (args[0]->kind == Ast_FieldValue);
+		for_array(i, args) {
+			Ast *arg = args[i];
 			bool mix = false;
 			if (first_is_field_value) {
 				mix = arg->kind != Ast_FieldValue;
@@ -7316,8 +7319,8 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 	}
 
 	if (operand->mode == Addressing_Invalid) {
-		for_array(i, ce->args) {
-			Ast *arg = ce->args[i];
+		for_array(i, args) {
+			Ast *arg = args[i];
 			if (arg->kind == Ast_FieldValue) {
 				arg = arg->FieldValue.value;
 			}
@@ -7352,12 +7355,12 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 			defer (gb_string_free(str));
 
 			operand->mode = Addressing_Invalid;
-			isize arg_count = ce->args.count;
+			isize arg_count = args.count;
 			switch (arg_count) {
 			case 0:  error(call, "Missing argument in conversion to '%s'", str);   break;
 			default: error(call, "Too many arguments in conversion to '%s'", str); break;
 			case 1: {
-				Ast *arg = ce->args[0];
+				Ast *arg = args[0];
 				if (arg->kind == Ast_FieldValue) {
 					error(call, "'field = value' cannot be used in a type conversion");
 					arg = arg->FieldValue.value;
@@ -7412,7 +7415,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 		}
 	}
 
-	CallArgumentData data = check_call_arguments(c, operand, proc_type, call);
+	CallArgumentData data = check_call_arguments(c, operand, proc_type, call, args);
 	Type *result_type = data.result_type;
 	gb_zero_item(operand);
 	operand->expr = call;
@@ -7460,15 +7463,17 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Type *t
 		}
 	}
 
-	switch (ce->inlining) {
+	switch (inlining) {
 		case ProcInlining_inline: {
-			Entity *e = entity_from_expr(ce->proc);
-			if (e != nullptr && e->kind == Entity_Procedure) {
-				DeclInfo *decl = e->decl_info;
-				if (decl->proc_lit) {
-					ast_node(pl, ProcLit, decl->proc_lit);
-					if (pl->inlining == ProcInlining_no_inline) {
-						error(call, "'inline' cannot be applied to a procedure that has be marked as 'no_inline'");
+			if (proc != nullptr) {
+				Entity *e = entity_from_expr(proc);
+				if (e != nullptr && e->kind == Entity_Procedure) {
+					DeclInfo *decl = e->decl_info;
+					if (decl->proc_lit) {
+						ast_node(pl, ProcLit, decl->proc_lit);
+						if (pl->inlining == ProcInlining_no_inline) {
+							error(call, "'inline' cannot be applied to a procedure that has be marked as 'no_inline'");
+						}
 					}
 				}
 			}
@@ -9097,6 +9102,117 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		node->viral_state_flags |= se->expr->viral_state_flags;
 	case_end;
 
+	case_ast_node(se, SelectorCallExpr, node);
+		// IMPORTANT NOTE(bill, 2020-05-22): This is a complete hack to get a shorthand which is extremely useful for vtables
+		// COM APIs is a great example of where this kind of thing is extremely useful
+		// General idea:
+		//
+		//     x->y(123)  ==  x.y(x, 123)
+		//
+		// How this has been implemented at the moment is quite hacky but it's done so to reduce need for huge backend changes
+		// Just regenerating a new AST aids things
+		//
+		// TODO(bill): Is this a good hack or not?
+		//
+		// NOTE(bill, 2020-05-22): I'm going to regret this decision, ain't I?
+
+		Operand x = {};
+		ExprKind kind = check_expr_base(c, &x, se->expr, nullptr);
+		if (x.mode == Addressing_Invalid || x.type == t_invalid) {
+			o->mode = Addressing_Invalid;
+			o->type = t_invalid;
+			o->expr = node;
+			return kind;
+		}
+		if (!is_type_proc(x.type)) {
+			gbString type_str = type_to_string(x.type);
+			error(se->call, "Selector call expressions expect a procedure type for the call, got '%s'", type_str);
+			gb_string_free(type_str);
+
+			o->mode = Addressing_Invalid;
+			o->type = t_invalid;
+			o->expr = node;
+			return Expr_Stmt;
+		}
+
+		ast_node(ce, CallExpr, se->call);
+
+		GB_ASSERT(x.expr->kind == Ast_SelectorExpr);
+
+		Ast *first_arg = x.expr->SelectorExpr.expr;
+		GB_ASSERT(first_arg != nullptr);
+
+		Type *pt = base_type(x.type);
+		GB_ASSERT(pt->kind == Type_Proc);
+		Type *first_type = nullptr;
+		String first_arg_name = {};
+		if (pt->Proc.param_count > 0) {
+			Entity *f = pt->Proc.params->Tuple.variables[0];
+			first_type = f->type;
+			first_arg_name = f->token.string;
+		}
+		if (first_arg_name.len == 0) {
+			first_arg_name = str_lit("_");
+		}
+
+		Operand y = {};
+		y.mode = first_arg->tav.mode;
+		y.type = first_arg->tav.type;
+		y.value = first_arg->tav.value;
+		if (check_is_assignable_to(c, &y, first_type)) {
+			// Do nothing, it's valid
+		} else {
+			Operand z = y;
+			z.type = type_deref(y.type);
+			if (check_is_assignable_to(c, &z, first_type)) {
+				// NOTE(bill): AST GENERATION HACK!
+				Token op = {Token_Pointer};
+				first_arg = ast_deref_expr(first_arg->file, first_arg, op);
+			} else if (y.mode == Addressing_Variable) {
+				Operand w = y;
+				w.type = alloc_type_pointer(y.type);
+				if (check_is_assignable_to(c, &w, first_type)) {
+					// NOTE(bill): AST GENERATION HACK!
+					Token op = {Token_And};
+					first_arg = ast_unary_expr(first_arg->file, op, first_arg);
+				}
+			}
+		}
+
+		if (ce->args.count > 0) {
+			bool fail = false;
+			bool first_is_field_value = (ce->args[0]->kind == Ast_FieldValue);
+			for_array(i, ce->args) {
+				Ast *arg = ce->args[i];
+				bool mix = false;
+				if (first_is_field_value) {
+					mix = arg->kind != Ast_FieldValue;
+				} else {
+					mix = arg->kind == Ast_FieldValue;
+				}
+				if (mix) {
+					fail = true;
+					break;
+				}
+			}
+			if (!fail && first_is_field_value) {
+				Token op = {Token_Eq};
+				AstFile *f = first_arg->file;
+				first_arg = ast_field_value(f, ast_ident(f, make_token_ident(first_arg_name)), first_arg, op);
+			}
+		}
+
+
+
+		auto modified_args = array_make<Ast *>(heap_allocator(), ce->args.count+1);
+		modified_args[0] = first_arg;
+		array_copy(&modified_args, ce->args, 1);
+		ce->args = modified_args;
+		se->modified_call = true;
+
+		check_expr_with_type_hint(c, o, se->call, type_hint);
+	case_end;
+
 
 	case_ast_node(ise, ImplicitSelectorExpr, node);
 		o->type = t_invalid;
@@ -9487,7 +9603,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 
 	case_ast_node(ce, CallExpr, node);
-		return check_call_expr(c, o, node, type_hint);
+		return check_call_expr(c, o, node, ce->proc, ce->args, ce->inlining, type_hint);
 	case_end;
 
 	case_ast_node(de, DerefExpr, node);
@@ -9758,13 +9874,28 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 
 	case_ast_node(se, SelectorExpr, node);
 		str = write_expr_to_string(str, se->expr);
-		str = gb_string_append_rune(str, '.');
+		str = string_append_token(str, se->token);
 		str = write_expr_to_string(str, se->selector);
 	case_end;
 
 	case_ast_node(se, ImplicitSelectorExpr, node);
 		str = gb_string_append_rune(str, '.');
 		str = write_expr_to_string(str, se->selector);
+	case_end;
+
+	case_ast_node(se, SelectorCallExpr, node);
+		str = write_expr_to_string(str, se->expr);
+		str = gb_string_appendc(str, "(");
+		ast_node(ce, CallExpr, se->call);
+		isize start = se->modified_call ? 1 : 0;
+		for (isize i = start; i < ce->args.count; i++) {
+			Ast *arg = ce->args[i];
+			if (i > start) {
+				str = gb_string_appendc(str, ", ");
+			}
+			str = write_expr_to_string(str, arg);
+		}
+		str = gb_string_appendc(str, ")");
 	case_end;
 
 	case_ast_node(ta, TypeAssertion, node);

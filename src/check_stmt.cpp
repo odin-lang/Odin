@@ -1272,6 +1272,18 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					}
 				}
 				return;
+			} else if (operand.expr->kind == Ast_SelectorCallExpr) {
+				AstSelectorCallExpr *se = &operand.expr->SelectorCallExpr;
+				ast_node(ce, CallExpr, se->call);
+				Type *t = type_of_expr(ce->proc);
+				if (is_type_proc(t)) {
+					if (t->Proc.require_results) {
+						gbString expr_str = expr_to_string(ce->proc);
+						error(node, "'%s' requires that its results must be handled", expr_str);
+						gb_string_free(expr_str);
+					}
+				}
+				return;
 			}
 			gbString expr_str = expr_to_string(operand.expr);
 			error(node, "Expression is not used: '%s'", expr_str);
