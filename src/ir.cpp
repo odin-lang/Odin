@@ -7682,7 +7682,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 		GB_ASSERT(se->modified_call);
 		TypeAndValue tav = type_and_value_of_expr(expr);
 		GB_ASSERT(tav.mode != Addressing_Invalid);
-		return ir_addr_load(proc, ir_build_addr(proc, se->call));
+		return ir_build_expr(proc, se->call);
 	case_end;
 
 	case_ast_node(te, TernaryExpr, expr);
@@ -8249,6 +8249,13 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 		} else {
 			GB_PANIC("Unsupported selector expression");
 		}
+	case_end;
+
+	case_ast_node(se, SelectorCallExpr, expr);
+		GB_ASSERT(se->modified_call);
+		TypeAndValue tav = type_and_value_of_expr(expr);
+		GB_ASSERT(tav.mode != Addressing_Invalid);
+		return ir_build_addr(proc, se->call);
 	case_end;
 
 	case_ast_node(ta, TypeAssertion, expr);
