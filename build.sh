@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 release_mode=$1
 
