@@ -9025,6 +9025,13 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		return lb_const_value(p->module, tv.type, tv.value);
 	case_end;
 
+	case_ast_node(se, SelectorCallExpr, expr);
+		GB_ASSERT(se->modified_call);
+		TypeAndValue tav = type_and_value_of_expr(expr);
+		GB_ASSERT(tav.mode != Addressing_Invalid);
+		return lb_addr_load(p, lb_build_addr(p, se->call));
+	case_end;
+
 	case_ast_node(te, TernaryExpr, expr);
 		LLVMValueRef incoming_values[2] = {};
 		LLVMBasicBlockRef incoming_blocks[2] = {};

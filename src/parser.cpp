@@ -24,6 +24,11 @@ Token ast_token(Ast *node) {
 			return ast_token(node->SelectorExpr.selector);
 		}
 		return node->SelectorExpr.token;
+	case Ast_SelectorCallExpr:
+		if (node->SelectorCallExpr.expr != nullptr) {
+			return ast_token(node->SelectorCallExpr.expr);
+		}
+		return node->SelectorCallExpr.token;
 	case Ast_ImplicitSelectorExpr:
 		if (node->ImplicitSelectorExpr.selector != nullptr) {
 			return ast_token(node->ImplicitSelectorExpr.selector);
@@ -173,6 +178,10 @@ Ast *clone_ast(Ast *node) {
 		break;
 	case Ast_ImplicitSelectorExpr:
 		n->ImplicitSelectorExpr.selector = clone_ast(n->ImplicitSelectorExpr.selector);
+		break;
+	case Ast_SelectorCallExpr:
+		n->SelectorCallExpr.expr = clone_ast(n->SelectorCallExpr.expr);
+		n->SelectorCallExpr.call = clone_ast(n->SelectorCallExpr.call);
 		break;
 	case Ast_IndexExpr:
 		n->IndexExpr.expr  = clone_ast(n->IndexExpr.expr);
@@ -543,6 +552,14 @@ Ast *ast_implicit_selector_expr(AstFile *f, Token token, Ast *selector) {
 	Ast *result = alloc_ast_node(f, Ast_ImplicitSelectorExpr);
 	result->ImplicitSelectorExpr.token = token;
 	result->ImplicitSelectorExpr.selector = selector;
+	return result;
+}
+
+Ast *ast_selector_call_expr(AstFile *f, Token token, Ast *expr, Ast *call) {
+	Ast *result = alloc_ast_node(f, Ast_SelectorCallExpr);
+	result->SelectorCallExpr.token = token;
+	result->SelectorCallExpr.expr = expr;
+	result->SelectorCallExpr.call = call;
 	return result;
 }
 
@@ -2417,8 +2434,11 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 
 		case Token_ArrowRight: {
 			Token token = advance_token(f);
-			syntax_error(token, "Selector expressions use '.' rather than '->'");
-			operand = ast_selector_expr(f, token, operand, parse_ident(f));
+			// syntax_error(token, "Selector expressions use '.' rather than '->'");
+
+			Ast *sel = ast_selector_expr(f, token, operand, parse_ident(f));
+			Ast *call = parse_call_expr(f, sel);
+			operand = ast_selector_call_expr(f, token, sel, call);
 			break;
 		}
 
