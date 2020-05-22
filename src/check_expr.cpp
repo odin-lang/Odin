@@ -9210,7 +9210,9 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		ce->args = modified_args;
 		se->modified_call = true;
 
-		check_expr_with_type_hint(c, o, se->call, type_hint);
+		check_expr_base(c, o, se->call, type_hint);
+		o->expr = node;
+		return Expr_Expr;
 	case_end;
 
 
