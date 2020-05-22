@@ -7769,23 +7769,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			o->type = t_context;
 			break;
 
-		case Token_size_of:
-			o->mode       = Addressing_Builtin;
-			o->builtin_id = BuiltinProc_size_of;
-			break;
-		case Token_align_of:
-			o->mode       = Addressing_Builtin;
-			o->builtin_id = BuiltinProc_align_of;
-			break;
-		case Token_offset_of:
-			o->mode       = Addressing_Builtin;
-			o->builtin_id = BuiltinProc_offset_of;
-			break;
-		case Token_type_of:
-			o->mode       = Addressing_Builtin;
-			o->builtin_id = BuiltinProc_type_of;
-			break;
-
 		default:
 			error(node, "Illegal implicit name '%.*s'", LIT(i->string));
 			return kind;
