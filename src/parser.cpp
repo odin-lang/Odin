@@ -1731,11 +1731,6 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 	case Token_Rune:
 		return ast_basic_lit(f, advance_token(f));
 
-	case Token_size_of:
-	case Token_align_of:
-	case Token_offset_of:
-		return parse_call_expr(f, ast_implicit(f, advance_token(f)));
-
 	case Token_String:
 		return ast_basic_lit(f, advance_token(f));
 
@@ -2014,17 +2009,6 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 	case Token_typeid: {
 		Token token = expect_token(f, Token_typeid);
 		return ast_typeid_type(f, token, nullptr);
-	} break;
-
-	case Token_type_of: {
-		Ast *i = ast_implicit(f, expect_token(f, Token_type_of));
-		Ast *type = parse_call_expr(f, i);
-		while (f->curr_token.kind == Token_Period) {
-			Token token = advance_token(f);
-			Ast *sel = parse_ident(f);
-			type = ast_selector_expr(f, token, type, sel);
-		}
-		return type;
 	} break;
 
 	case Token_Pointer: {

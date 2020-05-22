@@ -117,10 +117,6 @@ TOKEN_KIND(Token__KeywordBegin, ""), \
 	TOKEN_KIND(Token_inline,      "inline"),      \
 	TOKEN_KIND(Token_no_inline,   "no_inline"),   \
 	TOKEN_KIND(Token_context,     "context"),     \
-	TOKEN_KIND(Token_size_of,     "size_of"),     \
-	TOKEN_KIND(Token_align_of,    "align_of"),    \
-	TOKEN_KIND(Token_offset_of,   "offset_of"),   \
-	TOKEN_KIND(Token_type_of,     "type_of"),     \
 	TOKEN_KIND(Token_macro,       "macro"),       \
 	TOKEN_KIND(Token_const,       "const"),       \
 TOKEN_KIND(Token__KeywordEnd, ""), \
