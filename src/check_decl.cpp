@@ -1174,11 +1174,14 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 	CheckerContext new_ctx = *ctx_;
 	CheckerContext *ctx = &new_ctx;
 
+	GB_ASSERT(type->kind == Type_Proc);
+
 	ctx->scope = decl->scope;
 	ctx->decl = decl;
 	ctx->proc_name = proc_name;
 	ctx->curr_proc_decl = decl;
 	ctx->curr_proc_sig  = type;
+	ctx->curr_proc_calling_convention = type->Proc.calling_convention;
 
 	ast_node(bs, BlockStmt, body);
 
@@ -1187,7 +1190,6 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 	defer (array_free(&using_entities));
 
 	{
-		GB_ASSERT(type->kind == Type_Proc);
 		if (type->Proc.param_count > 0) {
 			TypeTuple *params = &type->Proc.params->Tuple;
 			for_array(i, params->variables) {
@@ -1242,7 +1244,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 		// NOTE(bill, 2019-08-31): Don't check the body as the where clauses failed
 		return;
 	}
-	
+
 	check_open_scope(ctx, body);
 	{
 		for_array(i, using_entities) {

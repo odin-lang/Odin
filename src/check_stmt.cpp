@@ -1301,6 +1301,11 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 	case_end;
 
 	case_ast_node(as, AssignStmt, node);
+		if (ctx->curr_proc_calling_convention == ProcCC_Pure) {
+			error(node, "Assignment statements are not allowed within a \"pure\" procedure");
+			// Continue
+		}
+
 		switch (as->op.kind) {
 		case Token_Eq: {
 			// a, b, c = 1, 2, 3;  // Multisided
@@ -2026,6 +2031,12 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 			check_arity_match(ctx, vd);
 			check_init_variables(ctx, entities, entity_count, vd->values, str_lit("variable declaration"));
+
+			if (ctx->curr_proc_calling_convention == ProcCC_Pure) {
+				if (vd->values.count == 0) {
+					error(node, "Variable declarations without assignment are not allowed within \"pure\" procedures");
+				}
+			}
 
 			for (isize i = 0; i < entity_count; i++) {
 				Entity *e = entities[i];

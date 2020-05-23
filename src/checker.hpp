@@ -297,6 +297,7 @@ struct CheckerContext {
 	String         proc_name;
 	DeclInfo *     curr_proc_decl;
 	Type *         curr_proc_sig;
+	ProcCallingConvention curr_proc_calling_convention;
 	bool           in_proc_sig;
 	ForeignContext foreign_context;
 	gbAllocator    allocator;

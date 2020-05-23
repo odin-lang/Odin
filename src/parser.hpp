@@ -176,6 +176,7 @@ enum ProcCallingConvention {
 	ProcCC_Invalid = 0,
 	ProcCC_Odin,
 	ProcCC_Contextless,
+	ProcCC_Pure,
 	ProcCC_CDecl,
 	ProcCC_StdCall,
 	ProcCC_FastCall,
