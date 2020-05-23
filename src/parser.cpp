@@ -3895,7 +3895,7 @@ Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 	}
 
 	if (is_using) {
-		syntax_warning(import_name, "'using import' is deprecated, please use the import name explicitly");
+		syntax_error(import_name, "'using import' is not allowed, please use the import name explicitly");
 	}
 
 	expect_semicolon(f, s);
