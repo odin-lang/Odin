@@ -291,7 +291,6 @@ compare_strings :: proc(a, b: string) -> int {
 binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 	where intrinsics.type_is_ordered(T) #no_bounds_check {
 
-
 	n := len(array);
 	switch n {
 	case 0:
@@ -324,6 +323,17 @@ binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 
 	if key == array[lo] {
 		return lo, true;
+	}
+	return -1, false;
+}
+
+
+linear_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
+	where intrinsics.type_is_comparable(T) #no_bounds_check {
+	for x, i in array {
+		if x == key {
+			return i, true;
+		}
 	}
 	return -1, false;
 }
