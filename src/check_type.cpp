@@ -2452,6 +2452,7 @@ void set_procedure_abi_types(gbAllocator allocator, Type *type) {
 			switch (type->Proc.calling_convention) {
 			case ProcCC_Odin:
 			case ProcCC_Contextless:
+			case ProcCC_Pure:
 				if (is_type_pointer(new_type) & !is_type_pointer(e->type)) {
 					e->flags |= EntityFlag_ImplicitReference;
 				}
@@ -2548,7 +2549,9 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 		type->Proc.has_named_results = first->token.string != "";
 	}
 
-
+	if (result_count == 0 && cc == ProcCC_Pure) {
+		error(proc_type_node, "\"pure\" procedures must have at least 1 return value");
+	}
 
 
 	bool optional_ok = (pt->tags & ProcTag_optional_ok) != 0;

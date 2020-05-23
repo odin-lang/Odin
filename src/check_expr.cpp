@@ -1165,6 +1165,11 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 		if (e->flags & EntityFlag_Value) {
 			o->mode = Addressing_Value;
 		}
+		if (c->curr_proc_calling_convention == ProcCC_Pure) {
+			if (e->scope->flags & (ScopeFlag_Global|ScopeFlag_File|ScopeFlag_Pkg)) {
+				error(n, "Global variables are not allowed within a \"pure\" procedure, got '%.*s'", LIT(e->token.string));
+			}
+		}
 		break;
 
 	case Entity_Procedure:
@@ -7434,6 +7439,14 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 		}
 	}
 
+	{
+		if (c->curr_proc_calling_convention == ProcCC_Pure) {
+			if (pt->kind == Type_Proc && pt->Proc.calling_convention != ProcCC_Pure) {
+				error(call, "Only \"pure\" procedure calls are allowed within a \"pure\" procedure");
+			}
+		}
+	}
+
 	#if 0
 	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
 		init_core_context(c->checker);
@@ -7755,23 +7768,28 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case_ast_node(i, Implicit, node)
 		switch (i->kind) {
 		case Token_context:
-			if (c->proc_name.len == 0 && c->curr_proc_sig == nullptr) {
-				error(node, "'context' is only allowed within procedures %p", c->curr_proc_decl);
-				return kind;
-			}
+			{
+				if (c->proc_name.len == 0 && c->curr_proc_sig == nullptr) {
+					error(node, "'context' is only allowed within procedures %p", c->curr_proc_decl);
+					return kind;
+				}
+				if (c->curr_proc_calling_convention == ProcCC_Pure) {
+					error(node, "'context' is not allowed within a \"pure\" procedure");
+				} else {
+					if (unparen_expr(c->assignment_lhs_hint) == node) {
+						c->scope->flags |= ScopeFlag_ContextDefined;
+					}
 
-			if (unparen_expr(c->assignment_lhs_hint) == node) {
-				c->scope->flags |= ScopeFlag_ContextDefined;
-			}
+					if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
+						error(node, "'context' has not been defined within this scope");
+						// Continue with value
+					}
+				}
 
-			if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
-				error(node, "'context' has not been defined within this scope");
-				// Continue with value
+				init_core_context(c->checker);
+				o->mode = Addressing_Context;
+				o->type = t_context;
 			}
-
-			init_core_context(c->checker);
-			o->mode = Addressing_Context;
-			o->type = t_context;
 			break;
 
 		default:

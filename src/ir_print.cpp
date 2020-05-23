@@ -1434,6 +1434,7 @@ void ir_print_calling_convention(irFileBuffer *f, irModule *m, ProcCallingConven
 	switch (cc) {
 	case ProcCC_Odin:        ir_write_str_lit(f, "");       break;
 	case ProcCC_Contextless: ir_write_str_lit(f, "");       break;
+	case ProcCC_Pure:        ir_write_str_lit(f, "");       break;
 	// case ProcCC_CDecl:       ir_write_str_lit(f, "ccc ");   break;
 	case ProcCC_CDecl:       ir_write_str_lit(f, "");   break;
 	case ProcCC_StdCall:     ir_write_str_lit(f, "cc 64 "); break;
