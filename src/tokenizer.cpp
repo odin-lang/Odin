@@ -960,6 +960,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '`': // Raw String Literal
 		case '"': // String Literal
 		{
+			bool has_carriage_return = false;
 			i32 success;
 			Rune quote = curr_rune;
 			token.kind = Token_String;
@@ -989,10 +990,13 @@ Token tokenizer_get_token(Tokenizer *t) {
 					if (r == quote) {
 						break;
 					}
+					if (r == '\r') {
+						has_carriage_return = true;
+					}
 				}
 			}
 			token.string.len = t->curr - token.string.text;
-			success = unquote_string(heap_allocator(), &token.string);
+			success = unquote_string(heap_allocator(), &token.string, 0, has_carriage_return);
 			if (success > 0) {
 				if (success == 2) {
 					array_add(&t->allocated_strings, token.string);

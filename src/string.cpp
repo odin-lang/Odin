@@ -661,10 +661,25 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 }
 
 
+String strip_carriage_return(gbAllocator a, String s) {
+	isize buf_len = s.len;
+	u8 *buf = gb_alloc_array(a, u8, buf_len);
+	isize i = 0;
+	for (isize j = 0; j < s.len; j++) {
+		u8 c = s.text[j];
+
+		if (c != '\r') {
+			buf[i++] = c;
+		}
+	}
+	return make_string(buf, i);
+}
+
+
 // 0 == failure
 // 1 == original memory
 // 2 == new allocation
-i32 unquote_string(gbAllocator a, String *s_, u8 quote=0) {
+i32 unquote_string(gbAllocator a, String *s_, u8 quote=0, bool has_carriage_return=false) {
 	String s = *s_;
 	isize n = s.len;
 	if (quote == 0) {
@@ -682,6 +697,11 @@ i32 unquote_string(gbAllocator a, String *s_, u8 quote=0) {
 	if (quote == '`') {
 		if (string_contains_char(s, '`')) {
 			return 0;
+		}
+
+		if (has_carriage_return) {
+			*s_ = strip_carriage_return(a, s);
+			return 2;
 		}
 		*s_ = s;
 		return 1;
