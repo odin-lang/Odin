@@ -7,7 +7,6 @@ import "core:thread"
 import "core:time"
 import "core:reflect"
 import "core:runtime"
-import "core:sort"
 import "intrinsics"
 
 
@@ -1975,23 +1974,11 @@ pure_procedures :: proc() {
 	}
 
 	x := do_math(5);
-	fmt.println("do_math(5) ==", x);
+	fmt.println(x);
 }
 
 main :: proc() {
-	x := [?]f32{1, 1, 5, 6, 7, 8, 9, 10, 15, 15};
-	i, ok := sort.binary_search(x[:], 7);
-	fmt.println(x);
-	fmt.println(i, ok);
-
-	y := [?]string{"apple", "hello", "goodbye", "what?"};
-	sort.quick_sort(y[:]);
-	j, y_ok := sort.binary_search(y[:], "goodbye");
-	fmt.println(y);
-	fmt.println(j, y_ok);
-
-
-	when false {
+	when true {
 		the_basics();
 		control_flow();
 		named_proc_return_parameters();
