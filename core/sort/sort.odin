@@ -286,3 +286,44 @@ compare_strings :: proc(a, b: string) -> int {
 	y := transmute(mem.Raw_String)b;
 	return mem.compare_byte_ptrs(x.data, y.data, min(x.len, y.len));
 }
+
+
+binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
+	where intrinsics.type_is_ordered(T) #no_bounds_check {
+
+
+	n := len(array);
+	switch n {
+	case 0:
+		return -1, false;
+	case 1:
+		if array[0] == key {
+			return 0, true;
+		}
+		return -1, false;
+	}
+
+	lo, hi := 0, n-1;
+
+	for array[hi] != array[lo] && key >= array[lo] && key <= array[hi] {
+		when intrinsics.type_is_ordered_numeric(T) {
+			// NOTE(bill): This is technically interpolation search
+			m := lo + int((key - array[lo]) * T(hi - lo) / (array[hi] - array[lo]));
+		} else {
+			m := (lo + hi)/2;
+		}
+		switch {
+		case array[m] < key:
+			lo = m + 1;
+		case key < array[m]:
+			hi = m - 1;
+		case:
+			return m, true;
+		}
+	}
+
+	if key == array[lo] {
+		return lo, true;
+	}
+	return -1, false;
+}
