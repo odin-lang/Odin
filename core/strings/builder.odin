@@ -8,9 +8,26 @@ Builder :: struct {
 	buf: [dynamic]byte,
 }
 
-make_builder :: proc(allocator := context.allocator) -> Builder {
+make_builder_none :: proc(allocator := context.allocator) -> Builder {
 	return Builder{make([dynamic]byte, allocator)};
 }
+
+make_builder_len :: proc(len: int, allocator := context.allocator) -> Builder {
+	return Builder{make([dynamic]byte, len, allocator)};
+}
+
+make_builder_len_cap :: proc(len, cap: int, allocator := context.allocator) -> Builder {
+	return Builder{make([dynamic]byte, len, cap, allocator)};
+}
+
+make_builder :: proc{
+	make_builder_none,
+	make_builder_len,
+	make_builder_len_cap,
+};
+
+
+
 
 destroy_builder :: proc(b: ^Builder) {
 	delete(b.buf);

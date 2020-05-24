@@ -105,7 +105,8 @@ is_title :: proc(r: rune) -> bool {
 	return is_upper(r) && is_lower(r);
 }
 
-is_white_space :: proc(r: rune) -> bool {
+is_white_space :: is_space;
+is_space :: proc(r: rune) -> bool {
 	c := i32(r);
 	p := binary_search(c, space_ranges[:], len(space_ranges)/2, 2);
 	if p >= 0 && space_ranges[p] <= c && c <= space_ranges[p+1] {
