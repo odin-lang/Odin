@@ -2355,58 +2355,24 @@ void lb_begin_procedure_body(lbProcedure *p) {
 
 	if (p->type->Proc.params != nullptr) {
 		TypeTuple *params = &p->type->Proc.params->Tuple;
-		if (p->type_expr != nullptr) {
-			ast_node(pt, ProcType, p->type_expr);
-			isize param_index = 0;
-			isize q_index = 0;
+		auto abi_types = p->type->Proc.abi_compat_params;
 
-			for_array(i, params->variables) {
-				ast_node(fl, FieldList, pt->params);
-				GB_ASSERT(fl->list.count > 0);
-				GB_ASSERT(fl->list[0]->kind == Ast_Field);
-				if (q_index == fl->list[param_index]->Field.names.count) {
-					q_index = 0;
-					param_index++;
-				}
-				ast_node(field, Field, fl->list[param_index]);
-				Ast *name = field->names[q_index++];
-
-				Entity *e = params->variables[i];
-				if (e->kind != Entity_Variable) {
-					continue;
-				}
-
-				Type *abi_type = p->type->Proc.abi_compat_params[i];
-				if (e->token.string != "") {
-					lb_add_param(p, e, name, abi_type, parameter_index);
-				}
-
-				if (is_type_tuple(abi_type)) {
-					parameter_index += cast(i32)abi_type->Tuple.variables.count;
-				} else {
-					parameter_index += 1;
-				}
+		for_array(i, params->variables) {
+			Entity *e = params->variables[i];
+			if (e->kind != Entity_Variable) {
+				continue;
 			}
-		} else {
-			auto abi_types = p->type->Proc.abi_compat_params;
-
-			for_array(i, params->variables) {
-				Entity *e = params->variables[i];
-				if (e->kind != Entity_Variable) {
-					continue;
-				}
-				Type *abi_type = e->type;
-				if (abi_types.count > 0) {
-					abi_type = abi_types[i];
-				}
-				if (e->token.string != "") {
-					lb_add_param(p, e, nullptr, abi_type, parameter_index);
-				}
-				if (is_type_tuple(abi_type)) {
-					parameter_index += cast(i32)abi_type->Tuple.variables.count;
-				} else {
-					parameter_index += 1;
-				}
+			Type *abi_type = e->type;
+			if (abi_types.count > 0) {
+				abi_type = abi_types[i];
+			}
+			if (e->token.string != "") {
+				lb_add_param(p, e, nullptr, abi_type, parameter_index);
+			}
+			if (is_type_tuple(abi_type)) {
+				parameter_index += cast(i32)abi_type->Tuple.variables.count;
+			} else {
+				parameter_index += 1;
 			}
 		}
 	}
