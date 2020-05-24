@@ -46,9 +46,9 @@ builder_cap :: proc(b: Builder) -> int {
 	return cap(b.buf);
 }
 
-builder_pop_rune :: proc(b: ^Builder) -> (rune, int) {
+pop_rune :: proc(b: ^Builder) -> (rune, int) {
 	r, size := utf8.decode_last_rune_in_string(string(b.buf[:]));
-	raw_dyn := transmute(^mem.Raw_Dynamic_Array)&b.buf;
+	raw_dyn := cast(^mem.Raw_Dynamic_Array)&b.buf;
 	raw_dyn.len -= size;
 
 	return r, size;
