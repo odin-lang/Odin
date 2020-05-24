@@ -707,6 +707,192 @@ scrub :: proc(s: string, replacement: string, allocator := context.allocator) ->
 	return to_string(b);
 }
 
+to_snake_case :: proc(str: string, allocator := context.allocator) -> string {
+    buf := make_builder(allocator);
+
+    last_chars: [2]rune;
+    for char, _ in str {
+        switch char {
+        case 'A'..'Z':
+            switch last_chars[1] {
+            case 'a'..'z', '0'..'9':
+                write_rune(&buf, '_');
+            case 'A'..'Z':
+                write_rune(&buf, last_chars[1] + ('a'-'A'));
+            }
+        case 'a'..'z':
+            switch last_chars[1] {
+            case 'A'..'Z':
+                switch last_chars[0] {
+                case 'A'..'Z':
+                    write_rune(&buf, '_');
+                }
+                write_rune(&buf, last_chars[1] + ('a'-'A'));
+            case '0'..'9':
+                write_rune(&buf, '_');
+            }
+            write_rune(&buf, char);
+        case '0'..'9':
+            switch last_chars[1] {
+            case 'A'..'Z':
+                write_rune(&buf, last_chars[1] + ('a'-'A'));
+                write_rune(&buf, '_');
+            case 'a'..'z':
+                write_rune(&buf, '_');
+            }
+            write_rune(&buf, char);
+        case '_':
+            switch last_chars[1] {
+            case 'A'..'Z':
+                write_rune(&buf, last_chars[1] + ('a'-'A'));
+            }
+            write_rune(&buf, char);
+        case:
+            unimplemented();
+        }
+
+        last_chars[0] = last_chars[1];
+        last_chars[1] = char;
+    }
+
+    switch last_chars[1] {
+    case 'A'..'Z':
+        write_rune(&buf, last_chars[1] + ('a'-'A'));
+    }
+
+    return to_string(buf);
+}
+
+to_ada_case :: proc(str: string, allocator := context.allocator) -> string {
+    buf := make_builder(allocator);
+ 
+    last_chars: [2]rune;
+    for char, _ in str {
+        switch char {
+        case 'A'..'Z':
+            switch last_chars[1] {
+            case 'a'..'z', '0'..'9':
+                write_rune(&buf, '_');
+            case 'A'..'Z':
+                switch last_chars[0] {
+                case '_', '\x00':
+                    write_rune(&buf, last_chars[1]);
+                case:
+                    write_rune(&buf, last_chars[1] + ('a'-'A'));
+                }
+            }
+        case 'a'..'z':
+            switch last_chars[1] {
+            case 'A'..'Z':
+                switch last_chars[0] {
+                case 'A'..'Z':
+                    write_rune(&buf, '_');
+                    write_rune(&buf, last_chars[1]);
+                case:
+                    write_rune(&buf, last_chars[1]);
+                }
+                write_rune(&buf, char);
+            case '0'..'9':
+                write_rune(&buf, '_');
+                write_rune(&buf, char);
+            case 'a'..'z':
+                write_rune(&buf, char);
+            case '_', '\x00':
+                write_rune(&buf, char - ('a'-'A'));
+            }
+        case '0'..'9':
+            switch last_chars[1] {
+            case 'A'..'Z':
+                write_rune(&buf, last_chars[1] + ('a'-'A'));
+                write_rune(&buf, '_');
+            case 'a'..'z':
+                write_rune(&buf, '_');
+            }
+            write_rune(&buf, char);
+        case '_':
+            switch last_chars[1] {
+            case 'A'..'Z':
+                write_rune(&buf, last_chars[1] + ('a'-'A'));
+            }
+            write_rune(&buf, char);
+        case:
+            write_rune(&buf, char);
+        }
+ 
+        last_chars[0] = last_chars[1];
+        last_chars[1] = char;
+    }
+ 
+    switch last_chars[1] {
+    case 'A'..'Z':
+        write_rune(&buf, last_chars[1] + ('a'-'A'));
+    }
+ 
+    return to_string(buf);
+}
+
+to_screaming_snake_case :: proc(str: string, allocator := context.allocator) -> string {
+    buf := make_builder(allocator);
+ 
+    last_chars: [2]rune;
+    for char, _ in str {
+        switch char {
+        case 'A'..'Z':
+            switch last_chars[1] {
+            case 'a'..'z', '0'..'9':
+                write_rune(&buf, '_');
+            case 'A'..'Z':
+                write_rune(&buf, last_chars[1]);
+            }
+        case 'a'..'z':
+            switch last_chars[1] {
+            case 'A'..'Z':
+                switch last_chars[0] {
+                case 'A'..'Z':
+                    write_rune(&buf, '_');
+                    write_rune(&buf, last_chars[1]);
+                case:
+                    write_rune(&buf, last_chars[1]);
+                }
+                write_rune(&buf, char - ('a'-'A'));
+            case '0'..'9':
+                write_rune(&buf, '_');
+                write_rune(&buf, char - ('a'-'A'));
+            case 'a'..'z':
+                write_rune(&buf, char - ('a'-'A'));
+            case '_', '\x00':
+                write_rune(&buf, char - ('a'-'A'));
+            }
+        case '0'..'9':
+            switch last_chars[1] {
+            case 'A'..'Z':
+                write_rune(&buf, last_chars[1]);
+                write_rune(&buf, '_');
+            case 'a'..'z':
+                write_rune(&buf, '_');
+            }
+            write_rune(&buf, char);
+        case '_':
+            switch last_chars[1] {
+            case 'A'..'Z':
+                write_rune(&buf, last_chars[1]);
+            }
+            write_rune(&buf, char);
+        case:
+            unimplemented();
+        }
+ 
+        last_chars[0] = last_chars[1];
+        last_chars[1] = char;
+    }
+ 
+    switch last_chars[1] {
+    case 'A'..'Z':
+        write_rune(&buf, last_chars[1]);
+    }
+ 
+    return to_string(buf);
+}
 
 reverse :: proc(s: string, allocator := context.allocator) -> string {
 	str := s;
