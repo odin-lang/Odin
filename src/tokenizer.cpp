@@ -718,13 +718,8 @@ Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 			}
 
 		} else {
-			seen_decimal_point = false;
 			scan_mantissa(t, 10);
-
-			if (t->curr_rune == '.' || t->curr_rune == 'e' || t->curr_rune == 'E') {
-				seen_decimal_point = true;
-				goto fraction;
-			}
+			goto fraction;
 		}
 
 		goto end;
