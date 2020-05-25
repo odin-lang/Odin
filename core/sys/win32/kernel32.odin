@@ -5,187 +5,296 @@ foreign import "system:kernel32.lib"
 
 @(default_calling_convention = "std")
 foreign kernel32 {
-	@(link_name="CreateProcessA")		     create_process_a		      :: proc(application_name, command_line: cstring,
-	                                                              				 process_attributes, thread_attributes: ^Security_Attributes,
-	                                                              				 inherit_handle: Bool, creation_flags: u32, environment: rawptr,
-	                                                              				 current_direcotry: cstring, startup_info: ^Startup_Info,
-	                                                              				 process_information: ^Process_Information) -> Bool ---;
-	@(link_name="CreateProcessW")            create_process_w             :: proc(application_name, command_line: Wstring,
-	                                                                             process_attributes, thread_attributes: ^Security_Attributes,
-	                                                                             inherit_handle: Bool, creation_flags: u32, environment: rawptr,
-	                                                                             current_direcotry: cstring, startup_info: ^Startup_Info,
-	                                                                             process_information: ^Process_Information) -> Bool ---;
-	@(link_name="GetExitCodeProcess")		 get_exit_code_process        :: proc(process: Handle, exit: ^u32) -> Bool ---;
-	@(link_name="ExitProcess")               exit_process                 :: proc(exit_code: u32) ---;
-	@(link_name="GetModuleHandleA")          get_module_handle_a          :: proc(module_name: cstring) -> Hmodule ---;
-	@(link_name="GetModuleHandleW")          get_module_handle_w          :: proc(module_name: Wstring) -> Hmodule ---;
+	CreateProcessA            :: proc(application_name, command_line: cstring,
+	                                  process_attributes, thread_attributes: ^SECURITY_ATTRIBUTES,
+	                                  inherit_handle: BOOL, creation_flags: u32, environment: rawptr,
+	                                  current_direcotry: cstring, startup_info: ^STARTUPINFO,
+	                                  process_information: ^PROCESS_INFORMATION) -> BOOL ---;
 
-	@(link_name="GetModuleFileNameA")        get_module_file_name_a       :: proc(module: Hmodule, filename: cstring, size: u32) -> u32 ---;
-	@(link_name="GetModuleFileNameW")        get_module_file_name_w       :: proc(module: Hmodule, filename: Wstring, size: u32) -> u32 ---;
+	CreateProcessW            :: proc(application_name, command_line: LPCWSTR,
+	                                  process_attributes, thread_attributes: ^SECURITY_ATTRIBUTES,
+	                                  inherit_handle: BOOL, creation_flags: u32, environment: rawptr,
+	                                  current_direcotry: cstring, startup_info: ^STARTUPINFO,
+	                                  process_information: ^PROCESS_INFORMATION) -> BOOL ---;
 
-	@(link_name="Sleep")                     sleep                        :: proc(ms: u32) ---;
-	@(link_name="QueryPerformanceFrequency") query_performance_frequency  :: proc(result: ^i64) -> i32 ---;
-	@(link_name="QueryPerformanceCounter")   query_performance_counter    :: proc(result: ^i64) -> i32 ---;
-	@(link_name="OutputDebugStringA")        output_debug_string_a        :: proc(c_str: cstring) ---;
+	GetExitCodeProcess        :: proc(process: HANDLE, exit: ^u32) -> BOOL ---;
+	ExitProcess               :: proc(exit_code: u32) ---;
+	GetModuleHandleA          :: proc(module_name: cstring) -> HMODULE ---;
+	GetModuleHandleW          :: proc(module_name: LPCWSTR) -> HMODULE ---;
 
-	@(link_name="GetCommandLineA")           get_command_line_a           :: proc() -> cstring ---;
-	@(link_name="GetCommandLineW")           get_command_line_w           :: proc() -> Wstring ---;
-	@(link_name="GetSystemMetrics")          get_system_metrics           :: proc(index: i32) -> i32 ---;
-	@(link_name="GetSystemInfo")             get_system_info              :: proc(info: ^System_Info) ---;
-	@(link_name="GetVersionExA")             get_version                  :: proc(osvi: ^OS_Version_Info_Ex_A) ---;
-	@(link_name="GetCurrentThreadId")        get_current_thread_id        :: proc() -> u32 ---;
+	GetModuleFileNameA        :: proc(module: HMODULE, filename: cstring, size: u32) -> u32 ---;
+	GetModuleFileNameW        :: proc(module: HMODULE, filename: LPCWSTR, size: u32) -> u32 ---;
+
+	Sleep                     :: proc(ms: u32) ---;
+	QueryPerformanceFrequency :: proc(result: ^i64) -> i32 ---;
+	QueryPerformanceCounter   :: proc(result: ^i64) -> i32 ---;
+	OutputDebugStringA        :: proc(c_str: cstring) ---;
+
+	GetCommandLineA           :: proc() -> cstring ---;
+	GetCommandLineW           :: proc() -> LPCWSTR ---;
+	GetSystemMetrics          :: proc(index: i32) -> i32 ---;
+	GetSystemInfo             :: proc(info: ^SYSTEM_INFO) ---;
+	GetVersionExA             :: proc(osvi: ^OSVERSIONINFOEXA) ---;
+	GetCurrentThreadId        :: proc() -> u32 ---;
 
 	// NOTE(tetra): Not thread safe with SetCurrentDirectory and GetFullPathName;
 	// The current directory is stored as a global variable in the process.
-	@(link_name="GetCurrentDirectoryW")       get_current_directory_w     :: proc(len: u32, buf: Wstring) -> u32 ---;
-	@(link_name="SetCurrentDirectoryW")       set_current_directory_w     :: proc(buf: Wstring) -> u32 ---;
+	GetCurrentDirectoryW      :: proc(len: u32, buf: LPCWSTR) -> u32 ---;
+	SetCurrentDirectoryW      :: proc(buf: LPCWSTR) -> u32 ---;
 
-	@(link_name="GetSystemTimeAsFileTime")   get_system_time_as_file_time :: proc(system_time_as_file_time: ^Filetime) ---;
-	@(link_name="FileTimeToLocalFileTime")   file_time_to_local_file_time :: proc(file_time: ^Filetime, local_file_time: ^Filetime) -> Bool ---;
-	@(link_name="FileTimeToSystemTime")      file_time_to_system_time     :: proc(file_time: ^Filetime, system_time: ^Systemtime) -> Bool ---;
-	@(link_name="SystemTimeToFileTime")      system_time_to_file_time     :: proc(system_time: ^Systemtime, file_time: ^Filetime) -> Bool ---;
+	GetSystemTimeAsFileTime   :: proc(system_time_as_file_time: ^FILETIME) ---;
+	FileTimeToLocalFileTime   :: proc(file_time: ^FILETIME, local_file_time: ^FILETIME) -> BOOL ---;
+	FileTimeToSystemTime      :: proc(file_time: ^FILETIME, system_time: ^SYSTEMTIME) -> BOOL ---;
+	SystemTimeToFileTime      :: proc(system_time: ^SYSTEMTIME, file_time: ^FILETIME) -> BOOL ---;
 
-	@(link_name="GetStdHandle")              get_std_handle               :: proc(h: i32) -> Handle ---;
+	GetStdHandle :: proc(h: i32) -> HANDLE ---;
 
-	@(link_name="CreateFileA")
-	create_file_a :: proc(filename: cstring, desired_access, share_module: u32,
+	CreateFileA :: proc(filename: cstring, desired_access, share_module: u32,
 	                      security: rawptr,
-	                      creation, flags_and_attribs: u32, template_file: Handle) -> Handle ---;
+	                      creation, flags_and_attribs: u32, template_file: HANDLE) -> HANDLE ---;
 
-	@(link_name="CreateFileW")
-	create_file_w :: proc(filename: Wstring, desired_access, share_module: u32,
+	CreateFileW :: proc(filename: LPCWSTR, desired_access, share_module: u32,
 	                      security: rawptr,
-	                      creation, flags_and_attribs: u32, template_file: Handle) -> Handle ---;
+	                      creation, flags_and_attribs: u32, template_file: HANDLE) -> HANDLE ---;
 
 
-	@(link_name="ReadFile")  read_file  :: proc(h: Handle, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> Bool ---;
-	@(link_name="WriteFile") write_file :: proc(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool ---;
+	ReadFile  :: proc(h: HANDLE, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> BOOL ---;
+	WriteFile :: proc(h: HANDLE, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> BOOL ---;
 
-	@(link_name="GetFileSizeEx")              get_file_size_ex               :: proc(file_handle: Handle, file_size: ^i64) -> Bool ---;
-	@(link_name="GetFileInformationByHandle") get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool ---;
+	GetFileSizeEx              :: proc(file_handle: HANDLE, file_size: ^i64) -> BOOL ---;
+	GetFileInformationByHandle :: proc(file_handle: HANDLE, file_info: ^BY_HANDLE_FILE_INFORMATION) -> BOOL ---;
 
-	@(link_name="CreateDirectoryA") 		  create_directory_a			 :: proc(path: cstring, security_attributes: ^Security_Attributes) -> Bool ---;
-	@(link_name="CreateDirectoryW") 		  create_directory_w			 :: proc(path: Wstring, security_attributes: ^Security_Attributes) -> Bool ---;
+	CreateDirectoryA :: proc(path: cstring, security_attributes: ^SECURITY_ATTRIBUTES) -> BOOL ---;
+	CreateDirectoryW :: proc(path: LPCWSTR, security_attributes: ^SECURITY_ATTRIBUTES) -> BOOL ---;
 
-	@(link_name="GetFileType")    get_file_type    :: proc(file_handle: Handle) -> u32 ---;
-	@(link_name="SetFilePointer") set_file_pointer :: proc(file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 ---;
+	GetFileType    :: proc(file_handle: HANDLE) -> u32 ---;
+	SetFilePointer :: proc(file_handle: HANDLE, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 ---;
 
-	@(link_name="SetHandleInformation") set_handle_information :: proc(obj: Handle, mask, flags: u32) -> Bool ---;
+	SetHandleInformation :: proc(obj: HANDLE, mask, flags: u32) -> BOOL ---;
 
-	@(link_name="FindFirstFileA") find_first_file_a :: proc(file_name: cstring, data: ^Find_Data_A) -> Handle ---;
-	@(link_name="FindNextFileA")  find_next_file_a  :: proc(file: Handle, data: ^Find_Data_A) -> Bool ---;
+	FindFirstFileA :: proc(file_name: cstring, data: ^WIN32_FIND_DATAA) -> HANDLE ---;
+	FindNextFileA  :: proc(file: HANDLE, data: ^WIN32_FIND_DATAA) -> BOOL ---;
+	FindFirstFileW :: proc(file_name: LPCWSTR, data: ^WIN32_FIND_DATAW) -> HANDLE ---;
+	FindNextFileW  :: proc(file: HANDLE, data: ^WIN32_FIND_DATAW) -> BOOL ---;
+	FindClose      :: proc(file: HANDLE) -> BOOL ---;
 
-	@(link_name="FindFirstFileW") find_first_file_w :: proc(file_name: Wstring, data: ^Find_Data_W) -> Handle ---;
-	@(link_name="FindNextFileW")  find_next_file_w  :: proc(file: Handle, data: ^Find_Data_W) -> Bool ---;
+	MoveFileExA :: proc(existing, new: cstring, flags: u32) -> BOOL ---;
+	DeleteFileA :: proc(file_name: cstring) -> BOOL ---;
+	CopyFileA   :: proc(existing, new: cstring, fail_if_exists: BOOL) -> BOOL ---;
 
-	@(link_name="FindClose")      find_close        :: proc(file: Handle) -> Bool ---;
+	MoveFileExW :: proc(existing, new: LPCWSTR, flags: u32) -> BOOL ---;
+	DeleteFileW :: proc(file_name: LPCWSTR) -> BOOL ---;
+	CopyFileW   :: proc(existing, new: LPCWSTR, fail_if_exists: BOOL) -> BOOL ---;
 
-	@(link_name="MoveFileExA")    move_file_ex_a    :: proc(existing, new: cstring, flags: u32) -> Bool ---;
-	@(link_name="DeleteFileA")    delete_file_a     :: proc(file_name: cstring) -> Bool ---;
-	@(link_name="CopyFileA")      copy_file_a       :: proc(existing, new: cstring, fail_if_exists: Bool) -> Bool ---;
+	HeapAlloc      :: proc(h: HANDLE, flags: u32, bytes: int) -> rawptr ---;
+	HeapReAlloc    :: proc(h: HANDLE, flags: u32, memory: rawptr, bytes: int) -> rawptr ---;
+	HeapFree       :: proc(h: HANDLE, flags: u32, memory: rawptr) -> BOOL ---;
+	GetProcessHeap :: proc() -> HANDLE ---;
 
-	@(link_name="MoveFileExW")    move_file_ex_w    :: proc(existing, new: Wstring, flags: u32) -> Bool ---;
-	@(link_name="DeleteFileW")    delete_file_w     :: proc(file_name: Wstring) -> Bool ---;
-	@(link_name="CopyFileW")      copy_file_w       :: proc(existing, new: Wstring, fail_if_exists: Bool) -> Bool ---;
+	LocalAlloc   :: proc(flags: u32, bytes: int) -> rawptr ---;
+	LocalReAlloc :: proc(mem: rawptr, bytes: int, flags: uint) -> rawptr ---;
+	LocalFree    :: proc(mem: rawptr) -> rawptr ---;
 
-	@(link_name="HeapAlloc")      heap_alloc       :: proc(h: Handle, flags: u32, bytes: int) -> rawptr ---;
-	@(link_name="HeapReAlloc")    heap_realloc     :: proc(h: Handle, flags: u32, memory: rawptr, bytes: int) -> rawptr ---;
-	@(link_name="HeapFree")       heap_free        :: proc(h: Handle, flags: u32, memory: rawptr) -> Bool ---;
-	@(link_name="GetProcessHeap") get_process_heap :: proc() -> Handle ---;
+	FindFirstChangeNotificationA :: proc(path: cstring, watch_subtree: BOOL, filter: u32) -> HANDLE ---;
+	FindNextChangeNotification   :: proc(h: HANDLE) -> BOOL ---;
+	FindCloseChangeNotification  :: proc(h: HANDLE) -> BOOL ---;
 
-	@(link_name="LocalAlloc")     local_alloc      :: proc(flags: u32, bytes: int) -> rawptr ---;
-	@(link_name="LocalReAlloc")   local_realloc    :: proc(mem: rawptr, bytes: int, flags: uint) -> rawptr ---;
-	@(link_name="LocalFree")      local_free       :: proc(mem: rawptr) -> rawptr ---;
+	ReadDirectoryChangesW :: proc(dir: HANDLE, buf: rawptr, buf_length: u32,
+	                                                                      watch_subtree: BOOL, notify_filter: u32,
+	                                                                      bytes_returned: ^u32, overlapped: ^OVERLAPPED,
+	                                                                      completion: rawptr) -> BOOL ---;
 
-	@(link_name="FindFirstChangeNotificationA") find_first_change_notification_a :: proc(path: cstring, watch_subtree: Bool, filter: u32) -> Handle ---;
-	@(link_name="FindNextChangeNotification")   find_next_change_notification    :: proc(h: Handle) -> Bool ---;
-	@(link_name="FindCloseChangeNotification")  find_close_change_notification   :: proc(h: Handle) -> Bool ---;
+	WideCharToMultiByte :: proc(code_page: u32, flags: u32,
+	                            wchar_str: LPCWSTR, wchar: i32,
+	                            multi_str: cstring, multi: i32,
+	                            default_char: cstring, used_default_char: ^BOOL) -> i32 ---;
 
-	@(link_name="ReadDirectoryChangesW") read_directory_changes_w :: proc(dir: Handle, buf: rawptr, buf_length: u32,
-	                                                                      watch_subtree: Bool, notify_filter: u32,
-	                                                                      bytes_returned: ^u32, overlapped: ^Overlapped,
-	                                                                      completion: rawptr) -> Bool ---;
+	MultiByteToWideChar :: proc(code_page: u32, flags: u32,
+	                            mb_str: cstring, mb: i32,
+	                            wc_str: LPCWSTR, wc: i32) -> i32 ---;
 
-	@(link_name="WideCharToMultiByte") wide_char_to_multi_byte :: proc(code_page: u32, flags: u32,
-	                                                                   wchar_str: Wstring, wchar: i32,
-	                                                                   multi_str: cstring, multi: i32,
-	                                                                   default_char: cstring, used_default_char: ^Bool) -> i32 ---;
-
-	@(link_name="MultiByteToWideChar") multi_byte_to_wide_char :: proc(code_page: u32, flags: u32,
-	                                                                   mb_str: cstring, mb: i32,
-	                                                                   wc_str: Wstring, wc: i32) -> i32 ---;
-
-	@(link_name="CreateSemaphoreA")    create_semaphore_a     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: cstring) -> Handle ---;
-	@(link_name="CreateSemaphoreW")    create_semaphore_w     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: cstring) -> Handle ---;
-	@(link_name="ReleaseSemaphore")    release_semaphore      :: proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool ---;
-	@(link_name="WaitForSingleObject") wait_for_single_object :: proc(handle: Handle, milliseconds: u32) -> u32 ---;
+	CreateSemaphoreA    :: proc(attributes: ^SECURITY_ATTRIBUTES, initial_count, maximum_count: i32, name: cstring) -> HANDLE ---;
+	CreateSemaphoreW    :: proc(attributes: ^SECURITY_ATTRIBUTES, initial_count, maximum_count: i32, name: cstring) -> HANDLE ---;
+	ReleaseSemaphore    :: proc(semaphore: HANDLE, release_count: i32, previous_count: ^i32) -> BOOL ---;
+	WaitForSingleObject :: proc(handle: HANDLE, milliseconds: u32) -> u32 ---;
 }
+
+create_process_a                  :: CreateProcessA;
+create_process_w                  :: CreateProcessW;
+get_exit_code_process             :: GetExitCodeProcess;
+exit_process                      :: ExitProcess;
+get_module_handle_a               :: GetModuleHandleA;
+get_module_handle_w               :: GetModuleHandleW;
+get_module_file_name_a            :: GetModuleFileNameA;
+get_module_file_name_w            :: GetModuleFileNameW;
+sleep                             :: Sleep;
+query_performance_frequency       :: QueryPerformanceFrequency;
+query_performance_counter         :: QueryPerformanceCounter;
+output_debug_string_a             :: OutputDebugStringA;
+get_command_line_a                :: GetCommandLineA;
+get_command_line_w                :: GetCommandLineW;
+get_system_metrics                :: GetSystemMetrics;
+get_system_info                   :: GetSystemInfo;
+get_version                       :: GetVersionExA;
+get_current_thread_id             :: GetCurrentThreadId;
+get_current_directory_w           :: GetCurrentDirectoryW;
+set_current_directory_w           :: SetCurrentDirectoryW;
+get_system_time_as_file_time      :: GetSystemTimeAsFileTime;
+file_time_to_local_file_time      :: FileTimeToLocalFileTime;
+file_time_to_system_time          :: FileTimeToSystemTime;
+system_time_to_file_time          :: SystemTimeToFileTime;
+get_std_handle                    :: GetStdHandle;
+create_file_a                     :: CreateFileA;
+create_file_w                     :: CreateFileW;
+read_file                         :: ReadFile;
+write_file                        :: WriteFile;
+get_file_size_ex                  :: GetFileSizeEx;
+get_file_information_by_handle    :: GetFileInformationByHandle;
+create_directory_a                :: CreateDirectoryA;
+create_directory_w                :: CreateDirectoryW;
+get_file_type                     :: GetFileType;
+set_file_pointer                  :: SetFilePointer;
+set_handle_information            :: SetHandleInformation;
+find_first_file_a                 :: FindFirstFileA;
+find_next_file_a                  :: FindNextFileA;
+find_first_file_w                 :: FindFirstFileW;
+find_next_file_w                  :: FindNextFileW;
+find_close                        :: FindClose;
+move_file_ex_a                    :: MoveFileExA;
+delete_file_a                     :: DeleteFileA;
+copy_file_a                       :: CopyFileA;
+move_file_ex_w                    :: MoveFileExW;
+delete_file_w                     :: DeleteFileW;
+copy_file_w                       :: CopyFileW;
+heap_alloc                        :: HeapAlloc;
+heap_realloc                      :: HeapReAlloc;
+heap_free                         :: HeapFree;
+get_process_heap                  :: GetProcessHeap;
+local_alloc                       :: LocalAlloc;
+local_realloc                     :: LocalReAlloc;
+local_free                        :: LocalFree;
+find_first_change_notification_a  :: FindFirstChangeNotificationA;
+find_next_change_notification     :: FindNextChangeNotification;
+find_close_change_notification    :: FindCloseChangeNotification;
+read_directory_changes_w          :: ReadDirectoryChangesW;
+wide_char_to_multi_byte           :: WideCharToMultiByte;
+multi_byte_to_wide_char           :: MultiByteToWideChar;
+create_semaphore_a                :: CreateSemaphoreA;
+create_semaphore_w                :: CreateSemaphoreW;
+release_semaphore                 :: ReleaseSemaphore;
+wait_for_single_object            :: WaitForSingleObject;
 
 // @(default_calling_convention = "c")
 foreign kernel32 {
-	@(link_name="GetLastError")              get_last_error               :: proc() -> i32 ---;
-	@(link_name="CloseHandle")               close_handle                 :: proc(h: Handle) -> i32 ---;
+	GetLastError :: proc() -> i32 ---;
 
-	@(link_name="GetFileAttributesA")         get_file_attributes_a          :: proc(filename: cstring) -> u32 ---;
-	@(link_name="GetFileAttributesW")         get_file_attributes_w          :: proc(filename: Wstring) -> u32 ---;
-	@(link_name="GetFileAttributesExA")       get_file_attributes_ex_a       :: proc(filename: cstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: ^File_Attribute_Data) -> Bool ---;
-	@(link_name="GetFileAttributesExW")       get_file_attributes_ex_w       :: proc(filename: Wstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: ^File_Attribute_Data) -> Bool ---;
-	@(link_name="CompareFileTime")            compare_file_time              :: proc(a, b: ^Filetime) -> i32 ---;
+	CloseHandle  :: proc(h: HANDLE) -> i32 ---;
+
+	GetFileAttributesA   :: proc(filename: cstring) -> u32 ---;
+	GetFileAttributesW   :: proc(filename: LPCWSTR) -> u32 ---;
+	GetFileAttributesExA :: proc(filename: cstring, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: ^WIN32_FILE_ATTRIBUTE_DATA) -> BOOL ---;
+	GetFileAttributesExW :: proc(filename: LPCWSTR, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: ^WIN32_FILE_ATTRIBUTE_DATA) -> BOOL ---;
+
+	CompareFileTime      :: proc(a, b: ^FILETIME) -> i32 ---;
 }
+
+get_last_error           :: GetLastError;
+close_handle             :: CloseHandle;
+get_file_attributes_a    :: GetFileAttributesA;
+get_file_attributes_w    :: GetFileAttributesW;
+get_file_attributes_ex_a :: GetFileAttributesExA;
+get_file_attributes_ex_w :: GetFileAttributesExW;
+compare_file_time        :: CompareFileTime;
 
 @(default_calling_convention = "c")
 foreign kernel32 {
-	@(link_name="InterlockedCompareExchange") interlocked_compare_exchange :: proc(dst: ^i32, exchange, comparand: i32) -> i32 ---;
-	@(link_name="InterlockedExchange")        interlocked_exchange         :: proc(dst: ^i32, desired: i32) -> i32 ---;
-	@(link_name="InterlockedExchangeAdd")     interlocked_exchange_add     :: proc(dst: ^i32, desired: i32) -> i32 ---;
-	@(link_name="InterlockedAnd")             interlocked_and              :: proc(dst: ^i32, desired: i32) -> i32 ---;
-	@(link_name="InterlockedOr")              interlocked_or               :: proc(dst: ^i32, desired: i32) -> i32 ---;
+	InterlockedCompareExchange :: proc(dst: ^i32, exchange, comparand: i32) -> i32 ---;
+	InterlockedExchange        :: proc(dst: ^i32, desired: i32) -> i32 ---;
+	InterlockedExchangeAdd     :: proc(dst: ^i32, desired: i32) -> i32 ---;
+	InterlockedAnd             :: proc(dst: ^i32, desired: i32) -> i32 ---;
+	InterlockedOr              :: proc(dst: ^i32, desired: i32) -> i32 ---;
 
-	@(link_name="InterlockedCompareExchange64") interlocked_compare_exchange64 :: proc(dst: ^i64, exchange, comparand: i64) -> i64 ---;
-	@(link_name="InterlockedExchange64")        interlocked_exchange64         :: proc(dst: ^i64, desired: i64) -> i64 ---;
-	@(link_name="InterlockedExchangeAdd64")     interlocked_exchange_add64     :: proc(dst: ^i64, desired: i64) -> i64 ---;
-	@(link_name="InterlockedAnd64")             interlocked_and64              :: proc(dst: ^i64, desired: i64) -> i64 ---;
-	@(link_name="InterlockedOr64")              interlocked_or64               :: proc(dst: ^i64, desired: i64) -> i64 ---;
+	InterlockedCompareExchange64 :: proc(dst: ^i64, exchange, comparand: i64) -> i64 ---;
+	InterlockedExchange64        :: proc(dst: ^i64, desired: i64) -> i64 ---;
+	InterlockedExchangeAdd64     :: proc(dst: ^i64, desired: i64) -> i64 ---;
+	InterlockedAnd64             :: proc(dst: ^i64, desired: i64) -> i64 ---;
+	InterlockedOr64              :: proc(dst: ^i64, desired: i64) -> i64 ---;
 }
+
+interlocked_compare_exchange   :: InterlockedCompareExchange;
+interlocked_exchange           :: InterlockedExchange;
+interlocked_exchange_add       :: InterlockedExchangeAdd;
+interlocked_and                :: InterlockedAnd;
+interlocked_or                 :: InterlockedOr;
+interlocked_compare_exchange64 :: InterlockedCompareExchange64;
+interlocked_exchange64         :: InterlockedExchange64;
+interlocked_exchange_add64     :: InterlockedExchangeAdd64;
+interlocked_and64              :: InterlockedAnd64;
+interlocked_or64               :: InterlockedOr64;
 
 @(default_calling_convention = "std")
 foreign kernel32 {
-	@(link_name="_mm_pause")        mm_pause           :: proc() ---;
-	@(link_name="ReadWriteBarrier") read_write_barrier :: proc() ---;
-	@(link_name="WriteBarrier")     write_barrier      :: proc() ---;
-	@(link_name="ReadBarrier")      read_barrier       :: proc() ---;
+	_mm_pause        :: proc() ---;
+	ReadWriteBarrier :: proc() ---;
+	WriteBarrier     :: proc() ---;
+	ReadBarrier      :: proc() ---;
 
-	@(link_name="CreateThread")
-	create_thread :: proc(thread_attributes: ^Security_Attributes, stack_size: int, start_routine: rawptr,
-	                      parameter: rawptr, creation_flags: u32, thread_id: ^u32) -> Handle ---;
-	@(link_name="ResumeThread")      resume_thread        :: proc(thread: Handle) -> u32 ---;
-	@(link_name="GetThreadPriority") get_thread_priority  :: proc(thread: Handle) -> i32 ---;
-	@(link_name="SetThreadPriority") set_thread_priority  :: proc(thread: Handle, priority: i32) -> Bool ---;
-    @(link_name="GetExitCodeThread") get_exit_code_thread :: proc(thread: Handle, exit_code: ^u32) -> Bool ---;
-	@(link_name="TerminateThread")   terminate_thread     :: proc(thread: Handle, exit_code: u32) -> Bool ---;
+	CreateThread       :: proc(thread_attributes: ^SECURITY_ATTRIBUTES, stack_size: int, start_routine: rawptr,
+	                           parameter: rawptr, creation_flags: u32, thread_id: ^u32) -> HANDLE ---;
+	ResumeThread       :: proc(thread: HANDLE) -> u32 ---;
+	GetThreadPriority  :: proc(thread: HANDLE) -> i32 ---;
+	SetThreadPriority  :: proc(thread: HANDLE, priority: i32) -> BOOL ---;
+    GetExitCodeThread  :: proc(thread: HANDLE, exit_code: ^u32) -> BOOL ---;
+	TerminateThread    :: proc(thread: HANDLE, exit_code: u32) -> BOOL ---;
 
-	@(link_name="InitializeCriticalSection")             initialize_critical_section                :: proc(critical_section: ^Critical_Section) ---;
-	@(link_name="InitializeCriticalSectionAndSpinCount") initialize_critical_section_and_spin_count :: proc(critical_section: ^Critical_Section, spin_count: u32) ---;
-	@(link_name="DeleteCriticalSection")                 delete_critical_section                    :: proc(critical_section: ^Critical_Section) ---;
-	@(link_name="SetCriticalSectionSpinCount")           set_critical_section_spin_count            :: proc(critical_section: ^Critical_Section, spin_count: u32) -> u32 ---;
-	@(link_name="TryEnterCriticalSection")               try_enter_critical_section                 :: proc(critical_section: ^Critical_Section) -> Bool ---;
-	@(link_name="EnterCriticalSection")                  enter_critical_section                     :: proc(critical_section: ^Critical_Section) ---;
-	@(link_name="LeaveCriticalSection")                  leave_critical_section                     :: proc(critical_section: ^Critical_Section) ---;
+	InitializeCriticalSection             :: proc(critical_section: ^CRITICAL_SECTION) ---;
+	InitializeCriticalSectionAndSpinCount :: proc(critical_section: ^CRITICAL_SECTION, spin_count: u32) ---;
+	DeleteCriticalSection                 :: proc(critical_section: ^CRITICAL_SECTION) ---;
+	SetCriticalSectionSpinCount           :: proc(critical_section: ^CRITICAL_SECTION, spin_count: u32) -> u32 ---;
+	TryEnterCriticalSection               :: proc(critical_section: ^CRITICAL_SECTION) -> BOOL ---;
+	EnterCriticalSection                  :: proc(critical_section: ^CRITICAL_SECTION) ---;
+	LeaveCriticalSection                  :: proc(critical_section: ^CRITICAL_SECTION) ---;
 
-	@(link_name="CreateEventA") create_event_a :: proc(event_attributes: ^Security_Attributes, manual_reset, initial_state: Bool, name: cstring) -> Handle ---;
-	@(link_name="CreateEventW") create_event_w :: proc(event_attributes: ^Security_Attributes, manual_reset, initial_state: Bool, name: Wstring) -> Handle ---;
-	@(link_name="PulseEvent")   pulse_event    :: proc(event: Handle) -> Bool ---;
-	@(link_name="SetEvent")     set_event      :: proc(event: Handle) -> Bool ---;
-	@(link_name="ResetEvent")   reset_event    :: proc(event: Handle) -> Bool ---;
+	CreateEventA :: proc(event_attributes: ^SECURITY_ATTRIBUTES, manual_reset, initial_state: BOOL, name: cstring) -> HANDLE ---;
+	CreateEventW :: proc(event_attributes: ^SECURITY_ATTRIBUTES, manual_reset, initial_state: BOOL, name: LPCWSTR) -> HANDLE ---;
+	PulseEvent   :: proc(event: HANDLE) -> BOOL ---;
+	SetEvent     :: proc(event: HANDLE) -> BOOL ---;
+	ResetEvent   :: proc(event: HANDLE) -> BOOL ---;
 
-	@(link_name="LoadLibraryA")   load_library_a   :: proc(c_str: cstring)  -> Hmodule ---;
-	@(link_name="LoadLibraryW")   load_library_w   :: proc(c_str: Wstring) -> Hmodule ---;
-	@(link_name="FreeLibrary")    free_library     :: proc(h: Hmodule) -> Bool ---;
-	@(link_name="GetProcAddress") get_proc_address :: proc(h: Hmodule, c_str: cstring) -> rawptr ---;
-
+	LoadLibraryA   :: proc(c_str: cstring)  -> HMODULE ---;
+	LoadLibraryW   :: proc(c_str: LPCWSTR) -> HMODULE ---;
+	FreeLibrary    :: proc(h: HMODULE) -> BOOL ---;
+	GetProcAddress :: proc(h: HMODULE, c_str: cstring) -> rawptr ---;
 }
 
-Memory_Basic_Information :: struct {
+mm_pause                                   :: _mm_pause;
+read_write_barrier                         :: ReadWriteBarrier;
+write_barrier                              :: WriteBarrier;
+read_barrier                               :: ReadBarrier;
+create_thread                              :: CreateThread;
+resume_thread                              :: ResumeThread;
+get_thread_priority                        :: GetThreadPriority;
+set_thread_priority                        :: SetThreadPriority;
+get_exit_code_thread                       :: GetExitCodeThread;
+terminate_thread                           :: TerminateThread;
+initialize_critical_section                :: InitializeCriticalSection;
+initialize_critical_section_and_spin_count :: InitializeCriticalSectionAndSpinCount;
+delete_critical_section                    :: DeleteCriticalSection;
+set_critical_section_spin_count            :: SetCriticalSectionSpinCount;
+try_enter_critical_section                 :: TryEnterCriticalSection;
+enter_critical_section                     :: EnterCriticalSection;
+leave_critical_section                     :: LeaveCriticalSection;
+create_event_a                             :: CreateEventA;
+create_event_w                             :: CreateEventW;
+pulse_event                                :: PulseEvent;
+set_event                                  :: SetEvent;
+reset_event                                :: ResetEvent;
+load_library_a                             :: LoadLibraryA;
+load_library_w                             :: LoadLibraryW;
+free_library                               :: FreeLibrary;
+get_proc_address                           :: GetProcAddress;
+
+MEMORY_BASIC_INFORMATION :: struct {
 	base_address:       rawptr,
 	allocation_base:    rawptr,
 	allocation_protect: u32,
@@ -197,13 +306,20 @@ Memory_Basic_Information :: struct {
 
 @(default_calling_convention = "std")
 foreign kernel32 {
-	@(link_name="VirtualAlloc")   virtual_alloc    :: proc(address: rawptr, size: uint, allocation_type: u32, protect: u32) -> rawptr ---
-	@(link_name="VirtualAllocEx") virtual_alloc_ex :: proc(process: Handle, address: rawptr, size: uint, allocation_type: u32, protect: u32) -> rawptr ---
-	@(link_name="VirtualFree")    virtual_free     :: proc(address: rawptr, size: uint, free_type: u32) -> Bool ---
-	@(link_name="VirtualLock")    virtual_lock     :: proc(address: rawptr, size: uint) -> Bool ---
-	@(link_name="VirtualProtect") virtual_protect  :: proc(address: rawptr, size: uint, new_protect: u32, old_protect: ^u32) -> Bool ---
-	@(link_name="VirtualQuery")   virtual_query    :: proc(address: rawptr, buffer: ^Memory_Basic_Information, length: uint) -> uint ---
+	VirtualAlloc   :: proc(address: rawptr, size: uint, allocation_type: u32, protect: u32) -> rawptr ---
+	VirtualAllocEx :: proc(process: HANDLE, address: rawptr, size: uint, allocation_type: u32, protect: u32) -> rawptr ---
+	VirtualFree    :: proc(address: rawptr, size: uint, free_type: u32) -> BOOL ---
+	VirtualLock    :: proc(address: rawptr, size: uint) -> BOOL ---
+	VirtualProtect :: proc(address: rawptr, size: uint, new_protect: u32, old_protect: ^u32) -> BOOL ---
+	VirtualQuery   :: proc(address: rawptr, buffer: ^MEMORY_BASIC_INFORMATION, length: uint) -> uint ---
 }
+
+virtual_alloc    :: VirtualAlloc;
+virtual_alloc_ex :: VirtualAllocEx;
+virtual_free     :: VirtualFree;
+virtual_lock     :: VirtualLock;
+virtual_protect  :: VirtualProtect;
+virtual_query    :: VirtualQuery;
 
 MEM_COMMIT      :: 0x00001000;
 MEM_RESERVE     :: 0x00002000;

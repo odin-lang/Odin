@@ -1,118 +1,152 @@
 // +build windows
 package win32
 
-Uint_Ptr :: distinct uint;
-Long_Ptr :: distinct int;
-
-Handle    :: distinct rawptr;
-Hwnd      :: distinct Handle;
-Hdc       :: distinct Handle;
-Hinstance :: distinct Handle;
-Hicon     :: distinct Handle;
-Hcursor   :: distinct Handle;
-Hmenu     :: distinct Handle;
-Hbitmap   :: distinct Handle;
-Hbrush    :: distinct Handle;
-Hgdiobj   :: distinct Handle;
-Hmodule   :: distinct Handle;
-Hmonitor  :: distinct Handle;
-Hrawinput :: distinct Handle;
-Hresult   :: distinct i32;
-HKL       :: distinct Handle;
-Wparam    :: distinct Uint_Ptr;
-Lparam    :: distinct Long_Ptr;
-Lresult   :: distinct Long_Ptr;
-Wnd_Proc  :: distinct #type proc "std" (Hwnd, u32, Wparam, Lparam) -> Lresult;
-Monitor_Enum_Proc :: distinct #type proc "std" (Hmonitor, Hdc, ^Rect, Lparam) -> bool;
+UINT_PTR :: distinct uint;
+LONG_PTR :: distinct int;
+Uint_Ptr :: UINT_PTR;
+Long_Ptr :: LONG_PTR;
 
 
+HANDLE    :: distinct rawptr;
+HWND      :: distinct HANDLE;
+HDC       :: distinct HANDLE;
+HINSTANCE :: distinct HANDLE;
+HICON     :: distinct HANDLE;
+HCURSOR   :: distinct HANDLE;
+HMENU     :: distinct HANDLE;
+HBITMAP   :: distinct HANDLE;
+HBRUSH    :: distinct HANDLE;
+HGDIOBJ   :: distinct HANDLE;
+HMODULE   :: distinct HANDLE;
+HMONITOR  :: distinct HANDLE;
+HRAWINPUT :: distinct HANDLE;
+HRESULT   :: distinct i32;
+HKL       :: distinct HANDLE;
+WPARAM    :: distinct UINT_PTR;
+LPARAM    :: distinct LONG_PTR;
+LRESULT   :: distinct LONG_PTR;
+WNDPROC  :: distinct #type proc "std" (HWND, u32, WPARAM, LPARAM) -> LRESULT;
+MONITORENUMPROC :: distinct #type proc "std" (HMONITOR, HDC, ^RECT, LPARAM) -> bool;
 
-Bool :: distinct b32;
+Handle    :: HANDLE;
+Hwnd      :: HWND;
+Hdc       :: HDC;
+Hinstance :: HINSTANCE;
+Hicon     :: HICON;
+Hcursor   :: HCURSOR;
+Hmenu     :: HMENU;
+Hbitmap   :: HBITMAP;
+Hbrush    :: HBRUSH;
+Hgdiobj   :: HGDIOBJ;
+Hmodule   :: HMODULE;
+Hmonitor  :: HMONITOR;
+Hrawinput :: HRAWINPUT;
+Hresult   :: HRESULT;
+Wparam    :: WPARAM;
+Lparam    :: LPARAM;
+Lresult   :: LRESULT;
+Wnd_Proc  :: WNDPROC;
+Monitor_Enum_Proc :: MONITORENUMPROC;
 
-Wstring :: distinct ^u16;
 
-Point :: struct {
+
+BOOL :: distinct b32;
+Bool :: BOOL;
+
+LPCWSTR :: distinct ^u16;
+Wstring :: LPCWSTR;
+
+POINT :: struct {
 	x, y: i32,
 }
+Point :: POINT;
 
-Wnd_Class_A :: struct {
+WNDCLASSA :: struct {
 	style:                 u32,
-	wnd_proc:              Wnd_Proc,
+	wnd_proc:              WNDPROC,
 	cls_extra, wnd_extra:  i32,
-	instance:              Hinstance,
-	icon:                  Hicon,
-	cursor:                Hcursor,
-	background:            Hbrush,
+	instance:              HINSTANCE,
+	icon:                  HICON,
+	cursor:                HCURSOR,
+	background:            HBRUSH,
 	menu_name, class_name: cstring
 }
+Wnd_Class_A :: WNDCLASSA;
 
-Wnd_Class_W :: struct {
+WNDCLASSW :: struct {
 	style:                 u32,
-	wnd_proc:              Wnd_Proc,
+	wnd_proc:              WNDPROC,
 	cls_extra, wnd_extra:  i32,
-	instance:              Hinstance,
-	icon:                  Hicon,
-	cursor:                Hcursor,
-	background:            Hbrush,
-	menu_name, class_name: Wstring
+	instance:              HINSTANCE,
+	icon:                  HICON,
+	cursor:                HCURSOR,
+	background:            HBRUSH,
+	menu_name, class_name: LPCWSTR
 }
+Wnd_Class_W :: WNDCLASSW;
 
-Wnd_Class_Ex_A :: struct {
+WNDCLASSEXA :: struct {
 	size, style:           u32,
-	wnd_proc:              Wnd_Proc,
+	wnd_proc:              WNDPROC,
 	cls_extra, wnd_extra:  i32,
-	instance:              Hinstance,
-	icon:                  Hicon,
-	cursor:                Hcursor,
-	background:            Hbrush,
+	instance:              HINSTANCE,
+	icon:                  HICON,
+	cursor:                HCURSOR,
+	background:            HBRUSH,
 	menu_name, class_name: cstring,
-	sm:                    Hicon,
+	sm:                    HICON,
 }
+Wnd_Class_Ex_A :: WNDCLASSEXA;
 
-Wnd_Class_Ex_W :: struct {
+WNDCLASSEXW :: struct {
 	size, style:           u32,
-	wnd_proc:              Wnd_Proc,
+	wnd_proc:              WNDPROC,
 	cls_extra, wnd_extra:  i32,
-	instance:              Hinstance,
-	icon:                  Hicon,
-	cursor:                Hcursor,
-	background:            Hbrush,
-	menu_name, class_name: Wstring,
-	sm:                    Hicon,
+	instance:              HINSTANCE,
+	icon:                  HICON,
+	cursor:                HCURSOR,
+	background:            HBRUSH,
+	menu_name, class_name: LPCWSTR,
+	sm:                    HICON,
 }
+Wnd_Class_Ex_W :: WNDCLASSEXW;
 
 
-Msg :: struct {
-	hwnd:    Hwnd,
+MSG :: struct {
+	hwnd:    HWND,
 	message: u32,
-	wparam:  Wparam,
-	lparam:  Lparam,
+	wparam:  WPARAM,
+	lparam:  LPARAM,
 	time:    u32,
-	pt:      Point,
+	pt:      POINT,
 }
+Msg :: MSG;
 
-Rect :: struct {
+RECT :: struct {
 	left:   i32,
 	top:    i32,
 	right:  i32,
 	bottom: i32,
 }
+Rect :: RECT;
 
-Filetime :: struct {
+FILETIME :: struct {
 	lo, hi: u32,
 }
+Filetime :: FILETIME;
 
-Systemtime :: struct {
+SYSTEMTIME :: struct {
 	year, month: u16,
 	day_of_week, day: u16,
 	hour, minute, second, millisecond: u16,
 }
+Systemtime :: SYSTEMTIME;
 
-By_Handle_File_Information :: struct {
+BY_HANDLE_FILE_INFORMATION :: struct {
 	file_attributes:      u32,
 	creation_time,
 	last_access_time,
-	last_write_time:      Filetime,
+	last_write_time:      FILETIME,
 	volume_serial_number,
 	file_size_high,
 	file_size_low,
@@ -120,23 +154,25 @@ By_Handle_File_Information :: struct {
 	file_index_high,
 	file_index_low:       u32,
 }
+By_Handle_File_Information :: BY_HANDLE_FILE_INFORMATION;
 
-File_Attribute_Data :: struct {
+WIN32_FILE_ATTRIBUTE_DATA :: struct {
 	file_attributes:  u32,
 	creation_time,
 	last_access_time,
-	last_write_time:  Filetime,
+	last_write_time:  FILETIME,
 	file_size_high,
 	file_size_low:    u32,
 }
+File_Attribute_Data :: WIN32_FILE_ATTRIBUTE_DATA;
 
 // NOTE(Jeroen): The widechar version might want at least the 32k MAX_PATH_WIDE
 // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-findfirstfilew#parameters
-Find_Data_W :: struct{
+WIN32_FIND_DATAW :: struct {
     file_attributes:     u32,
-    creation_time:       Filetime,
-    last_access_time:    Filetime,
-    last_write_time:     Filetime,
+    creation_time:       FILETIME,
+    last_access_time:    FILETIME,
+    last_write_time:     FILETIME,
     file_size_high:      u32,
     file_size_low:       u32,
     reserved0:           u32,
@@ -144,12 +180,13 @@ Find_Data_W :: struct{
     file_name:           [MAX_PATH]u16,
     alternate_file_name: [14]u16,
 }
+Find_Data_W :: WIN32_FIND_DATAW;
 
-Find_Data_A :: struct{
+WIN32_FIND_DATAA :: struct {
     file_attributes:     u32,
-    creation_time:       Filetime,
-    last_access_time:    Filetime,
-    last_write_time:     Filetime,
+    creation_time:       FILETIME,
+    last_access_time:    FILETIME,
+    last_write_time:     FILETIME,
     file_size_high:      u32,
     file_size_low:       u32,
     reserved0:           u32,
@@ -157,25 +194,28 @@ Find_Data_A :: struct{
     file_name:           [MAX_PATH]byte,
     alternate_file_name: [14]byte,
 }
+Find_Data_A :: WIN32_FIND_DATAA;
 
-Security_Attributes :: struct {
+SECURITY_ATTRIBUTES :: struct {
 	length:              u32,
 	security_descriptor: rawptr,
-	inherit_handle:      Bool,
+	inherit_handle:      BOOL,
 }
+Security_Attributes :: SECURITY_ATTRIBUTES;
 
-Process_Information :: struct {
-	process:    Handle,
-	thread:     Handle,
+PROCESS_INFORMATION :: struct {
+	process:    HANDLE,
+	thread:     HANDLE,
 	process_id: u32,
 	thread_id:  u32
 }
+Process_Information :: PROCESS_INFORMATION;
 
-Startup_Info :: struct {
+STARTUPINFO :: struct {
     cb:             u32,
-    reserved:       Wstring,
-    desktop:        Wstring,
-    title:          Wstring,
+    reserved:       LPCWSTR,
+    desktop:        LPCWSTR,
+    title:          LPCWSTR,
     x:              u32,
     y:              u32,
     x_size:         u32,
@@ -187,12 +227,14 @@ Startup_Info :: struct {
     show_window:    u16,
     _:              u16,
     _:              cstring,
-    stdin:          Handle,
-    stdout:         Handle,
-    stderr:         Handle,
+    stdin:          HANDLE,
+    stdout:         HANDLE,
+    stderr:         HANDLE,
 }
+Startup_Info :: STARTUPINFO;
 
-Pixel_Format_Descriptor :: struct {
+
+PIXELFORMATDESCRIPTOR :: struct {
 	size,
 	version,
 	flags: u32,
@@ -222,53 +264,59 @@ Pixel_Format_Descriptor :: struct {
 	visible_mask,
 	damage_mask: u32,
 }
+Pixel_Format_Descriptor :: PIXELFORMATDESCRIPTOR;
 
-Critical_Section :: struct {
-	debug_info:      ^Critical_Section_Debug,
+CRITICAL_SECTION :: struct {
+	debug_info:      ^CRITICAL_SECTION_DEBUG,
 
 	lock_count:      i32,
 	recursion_count: i32,
-	owning_thread:   Handle,
-	lock_semaphore:  Handle,
+	owning_thread:   HANDLE,
+	lock_semaphore:  HANDLE,
 	spin_count:      ^u32,
 }
+Critical_Section :: CRITICAL_SECTION;
 
-Critical_Section_Debug :: struct {
+CRITICAL_SECTION_DEBUG :: struct {
 	typ:                           u16,
 	creator_back_trace_index:      u16,
-	critical_section:              ^Critical_Section,
-	process_locks_list:            ^List_Entry,
+	critical_section:              ^CRITICAL_SECTION,
+	process_locks_list:            ^LIST_ENTRY,
 	entry_count:                   u32,
 	contention_count:              u32,
 	flags:                         u32,
 	creator_back_trace_index_high: u16,
 	spare_word:                    u16,
 }
+Critical_Section_Debug :: CRITICAL_SECTION_DEBUG;
 
-List_Entry :: struct {flink, blink: ^List_Entry};
+LIST_ENTRY :: struct {flink, blink: ^LIST_ENTRY};
+List_Entry :: LIST_ENTRY;
 
-
-Raw_Input_Device :: struct {
+RAWINPUTDEVICE :: struct {
 	usage_page: u16,
 	usage:      u16,
 	flags:      u32,
-	wnd_target: Hwnd,
+	wnd_target: HWND,
 }
+Raw_Input_Device :: RAWINPUTDEVICE;
 
-Raw_Input_Header :: struct {
+RAWINPUTHEADER :: struct {
 	kind:   u32,
 	size:   u32,
-	device: Handle,
-	wparam: Wparam,
+	device: HANDLE,
+	wparam: WPARAM,
 }
+Raw_Input_Header :: RAWINPUTHEADER;
 
-Raw_HID :: struct {
+RAWHID :: struct {
 	size_hid: u32,
 	count:    u32,
 	raw_data: [1]byte,
 }
+Raw_HID :: RAWHID;
 
-Raw_Keyboard :: struct {
+RAWKEYBOARD :: struct {
 	make_code:         u16,
 	flags:             u16,
 	reserved:          u16,
@@ -276,8 +324,9 @@ Raw_Keyboard :: struct {
 	message:           u32,
 	extra_information: u32,
 }
+Raw_Keyboard :: RAWKEYBOARD;
 
-Raw_Mouse :: struct {
+RAWMOUSE :: struct {
 	flags: u16,
 	using data: struct #raw_union {
 		buttons: u32,
@@ -291,18 +340,19 @@ Raw_Mouse :: struct {
 	last_y:            i32,
 	extra_information: u32,
 }
+Raw_Mouse :: RAWMOUSE;
 
-Raw_Input :: struct {
-	using header: Raw_Input_Header,
+RAWINPUT :: struct {
+	using header: RAWINPUTHEADER,
 	data: struct #raw_union {
-		mouse:    Raw_Mouse,
-		keyboard: Raw_Keyboard,
-		hid:      Raw_HID,
+		mouse:    RAWMOUSE,
+		keyboard: RAWKEYBOARD,
+		hid:      RAWHID,
 	},
 }
+Raw_Input :: RAWINPUT;
 
-
-Overlapped :: struct {
+OVERLAPPED :: struct {
     internal:      ^u64,
     internal_high: ^u64,
     using _: struct #raw_union {
@@ -312,18 +362,20 @@ Overlapped :: struct {
         },
         pointer: rawptr,
     },
-    event: Handle,
+    event: HANDLE,
 }
+Overlapped :: OVERLAPPED;
 
-File_Notify_Information :: struct {
+FILE_NOTIFY_INFORMATION :: struct {
   next_entry_offset: u32,
   action:            u32,
   file_name_length:  u32,
   file_name:         [1]u16,
 }
+File_Notify_Information :: FILE_NOTIFY_INFORMATION;
 
 // https://docs.microsoft.com/en-gb/windows/win32/api/sysinfoapi/ns-sysinfoapi-system_info
-System_Info :: struct {
+SYSTEM_INFO :: struct {
 	using _: struct #raw_union {
 		oem_id: u32,
 		using _: struct #raw_union {
@@ -341,9 +393,10 @@ System_Info :: struct {
 	processor_level: u16,
 	processor_revision: u16,
 }
+System_Info :: SYSTEM_INFO;
 
 // https://docs.microsoft.com/en-us/windows/desktop/api/winnt/ns-winnt-_osversioninfoexa
-OS_Version_Info_Ex_A :: struct {
+OSVERSIONINFOEXA :: struct {
   os_version_info_size: u32,
   major_version:        u32,
   minor_version:        u32,
@@ -356,6 +409,7 @@ OS_Version_Info_Ex_A :: struct {
   product_type:         u8,
   reserved:             u8
 }
+OS_Version_Info_Ex_A :: OSVERSIONINFOEXA;
 
 MAPVK_VK_TO_VSC    :: 0;
 MAPVK_VSC_TO_VK    :: 1;
@@ -492,7 +546,7 @@ VK_F22            :: 0x85;
 VK_F23            :: 0x86;
 VK_F24            :: 0x87;
 
-INVALID_HANDLE :: Handle(~uintptr(0));
+INVALID_HANDLE :: HANDLE(~uintptr(0));
 
 CREATE_SUSPENDED                  :: 0x00000004;
 STACK_SIZE_PARAM_IS_A_RESERVATION :: 0x00010000;
@@ -593,7 +647,7 @@ SM_CYSCREEN :: 1;
 
 SW_SHOW :: 5;
 
-COLOR_BACKGROUND :: Hbrush(uintptr(1));
+COLOR_BACKGROUND :: HBRUSH(uintptr(1));
 
 INVALID_SET_FILE_POINTER :: ~u32(0);
 HEAP_ZERO_MEMORY         :: 0x00000008;
@@ -604,7 +658,7 @@ GWLP_ID                  :: -12;
 GWL_STYLE                :: -16;
 GWLP_USERDATA            :: -21;
 GWLP_WNDPROC             :: -4;
-Hwnd_TOP                 :: Hwnd(uintptr(0));
+Hwnd_TOP                 :: HWND(uintptr(0));
 
 BI_RGB         :: 0;
 DIB_RGB_COLORS :: 0x00;
@@ -777,14 +831,14 @@ utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 
 	b := transmute([]byte)s;
 	cstr := cstring(&b[0]);
-	n := multi_byte_to_wide_char(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, i32(len(s)), nil, 0);
+	n := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, i32(len(s)), nil, 0);
 	if n == 0 {
 		return nil;
 	}
 
 	text := make([]u16, n+1, allocator);
 
-	n1 := multi_byte_to_wide_char(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, i32(len(s)), Wstring(&text[0]), i32(n));
+	n1 := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, i32(len(s)), LPCWSTR(&text[0]), i32(n));
 	if n1 == 0 {
 		delete(text, allocator);
 		return nil;
@@ -796,9 +850,9 @@ utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 	}
 	return text[:n];
 }
-utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> Wstring {
+utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> LPCWSTR {
 	if res := utf8_to_utf16(s, allocator); res != nil {
-		return Wstring(&res[0]);
+		return LPCWSTR(&res[0]);
 	}
 	return nil;
 }
@@ -808,19 +862,19 @@ wstring_to_utf8 :: proc(s: Wstring, N: int, allocator := context.temp_allocator)
 		return "";
 	}
 
-	n := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), nil, 0, nil, nil);
+	n := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), nil, 0, nil, nil);
 	if n == 0 {
 		return "";
 	}
 
 	// If N == -1 the call to wide_char_to_multi_byte assume the wide string is null terminated
-	// and will scan it to find the first null terminated character. The resulting string will 
+	// and will scan it to find the first null terminated character. The resulting string will
 	// also null terminated.
-	// If N != -1 it assumes the wide string is not null terminated and the resulting string 
+	// If N != -1 it assumes the wide string is not null terminated and the resulting string
 	// will not be null terminated, we therefore have to force it to be null terminated manually.
 	text := make([]byte, n+1 if N != -1 else n, allocator);
 
-	if n1 := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), cstring(&text[0]), n, nil, nil); n1 == 0 {
+	if n1 := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), cstring(&text[0]), n, nil, nil); n1 == 0 {
 		delete(text, allocator);
 		return "";
 	}
@@ -842,14 +896,14 @@ utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
 
 get_query_performance_frequency :: proc() -> i64 {
 	r: i64;
-	query_performance_frequency(&r);
+	QueryPerformanceFrequency(&r);
 	return r;
 }
 
-HIWORD_W :: proc(wParam: Wparam) -> u16 { return u16((u32(wParam) >> 16) & 0xffff); }
-HIWORD_L :: proc(lParam: Lparam) -> u16 { return u16((u32(lParam) >> 16) & 0xffff); }
-LOWORD_W :: proc(wParam: Wparam) -> u16 { return u16(wParam); }
-LOWORD_L :: proc(lParam: Lparam) -> u16 { return u16(lParam); }
+HIWORD_W :: proc(wParam: WPARAM) -> u16 { return u16((u32(wParam) >> 16) & 0xffff); }
+HIWORD_L :: proc(lParam: LPARAM) -> u16 { return u16((u32(lParam) >> 16) & 0xffff); }
+LOWORD_W :: proc(wParam: WPARAM) -> u16 { return u16(wParam); }
+LOWORD_L :: proc(lParam: LPARAM) -> u16 { return u16(lParam); }
 
 is_key_down :: inline proc(key: Key_Code) -> bool { return get_async_key_state(i32(key)) < 0; }
 
@@ -908,23 +962,25 @@ FILE_TYPE_CHAR :: 0x0002;
 FILE_TYPE_PIPE :: 0x0003;
 
 
-Monitor_Info :: struct {
+MONITORINFO :: struct {
 	size:      u32,
-	monitor:   Rect,
-	work:      Rect,
+	monitor:   RECT,
+	work:      RECT,
 	flags:     u32,
 }
+Monitor_Info :: MONITORINFO;
 
-Window_Placement :: struct {
+WINDOWPLACEMENT :: struct {
 	length:     u32,
 	flags:      u32,
 	show_cmd:   u32,
-	min_pos:    Point,
-	max_pos:    Point,
-	normal_pos: Rect,
+	min_pos:    POINT,
+	max_pos:    POINT,
+	normal_pos: RECT,
 }
+Window_Placement :: WINDOWPLACEMENT;
 
-Bitmap_Info_Header :: struct {
+BITMAPINFOHEADER :: struct {
 	size:              u32,
 	width, height:     i32,
 	planes, bit_count: i16,
@@ -935,22 +991,27 @@ Bitmap_Info_Header :: struct {
 	clr_used:          u32,
 	clr_important:     u32,
 }
-Bitmap_Info :: struct {
-	using header: Bitmap_Info_Header,
-	colors:       [1]Rgb_Quad,
-}
+Bitmap_Info_Header :: BITMAPINFOHEADER;
 
-Paint_Struct :: struct {
-	hdc:          Hdc,
-	erase:        Bool,
-	rc_paint:     Rect,
-	restore:      Bool,
-	inc_update:   Bool,
+BITMAPINFO :: struct {
+	using header: BITMAPINFOHEADER,
+	colors:       [1]RGBQUAD,
+}
+Bitmap_Info :: BITMAPINFO;
+
+PAINTSTRUCT :: struct {
+	hdc:          HDC,
+	erase:        BOOL,
+	rc_paint:     RECT,
+	restore:      BOOL,
+	inc_update:   BOOL,
 	rgb_reserved: [32]byte
 }
+Paint_Struct :: PAINTSTRUCT;
 
 
-Rgb_Quad :: struct {blue, green, red, reserved: byte}
+RGBQUAD :: struct {blue, green, red, reserved: byte}
+Rgb_Quad :: RGBQUAD;
 
 
 Key_Code :: enum i32 {

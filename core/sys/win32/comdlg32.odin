@@ -4,12 +4,12 @@ package win32
 foreign import "system:comdlg32.lib"
 import "core:strings"
 
-OFN_Hook_Proc :: #type proc "stdcall" (hdlg: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Uint_Ptr;
+OFN_Hook_Proc :: #type proc "stdcall" (hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> UINT_PTR;
 
-Open_File_Name_A :: struct {
+OPENFILENAMEA :: struct {
 	struct_size:     u32,
-	hwnd_owner:      Hwnd,
-	instance:        Hinstance,
+	hwnd_owner:      HWND,
+	instance:        HINSTANCE,
 	filter:          cstring,
 	custom_filter:   cstring,
 	max_cust_filter: u32,
@@ -24,7 +24,7 @@ Open_File_Name_A :: struct {
 	file_offset:     u16,
 	file_extension:  u16,
 	def_ext:         cstring,
-	cust_data:       Lparam,
+	cust_data:       LPARAM,
 	hook:            OFN_Hook_Proc,
 	template_name:   cstring,
 	pv_reserved:     rawptr,
@@ -32,27 +32,27 @@ Open_File_Name_A :: struct {
 	flags_ex:        u32,
 }
 
-Open_File_Name_W :: struct {
+OPENFILENAMEW :: struct {
 	struct_size:     u32,
-	hwnd_owner:      Hwnd,
-	instance:        Hinstance,
-	filter:          Wstring,
-	custom_filter:   Wstring,
+	hwnd_owner:      HWND,
+	instance:        HINSTANCE,
+	filter:          LPCWSTR,
+	custom_filter:   LPCWSTR,
 	max_cust_filter: u32,
 	filter_index:    u32,
-	file:            Wstring,
+	file:            LPCWSTR,
 	max_file:        u32,
-	file_title:      Wstring,
+	file_title:      LPCWSTR,
 	max_file_title:  u32,
-	initial_dir:     Wstring,
-	title:           Wstring,
+	initial_dir:     LPCWSTR,
+	title:           LPCWSTR,
 	flags:           u32,
 	file_offset:     u16,
 	file_extension:  u16,
-	def_ext:         Wstring,
-	cust_data:       Lparam,
+	def_ext:         LPCWSTR,
+	cust_data:       LPARAM,
 	hook:            OFN_Hook_Proc,
-	template_name:   Wstring,
+	template_name:   LPCWSTR,
 	pv_reserved:     rawptr,
 	dw_reserved:     u32,
 	flags_ex:        u32,
@@ -60,12 +60,18 @@ Open_File_Name_W :: struct {
 
 @(default_calling_convention = "c")
 foreign comdlg32 {
-	@(link_name="GetOpenFileNameA") get_open_file_name_a :: proc(arg1: ^Open_File_Name_A) -> Bool ---
-	@(link_name="GetOpenFileNameW") get_open_file_name_w :: proc(arg1: ^Open_File_Name_W) -> Bool ---
-	@(link_name="GetSaveFileNameA") get_save_file_name_a :: proc(arg1: ^Open_File_Name_A) -> Bool ---
-	@(link_name="GetSaveFileNameW") get_save_file_name_w :: proc(arg1: ^Open_File_Name_W) -> Bool ---
-	@(link_name="CommDlgExtendedError") comm_dlg_extended_error :: proc() -> u32 ---
+	GetOpenFileNameA :: proc(arg1: ^OPENFILENAMEA) -> BOOL ---
+	GetOpenFileNameW :: proc(arg1: ^OPENFILENAMEW) -> BOOL ---
+	GetSaveFileNameA :: proc(arg1: ^OPENFILENAMEA) -> BOOL ---
+	GetSaveFileNameW :: proc(arg1: ^OPENFILENAMEW) -> BOOL ---
+	CommDlgExtendedError :: proc() -> u32 ---
 }
+
+get_open_file_name_a    :: GetOpenFileNameA;
+get_open_file_name_w    :: GetOpenFileNameW;
+get_save_file_name_a    :: GetSaveFileNameA;
+get_save_file_name_w    :: GetSaveFileNameW;
+comm_dlg_extended_error :: CommDlgExtendedError;
 
 OPEN_TITLE :: "Select file to open";
 OPEN_FLAGS :: u32(OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST);
@@ -94,9 +100,9 @@ _open_file_dialog :: proc(title: string, dir: string,
 	filter = strings.join(filters, "\u0000", context.temp_allocator);
 	filter = strings.concatenate({filter, "\u0000"}, context.temp_allocator);
 
-	ofn := Open_File_Name_W{
-		struct_size  = size_of(Open_File_Name_W),
-		file         = Wstring(&file_buf[0]),
+	ofn := OPENFILENAMEW{
+		struct_size  = size_of(OPENFILENAMEW),
+		file         = LPCWSTR(&file_buf[0]),
 		max_file     = MAX_PATH_WIDE,
 		title        = utf8_to_wstring(title, context.temp_allocator),
 		filter       = utf8_to_wstring(filter, context.temp_allocator),

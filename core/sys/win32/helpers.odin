@@ -4,19 +4,19 @@ package win32
 import "core:strings";
 
 call_external_process :: proc(program, command_line: string) -> bool {
-    si := Startup_Info{ cb=size_of(Startup_Info) };
-    pi := Process_Information{};
+    si := STARTUPINFO{ cb=size_of(STARTUPINFO) };
+    pi := PROCESS_INFORMATION{};
 
-    return cast(bool)create_process_w(
+    return cast(bool)CreateProcessW(
         utf8_to_wstring(program),
         utf8_to_wstring(command_line),
-        nil, 
-        nil, 
-        Bool(false), 
-        u32(0x10), 
-        nil, 
-        nil, 
-        &si, 
+        nil,
+        nil,
+        BOOL(false),
+        u32(0x10),
+        nil,
+        nil,
+        &si,
         &pi
     );
 }

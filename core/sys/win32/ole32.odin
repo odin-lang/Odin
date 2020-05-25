@@ -13,6 +13,9 @@ Com_Init :: enum {
 
 @(default_calling_convention = "std")
 foreign ole32 {
-	@(link_name ="CoInitializeEx") com_init_ex :: proc(reserved: rawptr, co_init: Com_Init) ->Hresult ---;
-	@(link_name = "CoUninitialize") com_shutdown :: proc() ---;
+    CoInitializeEx :: proc(reserved: rawptr, co_init: Com_Init) -> HRESULT ---;
+    CoUninitialize :: proc() ---;
 }
+
+co_initialize_ex :: CoInitializeEx;
+co_uninitialize  :: CoUninitialize;

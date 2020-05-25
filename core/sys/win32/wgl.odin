@@ -11,10 +11,13 @@ CONTEXT_FORWARD_COMPATIBLE_BIT_ARB    :: 0x0002;
 CONTEXT_CORE_PROFILE_BIT_ARB          :: 0x00000001;
 CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB :: 0x00000002;
 
-Hglrc     :: distinct Handle;
-Color_Ref :: distinct u32;
+HGLRC :: distinct HANDLE;
+Hglrc :: HGLRC;
 
-Layer_Plane_Descriptor :: struct {
+COLORREF  :: distinct u32;
+Color_Ref :: COLORREF;
+
+LAYERPLANEDESCRIPTOR :: struct {
 	size:             u16,
 	version:          u16,
 	flags:            u32,
@@ -40,21 +43,26 @@ Layer_Plane_Descriptor :: struct {
 	reserved:         u8,
 	transparent:      Color_Ref,
 }
+Layer_Plane_Descriptor :: LAYERPLANEDESCRIPTOR;
 
-Point_Float :: struct {x, y: f32};
 
-Glyph_Metrics_Float :: struct {
+POINTFLOAT  :: struct {x, y: f32};
+Point_Float :: POINTFLOAT;
+
+GLYPHMETRICSFLOAT :: struct {
 	black_box_x:  f32,
 	black_box_y:  f32,
 	glyph_origin: Point_Float,
 	cell_inc_x:   f32,
 	cell_inc_y:   f32,
 }
+Glyph_Metrics_Float :: GLYPHMETRICSFLOAT;
 
-Create_Context_Attribs_ARB_Type :: #type proc "c" (hdc: Hdc, h_share_context: rawptr, attribList: ^i32) -> Hglrc;
-Choose_Pixel_Format_ARB_Type    :: #type proc "c" (hdc: Hdc, attrib_i_list: ^i32, attrib_f_list: ^f32, max_formats: u32, formats: ^i32, num_formats : ^u32) -> Bool;
+
+Create_Context_Attribs_ARB_Type :: #type proc "c" (hdc: HDC, h_share_context: rawptr, attribList: ^i32) -> HGLRC;
+Choose_Pixel_Format_ARB_Type    :: #type proc "c" (hdc: HDC, attrib_i_list: ^i32, attrib_f_list: ^f32, max_formats: u32, formats: ^i32, num_formats : ^u32) -> BOOL;
 Swap_Interval_EXT_Type          :: #type proc "c" (interval: i32) -> bool;
-Get_Extensions_String_ARB_Type  :: #type proc "c" (Hdc) -> cstring;
+Get_Extensions_String_ARB_Type  :: #type proc "c" (HDC) -> cstring;
 
 // Procedures
 	create_context_attribs_arb: Create_Context_Attribs_ARB_Type;
@@ -64,51 +72,41 @@ Get_Extensions_String_ARB_Type  :: #type proc "c" (Hdc) -> cstring;
 
 
 foreign opengl32 {
-	@(link_name="wglCreateContext")
-	create_context :: proc(hdc: Hdc) -> Hglrc ---;
+	wglCreateContext     :: proc(hdc: HDC) -> HGLRC ---;
+	wglDeleteContext     :: proc(hglrc: HGLRC) -> BOOL ---;
+	wglMakeCurrent       :: proc(hdc: HDC, hglrc: HGLRC) -> BOOL ---;
+	wglCopyContext       :: proc(src, dst: HGLRC, mask: u32) -> BOOL ---;
+	wglGetCurrentContext :: proc() -> HGLRC ---;
+	wglGetProcAddress    :: proc(c_str: cstring) -> rawptr ---;
 
-	@(link_name="wglMakeCurrent")
-	make_current :: proc(hdc: Hdc, hglrc: Hglrc) -> Bool ---;
+	wglCreateLayerContext :: proc(hdc: HDC, layer_plane: i32) -> HGLRC ---;
 
-	@(link_name="wglGetProcAddress")
-	get_gl_proc_address :: proc(c_str: cstring) -> rawptr ---;
+	wglSwapLayerBuffers :: proc(hdc: HDC, planes: u32) -> BOOL ---;
+	wglGetCurrentDC     :: proc() -> HDC ---;
 
-	@(link_name="wglDeleteContext")
-	delete_context :: proc(hglrc: Hglrc) -> Bool ---;
+	wglDescribeLayerPlane     :: proc(hdc: HDC, pixel_format, layer_plane: i32, bytes: u32, pd: ^Layer_Plane_Descriptor) -> BOOL ---;
+	wglGetLayerPaletteEntries :: proc(hdc: HDC, layer_plane, start, entries: i32, cr: ^Color_Ref) -> i32 ---;
+	wglRealizeLayerPalette    :: proc(hdc: HDC, layer_plane: i32, realize: BOOL) -> BOOL ---;
+	wglSetLayerPaletteEntries :: proc(hdc: HDC, layer_plane, start, entries: i32, cr: ^Color_Ref) -> i32 ---;
+	wglShareLists             :: proc(hglrc1, hglrc2: HGLRC) -> BOOL ---;
 
-	@(link_name="wglCopyContext")
-	copy_context :: proc(src, dst: Hglrc, mask: u32) -> Bool ---;
-
-	@(link_name="wglCreateLayerContext")
-	create_layer_context :: proc(hdc: Hdc, layer_plane: i32) -> Hglrc ---;
-
-	@(link_name="wglDescribeLayerPlane")
-	describe_layer_plane :: proc(hdc: Hdc, pixel_format, layer_plane: i32, bytes: u32, pd: ^Layer_Plane_Descriptor) -> Bool ---;
-
-	@(link_name="wglGetCurrentContext")
-	get_current_context :: proc() -> Hglrc ---;
-
-	@(link_name="wglGetCurrentDC")
-	get_current_dc :: proc() -> Hdc ---;
-
-	@(link_name="wglGetLayerPaletteEntries")
-	get_layer_palette_entries :: proc(hdc: Hdc, layer_plane, start, entries: i32, cr: ^Color_Ref) -> i32 ---;
-
-	@(link_name="wglRealizeLayerPalette")
-	realize_layer_palette :: proc(hdc: Hdc, layer_plane: i32, realize: Bool) -> Bool ---;
-
-	@(link_name="wglSetLayerPaletteEntries")
-	set_layer_palette_entries :: proc(hdc: Hdc, layer_plane, start, entries: i32, cr: ^Color_Ref) -> i32 ---;
-
-	@(link_name="wglShareLists")
-	share_lists :: proc(hglrc1, hglrc2: Hglrc) -> Bool ---;
-
-	@(link_name="wglSwapLayerBuffers")
-	swap_layer_buffers :: proc(hdc: Hdc, planes: u32) -> Bool ---;
-
-	@(link_name="wglUseFontBitmaps")
-	use_font_bitmaps :: proc(hdc: Hdc, first, count, list_base: u32) -> Bool ---;
-
-	@(link_name="wglUseFontOutlines")
-	use_font_outlines :: proc(hdc: Hdc, first, count, list_base: u32, deviation, extrusion: f32, format: i32, gmf: ^Glyph_Metrics_Float) -> Bool ---;
+	wglUseFontBitmaps  :: proc(hdc: HDC, first, count, list_base: u32) -> BOOL ---;
+	wglUseFontOutlines :: proc(hdc: HDC, first, count, list_base: u32, deviation, extrusion: f32, format: i32, gmf: ^Glyph_Metrics_Float) -> BOOL ---;
 }
+
+create_context            :: wglCreateContext;
+delete_context            :: wglDeleteContext;
+make_current              :: wglMakeCurrent;
+copy_context              :: wglCopyContext;
+get_current_context       :: wglGetCurrentContext;
+get_gl_proc_address       :: wglGetProcAddress;
+create_layer_context      :: wglCreateLayerContext;
+swap_layer_buffers        :: wglSwapLayerBuffers;
+get_current_dc            :: wglGetCurrentDC;
+describe_layer_plane      :: wglDescribeLayerPlane;
+get_layer_palette_entries :: wglGetLayerPaletteEntries;
+realize_layer_palette     :: wglRealizeLayerPalette;
+set_layer_palette_entries :: wglSetLayerPaletteEntries;
+share_lists               :: wglShareLists;
+use_font_bitmaps          :: wglUseFontBitmaps;
+use_Font_outlines         :: wglUseFontOutlines;

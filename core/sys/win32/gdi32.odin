@@ -8,19 +8,25 @@ BLACKNESS :: 0x00000042;
 
 @(default_calling_convention = "std")
 foreign gdi32 {
-	@(link_name="GetStockObject") get_stock_object :: proc(fn_object: i32) -> Hgdiobj ---;
+	GetStockObject :: proc(fn_object: i32) -> HGDIOBJ ---;
 
-	@(link_name="StretchDIBits")
-	stretch_dibits :: proc(hdc: Hdc,
+	StretchDIBits :: proc(hdc: HDC,
 	                       x_dst, y_dst, width_dst, height_dst: i32,
 	                       x_src, y_src, width_src, header_src: i32,
-	                       bits: rawptr, bits_info: ^Bitmap_Info,
+	                       bits: rawptr, bits_info: ^BITMAPINFO,
 	                       usage: u32,
 	                       rop: u32) -> i32 ---;
 
-	@(link_name="SetPixelFormat")    set_pixel_format    :: proc(hdc: Hdc, pixel_format: i32, pfd: ^Pixel_Format_Descriptor) -> Bool ---;
-	@(link_name="ChoosePixelFormat") choose_pixel_format :: proc(hdc: Hdc, pfd: ^Pixel_Format_Descriptor) -> i32 ---;
-	@(link_name="SwapBuffers")       swap_buffers        :: proc(hdc: Hdc) -> Bool ---;
+	SetPixelFormat    :: proc(hdc: HDC, pixel_format: i32, pfd: ^PIXELFORMATDESCRIPTOR) -> BOOL ---;
+	ChoosePixelFormat :: proc(hdc: HDC, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 ---;
+	SwapBuffers       :: proc(hdc: HDC) -> BOOL ---;
 
-	@(link_name="PatBlt") pat_blt :: proc(hdc: Hdc, x, y, w, h: i32, rop: u32) -> Bool ---;
+	PatBlt :: proc(hdc: HDC, x, y, w, h: i32, rop: u32) -> BOOL ---;
 }
+
+get_stock_object    :: GetStockObject;
+stretch_dibits      :: StretchDIBits;
+set_pixel_format    :: SetPixelFormat;
+choose_pixel_format :: ChoosePixelFormat;
+swap_buffers        :: SwapBuffers;
+pat_blt             :: PatBlt;

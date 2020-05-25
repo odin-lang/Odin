@@ -5,9 +5,9 @@ import "core:sys/win32"
 IS_SUPPORTED :: true;
 
 now :: proc() -> Time {
-	file_time: win32.Filetime;
+	file_time: win32.FILETIME;
 
-	win32.get_system_time_as_file_time(&file_time);
+	win32.GetSystemTimeAsFileTime(&file_time);
 
 	ft := i64(u64(file_time.lo) | u64(file_time.hi) << 32);
 
@@ -16,5 +16,5 @@ now :: proc() -> Time {
 }
 
 sleep :: proc(d: Duration) {
-	win32.sleep(u32(d/Millisecond));
+	win32.Sleep(u32(d/Millisecond));
 }

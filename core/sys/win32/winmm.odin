@@ -6,5 +6,7 @@ foreign import "system:winmm.lib"
 
 @(default_calling_convention = "std")
 foreign winmm {
-	@(link_name="timeGetTime") time_get_time :: proc() -> u32 ---;
+	timeGetTime :: proc() -> u32 ---;
 }
+
+time_get_time :: timeGetTime;
