@@ -1415,6 +1415,8 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "-build-mode:exe       Build as an executable");
 		print_usage_line(3, "-build-mode:dll       Build as a dynamically linked library");
 		print_usage_line(3, "-build-mode:shared    Build as a dynamically linked library");
+		print_usage_line(3, "-build-mode:obj       Build as an object file");
+		print_usage_line(3, "-build-mode:object    Build as an object file");
 		print_usage_line(0, "");
 	}
 
@@ -1513,6 +1515,7 @@ int main(int arg_count, char const **arg_ptr) {
 	init_global_error_collector();
 	global_big_int_init();
 	arena_init(&global_ast_arena, heap_allocator());
+
 
 	array_init(&library_collections, heap_allocator());
 	// NOTE(bill): 'core' cannot be (re)defined by the user
@@ -1617,9 +1620,19 @@ int main(int arg_count, char const **arg_ptr) {
 
 
 	init_build_context(selected_target_metrics ? selected_target_metrics->metrics : nullptr);
-	if (build_context.word_size == 4) {
-		print_usage_line(0, "%.*s 32-bit is not yet supported", LIT(args[0]));
+	if (build_context.word_size == 4 && build_context.metrics.os != TargetOs_js) {
+		print_usage_line(0, "%.*s 32-bit is not yet supported for this platform", LIT(args[0]));
 		return 1;
+	}
+	if (build_context.metrics.os == TargetOs_js) {
+		if (!build_context.use_llvm_api) {
+			print_usage_line(0, "%.*s - js platform only supported with the -llvm-api backend", LIT(args[0]));
+			return 1;
+		}
+		if (build_context.build_mode != BuildMode_Object) {
+			print_usage_line(0, "%.*s - js platform only supports -build-mode:object", LIT(args[0]));
+			return 1;
+		}
 	}
 
 	init_universal();
@@ -1677,7 +1690,6 @@ int main(int arg_count, char const **arg_ptr) {
 
 	if (build_context.use_llvm_api) {
 #if defined(LLVM_BACKEND_SUPPORT)
-
 		timings_start_section(timings, str_lit("LLVM API Code Gen"));
 		lbGenerator gen = {};
 		if (!lb_init_generator(&gen, &checker)) {

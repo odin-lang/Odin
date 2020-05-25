@@ -2030,6 +2030,11 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	lb_add_member(m, p->name, proc_value);
 	lb_add_procedure_value(m, p);
 
+	if (p->is_export) {
+		LLVMSetLinkage(p->value, LLVMDLLExportLinkage);
+		LLVMSetDLLStorageClass(p->value, LLVMDLLExportStorageClass);
+		LLVMSetVisibility(p->value, LLVMDefaultVisibility);
+	}
 
 	// NOTE(bill): offset==0 is the return value
 	isize offset = 1;
@@ -11135,7 +11140,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			{
 				GB_ASSERT(t->Enum.base_type != nullptr);
-				GB_ASSERT(type_size_of(t_type_info_enum_value) == 16);
+				// GB_ASSERT_MSG(type_size_of(t_type_info_enum_value) == 16, "%lld == 16", cast(long long)type_size_of(t_type_info_enum_value));
 
 
 				LLVMValueRef vals[3] = {};
@@ -11542,7 +11547,12 @@ void lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Create Target Machine");
 
-	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, target_triple, "generic", "", LLVMCodeGenLevelNone, LLVMRelocDefault, LLVMCodeModelDefault);
+	LLVMCodeModel code_mode = LLVMCodeModelDefault;
+	if (build_context.metrics.arch == TargetArch_wasm32) {
+		code_mode = LLVMCodeModelJITDefault;
+	}
+
+	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, target_triple, "generic", "", LLVMCodeGenLevelNone, LLVMRelocDefault, code_mode);
 	defer (LLVMDisposeTargetMachine(target_machine));
 
 	LLVMSetModuleDataLayout(mod, LLVMCreateTargetDataLayout(target_machine));
@@ -11749,6 +11759,7 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 		if (is_export) {
 			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
+			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
 		}
 
 		GlobalVariable var = {};
@@ -12135,7 +12146,20 @@ void lb_generate_code(lbGenerator *gen) {
 	String filepath_ll  = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".ll"));
 	defer (gb_free(heap_allocator(), filepath_ll.text));
 
-	String filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".obj"));
+	String filepath_obj = {};
+	switch (build_context.metrics.os) {
+	case TargetOs_windows:
+		filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".obj"));
+		break;
+	case TargetOs_darwin:
+	case TargetOs_linux:
+	case TargetOs_essence:
+		filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".o"));
+		break;
+	case TargetOs_js:
+		filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".wasm"));
+		break;
+	}
 
 
 	if (build_context.keep_temp_files) {

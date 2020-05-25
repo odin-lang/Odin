@@ -5,6 +5,7 @@ enum TargetOsKind {
 	TargetOs_darwin,
 	TargetOs_linux,
 	TargetOs_essence,
+	TargetOs_js,
 
 	TargetOs_COUNT,
 };
@@ -14,6 +15,7 @@ enum TargetArchKind {
 
 	TargetArch_amd64,
 	TargetArch_386,
+	TargetArch_wasm32,
 
 	TargetArch_COUNT,
 };
@@ -33,12 +35,14 @@ String target_os_names[TargetOs_COUNT] = {
 	str_lit("darwin"),
 	str_lit("linux"),
 	str_lit("essence"),
+	str_lit("js"),
 };
 
 String target_arch_names[TargetArch_COUNT] = {
 	str_lit(""),
 	str_lit("amd64"),
 	str_lit("386"),
+	str_lit("wasm32"),
 };
 
 String target_endian_names[TargetEndian_COUNT] = {
@@ -51,11 +55,12 @@ TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Invalid,
 	TargetEndian_Little,
 	TargetEndian_Little,
+	TargetEndian_Little,
 };
 
 
 
-String const ODIN_VERSION = str_lit("0.12.0");
+String const ODIN_VERSION = str_lit("0.13.0");
 
 
 
@@ -204,6 +209,16 @@ gb_global TargetMetrics target_essence_amd64 = {
 	str_lit("x86_64-pc-none-elf"),
 };
 
+gb_global TargetMetrics target_js_wasm32 = {
+	TargetOs_js,
+	TargetArch_wasm32,
+	4,
+	8,
+	str_lit("wasm32-freestanding-js"),
+	str_lit(""),
+};
+
+
 struct NamedTargetMetrics {
 	String name;
 	TargetMetrics *metrics;
@@ -216,6 +231,8 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("linux_amd64"),   &target_linux_amd64 },
 	{ str_lit("windows_386"),   &target_windows_386 },
 	{ str_lit("windows_amd64"), &target_windows_amd64 },
+	{ str_lit("js_wasm32"),     &target_js_wasm32 },
+	{ str_lit("wasm32"),        &target_js_wasm32 },
 };
 
 NamedTargetMetrics *selected_target_metrics;
@@ -601,7 +618,7 @@ void init_build_context(TargetMetrics *cross_target) {
 		#if defined(GB_SYSTEM_WINDOWS)
 			metrics = target_windows_386;
 		#elif defined(GB_SYSTEM_OSX)
-			#error "Unsupported architecture"
+			#error "Build Error: Unsupported architecture"
 		#else
 			metrics = target_linux_386;
 		#endif
@@ -666,8 +683,10 @@ void init_build_context(TargetMetrics *cross_target) {
 			bc->link_flags = str_lit("-arch x86 ");
 			break;
 		}
+	} else if (bc->metrics.arch == TargetArch_wasm32) {
+
 	} else {
-		gb_printf_err("Unsupported architecture\n");;
+		gb_printf_err("Compiler Error: Unsupported architecture\n");;
 		gb_exit(1);
 	}
 
