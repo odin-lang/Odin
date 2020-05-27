@@ -948,7 +948,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 	Rune curr_rune = t->curr_rune;
 	if (rune_is_letter(curr_rune)) {
 		token.kind = Token_Ident;
-		while (rune_is_letter(t->curr_rune) || rune_is_digit(t->curr_rune)) {
+		while (rune_is_letter_or_digit(t->curr_rune)) {
 			advance_to_next_rune(t);
 		}
 
