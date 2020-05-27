@@ -631,7 +631,7 @@ make_aligned :: proc($T: typeid/[]$E, auto_cast len: int, alignment: int, alloca
 	if data == nil && size_of(E) != 0 {
 		return nil;
 	}
-	mem_zero(data, size_of(E)*len);
+	// mem_zero(data, size_of(E)*len);
 	s := Raw_Slice{data, len};
 	return transmute(T)s;
 }
@@ -659,7 +659,7 @@ make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, auto_cast len: int, a
 	if data == nil && size_of(E) != 0 {
 		s.len, s.cap = 0, 0;
 	}
-	mem_zero(data, size_of(E)*cap);
+	// mem_zero(data, size_of(E)*cap);
 	return transmute(T)s;
 }
 
