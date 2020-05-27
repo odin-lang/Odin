@@ -138,6 +138,7 @@ String const token_strings[] = {
 struct KeywordHashEntry {
 	u32       hash;
 	TokenKind kind;
+	String    text;
 };
 
 enum {
@@ -168,6 +169,7 @@ void add_keyword_hash_entry(String const &s, TokenKind kind) {
 	GB_ASSERT_MSG(entry->kind == Token_Invalid, "Keyword hash table initialtion collision: %.*s %.*s %08x %08x", LIT(s), LIT(token_strings[entry->kind]), hash, entry->hash);
 	entry->hash = hash;
 	entry->kind = kind;
+	entry->text = s;
 }
 void init_keyword_hash_table(void) {
 	for (i32 kind = Token__KeywordBegin+1; kind < Token__KeywordEnd; kind++) {
@@ -919,12 +921,15 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 			u32 index = hash & KEYWORD_HASH_TABLE_MASK;
 			KeywordHashEntry *entry = &keyword_hash_table[index];
 			if (entry->kind != Token_Invalid && entry->hash == hash) {
-				String const &entry_text = token_strings[entry->kind];
-				if (str_eq(entry_text, token->string)) {
+				if (str_eq(entry->text, token->string)) {
 					token->kind = entry->kind;
+					if (token->kind == Token_not_in && entry->text == "notin") {
+						syntax_warning(*token, "'notin' is deprecated in favour of 'not_in'");
+					}
 				}
 			}
 		}
+		return;
 
 	} else if (gb_is_between(curr_rune, '0', '9')) {
 		scan_number_to_token(t, token, false);
