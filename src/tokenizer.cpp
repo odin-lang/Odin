@@ -937,8 +937,10 @@ Token tokenizer_get_token(Tokenizer *t) {
 	}
 
 	Token token = {};
-	token.string = {t->curr, 1};
-	token.pos.file = t->fullpath;
+	token.string.text = t->curr;
+	token.string.len  = 1;
+	token.pos.file.text = t->fullpath.text;
+	token.pos.file.len  = t->fullpath.len;
 	token.pos.line = t->line_count;
 	token.pos.offset = t->curr - t->start;
 	token.pos.column = t->curr - t->line + 1;
