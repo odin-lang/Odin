@@ -1167,10 +1167,14 @@ void show_timings(Checker *c, Timings *t) {
 	isize files    = 0;
 	isize packages = p->packages.count;
 	isize total_file_size = 0;
+	f64 total_tokenizing_time = 0;
+	f64 total_parsing_time = 0;
 	for_array(i, p->packages) {
 		files += p->packages[i]->files.count;
 		for_array(j, p->packages[i]->files) {
 			AstFile *file = p->packages[i]->files[j];
+			total_tokenizing_time += file->time_to_tokenize;
+			total_parsing_time += file->time_to_parse;
 			total_file_size += file->tokenizer.end - file->tokenizer.start;
 		}
 	}
@@ -1184,6 +1188,32 @@ void show_timings(Checker *c, Timings *t) {
 			gb_printf("Total Files     - %td\n", files);
 			gb_printf("Total Packages  - %td\n", packages);
 			gb_printf("Total File Size - %td\n", total_file_size);
+			gb_printf("\n");
+		}
+		{
+			f64 time = total_tokenizing_time;
+			gb_printf("Tokenization Only\n");
+			gb_printf("LOC/s        - %.3f\n", cast(f64)lines/time);
+			gb_printf("us/LOC       - %.3f\n", 1.0e6*time/cast(f64)lines);
+			gb_printf("Tokens/s     - %.3f\n", cast(f64)tokens/time);
+			gb_printf("us/Token     - %.3f\n", 1.0e6*time/cast(f64)tokens);
+			gb_printf("bytes/s      - %.3f\n", cast(f64)total_file_size/time);
+			gb_printf("MiB/s        - %.3f\n", cast(f64)(total_file_size/time)/(1024*1024));
+			gb_printf("us/bytes     - %.3f\n", 1.0e6*time/cast(f64)total_file_size);
+
+			gb_printf("\n");
+		}
+		{
+			f64 time = total_parsing_time;
+			gb_printf("Parsing Only\n");
+			gb_printf("LOC/s        - %.3f\n", cast(f64)lines/time);
+			gb_printf("us/LOC       - %.3f\n", 1.0e6*time/cast(f64)lines);
+			gb_printf("Tokens/s     - %.3f\n", cast(f64)tokens/time);
+			gb_printf("us/Token     - %.3f\n", 1.0e6*time/cast(f64)tokens);
+			gb_printf("bytes/s      - %.3f\n", cast(f64)total_file_size/time);
+			gb_printf("MiB/s        - %.3f\n", cast(f64)(total_file_size/time)/(1024*1024));
+			gb_printf("us/bytes     - %.3f\n", 1.0e6*time/cast(f64)total_file_size);
+
 			gb_printf("\n");
 		}
 		{

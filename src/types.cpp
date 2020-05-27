@@ -770,7 +770,7 @@ void set_base_type(Type *t, Type *base) {
 Type *alloc_type(TypeKind kind) {
 	gbAllocator a = heap_allocator();
 	Type *t = gb_alloc_item(a, Type);
-	gb_zero_item(t);
+	zero_item(t);
 	t->kind = kind;
 	t->cached_size  = -1;
 	t->cached_align = -1;
