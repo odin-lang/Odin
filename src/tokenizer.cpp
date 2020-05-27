@@ -1064,6 +1064,7 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 		case '%':
 			token->kind = Token_Mod;
 			if (t->curr_rune == '=') {
+				advance_to_next_rune(t);
 				token->kind = Token_ModEq;
 			} else if (t->curr_rune == '%') {
 				token->kind = Token_ModMod;
