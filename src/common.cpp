@@ -28,6 +28,13 @@
 #include <math.h>
 #include <string.h>
 
+gb_inline void zero_size(void *ptr, isize len) {
+	memset(ptr, 0, len);
+}
+
+#define zero_item(ptr) zero_size((ptr), gb_size_of(ptr))
+
+
 template <typename U, typename V>
 gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
 
@@ -346,12 +353,6 @@ void mul_overflow_u64(u64 x, u64 y, u64 *lo, u64 *hi) {
 	*lo = (t << 32) + w3;
 #endif
 }
-
-gb_inline void zero_size(void *ptr, isize len) {
-	memset(ptr, 0, len);
-}
-
-#define zero_item(ptr) zero_size((ptr), gb_size_of(ptr))
 
 
 
