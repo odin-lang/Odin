@@ -12,7 +12,7 @@ bool rune_is_letter(Rune r) {
 		if (r == '_') {
 			return true;
 		}
-		return gb_char_is_alpha(cast(char)r) != 0;
+		return ((cast(u32)r | 0x20) - 0x61) < 26;
 	}
 	switch (utf8proc_category(r)) {
 	case UTF8PROC_CATEGORY_LU:
@@ -27,7 +27,7 @@ bool rune_is_letter(Rune r) {
 
 bool rune_is_digit(Rune r) {
 	if (r < 0x80) {
-		return gb_is_between(r, '0', '9');
+		return (cast(u32)r - '0') < 10;
 	}
 	return utf8proc_category(r) == UTF8PROC_CATEGORY_ND;
 }
