@@ -531,7 +531,7 @@ bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
 		}
 	}
 
-	gb_zero_item(ve);
+	zero_item(ve);
 	ve->kind = VettedEntity_Shadowed;
 	ve->entity = e;
 	ve->other = shadowed;
@@ -547,7 +547,7 @@ bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 			}
 		case Entity_ImportName:
 		case Entity_LibraryName:
-			gb_zero_item(ve);
+			zero_item(ve);
 			ve->kind = VettedEntity_Unused;
 			ve->entity = e;
 			return true;

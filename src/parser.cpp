@@ -111,7 +111,7 @@ Ast *clone_ast(Ast *node);
 Array<Ast *> clone_ast_array(Array<Ast *> array) {
 	Array<Ast *> result = {};
 	if (array.count > 0) {
-		result = array_make<Ast *>(ast_allocator(), array.count);
+		result = array_make<Ast *>(ast_allocator(nullptr), array.count);
 		for_array(i, array) {
 			result[i] = clone_ast(array[i]);
 		}
@@ -461,7 +461,7 @@ gb_global gbAtomic64 total_subtype_node_memory_test = {0};
 
 // NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
 Ast *alloc_ast_node(AstFile *f, AstKind kind) {
-	gbAllocator a = ast_allocator();
+	gbAllocator a = ast_allocator(f);
 
 	gb_atomic64_fetch_add(&total_allocated_node_memory, cast(i64)(gb_size_of(Ast)));
 	gb_atomic64_fetch_add(&total_subtype_node_memory_test, cast(i64)(gb_size_of(AstCommonStuff) + ast_variant_sizes[kind]));
@@ -1161,7 +1161,7 @@ CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_line_) {
 
 	CommentGroup *comments = nullptr;
 	if (list.count > 0) {
-		comments = gb_alloc_item(ast_allocator(), CommentGroup);
+		comments = gb_alloc_item(heap_allocator(), CommentGroup);
 		comments->list = list;
 		array_add(&f->comments, comments);
 	}
@@ -1194,12 +1194,15 @@ void comsume_comment_groups(AstFile *f, Token prev) {
 
 
 Token advance_token(AstFile *f) {
-	gb_zero_item(&f->lead_comment);
-	gb_zero_item(&f->line_comment);
+	f->lead_comment = nullptr;
+	f->line_comment = nullptr;
+
 	Token prev = f->prev_token = f->curr_token;
 
 	bool ok = next_token0(f);
-	if (ok) comsume_comment_groups(f, prev);
+	if (ok && f->curr_token.kind == Token_Comment) {
+		comsume_comment_groups(f, prev);
+	}
 	return prev;
 }
 
@@ -4303,23 +4306,36 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 		return ParseFile_None;
 	}
 
+	u64 start = time_stamp_time_now();
+
 	while (f->curr_token.kind != Token_EOF) {
-		Token token = tokenizer_get_token(&f->tokenizer);
-		if (token.kind == Token_Invalid) {
-			err_pos->line   = token.pos.line;
-			err_pos->column = token.pos.column;
+		Token *token = array_add_and_get(&f->tokens);
+		tokenizer_get_token(&f->tokenizer, token);
+		if (token->kind == Token_Invalid) {
+			err_pos->line   = token->pos.line;
+			err_pos->column = token->pos.column;
 			return ParseFile_InvalidToken;
 		}
-		array_add(&f->tokens, token);
 
-		if (token.kind == Token_EOF) {
+		if (token->kind == Token_EOF) {
 			break;
 		}
 	}
 
+	u64 end = time_stamp_time_now();
+	f->time_to_tokenize = cast(f64)(end-start)/cast(f64)time_stamp__freq();
+
 	f->curr_token_index = 0;
 	f->prev_token = f->tokens[f->curr_token_index];
 	f->curr_token = f->tokens[f->curr_token_index];
+
+	isize const page_size = 4*1024;
+	isize block_size = 2*f->tokens.count*gb_size_of(Ast);
+	block_size = ((block_size + page_size-1)/page_size) * page_size;
+	block_size = gb_clamp(block_size, page_size, ARENA_DEFAULT_BLOCK_SIZE);
+
+	arena_init(&f->arena, heap_allocator(), block_size);
+
 
 	array_init(&f->comments, heap_allocator(), 0, 0);
 	array_init(&f->imports,  heap_allocator(), 0, 0);
@@ -4843,9 +4859,13 @@ bool parse_file(Parser *p, AstFile *f) {
 		return true;
 	}
 
+	u64 start = time_stamp_time_now();
+
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = dir_from_path(filepath);
-	comsume_comment_groups(f, f->prev_token);
+	if (f->curr_token.kind == Token_Comment) {
+		comsume_comment_groups(f, f->prev_token);
+	}
 
 	CommentGroup *docs = f->lead_comment;
 
@@ -4886,27 +4906,29 @@ bool parse_file(Parser *p, AstFile *f) {
 	expect_semicolon(f, pd);
 	f->pkg_decl = pd;
 
-	if (f->error_count > 0) {
-		return false;
-	}
+	if (f->error_count == 0) {
+		f->decls = array_make<Ast *>(heap_allocator());
 
-	f->decls = array_make<Ast *>(heap_allocator());
-
-	while (f->curr_token.kind != Token_EOF) {
-		Ast *stmt = parse_stmt(f);
-		if (stmt && stmt->kind != Ast_EmptyStmt) {
-			array_add(&f->decls, stmt);
-			if (stmt->kind == Ast_ExprStmt &&
-			    stmt->ExprStmt.expr != nullptr &&
-			    stmt->ExprStmt.expr->kind == Ast_ProcLit) {
-				syntax_error(stmt, "Procedure literal evaluated but not used");
+		while (f->curr_token.kind != Token_EOF) {
+			Ast *stmt = parse_stmt(f);
+			if (stmt && stmt->kind != Ast_EmptyStmt) {
+				array_add(&f->decls, stmt);
+				if (stmt->kind == Ast_ExprStmt &&
+				    stmt->ExprStmt.expr != nullptr &&
+				    stmt->ExprStmt.expr->kind == Ast_ProcLit) {
+					syntax_error(stmt, "Procedure literal evaluated but not used");
+				}
 			}
 		}
+
+		parse_setup_file_decls(p, f, base_dir, f->decls);
 	}
 
-	parse_setup_file_decls(p, f, base_dir, f->decls);
+	u64 end = time_stamp_time_now();
+	f->time_to_parse = cast(f64)(end-start)/cast(f64)time_stamp__freq();
 
-	return true;
+
+	return f->error_count == 0;
 }
 
 

@@ -77,6 +77,8 @@ struct AstFile {
 	AstPackage * pkg;
 	Scope *      scope;
 
+	Arena        arena;
+
 	Ast *        pkg_decl;
 	String       fullpath;
 	Tokenizer    tokenizer;
@@ -102,6 +104,8 @@ struct AstFile {
 
 	Ast *        curr_proc;
 	isize        error_count;
+	f64          time_to_tokenize; // seconds
+	f64          time_to_parse;    // seconds
 
 	CommentGroup *lead_comment;     // Comment (block) before the decl
 	CommentGroup *line_comment;     // Comment after the semicolon
@@ -644,8 +648,9 @@ gb_inline bool is_ast_when_stmt(Ast *node) {
 
 gb_global Arena global_ast_arena = {};
 
-gbAllocator ast_allocator(void) {
-	Arena *arena = &global_ast_arena;
+gbAllocator ast_allocator(AstFile *f) {
+	Arena *arena = f ? &f->arena : &global_ast_arena;
+	// Arena *arena = &global_ast_arena;
 	return arena_allocator(arena);
 }
 

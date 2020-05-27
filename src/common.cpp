@@ -74,7 +74,7 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 	case gbAllocation_Alloc:
 		ptr = _aligned_malloc(size, alignment);
 		if (flags & gbAllocatorFlag_ClearToZero) {
-			gb_zero_size(ptr, size);
+			zero_size(ptr, size);
 		}
 		break;
 	case gbAllocation_Free:
@@ -105,7 +105,7 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 		// ptr = malloc(size+alignment);
 
 		if (flags & gbAllocatorFlag_ClearToZero) {
-			gb_zero_size(ptr, size);
+			zero_size(ptr, size);
 		}
 		break;
 	}
@@ -126,7 +126,7 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 		posix_memalign(&ptr, alignment, size);
 
 		if (flags & gbAllocatorFlag_ClearToZero) {
-			gb_zero_size(ptr, size);
+			zero_size(ptr, size);
 		}
 		break;
 	}
@@ -347,6 +347,12 @@ void mul_overflow_u64(u64 x, u64 y, u64 *lo, u64 *hi) {
 #endif
 }
 
+gb_inline void zero_size(void *ptr, isize len) {
+	memset(ptr, 0, len);
+}
+
+#define zero_item(ptr) zero_size((ptr), gb_size_of(ptr))
+
 
 
 gb_global String global_module_path = {0};
@@ -376,27 +382,27 @@ typedef struct Arena {
 void arena_init(Arena *arena, gbAllocator backing, isize block_size=ARENA_DEFAULT_BLOCK_SIZE) {
 	arena->backing = backing;
 	arena->block_size = block_size;
-	array_init(&arena->blocks, backing);
+	array_init(&arena->blocks, backing, 0, 2);
 	gb_mutex_init(&arena->mutex);
 }
 
 void arena_grow(Arena *arena, isize min_size) {
-	gb_mutex_lock(&arena->mutex);
-	defer (gb_mutex_unlock(&arena->mutex));
+	// gb_mutex_lock(&arena->mutex);
+	// defer (gb_mutex_unlock(&arena->mutex));
 
 	isize size = gb_max(arena->block_size, min_size);
 	size = ALIGN_UP(size, ARENA_MIN_ALIGNMENT);
 	void *new_ptr = gb_alloc(arena->backing, size);
 	arena->ptr = cast(u8 *)new_ptr;
-	// gb_zero_size(arena->ptr, size); // NOTE(bill): This should already be zeroed
+	// zero_size(arena->ptr, size); // NOTE(bill): This should already be zeroed
 	GB_ASSERT(arena->ptr == ALIGN_DOWN_PTR(arena->ptr, ARENA_MIN_ALIGNMENT));
 	arena->end = arena->ptr + size;
 	array_add(&arena->blocks, arena->ptr);
 }
 
 void *arena_alloc(Arena *arena, isize size, isize alignment) {
-	gb_mutex_lock(&arena->mutex);
-	defer (gb_mutex_unlock(&arena->mutex));
+	// gb_mutex_lock(&arena->mutex);
+	// defer (gb_mutex_unlock(&arena->mutex));
 
 	arena->total_used += size;
 
@@ -411,13 +417,13 @@ void *arena_alloc(Arena *arena, isize size, isize alignment) {
 	arena->ptr = cast(u8 *)ALIGN_UP_PTR(arena->ptr + size, align);
 	GB_ASSERT(arena->ptr <= arena->end);
 	GB_ASSERT(ptr == ALIGN_DOWN_PTR(ptr, align));
-	gb_zero_size(ptr, size);
+	// zero_size(ptr, size);
 	return ptr;
 }
 
 void arena_free_all(Arena *arena) {
-	gb_mutex_lock(&arena->mutex);
-	defer (gb_mutex_unlock(&arena->mutex));
+	// gb_mutex_lock(&arena->mutex);
+	// defer (gb_mutex_unlock(&arena->mutex));
 
 	for_array(i, arena->blocks) {
 		gb_free(arena->backing, arena->blocks[i]);

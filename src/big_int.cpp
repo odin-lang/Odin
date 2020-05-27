@@ -64,7 +64,7 @@ void big_int_dealloc(BigInt *dst) {
 	if (dst->len > 1) {
 		gb_free(big_int_allocator(), dst->d.words);
 	}
-	gb_zero_item(dst);
+	zero_item(dst);
 }
 
 BigInt big_int_make(BigInt const *b, bool abs=false);
