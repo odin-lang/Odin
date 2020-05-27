@@ -4284,8 +4284,15 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	}
 
 	isize file_size = f->tokenizer.end - f->tokenizer.start;
-	isize init_token_cap = cast(isize)gb_max(next_pow2(cast(i64)(file_size/2ll)), 16);
+
+	// NOTE(bill): Determine allocation size required for tokens
+	isize token_cap = file_size/3ll;
+	isize pow2_cap = gb_max(cast(isize)prev_pow2(cast(i64)token_cap)/2, 16);
+	token_cap = ((token_cap + pow2_cap-1)/pow2_cap) * pow2_cap;
+
+	isize init_token_cap = gb_max(token_cap, 16);
 	array_init(&f->tokens, heap_allocator(), 0, gb_max(init_token_cap, 16));
+	isize cap0 = f->tokens.capacity;
 
 	if (err == TokenizerInit_Empty) {
 		Token token = {Token_EOF};
@@ -4314,8 +4321,8 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	f->prev_token = f->tokens[f->curr_token_index];
 	f->curr_token = f->tokens[f->curr_token_index];
 
-	array_init(&f->comments, heap_allocator());
-	array_init(&f->imports, heap_allocator());
+	array_init(&f->comments, heap_allocator(), 0, 0);
+	array_init(&f->imports,  heap_allocator(), 0, 0);
 
 	f->curr_proc = nullptr;
 

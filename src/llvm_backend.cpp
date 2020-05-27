@@ -2034,6 +2034,11 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 		LLVMSetLinkage(p->value, LLVMDLLExportLinkage);
 		LLVMSetDLLStorageClass(p->value, LLVMDLLExportStorageClass);
 		LLVMSetVisibility(p->value, LLVMDefaultVisibility);
+
+		if (build_context.metrics.os == TargetOs_js) {
+			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-export-name", alloc_cstring(heap_allocator(), p->name));
+			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-exported", nullptr);
+		}
 	}
 
 	// NOTE(bill): offset==0 is the return value
@@ -12173,7 +12178,9 @@ void lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Object Generation");
 
-	LLVMBool was_an_error = LLVMTargetMachineEmitToFile(target_machine, mod, cast(char *)filepath_obj.text, LLVMObjectFile, &llvm_error);
+	LLVMCodeGenFileType code_gen_file_type = LLVMObjectFile;
+
+	LLVMBool was_an_error = LLVMTargetMachineEmitToFile(target_machine, mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error);
 	if (was_an_error) {
 		gb_printf_err("LLVM Error: %s\n", llvm_error);
 		gb_exit(1);

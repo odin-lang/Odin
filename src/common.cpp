@@ -158,7 +158,15 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 
 #include "range_cache.cpp"
 
-
+u32 fnv32a(void const *data, isize len) {
+	u8 const *bytes = cast(u8 const *)data;
+	u32 h = 0x811c9dc5;
+	for (isize i = 0; i < len; i++) {
+		u32 b = cast(u32)bytes[i];
+		h = (h ^ b) * 0x01000193;
+	}
+	return h;
+}
 
 u64 fnv64a(void const *data, isize len) {
 	u8 const *bytes = cast(u8 const *)data;

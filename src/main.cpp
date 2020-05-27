@@ -1513,9 +1513,9 @@ int main(int arg_count, char const **arg_ptr) {
 	init_string_buffer_memory();
 	init_string_interner();
 	init_global_error_collector();
+	init_keyword_hash_table();
 	global_big_int_init();
 	arena_init(&global_ast_arena, heap_allocator());
-
 
 	array_init(&library_collections, heap_allocator());
 	// NOTE(bill): 'core' cannot be (re)defined by the user

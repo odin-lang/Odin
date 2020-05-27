@@ -135,6 +135,49 @@ String const token_strings[] = {
 };
 
 
+struct KeywordHashEntry {
+	u32       hash;
+	TokenKind kind;
+};
+
+enum {
+	KEYWORD_HASH_TABLE_COUNT = 1<<9,
+	KEYWORD_HASH_TABLE_MASK = KEYWORD_HASH_TABLE_COUNT-1,
+};
+gb_global KeywordHashEntry keyword_hash_table[KEYWORD_HASH_TABLE_COUNT] = {};
+GB_STATIC_ASSERT(Token__KeywordEnd-Token__KeywordBegin <= gb_count_of(keyword_hash_table));
+
+gb_inline u32 keyword_hash(u8 const *text, isize len) {
+	return fnv32a(text, len);
+}
+void add_keyword_hash_entry(String const &s, TokenKind kind) {
+	u32 hash = keyword_hash(s.text, s.len);
+
+	// NOTE(bill): This is a bit of an empirical hack in order to speed things up
+	u32 index = hash & KEYWORD_HASH_TABLE_MASK;
+	KeywordHashEntry *entry = &keyword_hash_table[index];
+	GB_ASSERT_MSG(entry->kind == Token_Invalid, "Keyword hash table initialtion collision: %.*s %.*s %08x %08x", LIT(s), LIT(token_strings[entry->kind]), hash, entry->hash);
+	entry->hash = hash;
+	entry->kind = kind;
+}
+void init_keyword_hash_table(void) {
+	for (i32 kind = Token__KeywordBegin+1; kind < Token__KeywordEnd; kind++) {
+		add_keyword_hash_entry(token_strings[kind], cast(TokenKind)kind);
+	}
+
+	static struct {
+		String s;
+		TokenKind kind;
+	} const legacy_keywords[] = {
+		{str_lit("notin"), Token_not_in},
+	};
+
+	for (i32 i = 0; i < gb_count_of(legacy_keywords); i++) {
+		add_keyword_hash_entry(legacy_keywords[i].s, legacy_keywords[i].kind);
+	}
+}
+
+
 struct TokenPos {
 	String file;
 	isize  offset; // starting at 0
@@ -215,7 +258,8 @@ void end_error_block(void) {
 		u8 *text = gb_alloc_array(heap_allocator(), u8, n+1);
 		gb_memmove(text, global_error_collector.error_buffer.data, n);
 		text[n] = 0;
-		array_add(&global_error_collector.errors, make_string(text, n));
+		String s = {text, n};
+		array_add(&global_error_collector.errors, s);
 		global_error_collector.error_buffer.count = 0;
 
 		// gbFile *f = gb_file_get_standard(gbFileStandard_Error);
@@ -539,10 +583,11 @@ void advance_to_next_rune(Tokenizer *t) {
 			tokenizer_err(t, "Illegal character NUL");
 		} else if (rune >= 0x80) { // not ASCII
 			width = gb_utf8_decode(t->read_curr, t->end-t->read_curr, &rune);
-			if (rune == GB_RUNE_INVALID && width == 1)
+			if (rune == GB_RUNE_INVALID && width == 1) {
 				tokenizer_err(t, "Illegal UTF-8 encoding");
-			else if (rune == GB_RUNE_BOM && t->curr-t->start > 0)
+			} else if (rune == GB_RUNE_BOM && t->curr-t->start > 0){
 				tokenizer_err(t, "Illegal byte order mark");
+			}
 		}
 		t->read_curr += width;
 		t->curr_rune = rune;
@@ -609,21 +654,13 @@ gb_inline void destroy_tokenizer(Tokenizer *t) {
 	array_free(&t->allocated_strings);
 }
 
-void tokenizer_skip_whitespace(Tokenizer *t) {
-	while (t->curr_rune == ' ' ||
-	       t->curr_rune == '\t' ||
-	       t->curr_rune == '\n' ||
-	       t->curr_rune == '\r') {
-		advance_to_next_rune(t);
-	}
-}
-
 gb_inline i32 digit_value(Rune r) {
-	if (gb_char_is_digit(cast(char)r)) {
+	switch (r) {
+	case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
 		return r - '0';
-	} else if (gb_is_between(cast(char)r, 'a', 'f')) {
+	case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
 		return r - 'a' + 10;
-	} else if (gb_is_between(cast(char)r, 'A', 'F')) {
+	case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
 		return r - 'A' + 10;
 	}
 	return 16; // NOTE(bill): Larger than highest possible
@@ -645,7 +682,7 @@ u8 peek_byte(Tokenizer *t, isize offset=0) {
 Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 	Token token = {};
 	token.kind = Token_Integer;
-	token.string = make_string(t->curr, 1);
+	token.string = {t->curr, 1};
 	token.pos.file = t->fullpath;
 	token.pos.line = t->line_count;
 	token.pos.column = t->curr-t->line+1;
@@ -662,37 +699,43 @@ Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 	if (t->curr_rune == '0') {
 		u8 *prev = t->curr;
 		advance_to_next_rune(t);
-		if (t->curr_rune == 'b') { // Binary
+		switch (t->curr_rune) {
+		case 'b': // Binary
 			advance_to_next_rune(t);
 			scan_mantissa(t, 2);
 			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
 			}
-		} else if (t->curr_rune == 'o') { // Octal
+			goto end;
+		case 'o': // Octal
 			advance_to_next_rune(t);
 			scan_mantissa(t, 8);
 			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
 			}
-		} else if (t->curr_rune == 'd') { // Decimal
+			goto end;
+		case 'd': // Decimal
 			advance_to_next_rune(t);
 			scan_mantissa(t, 10);
 			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
 			}
-		} else if (t->curr_rune == 'z') { // Dozenal
+			goto end;
+		case 'z': // Dozenal
 			advance_to_next_rune(t);
 			scan_mantissa(t, 12);
 			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
 			}
-		} else if (t->curr_rune == 'x') { // Hexadecimal
+			goto end;
+		case 'x': // Hexadecimal
 			advance_to_next_rune(t);
 			scan_mantissa(t, 16);
 			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
 			}
-		} else if (t->curr_rune == 'h') { // Hexadecimal Float
+			goto end;
+		case 'h': // Hexadecimal Float
 			token.kind = Token_Float;
 			advance_to_next_rune(t);
 			scan_mantissa(t, 16);
@@ -716,13 +759,11 @@ Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 					break;
 				}
 			}
-
-		} else {
+			goto end;
+		default:
 			scan_mantissa(t, 10);
 			goto fraction;
 		}
-
-		goto end;
 	}
 
 	scan_mantissa(t, 10);
@@ -762,36 +803,47 @@ end:
 	return token;
 }
 
+
 bool scan_escape(Tokenizer *t) {
 	isize len = 0;
 	u32 base = 0, max = 0, x = 0;
 
 	Rune r = t->curr_rune;
-	if (r == 'a'  ||
-	    r == 'b'  ||
-	    r == 'e'  ||
-	    r == 'f'  ||
-	    r == 'n'  ||
-	    r == 'r'  ||
-	    r == 't'  ||
-	    r == 'v'  ||
-	    r == '\\' ||
-	    r == '\'' ||
-	    r == '\"') {
+	switch (r) {
+	case 'a':
+	case 'b':
+	case 'e':
+	case 'f':
+	case 'n':
+	case 'r':
+	case 't':
+	case 'v':
+	case '\\':
+	case '\'':
+	case '\"':
 		advance_to_next_rune(t);
 		return true;
-	} else if (gb_is_between(r, '0', '7')) {
+
+	case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7':
 		len = 3; base = 8; max = 255;
-	} else if (r == 'x') {
+		break;
+
+	case 'x':
 		advance_to_next_rune(t);
 		len = 2; base = 16; max = 255;
-	} else if (r == 'u') {
+		break;
+
+	case 'u':
 		advance_to_next_rune(t);
 		len = 4; base = 16; max = GB_RUNE_MAX;
-	} else if (r == 'U') {
+		break;
+
+	case 'U':
 		advance_to_next_rune(t);
 		len = 8; base = 16; max = GB_RUNE_MAX;
-	} else {
+		break;
+
+	default:
 		if (t->curr_rune < 0) {
 			tokenizer_err(t, "Escape sequence was not terminated");
 		} else {
@@ -871,10 +923,21 @@ gb_inline TokenKind token_kind_dub_eq(Tokenizer *t, Rune sing_rune, TokenKind si
 
 
 Token tokenizer_get_token(Tokenizer *t) {
-	tokenizer_skip_whitespace(t);
+	// Skip whitespace
+	for (;;) {
+		switch (t->curr_rune) {
+		case ' ':
+		case '\t':
+		case '\n':
+		case '\r':
+			advance_to_next_rune(t);
+			continue;
+		}
+		break;
+	}
 
 	Token token = {};
-	token.string = make_string(t->curr, 1);
+	token.string = {t->curr, 1};
 	token.pos.file = t->fullpath;
 	token.pos.line = t->line_count;
 	token.pos.offset = t->curr - t->start;
@@ -891,15 +954,14 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 		// NOTE(bill): All keywords are > 1
 		if (token.string.len > 1) {
-			for (i32 k = Token__KeywordBegin+1; k < Token__KeywordEnd; k++) {
-				if (token.string == token_strings[k]) {
-					token.kind = cast(TokenKind)k;
-					break;
+			u32 hash = keyword_hash(token.string.text, token.string.len);
+			u32 index = hash & KEYWORD_HASH_TABLE_MASK;
+			KeywordHashEntry *entry = &keyword_hash_table[index];
+			if (entry->kind != Token_Invalid) {
+				String const &entry_text = token_strings[entry->kind];
+				if (str_eq(entry_text, token.string)) {
+					token.kind = entry->kind;
 				}
-			}
-
-			if (token.kind == Token_Ident && token.string == "notin") {
-				token.kind = Token_not_in;
 			}
 		}
 
@@ -1142,7 +1204,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '|': token.kind = token_kind_dub_eq(t, '|', Token_Or, Token_OrEq, Token_CmpOr, Token_CmpOrEq); break;
 
 		default:
-		if (curr_rune != GB_RUNE_BOM) {
+			if (curr_rune != GB_RUNE_BOM) {
 				u8 str[4] = {};
 				int len = cast(int)gb_utf8_encode_rune(str, curr_rune);
 				tokenizer_err(t, "Illegal character: %.*s (%d) ", len, str, curr_rune);
