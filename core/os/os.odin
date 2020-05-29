@@ -85,11 +85,13 @@ read_entire_file :: proc(name: string) -> (data: []byte, success: bool) {
 	if data == nil {
 		return nil, false;
 	}
+	// TODO(tetra, 2020-05-29): Can't do this until named return values
+	// are properly set when returning normally ...
 	// defer if !success do delete(data);
 
 	bytes_read, read_err := read(fd, data);
 	if read_err != ERROR_NONE {
-		delete(data);
+		delete(data); // ... so we do this instead.
 		return nil, false;
 	}
 	return data[:bytes_read], true;

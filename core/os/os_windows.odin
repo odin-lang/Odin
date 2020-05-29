@@ -140,6 +140,8 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	return int(written), ERROR_NONE;
 }
 
+// Reads up to len(data) bytes.
+// Reads as much as possible.
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 do return 0, ERROR_NONE;
 
