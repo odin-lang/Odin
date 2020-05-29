@@ -193,8 +193,8 @@ arena_begin_temp_memory :: proc(using va: ^Arena) -> Arena_Temp_Memory {
 
 // TODO: Don't decommit every single time we end temp memory
 //       Maybe achieve this by committing/decommitting in chunks rather than pages.
-arena_end_temp_memory :: proc(mark_: Arena_Temp_Memory) {
-	using mark := mark_;
+arena_end_temp_memory :: proc(mark: Arena_Temp_Memory) {
+	using mark := mark;
 
 	if cursor == nil {
 		cursor = arena.base;
