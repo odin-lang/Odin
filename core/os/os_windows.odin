@@ -123,9 +123,9 @@ close :: proc(fd: Handle) -> Errno {
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 do return 0, ERROR_NONE;
 
-	written := 0;
+	written := i64(0);
 	for {
-		to_write := u32(min(1<<32-1, len(data)-written));
+		to_write := u32(min(1<<31-1, i64(len(data))-written));
 		if to_write <= 0 do break;
 
 		n: u32 = ---;
@@ -134,7 +134,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 			return int(written), Errno(win32.get_last_error());
 		}
 
-		written += int(n);
+		written += i64(n);
 	}
 
 	return int(written), ERROR_NONE;
@@ -145,9 +145,9 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 do return 0, ERROR_NONE;
 
-	read := 0;
+	read := i64(0);
 	for {
-		to_read := u32(min(1<<32-1, len(data)-read));
+		to_read := u32(min(1<<31-1, i64(len(data))-read));
 		if to_read <= 0 do break;
 
 		n: u32 = ---;
@@ -156,7 +156,7 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 			return int(read), Errno(win32.get_last_error());
 		}
 
-		read += int(n);
+		read += i64(n);
 	}
 
 	return int(read), ERROR_NONE;
