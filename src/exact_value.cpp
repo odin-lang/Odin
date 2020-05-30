@@ -281,6 +281,11 @@ ExactValue exact_value_float_from_string(String string) {
 		}
 	}
 
+	if (!string_contains_char(string, '.') && !string_contains_char(string, '-')) {
+		// NOTE(bill): treat as integer
+		return exact_value_integer_from_string(string);
+	}
+
 	f64 f = float_from_string(string);
 	return exact_value_float(f);
 }

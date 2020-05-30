@@ -291,7 +291,8 @@ void big_int_from_string(BigInt *dst, String const &s) {
 	big_int_from_u64(&b, base);
 	big_int_init(dst, &BIG_INT_ZERO);
 
-	for (isize i = 0; i < len; i++) {
+	isize i = 0;
+	for (; i < len; i++) {
 		Rune r = cast(Rune)text[i];
 		if (r == '_') {
 			continue;
@@ -303,6 +304,32 @@ void big_int_from_string(BigInt *dst, String const &s) {
 		BigInt val = big_int_make_u64(v);
 		big_int_mul_eq(dst, &b);
 		big_int_add_eq(dst, &val);
+	}
+	if (i < len && (text[i] == 'e' || text[i] == 'E')) {
+		i += 1;
+		GB_ASSERT(base == 10);
+		GB_ASSERT(text[i] != '-');
+		if (text[i] == '+') {
+			i += 1;
+		}
+		u64 exp = 0;
+		for (; i < len; i++) {
+			char r = cast(char)text[i];
+			if (r == '_') {
+				continue;
+			}
+			u64 v = 0;
+			if (gb_char_is_digit(r)) {
+				v = u64_digit_value(r);
+			} else {
+				break;
+			}
+			exp *= 10;
+			exp += v;
+		}
+		for (u64 x = 0; x < exp; x++) {
+			big_int_mul_eq(dst, &b);
+		}
 	}
 	big_int_normalize(dst);
 }
@@ -341,12 +368,30 @@ i64 big_int_to_i64(BigInt const *x) {
 }
 
 f64 big_int_to_f64(BigInt const *x) {
-	if (x->neg) {
-		i64 i = big_int_to_i64(x);
-		return cast(f64)i;
+	switch (x->len) {
+	case 0:
+		return 0.0;
+	case 1:
+		if (x->neg) {
+			i64 i = big_int_to_i64(x);
+			return cast(f64)i;
+		} else {
+			u64 u = big_int_to_u64(x);
+			return cast(f64)u;
+		}
 	}
-	u64 u = big_int_to_u64(x);
-	return cast(f64)u;
+
+
+	u64 const *words = big_int_ptr(x);
+	f64 base = pow(2.0, gb_size_of(u64));
+	// TODO(bill): clean up this code and make it more accurate
+	f64 res = 0;
+	for (isize i = x->len-1; i >= 0; i--) {
+		res *= base;
+		u64 w = words[i];
+		res += cast(f64)w;
+	}
+	return res;
 }
 
 bool bi__alias(BigInt const *dst, BigInt const *src) {
