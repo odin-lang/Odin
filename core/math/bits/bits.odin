@@ -29,11 +29,6 @@ foreign {
 	@(link_name="llvm.ctpop.i32")       count_ones32 :: proc(i: u32) -> u32 ---
 	@(link_name="llvm.ctpop.i64")       count_ones64 :: proc(i: u64) -> u64 ---
 
-	@(link_name="llvm.ctlz.i8")         leading_zeros8  :: proc(i:  u8, is_zero_undef := false) ->  u8 ---
-	@(link_name="llvm.ctlz.i16")        leading_zeros16 :: proc(i: u16, is_zero_undef := false) -> u16 ---
-	@(link_name="llvm.ctlz.i32")        leading_zeros32 :: proc(i: u32, is_zero_undef := false) -> u32 ---
-	@(link_name="llvm.ctlz.i64")        leading_zeros64 :: proc(i: u64, is_zero_undef := false) -> u64 ---
-
 	@(link_name="llvm.cttz.i8")         trailing_zeros8  :: proc(i:  u8,  is_zero_undef := false) ->  u8 ---
 	@(link_name="llvm.cttz.i16")        trailing_zeros16 :: proc(i: u16,  is_zero_undef := false) -> u16 ---
 	@(link_name="llvm.cttz.i32")        trailing_zeros32 :: proc(i: u32,  is_zero_undef := false) -> u32 ---
@@ -43,6 +38,29 @@ foreign {
 	@(link_name="llvm.bitreverse.i16")  reverse_bits16 :: proc(i: u16) -> u16 ---
 	@(link_name="llvm.bitreverse.i32")  reverse_bits32 :: proc(i: u32) -> u32 ---
 	@(link_name="llvm.bitreverse.i64")  reverse_bits64 :: proc(i: u64) -> u64 ---
+}
+
+
+trailing_zeros_uint :: proc(i: uint) -> uint {
+	when size_of(uint) == size_of(u64) {
+		return uint(trailing_zeros64(u64(i)));
+	} else {
+		return uint(trailing_zeros32(u32(i)));
+	}
+}
+
+
+leading_zeros_u8  :: proc(i:  u8) -> int {
+	return 8*size_of(i) - len_u8(i);
+}
+leading_zeros_u16 :: proc(i: u16) -> int {
+	return 8*size_of(i) - len_u16(i);
+}
+leading_zeros_u32 :: proc(i: u32) -> int {
+	return 8*size_of(i) - len_u32(i);
+}
+leading_zeros_u64 :: proc(i: u64) -> int {
+	return 8*size_of(i) - len_u64(i);
 }
 
 
@@ -257,6 +275,210 @@ overflowing_mul :: proc{
 	overflowing_mul_uint, overflowing_mul_int,
 };
 
+
+len_u8 :: proc(x: u8) -> int {
+	return int(len_u8_table[x]);
+}
+len_u16 :: proc(x: u16) -> (n: int) {
+	x := x;
+	if x >= 1<<8 {
+		x >>= 8;
+		n = 8;
+	}
+	return n + int(len_u8_table[x]);
+}
+len_u32 :: proc(x: u32) -> (n: int) {
+	x := x;
+	if x >= 1<<16 {
+		x >>= 16;
+		n = 16;
+	}
+	if x >= 1<<8 {
+		x >>= 8;
+		n += 8;
+	}
+	return n + int(len_u8_table[x]);
+}
+len_u64 :: proc(x: u64) -> (n: int) {
+	x := x;
+	if x >= 1<<32 {
+		x >>= 32;
+		n = 32;
+	}
+	if x >= 1<<16 {
+		x >>= 16;
+		n += 16;
+	}
+	if x >= 1<<8 {
+		x >>= 8;
+		n += 8;
+	}
+	return n + int(len_u8_table[x]);
+}
+len_uint :: proc(x: uint) -> (n: int) {
+	when size_of(uint) == size_of(u64) {
+		return len_u64(u64(x));
+	} else {
+		return len_u32(u32(x));
+	}
+}
+
+// returns the minimum number of bits required to represent x
+len :: proc{len_u8, len_u16, len_u32, len_u64, len_uint};
+
+
+add_u32 :: proc(x, y, carry: u32) -> (sum, carry_out: u32) {
+	yc := y + carry;
+	sum = x + yc;
+	if sum < x || yc < y {
+		carry_out = 1;
+	}
+	return;
+}
+add_u64 :: proc(x, y, carry: u64) -> (sum, carry_out: u64) {
+	yc := y + carry;
+	sum = x + yc;
+	if sum < x || yc < y {
+		carry_out = 1;
+	}
+	return;
+}
+add_uint :: proc(x, y, carry: uint) -> (sum, carry_out: uint) {
+	yc := y + carry;
+	sum = x + yc;
+	if sum < x || yc < y {
+		carry_out = 1;
+	}
+	return;
+}
+add :: proc{add_u32, add_u64, add_uint};
+
+
+sub_u32 :: proc(x, y, borrow: u32) -> (diff, borrow_out: u32) {
+	yb := y + borrow;
+	diff = x - yb;
+	if diff > x || yb < y {
+		borrow_out = 1;
+	}
+	return;
+}
+sub_u64 :: proc(x, y, borrow: u64) -> (diff, borrow_out: u64) {
+	yb := y + borrow;
+	diff = x - yb;
+	if diff > x || yb < y {
+		borrow_out = 1;
+	}
+	return;
+}
+sub_uint :: proc(x, y, borrow: uint) -> (diff, borrow_out: uint) {
+	yb := y + borrow;
+	diff = x - yb;
+	if diff > x || yb < y {
+		borrow_out = 1;
+	}
+	return;
+}
+sub :: proc{sub_u32, sub_u64, sub_uint};
+
+
+mul_u32 :: proc(x, y: u32) -> (hi, lo: u32) {
+	z := u64(x) * u64(y);
+	hi, lo = u32(z>>32), u32(z);
+	return;
+}
+mul_u64 :: proc(x, y: u64) -> (hi, lo: u64) {
+	mask :: 1<<32 - 1;
+
+	x0, x1 := x & mask, x >> 32;
+	y0, y1 := y & mask, y >> 32;
+
+	w0 := x0 * y0;
+	t := x1*y0 + w0>>32;
+
+	w1, w2 := t & mask, t >> 32;
+	w1 += x0 * y1;
+	hi = x1*y1 + w2 + w1>>32;
+	lo = x * y;
+	return;
+}
+
+mul_uint :: proc(x, y: uint) -> (hi, lo: uint) {
+	when size_of(uint) == size_of(u32) {
+		a, b := mul_u32(u32(x), u32(y));
+	} else {
+		#assert(size_of(uint) == size_of(u64));
+		a, b := mul_u64(u64(x), u64(y));
+	}
+	return uint(a), uint(b);
+}
+
+mul :: proc{mul_u32, mul_u64, mul_uint};
+
+
+div_u32 :: proc(hi, lo, y: u32) -> (quo, rem: u32) {
+	assert(y != 0 && y <= hi);
+	z := u64(hi)<<32 | u64(lo);
+	quo, rem = u32(z/u64(y)), u32(z%u64(y));
+	return;
+}
+div_u64 :: proc(hi, lo, y: u64) -> (quo, rem: u64) {
+	y := y;
+	two32  :: 1 << 32;
+	mask32 :: two32 - 1;
+	if y == 0 {
+		panic("divide error");
+	}
+	if y <= hi {
+		panic("overflow error");
+	}
+
+	s := uint(leading_zeros_u64(y));
+	y <<= s;
+
+	yn1 := y >> 32;
+	yn0 := y & mask32;
+	un32 := hi<<s | lo>>(64-s);
+	un10 := lo << s;
+	un1 := un10 >> 32;
+	un0 := un10 & mask32;
+	q1 := un32 / yn1;
+	rhat := un32 - q1*yn1;
+
+	for q1 >= two32 || q1*yn0 > two32*rhat+un1 {
+		q1 -= 1;
+		rhat += yn1;
+		if rhat >= two32 {
+			break;
+		}
+	}
+
+	un21 := un32*two32 + un1 - q1*y;
+	q0 := un21 / yn1;
+	rhat = un21 - q0*yn1;
+
+	for q0 >= two32 || q0*yn0 > two32*rhat+un0 {
+		q0 -= 1;
+		rhat += yn1;
+		if rhat >= two32 {
+			break;
+		}
+	}
+
+	return q1*two32 + q0, (un21*two32 + un0 - q0*y) >> s;
+}
+div_uint :: proc(hi, lo, y: uint) -> (quo, rem: uint) {
+	when size_of(uint) == size_of(u32) {
+		a, b := div_u32(u32(hi), u32(lo), u32(y));
+	} else {
+		#assert(size_of(uint) == size_of(u64));
+		a, b := div_u64(u64(hi), u64(lo), u64(y));
+	}
+	return uint(a), uint(b);
+}
+div :: proc{div_u32, div_u64, div_uint};
+
+
+
 is_power_of_two_u8   :: proc(i:   u8) -> bool { return i > 0 && (i & (i-1)) == 0; }
 is_power_of_two_i8   :: proc(i:   i8) -> bool { return i > 0 && (i & (i-1)) == 0; }
 is_power_of_two_u16  :: proc(i:  u16) -> bool { return i > 0 && (i & (i-1)) == 0; }
@@ -275,3 +497,19 @@ is_power_of_two :: proc{
 	is_power_of_two_u64,  is_power_of_two_i64,
 	is_power_of_two_uint, is_power_of_two_int,
 };
+
+
+@private
+len_u8_table := [256]u8{
+	0         = 0,
+	1         = 1,
+	2..<4     = 2,
+	4..<8     = 3,
+	8..<16    = 4,
+	16..<32   = 5,
+	32..<64   = 6,
+	64..<128  = 7,
+	128..<256 = 8,
+};
+
+

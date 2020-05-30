@@ -1,6 +1,7 @@
 package math
 
 import "intrinsics"
+_ :: intrinsics;
 
 Float_Class :: enum {
 	Normal,    // an ordinary nonzero floating point value
