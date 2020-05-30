@@ -10645,9 +10645,17 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	if (build_context.out_filepath.len == 0) {
 		gen->output_name = remove_directory_from_path(init_fullpath);
 		gen->output_name = remove_extension_from_path(gen->output_name);
+		gen->output_name = string_trim_whitespace(gen->output_name);
+		if (gen->output_name.len == 0) {
+			gen->output_name = c->info.init_scope->pkg->name;
+		}
 		gen->output_base = gen->output_name;
 	} else {
 		gen->output_name = build_context.out_filepath;
+		gen->output_name = string_trim_whitespace(gen->output_name);
+		if (gen->output_name.len == 0) {
+			gen->output_name = c->info.init_scope->pkg->name;
+		}
 		isize pos = string_extension_position(gen->output_name);
 		if (pos < 0) {
 			gen->output_base = gen->output_name;

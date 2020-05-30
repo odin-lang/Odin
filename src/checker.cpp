@@ -1834,11 +1834,37 @@ bool is_entity_a_dependency(Entity *e) {
 	case Entity_Constant:
 	case Entity_Variable:
 		return e->pkg != nullptr;
+	case Entity_TypeName:
+		return false;
 	}
 	return false;
 }
 
+void add_entity_dependency_from_procedure_parameters(Map<EntityGraphNode *> *M, EntityGraphNode *n, Type *tuple) {
+	if (tuple == nullptr) {
+		return;
+	}
+	Entity *e = n->entity;
+	bool print_deps = false;
+
+	GB_ASSERT(tuple->kind == Type_Tuple);
+	TypeTuple *t = &tuple->Tuple;
+	for_array(i, t->variables) {
+		Entity *v = t->variables[i];
+		EntityGraphNode **found = map_get(M, hash_pointer(v));
+		if (found == nullptr) {
+			continue;
+		}
+		EntityGraphNode *m = *found;
+		entity_graph_node_set_add(&n->succ, m);
+		entity_graph_node_set_add(&m->pred, n);
+	}
+
+}
+
 Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
+#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
+
 	gbAllocator a = heap_allocator();
 
 	Map<EntityGraphNode *> M = {}; // Key: Entity *
@@ -1854,20 +1880,20 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		}
 	}
 
-#define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
-
-
 	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 1");
 	// Calculate edges for graph M
 	for_array(i, M.entries) {
-		Entity *   e = cast(Entity *)cast(uintptr)M.entries[i].key.key;
 		EntityGraphNode *n = M.entries[i].value;
+		Entity *e = n->entity;
 
 		DeclInfo *decl = decl_info_of_entity(e);
 		GB_ASSERT(decl != nullptr);
 
 		for_array(j, decl->deps.entries) {
 			Entity *dep = decl->deps.entries[j].ptr;
+			if (dep->flags & EntityFlag_Field) {
+				continue;
+			}
 			GB_ASSERT(dep != nullptr);
 			if (is_entity_a_dependency(dep)) {
 				EntityGraphNode **m_ = map_get(&M, hash_pointer(dep));
@@ -1924,7 +1950,6 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		EntityGraphNode *n = G[i];
 		n->index = i;
 		n->dep_count = n->succ.entries.count;
-
 		GB_ASSERT(n->dep_count >= 0);
 	}
 
@@ -3978,7 +4003,42 @@ void check_import_entities(Checker *c) {
 	}
 }
 
-Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visited = nullptr) {
+
+Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visited = nullptr);
+
+bool find_entity_path_tuple(Type *tuple, Entity *end, Map<Entity *> *visited, Array<Entity *> *path_) {
+	GB_ASSERT(path_ != nullptr);
+	if (tuple == nullptr) {
+		return false;
+	}
+	GB_ASSERT(tuple->kind == Type_Tuple);
+	for_array(i, tuple->Tuple.variables) {
+		Entity *var = tuple->Tuple.variables[i];
+		DeclInfo *var_decl = var->decl_info;
+		if (var_decl == nullptr) {
+			continue;
+		}
+		for_array(i, var_decl->deps.entries) {
+			Entity *dep = var_decl->deps.entries[i].ptr;
+			if (dep == end) {
+				auto path = array_make<Entity *>(heap_allocator());
+				array_add(&path, dep);
+				*path_ = path;
+				return true;
+			}
+			auto next_path = find_entity_path(dep, end, visited);
+			if (next_path.count > 0) {
+				array_add(&next_path, dep);
+				*path_ = next_path;
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visited) {
 	Map<Entity *> visited_ = {};
 	bool made_visited = false;
 	if (visited == nullptr) {
@@ -4001,17 +4061,30 @@ Array<Entity *> find_entity_path(Entity *start, Entity *end, Map<Entity *> *visi
 
 	DeclInfo *decl = start->decl_info;
 	if (decl) {
-		for_array(i, decl->deps.entries) {
-			Entity *dep = decl->deps.entries[i].ptr;
-			if (dep == end) {
-				auto path = array_make<Entity *>(heap_allocator());
-				array_add(&path, dep);
+		if (start->kind == Entity_Procedure) {
+			Type *t = base_type(start->type);
+			GB_ASSERT(t->kind == Type_Proc);
+
+			Array<Entity *> path = {};
+			if (find_entity_path_tuple(t->Proc.params, end, visited, &path)) {
 				return path;
 			}
-			auto next_path = find_entity_path(dep, end, visited);
-			if (next_path.count > 0) {
-				array_add(&next_path, dep);
-				return next_path;
+			if (find_entity_path_tuple(t->Proc.results, end, visited, &path)) {
+				return path;
+			}
+		} else {
+			for_array(i, decl->deps.entries) {
+				Entity *dep = decl->deps.entries[i].ptr;
+				if (dep == end) {
+					auto path = array_make<Entity *>(heap_allocator());
+					array_add(&path, dep);
+					return path;
+				}
+				auto next_path = find_entity_path(dep, end, visited);
+				if (next_path.count > 0) {
+					array_add(&next_path, dep);
+					return next_path;
+				}
 			}
 		}
 	}

@@ -66,7 +66,7 @@ enum EntityFlag : u32 {
 
 enum EntityState {
 	EntityState_Unresolved = 0,
-	EntityState_InProgress  = 1,
+	EntityState_InProgress = 1,
 	EntityState_Resolved   = 2,
 };
 

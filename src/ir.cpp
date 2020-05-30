@@ -11485,9 +11485,17 @@ bool ir_gen_init(irGen *s, Checker *c) {
 	if (build_context.out_filepath.len == 0) {
 		s->output_name = remove_directory_from_path(init_fullpath);
 		s->output_name = remove_extension_from_path(s->output_name);
+		s->output_name = string_trim_whitespace(s->output_name);
+		if (s->output_name.len == 0) {
+			s->output_name = c->info.init_scope->pkg->name;
+		}
 		s->output_base = s->output_name;
 	} else {
 		s->output_name = build_context.out_filepath;
+		s->output_name = string_trim_whitespace(s->output_name);
+		if (s->output_name.len == 0) {
+			s->output_name = c->info.init_scope->pkg->name;
+		}
 		isize pos = string_extension_position(s->output_name);
 		if (pos < 0) {
 			s->output_base = s->output_name;
