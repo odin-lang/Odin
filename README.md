@@ -98,6 +98,16 @@ Odin only supports x86-64 at the moment (64-bit), relies on LLVM for code genera
 
 In addition, the following platform-specific steps are necessary:
 
+- GNU/Linux
+    * Have LLVM installed (opt/llc)
+    * Have Clang installed (version X.X or later, for linking)
+    * Make sure the LLVM binaries and the linker are added to your `$PATH` environment variable
+
+- MacOS
+    * Have LLVM explicitly installed (`brew install llvm`)
+    * Have XCode installed (version X.X or later, for linking)
+    * Make sure the LLVM binaries and the linker are added to your `$PATH` environment variable
+
 - Windows
     * Have Visual Studio installed (MSVC 2010 or later, for the linker)
     * Have a copy of `opt.exe` and `llc.exe` in `Odin/bin`. Pre-built Windows binaries can be found [here](https://github.com/odin-lang/Odin/releases/tag/llvm-windows) and *must* be explicitly copied
@@ -105,17 +115,7 @@ In addition, the following platform-specific steps are necessary:
         * **Basic:** run the `x64 Native Tools Command Prompt for VS2017` shortcut bundled with VS 2017, or
         * **Advanced:** run `vcvarsall.bat x64` from a blank `cmd` session
 
-- MacOS
-    * Have LLVM explicitly installed (`brew install llvm`)
-    * Have XCode installed (version X.X or later, for linking)
-    * Make sure the LLVM binaries and the linker are added to your `$PATH` environmental variable
-
-- GNU/Linux
-    * Have LLVM installed (opt/llc)
-    * Have Clang installed (version X.X or later, for linking)
-    * Make sure the LLVM binaries and the linker are added to your `$PATH` environmental variable
-
-Then build the compiler by calling `build.bat` (Windows) or `make` (Linux/MacOS). This will automatically run the demo program if successful.
+Then build the compiler by calling `make` (Linux/MacOS) or `build.bat` (Windows). This will automatically run the demo program if successful.
 
 **Notes for Linux:**: The compiler currently relies on the `core` and `shared` library collection being relative to the compiler executable. Installing the compiler in the usual sense (to `/usr/local/bin` or similar) is therefore not as straight forward as you need to make sure the mentioned libraries are available. As a result, it is recommended to simply explicitly invoke the compiler with `/path/to/odin` in your preferred build system, or add `/path/to/odin` to `$PATH`.
 
@@ -125,6 +125,17 @@ Please read the [Getting Started Guide](https://github.com/odin-lang/Odin/wiki#g
 
 Please read the [Getting Started Guide](https://github.com/odin-lang/Odin/wiki#getting-started-with-odin).
 
+- GNU/Linux
+	* x86-64
+	* Build tools (ld)
+	* LLVM installed
+	* Clang installed (temporary - this is Calling the linker for now)
+
+- MacOS
+	* x86-64
+	* LLVM explicitly installed (`brew install llvm`)
+	* XCode installed (for the linker)
+
 - Windows
 	* x86-64
 	* MSVC 2010 installed (C++11 support)
@@ -132,16 +143,6 @@ Please read the [Getting Started Guide](https://github.com/odin-lang/Odin/wiki#g
 	* Requires MSVC's link.exe as the linker
 		* run `vcvarsall.bat` to setup the path
 
-- MacOS
-	* x86-64
-	* LLVM explicitly installed (`brew install llvm`)
-	* XCode installed (for the linker)
-
-- GNU/Linux
-	* x86-64
-	* Build tools (ld)
-	* LLVM installed
-	* Clang installed (temporary - this is Calling the linker for now)
 
 ## Warnings
 
@@ -163,4 +164,3 @@ Please read the [Getting Started Guide](https://github.com/odin-lang/Odin/wiki#g
 * [Loadsachanges](https://www.youtube.com/watch?v=ar0vFMoMtrI)
 * [Packages, Bit Sets, cstring](https://youtu.be/b8bJbjiXZrQ)
 	- [Q&A](https://youtu.be/5jmxyIfyyTk)
-
