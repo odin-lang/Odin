@@ -3197,6 +3197,9 @@ bool check_index_value(CheckerContext *c, bool open_range, Ast *index_value, i64
 
 				return true;
 			}
+		} else {
+			if (value) *value = exact_value_to_i64(operand.value);
+			return true;
 		}
 	}
 
@@ -3298,8 +3301,9 @@ ExactValue get_constant_field_single(CheckerContext *c, ExactValue value, i32 in
 						i64 field_index = exact_value_to_i64(index_value);
 						if (index == field_index) {
 							TypeAndValue tav = fv->value->tav;
-							value = tav.value;
-							break;
+							if (success_) *success_ = true;
+							if (finish_) *finish_ = false;
+							return tav.value;;
 						}
 					}
 
@@ -3312,6 +3316,12 @@ ExactValue get_constant_field_single(CheckerContext *c, ExactValue value, i32 in
 				if (finish_) *finish_ = true;
 				return empty_exact_value;
 			}
+			if (cl->elems.count <= index) {
+				if (success_) *success_ = false;
+				if (finish_) *finish_ = false;
+				return value;
+			}
+
 			TypeAndValue tav = cl->elems[index]->tav;
 			if (tav.mode == Addressing_Constant) {
 				if (success_) *success_ = true;
@@ -9377,6 +9387,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 		if (is_const) {
 			if (is_type_array(t)) {
+				// OKay
+			} else if (is_type_slice(t)) {
 				// Okay
 			} else if (is_type_enumerated_array(t)) {
 				// Okay
@@ -9424,6 +9436,10 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		bool ok = check_index_value(c, false, ie->index, max_count, &index, index_type_hint);
 		if (is_const) {
 			if (index < 0) {
+				if (max_count < 0) {
+
+				}
+
 				gbString str = expr_to_string(o->expr);
 				error(o->expr, "Cannot index a constant '%s'", str);
 				error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
@@ -9434,7 +9450,18 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			} else if (ok) {
 				ExactValue value = type_and_value_of_expr(ie->expr).value;
 				o->mode = Addressing_Constant;
-				o->value = get_constant_field_single(c, value, cast(i32)index, nullptr, nullptr);
+				bool success = false;
+				bool finish = false;
+				o->value = get_constant_field_single(c, value, cast(i32)index, &success, &finish);
+				if (!success) {
+					gbString str = expr_to_string(o->expr);
+					error(o->expr, "Cannot index a constant '%s' with index %lld", str, cast(long long)index);
+					error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
+					gb_string_free(str);
+					o->mode = Addressing_Invalid;
+					o->expr = node;
+					return kind;
+				}
 			}
 		}
 	case_end;
