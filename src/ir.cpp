@@ -4499,11 +4499,35 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 handle_op:
 	switch (op) {
 	case Token_Shl:
-	case Token_Shr:
-		left = ir_emit_conv(proc, left, type);
-		right = ir_emit_conv(proc, right, type);
+		{
+			left = ir_emit_conv(proc, left, type);
+			right = ir_emit_conv(proc, right, type);
+			ir_emit(proc, ir_instr_binary_op(proc, op, left, right, type));
 
-		break;
+			irValue *bits = right;
+
+			irValue *max = ir_value_constant(type, exact_value_i64(8*type_size_of(type) - 1));
+			irValue *less_equal_width = ir_emit(proc, ir_instr_binary_op(proc, Token_LtEq, bits, max, t_llvm_bool));
+
+
+			irValue *zero = ir_value_constant(type, exact_value_i64(0));
+			irValue *res = ir_emit(proc, ir_instr_binary_op(proc, op, left, bits, type));
+			return ir_emit_select(proc, less_equal_width, res, zero);
+		}
+	case Token_Shr:
+		{
+			left = ir_emit_conv(proc, left, type);
+			right = ir_emit_conv(proc, right, type);
+			bool is_unsigned = is_type_unsigned(ir_type(left));
+
+			irValue *bits = right;
+
+			irValue *max = ir_value_constant(type, exact_value_i64(8*type_size_of(type) - 1));
+			irValue *less_equal_width = ir_emit(proc, ir_instr_binary_op(proc, Token_LtEq, bits, max, t_llvm_bool));
+
+			bits = ir_emit_select(proc, less_equal_width, bits, max);
+			return ir_emit(proc, ir_instr_binary_op(proc, op, left, bits, type));
+		}
 
 	case Token_AndNot: {
 		// NOTE(bill): x &~ y == x & (~y) == x & (y ~ -1)
