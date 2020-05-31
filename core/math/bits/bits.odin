@@ -123,16 +123,32 @@ count_zeros32  :: proc(i:  u32) ->  u32 { return  32 - count_ones32(i); }
 count_zeros64  :: proc(i:  u64) ->  u64 { return  64 - count_ones64(i); }
 
 
-rotate_left8   :: proc(i: u8,   s: uint) ->   u8 { return (i << s)|(i >> (8*size_of(u8)   - s)); }
-rotate_left16  :: proc(i: u16,  s: uint) ->  u16 { return (i << s)|(i >> (8*size_of(u16)  - s)); }
-rotate_left32  :: proc(i: u32,  s: uint) ->  u32 { return (i << s)|(i >> (8*size_of(u32)  - s)); }
-rotate_left64  :: proc(i: u64,  s: uint) ->  u64 { return (i << s)|(i >> (8*size_of(u64)  - s)); }
+rotate_left8 :: proc(x: u8,  k: int) -> u8 {
+	n :: 8;
+	s := uint(k) & (n-1);
+	return x <<s | x>>(n-s);
+}
+rotate_left16 :: proc(x: u16, k: int) -> u16 {
+	n :: 16;
+	s := uint(k) & (n-1);
+	return x <<s | x>>(n-s);
+}
+rotate_left32 :: proc(x: u32, k: int) -> u32 {
+	n :: 32;
+	s := uint(k) & (n-1);
+	return x <<s | x>>(n-s);
+}
+rotate_left64 :: proc(x: u64, k: int) -> u64 {
+	n :: 64;
+	s := uint(k) & (n-1);
+	return x <<s | x>>(n-s);
+}
 
-
-rotate_right8   :: proc(i: u8,   s: uint) ->   u8 { return (i >> s)|(i << (8*size_of(u8)   - s)); }
-rotate_right16  :: proc(i: u16,  s: uint) ->  u16 { return (i >> s)|(i << (8*size_of(u16)  - s)); }
-rotate_right32  :: proc(i: u32,  s: uint) ->  u32 { return (i >> s)|(i << (8*size_of(u32)  - s)); }
-rotate_right64  :: proc(i: u64,  s: uint) ->  u64 { return (i >> s)|(i << (8*size_of(u64)  - s)); }
+rotate_left :: proc(x: uint, k: int) -> uint {
+	n :: 8*size_of(uint);
+	s := uint(k) & (n-1);
+	return x <<s | x>>(n-s);
+}
 
 from_be_u8   :: proc(i:   u8) ->   u8 { return i; }
 from_be_u16  :: proc(i:  u16) ->  u16 { when ODIN_ENDIAN == "big" { return i; } else { return byte_swap(i); } }
