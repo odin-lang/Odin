@@ -116,7 +116,7 @@ unlerp     :: proc{unlerp_f32, unlerp_f64};
 
 wrap :: proc(x, y: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
 	tmp := mod(x, y);
-	return wrap + tmp if tmp < 0 else tmp;
+	return y + tmp if tmp < 0 else tmp;
 }
 angle_diff :: proc(a, b: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
 
