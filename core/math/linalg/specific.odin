@@ -1,7 +1,6 @@
 package linalg
 
 import "core:math"
-import "intrinsics"
 
 
 // Specific
