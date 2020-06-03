@@ -158,10 +158,10 @@ fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) {
 
 sbprint :: proc(buf: ^strings.Builder, args: ..any) -> string {
 	fi: Info;
-	prev_string := false;
 
 	fi.buf = buf;
 
+	prev_string := false;
 	for arg, i in args {
 		is_string := arg != nil && reflect.is_string(type_info_of(arg.id));
 		if i > 0 && !is_string && !prev_string {
@@ -937,23 +937,68 @@ enum_value_to_string :: proc(val: any) -> (string, bool) {
 	#partial switch e in type_info.variant {
 	case: return "", false;
 	case runtime.Type_Info_Enum:
-		get_str :: proc(data: rawptr, e: runtime.Type_Info_Enum) -> (string, bool) {
+		Enum_Value :: runtime.Type_Info_Enum_Value;
+
+		ev: Enum_Value;
+		ok := true;
+
+		bv := v;
+		bv.id = runtime.typeid_core(e.base.id);
+
+		switch i in bv {
+		case i8:   ev = Enum_Value(i);
+		case i16:  ev = Enum_Value(i);
+		case i32:  ev = Enum_Value(i);
+		case i64:  ev = Enum_Value(i);
+		case i128: ev = Enum_Value(i);
+
+		case int:  ev = Enum_Value(i);
+
+		case u8:   ev = Enum_Value(i);
+		case u16:  ev = Enum_Value(i);
+		case u32:  ev = Enum_Value(i);
+		case u64:  ev = Enum_Value(i);
+		case u128: ev = Enum_Value(i);
+		case uint: ev = Enum_Value(i);
+
+		case uintptr: ev = Enum_Value(i);
+
+		case i16le:  ev = Enum_Value(i);
+		case i32le:  ev = Enum_Value(i);
+		case i64le:  ev = Enum_Value(i);
+		case i128le: ev = Enum_Value(i);
+
+		case u16le:  ev = Enum_Value(i);
+		case u32le:  ev = Enum_Value(i);
+		case u64le:  ev = Enum_Value(i);
+		case u128le: ev = Enum_Value(i);
+
+		case i16be:  ev = Enum_Value(i);
+		case i32be:  ev = Enum_Value(i);
+		case i64be:  ev = Enum_Value(i);
+		case i128be: ev = Enum_Value(i);
+
+		case u16be:  ev = Enum_Value(i);
+		case u32be:  ev = Enum_Value(i);
+		case u64be:  ev = Enum_Value(i);
+		case u128be: ev = Enum_Value(i);
+
+		case:
+			ok = false;
+		}
+
+		if ok {
 			if len(e.values) == 0 {
 				return "", true;
 			} else {
-				for _, idx in e.values {
-					val := &e.values[idx];
-					// NOTE(bill): Removes need for parametric polymorphic check
-					res := mem.compare_ptrs(val, data, e.base.size);
-					if res == 0 {
+				for val, idx in e.values {
+					if val == ev {
 						return e.names[idx], true;
 					}
 				}
 			}
 			return "", false;
 		}
-
-		return get_str(v.data, e);
 	}
 
 	return "", false;
@@ -1001,80 +1046,27 @@ stored_enum_value_to_string :: proc(enum_type: ^runtime.Type_Info, ev: runtime.T
 	#partial switch e in et.variant {
 	case: return "", false;
 	case runtime.Type_Info_Enum:
-		get_str :: proc(i: $T, e: runtime.Type_Info_Enum) -> (string, bool) {
-			if reflect.is_string(e.base) {
-				for val, idx in e.values {
-					if v, ok := val.(T); ok && v == i {
-						return e.names[idx], true;
-					}
-				}
-			} else if len(e.values) == 0 {
-				return "", true;
-			} else {
-				for val, idx in e.values {
-					if v, ok := val.(T); ok && v == i {
-						return e.names[idx], true;
-					}
+		if reflect.is_string(e.base) {
+			for val, idx in e.values {
+				if val == ev {
+					return e.names[idx], true;
 				}
 			}
-			return "", false;
+		} else if len(e.values) == 0 {
+			return "", true;
+		} else {
+			for val, idx in e.values {
+				if val == ev {
+					return e.names[idx], true;
+				}
+			}
 		}
-
-		switch v in ev {
-		case rune:    return get_str(v + auto_cast offset, e);
-		case i8:      return get_str(v + auto_cast offset, e);
-		case i16:     return get_str(v + auto_cast offset, e);
-		case i32:     return get_str(v + auto_cast offset, e);
-		case i64:     return get_str(v + auto_cast offset, e);
-		case int:     return get_str(v + auto_cast offset, e);
-		case u8:      return get_str(v + auto_cast offset, e);
-		case u16:     return get_str(v + auto_cast offset, e);
-		case u32:     return get_str(v + auto_cast offset, e);
-		case u64:     return get_str(v + auto_cast offset, e);
-		case uint:    return get_str(v + auto_cast offset, e);
-		case uintptr: return get_str(v + auto_cast offset, e);
-		}
+		return "", false;
 	}
 
 	return "", false;
 }
 
-
-enum_value_to_u64 :: proc(ev: runtime.Type_Info_Enum_Value) -> u64 {
-	switch i in ev {
-	case rune:    return u64(i);
-	case i8:      return u64(i);
-	case i16:     return u64(i);
-	case i32:     return u64(i);
-	case i64:     return u64(i);
-	case int:     return u64(i);
-	case u8:      return u64(i);
-	case u16:     return u64(i);
-	case u32:     return u64(i);
-	case u64:     return u64(i);
-	case uint:    return u64(i);
-	case uintptr: return u64(i);
-	}
-	return 0;
-}
-
-enum_value_to_i64 :: proc(ev: runtime.Type_Info_Enum_Value) -> i64 {
-	switch i in ev {
-	case rune:    return i64(i);
-	case i8:      return i64(i);
-	case i16:     return i64(i);
-	case i32:     return i64(i);
-	case i64:     return i64(i);
-	case int:     return i64(i);
-	case u8:      return i64(i);
-	case u16:     return i64(i);
-	case u32:     return i64(i);
-	case u64:     return i64(i);
-	case uint:    return i64(i);
-	case uintptr: return i64(i);
-	}
-	return 0;
-}
 
 fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 	is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
@@ -1152,7 +1144,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 			if commas > 0 do strings.write_string(fi.buf, ", ");
 
 			if is_enum do for ev, evi in e.values {
-				v := enum_value_to_u64(ev);
+				v := u64(ev);
 				if v == u64(i) {
 					strings.write_string(fi.buf, e.names[evi]);
 					commas += 1;
@@ -1437,7 +1429,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				strings.write_byte(fi.buf, '.');
 				strings.write_string(fi.buf, idx);
 			} else {
-				strings.write_i64(fi.buf, enum_value_to_i64(info.min_value)+i64(i));
+				strings.write_i64(fi.buf, i64(info.min_value)+i64(i));
 			}
 			strings.write_string(fi.buf, " = ");
 

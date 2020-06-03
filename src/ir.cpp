@@ -9799,7 +9799,7 @@ void ir_build_range_enum(irProcedure *proc, Type *enum_type, Type *val_type, irV
 		GB_ASSERT(are_types_identical(enum_type, val_type));
 
 		if (is_type_integer(core_elem)) {
-			irValue *i = ir_emit_load(proc, ir_emit_conv(proc, val_ptr, t_i64_ptr));
+			irValue *i = ir_emit_load(proc, val_ptr);
 			val = ir_emit_conv(proc, i, t);
 		} else {
 			GB_PANIC("TODO(bill): enum core type %s", type_to_string(core_elem));
@@ -11812,8 +11812,8 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			irValue *min_v = ir_value_constant(core_type(t->EnumeratedArray.index), t->EnumeratedArray.min_value);
 			irValue *max_v = ir_value_constant(core_type(t->EnumeratedArray.index), t->EnumeratedArray.max_value);
 
-			ir_emit_store_union_variant(proc, min_value, min_v, ir_type(min_v));
-			ir_emit_store_union_variant(proc, max_value, max_v, ir_type(max_v));
+			ir_emit_store(proc, min_value, min_v);
+			ir_emit_store(proc, max_value, max_v);
 			break;
 		}
 		case Type_DynamicArray: {
@@ -11907,9 +11907,9 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 						irValue *value_ep = ir_emit_array_epi(proc, value_array, cast(i32)i);
 
 						ExactValue value = fields[i]->Constant.value;
-						irValue *v = ir_value_constant(t->Enum.base_type, value);
+						irValue *v = ir_value_constant(t_i64, value);
 
-						ir_emit_store_union_variant(proc, value_ep, v, ir_type(v));
+						ir_emit_store(proc, value_ep, v);
 						ir_emit_store(proc, name_ep, ir_const_string(proc->module, fields[i]->token.string));
 					}
 
