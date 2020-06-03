@@ -140,6 +140,18 @@ i32 linker_stage(lbGenerator *gen) {
 
 	String output_base = gen->output_base;
 
+	if (build_context.metrics.os == TargetOs_js) {
+		timings_start_section(timings, str_lit("wasm-ld"));
+		exit_code = system_exec_command_line_app("wasm-ld",
+			"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm-obj\" -o \"%.*s.wasm\" %.*s %.*s",
+			LIT(build_context.ODIN_ROOT),
+			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
+		if (exit_code != 0) {
+			return exit_code;
+		}
+		return exit_code;
+	}
+
 	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
 #ifdef GB_SYSTEM_UNIX
 		system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
@@ -1657,10 +1669,6 @@ int main(int arg_count, char const **arg_ptr) {
 	if (build_context.metrics.os == TargetOs_js) {
 		if (!build_context.use_llvm_api) {
 			print_usage_line(0, "%.*s - js platform only supported with the -llvm-api backend", LIT(args[0]));
-			return 1;
-		}
-		if (build_context.build_mode != BuildMode_Object) {
-			print_usage_line(0, "%.*s - js platform only supports -build-mode:object", LIT(args[0]));
 			return 1;
 		}
 	}
