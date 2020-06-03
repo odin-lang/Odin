@@ -4736,14 +4736,15 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<Ast *>
 			for_array(fp_idx, fl->filepaths) {
 				String file_str = fl->filepaths[fp_idx].string;
 				String fullpath = file_str;
-
-				String foreign_path = {};
-				bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, file_str, &foreign_path);
-				if (!ok) {
-					decls[i] = ast_bad_decl(f, fl->filepaths[fp_idx], fl->filepaths[fl->filepaths.count-1]);
-					goto end;
+				if (build_context.metrics.os != TargetOs_js) {
+					String foreign_path = {};
+					bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, file_str, &foreign_path);
+					if (!ok) {
+						decls[i] = ast_bad_decl(f, fl->filepaths[fp_idx], fl->filepaths[fl->filepaths.count-1]);
+						goto end;
+					}
+					fullpath = foreign_path;
 				}
-				fullpath = foreign_path;
 				array_add(&fl->fullpaths, fullpath);
 			}
 			if (fl->fullpaths.count == 0) {

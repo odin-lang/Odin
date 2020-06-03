@@ -2045,10 +2045,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 
 		if (build_context.metrics.os == TargetOs_js) {
 			char const *export_name = alloc_cstring(heap_allocator(), p->name);
-			LLVMAddTargetDependentFunctionAttr(p->value, "export", export_name);
-			LLVMAddTargetDependentFunctionAttr(p->value, "export-name", export_name);
 			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-export-name", export_name);
-			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-exported", nullptr);
 		}
 	}
 	if (p->is_foreign) {
@@ -2056,7 +2053,11 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 			char const *import_name = alloc_cstring(heap_allocator(), p->name);
 			char const *module_name = "env";
 			if (entity->Procedure.foreign_library != nullptr) {
-				module_name = alloc_cstring(heap_allocator(), entity->Procedure.foreign_library->token.string);
+				Entity *foreign_library = entity->Procedure.foreign_library;
+				GB_ASSERT(foreign_library->kind == Entity_LibraryName);
+				if (foreign_library->LibraryName.paths.count > 0)  {
+					module_name = alloc_cstring(heap_allocator(), foreign_library->LibraryName.paths[0]);
+				}
 			}
 			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-import-name",   import_name);
 			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-import-module", module_name);
