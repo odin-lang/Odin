@@ -2032,7 +2032,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	if (build_context.metrics.os != TargetOs_js)  {
 		cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
 	}
-	LLVMSetFunctionCallConv(p->value, lb_calling_convention_map[pt->Proc.calling_convention]);
+	LLVMSetFunctionCallConv(p->value, cc_kind);
 	lbValue proc_value = {p->value, p->type};
 	lb_add_entity(m, entity,  proc_value);
 	lb_add_member(m, p->name, proc_value);
@@ -2172,8 +2172,12 @@ lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type
 	p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
 
 	Type *pt = p->type;
-
-	LLVMSetFunctionCallConv(p->value, lb_calling_convention_map[pt->Proc.calling_convention]);
+	lbCallingConventionKind cc_kind = lbCallingConvention_C;
+	// TODO(bill): Clean up this logic
+	if (build_context.metrics.os != TargetOs_js)  {
+		cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
+	}
+	LLVMSetFunctionCallConv(p->value, cc_kind);
 	lbValue proc_value = {p->value, p->type};
 	lb_add_member(m, p->name, proc_value);
 	lb_add_procedure_value(m, p);
