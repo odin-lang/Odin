@@ -2017,6 +2017,9 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	p->branch_blocks.allocator = a;
 	p->context_stack.allocator = a;
 
+	if (p->is_foreign) {
+		lb_add_foreign_library_path(p->module, entity->Procedure.foreign_library);
+	}
 
 	char *c_link_name = alloc_cstring(heap_allocator(), p->name);
 	LLVMTypeRef func_ptr_type = lb_type(m, p->type);
@@ -2036,8 +2039,22 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 		LLVMSetVisibility(p->value, LLVMDefaultVisibility);
 
 		if (build_context.metrics.os == TargetOs_js) {
-			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-export-name", alloc_cstring(heap_allocator(), p->name));
+			char const *export_name = alloc_cstring(heap_allocator(), p->name);
+			LLVMAddTargetDependentFunctionAttr(p->value, "export", export_name);
+			LLVMAddTargetDependentFunctionAttr(p->value, "export-name", export_name);
+			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-export-name", export_name);
 			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-exported", nullptr);
+		}
+	}
+	if (p->is_foreign) {
+		if (build_context.metrics.os == TargetOs_js) {
+			char const *import_name = alloc_cstring(heap_allocator(), p->name);
+			char const *module_name = "env";
+			if (entity->Procedure.foreign_library != nullptr) {
+				module_name = alloc_cstring(heap_allocator(), entity->Procedure.foreign_library->token.string);
+			}
+			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-import-name",   import_name);
+			LLVMAddTargetDependentFunctionAttr(p->value, "wasm-import-module", module_name);
 		}
 	}
 
@@ -2085,9 +2102,6 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 	}
 
 
-	if (entity->Procedure.is_foreign) {
-		lb_add_foreign_library_path(p->module, entity->Procedure.foreign_library);
-	}
 
 
 	{ // Debug Information
@@ -12192,7 +12206,7 @@ void lb_generate_code(lbGenerator *gen) {
 		filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".o"));
 		break;
 	case TargetOs_js:
-		filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".wasm"));
+		filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".wasm-obj"));
 		break;
 	}
 
