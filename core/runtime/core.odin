@@ -34,11 +34,7 @@ Calling_Convention :: enum u8 {
 	Fast        = 5,
 }
 
-Type_Info_Enum_Value :: union {
-	rune,
-	i8, i16, i32, i64, int,
-	u8, u16, u32, u64, uint, uintptr,
-};
+Type_Info_Enum_Value :: distinct i64;
 
 Platform_Endianness :: enum u8 {
 	Platform = 0,

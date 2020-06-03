@@ -2027,6 +2027,11 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity) {
 
 	p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
 
+	lbCallingConventionKind cc_kind = lbCallingConvention_C;
+	// TODO(bill): Clean up this logic
+	if (build_context.metrics.os != TargetOs_js)  {
+		cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
+	}
 	LLVMSetFunctionCallConv(p->value, lb_calling_convention_map[pt->Proc.calling_convention]);
 	lbValue proc_value = {p->value, p->type};
 	lb_add_entity(m, entity,  proc_value);
@@ -4464,6 +4469,7 @@ LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
 
 		LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
 		LLVMSetInitializer(global_data, data);
+		LLVMSetLinkage(global_data, LLVMInternalLinkage);
 
 		LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
 		string_map_set(&m->const_strings, key, ptr);
@@ -4500,6 +4506,7 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 	}
 	LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
 	LLVMSetInitializer(global_data, data);
+	LLVMSetLinkage(global_data, LLVMInternalLinkage);
 
 	LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
 	LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), str.len, true);
@@ -11211,22 +11218,10 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 					LLVMTypeRef align_type = lb_alignment_prefix_type_hack(m, type_align_of(t));
 					LLVMTypeRef array_type = LLVMArrayType(lb_type(m, t_u8), 8);
-					LLVMTypeRef u64_type = lb_type(m, t_u64);
 
 					for_array(i, fields) {
-						ExactValue value = fields[i]->Constant.value;
-						lbValue v = lb_const_value(m, t->Enum.base_type, value);
-						LLVMValueRef zv = LLVMConstZExt(v.value, u64_type);
-						lbValue tag = lb_const_union_tag(m, t_type_info_enum_value, v.type);
-
-						LLVMValueRef vals[3] = {
-							LLVMConstNull(align_type),
-							zv,
-							tag.value,
-						};
-
 						name_values[i] = lb_const_string(m, fields[i]->token.string).value;
-						value_values[i] = LLVMConstStruct(vals, gb_count_of(vals), false);
+						value_values[i] = lb_const_value(m, t_i64, fields[i]->Constant.value).value;
 					}
 
 					LLVMValueRef name_init  = LLVMConstArray(lb_type(m, t_string),               name_values,  cast(unsigned)fields.count);
@@ -12211,21 +12206,25 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 
+	LLVMDIBuilderFinalize(m->debug_builder);
+	if (LLVMVerifyModule(mod, LLVMAbortProcessAction, &llvm_error)) {
+		gb_printf_err("LLVM Error: %s\n", llvm_error);
+		return;
+	}
+	llvm_error = nullptr;
 	if (build_context.keep_temp_files) {
 		TIME_SECTION("LLVM Print Module to File");
-		LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error);
-		// exit(1);
+		if (LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+			gb_printf_err("LLVM Error: %s\n", llvm_error);
+			return;
+		}
 	}
-	LLVMDIBuilderFinalize(m->debug_builder);
-	LLVMVerifyModule(mod, LLVMAbortProcessAction, &llvm_error);
-	llvm_error = nullptr;
 
 	TIME_SECTION("LLVM Object Generation");
 
 	LLVMCodeGenFileType code_gen_file_type = LLVMObjectFile;
 
-	LLVMBool was_an_error = LLVMTargetMachineEmitToFile(target_machine, mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error);
-	if (was_an_error) {
+	if (LLVMTargetMachineEmitToFile(target_machine, mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
 		gb_printf_err("LLVM Error: %s\n", llvm_error);
 		gb_exit(1);
 		return;
