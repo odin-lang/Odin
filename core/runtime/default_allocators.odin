@@ -129,7 +129,9 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 			allocator.curr_offset = allocator.prev_offset+size;
 			return old_memory;
 		}
-		return default_temp_allocator_proc(allocator_data, Allocator_Mode.Alloc, size, alignment, old_memory, old_size, flags, loc);
+		ptr := default_temp_allocator_proc(allocator_data, Allocator_Mode.Alloc, size, alignment, old_memory, old_size, flags, loc);
+		mem_copy(ptr, old_memory, old_size);
+		return ptr;
 	}
 
 	return nil;
