@@ -199,7 +199,7 @@ align_of_typeid :: proc(T: typeid) -> int {
 	return 1;
 }
 
-to_bytes :: proc(v: any) -> []byte {
+as_bytes :: proc(v: any) -> []byte {
 	if v != nil {
 		sz := size_of_typeid(v.id);
 		return mem.slice_ptr((^byte)(v.data), sz);
@@ -215,7 +215,7 @@ is_nil :: proc(v: any) -> bool {
 	if v == nil {
 		return true;
 	}
-	data := to_bytes(v);
+	data := as_bytes(v);
 	if data != nil {
 		return true;
 	}
@@ -502,7 +502,7 @@ enum_string :: proc(a: any) -> string {
 	if a == nil do return "";
 	ti := runtime.type_info_base(type_info_of(a.id));
 	if e, ok := ti.variant.(runtime.Type_Info_Enum); ok {
-		v, _ := to_i64(a);
+		v, _ := as_i64(a);
 		for value, i in e.values {
 			if value == runtime.Type_Info_Enum_Value(v) {
 				return e.names[i];
@@ -569,21 +569,21 @@ union_variant_typeid :: proc(a: any) -> typeid {
 }
 
 
-to_int :: proc(a: any) -> (value: int, valid: bool) {
+as_int :: proc(a: any) -> (value: int, valid: bool) {
 	v: i64;
-	v, valid = to_i64(a);
+	v, valid = as_i64(a);
 	value = int(v);
 	return;
 }
 
-to_uint :: proc(a: any) -> (value: uint, valid: bool) {
+as_uint :: proc(a: any) -> (value: uint, valid: bool) {
 	v: u64;
-	v, valid = to_u64(a);
+	v, valid = as_u64(a);
 	value = uint(v);
 	return;
 }
 
-to_i64 :: proc(a: any) -> (value: i64, valid: bool) {
+as_i64 :: proc(a: any) -> (value: i64, valid: bool) {
 	if a == nil do return;
 	a := a;
 	ti := runtime.type_info_core(type_info_of(a.id));
@@ -687,7 +687,7 @@ to_i64 :: proc(a: any) -> (value: i64, valid: bool) {
 	return;
 }
 
-to_u64 :: proc(a: any) -> (value: u64, valid: bool) {
+as_u64 :: proc(a: any) -> (value: u64, valid: bool) {
 	if a == nil do return;
 	a := a;
 	ti := runtime.type_info_core(type_info_of(a.id));
@@ -792,7 +792,7 @@ to_u64 :: proc(a: any) -> (value: u64, valid: bool) {
 }
 
 
-to_f64 :: proc(a: any) -> (value: f64, valid: bool) {
+as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 	if a == nil do return;
 	a := a;
 	ti := runtime.type_info_core(type_info_of(a.id));

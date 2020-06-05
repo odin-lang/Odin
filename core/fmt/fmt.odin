@@ -515,7 +515,7 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 	new_arg_index := arg_index;
 	ok := true;
 	if arg_index < len(args) {
-		num, ok = reflect.to_int(args[arg_index]);
+		num, ok = reflect.as_int(args[arg_index]);
 	}
 
 	if ok {
@@ -925,7 +925,7 @@ enum_value_to_string :: proc(val: any) -> (string, bool) {
 	case runtime.Type_Info_Enum:
 		Enum_Value :: runtime.Type_Info_Enum_Value;
 
-		ev_, ok := reflect.to_i64(val);
+		ev_, ok := reflect.as_i64(val);
 		ev := Enum_Value(ev_);
 
 		if ok {
@@ -1709,7 +1709,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		} else {
 			len_ptr := uintptr(v.data) + uintptr(info.base_integer.size);
 			len_any := any{rawptr(len_ptr), info.base_integer.id};
-			len, _ := reflect.to_int(len_any);
+			len, _ := reflect.as_int(len_any);
 			slice_type := reflect.type_info_base(info.slice).variant.(runtime.Type_Info_Slice);
 
 			strings.write_byte(fi.buf, '[');
