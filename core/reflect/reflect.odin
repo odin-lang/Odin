@@ -502,10 +502,9 @@ enum_string :: proc(a: any) -> string {
 	if a == nil do return "";
 	ti := runtime.type_info_base(type_info_of(a.id));
 	if e, ok := ti.variant.(runtime.Type_Info_Enum); ok {
-		for _, i in e.values {
-			value := &e.values[i];
-			n := mem.compare_byte_ptrs((^byte)(a.data), (^byte)(value), ti.size);
-			if n == 0 {
+		v, _ := to_i64(a);
+		for value, i in e.values {
+			if value == runtime.Type_Info_Enum_Value(v) {
 				return e.names[i];
 			}
 		}
@@ -522,21 +521,10 @@ enum_from_name :: proc($EnumType: typeid, name: string) -> (value: EnumType, ok:
     if eti, eti_ok := ti.variant.(runtime.Type_Info_Enum); eti_ok {
         for value_name, i in eti.names {
             if value_name != name do continue;
-            value_union := eti.values[i];
-            switch v in value_union {
-            case rune: value = EnumType(v); ok = true;
-            case u8:   value = EnumType(v); ok = true;
-            case u16:  value = EnumType(v); ok = true;
-            case u32:  value = EnumType(v); ok = true;
-            case u64:  value = EnumType(v); ok = true;
-            case uint: value = EnumType(v); ok = true;
-            case uintptr: value = EnumType(v); ok = true;
-            case i8:   value = EnumType(v); ok = true;
-            case i16:  value = EnumType(v); ok = true;
-            case i32:  value = EnumType(v); ok = true;
-            case i64:  value = EnumType(v); ok = true;
-            case int:  value = EnumType(v); ok = true;
-            }
+            v := eti.values[i];
+            value = EnumType(v);
+            ok = true;
+            return;
         }
     } else {
         panic("expected enum type to reflect.enum_from_name");
@@ -578,4 +566,332 @@ union_variant_typeid :: proc(a: any) -> typeid {
 	}
 
 	return nil;
+}
+
+
+to_int :: proc(a: any) -> (value: int, valid: bool) {
+	v: i64;
+	v, valid = to_i64(a);
+	value = int(v);
+	return;
+}
+
+to_uint :: proc(a: any) -> (value: uint, valid: bool) {
+	v: u64;
+	v, valid = to_u64(a);
+	value = uint(v);
+	return;
+}
+
+to_i64 :: proc(a: any) -> (value: i64, valid: bool) {
+	if a == nil do return;
+	a := a;
+	ti := runtime.type_info_core(type_info_of(a.id));
+	a.id = ti.id;
+
+	#partial switch info in ti.variant {
+	case Type_Info_Integer:
+		valid = true;
+		switch v in a {
+		case i8:    value = i64(v);
+		case i16:   value = i64(v);
+		case i32:   value = i64(v);
+		case i64:   value = i64(v);
+		case i128:  value = i64(v);
+
+		case u8:    value = i64(v);
+		case u16:   value = i64(v);
+		case u32:   value = i64(v);
+		case u64:   value = i64(v);
+		case u128:  value = i64(v);
+
+		case u16le: value = i64(v);
+		case u32le: value = i64(v);
+		case u64le: value = i64(v);
+		case u128le:value = i64(v);
+
+		case i16le: value = i64(v);
+		case i32le: value = i64(v);
+		case i64le: value = i64(v);
+		case i128le:value = i64(v);
+
+		case u16be: value = i64(v);
+		case u32be: value = i64(v);
+		case u64be: value = i64(v);
+		case u128be:value = i64(v);
+
+		case i16be: value = i64(v);
+		case i32be: value = i64(v);
+		case i64be: value = i64(v);
+		case i128be:value = i64(v);
+		case: valid = false;
+		}
+
+	case Type_Info_Rune:
+		r := a.(rune);
+		value = i64(r);
+		valid = true;
+
+	case Type_Info_Float:
+		valid = true;
+		switch v in a {
+		case f32:   value = i64(f32(v));
+		case f64:   value = i64(f64(v));
+		case f32le: value = i64(f32(v));
+		case f64le: value = i64(f64(v));
+		case f32be: value = i64(f32(v));
+		case f64be: value = i64(f64(v));
+		case: valid = false;
+		}
+
+	case Type_Info_Boolean:
+		valid = true;
+		switch v in a {
+		case bool: value = i64(bool(v));
+		case b8:   value = i64(bool(v));
+		case b16:  value = i64(bool(v));
+		case b32:  value = i64(bool(v));
+		case b64:  value = i64(bool(v));
+		case: valid = false;
+		}
+
+	case Type_Info_Complex:
+		switch v in a {
+		case complex64:
+			if imag(v) == 0 {
+				value = i64(real(v));
+				valid = true;
+			}
+		case complex128:
+			if imag(v) == 0 {
+				value = i64(real(v));
+				valid = true;
+			}
+		}
+
+	case Type_Info_Quaternion:
+		switch v in a {
+		case quaternion128:
+			if imag(v) == 0 && jmag(v) == 0 && kmag(v) == 0 {
+				value = i64(real(v));
+				valid = true;
+			}
+		case quaternion256:
+			if imag(v) == 0 && jmag(v) == 0 && kmag(v) == 0 {
+				value = i64(real(v));
+				valid = true;
+			}
+		}
+	}
+
+	return;
+}
+
+to_u64 :: proc(a: any) -> (value: u64, valid: bool) {
+	if a == nil do return;
+	a := a;
+	ti := runtime.type_info_core(type_info_of(a.id));
+	a.id = ti.id;
+
+	#partial switch info in ti.variant {
+	case Type_Info_Integer:
+		valid = true;
+		switch v in a {
+		case i8:    value = u64(v);
+		case i16:   value = u64(v);
+		case i32:   value = u64(v);
+		case i64:   value = u64(v);
+		case i128:  value = u64(v);
+
+		case u8:    value = u64(v);
+		case u16:   value = u64(v);
+		case u32:   value = u64(v);
+		case u64:   value = u64(v);
+		case u128:  value = u64(v);
+
+		case u16le: value = u64(v);
+		case u32le: value = u64(v);
+		case u64le: value = u64(v);
+		case u128le:value = u64(v);
+
+		case i16le: value = u64(v);
+		case i32le: value = u64(v);
+		case i64le: value = u64(v);
+		case i128le:value = u64(v);
+
+		case u16be: value = u64(v);
+		case u32be: value = u64(v);
+		case u64be: value = u64(v);
+		case u128be:value = u64(v);
+
+		case i16be: value = u64(v);
+		case i32be: value = u64(v);
+		case i64be: value = u64(v);
+		case i128be:value = u64(v);
+		case: valid = false;
+		}
+
+	case Type_Info_Rune:
+		r := a.(rune);
+		value = u64(r);
+		valid = true;
+
+	case Type_Info_Float:
+		valid = true;
+		switch v in a {
+		case f32:   value = u64(f32(v));
+		case f64:   value = u64(f64(v));
+		case f32le: value = u64(f32(v));
+		case f64le: value = u64(f64(v));
+		case f32be: value = u64(f32(v));
+		case f64be: value = u64(f64(v));
+		case: valid = false;
+		}
+
+	case Type_Info_Boolean:
+		valid = true;
+		switch v in a {
+		case bool: value = u64(bool(v));
+		case b8:   value = u64(bool(v));
+		case b16:  value = u64(bool(v));
+		case b32:  value = u64(bool(v));
+		case b64:  value = u64(bool(v));
+		case: valid = false;
+		}
+
+	case Type_Info_Complex:
+		switch v in a {
+		case complex64:
+			if imag(v) == 0 {
+				value = u64(real(v));
+				valid = true;
+			}
+		case complex128:
+			if imag(v) == 0 {
+				value = u64(real(v));
+				valid = true;
+			}
+		}
+
+	case Type_Info_Quaternion:
+		switch v in a {
+		case quaternion128:
+			if imag(v) == 0 && jmag(v) == 0 && kmag(v) == 0 {
+				value = u64(real(v));
+				valid = true;
+			}
+		case quaternion256:
+			if imag(v) == 0 && jmag(v) == 0 && kmag(v) == 0 {
+				value = u64(real(v));
+				valid = true;
+			}
+		}
+	}
+
+	return;
+}
+
+
+to_f64 :: proc(a: any) -> (value: f64, valid: bool) {
+	if a == nil do return;
+	a := a;
+	ti := runtime.type_info_core(type_info_of(a.id));
+	a.id = ti.id;
+
+	#partial switch info in ti.variant {
+	case Type_Info_Integer:
+		valid = true;
+		switch v in a {
+		case i8:    value = f64(v);
+		case i16:   value = f64(v);
+		case i32:   value = f64(v);
+		case i64:   value = f64(v);
+		case i128:  value = f64(v);
+
+		case u8:    value = f64(v);
+		case u16:   value = f64(v);
+		case u32:   value = f64(v);
+		case u64:   value = f64(v);
+		case u128:  value = f64(v);
+
+		case u16le: value = f64(v);
+		case u32le: value = f64(v);
+		case u64le: value = f64(v);
+		case u128le:value = f64(v);
+
+		case i16le: value = f64(v);
+		case i32le: value = f64(v);
+		case i64le: value = f64(v);
+		case i128le:value = f64(v);
+
+		case u16be: value = f64(v);
+		case u32be: value = f64(v);
+		case u64be: value = f64(v);
+		case u128be:value = f64(v);
+
+		case i16be: value = f64(v);
+		case i32be: value = f64(v);
+		case i64be: value = f64(v);
+		case i128be:value = f64(v);
+		case: valid = false;
+		}
+
+	case Type_Info_Rune:
+		r := a.(rune);
+		value = f64(i32(r));
+		valid = true;
+
+	case Type_Info_Float:
+		valid = true;
+		switch v in a {
+		case f32:   value = f64(f32(v));
+		case f64:   value = f64(f64(v));
+		case f32le: value = f64(f32(v));
+		case f64le: value = f64(f64(v));
+		case f32be: value = f64(f32(v));
+		case f64be: value = f64(f64(v));
+		case: valid = false;
+		}
+
+	case Type_Info_Boolean:
+		valid = true;
+		switch v in a {
+		case bool: value = f64(i32(bool(v)));
+		case b8:   value = f64(i32(bool(v)));
+		case b16:  value = f64(i32(bool(v)));
+		case b32:  value = f64(i32(bool(v)));
+		case b64:  value = f64(i32(bool(v)));
+		case: valid = false;
+		}
+
+	case Type_Info_Complex:
+		switch v in a {
+		case complex64:
+			if imag(v) == 0 {
+				value = f64(real(v));
+				valid = true;
+			}
+		case complex128:
+			if imag(v) == 0 {
+				value = f64(real(v));
+				valid = true;
+			}
+		}
+
+	case Type_Info_Quaternion:
+		switch v in a {
+		case quaternion128:
+			if imag(v) == 0 && jmag(v) == 0 && kmag(v) == 0 {
+				value = f64(real(v));
+				valid = true;
+			}
+		case quaternion256:
+			if imag(v) == 0 && jmag(v) == 0 && kmag(v) == 0 {
+				value = f64(real(v));
+				valid = true;
+			}
+		}
+	}
+
+	return;
 }
