@@ -515,21 +515,7 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 	new_arg_index := arg_index;
 	ok := true;
 	if arg_index < len(args) {
-		arg := args[arg_index];
-		arg.id = runtime.typeid_base(arg.id);
-		switch i in arg {
-		case int:  num = i;
-		case i8:   num = int(i);
-		case i16:  num = int(i);
-		case i32:  num = int(i);
-		case i64:  num = int(i);
-		case u8:   num = int(i);
-		case u16:  num = int(i);
-		case u32:  num = int(i);
-		case u64:  num = int(i);
-		case:
-			ok = false;
-		}
+		num, ok = reflect.to_int(args[arg_index]);
 	}
 
 	if ok {
@@ -939,53 +925,8 @@ enum_value_to_string :: proc(val: any) -> (string, bool) {
 	case runtime.Type_Info_Enum:
 		Enum_Value :: runtime.Type_Info_Enum_Value;
 
-		ev: Enum_Value;
-		ok := true;
-
-		bv := v;
-		bv.id = runtime.typeid_core(e.base.id);
-
-		switch i in bv {
-		case i8:   ev = Enum_Value(i);
-		case i16:  ev = Enum_Value(i);
-		case i32:  ev = Enum_Value(i);
-		case i64:  ev = Enum_Value(i);
-		case i128: ev = Enum_Value(i);
-
-		case int:  ev = Enum_Value(i);
-
-		case u8:   ev = Enum_Value(i);
-		case u16:  ev = Enum_Value(i);
-		case u32:  ev = Enum_Value(i);
-		case u64:  ev = Enum_Value(i);
-		case u128: ev = Enum_Value(i);
-		case uint: ev = Enum_Value(i);
-
-		case uintptr: ev = Enum_Value(i);
-
-		case i16le:  ev = Enum_Value(i);
-		case i32le:  ev = Enum_Value(i);
-		case i64le:  ev = Enum_Value(i);
-		case i128le: ev = Enum_Value(i);
-
-		case u16le:  ev = Enum_Value(i);
-		case u32le:  ev = Enum_Value(i);
-		case u64le:  ev = Enum_Value(i);
-		case u128le: ev = Enum_Value(i);
-
-		case i16be:  ev = Enum_Value(i);
-		case i32be:  ev = Enum_Value(i);
-		case i64be:  ev = Enum_Value(i);
-		case i128be: ev = Enum_Value(i);
-
-		case u16be:  ev = Enum_Value(i);
-		case u32be:  ev = Enum_Value(i);
-		case u64be:  ev = Enum_Value(i);
-		case u128be: ev = Enum_Value(i);
-
-		case:
-			ok = false;
-		}
+		ev_, ok := reflect.to_i64(val);
+		ev := Enum_Value(ev_);
 
 		if ok {
 			if len(e.values) == 0 {
@@ -1768,30 +1709,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		} else {
 			len_ptr := uintptr(v.data) + uintptr(info.base_integer.size);
 			len_any := any{rawptr(len_ptr), info.base_integer.id};
-			len: int = 0;
-			switch i in len_any {
-			case u8:    len = int(i);
-			case u16:   len = int(i);
-			case u32:   len = int(i);
-			case u64:   len = int(i);
-			case i8:    len = int(i);
-			case i16:   len = int(i);
-			case i32:   len = int(i);
-			case i64:   len = int(i);
-			case u16le: len = int(i);
-			case u32le: len = int(i);
-			case u64le: len = int(i);
-			case i16le: len = int(i);
-			case i32le: len = int(i);
-			case i64le: len = int(i);
-			case u16be: len = int(i);
-			case u32be: len = int(i);
-			case u64be: len = int(i);
-			case i16be: len = int(i);
-			case i32be: len = int(i);
-			case i64be: len = int(i);
-			}
-
+			len, _ := reflect.to_int(len_any);
 			slice_type := reflect.type_info_base(info.slice).variant.(runtime.Type_Info_Slice);
 
 			strings.write_byte(fi.buf, '[');
