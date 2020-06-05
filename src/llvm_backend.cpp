@@ -4771,9 +4771,28 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 			LLVMValueRef i = LLVMConstIntOfArbitraryPrecision(lb_type(m, t_uintptr), cast(unsigned)value.value_integer.len, big_int_ptr(&value.value_integer));
 			res.value = LLVMConstIntToPtr(i, lb_type(m, original_type));
 		} else {
-			res.value = LLVMConstIntOfArbitraryPrecision(lb_type(m, original_type), cast(unsigned)value.value_integer.len, big_int_ptr(&value.value_integer));
-			if (value.value_integer.neg) {
-				res.value = LLVMConstNeg(res.value);
+			unsigned len = cast(unsigned)value.value_integer.len;
+			if (len == 0) {
+				u64 word = 0;
+				res.value = LLVMConstNull(lb_type(m, original_type));
+			} else {
+				u64 *words = big_int_ptr(&value.value_integer);
+				if (is_type_different_to_arch_endianness(type)) {
+					// NOTE(bill): Swap byte order for different endianness
+					i64 sz = type_size_of(type);
+					isize byte_len = gb_size_of(u64)*len;
+					u8 *old_bytes = cast(u8 *)words;
+					// TODO(bill): Use a different allocator here for a temporary allocation
+					u8 *new_bytes = cast(u8 *)gb_alloc_align(heap_allocator(), byte_len, gb_align_of(u64));
+					for (i64 i = 0; i < sz; i++) {
+						new_bytes[i] = old_bytes[sz-1-i];
+					}
+					words = cast(u64 *)new_bytes;
+				}
+				res.value = LLVMConstIntOfArbitraryPrecision(lb_type(m, original_type), len, words);
+				if (value.value_integer.neg) {
+					res.value = LLVMConstNeg(res.value);
+				}
 			}
 		}
 		return res;
