@@ -3,7 +3,7 @@ package runtime
 import "core:os"
 
 bswap_16 :: proc "none" (x: u16) -> u16 {
-	return x>>8 | x<<16;
+	return x>>8 | x<<8;
 }
 
 bswap_32 :: proc "none" (x: u32) -> u32 {
