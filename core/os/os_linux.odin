@@ -448,7 +448,6 @@ get_current_directory :: proc() -> string {
 		resize(&buf, len(buf)+page_size);
 	}
 	unreachable();
-	return "";
 }
 
 set_current_directory :: proc(path: string) -> (err: Errno) {
