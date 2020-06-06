@@ -66,7 +66,7 @@ void check_stmt_list(CheckerContext *ctx, Array<Ast *> const &stmts, u32 flags) 
 
 			case Ast_ExprStmt:
 				if (is_divigering_stmt(n)) {
-					error(n, "Statements after a non-diverging procedure call are never executed");
+					error(n, "Statements after a diverging procedure call are never executed");
 				}
 				break;
 			}
