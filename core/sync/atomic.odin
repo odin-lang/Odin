@@ -53,7 +53,6 @@ atomic_load :: inline proc(dst: ^$T, $order: Ordering) -> T {
 	case .Acquire_Release: panic("there is no such thing as an acquire/release load");
 	}
 	panic("unknown order");
-	return T{};
 }
 
 atomic_swap :: inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
@@ -65,7 +64,6 @@ atomic_swap :: inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
 	case .Sequentially_Consistent: return intrinsics.atomic_xchg(dst, val);
 	}
 	panic("unknown order");
-	return T{};
 }
 
 atomic_compare_exchange :: inline proc(dst: ^$T, old, new: T, $success, $failure: Ordering) -> (val: T, ok: bool) {
@@ -146,7 +144,6 @@ atomic_add :: inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
 	case .Sequentially_Consistent: return intrinsics.atomic_add(dst, val);
 	}
 	panic("unknown order");
-	return T{};
 }
 
 atomic_sub :: inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
@@ -158,7 +155,6 @@ atomic_sub :: inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
 	case .Sequentially_Consistent: return intrinsics.atomic_sub(dst, val);
 	}
 	panic("unknown order");
-	return T{};
 }
 
 atomic_and :: inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
@@ -170,7 +166,6 @@ atomic_and :: inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
 	case .Sequentially_Consistent: return intrinsics.atomic_and(dst, val);
 	}
 	panic("unknown order");
-	return T{};
 }
 
 atomic_nand :: inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
@@ -182,7 +177,6 @@ atomic_nand :: inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
 	case .Sequentially_Consistent: return intrinsics.atomic_nand(dst, val);
 	}
 	panic("unknown order");
-	return T{};
 }
 
 atomic_or :: inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
@@ -194,7 +188,6 @@ atomic_or :: inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
 	case .Sequentially_Consistent: return intrinsics.atomic_or(dst, val);
 	}
 	panic("unknown order");
-	return T{};
 }
 
 atomic_xor :: inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
@@ -206,6 +199,5 @@ atomic_xor :: inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
 	case .Sequentially_Consistent: return intrinsics.atomic_xor(dst, val);
 	}
 	panic("unknown order");
-	return T{};
 }
 

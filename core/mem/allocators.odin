@@ -280,7 +280,6 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 		if !(start <= curr_addr && curr_addr < end) {
 			panic("Out of bounds memory address passed to stack allocator (free)");
-			return nil;
 		}
 
 		if curr_addr >= start+uintptr(s.curr_offset) {
@@ -293,7 +292,6 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 		if old_offset != int(header.prev_offset) {
 			panic("Out of order stack allocator free");
-			return nil;
 		}
 
 		s.curr_offset = int(old_offset);
@@ -317,7 +315,6 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		curr_addr := uintptr(old_memory);
 		if !(start <= curr_addr && curr_addr < end) {
 			panic("Out of bounds memory address passed to stack allocator (resize)");
-			return nil;
 		}
 
 		if curr_addr >= start+uintptr(s.curr_offset) {
@@ -426,7 +423,6 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 		if !(start <= curr_addr && curr_addr < end) {
 			panic("Out of bounds memory address passed to stack allocator (free)");
-			return nil;
 		}
 
 		if curr_addr >= start+uintptr(s.offset) {
@@ -455,7 +451,6 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		curr_addr := uintptr(old_memory);
 		if !(start <= curr_addr && curr_addr < end) {
 			panic("Out of bounds memory address passed to stack allocator (resize)");
-			return nil;
 		}
 
 		if curr_addr >= start+uintptr(s.offset) {
@@ -511,11 +506,10 @@ dynamic_pool_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 	case .Alloc:
 		return dynamic_pool_alloc(pool, size);
 	case .Free:
-		panic("Allocator_Mode.Free is not supported for a pool");
+		//
 	case .Free_All:
 		dynamic_pool_free_all(pool);
 	case .Resize:
-		panic("Allocator_Mode.Resize is not supported for a pool");
 		if old_size >= size {
 			return old_memory;
 		}

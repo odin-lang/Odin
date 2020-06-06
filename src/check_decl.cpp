@@ -1,4 +1,3 @@
-bool check_is_terminating(Ast *node);
 void check_stmt          (CheckerContext *ctx, Ast *node, u32 flags);
 
 // NOTE(bill): 'content_name' is for debugging and error messages
@@ -1257,7 +1256,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 		check_stmt_list(ctx, bs->stmts, Stmt_CheckScopeDecls);
 
 		if (type->Proc.result_count > 0) {
-			if (!check_is_terminating(body)) {
+			if (!check_is_terminating(body, str_lit(""))) {
 				if (token.kind == Token_Ident) {
 					error(bs->close, "Missing return statement at the end of the procedure '%.*s'", LIT(token.string));
 				} else {

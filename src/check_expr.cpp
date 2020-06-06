@@ -70,8 +70,8 @@ void     check_entity_decl              (CheckerContext *c, Entity *e, DeclInfo 
 void     check_const_decl               (CheckerContext *c, Entity *e, Ast *type_expr, Ast *init_expr, Type *named_type);
 void     check_proc_body                (CheckerContext *c, Token token, DeclInfo *decl, Type *type, Ast *body);
 void     update_expr_type               (CheckerContext *c, Ast *e, Type *type, bool final);
-bool     check_is_terminating           (Ast *node);
-bool     check_has_break                (Ast *stmt, bool implicit);
+bool     check_is_terminating           (Ast *node, String const &label);
+bool     check_has_break                (Ast *stmt, String const &label, bool implicit);
 void     check_stmt                     (CheckerContext *c, Ast *node, u32 flags);
 void     check_stmt_list                (CheckerContext *c, Array<Ast *> const &stmts, u32 flags);
 void     check_init_constant            (CheckerContext *c, Entity *e, Operand *operand);
