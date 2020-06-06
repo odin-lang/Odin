@@ -3173,6 +3173,10 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 		}
 	}
 
+	defer (if (pt->Proc.diverging) {
+		ir_emit_unreachable(p);
+	});
+
 	irValue *context_ptr = nullptr;
 	if (pt->Proc.calling_convention == ProcCC_Odin) {
 		context_ptr = ir_find_or_generate_context_ptr(p);

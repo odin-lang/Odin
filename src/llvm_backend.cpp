@@ -6902,6 +6902,10 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 		context_ptr = lb_find_or_generate_context_ptr(p);
 	}
 
+	defer (if (pt->Proc.diverging) {
+		LLVMBuildUnreachable(p->builder);
+	});
+
 	set_procedure_abi_types(heap_allocator(), pt);
 
 	bool is_c_vararg = pt->Proc.c_vararg;

@@ -1,3 +1,16 @@
+bool is_divigering_stmt(Ast *stmt) {
+	if (stmt->kind != Ast_ExprStmt) {
+		return false;
+	}
+	Ast *expr = unparen_expr(stmt->ExprStmt.expr);
+	if (expr->kind != Ast_CallExpr) {
+		return false;
+	}
+	Type *t = type_of_expr(expr->CallExpr.proc);
+	t = base_type(t);
+	return t->kind == Type_Proc && t->Proc.diverging;
+}
+
 void check_stmt_list(CheckerContext *ctx, Array<Ast *> const &stmts, u32 flags) {
 	if (stmts.count == 0) {
 		return;
@@ -39,6 +52,8 @@ void check_stmt_list(CheckerContext *ctx, Array<Ast *> const &stmts, u32 flags) 
 			new_flags |= Stmt_FallthroughAllowed;
 		}
 
+		check_stmt(ctx, n, new_flags);
+
 		if (i+1 < max_non_constant_declaration) {
 			switch (n->kind) {
 			case Ast_ReturnStmt:
@@ -48,14 +63,18 @@ void check_stmt_list(CheckerContext *ctx, Array<Ast *> const &stmts, u32 flags) 
 			case Ast_BranchStmt:
 				error(n, "Statements after this '%.*s' are never executed", LIT(n->BranchStmt.token.string));
 				break;
+
+			case Ast_ExprStmt:
+				if (is_divigering_stmt(n)) {
+					error(n, "Statements after a non-diverging procedure call are never executed");
+				}
+				break;
 			}
 		}
-
-		check_stmt(ctx, n, new_flags);
 	}
 }
 
-bool check_is_terminating_list(Array<Ast *> const &stmts) {
+bool check_is_terminating_list(Array<Ast *> const &stmts, String const &label) {
 	// Iterate backwards
 	for (isize n = stmts.count-1; n >= 0; n--) {
 		Ast *stmt = stmts[n];
@@ -63,18 +82,20 @@ bool check_is_terminating_list(Array<Ast *> const &stmts) {
 			// Okay
 		} else if (stmt->kind == Ast_ValueDecl && !stmt->ValueDecl.is_mutable) {
 			// Okay
+		} else if (is_divigering_stmt(stmt)) {
+			return true;
 		} else {
-			return check_is_terminating(stmt);
+			return check_is_terminating(stmt, label);
 		}
 	}
 
 	return false;
 }
 
-bool check_has_break_list(Array<Ast *> const &stmts, bool implicit) {
+bool check_has_break_list(Array<Ast *> const &stmts, String const &label, bool implicit) {
 	for_array(i, stmts) {
 		Ast *stmt = stmts[i];
-		if (check_has_break(stmt, implicit)) {
+		if (check_has_break(stmt, label, implicit)) {
 			return true;
 		}
 	}
@@ -82,25 +103,56 @@ bool check_has_break_list(Array<Ast *> const &stmts, bool implicit) {
 }
 
 
-bool check_has_break(Ast *stmt, bool implicit) {
+bool check_has_break(Ast *stmt, String const &label, bool implicit) {
 	switch (stmt->kind) {
 	case Ast_BranchStmt:
 		if (stmt->BranchStmt.token.kind == Token_break) {
-			return implicit;
+			if (stmt->BranchStmt.label == nullptr) {
+				return implicit;
+			}
+			if (stmt->BranchStmt.label->kind == Ast_Ident &&
+			    stmt->BranchStmt.label->Ident.token.string == label) {
+				return true;
+			}
 		}
 		break;
+
 	case Ast_BlockStmt:
-		return check_has_break_list(stmt->BlockStmt.stmts, implicit);
+		return check_has_break_list(stmt->BlockStmt.stmts, label, implicit);
 
 	case Ast_IfStmt:
-		if (check_has_break(stmt->IfStmt.body, implicit) ||
-		    (stmt->IfStmt.else_stmt != nullptr && check_has_break(stmt->IfStmt.else_stmt, implicit))) {
+		if (check_has_break(stmt->IfStmt.body, label, implicit) ||
+		    (stmt->IfStmt.else_stmt != nullptr && check_has_break(stmt->IfStmt.else_stmt, label, implicit))) {
 			return true;
 		}
 		break;
 
 	case Ast_CaseClause:
-		return check_has_break_list(stmt->CaseClause.stmts, implicit);
+		return check_has_break_list(stmt->CaseClause.stmts, label, implicit);
+
+	case Ast_SwitchStmt:
+		if (label != "" && check_has_break(stmt->SwitchStmt.body, label, false)) {
+			return true;
+		}
+		break;
+
+	case Ast_TypeSwitchStmt:
+		if (label != "" && check_has_break(stmt->TypeSwitchStmt.body, label, false)) {
+			return true;
+		}
+		break;
+
+	case Ast_ForStmt:
+		if (label != "" && check_has_break(stmt->ForStmt.body, label, false)) {
+			return true;
+		}
+		break;
+
+	case Ast_RangeStmt:
+		if (label != "" && check_has_break(stmt->RangeStmt.body, label, false)) {
+			return true;
+		}
+		break;
 	}
 
 	return false;
@@ -110,41 +162,42 @@ bool check_has_break(Ast *stmt, bool implicit) {
 
 // NOTE(bill): The last expression has to be a 'return' statement
 // TODO(bill): This is a mild hack and should be probably handled properly
-bool check_is_terminating(Ast *node) {
+bool check_is_terminating(Ast *node, String const &label) {
 	switch (node->kind) {
 	case_ast_node(rs, ReturnStmt, node);
 		return true;
 	case_end;
 
 	case_ast_node(bs, BlockStmt, node);
-		return check_is_terminating_list(bs->stmts);
+		return check_is_terminating_list(bs->stmts, label);
 	case_end;
 
 	case_ast_node(es, ExprStmt, node);
-		return check_is_terminating(es->expr);
+		return check_is_terminating(es->expr, label);
 	case_end;
 
 	case_ast_node(is, IfStmt, node);
 		if (is->else_stmt != nullptr) {
-			if (check_is_terminating(is->body) &&
-			    check_is_terminating(is->else_stmt)) {
+			if (check_is_terminating(is->body, label) &&
+			    check_is_terminating(is->else_stmt, label)) {
 			    return true;
 		    }
 		}
 	case_end;
 
 	case_ast_node(ws, WhenStmt, node);
+		// TODO(bill): Is this logic correct for when statements?
 		if (ws->else_stmt != nullptr) {
-			if (check_is_terminating(ws->body) &&
-			    check_is_terminating(ws->else_stmt)) {
+			if (check_is_terminating(ws->body, label) &&
+			    check_is_terminating(ws->else_stmt, label)) {
 			    return true;
 		    }
 		}
 	case_end;
 
 	case_ast_node(fs, ForStmt, node);
-		if (fs->cond == nullptr && !check_has_break(fs->body, true)) {
-			return check_is_terminating(fs->body);
+		if (fs->cond == nullptr && !check_has_break(fs->body, label, true)) {
+			return true;
 		}
 	case_end;
 
@@ -164,8 +217,8 @@ bool check_is_terminating(Ast *node) {
 			if (cc->list.count == 0) {
 				has_default = true;
 			}
-			if (!check_is_terminating_list(cc->stmts) ||
-			    check_has_break_list(cc->stmts, true)) {
+			if (!check_is_terminating_list(cc->stmts, label) ||
+			    check_has_break_list(cc->stmts, label, true)) {
 				return false;
 			}
 		}
@@ -180,8 +233,8 @@ bool check_is_terminating(Ast *node) {
 			if (cc->list.count == 0) {
 				has_default = true;
 			}
-			if (!check_is_terminating_list(cc->stmts) ||
-			    check_has_break_list(cc->stmts, true)) {
+			if (!check_is_terminating_list(cc->stmts, label) ||
+			    check_has_break_list(cc->stmts, label, true)) {
 				return false;
 			}
 		}
