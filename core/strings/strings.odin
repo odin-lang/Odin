@@ -4,39 +4,18 @@ import "core:mem"
 import "core:unicode"
 import "core:unicode/utf8"
 
-clone :: proc(s: string, allocator := context.allocator) -> string {
-	c := make([]byte, len(s)+1, allocator);
+clone :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> string {
+	c := make([]byte, len(s)+1, allocator, loc);
 	copy(c, s);
 	c[len(s)] = 0;
 	return string(c[:len(s)]);
 }
 
-clone_to_cstring :: proc(s: string, allocator := context.allocator) -> cstring {
-	c := make([]byte, len(s)+1, allocator);
+clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> cstring {
+	c := make([]byte, len(s)+1, allocator, loc);
 	copy(c, s);
 	c[len(s)] = 0;
 	return cstring(&c[0]);
-}
-
-@(deprecated="Please use 'strings.clone'")
-new_string :: proc(s: string, allocator := context.allocator) -> string {
-	c := make([]byte, len(s)+1, allocator);
-	copy(c, s);
-	c[len(s)] = 0;
-	return string(c[:len(s)]);
-}
-
-@(deprecated="Please use 'strings.clone_to_cstring'")
-new_cstring :: proc(s: string, allocator := context.allocator) -> cstring {
-	c := make([]byte, len(s)+1, allocator);
-	copy(c, s);
-	c[len(s)] = 0;
-	return cstring(&c[0]);
-}
-
-@(deprecated="Please use a standard cast for cstring to string")
-to_odin_string :: proc(str: cstring) -> string {
-	return string(str);
 }
 
 string_from_ptr :: proc(ptr: ^byte, len: int) -> string {
