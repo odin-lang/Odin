@@ -93,7 +93,7 @@ struct lbModule {
 	Array<lbProcedure *> procedures_to_generate;
 	Array<String> foreign_library_paths;
 
-
+	lbProcedure *curr_procedure;
 
 	LLVMDIBuilderRef debug_builder;
 	LLVMMetadataRef debug_compile_unit;
@@ -341,7 +341,8 @@ bool lb_is_const(lbValue value);
 bool lb_is_const_nil(lbValue value);
 String lb_get_const_string(lbModule *m, lbValue value);
 
-lbValue lb_generate_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id);
+lbValue lb_generate_local_array(lbProcedure *p, Type *elem_type, i64 count, bool zero_init=true);
+lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id);
 lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type);
 lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type);
 void    lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type, lbValue map_key, lbValue map_value);

@@ -33,10 +33,10 @@ struct lbCompoundLitElemTempData {
 lbLoopData lb_loop_start(lbProcedure *p, isize count, Type *index_type=t_i32);
 void lb_loop_end(lbProcedure *p, lbLoopData const &data);
 
-LLVMValueRef llvm_zero32(lbModule *m) {
-	return LLVMConstInt(lb_type(m, t_i32), 0, false);
+LLVMValueRef llvm_zero(lbModule *m) {
+	return LLVMConstInt(lb_type(m, t_int), 0, false);
 }
-LLVMValueRef llvm_one32(lbModule *m) {
+LLVMValueRef llvm_one(lbModule *m) {
 	return LLVMConstInt(lb_type(m, t_i32), 1, false);
 }
 
@@ -4459,7 +4459,7 @@ LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
 	if (found != nullptr) {
 		return *found;
 	} else {
-		LLVMValueRef indices[2] = {llvm_zero32(m), llvm_zero32(m)};
+		LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
 		LLVMValueRef data = LLVMConstStringInContext(m->ctx,
 			cast(char const *)str.text,
 			cast(unsigned)str.len,
@@ -4494,7 +4494,7 @@ lbValue lb_find_or_add_entity_string(lbModule *m, String const &str) {
 }
 
 lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) {
-	LLVMValueRef indices[2] = {llvm_zero32(m), llvm_zero32(m)};
+	LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
 	LLVMValueRef data = LLVMConstStringInContext(m->ctx,
 		cast(char const *)str.text,
 		cast(unsigned)str.len,
@@ -4685,34 +4685,58 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value) {
 			Type *t = alloc_type_array(elem, count);
 			lbValue backing_array = lb_const_value(m, t, value);
 
+			LLVMValueRef array_data = nullptr;
 
-			isize max_len = 7+8+1;
-			char *str = gb_alloc_array(heap_allocator(), char, max_len);
-			isize len = gb_snprintf(str, max_len, "csba$%x", m->global_array_index);
-			m->global_array_index++;
+			if (m->curr_procedure != nullptr) {
+				// NOTE(bill, 2020-06-08): This is a bit of a hack but a "constant" slice needs
+				// its backing data on the stack
+				lbProcedure *p = m->curr_procedure;
+				LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
 
-			String name = make_string(cast(u8 *)str, len-1);
+				LLVMTypeRef llvm_type = lb_type(m, t);
+				array_data = LLVMBuildAlloca(p->builder, llvm_type, "");
+				LLVMSetAlignment(array_data, 16); // TODO(bill): Make this configurable
+				LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
+				LLVMBuildStore(p->builder, backing_array.value, array_data);
 
-			Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
-			LLVMValueRef global_data = LLVMAddGlobal(m->mod, lb_type(m, t), str);
-			LLVMSetInitializer(global_data, backing_array.value);
+				{
+					LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
+					LLVMValueRef ptr = LLVMBuildInBoundsGEP(p->builder, array_data, indices, 2, "");
+					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
+					lbAddr slice = lb_add_local_generated(p, type, false);
+					lb_fill_slice(p, slice, {ptr, alloc_type_pointer(elem)}, {len, t_int});
+					return lb_addr_load(p, slice);
+				}
+			} else {
+				isize max_len = 7+8+1;
+				char *str = gb_alloc_array(heap_allocator(), char, max_len);
+				isize len = gb_snprintf(str, max_len, "csba$%x", m->global_array_index);
+				m->global_array_index++;
 
-			lbValue g = {};
-			g.value = global_data;
-			g.type = t;
+				String name = make_string(cast(u8 *)str, len-1);
 
-			lb_add_entity(m, e, g);
-			lb_add_member(m, name, g);
+				Entity *e = alloc_entity_constant(nullptr, make_token_ident(name), t, value);
+				array_data = LLVMAddGlobal(m->mod, lb_type(m, t), str);
+				LLVMSetInitializer(array_data, backing_array.value);
 
-			{
-				LLVMValueRef indices[2] = {llvm_zero32(m), llvm_zero32(m)};
-				LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
-				LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
-				LLVMValueRef values[2] = {ptr, len};
+				lbValue g = {};
+				g.value = array_data;
+				g.type = t;
 
-				res.value = LLVMConstNamedStruct(lb_type(m, original_type), values, 2);
-				return res;
+				lb_add_entity(m, e, g);
+				lb_add_member(m, name, g);
+
+				{
+					LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
+					LLVMValueRef ptr = LLVMConstInBoundsGEP(array_data, indices, 2);
+					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
+					LLVMValueRef values[2] = {ptr, len};
+
+					res.value = LLVMConstNamedStruct(lb_type(m, original_type), values, 2);
+					return res;
+				}
 			}
+
 
 		}
 	} else if (is_type_array(type) && value.kind == ExactValue_String && !is_type_u8(core_array_type(type))) {
@@ -6525,7 +6549,7 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	if (lb_is_const(s)) {
 		lbModule *m = p->module;
 		lbValue res = {};
-		LLVMValueRef indices[2] = {llvm_zero32(m), LLVMConstInt(lb_type(m, t_i32), index, false)};
+		LLVMValueRef indices[2] = {llvm_zero(m), LLVMConstInt(lb_type(m, t_i32), index, false)};
 		res.value = LLVMConstGEP(s.value, indices, gb_count_of(indices));
 		res.type = alloc_type_pointer(result_type);
 		return res;
@@ -7031,7 +7055,7 @@ lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index) {
 	GB_ASSERT_MSG(is_type_integer(index.type), "%s", type_to_string(index.type));
 
 	LLVMValueRef indices[2] = {};
-	indices[0] = llvm_zero32(p->module);
+	indices[0] = llvm_zero(p->module);
 	indices[1] = lb_emit_conv(p, index, t_int).value;
 
 	Type *ptr = base_array_type(st);
@@ -7367,8 +7391,37 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	}
 
 	case BuiltinProc_swizzle: {
-		lbAddr addr = lb_build_addr(p, ce->args[0]);
 		isize index_count = ce->args.count-1;
+		if (is_type_simd_vector(tv.type)) {
+			lbValue vec = lb_build_expr(p, ce->args[0]);
+			if (index_count == 0) {
+				return vec;
+			}
+
+			unsigned mask_len = cast(unsigned)index_count;
+			LLVMValueRef *mask_elems = gb_alloc_array(heap_allocator(), LLVMValueRef, index_count);
+			for (isize i = 1; i < ce->args.count; i++) {
+				TypeAndValue tv = type_and_value_of_expr(ce->args[i]);
+				GB_ASSERT(is_type_integer(tv.type));
+				GB_ASSERT(tv.value.kind == ExactValue_Integer);
+
+				u32 index = cast(u32)big_int_to_i64(&tv.value.value_integer);
+				mask_elems[i-1] = LLVMConstInt(lb_type(p->module, t_u32), index, false);
+			}
+
+			LLVMValueRef mask = LLVMConstVector(mask_elems, mask_len);
+
+			LLVMValueRef v1 = vec.value;
+			LLVMValueRef v2 = vec.value;
+
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildShuffleVector(p->builder, v1, v2, mask, "");
+			return res;
+
+		}
+
+		lbAddr addr = lb_build_addr(p, ce->args[0]);
 		if (index_count == 0) {
 			return lb_addr_load(p, addr);
 		}
@@ -10468,12 +10521,15 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 				}
 
 				{
-					GB_ASSERT(lb_is_const(slice));
-					unsigned indices[1] = {1};
-
 					lbValue count = {};
 					count.type = t_int;
-					count.value = LLVMConstExtractValue(slice.value, indices, gb_count_of(indices));
+
+					if (lb_is_const(slice)) {
+						unsigned indices[1] = {1};
+						count.value = LLVMConstExtractValue(slice.value, indices, gb_count_of(indices));
+					} else {
+						count.value = LLVMBuildExtractValue(p->builder, slice.value, 1, "");
+					}
 					lb_fill_slice(p, v, data, count);
 				}
 			}
@@ -10501,7 +10557,8 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 				lb_emit_runtime_call(p, "__dynamic_array_reserve", args);
 			}
 
-			lbValue items = lb_generate_array(p->module, et, item_count, str_lit("dacl$"), cast(i64)cast(intptr)expr);
+			lbValue items = lb_generate_local_array(p, et, item_count);
+			// lbValue items = lb_generate_global_array(p->module, et, item_count, str_lit("dacl$"), cast(i64)cast(intptr)expr);
 
 			for_array(i, cl->elems) {
 				Ast *elem = cl->elems[i];
@@ -10830,8 +10887,12 @@ lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count) {
 	return offset;
 }
 
+lbValue lb_generate_local_array(lbProcedure *p, Type *elem_type, i64 count, bool zero_init) {
+	lbAddr addr = lb_add_local_generated(p, alloc_type_array(elem_type, count), zero_init);
+	return lb_addr_get_ptr(p, addr);
+}
 
-lbValue lb_generate_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id) {
+lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id) {
 	gbAllocator a = heap_allocator();
 	Token token = {Token_Ident};
 	isize name_len = prefix.len + 1 + 20;
@@ -10868,7 +10929,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		Type *type = base_type(lb_addr_type(lb_global_type_info_data));
 		GB_ASSERT(is_type_array(type));
 
-		LLVMValueRef indices[2] = {llvm_zero32(m), llvm_zero32(m)};
+		LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
 		LLVMValueRef values[2] = {
 			LLVMConstInBoundsGEP(lb_global_type_info_data.addr.value, indices, gb_count_of(indices)),
 			LLVMConstInt(lb_type(m, t_int), type->Array.count, true),
@@ -11231,9 +11292,9 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				vals[0] = lb_type_info(m, t->Enum.base_type).value;
 				if (t->Enum.fields.count > 0) {
 					auto fields = t->Enum.fields;
-					lbValue name_array  = lb_generate_array(m, t_string, fields.count,
+					lbValue name_array  = lb_generate_global_array(m, t_string, fields.count,
 					                                        str_lit("$enum_names"), cast(i64)entry_index);
-					lbValue value_array = lb_generate_array(m, t_type_info_enum_value, fields.count,
+					lbValue value_array = lb_generate_global_array(m, t_type_info_enum_value, fields.count,
 					                                        str_lit("$enum_values"), cast(i64)entry_index);
 
 
@@ -11438,9 +11499,9 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			isize count = t->BitField.fields.count;
 			if (count > 0) {
 				auto fields = t->BitField.fields;
-				lbValue name_array   = lb_generate_array(m, t_string, count, str_lit("$bit_field_names"),   cast(i64)entry_index);
-				lbValue bit_array    = lb_generate_array(m, t_i32,    count, str_lit("$bit_field_bits"),    cast(i64)entry_index);
-				lbValue offset_array = lb_generate_array(m, t_i32,    count, str_lit("$bit_field_offsets"), cast(i64)entry_index);
+				lbValue name_array   = lb_generate_global_array(m, t_string, count, str_lit("$bit_field_names"),   cast(i64)entry_index);
+				lbValue bit_array    = lb_generate_global_array(m, t_i32,    count, str_lit("$bit_field_bits"),    cast(i64)entry_index);
+				lbValue offset_array = lb_generate_global_array(m, t_i32,    count, str_lit("$bit_field_offsets"), cast(i64)entry_index);
 
 				for (isize i = 0; i < count; i++) {
 					Entity *f = fields[i];
@@ -12148,10 +12209,12 @@ void lb_generate_code(lbGenerator *gen) {
 			continue;
 		}
 		if (p->body != nullptr) { // Build Procedure
+			m->curr_procedure = p;
 			lb_begin_procedure_body(p);
 			lb_build_stmt(p, p->body);
 			lb_end_procedure_body(p);
 			p->is_done = true;
+			m->curr_procedure = nullptr;
 		}
 		lb_end_procedure(p);
 

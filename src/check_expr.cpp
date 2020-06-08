@@ -4347,17 +4347,27 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_swizzle: {
 		// swizzle :: proc(v: [N]T, ..int) -> [M]T
 		Type *type = base_type(operand->type);
-		if (!is_type_array(type)) {
+		i64 max_count = 0;
+		Type *elem_type = nullptr;
+
+		if (!is_type_array(type) && !is_type_simd_vector(type)) {
 			gbString type_str = type_to_string(operand->type);
 			error(call,
-			      "You can only 'swizzle' an array, got '%s'",
+			      "'swizzle' is only allowed on an array or #simd vector, got '%s'",
 			      type_str);
 			gb_string_free(type_str);
 			return false;
 		}
-
-		i64 max_count = type->Array.count;
-		Type *elem_type = type->Array.elem;
+		if (type->kind == Type_Array) {
+			max_count = type->Array.count;
+			elem_type = type->Array.elem;
+		} else if (type->kind == Type_SimdVector) {
+			max_count = type->SimdVector.count;
+			elem_type = type->SimdVector.elem;
+			if (!build_context.use_llvm_api) {
+				error(call, "'swizzle' with #simd vector is not supported on this backend");
+			}
+		}
 
 		i64 arg_count = 0;
 		for_array(i, ce->args) {
