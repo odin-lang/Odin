@@ -10,7 +10,6 @@ import "core:strings"
 import "core:reflect"
 import "intrinsics"
 
-
 @private
 DEFAULT_BUFFER_SIZE :: 1<<12;
 
@@ -34,6 +33,34 @@ Info :: struct {
 	arg: any, // Temporary
 	record_level: int,
 }
+
+// Custom formatter signature. It returns true if the formatting was successful and false when it could not be done
+User_Formatter :: #type proc(fi: ^Info, arg: any, verb: rune) -> bool;
+
+Register_User_Formatter_Error :: enum {
+	None,
+	No_User_Formatter,
+	Formatter_Previously_Found,
+}
+
+// NOTE(bill): This is a pointer to prevent accidental additions
+// it is prefixed with `_` rather than marked with a private attribute so that users can access it if necessary
+_user_formatters: ^map[typeid]User_Formatter;
+
+set_user_formatters :: proc(m: ^map[typeid]User_Formatter) {
+	_user_formatters = m;
+}
+register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Register_User_Formatter_Error {
+	if _user_formatters == nil {
+		return .No_User_Formatter;
+	}
+	if prev, found := _user_formatters[id]; found && prev != nil {
+		return .Formatter_Previously_Found;
+	}
+	_user_formatters[id] = formatter;
+	return .None;
+}
+
 
 fprint :: proc(fd: os.Handle, args: ..any) -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
@@ -1189,6 +1216,16 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		return;
 	}
 
+	if _user_formatters != nil {
+		formatter := _user_formatters[v.id];
+		if formatter != nil {
+			if ok := formatter(fi, v, verb); !ok {
+				fmt_bad_verb(fi, verb);
+			}
+			return;
+		}
+	}
+
 	type_info := type_info_of(v.id);
 	switch info in type_info.variant {
 	case runtime.Type_Info_Any:   // Ignore
@@ -1793,6 +1830,16 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 		}
 		reflect.write_type(fi.buf, ti);
 		return;
+	}
+
+	if _user_formatters != nil {
+		formatter := _user_formatters[arg.id];
+		if formatter != nil {
+			if ok := formatter(fi, arg, verb); !ok {
+				fmt_bad_verb(fi, verb);
+			}
+			return;
+		}
 	}
 
 
