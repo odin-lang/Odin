@@ -1301,38 +1301,52 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			set_procedure_abi_types(heap_allocator(), type);
 
 			LLVMTypeRef return_type = LLVMVoidTypeInContext(ctx);
-			isize offset = 0;
 			if (type->Proc.return_by_pointer) {
-				offset = 1;
+				// Void
 			} else if (type->Proc.abi_compat_result_type != nullptr) {
 				return_type = lb_type(m, type->Proc.abi_compat_result_type);
 			}
 
-			isize extra_param_count = offset;
+			isize extra_param_count = 0;
+			if (type->Proc.return_by_pointer) {
+				extra_param_count += 1;
+			}
 			if (type->Proc.calling_convention == ProcCC_Odin) {
 				extra_param_count += 1;
 			}
 
 			isize param_count = type->Proc.abi_compat_params.count + extra_param_count;
-			LLVMTypeRef *param_types = gb_alloc_array(heap_allocator(), LLVMTypeRef, param_count);
-			defer (gb_free(heap_allocator(), param_types));
+			auto param_types = array_make<LLVMTypeRef>(heap_allocator(), 0, param_count);
+			defer (array_free(&param_types));
 
-			isize param_index = offset;
+			if (type->Proc.return_by_pointer) {
+				array_add(&param_types, LLVMPointerType(lb_type(m, type->Proc.abi_compat_result_type), 0));
+			}
+
 			for_array(i, type->Proc.abi_compat_params) {
 				Type *param = type->Proc.abi_compat_params[i];
 				if (param == nullptr) {
 					continue;
 				}
-				param_types[param_index++] = lb_type(m, param);
-			}
-			if (type->Proc.return_by_pointer) {
-				param_types[0] = LLVMPointerType(lb_type(m, type->Proc.abi_compat_result_type), 0);
+				if (is_type_tuple(param)) {
+					param = base_type(param);
+					for_array(j, param->Tuple.variables) {
+						Entity *v = param->Tuple.variables[j];
+						if (v->kind != Entity_Variable) {
+							// Sanity check
+							continue;
+						}
+						array_add(&param_types, lb_type(m, v->type));
+					}
+				} else {
+					array_add(&param_types, lb_type(m, param));
+				}
 			}
 			if (type->Proc.calling_convention == ProcCC_Odin) {
-				param_types[param_index++] = lb_type(m, t_context_ptr);
+				array_add(&param_types, lb_type(m, t_context_ptr));
 			}
 
-			LLVMTypeRef t = LLVMFunctionType(return_type, param_types, cast(unsigned)param_index, type->Proc.c_vararg);
+			LLVMTypeRef t = LLVMFunctionType(return_type, param_types.data, cast(unsigned)param_types.count, type->Proc.c_vararg);
 			return LLVMPointerType(t, 0);
 		}
 		break;
@@ -2251,6 +2265,8 @@ lbValue lb_value_param(lbProcedure *p, Entity *e, Type *abi_type, i32 index, lbP
 			kind = lbParamPass_BitCast;
 		} else if (is_type_tuple(abi_type)) {
 			kind = lbParamPass_Tuple;
+		} else if (is_type_proc(abi_type)) {
+			kind = lbParamPass_Value;
 		} else {
 			GB_PANIC("Invalid abi type pass kind %s", type_to_string(abi_type));
 		}
@@ -2310,6 +2326,7 @@ lbValue lb_add_param(lbProcedure *p, Entity *e, Ast *expr, Type *abi_type, i32 i
 		}
 		for_array(i, abi_type->Tuple.variables) {
 			Type *t = abi_type->Tuple.variables[i]->type;
+			GB_ASSERT(!is_type_tuple(t));
 
 			lbParamPasskind elem_kind = lbParamPass_Value;
 			lbValue elem = lb_value_param(p, nullptr, t, index+cast(i32)i, &elem_kind);
@@ -5829,6 +5846,8 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 
 	Type *src = core_type(src_type);
 	Type *dst = core_type(t);
+	GB_ASSERT(src != nullptr);
+	GB_ASSERT(dst != nullptr);
 
 	if (is_type_untyped_nil(src)) {
 		return lb_const_nil(m, t);
@@ -7818,8 +7837,10 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		case BuiltinProc_atomic_xchg_relaxed: op = LLVMAtomicRMWBinOpXchg; ordering = LLVMAtomicOrderingMonotonic; break;
 		}
 
-		LLVMValueRef instr = LLVMBuildAtomicRMW(p->builder, op, dst.value, val.value, ordering, false);
-		return {};
+		lbValue res = {};
+		res.value = LLVMBuildAtomicRMW(p->builder, op, dst.value, val.value, ordering, false);
+		res.type = tv.type;
+		return res;
 	}
 
 	case BuiltinProc_atomic_cxchg:
@@ -7877,13 +7898,14 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		// TODO(bill): Figure out how to make it weak
 		LLVMBool single_threaded = !weak;
 
-		LLVMValueRef instr = LLVMBuildAtomicCmpXchg(p->builder, address.value,
-		                                            old_value.value, new_value.value,
-		                                            success_ordering,
-		                                            failure_ordering,
-		                                            single_threaded);
-
-		return {};
+		lbValue res = {};
+		res.value = LLVMBuildAtomicCmpXchg(p->builder, address.value,
+		                                   old_value.value, new_value.value,
+		                                   success_ordering,
+		                                   failure_ordering,
+		                                   single_threaded);
+		res.type = tv.type;
+		return res;
 	}
 	}
 
