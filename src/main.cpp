@@ -321,8 +321,8 @@ i32 linker_stage(lbGenerator *gen) {
 		gbString lib_str = gb_string_make(heap_allocator(), "-L/");
 		defer (gb_string_free(lib_str));
 
-		for_array(i, ir_gen.module.foreign_library_paths) {
-			String lib = ir_gen.module.foreign_library_paths[i];
+		for_array(i, gen->module.foreign_library_paths) {
+			String lib = gen->module.foreign_library_paths[i];
 
 			// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
 			//   This allows you to specify '-f' in a #foreign_system_library,
@@ -445,14 +445,6 @@ i32 linker_stage(lbGenerator *gen) {
 			}
 		}
 	#endif
-
-
-		if (build_context.show_timings) {
-			show_timings(&checker, timings);
-		}
-
-		remove_temp_files(output_base);
-
 
 	#endif
 	}
@@ -1403,7 +1395,7 @@ i32 exec_llvm_llc(String output_base) {
 		build_context.optimization_level,
 		LIT(build_context.llc_flags),
 		build_context.cross_compiling ? "-mtriple=" : "",
-		(int) (build_context.cross_compiling ? build_context.metrics.target_triplet.len : 0),
+		cast(int)(build_context.cross_compiling ? build_context.metrics.target_triplet.len : 0),
 		build_context.metrics.target_triplet.text);
 #endif
 }
@@ -1422,7 +1414,7 @@ void print_show_help(String const arg0, String const &command) {
 	} else if (command == "check") {
 		print_usage_line(1, "check     parse and type check .odin file");
 	} else if (command == "query") {
-		print_usage_line(1, "query     parse, type check, and output a .json file containing information about the program");
+		print_usage_line(1, "query     [experimental] parse, type check, and output a .json file containing information about the program");
 	} else if (command == "docs") {
 		print_usage_line(1, "docs      generate documentation for a .odin file");
 	} else if (command == "version") {
@@ -1819,7 +1811,8 @@ int main(int arg_count, char const **arg_ptr) {
 			return system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(gen.output_base), LIT(run_args_string));
 		#else
 			//NOTE(thebirk): This whole thing is a little leaky
-			String complete_path = concatenate_strings(heap_allocator(), output_base, output_ext);
+			String output_ext = {};
+			String complete_path = concatenate_strings(heap_allocator(), gen.output_base, output_ext);
 			complete_path = path_to_full_path(heap_allocator(), complete_path);
 			return system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
 		#endif

@@ -9121,7 +9121,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		} else if (e != nullptr && e->kind == Entity_Variable) {
 			return lb_addr_load(p, lb_build_addr(p, expr));
 		}
-		gb_printf_err("Error in: %.*s(%td:%td) %s\n", LIT(p->name), i->token.pos.line, i->token.pos.column);
+		gb_printf_err("Error in: %.*s(%td:%td)\n", LIT(p->name), i->token.pos.line, i->token.pos.column);
 		String pkg = {};
 		if (e->pkg) {
 			pkg = e->pkg->name;
