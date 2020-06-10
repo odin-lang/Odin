@@ -2259,6 +2259,8 @@ lbValue lb_value_param(lbProcedure *p, Entity *e, Type *abi_type, i32 index, lbP
 			kind = lbParamPass_Integer;
 		} else if (abi_type == t_llvm_bool) {
 			kind = lbParamPass_Value;
+		} else if (is_type_boolean(abi_type)) {
+			kind = lbParamPass_Integer;
 		} else if (is_type_simd_vector(abi_type)) {
 			kind = lbParamPass_BitCast;
 		} else if (is_type_float(abi_type)) {
@@ -7009,10 +7011,10 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 				} else if (!is_type_pointer(arg_type)) {
 					array_add(&processed_args, lb_copy_value_to_ptr(p, args[i], original_type, 16));
 				}
-			} else if (is_type_integer(new_type) || is_type_float(new_type)) {
-				array_add(&processed_args, lb_emit_transmute(p, args[i], new_type));
 			} else if (new_type == t_llvm_bool) {
 				array_add(&processed_args, lb_emit_conv(p, args[i], new_type));
+			} else if (is_type_integer(new_type) || is_type_float(new_type) || is_type_boolean(new_type)) {
+				array_add(&processed_args, lb_emit_transmute(p, args[i], new_type));
 			} else if (is_type_simd_vector(new_type)) {
 				array_add(&processed_args, lb_emit_transmute(p, args[i], new_type));
 			} else if (is_type_tuple(new_type)) {
