@@ -41,6 +41,7 @@ template <typename T> void     array_reserve       (Array<T> *array, isize capac
 template <typename T> void     array_resize        (Array<T> *array, isize count);
 template <typename T> void     array_set_capacity  (Array<T> *array, isize capacity);
 template <typename T> Array<T> array_slice         (Array<T> const &array, isize lo, isize hi);
+template <typename T> Array<T> array_clone         (gbAllocator const &a, Array<T> const &array);
 
 
 
@@ -243,6 +244,15 @@ gb_inline Array<T> array_slice(Array<T> const &array, isize lo, isize hi) {
 	}
 	return out;
 }
+
+template <typename T>
+Array<T> array_clone(gbAllocator const &allocator, Array<T> const &array) {
+	auto clone = array_make<T>(allocator, array.count, array.count);
+	array_copy(&clone, array, 0);
+	return clone;
+}
+
+
 template <typename T>
 void array_ordered_remove(Array<T> *array, isize index) {
 	GB_ASSERT(0 <= index && index < array->count);
