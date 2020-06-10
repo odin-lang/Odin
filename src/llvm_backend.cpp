@@ -3878,7 +3878,32 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 }
 
 
+bool lb_is_instr_terminating(LLVMValueRef instr) {
+
+	if (instr != nullptr) {
+		LLVMOpcode op = LLVMGetInstructionOpcode(instr);
+		switch (op) {
+		case LLVMRet:
+		case LLVMBr:
+		case LLVMSwitch:
+		case LLVMIndirectBr:
+		case LLVMInvoke:
+		case LLVMUnreachable:
+		case LLVMCallBr:
+			return true;
+		}
+	}
+	return false;
+}
+
 void lb_build_stmt(lbProcedure *p, Ast *node) {
+	if (p->curr_block != nullptr) {
+		LLVMValueRef last_instr = LLVMGetLastInstruction(p->curr_block->block);
+		if (lb_is_instr_terminating(last_instr)) {
+			return;
+		}
+	}
+
 	u64 prev_state_flags = p->module->state_flags;
 	defer (p->module->state_flags = prev_state_flags);
 
