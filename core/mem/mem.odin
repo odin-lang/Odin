@@ -1,6 +1,7 @@
 package mem
 
 import "core:runtime"
+import "core:intrinsics"
 
 set :: proc(data: rawptr, value: byte, len: int) -> rawptr {
 	return runtime.memset(data, i32(value), len);
@@ -68,6 +69,11 @@ compare_byte_ptrs :: proc(a, b: ^byte, n: int) -> int #no_bounds_check {
 	}
 
 	return 0;
+}
+
+simple_compare_values :: proc(a, b: $T) -> int where intrinsics.type_is_simple_compare(T) {
+	a, b := a, b;
+	return compare_byte_ptrs((^byte)(&a), (^byte)(&b), size_of(T));
 }
 
 compare_ptrs :: inline proc(a, b: rawptr, n: int) -> int {
