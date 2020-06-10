@@ -7760,6 +7760,20 @@ bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValu
 	return true;
 }
 
+bool check_is_operand_compound_lit_constant(CheckerContext *c, Operand *o) {
+	Ast *expr = unparen_expr(o->expr);
+	if (expr != nullptr) {
+		Entity *e = strip_entity_wrapping(entity_from_expr(expr));
+		if (e != nullptr && e->kind == Entity_Procedure) {
+			return true;
+		}
+		if (expr->kind == Ast_ProcLit) {
+			add_type_and_value(c->info, expr, Addressing_Constant, type_of_expr(expr), exact_value_procedure(expr));
+			return true;
+		}
+	}
+	return o->mode == Addressing_Constant;
+}
 
 
 ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
@@ -7779,7 +7793,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 		c->state_flags = out;
 	}
-
 
 	ExprKind kind = Expr_Stmt;
 
@@ -8242,7 +8255,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						is_constant = false;
 					}
 					if (is_constant) {
-						is_constant = o.mode == Addressing_Constant;
+						is_constant = check_is_operand_compound_lit_constant(c, &o);
 					}
 
 					check_assignment(c, &o, field->type, str_lit("structure literal"));
@@ -8277,7 +8290,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						is_constant = false;
 					}
 					if (is_constant) {
-						is_constant = o.mode == Addressing_Constant;
+						is_constant = check_is_operand_compound_lit_constant(c, &o);
 					}
 
 					check_assignment(c, &o, field->type, str_lit("structure literal"));
