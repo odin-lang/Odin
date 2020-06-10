@@ -12295,10 +12295,6 @@ void lb_generate_code(lbGenerator *gen) {
 			m->curr_procedure = nullptr;
 		}
 		lb_end_procedure(p);
-		if (p->name == "igTextColored") {
-			LLVMDumpValue(p->value);
-			gb_printf_err("\n");
-		}
 
 		// Add Flags
 		if (p->body != nullptr) {
