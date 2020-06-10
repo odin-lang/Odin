@@ -225,14 +225,13 @@ struct NamedTargetMetrics {
 };
 
 gb_global NamedTargetMetrics named_targets[] = {
-	{ str_lit("essence_amd64"), &target_essence_amd64 },
 	{ str_lit("darwin_amd64"),  &target_darwin_amd64 },
+	{ str_lit("essence_amd64"), &target_essence_amd64 },
+	{ str_lit("js_wasm32"),     &target_js_wasm32 },
 	{ str_lit("linux_386"),     &target_linux_386 },
 	{ str_lit("linux_amd64"),   &target_linux_amd64 },
 	{ str_lit("windows_386"),   &target_windows_386 },
 	{ str_lit("windows_amd64"), &target_windows_amd64 },
-	{ str_lit("js_wasm32"),     &target_js_wasm32 },
-	{ str_lit("wasm32"),        &target_js_wasm32 },
 };
 
 NamedTargetMetrics *selected_target_metrics;
