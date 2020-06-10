@@ -10025,7 +10025,8 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 					Ast *name = vd->names[i];
 					irAddr lval = ir_addr(nullptr);
 					if (!is_blank_ident(name)) {
-						ir_add_local_for_identifier(proc, name, false);
+						// NOTE(bill, 2020-06-10): This must be zero initialize because of weird LLVM optimization behaviours
+						ir_add_local_for_identifier(proc, name, true);
 						lval = ir_build_addr(proc, name);
 					}
 					array_add(&lvals, lval);
