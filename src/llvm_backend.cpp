@@ -1328,6 +1328,10 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				if (param == nullptr) {
 					continue;
 				}
+				if (type->Proc.params->Tuple.variables[i]->flags & EntityFlag_CVarArg) {
+					GB_ASSERT(i+1 == type->Proc.abi_compat_params.count);
+					break;
+				}
 				if (is_type_tuple(param)) {
 					param = base_type(param);
 					for_array(j, param->Tuple.variables) {
@@ -12291,6 +12295,10 @@ void lb_generate_code(lbGenerator *gen) {
 			m->curr_procedure = nullptr;
 		}
 		lb_end_procedure(p);
+		if (p->name == "igTextColored") {
+			LLVMDumpValue(p->value);
+			gb_printf_err("\n");
+		}
 
 		// Add Flags
 		if (p->body != nullptr) {
