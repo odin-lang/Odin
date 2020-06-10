@@ -123,7 +123,6 @@ struct BuildContext {
 	bool   has_resource;
 	String opt_flags;
 	String llc_flags;
-	String target_triplet;
 	String link_flags;
 	String extra_linker_flags;
 	BuildModeKind build_mode;
@@ -139,6 +138,7 @@ struct BuildContext {
 	bool   use_lld;
 	bool   vet;
 	bool   cross_compiling;
+	bool   keep_object_files;
 
 	bool   use_llvm_api;
 
@@ -226,7 +226,7 @@ struct NamedTargetMetrics {
 
 gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("essence_amd64"), &target_essence_amd64 },
-	{ str_lit("darwin_amd64"),   &target_darwin_amd64 },
+	{ str_lit("darwin_amd64"),  &target_darwin_amd64 },
 	{ str_lit("linux_386"),     &target_linux_386 },
 	{ str_lit("linux_amd64"),   &target_linux_amd64 },
 	{ str_lit("windows_386"),   &target_windows_386 },
@@ -604,47 +604,46 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->ODIN_VERSION = ODIN_VERSION;
 	bc->ODIN_ROOT    = odin_root_dir();
 
-	TargetMetrics metrics = {};
+	TargetMetrics *metrics = nullptr;
 
 	#if defined(GB_ARCH_64_BIT)
 		#if defined(GB_SYSTEM_WINDOWS)
-			metrics = target_windows_amd64;
+			metrics = &target_windows_amd64;
 		#elif defined(GB_SYSTEM_OSX)
-			metrics = target_darwin_amd64;
+			metrics = &target_darwin_amd64;
 		#else
-			metrics = target_linux_amd64;
+			metrics = &target_linux_amd64;
 		#endif
 	#else
 		#if defined(GB_SYSTEM_WINDOWS)
-			metrics = target_windows_386;
+			metrics = &target_windows_386;
 		#elif defined(GB_SYSTEM_OSX)
 			#error "Build Error: Unsupported architecture"
 		#else
-			metrics = target_linux_386;
+			metrics = &target_linux_386;
 		#endif
 	#endif
 
-	if (cross_target) {
-		metrics = *cross_target;
+	if (cross_target != nullptr && metrics != cross_target) {
+		metrics = cross_target;
 		bc->cross_compiling = true;
 	}
 
-	GB_ASSERT(metrics.os != TargetOs_Invalid);
-	GB_ASSERT(metrics.arch != TargetArch_Invalid);
-	GB_ASSERT(metrics.word_size > 1);
-	GB_ASSERT(metrics.max_align > 1);
+	GB_ASSERT(metrics->os != TargetOs_Invalid);
+	GB_ASSERT(metrics->arch != TargetArch_Invalid);
+	GB_ASSERT(metrics->word_size > 1);
+	GB_ASSERT(metrics->max_align > 1);
 
 
-	bc->metrics = metrics;
-	bc->ODIN_OS     = target_os_names[metrics.os];
-	bc->ODIN_ARCH   = target_arch_names[metrics.arch];
-	bc->ODIN_ENDIAN = target_endian_names[target_endians[metrics.arch]];
-	bc->endian_kind = target_endians[metrics.arch];
-	bc->word_size   = metrics.word_size;
-	bc->max_align   = metrics.max_align;
+	bc->metrics = *metrics;
+	bc->ODIN_OS     = target_os_names[metrics->os];
+	bc->ODIN_ARCH   = target_arch_names[metrics->arch];
+	bc->ODIN_ENDIAN = target_endian_names[target_endians[metrics->arch]];
+	bc->endian_kind = target_endians[metrics->arch];
+	bc->word_size   = metrics->word_size;
+	bc->max_align   = metrics->max_align;
 	bc->link_flags  = str_lit(" ");
 	bc->opt_flags   = str_lit(" ");
-	bc->target_triplet = metrics.target_triplet;
 
 
 	gbString llc_flags = gb_string_make_reserve(heap_allocator(), 64);

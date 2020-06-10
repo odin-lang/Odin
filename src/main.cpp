@@ -157,8 +157,17 @@ i32 linker_stage(lbGenerator *gen) {
 		system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
 				LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
 #else
-		gb_printf_err("Don't know how to cross compile to selected target.\n");
+		gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
+			LIT(target_os_names[build_context.metrics.os]),
+			LIT(target_arch_names[build_context.metrics.arch])
+		);
 #endif
+	} else if (build_context.cross_compiling) {
+		gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
+			LIT(target_os_names[build_context.metrics.os]),
+			LIT(target_arch_names[build_context.metrics.arch])
+		);
+		build_context.keep_object_files = true;
 	} else {
 	#if defined(GB_SYSTEM_WINDOWS)
 		timings_start_section(timings, str_lit("msvc-link"));
@@ -1310,7 +1319,7 @@ void remove_temp_files(String output_base) {
 	} while (0)
 	EXT_REMOVE(".ll");
 	EXT_REMOVE(".bc");
-	if (build_context.build_mode != BuildMode_Object) {
+	if (build_context.build_mode != BuildMode_Object && !build_context.keep_object_files) {
 	#if defined(GB_SYSTEM_WINDOWS)
 		EXT_REMOVE(".obj");
 		EXT_REMOVE(".res");
@@ -1847,8 +1856,17 @@ int main(int arg_count, char const **arg_ptr) {
 			system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
 					LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
 	#else
-			gb_printf_err("Don't know how to cross compile to selected target.\n");
+			gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
+				LIT(target_os_names[build_context.metrics.os]),
+				LIT(target_arch_names[build_context.metrics.arch])
+			);
 	#endif
+		} else if (build_context.cross_compiling) {
+			gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
+				LIT(target_os_names[build_context.metrics.os]),
+				LIT(target_arch_names[build_context.metrics.arch])
+			);
+			build_context.keep_object_files = true;
 		} else {
 		#if defined(GB_SYSTEM_WINDOWS)
 			timings_start_section(timings, str_lit("msvc-link"));
