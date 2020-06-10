@@ -2434,7 +2434,6 @@ void lb_begin_procedure_body(lbProcedure *p) {
 	if (p->type->Proc.has_named_results) {
 		GB_ASSERT(p->type->Proc.result_count > 0);
 		TypeTuple *results = &p->type->Proc.results->Tuple;
-		LLVMValueRef return_ptr = LLVMGetParam(p->value, 0);
 
 		isize result_index = 0;
 
@@ -4192,6 +4191,15 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 				res = lb_build_expr(p, rs->results[0]);
 				res = lb_emit_conv(p, res, e->type);
 			}
+			if (p->type->Proc.has_named_results) {
+				// NOTE(bill): store the named values before returning
+				if (e->token.string != "") {
+					lbValue *found = map_get(&p->module->values, hash_entity(e));
+					GB_ASSERT(found != nullptr);
+					lb_emit_store(p, *found, res);
+				}
+			}
+
 		} else {
 			auto results = array_make<lbValue>(heap_allocator(), 0, return_count);
 
@@ -4220,6 +4228,23 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			}
 
 			GB_ASSERT(results.count == return_count);
+
+			if (p->type->Proc.has_named_results) {
+				// NOTE(bill): store the named values before returning
+				for_array(i, p->type->Proc.results->Tuple.variables) {
+					Entity *e = p->type->Proc.results->Tuple.variables[i];
+					if (e->kind != Entity_Variable) {
+						continue;
+					}
+
+					if (e->token.string == "") {
+						continue;
+					}
+					lbValue *found = map_get(&p->module->values, hash_entity(e));
+					GB_ASSERT(found != nullptr);
+					lb_emit_store(p, *found, results[i]);
+				}
+			}
 
 			Type *ret_type = p->type->Proc.results;
 			// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops

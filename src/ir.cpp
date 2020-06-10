@@ -10164,6 +10164,14 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 				v = ir_build_expr(proc, rs->results[0]);
 				v = ir_emit_conv(proc, v, e->type);
 			}
+			if (proc->type->Proc.has_named_results) {
+				// NOTE(bill): store the named values before returning
+				if (e->token.string != "") {
+					irValue **found = map_get(&proc->module->values, hash_entity(e));
+					GB_ASSERT(found != nullptr);
+					ir_emit_store(proc, *found, v);
+				}
+			}
 		} else {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
 			defer (gb_temp_arena_memory_end(tmp));
@@ -10195,6 +10203,23 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 			}
 
 			GB_ASSERT(results.count == return_count);
+
+			if (proc->type->Proc.has_named_results) {
+				// NOTE(bill): store the named values before returning
+				for_array(i, tuple->variables) {
+					Entity *e = tuple->variables[i];
+					if (e->kind != Entity_Variable) {
+						continue;
+					}
+
+					if (e->token.string == "") {
+						continue;
+					}
+					irValue **found = map_get(&proc->module->values, hash_entity(e));
+					GB_ASSERT(found != nullptr);
+					ir_emit_store(proc, *found, results[i]);
+				}
+			}
 
 			Type *ret_type = proc->type->Proc.results;
 			// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
