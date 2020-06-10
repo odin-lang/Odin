@@ -523,6 +523,7 @@ struct irAddr {
 };
 
 Type *ir_type(irValue *value);
+irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, Ast *expr, irProcedure *proc = nullptr);
 
 irAddr ir_addr(irValue *addr) {
 	irAddr v = {irAddr_Default, addr};
@@ -1614,7 +1615,27 @@ irDefer ir_add_defer_proc(irProcedure *proc, isize scope_index, irValue *deferre
 }
 
 
-
+void ir_check_compound_lit_constant(irModule *m, Ast *expr) {
+	expr = unparen_expr(expr);
+	if (expr == nullptr) {
+		return;
+	}
+	if (expr->kind == Ast_CompoundLit) {
+		ast_node(cl, CompoundLit, expr);
+		for_array(i, cl->elems) {
+			Ast *elem = cl->elems[i];
+			if (elem->kind == Ast_FieldValue) {
+				ast_node(fv, FieldValue, elem);
+				ir_check_compound_lit_constant(m, fv->value);
+			} else {
+				ir_check_compound_lit_constant(m, elem);
+			}
+		}
+	}
+	if (expr->kind == Ast_ProcLit) {
+		ir_gen_anonymous_proc_lit(m, str_lit("_proclit"), expr);
+	}
+}
 
 irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 	gbAllocator a = ir_allocator();
@@ -1650,6 +1671,10 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 
 			return ir_value_constant_slice(type, g, count);
 		}
+	}
+
+	if (value.kind == ExactValue_Compound) {
+		ir_check_compound_lit_constant(m, value.value_compound);
 	}
 
 	return ir_value_constant(type, value);
@@ -6504,7 +6529,7 @@ void ir_pop_target_list(irProcedure *proc) {
 
 
 
-irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, Ast *expr, irProcedure *proc = nullptr) {
+irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, Ast *expr, irProcedure *proc) {
 	ast_node(pl, ProcLit, expr);
 
 	// NOTE(bill): Generate a new name
