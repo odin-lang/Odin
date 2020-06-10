@@ -435,7 +435,11 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 		case Addressing_ProcGroup:
 			GB_ASSERT(operand.proc_group != nullptr);
 			GB_ASSERT(operand.proc_group->kind == Entity_ProcGroup);
-			override_entity_in_scope(e, operand.proc_group);
+			// NOTE(bill, 2020-06-10): It is better to just clone the contents than overriding the entity in the scope
+			// Thank goodness I made entities a tagged union to allow for this implace patching
+			// override_entity_in_scope(e, operand.proc_group);
+			e->kind = Entity_ProcGroup;
+			e->ProcGroup.entities = array_clone(heap_allocator(), operand.proc_group->ProcGroup.entities);
 			return;
 		}
 
