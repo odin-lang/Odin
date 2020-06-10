@@ -3524,12 +3524,16 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 
 	Scope *scope = nullptr;
 
+	bool force_use = false;
+
 	if (id->fullpath == "builtin") {
 		scope = builtin_pkg->scope;
 		builtin_pkg->used = true;
+		force_use = true;
 	} else if (id->fullpath == "intrinsics") {
 		scope = intrinsics_pkg->scope;
 		intrinsics_pkg->used = true;
+		force_use = true;
 	} else {
 		AstPackage **found = string_map_get(pkgs, id->fullpath);
 		if (found == nullptr) {
@@ -3575,7 +3579,7 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		                                     scope);
 
 		add_entity(ctx->checker, parent_scope, nullptr, e);
-		if (id->is_using) {
+		if (force_use || id->is_using) {
 			add_entity_use(ctx, nullptr, e);
 		}
 	}
