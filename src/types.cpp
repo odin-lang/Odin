@@ -956,10 +956,15 @@ Type *alloc_type_simd_vector(i64 count, Type *elem) {
 Type *type_deref(Type *t) {
 	if (t != nullptr) {
 		Type *bt = base_type(t);
-		if (bt == nullptr)
+		if (bt == nullptr) {
 			return nullptr;
-		if (bt != nullptr && bt->kind == Type_Pointer)
+		}
+		if (bt != nullptr && bt->kind == Type_Pointer) {
 			return bt->Pointer.elem;
+		}
+		if (bt != nullptr && bt->kind == Type_RelativePointer) {
+			return type_deref(bt->RelativePointer.pointer_type);
+		}
 	}
 	return t;
 }
