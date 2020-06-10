@@ -593,37 +593,40 @@ as_i64 :: proc(a: any) -> (value: i64, valid: bool) {
 	case Type_Info_Integer:
 		valid = true;
 		switch v in a {
-		case i8:    value = i64(v);
-		case i16:   value = i64(v);
-		case i32:   value = i64(v);
-		case i64:   value = i64(v);
-		case i128:  value = i64(v);
+		case i8:      value = i64(v);
+		case i16:     value = i64(v);
+		case i32:     value = i64(v);
+		case i64:     value = i64(v);
+		case i128:    value = i64(v);
+		case int:     value = i64(v);
 
-		case u8:    value = i64(v);
-		case u16:   value = i64(v);
-		case u32:   value = i64(v);
-		case u64:   value = i64(v);
-		case u128:  value = i64(v);
+		case u8:      value = i64(v);
+		case u16:     value = i64(v);
+		case u32:     value = i64(v);
+		case u64:     value = i64(v);
+		case u128:    value = i64(v);
+		case uint:    value = i64(v);
+		case uintptr: value = i64(v);
 
-		case u16le: value = i64(v);
-		case u32le: value = i64(v);
-		case u64le: value = i64(v);
-		case u128le:value = i64(v);
+		case u16le:   value = i64(v);
+		case u32le:   value = i64(v);
+		case u64le:   value = i64(v);
+		case u128le:  value = i64(v);
 
-		case i16le: value = i64(v);
-		case i32le: value = i64(v);
-		case i64le: value = i64(v);
-		case i128le:value = i64(v);
+		case i16le:   value = i64(v);
+		case i32le:   value = i64(v);
+		case i64le:   value = i64(v);
+		case i128le:  value = i64(v);
 
-		case u16be: value = i64(v);
-		case u32be: value = i64(v);
-		case u64be: value = i64(v);
-		case u128be:value = i64(v);
+		case u16be:   value = i64(v);
+		case u32be:   value = i64(v);
+		case u64be:   value = i64(v);
+		case u128be:  value = i64(v);
 
-		case i16be: value = i64(v);
-		case i32be: value = i64(v);
-		case i64be: value = i64(v);
-		case i128be:value = i64(v);
+		case i16be:   value = i64(v);
+		case i32be:   value = i64(v);
+		case i64be:   value = i64(v);
+		case i128be:  value = i64(v);
 		case: valid = false;
 		}
 
@@ -697,37 +700,40 @@ as_u64 :: proc(a: any) -> (value: u64, valid: bool) {
 	case Type_Info_Integer:
 		valid = true;
 		switch v in a {
-		case i8:    value = u64(v);
-		case i16:   value = u64(v);
-		case i32:   value = u64(v);
-		case i64:   value = u64(v);
-		case i128:  value = u64(v);
+		case i8:     value = u64(v);
+		case i16:    value = u64(v);
+		case i32:    value = u64(v);
+		case i64:    value = u64(v);
+		case i128:   value = u64(v);
+		case int:    value = u64(v);
 
-		case u8:    value = u64(v);
-		case u16:   value = u64(v);
-		case u32:   value = u64(v);
-		case u64:   value = u64(v);
-		case u128:  value = u64(v);
+		case u8:     value = u64(v);
+		case u16:    value = u64(v);
+		case u32:    value = u64(v);
+		case u64:    value = u64(v);
+		case u128:   value = u64(v);
+		case uint:   value = u64(v);
+		case uintptr:value = u64(v);
 
-		case u16le: value = u64(v);
-		case u32le: value = u64(v);
-		case u64le: value = u64(v);
-		case u128le:value = u64(v);
+		case u16le:  value = u64(v);
+		case u32le:  value = u64(v);
+		case u64le:  value = u64(v);
+		case u128le: value = u64(v);
 
-		case i16le: value = u64(v);
-		case i32le: value = u64(v);
-		case i64le: value = u64(v);
-		case i128le:value = u64(v);
+		case i16le:  value = u64(v);
+		case i32le:  value = u64(v);
+		case i64le:  value = u64(v);
+		case i128le: value = u64(v);
 
-		case u16be: value = u64(v);
-		case u32be: value = u64(v);
-		case u64be: value = u64(v);
-		case u128be:value = u64(v);
+		case u16be:  value = u64(v);
+		case u32be:  value = u64(v);
+		case u64be:  value = u64(v);
+		case u128be: value = u64(v);
 
-		case i16be: value = u64(v);
-		case i32be: value = u64(v);
-		case i64be: value = u64(v);
-		case i128be:value = u64(v);
+		case i16be:  value = u64(v);
+		case i32be:  value = u64(v);
+		case i64be:  value = u64(v);
+		case i128be: value = u64(v);
 		case: valid = false;
 		}
 
