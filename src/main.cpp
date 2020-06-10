@@ -1403,8 +1403,8 @@ i32 exec_llvm_llc(String output_base) {
 		build_context.optimization_level,
 		LIT(build_context.llc_flags),
 		build_context.cross_compiling ? "-mtriple=" : "",
-		(int) (build_context.cross_compiling ? build_context.target_triplet.len : 0),
-		build_context.target_triplet.text);
+		(int) (build_context.cross_compiling ? build_context.metrics.target_triplet.len : 0),
+		build_context.metrics.target_triplet.text);
 #endif
 }
 
