@@ -1615,10 +1615,10 @@ irDefer ir_add_defer_proc(irProcedure *proc, isize scope_index, irValue *deferre
 }
 
 
-void ir_check_compound_lit_constant(irModule *m, Ast *expr) {
+irValue *ir_check_compound_lit_constant(irModule *m, Ast *expr) {
 	expr = unparen_expr(expr);
 	if (expr == nullptr) {
-		return;
+		return nullptr;
 	}
 	if (expr->kind == Ast_CompoundLit) {
 		ast_node(cl, CompoundLit, expr);
@@ -1633,8 +1633,9 @@ void ir_check_compound_lit_constant(irModule *m, Ast *expr) {
 		}
 	}
 	if (expr->kind == Ast_ProcLit) {
-		ir_gen_anonymous_proc_lit(m, str_lit("_proclit"), expr);
+		return ir_gen_anonymous_proc_lit(m, str_lit("_proclit"), expr);
 	}
+	return 	nullptr;
 }
 
 irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
@@ -1674,7 +1675,11 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 	}
 
 	if (value.kind == ExactValue_Compound) {
-		ir_check_compound_lit_constant(m, value.value_compound);
+		// NOTE(bill): Removed for numerous reasons
+		irValue *lit = ir_check_compound_lit_constant(m, value.value_compound);
+		if (lit != nullptr) {
+			return lit;
+		}
 	}
 
 	return ir_value_constant(type, value);
@@ -6530,6 +6535,11 @@ void ir_pop_target_list(irProcedure *proc) {
 
 
 irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, Ast *expr, irProcedure *proc) {
+	auto *found = map_get(&m->anonymous_proc_lits, hash_pointer(expr));
+	if (found != nullptr) {
+		return *found;
+	}
+
 	ast_node(pl, ProcLit, expr);
 
 	// NOTE(bill): Generate a new name
