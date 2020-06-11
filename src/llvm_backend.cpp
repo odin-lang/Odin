@@ -53,6 +53,24 @@ LLVMValueRef llvm_cstring(lbModule *m, String const &str) {
 	return LLVMConstExtractValue(v.value, indices, gb_count_of(indices));
 }
 
+bool lb_is_instr_terminating(LLVMValueRef instr) {
+	if (instr != nullptr) {
+		LLVMOpcode op = LLVMGetInstructionOpcode(instr);
+		switch (op) {
+		case LLVMRet:
+		case LLVMBr:
+		case LLVMSwitch:
+		case LLVMIndirectBr:
+		case LLVMInvoke:
+		case LLVMUnreachable:
+		case LLVMCallBr:
+			return true;
+		}
+	}
+	return false;
+}
+
+
 
 lbAddr lb_addr(lbValue addr) {
 	lbAddr v = {lbAddr_Default, addr};
@@ -2497,7 +2515,7 @@ void lb_end_procedure_body(lbProcedure *p) {
 
 	if (p->type->Proc.result_count == 0) {
 	    LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
-	    if (!LLVMIsAReturnInst(instr)) {
+	    if (!lb_is_instr_terminating(instr)) {
 	    	lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
 			LLVMBuildRetVoid(p->builder);
 		}
@@ -3882,25 +3900,6 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 	return res;
 }
 
-
-bool lb_is_instr_terminating(LLVMValueRef instr) {
-
-	if (instr != nullptr) {
-		LLVMOpcode op = LLVMGetInstructionOpcode(instr);
-		switch (op) {
-		case LLVMRet:
-		case LLVMBr:
-		case LLVMSwitch:
-		case LLVMIndirectBr:
-		case LLVMInvoke:
-		case LLVMUnreachable:
-		case LLVMCallBr:
-			return true;
-		}
-	}
-	return false;
-}
-
 void lb_build_stmt(lbProcedure *p, Ast *node) {
 	if (p->curr_block != nullptr) {
 		LLVMValueRef last_instr = LLVMGetLastInstruction(p->curr_block->block);
@@ -4200,7 +4199,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 				if (e->token.string != "") {
 					lbValue *found = map_get(&p->module->values, hash_entity(e));
 					GB_ASSERT(found != nullptr);
-					lb_emit_store(p, *found, res);
+					lb_emit_store(p, *found, lb_emit_conv(p, res, e->type));
 				}
 			}
 
@@ -4246,7 +4245,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 					}
 					lbValue *found = map_get(&p->module->values, hash_entity(e));
 					GB_ASSERT(found != nullptr);
-					lb_emit_store(p, *found, results[i]);
+					lb_emit_store(p, *found, lb_emit_conv(p, results[i], e->type));
 				}
 			}
 
@@ -8897,6 +8896,14 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 
 
 lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
+	auto *found = map_get(&m->anonymous_proc_lits, hash_pointer(expr));
+	if (found != nullptr) {
+		lbValue value = {};
+		value.value = (*found)->value;
+		value.type = (*found)->type;
+		return value;
+	}
+
 	ast_node(pl, ProcLit, expr);
 
 	// NOTE(bill): Generate a new name

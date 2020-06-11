@@ -7761,6 +7761,9 @@ bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValu
 }
 
 bool check_is_operand_compound_lit_constant(CheckerContext *c, Operand *o) {
+	if (is_operand_nil(*o)) {
+		return true;
+	}
 	Ast *expr = unparen_expr(o->expr);
 	if (expr != nullptr) {
 		Entity *e = strip_entity_wrapping(entity_from_expr(expr));
