@@ -108,6 +108,7 @@ enum BasicFlag {
 	BasicFlag_Ordered        = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
 	BasicFlag_OrderedNumeric = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Rune,
 	BasicFlag_ConstantType   = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
+	BasicFlag_SimpleCompare  = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_Pointer | BasicFlag_Rune,
 };
 
 struct BasicType {
@@ -1261,8 +1262,11 @@ bool is_type_simple_compare(Type *t) {
 	case Type_Array:
 		return is_type_simple_compare(t->Array.elem);
 
+	case Type_EnumeratedArray:
+		return is_type_simple_compare(t->EnumeratedArray.elem);
+
 	case Type_Basic:
-		if (t->Basic.flags & (BasicFlag_Integer|BasicFlag_Float|BasicFlag_Complex|BasicFlag_Rune|BasicFlag_Pointer)) {
+		if (t->Basic.flags & BasicFlag_SimpleCompare) {
 			return true;
 		}
 		return false;
@@ -1272,6 +1276,28 @@ bool is_type_simple_compare(Type *t) {
 	case Type_BitSet:
 	case Type_BitField:
 		return true;
+
+	case Type_Struct:
+		for_array(i, t->Struct.fields) {
+			Entity *f = t->Struct.fields[i];
+			if (!is_type_simple_compare(f->type)) {
+				return false;
+			}
+		}
+		return true;
+
+	case Type_Union:
+		for_array(i, t->Union.variants) {
+			Type *v = t->Union.variants[i];
+			if (!is_type_simple_compare(v)) {
+				return false;
+			}
+		}
+		return true;
+
+	case Type_SimdVector:
+		return is_type_simple_compare(t->SimdVector.elem);
+
 	}
 
 	return false;
