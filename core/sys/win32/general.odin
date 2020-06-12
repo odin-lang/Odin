@@ -803,34 +803,41 @@ utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> Wstri
 	return nil;
 }
 
-utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
-	if len(s) < 1 {
+wstring_to_utf8 :: proc(s: Wstring, N: int, allocator := context.temp_allocator) -> string {
+	if N == 0 {
 		return "";
 	}
 
-	n := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, Wstring(&s[0]), i32(len(s)), nil, 0, nil, nil);
+	n := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), nil, 0, nil, nil);
 	if n == 0 {
 		return "";
 	}
 
-	text := make([]byte, n+1, allocator);
+	// NOTE: If N == -1 the call to wide_char_to_multi_byte assumes the wide string is null terminated, 
+	//       and will scan it for the first null terminated character. The resulting string is also null terminated.
+	//       If N != -1 it assumes the wide string is not null terminated and the resulting string is not null terminated.
+	text := make([]byte, n+1 if N != -1 else n, allocator);
 
-	n1 := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, Wstring(&s[0]), i32(len(s)), cstring(&text[0]), n, nil, nil);
-	if n1 == 0 {
+	if n1 := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), cstring(&text[0]), n, nil, nil); n1 == 0 {
 		delete(text, allocator);
 		return "";
 	}
 
-	text[n] = 0;
+	if N > 0 {
+		// NOTE: The input string is not expected to be null terminated, so we strip excess zeros at the end. 
+		text[n] = 0;
 
-	for n >= 1 && text[n-1] == 0 {
-		n -= 1;
+		for n >= 1 && text[n-1] == 0 {
+			n -= 1;
+		}
 	}
 	return string(text[:n]);
 }
 
-
-
+utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
+	if len(s) == 0 do return "";
+	return wstring_to_utf8(cast(Wstring)&s[0], len(s), allocator);
+}
 
 get_query_performance_frequency :: proc() -> i64 {
 	r: i64;
