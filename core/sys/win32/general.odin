@@ -791,7 +791,7 @@ utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 	}
 
 	text[n] = 0;
-	for n >= 0 && text[n] == 0 {
+	for n >= 1 && text[n-1] == 0 {
 		n -= 1;
 	}
 	return text[:n];
@@ -823,7 +823,7 @@ utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
 
 	text[n] = 0;
 
-	for n >= 0 && text[n] == 0 {
+	for n >= 1 && text[n-1] == 0 {
 		n -= 1;
 	}
 	return string(text[:n]);
