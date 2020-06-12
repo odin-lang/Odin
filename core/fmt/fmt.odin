@@ -898,6 +898,11 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 	switch verb {
 	case 's', 'v':
 		strings.write_string(fi.buf, s);
+		if fi.width_set && len(s) < fi.width {
+			for i in 0..<fi.width - len(s) {
+				strings.write_byte(fi.buf, ' ');
+			}
+		}
 
 	case 'q': // quoted string
 		strings.write_quoted_string(fi.buf, s, '"');
