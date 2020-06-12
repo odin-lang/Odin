@@ -899,7 +899,7 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 	case 's', 'v':
 		strings.write_string(fi.buf, s);
 		if fi.width_set && len(s) < fi.width {
-			for i in 0..<fi.width - len(s) {
+			for _ in 0..<fi.width - len(s) {
 				strings.write_byte(fi.buf, ' ');
 			}
 		}
