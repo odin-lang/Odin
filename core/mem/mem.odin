@@ -71,9 +71,9 @@ compare_byte_ptrs :: proc(a, b: ^byte, n: int) -> int #no_bounds_check {
 	return 0;
 }
 
-simple_compare_values :: proc(a, b: $T) -> int where intrinsics.type_is_simple_compare(T) {
+simple_equal :: proc(a, b: $T) -> bool where intrinsics.type_is_simple_compare(T) {
 	a, b := a, b;
-	return compare_byte_ptrs((^byte)(&a), (^byte)(&b), size_of(T));
+	return compare_byte_ptrs((^byte)(&a), (^byte)(&b), size_of(T)) == 0;
 }
 
 compare_ptrs :: inline proc(a, b: rawptr, n: int) -> int {
