@@ -791,8 +791,10 @@ utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 	}
 
 	text[n] = 0;
-
-	return text[:len(text)-1];
+	for n >= 0 && text[n] == 0 {
+		n -= 1;
+	}
+	return text[:n];
 }
 utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> Wstring {
 	if res := utf8_to_utf16(s, allocator); res != nil {
@@ -821,7 +823,10 @@ utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
 
 	text[n] = 0;
 
-	return string(text[:len(text)-1]);
+	for n >= 0 && text[n] == 0 {
+		n -= 1;
+	}
+	return string(text[:n]);
 }
 
 
