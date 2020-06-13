@@ -282,8 +282,7 @@ get_current_directory :: proc() -> string {
 
 	intrinsics.atomic_store(&cwd_gate, false);
 
-	dir_utf8 := win32.utf16_to_utf8(dir_buf_wstr);
-	return dir_utf8[:len(dir_utf8)-1]; // NOTE(tetra): Remove the NUL.
+	return win32.utf16_to_utf8(dir_buf_wstr);
 }
 
 set_current_directory :: proc(path: string) -> (err: Errno) {
