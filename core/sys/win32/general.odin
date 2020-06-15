@@ -813,9 +813,11 @@ wstring_to_utf8 :: proc(s: Wstring, N: int, allocator := context.temp_allocator)
 		return "";
 	}
 
-	// NOTE: If N == -1 the call to wide_char_to_multi_byte assumes the wide string is null terminated, 
-	//       and will scan it for the first null terminated character. The resulting string is also null terminated.
-	//       If N != -1 it assumes the wide string is not null terminated and the resulting string is not null terminated.
+	// If N == -1 the call to wide_char_to_multi_byte assume the wide string is null terminated
+	// and will scan it to find the first null terminated character. The resulting string will 
+	// also null terminated.
+	// If N != -1 it assumes the wide string is not null terminated and the resulting string 
+	// will not be null terminated, we therefore have to force it to be null terminated manually.
 	text := make([]byte, n+1 if N != -1 else n, allocator);
 
 	if n1 := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), cstring(&text[0]), n, nil, nil); n1 == 0 {
@@ -823,14 +825,13 @@ wstring_to_utf8 :: proc(s: Wstring, N: int, allocator := context.temp_allocator)
 		return "";
 	}
 
-	if N > 0 {
-		// NOTE: The input string is not expected to be null terminated, so we strip excess zeros at the end. 
-		text[n] = 0;
-
-		for n >= 1 && text[n-1] == 0 {
-			n -= 1;
+	for i in 0..<n {
+		if text[i] == 0 {
+			n = i;
+			break;
 		}
 	}
+
 	return string(text[:n]);
 }
 
