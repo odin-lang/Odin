@@ -248,7 +248,7 @@ lbBlock *lb_create_block(lbProcedure *p, char const *name, bool append=false);
 
 lbValue lb_const_nil(lbModule *m, Type *type);
 lbValue lb_const_undef(lbModule *m, Type *type);
-lbValue lb_const_value(lbModule *m, Type *type, ExactValue value);
+lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local=true);
 lbValue lb_const_bool(lbModule *m, Type *type, bool value);
 lbValue lb_const_int(lbModule *m, Type *type, u64 value);
 
