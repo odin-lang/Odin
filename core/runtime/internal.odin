@@ -583,6 +583,23 @@ quaternion256_eq :: inline proc "contextless" (a, b: quaternion256) -> bool { re
 quaternion256_ne :: inline proc "contextless" (a, b: quaternion256) -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b); }
 
 
+bounds_trap :: proc "contextless" () -> ! {
+	when ODIN_OS == "windows" {
+		windows_trap_array_bounds();
+	} else {
+		trap();
+	}
+}
+
+type_assertion_trap :: proc "contextless" () -> ! {
+	when ODIN_OS == "windows" {
+		windows_trap_type_assertion();
+	} else {
+		trap();
+	}
+}
+
+
 bounds_check_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
 	if 0 <= index && index < count do return;
 	handle_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
@@ -594,7 +611,7 @@ bounds_check_error :: proc "contextless" (file: string, line, column: int, index
 		os.write_string(fd, " is out of bounds range 0:");
 		print_i64(fd, i64(count));
 		os.write_byte(fd, '\n');
-		debug_trap();
+		bounds_trap();
 	}
 	handle_error(file, line, column, index, count);
 }
@@ -610,7 +627,7 @@ slice_handle_error :: proc "contextless" (file: string, line, column: int, lo, h
 	os.write_string(fd, ":");
 	print_i64(fd, i64(len));
 	os.write_byte(fd, '\n');
-	debug_trap();
+	bounds_trap();
 }
 
 slice_expr_error_hi :: proc "contextless" (file: string, line, column: int, hi: int, len: int) {
@@ -636,7 +653,7 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int,
 		os.write_string(fd, ":");
 		print_i64(fd, i64(max));
 		os.write_byte(fd, '\n');
-		debug_trap();
+		bounds_trap();
 	}
 	handle_error(file, line, column, low, high, max);
 }
@@ -653,7 +670,7 @@ type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column
 		os.write_string(fd, " to ");
 		print_typeid(fd, to);
 		os.write_byte(fd, '\n');
-		debug_trap();
+		type_assertion_trap();
 	}
 	handle_error(file, line, column, from, to);
 }
@@ -764,7 +781,7 @@ make_slice_error_loc :: inline proc "contextless" (loc := #caller_location, len:
 		os.write_string(fd, " Invalid slice length for make: ");
 		print_i64(fd, i64(len));
 		os.write_byte(fd, '\n');
-		debug_trap();
+		bounds_trap();
 	}
 	handle_error(loc, len);
 }
@@ -780,7 +797,7 @@ make_dynamic_array_error_loc :: inline proc "contextless" (using loc := #caller_
 		os.write_byte(fd, ':');
 		print_i64(fd, i64(cap));
 		os.write_byte(fd, '\n');
-		debug_trap();
+		bounds_trap();
 	}
 	handle_error(loc, len, cap);
 }
@@ -794,7 +811,7 @@ make_map_expr_error_loc :: inline proc "contextless" (loc := #caller_location, c
 		os.write_string(fd, " Invalid map capacity for make: ");
 		print_i64(fd, i64(cap));
 		os.write_byte(fd, '\n');
-		debug_trap();
+		bounds_trap();
 	}
 	handle_error(loc, cap);
 }
