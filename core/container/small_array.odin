@@ -1,7 +1,5 @@
 package container
 
-import "core:mem"
-
 Small_Array :: struct(N: int, T: typeid) where N >= 0 {
 	data: [N]T,
 	len:  int,
