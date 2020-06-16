@@ -14,27 +14,27 @@ is_valid :: proc(data: []byte, spec := Specification.JSON) -> bool {
 validate_object_key :: proc(p: ^Parser) -> bool {
 	tok := p.curr_token;
 	if p.spec == Specification.JSON5 {
-		if tok.kind == Kind.String {
-			expect_token(p, Kind.String);
+		if tok.kind == .String {
+			expect_token(p, .String);
 			return true;
-		} else if tok.kind == Kind.Ident {
-			expect_token(p, Kind.Ident);
+		} else if tok.kind == .Ident {
+			expect_token(p, .Ident);
 			return true;
 		}
 	}
-	err := expect_token(p, Kind.String);
+	err := expect_token(p, .String);
 	return err == Error.None;
 }
 validate_object :: proc(p: ^Parser) -> bool {
-	if err := expect_token(p, Kind.Open_Brace); err != Error.None {
+	if err := expect_token(p, .Open_Brace); err != Error.None {
 		return false;
 	}
 
-	for p.curr_token.kind != Kind.Close_Brace {
+	for p.curr_token.kind != .Close_Brace {
 		if !validate_object_key(p) {
 			return false;
 		}
-		if colon_err := expect_token(p, Kind.Colon); colon_err != Error.None {
+		if colon_err := expect_token(p, .Colon); colon_err != Error.None {
 			return false;
 		}
 
@@ -44,12 +44,12 @@ validate_object :: proc(p: ^Parser) -> bool {
 
 		if p.spec == Specification.JSON5 {
 			// Allow trailing commas
-			if allow_token(p, Kind.Comma) {
+			if allow_token(p, .Comma) {
 				continue;
 			}
 		} else {
 			// Disallow trailing commas
-			if allow_token(p, Kind.Comma) {
+			if allow_token(p, .Comma) {
 				continue;
 			} else {
 				break;
@@ -57,31 +57,31 @@ validate_object :: proc(p: ^Parser) -> bool {
 		}
 	}
 
-	if err := expect_token(p, Kind.Close_Brace); err != Error.None {
+	if err := expect_token(p, .Close_Brace); err != Error.None {
 		return false;
 	}
 	return true;
 }
 
 validate_array :: proc(p: ^Parser) -> bool {
-	if err := expect_token(p, Kind.Open_Bracket); err != Error.None {
+	if err := expect_token(p, .Open_Bracket); err != Error.None {
 		return false;
 	}
 
-	for p.curr_token.kind != Kind.Close_Bracket {
+	for p.curr_token.kind != .Close_Bracket {
 		if !validate_value(p) {
 			return false;
 		}
 
 		// Disallow trailing commas for the time being
-		if allow_token(p, Kind.Comma) {
+		if allow_token(p, .Comma) {
 			continue;
 		} else {
 			break;
 		}
 	}
 
-	if err := expect_token(p, Kind.Close_Bracket); err != Error.None {
+	if err := expect_token(p, .Close_Bracket); err != Error.None {
 		return false;
 	}
 
