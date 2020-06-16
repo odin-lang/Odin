@@ -7,8 +7,6 @@ import "core:thread"
 import "core:time"
 import "core:reflect"
 import "core:runtime"
-import "core:container"
-import "core:hash"
 import "intrinsics"
 
 
@@ -1980,25 +1978,7 @@ pure_procedures :: proc() {
 }
 
 main :: proc() {
-	bloom := &container.Bloom_Filter{};
-
-	container.bloom_filter_init(bloom, 16);
-	defer container.bloom_filter_destroy(bloom);
-	container.bloom_filter_add_hash_proc(bloom, hash.djb2);
-	container.bloom_filter_add_hash_proc(bloom, hash.jenkins);
-	container.bloom_filter_add_hash_proc(bloom, hash.sdbm);
-	container.bloom_filter_add_hash_proc(bloom, hash.fnv32a);
-
-	fmt.printf("Should be false: %v\n", container.bloom_filter_test_string(bloom, "hello world"));
-	container.bloom_filter_add_string(bloom, "hello world");
-	fmt.printf("Should be true: %v\n", container.bloom_filter_test_string(bloom, "hello world"));
-	fmt.printf("Should probably be false: %v\n", container.bloom_filter_test_string(bloom, "world hello"));
-	fmt.println(bloom.bits);
-
-
-	fmt.println("Here");
-
-	when false {
+	when true {
 		the_basics();
 		control_flow();
 		named_proc_return_parameters();
