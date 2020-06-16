@@ -89,6 +89,7 @@ enum DeferredProcedureKind {
 	DeferredProcedure_none,
 	DeferredProcedure_in,
 	DeferredProcedure_out,
+	DeferredProcedure_in_out,
 };
 struct DeferredProcedure {
 	DeferredProcedureKind kind;

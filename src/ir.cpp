@@ -3319,6 +3319,14 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 			case DeferredProcedure_out:
 				result_as_args = ir_value_to_array(p, result);
 				break;
+			case DeferredProcedure_in_out:
+				{
+					auto out_args = ir_value_to_array(p, result);
+					array_init(&result_as_args, heap_allocator(), in_args.count + out_args.count);
+					array_copy(&result_as_args, in_args, 0);
+					array_copy(&result_as_args, out_args, in_args.count);
+				}
+				break;
 			}
 
 			ir_add_defer_proc(p, p->scope_index, deferred, result_as_args);
