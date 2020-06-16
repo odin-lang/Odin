@@ -2337,6 +2337,22 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		}
 		error(elem, "Expected a procedure entity for '%.*s'", LIT(name));
 		return false;
+	} else if (name == "deferred_in_out") {
+		if (value != nullptr) {
+			Operand o = {};
+			check_expr(c, &o, value);
+			Entity *e = entity_of_node(o.expr);
+			if (e != nullptr && e->kind == Entity_Procedure) {
+				if (ac->deferred_procedure.entity != nullptr) {
+					error(elem, "Previous usage of a 'deferred_*' attribute");
+				}
+				ac->deferred_procedure.kind = DeferredProcedure_in_out;
+				ac->deferred_procedure.entity = e;
+				return true;
+			}
+		}
+		error(elem, "Expected a procedure entity for '%.*s'", LIT(name));
+		return false;
 	} else if (name == "link_name") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 
@@ -4379,6 +4395,9 @@ void check_parsed_files(Checker *c) {
 			case DeferredProcedure_out:
 				error(src->token, "'deferred_out' cannot be used with a polymorphic procedure");
 				break;
+			case DeferredProcedure_in_out:
+				error(src->token, "'deferred_in_out' cannot be used with a polymorphic procedure");
+				break;
 			}
 			continue;
 		}
@@ -4448,6 +4467,53 @@ void check_parsed_files(Checker *c) {
 				// Okay!
 			} else {
 				gbString s = type_to_string(src_results);
+				gbString d = type_to_string(dst_params);
+				error(src->token, "Deferred procedure '%.*s' parameters do not match the results of initial procedure '%.*s':\n\t(%s) =/= (%s)",
+				      LIT(src->token.string), LIT(dst->token.string),
+				      s, d
+				);
+				gb_string_free(d);
+				gb_string_free(s);
+				continue;
+			}
+		} else if (dst_kind == DeferredProcedure_in_out) {
+			if (src_params == nullptr && src_results == nullptr && dst_params == nullptr) {
+				// Okay
+				continue;
+			}
+
+			GB_ASSERT(dst_params->kind == Type_Tuple);
+
+			Type *tsrc = alloc_type_tuple();
+			auto &sv = tsrc->Tuple.variables;
+			auto const &dv = dst_params->Tuple.variables;
+
+			isize len = 0;
+			if (src_params != nullptr) {
+				GB_ASSERT(src_params->kind == Type_Tuple);
+				len += src_params->Tuple.variables.count;
+			}
+			if (src_results != nullptr) {
+				GB_ASSERT(src_results->kind == Type_Tuple);
+				len += src_results->Tuple.variables.count;
+			}
+			array_init(&sv, heap_allocator(), 0, len);
+			if (src_params != nullptr) {
+				for_array(i, src_params->Tuple.variables) {
+					array_add(&sv, src_params->Tuple.variables[i]);
+				}
+			}
+			if (src_results != nullptr) {
+				for_array(i, src_results->Tuple.variables) {
+					array_add(&sv, src_results->Tuple.variables[i]);
+				}
+			}
+
+
+			if (are_types_identical(tsrc, dst_params)) {
+				// Okay!
+			} else {
+				gbString s = type_to_string(tsrc);
 				gbString d = type_to_string(dst_params);
 				error(src->token, "Deferred procedure '%.*s' parameters do not match the results of initial procedure '%.*s':\n\t(%s) =/= (%s)",
 				      LIT(src->token.string), LIT(dst->token.string),
