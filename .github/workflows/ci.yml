@@ -2,24 +2,27 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  build_unix:
-    runs-on: ${{ matrix.os }}
-    strategy:
-        matrix:
-          os: [ubuntu-latest, macOS-latest]
-          
+  build_linux:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - name: (macOS) Download LLVM and setup PATH
-        if: startsWith(matrix.os, 'macOS')
+      - name: Download LLVM
+        run: sudo apt-get install llvm
+      - name: build odin
+        run: make release
+      - name: Odin run
+        run: ./odin run examples/demo/demo.odin
+      - name: Odin check
+        run: ./odin check examples/demo/demo.odin -vet
+  build_macOS:
+    runs-on: macOS-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Download LLVM and setup PATH
         run: |
           brew install llvm
           echo ::add-path::/usr/local/opt/llvm/bin
           echo ::set-env name=CPATH::`xcrun --show-sdk-path`/usr/include
-      - name: (Linux) Download LLVM
-        if: startsWith(matrix.os, 'ubuntu')
-        run: |
-          sudo apt-get install llvm
       - name: build odin
         run: make release
       - name: Odin run
@@ -30,14 +33,13 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v1
-      - name: Install cURL
-        run: choco install curl
       - name: Download and unpack LLVM bins
-        shell: cmd
+        shell: powershell
         run: |
           cd bin
-          curl -sL https://github.com/odin-lang/Odin/releases/download/llvm-windows/llvm-binaries.zip --output llvm-binaries.zip
-          7z x llvm-binaries.zip > nul
+          $ProgressPreference = "SilentlyContinue";
+          Invoke-WebRequest -Uri https://github.com/odin-lang/Odin/releases/download/llvm-windows/llvm-binaries.zip -OutFile llvm-binaries.zip
+          7z x llvm-binaries.zip > $null
       - name: build Odin
         shell: cmd
         run: |
