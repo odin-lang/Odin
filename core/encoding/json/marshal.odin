@@ -10,6 +10,7 @@ import "core:reflect"
 Marshal_Error :: enum {
 	None,
 	Unsupported_Type,
+	Invalid_Data,
 }
 
 marshal :: proc(v: any, allocator := context.allocator) -> ([]byte, Marshal_Error) {
@@ -17,7 +18,7 @@ marshal :: proc(v: any, allocator := context.allocator) -> ([]byte, Marshal_Erro
 
 	err := marshal_arg(&b, v);
 
-	if err != Marshal_Error.None {
+	if err != .None {
 		strings.destroy_builder(&b);
 		return nil, err;
 	}
@@ -34,15 +35,15 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 	using runtime;
 	if v == nil {
 		write_string(b, "null");
-		return Marshal_Error.None;
+		return .None;
 	}
 
 	ti := type_info_base(type_info_of(v.id));
 	a := any{v.data, ti.id};
 
-	#partial switch info in ti.variant {
+	switch info in ti.variant {
 	case Type_Info_Named:
-		panic("Unreachable");
+		unreachable();
 
 	case Type_Info_Integer:
 		buf: [21]byte;
@@ -108,7 +109,10 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		write_string(b, string(s));
 
 	case Type_Info_Complex:
-		return Marshal_Error.Unsupported_Type;
+		return .Unsupported_Type;
+
+	case Type_Info_Quaternion:
+		return .Unsupported_Type;
 
 	case Type_Info_String:
 		switch s in a {
@@ -128,19 +132,31 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		write_string(b, val ? "true" : "false");
 
 	case Type_Info_Any:
-		return Marshal_Error.Unsupported_Type;
+		return .Unsupported_Type;
 
 	case Type_Info_Type_Id:
-		return Marshal_Error.Unsupported_Type;
+		return .Unsupported_Type;
 
 	case Type_Info_Pointer:
-		return Marshal_Error.Unsupported_Type;
+		return .Unsupported_Type;
 
 	case Type_Info_Procedure:
-		return Marshal_Error.Unsupported_Type;
+		return .Unsupported_Type;
 
 	case Type_Info_Tuple:
-		return Marshal_Error.Unsupported_Type;
+		return .Unsupported_Type;
+
+	case Type_Info_Enumerated_Array:
+		return .Unsupported_Type;
+
+	case Type_Info_Simd_Vector:
+		return .Unsupported_Type;
+
+	case Type_Info_Relative_Pointer:
+		return .Unsupported_Type;
+
+	case Type_Info_Relative_Slice:
+		return .Unsupported_Type;
 
 	case Type_Info_Array:
 		write_byte(b, '[');
@@ -180,7 +196,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		write_byte(b, '{');
 		if m != nil {
 			if info.generated_struct == nil {
-				return Marshal_Error.Unsupported_Type;
+				return .Unsupported_Type;
 			}
 			entries    := &m.entries;
 			gs         := type_info_base(info.generated_struct).variant.(Type_Info_Struct);
@@ -320,11 +336,11 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		write_u64(b, bit_data);
 
 
-		return Marshal_Error.Unsupported_Type;
+		return .Unsupported_Type;
 
 	case Type_Info_Opaque:
-		return Marshal_Error.Unsupported_Type;
+		return .Unsupported_Type;
 	}
 
-	return Marshal_Error.None;
+	return .None;
 }

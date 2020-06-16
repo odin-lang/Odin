@@ -5,11 +5,12 @@ import "core:unicode/utf8"
 import "core:strconv"
 
 Parser :: struct {
-	tok:        Tokenizer,
-	prev_token: Token,
-	curr_token: Token,
-	spec:       Specification,
-	allocator:  mem.Allocator,
+	tok:            Tokenizer,
+	prev_token:     Token,
+	curr_token:     Token,
+	spec:           Specification,
+	allocator:      mem.Allocator,
+	unmarshal_data: any,
 }
 
 make_parser :: proc(data: []byte, spec := Specification.JSON, allocator := context.allocator) -> Parser {
@@ -46,7 +47,7 @@ advance_token :: proc(p: ^Parser) -> (Token, Error) {
 }
 
 
-allow_token :: proc(p: ^Parser, kind: Kind) -> bool {
+allow_token :: proc(p: ^Parser, kind: Token_Kind) -> bool {
 	if p.curr_token.kind == kind {
 		advance_token(p);
 		return true;
@@ -54,13 +55,13 @@ allow_token :: proc(p: ^Parser, kind: Kind) -> bool {
 	return false;
 }
 
-expect_token :: proc(p: ^Parser, kind: Kind) -> Error {
+expect_token :: proc(p: ^Parser, kind: Token_Kind) -> Error {
 	prev := p.curr_token;
 	advance_token(p);
 	if prev.kind == kind {
-		return Error.None;
+		return .None;
 	}
-	return Error.Unexpected_Token;
+	return .Unexpected_Token;
 }
 
 
@@ -71,44 +72,44 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 
 	token := p.curr_token;
 	#partial switch token.kind {
-	case Kind.Null:
+	case .Null:
 		value.value = Null{};
 		advance_token(p);
 		return;
-	case Kind.False:
+	case .False:
 		value.value = Boolean(false);
 		advance_token(p);
 		return;
-	case Kind.True:
+	case .True:
 		value.value = Boolean(true);
 		advance_token(p);
 		return;
 
-	case Kind.Integer:
+	case .Integer:
 		i, _ := strconv.parse_i64(token.text);
 		value.value = Integer(i);
 		advance_token(p);
 		return;
-	case Kind.Float:
+	case .Float:
 		f, _ := strconv.parse_f64(token.text);
 		value.value = Float(f);
 		advance_token(p);
 		return;
-	case Kind.String:
+	case .String:
 		value.value = String(unquote_string(token, p.spec, p.allocator));
 		advance_token(p);
 		return;
 
-	case Kind.Open_Brace:
+	case .Open_Brace:
 		return parse_object(p);
 
-	case Kind.Open_Bracket:
+	case .Open_Bracket:
 		return parse_array(p);
 
 	case:
 		if p.spec == Specification.JSON5 {
 			#partial switch token.kind {
-			case Kind.Infinity:
+			case .Infinity:
 				inf: u64 = 0x7ff0000000000000;
 				if token.text[0] == '-' {
 					inf = 0xfff0000000000000;
@@ -116,7 +117,7 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 				value.value = transmute(f64)inf;
 				advance_token(p);
 				return;
-			case Kind.NaN:
+			case .NaN:
 				nan: u64 = 0x7ff7ffffffffffff;
 				if token.text[0] == '-' {
 					nan = 0xfff7ffffffffffff;
@@ -128,7 +129,7 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		}
 	}
 
-	err = Error.Unexpected_Token;
+	err = .Unexpected_Token;
 	advance_token(p);
 	return;
 }
@@ -136,36 +137,36 @@ parse_value :: proc(p: ^Parser) -> (value: Value, err: Error) {
 parse_array :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	value.pos = p.curr_token.pos;
 	defer value.end = token_end_pos(p.prev_token);
-	if err = expect_token(p, Kind.Open_Bracket); err != Error.None {
+	if err = expect_token(p, .Open_Bracket); err != .None {
 		return;
 	}
 
 	array: Array;
 	array.allocator = p.allocator;
-	defer if err != Error.None {
+	defer if err != .None {
 		for elem in array {
 			destroy_value(elem);
 		}
 		delete(array);
 	}
 
-	for p.curr_token.kind != Kind.Close_Bracket {
+	for p.curr_token.kind != .Close_Bracket {
 		elem, elem_err := parse_value(p);
-		if elem_err != Error.None {
+		if elem_err != .None {
 			err = elem_err;
 			return;
 		}
 		append(&array, elem);
 
 		// Disallow trailing commas for the time being
-		if allow_token(p, Kind.Comma) {
+		if allow_token(p, .Comma) {
 			continue;
 		} else {
 			break;
 		}
 	}
 
-	if err = expect_token(p, Kind.Close_Bracket); err != Error.None {
+	if err = expect_token(p, .Close_Bracket); err != .None {
 		return;
 	}
 
@@ -184,18 +185,18 @@ clone_string :: proc(s: string, allocator: mem.Allocator) -> string {
 parse_object_key :: proc(p: ^Parser) -> (key: string, err: Error) {
 	tok := p.curr_token;
 	if p.spec == Specification.JSON5 {
-		if tok.kind == Kind.String {
-			expect_token(p, Kind.String);
+		if tok.kind == .String {
+			expect_token(p, .String);
 			key = unquote_string(tok, p.spec, p.allocator);
 			return;
-		} else if tok.kind == Kind.Ident {
-			expect_token(p, Kind.Ident);
+		} else if tok.kind == .Ident {
+			expect_token(p, .Ident);
 			key = clone_string(tok.text, p.allocator);
 			return;
 		}
 	}
-	if tok_err := expect_token(p, Kind.String); tok_err != Error.None {
-		err = Error.Expected_String_For_Object_Key;
+	if tok_err := expect_token(p, .String); tok_err != .None {
+		err = .Expected_String_For_Object_Key;
 		return;
 	}
 	key = unquote_string(tok, p.spec, p.allocator);
@@ -206,14 +207,14 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 	value.pos = p.curr_token.pos;
 	defer value.end = token_end_pos(p.prev_token);
 
-	if err = expect_token(p, Kind.Open_Brace); err != Error.None {
+	if err = expect_token(p, .Open_Brace); err != .None {
 		value.pos = p.curr_token.pos;
 		return;
 	}
 
 	obj: Object;
 	obj.allocator = p.allocator;
-	defer if err != Error.None {
+	defer if err != .None {
 		for key, elem in obj {
 			delete(key, p.allocator);
 			destroy_value(elem);
@@ -221,30 +222,30 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		delete(obj);
 	}
 
-	for p.curr_token.kind != Kind.Close_Brace {
+	for p.curr_token.kind != .Close_Brace {
 		key: string;
 		key, err = parse_object_key(p);
-		if err != Error.None {
+		if err != .None {
 			delete(key, p.allocator);
 			value.pos = p.curr_token.pos;
 			return;
 		}
 
-		if colon_err := expect_token(p, Kind.Colon); colon_err != Error.None {
-			err = Error.Expected_Colon_After_Key;
+		if colon_err := expect_token(p, .Colon); colon_err != .None {
+			err = .Expected_Colon_After_Key;
 			value.pos = p.curr_token.pos;
 			return;
 		}
 
 		elem, elem_err := parse_value(p);
-		if elem_err != Error.None {
+		if elem_err != .None {
 			err = elem_err;
 			value.pos = p.curr_token.pos;
 			return;
 		}
 
 		if key in obj {
-			err = Error.Duplicate_Object_Key;
+			err = .Duplicate_Object_Key;
 			value.pos = p.curr_token.pos;
 			delete(key, p.allocator);
 			return;
@@ -254,12 +255,12 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 
 		if p.spec == Specification.JSON5 {
 			// Allow trailing commas
-			if allow_token(p, Kind.Comma) {
+			if allow_token(p, .Comma) {
 				continue;
 			}
 		} else {
 			// Disallow trailing commas
-			if allow_token(p, Kind.Comma) {
+			if allow_token(p, .Comma) {
 				continue;
 			} else {
 				break;
@@ -267,7 +268,7 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 		}
 	}
 
-	if err = expect_token(p, Kind.Close_Brace); err != Error.None {
+	if err = expect_token(p, .Close_Brace); err != .None {
 		value.pos = p.curr_token.pos;
 		return;
 	}
@@ -316,7 +317,7 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 		return r;
 	}
 
-	if token.kind != Kind.String {
+	if token.kind != .String {
 		return "";
 	}
 	s := token.text;
