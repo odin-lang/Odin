@@ -4,12 +4,13 @@ import "core:unicode/utf8"
 
 Token :: struct {
 	using pos: Pos,
-	kind: Kind,
+	kind: Token_Kind,
 	text: string,
 }
 
-Kind :: enum {
+Token_Kind :: enum {
 	Invalid,
+	EOF,
 
 	Null,
 	False,
@@ -122,7 +123,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 				t.pos.column = 1;
 				next_rune(t);
 			case:
-				if t.spec == Specification.JSON5 {
+				if t.spec == .JSON5 {
 					switch t.r {
 					case 0x2028, 0x2029, 0xFEFF:
 						next_rune(t);
@@ -159,36 +160,37 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 	token.pos = t.pos;
 
-	token.kind = Kind.Invalid;
+	token.kind = .Invalid;
 
 	curr_rune := t.r;
 	next_rune(t);
 
 	block: switch curr_rune {
 	case utf8.RUNE_ERROR:
-		err = Error.Illegal_Character;
+		err = .Illegal_Character;
 	case utf8.RUNE_EOF, '\x00':
-		err = Error.EOF;
+		token.kind = .EOF;
+		err = .EOF;
 
 	case 'A'..'Z', 'a'..'z', '_':
-		token.kind = Kind.Ident;
+		token.kind = .Ident;
 
 		skip_alphanum(t);
 
 		switch str := string(t.data[token.offset:t.offset]); str {
-		case "null":  token.kind = Kind.Null;
-		case "false": token.kind = Kind.False;
-		case "true":  token.kind = Kind.True;
+		case "null":  token.kind = .Null;
+		case "false": token.kind = .False;
+		case "true":  token.kind = .True;
 		case:
-			if t.spec == Specification.JSON5 do switch str {
-			case "Infinity": token.kind = Kind.Infinity;
-			case "NaN":      token.kind = Kind.NaN;
+			if t.spec == .JSON5 do switch str {
+			case "Infinity": token.kind = .Infinity;
+			case "NaN":      token.kind = .NaN;
 			}
 		}
 
 	case '+':
-		err = Error.Illegal_Character;
-		if t.spec != Specification.JSON5 {
+		err = .Illegal_Character;
+		if t.spec != .JSON5 {
 			break;
 		}
 		fallthrough;
@@ -199,15 +201,15 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			// Okay
 		case:
 			// Illegal use of +/-
-			err = Error.Illegal_Character;
+			err = .Illegal_Character;
 
-			if t.spec == Specification.JSON5 {
+			if t.spec == .JSON5 {
 				if t.r == 'I' || t.r == 'N' {
 					skip_alphanum(t);
 				}
 				switch string(t.data[token.offset:t.offset]) {
-				case "-Infinity": token.kind = Kind.Infinity;
-				case "-NaN":      token.kind = Kind.NaN;
+				case "-Infinity": token.kind = .Infinity;
+				case "-NaN":      token.kind = .NaN;
 				}
 			}
 			break block;
@@ -215,8 +217,8 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		fallthrough;
 
 	case '0'..'9':
-		token.kind = Kind.Integer;
-		if t.spec == Specification.JSON5 { // Hexadecimal Numbers
+		token.kind = .Integer;
+		if t.spec == .JSON5 { // Hexadecimal Numbers
 			if curr_rune == '0' && (t.r == 'x' || t.r == 'X') {
 				next_rune(t);
 				skip_hex_digits(t);
@@ -227,7 +229,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		skip_digits(t);
 
 		if t.r == '.' {
-			token.kind = Kind.Float;
+			token.kind = .Float;
 			next_rune(t);
 			skip_digits(t);
 		}
@@ -241,12 +243,12 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 		str := string(t.data[token.offset:t.offset]);
 		if !is_valid_number(str, t.spec) {
-			err = Error.Invalid_Number;
+			err = .Invalid_Number;
 		}
 
 	case '.':
-		err = Error.Illegal_Character;
-		if t.spec == Specification.JSON5 { // Allow leading decimal point
+		err = .Illegal_Character;
+		if t.spec == .JSON5 { // Allow leading decimal point
 			skip_digits(t);
 			if t.r == 'e' || t.r == 'E' {
 				switch r := next_rune(t); r {
@@ -257,24 +259,24 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			}
 			str := string(t.data[token.offset:t.offset]);
 			if !is_valid_number(str, t.spec) {
-				err = Error.Invalid_Number;
+				err = .Invalid_Number;
 			}
 		}
 
 
 	case '\'':
-		err = Error.Illegal_Character;
-		if t.spec != Specification.JSON5 {
+		err = .Illegal_Character;
+		if t.spec != .JSON5 {
 			break;
 		}
 		fallthrough;
 	case '"':
-		token.kind = Kind.String;
+		token.kind = .String;
 		quote := curr_rune;
 		for t.offset < len(t.data) {
 			r := t.r;
 			if r == '\n' || r < 0 {
-				err = Error.String_Not_Terminated;
+				err = .String_Not_Terminated;
 				break;
 			}
 			next_rune(t);
@@ -288,20 +290,20 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 		str := string(t.data[token.offset : t.offset]);
 		if !is_valid_string_literal(str, t.spec) {
-			err = Error.Invalid_String;
+			err = .Invalid_String;
 		}
 
 
-	case ',': token.kind = Kind.Comma;
-	case ':': token.kind = Kind.Colon;
-	case '{': token.kind = Kind.Open_Brace;
-	case '}': token.kind = Kind.Close_Brace;
-	case '[': token.kind = Kind.Open_Bracket;
-	case ']': token.kind = Kind.Close_Bracket;
+	case ',': token.kind = .Comma;
+	case ':': token.kind = .Colon;
+	case '{': token.kind = .Open_Brace;
+	case '}': token.kind = .Close_Brace;
+	case '[': token.kind = .Open_Bracket;
+	case ']': token.kind = .Close_Bracket;
 
 	case '/':
-		err = Error.Illegal_Character;
-		if t.spec == Specification.JSON5 {
+		err = .Illegal_Character;
+		if t.spec == .JSON5 {
 			switch t.r {
 			case '/':
 				// Single-line comments
@@ -319,11 +321,11 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 						}
 					}
 				}
-				err = Error.EOF;
+				err = .EOF;
 			}
 		}
 
-	case: err = Error.Illegal_Character;
+	case: err = .Illegal_Character;
 	}
 
 	token.text = string(t.data[token.offset : t.offset]);
@@ -344,7 +346,7 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 		if s == "" {
 			return false;
 		}
-	} else if spec == Specification.JSON5 {
+	} else if spec == .JSON5 {
 		if s[0] == '+' { // Allow positive sign
 			s = s[1:];
 			if s == "" {
@@ -360,7 +362,7 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 		s = s[1:];
 		for len(s) > 0 && '0' <= s[0] && s[0] <= '9' do s = s[1:];
 	case '.':
-		if spec == Specification.JSON5 { // Allow leading decimal point
+		if spec == .JSON5 { // Allow leading decimal point
 			s = s[1:];
 		} else {
 			return false;
@@ -369,7 +371,7 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 		return false;
 	}
 
-	if spec == Specification.JSON5 {
+	if spec == .JSON5 {
 		if len(s) == 1 && s[0] == '.' { // Allow trailing decimal point
 			return true;
 		}
@@ -406,7 +408,7 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 		return false;
 	}
 	if s[0] != '"' || s[len(s)-1] != '"' {
-		if spec == Specification.JSON5 {
+		if spec == .JSON5 {
 			if s[0] != '\'' || s[len(s)-1] != '\'' {
 				return false;
 			}

@@ -57,7 +57,7 @@ set_add :: proc(m: ^Set, key: u64) {
 		_set_grow(m);
 	}
 
-	i := _set_find_or_make(m, key);
+	_ = _set_find_or_make(m, key);
 	if _set_full(m^) {
 		_set_grow(m);
 	}

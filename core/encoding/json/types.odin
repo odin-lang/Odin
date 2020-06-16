@@ -2,7 +2,8 @@ package json
 
 Specification :: enum {
 	JSON,
-	JSON5,
+	JSON5, // https://json5.org/
+	// MJSON, // http://bitsquid.blogspot.com/2009/09/json-configuration-data.html
 }
 
 Null    :: distinct rawptr;
