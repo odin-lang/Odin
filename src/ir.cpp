@@ -11882,8 +11882,8 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			irValue *min_value = ir_emit_struct_ep(proc, tag, 4);
 			irValue *max_value = ir_emit_struct_ep(proc, tag, 5);
 
-			irValue *min_v = ir_value_constant(core_type(t->EnumeratedArray.index), t->EnumeratedArray.min_value);
-			irValue *max_v = ir_value_constant(core_type(t->EnumeratedArray.index), t->EnumeratedArray.max_value);
+			irValue *min_v = ir_value_constant(t_i64, t->EnumeratedArray.min_value);
+			irValue *max_v = ir_value_constant(t_i64, t->EnumeratedArray.max_value);
 
 			ir_emit_store(proc, min_value, min_v);
 			ir_emit_store(proc, max_value, max_v);

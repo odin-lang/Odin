@@ -11273,11 +11273,11 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			lbValue min_value = lb_emit_struct_ep(p, tag, 4);
 			lbValue max_value = lb_emit_struct_ep(p, tag, 5);
 
-			lbValue min_v = lb_const_value(m, core_type(t->EnumeratedArray.index), t->EnumeratedArray.min_value);
-			lbValue max_v = lb_const_value(m, core_type(t->EnumeratedArray.index), t->EnumeratedArray.max_value);
+			lbValue min_v = lb_const_value(m, t_i64, t->EnumeratedArray.min_value);
+			lbValue max_v = lb_const_value(m, t_i64, t->EnumeratedArray.max_value);
 
-			lb_emit_store_union_variant(p, min_value, min_v, min_v.type);
-			lb_emit_store_union_variant(p, max_value, max_v, max_v.type);
+			lb_emit_store(p, min_value, min_v);
+			lb_emit_store(p, max_value, max_v);
 			break;
 		}
 		case Type_DynamicArray: {
