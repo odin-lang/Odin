@@ -562,6 +562,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 	}
 
 	case Entity_Variable: {
+		bool is_ptr = is_type_pointer(e->type);
 		Type *t = base_type(type_deref(e->type));
 		if (t->kind == Type_Struct) {
 			// TODO(bill): Make it work for unions too
@@ -570,7 +571,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 				Entity *f = found->elements.entries[i].value;
 				if (f->kind == Entity_Variable) {
 					Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, expr);
-					if (e->flags & EntityFlag_Value) uvar->flags |= EntityFlag_Value;
+					if (!is_ptr && e->flags & EntityFlag_Value) uvar->flags |= EntityFlag_Value;
 					if (e->flags & EntityFlag_Param) uvar->flags |= EntityFlag_Param;
 					Entity *prev = scope_insert(ctx->scope, uvar);
 					if (prev != nullptr) {
