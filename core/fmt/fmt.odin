@@ -185,17 +185,25 @@ fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) {
 
 sbprint :: proc(buf: ^strings.Builder, args: ..any) -> string {
 	fi: Info;
-
 	fi.buf = buf;
 
-	prev_string := false;
-	for arg, i in args {
-		is_string := arg != nil && reflect.is_string(type_info_of(arg.id));
-		if i > 0 && !is_string && !prev_string {
-			strings.write_byte(buf, ' ');
-		}
+	// NOTE(bill): Old approach
+	// prev_string := false;
+	// for arg, i in args {
+	// 	is_string := arg != nil && reflect.is_string(type_info_of(arg.id));
+	// 	if i > 0 && !is_string && !prev_string {
+	// 		strings.write_byte(buf, ' ');
+	// 	}
+	// 	fmt_value(&fi, args[i], 'v');
+	// 	prev_string = is_string;
+	// }
+	// NOTE(bill, 2020-06-19): I have found that the previous approach was not what people were expecting
+	// and were expecting `*print` to be the same `*println` except for the added newline
+	// so I am going to keep the same behaviour as `*println` for `*print`
+	for _, i in args {
+		if i > 0 do strings.write_byte(buf, ' ');
+
 		fmt_value(&fi, args[i], 'v');
-		prev_string = is_string;
 	}
 	return strings.to_string(buf^);
 }
