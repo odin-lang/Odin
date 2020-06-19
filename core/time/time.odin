@@ -127,8 +127,17 @@ clock :: proc(t: Time) -> (hour, min, sec: int) {
 
 
 
-ABSOLUTE_ZERO_YEAR :: -292277022399; // Day is chosen so that 2001-01-01 is Monday in the calculations
-UNIX_TO_ABSOLUTE :: (1969*365 + 1969/4 - 1969/100 + 1969/400 - ((ABSOLUTE_ZERO_YEAR - 1) * 365.2425)) * SECONDS_PER_DAY;
+ABSOLUTE_ZERO_YEAR :: i64(-292277022399); // Day is chosen so that 2001-01-01 is Monday in the calculations
+ABSOLUTE_TO_INTERNAL :: i64(-9223371966579724800); // i64((ABSOLUTE_ZERO_YEAR - 1) * 365.2425 * SECONDS_PER_DAY);
+INTERNAL_TO_ABSOLUTE :: i64(-ABSOLUTE_TO_INTERNAL);
+
+UNIX_TO_INTERNAL :: i64((1969*365 + 1969/4 - 1969/100 + 1969/400) * SECONDS_PER_DAY);
+INTERNAL_TO_UNIX :: i64(-UNIX_TO_INTERNAL);
+
+WALL_TO_INTERNAL :: i64((1884*365 + 1884/4 - 1884/100 + 1884/400) * SECONDS_PER_DAY);
+INTERNAL_TO_WALL :: i64(- WALL_TO_INTERNAL);
+
+UNIX_TO_ABSOLUTE :: i64(UNIX_TO_INTERNAL + INTERNAL_TO_ABSOLUTE);
 
 _is_leap_year :: proc(year: int) -> bool {
 	return year%4 == 0 && (year%100 != 0 || year%400 == 0);
