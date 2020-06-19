@@ -10,8 +10,7 @@ import "core:strings"
 import "core:reflect"
 import "intrinsics"
 
-@private
-DEFAULT_BUFFER_SIZE :: 1<<12;
+DEFAULT_BUFFER_SIZE :: #config(FMT_DEFAULT_BUFFER_SIZE, 1<<12);
 
 Info :: struct {
 	minus:     bool,
