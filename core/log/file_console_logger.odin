@@ -60,9 +60,10 @@ destroy_console_logger :: proc(log: ^Logger) {
 
 file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
 	data := cast(^File_Console_Logger_Data)logger_data;
-	h: os.Handle;
-	if(data.file_handle != os.INVALID_HANDLE) do h = data.file_handle;
-	else                                      do h = os.stdout if level <= Level.Error else os.stderr;
+	h: os.Handle = os.stdout if level <= Level.Error else os.stderr;
+	if data.file_handle != os.INVALID_HANDLE {
+		h = data.file_handle;
+	}
 	backing: [1024]byte; //NOTE(Hoej): 1024 might be too much for a header backing, unless somebody has really long paths.
 	buf := strings.builder_from_slice(backing[:]);
 
@@ -74,8 +75,8 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 			t := time.now();
 			y, m, d := time.date(t);
 			h, min, s := time.clock(t);
-			if Option.Date in options do fmt.sbprintf(&buf, "%d-%02d-%02d ", y, m, d);
-			if Option.Time in options do fmt.sbprintf(&buf, "%02d:%02d:%02d", h, min, s);
+			if .Date in options do fmt.sbprintf(&buf, "%d-%02d-%02d ", y, m, d);
+			if .Time in options do fmt.sbprintf(&buf, "%02d:%02d:%02d", h, min, s);
 			fmt.sbprint(&buf, "] ");
 		}
 	}
@@ -115,21 +116,29 @@ do_location_header :: proc(opts: Options, buf: ^strings.Builder, location := #ca
 	file := location.file_path;
 	if .Short_File_Path in opts {
 		last := 0;
-		for r, i in location.file_path do if r == '/' do last = i+1;
+		for r, i in location.file_path {
+			if r == '/' {
+				last = i+1;
+			}
+		}
 		file = location.file_path[last:];
 	}
 
-	if Location_File_Opts & opts != nil do fmt.sbprint(buf, file);
-
-	if .Procedure in opts {
-		if Location_File_Opts & opts != nil do fmt.sbprint(buf, ".");
-		fmt.sbprintf(buf, "%s()", location.procedure);
+	if Location_File_Opts & opts != nil {
+		fmt.sbprint(buf, file);
 	}
-
 	if .Line in opts {
 		if Location_File_Opts & opts != nil || .Procedure in opts do fmt.sbprint(buf, ":");
 		fmt.sbprint(buf, location.line);
 	}
+
+	if .Procedure in opts {
+		if Location_File_Opts & opts != nil {
+			fmt.sbprint(buf, ".");
+		}
+		fmt.sbprintf(buf, "%s()", location.procedure);
+	}
+
 
 	fmt.sbprint(buf, "] ");
 }
