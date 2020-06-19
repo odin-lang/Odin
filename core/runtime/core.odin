@@ -264,11 +264,11 @@ Allocator :: struct {
 // Logging stuff
 
 Logger_Level :: enum {
-	Debug,
-	Info,
-	Warning,
-	Error,
-	Fatal,
+	Debug   = 0,
+	Info    = 10,
+	Warning = 20,
+	Error   = 30,
+	Fatal   = 40,
 }
 
 Logger_Option :: enum {
