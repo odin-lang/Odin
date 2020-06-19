@@ -109,6 +109,18 @@ fatal :: proc(args: ..any, location := #caller_location) {
 	log(level=.Fatal,   args=args, location=location);
 }
 
+panic :: proc(args: ..any, location := #caller_location) -> ! {
+	log(level=.Fatal, args=args, location=location);
+	runtime.panic("log.panic");
+}
+panicf :: proc(fmt_str: string, args: ..any, location := #caller_location) -> ! {
+	logf(level=.Fatal, fmt_str=fmt_str, args=args, location=location);
+	runtime.panic("log.panicf");
+}
+
+
+
+
 log :: proc(level: Level, args: ..any, location := #caller_location) {
 	logger := context.logger;
 	if level < logger.lowest_level {
