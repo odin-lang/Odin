@@ -58,7 +58,7 @@ ExprKind check_expr_base                (CheckerContext *c, Operand *operand, As
 void     check_expr_with_type_hint      (CheckerContext *c, Operand *o, Ast *e, Type *t);
 Type *   check_type                     (CheckerContext *c, Ast *expression);
 Type *   check_type_expr                (CheckerContext *c, Ast *expression, Type *named_type);
-Type *   make_optional_ok_type          (Type *value);
+Type *   make_optional_ok_type          (Type *value, bool typed=true);
 void     check_type_decl                (CheckerContext *c, Entity *e, Ast *type_expr, Type *def);
 Entity * check_selector                 (CheckerContext *c, Operand *operand, Ast *node, Type *type_hint);
 Entity * check_ident                    (CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name);
@@ -5532,7 +5532,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			check_assignment(c, &y, elem, builtin_name);
 
 			operand->mode = Addressing_Value;
-			operand->type = make_optional_ok_type(elem);
+			operand->type = make_optional_ok_type(elem, /*typed*/false);
 			break;
 		}
 		break;
