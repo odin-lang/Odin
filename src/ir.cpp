@@ -976,8 +976,8 @@ irValue *ir_value_param(irProcedure *parent, Entity *e, Type *abi_type, i32 inde
 	if (e != nullptr && abi_type != e->type) {
 		if (is_type_pointer(abi_type)) {
 			GB_ASSERT(e->kind == Entity_Variable);
-			Type *av = type_deref(abi_type);
-			if (are_types_identical(av, e->type)) {
+			Type *av = core_type(type_deref(abi_type));
+			if (are_types_identical(av, core_type(e->type))) {
 				v->Param.kind = irParamPass_Pointer;
 				if (e->flags&EntityFlag_Value) {
 					v->Param.kind = irParamPass_ConstRef;
@@ -3246,8 +3246,8 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 			array_add(&processed_args, args[i]);
 		} else if (!are_types_identical(original_type, new_type)) {
 			if (is_type_pointer(new_type) && !is_type_pointer(original_type)) {
-				Type *av = type_deref(new_type);
-				if (are_types_identical(av, original_type)) {
+				Type *av = core_type(type_deref(new_type));
+				if (are_types_identical(av, core_type(original_type))) {
 					if (e->flags&EntityFlag_ImplicitReference) {
 						array_add(&processed_args, ir_address_from_load_or_generate_local(p, args[i]));
 					} else if (!is_type_pointer(arg_type)) {
