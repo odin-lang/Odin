@@ -976,9 +976,14 @@ irValue *ir_value_param(irProcedure *parent, Entity *e, Type *abi_type, i32 inde
 	if (e != nullptr && abi_type != e->type) {
 		if (is_type_pointer(abi_type)) {
 			GB_ASSERT(e->kind == Entity_Variable);
-			v->Param.kind = irParamPass_Pointer;
-			if (e->flags&EntityFlag_Value) {
-				v->Param.kind = irParamPass_ConstRef;
+			Type *av = type_deref(abi_type);
+			if (are_types_identical(abi_type, e->type)) {
+				v->Param.kind = irParamPass_Pointer;
+				if (e->flags&EntityFlag_Value) {
+					v->Param.kind = irParamPass_ConstRef;
+				}
+			} else {
+				v->Param.kind = irParamPass_BitCast;
 			}
 		} else if (is_type_integer(abi_type)) {
 			v->Param.kind = irParamPass_Integer;
@@ -3241,10 +3246,15 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 			array_add(&processed_args, args[i]);
 		} else if (!are_types_identical(original_type, new_type)) {
 			if (is_type_pointer(new_type) && !is_type_pointer(original_type)) {
-				if (e->flags&EntityFlag_ImplicitReference) {
-					array_add(&processed_args, ir_address_from_load_or_generate_local(p, args[i]));
-				} else if (!is_type_pointer(arg_type)) {
-					array_add(&processed_args, ir_copy_value_to_ptr(p, args[i], original_type, 16));
+				Type *av = type_deref(new_type);
+				if (are_types_identical(av, original_type)) {
+					if (e->flags&EntityFlag_ImplicitReference) {
+						array_add(&processed_args, ir_address_from_load_or_generate_local(p, args[i]));
+					} else if (!is_type_pointer(arg_type)) {
+						array_add(&processed_args, ir_copy_value_to_ptr(p, args[i], original_type, 16));
+					}
+				} else {
+					array_add(&processed_args, ir_emit_transmute(p, args[i], new_type));
 				}
 			} else if (is_type_integer(new_type) || is_type_float(new_type)) {
 				array_add(&processed_args, ir_emit_transmute(p, args[i], new_type));
