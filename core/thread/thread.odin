@@ -1,8 +1,6 @@
 package thread
 
 import "core:runtime"
-import "core:os"
-import "core:sync"
 
 Thread_Proc :: #type proc(^Thread);
 
