@@ -20,6 +20,7 @@ Thread_Os_Specific :: struct #align 16 {
 	// signal to start it.
 	// destroyed after thread is started.
 	start_gate: sync.Condition,
+	start_mutex: sync.Mutex,
 
 	// if true, the thread has been started and the start_gate has been destroyed.
 	started: bool,
@@ -48,7 +49,9 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 		t := (^Thread)(t);
 		sync.condition_wait_for(&t.start_gate);
 		sync.condition_destroy(&t.start_gate);
+		sync.mutex_destroy(&t.start_mutex);
 		t.start_gate = {};
+		t.start_mutex = {};
 
 		c := context;
 		if ic, ok := t.init_context.?; ok {
@@ -96,7 +99,8 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	res = unix.pthread_attr_setschedparam(&attrs, &params);
 	assert(res == 0);
 
-	sync.condition_init(&thread.start_gate);
+	sync.mutex_init(&thread.start_mutex);
+	sync.condition_init(&thread.start_gate, &thread.start_mutex);
 	if unix.pthread_create(&thread.unix_thread, &attrs, __linux_thread_entry_proc, thread) != 0 {
 		free(thread);
 		return nil;
