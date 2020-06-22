@@ -977,7 +977,7 @@ irValue *ir_value_param(irProcedure *parent, Entity *e, Type *abi_type, i32 inde
 		if (is_type_pointer(abi_type)) {
 			GB_ASSERT(e->kind == Entity_Variable);
 			Type *av = type_deref(abi_type);
-			if (are_types_identical(abi_type, e->type)) {
+			if (are_types_identical(av, e->type)) {
 				v->Param.kind = irParamPass_Pointer;
 				if (e->flags&EntityFlag_Value) {
 					v->Param.kind = irParamPass_ConstRef;
