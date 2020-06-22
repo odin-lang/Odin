@@ -528,16 +528,6 @@ copy :: proc{copy_slice, copy_from_string};
 
 
 
-
-@builtin
-pop :: proc(array: ^$T/[dynamic]$E) -> E {
-	if array == nil do return E{};
-	assert(len(array) > 0);
-	res := #no_bounds_check array[len(array)-1];
-	(^Raw_Dynamic_Array)(array).len -= 1;
-	return res;
-}
-
 @builtin
 unordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_location) {
 	bounds_check_error_loc(loc, index, len(array));
@@ -557,8 +547,42 @@ ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_locati
 	pop(array);
 }
 
+
 @builtin
-pop_front :: proc(array: ^$T/[dynamic]$E) -> (E, bool) #no_bounds_check {
+pop :: proc(array: ^$T/[dynamic]$E) -> E {
+	if len(array) == 0 {
+		return E{};
+	}
+	assert(len(array) > 0);
+	res := #no_bounds_check array[len(array)-1];
+	(^Raw_Dynamic_Array)(array).len -= 1;
+	return res;
+}
+
+
+@builtin
+pop_safe :: proc(array: ^$T/[dynamic]$E) -> (E, bool) {
+	if len(array) == 0 {
+		return E{}, false;
+	}
+	res :=  #no_bounds_check array[len(array)-1];
+	(^Raw_Dynamic_Array)(array).len -= 1;
+	return res, true;
+}
+
+@builtin
+pop_front :: proc(array: ^$T/[dynamic]$E) -> E #no_bounds_check {
+	assert(len(array) > 0);
+	res := array[0];
+	if len(array) > 1 {
+		copy(array[0:], array[1:]);
+	}
+	(^Raw_Dynamic_Array)(array).len -= 1;
+	return res;
+}
+
+@builtin
+pop_front_safe :: proc(array: ^$T/[dynamic]$E) -> (E, bool) #no_bounds_check {
 	if len(array) == 0 {
 		return E{}, false;
 	}
