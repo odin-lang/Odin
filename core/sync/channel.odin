@@ -4,6 +4,8 @@ import "core:mem"
 import "core:time"
 import "core:math/rand"
 
+_, _ :: time, rand;
+
 Channel :: struct(T: typeid) {
 	using internal: ^_Channel_Internal(T),
 	_: bool,
