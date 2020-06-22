@@ -9,7 +9,7 @@ if "%1" == "1" (
 ) else if "%1" == "release" (
 	set release_mode=1
 ) else (
-	set release_mode=0
+	set release_mode=1
 )
 
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
@@ -49,9 +49,15 @@ set linker_settings=%libs% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-cl %compiler_settings% "src\main.cpp" ^
-	/link %linker_settings% -OUT:%exe_name% ^
-	&& odin run examples/demo/demo.odin
+rem cl %compiler_settings% "src\main.cpp" ^
+rem 	/link %linker_settings% -OUT:%exe_name% ^
+rem 	&& odin run examples/demo/demo.odin -llvm-api -vet
+rem odin build examples/wasm.odin -llvm-api -target:wasm32 -keep-temp-files
+rem odin run generate-wasm.odin
+rem odin build examples/threading -llvm-api -target:darwin_amd64
+odin run examples/threading -llvm-api
+
+
 if %errorlevel% neq 0 (
 	goto end_of_build
 )
