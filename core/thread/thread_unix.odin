@@ -51,14 +51,14 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 		t.start_gate = {};
 
 		c := context;
-		if t.use_init_context {
-			c = t.init_context;
+		if ic, ok := t.init_context.?; ok {
+			c = ic;
 		}
 		context = c;
 
 		t.procedure(t);
 
-		if !t.use_init_context {
+		if t.init_context == nil {
 			if context.temp_allocator.data == &runtime.global_default_temp_allocator_data {
 				runtime.default_temp_allocator_destroy(auto_cast context.temp_allocator.data);
 			}
