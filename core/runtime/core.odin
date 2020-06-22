@@ -310,6 +310,9 @@ Context :: struct {
 }
 
 
+@builtin
+Maybe :: union(T: typeid) #maybe {T};
+
 
 
 @thread_local global_default_temp_allocator_data: Default_Temp_Allocator;
@@ -552,6 +555,19 @@ ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_locati
 		copy(array[index:], array[index+1:]);
 	}
 	pop(array);
+}
+
+@builtin
+pop_front :: proc(array: ^$T/[dynamic]$E) -> (E, bool) #no_bounds_check {
+	if len(array) == 0 {
+		return E{}, false;
+	}
+	res := array[0];
+	if len(array) > 1 {
+		copy(array[0:], array[1:]);
+	}
+	(^Raw_Dynamic_Array)(array).len -= 1;
+	return res, true;
 }
 
 
