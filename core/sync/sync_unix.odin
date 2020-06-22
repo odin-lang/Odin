@@ -81,7 +81,7 @@ condition_signal :: proc(c: ^Condition) -> bool {
 
 // Awaken all threads who are waiting on the condition
 condition_broadcast :: proc(c: ^Condition) -> bool {
-	return pthread_cond_broadcast(&c.handle) == 0;
+	return unix.pthread_cond_broadcast(&c.handle) == 0;
 }
 
 // Wait for the condition to be signalled.
