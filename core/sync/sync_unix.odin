@@ -12,6 +12,7 @@ Mutex :: struct {
 // one thread.
 Condition :: struct {
 	handle: unix.pthread_cond_t,
+	mutex:  ^Mutex,
 
 	// NOTE(tetra, 2019-11-11): Used to mimic the more sane behavior of Windows' AutoResetEvent.
 	// This means that you may signal the condition before anyone is waiting to cause the
@@ -20,8 +21,6 @@ Condition :: struct {
 	// but not one that is about to wait, which can cause your program to become out of sync in
 	// ways that are hard to debug or fix.
 	flag: bool, // atomically mutated
-
-	mutex: Mutex,
 }
 
 
@@ -54,46 +53,59 @@ mutex_unlock :: proc(m: ^Mutex) {
 }
 
 
-condition_init :: proc(c: ^Condition) {
+condition_init :: proc(c: ^Condition, mutex: ^Mutex) -> bool {
 	// NOTE(tetra, 2019-11-01): POSIX OOM if we cannot init the attrs or the condition.
 	attrs: unix.pthread_condattr_t;
-	assert(unix.pthread_condattr_init(&attrs) == 0);
+	if unix.pthread_condattr_init(&attrs) != 0 {
+		return false;
+	}
 	defer unix.pthread_condattr_destroy(&attrs); // ignores destruction error
 
-	assert(unix.pthread_cond_init(&c.handle, &attrs) == 0);
-
-	mutex_init(&c.mutex);
 	c.flag = false;
+	c.mutex = mutex;
+	return unix.pthread_cond_init(&c.handle, &attrs) == 0;
 }
 
 condition_destroy :: proc(c: ^Condition) {
 	assert(unix.pthread_cond_destroy(&c.handle) == 0);
-	mutex_destroy(&c.mutex);
 	c.handle = {};
 }
 
-// Awaken exactly one thread who is waiting on the condition.
-condition_signal :: proc(c: ^Condition) {
-	mutex_lock(&c.mutex);
-	defer mutex_unlock(&c.mutex);
+// Awaken exactly one thread who is waiting on the condition
+condition_signal :: proc(c: ^Condition) -> bool {
+	mutex_lock(c.mutex);
+	defer mutex_unlock(c.mutex);
 	atomic_swap(&c.flag, true, .Sequentially_Consistent);
-	assert(unix.pthread_cond_signal(&c.handle) == 0);
+	return unix.pthread_cond_signal(&c.handle) == 0;
+}
+
+// Awaken all threads who are waiting on the condition
+condition_broadcast :: proc(c: ^Condition) -> bool {
+	return pthread_cond_broadcast(&c.handle) == 0;
 }
 
 // Wait for the condition to be signalled.
 // Does not block if the condition has been signalled and no one
 // has waited on it yet.
-condition_wait_for :: proc(c: ^Condition) {
-	mutex_lock(&c.mutex);
-	defer mutex_unlock(&c.mutex);
+condition_wait_for :: proc(c: ^Condition) -> bool {
+	mutex_lock(c.mutex);
+	defer mutex_unlock(c.mutex);
 	// NOTE(tetra): If a thread comes by and steals the flag immediately after the signal occurs,
 	// the thread that gets signalled and wakes up, discovers that the flag was taken and goes
 	// back to sleep.
 	// Though this overall behavior is the most sane, there may be a better way to do this that means that
 	// the first thread to wait, gets the flag first.
-	if atomic_swap(&c.flag, false, .Sequentially_Consistent) do return;
-	for {
-		assert(unix.pthread_cond_wait(&c.handle, &c.mutex.handle) == 0);
-		if atomic_swap(&c.flag, false, .Sequentially_Consistent) do break;
+	if atomic_swap(&c.flag, false, .Sequentially_Consistent) {
+		return true;
 	}
+	for {
+		if unix.pthread_cond_wait(&c.handle, &c.mutex.handle) != 0 {
+			return false;
+		}
+		if atomic_swap(&c.flag, false, .Sequentially_Consistent) {
+			return true;
+		}
+	}
+
+	return false;
 }

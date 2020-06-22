@@ -3,15 +3,20 @@ package sync
 
 import "core:sys/win32"
 
+foreign import kernel32 "system:kernel32.lib"
+
 // A lock that can only be held by one thread at once.
 Mutex :: struct {
 	_critical_section: win32.Critical_Section,
 }
 
+
 // Blocks until signalled.
 // When signalled, awakens exactly one waiting thread.
 Condition :: struct {
-	event: win32.Handle,
+	_handle: WIN32_CONDITION_VARIABLE,
+
+	mutex: ^Mutex,
 }
 
 // When waited upon, blocks until the internal count is greater than zero, then subtracts one.
@@ -60,27 +65,44 @@ mutex_unlock :: proc(m: ^Mutex) {
 	win32.leave_critical_section(&m._critical_section);
 }
 
-
-condition_init :: proc(using c: ^Condition) {
-	// create an auto-reset event.
-	// NOTE(tetra, 2019-10-30): this will, when signalled, signal exactly one waiting thread
-	// and then reset itself automatically.
-	event = win32.create_event_w(nil, false, false, nil);
-	assert(event != nil);
+@private WIN32_CONDITION_VARIABLE :: distinct rawptr;
+@private
+foreign kernel32 {
+	InitializeConditionVariable :: proc(ConditionVariable: ^WIN32_CONDITION_VARIABLE) ---
+	WakeConditionVariable :: proc(ConditionVariable: ^WIN32_CONDITION_VARIABLE) ---
+	WakeAllConditionVariable :: proc(ConditionVariable: ^WIN32_CONDITION_VARIABLE) ---
+	SleepConditionVariableCS :: proc(ConditionVariable: ^WIN32_CONDITION_VARIABLE, CriticalSection: ^win32.Critical_Section, dwMilliseconds: u32) -> b32 ---
 }
 
-condition_destroy :: proc(using c: ^Condition) {
-	if event != nil {
-		win32.close_handle(event);
+condition_init :: proc(c: ^Condition, mutex: ^Mutex) -> bool {
+	assert(mutex != nil);
+	InitializeConditionVariable(&c._handle);
+	c.mutex = mutex;
+	return c._handle != nil;
+}
+
+condition_destroy :: proc(c: ^Condition) {
+	if c._handle != nil {
+		WakeAllConditionVariable(&c._handle);
 	}
 }
 
-condition_signal :: proc(using c: ^Condition) {
-	ok := win32.set_event(event);
-	assert(bool(ok));
+condition_signal :: proc(c: ^Condition) -> bool {
+	if c._handle == nil {
+		return false;
+	}
+	WakeConditionVariable(&c._handle);
+	return true;
 }
 
-condition_wait_for :: proc(using c: ^Condition) {
-	result := win32.wait_for_single_object(event, win32.INFINITE);
-	assert(result != win32.WAIT_FAILED);
+condition_broadcast :: proc(c: ^Condition) -> bool {
+	if c._handle == nil {
+		return false;
+	}
+	WakeAllConditionVariable(&c._handle);
+	return true;
+}
+
+condition_wait_for :: proc(c: ^Condition) -> bool {
+	return cast(bool)SleepConditionVariableCS(&c._handle, &c.mutex._critical_section, win32.INFINITE);
 }
