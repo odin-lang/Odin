@@ -8,7 +8,6 @@ _, _ :: time, rand;
 
 Channel :: struct(T: typeid) {
 	using internal: ^_Channel_Internal(T),
-	_: bool,
 }
 
 _Channel_Internal :: struct(T: typeid) {
@@ -25,6 +24,10 @@ _Channel_Internal :: struct(T: typeid) {
 	closed:    bool,
 	r_waiting: int,
 	w_waiting: int,
+}
+
+channel_init :: proc(c: ^$C/Channel($T), cap: int = 0, allocator := context.allocator) {
+	c^ = cast(C)channel_make(T, cap, allocator);
 }
 
 channel_make :: proc($T: typeid, cap: int = 0, allocator := context.allocator) -> (ch: Channel(T)) {
@@ -166,6 +169,12 @@ channel_can_read :: proc(ch: $C/Channel($T)) -> bool {
 	return len(ch.queue) > 0;
 }
 
+channel_can_read_write :: proc(ch: $C/Channel($T)) -> bool {
+	mutex_lock(&ch.mutex);
+	defer mutex_unlock(&ch.mutex);
+	return 0 < len(ch.queue) && len(ch.queue) < cap(ch.queue);
+}
+
 channel_iterator :: proc(ch: $C/Channel($T)) -> (elem: T, ok: bool) {
 	mutex_lock(&ch.mutex);
 	defer mutex_unlock(&ch.mutex);
@@ -179,7 +188,7 @@ channel_iterator :: proc(ch: $C/Channel($T)) -> (elem: T, ok: bool) {
 
 
 
-channel_select :: proc(read_channels, write_channels: []$C/Channel($T), write_msgs: []T) -> (read_msg: T, index: int) {
+channel_select :: proc(readers, writers: []$C/Channel($T), write_msgs: []T) -> (read_msg: T, index: int) {
 	Candidate :: struct {
 		ch:    C,
 		msg:   T,
@@ -188,10 +197,10 @@ channel_select :: proc(read_channels, write_channels: []$C/Channel($T), write_ms
 	};
 
 	count := 0;
-	candidates := make([]Candidate, len(read_channels) + len(write_channels));
+	candidates := make([]Candidate, len(readers) + len(writers));
 	defer delete(candidates);
 
-	for c, i in read_channels {
+	for c, i in readers {
 		if channel_can_read(c) {
 			candidates[count] = {
 				ch = c,
@@ -202,7 +211,7 @@ channel_select :: proc(read_channels, write_channels: []$C/Channel($T), write_ms
 		}
 	}
 
-	for c, i in write_channels {
+	for c, i in writers {
 		if channel_can_write(c) {
 			candidates[count] = {
 				ch = c,
@@ -239,10 +248,10 @@ channel_select :: proc(read_channels, write_channels: []$C/Channel($T), write_ms
 }
 
 
-channel_select_write :: proc(write_channels: []$C/Channel($T), write_msgs: []T) -> (read_msg: T, index: int) {
-	return channel_select([]C{}, write_channels, msg);
+channel_select_write :: proc(writers: []$C/Channel($T), write_msgs: []T) -> (read_msg: T, index: int) {
+	return channel_select([]C{}, writers, msg);
 }
-channel_select_read :: proc(read_channels: []$C/Channel($T)) -> (index: int) {
-	_, index = channel_select(read_channels, []C{}, nil);
+channel_select_read :: proc(readers: []$C/Channel($T)) -> (index: int) {
+	_, index = channel_select(readers, []C{}, nil);
 	return;
 }
