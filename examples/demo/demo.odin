@@ -1120,7 +1120,6 @@ threading_example :: proc() {
 		for in prefix_table {
 			if t := thread.create(worker_proc); t != nil {
 				t.init_context = context;
-				t.use_init_context = true;
 				t.user_index = len(threads);
 				append(&threads, t);
 				thread.start(t);

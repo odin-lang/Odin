@@ -10,33 +10,33 @@ Thread_Os_Specific :: struct {
 	done: bool, // see note in `is_done`
 }
 
-THREAD_PRIORITY_IDLE   :: -15;
-THREAD_PRIORITY_LOWEST :: -2;
-THREAD_PRIORITY_BELOW_NORMAL :: -1;
-THREAD_PRIORITY_NORMAL :: 0;
-THREAD_PRIORITY_ABOVE_NORMAL :: 1;
-THREAD_PRIORITY_HIGHEST :: 2;
-THREAD_PRIORITY_TIME_CRITICAL :: 15;
 
-Thread_Priority :: enum i32 {
-	Normal = THREAD_PRIORITY_NORMAL,
-	Low = THREAD_PRIORITY_LOWEST,
-	High = THREAD_PRIORITY_HIGHEST,
+Thread_Priority :: enum {
+	Normal,
+	Low,
+	High,
 }
+
+_thread_priority_map := map[Thread_Priority]i32{
+	.Normal = 0,
+	.Low = -2,
+	.High = +2,
+};
 
 create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
 	win32_thread_id: u32;
 
 	__windows_thread_entry_proc :: proc "c" (t: ^Thread) -> i32 {
-		c := runtime.default_context();
-		if t.use_init_context {
-			c = t.init_context;
+		context = runtime.default_context();
+		c := context;
+		if ic, ok := t.init_context.?; ok {
+			c = ic;
 		}
 		context = c;
 
 		t.procedure(t);
 
-		if !t.use_init_context {
+		if t.init_context == nil {
 			if context.temp_allocator.data == &runtime.global_default_temp_allocator_data {
 				runtime.default_temp_allocator_destroy(auto_cast context.temp_allocator.data);
 			}
@@ -58,8 +58,9 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	thread.procedure       = procedure;
 	thread.win32_thread    = win32_thread;
 	thread.win32_thread_id = win32_thread_id;
+	thread.init_context = context;
 
-	ok := win32.set_thread_priority(win32_thread, i32(priority));
+	ok := win32.set_thread_priority(win32_thread, _thread_priority_map[priority]);
 	assert(ok == true);
 
 	return thread;
