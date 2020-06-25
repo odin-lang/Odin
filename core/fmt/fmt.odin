@@ -61,18 +61,18 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 }
 
 
-fprint :: proc(fd: os.Handle, args: ..any) -> int {
+fprint :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := strings.builder_from_slice(data[:]);
-	res := sbprint(&buf, ..args);
+	res := sbprint(buf=&buf, args=args, sep=sep);
 	os.write_string(fd, res);
 	return len(res);
 }
 
-fprintln :: proc(fd: os.Handle, args: ..any) -> int {
+fprintln :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := strings.builder_from_slice(data[:]);
-	res := sbprintln(&buf, ..args);
+	res := sbprintln(buf=&buf, args=args, sep=sep);
 	os.write_string(fd, res);
 	return len(res);
 }
@@ -86,12 +86,12 @@ fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 
 
 // print* procedures return the number of bytes written
-print   :: proc(args: ..any)              -> int { return fprint(os.stdout, ..args); }
-println :: proc(args: ..any)              -> int { return fprintln(os.stdout, ..args); }
+print   :: proc(args: ..any, sep := " ") -> int { return fprint(fd=os.stdout, args=args, sep=sep); }
+println :: proc(args: ..any, sep := " ") -> int { return fprintln(fd=os.stdout, args=args, sep=sep); }
 printf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stdout, fmt, ..args); }
 
-eprint   :: proc(args: ..any)              -> int { return fprint(os.stderr, ..args); }
-eprintln :: proc(args: ..any)              -> int { return fprintln(os.stderr, ..args); }
+eprint   :: proc(args: ..any, sep := " ") -> int { return fprint(fd=os.stderr, args=args, sep=sep); }
+eprintln :: proc(args: ..any, sep := " ") -> int { return fprintln(fd=os.stderr, args=args, sep=sep); }
 eprintf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stderr, fmt, ..args); }
 
 
@@ -102,14 +102,14 @@ eprintf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stderr, fm
 
 // aprint* procedures return a string that was allocated with the current context
 // They must be freed accordingly
-aprint :: proc(args: ..any) -> string {
+aprint :: proc(args: ..any, sep := " ") -> string {
 	str := strings.make_builder();
-	sbprint(&str, ..args);
+	sbprint(buf=&str, args=args, sep=sep);
 	return strings.to_string(str);
 }
-aprintln :: proc(args: ..any) -> string {
+aprintln :: proc(args: ..any, sep := " ") -> string {
 	str := strings.make_builder();
-	sbprintln(&str, ..args);
+	sbprintln(buf=&str, args=args, sep=sep);
 	return strings.to_string(str);
 }
 aprintf :: proc(fmt: string, args: ..any) -> string {
@@ -120,14 +120,14 @@ aprintf :: proc(fmt: string, args: ..any) -> string {
 
 
 // tprint* procedures return a string that was allocated with the current context's temporary allocator
-tprint :: proc(args: ..any) -> string {
+tprint :: proc(args: ..any, sep := " ") -> string {
 	str := strings.make_builder(context.temp_allocator);
-	sbprint(&str, ..args);
+	sbprint(buf=&str, args=args, sep=sep);
 	return strings.to_string(str);
 }
-tprintln :: proc(args: ..any) -> string {
+tprintln :: proc(args: ..any, sep := " ") -> string {
 	str := strings.make_builder(context.temp_allocator);
-	sbprintln(&str, ..args);
+	sbprintln(buf=&str, args=args, sep=sep);
 	return strings.to_string(str);
 }
 tprintf :: proc(fmt: string, args: ..any) -> string {
@@ -138,13 +138,13 @@ tprintf :: proc(fmt: string, args: ..any) -> string {
 
 
 // bprint* procedures return a string using a buffer from an array
-bprint :: proc(buf: []byte, args: ..any) -> string {
+bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 	sb := strings.builder_from_slice(buf[0:len(buf)]);
-	return sbprint(&sb, ..args);
+	return sbprint(buf=&sb, args=args, sep=sep);
 }
-bprintln :: proc(buf: []byte, args: ..any) -> string {
+bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 	sb := strings.builder_from_slice(buf[0:len(buf)]);
-	return sbprintln(&sb, ..args);
+	return sbprintln(buf=&sb, args=args, sep=sep);
 }
 bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
 	sb := strings.builder_from_slice(buf[0:len(buf)]);
@@ -182,7 +182,7 @@ fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) {
 
 
 
-sbprint :: proc(buf: ^strings.Builder, args: ..any) -> string {
+sbprint :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 	fi: Info;
 	fi.buf = buf;
 
@@ -200,19 +200,19 @@ sbprint :: proc(buf: ^strings.Builder, args: ..any) -> string {
 	// and were expecting `*print` to be the same `*println` except for the added newline
 	// so I am going to keep the same behaviour as `*println` for `*print`
 	for _, i in args {
-		if i > 0 do strings.write_byte(buf, ' ');
+		if i > 0 do strings.write_string(buf, sep);
 
 		fmt_value(&fi, args[i], 'v');
 	}
 	return strings.to_string(buf^);
 }
 
-sbprintln :: proc(buf: ^strings.Builder, args: ..any) -> string {
+sbprintln :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 	fi: Info;
 	fi.buf = buf;
 
 	for _, i in args {
-		if i > 0 do strings.write_byte(buf, ' ');
+		if i > 0 do strings.write_string(buf, sep);
 
 		fmt_value(&fi, args[i], 'v');
 	}
