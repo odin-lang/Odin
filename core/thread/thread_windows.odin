@@ -95,5 +95,5 @@ terminate :: proc(using thread : ^Thread, exit_code: u32) {
 }
 
 yield :: proc() {
-	win32.Sleep(0);
+	win32.SwitchToThread();
 }

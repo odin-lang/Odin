@@ -2,25 +2,35 @@
 package sync
 
 import win32 "core:sys/windows"
+import "core:time"
 
-// A lock that can only be held by one thread at once.
 Mutex :: struct {
 	_critical_section: win32.CRITICAL_SECTION,
 }
 
+Blocking_Mutex :: struct {
+	_handle: win32.SRWLOCK,
+}
+
+
+Condition_Mutex_Ptr :: union{^Mutex, ^Blocking_Mutex};
 
 // Blocks until signalled.
 // When signalled, awakens exactly one waiting thread.
 Condition :: struct {
 	_handle: win32.CONDITION_VARIABLE,
 
-	mutex: ^Mutex,
+	mutex: Condition_Mutex_Ptr,
 }
 
 // When waited upon, blocks until the internal count is greater than zero, then subtracts one.
 // Posting to the semaphore increases the count by one, or the provided amount.
 Semaphore :: struct {
 	_handle: win32.HANDLE,
+}
+
+RW_Lock :: struct {
+	_handle: win32.SRWLOCK,
 }
 
 
@@ -63,7 +73,28 @@ mutex_unlock :: proc(m: ^Mutex) {
 	win32.LeaveCriticalSection(&m._critical_section);
 }
 
-condition_init :: proc(c: ^Condition, mutex: ^Mutex) -> bool {
+blocking_mutex_init :: proc(m: ^Blocking_Mutex) {
+	//
+}
+
+blocking_mutex_destroy :: proc(m: ^Blocking_Mutex) {
+	//
+}
+
+blocking_mutex_lock :: proc(m: ^Blocking_Mutex) {
+	win32.AcquireSRWLockExclusive(&m._handle);
+}
+
+blocking_mutex_try_lock :: proc(m: ^Blocking_Mutex) -> bool {
+	return bool(win32.TryAcquireSRWLockExclusive(&m._handle));
+}
+
+blocking_mutex_unlock :: proc(m: ^Blocking_Mutex) {
+	win32.ReleaseSRWLockExclusive(&m._handle);
+}
+
+
+condition_init :: proc(c: ^Condition, mutex: Condition_Mutex_Ptr) -> bool {
 	assert(mutex != nil);
 	win32.InitializeConditionVariable(&c._handle);
 	c.mutex = mutex;
@@ -71,9 +102,7 @@ condition_init :: proc(c: ^Condition, mutex: ^Mutex) -> bool {
 }
 
 condition_destroy :: proc(c: ^Condition) {
-	if c._handle.ptr != nil {
-		win32.WakeAllConditionVariable(&c._handle);
-	}
+	//
 }
 
 condition_signal :: proc(c: ^Condition) -> bool {
@@ -93,5 +122,51 @@ condition_broadcast :: proc(c: ^Condition) -> bool {
 }
 
 condition_wait_for :: proc(c: ^Condition) -> bool {
-	return cast(bool)win32.SleepConditionVariableCS(&c._handle, &c.mutex._critical_section, win32.INFINITE);
+	switch m in &c.mutex {
+	case ^Mutex:
+		return cast(bool)win32.SleepConditionVariableCS(&c._handle, &m._critical_section, win32.INFINITE);
+	case ^Blocking_Mutex:
+		return cast(bool)win32.SleepConditionVariableSRW(&c._handle, &m._handle, win32.INFINITE, 0);
+	}
+	return false;
 }
+condition_wait_for_timeout :: proc(c: ^Condition, duration: time.Duration) -> bool {
+	ms := win32.DWORD((time.duration_nanoseconds(duration) + 999999)/1000000);
+	switch m in &c.mutex {
+	case ^Mutex:
+		return cast(bool)win32.SleepConditionVariableCS(&c._handle, &m._critical_section, ms);
+	case ^Blocking_Mutex:
+		return cast(bool)win32.SleepConditionVariableSRW(&c._handle, &m._handle, ms, 0);
+	}
+	return false;
+}
+
+
+
+rw_lock_init :: proc(l: ^RW_Lock) {
+	l._handle = win32.SRWLOCK_INIT;
+}
+rw_lock_destroy :: proc(l: ^RW_Lock) {
+	//
+}
+rw_lock_read :: proc(l: ^RW_Lock) {
+	win32.AcquireSRWLockShared(&l._handle);
+}
+rw_lock_try_read :: proc(l: ^RW_Lock) -> bool {
+	return bool(win32.TryAcquireSRWLockShared(&l._handle));
+}
+rw_lock_write :: proc(l: ^RW_Lock) {
+	win32.AcquireSRWLockExclusive(&l._handle);
+}
+rw_lock_try_write :: proc(l: ^RW_Lock) -> bool {
+	return bool(win32.TryAcquireSRWLockExclusive(&l._handle));
+}
+rw_lock_read_unlock :: proc(l: ^RW_Lock) {
+	win32.ReleaseSRWLockShared(&l._handle);
+}
+rw_lock_write_unlock :: proc(l: ^RW_Lock) {
+	win32.ReleaseSRWLockExclusive(&l._handle);
+}
+
+
+
