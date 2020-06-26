@@ -256,8 +256,7 @@ foreign kernel32 {
 	GetSystemInfo :: proc(system_info: ^SYSTEM_INFO) ---
 	GetVersionExW :: proc(osvi: ^OSVERSIONINFOEXW) ---
 
-	LoadLibraryA:: proc(c_str: LPCSTR)  -> HMODULE ---
-	LoadLibraryW:: proc(c_str: LPCWSTR) -> HMODULE ---
-	FreeLibrary:: proc(h: HMODULE) -> BOOL ---
-	GetProcAddress:: proc(h: HMODULE, c_str: LPCSTR) -> rawptr ---
+	LoadLibraryW :: proc(c_str: LPCWSTR) -> HMODULE ---
+	FreeLibrary :: proc(h: HMODULE) -> BOOL ---
+	GetProcAddress :: proc(h: HMODULE, c_str: LPCSTR) -> rawptr ---
 }

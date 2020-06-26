@@ -665,7 +665,7 @@ FILE_STANDARD_INFO :: struct {
 // https://docs.microsoft.com/en-gb/windows/win32/api/sysinfoapi/ns-sysinfoapi-system_info
 SYSTEM_INFO :: struct {
 	using _: struct #raw_union {
-		oem_id: DWORD,
+		dwOemID: DWORD,
 		using _: struct #raw_union {
 			wProcessorArchitecture: WORD,
 			wReserved: WORD, // reserved
