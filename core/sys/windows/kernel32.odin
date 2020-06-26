@@ -245,6 +245,9 @@ foreign kernel32 {
 	AcquireSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
 	TryAcquireSRWLockExclusive :: proc(SRWLock: ^SRWLOCK) -> BOOL ---
 	ReleaseSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
+	AcquireSRWLockShared    :: proc(SRWLock: ^SRWLOCK) ---
+	TryAcquireSRWLockShared :: proc(SRWLock: ^SRWLOCK) -> BOOL ---
+	ReleaseSRWLockShared    :: proc(SRWLock: ^SRWLOCK) ---
 
 	InitializeConditionVariable :: proc(ConditionVariable: ^CONDITION_VARIABLE) ---
 	WakeConditionVariable       :: proc(ConditionVariable: ^CONDITION_VARIABLE) ---
