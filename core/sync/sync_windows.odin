@@ -3,8 +3,6 @@ package sync
 
 import win32 "core:sys/windows"
 
-foreign import kernel32 "system:kernel32.lib"
-
 // A lock that can only be held by one thread at once.
 Mutex :: struct {
 	_critical_section: win32.CRITICAL_SECTION,
