@@ -1,7 +1,7 @@
 // +build windows
 package os
 
-import "core:sys/win32"
+import win32 "core:sys/windows"
 import "core:intrinsics"
 
 OS :: "windows";
@@ -85,8 +85,8 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 	}
 
 	share_mode := u32(win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE);
-	sa: ^win32.Security_Attributes = nil;
-	sa_inherit := win32.Security_Attributes{length = size_of(win32.Security_Attributes), inherit_handle = true};
+	sa: ^win32.SECURITY_ATTRIBUTES = nil;
+	sa_inherit := win32.SECURITY_ATTRIBUTES{nLength = size_of(win32.SECURITY_ATTRIBUTES), bInheritHandle = true};
 	if mode&O_CLOEXEC == 0 {
 		sa = &sa_inherit;
 	}
@@ -105,16 +105,16 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 		create_mode = win32.OPEN_EXISTING;
 	}
 	wide_path := win32.utf8_to_wstring(path);
-	handle := Handle(win32.create_file_w(wide_path, access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
+	handle := Handle(win32.CreateFileW(auto_cast wide_path, access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
 	if handle != INVALID_HANDLE do return handle, ERROR_NONE;
 
-	err := Errno(win32.get_last_error());
+	err := Errno(win32.GetLastError());
 	return INVALID_HANDLE, err;
 }
 
 close :: proc(fd: Handle) -> Errno {
-	if win32.close_handle(win32.Handle(fd)) == 0 {
-		return Errno(win32.get_last_error());
+	if !win32.CloseHandle(win32.HANDLE(fd)) {
+		return Errno(win32.GetLastError());
 	}
 	return ERROR_NONE;
 }
@@ -123,18 +123,18 @@ close :: proc(fd: Handle) -> Errno {
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 do return 0, ERROR_NONE;
 
-	single_write_length: i32;
+	single_write_length: win32.DWORD;
 	total_write: i64;
 	length := i64(len(data));
 
 	for total_write < length {
 		remaining := length - total_write;
 		MAX :: 1<<31-1;
-		to_write: i32 = min(i32(remaining), MAX);
+		to_write := win32.DWORD(min(i32(remaining), MAX));
 
-		e := win32.write_file(win32.Handle(fd), &data[total_write], to_write, &single_write_length, nil);
+		e := win32.WriteFile(win32.HANDLE(fd), &data[total_write], to_write, &single_write_length, nil);
 		if single_write_length <= 0 || !e {
-			err := Errno(win32.get_last_error());
+			err := Errno(win32.GetLastError());
 			return int(total_write), err;
 		}
 		total_write += i64(single_write_length);
@@ -145,18 +145,18 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 do return 0, ERROR_NONE;
 
-	single_read_length: i32;
+	single_read_length: win32.DWORD;
 	total_read: i64;
 	length := i64(len(data));
 
 	for total_read < length {
 		remaining := length - total_read;
 		MAX :: 1<<32-1;
-		to_read: u32 = min(u32(remaining), MAX);
+		to_read := win32.DWORD(min(u32(remaining), MAX));
 
-		e := win32.read_file(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
+		e := win32.ReadFile(win32.HANDLE(fd), &data[total_read], to_read, &single_read_length, nil);
 		if single_read_length <= 0 || !e {
-			err := Errno(win32.get_last_error());
+			err := Errno(win32.GetLastError());
 			return int(total_read), err;
 		}
 		total_read += i64(single_read_length);
@@ -173,37 +173,37 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	}
 	hi := i32(offset>>32);
 	lo := i32(offset);
-	ft := win32.get_file_type(win32.Handle(fd));
+	ft := win32.GetFileType(win32.HANDLE(fd));
 	if ft == win32.FILE_TYPE_PIPE do return 0, ERROR_FILE_IS_PIPE;
 
-	dw_ptr := win32.set_file_pointer(win32.Handle(fd), lo, &hi, w);
+	dw_ptr := win32.SetFilePointer(win32.HANDLE(fd), lo, &hi, w);
 	if dw_ptr == win32.INVALID_SET_FILE_POINTER {
-		err := Errno(win32.get_last_error());
+		err := Errno(win32.GetLastError());
 		return 0, err;
 	}
 	return i64(hi)<<32 + i64(dw_ptr), ERROR_NONE;
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
-	length: i64;
+	length: win32.LARGE_INTEGER;
 	err: Errno;
-	if !win32.get_file_size_ex(win32.Handle(fd), &length) {
-		err = Errno(win32.get_last_error());
+	if !win32.GetFileSizeEx(win32.HANDLE(fd), &length) {
+		err = Errno(win32.GetLastError());
 	}
-	return length, err;
+	return i64(length), err;
 }
 
 
 
 // NOTE(bill): Uses startup to initialize it
-stdin  := get_std_handle(win32.STD_INPUT_HANDLE);
-stdout := get_std_handle(win32.STD_OUTPUT_HANDLE);
-stderr := get_std_handle(win32.STD_ERROR_HANDLE);
+stdin  := get_std_handle(int(win32.STD_INPUT_HANDLE));
+stdout := get_std_handle(int(win32.STD_OUTPUT_HANDLE));
+stderr := get_std_handle(int(win32.STD_ERROR_HANDLE));
 
 
 get_std_handle :: proc "contextless" (h: int) -> Handle {
-	fd := win32.get_std_handle(i32(h));
-	win32.set_handle_information(fd, win32.HANDLE_FLAG_INHERIT, 0);
+	fd := win32.GetStdHandle(win32.DWORD(h));
+	win32.SetHandleInformation(fd, win32.HANDLE_FLAG_INHERIT, 0);
 	return Handle(fd);
 }
 
@@ -212,32 +212,32 @@ get_std_handle :: proc "contextless" (h: int) -> Handle {
 
 
 last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
-	file_info: win32.By_Handle_File_Information;
-	if !win32.get_file_information_by_handle(win32.Handle(fd), &file_info) {
-		return 0, Errno(win32.get_last_error());
+	file_info: win32.BY_HANDLE_FILE_INFORMATION;
+	if !win32.GetFileInformationByHandle(win32.HANDLE(fd), &file_info) {
+		return 0, Errno(win32.GetLastError());
 	}
-	lo := File_Time(file_info.last_write_time.lo);
-	hi := File_Time(file_info.last_write_time.hi);
+	lo := File_Time(file_info.ftLastWriteTime.dwLowDateTime);
+	hi := File_Time(file_info.ftLastWriteTime.dwHighDateTime);
 	return lo | hi << 32, ERROR_NONE;
 }
 
 last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
-	data: win32.File_Attribute_Data;
+	data: win32.WIN32_FILE_ATTRIBUTE_DATA;
 
 	wide_path := win32.utf8_to_wstring(name);
-	if !win32.get_file_attributes_ex_w(wide_path, win32.GetFileExInfoStandard, &data) {
-		return 0, Errno(win32.get_last_error());
+	if !win32.GetFileAttributesExW(auto_cast wide_path, win32.GetFileExInfoStandard, &data) {
+		return 0, Errno(win32.GetLastError());
 	}
 
-	l := File_Time(data.last_write_time.lo);
-	h := File_Time(data.last_write_time.hi);
+	l := File_Time(data.ftLastWriteTime.dwLowDateTime);
+	h := File_Time(data.ftLastWriteTime.dwHighDateTime);
 	return l | h << 32, ERROR_NONE;
 }
 
 
 
 heap_alloc :: proc(size: int) -> rawptr {
-	return win32.heap_alloc(win32.get_process_heap(), win32.HEAP_ZERO_MEMORY, size);
+	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, uint(size));
 }
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	if new_size == 0 {
@@ -246,11 +246,11 @@ heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	}
 	if ptr == nil do return heap_alloc(new_size);
 
-	return win32.heap_realloc(win32.get_process_heap(), win32.HEAP_ZERO_MEMORY, ptr, new_size);
+	return win32.HeapReAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, ptr, uint(new_size));
 }
 heap_free :: proc(ptr: rawptr) {
 	if ptr == nil do return;
-	win32.heap_free(win32.get_process_heap(), 0, ptr);
+	win32.HeapFree(win32.GetProcessHeap(), 0, ptr);
 }
 
 get_page_size :: proc() -> int {
@@ -259,9 +259,9 @@ get_page_size :: proc() -> int {
 	@static page_size := -1;
 	if page_size != -1 do return page_size;
 
-	info: win32.System_Info;
-	win32.get_system_info(&info);
-	page_size = int(info.page_size);
+	info: win32.SYSTEM_INFO;
+	win32.GetSystemInfo(&info);
+	page_size = int(info.dwPageSize);
 	return page_size;
 }
 
@@ -274,10 +274,10 @@ get_page_size :: proc() -> int {
 get_current_directory :: proc() -> string {
 	for intrinsics.atomic_xchg(&cwd_gate, true) {}
 
-	sz_utf16 := win32.get_current_directory_w(0, nil);
+	sz_utf16 := win32.GetCurrentDirectoryW(0, nil);
 	dir_buf_wstr := make([]u16, sz_utf16, context.temp_allocator); // the first time, it _includes_ the NUL.
 
-	sz_utf16 = win32.get_current_directory_w(u32(len(dir_buf_wstr)), cast(win32.Wstring) &dir_buf_wstr[0]);
+	sz_utf16 = win32.GetCurrentDirectoryW(win32.DWORD(len(dir_buf_wstr)), auto_cast &dir_buf_wstr[0]);
 	assert(int(sz_utf16)+1 == len(dir_buf_wstr)); // the second time, it _excludes_ the NUL.
 
 	intrinsics.atomic_store(&cwd_gate, false);
@@ -291,8 +291,8 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 	for intrinsics.atomic_xchg(&cwd_gate, true) {}
 	defer intrinsics.atomic_store(&cwd_gate, false);
 
-	res := win32.set_current_directory_w(wstr);
-	if res == 0 do return Errno(win32.get_last_error());
+	res := win32.SetCurrentDirectoryW(auto_cast wstr);
+	if !res do return Errno(win32.GetLastError());
 
 	return;
 }
@@ -300,29 +300,29 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 
 
 exit :: proc(code: int) -> ! {
-	win32.exit_process(u32(code));
+	win32.ExitProcess(win32.DWORD(code));
 }
 
 
 
 current_thread_id :: proc "contextless" () -> int {
-	return int(win32.get_current_thread_id());
+	return int(win32.GetCurrentThreadId());
 }
 
 
 
 _alloc_command_line_arguments :: proc() -> []string {
 	arg_count: i32;
-	arg_list_ptr := win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
+	arg_list_ptr := win32.CommandLineToArgvW(win32.GetCommandLineW(), &arg_count);
 	arg_list := make([]string, int(arg_count));
 	for _, i in arg_list {
-		wc_str := (^win32.Wstring)(uintptr(arg_list_ptr) + size_of(win32.Wstring)*uintptr(i))^;
-		olen := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, wc_str, -1,
-		                                      nil, 0, nil, nil);
+		wc_str := (^win32.wstring)(uintptr(arg_list_ptr) + size_of(win32.wstring)*uintptr(i))^;
+		olen := win32.WideCharToMultiByte(win32.CP_UTF8, 0, wc_str, -1,
+		                                  nil, 0, nil, nil);
 
 		buf := make([]byte, int(olen));
-		n := win32.wide_char_to_multi_byte(win32.CP_UTF8, 0, wc_str, -1,
-		                                   cstring(&buf[0]), olen, nil, nil);
+		n := win32.WideCharToMultiByte(win32.CP_UTF8, 0, wc_str, -1,
+		                               &buf[0], olen, nil, nil);
 		if n > 0 {
 			n -= 1;
 		}
@@ -332,10 +332,10 @@ _alloc_command_line_arguments :: proc() -> []string {
 	return arg_list;
 }
 
-get_windows_version_ansi :: proc() -> win32.OS_Version_Info_Ex_A {
-	osvi : win32.OS_Version_Info_Ex_A;
-	osvi.os_version_info_size = size_of(win32.OS_Version_Info_Ex_A);
-    win32.get_version(&osvi);
+get_windows_version_ansi :: proc() -> win32.OSVERSIONINFOEXW {
+	osvi : win32.OSVERSIONINFOEXW;
+	osvi.os_version_info_size = size_of(win32.OSVERSIONINFOEXW);
+    win32.GetVersionExW(&osvi);
     return osvi;
 }
 
