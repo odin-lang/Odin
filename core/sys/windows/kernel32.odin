@@ -26,10 +26,14 @@ foreign kernel32 {
 	SetHandleInformation :: proc(hObject: HANDLE,
 	                             dwMask: DWORD,
 	                             dwFlags: DWORD) -> BOOL ---
+
 	AddVectoredExceptionHandler :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---
 	AddVectoredContinueHandler  :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---
 	RemoveVectoredExceptionHandler  :: proc(Handle: LPVOID) -> DWORD ---
 	RemoveVectoredContinueHandler  :: proc(Handle: LPVOID) -> DWORD ---
+	RaiseException :: proc(dwExceptionCode, dwExceptionFlags, nNumberOfArguments: DWORD, lpArguments: ^ULONG_PTR) -> ! ---
+
+
 	CreateHardLinkW :: proc(lpSymlinkFileName: LPCWSTR,
 	                        lpTargetFileName: LPCWSTR,
 	                        lpSecurityAttributes: LPSECURITY_ATTRIBUTES) -> BOOL ---
@@ -39,7 +43,6 @@ foreign kernel32 {
 	                                     lpFileInformation: LPVOID,
 	                                     dwBufferSize: DWORD) -> BOOL ---
 
-	GetCurrentProcessId :: proc() -> DWORD ---
 	InitializeCriticalSection :: proc(CriticalSection: ^CRITICAL_SECTION) ---
 	InitializeCriticalSectionAndSpinCount :: proc(CriticalSection: ^CRITICAL_SECTION, dwSpinCount: DWORD) -> BOOL ---
 	EnterCriticalSection :: proc(CriticalSection: ^CRITICAL_SECTION) ---
@@ -53,6 +56,7 @@ foreign kernel32 {
 	GetCommandLineW :: proc() -> LPCWSTR ---
 	GetTempPathW :: proc(nBufferLength: DWORD, lpBuffer: LPCWSTR) -> DWORD ---
 	GetCurrentProcess :: proc() -> HANDLE ---
+	GetCurrentProcessId :: proc() -> DWORD ---
 	GetCurrentThread :: proc() -> HANDLE ---
 	GetCurrentThreadId :: proc() -> DWORD ---
 	GetStdHandle :: proc(which: DWORD) -> HANDLE ---
