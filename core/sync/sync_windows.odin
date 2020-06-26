@@ -1,20 +1,23 @@
 // +build windows
 package sync
 
-import "core:sys/win32"
+import win32 "core:sys/windows"
 
-foreign import kernel32 "system:kernel32.lib"
 
-// A lock that can only be held by one thread at once.
 Mutex :: struct {
-	_critical_section: win32.Critical_Section,
+	_handle: win32.SRWLOCK,
+
+}
+
+Recursive_Mutex :: struct {
+	_handle: win32.CRITICAL_SECTION,
 }
 
 
 // Blocks until signalled.
 // When signalled, awakens exactly one waiting thread.
 Condition :: struct {
-	_handle: WIN32_CONDITION_VARIABLE,
+	_handle: win32.CONDITION_VARIABLE,
 
 	mutex: ^Mutex,
 }
@@ -22,87 +25,98 @@ Condition :: struct {
 // When waited upon, blocks until the internal count is greater than zero, then subtracts one.
 // Posting to the semaphore increases the count by one, or the provided amount.
 Semaphore :: struct {
-	_handle: win32.Handle,
+	_handle: win32.HANDLE,
 }
 
 
 semaphore_init :: proc(s: ^Semaphore, initial_count := 0) {
-	s._handle = win32.create_semaphore_w(nil, i32(initial_count), 1<<31-1, nil);
+	s._handle = win32.CreateSemaphoreW(nil, win32.LONG(initial_count), 1<<31-1, nil);
 }
 
 semaphore_destroy :: proc(s: ^Semaphore) {
-	win32.close_handle(s._handle);
+	win32.CloseHandle(s._handle);
 }
 
 semaphore_post :: proc(s: ^Semaphore, count := 1) {
-	win32.release_semaphore(s._handle, i32(count), nil);
+	win32.ReleaseSemaphore(s._handle, win32.LONG(count), nil);
 }
 
 semaphore_wait_for :: proc(s: ^Semaphore) {
-	// NOTE(tetra, 2019-10-30): wait_for_single_object decrements the count before it returns.
-	result := win32.wait_for_single_object(s._handle, win32.INFINITE);
+	// NOTE(tetra, 2019-10-30): WaitForSingleObject decrements the count before it returns.
+	result := win32.WaitForSingleObject(s._handle, win32.INFINITE);
 	assert(result != win32.WAIT_FAILED);
 }
 
 
 mutex_init :: proc(m: ^Mutex, spin_count := 0) {
-	win32.initialize_critical_section_and_spin_count(&m._critical_section, u32(spin_count));
+	win32.InitializeSRWLock(&m._handle);
 }
 
 mutex_destroy :: proc(m: ^Mutex) {
-	win32.delete_critical_section(&m._critical_section);
+	win32.ReleaseSRWLockExclusive(&m._handle);
 }
 
 mutex_lock :: proc(m: ^Mutex) {
-	win32.enter_critical_section(&m._critical_section);
+	win32.AcquireSRWLockExclusive(&m._handle);
 }
 
 mutex_try_lock :: proc(m: ^Mutex) -> bool {
-	return bool(win32.try_enter_critical_section(&m._critical_section));
+	return bool(win32.TryAcquireSRWLockExclusive(&m._handle));
 }
 
 mutex_unlock :: proc(m: ^Mutex) {
-	win32.leave_critical_section(&m._critical_section);
+	win32.ReleaseSRWLockExclusive(&m._handle);
 }
 
-@private WIN32_CONDITION_VARIABLE :: distinct rawptr;
-@private
-foreign kernel32 {
-	InitializeConditionVariable :: proc(ConditionVariable: ^WIN32_CONDITION_VARIABLE) ---
-	WakeConditionVariable :: proc(ConditionVariable: ^WIN32_CONDITION_VARIABLE) ---
-	WakeAllConditionVariable :: proc(ConditionVariable: ^WIN32_CONDITION_VARIABLE) ---
-	SleepConditionVariableCS :: proc(ConditionVariable: ^WIN32_CONDITION_VARIABLE, CriticalSection: ^win32.Critical_Section, dwMilliseconds: u32) -> b32 ---
+
+recursive_mutex_init :: proc(m: ^Recursive_Mutex, spin_count := 0) {
+	win32.InitializeCriticalSectionAndSpinCount(&m._handle, u32(spin_count));
+}
+
+recursive_mutex_destroy :: proc(m: ^Recursive_Mutex) {
+	win32.DeleteCriticalSection(&m._handle);
+}
+
+recursive_mutex_lock :: proc(m: ^Recursive_Mutex) {
+	win32.EnterCriticalSection(&m._handle);
+}
+
+recursive_mutex_try_lock :: proc(m: ^Recursive_Mutex) -> bool {
+	return bool(win32.TryEnterCriticalSection(&m._handle));
+}
+
+recursive_mutex_unlock :: proc(m: ^Recursive_Mutex) {
+	win32.LeaveCriticalSection(&m._handle);
 }
 
 condition_init :: proc(c: ^Condition, mutex: ^Mutex) -> bool {
 	assert(mutex != nil);
-	InitializeConditionVariable(&c._handle);
+	win32.InitializeConditionVariable(&c._handle);
 	c.mutex = mutex;
-	return c._handle != nil;
+	return true;
 }
 
 condition_destroy :: proc(c: ^Condition) {
-	if c._handle != nil {
-		WakeAllConditionVariable(&c._handle);
-	}
+	// Does nothing
 }
 
 condition_signal :: proc(c: ^Condition) -> bool {
-	if c._handle == nil {
+	if c._handle.ptr == nil {
 		return false;
 	}
-	WakeConditionVariable(&c._handle);
+	win32.WakeConditionVariable(&c._handle);
 	return true;
 }
 
 condition_broadcast :: proc(c: ^Condition) -> bool {
-	if c._handle == nil {
+	if c._handle.ptr == nil {
 		return false;
 	}
-	WakeAllConditionVariable(&c._handle);
+	win32.WakeAllConditionVariable(&c._handle);
 	return true;
 }
 
 condition_wait_for :: proc(c: ^Condition) -> bool {
-	return cast(bool)SleepConditionVariableCS(&c._handle, &c.mutex._critical_section, win32.INFINITE);
+	res := win32.SleepConditionVariableSRW(&c._handle, &c.mutex._handle, win32.INFINITE, 0);
+	return bool(res);
 }

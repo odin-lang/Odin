@@ -13,7 +13,7 @@ foreign kernel32 {
 	@(link_name="CreateProcessW")            create_process_w             :: proc(application_name, command_line: Wstring,
 	                                                                             process_attributes, thread_attributes: ^Security_Attributes,
 	                                                                             inherit_handle: Bool, creation_flags: u32, environment: rawptr,
-	                                                                             current_direcotry: cstring, startup_info: ^Startup_Info,
+	                                                                             current_direcotry: Wstring, startup_info: ^Startup_Info,
 	                                                                             process_information: ^Process_Information) -> Bool ---;
 	@(link_name="GetExitCodeProcess")		 get_exit_code_process        :: proc(process: Handle, exit: ^u32) -> Bool ---;
 	@(link_name="ExitProcess")               exit_process                 :: proc(exit_code: u32) ---;
@@ -156,7 +156,7 @@ foreign kernel32 {
 	@(link_name="ReadBarrier")      read_barrier       :: proc() ---;
 
 	@(link_name="CreateThread")
-	create_thread :: proc(thread_attributes: ^Security_Attributes, stack_size: int, start_routine: rawptr,
+	create_thread :: proc(thread_attributes: ^Security_Attributes, stack_size: uint, start_routine: proc "stdcall" (rawptr) -> u32,
 	                      parameter: rawptr, creation_flags: u32, thread_id: ^u32) -> Handle ---;
 	@(link_name="ResumeThread")      resume_thread        :: proc(thread: Handle) -> u32 ---;
 	@(link_name="GetThreadPriority") get_thread_priority  :: proc(thread: Handle) -> i32 ---;
@@ -165,10 +165,10 @@ foreign kernel32 {
 	@(link_name="TerminateThread")   terminate_thread     :: proc(thread: Handle, exit_code: u32) -> Bool ---;
 
 	@(link_name="InitializeCriticalSection")             initialize_critical_section                :: proc(critical_section: ^Critical_Section) ---;
-	@(link_name="InitializeCriticalSectionAndSpinCount") initialize_critical_section_and_spin_count :: proc(critical_section: ^Critical_Section, spin_count: u32) ---;
+	@(link_name="InitializeCriticalSectionAndSpinCount") initialize_critical_section_and_spin_count :: proc(critical_section: ^Critical_Section, spin_count: u32) -> b32 ---;
 	@(link_name="DeleteCriticalSection")                 delete_critical_section                    :: proc(critical_section: ^Critical_Section) ---;
 	@(link_name="SetCriticalSectionSpinCount")           set_critical_section_spin_count            :: proc(critical_section: ^Critical_Section, spin_count: u32) -> u32 ---;
-	@(link_name="TryEnterCriticalSection")               try_enter_critical_section                 :: proc(critical_section: ^Critical_Section) -> Bool ---;
+	@(link_name="TryEnterCriticalSection")               try_enter_critical_section                 :: proc(critical_section: ^Critical_Section) -> b8 ---;
 	@(link_name="EnterCriticalSection")                  enter_critical_section                     :: proc(critical_section: ^Critical_Section) ---;
 	@(link_name="LeaveCriticalSection")                  leave_critical_section                     :: proc(critical_section: ^Critical_Section) ---;
 

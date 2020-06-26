@@ -2,11 +2,11 @@ package thread
 
 import "core:runtime"
 import "core:sync"
-import "core:sys/win32"
+import win32 "core:sys/windows"
 
 Thread_Os_Specific :: struct {
-	win32_thread:    win32.Handle,
-	win32_thread_id: u32,
+	win32_thread:    win32.HANDLE,
+	win32_thread_id: win32.DWORD,
 	done: bool, // see note in `is_done`
 }
 
@@ -24,9 +24,10 @@ _thread_priority_map := map[Thread_Priority]i32{
 };
 
 create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
-	win32_thread_id: u32;
+	win32_thread_id: win32.DWORD;
 
-	__windows_thread_entry_proc :: proc "c" (t: ^Thread) -> i32 {
+	__windows_thread_entry_proc :: proc "stdcall" (t_: rawptr) -> win32.DWORD {
+		t := (^Thread)(t_);
 		context = runtime.default_context();
 		c := context;
 		if ic, ok := t.init_context.?; ok {
@@ -47,10 +48,9 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	}
 
 
-	win32_thread_proc := rawptr(__windows_thread_entry_proc);
 	thread := new(Thread);
 
-	win32_thread := win32.create_thread(nil, 0, win32_thread_proc, thread, win32.CREATE_SUSPENDED, &win32_thread_id);
+	win32_thread := win32.CreateThread(nil, 0, __windows_thread_entry_proc, thread, win32.CREATE_SUSPENDED, &win32_thread_id);
 	if win32_thread == nil {
 		free(thread);
 		return nil;
@@ -60,14 +60,14 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	thread.win32_thread_id = win32_thread_id;
 	thread.init_context = context;
 
-	ok := win32.set_thread_priority(win32_thread, _thread_priority_map[priority]);
+	ok := win32.SetThreadPriority(win32_thread, _thread_priority_map[priority]);
 	assert(ok == true);
 
 	return thread;
 }
 
 start :: proc(using thread: ^Thread) {
-	win32.resume_thread(win32_thread);
+	win32.ResumeThread(win32_thread);
 }
 
 is_done :: proc(using thread: ^Thread) -> bool {
@@ -79,8 +79,8 @@ is_done :: proc(using thread: ^Thread) -> bool {
 
 join :: proc(using thread: ^Thread) {
 	if win32_thread != win32.INVALID_HANDLE {
-		win32.wait_for_single_object(win32_thread, win32.INFINITE);
-		win32.close_handle(win32_thread);
+		win32.WaitForSingleObject(win32_thread, win32.INFINITE);
+		win32.CloseHandle(win32_thread);
 		win32_thread = win32.INVALID_HANDLE;
 	}
 }
@@ -90,10 +90,10 @@ destroy :: proc(thread: ^Thread) {
 	free(thread);
 }
 
-terminate :: proc(using thread : ^Thread, exit_code : u32) {
-	win32.terminate_thread(win32_thread, exit_code);
+terminate :: proc(using thread : ^Thread, exit_code: u32) {
+	win32.TerminateThread(win32_thread, exit_code);
 }
 
 yield :: proc() {
-	win32.sleep(0);
+	win32.Sleep(0);
 }

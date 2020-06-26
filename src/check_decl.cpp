@@ -505,9 +505,13 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 
 typedef bool TypeCheckSig(Type *t);
 bool sig_compare(TypeCheckSig *a, Type *x, Type *y) {
+	x = core_type(x);
+	y = core_type(y);
 	return (a(x) && a(y));
 }
 bool sig_compare(TypeCheckSig *a, TypeCheckSig *b, Type *x, Type *y) {
+	x = core_type(x);
+	y = core_type(y);
 	if (a == b) {
 		return sig_compare(a, x, y);
 	}
@@ -539,6 +543,13 @@ bool signature_parameter_similar_enough(Type *x, Type *y) {
 	}
 
 	if (sig_compare(is_type_uintptr, is_type_rawptr, x, y)) {
+		return true;
+	}
+
+	if (sig_compare(is_type_proc, is_type_proc, x, y)) {
+		return true;
+	}
+	if (sig_compare(is_type_proc, is_type_pointer, x, y)) {
 		return true;
 	}
 

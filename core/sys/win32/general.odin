@@ -814,9 +814,9 @@ wstring_to_utf8 :: proc(s: Wstring, N: int, allocator := context.temp_allocator)
 	}
 
 	// If N == -1 the call to wide_char_to_multi_byte assume the wide string is null terminated
-	// and will scan it to find the first null terminated character. The resulting string will 
+	// and will scan it to find the first null terminated character. The resulting string will
 	// also null terminated.
-	// If N != -1 it assumes the wide string is not null terminated and the resulting string 
+	// If N != -1 it assumes the wide string is not null terminated and the resulting string
 	// will not be null terminated, we therefore have to force it to be null terminated manually.
 	text := make([]byte, n+1 if N != -1 else n, allocator);
 
