@@ -4,35 +4,12 @@ package sync
 import win32 "core:sys/windows"
 import "core:time"
 
-Mutex :: struct {
-	_critical_section: win32.CRITICAL_SECTION,
-}
-
-Blocking_Mutex :: struct {
-	_handle: win32.SRWLOCK,
-}
-
-
-Condition_Mutex_Ptr :: union{^Mutex, ^Blocking_Mutex};
-
-// Blocks until signalled.
-// When signalled, awakens exactly one waiting thread.
-Condition :: struct {
-	_handle: win32.CONDITION_VARIABLE,
-
-	mutex: Condition_Mutex_Ptr,
-}
 
 // When waited upon, blocks until the internal count is greater than zero, then subtracts one.
 // Posting to the semaphore increases the count by one, or the provided amount.
 Semaphore :: struct {
 	_handle: win32.HANDLE,
 }
-
-RW_Lock :: struct {
-	_handle: win32.SRWLOCK,
-}
-
 
 semaphore_init :: proc(s: ^Semaphore, initial_count := 0) {
 	s._handle = win32.CreateSemaphoreW(nil, i32(initial_count), 1<<31-1, nil);
@@ -50,6 +27,11 @@ semaphore_wait_for :: proc(s: ^Semaphore) {
 	// NOTE(tetra, 2019-10-30): wait_for_single_object decrements the count before it returns.
 	result := win32.WaitForSingleObject(s._handle, win32.INFINITE);
 	assert(result != win32.WAIT_FAILED);
+}
+
+
+Mutex :: struct {
+	_critical_section: win32.CRITICAL_SECTION,
 }
 
 
@@ -73,6 +55,11 @@ mutex_unlock :: proc(m: ^Mutex) {
 	win32.LeaveCriticalSection(&m._critical_section);
 }
 
+Blocking_Mutex :: struct {
+	_handle: win32.SRWLOCK,
+}
+
+
 blocking_mutex_init :: proc(m: ^Blocking_Mutex) {
 	//
 }
@@ -91,6 +78,15 @@ blocking_mutex_try_lock :: proc(m: ^Blocking_Mutex) -> bool {
 
 blocking_mutex_unlock :: proc(m: ^Blocking_Mutex) {
 	win32.ReleaseSRWLockExclusive(&m._handle);
+}
+
+
+// Blocks until signalled.
+// When signalled, awakens exactly one waiting thread.
+Condition :: struct {
+	_handle: win32.CONDITION_VARIABLE,
+
+	mutex: Condition_Mutex_Ptr,
 }
 
 
@@ -143,6 +139,11 @@ condition_wait_for_timeout :: proc(c: ^Condition, duration: time.Duration) -> bo
 
 
 
+
+RW_Lock :: struct {
+	_handle: win32.SRWLOCK,
+}
+
 rw_lock_init :: proc(l: ^RW_Lock) {
 	l._handle = win32.SRWLOCK_INIT;
 }
@@ -167,6 +168,3 @@ rw_lock_read_unlock :: proc(l: ^RW_Lock) {
 rw_lock_write_unlock :: proc(l: ^RW_Lock) {
 	win32.ReleaseSRWLockExclusive(&l._handle);
 }
-
-
-

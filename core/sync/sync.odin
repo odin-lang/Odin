@@ -6,6 +6,9 @@ cpu_relax :: inline proc() {
 	intrinsics.cpu_relax();
 }
 
+Condition_Mutex_Ptr :: union{^Mutex, ^Blocking_Mutex};
+
+
 Ticket_Mutex :: struct {
 	ticket:  u64,
 	serving: u64,
