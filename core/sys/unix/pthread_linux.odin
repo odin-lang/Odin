@@ -62,6 +62,10 @@ pthread_barrierattr_t :: opaque struct #align 16 {
 	_: [PTHREAD_BARRIERATTR_T_SIZE] c.char,
 };
 
+PTHREAD_MUTEX_NORMAL :: 0;
+PTHREAD_MUTEX_RECURSIVE :: 1;
+PTHREAD_MUTEX_ERRORCHECK :: 2;
+
 
 // TODO(tetra, 2019-11-01): Maybe make `enum c.int`s for these?
 PTHREAD_CREATE_JOINABLE :: 0;
