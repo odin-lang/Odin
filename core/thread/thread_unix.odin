@@ -120,7 +120,9 @@ is_done :: proc(t: ^Thread) -> bool {
 }
 
 join :: proc(t: ^Thread) {
-	if unix.pthread_equal(unix.pthread_self(), t.unix_thread) do return;
+	if unix.pthread_equal(unix.pthread_self(), t.unix_thread) {
+		return;
+	}
 	// if unix.pthread_self().x == t.unix_thread.x do return;
 
 	// NOTE(tetra): It's apparently UB for multiple threads to join the same thread
@@ -131,7 +133,9 @@ join :: proc(t: ^Thread) {
 	// sure it makes sense to need to join from multiple threads?
 	if sync.atomic_swap(&t.already_joined, true, .Sequentially_Consistent) {
 		for {
-			if sync.atomic_load(&t.done, .Sequentially_Consistent) do return;
+			if sync.atomic_load(&t.done, .Sequentially_Consistent) {
+				return;
+			}
 			intrinsics.cpu_relax();
 		}
 	}
@@ -141,11 +145,15 @@ join :: proc(t: ^Thread) {
 	// We do this instead because I don't know if there is a danger
 	// that you may join a different thread from the one you called join on,
 	// if the thread handle is reused.
-	if sync.atomic_load(&t.done, .Sequentially_Consistent) do return;
+	if sync.atomic_load(&t.done, .Sequentially_Consistent) {
+		return;
+	}
 
-	ret := unix.pthread_join(t.unix_thread, nil);
-	assert(ret == 0, "cannot join thread");
-	assert(sync.atomic_load(&t.done, .Sequentially_Consistent), "thread not done after join");
+	ret_val: rawptr;
+	_ = unix.pthread_join(t.unix_thread, &ret_val);
+	if !sync.atomic_load(&t.done, .Sequentially_Consistent) {
+		panic("thread not done after join");
+	}
 }
 
 destroy :: proc(t: ^Thread) {
