@@ -2,6 +2,7 @@
 package sync
 
 import "core:sys/unix"
+import "core:time"
 
 // A recursive lock that can only be held by one thread at once
 Mutex :: struct {
@@ -176,3 +177,67 @@ condition_wait_for :: proc(c: ^Condition) -> bool {
 	}
 	return false;
 }
+
+// Wait for the condition to be signalled.
+// Does not block if the condition has been signalled and no one
+// has waited on it yet.
+condition_wait_for_timeout :: proc(c: ^Condition, duration: time.Duration) -> bool {
+	switch m in c.mutex {
+	case ^Mutex:
+		mutex_lock(m);
+		defer mutex_unlock(m);
+		// NOTE(tetra): If a thread comes by and steals the flag immediately after the signal occurs,
+		// the thread that gets signalled and wakes up, discovers that the flag was taken and goes
+		// back to sleep.
+		// Though this overall behavior is the most sane, there may be a better way to do this that means that
+		// the first thread to wait, gets the flag first.
+		if atomic_swap(&c.flag, false, .Sequentially_Consistent) {
+			return true;
+		}
+
+		ns := time.duration_nanoseconds(duration);
+		timeout: time.TimeSpec;
+		timeout.tv_sec  = ns / 1e9;
+		timeout.tv_nsec = ns % 1e9;
+
+		for {
+			if unix.pthread_cond_timedwait(&c.handle, &m.handle, &timeout) != 0 {
+				return false;
+			}
+			if atomic_swap(&c.flag, false, .Sequentially_Consistent) {
+				return true;
+			}
+		}
+		return false;
+
+	case ^Blocking_Mutex:
+		blocking_mutex_lock(m);
+		defer blocking_mutex_unlock(m);
+		// NOTE(tetra): If a thread comes by and steals the flag immediately after the signal occurs,
+		// the thread that gets signalled and wakes up, discovers that the flag was taken and goes
+		// back to sleep.
+		// Though this overall behavior is the most sane, there may be a better way to do this that means that
+		// the first thread to wait, gets the flag first.
+		if atomic_swap(&c.flag, false, .Sequentially_Consistent) {
+			return true;
+		}
+
+		ns := time.duration_nanoseconds(duration);
+
+		timeout: time.TimeSpec;
+		timeout.tv_sec  = ns / 1e9;
+		timeout.tv_nsec = ns % 1e9;
+
+		for {
+			if unix.pthread_cond_timedwait(&c.handle, &m.handle, &timeout) != 0 {
+				return false;
+			}
+			if atomic_swap(&c.flag, false, .Sequentially_Consistent) {
+				return true;
+			}
+		}
+		return false;
+	}
+	return false;
+}
+
