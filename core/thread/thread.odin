@@ -44,8 +44,9 @@ run_with_data :: proc(fn: proc(data: rawptr), data: rawptr, init_context: Maybe(
 }
 
 
-run_with_thread_proc :: proc(fn: Thread_Proc, init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal) {
+create_and_start :: proc(fn: Thread_Proc, init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal) -> ^Thread {
 	t := create(fn, priority);
 	t.init_context = init_context;
 	start(t);
+	return t;
 }
