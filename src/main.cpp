@@ -162,7 +162,7 @@ i32 linker_stage(lbGenerator *gen) {
 			LIT(target_arch_names[build_context.metrics.arch])
 		);
 #endif
-	} else if (build_context.cross_compiling) {
+	} else if (build_context.cross_compiling && build_context.different_os) {
 		gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
 			LIT(target_os_names[build_context.metrics.os]),
 			LIT(target_arch_names[build_context.metrics.arch])
@@ -1689,10 +1689,10 @@ int main(int arg_count, char const **arg_ptr) {
 
 
 	init_build_context(selected_target_metrics ? selected_target_metrics->metrics : nullptr);
-	if (build_context.word_size == 4 && build_context.metrics.os != TargetOs_js) {
-		print_usage_line(0, "%.*s 32-bit is not yet supported for this platform", LIT(args[0]));
-		return 1;
-	}
+	// if (build_context.word_size == 4 && build_context.metrics.os != TargetOs_js) {
+	// 	print_usage_line(0, "%.*s 32-bit is not yet supported for this platform", LIT(args[0]));
+	// 	return 1;
+	// }
 	if (build_context.metrics.os == TargetOs_js) {
 		if (!build_context.use_llvm_api) {
 			print_usage_line(0, "%.*s - js platform only supported with the -llvm-api backend", LIT(args[0]));
@@ -1880,7 +1880,7 @@ int main(int arg_count, char const **arg_ptr) {
 				LIT(target_arch_names[build_context.metrics.arch])
 			);
 	#endif
-		} else if (build_context.cross_compiling) {
+		} else if (build_context.cross_compiling && build_context.different_os) {
 			gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
 				LIT(target_os_names[build_context.metrics.os]),
 				LIT(target_arch_names[build_context.metrics.arch])

@@ -196,12 +196,12 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 
 
 // NOTE(bill): Uses startup to initialize it
-stdin  := get_std_handle(int(win32.STD_INPUT_HANDLE));
-stdout := get_std_handle(int(win32.STD_OUTPUT_HANDLE));
-stderr := get_std_handle(int(win32.STD_ERROR_HANDLE));
+stdin  := get_std_handle(uint(win32.STD_INPUT_HANDLE));
+stdout := get_std_handle(uint(win32.STD_OUTPUT_HANDLE));
+stderr := get_std_handle(uint(win32.STD_ERROR_HANDLE));
 
 
-get_std_handle :: proc "contextless" (h: int) -> Handle {
+get_std_handle :: proc "contextless" (h: uint) -> Handle {
 	fd := win32.GetStdHandle(win32.DWORD(h));
 	win32.SetHandleInformation(fd, win32.HANDLE_FLAG_INHERIT, 0);
 	return Handle(fd);

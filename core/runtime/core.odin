@@ -1126,21 +1126,21 @@ card :: proc(s: $S/bit_set[$E; $U]) -> int {
 
 
 @builtin
-raw_array_data :: proc(a: $P/^($T/[$N]$E)) -> ^E {
+raw_array_data :: proc "contextless" (a: $P/^($T/[$N]$E)) -> ^E {
 	return (^E)(a);
 }
 @builtin
-raw_slice_data :: proc(s: $S/[]$E) -> ^E {
+raw_slice_data :: proc "contextless" (s: $S/[]$E) -> ^E {
 	ptr := (transmute(Raw_Slice)s).data;
 	return (^E)(ptr);
 }
 @builtin
-raw_dynamic_array_data :: proc(s: $S/[dynamic]$E) -> ^E {
+raw_dynamic_array_data :: proc "contextless" (s: $S/[dynamic]$E) -> ^E {
 	ptr := (transmute(Raw_Dynamic_Array)s).data;
 	return (^E)(ptr);
 }
 @builtin
-raw_string_data :: proc(s: $S/string) -> ^u8 {
+raw_string_data :: proc "contextless" (s: $S/string) -> ^u8 {
 	return (transmute(Raw_String)s).data;
 }
 

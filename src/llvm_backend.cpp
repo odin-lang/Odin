@@ -12272,19 +12272,29 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 	if (!(build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main)) {
+
+
 		Type *params  = alloc_type_tuple();
 		Type *results = alloc_type_tuple();
 
-		array_init(&params->Tuple.variables, heap_allocator(), 2);
-		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32, false, true);
-		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), alloc_type_pointer(t_cstring), false, true);
+		String name = str_lit("main");
+		if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_386) {
+			name = str_lit("mainCRTStartup");
+		} else {
+			array_init(&params->Tuple.variables, heap_allocator(), 2);
+			params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32, false, true);
+			params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), alloc_type_pointer(t_cstring), false, true);
+		}
 
 		array_init(&results->Tuple.variables, heap_allocator(), 1);
 		results->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("_"),   t_i32, false, true);
 
-		Type *proc_type = alloc_type_proc(nullptr, params, 2, results, 1, false, ProcCC_CDecl);
+		Type *proc_type = alloc_type_proc(nullptr,
+			params, params->Tuple.variables.count,
+			results, results->Tuple.variables.count, false, ProcCC_CDecl);
 
-		lbProcedure *p = lb_create_dummy_procedure(m, str_lit("main"), proc_type);
+
+		lbProcedure *p = lb_create_dummy_procedure(m, name, proc_type);
 		p->is_startup = true;
 
 		lb_begin_procedure_body(p);
