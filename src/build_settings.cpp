@@ -138,6 +138,7 @@ struct BuildContext {
 	bool   use_lld;
 	bool   vet;
 	bool   cross_compiling;
+	bool   different_os;
 	bool   keep_object_files;
 
 	bool   use_llvm_api;
@@ -624,8 +625,9 @@ void init_build_context(TargetMetrics *cross_target) {
 	#endif
 
 	if (cross_target != nullptr && metrics != cross_target) {
-		metrics = cross_target;
+		bc->different_os = cross_target->os != metrics->os;
 		bc->cross_compiling = true;
+		metrics = cross_target;
 	}
 
 	GB_ASSERT(metrics->os != TargetOs_Invalid);
