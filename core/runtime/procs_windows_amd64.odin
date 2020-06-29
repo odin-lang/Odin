@@ -32,6 +32,9 @@ memcpy :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 	foreign kernel32 {
 		RtlCopyMemory :: proc "c" (dst, src: rawptr, len: int) ---
 	}
+	if dst == nil || src == nil || len == 0 {
+		return dst;
+	}
 	RtlCopyMemory(dst, src, len);
 	return dst;
 }
@@ -41,12 +44,19 @@ memmove :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 	foreign kernel32 {
 		RtlMoveMemory :: proc "c" (dst, src: rawptr, len: int) ---
 	}
+	if dst == nil || src == nil || len == 0 {
+		return dst;
+	}
 	RtlMoveMemory(dst, src, len);
 	return dst;
 }
 
 // @(link_name="memset")
 memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {
+	if ptr == nil || len == 0 {
+		return ptr;
+	}
+
 	b := byte(val);
 
 	p_start := uintptr(ptr);

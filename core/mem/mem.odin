@@ -13,9 +13,7 @@ zero_item :: inline proc(item: $P/^$T) {
 	set(item, 0, size_of(T));
 }
 zero_slice :: proc(data: $T/[]$E) {
-	if n := len(data); n > 0 {
-		zero(&data[0], size_of(E)*n);
-	}
+	zero(raw_data(data), size_of(E)*n);
 }
 
 
@@ -26,9 +24,7 @@ copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr {
 	return runtime.mem_copy_non_overlapping(dst, src, len);
 }
 compare :: inline proc(a, b: []byte) -> int {
-	// NOTE(tetra): no-abc is okay here because if the slices are empty, `&a[0]` is just nil+0 == nil, which
-	// compare_byte_ptrs handles fine when the passed length is also zero.
-	res := #no_bounds_check compare_byte_ptrs(&a[0], &b[0], min(len(a), len(b)));
+	res := compare_byte_ptrs(raw_data(a), raw_data(b), min(len(a), len(b)));
 	if res == 0 && len(a) != len(b) {
 		return len(a) <= len(b) ? -1 : +1;
 	} else if len(a) == 0 && len(b) == 0 {
@@ -38,6 +34,17 @@ compare :: inline proc(a, b: []byte) -> int {
 }
 
 compare_byte_ptrs :: proc(a, b: ^byte, n: int) -> int #no_bounds_check {
+	switch {
+	case a == b:
+		return 0;
+	case a == nil:
+		return -1;
+	case b == nil:
+		return -1;
+	case n == 0:
+		return 0;
+	}
+
 	x := slice_ptr(a, n);
 	y := slice_ptr(b, n);
 
@@ -121,11 +128,10 @@ slice_to_components :: proc(slice: $E/[]$T) -> (data: ^T, len: int) {
 }
 
 buffer_from_slice :: inline proc(backing: $T/[]$E) -> [dynamic]E {
-	s := transmute(Raw_Slice)backing;
 	return transmute([dynamic]E)Raw_Dynamic_Array{
-		data      = s.data,
+		data      = raw_data(s),
 		len       = 0,
-		cap       = s.len,
+		cap       = len(s),
 		allocator = nil_allocator(),
 	};
 }
