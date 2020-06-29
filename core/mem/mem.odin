@@ -78,6 +78,44 @@ compare_byte_ptrs :: proc(a, b: ^byte, n: int) -> int #no_bounds_check {
 	return 0;
 }
 
+check_zero :: proc(data: []byte) -> bool {
+	return check_zero_ptr(raw_data(data), len(data));
+}
+
+check_zero_ptr :: proc(ptr: rawptr, len: int) -> bool {
+	switch {
+	case len <= 0:
+		return true;
+	case ptr == nil:
+		return true;
+	}
+
+	start := uintptr(ptr);
+	start_aligned := align_forward_uintptr(start, align_of(uintptr));
+	end := start + uintptr(len);
+	end_aligned := align_backward_uintptr(end, align_of(uintptr));
+
+	for b in start..<start_aligned {
+		if (^byte)(b)^ != 0 {
+			return false;
+		}
+	}
+
+	for b := start_aligned; b < end_aligned; b += size_of(uintptr) {
+		if (^uintptr)(b)^ != 0 {
+			return false;
+		}
+	}
+
+	for b in end_aligned..<end {
+		if (^byte)(b)^ != 0 {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 simple_equal :: proc(a, b: $T) -> bool where intrinsics.type_is_simple_compare(T) {
 	a, b := a, b;
 	return compare_byte_ptrs((^byte)(&a), (^byte)(&b), size_of(T)) == 0;
