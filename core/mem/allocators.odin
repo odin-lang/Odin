@@ -247,7 +247,7 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	}
 
 	raw_alloc :: proc(s: ^Stack, size, alignment: int) -> rawptr {
-		curr_addr := uintptr(&s.data[0]) + uintptr(s.curr_offset);
+		curr_addr := uintptr(raw_data(s.data)) + uintptr(s.curr_offset);
 		padding := calc_padding_with_header(curr_addr, uintptr(alignment), size_of(Stack_Allocation_Header));
 		if s.curr_offset + padding + size > len(s.data) {
 			return nil;
@@ -274,7 +274,7 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		if old_memory == nil {
 			return nil;
 		}
-		start := uintptr(&s.data[0]);
+		start := uintptr(raw_data(s.data));
 		end := start + uintptr(len(s.data));
 		curr_addr := uintptr(old_memory);
 
@@ -288,7 +288,7 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		}
 
 		header := (^Stack_Allocation_Header)(curr_addr - size_of(Stack_Allocation_Header));
-		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(&s.data[0]));
+		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)));
 
 		if old_offset != int(header.prev_offset) {
 			panic("Out of order stack allocator free");
@@ -310,7 +310,7 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			return nil;
 		}
 
-		start := uintptr(&s.data[0]);
+		start := uintptr(raw_data(s.data));
 		end := start + uintptr(len(s.data));
 		curr_addr := uintptr(old_memory);
 		if !(start <= curr_addr && curr_addr < end) {
@@ -327,7 +327,7 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		}
 
 		header := (^Stack_Allocation_Header)(curr_addr - size_of(Stack_Allocation_Header));
-		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(&s.data[0]));
+		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)));
 
 		if old_offset != int(header.prev_offset) {
 			ptr := raw_alloc(s, size, alignment);
@@ -392,7 +392,7 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	align := clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2);
 
 	raw_alloc :: proc(s: ^Small_Stack, size, alignment: int) -> rawptr {
-		curr_addr := uintptr(&s.data[0]) + uintptr(s.offset);
+		curr_addr := uintptr(raw_data(s.data)) + uintptr(s.offset);
 		padding := calc_padding_with_header(curr_addr, uintptr(alignment), size_of(Small_Stack_Allocation_Header));
 		if s.offset + padding + size > len(s.data) {
 			return nil;
@@ -417,7 +417,7 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		if old_memory == nil {
 			return nil;
 		}
-		start := uintptr(&s.data[0]);
+		start := uintptr(raw_data(s.data));
 		end := start + uintptr(len(s.data));
 		curr_addr := uintptr(old_memory);
 
@@ -431,7 +431,7 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		}
 
 		header := (^Small_Stack_Allocation_Header)(curr_addr - size_of(Small_Stack_Allocation_Header));
-		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(&s.data[0]));
+		old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)));
 
 		s.offset = int(old_offset);
 
@@ -446,7 +446,7 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			return nil;
 		}
 
-		start := uintptr(&s.data[0]);
+		start := uintptr(raw_data(s.data));
 		end := start + uintptr(len(s.data));
 		curr_addr := uintptr(old_memory);
 		if !(start <= curr_addr && curr_addr < end) {

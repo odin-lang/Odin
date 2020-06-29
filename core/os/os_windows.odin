@@ -322,7 +322,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 
 		buf := make([]byte, int(olen));
 		n := win32.WideCharToMultiByte(win32.CP_UTF8, 0, wc_str, -1,
-		                               &buf[0], olen, nil, nil);
+		                               raw_data(buf), olen, nil, nil);
 		if n > 0 {
 			n -= 1;
 		}

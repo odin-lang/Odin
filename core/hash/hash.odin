@@ -71,7 +71,7 @@ murmur32 :: proc(data: []byte) -> u32 {
 
 	h1: u32 = 0;
 	nblocks := len(data)/4;
-	p := &data[0];
+	p := raw_data(data);
 	p1 := mem.ptr_offset(p, 4*nblocks);
 
 	for ; p < p1; p = mem.ptr_offset(p, 4) {
@@ -122,7 +122,7 @@ murmur64 :: proc(data: []byte) -> u64 {
 		r :: 47;
 
 		h: u64 = SEED ~ (u64(len(data)) * m);
-		data64 := mem.slice_ptr(cast(^u64)&data[0], len(data)/size_of(u64));
+		data64 := mem.slice_ptr(cast(^u64)raw_data(data), len(data)/size_of(u64));
 
 		for _, i in data64 {
 			k := data64[i];
@@ -158,7 +158,7 @@ murmur64 :: proc(data: []byte) -> u64 {
 
 		h1 := u32(SEED) ~ u32(len(data));
 		h2 := u32(SEED) >> 32;
-		data32 := mem.slice_ptr(cast(^u32)&data[0], len(data)/size_of(u32));
+		data32 := mem.slice_ptr(cast(^u32)raw_data(data), len(data)/size_of(u32));
 		len := len(data);
 		i := 0;
 

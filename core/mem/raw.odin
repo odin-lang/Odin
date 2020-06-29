@@ -42,6 +42,9 @@ make_any :: inline proc(data: rawptr, id: typeid) -> any {
 	return transmute(any)Raw_Any{data, id};
 }
 
+raw_array_data :: proc(a: $P/^($T/[$N]$E)) -> ^E {
+	return (^E)(a);
+}
 raw_string_data :: inline proc(s: $T/string) -> ^byte {
 	return (transmute(Raw_String)s).data;
 }
@@ -52,6 +55,6 @@ raw_dynamic_array_data :: inline proc(a: $T/[dynamic]$E) -> ^E {
 	return cast(^E)(transmute(Raw_Dynamic_Array)a).data;
 }
 
-raw_data :: proc{raw_string_data, raw_slice_data, raw_dynamic_array_data};
+raw_data :: proc{raw_array_data, raw_string_data, raw_slice_data, raw_dynamic_array_data};
 
 

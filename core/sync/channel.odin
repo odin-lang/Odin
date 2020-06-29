@@ -6,6 +6,39 @@ import "core:math/rand"
 
 _, _ :: time, rand;
 
+chan :: struct(T: typeid) {
+	qlen: uint,
+	qcap: uint,
+	closed: b32,
+	sendx: uint,
+	recvx: uint,
+	mutex: Blocking_Mutex,
+	allocator: mem.Allocator,
+
+	buf: [0]T,
+}
+
+makechan :: proc($T: typeid, cap: int, allocator := context.allocator) -> ^chan(T) {
+	chan_size :: size_of(chan(T));
+	chan_align :: align_of(chan(T));
+
+	mem := uintptr(cap) * size_of(T);
+	c := cast(^chan(T))mem.alloc(chan_size+mem, chan_align, allocator);
+	c.allocator = allocator;
+	c.qlen = 0;
+	c.qcap = uint(cap);
+	blocking_mutex_init(&c.mutex);
+	return c;
+}
+chanbuf :: proc(c: ^$C/chan($T)) -> []T #no_bounds_check {
+	return c.buf[0:c.qcap];
+}
+
+
+
+
+/*
+
 Channel :: struct(T: typeid) {
 	using internal: ^_Channel_Internal(T),
 }
@@ -255,3 +288,4 @@ channel_select_read :: proc(readers: []$C/Channel($T)) -> (index: int) {
 	_, index = channel_select(readers, []C{}, nil);
 	return;
 }
+*/

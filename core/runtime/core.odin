@@ -510,16 +510,16 @@ default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code
 @builtin
 copy_slice :: proc "contextless" (dst, src: $T/[]$E) -> int {
 	n := max(0, min(len(dst), len(src)));
-	#no_bounds_check if n > 0 do mem_copy(&dst[0], &src[0], n*size_of(E));
+	if n > 0 {
+		mem_copy(raw_data(dst), raw_data(src), n*size_of(E));
+	}
 	return n;
 }
 @builtin
 copy_from_string :: proc "contextless" (dst: $T/[]$E/u8, src: $S/string) -> int {
 	n := max(0, min(len(dst), len(src)));
 	if n > 0 {
-		d := (transmute(Raw_Slice)dst).data;
-		s := (transmute(Raw_String)src).data;
-		mem_copy(d, s, n);
+		mem_copy(raw_data(dst), raw_data(src), n);
 	}
 	return n;
 }
@@ -615,7 +615,7 @@ free_all :: proc{mem_free_all};
 
 @builtin
 delete_string :: proc(str: string, allocator := context.allocator, loc := #caller_location) {
-	mem_free((transmute(Raw_String)str).data, allocator, loc);
+	mem_free(raw_data(str), allocator, loc);
 }
 @builtin
 delete_cstring :: proc(str: cstring, allocator := context.allocator, loc := #caller_location) {
@@ -623,11 +623,11 @@ delete_cstring :: proc(str: cstring, allocator := context.allocator, loc := #cal
 }
 @builtin
 delete_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) {
-	mem_free((transmute(Raw_Dynamic_Array)array).data, array.allocator, loc);
+	mem_free(raw_data(array), array.allocator, loc);
 }
 @builtin
 delete_slice :: proc(array: $T/[]$E, allocator := context.allocator, loc := #caller_location) {
-	mem_free((transmute(Raw_Slice)array).data, allocator, loc);
+	mem_free(raw_data(array), allocator, loc);
 }
 @builtin
 delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) {
@@ -1114,6 +1114,9 @@ card :: proc(s: $S/bit_set[$E; $U]) -> int {
 	} else when size_of(S) == 8 {
 		foreign { @(link_name="llvm.ctpop.i64") count_ones :: proc(i: u64) -> u64 --- }
 		return int(count_ones(transmute(u64)s));
+	} else when size_of(S) == 16 {
+		foreign { @(link_name="llvm.ctpop.i128") count_ones :: proc(i: u128) -> u128 --- }
+		return int(count_ones(transmute(u128)s));
 	} else {
 		#assert(false);
 		return 0;
@@ -1122,6 +1125,27 @@ card :: proc(s: $S/bit_set[$E; $U]) -> int {
 
 
 
+@builtin
+raw_array_data :: proc(a: $P/^($T/[$N]$E)) -> ^E {
+	return (^E)(a);
+}
+@builtin
+raw_slice_data :: proc(s: $S/[]$E) -> ^E {
+	ptr := (transmute(Raw_Slice)s).data;
+	return (^E)(ptr);
+}
+@builtin
+raw_dynamic_array_data :: proc(s: $S/[dynamic]$E) -> ^E {
+	ptr := (transmute(Raw_Dynamic_Array)s).data;
+	return (^E)(ptr);
+}
+@builtin
+raw_string_data :: proc(s: $S/string) -> ^u8 {
+	return (transmute(Raw_String)s).data;
+}
+
+@builtin
+raw_data :: proc{raw_array_data, raw_slice_data, raw_dynamic_array_data, raw_string_data};
 
 
 

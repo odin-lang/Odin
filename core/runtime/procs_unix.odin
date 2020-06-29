@@ -3,6 +3,9 @@ package runtime
 
 @(link_name="memset")
 memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {
+	if ptr == nil || len == 0 {
+		return ptr;
+	}
 	b := byte(val);
 
 	p_start := uintptr(ptr);

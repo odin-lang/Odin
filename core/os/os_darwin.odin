@@ -317,7 +317,7 @@ write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, 0;
 	}
-	bytes_written := _unix_write(fd, &data[0], len(data));
+	bytes_written := _unix_write(fd, raw_data(data), len(data));
 	if(bytes_written == -1) {
 		return 0, 1;
 	}
@@ -327,7 +327,7 @@ write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	assert(fd != -1);
 
-	bytes_read := _unix_read(fd, &data[0], len(data));
+	bytes_read := _unix_read(fd, raw_data(data), len(data));
 	if bytes_read == -1 {
 		return 0, 1;
 	}
@@ -406,7 +406,7 @@ get_current_directory :: proc() -> string {
 	page_size := get_page_size(); // NOTE(tetra): See note in os_linux.odin/get_current_directory.
 	buf := make([dynamic]u8, page_size);
 	for {
-		cwd := _unix_getcwd(cstring(#no_bounds_check &buf[0]), c.size_t(len(buf)));
+		cwd := _unix_getcwd(cstring(raw_data(buf)), c.size_t(len(buf)));
 		if cwd != nil {
 			return string(cwd);
 		}

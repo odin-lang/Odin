@@ -392,10 +392,10 @@ mul :: proc{
 	quaternion256_mul_vector3,
 };
 
-vector_to_ptr :: proc(v: ^$V/[$N]$E) -> ^E where IS_NUMERIC(E) {
+vector_to_ptr :: proc(v: ^$V/[$N]$E) -> ^E where IS_NUMERIC(E), N > 0 #no_bounds_check {
 	return &v[0];
 }
-matrix_to_ptr :: proc(m: ^$A/[$I][$J]$E) -> ^E where IS_NUMERIC(E) {
+matrix_to_ptr :: proc(m: ^$A/[$I][$J]$E) -> ^E where IS_NUMERIC(E), I > 0, J > 0 #no_bounds_check {
 	return &m[0][0];
 }
 
