@@ -519,24 +519,21 @@ bool sig_compare(TypeCheckSig *a, TypeCheckSig *b, Type *x, Type *y) {
 }
 
 bool signature_parameter_similar_enough(Type *x, Type *y) {
-	x = core_type(x);
-	y = core_type(y);
-
 	if (sig_compare(is_type_pointer, x, y)) {
 		return true;
 	}
 
 	if (sig_compare(is_type_integer, x, y)) {
-		GB_ASSERT(x->kind == Type_Basic);
-		GB_ASSERT(y->kind == Type_Basic);
+		GB_ASSERT(core_type(x)->kind == Type_Basic);
+		GB_ASSERT(core_type(y)->kind == Type_Basic);
 		i64 sx = type_size_of(x);
 		i64 sy = type_size_of(y);
 		if (sx == sy) return true;
 	}
 
 	if (sig_compare(is_type_integer, is_type_boolean, x, y)) {
-		GB_ASSERT(x->kind == Type_Basic);
-		GB_ASSERT(y->kind == Type_Basic);
+		GB_ASSERT(core_type(x)->kind == Type_Basic);
+		GB_ASSERT(core_type(y)->kind == Type_Basic);
 		i64 sx = type_size_of(x);
 		i64 sy = type_size_of(y);
 		if (sx == sy) return true;
