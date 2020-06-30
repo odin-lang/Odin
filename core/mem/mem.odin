@@ -13,7 +13,7 @@ zero_item :: inline proc(item: $P/^$T) {
 	set(item, 0, size_of(T));
 }
 zero_slice :: proc(data: $T/[]$E) {
-	zero(raw_data(data), size_of(E)*n);
+	zero(raw_data(data), size_of(E)*len(data));
 }
 
 
