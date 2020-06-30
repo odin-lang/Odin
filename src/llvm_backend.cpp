@@ -794,7 +794,9 @@ String lb_mangle_name(lbModule *m, Entity *e) {
 	GB_ASSERT_MSG(pkg != nullptr, "Missing package for '%.*s'", LIT(name));
 	String pkgn = pkg->name;
 	GB_ASSERT(!rune_is_digit(pkgn[0]));
-
+	if (pkgn == "llvm") {
+		pkgn = str_lit("llvm$");
+	}
 
 	isize max_len = pkgn.len + 1 + name.len + 1;
 	bool require_suffix_id = is_type_polymorphic(e->type, true);
