@@ -519,6 +519,9 @@ bool sig_compare(TypeCheckSig *a, TypeCheckSig *b, Type *x, Type *y) {
 }
 
 bool signature_parameter_similar_enough(Type *x, Type *y) {
+	x = core_type(x);
+	y = core_type(y);
+
 	if (sig_compare(is_type_pointer, x, y)) {
 		return true;
 	}

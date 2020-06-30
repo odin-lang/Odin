@@ -12204,7 +12204,10 @@ void lb_generate_code(lbGenerator *gen) {
 		for_array(i, global_variables) {
 			auto *var = &global_variables[i];
 			if (var->decl->init_expr != nullptr)  {
-				var->init = lb_build_expr(p, var->decl->init_expr);
+				lbValue init = lb_build_expr(p, var->decl->init_expr);
+				if (!lb_is_const(init)) {
+					var->init = init;
+				}
 			}
 
 			Entity *e = var->decl->entity;
@@ -12440,6 +12443,11 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 	array_add(&gen->output_object_paths, filepath_obj);
+
+	for_array(i, m->info->required_foreign_imports_through_force) {
+		Entity *e = m->info->required_foreign_imports_through_force[i];
+		lb_add_foreign_library_path(m, e);
+	}
 
 #undef TIME_SECTION
 }

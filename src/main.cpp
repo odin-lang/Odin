@@ -43,12 +43,15 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 #if defined(GB_SYSTEM_WINDOWS)
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
-	char cmd_line[4*1024] = {0};
-	isize cmd_len;
+	isize cmd_len = 0;
+	isize cmd_cap = 1024;
+	char *cmd_line = cast(char *)calloc(1, cmd_cap);
 	va_list va;
 	gbTempArenaMemory tmp;
 	String16 cmd;
 	i32 exit_code = 0;
+
+	defer (free(cmd_line));
 
 	start_info.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
 	start_info.wShowWindow = SW_SHOW;
@@ -57,10 +60,21 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	start_info.hStdError   = GetStdHandle(STD_ERROR_HANDLE);
 
 	va_start(va, fmt);
-	cmd_len = gb_snprintf_va(cmd_line, gb_size_of(cmd_line), fmt, va);
+	for (;;) {
+		cmd_len = gb_snprintf_va(cmd_line, cmd_cap-1, fmt, va);
+		if (cmd_len < 0) {
+			cmd_cap *= 2;
+			cmd_line = cast(char *)realloc(cmd_line, cmd_cap);
+			continue;
+		}
+		break;
+	}
 	va_end(va);
 
-	// gb_printf_err("%.*s\n", cast(int)cmd_len, cmd_line);
+	if (build_context.show_system_calls) {
+		gb_printf_err("[SYSTEM CALL] %s\n", name);
+		gb_printf_err("%.*s\n\n", cast(int)cmd_len, cmd_line);
+	}
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -95,8 +109,11 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	va_end(va);
 	cmd = make_string(cast(u8 *)&cmd_line, cmd_len-1);
 
-	// printf("do: %s\n", cmd_line);
-	exit_code = system(&cmd_line[0]);
+	if (build_context.show_system_calls) {
+		gb_printf_err("[SYSTEM CALL] %s\n", name);
+		gb_printf_err("%s\n\n", cmd_line);
+		exit_code = system(&cmd_line[0]);
+	}
 
 	// pid_t pid = fork();
 	// int status = 0;
@@ -554,6 +571,7 @@ enum BuildFlagKind {
 	BuildFlag_OptimizationLevel,
 	BuildFlag_ShowTimings,
 	BuildFlag_ShowMoreTimings,
+	BuildFlag_ShowSystemCalls,
 	BuildFlag_ThreadCount,
 	BuildFlag_KeepTempFiles,
 	BuildFlag_Collection,
@@ -648,6 +666,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),               BuildFlagParam_Integer);
 	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),      BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,   str_lit("show-more-timings"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_ShowSystemCalls,   str_lit("show-system-calls"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),      BuildFlagParam_Integer);
 	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"),   BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),        BuildFlagParam_String);
@@ -835,6 +854,10 @@ bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_timings = true;
 							build_context.show_more_timings = true;
+							break;
+						case BuildFlag_ShowSystemCalls:
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.show_system_calls = true;
 							break;
 						case BuildFlag_ThreadCount: {
 							GB_ASSERT(value.kind == ExactValue_Integer);
