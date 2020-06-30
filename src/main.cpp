@@ -44,14 +44,13 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
 	isize cmd_len = 0;
-	isize cmd_cap = 1024;
-	char *cmd_line = cast(char *)calloc(1, cmd_cap);
+	isize const cmd_cap = 4096;
+	char cmd_line[cmd_cap] = {};
 	va_list va;
 	gbTempArenaMemory tmp;
 	String16 cmd;
 	i32 exit_code = 0;
 
-	defer (free(cmd_line));
 
 	start_info.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
 	start_info.wShowWindow = SW_SHOW;
@@ -60,20 +59,12 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	start_info.hStdError   = GetStdHandle(STD_ERROR_HANDLE);
 
 	va_start(va, fmt);
-	for (;;) {
-		cmd_len = gb_snprintf_va(cmd_line, cmd_cap-1, fmt, va);
-		if (cmd_len < 0) {
-			cmd_cap *= 2;
-			cmd_line = cast(char *)realloc(cmd_line, cmd_cap);
-			continue;
-		}
-		break;
-	}
+	cmd_len = gb_snprintf_va(cmd_line, cmd_cap-1, fmt, va);
 	va_end(va);
 
 	if (build_context.show_system_calls) {
 		gb_printf_err("[SYSTEM CALL] %s\n", name);
-		gb_printf_err("%.*s\n\n", cast(int)cmd_len, cmd_line);
+		gb_printf_err("%.*s\n\n", cast(int)(cmd_len-1), cmd_line);
 	}
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
@@ -112,8 +103,8 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	if (build_context.show_system_calls) {
 		gb_printf_err("[SYSTEM CALL] %s\n", name);
 		gb_printf_err("%s\n\n", cmd_line);
-		exit_code = system(&cmd_line[0]);
 	}
+	exit_code = system(cmd_line);
 
 	// pid_t pid = fork();
 	// int status = 0;
