@@ -125,9 +125,15 @@ type_is_bit_field_value  :: proc($T: typeid) -> bool ---
 type_is_bit_set          :: proc($T: typeid) -> bool ---
 type_is_simd_vector      :: proc($T: typeid) -> bool ---
 
-type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
-
 type_has_nil :: proc($T: typeid) -> bool ---
+
+type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
 
 type_proc_parameter_count :: proc($T: typeid) -> int where type_is_proc(T) ---
 type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---
+
+type_proc_parameter_type  :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
+type_proc_return_type     :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
+
+type_polymorphic_record_parameter_count :: proc($T: typeid) -> typeid ---
+type_polymorphic_record_parameter_value :: proc($T: typeid, index: int) -> $V ---
