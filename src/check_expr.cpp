@@ -5692,6 +5692,124 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->type = t_untyped_integer;
 		break;
 
+	case BuiltinProc_type_proc_parameter_type:
+		if (operand->mode != Addressing_Type || !is_type_proc(operand->type)) {
+			error(operand->expr, "Expected a procedure type for '%.*s'", LIT(builtin_name));
+			return false;
+		} else {
+			if (is_type_polymorphic(operand->type)) {
+				error(operand->expr, "Expected a non-polymorphic procedure type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			Operand op = {};
+			check_expr(c, &op, ce->args[1]);
+			if (op.mode != Addressing_Constant && !is_type_integer(op.type)) {
+				error(op.expr, "Expected a constant integer for the index of procedure parameter value");
+				return false;
+			}
+
+			i64 index = exact_value_to_i64(op.value);
+			if (index < 0) {
+				error(op.expr, "Expected a non-negative integer for the index of procedure parameter value, got %lld", cast(long long)index);
+				return false;
+			}
+
+			Entity *param = nullptr;
+			i64 count = 0;
+
+			Type *bt = base_type(operand->type);
+			if (bt->kind == Type_Proc) {
+				count = bt->Proc.param_count;
+				if (index < count) {
+					param = bt->Proc.params->Tuple.variables[index];
+				}
+			}
+
+			if (index >= count) {
+				error(op.expr, "Index of procedure parameter value out of bounds, expected 0..<%lld, got %lld", cast(long long)count, cast(long long)index);
+				return false;
+			}
+			GB_ASSERT(param != nullptr);
+			switch (param->kind) {
+			case Entity_Constant:
+				operand->mode = Addressing_Constant;
+				operand->type = param->type;
+				operand->value = param->Constant.value;
+				break;
+			case Entity_TypeName:
+			case Entity_Variable:
+				operand->mode = Addressing_Type;
+				operand->type = param->type;
+				break;
+			default:
+				GB_PANIC("Unhandled procedure entity type %d", param->kind);
+				break;
+			}
+
+		}
+
+		break;
+
+	case BuiltinProc_type_proc_return_type:
+		if (operand->mode != Addressing_Type || !is_type_proc(operand->type)) {
+			error(operand->expr, "Expected a procedure type for '%.*s'", LIT(builtin_name));
+			return false;
+		} else {
+			if (is_type_polymorphic(operand->type)) {
+				error(operand->expr, "Expected a non-polymorphic procedure type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			Operand op = {};
+			check_expr(c, &op, ce->args[1]);
+			if (op.mode != Addressing_Constant && !is_type_integer(op.type)) {
+				error(op.expr, "Expected a constant integer for the index of procedure parameter value");
+				return false;
+			}
+
+			i64 index = exact_value_to_i64(op.value);
+			if (index < 0) {
+				error(op.expr, "Expected a non-negative integer for the index of procedure parameter value, got %lld", cast(long long)index);
+				return false;
+			}
+
+			Entity *param = nullptr;
+			i64 count = 0;
+
+			Type *bt = base_type(operand->type);
+			if (bt->kind == Type_Proc) {
+				count = bt->Proc.result_count;
+				if (index < count) {
+					param = bt->Proc.results->Tuple.variables[index];
+				}
+			}
+
+			if (index >= count) {
+				error(op.expr, "Index of procedure parameter value out of bounds, expected 0..<%lld, got %lld", cast(long long)count, cast(long long)index);
+				return false;
+			}
+			GB_ASSERT(param != nullptr);
+			switch (param->kind) {
+			case Entity_Constant:
+				operand->mode = Addressing_Constant;
+				operand->type = param->type;
+				operand->value = param->Constant.value;
+				break;
+			case Entity_TypeName:
+			case Entity_Variable:
+				operand->mode = Addressing_Type;
+				operand->type = param->type;
+				break;
+			default:
+				GB_PANIC("Unhandled procedure entity type %d", param->kind);
+				break;
+			}
+
+		}
+
+		break;
+
 	case BuiltinProc_type_polymorphic_record_parameter_count:
 		operand->value = exact_value_i64(0);
 		if (operand->mode != Addressing_Type) {
@@ -5724,13 +5842,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			Operand op = {};
 			check_expr(c, &op, ce->args[1]);
 			if (op.mode != Addressing_Constant && !is_type_integer(op.type)) {
-				error(op.expr, "Execpted a constant integer for the index of record parameter value");
+				error(op.expr, "Expected a constant integer for the index of record parameter value");
 				return false;
 			}
 
 			i64 index = exact_value_to_i64(op.value);
 			if (index < 0) {
-				error(op.expr, "Execpted a non-negative integer for the index of record parameter value, got %lld", cast(long long)index);
+				error(op.expr, "Expected a non-negative integer for the index of record parameter value, got %lld", cast(long long)index);
 				return false;
 			}
 
@@ -5773,7 +5891,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				operand->type = param->type;
 				break;
 			default:
-				GB_PANIC("Unhandle polymorphic record type");
+				GB_PANIC("Unhandled polymorphic record type");
 				break;
 			}
 
