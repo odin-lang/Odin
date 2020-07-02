@@ -127,19 +127,18 @@ do_location_header :: proc(opts: Options, buf: ^strings.Builder, location := #ca
 	if Location_File_Opts & opts != nil {
 		fmt.sbprint(buf, file);
 	}
-
-	if .Procedure in opts {
+	if .Line in opts {
 		if Location_File_Opts & opts != nil {
 			fmt.sbprint(buf, ":");
 		}
-		fmt.sbprintf(buf, "%s()", location.procedure);
+		fmt.sbprint(buf, location.line);
 	}
 
-	if .Line in opts {
+	if .Procedure in opts {
 		if (Location_File_Opts | {.Procedure}) & opts != nil {
 			fmt.sbprint(buf, ":");
 		}
-		fmt.sbprint(buf, location.line);
+		fmt.sbprintf(buf, "%s()", location.procedure);
 	}
 
 	fmt.sbprint(buf, "] ");
