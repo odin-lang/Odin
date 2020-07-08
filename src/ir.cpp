@@ -153,6 +153,8 @@ struct irProcedure {
 	irTargetList *        target_list;
 	Array<irValue *>      referrers;
 
+	Ast *curr_stmt;
+
 	Array<irContextData>  context_stack;
 
 	i32      parameter_count;
@@ -3614,7 +3616,7 @@ void ir_emit_bounds_check(irProcedure *proc, Token token, irValue *index, irValu
 
 
 irValue *ir_insert_dynamic_map_key_and_value(irProcedure *proc, irValue *addr, Type *map_type,
-                                             irValue *map_key, irValue *map_value) {
+                                             irValue *map_key, irValue *map_value, Ast *node) {
 	map_type = base_type(map_type);
 
 	irValue *h = ir_gen_map_header(proc, addr, map_type);
@@ -3628,7 +3630,7 @@ irValue *ir_insert_dynamic_map_key_and_value(irProcedure *proc, irValue *addr, T
 	args[0] = h;
 	args[1] = key;
 	args[2] = ir_emit_conv(proc, ptr, t_rawptr);
-	args[3] = ir_emit_source_code_location(proc, nullptr);
+	args[3] = ir_emit_source_code_location(proc, node);
 	return ir_emit_runtime_call(proc, "__dynamic_map_set", args);
 }
 
@@ -3768,7 +3770,7 @@ void ir_addr_store(irProcedure *proc, irAddr addr, irValue *value) {
 		return;
 
 	} else if (addr.kind == irAddr_Map) {
-		ir_insert_dynamic_map_key_and_value(proc, addr.addr, addr.map_type, addr.map_key, value);
+		ir_insert_dynamic_map_key_and_value(proc, addr.addr, addr.map_type, addr.map_key, value, proc->curr_stmt);
 		return;
 	} else if (addr.kind == irAddr_BitField) {
 		gbAllocator a = ir_allocator();
@@ -6784,6 +6786,10 @@ u64 ir_generate_source_code_location_hash(TokenPos pos) {
 }
 
 irValue *ir_emit_source_code_location(irProcedure *proc, String procedure, TokenPos pos) {
+	if (pos.file == "") {
+		gb_printf_err("here\n");
+	}
+
 	gbAllocator a = ir_allocator();
 	irValue *v = ir_alloc_value(irValue_SourceCodeLocation);
 	v->SourceCodeLocation.file      = ir_find_or_add_entity_string(proc->module, pos.file);
@@ -8880,7 +8886,7 @@ irAddr ir_build_addr(irProcedure *proc, Ast *expr) {
 
 				irValue *key   = ir_build_expr(proc, fv->field);
 				irValue *value = ir_build_expr(proc, fv->value);
-				ir_insert_dynamic_map_key_and_value(proc, v, type, key, value);
+				ir_insert_dynamic_map_key_and_value(proc, v, type, key, value, elem);
 			}
 			break;
 		}
@@ -9578,6 +9584,8 @@ void ir_build_stmt_list(irProcedure *proc, Array<Ast *> stmts) {
 
 void ir_build_stmt_internal(irProcedure *proc, Ast *node);
 void ir_build_stmt(irProcedure *proc, Ast *node) {
+	Ast *prev_stmt = proc->curr_stmt;
+	proc->curr_stmt = node;
 	u64 prev_state_flags = proc->module->state_flags;
 	defer (proc->module->state_flags = prev_state_flags);
 
@@ -9600,6 +9608,7 @@ void ir_build_stmt(irProcedure *proc, Ast *node) {
 	ir_build_stmt_internal(proc, node);
 	ir_pop_debug_location(proc->module);
 
+	proc->curr_stmt = prev_stmt;
 }
 
 void ir_build_when_stmt(irProcedure *proc, AstWhenStmt *ws) {
