@@ -61,7 +61,7 @@ Blocking_Mutex :: struct {
 
 
 blocking_mutex_init :: proc(m: ^Blocking_Mutex) {
-	//
+	m^ = Blocking_Mutex{};
 }
 
 blocking_mutex_destroy :: proc(m: ^Blocking_Mutex) {
