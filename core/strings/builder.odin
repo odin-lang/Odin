@@ -86,6 +86,24 @@ write_bytes :: proc(b: ^Builder, x: []byte) {
 	append(&b.buf, ..x);
 }
 
+pop_byte :: proc(b: ^Builder) -> (r: byte) {
+	if len(b.buf) == 0 {
+		return 0;
+	}
+	r = b.buf[len(b.buf)-1];
+	d := cast(^mem.Raw_Dynamic_Array)&b.buf;
+	d.len = max(d.len-1, 0);
+	return;
+}
+
+pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
+	r, width = utf8.decode_last_rune(b.buf[:]);
+	d := cast(^mem.Raw_Dynamic_Array)&b.buf;
+	d.len = max(d.len-width, 0);
+	return;
+}
+
+
 @(private, static)
 DIGITS_LOWER := "0123456789abcdefx";
 
