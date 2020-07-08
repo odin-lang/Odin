@@ -298,10 +298,6 @@ Context :: struct {
 	assertion_failure_proc: Assertion_Failure_Proc,
 	logger:                 Logger,
 
-	// stdin:  os.Handle,
-	// stdout: os.Handle,
-	// stderr: os.Handle,
-
 	thread_id:  int,
 
 	user_data:  any,
