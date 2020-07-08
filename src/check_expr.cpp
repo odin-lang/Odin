@@ -3665,16 +3665,19 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		}
 		break;
 	case Entity_Variable:
-		// TODO(bill): Is this the rule I need?
-		if (operand->mode == Addressing_Context) {
-			if (sel.indirect) {
-				operand->mode = Addressing_Variable;
-			}
+		if (sel.indirect) {
+			operand->mode = Addressing_Variable;
+		} else if (operand->mode == Addressing_Context) {
+			// Do nothing
 		} else if (operand->mode == Addressing_MapIndex) {
 			operand->mode = Addressing_Value;
 		} else if (entity->flags & EntityFlag_SoaPtrField) {
 			operand->mode = Addressing_SoaVariable;
-		} else if (sel.indirect || operand->mode != Addressing_Value || operand->mode == Addressing_SoaVariable) {
+		} else if (operand->mode == Addressing_OptionalOk) {
+			operand->mode = Addressing_Value;
+		} else if (operand->mode == Addressing_SoaVariable) {
+			operand->mode = Addressing_Variable;
+		} else if (operand->mode != Addressing_Value) {
 			operand->mode = Addressing_Variable;
 		} else {
 			operand->mode = Addressing_Value;
