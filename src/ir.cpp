@@ -4335,6 +4335,42 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 		return ir_emit_byte_swap(proc, res, type);
 	}
 
+	if (op == Token_Sub) {
+		if (is_type_integer(ir_type(x))) {
+			return ir_emit(proc, ir_instr_unary_op(proc, op, x, type));
+		} else if (is_type_float(ir_type(x))) {
+			return ir_emit(proc, ir_instr_unary_op(proc, op, x, type));
+		} else if (is_type_complex(ir_type(x))) {
+			irValue *addr = ir_add_local_generated(proc, ir_type(x), false);
+
+			irValue *v0 = ir_emit_struct_ev(proc, x, 0);
+			irValue *v1 = ir_emit_struct_ev(proc, x, 1);
+			v0 = ir_emit(proc, ir_instr_unary_op(proc, op, v0, ir_type(v0)));
+			v1 = ir_emit(proc, ir_instr_unary_op(proc, op, v1, ir_type(v1)));
+			ir_emit_store(proc, ir_emit_struct_ep(proc, addr, 0), v0);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, addr, 1), v1);
+
+			return ir_emit_load(proc, addr);
+		} else if (is_type_quaternion(ir_type(x))) {
+			irValue *addr = ir_add_local_generated(proc, ir_type(x), false);
+
+			irValue *v0 = ir_emit_struct_ev(proc, x, 0);
+			irValue *v1 = ir_emit_struct_ev(proc, x, 1);
+			irValue *v2 = ir_emit_struct_ev(proc, x, 2);
+			irValue *v3 = ir_emit_struct_ev(proc, x, 3);
+			v0 = ir_emit(proc, ir_instr_unary_op(proc, op, v0, ir_type(v0)));
+			v1 = ir_emit(proc, ir_instr_unary_op(proc, op, v1, ir_type(v1)));
+			v2 = ir_emit(proc, ir_instr_unary_op(proc, op, v2, ir_type(v2)));
+			v3 = ir_emit(proc, ir_instr_unary_op(proc, op, v3, ir_type(v3)));
+			ir_emit_store(proc, ir_emit_struct_ep(proc, addr, 0), v0);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, addr, 1), v1);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, addr, 2), v2);
+			ir_emit_store(proc, ir_emit_struct_ep(proc, addr, 3), v3);
+
+			return ir_emit_load(proc, addr);
+		}
+	}
+
 	return ir_emit(proc, ir_instr_unary_op(proc, op, x, type));
 }
 
