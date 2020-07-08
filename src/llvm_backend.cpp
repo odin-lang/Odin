@@ -384,7 +384,7 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 
 		return;
 	} else if (addr.kind == lbAddr_Map) {
-		lb_insert_dynamic_map_key_and_value(p, addr, addr.map.type, addr.map.key, value);
+		lb_insert_dynamic_map_key_and_value(p, addr, addr.map.type, addr.map.key, value, p->curr_stmt);
 		return;
 	} else if (addr.kind == lbAddr_BitField) {
 		Type *bft = base_type(type_deref(addr.addr.type));
@@ -3909,6 +3909,10 @@ lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast
 }
 
 void lb_build_stmt(lbProcedure *p, Ast *node) {
+	Ast *prev_stmt = p->curr_stmt;
+	defer (p->curr_stmt = prev_stmt);
+	p->curr_stmt = node;
+
 	if (p->curr_block != nullptr) {
 		LLVMValueRef last_instr = LLVMGetLastInstruction(p->curr_block->block);
 		if (lb_is_instr_terminating(last_instr)) {
@@ -9616,7 +9620,7 @@ lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type) {
 }
 
 void lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type,
-                                         lbValue map_key, lbValue map_value) {
+                                         lbValue map_key, lbValue map_value, Ast *node) {
 	map_type = base_type(map_type);
 	GB_ASSERT(map_type->kind == Type_Map);
 
@@ -9631,7 +9635,7 @@ void lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_
 	args[0] = h;
 	args[1] = key;
 	args[2] = lb_emit_conv(p, value_addr.addr, t_rawptr);
-	args[3] = lb_emit_source_code_location(p, nullptr);
+	args[3] = lb_emit_source_code_location(p, node);
 	lb_emit_runtime_call(p, "__dynamic_map_set", args);
 }
 
@@ -10336,7 +10340,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 				lbValue key   = lb_build_expr(p, fv->field);
 				lbValue value = lb_build_expr(p, fv->value);
-				lb_insert_dynamic_map_key_and_value(p, v, type, key, value);
+				lb_insert_dynamic_map_key_and_value(p, v, type, key, value, elem);
 			}
 			break;
 		}

@@ -218,6 +218,8 @@ struct lbProcedure {
 	lbBlock *        curr_block;
 	lbTargetList *   target_list;
 
+	Ast *curr_stmt;
+
 	Array<lbContextData> context_stack;
 
 	lbValue  return_ptr_hint_value;
@@ -345,7 +347,7 @@ lbValue lb_generate_local_array(lbProcedure *p, Type *elem_type, i64 count, bool
 lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id);
 lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type);
 lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type);
-void    lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type, lbValue map_key, lbValue map_value);
+void    lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type, lbValue map_key, lbValue map_value, Ast *node);
 
 
 void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value);
