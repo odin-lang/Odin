@@ -4,6 +4,11 @@ import "core:mem"
 import "core:strconv"
 import "core:unicode/utf8"
 
+
+OS :: ODIN_OS;
+ARCH :: ODIN_ARCH;
+ENDIAN :: ODIN_ENDIAN;
+
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, transmute([]byte)str);
 }

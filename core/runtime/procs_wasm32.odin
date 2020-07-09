@@ -1,3 +1,4 @@
+//+build wasm32
 package runtime
 
 @(link_name="memset")

@@ -1,8 +1,5 @@
 package os
 
-OS :: "js";
-
-
 Handle :: distinct i32;
 Errno :: distinct i32;
 
