@@ -24,7 +24,7 @@ Textbox :: struct { using element : Element, };
 ListView :: struct { using element : Element, };
 NumericEntry :: struct { using element : Element, };
 Menu :: struct { using element : Element, };
-MenuCallbackFunction :: distinct #type proc (^Element, Generic); 
+MenuCallbackFunction :: distinct #type proc (^Element, Generic);
 INSTANCE_TYPE :: Instance;
 SCANCODE_A ::  (0x1C);
 SCANCODE_B ::  (0x32);
@@ -2436,5 +2436,3 @@ current_thread_id :: proc "contextless" () -> int {
 	// return int(EsThreadGetID(ES_CURRENT_THREAD));
 	return -1;
 }
-
-OS :: "essence";

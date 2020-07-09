@@ -4,8 +4,6 @@ package os
 import win32 "core:sys/windows"
 import "core:intrinsics"
 
-OS :: "windows";
-
 Handle    :: distinct uintptr;
 File_Time :: distinct u64;
 Errno     :: distinct int;

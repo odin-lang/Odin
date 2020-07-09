@@ -7,8 +7,6 @@ import "core:runtime"
 import "core:strings"
 import "core:c"
 
-OS :: "linux";
-
 Handle    :: distinct i32;
 File_Time :: distinct u64;
 Errno     :: distinct i32;
