@@ -183,6 +183,15 @@ foreign kernel32 {
 	@(link_name="FreeLibrary")    free_library     :: proc(h: Hmodule) -> Bool ---;
 	@(link_name="GetProcAddress") get_proc_address :: proc(h: Hmodule, c_str: cstring) -> rawptr ---;
 
+	@(link_name="GetFullPathNameA")  get_full_path_name_a  :: proc(filename: cstring, buffer_length: u32, buffer: cstring, file_part: ^Wstring) -> u32 ---;
+	@(link_name="GetFullPathNameW")  get_full_path_name_w  :: proc(filename: Wstring, buffer_length: u32, buffer: Wstring, file_part: ^Wstring) -> u32 ---;
+	@(link_name="GetLongPathNameA")  get_long_path_name_a  :: proc(short, long: cstring, len: u32) -> u32 ---;
+	@(link_name="GetLongPathNameW")  get_long_path_name_w  :: proc(short, long: Wstring, len: u32) -> u32 ---;
+	@(link_name="GetShortPathNameA") get_short_path_name_a :: proc(long, short: cstring, len: u32) -> u32 ---;
+	@(link_name="GetShortPathNameW") get_short_path_name_w :: proc(long, short: Wstring, len: u32) -> u32 ---;
+
+	@(link_name="GetCurrentDirectoryA") get_current_directory_a :: proc(buffer_length: u32, buffer: cstring) -> u32 ---;
+	@(link_name="GetCurrentDirectoryW") get_current_directory_w :: proc(buffer_length: u32, buffer: Wstring) -> u32 ---;
 }
 
 Memory_Basic_Information :: struct {
