@@ -259,6 +259,7 @@ foreign kernel32 {
 	GetFileType :: proc(file_handle: HANDLE) -> DWORD ---
 	SetFilePointer :: proc(file_handle: HANDLE, distance_to_move: LONG, distance_to_move_high: ^LONG, move_method: DWORD) -> DWORD ---
 	GetFileSizeEx :: proc(file_handle: HANDLE, file_size: ^LARGE_INTEGER) -> BOOL ---
+	GetFileAttributesW   :: proc(lpFileName: LPCWSTR) -> DWORD ---
 	GetFileAttributesExW :: proc(lpFileName: LPCWSTR, fInfoLevelId: GET_FILEEX_INFO_LEVELS, lpFileInformation: LPVOID) -> BOOL ---
 	GetSystemInfo :: proc(system_info: ^SYSTEM_INFO) ---
 	GetVersionExW :: proc(osvi: ^OSVERSIONINFOEXW) ---
@@ -266,4 +267,10 @@ foreign kernel32 {
 	LoadLibraryW :: proc(c_str: LPCWSTR) -> HMODULE ---
 	FreeLibrary :: proc(h: HMODULE) -> BOOL ---
 	GetProcAddress :: proc(h: HMODULE, c_str: LPCSTR) -> rawptr ---
+
+
+	GetFullPathNameW  :: proc(filename: LPCWSTR, buffer_length: DWORD, buffer: LPCWSTR, file_part: ^LPCWSTR) -> DWORD ---
+	GetLongPathNameW  :: proc(short, long: LPCWSTR, len: DWORD) -> DWORD ---
+	GetShortPathNameW :: proc(long, short: LPCWSTR, len: DWORD) -> DWORD ---
+
 }
