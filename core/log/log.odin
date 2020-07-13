@@ -93,20 +93,20 @@ fatalf :: proc(fmt_str: string, args: ..any, location := #caller_location) {
 	logf(level=.Fatal,   fmt_str=fmt_str, args=args, location=location);
 }
 
-debug :: proc(args: ..any, location := #caller_location) {
-	log(level=.Debug,   args=args, location=location);
+debug :: proc(args: ..any, sep := " ", location := #caller_location) {
+	log(level=.Debug,   args=args, sep=sep, location=location);
 }
-info  :: proc(args: ..any, location := #caller_location) {
-	log(level=.Info,    args=args, location=location);
+info  :: proc(args: ..any, sep := " ", location := #caller_location) {
+	log(level=.Info,    args=args, sep=sep, location=location);
 }
-warn  :: proc(args: ..any, location := #caller_location) {
-	log(level=.Warning, args=args, location=location);
+warn  :: proc(args: ..any, sep := " ", location := #caller_location) {
+	log(level=.Warning, args=args, sep=sep, location=location);
 }
-error :: proc(args: ..any, location := #caller_location) {
-	log(level=.Error,   args=args, location=location);
+error :: proc(args: ..any, sep := " ", location := #caller_location) {
+	log(level=.Error,   args=args, sep=sep, location=location);
 }
-fatal :: proc(args: ..any, location := #caller_location) {
-	log(level=.Fatal,   args=args, location=location);
+fatal :: proc(args: ..any, sep := " ", location := #caller_location) {
+	log(level=.Fatal,   args=args, sep=sep, location=location);
 }
 
 panic :: proc(args: ..any, location := #caller_location) -> ! {
@@ -121,12 +121,12 @@ panicf :: proc(fmt_str: string, args: ..any, location := #caller_location) -> ! 
 
 
 
-log :: proc(level: Level, args: ..any, location := #caller_location) {
+log :: proc(level: Level, args: ..any, sep := " ", location := #caller_location) {
 	logger := context.logger;
 	if level < logger.lowest_level {
 		return;
 	}
-	str := fmt.tprint(..args); //NOTE(Hoej): While tprint isn't thread-safe, no logging is.
+	str := fmt.tprint(args=args, sep=sep); //NOTE(Hoej): While tprint isn't thread-safe, no logging is.
 	logger.procedure(logger.data, level, str, logger.options, location);
 }
 
