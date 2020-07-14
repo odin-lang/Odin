@@ -156,6 +156,13 @@ join :: proc(t: ^Thread) {
 	}
 }
 
+join_multiple :: proc(threads: ..^Thread) {
+	for t in threads {
+		join(t);
+	}
+}
+
+
 destroy :: proc(t: ^Thread) {
 	join(t);
 	t.unix_thread = {};
