@@ -1,6 +1,5 @@
 package sync
 
-// import "core:fmt"
 import "core:mem"
 import "core:time"
 import "core:intrinsics"
@@ -113,17 +112,32 @@ channel_close :: proc(ch: $C/Channel($T), loc := #caller_location) {
 }
 
 
-channel_iterator :: proc(ch: $C/Channel($T)) -> (val: T, ok: bool) {
+channel_iterator :: proc(ch: $C/Channel($T)) -> (msg: T, ok: bool) {
 	c := ch._internal;
 	if c == nil {
 		return;
 	}
 
 	if !c.closed || c.len > 0 {
-		val, ok = channel_recv(ch), true;
+		msg, ok = channel_recv(ch), true;
 	}
 	return;
 }
+channel_drain :: proc(ch: $C/Channel($T)) {
+	raw_channel_drain(ch._internal);
+}
+
+
+channel_move :: proc(dst, src: $C/Channel($T)) {
+	// for channel_len(src) > 0 {
+	// 	msg := channel_recv(src);
+	// 	channel_send(dst, msg);
+	// }
+	for msg in channel_iterator(src) {
+		channel_send(dst, msg);
+	}
+}
+
 
 
 channel_select_recv :: proc(channels: ..^Raw_Channel) -> (index: int) {
@@ -243,8 +257,6 @@ channel_select_send_msg :: proc(msg: $T, channels: ..$C/Channel(T)) -> (index: i
 	channel_send(channels[index], msg);
 	return;
 }
-
-
 
 
 
@@ -392,4 +404,16 @@ raw_channel_can_recv :: proc(c: ^Raw_Channel) -> (ok: bool) {
 	ok = c.len > 0;
 	mutex_unlock(&c.mutex);
 	return;
+}
+
+
+raw_channel_drain :: proc(c: ^Raw_Channel) {
+	if c == nil {
+		return;
+	}
+	mutex_lock(&c.mutex);
+	c.len   = 0;
+	c.read  = 0;
+	c.write = 0;
+	mutex_unlock(&c.mutex);
 }
