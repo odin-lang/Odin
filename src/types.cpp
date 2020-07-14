@@ -1788,7 +1788,6 @@ bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 
 
 bool type_has_undef(Type *t) {
-	// t = base_type(t);
 	return true;
 }
 

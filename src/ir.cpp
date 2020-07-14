@@ -4737,6 +4737,14 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 			irValue *cap  = ir_soa_struct_cap(proc, x);
 			return ir_emit_comp(proc, op_kind, cap, v_zero);
 		}
+	} else if (is_type_struct(t) && type_has_nil(t)) {
+		auto args = array_make<irValue *>(heap_allocator(), 2);
+		irValue *lhs = ir_address_from_load_or_generate_local(proc, x);
+		args[0] = ir_emit_conv(proc, lhs, t_rawptr);
+		args[1] = ir_const_int(type_size_of(t));
+		irValue *val = ir_emit_runtime_call(proc, "memory_compare_zero", args);
+		irValue *res = ir_emit_comp(proc, op_kind, val, v_zero);
+		return ir_emit_conv(proc, res, t_bool);
 	}
 	return nullptr;
 }
