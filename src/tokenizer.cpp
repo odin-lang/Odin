@@ -1060,12 +1060,6 @@ void tokenizer_get_token(Tokenizer *t, Token *token) {
 		case '}':  token->kind = Token_CloseBrace;   break;
 		case '\\': token->kind = Token_BackSlash;    break;
 
-		// case 0x2260: token->kind = Token_NotEq;  break; // '≠'
-		// case 0x2264: token->kind = Token_LtEq;   break; // '≤'
-		// case 0x2265: token->kind = Token_GtEq;   break; // '≥'
-		// case 0x2208: token->kind = Token_in;     break; // '∈'
-		// case 0x2209: token->kind = Token_not_in; break; // '∉'
-
 		case '%':
 			token->kind = Token_Mod;
 			if (t->curr_rune == '=') {
