@@ -17,7 +17,7 @@ Thread_Priority :: enum {
 	High,
 }
 
-_thread_priority_map := map[Thread_Priority]i32{
+_thread_priority_map := [Thread_Priority]i32{
 	.Normal = 0,
 	.Low = -2,
 	.High = +2,

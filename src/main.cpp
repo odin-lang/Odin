@@ -572,6 +572,7 @@ enum BuildFlagKind {
 	BuildFlag_Debug,
 	BuildFlag_DisableAssert,
 	BuildFlag_NoBoundsCheck,
+	BuildFlag_NoDynamicLiterals,
 	BuildFlag_NoCRT,
 	BuildFlag_UseLLD,
 	BuildFlag_Vet,
@@ -652,25 +653,26 @@ ExactValue build_param_to_exact_value(String name, String param) {
 
 bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
-	add_flag(&build_flags, BuildFlag_Help,              str_lit("help"),              BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),               BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),               BuildFlagParam_Integer);
-	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),      BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_ShowMoreTimings,   str_lit("show-more-timings"), BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_ShowSystemCalls,   str_lit("show-system-calls"), BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),      BuildFlagParam_Integer);
-	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"),   BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),        BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_Define,            str_lit("define"),            BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),        BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_Target,            str_lit("target"),            BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),             BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_DisableAssert,     str_lit("disable-assert"),    BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"),   BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),            BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),               BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),               BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),          BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_Help,              str_lit("help"),                BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),                 BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),                 BuildFlagParam_Integer);
+	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),        BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_ShowMoreTimings,   str_lit("show-more-timings"),   BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_ShowSystemCalls,   str_lit("show-system-calls"),   BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),        BuildFlagParam_Integer);
+	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"),     BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),          BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_Define,            str_lit("define"),              BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),          BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_Target,            str_lit("target"),              BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),               BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_DisableAssert,     str_lit("disable-assert"),      BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"),     BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_NoDynamicLiterals, str_lit("no-dynamic-literals"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),              BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),                 BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),                 BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"), BuildFlagParam_String);
 
@@ -1066,6 +1068,10 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_NoBoundsCheck:
 							build_context.no_bounds_check = true;
+							break;
+
+						case BuildFlag_NoDynamicLiterals:
+							build_context.no_dynamic_literals = true;
 							break;
 
 						case BuildFlag_NoCRT:
