@@ -9339,6 +9339,14 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			first_arg_name = str_lit("_");
 		}
 
+		if (first_type == nullptr) {
+			error(se->call, "Selector call expressions expect a procedure type for the call with at least 1 parameter");
+			o->mode = Addressing_Invalid;
+			o->type = t_invalid;
+			o->expr = node;
+			return Expr_Stmt;
+		}
+
 		Operand y = {};
 		y.mode = first_arg->tav.mode;
 		y.type = first_arg->tav.type;
