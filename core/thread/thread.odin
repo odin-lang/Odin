@@ -1,6 +1,8 @@
 package thread
 
 import "core:runtime"
+import "core:sync"
+import "core:intrinsics"
 
 Thread_Proc :: #type proc(^Thread);
 
@@ -49,4 +51,32 @@ create_and_start :: proc(fn: Thread_Proc, init_context: Maybe(runtime.Context) =
 	t.init_context = init_context;
 	start(t);
 	return t;
+}
+
+
+Once :: struct {
+	m:    sync.Blocking_Mutex,
+	done: bool,
+}
+once_init :: proc(o: ^Once) {
+	sync.blocking_mutex_init(&o.m);
+	intrinsics.atomic_store_rel(&o.done, false);
+}
+once_destroy :: proc(o: ^Once) {
+	sync.blocking_mutex_destroy(&o.m);
+}
+
+once_do :: proc(o: ^Once, fn: proc()) {
+	if intrinsics.atomic_load(&o.done) == false {
+		_once_do_slow(o, fn);
+	}
+}
+
+_once_do_slow :: proc(o: ^Once, fn: proc()) {
+	sync.blocking_mutex_lock(&o.m);
+	defer sync.blocking_mutex_unlock(&o.m);
+	if !o.done {
+		fn();
+		intrinsics.atomic_store_rel(&o.done, true);
+	}
 }
