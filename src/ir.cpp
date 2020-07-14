@@ -2845,6 +2845,52 @@ irDebugInfo *ir_add_debug_info_type(irModule *module, Type *type, Entity *e, irD
 		return di;
 	}
 
+	if (is_type_relative_pointer(type)) {
+		Type *base_integer = base_type(type)->RelativePointer.base_integer;
+		base_integer = core_type(base_integer);
+		GB_ASSERT(base_integer->kind == Type_Basic);
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_BasicType);
+		di->BasicType.encoding = ir_debug_encoding_for_basic(base_integer->Basic.kind);
+		di->BasicType.name = base_integer->Basic.name;
+		di->BasicType.size = ir_debug_size_bits(type);
+		di->BasicType.align = ir_debug_align_bits(type);
+		map_set(&module->debug_info, hash_type(type), di);
+		return di;
+	}
+
+	if (is_type_relative_slice(type)) {
+		Type *base_integer = base_type(type)->RelativeSlice.base_integer;
+		base_integer = core_type(base_integer);
+
+		// NOTE(lachsinc): Every slice type has its own composite type / field debug infos created. This is sorta wasteful.
+		irDebugInfo *di = ir_alloc_debug_info(irDebugInfo_CompositeType);
+		di->CompositeType.name = str_lit("relative slice");
+		di->CompositeType.tag = irDebugBasicEncoding_structure_type;
+		di->CompositeType.size = ir_debug_size_bits(type); // TODO(lachsinc): Correct ??
+		di->CompositeType.align = ir_debug_align_bits(type);
+		map_set(&module->debug_info, hash_type(type), di);
+
+		irDebugInfo *data_di = ir_add_debug_info_field_internal(module, str_lit("data"), base_integer,
+		                                                        0,
+		                                                        nullptr,
+		                                                        di);
+		map_set(&module->debug_info, hash_pointer(data_di), data_di);
+
+		irDebugInfo *len_di = ir_add_debug_info_field_internal(module, str_lit("len"), base_integer,
+		                                                       data_di->DerivedType.size,
+		                                                       nullptr,
+		                                                       di);
+		map_set(&module->debug_info, hash_pointer(len_di), len_di);
+
+		irDebugInfo *elements_di = ir_add_debug_info_array(module, 0, 2);
+		array_add(&elements_di->DebugInfoArray.elements, data_di);
+		array_add(&elements_di->DebugInfoArray.elements, len_di);
+		di->CompositeType.elements = elements_di;
+		map_set(&module->debug_info, hash_pointer(elements_di), elements_di);
+
+		return di;
+	}
+
 	GB_PANIC("Unreachable %s", type_to_string(type));
 	return nullptr;
 }

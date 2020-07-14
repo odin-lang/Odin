@@ -7977,15 +7977,25 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 
 		// TODO(bill): Figure out how to make it weak
-		LLVMBool single_threaded = !weak;
+		LLVMBool single_threaded = weak;
+
+		LLVMValueRef value = LLVMBuildAtomicCmpXchg(
+			p->builder, address.value,
+			old_value.value, new_value.value,
+			success_ordering,
+			failure_ordering,
+			single_threaded
+		);
+
+		GB_ASSERT(tv.type->kind == Type_Tuple);
+		Type *fix_typed = alloc_type_tuple();
+		array_init(&fix_typed->Tuple.variables, heap_allocator(), 2);
+		fix_typed->Tuple.variables[0] = tv.type->Tuple.variables[0];
+		fix_typed->Tuple.variables[1] = alloc_entity_field(nullptr, blank_token, t_llvm_bool, false, 1);
 
 		lbValue res = {};
-		res.value = LLVMBuildAtomicCmpXchg(p->builder, address.value,
-		                                   old_value.value, new_value.value,
-		                                   success_ordering,
-		                                   failure_ordering,
-		                                   single_threaded);
-		res.type = tv.type;
+		res.value = value;
+		res.type = fix_typed;
 		return res;
 	}
 	}
