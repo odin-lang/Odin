@@ -85,6 +85,30 @@ join :: proc(using thread: ^Thread) {
 	}
 }
 
+join_multiple :: proc(threads: ..^Thread) {
+	MAXIMUM_WAIT_OBJECTS :: 64;
+
+	handles: [MAXIMUM_WAIT_OBJECTS]win32.HANDLE;
+
+	for k := 0; k < len(threads); k += MAXIMUM_WAIT_OBJECTS {
+		count := min(len(threads) - k, MAXIMUM_WAIT_OBJECTS);
+		n, j := u32(0), 0;
+		for i in 0..<count {
+			handle := threads[i+k].win32_thread;
+			if handle != win32.INVALID_HANDLE {
+				handles[j] = handle;
+				j += 1;
+			}
+		}
+		win32.WaitForMultipleObjects(n, &handles[0], true, win32.INFINITE);
+	}
+
+	for t in threads {
+		win32.CloseHandle(t.win32_thread);
+		t.win32_thread = win32.INVALID_HANDLE;
+	}
+}
+
 destroy :: proc(thread: ^Thread) {
 	join(thread);
 	free(thread);
@@ -97,3 +121,4 @@ terminate :: proc(using thread : ^Thread, exit_code: u32) {
 yield :: proc() {
 	win32.SwitchToThread();
 }
+
