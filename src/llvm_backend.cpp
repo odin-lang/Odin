@@ -8584,6 +8584,14 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 				return res;
 			}
 		}
+	} else if (is_type_struct(t) && type_has_nil(t)) {
+		auto args = array_make<lbValue>(heap_allocator(), 2);
+		lbValue lhs = lb_address_from_load_or_generate_local(p, x);
+		args[0] = lb_emit_conv(p, lhs, t_rawptr);
+		args[1] = lb_const_int(p->module, t_int, type_size_of(t));
+		lbValue val = lb_emit_runtime_call(p, "memory_compare_zero", args);
+		lbValue res = lb_emit_comp(p, op_kind, val, lb_const_int(p->module, t_int, 0));
+		return res;
 	}
 	return {};
 }
