@@ -134,6 +134,7 @@ struct BuildContext {
 	bool   keep_temp_files;
 	bool   ignore_unknown_attributes;
 	bool   no_bounds_check;
+	bool   no_dynamic_literals;
 	bool   no_output_files;
 	bool   no_crt;
 	bool   use_lld;

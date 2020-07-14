@@ -8455,8 +8455,10 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				context_name = str_lit("dynamic array literal");
 				is_constant = false;
 
-				add_package_dependency(c, "runtime", "__dynamic_array_reserve");
-				add_package_dependency(c, "runtime", "__dynamic_array_append");
+				if (!build_context.no_dynamic_literals) {
+					add_package_dependency(c, "runtime", "__dynamic_array_reserve");
+					add_package_dependency(c, "runtime", "__dynamic_array_append");
+				}
 			} else if (t->kind == Type_SimdVector) {
 				elem_type = t->SimdVector.elem;
 				context_name = str_lit("simd vector literal");
@@ -8581,7 +8583,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					cl->max_count = max;
 				}
 
-
 			} else {
 				isize index = 0;
 				for (; index < cl->elems.count; index++) {
@@ -8632,6 +8633,14 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 					error(node, "Compound literals are not allowed with intrinsics.x86_mmx");
 				}
 			}
+
+
+			if (t->kind == Type_DynamicArray) {
+				if (build_context.no_dynamic_literals && cl->elems.count) {
+					error(node, "Compound literals of dynamic types have been disabled");
+				}
+			}
+
 			break;
 		}
 
@@ -8940,8 +8949,12 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 				}
 			}
 
-			add_package_dependency(c, "runtime", "__dynamic_map_reserve");
-			add_package_dependency(c, "runtime", "__dynamic_map_set");
+			if (build_context.no_dynamic_literals && cl->elems.count) {
+				error(node, "Compound literals of dynamic types have been disabled");
+			} else {
+				add_package_dependency(c, "runtime", "__dynamic_map_reserve");
+				add_package_dependency(c, "runtime", "__dynamic_map_set");
+			}
 			break;
 		}
 
