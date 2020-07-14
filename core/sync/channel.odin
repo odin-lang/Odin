@@ -2,7 +2,6 @@ package sync
 
 import "core:mem"
 import "core:time"
-import "core:fmt"
 import "core:intrinsics"
 import "core:math/rand"
 
