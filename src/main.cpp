@@ -1195,7 +1195,14 @@ bool parse_build_flags(Array<String> args) {
 					}
 
 
-					set_flags[bf.kind] = ok;
+					switch (bf.kind) {
+					case BuildFlag_Define:
+						// Allow for multiple
+						break;
+					default:
+						set_flags[bf.kind] = ok;
+						break;
+					}
 				}
 				break;
 			}
