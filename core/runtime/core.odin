@@ -279,7 +279,8 @@ Logger_Option :: enum {
 	Long_File_Path,
 	Line,
 	Procedure,
-	Terminal_Color
+	Terminal_Color,
+	Thread_Id
 }
 
 Logger_Options :: bit_set[Logger_Option];
