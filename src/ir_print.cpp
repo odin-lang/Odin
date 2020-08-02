@@ -1539,6 +1539,16 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	case irInstr_InlineCode:
 		{
 			switch (instr->InlineCode.id) {
+			case BuiltinProc_alloca:
+				ir_fprintf(f, "%%%d = ", value->index);
+				ir_write_str_lit(f, "alloca i8, ");
+				ir_print_type(f, m, ir_type(instr->InlineCode.operands[0]));
+				ir_write_str_lit(f, " ");
+				ir_print_value(f, m, instr->InlineCode.operands[0], ir_type(instr->InlineCode.operands[0]));
+				ir_write_str_lit(f, ", align ");
+				ir_print_value(f, m, instr->InlineCode.operands[1], t_i32);
+				break;
+
 			case BuiltinProc_cpu_relax:
 				ir_write_str_lit(f, "call void asm sideeffect \"pause\", \"\"()");
 				break;

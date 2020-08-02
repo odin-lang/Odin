@@ -200,7 +200,7 @@ gbAllocator ir_allocator(void) {
 	IR_INSTR_KIND(ZeroInit, struct { irValue *address; })             \
 	IR_INSTR_KIND(Store,    struct { irValue *address, *value; bool is_volatile; }) \
 	IR_INSTR_KIND(Load,     struct { Type *type; irValue *address; i64 custom_align; }) \
-	IR_INSTR_KIND(InlineCode, struct { BuiltinProcId id; Array<irValue *> operands; }) \
+	IR_INSTR_KIND(InlineCode, struct { BuiltinProcId id; Array<irValue *> operands; Type *type; }) \
 	IR_INSTR_KIND(AtomicFence, struct { BuiltinProcId id; })          \
 	IR_INSTR_KIND(AtomicStore, struct {                               \
 		irValue *address, *value;                                     \
@@ -741,6 +741,8 @@ gb_inline bool ir_min_dep_entity(irModule *m, Entity *e) {
 
 Type *ir_instr_type(irInstr *instr) {
 	switch (instr->kind) {
+	case irInstr_InlineCode:
+		return instr->InlineCode.type;
 	case irInstr_Local:
 		return instr->Local.type;
 	case irInstr_Load:
@@ -1093,11 +1095,12 @@ irValue *ir_instr_load(irProcedure *p, irValue *address) {
 	return v;
 }
 
-irValue *ir_instr_inline_code(irProcedure *p, BuiltinProcId id, Array<irValue *> operands) {
+irValue *ir_instr_inline_code(irProcedure *p, BuiltinProcId id, Array<irValue *> const &operands, Type *type) {
 	irValue *v = ir_alloc_instr(p, irInstr_InlineCode);
 	irInstr *i = &v->Instr;
 	i->InlineCode.id = id;
 	i->InlineCode.operands = operands;
+	i->InlineCode.type = type;
 	return v;
 }
 
@@ -7287,8 +7290,16 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 
 
 	// "Intrinsics"
+	case BuiltinProc_alloca:
+		{
+			auto args = array_make<irValue *>(heap_allocator(), 2);
+			args[0] = ir_emit_conv(proc, ir_build_expr(proc, ce->args[0]), t_i32);
+			args[1] = ir_build_expr(proc, ce->args[1]);
+			return ir_emit(proc, ir_instr_inline_code(proc, id, args, t_u8_ptr));
+		}
+
 	case BuiltinProc_cpu_relax:
-		return ir_emit(proc, ir_instr_inline_code(proc, id, {}));
+		return ir_emit(proc, ir_instr_inline_code(proc, id, {}, nullptr));
 
 	case BuiltinProc_atomic_fence:
 	case BuiltinProc_atomic_fence_acq:

@@ -1,10 +1,15 @@
 // This is purely for documentation
 package intrinsics
 
+// Types
 
 x86_mmx :: x86_mmx; // Specialized SIMD Vector type
 
 simd_vector :: proc($N: int, $T: typeid) -> type/#simd[N]T
+soa_struct :: proc($N: int, $T: typeid) -> type/#soa[N]T
+
+
+// Atomics
 
 atomic_fence        :: proc() ---
 atomic_fence_acq    :: proc() ---
@@ -78,6 +83,11 @@ atomic_cxchgweak_failacq            :: proc(dst: ^$T, old, new: T) -> (T, /*opti
 atomic_cxchgweak_acq_failrelaxed    :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
 atomic_cxchgweak_acqrel_failrelaxed :: proc(dst: ^$T, old, new: T) -> (T, /*option*/bool) ---
 
+// Instructions
+
+alloca :: proc(size, align: int) -> ^u8 ---
+
+cpu_relax :: proc() ---
 
 // Constant type tests
 
