@@ -11,10 +11,6 @@ raw_channel_wait_queue_signal :: proc(q: ^Raw_Channel_Wait_Queue) {
 	// stub
 }
 
-
 raw_channel_wait_queue_broadcast :: proc(q: ^Raw_Channel_Wait_Queue) {
-	for x := q^; x != nil; x = x.next {
-		q^ = x.next;
-		// stub
-	}
+	// stub
 }
