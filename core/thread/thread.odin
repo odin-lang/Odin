@@ -31,7 +31,7 @@ run :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := 
 }
 
 
-run_with_data :: proc(fn: proc(data: rawptr), data: rawptr, init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal) {
+run_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal) {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(rawptr))t.data;
 		data := rawptr(uintptr(t.user_index));

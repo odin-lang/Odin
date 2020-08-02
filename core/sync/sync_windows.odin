@@ -61,7 +61,7 @@ Blocking_Mutex :: struct {
 
 
 blocking_mutex_init :: proc(m: ^Blocking_Mutex) {
-	m^ = Blocking_Mutex{};
+	win32.InitializeSRWLock(&m._handle);
 }
 
 blocking_mutex_destroy :: proc(m: ^Blocking_Mutex) {
@@ -127,7 +127,7 @@ condition_wait_for :: proc(c: ^Condition) -> bool {
 	return false;
 }
 condition_wait_for_timeout :: proc(c: ^Condition, duration: time.Duration) -> bool {
-	ms := win32.DWORD((time.duration_nanoseconds(duration) + 999999)/1000000);
+	ms := win32.DWORD((max(time.duration_nanoseconds(duration), 0) + 999999)/1000000);
 	switch m in &c.mutex {
 	case ^Mutex:
 		return cast(bool)win32.SleepConditionVariableCS(&c._handle, &m._critical_section, ms);
@@ -168,3 +168,9 @@ rw_lock_read_unlock :: proc(l: ^RW_Lock) {
 rw_lock_write_unlock :: proc(l: ^RW_Lock) {
 	win32.ReleaseSRWLockExclusive(&l._handle);
 }
+
+
+thread_yield :: proc() {
+	win32.SwitchToThread();
+}
+
