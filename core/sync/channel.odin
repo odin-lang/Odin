@@ -1,7 +1,6 @@
 package sync
 
 import "core:mem"
-import "core:fmt"
 import "core:time"
 import "core:intrinsics"
 import "core:math/rand"
@@ -380,8 +379,6 @@ select_timeout :: proc(timeout: time.Duration, channels: ..Select_Channel) -> (i
 	cap := len(channels);
 	candidates = candidates[:cap];
 
-	nil_channel := Raw_Channel{closed = true};
-
 	count := u32(0);
 	for c, i in channels {
 		if c.channel == nil {
@@ -403,7 +400,7 @@ select_timeout :: proc(timeout: time.Duration, channels: ..Select_Channel) -> (i
 
 	if count == 0 {
 		wait_state: uintptr = 0;
-		for c, i in channels {
+		for _, i in channels {
 			q := &queues[i];
 			q.state = &wait_state;
 		}
@@ -677,7 +674,6 @@ select_try :: proc(channels: ..Select_Channel) -> (index: int) {
 	assert(len(channels) <= MAX_SELECT_CHANNELS);
 
 	backing: [MAX_SELECT_CHANNELS]int;
-	queues:  [MAX_SELECT_CHANNELS]Raw_Channel_Wait_Queue;
 	candidates := backing[:];
 	cap := len(channels);
 	candidates = candidates[:cap];
