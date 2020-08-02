@@ -14,11 +14,7 @@ PTHREAD_ONCE_SIZE      :: 8;
 PTHREAD_RWLOCK_SIZE    :: 192;
 PTHREAD_RWLOCKATTR_SIZE :: 16;
 
-pthread_t :: opaque struct #align 16 {
-	sig: c.long,
-	cleanup_stack: rawptr,
-	_: [PTHREAD_SIZE] c.char,
-};
+pthread_t :: opaque u64;
 
 pthread_attr_t :: opaque struct #align 16 {
 	sig: c.long,
