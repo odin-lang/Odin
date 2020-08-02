@@ -1,5 +1,7 @@
 package mem
 
+import "intrinsics"
+
 nil_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                            size, alignment: int,
                            old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
@@ -629,4 +631,82 @@ dynamic_pool_free_all :: proc(using pool: ^Dynamic_Pool) {
 		free(block, block_allocator);
 	}
 	clear(&unused_blocks);
+}
+
+
+panic_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
+                             size, alignment: int,
+                             old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+
+	switch mode {
+	case .Alloc:
+		if size > 0 {
+			panic("mem: panic allocator, .Alloc called");
+		}
+	case .Resize:
+		if size > 0 {
+			panic("mem: panic allocator, .Resize called");
+		}
+	case .Free:
+		if old_memory != nil {
+			panic("mem: panic allocator, .Free called");
+		}
+	case .Free_All:
+		panic("mem: panic allocator, .Free_All called");
+	}
+
+	return nil;
+}
+
+panic_allocator :: proc() -> Allocator {
+	return Allocator{
+		procedure = panic_allocator_proc,
+		data = nil,
+	};
+}
+
+
+alloca_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
+                              size, alignment: int,
+                              old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+	switch mode {
+	case .Alloc:
+		switch alignment {
+		case:   return intrinsics.alloca(size, 2*align_of(uintptr));
+		case 0: return intrinsics.alloca(size, 0);
+
+		case 1:     return intrinsics.alloca(size, 1);
+		case 2:     return intrinsics.alloca(size, 2);
+		case 4:     return intrinsics.alloca(size, 4);
+		case 8:     return intrinsics.alloca(size, 8);
+		case 16:    return intrinsics.alloca(size, 16);
+		case 32:    return intrinsics.alloca(size, 32);
+		case 64:    return intrinsics.alloca(size, 64);
+		case 128:   return intrinsics.alloca(size, 128);
+		case 256:   return intrinsics.alloca(size, 256);
+		case 512:   return intrinsics.alloca(size, 512);
+		case 1024:  return intrinsics.alloca(size, 1024);
+		case 2048:  return intrinsics.alloca(size, 2048);
+		case 4096:  return intrinsics.alloca(size, 4096);
+		case 8192:  return intrinsics.alloca(size, 8192);
+		case 16384: return intrinsics.alloca(size, 16384);
+		case 32768: return intrinsics.alloca(size, 32768);
+		case 65536: return intrinsics.alloca(size, 65536);
+		}
+	case .Resize:
+		return default_resize_align(old_memory, old_size, size, alignment, alloca_allocator());
+
+	case .Free:
+		// Do nothing
+	case .Free_All:
+		// Do nothing
+	}
+	return nil;
+}
+
+alloca_allocator :: proc() -> Allocator {
+	return Allocator{
+		procedure = alloca_allocator_proc,
+		data = nil,
+	};
 }

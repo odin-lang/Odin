@@ -5408,6 +5408,60 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
+	case BuiltinProc_alloca:
+		{
+			Operand sz = {};
+			Operand al = {};
+
+			check_expr(c, &sz, ce->args[0]);
+			if (sz.mode == Addressing_Invalid) {
+				return false;
+			}
+			check_expr(c, &al, ce->args[1]);
+			if (al.mode == Addressing_Invalid) {
+				return false;
+			}
+			convert_to_typed(c, &sz, t_int); if (sz.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &al, t_int); if (al.mode == Addressing_Invalid) return false;
+
+			if (!is_type_integer(sz.type) || !is_type_integer(al.type)) {
+				error(operand->expr, "Both parameters to '%.*s' must integers", LIT(builtin_name));
+				return false;
+			}
+
+			if (sz.mode == Addressing_Constant) {
+				i64 i_sz = exact_value_to_i64(sz.value);
+				if (i_sz < 0) {
+					error(sz.expr, "Size parameter to '%.*s' must be non-negative, got %lld", LIT(builtin_name), cast(long long)i_sz);
+					return false;
+				}
+			}
+			if (al.mode == Addressing_Constant) {
+				i64 i_al = exact_value_to_i64(al.value);
+				if (i_al < 0) {
+					error(al.expr, "Alignment parameter to '%.*s' must be non-negative, got %lld", LIT(builtin_name), cast(long long)i_al);
+					return false;
+				}
+
+				if (i_al > 1<<29) {
+					error(al.expr, "Alignment parameter to '%.*s' must not exceed '1<<29', got %lld", LIT(builtin_name), cast(long long)i_al);
+					return false;
+				}
+
+				if (!gb_is_power_of_two(cast(isize)i_al) && i_al != 0) {
+					error(al.expr, "Alignment parameter to '%.*s' must be a power of 2 or 0, got %lld", LIT(builtin_name), cast(long long)i_al);
+					return false;
+				}
+			} else {
+				error(al.expr, "Alignment parameter to '%.*s' must be constant", LIT(builtin_name));
+			}
+
+			operand->type = t_u8_ptr;
+			operand->mode = Addressing_Value;
+			break;
+		}
+
+
 	case BuiltinProc_cpu_relax:
 		operand->mode = Addressing_NoValue;
 		break;

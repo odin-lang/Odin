@@ -36,6 +36,7 @@ enum BuiltinProcId {
 	BuiltinProc_simd_vector,
 	BuiltinProc_soa_struct,
 
+	BuiltinProc_alloca,
 	BuiltinProc_cpu_relax,
 
 	BuiltinProc_atomic_fence,
@@ -220,7 +221,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_vector"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
 	{STR_LIT("soa_struct"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
 
-	{STR_LIT("cpu_relax"),  0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("alloca"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("cpu_relax"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("atomic_fence"),        0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_fence_acq"),    0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},

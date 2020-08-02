@@ -7778,6 +7778,19 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 
 	// "Intrinsics"
+
+	case BuiltinProc_alloca:
+		{
+			lbValue sz = lb_build_expr(p, ce->args[0]);
+			i64 al = exact_value_to_i64(type_and_value_of_expr(ce->args[1]).value);
+
+			lbValue res = {};
+			res.type = t_u8_ptr;
+			res.value = LLVMBuildArrayAlloca(p->builder, lb_type(p->module, t_u8), sz.value, "");
+			LLVMSetAlignment(res.value, cast(unsigned)al);
+			return res;
+		}
+
 	case BuiltinProc_cpu_relax:
 		// TODO(bill): BuiltinProc_cpu_relax
 		// ir_write_str_lit(f, "call void asm sideeffect \"pause\", \"\"()");
