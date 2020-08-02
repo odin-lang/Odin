@@ -83,6 +83,12 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 
 	do_location_header(options, &buf, location);
 
+	if .Thread_Id in options {
+		// NOTE(Oskar): not using context.thread_id here since that could be
+		// incorrect when replacing context for a thread.
+		fmt.sbprintf(&buf, "[{}] ", os.current_thread_id());
+	}
+
 	if data.ident != "" do fmt.sbprintf(&buf, "[%s] ", data.ident);
 	//TODO(Hoej): When we have better atomics and such, make this thread-safe
 	fmt.fprintf(h, "%s %s\n", strings.to_string(buf), text);
