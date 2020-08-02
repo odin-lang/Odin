@@ -241,3 +241,8 @@ condition_wait_for_timeout :: proc(c: ^Condition, duration: time.Duration) -> bo
 	return false;
 }
 
+
+
+thread_yield :: proc() {
+	unix.sched_yield();
+}
