@@ -817,6 +817,8 @@ panic_allocator :: proc() -> Allocator {
 // blocks to be reused, in the same order, when you allocate from the arena again.
 //
 // Will not allocate more than the block size in bytes; if you ask for more than a block, it returns nil.
+//
+// TODO: Remove this, preferring virtual arena?
 Dynamic_Arena :: struct {
 	block_size: int,
 
