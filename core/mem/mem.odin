@@ -167,9 +167,9 @@ slice_to_components :: proc(slice: $E/[]$T) -> (data: ^T, len: int) {
 
 buffer_from_slice :: inline proc(backing: $T/[]$E) -> [dynamic]E {
 	return transmute([dynamic]E)Raw_Dynamic_Array{
-		data      = raw_data(s),
+		data      = raw_data(backing),
 		len       = 0,
-		cap       = len(s),
+		cap       = len(backing),
 		allocator = nil_allocator(),
 	};
 }
