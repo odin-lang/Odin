@@ -611,7 +611,7 @@ next_power_of_two :: proc(x: int) -> int {
 }
 
 sum :: proc(x: $T/[]$E) -> (res: E)
-	where intrinsics.BuiltinProc_type_is_numeric(E) {
+	where intrinsics.type_is_numeric(E) {
 	for i in x {
 		res += i;
 	}
@@ -619,7 +619,7 @@ sum :: proc(x: $T/[]$E) -> (res: E)
 }
 
 prod :: proc(x: $T/[]$E) -> (res: E)
-	where intrinsics.BuiltinProc_type_is_numeric(E) {
+	where intrinsics.type_is_numeric(E) {
 	for i in x {
 		res *= i;
 	}
@@ -627,7 +627,7 @@ prod :: proc(x: $T/[]$E) -> (res: E)
 }
 
 cumsum_inplace :: proc(x: $T/[]$E) -> T
-	where intrinsics.BuiltinProc_type_is_numeric(E) {
+	where intrinsics.type_is_numeric(E) {
 	for i in 1..<len(x) {
 		x[i] = x[i-1] + x[i];
 	}
@@ -635,7 +635,7 @@ cumsum_inplace :: proc(x: $T/[]$E) -> T
 
 
 cumsum :: proc(dst, src: $T/[]$E) -> T
-	where intrinsics.BuiltinProc_type_is_numeric(E) {
+	where intrinsics.type_is_numeric(E) {
 	N := min(len(dst), len(src));
 	if N > 0 {
 		dst[0] = src[0];
