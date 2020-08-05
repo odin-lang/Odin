@@ -3316,7 +3316,19 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 			} else if (is_type_tuple(new_type)) {
 				Type *abi_type = pt->Proc.abi_compat_params[i];
 				Type *st = struct_type_from_systemv_distribute_struct_fields(abi_type);
-				irValue *x = ir_emit_transmute(p, args[i], st);
+				irValue *x = nullptr;
+				i64 st_sz = type_size_of(st);
+				i64 arg_sz = type_size_of(ir_type(args[i]));
+				if (st_sz == arg_sz) {
+					x = ir_emit_transmute(p, args[i], st);
+				} else {
+					// NOTE(bill): struct{f32, f32, f32} != struct{#simd[2]f32, f32}
+					GB_ASSERT(st_sz > arg_sz);
+					irValue *xx = ir_add_local_generated(p, st, false);
+					irValue *pp = ir_emit_conv(p, xx, alloc_type_pointer(ir_type(args[i])));
+					ir_emit_store(p, pp, args[i]);
+					x = ir_emit_load(p, xx);
+				}
 				for (isize j = 0; j < new_type->Tuple.variables.count; j++) {
 					irValue *xx = ir_emit_struct_ev(p, x, cast(i32)j);
 					array_add(&processed_args, xx);
