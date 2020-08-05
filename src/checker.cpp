@@ -1377,8 +1377,11 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		break;
 
 	case Type_Union:
-		add_type_info_type(c, t_int);
-		add_type_info_type(c, t_type_info_ptr);
+		if (union_tag_size(t) > 0) {
+			add_type_info_type(c, union_tag_type(t));
+		} else {
+			add_type_info_type(c, t_type_info_ptr);
+		}
 		for_array(i, bt->Union.variants) {
 			add_type_info_type(c, bt->Union.variants[i]);
 		}
@@ -1589,8 +1592,11 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		break;
 
 	case Type_Union:
-		add_min_dep_type_info(c, t_int);
-		add_min_dep_type_info(c, t_type_info_ptr);
+		if (union_tag_size(t) > 0) {
+			add_min_dep_type_info(c, union_tag_type(t));
+		} else {
+			add_min_dep_type_info(c, t_type_info_ptr);
+		}
 		for_array(i, bt->Union.variants) {
 			add_min_dep_type_info(c, bt->Union.variants[i]);
 		}
