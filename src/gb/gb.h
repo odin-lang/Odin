@@ -4052,7 +4052,8 @@ gb_inline char *gb_alloc_str(gbAllocator a, char const *str) {
 
 gb_inline char *gb_alloc_str_len(gbAllocator a, char const *str, isize len) {
 	char *result;
-	result = cast(char *)gb_alloc_copy(a, str, len+1);
+	result = cast(char *)gb_alloc(a, len+1);
+	gb_memmove(result, str, len);
 	result[len] = '\0';
 	return result;
 }
