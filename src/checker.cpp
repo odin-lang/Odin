@@ -1329,6 +1329,15 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 		}
 		break;
 
+	case Type_Opaque:
+		add_type_info_type(c, bt->Opaque.elem);
+		break;
+
+	case Type_BitSet:
+		add_type_info_type(c, bt->BitSet.elem);
+		add_type_info_type(c, bt->BitSet.underlying);
+		break;
+
 	case Type_Pointer:
 		add_type_info_type(c, bt->Pointer.elem);
 		break;
@@ -1360,20 +1369,6 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 
 	case Type_Enum:
 		add_type_info_type(c, bt->Enum.base_type);
-		break;
-
-	case Type_BitSet:
-		add_type_info_type(c, bt->BitSet.elem);
-		add_type_info_type(c, bt->BitSet.underlying);
-		break;
-
-	case Type_BitFieldValue:
-		break;
-	case Type_BitField:
-		break;
-
-	case Type_Opaque:
-		add_type_info_type(c, bt->Opaque.elem);
 		break;
 
 	case Type_Union:
@@ -1409,6 +1404,11 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 			Entity *f = bt->Struct.fields[i];
 			add_type_info_type(c, f->type);
 		}
+		break;
+
+	case Type_BitFieldValue:
+		break;
+	case Type_BitField:
 		break;
 
 	case Type_Map:
@@ -1570,9 +1570,9 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		break;
 	case Type_EnumeratedArray:
 		add_min_dep_type_info(c, bt->EnumeratedArray.index);
+		add_min_dep_type_info(c, t_int);
 		add_min_dep_type_info(c, bt->EnumeratedArray.elem);
 		add_min_dep_type_info(c, alloc_type_pointer(bt->EnumeratedArray.elem));
-		add_min_dep_type_info(c, t_int);
 		break;
 
 	case Type_DynamicArray:
@@ -1603,15 +1603,26 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		break;
 
 	case Type_Struct:
-		for_array(i, bt->Struct.fields) {
-			Entity *f = bt->Struct.fields[i];
-			add_min_dep_type_info(c, f->type);
-		}
 		if (bt->Struct.scope != nullptr) {
 			for_array(i, bt->Struct.scope->elements.entries) {
 				Entity *e = bt->Struct.scope->elements.entries[i].value;
-				add_min_dep_type_info(c, e->type);
+				switch (bt->Struct.soa_kind) {
+				case StructSoa_Dynamic:
+					add_min_dep_type_info(c, t_allocator);
+					/*fallthrough*/
+				case StructSoa_Slice:
+				case StructSoa_Fixed:
+					add_min_dep_type_info(c, alloc_type_pointer(e->type));
+					break;
+				default:
+					add_min_dep_type_info(c, e->type);
+					break;
+				}
 			}
+		}
+		for_array(i, bt->Struct.fields) {
+			Entity *f = bt->Struct.fields[i];
+			add_min_dep_type_info(c, f->type);
 		}
 		break;
 
