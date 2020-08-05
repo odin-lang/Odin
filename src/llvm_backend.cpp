@@ -7066,7 +7066,19 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 			} else if (is_type_tuple(new_type)) {
 				Type *abi_type = pt->Proc.abi_compat_params[i];
 				Type *st = struct_type_from_systemv_distribute_struct_fields(abi_type);
-				lbValue x = lb_emit_transmute(p, args[i], st);
+				lbValue x = {};
+				i64 st_sz = type_size_of(st);
+				i64 arg_sz = type_size_of(args[i].type);
+				if (st_sz == arg_sz) {
+					x = lb_emit_transmute(p, args[i], st);
+				} else {
+					// NOTE(bill): struct{f32, f32, f32} != struct{#simd[2]f32, f32}
+					GB_ASSERT(st_sz > arg_sz);
+					lbAddr xx = lb_add_local_generated(p, st, false);
+					lbValue pp = lb_emit_conv(p, xx.addr, alloc_type_pointer(args[i].type));
+					lb_emit_store(p, pp, args[i]);
+					x = lb_addr_load(p, xx);
+				}
 				for (isize j = 0; j < new_type->Tuple.variables.count; j++) {
 					lbValue xx = lb_emit_struct_ev(p, x, cast(i32)j);
 					array_add(&processed_args, xx);
