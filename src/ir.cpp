@@ -10394,7 +10394,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 					}
 					irValue **found = map_get(&proc->module->values, hash_entity(e));
 					GB_ASSERT(found != nullptr);
-					ir_emit_store(proc, *found, results[i]);
+					ir_emit_store(proc, *found, ir_emit_conv(proc, results[i], e->type));
 				}
 			}
 
