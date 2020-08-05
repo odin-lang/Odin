@@ -4783,6 +4783,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 
 		if (operand->mode == Addressing_Type) {
+			if (ce->args.count != 1) {
+				error(call, "If 'min' gets a type, only 1 arguments is allowed, got %td", ce->args.count);
+				return false;
+			}
+
 			if (is_type_boolean(type)) {
 				operand->mode  = Addressing_Constant;
 				operand->type  = original_type;
@@ -4951,6 +4956,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 
 		if (operand->mode == Addressing_Type) {
+			if (ce->args.count != 1) {
+				error(call, "If 'max' gets a type, only 1 arguments is allowed, got %td", ce->args.count);
+				return false;
+			}
+
 			if (is_type_boolean(type)) {
 				operand->mode  = Addressing_Constant;
 				operand->type  = original_type;
