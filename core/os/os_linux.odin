@@ -449,47 +449,47 @@ getpwnam :: proc(name: string) -> ^passwd {
 	return _unix_getpwnam(cstr);
 }
 
-readlink :: proc(pathname: string, buf: []u8) -> (int, os.Errno) {
+readlink :: proc(pathname: string, buf: []u8) -> (int, Errno) {
 	cstr_pathname := strings.clone_to_cstring(pathname);
 	defer delete(cstr_pathname);
 	bytes_written := _unix_readlink(cstr_pathname, cstring(#no_bounds_check &buf[0]), c.size_t(len(buf)));
 	if bytes_written == -1 {
-		return -1, os.Errno(os.get_last_error());
+		return -1, Errno(get_last_error());
 	}
-	return int(bytes_written), os.ERROR_NONE;
+	return int(bytes_written), ERROR_NONE;
 }
 
-opendir :: proc(name: string) -> (^DIR, os.Errno) {
+opendir :: proc(name: string) -> (^DIR, Errno) {
 	cstr := strings.clone_to_cstring(name);
 	defer delete(cstr);
 	result := _unix_opendir(cstr);
 	if result == nil {
-		return nil, os.Errno(os.get_last_error());
+		return nil, Errno(get_last_error());
 	}
-	return result, os.ERROR_NONE;
+	return result, ERROR_NONE;
 }
 
-readdir :: proc(dirp: ^DIR) -> (^dirent, os.Errno) {
-	previous := os.Errno(os.get_last_error());
+readdir :: proc(dirp: ^DIR) -> (^dirent, Errno) {
+	previous := Errno(get_last_error());
 
 	result := _unix_readdir(dirp);
-	err := os.Errno(os.get_last_error());
+	err := Errno(get_last_error());
 
 	if result == nil && previous != err { // If nil and errno changed, err occured
 		return nil, err;
 	} else if result == nil { // If errno not changed, end of directory stream
-		return nil, os.ERROR_NONE;
+		return nil, ERROR_NONE;
 	}
 
-	return result, os.ERROR_NONE;
+	return result, ERROR_NONE;
 }
 
-closedir :: proc(dirp: ^DIR) -> os.Errno {
+closedir :: proc(dirp: ^DIR) -> Errno {
 	result := _unix_closedir(dirp);
 	if result == 0 {
-		return os.ERROR_NONE;
+		return ERROR_NONE;
 	} else {
-		return os.Errno(os.get_last_error());
+		return Errno(get_last_error());
 	}
 }
 
@@ -516,28 +516,28 @@ getenv :: proc(name: string) -> (string, bool) {
 	return string(cstr), true;
 }
 
-setenv :: proc(name: string, value: string, overwrite: bool) -> os.Errno {
+setenv :: proc(name: string, value: string, overwrite: bool) -> Errno {
 	name_str := strings.clone_to_cstring(name);
 	defer delete(name_str);
 	value_str := strings.clone_to_cstring(value);
 	defer delete(value_str);
 	result := _unix_setenv(name_str, value_str, overwrite ? 1 : 0);
 	if result == -1 {
-		return os.Errno(os.get_last_error());
+		return Errno(get_last_error());
 	}
 
-	return os.ERROR_NONE;
+	return ERROR_NONE;
 }
 
-unsetenv :: proc(name: string) -> os.Errno {
+unsetenv :: proc(name: string) -> Errno {
 	name_str := strings.clone_to_cstring(name);
 	defer delete(name_str);
 	result := _unix_unsetenv(name_str);
 	if result == -1 {
-		return os.Errno(os.get_last_error());
+		return Errno(get_last_error());
 	}
 
-	return os.ERROR_NONE;
+	return ERROR_NONE;
 }
 
 get_current_directory :: proc() -> string {
