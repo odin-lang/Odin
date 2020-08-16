@@ -194,6 +194,13 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 			return aligned_alloc(size, alignment);
 		}
 		return aligned_resize(old_memory, old_size, size, alignment);
+
+	case .Query_Features:
+		set := (^mem.Allocator_Mode_Set)(old_memory);
+		if set != nil {
+			set^ = {.Alloc, .Free, .Resize, .Query_Features};
+		}
+		return set;
 	}
 
 	return nil;
