@@ -267,6 +267,81 @@ compare_ints :: proc(a, b: int) -> int {
 	return 0;
 }
 
+compare_uints :: proc(a, b: uint) -> int {
+	switch {
+	case a < b: return -1;
+	case a > b: return +1;
+	}
+	return 0;
+}
+
+compare_u8s :: proc(a, b: u8) -> int {
+	switch {
+	case a < b: return -1;
+	case a > b: return +1;
+	}
+	return 0;
+}
+
+compare_u16s :: proc(a, b: u16) -> int {
+	switch {
+	case a < b: return -1;
+	case a > b: return +1;
+	}
+	return 0;
+}
+
+compare_u32s :: proc(a, b: u32) -> int {
+	switch {
+	case a < b: return -1;
+	case a > b: return +1;
+	}
+	return 0;
+}
+
+compare_u64s :: proc(a, b: u64) -> int {
+	switch {
+	case a < b: return -1;
+	case a > b: return +1;
+	}
+	return 0;
+}
+
+compare_i8s :: proc(a, b: i8) -> int {
+	switch {
+	case a < b: return -1;
+	case a > b: return +1;
+	}
+	return 0;
+}
+
+compare_i16s :: proc(a, b: i16) -> int {
+	switch {
+	case a < b: return -1;
+	case a > b: return +1;
+	}
+	return 0;
+}
+
+compare_i32s :: proc(a, b: i32) -> int {
+	switch {
+	case a < b: return -1;
+	case a > b: return +1;
+	}
+	return 0;
+}
+
+compare_i64s :: proc(a, b: i64) -> int {
+	switch {
+	case a < b: return -1;
+	case a > b: return +1;
+	}
+	return 0;
+}
+
+
+
+
 compare_f32s :: proc(a, b: f32) -> int {
 	switch delta := a - b; {
 	case delta < 0: return -1;
