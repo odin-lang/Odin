@@ -234,6 +234,9 @@ args__: []cstring;
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 
+@builtin
+Maybe :: union(T: typeid) #maybe {T};
+
 
 Source_Code_Location :: struct {
 	file_path:    string,
@@ -252,9 +255,16 @@ Allocator_Mode :: enum byte {
 	Free_All,
 	Resize,
 	Query_Features,
+	Query_Info,
 }
 
 Allocator_Mode_Set :: distinct bit_set[Allocator_Mode];
+
+Allocator_Query_Info :: struct {
+	pointer:   rawptr,
+	size:      Maybe(int),
+	alignment: Maybe(int),
+}
 
 Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
@@ -308,10 +318,6 @@ Context :: struct {
 	user_ptr:   rawptr,
 	user_index: int,
 }
-
-
-@builtin
-Maybe :: union(T: typeid) #maybe {T};
 
 
 

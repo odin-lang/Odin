@@ -201,6 +201,9 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 			set^ = {.Alloc, .Free, .Resize, .Query_Features};
 		}
 		return set;
+
+	case .Query_Info:
+		return nil;
 	}
 
 	return nil;
