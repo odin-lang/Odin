@@ -1,6 +1,7 @@
 package mem
 
 import "intrinsics"
+import "core:runtime"
 
 nil_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                            size, alignment: int,
@@ -709,4 +710,71 @@ alloca_allocator :: proc() -> Allocator {
 		procedure = alloca_allocator_proc,
 		data = nil,
 	};
+}
+
+
+
+
+
+Tracking_Allocator_Entry :: struct {
+	memory:   rawptr,
+	size:     int,
+	location: runtime.Source_Code_Location,
+}
+Tracking_Allocator :: struct {
+	backing:           Allocator,
+	allocation_map:    map[rawptr]Tracking_Allocator_Entry,
+	clear_on_free_all: bool,
+}
+
+tracking_allocator_init :: proc(t: ^Tracking_Allocator, backing_allocator: Allocator, allocation_map_allocator := context.allocator) {
+	t.backing = backing_allocator;
+	t.allocation_map.allocator = allocation_map_allocator;
+}
+
+tracking_allocator_destroy :: proc(t: ^Tracking_Allocator) {
+	delete(t.allocation_map);
+}
+
+tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
+	return Allocator{
+		data = data,
+		procedure = tracking_allocator_proc,
+	};
+}
+
+tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode, size, alignment: int, old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+	data := (^Tracking_Allocator)(allocator_data);
+	result := data.backing.procedure(data.backing.data, mode, size, alignment, old_memory, old_size, flags, loc);
+
+	if data.allocation_map.allocator.procedure == nil {
+		data.allocation_map.allocator = context.allocator;
+	}
+
+	switch mode {
+	case .Alloc:
+		data.allocation_map[result] = Tracking_Allocator_Entry{
+			memory = result,
+			size = size,
+			location = loc,
+		};
+	case .Free:
+		delete_key(&data.allocation_map, old_memory);
+	case .Resize:
+		if old_memory != result {
+			delete_key(&data.allocation_map, old_memory);
+		}
+		data.allocation_map[result] = Tracking_Allocator_Entry{
+			memory = result,
+			size = size,
+			location = loc,
+		};
+
+	case .Free_All:
+		if data.clear_on_free_all {
+			clear_map(&data.allocation_map);
+		}
+	}
+
+	return result;
 }
