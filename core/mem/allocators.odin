@@ -74,6 +74,13 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 	case .Resize:
 		return default_resize_align(old_memory, old_size, size, alignment, arena_allocator(arena));
+
+	case .Query_Features:
+		set := (^Allocator_Mode_Set)(old_memory);
+		if set != nil {
+			set^ = {.Alloc, .Free_All, .Resize, .Query_Features};
+		}
+		return set;
 	}
 
 	return nil;
@@ -197,6 +204,13 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			return old_memory;
 		}
 		return scratch_allocator_proc(allocator_data, Allocator_Mode.Alloc, size, alignment, old_memory, old_size, flags, loc);
+
+	case .Query_Features:
+		set := (^Allocator_Mode_Set)(old_memory);
+		if set != nil {
+			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
+		}
+		return set;
 	}
 
 	return nil;
@@ -348,6 +362,13 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		}
 
 		return old_memory;
+
+	case .Query_Features:
+		set := (^Allocator_Mode_Set)(old_memory);
+		if set != nil {
+			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
+		}
+		return set;
 	}
 
 	return nil;
@@ -468,6 +489,13 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		ptr := raw_alloc(s, size, align);
 		copy(ptr, old_memory, min(old_size, size));
 		return ptr;
+
+	case .Query_Features:
+		set := (^Allocator_Mode_Set)(old_memory);
+		if set != nil {
+			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
+		}
+		return set;
 	}
 
 	return nil;
@@ -519,6 +547,13 @@ dynamic_pool_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 		ptr := dynamic_pool_alloc(pool, size);
 		copy(ptr, old_memory, old_size);
 		return ptr;
+
+	case .Query_Features:
+		set := (^Allocator_Mode_Set)(old_memory);
+		if set != nil {
+			set^ = {.Alloc, .Free_All, .Resize, .Query_Features};
+		}
+		return set;
 	}
 	return nil;
 }
@@ -654,6 +689,13 @@ panic_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		}
 	case .Free_All:
 		panic("mem: panic allocator, .Free_All called");
+
+	case .Query_Features:
+		set := (^Allocator_Mode_Set)(old_memory);
+		if set != nil {
+			set^ = {.Query_Features};
+		}
+		return set;
 	}
 
 	return nil;
@@ -701,6 +743,13 @@ alloca_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		// Do nothing
 	case .Free_All:
 		// Do nothing
+
+	case .Query_Features:
+		set := (^Allocator_Mode_Set)(old_memory);
+		if set != nil {
+			set^ = {.Alloc, .Resize, .Query_Features};
+		}
+		return set;
 	}
 	return nil;
 }
@@ -774,6 +823,13 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode, si
 		if data.clear_on_free_all {
 			clear_map(&data.allocation_map);
 		}
+
+	case .Query_Features:
+		set := (^Allocator_Mode_Set)(old_memory);
+		if set != nil {
+			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
+		}
+		return set;
 	}
 
 	return result;

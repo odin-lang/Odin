@@ -251,7 +251,10 @@ Allocator_Mode :: enum byte {
 	Free,
 	Free_All,
 	Resize,
+	Query_Features,
 }
+
+Allocator_Mode_Set :: distinct bit_set[Allocator_Mode];
 
 Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
@@ -263,7 +266,7 @@ Allocator :: struct {
 
 // Logging stuff
 
-Logger_Level :: enum {
+Logger_Level :: enum uint {
 	Debug   = 0,
 	Info    = 10,
 	Warning = 20,

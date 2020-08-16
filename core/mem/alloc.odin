@@ -10,7 +10,13 @@ Allocator_Mode :: enum byte {
 	Free,
 	Free_All,
 	Resize,
+	Query_Features,
 }
+*/
+
+Allocator_Mode_Set :: runtime.Allocator_Mode_Set;
+/*
+Allocator_Mode_Set :: distinct bit_set[Allocator_Mode];
 */
 
 Allocator_Proc :: runtime.Allocator_Proc;
@@ -62,6 +68,18 @@ resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEF
 	}
 	return allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, 0, loc);
 }
+
+query_features :: proc(allocator: Allocator, loc := #caller_location) -> Allocator_Mode_Set {
+	if allocator.procedure != nil {
+		set: Allocator_Mode_Set;
+		res := allocator.procedure(allocator.data, Allocator_Mode.Query_Features, 0, 0, &set, 0, 0, loc);
+		if res == &set {
+			return set;
+		}
+	}
+	return nil;
+}
+
 
 
 delete_string :: proc(str: string, allocator := context.allocator, loc := #caller_location) {

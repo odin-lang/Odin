@@ -132,6 +132,13 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 		ptr := default_temp_allocator_proc(allocator_data, Allocator_Mode.Alloc, size, alignment, old_memory, old_size, flags, loc);
 		mem_copy(ptr, old_memory, old_size);
 		return ptr;
+
+	case .Query_Features:
+		set := (^Allocator_Mode_Set)(old_memory);
+		if set != nil {
+			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
+		}
+		return set;
 	}
 
 	return nil;
