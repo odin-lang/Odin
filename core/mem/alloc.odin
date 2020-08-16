@@ -19,6 +19,15 @@ Allocator_Mode_Set :: runtime.Allocator_Mode_Set;
 Allocator_Mode_Set :: distinct bit_set[Allocator_Mode];
 */
 
+Allocator_Query_Info :: runtime.Allocator_Query_Info;
+/*
+Allocator_Query_Info :: struct {
+	pointer:   Maybe(rawptr),
+	size:      Maybe(int),
+	alignment: Maybe(int),
+}
+*/
+
 Allocator_Proc :: runtime.Allocator_Proc;
 /*
 Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
@@ -69,15 +78,20 @@ resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEF
 	return allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, 0, loc);
 }
 
-query_features :: proc(allocator: Allocator, loc := #caller_location) -> Allocator_Mode_Set {
+query_features :: proc(allocator: Allocator, loc := #caller_location) -> (set: Allocator_Mode_Set) {
 	if allocator.procedure != nil {
-		set: Allocator_Mode_Set;
-		res := allocator.procedure(allocator.data, Allocator_Mode.Query_Features, 0, 0, &set, 0, 0, loc);
-		if res == &set {
-			return set;
-		}
+		allocator.procedure(allocator.data, Allocator_Mode.Query_Features, 0, 0, &set, 0, 0, loc);
+		return set;
 	}
 	return nil;
+}
+
+query_info :: proc(pointer: rawptr, allocator: Allocator, loc := #caller_location) -> (props: Allocator_Query_Info) {
+	props.pointer = pointer;
+	if allocator.procedure != nil {
+		allocator.procedure(allocator.data, Allocator_Mode.Query_Info, 0, 0, &props, 0, 0, loc);
+	}
+	return;
 }
 
 

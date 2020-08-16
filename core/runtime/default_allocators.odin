@@ -139,6 +139,9 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
 		}
 		return set;
+
+	case .Query_Info:
+		return nil;
 	}
 
 	return nil;

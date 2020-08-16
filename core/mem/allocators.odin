@@ -81,6 +81,9 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			set^ = {.Alloc, .Free_All, .Resize, .Query_Features};
 		}
 		return set;
+
+	case .Query_Info:
+		return nil;
 	}
 
 	return nil;
@@ -211,6 +214,9 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
 		}
 		return set;
+
+	case .Query_Info:
+		return nil;
 	}
 
 	return nil;
@@ -369,6 +375,8 @@ stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
 		}
 		return set;
+	case .Query_Info:
+		return nil;
 	}
 
 	return nil;
@@ -496,6 +504,9 @@ small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
 		}
 		return set;
+
+	case .Query_Info:
+		return nil;
 	}
 
 	return nil;
@@ -551,9 +562,18 @@ dynamic_pool_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory);
 		if set != nil {
-			set^ = {.Alloc, .Free_All, .Resize, .Query_Features};
+			set^ = {.Alloc, .Free_All, .Resize, .Query_Features, .Query_Info};
 		}
 		return set;
+
+	case .Query_Info:
+		info := (^Allocator_Query_Info)(old_memory);
+		if info != nil && info.pointer != nil {
+			info.size = pool.block_size;
+			info.alignment = pool.alignment;
+			return info;
+		}
+		return nil;
 	}
 	return nil;
 }
@@ -696,6 +716,9 @@ panic_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			set^ = {.Query_Features};
 		}
 		return set;
+
+	case .Query_Info:
+		return nil;
 	}
 
 	return nil;
@@ -750,6 +773,9 @@ alloca_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			set^ = {.Alloc, .Resize, .Query_Features};
 		}
 		return set;
+
+	case .Query_Info:
+		return nil;
 	}
 	return nil;
 }
@@ -766,8 +792,9 @@ alloca_allocator :: proc() -> Allocator {
 
 
 Tracking_Allocator_Entry :: struct {
-	memory:   rawptr,
-	size:     int,
+	memory:    rawptr,
+	size:      int,
+	alignment: int,
 	location: runtime.Source_Code_Location,
 }
 Tracking_Allocator :: struct {
@@ -794,6 +821,20 @@ tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
 
 tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode, size, alignment: int, old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
 	data := (^Tracking_Allocator)(allocator_data);
+	if mode == .Query_Info {
+		info := (^Allocator_Query_Info)(old_memory);
+		if info != nil && info.pointer != nil {
+			if entry, ok := data.allocation_map[info.pointer]; ok {
+				info.size = entry.size;
+				info.alignment = entry.alignment;
+				return info;
+			}
+			info.pointer = nil;
+		}
+
+		return nil;
+	}
+
 	result := data.backing.procedure(data.backing.data, mode, size, alignment, old_memory, old_size, flags, loc);
 
 	if data.allocation_map.allocator.procedure == nil {
@@ -805,6 +846,7 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode, si
 		data.allocation_map[result] = Tracking_Allocator_Entry{
 			memory = result,
 			size = size,
+			alignment = alignment,
 			location = loc,
 		};
 	case .Free:
@@ -816,6 +858,7 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode, si
 		data.allocation_map[result] = Tracking_Allocator_Entry{
 			memory = result,
 			size = size,
+			alignment = alignment,
 			location = loc,
 		};
 
@@ -827,9 +870,12 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode, si
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory);
 		if set != nil {
-			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features};
+			set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features, .Query_Info};
 		}
 		return set;
+
+	case .Query_Info:
+		unreachable();
 	}
 
 	return result;
