@@ -6,6 +6,10 @@ bool is_divigering_stmt(Ast *stmt) {
 	if (expr->kind != Ast_CallExpr) {
 		return false;
 	}
+	if (expr->CallExpr.proc->kind == Ast_BasicDirective) {
+		String name = expr->CallExpr.proc->BasicDirective.name;
+		return name == "panic";
+	}
 	Type *t = type_of_expr(expr->CallExpr.proc);
 	t = base_type(t);
 	return t->kind == Type_Proc && t->Proc.diverging;
@@ -173,7 +177,7 @@ bool check_is_terminating(Ast *node, String const &label) {
 	case_end;
 
 	case_ast_node(es, ExprStmt, node);
-		return check_is_terminating(es->expr, label);
+		return check_is_terminating(unparen_expr(es->expr), label);
 	case_end;
 
 	case_ast_node(is, IfStmt, node);
