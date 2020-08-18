@@ -59,6 +59,9 @@ to_title :: proc(r: rune) -> rune {
 
 
 is_lower :: proc(r: rune) -> bool {
+	if r <= MAX_ASCII {
+		return u8(r)-'a' < 26;
+	}
 	c := i32(r);
 	p := binary_search(c, to_upper_ranges[:], len(to_upper_ranges)/3, 3);
 	if p >= 0 && to_upper_ranges[p] <= c && c <= to_upper_ranges[p+1] {
@@ -72,6 +75,9 @@ is_lower :: proc(r: rune) -> bool {
 }
 
 is_upper :: proc(r: rune) -> bool {
+	if r <= MAX_ASCII {
+		return u8(r)-'A' < 26;
+	}
 	c := i32(r);
 	p := binary_search(c, to_lower_ranges[:], len(to_lower_ranges)/3, 3);
 	if p >= 0 && to_lower_ranges[p] <= c && c <= to_lower_ranges[p+1] {
@@ -85,6 +91,9 @@ is_upper :: proc(r: rune) -> bool {
 }
 
 is_alpha :: proc(r: rune) -> bool {
+	if r <= MAX_ASCII {
+		return (u8(r)|32)-'a' < 26;
+	}
 	if is_upper(r) || is_lower(r) {
 		return true;
 	}
@@ -105,8 +114,23 @@ is_title :: proc(r: rune) -> bool {
 	return is_upper(r) && is_lower(r);
 }
 
+is_digit :: proc(r: rune) -> bool {
+	if r <= MAX_LATIN1 {
+		return '0' <= r && r <= '9';
+	}
+	return false;
+}
+
+
 is_white_space :: is_space;
 is_space :: proc(r: rune) -> bool {
+	if u32(r) <= MAX_LATIN1 {
+		switch r {
+		case '\t', '\n', '\v', '\f', '\r', ' ', 0x85, 0xa0:
+			return true;
+		}
+		return false;
+	}
 	c := i32(r);
 	p := binary_search(c, space_ranges[:], len(space_ranges)/2, 2);
 	if p >= 0 && space_ranges[p] <= c && c <= space_ranges[p+1] {
