@@ -166,6 +166,15 @@ arena_allocator_proc :: proc(data: rawptr, mode: mem.Allocator_Mode,
 		arena_free_all(arena);
 	case .Resize:
 		return arena_realloc(arena, old_memory, old_size, size, alignment);
+	case .Query_Features:
+		set := (^mem.Allocator_Mode_Set)(old_memory);
+		if set != nil {
+			set^ = {.Alloc, .Free_All, .Resize, .Query_Features};
+		}
+		return set;
+	case .Query_Info:
+		// TODO(tetra): consider if we should use this
+		return nil;
 	}
 
 	return nil;
