@@ -1,6 +1,6 @@
 package virtual
 
-import "core:sys/win32"
+import win "core:sys/windows"
 import "core:mem"
 import "core:os"
 
@@ -45,13 +45,13 @@ access_to_flags :: proc(access: Memory_Access_Flags) -> u32 {
 
 
 reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
-	ptr := win32.virtual_alloc(desired_base, uint(size), win32.MEM_RESERVE, win32.PAGE_NOACCESS);
+	ptr := win.VirtualAlloc(desired_base, uint(size), win.MEM_RESERVE, win.PAGE_NOACCESS);
 	return mem.slice_ptr(cast(^byte)ptr, size);
 }
 
 alloc :: proc(size: int, access := Memory_Access_Flags{.Read, .Write}, desired_base: rawptr = nil) -> (memory: []byte) {
 	flags := access_to_flags(access);
-	ptr := win32.virtual_alloc(desired_base, uint(size), win32.MEM_RESERVE | win32.MEM_COMMIT, flags);
+	ptr := win.VirtualAlloc(desired_base, uint(size), win.MEM_RESERVE | win.MEM_COMMIT, flags);
 	return mem.slice_ptr(cast(^byte)ptr, size);
 }
 
@@ -65,7 +65,7 @@ free :: proc(memory: []byte) {
 	// NOTE(tetra): On Windows, freeing virtual memory doesn't use lengths; the system
 	// simply frees the block that was reserved originally.
 	// For portability, we just ignore the length here, but still ask for the slice.
-	ok := bool(win32.virtual_free(&memory[0], 0, win32.MEM_RELEASE));
+	ok := bool(win.VirtualFree(&memory[0], 0, win.MEM_RELEASE));
 	assert(ok);
 }
 
@@ -78,7 +78,7 @@ commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> 
 	flags := access_to_flags(access);
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
-	ptr := win32.virtual_alloc(&memory[0], uint(len(memory)), win32.MEM_COMMIT, flags);
+	ptr := win.VirtualAlloc(&memory[0], uint(len(memory)), win.MEM_COMMIT, flags);
 	return ptr != nil;
 }
 
@@ -89,7 +89,7 @@ decommit :: proc(memory: []byte) {
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 
-	ok := bool(win32.virtual_free(&memory[0], uint(len(memory)), win32.MEM_DECOMMIT));
+	ok := bool(win.VirtualFree(&memory[0], uint(len(memory)), win.MEM_DECOMMIT));
 	assert(ok);
 }
 
@@ -101,6 +101,6 @@ set_access :: proc(memory: []byte, access: Memory_Access_Flags) {
 
 	flags := access_to_flags(access);
 	unused: u32 = ---;
-	ok := bool(win32.virtual_protect(&memory[0], uint(len(memory)), u32(flags), &unused));
+	ok := bool(win.VirtualProtect(&memory[0], uint(len(memory)), u32(flags), &unused));
 	assert(ok);
 }
