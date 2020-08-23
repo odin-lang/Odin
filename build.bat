@@ -12,9 +12,19 @@ if "%1" == "1" (
 	set release_mode=0
 )
 
-set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
-set compiler_defines= -DLLVM_BACKEND_SUPPORT
+:: Normal = 0, CI Nightly = 1
+if "%2" == "1" (
+    set nightly=1
+) else (
+    set nightly=0
+)
 
+set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
+set compiler_defines= -DLLVM_BACKEND_SUPPORT 
+
+for /f %%i in ('git rev-parse --short HEAD') do set GIT_SHA=%%i
+if %ERRORLEVEL% equ 0 set compiler_defines=%compiler_defines% -DGIT_SHA=\"%GIT_SHA%\"
+if %nightly% equ 1 set compiler_defines=%compiler_defines% -DNIGHTLY
 
 if %release_mode% EQU 0 ( rem Debug
 	set compiler_flags=%compiler_flags% -Od -MDd -Z7
@@ -49,12 +59,10 @@ set linker_settings=%libs% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-cl %compiler_settings% "src\main.cpp" ^
-	/link %linker_settings% -OUT:%exe_name% ^
-	&& odin run examples/demo/demo.odin
-if %errorlevel% neq 0 (
-	goto end_of_build
-)
+cl %compiler_settings% "src\main.cpp" /link %linker_settings% -OUT:%exe_name%
+
+if %errorlevel% neq 0 goto end_of_build
+if %release_mode% EQU 0 odin run examples/demo/demo.odin
 
 del *.obj > NUL 2> NUL
 
