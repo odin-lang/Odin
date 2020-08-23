@@ -2,7 +2,7 @@ package container
 
 
 Ring :: struct(T: typeid) {
-	next, prev: ^Ring,
+	next, prev: ^Ring(T),
 	value: T,
 }
 
