@@ -22,7 +22,7 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          ./ci/build_ci.bat
+          ./build.bat 1 1
       - name: Odin run
         shell: cmd
         run: |
