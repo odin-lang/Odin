@@ -4227,6 +4227,28 @@ irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr, bool allow_refer
 		}
 	}
 
+	case irAddr_RelativePointer: {
+		Type *rel_ptr = base_type(ir_addr_type(addr));
+		GB_ASSERT(rel_ptr->kind == Type_RelativePointer);
+
+		irValue *ptr = ir_emit_conv(proc, addr.addr, t_uintptr);
+		irValue *offset = ir_emit_conv(proc, ptr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		offset = ir_emit_load(proc, offset);
+
+		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
+			offset = ir_emit_conv(proc, offset, t_i64);
+		}
+		offset = ir_emit_conv(proc, offset, t_uintptr);
+		irValue *absolute_ptr = ir_emit_arith(proc, Token_Add, ptr, offset, t_uintptr);
+		absolute_ptr = ir_emit_conv(proc, absolute_ptr, rel_ptr->RelativePointer.pointer_type);
+
+		irValue *cond = ir_emit_comp(proc, Token_CmpEq, offset, ir_value_nil(rel_ptr->RelativePointer.base_integer));
+
+		// NOTE(bill): nil check
+		irValue *nil_ptr = ir_value_nil(rel_ptr->RelativePointer.pointer_type);
+		irValue *final_ptr = ir_emit_select(proc, cond, nil_ptr, absolute_ptr);
+		return final_ptr;
+	}
 
 	case irAddr_BitField: {
 		irValue *v = ir_addr_load(proc, addr);
@@ -5101,6 +5123,10 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		t = t->Opaque.elem;
 	}
 
+	if (is_type_relative_pointer(t)) {
+		s = ir_addr_get_ptr(proc, ir_addr(s));
+	}
+
 	if (is_type_struct(t)) {
 		result_type = alloc_type_pointer(t->Struct.fields[index]->type);
 	} else if (is_type_union(t)) {
@@ -5336,6 +5362,8 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 		} else if (type->kind == Type_Array) {
 			e = ir_emit_array_epi(proc, e, index);
 		} else if (type->kind == Type_Map) {
+			e = ir_emit_struct_ep(proc, e, index);
+		} else if (type->kind == Type_RelativePointer) {
 			e = ir_emit_struct_ep(proc, e, index);
 		} else {
 			GB_PANIC("un-gep-able type %s", type_to_string(type));
