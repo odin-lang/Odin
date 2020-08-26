@@ -1654,13 +1654,10 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 			names := make([]^ast.Expr, 1);
 			names[0] = ast.new(ast.Ident, tok.pos, end_pos(tok));
 			switch ident in &names[0].derived {
-				case ast.Ident: {
-					ident.name = tok.text;
-				}
-
-				case: {
-					unreachable();
-				}
+			case ast.Ident:
+				ident.name = tok.text;
+			case:
+				unreachable();
 			}
 
 			flags := check_field_flag_prefixes(p, len(list), allowed_flags, eaf.flags);
