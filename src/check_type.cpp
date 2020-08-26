@@ -1137,7 +1137,7 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 	} else {
 		Type *elem = check_type_expr(c, bs->elem, nullptr);
 
-		#if 1
+		#if 0
 		if (named_type != nullptr && named_type->kind == Type_Named &&
 		    elem->kind == Type_Enum) {
 			// NOTE(bill): Anonymous enumeration
