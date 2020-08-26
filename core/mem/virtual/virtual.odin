@@ -25,6 +25,9 @@ previous_page :: proc(ptr: rawptr) -> rawptr {
 }
 
 // Given a number of bytes, returns the number of pages needed to contain it.
+// ```odin
+// assert(virtual.bytes_to_pages(4097) == 2); // assuming page size is 4096.
+// ```
 bytes_to_pages :: proc(size: int) -> int {
 	page_size := os.get_page_size();
 	bytes := mem.align_forward_uintptr(uintptr(size), uintptr(page_size));
@@ -34,15 +37,18 @@ bytes_to_pages :: proc(size: int) -> int {
 
 // A push buffer, just like `mem.Arena`, but which is backed by virtual memory.
 //
-// This means that you can have a multiple-gigabyte contiguous block of memory,
-// but only have the amount you actually use committed to physical memory.
+// This means it can expand dynamically, up to a maximum size, but the backing
+// memory remains contiguous.
 //
-// Resetting this arena will decommit the memory out of physical memory, and will
-// therefore free up system resources.
+// Only the amount currently in use actually takes up physical memory, rounded up to
+// a multiple of the page size.
+//
+// Resetting this arena with `arena_free_all` will decommit the memory, freeing up physical memory.
 //
 // WARNING: attempting to write to a pointer within this arena that was returned by
 // `arena_alloc` after `arena_free_all` has been called, will segfault.
-// Attempting to modify data in the arena's buffer before it has been returned from `arena_alloc` may also segfault.
+// Attempting to modify data in the arena's virtual memory region before it has been
+// returned from `arena_alloc` may also segfault.
 Arena :: struct {
 	base:            rawptr,
 	max_size:        int,
@@ -62,11 +68,17 @@ arena_init :: proc(va: ^Arena, max_size: int, desired_base_ptr: rawptr = nil) {
 	va.desired_base_ptr = desired_base_ptr;
 }
 
+// Frees all the allocations made using this arena.
+// The virtual memory is decommitted, but not released.
+// This will free up physical memory but keep the virtual address space reserved.
+// You may then proceed as if you had only just created the arena and called `arena_init`.
 arena_free_all :: proc(using va: ^Arena) {
 	cursor = base;
 	decommit(mem.slice_ptr(cast(^byte) base, max_size));
 }
 
+// Gets a suitably-aligned pointer to a certain number of bytes of virtual memory in the arena.
+// The arena should already be initialized.
 arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 	if va.base == nil {
 		if va.max_size == 0 do return nil; // NOTE(tetra): Size specified as zero, or arena not initialized
@@ -106,7 +118,9 @@ arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 	return region;
 }
 
-// You may resize the last allocation requested using this procedure, in which case, no data will be copied.
+// Resizes a previous allocation.
+// If `old_memory` is the latest allocation from this allocator, the allocation will be resized in-place.
+// Otherwise, this is equivalent to calling `arena_alloc` and copying.
 arena_realloc :: proc(va: ^Arena, old_memory: rawptr, old_size, size, alignment: int) -> rawptr {
 	old_region_end := mem.ptr_offset(cast(^byte)old_memory, old_size);
 
@@ -193,6 +207,17 @@ Arena_Temp_Memory :: struct {
 	cursor: rawptr,
 }
 
+// Creates a "mark" which you can snap back to later.
+// Useful if you want to make a bunch of allocations, but want to release them all
+// shortly afterwards, without effecting anything allocated before them.
+// ```odin
+// {
+//     mark := virtual.arena_begin_temp_memory(arena);
+//     defer virtual.arena_end_temp_memory(mark);
+//
+//     // do allocations here
+// } // .. which are then released here
+// ```
 arena_begin_temp_memory :: proc(using va: ^Arena) -> Arena_Temp_Memory {
 	return {
 		arena = va,
@@ -200,8 +225,8 @@ arena_begin_temp_memory :: proc(using va: ^Arena) -> Arena_Temp_Memory {
 	};
 }
 
-// TODO: Don't decommit every single time we end temp memory
-//       Maybe achieve this by committing/decommitting in chunks rather than pages.
+// Reset back to a previous mark, freeing all of the memory allocations since then.
+// This will decommit any extra pages that have been committed since the mark.
 arena_end_temp_memory :: proc(mark: Arena_Temp_Memory) {
 	using mark := mark;
 

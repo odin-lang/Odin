@@ -55,7 +55,7 @@ alloc :: proc(size: int, access := Memory_Access_Flags{.Read, .Write}, desired_b
 	return mem.slice_ptr(cast(^byte)ptr, size);
 }
 
-// Frees the entire page that the given pointer is in.
+// Frees the entire block of virtual memory which contains the slice.
 free :: proc(memory: []byte) {
 	if memory == nil do return;
 
