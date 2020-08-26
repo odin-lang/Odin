@@ -1684,7 +1684,17 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 		#endif
 	} else if (command == "version") {
-		gb_printf("%.*s version %.*s\n", LIT(args[0]), LIT(ODIN_VERSION));
+		gb_printf("%.*s version %.*s", LIT(args[0]), LIT(ODIN_VERSION));
+		
+		#ifdef NIGHTLY
+		gb_printf("-nightly");
+		#endif
+
+		#ifdef GIT_SHA
+		gb_printf("-%s", GIT_SHA);
+		#endif
+		
+		gb_printf("\n");
 		return 0;
 	} else {
 		usage(args[0]);
