@@ -48,8 +48,8 @@ base :: proc(path: string, new := false, allocator := context.allocator) -> stri
 name :: proc(path: string, new := false, allocator := context.allocator) -> string {
 	if path == "" do return "";
 
-	dot := len(path);
-	end := dot - 1;
+	end := len(path) - 1;
+	dot := end;
 
 	for i := end; i >= 0; i -= 1 {
 		switch path[i] {
