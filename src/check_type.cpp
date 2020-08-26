@@ -1662,6 +1662,10 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 					error(name, "'auto_cast' can only be applied to variable fields");
 					p->flags &= ~FieldFlag_auto_cast;
 				}
+				if (p->flags&FieldFlag_const) {
+					error(name, "'#const' can only be applied to variable fields");
+					p->flags &= ~FieldFlag_const;
+				}
 
 				param = alloc_entity_type_name(scope, name->Ident.token, type, EntityState_Resolved);
 				param->TypeName.is_type_alias = true;
@@ -1726,6 +1730,10 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 						error(name, "'auto_cast' can only be applied to variable fields");
 						p->flags &= ~FieldFlag_auto_cast;
 					}
+					if (p->flags&FieldFlag_const) {
+						error(name, "'#const' can only be applied to variable fields");
+						p->flags &= ~FieldFlag_const;
+					}
 
 					if (!is_type_constant_type(type) && !is_type_polymorphic(type)) {
 						gbString str = type_to_string(type);
@@ -1744,6 +1752,9 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			}
 			if (p->flags&FieldFlag_auto_cast) {
 				param->flags |= EntityFlag_AutoCast;
+			}
+			if (p->flags&FieldFlag_const) {
+				param->flags |= EntityFlag_ConstInput;
 			}
 
 			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
