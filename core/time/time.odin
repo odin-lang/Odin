@@ -146,6 +146,7 @@ WALL_TO_INTERNAL :: i64((1884*365 + 1884/4 - 1884/100 + 1884/400) * SECONDS_PER_
 INTERNAL_TO_WALL :: i64(- WALL_TO_INTERNAL);
 
 UNIX_TO_ABSOLUTE :: i64(UNIX_TO_INTERNAL + INTERNAL_TO_ABSOLUTE);
+ABSOLUTE_TO_UNIX :: i64(-UNIX_TO_ABSOLUTE);
 
 _is_leap_year :: proc(year: int) -> bool {
 	return year%4 == 0 && (year%100 != 0 || year%400 == 0);
@@ -192,11 +193,12 @@ _abs_date :: proc(abs: u64, full: bool) -> (year: int, month: Month, day: int, y
 	}
 
 	day = yday;
+
 	if _is_leap_year(year) do switch {
-	case day < 31+29-1:
+	case day > 31+29-1:
 		day -= 1;
 	case day == 31+29-1:
-		month = Month.February;
+		month = .February;
 		day = 29;
 		return;
 	}
