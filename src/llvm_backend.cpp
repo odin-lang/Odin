@@ -4219,6 +4219,9 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 
 		if (return_count == 0) {
 			// No return values
+
+			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+
 			LLVMBuildRetVoid(p->builder);
 			return;
 		} else if (return_count == 1) {
@@ -6905,6 +6908,10 @@ void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block) {
 	isize i = count;
 	while (i --> 0) {
 		lbDefer d = p->defer_stmts[i];
+
+		isize prev_context_stack_count = p->context_stack.count;
+		defer (p->context_stack.count = prev_context_stack_count);
+		p->context_stack.count = d.context_stack_count;
 
 		if (kind == lbDeferExit_Default) {
 			if (p->scope_index == d.scope_index &&
