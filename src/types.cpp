@@ -877,6 +877,9 @@ Type *alloc_type_named(String name, Type *base, Entity *type_name) {
 	Type *t = alloc_type(Type_Named);
 	t->Named.name = name;
 	t->Named.base = base;
+	if (base != t) {
+		t->Named.base = base_type(base);
+	}
 	t->Named.type_name = type_name;
 	return t;
 }

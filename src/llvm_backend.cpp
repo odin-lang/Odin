@@ -145,6 +145,30 @@ lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 
 		return lb_emit_conv(p, ptr, alloc_type_pointer(map_type->Map.value));
 	}
+
+	case lbAddr_RelativePointer: {
+		Type *rel_ptr = base_type(lb_addr_type(addr));
+		GB_ASSERT(rel_ptr->kind == Type_RelativePointer);
+
+		lbValue ptr = lb_emit_conv(p, addr.addr, t_uintptr);
+		lbValue offset = lb_emit_conv(p, ptr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		offset = lb_emit_load(p, offset);
+
+		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
+		offset = lb_emit_conv(p, offset, t_i64);
+		}
+		offset = lb_emit_conv(p, offset, t_uintptr);
+		lbValue absolute_ptr = lb_emit_arith(p, Token_Add, ptr, offset, t_uintptr);
+		absolute_ptr = lb_emit_conv(p, absolute_ptr, rel_ptr->RelativePointer.pointer_type);
+
+		lbValue cond = lb_emit_comp(p, Token_CmpEq, offset, lb_const_nil(p->module, rel_ptr->RelativePointer.base_integer));
+
+		// NOTE(bill): nil check
+		lbValue nil_ptr = lb_const_nil(p->module, rel_ptr->RelativePointer.pointer_type);
+		lbValue final_ptr = lb_emit_select(p, cond, nil_ptr, absolute_ptr);
+		return final_ptr;
+	}
+
 	case lbAddr_BitField: {
 		lbValue v = lb_addr_load(p, addr);
 		return lb_address_from_load_or_generate_local(p, v);
@@ -6562,6 +6586,10 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		t = t->Opaque.elem;
 	}
 
+	if (is_type_relative_pointer(t)) {
+		s = lb_addr_get_ptr(p, lb_addr(s));
+	}
+
 	if (is_type_struct(t)) {
 		result_type = get_struct_field_type(t, index);
 	} else if (is_type_union(t)) {
@@ -6809,7 +6837,7 @@ lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection sel) {
 				break;
 
 			default:
-				GB_PANIC("un-gep-able type");
+				GB_PANIC("un-gep-able type %s", type_to_string(type));
 				break;
 			}
 		} else if (type->kind == Type_Slice) {
@@ -6819,6 +6847,8 @@ lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection sel) {
 		} else if (type->kind == Type_Array) {
 			e = lb_emit_array_epi(p, e, index);
 		} else if (type->kind == Type_Map) {
+			e = lb_emit_struct_ep(p, e, index);
+		} else if (type->kind == Type_RelativePointer) {
 			e = lb_emit_struct_ep(p, e, index);
 		} else {
 			GB_PANIC("un-gep-able type %s", type_to_string(type));
