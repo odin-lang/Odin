@@ -46,13 +46,19 @@ access_to_flags :: proc(access: Memory_Access_Flags) -> u32 {
 
 reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
 	ptr := win.VirtualAlloc(desired_base, uint(size), win.MEM_RESERVE, win.PAGE_NOACCESS);
-	return mem.slice_ptr(cast(^byte)ptr, size);
+	if ptr != nil {
+		memory = mem.slice_ptr(cast(^byte)ptr, size);
+	}
+	return;
 }
 
 alloc :: proc(size: int, access := Memory_Access_Flags{.Read, .Write}, desired_base: rawptr = nil) -> (memory: []byte) {
 	flags := access_to_flags(access);
 	ptr := win.VirtualAlloc(desired_base, uint(size), win.MEM_RESERVE | win.MEM_COMMIT, flags);
-	return mem.slice_ptr(cast(^byte)ptr, size);
+	if ptr != nil {
+		memory = mem.slice_ptr(cast(^byte)ptr, size);
+	}
+	return;
 }
 
 // Frees the entire block of virtual memory which contains the slice.
