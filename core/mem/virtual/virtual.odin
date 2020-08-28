@@ -3,24 +3,25 @@ package virtual
 import "core:mem"
 import "core:os"
 
-// Returns a pointer to the first byte of the page the given pointer is in.
+// Returns a pointer to the first byte of the page containing the pointer.
 enclosing_page_ptr :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
 	start := mem.align_backward(ptr, uintptr(page_size));
 	return start;
 }
 
-// Returns a pointer to the first byte of the page after the one the given pointer is in.
+// Returns a pointer to the first byte of the next page.
 next_page_ptr :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
 	start := mem.align_forward(rawptr(uintptr(ptr)+1), uintptr(page_size));
 	return start;
 }
 
-// Gets the page before the one referred to by a pointer or slice.
+// Returns a pointer to the first byte of the previous page.
 previous_page_ptr :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
-	start := mem.align_backward(rawptr(uintptr(ptr)-1), uintptr(page_size));
+	page := enclosing_page_ptr(ptr);
+	start := mem.align_backward(rawptr(uintptr(page)-1), uintptr(page_size));
 	return start;
 }
 
