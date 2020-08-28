@@ -88,10 +88,10 @@ arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 		// unless any is actually requested.
 		// It's also how we only reserve the first time we're asked to allocate.
 
-		base_ptr := reserve(va.max_size, va.desired_base_ptr);
-		if base_ptr == nil do return nil;
+		memory := reserve(va.max_size, va.desired_base_ptr);
+		if memory == nil do return nil;
 
-		va.base = &base_ptr[0];
+		va.base = raw_data(memory);
 		va.cursor = va.base;
 	}
 
