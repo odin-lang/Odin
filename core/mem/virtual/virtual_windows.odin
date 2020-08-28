@@ -52,7 +52,7 @@ reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
 	return;
 }
 
-alloc :: proc(size: int, access := Memory_Access_Flags{.Read, .Write}, desired_base: rawptr = nil) -> (memory: []byte) {
+alloc :: proc(size: int, desired_base: rawptr = nil, access := Memory_Access_Flags{.Read, .Write}) -> (memory: []byte) {
 	flags := access_to_flags(access);
 	ptr := win.VirtualAlloc(desired_base, uint(size), win.MEM_RESERVE | win.MEM_COMMIT, flags);
 	if ptr != nil {
@@ -75,7 +75,7 @@ free :: proc(memory: []byte) {
 	assert(ok);
 }
 
-// Commits pages that overlap the given memory block.
+// Commits the entirety of pages that overlap the given memory block.
 // The pages still do not take up system resources until they are written to.
 // If you fail to do this before accessing the memory, it will segfault.
 commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> bool {
@@ -88,7 +88,7 @@ commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> 
 	return ptr != nil;
 }
 
-// Decommits pages that overlap the given memory block.
+// Decommits the entirety of pages that overlap the given memory block.
 decommit :: proc(memory: []byte) {
 	assert(memory != nil);
 

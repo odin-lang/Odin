@@ -4,21 +4,21 @@ import "core:mem"
 import "core:os"
 
 // Returns a pointer to the first byte of the page the given pointer is in.
-enclosing_page :: proc(ptr: rawptr) -> rawptr {
+enclosing_page_ptr :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
 	start := mem.align_backward(ptr, uintptr(page_size));
 	return start;
 }
 
 // Returns a pointer to the first byte of the page after the one the given pointer is in.
-next_page :: proc(ptr: rawptr) -> rawptr {
+next_page_ptr :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
 	start := mem.align_forward(rawptr(uintptr(ptr)+1), uintptr(page_size));
 	return start;
 }
 
-// Returns a pointer to the first byte of the page before the one the given pointer is in.
-previous_page :: proc(ptr: rawptr) -> rawptr {
+// Gets the page before the one referred to by a pointer or slice.
+previous_page_ptr :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
 	start := mem.align_backward(rawptr(uintptr(ptr)-1), uintptr(page_size));
 	return start;
@@ -241,9 +241,9 @@ arena_end_temp_memory :: proc(mark: Arena_Temp_Memory) {
 
 	// TODO(tetra): Decommit at all? Decommit only in chunks and not pages, to reduce syscall count?
 
-	start := enclosing_page(cursor);
+	start := enclosing_page_ptr(cursor);
 	if start < cursor {
-		start = next_page(start);
+		start = next_page_ptr(start);
 	}
 
 	if arena.cursor > start {
