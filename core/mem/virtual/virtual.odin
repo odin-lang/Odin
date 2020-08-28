@@ -3,7 +3,8 @@ package virtual
 import "core:mem"
 import "core:os"
 
-// Returns a pointer to the first byte of the page containing the pointer.
+// Returns a pointer to the first byte of the page that a pointer lies within.
+// The pointer may point to any byte within the page.
 enclosing_page_ptr :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
 	start := mem.align_backward(ptr, uintptr(page_size));
@@ -13,7 +14,8 @@ enclosing_page_ptr :: proc(ptr: rawptr) -> rawptr {
 // Returns a pointer to the first byte of the next page.
 next_page_ptr :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
-	start := mem.align_forward(rawptr(uintptr(ptr)+1), uintptr(page_size));
+	page := enclosing_page_ptr(ptr);
+	start := mem.align_forward(rawptr(uintptr(page)+1), uintptr(page_size));
 	return start;
 }
 
