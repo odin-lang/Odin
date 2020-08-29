@@ -110,7 +110,7 @@ arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 	// NOTE(tetra): Check the new region stays with the arena, commit the pages,
 	// and shift up the cursor.
 
-	ptr := &va.memory[va.cursor];
+	ptr := #no_bounds_check &va.memory[va.cursor];
 	ptr = cast(^byte) mem.align_forward(ptr, uintptr(alignment));
 
 	new_cursor := mem.ptr_sub(ptr, raw_data(va.memory)) + requested_size;
@@ -136,7 +136,7 @@ arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 arena_realloc :: proc(va: ^Arena, old_memory: rawptr, old_size, size, alignment: int) -> rawptr {
 	// NOTE(tetra): If we can't resize in place, copy to new allocation instead.
 	old_memory_end := mem.ptr_offset(cast(^byte)old_memory, old_size);
-	if old_memory == nil || old_memory_end != &va.memory[va.cursor] {
+	if old_memory == nil || old_memory_end != #no_bounds_check &va.memory[va.cursor] {
 		ptr := arena_alloc(va, size, alignment);
 		if ptr == nil do return nil;
 
@@ -248,7 +248,7 @@ arena_end_temp_memory :: proc(mark: Arena_Temp_Memory) {
 
 	// TODO(tetra): Decommit at all? Decommit only in chunks and not pages, to reduce syscall count?
 
-	ptr := &arena.memory[cursor];
+	ptr := #no_bounds_check &arena.memory[cursor];
 	start := enclosing_page_ptr(ptr);
 	if start < ptr {
 		// NOTE(tetra): If the cursor's on the first byte of a page, we don't need to decommit
@@ -259,7 +259,7 @@ arena_end_temp_memory :: proc(mark: Arena_Temp_Memory) {
 
 	decommit_cursor := mem.ptr_sub((^byte)(start), raw_data(arena.memory));
 	if arena.cursor > decommit_cursor {
-		decommit(arena.memory[decommit_cursor:]);
+		decommit(#no_bounds_check arena.memory[decommit_cursor:]);
 		pages := bytes_to_pages(arena.cursor - decommit_cursor);
 		arena.pages_committed -= pages;
 	}
