@@ -119,7 +119,7 @@ vector4_linear_to_srgb :: proc(col: Vector4) -> Vector4 {
 }
 
 vector4_hsl_to_rgb :: proc(h, s, l: Float, a: Float = 1) -> Vector4 {
-	hue_to_rgb :: proc(p, q, t0: Float) -> Float {
+	hue_to_rgb :: proc(p, q, t: Float) -> Float {
 		t := t;
 		if t < 0 do t += 1;
 		if t > 1 do t -= 1;
