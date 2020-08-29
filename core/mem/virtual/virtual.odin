@@ -79,6 +79,7 @@ Arena :: struct {
 
 // Initialize an area with the given maximum size and base pointer.
 // The max size can be abnormally huge, since only what you write to will be committed to physical memory.
+@(require_results)
 arena_init :: proc(va: ^Arena, max_size: int, desired_base_ptr: rawptr = nil) -> bool {
 	if max_size == 0 do return true;
 
