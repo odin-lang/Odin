@@ -133,28 +133,29 @@ arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 // Resizes a previous allocation.
 // If `old_memory` is the latest allocation from this allocator, the allocation will be resized in-place.
 // Otherwise, this is equivalent to calling `arena_alloc` and copying.
-arena_realloc :: proc(va: ^Arena, old_memory: rawptr, old_size, size, alignment: int) -> rawptr {
+arena_realloc :: proc(va: ^Arena, old_memory: rawptr, old_size, new_size, alignment: int) -> rawptr {
 	// NOTE(tetra): If we can't resize in place, copy to new allocation instead.
 	old_memory_end := mem.ptr_offset(cast(^byte)old_memory, old_size);
 	if old_memory == nil || old_memory_end != #no_bounds_check &va.memory[va.cursor] {
-		ptr := arena_alloc(va, size, alignment);
-		if ptr == nil do return nil;
-
-		mem.copy(ptr, old_memory, old_size);
+		ptr := arena_alloc(va, new_size, alignment);
+		if ptr != nil {
+			mem.copy(ptr, old_memory, old_size);
+		}
 		return ptr;
 	}
 
 
 	// NOTE(tetra): We were the last allocation; commit the new pages and shift up the cursor.
 
-	new_cursor := va.cursor - old_size + size;
+	new_cursor := va.cursor - old_size + new_size;
 	if new_cursor >= len(va.memory) do return nil;
 
 	new_total_pages_needed := bytes_to_pages(new_cursor);
 	if new_total_pages_needed > va.pages_committed {
 		pages := page_slice(raw_data(va.memory), new_total_pages_needed);
-		ok := commit(pages);
-		assert(ok);
+		if !commit(pages) {
+			return nil;
+		}
 		va.pages_committed = new_total_pages_needed;
 	}
 

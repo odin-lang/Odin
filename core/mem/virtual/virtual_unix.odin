@@ -37,7 +37,6 @@ Memory_Access_Flag :: enum i32 {
 }
 Memory_Access_Flags :: bit_set[Memory_Access_Flag; i32]; // NOTE: For PROT_NONE, use `{}`.
 
-// Reserve virtual address space, but do not commit it; it will not consume physical memory.
 reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
 	flags: i32 = MAP_PRIVATE | MAP_ANONYMOUS;
 	if desired_base != nil do flags |= MAP_FIXED;
@@ -54,8 +53,6 @@ reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
 	return;
 }
 
-// Reserve and commit virtual memory.
-// Equivalent to calling reserve, then commit.
 alloc :: proc(size: int, access := Memory_Access_Flags{.Read, .Write}, desired_base: rawptr = nil) -> (memory: []byte) {
 	memory = reserve(size, desired_base);
 	if memory == nil do return;
@@ -65,7 +62,6 @@ alloc :: proc(size: int, access := Memory_Access_Flags{.Read, .Write}, desired_b
 	return;
 }
 
-// Frees all pages that overlap the given memory block.
 free :: proc(memory: []byte) {
 	if memory == nil do return;
 
@@ -76,9 +72,6 @@ free :: proc(memory: []byte) {
 	assert(res != MAP_FAILED);
 }
 
-// Commit pages to physical memory so they can be used.
-// The pages still do not take up system resources until they are written to.
-// If you fail to do this before accessing the memory, it will segfault.
 commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> bool {
 	assert(memory != nil);
 
@@ -87,9 +80,6 @@ commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> 
 	return true;
 }
 
-// Decommit pages that were previously committed, causing them to be removed from physical memory,
-// and therefore freeing up system resources, but does not free the virtual memory; you may
-// commit them again later.
 decommit :: proc(memory: []byte) {
 	assert(memory != nil);
 

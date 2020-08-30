@@ -61,7 +61,6 @@ alloc :: proc(size: int, desired_base: rawptr = nil, access := Memory_Access_Fla
 	return;
 }
 
-// Frees the entire block of virtual memory which contains the slice.
 free :: proc(memory: []byte) {
 	if memory == nil do return;
 
@@ -75,9 +74,6 @@ free :: proc(memory: []byte) {
 	assert(ok);
 }
 
-// Commits the entirety of pages that overlap the given memory block.
-// The pages still do not take up system resources until they are written to.
-// If you fail to do this before accessing the memory, it will segfault.
 commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> bool {
 	assert(memory != nil);
 
@@ -88,7 +84,6 @@ commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> 
 	return ptr != nil;
 }
 
-// Decommits the entirety of pages that overlap the given memory block.
 decommit :: proc(memory: []byte) {
 	assert(memory != nil);
 
