@@ -11,11 +11,6 @@ enclosing_page_ptr :: proc(ptr: rawptr) -> rawptr {
 	return start;
 }
 
-enclosing_page :: proc(ptr: rawptr) -> []byte {
-	page_ptr := enclosing_page_ptr(ptr);
-	return mem.slice_ptr_to_bytes(page_ptr, os.get_page_size());
-}
-
 // Returns a pointer to the first byte of the next page.
 next_page_ptr :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
@@ -30,6 +25,24 @@ previous_page_ptr :: proc(ptr: rawptr) -> rawptr {
 	page := enclosing_page_ptr(ptr);
 	start := mem.align_backward(rawptr(uintptr(page)-1), uintptr(page_size));
 	return start;
+}
+
+// Gets the page that contains the given pointer as a []byte.
+enclosing_page :: proc(ptr: rawptr) -> []byte {
+	page_ptr := enclosing_page_ptr(ptr);
+	return mem.slice_ptr_to_bytes(page_ptr, os.get_page_size());
+}
+
+// Gets the page after the one that contains the given pointer as a []byte.
+next_page :: proc(ptr: rawptr) -> []byte {
+	page_ptr := next_page_ptr(ptr);
+	return mem.slice_ptr_to_bytes(ptr, os.get_page_size());
+}
+
+// Gets the page before the one that contains the given pointer as a []byte.
+previous_page :: proc(ptr: rawptr) -> []byte {
+	page_ptr := previous_page_ptr(ptr);
+	return mem.slice_ptr_to_bytes(ptr, os.get_page_size());
 }
 
 // Given a number of bytes, returns the number of pages needed to contain it.
@@ -227,15 +240,16 @@ Arena_Temp_Memory :: struct {
 }
 
 // Creates a "mark" which you can snap back to later.
-// Useful if you want to make a bunch of allocations, but want to release them all
-// shortly afterwards, without effecting anything allocated before them.
+//
+// Allows you to free everything allocated after the call to this
+// procedure, and have the space reused by future allocations.
 // ```odin
 // {
 //     mark := virtual.arena_begin_temp_memory(arena);
 //     defer virtual.arena_end_temp_memory(mark);
 //
 //     // do allocations here
-// } // .. which are then released here
+// } // .. which are then released here, but allocations before the '{' remains valid.
 // ```
 arena_begin_temp_memory :: proc(using va: ^Arena) -> Arena_Temp_Memory {
 	return {
@@ -244,8 +258,10 @@ arena_begin_temp_memory :: proc(using va: ^Arena) -> Arena_Temp_Memory {
 	};
 }
 
-// Reset back to a previous mark, freeing all of the memory allocations since then.
+// Reset back to a mark acquired from a call to `arena_begin_temp_memory`.
+//
 // This will decommit any extra pages that have been committed since the mark.
+// Those pages will then be reused by future allocations.
 arena_end_temp_memory :: proc(mark: Arena_Temp_Memory) {
 	using mark := mark;
 
