@@ -49,11 +49,11 @@ reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
 	// NOTE: sets errno.
 	if int(uintptr(ptr)) == MAP_FAILED do return;
 
-	memory = mem.slice_ptr(cast(^byte) ptr, size);
+	memory = mem.slice_ptr_to_bytes(ptr, size);
 	return;
 }
 
-alloc :: proc(size: int, access := Memory_Access_Flags{.Read, .Write}, desired_base: rawptr = nil) -> (memory: []byte) {
+alloc :: proc(size: int, desired_base: rawptr = nil, access := Memory_Access_Flags{.Read, .Write}) -> (memory: []byte) {
 	memory = reserve(size, desired_base);
 	if memory == nil do return;
 

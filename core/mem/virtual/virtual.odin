@@ -11,6 +11,11 @@ enclosing_page_ptr :: proc(ptr: rawptr) -> rawptr {
 	return start;
 }
 
+enclosing_page :: proc(ptr: rawptr) -> []byte {
+	page_ptr := enclosing_page_ptr(ptr);
+	return mem.slice_ptr_to_bytes(page_ptr, os.get_page_size());
+}
+
 // Returns a pointer to the first byte of the next page.
 next_page_ptr :: proc(ptr: rawptr) -> rawptr {
 	page_size := os.get_page_size();
@@ -31,9 +36,9 @@ previous_page_ptr :: proc(ptr: rawptr) -> rawptr {
 // ```odin
 // assert(virtual.bytes_to_pages(4097) == 2); // assuming page size is 4096.
 // ```
-bytes_to_pages :: proc(size: int) -> int {
+bytes_to_pages :: proc(num_bytes: int) -> int {
 	page_size := os.get_page_size();
-	bytes := mem.align_forward_uintptr(uintptr(size), uintptr(page_size));
+	bytes := mem.align_forward_uintptr(uintptr(num_bytes), uintptr(page_size));
 	return int(bytes) / page_size;
 }
 
@@ -42,14 +47,16 @@ pages_to_bytes :: proc(num_pages: int) -> int {
 	return num_pages * os.get_page_size();
 }
 
-// Gets a number of pages as a slice.
+// Gets a slice of a number of pages, starting from the page that contains
+// the given pointer.
 // The pointer may point to any of the bytes in the first page.
 page_slice :: proc(ptr: rawptr, num_pages := 1) -> []byte {
-	if num_pages <= 0 do return nil;
-
-	page_ptr := cast(^byte) enclosing_page_ptr(ptr);
-	bytes := pages_to_bytes(num_pages) * os.get_page_size();
-	return mem.slice_ptr(page_ptr, bytes);
+	if num_pages <= 0 {
+		return nil;
+	}
+	num_bytes := pages_to_bytes(num_pages) * os.get_page_size();
+	page_ptr := enclosing_page_ptr(ptr);
+	return mem.slice_ptr_to_bytes(page_ptr, num_bytes);
 }
 
 
@@ -94,7 +101,7 @@ arena_init :: proc(va: ^Arena, max_size: int, desired_base_ptr: rawptr = nil) ->
 }
 
 // Frees all the allocations made using this arena.
-// The virtual memory is decommitted, but not released.
+// The virtual memory is decommitted, but not returned to the system.
 // This will free up physical memory but keep the virtual address space reserved.
 // You may then proceed as if you had only just created the arena and called `arena_init`.
 arena_free_all :: proc(using va: ^Arena) {

@@ -47,7 +47,7 @@ access_to_flags :: proc(access: Memory_Access_Flags) -> u32 {
 reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
 	ptr := win.VirtualAlloc(desired_base, uint(size), win.MEM_RESERVE, win.PAGE_NOACCESS);
 	if ptr != nil {
-		memory = mem.slice_ptr(cast(^byte)ptr, size);
+		memory = mem.slice_ptr_to_bytes(ptr, size);
 	}
 	return;
 }
@@ -56,7 +56,7 @@ alloc :: proc(size: int, desired_base: rawptr = nil, access := Memory_Access_Fla
 	flags := access_to_flags(access);
 	ptr := win.VirtualAlloc(desired_base, uint(size), win.MEM_RESERVE | win.MEM_COMMIT, flags);
 	if ptr != nil {
-		memory = mem.slice_ptr(cast(^byte)ptr, size);
+		memory = mem.slice_ptr_to_bytes(ptr, size);
 	}
 	return;
 }
