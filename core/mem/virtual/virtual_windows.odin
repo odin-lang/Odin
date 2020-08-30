@@ -61,7 +61,7 @@ alloc :: proc(size: int, desired_base: rawptr = nil, access := Memory_Access_Fla
 	return;
 }
 
-free :: proc(memory: []byte) {
+release :: proc(memory: []byte) {
 	if memory == nil do return;
 
 	page_size := os.get_page_size();

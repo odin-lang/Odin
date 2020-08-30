@@ -175,7 +175,7 @@ arena_realloc :: proc(va: ^Arena, old_memory: rawptr, old_size, new_size, alignm
 // Releases the virtual memory back to the system.
 // Afterwards, the arena can be initialized again with `arena_init`.
 arena_destroy :: proc(using va: ^Arena) {
-	free(memory);
+	release(memory);
 	va^ = {};
 }
 
