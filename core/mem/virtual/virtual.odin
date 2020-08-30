@@ -219,7 +219,7 @@ arena_allocator_proc :: proc(data: rawptr, mode: mem.Allocator_Mode,
 		}
 		return set;
 	case .Query_Info:
-		// TODO(tetra): consider if we should use this
+		// TODO(tetra): return info about size/alignment of an allocation
 		return nil;
 	}
 
@@ -282,7 +282,7 @@ arena_end_temp_memory :: proc(mark: Arena_Temp_Memory) {
 	}
 
 	decommit_cursor := mem.ptr_sub((^byte)(start), raw_data(arena.memory));
-	if arena.cursor > decommit_cursor {
+	if decommit_cursor < arena.cursor {
 		decommit(#no_bounds_check arena.memory[decommit_cursor:]);
 		pages := bytes_to_pages(arena.cursor - decommit_cursor);
 		arena.pages_committed -= pages;
