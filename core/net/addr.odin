@@ -10,6 +10,11 @@ Ipv4_Address :: distinct [4]u8;
 Ipv6_Address :: distinct [8]u16be;
 Address :: union {Ipv4_Address, Ipv6_Address};
 
+Addr_Type :: enum {
+	Ipv4,
+	Ipv6,
+}
+
 @static Ipv4_Loopback := Ipv4_Address{127, 0, 0, 1};
 @static Ipv6_Loopback := Ipv6_Address{0, 0, 0, 0, 0, 0, 0, 1};
 
@@ -76,17 +81,19 @@ parse_ipv6_addr :: proc(address_and_maybe_port: string) -> (addr: Ipv6_Address, 
 		addr[i] = u16be(n16);
 	}
 
-	if double_colon do for _, i in parts {
-		part := parts[len(parts)-1-i];
-		switch len(part) {
-		case 3: return;
-		case 0: break; // NOTE(tetra): Zero means '::' - only one of these is allowed.
+	if double_colon {
+		loop: for _, i in parts {
+			part := parts[len(parts)-1-i];
+			switch len(part) {
+			case 3: return;
+			case 0: break loop; // NOTE(tetra): Zero means '::' - only one of these is allowed.
+			}
+			n, ok := strconv.parse_uint(part, 16);
+			if !ok do return; // NOTE(tetra): Not all of this part was digits.
+			n16 := u16(n);
+			if n16 >= max(u16) do return;
+			addr[len(addr)-1-i] = u16be(n16);
 		}
-		n, ok := strconv.parse_uint(part, 16);
-		if !ok do return; // NOTE(tetra): Not all of this part was digits.
-		n16 := u16(n);
-		if n16 >= max(u16) do return;
-		addr[len(addr)-1-i] = u16be(n16);
 	}
 	ok = true;
 	return;
@@ -190,16 +197,6 @@ map_to_ipv6 :: proc(addr: Address) -> Address {
 	return addr6;
 }
 
-// TODO: A way to get the tag without type information that's cleaner than this.
-get_addr_type :: proc(addr: Address) -> Addr_Type {
-	switch v in addr {
-	case Ipv4_Address: return .Ipv4;
-	case Ipv6_Address: return .Ipv6;
-	}
-	panic("unknown address type");
-	return {};
-}
-
 
 // Returns a temporarily-allocated string representation of the address.
 addr_to_string :: proc(addr: Address, allocator := context.temp_allocator) -> string {
@@ -209,15 +206,15 @@ addr_to_string :: proc(addr: Address, allocator := context.temp_allocator) -> st
 		fmt.sbprintf(&b, "%v.%v.%v.%v", v[0], v[1], v[2], v[3]);
 	case Ipv6_Address:
 		i := 0;
-		dc := false;
+		seen_double_colon := false;
 		for i < len(v) {
-			if !dc && v[i] == 0 && v[i+1] == 0 {
-				dc = true;
+			if !seen_double_colon && v[i] == 0 && v[i+1] == 0 {
+				seen_double_colon = true;
 				for i < len(v) && v[i] == 0 {
 					i += 1;
 				}
 				fmt.sbprintf(&b, "::");
-				break;
+				break; // TODO: do we need this?
 			} else if i > 0 {
 				fmt.sbprint(&b, ":");
 			}
