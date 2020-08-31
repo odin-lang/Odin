@@ -3,7 +3,7 @@ package net
 import "core:strings"
 import "core:mem"
 
-import "core:sys/win32"
+import win "core:sys/windows"
 
 
 // Resolves a hostname to exactly one IPv4 and IPv6 address.
@@ -86,12 +86,12 @@ resolve :: proc(hostname: string, addr_types: bit_set[Addr_Type] = {.Ipv4, .Ipv6
 
 // TODO: Support SRV records.
 Dns_Record_Type :: enum u16 {
-    Ipv4 = win32.DNS_TYPE_A,    // Ipv4 address.
-    Ipv6 = win32.DNS_TYPE_AAAA, // Ipv6 address.
-    Cname = win32.DNS_TYPE_CNAME, // Another host name.
-    Txt = win32.DNS_TYPE_TEXT,  // Arbitrary binary data or text.
-    Ns = win32.DNS_TYPE_NS,     // Address of a name server. TODO(tetra): .. Name server for what?
-    Mx = win32.DNS_TYPE_MX,     // Address and preference priority of a mail exchange server.
+    Ipv4 = win.DNS_TYPE_A,    // Ipv4 address.
+    Ipv6 = win.DNS_TYPE_AAAA, // Ipv6 address.
+    Cname = win.DNS_TYPE_CNAME, // Another host name.
+    Txt = win.DNS_TYPE_TEXT,  // Arbitrary binary data or text.
+    Ns = win.DNS_TYPE_NS,     // Address of a name server. TODO(tetra): .. Name server for what?
+    Mx = win.DNS_TYPE_MX,     // Address and preference priority of a mail exchange server.
 }
 
 Dns_Record_Ipv4  :: distinct Ipv4_Address;
@@ -125,19 +125,19 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 	context.allocator = allocator;
 
 	host_cstr := strings.clone_to_cstring(hostname, context.temp_allocator);
-	rec: ^win32.Dns_Record;
-	res := win32.DnsQuery_UTF8(host_cstr, u16(type), 0, nil, &rec, nil);
-	if res == win32.DNS_INFO_NO_RECORDS || res == win32.ERROR_INVALID_NAME {
+	rec: ^win.DNS_RECORD;
+	res := win.DnsQuery_UTF8(host_cstr, u16(type), 0, nil, &rec, nil);
+	if res == win.DNS_INFO_NO_RECORDS || res == win.ERROR_INVALID_NAME {
 		// NOTE(tetra): ERROR_INVALID_NAME is returned if there are no such CNAME or TXT records???
 		ok = true;
 		return;
 	}
 	if res != 0 do return;
-	defer win32.DnsRecordListFree(rec, 1); // 1 means that we're freeing a list... because the proc name isn't enough.
+	defer win.DnsRecordListFree(rec, 1); // 1 means that we're freeing a list... because the proc name isn't enough.
 
 	count := 0;
-	for r := rec; r != nil; r = r.next {
-		if r.type != u16(type) do continue; // NOTE(tetra): Should never happen, but...
+	for r := rec; r != nil; r = r.pNext {
+		if r.wType != u16(type) do continue; // NOTE(tetra): Should never happen, but...
 		count += 1;
 	}
 
@@ -145,38 +145,38 @@ get_dns_records :: proc(hostname: string, type: Dns_Record_Type, allocator := co
 	recs := make([dynamic]Dns_Record, 0, count);
 	if recs == nil do return; // return no results if OOM.
 
-	for r := rec; r != nil; r = r.next {
-		if r.type != u16(type) do continue; // NOTE(tetra): Should never happen, but...
+	for r := rec; r != nil; r = r.pNext {
+		if r.wType != u16(type) do continue; // NOTE(tetra): Should never happen, but...
 
 		new_rec: Dns_Record;
 
-		switch Dns_Record_Type(r.type) {
+		switch Dns_Record_Type(r.wType) {
 		case .Ipv4:
-			addr := Ipv4_Address(transmute([4]u8) r.data.ip_address);
+			addr := Ipv4_Address(transmute([4]u8) r.Data.A);
 			new_rec = Dns_Record_Ipv4(addr); // NOTE(tetra): value copy
 		case .Ipv6:
-			addr := Ipv6_Address(transmute([8]u16be) r.data.ip6_address);
+			addr := Ipv6_Address(transmute([8]u16be) r.Data.AAAA);
 			new_rec = Dns_Record_Ipv6(addr); // NOTE(tetra): value copy
 		case .Cname:
-			host := string(r.data.cname);
+			host := string(r.Data.CNAME);
 			new_rec = Dns_Record_Cname(strings.clone(host));
 		case .Txt:
-			n := r.data.text.string_count;
-			ptr := &r.data.text.string_array;
+			n := r.Data.TXT.dwStringCount;
+			ptr := &r.Data.TXT.pStringArray;
 			c_strs := mem.slice_ptr(ptr, int(n));
 			for cstr in c_strs {
 				s := string(cstr);
 				new_rec = Dns_Record_Text(strings.clone(s));
 			}
 		case .Ns:
-			host := string(r.data.name_host);
+			host := string(r.Data.NS);
 			new_rec = Dns_Record_Ns(strings.clone(host));
 		case .Mx:
 			// TODO(tetra): Order by preference priority? (Prefer hosts with lower preference values.)
 			// Or maybe not because you're supposed to just use the first one that works
 			// and which order they're in changes between after every few calls.
-			host := string(r.data.mail_exchange.host);
-			preference := int(r.data.mail_exchange.preference);
+			host := string(r.Data.MX.pNameExchange);
+			preference := int(r.Data.MX.wPreference);
 			new_rec = Dns_Record_Mx { host       = strings.clone(host),
 			                          preference = preference };
 		}
