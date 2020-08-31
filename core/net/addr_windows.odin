@@ -1,39 +1,50 @@
 package net
 
-import "core:sys/win32"
+import "core:c"
+import win "core:sys/windows"
 
 
 // Returns an address for each interface that can be bound to.
 get_network_interfaces :: proc() -> []Address {
+	// TODO
 	return nil;
 }
 
 @private
-to_socket_address :: proc(addr: Address, port: int) -> (socket_addr: win32.Socket_Address, addr_size: i32) {
+to_socket_address :: proc(family: c.int, addr: Address, port: int) -> (socket_addr: win.SOCKADDR, addr_size: c.int) {
 	switch a in addr {
 	case Ipv4_Address:
-		socket_addr = win32.make_sockaddr(win32.AF_INET,  transmute(win32.in_addr)  a, u16(port));
-		addr_size = size_of(socket_addr.ipv4);
+		sockaddr := cast(^win.sockaddr_in) &socket_addr;
+		sockaddr.sin_port = u16be(win.USHORT(port));
+		sockaddr.sin_addr = transmute(win.in_addr) a;
+		addr_size = size_of(win.sockaddr_in);
+		sockaddr.sin_family = u16(family);
 	case Ipv6_Address:
-		socket_addr = win32.make_sockaddr(win32.AF_INET6, transmute(win32.in6_addr) a, u16(port));
-		addr_size = size_of(socket_addr.ipv6);
+		sockaddr := cast(^win.sockaddr_in6) &socket_addr;
+		sockaddr.sin6_port = u16be(win.USHORT(port));
+		sockaddr.sin6_addr = transmute(win.in6_addr) a;
+		addr_size = size_of(win.sockaddr_in6);
+		sockaddr.sin6_family = u16(family);
 	}
 	return;
 }
 
 @private
-to_canonical_endpoint :: proc(native_addr: win32.Socket_Address, auto_cast addr_size: int) -> (ep: Endpoint) {
+to_canonical_endpoint :: proc(native_addr: win.SOCKADDR, auto_cast addr_size: int) -> (ep: Endpoint) {
 	switch addr_size {
-	case size_of(win32.sockaddr_in):
-		port := int(native_addr.ipv4.port);
+	case size_of(win.sockaddr_in):
+		addr := transmute(win.sockaddr_in) native_addr;
+		port := int(addr.sin_port);
 		ep = Endpoint {
-			addr = Ipv4_Address(native_addr.ipv4.addr),
+			addr = Ipv4_Address(transmute([4]byte) addr.sin_addr),
 			port = port,
 		};
-	case size_of(win32.sockaddr_in6):
-		port := int(native_addr.ipv6.port);
+	case size_of(win.sockaddr_in6):
+		na := native_addr;
+		addr := cast(^win.sockaddr_in6) &na;
+		port := int(addr.sin6_port);
 		ep = Endpoint {
-			addr = Ipv6_Address(transmute([8]u16be) native_addr.ipv6.addr),
+			addr = Ipv6_Address(transmute([8]u16be) addr.sin6_addr),
 			port = port,
 		};
 	case:
