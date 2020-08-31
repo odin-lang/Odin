@@ -3,6 +3,7 @@ package sys_windows
 
 import "core:strings"
 import "core:sys/win32"
+import "intrinsics"
 
 LOWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
 	return WORD(x & 0xffff)
@@ -84,6 +85,8 @@ utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
 	}
 	return wstring_to_utf8(raw_data(s), len(s), allocator)
 }
+
+
 
 // AdvAPI32, NetAPI32 and UserENV helpers.
 
@@ -455,4 +458,19 @@ run_as_user :: proc(username, password, application, commandline: string, pi: ^P
     } else {
     	return false
     }
+}
+
+ensure_winsock_initialized :: proc() {
+	@static gate := false;
+	@static initted := false;
+
+	for intrinsics.atomic_xchg(&gate, true) {}
+	defer intrinsics.atomic_store(&gate, false);
+
+	unused_info: WSADATA;
+	version_requested := WORD(2) << 8 | 2;
+	res := WSAStartup(version_requested, &unused_info);
+	assert(res == 0, "unable to initialized Winsock2");
+
+	initted = true;
 }

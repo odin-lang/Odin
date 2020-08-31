@@ -8,7 +8,7 @@ import "core:c"
 foreign Ws2_32 {
 	WSAStartup :: proc(version_requested: u32, data: ^WSADATA) -> i32 ---;
 	WSAGetLastError :: proc() -> i32 ---;
-	
+
 	@(link_name="WSACleanup") wsa_cleanup :: proc() -> i32 ---;
 }
 
@@ -21,7 +21,7 @@ foreign Ws2_32 {
 	@(link_name="getaddrinfo")  getaddrinfo :: proc(name: cstring, port: cstring, hints: ^addrinfo, addr_list: ^^addrinfo) -> i32 ---;
 	@(link_name="bind")         bind :: proc(socket: SOCKET, addr: ^Socket_Address, size_of_addr: i32) -> i32 ---;
 	@(link_name="listen")       listen :: proc(socket: SOCKET, pending_conn_queue_length: i32) -> i32 ---;
-	
+
 	// NOTE(tetra): addr_length is max size of addr on call, and actual size on return (which tells you if it's Ipv4 or Ipv6).
 	@(link_name="accept")       accept :: proc(socket: SOCKET, addr: ^Socket_Address, addr_length: ^i32) -> SOCKET ---;
 
