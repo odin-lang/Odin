@@ -649,14 +649,14 @@ ADDRINFOA :: struct {
 
 sockaddr_in :: struct {
 	sin_family: ADDRESS_FAMILY,
-	sin_port: USHORT,
+	sin_port: u16be,
 	sin_addr: in_addr,
 	sin_zero: [8]CHAR,
 }
 
 sockaddr_in6 :: struct {
 	sin6_family: ADDRESS_FAMILY,
-	sin6_port: USHORT,
+	sin6_port: u16be,
 	sin6_flowinfo: c_ulong,
 	sin6_addr: in6_addr,
 	sin6_scope_id: c_ulong,
@@ -668,6 +668,51 @@ in_addr :: struct {
 
 in6_addr :: struct {
 	s6_addr: [16]u8,
+}
+
+DNS_STATUS :: distinct DWORD; // zero is success
+
+DNS_TYPE_A     :: 0x1;
+DNS_TYPE_NS    :: 0x2;
+DNS_TYPE_CNAME :: 0x5;
+DNS_TYPE_MX    :: 0xf;
+DNS_TYPE_AAAA  :: 0x1c;
+DNS_TYPE_TEXT  :: 0x10;
+
+DNS_INFO_NO_RECORDS :: 9501;
+DNS_QUERY_NO_RECURSION :: 0x00000004;
+
+ERROR_INVALID_NAME :: 123;
+
+DNS_RECORD :: struct {
+    pNext: ^DNS_RECORD,
+    pName: cstring,
+    wType: WORD,
+    wDataLength: USHORT,
+    Flags: DWORD,
+    dwTtl: DWORD,
+    _: DWORD,
+    Data: struct #raw_union {
+        CNAME: DNS_PTR_DATAA,
+        A: u32be, // Ipv4 Address
+        AAAA: u128be, // Ipv6 Address
+        TXT: DNS_TXT_DATAA,
+        NS: DNS_PTR_DATAA,
+        MX: DNS_MX_DATAA,
+    }
+}
+
+DNS_TXT_DATAA :: struct {
+    dwStringCount: DWORD,
+    pStringArray: cstring,
+}
+
+DNS_PTR_DATAA :: cstring;
+
+DNS_MX_DATAA :: struct {
+    pNameExchange: cstring, // the hostname
+    wPreference: WORD,
+    _: WORD, // padding.
 }
 
 EXCEPTION_DISPOSITION :: enum c_int {
