@@ -51,10 +51,24 @@ close :: proc(s: Socket) {
 	win.closesocket(win.SOCKET(s));
 }
 
-recv :: proc(s: Socket, buf: []byte) -> (int, os.Errno) {
-	return 0, 0;
+recv :: proc(s: Socket, buf: []byte) -> (bytes_read: int, err: os.Errno) {
+	res := win.recv(win.SOCKET(s), &buf[0], c.int(len(buf)), 0);
+	if res < 0 {
+		err = os.Errno(win.WSAGetLastError());
+	}
+	bytes_read = int(res);
+	return;
 }
 
 send :: proc(s: Socket, buf: []byte) -> (int, os.Errno) {
-
+	sent := 0;
+	for sent < len(buf) {
+		limit := min(1<<31, len(buf) - sent);
+		res := win.send(win.SOCKET(s), &buf[0], c.int(limit), 0);
+		if res < 0 {
+			return sent, os.Errno(win.WSAGetLastError());
+		}
+		sent += int(res);
+	}
+	return sent, os.ERROR_NONE;
 }
