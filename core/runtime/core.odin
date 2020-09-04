@@ -553,6 +553,24 @@ ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_locati
 	pop(array);
 }
 
+@builtin
+unordered_remove_range :: proc(array: ^$D/[dynamic]$T, lo, hi: int, loc := #caller_location) {
+	slice_expr_error_lo_hi_loc(loc, lo, hi, len(array));
+	for index in lo..<hi {
+		unordered_remove(array, index, loc);
+	}
+}
+
+@builtin
+ordered_remove_range :: proc(array: ^$D/[dynamic]$T, lo, hi: int, loc := #caller_location) {
+	slice_expr_error_lo_hi_loc(loc, lo, hi, len(array));
+	n := max(hi-lo, 0);
+	if n > 0 {
+		copy(array[lo:], array[hi:]);
+		(^Raw_Dynamic_Array)(array).len -= n;
+	}
+}
+
 
 @builtin
 pop :: proc(array: ^$T/[dynamic]$E) -> E {
@@ -994,17 +1012,84 @@ append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_l
 	}
 }
 
-@builtin append :: proc{append_elem, append_elems, append_elem_string};
-@builtin append_soa :: proc{append_soa_elem, append_soa_elems};
-
-
-
 @builtin
 append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_location) {
 	for arg in args {
 		append(array = array, args = transmute([]E)(arg), loc = loc);
 	}
 }
+
+
+@builtin append :: proc{append_elem, append_elems, append_elem_string};
+@builtin append_soa :: proc{append_soa_elem, append_soa_elems};
+
+
+@builtin
+insert_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	if array == nil {
+		return;
+	}
+	n := len(array);
+	m :: 1;
+	resize(array, n+m, loc);
+	if n+m <= len(array) {
+		when size_of(E) != 0 {
+			copy(array[index+m:], array[index:]);
+			array[index] = arg;
+		}
+		ok = true;
+	}
+	return;
+}
+
+@builtin
+insert_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	if array == nil {
+		return;
+	}
+	if len(args) == 0 {
+		ok = true;
+		return;
+	}
+
+	n := len(array);
+	m := len(args);
+	resize(array, n+m, loc);
+	if n+m <= len(array) {
+		when size_of(E) != 0 {
+			copy(array[index+m:], array[index:]);
+			copy(array[index:], args);
+		}
+		ok = true;
+	}
+	return;
+}
+
+@builtin
+insert_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	if array == nil {
+		return;
+	}
+	if len(args) == 0 {
+		ok = true;
+		return;
+	}
+
+	n := len(array);
+	m := len(args);
+	resize(array, n+m, loc);
+	if n+m <= len(array) {
+		copy(array[index+m:], array[index:]);
+		copy(array[index:], args);
+		ok = true;
+	}
+	return;
+}
+
+@builtin insert_at :: proc{insert_at_elem, insert_at_elems, insert_at_elem_string};
+
+
+
 
 @builtin
 clear_dynamic_array :: inline proc "contextless" (array: ^$T/[dynamic]$E) {
