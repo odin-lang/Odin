@@ -70,7 +70,7 @@ file_size_from_path :: proc(path: string) -> i64 {
 	return length;
 }
 
-read_entire_file :: proc(name: string) -> (data: []byte, success: bool) {
+read_entire_file :: proc(name: string, allocator := context.allocator) -> (data: []byte, success: bool) {
 	fd, err := open(name, O_RDONLY, 0);
 	if err != 0 {
 		return nil, false;
@@ -86,7 +86,7 @@ read_entire_file :: proc(name: string) -> (data: []byte, success: bool) {
 		return nil, true;
 	}
 
-	data = make([]byte, int(length));
+	data = make([]byte, int(length), allocator);
 	if data == nil {
 		return nil, false;
 	}

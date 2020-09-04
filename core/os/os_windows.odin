@@ -271,7 +271,7 @@ get_page_size :: proc() -> int {
 // The current directory is stored as a global variable in the process.
 @private cwd_gate := false;
 
-get_current_directory :: proc() -> string {
+get_current_directory :: proc(allocator := context.allocator) -> string {
 	for intrinsics.atomic_xchg(&cwd_gate, true) {}
 
 	sz_utf16 := win32.GetCurrentDirectoryW(0, nil);
@@ -282,7 +282,7 @@ get_current_directory :: proc() -> string {
 
 	intrinsics.atomic_store(&cwd_gate, false);
 
-	return win32.utf16_to_utf8(dir_buf_wstr);
+	return win32.utf16_to_utf8(dir_buf_wstr, allocator);
 }
 
 set_current_directory :: proc(path: string) -> (err: Errno) {
