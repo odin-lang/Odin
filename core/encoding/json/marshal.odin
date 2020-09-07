@@ -210,11 +210,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 				data := uintptr(entries.data) + uintptr(i*entry_size);
 				header := cast(^Map_Entry_Header)data;
 
-				if reflect.is_string(info.key) {
-					marshal_arg(b, header.key.str);
-				} else {
-					marshal_arg(b, any{rawptr(&header.key.hash), info.key.id});
-				}
+				marshal_arg(b, any{rawptr(&header.key.key.val), info.key.id});
 
 				write_string(b, ": ");
 

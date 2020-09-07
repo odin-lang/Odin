@@ -2794,6 +2794,8 @@ void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 
 	if (is_type_string(key)) {
 		add_package_dependency(ctx, "runtime", "default_hash_string");
+	} else {
+		add_package_dependency(ctx, "runtime", "default_hash_ptr");
 	}
 
 

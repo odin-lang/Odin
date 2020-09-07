@@ -1501,10 +1501,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				header := cast(^runtime.Map_Entry_Header)data;
 
 				if reflect.is_string(info.key) {
-					strings.write_string(fi.buf, header.key.str);
+					strings.write_string(fi.buf, header.key.key.str);
 				} else {
 					fi := Info{buf = fi.buf};
-					fmt_arg(&fi, any{rawptr(&header.key.hash), info.key.id}, 'v');
+					fmt_arg(&fi, any{rawptr(&header.key.key.val), info.key.id}, 'v');
 				}
 
 				strings.write_string(fi.buf, "=");

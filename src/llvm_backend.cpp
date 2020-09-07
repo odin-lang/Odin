@@ -3077,8 +3077,6 @@ void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValu
 		break;
 	}
 	case Type_Map: {
-		lbAddr key = lb_add_local_generated(p, expr_type->Map.key, true);
-
 		lbValue entries = lb_map_entries_ptr(p, expr);
 		lbValue elem = lb_emit_struct_ep(p, entries, 0);
 		elem = lb_emit_load(p, elem);
@@ -3086,17 +3084,11 @@ void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValu
 		lbValue entry = lb_emit_ptr_offset(p, elem, idx);
 		val = lb_emit_load(p, lb_emit_struct_ep(p, entry, 2));
 
-		lbValue hash = lb_emit_struct_ep(p, entry, 0);
-		if (is_type_string(expr_type->Map.key)) {
-			lbValue str = lb_emit_struct_ep(p, hash, 1);
-			lb_addr_store(p, key, lb_emit_load(p, str));
-		} else {
-			lbValue hash_ptr = lb_emit_struct_ep(p, hash, 0);
-			hash_ptr = lb_emit_conv(p, hash_ptr, key.addr.type);
-			lb_addr_store(p, key, lb_emit_load(p, hash_ptr));
-		}
+		lbValue key_raw = lb_emit_struct_ep(p, entry, 0);
+		key_raw = lb_emit_struct_ep(p, key_raw, 1);
+		lbValue key = lb_emit_conv(p, key_raw, alloc_type_pointer(expr_type->Map.key));
 
-		idx = lb_addr_load(p, key);
+		idx = lb_emit_load(p, key);
 
 		break;
 	}
@@ -9655,45 +9647,45 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type) {
 	Type *hash_type = t_u64;
 	lbAddr v = lb_add_local_generated(p, t_map_key, true);
+	lbValue vp = lb_addr_get_ptr(p, v);
 	Type *t = base_type(key.type);
 	key = lb_emit_conv(p, key, key_type);
-	if (is_type_integer(t)) {
-		lb_emit_store(p, lb_emit_struct_ep(p, v.addr, 0), lb_emit_conv(p, key, hash_type));
-	} else if (is_type_enum(t)) {
-		lb_emit_store(p, lb_emit_struct_ep(p, v.addr, 0), lb_emit_conv(p, key, hash_type));
-	} else if (is_type_typeid(t)) {
-		lbValue i = lb_emit_transmute(p, key, t_uint);
-		lb_emit_store(p, lb_emit_struct_ep(p, v.addr, 0), lb_emit_conv(p, i, hash_type));
-	} else if (is_type_pointer(t)) {
-		lbValue ptr = lb_emit_conv(p, key, t_uintptr);
-		lb_emit_store(p, lb_emit_struct_ep(p, v.addr, 0), lb_emit_conv(p, ptr, hash_type));
-	} else if (is_type_float(t)) {
-		lbValue bits = {};
-		i64 size = type_size_of(t);
-		switch (8*size) {
-		case 32:  bits = lb_emit_transmute(p, key, t_u32); break;
-		case 64:  bits = lb_emit_transmute(p, key, t_u64);  break;
-		default: GB_PANIC("Unhandled float size: %lld bits", size); break;
-		}
 
-		lb_emit_store(p, lb_emit_struct_ep(p, v.addr, 0), lb_emit_conv(p, bits, hash_type));
-	} else if (is_type_string(t)) {
+	if (is_type_string(t)) {
 		lbValue str = lb_emit_conv(p, key, t_string);
 		lbValue hashed_str = {};
 
-		if (false && lb_is_const(str)) {
-			String value = lb_get_const_string(p->module, str);
-			u64 hs = fnv64a(value.text, value.len);
-			hashed_str = lb_const_value(p->module, t_u64, exact_value_u64(hs));
+		if (lb_is_const(str)) {
+			String v = lb_get_const_string(p->module, str);
+			u64 hs = fnv64a(v.text, v.len);
+			hashed_str = lb_const_int(p->module, t_u64, hs);
 		} else {
 			auto args = array_make<lbValue>(heap_allocator(), 1);
 			args[0] = str;
 			hashed_str = lb_emit_runtime_call(p, "default_hash_string", args);
 		}
-		lb_emit_store(p, lb_emit_struct_ep(p, v.addr, 0), hashed_str);
-		lb_emit_store(p, lb_emit_struct_ep(p, v.addr, 1), str);
+		lb_emit_store(p, lb_emit_struct_ep(p, vp, 0), hashed_str);
+
+		lbValue key_data = lb_emit_struct_ep(p, vp, 1);
+		key_data = lb_emit_conv(p, key_data, alloc_type_pointer(key_type));
+		lb_emit_store(p, key_data, str);
 	} else {
-		GB_PANIC("Unhandled map key type");
+		i64 sz = type_size_of(t);
+		GB_ASSERT(sz <= 8);
+		if (sz != 0) {
+			auto args = array_make<lbValue>(heap_allocator(), 2);
+			args[0] = lb_address_from_load_or_generate_local(p, key);
+			args[1] = lb_const_int(p->module, t_int, sz);
+			lbValue hash = lb_emit_runtime_call(p, "default_hash_ptr", args);
+
+
+			lbValue hash_ptr = lb_emit_struct_ep(p, vp, 0);
+			lbValue key_data = lb_emit_struct_ep(p, vp, 1);
+			key_data = lb_emit_conv(p, key_data, alloc_type_pointer(key_type));
+
+			lb_emit_store(p, hash_ptr, hash);
+			lb_emit_store(p, key_data, key);
+		}
 	}
 
 	return lb_addr_load(p, v);

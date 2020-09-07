@@ -17,6 +17,8 @@ HANDLE :: distinct LPVOID;
 HINSTANCE :: HANDLE;
 HMODULE :: distinct HINSTANCE;
 HRESULT :: distinct LONG;
+HWND :: distinct HANDLE;
+HMONITOR :: distinct HANDLE;
 BOOL :: distinct b32;
 BYTE :: distinct u8;
 BOOLEAN :: distinct b8;

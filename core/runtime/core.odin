@@ -349,7 +349,17 @@ INITIAL_MAP_CAP :: 16;
 
 Map_Key :: struct {
 	hash: u64,
-	str:  string,
+	/* NOTE(bill)
+		size_of(Map_Key) == 16 Bytes on 32-bit systems
+		size_of(Map_Key) == 24 Bytes on 64-bit systems
+
+		This does mean that an extra word is wasted for each map when a string is not used on 64-bit systems
+		however, this is probably not a huge problem in terms of memory usage
+	*/
+	key: struct #raw_union {
+		str: string,
+		val: u64,
+	},
 }
 
 Map_Find_Result :: struct {
@@ -1407,28 +1417,34 @@ __get_map_key :: proc "contextless" (k: $K) -> Map_Key {
 	T :: intrinsics.type_core_type(K);
 
 	when intrinsics.type_is_integer(T) {
+		map_key.hash = default_hash_ptr(&key, size_of(T));
+
 		sz :: 8*size_of(T);
-		     when sz ==  8 do map_key.hash = u64(( ^u8)(&key)^);
-		else when sz == 16 do map_key.hash = u64((^u16)(&key)^);
-		else when sz == 32 do map_key.hash = u64((^u32)(&key)^);
-		else when sz == 64 do map_key.hash = u64((^u64)(&key)^);
-		else do #assert(false, "Unhandled integer size");
+		     when sz ==  8 do map_key.key.val = u64(( ^u8)(&key)^);
+		else when sz == 16 do map_key.key.val = u64((^u16)(&key)^);
+		else when sz == 32 do map_key.key.val = u64((^u32)(&key)^);
+		else when sz == 64 do map_key.key.val = u64((^u64)(&key)^);
+		else do #panic("Unhandled integer size");
 	} else when intrinsics.type_is_rune(T) {
-		map_key.hash = u64((^rune)(&key)^);
+		map_key.hash = default_hash_ptr(&key, size_of(T));
+		map_key.key.val = u64((^rune)(&key)^);
 	} else when intrinsics.type_is_pointer(T) {
-		map_key.hash = u64(uintptr((^rawptr)(&key)^));
+		map_key.hash = default_hash_ptr(&key, size_of(T));
+		map_key.key.val = u64(uintptr((^rawptr)(&key)^));
 	} else when intrinsics.type_is_float(T) {
+		map_key.hash = default_hash_ptr(&key, size_of(T));
+
 		sz :: 8*size_of(T);
-		     when sz == 32 do map_key.hash = u64((^u32)(&key)^);
-		else when sz == 64 do map_key.hash = u64((^u64)(&key)^);
-		else do #assert(false, "Unhandled float size");
+		     when sz == 32 do map_key.key.val = u64((^u32)(&key)^);
+		else when sz == 64 do map_key.key.val = u64((^u64)(&key)^);
+		else do #panic("Unhandled float size");
 	} else when intrinsics.type_is_string(T) {
 		#assert(T == string);
 		str := (^string)(&key)^;
 		map_key.hash = default_hash_string(str);
-		map_key.str  = str;
+		map_key.key.str = str;
 	} else {
-		#assert(false, "Unhandled map key type");
+		#panic("Unhandled map key type");
 	}
 
 	return map_key;
@@ -1443,10 +1459,18 @@ _fnv64a :: proc "contextless" (data: []byte, seed: u64 = 0xcbf29ce484222325) -> 
 }
 
 
-default_hash :: proc "contextless" (data: []byte) -> u64 {
+default_hash :: inline proc "contextless" (data: []byte) -> u64 {
+	context = default_context();
+	os.write_string(os.stdout, "here - default_hash\n");
 	return _fnv64a(data);
 }
-default_hash_string :: proc "contextless" (s: string) -> u64 do return default_hash(transmute([]byte)(s));
+default_hash_string :: inline proc "contextless" (s: string) -> u64 {
+	return default_hash(transmute([]byte)(s));
+}
+default_hash_ptr :: inline proc "contextless" (data: rawptr, size: int) -> u64 {
+	s := Raw_Slice{data, size};
+	return default_hash(transmute([]byte)(s));
+}
 
 
 source_code_location_hash :: proc(s: Source_Code_Location) -> u64 {
@@ -1582,7 +1606,11 @@ __dynamic_map_full :: inline proc(using h: Map_Header) -> bool {
 
 __dynamic_map_hash_equal :: proc(h: Map_Header, a, b: Map_Key) -> bool {
 	if a.hash == b.hash {
-		if h.is_key_string do return a.str == b.str;
+		if h.is_key_string {
+			return a.key.str == b.key.str;
+		} else {
+			return a.key.val == b.key.val;
+		}
 		return true;
 	}
 	return false;
