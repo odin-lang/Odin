@@ -10,11 +10,9 @@ Rand :: struct {
 _GLOBAL_SEED_DATA := 1234567890;
 @(private, static)
 global_rand := create(u64(uintptr(&_GLOBAL_SEED_DATA)));
-@(private, static)
-global_rand_ptr := &global_rand;
 
 set_global_seed :: proc(seed: u64) {
-	init(global_rand_ptr, seed);
+	init(&global_rand, seed);
 }
 
 create :: proc(seed: u64) -> Rand {
@@ -32,6 +30,12 @@ init :: proc(r: ^Rand, seed: u64) {
 }
 
 _random :: proc(r: ^Rand) -> u32 {
+	r := r;
+	if r == nil {
+		// NOTE(bill, 2020-09-07): Do this so that people can
+		// enforce the global random state if necessary with `nil`
+		r = &global_rand;
+	}
 	old_state := r.state;
 	r.state = old_state * 6364136223846793005 + (r.inc|1);
 	xor_shifted := u32(((old_state>>18) ~ old_state) >> 27);
@@ -39,15 +43,15 @@ _random :: proc(r: ^Rand) -> u32 {
 	return (xor_shifted >> rot) | (xor_shifted << ((-rot) & 31));
 }
 
-uint32 :: proc(r: ^Rand = global_rand_ptr) -> u32 { return _random(r); }
+uint32 :: proc(r: ^Rand = nil) -> u32 { return _random(r); }
 
-uint64 :: proc(r: ^Rand = global_rand_ptr) -> u64 {
+uint64 :: proc(r: ^Rand = nil) -> u64 {
 	a := u64(_random(r));
 	b := u64(_random(r));
 	return (a<<32) | b;
 }
 
-uint128 :: proc(r: ^Rand = global_rand_ptr) -> u128 {
+uint128 :: proc(r: ^Rand = nil) -> u128 {
 	a := u128(_random(r));
 	b := u128(_random(r));
 	c := u128(_random(r));
@@ -55,11 +59,11 @@ uint128 :: proc(r: ^Rand = global_rand_ptr) -> u128 {
 	return (a<<96) | (b<<64) | (c<<32) | d;
 }
 
-int31  :: proc(r: ^Rand = global_rand_ptr) -> i32  { return i32(uint32(r) << 1 >> 1); }
-int63  :: proc(r: ^Rand = global_rand_ptr) -> i64  { return i64(uint64(r) << 1 >> 1); }
-int127 :: proc(r: ^Rand = global_rand_ptr) -> i128 { return i128(uint128(r) << 1 >> 1); }
+int31  :: proc(r: ^Rand = nil) -> i32  { return i32(uint32(r) << 1 >> 1); }
+int63  :: proc(r: ^Rand = nil) -> i64  { return i64(uint64(r) << 1 >> 1); }
+int127 :: proc(r: ^Rand = nil) -> i128 { return i128(uint128(r) << 1 >> 1); }
 
-int31_max :: proc(n: i32, r: ^Rand = global_rand_ptr) -> i32 {
+int31_max :: proc(n: i32, r: ^Rand = nil) -> i32 {
 	if n <= 0 do panic("Invalid argument to int31_max");
 	if n&(n-1) == 0 {
 		return int31(r) & (n-1);
@@ -72,7 +76,7 @@ int31_max :: proc(n: i32, r: ^Rand = global_rand_ptr) -> i32 {
 	return v % n;
 }
 
-int63_max :: proc(n: i64, r: ^Rand = global_rand_ptr) -> i64 {
+int63_max :: proc(n: i64, r: ^Rand = nil) -> i64 {
 	if n <= 0 do panic("Invalid argument to int63_max");
 	if n&(n-1) == 0 {
 		return int63(r) & (n-1);
@@ -85,7 +89,7 @@ int63_max :: proc(n: i64, r: ^Rand = global_rand_ptr) -> i64 {
 	return v % n;
 }
 
-int127_max :: proc(n: i128, r: ^Rand = global_rand_ptr) -> i128 {
+int127_max :: proc(n: i128, r: ^Rand = nil) -> i128 {
 	if n <= 0 do panic("Invalid argument to int63_max");
 	if n&(n-1) == 0 {
 		return int127(r) & (n-1);
@@ -98,7 +102,7 @@ int127_max :: proc(n: i128, r: ^Rand = global_rand_ptr) -> i128 {
 	return v % n;
 }
 
-int_max :: proc(n: int, r: ^Rand = global_rand_ptr) -> int {
+int_max :: proc(n: int, r: ^Rand = nil) -> int {
 	if n <= 0 do panic("Invalid argument to int_max");
 	when size_of(int) == 4 {
 		return int(int31_max(i32(n), r));
@@ -107,14 +111,14 @@ int_max :: proc(n: int, r: ^Rand = global_rand_ptr) -> int {
 	}
 }
 
-float64 :: proc(r: ^Rand = global_rand_ptr) -> f64 { return f64(int63_max(1<<53, r)) / (1 << 53); }
-float32 :: proc(r: ^Rand = global_rand_ptr) -> f32 { return f32(float64(r)); }
+float64 :: proc(r: ^Rand = nil) -> f64 { return f64(int63_max(1<<53, r)) / (1 << 53); }
+float32 :: proc(r: ^Rand = nil) -> f32 { return f32(float64(r)); }
 
-float64_range :: proc(lo, hi: f64, r: ^Rand = global_rand_ptr) -> f64 { return (hi-lo)*float64(r) + lo; }
-float32_range :: proc(lo, hi: f32, r: ^Rand = global_rand_ptr) -> f32 { return (hi-lo)*float32(r) + lo; }
+float64_range :: proc(lo, hi: f64, r: ^Rand = nil) -> f64 { return (hi-lo)*float64(r) + lo; }
+float32_range :: proc(lo, hi: f32, r: ^Rand = nil) -> f32 { return (hi-lo)*float32(r) + lo; }
 
 
-read :: proc(p: []byte, r: ^Rand = global_rand_ptr) -> (n: int) {
+read :: proc(p: []byte, r: ^Rand = nil) -> (n: int) {
 	pos := i8(0);
 	val := i64(0);
 	for n = 0; n < len(p); n += 1 {
@@ -130,10 +134,10 @@ read :: proc(p: []byte, r: ^Rand = global_rand_ptr) -> (n: int) {
 }
 
 // perm returns a slice of n ints in a pseudo-random permutation of integers in the range [0, n)
-perm :: proc(n: int, r: ^Rand = global_rand_ptr) -> []int {
+perm :: proc(n: int, r: ^Rand = nil) -> []int {
 	m := make([]int, n);
 	for i := 0; i < n; i += 1 {
-		j := int_max(i+1);
+		j := int_max(i+1, r);
 		m[i] = m[j];
 		m[j] = i;
 	}
@@ -141,7 +145,7 @@ perm :: proc(n: int, r: ^Rand = global_rand_ptr) -> []int {
 }
 
 
-shuffle :: proc(array: $T/[]$E, r: ^Rand = global_rand_ptr) {
+shuffle :: proc(array: $T/[]$E, r: ^Rand = nil) {
 	n := i64(len(array));
 	if n < 2 do return;
 
