@@ -17,7 +17,7 @@ import "core:math"
 //
 // sample = norm_float64() * std_dev + mean
 //
-norm_float64 :: proc(r: ^Rand = global_rand_ptr) -> f64 {
+norm_float64 :: proc(r: ^Rand = nil) -> f64 {
 	rn :: 3.442619855899;
 
 	@(static)
