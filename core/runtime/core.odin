@@ -1460,8 +1460,6 @@ _fnv64a :: proc "contextless" (data: []byte, seed: u64 = 0xcbf29ce484222325) -> 
 
 
 default_hash :: inline proc "contextless" (data: []byte) -> u64 {
-	context = default_context();
-	os.write_string(os.stdout, "here - default_hash\n");
 	return _fnv64a(data);
 }
 default_hash_string :: inline proc "contextless" (s: string) -> u64 {
