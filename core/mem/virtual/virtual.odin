@@ -36,13 +36,13 @@ enclosing_page :: proc(ptr: rawptr) -> []byte {
 // Gets the page after the one that contains the given pointer as a []byte.
 next_page :: proc(ptr: rawptr) -> []byte {
 	page_ptr := next_page_ptr(ptr);
-	return mem.slice_ptr_to_bytes(ptr, os.get_page_size());
+	return mem.slice_ptr_to_bytes(page_ptr, os.get_page_size());
 }
 
 // Gets the page before the one that contains the given pointer as a []byte.
 previous_page :: proc(ptr: rawptr) -> []byte {
 	page_ptr := previous_page_ptr(ptr);
-	return mem.slice_ptr_to_bytes(ptr, os.get_page_size());
+	return mem.slice_ptr_to_bytes(page_ptr, os.get_page_size());
 }
 
 // Given a number of bytes, returns the number of pages needed to contain it.
@@ -165,7 +165,8 @@ arena_realloc :: proc(va: ^Arena, old_memory: rawptr, old_size, new_size, alignm
 	}
 
 
-	// NOTE(tetra): We were the last allocation; commit the new pages and shift up the cursor.
+	// NOTE(tetra): We were the last allocation; if growing, commit the new pages and shift up the cursor.
+	// Otherwise, we'll just shift the cursor back down.
 
 	new_cursor := va.cursor - old_size + new_size;
 	if new_cursor >= len(va.memory) do return nil;
