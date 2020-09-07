@@ -3593,27 +3593,8 @@ irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 	irValue *v = ir_add_local_generated(proc, t_map_key, true);
 	Type *t = base_type(ir_type(key));
 	key = ir_emit_conv(proc, key, key_type);
-	if (is_type_integer(t)) {
-		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, key, hash_type));
-	} else if (is_type_enum(t)) {
-		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, key, hash_type));
-	} else if (is_type_typeid(t)) {
-		irValue *i = ir_emit_bitcast(proc, key, t_uint);
-		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, i, hash_type));
-	} else if (is_type_pointer(t)) {
-		irValue *p = ir_emit_conv(proc, key, t_uintptr);
-		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, p, hash_type));
-	} else if (is_type_float(t)) {
-		irValue *bits = nullptr;
-		i64 size = type_size_of(t);
-		switch (8*size) {
-		case 32:  bits = ir_emit_transmute(proc, key, t_u32); break;
-		case 64:  bits = ir_emit_transmute(proc, key, t_u64);  break;
-		default: GB_PANIC("Unhandled float size: %lld bits", size); break;
-		}
 
-		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, bits, hash_type));
-	} else if (is_type_string(t)) {
+	if (is_type_string(t)) {
 		irValue *str = ir_emit_conv(proc, key, t_string);
 		irValue *hashed_str = nullptr;
 
@@ -3628,9 +3609,27 @@ irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 			hashed_str = ir_emit_runtime_call(proc, "default_hash_string", args);
 		}
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), hashed_str);
-		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 1), str);
+
+		irValue *key_data = ir_emit_struct_ep(proc, v, 1);
+		key_data = ir_emit_conv(proc, key_data, alloc_type_pointer(key_type));
+		ir_emit_store(proc, key_data, str);
 	} else {
-		GB_PANIC("Unhandled map key type");
+		i64 sz = type_size_of(t);
+		GB_ASSERT(sz <= 8);
+		if (sz != 0) {
+			auto args = array_make<irValue *>(ir_allocator(), 2);
+			args[0] = ir_address_from_load_or_generate_local(proc, key);
+			args[1] = ir_const_int(sz);
+			irValue *hash = ir_emit_runtime_call(proc, "default_hash_ptr", args);
+
+
+			irValue *hash_ptr = ir_emit_struct_ep(proc, v, 0);
+			irValue *key_data = ir_emit_struct_ep(proc, v, 1);
+			key_data = ir_emit_conv(proc, key_data, alloc_type_pointer(key_type));
+
+			ir_emit_store(proc, hash_ptr, hash);
+			ir_emit_store(proc, key_data, key);
+		}
 	}
 
 	return ir_emit_load(proc, v);
@@ -9818,8 +9817,6 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 		break;
 	}
 	case Type_Map: {
-		irValue *key = ir_add_local_generated(proc, expr_type->Map.key, true);
-
 		irValue *entries = ir_map_entries_ptr(proc, expr);
 		irValue *elem = ir_emit_struct_ep(proc, entries, 0);
 		elem = ir_emit_load(proc, elem);
@@ -9827,15 +9824,9 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 		irValue *entry = ir_emit_ptr_offset(proc, elem, idx);
 		val = ir_emit_load(proc, ir_emit_struct_ep(proc, entry, 2));
 
-		irValue *hash = ir_emit_struct_ep(proc, entry, 0);
-		if (is_type_string(expr_type->Map.key)) {
-			irValue *str = ir_emit_struct_ep(proc, hash, 1);
-			ir_emit_store(proc, key, ir_emit_load(proc, str));
-		} else {
-			irValue *hash_ptr = ir_emit_struct_ep(proc, hash, 0);
-			hash_ptr = ir_emit_conv(proc, hash_ptr, ir_type(key));
-			ir_emit_store(proc, key, ir_emit_load(proc, hash_ptr));
-		}
+		irValue *key_raw = ir_emit_struct_ep(proc, entry, 0);
+		key_raw = ir_emit_struct_ep(proc, key_raw, 1);
+		irValue *key = ir_emit_conv(proc, key_raw, alloc_type_pointer(expr_type->Map.key));
 
 		idx = ir_emit_load(proc, key);
 
