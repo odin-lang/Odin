@@ -4566,6 +4566,35 @@ void check_parsed_files(Checker *c) {
 			error(token, "Undefined entry point procedure 'main'");
 		}
 	}
+
+	TIME_SECTION("check unique package names");
+	{
+		StringMap<AstPackage *> pkgs = {}; // Key: package name
+		string_map_init(&pkgs, heap_allocator(), 2*c->info.packages.entries.count);
+		defer (string_map_destroy(&pkgs));
+
+		for_array(i, c->info.packages.entries) {
+			AstPackage *pkg = c->info.packages.entries[i].value;
+			if (pkg->files.count == 0) {
+				continue; // Sanity check
+			}
+
+			String name = pkg->name;
+			auto key = string_hash_string(name);
+			auto *found = string_map_get(&pkgs, key);
+			if (found == nullptr) {
+				string_map_set(&pkgs, key, pkg);
+				continue;
+			}
+
+			error(pkg->files[0]->pkg_decl, "Duplicate declaration of 'package %.*s'", LIT(name));
+			error_line("\tA package name must be unique\n"
+			           "\tThere is no relation between a package name and the directory that contains it, so they can be completely different\n"
+			           "\tA package name is required for link name prefixing to have a consistent ABI\n");
+			error((*found)->files[0]->pkg_decl, "found at previous location");
+		}
+	}
+
 	TIME_SECTION("type check finish");
 
 #undef TIME_SECTION
