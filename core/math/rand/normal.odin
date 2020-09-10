@@ -116,6 +116,12 @@ norm_float64 :: proc(r: ^Rand = nil) -> f64 {
 		0.008624485, 0.005548995, 0.0026696292,
 	};
 
+	r := r;
+	if r == nil {
+		// NOTE(bill, 2020-09-07): Do this so that people can
+		// enforce the global random state if necessary with `nil`
+		r = &global_rand;
+	}
 
 	for {
 		j := i32(uint32(r));
