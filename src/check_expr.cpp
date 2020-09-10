@@ -7655,7 +7655,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 
 	{
 		if (c->curr_proc_calling_convention == ProcCC_Pure) {
-			if (pt->kind == Type_Proc && pt->Proc.calling_convention != ProcCC_Pure) {
+			if (pt->kind == Type_Proc && pt->Proc.calling_convention != ProcCC_Pure && pt->Proc.calling_convention != ProcCC_PureNone) {
 				error(call, "Only \"pure\" procedure calls are allowed within a \"pure\" procedure");
 			}
 		}

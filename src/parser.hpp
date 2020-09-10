@@ -178,14 +178,15 @@ enum ProcTag {
 
 enum ProcCallingConvention {
 	ProcCC_Invalid = 0,
-	ProcCC_Odin,
-	ProcCC_Contextless,
-	ProcCC_Pure,
-	ProcCC_CDecl,
-	ProcCC_StdCall,
-	ProcCC_FastCall,
+	ProcCC_Odin = 1,
+	ProcCC_Contextless = 2,
+	ProcCC_Pure = 3,
+	ProcCC_CDecl = 4,
+	ProcCC_StdCall = 5,
+	ProcCC_FastCall = 6,
 
-	ProcCC_None,
+	ProcCC_None = 7,
+	ProcCC_PureNone = 8,
 
 	ProcCC_MAX,
 

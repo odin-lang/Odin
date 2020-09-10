@@ -5,9 +5,36 @@ import "intrinsics"
 
 // Generic
 
+TAU          :: 6.28318530717958647692528676655900576;
+PI           :: 3.14159265358979323846264338327950288;
+
+E            :: 2.71828182845904523536;
+
+τ :: TAU;
+π :: PI;
+e :: E;
+
+SQRT_TWO     :: 1.41421356237309504880168872420969808;
+SQRT_THREE   :: 1.73205080756887729352744634150587236;
+SQRT_FIVE    :: 2.23606797749978969640917366873127623;
+
+LN2          :: 0.693147180559945309417232121458176568;
+LN10         :: 2.30258509299404568401799145468436421;
+
+MAX_F64_PRECISION :: 16; // Maximum number of meaningful digits after the decimal point for 'f64'
+MAX_F32_PRECISION ::  8; // Maximum number of meaningful digits after the decimal point for 'f32'
+
+RAD_PER_DEG :: TAU/360.0;
+DEG_PER_RAD :: 360.0/TAU;
+
+
+
 @private IS_NUMERIC :: intrinsics.type_is_numeric;
 @private IS_QUATERNION :: intrinsics.type_is_quaternion;
 @private IS_ARRAY :: intrinsics.type_is_array;
+@private IS_FLOAT :: intrinsics.type_is_float;
+@private BASE_TYPE :: intrinsics.type_base_type;
+@private ELEM_TYPE :: intrinsics.type_elem_type;
 
 
 vector_dot :: proc(a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) {
@@ -41,8 +68,16 @@ vector_cross3 :: proc(a, b: $T/[3]$E) -> (c: T) where IS_NUMERIC(E) {
 	return;
 }
 
+quaternion_cross :: proc(q1, q2: $Q) -> (q3: Q) where IS_QUATERNION(Q) {
+	q3.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
+	q3.y = q1.w * q2.y + q1.y * q2.w + q1.z * q2.x - q1.x * q2.z;
+	q3.z = q1.w * q2.z + q1.z * q2.w + q1.x * q2.y - q1.y * q2.x;
+	q3.w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z;
+	return;
+}
+
 vector_cross :: proc{vector_cross2, vector_cross3};
-cross :: vector_cross;
+cross :: proc{vector_cross2, vector_cross3, quaternion_cross};
 
 vector_normalize :: proc(v: $T/[$N]$E) -> T where IS_NUMERIC(E) {
 	return v / length(v);
@@ -83,225 +118,6 @@ length :: proc{vector_length, quaternion_length};
 length2 :: proc{vector_length2, quaternion_length2};
 
 
-vector_lerp :: proc(x, y, t: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		ti := t[i];
-		s[i] = x[i]*(1-ti) + y[i]*ti;
-	}
-	return s;
-}
-
-vector_unlerp :: proc(a, b, x: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		ai := a[i];
-		s[i] = (x[i]-ai)/(b[i]-ai);
-	}
-	return s;
-}
-
-vector_sin :: proc(angle: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.sin(angle[i]);
-	}
-	return s;
-}
-
-vector_cos :: proc(angle: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.cos(angle[i]);
-	}
-	return s;
-}
-
-vector_tan :: proc(angle: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.tan(angle[i]);
-	}
-	return s;
-}
-
-
-vector_asin :: proc(x: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.asin(x[i]);
-	}
-	return s;
-}
-
-vector_acos :: proc(x: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.acos(x[i]);
-	}
-	return s;
-}
-
-vector_atan :: proc(x: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.atan(x[i]);
-	}
-	return s;
-}
-
-vector_atan2 :: proc(y, x: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.atan(y[i], x[i]);
-	}
-	return s;
-}
-
-vector_pow :: proc(x, y: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.pow(x[i], y[i]);
-	}
-	return s;
-}
-
-vector_expr :: proc(x: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.expr(x[i]);
-	}
-	return s;
-}
-
-vector_sqrt :: proc(x: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.sqrt(x[i]);
-	}
-	return s;
-}
-
-vector_abs :: proc(x: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = abs(x[i]);
-	}
-	return s;
-}
-
-vector_sign :: proc(v: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.sign(v[i]);
-	}
-	return s;
-}
-
-vector_floor :: proc(v: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.floor(v[i]);
-	}
-	return s;
-}
-
-vector_ceil :: proc(v: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.ceil(v[i]);
-	}
-	return s;
-}
-
-
-vector_mod :: proc(x, y: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = math.mod(x[i], y[i]);
-	}
-	return s;
-}
-
-vector_min :: proc(a, b: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = min(a[i], b[i]);
-	}
-	return s;
-}
-
-vector_max :: proc(a, b: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = max(a[i], b[i]);
-	}
-	return s;
-}
-
-vector_clamp :: proc(x, a, b: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = clamp(x[i], a[i], b[i]);
-	}
-	return s;
-}
-
-vector_mix :: proc(x, y, a: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = x[i]*(1-a[i]) + y[i]*a[i];
-	}
-	return s;
-}
-
-vector_step :: proc(edge, x: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		s[i] = 0 if x[i] < edge[i] else 1;
-	}
-	return s;
-}
-
-vector_smoothstep :: proc(edge0, edge1, x: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		e0, e1 := edge0[i], edge1[i];
-		t := clamp((x[i] - e0) / (e1 - e0), 0, 1);
-		s[i] = t * t * (3 - 2*t);
-	}
-	return s;
-}
-
-vector_smootherstep :: proc(edge0, edge1, x: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	s: V;
-	for i in 0..<N {
-		e0, e1 := edge0[i], edge1[i];
-		t := clamp((x[i] - e0) / (e1 - e0), 0, 1);
-		s[i] = t * t * t * (t * (6*t - 15) + 10);
-	}
-	return s;
-}
-
-vector_distance :: proc(p0, p1: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	return length(p1 - p0);
-}
-
-vector_reflect :: proc(i, n: $V/[$N]$E) -> V where IS_NUMERIC(E) {
-	b := n * (2 * dot(n, i));
-	return i - b;
-}
-
-vector_refract :: proc(i, n: $V/[$N]$E, eta: E) -> V where IS_NUMERIC(E) {
-	dv := dot(n, i);
-	k := 1 - eta*eta - (1 - dv*dv);
-	a := i * eta;
-	b := n * eta*dv*math.sqrt(k);
-	return (a - b) * E(int(k >= 0));
-}
-
-
-
 identity :: proc($T: typeid/[$N][N]$E) -> (m: T) {
 	for i in 0..<N do m[i][i] = E(1);
 	return m;
@@ -337,6 +153,17 @@ matrix_mul :: proc(a, b: $M/[$N][N]$E) -> (c: M)
 	return;
 }
 
+matrix_comp_mul :: proc(a, b: $M/[$J][$I]$E) -> (c: M)
+	where !IS_ARRAY(E),
+	     IS_NUMERIC(E) {
+	for j in 0..<J {
+		for i in 0..<I {
+			c[j][i] = a[j][i] * b[j][i];
+		}
+	}
+	return;
+}
+
 matrix_mul_differ :: proc(a: $A/[$J][$I]$E, b: $B/[$K][J]E) -> (c: [K][I]E)
 	where !IS_ARRAY(E),
 		  IS_NUMERIC(E),
@@ -363,6 +190,9 @@ matrix_mul_vector :: proc(a: $A/[$I][$J]$E, b: $B/[I]E) -> (c: B)
 	return;
 }
 
+quaternion_mul_quaternion :: proc(q1, q2: $Q) -> Q where IS_QUATERNION(Q) {
+	return q1 * q2;
+}
 quaternion128_mul_vector3 :: proc(q: $Q/quaternion128, v: $V/[3]$F/f32) -> V {
 	Raw_Quaternion :: struct {xyz: [3]f32, r: f32};
 
@@ -390,6 +220,7 @@ mul :: proc{
 	matrix_mul_vector,
 	quaternion128_mul_vector3,
 	quaternion256_mul_vector3,
+	quaternion_mul_quaternion,
 };
 
 vector_to_ptr :: proc(v: ^$V/[$N]$E) -> ^E where IS_NUMERIC(E), N > 0 #no_bounds_check {
@@ -398,4 +229,8 @@ vector_to_ptr :: proc(v: ^$V/[$N]$E) -> ^E where IS_NUMERIC(E), N > 0 #no_bounds
 matrix_to_ptr :: proc(m: ^$A/[$I][$J]$E) -> ^E where IS_NUMERIC(E), I > 0, J > 0 #no_bounds_check {
 	return &m[0][0];
 }
+
+to_ptr :: proc{vector_to_ptr, matrix_to_ptr};
+
+
 

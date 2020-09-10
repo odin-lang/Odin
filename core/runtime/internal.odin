@@ -2,31 +2,31 @@ package runtime
 
 import "core:os"
 
-bswap_16 :: proc "none" (x: u16) -> u16 {
+bswap_16 :: proc "pure" (x: u16) -> u16 {
 	return x>>8 | x<<8;
 }
 
-bswap_32 :: proc "none" (x: u32) -> u32 {
+bswap_32 :: proc "pure" (x: u32) -> u32 {
 	return x>>24 | (x>>8)&0xff00 | (x<<8)&0xff0000 | x<<24;
 }
 
-bswap_64 :: proc "none" (x: u64) -> u64 {
+bswap_64 :: proc "pure" (x: u64) -> u64 {
 	return u64(bswap_32(u32(x))) | u64(bswap_32(u32(x>>32)));
 }
 
-bswap_128 :: proc "none" (x: u128) -> u128 {
+bswap_128 :: proc "pure" (x: u128) -> u128 {
 	return u128(bswap_64(u64(x))) | u128(bswap_64(u64(x>>64)));
 }
 
 
-bswap_f32 :: proc "none" (f: f32) -> f32 {
+bswap_f32 :: proc "pure" (f: f32) -> f32 {
 	x := transmute(u32)f;
 	z := x>>24 | (x>>8)&0xff00 | (x<<8)&0xff0000 | x<<24;
 	return transmute(f32)z;
 
 }
 
-bswap_f64 :: proc "none" (f: f64) -> f64 {
+bswap_f64 :: proc "pure" (f: f64) -> f64 {
 	x := transmute(u64)f;
 	z := u64(bswap_32(u32(x))) | u64(bswap_32(u32(x>>32)));
 	return transmute(f64)z;

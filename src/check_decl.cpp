@@ -1197,6 +1197,15 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 	ctx->curr_proc_sig  = type;
 	ctx->curr_proc_calling_convention = type->Proc.calling_convention;
 
+	switch (type->Proc.calling_convention) {
+	case ProcCC_None:
+		error(body, "Procedures with the calling convention \"none\" are not allowed a body");
+		break;
+	case ProcCC_PureNone:
+		error(body, "Procedures with the calling convention \"pure_none\" are not allowed a body");
+		break;
+	}
+
 	ast_node(bs, BlockStmt, body);
 
 	Array<ProcUsingVar> using_entities = {};
