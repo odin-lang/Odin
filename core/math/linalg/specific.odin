@@ -297,121 +297,61 @@ quaternion_squad :: proc(q1, q2, s1, s2: Quaternion, h: Float) -> Quaternion {
 
 
 quaternion_from_matrix4 :: proc(m: Matrix4) -> (q: Quaternion) {
-	four_x_squared_minus_1, four_y_squared_minus_1,
-	four_z_squared_minus_1, four_w_squared_minus_1,
-	four_biggest_squared_minus_1: Float;
-
-	/* xyzw */
-	/* 0123 */
-	biggest_index := 3;
-	biggest_value, mult: Float;
-
-	four_x_squared_minus_1 = m[0][0] - m[1][1] - m[2][2];
-	four_y_squared_minus_1 = m[1][1] - m[0][0] - m[2][2];
-	four_z_squared_minus_1 = m[2][2] - m[0][0] - m[1][1];
-	four_w_squared_minus_1 = m[0][0] + m[1][1] + m[2][2];
-
-	four_biggest_squared_minus_1 = four_w_squared_minus_1;
-	if four_x_squared_minus_1 > four_biggest_squared_minus_1 {
-		four_biggest_squared_minus_1 = four_x_squared_minus_1;
-		biggest_index = 0;
-	}
-	if four_y_squared_minus_1 > four_biggest_squared_minus_1 {
-		four_biggest_squared_minus_1 = four_y_squared_minus_1;
-		biggest_index = 1;
-	}
-	if four_z_squared_minus_1 > four_biggest_squared_minus_1 {
-		four_biggest_squared_minus_1 = four_z_squared_minus_1;
-		biggest_index = 2;
-	}
-
-	biggest_value = math.sqrt(four_biggest_squared_minus_1 + 1) * 0.5;
-	mult = 0.25 / biggest_value;
-
-
-	switch biggest_index {
-	case 0:
-		q.w = biggest_value;
-		q.x = (m[0][1] + m[1][0]) * mult;
-		q.y = (m[2][0] + m[0][2]) * mult;
-		q.z = (m[1][2] - m[2][1]) * mult;
-	case 1:
-		q.w = (m[0][1] + m[1][0]) * mult;
-		q.x = biggest_value;
-		q.y = (m[1][2] + m[2][1]) * mult;
-		q.z = (m[2][0] - m[0][2]) * mult;
-	case 2:
-		q.w = (m[2][0] + m[0][2]) * mult;
-		q.x = (m[1][2] + m[2][1]) * mult;
-		q.y = biggest_value;
-		q.z = (m[0][1] - m[1][0]) * mult;
-	case 3:
-		q.w = (m[1][2] - m[2][1]) * mult;
-		q.x = (m[2][0] - m[0][2]) * mult;
-		q.y = (m[0][1] - m[1][0]) * mult;
-		q.z = biggest_value;
-	}
-
-	return;
+	m3: Matrix3 = ---;
+	m3[0][0], m3[0][1], m3[0][2] = m[0][0], m[0][1], m[0][2];
+	m3[1][0], m3[1][1], m3[1][2] = m[1][0], m[1][1], m[1][2];
+	m3[2][0], m3[2][1], m3[2][2] = m[2][0], m[2][1], m[2][2];
+	return quaternion_from_matrix3(m3);
 }
 
 
 quaternion_from_matrix3 :: proc(m: Matrix3) -> (q: Quaternion) {
-	four_x_squared_minus_1, four_y_squared_minus_1,
-	four_z_squared_minus_1, four_w_squared_minus_1,
-	four_biggest_squared_minus_1: Float;
+	four_x_squared_minus_1 := m[0][0] - m[1][1] - m[2][2];
+	four_y_squared_minus_1 := m[1][1] - m[0][0] - m[2][2];
+	four_z_squared_minus_1 := m[2][2] - m[0][0] - m[1][1];
+	four_w_squared_minus_1 := m[0][0] + m[1][1] + m[2][2];
 
-	/* xyzw */
-	/* 0123 */
-	biggest_index := 3;
-	biggest_value, mult: Float;
-
-	four_x_squared_minus_1 = m[0][0] - m[1][1] - m[2][2];
-	four_y_squared_minus_1 = m[1][1] - m[0][0] - m[2][2];
-	four_z_squared_minus_1 = m[2][2] - m[0][0] - m[1][1];
-	four_w_squared_minus_1 = m[0][0] + m[1][1] + m[2][2];
-
-	four_biggest_squared_minus_1 = four_w_squared_minus_1;
+	biggest_index := 0;
+	four_biggest_squared_minus_1 := four_w_squared_minus_1;
 	if four_x_squared_minus_1 > four_biggest_squared_minus_1 {
 		four_biggest_squared_minus_1 = four_x_squared_minus_1;
-		biggest_index = 0;
+		biggest_index = 1;
 	}
 	if four_y_squared_minus_1 > four_biggest_squared_minus_1 {
 		four_biggest_squared_minus_1 = four_y_squared_minus_1;
-		biggest_index = 1;
+		biggest_index = 2;
 	}
 	if four_z_squared_minus_1 > four_biggest_squared_minus_1 {
 		four_biggest_squared_minus_1 = four_z_squared_minus_1;
-		biggest_index = 2;
+		biggest_index = 3;
 	}
 
-	biggest_value = math.sqrt(four_biggest_squared_minus_1 + 1) * 0.5;
-	mult = 0.25 / biggest_value;
+	biggest_val := math.sqrt(four_biggest_squared_minus_1 + 1) * 0.5;
+	mult := 0.25 / biggest_val;
 
-
+	q = 1;
 	switch biggest_index {
 	case 0:
-		q.w = biggest_value;
-		q.x = (m[0][1] + m[1][0]) * mult;
-		q.y = (m[2][0] + m[0][2]) * mult;
-		q.z = (m[1][2] - m[2][1]) * mult;
-	case 1:
-		q.w = (m[0][1] + m[1][0]) * mult;
-		q.x = biggest_value;
-		q.y = (m[1][2] + m[2][1]) * mult;
-		q.z = (m[2][0] - m[0][2]) * mult;
-	case 2:
-		q.w = (m[2][0] + m[0][2]) * mult;
-		q.x = (m[1][2] + m[2][1]) * mult;
-		q.y = biggest_value;
+		q.w = biggest_val;
+		q.x = (m[1][2] - m[2][1]) * mult;
+		q.y = (m[2][0] - m[0][2]) * mult;
 		q.z = (m[0][1] - m[1][0]) * mult;
-	case 3:
+	case 1:
 		q.w = (m[1][2] - m[2][1]) * mult;
-		q.x = (m[2][0] - m[0][2]) * mult;
-		q.y = (m[0][1] - m[1][0]) * mult;
-		q.z = biggest_value;
+		q.x = biggest_val;
+		q.y = (m[0][1] + m[1][0]) * mult;
+		q.z = (m[2][0] + m[0][2]) * mult;
+	case 2:
+		q.w = (m[2][0] - m[0][2]) * mult;
+		q.x = (m[0][1] + m[1][0]) * mult;
+		q.y = biggest_val;
+		q.z = (m[1][2] + m[2][1]) * mult;
+	case 3:
+		q.w = (m[0][1] - m[1][0]) * mult;
+		q.x = (m[2][0] + m[0][2]) * mult;
+		q.y = (m[1][2] + m[2][1]) * mult;
+		q.z = biggest_val;
 	}
-
 	return;
 }
 
@@ -470,28 +410,27 @@ matrix2_adjoint :: proc(m: Matrix2) -> (c: Matrix2) {
 
 
 matrix3_from_quaternion :: proc(q: Quaternion) -> (m: Matrix3) {
-	xx := q.x * q.x;
-	xy := q.x * q.y;
-	xz := q.x * q.z;
-	xw := q.x * q.w;
-	yy := q.y * q.y;
-	yz := q.y * q.z;
-	yw := q.y * q.w;
-	zz := q.z * q.z;
-	zw := q.z * q.w;
+	qxx := q.x * q.x;
+	qyy := q.y * q.y;
+	qzz := q.z * q.z;
+	qxz := q.x * q.z;
+	qxy := q.x * q.y;
+	qyz := q.y * q.z;
+	qwx := q.w * q.x;
+	qwy := q.w * q.y;
+	qwz := q.w * q.z;
 
-	m[0][0] = 1 - 2 * (yy + zz);
-	m[1][0] = 2 * (xy - zw);
-	m[2][0] = 2 * (xz + yw);
+	m[0][0] = 1 - 2 * (qyy + qzz);
+	m[0][1] = 2 * (qxy + qwz);
+	m[0][2] = 2 * (qxz - qwy);
 
-	m[0][1] = 2 * (xy + zw);
-	m[1][1] = 1 - 2 * (xx + zz);
-	m[2][1] = 2 * (yz - xw);
+	m[1][0] = 2 * (qxy - qwz);
+	m[1][1] = 1 - 2 * (qxx + qzz);
+	m[1][2] = 2 * (qyz + qwx);
 
-	m[0][2] = 2 * (xz - yw);
-	m[1][2] = 2 * (yz + xw);
-	m[2][2] = 1 - 2 * (xx + yy);
-
+	m[2][0] = 2 * (qxz + qwy);
+	m[2][1] = 2 * (qyz - qwx);
+	m[2][2] = 1 - 2 * (qxx + qyy);
 	return m;
 }
 
@@ -578,29 +517,29 @@ matrix3_look_at :: proc(eye, centre, up: Vector3) -> Matrix3 {
 }
 
 matrix4_from_quaternion :: proc(q: Quaternion) -> (m: Matrix4) {
-	xx := q.x * q.x;
-	xy := q.x * q.y;
-	xz := q.x * q.z;
-	xw := q.x * q.w;
-	yy := q.y * q.y;
-	yz := q.y * q.z;
-	yw := q.y * q.w;
-	zz := q.z * q.z;
-	zw := q.z * q.w;
+	qxx := q.x * q.x;
+	qyy := q.y * q.y;
+	qzz := q.z * q.z;
+	qxz := q.x * q.z;
+	qxy := q.x * q.y;
+	qyz := q.y * q.z;
+	qwx := q.w * q.x;
+	qwy := q.w * q.y;
+	qwz := q.w * q.z;
 
-	m = MATRIX4_IDENTITY;
+	m[0][0] = 1 - 2 * (qyy + qzz);
+	m[0][1] = 2 * (qxy + qwz);
+	m[0][2] = 2 * (qxz - qwy);
 
-	m[0][0] = 1 - 2 * (yy + zz);
-	m[1][0] = 2 * (xy - zw);
-	m[2][0] = 2 * (xz + yw);
+	m[1][0] = 2 * (qxy - qwz);
+	m[1][1] = 1 - 2 * (qxx + qzz);
+	m[1][2] = 2 * (qyz + qwx);
 
-	m[0][1] = 2 * (xy + zw);
-	m[1][1] = 1 - 2 * (xx + zz);
-	m[2][1] = 2 * (yz - xw);
+	m[2][0] = 2 * (qxz + qwy);
+	m[2][1] = 2 * (qyz - qwx);
+	m[2][2] = 1 - 2 * (qxx + qyy);
 
-	m[0][2] = 2 * (xz - yw);
-	m[1][2] = 2 * (yz + xw);
-	m[2][2] = 1 - 2 * (xx + yy);
+	m[3][3] = 1;
 
 	return m;
 }
