@@ -204,49 +204,6 @@ angle_axis_from_quaternion :: proc(q: Quaternion) -> (angle: Float, axis: Vector
 	return;
 }
 
-
-quaternion_from_euler_angles :: proc(pitch, yaw, roll: Float) -> Quaternion {
-	a, b, c := pitch, yaw, roll;
-
-	ca, sa := math.cos(a*0.5), math.sin(a*0.5);
-	cb, sb := math.cos(b*0.5), math.sin(b*0.5);
-	cc, sc := math.cos(c*0.5), math.sin(c*0.5);
-
-	q: Quaternion;
-	q.x = sa*cb*cc - ca*sb*sc;
-	q.y = ca*sb*cc + sa*cb*sc;
-	q.z = ca*cb*sc - sa*sb*cc;
-	q.w = ca*cb*cc + sa*sb*sc;
-	return q;
-}
-
-roll_from_quaternion :: proc(q: Quaternion) -> Float {
-	return math.atan2(2 * q.x*q.y + q.w*q.z, q.w*q.w + q.x*q.x - q.y*q.y - q.z*q.z);
-}
-
-pitch_from_quaternion :: proc(q: Quaternion) -> Float {
-	y := 2 * (q.y*q.z + q.w*q.w);
-	x := q.w*q.w - q.x*q.x - q.y*q.y + q.z*q.z;
-
-	if abs(x) <= FLOAT_EPSILON && abs(y) <= FLOAT_EPSILON {
-		return 2 * math.atan2(q.x, q.w);
-	}
-
-	return math.atan2(y, x);
-}
-
-yaw_from_quaternion :: proc(q: Quaternion) -> Float {
-	return math.asin(clamp(-2 * (q.x*q.z - q.w*q.y), -1, 1));
-}
-
-
-euler_angles_from_quaternion :: proc(q: Quaternion) -> (pitch, yaw, roll: Float) {
-	pitch = pitch_from_quaternion(q);
-	yaw = yaw_from_quaternion(q);
-	roll = roll_from_quaternion(q);
-	return;
-}
-
 quaternion_from_forward_and_up :: proc(forward, up: Vector3) -> Quaternion {
 	f := normalize(forward);
 	s := normalize(cross(f, up));
@@ -620,9 +577,7 @@ matrix3_look_at :: proc(eye, centre, up: Vector3) -> Matrix3 {
 	};
 }
 
-matrix4_from_quaternion :: proc(q: Quaternion) -> Matrix4 {
-	m := MATRIX4_IDENTITY;
-
+matrix4_from_quaternion :: proc(q: Quaternion) -> (m: Matrix4) {
 	xx := q.x * q.x;
 	xy := q.x * q.y;
 	xz := q.x * q.z;
@@ -632,6 +587,8 @@ matrix4_from_quaternion :: proc(q: Quaternion) -> Matrix4 {
 	yw := q.y * q.w;
 	zz := q.z * q.z;
 	zw := q.z * q.w;
+
+	m = MATRIX4_IDENTITY;
 
 	m[0][0] = 1 - 2 * (yy + zz);
 	m[1][0] = 2 * (xy - zw);
