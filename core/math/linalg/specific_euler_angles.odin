@@ -3,51 +3,54 @@ package linalg
 import "core:math"
 
 Euler_Angle_Order :: enum {
+	// Tait-Bryan
 	XYZ,
+	XZY,
 	YXZ,
-	XZX,
+	YZX,
+	ZXY,
+	ZYX,
+
+	// Proper Euler
 	XYX,
+	XZX,
 	YXY,
 	YZY,
-	ZYZ,
 	ZXZ,
-	XZY,
-	YZX,
-	ZYX,
-	ZXY,
+	ZYZ,
 }
 
 euler_angles_from_matrix4 :: proc(m: Matrix4, order: Euler_Angle_Order) -> (t1, t2, t3: Float) {
 	switch order {
 	case .XYZ: t1, t2, t3 = euler_angles_xyz_from_matrix4(m);
+	case .XZY: t1, t2, t3 = euler_angles_xzy_from_matrix4(m);
 	case .YXZ: t1, t2, t3 = euler_angles_yxz_from_matrix4(m);
-	case .XZX: t1, t2, t3 = euler_angles_xzx_from_matrix4(m);
+	case .YZX: t1, t2, t3 = euler_angles_yzx_from_matrix4(m);
+	case .ZXY: t1, t2, t3 = euler_angles_zxy_from_matrix4(m);
+	case .ZYX: t1, t2, t3 = euler_angles_zyx_from_matrix4(m);
 	case .XYX: t1, t2, t3 = euler_angles_xyx_from_matrix4(m);
+	case .XZX: t1, t2, t3 = euler_angles_xzx_from_matrix4(m);
 	case .YXY: t1, t2, t3 = euler_angles_yxy_from_matrix4(m);
 	case .YZY: t1, t2, t3 = euler_angles_yzy_from_matrix4(m);
-	case .ZYZ: t1, t2, t3 = euler_angles_zyz_from_matrix4(m);
 	case .ZXZ: t1, t2, t3 = euler_angles_zxz_from_matrix4(m);
-	case .XZY: t1, t2, t3 = euler_angles_xzy_from_matrix4(m);
-	case .YZX: t1, t2, t3 = euler_angles_yzx_from_matrix4(m);
-	case .ZYX: t1, t2, t3 = euler_angles_zyx_from_matrix4(m);
-	case .ZXY: t1, t2, t3 = euler_angles_zxy_from_matrix4(m);
+	case .ZYZ: t1, t2, t3 = euler_angles_zyz_from_matrix4(m);
 	}
 	return;
 }
 euler_angles_from_quaternion :: proc(m: Quaternion, order: Euler_Angle_Order) -> (t1, t2, t3: Float) {
 	switch order {
 	case .XYZ: t1, t2, t3 = euler_angles_xyz_from_quaternion(m);
+	case .XZY: t1, t2, t3 = euler_angles_xzy_from_quaternion(m);
 	case .YXZ: t1, t2, t3 = euler_angles_yxz_from_quaternion(m);
-	case .XZX: t1, t2, t3 = euler_angles_xzx_from_quaternion(m);
+	case .YZX: t1, t2, t3 = euler_angles_yzx_from_quaternion(m);
+	case .ZXY: t1, t2, t3 = euler_angles_zxy_from_quaternion(m);
+	case .ZYX: t1, t2, t3 = euler_angles_zyx_from_quaternion(m);
 	case .XYX: t1, t2, t3 = euler_angles_xyx_from_quaternion(m);
+	case .XZX: t1, t2, t3 = euler_angles_xzx_from_quaternion(m);
 	case .YXY: t1, t2, t3 = euler_angles_yxy_from_quaternion(m);
 	case .YZY: t1, t2, t3 = euler_angles_yzy_from_quaternion(m);
-	case .ZYZ: t1, t2, t3 = euler_angles_zyz_from_quaternion(m);
 	case .ZXZ: t1, t2, t3 = euler_angles_zxz_from_quaternion(m);
-	case .XZY: t1, t2, t3 = euler_angles_xzy_from_quaternion(m);
-	case .YZX: t1, t2, t3 = euler_angles_yzx_from_quaternion(m);
-	case .ZYX: t1, t2, t3 = euler_angles_zyx_from_quaternion(m);
-	case .ZXY: t1, t2, t3 = euler_angles_zxy_from_quaternion(m);
+	case .ZYZ: t1, t2, t3 = euler_angles_zyz_from_quaternion(m);
 	}
 	return;
 }
@@ -61,17 +64,17 @@ matrix4_from_euler_angles :: proc(t1, t2, t3: Float, order: Euler_Angle_Order) -
 
 	switch order {
 	case .XYZ: m1, m2, m3 = X(t1), Y(t2), Z(t3);
+	case .XZY: m1, m2, m3 = X(t1), Z(t2), Y(t3);
 	case .YXZ: m1, m2, m3 = Y(t1), X(t2), Z(t3);
-	case .XZX: m1, m2, m3 = X(t1), Z(t2), X(t3);
+	case .YZX: m1, m2, m3 = Y(t1), Z(t2), X(t3);
+	case .ZXY: m1, m2, m3 = Z(t1), X(t2), Y(t3);
+	case .ZYX: m1, m2, m3 = Z(t1), Y(t2), X(t3);
 	case .XYX: m1, m2, m3 = X(t1), Y(t2), X(t3);
+	case .XZX: m1, m2, m3 = X(t1), Z(t2), X(t3);
 	case .YXY: m1, m2, m3 = Y(t1), X(t2), Y(t3);
 	case .YZY: m1, m2, m3 = Y(t1), Z(t2), Y(t3);
-	case .ZYZ: m1, m2, m3 = Z(t1), Y(t2), Z(t3);
 	case .ZXZ: m1, m2, m3 = Z(t1), X(t2), Z(t3);
-	case .XZY: m1, m2, m3 = X(t1), Z(t2), Y(t3);
-	case .YZX: m1, m2, m3 = Y(t1), Z(t2), X(t3);
-	case .ZYX: m1, m2, m3 = Z(t1), Y(t2), X(t3);
-	case .ZXY: m1, m2, m3 = Z(t1), X(t2), Y(t3);
+	case .ZYZ: m1, m2, m3 = Z(t1), Y(t2), Z(t3);
 	}
 
 	return mul(m1, mul(m2, m3));
@@ -82,24 +85,24 @@ quaternion_from_euler_angles :: proc(t1, t2, t3: Float, order: Euler_Angle_Order
 	Y :: quaternion_from_euler_angle_y;
 	Z :: quaternion_from_euler_angle_z;
 
-	m1, m2, m3: Quaternion;
+	q1, q2, q3: Quaternion;
 
 	switch order {
-	case .XYZ: m1, m2, m3 = X(t1), Y(t2), Z(t3);
-	case .YXZ: m1, m2, m3 = Y(t1), X(t2), Z(t3);
-	case .XZX: m1, m2, m3 = X(t1), Z(t2), X(t3);
-	case .XYX: m1, m2, m3 = X(t1), Y(t2), X(t3);
-	case .YXY: m1, m2, m3 = Y(t1), X(t2), Y(t3);
-	case .YZY: m1, m2, m3 = Y(t1), Z(t2), Y(t3);
-	case .ZYZ: m1, m2, m3 = Z(t1), Y(t2), Z(t3);
-	case .ZXZ: m1, m2, m3 = Z(t1), X(t2), Z(t3);
-	case .XZY: m1, m2, m3 = X(t1), Z(t2), Y(t3);
-	case .YZX: m1, m2, m3 = Y(t1), Z(t2), X(t3);
-	case .ZYX: m1, m2, m3 = Z(t1), Y(t2), X(t3);
-	case .ZXY: m1, m2, m3 = Z(t1), X(t2), Y(t3);
+	case .XYZ: q1, q2, q3 = X(t1), Y(t2), Z(t3);
+	case .XZY: q1, q2, q3 = X(t1), Z(t2), Y(t3);
+	case .YXZ: q1, q2, q3 = Y(t1), X(t2), Z(t3);
+	case .YZX: q1, q2, q3 = Y(t1), Z(t2), X(t3);
+	case .ZXY: q1, q2, q3 = Z(t1), X(t2), Y(t3);
+	case .ZYX: q1, q2, q3 = Z(t1), Y(t2), X(t3);
+	case .XYX: q1, q2, q3 = X(t1), Y(t2), X(t3);
+	case .XZX: q1, q2, q3 = X(t1), Z(t2), X(t3);
+	case .YXY: q1, q2, q3 = Y(t1), X(t2), Y(t3);
+	case .YZY: q1, q2, q3 = Y(t1), Z(t2), Y(t3);
+	case .ZXZ: q1, q2, q3 = Z(t1), X(t2), Z(t3);
+	case .ZYZ: q1, q2, q3 = Z(t1), Y(t2), Z(t3);
 	}
 
-	return m1 * (m2 * m3);
+	return q1 * (q2 * q3);
 }
 
 
