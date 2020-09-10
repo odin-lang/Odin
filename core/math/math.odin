@@ -36,7 +36,7 @@ RAD_PER_DEG :: TAU/360.0;
 DEG_PER_RAD :: 360.0/TAU;
 
 
-@(default_calling_convention="none")
+@(default_calling_convention="pure_none")
 foreign _ {
 	@(link_name="llvm.sqrt.f32")
 	sqrt_f32 :: proc(x: f32) -> f32 ---;
@@ -103,11 +103,12 @@ log10_f64 :: proc(x: f64) -> f64 { return ln(x)/LN10; }
 log10     :: proc{log10_f32, log10_f64};
 
 
-tan_f32 :: proc "c" (θ: f32) -> f32 { return sin(θ)/cos(θ); }
-tan_f64 :: proc "c" (θ: f64) -> f64 { return sin(θ)/cos(θ); }
+tan_f32 :: proc(θ: f32) -> f32 { return sin(θ)/cos(θ); }
+tan_f64 :: proc(θ: f64) -> f64 { return sin(θ)/cos(θ); }
 tan     :: proc{tan_f32, tan_f64};
 
 lerp :: proc(a, b: $T, t: $E) -> (x: T) { return a*(1-t) + b*t; }
+saturate :: proc(a: $T) -> (x: T) { return clamp(a, 0, 1); };
 
 unlerp_f32 :: proc(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
 unlerp_f64 :: proc(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }

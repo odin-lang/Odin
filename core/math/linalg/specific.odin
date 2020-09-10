@@ -5,7 +5,7 @@ import "core:math"
 
 // Specific
 
-Float :: f32;
+Float :: f64 when #config(ODIN_MATH_LINALG_USE_F64, false) else f32;
 
 FLOAT_EPSILON :: 1e-7 when size_of(Float) == 4 else 1e-15;
 
@@ -52,25 +52,16 @@ VECTOR3_Y_AXIS :: Vector3{0, 1, 0};
 VECTOR3_Z_AXIS :: Vector3{0, 0, 1};
 
 
-radians :: proc(degrees: Float) -> Float {
-	return math.TAU * degrees / 360.0;
-}
-
-degrees :: proc(radians: Float) -> Float {
-	return 360.0 * radians / math.TAU;
-}
-
-
-vector2_orthogonal :: proc(v: Vector2) -> Vector2 {
+vector2_orthogonal :: proc(v: $V/[2]$E) -> V where !IS_ARRAY(E), IS_FLOAT(E) {
 	return {-v.y, v.x};
 }
 
-vector3_orthogonal :: proc(v: Vector3) -> Vector3 {
+vector3_orthogonal :: proc(v: $V/[3]$E) -> V where !IS_ARRAY(E), IS_FLOAT(E) {
 	x := abs(v.x);
 	y := abs(v.y);
 	z := abs(v.z);
 
-	other: Vector3;
+	other: V;
 	if x < y {
 		if x < z {
 			other = {1, 0, 0};
@@ -86,6 +77,9 @@ vector3_orthogonal :: proc(v: Vector3) -> Vector3 {
 	}
 	return normalize(cross(v, other));
 }
+
+orthogonal :: proc{vector2_orthogonal, vector3_orthogonal};
+
 
 
 vector4_srgb_to_linear :: proc(col: Vector4) -> Vector4 {
@@ -178,17 +172,41 @@ vector4_rgb_to_hsl :: proc(col: Vector4) -> Vector4 {
 
 
 
-quaternion_angle_axis :: proc(angle_radians: Float, axis: Vector3) -> Quaternion {
+quaternion_angle_axis :: proc(angle_radians: Float, axis: Vector3) -> (q: Quaternion) {
 	t := angle_radians*0.5;
-	w := math.cos(t);
 	v := normalize(axis) * math.sin(t);
-	return quaternion(w, v.x, v.y, v.z);
+	q.x = v.x;
+	q.y = v.y;
+	q.z = v.z;
+	q.w = math.cos(t);
+	return;
+}
+
+angle_from_quaternion :: proc(q: Quaternion) -> Float {
+	if abs(q.w) > math.SQRT_THREE*0.5 {
+		return math.asin(q.x*q.x + q.y*q.y + q.z*q.z) * 2;
+	}
+
+	return math.cos(q.x) * 2;
+}
+
+axis_from_quaternion :: proc(q: Quaternion) -> Vector3 {
+	t1 := 1 - q.w*q.w;
+	if t1 < 0 {
+		return Vector3{0, 0, 1};
+	}
+	t2 := 1.0 / math.sqrt(t1);
+	return Vector3{q.x*t2, q.y*t2, q.z*t2};
+}
+angle_axis_from_quaternion :: proc(q: Quaternion) -> (angle: Float, axis: Vector3) {
+	angle = angle_from_quaternion(q);
+	axis  = axis_from_quaternion(q);
+	return;
 }
 
 
-quaternion_from_euler_angles :: proc(roll, pitch, yaw: Float) -> Quaternion {
-	x, y, z := roll, pitch, yaw;
-	a, b, c := x, y, z;
+quaternion_from_euler_angles :: proc(pitch, yaw, roll: Float) -> Quaternion {
+	a, b, c := pitch, yaw, roll;
 
 	ca, sa := math.cos(a*0.5), math.sin(a*0.5);
 	cb, sb := math.cos(b*0.5), math.sin(b*0.5);
@@ -202,25 +220,30 @@ quaternion_from_euler_angles :: proc(roll, pitch, yaw: Float) -> Quaternion {
 	return q;
 }
 
-euler_angles_from_quaternion :: proc(q: Quaternion) -> (roll, pitch, yaw: Float) {
-	// roll, x-axis rotation
-	sinr_cosp: Float = 2 * (q.w * q.x + q.y * q.z);
-	cosr_cosp: Float = 1 - 2 * (q.x * q.x + q.y * q.y);
-	roll = math.atan2(sinr_cosp, cosr_cosp);
+roll_from_quaternion :: proc(q: Quaternion) -> Float {
+	return math.atan2(2 * q.x*q.y + q.w*q.z, q.w*q.w + q.x*q.x - q.y*q.y - q.z*q.z);
+}
 
-	// pitch, y-axis rotation
-	sinp: Float = 2 * (q.w * q.y - q.z * q.x);
-	if abs(sinp) >= 1 {
-		pitch = math.copy_sign(math.TAU * 0.25, sinp);
-	} else {
-		pitch = 2 * math.asin(sinp);
+pitch_from_quaternion :: proc(q: Quaternion) -> Float {
+	y := 2 * (q.y*q.z + q.w*q.w);
+	x := q.w*q.w - q.x*q.x - q.y*q.y + q.z*q.z;
+
+	if abs(x) <= FLOAT_EPSILON && abs(y) <= FLOAT_EPSILON {
+		return 2 * math.atan2(q.x, q.w);
 	}
 
-	// yaw, z-axis rotation
-	siny_cosp: Float = 2 * (q.w * q.z + q.x * q.y);
-	cosy_cosp: Float = 1 - 2 * (q.y * q.y + q.z * q.z);
-	yaw = math.atan2(siny_cosp, cosy_cosp);
+	return math.atan2(y, x);
+}
 
+yaw_from_quaternion :: proc(q: Quaternion) -> Float {
+	return math.asin(clamp(-2 * (q.x*q.z - q.w*q.y), -1, 1));
+}
+
+
+euler_angles_from_quaternion :: proc(q: Quaternion) -> (pitch, yaw, roll: Float) {
+	pitch = pitch_from_quaternion(q);
+	yaw = yaw_from_quaternion(q);
+	roll = roll_from_quaternion(q);
 	return;
 }
 
@@ -269,18 +292,20 @@ quaternion_from_forward_and_up :: proc(forward, up: Vector3) -> Quaternion {
 }
 
 quaternion_look_at :: proc(eye, centre: Vector3, up: Vector3) -> Quaternion {
-	return quaternion_from_forward_and_up(centre-eye, up);
+	return quaternion_from_matrix3(matrix3_look_at(eye, centre, up));
 }
 
 
-quaternion_nlerp :: proc(a, b: Quaternion, t: Float) -> Quaternion {
-	c := a + (b-a)*quaternion(t, 0, 0, 0);
+quaternion_nlerp :: proc(a, b: Quaternion, t: Float) -> (c: Quaternion) {
+	c.x = a.x + (b.x-a.x)*t;
+	c.y = a.y + (b.y-a.y)*t;
+	c.z = a.z + (b.z-a.z)*t;
+	c.w = a.w + (b.w-a.w)*t;
 	return normalize(c);
 }
 
 
-quaternion_slerp :: proc(x, y: Quaternion, t: Float) -> Quaternion {
-
+quaternion_slerp :: proc(x, y: Quaternion, t: Float) -> (q: Quaternion) {
 	a, b := x, y;
 	cos_angle := dot(a, b);
 	if cos_angle < 0 {
@@ -288,20 +313,33 @@ quaternion_slerp :: proc(x, y: Quaternion, t: Float) -> Quaternion {
 		cos_angle = -cos_angle;
 	}
 	if cos_angle > 1 - FLOAT_EPSILON {
-		return a + (b-a)*quaternion(t, 0, 0, 0);
+		q.x = a.x + (b.x-a.x)*t;
+		q.y = a.y + (b.y-a.y)*t;
+		q.z = a.z + (b.z-a.z)*t;
+		q.w = a.w + (b.w-a.w)*t;
+		return;
 	}
 
 	angle := math.acos(cos_angle);
 	sin_angle := math.sin(angle);
-	factor_a, factor_b: Quaternion;
-	factor_a = quaternion(math.sin((1-t) * angle) / sin_angle, 0, 0, 0);
-	factor_b = quaternion(math.sin(t * angle)     / sin_angle, 0, 0, 0);
+	factor_a := math.sin((1-t) * angle) / sin_angle;
+	factor_b := math.sin(t * angle)     / sin_angle;
 
-	return factor_a * a + factor_b * b;
+
+	q.x = factor_a * a.x + factor_b * b.x;
+	q.y = factor_a * a.y + factor_b * b.y;
+	q.z = factor_a * a.z + factor_b * b.z;
+	q.w = factor_a * a.w + factor_b * b.w;
+	return;
+}
+
+quaternion_squad :: proc(q1, q2, s1, s2: Quaternion, h: Float) -> Quaternion {
+	slerp :: quaternion_slerp;
+	return slerp(slerp(q1, q2, h), slerp(s1, s2, h), 2 * (1 - h) * h);
 }
 
 
-quaternion_from_matrix4 :: proc(m: Matrix4) -> Quaternion {
+quaternion_from_matrix4 :: proc(m: Matrix4) -> (q: Quaternion) {
 	four_x_squared_minus_1, four_y_squared_minus_1,
 	four_z_squared_minus_1, four_w_squared_minus_1,
 	four_biggest_squared_minus_1: Float;
@@ -336,40 +374,32 @@ quaternion_from_matrix4 :: proc(m: Matrix4) -> Quaternion {
 
 	switch biggest_index {
 	case 0:
-		return quaternion(
-			biggest_value,
-			(m[0][1] + m[1][0]) * mult,
-			(m[2][0] + m[0][2]) * mult,
-			(m[1][2] - m[2][1]) * mult,
-		);
+		q.w = biggest_value;
+		q.x = (m[0][1] + m[1][0]) * mult;
+		q.y = (m[2][0] + m[0][2]) * mult;
+		q.z = (m[1][2] - m[2][1]) * mult;
 	case 1:
-		return quaternion(
-			(m[0][1] + m[1][0]) * mult,
-			biggest_value,
-			(m[1][2] + m[2][1]) * mult,
-			(m[2][0] - m[0][2]) * mult,
-		);
+		q.w = (m[0][1] + m[1][0]) * mult;
+		q.x = biggest_value;
+		q.y = (m[1][2] + m[2][1]) * mult;
+		q.z = (m[2][0] - m[0][2]) * mult;
 	case 2:
-		return quaternion(
-			(m[2][0] + m[0][2]) * mult,
-			(m[1][2] + m[2][1]) * mult,
-			biggest_value,
-			(m[0][1] - m[1][0]) * mult,
-		);
+		q.w = (m[2][0] + m[0][2]) * mult;
+		q.x = (m[1][2] + m[2][1]) * mult;
+		q.y = biggest_value;
+		q.z = (m[0][1] - m[1][0]) * mult;
 	case 3:
-		return quaternion(
-			(m[1][2] - m[2][1]) * mult,
-			(m[2][0] - m[0][2]) * mult,
-			(m[0][1] - m[1][0]) * mult,
-			biggest_value,
-		);
+		q.w = (m[1][2] - m[2][1]) * mult;
+		q.x = (m[2][0] - m[0][2]) * mult;
+		q.y = (m[0][1] - m[1][0]) * mult;
+		q.z = biggest_value;
 	}
 
-	return 0;
+	return;
 }
 
 
-quaternion_from_matrix3 :: proc(m: Matrix3) -> Quaternion {
+quaternion_from_matrix3 :: proc(m: Matrix3) -> (q: Quaternion) {
 	four_x_squared_minus_1, four_y_squared_minus_1,
 	four_z_squared_minus_1, four_w_squared_minus_1,
 	four_biggest_squared_minus_1: Float;
@@ -404,55 +434,54 @@ quaternion_from_matrix3 :: proc(m: Matrix3) -> Quaternion {
 
 	switch biggest_index {
 	case 0:
-		return quaternion(
-			biggest_value,
-			(m[0][1] + m[1][0]) * mult,
-			(m[2][0] + m[0][2]) * mult,
-			(m[1][2] - m[2][1]) * mult,
-		);
+		q.w = biggest_value;
+		q.x = (m[0][1] + m[1][0]) * mult;
+		q.y = (m[2][0] + m[0][2]) * mult;
+		q.z = (m[1][2] - m[2][1]) * mult;
 	case 1:
-		return quaternion(
-			(m[0][1] + m[1][0]) * mult,
-			biggest_value,
-			(m[1][2] + m[2][1]) * mult,
-			(m[2][0] - m[0][2]) * mult,
-		);
+		q.w = (m[0][1] + m[1][0]) * mult;
+		q.x = biggest_value;
+		q.y = (m[1][2] + m[2][1]) * mult;
+		q.z = (m[2][0] - m[0][2]) * mult;
 	case 2:
-		return quaternion(
-			(m[2][0] + m[0][2]) * mult,
-			(m[1][2] + m[2][1]) * mult,
-			biggest_value,
-			(m[0][1] - m[1][0]) * mult,
-		);
+		q.w = (m[2][0] + m[0][2]) * mult;
+		q.x = (m[1][2] + m[2][1]) * mult;
+		q.y = biggest_value;
+		q.z = (m[0][1] - m[1][0]) * mult;
 	case 3:
-		return quaternion(
-			(m[1][2] - m[2][1]) * mult,
-			(m[2][0] - m[0][2]) * mult,
-			(m[0][1] - m[1][0]) * mult,
-			biggest_value,
-		);
+		q.w = (m[1][2] - m[2][1]) * mult;
+		q.x = (m[2][0] - m[0][2]) * mult;
+		q.y = (m[0][1] - m[1][0]) * mult;
+		q.z = biggest_value;
 	}
 
-	return 0;
+	return;
 }
 
-quaternion_between_two_vector3 :: proc(from, to: Vector3) -> Quaternion {
+quaternion_between_two_vector3 :: proc(from, to: Vector3) -> (q: Quaternion) {
 	x := normalize(from);
 	y := normalize(to);
 
 	cos_theta := dot(x, y);
 	if abs(cos_theta + 1) < 2*FLOAT_EPSILON {
 		v := vector3_orthogonal(x);
-		return quaternion(0, v.x, v.y, v.z);
+		q.x = v.x;
+		q.y = v.y;
+		q.z = v.z;
+		q.w = 0;
+		return;
 	}
 	v := cross(x, y);
 	w := cos_theta + 1;
-	return Quaternion(normalize(quaternion(w, v.x, v.y, v.z)));
+	q.w = w;
+	q.x = v.x;
+	q.y = v.y;
+	q.z = v.z;
+	return normalize(q);
 }
 
 
-matrix2_inverse_transpose :: proc(m: Matrix2) -> Matrix2 {
-	c: Matrix2;
+matrix2_inverse_transpose :: proc(m: Matrix2) -> (c: Matrix2) {
 	d := m[0][0]*m[1][1] - m[1][0]*m[0][1];
 	id := 1.0/d;
 	c[0][0] = +m[1][1] * id;
@@ -464,8 +493,7 @@ matrix2_inverse_transpose :: proc(m: Matrix2) -> Matrix2 {
 matrix2_determinant :: proc(m: Matrix2) -> Float {
 	return m[0][0]*m[1][1] - m[1][0]*m[0][1];
 }
-matrix2_inverse :: proc(m: Matrix2) -> Matrix2 {
-	c: Matrix2;
+matrix2_inverse :: proc(m: Matrix2) -> (c: Matrix2) {
 	d := m[0][0]*m[1][1] - m[1][0]*m[0][1];
 	id := 1.0/d;
 	c[0][0] = +m[1][1] * id;
@@ -475,8 +503,7 @@ matrix2_inverse :: proc(m: Matrix2) -> Matrix2 {
 	return c;
 }
 
-matrix2_adjoint :: proc(m: Matrix2) -> Matrix2 {
-	c: Matrix2;
+matrix2_adjoint :: proc(m: Matrix2) -> (c: Matrix2) {
 	c[0][0] = +m[1][1];
 	c[0][1] = -m[1][0];
 	c[1][0] = -m[0][1];
@@ -485,7 +512,7 @@ matrix2_adjoint :: proc(m: Matrix2) -> Matrix2 {
 }
 
 
-matrix3_from_quaternion :: proc(q: Quaternion) -> Matrix3 {
+matrix3_from_quaternion :: proc(q: Quaternion) -> (m: Matrix3) {
 	xx := q.x * q.x;
 	xy := q.x * q.y;
 	xz := q.x * q.z;
@@ -496,7 +523,6 @@ matrix3_from_quaternion :: proc(q: Quaternion) -> Matrix3 {
 	zz := q.z * q.z;
 	zw := q.z * q.w;
 
-	m: Matrix3;
 	m[0][0] = 1 - 2 * (yy + zz);
 	m[1][0] = 2 * (xy - zw);
 	m[2][0] = 2 * (xz + yw);
@@ -524,8 +550,7 @@ matrix3_determinant :: proc(m: Matrix3) -> Float {
 	return a + b + c;
 }
 
-matrix3_adjoint :: proc(m: Matrix3) -> Matrix3 {
-	adjoint: Matrix3;
+matrix3_adjoint :: proc(m: Matrix3) -> (adjoint: Matrix3) {
 	adjoint[0][0] = +(m[1][1] * m[2][2] - m[1][2] * m[2][1]);
 	adjoint[1][0] = -(m[0][1] * m[2][2] - m[0][2] * m[2][1]);
 	adjoint[2][0] = +(m[0][1] * m[1][2] - m[0][2] * m[1][1]);
@@ -553,8 +578,7 @@ matrix3_inverse_transpose :: proc(m: Matrix3) -> Matrix3 {
 }
 
 
-matrix3_scale :: proc(s: Vector3) -> Matrix3 {
-	m: Matrix3;
+matrix3_scale :: proc(s: Vector3) -> (m: Matrix3) {
 	m[0][0] = s[0];
 	m[1][1] = s[1];
 	m[2][2] = s[2];
@@ -597,7 +621,7 @@ matrix3_look_at :: proc(eye, centre, up: Vector3) -> Matrix3 {
 }
 
 matrix4_from_quaternion :: proc(q: Quaternion) -> Matrix4 {
-	m := identity(Matrix4);
+	m := MATRIX4_IDENTITY;
 
 	xx := q.x * q.x;
 	xy := q.x * q.y;
@@ -693,7 +717,7 @@ matrix4_inverse_transpose :: proc(m: Matrix4) -> Matrix4 {
 }
 
 matrix4_translate :: proc(v: Vector3) -> Matrix4 {
-	m := identity(Matrix4);
+	m := MATRIX4_IDENTITY;
 	m[3][0] = v[0];
 	m[3][1] = v[1];
 	m[3][2] = v[2];
@@ -708,7 +732,7 @@ matrix4_rotate :: proc(angle_radians: Float, v: Vector3) -> Matrix4 {
 	a := normalize(v);
 	t := a * (1-c);
 
-	rot := identity(Matrix4);
+	rot := MATRIX4_IDENTITY;
 
 	rot[0][0] = c + t[0]*a[0];
 	rot[0][1] = 0 + t[0]*a[1] + s*a[2];
@@ -737,16 +761,20 @@ matrix4_scale :: proc(v: Vector3) -> Matrix4 {
 	return m;
 }
 
-matrix4_look_at :: proc(eye, centre, up: Vector3) -> Matrix4 {
+matrix4_look_at :: proc(eye, centre, up: Vector3, flip_z_axis := true) -> Matrix4 {
 	f := normalize(centre - eye);
 	s := normalize(cross(f, up));
 	u := cross(s, f);
-	return Matrix4{
+
+	fe := dot(f, eye);
+
+	m := Matrix4{
 		{+s.x, +u.x, -f.x, 0},
 		{+s.y, +u.y, -f.y, 0},
 		{+s.z, +u.z, -f.z, 0},
-		{-dot(s, eye), -dot(u, eye), +dot(f, eye), 1},
+		{-dot(s, eye), -dot(u, eye), +fe if flip_z_axis else -fe, 1},
 	};
+	return m;
 }
 
 
@@ -797,3 +825,5 @@ matrix4_infinite_perspective :: proc(fovy, aspect, near: Float, flip_z_axis := t
 
 	return;
 }
+
+

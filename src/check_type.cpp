@@ -2200,7 +2200,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 		return new_type;
 	}
 
-	if (cc == ProcCC_None) {
+	if (cc == ProcCC_None || cc == ProcCC_PureNone) {
 		return new_type;
 	}
 
@@ -2335,7 +2335,7 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCal
 	if (build_context.ODIN_OS == "windows") {
 		if (build_context.ODIN_ARCH == "amd64") {
 			if (is_type_integer_128bit(single_type)) {
-				if (cc == ProcCC_None) {
+				if (cc == ProcCC_None || cc == ProcCC_PureNone) {
 					return original_type;
 				} else {
 					return alloc_type_simd_vector(2, t_u64);
@@ -2401,7 +2401,7 @@ bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type 
 	if (abi_return_type == nullptr) {
 		return false;
 	}
-	if (cc == ProcCC_None) {
+	if (cc == ProcCC_None || cc == ProcCC_PureNone) {
 		return false;
 	}
 
