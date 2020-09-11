@@ -37,6 +37,10 @@ DEG_PER_RAD :: 360.0/TAU;
 @private ELEM_TYPE :: intrinsics.type_elem_type;
 
 
+scalar_dot :: proc(a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T) {
+	return a * b;
+}
+
 vector_dot :: proc(a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) {
 	for i in 0..<N {
 		c += a[i] * b[i];
@@ -50,12 +54,26 @@ quaternion256_dot :: proc(a, b: $T/quaternion256) -> (c: f64) {
 	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
-dot :: proc{vector_dot, quaternion128_dot, quaternion256_dot};
+dot :: proc{scalar_dot, vector_dot, quaternion128_dot, quaternion256_dot};
+
+inner_product :: dot;
+outer_product :: proc(a: $A/[$M]$E, b: $B/[$N]E) -> (out: [M][N]E) where IS_NUMERIC(E) {
+	for i in 0..<M {
+		for j in 0..<N {
+			out[i][j] = a[i]*b[j];
+		}
+	}
+	return;
+}
 
 quaternion_inverse :: proc(q: $Q) -> Q where IS_QUATERNION(Q) {
 	return conj(q) * quaternion(1.0/dot(q, q), 0, 0, 0);
 }
 
+
+scalar_cross :: proc(a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T) {
+	return a * b;
+}
 
 vector_cross2 :: proc(a, b: $T/[2]$E) -> E where IS_NUMERIC(E) {
 	return a[0]*b[1] - b[0]*a[1];
@@ -76,8 +94,8 @@ quaternion_cross :: proc(q1, q2: $Q) -> (q3: Q) where IS_QUATERNION(Q) {
 	return;
 }
 
-vector_cross :: proc{vector_cross2, vector_cross3};
-cross :: proc{vector_cross2, vector_cross3, quaternion_cross};
+vector_cross :: proc{scalar_cross, vector_cross2, vector_cross3};
+cross :: proc{scalar_cross, vector_cross2, vector_cross3, quaternion_cross};
 
 vector_normalize :: proc(v: $T/[$N]$E) -> T where IS_NUMERIC(E) {
 	return v / length(v);
@@ -114,9 +132,26 @@ quaternion_length2 :: proc(q: $Q) -> Q where IS_QUATERNION(Q) {
 	return dot(q, q);
 }
 
+scalar_triple_product :: proc(a, b, c: $T/[$N]$E) -> E where IS_NUMERIC(E) {
+	// a . (b x c)
+	// b . (c x a)
+	// c . (a x b)
+	return dot(a, cross(b, c));
+}
+
+vector_triple_product :: proc(a, b, c: $T/[$N]$E) -> T where IS_NUMERIC(E) {
+	// a x (b x c)
+	// (a . c)b - (a . b)c
+	return cross(a, cross(b, c));
+}
+
+
 length :: proc{vector_length, quaternion_length};
 length2 :: proc{vector_length2, quaternion_length2};
 
+projection :: proc(x, normal: $T/[$N]$E) -> T where IS_NUMERIC(E) {
+	return dot(x, normal) / dot(normal, normal) * normal;
+}
 
 identity :: proc($T: typeid/[$N][N]$E) -> (m: T) {
 	for i in 0..<N do m[i][i] = E(1);
@@ -234,3 +269,45 @@ to_ptr :: proc{vector_to_ptr, matrix_to_ptr};
 
 
 
+
+
+// Splines
+
+vector_slerp :: proc(x, y: $T/[$N]$E, a: E) -> T {
+	cos_alpha := dot(x, y);
+	alpha := math.acos(cos_alpha);
+	sin_alpha := math.sin(alpha);
+
+	t1 := math.sin((1 - a) * alpha) / sin_alpha;
+	t2 := math.sin(a * alpha) / sin_alpha;
+
+	return x * t1 + y * t2;
+}
+
+catmull_rom :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
+	s2 := s*s;
+	s3 := s2*s;
+
+	f1 := -s3 + 2 * s2 - s;
+	f2 := 3 * s3 - 5 * s2 + 2;
+	f3 := -3 * s3 + 4 * s2 + s;
+	f4 := s3 - s2;
+
+	return (f1 * v1 + f2 * v2 + f3 * v3 + f4 * v4) * 0.5;
+}
+
+hermite :: proc(v1, t1, v2, t2: $T/[$N]$E, s: E) -> T {
+	s2 := s*s;
+	s3 := s2*s;
+
+	f1 := 2 * s3 - 3 * s2 + 1;
+	f2 := -2 * s3 + 3 * s2;
+	f3 := s3 - 2 * s2 + s;
+	f4 := s3 - s2;
+
+	return f1 * v1 + f2 * v2 + f3 * t1 + f4 * t2;
+}
+
+cubic :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
+	return ((v1 * s + v2) * s + v3) * s + v3;
+}

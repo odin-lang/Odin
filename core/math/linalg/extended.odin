@@ -478,44 +478,44 @@ is_inf :: proc{is_inf_single, is_inf_array};
 classify :: proc{classify_single, classify_array};
 
 
-less_than_single          :: proc(x, y: $T) -> (out: bool) where IS_FLOAT(T) { return x < y; }
-less_than_equal_single    :: proc(x, y: $T) -> (out: bool) where IS_FLOAT(T) { return x <= y; }
-greater_than_single       :: proc(x, y: $T) -> (out: bool) where IS_FLOAT(T) { return x > y; }
-greater_than_equal_single :: proc(x, y: $T) -> (out: bool) where IS_FLOAT(T) { return x >= y; }
-equal_single              :: proc(x, y: $T) -> (out: bool) where IS_FLOAT(T) { return x == y; }
-not_equal_single          :: proc(x, y: $T) -> (out: bool) where IS_FLOAT(T) { return x != y; }
+less_than_single          :: proc(x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x < y; }
+less_than_equal_single    :: proc(x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x <= y; }
+greater_than_single       :: proc(x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x > y; }
+greater_than_equal_single :: proc(x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x >= y; }
+equal_single              :: proc(x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x == y; }
+not_equal_single          :: proc(x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x != y; }
 
-less_than_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) {
+less_than_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
 	for i in 0..<N {
 		out[i] = x[i] < y[i];
 	}
 	return;
 }
-less_than_equal_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) {
+less_than_equal_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
 	for i in 0..<N {
 		out[i] = x[i] <= y[i];
 	}
 	return;
 }
-greater_than_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) {
+greater_than_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
 	for i in 0..<N {
 		out[i] = x[i] > y[i];
 	}
 	return;
 }
-greater_than_equal_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) {
+greater_than_equal_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
 	for i in 0..<N {
 		out[i] = x[i] >= y[i];
 	}
 	return;
 }
-equal_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) {
+equal_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
 	for i in 0..<N {
 		out[i] = x[i] == y[i];
 	}
 	return;
 }
-not_equal_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) {
+not_equal_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
 	for i in 0..<N {
 		out[i] = x[i] != y[i];
 	}
@@ -539,7 +539,7 @@ any :: proc(x: $A/[$N]bool) -> (out: bool) {
 }
 all :: proc(x: $A/[$N]bool) -> (out: bool) {
 	for e in x {
-		if !x {
+		if !e {
 			return false;
 		}
 	}
