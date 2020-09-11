@@ -4895,6 +4895,9 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			if (is_type_cstring(res.type)) {
 				res.value = ptr;
 			} else {
+				if (value.value_string.len == 0) {
+					ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
+				}
 				LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), value.value_string.len, true);
 				LLVMValueRef values[2] = {ptr, str_len};
 
