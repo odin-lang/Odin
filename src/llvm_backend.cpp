@@ -4558,6 +4558,10 @@ lbValue lb_emit_clamp(lbProcedure *p, Type *t, lbValue x, lbValue min, lbValue m
 
 
 LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
+	if (str.len == 0) {
+		return LLVMConstNull(lb_type(m, t_u8_ptr));
+	}
+
 	StringHashKey key = string_hash_string(str);
 	LLVMValueRef *found = string_map_get(&m->const_strings, key);
 	if (found != nullptr) {
@@ -4587,6 +4591,9 @@ LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
 }
 
 lbValue lb_find_or_add_entity_string(lbModule *m, String const &str) {
+	if (str.len == 0) {
+		return lb_zero(m, t_string);
+	}
 	LLVMValueRef ptr = lb_find_or_add_entity_string_ptr(m, str);
 	LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), str.len, true);
 	LLVMValueRef values[2] = {ptr, str_len};
@@ -4598,6 +4605,10 @@ lbValue lb_find_or_add_entity_string(lbModule *m, String const &str) {
 }
 
 lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) {
+	if (str.len == 0) {
+		return lb_zero(m, t_u8_slice);
+	}
+
 	LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
 	LLVMValueRef data = LLVMConstStringInContext(m->ctx,
 		cast(char const *)str.text,

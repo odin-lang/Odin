@@ -723,3 +723,150 @@ matrix4_infinite_perspective :: proc(fovy, aspect, near: Float, flip_z_axis := t
 }
 
 
+matrix2_from_scalar :: proc(f: Float) -> (m: Matrix2) {
+	m[0][0], m[0][1] = f, 0;
+	m[1][0], m[1][1] = 0, f;
+	return;
+}
+
+matrix3_from_scalar :: proc(f: Float) -> (m: Matrix3) {
+	m[0][0], m[0][1], m[0][2] = f, 0, 0;
+	m[1][0], m[1][1], m[1][2] = 0, f, 0;
+	m[2][0], m[2][1], m[2][2] = 0, 0, f;
+	return;
+}
+
+matrix4_from_scalar :: proc(f: Float) -> (m: Matrix4) {
+	m[0][0], m[0][1], m[0][2], m[0][3] = f, 0, 0, 0;
+	m[1][0], m[1][1], m[1][2], m[1][3] = 0, f, 0, 0;
+	m[2][0], m[2][1], m[2][2], m[2][3] = 0, 0, f, 0;
+	m[3][0], m[3][1], m[3][2], m[3][3] = 0, 0, 0, f;
+	return;
+}
+
+matrix2_from_matrix3 :: proc(m: Matrix3) -> (r: Matrix2) {
+	r[0][0], r[0][1] = m[0][0], m[0][1];
+	r[1][0], r[1][1] = m[1][0], m[1][1];
+	return;
+}
+
+matrix2_from_matrix4 :: proc(m: Matrix4) -> (r: Matrix2) {
+	r[0][0], r[0][1] = m[0][0], m[0][1];
+	r[1][0], r[1][1] = m[1][0], m[1][1];
+	return;
+}
+
+matrix3_from_matrix2 :: proc(m: Matrix2) -> (r: Matrix3) {
+	r[0][0], r[0][1], r[0][2] = m[0][0], m[0][1], 0;
+	r[1][0], r[1][1], r[1][2] = m[1][0], m[1][1], 0;
+	r[2][0], r[2][1], r[2][2] =       0,       0, 1;
+	return;
+}
+
+matrix3_from_matrix4 :: proc(m: Matrix4) -> (r: Matrix3) {
+	r[0][0], r[0][1], r[0][2] = m[0][0], m[0][1], m[0][2];
+	r[1][0], r[1][1], r[1][2] = m[1][0], m[1][1], m[1][2];
+	r[2][0], r[2][1], r[2][2] = m[2][0], m[2][1], m[2][2];
+	return;
+}
+
+matrix4_from_matrix2 :: proc(m: Matrix2) -> (r: Matrix4) {
+	r[0][0], r[0][1], r[0][2], r[0][3] = m[0][0], m[0][1], 0, 0;
+	r[1][0], r[1][1], r[1][2], r[1][3] = m[1][0], m[1][1], 0, 0;
+	r[2][0], r[2][1], r[2][2], r[2][3] =       0,       0, 1, 0;
+	r[3][0], r[3][1], r[3][2], r[3][3] =       0,       0, 0, 1;
+	return;
+}
+matrix4_from_matrix3 :: proc(m: Matrix3) -> (r: Matrix4) {
+	r[0][0], r[0][1], r[0][2], r[0][3] = m[0][0], m[0][1], m[0][2], 0;
+	r[1][0], r[1][1], r[1][2], r[1][3] = m[1][0], m[1][1], m[1][2], 0;
+	r[2][0], r[2][1], r[2][2], r[2][3] = m[2][0], m[2][1], m[2][2], 0;
+	r[3][0], r[3][1], r[3][2], r[3][3] =       0,       0,       0, 1;
+	return;
+}
+
+quaternion_from_scalar :: proc(f: Float) -> (q: Quaternion) {
+	q.w = f;
+	return;
+}
+
+to_matrix2    :: proc{matrix2_from_scalar, matrix2_from_matrix3, matrix2_from_matrix4};
+to_matrix3    :: proc{matrix3_from_scalar, matrix3_from_matrix2, matrix3_from_matrix4, matrix3_from_quaternion};
+to_matrix4    :: proc{matrix4_from_scalar, matrix4_from_matrix2, matrix4_from_matrix3, matrix4_from_quaternion};
+to_quaternion :: proc{quaternion_from_scalar, quaternion_from_matrix3, quaternion_from_matrix4};
+
+
+
+matrix2_orthonormalize :: proc(m: Matrix2) -> (r: Matrix2) {
+	r[0] = normalize(m[0]);
+
+	d0 := dot(r[0], r[1]);
+	r[1] -= r[0] * d0;
+	r[1] = normalize(r[1]);
+
+	return;
+}
+
+matrix3_orthonormalize :: proc(m: Matrix3) -> (r: Matrix3) {
+	r[0] = normalize(m[0]);
+
+	d0 := dot(r[0], r[1]);
+	r[1] -= r[0] * d0;
+	r[1] = normalize(r[1]);
+
+	d1 := dot(r[1], r[2]);
+	d0 = dot(r[0], r[2]);
+	r[2] -= r[0]*d0 + r[1]*d1;
+	r[2] = normalize(r[2]);
+
+	return;
+}
+
+vector3_orthonormalize :: proc(x, y: Vector3) -> (z: Vector3) {
+	return normalize(x - y * dot(y, x));
+}
+
+
+orthonormalize :: proc{
+	matrix2_orthonormalize,
+	matrix3_orthonormalize,
+	vector3_orthonormalize,
+};
+
+
+matrix4_orientation :: proc(normal, up: Vector3) -> Matrix4 {
+	if all(equal(normal, up)) {
+		return MATRIX4_IDENTITY;
+	}
+
+	rotation_axis := cross(up, normal);
+	angle := math.acos(dot(normal, up));
+
+	return matrix4_rotate(angle, rotation_axis);
+}
+
+
+
+euclidean_from_polar :: proc(polar: Vector2) -> Vector3 {
+	latitude, longitude := polar.x, polar.y;
+	cx, sx := math.cos(latitude), math.sin(latitude);
+	cy, sy := math.cos(longitude), math.sin(longitude);
+
+	return Vector3{
+		cx*sy,
+		sx,
+		cx*cy,
+	};
+}
+polar_from_euclidean :: proc(euclidean: Vector3) -> Vector3 {
+	n := length(euclidean);
+	tmp := euclidean / n;
+
+	xz_dist := math.sqrt(tmp.x*tmp.x + tmp.z*tmp.z);
+
+	return Vector3{
+		math.asin(tmp.y),
+		math.atan2(tmp.x, tmp.z),
+		xz_dist,
+	};
+}
