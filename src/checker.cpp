@@ -2860,12 +2860,8 @@ bool check_arity_match(CheckerContext *c, AstValueDecl *vd, bool is_global) {
 			return false;
 		} else if (is_global) {
 			Ast *n = vd->values[rhs-1];
-			isize total = get_total_value_count(vd->values);
-			if (total > rhs) {
-				error(n, "Global declarations do not allow for multi-valued expressions. Expected %td expressions on the right hand side, got %td", lhs, rhs);
-			} else {
-				error(n, "Expected %td expressions on the right hand side, got %td", lhs, rhs);
-			}
+			error(n, "Expected %td expressions on the right hand side, got %td", lhs, rhs);
+			error_line("Note: Global declarations do not allow for multi-valued expressions");
 			return false;
 		}
 	}

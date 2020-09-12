@@ -2835,7 +2835,12 @@ Ast *parse_value_decl(AstFile *f, Array<Ast *> names, CommentGroup *docs) {
 
 	if (f->curr_proc == nullptr) {
 		if (values.count > 0 && names.count != values.count) {
-			syntax_error(values[0], "Expected %td expressions on the right hand side, got %td", names.count, values.count);
+			syntax_error(
+				values[0],
+				"Expected %td expressions on the right hand side, got %td\n"
+				"\tNote: Global declarations do not allow for multi-valued expressions",
+				names.count, values.count
+			);
 		}
 	}
 
