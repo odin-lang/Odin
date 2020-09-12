@@ -2087,8 +2087,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				}
 			}
 
-			check_arity_match(ctx, vd);
 			check_init_variables(ctx, entities, entity_count, vd->values, str_lit("variable declaration"));
+			check_arity_match(ctx, vd, false);
 
 			if (ctx->curr_proc_calling_convention == ProcCC_Pure) {
 				if (vd->values.count == 0) {
