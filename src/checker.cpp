@@ -2808,9 +2808,33 @@ void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, De
 }
 
 
+isize get_total_value_count(Array<Ast *> const &values) {
+	isize count = 0;
+	for_array(i, values) {
+		Type *t = type_of_expr(values[i]);
+		if (t == nullptr) {
+			count += 1;
+			continue;
+		}
+		t = core_type(t);
+		if (t->kind == Type_Tuple) {
+			count += t->Tuple.variables.count;
+		} else {
+			count += 1;
+		}
+	}
+	return count;
+}
+
 bool check_arity_match(CheckerContext *c, AstValueDecl *vd, bool is_global) {
 	isize lhs = vd->names.count;
-	isize rhs = vd->values.count;
+	isize rhs = 0;
+	if (is_global) {
+		// NOTE(bill): Disallow global variables to be multi-valued for a few reasons
+		rhs = vd->values.count;
+	} else {
+		rhs = get_total_value_count(vd->values);
+	}
 
 	if (rhs == 0) {
 		if (vd->type == nullptr) {
@@ -2836,7 +2860,12 @@ bool check_arity_match(CheckerContext *c, AstValueDecl *vd, bool is_global) {
 			return false;
 		} else if (is_global) {
 			Ast *n = vd->values[rhs-1];
-			error(n, "Expected %td expressions on the right hand side, got %td", lhs, rhs);
+			isize total = get_total_value_count(vd->values);
+			if (total > rhs) {
+				error(n, "Global declarations do not allow for multi-valued expressions. Expected %td expressions on the right hand side, got %td", lhs, rhs);
+			} else {
+				error(n, "Expected %td expressions on the right hand side, got %td", lhs, rhs);
+			}
 			return false;
 		}
 	}
