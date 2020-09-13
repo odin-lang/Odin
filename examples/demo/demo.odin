@@ -480,6 +480,36 @@ explicit_procedure_overloading :: proc() {
 	// Ambiguous answers
 	// add(1.0, 2);
 	// add(1, 2.0);
+
+	fmt.println("\n# explicit procedure overloading using unique parameter names");
+
+	resize_frame :: proc{resize_frame_xyxy, resize_frame_xywh, resize_frame_ltrb};
+
+	resize_frame_xyxy :: proc(x0, y0, x1, y1 : int) {
+		fmt.printf(" frame resized to p0=(%d,%d) p1=(%d,%d)\n", x0, y0, x1, y1);
+	}
+
+	resize_frame_xywh :: proc(x, y, width, height : int) {
+		fmt.print("(xywh)");
+		// Allowed to use procedure group name inside specific members
+		resize_frame(x0=x, y0=y, x1=x+width, y1=y+height);
+	}
+
+	resize_frame_ltrb :: proc(left, top, right, bottom : int) {
+		fmt.print("(ltrb)");
+		// Allowed to reorder named arguments
+		resize_frame(x0=left, y1=top, x1=right, y0=bottom);
+	}
+
+	// These are equivalent
+	resize_frame(x=1, y=2, width=5, height=6);
+	resize_frame(left=1, top=8, bottom=2, right=6);
+
+	// Not allowed to mix named and unnamed arguments
+	// resize_frame(1, 1, x1=5, y1=10);
+
+	// Ambiguous
+	// resize_frame(1, 1, 5, 10);
 }
 
 struct_type :: proc() {

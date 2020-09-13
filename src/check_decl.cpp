@@ -1079,6 +1079,7 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) 
 				break;
 			case ProcOverload_ParamCount:
 			case ProcOverload_ParamTypes:
+			case ProcOverload_ParamNames:
 				// This is okay :)
 				break;
 

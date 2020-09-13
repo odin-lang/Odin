@@ -2229,6 +2229,8 @@ enum ProcTypeOverloadKind {
 	ProcOverload_ParamCount,
 	ProcOverload_ParamVariadic,
 	ProcOverload_ParamTypes,
+	ProcOverload_ParamNames,
+
 	ProcOverload_ResultCount,
 	ProcOverload_ResultTypes,
 	ProcOverload_Polymorphic,
@@ -2294,6 +2296,9 @@ ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 		Entity *ey = py.params->Tuple.variables[0];
 		bool ok = are_types_identical(ex->type, ey->type);
 		if (ok) {
+			if (ex->token.string != ey->token.string) {
+				return ProcOverload_ParamNames;
+			}
 		}
 	}
 
