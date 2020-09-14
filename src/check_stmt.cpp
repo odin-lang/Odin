@@ -1926,7 +1926,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			return;
 		}
 		for_array(i, us->list) {
-			Ast *expr = unparen_expr(us->list[0]);
+			Ast *expr = unparen_expr(us->list[i]);
 			Entity *e = nullptr;
 
 			bool is_selector = false;
