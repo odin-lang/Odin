@@ -5,24 +5,21 @@ import "core:c";
 pthread_t :: distinct u64;
 // pthread_t :: struct #align 16 { x: u64 };
 
-// NOTE(tetra): Got all the size constants from pthreadtypes-arch.h on my
-// Linux machine.
+PTHREAD_COND_T_SIZE :: 8;
 
-PTHREAD_COND_T_SIZE :: 48;
-
-PTHREAD_MUTEXATTR_T_SIZE :: 4;
-PTHREAD_CONDATTR_T_SIZE  :: 4;
+PTHREAD_MUTEXATTR_T_SIZE :: 8;
+PTHREAD_CONDATTR_T_SIZE  :: 8;
 PTHREAD_RWLOCKATTR_T_SIZE  :: 8;
-PTHREAD_BARRIERATTR_T_SIZE :: 4;
+PTHREAD_BARRIERATTR_T_SIZE :: 8;
 
 // WARNING: The sizes of these things are different yet again
 // on non-X86!
 when size_of(int) == 8 {
-	PTHREAD_ATTR_T_SIZE  :: 56;
-	PTHREAD_MUTEX_T_SIZE :: 40;
-	PTHREAD_RWLOCK_T_SIZE  :: 56;
-	PTHREAD_BARRIER_T_SIZE :: 32;
-} else when size_of(int) == 4 {
+	PTHREAD_ATTR_T_SIZE  :: 8;
+	PTHREAD_MUTEX_T_SIZE :: 8;
+	PTHREAD_RWLOCK_T_SIZE  :: 8;
+	PTHREAD_BARRIER_T_SIZE :: 8;
+} else when size_of(int) == 4 { // TODO
 	PTHREAD_ATTR_T_SIZE  :: 32;
 	PTHREAD_MUTEX_T_SIZE :: 32;
 	PTHREAD_RWLOCK_T_SIZE  :: 44;
@@ -82,6 +79,7 @@ sched_param :: struct {
 /*sem_t :: struct #align 16 {
 	_: [SEM_T_SIZE] c.char,
 }*/
+SEM_T_SIZE :: 16;
 _usem :: struct {
 	_has_waiters: u32,
 	_count: u32,
@@ -97,11 +95,11 @@ sem_t :: struct {
 	_padding: u32,
 }
 
-when size_of(int) == 8 {
+/*when size_of(int) == 8 {
 	SEM_T_SIZE :: 32;
 } else when size_of(int) == 4 {
 	SEM_T_SIZE :: 16;
-}
+}*/
 
 foreign import "system:pthread"
 
