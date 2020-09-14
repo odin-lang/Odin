@@ -1253,7 +1253,13 @@ bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Typ
 						e->type = t_e->type;
 					}
 				} else {
-					bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
+					if (st->kind == Type_Basic && tt->kind == Type_Basic &&
+						s_e->kind == Entity_Constant && t_e->kind == Entity_Constant) {
+						if (!compare_exact_values(Token_CmpEq, s_e->Constant.value, t_e->Constant.value))
+							return false;
+					} else {
+						bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
+					}
 				}
 			}
 
