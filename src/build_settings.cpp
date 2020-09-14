@@ -216,15 +216,15 @@ gb_global TargetMetrics target_freebsd_386 = {
 	TargetArch_386,
 	4,
 	8,
-	str_lit("i386-unknown-freebsd"),
+	str_lit("i386-unknown-freebsd-elf"),
 };
 
 gb_global TargetMetrics target_freebsd_amd64 = {
 	TargetOs_freebsd,
-	TargetArch_386,
+	TargetArch_amd64,
 	8,
 	16,
-	str_lit("x86_64-unknown-freebsd"),
+	str_lit("x86_64-unknown-freebsd-elf"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
@@ -653,6 +653,8 @@ void init_build_context(TargetMetrics *cross_target) {
 			metrics = &target_windows_amd64;
 		#elif defined(GB_SYSTEM_OSX)
 			metrics = &target_darwin_amd64;
+		#elif defined(GB_SYSTEM_FREEBSD)
+			metrics = &target_freebsd_amd64;
 		#else
 			metrics = &target_linux_amd64;
 		#endif
@@ -661,6 +663,8 @@ void init_build_context(TargetMetrics *cross_target) {
 			metrics = &target_windows_386;
 		#elif defined(GB_SYSTEM_OSX)
 			#error "Build Error: Unsupported architecture"
+		#elif defined(GB_SYSTEM_FREEBSD)
+			metrics = &target_freebsd_386;
 		#else
 			metrics = &target_linux_386;
 		#endif
@@ -709,6 +713,9 @@ void init_build_context(TargetMetrics *cross_target) {
 		case TargetOs_linux:
 			bc->link_flags = str_lit("-arch x86-64 ");
 			break;
+		case TargetOs_freebsd:
+			bc->link_flags = str_lit("-arch x86-64");
+			break;
 		}
 	} else if (bc->metrics.arch == TargetArch_386) {
 		llc_flags = gb_string_appendc(llc_flags, "-march=x86 ");
@@ -723,6 +730,9 @@ void init_build_context(TargetMetrics *cross_target) {
 			break;
 		case TargetOs_linux:
 			bc->link_flags = str_lit("-arch x86 ");
+			break;
+		case TargetOs_freebsd:
+			bc->link_flags = str_lit("-arch x86");
 			break;
 		}
 	} else if (bc->metrics.arch == TargetArch_wasm32) {
