@@ -954,7 +954,7 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 
 	return ReadDirectory_None;
 }
-#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX)
+#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD)
 
 #include <dirent.h>
 

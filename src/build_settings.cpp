@@ -1,3 +1,8 @@
+#if defined(GB_SYSTEM_FREEBSD)
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#endif
+
 enum TargetOsKind {
 	TargetOs_Invalid,
 
@@ -6,6 +11,7 @@ enum TargetOsKind {
 	TargetOs_linux,
 	TargetOs_essence,
 	TargetOs_js,
+	TargetOs_freebsd,
 
 	TargetOs_COUNT,
 };
@@ -36,6 +42,7 @@ String target_os_names[TargetOs_COUNT] = {
 	str_lit("linux"),
 	str_lit("essence"),
 	str_lit("js"),
+	str_lit("freebsd"),
 };
 
 String target_arch_names[TargetArch_COUNT] = {
@@ -204,6 +211,23 @@ gb_global TargetMetrics target_darwin_amd64 = {
 	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
+gb_global TargetMetrics target_freebsd_386 = {
+	TargetOs_freebsd,
+	TargetArch_386,
+	4,
+	8,
+	str_lit("i386-unknown-freebsd"),
+};
+
+gb_global TargetMetrics target_freebsd_amd64 = {
+	TargetOs_freebsd,
+	TargetArch_386,
+	8,
+	16,
+	str_lit("x86_64-unknown-freebsd"),
+	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+};
+
 gb_global TargetMetrics target_essence_amd64 = {
 	TargetOs_essence,
 	TargetArch_amd64,
@@ -235,6 +259,8 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("linux_amd64"),   &target_linux_amd64 },
 	{ str_lit("windows_386"),   &target_windows_386 },
 	{ str_lit("windows_amd64"), &target_windows_amd64 },
+	{ str_lit("freebsd_386"),   &target_freebsd_386 },
+	{ str_lit("freebsd_amd64"), &target_freebsd_amd64 },
 };
 
 NamedTargetMetrics *selected_target_metrics;
@@ -476,7 +502,21 @@ String odin_root_dir(void) {
 		// of this compiler, it should be _good enough_.
 		// That said, there's no solid 100% method on Linux to get the program's
 		// path without checking this link. Sorry.
+#if defined(GB_SYSTEM_FREEBSD)
+		int mib[4];
+		mib[0] = CTL_KERN;
+		mib[1] = KERN_PROC;
+		mib[2] = KERN_PROC_PATHNAME;
+		mib[3] = -1;
+		len = path_buf.count;
+		sysctl(mib, 4, &path_buf[0], (size_t *) &len, NULL, 0);
+#elif defined(GB_SYSTEM_NETBSD)
+		len = readlink("/proc/curproc/exe", &path_buf[0], path_buf.count);
+#elif defined(GB_SYSTEM_DRAGONFLYBSD)
+		len = readlink("/proc/curproc/file", &path_buf[0], path_buf.count);
+#else
 		len = readlink("/proc/self/exe", &path_buf[0], path_buf.count);
+#endif
 		if(len == 0) {
 			return make_string(nullptr, 0);
 		}
