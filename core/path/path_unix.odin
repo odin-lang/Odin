@@ -1,4 +1,4 @@
-//+build linux, darwin
+//+build linux, darwin, freebsd
 package path
 
 foreign import libc "system:c"

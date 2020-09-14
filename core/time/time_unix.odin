@@ -1,4 +1,4 @@
-//+build linux, darwin
+//+build linux, darwin, freebsd
 package time
 
 IS_SUPPORTED :: true; // NOTE: Times on Darwin are UTC.

@@ -23,6 +23,8 @@ if [[ "$(uname)" == "Darwin" ]]; then
 	compiler="clang"
 
 	other_args="${other_args} -liconv"
+elif [[ "$(uname)" == "FreeBSD" ]]; then
+	compiler="clang"
 fi
 
 ${compiler} src/main.cpp ${warnings_to_disable} ${libraries} ${other_args} -o odin && ./odin run examples/demo/demo.odin
