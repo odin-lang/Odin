@@ -66,7 +66,7 @@ small_array_pop_back :: proc(a: ^$A/Small_Array($N, $T), loc := #caller_location
 	return item;
 }
 
-small_array_pop_font :: proc(a: ^$A/Small_Array($N, $T), loc := #caller_location) -> T {
+small_array_pop_front :: proc(a: ^$A/Small_Array($N, $T), loc := #caller_location) -> T {
 	assert(condition=a.len > 0, loc=loc);
 	item := a.data[0];
 	s := small_array_slice(a);
