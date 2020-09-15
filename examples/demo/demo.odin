@@ -712,8 +712,8 @@ union_type :: proc() {
 using_statement :: proc() {
 	fmt.println("\n# using statement");
 	// using can used to bring entities declared in a scope/namespace
-	// into the current scope. This can be applied to import declarations,
-	// import names, struct fields, procedure fields, and struct values.
+	// into the current scope. This can be applied to import names, struct 
+	// fields, procedure fields, and struct values.
 
 	Vector3 :: struct{x, y, z: f32};
 	{
