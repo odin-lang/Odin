@@ -3,8 +3,8 @@ package json
 import "core:mem"
 
 // NOTE(bill): is_valid will not check for duplicate keys
-is_valid :: proc(data: []byte, spec := Specification.JSON) -> bool {
-	p := make_parser(data, spec, mem.nil_allocator());
+is_valid :: proc(data: []byte, spec := Specification.JSON, parse_integers := false) -> bool {
+	p := make_parser(data, spec, parse_integers, mem.nil_allocator());
 	if p.spec == Specification.JSON5 {
 		return validate_value(&p);
 	}
