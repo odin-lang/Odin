@@ -42,12 +42,13 @@ Tokenizer :: struct {
 	w:                int,  // current rune width in bytes
 	curr_line_offset: int,
 	spec:             Specification,
+	parse_integers:   bool,
 }
 
 
 
-make_tokenizer :: proc(data: []byte, spec := Specification.JSON) -> Tokenizer {
-	t := Tokenizer{pos = {line=1}, data = data, spec = spec};
+make_tokenizer :: proc(data: []byte, spec := Specification.JSON, parse_integers := false) -> Tokenizer {
+	t := Tokenizer{pos = {line=1}, data = data, spec = spec, parse_integers = parse_integers};
 	next_rune(&t);
 	if t.r == utf8.RUNE_BOM {
 		next_rune(&t);
@@ -217,7 +218,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		fallthrough;
 
 	case '0'..'9':
-		token.kind = .Integer;
+		token.kind = t.parse_integers ? .Integer : .Float;
 		if t.spec == .JSON5 { // Hexadecimal Numbers
 			if curr_rune == '0' && (t.r == 'x' || t.r == 'X') {
 				next_rune(t);
