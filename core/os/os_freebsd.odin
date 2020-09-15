@@ -150,7 +150,6 @@ _File_Time :: struct {
 }
 
 pid_t :: u32;
-// timespec
 
 Stat :: struct {
 	device_id: u64,
