@@ -13,6 +13,8 @@ enum TargetOsKind {
 	TargetOs_js,
 	TargetOs_freebsd,
 
+	TargetOs_freestanding,
+
 	TargetOs_COUNT,
 };
 
@@ -43,6 +45,8 @@ String target_os_names[TargetOs_COUNT] = {
 	str_lit("essence"),
 	str_lit("js"),
 	str_lit("freebsd"),
+
+	str_lit("freestanding"),
 };
 
 String target_arch_names[TargetArch_COUNT] = {
