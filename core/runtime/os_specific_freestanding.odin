@@ -1,24 +1,21 @@
-//+build !freestanding
+//+build freestanding
 package runtime
 
-import "core:os"
-
 _OS_Errno  :: distinct int;
-_OS_Handle :: os.Handle;
+_OS_Handle :: distinct uintptr;
 
 os_stdout :: proc "contextless" () -> _OS_Handle {
-	return os.stdout;
+	return 1;
 }
 os_stderr :: proc "contextless" () -> _OS_Handle {
-	return os.stderr;
+	return 2;
 }
 
 // TODO(bill): reimplement `os.write`
 os_write :: proc(fd: _OS_Handle, data: []byte) -> (int, _OS_Errno) {
-	n, err := os.write(fd, data);
-	return int(n), _OS_Errno(err);
+	return 0, -1;
 }
 
 current_thread_id :: proc "contextless" () -> int {
-	return os.current_thread_id();
+	return 0;
 }
