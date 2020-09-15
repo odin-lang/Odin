@@ -84,8 +84,6 @@ struct lbModule {
 
 	Map<lbProcedure *> anonymous_proc_lits; // Key: Ast *
 
-	lbAddr global_default_context;
-
 	u32 global_array_index;
 	u32 global_generated_index;
 	u32 nested_type_name_guid;
@@ -355,7 +353,6 @@ lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValue value);
 lbValue lb_emit_source_code_location(lbProcedure *p, String const &procedure, TokenPos const &pos);
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
-#define LB_STARTUP_CONTEXT_PROC_NAME   "__$startup_context"
 #define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
 #define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"
 #define LB_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"

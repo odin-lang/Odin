@@ -11850,9 +11850,6 @@ void lb_generate_code(lbGenerator *gen) {
 	arena_init(&temp_arena, heap_allocator());
 	gbAllocator temp_allocator = arena_allocator(&temp_arena);
 
-	gen->module.global_default_context = lb_add_global_generated(m, t_context, {});
-	gen->module.global_default_context.kind = lbAddr_Context;
-
 	auto *min_dep_set = &info->minimum_dependency_set;
 
 
@@ -12228,7 +12225,6 @@ void lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Runtime Creation");
 
 	lbProcedure *startup_type_info = nullptr;
-	lbProcedure *startup_context = nullptr;
 	lbProcedure *startup_runtime = nullptr;
 	{ // Startup Type Info
 		Type *params  = alloc_type_tuple();
@@ -12255,31 +12251,6 @@ void lb_generate_code(lbGenerator *gen) {
 
 		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
 	}
-	{ // Startup Context
-		Type *params  = alloc_type_tuple();
-		Type *results = alloc_type_tuple();
-
-		Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
-
-		lbProcedure *p = lb_create_dummy_procedure(m, str_lit(LB_STARTUP_CONTEXT_PROC_NAME), proc_type);
-		p->is_startup = true;
-		startup_context = p;
-
-		lb_begin_procedure_body(p);
-
-		lb_emit_init_context(p, p->module->global_default_context);
-
-		lb_end_procedure_body(p);
-
-		if (LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
-			gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
-			LLVMDumpValue(p->value);
-			gb_printf_err("\n\n\n\n");
-			LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
-		}
-
-		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
-	}
 	{ // Startup Runtime
 		Type *params  = alloc_type_tuple();
 		Type *results = alloc_type_tuple();
@@ -12291,6 +12262,9 @@ void lb_generate_code(lbGenerator *gen) {
 		startup_runtime = p;
 
 		lb_begin_procedure_body(p);
+
+
+		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
 
 		for_array(i, global_variables) {
 			auto *var = &global_variables[i];
@@ -12396,8 +12370,6 @@ void lb_generate_code(lbGenerator *gen) {
 		lbValue *found = map_get(&m->values, hash_entity(entry_point));
 		GB_ASSERT(found != nullptr);
 
-		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
-		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_context->type)), startup_context->value, nullptr, 0, "");
 		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_runtime->type)), startup_runtime->value, nullptr, 0, "");
 		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, found->type)), found->value, nullptr, 0, "");
 		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 0, false));

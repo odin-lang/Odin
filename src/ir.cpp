@@ -33,8 +33,6 @@ struct irModule {
 	i32                   global_array_index; // For ConstantSlice
 	i32                   global_generated_index;
 
-	irValue *             global_default_context;
-
 	// NOTE(bill): To prevent strings from being copied a lot
 	// Mainly used for file names
 	StringMap<irValue *>  const_strings;
@@ -179,6 +177,7 @@ gbAllocator ir_allocator(void) {
 }
 
 
+#define IR_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
 #define IR_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"
 #define IR_TYPE_INFO_DATA_NAME       "__$type_info_data"
 #define IR_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"
@@ -3170,11 +3169,12 @@ irValue *ir_emit_comment(irProcedure *p, String text) {
 	return ir_emit(p, ir_instr_comment(p, text));
 }
 
-void ir_emit_init_context(irProcedure *proc, irValue *c = nullptr) {
+void ir_emit_init_context(irProcedure *proc, irValue *c) {
+	GB_ASSERT(c != nullptr);
 	irModule *m = proc->module;
 	gbAllocator a = ir_allocator();
 	auto args = array_make<irValue *>(a, 1);
-	args[0] = c ? c : m->global_default_context;
+	args[0] = c;
 	ir_emit_runtime_call(proc, "__init_context", args);
 }
 
@@ -12442,9 +12442,6 @@ void ir_gen_tree(irGen *s) {
 		}
 	}
 
-	// Add global default context
-	m->global_default_context = ir_add_global_generated(m, t_context, nullptr);
-
 	struct irGlobalVariable {
 		irValue *var, *init;
 		DeclInfo *decl;
@@ -12819,6 +12816,31 @@ void ir_gen_tree(irGen *s) {
 	}
 #endif
 
+	irValue *startup_type_info = nullptr;
+	{  // Startup Type Info
+		// Cleanup(bill): probably better way of doing code insertion
+		String name = str_lit(IR_STARTUP_TYPE_INFO_PROC_NAME);
+		Type *proc_type = alloc_type_proc(gb_alloc_item(a, Scope),
+		                                  nullptr, 0,
+		                                  nullptr, 0, false,
+		                                  ProcCC_Contextless);
+		Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
+		Entity *e = alloc_entity_procedure(nullptr, make_token_ident(name), proc_type, 0);
+		irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, name);
+		p->Proc.is_startup = true;
+		startup_type_info = p;
+
+		map_set(&m->values, hash_entity(e), p);
+		string_map_set(&m->members, name, p);
+
+		irProcedure *proc = &p->Proc;
+		proc->inlining = ProcInlining_no_inline; // TODO(bill): is no_inline a good idea?
+
+		ir_begin_procedure_body(proc);
+		ir_setup_type_info_data(proc);
+		ir_end_procedure_body(proc);
+	}
+
 	{ // Startup Runtime
 		// Cleanup(bill): probably better way of doing code insertion
 		String name = str_lit(IR_STARTUP_RUNTIME_PROC_NAME);
@@ -12841,10 +12863,7 @@ void ir_gen_tree(irGen *s) {
 		ir_begin_procedure_body(proc);
 		defer (ir_end_procedure_body(proc));
 
-		ir_emit_init_context(proc);
-
-		ir_setup_type_info_data(proc);
-
+		ir_emit_call(proc, startup_type_info, {}, ProcInlining_no_inline);
 
 		for_array(i, global_variables) {
 			irGlobalVariable *var = &global_variables[i];
