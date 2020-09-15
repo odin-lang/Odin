@@ -2,6 +2,8 @@ package reflect
 
 import "core:runtime"
 import "core:mem"
+_ :: runtime;
+_ :: mem;
 
 Map_Entry_Info :: struct(Key, Value: typeid) {
 	hash:  u64,
