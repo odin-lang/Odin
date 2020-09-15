@@ -6,9 +6,6 @@ import "core:os"
 _OS_Errno  :: distinct int;
 _OS_Handle :: os.Handle;
 
-os_stdout :: proc "contextless" () -> _OS_Handle {
-	return os.stdout;
-}
 os_stderr :: proc "contextless" () -> _OS_Handle {
 	return os.stderr;
 }

@@ -4,9 +4,6 @@ package runtime
 _OS_Errno  :: distinct int;
 _OS_Handle :: distinct uintptr;
 
-os_stdout :: proc "contextless" () -> _OS_Handle {
-	return 1;
-}
 os_stderr :: proc "contextless" () -> _OS_Handle {
 	return 2;
 }
