@@ -3,7 +3,6 @@
 // The compiler relies upon this _exact_ order
 package runtime
 
-import "core:os"
 import "intrinsics"
 _ :: intrinsics;
 
@@ -510,33 +509,16 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.temp_allocator.procedure = default_temp_allocator_proc;
 	c.temp_allocator.data = &global_default_temp_allocator_data;
 
-	c.thread_id = os.current_thread_id(); // NOTE(bill): This is "contextless" so it is okay to call
+	c.thread_id = current_thread_id(); // NOTE(bill): This is "contextless" so it is okay to call
 	c.assertion_failure_proc = default_assertion_failure_proc;
 
 	c.logger.procedure = default_logger_proc;
 	c.logger.data = nil;
-
-	// c.stdin  = os.stdin;
-	// c.stdout = os.stdout;
-	// c.stderr = os.stderr;
 }
 
 @builtin
 init_global_temporary_allocator :: proc(data: []byte, backup_allocator := context.allocator) {
 	default_temp_allocator_init(&global_default_temp_allocator_data, data, backup_allocator);
-}
-
-default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) {
-	fd := os.stderr;
-	print_caller_location(fd, loc);
-	os.write_string(fd, " ");
-	os.write_string(fd, prefix);
-	if len(message) > 0 {
-		os.write_string(fd, ": ");
-		os.write_string(fd, message);
-	}
-	os.write_byte(fd, '\n');
-	debug_trap();
 }
 
 
