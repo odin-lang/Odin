@@ -12863,7 +12863,7 @@ void ir_gen_tree(irGen *s) {
 		ir_begin_procedure_body(proc);
 		defer (ir_end_procedure_body(proc));
 
-		ir_emit_call(proc, startup_type_info, {}, ProcInlining_no_inline);
+		ir_emit(proc, ir_instr_call(proc, startup_type_info, nullptr, {}, nullptr, nullptr, ProcInlining_none));
 
 		for_array(i, global_variables) {
 			irGlobalVariable *var = &global_variables[i];
