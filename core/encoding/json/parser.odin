@@ -11,11 +11,12 @@ Parser :: struct {
 	spec:           Specification,
 	allocator:      mem.Allocator,
 	unmarshal_data: any,
+	parse_integers: bool,
 }
 
-make_parser :: proc(data: []byte, spec := Specification.JSON, allocator := context.allocator) -> Parser {
+make_parser :: proc(data: []byte, spec := Specification.JSON, parse_integers := false, allocator := context.allocator) -> Parser {
 	p: Parser;
-	p.tok = make_tokenizer(data, spec);
+	p.tok = make_tokenizer(data, spec, parse_integers);
 	p.spec = spec;
 	p.allocator = allocator;
 	assert(p.allocator.procedure != nil);
@@ -23,9 +24,9 @@ make_parser :: proc(data: []byte, spec := Specification.JSON, allocator := conte
 	return p;
 }
 
-parse :: proc(data: []byte, spec := Specification.JSON, allocator := context.allocator) -> (Value, Error) {
+parse :: proc(data: []byte, spec := Specification.JSON, parse_integers := false, allocator := context.allocator) -> (Value, Error) {
 	context.allocator = allocator;
-	p := make_parser(data, spec, allocator);
+	p := make_parser(data, spec, parse_integers, allocator);
 
 	if p.spec == Specification.JSON5 {
 		return parse_value(&p);
