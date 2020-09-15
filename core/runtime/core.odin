@@ -1234,8 +1234,7 @@ card :: proc(s: $S/bit_set[$E; $U]) -> int {
 		foreign { @(link_name="llvm.ctpop.i128") count_ones :: proc(i: u128) -> u128 --- }
 		return int(count_ones(transmute(u128)s));
 	} else {
-		#assert(false);
-		return 0;
+		#panic("Unhandled card bit_set size");
 	}
 }
 

@@ -5,6 +5,7 @@ import "core:odin/tokenizer"
 Proc_Tag :: enum {
 	Bounds_Check,
 	No_Bounds_Check,
+	Optional_Ok,
 }
 Proc_Tags :: distinct bit_set[Proc_Tag; u32];
 
@@ -21,6 +22,9 @@ Proc_Calling_Convention :: enum i32 {
 	C_Decl,
 	Std_Call,
 	Fast_Call,
+	Pure,
+	None,
+	Pure_None,
 
 	Foreign_Block_Default = -1,
 }
@@ -334,6 +338,20 @@ Range_Stmt :: struct {
 	body:      ^Stmt,
 }
 
+Inline_Range_Stmt :: struct {
+	using node: Stmt,
+	label:     ^Expr,
+	inline_pos: tokenizer.Pos,
+	for_pos:    tokenizer.Pos,
+	val0:       ^Expr,
+	val1:       ^Expr,
+	in_pos:     tokenizer.Pos,
+	expr:       ^Expr,
+	body:       ^Stmt,
+}
+
+
+
 
 Case_Clause :: struct {
 	using node: Stmt,
@@ -646,4 +664,11 @@ Map_Type :: struct {
 	tok_pos: tokenizer.Pos,
 	key:     ^Expr,
 	value:   ^Expr,
+}
+
+
+Relative_Type :: struct {
+	using node: Expr,
+	tag:  ^Expr,
+	type: ^Expr,
 }
