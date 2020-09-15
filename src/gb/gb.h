@@ -317,7 +317,7 @@ extern "C" {
 	#endif
 	#include <stdlib.h> // NOTE(bill): malloc on linux
 	#include <sys/mman.h>
-	#if !defined(GB_SYSTEM_OSX)
+	#if !defined(GB_SYSTEM_OSX) && !defined(__FreeBSD__)
 		#include <sys/sendfile.h>
 	#endif
 	#include <sys/stat.h>
@@ -340,6 +340,17 @@ extern "C" {
 	#include <sys/sysctl.h>
 	#include <copyfile.h>
 	#include <mach/clock.h>
+#endif
+
+#if defined(GB_SYSTEM_FREEBSD)
+	#include <sys/sysctl.h>
+	#include <pthread_np.h>
+	#include <sys/cpuset.h>
+	#include <sys/types.h>
+	#include <sys/socket.h>
+	#include <sys/uio.h>
+	#define lseek64 lseek
+	#define sendfile(out, in, offset, count) sendfile(out, in, offset, count, NULL, NULL, 0)
 #endif
 
 #if defined(GB_SYSTEM_UNIX)
@@ -1042,6 +1053,13 @@ typedef struct gbAffinity {
 #elif defined(GB_SYSTEM_LINUX)
 typedef struct gbAffinity {
 	b32   is_accurate;
+	isize core_count;
+	isize thread_count;
+	isize threads_per_core;
+} gbAffinity;
+#elif defined(GB_SYSTEM_FREEBSD)
+typedef struct gbAffinity {
+	b32 is_accurate;
 	isize core_count;
 	isize thread_count;
 	isize threads_per_core;
@@ -4805,6 +4823,8 @@ void gb_thread_set_name(gbThread *t, char const *name) {
 #elif defined(GB_SYSTEM_OSX)
 	// TODO(bill): Test if this works
 	pthread_setname_np(name);
+#elif defined(GB_SYSTEM_FREEBSD)
+	pthread_set_name_np(t->posix_handle, name);
 #else
 	// TODO(bill): Test if this works
 	pthread_setname_np(t->posix_handle, name);
@@ -5083,6 +5103,69 @@ b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
 	info.affinity_tag = cast(integer_t)index;
 	result = thread_policy_set(thread, THREAD_AFFINITY_POLICY, cast(thread_policy_t)&info, THREAD_AFFINITY_POLICY_COUNT);
 	return result == KERN_SUCCESS;
+}
+
+isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
+	GB_ASSERT(core >= 0 && core < a->core_count);
+	return a->threads_per_core;
+}
+
+#elif defined(GB_SYSTEM_FREEBSD)
+#include <stdio.h>
+
+void gb_affinity_init(gbAffinity *a) {
+	usize count = 0;
+	usize count_size = sizeof(count);
+
+	a->is_accurate      = false;
+	a->thread_count     = 1;
+	a->core_count       = 1;
+	a->threads_per_core = 1;
+
+	if (sysctlbyname("hw.logicalcpu", &count, &count_size, NULL, 0) == 0) {
+		if (count > 0) {
+			a->thread_count = count;
+			// Get # of physical cores
+			if (sysctlbyname("hw.physicalcpu", &count, &count_size, NULL, 0) == 0) {
+				if (count > 0) {
+					a->core_count = count;
+					a->threads_per_core = a->thread_count / count;
+					if (a->threads_per_core < 1)
+						a->threads_per_core = 1;
+					else
+						a->is_accurate = true;
+				}
+			}
+		}
+	}
+
+}
+
+void gb_affinity_destroy(gbAffinity *a) {
+	gb_unused(a);
+}
+
+b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
+	isize index;
+	pthread_t thread;
+
+	int result;
+
+	GB_ASSERT(core < a->core_count);
+	GB_ASSERT(thread_index < a->threads_per_core);
+
+	index = core * a->threads_per_core + thread_index;
+	thread = pthread_self();
+	
+
+	cpuset_t mn;
+	CPU_ZERO(&mn);
+	CPU_SET(size_t(index), &mn);
+	//info.affinity_tag = cast(integer_t)index;
+	//result = thread_policy_set(thread, THREAD_AFFINITY_POLICY, cast(thread_policy_t)&info, THREAD_AFFINITY_POLICY_COUNT);
+
+	result = pthread_setaffinity_np(thread, sizeof(cpuset_t), &mn);
+	return result == 0;
 }
 
 isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
