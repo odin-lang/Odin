@@ -67,19 +67,15 @@ PTHREAD_EXPLICIT_SCHED :: 0;
 PTHREAD_PROCESS_PRIVATE :: 0;
 PTHREAD_PROCESS_SHARED :: 1;
 
-/*SCHED_OTHER :: 0;
 SCHED_FIFO  :: 1;
-SCHED_RR :: 2; // Round robin.
-*/
+SCHED_OTHER :: 2;
+SCHED_RR :: 3; // Round robin.
+
 
 sched_param :: struct {
 	sched_priority: c.int,
 }
 
-/*sem_t :: struct #align 16 {
-	_: [SEM_T_SIZE] c.char,
-}*/
-SEM_T_SIZE :: 16;
 _usem :: struct {
 	_has_waiters: u32,
 	_count: u32,
@@ -94,12 +90,6 @@ sem_t :: struct {
 	_kern: _usem2,
 	_padding: u32,
 }
-
-/*when size_of(int) == 8 {
-	SEM_T_SIZE :: 32;
-} else when size_of(int) == 4 {
-	SEM_T_SIZE :: 16;
-}*/
 
 foreign import "system:pthread"
 
