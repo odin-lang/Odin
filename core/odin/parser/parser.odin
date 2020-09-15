@@ -177,6 +177,19 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	return true;
 }
 
+peek_token_kind :: proc(p: ^Parser, kind: tokenizer.Token_Kind, lookahead := 0) -> (ok: bool) {
+	prev_parser := p^;
+	defer p^ = prev_parser;
+
+	p.tok.err = nil;
+	for i := 0; i <= lookahead; i += 1 {
+		advance_token(p);
+	}
+	ok = p.curr_tok.kind == kind;
+
+	return;
+}
+
 
 next_token0 :: proc(p: ^Parser) -> bool {
 	p.curr_tok = tokenizer.scan(&p.tok);
@@ -335,7 +348,7 @@ is_semicolon_optional_for_node :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 		return true;
 
 	case ast.If_Stmt, ast.When_Stmt,
-	     ast.For_Stmt, ast.Range_Stmt,
+	     ast.For_Stmt, ast.Range_Stmt, ast.Inline_Range_Stmt,
 	     ast.Switch_Stmt, ast.Type_Switch_Stmt:
 		return true;
 
@@ -391,15 +404,21 @@ expect_semicolon :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 			}
 		} else {
 			#partial switch p.curr_tok.kind {
-			case .Close_Brace:
-			case .Close_Paren:
-			case .Else:
+			case .Close_Brace, .Close_Paren, .Else:
 				return true;
+			case .EOF:
+				if is_semicolon_optional_for_node(p, node) {
+					return true;
+				}
 			}
+		}
+	} else {
+		if p.curr_tok.kind == .EOF {
+			return true;
 		}
 	}
 
-	error(p, prev.pos, "expected ';', got %s", tokenizer.to_string(prev.kind));
+	error(p, prev.pos, "expected ';', got %s", tokenizer.to_string(p.curr_tok.kind));
 	return false;
 }
 
@@ -967,6 +986,64 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	     .Pointer,
 	     // Unary Expressions
 	     .Add, .Sub, .Xor, .Not, .And:
+
+	    if peek_token_kind(p, .For) {
+	    	inline_tok := expect_token(p, .Inline);
+	    	for_tok := expect_token(p, .For);
+	    	val0, val1: ^ast.Expr;
+	    	in_tok: tokenizer.Token;
+	    	expr: ^ast.Expr;
+	    	body: ^ast.Stmt;
+
+	    	bad_stmt := false;
+
+	    	if p.curr_tok.kind != .In {
+	    		idents := parse_ident_list(p, false);
+	    		switch len(idents) {
+	    		case 1:
+	    			val0 = idents[0];
+	    		case 2:
+	    			val0, val1 = idents[0], idents[1];
+	    		case:
+	    			error(p, for_tok.pos, "expected either 1 or 2 identifiers");
+	    			bad_stmt = true;
+	    		}
+	    	}
+
+	    	in_tok = expect_token(p, .In);
+
+	    	prev_allow_range := p.allow_range;
+	    	prev_level := p.expr_level;
+	    	p.allow_range = true;
+	    	p.expr_level = -1;
+
+	    	expr = parse_expr(p, false);
+
+	    	p.expr_level = prev_level;
+	    	p.allow_range = prev_allow_range;
+
+	    	if allow_token(p, .Do) {
+	    		body = convert_stmt_to_body(p, parse_stmt(p));
+	    	} else {
+	    		body = parse_block_stmt(p, false);
+	    	}
+
+	    	if bad_stmt {
+				return ast.new(ast.Bad_Stmt, inline_tok.pos, end_pos(p.prev_tok));
+	    	}
+
+	    	range_stmt := ast.new(ast.Inline_Range_Stmt, inline_tok.pos, body.end);
+	    	range_stmt.inline_pos = inline_tok.pos;
+	    	range_stmt.for_pos = for_tok.pos;
+	    	range_stmt.val0 = val0;
+	    	range_stmt.val1 = val1;
+	    	range_stmt.in_pos = in_tok.pos;
+	    	range_stmt.expr = expr;
+	    	range_stmt.body = body;
+	    	return range_stmt;
+	    }
+
+
 	    s := parse_simple_stmt(p, {Stmt_Allow_Flag.Label});
 	    expect_semicolon(p, s);
 		return s;
@@ -1131,9 +1208,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 token_precedence :: proc(p: ^Parser, kind: tokenizer.Token_Kind) -> int {
 	#partial switch kind {
-	case .Question:
-	case .If:
-	case .When:
+	case .Question, .If, .When:
 		return 1;
 	case .Ellipsis, .Range_Half:
 		if !p.allow_range {
@@ -1731,23 +1806,30 @@ parse_results :: proc(p: ^Parser) -> (list: ^ast.Field_List, diverging: bool) {
 
 
 string_to_calling_convention :: proc(s: string) -> ast.Proc_Calling_Convention {
-	using ast.Proc_Calling_Convention;
 	if s[0] != '"' && s[0] != '`' {
-		return Invalid;
+		return .Invalid;
 	}
 	switch s[1:len(s)-1] {
 	case "odin":
-		return Odin;
+		return .Odin;
 	case "contextless":
-		return Contextless;
+		return .Contextless;
 	case "cdecl", "c":
-		return C_Decl;
+		return .C_Decl;
 	case "stdcall", "std":
-		return Std_Call;
+		return .Std_Call;
 	case "fast", "fastcall":
-		return Fast_Call;
+		return .Fast_Call;
+
+	case "pure":
+		return .Pure;
+	case "none":
+		return .None;
+	case "pure_none":
+		return .Pure_None;
+
 	}
-	return Invalid;
+	return .Invalid;
 }
 
 parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
@@ -1760,6 +1842,8 @@ parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
 			tags |= {.Bounds_Check};
 		case "no_bounds_check":
 			tags |= {.No_Bounds_Check};
+		case "optional_ok":
+			tags |= {.Optional_Ok};
 		case:
 		}
 	}
@@ -1926,7 +2010,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return parse_call_expr(p, bd);
 
 
-		case "soa", "vector":
+		case "soa", "simd":
 			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(name));
 			bd.tok  = tok;
 			bd.name = name.text;
@@ -1936,9 +2020,56 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			case ast.Array_Type:         t.tag = bd;
 			case ast.Dynamic_Array_Type: t.tag = bd;
 			case:
-				error(p, original_type.pos, "expected an array type after #%s");
+				error(p, original_type.pos, "expected an array type after #%s", name.text);
 			}
 			return original_type;
+
+		case "partial":
+			tag := ast.new(ast.Basic_Directive, tok.pos, end_pos(name));
+			tag.tok = tok;
+			tag.name = name.text;
+			original_type := parse_type(p);
+			type := ast.unparen_expr(original_type);
+			switch t in &type.derived {
+			case ast.Array_Type:
+				t.tag = tag;
+			case:
+				error(p, tok.pos, "expected an enumerated array type after #%s", name.text);
+
+			}
+			return original_type;
+
+		case "bounds_check", "no_bounds_check":
+			operand := parse_expr(p, lhs);
+
+			switch name.text {
+			case "bounds_check":
+				operand.state_flags |= {.Bounds_Check};
+				if .No_Bounds_Check in operand.state_flags {
+					error(p, name.pos, "#bounds_check and #no_bounds_check cannot be applied together");
+				}
+			case "no_bounds_check":
+				operand.state_flags |= {.No_Bounds_Check};
+				if .Bounds_Check in operand.state_flags {
+					error(p, name.pos, "#bounds_check and #no_bounds_check cannot be applied together");
+				}
+			case: unimplemented();
+			}
+			return operand;
+
+		case "relative":
+			tag := ast.new(ast.Basic_Directive, tok.pos, end_pos(name));
+			tag.tok = tok;
+			tag.name = name.text;
+
+			tag_call := parse_call_expr(p, tag);
+			type := parse_type(p);
+
+			rt := ast.new(ast.Relative_Type, tok.pos, type.end);
+			rt.tag = tag_call;
+			rt.type = type;
+			return rt;
+
 		case:
 			expr := parse_expr(p, lhs);
 			te := ast.new(ast.Tag_Expr, tok.pos, expr.pos);
@@ -2010,6 +2141,8 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		}
 
 		type := parse_proc_type(p, tok);
+		tags := parse_proc_tags(p);
+		type.tags = tags;
 
 		where_token: tokenizer.Token;
 		where_clauses: []^ast.Expr;
@@ -2020,7 +2153,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			where_clauses = parse_rhs_expr_list(p);
 			p.expr_level = prev_level;
 		}
-
 		if p.allow_type && p.expr_level < 0 {
 			if where_token.kind != .Invalid {
 				error(p, where_token.pos, "'where' clauses are not allowed on procedure types");
@@ -2030,7 +2162,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		body: ^ast.Stmt;
 
 		if allow_token(p, .Undef) {
-			// Okay
+			body = nil;
 			if where_token.kind != .Invalid {
 				error(p, where_token.pos, "'where' clauses are not allowed on procedure literals without a defined body (replaced with ---");
 			}
@@ -2051,6 +2183,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		pl := ast.new(ast.Proc_Lit, tok.pos, end_pos(p.prev_tok));
 		pl.type = type;
 		pl.body = body;
+		pl.tags = tags;
 		pl.where_token = where_token;
 		pl.where_clauses = where_clauses;
 		return pl;
@@ -2638,6 +2771,18 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 
 				operand = ta;
 
+			case .Question:
+				question := expect_token(p, .Question);
+				type := ast.new(ast.Unary_Expr, question.pos, end_pos(question));
+				type.op = question;
+				type.expr = nil;
+
+				ta := ast.new(ast.Type_Assertion, operand.pos, type.end);
+				ta.expr  = operand;
+				ta.type  = type;
+
+				operand = ta;
+
 			case:
 				error(p, p.curr_tok.pos, "expected a selector");
 				advance_token(p);
@@ -2736,7 +2881,9 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 
 			expect_operator(p);
 
-			if op.kind == .Question {
+			#partial switch op.kind {
+			case .Question:
+
 				cond := expr;
 				x := parse_expr(p, lhs);
 				colon := expect_token(p, .Colon);
@@ -2749,7 +2896,7 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 				te.y    = y;
 
 				expr = te;
-			} else if op.kind == .If {
+			case .If:
 				x := expr;
 				cond := parse_expr(p, lhs);
 				else_tok := expect_token(p, .Else);
@@ -2762,7 +2909,7 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 				te.y    = y;
 
 				expr = te;
-			} else if op.kind == .When {
+			case .When:
 				x := expr;
 				cond := parse_expr(p, lhs);
 				else_tok := expect_token(p, .Else);
@@ -2775,7 +2922,7 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 				te.y    = y;
 
 				expr = te;
-			} else {
+			case:
 				right := parse_binary_expr(p, false, prec+1);
 				if right == nil {
 					error(p, op.pos, "expected expression on the right-hand side of the binary operator");

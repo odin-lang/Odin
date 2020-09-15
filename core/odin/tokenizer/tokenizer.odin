@@ -150,13 +150,21 @@ scan_comment :: proc(t: ^Tokenizer) -> string {
 
 		/* style comment */
 		advance_rune(t);
-		for t.ch >= 0 {
+		nest := 1;
+		for t.ch >= 0 && nest > 0 {
 			ch := t.ch;
 			advance_rune(t);
+			if ch == '/' && t.ch == '*' {
+				nest += 1;
+			}
+
 			if ch == '*' && t.ch == '/' {
+				nest -= 1;
 				advance_rune(t);
 				next = t.offset;
-				break general;
+				if nest == 0 {
+					break general;
+				}
 			}
 		}
 
