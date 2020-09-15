@@ -1,12 +1,30 @@
 package runtime
 
-import "core:os"
+when ODIN_OS == "freestanding" {
+	// mem.nil_allocator reimplementation
 
-default_allocator_proc :: os.heap_allocator_proc;
+	default_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
+	                               size, alignment: int,
+	                               old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+		return nil;
+	}
 
-default_allocator :: proc() -> Allocator {
-	return os.heap_allocator();
+	default_allocator :: proc() -> Allocator {
+		return Allocator{
+			procedure = default_allocator_proc,
+			data = nil,
+		};
+	}
+} else {
+	import "core:os"
+
+	default_allocator_proc :: os.heap_allocator_proc;
+
+	default_allocator :: proc() -> Allocator {
+		return os.heap_allocator();
+	}
 }
+
 
 
 Default_Temp_Allocator :: struct {
