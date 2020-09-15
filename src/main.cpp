@@ -580,6 +580,8 @@ enum BuildFlagKind {
 	BuildFlag_IgnoreUnknownAttributes,
 	BuildFlag_ExtraLinkerFlags,
 
+	BuildFlag_DefaultToNilAllocator,
+
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
 	BuildFlag_GoToDefinitions,
@@ -675,6 +677,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"), BuildFlagParam_String);
+
+	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator, str_lit("default-to-nil-allocator"), BuildFlagParam_None);
 
 	add_flag(&build_flags, BuildFlag_Compact, str_lit("compact"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_GlobalDefinitions, str_lit("global-definitions"), BuildFlagParam_None);
@@ -1097,6 +1101,10 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ExtraLinkerFlags:
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.extra_linker_flags = value.value_string;
+							break;
+
+						case BuildFlag_DefaultToNilAllocator:
+							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
 							break;
 
 						case BuildFlag_Compact:
@@ -1685,7 +1693,7 @@ int main(int arg_count, char const **arg_ptr) {
 		#endif
 	} else if (command == "version") {
 		gb_printf("%.*s version %.*s", LIT(args[0]), LIT(ODIN_VERSION));
-		
+
 		#ifdef NIGHTLY
 		gb_printf("-nightly");
 		#endif
@@ -1693,7 +1701,7 @@ int main(int arg_count, char const **arg_ptr) {
 		#ifdef GIT_SHA
 		gb_printf("-%s", GIT_SHA);
 		#endif
-		
+
 		gb_printf("\n");
 		return 0;
 	} else {
