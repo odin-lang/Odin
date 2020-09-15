@@ -4821,16 +4821,16 @@ bool parse_build_tag(Token token_for_pos, String s) {
 				TargetArchKind arch = get_target_arch_from_string(p);
 				if (os != TargetOs_Invalid) {
 					GB_ASSERT(arch == TargetArch_Invalid);
-					if (is_notted && os == build_context.metrics.os) {
-						this_kind_correct = false;
-					} else if (os != build_context.metrics.os) {
-						this_kind_correct = false;
+					if (is_notted) {
+						this_kind_correct = this_kind_correct && (os != build_context.metrics.os);
+					} else {
+						this_kind_correct = this_kind_correct && (os == build_context.metrics.os);
 					}
 				} else if (arch != TargetArch_Invalid) {
-					if (is_notted && arch == build_context.metrics.arch) {
-						this_kind_correct = false;
-					} else if (arch != build_context.metrics.arch) {
-						this_kind_correct = false;
+					if (is_notted) {
+						this_kind_correct = this_kind_correct && (arch != build_context.metrics.arch);
+					} else {
+						this_kind_correct = this_kind_correct && (arch == build_context.metrics.arch);
 					}
 				}
 				if (os == TargetOs_Invalid && arch == TargetArch_Invalid) {
