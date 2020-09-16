@@ -1222,6 +1222,7 @@ map_type :: proc() {
 	fmt.println(m["Bob"]);
 
 	delete_key(&m, "Ted");
+	fmt.println("After delete");
 
 	// If an element of a key does not exist, the zero value of the
 	// element will be returned. To check to see if an element exists

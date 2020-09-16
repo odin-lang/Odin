@@ -27,4 +27,6 @@ elif [[ "$(uname)" == "FreeBSD" ]]; then
 	compiler="clang"
 fi
 
-${compiler} src/main.cpp ${warnings_to_disable} ${libraries} ${other_args} -o odin && ./odin run examples/demo/demo.odin
+${compiler} src/main.cpp ${warnings_to_disable} ${libraries} ${other_args} -o odin
+echo "Compilation finished"
+./odin run examples/demo/demo.odin

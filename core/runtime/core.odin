@@ -1628,10 +1628,15 @@ __dynamic_map_hash_equal :: proc(h: Map_Header, a, b: Map_Key) -> bool {
 	return false;
 }
 
+import "core:fmt"
 __dynamic_map_find :: proc(using h: Map_Header, key: Map_Key) -> Map_Find_Result #no_bounds_check {
+	k := key;
+	hsh := k.hash;
+
 	fr := Map_Find_Result{-1, -1, -1};
 	if n := u64(len(m.hashes)); n > 0 {
-		fr.hash_index = int(key.hash % n);
+		fr.hash_index = int(hsh % n);
+		fmt.println("Testing");
 		fr.entry_index = m.hashes[fr.hash_index];
 		for fr.entry_index >= 0 {
 			entry := __dynamic_map_get_entry(h, fr.entry_index);

@@ -157,7 +157,7 @@ extern "C" {
 	#endif
 #endif
 
-#if defined(_WIN64) || defined(__x86_64__) || defined(_M_X64) || defined(__64BIT__) || defined(__powerpc64__) || defined(__ppc64__)
+#if defined(_WIN64) || defined(__x86_64__) || defined(_M_X64) || defined(__64BIT__) || defined(__powerpc64__) || defined(__ppc64__) || defined(__aarch64__)
 	#ifndef GB_ARCH_64_BIT
 	#define GB_ARCH_64_BIT 1
 	#endif
@@ -230,7 +230,7 @@ extern "C" {
 	#define GB_CACHE_LINE_SIZE 128
 	#endif
 
-#elif defined(__arm__)
+#elif defined(__arm__) || defined(__aarch64__) || defined(_M_ARM) || defined(_M_ARM64)
 	#ifndef GB_CPU_ARM
 	#define GB_CPU_ARM 1
 	#endif
@@ -1057,6 +1057,7 @@ typedef struct gbAffinity {
 	isize thread_count;
 	isize threads_per_core;
 } gbAffinity;
+
 #elif defined(GB_SYSTEM_FREEBSD)
 typedef struct gbAffinity {
 	b32 is_accurate;
@@ -3702,6 +3703,13 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 
 	void *dest_copy = dest;
 	__asm__ __volatile__("rep movsb" : "+D"(dest_copy), "+S"(source), "+c"(n) : : "memory");
+
+#elif defined(GB_CPU_ARM)
+	u8 *s = cast(u8 *) source;
+	u8 *d = cast(u8 *) dest;
+	for (size_t i = 0; i < n; i++) {
+		*(d+ i) = *(s+ i);
+	}
 #else
 	u8 *d = cast(u8 *)dest;
 	u8 const *s = cast(u8 const *)source;
@@ -4110,6 +4118,9 @@ gb_inline void *gb_default_resize_align(gbAllocator a, void *old_memory, isize o
 // IMPORTANT TODO(bill): Use compiler intrinsics for the atomics
 
 #if defined(GB_COMPILER_MSVC) && !defined(GB_COMPILER_CLANG)
+
+// TODO(Christian Seibold): Implement ARM for Windows
+
 gb_inline i32  gb_atomic32_load (gbAtomic32 const volatile *a)      { return a->value;  }
 gb_inline void gb_atomic32_store(gbAtomic32 volatile *a, i32 value) { a->value = value; }
 
@@ -4243,6 +4254,7 @@ gb_inline i32  gb_atomic32_load (gbAtomic32 const volatile *a)      { return a->
 gb_inline void gb_atomic32_store(gbAtomic32 volatile *a, i32 value) { a->value = value; }
 
 gb_inline i32 gb_atomic32_compare_exchange(gbAtomic32 volatile *a, i32 expected, i32 desired) {
+	printf("32_compare_exchange\n");
 	i32 original;
 	__asm__ volatile(
 		"lock; cmpxchgl %2, %1"
@@ -4253,6 +4265,7 @@ gb_inline i32 gb_atomic32_compare_exchange(gbAtomic32 volatile *a, i32 expected,
 }
 
 gb_inline i32 gb_atomic32_exchanged(gbAtomic32 volatile *a, i32 desired) {
+	printf("32_exchanged\n");
 	// NOTE(bill): No lock prefix is necessary for xchgl
 	i32 original;
 	__asm__ volatile(
@@ -4438,6 +4451,68 @@ gb_inline i64 gb_atomic64_fetch_or(gbAtomic64 volatile *a, i64 operand) {
 #endif
 }
 
+#elif defined(GB_CPU_ARM)
+
+// TODO(Christian Seibold): Use Assembly instead?
+// Also, what about MSVC?
+
+gb_inline i32  gb_atomic32_load (gbAtomic32 const volatile *a)      { return __atomic_load_n(&a->value, __ATOMIC_SEQ_CST);  }
+gb_inline void gb_atomic32_store(gbAtomic32 volatile *a, i32 value) { __atomic_store_n(&a->value, value, __ATOMIC_SEQ_CST); }
+
+gb_inline i32 gb_atomic32_compare_exchange(gbAtomic32 volatile *a, i32 expected, i32 desired) {
+	i32 expected_copy = expected;
+	auto result = __atomic_compare_exchange_n(&a->value, &expected_copy, desired, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+	if (result) return expected;
+	else return expected_copy;
+}
+
+gb_inline i32 gb_atomic32_exchanged(gbAtomic32 volatile *a, i32 desired) {
+	return __atomic_exchange_n(&a->value, desired, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i32 gb_atomic32_fetch_add(gbAtomic32 volatile *a, i32 operand) {
+	return __atomic_fetch_add(&a->value, operand, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i32 gb_atomic32_fetch_and(gbAtomic32 volatile *a, i32 operand) {
+	return __atomic_fetch_and(&a->value, operand, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i32 gb_atomic32_fetch_or(gbAtomic32 volatile *a, i32 operand) {
+	return __atomic_fetch_or(&a->value, operand, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i64 gb_atomic64_load(gbAtomic64 const volatile *a) {
+	return __atomic_load_n(&a->value, __ATOMIC_SEQ_CST);
+}
+
+gb_inline void gb_atomic64_store(gbAtomic64 volatile *a, i64 value) {
+	__atomic_store_n(&a->value, value, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i64 gb_atomic64_compare_exchange(gbAtomic64 volatile *a, i64 expected, i64 desired) {
+	i64 expected_copy = expected;
+	auto result = __atomic_compare_exchange_n(&a->value, &expected_copy, desired, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+	if (result) return expected;
+	else return expected_copy;
+}
+
+gb_inline i64 gb_atomic64_exchanged(gbAtomic64 volatile *a, i64 desired) {
+	return __atomic_exchange_n(&a->value, desired, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i64 gb_atomic64_fetch_add(gbAtomic64 volatile *a, i64 operand) {
+	return __atomic_fetch_add(&a->value, operand, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i64 gb_atomic64_fetch_and(gbAtomic64 volatile *a, i64 operand) {
+	return __atomic_fetch_and(&a->value, operand, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i64 gb_atomic64_fetch_or(gbAtomic64 volatile *a, i64 operand) {
+	return __atomic_fetch_or(&a->value, operand, __ATOMIC_SEQ_CST);
+}
+
 #else
 #error TODO(bill): Implement Atomics for this CPU
 #endif
@@ -4566,6 +4641,8 @@ gb_inline void gb_yield_thread(void) {
 	__asm__ volatile ("" : : : "memory");
 #elif defined(GB_CPU_X86)
 	_mm_pause();
+#elif defined(GB_CPU_ARM)
+	asm volatile("yield" : : : "memory");
 #else
 #error Unknown architecture
 #endif
@@ -4578,6 +4655,9 @@ gb_inline void gb_mfence(void) {
 	__sync_synchronize();
 #elif defined(GB_CPU_X86)
 	_mm_mfence();
+#elif defined(GB_CPU_ARM)
+	// TODO(Christian Seibold)
+	__atomic_thread_fence(__ATOMIC_SEQ_CST);
 #else
 #error Unknown architecture
 #endif
@@ -4590,6 +4670,9 @@ gb_inline void gb_sfence(void) {
 	__asm__ volatile ("" : : : "memory");
 #elif defined(GB_CPU_X86)
 	_mm_sfence();
+#elif defined(GB_CPU_ARM)
+	// TODO(Christian Seibold)
+	__atomic_thread_fence(__ATOMIC_SEQ_CST);
 #else
 #error Unknown architecture
 #endif
@@ -4602,6 +4685,9 @@ gb_inline void gb_lfence(void) {
 	__asm__ volatile ("" : : : "memory");
 #elif defined(GB_CPU_X86)
 	_mm_lfence();
+#elif defined(GB_CPU_ARM)
+	// TODO(Christian Seibold)
+	__atomic_thread_fence(__ATOMIC_SEQ_CST);
 #else
 #error Unknown architecture
 #endif
@@ -4787,6 +4873,12 @@ gb_inline u32 gb_thread_current_id(void) {
 	__asm__("mov %%gs:0x08,%0" : "=r"(thread_id));
 #elif defined(GB_ARCH_64_BIT) && defined(GB_CPU_X86)
 	__asm__("mov %%fs:0x10,%0" : "=r"(thread_id));
+#elif defined(GB_SYSTEM_LINUX) && defined(GB_CPU_ARM)
+	// TODO(Christian Seibold): Use assembly?
+	thread_id = gettid();
+#elif defined(GB_SYSTEM_FREEBSD) && defined(GB_CPU_ARM)
+	// TODO(Christian Seibold): Use assembly?
+	thread_id = pthread_getthreadid_np();
 #else
 	#error Unsupported architecture for gb_thread_current_id()
 #endif
@@ -5202,7 +5294,7 @@ void gb_affinity_init(gbAffinity *a) {
 		for (;;) {
 			// The 'temporary char'. Everything goes into this char,
 			// so that we can check against EOF at the end of this loop.
-			char c;
+			int c;
 
 #define AF__CHECK(letter) ((c = getc(cpu_info)) == letter)
 			if (AF__CHECK('c') && AF__CHECK('p') && AF__CHECK('u') && AF__CHECK(' ') &&
@@ -7693,7 +7785,7 @@ u64 gb_murmur64_seed(void const *data_, isize len, u64 seed) {
 
 #else // POSIX
 	gb_internal GB_FILE_SEEK_PROC(gb__posix_file_seek) {
-		#if defined(GB_SYSTEM_OSX)
+		#if defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD)
 		i64 res = lseek(fd.i, offset, whence);
 		#else
 		i64 res = lseek64(fd.i, offset, whence);
@@ -8807,6 +8899,12 @@ gb_inline gbDllProc gb_dll_proc_address(gbDllHandle dll, char const *proc_name) 
 		result = result|lower;
 
 		return result;
+	}
+#elif defined(__aarch64__)
+	gb_inline u64 gb_rdtsc(void) {
+		int64_t virtual_timer_value;
+		asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
+		return virtual_timer_value;
 	}
 #endif
 

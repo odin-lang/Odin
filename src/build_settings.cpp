@@ -24,6 +24,7 @@ enum TargetArchKind {
 	TargetArch_amd64,
 	TargetArch_386,
 	TargetArch_wasm32,
+	TargetArch_aarch64,
 
 	TargetArch_COUNT,
 };
@@ -54,6 +55,7 @@ String target_arch_names[TargetArch_COUNT] = {
 	str_lit("amd64"),
 	str_lit("386"),
 	str_lit("wasm32"),
+	str_lit("aarch64"),
 };
 
 String target_endian_names[TargetEndian_COUNT] = {
@@ -64,6 +66,7 @@ String target_endian_names[TargetEndian_COUNT] = {
 
 TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Invalid,
+	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
@@ -189,6 +192,14 @@ gb_global TargetMetrics target_windows_amd64 = {
 	str_lit("x86_64-pc-windows-msvc"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
+gb_global TargetMetrics target_windows_aarch64 = {
+	TargetOs_windows,
+	TargetArch_aarch64,
+	8,
+	16,
+	str_lit("aarch64-pc-windows-msvc"),
+	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+};
 
 gb_global TargetMetrics target_linux_386 = {
 	TargetOs_linux,
@@ -206,6 +217,14 @@ gb_global TargetMetrics target_linux_amd64 = {
 	str_lit("x86_64-pc-linux-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
+gb_global TargetMetrics target_linux_aarch64 = {
+	TargetOs_linux,
+	TargetArch_aarch64,
+	8,
+	16,
+	str_lit("aarch64-unknown-linux-gnu"),
+	str_lit("e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128"),
+};
 
 gb_global TargetMetrics target_darwin_amd64 = {
 	TargetOs_darwin,
@@ -213,6 +232,14 @@ gb_global TargetMetrics target_darwin_amd64 = {
 	8,
 	16,
 	str_lit("x86_64-apple-darwin"),
+	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
+};
+gb_global TargetMetrics target_darwin_aarch64 = {
+	TargetOs_darwin,
+	TargetArch_aarch64,
+	8,
+	16,
+	str_lit("aarch64-apple-darwin"),
 	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
@@ -223,13 +250,20 @@ gb_global TargetMetrics target_freebsd_386 = {
 	8,
 	str_lit("i386-unknown-freebsd-elf"),
 };
-
 gb_global TargetMetrics target_freebsd_amd64 = {
 	TargetOs_freebsd,
 	TargetArch_amd64,
 	8,
 	16,
 	str_lit("x86_64-unknown-freebsd-elf"),
+	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+};
+gb_global TargetMetrics target_freebsd_aarch64 = {
+	TargetOs_freebsd,
+	TargetArch_aarch64,
+	8,
+	16,
+	str_lit("aarch64-unknown-freebsd-elf"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
@@ -258,14 +292,18 @@ struct NamedTargetMetrics {
 
 gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("darwin_amd64"),  &target_darwin_amd64 },
+	{ str_lit("darwin_aarch64"),  &target_darwin_aarch64 },
 	{ str_lit("essence_amd64"), &target_essence_amd64 },
 	{ str_lit("js_wasm32"),     &target_js_wasm32 },
 	{ str_lit("linux_386"),     &target_linux_386 },
 	{ str_lit("linux_amd64"),   &target_linux_amd64 },
+	{ str_lit("linux_aarch64"),   &target_linux_aarch64 },
 	{ str_lit("windows_386"),   &target_windows_386 },
 	{ str_lit("windows_amd64"), &target_windows_amd64 },
+	{ str_lit("windows_aarch64"), &target_windows_aarch64 },
 	{ str_lit("freebsd_386"),   &target_freebsd_386 },
 	{ str_lit("freebsd_amd64"), &target_freebsd_amd64 },
+	{ str_lit("freebsd_aarch64"), &target_freebsd_aarch64 },
 };
 
 NamedTargetMetrics *selected_target_metrics;
@@ -654,16 +692,28 @@ void init_build_context(TargetMetrics *cross_target) {
 	TargetMetrics *metrics = nullptr;
 
 	#if defined(GB_ARCH_64_BIT)
-		#if defined(GB_SYSTEM_WINDOWS)
-			metrics = &target_windows_amd64;
-		#elif defined(GB_SYSTEM_OSX)
-			metrics = &target_darwin_amd64;
-		#elif defined(GB_SYSTEM_FREEBSD)
-			metrics = &target_freebsd_amd64;
-		#else
-			metrics = &target_linux_amd64;
+		#if defined(GB_CPU_X86)
+			#if defined(GB_SYSTEM_WINDOWS)
+				metrics = &target_windows_amd64;
+			#elif defined(GB_SYSTEM_OSX)
+				metrics = &target_darwin_amd64;
+			#elif defined(GB_SYSTEM_FREEBSD)
+				metrics = &target_freebsd_amd64;
+			#else
+				metrics = &target_linux_amd64;
+			#endif
+		#elif defined(GB_CPU_ARM)
+			#if defined(GB_SYSTEM_WINDOWS)
+				metrics = &target_windows_aarch64;
+			#elif defined(GB_SYSTEM_OSX)
+				metrics = &target_darwin_aarch64;
+			#elif defined(GB_SYSTEM_FREEBSD)
+				metrics = &target_freebsd_aarch64;
+			#else
+				metrics = &target_linux_aarch64;
+			#endif
 		#endif
-	#else
+	#elif defined(GB_ARCH_32_BIT)
 		#if defined(GB_SYSTEM_WINDOWS)
 			metrics = &target_windows_386;
 		#elif defined(GB_SYSTEM_OSX)
@@ -738,6 +788,24 @@ void init_build_context(TargetMetrics *cross_target) {
 			break;
 		case TargetOs_freebsd:
 			bc->link_flags = str_lit("-arch x86");
+			break;
+		}
+	} else if (bc->metrics.arch == TargetArch_aarch64) {
+		llc_flags = gb_string_appendc(llc_flags, "-march=aarch64 ");
+
+		switch (bc->metrics.os) {
+		case TargetOs_windows:
+			bc->link_flags = str_lit("/machine:aarch64 ");
+			break;
+		case TargetOs_darwin:
+			gb_printf_err("Unsupported architecture\n");
+			gb_exit(1);
+			break;
+		case TargetOs_linux:
+			bc->link_flags = str_lit("-arch aarch64 ");
+			break;
+		case TargetOs_freebsd:
+			bc->link_flags = str_lit("-arch aarch64");
 			break;
 		}
 	} else if (bc->metrics.arch == TargetArch_wasm32) {
