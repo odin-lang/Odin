@@ -139,6 +139,8 @@ type_has_nil :: proc($T: typeid) -> bool ---
 
 type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
 
+type_has_field :: proc($T: typeid, $name: string) -> bool ---
+
 type_proc_parameter_count :: proc($T: typeid) -> int where type_is_proc(T) ---
 type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---
 
