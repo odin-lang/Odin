@@ -3120,6 +3120,11 @@ void ir_value_set_debug_location(irProcedure *proc, irValue *v) {
 		return; // Already set
 	}
 
+	if (proc->is_startup) {
+		// ignore startup procedures
+		return;
+	}
+
 	irModule *m = proc->module;
 	GB_ASSERT(m->debug_location_stack.count > 0);
 	v->loc = *array_end_ptr(&m->debug_location_stack);
