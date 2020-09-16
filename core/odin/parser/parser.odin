@@ -1101,12 +1101,14 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 	case .Break, .Continue, .Fallthrough:
 		tok := advance_token(p);
-		label: ^ast.Expr;
+		label: ^ast.Ident;
 		if tok.kind != .Fallthrough && p.curr_tok.kind == .Ident {
 			label = parse_ident(p);
 		}
 		end := label.end if label != nil else end_pos(tok);
 		s := ast.new(ast.Branch_Stmt, tok.pos, end);
+		s.tok = tok;
+		s.label = label;
 		expect_semicolon(p, s);
 		return s;
 
