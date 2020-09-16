@@ -852,6 +852,10 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 		return false;
 	case Type_Pointer:
 		if (source->kind == Type_Pointer) {
+			isize level = check_is_assignable_to_using_subtype(source->Pointer.elem, poly->Pointer.elem);
+			if (level > 0) {
+				return true;
+			}
 			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Pointer.elem, true, modify_type);
 		}
 		return false;
