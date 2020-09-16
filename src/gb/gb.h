@@ -4254,7 +4254,6 @@ gb_inline i32  gb_atomic32_load (gbAtomic32 const volatile *a)      { return a->
 gb_inline void gb_atomic32_store(gbAtomic32 volatile *a, i32 value) { a->value = value; }
 
 gb_inline i32 gb_atomic32_compare_exchange(gbAtomic32 volatile *a, i32 expected, i32 desired) {
-	printf("32_compare_exchange\n");
 	i32 original;
 	__asm__ volatile(
 		"lock; cmpxchgl %2, %1"
@@ -4265,7 +4264,6 @@ gb_inline i32 gb_atomic32_compare_exchange(gbAtomic32 volatile *a, i32 expected,
 }
 
 gb_inline i32 gb_atomic32_exchanged(gbAtomic32 volatile *a, i32 desired) {
-	printf("32_exchanged\n");
 	// NOTE(bill): No lock prefix is necessary for xchgl
 	i32 original;
 	__asm__ volatile(
