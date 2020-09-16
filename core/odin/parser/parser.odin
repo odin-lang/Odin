@@ -1422,11 +1422,11 @@ parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
 
 	for {
 		kind := is_token_field_prefix(p);
-		if kind == Field_Prefix.Invalid {
+		if kind == .Invalid {
 			break;
 		}
 
-		if kind == Field_Prefix.Unknown {
+		if kind == .Unknown {
 			error(p, p.curr_tok.pos, "unknown prefix kind '#%s'", p.curr_tok.text);
 			continue;
 		}
@@ -1443,19 +1443,19 @@ parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
 		case Invalid, Unknown: // Ignore
 		case Using:
 			if count > 1 do error(p, p.curr_tok.pos, "multiple 'using' in this field list");
-			if count > 0 do flags |= {ast.Field_Flag.Using};
+			if count > 0 do flags |= {.Using};
 		case No_Alias:
 			if count > 1 do error(p, p.curr_tok.pos, "multiple '#no_alias' in this field list");
-			if count > 0 do flags |= {ast.Field_Flag.No_Alias};
+			if count > 0 do flags |= {.No_Alias};
 		case C_Vararg:
 			if count > 1 do error(p, p.curr_tok.pos, "multiple '#c_vararg' in this field list");
-			if count > 0 do flags |= {ast.Field_Flag.C_Vararg};
+			if count > 0 do flags |= {.C_Vararg};
 		case In:
 			if count > 1 do error(p, p.curr_tok.pos, "multiple 'in' in this field list");
-			if count > 0 do flags |= {ast.Field_Flag.In};
+			if count > 0 do flags |= {.In};
 		case Auto_Cast:
 			if count > 1 do error(p, p.curr_tok.pos, "multiple 'auto_cast' in this field list");
-			if count > 0 do flags |= {ast.Field_Flag.Auto_Cast};
+			if count > 0 do flags |= {.Auto_Cast};
 		}
 	}
 
@@ -1464,9 +1464,9 @@ parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
 
 check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, set_flags: ast.Field_Flags) -> (flags: ast.Field_Flags) {
 	flags = set_flags;
-	if name_count > 1 && ast.Field_Flag.Using in flags {
+	if name_count > 1 && .Using in flags {
 		error(p, p.curr_tok.pos, "cannot apply 'using' to more than one of the same type");
-		flags &~= {ast.Field_Flag.Using};
+		flags &~= {.Using};
 	}
 
 	for flag in ast.Field_Flag {
@@ -1489,15 +1489,15 @@ check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, se
 		}
 	}
 
-	if ast.Field_Flag.Using in allowed_flags && ast.Field_Flag.Using in flags {
-		flags &~= {ast.Field_Flag.Using};
+	if .Using in allowed_flags && .Using in flags {
+		flags &~= {.Using};
 	}
 
 	return flags;
 }
 
 parse_var_type :: proc(p: ^Parser, flags: ast.Field_Flags) -> ^ast.Expr {
-	if ast.Field_Flag.Ellipsis in flags && p.curr_tok.kind == .Ellipsis {
+	if .Ellipsis in flags && p.curr_tok.kind == .Ellipsis {
 		tok := advance_token(p);
 		type := parse_type_or_ident(p);
 		if type == nil {
@@ -1509,7 +1509,7 @@ parse_var_type :: proc(p: ^Parser, flags: ast.Field_Flags) -> ^ast.Expr {
 		return e;
 	}
 	type: ^ast.Expr;
-	if ast.Field_Flag.Typeid_Token in flags && p.curr_tok.kind == .Typeid {
+	if .Typeid_Token in flags && p.curr_tok.kind == .Typeid {
 		tok := expect_token(p, .Typeid);
 		specialization: ^ast.Expr;
 		end := tok.pos;
@@ -1637,7 +1637,7 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 
 		if allow_token(p, .Eq) {
 			default_value = parse_expr(p, false);
-			if ast.Field_Flag.Default_Parameters not_in allowed_flags {
+			if .Default_Parameters not_in allowed_flags {
 				error(p, p.curr_tok.pos, "default parameters are only allowed for procedures");
 				default_value = nil;
 			}
@@ -1695,14 +1695,14 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 
 	seen_ellipsis := false;
 
-	allow_typeid_token := ast.Field_Flag.Typeid_Token in allowed_flags;
+	allow_typeid_token := .Typeid_Token in allowed_flags;
 	allow_poly_names := allow_typeid_token;
 
 	for p.curr_tok.kind != follow &&
 	    p.curr_tok.kind != .Colon &&
 	    p.curr_tok.kind != .EOF {
 		prefix_flags := parse_field_prefixes(p);
-		param := parse_var_type(p, allowed_flags & {ast.Field_Flag.Typeid_Token, ast.Field_Flag.Ellipsis});
+		param := parse_var_type(p, allowed_flags & {.Typeid_Token, .Ellipsis});
 		if _, ok := param.derived.(ast.Ellipsis); ok {
 			if seen_ellipsis {
 				error(p, param.pos, "extra variadic parameter after ellipsis");
@@ -1724,7 +1724,7 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 			type := eaf.expr;
 			tok: tokenizer.Token;
 			tok.pos = type.pos;
-			if ast.Field_Flag.Results not_in allowed_flags {
+			if .Results not_in allowed_flags {
 				tok.text = "_";
 			}
 
