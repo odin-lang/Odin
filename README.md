@@ -94,7 +94,7 @@ The official blog of the Odin programming language, featuring announcements, new
 
 ## Setup
 
-Odin only supports x86-64 at the moment (64-bit), relies on LLVM for code generation and an external linker.
+Odin only supports x86-64/amd64 at the moment (64-bit), relies on LLVM for code generation and an external linker.
 
 In addition, the following platform-specific steps are necessary:
 
@@ -126,27 +126,34 @@ Please read the [Getting Started Guide](https://github.com/odin-lang/Odin/wiki#g
 Please read the [Getting Started Guide](https://github.com/odin-lang/Odin/wiki#getting-started-with-odin).
 
 - Windows
-	* x86-64
+	* x86-64/amd64
 	* MSVC 2010 installed (C++11 support)
 	* [LLVM binaries](https://github.com/odin-lang/Odin/releases/tag/llvm-windows) for `opt.exe`, `llc.exe`, and `lld-link.exe`
 	* Requires MSVC's link.exe as the linker
 		* run `vcvarsall.bat` to setup the path
 
 - MacOS
-	* x86-64
+	* x86-64/amd64
 	* LLVM explicitly installed (`brew install llvm`)
 	* XCode installed (for the linker)
 
 - GNU/Linux
-	* x86-64
+	* x86-64/amd64
 	* Build tools (ld)
 	* LLVM installed
 	* Clang installed (temporary - this is Calling the linker for now)
 
+- FreeBSD
+	* x86-64/amd64
+	* Build tools (ld)
+	* LLVM installed
+	* Clang installed (temporary - this is Calling the linker for now)
+
+Other platforms may be supported but are experimental for the time being.
+
 ## Warnings
 
-* This is still highly in development and the language's design is quite volatile.
-* Syntax is not fixed.
+* The Odin compiler is still in development.
 
 ## Demonstrations:
 * First Talk & Demo
