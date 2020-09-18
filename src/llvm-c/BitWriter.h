@@ -19,7 +19,7 @@
 #ifndef LLVM_C_BITWRITER_H
 #define LLVM_C_BITWRITER_H
 
-#include "llvm-c/Types.h"
+#include "Types.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -22,9 +22,9 @@
 #ifndef LLVM_C_ORCBINDINGS_H
 #define LLVM_C_ORCBINDINGS_H
 
-#include "llvm-c/Error.h"
-#include "llvm-c/Object.h"
-#include "llvm-c/TargetMachine.h"
+#include "Error.h"
+#include "Object.h"
+#include "TargetMachine.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -15,8 +15,8 @@
 #ifndef LLVM_C_CORE_H
 #define LLVM_C_CORE_H
 
-#include "llvm-c/ErrorHandling.h"
-#include "llvm-c/Types.h"
+#include "ErrorHandling.h"
+#include "Types.h"
 
 #ifdef __cplusplus
 extern "C" {

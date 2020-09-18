@@ -19,7 +19,7 @@
 #ifndef LLVM_C_OBJECT_H
 #define LLVM_C_OBJECT_H
 
-#include "llvm-c/Types.h"
+#include "Types.h"
 #include "Config/llvm-config.h"
 
 #ifdef __cplusplus
