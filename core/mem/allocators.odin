@@ -703,9 +703,6 @@ dynamic_pool_alloc_bytes :: proc(using pool: ^Dynamic_Pool, bytes: int) -> ([]by
 	n := bytes
 	extra := alignment - (n % alignment)
 	n += extra
-	if n >= out_band_size {
-		assert(block_allocator.procedure != nil)
-		memory, err := block_allocator.procedure(block_allocator.data, Allocator_Mode.Alloc,
 
 	// NOTE(tetra): If we are asked to allocate more than a certain size,
 	// we allocate it into it's own block, all by itself.
@@ -713,10 +710,10 @@ dynamic_pool_alloc_bytes :: proc(using pool: ^Dynamic_Pool, bytes: int) -> ([]by
 		if n > block_size do return nil
 
 		assert(block_allocator.procedure != nil)
-		memory := block_allocator.procedure(block_allocator.data, Allocator_Mode.Alloc,
+		memory, err := block_allocator.procedure(block_allocator.data, Allocator_Mode.Alloc,
 			                                block_size, alignment,
 			                                nil, 0)
-		if memory != nil {
+		if err != nil {
 			append(&out_band_blocks, (^byte)(memory));
 		}
 		return memory, err
