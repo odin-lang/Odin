@@ -199,18 +199,25 @@ WSASYS_STATUS_LEN :: 128
 WSAPROTOCOL_LEN: DWORD : 255
 INVALID_SOCKET :: ~SOCKET(0)
 
+
+WSAEINTR: c_int : 10004 // Call interrupted. CancelBlockingCall was called. (This is different on Linux.)
 WSAEACCES: c_int : 10013
 WSAEINVAL: c_int : 10022
 WSAEWOULDBLOCK: c_int : 10035
+WSAEMSGSIZE: c_int : 10040 // Message was truncated because it exceeded max datagram size.
 WSAEPROTOTYPE: c_int : 10041
 WSAEADDRINUSE: c_int : 10048
 WSAEADDRNOTAVAIL: c_int : 10049
+WSAENETDOWN: c_int : 10050
+WSAENETUNREACH: c_int : 10051
 WSAECONNABORTED: c_int : 10053
 WSAECONNRESET: c_int : 10054
+WSAENOBUFS: c_int : 10055 // No buffer space is available. The outgoing queue may be full in which case you should probably try again after a pause.
 WSAENOTCONN: c_int : 10057
 WSAESHUTDOWN: c_int : 10058
 WSAETIMEDOUT: c_int : 10060
 WSAECONNREFUSED: c_int : 10061
+WSAEHOSTUNREACH: c_int : 10065
 
 MAX_PROTOCOL_CHAIN: DWORD : 7
 
@@ -670,19 +677,17 @@ in6_addr :: struct {
 	s6_addr: [16]u8,
 }
 
-DNS_STATUS :: distinct DWORD; // zero is success
+DNS_STATUS :: distinct DWORD // zero is success
 
-DNS_TYPE_A     :: 0x1;
-DNS_TYPE_NS    :: 0x2;
-DNS_TYPE_CNAME :: 0x5;
-DNS_TYPE_MX    :: 0xf;
-DNS_TYPE_AAAA  :: 0x1c;
-DNS_TYPE_TEXT  :: 0x10;
+DNS_TYPE_A     :: 0x1
+DNS_TYPE_NS    :: 0x2
+DNS_TYPE_CNAME :: 0x5
+DNS_TYPE_MX    :: 0xf
+DNS_TYPE_AAAA  :: 0x1c
+DNS_TYPE_TEXT  :: 0x10
 
-DNS_INFO_NO_RECORDS :: 9501;
-DNS_QUERY_NO_RECURSION :: 0x00000004;
-
-ERROR_INVALID_NAME :: 123;
+DNS_INFO_NO_RECORDS :: 9501
+DNS_QUERY_NO_RECURSION :: 0x00000004
 
 DNS_RECORD :: struct {
     pNext: ^DNS_RECORD,
@@ -699,7 +704,7 @@ DNS_RECORD :: struct {
         TXT: DNS_TXT_DATAA,
         NS: DNS_PTR_DATAA,
         MX: DNS_MX_DATAA,
-    }
+    },
 }
 
 DNS_TXT_DATAA :: struct {
@@ -707,7 +712,7 @@ DNS_TXT_DATAA :: struct {
     pStringArray: cstring,
 }
 
-DNS_PTR_DATAA :: cstring;
+DNS_PTR_DATAA :: cstring
 
 DNS_MX_DATAA :: struct {
     pNameExchange: cstring, // the hostname
