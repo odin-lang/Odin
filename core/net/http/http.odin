@@ -2,17 +2,29 @@ package http
 
 import "core:net"
 import "core:strings"
+import "core:os"
 import "core:strconv"
+import "core:mem"
 
 Status :: enum {
 	Unknown = 0,
-	Bad_Response_Header = -1, // NOTE(tetra): Only produced by execute_request.
+
+	// NOTE(tetra): Only produced by recv_request.
+	Bad_Response_Header = -1,
+	Bad_Status_Code = -2,
 
 	Ok = 200,
 	Bad_Request = 400,
 	Forbidden = 403,
 	Not_Found = 404,
 	Im_A_Teapot = 418,
+
+	Moved_Permanently = 301,
+	Moved_Temporarily = 302,
+	See_Other = 303,
+	Not_Modified = 304,
+	Temporary_Redirect = 307, // same as Moved_Temporarily, but requires use of same Method.
+	Permanent_Redirect = 308, // same as Moved_Permanently, but requires use of same Method.
 
 	Internal_Error = 500,
 	Not_Implemented = 501,
@@ -34,7 +46,7 @@ Response :: struct {
 	body: string,
 }
 
-response_destroy :: proc(using r: ^Response) {
+response_destroy :: proc(using r: Response) {
 	// TODO(tetra): Use arenas for the map data in Requests and Responses so that the memory
 	// can be block-freed.
 	for k, v in headers {
@@ -43,7 +55,6 @@ response_destroy :: proc(using r: ^Response) {
 	}
 	delete(headers);
 	delete(body);
-	r^ = {};
 }
 
 
@@ -67,47 +78,168 @@ request_init :: proc(req: ^Request, method: Method, url: string, allocator := co
 	req.headers.allocator = allocator;
 }
 
+request_destroy :: proc(using req: Request) {
+	delete(headers);
+	delete(queries);
+}
+
 
 
 get :: proc(url: string, allocator := context.allocator) -> (resp: Response, ok: bool) {
 	r: Request;
 	request_init(&r, .Get, url, allocator);
+	defer if !ok do request_destroy(r);
 	r.headers["Connection"] = "close";
 	resp, ok = execute_request(r, allocator);
 	return;
 }
 
-execute_request :: proc(r: Request, allocator := context.allocator) -> (resp: Response, ok: bool) {
-	using strings;
-
+send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net.Socket, ok: bool) {
 	assert(r.scheme == "http", "only HTTP is supported at this time");
-
-	context.allocator = allocator;
 
 	addr4, addr6, resolve_ok := net.resolve(r.host);
 	if !resolve_ok do return;
 	addr := addr4 != nil ? addr4 : addr6;
 
 	// TODO(tetra): SSL/TLS.
-	skt, err := net.dial(addr, 80);
-	if err != .Ok do return; // TODO(tetra): return instead?
+	skt, err := net.dial(addr, 80, .Tcp);
+	if err != .Ok do return;
 
-	bytes := request_to_bytes(r);
+	bytes := request_to_bytes(r, allocator);
 	if bytes == nil do return;
+	defer delete(bytes);
 
-	write_err := net.write(skt, bytes);
-	if write_err != .Ok do return; // TODO(tetra): return instead?
+	_, write_err := net.send(skt, bytes);
+	if write_err != .Ok do return;
 
-	read_err: net.Read_Error;
-	resp, read_err = read_response(skt);
-	if read_err != .Ok do return; // TODO(tetra): return instead?
+	return skt, true;
+}
 
+// TODO(tetra): Ideally, we'd have a nice way to read from a slice too.
+recv_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp: Response, ok: bool) {
+	using strings;
+
+	context.allocator = allocator;
+
+	// TODO(tetra): Handle not receiving the response in one read call.
+	read_buf: [8192]byte = ---;
+	n, read_err := net.recv(skt, read_buf[:]);
+	assert(n > 0); // TODO
+
+	resp_parts := split(string(read_buf[:n]), "\n");
+	assert(len(resp_parts) >= 1);
+
+	status_parts := split(resp_parts[0], " ");
+	assert(len(status_parts) >= 3); // NOTE(tetra): 3 for OK, more if status text is more than one word.
+
+	status_code, _ := strconv.parse_int(status_parts[1]);
+	resp.status = Status(status_code);
+	if !(resp.status >= min(Status) && resp.status <= max(Status)) {
+		resp.status = .Bad_Status_Code;
+		return;
+	}
+
+	resp_parts = resp_parts[1:];
+
+	// TODO(tetra): Use an arena for the response data.
+	resp.headers = make(map[string]string, len(resp_parts));
+	defer if read_err != .Ok do response_destroy(resp);
+
+	last_hdr_index := -1;
+	for part, i in resp_parts {
+		trimmed_part := trim_right_space(part);
+		last_hdr_index = i;
+		if trimmed_part == "" do break; // end of headers. (empty, because we split by newlines.)
+
+		idx := index(trimmed_part, ":");
+		if idx == -1 {
+			resp.status = .Bad_Response_Header;
+			return;
+		}
+		// the header parts are currently in `read_buf` (stack memory), but we want to return them.
+		name  := clone(trim_space(trimmed_part[:idx]));
+		value := clone(trim_space(trimmed_part[idx+1:]));
+		resp.headers[name] = value;
+
+	}
+	if last_hdr_index == -1 {
+		// NOTE(tetra): Should have found the last header.
+		resp.status = .Bad_Response_Header;
+		return;
+	}
+
+	#partial switch resp.status {
+	case .Ok:
+		// do nothing
+	case:
+		ok = true;
+		return;
+	}
+
+	body_buf := make_builder(0, 8192, allocator);
+	defer if !ok do destroy_builder(&body_buf);
+
+	fragment := resp_parts[last_hdr_index+1];
+	write_string(&body_buf, fragment);
+
+	for {
+		if has_suffix(to_string(body_buf), "\r\n\r\n") do break;
+
+		n, read_err := net.recv(skt, read_buf[:]);
+		if read_err != .Ok do return;
+		if n == 0 do break;
+
+		fragment := read_buf[:n];
+		write_bytes(&body_buf, fragment);
+	}
+
+
+	// TODO(tetra): Use the content-length to slice the body.
+	body := trim_space(to_string(body_buf));
+	resp.body = body;
 	ok = true;
 	return;
 }
 
+import "core:fmt"
+// Executes an HTTP 1.1 request.
+// Follows 301 redirects.
+// If ok=true, you should call response_destroy on the response.
+execute_request :: proc(r: Request, allocator := context.allocator) -> (response: Response, ok: bool) {
+	r := r;
+	resp: Response;
 
+	context.allocator = allocator;
 
+	for {
+		skt, send_ok := send_request(r);
+		if !send_ok do return;
+		defer net.close(skt);
+
+		read_ok: bool;
+		resp, read_ok = recv_response(skt);
+		if !read_ok do return;
+
+		if resp.status != .Moved_Permanently {
+			break;
+		} else {
+			location, has_new_location := resp.headers["Location"];
+			if !has_new_location do return;
+
+			r2 := r;
+			request_init(&r2, .Get, location);
+			r2.headers = r.headers;
+			r2.queries = r.queries;
+			r = r2;
+
+			response_destroy(resp);
+		}
+	}
+
+	response = resp;
+	ok = true;
+	return;
+}
 
 request_to_bytes :: proc(r: Request, allocator := context.allocator) -> []byte {
 	using strings;
@@ -152,61 +284,4 @@ request_to_bytes :: proc(r: Request, allocator := context.allocator) -> []byte {
 
 	write_string(&b, "\r\n");
 	return b.buf[:];
-}
-
-// TODO(tetra): Ideally, we'd have a nice way to read from a slice too.
-read_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp: Response, read_err: net.Read_Error) {
-	using strings;
-
-	context.allocator = allocator;
-
-	// TODO(tetra): Handle not receiving the response in one read call.
-	read_buf: [4096]byte;
-	n: int;
-	n, read_err = net.read(skt, read_buf[:]);
-	assert(n > 0); // TODO
-
-	resp_parts := split(string(read_buf[:n]), "\n");
-	assert(len(resp_parts) >= 1);
-
-	status_parts := split(resp_parts[0], " ");
-	assert(len(status_parts) >= 3); // NOTE(tetra): 3 for OK, more if status text is more than one word.
-
-	status_code, _ := strconv.parse_int(status_parts[1]);
-	resp.status = Status(status_code);
-
-	resp_parts = resp_parts[1:];
-
-	// TODO(tetra): Use an arena for the response data.
-	resp.headers = make(map[string]string, len(resp_parts));
-	defer if read_err != .Ok do response_destroy(&resp);
-
-	last_hdr_index := -1;
-	for part, i in resp_parts {
-		trimmed_part := trim_right_space(part);
-		last_hdr_index = i;
-		if trimmed_part == "" do break; // end of headers. (empty, because we split by newlines.)
-
-		idx := index(trimmed_part, ":");
-		if idx == -1 {
-			resp.status = .Bad_Response_Header;
-			return;
-		}
-		// the header parts are currently in `read_buf` (stack memory), but we want to return them.
-		name  := clone(trim_space(trimmed_part[:idx]));
-		value := clone(trim_space(trimmed_part[idx+1:]));
-		resp.headers[name] = value;
-
-	}
-	if last_hdr_index == -1 {
-		// NOTE(tetra): Should have found the last header.
-		resp.status = .Bad_Response_Header;
-		return;
-	}
-
-	// TODO(tetra): Use the content-length to slice the body.
-	body := resp_parts[last_hdr_index+1];
-	body = trim_space(body);
-	resp.body = clone(body);
-	return;
 }
