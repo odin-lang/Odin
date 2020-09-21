@@ -3,7 +3,7 @@ package sys_windows
 
 import "core:strings"
 import "core:sys/win32"
-import "intrinsics"
+import "core:intrinsics"
 
 LOWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
 	return WORD(x & 0xffff)
