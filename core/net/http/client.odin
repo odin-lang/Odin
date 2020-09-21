@@ -6,41 +6,128 @@ import "core:mem"
 import "core:sync"
 
 
-Client_Request :: struct {
-	request: Request,
+Request_Status :: enum {
+	Need_Send,
+	Send_Failed,
+	Wait_Reply,
+	Recv_Failed,
+	Done,
+}
 
+Client_Request :: struct {
+	request:   Request,
+	response:  Response,
+	socket:    net.Socket, // only valid if status == .Wait_Reply
+	status:    Request_Status,
 }
 
 
 Client :: struct {
-	pool:      mem.Dynamic_Arena,
-	requests:  [dynamic]^Client_Request,
-	lock:      sync.Ticket_Mutex,
+	next_id:  Request_Id,
+	requests: map[Request_Id]Client_Request,
+	lock:     sync.Ticket_Mutex,
 }
 
 client_init :: proc(using c: ^Client, allocator := context.allocator) {
-	mem.dynamic_arena_init(&pool, allocator);
-	requests.allocator = mem.dynamic_arena_allocator(&pool);
 	sync.ticket_mutex_init(&lock);
+	next_id = 0;
 }
 
-client_destroy :: proc(using c: Client) {
-	mem.dynamic_arena_destroy(&pool);
+client_destroy :: proc(using c: ^Client) {
+	delete(requests);
+	c^ = {};
 }
 
-client_submit_request :: proc(using c: ^Client, req: Request) {
-	sync.ticket_mutex_lock(&lock);
-	defer sync.ticket_mutex_unlock(&lock);
 
-	append(&requests);
+Request_Id :: distinct int;
+
+client_submit_request :: proc(using c: ^Client, req: Request) -> Request_Id {
+	cr := Client_Request{
+		request = req,
+		response = {},
+		status = .Need_Send,
+	};
+
+	{
+		sync.ticket_mutex_lock(&lock);
+		defer sync.ticket_mutex_unlock(&lock);
+		id := next_id;
+		next_id += 1;
+		requests[id] = cr;
+		return Request_Id(id);
+	}
 }
 
-client_get_response :: proc(using c: ^Client) -> ^Response {
-	
+client_wait_for_response :: proc(using c: ^Client, id: Request_Id) -> (response: Response, final_status: Request_Status) {
+	cr: Client_Request;
+	loop: for {
+		{
+			sync.ticket_mutex_lock(&lock);
+			defer sync.ticket_mutex_unlock(&lock);
+			found: bool;
+			cr, found = requests[id];
+			if !found do return;
+		}
+
+		#partial switch cr.status {
+		case .Done, .Send_Failed, .Recv_Failed:
+			break loop;
+		case:
+			// be patient
+		}
+
+		client_process_requests(c);
+	}
+
+	{
+		sync.ticket_mutex_lock(&lock);
+		defer sync.ticket_mutex_unlock(&lock);
+		delete_key(&requests, id);
+	}
+
+	return cr.response, cr.status;
 }
 
-client_execute_request :: proc(using c: ^Client, req: Request) {
-	
+client_execute_request :: proc(using c: ^Client, req: Request) -> (response: Response, ok: bool) {
+	id := client_submit_request(c, req);
+	return client_wait_for_response(c, id);
+}
+
+client_process_requests :: proc(using c: ^Client) {
+	close_socket :: proc(s: ^net.Socket) {
+		net.close(s^);
+		s^ = {};
+	}
+
+	for id, req in &requests {
+		sync.ticket_mutex_lock(&lock);
+		defer sync.ticket_mutex_unlock(&lock);
+
+		switch req.status {
+		case .Need_Send:
+			skt, ok := send_request(req.request);
+			if ok {
+				req.socket = skt;
+				req.status = .Wait_Reply;
+			} else {
+				req.status = .Send_Failed;
+				close_socket(&req.socket);
+			}
+		case .Wait_Reply:
+			resp, ok := recv_response(req.socket);
+			if ok {
+				req.response = resp;
+				req.status = .Done;
+			} else {
+				req.status = .Recv_Failed;
+			}
+			close_socket(&req.socket);
+		case .Done, .Send_Failed, .Recv_Failed:
+			// do nothing.
+			// it'll be removed from the list when user code
+			// asks for it.
+		}
+	}
 }
 
 /*
