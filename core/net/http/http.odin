@@ -5,6 +5,7 @@ import "core:strings"
 import "core:os"
 import "core:strconv"
 import "core:mem"
+import "core:fmt" // for panicf
 
 Status :: enum {
 	Unknown = 0,
@@ -95,14 +96,20 @@ get :: proc(url: string, allocator := context.allocator) -> (resp: Response, ok:
 }
 
 send_request :: proc(r: Request, allocator := context.allocator) -> (socket: net.Socket, ok: bool) {
-	assert(r.scheme == "http", "only HTTP is supported at this time");
+	if r.scheme != "http" {
+		fmt.panicf("%v is not a supported scheme at this time", r.scheme);
+	}
 
-	addr4, addr6, resolve_ok := net.resolve(r.host);
+	host, port, port_ok := net.split_port(r.host);
+	if !port_ok do return;
+	if port == 0 do port = 80;
+
+	addr4, addr6, resolve_ok := net.resolve(host);
 	if !resolve_ok do return;
 	addr := addr4 != nil ? addr4 : addr6;
 
 	// TODO(tetra): SSL/TLS.
-	skt, err := net.dial(addr, 80, .Tcp);
+	skt, err := net.dial(addr, port, .Tcp);
 	if err != .Ok do return;
 
 	bytes := request_to_bytes(r, allocator);
@@ -201,7 +208,6 @@ recv_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp:
 	return;
 }
 
-import "core:fmt"
 // Executes an HTTP 1.1 request.
 // Follows 301 redirects.
 // If ok=true, you should call response_destroy on the response.
