@@ -826,7 +826,7 @@ void init_build_context(TargetMetrics *cross_target) {
 			gb_exit(1);
 			break;
 		case TargetOs_linux:
-			bc->link_flags = str_lit("-arch rv64imafdc ");
+			bc->link_flags = str_lit("-arch rv64imafdc -mfloat-abi=hard ");
 			break;
 		case TargetOs_freebsd:
 			bc->link_flags = str_lit("-arch riscv64 ");
