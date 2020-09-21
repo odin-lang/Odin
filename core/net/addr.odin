@@ -127,13 +127,15 @@ parse_endpoint :: proc(address: string) -> (ep: Endpoint, ok: bool) {
 }
 
 
-split_port :: proc(addr_or_host_and_port: string, default_port := -1) -> (addr_or_host: string, port: int, ok: bool) {
+// Takes an endpoint string and returns its parts.
+// Returns ok=false if port is not a number.
+split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok: bool) {
 	rest: string = ---;
 
 	// Ipv6 [addr_or_host]:port
-	if i := strings.last_index(addr_or_host_and_port, "]:"); i != -1 {
-		addr_or_host = addr_or_host_and_port[1:i];
-		port, ok = strconv.parse_int(addr_or_host_and_port[i+2:], 10);
+	if i := strings.last_index(endpoint_str, "]:"); i != -1 {
+		addr_or_host = endpoint_str[1:i];
+		port, ok = strconv.parse_int(endpoint_str[i+2:], 10);
 		if !ok do return;
 
 		ok = true;
@@ -141,12 +143,12 @@ split_port :: proc(addr_or_host_and_port: string, default_port := -1) -> (addr_o
 	}
 
 	// Ipv4 addr_or_host:port
-	if n := strings.count(addr_or_host_and_port, ":"); n == 1 {
-		i := strings.last_index(addr_or_host_and_port, ":");
-		if i == -1 do return;
+	if n := strings.count(endpoint_str, ":"); n == 1 {
+		i := strings.last_index(endpoint_str, ":");
+		assert(i != -1);
 
-		addr_or_host = addr_or_host_and_port[:i];
-		port, ok = strconv.parse_int(addr_or_host_and_port[i+1:], 10);
+		addr_or_host = endpoint_str[:i];
+		port, ok = strconv.parse_int(endpoint_str[i+1:], 10);
 		if !ok do return;
 
 		ok = true;
@@ -154,8 +156,8 @@ split_port :: proc(addr_or_host_and_port: string, default_port := -1) -> (addr_o
 	}
 
 	// No port
-	addr_or_host = addr_or_host_and_port;
-	port = default_port;
+	addr_or_host = endpoint_str;
+	port = 0;
 	ok = true;
 	return;
 }
