@@ -130,15 +130,10 @@ parse_endpoint :: proc(address: string) -> (ep: Endpoint, ok: bool) {
 // Takes an endpoint string and returns its parts.
 // Returns ok=false if port is not a number.
 split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok: bool) {
-	rest: string = ---;
-
 	// Ipv6 [addr_or_host]:port
 	if i := strings.last_index(endpoint_str, "]:"); i != -1 {
 		addr_or_host = endpoint_str[1:i];
 		port, ok = strconv.parse_int(endpoint_str[i+2:], 10);
-		if !ok do return;
-
-		ok = true;
 		return;
 	}
 
@@ -149,9 +144,8 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 
 		addr_or_host = endpoint_str[:i];
 		port, ok = strconv.parse_int(endpoint_str[i+1:], 10);
-		if !ok do return;
-
-		ok = true;
+		return;
+	} else if n > 1 {
 		return;
 	}
 
@@ -162,8 +156,8 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 	return;
 }
 
-// TODO(tetra): Are we okay with the amount of work this does?
-join_port :: proc(address_or_host: string, port: int, allocator := context.temp_allocator) -> string {
+// Joins an address or hostname with a port.
+join_port :: proc(address_or_host: string, port: int, allocator := context.allocator) -> string {
 	addr_or_host, _, ok := split_port(address_or_host);
 	if !ok do return addr_or_host;
 
@@ -176,9 +170,9 @@ join_port :: proc(address_or_host: string, port: int, allocator := context.temp_
 	} else {
 		switch in addr {
 		case Ipv4_Address:
-			fmt.sbprintf(&b, "%v:%v", to_string(addr), port);
+			fmt.sbprintf(&b, "%v:%v", addr_to_string(addr), port);
 		case Ipv6_Address:
-			fmt.sbprintf(&b, "[%v]:%v", to_string(addr), port);
+			fmt.sbprintf(&b, "[%v]:%v", addr_to_string(addr), port);
 		}
 	}
 	return strings.to_string(b);
