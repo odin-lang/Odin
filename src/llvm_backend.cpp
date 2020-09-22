@@ -370,21 +370,7 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 			while (arg_index < end) {
 				Entity *e = param_tuple->variables[arg_index];
 				GB_ASSERT(e->kind == Entity_Variable);
-
-				switch (e->Variable.param_value.kind) {
-				case ParameterValue_Constant:
-					args[arg_index++] = lb_const_value(p->module, e->type, e->Variable.param_value.value);
-					break;
-				case ParameterValue_Nil:
-					args[arg_index++] = lb_const_nil(m, e->type);
-					break;
-				case ParameterValue_Location:
-					args[arg_index++] = lb_emit_source_code_location(p, proc_name, pos);
-					break;
-				case ParameterValue_Value:
-					args[arg_index++] = lb_build_expr(p, e->Variable.param_value.ast_value);
-					break;
-				}
+				args[arg_index++] = lb_handle_param_value(p, e->type, e->Variable.param_value, pos);
 			}
 		}
 
@@ -8072,6 +8058,40 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 }
 
 
+lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos) {
+	switch (param_value.kind) {
+	case ParameterValue_Constant:
+		if (is_type_constant_type(parameter_type)) {
+			return lb_const_value(p->module, parameter_type, param_value.value);
+		} else {
+			ExactValue ev = param_value.value;
+			lbValue arg = {};
+			Type *type = type_of_expr(param_value.original_ast_expr);
+			if (type != nullptr) {
+				arg = lb_const_value(p->module, type, ev);
+			} else {
+				arg = lb_const_value(p->module, parameter_type, param_value.value);
+			}
+			return lb_emit_conv(p, arg, parameter_type);
+		}
+
+	case ParameterValue_Nil:
+		return lb_const_nil(p->module, parameter_type);
+	case ParameterValue_Location:
+		{
+			String proc_name = {};
+			if (p->entity != nullptr) {
+				proc_name = p->entity->token.string;
+			}
+			return lb_emit_source_code_location(p, proc_name, pos);
+		}
+	case ParameterValue_Value:
+		return lb_build_expr(p, param_value.ast_value);
+	}
+	return lb_const_nil(p->module, parameter_type);
+}
+
+
 lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 	lbModule *m = p->module;
 
@@ -8166,20 +8186,7 @@ lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 			} else {
 				GB_ASSERT(e->kind == Entity_Variable);
 				if (args[i].value == nullptr) {
-					switch (e->Variable.param_value.kind) {
-					case ParameterValue_Constant:
-						args[i] = lb_const_value(p->module, e->type, e->Variable.param_value.value);
-						break;
-					case ParameterValue_Nil:
-						args[i] = lb_const_nil(m, e->type);
-						break;
-					case ParameterValue_Location:
-						args[i] = lb_emit_source_code_location(p, p->entity->token.string, ast_token(expr).pos);
-						break;
-					case ParameterValue_Value:
-						args[i] = lb_build_expr(p, e->Variable.param_value.ast_value);
-						break;
-					}
+					args[i] = lb_handle_param_value(p, e->type, e->Variable.param_value, ast_token(expr).pos);
 				} else {
 					args[i] = lb_emit_conv(p, args[i], e->type);
 				}
@@ -8273,21 +8280,7 @@ lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 			while (arg_index < end) {
 				Entity *e = param_tuple->variables[arg_index];
 				GB_ASSERT(e->kind == Entity_Variable);
-
-				switch (e->Variable.param_value.kind) {
-				case ParameterValue_Constant:
-					args[arg_index++] = lb_const_value(p->module, e->type, e->Variable.param_value.value);
-					break;
-				case ParameterValue_Nil:
-					args[arg_index++] = lb_const_nil(m, e->type);
-					break;
-				case ParameterValue_Location:
-					args[arg_index++] = lb_emit_source_code_location(p, proc_name, pos);
-					break;
-				case ParameterValue_Value:
-					args[arg_index++] = lb_build_expr(p, e->Variable.param_value.ast_value);
-					break;
-				}
+				args[arg_index++] = lb_handle_param_value(p, e->type, e->Variable.param_value, ast_token(expr).pos);
 			}
 		}
 
@@ -8371,20 +8364,7 @@ lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 	if (variadic && variadic_index+1 < param_count) {
 		for (isize i = variadic_index+1; i < param_count; i++) {
 			Entity *e = param_tuple->variables[i];
-			switch (e->Variable.param_value.kind) {
-			case ParameterValue_Constant:
-				args[i] = lb_const_value(p->module, e->type, e->Variable.param_value.value);
-				break;
-			case ParameterValue_Nil:
-				args[i] = lb_const_nil(m, e->type);
-				break;
-			case ParameterValue_Location:
-				args[i] = lb_emit_source_code_location(p, proc_name, pos);
-				break;
-			case ParameterValue_Value:
-				args[i] = lb_build_expr(p, e->Variable.param_value.ast_value);
-				break;
-			}
+			args[i] = lb_handle_param_value(p, e->type, e->Variable.param_value, ast_token(expr).pos);
 		}
 	}
 

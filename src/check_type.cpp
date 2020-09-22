@@ -1370,6 +1370,7 @@ bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
 
 ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location) {
 	ParameterValue param_value = {};
+	param_value.original_ast_expr = expr;
 	if (expr == nullptr) {
 		return param_value;
 	}
