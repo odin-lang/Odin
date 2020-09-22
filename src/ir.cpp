@@ -7450,7 +7450,42 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 	return nullptr;
 }
 
+
+irValue *ir_handle_param_value(irProcedure *proc, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos) {
+	switch (param_value.kind) {
+	case ParameterValue_Constant:
+		if (is_type_constant_type(parameter_type)) {
+			return ir_value_constant(parameter_type, param_value.value);
+		} else {
+			ExactValue ev = param_value.value;
+			irValue *arg = nullptr;
+			Type *type = type_of_expr(param_value.original_ast_expr);
+			if (type != nullptr) {
+				arg = ir_value_constant(type, ev);
+			} else {
+				arg = ir_value_constant(parameter_type, param_value.value);
+			}
+			return ir_emit_conv(proc, arg, parameter_type);
+		}
+
+	case ParameterValue_Nil:
+		return ir_value_nil(parameter_type);
+	case ParameterValue_Location:
+		{
+			String proc_name = {};
+			if (proc->entity != nullptr) {
+				proc_name = proc->entity->token.string;
+			}
+			return ir_emit_source_code_location(proc, proc_name, pos);
+		}
+	case ParameterValue_Value:
+		return ir_build_expr(proc, param_value.ast_value);
+	}
+	return ir_value_nil(parameter_type);
+}
+
 irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr);
+
 
 irValue *ir_build_expr(irProcedure *proc, Ast *expr) {
 	u64 prev_state_flags = proc->module->state_flags;
@@ -7562,20 +7597,7 @@ irValue *ir_build_call_expr(irProcedure *proc, Ast *expr) {
 			} else {
 				GB_ASSERT(e->kind == Entity_Variable);
 				if (args[i] == nullptr) {
-					switch (e->Variable.param_value.kind) {
-					case ParameterValue_Constant:
-						args[i] = ir_value_constant(e->type, e->Variable.param_value.value);
-						break;
-					case ParameterValue_Nil:
-						args[i] = ir_value_nil(e->type);
-						break;
-					case ParameterValue_Location:
-						args[i] = ir_emit_source_code_location(proc, proc->entity->token.string, ast_token(expr).pos);
-						break;
-					case ParameterValue_Value:
-						args[i] = ir_build_expr(proc, e->Variable.param_value.ast_value);
-						break;
-					}
+					args[i] = ir_handle_param_value(proc, e->type, e->Variable.param_value, ast_token(expr).pos);
 				} else {
 					args[i] = ir_emit_conv(proc, args[i], e->type);
 				}
@@ -7612,12 +7634,6 @@ irValue *ir_build_call_expr(irProcedure *proc, Ast *expr) {
 	bool variadic = pt->variadic && variadic_index >= 0;
 	bool vari_expand = ce->ellipsis.pos.line != 0;
 	bool is_c_vararg = pt->c_vararg;
-
-	String proc_name = {};
-	if (proc->entity != nullptr) {
-		proc_name = proc->entity->token.string;
-	}
-	TokenPos pos = ast_token(ce->proc).pos;
 
 	TypeTuple *param_tuple = nullptr;
 	if (pt->params) {
@@ -7658,21 +7674,7 @@ irValue *ir_build_call_expr(irProcedure *proc, Ast *expr) {
 			while (arg_index < end) {
 				Entity *e = param_tuple->variables[arg_index];
 				GB_ASSERT(e->kind == Entity_Variable);
-
-				switch (e->Variable.param_value.kind) {
-				case ParameterValue_Constant:
-					args[arg_index++] = ir_value_constant(e->type, e->Variable.param_value.value);
-					break;
-				case ParameterValue_Nil:
-					args[arg_index++] = ir_value_nil(e->type);
-					break;
-				case ParameterValue_Location:
-					args[arg_index++] = ir_emit_source_code_location(proc, proc_name, pos);
-					break;
-				case ParameterValue_Value:
-					args[arg_index++] = ir_build_expr(proc, e->Variable.param_value.ast_value);
-					break;
-				}
+				args[arg_index++] = ir_handle_param_value(proc, e->type, e->Variable.param_value, ast_token(expr).pos);
 			}
 		}
 
@@ -7753,20 +7755,7 @@ irValue *ir_build_call_expr(irProcedure *proc, Ast *expr) {
 	if (variadic && variadic_index+1 < param_count) {
 		for (isize i = variadic_index+1; i < param_count; i++) {
 			Entity *e = param_tuple->variables[i];
-			switch (e->Variable.param_value.kind) {
-			case ParameterValue_Constant:
-				args[i] = ir_value_constant(e->type, e->Variable.param_value.value);
-				break;
-			case ParameterValue_Nil:
-				args[i] = ir_value_nil(e->type);
-				break;
-			case ParameterValue_Location:
-				args[i] = ir_emit_source_code_location(proc, proc_name, pos);
-				break;
-			case ParameterValue_Value:
-				args[i] = ir_build_expr(proc, e->Variable.param_value.ast_value);
-				break;
-			}
+			args[i] = ir_handle_param_value(proc, e->type, e->Variable.param_value, ast_token(expr).pos);
 		}
 	}
 
