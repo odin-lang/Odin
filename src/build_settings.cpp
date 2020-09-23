@@ -154,6 +154,7 @@ struct BuildContext {
 	bool   cross_compiling;
 	bool   different_os;
 	bool   keep_object_files;
+	bool   disallow_do;
 
 	bool   use_llvm_api;
 

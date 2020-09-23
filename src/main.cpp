@@ -579,6 +579,7 @@ enum BuildFlagKind {
 	BuildFlag_UseLLVMApi,
 	BuildFlag_IgnoreUnknownAttributes,
 	BuildFlag_ExtraLinkerFlags,
+	BuildFlag_DisallowDo,
 
 	BuildFlag_DefaultToNilAllocator,
 
@@ -677,6 +678,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"), BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_DisallowDo,        str_lit("disallow-do"), BuildFlagParam_None);
 
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator, str_lit("default-to-nil-allocator"), BuildFlagParam_None);
 
@@ -1101,6 +1103,10 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ExtraLinkerFlags:
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.extra_linker_flags = value.value_string;
+							break;
+
+						case BuildFlag_DisallowDo:
+							build_context.disallow_do = true;
 							break;
 
 						case BuildFlag_DefaultToNilAllocator:
