@@ -32,7 +32,9 @@ Parser :: struct {
 
 print_value :: proc(value: Value, pretty := true, indent := 0) {
 	print_indent :: proc(indent: int) {
-		for _ in 0..<indent do fmt.print("\t");
+		for _ in 0..<indent {
+			fmt.print("\t");
+		}
 	}
 
 	switch v in value {
@@ -42,22 +44,22 @@ print_value :: proc(value: Value, pretty := true, indent := 0) {
 	case string: fmt.print(v);
 	case Array:
 		fmt.print("[");
-		if pretty do fmt.println();
+		if pretty { fmt.println(); }
 		for e, i in v {
 			if pretty {
 				print_indent(indent+1);
 				print_value(e, pretty, indent+1);
 				fmt.println(",");
 			} else {
-				if i > 0 do fmt.print(", ");
+				if i > 0 { fmt.print(", "); }
 				print_value(e);
 			}
 		}
-		if pretty do print_indent(indent);
+		if pretty { print_indent(indent); }
 		fmt.print("]");
 	case Dict:
 		fmt.print("{");
-		if pretty do fmt.println();
+		if pretty { fmt.println(); }
 
 		i := 0;
 		for name, val in v {
@@ -67,14 +69,14 @@ print_value :: proc(value: Value, pretty := true, indent := 0) {
 				print_value(val, pretty, indent+1);
 				fmt.println(",");
 			} else {
-				if i > 0 do fmt.print(", ");
+				if i > 0 { fmt.print(", "); }
 				fmt.printf("%s = ", name);
 				print_value(val, pretty, indent+1);
 				i += 1;
 			}
 		}
 
-		if pretty do print_indent(indent);
+		if pretty { print_indent(indent); }
 		fmt.print("}");
 	case:
 		fmt.print("nil");
@@ -149,17 +151,23 @@ destroy :: proc(p: ^Parser) {
 	destroy_value :: proc(value: Value) {
 		#partial switch v in value {
 		case Array:
-			for elem in v do destroy_value(elem);
+			for elem in v {
+				destroy_value(elem);
+			}
 			delete(v);
 
 		case Dict:
-			for _, dv in v do destroy_value(dv);
+			for _, dv in v {
+				destroy_value(dv);
+			}
 			delete(v);
 		}
 	}
 
 	delete(p.tokens);
-	for s in p.allocated_strings do delete(s);
+	for s in p.allocated_strings {
+		delete(s);
+	}
 	delete(p.allocated_strings);
 	delete(p.dict_stack);
 
@@ -348,7 +356,9 @@ expect_token :: proc(p: ^Parser, kind: Kind) -> Token {
 	prev := p.curr_token;
 	if prev.kind != kind {
 		got := prev.lit;
-		if got == "\n" do got = ";";
+		if got == "\n" {
+			got = ";";
+		}
 		error(p, prev.pos, "Expected %s, got %s", kind_to_string[kind], got);
 	}
 	next_token(p);
@@ -411,7 +421,7 @@ parse_operand :: proc(p: ^Parser) -> (Value, Pos) {
 	case .Ident:
 		next_token(p);
 		v, ok := lookup_value(p, tok.lit);
-		if !ok do error(p, tok.pos, "Undeclared identifier %s", tok.lit);
+		if !ok { error(p, tok.pos, "Undeclared identifier %s", tok.lit); }
 		return v, tok.pos;
 
 	case .True:
@@ -438,7 +448,7 @@ parse_operand :: proc(p: ^Parser) -> (Value, Pos) {
 	case .String:
 		next_token(p);
 		str, ok := unquote_string(p, tok);
-		if !ok do error(p, tok.pos, "Unable to unquote string");
+		if !ok { error(p, tok.pos, "Unable to unquote string"); }
 		return string(str), tok.pos;
 
 	case .Open_Paren:
@@ -480,7 +490,7 @@ parse_operand :: proc(p: ^Parser) -> (Value, Pos) {
 		    }
 
 			name, ok := unquote_string(p, name_tok);
-			if !ok do error(p, tok.pos, "Unable to unquote string");
+			if !ok { error(p, tok.pos, "Unable to unquote string"); }
 		    expect_token(p, .Assign);
 			elem, _ := parse_expr(p);
 
@@ -520,7 +530,7 @@ parse_atom_expr :: proc(p: ^Parser, operand: Value, pos: Pos) -> (Value, Pos) {
 					continue;
 				}
 				name, usok := unquote_string(p, tok);
-				if !usok do error(p, tok.pos, "Unable to unquote string");
+				if !usok { error(p, tok.pos, "Unable to unquote string"); }
 				val, found := d[name];
 				if !found {
 					error(p, tok.pos, "Field %s not found in dictionary", name);
@@ -594,7 +604,7 @@ parse_unary_expr :: proc(p: ^Parser) -> (Value, Pos) {
 		next_token(p);
 		tok := expect_token(p, .String);
 		v, ok := lookup_value(p, tok.lit);
-		if !ok do error(p, tok.pos, "Undeclared identifier %s", tok.lit);
+		if !ok { error(p, tok.pos, "Undeclared identifier %s", tok.lit); }
 		return parse_atom_expr(p, v, tok.pos);
 
 	case .Add, .Sub:
@@ -603,8 +613,8 @@ parse_unary_expr :: proc(p: ^Parser) -> (Value, Pos) {
 		expr, pos := parse_unary_expr(p);
 
 		#partial switch e in expr {
-		case i64: if op.kind == .Sub do return -e, pos;
-		case f64: if op.kind == .Sub do return -e, pos;
+		case i64: if op.kind == .Sub { return -e, pos; }
+		case f64: if op.kind == .Sub { return -e, pos; }
 		case:
 			error(p, op.pos, "Unary operator %s can only be used on integers or floats", op.lit);
 			return nil, op.pos;
@@ -678,7 +688,7 @@ calculate_binary_value :: proc(p: ^Parser, op: Kind, a, b: Value) -> (Value, boo
 
 	case bool:
 		b, ok := y.(bool);
-		if !ok do return nil, false;
+		if !ok { return nil, false; }
 		#partial switch op {
 		case .Eq:    return a == b, true;
 		case .NotEq: return a != b, true;
@@ -688,7 +698,7 @@ calculate_binary_value :: proc(p: ^Parser, op: Kind, a, b: Value) -> (Value, boo
 
 	case i64:
 		b, ok := y.(i64);
-		if !ok do return nil, false;
+		if !ok { return nil, false; }
 		#partial switch op {
 		case .Add:   return a + b, true;
 		case .Sub:   return a - b, true;
@@ -705,7 +715,7 @@ calculate_binary_value :: proc(p: ^Parser, op: Kind, a, b: Value) -> (Value, boo
 
 	case f64:
 		b, ok := y.(f64);
-		if !ok do return nil, false;
+		if !ok { return nil, false; }
 
 		#partial switch op {
 		case .Add:   return a + b, true;
@@ -722,7 +732,7 @@ calculate_binary_value :: proc(p: ^Parser, op: Kind, a, b: Value) -> (Value, boo
 
 	case string:
 		b, ok := y.(string);
-		if !ok do return nil, false;
+		if !ok { return nil, false; }
 
 		#partial switch op {
 		case .Add:
@@ -825,7 +835,7 @@ parse_assignment :: proc(p: ^Parser) -> bool {
 	if allow_token(p, .Ident) || allow_token(p, .String) {
 		expect_token(p, .Assign);
 		name, ok := unquote_string(p, tok);
-		if !ok do error(p, tok.pos, "Unable to unquote string");
+		if !ok { error(p, tok.pos, "Unable to unquote string"); }
 		expr, _ := parse_expr(p);
 		d := top_dict(p);
 		if _, ok2 := d[name]; ok2 {

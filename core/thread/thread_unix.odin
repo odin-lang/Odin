@@ -72,7 +72,9 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	}
 
 	attrs: unix.pthread_attr_t;
-	if unix.pthread_attr_init(&attrs) != 0 do return nil; // NOTE(tetra, 2019-11-01): POSIX OOM.
+	if unix.pthread_attr_init(&attrs) != 0 {
+		return nil; // NOTE(tetra, 2019-11-01): POSIX OOM.
+	}
 	defer unix.pthread_attr_destroy(&attrs);
 
 	// NOTE(tetra, 2019-11-01): These only fail if their argument is invalid.
@@ -80,7 +82,9 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 	assert(unix.pthread_attr_setinheritsched(&attrs, unix.PTHREAD_EXPLICIT_SCHED) == 0);
 
 	thread := new(Thread);
-	if thread == nil do return nil;
+	if thread == nil {
+		return nil;
+	}
 
 	// Set thread priority.
 	policy: i32;
@@ -111,7 +115,9 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^T
 }
 
 start :: proc(t: ^Thread) {
-	if sync.atomic_swap(&t.started, true, .Sequentially_Consistent) do return;
+	if sync.atomic_swap(&t.started, true, .Sequentially_Consistent) {
+		return;
+	}
 	sync.condition_signal(&t.start_gate);
 }
 

@@ -66,8 +66,8 @@ sleep :: proc(d: Duration) {
 	seconds := u32(ds);
 	nanoseconds := i64((ds - f64(seconds)) * 1e9);
 
-	if seconds > 0 do _unix_sleep(seconds);
-	if nanoseconds > 0 do nanosleep(nanoseconds);
+	if seconds > 0     { _unix_sleep(seconds);   }
+	if nanoseconds > 0 { nanosleep(nanoseconds); }
 }
 
 nanosleep :: proc(nanoseconds: i64) -> int {

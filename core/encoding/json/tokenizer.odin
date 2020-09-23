@@ -183,9 +183,11 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		case "false": token.kind = .False;
 		case "true":  token.kind = .True;
 		case:
-			if t.spec == .JSON5 do switch str {
-			case "Infinity": token.kind = .Infinity;
-			case "NaN":      token.kind = .NaN;
+			if t.spec == .JSON5 {
+				switch str {
+				case "Infinity": token.kind = .Infinity;
+				case "NaN":      token.kind = .NaN;
+				}
 			}
 		}
 
@@ -361,7 +363,9 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 		s = s[1:];
 	case '1'..'9':
 		s = s[1:];
-		for len(s) > 0 && '0' <= s[0] && s[0] <= '9' do s = s[1:];
+		for len(s) > 0 && '0' <= s[0] && s[0] <= '9' {
+			s = s[1:];
+		}
 	case '.':
 		if spec == .JSON5 { // Allow leading decimal point
 			s = s[1:];
@@ -380,7 +384,9 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 
 	if len(s) >= 2 && s[0] == '.' && '0' <= s[1] && s[1] <= '9' {
 		s = s[2:];
-		for len(s) > 0 && '0' <= s[0] && s[0] <= '9' do s = s[1:];
+		for len(s) > 0 && '0' <= s[0] && s[0] <= '9' {
+			s = s[1:];
+		}
 	}
 
 	if len(s) >= 2 && (s[0] == 'e' || s[0] == 'E') {
@@ -392,7 +398,9 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 				return false;
 			}
 		}
-		for len(s) > 0 && '0' <= s[0] && s[0] <= '9' do s = s[1:];
+		for len(s) > 0 && '0' <= s[0] && s[0] <= '9' {
+			s = s[1:];
+		}
 	}
 
 	// The string should be empty now to be valid

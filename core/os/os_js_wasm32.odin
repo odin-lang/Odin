@@ -56,10 +56,14 @@ heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 		heap_free(ptr);
 		return nil;
 	}
-	if ptr == nil do return heap_alloc(new_size);
+	if ptr == nil {
+		return heap_alloc(new_size);
+	}
 
 	return nil;
 }
 heap_free :: proc(ptr: rawptr) {
-	if ptr == nil do return;
+	if ptr == nil {
+		return;
+	}
 }

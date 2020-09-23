@@ -5,7 +5,9 @@ import "core:os"
 
 load_library :: proc(path: string, global_symbols := false) -> (Library, bool) {
     flags := os.RTLD_NOW;
-    if global_symbols do flags |= os.RTLD_GLOBAL;
+    if global_symbols {
+    	flags |= os.RTLD_GLOBAL;
+    }
     lib := os.dlopen(path, flags);
     return Library(lib), lib != nil;
 }

@@ -40,7 +40,9 @@ compare :: proc(lhs, rhs: string) -> int {
 
 contains_rune :: proc(s: string, r: rune) -> int {
 	for c, offset in s {
-		if c == r do return offset;
+		if c == r {
+			return offset;
+		}
 	}
 	return -1;
 }
@@ -216,7 +218,9 @@ split_after_n :: inline proc(s, sep: string, n: int, allocator := context.alloca
 
 index_byte :: proc(s: string, c: byte) -> int {
 	for i := 0; i < len(s); i += 1 {
-		if s[i] == c do return i;
+		if s[i] == c {
+			return i;
+		}
 	}
 	return -1;
 }
@@ -224,7 +228,9 @@ index_byte :: proc(s: string, c: byte) -> int {
 // Returns i1 if c is not present
 last_index_byte :: proc(s: string, c: byte) -> int {
 	for i := len(s)-1; i >= 0; i -= 1 {
-		if s[i] == c do return i;
+		if s[i] == c {
+			return i;
+		}
 	}
 	return -1;
 }

@@ -70,7 +70,9 @@ _less_than_half :: inline proc(x, y: Duration) -> bool {
 }
 
 duration_round :: proc(d, m: Duration) -> Duration {
-	if m <= 0 do return d;
+	if m <= 0 {
+		return d;
+	}
 
 	r := d % m;
 	if d < 0 {
@@ -194,13 +196,15 @@ _abs_date :: proc(abs: u64, full: bool) -> (year: int, month: Month, day: int, y
 
 	day = yday;
 
-	if _is_leap_year(year) do switch {
-	case day > 31+29-1:
-		day -= 1;
-	case day == 31+29-1:
-		month = .February;
-		day = 29;
-		return;
+	if _is_leap_year(year) {
+		switch {
+		case day > 31+29-1:
+			day -= 1;
+		case day == 31+29-1:
+			month = .February;
+			day = 29;
+			return;
+		}
 	}
 
 	month = Month(day / 31);

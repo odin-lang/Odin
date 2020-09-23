@@ -52,13 +52,17 @@ parse_i64_of_base :: proc(str: string, base: int) -> (value: i64, ok: bool) {
 			continue;
 		}
 		v := i64(_digit_value(r));
-		if v >= i64(base) do break;
+		if v >= i64(base) {
+			break;
+		}
 		value *= i64(base);
 		value += v;
 		i += 1;
 	}
 
-	if neg do value = -value;
+	if neg {
+		value = -value;
+	}
 	ok = i > 0;
 	return;
 }
@@ -106,13 +110,17 @@ parse_i64_maybe_prefixed :: proc(str: string) -> (value: i64, ok: bool) {
 			continue;
 		}
 		v := i64(_digit_value(r));
-		if v >= base do break;
+		if v >= base {
+			break;
+		}
 		value *= base;
 		value += v;
 		i += 1;
 	}
 
-	if neg do value = -value;
+	if neg {
+		value = -value;
+	}
 	ok = i > 0;
 	return;
 }
@@ -145,7 +153,9 @@ parse_u64_of_base :: proc(str: string, base: int) -> (value: u64, ok: bool) {
 			continue;
 		}
 		v := u64(_digit_value(r));
-		if v >= u64(base) do break;
+		if v >= u64(base) {
+			break;
+		}
 		value *= u64(base);
 		value += v;
 		i += 1;
@@ -192,7 +202,9 @@ parse_u64_maybe_prefixed :: proc(str: string) -> (value: u64, ok: bool) {
 			continue;
 		}
 		v := u64(_digit_value(r));
-		if v >= base do break;
+		if v >= base {
+			break;
+		}
 		value *= base;
 		value += u64(v);
 		i += 1;
@@ -302,10 +314,14 @@ parse_f64 :: proc(s: string) -> (value: f64, ok: bool) {
 
 	for ; i < len(s); i += 1 {
 		r := rune(s[i]);
-		if r == '_' do continue;
+		if r == '_' {
+			continue;
+		}
 
 		v := _digit_value(r);
-		if v >= 10 do break;
+		if v >= 10 {
+			break;
+		}
 		value *= 10;
 		value += f64(v);
 	}
@@ -316,10 +332,14 @@ parse_f64 :: proc(s: string) -> (value: f64, ok: bool) {
 
 		for ; i < len(s); i += 1 {
 			r := rune(s[i]);
-			if r == '_' do continue;
+			if r == '_' {
+				continue;
+			}
 
 			v := _digit_value(r);
-			if v >= 10 do break;
+			if v >= 10 {
+				break;
+			}
 			value += f64(v)/pow10;
 			pow10 *= 10;
 		}
@@ -340,10 +360,14 @@ parse_f64 :: proc(s: string) -> (value: f64, ok: bool) {
 			exp: u32 = 0;
 			for ; i < len(s); i += 1 {
 				r := rune(s[i]);
-				if r == '_' do continue;
+				if r == '_' {
+					continue;
+				}
 
 				d := u32(_digit_value(r));
-				if d >= 10 do break;
+				if d >= 10 {
+					break;
+				}
 				exp = exp * 10 + d;
 			}
 			if exp > 308 { exp = 308; }
@@ -367,8 +391,11 @@ parse_f64 :: proc(s: string) -> (value: f64, ok: bool) {
 
 append_bool :: proc(buf: []byte, b: bool) -> string {
 	n := 0;
-	if b do n = copy(buf, "true");
-	else do n = copy(buf, "false");
+	if b {
+		n = copy(buf, "true");
+	} else {
+		n = copy(buf, "false");
+	}
 	return string(buf[:n]);
 }
 
@@ -399,7 +426,9 @@ append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> str
 
 quote :: proc(buf: []byte, str: string) -> string {
 	write_byte :: inline proc(buf: []byte, i: ^int, bytes: ..byte) {
-		if i^ >= len(buf) do return;
+		if i^ >= len(buf) {
+			return;
+		}
 		n := copy(buf[i^:], bytes[:]);
 		i^ += n;
 	}
@@ -590,7 +619,9 @@ unquote_char :: proc(str: string, quote: byte) -> (r: rune, multiple_bytes: bool
 unquote_string :: proc(lit: string, allocator := context.allocator) -> (res: string, allocated, success: bool) {
 	contains_rune :: proc(s: string, r: rune) -> int {
 		for c, offset in s {
-			if c == r do return offset;
+			if c == r {
+				return offset;
+			}
 		}
 		return -1;
 	}

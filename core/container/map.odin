@@ -170,7 +170,9 @@ multi_map_count :: proc(m: $M/Map($Value), key: u64) -> int {
 multi_map_get :: proc{multi_map_get_array, multi_map_get_slice};
 
 multi_map_get_array :: proc(m: $M/Map($Value), key: u64, items: ^Array(Value)) {
-	if items == nil do return;
+	if items == nil {
+		return;
+	}
 	e := multi_map_find_first(m, key);
 	for e != nil {
 		array_append(items, e.value);

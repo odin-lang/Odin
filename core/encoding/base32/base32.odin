@@ -92,7 +92,9 @@ _encode :: proc(out, data: []byte, ENC_TBL := ENC_TABLE, allocator := context.al
 }
 
 decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> []byte #no_bounds_check{
-    if len(data) == 0 do return []byte{};
+    if len(data) == 0 {
+        return nil;
+    }
 
     outi := 0;
     olen := len(data);
@@ -113,7 +115,9 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocato
             data = data[1:];
             if input == byte(PADDING) && j >= 2 && len(data) < 8 {
                 assert(!(len(data) + j < 8 - 1), "Corrupted input");
-                for k := 0; k < 8-1-j; k +=1 do assert(len(data) < k || data[k] == byte(PADDING), "Corrupted input");
+                for k := 0; k < 8-1-j; k +=1 {
+                    assert(len(data) < k || data[k] == byte(PADDING), "Corrupted input");
+                }
                 dlen, end = j, true;
                 assert(dlen != 1 && dlen != 3 && dlen != 6, "Corrupted input");
                 break;

@@ -186,13 +186,15 @@ any_to_bytes :: inline proc(val: any) -> []byte {
 }
 
 
-kilobytes :: inline proc(x: int) -> int do return          (x) * 1024;
-megabytes :: inline proc(x: int) -> int do return kilobytes(x) * 1024;
-gigabytes :: inline proc(x: int) -> int do return megabytes(x) * 1024;
-terabytes :: inline proc(x: int) -> int do return gigabytes(x) * 1024;
+kilobytes :: inline proc(x: int) -> int { return          (x) * 1024; }
+megabytes :: inline proc(x: int) -> int { return kilobytes(x) * 1024; }
+gigabytes :: inline proc(x: int) -> int { return megabytes(x) * 1024; }
+terabytes :: inline proc(x: int) -> int { return gigabytes(x) * 1024; }
 
 is_power_of_two :: inline proc(x: uintptr) -> bool {
-	if x <= 0 do return false;
+	if x <= 0 {
+		return false;
+	}
 	return (x & (x-1)) == 0;
 }
 
@@ -205,7 +207,9 @@ align_forward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
 
 	p := ptr;
 	modulo := p & (align-1);
-	if modulo != 0 do p += align - modulo;
+	if modulo != 0 {
+		p += align - modulo;
+	}
 	return p;
 }
 
@@ -264,7 +268,9 @@ calc_padding_with_header :: proc(ptr: uintptr, align: uintptr, header_size: int)
 	modulo := p & (a-1);
 
 	padding := uintptr(0);
-	if modulo != 0 do padding = a - modulo;
+	if modulo != 0 {
+		padding = a - modulo;
+	}
 
 	needed_space := uintptr(header_size);
 	if padding < needed_space {

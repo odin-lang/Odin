@@ -161,7 +161,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 	case Type_Info_Array:
 		write_byte(b, '[');
 		for i in 0..<info.count {
-			if i > 0 do write_string(b, ", ");
+			if i > 0 { write_string(b, ", "); }
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size);
 			marshal_arg(b, any{rawptr(data), info.elem.id});
@@ -172,7 +172,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		write_byte(b, '[');
 		array := cast(^mem.Raw_Dynamic_Array)v.data;
 		for i in 0..<array.len {
-			if i > 0 do write_string(b, ", ");
+			if i > 0 { write_string(b, ", "); }
 
 			data := uintptr(array.data) + uintptr(i*info.elem_size);
 			marshal_arg(b, any{rawptr(data), info.elem.id});
@@ -183,7 +183,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 		write_byte(b, '[');
 		slice := cast(^mem.Raw_Slice)v.data;
 		for i in 0..<slice.len {
-			if i > 0 do write_string(b, ", ");
+			if i > 0 { write_string(b, ", "); }
 
 			data := uintptr(slice.data) + uintptr(i*info.elem_size);
 			marshal_arg(b, any{rawptr(data), info.elem.id});
@@ -205,7 +205,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 			entry_size := ed.elem_size;
 
 			for i in 0..<entries.len {
-				if i > 0 do write_string(b, ", ");
+				if i > 0 { write_string(b, ", "); }
 
 				data := uintptr(entries.data) + uintptr(i*entry_size);
 				header := cast(^Map_Entry_Header)data;
@@ -223,7 +223,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 	case Type_Info_Struct:
 		write_byte(b, '{');
 		for name, i in info.names {
-			if i > 0 do write_string(b, ", ");
+			if i > 0 { write_string(b, ", "); }
 			write_quoted_string(b, name);
 			write_string(b, ": ");
 
@@ -271,7 +271,7 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 
 		write_byte(b, '{');
 		for name, i in info.names {
-			if i > 0 do write_string(b, ", ");
+			if i > 0 { write_string(b, ", "); }
 
 			bits := u64(info.bits[i]);
 			offset := u64(info.offsets[i]);
@@ -317,15 +317,21 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 			bit_data = u64(x);
 		case 16:
 			x := (^u16)(v.data)^;
-			if do_byte_swap do x = bits.byte_swap(x);
+			if do_byte_swap {
+				x = bits.byte_swap(x);
+			}
 			bit_data = u64(x);
 		case 32:
 			x := (^u32)(v.data)^;
-			if do_byte_swap do x = bits.byte_swap(x);
+			if do_byte_swap {
+				x = bits.byte_swap(x);
+			}
 			bit_data = u64(x);
 		case 64:
 			x := (^u64)(v.data)^;
-			if do_byte_swap do x = bits.byte_swap(x);
+			if do_byte_swap {
+				x = bits.byte_swap(x);
+			}
 			bit_data = u64(x);
 		case: panic("unknown bit_size size");
 		}

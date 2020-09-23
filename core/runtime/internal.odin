@@ -38,7 +38,9 @@ ptr_offset :: inline proc "contextless" (ptr: $P/^$T, n: int) -> P {
 }
 
 is_power_of_two_int :: inline proc(x: int) -> bool {
-	if x <= 0 do return false;
+	if x <= 0 {
+		return false;
+	}
 	return (x & (x-1)) == 0;
 }
 
@@ -47,12 +49,16 @@ align_forward_int :: inline proc(ptr, align: int) -> int {
 
 	p := ptr;
 	modulo := p & (align-1);
-	if modulo != 0 do p += align - modulo;
+	if modulo != 0 {
+		p += align - modulo;
+	}
 	return p;
 }
 
 is_power_of_two_uintptr :: inline proc(x: uintptr) -> bool {
-	if x <= 0 do return false;
+	if x <= 0 {
+		return false;
+	}
 	return (x & (x-1)) == 0;
 }
 
@@ -61,19 +67,27 @@ align_forward_uintptr :: inline proc(ptr, align: uintptr) -> uintptr {
 
 	p := ptr;
 	modulo := p & (align-1);
-	if modulo != 0 do p += align - modulo;
+	if modulo != 0 {
+		p += align - modulo;
+	}
 	return p;
 }
 
 mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
-	if data == nil do return nil;
-	if len < 0 do return data;
+	if data == nil {
+		return nil;
+	}
+	if len < 0 {
+		return data;
+	}
 	memset(data, 0, len);
 	return data;
 }
 
 mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
-	if src == nil do return dst;
+	if src == nil {
+		return dst;
+	}
 	// NOTE(bill): This _must_ be implemented like C's memmove
 	foreign _ {
 		when ODIN_USE_LLVM_API {
@@ -99,7 +113,9 @@ mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 }
 
 mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
-	if src == nil do return dst;
+	if src == nil {
+		return dst;
+	}
 	// NOTE(bill): This _must_ be implemented like C's memcpy
 	foreign _ {
 		when ODIN_USE_LLVM_API {
@@ -127,14 +143,22 @@ mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> r
 DEFAULT_ALIGNMENT :: 2*align_of(rawptr);
 
 mem_alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
-	if size == 0 do return nil;
-	if allocator.procedure == nil do return nil;
+	if size == 0 {
+		return nil;
+	}
+	if allocator.procedure == nil {
+		return nil;
+	}
 	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, 0, loc);
 }
 
 mem_free :: inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) {
-	if ptr == nil do return;
-	if allocator.procedure == nil do return;
+	if ptr == nil {
+		return;
+	}
+	if allocator.procedure == nil {
+		return;
+	}
 	allocator.procedure(allocator.data, .Free, 0, 0, ptr, 0, 0, loc);
 }
 
@@ -263,7 +287,9 @@ cstring_len :: proc "contextless" (s: cstring) -> int {
 }
 
 cstring_to_string :: proc "contextless" (s: cstring) -> string {
-	if s == nil do return "";
+	if s == nil {
+		return "";
+	}
 	ptr := (^byte)(s);
 	n := cstring_len(s);
 	return transmute(string)Raw_String{ptr, n};

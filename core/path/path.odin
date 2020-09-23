@@ -6,7 +6,9 @@ import "core:unicode/utf8"
 
 // returns everything preceding the last path element
 dir :: proc(path: string, new := false, allocator := context.allocator) -> string {
-	if path == "" do return "";
+	if path == "" {
+		return "";
+	}
 
 	for i := len(path) - 1; i >= 0; i -= 1 {
 		if path[i] == '/' || path[i] == '\\' {
@@ -25,7 +27,9 @@ dir :: proc(path: string, new := false, allocator := context.allocator) -> strin
 
 // returns the final path element
 base :: proc(path: string, new := false, allocator := context.allocator) -> string {
-	if path == "" do return "";
+	if path == "" {
+		return "";
+	}
 
 	end := len(path) - 1;
 
@@ -46,7 +50,9 @@ base :: proc(path: string, new := false, allocator := context.allocator) -> stri
 
 // returns the final path element, excluding the file extension if there is one
 name :: proc(path: string, new := false, allocator := context.allocator) -> string {
-	if path == "" do return "";
+	if path == "" {
+		return "";
+	}
 
 	end := len(path) - 1;
 	dot := end;
@@ -64,7 +70,9 @@ name :: proc(path: string, new := false, allocator := context.allocator) -> stri
 
 // returns the file extension, if there is one
 ext :: proc(path: string, new := false, allocator := context.allocator) -> string {
-	if path == "" do return "";
+	if path == "" {
+		return "";
+	}
 
 	for i := len(path)-1; i >= 0; i -= 1 {
 		switch path[i] {
@@ -82,7 +90,9 @@ rel :: proc{rel_between, rel_current};
 
 // returns the relative path from one path to another
 rel_between :: proc(from, to: string, allocator := context.allocator) -> string {
-	if from == "" || to == "" do return "";
+	if from == "" || to == "" {
+		return "";
+	}
 
 	from, to := from, to;
 	from = full(from, context.temp_allocator);

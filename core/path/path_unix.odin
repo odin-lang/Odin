@@ -60,21 +60,21 @@ current :: proc(allocator := context.temp_allocator) -> string {
 
 
 exists :: proc(path: string) -> bool {
-	if _, ok := os.stat(path); ok {
+	if _, err := os.stat(path); err != 0 {
 		return true;
 	}
 	return false;
 }
 
 is_dir :: proc(path: string) -> bool {
-	if stat, ok := os.stat(path); ok {
+	if stat, err := os.stat(path); err != 0 {
 		return os.S_ISDIR(u32(stat.mode));
 	}
 	return false;
 }
 
 is_file :: proc(path: string) -> bool {
-	if stat, ok := os.stat(path); ok {
+	if stat, err := os.stat(path); err != 0 {
 		return os.S_ISREG(u32(stat.mode));
 	}
 	return false;

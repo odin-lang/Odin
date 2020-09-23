@@ -154,7 +154,9 @@ projection :: proc(x, normal: $T/[$N]$E) -> T where IS_NUMERIC(E) {
 }
 
 identity :: proc($T: typeid/[$N][N]$E) -> (m: T) {
-	for i in 0..<N do m[i][i] = E(1);
+	for i in 0..<N {
+		m[i][i] = E(1);
+	}
 	return m;
 }
 

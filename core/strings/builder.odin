@@ -131,7 +131,7 @@ write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"') {
 
 
 write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) {
-	if write_quote do write_byte(b, '\'');
+	if write_quote { write_byte(b, '\''); }
 	switch r {
 	case '\a': write_string(b, `\a"`);
 	case '\b': write_string(b, `\b"`);
@@ -156,7 +156,7 @@ write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) {
 		}
 
 	}
-	if write_quote do write_byte(b, '\'');
+	if write_quote { write_byte(b, '\''); }
 }
 
 

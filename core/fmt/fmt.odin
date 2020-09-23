@@ -200,7 +200,9 @@ sbprint :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 	// and were expecting `*print` to be the same `*println` except for the added newline
 	// so I am going to keep the same behaviour as `*println` for `*print`
 	for _, i in args {
-		if i > 0 do strings.write_string(buf, sep);
+		if i > 0 {
+			strings.write_string(buf, sep);
+		}
 
 		fmt_value(&fi, args[i], 'v');
 	}
@@ -212,7 +214,9 @@ sbprintln :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 	fi.buf = buf;
 
 	for _, i in args {
-		if i > 0 do strings.write_string(buf, sep);
+		if i > 0 {
+			strings.write_string(buf, sep);
+		}
 
 		fmt_value(&fi, args[i], 'v');
 	}
@@ -479,10 +483,15 @@ sbprintf :: proc(b: ^strings.Builder, fmt: string, args: ..any) -> string {
 	if !fi.reordered && arg_index < len(args) {
 		strings.write_string(b, "%!(EXTRA ");
 		for arg, index in args[arg_index:] {
-			if index > 0 do strings.write_string(b, ", ");
+			if index > 0 {
+				strings.write_string(b, ", ");
+			}
 
-			if arg == nil do strings.write_string(b, "<nil>");
-			else          do fmt_arg(&fi, args[index], 'v');
+			if arg == nil {
+				strings.write_string(b, "<nil>");
+			} else {
+				fmt_arg(&fi, args[index], 'v');
+			}
 		}
 		strings.write_string(b, ")");
 	}
@@ -502,7 +511,9 @@ _parse_int :: proc(s: string, offset: int) -> (result: int, new_offset: int, ok:
 	new_offset = offset;
 	for new_offset <= len(s) {
 		c := s[new_offset];
-		if !is_digit(c) do break;
+		if !is_digit(c) {
+			break;
+		}
 		new_offset += 1;
 
 		result *= 10;
@@ -514,7 +525,9 @@ _parse_int :: proc(s: string, offset: int) -> (result: int, new_offset: int, ok:
 
 _arg_number :: proc(fi: ^Info, arg_index: int, format: string, offset, arg_count: int) -> (index, new_offset: int, ok: bool) {
 	parse_arg_number :: proc(format: string) -> (int, int, bool) {
-		if len(format) < 3 do return 0, 1, false;
+		if len(format) < 3 {
+			return 0, 1, false;
+		}
 
 		for i in 1..<len(format) {
 			if format[i] == ']' {
@@ -585,10 +598,14 @@ fmt_bool :: proc(using fi: ^Info, b: bool, verb: rune) {
 
 
 fmt_write_padding :: proc(fi: ^Info, width: int) {
-	if width <= 0 do return;
+	if width <= 0 {
+		return;
+	}
 
 	pad_byte: byte = '0';
-	if fi.space do pad_byte = ' ';
+	if fi.space {
+		pad_byte = ' ';
+	}
 
 	for i := 0; i < width; i += 1 {
 		strings.write_byte(fi.buf, pad_byte);
@@ -636,9 +653,9 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	start := 0;
 
 	flags: strconv.Int_Flags;
-	if fi.hash && !fi.zero do flags |= {.Prefix};
-	if fi.plus             do flags |= {.Plus};
-	if fi.space            do flags |= {.Space};
+	if fi.hash && !fi.zero { flags |= {.Prefix}; }
+	if fi.plus             { flags |= {.Plus};   }
+	if fi.space            { flags |= {.Space};  }
 	s := strconv.append_bits(buf[start:], u, base, is_signed, bit_size, digits, flags);
 
 	if fi.hash && fi.zero {
@@ -702,9 +719,9 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	start := 0;
 
 	flags: strconv.Int_Flags;
-	if fi.hash && !fi.zero do flags |= {.Prefix};
-	if fi.plus             do flags |= {.Plus};
-	if fi.space            do flags |= {.Space};
+	if fi.hash && !fi.zero { flags |= {.Prefix}; }
+	if fi.plus             { flags |= {.Plus};   }
+	if fi.space            { flags |= {.Space};  }
 	s := strconv.append_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags);
 
 	if fi.hash && fi.zero {
@@ -810,7 +827,9 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 	switch verb {
 	case 'f', 'F', 'v':
 		prec: int = 3;
-		if fi.prec_set do prec = fi.prec;
+		if fi.prec_set {
+			prec = fi.prec;
+		}
 		buf: [386]byte;
 
 		str := strconv.append_float(buf[1:], v, 'f', prec, bit_size);
@@ -844,7 +863,9 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 
 	case 'e', 'E':
 		prec: int = 3;
-		if fi.prec_set do prec = fi.prec;
+		if fi.prec_set {
+			prec = fi.prec;
+		}
 		buf: [386]byte;
 
 		str := strconv.append_float(buf[1:], v, 'e', prec, bit_size);
@@ -920,9 +941,13 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 		defer fi.space = space;
 
 		for i in 0..<len(s) {
-			if i > 0 && space do strings.write_byte(fi.buf, ' ');
+			if i > 0 && space {
+				strings.write_byte(fi.buf, ' ');
+			}
 			char_set := __DIGITS_UPPER;
-			if verb == 'x' do char_set = __DIGITS_LOWER;
+			if verb == 'x' {
+				char_set = __DIGITS_LOWER;
+			}
 			_fmt_int(fi, u64(s[i]), 16, false, 8, char_set);
 		}
 
@@ -1089,19 +1114,19 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 			bits = u128(x);
 		case 16:
 			x := (^u16)(v.data)^;
-			if do_byte_swap do x = byte_swap(x);
+			if do_byte_swap { x = byte_swap(x); }
 			bits = u128(x);
 		case 32:
 			x := (^u32)(v.data)^;
-			if do_byte_swap do x = byte_swap(x);
+			if do_byte_swap { x = byte_swap(x); }
 			bits = u128(x);
 		case 64:
 			x := (^u64)(v.data)^;
-			if do_byte_swap do x = byte_swap(x);
+			if do_byte_swap { x = byte_swap(x); }
 			bits = u128(x);
 		case 128:
 			x := (^u128)(v.data)^;
-			if do_byte_swap do x = byte_swap(x);
+			if do_byte_swap { x = byte_swap(x); }
 			bits = u128(x);
 		case: panic("unknown bit_size size");
 		}
@@ -1123,14 +1148,18 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 				continue loop;
 			}
 
-			if commas > 0 do strings.write_string(fi.buf, ", ");
+			if commas > 0 {
+				strings.write_string(fi.buf, ", ");
+			}
 
-			if is_enum do for ev, evi in e.values {
-				v := u64(ev);
-				if v == u64(i) {
-					strings.write_string(fi.buf, e.names[evi]);
-					commas += 1;
-					continue loop;
+			if is_enum {
+				for ev, evi in e.values {
+					v := u64(ev);
+					if v == u64(i) {
+						strings.write_string(fi.buf, e.names[evi]);
+						commas += 1;
+						continue loop;
+					}
 				}
 			}
 			v := i64(i) + info.lower;
@@ -1185,12 +1214,14 @@ fmt_bit_field :: proc(fi: ^Info, v: any, bit_field_name: string = "") {
 
 fmt_opaque :: proc(fi: ^Info, v: any) {
 	is_nil :: proc(data: rawptr, n: int) -> bool {
-		if data == nil do return true;
-		if n == 0 do return true;
+		if data == nil { return true; }
+		if n == 0 { return true; }
 
 		a := (^byte)(data);
-		for i in 0..<n do if mem.ptr_offset(a, i)^ != 0 {
-			return false;
+		for i in 0..<n {
+			if mem.ptr_offset(a, i)^ != 0 {
+				return false;
+			}
 		}
 		return true;
 	}
@@ -1206,7 +1237,7 @@ fmt_opaque :: proc(fi: ^Info, v: any) {
 
 	if ot, ok := rt.type_info_base(type_info).variant.(rt.Type_Info_Opaque); ok {
 		elem := rt.type_info_base(ot.elem);
-		if elem == nil do return;
+		if elem == nil { return; }
 		reflect.write_type(fi.buf, type_info);
 		strings.write_byte(fi.buf, '{');
 		defer strings.write_byte(fi.buf, '}');
@@ -1269,9 +1300,13 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			fi.hash = false;
 			fi.indent += 1;
 
-			if hash	do strings.write_byte(fi.buf, '\n');
+			if hash	{
+				strings.write_byte(fi.buf, '\n');
+			}
 			defer {
-				if hash do for in 0..<indent do strings.write_byte(fi.buf, '\t');
+				if hash {
+					for in 0..<indent { strings.write_byte(fi.buf, '\t'); }
+				}
 				strings.write_byte(fi.buf, ']' if is_soa else '}');
 			}
 
@@ -1285,11 +1320,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				}
 
 				for index in 0..<uintptr(b.soa_len) {
-					if !hash && index > 0 do strings.write_string(fi.buf, ", ");
+					if !hash && index > 0 { strings.write_string(fi.buf, ", "); }
 
 					field_count := -1;
 
-					if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
+					if !hash && field_count > 0 { strings.write_string(fi.buf, ", "); }
 
 					strings.write_string(fi.buf, base_type_name);
 					strings.write_byte(fi.buf, '{');
@@ -1298,8 +1333,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 					for name, i in b.names {
 						field_count += 1;
 
-						if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
-						if hash do for in 0..<fi.indent do strings.write_byte(fi.buf, '\t');
+						if !hash && field_count > 0 { strings.write_string(fi.buf, ", "); }
+						if hash {
+							for in 0..<fi.indent { strings.write_byte(fi.buf, '\t'); }
+						}
 
 						strings.write_string(fi.buf, name);
 						strings.write_string(fi.buf, " = ");
@@ -1313,7 +1350,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 							fmt_arg(fi, any{data, t.id}, 'v');
 						}
 
-						if hash do strings.write_string(fi.buf, ",\n");
+						if hash { strings.write_string(fi.buf, ",\n"); }
 					}
 				}
 			} else {
@@ -1321,8 +1358,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				for name, i in b.names {
 					field_count += 1;
 
-					if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
-					if hash do for in 0..<fi.indent do strings.write_byte(fi.buf, '\t');
+					if !hash && field_count > 0 { strings.write_string(fi.buf, ", "); }
+					if hash {
+						for in 0..<fi.indent { strings.write_byte(fi.buf, '\t'); }
+					}
 
 					strings.write_string(fi.buf, name);
 					strings.write_string(fi.buf, " = ");
@@ -1334,7 +1373,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 						fmt_arg(fi, any{data, t.id}, 'v');
 					}
 
-					if hash do strings.write_string(fi.buf, ",\n");
+					if hash { strings.write_string(fi.buf, ",\n"); }
 				}
 			}
 
@@ -1365,35 +1404,37 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				a := any{ptr, info.elem.id};
 
 				elem := runtime.type_info_base(info.elem);
-				if elem != nil do #partial switch e in elem.variant {
-				case runtime.Type_Info_Array,
-				     runtime.Type_Info_Slice,
-				     runtime.Type_Info_Dynamic_Array,
-				     runtime.Type_Info_Map:
-					if ptr == nil {
-						strings.write_string(fi.buf, "<nil>");
-						return;
-					}
-					if fi.record_level < 1 {
-					  	fi.record_level += 1;
-						defer fi.record_level -= 1;
-						strings.write_byte(fi.buf, '&');
-						fmt_value(fi, a, verb);
-						return;
-					}
+				if elem != nil {
+					#partial switch e in elem.variant {
+					case runtime.Type_Info_Array,
+					     runtime.Type_Info_Slice,
+					     runtime.Type_Info_Dynamic_Array,
+					     runtime.Type_Info_Map:
+						if ptr == nil {
+							strings.write_string(fi.buf, "<nil>");
+							return;
+						}
+						if fi.record_level < 1 {
+						  	fi.record_level += 1;
+							defer fi.record_level -= 1;
+							strings.write_byte(fi.buf, '&');
+							fmt_value(fi, a, verb);
+							return;
+						}
 
-				case runtime.Type_Info_Struct,
-				     runtime.Type_Info_Union:
-					if ptr == nil {
-						strings.write_string(fi.buf, "<nil>");
-						return;
-					}
-					if fi.record_level < 1 {
-						fi.record_level += 1;
-						defer fi.record_level -= 1;
-						strings.write_byte(fi.buf, '&');
-						fmt_value(fi, a, verb);
-						return;
+					case runtime.Type_Info_Struct,
+					     runtime.Type_Info_Union:
+						if ptr == nil {
+							strings.write_string(fi.buf, "<nil>");
+							return;
+						}
+						if fi.record_level < 1 {
+							fi.record_level += 1;
+							defer fi.record_level -= 1;
+							strings.write_byte(fi.buf, '&');
+							fmt_value(fi, a, verb);
+							return;
+						}
 					}
 				}
 			}
@@ -1404,7 +1445,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		strings.write_byte(fi.buf, '[');
 		defer strings.write_byte(fi.buf, ']');
 		for i in 0..<info.count {
-			if i > 0 do strings.write_string(fi.buf, ", ");
+			if i > 0 { strings.write_string(fi.buf, ", "); }
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size);
 			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
@@ -1414,7 +1455,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		strings.write_byte(fi.buf, '[');
 		defer strings.write_byte(fi.buf, ']');
 		for i in 0..<info.count {
-			if i > 0 do strings.write_string(fi.buf, ", ");
+			if i > 0 { strings.write_string(fi.buf, ", "); }
 
 			idx, ok := stored_enum_value_to_string(info.index, info.min_value, i);
 			if ok {
@@ -1438,7 +1479,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			defer strings.write_byte(fi.buf, ']');
 			array := cast(^mem.Raw_Dynamic_Array)v.data;
 			for i in 0..<array.len {
-				if i > 0 do strings.write_string(fi.buf, ", ");
+				if i > 0 { strings.write_string(fi.buf, ", "); }
 
 				data := uintptr(array.data) + uintptr(i*info.elem_size);
 				fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
@@ -1452,7 +1493,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		strings.write_byte(fi.buf, '<');
 		defer strings.write_byte(fi.buf, '>');
 		for i in 0..<info.count {
-			if i > 0 do strings.write_string(fi.buf, ", ");
+			if i > 0 { strings.write_string(fi.buf, ", "); }
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size);
 			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
@@ -1468,7 +1509,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			defer strings.write_byte(fi.buf, ']');
 			slice := cast(^mem.Raw_Slice)v.data;
 			for i in 0..<slice.len {
-				if i > 0 do strings.write_string(fi.buf, ", ");
+				if i > 0 { strings.write_string(fi.buf, ", "); }
 
 				data := uintptr(slice.data) + uintptr(i*info.elem_size);
 				fmt_arg(fi, any{rawptr(data), info.elem.id}, verb);
@@ -1495,7 +1536,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			entry_size := ed.elem_size;
 
 			for i in 0..<entries.len {
-				if i > 0 do strings.write_string(fi.buf, ", ");
+				if i > 0 { strings.write_string(fi.buf, ", "); }
 
 				data := uintptr(entries.data) + uintptr(i*entry_size);
 				header := cast(^runtime.Map_Entry_Header)data;
@@ -1530,7 +1571,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		fi.hash = false;
 
 
-		if hash	do strings.write_byte(fi.buf, '\n');
+		if hash	{ strings.write_byte(fi.buf, '\n'); }
 
 		if is_soa {
 			fi.indent += 1;
@@ -1559,11 +1600,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 
 			for index in 0..<n {
-				if !hash && index > 0 do strings.write_string(fi.buf, ", ");
+				if !hash && index > 0 { strings.write_string(fi.buf, ", "); }
 
 				field_count := -1;
 
-				if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
+				if !hash && field_count > 0 { strings.write_string(fi.buf, ", "); }
 
 				strings.write_string(fi.buf, base_type_name);
 				strings.write_byte(fi.buf, '{');
@@ -1573,8 +1614,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 					name := info.names[i];
 					field_count += 1;
 
-					if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
-					if hash do for in 0..<fi.indent do strings.write_byte(fi.buf, '\t');
+					if !hash && field_count > 0 { strings.write_string(fi.buf, ", "); }
+					if hash {
+						for in 0..<fi.indent { strings.write_byte(fi.buf, '\t'); }
+					}
 
 					strings.write_string(fi.buf, name);
 					strings.write_string(fi.buf, " = ");
@@ -1600,7 +1643,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 						}
 					}
 
-					if hash do strings.write_string(fi.buf, ",\n");
+					if hash { strings.write_string(fi.buf, ",\n"); }
 				}
 			}
 		} else {
@@ -1608,8 +1651,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			for name, i in info.names {
 				field_count += 1;
 
-				if !hash && field_count > 0 do strings.write_string(fi.buf, ", ");
-				if hash do for in 0..<fi.indent do strings.write_byte(fi.buf, '\t');
+				if !hash && field_count > 0 { strings.write_string(fi.buf, ", "); }
+				if hash {
+					for in 0..<fi.indent { strings.write_byte(fi.buf, '\t'); }
+				}
 
 				strings.write_string(fi.buf, name);
 				strings.write_string(fi.buf, " = ");
@@ -1621,7 +1666,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 					fmt_arg(fi, any{data, t.id}, 'v');
 				}
 
-				if hash do strings.write_string(fi.buf, ",\n");
+				if hash {
+					strings.write_string(fi.buf, ",\n");
+				}
 			}
 		}
 
@@ -1767,7 +1814,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			defer strings.write_byte(fi.buf, ']');
 
 			for i in 0..<len {
-				if i > 0 do strings.write_string(fi.buf, ", ");
+				if i > 0 { strings.write_string(fi.buf, ", "); }
 
 				data := uintptr(ptr) + uintptr(i*slice_type.elem_size);
 				fmt_arg(fi, any{rawptr(data), slice_type.elem.id}, verb);
@@ -1812,15 +1859,21 @@ fmt_quaternion  :: proc(fi: ^Info, q: quaternion256, bits: int, verb: rune) {
 
 		fmt_float(fi, r, bits/4, verb);
 
-		if !fi.plus && i >= 0 do strings.write_rune(fi.buf, '+');
+		if !fi.plus && i >= 0 {
+			strings.write_rune(fi.buf, '+');
+		}
 		fmt_float(fi, i, bits/4, verb);
 		strings.write_rune(fi.buf, 'i');
 
-		if !fi.plus && j >= 0 do strings.write_rune(fi.buf, '+');
+		if !fi.plus && j >= 0 {
+			strings.write_rune(fi.buf, '+');
+		}
 		fmt_float(fi, j, bits/4, verb);
 		strings.write_rune(fi.buf, 'j');
 
-		if !fi.plus && k >= 0 do strings.write_rune(fi.buf, '+');
+		if !fi.plus && k >= 0 {
+			strings.write_rune(fi.buf, '+');
+		}
 		fmt_float(fi, k, bits/4, verb);
 		strings.write_rune(fi.buf, 'k');
 

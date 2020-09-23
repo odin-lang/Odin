@@ -240,13 +240,13 @@ S_ISGID :: 0o2000; // Set group id on execution
 S_ISVTX :: 0o1000; // Directory restrcted delete
 
 
-S_ISLNK  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFLNK;
-S_ISREG  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFREG;
-S_ISDIR  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFDIR;
-S_ISCHR  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFCHR;
-S_ISBLK  :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFBLK;
-S_ISFIFO :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFIFO;
-S_ISSOCK :: inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFSOCK;
+S_ISLNK  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFLNK;  }
+S_ISREG  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFREG;  }
+S_ISDIR  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFDIR;  }
+S_ISCHR  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFCHR;  }
+S_ISBLK  :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFBLK;  }
+S_ISFIFO :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFIFO;  }
+S_ISSOCK :: inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK; }
 
 F_OK :: 0; // Test for file existance
 X_OK :: 1; // Test for execute permission
@@ -451,7 +451,9 @@ get_current_directory :: proc() -> string {
 set_current_directory :: proc(path: string) -> (err: Errno) {
 	cstr := strings.clone_to_cstring(path, context.temp_allocator);
 	res := _unix_chdir(cstr);
-	if res == -1 do return Errno(get_last_error());
+	if res == -1 {
+		return Errno(get_last_error());
+	}
 	return ERROR_NONE;
 }
 
@@ -488,7 +490,9 @@ get_page_size :: proc() -> int {
 	// NOTE(tetra): The page size never changes, so why do anything complicated
 	// if we don't have to.
 	@static page_size := -1;
-	if page_size != -1 do return page_size;
+	if page_size != -1 {
+		return page_size;
+	}
 
 	page_size = int(_unix_getpagesize());
 	return page_size;
