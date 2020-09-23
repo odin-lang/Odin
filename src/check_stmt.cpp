@@ -1295,6 +1295,65 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	}
 }
 
+void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
+	if (body->kind != Ast_BlockStmt) {
+		return;
+	}
+	ast_node(bs, BlockStmt, body);
+	// NOTE(bill, 2020-09-23): This logic is prevent common erros with block statements
+	// e.g. if cond { x := 123; } // this is an error
+	if (body->scope != nullptr && body->scope->elements.entries.count > 0) {
+		if (body->scope->parent->node != nullptr) {
+			switch (body->scope->parent->node->kind) {
+			case Ast_IfStmt:
+			case Ast_ForStmt:
+			case Ast_RangeStmt:
+			case Ast_InlineRangeStmt:
+			case Ast_SwitchStmt:
+			case Ast_TypeSwitchStmt:
+				// TODO(bill): Is this a correct checking system?
+				break;
+			default:
+				return;
+			}
+		}
+
+		isize stmt_count = 0;
+		Ast *the_stmt = nullptr;
+		for_array(i, bs->stmts) {
+			Ast *stmt = bs->stmts[i];
+			GB_ASSERT(stmt != nullptr);
+			switch (stmt->kind) {
+			case_ast_node(es, EmptyStmt, stmt);
+			case_end;
+			case_ast_node(bs, BadStmt, stmt);
+			case_end;
+			case_ast_node(bd, BadDecl, stmt);
+			case_end;
+			default:
+				the_stmt = stmt;
+				stmt_count += 1;
+				break;
+			}
+		}
+
+		if (stmt_count == 1) {
+			if (the_stmt->kind == Ast_ValueDecl) {
+				for_array(i, the_stmt->ValueDecl.names) {
+					Ast *name = the_stmt->ValueDecl.names[i];
+					if (name->kind != Ast_Ident) {
+						continue;
+					}
+					String n = name->Ident.token.string;
+					if (n != "_") {
+						error(name, "'%.*s' declared but not used", LIT(n));
+					}
+				}
+			}
+		}
+	}
+}
+
 void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
@@ -1505,6 +1564,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		check_label(ctx, bs->label, node);
 
 		check_stmt_list(ctx, bs->stmts, flags);
+		check_block_stmt_for_errors(ctx, node);
 		check_close_scope(ctx);
 	case_end;
 
