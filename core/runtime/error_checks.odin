@@ -18,7 +18,9 @@ type_assertion_trap :: proc "contextless" () -> ! {
 
 
 bounds_check_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
-	if 0 <= index && index < count do return;
+	if 0 <= index && index < count {
+		return;
+	}
 	handle_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
 		context = default_context();
 		fd := os_stderr();
@@ -48,17 +50,23 @@ slice_handle_error :: proc "contextless" (file: string, line, column: int, lo, h
 }
 
 slice_expr_error_hi :: proc "contextless" (file: string, line, column: int, hi: int, len: int) {
-	if 0 <= hi && hi <= len do return;
+	if 0 <= hi && hi <= len {
+		return;
+	}
 	slice_handle_error(file, line, column, 0, hi, len);
 }
 
 slice_expr_error_lo_hi :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
-	if 0 <= lo && lo <= len && lo <= hi && hi <= len do return;
+	if 0 <= lo && lo <= len && lo <= hi && hi <= len {
+		return;
+	}
 	slice_handle_error(file, line, column, lo, hi, len);
 }
 
 dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
-	if 0 <= low && low <= high && high <= max do return;
+	if 0 <= low && low <= high && high <= max {
+		return;
+	}
 	handle_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
 		context = default_context();
 		fd := os_stderr();
@@ -77,7 +85,9 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int,
 
 
 type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: typeid) {
-	if ok do return;
+	if ok {
+		return;
+	}
 	handle_error :: proc "contextless" (file: string, line, column: int, from, to: typeid) {
 		context = default_context();
 		fd := os_stderr();
@@ -93,7 +103,9 @@ type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column
 }
 
 make_slice_error_loc :: inline proc "contextless" (loc := #caller_location, len: int) {
-	if 0 <= len do return;
+	if 0 <= len {
+		return;
+	}
 	handle_error :: proc "contextless" (loc: Source_Code_Location, len: int) {
 		context = default_context();
 		fd := os_stderr();
@@ -107,7 +119,9 @@ make_slice_error_loc :: inline proc "contextless" (loc := #caller_location, len:
 }
 
 make_dynamic_array_error_loc :: inline proc "contextless" (using loc := #caller_location, len, cap: int) {
-	if 0 <= len && len <= cap do return;
+	if 0 <= len && len <= cap {
+		return;
+	}
 	handle_error :: proc "contextless" (loc: Source_Code_Location, len, cap: int) {
 		context = default_context();
 		fd := os_stderr();
@@ -123,7 +137,9 @@ make_dynamic_array_error_loc :: inline proc "contextless" (using loc := #caller_
 }
 
 make_map_expr_error_loc :: inline proc "contextless" (loc := #caller_location, cap: int) {
-	if 0 <= cap do return;
+	if 0 <= cap {
+		return;
+	}
 	handle_error :: proc "contextless" (loc: Source_Code_Location, cap: int) {
 		context = default_context();
 		fd := os_stderr();

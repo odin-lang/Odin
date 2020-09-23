@@ -9,7 +9,6 @@ import "core:reflect"
 import "core:runtime"
 import "intrinsics"
 
-
 /*
 	The Odin programming language is fast, concise, readable, pragmatic and open sourced.
 	It is designed with the intent of replacing C with the following goals:
@@ -135,9 +134,9 @@ control_flow :: proc() {
 		}
 
 		// NOTE: Unlike other languages like C, there are no parentheses `( )` surrounding the three components.
-		// Braces `{ }` or a `do` are always required>
+		// Braces `{ }` or a `do` are always required
 		for i := 0; i < 10; i += 1 { }
-		for i := 0; i < 10; i += 1 do fmt.print();
+		// for i := 0; i < 10; i += 1 do fmt.print();
 
 		// The initial and post statements are optional
 		i := 0;
@@ -620,8 +619,8 @@ union_type :: proc() {
 		case Frog:
 			fmt.println("Ribbit");
 		case Monster:
-			if e.is_robot  do fmt.println("Robotic");
-			if e.is_zombie do fmt.println("Grrrr!");
+			if e.is_robot  { fmt.println("Robotic"); }
+			if e.is_zombie { fmt.println("Grrrr!");  }
 			fmt.println("I'm a monster");
 		}
 	}
@@ -665,8 +664,8 @@ union_type :: proc() {
 		case Frog:
 			fmt.println("Ribbit");
 		case Monster:
-			if e.is_robot  do fmt.println("Robotic");
-			if e.is_zombie do fmt.println("Grrrr!");
+			if e.is_robot  { fmt.println("Robotic"); }
+			if e.is_zombie { fmt.println("Grrrr!");  }
 		}
 
 		// NOTE(bill): As you can see, the usage code has not changed, only its
@@ -712,7 +711,7 @@ union_type :: proc() {
 using_statement :: proc() {
 	fmt.println("\n# using statement");
 	// using can used to bring entities declared in a scope/namespace
-	// into the current scope. This can be applied to import names, struct 
+	// into the current scope. This can be applied to import names, struct
 	// fields, procedure fields, and struct values.
 
 	Vector3 :: struct{x, y, z: f32};
@@ -920,7 +919,9 @@ parametric_polymorphism :: proc() {
 		// Only allow types that are specializations of `Table`
 		allocate :: proc(table: ^$T/Table, capacity: int) {
 			c := context;
-			if table.allocator.procedure != nil do c.allocator = table.allocator;
+			if table.allocator.procedure != nil {
+				c.allocator = table.allocator;
+			}
 			context = c;
 
 			table.slots = make_slice(type_of(table.slots), max(capacity, TABLE_SIZE_MIN));
@@ -928,7 +929,9 @@ parametric_polymorphism :: proc() {
 
 		expand :: proc(table: ^$T/Table) {
 			c := context;
-			if table.allocator.procedure != nil do c.allocator = table.allocator;
+			if table.allocator.procedure != nil {
+				c.allocator = table.allocator;
+			}
 			context = c;
 
 			old_slots := table.slots;
@@ -937,8 +940,10 @@ parametric_polymorphism :: proc() {
 			cap := max(2*len(table.slots), TABLE_SIZE_MIN);
 			allocate(table, cap);
 
-			for s in old_slots do if s.occupied {
-				put(table, s.key, s.value);
+			for s in old_slots {
+				if s.occupied {
+					put(table, s.key, s.value);
+				}
 			}
 		}
 
@@ -983,7 +988,9 @@ parametric_polymorphism :: proc() {
 		}
 
 		find_index :: proc(table: ^Table($Key, $Value), key: Key, hash: u32) -> int {
-			if len(table.slots) <= 0 do return -1;
+			if len(table.slots) <= 0 {
+				return -1;
+			}
 
 			index := int(hash % u32(len(table.slots)));
 			for table.slots[index].occupied {
@@ -1012,8 +1019,8 @@ parametric_polymorphism :: proc() {
 
 		table: Table(string, int);
 
-		for i in 0..36 do put(&table, "Hellope", i);
-		for i in 0..42 do put(&table, "World!",  i);
+		for i in 0..36 { put(&table, "Hellope", i); }
+		for i in 0..42 { put(&table, "World!",  i); }
 
 		found, _ := find(&table, "Hellope");
 		fmt.printf("`found` is %v\n", found);
@@ -1597,7 +1604,9 @@ where_clauses :: proc() {
 }
 
 
-when ODIN_OS == "windows" do foreign import kernel32 "system:kernel32.lib"
+when ODIN_OS == "windows" {
+	foreign import kernel32 "system:kernel32.lib"
+}
 
 foreign_system :: proc() {
 	fmt.println("\n#foreign system");
@@ -1736,7 +1745,9 @@ range_statements_with_multiple_return_values :: proc() {
 		it := make_my_iterator(data);
 		for {
 			val, _, cond := my_iterator(&it);
-			if !cond do break;
+			if !cond {
+				break;
+			}
 			fmt.println(val);
 		}
 	}

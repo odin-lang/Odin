@@ -408,7 +408,9 @@ foreign {
 
 
 type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
-	if info == nil do return nil;
+	if info == nil {
+		return nil;
+	}
 
 	base := info;
 	loop: for {
@@ -422,7 +424,9 @@ type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 
 
 type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
-	if info == nil do return nil;
+	if info == nil {
+		return nil;
+	}
 
 	base := info;
 	loop: for {
@@ -477,7 +481,7 @@ foreign {
 
 
 default_logger_proc :: proc(data: rawptr, level: Logger_Level, text: string, options: Logger_Options, location := #caller_location) {
-	// Do nothing
+	// Nothing
 }
 
 default_logger :: proc() -> Logger {
@@ -493,14 +497,18 @@ default_context :: proc "contextless" () -> Context {
 
 @private
 __init_context_from_ptr :: proc "contextless" (c: ^Context, other: ^Context) {
-	if c == nil do return;
+	if c == nil {
+		return;
+	}
 	c^ = other^;
 	__init_context(c);
 }
 
 @private
 __init_context :: proc "contextless" (c: ^Context) {
-	if c == nil do return;
+	if c == nil {
+		return;
+	}
 
 	// NOTE(bill): Do not initialize these procedures with a call as they are not defined with the "contexless" calling convention
 	c.allocator.procedure = default_allocator_proc;
@@ -699,14 +707,14 @@ delete :: proc{
 @builtin
 new :: inline proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> ^T {
 	ptr := (^T)(mem_alloc(size_of(T), align_of(T), allocator, loc));
-	if ptr != nil do ptr^ = T{};
+	if ptr != nil { ptr^ = T{}; }
 	return ptr;
 }
 
 @builtin
 new_clone :: inline proc(data: $T, allocator := context.allocator, loc := #caller_location) -> ^T {
 	ptr := (^T)(mem_alloc(size_of(T), align_of(T), allocator, loc));
-	if ptr != nil do ptr^ = data;
+	if ptr != nil { ptr^ = data; }
 	return ptr;
 }
 
@@ -771,7 +779,9 @@ make :: proc{
 
 @builtin
 clear_map :: inline proc "contextless" (m: ^$T/map[$K]$V) {
-	if m == nil do return;
+	if m == nil {
+		return;
+	}
 	raw_map := (^Raw_Map)(m);
 	entries := (^Raw_Dynamic_Array)(&raw_map.entries);
 	entries.len = 0;
@@ -782,19 +792,25 @@ clear_map :: inline proc "contextless" (m: ^$T/map[$K]$V) {
 
 @builtin
 reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int) {
-	if m != nil do __dynamic_map_reserve(__get_map_header(m), capacity);
+	if m != nil {
+		__dynamic_map_reserve(__get_map_header(m), capacity);
+	}
 }
 
 @builtin
 delete_key :: proc(m: ^$T/map[$K]$V, key: K) {
-	if m != nil do __dynamic_map_delete_key(__get_map_header(m), __get_map_key(key));
+	if m != nil {
+		__dynamic_map_delete_key(__get_map_header(m), __get_map_key(key));
+	}
 }
 
 
 
 @builtin
 append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
-	if array == nil do return;
+	if array == nil {
+		return;
+	}
 
 	arg_len := 1;
 
@@ -816,10 +832,14 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 }
 @builtin
 append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)  {
-	if array == nil do return;
+	if array == nil {
+		return;
+	}
 
 	arg_len := len(args);
-	if arg_len <= 0 do return;
+	if arg_len <= 0 {
+		return;
+	}
 
 
 	if cap(array) < len(array)+arg_len {
@@ -845,10 +865,14 @@ append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #ca
 
 @builtin
 reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_location) -> bool {
-	if array == nil do return false;
+	if array == nil {
+		return false;
+	}
 
 	old_cap := cap(array);
-	if capacity <= old_cap do return true;
+	if capacity <= old_cap {
+		return true;
+	}
 
 	if array.allocator.procedure == nil {
 		array.allocator = context.allocator;
@@ -894,7 +918,9 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 		array.allocator.data, .Alloc, new_size, max_align,
 		nil, old_size, 0, loc,
 	);
-	if new_data == nil do return false;
+	if new_data == nil {
+		return false;
+	}
 
 
 	cap_ptr^ = capacity;
@@ -929,7 +955,9 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 
 @builtin
 append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, arg: E, loc := #caller_location) {
-	if array == nil do return;
+	if array == nil {
+		return;
+	}
 
 	arg_len := 1;
 
@@ -981,7 +1009,9 @@ append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, arg: E, loc := #caller_locat
 
 @builtin
 append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_location) {
-	if array == nil do return;
+	if array == nil {
+		return;
+	}
 
 	arg_len := len(args);
 	if arg_len == 0 {
@@ -1118,15 +1148,21 @@ insert_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string
 
 @builtin
 clear_dynamic_array :: inline proc "contextless" (array: ^$T/[dynamic]$E) {
-	if array != nil do (^Raw_Dynamic_Array)(array).len = 0;
+	if array != nil {
+		(^Raw_Dynamic_Array)(array).len = 0;
+	}
 }
 
 @builtin
 reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #caller_location) -> bool {
-	if array == nil do return false;
+	if array == nil {
+		return false;
+	}
 	a := (^Raw_Dynamic_Array)(array);
 
-	if capacity <= a.cap do return true;
+	if capacity <= a.cap {
+		return true;
+	}
 
 	if a.allocator.procedure == nil {
 		a.allocator = context.allocator;
@@ -1141,7 +1177,9 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 		allocator.data, .Resize, new_size, align_of(E),
 		a.data, old_size, 0, loc,
 	);
-	if new_data == nil do return false;
+	if new_data == nil {
+		return false;
+	}
 
 	a.data = new_data;
 	a.cap = capacity;
@@ -1150,7 +1188,9 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 
 @builtin
 resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller_location) -> bool {
-	if array == nil do return false;
+	if array == nil {
+		return false;
+	}
 	a := (^Raw_Dynamic_Array)(array);
 
 	if length <= a.cap {
@@ -1171,7 +1211,9 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 		allocator.data, .Resize, new_size, align_of(E),
 		a.data, old_size, 0, loc,
 	);
-	if new_data == nil do return false;
+	if new_data == nil {
+		return false;
+	}
 
 	a.data = new_data;
 	a.len = length;
@@ -1188,7 +1230,9 @@ incl_elem :: inline proc(s: ^$S/bit_set[$E; $U], elem: E) -> S {
 }
 @builtin
 incl_elems :: inline proc(s: ^$S/bit_set[$E; $U], elems: ..E) -> S {
-	for elem in elems do s^ |= {elem};
+	for elem in elems {
+		s^ |= {elem};
+	}
 	return s^;
 }
 @builtin
@@ -1203,7 +1247,9 @@ excl_elem :: inline proc(s: ^$S/bit_set[$E; $U], elem: E) -> S {
 }
 @builtin
 excl_elems :: inline proc(s: ^$S/bit_set[$E; $U], elems: ..E) -> S {
-	for elem in elems do s^ &~= {elem};
+	for elem in elems {
+		s^ &~= {elem};
+	}
 	return s^;
 }
 @builtin
@@ -1337,7 +1383,9 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	}
 	assert(array.allocator.procedure != nil);
 
-	if cap <= array.cap do return true;
+	if cap <= array.cap {
+		return true;
+	}
 
 	old_size  := array.cap * elem_size;
 	new_size  := cap * elem_size;
@@ -1356,7 +1404,9 @@ __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: 
 	array := (^Raw_Dynamic_Array)(array_);
 
 	ok := __dynamic_array_reserve(array_, elem_size, elem_align, len, loc);
-	if ok do array.len = len;
+	if ok {
+		array.len = len;
+	}
 	return ok;
 }
 
@@ -1365,8 +1415,12 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
                                items: rawptr, item_count: int, loc := #caller_location) -> int {
 	array := (^Raw_Dynamic_Array)(array_);
 
-	if items == nil    do return 0;
-	if item_count <= 0 do return 0;
+	if items == nil    {
+		return 0;
+	}
+	if item_count <= 0 {
+		return 0;
+	}
 
 
 	ok := true;
@@ -1375,7 +1429,9 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 		ok = __dynamic_array_reserve(array, elem_size, elem_align, cap, loc);
 	}
 	// TODO(bill): Better error handling for failed reservation
-	if !ok do return array.len;
+	if !ok {
+		return array.len;
+	}
 
 	assert(array.data != nil);
 	data := uintptr(array.data) + uintptr(elem_size*array.len);
@@ -1394,7 +1450,9 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 		ok = __dynamic_array_reserve(array, elem_size, elem_align, cap, loc);
 	}
 	// TODO(bill): Better error handling for failed reservation
-	if !ok do return array.len;
+	if !ok {
+		return array.len;
+	}
 
 	assert(array.data != nil);
 	data := uintptr(array.data) + uintptr(elem_size*array.len);
@@ -1434,11 +1492,11 @@ __get_map_key :: proc "contextless" (k: $K) -> Map_Key {
 		map_key.hash = default_hash_ptr(&key, size_of(T));
 
 		sz :: 8*size_of(T);
-		     when sz ==  8 do map_key.key.val = u64(( ^u8)(&key)^);
-		else when sz == 16 do map_key.key.val = u64((^u16)(&key)^);
-		else when sz == 32 do map_key.key.val = u64((^u32)(&key)^);
-		else when sz == 64 do map_key.key.val = u64((^u64)(&key)^);
-		else do #panic("Unhandled integer size");
+		     when sz ==  8 { map_key.key.val = u64(( ^u8)(&key)^); }
+		else when sz == 16 { map_key.key.val = u64((^u16)(&key)^); }
+		else when sz == 32 { map_key.key.val = u64((^u32)(&key)^); }
+		else when sz == 64 { map_key.key.val = u64((^u64)(&key)^); }
+		else { #panic("Unhandled integer size"); }
 	} else when intrinsics.type_is_rune(T) {
 		map_key.hash = default_hash_ptr(&key, size_of(T));
 		map_key.key.val = u64((^rune)(&key)^);
@@ -1449,9 +1507,9 @@ __get_map_key :: proc "contextless" (k: $K) -> Map_Key {
 		map_key.hash = default_hash_ptr(&key, size_of(T));
 
 		sz :: 8*size_of(T);
-		     when sz == 32 do map_key.key.val = u64((^u32)(&key)^);
-		else when sz == 64 do map_key.key.val = u64((^u64)(&key)^);
-		else do #panic("Unhandled float size");
+		     when sz == 32 { map_key.key.val = u64((^u32)(&key)^); }
+		else when sz == 64 { map_key.key.val = u64((^u64)(&key)^); }
+		else { #panic("Unhandled float size"); }
 	} else when intrinsics.type_is_string(T) {
 		#assert(T == string);
 		str := (^string)(&key)^;
@@ -1497,7 +1555,9 @@ source_code_location_hash :: proc(s: Source_Code_Location) -> u64 {
 __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, loc := #caller_location) -> bool {
 	array := (^Raw_Slice)(array_);
 
-	if new_count < array.len do return true;
+	if new_count < array.len {
+		return true;
+	}
 
 	assert(allocator.procedure != nil);
 
@@ -1505,7 +1565,9 @@ __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, l
 	new_size := new_count*size_of(T);
 
 	new_data := mem_resize(array.data, old_size, new_size, align_of(T), allocator, loc);
-	if new_data == nil do return false;
+	if new_data == nil {
+		return false;
+	}
 	array.data = new_data;
 	array.len = new_count;
 	return true;
@@ -1516,7 +1578,9 @@ __dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller
 
 	old_len := len(m.hashes);
 	__slice_resize(&m.hashes, cap, m.entries.allocator, loc);
-	for i in old_len..<len(m.hashes) do m.hashes[i] = -1;
+	for i in old_len..<len(m.hashes) {
+		m.hashes[i] = -1;
+	}
 
 }
 __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #caller_location) #no_bounds_check {
@@ -1533,10 +1597,14 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 
 	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len, loc);
 	__slice_resize(&nm.hashes, new_count, m.entries.allocator, loc);
-	for i in 0 ..< new_count do nm.hashes[i] = -1;
+	for i in 0 ..< new_count {
+		nm.hashes[i] = -1;
+	}
 
 	for i in 0 ..< m.entries.len {
-		if len(nm.hashes) == 0 do __dynamic_map_grow(new_header, loc);
+		if len(nm.hashes) == 0 {
+			__dynamic_map_grow(new_header, loc);
+		}
 
 		entry_header := __dynamic_map_get_entry(header, i);
 		data := uintptr(entry_header);
@@ -1555,7 +1623,9 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 		ndata := uintptr(e);
 		mem_copy(rawptr(ndata+value_offset), rawptr(data+value_offset), value_size);
 
-		if __dynamic_map_full(new_header) do __dynamic_map_grow(new_header, loc);
+		if __dynamic_map_full(new_header) {
+			__dynamic_map_grow(new_header, loc);
+		}
 	}
 	delete(m.hashes, m.entries.allocator, loc);
 	free(m.entries.data, m.entries.allocator, loc);
@@ -1635,7 +1705,9 @@ __dynamic_map_find :: proc(using h: Map_Header, key: Map_Key) -> Map_Find_Result
 		fr.entry_index = m.hashes[fr.hash_index];
 		for fr.entry_index >= 0 {
 			entry := __dynamic_map_get_entry(h, fr.entry_index);
-			if __dynamic_map_hash_equal(h, entry.key, key) do return fr;
+			if __dynamic_map_hash_equal(h, entry.key, key) {
+				return fr;
+			}
 			fr.entry_prev = fr.entry_index;
 			fr.entry_index = entry.next;
 		}

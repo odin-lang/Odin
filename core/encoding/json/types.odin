@@ -65,7 +65,9 @@ destroy_value :: proc(value: Value) {
 		}
 		delete(v);
 	case Array:
-		for elem in v do destroy_value(elem);
+		for elem in v {
+			destroy_value(elem);
+		}
 		delete(v);
 	case String:
 		delete(v);

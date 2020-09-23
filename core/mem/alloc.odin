@@ -46,14 +46,22 @@ Allocator :: struct {
 DEFAULT_ALIGNMENT :: 2*align_of(rawptr);
 
 alloc :: inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
-	if size == 0 do return nil;
-	if allocator.procedure == nil do return nil;
+	if size == 0 {
+		return nil;
+	}
+	if allocator.procedure == nil {
+		return nil;
+	}
 	return allocator.procedure(allocator.data, Allocator_Mode.Alloc, size, alignment, nil, 0, 0, loc);
 }
 
 free :: inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) {
-	if ptr == nil do return;
-	if allocator.procedure == nil do return;
+	if ptr == nil {
+		return;
+	}
+	if allocator.procedure == nil {
+		return;
+	}
 	allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, 0, 0, loc);
 }
 
@@ -129,12 +137,12 @@ new :: inline proc($T: typeid, allocator := context.allocator, loc := #caller_lo
 }
 new_aligned :: inline proc($T: typeid, alignment: int, allocator := context.allocator, loc := #caller_location) -> ^T {
 	ptr := (^T)(alloc(size_of(T), alignment, allocator, loc));
-	if ptr != nil do ptr^ = T{};
+	if ptr != nil { ptr^ = T{}; }
 	return ptr;
 }
 new_clone :: inline proc(data: $T, allocator := context.allocator, loc := #caller_location) -> ^T {
 	ptr := (^T)(alloc(size_of(T), align_of(T), allocator, loc));
-	if ptr != nil do ptr^ = data;
+	if ptr != nil { ptr^ = data; }
 	return ptr;
 }
 
@@ -188,17 +196,23 @@ make :: proc{
 
 
 default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: int, allocator := context.allocator, loc := #caller_location) -> rawptr {
-	if old_memory == nil do return alloc(new_size, alignment, allocator, loc);
+	if old_memory == nil {
+		return alloc(new_size, alignment, allocator, loc);
+	}
 
 	if new_size == 0 {
 		free(old_memory, allocator, loc);
 		return nil;
 	}
 
-	if new_size == old_size do return old_memory;
+	if new_size == old_size {
+		return old_memory;
+	}
 
 	new_memory := alloc(new_size, alignment, allocator, loc);
-	if new_memory == nil do return nil;
+	if new_memory == nil {
+		return nil;
+	}
 
 	copy(new_memory, old_memory, min(old_size, new_size));
 	free(old_memory, allocator, loc);

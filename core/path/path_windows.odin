@@ -23,7 +23,9 @@ long :: proc(path: string, allocator := context.temp_allocator) -> string {
 	c_path := win32.utf8_to_wstring(path, context.temp_allocator);
 	length := win32.GetLongPathNameW(c_path, nil, 0);
 
-	if length == 0 do return "";
+	if length == 0 {
+		return "";
+	}
 
 	buf := make([]u16, length, context.temp_allocator);
 
@@ -38,7 +40,9 @@ short :: proc(path: string, allocator := context.temp_allocator) -> string {
 	c_path := win32.utf8_to_wstring(path, context.temp_allocator);
 	length := win32.GetShortPathNameW(c_path, nil, 0);
 
-	if length == 0 do return "";
+	if length == 0 {
+		return "";
+	}
 
 	buf := make([]u16, length, context.temp_allocator);
 
@@ -53,7 +57,9 @@ full :: proc(path: string, allocator := context.temp_allocator) -> string {
 	c_path := win32.utf8_to_wstring(path, context.temp_allocator);
 	length := win32.GetFullPathNameW(c_path, 0, nil, nil);
 
-	if length == 0 do return "";
+	if length == 0 {
+		return "";
+	}
 
 	buf := make([]u16, length, context.temp_allocator);
 
@@ -67,7 +73,9 @@ full :: proc(path: string, allocator := context.temp_allocator) -> string {
 current :: proc(allocator := context.temp_allocator) -> string {
 	length := win32.GetCurrentDirectoryW(0, nil);
 
-	if length == 0 do return "";
+	if length == 0 {
+		return "";
+	}
 
 	buf := make([]u16, length, context.temp_allocator);
 

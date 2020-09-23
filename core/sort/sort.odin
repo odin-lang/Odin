@@ -16,11 +16,15 @@ bubble_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 			if f(array[j], array[j+1]) > 0 {
 				array[j], array[j+1] = array[j+1], array[j];
 				prev_swap = j;
-				if init_swap == -1 do init_swap = j;
+				if init_swap == -1 {
+					init_swap = j;
+				}
 			}
 		}
 
-		if prev_swap == -1 do return;
+		if prev_swap == -1 {
+			return;
+		}
 
 		init_j = max(init_swap-1, 0);
 		last_j = prev_swap;
@@ -39,11 +43,15 @@ bubble_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 			if array[j] > array[j+1] {
 				array[j], array[j+1] = array[j+1], array[j];
 				prev_swap = j;
-				if init_swap == -1 do init_swap = j;
+				if init_swap == -1 {
+					init_swap = j;
+				}
 			}
 		}
 
-		if prev_swap == -1 do return;
+		if prev_swap == -1 {
+			return;
+		}
 
 		init_j = max(init_swap-1, 0);
 		last_j = prev_swap;
@@ -54,16 +62,20 @@ quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	assert(f != nil);
 	a := array;
 	n := len(a);
-	if n < 2 do return;
+	if n < 2 {
+		return;
+	}
 
 	p := a[n/2];
 	i, j := 0, n-1;
 
 	loop: for {
-		for f(a[i], p) < 0 do i += 1;
-		for f(p, a[j]) < 0 do j -= 1;
+		for f(a[i], p) < 0 { i += 1; }
+		for f(p, a[j]) < 0 { j -= 1; }
 
-		if i >= j do break loop;
+		if i >= j {
+			break loop;
+		}
 
 		a[i], a[j] = a[j], a[i];
 		i += 1;
@@ -77,16 +89,20 @@ quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 quick_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	a := array;
 	n := len(a);
-	if n < 2 do return;
+	if n < 2 {
+		return;
+	}
 
 	p := a[n/2];
 	i, j := 0, n-1;
 
 	loop: for {
-		for a[i] < p do i += 1;
-		for p < a[j] do j -= 1;
+		for a[i] < p { i += 1; }
+		for p < a[j] { j -= 1; }
 
-		if i >= j do break loop;
+		if i >= j {
+			break loop;
+		}
 
 		a[i], a[j] = a[j], a[i];
 		i += 1;
@@ -99,7 +115,9 @@ quick_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 
 _log2 :: proc(x: int) -> int {
 	res := 0;
-	for n := x; n != 0; n >>= 1 do res += 1;
+	for n := x; n != 0; n >>= 1 {
+		res += 1;
+	}
 	return res;
 }
 
@@ -206,7 +224,9 @@ heap_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	}
 
 	n := len(array);
-	if n == 0 do return;
+	if n == 0 {
+		return;
+	}
 
 	for i := n/2; i >= 0; i -= 1 {
 		sift_proc(array, i, n-1, f);
@@ -238,7 +258,9 @@ heap_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	}
 
 	n := len(array);
-	if n == 0 do return;
+	if n == 0 {
+		return;
+	}
 
 	for i := n/2; i >= 0; i -= 1 {
 		sift(array, i, n-1);

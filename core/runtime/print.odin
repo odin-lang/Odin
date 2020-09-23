@@ -199,7 +199,7 @@ print_type :: proc(fd: _OS_Handle, ti: ^Type_Info) {
 			t := info.params.variant.(Type_Info_Tuple);
 			print_byte(fd, '(');
 			for t, i in t.types {
-				if i > 0 do print_string(fd, ", ");
+				if i > 0 { print_string(fd, ", "); }
 				print_type(fd, t);
 			}
 			print_string(fd, ")");
@@ -210,9 +210,9 @@ print_type :: proc(fd: _OS_Handle, ti: ^Type_Info) {
 		}
 	case Type_Info_Tuple:
 		count := len(info.names);
-		if count != 1 do print_byte(fd, '(');
+		if count != 1 { print_byte(fd, '('); }
 		for name, i in info.names {
-			if i > 0 do print_string(fd, ", ");
+			if i > 0 { print_string(fd, ", "); }
 
 			t := info.types[i];
 
@@ -222,7 +222,7 @@ print_type :: proc(fd: _OS_Handle, ti: ^Type_Info) {
 			}
 			print_type(fd, t);
 		}
-		if count != 1 do print_string(fd, ")");
+		if count != 1 { print_string(fd, ")"); }
 
 	case Type_Info_Array:
 		print_byte(fd, '[');
@@ -270,8 +270,8 @@ print_type :: proc(fd: _OS_Handle, ti: ^Type_Info) {
 		}
 
 		print_string(fd, "struct ");
-		if info.is_packed    do print_string(fd, "#packed ");
-		if info.is_raw_union do print_string(fd, "#raw_union ");
+		if info.is_packed    { print_string(fd, "#packed "); }
+		if info.is_raw_union { print_string(fd, "#raw_union "); }
 		if info.custom_align {
 			print_string(fd, "#align ");
 			print_u64(fd, u64(ti.align));
@@ -279,7 +279,7 @@ print_type :: proc(fd: _OS_Handle, ti: ^Type_Info) {
 		}
 		print_byte(fd, '{');
 		for name, i in info.names {
-			if i > 0 do print_string(fd, ", ");
+			if i > 0 { print_string(fd, ", "); }
 			print_string(fd, name);
 			print_string(fd, ": ");
 			print_type(fd, info.types[i]);
@@ -297,7 +297,7 @@ print_type :: proc(fd: _OS_Handle, ti: ^Type_Info) {
 		}
 		print_byte(fd, '{');
 		for variant, i in info.variants {
-			if i > 0 do print_string(fd, ", ");
+			if i > 0 { print_string(fd, ", "); }
 			print_type(fd, variant);
 		}
 		print_string(fd, "}");
@@ -307,7 +307,7 @@ print_type :: proc(fd: _OS_Handle, ti: ^Type_Info) {
 		print_type(fd, info.base);
 		print_string(fd, " {");
 		for name, i in info.names {
-			if i > 0 do print_string(fd, ", ");
+			if i > 0 { print_string(fd, ", "); }
 			print_string(fd, name);
 		}
 		print_string(fd, "}");
@@ -321,7 +321,7 @@ print_type :: proc(fd: _OS_Handle, ti: ^Type_Info) {
 		}
 		print_string(fd, " {");
 		for name, i in info.names {
-			if i > 0 do print_string(fd, ", ");
+			if i > 0 { print_string(fd, ", "); }
 			print_string(fd, name);
 			print_string(fd, ": ");
 			print_u64(fd, u64(info.bits[i]));

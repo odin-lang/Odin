@@ -841,13 +841,13 @@ parse_attribute :: proc(p: ^Parser, tok: tokenizer.Token, open_kind, close_kind:
 	decl := parse_stmt(p);
 	switch d in &decl.derived {
 	case ast.Value_Decl:
-		if d.docs == nil do d.docs = docs;
+		if d.docs == nil { d.docs = docs; }
 		append(&d.attributes, attribute);
 	case ast.Foreign_Block_Decl:
-		if d.docs == nil do d.docs = docs;
+		if d.docs == nil { d.docs = docs; }
 		append(&d.attributes, attribute);
 	case ast.Foreign_Import_Decl:
-		if d.docs == nil do d.docs = docs;
+		if d.docs == nil { d.docs = docs; }
 		append(&d.attributes, attribute);
 	case:
 		error(p, decl.pos, "expected a value or foreign declaration after an attribute");
@@ -1136,10 +1136,12 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		}
 		expect_token_after(p, .Colon, "identifier list");
 		decl := parse_value_decl(p, list, docs);
-		if decl != nil do switch d in &decl.derived {
-		case ast.Value_Decl:
-			d.is_using = true;
-			return decl;
+		if decl != nil {
+			switch d in &decl.derived {
+			case ast.Value_Decl:
+				d.is_using = true;
+				return decl;
+			}
 		}
 
 		error(p, tok.pos, "illegal use of 'using' statement");
@@ -1442,20 +1444,20 @@ parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
 		switch kind {
 		case Invalid, Unknown: // Ignore
 		case Using:
-			if count > 1 do error(p, p.curr_tok.pos, "multiple 'using' in this field list");
-			if count > 0 do flags |= {.Using};
+			if count > 1 { error(p, p.curr_tok.pos, "multiple 'using' in this field list"); }
+			if count > 0 { flags |= {.Using}; }
 		case No_Alias:
-			if count > 1 do error(p, p.curr_tok.pos, "multiple '#no_alias' in this field list");
-			if count > 0 do flags |= {.No_Alias};
+			if count > 1 { error(p, p.curr_tok.pos, "multiple '#no_alias' in this field list"); }
+			if count > 0 { flags |= {.No_Alias}; }
 		case C_Vararg:
-			if count > 1 do error(p, p.curr_tok.pos, "multiple '#c_vararg' in this field list");
-			if count > 0 do flags |= {.C_Vararg};
+			if count > 1 { error(p, p.curr_tok.pos, "multiple '#c_vararg' in this field list"); }
+			if count > 0 { flags |= {.C_Vararg}; }
 		case In:
-			if count > 1 do error(p, p.curr_tok.pos, "multiple 'in' in this field list");
-			if count > 0 do flags |= {.In};
+			if count > 1 { error(p, p.curr_tok.pos, "multiple 'in' in this field list"); }
+			if count > 0 { flags |= {.In}; }
 		case Auto_Cast:
-			if count > 1 do error(p, p.curr_tok.pos, "multiple 'auto_cast' in this field list");
-			if count > 0 do flags |= {.Auto_Cast};
+			if count > 1 { error(p, p.curr_tok.pos, "multiple 'auto_cast' in this field list"); }
+			if count > 0 { flags |= {.Auto_Cast}; }
 		}
 	}
 
@@ -1610,7 +1612,9 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 			return false;
 		}
 		is_type_ellipsis :: proc(type: ^ast.Expr) -> bool {
-			if type == nil do return false;
+			if type == nil {
+				return false;
+			}
 			_, ok := type.derived.(ast.Ellipsis);
 			return ok;
 		}
@@ -1653,7 +1657,9 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 		}
 
 		if is_type_ellipsis(type) {
-			if seen_ellipsis^ do error(p, type.pos, "extra variadic parameter after ellipsis");
+			if seen_ellipsis^ {
+				error(p, type.pos, "extra variadic parameter after ellipsis");
+			}
 			seen_ellipsis^ = true;
 			if len(names) != 1 {
 				error(p, type.pos, "variadic parameters can only have one field name");
@@ -1914,7 +1920,9 @@ check_poly_params_for_type :: proc(p: ^Parser, poly_params: ^ast.Field_List, tok
 	}
 	for field in poly_params.list {
 		for name in field.names {
-			if name == nil do continue;
+			if name == nil {
+				continue;
+			}
 			if _, ok := name.derived.(ast.Poly_Type); ok {
 				error(p, name.pos, "polymorphic names are not needed for %s parameters", tok.text);
 				return;
@@ -2316,13 +2324,19 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			tag := expect_token_after(p, .Ident, "#");
 			switch tag.text {
 			case "packed":
-				if is_packed do error(p, tag.pos, "duplicate struct tag '#%s'", tag.text);
+				if is_packed {
+					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text);
+				}
 				is_packed = true;
 			case "align":
-				if align != nil do error(p, tag.pos, "duplicate struct tag '#%s'", tag.text);
+				if align != nil {
+					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text);
+				}
 				align = parse_expr(p, true);
 			case "raw_union":
-				if is_raw_union do error(p, tag.pos, "duplicate struct tag '#%s'", tag.text);
+				if is_raw_union {
+					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text);
+				}
 				is_raw_union = true;
 			case:
 				error(p, tag.pos, "invalid struct tag '#%s", tag.text);
@@ -2383,10 +2397,14 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			tag := expect_token_after(p, .Ident, "#");
 			switch tag.text {
 			case "align":
-				if align != nil do error(p, tag.pos, "duplicate union tag '#%s'", tag.text);
+				if align != nil {
+					error(p, tag.pos, "duplicate union tag '#%s'", tag.text);
+				}
 				align = parse_expr(p, true);
 			case "maybe":
-				if is_maybe do error(p, tag.pos, "duplicate union tag '#%s'", tag.text);
+				if is_maybe {
+					error(p, tag.pos, "duplicate union tag '#%s'", tag.text);
+				}
 				is_maybe = true;
 			case:
 				error(p, tag.pos, "invalid union tag '#%s", tag.text);
@@ -2675,7 +2693,9 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Call_Expr {
 parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^ast.Expr) {
 	operand = value;
 	if operand == nil {
-		if p.allow_type do return nil;
+		if p.allow_type {
+			return nil;
+		}
 		error(p, p.curr_tok.pos, "expected an operand");
 		be := ast.new(ast.Bad_Expr, p.curr_tok.pos, end_pos(p.curr_tok));
 		advance_token(p);
@@ -3012,12 +3032,14 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 				label := lhs[0];
 				stmt := parse_stmt(p);
 
-				if stmt != nil do switch n in &stmt.derived {
-				case ast.Block_Stmt:       n.label = label;
-				case ast.If_Stmt:          n.label = label;
-				case ast.For_Stmt:         n.label = label;
-				case ast.Switch_Stmt:      n.label = label;
-				case ast.Type_Switch_Stmt: n.label = label;
+				if stmt != nil {
+					switch n in &stmt.derived {
+					case ast.Block_Stmt:       n.label = label;
+					case ast.If_Stmt:          n.label = label;
+					case ast.For_Stmt:         n.label = label;
+					case ast.Switch_Stmt:      n.label = label;
+					case ast.Type_Switch_Stmt: n.label = label;
+					}
 				}
 
 				return stmt;

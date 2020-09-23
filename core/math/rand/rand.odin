@@ -64,7 +64,9 @@ int63  :: proc(r: ^Rand = nil) -> i64  { return i64(uint64(r) << 1 >> 1); }
 int127 :: proc(r: ^Rand = nil) -> i128 { return i128(uint128(r) << 1 >> 1); }
 
 int31_max :: proc(n: i32, r: ^Rand = nil) -> i32 {
-	if n <= 0 do panic("Invalid argument to int31_max");
+	if n <= 0 {
+		panic("Invalid argument to int31_max");
+	}
 	if n&(n-1) == 0 {
 		return int31(r) & (n-1);
 	}
@@ -77,7 +79,9 @@ int31_max :: proc(n: i32, r: ^Rand = nil) -> i32 {
 }
 
 int63_max :: proc(n: i64, r: ^Rand = nil) -> i64 {
-	if n <= 0 do panic("Invalid argument to int63_max");
+	if n <= 0 {
+		panic("Invalid argument to int63_max");
+	}
 	if n&(n-1) == 0 {
 		return int63(r) & (n-1);
 	}
@@ -90,7 +94,9 @@ int63_max :: proc(n: i64, r: ^Rand = nil) -> i64 {
 }
 
 int127_max :: proc(n: i128, r: ^Rand = nil) -> i128 {
-	if n <= 0 do panic("Invalid argument to int63_max");
+	if n <= 0 {
+		panic("Invalid argument to int63_max");
+	}
 	if n&(n-1) == 0 {
 		return int127(r) & (n-1);
 	}
@@ -103,7 +109,9 @@ int127_max :: proc(n: i128, r: ^Rand = nil) -> i128 {
 }
 
 int_max :: proc(n: int, r: ^Rand = nil) -> int {
-	if n <= 0 do panic("Invalid argument to int_max");
+	if n <= 0 {
+		panic("Invalid argument to int_max");
+	}
 	when size_of(int) == 4 {
 		return int(int31_max(i32(n), r));
 	} else {
@@ -147,7 +155,9 @@ perm :: proc(n: int, r: ^Rand = nil) -> []int {
 
 shuffle :: proc(array: $T/[]$E, r: ^Rand = nil) {
 	n := i64(len(array));
-	if n < 2 do return;
+	if n < 2 {
+		return;
+	}
 
 	for i := i64(0); i < n; i += 1 {
 		j := int63_max(n, r);

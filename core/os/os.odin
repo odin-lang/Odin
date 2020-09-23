@@ -175,7 +175,9 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	}
 
 	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int) -> rawptr {
-		if p == nil do return nil;
+		if p == nil {
+			return nil;
+		}
 		return aligned_alloc(new_size, new_alignment, p);
 	}
 

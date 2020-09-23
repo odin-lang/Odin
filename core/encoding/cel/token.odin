@@ -162,9 +162,9 @@ token_lookup :: proc(ident: string) -> Kind {
 	return Ident;
 }
 
-is_literal  :: proc(tok: Kind) -> bool do return _literal_start  < tok && tok < _literal_end;
-is_operator :: proc(tok: Kind) -> bool do return _operator_start < tok && tok < _operator_end;
-is_keyword  :: proc(tok: Kind) -> bool do return _keyword_start  < tok && tok < _keyword_end;
+is_literal  :: proc(tok: Kind) -> bool { return _literal_start  < tok && tok < _literal_end;  }
+is_operator :: proc(tok: Kind) -> bool { return _operator_start < tok && tok < _operator_end; }
+is_keyword  :: proc(tok: Kind) -> bool { return _keyword_start  < tok && tok < _keyword_end;  }
 
 
 tokenizer_init :: proc(t: ^Tokenizer, src: []byte, file := "") {

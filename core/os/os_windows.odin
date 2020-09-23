@@ -54,6 +54,7 @@ WSAECONNRESET:                Errno : 10054;
 
 // Windows reserves errors >= 1<<29 for application use
 ERROR_FILE_IS_PIPE:           Errno : 1<<29 + 0;
+ERROR_FILE_IS_NOT_DIR:        Errno : 1<<29 + 1;
 
 
 // "Argv" arguments converted to Odin strings
@@ -65,7 +66,9 @@ is_path_separator :: proc(r: rune) -> bool {
 }
 
 open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errno) {
-	if len(path) == 0 do return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
+	if len(path) == 0 {
+		return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
+	}
 
 	access: u32;
 	switch mode & (O_RDONLY|O_WRONLY|O_RDWR) {
@@ -104,7 +107,9 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 	}
 	wide_path := win32.utf8_to_wstring(path);
 	handle := Handle(win32.CreateFileW(auto_cast wide_path, access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
-	if handle != INVALID_HANDLE do return handle, ERROR_NONE;
+	if handle != INVALID_HANDLE {
+		return handle, ERROR_NONE;
+	}
 
 	err := Errno(win32.GetLastError());
 	return INVALID_HANDLE, err;
@@ -119,7 +124,9 @@ close :: proc(fd: Handle) -> Errno {
 
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	if len(data) == 0 do return 0, ERROR_NONE;
+	if len(data) == 0 {
+		return 0, ERROR_NONE;
+	}
 
 	single_write_length: win32.DWORD;
 	total_write: i64;
@@ -141,7 +148,9 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 }
 
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	if len(data) == 0 do return 0, ERROR_NONE;
+	if len(data) == 0 {
+		return 0, ERROR_NONE;
+	}
 
 	single_read_length: win32.DWORD;
 	total_read: i64;
@@ -172,7 +181,9 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	hi := i32(offset>>32);
 	lo := i32(offset);
 	ft := win32.GetFileType(win32.HANDLE(fd));
-	if ft == win32.FILE_TYPE_PIPE do return 0, ERROR_FILE_IS_PIPE;
+	if ft == win32.FILE_TYPE_PIPE {
+		return 0, ERROR_FILE_IS_PIPE;
+	}
 
 	dw_ptr := win32.SetFilePointer(win32.HANDLE(fd), lo, &hi, w);
 	if dw_ptr == win32.INVALID_SET_FILE_POINTER {
@@ -244,12 +255,16 @@ heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 		heap_free(ptr);
 		return nil;
 	}
-	if ptr == nil do return heap_alloc(new_size);
+	if ptr == nil {
+		return heap_alloc(new_size);
+	}
 
 	return win32.HeapReAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, ptr, uint(new_size));
 }
 heap_free :: proc(ptr: rawptr) {
-	if ptr == nil do return;
+	if ptr == nil {
+		return;
+	}
 	win32.HeapFree(win32.GetProcessHeap(), 0, ptr);
 }
 
@@ -257,7 +272,9 @@ get_page_size :: proc() -> int {
 	// NOTE(tetra): The page size never changes, so why do anything complicated
 	// if we don't have to.
 	@static page_size := -1;
-	if page_size != -1 do return page_size;
+	if page_size != -1 {
+		return page_size;
+	}
 
 	info: win32.SYSTEM_INFO;
 	win32.GetSystemInfo(&info);
@@ -292,7 +309,9 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 	defer intrinsics.atomic_store(&cwd_gate, false);
 
 	res := win32.SetCurrentDirectoryW(auto_cast wstr);
-	if !res do return Errno(win32.GetLastError());
+	if !res {
+		return Errno(win32.GetLastError());
+	}
 
 	return;
 }
@@ -368,3 +387,4 @@ is_windows_10 :: proc() -> bool {
 	osvi := get_windows_version_ansi();
 	return (osvi.major_version == 10 && osvi.minor_version == 0);
 }
+
