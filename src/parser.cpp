@@ -1998,6 +1998,10 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			body = convert_stmt_to_body(f, parse_stmt(f));
 			f->curr_proc = curr_proc;
 
+			if (build_context.disallow_do) {
+				syntax_error(body, "'do' has been disallowed");
+			}
+
 			return ast_proc_lit(f, type, body, tags, where_token, where_clauses);
 		}
 
@@ -3558,6 +3562,9 @@ Ast *parse_if_stmt(AstFile *f) {
 
 	if (allow_token(f, Token_do)) {
 		body = convert_stmt_to_body(f, parse_stmt(f));
+		if (build_context.disallow_do) {
+			syntax_error(body, "'do' has been disallowed");
+		}
 	} else {
 		body = parse_block_stmt(f, false);
 	}
@@ -3573,6 +3580,9 @@ Ast *parse_if_stmt(AstFile *f) {
 		case Token_do: {
 			Token arrow = expect_token(f, Token_do);
 			else_stmt = convert_stmt_to_body(f, parse_stmt(f));
+			if (build_context.disallow_do) {
+				syntax_error(else_stmt, "'do' has been disallowed");
+			}
 		} break;
 		default:
 			syntax_error(f->curr_token, "Expected if statement block statement");
@@ -3603,6 +3613,9 @@ Ast *parse_when_stmt(AstFile *f) {
 
 	if (allow_token(f, Token_do)) {
 		body = convert_stmt_to_body(f, parse_stmt(f));
+		if (build_context.disallow_do) {
+			syntax_error(body, "'do' has been disallowed");
+		}
 	} else {
 		body = parse_block_stmt(f, true);
 	}
@@ -3618,6 +3631,9 @@ Ast *parse_when_stmt(AstFile *f) {
 		case Token_do: {
 			Token arrow = expect_token(f, Token_do);
 			else_stmt = convert_stmt_to_body(f, parse_stmt(f));
+			if (build_context.disallow_do) {
+				syntax_error(else_stmt, "'do' has been disallowed");
+			}
 		} break;
 		default:
 			syntax_error(f->curr_token, "Expected when statement block statement");
@@ -3698,6 +3714,9 @@ Ast *parse_for_stmt(AstFile *f) {
 
 			if (allow_token(f, Token_do)) {
 				body = convert_stmt_to_body(f, parse_stmt(f));
+				if (build_context.disallow_do) {
+					syntax_error(body, "'do' has been disallowed");
+				}
 			} else {
 				body = parse_block_stmt(f, false);
 			}
@@ -3728,6 +3747,9 @@ Ast *parse_for_stmt(AstFile *f) {
 
 	if (allow_token(f, Token_do)) {
 		body = convert_stmt_to_body(f, parse_stmt(f));
+		if (build_context.disallow_do) {
+			syntax_error(body, "'do' has been disallowed");
+		}
 	} else {
 		body = parse_block_stmt(f, false);
 	}
@@ -4072,6 +4094,9 @@ Ast *parse_stmt(AstFile *f) {
 
 			if (allow_token(f, Token_do)) {
 				body = convert_stmt_to_body(f, parse_stmt(f));
+				if (build_context.disallow_do) {
+					syntax_error(body, "'do' has been disallowed");
+				}
 			} else {
 				body = parse_block_stmt(f, false);
 			}
