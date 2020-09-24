@@ -128,12 +128,22 @@ recv_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp:
 
 	context.allocator = allocator;
 
-	// TODO(tetra): Handle not receiving the response in one read call.
-	read_buf: [8192]byte = ---;
-	n, read_err := net.recv(skt, read_buf[:]);
-	assert(n > 0); // TODO
+	// TODO: Read all the data, then parse it.
 
-	resp_parts := split(string(read_buf[:n]), "\n");
+	read_buf: [8192]byte = ---;
+	incoming := make_builder(0, 8192);
+	defer destroy_builder(&incoming);
+	for {
+		// if has_suffix(to_string(incoming), "\r\n\r\n") do break;
+
+		n, read_err := net.recv(skt, read_buf[:]);
+		if read_err != .Ok do return;
+		if n == 0 do break;
+
+		write_bytes(&incoming, read_buf[:n]);
+	}
+
+	resp_parts := split(to_string(incoming), "\n");
 	assert(len(resp_parts) >= 1);
 
 	status_parts := split(resp_parts[0], " ");
@@ -141,16 +151,12 @@ recv_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp:
 
 	status_code, _ := strconv.parse_int(status_parts[1]);
 	resp.status = Status(status_code);
-	if !(resp.status >= min(Status) && resp.status <= max(Status)) {
-		resp.status = .Bad_Status_Code;
-		return;
-	}
 
 	resp_parts = resp_parts[1:];
 
 	// TODO(tetra): Use an arena for the response data.
 	resp.headers = make(map[string]string, len(resp_parts));
-	defer if read_err != .Ok do response_destroy(resp);
+	defer if !ok do response_destroy(resp);
 
 	last_hdr_index := -1;
 	for part, i in resp_parts {
@@ -163,7 +169,7 @@ recv_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp:
 			resp.status = .Bad_Response_Header;
 			return;
 		}
-		// the header parts are currently in `read_buf` (stack memory), but we want to return them.
+		// the header parts are currently in `read_buf` (temporary memory), but we want to return them.
 		name  := clone(trim_space(trimmed_part[:idx]));
 		value := clone(trim_space(trimmed_part[idx+1:]));
 		resp.headers[name] = value;
@@ -175,34 +181,64 @@ recv_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp:
 		return;
 	}
 
-	#partial switch resp.status {
-	case .Ok:
-		// do nothing
-	case:
+	if resp.status != .Ok {
 		ok = true;
 		return;
 	}
 
-	body_buf := make_builder(0, 8192, allocator);
+	body_buf := make_builder(0, 8192);
 	defer if !ok do destroy_builder(&body_buf);
 
-	fragment := resp_parts[last_hdr_index+1];
-	write_string(&body_buf, fragment);
-
-	for {
-		if has_suffix(to_string(body_buf), "\r\n\r\n") do break;
-
-		n, read_err := net.recv(skt, read_buf[:]);
-		if read_err != .Ok do return;
-		if n == 0 do break;
-
-		fragment := read_buf[:n];
-		write_bytes(&body_buf, fragment);
+	explicit_encoding, _ := resp.headers["Transfer-Encoding"]; // NOTE(tetra): error ignored because it'll be the empty string if there was one
+	switch {
+	case explicit_encoding == "":
+		remaining := resp_parts[last_hdr_index+1:];
+		for len(remaining) > 0 {
+			if has_suffix(to_string(body_buf), "\r\n\r\n") do break;
+			chunk := remaining[0];
+			write_bytes(&body_buf, transmute([]byte) trim_right_space(chunk));
+			remaining = remaining[1:];
+		}
+	case explicit_encoding == "chunked":
+		// NOTE(tetra): instead of getting the body as normal, you get the number of bytes in the following chunk,
+		// followed by \r\n\r\n, followed by the chunk.
+		remaining := resp_parts[last_hdr_index+1:];
+		expect_count := true;
+		was_blank := false;
+		for len(remaining) > 0 {
+			defer remaining = remaining[1:];
+			if expect_count {
+				expect_count = false;
+				continue;
+			}
+			chunk := remaining[0];
+			if was_blank && chunk == "" {
+				break;
+			}
+			if chunk == "" {
+				// means it was \r\n\r\n
+				was_blank = true;
+				continue;
+			}
+			fmt.printf("committing chunk with %v bytes: %v\n", len(chunk), chunk if len(chunk) <= 16 else "<...>");
+			write_bytes(&body_buf, transmute([]byte) trim_right_space(chunk));
+			expect_count = true;
+		}
+		// for len(remaining) > 0 {
+		// 	if len(remaining) < 3 do break;
+		// 	size_part := remaining[0];
+		// 	chunk := remaining[1];
+		// 	empty := remaining[2];
+		// 	assert(empty == "");
+		// 	remaining = remaining[3:];
+		// 	write_bytes(&body_buf, transmute([]byte) chunk);
+		// }
+	case:
+		return;
 	}
 
-
 	// TODO(tetra): Use the content-length to slice the body.
-	body := trim_space(to_string(body_buf));
+	body := to_string(body_buf);
 	resp.body = body;
 	ok = true;
 	return;
