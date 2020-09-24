@@ -57,6 +57,12 @@ dial :: proc(addr: Address, port: int, type: Socket_Type) -> (Socket, Dial_Error
 	return Socket(sock), .Ok;
 }
 
+// TODO: put this in listen() when we make it:
+// NOTE(tetra): This is so that if we crash while the socket is open, we can
+// bypass the cooldown period, and allow the next run of the program to
+// use the same address, for the same socket immediately.
+// set_option(sock, .Reuse_Address);
+
 close :: proc(s: Socket) {
 	win.closesocket(win.SOCKET(s));
 }
