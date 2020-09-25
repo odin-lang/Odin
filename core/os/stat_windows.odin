@@ -2,8 +2,6 @@ package os
 
 import "core:time"
 import win32 "core:sys/windows"
-import "core:runtime"
-import "core:strings"
 
 stat :: proc(fd: Handle) -> (File_Info, Errno) {
 	if fd == 0 {
