@@ -1297,7 +1297,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				v := v;
 				w := len(buf);
 				print := false;
-				for i in 0..<prec {
+				for in 0..<prec {
 					digit := v % 10;
 					print = print || digit != 0;
 					if print {
