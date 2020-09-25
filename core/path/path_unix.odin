@@ -9,9 +9,11 @@ import "core:strings"
 
 MAX :: 4096; // @note(bp): apparently PATH_MAX is bullshit
 
-SEPARATOR        :: '/';
-SEPARATOR_STRING :: "/";
+OS_SEPARATOR        :: '/';
+OS_SEPARATOR_STRING :: "/";
 
+OS_SEPARATORS :: `/`;
+OS_SEPARATORS_ARRAY :: []string{`/`};
 
 @(private)
 null_term :: proc(str: string) -> string {

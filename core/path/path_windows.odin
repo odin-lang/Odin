@@ -4,9 +4,11 @@ import "core:strings"
 import win32 "core:sys/windows"
 
 
-SEPARATOR        :: '\\';
-SEPARATOR_STRING :: "\\";
+OS_SEPARATOR        :: '\\';
+OS_SEPARATOR_STRING :: "\\";
 
+OS_SEPARATORS :: `/\`;
+OS_SEPARATORS_ARRAY :: []string{`/`, `\`};
 
 @(private)
 null_term :: proc "contextless" (str: string) -> string {
