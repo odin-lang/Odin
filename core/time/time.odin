@@ -135,6 +135,20 @@ read_cycle_counter :: proc() -> u64 {
 }
 
 
+unix :: proc(sec: i64, nsec: i64) -> Time {
+	sec, nsec := sec, nsec;
+	if nsec < 0 || nsec >= 1e9 {
+		n := nsec / 1e9;
+		sec += n;
+		nsec -= n * 1e9;
+		if nsec < 0 {
+			nsec += 1e9;
+			sec -= 1;
+		}
+	}
+	return Time{(sec*1e9 + nsec) + UNIX_TO_INTERNAL};
+}
+
 
 
 ABSOLUTE_ZERO_YEAR :: i64(-292277022399); // Day is chosen so that 2001-01-01 is Monday in the calculations
