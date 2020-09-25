@@ -1,13 +1,14 @@
 package fmt
 
-import "core:runtime"
-import "core:os"
-import "core:mem"
 import "core:math/bits"
-import "core:unicode/utf8"
+import "core:mem"
+import "core:os"
+import "core:reflect"
+import "core:runtime"
 import "core:strconv"
 import "core:strings"
-import "core:reflect"
+import "core:time"
+import "core:unicode/utf8"
 import "intrinsics"
 
 DEFAULT_BUFFER_SIZE :: #config(FMT_DEFAULT_BUFFER_SIZE, 1<<12);
@@ -1256,6 +1257,18 @@ fmt_opaque :: proc(fi: ^Info, v: any) {
 }
 
 fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
+	write_padded_number :: proc(fi: ^Info, i: i64, width: int) {
+		n := width-1;
+		for x := i; x >= 10; x /= 10 {
+			n -= 1;
+		}
+		for in 0..<n {
+			strings.write_byte(fi.buf, '0');
+		}
+		strings.write_i64(fi.buf, i, 10);
+	}
+
+
 	if v.data == nil || v.id == nil {
 		strings.write_string(fi.buf, "<nil>");
 		return;
@@ -1277,6 +1290,124 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	case runtime.Type_Info_Tuple: // Ignore
 
 	case runtime.Type_Info_Named:
+		// Built-in Custom Formatters for core library types
+		switch a in v {
+		case time.Duration:
+			ffrac :: proc(buf: []byte, v: u64, prec: int) -> (nw: int, nv: u64) {
+				v := v;
+				w := len(buf);
+				print := false;
+				for i in 0..<prec {
+					digit := v % 10;
+					print = print || digit != 0;
+					if print {
+						w -= 1;
+						buf[w] = byte(digit) + '0';
+					}
+					v /= 10;
+				}
+				if print {
+					w -= 1;
+					buf[w] = '.';
+				}
+				return w, v;
+			}
+			fint :: proc(buf: []byte, v: u64) -> int {
+				v := v;
+				w := len(buf);
+				if v == 0 {
+					w -= 1;
+					buf[w] = '0';
+				} else {
+					for v > 0 {
+						w -= 1;
+						buf[w] = byte(v%10) + '0';
+						v /= 10;
+					}
+				}
+				return w;
+			}
+
+			buf: [32]byte;
+			w := len(buf);
+			u := u64(a);
+			neg := a < 0;
+			if neg {
+				u = -u;
+			}
+
+			if u < u64(time.Second) {
+				prec: int;
+				w -= 1;
+				buf[w] = 's';
+				w -= 1;
+				switch {
+				case u == 0:
+					strings.write_string(fi.buf, "0s");
+					return;
+				case u < u64(time.Microsecond):
+					prec = 0;
+					buf[w] = 'n';
+				case u < u64(time.Millisecond):
+					prec = 3;
+					// U+00B5 'µ' micro sign == 0xC2 0xB5
+					w -= 1; // Need room for two bytes
+					copy(buf[w:], "µ");
+				case:
+					prec = 6;
+					buf[w] = 'm';
+				}
+				w, u = ffrac(buf[:w], u, prec);
+				w = fint(buf[:w], u);
+			} else {
+				w -= 1;
+				buf[w] = 's';
+				w, u = ffrac(buf[:w], u, 9);
+				w = fint(buf[:w], u%60);
+				u /= 60;
+				if u > 0 {
+					w -= 1;
+					buf[w] = 'm';
+					w = fint(buf[:w], u%60);
+					u /= 60;
+					if u > 0 {
+						w -= 1;
+						buf[w] = 'h';
+						w = fint(buf[:w], u);
+					}
+				}
+			}
+
+			if neg {
+				w -= 1;
+				buf[w] = '-';
+			}
+			strings.write_string(fi.buf, string(buf[w:]));
+			return;
+
+		case time.Time:
+			t := a;
+			y, mon, d := time.date(t);
+			h, min, s := time.clock(t);
+			ns := i64(t._nsec - (t._nsec/1e9 + time.UNIX_TO_ABSOLUTE)*1e9) % 1e9;
+			write_padded_number(fi, i64(y), 4);
+			strings.write_byte(fi.buf, '-');
+			write_padded_number(fi, i64(mon), 2);
+			strings.write_byte(fi.buf, '-');
+			write_padded_number(fi, i64(d), 2);
+			strings.write_byte(fi.buf, ' ');
+
+			write_padded_number(fi, i64(h), 2);
+			strings.write_byte(fi.buf, ':');
+			write_padded_number(fi, i64(min), 2);
+			strings.write_byte(fi.buf, ':');
+			write_padded_number(fi, i64(s), 2);
+			strings.write_byte(fi.buf, '.');
+			write_padded_number(fi, i64(ns), 9);
+			strings.write_string(fi.buf, " +0000 UTC");
+			return;
+		}
+
 		#partial switch b in info.base.variant {
 		case runtime.Type_Info_Struct:
 			if verb != 'v' {
