@@ -6,12 +6,8 @@ IS_SUPPORTED :: true;
 
 now :: proc() -> Time {
 	file_time: win32.FILETIME;
-
 	win32.GetSystemTimeAsFileTime(&file_time);
-
-	ft := i64(u64(file_time.dwLowDateTime) | u64(file_time.dwHighDateTime) << 32);
-
-	ns := (ft - 0x019db1ded53e8000) * 100;
+	ns := win32.FILETIME_as_unix_nanoseconds(file_time);
 	return Time{_nsec=ns};
 }
 

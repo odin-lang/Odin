@@ -32,10 +32,12 @@ ERROR_FILE_NOT_FOUND:         Errno : 2;
 ERROR_PATH_NOT_FOUND:         Errno : 3;
 ERROR_ACCESS_DENIED:          Errno : 5;
 ERROR_INVALID_HANDLE:         Errno : 6;
+ERROR_NOT_ENOUGH_MEMORY:      Errno : 8;
 ERROR_NO_MORE_FILES:          Errno : 18;
 ERROR_HANDLE_EOF:             Errno : 38;
 ERROR_NETNAME_DELETED:        Errno : 64;
 ERROR_FILE_EXISTS:            Errno : 80;
+ERROR_INVALID_PARAMETER:      Errno : 87;
 ERROR_BROKEN_PIPE:            Errno : 109;
 ERROR_BUFFER_OVERFLOW:        Errno : 111;
 ERROR_INSUFFICIENT_BUFFER:    Errno : 122;
@@ -106,7 +108,7 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 		create_mode = win32.OPEN_EXISTING;
 	}
 	wide_path := win32.utf8_to_wstring(path);
-	handle := Handle(win32.CreateFileW(auto_cast wide_path, access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
+	handle := Handle(win32.CreateFileW(auto_cast wide_path, access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL|win32.FILE_FLAG_BACKUP_SEMANTICS, nil));
 	if handle != INVALID_HANDLE {
 		return handle, ERROR_NONE;
 	}

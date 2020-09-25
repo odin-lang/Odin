@@ -273,4 +273,6 @@ foreign kernel32 {
 	GetLongPathNameW  :: proc(short, long: LPCWSTR, len: DWORD) -> DWORD ---
 	GetShortPathNameW :: proc(long, short: LPCWSTR, len: DWORD) -> DWORD ---
 
+	GetFinalPathNameByHandleW :: proc(hFile: HANDLE, lpszFilePath: LPCWSTR, cchFilePath: DWORD, dwFlags: DWORD) -> DWORD ---
+
 }

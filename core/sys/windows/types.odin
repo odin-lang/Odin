@@ -83,6 +83,7 @@ FILE_ATTRIBUTE_NORMAL: DWORD : 0x00000080;
 FILE_ATTRIBUTE_TEMPORARY: DWORD : 0x00000100;
 FILE_ATTRIBUTE_SPARSE_FILE: DWORD : 0x00000200;
 FILE_ATTRIBUTE_REPARSE_Point: DWORD : 0x00000400;
+FILE_ATTRIBUTE_REPARSE_POINT: DWORD : 0x00000400;
 FILE_ATTRIBUTE_COMPRESSED: DWORD : 0x00000800;
 FILE_ATTRIBUTE_OFFLINE: DWORD : 0x00001000;
 FILE_ATTRIBUTE_NOT_CONTENT_INDEXED: DWORD : 0x00002000;
@@ -535,6 +536,11 @@ FILETIME :: struct {
 	dwHighDateTime: DWORD,
 }
 
+FILETIME_as_unix_nanoseconds :: proc "contextless" (ft: FILETIME) -> i64 {
+	t := i64(u64(ft.dwLowDateTime) | u64(ft.dwHighDateTime) << 32);
+	return (t - 0x019db1ded53e8000) * 100;
+}
+
 OVERLAPPED :: struct {
 	Internal: ^c_ulong,
 	InternalHigh: ^c_ulong,
@@ -673,6 +679,11 @@ FILE_STANDARD_INFO :: struct {
 	NumberOfLinks: DWORD,
 	DeletePending: BOOLEAN,
 	Directory: BOOLEAN,
+}
+
+FILE_ATTRIBUTE_TAG_INFO :: struct {
+	FileAttributes: DWORD,
+	ReparseTag: DWORD,
 }
 
 

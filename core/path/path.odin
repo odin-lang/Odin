@@ -4,8 +4,8 @@ import "core:strings"
 import "core:runtime"
 import "core:unicode/utf8"
 
-// is_separator_byte checks whether the byte is a valid separator character
-is_separator_byte :: proc(c: byte) -> bool {
+// is_separator checks whether the byte is a valid separator character
+is_separator :: proc(c: byte) -> bool {
 	switch c {
 	case '/':  return true;
 	case '\\': return ODIN_OS == "windows";
@@ -23,7 +23,7 @@ is_abs :: proc(path: string) -> bool {
 		if len(path) > 2 {
 			switch path[0] {
 			case 'A'..'Z', 'a'..'z':
-				return path[1] == ':' && is_separator_byte(path[2]);
+				return path[1] == ':' && is_separator(path[2]);
 			}
 		}
 	}
@@ -48,7 +48,7 @@ base :: proc(path: string, new := false, allocator := context.allocator) -> (las
 
 	path := path;
 
-	for len(path) > 0 && is_separator_byte(path[len(path)-1]) {
+	for len(path) > 0 && is_separator(path[len(path)-1]) {
 		path = path[:len(path)-1];
 	}
 	if i := strings.last_index_any(path, OS_SEPARATORS); i >= 0 {
@@ -103,7 +103,7 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 		return strings.clone(".");
 	}
 
-	// NOTE(bill): do not use is_separator_byte because window paths do not follow this convention
+	// NOTE(bill): do not use is_separator because window paths do not follow this convention
 	rooted := path[0] == '/';
 	n := len(path);
 
@@ -118,16 +118,16 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 
 	for r < n {
 		switch {
-		case is_separator_byte(path[r]):
+		case is_separator(path[r]):
 			r += 1;
-		case path[r] == '.' && (r+1 == n || is_separator_byte(path[r+1])):
+		case path[r] == '.' && (r+1 == n || is_separator(path[r+1])):
 			r += 1;
-		case path[r] == '.' && path[r+1] == '.' && (r+2 == n || is_separator_byte(path[r+2])):
+		case path[r] == '.' && path[r+1] == '.' && (r+2 == n || is_separator(path[r+2])):
 			r += 2;
 			switch {
 			case out.w > dot_dot:
 				out.w -= 1;
-				for out.w > dot_dot && !is_separator_byte(lazy_buffer_index(out, out.w)) {
+				for out.w > dot_dot && !is_separator(lazy_buffer_index(out, out.w)) {
 					out.w -= 1;
 				}
 
@@ -143,7 +143,7 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 			if rooted && out.w != 1 || !rooted && out.w != 0 {
 				lazy_buffer_append(out, '/');
 			}
-			for ; r < n && !is_separator_byte(path[r]); r += 1 {
+			for ; r < n && !is_separator(path[r]); r += 1 {
 				lazy_buffer_append(out, path[r]);
 			}
 		}
@@ -173,7 +173,7 @@ join :: proc(elems: ..string, allocator := context.allocator) -> string {
 // The extension is the suffix beginning at the file fot in the last slash separated element of "path"
 // The path is empty if there is no dot
 ext :: proc(path: string, new := false, allocator := context.allocator) -> string {
-	for i := len(path)-1; i >= 0 && !is_separator_byte(path[i]); i -= 1 {
+	for i := len(path)-1; i >= 0 && !is_separator(path[i]); i -= 1 {
 		if path[i] == '.' {
 			res := path[i:];
 			if new {
@@ -194,7 +194,7 @@ name :: proc(path: string, new := false, allocator := context.allocator) -> (nam
 		name = strings.clone(name, allocator);
 	}
 
-	for i := len(file)-1; i >= 0 && !is_separator_byte(file[i]); i -= 1 {
+	for i := len(file)-1; i >= 0 && !is_separator(file[i]); i -= 1 {
 		if file[i] == '.' {
 			name = file[:i];
 			return;
