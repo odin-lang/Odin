@@ -2,6 +2,8 @@ package reflect
 
 import "core:runtime"
 import "core:mem"
+import "intrinsics"
+_ :: intrinsics;
 
 Type_Info :: runtime.Type_Info;
 
@@ -1086,6 +1088,120 @@ as_string :: proc(a: any) -> (value: string, valid: bool) {
 		case cstring: value = string(v);
 		case: valid = false;
 		}
+	}
+
+	return;
+}
+
+relative_pointer_to_absolute :: proc(a: any) -> rawptr {
+	if a == nil { return nil; }
+	a := a;
+	ti := runtime.type_info_core(type_info_of(a.id));
+	a.id = ti.id;
+
+	#partial switch info in ti.variant {
+	case Type_Info_Relative_Pointer:
+		return relative_pointer_to_absolute_raw(a.data, info.base_integer.id);
+	}
+	return nil;
+}
+
+
+relative_pointer_to_absolute_raw :: proc(data: rawptr, base_integer_id: typeid) -> rawptr {
+	_handle :: proc(ptr: ^$T) -> rawptr where intrinsics.type_is_integer(T) {
+		if ptr^ == 0 {
+			return nil;
+		}
+		when intrinsics.type_is_unsigned(T) {
+			return rawptr(uintptr(ptr) + uintptr(ptr^));
+		} else {
+			return rawptr(uintptr(ptr) + uintptr(i64(ptr^)));
+		}
+	}
+
+	ptr_any := any{data, base_integer_id};
+	ptr: rawptr;
+	switch i in &ptr_any {
+	case u8:    ptr = _handle(&i);
+	case u16:   ptr = _handle(&i);
+	case u32:   ptr = _handle(&i);
+	case u64:   ptr = _handle(&i);
+	case i8:    ptr = _handle(&i);
+	case i16:   ptr = _handle(&i);
+	case i32:   ptr = _handle(&i);
+	case i64:   ptr = _handle(&i);
+	case u16le: ptr = _handle(&i);
+	case u32le: ptr = _handle(&i);
+	case u64le: ptr = _handle(&i);
+	case i16le: ptr = _handle(&i);
+	case i32le: ptr = _handle(&i);
+	case i64le: ptr = _handle(&i);
+	case u16be: ptr = _handle(&i);
+	case u32be: ptr = _handle(&i);
+	case u64be: ptr = _handle(&i);
+	case i16be: ptr = _handle(&i);
+	case i32be: ptr = _handle(&i);
+	case i64be: ptr = _handle(&i);
+	}
+	return ptr;
+
+}
+
+
+
+as_pointer :: proc(a: any) -> (value: rawptr, valid: bool) {
+	if a == nil { return; }
+	a := a;
+	ti := runtime.type_info_core(type_info_of(a.id));
+	a.id = ti.id;
+
+	#partial switch info in ti.variant {
+	case Type_Info_Pointer:
+		valid = true;
+		value = a.data;
+
+	case Type_Info_String:
+		valid = true;
+		switch v in a {
+		case cstring: value = rawptr(v);
+		case: valid = false;
+		}
+
+	case Type_Info_Relative_Pointer:
+		valid = true;
+		value = relative_pointer_to_absolute_raw(a.data, info.base_integer.id);
+	}
+
+	return;
+}
+
+
+as_raw_data :: proc(a: any) -> (value: rawptr, valid: bool) {
+	if a == nil { return; }
+	a := a;
+	ti := runtime.type_info_core(type_info_of(a.id));
+	a.id = ti.id;
+
+	#partial switch info in ti.variant {
+	case Type_Info_String:
+		valid = true;
+		switch v in a {
+		case string:  value = raw_data(v);
+		case cstring: value = rawptr(v); // just in case
+		case: valid = false;
+		}
+
+	case Type_Info_Array:
+		valid = true;
+		value = a.data;
+
+	case Type_Info_Slice:
+		valid = true;
+		value = (^mem.Raw_Slice)(a.data).data;
+
+	case Type_Info_Dynamic_Array:
+		valid = true;
+		value = (^mem.Raw_Dynamic_Array)(a.data).data;
 	}
 
 	return;
