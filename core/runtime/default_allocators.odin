@@ -110,9 +110,7 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 		}
 		last_ptr := rawptr(&allocator.data[allocator.prev_offset]);
 		if old_memory == last_ptr {
-			full_size := allocator.curr_offset - allocator.prev_offset;
 			allocator.curr_offset = allocator.prev_offset;
-			mem_zero(last_ptr, full_size);
 			return nil;
 		} else {
 			#no_bounds_check start, end := &allocator.data[0], &allocator.data[allocator.curr_offset];
