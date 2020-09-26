@@ -551,11 +551,22 @@ union_variant_type_info :: proc(a: any) -> ^runtime.Type_Info {
 	return type_info_of(id);
 }
 
+type_info_union_is_pure_maybe :: proc(info: runtime.Type_Info_Union) -> bool {
+	return info.maybe && len(info.variants) == 1 && is_pointer(info.variants[0]);
+}
+
 union_variant_typeid :: proc(a: any) -> typeid {
 	if a == nil { return nil; }
 
 	ti := runtime.type_info_base(type_info_of(a.id));
 	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
+		if type_info_union_is_pure_maybe(info) {
+			if a.data != nil {
+				return info.variants[0].id;
+			}
+			return nil;
+		}
+
 		tag_ptr := uintptr(a.data) + info.tag_offset;
 		tag_any := any{rawptr(tag_ptr), info.tag_type.id};
 
@@ -573,15 +584,159 @@ union_variant_typeid :: proc(a: any) -> typeid {
 		}
 
 		if a.data != nil && tag != 0 {
-			return info.variants[tag-1].id;
+			i := tag if info.no_nil else tag-1;
+			return info.variants[i].id;
 		}
-	} else {
-		panic("expected a union to reflect.union_variant_typeid");
-	}
 
-	return nil;
+		return nil;
+	}
+	panic("expected a union to reflect.union_variant_typeid");
+
 }
 
+get_union_variant_raw_tag :: proc(a: any) -> i64 {
+	if a == nil { return -1; }
+
+	ti := runtime.type_info_base(type_info_of(a.id));
+	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
+		if type_info_union_is_pure_maybe(info) {
+			return 1 if a.data != nil else 0;
+		}
+
+		tag_ptr := uintptr(a.data) + info.tag_offset;
+		tag_any := any{rawptr(tag_ptr), info.tag_type.id};
+
+		tag: i64 = ---;
+		switch i in tag_any {
+		case u8:   tag = i64(i);
+		case i8:   tag = i64(i);
+		case u16:  tag = i64(i);
+		case i16:  tag = i64(i);
+		case u32:  tag = i64(i);
+		case i32:  tag = i64(i);
+		case u64:  tag = i64(i);
+		case i64:  tag = i64(i);
+		case: unimplemented();
+		}
+
+		return tag;
+	}
+	panic("expected a union to reflect.get_union_variant_raw_tag");
+}
+
+
+set_union_variant_raw_tag :: proc(a: any, tag: i64) {
+	if a == nil { return; }
+
+	ti := runtime.type_info_base(type_info_of(a.id));
+	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
+		if type_info_union_is_pure_maybe(info) {
+			// Cannot do anything
+			return;
+		}
+
+		tag_ptr := uintptr(a.data) + info.tag_offset;
+		tag_any := any{rawptr(tag_ptr), info.tag_type.id};
+
+		switch i in &tag_any {
+		case u8:   i = u8(tag);
+		case i8:   i = i8(tag);
+		case u16:  i = u16(tag);
+		case i16:  i = i16(tag);
+		case u32:  i = u32(tag);
+		case i32:  i = i32(tag);
+		case u64:  i = u64(tag);
+		case i64:  i = i64(tag);
+		case: unimplemented();
+		}
+
+		return;
+	}
+	panic("expected a union to reflect.set_union_variant_raw_tag");
+}
+
+set_union_variant_typeid :: proc(a: any, id: typeid) {
+	if a == nil { return; }
+
+	ti := runtime.type_info_base(type_info_of(a.id));
+	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
+		if type_info_union_is_pure_maybe(info) {
+			// Cannot do anything
+			return;
+		}
+
+		if id == nil && !info.no_nil {
+			set_union_variant_raw_tag(a, 0);
+			return;
+		}
+
+		for variant, i in info.variants {
+			if variant.id == id {
+				tag := i64(i);
+				if !info.no_nil {
+					tag += 1;
+				}
+				set_union_variant_raw_tag(a, tag);
+				return;
+			}
+		}
+		return;
+	}
+	panic("expected a union to reflect.set_union_variant_typeid");
+}
+
+set_union_variant_type_info :: proc(a: any, ti: ^Type_Info) {
+	if a == nil { return; }
+
+	ti := runtime.type_info_base(type_info_of(a.id));
+	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
+		if type_info_union_is_pure_maybe(info) {
+			// Cannot do anything
+			return;
+		}
+
+		if ti == nil && !info.no_nil {
+			set_union_variant_raw_tag(a, 0);
+			return;
+		}
+
+		for variant, i in info.variants {
+			if variant == ti {
+				tag := i64(i);
+				if !info.no_nil {
+					tag += 1;
+				}
+				set_union_variant_raw_tag(a, tag);
+				return;
+			}
+		}
+		return;
+	}
+	panic("expected a union to reflect.set_union_variant_type_info");
+}
+
+
+as_bool :: proc(a: any) -> (value: bool, valid: bool) {
+	if a == nil { return; }
+	a := a;
+	ti := runtime.type_info_core(type_info_of(a.id));
+	a.id = ti.id;
+
+	#partial switch info in ti.variant {
+	case Type_Info_Boolean:
+		valid = true;
+		switch v in a {
+		case bool: value = bool(v);
+		case b8:   value = bool(v);
+		case b16:  value = bool(v);
+		case b32:  value = bool(v);
+		case b64:  value = bool(v);
+		case: valid = false;
+		}
+	}
+
+	return;
+}
 
 as_int :: proc(a: any) -> (value: int, valid: bool) {
 	v: i64;
@@ -910,6 +1065,26 @@ as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 				value = f64(real(v));
 				valid = true;
 			}
+		}
+	}
+
+	return;
+}
+
+
+as_string :: proc(a: any) -> (value: string, valid: bool) {
+	if a == nil { return; }
+	a := a;
+	ti := runtime.type_info_core(type_info_of(a.id));
+	a.id = ti.id;
+
+	#partial switch info in ti.variant {
+	case Type_Info_String:
+		valid = true;
+		switch v in a {
+		case string:  value = string(v);
+		case cstring: value = string(v);
+		case: valid = false;
 		}
 	}
 
