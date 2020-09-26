@@ -1,10 +1,12 @@
 package filepath
 
 import "core:strings"
+import "core:os"
+import win32 "core:sys/windows"
 
 SEPARATOR :: '\\';
 SEPARATOR_STRING :: `\`;
-
+LIST_SEPARATOR :: ';';
 
 reserved_names := []string{
 	"CON", "PRN", "AUX", "NUL",
@@ -27,6 +29,108 @@ is_reserved_name :: proc(path: string) -> bool {
 is_UNC :: proc(path: string) -> bool {
 	return volume_name_len(path) > 2;
 }
+
+
+is_abs :: proc(path: string) -> bool {
+	if is_reserved_name(path) {
+		return true;
+	}
+	l := volume_name_len(path);
+	if l == 0 {
+		return false;
+	}
+
+	path := path[l:];
+	if path == "" {
+		return false;
+	}
+	return is_slash(path[0]);
+}
+
+
+@(private)
+full_path :: proc(name: string, allocator := context.allocator) -> (path: string, err: os.Errno) {
+	name := name;
+	if name == "" {
+		name = ".";
+	}
+	p := win32.utf8_to_utf16(name, context.temp_allocator);
+	defer delete(p);
+	buf := make([dynamic]u16, 100, allocator);
+	for {
+		n := win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil);
+		if n == 0 {
+			delete(buf);
+			return "", os.Errno(win32.GetLastError());
+		}
+		if n <= u32(len(buf)) {
+			return win32.utf16_to_utf8(buf[:n]), os.ERROR_NONE;
+		}
+		resize(&buf, len(buf)*2);
+	}
+}
+
+
+
+
+abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
+	full_path, err := full_path(path, context.temp_allocator);
+	if err != 0 {
+		return "", false;
+	}
+	return clean(full_path, allocator), true;
+}
+
+split_list :: proc(path: string, allocator := context.allocator) -> []string {
+	if path == "" {
+		return nil;
+	}
+
+	start: int;
+	quote: bool;
+
+	start, quote = 0, false;
+	count := 0;
+
+	for i := 0; i < len(path); i += 1 {
+		c := path[i];
+		switch {
+		case c == '"':
+			quote = !quote;
+		case c == LIST_SEPARATOR && !quote:
+			count += 1;
+		}
+	}
+
+	start, quote = 0, false;
+	list := make([]string, count, allocator);
+	index := 0;
+	for i := 0; i < len(path); i += 1 {
+		c := path[i];
+		switch {
+		case c == '"':
+			quote = !quote;
+		case c == LIST_SEPARATOR && !quote:
+			list[index] = path[start:i];
+			index += 1;
+			start = i + 1;
+		}
+	}
+	assert(index == count);
+
+	for s, i in list {
+		s, new := strings.replace_all(s, `"`, ``, allocator);
+		if !new {
+			s = strings.clone(s, allocator);
+		}
+		list[i] = s;
+	}
+
+	return list;
+}
+
+
+
 
 join :: proc(elems: ..string, allocator := context.allocator) -> string {
 	for e, i in elems {

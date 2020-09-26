@@ -275,4 +275,8 @@ foreign kernel32 {
 
 	GetFinalPathNameByHandleW :: proc(hFile: HANDLE, lpszFilePath: LPCWSTR, cchFilePath: DWORD, dwFlags: DWORD) -> DWORD ---
 
+
+	SetEndOfFile :: proc(hFile: HANDLE) -> BOOL ---
+
+	CreatePipe :: proc(hReadPipe, hWritePipe: ^HANDLE, lpPipeAttributes: LPSECURITY_ATTRIBUTES, nSize: DWORD) -> BOOL ---
 }

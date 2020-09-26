@@ -42,6 +42,7 @@ volume_name_len :: proc(path: string) -> int {
 		}
 	}
 
+	// URL: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
 	if l := len(path); l >= 5 && is_slash(path[0]) && is_slash(path[1]) &&
 		!is_slash(path[2]) && path[2] != '.' {
 		for n := 3; n < l-1; n += 1 {
@@ -65,6 +66,31 @@ volume_name_len :: proc(path: string) -> int {
 	return 0;
 }
 
+base :: proc(path: string) -> string {
+	if path == "" {
+		return ".";
+	}
+
+	path := path;
+	for len(path) > 0 && is_separator(path[len(path)-1]) {
+		path = path[:len(path)-1];
+	}
+
+	path = path[volume_name_len(path):];
+
+	i := len(path)-1;
+	for i >= 0 && !is_separator(path[i]) {
+		i -= 1;
+	}
+	if i >= 0 {
+		path = path[i+1:];
+	}
+	if path == "" {
+		return SEPARATOR_STRING;
+	}
+	return path;
+}
+
 
 clean :: proc(path: string, allocator := context.allocator) -> string {
 	context.allocator = allocator;
@@ -76,7 +102,11 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 
 	if path == "" {
 		if vol_len > 1 && original_path[1] != ':' {
-			return from_slash(original_path);
+			s, ok := from_slash(original_path);
+			if !ok {
+				s = strings.clone(s);
+			}
+			return s;
 		}
 		return strings.concatenate({original_path, "."});
 	}
@@ -134,19 +164,133 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 	}
 
 	s := lazy_buffer_string(out);
-	cleaned := from_slash(s);
+	cleaned, new_allocation := from_slash(s);
+	if new_allocation {
+		delete(s);
+	}
 	return cleaned;
 }
 
-from_slash :: proc(path: string, allocator := context.allocator) -> string {
+from_slash :: proc(path: string, allocator := context.allocator) -> (new_path: string, new_allocation: bool) {
 	if SEPARATOR == '/' {
-		return path;
+		return path, false;
 	}
-	s, ok := strings.replace_all(path, "/", SEPARATOR_STRING, allocator);
-	if !ok {
-		s = strings.clone(s, allocator);
+	return strings.replace_all(path, "/", SEPARATOR_STRING, allocator);
+}
+
+to_slash :: proc(path: string, allocator := context.allocator) -> (new_path: string, new_allocation: bool) {
+	if SEPARATOR == '/' {
+		return path, false;
 	}
-	return s;
+	return strings.replace_all(path, SEPARATOR_STRING, "/", allocator);
+}
+
+ext :: proc(path: string) -> string {
+	for i := len(path)-1; i >= 0 && !is_separator(path[i]); i -= 1 {
+		if path[i] == '.' {
+			return path[i:];
+		}
+	}
+	return "";
+}
+
+
+Relative_Error :: enum {
+	None,
+
+	Cannot_Relate,
+}
+
+rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (string, Relative_Error) {
+	context.allocator = allocator;
+	base_vol, target_vol := volume_name(base_path), volume_name(target_path);
+	base, target := clean(base_path), clean(target_path);
+
+	delete_target := true;
+	defer {
+		if delete_target {
+			delete(target);
+		}
+		delete(base);
+	}
+
+	if strings.equal_fold(target, base) {
+		return strings.clone("."), .None;
+	}
+
+	base = base[len(base_vol):];
+	target = target[len(target_vol):];
+	if base == "." {
+		base = "";
+	}
+
+	base_slashed := len(base) > 0 && base[0] == SEPARATOR;
+	target_slashed := len(target) > 0 && target[0] == SEPARATOR;
+	if base_slashed != target_slashed || !strings.equal_fold(base_vol, target_vol) {
+		return "", .Cannot_Relate;
+	}
+
+	bl, tl := len(base), len(target);
+	b0, bi, t0, ti: int;
+	for {
+		for bi < bl && base[bi] != SEPARATOR {
+			bi += 1;
+		}
+		for ti < tl && target[ti] != SEPARATOR {
+			ti += 1;
+		}
+		if !strings.equal_fold(target[t0:ti], base[t0:ti]) {
+			break;
+		}
+		if bi < bl {
+			bi += 1;
+		}
+		if ti < tl {
+			ti += 1;
+		}
+		b0, t0 = bi, ti;
+	}
+
+	if base[b0:bi] == ".." {
+		return "", .Cannot_Relate;
+	}
+
+	if b0 != bl {
+		seps := strings.count(base[b0:bl], SEPARATOR_STRING);
+		size := 2 + seps*3;
+		if tl != t0 {
+			size += 1 + tl - t0;
+		}
+		buf := make([]byte, size);
+		n := copy(buf, "..");
+		for i in 0..<seps {
+			buf[n] = SEPARATOR;
+			copy(buf[n+1:], "..");
+			n += 3;
+		}
+		if t0 != tl {
+			buf[n] = SEPARATOR;
+			copy(buf[n+1:], target[t0:]);
+		}
+		return string(buf), .None;
+	}
+
+	delete_target = false;
+	return target[t0:], .None;
+}
+
+dir :: proc(path: string, allocator := context.allocator) -> string {
+	vol := volume_name(path);
+	i := len(path) - 1;
+	for i >= len(vol) && is_separator(path[i]) {
+		i -= 1;
+	}
+	dir := clean(path[len(vol) : i+1], allocator);
+	defer delete(dir, allocator);
+	if dir == "." && len(vol) > 2 {
+		return strings.clone(vol);
+	}
+	return strings.concatenate({vol, dir});
 }
 
 
