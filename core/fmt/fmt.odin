@@ -1877,59 +1877,13 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		fmt_opaque(fi, v);
 
 	case runtime.Type_Info_Relative_Pointer:
-		ptr_any := any{v.data, info.base_integer.id};
-		ptr: rawptr;
-		switch i in &ptr_any {
-		case u8:    ptr = handle_relative_pointer(&i);
-		case u16:   ptr = handle_relative_pointer(&i);
-		case u32:   ptr = handle_relative_pointer(&i);
-		case u64:   ptr = handle_relative_pointer(&i);
-		case i8:    ptr = handle_relative_pointer(&i);
-		case i16:   ptr = handle_relative_pointer(&i);
-		case i32:   ptr = handle_relative_pointer(&i);
-		case i64:   ptr = handle_relative_pointer(&i);
-		case u16le: ptr = handle_relative_pointer(&i);
-		case u32le: ptr = handle_relative_pointer(&i);
-		case u64le: ptr = handle_relative_pointer(&i);
-		case i16le: ptr = handle_relative_pointer(&i);
-		case i32le: ptr = handle_relative_pointer(&i);
-		case i64le: ptr = handle_relative_pointer(&i);
-		case u16be: ptr = handle_relative_pointer(&i);
-		case u32be: ptr = handle_relative_pointer(&i);
-		case u64be: ptr = handle_relative_pointer(&i);
-		case i16be: ptr = handle_relative_pointer(&i);
-		case i32be: ptr = handle_relative_pointer(&i);
-		case i64be: ptr = handle_relative_pointer(&i);
-		}
+		ptr := reflect.relative_pointer_to_absolute_raw(v.data, info.base_integer.id);
 		absolute_ptr := any{ptr, info.pointer.id};
 
 		fmt_value(fi, absolute_ptr, verb);
 
 	case runtime.Type_Info_Relative_Slice:
-		ptr_any := any{v.data, info.base_integer.id};
-		ptr: rawptr;
-		switch i in &ptr_any {
-		case u8:    ptr = handle_relative_pointer(&i);
-		case u16:   ptr = handle_relative_pointer(&i);
-		case u32:   ptr = handle_relative_pointer(&i);
-		case u64:   ptr = handle_relative_pointer(&i);
-		case i8:    ptr = handle_relative_pointer(&i);
-		case i16:   ptr = handle_relative_pointer(&i);
-		case i32:   ptr = handle_relative_pointer(&i);
-		case i64:   ptr = handle_relative_pointer(&i);
-		case u16le: ptr = handle_relative_pointer(&i);
-		case u32le: ptr = handle_relative_pointer(&i);
-		case u64le: ptr = handle_relative_pointer(&i);
-		case i16le: ptr = handle_relative_pointer(&i);
-		case i32le: ptr = handle_relative_pointer(&i);
-		case i64le: ptr = handle_relative_pointer(&i);
-		case u16be: ptr = handle_relative_pointer(&i);
-		case u32be: ptr = handle_relative_pointer(&i);
-		case u64be: ptr = handle_relative_pointer(&i);
-		case i16be: ptr = handle_relative_pointer(&i);
-		case i32be: ptr = handle_relative_pointer(&i);
-		case i64be: ptr = handle_relative_pointer(&i);
-		}
+		ptr := reflect.relative_pointer_to_absolute_raw(v.data, info.base_integer.id);
 
 		if verb == 'p' {
 			fmt_pointer(fi, ptr, 'p');
