@@ -687,7 +687,7 @@ set_union_variant_typeid :: proc(a: any, id: typeid) {
 	panic("expected a union to reflect.set_union_variant_typeid");
 }
 
-set_union_variant_type_info :: proc(a: any, ti: ^Type_Info) {
+set_union_variant_type_info :: proc(a: any, tag_ti: ^Type_Info) {
 	if a == nil { return; }
 
 	ti := runtime.type_info_base(type_info_of(a.id));
@@ -697,13 +697,13 @@ set_union_variant_type_info :: proc(a: any, ti: ^Type_Info) {
 			return;
 		}
 
-		if ti == nil && !info.no_nil {
+		if tag_ti == nil && !info.no_nil {
 			set_union_variant_raw_tag(a, 0);
 			return;
 		}
 
 		for variant, i in info.variants {
-			if variant == ti {
+			if variant == tag_ti {
 				tag := i64(i);
 				if !info.no_nil {
 					tag += 1;
