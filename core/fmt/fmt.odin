@@ -1811,7 +1811,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 
 
-		if info.maybe && len(info.variants) == 1 && reflect.is_pointer(info.variants[0]) {
+		if reflect.type_info_union_is_pure_maybe(info) {
 			if v.data == nil {
 				strings.write_string(fi.buf, "nil");
 			} else {
