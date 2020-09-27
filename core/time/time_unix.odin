@@ -5,9 +5,7 @@ IS_SUPPORTED :: true; // NOTE: Times on Darwin are UTC.
 
 when ODIN_OS == "darwin" {
   foreign import libc "System.framework"
-}
-
-when ODIN_OS != "darwin" {
+} else  {
   foreign import libc "system:c"
 }
 
