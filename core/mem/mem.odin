@@ -162,7 +162,7 @@ slice_data_cast :: proc($T: typeid/[]$A, slice: $S/[]$B) -> T {
 
 slice_to_components :: proc(slice: $E/[]$T) -> (data: ^T, len: int) {
 	s := transmute(Raw_Slice)slice;
-	return s.data, s.len;
+	return (^T)(s.data), s.len;
 }
 
 buffer_from_slice :: proc(backing: $T/[]$E) -> [dynamic]E {

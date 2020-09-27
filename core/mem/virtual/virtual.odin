@@ -133,14 +133,16 @@ arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 	ptr := #no_bounds_check &va.memory[va.cursor];
 	ptr = cast(^byte) mem.align_forward(ptr, uintptr(alignment));
 
+
 	new_cursor := mem.ptr_sub(ptr, raw_data(va.memory)) + requested_size;
 	if new_cursor >= len(va.memory) do return nil;
 
 	new_total_pages_needed := bytes_to_pages(new_cursor);
 	if new_total_pages_needed > va.pages_committed {
 		pages := page_slice(raw_data(va.memory), new_total_pages_needed);
-		ok := commit(pages);
-		assert(ok);
+		if !commit(pages) {
+			return nil;
+		}
 		va.pages_committed = new_total_pages_needed;
 	}
 
