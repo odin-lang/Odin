@@ -3,7 +3,14 @@ package time
 
 IS_SUPPORTED :: true; // NOTE: Times on Darwin are UTC.
 
-foreign import libc "system:c"
+when ODIN_OS == "darwin" {
+  foreign import libc "System.framework"
+}
+
+when ODIN_OS != "darwin" {
+  foreign import libc "system:c"
+}
+
 
 @(default_calling_convention="c")
 foreign libc {
