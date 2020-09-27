@@ -1,3 +1,8 @@
+// The path package is only to be used for paths separated by forward slashes,
+// e.g. paths in URLs
+//
+// This package does not deal with Windows/NT paths with volume letters or backslashes
+// To manipulate operating system specific paths, use the path/filepath package
 package path
 
 import "core:strings"
@@ -5,29 +10,14 @@ import "core:runtime"
 import "core:unicode/utf8"
 
 // is_separator checks whether the byte is a valid separator character
-is_separator :: proc(c: byte) -> bool {
-	switch c {
-	case '/':  return true;
-	case '\\': return ODIN_OS == "windows";
-	}
-	return false;
+is_separator :: inline proc(c: byte) -> bool {
+	return c == '/';
 }
 
 
 // is_abs checks whether the path is absolute
-is_abs :: proc(path: string) -> bool {
-	if len(path) > 0 && path[0] == '/' {
-		return true;
-	}
-	when ODIN_OS == "windows" {
-		if len(path) > 2 {
-			switch path[0] {
-			case 'A'..'Z', 'a'..'z':
-				return path[1] == ':' && is_separator(path[2]);
-			}
-		}
-	}
-	return false;
+is_abs :: inline proc(path: string) -> bool {
+	return len(path) > 0 && path[0] == '/';
 }
 
 
@@ -51,7 +41,7 @@ base :: proc(path: string, new := false, allocator := context.allocator) -> (las
 	for len(path) > 0 && is_separator(path[len(path)-1]) {
 		path = path[:len(path)-1];
 	}
-	if i := strings.last_index_any(path, OS_SEPARATORS); i >= 0 {
+	if i := strings.last_index(path, "/"); i >= 0 {
 		path = path[i+1:];
 	}
 
@@ -79,13 +69,13 @@ dir :: proc(path: string, allocator := context.allocator) -> string {
 // If there is no slash in path, it returns an empty dir and file set to path
 // The returned values have the property that path = dir+file
 split :: proc(path: string) -> (dir, file: string) {
-	i := strings.last_index_any(path, OS_SEPARATORS);
+	i := strings.last_index(path, "/");
 	return path[:i+1], path[i+1:];
 }
 
 // split_elements splits the path elements into slices of the original path string
 split_elements :: proc(path: string, allocator := context.allocator) -> []string {
-	return strings.split_multi(path, OS_SEPARATORS_ARRAY, true, allocator);
+	return strings.split(path, "/", allocator);
 }
 
 // clean returns the shortest path name equivalent to path through lexical analysis only
@@ -203,131 +193,6 @@ name :: proc(path: string, new := false, allocator := context.allocator) -> (nam
 	return file;
 
 }
-
-
-
-rel :: proc{rel_between, rel_current};
-
-// returns the relative path from one path to another
-rel_between :: proc(from, to: string, allocator := context.allocator) -> string {
-	if from == "" || to == "" {
-		return "";
-	}
-
-	from, to := from, to;
-	from = full(from, context.temp_allocator);
-	to   = full(to,   context.temp_allocator);
-
-	from_is_dir := is_dir(from);
-	to_is_dir   := is_dir(to);
-
-	index, slash := 0, 0;
-
-	for {
-		if index >= len(from) {
-			if index >= len(to) || (from_is_dir && index < len(to) && (to[index] == '/' || to[index] == '\\')) {
-				slash = index;
-			}
-
-			break;
-		}
-		else if index >= len(to) {
-			if index >= len(from) || (to_is_dir && index < len(from) && (from[index] == '/' || from[index] == '\\')) {
-				slash = index;
-			}
-
-			break;
-		}
-
-		lchar, skip := utf8.decode_rune_in_string(from[index:]);
-		rchar, _    := utf8.decode_rune_in_string(to[index:]);
-
-		if (lchar == '/' || lchar == '\\') && (rchar == '/' || lchar == '\\') {
-			slash = index;
-		}
-		else if lchar != rchar {
-			break;
-		}
-
-		index += skip;
-	}
-
-	if slash < 1 {
-		// there is no common path, use the absolute `to` path
-		return strings.clone(to, allocator);
-	}
-
-	from_slashes, to_slashes := 0, 0;
-
-	if slash < len(from) {
-		from = from[slash+1:];
-
-		if from_is_dir {
-			from_slashes += 1;
-		}
-	}
-	else {
-		from = "";
-	}
-
-	if slash < len(to) {
-		to = to[slash+1:];
-
-		if to_is_dir {
-			to_slashes += 1;
-		}
-	}
-	else {
-		to = "";
-	}
-
-	for char in from {
-		if char == '/' || char == '\\' {
-			from_slashes += 1;
-		}
-	}
-
-	for char in to {
-		if char == '/' || char == '\\' {
-			to_slashes += 1;
-		}
-	}
-
-	if from_slashes == 0 {
-		buffer := make([]byte, 2 + len(to), allocator);
-
-		buffer[0] = '.';
-		buffer[1] = '/';
-		copy(buffer[2:], to);
-
-		return string(buffer);
-	}
-	else {
-		buffer := make([]byte, from_slashes*3 + len(to), allocator);
-
-		for i in 0..<from_slashes {
-			buffer[i*3+0] = '.';
-			buffer[i*3+1] = '.';
-			buffer[i*3+2] = '/';
-		}
-
-		copy(buffer[from_slashes*3:], to);
-
-		return string(buffer);
-	}
-
-	return "";
-}
-
-// returns the relative path from the current directory to another path
-rel_current :: proc(to: string, allocator := context.allocator) -> string {
-	return rel_between(current(context.allocator), to, allocator);
-}
-
-
-
-
-
 
 
 

@@ -35,7 +35,7 @@ bounds_check_error :: proc "contextless" (file: string, line, column: int, index
 	handle_error(file, line, column, index, count);
 }
 
-slice_handle_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) {
+slice_handle_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) -> ! {
 	context = default_context();
 	fd := os_stderr();
 	print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
