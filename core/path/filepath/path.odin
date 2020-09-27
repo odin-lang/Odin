@@ -1,3 +1,5 @@
+// The path/filepath package uses either forward slashes or backslashes depending on the operating system
+// To process paths usch as URLs that depend on forward slashes regardless of the OS, use the path package
 package filepath
 
 import "core:os"
