@@ -14,7 +14,7 @@ import "core:sort"
 // The sole exception is if 'skip_dir' is returned as true:
 // 	when 'skip_dir' is invoked on a directory. 'walk' skips directory contents
 // 	when 'skip_dir' is invoked on a non-directory. 'walk' skips the remaining files in the containing directory
-Walk_Proc :: #type proc(info: os.File_Info, in_err: os.Errno, user_data: rawptr) -> (err: os.Errno, skip_dir: bool);
+Walk_Proc :: #type proc(info: os.File_Info, in_err: os.Errno) -> (err: os.Errno, skip_dir: bool);
 
 // walk walks the file tree rooted at 'root', calling 'walk_proc' for each file or directory in the tree, including 'root'
 // All errors that happen visiting files and directories are filtered by walk_proc
@@ -22,28 +22,28 @@ Walk_Proc :: #type proc(info: os.File_Info, in_err: os.Errno, user_data: rawptr)
 // NOTE: Walking large directories can be inefficient due to the lexical sort
 // NOTE: walk does not follow symbolic links
 // NOTE: os.File_Info uses the 'context.temp_allocator' to allocate, and will delete when it is done
-walk :: proc(root: string, walk_proc: Walk_Proc, user_data: rawptr) -> os.Errno {
+walk :: proc(root: string, walk_proc: Walk_Proc) -> os.Errno {
 	info, err := os.lstat(root, context.temp_allocator);
 	defer os.file_info_delete(info, context.temp_allocator);
 
 	skip_dir: bool;
 	if err != 0 {
-		err, skip_dir = walk_proc(info, err, user_data);
+		err, skip_dir = walk_proc(info, err);
 	} else {
-		err, skip_dir = _walk(info, walk_proc, user_data);
+		err, skip_dir = _walk(info, walk_proc);
 	}
 	return 0 if skip_dir else err;
 }
 
 
 @(private)
-_walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (err: os.Errno, skip_dir: bool) {
+_walk :: proc(info: os.File_Info, walk_proc: Walk_Proc) -> (err: os.Errno, skip_dir: bool) {
 	if !info.is_dir {
 		if info.fullpath == "" && info.name == "" {
 			// ignore empty things
 			return;
 		}
-		return walk_proc(info, 0, user_data);
+		return walk_proc(info, 0);
 	}
 
 	fis: []os.File_Info;
@@ -51,14 +51,14 @@ _walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (e
 	fis, err = read_dir(info.fullpath, context.temp_allocator);
 	defer os.file_info_slice_delete(fis, context.temp_allocator);
 
-	err1, skip_dir = walk_proc(info, err, user_data);
+	err1, skip_dir = walk_proc(info, err);
 	if err != 0 || err1 != 0 || skip_dir {
 		err = err1;
 		return;
 	}
 
 	for fi in fis {
-		err, skip_dir = _walk(fi, walk_proc, user_data);
+		err, skip_dir = _walk(fi, walk_proc);
 		if err != 0 || skip_dir {
 			if !fi.is_dir || !skip_dir {
 				return;
