@@ -3,10 +3,88 @@ package os
 import "core:time"
 import win32 "core:sys/windows"
 
-stat :: proc(fd: Handle) -> (File_Info, Errno) {
+@(private)
+full_path_from_name :: proc(name: string, allocator := context.allocator) -> (path: string, err: Errno) {
+	name := name;
+	if name == "" {
+		name = ".";
+	}
+	p := win32.utf8_to_utf16(name, context.temp_allocator);
+	defer delete(p);
+	buf := make([dynamic]u16, 100, allocator);
+	for {
+		n := win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil);
+		if n == 0 {
+			delete(buf);
+			return "", Errno(win32.GetLastError());
+		}
+		if n <= u32(len(buf)) {
+			return win32.utf16_to_utf8(buf[:n]), ERROR_NONE;
+		}
+		resize(&buf, len(buf)*2);
+	}
+
+	return;
+}
+
+@(private)
+_stat :: proc(name: string, create_file_attributes: u32, allocator := context.allocator) -> (fi: File_Info, e: Errno) {
+	if len(name) == 0 {
+		return {}, ERROR_PATH_NOT_FOUND;
+	}
+
+	context.allocator = allocator;
+
+
+	wname := win32.utf8_to_wstring(fix_long_path(name), context.temp_allocator);
+	fa: win32.WIN32_FILE_ATTRIBUTE_DATA;
+	ok := win32.GetFileAttributesExW(wname, win32.GetFileExInfoStandard, &fa);
+	if ok && fa.dwFileAttributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
+		// Not a symlink
+		return file_info_from_win32_file_attribute_data(&fa, name);
+	}
+
+	err := 0 if ok else win32.GetLastError();
+
+	if err == win32.ERROR_SHARING_VIOLATION {
+		fd: win32.WIN32_FIND_DATAW;
+		sh := win32.FindFirstFileW(wname, &fd);
+		if sh == win32.INVALID_HANDLE_VALUE {
+			e = Errno(win32.GetLastError());
+			return;
+		}
+		win32.FindClose(sh);
+
+		return file_info_from_win32_find_data(&fd, name);
+	}
+
+	h := win32.CreateFileW(wname, 0, 0, nil, win32.OPEN_EXISTING, create_file_attributes, nil);
+	if h == win32.INVALID_HANDLE_VALUE {
+		e = Errno(win32.GetLastError());
+		return;
+	}
+	defer win32.CloseHandle(h);
+	return file_info_from_get_file_information_by_handle(name, h);
+}
+
+
+lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Errno) {
+	attrs := u32(win32.FILE_FLAG_BACKUP_SEMANTICS);
+	attrs |= win32.FILE_FLAG_OPEN_REPARSE_POINT;
+	return _stat(name, attrs, allocator);
+}
+
+stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Errno) {
+	attrs := u32(win32.FILE_FLAG_BACKUP_SEMANTICS);
+	return _stat(name, attrs, allocator);
+}
+
+fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Errno) {
 	if fd == 0 {
 		return {}, ERROR_INVALID_HANDLE;
 	}
+	context.allocator = allocator;
+
 	path, err := cleanpath_from_handle(fd);
 	if err != ERROR_NONE {
 		return {}, err;
@@ -22,7 +100,7 @@ stat :: proc(fd: Handle) -> (File_Info, Errno) {
 		return fi, ERROR_NONE;
 	}
 
-	return stat_from_file_information(path, h);
+	return file_info_from_get_file_information_by_handle(path, h);
 }
 
 
@@ -137,8 +215,73 @@ file_type_mode :: proc(h: win32.HANDLE) -> File_Mode {
 	return 0;
 }
 
+
 @(private)
-stat_from_file_information :: proc(path: string, h: win32.HANDLE) -> (File_Info, Errno) {
+file_mode_from_file_attributes :: proc(FileAttributes: win32.DWORD, h: win32.HANDLE, ReparseTag: win32.DWORD) -> (mode: File_Mode) {
+	if FileAttributes & win32.FILE_ATTRIBUTE_READONLY != 0 {
+		mode |= 0o444;
+	} else {
+		mode |= 0o666;
+	}
+
+	is_sym := false;
+	if FileAttributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
+		is_sym = false;
+	} else {
+		is_sym = ReparseTag == win32.IO_REPARSE_TAG_SYMLINK || ReparseTag == win32.IO_REPARSE_TAG_MOUNT_POINT;
+	}
+
+	if is_sym {
+		mode |= File_Mode_Sym_Link;
+	} else {
+		if FileAttributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
+			mode |= 0o111 | File_Mode_Dir;
+		}
+
+		if h != nil {
+			mode |= file_type_mode(h);
+		}
+	}
+
+	return;
+}
+
+@(private)
+file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, name: string) -> (fi: File_Info, e: Errno) {
+	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow);
+
+	fi.mode |= file_mode_from_file_attributes(d.dwFileAttributes, nil, 0);
+	fi.is_dir = fi.mode & File_Mode_Dir != 0;
+
+	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime));
+	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime));
+	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime));
+
+	fi.fullpath, e = full_path_from_name(name);
+	fi.name = basename(fi.fullpath);
+
+	return;
+}
+
+@(private)
+file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string) -> (fi: File_Info, e: Errno) {
+	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow);
+
+	fi.mode |= file_mode_from_file_attributes(d.dwFileAttributes, nil, 0);
+	fi.is_dir = fi.mode & File_Mode_Dir != 0;
+
+	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime));
+	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime));
+	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime));
+
+	fi.fullpath, e = full_path_from_name(name);
+	fi.name = basename(fi.fullpath);
+
+	return;
+}
+
+@(private)
+file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE) -> (File_Info, Errno) {
 	d: win32.BY_HANDLE_FILE_INFORMATION;
 	if !win32.GetFileInformationByHandle(h, &d) {
 		err := Errno(win32.GetLastError());
@@ -162,34 +305,13 @@ stat_from_file_information :: proc(path: string, h: win32.HANDLE) -> (File_Info,
 	fi.name = basename(path);
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow);
 
-	if ti.FileAttributes & win32.FILE_ATTRIBUTE_READONLY != 0 {
-		fi.mode |= 0o444;
-	} else {
-		fi.mode |= 0o666;
-	}
-
-	is_sym := false;
-	if ti.FileAttributes & win32.FILE_ATTRIBUTE_REPARSE_Point == 0 {
-		is_sym = false;
-	} else {
-		is_sym = ti.ReparseTag == win32.IO_REPARSE_TAG_SYMLINK || ti.ReparseTag == win32.IO_REPARSE_TAG_MOUNT_POINT;
-	}
-
-	if is_sym {
-		fi.mode |= File_Mode_Sym_Link;
-	} else {
-		if ti.FileAttributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
-			fi.mode |= 0o111 | File_Mode_Dir;
-		}
-
-		fi.mode |= file_type_mode(h);
-	}
+	fi.mode |= file_mode_from_file_attributes(ti.FileAttributes, h, ti.ReparseTag);
+	fi.is_dir = fi.mode & File_Mode_Dir != 0;
 
 	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime));
 	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime));
 	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime));
 
-	fi.is_dir = fi.mode & File_Mode_Dir != 0;
 
 	return fi, ERROR_NONE;
 }

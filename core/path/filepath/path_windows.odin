@@ -68,6 +68,8 @@ full_path :: proc(name: string, allocator := context.allocator) -> (path: string
 		}
 		resize(&buf, len(buf)*2);
 	}
+
+	return;
 }
 
 

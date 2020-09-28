@@ -57,7 +57,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 
 	h := win32.HANDLE(fd);
 
-	dir_fi, _ := stat_from_file_information("", h);
+	dir_fi, _ := file_info_from_get_file_information_by_handle("", h);
 	if !dir_fi.is_dir {
 		return nil, ERROR_FILE_IS_NOT_DIR;
 	}
