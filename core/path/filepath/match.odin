@@ -83,8 +83,8 @@ scan_chunk :: proc(pattern: string) -> (star: bool, chunk, rest: string) {
 		pattern = pattern[1:];
 		star = true;
 	}
-	in_range := false;
-	i: int;
+
+	in_range, i := false, 0;
 
 	scan_loop: for i = 0; i < len(pattern); i += 1 {
 		switch pattern[i] {
@@ -272,7 +272,7 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string) -> (m: [dynamic]s
 	}
 	defer os.close(d);
 
-	fi, ferr := os.stat(d);
+	fi, ferr := os.fstat(d);
 	if ferr != 0 {
 		os.file_info_delete(fi);
 		return;
