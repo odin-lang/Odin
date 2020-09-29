@@ -56,7 +56,7 @@ WSAECONNRESET:                Errno : 10054;
 // Windows reserves errors >= 1<<29 for application use
 ERROR_FILE_IS_PIPE:           Errno : 1<<29 + 0;
 ERROR_FILE_IS_NOT_DIR:        Errno : 1<<29 + 1;
-
+ERROR_NEGATIVE_OFFSET:        Errno : 1<<29 + 2;
 
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments();
