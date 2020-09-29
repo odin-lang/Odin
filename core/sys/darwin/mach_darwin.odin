@@ -1,6 +1,6 @@
 package darwin;
 
-foreign import "system:pthread"
+foreign import pthread "System.framework"
 
 import "core:c"
 

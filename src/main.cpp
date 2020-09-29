@@ -432,7 +432,11 @@ i32 linker_stage(lbGenerator *gen) {
 			#endif
 			, linker, object_files, LIT(output_base), LIT(output_ext),
 			lib_str,
-			"-lc -lm",
+      #if defined(GB_SYSTEM_OSX)
+        "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      #else
+        "-lc -lm",
+      #endif
 			LIT(build_context.link_flags),
 			LIT(build_context.extra_linker_flags),
 			link_settings);
@@ -2195,7 +2199,11 @@ int main(int arg_count, char const **arg_ptr) {
 				#endif
 				, linker, LIT(output_base), LIT(output_base), LIT(output_ext),
 				lib_str,
-				"-lc -lm",
+        #if defined(GB_SYSTEM_OSX)
+          "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        #else
+          "-lc -lm",
+        #endif
 				LIT(build_context.link_flags),
 				LIT(build_context.extra_linker_flags),
 				link_settings);
