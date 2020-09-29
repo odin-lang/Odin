@@ -290,6 +290,6 @@ calc_padding_with_header :: proc(ptr: uintptr, align: uintptr, header_size: int)
 
 clone_slice :: proc(slice: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> T {
 	new_slice := make(T, len(slice), allocator, loc);
-	copy(new_slice, slice);
+	runtime.copy(new_slice, slice);
 	return new_slice;
 }

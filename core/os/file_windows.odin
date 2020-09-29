@@ -77,8 +77,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 
 	for total_write < length {
 		remaining := length - total_write;
-		MAX :: 1<<31-1;
-		to_write := win32.DWORD(min(i32(remaining), MAX));
+		to_write := win32.DWORD(min(i32(remaining), MAX_RW));
 
 		e := win32.WriteFile(win32.HANDLE(fd), &data[total_write], to_write, &single_write_length, nil);
 		if single_write_length <= 0 || !e {
@@ -101,8 +100,7 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 
 	for total_read < length {
 		remaining := length - total_read;
-		MAX :: 1<<32-1;
-		to_read := win32.DWORD(min(u32(remaining), MAX));
+		to_read := win32.DWORD(min(u32(remaining), MAX_RW));
 
 		e := win32.ReadFile(win32.HANDLE(fd), &data[total_read], to_read, &single_read_length, nil);
 		if single_read_length <= 0 || !e {
@@ -144,6 +142,101 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 	}
 	return i64(length), err;
 }
+
+
+@(private)
+MAX_RW :: 1<<30;
+
+@(private)
+pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+	buf := data;
+	if len(buf) > MAX_RW {
+		buf = buf[:MAX_RW];
+
+	}
+	curr_offset, e := seek(fd, offset, 1);
+	if e != 0 {
+		return 0, e;
+	}
+	defer seek(fd, curr_offset, 0);
+
+	o := win32.OVERLAPPED{
+		OffsetHigh = u32(offset>>32),
+		Offset = u32(offset),
+	};
+
+	h := win32.HANDLE(fd);
+	done: win32.DWORD;
+	if !win32.ReadFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
+		e = Errno(win32.GetLastError());
+		done = 0;
+	}
+	return int(done), e;
+}
+@(private)
+pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+	buf := data;
+	if len(buf) > MAX_RW {
+		buf = buf[:MAX_RW];
+
+	}
+	curr_offset, e := seek(fd, offset, 1);
+	if e != 0 {
+		return 0, e;
+	}
+	defer seek(fd, curr_offset, 0);
+
+	o := win32.OVERLAPPED{
+		OffsetHigh = u32(offset>>32),
+		Offset = u32(offset),
+	};
+
+	h := win32.HANDLE(fd);
+	done: win32.DWORD;
+	if !win32.WriteFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
+		e = Errno(win32.GetLastError());
+		done = 0;
+	}
+	return int(done), e;
+}
+
+read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
+	if offset < 0 {
+		return 0, ERROR_NEGATIVE_OFFSET;
+	}
+
+	b, offset := data, offset;
+	for len(b) > 0 {
+		m, e := pread(fd, b, offset);
+		if e != 0 {
+			err = e;
+			break;
+		}
+		n += m;
+		b = b[m:];
+		offset += i64(m);
+	}
+	return;
+}
+write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
+	if offset < 0 {
+		return 0, ERROR_NEGATIVE_OFFSET;
+	}
+
+	b, offset := data, offset;
+	for len(b) > 0 {
+		m, e := pwrite(fd, b, offset);
+		if e != 0 {
+			err = e;
+			break;
+		}
+		n += m;
+		b = b[m:];
+		offset += i64(m);
+	}
+	return;
+}
+
 
 
 // NOTE(bill): Uses startup to initialize it
@@ -188,20 +281,19 @@ is_dir :: proc(path: string) -> bool {
 	return false;
 }
 
-// NOTE(tetra): GetCurrentDirectory is not thread safe with SetCurrentDirectory and GetFullPathName;
-// The current directory is stored as a global variable in the process.
-@private cwd_gate := false;
+// NOTE(tetra): GetCurrentDirectory is not thread safe with SetCurrentDirectory and GetFullPathName
+@private cwd_lock := win32.SRWLOCK{}; // zero is initialized
 
 get_current_directory :: proc(allocator := context.allocator) -> string {
-	for intrinsics.atomic_xchg(&cwd_gate, true) {}
+	win32.AcquireSRWLockExclusive(&cwd_lock);
 
 	sz_utf16 := win32.GetCurrentDirectoryW(0, nil);
 	dir_buf_wstr := make([]u16, sz_utf16, context.temp_allocator); // the first time, it _includes_ the NUL.
 
-	sz_utf16 = win32.GetCurrentDirectoryW(win32.DWORD(len(dir_buf_wstr)), auto_cast &dir_buf_wstr[0]);
+	sz_utf16 = win32.GetCurrentDirectoryW(win32.DWORD(len(dir_buf_wstr)), raw_data(dir_buf_wstr));
 	assert(int(sz_utf16)+1 == len(dir_buf_wstr)); // the second time, it _excludes_ the NUL.
 
-	intrinsics.atomic_store(&cwd_gate, false);
+	win32.ReleaseSRWLockExclusive(&cwd_lock);
 
 	return win32.utf16_to_utf8(dir_buf_wstr, allocator);
 }
@@ -209,13 +301,13 @@ get_current_directory :: proc(allocator := context.allocator) -> string {
 set_current_directory :: proc(path: string) -> (err: Errno) {
 	wstr := win32.utf8_to_wstring(path);
 
-	for intrinsics.atomic_xchg(&cwd_gate, true) {}
-	defer intrinsics.atomic_store(&cwd_gate, false);
+	win32.AcquireSRWLockExclusive(&cwd_lock);
 
-	res := win32.SetCurrentDirectoryW(auto_cast wstr);
-	if !res {
-		return Errno(win32.GetLastError());
+	if !win32.SetCurrentDirectoryW(wstr) {
+		err = Errno(win32.GetLastError());
 	}
+
+	win32.ReleaseSRWLockExclusive(&cwd_lock);
 
 	return;
 }
