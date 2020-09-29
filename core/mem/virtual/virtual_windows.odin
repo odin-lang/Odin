@@ -65,12 +65,12 @@ release :: proc(memory: []byte) {
 	if memory == nil do return;
 
 	page_size := os.get_page_size();
-	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
+	assert(mem.align_forward(raw_data(memory), uintptr(page_size)) == raw_data(memory), "must start at page boundary");
 
 	// NOTE(tetra): On Windows, freeing virtual memory doesn't use lengths; the system
 	// simply frees the block that was reserved originally.
 	// For portability, we just ignore the length here, but still ask for the slice.
-	ok := bool(win.VirtualFree(&memory[0], 0, win.MEM_RELEASE));
+	ok := bool(win.VirtualFree(raw_data(memory), 0, win.MEM_RELEASE));
 	assert(ok);
 }
 
@@ -79,8 +79,8 @@ commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> 
 
 	flags := access_to_flags(access);
 	page_size := os.get_page_size();
-	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
-	ptr := win.VirtualAlloc(&memory[0], uint(len(memory)), win.MEM_COMMIT, flags);
+	assert(mem.align_forward(raw_data(memory), uintptr(page_size)) == raw_data(memory), "must start at page boundary");
+	ptr := win.VirtualAlloc(raw_data(memory), uint(len(memory)), win.MEM_COMMIT, flags);
 	return ptr != nil;
 }
 
@@ -88,9 +88,9 @@ decommit :: proc(memory: []byte) {
 	assert(memory != nil);
 
 	page_size := os.get_page_size();
-	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
+	assert(mem.align_forward(raw_data(memory), uintptr(page_size)) == raw_data(memory), "must start at page boundary");
 
-	ok := bool(win.VirtualFree(&memory[0], uint(len(memory)), win.MEM_DECOMMIT));
+	ok := bool(win.VirtualFree(raw_data(memory), uint(len(memory)), win.MEM_DECOMMIT));
 	assert(ok);
 }
 
@@ -98,10 +98,10 @@ set_access :: proc(memory: []byte, access: Memory_Access_Flags) {
 	assert(memory != nil);
 
 	page_size := os.get_page_size();
-	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
+	assert(mem.align_forward(raw_data(memory), uintptr(page_size)) == raw_data(memory), "must start at page boundary");
 
 	flags := access_to_flags(access);
 	unused: u32 = ---;
-	ok := bool(win.VirtualProtect(&memory[0], uint(len(memory)), u32(flags), &unused));
+	ok := bool(win.VirtualProtect(raw_data(memory), uint(len(memory)), u32(flags), &unused));
 	assert(ok);
 }
