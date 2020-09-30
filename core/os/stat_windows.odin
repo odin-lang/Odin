@@ -10,7 +10,6 @@ full_path_from_name :: proc(name: string, allocator := context.allocator) -> (pa
 		name = ".";
 	}
 	p := win32.utf8_to_utf16(name, context.temp_allocator);
-	defer delete(p);
 	buf := make([dynamic]u16, 100, allocator);
 	for {
 		n := win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil);

@@ -165,7 +165,7 @@ assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_locati
 	return condition;
 }
 
-panicf :: proc(fmt: string, args: ..any, loc := #caller_location) {
+panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc;
 	if p == nil {
 		p = runtime.default_assertion_failure_proc;
