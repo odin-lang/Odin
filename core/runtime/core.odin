@@ -587,19 +587,13 @@ ordered_remove :: proc(array: ^$D/[dynamic]$T, index: int, loc := #caller_locati
 }
 
 @builtin
-unordered_remove_range :: proc(array: ^$D/[dynamic]$T, lo, hi: int, loc := #caller_location) {
-	slice_expr_error_lo_hi_loc(loc, lo, hi, len(array));
-	for index in lo..<hi {
-		unordered_remove(array, index, loc);
-	}
-}
-
-@builtin
-ordered_remove_range :: proc(array: ^$D/[dynamic]$T, lo, hi: int, loc := #caller_location) {
+remove_range :: proc(array: ^$D/[dynamic]$T, lo, hi: int, loc := #caller_location) {
 	slice_expr_error_lo_hi_loc(loc, lo, hi, len(array));
 	n := max(hi-lo, 0);
 	if n > 0 {
-		copy(array[lo:], array[hi:]);
+		if hi != len(array) {
+			copy(array[lo:], array[hi:]);
+		}
 		(^Raw_Dynamic_Array)(array).len -= n;
 	}
 }
