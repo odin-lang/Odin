@@ -7806,6 +7806,18 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 			Entity *e = entity_from_expr(expr);
 			e = strip_entity_wrapping(e);
 			GB_ASSERT(e != nullptr);
+			if (e->kind == Entity_Procedure && e->Procedure.is_foreign) {
+				// NOTE(bill): There can be duplicates of the foreign procedure; get the main one
+				String link_name = e->token.string;
+				if (e->Procedure.link_name.len != 0) {
+					link_name = e->Procedure.link_name;
+				}
+				auto *found = string_map_get(&proc->module->members, link_name);
+				if (found) {
+					return *found;
+				}
+			}
+
 			auto *found = map_get(&proc->module->values, hash_entity(e));
 			if (found) {
 				auto v = *found;
