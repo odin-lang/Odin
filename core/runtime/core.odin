@@ -531,15 +531,14 @@ init_global_temporary_allocator :: proc(data: []byte, backup_allocator := contex
 
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) {
-	fd := os_stderr();
-	print_caller_location(fd, loc);
-	print_string(fd, " ");
-	print_string(fd, prefix);
+	print_caller_location(loc);
+	print_string(" ");
+	print_string(prefix);
 	if len(message) > 0 {
-		print_string(fd, ": ");
-		print_string(fd, message);
+		print_string(": ");
+		print_string(message);
 	}
-	print_byte(fd, '\n');
+	print_byte('\n');
 	debug_trap();
 }
 

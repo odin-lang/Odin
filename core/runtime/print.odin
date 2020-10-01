@@ -2,7 +2,7 @@ package runtime
 
 _INTEGER_DIGITS :: "0123456789abcdefghijklmnopqrstuvwxyz";
 
-encode_rune :: proc(c: rune) -> ([4]u8, int) {
+encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) {
 	r := c;
 
 	buf: [4]u8;
@@ -38,55 +38,55 @@ encode_rune :: proc(c: rune) -> ([4]u8, int) {
 	return buf, 4;
 }
 
-print_string :: proc(fd: _OS_Handle, str: string) -> (int, _OS_Errno) {
-	return os_write(fd, transmute([]byte)str);
+print_string :: proc "contextless" (str: string) -> (int, _OS_Errno) {
+	return os_write(transmute([]byte)str);
 }
 
-print_byte :: proc(fd: _OS_Handle, b: byte) -> (int, _OS_Errno) {
-	return os_write(fd, []byte{b});
+print_byte :: proc "contextless" (b: byte) -> (int, _OS_Errno) {
+	return os_write([]byte{b});
 }
 
-print_encoded_rune :: proc(fd: _OS_Handle, r: rune) {
-	print_byte(fd, '\'');
+print_encoded_rune :: proc "contextless" (r: rune) {
+	print_byte('\'');
 
 	switch r {
-	case '\a': print_string(fd, "\\a");
-	case '\b': print_string(fd, "\\b");
-	case '\e': print_string(fd, "\\e");
-	case '\f': print_string(fd, "\\f");
-	case '\n': print_string(fd, "\\n");
-	case '\r': print_string(fd, "\\r");
-	case '\t': print_string(fd, "\\t");
-	case '\v': print_string(fd, "\\v");
+	case '\a': print_string("\\a");
+	case '\b': print_string("\\b");
+	case '\e': print_string("\\e");
+	case '\f': print_string("\\f");
+	case '\n': print_string("\\n");
+	case '\r': print_string("\\r");
+	case '\t': print_string("\\t");
+	case '\v': print_string("\\v");
 	case:
 		if r <= 0 {
-			print_string(fd, "\\x00");
+			print_string("\\x00");
 		} else if r < 32 {
 			digits := _INTEGER_DIGITS;
 			n0, n1 := u8(r) >> 4, u8(r) & 0xf;
-			print_string(fd, "\\x");
-			print_byte(fd, digits[n0]);
-			print_byte(fd, digits[n1]);
+			print_string("\\x");
+			print_byte(digits[n0]);
+			print_byte(digits[n1]);
 		} else {
-			print_rune(fd, r);
+			print_rune(r);
 		}
 	}
-	print_byte(fd, '\'');
+	print_byte('\'');
 }
 
-print_rune :: proc(fd: _OS_Handle, r: rune) -> (int, _OS_Errno) {
+print_rune :: proc "contextless" (r: rune) -> (int, _OS_Errno) {
 	RUNE_SELF :: 0x80;
 
 	if r < RUNE_SELF {
-		return print_byte(fd, byte(r));
+		return print_byte(byte(r));
 	}
 
 	b, n := encode_rune(r);
-	return os_write(fd, b[:n]);
+	return os_write(b[:n]);
 }
 
 
-print_u64 :: proc(fd: _OS_Handle, x: u64) {
+print_u64 :: proc "contextless" (x: u64) {
 	digits := _INTEGER_DIGITS;
 
 	a: [129]byte;
@@ -99,11 +99,11 @@ print_u64 :: proc(fd: _OS_Handle, x: u64) {
 	}
 	i -= 1; a[i] = digits[u % b];
 
-	os_write(fd, a[i:]);
+	os_write(a[i:]);
 }
 
 
-print_i64 :: proc(fd: _OS_Handle, x: i64) {
+print_i64 :: proc "contextless" (x: i64) {
 	digits := _INTEGER_DIGITS;
 	b :: i64(10);
 
@@ -122,257 +122,257 @@ print_i64 :: proc(fd: _OS_Handle, x: i64) {
 		i -= 1; a[i] = '-';
 	}
 
-	os_write(fd, a[i:]);
+	os_write(a[i:]);
 }
 
-print_caller_location :: proc(fd: _OS_Handle, using loc: Source_Code_Location) {
-	print_string(fd, file_path);
-	print_byte(fd, '(');
-	print_u64(fd, u64(line));
-	print_byte(fd, ':');
-	print_u64(fd, u64(column));
-	print_byte(fd, ')');
+print_caller_location :: proc "contextless" (using loc: Source_Code_Location) {
+	print_string(file_path);
+	print_byte('(');
+	print_u64(u64(line));
+	print_byte(':');
+	print_u64(u64(column));
+	print_byte(')');
 }
-print_typeid :: proc(fd: _OS_Handle, id: typeid) {
+print_typeid :: proc "contextless" (id: typeid) {
 	if id == nil {
-		print_string(fd, "nil");
+		print_string("nil");
 	} else {
 		ti := type_info_of(id);
-		print_type(fd, ti);
+		print_type(ti);
 	}
 }
-print_type :: proc(fd: _OS_Handle, ti: ^Type_Info) {
+print_type :: proc "contextless" (ti: ^Type_Info) {
 	if ti == nil {
-		print_string(fd, "nil");
+		print_string("nil");
 		return;
 	}
 
 	switch info in ti.variant {
 	case Type_Info_Named:
-		print_string(fd, info.name);
+		print_string(info.name);
 	case Type_Info_Integer:
 		switch ti.id {
-		case int:     print_string(fd, "int");
-		case uint:    print_string(fd, "uint");
-		case uintptr: print_string(fd, "uintptr");
+		case int:     print_string("int");
+		case uint:    print_string("uint");
+		case uintptr: print_string("uintptr");
 		case:
-			print_byte(fd, 'i' if info.signed else 'u');
-			print_u64(fd, u64(8*ti.size));
+			print_byte('i' if info.signed else 'u');
+			print_u64(u64(8*ti.size));
 		}
 	case Type_Info_Rune:
-		print_string(fd, "rune");
+		print_string("rune");
 	case Type_Info_Float:
-		print_byte(fd, 'f');
-		print_u64(fd, u64(8*ti.size));
+		print_byte('f');
+		print_u64(u64(8*ti.size));
 	case Type_Info_Complex:
-		print_string(fd, "complex");
-		print_u64(fd, u64(8*ti.size));
+		print_string("complex");
+		print_u64(u64(8*ti.size));
 	case Type_Info_Quaternion:
-		print_string(fd, "quaternion");
-		print_u64(fd, u64(8*ti.size));
+		print_string("quaternion");
+		print_u64(u64(8*ti.size));
 	case Type_Info_String:
-		print_string(fd, "string");
+		print_string("string");
 	case Type_Info_Boolean:
 		switch ti.id {
-		case bool: print_string(fd, "bool");
+		case bool: print_string("bool");
 		case:
-			print_byte(fd, 'b');
-			print_u64(fd, u64(8*ti.size));
+			print_byte('b');
+			print_u64(u64(8*ti.size));
 		}
 	case Type_Info_Any:
-		print_string(fd, "any");
+		print_string("any");
 	case Type_Info_Type_Id:
-		print_string(fd, "typeid");
+		print_string("typeid");
 
 	case Type_Info_Pointer:
 		if info.elem == nil {
-			print_string(fd, "rawptr");
+			print_string("rawptr");
 		} else {
-			print_string(fd, "^");
-			print_type(fd, info.elem);
+			print_string("^");
+			print_type(info.elem);
 		}
 	case Type_Info_Procedure:
-		print_string(fd, "proc");
+		print_string("proc");
 		if info.params == nil {
-			print_string(fd, "()");
+			print_string("()");
 		} else {
 			t := info.params.variant.(Type_Info_Tuple);
-			print_byte(fd, '(');
+			print_byte('(');
 			for t, i in t.types {
-				if i > 0 { print_string(fd, ", "); }
-				print_type(fd, t);
+				if i > 0 { print_string(", "); }
+				print_type(t);
 			}
-			print_string(fd, ")");
+			print_string(")");
 		}
 		if info.results != nil {
-			print_string(fd, " -> ");
-			print_type(fd, info.results);
+			print_string(" -> ");
+			print_type(info.results);
 		}
 	case Type_Info_Tuple:
 		count := len(info.names);
-		if count != 1 { print_byte(fd, '('); }
+		if count != 1 { print_byte('('); }
 		for name, i in info.names {
-			if i > 0 { print_string(fd, ", "); }
+			if i > 0 { print_string(", "); }
 
 			t := info.types[i];
 
 			if len(name) > 0 {
-				print_string(fd, name);
-				print_string(fd, ": ");
+				print_string(name);
+				print_string(": ");
 			}
-			print_type(fd, t);
+			print_type(t);
 		}
-		if count != 1 { print_string(fd, ")"); }
+		if count != 1 { print_string(")"); }
 
 	case Type_Info_Array:
-		print_byte(fd, '[');
-		print_u64(fd, u64(info.count));
-		print_byte(fd, ']');
-		print_type(fd, info.elem);
+		print_byte('[');
+		print_u64(u64(info.count));
+		print_byte(']');
+		print_type(info.elem);
 
 	case Type_Info_Enumerated_Array:
-		print_byte(fd, '[');
-		print_type(fd, info.index);
-		print_byte(fd, ']');
-		print_type(fd, info.elem);
+		print_byte('[');
+		print_type(info.index);
+		print_byte(']');
+		print_type(info.elem);
 
 
 	case Type_Info_Dynamic_Array:
-		print_string(fd, "[dynamic]");
-		print_type(fd, info.elem);
+		print_string("[dynamic]");
+		print_type(info.elem);
 	case Type_Info_Slice:
-		print_string(fd, "[]");
-		print_type(fd, info.elem);
+		print_string("[]");
+		print_type(info.elem);
 
 	case Type_Info_Map:
-		print_string(fd, "map[");
-		print_type(fd, info.key);
-		print_byte(fd, ']');
-		print_type(fd, info.value);
+		print_string("map[");
+		print_type(info.key);
+		print_byte(']');
+		print_type(info.value);
 
 	case Type_Info_Struct:
 		switch info.soa_kind {
 		case .None: // Ignore
 		case .Fixed:
-			print_string(fd, "#soa[");
-			print_u64(fd, u64(info.soa_len));
-			print_byte(fd, ']');
-			print_type(fd, info.soa_base_type);
+			print_string("#soa[");
+			print_u64(u64(info.soa_len));
+			print_byte(']');
+			print_type(info.soa_base_type);
 			return;
 		case .Slice:
-			print_string(fd, "#soa[]");
-			print_type(fd, info.soa_base_type);
+			print_string("#soa[]");
+			print_type(info.soa_base_type);
 			return;
 		case .Dynamic:
-			print_string(fd, "#soa[dynamic]");
-			print_type(fd, info.soa_base_type);
+			print_string("#soa[dynamic]");
+			print_type(info.soa_base_type);
 			return;
 		}
 
-		print_string(fd, "struct ");
-		if info.is_packed    { print_string(fd, "#packed "); }
-		if info.is_raw_union { print_string(fd, "#raw_union "); }
+		print_string("struct ");
+		if info.is_packed    { print_string("#packed "); }
+		if info.is_raw_union { print_string("#raw_union "); }
 		if info.custom_align {
-			print_string(fd, "#align ");
-			print_u64(fd, u64(ti.align));
-			print_byte(fd, ' ');
+			print_string("#align ");
+			print_u64(u64(ti.align));
+			print_byte(' ');
 		}
-		print_byte(fd, '{');
+		print_byte('{');
 		for name, i in info.names {
-			if i > 0 { print_string(fd, ", "); }
-			print_string(fd, name);
-			print_string(fd, ": ");
-			print_type(fd, info.types[i]);
+			if i > 0 { print_string(", "); }
+			print_string(name);
+			print_string(": ");
+			print_type(info.types[i]);
 		}
-		print_byte(fd, '}');
+		print_byte('}');
 
 	case Type_Info_Union:
-		print_string(fd, "union ");
+		print_string("union ");
 		if info.custom_align {
-			print_string(fd, "#align ");
-			print_u64(fd, u64(ti.align));
+			print_string("#align ");
+			print_u64(u64(ti.align));
 		}
 		if info.no_nil {
-			print_string(fd, "#no_nil ");
+			print_string("#no_nil ");
 		}
-		print_byte(fd, '{');
+		print_byte('{');
 		for variant, i in info.variants {
-			if i > 0 { print_string(fd, ", "); }
-			print_type(fd, variant);
+			if i > 0 { print_string(", "); }
+			print_type(variant);
 		}
-		print_string(fd, "}");
+		print_string("}");
 
 	case Type_Info_Enum:
-		print_string(fd, "enum ");
-		print_type(fd, info.base);
-		print_string(fd, " {");
+		print_string("enum ");
+		print_type(info.base);
+		print_string(" {");
 		for name, i in info.names {
-			if i > 0 { print_string(fd, ", "); }
-			print_string(fd, name);
+			if i > 0 { print_string(", "); }
+			print_string(name);
 		}
-		print_string(fd, "}");
+		print_string("}");
 
 	case Type_Info_Bit_Field:
-		print_string(fd, "bit_field ");
+		print_string("bit_field ");
 		if ti.align != 1 {
-			print_string(fd, "#align ");
-			print_u64(fd, u64(ti.align));
-			print_byte(fd, ' ');
+			print_string("#align ");
+			print_u64(u64(ti.align));
+			print_byte(' ');
 		}
-		print_string(fd, " {");
+		print_string(" {");
 		for name, i in info.names {
-			if i > 0 { print_string(fd, ", "); }
-			print_string(fd, name);
-			print_string(fd, ": ");
-			print_u64(fd, u64(info.bits[i]));
+			if i > 0 { print_string(", "); }
+			print_string(name);
+			print_string(": ");
+			print_u64(u64(info.bits[i]));
 		}
-		print_string(fd, "}");
+		print_string("}");
 
 	case Type_Info_Bit_Set:
-		print_string(fd, "bit_set[");
+		print_string("bit_set[");
 
 		#partial switch elem in type_info_base(info.elem).variant {
 		case Type_Info_Enum:
-			print_type(fd, info.elem);
+			print_type(info.elem);
 		case Type_Info_Rune:
-			print_encoded_rune(fd, rune(info.lower));
-			print_string(fd, "..");
-			print_encoded_rune(fd, rune(info.upper));
+			print_encoded_rune(rune(info.lower));
+			print_string("..");
+			print_encoded_rune(rune(info.upper));
 		case:
-			print_i64(fd, info.lower);
-			print_string(fd, "..");
-			print_i64(fd, info.upper);
+			print_i64(info.lower);
+			print_string("..");
+			print_i64(info.upper);
 		}
 		if info.underlying != nil {
-			print_string(fd, "; ");
-			print_type(fd, info.underlying);
+			print_string("; ");
+			print_type(info.underlying);
 		}
-		print_byte(fd, ']');
+		print_byte(']');
 
 	case Type_Info_Opaque:
-		print_string(fd, "opaque ");
-		print_type(fd, info.elem);
+		print_string("opaque ");
+		print_type(info.elem);
 
 	case Type_Info_Simd_Vector:
 		if info.is_x86_mmx {
-			print_string(fd, "intrinsics.x86_mmx");
+			print_string("intrinsics.x86_mmx");
 		} else {
-			print_string(fd, "#simd[");
-			print_u64(fd, u64(info.count));
-			print_byte(fd, ']');
-			print_type(fd, info.elem);
+			print_string("#simd[");
+			print_u64(u64(info.count));
+			print_byte(']');
+			print_type(info.elem);
 		}
 
 	case Type_Info_Relative_Pointer:
-		print_string(fd, "#relative(");
-		print_type(fd, info.base_integer);
-		print_string(fd, ") ");
-		print_type(fd, info.pointer);
+		print_string("#relative(");
+		print_type(info.base_integer);
+		print_string(") ");
+		print_type(info.pointer);
 
 	case Type_Info_Relative_Slice:
-		print_string(fd, "#relative(");
-		print_type(fd, info.base_integer);
-		print_string(fd, ") ");
-		print_type(fd, info.slice);
+		print_string("#relative(");
+		print_type(info.base_integer);
+		print_string(") ");
+		print_type(info.slice);
 	}
 }
