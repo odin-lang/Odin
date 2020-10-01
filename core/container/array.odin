@@ -10,6 +10,8 @@ Array :: struct(T: typeid) {
 	allocator: mem.Allocator,
 }
 
+ARRAY_DEFAULT_CAPACITY :: 16;
+
 /*
 array_init :: proc {
 	array_init_none,
@@ -42,11 +44,12 @@ array_set_capacity
 array_grow
 */
 
+
 array_init_none :: proc(a: ^$A/Array, allocator := context.allocator) {
-	array_init_len(a, 0, allocator);
+	array_init_len_cap(a, 0, ARRAY_DEFAULT_CAPACITY, allocator);
 }
 array_init_len :: proc(a: ^$A/Array, len: int, allocator := context.allocator) {
-	array_init_len_cap(a, 0, 16, allocator);
+	array_init_len_cap(a, len, len, allocator);
 }
 array_init_len_cap :: proc(a: ^$A/Array($T), len: int, cap: int, allocator := context.allocator) {
 	a.allocator = allocator;
