@@ -11,7 +11,7 @@ import "core:time"
 import "core:unicode/utf8"
 import "intrinsics"
 
-DEFAULT_BUFFER_SIZE :: #config(FMT_DEFAULT_BUFFER_SIZE, 1<<12);
+DEFAULT_BUFFER_SIZE :: #config(FMT_DEFAULT_BUFFER_SIZE, 1<<10);
 
 Info :: struct {
 	minus:     bool,
@@ -62,29 +62,58 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 }
 
 
+Flush_Data :: struct {
+	handle: os.Handle,
+	bytes_written: int,
+}
+
+fmt_file_builder :: proc(data: []byte, fd: ^Flush_Data) -> strings.Builder {
+	b := strings.builder_from_slice(data);
+	b.flush_data = rawptr(fd);
+	b.flush_proc = proc(b: ^strings.Builder) -> (do_reset: bool) {
+		fd := (^Flush_Data)(b.flush_data);
+		res := strings.to_string(b^);
+		n, _ := os.write_string(fd.handle, res);
+		fd.bytes_written += max(n, 0);
+		return true;
+	};
+
+	return b;
+}
+
 fprint :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
-	buf := strings.builder_from_slice(data[:]);
+	flush_data := Flush_Data{handle=fd};
+	buf := fmt_file_builder(data[:], &flush_data);
 	res := sbprint(buf=&buf, args=args, sep=sep);
-	os.write_string(fd, res);
-	return len(res);
+	strings.flush_builder(&buf);
+	return flush_data.bytes_written;
 }
 
 fprintln :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
-	buf := strings.builder_from_slice(data[:]);
+	flush_data := Flush_Data{handle=fd};
+	buf := fmt_file_builder(data[:], &flush_data);
 	res := sbprintln(buf=&buf, args=args, sep=sep);
-	os.write_string(fd, res);
-	return len(res);
+	strings.flush_builder(&buf);
+	return flush_data.bytes_written;
 }
 fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
-	buf := strings.builder_from_slice(data[:]);
+	flush_data := Flush_Data{handle=fd};
+	buf := fmt_file_builder(data[:], &flush_data);
 	res := sbprintf(&buf, fmt, ..args);
-	os.write_string(fd, res);
-	return len(res);
+	strings.flush_builder(&buf);
+	return flush_data.bytes_written;
 }
-
+fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) -> int {
+	data: [DEFAULT_BUFFER_SIZE]byte;
+	flush_data := Flush_Data{handle=fd};
+	buf := fmt_file_builder(data[:], &flush_data);
+	reflect.write_type(&buf, info);
+	strings.flush_builder(&buf);
+	return flush_data.bytes_written;
+}
 
 // print* procedures return the number of bytes written
 print   :: proc(args: ..any, sep := " ") -> int { return fprint(fd=os.stdout, args=args, sep=sep); }
@@ -174,12 +203,7 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 	p("Panic", message, loc);
 }
 
-fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) {
-	data: [DEFAULT_BUFFER_SIZE]byte;
-	buf := strings.builder_from_slice(data[:]);
-	reflect.write_type(&buf, info);
-	os.write_string(fd, strings.to_string(buf));
-}
+
 
 
 
