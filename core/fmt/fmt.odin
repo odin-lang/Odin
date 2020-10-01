@@ -85,7 +85,7 @@ fprint :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	flush_data := Flush_Data{handle=fd};
 	buf := fmt_file_builder(data[:], &flush_data);
-	res := sbprint(buf=&buf, args=args, sep=sep);
+	_ = sbprint(buf=&buf, args=args, sep=sep);
 	strings.flush_builder(&buf);
 	return flush_data.bytes_written;
 }
@@ -94,7 +94,7 @@ fprintln :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	flush_data := Flush_Data{handle=fd};
 	buf := fmt_file_builder(data[:], &flush_data);
-	res := sbprintln(buf=&buf, args=args, sep=sep);
+	_ = sbprintln(buf=&buf, args=args, sep=sep);
 	strings.flush_builder(&buf);
 	return flush_data.bytes_written;
 }
@@ -102,7 +102,7 @@ fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	flush_data := Flush_Data{handle=fd};
 	buf := fmt_file_builder(data[:], &flush_data);
-	res := sbprintf(&buf, fmt, ..args);
+	_ = sbprintf(&buf, fmt, ..args);
 	strings.flush_builder(&buf);
 	return flush_data.bytes_written;
 }
