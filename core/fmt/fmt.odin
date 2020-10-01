@@ -86,7 +86,6 @@ fprint :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
 	flush_data := Flush_Data{handle=fd};
 	buf := fmt_file_builder(data[:], &flush_data);
 	_ = sbprint(buf=&buf, args=args, sep=sep);
-	strings.flush_builder(&buf);
 	return flush_data.bytes_written;
 }
 
@@ -95,7 +94,6 @@ fprintln :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
 	flush_data := Flush_Data{handle=fd};
 	buf := fmt_file_builder(data[:], &flush_data);
 	_ = sbprintln(buf=&buf, args=args, sep=sep);
-	strings.flush_builder(&buf);
 	return flush_data.bytes_written;
 }
 fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
@@ -103,7 +101,6 @@ fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 	flush_data := Flush_Data{handle=fd};
 	buf := fmt_file_builder(data[:], &flush_data);
 	_ = sbprintf(&buf, fmt, ..args);
-	strings.flush_builder(&buf);
 	return flush_data.bytes_written;
 }
 fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) -> int {
@@ -231,6 +228,7 @@ sbprint :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 
 		fmt_value(&fi, args[i], 'v');
 	}
+	strings.flush_builder(buf);
 	return strings.to_string(buf^);
 }
 
@@ -246,6 +244,7 @@ sbprintln :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 		fmt_value(&fi, args[i], 'v');
 	}
 	strings.write_byte(buf, '\n');
+	strings.flush_builder(buf);
 	return strings.to_string(buf^);
 }
 
@@ -521,6 +520,7 @@ sbprintf :: proc(b: ^strings.Builder, fmt: string, args: ..any) -> string {
 		strings.write_string(b, ")");
 	}
 
+	strings.flush_builder(b);
 	return strings.to_string(b^);
 }
 
