@@ -15,7 +15,8 @@ when ODIN_DEFAULT_TO_NIL_ALLOCATOR || ODIN_OS == "freestanding" {
 			data = nil,
 		};
 	}
-} else {
+} else when ODIN_OS != "windows" {
+	// TODO(bill): reimplement these procedures in the os_specific stuff
 	import "core:os"
 
 	default_allocator_proc :: os.heap_allocator_proc;

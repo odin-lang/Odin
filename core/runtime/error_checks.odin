@@ -23,13 +23,12 @@ bounds_check_error :: proc "contextless" (file: string, line, column: int, index
 	}
 	handle_error :: proc "contextless" (file: string, line, column: int, index, count: int) {
 		context = default_context();
-		fd := os_stderr();
-		print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
-		print_string(fd, " Index ");
-		print_i64(fd, i64(index));
-		print_string(fd, " is out of bounds range 0:");
-		print_i64(fd, i64(count));
-		print_byte(fd, '\n');
+		print_caller_location(Source_Code_Location{file, line, column, "", 0});
+		print_string(" Index ");
+		print_i64(i64(index));
+		print_string(" is out of bounds range 0:");
+		print_i64(i64(count));
+		print_byte('\n');
 		bounds_trap();
 	}
 	handle_error(file, line, column, index, count);
@@ -37,15 +36,14 @@ bounds_check_error :: proc "contextless" (file: string, line, column: int, index
 
 slice_handle_error :: proc "contextless" (file: string, line, column: int, lo, hi: int, len: int) -> ! {
 	context = default_context();
-	fd := os_stderr();
-	print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
-	print_string(fd, " Invalid slice indices: ");
-	print_i64(fd, i64(lo));
-	print_string(fd, ":");
-	print_i64(fd, i64(hi));
-	print_string(fd, ":");
-	print_i64(fd, i64(len));
-	print_byte(fd, '\n');
+	print_caller_location(Source_Code_Location{file, line, column, "", 0});
+	print_string(" Invalid slice indices: ");
+	print_i64(i64(lo));
+	print_string(":");
+	print_i64(i64(hi));
+	print_string(":");
+	print_i64(i64(len));
+	print_byte('\n');
 	bounds_trap();
 }
 
@@ -69,15 +67,14 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: int,
 	}
 	handle_error :: proc "contextless" (file: string, line, column: int, low, high, max: int) {
 		context = default_context();
-		fd := os_stderr();
-		print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
-		print_string(fd, " Invalid dynamic array values: ");
-		print_i64(fd, i64(low));
-		print_string(fd, ":");
-		print_i64(fd, i64(high));
-		print_string(fd, ":");
-		print_i64(fd, i64(max));
-		print_byte(fd, '\n');
+		print_caller_location(Source_Code_Location{file, line, column, "", 0});
+		print_string(" Invalid dynamic array values: ");
+		print_i64(i64(low));
+		print_string(":");
+		print_i64(i64(high));
+		print_string(":");
+		print_i64(i64(max));
+		print_byte('\n');
 		bounds_trap();
 	}
 	handle_error(file, line, column, low, high, max);
@@ -90,13 +87,12 @@ type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column
 	}
 	handle_error :: proc "contextless" (file: string, line, column: int, from, to: typeid) {
 		context = default_context();
-		fd := os_stderr();
-		print_caller_location(fd, Source_Code_Location{file, line, column, "", 0});
-		print_string(fd, " Invalid type assertion from ");
-		print_typeid(fd, from);
-		print_string(fd, " to ");
-		print_typeid(fd, to);
-		print_byte(fd, '\n');
+		print_caller_location(Source_Code_Location{file, line, column, "", 0});
+		print_string(" Invalid type assertion from ");
+		print_typeid(from);
+		print_string(" to ");
+		print_typeid(to);
+		print_byte('\n');
 		type_assertion_trap();
 	}
 	handle_error(file, line, column, from, to);
@@ -108,11 +104,10 @@ make_slice_error_loc :: inline proc "contextless" (loc := #caller_location, len:
 	}
 	handle_error :: proc "contextless" (loc: Source_Code_Location, len: int) {
 		context = default_context();
-		fd := os_stderr();
-		print_caller_location(fd, loc);
-		print_string(fd, " Invalid slice length for make: ");
-		print_i64(fd, i64(len));
-		print_byte(fd, '\n');
+		print_caller_location(loc);
+		print_string(" Invalid slice length for make: ");
+		print_i64(i64(len));
+		print_byte('\n');
 		bounds_trap();
 	}
 	handle_error(loc, len);
@@ -124,13 +119,12 @@ make_dynamic_array_error_loc :: inline proc "contextless" (using loc := #caller_
 	}
 	handle_error :: proc "contextless" (loc: Source_Code_Location, len, cap: int) {
 		context = default_context();
-		fd := os_stderr();
-		print_caller_location(fd, loc);
-		print_string(fd, " Invalid dynamic array parameters for make: ");
-		print_i64(fd, i64(len));
-		print_byte(fd, ':');
-		print_i64(fd, i64(cap));
-		print_byte(fd, '\n');
+		print_caller_location(loc);
+		print_string(" Invalid dynamic array parameters for make: ");
+		print_i64(i64(len));
+		print_byte(':');
+		print_i64(i64(cap));
+		print_byte('\n');
 		bounds_trap();
 	}
 	handle_error(loc, len, cap);
@@ -142,11 +136,10 @@ make_map_expr_error_loc :: inline proc "contextless" (loc := #caller_location, c
 	}
 	handle_error :: proc "contextless" (loc: Source_Code_Location, cap: int) {
 		context = default_context();
-		fd := os_stderr();
-		print_caller_location(fd, loc);
-		print_string(fd, " Invalid map capacity for make: ");
-		print_i64(fd, i64(cap));
-		print_byte(fd, '\n');
+		print_caller_location(loc);
+		print_string(" Invalid map capacity for make: ");
+		print_i64(i64(cap));
+		print_byte('\n');
 		bounds_trap();
 	}
 	handle_error(loc, cap);
