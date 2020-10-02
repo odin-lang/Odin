@@ -880,3 +880,101 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode, si
 
 	return result;
 }
+
+
+
+// Small_Allocator primary allocates memory from its local buffer of size BUFFER_SIZE
+// If that buffer's memory is exhausted, it will use the backing allocator (a scratch allocator is recommended)
+// Memory allocated with Small_Allocator cannot be freed individually using 'free' and must be freed using 'free_all'
+Small_Allocator :: struct(BUFFER_SIZE: int)
+	where
+		BUFFER_SIZE >= 2*size_of(uintptr),
+		BUFFER_SIZE & (BUFFER_SIZE-1) == 0 {
+
+	buffer:     [BUFFER_SIZE]byte,
+	backing:    Allocator,
+	start:      uintptr,
+	curr:       uintptr,
+	end:        uintptr,
+	chunk_size: int
+}
+
+small_allocator :: proc(s: ^$S/Small_Allocator, backing := context.allocator) -> (a: Allocator) {
+	if s.backing.procedure == nil {
+		s.backing = backing;
+	}
+	a.data = s;
+	a.procedure = proc(allocator_data: rawptr, mode: Allocator_Mode, size, alignment: int, old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
+		s := (^S)(allocator_data);
+		if s.chunk_size <= 0 {
+			s.chunk_size = 4*1024;
+		}
+		if s.start == 0 {
+			s.start = uintptr(&s.buffer[0]);
+			s.curr = s.start;
+			s.end = s.start + uintptr(S.BUFFER_SIZE);
+			(^rawptr)(s.start)^ = nil;
+			s.curr += size_of(rawptr);
+		}
+
+
+		switch mode {
+		case .Alloc:
+			s.curr = align_forward_uintptr(s.curr, uintptr(alignment));
+			if size > int(s.end - s.curr) {
+				to_allocate := size_of(rawptr) + size + alignment;
+				if to_allocate < s.chunk_size {
+					to_allocate = s.chunk_size;
+				}
+				s.chunk_size *= 2;
+
+				p := alloc(to_allocate, 16, s.backing, loc);
+				(^rawptr)(s.start)^ = p;
+				s.start = uintptr(p);
+				s.curr = s.start;
+				s.end = s.start + uintptr(to_allocate);
+
+				(^rawptr)(s.start)^ = nil;
+				s.curr += size_of(rawptr);
+				s.curr = align_forward_uintptr(s.curr, uintptr(alignment));
+			}
+
+			p := rawptr(s.curr);
+			s.curr += uintptr(size);
+			return p;
+
+		case .Free:
+			// NOP
+			return nil;
+
+		case .Resize:
+			// No need copying the code
+			return default_resize_align(old_memory, old_size, size, alignment, small_allocator(s, s.backing), loc);
+
+		case .Free_All:
+			p := (^rawptr)(&s.buffer[0])^;
+			for p != nil {
+				next := (^rawptr)(p)^;
+				free(next, s.backing, loc);
+				p = next;
+			}
+			// Reset to default
+			s.start = uintptr(&s.buffer[0]);
+			s.curr = s.start;
+			s.end = s.start + uintptr(S.BUFFER_SIZE);
+
+			(^rawptr)(s.start)^ = nil;
+			s.curr += size_of(rawptr);
+
+
+		case .Query_Features:
+			return nil;
+
+		case .Query_Info:
+			return nil;
+		}
+
+		return nil;
+	};
+	return a;
+}
