@@ -525,8 +525,8 @@ __init_context :: proc "contextless" (c: ^Context) {
 }
 
 @builtin
-init_global_temporary_allocator :: proc(data: []byte, backup_allocator := context.allocator) {
-	default_temp_allocator_init(&global_default_temp_allocator_data, data, backup_allocator);
+init_global_temporary_allocator :: proc(size: int, backup_allocator := context.allocator) {
+	default_temp_allocator_init(&global_default_temp_allocator_data, size, backup_allocator);
 }
 
 
