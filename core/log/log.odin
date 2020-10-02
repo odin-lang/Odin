@@ -123,6 +123,9 @@ panicf :: proc(fmt_str: string, args: ..any, location := #caller_location) -> ! 
 
 log :: proc(level: Level, args: ..any, sep := " ", location := #caller_location) {
 	logger := context.logger;
+	if logger.procedure == nil {
+		return;
+	}
 	if level < logger.lowest_level {
 		return;
 	}
@@ -132,6 +135,9 @@ log :: proc(level: Level, args: ..any, sep := " ", location := #caller_location)
 
 logf :: proc(level: Level, fmt_str: string, args: ..any, location := #caller_location) {
 	logger := context.logger;
+	if logger.procedure == nil {
+		return;
+	}
 	if level < logger.lowest_level {
 		return;
 	}

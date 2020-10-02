@@ -27,127 +27,147 @@ when ODIN_DEFAULT_TO_NIL_ALLOCATOR || ODIN_OS == "freestanding" {
 }
 
 
+DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE: int : #config(DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE, 1<<22);
+
 
 Default_Temp_Allocator :: struct {
-	data:     []byte,
-	curr_offset: int,
-	prev_offset: int,
-	backup_allocator: Allocator,
+	data:               []byte,
+	curr_offset:        int,
+	prev_allocation:    rawptr,
+	backup_allocator:   Allocator,
 	leaked_allocations: [dynamic]rawptr,
 }
 
-default_temp_allocator_init :: proc(allocator: ^Default_Temp_Allocator, data: []byte, backup_allocator := context.allocator) {
-	allocator.data = data;
-	allocator.curr_offset = 0;
-	allocator.prev_offset = 0;
-	allocator.backup_allocator = backup_allocator;
-	allocator.leaked_allocations.allocator = backup_allocator;
+default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backup_allocator := context.allocator) {
+	s.data = make_aligned([]byte, size, 2*align_of(rawptr), backup_allocator);
+	s.curr_offset = 0;
+	s.prev_allocation = nil;
+	s.backup_allocator = backup_allocator;
+	s.leaked_allocations.allocator = backup_allocator;
 }
 
-default_temp_allocator_destroy :: proc(using allocator: ^Default_Temp_Allocator) {
-	if allocator == nil {
+default_temp_allocator_destroy :: proc(s: ^Default_Temp_Allocator) {
+	if s == nil {
 		return;
 	}
-	for ptr in leaked_allocations {
-		free(ptr, backup_allocator);
+	for ptr in s.leaked_allocations {
+		free(ptr, s.backup_allocator);
 	}
-	delete(leaked_allocations);
-	delete(data, backup_allocator);
-	allocator^ = {};
+	delete(s.leaked_allocations);
+	delete(s.data, s.backup_allocator);
+	s^ = {};
 }
 
 default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                     size, alignment: int,
                                     old_memory: rawptr, old_size: int, flags: u64 = 0, loc := #caller_location) -> rawptr {
 
-	allocator := (^Default_Temp_Allocator)(allocator_data);
+	s := (^Default_Temp_Allocator)(allocator_data);
 
-	if allocator.data == nil {
-		DEFAULT_SCRATCH_BACKING_SIZE :: 1<<22;
+	if s.data == nil {
 		a := context.allocator;
 		if !(context.allocator.procedure != default_temp_allocator_proc &&
 		     context.allocator.data != allocator_data) {
 			a = default_allocator();
 		}
-		default_temp_allocator_init(allocator, make([]byte, DEFAULT_SCRATCH_BACKING_SIZE, a), a);
+		default_temp_allocator_init(s, DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE, a);
 	}
+
+	size := size;
 
 	switch mode {
 	case .Alloc:
+		size = align_forward_int(size, alignment);
+
 		switch {
-		case allocator.curr_offset+size <= len(allocator.data):
-			offset := align_forward_uintptr(uintptr(allocator.curr_offset), uintptr(alignment));
-			ptr := &allocator.data[offset];
-			mem_zero(ptr, size);
-			allocator.prev_offset = int(offset);
-			allocator.curr_offset = int(offset) + size;
-			return ptr;
-		case size <= len(allocator.data):
-			offset := align_forward_uintptr(uintptr(0), uintptr(alignment));
-			ptr := &allocator.data[offset];
-			mem_zero(ptr, size);
-			allocator.prev_offset = int(offset);
-			allocator.curr_offset = int(offset) + size;
-			return ptr;
+		case s.curr_offset+size <= len(s.data):
+			start := uintptr(raw_data(s.data));
+			ptr := start + uintptr(s.curr_offset);
+			ptr = align_forward_uintptr(ptr, uintptr(alignment));
+			mem_zero(rawptr(ptr), size);
+
+			s.prev_allocation = rawptr(ptr);
+			offset := int(ptr - start);
+			s.curr_offset = offset + size;
+			return rawptr(ptr);
+
+		case size <= len(s.data):
+			start := uintptr(raw_data(s.data));
+			ptr := align_forward_uintptr(start, uintptr(alignment));
+			mem_zero(rawptr(ptr), size);
+
+			s.prev_allocation = rawptr(ptr);
+			offset := int(ptr - start);
+			s.curr_offset = offset + size;
+			return rawptr(ptr);
 		}
-		// TODO(bill): Should leaks be notified about? Should probably use a logging system that is built into the context system
-		a := allocator.backup_allocator;
+		a := s.backup_allocator;
 		if a.procedure == nil {
 			a = context.allocator;
-			allocator.backup_allocator = a;
+			s.backup_allocator = a;
 		}
 
 		ptr := mem_alloc(size, alignment, a, loc);
-		if allocator.leaked_allocations == nil {
-			allocator.leaked_allocations = make([dynamic]rawptr, a);
+		if s.leaked_allocations == nil {
+			s.leaked_allocations = make([dynamic]rawptr, a);
 		}
-		append(&allocator.leaked_allocations, ptr);
+		append(&s.leaked_allocations, ptr);
+
+		// TODO(bill): Should leaks be notified about?
+		if logger := context.logger; logger.lowest_level <= .Warning {
+			if logger.procedure != nil {
+				logger.procedure(logger.data, .Warning, "default temp allocator resorted to backup_allocator" , logger.options, loc);
+			}
+		}
 
 		return ptr;
 
 	case .Free:
-		if len(allocator.data) == 0 {
+		start := uintptr(raw_data(s.data));
+		end := start + uintptr(len(s.data));
+		old_ptr := uintptr(old_memory);
+
+		if s.prev_allocation == old_memory {
+			s.curr_offset = int(uintptr(s.prev_allocation) - uintptr(start));
+			s.prev_allocation = nil;
 			return nil;
 		}
-		last_ptr := rawptr(&allocator.data[allocator.prev_offset]);
-		if old_memory == last_ptr {
-			allocator.curr_offset = allocator.prev_offset;
-			return nil;
-		} else {
-			#no_bounds_check start, end := &allocator.data[0], &allocator.data[allocator.curr_offset];
-			if start <= old_memory && old_memory < end {
-				// NOTE(bill): Cannot free this pointer
-				return nil;
-			}
 
-			if len(allocator.leaked_allocations) != 0 {
-				for ptr, i in allocator.leaked_allocations {
-					if ptr == old_memory {
-						free(ptr, allocator.backup_allocator);
-						ordered_remove(&allocator.leaked_allocations, i);
-						return nil;
-					}
+		if start <= old_ptr && old_ptr < end {
+			// NOTE(bill): Cannot free this pointer but it is valid
+			return nil;
+		}
+
+		if len(s.leaked_allocations) != 0 {
+			for ptr, i in s.leaked_allocations {
+				if ptr == old_memory {
+					free(ptr, s.backup_allocator);
+					ordered_remove(&s.leaked_allocations, i);
+					return nil;
 				}
 			}
 		}
-		// NOTE(bill): It's a temporary memory, don't worry about freeing
+		panic("invalid pointer passed to default_temp_allocator");
 
 	case .Free_All:
-		allocator.curr_offset = 0;
-		allocator.prev_offset = 0;
-		for ptr in allocator.leaked_allocations {
-			free(ptr, allocator.backup_allocator);
+		s.curr_offset = 0;
+		s.prev_allocation = nil;
+		for ptr in s.leaked_allocations {
+			free(ptr, s.backup_allocator);
 		}
-		clear(&allocator.leaked_allocations);
+		clear(&s.leaked_allocations);
 
 	case .Resize:
-		last_ptr := #no_bounds_check rawptr(&allocator.data[allocator.prev_offset]);
-		if old_memory == last_ptr && len(allocator.data)-allocator.prev_offset >= size {
-			allocator.curr_offset = allocator.prev_offset+size;
+		begin := uintptr(raw_data(s.data));
+		end := begin + uintptr(len(s.data));
+		old_ptr := uintptr(old_memory);
+		if begin <= old_ptr && old_ptr < end && old_ptr+uintptr(size) < end {
+			s.curr_offset = int(old_ptr-begin)+size;
 			return old_memory;
 		}
-		ptr := default_temp_allocator_proc(allocator_data, Allocator_Mode.Alloc, size, alignment, old_memory, old_size, flags, loc);
+		ptr := default_temp_allocator_proc(allocator_data, .Alloc, size, alignment, old_memory, old_size, flags, loc);
 		mem_copy(ptr, old_memory, old_size);
+		default_temp_allocator_proc(allocator_data, .Free, 0, alignment, old_memory, old_size, flags, loc);
 		return ptr;
 
 	case .Query_Features:
