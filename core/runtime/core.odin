@@ -599,31 +599,28 @@ remove_range :: proc(array: ^$D/[dynamic]$T, lo, hi: int, loc := #caller_locatio
 
 
 @builtin
-pop :: proc(array: ^$T/[dynamic]$E) -> E {
-	if len(array) == 0 {
-		return E{};
-	}
-	assert(len(array) > 0);
-	res := #no_bounds_check array[len(array)-1];
+pop :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
+	assert(len(array) > 0, "", loc);
+	res = array[len(array)-1];
 	(^Raw_Dynamic_Array)(array).len -= 1;
 	return res;
 }
 
 
 @builtin
-pop_safe :: proc(array: ^$T/[dynamic]$E) -> (E, bool) {
+pop_safe :: proc(array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
 	if len(array) == 0 {
-		return E{}, false;
+		return;
 	}
-	res :=  #no_bounds_check array[len(array)-1];
+	res, ok = array[len(array)-1], true;
 	(^Raw_Dynamic_Array)(array).len -= 1;
-	return res, true;
+	return;
 }
 
 @builtin
-pop_front :: proc(array: ^$T/[dynamic]$E) -> E #no_bounds_check {
-	assert(len(array) > 0);
-	res := array[0];
+pop_front :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
+	assert(len(array) > 0, "", loc);
+	res = array[0];
 	if len(array) > 1 {
 		copy(array[0:], array[1:]);
 	}
@@ -632,16 +629,16 @@ pop_front :: proc(array: ^$T/[dynamic]$E) -> E #no_bounds_check {
 }
 
 @builtin
-pop_front_safe :: proc(array: ^$T/[dynamic]$E) -> (E, bool) #no_bounds_check {
+pop_front_safe :: proc(array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
 	if len(array) == 0 {
-		return E{}, false;
+		return;
 	}
-	res := array[0];
+	res, ok = array[0], true;
 	if len(array) > 1 {
 		copy(array[0:], array[1:]);
 	}
 	(^Raw_Dynamic_Array)(array).len -= 1;
-	return res, true;
+	return;
 }
 
 
