@@ -241,7 +241,7 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 		for ti < tl && target[ti] != SEPARATOR {
 			ti += 1;
 		}
-		if !strings.equal_fold(target[t0:ti], base[t0:ti]) {
+		if !strings.equal_fold(target[t0:ti], base[b0:bi]) {
 			break;
 		}
 		if bi < bl {
@@ -284,7 +284,7 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 dir :: proc(path: string, allocator := context.allocator) -> string {
 	vol := volume_name(path);
 	i := len(path) - 1;
-	for i >= len(vol) && is_separator(path[i]) {
+	for i >= len(vol) && !is_separator(path[i]) {
 		i -= 1;
 	}
 	dir := clean(path[len(vol) : i+1], allocator);
