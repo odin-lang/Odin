@@ -51,8 +51,8 @@ previous_page :: proc(ptr: rawptr) -> []byte {
 // ```
 bytes_to_pages :: proc(num_bytes: int) -> int {
 	page_size := os.get_page_size();
-	bytes := mem.align_forward_uintptr(uintptr(num_bytes), uintptr(page_size));
-	return int(bytes) / page_size;
+	bytes := mem.align_forward_int(num_bytes, page_size);
+	return bytes / page_size;
 }
 
 // Given a number of pages, returns the number of bytes that is.
@@ -67,7 +67,7 @@ page_slice :: proc(ptr: rawptr, num_pages := 1) -> []byte {
 	if num_pages <= 0 {
 		return nil;
 	}
-	num_bytes := pages_to_bytes(num_pages) * os.get_page_size();
+	num_bytes := pages_to_bytes(num_pages);
 	page_ptr := enclosing_page_ptr(ptr);
 	return mem.slice_ptr_to_bytes(page_ptr, num_bytes);
 }
@@ -140,6 +140,7 @@ arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 	new_total_pages_needed := bytes_to_pages(new_cursor);
 	if new_total_pages_needed > va.pages_committed {
 		pages := page_slice(raw_data(va.memory), new_total_pages_needed);
+
 		if !commit(pages) {
 			return nil;
 		}
