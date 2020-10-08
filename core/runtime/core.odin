@@ -1068,6 +1068,14 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 @builtin append :: proc{append_elem, append_elems, append_elem_string};
 @builtin append_soa :: proc{append_soa_elem, append_soa_elems};
 
+@builtin
+append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) {
+	if array == nil {
+		return;
+	}
+	resize(array, len(array)+1);
+}
+
 
 @builtin
 insert_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
