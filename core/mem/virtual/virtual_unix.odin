@@ -6,6 +6,7 @@ import "core:mem"
 
 foreign import libc "system:c"
 
+// TODO: move to something like core:libc?
 foreign libc {
 	@(link_name="mprotect") _unix_mprotect :: proc(base: rawptr, size: u64, prot: i32) -> i32 ---;
 	@(link_name="mmap")     _unix_mmap     :: proc(base: rawptr, size: u64, prot: i32, flags: i32, fd: os.Handle, offset: i32) -> rawptr ---;
@@ -72,6 +73,7 @@ release :: proc(memory: []byte) {
 	assert(res != MAP_FAILED);
 }
 
+@(require_results)
 commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> bool {
 	assert(memory != nil);
 

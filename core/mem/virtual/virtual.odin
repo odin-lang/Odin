@@ -140,7 +140,6 @@ arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 	new_total_pages_needed := bytes_to_pages(new_cursor);
 	if new_total_pages_needed > va.pages_committed {
 		pages := page_slice(raw_data(va.memory), new_total_pages_needed);
-
 		if !commit(pages) {
 			return nil;
 		}

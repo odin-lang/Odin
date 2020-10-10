@@ -74,12 +74,14 @@ release :: proc(memory: []byte) {
 	assert(ok);
 }
 
+@(require_results)
 commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> bool {
 	assert(memory != nil);
 
-	flags := access_to_flags(access);
 	page_size := os.get_page_size();
 	assert(mem.align_forward(raw_data(memory), uintptr(page_size)) == raw_data(memory), "must start at page boundary");
+
+	flags := access_to_flags(access);
 	ptr := win.VirtualAlloc(raw_data(memory), uint(len(memory)), win.MEM_COMMIT, flags);
 	return ptr != nil;
 }
