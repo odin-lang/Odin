@@ -61,16 +61,19 @@ alloc :: proc(size: int, desired_base: rawptr = nil, access := Memory_Access_Fla
 	return;
 }
 
-release :: proc(memory: []byte) {
-	if memory == nil do return;
+release :: proc(originally_reserved_region: []byte) {
+	if originally_reserved_region == nil do return;
 
 	page_size := os.get_page_size();
-	assert(mem.align_forward(raw_data(memory), uintptr(page_size)) == raw_data(memory), "must start at page boundary");
+	assert(mem.is_aligned_to(raw_data(originally_reserved_region), page_size), "must start at page boundary");
 
-	// NOTE(tetra): On Windows, freeing virtual memory doesn't use lengths; the system
+	// NOTE(tetra): On Windows, freeing virtual originally_reserved_region doesn't use lengths; the system
 	// simply frees the block that was reserved originally.
 	// For portability, we just ignore the length here, but still ask for the slice.
-	ok := bool(win.VirtualFree(raw_data(memory), 0, win.MEM_RELEASE));
+	//
+	// Ideally we'd check that the user passed the entire region that was reserved in the first place
+	// but that doesn't appear to be possible.
+	ok := bool(win.VirtualFree(raw_data(originally_reserved_region), 0, win.MEM_RELEASE));
 	assert(ok);
 }
 
@@ -79,7 +82,7 @@ commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> 
 	assert(memory != nil);
 
 	page_size := os.get_page_size();
-	assert(mem.align_forward(raw_data(memory), uintptr(page_size)) == raw_data(memory), "must start at page boundary");
+	assert(mem.is_aligned_to(raw_data(memory), page_size), "must start at page boundary");
 
 	flags := access_to_flags(access);
 	ptr := win.VirtualAlloc(raw_data(memory), uint(len(memory)), win.MEM_COMMIT, flags);
@@ -90,7 +93,7 @@ decommit :: proc(memory: []byte) {
 	assert(memory != nil);
 
 	page_size := os.get_page_size();
-	assert(mem.align_forward(raw_data(memory), uintptr(page_size)) == raw_data(memory), "must start at page boundary");
+	assert(mem.is_aligned_to(raw_data(memory), page_size), "must start at page boundary");
 
 	ok := bool(win.VirtualFree(raw_data(memory), uint(len(memory)), win.MEM_DECOMMIT));
 	assert(ok);
@@ -100,7 +103,7 @@ set_access :: proc(memory: []byte, access: Memory_Access_Flags) {
 	assert(memory != nil);
 
 	page_size := os.get_page_size();
-	assert(mem.align_forward(raw_data(memory), uintptr(page_size)) == raw_data(memory), "must start at page boundary");
+	assert(mem.is_aligned_to(raw_data(memory), page_size), "must start at page boundary");
 
 	flags := access_to_flags(access);
 	unused: u32 = ---;

@@ -236,6 +236,10 @@ align_backward_uint :: proc(ptr, align: uint) -> uint {
 	return uint(align_backward_uintptr(uintptr(ptr), uintptr(align)));
 }
 
+is_aligned_to :: inline proc(ptr: rawptr, align: int) -> bool {
+	return align_forward(ptr, uintptr(align)) == ptr;
+}
+
 context_from_allocator :: proc(a: Allocator) -> type_of(context) {
 	context.allocator = a;
 	return context;

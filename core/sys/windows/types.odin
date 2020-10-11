@@ -352,6 +352,17 @@ HEAP_ZERO_MEMORY: DWORD : 0x00000008;
 HANDLE_FLAG_INHERIT: DWORD : 0x00000001;
 HANDLE_FLAG_PROTECT_FROM_CLOSE :: 0x00000002;
 
+MEMORY_BASIC_INFORMATION :: struct {
+	BaseAddress:       LPVOID,
+	AllocationBase:    LPVOID,
+	AllocationProtect: DWORD,
+	PartitionSize:     WORD,
+	RegionSize:        SIZE_T,
+	State:             DWORD,
+	Protect:           DWORD,
+	Type:              DWORD,
+}
+
 TOKEN_READ: DWORD : 0x20008;
 
 CP_ACP        :: 0;     // default to ANSI code page
