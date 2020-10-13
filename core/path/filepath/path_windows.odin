@@ -49,14 +49,16 @@ is_abs :: proc(path: string) -> bool {
 
 
 @(private)
-full_path :: proc(name: string, allocator := context.allocator) -> (path: string, err: os.Errno) {
+temp_full_path :: proc(name: string) -> (path: string, err: os.Errno) {
+	ta := context.temp_allocator;
+
 	name := name;
 	if name == "" {
 		name = ".";
 	}
-	p := win32.utf8_to_utf16(name, context.temp_allocator);
-	defer delete(p);
-	buf := make([dynamic]u16, 100, allocator);
+
+	p := win32.utf8_to_utf16(name, ta);
+	buf := make([dynamic]u16, 100, ta);
 	for {
 		n := win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil);
 		if n == 0 {
@@ -64,7 +66,7 @@ full_path :: proc(name: string, allocator := context.allocator) -> (path: string
 			return "", os.Errno(win32.GetLastError());
 		}
 		if n <= u32(len(buf)) {
-			return win32.utf16_to_utf8(buf[:n]), os.ERROR_NONE;
+			return win32.utf16_to_utf8(buf[:n], ta), os.ERROR_NONE;
 		}
 		resize(&buf, len(buf)*2);
 	}
@@ -74,13 +76,13 @@ full_path :: proc(name: string, allocator := context.allocator) -> (path: string
 
 
 
-
 abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
-	full_path, err := full_path(path, context.temp_allocator);
+	full_path, err := temp_full_path(path);
 	if err != 0 {
 		return "", false;
 	}
-	return clean(full_path, allocator), true;
+	p := clean(full_path, allocator);
+	return p, true;
 }
 
 split_list :: proc(path: string, allocator := context.allocator) -> []string {

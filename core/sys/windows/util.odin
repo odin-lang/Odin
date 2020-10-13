@@ -1,12 +1,20 @@
 package sys_windows
 
+LOWORD :: inline proc "contextless" (x: DWORD) -> WORD {
+	return WORD(x & 0xffff);
+}
+
+HIWORD :: inline proc "contextless" (x: DWORD) -> WORD {
+	return WORD(x >> 16);
+}
+
 utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 	if len(s) < 1 {
 		return nil;
 	}
 
 	b := transmute([]byte)s;
-	cstr := &b[0];
+	cstr := raw_data(b);
 	n := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, i32(len(s)), nil, 0);
 	if n == 0 {
 		return nil;
@@ -14,7 +22,7 @@ utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 
 	text := make([]u16, n+1, allocator);
 
-	n1 := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, i32(len(s)), wstring(&text[0]), i32(n));
+	n1 := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, i32(len(s)), raw_data(text), i32(n));
 	if n1 == 0 {
 		delete(text, allocator);
 		return nil;
@@ -34,7 +42,7 @@ utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> wstri
 }
 
 wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator) -> string {
-	if N == 0 {
+	if N <= 0 {
 		return "";
 	}
 
@@ -50,7 +58,8 @@ wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator)
 	// will not be null terminated, we therefore have to force it to be null terminated manually.
 	text := make([]byte, n+1 if N != -1 else n, allocator);
 
-	if n1 := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), &text[0], n, nil, nil); n1 == 0 {
+	n1 := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), raw_data(text), n, nil, nil);
+	if n1 == 0 {
 		delete(text, allocator);
 		return "";
 	}
@@ -69,6 +78,6 @@ utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
 	if len(s) == 0 {
 		return "";
 	}
-	return wstring_to_utf8(cast(wstring)&s[0], len(s), allocator);
+	return wstring_to_utf8(raw_data(s), len(s), allocator);
 }
 
