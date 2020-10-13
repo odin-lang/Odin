@@ -123,6 +123,10 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 		return ptr;
 
 	case .Free:
+		if old_memory == nil {
+			return nil;
+		}
+
 		start := uintptr(raw_data(s.data));
 		end := start + uintptr(len(s.data));
 		old_ptr := uintptr(old_memory);
@@ -161,9 +165,11 @@ default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 		begin := uintptr(raw_data(s.data));
 		end := begin + uintptr(len(s.data));
 		old_ptr := uintptr(old_memory);
-		if begin <= old_ptr && old_ptr < end && old_ptr+uintptr(size) < end {
-			s.curr_offset = int(old_ptr-begin)+size;
-			return old_memory;
+		if old_memory == s.prev_allocation && old_ptr & uintptr(alignment)-1 == 0 {
+			if old_ptr+uintptr(size) < end {
+				s.curr_offset = int(old_ptr-begin)+size;
+				return old_memory;
+			}
 		}
 		ptr := default_temp_allocator_proc(allocator_data, .Alloc, size, alignment, old_memory, old_size, flags, loc);
 		mem_copy(ptr, old_memory, old_size);

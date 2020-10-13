@@ -124,7 +124,7 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 
 	r, dot_dot := 0, 0;
 	if rooted {
-		lazy_buffer_append(out, '/');
+		lazy_buffer_append(out, SEPARATOR);
 		r, dot_dot = 1, 1;
 	}
 
@@ -144,7 +144,7 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 				}
 			case !rooted:
 				if out.w > 0 {
-					lazy_buffer_append(out, '/');
+					lazy_buffer_append(out, SEPARATOR);
 				}
 				lazy_buffer_append(out, '.');
 				lazy_buffer_append(out, '.');
@@ -152,7 +152,7 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 			}
 		case:
 			if rooted && out.w != 1 || !rooted && out.w != 0 {
-				lazy_buffer_append(out, '/');
+				lazy_buffer_append(out, SEPARATOR);
 			}
 			for ; r < n && !is_separator(path[r]); r += 1 {
 				lazy_buffer_append(out, path[r]);

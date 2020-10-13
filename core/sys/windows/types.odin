@@ -2,15 +2,16 @@ package sys_windows
 
 import "core:c"
 
-c_char :: c.char;
-c_int :: c.int;
-c_uint :: c.uint;
-c_long :: c.long;
+c_char     :: c.char;
+c_int      :: c.int;
+c_uint     :: c.uint;
+c_long     :: c.long;
 c_longlong :: c.longlong;
-c_ulong :: c.ulong;
-c_ushort :: c.ushort;
-size_t :: c.size_t;
-wchar_t :: c.wchar_t;
+c_ulong    :: c.ulong;
+c_short    :: c.short;
+c_ushort   :: c.ushort;
+size_t     :: c.size_t;
+wchar_t    :: c.wchar_t;
 
 DWORD :: c_ulong;
 HANDLE :: distinct LPVOID;
@@ -35,6 +36,9 @@ ULONG_PTR :: uint;
 DWORD_PTR :: ULONG_PTR;
 ULONG :: c_ulong;
 UCHAR :: BYTE;
+
+PDWORD_PTR :: ^DWORD_PTR;
+ATOM :: distinct WORD;
 
 wstring :: ^WCHAR;
 
@@ -717,15 +721,15 @@ SYSTEM_INFO :: struct {
 
 // https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ns-wdm-_osversioninfoexw
 OSVERSIONINFOEXW :: struct {
-  os_version_info_size: ULONG,
-  major_version:        ULONG,
-  minor_version:        ULONG,
-  build_number:         ULONG,
-  platform_id :         ULONG,
-  service_pack_string:  [128]WCHAR,
-  service_pack_major:   USHORT,
-  service_pack_minor:   USHORT,
-  suite_mask:           USHORT,
-  product_type:         UCHAR,
-  reserved:             UCHAR,
+	os_version_info_size: ULONG,
+	major_version:        ULONG,
+	minor_version:        ULONG,
+	build_number:         ULONG,
+	platform_id :         ULONG,
+	service_pack_string:  [128]WCHAR,
+	service_pack_major:   USHORT,
+	service_pack_minor:   USHORT,
+	suite_mask:           USHORT,
+	product_type:         UCHAR,
+	reserved:             UCHAR,
 }
