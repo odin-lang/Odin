@@ -52,10 +52,9 @@ slice_interface :: proc(s: ^$T/[]$E) -> Interface where ORD(E) {
 	};
 }
 
-reverse_sort :: proc(it: Interface) {
-	it := it;
-	sort(Interface{
-		collection = &it,
+reverse_interface :: proc(it: ^Interface) -> Interface {
+	return Interface{
+		collection = it,
 
 		len = proc(rit: Interface) -> int {
 			it := (^Interface)(rit.collection);
@@ -69,7 +68,12 @@ reverse_sort :: proc(it: Interface) {
 			it := (^Interface)(rit.collection);
 			it.swap(it^, i, j);
 		},
-	});
+	};
+}
+
+reverse_sort :: proc(it: Interface) {
+	it := it;
+	sort(reverse_interface(&it));
 }
 
 reverse_slice :: proc(array: $T/[]$E) where ORD(E) {
@@ -269,11 +273,15 @@ _quick_sort :: proc(it: Interface, a, b, max_depth: int) {
 				it->swap(i, i-6);
 			}
 		}
-		// insertion sort
-		for i in a+1..<b {
-			for j := i; j > a && it->less(j, j-1); j -= 1 {
-				it->swap(j, j-1);
-			}
+		_insertion_sort(it, a, b);
+	}
+}
+
+@(private)
+_insertion_sort :: proc(it: Interface, a, b: int) {
+	for i in a+1..<b {
+		for j := i; j > a && it->less(j, j-1); j -= 1 {
+			it->swap(j, j-1);
 		}
 	}
 }

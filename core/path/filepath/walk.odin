@@ -1,7 +1,7 @@
 package filepath
 
 import "core:os"
-import "core:sort"
+import "core:slice"
 
 // Walk_Proc is the type of the procedure called for each file or directory visited by 'walk'
 // The 'path' parameter contains the parameter to walk as a prefix (this is the same as info.fullpath except on 'root')
@@ -81,8 +81,8 @@ read_dir :: proc(dir_name: string, allocator := context.temp_allocator) -> ([]os
 	if err != 0 {
 		return nil, err;
 	}
-	sort.quick_sort_proc(fis, proc(a, b: os.File_Info) -> int {
-		return sort.compare_strings(a.name, b.name);
+	slice.sort_proc(fis, proc(a, b: os.File_Info) -> bool {
+		return a.name < b.name;
 	});
 	return fis, 0;
 }
