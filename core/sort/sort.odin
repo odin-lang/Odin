@@ -3,6 +3,286 @@ package sort
 import "core:mem"
 import "intrinsics"
 
+_ :: intrinsics;
+ORD :: intrinsics.type_is_ordered;
+
+Interface :: struct {
+	len:  proc(it: Interface) -> int,
+	less: proc(it: Interface, i, j: int) -> bool,
+	swap: proc(it: Interface, i, j: int),
+	collection: rawptr,
+}
+
+// sort sorts an Interface
+// This sort is not guaranteed to be stable
+sort :: proc(it: Interface) {
+	max_depth :: proc(n: int) -> int { // 2*ceil(log2(n+1))
+		depth: int;
+		for i := n; i > 0; i >>= 1 {
+			depth += 1;
+		}
+		return depth * 2;
+	}
+
+	n := it->len();
+	_quick_sort(it, 0, n, max_depth(n));
+}
+
+
+slice :: proc(array: $T/[]$E) where ORD(E) {
+	s := array;
+	sort(slice_interface(&s));
+}
+
+slice_interface :: proc(s: ^$T/[]$E) -> Interface where ORD(E) {
+	return Interface{
+		collection = rawptr(s),
+		len = proc(it: Interface) -> int {
+			s := (^T)(it.collection);
+			return len(s^);
+		},
+		less = proc(it: Interface, i, j: int) -> bool {
+			s := (^T)(it.collection);
+			return s[i] < s[j];
+		},
+		swap = proc(it: Interface, i, j: int) {
+			s := (^T)(it.collection);
+			s[i], s[j] = s[j], s[i];
+		},
+	};
+}
+
+reverse_sort :: proc(it: Interface) {
+	it := it;
+	sort(Interface{
+		collection = &it,
+
+		len = proc(rit: Interface) -> int {
+			it := (^Interface)(rit.collection);
+			return it.len(it^);
+		},
+		less = proc(rit: Interface, i, j: int) -> bool {
+			it := (^Interface)(rit.collection);
+			return it.less(it^, j, i); // reverse parameters
+		},
+		swap = proc(rit: Interface, i, j: int) {
+			it := (^Interface)(rit.collection);
+			it.swap(it^, i, j);
+		},
+	});
+}
+
+reverse_slice :: proc(array: $T/[]$E) where ORD(E) {
+	s := array;
+	sort(Interface{
+		collection = rawptr(&s),
+		len = proc(it: Interface) -> int {
+			s := (^T)(it.collection);
+			return len(s^);
+		},
+		less = proc(it: Interface, i, j: int) -> bool {
+			s := (^T)(it.collection);
+			return s[j] < s[i]; // manual set up
+		},
+		swap = proc(it: Interface, i, j: int) {
+			s := (^T)(it.collection);
+			s[i], s[j] = s[j], s[i];
+		},
+	});
+}
+
+
+
+is_sorted :: proc(it: Interface) -> bool {
+	n := it->len();
+	for i := n-1; i > 0; i -= 1 {
+		if it->less(i, i-1) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
+swap_range :: proc(it: Interface, a, b, n: int) {
+	for i in 0..<n {
+		it->swap(a+i, b+i);
+	}
+}
+
+rotate :: proc(it: Interface, a, m, b: int) {
+	i := m - a;
+	j := b - m;
+
+	for i != j {
+		if i > j {
+			swap_range(it, m-i, m, j);
+			i -= j;
+		} else {
+			swap_range(it, m-i, m+j-1, i);
+			j -= 1;
+		}
+	}
+	swap_range(it, m-i, m, i);
+}
+
+
+
+@(private)
+_quick_sort :: proc(it: Interface, a, b, max_depth: int) {
+	median3 :: proc(it: Interface, m1, m0, m2: int) {
+		if it->less(m1, m0) {
+			it->swap(m1, m0);
+		}
+		if it->less(m2, m1) {
+			it->swap(m2, m1);
+			if it->less(m1, m0) {
+				it->swap(m1, m0);
+			}
+		}
+	}
+
+	do_pivot :: proc(it: Interface, lo, hi: int) -> (midlo, midhi: int) {
+		m := int(uint(lo+hi)>>1);
+		if hi-lo > 40 {
+			s := (hi-lo)/8;
+			median3(it, lo, lo+s, lo+s*2);
+			median3(it, m, m-s, m+s);
+			median3(it, hi-1, hi-1-s, hi-1-s*2);
+		}
+		median3(it, lo, m, hi-1);
+
+		pivot := lo;
+		a, c := lo+1, hi-1;
+
+		for ; a < c && it->less(a, pivot); a += 1 {
+		}
+		b := a;
+
+		for {
+			for ; b < c && !it->less(pivot, b); b += 1 { // data[b] <= pivot
+			}
+			for ; b < c && it->less(pivot, c-1); c -=1 { // data[c-1] > pivot
+			}
+			if b >= c {
+				break;
+			}
+
+			it->swap(b, c-1);
+			b += 1;
+			c -= 1;
+		}
+
+		protect := hi-c < 5;
+		if !protect && hi-c < (hi-lo)/4 {
+			dups := 0;
+			if !it->less(pivot, hi-1) {
+				it->swap(c, hi-1);
+				c += 1;
+				dups += 1;
+			}
+			if !it->less(b-1, pivot) {
+				b -= 1;
+				dups += 1;
+			}
+
+			if !it->less(m, pivot) {
+				it->swap(m, b-1);
+				b -= 1;
+				dups += 1;
+			}
+			protect = dups > 1;
+		}
+		if protect {
+			for {
+				for ; a < b && !it->less(b-1, pivot); b -= 1 {
+				}
+				for ; a < b && it->less(a, pivot); a += 1 {
+				}
+				if a >= b {
+					break;
+				}
+				it->swap(a, b-1);
+				a += 1;
+				b -= 1;
+			}
+		}
+		it->swap(pivot, b-1);
+		return b-1, c;
+	}
+
+	heap_sort :: proc(it: Interface, a, b: int) {
+		sift_down :: proc(it: Interface, lo, hi, first: int) {
+			root := lo;
+			for {
+				child := 2*root + 1;
+				if child >= hi {
+					break;
+				}
+				if child+1 < hi && it->less(first+child, first+child+1) {
+					child += 1;
+				}
+				if !it->less(first+root, first+child) {
+					return;
+				}
+				it->swap(first+root, first+child);
+				root = child;
+			}
+		}
+
+
+		first, lo, hi := a, 0, b-a;
+
+		for i := (hi-1)/2; i >= 0; i -= 1 {
+			sift_down(it, i, hi, first);
+		}
+
+		for i := hi-1; i >= 0; i -= 1 {
+			it->swap(first, first+i);
+			sift_down(it, lo, i, first);
+		}
+	}
+
+
+
+	a, b, max_depth := a, b, max_depth;
+
+	if b-a > 12 { // only use shell sort for lengths <= 12
+		if max_depth == 0 {
+			heap_sort(it, a, b);
+			return;
+		}
+		max_depth -= 1;
+		mlo, mhi := do_pivot(it, a, b);
+		if mlo-a < b-mhi {
+			_quick_sort(it, a, mlo, max_depth);
+			a = mhi;
+		} else {
+			_quick_sort(it, mhi, b, max_depth);
+			b = mlo;
+		}
+	}
+	if b-a > 1 {
+		// Shell short with gap 6
+		for i in a+6..<b {
+			if it->less(i, i-6) {
+				it->swap(i, i-6);
+			}
+		}
+		// insertion sort
+		for i in a+1..<b {
+			for j := i; j > a && it->less(j, j-1); j -= 1 {
+				it->swap(j, j-1);
+			}
+		}
+	}
+}
+
+
+
+
+
+// @(deprecated="use sort.sort or slice.sort_proc")
 bubble_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	assert(f != nil);
 	count := len(array);
@@ -31,6 +311,7 @@ bubble_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	}
 }
 
+// @(deprecated="use sort.sort_slice or slice.sort")
 bubble_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	count := len(array);
 
@@ -58,6 +339,7 @@ bubble_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	}
 }
 
+// @(deprecated="use sort.sort or slice.sort_proc")
 quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	assert(f != nil);
 	a := array;
@@ -86,6 +368,7 @@ quick_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	quick_sort_proc(a[i:n], f);
 }
 
+// @(deprecated="use sort.sort_slice or slice.sort")
 quick_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	a := array;
 	n := len(a);
@@ -121,6 +404,7 @@ _log2 :: proc(x: int) -> int {
 	return res;
 }
 
+// @(deprecated="use sort.sort or slice.sort_proc")
 merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	merge :: proc(a: A, start, mid, end: int, f: proc(T, T) -> int) {
 		s, m := start, mid;
@@ -162,6 +446,7 @@ merge_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	internal_sort(array, 0, len(array)-1, f);
 }
 
+// @(deprecated="use sort.sort_slice or slice.sort")
 merge_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	merge :: proc(a: A, start, mid, end: int) {
 		s, m := start, mid;
@@ -204,6 +489,7 @@ merge_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 }
 
 
+// @(deprecated="use sort.sort or slice.sort_proc")
 heap_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	sift_proc :: proc(a: A, pi: int, n: int, f: proc(T, T) -> int) #no_bounds_check {
 		p := pi;
@@ -238,6 +524,7 @@ heap_sort_proc :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	}
 }
 
+// @(deprecated="use sort.sort_slice or slice.sort")
 heap_sort :: proc(array: $A/[]$T) where intrinsics.type_is_ordered(T) {
 	sift :: proc(a: A, pi: int, n: int) #no_bounds_check {
 		p := pi;
@@ -385,6 +672,7 @@ compare_strings :: proc(a, b: string) -> int {
 }
 
 
+@(deprecated="use slice.binary_search")
 binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 	where intrinsics.type_is_ordered(T) #no_bounds_check {
 
@@ -424,7 +712,7 @@ binary_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 	return -1, false;
 }
 
-
+@(deprecated="use slice.linear_search")
 linear_search :: proc(array: $A/[]$T, key: T) -> (index: int, found: bool)
 	where intrinsics.type_is_comparable(T) #no_bounds_check {
 	for x, i in array {
