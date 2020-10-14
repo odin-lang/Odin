@@ -1732,6 +1732,15 @@ void check_polymorphic_params_for_type(AstFile *f, Ast *polymorphic_params, Toke
 	}
 }
 
+bool ast_on_same_line(Token const &x, Ast *yp) {
+	Token y = ast_token(yp);
+	return x.pos.line == y.pos.line;
+}
+
+bool ast_on_same_line(Ast *x, Ast *y) {
+	return ast_on_same_line(ast_token(x), y);
+}
+
 
 Ast *parse_operand(AstFile *f, bool lhs) {
 	Ast *operand = nullptr; // Operand
@@ -2000,6 +2009,8 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 			if (build_context.disallow_do) {
 				syntax_error(body, "'do' has been disallowed");
+			} else if (!ast_on_same_line(type, body)) {
+				syntax_error(body, "The body of a 'do' be on the same line as the signature");
 			}
 
 			return ast_proc_lit(f, type, body, tags, where_token, where_clauses);
@@ -3564,6 +3575,8 @@ Ast *parse_if_stmt(AstFile *f) {
 		body = convert_stmt_to_body(f, parse_stmt(f));
 		if (build_context.disallow_do) {
 			syntax_error(body, "'do' has been disallowed");
+		} else if (!ast_on_same_line(cond, body)) {
+			syntax_error(body, "The body of a 'do' be on the same line as if condition");
 		}
 	} else {
 		body = parse_block_stmt(f, false);
@@ -3582,6 +3595,8 @@ Ast *parse_if_stmt(AstFile *f) {
 			else_stmt = convert_stmt_to_body(f, parse_stmt(f));
 			if (build_context.disallow_do) {
 				syntax_error(else_stmt, "'do' has been disallowed");
+			} else if (!ast_on_same_line(cond, body)) {
+				syntax_error(body, "The body of a 'do' be on the same line as 'else'");
 			}
 		} break;
 		default:
@@ -3615,6 +3630,8 @@ Ast *parse_when_stmt(AstFile *f) {
 		body = convert_stmt_to_body(f, parse_stmt(f));
 		if (build_context.disallow_do) {
 			syntax_error(body, "'do' has been disallowed");
+		} else if (!ast_on_same_line(cond, body)) {
+			syntax_error(body, "The body of a 'do' be on the same line as when statement");
 		}
 	} else {
 		body = parse_block_stmt(f, true);
@@ -3633,6 +3650,8 @@ Ast *parse_when_stmt(AstFile *f) {
 			else_stmt = convert_stmt_to_body(f, parse_stmt(f));
 			if (build_context.disallow_do) {
 				syntax_error(else_stmt, "'do' has been disallowed");
+			} else if (!ast_on_same_line(cond, body)) {
+				syntax_error(body, "The body of a 'do' be on the same line as 'else'");
 			}
 		} break;
 		default:
@@ -3716,6 +3735,8 @@ Ast *parse_for_stmt(AstFile *f) {
 				body = convert_stmt_to_body(f, parse_stmt(f));
 				if (build_context.disallow_do) {
 					syntax_error(body, "'do' has been disallowed");
+				} else if (!ast_on_same_line(token, body)) {
+					syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
 				}
 			} else {
 				body = parse_block_stmt(f, false);
@@ -3749,6 +3770,8 @@ Ast *parse_for_stmt(AstFile *f) {
 		body = convert_stmt_to_body(f, parse_stmt(f));
 		if (build_context.disallow_do) {
 			syntax_error(body, "'do' has been disallowed");
+		} else if (!ast_on_same_line(token, body)) {
+			syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
 		}
 	} else {
 		body = parse_block_stmt(f, false);
@@ -4096,6 +4119,8 @@ Ast *parse_stmt(AstFile *f) {
 				body = convert_stmt_to_body(f, parse_stmt(f));
 				if (build_context.disallow_do) {
 					syntax_error(body, "'do' has been disallowed");
+				} else if (!ast_on_same_line(for_token, body)) {
+					syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
 				}
 			} else {
 				body = parse_block_stmt(f, false);
