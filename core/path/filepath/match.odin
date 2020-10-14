@@ -1,7 +1,7 @@
 package filepath
 
 import "core:os"
-import "core:sort"
+import "core:slice"
 import "core:strings"
 import "core:unicode/utf8"
 
@@ -284,8 +284,8 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string) -> (m: [dynamic]s
 
 
 	fis, _ := os.read_dir(d, -1);
-	sort.quick_sort_proc(fis, proc(a, b: os.File_Info) -> int {
-		return sort.compare_strings(a.name, b.name);
+	slice.sort_proc(fis, proc(a, b: os.File_Info) -> bool {
+		return a.name < b.name;
 	});
 	defer {
 		for fi in fis {
