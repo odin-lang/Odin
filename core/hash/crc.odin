@@ -1,13 +1,13 @@
 package hash
 
-crc32 :: proc(data: []byte) -> u32 {
+crc32 :: proc(data: []byte) -> u32 #no_bounds_check {
 	result := ~u32(0);
 	for b in data {
 		result = result>>8 ~ _crc32_table[(result ~ u32(b)) & 0xff];
 	}
 	return ~result;
 }
-crc64 :: proc(data: []byte) -> u64 {
+crc64 :: proc(data: []byte) -> u64 #no_bounds_check {
 	result := ~u64(0);
 	for b in data {
 		result = result>>8 ~ _crc64_table[(result ~ u64(b)) & 0xff];
