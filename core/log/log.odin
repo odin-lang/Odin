@@ -111,11 +111,11 @@ fatal :: proc(args: ..any, sep := " ", location := #caller_location) {
 
 panic :: proc(args: ..any, location := #caller_location) -> ! {
 	log(level=.Fatal, args=args, location=location);
-	runtime.panic("log.panic");
+	runtime.panic("log.panic", location);
 }
 panicf :: proc(fmt_str: string, args: ..any, location := #caller_location) -> ! {
 	logf(level=.Fatal, fmt_str=fmt_str, args=args, location=location);
-	runtime.panic("log.panicf");
+	runtime.panic("log.panicf", location);
 }
 
 
