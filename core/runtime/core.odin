@@ -323,9 +323,6 @@ Context :: struct {
 }
 
 
-
-@thread_local global_default_temp_allocator_data: Default_Temp_Allocator;
-
 Raw_String :: struct {
 	data: ^byte,
 	len:  int,
@@ -523,6 +520,8 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.logger.procedure = default_logger_proc;
 	c.logger.data = nil;
 }
+
+@thread_local global_default_temp_allocator_data: Default_Temp_Allocator;
 
 @builtin
 init_global_temporary_allocator :: proc(size: int, backup_allocator := context.allocator) {
