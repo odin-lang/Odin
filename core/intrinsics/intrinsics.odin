@@ -149,3 +149,6 @@ type_proc_return_type     :: proc($T: typeid, index: int) -> typeid where type_i
 
 type_polymorphic_record_parameter_count :: proc($T: typeid) -> typeid ---
 type_polymorphic_record_parameter_value :: proc($T: typeid, index: int) -> $V ---
+
+
+type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---

@@ -181,6 +181,8 @@ BuiltinProc__type_simple_boolean_end,
 	BuiltinProc_type_polymorphic_record_parameter_count,
 	BuiltinProc_type_polymorphic_record_parameter_value,
 
+	BuiltinProc_type_field_index_of,
+
 BuiltinProc__type_end,
 
 
@@ -362,6 +364,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("type_polymorphic_record_parameter_count"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_polymorphic_record_parameter_value"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("type_field_index_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 };

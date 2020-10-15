@@ -5997,6 +5997,48 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 
 		break;
+
+	case BuiltinProc_type_field_index_of:
+		{
+			Operand op = {};
+			Type *bt = check_type(c, ce->args[0]);
+			Type *type = base_type(bt);
+			if (type == nullptr || type == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			Operand x = {};
+			check_expr(c, &x, ce->args[1]);
+
+			if (!is_type_string(x.type) || x.mode != Addressing_Constant || x.value.kind != ExactValue_String) {
+				error(ce->args[1], "Expected a const string for field argument");
+				return false;
+			}
+
+			String field_name = x.value.value_string;
+
+			Selection sel = lookup_field(type, field_name, false);
+			if (sel.entity == nullptr) {
+				gbString type_str = type_to_string(bt);
+				error(ce->args[0],
+				      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
+				gb_string_free(type_str);
+				return false;
+			}
+			if (sel.indirect) {
+				gbString type_str = type_to_string(bt);
+				error(ce->args[0],
+				      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
+				gb_string_free(type_str);
+				return false;
+			}
+
+			operand->mode = Addressing_Constant;
+			operand->value = exact_value_u64(sel.index[0]);
+			operand->type = t_uintptr;
+			break;
+		}
+		break;
 	}
 
 	return true;
