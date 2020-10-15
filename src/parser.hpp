@@ -128,6 +128,7 @@ struct AstPackage {
 	String           name;
 	String           fullpath;
 	Array<AstFile *> files;
+	bool             is_single_file;
 
 	// NOTE(bill): Created/set in checker
 	Scope *   scope;

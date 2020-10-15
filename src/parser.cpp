@@ -4507,12 +4507,14 @@ bool try_add_import_path(Parser *p, String const &path, String const &rel_path, 
 
 	// NOTE(bill): Single file initial package
 	if (kind == Package_Init && string_ends_with(path, FILE_EXT)) {
+
 		FileInfo fi = {};
 		fi.name = filename_from_path(path);
 		fi.fullpath = path;
 		fi.size = get_file_size(path);
 		fi.is_dir = false;
 
+		pkg->is_single_file = true;
 		parser_add_file_to_process(p, pkg, fi, pos);
 		parser_add_package(p, pkg);
 		return true;
@@ -4866,27 +4868,33 @@ bool parse_build_tag(Token token_for_pos, String s) {
 				}
 			}
 
-			if (p.len > 0) {
-				TargetOsKind   os   = get_target_os_from_string(p);
-				TargetArchKind arch = get_target_arch_from_string(p);
-				if (os != TargetOs_Invalid) {
-					GB_ASSERT(arch == TargetArch_Invalid);
-					if (is_notted) {
-						this_kind_correct = this_kind_correct && (os != build_context.metrics.os);
-					} else {
-						this_kind_correct = this_kind_correct && (os == build_context.metrics.os);
-					}
-				} else if (arch != TargetArch_Invalid) {
-					if (is_notted) {
-						this_kind_correct = this_kind_correct && (arch != build_context.metrics.arch);
-					} else {
-						this_kind_correct = this_kind_correct && (arch == build_context.metrics.arch);
-					}
+			if (p.len == 0) {
+				continue;
+			}
+			if (p == "ignore") {
+				this_kind_correct = false;
+				continue;
+			}
+
+			TargetOsKind   os   = get_target_os_from_string(p);
+			TargetArchKind arch = get_target_arch_from_string(p);
+			if (os != TargetOs_Invalid) {
+				GB_ASSERT(arch == TargetArch_Invalid);
+				if (is_notted) {
+					this_kind_correct = this_kind_correct && (os != build_context.metrics.os);
+				} else {
+					this_kind_correct = this_kind_correct && (os == build_context.metrics.os);
 				}
-				if (os == TargetOs_Invalid && arch == TargetArch_Invalid) {
-					syntax_error(token_for_pos, "Invalid build tag platform: %.*s", LIT(p));
-					break;
+			} else if (arch != TargetArch_Invalid) {
+				if (is_notted) {
+					this_kind_correct = this_kind_correct && (arch != build_context.metrics.arch);
+				} else {
+					this_kind_correct = this_kind_correct && (arch == build_context.metrics.arch);
 				}
+			}
+			if (os == TargetOs_Invalid && arch == TargetArch_Invalid) {
+				syntax_error(token_for_pos, "Invalid build tag platform: %.*s", LIT(p));
+				break;
 			}
 		} while (s.len > 0);
 
@@ -4942,7 +4950,7 @@ bool parse_file(Parser *p, AstFile *f) {
 	}
 	f->package_name = package_name.string;
 
-	if (docs != nullptr && docs->list.count > 0) {
+	if (!f->pkg->is_single_file && docs != nullptr && docs->list.count > 0) {
 		for_array(i, docs->list) {
 			Token tok = docs->list[i]; GB_ASSERT(tok.kind == Token_Comment);
 			String str = tok.string;
@@ -4996,7 +5004,6 @@ ParseFileError process_imported_file(Parser *p, ImportedFile const &imported_fil
 
 	AstFile *file = gb_alloc_item(heap_allocator(), AstFile);
 	file->pkg = pkg;
-
 	file->id = imported_file.index+1;
 
 	TokenPos err_pos = {0};
