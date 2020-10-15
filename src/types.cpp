@@ -2457,6 +2457,7 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 
 			if (f->flags & EntityFlag_Using) {
 				isize prev_count = sel.index.count;
+				bool prev_indirect = sel.indirect;
 				selection_add_index(&sel, i); // HACK(bill): Leaky memory
 
 				sel = lookup_field_with_selection(f->type, field_name, is_type, sel, allow_blank_ident);
@@ -2468,6 +2469,7 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 					return sel;
 				}
 				sel.index.count = prev_count;
+				sel.indirect = prev_indirect;
 			}
 		}
 
