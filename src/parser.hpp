@@ -121,14 +121,28 @@ struct AstFile {
 	struct LLVMOpaqueMetadata *llvm_metadata_scope;
 };
 
+enum AstForeignFileKind {
+	AstForeignFile_Invalid,
+
+	AstForeignFile_S, // Source,
+
+	AstForeignFile_COUNT
+};
+
+struct AstForeignFile {
+	AstForeignFileKind kind;
+	String source;
+};
+
 
 struct AstPackage {
-	PackageKind      kind;
-	isize            id;
-	String           name;
-	String           fullpath;
-	Array<AstFile *> files;
-	bool             is_single_file;
+	PackageKind           kind;
+	isize                 id;
+	String                name;
+	String                fullpath;
+	Array<AstFile *>      files;
+	Array<AstForeignFile> foreign_files;
+	bool                  is_single_file;
 
 	// NOTE(bill): Created/set in checker
 	Scope *   scope;
@@ -156,6 +170,12 @@ gb_global ThreadPool parser_thread_pool = {};
 struct ParserWorkerData {
 	Parser *parser;
 	ImportedFile imported_file;
+};
+
+struct ForeignFileWorkerData {
+	Parser *parser;
+	ImportedFile imported_file;
+	AstForeignFileKind foreign_kind;
 };
 
 

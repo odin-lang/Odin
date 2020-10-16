@@ -4430,6 +4430,7 @@ void destroy_parser(Parser *p) {
 			destroy_ast_file(pkg->files[j]);
 		}
 		array_free(&pkg->files);
+		array_free(&pkg->foreign_files);
 	}
 #if 0
 	for_array(i, p->package_imports) {
@@ -4482,6 +4483,45 @@ void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo fi, TokenPo
 	thread_pool_add_task(&parser_thread_pool, parser_worker_proc, wd);
 }
 
+WORKER_TASK_PROC(foreign_file_worker_proc) {
+	ForeignFileWorkerData *wd = cast(ForeignFileWorkerData *)data;
+	Parser *p = wd->parser;
+	ImportedFile *imp = &wd->imported_file;
+	AstPackage *pkg = imp->pkg;
+
+	AstForeignFile foreign_file = {wd->foreign_kind};
+
+	String fullpath = string_trim_whitespace(imp->fi.fullpath); // Just in case
+
+	char *c_str = alloc_cstring(heap_allocator(), fullpath);
+	defer (gb_free(heap_allocator(), c_str));
+
+	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);
+	foreign_file.source.text = (u8 *)fc.data;
+	foreign_file.source.len = fc.size;
+
+	switch (wd->foreign_kind) {
+	case AstForeignFile_S:
+		// TODO(bill): Actually do something with it
+		break;
+	}
+	gb_mutex_lock(&p->file_add_mutex);
+	array_add(&pkg->foreign_files, foreign_file);
+	gb_mutex_unlock(&p->file_add_mutex);
+	return 0;
+}
+
+
+void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, AstForeignFileKind kind, FileInfo fi, TokenPos pos) {
+	// TODO(bill): Use a better allocator
+	ImportedFile f = {pkg, fi, pos, p->file_to_process_count++};
+	auto wd = gb_alloc_item(heap_allocator(), ForeignFileWorkerData);
+	wd->parser = p;
+	wd->imported_file = f;
+	wd->foreign_kind = kind;
+	thread_pool_add_task(&parser_thread_pool, foreign_file_worker_proc, wd);
+}
+
 
 // NOTE(bill): Returns true if it's added
 bool try_add_import_path(Parser *p, String const &path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
@@ -4504,6 +4544,7 @@ bool try_add_import_path(Parser *p, String const &path, String const &rel_path, 
 	pkg->kind = kind;
 	pkg->fullpath = path;
 	array_init(&pkg->files, heap_allocator());
+	pkg->foreign_files.allocator = heap_allocator();
 
 	// NOTE(bill): Single file initial package
 	if (kind == Package_Init && string_ends_with(path, FILE_EXT)) {
@@ -4554,11 +4595,17 @@ bool try_add_import_path(Parser *p, String const &path, String const &rel_path, 
 	for_array(list_index, list) {
 		FileInfo fi = list[list_index];
 		String name = fi.name;
-		if (string_ends_with(name, FILE_EXT)) {
+		String ext = path_extension(name);
+		if (ext == FILE_EXT) {
 			if (is_excluded_target_filename(name)) {
 				continue;
 			}
 			parser_add_file_to_process(p, pkg, fi, pos);
+		} else if (ext == ".S" || ext ==".s") {
+			if (is_excluded_target_filename(name)) {
+				continue;
+			}
+			parser_add_foreign_file_to_process(p, pkg, AstForeignFile_S, fi, pos);
 		}
 	}
 

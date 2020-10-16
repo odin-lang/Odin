@@ -291,10 +291,8 @@ TargetArchKind get_target_arch_from_string(String str) {
 
 
 bool is_excluded_target_filename(String name) {
-	String const ext = str_lit(".odin");
 	String original_name = name;
-	GB_ASSERT(string_ends_with(name, ext));
-	name = substring(name, 0, name.len-ext.len);
+	name = remove_extension_from_path(name);
 
 	String str1 = {};
 	String str2 = {};
