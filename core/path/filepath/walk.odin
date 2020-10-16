@@ -81,7 +81,7 @@ read_dir :: proc(dir_name: string, allocator := context.temp_allocator) -> ([]os
 	if err != 0 {
 		return nil, err;
 	}
-	slice.sort_proc(fis, proc(a, b: os.File_Info) -> bool {
+	slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {
 		return a.name < b.name;
 	});
 	return fis, 0;

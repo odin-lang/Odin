@@ -16,24 +16,15 @@ sort :: proc(data: $T/[]$E) where ORD(E) {
 	}
 }
 
-// sort_proc sorts a slice with a given procedure to test whether two values are ordered "i < j"
+// sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
 // This sort is not guaranteed to be stable
-sort_proc :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
+sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
 			_quick_sort_proc(data, 0, n, _max_depth(n), less);
 		}
 	}
 }
-
-reverse_sort :: proc(data: $T/[]$E) where ORD(E) {
-	sort_proc(data, proc(i, j: E) -> bool {
-		return j < i;
-	});
-}
-
-
-
 
 is_sorted :: proc(array: $T/[]$E) -> bool where ORD(E) {
 	for i := len(array)-1; i > 0; i -= 1 {
@@ -44,9 +35,43 @@ is_sorted :: proc(array: $T/[]$E) -> bool where ORD(E) {
 	return true;
 }
 
-is_sorted_proc :: proc(array: $T/[]$E, less: proc(i, j: E) -> bool) -> bool {
+is_sorted_by :: proc(array: $T/[]$E, less: proc(i, j: E) -> bool) -> bool {
 	for i := len(array)-1; i > 0; i -= 1 {
 		if less(array[i], array[i-1]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
+reverse_sort :: proc(data: $T/[]$E) where ORD(E) {
+	sort_by(data, proc(i, j: E) -> bool {
+		return j < i;
+	});
+}
+
+
+// TODO(bill): Should `sort_by_key` exist or is `sort_by` more than enough?
+sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
+	context.user_ptr = rawptr(key);
+	sort_by(data, proc(i, j: E) -> bool {
+		k := (proc(E) -> K)(context.user_ptr);
+		return k(i) < k(j);
+	});
+}
+
+reverse_sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
+	context.user_ptr = rawptr(key);
+	sort_by(data, proc(i, j: E) -> bool {
+		k := (proc(E) -> K)(context.user_ptr);
+		return k(j) < k(i);
+	});
+}
+
+is_sorted_by_key :: proc(array: $T/[]$E, key: proc(E) -> $K) -> bool where ORD(K) {
+	for i := len(array)-1; i > 0; i -= 1 {
+		if key(array[i]) < key(array[i-1]) {
 			return false;
 		}
 	}
