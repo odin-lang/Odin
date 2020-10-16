@@ -660,6 +660,19 @@ trim_null :: proc(s: string) -> string {
 	return trim_right_null(trim_left_null(s));
 }
 
+trim_prefix :: proc(s, prefix: string) -> string {
+	if has_prefix(s, prefix) {
+		return s[len(prefix):];
+	}
+	return s;
+}
+
+trim_suffix :: proc(s, suffix: string) -> string {
+	if has_suffix(s, suffix) {
+		return s[:len(s)-len(suffix)];
+	}
+	return s;
+}
 
 split_multi :: proc(s: string, substrs: []string, skip_empty := false, allocator := context.allocator) -> []string #no_bounds_check {
 	if s == "" || len(substrs) <= 0 {
@@ -1104,6 +1117,62 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 
 	return to_string(b);
 }
+
+
+
+to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) -> string {
+	if len(s) == 0 {
+		return "";
+	}
+
+	b := make_builder_len_cap(0, 0, allocator);
+
+	s := s;
+	for c, i in s {
+		if c != utf8.RUNE_ERROR {
+			continue;
+		}
+
+		_, w := utf8.decode_rune_in_string(s[i:]);
+		if w == 1 {
+			grow_builder(&b, len(s) + len(replacement));
+			write_string(&b, s[:i]);
+			s = s[i:];
+			break;
+		}
+	}
+
+	if builder_cap(b) == 0 {
+		return clone(s, allocator);
+	}
+
+	invalid := false;
+
+	for i := 0; i < len(s); /**/ {
+		c := s[i];
+		if c < utf8.RUNE_SELF {
+			i += 1;
+			invalid = false;
+			write_byte(&b, c);
+			continue;
+		}
+
+		_, w := utf8.decode_rune_in_string(s[i:]);
+		if w == 1 {
+			i += 1;
+			if !invalid {
+				invalid = true;
+				write_string(&b, replacement);
+			}
+			continue;
+		}
+		invalid = false;
+		write_string(&b, s[i:][:w]);
+		i += w;
+	}
+	return to_string(b);
+}
+
 
 
 @private
