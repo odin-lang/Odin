@@ -583,8 +583,9 @@ enum BuildFlagKind {
 	BuildFlag_UseLLVMApi,
 	BuildFlag_IgnoreUnknownAttributes,
 	BuildFlag_ExtraLinkerFlags,
-	BuildFlag_DisallowDo,
+	BuildFlag_Microarch,
 
+	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
 
 	BuildFlag_Compact,
@@ -681,9 +682,10 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),                 BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"), BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_DisallowDo,        str_lit("disallow-do"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"),              BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_Microarch,         str_lit("microarch"),                       BuildFlagParam_String);
 
+	add_flag(&build_flags, BuildFlag_DisallowDo,            str_lit("disallow-do"),              BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator, str_lit("default-to-nil-allocator"), BuildFlagParam_None);
 
 	add_flag(&build_flags, BuildFlag_Compact, str_lit("compact"), BuildFlagParam_None);
@@ -1107,6 +1109,12 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ExtraLinkerFlags:
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.extra_linker_flags = value.value_string;
+							break;
+
+						case BuildFlag_Microarch:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.microarch = value.value_string;
+							string_to_lower(&build_context.microarch);
 							break;
 
 						case BuildFlag_DisallowDo:
