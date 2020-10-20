@@ -11874,7 +11874,15 @@ void lb_generate_code(lbGenerator *gen) {
 
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
 
-	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, target_triple, llvm_cpu, llvm_features, LLVMCodeGenLevelNone, LLVMRelocDefault, code_mode);
+	LLVMCodeGenOptLevel code_gen_level = LLVMCodeGenLevelNone;
+	switch (build_context.optimization_level) {
+	case 0: code_gen_level = LLVMCodeGenLevelNone;       break;
+	case 1: code_gen_level = LLVMCodeGenLevelLess;       break;
+	case 2: code_gen_level = LLVMCodeGenLevelDefault;    break;
+	case 3: code_gen_level = LLVMCodeGenLevelAggressive; break;
+	}
+
+	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, target_triple, llvm_cpu, llvm_features, code_gen_level, LLVMRelocDefault, code_mode);
 	defer (LLVMDisposeTargetMachine(target_machine));
 
 
