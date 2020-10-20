@@ -3338,6 +3338,17 @@ Type *get_struct_field_type(Type *t, isize index) {
 }
 
 
+Type *reduce_tuple_to_single_type(Type *original_type) {
+	if (original_type != nullptr) {
+		Type *t = core_type(original_type);
+		if (t->kind == Type_Tuple && t->Tuple.variables.count == 1) {
+			return t->Tuple.variables[0]->type;
+		}
+	}
+	return original_type;
+}
+
+
 gbString write_type_to_string(gbString str, Type *type) {
 	if (type == nullptr) {
 		return gb_string_appendc(str, "<no type>");

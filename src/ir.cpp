@@ -11296,30 +11296,30 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	if (proc->type->Proc.has_named_results) {
 		GB_ASSERT(proc->type->Proc.result_count > 0);
 		TypeTuple *results = &proc->type->Proc.results->Tuple;
+
 		for_array(i, results->variables) {
 			Entity *e = results->variables[i];
-			if (e->kind != Entity_Variable) {
-				continue;
-			}
+			GB_ASSERT(e->kind == Entity_Variable);
 
 			if (e->token.string != "") {
 				GB_ASSERT(!is_blank_ident(e->token));
-				irValue *res = ir_add_local(proc, e, e->identifier, true);
 
-				irValue *c = nullptr;
-				switch (e->Variable.param_value.kind) {
-				case ParameterValue_Constant:
-					c = ir_value_constant(e->type, e->Variable.param_value.value);
-					break;
-				case ParameterValue_Nil:
-					c = ir_value_nil(e->type);
-					break;
-				case ParameterValue_Location:
-					GB_PANIC("ParameterValue_Location");
-					break;
+				irAddr res = {};
+				if (proc->type->Proc.return_by_pointer) {
+					irValue *ptr = proc->return_ptr;
+					if (results->variables.count != 1) {
+						ptr = ir_emit_struct_ep(proc, ptr, cast(i32)i);
+					}
+
+					res = ir_addr(ptr);
+					ir_module_add_value(proc->module, e, ptr);
+				} else {
+					res = ir_addr(ir_add_local(proc, e, e->identifier, true));
 				}
-				if (c != nullptr) {
-					ir_emit_store(proc, res, c);
+
+				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
+					irValue *c = ir_handle_param_value(proc, e->type, e->Variable.param_value, e->token.pos);
+					ir_addr_store(proc, res, c);
 				}
 			}
 		}
