@@ -2430,15 +2430,16 @@ void lb_begin_procedure_body(lbProcedure *p) {
 
 	i32 parameter_index = 0;
 
+
+	lbValue return_ptr_value = {};
 	if (p->type->Proc.return_by_pointer) {
 		// NOTE(bill): this must be parameter 0
 		Type *ptr_type = alloc_type_pointer(reduce_tuple_to_single_type(p->type->Proc.results));
 		Entity *e = alloc_entity_param(nullptr, make_token_ident(str_lit("agg.result")), ptr_type, false, false);
 		e->flags |= EntityFlag_Sret | EntityFlag_NoAlias;
 
-		lbValue return_ptr_value = {};
 		return_ptr_value.value = LLVMGetParam(p->value, 0);
-		return_ptr_value.type = alloc_type_pointer(p->type->Proc.abi_compat_result_type);
+		return_ptr_value.type = ptr_type;
 		p->return_ptr = lb_addr(return_ptr_value);
 
 		lb_add_entity(p->module, e, return_ptr_value);
@@ -2475,37 +2476,31 @@ void lb_begin_procedure_body(lbProcedure *p) {
 		GB_ASSERT(p->type->Proc.result_count > 0);
 		TypeTuple *results = &p->type->Proc.results->Tuple;
 
-		isize result_index = 0;
-
 		for_array(i, results->variables) {
 			Entity *e = results->variables[i];
-			if (e->kind != Entity_Variable) {
-				continue;
-			}
+			GB_ASSERT(e->kind == Entity_Variable);
 
 			if (e->token.string != "") {
 				GB_ASSERT(!is_blank_ident(e->token));
 
-				lbAddr res = lb_add_local(p, e->type, e);
+				lbAddr res = {};
+				if (p->type->Proc.return_by_pointer) {
+					lbValue ptr = return_ptr_value;
+					if (results->variables.count != 1) {
+						ptr = lb_emit_struct_ep(p, ptr, cast(i32)i);
+					}
 
-				lbValue c = {};
-				switch (e->Variable.param_value.kind) {
-				case ParameterValue_Constant:
-					c = lb_const_value(p->module, e->type, e->Variable.param_value.value);
-					break;
-				case ParameterValue_Nil:
-					c = lb_const_nil(p->module, e->type);
-					break;
-				case ParameterValue_Location:
-					GB_PANIC("ParameterValue_Location");
-					break;
+					res = lb_addr(ptr);
+					lb_add_entity(p->module, e, ptr);
+				} else {
+					res = lb_add_local(p, e->type, e);
 				}
-				if (c.value != nullptr) {
+
+				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
+					lbValue c = lb_handle_param_value(p, e->type, e->Variable.param_value, e->token.pos);
 					lb_addr_store(p, res, c);
 				}
 			}
-
-			result_index += 1;
 		}
 	}
 
@@ -12188,7 +12183,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(mod);
 	defer (LLVMDisposePassManager(default_function_pass_manager));
-	{
+	/*{
 		LLVMAddMemCpyOptPass(default_function_pass_manager);
 		LLVMAddPromoteMemoryToRegisterPass(default_function_pass_manager);
 		LLVMAddMergedLoadStoreMotionPass(default_function_pass_manager);
@@ -12219,7 +12214,57 @@ void lb_generate_code(lbGenerator *gen) {
 			LLVMAddLoopVectorizePass(default_function_pass_manager);
 
 		}
+	}*/
+	if (build_context.optimization_level == 0 && false) {
+		auto dfpm = default_function_pass_manager;
+
+		LLVMAddMemCpyOptPass(dfpm);
+		LLVMAddPromoteMemoryToRegisterPass(dfpm);
+		LLVMAddMergedLoadStoreMotionPass(dfpm);
+		LLVMAddAggressiveInstCombinerPass(dfpm);
+		LLVMAddConstantPropagationPass(dfpm);
+		LLVMAddAggressiveDCEPass(dfpm);
+		LLVMAddMergedLoadStoreMotionPass(dfpm);
+		LLVMAddPromoteMemoryToRegisterPass(dfpm);
+		LLVMAddCFGSimplificationPass(dfpm);
+		LLVMAddScalarizerPass(dfpm);
+	} else {
+		auto dfpm = default_function_pass_manager;
+
+		LLVMAddMemCpyOptPass(dfpm);
+		LLVMAddPromoteMemoryToRegisterPass(dfpm);
+		LLVMAddMergedLoadStoreMotionPass(dfpm);
+		LLVMAddAggressiveInstCombinerPass(dfpm);
+		LLVMAddConstantPropagationPass(dfpm);
+		LLVMAddAggressiveDCEPass(dfpm);
+		LLVMAddMergedLoadStoreMotionPass(dfpm);
+		LLVMAddPromoteMemoryToRegisterPass(dfpm);
+		LLVMAddCFGSimplificationPass(dfpm);
+
+
+		// LLVMAddInstructionCombiningPass(dfpm);
+		LLVMAddSLPVectorizePass(dfpm);
+		LLVMAddLoopVectorizePass(dfpm);
+		LLVMAddEarlyCSEPass(dfpm);
+		LLVMAddEarlyCSEMemSSAPass(dfpm);
+
+		LLVMAddScalarizerPass(dfpm);
+		LLVMAddLoopIdiomPass(dfpm);
+
+		// LLVMAddAggressiveInstCombinerPass(dfpm);
+		// LLVMAddLowerExpectIntrinsicPass(dfpm);
+
+		// LLVMAddPartiallyInlineLibCallsPass(dfpm);
+
+		// LLVMAddAlignmentFromAssumptionsPass(dfpm);
+		// LLVMAddDeadStoreEliminationPass(dfpm);
+		// LLVMAddReassociatePass(dfpm);
+		// LLVMAddAddDiscriminatorsPass(dfpm);
+		// LLVMAddPromoteMemoryToRegisterPass(dfpm);
+		// LLVMAddCorrelatedValuePropagationPass(dfpm);
+		// LLVMAddMemCpyOptPass(dfpm);
 	}
+
 
 	LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(mod);
 	defer (LLVMDisposePassManager(default_function_pass_manager_without_memcpy));

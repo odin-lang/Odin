@@ -2318,15 +2318,6 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 	return new_type;
 }
 
-Type *reduce_tuple_to_single_type(Type *original_type) {
-	if (original_type != nullptr) {
-		Type *t = core_type(original_type);
-		if (t->kind == Type_Tuple && t->Tuple.variables.count == 1) {
-			return t->Tuple.variables[0]->type;
-		}
-	}
-	return original_type;
-}
 
 Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCallingConvention cc) {
 	Type *new_type = original_type;
