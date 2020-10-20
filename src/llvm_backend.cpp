@@ -5496,18 +5496,26 @@ lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Ty
 
 		if (inline_array_arith) {
 			for (i64 i = 0; i < count; i++) {
-				lbValue a = lb_emit_load(p, lb_emit_array_epi(p, x, i));
-				lbValue b = lb_emit_load(p, lb_emit_array_epi(p, y, i));
+				lbValue a_ptr = lb_emit_array_epi(p, x, i);
+				lbValue b_ptr = lb_emit_array_epi(p, y, i);
+				lbValue dst_ptr = lb_emit_array_epi(p, res.addr, i);
+
+				lbValue a = lb_emit_load(p, a_ptr);
+				lbValue b = lb_emit_load(p, b_ptr);
 				lbValue c = lb_emit_arith(p, op, a, b, elem_type);
-				lb_emit_store(p, lb_emit_array_epi(p, res.addr, i), c);
+				lb_emit_store(p, dst_ptr, c);
 			}
 		} else {
-			auto loop_data = lb_loop_start(p, count);
+			auto loop_data = lb_loop_start(p, count, t_i32);
 
-			lbValue a = lb_emit_load(p, lb_emit_array_ep(p, x, loop_data.idx));
-			lbValue b = lb_emit_load(p, lb_emit_array_ep(p, y, loop_data.idx));
+			lbValue a_ptr = lb_emit_array_ep(p, x, loop_data.idx);
+			lbValue b_ptr = lb_emit_array_ep(p, y, loop_data.idx);
+			lbValue dst_ptr = lb_emit_array_ep(p, res.addr, loop_data.idx);
+
+			lbValue a = lb_emit_load(p, a_ptr);
+			lbValue b = lb_emit_load(p, b_ptr);
 			lbValue c = lb_emit_arith(p, op, a, b, elem_type);
-			lb_emit_store(p, lb_emit_array_ep(p, res.addr, loop_data.idx), c);
+			lb_emit_store(p, dst_ptr, c);
 
 			lb_loop_end(p, loop_data);
 		}

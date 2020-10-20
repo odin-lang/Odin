@@ -4495,18 +4495,25 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 		if (inline_array_arith) {
 			// inline
 			for (i32 i = 0; i < count; i++) {
-				irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
-				irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
+				irValue *x_ptr = ir_emit_array_epi(proc, lhs, i);
+				irValue *y_ptr = ir_emit_array_epi(proc, rhs, i);
+				irValue *dst_ptr = ir_emit_array_epi(proc, res, i);
+				irValue *x = ir_emit_load(proc, x_ptr);
+				irValue *y = ir_emit_load(proc, y_ptr);
 				irValue *z = ir_emit_arith(proc, op, x, y, elem_type);
-				ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
+				ir_emit_store(proc, dst_ptr, z);
 			}
 		} else {
 			auto loop_data = ir_loop_start(proc, count, t_i32);
 
-			irValue *x = ir_emit_load(proc, ir_emit_array_ep(proc, lhs, loop_data.idx));
-			irValue *y = ir_emit_load(proc, ir_emit_array_ep(proc, rhs, loop_data.idx));
+			irValue *x_ptr = ir_emit_array_ep(proc, lhs, loop_data.idx);
+			irValue *y_ptr = ir_emit_array_ep(proc, rhs, loop_data.idx);
+			irValue *dst_ptr = ir_emit_array_ep(proc, res, loop_data.idx);
+
+			irValue *x = ir_emit_load(proc, x_ptr);
+			irValue *y = ir_emit_load(proc, y_ptr);
 			irValue *z = ir_emit_arith(proc, op, x, y, elem_type);
-			ir_emit_store(proc, ir_emit_array_ep(proc, res, loop_data.idx), z);
+			ir_emit_store(proc, dst_ptr, z);
 
 			ir_loop_end(proc, loop_data);
 		}
