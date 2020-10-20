@@ -11858,7 +11858,21 @@ void lb_generate_code(lbGenerator *gen) {
 		code_mode = LLVMCodeModelJITDefault;
 	}
 
-	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, target_triple, "generic", "", LLVMCodeGenLevelNone, LLVMRelocDefault, code_mode);
+	char const *host_cpu_name = LLVMGetHostCPUName();
+	char const *llvm_cpu = "generic";
+	char const *llvm_features = "";
+	if (build_context.microarch.len != 0) {
+		if (build_context.microarch == "native") {
+			llvm_cpu = host_cpu_name;
+		} else {
+			llvm_cpu = alloc_cstring(heap_allocator(), build_context.microarch);
+		}
+		if (gb_strcmp(llvm_cpu, host_cpu_name) == 0) {
+			llvm_features = LLVMGetHostCPUFeatures();
+		}
+	}
+
+	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, target_triple, llvm_cpu, llvm_features, LLVMCodeGenLevelNone, LLVMRelocDefault, code_mode);
 	defer (LLVMDisposeTargetMachine(target_machine));
 
 	LLVMSetModuleDataLayout(mod, LLVMCreateTargetDataLayout(target_machine));
@@ -12424,6 +12438,7 @@ void lb_generate_code(lbGenerator *gen) {
 	defer (LLVMDisposePassManager(module_pass_manager));
 	LLVMAddAlwaysInlinerPass(module_pass_manager);
 	LLVMAddStripDeadPrototypesPass(module_pass_manager);
+	LLVMAddAnalysisPasses(target_machine, module_pass_manager);
 	// if (build_context.optimization_level >= 2) {
 	// 	LLVMAddArgumentPromotionPass(module_pass_manager);
 	// 	LLVMAddConstantMergePass(module_pass_manager);

@@ -64,6 +64,13 @@ close :: proc(fd: Handle) -> Errno {
 	return ERROR_NONE;
 }
 
+flush :: proc(fd: Handle) -> (err: Errno) {
+	if !win32.FlushFileBuffers(win32.HANDLE(fd)) {
+		err = Errno(win32.GetLastError());
+	}
+	return;
+}
+
 
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {

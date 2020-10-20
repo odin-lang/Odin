@@ -137,6 +137,7 @@ struct BuildContext {
 	String llc_flags;
 	String link_flags;
 	String extra_linker_flags;
+	String microarch;
 	BuildModeKind build_mode;
 	bool   generate_docs;
 	i32    optimization_level;
@@ -706,7 +707,9 @@ void init_build_context(TargetMetrics *cross_target) {
 	// across OSs. It doesn't make sense to allocate extra data on the heap
 	// here, so I just #defined the linker flags to keep things concise.
 	if (bc->metrics.arch == TargetArch_amd64) {
-		llc_flags = gb_string_appendc(llc_flags, "-march=x86-64 ");
+		if (bc->microarch.len == 0) {
+			llc_flags = gb_string_appendc(llc_flags, "-march=x86-64 ");
+		}
 
 		switch (bc->metrics.os) {
 		case TargetOs_windows:
@@ -718,11 +721,13 @@ void init_build_context(TargetMetrics *cross_target) {
 			bc->link_flags = str_lit("-arch x86-64 ");
 			break;
 		case TargetOs_freebsd:
-			bc->link_flags = str_lit("-arch x86-64");
+			bc->link_flags = str_lit("-arch x86-64 ");
 			break;
 		}
 	} else if (bc->metrics.arch == TargetArch_386) {
-		llc_flags = gb_string_appendc(llc_flags, "-march=x86 ");
+		if (bc->microarch.len == 0) {
+			llc_flags = gb_string_appendc(llc_flags, "-march=x86 ");
+		}
 
 		switch (bc->metrics.os) {
 		case TargetOs_windows:
@@ -736,7 +741,7 @@ void init_build_context(TargetMetrics *cross_target) {
 			bc->link_flags = str_lit("-arch x86 ");
 			break;
 		case TargetOs_freebsd:
-			bc->link_flags = str_lit("-arch x86");
+			bc->link_flags = str_lit("-arch x86 ");
 			break;
 		}
 	} else if (bc->metrics.arch == TargetArch_wasm32) {
@@ -745,11 +750,25 @@ void init_build_context(TargetMetrics *cross_target) {
 		gb_printf_err("Compiler Error: Unsupported architecture\n");;
 		gb_exit(1);
 	}
+	llc_flags = gb_string_appendc(llc_flags, " ");
 
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
 
 	gbString opt_flags = gb_string_make_reserve(heap_allocator(), 64);
+
+
+	if (bc->microarch.len != 0) {
+		opt_flags = gb_string_appendc(opt_flags, "-march=");
+		opt_flags = gb_string_append_length(opt_flags, bc->microarch.text, bc->microarch.len);
+		opt_flags = gb_string_appendc(opt_flags, " ");
+
+		// llc_flags = gb_string_appendc(opt_flags, "-march=");
+		// llc_flags = gb_string_append_length(llc_flags, bc->microarch.text, bc->microarch.len);
+		// llc_flags = gb_string_appendc(llc_flags, " ");
+	}
+
+
 	if (bc->optimization_level != 0) {
 		opt_flags = gb_string_append_fmt(opt_flags, "-O%d ", bc->optimization_level);
 		// NOTE(lachsinc): The following options were previously passed during call
@@ -761,7 +780,9 @@ void init_build_context(TargetMetrics *cross_target) {
 		opt_flags = gb_string_appendc(opt_flags, "-mem2reg -memcpyopt -die ");
 	}
 
-	bc->llc_flags = make_string_c(llc_flags);
+
+
+
 
 
 	// NOTE(lachsinc): This optimization option was previously required to get
@@ -772,6 +793,7 @@ void init_build_context(TargetMetrics *cross_target) {
 	// }
 
 	bc->opt_flags = make_string_c(opt_flags);
+	bc->llc_flags = make_string_c(llc_flags);
 
 
 	#undef LINK_FLAG_X64

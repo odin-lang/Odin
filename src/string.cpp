@@ -125,6 +125,12 @@ gb_inline bool str_eq_ignore_case(String const &a, String const &b) {
 	return false;
 }
 
+void string_to_lower(String *s) {
+	for (isize i = 0; i < s->len; i++) {
+		s->text[i] = gb_char_to_lower(s->text[i]);
+	}
+}
+
 int string_compare(String const &x, String const &y) {
 	if (x.len != y.len || x.text != y.text) {
 		isize n, fast, offset, curr_block;
