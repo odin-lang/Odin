@@ -11872,8 +11872,11 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
+
 	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, target_triple, llvm_cpu, llvm_features, LLVMCodeGenLevelNone, LLVMRelocDefault, code_mode);
 	defer (LLVMDisposeTargetMachine(target_machine));
+
 
 	LLVMSetModuleDataLayout(mod, LLVMCreateTargetDataLayout(target_machine));
 
@@ -12461,18 +12464,25 @@ void lb_generate_code(lbGenerator *gen) {
 	defer (gb_free(heap_allocator(), filepath_ll.text));
 
 	String filepath_obj = {};
-	switch (build_context.metrics.os) {
-	case TargetOs_windows:
-		filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".obj"));
-		break;
-	case TargetOs_darwin:
-	case TargetOs_linux:
-	case TargetOs_essence:
-		filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".o"));
-		break;
-	case TargetOs_js:
-		filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".wasm-obj"));
-		break;
+	LLVMCodeGenFileType code_gen_file_type = LLVMObjectFile;
+
+	if (build_context.build_mode == BuildMode_Assembly) {
+		filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".S"));
+		code_gen_file_type = LLVMAssemblyFile;
+	} else {
+		switch (build_context.metrics.os) {
+		case TargetOs_windows:
+			filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".obj"));
+			break;
+		case TargetOs_darwin:
+		case TargetOs_linux:
+		case TargetOs_essence:
+			filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".o"));
+			break;
+		case TargetOs_js:
+			filepath_obj = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".wasm-obj"));
+			break;
+		}
 	}
 
 
@@ -12491,8 +12501,6 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 	TIME_SECTION("LLVM Object Generation");
-
-	LLVMCodeGenFileType code_gen_file_type = LLVMObjectFile;
 
 	if (LLVMTargetMachineEmitToFile(target_machine, mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
 		gb_printf_err("LLVM Error: %s\n", llvm_error);
