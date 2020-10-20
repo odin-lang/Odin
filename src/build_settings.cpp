@@ -101,6 +101,7 @@ enum BuildModeKind {
 	BuildMode_Executable,
 	BuildMode_DynamicLibrary,
 	BuildMode_Object,
+	BuildMode_Assembly,
 };
 
 

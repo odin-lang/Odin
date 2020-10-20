@@ -1061,6 +1061,8 @@ bool parse_build_flags(Array<String> args) {
 								build_context.build_mode = BuildMode_Object;
 							} else if (str == "exe") {
 								build_context.build_mode = BuildMode_Executable;
+							} else if (str == "asm" || str == "assembly" || str == "assembler") {
+								build_context.build_mode = BuildMode_Assembly;
 							} else {
 								gb_printf_err("Unknown build mode '%.*s'\n", LIT(str));
 								bad_flags = true;
@@ -1762,6 +1764,12 @@ int main(int arg_count, char const **arg_ptr) {
 			return 1;
 		}
 	}
+	if (!build_context.use_llvm_api) {
+		if (build_context.build_mode == BuildMode_Assembly) {
+			print_usage_line(0, "-build-mode:assembly is only supported with the -llvm-api backend", LIT(args[0]));
+			return 1;
+		}
+	}
 
 	init_universal();
 	// TODO(bill): prevent compiling without a linker
@@ -1825,11 +1833,16 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 		lb_generate_code(&gen);
 
-		if (build_context.build_mode != BuildMode_Object) {
-			i32 linker_stage_exit_count = linker_stage(&gen);
-			if (linker_stage_exit_count != 0) {
-				return linker_stage_exit_count;
+		switch (build_context.build_mode) {
+		case BuildMode_Executable:
+		case BuildMode_DynamicLibrary:
+			{
+				i32 linker_stage_exit_count = linker_stage(&gen);
+				if (linker_stage_exit_count != 0) {
+					return linker_stage_exit_count;
+				}
 			}
+			break;
 		}
 
 		if (build_context.show_timings) {
