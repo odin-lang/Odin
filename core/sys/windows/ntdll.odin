@@ -1,4 +1,4 @@
-package version
+package sys_windows
 
 foreign import ntdll_lib "system:ntdll.lib"
 
