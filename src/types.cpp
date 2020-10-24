@@ -1210,6 +1210,10 @@ bool is_type_proc(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Proc;
 }
+bool is_type_asm_proc(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_Proc && t->Proc.calling_convention == ProcCC_InlineAsm;
+}
 bool is_type_poly_proc(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Proc && t->Proc.is_polymorphic;

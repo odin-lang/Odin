@@ -45,6 +45,7 @@ Token ast_token(Ast *node) {
 	case Ast_TypeAssertion:      return ast_token(node->TypeAssertion.expr);
 	case Ast_TypeCast:           return node->TypeCast.token;
 	case Ast_AutoCast:           return node->AutoCast.token;
+	case Ast_InlineAsmExpr:      return node->InlineAsmExpr.token;
 
 	case Ast_BadStmt:            return node->BadStmt.begin;
 	case Ast_EmptyStmt:          return node->EmptyStmt.token;
@@ -230,6 +231,13 @@ Ast *clone_ast(Ast *node) {
 		break;
 	case Ast_AutoCast:
 		n->AutoCast.expr = clone_ast(n->AutoCast.expr);
+		break;
+
+	case Ast_InlineAsmExpr:
+		n->InlineAsmExpr.param_types        = clone_ast_array(n->InlineAsmExpr.param_types);
+		n->InlineAsmExpr.return_type        = clone_ast(n->InlineAsmExpr.return_type);
+		n->InlineAsmExpr.asm_string         = clone_ast(n->InlineAsmExpr.asm_string);
+		n->InlineAsmExpr.constraints_string = clone_ast(n->InlineAsmExpr.constraints_string);
 		break;
 
 	case Ast_BadStmt:   break;
@@ -715,6 +723,28 @@ Ast *ast_auto_cast(AstFile *f, Token token, Ast *expr) {
 	return result;
 }
 
+Ast *ast_inline_asm_expr(AstFile *f, Token token, Token open, Token close,
+                         Array<Ast *> const &param_types,
+                         Ast *return_type,
+                         Ast *asm_string,
+                         Ast *constraints_string,
+                         bool has_side_effects,
+                         bool is_align_stack,
+                         InlineAsmDialectKind dialect) {
+
+	Ast *result = alloc_ast_node(f, Ast_InlineAsmExpr);
+	result->InlineAsmExpr.token              = token;
+	result->InlineAsmExpr.open               = open;
+	result->InlineAsmExpr.close              = close;
+	result->InlineAsmExpr.param_types        = param_types;
+	result->InlineAsmExpr.return_type        = return_type;
+	result->InlineAsmExpr.asm_string         = asm_string;
+	result->InlineAsmExpr.constraints_string = constraints_string;
+	result->InlineAsmExpr.has_side_effects   = has_side_effects;
+	result->InlineAsmExpr.is_align_stack     = is_align_stack;
+	result->InlineAsmExpr.dialect            = dialect;
+	return result;
+}
 
 
 
@@ -2314,6 +2344,80 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		expect_token(f, Token_CloseBracket);
 		return ast_bit_set_type(f, token, elem, underlying);
+	}
+
+	case Token_asm: {
+		Token token = expect_token(f, Token_asm);
+
+		Array<Ast *> param_types = {};
+		Ast *return_type = nullptr;
+		if (allow_token(f, Token_OpenParen)) {
+			param_types = array_make<Ast *>(heap_allocator());
+			while (f->curr_token.kind != Token_CloseParen && f->curr_token.kind != Token_EOF) {
+				Ast *t = parse_type(f);
+				array_add(&param_types, t);
+				if (f->curr_token.kind != Token_Comma ||
+				    f->curr_token.kind == Token_EOF) {
+				    break;
+				}
+				advance_token(f);
+			}
+			expect_token(f, Token_CloseParen);
+
+			if (allow_token(f, Token_ArrowRight)) {
+				return_type = parse_type(f);
+			}
+		}
+
+		bool has_side_effects = false;
+		bool is_align_stack = false;
+		InlineAsmDialectKind dialect = InlineAsmDialect_Default;
+
+		while (f->curr_token.kind == Token_Hash) {
+			advance_token(f);
+			if (f->curr_token.kind == Token_Ident) {
+				Token token = advance_token(f);
+				String name = token.string;
+				if (name == "side_effects") {
+					if (has_side_effects) {
+						syntax_error(token, "Duplicate directive on inline asm expression: '#side_effects'");
+					}
+					has_side_effects = true;
+				} else if (name == "align_stack") {
+					if (is_align_stack) {
+						syntax_error(token, "Duplicate directive on inline asm expression: '#align_stack'");
+					}
+					is_align_stack = true;
+				} else if (name == "att") {
+					if (dialect == InlineAsmDialect_ATT) {
+						syntax_error(token, "Duplicate directive on inline asm expression: '#att'");
+					} else if (dialect != InlineAsmDialect_Default) {
+						syntax_error(token, "Conflicting asm dialects");
+					} else {
+						dialect = InlineAsmDialect_ATT;
+					}
+				} else if (name == "intel") {
+					if (dialect == InlineAsmDialect_Intel) {
+						syntax_error(token, "Duplicate directive on inline asm expression: '#intel'");
+					} else if (dialect != InlineAsmDialect_Default) {
+						syntax_error(token, "Conflicting asm dialects");
+					} else {
+						dialect = InlineAsmDialect_Intel;
+					}
+				}
+			} else {
+				syntax_error(f->curr_token, "Expected an identifier after hash");
+			}
+		}
+
+		Token open = expect_token(f, Token_OpenBrace);
+		Ast *asm_string = parse_expr(f, false);
+		expect_token(f, Token_Comma);
+		Ast *constraints_string = parse_expr(f, false);
+		allow_token(f, Token_Comma);
+		Token close = expect_token(f, Token_CloseBrace);
+
+		return ast_inline_asm_expr(f, token, open, close, param_types, return_type, asm_string, constraints_string, has_side_effects, is_align_stack, dialect);
 	}
 
 	default: {
@@ -4142,6 +4246,7 @@ Ast *parse_stmt(AstFile *f) {
 	case Token_String:
 	case Token_OpenParen:
 	case Token_Pointer:
+	case Token_asm: // Inline assembly
 	// Unary Operators
 	case Token_Add:
 	case Token_Sub:

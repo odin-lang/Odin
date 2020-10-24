@@ -9563,6 +9563,43 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	case_ast_node(ie, IndexExpr, expr);
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	case_end;
+
+	case_ast_node(ia, InlineAsmExpr, expr);
+		Type *t = type_of_expr(expr);
+		GB_ASSERT(is_type_asm_proc(t));
+
+		String asm_string = {};
+		String constraints_string = {};
+
+		TypeAndValue tav;
+		tav = type_and_value_of_expr(ia->asm_string);
+		GB_ASSERT(is_type_string(tav.type));
+		GB_ASSERT(tav.value.kind == ExactValue_String);
+		asm_string = tav.value.value_string;
+
+		tav = type_and_value_of_expr(ia->constraints_string);
+		GB_ASSERT(is_type_string(tav.type));
+		GB_ASSERT(tav.value.kind == ExactValue_String);
+		constraints_string = tav.value.value_string;
+
+
+		LLVMInlineAsmDialect dialect = LLVMInlineAsmDialectATT;
+		switch (ia->dialect) {
+		case InlineAsmDialect_Default: dialect = LLVMInlineAsmDialectATT;   break;
+		case InlineAsmDialect_ATT:     dialect = LLVMInlineAsmDialectATT;   break;
+		case InlineAsmDialect_Intel:   dialect = LLVMInlineAsmDialectIntel; break;
+		default: GB_PANIC("Unhandled inline asm dialect"); break;
+		}
+
+		LLVMTypeRef func_type = LLVMGetElementType(lb_type(p->module, t));
+		LLVMValueRef the_asm = LLVMGetInlineAsm(func_type,
+			cast(char *)asm_string.text, cast(size_t)asm_string.len,
+			cast(char *)constraints_string.text, cast(size_t)constraints_string.len,
+			ia->has_side_effects, ia->is_align_stack, dialect
+		);
+		GB_ASSERT(the_asm != nullptr);
+		return {the_asm, t};
+	case_end;
 	}
 
 	GB_PANIC("lb_build_expr: %.*s", LIT(ast_strings[expr->kind]));

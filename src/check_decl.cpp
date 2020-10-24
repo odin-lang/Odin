@@ -79,7 +79,11 @@ Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, Stri
 			}
 			t = default_type(t);
 		}
-		if (is_type_polymorphic(t)) {
+		if (is_type_asm_proc(t)) {
+			error(e->token, "Invalid use of inline asm in %.*s", LIT(context_name));
+			e->type = t_invalid;
+			return nullptr;
+		} else if (is_type_polymorphic(t)) {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
 			error(e->token, "Invalid use of a polymorphic type '%s' in %.*s", str, LIT(context_name));
