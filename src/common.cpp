@@ -968,7 +968,20 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 
 	DIR *dir = opendir(c_path);
 	if (!dir) {
-		return ReadDirectory_NotDir;
+		switch (errno) {
+		case ENOENT:
+			return ReadDirectory_NotExists;
+		case EACCES:
+			return ReadDirectory_Permission;
+		case ENOTDIR:
+			return ReadDirectory_NotDir;
+		default:
+			// ENOMEM: out of memory
+			// EMFILE: per-process limit on open fds reached
+			// ENFILE: system-wide limit on total open files reached
+			return ReadDirectory_Unknown;
+		}
+		GB_PANIC("unreachable");
 	}
 
 	array_init(fi, a, 0, 100);
