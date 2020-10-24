@@ -209,6 +209,8 @@ enum ProcCallingConvention {
 	ProcCC_None = 7,
 	ProcCC_PureNone = 8,
 
+	ProcCC_InlineAsm = 9,
+
 	ProcCC_MAX,
 
 
@@ -248,6 +250,20 @@ enum StmtAllowFlag {
 	StmtAllowFlag_None    = 0,
 	StmtAllowFlag_In      = 1<<0,
 	StmtAllowFlag_Label   = 1<<1,
+};
+
+enum InlineAsmDialectKind : u8 {
+	InlineAsmDialect_Default, // ATT is default
+	InlineAsmDialect_ATT,
+	InlineAsmDialect_Intel,
+
+	InlineAsmDialect_COUNT,
+};
+
+char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
+	"",
+	"att",
+	"intel",
 };
 
 #define AST_KINDS \
@@ -323,6 +339,17 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(TypeAssertion, "type assertion",      struct { Ast *expr; Token dot; Ast *type; Type *type_hint; }) \
 	AST_KIND(TypeCast,      "type cast",           struct { Token token; Ast *type, *expr; }) \
 	AST_KIND(AutoCast,      "auto_cast",           struct { Token token; Ast *expr; }) \
+	AST_KIND(InlineAsmExpr, "inline asm expression", struct { \
+		Token token; \
+		Token open, close; \
+		Array<Ast *> param_types; \
+		Ast *return_type; \
+		Ast *asm_string; \
+		Ast *constraints_string; \
+		bool has_side_effects; \
+		bool is_align_stack; \
+		InlineAsmDialectKind dialect; \
+	}) \
 AST_KIND(_ExprEnd,       "", bool) \
 AST_KIND(_StmtBegin,     "", bool) \
 	AST_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
@@ -336,10 +363,6 @@ AST_KIND(_StmtBegin,     "", bool) \
 	AST_KIND(AssignStmt, "assign statement", struct { \
 		Token op; \
 		Array<Ast *> lhs, rhs; \
-	}) \
-	AST_KIND(IncDecStmt, "increment decrement statement", struct { \
-		Token op; \
-		Ast *expr; \
 	}) \
 AST_KIND(_ComplexStmtBegin, "", bool) \
 	AST_KIND(BlockStmt, "block statement", struct { \

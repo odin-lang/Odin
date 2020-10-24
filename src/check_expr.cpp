@@ -4260,11 +4260,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		if (o.mode == Addressing_Invalid || o.mode == Addressing_Builtin) {
 			return false;
 		}
-		if (o.type == nullptr || o.type == t_invalid) {
-			error(o.expr, "Invalid argument to 'type_of'");
-			return false;
-		}
-		if (o.type == nullptr || o.type == t_invalid) {
+		if (o.type == nullptr || o.type == t_invalid || is_type_asm_proc(o.type)) {
 			error(o.expr, "Invalid argument to 'type_of'");
 			return false;
 		}
@@ -4300,7 +4296,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 		Type *t = o.type;
-		if (t == nullptr || t == t_invalid || is_type_polymorphic(t)) {
+		if (t == nullptr || t == t_invalid || is_type_asm_proc(o.type) || is_type_polymorphic(t)) {
 			if (is_type_polymorphic(t)) {
 				error(ce->args[0], "Invalid argument for 'type_info_of', unspecialized polymorphic type");
 			} else {
@@ -4339,7 +4335,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 		Type *t = o.type;
-		if (t == nullptr || t == t_invalid || is_type_polymorphic(operand->type)) {
+		if (t == nullptr || t == t_invalid || is_type_asm_proc(o.type) || is_type_polymorphic(operand->type)) {
 			error(ce->args[0], "Invalid argument for 'typeid_of'");
 			return false;
 		}
@@ -10010,6 +10006,57 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		}
 	case_end;
 
+	case_ast_node(ia, InlineAsmExpr, node);
+		if (c->curr_proc_decl == nullptr) {
+			error(node, "Inline asm expressions are only allowed within a procedure body");
+		}
+
+		if (!build_context.use_llvm_api) {
+			error(node, "Inline asm expressions are only currently allowed with -llvm-api");
+		}
+
+		auto param_types = array_make<Type *>(heap_allocator(), ia->param_types.count);
+		Type *return_type = nullptr;
+		for_array(i, ia->param_types) {
+			param_types[i] = check_type(c, ia->param_types[i]);
+		}
+		if (ia->return_type != nullptr) {
+			return_type = check_type(c, ia->return_type);
+		}
+		Operand x = {};
+		check_expr(c, &x, ia->asm_string);
+		if (x.mode != Addressing_Constant || !is_type_string(x.type)) {
+			error(x.expr, "Expected a constant string for the inline asm main parameter");
+		}
+		check_expr(c, &x, ia->constraints_string);
+		if (x.mode != Addressing_Constant || !is_type_string(x.type)) {
+			error(x.expr, "Expected a constant string for the inline asm constraints parameter");
+		}
+
+		Scope *scope = create_scope(c->scope, heap_allocator());
+		scope->flags |= ScopeFlag_Proc;
+
+		Type *params = alloc_type_tuple();
+		Type *results = alloc_type_tuple();
+		if (param_types.count != 0) {
+			array_init(&params->Tuple.variables, heap_allocator(), param_types.count);
+			for_array(i, param_types) {
+				params->Tuple.variables[i] = alloc_entity_param(scope, blank_token, param_types[i], false, true);
+			}
+		}
+		if (return_type != nullptr) {
+			array_init(&results->Tuple.variables, heap_allocator(), 1);
+			results->Tuple.variables[0] = alloc_entity_param(scope, blank_token, return_type, false, true);
+		}
+
+
+		Type *pt = alloc_type_proc(scope, params, param_types.count, results, return_type != nullptr ? 1 : 0, false, ProcCC_InlineAsm);
+		o->type = pt;
+		o->mode = Addressing_Value;
+		o->expr = node;
+		return Expr_Expr;
+	case_end;
+
 	case Ast_TypeidType:
 	case Ast_PolyType:
 	case Ast_ProcType:
@@ -10538,6 +10585,37 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 		str = write_expr_to_string(str, rt->tag);
 		str = gb_string_appendc(str, "" );
 		str = write_expr_to_string(str, rt->type);
+	case_end;
+
+
+	case_ast_node(ia, InlineAsmExpr, node);
+		str = gb_string_appendc(str, "asm(");
+		for_array(i, ia->param_types) {
+			if (i > 0) {
+				str = gb_string_appendc(str, ", ");
+			}
+			str = write_expr_to_string(str, ia->param_types[i]);
+		}
+		str = gb_string_appendc(str, ")");
+		if (ia->return_type != nullptr) {
+			str = gb_string_appendc(str, " -> ");
+			str = write_expr_to_string(str, ia->return_type);
+		}
+		if (ia->has_side_effects) {
+			str = gb_string_appendc(str, " #side_effects");
+		}
+		if (ia->is_align_stack) {
+			str = gb_string_appendc(str, " #stack_align");
+		}
+		if (ia->dialect) {
+			str = gb_string_appendc(str, " #");
+			str = gb_string_appendc(str, inline_asm_dialect_strings[ia->dialect]);
+		}
+		str = gb_string_appendc(str, " {");
+		str = write_expr_to_string(str, ia->asm_string);
+		str = gb_string_appendc(str, ", ");
+		str = write_expr_to_string(str, ia->constraints_string);
+		str = gb_string_appendc(str, "}");
 	case_end;
 	}
 
