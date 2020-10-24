@@ -9,18 +9,7 @@ Tick :: struct {
     _ns: u64,
 }
 
-/**
- * Prevents 64-bit overflow when converting 
- * 
- * @see https://gist.github.com/jspohr/3dc4f00033d79ec5bdaf67bc46c813e3
- */
-int64_safediv :: proc(v: i64, n: i64, d: i64) -> i64 {
-    q := v / d;
-    r := v % d;
-    return q * n + r * n / d;
-}
-
-diff :: proc(new: Tick, old: Tick) -> Tick {
+diff :: proc(new, old: Tick) -> Tick {
     if new._ns > old._ns {
         return Tick{ _ns=new._ns - old._ns };
     }
