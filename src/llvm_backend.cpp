@@ -7835,8 +7835,17 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 
 	case BuiltinProc_cpu_relax:
-		// TODO(bill): BuiltinProc_cpu_relax
-		// ir_write_str_lit(f, "call void asm sideeffect \"pause\", \"\"()");
+		{
+			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
+			LLVMValueRef the_asm = LLVMGetInlineAsm(func_type,
+				"pause", 5,
+				"", 0,
+				/*HasSideEffects*/true, /*IsAlignStack*/false,
+				LLVMInlineAsmDialectATT
+			);
+			GB_ASSERT(the_asm != nullptr);
+			LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+		}
 		return {};
 
 	case BuiltinProc_atomic_fence:
