@@ -7,7 +7,7 @@ import "core:sys/win32"
 qpc_freq : i64;
 
 /**
- * Prevents 64-bit overflow when converting 
+ * Prevents 64-bit overflow when converting from sec to ns
  * 
  * @see https://gist.github.com/jspohr/3dc4f00033d79ec5bdaf67bc46c813e3
  */
@@ -26,5 +26,5 @@ now :: proc() -> Tick {
     win32.query_performance_counter(&now);
 
     result := int64_safediv(now, 1000000000, qpc_freq);
-    return Tick{ _ns=u64(result) };
+    return Tick{ _nsec=result };
 }

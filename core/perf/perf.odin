@@ -2,47 +2,41 @@ package perf
 
 import "core:time"
 
-/**
- * Time relative to performance counter start
- */
 Tick :: struct {
-    _ns: u64,
+    _nsec: i64, // zero is performance counter start
 }
 
-diff :: proc(new, old: Tick) -> Tick {
-    if new._ns > old._ns {
-        return Tick{ _ns=new._ns - old._ns };
-    }
-    return Tick{ _ns=1 };
+Duration :: time.Duration;
+
+ns  :: time.duration_nanoseconds;
+us  :: time.duration_microseconds;
+ms  :: time.duration_milliseconds;
+sec :: time.duration_seconds;
+
+diff :: inline proc(new, old: Tick) -> Duration {
+    return time.Duration(new._nsec - old._nsec);
 }
 
-since :: proc(start: Tick) -> Tick {
+since :: inline proc(start: Tick) -> Duration {
     return diff(now(), start);
 }
 
-laptime :: proc(last: ^Tick) -> Tick {
+laptime :: proc(last: ^Tick) -> Duration {
     assert(last != nil);
-    dt : Tick;
+    d : Duration;
     now := now();
-    if last._ns != 0 {
-        dt = diff(now, last^);
+    if last._nsec != 0 {
+        d = diff(now, last^);
     }
     last^ = now;
-    return dt;
+    return d;
 }
 
-sec :: inline proc(t: Tick) -> f64 {
-    return f64(t._ns) / 1000000000.0;
+@(deferred_out=_end_scope_duration)
+scope_duration :: proc(d: ^Duration) -> (Tick, ^Duration) {
+    return now(), d;
 }
 
-ms :: inline proc(t: Tick) -> f64 {
-    return f64(t._ns) / 1000000.0;
-}
-
-us :: inline proc(t: Tick) -> f64 {
-    return f64(t._ns) / 1000.0;
-}
-
-ns :: inline proc(t: Tick) -> f64 {
-    return f64(t._ns);
+_end_scope_duration :: proc(t: Tick, d: ^Duration) {
+    d^ = since(t);
 }
