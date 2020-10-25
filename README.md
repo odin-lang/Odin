@@ -1,3 +1,5 @@
+TEST
+
 <p align="center">
     <img src="misc/logo-slim.png" alt="Odin logo" height="120">
     <br/>
