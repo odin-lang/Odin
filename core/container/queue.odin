@@ -65,6 +65,10 @@ queue_space :: proc(q: $Q/Queue($T)) -> int {
 	return array_len(q.data) - q.len;
 }
 
+queue_slice :: proc(q: ^$Q/Queue($T)) -> []T {
+	return array_slice(q.data)[q.offset:][:q.len];
+}
+
 queue_get :: proc(q: $Q/Queue($T), index: int) -> T {
 	i := (index + q.offset) % array_len(q.data);
 	data := array_slice(q.data);
