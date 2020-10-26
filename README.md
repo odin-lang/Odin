@@ -1,7 +1,7 @@
 <p align="center">
     <img src="misc/logo-slim.png" alt="Odin logo" height="120">
     <br/>
-    A fast, concise, readable, pragmatic and open sourced programming language.
+    A fast, concise, readable, pragmatic and open-source programming language.
     <br/>
     <br/>
     <a href="https://github.com/odin-lang/odin/releases/latest">
@@ -21,7 +21,7 @@
 
 # The Odin Programming Language
 
-The Odin programming language is fast, concise, readable, pragmatic and open sourced. It is designed with the intent of creating an alternative to C with the following goals:
+The Odin programming language is fast, concise, readable, pragmatic and open-source. It is designed with the intent of creating an alternative to C with the following goals:
 * simplicity
 * high performance
 * built for modern systems
@@ -105,7 +105,7 @@ In addition, the following platform-specific steps are necessary:
         * **Basic:** run the `x64 Native Tools Command Prompt for VS2017` shortcut bundled with VS 2017, or
         * **Advanced:** run `vcvarsall.bat x64` from a blank `cmd` session
 
-- MacOS
+- macOS
     * Have LLVM explicitly installed (`brew install llvm`)
     * Have XCode installed (version X.X or later, for linking)
     * Make sure the LLVM binaries and the linker are added to your `$PATH` environmental variable
@@ -115,7 +115,7 @@ In addition, the following platform-specific steps are necessary:
     * Have Clang installed (version X.X or later, for linking)
     * Make sure the LLVM binaries and the linker are added to your `$PATH` environmental variable
 
-Then build the compiler by calling `build.bat` (Windows) or `make` (Linux/MacOS). This will automatically run the demo program if successful.
+Then build the compiler by calling `build.bat` (Windows) or `make` (Linux/macOS). This will automatically run the demo program if successful.
 
 **Notes for Linux:**: The compiler currently relies on the `core` and `shared` library collection being relative to the compiler executable. Installing the compiler in the usual sense (to `/usr/local/bin` or similar) is therefore not as straight forward as you need to make sure the mentioned libraries are available. As a result, it is recommended to simply explicitly invoke the compiler with `/path/to/odin` in your preferred build system, or add `/path/to/odin` to `$PATH`.
 
@@ -130,7 +130,7 @@ Please read the [Getting Started Guide](https://github.com/odin-lang/Odin/wiki#g
 	* MSVC 2010 installed (C++11 support)
 	* [LLVM binaries](https://github.com/odin-lang/Odin/releases/tag/llvm-windows) for `opt.exe`, `llc.exe`, and `lld-link.exe`
 	* Requires MSVC's link.exe as the linker
-		* run `vcvarsall.bat` to setup the path
+		* run `vcvarsall.bat` to set up the path
 
 - MacOS
 	* x86-64/amd64
