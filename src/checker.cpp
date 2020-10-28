@@ -4309,6 +4309,10 @@ void check_parsed_files(Checker *c) {
 			GB_ASSERT(c->info.runtime_package == nullptr);
 			c->info.runtime_package = p;
 		}
+		if (p->kind == Package_Init) {
+			GB_ASSERT(c->info.init_package == nullptr);
+			c->info.init_package = p;
+		}
 	}
 
 	TIME_SECTION("collect entities");

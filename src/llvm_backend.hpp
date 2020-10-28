@@ -211,6 +211,8 @@ struct lbProcedure {
 	Array<lbBranchBlocks> branch_blocks;
 	Scope *          curr_scope;
 	i32              scope_index;
+	Array<Scope *>   scope_stack;
+
 	lbBlock *        decl_block;
 	lbBlock *        entry_block;
 	lbBlock *        curr_block;
@@ -219,6 +221,8 @@ struct lbProcedure {
 	Ast *curr_stmt;
 
 	Array<lbContextData> context_stack;
+
+	LLVMMetadataRef debug_info;
 
 	lbValue  return_ptr_hint_value;
 	Ast *    return_ptr_hint_ast;
@@ -354,6 +358,7 @@ lbValue lb_emit_source_code_location(lbProcedure *p, String const &procedure, To
 
 lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos);
 
+LLVMMetadataRef lb_debug_type(lbModule *m, Type *type);
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"

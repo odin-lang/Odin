@@ -197,3 +197,31 @@ is_windows_10 :: proc() -> bool {
 	return (osvi.major_version == 10 && osvi.minor_version == 0);
 }
 
+
+
+
+urandom :: proc(data: []byte) -> (success: bool) {
+	return urandom_ptr(raw_data(data), len(data));
+}
+urandom_ptr :: proc(ptr: rawptr, len: int) -> (success: bool) {
+	@static h_crypt_prov: win32.HCRYPTPROV;
+	if h_crypt_prov == nil {
+		if !win32.CryptAcquireContextW(&h_crypt_prov, nil, nil, win32.PROV_RSA_FULL, win32.CRYPT_VERIFYCONTEXT) {
+			return false;
+		}
+	}
+
+	size := len;
+	data := uintptr(ptr);
+	for size > 0 {
+		MAX_CHUNK :: 1<<31 - 1;
+		chunk := win32.DWORD(min(size, MAX_CHUNK));
+		if !win32.CryptGenRandom(h_crypt_prov, chunk, (^win32.BYTE)(data)) {
+			return false;
+		}
+		data += uintptr(chunk);
+		size -= int(chunk);
+	}
+
+	return true;
+}
