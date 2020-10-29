@@ -25,8 +25,9 @@ jobs:
       - name: Download LLVM and setup PATH
         run: |
           brew install llvm
-          echo ::add-path::/usr/local/opt/llvm/bin
-          echo ::set-env name=CPATH::`xcrun --show-sdk-path`/usr/include
+          echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
+          echo "CPATH=`xcrun --show-sdk-path`/usr/include" >> $GITHUB_ENV
+          echo $CPATH
       - name: build odin
         run: make release
       - name: Odin run
