@@ -1623,6 +1623,7 @@ irDefer ir_add_defer_proc(irProcedure *proc, isize scope_index, irValue *deferre
 	return d;
 }
 
+irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value);
 
 irValue *ir_check_compound_lit_constant(irModule *m, Ast *expr) {
 	expr = unparen_expr(expr);
@@ -1644,6 +1645,14 @@ irValue *ir_check_compound_lit_constant(irModule *m, Ast *expr) {
 	if (expr->kind == Ast_ProcLit) {
 		return ir_gen_anonymous_proc_lit(m, str_lit("_proclit"), expr);
 	}
+
+	if (expr->kind == Ast_Ident || expr->kind == Ast_SelectorExpr) {
+		TypeAndValue tav = type_and_value_of_expr(expr);
+		if (tav.mode == Addressing_Constant) {
+			return ir_add_module_constant(m, tav.type, tav.value);
+		}
+	}
+
 	return 	nullptr;
 }
 
