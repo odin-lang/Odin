@@ -15,14 +15,15 @@ jobs:
       - name: Odin check
         run: ./odin check examples/demo/demo.odin -vet
   build_macOS:
-    runs-on: macOS-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM and setup PATH
         run: |
           brew install llvm
-          echo ::add-path::/usr/local/opt/llvm/bin
-          echo ::set-env name=CPATH::`xcrun --show-sdk-path`/usr/include
+          echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
+          TMP_PATH=$(xcrun --show-sdk-path)/user/include
+          echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
         run: make release
       - name: Odin run
