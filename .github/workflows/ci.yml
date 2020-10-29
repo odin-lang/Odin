@@ -22,12 +22,12 @@ jobs:
         with:
           xcode-version: 11.7
       - uses: actions/checkout@v1
-      - name: Download LLVM and setup PATH
-        run: |
-          brew install llvm
-          echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
-          echo "CPATH=`xcrun --show-sdk-path`/usr/include" >> $GITHUB_ENV
-          echo $CPATH
+#       - name: Download LLVM and setup PATH
+#         run: |
+#           brew install llvm
+#           echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
+#           echo "CPATH=`xcrun --show-sdk-path`/usr/include" >> $GITHUB_ENV
+#           echo $CPATH
       - name: build odin
         run: make release
       - name: Odin run
