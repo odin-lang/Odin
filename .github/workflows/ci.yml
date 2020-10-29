@@ -17,6 +17,10 @@ jobs:
   build_macOS:
     runs-on: macOS-latest
     steps:
+      - name: Setup Xcode version
+        uses: maxim-lobanov/setup-xcode@v1.2.1
+        with:
+          xcode-version: 11.7
       - uses: actions/checkout@v1
       - name: Download LLVM and setup PATH
         run: |
