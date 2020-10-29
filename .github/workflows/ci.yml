@@ -17,17 +17,19 @@ jobs:
   build_macOS:
     runs-on: macos-11.0
     steps:
-      - name: Setup Xcode version
-        uses: maxim-lobanov/setup-xcode@v1.2.1
-        with:
-          xcode-version: 11.7
       - uses: actions/checkout@v1
-#       - name: Download LLVM and setup PATH
-#         run: |
-#           brew install llvm
-#           echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
-#           echo "CPATH=`xcrun --show-sdk-path`/usr/include" >> $GITHUB_ENV
-#           echo $CPATH
+      - name: Download LLVM and setup PATH
+        run: |
+          brew install llvm
+          echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
+          TMP_PATH=$(xcrun --show-sdk-path)/user/include
+          echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
+          echo $CPATH
+      - name: TEST
+        run: |
+          echo $CPATH
+          llc --version
+          opt --version
       - name: build odin
         run: make release
       - name: Odin run
