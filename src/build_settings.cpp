@@ -427,33 +427,34 @@ String odin_root_dir(void) {
 
 #elif defined(GB_SYSTEM_OSX)
 
-#include <mach-o/dyld.h>
+#include <libproc.h>
 
 String path_to_fullpath(gbAllocator a, String s);
 
 String odin_root_dir(void) {
-	String path = global_module_path;
-	isize len, i;
-	gbTempArenaMemory tmp;
-	u8 *text;
+  String path = global_module_path;
+  isize len, i;
+  gbTempArenaMemory tmp;
+  u8 *text;
 
-	if (global_module_path_set) {
-		return global_module_path;
-	}
+  if (global_module_path_set) {
+    return global_module_path;
+  }
 
-	auto path_buf = array_make<char>(heap_allocator(), 300);
-
-	len = 0;
-	for (;;) {
-		u32 sz = path_buf.count;
-		int res = _NSGetExecutablePath(&path_buf[0], &sz);
-		if(res == 0) {
-			len = sz;
-			break;
-		} else {
-			array_resize(&path_buf, sz + 1);
-		}
-	}
+  auto path_buf = array_make<char>(heap_allocator(), PROC_PIDPATHINFO_MAXSIZE);
+  
+  len = 0;
+  for (;;) {
+    u32 sz = path_buf.count;
+    int pid = getpid();
+    int res = proc_pidpath(pid, &path_buf[0], sz);
+    if(res == 0) {
+      len = sz;
+      break;
+    } else {
+      array_resize(&path_buf, sz + 1);
+    }
+  }
 
 	gb_mutex_lock(&string_buffer_mutex);
 	defer (gb_mutex_unlock(&string_buffer_mutex));
