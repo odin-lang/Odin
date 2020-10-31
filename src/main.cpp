@@ -341,11 +341,11 @@ i32 linker_stage(lbGenerator *gen) {
 					String lib_name = lib;
 					lib_name = remove_extension_from_path(lib_name);
 					lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", LIT(lib_name));
-				} else if (string_ends_with(lib, str_lit(".a"))) {
+				} else if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o")) || string_ends_with(lib, str_lit(".dylib"))) {
+          				// For:
+          				// object 
+          				// dynamic lib
 					// static libs, absolute full path relative to the file in which the lib was imported from
-					lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
-				} else if (string_ends_with(lib, str_lit(".dylib"))) {
-					// dynamic lib
 					lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
 				} else {
 					// dynamic or static system lib, just link regularly searching system library paths
@@ -431,19 +431,19 @@ i32 linker_stage(lbGenerator *gen) {
 				" -e _main "
 			#endif
 			, linker, object_files, LIT(output_base), LIT(output_ext),
-			lib_str,
-      #if defined(GB_SYSTEM_OSX)
-        "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
-      #else
-        "-lc -lm",
-      #endif
+      			#if defined(GB_SYSTEM_OSX)
+        			"-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
+      			#else
+        			"-lc -lm",
+      			#endif
+      			lib_str,
 			LIT(build_context.link_flags),
 			LIT(build_context.extra_linker_flags),
 			link_settings);
 		if (exit_code != 0) {
 			return exit_code;
 		}
-
+    
 	#if defined(GB_SYSTEM_OSX)
 		if (build_context.ODIN_DEBUG) {
 			// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
@@ -2136,13 +2136,14 @@ int main(int arg_count, char const **arg_ptr) {
 						String lib_name = lib;
 						lib_name = remove_extension_from_path(lib_name);
 						lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", LIT(lib_name));
-					} else if (string_ends_with(lib, str_lit(".a"))) {
-						// static libs, absolute full path relative to the file in which the lib was imported from
-						lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
-					} else if (string_ends_with(lib, str_lit(".dylib"))) {
-						// dynamic lib
-						lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
-					} else {
+						
+				} else if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o")) || string_ends_with(lib, str_lit(".dylib"))) {
+          				// For:
+          				// object 
+          				// dynamic lib
+					// static libs, absolute full path relative to the file in which the lib was imported from
+					lib_str = gb_string_append_fmt(lib_str, " %.*s ", LIT(lib));
+				} else {
 						// dynamic or static system lib, just link regularly searching system library paths
 						lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 					}
@@ -2220,11 +2221,11 @@ int main(int arg_count, char const **arg_ptr) {
 				#endif
 				, linker, LIT(output_base), LIT(output_base), LIT(output_ext),
 				lib_str,
-        #if defined(GB_SYSTEM_OSX)
-          "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
-        #else
-          "-lc -lm",
-        #endif
+        			#if defined(GB_SYSTEM_OSX)
+          				"-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
+        			#else
+          				"-lc -lm",
+        			#endif
 				LIT(build_context.link_flags),
 				LIT(build_context.extra_linker_flags),
 				link_settings);
