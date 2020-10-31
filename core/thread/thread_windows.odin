@@ -92,7 +92,7 @@ join_multiple :: proc(threads: ..^Thread) {
 
 	for k := 0; k < len(threads); k += MAXIMUM_WAIT_OBJECTS {
 		count := min(len(threads) - k, MAXIMUM_WAIT_OBJECTS);
-		n, j := u32(0), 0;
+		j := 0;
 		for i in 0..<count {
 			handle := threads[i+k].win32_thread;
 			if handle != win32.INVALID_HANDLE {
@@ -100,7 +100,7 @@ join_multiple :: proc(threads: ..^Thread) {
 				j += 1;
 			}
 		}
-		win32.WaitForMultipleObjects(n, &handles[0], true, win32.INFINITE);
+		win32.WaitForMultipleObjects(u32(j), &handles[0], true, win32.INFINITE);
 	}
 
 	for t in threads {
