@@ -435,7 +435,7 @@ i32 linker_stage(lbGenerator *gen) {
 			#endif
 			, linker, object_files, LIT(output_base), LIT(output_ext),
       #if defined(GB_SYSTEM_OSX)
-        "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk -L/usr/local/lib",
+        "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
       #else
         "-lc -lm",
       #endif
