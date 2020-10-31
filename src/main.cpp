@@ -431,19 +431,19 @@ i32 linker_stage(lbGenerator *gen) {
 				" -e _main "
 			#endif
 			, linker, object_files, LIT(output_base), LIT(output_ext),
-			lib_str,
       #if defined(GB_SYSTEM_OSX)
-        "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk -L/usr/local/lib",
       #else
         "-lc -lm",
       #endif
+      lib_str,
 			LIT(build_context.link_flags),
 			LIT(build_context.extra_linker_flags),
 			link_settings);
 		if (exit_code != 0) {
 			return exit_code;
 		}
-
+    
 	#if defined(GB_SYSTEM_OSX)
 		if (build_context.ODIN_DEBUG) {
 			// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
@@ -2221,7 +2221,7 @@ int main(int arg_count, char const **arg_ptr) {
 				, linker, LIT(output_base), LIT(output_base), LIT(output_ext),
 				lib_str,
         #if defined(GB_SYSTEM_OSX)
-          "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+          "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
         #else
           "-lc -lm",
         #endif
