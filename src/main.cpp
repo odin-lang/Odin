@@ -587,6 +587,7 @@ enum BuildFlagKind {
 
 	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
+	BuildFlag_InsertSemicolon,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -687,6 +688,7 @@ bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_DisallowDo,            str_lit("disallow-do"),              BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator, str_lit("default-to-nil-allocator"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_InsertSemicolon,       str_lit("insert-semicolon"),         BuildFlagParam_None);
 
 	add_flag(&build_flags, BuildFlag_Compact, str_lit("compact"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_GlobalDefinitions, str_lit("global-definitions"), BuildFlagParam_None);
@@ -1125,6 +1127,10 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_DefaultToNilAllocator:
 							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
+							break;
+
+						case BuildFlag_InsertSemicolon:
+							build_context.insert_semicolon = true;
 							break;
 
 						case BuildFlag_Compact:

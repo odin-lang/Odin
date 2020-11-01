@@ -157,6 +157,7 @@ struct BuildContext {
 	bool   different_os;
 	bool   keep_object_files;
 	bool   disallow_do;
+	bool   insert_semicolon;
 
 	bool   use_llvm_api;
 

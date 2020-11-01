@@ -935,7 +935,7 @@ Small_Allocator :: struct(BUFFER_SIZE: int)
 	start:      uintptr,
 	curr:       uintptr,
 	end:        uintptr,
-	chunk_size: int
+	chunk_size: int,
 }
 
 small_allocator :: proc(s: ^$S/Small_Allocator, backing := context.allocator) -> (a: Allocator) {
