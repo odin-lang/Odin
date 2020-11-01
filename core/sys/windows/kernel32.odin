@@ -183,8 +183,7 @@ foreign kernel32 {
 		lpOverlapped: LPOVERLAPPED,
 	) -> BOOL ---
 	CloseHandle :: proc(hObject: HANDLE) -> BOOL ---
-	MoveFileExW :: proc(lpExistingFileName: LPCWSTR, lpNewFileName: LPCWSTR, dwFlags: DWORD)
-	-> BOOL ---
+	MoveFileExW :: proc(lpExistingFileName: LPCWSTR, lpNewFileName: LPCWSTR, dwFlags: DWORD) -> BOOL ---
 	SetFilePointerEx :: proc(
 		hFile: HANDLE,
 		liDistanceToMove: LARGE_INTEGER,
