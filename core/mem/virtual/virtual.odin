@@ -92,7 +92,7 @@ Arena :: struct {
 	cursor: int,
 
 	pages_committed: int,
-	high_mark:       int, // largest number of bytes allocated
+	peak_used:       int, // largest number of bytes allocated
 
 	desired_base_ptr: rawptr, // may be nil on first allocation
 }
@@ -146,7 +146,7 @@ arena_alloc :: proc(va: ^Arena, requested_size, alignment: int) -> rawptr {
 		va.pages_committed = new_total_pages_needed;
 	}
 
-	va.high_mark = max(va.high_mark, new_cursor);
+	va.peak_used = max(va.peak_used, new_cursor);
 	va.cursor = new_cursor;
 
 	return ptr;
@@ -182,7 +182,7 @@ arena_realloc :: proc(va: ^Arena, old_memory: rawptr, old_size, new_size, alignm
 		va.pages_committed = new_total_pages_needed;
 	}
 
-	va.high_mark = max(va.high_mark, new_cursor);
+	va.peak_used = max(va.peak_used, new_cursor);
 	va.cursor = new_cursor;
 
 	return old_memory;
