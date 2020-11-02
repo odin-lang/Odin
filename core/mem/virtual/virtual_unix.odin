@@ -56,10 +56,12 @@ reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
 
 alloc :: proc(size: int, desired_base: rawptr = nil, access := Memory_Access_Flags{.Read, .Write}) -> (memory: []byte) {
 	memory = reserve(size, desired_base);
-	if memory == nil do return;
-
-	ok := commit(memory, access);
-	assert(ok);
+	if memory == nil {
+		return nil;
+	}
+	if !commit(memory, access) {
+		return nil;
+	}
 	return;
 }
 
@@ -73,11 +75,16 @@ release :: proc(memory: []byte) {
 	assert(res != MAP_FAILED);
 }
 
+// With the default overcommit setup, this will fail if you ask for wildly more memory than is available.
+// Otherwise, will not fail.
+// You will get a segfault on access if the system runs out of swap.
 @(require_results)
 commit :: proc(memory: []byte, access := Memory_Access_Flags{.Read, .Write}) -> bool {
 	assert(memory != nil);
 
-	set_access(memory, access);
+	if !set_access(memory, access) {
+		return false;
+	}
 	_ = _unix_madvise(&memory[0], u64(len(memory)), MADV_WILLNEED); // ignored, since advisory is not required
 	return true;
 }
@@ -89,11 +96,12 @@ decommit :: proc(memory: []byte) {
 	_ = _unix_madvise(&memory[0], u64(len(memory)), MADV_DONTNEED); // ignored, since advisory is not required
 }
 
-set_access :: proc(memory: []byte, access: Memory_Access_Flags) {
+set_access :: proc(memory: []byte, access: Memory_Access_Flags) -> bool {
 	assert(memory != nil);
 
 	page_size := os.get_page_size();
 	assert(mem.align_forward(&memory[0], uintptr(page_size)) == &memory[0], "must start at page boundary");
 	ret := _unix_mprotect(&memory[0], u64(len(memory)), transmute(i32) access);
-	assert(ret == 0);
+	return ret == 0;
+
 }

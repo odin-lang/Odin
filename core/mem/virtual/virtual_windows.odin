@@ -99,7 +99,7 @@ decommit :: proc(memory: []byte) {
 	assert(ok);
 }
 
-set_access :: proc(memory: []byte, access: Memory_Access_Flags) {
+set_access :: proc(memory: []byte, access: Memory_Access_Flags) -> bool {
 	assert(memory != nil);
 
 	page_size := os.get_page_size();
@@ -108,5 +108,5 @@ set_access :: proc(memory: []byte, access: Memory_Access_Flags) {
 	flags := access_to_flags(access);
 	unused: u32 = ---;
 	ok := bool(win.VirtualProtect(raw_data(memory), uint(len(memory)), u32(flags), &unused));
-	assert(ok);
+	return ok;
 }
