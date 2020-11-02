@@ -52,15 +52,6 @@ reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
 	return;
 }
 
-alloc :: proc(size: int, desired_base: rawptr = nil, access := Memory_Access_Flags{.Read, .Write}) -> (memory: []byte) {
-	flags := access_to_flags(access);
-	ptr := win.VirtualAlloc(desired_base, uint(size), win.MEM_RESERVE | win.MEM_COMMIT, flags);
-	if ptr != nil {
-		memory = mem.slice_ptr_to_bytes(ptr, size);
-	}
-	return;
-}
-
 release :: proc(originally_reserved_region: []byte) {
 	if originally_reserved_region == nil do return;
 

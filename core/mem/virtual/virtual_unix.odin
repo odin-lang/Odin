@@ -54,17 +54,6 @@ reserve :: proc(size: int, desired_base: rawptr = nil) -> (memory: []byte) {
 	return;
 }
 
-alloc :: proc(size: int, desired_base: rawptr = nil, access := Memory_Access_Flags{.Read, .Write}) -> (memory: []byte) {
-	memory = reserve(size, desired_base);
-	if memory == nil {
-		return nil;
-	}
-	if !commit(memory, access) {
-		return nil;
-	}
-	return;
-}
-
 release :: proc(memory: []byte) {
 	if memory == nil do return;
 
