@@ -75,7 +75,7 @@ the_basics :: proc() {
 		// Binary literals are prefixed with 0b, octal literals with 0o, and hexadecimal
 		// literals 0x. A leading zero does not produce an octal constant (unlike C).
 
-		// In Odin, if a number constant is possible to be represented by a type without
+		// In Odin, if a numeric constant can be represented by a type without
 		// precision loss, it will automatically convert to that type.
 
 		x: int = 1.0; // A float literal but it can be represented by an integer without precision loss
@@ -85,7 +85,7 @@ the_basics :: proc() {
 		y = 1;  // `1` is an untyped integer literal which can implicitly convert to `int`
 
 		z: f64; // `z` is typed of type `f64` (64-bit floating point number)
-		z = 1;  // `1` is an untyped integer literals which can be implicity conver to `f64`
+		z = 1;  // `1` is an untyped integer literal which can be implicitly converted to `f64`
 				// No need for any suffixes or decimal places like in other languages
 				// CONSTANTS JUST WORK!!!
 
@@ -150,7 +150,7 @@ control_flow :: proc() {
 			i += 1;
 		}
 
-		// If the condition is omitted, this produces an infinite loop:
+		// If the condition is omitted, an infinite loop is produced:
 		for {
 			break;
 		}
