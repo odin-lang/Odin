@@ -30,7 +30,7 @@ The proposal process is the process for reviewing a proposal and reaching a deci
 	* Accept proposal
 	* Decline proposal
 
-After the proposal is accepted or declined, implementation of the proprosal proceeds in the same way as any other contribution to the project.
+After the proposal is accepted or declined, implementation of the proposal proceeds in the same way as any other contribution to the project.
 
 ## Design Documents
 
