@@ -216,7 +216,7 @@ split_last :: proc(array: $T/[]$E) -> (rest: T, last: E) {
 first :: proc(array: $T/[]$E) -> E {
 	return array[0];
 }
-last :: proc(array: $T/[]$E) -> ^E {
+last :: proc(array: $T/[]$E) -> E {
 	return array[len(array)-1];
 }
 
