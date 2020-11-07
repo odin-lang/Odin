@@ -96,6 +96,9 @@ jobs:
     needs: [build_windows, build_macos, build_ubuntu]
     steps:
       - uses: actions/checkout@v1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
       
       - name: Install B2 CLI
         shell: bash
