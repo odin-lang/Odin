@@ -5,8 +5,6 @@ jobs:
   build_linux:
     runs-on: ubuntu-latest
     steps:
-      - name: TESTING
-        run: exit 1
       - uses: actions/checkout@v1
       - name: Download LLVM
         run: sudo apt-get install llvm
