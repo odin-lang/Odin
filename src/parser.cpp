@@ -4724,7 +4724,7 @@ gb_global Rune illegal_import_runes[] = {
 	'\\', // NOTE(bill): Disallow windows style filepaths
 	'!', '$', '%', '^', '&', '*', '(', ')', '=', '+',
 	'[', ']', '{', '}',
-	';', ':', '#',
+	';', '#',
 	'|', ',',  '<', '>', '?',
 };
 
