@@ -323,6 +323,7 @@ String const type_strings[] = {
 enum TypeFlag : u32 {
 	TypeFlag_Polymorphic     = 1<<1,
 	TypeFlag_PolySpecialized = 1<<2,
+	TypeFlag_InProcessOfCheckingPolymorphic = 1<<3,
 };
 
 struct Type {
@@ -1695,12 +1696,23 @@ TypeTuple *get_record_polymorphic_params(Type *t) {
 
 
 bool is_type_polymorphic(Type *t, bool or_specialized=false) {
+	if (t->flags & TypeFlag_InProcessOfCheckingPolymorphic) {
+		return false;
+	}
+
 	switch (t->kind) {
 	case Type_Generic:
 		return true;
 
 	case Type_Named:
-		return is_type_polymorphic(t->Named.base, or_specialized);
+		{
+			u32 flags = t->flags;
+			t->flags |= TypeFlag_InProcessOfCheckingPolymorphic;
+			bool ok = is_type_polymorphic(t->Named.base, or_specialized);
+			t->flags = flags;
+			return ok;
+		}
+
 	case Type_Opaque:
 		return is_type_polymorphic(t->Opaque.elem, or_specialized);
 	case Type_Pointer:
