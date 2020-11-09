@@ -1,3 +1,4 @@
+ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location);
 
 void populate_using_array_index(CheckerContext *ctx, Ast *node, AstField *field, Type *t, String name, i32 idx) {
 	t = base_type(t);
@@ -408,31 +409,49 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 				}
 				ast_node(p, Field, param);
 				Ast *type_expr = p->type;
+				Ast *default_value = unparen_expr(p->default_value);
 				Type *type = nullptr;
 				bool is_type_param = false;
 				bool is_type_polymorphic_type = false;
-				if (type_expr == nullptr) {
+				if (type_expr == nullptr && default_value == nullptr) {
 					error(param, "Expected a type for this parameter");
 					continue;
 				}
-				if (type_expr->kind == Ast_Ellipsis) {
-					type_expr = type_expr->Ellipsis.expr;
-					error(param, "A polymorphic parameter cannot be variadic");
-				}
-				if (type_expr->kind == Ast_TypeidType) {
-					is_type_param = true;
-					Type *specialization = nullptr;
-					if (type_expr->TypeidType.specialization != nullptr) {
-						Ast *s = type_expr->TypeidType.specialization;
-						specialization = check_type(ctx, s);
+
+				if (type_expr != nullptr) {
+					if (type_expr->kind == Ast_Ellipsis) {
+						type_expr = type_expr->Ellipsis.expr;
+						error(param, "A polymorphic parameter cannot be variadic");
 					}
-					type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
-				} else {
-					type = check_type(ctx, type_expr);
-					if (is_type_polymorphic(type)) {
-						is_type_polymorphic_type = true;
+					if (type_expr->kind == Ast_TypeidType) {
+						is_type_param = true;
+						Type *specialization = nullptr;
+						if (type_expr->TypeidType.specialization != nullptr) {
+							Ast *s = type_expr->TypeidType.specialization;
+							specialization = check_type(ctx, s);
+						}
+						type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
+					} else {
+						type = check_type(ctx, type_expr);
+						if (is_type_polymorphic(type)) {
+							is_type_polymorphic_type = true;
+						}
 					}
 				}
+
+				ParameterValue param_value = {};
+				if (default_value != nullptr)  {
+					Type *out_type = nullptr;
+					param_value = handle_parameter_value(ctx, type, &out_type, default_value, false);
+					if (type == nullptr && out_type != nullptr) {
+						type = out_type;
+					}
+					if (param_value.kind != ParameterValue_Constant && param_value.kind != ParameterValue_Nil) {
+						error(default_value, "Invalid parameter value");
+						param_value = {};
+					}
+				}
+
 
 				if (type == nullptr) {
 					error(params[i], "Invalid parameter type");
@@ -471,7 +490,14 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 					Token token = name->Ident.token;
 
 					if (poly_operands != nullptr) {
-						Operand operand = (*poly_operands)[entities.count];
+						Operand operand = {};
+						operand.type = t_invalid;
+						if (entities.count < poly_operands->count) {
+							operand = (*poly_operands)[entities.count];
+						} else if (param_value.kind != ParameterValue_Invalid) {
+							operand.mode = Addressing_Constant;
+							operand.value = param_value.value;
+						}
 						if (is_type_param) {
 							if (is_type_polymorphic(base_type(operand.type))) {
 								is_polymorphic = true;
@@ -486,6 +512,7 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 							}
 							if (e == nullptr) {
 								e = alloc_entity_constant(scope, token, operand.type, operand.value);
+								e->Constant.param_value = param_value;
 							}
 						}
 					} else {
@@ -493,7 +520,8 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 							e = alloc_entity_type_name(scope, token, type);
 							e->TypeName.is_type_alias = true;
 						} else {
-							e = alloc_entity_constant(scope, token, type, empty_exact_value);
+							e = alloc_entity_constant(scope, token, type, param_value.value);
+							e->Constant.param_value = param_value;
 						}
 					}
 
@@ -599,29 +627,45 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 				}
 				ast_node(p, Field, param);
 				Ast *type_expr = p->type;
+				Ast *default_value = unparen_expr(p->default_value);
 				Type *type = nullptr;
 				bool is_type_param = false;
 				bool is_type_polymorphic_type = false;
-				if (type_expr == nullptr) {
+				if (type_expr == nullptr && default_value == nullptr) {
 					error(param, "Expected a type for this parameter");
 					continue;
 				}
-				if (type_expr->kind == Ast_Ellipsis) {
-					type_expr = type_expr->Ellipsis.expr;
-					error(param, "A polymorphic parameter cannot be variadic");
-				}
-				if (type_expr->kind == Ast_TypeidType) {
-					is_type_param = true;
-					Type *specialization = nullptr;
-					if (type_expr->TypeidType.specialization != nullptr) {
-						Ast *s = type_expr->TypeidType.specialization;
-						specialization = check_type(ctx, s);
+				if (type_expr != nullptr) {
+					if (type_expr->kind == Ast_Ellipsis) {
+						type_expr = type_expr->Ellipsis.expr;
+						error(param, "A polymorphic parameter cannot be variadic");
 					}
-					type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
-				} else {
-					type = check_type(ctx, type_expr);
-					if (is_type_polymorphic(type)) {
-						is_type_polymorphic_type = true;
+					if (type_expr->kind == Ast_TypeidType) {
+						is_type_param = true;
+						Type *specialization = nullptr;
+						if (type_expr->TypeidType.specialization != nullptr) {
+							Ast *s = type_expr->TypeidType.specialization;
+							specialization = check_type(ctx, s);
+						}
+						type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
+					} else {
+						type = check_type(ctx, type_expr);
+						if (is_type_polymorphic(type)) {
+							is_type_polymorphic_type = true;
+						}
+					}
+				}
+
+				ParameterValue param_value = {};
+				if (default_value != nullptr)  {
+					Type *out_type = nullptr;
+					param_value = handle_parameter_value(ctx, type, &out_type, default_value, false);
+					if (type == nullptr && out_type != nullptr) {
+						type = out_type;
+					}
+					if (param_value.kind != ParameterValue_Constant && param_value.kind != ParameterValue_Nil) {
+						error(default_value, "Invalid parameter value");
+						param_value = {};
 					}
 				}
 
@@ -662,7 +706,14 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 					Token token = name->Ident.token;
 
 					if (poly_operands != nullptr) {
-						Operand operand = (*poly_operands)[entities.count];
+						Operand operand = {};
+						operand.type = t_invalid;
+						if (entities.count < poly_operands->count) {
+							operand = (*poly_operands)[entities.count];
+						} else if (param_value.kind != ParameterValue_Invalid) {
+							operand.mode = Addressing_Constant;
+							operand.value = param_value.value;
+						}
 						if (is_type_param) {
 							GB_ASSERT(operand.mode == Addressing_Type ||
 							          operand.mode == Addressing_Invalid);
@@ -675,6 +726,7 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 						} else {
 							// GB_ASSERT(operand.mode == Addressing_Constant);
 							e = alloc_entity_constant(scope, token, operand.type, operand.value);
+							e->Constant.param_value = param_value;
 						}
 					} else {
 						if (is_type_param) {
@@ -682,6 +734,7 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 							e->TypeName.is_type_alias = true;
 						} else {
 							e = alloc_entity_constant(scope, token, type, empty_exact_value);
+							e->Constant.param_value = param_value;
 						}
 					}
 

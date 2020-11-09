@@ -7338,6 +7338,7 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 						Entity *e = params->variables[i];
 						if (e->kind == Entity_Constant) {
 							check_expr_with_type_hint(c, &operands[i], fv->value, e->type);
+							continue;
 						}
 					}
 
@@ -7371,9 +7372,22 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 
 	TypeTuple *tuple = get_record_polymorphic_params(original_type);
 	isize param_count = tuple->variables.count;
+	isize minimum_param_count = param_count;
+	for (minimum_param_count = tuple->variables.count-1; minimum_param_count >= 0; minimum_param_count--) {
+		Entity *e = tuple->variables[minimum_param_count];
+		if (e->kind != Entity_Constant) {
+			break;
+		}
+		if (e->Constant.param_value.kind == ParameterValue_Invalid) {
+			break;
+		}
+	}
 
 	Array<Operand> ordered_operands = operands;
-	if (named_fields) {
+	if (!named_fields) {
+		ordered_operands = array_make<Operand>(c->allocator, param_count);
+		array_copy(&ordered_operands, operands, 0);
+	} else {
 		bool *visited = gb_alloc_array(c->allocator, bool, param_count);
 
 		// LEAK(bill)
@@ -7440,26 +7454,55 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 		return err;
 	}
 
-	if (param_count < ordered_operands.count) {
-		error(call, "Too many polymorphic type arguments, expected %td, got %td", param_count, ordered_operands.count);
-		err = CallArgumentError_TooManyArguments;
-	} else if (param_count > ordered_operands.count) {
-		error(call, "Too few polymorphic type arguments, expected %td, got %td", param_count, ordered_operands.count);
-		err = CallArgumentError_TooFewArguments;
+	if (minimum_param_count != param_count) {
+		if (param_count < ordered_operands.count) {
+			error(call, "Too many polymorphic type arguments, expected a maximum of %td, got %td", param_count, ordered_operands.count);
+			err = CallArgumentError_TooManyArguments;
+		} else if (minimum_param_count > ordered_operands.count) {
+			error(call, "Too few polymorphic type arguments, expected a minimum of %td, got %td", minimum_param_count, ordered_operands.count);
+			err = CallArgumentError_TooFewArguments;
+		}
+	} else {
+		if (param_count < ordered_operands.count) {
+			error(call, "Too many polymorphic type arguments, expected %td, got %td", param_count, ordered_operands.count);
+			err = CallArgumentError_TooManyArguments;
+		} else if (param_count > ordered_operands.count) {
+			error(call, "Too few polymorphic type arguments, expected %td, got %td", param_count, ordered_operands.count);
+			err = CallArgumentError_TooFewArguments;
+		}
 	}
 
 	if (err != 0) {
 		return err;
 	}
 
+	if (minimum_param_count != param_count) {
+		isize missing_count = 0;
+		// NOTE(bill): Replace missing operands with the default values (if possible)
+		for_array(i, ordered_operands) {
+			Operand *o = &ordered_operands[i];
+			if (o->expr == nullptr) {
+				Entity *e = tuple->variables[i];
+				if (e->kind == Entity_Constant) {
+					missing_count += 1;
+					o->mode = Addressing_Constant;
+					o->type = default_type(e->type);
+					o->expr = unparen_expr(e->Constant.param_value.original_ast_expr);
+					if (e->Constant.param_value.kind == ParameterValue_Constant) {
+						o->value = e->Constant.param_value.value;
+					}
+				}
+			}
+		}
+	}
+
 	i64 score = 0;
 	for (isize i = 0; i < param_count; i++) {
+		Entity *e = tuple->variables[i];
 		Operand *o = &ordered_operands[i];
 		if (o->mode == Addressing_Invalid) {
 			continue;
 		}
-		Entity *e = tuple->variables[i];
-
 		if (e->kind == Entity_TypeName) {
 			if (o->mode != Addressing_Type) {
 				if (show_error) {
@@ -7800,7 +7843,7 @@ void check_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e, Type *t) {
 		err_str = "used as a value";
 		break;
 	case Addressing_Type:
-		err_str = "is not an expression";
+		err_str = "is not an expression but a";
 		break;
 	case Addressing_Builtin:
 		err_str = "must be called";

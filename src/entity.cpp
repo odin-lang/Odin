@@ -120,6 +120,7 @@ struct Entity {
 	union {
 		struct {
 			ExactValue value;
+			ParameterValue param_value;
 		} Constant;
 		struct {
 			Ast *init_expr; // only used for some variables within procedure bodies
