@@ -1370,7 +1370,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 							// Sanity check
 							continue;
 						}
-						array_add(&param_types, lb_type(m, v->type));
+						LLVMTypeRef t = lb_type(m, v->type);
+						array_add(&param_types, t);
 					}
 				} else {
 					array_add(&param_types, lb_type(m, param));
