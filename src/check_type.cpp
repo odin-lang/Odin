@@ -2473,10 +2473,6 @@ void set_procedure_abi_types(gbAllocator allocator, Type *type) {
 		Entity *e = type->Proc.params->Tuple.variables[i];
 		if (e->kind == Entity_Variable) {
 			Type *original_type = e->type;
-			if (is_type_named(original_type) && is_type_proc(original_type)) {
-				continue;
-			}
-
 			Type *new_type = type_to_abi_compat_param_type(allocator, original_type, type->Proc.calling_convention);
 			type->Proc.abi_compat_params[i] = new_type;
 			switch (type->Proc.calling_convention) {
