@@ -2122,7 +2122,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		if (allow_token(f, Token_OpenParen)) {
 			isize param_count = 0;
-			polymorphic_params = parse_field_list(f, &param_count, 0, Token_CloseParen, false, true);
+			polymorphic_params = parse_field_list(f, &param_count, 0, Token_CloseParen, true, true);
 			if (param_count == 0) {
 				syntax_error(polymorphic_params, "Expected at least 1 polymorphic parameter");
 				polymorphic_params = nullptr;
@@ -2203,7 +2203,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		if (allow_token(f, Token_OpenParen)) {
 			isize param_count = 0;
-			polymorphic_params = parse_field_list(f, &param_count, 0, Token_CloseParen, false, true);
+			polymorphic_params = parse_field_list(f, &param_count, 0, Token_CloseParen, true, true);
 			if (param_count == 0) {
 				syntax_error(polymorphic_params, "Expected at least 1 polymorphic parametric");
 				polymorphic_params = nullptr;
