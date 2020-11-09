@@ -324,6 +324,7 @@ enum TypeFlag : u32 {
 	TypeFlag_Polymorphic     = 1<<1,
 	TypeFlag_PolySpecialized = 1<<2,
 	TypeFlag_InProcessOfCheckingPolymorphic = 1<<3,
+	TypeFlag_InProcessOfCheckingABI = 1<<4,
 };
 
 struct Type {

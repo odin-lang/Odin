@@ -2209,6 +2209,11 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 		return new_type;
 	}
 
+	if (is_type_proc(original_type)) {
+		// NOTE(bill): Force a cast to prevent a possible type cycle
+		return t_rawptr;
+	}
+
 	if (cc == ProcCC_None || cc == ProcCC_PureNone || cc == ProcCC_InlineAsm) {
 		return new_type;
 	}
@@ -2332,6 +2337,11 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCal
 		return new_type;
 	}
 
+	if (is_type_proc(single_type)) {
+		// NOTE(bill): Force a cast to prevent a possible type cycle
+		return t_rawptr;
+	}
+
 	if (is_type_simd_vector(single_type)) {
 		return new_type;
 	}
@@ -2451,22 +2461,29 @@ void set_procedure_abi_types(gbAllocator allocator, Type *type) {
 		return;
 	}
 
-	if (type->Proc.abi_types_set) {
+	if (type->Proc.abi_types_set || type->flags & TypeFlag_InProcessOfCheckingABI) {
 		return;
 	}
+
+	u32 flags = type->flags;
+	type->flags |= TypeFlag_InProcessOfCheckingABI;
 
 	type->Proc.abi_compat_params = array_make<Type *>(allocator, cast(isize)type->Proc.param_count);
 	for (i32 i = 0; i < type->Proc.param_count; i++) {
 		Entity *e = type->Proc.params->Tuple.variables[i];
 		if (e->kind == Entity_Variable) {
 			Type *original_type = e->type;
+			if (is_type_named(original_type) && is_type_proc(original_type)) {
+				continue;
+			}
+
 			Type *new_type = type_to_abi_compat_param_type(allocator, original_type, type->Proc.calling_convention);
 			type->Proc.abi_compat_params[i] = new_type;
 			switch (type->Proc.calling_convention) {
 			case ProcCC_Odin:
 			case ProcCC_Contextless:
 			case ProcCC_Pure:
-				if (is_type_pointer(new_type) & !is_type_pointer(e->type)) {
+				if (is_type_pointer(new_type) && !is_type_pointer(e->type) && !is_type_proc(e->type)) {
 					e->flags |= EntityFlag_ImplicitReference;
 				}
 				break;
@@ -2474,7 +2491,7 @@ void set_procedure_abi_types(gbAllocator allocator, Type *type) {
 
 			if (build_context.ODIN_OS == "linux" ||
 			    build_context.ODIN_OS == "darwin") {
-				if (is_type_pointer(new_type) & !is_type_pointer(e->type)) {
+				if (is_type_pointer(new_type) & !is_type_pointer(e->type) && !is_type_proc(e->type)) {
 					e->flags |= EntityFlag_ByVal;
 				}
 			}
@@ -2499,6 +2516,7 @@ void set_procedure_abi_types(gbAllocator allocator, Type *type) {
 	type->Proc.return_by_pointer = abi_compat_return_by_pointer(allocator, type->Proc.calling_convention, type->Proc.abi_compat_result_type);
 
 	type->Proc.abi_types_set = true;
+	type->flags = flags;
 }
 
 // NOTE(bill): 'operands' is for generating non generic procedure type
