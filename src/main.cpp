@@ -581,6 +581,7 @@ enum BuildFlagKind {
 	BuildFlag_NoBoundsCheck,
 	BuildFlag_NoDynamicLiterals,
 	BuildFlag_NoCRT,
+	BuildFlag_NoEntryPoint,
 	BuildFlag_UseLLD,
 	BuildFlag_Vet,
 	BuildFlag_UseLLVMApi,
@@ -681,6 +682,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"),     BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals, str_lit("no-dynamic-literals"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),              BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_NoEntryPoint,      str_lit("no-entry-point"),      BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),                 BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),                 BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None);
@@ -1093,6 +1095,10 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_NoCRT:
 							build_context.no_crt = true;
+							break;
+
+						case BuildFlag_NoEntryPoint:
+							build_context.no_entry_point = true;
 							break;
 
 						case BuildFlag_UseLLD:
