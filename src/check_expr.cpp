@@ -4343,7 +4343,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		add_type_info_type(c, t);
 
-		t = base_type(t);
 		if (o.mode != Addressing_Type) {
 			error(expr, "Expected a type for 'typeid_of'");
 			return false;
@@ -4351,6 +4350,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		operand->mode = Addressing_Value;
 		operand->type = t_typeid;
+		operand->value = exact_value_typeid(t);
 		break;
 	}
 
@@ -7843,7 +7843,7 @@ void check_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e, Type *t) {
 		err_str = "used as a value";
 		break;
 	case Addressing_Type:
-		err_str = "is not an expression but a";
+		err_str = "is not an expression but a type";
 		break;
 	case Addressing_Builtin:
 		err_str = "must be called";
@@ -9108,6 +9108,9 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			}
 			is_constant = false;
 			{ // Checker values
+				bool key_is_typeid = is_type_typeid(t->Map.key);
+				bool value_is_typeid = is_type_typeid(t->Map.value);
+
 				for_array(i, cl->elems) {
 					Ast *elem = cl->elems[i];
 					if (elem->kind != Ast_FieldValue) {
@@ -9115,13 +9118,22 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 						continue;
 					}
 					ast_node(fv, FieldValue, elem);
-					check_expr_with_type_hint(c, o, fv->field, t->Map.key);
+
+					if (key_is_typeid) {
+						check_expr_or_type(c, o, fv->field, t->Map.key);
+					} else {
+						check_expr_with_type_hint(c, o, fv->field, t->Map.key);
+					}
 					check_assignment(c, o, t->Map.key, str_lit("map literal"));
 					if (o->mode == Addressing_Invalid) {
 						continue;
 					}
 
-					check_expr_with_type_hint(c, o, fv->value, t->Map.value);
+					if (value_is_typeid) {
+						check_expr_or_type(c, o, fv->value, t->Map.value);
+					} else {
+						check_expr_with_type_hint(c, o, fv->value, t->Map.value);
+					}
 					check_assignment(c, o, t->Map.value, str_lit("map literal"));
 				}
 			}
@@ -9677,7 +9689,11 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 		if (is_type_map(t)) {
 			Operand key = {};
-			check_expr_with_type_hint(c, &key, ie->index, t->Map.key);
+			if (is_type_typeid(t->Map.key)) {
+				check_expr_or_type(c, &key, ie->index, t->Map.key);
+			} else {
+				check_expr_with_type_hint(c, &key, ie->index, t->Map.key);
+			}
 			check_assignment(c, &key, t->Map.key, str_lit("map index"));
 			if (key.mode == Addressing_Invalid) {
 				o->mode = Addressing_Invalid;

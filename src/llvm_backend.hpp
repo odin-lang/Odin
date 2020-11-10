@@ -301,7 +301,7 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_ini
 
 void lb_add_foreign_library_path(lbModule *m, Entity *e);
 
-lbValue lb_typeid(lbModule *m, Type *type, Type *typeid_type=t_typeid);
+lbValue lb_typeid(lbModule *m, Type *type);
 
 lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value);
 lbValue lb_address_from_load(lbProcedure *p, lbValue value);
