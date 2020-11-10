@@ -4635,7 +4635,7 @@ isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=tr
 	return -1;
 }
 
-lbValue lb_typeid(lbModule *m, Type *type, Type *typeid_type) {
+lbValue lb_typeid(lbModule *m, Type *type) {
 	type = default_type(type);
 
 	u64 id = cast(u64)lb_type_info_index(m->info, type);
@@ -4687,6 +4687,7 @@ lbValue lb_typeid(lbModule *m, Type *type, Type *typeid_type) {
 
 	u64 data = 0;
 	if (build_context.word_size == 4) {
+		GB_ASSERT(id <= (1u<<24u));
 		data |= (id       &~ (1u<<24)) << 0u;  // index
 		data |= (kind     &~ (1u<<5))  << 24u; // kind
 		data |= (named    &~ (1u<<1))  << 29u; // kind
@@ -4694,6 +4695,7 @@ lbValue lb_typeid(lbModule *m, Type *type, Type *typeid_type) {
 		data |= (reserved &~ (1u<<1))  << 31u; // kind
 	} else {
 		GB_ASSERT(build_context.word_size == 8);
+		GB_ASSERT(id <= (1ull<<56u));
 		data |= (id       &~ (1ull<<56)) << 0ul;  // index
 		data |= (kind     &~ (1ull<<5))  << 56ull; // kind
 		data |= (named    &~ (1ull<<1))  << 61ull; // kind
@@ -4701,10 +4703,9 @@ lbValue lb_typeid(lbModule *m, Type *type, Type *typeid_type) {
 		data |= (reserved &~ (1ull<<1))  << 63ull; // kind
 	}
 
-
 	lbValue res = {};
-	res.value = LLVMConstInt(lb_type(m, typeid_type), data, false);
-	res.type = typeid_type;
+	res.value = LLVMConstInt(lb_type(m, t_typeid), data, false);
+	res.type = t_typeid;
 	return res;
 }
 
@@ -4739,7 +4740,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 	value = convert_exact_value_for_type(value, type);
 
 	if (value.kind == ExactValue_Typeid) {
-		return lb_typeid(m, value.value_typeid, original_type);
+		return lb_typeid(m, value.value_typeid);
 	}
 
 	if (value.kind == ExactValue_Invalid) {
@@ -5294,7 +5295,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		}
 		break;
 	case ExactValue_Typeid:
-		return lb_typeid(m, value.value_typeid, original_type);
+		return lb_typeid(m, value.value_typeid);
 	}
 
 	return lb_const_nil(m, original_type);
@@ -5804,10 +5805,10 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			lbValue right = {};
 
 			if (be->left->tav.mode == Addressing_Type) {
-				left = lb_typeid(p->module, be->left->tav.type, t_typeid);
+				left = lb_typeid(p->module, be->left->tav.type);
 			}
 			if (be->right->tav.mode == Addressing_Type) {
-				right = lb_typeid(p->module, be->right->tav.type, t_typeid);
+				right = lb_typeid(p->module, be->right->tav.type);
 			}
 			if (left.value == nullptr)  left  = lb_build_expr(p, be->left);
 			if (right.value == nullptr) right = lb_build_expr(p, be->right);
@@ -7467,16 +7468,9 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	case BuiltinProc_typeid_of: {
 		Ast *arg = ce->args[0];
 		TypeAndValue tav = type_and_value_of_expr(arg);
-		if (tav.mode == Addressing_Type) {
-			Type *t = default_type(type_of_expr(arg));
-			return lb_typeid(p->module, t);
-		}
-		Type *t = base_type(tav.type);
-		GB_ASSERT(are_types_identical(t, t_type_info_ptr));
-
-		auto args = array_make<lbValue>(heap_allocator(), 1);
-		args[0] = lb_emit_conv(p, lb_build_expr(p, arg), t_type_info_ptr);
-		return lb_emit_runtime_call(p, "__typeid_of", args);
+		GB_ASSERT(tav.mode == Addressing_Type);
+		Type *t = default_type(type_of_expr(arg));
+		return lb_typeid(p->module, t);
 	}
 
 	case BuiltinProc_len: {
