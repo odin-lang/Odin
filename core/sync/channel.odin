@@ -145,7 +145,7 @@ channel_close :: proc(ch: $C/Channel($T, $D), loc := #caller_location) {
 }
 
 
-channel_iterator :: proc(ch: $C/Channel($T, $D)) -> (msg: T, ok: bool) where D >= .Both {
+channel_iterator :: proc(ch: $C/Channel($T, $D)) -> (msg: T, ok: bool) where D <= .Both {
 	c := ch._internal;
 	if c == nil {
 		return;
@@ -287,17 +287,18 @@ raw_channel_send_impl :: proc(c: ^Raw_Channel, msg: rawptr, block: bool, loc := 
 		for c.len >= c.cap {
 			condition_wait_for(&c.cond);
 		}
-	} else if c.len > 0 {
+	} else if c.len > 0 { // TODO(bill): determine correct behaviour
 		if !block {
 			return false;
 		}
 		condition_wait_for(&c.cond);
+	} else if c.len == 0 && !block {
+		return false;
 	}
 
 	send(c, msg);
 	condition_signal(&c.cond);
 	raw_channel_wait_queue_signal(c.recvq);
-
 
 	return true;
 }
@@ -564,7 +565,7 @@ select_recv_msg :: proc(channels: ..$C/Channel($T, $D)) -> (msg: T, index: int) 
 			q.state = &state;
 			raw_channel_wait_queue_insert(&c.recvq, q);
 		}
-		raw_channel_wait_queue_wait_on(&state);
+		raw_channel_wait_queue_wait_on(&state, SELECT_MAX_TIMEOUT);
 		for c, i in channels {
 			q := &queues[i];
 			raw_channel_wait_queue_remove(&c.recvq, q);
@@ -618,7 +619,7 @@ select_send_msg :: proc(msg: $T, channels: ..$C/Channel(T, $D)) -> (index: int) 
 			q.state = &state;
 			raw_channel_wait_queue_insert(&c.recvq, q);
 		}
-		raw_channel_wait_queue_wait_on(&state);
+		raw_channel_wait_queue_wait_on(&state, SELECT_MAX_TIMEOUT);
 		for c, i in channels {
 			q := &queues[i];
 			raw_channel_wait_queue_remove(&c.recvq, q);
@@ -813,13 +814,12 @@ select_try_send :: proc(channels: ..^Raw_Channel) -> (index: int) #no_bounds_che
 select_try_recv_msg :: proc(channels: ..$C/Channel($T, $D)) -> (msg: T, index: int) {
 	switch len(channels) {
 	case 0:
-		index = 0;
+		index = -1;
 		return;
 	case 1:
-		if c := channels[0]; channel_can_recv(c) {
+		ok: bool;
+		if msg, ok = channel_try_recv(channels[0]); ok {
 			index = 0;
-			msg = channel_recv(c);
-			return;
 		}
 		return;
 	}
@@ -850,15 +850,13 @@ select_try_recv_msg :: proc(channels: ..$C/Channel($T, $D)) -> (msg: T, index: i
 }
 
 select_try_send_msg :: proc(msg: $T, channels: ..$C/Channel(T, $D)) -> (index: int) {
+	index = -1;
 	switch len(channels) {
 	case 0:
-		index = 0;
 		return;
 	case 1:
-		if c := channels[0]; channel_can_send(c) {
+		if channel_try_send(channels[0], msg) {
 			index = 0;
-			channel_send(c, msg);
-			return;
 		}
 		return;
 	}
