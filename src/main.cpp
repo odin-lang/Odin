@@ -592,7 +592,6 @@ enum BuildFlagKind {
 	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
 
-
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
 	BuildFlag_GoToDefinitions,
