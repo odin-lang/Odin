@@ -1842,6 +1842,22 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		add_dependency_to_set(c, e);
 	}
 
+	for_array(i, c->info.entities) {
+		Entity *e = c->info.entities[i];
+		switch (e->kind) {
+		case Entity_Variable:
+			if (e->Variable.is_export) {
+				add_dependency_to_set(c, e);
+			}
+			break;
+		case Entity_Procedure:
+			if (e->Procedure.is_export) {
+				add_dependency_to_set(c, e);
+			}
+			break;
+		}
+	}
+
 	add_dependency_to_set(c, start);
 }
 
