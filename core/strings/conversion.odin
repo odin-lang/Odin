@@ -1,5 +1,8 @@
 package strings
 
+import "core:unicode"
+import "core:unicode/utf8"
+
 to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) -> string {
 	if len(s) == 0 {
 		return "";

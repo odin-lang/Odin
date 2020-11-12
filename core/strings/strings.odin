@@ -1,7 +1,6 @@
 package strings
 
 import "core:mem"
-import "core:unicode"
 import "core:unicode/utf8"
 
 clone :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> string {
