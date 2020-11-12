@@ -886,6 +886,16 @@ Type *alloc_type_named(String name, Type *base, Entity *type_name) {
 	return t;
 }
 
+bool is_calling_convention_none(ProcCallingConvention calling_convention) {
+	switch (calling_convention) {
+	case ProcCC_None:
+	case ProcCC_PureNone:
+	case ProcCC_InlineAsm:
+		return true;
+	}
+	return false;
+}
+
 Type *alloc_type_tuple() {
 	Type *t = alloc_type(Type_Tuple);
 	return t;
