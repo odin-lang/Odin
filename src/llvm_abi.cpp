@@ -34,6 +34,10 @@ struct lbFunctionType {
 	lbArgType        ret;
 };
 
+i64 llvm_align_formula(i64 off, i64 a) {
+	return (off + a - 1) / a * a;
+}
+
 
 bool lb_is_type_kind(LLVMTypeRef type, LLVMTypeKind kind) {
 	return LLVMGetTypeKind(type) == kind;
@@ -165,11 +169,11 @@ i64 lb_sizeof(LLVMTypeRef type) {
 				for (unsigned i = 0; i < field_count; i++) {
 					LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
 					i64 align = lb_alignof(field);
-					offset = align_formula(offset, align);
+					offset = llvm_align_formula(offset, align);
 					offset += lb_sizeof(field);
 				}
 			}
-			offset = align_formula(offset, lb_alignof(type));
+			offset = llvm_align_formula(offset, lb_alignof(type));
 			return offset;
 		}
 		break;
@@ -177,7 +181,7 @@ i64 lb_sizeof(LLVMTypeRef type) {
 		{
 			LLVMTypeRef elem = LLVMGetElementType(type);
 			i64 elem_size = lb_sizeof(elem);
-			i64 count = LLVMGetVectorSize(type);
+			i64 count = LLVMGetArrayLength(type);
 			i64 size = count * elem_size;
 			return size;
 		}
@@ -239,7 +243,7 @@ i64 lb_alignof(LLVMTypeRef type) {
 		{
 			LLVMTypeRef elem = LLVMGetElementType(type);
 			i64 elem_size = lb_sizeof(elem);
-			i64 count = LLVMGetVectorSize(type);
+			i64 count = LLVMGetArrayLength(type);
 			i64 size = count * elem_size;
 			return size;
 		}
@@ -300,7 +304,7 @@ Type *lb_abi_to_odin_type(LLVMTypeRef type) {
 	case LLVMArrayTypeKind:
 		{
 
-			i64 count = LLVMGetVectorSize(type);
+			i64 count = LLVMGetArrayLength(type);
 			Type *elem = lb_abi_to_odin_type(LLVMGetElementType(type));
 			return alloc_type_array(elem, count);
 		}
@@ -451,7 +455,10 @@ namespace lbAbiAmd64SysV {
 		RegClass_SSEFv,
 		RegClass_SSEDs,
 		RegClass_SSEDv,
-		RegClass_SSEInt,
+		RegClass_SSEInt8,
+		RegClass_SSEInt16,
+		RegClass_SSEInt32,
+		RegClass_SSEInt64,
 		RegClass_SSEUp,
 		RegClass_X87,
 		RegClass_X87Up,
@@ -475,19 +482,88 @@ namespace lbAbiAmd64SysV {
 		}
 	}
 
+	enum Amd64TypeAttributeKind {
+		Amd64TypeAttribute_None,
+		Amd64TypeAttribute_ByVal,
+		Amd64TypeAttribute_StructRect,
+	};
+
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
 	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
 	void classify_with(LLVMTypeRef t, Array<RegClass> *cls, i64 ix, i64 off);
 	void fixup(LLVMTypeRef t, Array<RegClass> *cls);
+	lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind);
+	Array<RegClass> classify(LLVMTypeRef t);
+	LLVMTypeRef llreg(LLVMContextRef c, Array<RegClass> const &reg_classes);
 
 	LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(heap_allocator(), lbFunctionType);
 		ft->ctx = c;
-		// TODO(bill): THIS IS VERY VERY WRONG!
-		ft->args = compute_arg_types(c, arg_types, arg_count);
-		ft->ret = compute_return_type(c, return_type, return_is_defined);
 		ft->calling_convention = calling_convention;
+
+		ft->args = array_make<lbArgType>(heap_allocator(), arg_count);
+		for (unsigned i = 0; i < arg_count; i++) {
+			ft->args[i] = amd64_type(c, arg_types[i], Amd64TypeAttribute_ByVal);
+		}
+
+		if (return_is_defined) {
+			ft->ret = amd64_type(c, return_type, Amd64TypeAttribute_StructRect);
+		} else {
+			ft->ret = lb_arg_type_direct(LLVMVoidTypeInContext(c));
+		}
+
 		return ft;
+	}
+
+	bool is_mem_cls(Array<RegClass> const &cls, Amd64TypeAttributeKind attribute_kind) {
+		if (attribute_kind == Amd64TypeAttribute_ByVal) {
+			if (cls.count == 0) {
+				return false;
+			}
+			auto first = cls[0];
+			return first == RegClass_Memory || first == RegClass_X87 || first == RegClass_ComplexX87;
+		} else if (attribute_kind == Amd64TypeAttribute_StructRect) {
+			if (cls.count == 0) {
+				return false;
+			}
+			return cls[0] == RegClass_Memory;
+		}
+		return false;
+	}
+
+	bool is_register(LLVMTypeRef type) {
+		LLVMTypeKind kind = LLVMGetTypeKind(type);
+		switch (kind) {
+		case LLVMIntegerTypeKind:
+		case LLVMFloatTypeKind:
+		case LLVMDoubleTypeKind:
+		case LLVMPointerTypeKind:
+			return true;
+		}
+		return false;
+	}
+
+	lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind) {
+		if (is_register(type)) {
+			LLVMAttributeRef attribute = nullptr;
+			if (type == LLVMInt1TypeInContext(c)) {
+				attribute = lb_create_enum_attribute(c, "zext", true);
+			}
+			return lb_arg_type_direct(type, nullptr, nullptr, attribute);
+		}
+
+		auto cls = classify(type);
+		if (is_mem_cls(cls, attribute_kind)) {
+			LLVMAttributeRef attribute = nullptr;
+			if (attribute_kind == Amd64TypeAttribute_ByVal) {
+				attribute = lb_create_enum_attribute(c, "byval", true);
+			} else if (attribute_kind == Amd64TypeAttribute_StructRect) {
+				attribute = lb_create_enum_attribute(c, "sret", true);
+			}
+			return lb_arg_type_indirect(type, attribute);
+		} else {
+			return lb_arg_type_direct(type, llreg(c, cls), nullptr, nullptr);
+		}
 	}
 
 	lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type) {
@@ -517,7 +593,7 @@ namespace lbAbiAmd64SysV {
 		for (unsigned i = 0; i < field_count; i++) {
 			LLVMTypeRef t = fields[i];
 			if (!packed) {
-				field_off = align_formula(field_off, lb_alignof(t));
+				field_off = llvm_align_formula(field_off, lb_alignof(t));
 			}
 			classify_with(t, cls, i, field_off);
 			field_off += lb_sizeof(t);
@@ -601,7 +677,7 @@ namespace lbAbiAmd64SysV {
 	}
 
 
-	LLVMTypeRef llreg(LLVMContextRef c, Array<RegClass> const &reg_classes) {;
+	LLVMTypeRef llreg(LLVMContextRef c, Array<RegClass> const &reg_classes) {
 		auto types = array_make<LLVMTypeRef>(heap_allocator(), 0, reg_classes.count);
 		for_array(i, reg_classes) {
 			switch (reg_classes[i]) {
@@ -609,9 +685,43 @@ namespace lbAbiAmd64SysV {
 				array_add(&types, LLVMIntTypeInContext(c, 64));
 				break;
 			case RegClass_SSEFv:
+			case RegClass_SSEDv:
+			case RegClass_SSEInt8:
+			case RegClass_SSEInt16:
+			case RegClass_SSEInt32:
+			case RegClass_SSEInt64:
 				{
+					unsigned elems_per_word = 0;
+					LLVMTypeRef elem_type = nullptr;
+					switch (reg_classes[i]) {
+					case RegClass_SSEFv:
+						elems_per_word = 2;
+						elem_type = LLVMFloatTypeInContext(c);
+						break;
+					case RegClass_SSEDv:
+						elems_per_word = 1;
+						elem_type = LLVMDoubleTypeInContext(c);
+						break;
+					case RegClass_SSEInt8:
+						elems_per_word = 64/8;
+						elem_type = LLVMIntTypeInContext(c, 8);
+						break;
+					case RegClass_SSEInt16:
+						elems_per_word = 64/16;
+						elem_type = LLVMIntTypeInContext(c, 16);
+						break;
+					case RegClass_SSEInt32:
+						elems_per_word = 64/32;
+						elem_type = LLVMIntTypeInContext(c, 32);
+						break;
+					case RegClass_SSEInt64:
+						elems_per_word = 64/64;
+						elem_type = LLVMIntTypeInContext(c, 64);
+						break;
+					}
+
 					unsigned vec_len = llvec_len(array_slice(reg_classes, i+1, reg_classes.count));
-					LLVMTypeRef vec_type = LLVMVectorType(LLVMFloatTypeInContext(c), vec_len);
+					LLVMTypeRef vec_type = LLVMVectorType(elem_type, vec_len * elems_per_word);
 					array_add(&types, vec_type);
 					i += vec_len;
 					continue;
@@ -635,11 +745,11 @@ namespace lbAbiAmd64SysV {
 		i64 t_align = lb_alignof(t);
 		i64 t_size  = lb_sizeof(t);
 
-		i64 mis_align = off % t_align;
-		if (mis_align != 0) {
+		i64 misalign = off % t_align;
+		if (misalign != 0) {
 			i64 e = (off + t_size + 7) / 8;
 			for (i64 i = off / 8; i < e; i++) {
-				unify(cls, ix+1, RegClass_Memory);
+				unify(cls, ix+i, RegClass_Memory);
 			}
 			return;
 		}
@@ -647,13 +757,13 @@ namespace lbAbiAmd64SysV {
 		switch (LLVMGetTypeKind(t)) {
 		case LLVMIntegerTypeKind:
 		case LLVMPointerTypeKind:
-			unify(cls, ix+off / 8, RegClass_Int);
+			unify(cls, ix + off/8, RegClass_Int);
 			break;
 		case LLVMFloatTypeKind:
-			unify(cls, ix+off / 8, (off%8 == 4) ? RegClass_SSEFv : RegClass_SSEFs);
+			unify(cls, ix + off/8, (off%8 == 4) ? RegClass_SSEFv : RegClass_SSEFs);
 			break;
 		case LLVMDoubleTypeKind:
-			unify(cls, ix+off / 8,  RegClass_SSEDs);
+			unify(cls, ix + off/8,  RegClass_SSEDs);
 			break;
 		case LLVMStructTypeKind:
 			{
@@ -673,6 +783,42 @@ namespace lbAbiAmd64SysV {
 				i64 elem_sz = lb_sizeof(elem);
 				for (i64 i = 0; i < len; i++) {
 					classify_with(elem, cls, ix, off + i*elem_sz);
+				}
+			}
+			break;
+		case LLVMVectorTypeKind:
+			{
+				i64 len = LLVMGetVectorSize(t);
+				LLVMTypeRef elem = LLVMGetElementType(t);
+				i64 elem_sz = lb_sizeof(elem);
+				LLVMTypeKind elem_kind = LLVMGetTypeKind(elem);
+				RegClass reg = RegClass_NoClass;
+				switch (elem_kind) {
+				case LLVMIntegerTypeKind:
+					switch (LLVMGetIntTypeWidth(elem)) {
+					case 8:  reg = RegClass_SSEInt8;
+					case 16: reg = RegClass_SSEInt16;
+					case 32: reg = RegClass_SSEInt32;
+					case 64: reg = RegClass_SSEInt64;
+					default:
+						GB_PANIC("Unhandled integer width for vector type");
+					}
+					break;
+				case LLVMFloatTypeKind:
+					reg = RegClass_SSEFv;
+					break;
+				case LLVMDoubleTypeKind:
+					reg = RegClass_SSEDv;
+					break;
+				default:
+					GB_PANIC("Unhandled vector element type");
+				}
+
+				for (i64 i = 0; i < len; i++) {
+					unify(cls, ix + (off + i*elem_sz)/8, reg);
+					// NOTE(bill): Everything after the first one is the upper
+					// half of a register
+					reg = RegClass_SSEUp;
 				}
 			}
 			break;
