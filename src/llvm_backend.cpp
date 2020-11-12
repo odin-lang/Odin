@@ -1380,7 +1380,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				LLVMTypeRef *params = gb_alloc_array(heap_allocator(), LLVMTypeRef, param_count);
 				if (type->Proc.result_count != 0) {
 					Type *single_ret = reduce_tuple_to_single_type(type->Proc.results);
-					ret = lb_type(m, type->Proc.results);
+					ret = lb_type(m, single_ret);
 					if (ret != nullptr) {
 						if (is_calling_convention_none(type->Proc.calling_convention) &&
 						    is_type_boolean(single_ret) &&
@@ -1399,13 +1399,15 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 							continue;
 						}
 
+						Type *e_type = reduce_tuple_to_single_type(e->type);
+
 						LLVMTypeRef param_type = nullptr;
 						if (is_calling_convention_none(type->Proc.calling_convention) &&
-						    is_type_boolean(e->type) &&
-						    type_size_of(e->type) <= 1) {
+						    is_type_boolean(e_type) &&
+						    type_size_of(e_type) <= 1) {
 							param_type = LLVMInt1TypeInContext(m->ctx);
 						} else {
-							param_type = lb_type(m, e->type);
+							param_type = lb_type(m, e_type);
 						}
 						params[param_index++] =	param_type;
 					}
@@ -2511,7 +2513,13 @@ void lb_start_block(lbProcedure *p, lbBlock *b) {
 
 LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRef dst_type) {
 	LLVMTypeRef src_type = LLVMTypeOf(val);
-	GB_ASSERT(lb_sizeof(src_type) == lb_sizeof(dst_type));
+	i64 src_size = lb_sizeof(src_type);
+	i64 dst_size = lb_sizeof(dst_type);
+	if (src_size != dst_size && (lb_is_type_kind(src_type, LLVMVectorTypeKind) ^ lb_is_type_kind(dst_type, LLVMVectorTypeKind))) {
+		// Okay
+	} else {
+		GB_ASSERT_MSG(src_size == dst_size, "%s == %s", LLVMPrintTypeToString(src_type), LLVMPrintTypeToString(dst_type));
+	}
 
 	LLVMTypeKind src_kind = LLVMGetTypeKind(src_type);
 	LLVMTypeKind dst_kind = LLVMGetTypeKind(dst_type);
@@ -4538,27 +4546,51 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 		}
 
 
-		if (p->type->Proc.return_by_pointer) {
-			if (res.value != nullptr) {
-				lb_addr_store(p, p->return_ptr, res);
+		if (p->abi_function_type) {
+			if (p->abi_function_type->ret.kind == lbArg_Indirect) {
+				if (res.value != nullptr) {
+					LLVMBuildStore(p->builder, res.value, p->return_ptr.addr.value);
+				} else {
+					LLVMBuildStore(p->builder, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
+				}
+
+				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+
+				LLVMBuildRetVoid(p->builder);
 			} else {
-				lb_addr_store(p, p->return_ptr, lb_const_nil(p->module, p->type->Proc.abi_compat_result_type));
+				LLVMValueRef ret_val = res.value;
+				if (p->abi_function_type->ret.cast_type != nullptr) {
+					ret_val = OdinLLVMBuildTransmute(p, ret_val, p->abi_function_type->ret.cast_type);
+				}
+				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+				LLVMBuildRet(p->builder, ret_val);
 			}
-
-			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-
-			LLVMBuildRetVoid(p->builder);
 		} else {
-			GB_ASSERT_MSG(res.value != nullptr, "%.*s", LIT(p->name));
-			Type *abi_rt = p->type->Proc.abi_compat_result_type;
-			if (!are_types_identical(res.type, abi_rt)) {
-				res = lb_emit_transmute(p, res, abi_rt);
+			GB_ASSERT(!USE_LLVM_ABI);
+
+			if (p->type->Proc.return_by_pointer) {
+				if (res.value != nullptr) {
+					lb_addr_store(p, p->return_ptr, res);
+				} else {
+					lb_addr_store(p, p->return_ptr, lb_const_nil(p->module, p->type->Proc.abi_compat_result_type));
+				}
+
+				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+
+				LLVMBuildRetVoid(p->builder);
+			} else {
+				GB_ASSERT_MSG(res.value != nullptr, "%.*s", LIT(p->name));
+
+				Type *abi_rt = p->type->Proc.abi_compat_result_type;
+				if (!are_types_identical(res.type, abi_rt)) {
+					res = lb_emit_transmute(p, res, abi_rt);
+				}
+				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+				LLVMBuildRet(p->builder, res.value);
 			}
-
-			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-
-			LLVMBuildRet(p->builder, res.value);
 		}
+
+
 	case_end;
 
 	case_ast_node(is, IfStmt, node);
@@ -6585,8 +6617,6 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		return res;
 	}
 
-
-
 	// []byte/[]u8 <-> string
 	if (is_type_u8_slice(src) && is_type_string(dst)) {
 		return lb_emit_transmute(p, value, t);
@@ -6635,6 +6665,34 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 
 		return lb_addr_load(p, result);
 	}
+
+
+	i64 src_sz = type_size_of(src);
+	i64 dst_sz = type_size_of(dst);
+
+	if (src_sz == dst_sz) {
+		// bit_set <-> integer
+		if (is_type_integer(src) && is_type_bit_set(dst)) {
+			lbValue res = lb_emit_conv(p, value, bit_set_to_int(dst));
+			res.type = dst;
+			return res;
+		}
+		if (is_type_bit_set(src) && is_type_integer(dst)) {
+			lbValue bs = value;
+			bs.type = bit_set_to_int(src);
+			return lb_emit_conv(p, bs, dst);
+		}
+
+		// typeid <-> integer
+		if (is_type_integer(src) && is_type_typeid(dst)) {
+			return lb_emit_transmute(p, value, dst);
+		}
+		if (is_type_typeid(src) && is_type_integer(dst)) {
+			return lb_emit_transmute(p, value, dst);
+		}
+	}
+
+
 
 	if (is_type_untyped(src)) {
 		if (is_type_string(src) && is_type_string(dst)) {
@@ -6715,6 +6773,14 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 
 	i64 sz = type_size_of(src);
 	i64 dz = type_size_of(dst);
+
+	if (sz != dz) {
+		LLVMTypeRef s = lb_type(m, src);
+		LLVMTypeRef d = lb_type(m, dst);
+		i64 llvm_sz = lb_sizeof(s);
+		i64 llvm_dz = lb_sizeof(d);
+		GB_ASSERT_MSG(llvm_sz == llvm_dz, "%s %s", LLVMPrintTypeToString(s), LLVMPrintTypeToString(d));
+	}
 
 	GB_ASSERT_MSG(sz == dz, "Invalid transmute conversion: '%s' to '%s'", type_to_string(src_type), type_to_string(t));
 
@@ -7353,8 +7419,8 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 		}
 		GB_ASSERT(ft_found != nullptr);
 
-		lbFunctionType *abi_ft = *ft_found;
-		bool return_by_pointer = abi_ft->ret.kind == lbArg_Indirect;
+		lbFunctionType *ft = *ft_found;
+		bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
 
 		unsigned param_index = 0;
 		for (isize i = 0; i < param_count; i++) {
@@ -7365,7 +7431,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 			GB_ASSERT(e->flags & EntityFlag_Param);
 
 			Type *original_type = e->type;
-			lbArgType *arg = &abi_ft->args[param_index];
+			lbArgType *arg = &ft->args[param_index];
 			if (arg->kind == lbArg_Ignore) {
 				continue;
 			}
@@ -7381,9 +7447,15 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 				if (xt == abi_type) {
 					array_add(&processed_args, x);
 				} else {
-					Type *at = lb_abi_to_odin_type(abi_type);
+					Type *at = lb_abi_to_odin_type(abi_type, false);
 					if (at == t_llvm_bool) {
 						x = lb_emit_conv(p, x, at);
+					} else if (is_type_simd_vector(at) && lb_sizeof(abi_type) > lb_sizeof(xt)) {
+						lbAddr v = lb_add_local_generated(p, at, false);
+						lbValue ptr = lb_addr_get_ptr(p, v);
+						ptr = lb_emit_conv(p, ptr, alloc_type_pointer(x.type));
+						lb_emit_store(p, ptr, x);
+						x = lb_addr_load(p, v);
 					} else {
 						x = lb_emit_transmute(p, x, at);
 					}
@@ -7420,16 +7492,27 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 			GB_ASSERT(is_type_pointer(return_ptr.type));
 			lb_emit_call_internal(p, value, return_ptr, processed_args, nullptr, context_ptr, inlining);
 			result = lb_emit_load(p, return_ptr);
-		} else {
-			LLVMTypeRef ret_type = abi_ft->ret.cast_type;
+		} else if (rt != nullptr) {
+			LLVMTypeRef ret_type = ft->ret.cast_type;
 			if (!ret_type) {
-				ret_type = abi_ft->ret.type;
+				ret_type = ft->ret.type;
 			}
-			Type *abi_rt = lb_abi_to_odin_type(ret_type);
+			Type *abi_rt = lb_abi_to_odin_type(ret_type, true);
 			result = lb_emit_call_internal(p, value, {}, processed_args, abi_rt, context_ptr, inlining);
-			if (abi_rt != rt) {
-				result = lb_emit_transmute(p, result, rt);
+			if (ret_type != lb_type(m, rt)) {
+				if (is_type_simd_vector(abi_rt) && lb_sizeof(ret_type) > type_size_of(rt)) {
+					lbValue ptr = lb_address_from_load_or_generate_local(p, result);
+					ptr = lb_emit_conv(p, ptr, alloc_type_pointer(rt));
+					result = lb_emit_load(p, ptr);
+				} else {
+					result = lb_emit_transmute(p, result, rt);
+				}
 			}
+			if (!is_type_tuple(rt)) {
+				result = lb_emit_conv(p, result, rt);
+			}
+		} else {
+			lb_emit_call_internal(p, value, {}, processed_args, nullptr, context_ptr, inlining);
 		}
 
 	} else {
@@ -12856,6 +12939,10 @@ void lb_generate_code(lbGenerator *gen) {
 		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
 	}
 
+
+	String filepath_ll  = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".ll"));
+	defer (gb_free(heap_allocator(), filepath_ll.text));
+
 	TIME_SECTION("LLVM Procedure Generation");
 	for_array(i, m->procedures_to_generate) {
 		lbProcedure *p = m->procedures_to_generate[i];
@@ -12886,7 +12973,11 @@ void lb_generate_code(lbGenerator *gen) {
 			gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %.*s\n", LIT(p->name));
 			LLVMDumpValue(p->value);
 			gb_printf_err("\n\n\n\n");
-			LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
+			if (LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+				gb_printf_err("LLVM Error: %s\n", llvm_error);
+			}
+			LLVMVerifyFunction(p->value, LLVMPrintMessageAction);
+			gb_exit(1);
 		}
 	}
 
@@ -12933,9 +13024,6 @@ void lb_generate_code(lbGenerator *gen) {
 	llvm_error = nullptr;
 	defer (LLVMDisposeMessage(llvm_error));
 
-	String filepath_ll  = concatenate_strings(heap_allocator(), gen->output_base, STR_LIT(".ll"));
-	defer (gb_free(heap_allocator(), filepath_ll.text));
-
 	String filepath_obj = {};
 	LLVMCodeGenFileType code_gen_file_type = LLVMObjectFile;
 
@@ -12962,6 +13050,7 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMDIBuilderFinalize(m->debug_builder);
 	if (LLVMVerifyModule(mod, LLVMAbortProcessAction, &llvm_error)) {
 		gb_printf_err("LLVM Error: %s\n", llvm_error);
+		gb_exit(1);
 		return;
 	}
 	llvm_error = nullptr;
@@ -12969,6 +13058,7 @@ void lb_generate_code(lbGenerator *gen) {
 		TIME_SECTION("LLVM Print Module to File");
 		if (LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error)) {
 			gb_printf_err("LLVM Error: %s\n", llvm_error);
+			gb_exit(1);
 			return;
 		}
 	}
