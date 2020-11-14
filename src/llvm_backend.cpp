@@ -1278,6 +1278,9 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				offset = 1;
 			}
 
+			m->internal_type_level += 1;
+			defer (m->internal_type_level -= 1);
+
 			unsigned field_count = cast(unsigned)(type->Struct.fields.count + offset);
 			LLVMTypeRef *fields = gb_alloc_array(heap_allocator(), LLVMTypeRef, field_count);
 			GB_ASSERT(fields != nullptr);
@@ -1287,6 +1290,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				Entity *field = type->Struct.fields[i];
 				fields[i+offset] = lb_type(m, field->type);
 			}
+
 
 			if (type->Struct.custom_align > 0) {
 				fields[0] = lb_alignment_prefix_type_hack(m, type->Struct.custom_align);
