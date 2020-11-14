@@ -275,8 +275,8 @@ Type *alloc_type_struct_from_field_types(Type **field_types, isize field_count, 
 	return t;
 }
 
-Type *alloc_type_tuple_from_field_types(Type **field_types, isize field_count, bool is_packed) {
-	if (field_count == 1) {
+Type *alloc_type_tuple_from_field_types(Type **field_types, isize field_count, bool is_packed, bool must_be_tuple) {
+	if (!must_be_tuple && field_count == 1) {
 		return field_types[0];
 	}
 
@@ -289,6 +289,21 @@ Type *alloc_type_tuple_from_field_types(Type **field_types, isize field_count, b
 	}
 	t->Tuple.is_packed = is_packed;
 
+	return t;
+}
+
+Type *alloc_type_proc_from_types(Type **param_types, unsigned param_count, Type *results, bool is_c_vararg) {
+
+	Type *params  = alloc_type_tuple_from_field_types(param_types, param_count, false, true);
+	isize results_count = 0;
+	if (results != nullptr) {
+		GB_ASSERT(results->kind == Type_Tuple);
+		results_count = results->Tuple.variables.count;
+	}
+
+	Scope *scope = nullptr;
+	Type *t = alloc_type_proc(scope, params, param_count, results, results_count, false, /*not sure what to put here*/ProcCC_CDecl);
+	t->Proc.c_vararg = is_c_vararg;
 	return t;
 }
 
@@ -318,7 +333,33 @@ Type *lb_abi_to_odin_type(LLVMTypeRef type, bool is_return, u32 level = 0) {
 	case LLVMDoubleTypeKind:
 		return t_f64;
 	case LLVMPointerTypeKind:
-		return t_rawptr;
+		{
+			LLVMTypeRef elem = LLVMGetElementType(type);
+			if (lb_is_type_kind(elem, LLVMFunctionTypeKind)) {
+				unsigned param_count = LLVMCountParamTypes(elem);
+				LLVMTypeRef *params = gb_alloc_array(heap_allocator(), LLVMTypeRef, param_count);
+				defer (gb_free(heap_allocator(), params));
+				LLVMGetParamTypes(elem, params);
+
+				Type **param_types = gb_alloc_array(heap_allocator(), Type *, param_count);
+				defer (gb_free(heap_allocator(), param_types));
+
+				for (unsigned i = 0; i < param_count; i++) {
+					param_types[i] = lb_abi_to_odin_type(params[i], false, /*level*/0);
+				}
+
+				LLVMTypeRef ret = LLVMGetReturnType(elem);
+				Type *ret_type = lb_abi_to_odin_type(ret, true, /*level*/0);
+
+				bool is_c_vararg = !!LLVMIsFunctionVarArg(elem);
+				return alloc_type_proc_from_types(param_types, param_count, ret_type, is_c_vararg);
+			}
+			return alloc_type_pointer(lb_abi_to_odin_type(elem, false, level));
+		}
+	case LLVMFunctionTypeKind:
+		GB_PANIC("LLVMFunctionTypeKind should not be seen on its own");
+		break;
+
 	case LLVMStructTypeKind:
 		{
 			unsigned field_count = LLVMCountStructElementTypes(type);
@@ -327,7 +368,7 @@ Type *lb_abi_to_odin_type(LLVMTypeRef type, bool is_return, u32 level = 0) {
 				fields[i] = lb_abi_to_odin_type(LLVMStructGetTypeAtIndex(type, i), false, level+1);
 			}
 			if (is_return) {
-				return alloc_type_tuple_from_field_types(fields, field_count, !!LLVMIsPackedStruct(type));
+				return alloc_type_tuple_from_field_types(fields, field_count, !!LLVMIsPackedStruct(type), false);
 			} else {
 				return alloc_type_struct_from_field_types(fields, field_count, !!LLVMIsPackedStruct(type));
 			}
