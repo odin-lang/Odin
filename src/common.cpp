@@ -373,8 +373,8 @@ typedef struct Arena {
 	gbAllocator backing;
 	isize       block_size;
 	gbMutex     mutex;
-
 	isize total_used;
+	bool   use_mutex;
 } Arena;
 
 #define ARENA_MIN_ALIGNMENT 16
@@ -388,8 +388,9 @@ void arena_init(Arena *arena, gbAllocator backing, isize block_size=ARENA_DEFAUL
 }
 
 void arena_grow(Arena *arena, isize min_size) {
-	// gb_mutex_lock(&arena->mutex);
-	// defer (gb_mutex_unlock(&arena->mutex));
+	if (arena->use_mutex) {
+		gb_mutex_lock(&arena->mutex);
+	}
 
 	isize size = gb_max(arena->block_size, min_size);
 	size = ALIGN_UP(size, ARENA_MIN_ALIGNMENT);
@@ -399,11 +400,16 @@ void arena_grow(Arena *arena, isize min_size) {
 	GB_ASSERT(arena->ptr == ALIGN_DOWN_PTR(arena->ptr, ARENA_MIN_ALIGNMENT));
 	arena->end = arena->ptr + size;
 	array_add(&arena->blocks, arena->ptr);
+
+	if (arena->use_mutex) {
+		gb_mutex_unlock(&arena->mutex);
+	}
 }
 
 void *arena_alloc(Arena *arena, isize size, isize alignment) {
-	// gb_mutex_lock(&arena->mutex);
-	// defer (gb_mutex_unlock(&arena->mutex));
+	if (arena->use_mutex) {
+		gb_mutex_lock(&arena->mutex);
+	}
 
 	arena->total_used += size;
 
@@ -419,12 +425,17 @@ void *arena_alloc(Arena *arena, isize size, isize alignment) {
 	GB_ASSERT(arena->ptr <= arena->end);
 	GB_ASSERT(ptr == ALIGN_DOWN_PTR(ptr, align));
 	// zero_size(ptr, size);
+
+	if (arena->use_mutex) {
+		gb_mutex_unlock(&arena->mutex);
+	}
 	return ptr;
 }
 
 void arena_free_all(Arena *arena) {
-	// gb_mutex_lock(&arena->mutex);
-	// defer (gb_mutex_unlock(&arena->mutex));
+	if (arena->use_mutex) {
+		gb_mutex_lock(&arena->mutex);
+	}
 
 	for_array(i, arena->blocks) {
 		gb_free(arena->backing, arena->blocks[i]);
@@ -432,6 +443,10 @@ void arena_free_all(Arena *arena) {
 	array_clear(&arena->blocks);
 	arena->ptr = nullptr;
 	arena->end = nullptr;
+
+	if (arena->use_mutex) {
+		gb_mutex_unlock(&arena->mutex);
+	}
 }
 
 
@@ -460,7 +475,14 @@ GB_ALLOCATOR_PROC(arena_allocator_proc) {
 		// GB_PANIC("gbAllocation_Free not supported");
 		break;
 	case gbAllocation_Resize:
-		GB_PANIC("gbAllocation_Resize: not supported");
+		if (size == 0) {
+			ptr = nullptr;
+		} else if (size <= old_size) {
+			ptr = old_memory;
+		} else {
+			ptr = arena_alloc(arena, size, alignment);
+			gb_memmove(ptr, old_memory, old_size);
+		}
 		break;
 	case gbAllocation_FreeAll:
 		arena_free_all(arena);
@@ -471,6 +493,16 @@ GB_ALLOCATOR_PROC(arena_allocator_proc) {
 }
 
 
+
+gb_global Arena permanent_arena = {};
+gb_global Arena temporary_arena = {};
+
+gbAllocator permanent_allocator() {
+	return arena_allocator(&permanent_arena);
+}
+gbAllocator temporary_allocator() {
+	return arena_allocator(&temporary_arena);
+}
 
 
 

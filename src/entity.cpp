@@ -220,7 +220,7 @@ bool entity_has_deferred_procedure(Entity *e) {
 gb_global u64 global_entity_id = 0;
 
 Entity *alloc_entity(EntityKind kind, Scope *scope, Token token, Type *type) {
-	gbAllocator a = heap_allocator();
+	gbAllocator a = permanent_allocator();
 	Entity *entity = gb_alloc_item(a, Entity);
 	entity->kind   = kind;
 	entity->state  = EntityState_Unresolved;

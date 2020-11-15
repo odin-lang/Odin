@@ -276,6 +276,9 @@ Type *alloc_type_struct_from_field_types(Type **field_types, isize field_count, 
 }
 
 Type *alloc_type_tuple_from_field_types(Type **field_types, isize field_count, bool is_packed, bool must_be_tuple) {
+	if (field_count == 0) {
+		return nullptr;
+	}
 	if (!must_be_tuple && field_count == 1) {
 		return field_types[0];
 	}
@@ -297,7 +300,9 @@ Type *alloc_type_proc_from_types(Type **param_types, unsigned param_count, Type 
 	Type *params  = alloc_type_tuple_from_field_types(param_types, param_count, false, true);
 	isize results_count = 0;
 	if (results != nullptr) {
-		GB_ASSERT(results->kind == Type_Tuple);
+		if (results->kind != Type_Tuple) {
+			results = alloc_type_tuple_from_field_types(&results, 1, false, true);
+		}
 		results_count = results->Tuple.variables.count;
 	}
 

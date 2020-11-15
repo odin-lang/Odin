@@ -771,7 +771,8 @@ void set_base_type(Type *t, Type *base) {
 
 
 Type *alloc_type(TypeKind kind) {
-	gbAllocator a = heap_allocator();
+	// gbAllocator a = heap_allocator();
+	gbAllocator a = permanent_allocator();
 	Type *t = gb_alloc_item(a, Type);
 	zero_item(t);
 	t->kind = kind;
@@ -2340,7 +2341,7 @@ Selection lookup_field_from_index(Type *type, i64 index) {
 	GB_ASSERT(is_type_struct(type) || is_type_union(type) || is_type_tuple(type));
 	type = base_type(type);
 
-	gbAllocator a = heap_allocator();
+	gbAllocator a = permanent_allocator();
 	isize max_count = 0;
 	switch (type->kind) {
 	case Type_Struct:   max_count = type->Struct.fields.count;   break;
@@ -2397,7 +2398,6 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 		return empty_selection;
 	}
 
-	gbAllocator a = heap_allocator();
 	Type *type = type_deref(type_);
 	bool is_ptr = type != type_;
 	sel.indirect = sel.indirect || is_ptr;
@@ -2986,7 +2986,7 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 }
 
 Array<i64> type_set_offsets_of(Array<Entity *> const &fields, bool is_packed, bool is_raw_union) {
-	gbAllocator a = heap_allocator();
+	gbAllocator a = permanent_allocator();
 	auto offsets = array_make<i64>(a, fields.count);
 	i64 curr_offset = 0;
 	if (is_raw_union) {

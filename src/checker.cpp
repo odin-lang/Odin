@@ -690,8 +690,10 @@ void add_global_type_entity(String name, Type *type) {
 
 void init_universal(void) {
 	BuildContext *bc = &build_context;
+
 	// NOTE(bill): No need to free these
-	gbAllocator a = heap_allocator();
+	// gbAllocator a = heap_allocator();
+	gbAllocator a = permanent_allocator();
 
 	builtin_pkg = gb_alloc_item(a, AstPackage);
 	builtin_pkg->name = str_lit("builtin");
