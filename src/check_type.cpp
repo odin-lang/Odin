@@ -1390,7 +1390,7 @@ Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Oper
 
 	if (is_polymorphic_type_assignable(ctx, poly_type, operand.type, false, modify_type)) {
 		if (show_error) {
-			set_procedure_abi_types(ctx->allocator, poly_type);
+			set_procedure_abi_types(poly_type);
 		}
 		return poly_type;
 	}
@@ -2508,7 +2508,7 @@ bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type 
 	return false;
 }
 
-void set_procedure_abi_types(gbAllocator allocator, Type *type) {
+void set_procedure_abi_types(Type *type) {
 	type = base_type(type);
 	if (type->kind != Type_Proc) {
 		return;
@@ -2517,6 +2517,8 @@ void set_procedure_abi_types(gbAllocator allocator, Type *type) {
 	if (type->Proc.abi_types_set || type->flags & TypeFlag_InProcessOfCheckingABI) {
 		return;
 	}
+
+	gbAllocator allocator = permanent_allocator();
 
 	u32 flags = type->flags;
 	type->flags |= TypeFlag_InProcessOfCheckingABI;
@@ -2550,13 +2552,13 @@ void set_procedure_abi_types(gbAllocator allocator, Type *type) {
 	for (i32 i = 0; i < type->Proc.param_count; i++) {
 		Entity *e = type->Proc.params->Tuple.variables[i];
 		if (e->kind == Entity_Variable) {
-			set_procedure_abi_types(allocator, e->type);
+			set_procedure_abi_types(e->type);
 		}
 	}
 	for (i32 i = 0; i < type->Proc.result_count; i++) {
 		Entity *e = type->Proc.results->Tuple.variables[i];
 		if (e->kind == Entity_Variable) {
-			set_procedure_abi_types(allocator, e->type);
+			set_procedure_abi_types(e->type);
 		}
 	}
 

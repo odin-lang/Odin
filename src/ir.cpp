@@ -1159,7 +1159,7 @@ irValue *ir_instr_atomic_cxchg(irProcedure *p, Type *type, irValue *address, irV
 		GB_ASSERT(type->Tuple.variables.count == 2);
 		Type *elem = type->Tuple.variables[0]->type;
 		// LEAK TODO(bill): LLVM returns {T, i1} whilst Odin does {T, bool}, fix this mapping hack
-		gbAllocator a = heap_allocator();
+		gbAllocator a = permanent_allocator();
 		Type *llvm_type = alloc_type_tuple();
 		array_init(&llvm_type->Tuple.variables, a, 0, 2);
 		array_add (&llvm_type->Tuple.variables, alloc_entity_field(nullptr, blank_token, elem, false, 0));
@@ -1799,7 +1799,7 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, Ast *expr, bool zero_initial
 	if (zero_initialized) {
 		ir_emit_zero_init(proc, instr, expr);
 	}
-	set_procedure_abi_types(heap_allocator(), e->type);
+	set_procedure_abi_types(e->type);
 
 	// if (proc->module->generate_debug_info && expr != nullptr && proc->entity != nullptr) {
 	// if (proc->module->generate_debug_info && proc->entity != nullptr) {
@@ -3282,7 +3282,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, Array<irValue *> const &ar
 		context_ptr = ir_find_or_generate_context_ptr(p);
 	}
 
-	set_procedure_abi_types(heap_allocator(), pt);
+	set_procedure_abi_types(pt);
 
 	bool is_c_vararg = pt->Proc.c_vararg;
 	isize param_count = pt->Proc.param_count;
@@ -6636,7 +6636,7 @@ void ir_mangle_add_sub_type_name(irModule *m, Entity *field, String parent) {
 		return;
 	}
 	if (is_type_proc(field->type)) {
-		set_procedure_abi_types(heap_allocator(), field->type);
+		set_procedure_abi_types(field->type);
 	}
 
 	String cn = field->token.string;
@@ -6733,7 +6733,7 @@ irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, Ast *expr, i
 	String name = make_string(name_text, name_len-1);
 
 	Type *type = type_of_expr(expr);
-	set_procedure_abi_types(heap_allocator(), type);
+	set_procedure_abi_types(type);
 	irValue *value = ir_value_procedure(m, nullptr, type, pl->type, pl->body, name);
 
 	value->Proc.tags = pl->tags;
@@ -7584,7 +7584,7 @@ irValue *ir_build_call_expr(irProcedure *proc, Ast *expr) {
 	Type *proc_type_ = base_type(ir_type(value));
 	GB_ASSERT(proc_type_->kind == Type_Proc);
 	TypeProc *pt = &proc_type_->Proc;
-	set_procedure_abi_types(heap_allocator(), proc_type_);
+	set_procedure_abi_types(proc_type_);
 
 	if (is_call_expr_field_value(ce)) {
 		auto args = array_make<irValue *>(ir_allocator(), pt->param_count);
@@ -9574,7 +9574,7 @@ void ir_build_nested_proc(irProcedure *proc, AstProcLit *pd, Entity *e) {
 	name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
 	String name = make_string(name_text, name_len-1);
 
-	set_procedure_abi_types(heap_allocator(), e->type);
+	set_procedure_abi_types(e->type);
 	irValue *value = ir_value_procedure(proc->module, e, e->type, pd->type, pd->body, name);
 
 	value->Proc.tags = pd->tags;
@@ -9673,7 +9673,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstValueDecl *vd) {
 					return;
 				}
 
-				set_procedure_abi_types(heap_allocator(), e->type);
+				set_procedure_abi_types(e->type);
 				irValue *value = ir_value_procedure(proc->module, e, e->type, pl->type, pl->body, name);
 
 				value->Proc.tags = pl->tags;
@@ -11471,7 +11471,7 @@ void ir_insert_code_before_proc(irProcedure* proc, irProcedure *parent) {
 void ir_build_proc(irValue *value, irProcedure *parent) {
 	irProcedure *proc = &value->Proc;
 
-	set_procedure_abi_types(heap_allocator(), proc->type);
+	set_procedure_abi_types(proc->type);
 
 	proc->parent = parent;
 
@@ -12612,7 +12612,7 @@ void ir_gen_tree(irGen *s) {
 
 			Ast *type_expr = pl->type;
 
-			set_procedure_abi_types(heap_allocator(), e->type);
+			set_procedure_abi_types(e->type);
 			irValue *p = ir_value_procedure(m, e, e->type, type_expr, body, name);
 			p->Proc.tags = pl->tags;
 			p->Proc.inlining = pl->inlining;
