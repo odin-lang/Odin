@@ -1876,9 +1876,6 @@ int main(int arg_count, char const **arg_ptr) {
 			SIZE_T virtual_mem_used_by_me = pmc.PrivateUsage;
 			gb_printf_err("virtual_memory_used:            %tu B\n", virtual_mem_used_by_me);
 
-			gb_printf_err("total_allocated_node_memory:    %lld B\n", total_allocated_node_memory.value);
-			gb_printf_err("total_subtype_node_memory_test: %lld B\n", total_subtype_node_memory_test.value);
-			gb_printf_err("fraction:                       %.6f\n", (f64)total_subtype_node_memory_test.value/(f64)total_allocated_node_memory.value);
 			Parser *p      = checker.parser;
 			isize lines    = p->total_line_count;
 			isize tokens   = p->total_token_count;

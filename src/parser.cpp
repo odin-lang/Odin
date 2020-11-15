@@ -109,9 +109,6 @@ Token ast_token(Ast *node) {
 }
 
 
-gb_global gbAtomic64 total_allocated_node_memory = {0};
-gb_global gbAtomic64 total_subtype_node_memory_test = {0};
-
 isize ast_node_size(AstKind kind) {
 	return align_formula_isize(gb_size_of(AstCommonStuff) + ast_variant_sizes[kind], gb_align_of(void *));
 
@@ -122,10 +119,6 @@ Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 
 	isize size = ast_node_size(kind);
 
-	gb_atomic64_fetch_add(&total_allocated_node_memory, cast(i64)(gb_size_of(Ast)));
-	gb_atomic64_fetch_add(&total_subtype_node_memory_test, cast(i64)(gb_size_of(AstCommonStuff) + ast_variant_sizes[kind]));
-
-	// Ast *node = gb_alloc_item(a, Ast);
 	Ast *node = cast(Ast *)gb_alloc(a, size);
 	node->kind = kind;
 	node->file = f;
@@ -2511,7 +2504,15 @@ Ast *parse_call_expr(AstFile *f, Ast *operand) {
 	f->expr_level--;
 	close_paren = expect_closing(f, Token_CloseParen, str_lit("argument list"));
 
-	return ast_call_expr(f, operand, args, open_paren, close_paren, ellipsis);
+
+	Ast *call = ast_call_expr(f, operand, args, open_paren, close_paren, ellipsis);
+
+	Ast *o = unparen_expr(operand);
+	if (o->kind == Ast_SelectorExpr && o->SelectorExpr.token.kind == Token_ArrowRight) {
+		return ast_selector_call_expr(f, o->SelectorExpr.token, o, call);
+	}
+
+	return call;
 }
 
 Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
@@ -2563,11 +2564,10 @@ Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 
 		case Token_ArrowRight: {
 			Token token = advance_token(f);
-			// syntax_error(token, "Selector expressions use '.' rather than '->'");
 
-			Ast *sel = ast_selector_expr(f, token, operand, parse_ident(f));
-			Ast *call = parse_call_expr(f, sel);
-			operand = ast_selector_call_expr(f, token, sel, call);
+			operand = ast_selector_expr(f, token, operand, parse_ident(f));
+			// Ast *call = parse_call_expr(f, sel);
+			// operand = ast_selector_call_expr(f, token, sel, call);
 			break;
 		}
 

@@ -45,7 +45,7 @@ enum StmtFlag {
 
 	Stmt_TypeSwitch = 1<<4,
 
-	Stmt_CheckScopeDecls    = 1<<5,
+	Stmt_CheckScopeDecls = 1<<5,
 };
 
 enum BuiltinProcPkg {
@@ -316,6 +316,7 @@ struct CheckerContext {
 	bool       no_polymorphic_errors;
 	bool       hide_polymorphic_errors;
 	bool       in_polymorphic_specialization;
+	bool       allow_arrow_right_selector_expr;
 	Scope *    polymorphic_scope;
 
 	Ast *assignment_lhs_hint;
