@@ -655,6 +655,7 @@ struct Ast {
 	Scope *      scope;
 	TypeAndValue tav;
 
+	// IMPORTANT NOTE(bill): This must be at the end since the AST is allocated to be size of the variant
 	union {
 #define AST_KIND(_kind_name_, name, ...) GB_JOIN2(Ast, _kind_name_) _kind_name_;
 	AST_KINDS

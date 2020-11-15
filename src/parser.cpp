@@ -108,6 +108,30 @@ Token ast_token(Ast *node) {
 	return empty_token;
 }
 
+
+gb_global gbAtomic64 total_allocated_node_memory = {0};
+gb_global gbAtomic64 total_subtype_node_memory_test = {0};
+
+isize ast_node_size(AstKind kind) {
+	return align_formula_isize(gb_size_of(AstCommonStuff) + ast_variant_sizes[kind], gb_align_of(void *));
+
+}
+// NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
+Ast *alloc_ast_node(AstFile *f, AstKind kind) {
+	gbAllocator a = ast_allocator(f);
+
+	isize size = ast_node_size(kind);
+
+	gb_atomic64_fetch_add(&total_allocated_node_memory, cast(i64)(gb_size_of(Ast)));
+	gb_atomic64_fetch_add(&total_subtype_node_memory_test, cast(i64)(gb_size_of(AstCommonStuff) + ast_variant_sizes[kind]));
+
+	// Ast *node = gb_alloc_item(a, Ast);
+	Ast *node = cast(Ast *)gb_alloc(a, size);
+	node->kind = kind;
+	node->file = f;
+	return node;
+}
+
 Ast *clone_ast(Ast *node);
 Array<Ast *> clone_ast_array(Array<Ast *> array) {
 	Array<Ast *> result = {};
@@ -125,7 +149,7 @@ Ast *clone_ast(Ast *node) {
 		return nullptr;
 	}
 	Ast *n = alloc_ast_node(node->file, node->kind);
-	gb_memmove(n, node, gb_size_of(Ast));
+	gb_memmove(n, node, ast_node_size(node->kind));
 
 	switch (n->kind) {
 	default: GB_PANIC("Unhandled Ast %.*s", LIT(ast_strings[n->kind])); break;
@@ -461,23 +485,6 @@ bool ast_node_expect(Ast *node, AstKind kind) {
 		return false;
 	}
 	return true;
-}
-
-
-gb_global gbAtomic64 total_allocated_node_memory = {0};
-gb_global gbAtomic64 total_subtype_node_memory_test = {0};
-
-// NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
-Ast *alloc_ast_node(AstFile *f, AstKind kind) {
-	gbAllocator a = ast_allocator(f);
-
-	gb_atomic64_fetch_add(&total_allocated_node_memory, cast(i64)(gb_size_of(Ast)));
-	gb_atomic64_fetch_add(&total_subtype_node_memory_test, cast(i64)(gb_size_of(AstCommonStuff) + ast_variant_sizes[kind]));
-
-	Ast *node = gb_alloc_item(a, Ast);
-	node->kind = kind;
-	node->file = f;
-	return node;
 }
 
 Ast *ast_bad_expr(AstFile *f, Token begin, Token end) {

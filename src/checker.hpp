@@ -337,8 +337,6 @@ struct Checker {
 
 
 
-
-
 gb_global AstPackage *builtin_pkg    = nullptr;
 gb_global AstPackage *intrinsics_pkg = nullptr;
 gb_global AstPackage *config_pkg      = nullptr;

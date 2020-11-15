@@ -1643,12 +1643,15 @@ int main(int arg_count, char const **arg_ptr) {
 	timings_init(timings, str_lit("Total Time"), 128);
 	defer (timings_destroy(timings));
 
+	arena_init(&permanent_arena, heap_allocator());
+	arena_init(&temporary_arena, heap_allocator());
+	arena_init(&global_ast_arena, heap_allocator());
+
 	init_string_buffer_memory();
 	init_string_interner();
 	init_global_error_collector();
 	init_keyword_hash_table();
 	global_big_int_init();
-	arena_init(&global_ast_arena, heap_allocator());
 
 	array_init(&library_collections, heap_allocator());
 	// NOTE(bill): 'core' cannot be (re)defined by the user
@@ -1795,6 +1798,8 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
+	arena_free_all(&temporary_arena);
+
 	if (build_context.generate_docs) {
 		// generate_documentation(&parser);
 		return 0;
@@ -1812,6 +1817,7 @@ int main(int arg_count, char const **arg_ptr) {
 		check_parsed_files(&checker);
 	}
 
+	arena_free_all(&temporary_arena);
 
 	if (build_context.no_output_files) {
 		if (build_context.query_data_set_settings.ok) {
@@ -1841,6 +1847,8 @@ int main(int arg_count, char const **arg_ptr) {
 			return 1;
 		}
 		lb_generate_code(&gen);
+
+		arena_free_all(&temporary_arena);
 
 		switch (build_context.build_mode) {
 		case BuildMode_Executable:
@@ -1919,11 +1927,17 @@ int main(int arg_count, char const **arg_ptr) {
 		timings_start_section(timings, str_lit("llvm ir gen"));
 		ir_gen_tree(&ir_gen);
 
+		arena_free_all(&temporary_arena);
+
 		timings_start_section(timings, str_lit("llvm ir opt tree"));
 		ir_opt_tree(&ir_gen);
 
+		arena_free_all(&temporary_arena);
+
 		timings_start_section(timings, str_lit("llvm ir print"));
 		print_llvm_ir(&ir_gen);
+
+		arena_free_all(&temporary_arena);
 
 
 		String output_name = ir_gen.output_name;
