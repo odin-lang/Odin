@@ -103,6 +103,11 @@ void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCa
 		offset += 1;
 	}
 
+	LLVMContextRef c = ft->ctx;
+	LLVMAttributeRef noalias_attr   = lb_create_enum_attribute(c, "noalias", true);
+	LLVMAttributeRef nonnull_attr   = lb_create_enum_attribute(c, "nonnull", true);
+	LLVMAttributeRef nocapture_attr = lb_create_enum_attribute(c, "nocapture", true);
+
 	unsigned arg_index = offset;
 	for (unsigned i = 0; i < arg_count; i++) {
 		lbArgType *arg = &ft->args[i];
@@ -129,10 +134,9 @@ void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCa
 	LLVMSetFunctionCallConv(fn, cc_kind);
 	if (calling_convention == ProcCC_Odin) {
 		unsigned context_index = offset+arg_count;
-		LLVMContextRef c = ft->ctx;
-		LLVMAddAttributeAtIndex(fn, context_index, lb_create_enum_attribute(c, "noalias", true));
-		LLVMAddAttributeAtIndex(fn, context_index, lb_create_enum_attribute(c, "nonnull", true));
-		LLVMAddAttributeAtIndex(fn, context_index, lb_create_enum_attribute(c, "nocapture", true));
+		LLVMAddAttributeAtIndex(fn, context_index, noalias_attr);
+		LLVMAddAttributeAtIndex(fn, context_index, nonnull_attr);
+		LLVMAddAttributeAtIndex(fn, context_index, nocapture_attr);
 	}
 
 }
@@ -201,9 +205,6 @@ i64 lb_sizeof(LLVMTypeRef type) {
 	}
 	GB_PANIC("Unhandled type for lb_sizeof -> %s", LLVMPrintTypeToString(type));
 
-	// LLVMValueRef v = LLVMSizeOf(type);
-	// GB_ASSERT(LLVMIsConstant(v));
-	// return cast(i64)LLVMConstIntGetSExtValue(v);
 	return 0;
 }
 
@@ -400,9 +401,6 @@ Type *lb_abi_to_odin_type(LLVMTypeRef type, bool is_return, u32 level = 0) {
 	}
 	GB_PANIC("Unhandled type for lb_abi_to_odin_type -> %s", LLVMPrintTypeToString(type));
 
-	// LLVMValueRef v = LLVMSizeOf(type);
-	// GB_ASSERT(LLVMIsConstant(v));
-	// return cast(i64)LLVMConstIntGetSExtValue(v);
 	return 0;
 }
 
@@ -441,7 +439,7 @@ namespace lbAbi386 {
 		LLVMAttributeRef attr = nullptr;
 		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
 		if (type == i1) {
-			// attr = lb_create_enum_attribute(c, "zext", true);
+			attr = lb_create_enum_attribute(c, "zeroext", true);
 			// return lb_arg_type_direct(type, i1, nullptr, attr);
 		}
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
@@ -625,7 +623,7 @@ namespace lbAbiAmd64SysV {
 		if (is_register(type)) {
 			LLVMAttributeRef attribute = nullptr;
 			if (type == LLVMInt1TypeInContext(c)) {
-				attribute = lb_create_enum_attribute(c, "zext", true);
+				attribute = lb_create_enum_attribute(c, "zeroext", true);
 			}
 			return lb_arg_type_direct(type, nullptr, nullptr, attribute);
 		}
@@ -648,7 +646,7 @@ namespace lbAbiAmd64SysV {
 		LLVMAttributeRef attr = nullptr;
 		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
 		if (type == i1) {
-			attr = lb_create_enum_attribute(c, "zext", true);
+			attr = lb_create_enum_attribute(c, "zeroext", true);
 		}
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}

@@ -897,6 +897,15 @@ bool is_calling_convention_none(ProcCallingConvention calling_convention) {
 	return false;
 }
 
+bool is_calling_convention_odin(ProcCallingConvention calling_convention) {
+	switch (calling_convention) {
+	case ProcCC_Odin:
+	case ProcCC_Contextless:
+		return true;
+	}
+	return false;
+}
+
 Type *alloc_type_tuple() {
 	Type *t = alloc_type(Type_Tuple);
 	return t;
