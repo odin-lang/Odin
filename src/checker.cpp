@@ -1729,7 +1729,10 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 
 
 void generate_minimum_dependency_set(Checker *c, Entity *start) {
-	ptr_set_init(&c->info.minimum_dependency_set, heap_allocator());
+	isize entity_count = c->info.entities.count;
+	isize min_dep_set_cap = next_pow2_isize(entity_count*4); // empirically determined factor
+
+	ptr_set_init(&c->info.minimum_dependency_set, heap_allocator(), min_dep_set_cap);
 	ptr_set_init(&c->info.minimum_dependency_type_info_set, heap_allocator());
 
 	String required_runtime_entities[] = {
@@ -1893,19 +1896,17 @@ void add_entity_dependency_from_procedure_parameters(Map<EntityGraphNode *> *M, 
 
 }
 
-Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
+Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbAllocator allocator) {
 #define TIME_SECTION(str) do { if (build_context.show_more_timings) timings_start_section(&global_timings, str_lit(str)); } while (0)
 
-	gbAllocator a = heap_allocator();
-
 	Map<EntityGraphNode *> M = {}; // Key: Entity *
-	map_init(&M, a, info->entities.count);
+	map_init(&M, allocator, info->entities.count);
 	defer (map_destroy(&M));
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
 		DeclInfo *d = e->decl_info;
 		if (is_entity_a_dependency(e)) {
-			EntityGraphNode *n = gb_alloc_item(a, EntityGraphNode);
+			EntityGraphNode *n = gb_alloc_item(allocator, EntityGraphNode);
 			n->entity = e;
 			map_set(&M, hash_pointer(e), n);
 		}
@@ -1940,7 +1941,7 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 	// This means that the entity graph node set will have to be thread safe
 
 	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2");
-	auto G = array_make<EntityGraphNode *>(a, 0, M.entries.count);
+	auto G = array_make<EntityGraphNode *>(allocator, 0, M.entries.count);
 
 	for_array(i, M.entries) {
 		auto *entry = &M.entries[i];
@@ -1961,17 +1962,27 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 						EntityGraphNode *s = n->succ.entries[k].ptr;
 						// Ignore self-cycles
 						if (s != n) {
+							if (p->entity->kind == Entity_Procedure &&
+							    s->entity->kind == Entity_Procedure) {
+							    	// NOTE(bill, 2020-11-15): Only care about variable initialization ordering
+							    	// TODO(bill): This is probably wrong!!!!
+								continue;
+							}
+							// IMPORTANT NOTE/TODO(bill, 2020-11-15): These three calls take the majority of the
+							// the time to process
+
 							entity_graph_node_set_add(&p->succ, s);
 							entity_graph_node_set_add(&s->pred, p);
 							// Remove edge to 'n'
 							entity_graph_node_set_remove(&s->pred, n);
 						}
 					}
+
 					// Remove edge to 'n'
 					entity_graph_node_set_remove(&p->succ, n);
 				}
 			}
-		} else {
+		} else if (e->kind == Entity_Variable) {
 			array_add(&G, n);
 		}
 	}
@@ -1983,6 +1994,28 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info) {
 		n->dep_count = n->succ.entries.count;
 		GB_ASSERT(n->dep_count >= 0);
 	}
+
+	// f64 succ_count = 0.0;
+	// f64 pred_count = 0.0;
+	// f64 succ_capacity = 0.0;
+	// f64 pred_capacity = 0.0;
+	// f64 succ_max = 0.0;
+	// f64 pred_max = 0.0;
+	// for_array(i, G) {
+	// 	EntityGraphNode *n = G[i];
+	// 	succ_count += n->succ.entries.count;
+	// 	pred_count += n->pred.entries.count;
+	// 	succ_capacity += n->succ.entries.capacity;
+	// 	pred_capacity += n->pred.entries.capacity;
+
+	// 	succ_max = gb_max(succ_max, n->succ.entries.capacity);
+	// 	pred_max = gb_max(pred_max, n->pred.entries.capacity);
+
+	// }
+	// f64 count = cast(f64)G.count;
+	// gb_printf_err(">>>count    pred: %f succ: %f\n", pred_count/count, succ_count/count);
+	// gb_printf_err(">>>capacity pred: %f succ: %f\n", pred_capacity/count, succ_capacity/count);
+	// gb_printf_err(">>>max      pred: %f succ: %f\n", pred_max, succ_max);
 
 	return G;
 
@@ -4174,7 +4207,7 @@ void calculate_global_init_order(Checker *c) {
 	CheckerInfo *info = &c->info;
 
 	TIME_SECTION("calculate_global_init_order: generate entity dependency graph");
-	Array<EntityGraphNode *> dep_graph = generate_entity_dependency_graph(info);
+	Array<EntityGraphNode *> dep_graph = generate_entity_dependency_graph(info, heap_allocator());
 	defer ({
 		for_array(i, dep_graph) {
 			entity_graph_node_destroy(dep_graph[i], heap_allocator());
