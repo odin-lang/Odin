@@ -781,6 +781,8 @@ void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbValue variant
 
 
 void lb_clone_struct_type(LLVMTypeRef dst, LLVMTypeRef src) {
+	SCOPED_TEMPORARY_BLOCK();
+
 	unsigned field_count = LLVMCountStructElementTypes(src);
 	LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
 	LLVMGetStructElementTypes(src, fields);
@@ -1277,9 +1279,10 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			m->internal_type_level += 1;
 			defer (m->internal_type_level -= 1);
 
+			SCOPED_TEMPORARY_BLOCK();
+
 			unsigned field_count = cast(unsigned)(type->Struct.fields.count + offset);
 			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
-			GB_ASSERT(fields != nullptr);
 
 			for_array(i, type->Struct.fields) {
 				Entity *field = type->Struct.fields[i];
@@ -1338,6 +1341,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		if (type->Tuple.variables.count == 1) {
 			return lb_type(m, type->Tuple.variables[0]->type);
 		} else {
+			SCOPED_TEMPORARY_BLOCK();
+
 			unsigned field_count = cast(unsigned)(type->Tuple.variables.count);
 			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
 
@@ -1437,6 +1442,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				extra_param_count += 1;
 			}
 
+			SCOPED_TEMPORARY_BLOCK();
+
 			isize param_count = type->Proc.abi_compat_params.count + extra_param_count;
 			auto param_types = array_make<LLVMTypeRef>(temporary_allocator(), 0, param_count);
 
@@ -1483,6 +1490,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		{
 			LLVMTypeRef internal_type = nullptr;
 			{
+				SCOPED_TEMPORARY_BLOCK();
+
 				GB_ASSERT(type->BitField.fields.count == type->BitField.sizes.count);
 				unsigned field_count = cast(unsigned)type->BitField.fields.count;
 				LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
@@ -5279,8 +5288,9 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				return lb_const_nil(m, original_type);
 			}
 			if (cl->elems[0]->kind == Ast_FieldValue) {
-				// TODO(bill): This is O(N*M) and will be quite slow; it should probably be sorted before hand
+				SCOPED_TEMPORARY_BLOCK();
 
+				// TODO(bill): This is O(N*M) and will be quite slow; it should probably be sorted before hand
 				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, type->Array.count);
 
 				isize value_index = 0;
@@ -5338,6 +5348,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			} else {
 				GB_ASSERT_MSG(elem_count == type->Array.count, "%td != %td", elem_count, type->Array.count);
 
+				SCOPED_TEMPORARY_BLOCK();
 				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, type->Array.count);
 
 				for (isize i = 0; i < elem_count; i++) {
@@ -5360,8 +5371,8 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				return lb_const_nil(m, original_type);
 			}
 			if (cl->elems[0]->kind == Ast_FieldValue) {
+				SCOPED_TEMPORARY_BLOCK();
 				// TODO(bill): This is O(N*M) and will be quite slow; it should probably be sorted before hand
-
 				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, type->EnumeratedArray.count);
 
 				isize value_index = 0;
@@ -5423,6 +5434,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			} else {
 				GB_ASSERT_MSG(elem_count == type->EnumeratedArray.count, "%td != %td", elem_count, type->EnumeratedArray.count);
 
+				SCOPED_TEMPORARY_BLOCK();
 				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, type->EnumeratedArray.count);
 
 				for (isize i = 0; i < elem_count; i++) {
@@ -5446,6 +5458,8 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				return lb_const_nil(m, original_type);
 			}
 			GB_ASSERT(elem_type_can_be_constant(elem_type));
+
+			SCOPED_TEMPORARY_BLOCK();
 
 			isize total_elem_count = type->SimdVector.count;
 			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, total_elem_count);
@@ -5472,6 +5486,8 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			if (type->Struct.custom_align > 0) {
 				offset = 1;
 			}
+
+			SCOPED_TEMPORARY_BLOCK();
 
 			isize value_count = type->Struct.fields.count + offset;
 			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, value_count);
@@ -10880,6 +10896,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			if (cl->elems.count > 0) {
 				lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
 
+				SCOPED_TEMPORARY_BLOCK();
 				auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
 				// NOTE(bill): Separate value, gep, store into their own chunks
@@ -10979,6 +10996,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			if (cl->elems.count > 0) {
 				lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
 
+				SCOPED_TEMPORARY_BLOCK();
 				auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
 				// NOTE(bill): Separate value, gep, store into their own chunks
@@ -11087,6 +11105,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 				lbValue data = lb_slice_elem(p, slice);
 
+				SCOPED_TEMPORARY_BLOCK();
 				auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
 				for_array(i, cl->elems) {
@@ -11935,6 +11954,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 					                                        str_lit("$enum_values"), cast(i64)entry_index);
 
 
+					SCOPED_TEMPORARY_BLOCK();
 					LLVMValueRef *name_values = gb_alloc_array(temporary_allocator(), LLVMValueRef, fields.count);
 					LLVMValueRef *value_values = gb_alloc_array(temporary_allocator(), LLVMValueRef, fields.count);
 
@@ -12894,7 +12914,7 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 
-	String filepath_ll = concatenate_strings(temporary_allocator(), gen->output_base, STR_LIT(".ll"));
+	String filepath_ll = concatenate_strings(permanent_allocator(), gen->output_base, STR_LIT(".ll"));
 
 	TIME_SECTION("LLVM Procedure Generation");
 	for_array(i, m->procedures_to_generate) {

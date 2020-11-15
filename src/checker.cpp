@@ -187,8 +187,8 @@ void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	array_init  (&d->labels,         heap_allocator());
 }
 
-DeclInfo *make_decl_info(gbAllocator a, Scope *scope, DeclInfo *parent) {
-	DeclInfo *d = gb_alloc_item(a, DeclInfo);
+DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
+	DeclInfo *d = gb_alloc_item(permanent_allocator(), DeclInfo);
 	init_decl_info(d, scope, parent);
 	return d;
 }
@@ -219,8 +219,8 @@ bool decl_info_has_init(DeclInfo *d) {
 
 
 
-Scope *create_scope(Scope *parent, gbAllocator allocator, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
-	Scope *s = gb_alloc_item(allocator, Scope);
+Scope *create_scope(Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
+	Scope *s = gb_alloc_item(permanent_allocator(), Scope);
 	s->parent = parent;
 	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);
 	ptr_set_init(&s->imported, heap_allocator(), 0);
@@ -244,7 +244,7 @@ Scope *create_scope_from_file(CheckerContext *c, AstFile *f) {
 	GB_ASSERT(f->pkg != nullptr);
 	GB_ASSERT(f->pkg->scope != nullptr);
 
-	Scope *s = create_scope(f->pkg->scope, c->allocator);
+	Scope *s = create_scope(f->pkg->scope);
 
 	array_reserve(&s->delayed_imports, f->imports.count);
 	array_reserve(&s->delayed_directives, f->directive_count);
@@ -264,7 +264,7 @@ Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg) {
 		decl_count += pkg->files[i]->decls.count;
 	}
 	isize init_elements_capacity = 2*decl_count;
-	Scope *s = create_scope(builtin_pkg->scope, c->allocator, init_elements_capacity);
+	Scope *s = create_scope(builtin_pkg->scope, init_elements_capacity);
 
 	s->flags |= ScopeFlag_Pkg;
 	s->pkg = pkg;
@@ -324,7 +324,7 @@ void check_open_scope(CheckerContext *c, Ast *node) {
 	GB_ASSERT(node->kind == Ast_Invalid ||
 	          is_ast_stmt(node) ||
 	          is_ast_type(node));
-	Scope *scope = create_scope(c->scope, c->allocator);
+	Scope *scope = create_scope(c->scope);
 	add_scope(c, node, scope);
 	switch (node->kind) {
 	case Ast_ProcType:
@@ -699,7 +699,7 @@ void init_universal(void) {
 	builtin_pkg->name = str_lit("builtin");
 	builtin_pkg->kind = Package_Normal;
 
-	builtin_pkg->scope = create_scope(nullptr, a);
+	builtin_pkg->scope = create_scope(nullptr);
 	builtin_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global;
 	builtin_pkg->scope->pkg = builtin_pkg;
 
@@ -707,7 +707,7 @@ void init_universal(void) {
 	intrinsics_pkg->name = str_lit("intrinsics");
 	intrinsics_pkg->kind = Package_Normal;
 
-	intrinsics_pkg->scope = create_scope(nullptr, a);
+	intrinsics_pkg->scope = create_scope(nullptr);
 	intrinsics_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global;
 	intrinsics_pkg->scope->pkg = intrinsics_pkg;
 
@@ -715,7 +715,7 @@ void init_universal(void) {
 	config_pkg->name = str_lit("config");
 	config_pkg->kind = Package_Normal;
 
-	config_pkg->scope = create_scope(nullptr, a);
+	config_pkg->scope = create_scope(nullptr);
 	config_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global;
 	config_pkg->scope->pkg = config_pkg;
 
@@ -872,7 +872,6 @@ CheckerContext make_checker_context(Checker *c) {
 	CheckerContext ctx = c->init_ctx;
 	ctx.checker   = c;
 	ctx.info      = &c->info;
-	ctx.allocator = c->allocator;
 	ctx.scope     = builtin_pkg->scope;
 	ctx.pkg       = builtin_pkg;
 
@@ -905,8 +904,6 @@ bool init_checker(Checker *c, Parser *parser) {
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
 	isize total_token_count = c->parser->total_token_count;
 	isize arena_size = 2 * item_size * total_token_count;
-
-	c->allocator = heap_allocator();
 
 	c->init_ctx = make_checker_context(c);
 	return true;
@@ -2597,7 +2594,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 
 				if (valid && build_context.use_llvm_api) {
 					if (ac->atom_op_table == nullptr) {
-						ac->atom_op_table = gb_alloc_item(heap_allocator(), TypeAtomOpTable);
+						ac->atom_op_table = gb_alloc_item(permanent_allocator(), TypeAtomOpTable);
 					}
 					ac->atom_op_table->op[TypeAtomOp_index_get] = e;
 				}
@@ -2656,7 +2653,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 
 				if (valid && build_context.use_llvm_api) {
 					if (ac->atom_op_table == nullptr) {
-						ac->atom_op_table = gb_alloc_item(heap_allocator(), TypeAtomOpTable);
+						ac->atom_op_table = gb_alloc_item(permanent_allocator(), TypeAtomOpTable);
 					}
 					ac->atom_op_table->op[TypeAtomOp_index_set] = e;
 				}
@@ -2738,7 +2735,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 
 				if (valid && build_context.use_llvm_api) {
 					if (ac->atom_op_table == nullptr) {
-						ac->atom_op_table = gb_alloc_item(heap_allocator(), TypeAtomOpTable);
+						ac->atom_op_table = gb_alloc_item(permanent_allocator(), TypeAtomOpTable);
 					}
 					ac->atom_op_table->op[TypeAtomOp_slice] = e;
 				}
@@ -3090,7 +3087,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			}
 
 			Ast *init_expr = value;
-			DeclInfo *d = make_decl_info(heap_allocator(), c->scope, c->decl);
+			DeclInfo *d = make_decl_info(c->scope, c->decl);
 			d->entity    = e;
 			d->type_expr = vd->type;
 			d->init_expr = init_expr;
@@ -3118,7 +3115,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			Token token = name->Ident.token;
 
 			Ast *fl = c->foreign_context.curr_library;
-			DeclInfo *d = make_decl_info(c->allocator, c->scope, c->decl);
+			DeclInfo *d = make_decl_info(c->scope, c->decl);
 			Entity *e = nullptr;
 
 			d->attributes = vd->attributes;
@@ -4317,7 +4314,7 @@ void check_parsed_files(Checker *c) {
 	for_array(i, c->parser->packages) {
 		AstPackage *p = c->parser->packages[i];
 		Scope *scope = create_scope_from_package(&c->init_ctx, p);
-		p->decl_info = make_decl_info(c->allocator, scope, c->init_ctx.decl);
+		p->decl_info = make_decl_info(scope, c->init_ctx.decl);
 		string_map_set(&c->info.packages, p->fullpath, p);
 
 		if (scope->flags&ScopeFlag_Init) {

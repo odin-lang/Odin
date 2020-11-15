@@ -400,7 +400,7 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 				}
 			}
 
-			auto entities = array_make<Entity *>(ctx->allocator, 0, variable_count);
+			auto entities = array_make<Entity *>(permanent_allocator(), 0, variable_count);
 
 			for_array(i, params) {
 				Ast *param = params[i];
@@ -596,7 +596,7 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 
 	Entity *using_index_expr = nullptr;
 
-	auto variants = array_make<Type *>(ctx->allocator, 0, variant_count);
+	auto variants = array_make<Type *>(permanent_allocator(), 0, variant_count);
 
 	union_type->Union.scope = ctx->scope;
 
@@ -618,7 +618,7 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 				}
 			}
 
-			auto entities = array_make<Entity *>(ctx->allocator, 0, variable_count);
+			auto entities = array_make<Entity *>(permanent_allocator(), 0, variable_count);
 
 			for_array(i, params) {
 				Ast *param = params[i];
@@ -869,7 +869,7 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 	enum_type->Enum.base_type = base_type;
 	enum_type->Enum.scope = ctx->scope;
 
-	auto fields = array_make<Entity *>(ctx->allocator, 0, et->fields.count);
+	auto fields = array_make<Entity *>(permanent_allocator(), 0, et->fields.count);
 
 	Type *constant_type = enum_type;
 	if (named_type != nullptr) {
@@ -986,9 +986,9 @@ void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type, Ast *node) 
 	ast_node(bft, BitFieldType, node);
 	GB_ASSERT(is_type_bit_field(bit_field_type));
 
-	auto fields  = array_make<Entity*>(ctx->allocator, 0, bft->fields.count);
-	auto sizes   = array_make<u32>    (ctx->allocator, 0, bft->fields.count);
-	auto offsets = array_make<u32>    (ctx->allocator, 0, bft->fields.count);
+	auto fields  = array_make<Entity*>(permanent_allocator(), 0, bft->fields.count);
+	auto sizes   = array_make<u32>    (permanent_allocator(), 0, bft->fields.count);
+	auto offsets = array_make<u32>    (permanent_allocator(), 0, bft->fields.count);
 
 	scope_reserve(ctx->scope, bft->fields.count);
 
@@ -1549,7 +1549,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 	bool is_variadic = false;
 	isize variadic_index = -1;
 	bool is_c_vararg = false;
-	auto variables = array_make<Entity *>(ctx->allocator, 0, variable_count);
+	auto variables = array_make<Entity *>(permanent_allocator(), 0, variable_count);
 	for_array(i, params) {
 		Ast *param = params[i];
 		if (param->kind != Ast_Field) {
@@ -1891,7 +1891,7 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 		}
 	}
 
-	auto variables = array_make<Entity *>(ctx->allocator, 0, variable_count);
+	auto variables = array_make<Entity *>(permanent_allocator(), 0, variable_count);
 	for_array(i, results) {
 		ast_node(field, Field, results[i]);
 		Ast *default_value = unparen_expr(field->default_value);
@@ -2781,7 +2781,6 @@ void init_map_entry_type(Type *type) {
 
 	// NOTE(bill): The preload types may have not been set yet
 	GB_ASSERT(t_map_key != nullptr);
-	gbAllocator a = heap_allocator();
 	Type *entry_type = alloc_type_struct();
 
 	/*
@@ -2793,9 +2792,9 @@ void init_map_entry_type(Type *type) {
 	}
 	*/
 	Ast *dummy_node = alloc_ast_node(nullptr, Ast_Invalid);
-	Scope *s = create_scope(builtin_pkg->scope, a);
+	Scope *s = create_scope(builtin_pkg->scope);
 
-	auto fields = array_make<Entity *>(a, 0, 3);
+	auto fields = array_make<Entity *>(permanent_allocator(), 0, 3);
 	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("key")),   t_map_key,       false, 0, EntityState_Resolved));
 	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("next")),  t_int,           false, 1, EntityState_Resolved));
 	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("value")), type->Map.value, false, 2, EntityState_Resolved));
@@ -2803,7 +2802,6 @@ void init_map_entry_type(Type *type) {
 
 	entry_type->Struct.fields = fields;
 
-	// type_set_offsets(a, entry_type);
 	type->Map.entry_type = entry_type;
 }
 
@@ -2826,15 +2824,14 @@ void init_map_internal_types(Type *type) {
 		entries: [dynamic]EntryType;
 	}
 	*/
-	gbAllocator a = heap_allocator();
 	Ast *dummy_node = alloc_ast_node(nullptr, Ast_Invalid);
-	Scope *s = create_scope(builtin_pkg->scope, a);
+	Scope *s = create_scope(builtin_pkg->scope);
 
 	Type *hashes_type  = alloc_type_slice(t_int);
 	Type *entries_type = alloc_type_dynamic_array(type->Map.entry_type);
 
 
-	auto fields = array_make<Entity *>(a, 0, 2);
+	auto fields = array_make<Entity *>(permanent_allocator(), 0, 2);
 	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0, EntityState_Resolved));
 	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("entries")), entries_type, false, 1, EntityState_Resolved));
 
@@ -2902,7 +2899,7 @@ Type *make_soa_struct_fixed(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_
 		soa_struct->Struct.soa_elem = elem;
 		soa_struct->Struct.soa_count = count;
 
-		scope = create_scope(ctx->scope, ctx->allocator);
+		scope = create_scope(ctx->scope);
 		soa_struct->Struct.scope = scope;
 
 		String params_xyzw[4] = {
@@ -2935,7 +2932,7 @@ Type *make_soa_struct_fixed(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_
 		soa_struct->Struct.soa_elem = elem;
 		soa_struct->Struct.soa_count = count;
 
-		scope = create_scope(old_struct->Struct.scope->parent, ctx->allocator);
+		scope = create_scope(old_struct->Struct.scope->parent);
 		soa_struct->Struct.scope = scope;
 
 		for_array(i, old_struct->Struct.fields) {
@@ -2996,7 +2993,7 @@ Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_
 		soa_struct->Struct.soa_count = 0;
 		soa_struct->Struct.is_polymorphic = true;
 
-		scope = create_scope(ctx->scope, ctx->allocator);
+		scope = create_scope(ctx->scope);
 		soa_struct->Struct.scope = scope;
 	} else if (is_type_array(elem)) {
 		Type *old_array = base_type(elem);
@@ -3010,7 +3007,7 @@ Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_
 		soa_struct->Struct.soa_elem = elem;
 		soa_struct->Struct.soa_count = 0;
 
-		scope = create_scope(ctx->scope, ctx->allocator);
+		scope = create_scope(ctx->scope);
 		soa_struct->Struct.scope = scope;
 
 		String params_xyzw[4] = {
@@ -3046,7 +3043,7 @@ Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_
 		soa_struct->Struct.soa_elem = elem;
 		soa_struct->Struct.soa_count = 0;
 
-		scope = create_scope(old_struct->Struct.scope->parent, ctx->allocator);
+		scope = create_scope(old_struct->Struct.scope->parent);
 		soa_struct->Struct.scope = scope;
 
 		for_array(i, old_struct->Struct.fields) {
@@ -3113,7 +3110,7 @@ Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, As
 		soa_struct->Struct.soa_count = 0;
 		soa_struct->Struct.is_polymorphic = true;
 
-		scope = create_scope(ctx->scope, ctx->allocator);
+		scope = create_scope(ctx->scope);
 		soa_struct->Struct.scope = scope;
 	} else if (is_type_array(elem)) {
 		Type *old_array = base_type(elem);
@@ -3127,7 +3124,7 @@ Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, As
 		soa_struct->Struct.soa_elem = elem;
 		soa_struct->Struct.soa_count = 0;
 
-		scope = create_scope(ctx->scope, ctx->allocator);
+		scope = create_scope(ctx->scope);
 		soa_struct->Struct.scope = scope;
 
 		String params_xyzw[4] = {
@@ -3162,7 +3159,7 @@ Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, As
 		soa_struct->Struct.soa_elem = elem;
 		soa_struct->Struct.soa_count = 0;
 
-		scope = create_scope(old_struct->Struct.scope->parent, ctx->allocator);
+		scope = create_scope(old_struct->Struct.scope->parent);
 		soa_struct->Struct.scope = scope;
 
 		for_array(i, old_struct->Struct.fields) {

@@ -5156,7 +5156,7 @@ b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
 
 	index = core * a->threads_per_core + thread_index;
 	thread = pthread_self();
-	
+
 
 	cpuset_t mn;
 	CPU_ZERO(&mn);

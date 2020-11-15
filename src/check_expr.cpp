@@ -267,7 +267,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 
 	CheckerContext nctx = *c;
 
-	Scope *scope = create_scope(base_entity->scope, a);
+	Scope *scope = create_scope(base_entity->scope);
 	scope->flags |= ScopeFlag_Proc;
 	nctx.scope = scope;
 	nctx.allow_polymorphic_types = true;
@@ -366,7 +366,7 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *c, Entity *base_enti
 	u64 tags = base_entity->Procedure.tags;
 	Ast *ident = clone_ast(base_entity->identifier);
 	Token token = ident->Ident.token;
-	DeclInfo *d = make_decl_info(nctx.allocator, scope, old_decl->parent);
+	DeclInfo *d = make_decl_info(scope, old_decl->parent);
 	d->gen_proc_type = final_proc_type;
 	d->type_expr = pl->type;
 	d->proc_lit = proc_lit;
@@ -1832,11 +1832,8 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 	}
 
 
+	SCOPED_TEMPORARY_BLOCK();
 	gbString err_str = nullptr;
-
-	defer (if (err_str != nullptr) {
-		gb_string_free(err_str);
-	});
 
 	if (check_is_assignable_to(c, x, y->type) ||
 	    check_is_assignable_to(c, y, x->type)) {
@@ -1867,8 +1864,8 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 			}
 			gbString type_string = type_to_string(err_type);
 			defer (gb_string_free(type_string));
-			err_str = gb_string_make(c->allocator,
-			                         gb_bprintf("operator '%.*s' not defined for type '%s'", LIT(token_strings[op]), type_string));
+			err_str = gb_string_make(temporary_allocator(),
+				gb_bprintf("operator '%.*s' not defined for type '%s'", LIT(token_strings[op]), type_string));
 		}
 	} else {
 		gbString xt, yt;
@@ -1882,8 +1879,7 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 		} else {
 			yt = type_to_string(y->type);
 		}
-		err_str = gb_string_make(c->allocator,
-		                         gb_bprintf("mismatched types '%s' and '%s'", xt, yt));
+		err_str = gb_string_make(temporary_allocator(), gb_bprintf("mismatched types '%s' and '%s'", xt, yt));
 		gb_string_free(yt);
 		gb_string_free(xt);
 	}
@@ -2978,9 +2974,10 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 
 	case Type_Union:
 		if (!is_operand_nil(*operand) && !is_operand_undef(*operand)) {
+			SCOPED_TEMPORARY_BLOCK();
+
 			isize count = t->Union.variants.count;
-			ValidIndexAndScore *valids = gb_alloc_array(c->allocator, ValidIndexAndScore, count);
-			defer (gb_free(c->allocator, valids));
+			ValidIndexAndScore *valids = gb_alloc_array(temporary_allocator(), ValidIndexAndScore, count);
 			isize valid_count = 0;
 			isize first_success_index = -1;
 			for_array(i, t->Union.variants) {
@@ -4739,7 +4736,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			gb_string_free(type_str);
 			return false;
 		}
-		gbAllocator a = c->allocator;
+		gbAllocator a = permanent_allocator();
 
 		Type *tuple = alloc_type_tuple();
 
@@ -5356,7 +5353,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			soa_struct->Struct.soa_elem = elem;
 			soa_struct->Struct.soa_count = count;
 
-			scope = create_scope(c->scope, c->allocator);
+			scope = create_scope(c->scope);
 			soa_struct->Struct.scope = scope;
 
 			String params_xyzw[4] = {
@@ -5389,7 +5386,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			soa_struct->Struct.soa_elem = elem;
 			soa_struct->Struct.soa_count = count;
 
-			scope = create_scope(old_struct->Struct.scope->parent, c->allocator);
+			scope = create_scope(old_struct->Struct.scope->parent);
 			soa_struct->Struct.scope = scope;
 
 			for_array(i, old_struct->Struct.fields) {
@@ -6539,11 +6536,11 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
 	CallArgumentError err = CallArgumentError_None;
 
+	SCOPED_TEMPORARY_BLOCK();
+
 	isize param_count = pt->param_count;
-	bool *visited = gb_alloc_array(c->allocator, bool, param_count);
-	defer (gb_free(c->allocator, visited));
-	auto ordered_operands = array_make<Operand>(c->allocator, param_count);
-	defer (array_free(&ordered_operands));
+	bool *visited = gb_alloc_array(temporary_allocator(), bool, param_count);
+	auto ordered_operands = array_make<Operand>(temporary_allocator(), param_count);
 	defer ({
 		for_array(i, ordered_operands) {
 			Operand const &o = ordered_operands[i];
@@ -7385,13 +7382,15 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 
 	Array<Operand> ordered_operands = operands;
 	if (!named_fields) {
-		ordered_operands = array_make<Operand>(c->allocator, param_count);
+		ordered_operands = array_make<Operand>(permanent_allocator(), param_count);
 		array_copy(&ordered_operands, operands, 0);
 	} else {
-		bool *visited = gb_alloc_array(c->allocator, bool, param_count);
+		SCOPED_TEMPORARY_BLOCK();
+
+		bool *visited = gb_alloc_array(temporary_allocator(), bool, param_count);
 
 		// LEAK(bill)
-		ordered_operands = array_make<Operand>(c->allocator, param_count);
+		ordered_operands = array_make<Operand>(permanent_allocator(), param_count);
 
 		for_array(i, ce->args) {
 			Ast *arg = ce->args[i];
@@ -7549,8 +7548,6 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 	}
 
 	{
-		gbAllocator a = c->allocator;
-
 		bool failure = false;
 		Entity *found_entity = find_polymorphic_record_entity(c, original_type, param_count, ordered_operands, &failure);
 		if (found_entity) {
@@ -8213,7 +8210,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		Type *type = alloc_type(Type_Proc);
 		check_open_scope(&ctx, pl->type);
 		{
-			decl = make_decl_info(ctx.allocator, ctx.scope, ctx.decl);
+			decl = make_decl_info(ctx.scope, ctx.decl);
 			decl->proc_lit  = node;
 			ctx.decl = decl;
 			defer (ctx.decl = ctx.decl->parent);
@@ -8510,7 +8507,9 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			}
 
 			if (cl->elems[0]->kind == Ast_FieldValue) {
-				bool *fields_visited = gb_alloc_array(c->allocator, bool, field_count);
+				SCOPED_TEMPORARY_BLOCK();
+
+				bool *fields_visited = gb_alloc_array(temporary_allocator(), bool, field_count);
 
 				for_array(i, cl->elems) {
 					Ast *elem = cl->elems[i];
@@ -10092,7 +10091,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			error(x.expr, "Expected a constant string for the inline asm constraints parameter");
 		}
 
-		Scope *scope = create_scope(c->scope, heap_allocator());
+		Scope *scope = create_scope(c->scope);
 		scope->flags |= ScopeFlag_Proc;
 
 		Type *params = alloc_type_tuple();

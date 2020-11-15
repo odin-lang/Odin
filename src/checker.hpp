@@ -301,7 +301,6 @@ struct CheckerContext {
 	ProcCallingConvention curr_proc_calling_convention;
 	bool           in_proc_sig;
 	ForeignContext foreign_context;
-	gbAllocator    allocator;
 
 	CheckerTypePath *type_path;
 	isize            type_level; // TODO(bill): Actually handle correctly
@@ -331,7 +330,6 @@ struct Checker {
 	Array<Entity *> procs_with_deferred_to_check;
 
 	CheckerContext *curr_ctx;
-	gbAllocator    allocator;
 	CheckerContext init_ctx;
 };
 
