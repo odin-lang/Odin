@@ -1644,7 +1644,7 @@ int main(int arg_count, char const **arg_ptr) {
 	defer (timings_destroy(timings));
 
 	arena_init(&permanent_arena, heap_allocator());
-	arena_init(&temporary_arena, heap_allocator());
+	temp_allocator_init(&temporary_allocator_data, 16*1024*1024);
 	arena_init(&global_ast_arena, heap_allocator());
 	permanent_arena.use_mutex = true;
 
@@ -1799,7 +1799,7 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
-	arena_free_all(&temporary_arena);
+	temp_allocator_free_all(&temporary_allocator_data);
 
 	if (build_context.generate_docs) {
 		// generate_documentation(&parser);
@@ -1818,7 +1818,7 @@ int main(int arg_count, char const **arg_ptr) {
 		check_parsed_files(&checker);
 	}
 
-	arena_free_all(&temporary_arena);
+	temp_allocator_free_all(&temporary_allocator_data);
 
 	if (build_context.no_output_files) {
 		if (build_context.query_data_set_settings.ok) {
@@ -1849,7 +1849,7 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 		lb_generate_code(&gen);
 
-		arena_free_all(&temporary_arena);
+		temp_allocator_free_all(&temporary_allocator_data);
 
 		switch (build_context.build_mode) {
 		case BuildMode_Executable:
@@ -1928,17 +1928,17 @@ int main(int arg_count, char const **arg_ptr) {
 		timings_start_section(timings, str_lit("llvm ir gen"));
 		ir_gen_tree(&ir_gen);
 
-		arena_free_all(&temporary_arena);
+		temp_allocator_free_all(&temporary_allocator_data);
 
 		timings_start_section(timings, str_lit("llvm ir opt tree"));
 		ir_opt_tree(&ir_gen);
 
-		arena_free_all(&temporary_arena);
+		temp_allocator_free_all(&temporary_allocator_data);
 
 		timings_start_section(timings, str_lit("llvm ir print"));
 		print_llvm_ir(&ir_gen);
 
-		arena_free_all(&temporary_arena);
+		temp_allocator_free_all(&temporary_allocator_data);
 
 
 		String output_name = ir_gen.output_name;

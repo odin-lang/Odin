@@ -640,8 +640,6 @@ void add_constant_switch_case(CheckerContext *ctx, Map<TypeAndToken> *seen, Oper
 	HashKey key = hash_exact_value(operand.value);
 	TypeAndToken *found = map_get(seen, key);
 	if (found != nullptr) {
-		SCOPED_TEMPORARY_BLOCK();
-
 		isize count = multi_map_count(seen, key);
 		TypeAndToken *taps = gb_alloc_array(temporary_allocator(), TypeAndToken, count);
 
@@ -1026,7 +1024,6 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		GB_ASSERT(is_type_enum(et));
 		auto fields = et->Enum.fields;
 
-		SCOPED_TEMPORARY_BLOCK();
 		auto unhandled = array_make<Entity *>(temporary_allocator(), 0, fields.count);
 
 		for_array(i, fields) {
@@ -1266,7 +1263,6 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		GB_ASSERT(is_type_union(ut));
 		auto variants = ut->Union.variants;
 
-		SCOPED_TEMPORARY_BLOCK();
 		auto unhandled = array_make<Type *>(temporary_allocator(), 0, variants.count);
 
 		for_array(i, variants) {
@@ -1434,7 +1430,6 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				return;
 			}
 
-			SCOPED_TEMPORARY_BLOCK();
 
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 			// an extra allocation

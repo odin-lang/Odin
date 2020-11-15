@@ -76,8 +76,6 @@ void ir_write_u64(irFileBuffer *f, u64 i) {
 }
 void ir_write_big_int(irFileBuffer *f, BigInt const &x, Type *type, bool swap_endian) {
 	if (x.len == 2) {
-		SCOPED_TEMPORARY_BLOCK();
-
 		u64 words[2] = {};
 		BigInt y = x;
 		if (swap_endian) {
