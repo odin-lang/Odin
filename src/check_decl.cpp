@@ -121,7 +121,6 @@ void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Ar
 
 	// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 	// an extra allocation
-	SCOPED_TEMPORARY_BLOCK();
 	auto operands = array_make<Operand>(temporary_allocator(), 0, 2*lhs_count);
 	check_unpack_arguments(ctx, lhs, lhs_count, &operands, inits, true, false);
 

@@ -1832,7 +1832,6 @@ void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
 	}
 
 
-	SCOPED_TEMPORARY_BLOCK();
 	gbString err_str = nullptr;
 
 	if (check_is_assignable_to(c, x, y->type) ||
@@ -2974,8 +2973,6 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 
 	case Type_Union:
 		if (!is_operand_nil(*operand) && !is_operand_undef(*operand)) {
-			SCOPED_TEMPORARY_BLOCK();
-
 			isize count = t->Union.variants.count;
 			ValidIndexAndScore *valids = gb_alloc_array(temporary_allocator(), ValidIndexAndScore, count);
 			isize valid_count = 0;
@@ -6536,8 +6533,6 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
 	CallArgumentError err = CallArgumentError_None;
 
-	SCOPED_TEMPORARY_BLOCK();
-
 	isize param_count = pt->param_count;
 	bool *visited = gb_alloc_array(temporary_allocator(), bool, param_count);
 	auto ordered_operands = array_make<Operand>(temporary_allocator(), param_count);
@@ -7385,8 +7380,6 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 		ordered_operands = array_make<Operand>(permanent_allocator(), param_count);
 		array_copy(&ordered_operands, operands, 0);
 	} else {
-		SCOPED_TEMPORARY_BLOCK();
-
 		bool *visited = gb_alloc_array(temporary_allocator(), bool, param_count);
 
 		// LEAK(bill)
@@ -8507,8 +8500,6 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			}
 
 			if (cl->elems[0]->kind == Ast_FieldValue) {
-				SCOPED_TEMPORARY_BLOCK();
-
 				bool *fields_visited = gb_alloc_array(temporary_allocator(), bool, field_count);
 
 				for_array(i, cl->elems) {

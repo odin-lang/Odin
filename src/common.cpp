@@ -56,6 +56,14 @@ gb_inline isize align_formula_isize(isize size, isize align) {
 	}
 	return size;
 }
+gb_inline void *align_formula_ptr(void *ptr, isize align) {
+	if (align > 0) {
+		uintptr result = (cast(uintptr)ptr) + align-1;
+		return (void *)(result - result%align);
+	}
+	return ptr;
+}
+
 
 GB_ALLOCATOR_PROC(heap_allocator_proc);
 
@@ -380,6 +388,9 @@ typedef struct Arena {
 #define ARENA_MIN_ALIGNMENT 16
 #define ARENA_DEFAULT_BLOCK_SIZE (8*1024*1024)
 
+
+gb_global Arena permanent_arena = {};
+
 void arena_init(Arena *arena, gbAllocator backing, isize block_size=ARENA_DEFAULT_BLOCK_SIZE) {
 	arena->backing = backing;
 	arena->block_size = block_size;
@@ -491,51 +502,98 @@ GB_ALLOCATOR_PROC(arena_allocator_proc) {
 	return ptr;
 }
 
-struct SCOPED_TEMP_ARENA_MEMORY {
-	Arena *arena;
-	u8 *   ptr;
-	u8 *   end;
-	u8 *   prev;
-	isize  total_used;
-	isize  block_count;
-
-	SCOPED_TEMP_ARENA_MEMORY(Arena *the_arena) {
-		GB_ASSERT(!the_arena->use_mutex);
-		arena       = the_arena;
-		ptr         = arena->ptr;
-		end         = arena->end;
-		prev        = arena->prev;
-		total_used  = arena->total_used;
-		block_count = arena->blocks.count;
-	}
-	~SCOPED_TEMP_ARENA_MEMORY() {
-		if (arena->blocks.count != block_count) {
-			for (isize i = block_count; i < arena->blocks.count; i++) {
-				gb_free(arena->backing, arena->blocks[i]);
-			}
-			arena->blocks.count = block_count;
-		}
-		arena->ptr        = ptr;
-		arena->end        = end;
-		arena->prev       = prev;
-		arena->total_used = total_used;
-	}
-};
-
-
-
-
-gb_global Arena permanent_arena = {};
-gb_global Arena temporary_arena = {};
 
 gbAllocator permanent_allocator() {
 	return arena_allocator(&permanent_arena);
-}
-gbAllocator temporary_allocator() {
-	return arena_allocator(&temporary_arena);
+	// return heap_allocator();
 }
 
-#define SCOPED_TEMPORARY_BLOCK() auto GB_DEFER_3(_SCOPED_TEMPORARY_BLOCK_) = SCOPED_TEMP_ARENA_MEMORY(&temporary_arena)
+
+
+struct Temp_Allocator {
+	u8 *data;
+	isize len;
+	isize curr_offset;
+	gbAllocator backup_allocator;
+	Array<void *> leaked_allocations;
+};
+
+gb_global Temp_Allocator temporary_allocator_data = {};
+
+void temp_allocator_init(Temp_Allocator *s, isize size) {
+	s->backup_allocator = heap_allocator();
+	s->data = cast(u8 *)gb_alloc_align(s->backup_allocator, size, 16);
+	s->curr_offset = 0;
+	s->leaked_allocations.allocator = s->backup_allocator;
+}
+
+void *temp_allocator_alloc(Temp_Allocator *s, isize size, isize alignment) {
+	size = align_formula_isize(size, alignment);
+	if (s->curr_offset+size <= s->len) {
+		u8 *start = s->data;
+		u8 *ptr = start + s->curr_offset;
+		ptr = cast(u8 *)align_formula_ptr(ptr, alignment);
+		// assume memory is zero
+
+		isize offset = ptr - start;
+		s->curr_offset = offset + size;
+		return ptr;
+	} else if (size <= s->len) {
+		u8 *start = s->data;
+		u8 *ptr = cast(u8 *)align_formula_ptr(start, alignment);
+		// assume memory is zero
+
+		isize offset = ptr - start;
+		s->curr_offset = offset + size;
+		return ptr;
+	}
+
+	void *ptr = gb_alloc_align(s->backup_allocator, size, alignment);
+	array_add(&s->leaked_allocations, ptr);
+	return ptr;
+}
+
+void temp_allocator_free_all(Temp_Allocator *s) {
+	s->curr_offset = 0;
+	for_array(i, s->leaked_allocations) {
+		gb_free(s->backup_allocator, s->leaked_allocations[i]);
+	}
+	array_clear(&s->leaked_allocations);
+	gb_zero_size(s->data, s->len);
+}
+
+GB_ALLOCATOR_PROC(temp_allocator_proc) {
+	void *ptr = nullptr;
+	Temp_Allocator *s = cast(Temp_Allocator *)allocator_data;
+	GB_ASSERT_NOT_NULL(s);
+
+	switch (type) {
+	case gbAllocation_Alloc:
+		return temp_allocator_alloc(s, size, alignment);
+	case gbAllocation_Free:
+		break;
+	case gbAllocation_Resize:
+		if (size == 0) {
+			ptr = nullptr;
+		} else if (size <= old_size) {
+			ptr = old_memory;
+		} else {
+			ptr = temp_allocator_alloc(s, size, alignment);
+			gb_memmove(ptr, old_memory, old_size);
+		}
+		break;
+	case gbAllocation_FreeAll:
+		temp_allocator_free_all(s);
+		break;
+	}
+
+	return ptr;
+}
+
+
+gbAllocator temporary_allocator() {
+	return {temp_allocator_proc, &temporary_allocator_data};
+}
 
 
 
