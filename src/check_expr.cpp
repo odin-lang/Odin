@@ -3437,6 +3437,13 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 	Entity *entity = nullptr;
 	Selection sel = {}; // NOTE(bill): Not used if it's an import name
 
+	if (!c->allow_arrow_right_selector_expr && se->token.kind == Token_ArrowRight) {
+		error(node, "Illegal use of -> selector shorthand outside of a call");
+		operand->mode = Addressing_Invalid;
+		operand->expr = node;
+		return nullptr;
+	}
+
 	operand->expr = node;
 
 	Ast *op_expr  = se->expr;
@@ -9492,8 +9499,13 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		//
 		// NOTE(bill, 2020-05-22): I'm going to regret this decision, ain't I?
 
+		bool allow_arrow_right_selector_expr;
+		allow_arrow_right_selector_expr = c->allow_arrow_right_selector_expr;
+		c->allow_arrow_right_selector_expr = true;
 		Operand x = {};
 		ExprKind kind = check_expr_base(c, &x, se->expr, nullptr);
+		c->allow_arrow_right_selector_expr = allow_arrow_right_selector_expr;
+
 		if (x.mode == Addressing_Invalid || x.type == t_invalid) {
 			o->mode = Addressing_Invalid;
 			o->type = t_invalid;
@@ -9594,7 +9606,11 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		ce->args = modified_args;
 		se->modified_call = true;
 
+		allow_arrow_right_selector_expr = c->allow_arrow_right_selector_expr;
+		c->allow_arrow_right_selector_expr = true;
 		check_expr_base(c, o, se->call, type_hint);
+		c->allow_arrow_right_selector_expr = allow_arrow_right_selector_expr;
+
 		o->expr = node;
 		return Expr_Expr;
 	case_end;

@@ -858,8 +858,7 @@ void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 		token.pos    = ast_token(ss->body).pos;
 		token.string = str_lit("true");
 
-		x.expr = gb_alloc_item(permanent_allocator(), Ast);
-		x.expr->kind = Ast_Ident;
+		x.expr = alloc_ast_node(nullptr, Ast_Ident);
 		x.expr->Ident.token = token;
 	}
 
