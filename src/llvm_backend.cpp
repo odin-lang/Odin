@@ -7440,8 +7440,14 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 				}
 
 			} else if (arg->kind == lbArg_Indirect) {
-				// lbValue ptr = lb_copy_value_to_ptr(p, x, original_type, 16);
-				lbValue ptr = lb_address_from_load_or_generate_local(p, x);
+				lbValue ptr = {};
+				if (is_calling_convention_odin(pt->Proc.calling_convention)) {
+					// NOTE(bill): Odin parameters are immutable so the original value can be passed if possible
+					// i.e. `T const &` in C++
+					ptr = lb_address_from_load_or_generate_local(p, x);
+				} else {
+					ptr = lb_copy_value_to_ptr(p, x, original_type, 16);
+				}
 				array_add(&processed_args, ptr);
 			}
 
@@ -7454,18 +7460,17 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 
 		Type *rt = reduce_tuple_to_single_type(results);
 		if (return_by_pointer) {
-
 			lbValue return_ptr = {};
-			// if (use_return_ptr_hint && p->return_ptr_hint_value.value != nullptr) {
-			// 	if (are_types_identical(type_deref(p->return_ptr_hint_value.type), rt)) {
-			// 		return_ptr = p->return_ptr_hint_value;
-			// 		p->return_ptr_hint_used = true;
-			// 	}
-			// }
-			// if (return_ptr.value == nullptr) {
+			if (use_return_ptr_hint && p->return_ptr_hint_value.value != nullptr) {
+				if (are_types_identical(type_deref(p->return_ptr_hint_value.type), rt)) {
+					return_ptr = p->return_ptr_hint_value;
+					p->return_ptr_hint_used = true;
+				}
+			}
+			if (return_ptr.value == nullptr) {
 				lbAddr r = lb_add_local_generated(p, rt, true);
 				return_ptr = r.addr;
-			// }
+			}
 			GB_ASSERT(is_type_pointer(return_ptr.type));
 			lb_emit_call_internal(p, value, return_ptr, processed_args, nullptr, context_ptr, inlining);
 			result = lb_emit_load(p, return_ptr);

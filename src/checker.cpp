@@ -1679,8 +1679,6 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 	CheckerInfo *info = &c->info;
 	auto *set = &info->minimum_dependency_set;
 
-	String name = entity->token.string;
-
 	if (entity->type != nullptr &&
 	    is_type_polymorphic(entity->type)) {
 
@@ -1714,16 +1712,15 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 			if (fl != nullptr) {
 				GB_ASSERT_MSG(fl->kind == Entity_LibraryName &&
 				              (fl->flags&EntityFlag_Used),
-				              "%.*s", LIT(name));
+				              "%.*s", LIT(entity->token.string));
 				add_dependency_to_set(c, fl);
 			}
-		}
-		if (e->kind == Entity_Variable && e->Variable.is_foreign) {
+		} else if (e->kind == Entity_Variable && e->Variable.is_foreign) {
 			Entity *fl = e->Variable.foreign_library;
 			if (fl != nullptr) {
 				GB_ASSERT_MSG(fl->kind == Entity_LibraryName &&
 				              (fl->flags&EntityFlag_Used),
-				              "%.*s", LIT(name));
+				              "%.*s", LIT(entity->token.string));
 				add_dependency_to_set(c, fl);
 			}
 		}
