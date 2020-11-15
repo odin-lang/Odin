@@ -82,13 +82,13 @@ gb_internal PtrSetFindResult ptr_set__find(PtrSet<T> *s, T ptr) {
 		u64 hash = 0xcbf29ce484222325ull ^ cast(u64)cast(uintptr)ptr;
 		u64 n = cast(u64)s->hashes.count;
 		fr.hash_index = cast(PtrSetIndex)(hash & (n-1));
-		fr.entry_index = s->hashes[fr.hash_index];
+		fr.entry_index = s->hashes.data[fr.hash_index];
 		while (fr.entry_index != PTR_SET_SENTINEL) {
-			if (s->entries[fr.entry_index].ptr == ptr) {
+			if (s->entries.data[fr.entry_index].ptr == ptr) {
 				return fr;
 			}
 			fr.entry_prev = fr.entry_index;
-			fr.entry_index = s->entries[fr.entry_index].next;
+			fr.entry_index = s->entries.data[fr.entry_index].next;
 		}
 	}
 	return fr;
@@ -113,10 +113,10 @@ void ptr_set_rehash(PtrSet<T> *s, isize new_count) {
 	array_resize(&ns.hashes, new_count);
 	array_reserve(&ns.entries, s->entries.count);
 	for (i = 0; i < new_count; i++) {
-		ns.hashes[i] = PTR_SET_SENTINEL;
+		ns.hashes.data[i] = PTR_SET_SENTINEL;
 	}
 	for (i = 0; i < s->entries.count; i++) {
-		PtrSetEntry<T> *e = &s->entries[i];
+		PtrSetEntry<T> *e = &s->entries.data[i];
 		PtrSetFindResult fr;
 		if (ns.hashes.count == 0) {
 			ptr_set_grow(&ns);
@@ -124,11 +124,11 @@ void ptr_set_rehash(PtrSet<T> *s, isize new_count) {
 		fr = ptr_set__find(&ns, e->ptr);
 		j = ptr_set__add_entry(&ns, e->ptr);
 		if (fr.entry_prev == PTR_SET_SENTINEL) {
-			ns.hashes[fr.hash_index] = j;
+			ns.hashes.data[fr.hash_index] = j;
 		} else {
-			ns.entries[fr.entry_prev].next = j;
+			ns.entries.data[fr.entry_prev].next = j;
 		}
-		ns.entries[j].next = fr.entry_index;
+		ns.entries.data[j].next = fr.entry_index;
 		if (ptr_set__full(&ns)) {
 			ptr_set_grow(&ns);
 		}
@@ -157,9 +157,9 @@ T ptr_set_add(PtrSet<T> *s, T ptr) {
 	} else {
 		index = ptr_set__add_entry(s, ptr);
 		if (fr.entry_prev != PTR_SET_SENTINEL) {
-			s->entries[fr.entry_prev].next = index;
+			s->entries.data[fr.entry_prev].next = index;
 		} else {
-			s->hashes[fr.hash_index] = index;
+			s->hashes.data[fr.hash_index] = index;
 		}
 	}
 	if (ptr_set__full(s)) {
@@ -173,20 +173,20 @@ template <typename T>
 void ptr_set__erase(PtrSet<T> *s, PtrSetFindResult fr) {
 	PtrSetFindResult last;
 	if (fr.entry_prev == PTR_SET_SENTINEL) {
-		s->hashes[fr.hash_index] = s->entries[fr.entry_index].next;
+		s->hashes.data[fr.hash_index] = s->entries.data[fr.entry_index].next;
 	} else {
-		s->entries[fr.entry_prev].next = s->entries[fr.entry_index].next;
+		s->entries.data[fr.entry_prev].next = s->entries.data[fr.entry_index].next;
 	}
 	if (fr.entry_index == s->entries.count-1) {
 		array_pop(&s->entries);
 		return;
 	}
-	s->entries[fr.entry_index] = s->entries[s->entries.count-1];
-	last = ptr_set__find(s, s->entries[fr.entry_index].ptr);
+	s->entries.data[fr.entry_index] = s->entries.data[s->entries.count-1];
+	last = ptr_set__find(s, s->entries.data[fr.entry_index].ptr);
 	if (last.entry_prev != PTR_SET_SENTINEL) {
-		s->entries[last.entry_prev].next = fr.entry_index;
+		s->entries.data[last.entry_prev].next = fr.entry_index;
 	} else {
-		s->hashes[last.hash_index] = fr.entry_index;
+		s->hashes.data[last.hash_index] = fr.entry_index;
 	}
 }
 
