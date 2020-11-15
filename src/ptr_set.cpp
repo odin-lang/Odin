@@ -31,9 +31,26 @@ template <typename T> void ptr_set_grow   (PtrSet<T> *s);
 template <typename T> void ptr_set_rehash (PtrSet<T> *s, isize new_count);
 
 
+isize next_pow2_isize(isize n) {
+	if (n <= 0) {
+		return 0;
+	}
+	n--;
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	if (gb_size_of(isize) == 8) {
+		n |= n >> 32;
+	}
+	n++;
+	return n;
+}
+
 template <typename T>
 void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
-	capacity = next_pow2(gb_max(16, capacity));
+	capacity = next_pow2_isize(gb_max(16, capacity));
 
 	array_init(&s->hashes,  a, capacity);
 	array_init(&s->entries, a, 0, capacity);
