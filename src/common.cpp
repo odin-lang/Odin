@@ -451,7 +451,6 @@ void arena_free_all(Arena *arena) {
 
 
 
-
 GB_ALLOCATOR_PROC(arena_allocator_proc);
 
 gbAllocator arena_allocator(Arena *arena) {
@@ -492,6 +491,38 @@ GB_ALLOCATOR_PROC(arena_allocator_proc) {
 	return ptr;
 }
 
+struct SCOPED_TEMP_ARENA_MEMORY {
+	Arena *arena;
+	u8 *   ptr;
+	u8 *   end;
+	u8 *   prev;
+	isize  total_used;
+	isize  block_count;
+
+	SCOPED_TEMP_ARENA_MEMORY(Arena *the_arena) {
+		GB_ASSERT(!the_arena->use_mutex);
+		arena       = the_arena;
+		ptr         = arena->ptr;
+		end         = arena->end;
+		prev        = arena->prev;
+		total_used  = arena->total_used;
+		block_count = arena->blocks.count;
+	}
+	~SCOPED_TEMP_ARENA_MEMORY() {
+		if (arena->blocks.count != block_count) {
+			for (isize i = block_count; i < arena->blocks.count; i++) {
+				gb_free(arena->backing, arena->blocks[i]);
+			}
+			arena->blocks.count = block_count;
+		}
+		arena->ptr        = ptr;
+		arena->end        = end;
+		arena->prev       = prev;
+		arena->total_used = total_used;
+	}
+};
+
+
 
 
 gb_global Arena permanent_arena = {};
@@ -503,6 +534,8 @@ gbAllocator permanent_allocator() {
 gbAllocator temporary_allocator() {
 	return arena_allocator(&temporary_arena);
 }
+
+#define SCOPED_TEMPORARY_BLOCK() auto GB_DEFER_3(_SCOPED_TEMPORARY_BLOCK_) = SCOPED_TEMP_ARENA_MEMORY(&temporary_arena)
 
 
 

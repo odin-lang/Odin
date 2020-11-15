@@ -1646,6 +1646,7 @@ int main(int arg_count, char const **arg_ptr) {
 	arena_init(&permanent_arena, heap_allocator());
 	arena_init(&temporary_arena, heap_allocator());
 	arena_init(&global_ast_arena, heap_allocator());
+	permanent_arena.use_mutex = true;
 
 	init_string_buffer_memory();
 	init_string_interner();

@@ -76,7 +76,8 @@ void ir_write_u64(irFileBuffer *f, u64 i) {
 }
 void ir_write_big_int(irFileBuffer *f, BigInt const &x, Type *type, bool swap_endian) {
 	if (x.len == 2) {
-		gbAllocator a = heap_allocator(); // TODO(bill): Change this allocator
+		SCOPED_TEMPORARY_BLOCK();
+
 		u64 words[2] = {};
 		BigInt y = x;
 		if (swap_endian) {
@@ -88,9 +89,8 @@ void ir_write_big_int(irFileBuffer *f, BigInt const &x, Type *type, bool swap_en
 			y.d.words = words;
 		}
 
-		String s = big_int_to_string(a, &y, 10);
+		String s = big_int_to_string(temporary_allocator(), &y, 10);
 		ir_write_string(f, s);
-		gb_free(a, s.text);
 	} else {
 		i64 i = 0;
 		if (x.neg) {
