@@ -73,7 +73,7 @@ void     update_expr_type               (CheckerContext *c, Ast *e, Type *type, 
 bool     check_is_terminating           (Ast *node, String const &label);
 bool     check_has_break                (Ast *stmt, String const &label, bool implicit);
 void     check_stmt                     (CheckerContext *c, Ast *node, u32 flags);
-void     check_stmt_list                (CheckerContext *c, Array<Ast *> const &stmts, u32 flags);
+void     check_stmt_list                (CheckerContext *c, Slice<Ast *> const &stmts, u32 flags);
 void     check_init_constant            (CheckerContext *c, Entity *e, Operand *operand);
 bool     check_representable_as_constant(CheckerContext *c, ExactValue in_value, Type *type, ExactValue *out_value);
 bool     check_procedure_type           (CheckerContext *c, Type *type, Ast *proc_type_node, Array<Operand> *operands = nullptr);
@@ -133,7 +133,7 @@ void error_operand_no_value(Operand *o) {
 }
 
 
-void check_scope_decls(CheckerContext *c, Array<Ast *> const &nodes, isize reserve_size) {
+void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes, isize reserve_size) {
 	Scope *s = c->scope;
 
 	check_collect_entities(c, nodes);
@@ -6062,7 +6062,7 @@ isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs
 }
 
 
-bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, Array<Operand> *operands, Array<Ast *> const &rhs) {
+bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, Array<Operand> *operands, Slice<Ast *> const &rhs) {
 	bool optional_ok = false;
 	isize tuple_index = 0;
 	for_array(i, rhs) {
@@ -6146,7 +6146,7 @@ bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, 
 
 
 
-bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Array<Ast *> const &rhs, bool allow_ok, bool is_variadic) {
+bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Slice<Ast *> const &rhs, bool allow_ok, bool is_variadic) {
 	bool optional_ok = false;
 	isize tuple_index = 0;
 	for_array(i, rhs) {
@@ -6748,7 +6748,7 @@ Entity **populate_proc_parameter_list(CheckerContext *c, Type *proc_type, isize 
 }
 
 
-bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Scope *scope, Array<Ast *> *clauses, bool print_err) {
+bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Scope *scope, Slice<Ast *> *clauses, bool print_err) {
 	if (clauses != nullptr) {
 		for_array(i, *clauses) {
 			Ast *clause = (*clauses)[i];
@@ -6813,7 +6813,7 @@ bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Scope *scope, A
 }
 
 
-CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type *proc_type, Ast *call, Array<Ast *> const &args) {
+CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type *proc_type, Ast *call, Slice<Ast *> const &args) {
 	ast_node(ce, CallExpr, call);
 
 	CallArgumentCheckerType *call_checker = check_call_arguments_internal;
@@ -7598,7 +7598,7 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 
 
 
-ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *proc, Array<Ast *> const &args, ProcInlining inlining, Type *type_hint) {
+ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *proc, Slice<Ast *> const &args, ProcInlining inlining, Type *type_hint) {
 	if (proc != nullptr &&
 	    proc->kind == Ast_BasicDirective) {
 		ast_node(bd, BasicDirective, proc);
@@ -8150,7 +8150,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 	case_ast_node(bl, BasicLit, node);
 		Type *t = t_invalid;
-		switch (bl->value.kind) {
+		switch (node->tav.value.kind) {
 		case ExactValue_String:     t = t_untyped_string;     break;
 		case ExactValue_Float:      t = t_untyped_float;      break;
 		case ExactValue_Complex:    t = t_untyped_complex;    break;
@@ -8168,7 +8168,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 		o->mode  = Addressing_Constant;
 		o->type  = t;
-		o->value = bl->value;
+		o->value = node->tav.value;
 	case_end;
 
 	case_ast_node(bd, BasicDirective, node);
@@ -9600,9 +9600,9 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 
 
-		auto modified_args = array_make<Ast *>(heap_allocator(), ce->args.count+1);
+		auto modified_args = slice_make<Ast *>(heap_allocator(), ce->args.count+1);
 		modified_args[0] = first_arg;
-		array_copy(&modified_args, ce->args, 1);
+		slice_copy(&modified_args, ce->args, 1);
 		ce->args = modified_args;
 		se->modified_call = true;
 
@@ -10210,7 +10210,7 @@ void check_expr_or_type(CheckerContext *c, Operand *o, Ast *e, Type *type_hint) 
 
 gbString write_expr_to_string(gbString str, Ast *node);
 
-gbString write_struct_fields_to_string(gbString str, Array<Ast *> const &params) {
+gbString write_struct_fields_to_string(gbString str, Slice<Ast *> const &params) {
 	for_array(i, params) {
 		if (i > 0) {
 			str = gb_string_appendc(str, ", ");

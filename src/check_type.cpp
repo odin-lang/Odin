@@ -117,7 +117,7 @@ bool does_field_type_allow_using(Type *t) {
 	return false;
 }
 
-void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields, Array<String> *tags, Array<Ast *> const &params,
+void check_struct_fields(CheckerContext *ctx, Ast *node, Array<Entity *> *fields, Array<String> *tags, Slice<Ast *> const &params,
                          isize init_field_capacity, Type *struct_type, String context) {
 	*fields = array_make<Entity *>(heap_allocator(), 0, init_field_capacity);
 	*tags   = array_make<String>(heap_allocator(), 0, init_field_capacity);
@@ -389,7 +389,7 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 
 	if (st->polymorphic_params != nullptr) {
 		ast_node(field_list, FieldList, st->polymorphic_params);
-		Array<Ast *> params = field_list->list;
+		Slice<Ast *> params = field_list->list;
 		if (params.count != 0) {
 			isize variable_count = 0;
 			for_array(i, params) {
@@ -607,7 +607,7 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 
 	if (ut->polymorphic_params != nullptr) {
 		ast_node(field_list, FieldList, ut->polymorphic_params);
-		Array<Ast *> params = field_list->list;
+		Slice<Ast *> params = field_list->list;
 		if (params.count != 0) {
 			isize variable_count = 0;
 			for_array(i, params) {
@@ -1516,7 +1516,7 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 
 	bool success = true;
 	ast_node(field_list, FieldList, _params);
-	Array<Ast *> params = field_list->list;
+	Slice<Ast *> params = field_list->list;
 
 	if (params.count == 0) {
 		if (success_) *success_ = success;
@@ -1875,7 +1875,7 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 		return nullptr;
 	}
 	ast_node(field_list, FieldList, _results);
-	Array<Ast *> results = field_list->list;
+	Slice<Ast *> results = field_list->list;
 
 	if (results.count == 0) {
 		return nullptr;

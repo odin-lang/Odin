@@ -384,7 +384,7 @@ void check_add_foreign_import_decl(CheckerContext *c, Ast *decl);
 
 
 bool check_arity_match(CheckerContext *c, AstValueDecl *vd, bool is_global = false);
-void check_collect_entities(CheckerContext *c, Array<Ast *> const &nodes);
+void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes);
 void check_collect_entities_from_when_stmt(CheckerContext *c, AstWhenStmt *ws);
 void check_delayed_file_import_entity(CheckerContext *c, Ast *decl);
 

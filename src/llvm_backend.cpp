@@ -3134,7 +3134,7 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 }
 
 
-void lb_build_stmt_list(lbProcedure *p, Array<Ast *> const &stmts) {
+void lb_build_stmt_list(lbProcedure *p, Slice<Ast *> const &stmts) {
 	for_array(i, stmts) {
 		Ast *stmt = stmts[i];
 		switch (stmt->kind) {
@@ -3865,7 +3865,7 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss) {
 
 	ast_node(body, BlockStmt, ss->body);
 
-	Array<Ast *> default_stmts = {};
+	Slice<Ast *> default_stmts = {};
 	lbBlock *default_fall = nullptr;
 	lbBlock *default_block = nullptr;
 

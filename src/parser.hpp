@@ -46,7 +46,7 @@ enum ParseFileError {
 };
 
 struct CommentGroup {
-	Array<Token> list; // Token_Comment
+	Slice<Token> list; // Token_Comment
 };
 
 
@@ -98,8 +98,8 @@ struct AstFile {
 	bool         in_foreign_block;
 	bool         allow_type;
 
-	Array<Ast *> decls;
-	Array<Ast *> imports; // 'import' 'using import'
+	Slice<Ast *> decls;
+	Array<Ast *> imports; // 'import'
 	isize        directive_count;
 
 	Ast *        curr_proc;
@@ -277,7 +277,6 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 	AST_KIND(Undef,          "undef",           Token) \
 	AST_KIND(BasicLit,       "basic literal",   struct { \
 		Token token; \
-		ExactValue value; \
 	}) \
 	AST_KIND(BasicDirective, "basic directive", struct { \
 		Token  token; \
@@ -291,7 +290,7 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 		Token        token; \
 		Token        open;  \
 		Token        close; \
-		Array<Ast *> args;  \
+		Slice<Ast *> args;  \
 	}) \
 	AST_KIND(ProcLit, "procedure literal", struct { \
 		Ast *type; \
@@ -299,12 +298,12 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 		u64  tags; \
 		ProcInlining inlining; \
 		Token where_token; \
-		Array<Ast *> where_clauses; \
+		Slice<Ast *> where_clauses; \
 		DeclInfo *decl; \
 	}) \
 	AST_KIND(CompoundLit, "compound literal", struct { \
 		Ast *type; \
-		Array<Ast *> elems; \
+		Slice<Ast *> elems; \
 		Token open, close; \
 		i64 max_count; \
 	}) \
@@ -327,7 +326,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	}) \
 	AST_KIND(CallExpr,     "call expression", struct { \
 		Ast *        proc; \
-		Array<Ast *> args; \
+		Slice<Ast *> args; \
 		Token        open; \
 		Token        close; \
 		Token        ellipsis; \
@@ -344,7 +343,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(InlineAsmExpr, "inline asm expression", struct { \
 		Token token; \
 		Token open, close; \
-		Array<Ast *> param_types; \
+		Slice<Ast *> param_types; \
 		Ast *return_type; \
 		Ast *asm_string; \
 		Ast *constraints_string; \
@@ -364,11 +363,11 @@ AST_KIND(_StmtBegin,     "", bool) \
 	}) \
 	AST_KIND(AssignStmt, "assign statement", struct { \
 		Token op; \
-		Array<Ast *> lhs, rhs; \
+		Slice<Ast *> lhs, rhs; \
 	}) \
 AST_KIND(_ComplexStmtBegin, "", bool) \
 	AST_KIND(BlockStmt, "block statement", struct { \
-		Array<Ast *> stmts; \
+		Slice<Ast *> stmts; \
 		Ast *label;         \
 		Token open, close; \
 	}) \
@@ -390,7 +389,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 	}) \
 	AST_KIND(ReturnStmt, "return statement", struct { \
 		Token token; \
-		Array<Ast *> results; \
+		Slice<Ast *> results; \
 	}) \
 	AST_KIND(ForStmt, "for statement", struct { \
 		Token token; \
@@ -420,8 +419,8 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 	}) \
 	AST_KIND(CaseClause, "case clause", struct { \
 		Token token;             \
-		Array<Ast *> list;   \
-		Array<Ast *> stmts;  \
+		Slice<Ast *> list;   \
+		Slice<Ast *> stmts;  \
 		Entity *implicit_entity; \
 	}) \
 	AST_KIND(SwitchStmt, "switch statement", struct { \
@@ -438,12 +437,12 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Ast *tag;    \
 		Ast *body;   \
 		bool partial; \
-}) \
+	}) \
 	AST_KIND(DeferStmt,  "defer statement",  struct { Token token; Ast *stmt; }) \
 	AST_KIND(BranchStmt, "branch statement", struct { Token token; Ast *label; }) \
 	AST_KIND(UsingStmt,  "using statement",  struct { \
 		Token token; \
-		Array<Ast *> list; \
+		Slice<Ast *> list; \
 	}) \
 AST_KIND(_ComplexStmtEnd, "", bool) \
 AST_KIND(_StmtEnd,        "", bool) \
@@ -461,9 +460,9 @@ AST_KIND(_DeclBegin,      "", bool) \
 		Ast *name; \
 	}) \
 	AST_KIND(ValueDecl, "value declaration", struct { \
-		Array<Ast *> names;       \
+		Slice<Ast *> names;       \
 		Ast *        type;        \
-		Array<Ast *> values;      \
+		Slice<Ast *> values;      \
 		Array<Ast *> attributes;  \
 		CommentGroup *docs;       \
 		CommentGroup *comment;    \
@@ -488,10 +487,10 @@ AST_KIND(_DeclBegin,      "", bool) \
 	}) \
 	AST_KIND(ForeignImportDecl, "foreign import declaration", struct { \
 		Token    token;           \
-		Array<Token> filepaths;   \
+		Slice<Token> filepaths;   \
 		Token    library_name;    \
 		String   collection_name; \
-		Array<String> fullpaths;  \
+		Slice<String> fullpaths;  \
 		Array<Ast *> attributes;  \
 		CommentGroup *docs;       \
 		CommentGroup *comment;    \
@@ -499,11 +498,11 @@ AST_KIND(_DeclBegin,      "", bool) \
 AST_KIND(_DeclEnd,   "", bool) \
 	AST_KIND(Attribute, "attribute", struct { \
 		Token token;        \
-		Array<Ast *> elems; \
+		Slice<Ast *> elems; \
 		Token open, close;  \
 	}) \
 	AST_KIND(Field, "field", struct { \
-		Array<Ast *> names;         \
+		Slice<Ast *> names;         \
 		Ast *        type;          \
 		Ast *        default_value; \
 		Token        tag;           \
@@ -513,7 +512,7 @@ AST_KIND(_DeclEnd,   "", bool) \
 	}) \
 	AST_KIND(FieldList, "field list", struct { \
 		Token token;       \
-		Array<Ast *> list; \
+		Slice<Ast *> list; \
 	}) \
 AST_KIND(_TypeBegin, "", bool) \
 	AST_KIND(TypeidType, "typeid", struct { \
@@ -567,34 +566,34 @@ AST_KIND(_TypeBegin, "", bool) \
 	}) \
 	AST_KIND(StructType, "struct type", struct { \
 		Token token;                \
-		Array<Ast *> fields;        \
+		Slice<Ast *> fields;        \
 		isize field_count;          \
 		Ast *polymorphic_params;    \
 		Ast *align;                 \
 		Token where_token;          \
-		Array<Ast *> where_clauses; \
+		Slice<Ast *> where_clauses; \
 		bool is_packed;             \
 		bool is_raw_union;          \
 	}) \
 	AST_KIND(UnionType, "union type", struct { \
 		Token        token;         \
-		Array<Ast *> variants;      \
+		Slice<Ast *> variants;      \
 		Ast *polymorphic_params;    \
 		Ast *        align;         \
 		bool         maybe;         \
 		bool         no_nil;        \
 		Token where_token;          \
-		Array<Ast *> where_clauses; \
+		Slice<Ast *> where_clauses; \
 	}) \
 	AST_KIND(EnumType, "enum type", struct { \
 		Token        token; \
 		Ast *        base_type; \
-		Array<Ast *> fields; /* FieldValue */ \
+		Slice<Ast *> fields; /* FieldValue */ \
 		bool         is_using; \
 	}) \
 	AST_KIND(BitFieldType, "bit field type", struct { \
 		Token        token; \
-		Array<Ast *> fields; /* FieldValue with : */ \
+		Slice<Ast *> fields; /* FieldValue with : */ \
 		Ast *        align; \
 	}) \
 	AST_KIND(BitSetType, "bit set type", struct { \

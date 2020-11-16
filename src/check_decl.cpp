@@ -113,7 +113,7 @@ Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, Stri
 	return e->type;
 }
 
-void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Ast *> const &inits, String context_name) {
+void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Slice<Ast *> const &inits, String context_name) {
 	if ((lhs == nullptr || lhs_count == 0) && inits.count == 0) {
 		return;
 	}

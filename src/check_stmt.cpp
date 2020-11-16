@@ -15,7 +15,7 @@ bool is_divigering_stmt(Ast *stmt) {
 	return t->kind == Type_Proc && t->Proc.diverging;
 }
 
-void check_stmt_list(CheckerContext *ctx, Array<Ast *> const &stmts, u32 flags) {
+void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) {
 	if (stmts.count == 0) {
 		return;
 	}
@@ -78,7 +78,7 @@ void check_stmt_list(CheckerContext *ctx, Array<Ast *> const &stmts, u32 flags) 
 	}
 }
 
-bool check_is_terminating_list(Array<Ast *> const &stmts, String const &label) {
+bool check_is_terminating_list(Slice<Ast *> const &stmts, String const &label) {
 	// Iterate backwards
 	for (isize n = stmts.count-1; n >= 0; n--) {
 		Ast *stmt = stmts[n];
@@ -96,7 +96,7 @@ bool check_is_terminating_list(Array<Ast *> const &stmts, String const &label) {
 	return false;
 }
 
-bool check_has_break_list(Array<Ast *> const &stmts, String const &label, bool implicit) {
+bool check_has_break_list(Slice<Ast *> const &stmts, String const &label, bool implicit) {
 	for_array(i, stmts) {
 		Ast *stmt = stmts[i];
 		if (check_has_break(stmt, label, implicit)) {

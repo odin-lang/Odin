@@ -6884,7 +6884,7 @@ irValue *ir_find_global_variable(irProcedure *proc, String name) {
 	return *value;
 }
 
-void ir_build_stmt_list(irProcedure *proc, Array<Ast *> stmts);
+void ir_build_stmt_list(irProcedure *proc, Slice<Ast *> stmts);
 void ir_build_assign_op(irProcedure *proc, irAddr const &lhs, irValue *value, TokenKind op);
 
 bool is_double_pointer(Type *t) {
@@ -9689,7 +9689,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstValueDecl *vd) {
 	}
 }
 
-void ir_build_stmt_list(irProcedure *proc, Array<Ast *> stmts) {
+void ir_build_stmt_list(irProcedure *proc, Slice<Ast *> stmts) {
 	// NOTE(bill): Precollect constant entities
 	for_array(i, stmts) {
 		Ast *stmt = stmts[i];
@@ -10899,7 +10899,7 @@ void ir_build_stmt_internal(irProcedure *proc, Ast *node) {
 
 		ast_node(body, BlockStmt, ss->body);
 
-		Array<Ast *> default_stmts = {};
+		Slice<Ast *> default_stmts = {};
 		irBlock *default_fall = nullptr;
 		irBlock *default_block = nullptr;
 

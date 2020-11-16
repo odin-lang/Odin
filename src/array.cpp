@@ -43,10 +43,95 @@ template <typename T> void     array_set_capacity  (Array<T> *array, isize capac
 template <typename T> Array<T> array_slice         (Array<T> const &array, isize lo, isize hi);
 template <typename T> Array<T> array_clone         (gbAllocator const &a, Array<T> const &array);
 
-
-
 template <typename T> void array_ordered_remove  (Array<T> *array, isize index);
 template <typename T> void array_unordered_remove(Array<T> *array, isize index);
+
+template <typename T> void array_copy(Array<T> *array, Array<T> const &data, isize offset);
+template <typename T> void array_copy(Array<T> *array, Array<T> const &data, isize offset, isize count);
+
+template <typename T> T *array_end_ptr(Array<T> *array);
+
+
+template <typename T>
+struct Slice {
+	T *data;
+	isize count;
+
+	T &operator[](isize index) {
+		#if !defined(NO_ARRAY_BOUNDS_CHECK)
+			GB_ASSERT_MSG(0 <= index && index < count, "Index %td is out of bounds ranges 0..<%td", index, count);
+		#endif
+		return data[index];
+	}
+
+	T const &operator[](isize index) const {
+		#if !defined(NO_ARRAY_BOUNDS_CHECK)
+			GB_ASSERT_MSG(0 <= index && index < count, "Index %td is out of bounds ranges 0..<%td", index, count);
+		#endif
+		return data[index];
+	}
+};
+
+template <typename T> Slice<T> slice_from_array(Array<T> const &a);
+
+
+
+template <typename T>
+Slice<T> slice_make(gbAllocator const &allocator, isize count) {
+	Slice<T> s = {};
+	s.data = gb_alloc_array(allocator, T, count);
+	s.count = count;
+	return s;
+}
+
+
+template <typename T>
+Slice<T> slice_from_array(Array<T> const &a) {
+	return {a.data, a.count};
+}
+template <typename T>
+Slice<T> slice_clone(gbAllocator const &allocator, Slice<T> const &a) {
+	T *data = cast(T *)gb_alloc_copy_align(allocator, a.data, a.count*gb_size_of(T), gb_align_of(T));
+	return {data, a.count};
+}
+
+template <typename T>
+Slice<T> slice_clone_from_array(gbAllocator const &allocator, Array<T> const &a) {
+	auto c = array_clone(allocator, a);
+	return {c.data, c.count};
+}
+
+
+template <typename T>
+void slice_copy(Slice<T> *slice, Slice<T> const &data, isize offset) {
+	gb_memmove(slice->data+offset, data.data, gb_size_of(T)*data.count);
+}
+template <typename T>
+void slice_copy(Slice<T> *slice, Slice<T> const &data, isize offset, isize count) {
+	gb_memmove(slice->data+offset, data.data, gb_size_of(T)*gb_min(data.count, count));
+}
+
+
+
+template <typename T>
+void slice_ordered_remove(Slice<T> *array, isize index) {
+	GB_ASSERT(0 <= index && index < array->count);
+
+	isize bytes = gb_size_of(T) * (array->count-(index+1));
+	gb_memmove(array->data+index, array->data+index+1, bytes);
+	array->count -= 1;
+}
+
+template <typename T>
+void slice_unordered_remove(Slice<T> *array, isize index) {
+	GB_ASSERT(0 <= index && index < array->count);
+
+	isize n = array->count-1;
+	if (index != n) {
+		gb_memmove(array->data+index, array->data+n, gb_size_of(T));
+	}
+	array->count -= 1;
+}
 
 
 template <typename T>
