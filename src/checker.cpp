@@ -3012,8 +3012,8 @@ void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<Ast *> *attr
 }
 
 void check_collect_value_decl(CheckerContext *c, Ast *decl) {
-	if (decl->been_handled) return;
-	decl->been_handled = true;
+	if (decl->state_flags & StateFlag_BeenHandled) return;
+	decl->state_flags |= StateFlag_BeenHandled;
 
 	ast_node(vd, ValueDecl, decl);
 
@@ -3231,8 +3231,8 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 }
 
 void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
-	if (decl->been_handled) return;
-	decl->been_handled = true;
+	if (decl->state_flags & StateFlag_BeenHandled) return;
+	decl->state_flags |= StateFlag_BeenHandled;
 
 	ast_node(fb, ForeignBlockDecl, decl);
 	Ast *foreign_library = fb->foreign_library;
@@ -3616,8 +3616,8 @@ Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start, AstPackage
 }
 #endif
 void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
-	if (decl->been_handled) return;
-	decl->been_handled = true;
+	if (decl->state_flags & StateFlag_BeenHandled) return;
+	decl->state_flags |= StateFlag_BeenHandled;
 
 	ast_node(id, ImportDecl, decl);
 	Token token = id->relpath;
@@ -3731,8 +3731,8 @@ DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 }
 
 void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
-	if (decl->been_handled) return;
-	decl->been_handled = true;
+	if (decl->state_flags & StateFlag_BeenHandled) return;
+	decl->state_flags |= StateFlag_BeenHandled;
 
 	ast_node(fl, ForeignImportDecl, decl);
 
