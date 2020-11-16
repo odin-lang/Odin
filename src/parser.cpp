@@ -126,10 +126,20 @@ Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 }
 
 Ast *clone_ast(Ast *node);
-Array<Ast *> clone_ast_array(Array<Ast *> array) {
+Array<Ast *> clone_ast_array(Array<Ast *> const &array) {
 	Array<Ast *> result = {};
 	if (array.count > 0) {
 		result = array_make<Ast *>(ast_allocator(nullptr), array.count);
+		for_array(i, array) {
+			result[i] = clone_ast(array[i]);
+		}
+	}
+	return result;
+}
+Slice<Ast *> clone_ast_array(Slice<Ast *> const &array) {
+	Slice<Ast *> result = {};
+	if (array.count > 0) {
+		result = slice_clone(permanent_allocator(), array);
 		for_array(i, array) {
 			result[i] = clone_ast(array[i]);
 		}
@@ -537,10 +547,10 @@ Ast *ast_paren_expr(AstFile *f, Ast *expr, Token open, Token close) {
 	return result;
 }
 
-Ast *ast_call_expr(AstFile *f, Ast *proc, Array<Ast *> args, Token open, Token close, Token ellipsis) {
+Ast *ast_call_expr(AstFile *f, Ast *proc, Array<Ast *> const &args, Token open, Token close, Token ellipsis) {
 	Ast *result = alloc_ast_node(f, Ast_CallExpr);
 	result->CallExpr.proc     = proc;
-	result->CallExpr.args     = args;
+	result->CallExpr.args     = slice_from_array(args);
 	result->CallExpr.open     = open;
 	result->CallExpr.close    = close;
 	result->CallExpr.ellipsis = ellipsis;
@@ -624,7 +634,8 @@ Ast *ast_undef(AstFile *f, Token token) {
 Ast *ast_basic_lit(AstFile *f, Token basic_lit) {
 	Ast *result = alloc_ast_node(f, Ast_BasicLit);
 	result->BasicLit.token = basic_lit;
-	result->BasicLit.value = exact_value_from_basic_literal(basic_lit);
+	result->tav.mode = Addressing_Constant;
+	result->tav.value = exact_value_from_basic_literal(basic_lit);
 	return result;
 }
 
@@ -643,12 +654,12 @@ Ast *ast_ellipsis(AstFile *f, Token token, Ast *expr) {
 }
 
 
-Ast *ast_proc_group(AstFile *f, Token token, Token open, Token close, Array<Ast *> args) {
+Ast *ast_proc_group(AstFile *f, Token token, Token open, Token close, Array<Ast *> const &args) {
 	Ast *result = alloc_ast_node(f, Ast_ProcGroup);
 	result->ProcGroup.token = token;
 	result->ProcGroup.open  = open;
 	result->ProcGroup.close = close;
-	result->ProcGroup.args = args;
+	result->ProcGroup.args = slice_from_array(args);
 	return result;
 }
 
@@ -658,7 +669,7 @@ Ast *ast_proc_lit(AstFile *f, Ast *type, Ast *body, u64 tags, Token where_token,
 	result->ProcLit.body = body;
 	result->ProcLit.tags = tags;
 	result->ProcLit.where_token = where_token;
-	result->ProcLit.where_clauses = where_clauses;
+	result->ProcLit.where_clauses = slice_from_array(where_clauses);
 	return result;
 }
 
@@ -670,10 +681,10 @@ Ast *ast_field_value(AstFile *f, Ast *field, Ast *value, Token eq) {
 	return result;
 }
 
-Ast *ast_compound_lit(AstFile *f, Ast *type, Array<Ast *> elems, Token open, Token close) {
+Ast *ast_compound_lit(AstFile *f, Ast *type, Array<Ast *> const &elems, Token open, Token close) {
 	Ast *result = alloc_ast_node(f, Ast_CompoundLit);
 	result->CompoundLit.type = type;
-	result->CompoundLit.elems = elems;
+	result->CompoundLit.elems = slice_from_array(elems);
 	result->CompoundLit.open = open;
 	result->CompoundLit.close = close;
 	return result;
@@ -736,7 +747,7 @@ Ast *ast_inline_asm_expr(AstFile *f, Token token, Token open, Token close,
 	result->InlineAsmExpr.token              = token;
 	result->InlineAsmExpr.open               = open;
 	result->InlineAsmExpr.close              = close;
-	result->InlineAsmExpr.param_types        = param_types;
+	result->InlineAsmExpr.param_types        = slice_from_array(param_types);
 	result->InlineAsmExpr.return_type        = return_type;
 	result->InlineAsmExpr.asm_string         = asm_string;
 	result->InlineAsmExpr.constraints_string = constraints_string;
@@ -768,18 +779,18 @@ Ast *ast_expr_stmt(AstFile *f, Ast *expr) {
 	return result;
 }
 
-Ast *ast_assign_stmt(AstFile *f, Token op, Array<Ast *> lhs, Array<Ast *> rhs) {
+Ast *ast_assign_stmt(AstFile *f, Token op, Array<Ast *> const &lhs, Array<Ast *> const &rhs) {
 	Ast *result = alloc_ast_node(f, Ast_AssignStmt);
 	result->AssignStmt.op = op;
-	result->AssignStmt.lhs = lhs;
-	result->AssignStmt.rhs = rhs;
+	result->AssignStmt.lhs = slice_from_array(lhs);
+	result->AssignStmt.rhs = slice_from_array(rhs);
 	return result;
 }
 
 
-Ast *ast_block_stmt(AstFile *f, Array<Ast *> stmts, Token open, Token close) {
+Ast *ast_block_stmt(AstFile *f, Array<Ast *> const &stmts, Token open, Token close) {
 	Ast *result = alloc_ast_node(f, Ast_BlockStmt);
-	result->BlockStmt.stmts = stmts;
+	result->BlockStmt.stmts = slice_from_array(stmts);
 	result->BlockStmt.open = open;
 	result->BlockStmt.close = close;
 	return result;
@@ -805,10 +816,10 @@ Ast *ast_when_stmt(AstFile *f, Token token, Ast *cond, Ast *body, Ast *else_stmt
 }
 
 
-Ast *ast_return_stmt(AstFile *f, Token token, Array<Ast *> results) {
+Ast *ast_return_stmt(AstFile *f, Token token, Array<Ast *> const &results) {
 	Ast *result = alloc_ast_node(f, Ast_ReturnStmt);
 	result->ReturnStmt.token = token;
-	result->ReturnStmt.results = results;
+	result->ReturnStmt.results = slice_from_array(results);
 	return result;
 }
 
@@ -866,11 +877,11 @@ Ast *ast_type_switch_stmt(AstFile *f, Token token, Ast *tag, Ast *body) {
 	return result;
 }
 
-Ast *ast_case_clause(AstFile *f, Token token, Array<Ast *> list, Array<Ast *> stmts) {
+Ast *ast_case_clause(AstFile *f, Token token, Array<Ast *> const &list, Array<Ast *> const &stmts) {
 	Ast *result = alloc_ast_node(f, Ast_CaseClause);
 	result->CaseClause.token = token;
-	result->CaseClause.list  = list;
-	result->CaseClause.stmts = stmts;
+	result->CaseClause.list  = slice_from_array(list);
+	result->CaseClause.stmts = slice_from_array(stmts);
 	return result;
 }
 
@@ -889,10 +900,10 @@ Ast *ast_branch_stmt(AstFile *f, Token token, Ast *label) {
 	return result;
 }
 
-Ast *ast_using_stmt(AstFile *f, Token token, Array<Ast *> list) {
+Ast *ast_using_stmt(AstFile *f, Token token, Array<Ast *> const &list) {
 	Ast *result = alloc_ast_node(f, Ast_UsingStmt);
 	result->UsingStmt.token = token;
-	result->UsingStmt.list  = list;
+	result->UsingStmt.list  = slice_from_array(list);
 	return result;
 }
 
@@ -905,10 +916,10 @@ Ast *ast_bad_decl(AstFile *f, Token begin, Token end) {
 	return result;
 }
 
-Ast *ast_field(AstFile *f, Array<Ast *> names, Ast *type, Ast *default_value, u32 flags, Token tag,
+Ast *ast_field(AstFile *f, Array<Ast *> const &names, Ast *type, Ast *default_value, u32 flags, Token tag,
                CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_Field);
-	result->Field.names         = names;
+	result->Field.names         = slice_from_array(names);
 	result->Field.type          = type;
 	result->Field.default_value = default_value;
 	result->Field.flags         = flags;
@@ -918,10 +929,10 @@ Ast *ast_field(AstFile *f, Array<Ast *> names, Ast *type, Ast *default_value, u3
 	return result;
 }
 
-Ast *ast_field_list(AstFile *f, Token token, Array<Ast *> list) {
+Ast *ast_field_list(AstFile *f, Token token, Array<Ast *> const &list) {
 	Ast *result = alloc_ast_node(f, Ast_FieldList);
 	result->FieldList.token = token;
-	result->FieldList.list  = list;
+	result->FieldList.list  = slice_from_array(list);
 	return result;
 }
 
@@ -1002,7 +1013,7 @@ Ast *ast_dynamic_array_type(AstFile *f, Token token, Ast *elem) {
 	return result;
 }
 
-Ast *ast_struct_type(AstFile *f, Token token, Array<Ast *> fields, isize field_count,
+Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, isize field_count,
                      Ast *polymorphic_params, bool is_packed, bool is_raw_union,
                      Ast *align,
                      Token where_token, Array<Ast *> const &where_clauses) {
@@ -1015,38 +1026,38 @@ Ast *ast_struct_type(AstFile *f, Token token, Array<Ast *> fields, isize field_c
 	result->StructType.is_raw_union       = is_raw_union;
 	result->StructType.align              = align;
 	result->StructType.where_token        = where_token;
-	result->StructType.where_clauses      = where_clauses;
+	result->StructType.where_clauses      = slice_from_array(where_clauses);
 	return result;
 }
 
 
-Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> variants, Ast *polymorphic_params, Ast *align, bool no_nil, bool maybe,
+Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> const &variants, Ast *polymorphic_params, Ast *align, bool no_nil, bool maybe,
                     Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_UnionType);
 	result->UnionType.token              = token;
-	result->UnionType.variants           = variants;
+	result->UnionType.variants           = slice_from_array(variants);
 	result->UnionType.polymorphic_params = polymorphic_params;
 	result->UnionType.align              = align;
 	result->UnionType.no_nil             = no_nil;
-	result->UnionType.maybe             = maybe;
+	result->UnionType.maybe              = maybe;
 	result->UnionType.where_token        = where_token;
-	result->UnionType.where_clauses      = where_clauses;
+	result->UnionType.where_clauses      = slice_from_array(where_clauses);
 	return result;
 }
 
 
-Ast *ast_enum_type(AstFile *f, Token token, Ast *base_type, Array<Ast *> fields) {
+Ast *ast_enum_type(AstFile *f, Token token, Ast *base_type, Array<Ast *> const &fields) {
 	Ast *result = alloc_ast_node(f, Ast_EnumType);
 	result->EnumType.token = token;
 	result->EnumType.base_type = base_type;
-	result->EnumType.fields = fields;
+	result->EnumType.fields = slice_from_array(fields);
 	return result;
 }
 
-Ast *ast_bit_field_type(AstFile *f, Token token, Array<Ast *> fields, Ast *align) {
+Ast *ast_bit_field_type(AstFile *f, Token token, Array<Ast *> const &fields, Ast *align) {
 	Ast *result = alloc_ast_node(f, Ast_BitFieldType);
 	result->BitFieldType.token = token;
-	result->BitFieldType.fields = fields;
+	result->BitFieldType.fields = slice_from_array(fields);
 	result->BitFieldType.align = align;
 	return result;
 }
@@ -1069,7 +1080,7 @@ Ast *ast_map_type(AstFile *f, Token token, Ast *key, Ast *value) {
 
 
 Ast *ast_foreign_block_decl(AstFile *f, Token token, Ast *foreign_library, Ast *body,
-                                CommentGroup *docs) {
+                            CommentGroup *docs) {
 	Ast *result = alloc_ast_node(f, Ast_ForeignBlockDecl);
 	result->ForeignBlockDecl.token           = token;
 	result->ForeignBlockDecl.foreign_library = foreign_library;
@@ -1087,12 +1098,12 @@ Ast *ast_label_decl(AstFile *f, Token token, Ast *name) {
 	return result;
 }
 
-Ast *ast_value_decl(AstFile *f, Array<Ast *> names, Ast *type, Array<Ast *> values, bool is_mutable,
+Ast *ast_value_decl(AstFile *f, Array<Ast *> const &names, Ast *type, Array<Ast *> const &values, bool is_mutable,
                         CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_ValueDecl);
-	result->ValueDecl.names      = names;
+	result->ValueDecl.names      = slice_from_array(names);
 	result->ValueDecl.type       = type;
-	result->ValueDecl.values     = values;
+	result->ValueDecl.values     = slice_from_array(values);
 	result->ValueDecl.is_mutable = is_mutable;
 	result->ValueDecl.docs       = docs;
 	result->ValueDecl.comment    = comment;
@@ -1126,7 +1137,7 @@ Ast *ast_foreign_import_decl(AstFile *f, Token token, Array<Token> filepaths, To
                                  CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_ForeignImportDecl);
 	result->ForeignImportDecl.token        = token;
-	result->ForeignImportDecl.filepaths    = filepaths;
+	result->ForeignImportDecl.filepaths    = slice_from_array(filepaths);
 	result->ForeignImportDecl.library_name = library_name;
 	result->ForeignImportDecl.docs         = docs;
 	result->ForeignImportDecl.comment      = comment;
@@ -1136,11 +1147,11 @@ Ast *ast_foreign_import_decl(AstFile *f, Token token, Array<Token> filepaths, To
 }
 
 
-Ast *ast_attribute(AstFile *f, Token token, Token open, Token close, Array<Ast *> elems) {
+Ast *ast_attribute(AstFile *f, Token token, Token open, Token close, Array<Ast *> const &elems) {
 	Ast *result = alloc_ast_node(f, Ast_Attribute);
 	result->Attribute.token = token;
 	result->Attribute.open  = open;
-	result->Attribute.elems = elems;
+	result->Attribute.elems = slice_from_array(elems);
 	result->Attribute.close = close;
 	return result;
 }
@@ -1192,7 +1203,7 @@ CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_line_) {
 	CommentGroup *comments = nullptr;
 	if (list.count > 0) {
 		comments = gb_alloc_item(heap_allocator(), CommentGroup);
-		comments->list = list;
+		comments->list = slice_from_array(list);
 		array_add(&f->comments, comments);
 	}
 	return comments;
@@ -2181,7 +2192,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Ast *fields = parse_struct_field_list(f, &name_count);
 		Token    close  = expect_token(f, Token_CloseBrace);
 
-		Array<Ast *> decls = {};
+		Slice<Ast *> decls = {};
 		if (fields != nullptr) {
 			GB_ASSERT(fields->kind == Ast_FieldList);
 			decls = fields->FieldList.list;
@@ -4887,7 +4898,7 @@ bool determine_path_from_string(gbMutex *file_mutex, Ast *node, String base_dir,
 
 
 
-void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<Ast *> &decls);
+void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Slice<Ast *> &decls);
 
 void parse_setup_file_when_stmt(Parser *p, AstFile *f, String base_dir, AstWhenStmt *ws) {
 	if (ws->body != nullptr) {
@@ -4908,7 +4919,7 @@ void parse_setup_file_when_stmt(Parser *p, AstFile *f, String base_dir, AstWhenS
 	}
 }
 
-void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<Ast *> &decls) {
+void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Slice<Ast *> &decls) {
 	for_array(i, decls) {
 		Ast *node = decls[i];
 		if (!is_ast_decl(node) &&
@@ -4947,8 +4958,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<Ast *>
 		} else if (node->kind == Ast_ForeignImportDecl) {
 			ast_node(fl, ForeignImportDecl, node);
 
-			fl->fullpaths.allocator = heap_allocator();
-			array_reserve(&fl->fullpaths, fl->filepaths.count);
+			auto fullpaths = array_make<String>(permanent_allocator(), 0, fl->filepaths.count);
 
 			for_array(fp_idx, fl->filepaths) {
 				String file_str = fl->filepaths[fp_idx].string;
@@ -4962,13 +4972,16 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<Ast *>
 					}
 					fullpath = foreign_path;
 				}
-				array_add(&fl->fullpaths, fullpath);
+				array_add(&fullpaths, fullpath);
 			}
-			if (fl->fullpaths.count == 0) {
+			if (fullpaths.count == 0) {
 				syntax_error(decls[i], "No foreign paths found");
 				decls[i] = ast_bad_decl(f, fl->filepaths[0], fl->filepaths[fl->filepaths.count-1]);
 				goto end;
 			}
+
+			fl->fullpaths = slice_from_array(fullpaths);
+
 
 		} else if (node->kind == Ast_WhenStmt) {
 			ast_node(ws, WhenStmt, node);
@@ -5131,12 +5144,12 @@ bool parse_file(Parser *p, AstFile *f) {
 	f->pkg_decl = pd;
 
 	if (f->error_count == 0) {
-		f->decls = array_make<Ast *>(heap_allocator());
+		auto decls = array_make<Ast *>(heap_allocator());
 
 		while (f->curr_token.kind != Token_EOF) {
 			Ast *stmt = parse_stmt(f);
 			if (stmt && stmt->kind != Ast_EmptyStmt) {
-				array_add(&f->decls, stmt);
+				array_add(&decls, stmt);
 				if (stmt->kind == Ast_ExprStmt &&
 				    stmt->ExprStmt.expr != nullptr &&
 				    stmt->ExprStmt.expr->kind == Ast_ProcLit) {
@@ -5144,6 +5157,8 @@ bool parse_file(Parser *p, AstFile *f) {
 				}
 			}
 		}
+
+		f->decls = slice_from_array(decls);
 
 		parse_setup_file_decls(p, f, base_dir, f->decls);
 	}

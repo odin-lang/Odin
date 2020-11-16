@@ -2854,7 +2854,7 @@ void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, De
 }
 
 
-isize get_total_value_count(Array<Ast *> const &values) {
+isize get_total_value_count(Slice<Ast *> const &values) {
 	isize count = 0;
 	for_array(i, values) {
 		Type *t = type_of_expr(values[i]);
@@ -3068,7 +3068,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				} else {
 					entity_visibility_kind = kind;
 				}
-				array_unordered_remove(elems, j);
+				slice_unordered_remove(elems, j);
 				j -= 1;
 			}
 		}
@@ -3252,7 +3252,7 @@ void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
 }
 
 // NOTE(bill): If file_scopes == nullptr, this will act like a local scope
-void check_collect_entities(CheckerContext *c, Array<Ast *> const &nodes) {
+void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
 	for_array(decl_index, nodes) {
 		Ast *decl = nodes[decl_index];
 		if (!is_ast_decl(decl) && !is_ast_when_stmt(decl)) {
@@ -3783,7 +3783,7 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	}
 }
 
-bool collect_checked_packages_from_decl_list(Checker *c, Array<Ast *> const &decls) {
+bool collect_checked_packages_from_decl_list(Checker *c, Slice<Ast *> const &decls) {
 	bool new_files = false;
 	for_array(i, decls) {
 		Ast *decl = decls[i];
@@ -3805,7 +3805,7 @@ bool collect_checked_packages_from_decl_list(Checker *c, Array<Ast *> const &dec
 }
 
 // Returns true if a new package is present
-bool collect_file_decls(CheckerContext *ctx, Array<Ast *> const &decls);
+bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls);
 bool collect_file_decls_from_when_stmt(CheckerContext *ctx, AstWhenStmt *ws);
 
 bool collect_when_stmt_from_file(CheckerContext *ctx, AstWhenStmt *ws) {
@@ -3880,7 +3880,7 @@ bool collect_file_decls_from_when_stmt(CheckerContext *ctx, AstWhenStmt *ws) {
 	return false;
 }
 
-bool collect_file_decls(CheckerContext *ctx, Array<Ast *> const &decls) {
+bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls) {
 	GB_ASSERT(ctx->scope->flags&ScopeFlag_File);
 
 	if (collect_checked_packages_from_decl_list(ctx->checker, decls)) {
