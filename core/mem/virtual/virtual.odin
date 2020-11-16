@@ -116,7 +116,7 @@ arena_init :: proc(va: ^Arena, max_size: int, desired_base_ptr: rawptr = nil) ->
 // Frees all the allocations made using this arena.
 // The virtual memory is decommitted, but not returned to the system.
 // This will free up physical memory but keep the virtual address space reserved.
-// You may then proceed as if you had only just created the arena and called `arena_init`.
+// You may then proceed as if the arena has just been initialized.
 arena_free_all :: proc(using va: ^Arena) {
 	cursor = 0;
 	decommit(memory);
