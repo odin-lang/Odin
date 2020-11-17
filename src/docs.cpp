@@ -50,6 +50,14 @@ GB_COMPARE_PROC(cmp_entities_for_printing) {
 	return res;
 }
 
+GB_COMPARE_PROC(cmp_ast_package_by_name) {
+	GB_ASSERT(a != nullptr);
+	GB_ASSERT(b != nullptr);
+	AstPackage *x = *cast(AstPackage **)a;
+	AstPackage *y = *cast(AstPackage **)b;
+	return string_compare(x->name, y->name);
+}
+
 
 gbString expr_to_string(Ast *expression);
 gbString type_to_string(Type *type);
@@ -84,7 +92,39 @@ String alloc_comment_group_string(gbAllocator a, CommentGroup g) {
 	return make_string(text, len);
 }
 
+
+void print_doc_line(i32 indent, char const *fmt, ...) {
+	while (indent --> 0) {
+		gb_printf("\t");
+	}
+	va_list va;
+	va_start(va, fmt);
+	gb_printf_va(fmt, va);
+	va_end(va);
+	gb_printf("\n");
+}
+
+void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
+	print_doc_line(0, "%.*s", LIT(pkg->name));
+}
+
 void generate_documentation(Checker *c) {
 	CheckerInfo *info = &c->info;
 
+	if (build_context.cmd_doc_flags & CmdDocFlag_All) {
+		auto pkgs = array_make<AstPackage *>(permanent_allocator(), info->packages.entries.count);
+		for_array(i, info->packages.entries) {
+			array_add(&pkgs, info->packages.entries[i].value);
+		}
+
+		gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);
+
+		for_array(i, pkgs) {
+			print_doc_package(info, pkgs[i]);
+		}
+	} else {
+		GB_ASSERT(info->init_scope->flags & ScopeFlag_Pkg);
+		AstPackage *pkg = info->init_scope->pkg;
+		print_doc_package(info, pkg);
+	}
 }

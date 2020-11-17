@@ -104,6 +104,35 @@ enum BuildModeKind {
 	BuildMode_Assembly,
 };
 
+enum CommandKind : u32 {
+	Command_run     = 1<<0,
+	Command_build   = 1<<1,
+	Command_check   = 1<<3,
+	Command_query   = 1<<4,
+	Command_doc     = 1<<5,
+	Command_version = 1<<6,
+
+	Command__does_check = Command_run|Command_build|Command_check|Command_query|Command_doc,
+	Command__does_build = Command_run|Command_build,
+	Command_all = ~(u32)0,
+};
+
+char const *odin_command_strings[32] = {
+	"run",
+	"build",
+	"check",
+	"query",
+	"doc",
+	"version",
+};
+
+
+
+enum CmdDocFlag : u32 {
+	CmdDocFlag_All = 1<<0,
+};
+
+
 
 // This stores the information for the specify architecture of this build
 struct BuildContext {
@@ -124,6 +153,7 @@ struct BuildContext {
 	i64    word_size; // Size of a pointer, must be >= 4
 	i64    max_align; // max alignment, must be >= 1 (and typically >= word_size)
 
+	CommandKind command_kind;
 	String command;
 
 	TargetMetrics metrics;
@@ -166,6 +196,8 @@ struct BuildContext {
 	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
+
+	u32 cmd_doc_flags;
 
 	QueryDataSetSettings query_data_set_settings;
 
