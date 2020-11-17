@@ -1099,7 +1099,7 @@ Ast *ast_label_decl(AstFile *f, Token token, Ast *name) {
 }
 
 Ast *ast_value_decl(AstFile *f, Array<Ast *> const &names, Ast *type, Array<Ast *> const &values, bool is_mutable,
-                        CommentGroup *docs, CommentGroup *comment) {
+                    CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_ValueDecl);
 	result->ValueDecl.names      = slice_from_array(names);
 	result->ValueDecl.type       = type;
@@ -1122,7 +1122,7 @@ Ast *ast_package_decl(AstFile *f, Token token, Token name, CommentGroup *docs, C
 }
 
 Ast *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, Token import_name,
-                         CommentGroup *docs, CommentGroup *comment) {
+                     CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_ImportDecl);
 	result->ImportDecl.token       = token;
 	result->ImportDecl.is_using    = is_using;
@@ -1134,7 +1134,7 @@ Ast *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, Toke
 }
 
 Ast *ast_foreign_import_decl(AstFile *f, Token token, Array<Token> filepaths, Token library_name,
-                                 CommentGroup *docs, CommentGroup *comment) {
+                             CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_ForeignImportDecl);
 	result->ForeignImportDecl.token        = token;
 	result->ForeignImportDecl.filepaths    = slice_from_array(filepaths);

@@ -160,12 +160,13 @@ struct ProcInfo {
 
 
 enum ScopeFlag : i32 {
-	ScopeFlag_Pkg    = 1<<1,
-	ScopeFlag_Global = 1<<2,
-	ScopeFlag_File   = 1<<3,
-	ScopeFlag_Init   = 1<<4,
-	ScopeFlag_Proc   = 1<<5,
-	ScopeFlag_Type   = 1<<6,
+	ScopeFlag_Pkg     = 1<<1,
+	ScopeFlag_Builtin = 1<<2,
+	ScopeFlag_Global  = 1<<3,
+	ScopeFlag_File    = 1<<4,
+	ScopeFlag_Init    = 1<<5,
+	ScopeFlag_Proc    = 1<<6,
+	ScopeFlag_Type    = 1<<7,
 
 	ScopeFlag_HasBeenImported = 1<<10, // This is only applicable to file scopes
 

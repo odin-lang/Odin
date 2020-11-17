@@ -568,6 +568,7 @@ enum BuildFlagKind {
 	BuildFlag_OutFile,
 	BuildFlag_OptimizationLevel,
 	BuildFlag_ShowTimings,
+	BuildFlag_ShowUnused,
 	BuildFlag_ShowMoreTimings,
 	BuildFlag_ShowSystemCalls,
 	BuildFlag_ThreadCount,
@@ -669,6 +670,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),                 BuildFlagParam_String);
 	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),                 BuildFlagParam_Integer);
 	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),        BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_ShowUnused,        str_lit("show-unused"),         BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,   str_lit("show-more-timings"),   BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ShowSystemCalls,   str_lit("show-system-calls"),   BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),        BuildFlagParam_Integer);
@@ -859,6 +861,14 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ShowTimings:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_timings = true;
+							break;
+						case BuildFlag_ShowUnused:
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.show_unused = true;
+							if (build_context.command != "check") {
+								gb_printf_err("%.*s is only allowed with 'odin check'\n", LIT(name));
+								bad_flags = true;
+							}
 							break;
 						case BuildFlag_ShowMoreTimings:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
@@ -1487,6 +1497,7 @@ void print_show_help(String const arg0, String const &command) {
 
 	bool build = command == "build";
 	bool run_or_build = command == "run" || command == "build";
+	bool check_only = command == "check";
 	bool check = command == "run" || command == "build" || command == "check";
 
 	print_usage_line(0, "");
@@ -1518,6 +1529,12 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-thread-count:<integer>");
 		print_usage_line(2, "Override the number of threads the compiler will use to compile with");
 		print_usage_line(2, "Example: -thread-count:2");
+		print_usage_line(0, "");
+	}
+
+	if (check_only) {
+		print_usage_line(1, "-show-unused");
+		print_usage_line(2, "Shows unused package declarations within the current project");
 		print_usage_line(0, "");
 	}
 
@@ -1599,6 +1616,23 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-extra-linker-flags:<string>");
 		print_usage_line(2, "Adds extra linker specific flags in a string");
 		print_usage_line(0, "");
+
+		print_usage_line(1, "-microarch:<string>");
+		print_usage_line(2, "Specifies the specific micro-architecture for the build in a string");
+		print_usage_line(2, "Examples:");
+		print_usage_line(3, "-microarch:sandybridge");
+		print_usage_line(3, "-microarch:native");
+		print_usage_line(0, "");
+	}
+
+	if (check) {
+		print_usage_line(1, "-disallow-do");
+		print_usage_line(2, "Disallows the 'do' keyword in the project");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-default-to-nil-allocator");
+		print_usage_line(2, "Sets the default allocator to be the nil_allocator, an allocator which does nothing");
+		print_usage_line(0, "");
 	}
 
 	if (run_or_build) {
@@ -1630,6 +1664,127 @@ void print_show_help(String const arg0, String const &command) {
 
 		#endif
 	}
+}
+
+int unused_entity_kind_ordering[Entity_Count] = {
+	/*Invalid*/     -1,
+	/*Constant*/    0,
+	/*Variable*/    1,
+	/*TypeName*/    4,
+	/*Procedure*/   2,
+	/*ProcGroup*/   3,
+	/*Builtin*/     -1,
+	/*ImportName*/  -1,
+	/*LibraryName*/ -1,
+	/*Nil*/         -1,
+	/*Label*/       -1,
+};
+char const *unused_entity_names[Entity_Count] = {
+	/*Invalid*/     "",
+	/*Constant*/    "constants",
+	/*Variable*/    "variables",
+	/*TypeName*/    "types",
+	/*Procedure*/   "procedures",
+	/*ProcGroup*/   "proc_group",
+	/*Builtin*/     "",
+	/*ImportName*/  "import names",
+	/*LibraryName*/ "library names",
+	/*Nil*/         "",
+	/*Label*/       "",
+};
+
+
+GB_COMPARE_PROC(cmp_entities_for_unused) {
+	GB_ASSERT(a != nullptr);
+	GB_ASSERT(b != nullptr);
+	Entity *x = *cast(Entity **)a;
+	Entity *y = *cast(Entity **)b;
+	int res = 0;
+	res = string_compare(x->pkg->name, y->pkg->name);
+	if (res != 0) {
+		return res;
+	}
+	int ox = unused_entity_kind_ordering[x->kind];
+	int oy = unused_entity_kind_ordering[y->kind];
+	if (ox < oy) {
+		return -1;
+	} else if (ox > oy) {
+		return +1;
+	}
+	res = string_compare(x->token.string, y->token.string);
+	return res;
+}
+
+
+void print_show_unused(Checker *c) {
+	CheckerInfo *info = &c->info;
+
+	auto unused = array_make<Entity *>(permanent_allocator(), 0, info->entities.count);
+	for_array(i, info->entities) {
+		Entity *e = info->entities[i];
+		if (e == nullptr) {
+			continue;
+		}
+		if (e->pkg == nullptr || e->pkg->scope == nullptr) {
+			continue;
+		}
+		if (e->pkg->scope->flags & ScopeFlag_Builtin) {
+			continue;
+		}
+		switch (e->kind) {
+		case Entity_Invalid:
+		case Entity_Builtin:
+		case Entity_Nil:
+		case Entity_Label:
+			continue;
+		case Entity_Constant:
+		case Entity_Variable:
+		case Entity_TypeName:
+		case Entity_Procedure:
+		case Entity_ProcGroup:
+		case Entity_ImportName:
+		case Entity_LibraryName:
+			// Fine
+			break;
+		}
+		if ((e->scope->flags & (ScopeFlag_Pkg|ScopeFlag_File)) == 0) {
+			continue;
+		}
+		if (e->token.string.len == 0) {
+			continue;
+		}
+		if (e->token.string == "_") {
+			continue;
+		}
+		if (ptr_set_exists(&info->minimum_dependency_set, e)) {
+			continue;
+		}
+		array_add(&unused, e);
+	}
+
+	gb_sort_array(unused.data, unused.count, cmp_entities_for_unused);
+
+	print_usage_line(0, "Unused Package Declarations");
+
+	AstPackage *curr_pkg = nullptr;
+	EntityKind curr_entity_kind = Entity_Invalid;
+	for_array(i, unused) {
+		Entity *e = unused[i];
+		if (curr_pkg != e->pkg) {
+			curr_pkg = e->pkg;
+			curr_entity_kind = Entity_Invalid;
+			print_usage_line(0, "");
+			print_usage_line(0, "package %.*s", LIT(curr_pkg->name));
+		}
+		if (curr_entity_kind != e->kind) {
+			curr_entity_kind = e->kind;
+			print_usage_line(1, "%s", unused_entity_names[e->kind]);
+		}
+		// TokenPos pos = e->token.pos;
+		// print_usage_line(2, "%.*s(%td:%td) %.*s", LIT(pos.file), pos.line, pos.column, LIT(e->token.string));
+		print_usage_line(2, "%.*s", LIT(e->token.string));
+	}
+	print_usage_line(0, "");
 }
 
 int main(int arg_count, char const **arg_ptr) {
@@ -1821,6 +1976,10 @@ int main(int arg_count, char const **arg_ptr) {
 	temp_allocator_free_all(&temporary_allocator_data);
 
 	if (build_context.no_output_files) {
+		if (build_context.show_unused) {
+			print_show_unused(&checker);
+		}
+
 		if (build_context.query_data_set_settings.ok) {
 			generate_and_print_query_data(&checker, timings);
 		} else {

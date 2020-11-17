@@ -24,6 +24,7 @@ struct PtrSet {
 template <typename T> void ptr_set_init   (PtrSet<T> *s, gbAllocator a, isize capacity = 16);
 template <typename T> void ptr_set_destroy(PtrSet<T> *s);
 template <typename T> T    ptr_set_add    (PtrSet<T> *s, T ptr);
+template <typename T> bool ptr_set_update (PtrSet<T> *s, T ptr); // returns true if it previously existsed
 template <typename T> bool ptr_set_exists (PtrSet<T> *s, T ptr);
 template <typename T> void ptr_set_remove (PtrSet<T> *s, T ptr);
 template <typename T> void ptr_set_clear  (PtrSet<T> *s);
@@ -152,9 +153,7 @@ T ptr_set_add(PtrSet<T> *s, T ptr) {
 		ptr_set_grow(s);
 	}
 	fr = ptr_set__find(s, ptr);
-	if (fr.entry_index != PTR_SET_SENTINEL) {
-		index = fr.entry_index;
-	} else {
+	if (fr.entry_index == PTR_SET_SENTINEL) {
 		index = ptr_set__add_entry(s, ptr);
 		if (fr.entry_prev != PTR_SET_SENTINEL) {
 			s->entries.data[fr.entry_prev].next = index;
@@ -167,6 +166,32 @@ T ptr_set_add(PtrSet<T> *s, T ptr) {
 	}
 	return ptr;
 }
+
+template <typename T>
+bool ptr_set_update(PtrSet<T> *s, T ptr) { // returns true if it previously existsed
+	bool exists = false;
+	PtrSetIndex index;
+	PtrSetFindResult fr;
+	if (s->hashes.count == 0) {
+		ptr_set_grow(s);
+	}
+	fr = ptr_set__find(s, ptr);
+	if (fr.entry_index != PTR_SET_SENTINEL) {
+		exists = true;
+	} else {
+		index = ptr_set__add_entry(s, ptr);
+		if (fr.entry_prev != PTR_SET_SENTINEL) {
+			s->entries.data[fr.entry_prev].next = index;
+		} else {
+			s->hashes.data[fr.hash_index] = index;
+		}
+	}
+	if (ptr_set__full(s)) {
+		ptr_set_grow(s);
+	}
+	return exists;
+}
+
 
 
 template <typename T>
