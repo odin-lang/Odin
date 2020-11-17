@@ -3116,6 +3116,8 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			Ast *init_expr = value;
 			DeclInfo *d = make_decl_info(c->scope, c->decl);
 			d->decl_node = decl;
+			d->comment = vd->comment;
+			d->docs    = vd->docs;
 			d->entity    = e;
 			d->type_expr = vd->type;
 			d->init_expr = init_expr;
@@ -3147,6 +3149,8 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 			DeclInfo *d = make_decl_info(c->scope, c->decl);
 
 			d->decl_node = decl;
+			d->comment = vd->comment;
+			d->docs    = vd->docs;
 			d->attributes = vd->attributes;
 			d->type_expr = vd->type;
 			d->init_expr = init;
