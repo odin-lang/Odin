@@ -839,6 +839,8 @@ void init_checker_info(CheckerInfo *i) {
 	array_init(&i->variable_init_order, a);
 	array_init(&i->required_foreign_imports_through_force, a);
 	array_init(&i->required_global_variables, a);
+	array_init(&i->testing_procedures, a, 0, 0);
+
 
 	i->allow_identifier_uses = build_context.query_data_set_settings.kind == QueryDataSet_GoToDefinitions;
 	if (i->allow_identifier_uses) {
@@ -1854,7 +1856,50 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		}
 	}
 
-	add_dependency_to_set(c, start);
+	if (build_context.command_kind == Command_test) {
+		AstPackage *pkg = c->info.init_package;
+		Scope *s = pkg->scope;
+		for_array(i, s->elements.entries) {
+			Entity *e = s->elements.entries[i].value;
+			if (e->kind != Entity_Procedure) {
+				continue;
+			}
+			String name = e->token.string;
+			String prefix = str_lit("test_");
+
+
+			if (!string_starts_with(name, prefix)) {
+				continue;
+			}
+
+			bool is_tester = false;
+			if (name != prefix) {
+				is_tester = true;
+			} else {
+				if (e->file && e->file->is_test) {
+					error(e->token, "Invalid testing procedure name: %.*s", LIT(name));
+				}
+			}
+
+			Type *t = base_type(e->type);
+			GB_ASSERT(t->kind == Type_Proc);
+			if (t->Proc.param_count == 0 && t->Proc.result_count == 0) {
+				// Good
+			} else {
+				gbString str = type_to_string(t);
+				error(e->token, "Testing procedures must have a signature type of proc(), got %s", str);
+				gb_string_free(str);
+				is_tester = false;
+			}
+
+			if (is_tester) {
+				add_dependency_to_set(c, e);
+				array_add(&c->info.testing_procedures, e);
+			}
+		}
+	} else {
+		add_dependency_to_set(c, start);
+	}
 }
 
 bool is_entity_a_dependency(Entity *e) {
@@ -4344,6 +4389,7 @@ void check_parsed_files(Checker *c) {
 		string_map_set(&c->info.packages, p->fullpath, p);
 
 		if (scope->flags&ScopeFlag_Init) {
+			c->info.init_package = p;
 			c->info.init_scope = scope;
 		}
 		if (p->kind == Package_Runtime) {
@@ -4613,7 +4659,7 @@ void check_parsed_files(Checker *c) {
 
 
 	TIME_SECTION("check entry point");
-	if (build_context.build_mode == BuildMode_Executable && !build_context.no_entry_point) {
+	if (build_context.build_mode == BuildMode_Executable && !build_context.no_entry_point && build_context.command_kind != Command_test) {
 		Scope *s = c->info.init_scope;
 		GB_ASSERT(s != nullptr);
 		GB_ASSERT(s->flags&ScopeFlag_Init);

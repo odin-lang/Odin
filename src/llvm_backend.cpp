@@ -12875,11 +12875,21 @@ void lb_generate_code(lbGenerator *gen) {
 
 		lb_begin_procedure_body(p);
 
-		lbValue *found = map_get(&m->values, hash_entity(entry_point));
-		GB_ASSERT(found != nullptr);
-
 		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, startup_runtime->type)), startup_runtime->value, nullptr, 0, "");
-		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, found->type)), found->value, nullptr, 0, "");
+
+		if (build_context.command_kind == Command_test) {
+			for_array(i, m->info->testing_procedures) {
+				Entity *e = m->info->testing_procedures[i];
+				lbValue *found = map_get(&m->values, hash_entity(e));
+				GB_ASSERT(found != nullptr);
+				lb_emit_call(p, *found, {});
+			}
+		} else {
+			lbValue *found = map_get(&m->values, hash_entity(entry_point));
+			GB_ASSERT(found != nullptr);
+			LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(m, found->type)), found->value, nullptr, 0, "");
+		}
+
 		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 0, false));
 
 		lb_end_procedure_body(p);

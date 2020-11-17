@@ -107,6 +107,8 @@ struct AstFile {
 	f64          time_to_tokenize; // seconds
 	f64          time_to_parse;    // seconds
 
+	bool is_test;
+
 	CommentGroup *lead_comment;     // Comment (block) before the decl
 	CommentGroup *line_comment;     // Comment after the semicolon
 	CommentGroup *docs;             // current docs

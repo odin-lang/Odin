@@ -273,6 +273,7 @@ struct CheckerInfo {
 
 	AstPackage *          builtin_package;
 	AstPackage *          runtime_package;
+	AstPackage *          init_package;
 	Scope *               init_scope;
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
@@ -283,6 +284,7 @@ struct CheckerInfo {
 
 	Map<AtomOpMapEntry>   atom_op_map; // Key: Ast *
 
+	Array<Entity *> testing_procedures;
 
 	bool allow_identifier_uses;
 	Array<Ast *> identifier_uses; // only used by 'odin query'
