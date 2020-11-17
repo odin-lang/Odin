@@ -176,7 +176,9 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 		AstFile *f = pkg->files[i];
 		if (f->pkg_decl) {
 			GB_ASSERT(f->pkg_decl->kind == Ast_PackageDecl);
-			print_doc_comment_group_string(1, f->pkg_decl->PackageDecl.docs);
+			if (print_doc_comment_group_string(1, f->pkg_decl->PackageDecl.docs)) {
+				print_doc_line(0, "");
+			}
 		}
 	}
 
@@ -205,7 +207,6 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 		}
 		gb_sort_array(entities.data, entities.count, cmp_entities_for_printing);
 
-		AstPackage *curr_pkg = nullptr;
 		EntityKind curr_entity_kind = Entity_Invalid;
 		for_array(i, entities) {
 			Entity *e = entities[i];
@@ -217,8 +218,10 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 			}
 
 			if (curr_entity_kind != e->kind) {
+				if (curr_entity_kind != Entity_Invalid) {
+					print_doc_line(0, "");
+				}
 				curr_entity_kind = e->kind;
-				print_doc_line(0, "");
 				print_doc_line(1, "%s", print_entity_names[e->kind]);
 			}
 
