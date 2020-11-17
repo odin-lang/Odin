@@ -1559,10 +1559,18 @@ void print_show_help(String const arg0, String const &command) {
 	print_usage_line(0, "");
 
 	if (doc) {
+		print_usage_line(1, "-all");
+		print_usage_line(2, "Show all documentation for the packages");
+		print_usage_line(0, "");
+
 		print_usage_line(1, "-package:<string>");
 		print_usage_line(2, "Add package name to generate documentation for");
 		print_usage_line(2, "Multiple flags are allowed");
 		print_usage_line(2, "Example: -doc:runtime");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-all-packages");
+		print_usage_line(2, "Generates documentation for all packages used in the current project");
 		print_usage_line(0, "");
 	}
 
