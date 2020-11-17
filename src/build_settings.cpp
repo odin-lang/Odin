@@ -144,6 +144,7 @@ struct BuildContext {
 	i32    optimization_level;
 	bool   show_timings;
 	bool   show_unused;
+	bool   show_unused_with_location;
 	bool   show_more_timings;
 	bool   show_system_calls;
 	bool   keep_temp_files;

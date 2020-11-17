@@ -18,8 +18,8 @@ gb_global Timings global_timings = {0};
 #include "checker.hpp"
 
 #include "parser.cpp"
-#include "docs.cpp"
 #include "checker.cpp"
+#include "docs.cpp"
 
 
 #if defined(LLVM_BACKEND_SUPPORT)
@@ -522,7 +522,7 @@ void usage(String argv0) {
 	print_usage_line(1, "run       same as 'build', but also then runs the newly compiled executable.");
 	print_usage_line(1, "check     parse and type check .odin file");
 	print_usage_line(1, "query     parse, type check, and output a .json file containing information about the program");
-	print_usage_line(1, "docs      generate documentation for a .odin file");
+	print_usage_line(1, "doc       generate documentation .odin file, or directory of .odin files");
 	print_usage_line(1, "version   print version");
 	print_usage_line(0, "");
 	print_usage_line(0, "For more information of flags, apply the flag to see what is possible");
@@ -569,6 +569,7 @@ enum BuildFlagKind {
 	BuildFlag_OptimizationLevel,
 	BuildFlag_ShowTimings,
 	BuildFlag_ShowUnused,
+	BuildFlag_ShowUnusedWithLocation,
 	BuildFlag_ShowMoreTimings,
 	BuildFlag_ShowSystemCalls,
 	BuildFlag_ThreadCount,
@@ -671,6 +672,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),                 BuildFlagParam_Integer);
 	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),        BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ShowUnused,        str_lit("show-unused"),         BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation, str_lit("show-unused-with-location"), BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,   str_lit("show-more-timings"),   BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ShowSystemCalls,   str_lit("show-system-calls"),   BuildFlagParam_None);
 	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),        BuildFlagParam_Integer);
@@ -865,6 +867,15 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ShowUnused:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_unused = true;
+							if (build_context.command != "check") {
+								gb_printf_err("%.*s is only allowed with 'odin check'\n", LIT(name));
+								bad_flags = true;
+							}
+							break;
+						case BuildFlag_ShowUnusedWithLocation:
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.show_unused = true;
+							build_context.show_unused_with_location = true;
 							if (build_context.command != "check") {
 								gb_printf_err("%.*s is only allowed with 'odin check'\n", LIT(name));
 								bad_flags = true;
@@ -1489,12 +1500,13 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "check     parse and type check .odin file");
 	} else if (command == "query") {
 		print_usage_line(1, "query     [experimental] parse, type check, and output a .json file containing information about the program");
-	} else if (command == "docs") {
-		print_usage_line(1, "docs      generate documentation for a .odin file");
+	} else if (command == "doc") {
+		print_usage_line(1, "doc       generate documentation from a .odin file, or directory of .odin files");
 	} else if (command == "version") {
 		print_usage_line(1, "version   print version");
 	}
 
+	bool doc = command == "doc";
 	bool build = command == "build";
 	bool run_or_build = command == "run" || command == "build";
 	bool check_only = command == "check";
@@ -1535,6 +1547,9 @@ void print_show_help(String const arg0, String const &command) {
 	if (check_only) {
 		print_usage_line(1, "-show-unused");
 		print_usage_line(2, "Shows unused package declarations within the current project");
+		print_usage_line(0, "");
+		print_usage_line(1, "-show-unused-with-location");
+		print_usage_line(2, "Shows unused package declarations within the current project with the declarations source location");
 		print_usage_line(0, "");
 	}
 
@@ -1666,56 +1681,6 @@ void print_show_help(String const arg0, String const &command) {
 	}
 }
 
-int unused_entity_kind_ordering[Entity_Count] = {
-	/*Invalid*/     -1,
-	/*Constant*/    0,
-	/*Variable*/    1,
-	/*TypeName*/    4,
-	/*Procedure*/   2,
-	/*ProcGroup*/   3,
-	/*Builtin*/     -1,
-	/*ImportName*/  -1,
-	/*LibraryName*/ -1,
-	/*Nil*/         -1,
-	/*Label*/       -1,
-};
-char const *unused_entity_names[Entity_Count] = {
-	/*Invalid*/     "",
-	/*Constant*/    "constants",
-	/*Variable*/    "variables",
-	/*TypeName*/    "types",
-	/*Procedure*/   "procedures",
-	/*ProcGroup*/   "proc_group",
-	/*Builtin*/     "",
-	/*ImportName*/  "import names",
-	/*LibraryName*/ "library names",
-	/*Nil*/         "",
-	/*Label*/       "",
-};
-
-
-GB_COMPARE_PROC(cmp_entities_for_unused) {
-	GB_ASSERT(a != nullptr);
-	GB_ASSERT(b != nullptr);
-	Entity *x = *cast(Entity **)a;
-	Entity *y = *cast(Entity **)b;
-	int res = 0;
-	res = string_compare(x->pkg->name, y->pkg->name);
-	if (res != 0) {
-		return res;
-	}
-	int ox = unused_entity_kind_ordering[x->kind];
-	int oy = unused_entity_kind_ordering[y->kind];
-	if (ox < oy) {
-		return -1;
-	} else if (ox > oy) {
-		return +1;
-	}
-	res = string_compare(x->token.string, y->token.string);
-	return res;
-}
-
-
 void print_show_unused(Checker *c) {
 	CheckerInfo *info = &c->info;
 
@@ -1762,7 +1727,7 @@ void print_show_unused(Checker *c) {
 		array_add(&unused, e);
 	}
 
-	gb_sort_array(unused.data, unused.count, cmp_entities_for_unused);
+	gb_sort_array(unused.data, unused.count, cmp_entities_for_printing);
 
 	print_usage_line(0, "Unused Package Declarations");
 
@@ -1778,11 +1743,14 @@ void print_show_unused(Checker *c) {
 		}
 		if (curr_entity_kind != e->kind) {
 			curr_entity_kind = e->kind;
-			print_usage_line(1, "%s", unused_entity_names[e->kind]);
+			print_usage_line(1, "%s", print_entity_names[e->kind]);
 		}
-		// TokenPos pos = e->token.pos;
-		// print_usage_line(2, "%.*s(%td:%td) %.*s", LIT(pos.file), pos.line, pos.column, LIT(e->token.string));
-		print_usage_line(2, "%.*s", LIT(e->token.string));
+		if (build_context.show_unused_with_location) {
+			TokenPos pos = e->token.pos;
+			print_usage_line(2, "%.*s(%td:%td) %.*s", LIT(pos.file), pos.line, pos.column, LIT(e->token.string));
+		} else {
+			print_usage_line(2, "%.*s", LIT(e->token.string));
+		}
 	}
 	print_usage_line(0, "");
 }
@@ -1867,7 +1835,7 @@ int main(int arg_count, char const **arg_ptr) {
 		build_context.no_output_files = true;
 		build_context.query_data_set_settings.ok = true;
 		init_filename = args[2];
-	} else if (command == "docs") {
+	} else if (command == "doc") {
 		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
@@ -1875,6 +1843,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 		init_filename = args[2];
 		build_context.generate_docs = true;
+		build_context.no_entry_point = true; // ignore entry point
 		#if 1
 		print_usage_line(0, "Documentation generation is not yet supported");
 		return 1;
@@ -1956,10 +1925,6 @@ int main(int arg_count, char const **arg_ptr) {
 
 	temp_allocator_free_all(&temporary_allocator_data);
 
-	if (build_context.generate_docs) {
-		// generate_documentation(&parser);
-		return 0;
-	}
 	timings_start_section(timings, str_lit("type check"));
 
 	Checker checker = {0};
@@ -1974,6 +1939,11 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	temp_allocator_free_all(&temporary_allocator_data);
+
+	if (build_context.generate_docs) {
+		generate_documentation(&checker);
+		return global_error_collector.count ? 1 : 0;
+	}
 
 	if (build_context.no_output_files) {
 		if (build_context.show_unused) {
