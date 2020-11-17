@@ -110,20 +110,23 @@ void print_doc_line_no_newline(i32 indent, char const *fmt, ...) {
 	va_end(va);
 }
 
-bool print_doc_comment_group_string(i32 indent, CommentGroup const &g) {
+bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
+	if (g == nullptr) {
+		return false;
+	}
 	isize len = 0;
-	for_array(i, g.list) {
-		String comment = g.list[i].string;
+	for_array(i, g->list) {
+		String comment = g->list[i].string;
 		len += comment.len;
 		len += 1; // for \n
 	}
-	if (len == 0) {
+	if (len <= g->list.count) {
 		return false;
 	}
 
 	isize count = 0;
-	for_array(i, g.list) {
-		String comment = g.list[i].string;
+	for_array(i, g->list) {
+		String comment = g->list[i].string;
 		if (comment[1] == '/') {
 			comment.text += 2;
 			comment.len  -= 2;
@@ -131,7 +134,11 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup const &g) {
 			comment.text += 2;
 			comment.len  -= 4;
 		}
-		comment = string_trim_whitespace(comment);
+		if (comment.len > 0 && comment[0] == ' ') {
+			comment.text += 1;
+			comment.len  -= 1;
+		}
+
 		if (string_starts_with(comment, str_lit("@("))) {
 			continue;
 		}
@@ -163,6 +170,15 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 	}
 
 	print_doc_line(0, "package %.*s", LIT(pkg->name));
+
+
+	for_array(i, pkg->files) {
+		AstFile *f = pkg->files[i];
+		if (f->pkg_decl) {
+			GB_ASSERT(f->pkg_decl->kind == Ast_PackageDecl);
+			print_doc_comment_group_string(1, f->pkg_decl->PackageDecl.docs);
+		}
+	}
 
 	if (pkg->scope != nullptr) {
 		auto entities = array_make<Entity *>(heap_allocator(), 0, pkg->scope->elements.entries.count);
@@ -244,10 +260,8 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 				if (comment) {
 					// gb_printf(" <comment>");
 				}
-				if (docs) {
-					if (print_doc_comment_group_string(3, *docs)) {
-						gb_printf("\n");
-					}
+				if (print_doc_comment_group_string(3, docs)) {
+					gb_printf("\n");
 				}
 			}
 		}
