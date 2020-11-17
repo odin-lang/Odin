@@ -130,6 +130,7 @@ char const *odin_command_strings[32] = {
 
 enum CmdDocFlag : u32 {
 	CmdDocFlag_All = 1<<0,
+	CmdDocFlag_AllPackages = 1<<1,
 };
 
 
@@ -198,6 +199,7 @@ struct BuildContext {
 	bool   linker_map_file;
 
 	u32 cmd_doc_flags;
+	Array<String> doc_packages;
 
 	QueryDataSetSettings query_data_set_settings;
 

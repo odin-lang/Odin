@@ -59,9 +59,6 @@ GB_COMPARE_PROC(cmp_ast_package_by_name) {
 }
 
 
-gbString expr_to_string(Ast *expression);
-gbString type_to_string(Type *type);
-
 String alloc_comment_group_string(gbAllocator a, CommentGroup g) {
 	isize len = 0;
 	for_array(i, g.list) {
@@ -103,18 +100,216 @@ void print_doc_line(i32 indent, char const *fmt, ...) {
 	va_end(va);
 	gb_printf("\n");
 }
+void print_doc_line_no_newline(i32 indent, char const *fmt, ...) {
+	while (indent --> 0) {
+		gb_printf("\t");
+	}
+	va_list va;
+	va_start(va, fmt);
+	gb_printf_va(fmt, va);
+	va_end(va);
+}
+
+bool print_doc_comment_group_string(i32 indent, CommentGroup const &g) {
+	isize len = 0;
+	for_array(i, g.list) {
+		String comment = g.list[i].string;
+		len += comment.len;
+		len += 1; // for \n
+	}
+	if (len == 0) {
+		return false;
+	}
+
+	isize count = 0;
+	for_array(i, g.list) {
+		String comment = g.list[i].string;
+		if (comment[1] == '/') {
+			comment.text += 2;
+			comment.len  -= 2;
+		} else if (comment[1] == '*') {
+			comment.text += 2;
+			comment.len  -= 4;
+		}
+		comment = string_trim_whitespace(comment);
+		if (string_starts_with(comment, str_lit("@("))) {
+			continue;
+		}
+
+		print_doc_line(indent, "%.*s", LIT(comment));
+		count += 1;
+	}
+	return count > 0;
+}
+
+
+
+
+void print_doc_expr(Ast *expr) {
+	gbString s = nullptr;
+	if (build_context.cmd_doc_flags & CmdDocFlag_All) {
+		s = expr_to_string(expr);
+	} else {
+		s = expr_to_string_shorthand(expr);
+	}
+	gb_file_write(gb_file_get_standard(gbFileStandard_Output), s, gb_string_length(s));
+	gb_string_free(s);
+}
+
 
 void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
-	print_doc_line(0, "%.*s", LIT(pkg->name));
+	if (pkg == nullptr) {
+		return;
+	}
+
+	print_doc_line(0, "package %.*s", LIT(pkg->name));
+
+	if (pkg->scope != nullptr) {
+		auto entities = array_make<Entity *>(heap_allocator(), 0, pkg->scope->elements.entries.count);
+		defer (array_free(&entities));
+		for_array(i, pkg->scope->elements.entries) {
+			Entity *e = pkg->scope->elements.entries[i].value;
+			switch (e->kind) {
+			case Entity_Invalid:
+			case Entity_Builtin:
+			case Entity_Nil:
+			case Entity_Label:
+				continue;
+			case Entity_Constant:
+			case Entity_Variable:
+			case Entity_TypeName:
+			case Entity_Procedure:
+			case Entity_ProcGroup:
+			case Entity_ImportName:
+			case Entity_LibraryName:
+				// Fine
+				break;
+			}
+			array_add(&entities, e);
+		}
+		gb_sort_array(entities.data, entities.count, cmp_entities_for_printing);
+
+		AstPackage *curr_pkg = nullptr;
+		EntityKind curr_entity_kind = Entity_Invalid;
+		for_array(i, entities) {
+			Entity *e = entities[i];
+			if (e->pkg != pkg) {
+				continue;
+			}
+			if (!is_entity_exported(e)) {
+				continue;
+			}
+
+			if (curr_entity_kind != e->kind) {
+				curr_entity_kind = e->kind;
+				print_doc_line(0, "");
+				print_doc_line(1, "%s", print_entity_names[e->kind]);
+			}
+
+			Ast *type_expr = nullptr;
+			Ast *init_expr = nullptr;
+			Ast *decl_node = nullptr;
+			if (e->decl_info != nullptr) {
+				type_expr = e->decl_info->type_expr;
+				init_expr = e->decl_info->init_expr;
+				decl_node = e->decl_info->decl_node;
+			}
+			GB_ASSERT(type_expr != nullptr || init_expr != nullptr);
+			print_doc_line_no_newline(2, "%.*s", LIT(e->token.string));
+			if (type_expr != nullptr) {
+				gbString t = expr_to_string(type_expr);
+				gb_printf(": %s ", t);
+				gb_string_free(t);
+			} else {
+				gb_printf(" :");
+			}
+			if (e->kind == Entity_Variable) {
+				if (init_expr != nullptr) {
+					gb_printf("= ");
+					print_doc_expr(init_expr);
+				}
+			} else {
+				gb_printf(": ");
+				print_doc_expr(init_expr);
+			}
+
+			gb_printf(";\n");
+
+
+			if (decl_node && (true || (build_context.cmd_doc_flags & CmdDocFlag_All))) {
+				CommentGroup *docs = nullptr;
+				CommentGroup *comment = nullptr;
+				switch (decl_node->kind) {
+				case_ast_node(vd, ValueDecl, decl_node);
+					docs = vd->docs;
+					comment = vd->comment;
+				case_end;
+
+				case_ast_node(id, ImportDecl, decl_node);
+					docs = id->docs;
+					comment = id->comment;
+				case_end;
+
+				case_ast_node(fl, ForeignImportDecl, decl_node);
+					docs = fl->docs;
+					comment = fl->comment;
+				case_end;
+
+				case_ast_node(fb, ForeignBlockDecl, decl_node);
+					docs = fb->docs;
+				case_end;
+				}
+				if (comment) {
+					// gb_printf(" <comment>");
+				}
+				if (docs) {
+					if (print_doc_comment_group_string(3, *docs)) {
+						gb_printf("\n");
+					}
+				}
+			}
+		}
+		print_doc_line(0, "");
+	}
+
+	if (pkg->fullpath.len != 0) {
+		print_doc_line(0, "");
+		print_doc_line(1, "fullpath: %.*s", LIT(pkg->fullpath));
+		print_doc_line(1, "files:");
+		for_array(i, pkg->files) {
+			AstFile *f = pkg->files[i];
+			String filename = remove_directory_from_path(f->fullpath);
+			print_doc_line(2, "%.*s", LIT(filename));
+		}
+	}
+
 }
 
 void generate_documentation(Checker *c) {
 	CheckerInfo *info = &c->info;
 
-	if (build_context.cmd_doc_flags & CmdDocFlag_All) {
-		auto pkgs = array_make<AstPackage *>(permanent_allocator(), info->packages.entries.count);
-		for_array(i, info->packages.entries) {
-			array_add(&pkgs, info->packages.entries[i].value);
+	if (build_context.doc_packages.count != 0) {
+		auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.entries.count);
+		bool was_error = false;
+		for_array(j, build_context.doc_packages) {
+			bool found = false;
+			String name = build_context.doc_packages[j];
+			for_array(i, info->packages.entries) {
+				AstPackage *pkg = info->packages.entries[i].value;
+				if (name == pkg->name) {
+					found = true;
+					array_add(&pkgs, pkg);
+					break;
+				}
+			}
+			if (!found) {
+				gb_printf_err("Unknown package %.*s\n", LIT(name));
+				was_error = true;
+			}
+		}
+		if (was_error) {
+			gb_exit(1);
+			return;
 		}
 
 		gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);
@@ -126,5 +321,6 @@ void generate_documentation(Checker *c) {
 		GB_ASSERT(info->init_scope->flags & ScopeFlag_Pkg);
 		AstPackage *pkg = info->init_scope->pkg;
 		print_doc_package(info, pkg);
+
 	}
 }

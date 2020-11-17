@@ -4648,10 +4648,6 @@ void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, AstForeignFi
 
 // NOTE(bill): Returns true if it's added
 bool try_add_import_path(Parser *p, String const &path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
-	if (build_context.generate_docs) {
-		return false;
-	}
-
 	String const FILE_EXT = str_lit(".odin");
 
 	gb_mutex_lock(&p->file_add_mutex);
@@ -5253,7 +5249,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 	}
 
 	TokenPos init_pos = {};
-	if (!build_context.generate_docs) {
+	{
 		String s = get_fullpath_core(heap_allocator(), str_lit("runtime"));
 		try_add_import_path(p, s, s, init_pos, Package_Runtime);
 	}

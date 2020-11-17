@@ -945,7 +945,7 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 Entity *strip_entity_wrapping(Ast *expr);
 Entity *strip_entity_wrapping(Entity *e);
 
-gbString write_expr_to_string(gbString str, Ast *node);
+gbString write_expr_to_string(gbString str, Ast *node, bool shorthand);
 
 gbString write_exact_value_to_string(gbString str, ExactValue const &v, isize string_limit=36) {
 	switch (v.kind) {
@@ -981,9 +981,9 @@ gbString write_exact_value_to_string(gbString str, ExactValue const &v, isize st
 	case ExactValue_Pointer:
 		return str;
 	case ExactValue_Compound:
-		return write_expr_to_string(str, v.value_compound);
+		return write_expr_to_string(str, v.value_compound, false);
 	case ExactValue_Procedure:
-		return write_expr_to_string(str, v.value_procedure);
+		return write_expr_to_string(str, v.value_procedure, false);
 	}
 	return str;
 };
