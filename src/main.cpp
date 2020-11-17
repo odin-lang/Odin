@@ -623,10 +623,13 @@ struct BuildFlag {
 	BuildFlagKind      kind;
 	String             name;
 	BuildFlagParamKind param_kind;
+	u32                command_support;
+	bool               allow_mulitple;
 };
 
-void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind) {
-	BuildFlag flag = {kind, name, param_kind};
+
+void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind, u32 command_support, bool allow_mulitple=false) {
+	BuildFlag flag = {kind, name, param_kind, command_support, allow_mulitple};
 	array_add(build_flags, flag);
 }
 
@@ -667,46 +670,46 @@ ExactValue build_param_to_exact_value(String name, String param) {
 
 bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
-	add_flag(&build_flags, BuildFlag_Help,              str_lit("help"),                BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),                 BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),                 BuildFlagParam_Integer);
-	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),        BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_ShowUnused,        str_lit("show-unused"),         BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation, str_lit("show-unused-with-location"), BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_ShowMoreTimings,   str_lit("show-more-timings"),   BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_ShowSystemCalls,   str_lit("show-system-calls"),   BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),        BuildFlagParam_Integer);
-	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"),     BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),          BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_Define,            str_lit("define"),              BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),          BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_Target,            str_lit("target"),              BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),               BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_DisableAssert,     str_lit("disable-assert"),      BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"),     BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_NoDynamicLiterals, str_lit("no-dynamic-literals"), BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),              BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_NoEntryPoint,      str_lit("no-entry-point"),      BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),                 BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),                 BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"),              BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_Microarch,         str_lit("microarch"),                       BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_Help,              str_lit("help"),                BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),                 BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),                 BuildFlagParam_Integer, Command__does_build);
+	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),        BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_ShowMoreTimings,   str_lit("show-more-timings"),   BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_ShowUnused,        str_lit("show-unused"),         BuildFlagParam_None, Command_check);
+	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation, str_lit("show-unused-with-location"), BuildFlagParam_None, Command_check);
+	add_flag(&build_flags, BuildFlag_ShowSystemCalls,   str_lit("show-system-calls"),   BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),        BuildFlagParam_Integer, Command_all);
+	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"),     BuildFlagParam_None, Command__does_build);
+	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),          BuildFlagParam_String, Command__does_check);
+	add_flag(&build_flags, BuildFlag_Define,            str_lit("define"),              BuildFlagParam_String, Command__does_check, true);
+	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),          BuildFlagParam_String, Command__does_build); // Commands_build is not used to allow for a better error message
+	add_flag(&build_flags, BuildFlag_Target,            str_lit("target"),              BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),               BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_DisableAssert,     str_lit("disable-assert"),      BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"),     BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoDynamicLiterals, str_lit("no-dynamic-literals"), BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),              BuildFlagParam_None, Command__does_build);
+	add_flag(&build_flags, BuildFlag_NoEntryPoint,      str_lit("no-entry-point"),      BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),                 BuildFlagParam_None, Command__does_build);
+	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),                 BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None, Command__does_build);
+	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"),              BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_Microarch,         str_lit("microarch"),                       BuildFlagParam_String, Command__does_build);
 
-	add_flag(&build_flags, BuildFlag_DisallowDo,            str_lit("disallow-do"),              BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator, str_lit("default-to-nil-allocator"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_DisallowDo,            str_lit("disallow-do"),              BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator, str_lit("default-to-nil-allocator"), BuildFlagParam_None, Command__does_check);
 
-	add_flag(&build_flags, BuildFlag_Compact, str_lit("compact"), BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_GlobalDefinitions, str_lit("global-definitions"), BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_GoToDefinitions, str_lit("go-to-definitions"), BuildFlagParam_None);
+	add_flag(&build_flags, BuildFlag_Compact,           str_lit("compact"),            BuildFlagParam_None, Command_query);
+	add_flag(&build_flags, BuildFlag_GlobalDefinitions, str_lit("global-definitions"), BuildFlagParam_None, Command_query);
+	add_flag(&build_flags, BuildFlag_GoToDefinitions,   str_lit("go-to-definitions"),  BuildFlagParam_None, Command_query);
 
 
 #if defined(GB_SYSTEM_WINDOWS)
-	add_flag(&build_flags, BuildFlag_IgnoreVsSearch, str_lit("ignore-vs-search"),  BuildFlagParam_None);
-	add_flag(&build_flags, BuildFlag_ResourceFile,   str_lit("resource"),  BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_WindowsPdbName, str_lit("pdb-name"),  BuildFlagParam_String);
-	add_flag(&build_flags, BuildFlag_Subsystem,      str_lit("subsystem"), BuildFlagParam_String);
+	add_flag(&build_flags, BuildFlag_IgnoreVsSearch, str_lit("ignore-vs-search"),  BuildFlagParam_None, Command__does_build);
+	add_flag(&build_flags, BuildFlag_ResourceFile,   str_lit("resource"),          BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_WindowsPdbName, str_lit("pdb-name"),          BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_Subsystem,      str_lit("subsystem"),         BuildFlagParam_String, Command__does_build);
 #endif
 
 	GB_ASSERT(args.count >= 3);
@@ -736,11 +739,19 @@ bool parse_build_flags(Array<String> args) {
 		String param = {};
 		if (end < flag.len-1) param = substring(flag, 2+end, flag.len);
 
+		bool is_supported = true;
 		bool found = false;
+		BuildFlag found_bf = {};
 		for_array(build_flag_index, build_flags) {
 			BuildFlag bf = build_flags[build_flag_index];
 			if (bf.name == name) {
 				found = true;
+				found_bf = bf;
+				if ((bf.command_support & build_context.command_kind) == 0) {
+					is_supported = false;
+					break;
+				}
+
 				if (set_flags[bf.kind]) {
 					gb_printf_err("Previous flag set: '%.*s'\n", LIT(name));
 					bad_flags = true;
@@ -867,19 +878,11 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ShowUnused:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_unused = true;
-							if (build_context.command != "check") {
-								gb_printf_err("%.*s is only allowed with 'odin check'\n", LIT(name));
-								bad_flags = true;
-							}
 							break;
 						case BuildFlag_ShowUnusedWithLocation:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_unused = true;
 							build_context.show_unused_with_location = true;
-							if (build_context.command != "check") {
-								gb_printf_err("%.*s is only allowed with 'odin check'\n", LIT(name));
-								bad_flags = true;
-							}
 							break;
 						case BuildFlag_ShowMoreTimings:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
@@ -1252,20 +1255,30 @@ bool parse_build_flags(Array<String> args) {
 						}
 					}
 
-
-					switch (bf.kind) {
-					case BuildFlag_Define:
-						// Allow for multiple
-						break;
-					default:
+					if (!bf.allow_mulitple) {
 						set_flags[bf.kind] = ok;
-						break;
 					}
 				}
 				break;
 			}
 		}
-		if (!found) {
+		if (found && !is_supported) {
+			gb_printf_err("Unknown flag for 'odin %.*s': '%.*s'\n", LIT(build_context.command), LIT(name));
+			gb_printf_err("'%.*s' is supported with the following commands:\n", LIT(name));
+			gb_printf_err("\t");
+			i32 count = 0;
+			for (u32 i = 0; i < 32; i++) {
+				if (found_bf.command_support & (1<<i)) {
+					if (count > 0) {
+						gb_printf_err(", ");
+					}
+					gb_printf_err("%s", odin_command_strings[i]);
+					count += 1;
+				}
+			}
+			gb_printf_err("\n");
+			bad_flags = true;
+		} else if (!found) {
 			gb_printf_err("Unknown flag: '%.*s'\n", LIT(name));
 			bad_flags = true;
 		}
@@ -1795,6 +1808,7 @@ int main(int arg_count, char const **arg_ptr) {
 			usage(args[0]);
 			return 1;
 		}
+		build_context.command_kind = Command_run;
 
 		Array<String> run_args = array_make<String>(heap_allocator(), 0, arg_count);
 		defer (array_free(&run_args));
@@ -1814,17 +1828,20 @@ int main(int arg_count, char const **arg_ptr) {
 		run_args_string = string_join_and_quote(heap_allocator(), run_args);
 		init_filename = args[2];
 		run_output = true;
+
 	} else if (command == "build") {
 		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
 		}
+		build_context.command_kind = Command_build;
 		init_filename = args[2];
 	} else if (command == "check") {
 		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
 		}
+		build_context.command_kind = Command_check;
 		build_context.no_output_files = true;
 		init_filename = args[2];
 	} else if (command == "query") {
@@ -1832,6 +1849,7 @@ int main(int arg_count, char const **arg_ptr) {
 			usage(args[0]);
 			return 1;
 		}
+		build_context.command_kind = Command_query;
 		build_context.no_output_files = true;
 		build_context.query_data_set_settings.ok = true;
 		init_filename = args[2];
@@ -1841,14 +1859,17 @@ int main(int arg_count, char const **arg_ptr) {
 			return 1;
 		}
 
+		build_context.command_kind = Command_doc;
 		init_filename = args[2];
+		build_context.no_output_files = true;
 		build_context.generate_docs = true;
 		build_context.no_entry_point = true; // ignore entry point
-		#if 1
+		#if 0
 		print_usage_line(0, "Documentation generation is not yet supported");
 		return 1;
 		#endif
 	} else if (command == "version") {
+		build_context.command_kind = Command_version;
 		gb_printf("%.*s version %.*s", LIT(args[0]), LIT(ODIN_VERSION));
 
 		#ifdef NIGHTLY
