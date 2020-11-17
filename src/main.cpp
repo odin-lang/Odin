@@ -162,8 +162,11 @@ i32 linker_stage(lbGenerator *gen) {
 
 	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
 #ifdef GB_SYSTEM_UNIX
-		system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
-				LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
+		exit_code = system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
+			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
+		if (exit_code != 0) {
+			return exit_code;
+		}
 #else
 		gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
 			LIT(target_os_names[build_context.metrics.os]),
@@ -265,7 +268,7 @@ i32 linker_stage(lbGenerator *gen) {
 					LIT(build_context.resource_filepath)
 				);
 
-	            if (exit_code != 0) {
+				if (exit_code != 0) {
 					return exit_code;
 				}
 
@@ -283,6 +286,10 @@ i32 linker_stage(lbGenerator *gen) {
 					LIT(build_context.extra_linker_flags),
 					lib_str
 				);
+
+				if (exit_code != 0) {
+					return exit_code;
+				}
 			} else {
 				exit_code = system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" %s -OUT:\"%.*s.%s\" %s "
@@ -298,7 +305,10 @@ i32 linker_stage(lbGenerator *gen) {
 					LIT(build_context.extra_linker_flags),
 					lib_str
 				);
-			}
+
+				if (exit_code != 0) {
+					return exit_code;
+				}			}
 		} else { // lld
 			exit_code = system_exec_command_line_app("msvc-link",
 				"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s.%s\" %s "
@@ -315,6 +325,10 @@ i32 linker_stage(lbGenerator *gen) {
 				LIT(build_context.extra_linker_flags),
 				lib_str
 			);
+
+			if (exit_code != 0) {
+				return exit_code;
+			}
 		}
 	#else
 		timings_start_section(timings, str_lit("ld-link"));
