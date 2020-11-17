@@ -598,6 +598,8 @@ enum BuildFlagKind {
 	BuildFlag_GlobalDefinitions,
 	BuildFlag_GoToDefinitions,
 
+	BuildFlag_Package,
+
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
 	BuildFlag_ResourceFile,
@@ -703,6 +705,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Compact,           str_lit("compact"),            BuildFlagParam_None, Command_query);
 	add_flag(&build_flags, BuildFlag_GlobalDefinitions, str_lit("global-definitions"), BuildFlagParam_None, Command_query);
 	add_flag(&build_flags, BuildFlag_GoToDefinitions,   str_lit("go-to-definitions"),  BuildFlagParam_None, Command_query);
+
+	add_flag(&build_flags, BuildFlag_Package,   str_lit("package"),  BuildFlagParam_String, Command_doc, true);
 
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -1192,6 +1196,15 @@ bool parse_build_flags(Array<String> args) {
 							}
 							break;
 
+						case BuildFlag_Package:
+							GB_ASSERT(value.kind == ExactValue_String);
+							if (value.value_string.len == 0) {
+								gb_printf_err("Invalid use of -package flag\n");
+							} else {
+								array_add(&build_context.doc_packages, value.value_string);
+							}
+							break;
+
 					#if defined(GB_SYSTEM_WINDOWS)
 						case BuildFlag_IgnoreVsSearch:
 							GB_ASSERT(value.kind == ExactValue_Invalid);
@@ -1529,6 +1542,14 @@ void print_show_help(String const arg0, String const &command) {
 	print_usage_line(1, "Flags");
 	print_usage_line(0, "");
 
+	if (doc) {
+		print_usage_line(1, "-package:<string>");
+		print_usage_line(2, "Add package name to generate documentation for");
+		print_usage_line(2, "Multiple flags are allowed");
+		print_usage_line(2, "Example: -doc:runtime");
+		print_usage_line(0, "");
+	}
+
 	if (run_or_build) {
 		print_usage_line(1, "-out:<filepath>");
 		print_usage_line(2, "Set the file name of the outputted executable");
@@ -1795,6 +1816,8 @@ int main(int arg_count, char const **arg_ptr) {
 	add_library_collection(str_lit("core"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("core")));
 
 	map_init(&build_context.defined_values, heap_allocator());
+	build_context.doc_packages.allocator = heap_allocator();
+
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
 

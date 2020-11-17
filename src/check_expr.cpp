@@ -10208,14 +10208,14 @@ void check_expr_or_type(CheckerContext *c, Operand *o, Ast *e, Type *type_hint) 
 }
 
 
-gbString write_expr_to_string(gbString str, Ast *node);
+gbString write_expr_to_string(gbString str, Ast *node, bool shorthand);
 
 gbString write_struct_fields_to_string(gbString str, Slice<Ast *> const &params) {
 	for_array(i, params) {
 		if (i > 0) {
 			str = gb_string_appendc(str, ", ");
 		}
-		str = write_expr_to_string(str, params[i]);
+		str = write_expr_to_string(str, params[i], false);
 	}
 	return str;
 }
@@ -10229,11 +10229,23 @@ gbString string_append_string(gbString str, String string) {
 
 
 gbString string_append_token(gbString str, Token token) {
-	return string_append_string(str, token.string);
+	if (token.kind == Token_String) {
+		str = gb_string_append_rune(str, '"');
+	} else if (token.kind == Token_Rune) {
+		str = gb_string_append_rune(str, '\'');
+	}
+	str = string_append_string(str, token.string);
+	if (token.kind == Token_String) {
+		str = gb_string_append_rune(str, '"');
+	} else if (token.kind == Token_Rune) {
+		str = gb_string_append_rune(str, '\'');
+	}
+
+	return str;
 }
 
 
-gbString write_expr_to_string(gbString str, Ast *node) {
+gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 	if (node == nullptr)
 		return str;
 
@@ -10271,21 +10283,30 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 		str = gb_string_appendc(str, "proc{");
 		for_array(i, pg->args) {
 			if (i > 0) str = gb_string_appendc(str, ", ");
-			str = write_expr_to_string(str, pg->args[i]);
+			str = write_expr_to_string(str, pg->args[i], shorthand);
 		}
 		str = gb_string_append_rune(str, '}');
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);
-		str = write_expr_to_string(str, pl->type);
+		str = write_expr_to_string(str, pl->type, shorthand);
+		if (pl->body) {
+			str = gb_string_appendc(str, " {...}");
+		} else {
+			str = gb_string_appendc(str, " ---");
+		}
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);
-		str = write_expr_to_string(str, cl->type);
+		str = write_expr_to_string(str, cl->type, shorthand);
 		str = gb_string_append_rune(str, '{');
-		for_array(i, cl->elems) {
-			if (i > 0) str = gb_string_appendc(str, ", ");
-			str = write_expr_to_string(str, cl->elems[i]);
+		if (shorthand) {
+			str = gb_string_appendc(str, "...");
+		} else {
+			for_array(i, cl->elems) {
+				if (i > 0) str = gb_string_appendc(str, ", ");
+				str = write_expr_to_string(str, cl->elems[i], shorthand);
+			}
 		}
 		str = gb_string_append_rune(str, '}');
 	case_end;
@@ -10294,71 +10315,71 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 	case_ast_node(te, TagExpr, node);
 		str = gb_string_append_rune(str, '#');
 		str = string_append_token(str, te->name);
-		str = write_expr_to_string(str, te->expr);
+		str = write_expr_to_string(str, te->expr, shorthand);
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, node);
 		str = string_append_token(str, ue->op);
-		str = write_expr_to_string(str, ue->expr);
+		str = write_expr_to_string(str, ue->expr, shorthand);
 	case_end;
 
 	case_ast_node(de, DerefExpr, node);
-		str = write_expr_to_string(str, de->expr);
+		str = write_expr_to_string(str, de->expr, shorthand);
 		str = gb_string_append_rune(str, '^');
 	case_end;
 
 	case_ast_node(be, BinaryExpr, node);
-		str = write_expr_to_string(str, be->left);
+		str = write_expr_to_string(str, be->left, shorthand);
 		str = gb_string_append_rune(str, ' ');
 		str = string_append_token(str, be->op);
 		str = gb_string_append_rune(str, ' ');
-		str = write_expr_to_string(str, be->right);
+		str = write_expr_to_string(str, be->right, shorthand);
 	case_end;
 
 	case_ast_node(te, TernaryExpr, node);
-		str = write_expr_to_string(str, te->cond);
+		str = write_expr_to_string(str, te->cond, shorthand);
 		str = gb_string_appendc(str, " ? ");
-		str = write_expr_to_string(str, te->x);
+		str = write_expr_to_string(str, te->x, shorthand);
 		str = gb_string_appendc(str, " : ");
-		str = write_expr_to_string(str, te->y);
+		str = write_expr_to_string(str, te->y, shorthand);
 	case_end;
 
 	case_ast_node(te, TernaryIfExpr, node);
-		str = write_expr_to_string(str, te->x);
+		str = write_expr_to_string(str, te->x, shorthand);
 		str = gb_string_appendc(str, " if ");
-		str = write_expr_to_string(str, te->cond);
+		str = write_expr_to_string(str, te->cond, shorthand);
 		str = gb_string_appendc(str, " else ");
-		str = write_expr_to_string(str, te->y);
+		str = write_expr_to_string(str, te->y, shorthand);
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, node);
-		str = write_expr_to_string(str, te->x);
+		str = write_expr_to_string(str, te->x, shorthand);
 		str = gb_string_appendc(str, " when ");
-		str = write_expr_to_string(str, te->cond);
+		str = write_expr_to_string(str, te->cond, shorthand);
 		str = gb_string_appendc(str, " else ");
-		str = write_expr_to_string(str, te->y);
+		str = write_expr_to_string(str, te->y, shorthand);
 	case_end;
 
 
 	case_ast_node(pe, ParenExpr, node);
 		str = gb_string_append_rune(str, '(');
-		str = write_expr_to_string(str, pe->expr);
+		str = write_expr_to_string(str, pe->expr, shorthand);
 		str = gb_string_append_rune(str, ')');
 	case_end;
 
 	case_ast_node(se, SelectorExpr, node);
-		str = write_expr_to_string(str, se->expr);
+		str = write_expr_to_string(str, se->expr, shorthand);
 		str = string_append_token(str, se->token);
-		str = write_expr_to_string(str, se->selector);
+		str = write_expr_to_string(str, se->selector, shorthand);
 	case_end;
 
 	case_ast_node(se, ImplicitSelectorExpr, node);
 		str = gb_string_append_rune(str, '.');
-		str = write_expr_to_string(str, se->selector);
+		str = write_expr_to_string(str, se->selector, shorthand);
 	case_end;
 
 	case_ast_node(se, SelectorCallExpr, node);
-		str = write_expr_to_string(str, se->expr);
+		str = write_expr_to_string(str, se->expr, shorthand);
 		str = gb_string_appendc(str, "(");
 		ast_node(ce, CallExpr, se->call);
 		isize start = se->modified_call ? 1 : 0;
@@ -10367,86 +10388,86 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 			if (i > start) {
 				str = gb_string_appendc(str, ", ");
 			}
-			str = write_expr_to_string(str, arg);
+			str = write_expr_to_string(str, arg, shorthand);
 		}
 		str = gb_string_appendc(str, ")");
 	case_end;
 
 	case_ast_node(ta, TypeAssertion, node);
-		str = write_expr_to_string(str, ta->expr);
+		str = write_expr_to_string(str, ta->expr, shorthand);
 		str = gb_string_appendc(str, ".(");
-		str = write_expr_to_string(str, ta->type);
+		str = write_expr_to_string(str, ta->type, shorthand);
 		str = gb_string_append_rune(str, ')');
 	case_end;
 
 	case_ast_node(tc, TypeCast, node);
 		str = string_append_token(str, tc->token);
 		str = gb_string_append_rune(str, '(');
-		str = write_expr_to_string(str, tc->type);
+		str = write_expr_to_string(str, tc->type, shorthand);
 		str = gb_string_append_rune(str, ')');
-		str = write_expr_to_string(str, tc->expr);
+		str = write_expr_to_string(str, tc->expr, shorthand);
 	case_end;
 
 	case_ast_node(ac, AutoCast, node);
 		str = string_append_token(str, ac->token);
 		str = gb_string_append_rune(str, ' ');
-		str = write_expr_to_string(str, ac->expr);
+		str = write_expr_to_string(str, ac->expr, shorthand);
 	case_end;
 
 	case_ast_node(ie, IndexExpr, node);
-		str = write_expr_to_string(str, ie->expr);
+		str = write_expr_to_string(str, ie->expr, shorthand);
 		str = gb_string_append_rune(str, '[');
-		str = write_expr_to_string(str, ie->index);
+		str = write_expr_to_string(str, ie->index, shorthand);
 		str = gb_string_append_rune(str, ']');
 	case_end;
 
 	case_ast_node(se, SliceExpr, node);
-		str = write_expr_to_string(str, se->expr);
+		str = write_expr_to_string(str, se->expr, shorthand);
 		str = gb_string_append_rune(str, '[');
-		str = write_expr_to_string(str, se->low);
+		str = write_expr_to_string(str, se->low, shorthand);
 		str = string_append_token(str, se->interval);
-		str = write_expr_to_string(str, se->high);
+		str = write_expr_to_string(str, se->high, shorthand);
 		str = gb_string_append_rune(str, ']');
 	case_end;
 
 	case_ast_node(e, Ellipsis, node);
 		str = gb_string_appendc(str, "..");
-		str = write_expr_to_string(str, e->expr);
+		str = write_expr_to_string(str, e->expr, shorthand);
 	case_end;
 
 	case_ast_node(fv, FieldValue, node);
-		str = write_expr_to_string(str, fv->field);
+		str = write_expr_to_string(str, fv->field, shorthand);
 		str = gb_string_appendc(str, " = ");
-		str = write_expr_to_string(str, fv->value);
+		str = write_expr_to_string(str, fv->value, shorthand);
 	case_end;
 
 	case_ast_node(ht, HelperType, node);
 		str = gb_string_appendc(str, "#type ");
-		str = write_expr_to_string(str, ht->type);
+		str = write_expr_to_string(str, ht->type, shorthand);
 	case_end;
 
 	case_ast_node(ht, DistinctType, node);
 		str = gb_string_appendc(str, "distinct ");
-		str = write_expr_to_string(str, ht->type);
+		str = write_expr_to_string(str, ht->type, shorthand);
 	case_end;
 
 	case_ast_node(ht, OpaqueType, node);
 		str = gb_string_appendc(str, "opaque ");
-		str = write_expr_to_string(str, ht->type);
+		str = write_expr_to_string(str, ht->type, shorthand);
 	case_end;
 
 	case_ast_node(pt, PolyType, node);
 		str = gb_string_append_rune(str, '$');
-		str = write_expr_to_string(str, pt->type);
+		str = write_expr_to_string(str, pt->type, shorthand);
 		if (pt->specialization != nullptr) {
 			str = gb_string_append_rune(str, '/');
-			str = write_expr_to_string(str, pt->specialization);
+			str = write_expr_to_string(str, pt->specialization, shorthand);
 		}
 	case_end;
 
 	case_ast_node(pt, PointerType, node);
 		str = gb_string_append_rune(str, '^');
-		str = write_expr_to_string(str, pt->type);
+		str = write_expr_to_string(str, pt->type, shorthand);
 	case_end;
 
 	case_ast_node(at, ArrayType, node);
@@ -10456,40 +10477,44 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 		    at->count->UnaryExpr.op.kind == Token_Question) {
 			str = gb_string_appendc(str, "?");
 		} else {
-			str = write_expr_to_string(str, at->count);
+			str = write_expr_to_string(str, at->count, shorthand);
 		}
 		str = gb_string_append_rune(str, ']');
-		str = write_expr_to_string(str, at->elem);
+		str = write_expr_to_string(str, at->elem, shorthand);
 	case_end;
 
 	case_ast_node(at, DynamicArrayType, node);
 		str = gb_string_appendc(str, "[dynamic]");
-		str = write_expr_to_string(str, at->elem);
+		str = write_expr_to_string(str, at->elem, shorthand);
 	case_end;
 
 	case_ast_node(bf, BitFieldType, node);
 		str = gb_string_appendc(str, "bit_field ");
 		if (bf->align) {
 			str = gb_string_appendc(str, "#align ");
-			str = write_expr_to_string(str, bf->align);
+			str = write_expr_to_string(str, bf->align, shorthand);
 		}
 		str = gb_string_appendc(str, "{");
-		str = write_struct_fields_to_string(str, bf->fields);
+		if (shorthand) {
+			str = gb_string_appendc(str, "...");
+		} else {
+			str = write_struct_fields_to_string(str, bf->fields);
+		}
 		str = gb_string_appendc(str, "}");
 	case_end;
 
 	case_ast_node(bs, BitSetType, node);
 		str = gb_string_appendc(str, "bit_set[");
-		str = write_expr_to_string(str, bs->elem);
+		str = write_expr_to_string(str, bs->elem, shorthand);
 		str = gb_string_appendc(str, "]");
 	case_end;
 
 
 	case_ast_node(mt, MapType, node);
 		str = gb_string_appendc(str, "map[");
-		str = write_expr_to_string(str, mt->key);
+		str = write_expr_to_string(str, mt->key, shorthand);
 		str = gb_string_append_rune(str, ']');
-		str = write_expr_to_string(str, mt->value);
+		str = write_expr_to_string(str, mt->value, shorthand);
 	case_end;
 
 	case_ast_node(f, Field, node);
@@ -10509,7 +10534,7 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 		for_array(i, f->names) {
 			Ast *name = f->names[i];
 			if (i > 0) str = gb_string_appendc(str, ", ");
-			str = write_expr_to_string(str, name);
+			str = write_expr_to_string(str, name, shorthand);
 		}
 		if (f->names.count > 0) {
 			if (f->type == nullptr && f->default_value != nullptr) {
@@ -10519,14 +10544,14 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 		}
 		if (f->type != nullptr) {
 			str = gb_string_append_rune(str, ' ');
-			str = write_expr_to_string(str, f->type);
+			str = write_expr_to_string(str, f->type, shorthand);
 		}
 		if (f->default_value != nullptr) {
 			if (f->type != nullptr) {
 				str = gb_string_append_rune(str, ' ');
 			}
 			str = gb_string_appendc(str, "= ");
-			str = write_expr_to_string(str, f->default_value);
+			str = write_expr_to_string(str, f->default_value, shorthand);
 		}
 
 	case_end;
@@ -10552,7 +10577,7 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 		for_array(i, f->list) {
 			if (i > 0) str = gb_string_appendc(str, ", ");
 			if (has_name) {
-				str = write_expr_to_string(str, f->list[i]);
+				str = write_expr_to_string(str, f->list[i], shorthand);
 			} else {
 				ast_node(field, Field, f->list[i]);
 
@@ -10566,7 +10591,7 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 					str = gb_string_appendc(str, "#c_vararg ");
 				}
 
-				str = write_expr_to_string(str, field->type);
+				str = write_expr_to_string(str, field->type, shorthand);
 			}
 		}
 	case_end;
@@ -10581,7 +10606,7 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 			break;
 		}
 
-		str = write_expr_to_string(str, ce->proc);
+		str = write_expr_to_string(str, ce->proc, shorthand);
 		str = gb_string_appendc(str, "(");
 
 		for_array(i, ce->args) {
@@ -10589,7 +10614,7 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 			if (i > 0) {
 				str = gb_string_appendc(str, ", ");
 			}
-			str = write_expr_to_string(str, arg);
+			str = write_expr_to_string(str, arg, shorthand);
 		}
 		str = gb_string_appendc(str, ")");
 	case_end;
@@ -10598,17 +10623,17 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 		str = gb_string_appendc(str, "typeid");
 		if (tt->specialization) {
 			str = gb_string_appendc(str, "/");
-			str = write_expr_to_string(str, tt->specialization);
+			str = write_expr_to_string(str, tt->specialization, shorthand);
 		}
 	case_end;
 
 	case_ast_node(pt, ProcType, node);
 		str = gb_string_appendc(str, "proc(");
-		str = write_expr_to_string(str, pt->params);
+		str = write_expr_to_string(str, pt->params, shorthand);
 		str = gb_string_appendc(str, ")");
 		if (pt->results != nullptr) {
 			str = gb_string_appendc(str, " -> ");
-			str = write_expr_to_string(str, pt->results);
+			str = write_expr_to_string(str, pt->results, shorthand);
 		}
 
 	case_end;
@@ -10618,7 +10643,11 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 		if (st->is_packed)    str = gb_string_appendc(str, "#packed ");
 		if (st->is_raw_union) str = gb_string_appendc(str, "#raw_union ");
 		str = gb_string_append_rune(str, '{');
-		str = write_struct_fields_to_string(str, st->fields);
+		if (shorthand) {
+			str = gb_string_appendc(str, "...");
+		} else {
+			str = write_struct_fields_to_string(str, st->fields);
+		}
 		str = gb_string_append_rune(str, '}');
 	case_end;
 
@@ -10626,30 +10655,38 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 	case_ast_node(st, UnionType, node);
 		str = gb_string_appendc(str, "union ");
 		str = gb_string_append_rune(str, '{');
-		str = write_struct_fields_to_string(str, st->variants);
+		if (shorthand) {
+			str = gb_string_appendc(str, "...");
+		} else {
+			str = write_struct_fields_to_string(str, st->variants);
+		}
 		str = gb_string_append_rune(str, '}');
 	case_end;
 
 	case_ast_node(et, EnumType, node);
 		str = gb_string_appendc(str, "enum ");
 		if (et->base_type != nullptr) {
-			str = write_expr_to_string(str, et->base_type);
+			str = write_expr_to_string(str, et->base_type, shorthand);
 			str = gb_string_append_rune(str, ' ');
 		}
 		str = gb_string_append_rune(str, '{');
-		for_array(i, et->fields) {
-			if (i > 0) {
-				str = gb_string_appendc(str, ", ");
+		if (shorthand) {
+			str = gb_string_appendc(str, "...");
+		} else {
+			for_array(i, et->fields) {
+				if (i > 0) {
+					str = gb_string_appendc(str, ", ");
+				}
+				str = write_expr_to_string(str, et->fields[i], shorthand);
 			}
-			str = write_expr_to_string(str, et->fields[i]);
 		}
 		str = gb_string_append_rune(str, '}');
 	case_end;
 
 	case_ast_node(rt, RelativeType, node);
-		str = write_expr_to_string(str, rt->tag);
+		str = write_expr_to_string(str, rt->tag, shorthand);
 		str = gb_string_appendc(str, "" );
-		str = write_expr_to_string(str, rt->type);
+		str = write_expr_to_string(str, rt->type, shorthand);
 	case_end;
 
 
@@ -10659,12 +10696,12 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 			if (i > 0) {
 				str = gb_string_appendc(str, ", ");
 			}
-			str = write_expr_to_string(str, ia->param_types[i]);
+			str = write_expr_to_string(str, ia->param_types[i], shorthand);
 		}
 		str = gb_string_appendc(str, ")");
 		if (ia->return_type != nullptr) {
 			str = gb_string_appendc(str, " -> ");
-			str = write_expr_to_string(str, ia->return_type);
+			str = write_expr_to_string(str, ia->return_type, shorthand);
 		}
 		if (ia->has_side_effects) {
 			str = gb_string_appendc(str, " #side_effects");
@@ -10677,9 +10714,13 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 			str = gb_string_appendc(str, inline_asm_dialect_strings[ia->dialect]);
 		}
 		str = gb_string_appendc(str, " {");
-		str = write_expr_to_string(str, ia->asm_string);
-		str = gb_string_appendc(str, ", ");
-		str = write_expr_to_string(str, ia->constraints_string);
+		if (shorthand) {
+			str = gb_string_appendc(str, "...");
+		} else {
+			str = write_expr_to_string(str, ia->asm_string, shorthand);
+			str = gb_string_appendc(str, ", ");
+			str = write_expr_to_string(str, ia->constraints_string, shorthand);
+		}
 		str = gb_string_appendc(str, "}");
 	case_end;
 	}
@@ -10688,5 +10729,8 @@ gbString write_expr_to_string(gbString str, Ast *node) {
 }
 
 gbString expr_to_string(Ast *expression) {
-	return write_expr_to_string(gb_string_make(heap_allocator(), ""), expression);
+	return write_expr_to_string(gb_string_make(heap_allocator(), ""), expression, false);
+}
+gbString expr_to_string_shorthand(Ast *expression) {
+	return write_expr_to_string(gb_string_make(heap_allocator(), ""), expression, true);
 }

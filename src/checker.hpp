@@ -132,6 +132,7 @@ struct DeclInfo {
 
 	Entity *entity;
 
+	Ast *         decl_node;
 	Ast *         type_expr;
 	Ast *         init_expr;
 	Array<Ast *>  attributes;
