@@ -215,6 +215,8 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 				type_expr = e->decl_info->type_expr;
 				init_expr = e->decl_info->init_expr;
 				decl_node = e->decl_info->decl_node;
+				comment = e->decl_info->comment;
+				docs = e->decl_info->docs;
 			}
 			GB_ASSERT(type_expr != nullptr || init_expr != nullptr);
 			print_doc_line_no_newline(2, "%.*s", LIT(e->token.string));
