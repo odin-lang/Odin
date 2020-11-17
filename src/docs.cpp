@@ -58,38 +58,6 @@ GB_COMPARE_PROC(cmp_ast_package_by_name) {
 	return string_compare(x->name, y->name);
 }
 
-
-String alloc_comment_group_string(gbAllocator a, CommentGroup g) {
-	isize len = 0;
-	for_array(i, g.list) {
-		String comment = g.list[i].string;
-		len += comment.len;
-		len += 1; // for \n
-	}
-	if (len == 0) {
-		return make_string(nullptr, 0);
-	}
-
-	u8 *text = gb_alloc_array(a, u8, len+1);
-	len = 0;
-	for_array(i, g.list) {
-		String comment = g.list[i].string;
-		if (comment[1] == '/') {
-			comment.text += 2;
-			comment.len  -= 2;
-		} else if (comment[1] == '*') {
-			comment.text += 2;
-			comment.len  -= 4;
-		}
-		comment = string_trim_whitespace(comment);
-		gb_memmove(text+len, comment.text, comment.len);
-		len += comment.len;
-		text[len++] = '\n';
-	}
-	return make_string(text, len);
-}
-
-
 void print_doc_line(i32 indent, char const *fmt, ...) {
 	while (indent --> 0) {
 		gb_printf("\t");
@@ -127,6 +95,7 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 	isize count = 0;
 	for_array(i, g->list) {
 		String comment = g->list[i].string;
+		bool slash_slash = comment[1] == '/';
 		if (comment[1] == '/') {
 			comment.text += 2;
 			comment.len  -= 2;
@@ -134,11 +103,18 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 			comment.text += 2;
 			comment.len  -= 4;
 		}
+
+		// Ignore the first space
 		if (comment.len > 0 && comment[0] == ' ') {
 			comment.text += 1;
 			comment.len  -= 1;
 		}
 
+		if (slash_slash) {
+			if (string_starts_with(comment, str_lit("+"))) {
+				continue;
+			}
+		}
 		if (string_starts_with(comment, str_lit("@("))) {
 			continue;
 		}
