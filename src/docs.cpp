@@ -209,6 +209,8 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 			Ast *type_expr = nullptr;
 			Ast *init_expr = nullptr;
 			Ast *decl_node = nullptr;
+			CommentGroup *comment = nullptr;
+			CommentGroup *docs = nullptr;
 			if (e->decl_info != nullptr) {
 				type_expr = e->decl_info->type_expr;
 				init_expr = e->decl_info->init_expr;
@@ -236,29 +238,7 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 			gb_printf(";\n");
 
 
-			if (decl_node && (true || (build_context.cmd_doc_flags & CmdDocFlag_All))) {
-				CommentGroup *docs = nullptr;
-				CommentGroup *comment = nullptr;
-				switch (decl_node->kind) {
-				case_ast_node(vd, ValueDecl, decl_node);
-					docs = vd->docs;
-					comment = vd->comment;
-				case_end;
-
-				case_ast_node(id, ImportDecl, decl_node);
-					docs = id->docs;
-					comment = id->comment;
-				case_end;
-
-				case_ast_node(fl, ForeignImportDecl, decl_node);
-					docs = fl->docs;
-					comment = fl->comment;
-				case_end;
-
-				case_ast_node(fb, ForeignBlockDecl, decl_node);
-					docs = fb->docs;
-				case_end;
-				}
+			if (build_context.cmd_doc_flags & CmdDocFlag_All) {
 				if (comment) {
 					// gb_printf(" <comment>");
 				}
@@ -310,6 +290,18 @@ void generate_documentation(Checker *c) {
 		if (was_error) {
 			gb_exit(1);
 			return;
+		}
+
+		gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);
+
+		for_array(i, pkgs) {
+			print_doc_package(info, pkgs[i]);
+		}
+	} else if (build_context.cmd_doc_flags & CmdDocFlag_AllPackages) {
+		auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.entries.count);
+		for_array(i, info->packages.entries) {
+			AstPackage *pkg = info->packages.entries[i].value;
+			array_add(&pkgs, pkg);
 		}
 
 		gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);

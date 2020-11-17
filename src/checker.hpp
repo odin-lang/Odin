@@ -141,6 +141,9 @@ struct DeclInfo {
 	bool          is_using;
 	bool          where_clauses_evaluated;
 
+	CommentGroup *comment;
+	CommentGroup *docs;
+
 	PtrSet<Entity *>  deps;
 	PtrSet<Type *>    type_info_deps;
 	Array<BlockLabel> labels;
