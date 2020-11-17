@@ -85,6 +85,10 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 		exit_code = -1;
 	}
 
+	if (exit_code) {
+		exit(exit_code);
+	}
+
 	return exit_code;
 
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
@@ -133,6 +137,10 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 
 	// exit_code = status;
 
+	if (exit_code) {
+		exit(exit_code);
+	}
+
 	return exit_code;
 #endif
 }
@@ -141,32 +149,23 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 
 
 #if defined(LLVM_BACKEND_SUPPORT)
-i32 linker_stage(lbGenerator *gen) {
-	i32 exit_code = 0;
-
+void linker_stage(lbGenerator *gen) {
 	Timings *timings = &global_timings;
 
 	String output_base = gen->output_base;
 
 	if (build_context.metrics.os == TargetOs_js) {
 		timings_start_section(timings, str_lit("wasm-ld"));
-		exit_code = system_exec_command_line_app("wasm-ld",
+		system_exec_command_line_app("wasm-ld",
 			"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm-obj\" -o \"%.*s.wasm\" %.*s %.*s",
 			LIT(build_context.ODIN_ROOT),
 			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
-		if (exit_code != 0) {
-			return exit_code;
-		}
-		return exit_code;
 	}
 
 	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
 #ifdef GB_SYSTEM_UNIX
-		exit_code = system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
+		system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
 			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
-		if (exit_code != 0) {
-			return exit_code;
-		}
 #else
 		gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
 			LIT(target_os_names[build_context.metrics.os]),
@@ -197,7 +196,7 @@ i32 linker_stage(lbGenerator *gen) {
 
 		if (find_result.windows_sdk_version == 0) {
 			gb_printf_err("Windows SDK not found.\n");
-			return 1;
+			exit(1);
 		}
 
 		if (build_context.ignore_microsoft_magic) {
@@ -262,17 +261,13 @@ i32 linker_stage(lbGenerator *gen) {
 		char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
 		if (!build_context.use_lld) { // msvc
 			if (build_context.has_resource) {
-				exit_code = system_exec_command_line_app("msvc-link",
+				system_exec_command_line_app("msvc-link",
 					"\"rc.exe\" /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
 					LIT(output_base),
 					LIT(build_context.resource_filepath)
 				);
 
-				if (exit_code != 0) {
-					return exit_code;
-				}
-
-				exit_code = system_exec_command_line_app("msvc-link",
+				system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" %s \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
 					" %.*s "
@@ -286,12 +281,8 @@ i32 linker_stage(lbGenerator *gen) {
 					LIT(build_context.extra_linker_flags),
 					lib_str
 				);
-
-				if (exit_code != 0) {
-					return exit_code;
-				}
 			} else {
-				exit_code = system_exec_command_line_app("msvc-link",
+				system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" %s -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
 					" %.*s "
@@ -305,12 +296,9 @@ i32 linker_stage(lbGenerator *gen) {
 					LIT(build_context.extra_linker_flags),
 					lib_str
 				);
-
-				if (exit_code != 0) {
-					return exit_code;
-				}			}
+			}
 		} else { // lld
-			exit_code = system_exec_command_line_app("msvc-link",
+			system_exec_command_line_app("msvc-link",
 				"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s.%s\" %s "
 				"/nologo /incremental:no /opt:ref /subsystem:%s "
 				" %.*s "
@@ -325,10 +313,6 @@ i32 linker_stage(lbGenerator *gen) {
 				LIT(build_context.extra_linker_flags),
 				lib_str
 			);
-
-			if (exit_code != 0) {
-				return exit_code;
-			}
 		}
 	#else
 		timings_start_section(timings, str_lit("ld-link"));
@@ -433,7 +417,7 @@ i32 linker_stage(lbGenerator *gen) {
 			}
 		}
 
-		exit_code = system_exec_command_line_app("ld-link",
+		system_exec_command_line_app("ld-link",
 			"%s %s -o \"%.*s%.*s\" %s "
 			" %s "
 			" %.*s "
@@ -457,28 +441,21 @@ i32 linker_stage(lbGenerator *gen) {
 			LIT(build_context.link_flags),
 			LIT(build_context.extra_linker_flags),
 			link_settings);
-		if (exit_code != 0) {
-			return exit_code;
-		}
 
 	#if defined(GB_SYSTEM_OSX)
 		if (build_context.ODIN_DEBUG) {
 			// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
 			// to the symbols in the object file
-			exit_code = system_exec_command_line_app("dsymutil",
+			system_exec_command_line_app("dsymutil",
 				"dsymutil %.*s%.*s", LIT(output_base), LIT(output_ext)
 			);
-
-			if (exit_code != 0) {
-				return exit_code;
-			}
 		}
 	#endif
 
 	#endif
 	}
 
-	return exit_code;
+	return;
 }
 #endif
 
@@ -2070,12 +2047,7 @@ int main(int arg_count, char const **arg_ptr) {
 		switch (build_context.build_mode) {
 		case BuildMode_Executable:
 		case BuildMode_DynamicLibrary:
-			{
-				i32 linker_stage_exit_count = linker_stage(&gen);
-				if (linker_stage_exit_count != 0) {
-					return linker_stage_exit_count;
-				}
-			}
+			linker_stage(&gen);
 			break;
 		}
 
@@ -2159,19 +2131,11 @@ int main(int arg_count, char const **arg_ptr) {
 
 		build_context.optimization_level = gb_clamp(build_context.optimization_level, 0, 3);
 
-		i32 exit_code = 0;
-
 		timings_start_section(timings, str_lit("llvm-opt"));
-		exit_code = exec_llvm_opt(output_base);
-		if (exit_code != 0) {
-			return exit_code;
-		}
+		exec_llvm_opt(output_base);
 
 		timings_start_section(timings, str_lit("llvm-llc"));
-		exit_code = exec_llvm_llc(output_base);
-		if (exit_code != 0) {
-			return exit_code;
-		}
+		exec_llvm_llc(output_base);
 
 		if (build_context.build_mode == BuildMode_Object) {
 			// Ignore the linker
@@ -2180,7 +2144,7 @@ int main(int arg_count, char const **arg_ptr) {
 			}
 
 			remove_temp_files(output_base);
-			return exit_code;
+			return 0;
 		}
 
 		if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
@@ -2277,17 +2241,13 @@ int main(int arg_count, char const **arg_ptr) {
 
 			if (!build_context.use_lld) { // msvc
 				if (build_context.has_resource) {
-					exit_code = system_exec_command_line_app("msvc-link",
+					system_exec_command_line_app("msvc-link",
 						"\"rc.exe\" /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
 						LIT(output_base),
 						LIT(build_context.resource_filepath)
 					);
 
-		            if (exit_code != 0) {
-						return exit_code;
-					}
-
-					exit_code = system_exec_command_line_app("msvc-link",
+					system_exec_command_line_app("msvc-link",
 						"\"%.*slink.exe\" \"%.*s.obj\" \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
 						"/nologo /incremental:no /opt:ref /subsystem:%s "
 						" %.*s "
@@ -2302,7 +2262,7 @@ int main(int arg_count, char const **arg_ptr) {
 						lib_str
 					);
 				} else {
-					exit_code = system_exec_command_line_app("msvc-link",
+					system_exec_command_line_app("msvc-link",
 						"\"%.*slink.exe\" \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 						"/nologo /incremental:no /opt:ref /subsystem:%s "
 						" %.*s "
@@ -2318,7 +2278,7 @@ int main(int arg_count, char const **arg_ptr) {
 					);
 				}
 			} else { // lld
-				exit_code = system_exec_command_line_app("msvc-link",
+				system_exec_command_line_app("msvc-link",
 					"\"%.*s\\bin\\lld-link\" \"%.*s.obj\" -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
 					" %.*s "
@@ -2333,10 +2293,6 @@ int main(int arg_count, char const **arg_ptr) {
 					LIT(build_context.extra_linker_flags),
 					lib_str
 				);
-			}
-
-			if (exit_code != 0) {
-				return exit_code;
 			}
 
 			if (build_context.show_timings) {
@@ -2447,7 +2403,7 @@ int main(int arg_count, char const **arg_ptr) {
 			}
 
 
-			exit_code = system_exec_command_line_app("ld-link",
+			system_exec_command_line_app("ld-link",
 				"%s \"%.*s.o\" -o \"%.*s%.*s\" %s "
 				" %s "
 				" %.*s "
@@ -2471,21 +2427,14 @@ int main(int arg_count, char const **arg_ptr) {
 				LIT(build_context.link_flags),
 				LIT(build_context.extra_linker_flags),
 				link_settings);
-			if (exit_code != 0) {
-				return exit_code;
-			}
 
 		#if defined(GB_SYSTEM_OSX)
 			if (build_context.ODIN_DEBUG) {
 				// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
 				// to the symbols in the object file
-				exit_code = system_exec_command_line_app("dsymutil",
+				system_exec_command_line_app("dsymutil",
 					"dsymutil %.*s%.*s", LIT(output_base), LIT(output_ext)
 				);
-
-				if (exit_code != 0) {
-					return exit_code;
-				}
 			}
 		#endif
 

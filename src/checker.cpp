@@ -1864,9 +1864,13 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			if (e->kind != Entity_Procedure) {
 				continue;
 			}
+
+			if (e->file == nullptr || !e->file->is_test) {
+				continue;
+			}
+
 			String name = e->token.string;
 			String prefix = str_lit("test_");
-
 
 			if (!string_starts_with(name, prefix)) {
 				continue;
@@ -1876,9 +1880,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 			if (name != prefix) {
 				is_tester = true;
 			} else {
-				if (e->file && e->file->is_test) {
-					error(e->token, "Invalid testing procedure name: %.*s", LIT(name));
-				}
+				error(e->token, "Invalid testing procedure name: %.*s", LIT(name));
 			}
 
 			Type *t = base_type(e->type);
