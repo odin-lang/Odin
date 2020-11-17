@@ -224,7 +224,7 @@ index_byte :: proc(s: string, c: byte) -> int {
 	return -1;
 }
 
-// Returns i1 if c is not present
+// Returns -1 if c is not present
 last_index_byte :: proc(s: string, c: byte) -> int {
 	for i := len(s)-1; i >= 0; i -= 1 {
 		if s[i] == c {
