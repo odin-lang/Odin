@@ -1007,11 +1007,10 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) 
 			continue;
 		}
 
-		if (ptr_set_exists(&entity_set, e)) {
+		if (ptr_set_update(&entity_set, e)) {
 			error(arg, "Previous use of `%.*s` in procedure group", LIT(e->token.string));
 			continue;
 		}
-		ptr_set_add(&entity_set, e);
 		array_add(&pge->entities, e);
 	}
 

@@ -700,7 +700,7 @@ void init_universal(void) {
 	builtin_pkg->kind = Package_Normal;
 
 	builtin_pkg->scope = create_scope(nullptr);
-	builtin_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global;
+	builtin_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
 	builtin_pkg->scope->pkg = builtin_pkg;
 
 	intrinsics_pkg = gb_alloc_item(a, AstPackage);
@@ -708,7 +708,7 @@ void init_universal(void) {
 	intrinsics_pkg->kind = Package_Normal;
 
 	intrinsics_pkg->scope = create_scope(nullptr);
-	intrinsics_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global;
+	intrinsics_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
 	intrinsics_pkg->scope->pkg = intrinsics_pkg;
 
 	config_pkg = gb_alloc_item(a, AstPackage);
@@ -716,7 +716,7 @@ void init_universal(void) {
 	config_pkg->kind = Package_Normal;
 
 	config_pkg->scope = create_scope(nullptr);
-	config_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global;
+	config_pkg->scope->flags |= ScopeFlag_Pkg | ScopeFlag_Global | ScopeFlag_Builtin;
 	config_pkg->scope->pkg = config_pkg;
 
 
@@ -1501,11 +1501,10 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		ti_index = type_info_index(&c->info, t, false);
 	}
 	GB_ASSERT(ti_index >= 0);
-	if (ptr_set_exists(set, ti_index)) {
+	if (ptr_set_update(set, ti_index)) {
 		// Type Already exists
 		return;
 	}
-	ptr_set_add(set, ti_index);
 
 	// Add nested types
 	if (t->kind == Type_Named) {
@@ -1688,12 +1687,10 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 		}
 	}
 
-	if (ptr_set_exists(set, entity)) {
+	if (ptr_set_update(set, entity)) {
 		return;
 	}
 
-
-	ptr_set_add(set, entity);
 	DeclInfo *decl = decl_info_of_entity(entity);
 	if (decl == nullptr) {
 		return;
@@ -3567,11 +3564,9 @@ struct ImportPathItem {
 Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start, AstPackage *end, PtrSet<AstPackage *> *visited) {
 	Array<ImportPathItem> empty_path = {};
 
-	if (ptr_set_exists(visited, start)) {
+	if (ptr_set_update(visited, start)) {
 		return empty_path;
 	}
-	ptr_set_add(visited, start);
-
 
 	String path = start->fullpath;
 	AstPackage **found = string_map_get(&c->info.packages, path);
@@ -3657,10 +3652,8 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	GB_ASSERT(scope->flags&ScopeFlag_Pkg);
 
 
-	if (ptr_set_exists(&parent_scope->imported, scope)) {
+	if (ptr_set_update(&parent_scope->imported, scope)) {
 		// error(token, "Multiple import of the same file within this scope");
-	} else {
-		ptr_set_add(&parent_scope->imported, scope);
 	}
 
 	String import_name = path_to_entity_name(id->import_name.string, id->fullpath, false);
@@ -4013,10 +4006,9 @@ void check_import_entities(Checker *c) {
 		if (pkg == nullptr) {
 			continue;
 		}
-		if (ptr_set_exists(&emitted, pkg)) {
+		if (ptr_set_update(&emitted, pkg)) {
 			continue;
 		}
-		ptr_set_add(&emitted, pkg);
 
 		array_add(&package_order, n);
 	}
@@ -4259,11 +4251,9 @@ void calculate_global_init_order(Checker *c) {
 		// if (!decl_info_has_init(d)) {
 		// 	continue;
 		// }
-		if (ptr_set_exists(&emitted, d)) {
+		if (ptr_set_update(&emitted, d)) {
 			continue;
 		}
-		ptr_set_add(&emitted, d);
-
 
 		array_add(&info->variable_init_order, d);
 	}

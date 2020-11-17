@@ -143,6 +143,7 @@ struct BuildContext {
 	bool   generate_docs;
 	i32    optimization_level;
 	bool   show_timings;
+	bool   show_unused;
 	bool   show_more_timings;
 	bool   show_system_calls;
 	bool   keep_temp_files;
