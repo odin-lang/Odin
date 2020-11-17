@@ -1193,6 +1193,12 @@ CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_line_) {
 	Array<Token> list = {};
 	list.allocator = heap_allocator();
 	isize end_line = f->curr_token.pos.line;
+	if (f->curr_token_index == 1 &&
+	    f->prev_token.kind == Token_Comment &&
+	    f->prev_token.pos.line+1 == f->curr_token.pos.line) {
+		// NOTE(bill): Special logic for the first comment in the file
+		array_add(&list, f->prev_token);
+	}
 	while (f->curr_token.kind == Token_Comment &&
 	       f->curr_token.pos.line <= end_line+n) {
 		array_add(&list, consume_comment(f, &end_line));
