@@ -1,6 +1,58 @@
 // Generates Documentation
 
+
+gb_global int print_entity_kind_ordering[Entity_Count] = {
+	/*Invalid*/     -1,
+	/*Constant*/    0,
+	/*Variable*/    1,
+	/*TypeName*/    4,
+	/*Procedure*/   2,
+	/*ProcGroup*/   3,
+	/*Builtin*/     -1,
+	/*ImportName*/  -1,
+	/*LibraryName*/ -1,
+	/*Nil*/         -1,
+	/*Label*/       -1,
+};
+gb_global char const *print_entity_names[Entity_Count] = {
+	/*Invalid*/     "",
+	/*Constant*/    "constants",
+	/*Variable*/    "variables",
+	/*TypeName*/    "types",
+	/*Procedure*/   "procedures",
+	/*ProcGroup*/   "proc_group",
+	/*Builtin*/     "",
+	/*ImportName*/  "import names",
+	/*LibraryName*/ "library names",
+	/*Nil*/         "",
+	/*Label*/       "",
+};
+
+
+GB_COMPARE_PROC(cmp_entities_for_printing) {
+	GB_ASSERT(a != nullptr);
+	GB_ASSERT(b != nullptr);
+	Entity *x = *cast(Entity **)a;
+	Entity *y = *cast(Entity **)b;
+	int res = 0;
+	res = string_compare(x->pkg->name, y->pkg->name);
+	if (res != 0) {
+		return res;
+	}
+	int ox = print_entity_kind_ordering[x->kind];
+	int oy = print_entity_kind_ordering[y->kind];
+	if (ox < oy) {
+		return -1;
+	} else if (ox > oy) {
+		return +1;
+	}
+	res = string_compare(x->token.string, y->token.string);
+	return res;
+}
+
+
 gbString expr_to_string(Ast *expression);
+gbString type_to_string(Type *type);
 
 String alloc_comment_group_string(gbAllocator a, CommentGroup g) {
 	isize len = 0;
@@ -32,76 +84,7 @@ String alloc_comment_group_string(gbAllocator a, CommentGroup g) {
 	return make_string(text, len);
 }
 
-#if 0
-void print_type_spec(Ast *spec) {
-	ast_node(ts, TypeSpec, spec);
-	GB_ASSERT(ts->name->kind == Ast_Ident);
-	String name = ts->name->Ident.string;
-	if (name.len == 0) {
-		return;
-	}
-	if (name[0] == '_') {
-		return;
-	}
-	gb_printf("type %.*s\n", LIT(name));
-}
+void generate_documentation(Checker *c) {
+	CheckerInfo *info = &c->info;
 
-void print_proc_decl(AstProcDecl *pd) {
-	GB_ASSERT(pd->name->kind == Ast_Ident);
-	String name = pd->name->Ident.string;
-	if (name.len == 0) {
-		return;
-	}
-	if (name[0] == '_') {
-		return;
-	}
-
-	String docs = alloc_comment_group_string(heap_allocator(), pd->docs);
-	defer (gb_free(heap_allocator(), docs.text));
-
-	if (docs.len > 0) {
-		gb_file_write(&gb__std_files[gbFileStandard_Output], docs.text, docs.len);
-	} else {
-		return;
-	}
-
-	ast_node(proc_type, ProcType, pd->type);
-
-	gbString params = expr_to_string(proc_type->params);
-	defer (gb_string_free(params));
-	gb_printf("proc %.*s(%s)", LIT(name), params);
-	if (proc_type->results != nullptr)  {
-		ast_node(fl, FieldList, proc_type->results);
-		isize count = fl->list.count;
-		if (count > 0) {
-			gbString results = expr_to_string(proc_type->results);
-			defer (gb_string_free(results));
-			gb_printf(" -> ");
-			if (count != 1) {
-				gb_printf("(");
-			}
-			gb_printf("%s", results);
-			if (count != 1) {
-				gb_printf(")");
-			}
-		}
-	}
-	gb_printf("\n\n");
-}
-#endif
-void print_declaration(Ast *decl) {
-}
-
-void generate_documentation(Parser *parser) {
-	// for_array(file_index, parser->files) {
-	// 	AstFile *file = parser->files[file_index];
-	// 	Tokenizer *tokenizer = &file->tokenizer;
-	// 	String fullpath = tokenizer->fullpath;
-	// 	gb_printf("%.*s\n", LIT(fullpath));
-
-	// 	for_array(decl_index, file->decls) {
-	// 		Ast *decl = file->decls[decl_index];
-	// 		print_declaration(decl);
-	// 	}
-	// }
 }
