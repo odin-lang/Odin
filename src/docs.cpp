@@ -1,6 +1,5 @@
 // Generates Documentation
 
-
 gb_global int print_entity_kind_ordering[Entity_Count] = {
 	/*Invalid*/     -1,
 	/*Constant*/    0,
@@ -41,10 +40,9 @@ GB_COMPARE_PROC(cmp_entities_for_printing) {
 	}
 	int ox = print_entity_kind_ordering[x->kind];
 	int oy = print_entity_kind_ordering[y->kind];
-	if (ox < oy) {
-		return -1;
-	} else if (ox > oy) {
-		return +1;
+	res = ox - oy;
+	if (res != 0) {
+		return res;
 	}
 	res = string_compare(x->token.string, y->token.string);
 	return res;
@@ -96,6 +94,7 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 	for_array(i, g->list) {
 		String comment = g->list[i].string;
 		bool slash_slash = comment[1] == '/';
+		bool slash_star = comment[1] == '*';
 		if (comment[1] == '/') {
 			comment.text += 2;
 			comment.len  -= 2;
