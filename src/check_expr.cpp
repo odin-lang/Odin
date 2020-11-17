@@ -10633,7 +10633,26 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = gb_string_appendc(str, ")");
 		if (pt->results != nullptr) {
 			str = gb_string_appendc(str, " -> ");
+
+			bool parens_needed = false;
+			if (pt->results && pt->results->kind == Ast_FieldList) {
+				for_array(i, pt->results->FieldList.list) {
+					Ast *field = pt->results->FieldList.list[i];
+					ast_node(f, Field, field);
+					if (f->names.count != 0) {
+						parens_needed = true;
+						break;
+					}
+				}
+			}
+
+			if (parens_needed) {
+				str = gb_string_append_rune(str, '(');
+			}
 			str = write_expr_to_string(str, pt->results, shorthand);
+			if (parens_needed) {
+				str = gb_string_append_rune(str, ')');
+			}
 		}
 
 	case_end;
