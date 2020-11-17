@@ -675,7 +675,7 @@ ExactValue build_param_to_exact_value(String name, String param) {
 bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_Help,              str_lit("help"),                BuildFlagParam_None, Command_all);
-	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),                 BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),                 BuildFlagParam_String, Command__does_build &~ Command_test);
 	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),                 BuildFlagParam_Integer, Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),        BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,   str_lit("show-more-timings"),   BuildFlagParam_None, Command__does_check);
@@ -693,7 +693,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"),     BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals, str_lit("no-dynamic-literals"), BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),              BuildFlagParam_None, Command__does_build);
-	add_flag(&build_flags, BuildFlag_NoEntryPoint,      str_lit("no-entry-point"),      BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoEntryPoint,      str_lit("no-entry-point"),      BuildFlagParam_None, Command__does_check &~ Command_test);
 	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),                 BuildFlagParam_None, Command__does_build);
 	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),                 BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None, Command__does_build);
@@ -1540,6 +1540,8 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "run       same as 'build', but also then runs the newly compiled executable.");
 	} else if (command == "check") {
 		print_usage_line(1, "check     parse and type check .odin file");
+	} else if (command == "test") {
+		print_usage_line(1, "test      build ands runs 'test_*' procedures in the initial package");
 	} else if (command == "query") {
 		print_usage_line(1, "query     [experimental] parse, type check, and output a .json file containing information about the program");
 	} else if (command == "doc") {
@@ -1550,9 +1552,9 @@ void print_show_help(String const arg0, String const &command) {
 
 	bool doc = command == "doc";
 	bool build = command == "build";
-	bool run_or_build = command == "run" || command == "build";
+	bool run_or_build = command == "run" || command == "build" || command == "test";
 	bool check_only = command == "check";
-	bool check = command == "run" || command == "build" || command == "check";
+	bool check = run_or_build || command == "check";
 
 	print_usage_line(0, "");
 	print_usage_line(1, "Flags");
@@ -1850,12 +1852,15 @@ int main(int arg_count, char const **arg_ptr) {
 	String run_args_string = {};
 
 	bool run_output = false;
-	if (command == "run") {
+	if (command == "run" || command == "test") {
 		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
 		}
 		build_context.command_kind = Command_run;
+		if (command == "test") {
+			build_context.command_kind = Command_test;
+		}
 
 		Array<String> run_args = array_make<String>(heap_allocator(), 0, arg_count);
 		defer (array_free(&run_args));

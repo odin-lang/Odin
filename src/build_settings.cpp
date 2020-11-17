@@ -111,9 +111,10 @@ enum CommandKind : u32 {
 	Command_query   = 1<<4,
 	Command_doc     = 1<<5,
 	Command_version = 1<<6,
+	Command_test     = 1<<7,
 
-	Command__does_check = Command_run|Command_build|Command_check|Command_query|Command_doc,
-	Command__does_build = Command_run|Command_build,
+	Command__does_check = Command_run|Command_build|Command_check|Command_query|Command_doc|Command_test,
+	Command__does_build = Command_run|Command_build|Command_test,
 	Command_all = ~(u32)0,
 };
 
@@ -332,6 +333,19 @@ TargetArchKind get_target_arch_from_string(String str) {
 bool is_excluded_target_filename(String name) {
 	String original_name = name;
 	name = remove_extension_from_path(name);
+
+	if (string_starts_with(name, str_lit("."))) {
+		// Ignore .*.odin files
+		return true;
+	}
+
+	String test_suffix = str_lit("_test");
+	if (build_context.command_kind != Command_test) {
+		if (string_ends_with(name, test_suffix) && name != test_suffix) {
+			// Ignore *_test.odin files
+			return true;
+		}
+	}
 
 	String str1 = {};
 	String str2 = {};

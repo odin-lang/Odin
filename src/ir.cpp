@@ -12781,11 +12781,18 @@ void ir_gen_tree(irGen *s) {
 		ir_fill_slice(proc, global_args, argv, ir_emit_conv(proc, argc, t_int));
 
 		ir_emit(proc, ir_alloc_instr(proc, irInstr_StartupRuntime));
-		{
+		Array<irValue *> empty_args = {};
+		if (build_context.command_kind == Command_test) {
+			for_array(i, m->info->testing_procedures) {
+				Entity *e = m->info->testing_procedures[i];
+				irValue **found = map_get(&proc->module->values, hash_entity(e));
+				GB_ASSERT(found != nullptr);
+				ir_emit_call(proc, *found, empty_args);
+			}
+		} else {
 			irValue **found = map_get(&proc->module->values, hash_entity(entry_point));
 			if (found != nullptr) {
-				Array<irValue *> args = {};
-				ir_emit_call(proc, *found, args);
+				ir_emit_call(proc, *found, empty_args);
 			}
 		}
 
