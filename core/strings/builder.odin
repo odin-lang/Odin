@@ -131,6 +131,22 @@ write_rune :: proc(b: ^Builder, r: rune) -> int {
 	return n;
 }
 
+write_quoted_rune :: proc(b: ^Builder, r: rune) -> (n: int) {
+	quote := byte('\'');
+	n += write_byte(b, quote);
+	buf, width := utf8.encode_rune(r);
+	if width == 1 && r == utf8.RUNE_ERROR {
+		n += write_byte(b, '\\');
+		n += write_byte(b, 'x');
+		n += write_byte(b, DIGITS_LOWER[buf[0]>>4]);
+		n += write_byte(b, DIGITS_LOWER[buf[0]&0xf]);
+	} else {
+		n += write_escaped_rune(b, r, quote);
+	}
+	n += write_byte(b, quote);
+	return;
+}
+
 write_string :: proc(b: ^Builder, s: string) -> (n: int) {
 	return write_bytes(b, transmute([]byte)s);
 }
