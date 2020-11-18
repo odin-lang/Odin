@@ -387,10 +387,10 @@ scan_string :: proc(s: ^Scanner, quote: rune) -> (n: int) {
 			switch ch {
 			case quote, 'a', 'b', 'e', 'f', 'n', 'r', 't', 'v', '\\':
 				ch = advance(s);
-			case '0'..'7': ch = scan_digits(s, ch, 8, 3);
-			case 'x':      ch = scan_digits(s, ch, 16, 2);
-			case 'u':      ch = scan_digits(s, ch, 16, 4);
-			case 'U':      ch = scan_digits(s, ch, 16, 8);
+			case '0'..'7': ch = scan_digits(s, advance(s), 8, 3);
+			case 'x':      ch = scan_digits(s, advance(s), 16, 2);
+			case 'u':      ch = scan_digits(s, advance(s), 16, 4);
+			case 'U':      ch = scan_digits(s, advance(s), 16, 8);
 			case:
 				error(s, "invalid char escape");
 			}
