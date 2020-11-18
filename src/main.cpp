@@ -589,8 +589,7 @@ enum BuildFlagKind {
 	BuildFlag_GlobalDefinitions,
 	BuildFlag_GoToDefinitions,
 
-	BuildFlag_Package,
-	BuildFlag_All,
+	BuildFlag_Short,
 	BuildFlag_AllPackages,
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -699,9 +698,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_GlobalDefinitions, str_lit("global-definitions"), BuildFlagParam_None, Command_query);
 	add_flag(&build_flags, BuildFlag_GoToDefinitions,   str_lit("go-to-definitions"),  BuildFlagParam_None, Command_query);
 
-	add_flag(&build_flags, BuildFlag_Package,     str_lit("package"),       BuildFlagParam_String, Command_doc, true);
-	add_flag(&build_flags, BuildFlag_All,         str_lit("all"),           BuildFlagParam_None,   Command_doc);
-	add_flag(&build_flags, BuildFlag_AllPackages, str_lit("all-packages"),  BuildFlagParam_None,   Command_doc);
+	add_flag(&build_flags, BuildFlag_Short,         str_lit("short"),        BuildFlagParam_None, Command_doc);
+	add_flag(&build_flags, BuildFlag_AllPackages,   str_lit("all-packages"), BuildFlagParam_None, Command_doc);
 
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -852,7 +850,7 @@ bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
 							path = string_trim_whitespace(path);
-							if (is_import_path_valid(path)) {
+							if (is_build_flag_path_valid(path)) {
 								#if defined(GB_SYSTEM_WINDOWS)
 									String ext = path_extension(path);
 									if (ext == ".exe") {
@@ -1191,20 +1189,13 @@ bool parse_build_flags(Array<String> args) {
 							}
 							break;
 
-						case BuildFlag_Package:
-							GB_ASSERT(value.kind == ExactValue_String);
-							if (value.value_string.len == 0) {
-								gb_printf_err("Invalid use of -package flag\n");
-							} else {
-								array_add(&build_context.doc_packages, value.value_string);
-							}
-							break;
-						case BuildFlag_All:
-							build_context.cmd_doc_flags |= CmdDocFlag_All;
+						case BuildFlag_Short:
+							build_context.cmd_doc_flags |= CmdDocFlag_Short;
 							break;
 						case BuildFlag_AllPackages:
 							build_context.cmd_doc_flags |= CmdDocFlag_AllPackages;
 							break;
+
 
 
 					#if defined(GB_SYSTEM_WINDOWS)
@@ -1217,7 +1208,7 @@ bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
 							path = string_trim_whitespace(path);
-							if (is_import_path_valid(path)) {
+							if (is_build_flag_path_valid(path)) {
 								if(!string_ends_with(path, str_lit(".rc"))) {
 									gb_printf_err("Invalid -resource path %.*s, missing .rc\n", LIT(path));
 									bad_flags = true;
@@ -1235,7 +1226,7 @@ bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
 							path = string_trim_whitespace(path);
-							if (is_import_path_valid(path)) {
+							if (is_build_flag_path_valid(path)) {
 								// #if defined(GB_SYSTEM_WINDOWS)
 								// 	String ext = path_extension(path);
 								// 	if (ext != ".pdb") {
@@ -1298,12 +1289,6 @@ bool parse_build_flags(Array<String> args) {
 			bad_flags = true;
 		}
 	}
-
-	if (build_context.doc_packages.count > 0 && set_flags[BuildFlag_AllPackages]) {
-		gb_printf_err("'odin doc' does not allow both flags together '-all-packages' and '-package' together");;
-		bad_flags = true;
-	}
-
 
 	if (build_context.query_data_set_settings.ok) {
 		if (build_context.query_data_set_settings.kind == QueryDataSet_Invalid) {
@@ -1537,6 +1522,9 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "query     [experimental] parse, type check, and output a .json file containing information about the program");
 	} else if (command == "doc") {
 		print_usage_line(1, "doc       generate documentation from a .odin file, or directory of .odin files");
+		print_usage_line(2, "Examples:");
+		print_usage_line(3, "odin doc core/path");
+		print_usage_line(3, "odin doc core/path core/path/filepath");
 	} else if (command == "version") {
 		print_usage_line(1, "version   print version");
 	}
@@ -1552,14 +1540,8 @@ void print_show_help(String const arg0, String const &command) {
 	print_usage_line(0, "");
 
 	if (doc) {
-		print_usage_line(1, "-all");
-		print_usage_line(2, "Show all documentation for the packages");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-package:<string>");
-		print_usage_line(2, "Add package name to generate documentation for");
-		print_usage_line(2, "Multiple flags are allowed");
-		print_usage_line(2, "Example: -doc:runtime");
+		print_usage_line(1, "-short");
+		print_usage_line(2, "Show shortened documentation for the packages");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-all-packages");
@@ -1833,7 +1815,7 @@ int main(int arg_count, char const **arg_ptr) {
 	add_library_collection(str_lit("core"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("core")));
 
 	map_init(&build_context.defined_values, heap_allocator());
-	build_context.doc_packages.allocator = heap_allocator();
+	build_context.extra_packages.allocator = heap_allocator();
 
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
@@ -1904,6 +1886,20 @@ int main(int arg_count, char const **arg_ptr) {
 
 		build_context.command_kind = Command_doc;
 		init_filename = args[2];
+		for (isize i = 3; i < args.count; i++) {
+			auto arg = args[i];
+			if (string_starts_with(arg, str_lit("-"))) {
+				break;
+			}
+			array_add(&build_context.extra_packages, arg);
+		}
+		isize extra_count = build_context.extra_packages.count;
+		if (extra_count > 0) {
+			gb_memmove(args.data + 3, args.data + 3 + extra_count, extra_count * gb_size_of(*args.data));
+			args.count -= extra_count;
+		}
+
+
 		build_context.no_output_files = true;
 		build_context.generate_docs = true;
 		build_context.no_entry_point = true; // ignore entry point
@@ -2005,8 +2001,11 @@ int main(int arg_count, char const **arg_ptr) {
 	temp_allocator_free_all(&temporary_allocator_data);
 
 	if (build_context.generate_docs) {
+		if (global_error_collector.count != 0) {
+			return 1;
+		}
 		generate_documentation(&checker);
-		return global_error_collector.count ? 1 : 0;
+		return 0;
 	}
 
 	if (build_context.no_output_files) {
