@@ -776,6 +776,8 @@ fmt_rune :: proc(fi: ^Info, r: rune, verb: rune) {
 	switch verb {
 	case 'c', 'r', 'v':
 		strings.write_rune(fi.buf, r);
+	case 'q':
+		strings.write_quoted_rune(fi.buf, r);
 	case:
 		fmt_int(fi, u64(r), false, 32, verb);
 	}
