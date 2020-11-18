@@ -4653,14 +4653,14 @@ void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, AstForeignFi
 
 
 // NOTE(bill): Returns true if it's added
-bool try_add_import_path(Parser *p, String const &path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
+AstPackage *try_add_import_path(Parser *p, String const &path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
 	String const FILE_EXT = str_lit(".odin");
 
 	gb_mutex_lock(&p->file_add_mutex);
 	defer (gb_mutex_unlock(&p->file_add_mutex));
 
 	if (string_set_exists(&p->imported_files, path)) {
-		return false;
+		return nullptr;
 	}
 	string_set_add(&p->imported_files, path);
 
@@ -4683,7 +4683,7 @@ bool try_add_import_path(Parser *p, String const &path, String const &rel_path, 
 		pkg->is_single_file = true;
 		parser_add_file_to_process(p, pkg, fi, pos);
 		parser_add_package(p, pkg);
-		return true;
+		return pkg;
 	}
 
 
@@ -4699,22 +4699,22 @@ bool try_add_import_path(Parser *p, String const &path, String const &rel_path, 
 	switch (rd_err) {
 	case ReadDirectory_InvalidPath:
 		syntax_error(pos, "Invalid path: %.*s", LIT(rel_path));
-		return false;
+		return nullptr;
 	case ReadDirectory_NotExists:
 		syntax_error(pos, "Path does not exist: %.*s", LIT(rel_path));
-		return false;
+		return nullptr;
 	case ReadDirectory_Permission:
 		syntax_error(pos, "Unknown error whilst reading path %.*s", LIT(rel_path));
-		return false;
+		return nullptr;
 	case ReadDirectory_NotDir:
 		syntax_error(pos, "Expected a directory for a package, got a file: %.*s", LIT(rel_path));
-		return false;
+		return nullptr;
 	case ReadDirectory_Empty:
 		syntax_error(pos, "Empty directory: %.*s", LIT(rel_path));
-		return false;
+		return nullptr;
 	case ReadDirectory_Unknown:
 		syntax_error(pos, "Unknown error whilst reading path %.*s", LIT(rel_path));
-		return false;
+		return nullptr;
 	}
 
 	for_array(list_index, list) {
@@ -4736,7 +4736,7 @@ bool try_add_import_path(Parser *p, String const &path, String const &rel_path, 
 
 	parser_add_package(p, pkg);
 
-	return true;
+	return pkg;
 }
 
 gb_global Rune illegal_import_runes[] = {
@@ -4755,7 +4755,7 @@ bool is_import_path_valid(String path) {
 		u8 *curr = start;
 		while (curr < end) {
 			isize width = 1;
-			Rune r = curr[0];
+			Rune r = *curr;
 			if (r >= 0x80) {
 				width = gb_utf8_decode(curr, end-curr, &r);
 				if (r == GB_RUNE_INVALID && width == 1) {
@@ -4773,6 +4773,45 @@ bool is_import_path_valid(String path) {
 			}
 
 			curr += width;
+		}
+
+		return true;
+	}
+	return false;
+}
+
+bool is_build_flag_path_valid(String path) {
+	if (path.len > 0) {
+		u8 *start = path.text;
+		u8 *end = path.text + path.len;
+		u8 *curr = start;
+		isize index = 0;
+		while (curr < end) {
+			isize width = 1;
+			Rune r = *curr;
+			if (r >= 0x80) {
+				width = gb_utf8_decode(curr, end-curr, &r);
+				if (r == GB_RUNE_INVALID && width == 1) {
+					return false;
+				}
+				else if (r == GB_RUNE_BOM && curr-start > 0) {
+					return false;
+				}
+			}
+
+			for (isize i = 0; i < gb_count_of(illegal_import_runes); i++) {
+#if defined(GB_SYSTEM_WINDOWS)
+				if (r == '\\') {
+					break;
+				}
+#endif
+				if (r == illegal_import_runes[i]) {
+					return false;
+				}
+			}
+
+			curr += width;
+			index += 1;
 		}
 
 		return true;
@@ -5262,6 +5301,22 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 
 	try_add_import_path(p, init_fullpath, init_fullpath, init_pos, Package_Init);
 	p->init_fullpath = init_fullpath;
+
+	for_array(i, build_context.extra_packages) {
+		String path = build_context.extra_packages[i];
+		String fullpath = path_to_full_path(heap_allocator(), path); // LEAK?
+		if (!path_is_directory(fullpath)) {
+			String const ext = str_lit(".odin");
+			if (!string_ends_with(fullpath, ext)) {
+				error_line("Expected either a directory or a .odin file, got '%.*s'\n", LIT(fullpath));
+				return ParseFile_WrongExtension;
+			}
+		}
+		AstPackage *pkg = try_add_import_path(p, fullpath, fullpath, init_pos, Package_Normal);
+		if (pkg) {
+			pkg->is_extra = true;
+		}
+	}
 
 	thread_pool_start(&parser_thread_pool);
 	thread_pool_wait_to_process(&parser_thread_pool);

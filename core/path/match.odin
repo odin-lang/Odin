@@ -28,8 +28,6 @@ Match_Error :: enum {
 // match requires that the pattern matches the entirety of the name, not just a substring
 // The only possible error returned is .Syntax_Error
 //
-// NOTE(bill): This is effectively the shell pattern matching system found
-//
 match :: proc(pattern, name: string) -> (matched: bool, err: Match_Error) {
 	pattern, name := pattern, name;
 	pattern_loop: for len(pattern) > 0 {

@@ -93,6 +93,8 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 	isize count = 0;
 	for_array(i, g->list) {
 		String comment = g->list[i].string;
+		String original_comment = comment;
+
 		bool slash_slash = comment[1] == '/';
 		bool slash_star = comment[1] == '*';
 		if (comment[1] == '/') {
@@ -113,15 +115,51 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 			if (string_starts_with(comment, str_lit("+"))) {
 				continue;
 			}
-		}
-		if (string_starts_with(comment, str_lit("@("))) {
-			continue;
+			if (string_starts_with(comment, str_lit("@("))) {
+				continue;
+			}
 		}
 
-		print_doc_line(indent, "%.*s", LIT(comment));
-		count += 1;
+		if (slash_slash) {
+			print_doc_line(indent, "%.*s", LIT(comment));
+			count += 1;
+		} else {
+			isize pos = 0;
+			for (; pos < comment.len; pos++) {
+				isize end = pos;
+				for (; end < comment.len; end++) {
+					if (comment[end] == '\n') {
+						break;
+					}
+				}
+				String line = substring(comment, pos, end);
+				pos = end+1;
+				String trimmed_line = string_trim_whitespace(line);
+				if (trimmed_line.len == 0) {
+					if (count == 0) {
+						continue;
+					}
+				}
+				/*
+				 * Remove comments with
+				 * styles
+				 * like this
+				 */
+				if (string_starts_with(line, str_lit("* "))) {
+					line = substring(line, 2, line.len);
+				}
+
+				print_doc_line(indent, "%.*s", LIT(line));
+				count += 1;
+			}
+		}
 	}
-	return count > 0;
+
+	if (count > 0) {
+		print_doc_line(0, "");
+		return true;
+	}
+	return false;
 }
 
 
@@ -129,10 +167,10 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 
 void print_doc_expr(Ast *expr) {
 	gbString s = nullptr;
-	if (build_context.cmd_doc_flags & CmdDocFlag_All) {
-		s = expr_to_string(expr);
-	} else {
+	if (build_context.cmd_doc_flags & CmdDocFlag_Short) {
 		s = expr_to_string_shorthand(expr);
+	} else {
+		s = expr_to_string(expr);
 	}
 	gb_file_write(gb_file_get_standard(gbFileStandard_Output), s, gb_string_length(s));
 	gb_string_free(s);
@@ -151,9 +189,7 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 		AstFile *f = pkg->files[i];
 		if (f->pkg_decl) {
 			GB_ASSERT(f->pkg_decl->kind == Ast_PackageDecl);
-			if (print_doc_comment_group_string(1, f->pkg_decl->PackageDecl.docs)) {
-				print_doc_line(0, "");
-			}
+			print_doc_comment_group_string(1, f->pkg_decl->PackageDecl.docs);
 		}
 	}
 
@@ -182,6 +218,8 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 		}
 		gb_sort_array(entities.data, entities.count, cmp_entities_for_printing);
 
+		bool show_docs = (build_context.cmd_doc_flags & CmdDocFlag_Short) == 0;
+
 		EntityKind curr_entity_kind = Entity_Invalid;
 		for_array(i, entities) {
 			Entity *e = entities[i];
@@ -191,6 +229,7 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 			if (!is_entity_exported(e)) {
 				continue;
 			}
+
 
 			if (curr_entity_kind != e->kind) {
 				if (curr_entity_kind != Entity_Invalid) {
@@ -213,6 +252,7 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 				docs = e->decl_info->docs;
 			}
 			GB_ASSERT(type_expr != nullptr || init_expr != nullptr);
+
 			print_doc_line_no_newline(2, "%.*s", LIT(e->token.string));
 			if (type_expr != nullptr) {
 				gbString t = expr_to_string(type_expr);
@@ -233,14 +273,8 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 
 			gb_printf(";\n");
 
-
-			if (build_context.cmd_doc_flags & CmdDocFlag_All) {
-				if (comment) {
-					// gb_printf(" <comment>");
-				}
-				if (print_doc_comment_group_string(3, docs)) {
-					gb_printf("\n");
-				}
+			if (show_docs) {
+				print_doc_comment_group_string(3, docs);
 			}
 		}
 		print_doc_line(0, "");
@@ -248,7 +282,8 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 
 	if (pkg->fullpath.len != 0) {
 		print_doc_line(0, "");
-		print_doc_line(1, "fullpath: %.*s", LIT(pkg->fullpath));
+		print_doc_line(1, "fullpath:");
+		print_doc_line(2, "%.*s", LIT(pkg->fullpath));
 		print_doc_line(1, "files:");
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
@@ -262,51 +297,23 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 void generate_documentation(Checker *c) {
 	CheckerInfo *info = &c->info;
 
-	if (build_context.doc_packages.count != 0) {
-		auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.entries.count);
-		bool was_error = false;
-		for_array(j, build_context.doc_packages) {
-			bool found = false;
-			String name = build_context.doc_packages[j];
-			for_array(i, info->packages.entries) {
-				AstPackage *pkg = info->packages.entries[i].value;
-				if (name == pkg->name) {
-					found = true;
-					array_add(&pkgs, pkg);
-					break;
-				}
-			}
-			if (!found) {
-				gb_printf_err("Unknown package %.*s\n", LIT(name));
-				was_error = true;
-			}
-		}
-		if (was_error) {
-			gb_exit(1);
-			return;
-		}
-
-		gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);
-
-		for_array(i, pkgs) {
-			print_doc_package(info, pkgs[i]);
-		}
-	} else if (build_context.cmd_doc_flags & CmdDocFlag_AllPackages) {
-		auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.entries.count);
-		for_array(i, info->packages.entries) {
-			AstPackage *pkg = info->packages.entries[i].value;
+	auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.entries.count);
+	for_array(i, info->packages.entries) {
+		AstPackage *pkg = info->packages.entries[i].value;
+		if (build_context.cmd_doc_flags & CmdDocFlag_AllPackages) {
 			array_add(&pkgs, pkg);
+		} else {
+			if (pkg->kind == Package_Init) {
+				array_add(&pkgs, pkg);
+			} else if (pkg->is_extra) {
+				array_add(&pkgs, pkg);
+			}
 		}
+	}
 
-		gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);
+	gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);
 
-		for_array(i, pkgs) {
-			print_doc_package(info, pkgs[i]);
-		}
-	} else {
-		GB_ASSERT(info->init_scope->flags & ScopeFlag_Pkg);
-		AstPackage *pkg = info->init_scope->pkg;
-		print_doc_package(info, pkg);
-
+	for_array(i, pkgs) {
+		print_doc_package(info, pkgs[i]);
 	}
 }

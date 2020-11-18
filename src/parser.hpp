@@ -150,6 +150,7 @@ struct AstPackage {
 	Scope *   scope;
 	DeclInfo *decl_info;
 	bool      used;
+	bool      is_extra;
 };
 
 
