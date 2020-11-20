@@ -218,6 +218,14 @@ is_unsigned :: proc(info: ^Type_Info) -> bool {
 	return false;
 }
 
+is_byte :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false; }
+	#partial switch i in type_info_base(info).variant {
+	case Type_Info_Integer: return info.size == 1;
+	}
+	return false;
+}
+
 
 is_integer :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false; }
