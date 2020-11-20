@@ -1599,7 +1599,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 
 	case runtime.Type_Info_Array:
-		if verb == 's' && reflect.is_byte(info.elem) {
+		if (verb == 's' || verb == 'q') && reflect.is_byte(info.elem) {
 			s := strings.string_from_ptr((^byte)(v.data), info.count);
 			fmt_string(fi, s, verb);
 		} else {
@@ -1664,7 +1664,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	case runtime.Type_Info_Slice:
 		slice := cast(^mem.Raw_Slice)v.data;
-		if verb == 's' && reflect.is_byte(info.elem) {
+		if (verb == 's' || verb == 'q') && reflect.is_byte(info.elem) {
 			s := strings.string_from_ptr((^byte)(slice.data), slice.len);
 			fmt_string(fi, s, verb);
 		} else if verb == 'p' {

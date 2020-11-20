@@ -7801,9 +7801,11 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): Edge case
-	    	if (is_type_u8_array(tv.type) && tv.value.kind == ExactValue_String) {
-	    		return ir_add_module_constant(proc->module, tv.type, tv.value);
-	    	} else if (tv.value.kind != ExactValue_Compound &&
+		if (is_type_u8_array(tv.type) && tv.value.kind == ExactValue_String) {
+			return ir_add_module_constant(proc->module, tv.type, tv.value);
+		} else if (is_type_rune_array(tv.type) && tv.value.kind == ExactValue_String) {
+			return ir_add_module_constant(proc->module, tv.type, tv.value);
+		} else if (tv.value.kind != ExactValue_Compound &&
 		    is_type_array(tv.type)) {
 			Type *elem = core_array_type(tv.type);
 			ExactValue value = convert_exact_value_for_type(tv.value, elem);
