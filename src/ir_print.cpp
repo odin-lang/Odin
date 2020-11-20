@@ -745,7 +745,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 		ir_write_byte(f, ']');
 		return;
-	} else if (is_type_array(type) &&
+	}  else if (is_type_array(type) &&
 	    value.kind != ExactValue_Invalid &&
 	    value.kind != ExactValue_String &&
 	    value.kind != ExactValue_Compound) {
@@ -796,7 +796,11 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			GB_ASSERT(is_type_array(type));
 			ir_write_str_lit(f, "c\"");
 			ir_print_escape_string(f, str, false, false);
-			ir_write_str_lit(f, "\\00\"");
+			if (type->Array.count == str.len) {
+				ir_write_str_lit(f, "\"");
+			} else {
+				ir_write_str_lit(f, "\\00\"");
+			}
 		} else if (is_type_cstring(t)) {
 			// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
 			// of the .ll file
@@ -810,7 +814,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_write_str_lit(f, ", ");
 			ir_print_type(f, m, t_i32);
 			ir_write_str_lit(f, " 0, i32 0)");
-		}else {
+		} else {
 			// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
 			// of the .ll file
 			irValue *str_array = ir_add_global_string_array(m, str);

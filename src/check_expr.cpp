@@ -2955,6 +2955,12 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 		if (check_is_assignable_to(c, operand, elem)) {
 			operand->mode = Addressing_Value;
 		} else {
+			if (operand->value.kind == ExactValue_String && is_type_u8_array(t)) {
+				String s = operand->value.value_string;
+				if (s.len == t->Array.count) {
+					break;
+				}
+			}
 			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
 			return;

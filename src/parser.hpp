@@ -646,7 +646,7 @@ struct AstCommonStuff {
 	u16          viral_state_flags;
 	AstFile *    file;
 	Scope *      scope;
-	TypeAndValue tav;
+	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize pointer size
 };
 
 struct Ast {
@@ -655,7 +655,7 @@ struct Ast {
 	u16          viral_state_flags;
 	AstFile *    file;
 	Scope *      scope;
-	TypeAndValue tav;
+	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize pointer size
 
 	// IMPORTANT NOTE(bill): This must be at the end since the AST is allocated to be size of the variant
 	union {
