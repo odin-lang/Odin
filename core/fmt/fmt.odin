@@ -1633,13 +1633,15 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 
 	case runtime.Type_Info_Dynamic_Array:
-		if verb == 'p' {
-			slice := cast(^mem.Raw_Dynamic_Array)v.data;
-			fmt_pointer(fi, slice.data, 'p');
+		array := cast(^mem.Raw_Dynamic_Array)v.data;
+		if (verb == 's' || verb == 'q') && reflect.is_byte(info.elem) {
+			s := strings.string_from_ptr((^byte)(array.data), array.len);
+			fmt_string(fi, s, verb);
+		} else if verb == 'p' {
+			fmt_pointer(fi, array.data, 'p');
 		} else {
 			strings.write_byte(fi.buf, '[');
 			defer strings.write_byte(fi.buf, ']');
-			array := cast(^mem.Raw_Dynamic_Array)v.data;
 			for i in 0..<array.len {
 				if i > 0 { strings.write_string(fi.buf, ", "); }
 
