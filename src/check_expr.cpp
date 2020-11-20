@@ -2955,10 +2955,17 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 		if (check_is_assignable_to(c, operand, elem)) {
 			operand->mode = Addressing_Value;
 		} else {
-			if (operand->value.kind == ExactValue_String && is_type_u8_array(t)) {
+			if (operand->value.kind == ExactValue_String) {
 				String s = operand->value.value_string;
-				if (s.len == t->Array.count) {
-					break;
+				if (is_type_u8_array(t)) {
+					if (s.len == t->Array.count) {
+						break;
+					}
+				} else if (is_type_rune_array(t)) {
+					isize rune_count = s.len;
+					if (rune_count == t->Array.count) {
+						break;
+					}
 				}
 			}
 			operand->mode = Addressing_Invalid;

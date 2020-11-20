@@ -734,6 +734,28 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	if (is_type_array(type) && value.kind == ExactValue_String && !is_type_u8(core_array_type(type))) {
 		i64 count  = type->Array.count;
 		Type *elem = type->Array.elem;
+
+		if (is_type_rune_array(type)) {
+			Rune rune;
+			isize offset = 0;
+			isize width = 1;
+			String s = value.value_string;
+			ir_write_byte(f, '[');
+			for (i64 i = 0; i < count && offset < s.len; i++) {
+				width = gb_utf8_decode(s.text+offset, s.len-offset, &rune);
+				if (i > 0) ir_write_str_lit(f, ", ");
+				ir_print_type(f, m, elem);
+				ir_write_byte(f, ' ');
+				ir_print_exact_value(f, m, exact_value_i64(rune), elem);
+				offset += width;
+			}
+			GB_ASSERT(offset == s.len);
+
+			ir_write_byte(f, ']');
+			return;
+		}
+
+
 		ir_write_byte(f, '[');
 
 		for (i64 i = 0; i < count; i++) {

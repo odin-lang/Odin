@@ -5123,6 +5123,32 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 
 		}
 	} else if (is_type_array(type) && value.kind == ExactValue_String && !is_type_u8(core_array_type(type))) {
+		if (is_type_rune_array(type) && value.kind == ExactValue_String) {
+			i64 count  = type->Array.count;
+			Type *elem = type->Array.elem;
+			LLVMTypeRef et = lb_type(m, elem);
+
+			Rune rune;
+			isize offset = 0;
+			isize width = 1;
+			String s = value.value_string;
+
+			LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, count);
+
+			for (i64 i = 0; i < count && offset < s.len; i++) {
+				width = gb_utf8_decode(s.text+offset, s.len-offset, &rune);
+				offset += width;
+
+				elems[i] = LLVMConstInt(et, rune, true);
+
+			}
+			GB_ASSERT(offset == s.len);
+
+			res.value = LLVMConstArray(et, elems, cast(unsigned)count);
+			return res;
+		}
+		GB_PANIC("HERE!\n");
+
 		LLVMValueRef data = LLVMConstStringInContext(ctx,
 			cast(char const *)value.value_string.text,
 			cast(unsigned)value.value_string.len,

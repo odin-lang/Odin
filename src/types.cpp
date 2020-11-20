@@ -1214,27 +1214,6 @@ bool is_type_slice(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Slice;
 }
-bool is_type_u8_slice(Type *t) {
-	t = base_type(t);
-	if (t->kind == Type_Slice) {
-		return is_type_u8(t->Slice.elem);
-	}
-	return false;
-}
-bool is_type_u8_array(Type *t) {
-	t = base_type(t);
-	if (t->kind == Type_Array) {
-		return is_type_u8(t->Array.elem);
-	}
-	return false;
-}
-bool is_type_u8_ptr(Type *t) {
-	t = base_type(t);
-	if (t->kind == Type_Pointer) {
-		return is_type_u8(t->Slice.elem);
-	}
-	return false;
-}
 bool is_type_proc(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Proc;
@@ -1277,6 +1256,37 @@ bool is_type_relative_slice(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_RelativeSlice;
 }
+
+bool is_type_u8_slice(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Slice) {
+		return is_type_u8(t->Slice.elem);
+	}
+	return false;
+}
+bool is_type_u8_array(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Array) {
+		return is_type_u8(t->Array.elem);
+	}
+	return false;
+}
+bool is_type_u8_ptr(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Pointer) {
+		return is_type_u8(t->Slice.elem);
+	}
+	return false;
+}
+bool is_type_rune_array(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Array) {
+		return is_type_rune(t->Array.elem);
+	}
+	return false;
+}
+
+
 
 
 Type *core_array_type(Type *t) {
