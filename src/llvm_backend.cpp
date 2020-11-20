@@ -5126,7 +5126,15 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		LLVMValueRef data = LLVMConstStringInContext(ctx,
 			cast(char const *)value.value_string.text,
 			cast(unsigned)value.value_string.len,
-			false);
+			false /*DontNullTerminate*/);
+		res.value = data;
+		return res;
+	} else if (is_type_u8_array(type) && value.kind == ExactValue_String) {
+		GB_ASSERT(type->Array.count == value.value_string.len);
+		LLVMValueRef data = LLVMConstStringInContext(ctx,
+			cast(char const *)value.value_string.text,
+			cast(unsigned)value.value_string.len,
+			true /*DontNullTerminate*/);
 		res.value = data;
 		return res;
 	} else if (is_type_array(type) &&

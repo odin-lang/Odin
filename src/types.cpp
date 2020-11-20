@@ -1221,6 +1221,13 @@ bool is_type_u8_slice(Type *t) {
 	}
 	return false;
 }
+bool is_type_u8_array(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Array) {
+		return is_type_u8(t->Array.elem);
+	}
+	return false;
+}
 bool is_type_u8_ptr(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Pointer) {
