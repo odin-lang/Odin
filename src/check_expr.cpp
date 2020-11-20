@@ -2161,6 +2161,17 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	if (is_constant && is_type_untyped(src) && is_type_string(src)) {
+		if (is_type_u8_array(dst)) {
+			String s = operand->value.value_string;
+			return s.len == dst->Array.count;
+		}
+		if (is_type_rune_array(dst)) {
+			String s = operand->value.value_string;
+			return gb_utf8_strnlen(s.text, s.len) == dst->Array.count;
+		}
+	}
+
 
 	if (dst->kind == Type_Array && src->kind == Type_Array) {
 		if (are_types_identical(dst->Array.elem, src->Array.elem)) {
@@ -2962,7 +2973,7 @@ void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
 						break;
 					}
 				} else if (is_type_rune_array(t)) {
-					isize rune_count = s.len;
+					isize rune_count = gb_utf8_strnlen(s.text, s.len);
 					if (rune_count == t->Array.count) {
 						break;
 					}
