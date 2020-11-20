@@ -160,6 +160,8 @@ delete :: proc{
 };
 
 
+// The new built-in procedure allocates memory. The first argument is a type, not a value, and the value
+// return is a pointer to a newly allocated value of that type using the specified allocator, default is context.allocator
 @builtin
 new :: inline proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> ^T {
 	ptr := (^T)(mem_alloc(size_of(T), align_of(T), allocator, loc));
@@ -222,6 +224,10 @@ make_map :: proc($T: typeid/map[$K]$E, auto_cast cap: int = 16, allocator := con
 	return m;
 }
 
+// The make built-in procedure allocates and initializes a value of type slice, dynamic array, or map (only)
+// Similar to new, the first argument is a type, not a value. Unlike new, make's return type is the same as the
+// type of its argument, not a pointer to it.
+// Make uses the specified allocator, default is context.allocator, default is context.allocator
 @builtin
 make :: proc{
 	make_slice,
@@ -253,6 +259,8 @@ reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int) {
 	}
 }
 
+// The delete_key built-in procedure deletes the element with the specified key (m[key]) from the map.
+// If m is nil, or there is no such element, this procedure is a no-op
 @builtin
 delete_key :: proc(m: ^$T/map[$K]$V, key: K) {
 	if m != nil {
@@ -286,6 +294,7 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 		a.len += arg_len;
 	}
 }
+
 @builtin
 append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)  {
 	if array == nil {
@@ -313,6 +322,8 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 		a.len += arg_len;
 	}
 }
+
+// The append_string built-in procedure appends a string to the end of a [dynamic]u8 like type
 @builtin
 append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #caller_location) {
 	args := transmute([]E)arg;
@@ -523,6 +534,7 @@ append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_l
 	}
 }
 
+// The append_string built-in procedure appends multiple strings to the end of a [dynamic]u8 like type
 @builtin
 append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_location) {
 	for arg in args {
@@ -530,8 +542,10 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 	}
 }
 
-
+// The append built-in procedure appends elements to the end of a dynamic array
 @builtin append :: proc{append_elem, append_elems, append_elem_string};
+
+// The append_soa built-in procedure appends elements to the end of an #soa dynamic array
 @builtin append_soa :: proc{append_soa_elem, append_soa_elems};
 
 @builtin
