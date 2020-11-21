@@ -744,6 +744,7 @@ void init_universal(void) {
 	add_global_constant(str_lit("ODIN_DEFAULT_TO_NIL_ALLOCATOR"), t_untyped_bool, exact_value_bool(bc->ODIN_DEFAULT_TO_NIL_ALLOCATOR));
 	add_global_constant(str_lit("ODIN_USE_LLVM_API"), t_untyped_bool, exact_value_bool(bc->use_llvm_api));
 	add_global_constant(str_lit("ODIN_NO_DYNAMIC_LITERALS"), t_untyped_bool, exact_value_bool(bc->no_dynamic_literals));
+	add_global_constant(str_lit("ODIN_TEST"), t_untyped_bool, exact_value_bool(bc->command_kind == Command_test));
 
 
 // Builtin Procedures
