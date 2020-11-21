@@ -60,7 +60,7 @@ to_title :: proc(r: rune) -> rune {
 
 is_lower :: proc(r: rune) -> bool {
 	if r <= MAX_ASCII {
-		return u8(r)-'a' < 26;
+		return u32(r)-'a' < 26;
 	}
 	c := i32(r);
 	p := binary_search(c, to_upper_ranges[:], len(to_upper_ranges)/3, 3);
@@ -76,7 +76,7 @@ is_lower :: proc(r: rune) -> bool {
 
 is_upper :: proc(r: rune) -> bool {
 	if r <= MAX_ASCII {
-		return u8(r)-'A' < 26;
+		return u32(r)-'A' < 26;
 	}
 	c := i32(r);
 	p := binary_search(c, to_lower_ranges[:], len(to_lower_ranges)/3, 3);
