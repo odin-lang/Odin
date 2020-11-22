@@ -7659,7 +7659,7 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 				mix = arg->kind == Ast_FieldValue;
 			}
 			if (mix) {
-				error(arg, "Mixture of 'field = value' and value elements in a procedure all is not allowed");
+				error(arg, "Mixture of 'field = value' and value elements in a procedure call is not allowed");
 				fail = true;
 			}
 		}
