@@ -457,8 +457,7 @@ namespace lbAbi386 {
 		LLVMAttributeRef attr = nullptr;
 		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
 		if (type == i1) {
-			// attr = lb_create_enum_attribute(c, "zeroext", true);
-			// return lb_arg_type_direct(type, i1, nullptr, attr);
+			attr = lb_create_enum_attribute(c, "zeroext", true);
 		}
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
@@ -641,7 +640,7 @@ namespace lbAbiAmd64SysV {
 		if (is_register(type)) {
 			LLVMAttributeRef attribute = nullptr;
 			if (type == LLVMInt1TypeInContext(c)) {
-				// attribute = lb_create_enum_attribute(c, "zeroext", true);
+				attribute = lb_create_enum_attribute(c, "zeroext", true);
 			}
 			return lb_arg_type_direct(type, nullptr, nullptr, attribute);
 		}
@@ -664,7 +663,7 @@ namespace lbAbiAmd64SysV {
 		LLVMAttributeRef attr = nullptr;
 		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
 		if (type == i1) {
-			// attr = lb_create_enum_attribute(c, "zeroext", true);
+			attr = lb_create_enum_attribute(c, "zeroext", true);
 		}
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
