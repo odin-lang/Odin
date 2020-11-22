@@ -74,6 +74,7 @@ struct lbModule {
 	gbMutex mutex;
 
 	Map<LLVMTypeRef> types; // Key: Type *
+	Map<Type *> llvm_types; // Key: LLVMTypeRef
 	i32 internal_type_level;
 
 	Map<lbValue>  values;           // Key: Entity *

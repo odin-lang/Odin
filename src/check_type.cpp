@@ -2279,7 +2279,11 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type, ProcCall
 		return new_type;
 	}
 	if (build_context.ODIN_ARCH == "amd64") {
-		if (is_type_integer_128bit(original_type)) {
+		bool is_128 = is_type_integer_128bit(original_type);
+		if (!is_128 && is_type_bit_set(original_type) && type_size_of(original_type) == 16) {
+			// is_128 = true;
+		}
+		if (is_128) {
 			if (build_context.ODIN_OS == "windows") {
 				return alloc_type_simd_vector(2, t_u64);
 			} else {

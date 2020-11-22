@@ -40,6 +40,9 @@ i64 llvm_align_formula(i64 off, i64 a) {
 
 
 bool lb_is_type_kind(LLVMTypeRef type, LLVMTypeKind kind) {
+	if (type == nullptr) {
+		return false;
+	}
 	return LLVMGetTypeKind(type) == kind;
 }
 
@@ -124,6 +127,7 @@ void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCa
 
 	if (offset != 0 && ft->ret.kind == lbArg_Indirect && ft->ret.attribute != nullptr) {
 		LLVMAddAttributeAtIndex(fn, offset, ft->ret.attribute);
+		LLVMAddAttributeAtIndex(fn, offset, noalias_attr);
 	}
 
 	lbCallingConventionKind cc_kind = lbCallingConvention_C;
@@ -313,7 +317,14 @@ Type *alloc_type_proc_from_types(Type **param_types, unsigned param_count, Type 
 	return t;
 }
 
-Type *lb_abi_to_odin_type(LLVMTypeRef type, bool is_return, u32 level = 0) {
+#if 0
+Type *lb_abi_to_odin_type(lbModule *m, LLVMTypeRef type, bool is_return, u32 level = 0) {
+	Type **found = map_get(&m->llvm_types, hash_pointer(type));
+	if (found) {
+		return *found;
+	}
+	GB_ASSERT_MSG(level < 64, "%s %d", LLVMPrintTypeToString(type), is_return);
+
 	LLVMTypeKind kind = LLVMGetTypeKind(type);
 	switch (kind) {
 	case LLVMVoidTypeKind:
@@ -351,16 +362,16 @@ Type *lb_abi_to_odin_type(LLVMTypeRef type, bool is_return, u32 level = 0) {
 				defer (gb_free(heap_allocator(), param_types));
 
 				for (unsigned i = 0; i < param_count; i++) {
-					param_types[i] = lb_abi_to_odin_type(params[i], false, /*level*/0);
+					param_types[i] = lb_abi_to_odin_type(m, params[i], false, level+1);
 				}
 
 				LLVMTypeRef ret = LLVMGetReturnType(elem);
-				Type *ret_type = lb_abi_to_odin_type(ret, true, /*level*/0);
+				Type *ret_type = lb_abi_to_odin_type(m, ret, true, level+1);
 
 				bool is_c_vararg = !!LLVMIsFunctionVarArg(elem);
 				return alloc_type_proc_from_types(param_types, param_count, ret_type, is_c_vararg);
 			}
-			return alloc_type_pointer(lb_abi_to_odin_type(elem, false, level));
+			return alloc_type_pointer(lb_abi_to_odin_type(m, elem, false, level+1));
 		}
 	case LLVMFunctionTypeKind:
 		GB_PANIC("LLVMFunctionTypeKind should not be seen on its own");
@@ -371,7 +382,12 @@ Type *lb_abi_to_odin_type(LLVMTypeRef type, bool is_return, u32 level = 0) {
 			unsigned field_count = LLVMCountStructElementTypes(type);
 			Type **fields = gb_alloc_array(heap_allocator(), Type *, field_count);
 			for (unsigned i = 0; i < field_count; i++) {
-				fields[i] = lb_abi_to_odin_type(LLVMStructGetTypeAtIndex(type, i), false, level+1);
+				LLVMTypeRef field_type = LLVMStructGetTypeAtIndex(type, i);
+				if (lb_is_type_kind(field_type, LLVMPointerTypeKind) && level > 0) {
+					fields[i] = t_rawptr;
+				} else {
+					fields[i] = lb_abi_to_odin_type(m, field_type, false, level+1);
+				}
 			}
 			if (is_return) {
 				return alloc_type_tuple_from_field_types(fields, field_count, !!LLVMIsPackedStruct(type), false);
@@ -384,7 +400,7 @@ Type *lb_abi_to_odin_type(LLVMTypeRef type, bool is_return, u32 level = 0) {
 		{
 
 			i64 count = LLVMGetArrayLength(type);
-			Type *elem = lb_abi_to_odin_type(LLVMGetElementType(type), false, level+1);
+			Type *elem = lb_abi_to_odin_type(m, LLVMGetElementType(type), false, level+1);
 			return alloc_type_array(elem, count);
 		}
 		break;
@@ -394,7 +410,7 @@ Type *lb_abi_to_odin_type(LLVMTypeRef type, bool is_return, u32 level = 0) {
 	case LLVMVectorTypeKind:
 		{
 			i64 count = LLVMGetVectorSize(type);
-			Type *elem = lb_abi_to_odin_type(LLVMGetElementType(type), false, level+1);
+			Type *elem = lb_abi_to_odin_type(m, LLVMGetElementType(type), false, level+1);
 			return alloc_type_simd_vector(count, elem);
 		}
 
@@ -403,7 +419,7 @@ Type *lb_abi_to_odin_type(LLVMTypeRef type, bool is_return, u32 level = 0) {
 
 	return 0;
 }
-
+#endif
 
 
 #define LB_ABI_INFO(name) lbFunctionType *name(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention)
@@ -424,22 +440,24 @@ namespace lbAbi386 {
 		return ft;
 	}
 
-	lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type) {
-		if (build_context.metrics.os == TargetOs_windows &&
-		           build_context.word_size == 8 &&
-		           lb_is_type_kind(type, LLVMIntegerTypeKind) &&
-		           lb_sizeof(type) == 16) {
+	lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return) {
+		if (!is_return && lb_sizeof(type) > 8) {
+			return lb_arg_type_indirect(type, nullptr);
+		}
 
+		if (build_context.metrics.os == TargetOs_windows &&
+		    build_context.word_size == 8 &&
+		    lb_is_type_kind(type, LLVMIntegerTypeKind) &&
+		    type == LLVMIntTypeInContext(c, 128)) {
+		    	// NOTE(bill): Because Windows AMD64 is weird
 			LLVMTypeRef cast_type = LLVMVectorType(LLVMInt64TypeInContext(c), 2);
 			return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
 		}
 
-
-
 		LLVMAttributeRef attr = nullptr;
 		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
 		if (type == i1) {
-			attr = lb_create_enum_attribute(c, "zeroext", true);
+			// attr = lb_create_enum_attribute(c, "zeroext", true);
 			// return lb_arg_type_direct(type, i1, nullptr, attr);
 		}
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
@@ -451,15 +469,15 @@ namespace lbAbi386 {
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
 			LLVMTypeKind kind = LLVMGetTypeKind(t);
+			i64 sz = lb_sizeof(t);
 			if (kind == LLVMStructTypeKind) {
-				i64 sz = lb_sizeof(t);
 				if (sz == 0) {
 					args[i] = lb_arg_type_ignore(t);
 				} else {
 					args[i] = lb_arg_type_indirect(t, lb_create_enum_attribute(c, "byval", true));
 				}
 			} else {
-				args[i] = non_struct(c, t);
+				args[i] = non_struct(c, t, false);
 			}
 		}
 		return args;
@@ -478,7 +496,7 @@ namespace lbAbi386 {
 			}
 			return lb_arg_type_indirect(return_type, lb_create_enum_attribute(c, "sret", true));
 		}
-		return non_struct(c, return_type);
+		return non_struct(c, return_type, true);
 	}
 };
 
@@ -515,7 +533,7 @@ namespace lbAbiAmd64Win64 {
 					break;
 				}
 			} else {
-				args[i] = lbAbi386::non_struct(c, t);
+				args[i] = lbAbi386::non_struct(c, t, false);
 			}
 		}
 		return args;
@@ -623,7 +641,7 @@ namespace lbAbiAmd64SysV {
 		if (is_register(type)) {
 			LLVMAttributeRef attribute = nullptr;
 			if (type == LLVMInt1TypeInContext(c)) {
-				attribute = lb_create_enum_attribute(c, "zeroext", true);
+				// attribute = lb_create_enum_attribute(c, "zeroext", true);
 			}
 			return lb_arg_type_direct(type, nullptr, nullptr, attribute);
 		}
@@ -646,7 +664,7 @@ namespace lbAbiAmd64SysV {
 		LLVMAttributeRef attr = nullptr;
 		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
 		if (type == i1) {
-			attr = lb_create_enum_attribute(c, "zeroext", true);
+			// attr = lb_create_enum_attribute(c, "zeroext", true);
 		}
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
