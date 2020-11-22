@@ -51,7 +51,7 @@ jobs:
       - name: (Linux) Download LLVM
         run: sudo apt-get install llvm
       - name: build odin
-        run: make release
+        run: make nightly
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
       - name: Copy artifacts
@@ -77,7 +77,7 @@ jobs:
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
-        run: make release
+        run: make nightly
       - name: Odin run
         run: ./odin run examples/demo/demo.odin
       - name: Copy artifacts
