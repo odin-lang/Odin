@@ -13,7 +13,7 @@ if [ "$release_mode" -eq "0" ]; then
 	other_args="${other_args} -g"
 fi
 if [ "$release_mode" -eq "1" ]; then
-	other_args="${other_args} -O3 -march=native"
+	other_args="${other_args} -O3"
 fi
 
 if [[ "$(uname)" == "Darwin" ]]; then
