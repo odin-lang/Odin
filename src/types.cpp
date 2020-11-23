@@ -1321,54 +1321,6 @@ Type *core_array_type(Type *t) {
 	return t;
 }
 
-// NOTE(bill): type can be easily compared using memcmp
-bool is_type_simple_compare(Type *t) {
-	t = core_type(t);
-	switch (t->kind) {
-	case Type_Array:
-		return is_type_simple_compare(t->Array.elem);
-
-	case Type_EnumeratedArray:
-		return is_type_simple_compare(t->EnumeratedArray.elem);
-
-	case Type_Basic:
-		if (t->Basic.flags & BasicFlag_SimpleCompare) {
-			return true;
-		}
-		return false;
-
-	case Type_Pointer:
-	case Type_Proc:
-	case Type_BitSet:
-	case Type_BitField:
-		return true;
-
-	case Type_Struct:
-		for_array(i, t->Struct.fields) {
-			Entity *f = t->Struct.fields[i];
-			if (!is_type_simple_compare(f->type)) {
-				return false;
-			}
-		}
-		return true;
-
-	case Type_Union:
-		for_array(i, t->Union.variants) {
-			Type *v = t->Union.variants[i];
-			if (!is_type_simple_compare(v)) {
-				return false;
-			}
-		}
-		return true;
-
-	case Type_SimdVector:
-		return is_type_simple_compare(t->SimdVector.elem);
-
-	}
-
-	return false;
-}
-
 
 
 Type *base_complex_elem_type(Type *t) {
@@ -1977,6 +1929,55 @@ bool is_type_comparable(Type *t) {
 	}
 	return false;
 }
+
+// NOTE(bill): type can be easily compared using memcmp
+bool is_type_simple_compare(Type *t) {
+	t = core_type(t);
+	switch (t->kind) {
+	case Type_Array:
+		return is_type_simple_compare(t->Array.elem);
+
+	case Type_EnumeratedArray:
+		return is_type_simple_compare(t->EnumeratedArray.elem);
+
+	case Type_Basic:
+		if (t->Basic.flags & BasicFlag_SimpleCompare) {
+			return true;
+		}
+		return false;
+
+	case Type_Pointer:
+	case Type_Proc:
+	case Type_BitSet:
+	case Type_BitField:
+		return true;
+
+	case Type_Struct:
+		for_array(i, t->Struct.fields) {
+			Entity *f = t->Struct.fields[i];
+			if (!is_type_simple_compare(f->type)) {
+				return false;
+			}
+		}
+		return true;
+
+	case Type_Union:
+		for_array(i, t->Union.variants) {
+			Type *v = t->Union.variants[i];
+			if (!is_type_simple_compare(v)) {
+				return false;
+			}
+		}
+		return true;
+
+	case Type_SimdVector:
+		return is_type_simple_compare(t->SimdVector.elem);
+
+	}
+
+	return false;
+}
+
 
 Type *strip_type_aliasing(Type *x) {
 	if (x == nullptr) {

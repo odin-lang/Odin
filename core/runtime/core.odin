@@ -88,6 +88,8 @@ Type_Info_Tuple :: struct { // Only used for procedures parameters and results
 	types:        []^Type_Info,
 	names:        []string,
 };
+
+Type_Struct_Equal_Proc :: distinct proc "contextless" (rawptr, rawptr) -> bool;
 Type_Info_Struct :: struct {
 	types:        []^Type_Info,
 	names:        []string,
@@ -97,6 +99,9 @@ Type_Info_Struct :: struct {
 	is_packed:    bool,
 	is_raw_union: bool,
 	custom_align: bool,
+
+	equal: Type_Struct_Equal_Proc, // set only when the struct has .Comparable set but does not have .Simple_Compare set
+
 	// These are only set iff this structure is an SOA structure
 	soa_kind:      Type_Info_Struct_Soa_Kind,
 	soa_base_type: ^Type_Info,
