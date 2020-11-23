@@ -1207,7 +1207,7 @@ as_raw_data :: proc(a: any) -> (value: rawptr, valid: bool) {
 	return;
 }
 
-
+/*
 not_equal :: proc(a, b: any) -> bool {
 	return !equal(a, b);
 }
@@ -1284,3 +1284,4 @@ equal :: proc(a, b: any) -> bool {
 
 	return true;
 }
+*/
