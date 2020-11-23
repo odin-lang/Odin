@@ -351,48 +351,6 @@ Raw_Map :: struct {
 	entries: Raw_Dynamic_Array,
 }
 
-INITIAL_MAP_CAP :: 16;
-
-Map_Key :: struct {
-	hash: u64,
-	/* NOTE(bill)
-		size_of(Map_Key) == 16 Bytes on 32-bit systems
-		size_of(Map_Key) == 24 Bytes on 64-bit systems
-
-		This does mean that an extra word is wasted for each map when a string is not used on 64-bit systems
-		however, this is probably not a huge problem in terms of memory usage
-	*/
-	key: struct #raw_union {
-		str: string,
-		val: u64,
-	},
-}
-
-Map_Find_Result :: struct {
-	hash_index:  int,
-	entry_prev:  int,
-	entry_index: int,
-}
-
-Map_Entry_Header :: struct {
-	key:  Map_Key,
-	next: int,
-/*
-	value: Value_Type,
-*/
-}
-
-Map_Header :: struct {
-	m:             ^Raw_Map,
-	is_key_string: bool,
-
-	entry_size:    int,
-	entry_align:   int,
-
-	value_offset:  uintptr,
-	value_size:    int,
-}
-
 /////////////////////////////
 // Init Startup Procedures //
 /////////////////////////////
