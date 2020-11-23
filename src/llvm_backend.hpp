@@ -87,6 +87,8 @@ struct lbModule {
 	Map<lbProcedure *> anonymous_proc_lits; // Key: Ast *
 	Map<struct lbFunctionType *> function_type_map; // Key: Type *
 
+	Map<lbProcedure *> compare_procs; // Key: Type *
+
 	u32 global_array_index;
 	u32 global_generated_index;
 	u32 nested_type_name_guid;

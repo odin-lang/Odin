@@ -1942,6 +1942,15 @@ bool is_type_comparable(Type *t) {
 
 	case Type_Opaque:
 		return is_type_comparable(t->Opaque.elem);
+
+	case Type_Struct:
+		for_array(i, t->Struct.fields) {
+			Entity *f = t->Struct.fields[i];
+			if (!is_type_comparable(f->type)) {
+				return false;
+			}
+		}
+		return true;
 	}
 	return false;
 }
@@ -3401,6 +3410,58 @@ Type *reduce_tuple_to_single_type(Type *original_type) {
 }
 
 
+Type *alloc_type_struct_from_field_types(Type **field_types, isize field_count, bool is_packed) {
+	Type *t = alloc_type_struct();
+	t->Struct.fields = array_make<Entity *>(heap_allocator(), field_count);
+
+	Scope *scope = nullptr;
+	for_array(i, t->Struct.fields) {
+		t->Struct.fields[i] = alloc_entity_field(scope, blank_token, field_types[i], false, cast(i32)i, EntityState_Resolved);
+	}
+	t->Struct.is_packed = is_packed;
+
+	return t;
+}
+
+Type *alloc_type_tuple_from_field_types(Type **field_types, isize field_count, bool is_packed, bool must_be_tuple) {
+	if (field_count == 0) {
+		return nullptr;
+	}
+	if (!must_be_tuple && field_count == 1) {
+		return field_types[0];
+	}
+
+	Type *t = alloc_type_tuple();
+	t->Tuple.variables = array_make<Entity *>(heap_allocator(), field_count);
+
+	Scope *scope = nullptr;
+	for_array(i, t->Tuple.variables) {
+		t->Tuple.variables[i] = alloc_entity_param(scope, blank_token, field_types[i], false, false);
+	}
+	t->Tuple.is_packed = is_packed;
+
+	return t;
+}
+
+Type *alloc_type_proc_from_types(Type **param_types, unsigned param_count, Type *results, bool is_c_vararg, ProcCallingConvention calling_convention) {
+
+	Type *params  = alloc_type_tuple_from_field_types(param_types, param_count, false, true);
+	isize results_count = 0;
+	if (results != nullptr) {
+		if (results->kind != Type_Tuple) {
+			results = alloc_type_tuple_from_field_types(&results, 1, false, true);
+		}
+		results_count = results->Tuple.variables.count;
+	}
+
+	Scope *scope = nullptr;
+	Type *t = alloc_type_proc(scope, params, param_count, results, results_count, false, calling_convention);
+	t->Proc.c_vararg = is_c_vararg;
+	return t;
+}
+
+
+
 gbString write_type_to_string(gbString str, Type *type) {
 	if (type == nullptr) {
 		return gb_string_appendc(str, "<no type>");
@@ -3718,4 +3779,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 gbString type_to_string(Type *type) {
 	return write_type_to_string(gb_string_make(heap_allocator(), ""), type);
 }
+
+
+
 

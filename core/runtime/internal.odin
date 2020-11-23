@@ -180,8 +180,9 @@ mem_resize :: inline proc(ptr: rawptr, old_size, new_size: int, alignment: int =
 	}
 	return allocator.procedure(allocator.data, .Resize, new_size, alignment, ptr, old_size, 0, loc);
 }
-
-
+memory_equal :: proc "contextless" (a, b: rawptr, n: int) -> bool {
+	return memory_compare(a, b, n) == 0;
+}
 memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_check {
 	x := uintptr(a);
 	y := uintptr(b);
