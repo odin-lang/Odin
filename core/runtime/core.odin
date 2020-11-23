@@ -149,9 +149,16 @@ Type_Info_Relative_Slice :: struct {
 	base_integer: ^Type_Info,
 };
 
+Type_Info_Flag :: enum u8 {
+	Comparable     = 0,
+	Simple_Compare = 1,
+};
+Type_Info_Flags :: distinct bit_set[Type_Info_Flag; u32];
+
 Type_Info :: struct {
 	size:  int,
 	align: int,
+	flags: Type_Info_Flags,
 	id:    typeid,
 
 	variant: union {

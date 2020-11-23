@@ -899,6 +899,7 @@ bool init_checker(Checker *c, Parser *parser) {
 	gbAllocator a = heap_allocator();
 
 	init_checker_info(&c->info);
+	c->info.checker = c;
 
 	array_init(&c->procs_to_check, a);
 	array_init(&c->procs_with_deferred_to_check, a);
@@ -2179,9 +2180,9 @@ void init_core_type_info(Checker *c) {
 	t_type_info_enum_value = type_info_enum_value->type;
 	t_type_info_enum_value_ptr = alloc_type_pointer(t_type_info_enum_value);
 
-	GB_ASSERT(tis->fields.count == 4);
+	GB_ASSERT(tis->fields.count == 5);
 
-	Entity *type_info_variant = tis->fields[3];
+	Entity *type_info_variant = tis->fields[4];
 	Type *tiv_type = type_info_variant->type;
 	GB_ASSERT(is_type_union(tiv_type));
 
