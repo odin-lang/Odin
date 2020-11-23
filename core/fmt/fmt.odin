@@ -1707,16 +1707,12 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				data := uintptr(entries.data) + uintptr(i*entry_size);
 				header := cast(^runtime.Map_Entry_Header)data;
 
-				if reflect.is_string(info.key) {
-					strings.write_string(fi.buf, header.key.key.str);
-				} else {
-					fi := Info{buf = fi.buf};
-					fmt_arg(&fi, any{rawptr(&header.key.key.val), info.key.id}, 'v');
-				}
+				key := data + entry_type.offsets[2];
+				fmt_arg(&Info{buf = fi.buf}, any{rawptr(key), info.key.id}, 'v');
 
 				strings.write_string(fi.buf, "=");
 
-				value := data + entry_type.offsets[2];
+				value := data + entry_type.offsets[3];
 				fmt_arg(fi, any{rawptr(value), info.value.id}, 'v');
 			}
 		}

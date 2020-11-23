@@ -7,17 +7,7 @@ INITIAL_MAP_CAP :: 16;
 
 Map_Hash :: struct {
 	hash: u64,
-	/* NOTE(bill)
-		size_of(Map_Hash) == 16 Bytes on 32-bit systems
-		size_of(Map_Hash) == 24 Bytes on 64-bit systems
-
-		This does mean that an extra word is wasted for each map when a string is not used on 64-bit systems
-		however, this is probably not a huge problem in terms of memory usage
-	*/
-	key: struct #raw_union {
-		str: string,
-		val: u64,
-	},
+	key_ptr: rawptr, // address of Map_Entry_Header.key
 }
 
 Map_Find_Result :: struct {
@@ -27,9 +17,10 @@ Map_Find_Result :: struct {
 }
 
 Map_Entry_Header :: struct {
-	key:  Map_Hash,
+	hash: Map_Hash,
 	next: int,
 /*
+	key:   Key_Value,
 	value: Value_Type,
 */
 }
@@ -41,6 +32,9 @@ Map_Header :: struct {
 	entry_size:    int,
 	entry_align:   int,
 
+	key_offset:  uintptr,
+	key_size:    int,
+
 	value_offset:  uintptr,
 	value_size:    int,
 }
@@ -48,57 +42,50 @@ Map_Header :: struct {
 __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 	header := Map_Header{m = (^Raw_Map)(m)};
 	Entry :: struct {
-		key:   Map_Hash,
+		hash:  Map_Hash,
 		next:  int,
+		key:   K,
 		value: V,
 	};
 
 	header.is_key_string = intrinsics.type_is_string(K);
+
 	header.entry_size    = int(size_of(Entry));
 	header.entry_align   = int(align_of(Entry));
+
+	header.key_offset    = uintptr(offset_of(Entry, key));
+	header.key_size      = int(size_of(K));
+
 	header.value_offset  = uintptr(offset_of(Entry, value));
 	header.value_size    = int(size_of(V));
 	return header;
 }
 
-__get_map_key :: proc "contextless" (k: $K) -> Map_Hash {
+__get_map_key :: proc "contextless" (k: ^$K) -> Map_Hash {
 	key := k;
-	map_key: Map_Hash;
+	map_hash: Map_Hash;
 
 	T :: intrinsics.type_core_type(K);
 
+	map_hash.key_ptr = k;
+
 	when intrinsics.type_is_integer(T) {
-		map_key.hash = default_hash_ptr(&key, size_of(T));
-
-		sz :: 8*size_of(T);
-		     when sz ==  8 { map_key.key.val = u64(( ^u8)(&key)^); }
-		else when sz == 16 { map_key.key.val = u64((^u16)(&key)^); }
-		else when sz == 32 { map_key.key.val = u64((^u32)(&key)^); }
-		else when sz == 64 { map_key.key.val = u64((^u64)(&key)^); }
-		else { #panic("Unhandled integer size"); }
+		map_hash.hash = default_hash_ptr(key, size_of(T));
 	} else when intrinsics.type_is_rune(T) {
-		map_key.hash = default_hash_ptr(&key, size_of(T));
-		map_key.key.val = u64((^rune)(&key)^);
+		map_hash.hash = default_hash_ptr(key, size_of(T));
 	} else when intrinsics.type_is_pointer(T) {
-		map_key.hash = default_hash_ptr(&key, size_of(T));
-		map_key.key.val = u64(uintptr((^rawptr)(&key)^));
+		map_hash.hash = default_hash_ptr(key, size_of(T));
 	} else when intrinsics.type_is_float(T) {
-		map_key.hash = default_hash_ptr(&key, size_of(T));
-
-		sz :: 8*size_of(T);
-		     when sz == 32 { map_key.key.val = u64((^u32)(&key)^); }
-		else when sz == 64 { map_key.key.val = u64((^u64)(&key)^); }
-		else { #panic("Unhandled float size"); }
+		map_hash.hash = default_hash_ptr(key, size_of(T));
 	} else when intrinsics.type_is_string(T) {
 		#assert(T == string);
-		str := (^string)(&key)^;
-		map_key.hash = default_hash_string(str);
-		map_key.key.str = str;
+		str := (^string)(key)^;
+		map_hash.hash = default_hash_string(str);
 	} else {
 		#panic("Unhandled map key type");
 	}
 
-	return map_key;
+	return map_hash;
 }
 
 _fnv64a :: proc "contextless" (data: []byte, seed: u64 = 0xcbf29ce484222325) -> u64 {
@@ -188,8 +175,8 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 		entry_header := __dynamic_map_get_entry(header, i);
 		data := uintptr(entry_header);
 
-		fr := __dynamic_map_find(new_header, entry_header.key);
-		j := __dynamic_map_add_entry(new_header, entry_header.key, loc);
+		fr := __dynamic_map_find(new_header, entry_header.hash);
+		j := __dynamic_map_add_entry(new_header, entry_header.hash, loc);
 		if fr.entry_prev < 0 {
 			nm.hashes[fr.hash_index] = j;
 		} else {
@@ -199,8 +186,7 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 
 		e := __dynamic_map_get_entry(new_header, j);
 		e.next = fr.entry_index;
-		ndata := uintptr(e);
-		mem_copy(rawptr(ndata+value_offset), rawptr(data+value_offset), value_size);
+		mem_copy(rawptr(uintptr(e)+value_offset), rawptr(data+value_offset), value_size);
 
 		if __dynamic_map_full(new_header) {
 			__dynamic_map_grow(new_header, loc);
@@ -211,8 +197,8 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 	header.m^ = nm;
 }
 
-__dynamic_map_get :: proc(h: Map_Header, key: Map_Hash) -> rawptr {
-	index := __dynamic_map_find(h, key).entry_index;
+__dynamic_map_get :: proc(h: Map_Header, hash: Map_Hash) -> rawptr {
+	index := __dynamic_map_find(h, hash).entry_index;
 	if index >= 0 {
 		data := uintptr(__dynamic_map_get_entry(h, index));
 		return rawptr(data + h.value_offset);
@@ -220,7 +206,7 @@ __dynamic_map_get :: proc(h: Map_Header, key: Map_Hash) -> rawptr {
 	return nil;
 }
 
-__dynamic_map_set :: proc(h: Map_Header, key: Map_Hash, value: rawptr, loc := #caller_location) #no_bounds_check {
+__dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #caller_location) #no_bounds_check {
 	index: int;
 	assert(value != nil);
 
@@ -229,11 +215,11 @@ __dynamic_map_set :: proc(h: Map_Header, key: Map_Hash, value: rawptr, loc := #c
 		__dynamic_map_grow(h, loc);
 	}
 
-	fr := __dynamic_map_find(h, key);
+	fr := __dynamic_map_find(h, hash);
 	if fr.entry_index >= 0 {
 		index = fr.entry_index;
 	} else {
-		index = __dynamic_map_add_entry(h, key, loc);
+		index = __dynamic_map_add_entry(h, hash, loc);
 		if fr.entry_prev >= 0 {
 			entry := __dynamic_map_get_entry(h, fr.entry_prev);
 			entry.next = index;
@@ -243,9 +229,15 @@ __dynamic_map_set :: proc(h: Map_Header, key: Map_Hash, value: rawptr, loc := #c
 	}
 	{
 		e := __dynamic_map_get_entry(h, index);
-		e.key = key;
-		val := (^byte)(uintptr(e) + h.value_offset);
+
+		key := rawptr(uintptr(e) + h.key_offset);
+		mem_copy(key, hash.key_ptr, h.key_size);
+
+		val := rawptr(uintptr(e) + h.value_offset);
 		mem_copy(val, value, h.value_size);
+
+		e.hash.hash = hash.hash;
+		e.hash.key_ptr = key;
 	}
 
 	if __dynamic_map_full(h) {
@@ -267,24 +259,28 @@ __dynamic_map_full :: inline proc(using h: Map_Header) -> bool {
 
 __dynamic_map_hash_equal :: proc(h: Map_Header, a, b: Map_Hash) -> bool {
 	if a.hash == b.hash {
-		if h.is_key_string {
-			return a.key.str == b.key.str;
-		} else {
-			return a.key.val == b.key.val;
+		if a.key_ptr == b.key_ptr {
+			return true;
 		}
-		return true;
+		if a.key_ptr == nil || b.key_ptr == nil {
+			return false;
+		}
+		if h.is_key_string {
+			return (^string)(a.key_ptr)^ == (^string)(b.key_ptr)^;
+		}
+		return memory_equal(a.key_ptr, b.key_ptr, h.key_size);
 	}
 	return false;
 }
 
-__dynamic_map_find :: proc(using h: Map_Header, key: Map_Hash) -> Map_Find_Result #no_bounds_check {
+__dynamic_map_find :: proc(using h: Map_Header, hash: Map_Hash) -> Map_Find_Result #no_bounds_check {
 	fr := Map_Find_Result{-1, -1, -1};
 	if n := u64(len(m.hashes)); n > 0 {
-		fr.hash_index = int(key.hash % n);
+		fr.hash_index = int(hash.hash % n);
 		fr.entry_index = m.hashes[fr.hash_index];
 		for fr.entry_index >= 0 {
 			entry := __dynamic_map_get_entry(h, fr.entry_index);
-			if __dynamic_map_hash_equal(h, entry.key, key) {
+			if __dynamic_map_hash_equal(h, entry.hash, hash) {
 				return fr;
 			}
 			fr.entry_prev = fr.entry_index;
@@ -294,19 +290,21 @@ __dynamic_map_find :: proc(using h: Map_Header, key: Map_Hash) -> Map_Find_Resul
 	return fr;
 }
 
-__dynamic_map_add_entry :: proc(using h: Map_Header, key: Map_Hash, loc := #caller_location) -> int {
+__dynamic_map_add_entry :: proc(using h: Map_Header, hash: Map_Hash, loc := #caller_location) -> int {
 	prev := m.entries.len;
 	c := __dynamic_array_append_nothing(&m.entries, entry_size, entry_align, loc);
 	if c != prev {
 		end := __dynamic_map_get_entry(h, c-1);
-		end.key = key;
+		end.hash.hash = hash.hash;
+		end.hash.key_ptr = rawptr(uintptr(end) + key_offset);
+		mem_copy(end.hash.key_ptr, hash.key_ptr, key_size);
 		end.next = -1;
 	}
 	return prev;
 }
 
-__dynamic_map_delete_key :: proc(using h: Map_Header, key: Map_Hash) {
-	fr := __dynamic_map_find(h, key);
+__dynamic_map_delete_key :: proc(using h: Map_Header, hash: Map_Hash) {
+	fr := __dynamic_map_find(h, hash);
 	if fr.entry_index >= 0 {
 		__dynamic_map_erase(h, fr);
 	}
@@ -332,7 +330,7 @@ __dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) #no_bounds
 		end := __dynamic_map_get_entry(h, m.entries.len-1);
 		mem_copy(old, end, entry_size);
 
-		if last := __dynamic_map_find(h, old.key); last.entry_prev >= 0 {
+		if last := __dynamic_map_find(h, old.hash); last.entry_prev >= 0 {
 			last_entry := __dynamic_map_get_entry(h, last.entry_prev);
 			last_entry.next = fr.entry_index;
 		} else {
