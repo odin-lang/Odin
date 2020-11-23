@@ -3624,7 +3624,10 @@ irValue *ir_gen_map_hash(irProcedure *proc, irValue *key, Type *key_type) {
 			ExactValue ev = str->Constant.value;
 			GB_ASSERT(ev.kind == ExactValue_String);
 			u64 hs = fnv64a(ev.value_string.text, ev.value_string.len);
-			hashed_str = ir_value_constant(t_u64, exact_value_u64(hs));
+			if (build_context.word_size == 4) {
+				hs &= 0xffffffff;
+			}
+			hashed_str = ir_value_constant(t_uintptr, exact_value_u64(hs));
 		} else {
 			auto args = array_make<irValue *>(ir_allocator(), 1);
 			args[0] = str;

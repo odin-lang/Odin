@@ -10272,7 +10272,10 @@ lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type) {
 		if (lb_is_const(str)) {
 			String v = lb_get_const_string(p->module, str);
 			u64 hs = fnv64a(v.text, v.len);
-			hashed_str = lb_const_int(p->module, t_u64, hs);
+			if (build_context.word_size == 4) {
+				hs &= 0xffffffff;
+			}
+			hashed_str = lb_const_int(p->module, t_uintptr, hs);
 		} else {
 			auto args = array_make<lbValue>(permanent_allocator(), 1);
 			args[0] = str;
@@ -10287,7 +10290,6 @@ lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type) {
 			args[0] = lb_address_from_load_or_generate_local(p, key);
 			args[1] = lb_const_int(p->module, t_int, sz);
 			lbValue hash = lb_emit_runtime_call(p, "default_hash_ptr", args);
-
 			lb_emit_store(p, lb_emit_struct_ep(p, vp, 0), hash);
 		}
 	}

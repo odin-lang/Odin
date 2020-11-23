@@ -6,7 +6,7 @@ _ :: intrinsics;
 INITIAL_MAP_CAP :: 16;
 
 Map_Hash :: struct {
-	hash: u64,
+	hash:    uintptr,
 	key_ptr: rawptr, // address of Map_Entry_Header.key
 }
 
@@ -39,6 +39,37 @@ Map_Header :: struct {
 	value_size:    int,
 }
 
+INITIAL_HASH_SEED :: 0xcbf29ce484222325;
+
+_fnv64a :: proc "contextless" (data: []byte, seed: u64 = INITIAL_HASH_SEED) -> u64 {
+	h: u64 = seed;
+	for b in data {
+		h = (h ~ u64(b)) * 0x100000001b3;
+	}
+	return h;
+}
+
+default_hash :: inline proc "contextless" (data: []byte) -> uintptr {
+	return uintptr(_fnv64a(data));
+}
+default_hash_string :: inline proc "contextless" (s: string) -> uintptr {
+	return default_hash(transmute([]byte)(s));
+}
+default_hash_ptr :: inline proc "contextless" (data: rawptr, size: int) -> uintptr {
+	s := Raw_Slice{data, size};
+	return default_hash(transmute([]byte)(s));
+}
+
+
+source_code_location_hash :: proc(s: Source_Code_Location) -> uintptr {
+	hash := _fnv64a(transmute([]byte)s.file_path);
+	hash = hash ~ (u64(s.line) * 0x100000001b3);
+	hash = hash ~ (u64(s.column) * 0x100000001b3);
+	return uintptr(hash);
+}
+
+
+
 __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 	header := Map_Header{m = (^Raw_Map)(m)};
 	Entry :: struct {
@@ -58,10 +89,11 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 
 	header.value_offset  = uintptr(offset_of(Entry, value));
 	header.value_size    = int(size_of(V));
+
 	return header;
 }
 
-__get_map_key :: proc "contextless" (k: ^$K) -> Map_Hash {
+__get_map_hash :: proc "contextless" (k: ^$K) -> Map_Hash {
 	key := k;
 	map_hash: Map_Hash;
 
@@ -87,36 +119,6 @@ __get_map_key :: proc "contextless" (k: ^$K) -> Map_Hash {
 
 	return map_hash;
 }
-
-_fnv64a :: proc "contextless" (data: []byte, seed: u64 = 0xcbf29ce484222325) -> u64 {
-	h: u64 = seed;
-	for b in data {
-		h = (h ~ u64(b)) * 0x100000001b3;
-	}
-	return h;
-}
-
-
-default_hash :: inline proc "contextless" (data: []byte) -> u64 {
-	return _fnv64a(data);
-}
-default_hash_string :: inline proc "contextless" (s: string) -> u64 {
-	return default_hash(transmute([]byte)(s));
-}
-default_hash_ptr :: inline proc "contextless" (data: rawptr, size: int) -> u64 {
-	s := Raw_Slice{data, size};
-	return default_hash(transmute([]byte)(s));
-}
-
-
-source_code_location_hash :: proc(s: Source_Code_Location) -> u64 {
-	hash := _fnv64a(transmute([]byte)s.file_path);
-	hash = hash ~ (u64(s.line) * 0x100000001b3);
-	hash = hash ~ (u64(s.column) * 0x100000001b3);
-	return hash;
-}
-
-
 
 __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, loc := #caller_location) -> bool {
 	array := (^Raw_Slice)(array_);
@@ -275,7 +277,7 @@ __dynamic_map_hash_equal :: proc(h: Map_Header, a, b: Map_Hash) -> bool {
 
 __dynamic_map_find :: proc(using h: Map_Header, hash: Map_Hash) -> Map_Find_Result #no_bounds_check {
 	fr := Map_Find_Result{-1, -1, -1};
-	if n := u64(len(m.hashes)); n > 0 {
+	if n := uintptr(len(m.hashes)); n > 0 {
 		fr.hash_index = int(hash.hash % n);
 		fr.entry_index = m.hashes[fr.hash_index];
 		for fr.entry_index >= 0 {
