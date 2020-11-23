@@ -1705,7 +1705,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				if i > 0 { strings.write_string(fi.buf, ", "); }
 
 				data := uintptr(entries.data) + uintptr(i*entry_size);
-				header := cast(^runtime.Map_Entry_Header)data;
 
 				key := data + entry_type.offsets[2];
 				fmt_arg(&Info{buf = fi.buf}, any{rawptr(key), info.key.id}, 'v');
