@@ -1919,6 +1919,9 @@ bool is_type_comparable(Type *t) {
 		return is_type_comparable(t->Opaque.elem);
 
 	case Type_Struct:
+		if (t->Struct.is_raw_union) {
+			return is_type_simple_compare(t);
+		}
 		for_array(i, t->Struct.fields) {
 			Entity *f = t->Struct.fields[i];
 			if (!is_type_comparable(f->type)) {
