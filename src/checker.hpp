@@ -252,8 +252,12 @@ struct AtomOpMapEntry {
 };
 
 
+struct CheckerContext;
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
+	Checker *checker;
+
 	Map<ExprInfo>         untyped; // Key: Ast * | Expression -> ExprInfo
 	                               // NOTE(bill): This needs to be a map and not on the Ast
 	                               // as it needs to be iterated across

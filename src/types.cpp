@@ -373,7 +373,28 @@ enum Typeid_Kind : u8 {
 	Typeid_Relative_Slice,
 };
 
+// IMPORTANT NOTE(bill): This must match the same as the in core.odin
+enum TypeInfoFlag : u32 {
+	TypeInfoFlag_Comparable     = 1<<0,
+	TypeInfoFlag_Simple_Compare = 1<<1,
+};
 
+bool is_type_comparable(Type *t);
+bool is_type_simple_compare(Type *t);
+
+u32 type_info_flags_of_type(Type *type) {
+	if (type == nullptr) {
+		return 0;
+	}
+	u32 flags = 0;
+	if (is_type_comparable(type)) {
+		flags |= TypeInfoFlag_Comparable;
+	}
+	if (is_type_simple_compare(type)) {
+		flags |= TypeInfoFlag_Comparable;
+	}
+	return flags;
+}
 
 
 // TODO(bill): Should I add extra information here specifying the kind of selection?
@@ -1347,6 +1368,8 @@ bool is_type_simple_compare(Type *t) {
 
 	return false;
 }
+
+
 
 Type *base_complex_elem_type(Type *t) {
 	t = core_type(t);

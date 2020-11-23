@@ -11732,6 +11732,9 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 	// Useful types
 	Type *t_i64_slice_ptr    = alloc_type_pointer(alloc_type_slice(t_i64));
 	Type *t_string_slice_ptr = alloc_type_pointer(alloc_type_slice(t_string));
+	Entity *type_info_flags_entity = find_core_entity(info->checker, str_lit("Type_Info_Flags"));
+	Type *t_type_info_flags = type_info_flags_entity->type;
+
 
 	i32 type_info_member_types_index = 0;
 	i32 type_info_member_names_index = 0;
@@ -11751,11 +11754,14 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 		lbValue tag = {};
 		lbValue ti_ptr = lb_emit_array_epi(p, lb_global_type_info_data.addr, cast(i32)entry_index);
-		lbValue variant_ptr = lb_emit_struct_ep(p, ti_ptr, 3);
+		lbValue variant_ptr = lb_emit_struct_ep(p, ti_ptr, 4);
+
+		lbValue type_info_flags = lb_const_int(p->module, t_type_info_flags, type_info_flags_of_type(t));
 
 		lb_emit_store(p, lb_emit_struct_ep(p, ti_ptr, 0), lb_const_int(m, t_int, type_size_of(t)));
 		lb_emit_store(p, lb_emit_struct_ep(p, ti_ptr, 1), lb_const_int(m, t_int, type_align_of(t)));
-		lb_emit_store(p, lb_emit_struct_ep(p, ti_ptr, 2), lb_typeid(m, t));
+		lb_emit_store(p, lb_emit_struct_ep(p, ti_ptr, 2), type_info_flags);
+		lb_emit_store(p, lb_emit_struct_ep(p, ti_ptr, 3), lb_typeid(m, t));
 
 
 		switch (t->kind) {

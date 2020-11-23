@@ -11974,6 +11974,8 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 	// Useful types
 	Type *t_i64_slice_ptr    = alloc_type_pointer(alloc_type_slice(t_i64));
 	Type *t_string_slice_ptr = alloc_type_pointer(alloc_type_slice(t_string));
+	Entity *type_info_flags_entity = find_core_entity(info->checker, str_lit("Type_Info_Flags"));
+	Type *t_type_info_flags = type_info_flags_entity->type;
 
 	i32 type_info_member_types_index = 0;
 	i32 type_info_member_names_index = 0;
@@ -11993,11 +11995,14 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 
 		irValue *tag = nullptr;
 		irValue *ti_ptr = ir_emit_array_epi(proc, ir_global_type_info_data, cast(i32)entry_index);
-		irValue *variant_ptr = ir_emit_struct_ep(proc, ti_ptr, 3);
+		irValue *variant_ptr = ir_emit_struct_ep(proc, ti_ptr, 4);
+
+		irValue *type_info_flags = ir_value_constant(t_type_info_flags, exact_value_i64(type_info_flags_of_type(t)));
 
 		ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 0), ir_const_int(type_size_of(t)));
 		ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 1), ir_const_int(type_align_of(t)));
-		ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 2), ir_typeid(proc->module, t));
+		ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 2), type_info_flags);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 3), ir_typeid(proc->module, t));
 
 
 		switch (t->kind) {
