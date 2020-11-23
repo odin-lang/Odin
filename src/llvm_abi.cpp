@@ -267,56 +267,6 @@ i64 lb_alignof(LLVMTypeRef type) {
 	return 1;
 }
 
-Type *alloc_type_struct_from_field_types(Type **field_types, isize field_count, bool is_packed) {
-	Type *t = alloc_type_struct();
-	t->Struct.fields = array_make<Entity *>(heap_allocator(), field_count);
-
-	Scope *scope = nullptr;
-	for_array(i, t->Struct.fields) {
-		t->Struct.fields[i] = alloc_entity_field(scope, blank_token, field_types[i], false, cast(i32)i, EntityState_Resolved);
-	}
-	t->Struct.is_packed = is_packed;
-
-	return t;
-}
-
-Type *alloc_type_tuple_from_field_types(Type **field_types, isize field_count, bool is_packed, bool must_be_tuple) {
-	if (field_count == 0) {
-		return nullptr;
-	}
-	if (!must_be_tuple && field_count == 1) {
-		return field_types[0];
-	}
-
-	Type *t = alloc_type_tuple();
-	t->Tuple.variables = array_make<Entity *>(heap_allocator(), field_count);
-
-	Scope *scope = nullptr;
-	for_array(i, t->Tuple.variables) {
-		t->Tuple.variables[i] = alloc_entity_param(scope, blank_token, field_types[i], false, false);
-	}
-	t->Tuple.is_packed = is_packed;
-
-	return t;
-}
-
-Type *alloc_type_proc_from_types(Type **param_types, unsigned param_count, Type *results, bool is_c_vararg) {
-
-	Type *params  = alloc_type_tuple_from_field_types(param_types, param_count, false, true);
-	isize results_count = 0;
-	if (results != nullptr) {
-		if (results->kind != Type_Tuple) {
-			results = alloc_type_tuple_from_field_types(&results, 1, false, true);
-		}
-		results_count = results->Tuple.variables.count;
-	}
-
-	Scope *scope = nullptr;
-	Type *t = alloc_type_proc(scope, params, param_count, results, results_count, false, /*not sure what to put here*/ProcCC_CDecl);
-	t->Proc.c_vararg = is_c_vararg;
-	return t;
-}
-
 #if 0
 Type *lb_abi_to_odin_type(lbModule *m, LLVMTypeRef type, bool is_return, u32 level = 0) {
 	Type **found = map_get(&m->llvm_types, hash_pointer(type));
@@ -959,6 +909,16 @@ namespace lbAbiAmd64SysV {
 };
 
 
+namespace lbAbiAarch64 {
+	LB_ABI_INFO(abi_info) {
+		lbFunctionType *ft = gb_alloc_item(heap_allocator(), lbFunctionType);
+		ft->ctx = c;
+		// ft->args = compute_arg_types(c, arg_types, arg_count);
+		// ft->ret = lbAbi386::compute_return_type(c, return_type, return_is_defined);
+		// ft->calling_convention = calling_convention;
+		return ft;
+	}
+}
 
 
 LB_ABI_INFO(lb_get_abi_info) {

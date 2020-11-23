@@ -24,6 +24,7 @@ struct irModule {
 	Map<String>           entity_names;        // Key: Entity * of the typename
 	Map<irDebugInfo *>    debug_info;          // Key: Unique pointer
 	Map<irValue *>        anonymous_proc_lits; // Key: Ast *
+	Map<irValue *>        compare_procs; // Key: Type *
 
 	irDebugInfo *         debug_compile_unit;
 	Array<irDebugInfo *>  debug_location_stack;
@@ -161,6 +162,7 @@ struct irProcedure {
 	Ast *    return_ptr_hint_ast;
 	bool     return_ptr_hint_used;
 
+	bool ignore_dead_instr;
 
 	Array<irBranchBlocks> branch_blocks;
 
@@ -525,6 +527,8 @@ struct irAddr {
 
 Type *ir_type(irValue *value);
 irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, Ast *expr, irProcedure *proc = nullptr);
+void ir_begin_procedure_body(irProcedure *proc);
+void ir_end_procedure_body(irProcedure *proc);
 
 irAddr ir_addr(irValue *addr) {
 	irAddr v = {irAddr_Default, addr};
@@ -4859,6 +4863,87 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 	return nullptr;
 }
 
+irValue *ir_get_compare_proc_for_type(irModule *m, Type *type) {
+	Type *original_type = type;
+	type = base_type(type);
+	GB_ASSERT(type->kind == Type_Struct);
+	type_set_offsets(type);
+	Type *pt = alloc_type_pointer(type);
+
+	auto key = hash_type(type);
+	irValue **found = map_get(&m->compare_procs, key);
+	if (found) {
+		return *found;
+	}
+	static Type *proc_type = nullptr;
+	if (proc_type == nullptr) {
+		Type *args[2] = {t_rawptr, t_rawptr};
+		proc_type = alloc_type_proc_from_types(args, 2, t_bool, false, ProcCC_Contextless);
+		set_procedure_abi_types(proc_type);
+	}
+
+	static u32 proc_index = 0;
+
+	char buf[16] = {};
+	isize n = gb_snprintf(buf, 16, "__$cmp%u", ++proc_index);
+	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
+	String proc_name = make_string_c(str);
+
+
+	Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
+	Entity *e = alloc_entity_procedure(nullptr, make_token_ident(proc_name), proc_type, 0);
+	e->Procedure.link_name = proc_name;
+	irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, proc_name);
+	map_set(&m->values, hash_entity(e), p);
+	string_map_set(&m->members, proc_name, p);
+
+	irProcedure *proc = &p->Proc;
+	proc->is_startup = true;
+	proc->ignore_dead_instr = true;
+	ir_begin_procedure_body(proc);
+	// ir_start_block(proc, proc->decl_block);
+	GB_ASSERT(proc->curr_block != nullptr);
+
+	irBlock *done = ir_new_block(proc, nullptr, "done"); // NOTE(bill): Append later
+
+	irValue *x = proc->params[0];
+	irValue *y = proc->params[1];
+	irValue *lhs = ir_emit_conv(proc, x, pt);
+	irValue *rhs = ir_emit_conv(proc, y, pt);
+
+	irBlock *block_false = ir_new_block(proc, nullptr, "bfalse");
+
+	for_array(i, type->Struct.fields) {
+		irBlock *next_block = ir_new_block(proc, nullptr, "btrue");
+
+		irValue *pleft  = ir_emit_struct_ep(proc, lhs, cast(i32)i);
+		irValue *pright = ir_emit_struct_ep(proc, rhs, cast(i32)i);
+		irValue *left = ir_emit_load(proc, pleft);
+		irValue *right = ir_emit_load(proc, pright);
+		irValue *ok = ir_emit_comp(proc, Token_CmpEq, left, right);
+
+		ir_emit_if(proc, ok, next_block, block_false);
+
+		ir_emit_jump(proc, next_block);
+		ir_start_block(proc, next_block);
+	}
+
+	ir_emit_jump(proc, done);
+	ir_start_block(proc, block_false);
+
+	ir_emit(proc, ir_instr_return(proc, ir_const_bool(false)));
+
+	ir_emit_jump(proc, done);
+	ir_start_block(proc, done);
+	ir_emit(proc, ir_instr_return(proc, ir_const_bool(true)));
+
+	ir_end_procedure_body(proc);
+
+	map_set(&m->compare_procs, key, p);
+
+	return p;
+}
+
 irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irValue *right) {
 	Type *a = base_type(ir_type(left));
 	Type *b = base_type(ir_type(right));
@@ -4990,6 +5075,30 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 				return ir_emit_load(proc, val);
 			}
 		}
+	}
+
+	if (is_type_struct(a) && is_type_comparable(a)) {
+		irValue *left_ptr  = ir_address_from_load_or_generate_local(proc, left);
+		irValue *right_ptr = ir_address_from_load_or_generate_local(proc, right);
+		irValue *res = {};
+		if (is_type_simple_compare(a)) {
+			// TODO(bill): Test to see if this is actually faster!!!!
+			auto args = array_make<irValue *>(permanent_allocator(), 3);
+			args[0] = ir_emit_conv(proc, left_ptr, t_rawptr);
+			args[1] = ir_emit_conv(proc, right_ptr, t_rawptr);
+			args[2] = ir_const_int(type_size_of(a));
+			res = ir_emit_runtime_call(proc, "memory_equal", args);
+		} else {
+			irValue *value = ir_get_compare_proc_for_type(proc->module, a);
+			auto args = array_make<irValue *>(permanent_allocator(), 2);
+			args[0] = ir_emit_conv(proc, left_ptr, t_rawptr);
+			args[1] = ir_emit_conv(proc, right_ptr, t_rawptr);
+			res = ir_emit_call(proc, value, args);
+		}
+		if (op_kind == Token_NotEq) {
+			res = ir_emit_unary_arith(proc, Token_Not, res, ir_type(res));
+		}
+		return res;
 	}
 
 	if (is_type_string(a)) {
@@ -11350,6 +11459,9 @@ void ir_begin_procedure_body(irProcedure *proc) {
 
 
 bool ir_remove_dead_instr(irProcedure *proc) {
+	if (proc->ignore_dead_instr) {
+		return false;
+	}
 	isize elimination_count = 0;
 retry:
 #if 1
@@ -11476,7 +11588,7 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 
 	proc->parent = parent;
 
-	if (proc->body != nullptr) {
+	if (proc->body != nullptr && proc->body->kind != Ast_Invalid) {
 		u64 prev_state_flags = proc->module->state_flags;
 
 		if (proc->tags != 0) {
@@ -11578,6 +11690,7 @@ void ir_init_module(irModule *m, Checker *c) {
 	map_init(&m->debug_info,               heap_allocator());
 	map_init(&m->entity_names,             heap_allocator());
 	map_init(&m->anonymous_proc_lits,      heap_allocator());
+	map_init(&m->compare_procs,            heap_allocator());
 	array_init(&m->procs,                  heap_allocator());
 	array_init(&m->procs_to_generate,      heap_allocator());
 	array_init(&m->foreign_library_paths,  heap_allocator());

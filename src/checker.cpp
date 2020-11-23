@@ -1768,6 +1768,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("memcpy"),
 		str_lit("memmove"),
 
+		str_lit("memory_equal"),
 		str_lit("memory_compare"),
 		str_lit("memory_compare_zero"),
 

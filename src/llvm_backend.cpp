@@ -9143,6 +9143,78 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 	return {};
 }
 
+lbValue lb_get_compare_proc_for_type(lbModule *m, Type *type) {
+	Type *original_type = type;
+	type = base_type(type);
+	GB_ASSERT(type->kind == Type_Struct);
+	type_set_offsets(type);
+	Type *pt = alloc_type_pointer(type);
+	LLVMTypeRef ptr_type = lb_type(m, pt);
+
+	auto key = hash_type(type);
+	lbProcedure **found = map_get(&m->compare_procs, key);
+	lbProcedure *compare_proc = nullptr;
+	if (found) {
+		compare_proc = *found;
+	} else {
+		static Type *proc_type = nullptr;
+		if (proc_type == nullptr) {
+			Type *args[2] = {t_rawptr, t_rawptr};
+			proc_type = alloc_type_proc_from_types(args, 2, t_bool, false, ProcCC_Contextless);
+			set_procedure_abi_types(proc_type);
+		}
+
+		static u32 proc_index = 0;
+
+		char buf[16] = {};
+		isize n = gb_snprintf(buf, 16, "__$cmp%u", ++proc_index);
+		char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
+		String proc_name = make_string_c(str);
+
+		lbProcedure *p = lb_create_dummy_procedure(m, proc_name, proc_type);
+		lb_begin_procedure_body(p);
+
+		LLVMValueRef x = LLVMGetParam(p->value, 0);
+		LLVMValueRef y = LLVMGetParam(p->value, 1);
+		x = LLVMBuildPointerCast(p->builder, x, ptr_type, "");
+		y = LLVMBuildPointerCast(p->builder, y, ptr_type, "");
+		lbValue lhs = {x, pt};
+		lbValue rhs = {y, pt};
+
+		lbBlock *block_false = lb_create_block(p, "bfalse");
+
+		lbValue res = lb_const_bool(m, t_bool, true);
+		for_array(i, type->Struct.fields) {
+			lbBlock *next_block = lb_create_block(p, "btrue");
+
+			lbValue pleft  = lb_emit_struct_ep(p, lhs, cast(i32)i);
+			lbValue pright = lb_emit_struct_ep(p, rhs, cast(i32)i);
+			lbValue left = lb_emit_load(p, pleft);
+			lbValue right = lb_emit_load(p, pright);
+			lbValue ok = lb_emit_comp(p, Token_CmpEq, left, right);
+
+			lb_emit_if(p, ok, next_block, block_false);
+
+			lb_emit_jump(p, next_block);
+			lb_start_block(p, next_block);
+		}
+
+		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 1, false));
+
+		lb_start_block(p, block_false);
+
+		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 0, false));
+
+		lb_end_procedure_body(p);
+
+		map_set(&m->compare_procs, key, p);
+
+		compare_proc = p;
+	}
+	GB_ASSERT(compare_proc != nullptr);
+
+	return {compare_proc->value, compare_proc->type};
+}
 
 lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right) {
 	Type *a = core_type(left.type);
@@ -9270,6 +9342,31 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 				return lb_addr_load(p, val);
 			}
 		}
+	}
+
+
+	if (is_type_struct(a) && is_type_comparable(a)) {
+		lbValue left_ptr  = lb_address_from_load_or_generate_local(p, left);
+		lbValue right_ptr = lb_address_from_load_or_generate_local(p, right);
+		lbValue res = {};
+		if (is_type_simple_compare(a)) {
+			// TODO(bill): Test to see if this is actually faster!!!!
+			auto args = array_make<lbValue>(permanent_allocator(), 3);
+			args[0] = lb_emit_conv(p, left_ptr, t_rawptr);
+			args[1] = lb_emit_conv(p, right_ptr, t_rawptr);
+			args[2] = lb_const_int(p->module, t_int, type_size_of(a));
+			res = lb_emit_runtime_call(p, "memory_equal", args);
+		} else {
+			lbValue value = lb_get_compare_proc_for_type(p->module, a);
+			auto args = array_make<lbValue>(permanent_allocator(), 2);
+			args[0] = lb_emit_conv(p, left_ptr, t_rawptr);
+			args[1] = lb_emit_conv(p, right_ptr, t_rawptr);
+			res = lb_emit_call(p, value, args);
+		}
+		if (op_kind == Token_NotEq) {
+			res = lb_emit_unary_arith(p, Token_Not, res, res.type);
+		}
+		return res;
 	}
 
 	if (is_type_string(a)) {
@@ -11442,6 +11539,7 @@ void lb_init_module(lbModule *m, Checker *c) {
 	string_map_init(&m->const_strings, a);
 	map_init(&m->anonymous_proc_lits, a);
 	map_init(&m->function_type_map, a);
+	map_init(&m->compare_procs, a);
 	array_init(&m->procedures_to_generate, a);
 	array_init(&m->foreign_library_paths, a);
 
