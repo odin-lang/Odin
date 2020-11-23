@@ -12353,8 +12353,13 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 6), is_raw_union);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 7), is_custom_align);
 
+				if (is_type_comparable(t) && !is_type_simple_compare(t)) {
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 8), ir_get_compare_proc_for_type(proc->module, t));
+				}
+
+
 				if (t->Struct.soa_kind != StructSoa_None) {
-					irValue *kind = ir_emit_struct_ep(proc, tag, 8);
+					irValue *kind = ir_emit_struct_ep(proc, tag, 9);
 					Type *kind_type = type_deref(ir_type(kind));
 
 					irValue *soa_kind = ir_value_constant(kind_type, exact_value_i64(t->Struct.soa_kind));
@@ -12363,8 +12368,8 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 
 
 					ir_emit_store(proc, kind, soa_kind);
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 9), soa_type);
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 10), soa_len);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 10), soa_type);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 11), soa_len);
 				}
 			}
 

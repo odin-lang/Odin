@@ -1206,3 +1206,81 @@ as_raw_data :: proc(a: any) -> (value: rawptr, valid: bool) {
 
 	return;
 }
+
+
+not_equal :: proc(a, b: any) -> bool {
+	return !equal(a, b);
+}
+equal :: proc(a, b: any) -> bool {
+	if a == nil && b == nil {
+		return true;
+	}
+
+	if a.id != b.id {
+		return false;
+	}
+
+	if a.data == b.data {
+		return true;
+	}
+
+	t := type_info_of(a.id);
+	if .Comparable not_in t.flags {
+		return false;
+	}
+
+	if t.size == 0 {
+		return true;
+	}
+
+	if .Simple_Compare in t.flags {
+		return mem.compare_byte_ptrs((^byte)(a.data), (^byte)(b.data), t.size) == 0;
+	}
+
+	t = runtime.type_info_core(t);
+
+	#partial switch v in t.variant {
+	case Type_Info_String:
+		if v.is_cstring {
+			x := string((^cstring)(a.data)^);
+			y := string((^cstring)(b.data)^);
+			return x == y;
+		} else {
+			x := (^string)(a.data)^;
+			y := (^string)(b.data)^;
+			return x == y;
+		}
+
+	case Type_Info_Array:
+		for i in 0..<v.count {
+			x := rawptr(uintptr(a.data) + uintptr(v.elem_size*i));
+			y := rawptr(uintptr(b.data) + uintptr(v.elem_size*i));
+			if !equal(any{x, v.elem.id}, any{y, v.elem.id}) {
+				return false;
+			}
+		}
+	case Type_Info_Enumerated_Array:
+		for i in 0..<v.count {
+			x := rawptr(uintptr(a.data) + uintptr(v.elem_size*i));
+			y := rawptr(uintptr(b.data) + uintptr(v.elem_size*i));
+			if !equal(any{x, v.elem.id}, any{y, v.elem.id}) {
+				return false;
+			}
+		}
+	case Type_Info_Struct:
+		if v.equal != nil {
+			return v.equal(a.data, b.data);
+		} else {
+			for offset, i in v.offsets {
+				x := rawptr(uintptr(a.data) + offset);
+				y := rawptr(uintptr(b.data) + offset);
+				id := v.types[i].id;
+				if !equal(any{x, id}, any{y, id}) {
+					return false;
+				}
+			}
+		}
+	}
+
+	return true;
+}
