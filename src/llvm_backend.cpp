@@ -3361,13 +3361,8 @@ void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValu
 		elem = lb_emit_load(p, elem);
 
 		lbValue entry = lb_emit_ptr_offset(p, elem, idx);
-		val = lb_emit_load(p, lb_emit_struct_ep(p, entry, 2));
-
-		lbValue key_raw = lb_emit_struct_ep(p, entry, 0);
-		key_raw = lb_emit_struct_ep(p, key_raw, 1);
-		lbValue key = lb_emit_conv(p, key_raw, alloc_type_pointer(expr_type->Map.key));
-
-		idx = lb_emit_load(p, key);
+		idx = lb_emit_load(p, lb_emit_struct_ep(p, entry, 2));
+		val = lb_emit_load(p, lb_emit_struct_ep(p, entry, 3));
 
 		break;
 	}
@@ -10246,13 +10241,19 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 
 	i64 entry_size   = type_size_of  (map_type->Map.entry_type);
 	i64 entry_align  = type_align_of (map_type->Map.entry_type);
-	i64 value_offset = type_offset_of(map_type->Map.entry_type, 2);
+
+	i64 key_offset = type_offset_of(map_type->Map.entry_type, 2);
+	i64 key_size   = type_size_of  (map_type->Map.key);
+
+	i64 value_offset = type_offset_of(map_type->Map.entry_type, 3);
 	i64 value_size   = type_size_of  (map_type->Map.value);
 
 	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 2), lb_const_int(p->module, t_int, entry_size));
 	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 3), lb_const_int(p->module, t_int, entry_align));
-	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 4), lb_const_int(p->module, t_uintptr, value_offset));
-	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 5), lb_const_int(p->module, t_int, value_size));
+	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 4), lb_const_int(p->module, t_uintptr, key_offset));
+	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 5), lb_const_int(p->module, t_int, key_size));
+	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 6), lb_const_int(p->module, t_uintptr, value_offset));
+	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 7), lb_const_int(p->module, t_int, value_size));
 
 	return lb_addr_load(p, h);
 }
@@ -10278,10 +10279,6 @@ lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type) {
 			hashed_str = lb_emit_runtime_call(p, "default_hash_string", args);
 		}
 		lb_emit_store(p, lb_emit_struct_ep(p, vp, 0), hashed_str);
-
-		lbValue key_data = lb_emit_struct_ep(p, vp, 1);
-		key_data = lb_emit_conv(p, key_data, alloc_type_pointer(key_type));
-		lb_emit_store(p, key_data, str);
 	} else {
 		i64 sz = type_size_of(t);
 		GB_ASSERT(sz <= 8);
@@ -10291,15 +10288,13 @@ lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type) {
 			args[1] = lb_const_int(p->module, t_int, sz);
 			lbValue hash = lb_emit_runtime_call(p, "default_hash_ptr", args);
 
-
-			lbValue hash_ptr = lb_emit_struct_ep(p, vp, 0);
-			lbValue key_data = lb_emit_struct_ep(p, vp, 1);
-			key_data = lb_emit_conv(p, key_data, alloc_type_pointer(key_type));
-
-			lb_emit_store(p, hash_ptr, hash);
-			lb_emit_store(p, key_data, key);
+			lb_emit_store(p, lb_emit_struct_ep(p, vp, 0), hash);
 		}
 	}
+
+	lbValue key_ptr = lb_address_from_load_or_generate_local(p, key);
+	key_ptr = lb_emit_conv(p, key_ptr, t_rawptr);
+	lb_emit_store(p, lb_emit_struct_ep(p, vp, 1), key_ptr);
 
 	return lb_addr_load(p, v);
 }
@@ -12202,7 +12197,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 					lbValue soa_len = lb_const_int(m, t_int, t->Struct.soa_count);
 
 					vals[9]  = soa_kind.value;
-					vals[1]  = soa_type.value;
+					vals[10] = soa_type.value;
 					vals[11] = soa_len.value;
 				}
 			}

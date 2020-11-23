@@ -3595,18 +3595,22 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_ty
 
 	i64 entry_size   = type_size_of  (map_type->Map.entry_type);
 	i64 entry_align  = type_align_of (map_type->Map.entry_type);
-	i64 value_offset = type_offset_of(map_type->Map.entry_type, 2);
+	i64 key_offset   = type_offset_of(map_type->Map.entry_type, 2);
+	i64 key_size     = type_size_of  (map_type->Map.key);
+	i64 value_offset = type_offset_of(map_type->Map.entry_type, 3);
 	i64 value_size   = type_size_of  (map_type->Map.value);
 
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 2), ir_const_int(entry_size));
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 3), ir_const_int(entry_align));
-	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 4), ir_const_uintptr(value_offset));
-	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 5), ir_const_int(value_size));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 4), ir_const_uintptr(key_offset));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 5), ir_const_int(key_size));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 6), ir_const_uintptr(value_offset));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 7), ir_const_int(value_size));
 
 	return ir_emit_load(proc, h);
 }
 
-irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
+irValue *ir_gen_map_hash(irProcedure *proc, irValue *key, Type *key_type) {
 	Type *hash_type = t_u64;
 	irValue *v = ir_add_local_generated(proc, t_map_hash, true);
 	Type *t = base_type(ir_type(key));
@@ -3627,10 +3631,6 @@ irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 			hashed_str = ir_emit_runtime_call(proc, "default_hash_string", args);
 		}
 		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), hashed_str);
-
-		irValue *key_data = ir_emit_struct_ep(proc, v, 1);
-		key_data = ir_emit_conv(proc, key_data, alloc_type_pointer(key_type));
-		ir_emit_store(proc, key_data, str);
 	} else {
 		i64 sz = type_size_of(t);
 		GB_ASSERT(sz <= 8);
@@ -3640,15 +3640,16 @@ irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 			args[1] = ir_const_int(sz);
 			irValue *hash = ir_emit_runtime_call(proc, "default_hash_ptr", args);
 
-
 			irValue *hash_ptr = ir_emit_struct_ep(proc, v, 0);
-			irValue *key_data = ir_emit_struct_ep(proc, v, 1);
-			key_data = ir_emit_conv(proc, key_data, alloc_type_pointer(key_type));
-
 			ir_emit_store(proc, hash_ptr, hash);
-			ir_emit_store(proc, key_data, key);
 		}
 	}
+
+	irValue *key_ptr = ir_address_from_load_or_generate_local(proc, key);
+	key_ptr = ir_emit_conv(proc, key_ptr, t_rawptr);
+
+	irValue *key_data = ir_emit_struct_ep(proc, v, 1);
+	ir_emit_store(proc, key_data, key_ptr);
 
 	return ir_emit_load(proc, v);
 }
@@ -3705,7 +3706,7 @@ irValue *ir_insert_dynamic_map_key_and_value(irProcedure *proc, irValue *addr, T
 	map_type = base_type(map_type);
 
 	irValue *h = ir_gen_map_header(proc, addr, map_type);
-	irValue *key = ir_gen_map_key(proc, map_key, map_type->Map.key);
+	irValue *key = ir_gen_map_hash(proc, map_key, map_type->Map.key);
 	irValue *v = ir_emit_conv(proc, map_value, map_type->Map.value);
 
 	irValue *ptr = ir_add_local_generated(proc, ir_type(v), false);
@@ -4062,7 +4063,7 @@ irValue *ir_addr_load(irProcedure *proc, irAddr const &addr) {
 		Type *map_type = base_type(addr.map_type);
 		irValue *v = ir_add_local_generated(proc, map_type->Map.lookup_result_type, true);
 		irValue *h = ir_gen_map_header(proc, addr.addr, map_type);
-		irValue *key = ir_gen_map_key(proc, addr.map_key, map_type->Map.key);
+		irValue *key = ir_gen_map_hash(proc, addr.map_key, map_type->Map.key);
 
 		auto args = array_make<irValue *>(ir_allocator(), 2);
 		args[0] = h;
@@ -4230,7 +4231,7 @@ irValue *ir_addr_get_ptr(irProcedure *proc, irAddr const &addr, bool allow_refer
 		if (allow_reference) {
 			Type *map_type = base_type(addr.map_type);
 			irValue *h = ir_gen_map_header(proc, addr.addr, map_type);
-			irValue *key = ir_gen_map_key(proc, addr.map_key, map_type->Map.key);
+			irValue *key = ir_gen_map_hash(proc, addr.map_key, map_type->Map.key);
 
 			auto args = array_make<irValue *>(ir_allocator(), 2);
 			args[0] = h;
@@ -8320,7 +8321,7 @@ irValue *ir_build_expr_internal(irProcedure *proc, Ast *expr) {
 
 					irValue *addr = ir_address_from_load_or_generate_local(proc, right);
 					irValue *h = ir_gen_map_header(proc, addr, rt);
-					irValue *key = ir_gen_map_key(proc, left, rt->Map.key);
+					irValue *key = ir_gen_map_hash(proc, left, rt->Map.key);
 
 					auto args = array_make<irValue *>(ir_allocator(), 2);
 					args[0] = h;
@@ -9954,13 +9955,8 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 		elem = ir_emit_load(proc, elem);
 
 		irValue *entry = ir_emit_ptr_offset(proc, elem, idx);
-		val = ir_emit_load(proc, ir_emit_struct_ep(proc, entry, 2));
-
-		irValue *key_raw = ir_emit_struct_ep(proc, entry, 0);
-		key_raw = ir_emit_struct_ep(proc, key_raw, 1);
-		irValue *key = ir_emit_conv(proc, key_raw, alloc_type_pointer(expr_type->Map.key));
-
-		idx = ir_emit_load(proc, key);
+		idx = ir_emit_load(proc, ir_emit_struct_ep(proc, entry, 2));
+		val = ir_emit_load(proc, ir_emit_struct_ep(proc, entry, 3));
 
 		break;
 	}

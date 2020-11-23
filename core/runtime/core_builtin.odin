@@ -264,7 +264,8 @@ reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int) {
 @builtin
 delete_key :: proc(m: ^$T/map[$K]$V, key: K) {
 	if m != nil {
-		__dynamic_map_delete_key(__get_map_header(m), __get_map_key(key));
+		key := key;
+		__dynamic_map_delete_key(__get_map_header(m), __get_map_key(&key));
 	}
 }
 

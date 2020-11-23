@@ -2789,18 +2789,20 @@ void init_map_entry_type(Type *type) {
 
 	/*
 	struct {
-		key:         runtime.Map_Key,
-		next:        int,
-		value:       Value,
+		hash:  runtime.Map_Hash,
+		next:  int,
+		key:   Key,
+		value: Value,
 	}
 	*/
 	Ast *dummy_node = alloc_ast_node(nullptr, Ast_Invalid);
 	Scope *s = create_scope(builtin_pkg->scope);
 
 	auto fields = array_make<Entity *>(permanent_allocator(), 0, 4);
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("key")),       t_map_hash,      false, cast(i32)fields.count, EntityState_Resolved));
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("next")),      t_int,           false, cast(i32)fields.count, EntityState_Resolved));
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("value")),     type->Map.value, false, cast(i32)fields.count, EntityState_Resolved));
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("hash")),  t_map_hash,      false, cast(i32)fields.count, EntityState_Resolved));
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("next")),  t_int,           false, cast(i32)fields.count, EntityState_Resolved));
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("key")),   type->Map.key, false, cast(i32)fields.count, EntityState_Resolved));
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("value")), type->Map.value, false, cast(i32)fields.count, EntityState_Resolved));
 
 
 	entry_type->Struct.fields = fields;
