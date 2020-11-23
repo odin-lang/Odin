@@ -2784,24 +2784,23 @@ void init_map_entry_type(Type *type) {
 	if (type->Map.entry_type != nullptr) return;
 
 	// NOTE(bill): The preload types may have not been set yet
-	GB_ASSERT(t_map_key != nullptr);
+	GB_ASSERT(t_map_hash != nullptr);
 	Type *entry_type = alloc_type_struct();
 
 	/*
 	struct {
-		hash:  __MapKey;
-		next:  int;
-		key:   Key;
-		value: Value;
+		key:         runtime.Map_Key,
+		next:        int,
+		value:       Value,
 	}
 	*/
 	Ast *dummy_node = alloc_ast_node(nullptr, Ast_Invalid);
 	Scope *s = create_scope(builtin_pkg->scope);
 
-	auto fields = array_make<Entity *>(permanent_allocator(), 0, 3);
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("key")),   t_map_key,       false, 0, EntityState_Resolved));
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("next")),  t_int,           false, 1, EntityState_Resolved));
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("value")), type->Map.value, false, 2, EntityState_Resolved));
+	auto fields = array_make<Entity *>(permanent_allocator(), 0, 4);
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("key")),       t_map_hash,      false, cast(i32)fields.count, EntityState_Resolved));
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("next")),      t_int,           false, cast(i32)fields.count, EntityState_Resolved));
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("value")),     type->Map.value, false, cast(i32)fields.count, EntityState_Resolved));
 
 
 	entry_type->Struct.fields = fields;

@@ -3608,7 +3608,7 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_ty
 
 irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 	Type *hash_type = t_u64;
-	irValue *v = ir_add_local_generated(proc, t_map_key, true);
+	irValue *v = ir_add_local_generated(proc, t_map_hash, true);
 	Type *t = base_type(ir_type(key));
 	key = ir_emit_conv(proc, key, key_type);
 

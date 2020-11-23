@@ -10259,7 +10259,7 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 
 lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type) {
 	Type *hash_type = t_u64;
-	lbAddr v = lb_add_local_generated(p, t_map_key, true);
+	lbAddr v = lb_add_local_generated(p, t_map_hash, true);
 	lbValue vp = lb_addr_get_ptr(p, v);
 	Type *t = base_type(key.type);
 	key = lb_emit_conv(p, key, key_type);
