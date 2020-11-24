@@ -4639,7 +4639,11 @@ gb_inline void gb_yield_thread(void) {
 #if defined(GB_SYSTEM_WINDOWS)
 	_mm_pause();
 #elif defined(GB_SYSTEM_OSX)
+	#if defined(GB_CPU_X86)
 	__asm__ volatile ("" : : : "memory");
+	#elif defined(GB_CPU_ARM)
+	__asm__ volatile ("yield" : : : "memory");
+	#endif
 #elif defined(GB_CPU_X86)
 	_mm_pause();
 #else
@@ -4651,7 +4655,11 @@ gb_inline void gb_mfence(void) {
 #if defined(GB_SYSTEM_WINDOWS)
 	_ReadWriteBarrier();
 #elif defined(GB_SYSTEM_OSX)
+	#if defined(GB_CPU_X86)
 	__sync_synchronize();
+	#elif defined(GB_CPU_ARM)
+	__atomic_thread_fence(__ATOMIC_SEQ_CST);
+	#endif
 #elif defined(GB_CPU_X86)
 	_mm_mfence();
 #else
@@ -4663,7 +4671,12 @@ gb_inline void gb_sfence(void) {
 #if defined(GB_SYSTEM_WINDOWS)
 	_WriteBarrier();
 #elif defined(GB_SYSTEM_OSX)
+	#if defined(GB_CPU_X86)
 	__asm__ volatile ("" : : : "memory");
+	#elif defined(GB_CPU_ARM)
+	// TODO(bill): is this correct?
+	__atomic_thread_fence(__ATOMIC_SEQ_CST);
+	#endif
 #elif defined(GB_CPU_X86)
 	_mm_sfence();
 #else
@@ -5278,7 +5291,7 @@ void gb_affinity_init(gbAffinity *a) {
 		for (;;) {
 			// The 'temporary char'. Everything goes into this char,
 			// so that we can check against EOF at the end of this loop.
-			char c;
+			int c;
 
 #define AF__CHECK(letter) ((c = getc(cpu_info)) == letter)
 			if (AF__CHECK('c') && AF__CHECK('p') && AF__CHECK('u') && AF__CHECK(' ') &&
@@ -8884,6 +8897,14 @@ gb_inline gbDllProc gb_dll_proc_address(gbDllHandle dll, char const *proc_name) 
 
 		return result;
 	}
+#elif defined(__aarch64__)
+	gb_inline u64 gb_rdtsc(void) {
+		int64_t virtual_timer_value;
+ 		asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
+ 		return virtual_timer_value;
+	}
+#else 
+#error "gb_rdtsc not supported"
 #endif
 
 #if defined(GB_SYSTEM_WINDOWS)

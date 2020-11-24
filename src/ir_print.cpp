@@ -1575,7 +1575,11 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 				break;
 
 			case BuiltinProc_cpu_relax:
-				ir_write_str_lit(f, "call void asm sideeffect \"pause\", \"\"()");
+				if (build_context.metrics.arch == TargetArch_amd64) {
+					ir_write_str_lit(f, "call void asm sideeffect \"pause\", \"\"()");
+				} else {
+					// ir_write_str_lit(f, "call void asm sideeffect \"yield\", \"\"()");
+				}
 				break;
 			default: GB_PANIC("Unknown inline code %d", instr->InlineCode.id); break;
 			}
