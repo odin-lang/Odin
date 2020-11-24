@@ -8312,8 +8312,8 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		{
 			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
 			LLVMValueRef the_asm = LLVMGetInlineAsm(func_type,
-				"pause", 5,
-				"", 0,
+				cast(char *)"pause", 5,
+				cast(char *)"", 0,
 				/*HasSideEffects*/true, /*IsAlignStack*/false,
 				LLVMInlineAsmDialectATT
 			);
