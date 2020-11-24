@@ -157,7 +157,7 @@ extern "C" {
 	#endif
 #endif
 
-#if defined(_WIN64) || defined(__x86_64__) || defined(_M_X64) || defined(__64BIT__) || defined(__powerpc64__) || defined(__ppc64__)
+#if defined(_WIN64) || defined(__x86_64__) || defined(_M_X64) || defined(__64BIT__) || defined(__powerpc64__) || defined(__ppc64__) || defined(__aarch64__)
 	#ifndef GB_ARCH_64_BIT
 	#define GB_ARCH_64_BIT 1
 	#endif
@@ -230,7 +230,7 @@ extern "C" {
 	#define GB_CACHE_LINE_SIZE 128
 	#endif
 
-#elif defined(__arm__)
+#elif defined(__arm__) || defined(__aarch64__) || defined(_M_ARM) || defined(_M_ARM64)
 	#ifndef GB_CPU_ARM
 	#define GB_CPU_ARM 1
 	#endif
@@ -3702,6 +3702,12 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 
 	void *dest_copy = dest;
 	__asm__ __volatile__("rep movsb" : "+D"(dest_copy), "+S"(source), "+c"(n) : : "memory");
+#elif defined(GB_CPU_ARM)
+	u8 *s = cast(u8 *)source;
+	u8 *d = cast(u8 *)dest;
+	for (isize i = 0; i < n; i++) {
+		*d++ = *s++;
+	}
 #else
 	u8 *d = cast(u8 *)dest;
 	u8 const *s = cast(u8 const *)source;
@@ -4437,6 +4443,76 @@ gb_inline i64 gb_atomic64_fetch_or(gbAtomic64 volatile *a, i64 operand) {
 	}
 #endif
 }
+
+#elif defined(GB_CPU_ARM)
+
+gb_inline i32  gb_atomic32_load (gbAtomic32 const volatile *a) { 
+	return __atomic_load_n(&a->value, __ATOMIC_SEQ_CST);
+}
+gb_inline void gb_atomic32_store(gbAtomic32 volatile *a, i32 value) { 
+	__atomic_store_n(&a->value, value, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i32 gb_atomic32_compare_exchange(gbAtomic32 volatile *a, i32 expected, i32 desired) {
+	i32 expected_copy = expected;
+	auto result = __atomic_compare_exchange_n(&a->value, &expected_copy, desired, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+	if (result) {
+		return expected;
+	} else {
+		return expected_copy;
+	}
+}
+
+gb_inline i32 gb_atomic32_exchanged(gbAtomic32 volatile *a, i32 desired) {
+	return __atomic_exchange_n(&a->value, desired, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i32 gb_atomic32_fetch_add(gbAtomic32 volatile *a, i32 operand) {
+	return __atomic_fetch_add(&a->value, operand, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i32 gb_atomic32_fetch_and(gbAtomic32 volatile *a, i32 operand) {
+	return __atomic_fetch_and(&a->value, operand, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i32 gb_atomic32_fetch_or(gbAtomic32 volatile *a, i32 operand) {
+	return __atomic_fetch_or(&a->value, operand, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i64 gb_atomic64_load(gbAtomic64 const volatile *a) {
+	return __atomic_load_n(&a->value, __ATOMIC_SEQ_CST);
+}
+
+gb_inline void gb_atomic64_store(gbAtomic64 volatile *a, i64 value) {
+	__atomic_store_n(&a->value, value, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i64 gb_atomic64_compare_exchange(gbAtomic64 volatile *a, i64 expected, i64 desired) {
+	i64 expected_copy = expected;
+	auto result = __atomic_compare_exchange_n(&a->value, &expected_copy, desired, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+	if (result) {
+		return expected;
+	} else {
+		return expected_copy;
+	}
+}
+
+gb_inline i64 gb_atomic64_exchanged(gbAtomic64 volatile *a, i64 desired) {
+	return __atomic_exchange_n(&a->value, desired, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i64 gb_atomic64_fetch_add(gbAtomic64 volatile *a, i64 operand) {
+	return __atomic_fetch_add(&a->value, operand, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i64 gb_atomic64_fetch_and(gbAtomic64 volatile *a, i64 operand) {
+	return __atomic_fetch_and(&a->value, operand, __ATOMIC_SEQ_CST);
+}
+
+gb_inline i64 gb_atomic64_fetch_or(gbAtomic64 volatile *a, i64 operand) {
+	return __atomic_fetch_or(&a->value, operand, __ATOMIC_SEQ_CST);
+}
+
 
 #else
 #error TODO(bill): Implement Atomics for this CPU
