@@ -12522,6 +12522,10 @@ void lb_generate_code(lbGenerator *gen) {
 			1, "", 0,
 			LLVMDWARFEmissionFull, 0, true,
 			true
+		#if LLVM_VERSION_MAJOR > 10
+			, "", 0,
+			"", 0
+		#endif
 		);
 	}
 

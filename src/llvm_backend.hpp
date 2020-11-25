@@ -1,3 +1,5 @@
+#if defined(LLVM_BACKEND_SUPPORT)
+#if defined(GB_SYSTEM_WINDOWS)
 #include "llvm-c/Core.h"
 #include "llvm-c/ExecutionEngine.h"
 #include "llvm-c/Target.h"
@@ -12,6 +14,23 @@
 #include "llvm-c/Transforms/Scalar.h"
 #include "llvm-c/Transforms/Utils.h"
 #include "llvm-c/Transforms/Vectorize.h"
+#else
+#include <llvm-c/Core.h>
+#include <llvm-c/ExecutionEngine.h>
+#include <llvm-c/Target.h>
+#include <llvm-c/Analysis.h>
+#include <llvm-c/Object.h>
+#include <llvm-c/BitWriter.h>
+#include <llvm-c/DebugInfo.h>
+#include <llvm-c/Transforms/AggressiveInstCombine.h>
+#include <llvm-c/Transforms/InstCombine.h>
+#include <llvm-c/Transforms/IPO.h>
+#include <llvm-c/Transforms/PassManagerBuilder.h>
+#include <llvm-c/Transforms/Scalar.h>
+#include <llvm-c/Transforms/Utils.h>
+#include <llvm-c/Transforms/Vectorize.h>
+#endif
+#endif
 
 struct lbProcedure;
 

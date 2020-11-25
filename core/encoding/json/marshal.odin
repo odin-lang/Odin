@@ -210,12 +210,12 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 				data := uintptr(entries.data) + uintptr(i*entry_size);
 				header := cast(^Map_Entry_Header)data;
 
-				marshal_arg(b, any{rawptr(&header.key.key.val), info.key.id});
+				key   := rawptr(data + entry_type.offsets[2]);
+				value := rawptr(data + entry_type.offsets[3]);
 
+				marshal_arg(b, any{key, info.key.id});
 				write_string(b, ": ");
-
-				value := data + entry_type.offsets[2];
-				marshal_arg(b, any{rawptr(value), info.value.id});
+				marshal_arg(b, any{value, info.value.id});
 			}
 		}
 		write_byte(b, '}');
