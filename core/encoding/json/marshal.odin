@@ -208,8 +208,6 @@ marshal_arg :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
 				if i > 0 { write_string(b, ", "); }
 
 				data := uintptr(entries.data) + uintptr(i*entry_size);
-				header := cast(^Map_Entry_Header)data;
-
 				key   := rawptr(data + entry_type.offsets[2]);
 				value := rawptr(data + entry_type.offsets[3]);
 
