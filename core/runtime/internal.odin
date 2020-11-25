@@ -184,6 +184,12 @@ memory_equal :: proc "contextless" (a, b: rawptr, n: int) -> bool {
 	return memory_compare(a, b, n) == 0;
 }
 memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_check {
+	switch {
+	case a == b:   return 0;
+	case a == nil: return -1;
+	case b == nil: return +1;
+	}
+
 	x := uintptr(a);
 	y := uintptr(b);
 	n := uintptr(n);

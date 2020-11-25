@@ -186,9 +186,8 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 		}
 
 		e := __dynamic_map_get_entry(new_header, j);
-		mem_copy(e, entry_header, entry_size);
+		__dynamic_map_copy_entry(header, e, entry_header);
 		e.next = fr.entry_index;
-		e.hash.key_ptr = rawptr(uintptr(entry_header) + key_offset);
 
 		if __dynamic_map_full(new_header) {
 			__dynamic_map_grow(new_header, loc);
@@ -264,9 +263,8 @@ __dynamic_map_hash_equal :: proc(h: Map_Header, a, b: Map_Hash) -> bool {
 		if a.key_ptr == b.key_ptr {
 			return true;
 		}
-		if a.key_ptr == nil || b.key_ptr == nil {
-			return false;
-		}
+		assert(a.key_ptr != nil && b.key_ptr != nil);
+
 		if h.is_key_string {
 			return (^string)(a.key_ptr)^ == (^string)(b.key_ptr)^;
 		}
@@ -317,6 +315,11 @@ __dynamic_map_get_entry :: proc(using h: Map_Header, index: int) -> ^Map_Entry_H
 	return (^Map_Entry_Header)(uintptr(m.entries.data) + uintptr(index*entry_size));
 }
 
+__dynamic_map_copy_entry :: proc(h: Map_Header, new, old: ^Map_Entry_Header) {
+	mem_copy(new, old, h.entry_size);
+	new.hash.key_ptr = rawptr(uintptr(new) + h.key_offset);
+}
+
 __dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) #no_bounds_check {
 	if fr.entry_prev < 0 {
 		m.hashes[fr.hash_index] = __dynamic_map_get_entry(h, fr.entry_index).next;
@@ -330,7 +333,7 @@ __dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) #no_bounds
 	} else {
 		old := __dynamic_map_get_entry(h, fr.entry_index);
 		end := __dynamic_map_get_entry(h, m.entries.len-1);
-		mem_copy(old, end, entry_size);
+		__dynamic_map_copy_entry(h, old, end);
 
 		if last := __dynamic_map_find(h, old.hash); last.entry_prev >= 0 {
 			last_entry := __dynamic_map_get_entry(h, last.entry_prev);
