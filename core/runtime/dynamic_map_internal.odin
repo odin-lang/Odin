@@ -175,7 +175,6 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 		}
 
 		entry_header := __dynamic_map_get_entry(header, i);
-		data := uintptr(entry_header);
 
 		fr := __dynamic_map_find(new_header, entry_header.hash);
 		j := __dynamic_map_add_entry(new_header, entry_header.hash, loc);
@@ -187,8 +186,9 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 		}
 
 		e := __dynamic_map_get_entry(new_header, j);
+		mem_copy(e, entry_header, entry_size);
 		e.next = fr.entry_index;
-		mem_copy(rawptr(uintptr(e)+value_offset), rawptr(data+value_offset), value_size);
+		e.hash.key_ptr = rawptr(uintptr(entry_header) + key_offset);
 
 		if __dynamic_map_full(new_header) {
 			__dynamic_map_grow(new_header, loc);
