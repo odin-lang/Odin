@@ -2961,11 +2961,29 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 
 	LLVMTypeRef llvm_type = lb_type(p->module, type);
 	LLVMValueRef ptr = LLVMBuildAlloca(p->builder, llvm_type, name);
-	LLVMSetAlignment(ptr, 16); // TODO(bill): Make this configurable
+
+	// unsigned alignment = 16; // TODO(bill): Make this configurable
+	unsigned alignment = cast(unsigned)lb_alignof(llvm_type);
+	LLVMSetAlignment(ptr, alignment);
 
 	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
 	if (zero_init) {
-		LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);
+		LLVMTypeKind kind = LLVMGetTypeKind(llvm_type);
+
+		switch (kind) {
+		case LLVMStructTypeKind:
+		case LLVMArrayTypeKind:
+			{
+				// NOTE(bill): Enforce zeroing through memset to make sure padding is zeroed too
+				LLVMTypeRef type_i8 = LLVMInt8TypeInContext(p->module->ctx);
+				LLVMTypeRef type_i32 = LLVMInt32TypeInContext(p->module->ctx);
+				i32 sz = cast(i32)type_size_of(type);
+				LLVMBuildMemSet(p->builder, ptr, LLVMConstNull(type_i8), LLVMConstInt(type_i32, sz, false), alignment);
+			}
+			break;
+		default:
+			LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);
+		}
 	}
 
 	lbValue val = {};
