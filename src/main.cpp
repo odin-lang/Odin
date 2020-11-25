@@ -11,7 +11,11 @@
 gb_global Timings global_timings = {0};
 
 #if defined(LLVM_BACKEND_SUPPORT)
+#if defined(GB_SYSTEM_WINDOWS)
 #include "llvm-c/Types.h"
+#else
+#include <llvm-c/Types.h>
+#endif
 #endif
 
 #include "parser.hpp"
