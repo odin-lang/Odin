@@ -198,6 +198,13 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 	header.m^ = nm;
 }
 
+__dynamic_map_fix_keys :: proc (h: Map_Header) {
+	for i in 0 ..< h.m.entries.len {
+		entry := __dynamic_map_get_entry(h, i);
+		entry.hash.key_ptr = rawptr(uintptr(entry) + h.key_offset);
+	}
+}
+
 __dynamic_map_get :: proc(h: Map_Header, hash: Map_Hash) -> rawptr {
 	index := __dynamic_map_find(h, hash).entry_index;
 	if index >= 0 {
@@ -293,6 +300,7 @@ __dynamic_map_find :: proc(using h: Map_Header, hash: Map_Hash) -> Map_Find_Resu
 __dynamic_map_add_entry :: proc(using h: Map_Header, hash: Map_Hash, loc := #caller_location) -> int {
 	prev := m.entries.len;
 	c := __dynamic_array_append_nothing(&m.entries, entry_size, entry_align, loc);
+	__dynamic_map_fix_keys(h);
 	if c != prev {
 		end := __dynamic_map_get_entry(h, c-1);
 		end.hash.hash = hash.hash;
