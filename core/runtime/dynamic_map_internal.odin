@@ -141,8 +141,17 @@ __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, l
 	return true;
 }
 
+__dynamic_map_fix_keys :: proc(h: Map_Header) {
+	e := (^Map_Entry_Header)(m.entries.data);
+	for i in 0..<m.entries.len {
+		e.hash.key_ptr = rawptr(uintptr(e) + h.key_offset);
+		e = (^Map_Entry_Header)(uintptr(e) + uintptr(h.entry_size));
+	}
+}
+
 __dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller_location) {
 	__dynamic_array_reserve(&m.entries, entry_size, entry_align, cap, loc);
+	__dynamic_map_fix_keys(header);
 
 	old_len := len(m.hashes);
 	__slice_resize(&m.hashes, cap, m.entries.allocator, loc);
@@ -162,6 +171,9 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 		c.allocator = m.entries.allocator;
 	}
 	context = c;
+
+	new_count := new_count;
+	new_count = max(new_count, 2*m.entries.len);
 
 	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len, loc);
 	__slice_resize(&nm.hashes, new_count, m.entries.allocator, loc);
@@ -193,6 +205,7 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 			__dynamic_map_grow(new_header, loc);
 		}
 	}
+
 	delete(m.hashes, m.entries.allocator, loc);
 	free(m.entries.data, m.entries.allocator, loc);
 	header.m^ = nm;
@@ -292,7 +305,11 @@ __dynamic_map_find :: proc(using h: Map_Header, hash: Map_Hash) -> Map_Find_Resu
 
 __dynamic_map_add_entry :: proc(using h: Map_Header, hash: Map_Hash, loc := #caller_location) -> int {
 	prev := m.entries.len;
+	prev_data := m.entries.data;
 	c := __dynamic_array_append_nothing(&m.entries, entry_size, entry_align, loc);
+	if m.entries.data != prev_data {
+		__dynamic_map_fix_keys(h);
+	}
 	if c != prev {
 		end := __dynamic_map_get_entry(h, c-1);
 		end.hash.hash = hash.hash;
