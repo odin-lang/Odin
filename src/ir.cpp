@@ -10104,7 +10104,7 @@ void ir_build_range_enum(irProcedure *proc, Type *enum_type, Type *val_type, irV
 	irValue *max_count = ir_const_int(enum_count);
 
 	irValue *ti          = ir_type_info(proc, t);
-	irValue *variant     = ir_emit_struct_ep(proc, ti, 3);
+	irValue *variant     = ir_emit_struct_ep(proc, ti, 4);
 	irValue *eti_ptr     = ir_emit_conv(proc, variant, t_type_info_enum_ptr);
 	irValue *values      = ir_emit_load(proc, ir_emit_struct_ep(proc, eti_ptr, 2));
 	irValue *values_data = ir_slice_elem(proc, values);
