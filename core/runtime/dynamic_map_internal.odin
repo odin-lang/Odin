@@ -142,8 +142,8 @@ __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, l
 }
 
 __dynamic_map_fix_keys :: proc(h: Map_Header) {
-	e := (^Map_Entry_Header)(m.entries.data);
-	for i in 0..<m.entries.len {
+	e := (^Map_Entry_Header)(h.m.entries.data);
+	for i in 0..<h.m.entries.len {
 		e.hash.key_ptr = rawptr(uintptr(e) + h.key_offset);
 		e = (^Map_Entry_Header)(uintptr(e) + uintptr(h.entry_size));
 	}
