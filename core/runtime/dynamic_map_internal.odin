@@ -5,10 +5,46 @@ _ :: intrinsics;
 
 INITIAL_MAP_CAP :: 16;
 
+// Temporary data structure for comparing hashes and keys
 Map_Hash :: struct {
 	hash:    uintptr,
 	key_ptr: rawptr, // address of Map_Entry_Header.key
 }
+
+__get_map_hash :: proc "contextless" (k: ^$K) -> Map_Hash {
+	key := k;
+	map_hash: Map_Hash;
+
+	T :: intrinsics.type_core_type(K);
+
+	map_hash.key_ptr = k;
+
+	when intrinsics.type_is_integer(T) {
+		map_hash.hash = default_hash_ptr(key, size_of(T));
+	} else when intrinsics.type_is_rune(T) {
+		map_hash.hash = default_hash_ptr(key, size_of(T));
+	} else when intrinsics.type_is_pointer(T) {
+		map_hash.hash = default_hash_ptr(key, size_of(T));
+	} else when intrinsics.type_is_float(T) {
+		map_hash.hash = default_hash_ptr(key, size_of(T));
+	} else when intrinsics.type_is_string(T) {
+		#assert(T == string);
+		str := (^string)(key)^;
+		map_hash.hash = default_hash_string(str);
+	} else {
+		#panic("Unhandled map key type");
+	}
+
+	return map_hash;
+}
+
+__get_map_hash_from_entry :: proc "contextless" (h: Map_Header, entry: ^Map_Entry_Header) -> (hash: Map_Hash) {
+	hash.hash = entry.hash;
+	hash.key_ptr = rawptr(uintptr(entry) + h.key_offset);
+	return;
+}
+
+
 
 Map_Find_Result :: struct {
 	hash_index:  int,
@@ -17,7 +53,7 @@ Map_Find_Result :: struct {
 }
 
 Map_Entry_Header :: struct {
-	hash: Map_Hash,
+	hash: uintptr,
 	next: int,
 /*
 	key:   Key_Value,
@@ -73,7 +109,7 @@ source_code_location_hash :: proc(s: Source_Code_Location) -> uintptr {
 __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 	header := Map_Header{m = (^Raw_Map)(m)};
 	Entry :: struct {
-		hash:  Map_Hash,
+		hash:  uintptr,
 		next:  int,
 		key:   K,
 		value: V,
@@ -91,33 +127,6 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 	header.value_size    = int(size_of(V));
 
 	return header;
-}
-
-__get_map_hash :: proc "contextless" (k: ^$K) -> Map_Hash {
-	key := k;
-	map_hash: Map_Hash;
-
-	T :: intrinsics.type_core_type(K);
-
-	map_hash.key_ptr = k;
-
-	when intrinsics.type_is_integer(T) {
-		map_hash.hash = default_hash_ptr(key, size_of(T));
-	} else when intrinsics.type_is_rune(T) {
-		map_hash.hash = default_hash_ptr(key, size_of(T));
-	} else when intrinsics.type_is_pointer(T) {
-		map_hash.hash = default_hash_ptr(key, size_of(T));
-	} else when intrinsics.type_is_float(T) {
-		map_hash.hash = default_hash_ptr(key, size_of(T));
-	} else when intrinsics.type_is_string(T) {
-		#assert(T == string);
-		str := (^string)(key)^;
-		map_hash.hash = default_hash_string(str);
-	} else {
-		#panic("Unhandled map key type");
-	}
-
-	return map_hash;
 }
 
 __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, loc := #caller_location) -> bool {
@@ -141,17 +150,8 @@ __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, l
 	return true;
 }
 
-__dynamic_map_fix_keys :: proc(h: Map_Header) {
-	e := (^Map_Entry_Header)(h.m.entries.data);
-	for _ in 0..<h.m.entries.len {
-		e.hash.key_ptr = rawptr(uintptr(e) + h.key_offset);
-		e = (^Map_Entry_Header)(uintptr(e) + uintptr(h.entry_size));
-	}
-}
-
 __dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller_location) {
 	__dynamic_array_reserve(&m.entries, entry_size, entry_align, cap, loc);
-	__dynamic_map_fix_keys(header);
 
 	old_len := len(m.hashes);
 	__slice_resize(&m.hashes, cap, m.entries.allocator, loc);
@@ -187,9 +187,10 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 		}
 
 		entry_header := __dynamic_map_get_entry(header, i);
+		entry_hash := __get_map_hash_from_entry(header, entry_header);
 
-		fr := __dynamic_map_find(new_header, entry_header.hash);
-		j := __dynamic_map_add_entry(new_header, entry_header.hash, loc);
+		fr := __dynamic_map_find(new_header, entry_hash);
+		j := __dynamic_map_add_entry(new_header, entry_hash, loc);
 		if fr.entry_prev < 0 {
 			nm.hashes[fr.hash_index] = j;
 		} else {
@@ -243,15 +244,13 @@ __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #
 	}
 	{
 		e := __dynamic_map_get_entry(h, index);
+		e.hash = hash.hash;
 
 		key := rawptr(uintptr(e) + h.key_offset);
 		mem_copy(key, hash.key_ptr, h.key_size);
 
 		val := rawptr(uintptr(e) + h.value_offset);
 		mem_copy(val, value, h.value_size);
-
-		e.hash.hash = hash.hash;
-		e.hash.key_ptr = key;
 	}
 
 	if __dynamic_map_full(h) {
@@ -293,7 +292,8 @@ __dynamic_map_find :: proc(using h: Map_Header, hash: Map_Hash) -> Map_Find_Resu
 		fr.entry_index = m.hashes[fr.hash_index];
 		for fr.entry_index >= 0 {
 			entry := __dynamic_map_get_entry(h, fr.entry_index);
-			if __dynamic_map_hash_equal(h, entry.hash, hash) {
+			entry_hash := __get_map_hash_from_entry(h, entry);
+			if __dynamic_map_hash_equal(h, entry_hash, hash) {
 				return fr;
 			}
 			fr.entry_prev = fr.entry_index;
@@ -307,14 +307,10 @@ __dynamic_map_add_entry :: proc(using h: Map_Header, hash: Map_Hash, loc := #cal
 	prev := m.entries.len;
 	prev_data := m.entries.data;
 	c := __dynamic_array_append_nothing(&m.entries, entry_size, entry_align, loc);
-	if m.entries.data != prev_data {
-		__dynamic_map_fix_keys(h);
-	}
 	if c != prev {
 		end := __dynamic_map_get_entry(h, c-1);
-		end.hash.hash = hash.hash;
-		end.hash.key_ptr = rawptr(uintptr(end) + key_offset);
-		mem_copy(end.hash.key_ptr, hash.key_ptr, key_size);
+		end.hash = hash.hash;
+		mem_copy(rawptr(uintptr(end) + key_offset), hash.key_ptr, key_size);
 		end.next = -1;
 	}
 	return prev;
@@ -334,7 +330,6 @@ __dynamic_map_get_entry :: proc(using h: Map_Header, index: int) -> ^Map_Entry_H
 
 __dynamic_map_copy_entry :: proc(h: Map_Header, new, old: ^Map_Entry_Header) {
 	mem_copy(new, old, h.entry_size);
-	new.hash.key_ptr = rawptr(uintptr(new) + h.key_offset);
 }
 
 __dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) #no_bounds_check {
@@ -352,7 +347,9 @@ __dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) #no_bounds
 		end := __dynamic_map_get_entry(h, m.entries.len-1);
 		__dynamic_map_copy_entry(h, old, end);
 
-		if last := __dynamic_map_find(h, old.hash); last.entry_prev >= 0 {
+		old_hash := __get_map_hash_from_entry(h, old);
+
+		if last := __dynamic_map_find(h, old_hash); last.entry_prev >= 0 {
 			last_entry := __dynamic_map_get_entry(h, last.entry_prev);
 			last_entry.next = fr.entry_index;
 		} else {

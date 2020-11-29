@@ -2799,9 +2799,9 @@ void init_map_entry_type(Type *type) {
 	Scope *s = create_scope(builtin_pkg->scope);
 
 	auto fields = array_make<Entity *>(permanent_allocator(), 0, 4);
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("hash")),  t_map_hash,      false, cast(i32)fields.count, EntityState_Resolved));
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("hash")),  t_uintptr,       false, cast(i32)fields.count, EntityState_Resolved));
 	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("next")),  t_int,           false, cast(i32)fields.count, EntityState_Resolved));
-	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("key")),   type->Map.key, false, cast(i32)fields.count, EntityState_Resolved));
+	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("key")),   type->Map.key,   false, cast(i32)fields.count, EntityState_Resolved));
 	array_add(&fields, alloc_entity_field(s, make_token_ident(str_lit("value")), type->Map.value, false, cast(i32)fields.count, EntityState_Resolved));
 
 
