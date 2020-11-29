@@ -2860,37 +2860,31 @@ void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 			return;
 		}
 
+		if (is_type_simple_compare(key)) {
+			i64 sz = type_size_of(key);
+			if (1 <= sz && sz <= 16) {
+				char buf[20] = {};
+				gb_snprintf(buf, 20, "default_hasher%d", cast(i32)sz);
+				add_package_dependency(ctx, "runtime", buf);
+				return;
+			} else {
+				add_package_dependency(ctx, "runtime", "default_hasher_n");
+				return;
+			}
+		}
+
 		if (key->kind == Type_Struct) {
 			add_package_dependency(ctx, "runtime", "default_hasher_n");
-			if (!is_type_simple_compare(key)) {
-				for_array(i, key->Struct.fields) {
-					Entity *field = key->Struct.fields[i];
-					add_map_key_type_dependencies(ctx, field->type);
-				}
+			for_array(i, key->Struct.fields) {
+				Entity *field = key->Struct.fields[i];
+				add_map_key_type_dependencies(ctx, field->type);
 			}
 		} else if (key->kind == Type_EnumeratedArray) {
 			add_package_dependency(ctx, "runtime", "default_hasher_n");
-			if (!is_type_simple_compare(key->EnumeratedArray.elem)) {
-				add_map_key_type_dependencies(ctx, key->EnumeratedArray.elem);
-			}
+			add_map_key_type_dependencies(ctx, key->EnumeratedArray.elem);
 		} else if (key->kind == Type_Array) {
 			add_package_dependency(ctx, "runtime", "default_hasher_n");
-			if (!is_type_simple_compare(key->Array.elem)) {
-				add_map_key_type_dependencies(ctx, key->Array.elem);
-			}
-		} else {
-			if (!is_type_simple_compare(key)) {
-				GB_PANIC("HERE");
-			}
-
-			i64 sz = type_size_of(key);
-			switch (sz) {
-			case  1: add_package_dependency(ctx, "runtime", "default_hasher1");  break;
-			case  2: add_package_dependency(ctx, "runtime", "default_hasher2");  break;
-			case  4: add_package_dependency(ctx, "runtime", "default_hasher4");  break;
-			case  8: add_package_dependency(ctx, "runtime", "default_hasher8");  break;
-			case 16: add_package_dependency(ctx, "runtime", "default_hasher16"); break;
-			}
+			add_map_key_type_dependencies(ctx, key->Array.elem);
 		}
 	}
 }
