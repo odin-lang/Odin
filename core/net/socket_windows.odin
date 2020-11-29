@@ -21,8 +21,10 @@ Socket_Error :: enum {
 	Ok,
 }
 
-Dial_Error :: enum {
-	Ok
+Dial_Error :: enum i32 {
+	Ok,
+	Address_Not_Available = win.WSAEADDRNOTAVAIL,
+	Refused = win.WSAECONNREFUSED,
 }
 
 dial :: proc(addr: Address, port: int, type: Socket_Type) -> (Socket, Dial_Error) {
@@ -107,15 +109,15 @@ Send_Error :: enum i32 {
 // Repeatedly sends data until the entire buffer is sent.
 // If a send fails before all data is sent, returns the amount
 // sent up to that point.
-send :: proc(s: Socket, buf: []byte) -> (int, Send_Error) {
-	sent := 0;
-	for sent < len(buf) {
-		limit := min(1<<31, len(buf) - sent);
+send :: proc(s: Socket, buf: []byte) -> (bytes_written: int, err: Send_Error) {
+	for bytes_written < len(buf) {
+		limit := min(1<<31, len(buf) - bytes_written);
 		res := win.send(win.SOCKET(s), &buf[0], c.int(limit), 0);
 		if res < 0 {
-			return sent, Send_Error(win.WSAGetLastError());
+			err = Send_Error(win.WSAGetLastError());
+			return;
 		}
-		sent += int(res);
+		bytes_written += int(res);
 	}
-	return sent, .Ok;
+	return;
 }
