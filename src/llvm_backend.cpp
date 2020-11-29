@@ -12980,39 +12980,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(mod);
 	defer (LLVMDisposePassManager(default_function_pass_manager));
-	/*{
-		LLVMAddMemCpyOptPass(default_function_pass_manager);
-		LLVMAddPromoteMemoryToRegisterPass(default_function_pass_manager);
-		LLVMAddMergedLoadStoreMotionPass(default_function_pass_manager);
-		LLVMAddAggressiveInstCombinerPass(default_function_pass_manager);
-		LLVMAddConstantPropagationPass(default_function_pass_manager);
-		LLVMAddAggressiveDCEPass(default_function_pass_manager);
-		LLVMAddMergedLoadStoreMotionPass(default_function_pass_manager);
-		LLVMAddPromoteMemoryToRegisterPass(default_function_pass_manager);
-		LLVMAddCFGSimplificationPass(default_function_pass_manager);
-		// LLVMAddUnifyFunctionExitNodesPass(default_function_pass_manager);
-
-		if (build_context.optimization_level >= 2) {
-			LLVMAddAggressiveInstCombinerPass(default_function_pass_manager);
-			LLVMAddEarlyCSEPass(default_function_pass_manager);
-			LLVMAddEarlyCSEMemSSAPass(default_function_pass_manager);
-			LLVMAddLowerExpectIntrinsicPass(default_function_pass_manager);
-
-			LLVMAddAlignmentFromAssumptionsPass(default_function_pass_manager);
-			LLVMAddLoopRotatePass(default_function_pass_manager);
-			LLVMAddDeadStoreEliminationPass(default_function_pass_manager);
-			LLVMAddScalarizerPass(default_function_pass_manager);
-			LLVMAddReassociatePass(default_function_pass_manager);
-			LLVMAddAddDiscriminatorsPass(default_function_pass_manager);
-			LLVMAddPromoteMemoryToRegisterPass(default_function_pass_manager);
-			LLVMAddCorrelatedValuePropagationPass(default_function_pass_manager);
-
-			LLVMAddSLPVectorizePass(default_function_pass_manager);
-			LLVMAddLoopVectorizePass(default_function_pass_manager);
-
-		}
-	}*/
-	if (build_context.optimization_level == 0 && false) {
+	{
 		auto dfpm = default_function_pass_manager;
 
 		LLVMAddMemCpyOptPass(dfpm);
@@ -13024,42 +12992,33 @@ void lb_generate_code(lbGenerator *gen) {
 		LLVMAddMergedLoadStoreMotionPass(dfpm);
 		LLVMAddPromoteMemoryToRegisterPass(dfpm);
 		LLVMAddCFGSimplificationPass(dfpm);
+		LLVMAddTailCallEliminationPass(dfpm);
 		LLVMAddScalarizerPass(dfpm);
-	} else {
-		auto dfpm = default_function_pass_manager;
 
-		LLVMAddMemCpyOptPass(dfpm);
-		LLVMAddPromoteMemoryToRegisterPass(dfpm);
-		LLVMAddMergedLoadStoreMotionPass(dfpm);
-		LLVMAddAggressiveInstCombinerPass(dfpm);
-		LLVMAddConstantPropagationPass(dfpm);
-		LLVMAddAggressiveDCEPass(dfpm);
-		LLVMAddMergedLoadStoreMotionPass(dfpm);
-		LLVMAddPromoteMemoryToRegisterPass(dfpm);
-		LLVMAddCFGSimplificationPass(dfpm);
-
-
-		// LLVMAddInstructionCombiningPass(dfpm);
 		LLVMAddSLPVectorizePass(dfpm);
 		LLVMAddLoopVectorizePass(dfpm);
 		LLVMAddEarlyCSEPass(dfpm);
 		LLVMAddEarlyCSEMemSSAPass(dfpm);
 
+		LLVMAddConstantPropagationPass(dfpm);
 		LLVMAddScalarizerPass(dfpm);
 		LLVMAddLoopIdiomPass(dfpm);
 
-		// LLVMAddAggressiveInstCombinerPass(dfpm);
-		// LLVMAddLowerExpectIntrinsicPass(dfpm);
 
-		// LLVMAddPartiallyInlineLibCallsPass(dfpm);
+		if (build_context.optimization_level != 0) {
+			// LLVMAddAggressiveInstCombinerPass(dfpm);
+			// LLVMAddLowerExpectIntrinsicPass(dfpm);
 
-		// LLVMAddAlignmentFromAssumptionsPass(dfpm);
-		// LLVMAddDeadStoreEliminationPass(dfpm);
-		// LLVMAddReassociatePass(dfpm);
-		// LLVMAddAddDiscriminatorsPass(dfpm);
-		// LLVMAddPromoteMemoryToRegisterPass(dfpm);
-		// LLVMAddCorrelatedValuePropagationPass(dfpm);
-		// LLVMAddMemCpyOptPass(dfpm);
+			// LLVMAddPartiallyInlineLibCallsPass(dfpm);
+
+			// LLVMAddAlignmentFromAssumptionsPass(dfpm);
+			// LLVMAddDeadStoreEliminationPass(dfpm);
+			// LLVMAddReassociatePass(dfpm);
+			// LLVMAddAddDiscriminatorsPass(dfpm);
+			// LLVMAddPromoteMemoryToRegisterPass(dfpm);
+			// LLVMAddCorrelatedValuePropagationPass(dfpm);
+			// LLVMAddMemCpyOptPass(dfpm);
+		}
 	}
 
 
@@ -13307,6 +13266,15 @@ void lb_generate_code(lbGenerator *gen) {
 				}
 			}
 		}
+	}
+
+	for_array(i, m->equal_procs.entries) {
+		lbProcedure *p = m->equal_procs.entries[i].value;
+		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
+	}
+	for_array(i, m->hasher_procs.entries) {
+		lbProcedure *p = m->hasher_procs.entries[i].value;
+		LLVMRunFunctionPassManager(default_function_pass_manager, p->value);
 	}
 
 
