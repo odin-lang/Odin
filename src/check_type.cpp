@@ -2849,11 +2849,11 @@ void init_map_internal_types(Type *type) {
 }
 
 void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
-	if (is_type_string(key)) {
-		add_package_dependency(ctx, "runtime", "default_hash_string");
+	if (is_type_cstring(key)) {
+		add_package_dependency(ctx, "runtime", "default_hasher_cstring");
+	} else if (is_type_string(key)) {
 		add_package_dependency(ctx, "runtime", "default_hasher_string");
 	} else if (!is_type_polymorphic(key)) {
-		add_package_dependency(ctx, "runtime", "default_hash_ptr");
 		GB_ASSERT_MSG(is_type_simple_compare(key), "%s", type_to_string(key));
 
 		i64 sz = type_size_of(key);

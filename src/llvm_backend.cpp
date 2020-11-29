@@ -9286,6 +9286,12 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 		type_set_offsets(type);
 
 		GB_PANIC("Type_Struct");
+	} else if (is_type_cstring(type)) {
+		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		args[0] = data;
+		args[1] = seed;
+		lbValue res = lb_emit_runtime_call(p, "default_hasher_cstring", args);
+		LLVMBuildRet(p->builder, res.value);
 	} else if (is_type_string(type)) {
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		args[0] = data;
@@ -10375,37 +10381,17 @@ lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type) {
 	Type *t = base_type(key.type);
 	key = lb_emit_conv(p, key, key_type);
 
-	if (is_type_string(t)) {
-		lbValue str = lb_emit_conv(p, key, t_string);
-		lbValue hashed_str = {};
-
-		if (lb_is_const(str)) {
-			String v = lb_get_const_string(p->module, str);
-			u64 hs = fnv64a(v.text, v.len);
-			if (build_context.word_size == 4) {
-				hs &= 0xffffffff;
-			}
-			hashed_str = lb_const_int(p->module, t_uintptr, hs);
-		} else {
-			auto args = array_make<lbValue>(permanent_allocator(), 1);
-			args[0] = str;
-			hashed_str = lb_emit_runtime_call(p, "default_hash_string", args);
-		}
-		lb_emit_store(p, lb_emit_struct_ep(p, vp, 0), hashed_str);
-	} else {
-		i64 sz = type_size_of(t);
-		GB_ASSERT(sz <= 8);
-		if (sz != 0) {
-			auto args = array_make<lbValue>(permanent_allocator(), 2);
-			args[0] = lb_address_from_load_or_generate_local(p, key);
-			args[1] = lb_const_int(p->module, t_int, sz);
-			lbValue hash = lb_emit_runtime_call(p, "default_hash_ptr", args);
-			lb_emit_store(p, lb_emit_struct_ep(p, vp, 0), hash);
-		}
-	}
-
 	lbValue key_ptr = lb_address_from_load_or_generate_local(p, key);
 	key_ptr = lb_emit_conv(p, key_ptr, t_rawptr);
+
+	lbValue hasher = lb_get_hasher_proc_for_type(p->module, key_type);
+
+	auto args = array_make<lbValue>(permanent_allocator(), 2);
+	args[0] = key_ptr;
+	args[1] = lb_const_int(p->module, t_uintptr, 0);
+	lbValue hashed_key = lb_emit_call(p, hasher, args);
+
+	lb_emit_store(p, lb_emit_struct_ep(p, vp, 0), hashed_key);
 	lb_emit_store(p, lb_emit_struct_ep(p, vp, 1), key_ptr);
 
 	return lb_addr_load(p, v);

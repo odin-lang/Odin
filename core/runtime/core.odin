@@ -42,8 +42,10 @@ Platform_Endianness :: enum u8 {
 	Big      = 2,
 }
 
-Equal_Proc  :: distinct proc "contextless" (rawptr, rawptr) -> bool;
-Hasher_Proc :: distinct proc "contextless" (data: rawptr, seed: uintptr) -> uintptr;
+// Procedure type to test whether two values of the same type are equal
+Equal_Proc :: distinct proc "contextless" (rawptr, rawptr) -> bool;
+// Procedure type to hash a value, default seed value is 0
+Hasher_Proc :: distinct proc "contextless" (data: rawptr, seed: uintptr = 0) -> uintptr;
 
 Type_Info_Struct_Soa_Kind :: enum u8 {
 	None    = 0,

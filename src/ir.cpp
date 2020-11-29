@@ -532,6 +532,7 @@ irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, Ast *expr, i
 void ir_begin_procedure_body(irProcedure *proc);
 void ir_end_procedure_body(irProcedure *proc);
 irValue *ir_get_equal_proc_for_type(irModule *m, Type *type);
+irValue *ir_get_hasher_proc_for_type(irModule *m, Type *type);
 
 
 irAddr ir_addr(irValue *addr) {
@@ -3620,43 +3621,18 @@ irValue *ir_gen_map_hash(irProcedure *proc, irValue *key, Type *key_type) {
 	Type *t = base_type(ir_type(key));
 	key = ir_emit_conv(proc, key, key_type);
 
-	if (is_type_string(t)) {
-		irValue *str = ir_emit_conv(proc, key, t_string);
-		irValue *hashed_str = nullptr;
-
-		if (str->kind == irValue_Constant) {
-			ExactValue ev = str->Constant.value;
-			GB_ASSERT(ev.kind == ExactValue_String);
-			u64 hs = fnv64a(ev.value_string.text, ev.value_string.len);
-			if (build_context.word_size == 4) {
-				hs &= 0xffffffff;
-			}
-			hashed_str = ir_value_constant(t_uintptr, exact_value_u64(hs));
-		} else {
-			auto args = array_make<irValue *>(ir_allocator(), 1);
-			args[0] = str;
-			hashed_str = ir_emit_runtime_call(proc, "default_hash_string", args);
-		}
-		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), hashed_str);
-	} else {
-		i64 sz = type_size_of(t);
-		GB_ASSERT(sz <= 8);
-		if (sz != 0) {
-			auto args = array_make<irValue *>(ir_allocator(), 2);
-			args[0] = ir_address_from_load_or_generate_local(proc, key);
-			args[1] = ir_const_int(sz);
-			irValue *hash = ir_emit_runtime_call(proc, "default_hash_ptr", args);
-
-			irValue *hash_ptr = ir_emit_struct_ep(proc, v, 0);
-			ir_emit_store(proc, hash_ptr, hash);
-		}
-	}
-
 	irValue *key_ptr = ir_address_from_load_or_generate_local(proc, key);
 	key_ptr = ir_emit_conv(proc, key_ptr, t_rawptr);
 
-	irValue *key_data = ir_emit_struct_ep(proc, v, 1);
-	ir_emit_store(proc, key_data, key_ptr);
+	irValue *hasher = ir_get_hasher_proc_for_type(proc->module, key_type);
+
+	auto args = array_make<irValue *>(permanent_allocator(), 2);
+	args[0] = key_ptr;
+	args[1] = ir_value_constant(t_uintptr, exact_value_i64(0));
+	irValue *hashed_key = ir_emit_call(proc, hasher, args);
+
+	ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), hashed_key);
+	ir_emit_store(proc, ir_emit_struct_ep(proc, v, 1), key_ptr);
 
 	return ir_emit_load(proc, v);
 }
@@ -5007,6 +4983,12 @@ irValue *ir_get_hasher_proc_for_type(irModule *m, Type *type) {
 		type_set_offsets(type);
 
 		GB_PANIC("Type_Struct");
+	} else if (is_type_cstring(type)) {
+		auto args = array_make<irValue *>(permanent_allocator(), 2);
+		args[0] = data;
+		args[1] = seed;
+		irValue *res = ir_emit_runtime_call(proc, "default_hasher_cstring", args);
+		ir_emit(proc, ir_instr_return(proc, res));
 	} else if (is_type_string(type)) {
 		auto args = array_make<irValue *>(permanent_allocator(), 2);
 		args[0] = data;
