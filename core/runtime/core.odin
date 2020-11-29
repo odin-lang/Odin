@@ -42,6 +42,8 @@ Platform_Endianness :: enum u8 {
 	Big      = 2,
 }
 
+Equal_Proc :: distinct proc "contextless" (rawptr, rawptr) -> bool;
+
 Type_Info_Struct_Soa_Kind :: enum u8 {
 	None    = 0,
 	Fixed   = 1,
@@ -89,7 +91,6 @@ Type_Info_Tuple :: struct { // Only used for procedures parameters and results
 	names:        []string,
 };
 
-Type_Struct_Equal_Proc :: distinct proc "contextless" (rawptr, rawptr) -> bool;
 Type_Info_Struct :: struct {
 	types:        []^Type_Info,
 	names:        []string,
@@ -100,7 +101,7 @@ Type_Info_Struct :: struct {
 	is_raw_union: bool,
 	custom_align: bool,
 
-	equal: Type_Struct_Equal_Proc, // set only when the struct has .Comparable set but does not have .Simple_Compare set
+	equal: Equal_Proc, // set only when the struct has .Comparable set but does not have .Simple_Compare set
 
 	// These are only set iff this structure is an SOA structure
 	soa_kind:      Type_Info_Struct_Soa_Kind,
@@ -350,6 +351,7 @@ Raw_Map :: struct {
 	hashes:  []int,
 	entries: Raw_Dynamic_Array,
 }
+
 
 /////////////////////////////
 // Init Startup Procedures //

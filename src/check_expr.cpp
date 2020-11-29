@@ -6060,6 +6060,27 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			break;
 		}
 		break;
+
+	case BuiltinProc_type_equal_proc:
+		{
+			Operand op = {};
+			Type *bt = check_type(c, ce->args[0]);
+			Type *type = base_type(bt);
+			if (type == nullptr || type == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_comparable(type)) {
+				gbString t = type_to_string(type);
+				error(ce->args[0], "Expected a comparable type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = t_equal_proc;
+			break;
+		}
 	}
 
 	return true;

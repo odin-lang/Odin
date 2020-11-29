@@ -379,6 +379,8 @@ lbValue lb_emit_source_code_location(lbProcedure *p, String const &procedure, To
 
 lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos);
 
+lbValue lb_get_equal_proc_for_type(lbModule *m, Type *type);
+lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
