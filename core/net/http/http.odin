@@ -7,7 +7,7 @@ import "core:strconv"
 import "core:mem"
 import "core:fmt" // for panicf
 
-Status :: enum {
+Status_Code :: enum {
 	Unknown = 0,
 
 	// NOTE(tetra): Only produced by recv_request.
@@ -42,7 +42,7 @@ Method :: enum u8 {
 
 
 Response :: struct {
-	status: Status,
+	status_code: Status_Code,
 	headers: map[string]string, // TODO: We don't currently destroy the keys or values.
 	body: string,
 }
@@ -150,7 +150,7 @@ recv_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp:
 	assert(len(status_parts) >= 3); // NOTE(tetra): 3 for OK, more if status text is more than one word.
 
 	status_code, _ := strconv.parse_int(status_parts[1]);
-	resp.status = Status(status_code);
+	resp.status_code = Status_Code(status_code);
 
 	resp_parts = resp_parts[1:];
 
@@ -166,7 +166,7 @@ recv_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp:
 
 		idx := index(trimmed_part, ":");
 		if idx == -1 {
-			resp.status = .Bad_Response_Header;
+			resp.status_code = .Bad_Response_Header;
 			return;
 		}
 		// the header parts are currently in `read_buf` (temporary memory), but we want to return them.
@@ -177,11 +177,11 @@ recv_response :: proc(skt: net.Socket, allocator := context.allocator) -> (resp:
 	}
 	if last_hdr_index == -1 {
 		// NOTE(tetra): Should have found the last header.
-		resp.status = .Bad_Response_Header;
+		resp.status_code = .Bad_Response_Header;
 		return;
 	}
 
-	if resp.status != .Ok {
+	if resp.status_code != .Ok {
 		ok = true;
 		return;
 	}
@@ -262,7 +262,7 @@ execute_request :: proc(r: Request, allocator := context.allocator) -> (response
 		resp, read_ok = recv_response(skt);
 		if !read_ok do return;
 
-		if resp.status != .Moved_Permanently {
+		if resp.status_code != .Moved_Permanently {
 			break;
 		} else {
 			location, has_new_location := resp.headers["Location"];
