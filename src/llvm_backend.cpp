@@ -9253,15 +9253,11 @@ lbValue lb_simple_compare_hash(lbProcedure *p, Type *type, lbValue data, lbValue
 	GB_ASSERT_MSG(is_type_simple_compare(type), "%s", type_to_string(type));
 
 	i64 sz = type_size_of(type);
-	char const *name = nullptr;
-	switch (sz) {
-	case 1:  name = "default_hasher1";  break;
-	case 2:  name = "default_hasher2";  break;
-	case 4:  name = "default_hasher4";  break;
-	case 8:  name = "default_hasher8";  break;
-	case 16: name = "default_hasher16"; break;
-	}
-	if (name != nullptr) {
+
+	if (1 <= sz && sz <= 16) {
+		char name[20] = {};
+		gb_snprintf(name, 20, "default_hasher%d", cast(i32)sz);
+
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		args[0] = data;
 		args[1] = seed;

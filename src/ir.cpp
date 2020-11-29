@@ -4969,15 +4969,10 @@ irValue *ir_simple_compare_hash(irProcedure *p, Type *type, irValue *data, irVal
 	GB_ASSERT_MSG(is_type_simple_compare(type), "%s", type_to_string(type));
 
 	i64 sz = type_size_of(type);
-	char const *name = nullptr;
-	switch (sz) {
-	case 1:  name = "default_hasher1";  break;
-	case 2:  name = "default_hasher2";  break;
-	case 4:  name = "default_hasher4";  break;
-	case 8:  name = "default_hasher8";  break;
-	case 16: name = "default_hasher16"; break;
-	}
-	if (name != nullptr) {
+	if (1 <= sz && sz <= 16) {
+		char name[20] = {};
+		gb_snprintf(name, 20, "default_hasher%d", cast(i32)sz);
+
 		auto args = array_make<irValue *>(permanent_allocator(), 2);
 		args[0] = data;
 		args[1] = seed;
@@ -5038,7 +5033,19 @@ irValue *ir_get_hasher_proc_for_type(irModule *m, Type *type) {
 		return p;
 	}
 
-	if (type->kind == Type_Struct) {
+	if (is_type_cstring(type)) {
+		auto args = array_make<irValue *>(permanent_allocator(), 2);
+		args[0] = data;
+		args[1] = seed;
+		irValue *res = ir_emit_runtime_call(proc, "default_hasher_cstring", args);
+		ir_emit(proc, ir_instr_return(proc, res));
+	} else if (is_type_string(type)) {
+		auto args = array_make<irValue *>(permanent_allocator(), 2);
+		args[0] = data;
+		args[1] = seed;
+		irValue *res = ir_emit_runtime_call(proc, "default_hasher_string", args);
+		ir_emit(proc, ir_instr_return(proc, res));
+	} else if (type->kind == Type_Struct) {
 		type_set_offsets(type);
 		data = ir_emit_conv(proc, data, t_u8_ptr);
 
@@ -5096,24 +5103,9 @@ irValue *ir_get_hasher_proc_for_type(irModule *m, Type *type) {
 
 		irValue *res = ir_emit_load(proc, pres);
 		ir_emit(proc, ir_instr_return(proc, res));
-	} else if (is_type_cstring(type)) {
-		auto args = array_make<irValue *>(permanent_allocator(), 2);
-		args[0] = data;
-		args[1] = seed;
-		irValue *res = ir_emit_runtime_call(proc, "default_hasher_cstring", args);
-		ir_emit(proc, ir_instr_return(proc, res));
-	} else if (is_type_string(type)) {
-		auto args = array_make<irValue *>(permanent_allocator(), 2);
-		args[0] = data;
-		args[1] = seed;
-		irValue *res = ir_emit_runtime_call(proc, "default_hasher_string", args);
-		ir_emit(proc, ir_instr_return(proc, res));
 	} else {
 		GB_PANIC("Unhandled type for hasher: %s", type_to_string(type));
 	}
-
-
-	ir_end_procedure_body(proc);
 
 	return p;
 }
