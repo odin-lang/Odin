@@ -9249,6 +9249,32 @@ lbValue lb_get_equal_proc_for_type(lbModule *m, Type *type) {
 	return {compare_proc->value, compare_proc->type};
 }
 
+lbValue lb_simple_compare_hash(lbProcedure *p, Type *type, lbValue data, lbValue seed) {
+	GB_ASSERT_MSG(is_type_simple_compare(type), "%s", type_to_string(type));
+
+	i64 sz = type_size_of(type);
+	char const *name = nullptr;
+	switch (sz) {
+	case 1:  name = "default_hasher1";  break;
+	case 2:  name = "default_hasher2";  break;
+	case 4:  name = "default_hasher4";  break;
+	case 8:  name = "default_hasher8";  break;
+	case 16: name = "default_hasher16"; break;
+	}
+	if (name != nullptr) {
+		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		args[0] = data;
+		args[1] = seed;
+		return lb_emit_runtime_call(p, name, args);
+	}
+
+	auto args = array_make<lbValue>(permanent_allocator(), 3);
+	args[0] = data;
+	args[1] = seed;
+	args[2] = lb_const_int(p->module, t_int, type_size_of(type));
+	return lb_emit_runtime_call(p, "default_hasher_n", args);
+}
+
 lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 	Type *original_type = type;
 	type = core_type(type);
@@ -9259,11 +9285,9 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 
 	auto key = hash_type(type);
 	lbProcedure **found = map_get(&m->hasher_procs, key);
-	lbProcedure *hasher_proc = nullptr;
 	if (found) {
-		hasher_proc = *found;
-		GB_ASSERT(hasher_proc != nullptr);
-		return {hasher_proc->value, hasher_proc->type};
+		GB_ASSERT(*found != nullptr);
+		return {(*found)->value, (*found)->type};
 	}
 
 	static u32 proc_index = 0;
@@ -9276,102 +9300,77 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_hasher_proc);
 	map_set(&m->hasher_procs, key, p);
 	lb_begin_procedure_body(p);
+	defer (lb_end_procedure_body(p));
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
 	LLVMValueRef y = LLVMGetParam(p->value, 1);
 	lbValue data = {x, t_rawptr};
 	lbValue seed = {y, t_uintptr};
 
+	if (is_type_simple_compare(type)) {
+		lbValue res = lb_simple_compare_hash(p, type, data, seed);
+		LLVMBuildRet(p->builder, res.value);
+		return {p->value, p->type};
+	}
+
 	if (type->kind == Type_Struct)  {
 		type_set_offsets(type);
-		if (is_type_simple_compare(type)) {
-			i64 sz = type_size_of(type);
-			auto args = array_make<lbValue>(permanent_allocator(), 3);
-			args[0] = data;
+		data = lb_emit_conv(p, data, t_u8_ptr);
+
+		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		for_array(i, type->Struct.fields) {
+			i64 offset = type->Struct.offsets[i];
+			Entity *field = type->Struct.fields[i];
+			lbValue field_hasher = lb_get_hasher_proc_for_type(m, field->type);
+			lbValue ptr = lb_emit_ptr_offset(p, data, lb_const_int(m, t_uintptr, offset));
+
+			args[0] = ptr;
 			args[1] = seed;
-			args[2] = lb_const_int(m, t_int, sz);
-			lbValue res = lb_emit_runtime_call(p, "default_hasher_n", args);
-			LLVMBuildRet(p->builder, res.value);
-		} else {
-			data = lb_emit_conv(p, data, t_u8_ptr);
-
-			auto args = array_make<lbValue>(permanent_allocator(), 2);
-			for_array(i, type->Struct.fields) {
-				i64 offset = type->Struct.offsets[i];
-				Entity *field = type->Struct.fields[i];
-				lbValue field_hasher = lb_get_hasher_proc_for_type(m, field->type);
-				lbValue ptr = lb_emit_ptr_offset(p, data, lb_const_int(m, t_uintptr, offset));
-
-				args[0] = ptr;
-				args[1] = seed;
-				seed = lb_emit_call(p, field_hasher, args);
-			}
-			LLVMBuildRet(p->builder, seed.value);
+			seed = lb_emit_call(p, field_hasher, args);
 		}
+		LLVMBuildRet(p->builder, seed.value);
 	} else if (type->kind == Type_Array) {
-		if (is_type_simple_compare(type)) {
-			i64 sz = type_size_of(type);
-			auto args = array_make<lbValue>(permanent_allocator(), 3);
-			args[0] = data;
-			args[1] = seed;
-			args[2] = lb_const_int(m, t_int, sz);
-			lbValue res = lb_emit_runtime_call(p, "default_hasher_n", args);
-			LLVMBuildRet(p->builder, res.value);
-		} else {
-			lbAddr pres = lb_add_local_generated(p, t_uintptr, false);
-			lb_addr_store(p, pres, seed);
+		lbAddr pres = lb_add_local_generated(p, t_uintptr, false);
+		lb_addr_store(p, pres, seed);
 
-			auto args = array_make<lbValue>(permanent_allocator(), 2);
-			lbValue elem_hasher = lb_get_hasher_proc_for_type(m, type->Array.elem);
+		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		lbValue elem_hasher = lb_get_hasher_proc_for_type(m, type->Array.elem);
 
-			auto loop_data = lb_loop_start(p, type->Array.count, t_i32);
+		auto loop_data = lb_loop_start(p, type->Array.count, t_i32);
 
-			data = lb_emit_conv(p, data, pt);
+		data = lb_emit_conv(p, data, pt);
 
-			lbValue ptr = lb_emit_array_ep(p, data, loop_data.idx);
-			args[0] = ptr;
-			args[1] = lb_addr_load(p, pres);
-			lbValue new_seed = lb_emit_call(p, elem_hasher, args);
-			lb_addr_store(p, pres, new_seed);
+		lbValue ptr = lb_emit_array_ep(p, data, loop_data.idx);
+		args[0] = ptr;
+		args[1] = lb_addr_load(p, pres);
+		lbValue new_seed = lb_emit_call(p, elem_hasher, args);
+		lb_addr_store(p, pres, new_seed);
 
-			lb_loop_end(p, loop_data);
+		lb_loop_end(p, loop_data);
 
-			lbValue res = lb_addr_load(p, pres);
-			LLVMBuildRet(p->builder, res.value);
-		}
+		lbValue res = lb_addr_load(p, pres);
+		LLVMBuildRet(p->builder, res.value);
 	} else if (type->kind == Type_EnumeratedArray) {
-		if (is_type_simple_compare(type)) {
-			i64 sz = type_size_of(type);
-			auto args = array_make<lbValue>(permanent_allocator(), 3);
-			args[0] = data;
-			args[1] = seed;
-			args[2] = lb_const_int(m, t_int, sz);
-			lbValue res = lb_emit_runtime_call(p, "default_hasher_n", args);
-			LLVMBuildRet(p->builder, res.value);
-		} else {
-			lbAddr res = lb_add_local_generated(p, t_uintptr, false);
-			lb_addr_store(p, res, seed);
+		lbAddr res = lb_add_local_generated(p, t_uintptr, false);
+		lb_addr_store(p, res, seed);
 
-			auto args = array_make<lbValue>(permanent_allocator(), 2);
-			lbValue elem_hasher = lb_get_hasher_proc_for_type(m, type->EnumeratedArray.elem);
+		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		lbValue elem_hasher = lb_get_hasher_proc_for_type(m, type->EnumeratedArray.elem);
 
-			auto loop_data = lb_loop_start(p, type->EnumeratedArray.count, t_i32);
+		auto loop_data = lb_loop_start(p, type->EnumeratedArray.count, t_i32);
 
-			data = lb_emit_conv(p, data, pt);
+		data = lb_emit_conv(p, data, pt);
 
-			lbValue ptr = lb_emit_array_ep(p, data, loop_data.idx);
-			args[0] = ptr;
-			args[1] = lb_addr_load(p, res);
-			lbValue new_seed = lb_emit_call(p, elem_hasher, args);
-			lb_addr_store(p, res, new_seed);
+		lbValue ptr = lb_emit_array_ep(p, data, loop_data.idx);
+		args[0] = ptr;
+		args[1] = lb_addr_load(p, res);
+		lbValue new_seed = lb_emit_call(p, elem_hasher, args);
+		lb_addr_store(p, res, new_seed);
 
-			lb_loop_end(p, loop_data);
+		lb_loop_end(p, loop_data);
 
-			lbValue vres = lb_addr_load(p, res);
-			LLVMBuildRet(p->builder, vres.value);
-		}
-
-
+		lbValue vres = lb_addr_load(p, res);
+		LLVMBuildRet(p->builder, vres.value);
 	} else if (is_type_cstring(type)) {
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		args[0] = data;
@@ -9385,31 +9384,10 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 		lbValue res = lb_emit_runtime_call(p, "default_hasher_string", args);
 		LLVMBuildRet(p->builder, res.value);
 	} else {
-		GB_ASSERT_MSG(is_type_simple_compare(type), "%s", type_to_string(type));
-
-		i64 sz = type_size_of(type);
-		char const *name = nullptr;
-		switch (sz) {
-		case 1:  name = "default_hasher1";  break;
-		case 2:  name = "default_hasher2";  break;
-		case 4:  name = "default_hasher4";  break;
-		case 8:  name = "default_hasher8";  break;
-		case 16: name = "default_hasher16"; break;
-		default: GB_PANIC("unhandled hasher for key type: %s", type_to_string(type));
-		}
-		GB_ASSERT(name != nullptr);
-
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
-		args[0] = data;
-		args[1] = seed;
-		lbValue res = lb_emit_runtime_call(p, name, args);
-		LLVMBuildRet(p->builder, res.value);
+		GB_PANIC("Unhandled type for hasher: %s", type_to_string(type));
 	}
 
-	lb_end_procedure_body(p);
-
-	hasher_proc = p;
-	return {hasher_proc->value, hasher_proc->type};
+	return {p->value, p->type};
 }
 
 
