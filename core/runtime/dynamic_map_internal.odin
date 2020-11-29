@@ -76,6 +76,7 @@ default_hash_ptr :: inline proc "contextless" (data: rawptr, size: int) -> uintp
 	return default_hash(transmute([]byte)(s));
 }
 
+@(private)
 _default_hasher_const :: inline proc "contextless" (data: rawptr, seed: uintptr, $N: uint) -> uintptr {
 	h := u64(seed) + 0xcbf29ce484222325;
 	p := uintptr(data);
@@ -86,7 +87,8 @@ _default_hasher_const :: inline proc "contextless" (data: rawptr, seed: uintptr,
 	}
 	return uintptr(h);
 }
-_default_hasher_n :: inline proc "contextless" (data: rawptr, seed: uintptr, N: int) -> uintptr {
+
+default_hasher_n :: inline proc "contextless" (data: rawptr, seed: uintptr, N: int) -> uintptr {
 	h := u64(seed) + 0xcbf29ce484222325;
 	p := uintptr(data);
 	for _ in 0..<N {

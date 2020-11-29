@@ -5006,8 +5006,14 @@ irValue *ir_get_hasher_proc_for_type(irModule *m, Type *type) {
 
 	if (type->kind == Type_Struct) {
 		type_set_offsets(type);
-
-		GB_PANIC("Type_Struct");
+		GB_ASSERT(is_type_simple_compare(type));
+		i64 sz = type_size_of(type);
+		auto args = array_make<irValue *>(permanent_allocator(), 3);
+		args[0] = data;
+		args[1] = seed;
+		args[2] = ir_const_int(sz);
+		irValue *res = ir_emit_runtime_call(proc, "default_hasher_n", args);
+		ir_emit(proc, ir_instr_return(proc, res));
 	} else if (is_type_cstring(type)) {
 		auto args = array_make<irValue *>(permanent_allocator(), 2);
 		args[0] = data;
