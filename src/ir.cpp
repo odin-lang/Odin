@@ -3615,6 +3615,29 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_ty
 	return ir_emit_load(proc, h);
 }
 
+irValue *ir_const_hash(irModule *m, irValue *key, Type *key_type) {
+	irValue *hashed_key = nullptr;
+
+	if (key->kind == irValue_Constant) {
+		u64 hash = 0xcbf29ce484222325;
+		if (is_type_string(key_type)) {
+			GB_ASSERT(key->Constant.value.kind == ExactValue_String);
+			String s = key->Constant.value.value_string;
+			hash = fnv64a(s.text, s.len);
+		} else {
+			return nullptr;
+		}
+		// TODO(bill): other const hash types
+
+		if (build_context.word_size == 4) {
+			hash &= 0xffffffffull;
+		}
+		hashed_key = ir_const_uintptr(hash);
+	}
+
+	return hashed_key;
+}
+
 irValue *ir_gen_map_hash(irProcedure *proc, irValue *key, Type *key_type) {
 	Type *hash_type = t_u64;
 	irValue *v = ir_add_local_generated(proc, t_map_hash, true);
@@ -3624,12 +3647,14 @@ irValue *ir_gen_map_hash(irProcedure *proc, irValue *key, Type *key_type) {
 	irValue *key_ptr = ir_address_from_load_or_generate_local(proc, key);
 	key_ptr = ir_emit_conv(proc, key_ptr, t_rawptr);
 
-	irValue *hasher = ir_get_hasher_proc_for_type(proc->module, key_type);
-
-	auto args = array_make<irValue *>(permanent_allocator(), 2);
-	args[0] = key_ptr;
-	args[1] = ir_value_constant(t_uintptr, exact_value_i64(0));
-	irValue *hashed_key = ir_emit_call(proc, hasher, args);
+	irValue *hashed_key = ir_const_hash(proc->module, key, key_type);
+	if (hashed_key == nullptr) {
+		irValue *hasher = ir_get_hasher_proc_for_type(proc->module, key_type);
+		auto args = array_make<irValue *>(permanent_allocator(), 2);
+		args[0] = key_ptr;
+		args[1] = ir_value_constant(t_uintptr, exact_value_i64(0));
+		hashed_key = ir_emit_call(proc, hasher, args);
+	}
 
 	ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), hashed_key);
 	ir_emit_store(proc, ir_emit_struct_ep(proc, v, 1), key_ptr);

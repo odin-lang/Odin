@@ -142,7 +142,7 @@ lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 	case lbAddr_Map: {
 		Type *map_type = base_type(addr.map.type);
 		lbValue h = lb_gen_map_header(p, addr.addr, map_type);
-		lbValue key = lb_gen_map_key(p, addr.map.key, map_type->Map.key);
+		lbValue key = lb_gen_map_hash(p, addr.map.key, map_type->Map.key);
 
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		args[0] = h;
@@ -592,7 +592,7 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		Type *map_type = base_type(addr.map.type);
 		lbAddr v = lb_add_local_generated(p, map_type->Map.lookup_result_type, true);
 		lbValue h = lb_gen_map_header(p, addr.addr, map_type);
-		lbValue key = lb_gen_map_key(p, addr.map.key, map_type->Map.key);
+		lbValue key = lb_gen_map_hash(p, addr.map.key, map_type->Map.key);
 
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		args[0] = h;
@@ -6190,7 +6190,7 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 				{
 					lbValue addr = lb_address_from_load_or_generate_local(p, right);
 					lbValue h = lb_gen_map_header(p, addr, rt);
-					lbValue key = lb_gen_map_key(p, left, rt->Map.key);
+					lbValue key = lb_gen_map_hash(p, left, rt->Map.key);
 
 					auto args = array_make<lbValue>(permanent_allocator(), 2);
 					args[0] = h;
@@ -10374,7 +10374,30 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 	return lb_addr_load(p, h);
 }
 
-lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type) {
+lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
+	lbValue hashed_key = {};
+
+	if (lb_is_const(key)) {
+		u64 hash = 0xcbf29ce484222325;
+		if (is_type_string(key_type)) {
+			size_t length = 0;
+			char const *text = LLVMGetAsString(key.value, &length);
+			hash = fnv64a(text, cast(isize)length);
+		} else {
+			return {};
+		}
+		// TODO(bill): other const hash types
+
+		if (build_context.word_size == 4) {
+			hash &= 0xffffffffull;
+		}
+		hashed_key = lb_const_int(m, t_uintptr, hash);
+	}
+
+	return hashed_key;
+}
+
+lbValue lb_gen_map_hash(lbProcedure *p, lbValue key, Type *key_type) {
 	Type *hash_type = t_u64;
 	lbAddr v = lb_add_local_generated(p, t_map_hash, true);
 	lbValue vp = lb_addr_get_ptr(p, v);
@@ -10384,12 +10407,15 @@ lbValue lb_gen_map_key(lbProcedure *p, lbValue key, Type *key_type) {
 	lbValue key_ptr = lb_address_from_load_or_generate_local(p, key);
 	key_ptr = lb_emit_conv(p, key_ptr, t_rawptr);
 
-	lbValue hasher = lb_get_hasher_proc_for_type(p->module, key_type);
+	lbValue hashed_key = lb_const_hash(p->module, key, key_type);
+	if (hashed_key.value == nullptr) {
+		lbValue hasher = lb_get_hasher_proc_for_type(p->module, key_type);
 
-	auto args = array_make<lbValue>(permanent_allocator(), 2);
-	args[0] = key_ptr;
-	args[1] = lb_const_int(p->module, t_uintptr, 0);
-	lbValue hashed_key = lb_emit_call(p, hasher, args);
+		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		args[0] = key_ptr;
+		args[1] = lb_const_int(p->module, t_uintptr, 0);
+		hashed_key = lb_emit_call(p, hasher, args);
+	}
 
 	lb_emit_store(p, lb_emit_struct_ep(p, vp, 0), hashed_key);
 	lb_emit_store(p, lb_emit_struct_ep(p, vp, 1), key_ptr);
@@ -10403,7 +10429,7 @@ void lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_
 	GB_ASSERT(map_type->kind == Type_Map);
 
 	lbValue h = lb_gen_map_header(p, addr.addr, map_type);
-	lbValue key = lb_gen_map_key(p, map_key, map_type->Map.key);
+	lbValue key = lb_gen_map_hash(p, map_key, map_type->Map.key);
 	lbValue v = lb_emit_conv(p, map_value, map_type->Map.value);
 
 	lbAddr value_addr = lb_add_local_generated(p, v.type, false);
