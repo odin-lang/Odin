@@ -964,7 +964,6 @@ bool is_type_valid_for_keys(Type *t);
 
 Type *alloc_type_map(i64 count, Type *key, Type *value) {
 	if (key != nullptr) {
-		GB_ASSERT(is_type_valid_for_keys(key));
 		GB_ASSERT(value != nullptr);
 	}
 	Type *t = alloc_type(Type_Map);
@@ -1556,6 +1555,9 @@ bool is_type_valid_for_keys(Type *t) {
 		return true;
 	}
 	if (is_type_typeid(t)) {
+		return true;
+	}
+	if (is_type_simple_compare(t)) {
 		return true;
 	}
 

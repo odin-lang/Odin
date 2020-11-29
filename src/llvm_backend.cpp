@@ -9284,8 +9284,14 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 
 	if (type->kind == Type_Struct)  {
 		type_set_offsets(type);
-
-		GB_PANIC("Type_Struct");
+		GB_ASSERT(is_type_simple_compare(type));
+		i64 sz = type_size_of(type);
+		auto args = array_make<lbValue>(permanent_allocator(), 3);
+		args[0] = data;
+		args[1] = seed;
+		args[2] = lb_const_int(m, t_int, sz);
+		lbValue res = lb_emit_runtime_call(p, "default_hasher_n", args);
+		LLVMBuildRet(p->builder, res.value);
 	} else if (is_type_cstring(type)) {
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		args[0] = data;

@@ -2856,6 +2856,10 @@ void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 	} else if (!is_type_polymorphic(key)) {
 		GB_ASSERT_MSG(is_type_simple_compare(key), "%s", type_to_string(key));
 
+		if (is_type_struct(key)) {
+			add_package_dependency(ctx, "runtime", "default_hasher_n");
+		}
+
 		i64 sz = type_size_of(key);
 		switch (sz) {
 		case  1: add_package_dependency(ctx, "runtime", "default_hasher1");  break;
@@ -2863,7 +2867,6 @@ void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 		case  4: add_package_dependency(ctx, "runtime", "default_hasher4");  break;
 		case  8: add_package_dependency(ctx, "runtime", "default_hasher8");  break;
 		case 16: add_package_dependency(ctx, "runtime", "default_hasher16"); break;
-		default: GB_PANIC("unhandled hasher for key type: %s", type_to_string(key));
 		}
 	}
 }
