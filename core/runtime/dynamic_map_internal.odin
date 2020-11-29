@@ -63,13 +63,13 @@ Map_Entry_Header :: struct {
 
 Map_Header :: struct {
 	m:             ^Raw_Map,
-	is_key_string: bool,
+	equal:         Equal_Proc,
 
 	entry_size:    int,
 	entry_align:   int,
 
-	key_offset:  uintptr,
-	key_size:    int,
+	key_offset:    uintptr,
+	key_size:      int,
 
 	value_offset:  uintptr,
 	value_size:    int,
@@ -115,7 +115,7 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 		value: V,
 	};
 
-	header.is_key_string = intrinsics.type_is_string(K);
+	header.equal = intrinsics.type_equal_proc(K);
 
 	header.entry_size    = int(size_of(Entry));
 	header.entry_align   = int(align_of(Entry));
@@ -275,12 +275,7 @@ __dynamic_map_hash_equal :: proc(h: Map_Header, a, b: Map_Hash) -> bool {
 		if a.key_ptr == b.key_ptr {
 			return true;
 		}
-		assert(a.key_ptr != nil && b.key_ptr != nil);
-
-		if h.is_key_string {
-			return (^string)(a.key_ptr)^ == (^string)(b.key_ptr)^;
-		}
-		return memory_equal(a.key_ptr, b.key_ptr, h.key_size);
+		return h.equal(a.key_ptr, b.key_ptr);
 	}
 	return false;
 }

@@ -726,6 +726,14 @@ void init_universal(void) {
 	}
 	add_global_type_entity(str_lit("byte"), &basic_types[Basic_u8]);
 
+	{
+		void set_procedure_abi_types(Type *type);
+
+		Type *args[2] = {t_rawptr, t_rawptr};
+		t_equal_proc = alloc_type_proc_from_types(args, 2, t_bool, false, ProcCC_Contextless);
+		set_procedure_abi_types(t_equal_proc);
+	}
+
 // Constants
 	add_global_constant(str_lit("true"),  t_untyped_bool, exact_value_bool(true));
 	add_global_constant(str_lit("false"), t_untyped_bool, exact_value_bool(false));

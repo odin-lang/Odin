@@ -529,6 +529,8 @@ Type *ir_type(irValue *value);
 irValue *ir_gen_anonymous_proc_lit(irModule *m, String prefix_name, Ast *expr, irProcedure *proc = nullptr);
 void ir_begin_procedure_body(irProcedure *proc);
 void ir_end_procedure_body(irProcedure *proc);
+irValue *ir_get_equal_proc_for_type(irModule *m, Type *type);
+
 
 irAddr ir_addr(irValue *addr) {
 	irAddr v = {irAddr_Default, addr};
@@ -3591,7 +3593,6 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_ty
 	irValue *m = ir_emit_conv(proc, map_val_ptr, type_deref(ir_type(gep0)));
 	ir_emit_store(proc, gep0, m);
 
-	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 1), ir_const_bool(is_type_string(key_type)));
 
 	i64 entry_size   = type_size_of  (map_type->Map.entry_type);
 	i64 entry_align  = type_align_of (map_type->Map.entry_type);
@@ -3600,6 +3601,7 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val_ptr, Type *map_ty
 	i64 value_offset = type_offset_of(map_type->Map.entry_type, 3);
 	i64 value_size   = type_size_of  (map_type->Map.value);
 
+	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 1), ir_get_equal_proc_for_type(proc->module, key_type));
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 2), ir_const_int(entry_size));
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 3), ir_const_int(entry_align));
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 4), ir_const_uintptr(key_offset));
@@ -4867,23 +4869,15 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 	return nullptr;
 }
 
-irValue *ir_get_compare_proc_for_type(irModule *m, Type *type) {
+irValue *ir_get_equal_proc_for_type(irModule *m, Type *type) {
 	Type *original_type = type;
 	type = base_type(type);
-	GB_ASSERT(type->kind == Type_Struct);
-	type_set_offsets(type);
 	Type *pt = alloc_type_pointer(type);
 
 	auto key = hash_type(type);
 	irValue **found = map_get(&m->compare_procs, key);
 	if (found) {
 		return *found;
-	}
-	static Type *proc_type = nullptr;
-	if (proc_type == nullptr) {
-		Type *args[2] = {t_rawptr, t_rawptr};
-		proc_type = alloc_type_proc_from_types(args, 2, t_bool, false, ProcCC_Contextless);
-		set_procedure_abi_types(proc_type);
 	}
 
 	static u32 proc_index = 0;
@@ -4895,9 +4889,9 @@ irValue *ir_get_compare_proc_for_type(irModule *m, Type *type) {
 
 
 	Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
-	Entity *e = alloc_entity_procedure(nullptr, make_token_ident(proc_name), proc_type, 0);
+	Entity *e = alloc_entity_procedure(nullptr, make_token_ident(proc_name), t_equal_proc, 0);
 	e->Procedure.link_name = proc_name;
-	irValue *p = ir_value_procedure(m, e, proc_type, nullptr, body, proc_name);
+	irValue *p = ir_value_procedure(m, e, t_equal_proc, nullptr, body, proc_name);
 	map_set(&m->values, hash_entity(e), p);
 	string_map_set(&m->members, proc_name, p);
 
@@ -4908,38 +4902,58 @@ irValue *ir_get_compare_proc_for_type(irModule *m, Type *type) {
 	// ir_start_block(proc, proc->decl_block);
 	GB_ASSERT(proc->curr_block != nullptr);
 
-	irBlock *done = ir_new_block(proc, nullptr, "done"); // NOTE(bill): Append later
-
 	irValue *x = proc->params[0];
 	irValue *y = proc->params[1];
 	irValue *lhs = ir_emit_conv(proc, x, pt);
 	irValue *rhs = ir_emit_conv(proc, y, pt);
 
-	irBlock *block_false = ir_new_block(proc, nullptr, "bfalse");
+	irBlock *block_same_ptr = ir_new_block(proc, nullptr, "same_ptr");
+	irBlock *block_diff_ptr = ir_new_block(proc, nullptr, "diff_ptr");
 
-	for_array(i, type->Struct.fields) {
-		irBlock *next_block = ir_new_block(proc, nullptr, "btrue");
-
-		irValue *pleft  = ir_emit_struct_ep(proc, lhs, cast(i32)i);
-		irValue *pright = ir_emit_struct_ep(proc, rhs, cast(i32)i);
-		irValue *left = ir_emit_load(proc, pleft);
-		irValue *right = ir_emit_load(proc, pright);
-		irValue *ok = ir_emit_comp(proc, Token_CmpEq, left, right);
-
-		ir_emit_if(proc, ok, next_block, block_false);
-
-		ir_emit_jump(proc, next_block);
-		ir_start_block(proc, next_block);
-	}
-
-	ir_emit_jump(proc, done);
-	ir_start_block(proc, block_false);
-
-	ir_emit(proc, ir_instr_return(proc, ir_const_bool(false)));
-
-	ir_emit_jump(proc, done);
-	ir_start_block(proc, done);
+	irValue *same_ptr = ir_emit_comp(proc, Token_CmpEq, lhs, rhs);
+	ir_emit_if(proc, same_ptr, block_same_ptr, block_diff_ptr);
+	ir_start_block(proc, block_same_ptr);
 	ir_emit(proc, ir_instr_return(proc, ir_const_bool(true)));
+
+	ir_start_block(proc, block_diff_ptr);
+
+	if (type->kind == Type_Struct) {
+		type_set_offsets(type);
+
+		irBlock *done = ir_new_block(proc, nullptr, "done"); // NOTE(bill): Append later
+
+		irBlock *block_false = ir_new_block(proc, nullptr, "bfalse");
+
+		for_array(i, type->Struct.fields) {
+			irBlock *next_block = ir_new_block(proc, nullptr, "btrue");
+
+			irValue *pleft  = ir_emit_struct_ep(proc, lhs, cast(i32)i);
+			irValue *pright = ir_emit_struct_ep(proc, rhs, cast(i32)i);
+			irValue *left = ir_emit_load(proc, pleft);
+			irValue *right = ir_emit_load(proc, pright);
+			irValue *ok = ir_emit_comp(proc, Token_CmpEq, left, right);
+
+			ir_emit_if(proc, ok, next_block, block_false);
+
+			ir_emit_jump(proc, next_block);
+			ir_start_block(proc, next_block);
+		}
+
+		ir_emit_jump(proc, done);
+		ir_start_block(proc, block_false);
+
+		ir_emit(proc, ir_instr_return(proc, ir_const_bool(false)));
+
+		ir_emit_jump(proc, done);
+		ir_start_block(proc, done);
+		ir_emit(proc, ir_instr_return(proc, ir_const_bool(true)));
+	} else {
+		irValue *left = ir_emit_load(proc, lhs);
+		irValue *right = ir_emit_load(proc, rhs);
+		irValue *ok = ir_emit_comp(proc, Token_CmpEq, left, right);
+		ok = ir_emit_conv(proc, ok, t_bool);
+		ir_emit(proc, ir_instr_return(proc, ok));
+	}
 
 	ir_end_procedure_body(proc);
 
@@ -5093,7 +5107,7 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 			args[2] = ir_const_int(type_size_of(a));
 			res = ir_emit_runtime_call(proc, "memory_equal", args);
 		} else {
-			irValue *value = ir_get_compare_proc_for_type(proc->module, a);
+			irValue *value = ir_get_equal_proc_for_type(proc->module, a);
 			auto args = array_make<irValue *>(permanent_allocator(), 2);
 			args[0] = ir_emit_conv(proc, left_ptr, t_rawptr);
 			args[1] = ir_emit_conv(proc, right_ptr, t_rawptr);
@@ -7572,6 +7586,8 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 		return ir_emit(proc, ir_instr_atomic_cxchg(proc, type, address, old_value, new_value, id));
 	}
 
+	case BuiltinProc_type_equal_proc:
+		return ir_get_equal_proc_for_type(proc->module, ce->args[0]->tav.type);
 
 	}
 
@@ -12353,7 +12369,7 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 				ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 7), is_custom_align);
 
 				if (is_type_comparable(t) && !is_type_simple_compare(t)) {
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 8), ir_get_compare_proc_for_type(proc->module, t));
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 8), ir_get_equal_proc_for_type(proc->module, t));
 				}
 
 

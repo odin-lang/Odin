@@ -690,6 +690,8 @@ gb_global Type *t_map_header                     = nullptr;
 gb_global Type *t_vector_x86_mmx                 = nullptr;
 
 
+gb_global Type *t_equal_proc = nullptr;
+
 
 i64      type_size_of               (Type *t);
 i64      type_align_of              (Type *t);

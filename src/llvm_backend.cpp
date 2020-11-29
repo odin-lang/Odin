@@ -8555,6 +8555,10 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		res.type = fix_typed;
 		return res;
 	}
+
+
+	case BuiltinProc_type_equal_proc:
+		return lb_get_equal_proc_for_type(p->module, ce->args[0]->tav.type);
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));
@@ -9156,11 +9160,11 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 	return {};
 }
 
-lbValue lb_get_compare_proc_for_type(lbModule *m, Type *type) {
+lbValue lb_get_equal_proc_for_type(lbModule *m, Type *type) {
 	Type *original_type = type;
 	type = base_type(type);
-	GB_ASSERT(type->kind == Type_Struct);
-	type_set_offsets(type);
+	GB_ASSERT(is_type_comparable(type));
+
 	Type *pt = alloc_type_pointer(type);
 	LLVMTypeRef ptr_type = lb_type(m, pt);
 
@@ -9170,13 +9174,6 @@ lbValue lb_get_compare_proc_for_type(lbModule *m, Type *type) {
 	if (found) {
 		compare_proc = *found;
 	} else {
-		static Type *proc_type = nullptr;
-		if (proc_type == nullptr) {
-			Type *args[2] = {t_rawptr, t_rawptr};
-			proc_type = alloc_type_proc_from_types(args, 2, t_bool, false, ProcCC_Contextless);
-			set_procedure_abi_types(proc_type);
-		}
-
 		static u32 proc_index = 0;
 
 		char buf[16] = {};
@@ -9184,7 +9181,7 @@ lbValue lb_get_compare_proc_for_type(lbModule *m, Type *type) {
 		char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
 		String proc_name = make_string_c(str);
 
-		lbProcedure *p = lb_create_dummy_procedure(m, proc_name, proc_type);
+		lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_equal_proc);
 		lb_begin_procedure_body(p);
 
 		LLVMValueRef x = LLVMGetParam(p->value, 0);
@@ -9194,29 +9191,50 @@ lbValue lb_get_compare_proc_for_type(lbModule *m, Type *type) {
 		lbValue lhs = {x, pt};
 		lbValue rhs = {y, pt};
 
-		lbBlock *block_false = lb_create_block(p, "bfalse");
 
-		lbValue res = lb_const_bool(m, t_bool, true);
-		for_array(i, type->Struct.fields) {
-			lbBlock *next_block = lb_create_block(p, "btrue");
+		lbBlock *block_same_ptr = lb_create_block(p, "same_ptr");
+		lbBlock *block_diff_ptr = lb_create_block(p, "diff_ptr");
 
-			lbValue pleft  = lb_emit_struct_ep(p, lhs, cast(i32)i);
-			lbValue pright = lb_emit_struct_ep(p, rhs, cast(i32)i);
-			lbValue left = lb_emit_load(p, pleft);
-			lbValue right = lb_emit_load(p, pright);
-			lbValue ok = lb_emit_comp(p, Token_CmpEq, left, right);
-
-			lb_emit_if(p, ok, next_block, block_false);
-
-			lb_emit_jump(p, next_block);
-			lb_start_block(p, next_block);
-		}
-
+		lbValue same_ptr = lb_emit_comp(p, Token_CmpEq, lhs, rhs);
+		lb_emit_if(p, same_ptr, block_same_ptr, block_diff_ptr);
+		lb_start_block(p, block_same_ptr);
 		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 1, false));
 
-		lb_start_block(p, block_false);
+		lb_start_block(p, block_diff_ptr);
 
-		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 0, false));
+		if (type->kind == Type_Struct)  {
+			type_set_offsets(type);
+
+			lbBlock *block_false = lb_create_block(p, "bfalse");
+			lbValue res = lb_const_bool(m, t_bool, true);
+
+			for_array(i, type->Struct.fields) {
+				lbBlock *next_block = lb_create_block(p, "btrue");
+
+				lbValue pleft  = lb_emit_struct_ep(p, lhs, cast(i32)i);
+				lbValue pright = lb_emit_struct_ep(p, rhs, cast(i32)i);
+				lbValue left = lb_emit_load(p, pleft);
+				lbValue right = lb_emit_load(p, pright);
+				lbValue ok = lb_emit_comp(p, Token_CmpEq, left, right);
+
+				lb_emit_if(p, ok, next_block, block_false);
+
+				lb_emit_jump(p, next_block);
+				lb_start_block(p, next_block);
+			}
+
+			LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 1, false));
+
+			lb_start_block(p, block_false);
+
+			LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 0, false));
+		} else {
+			lbValue left = lb_emit_load(p, lhs);
+			lbValue right = lb_emit_load(p, rhs);
+			lbValue ok = lb_emit_comp(p, Token_CmpEq, left, right);
+			ok = lb_emit_conv(p, ok, t_bool);
+			LLVMBuildRet(p->builder, ok.value);
+		}
 
 		lb_end_procedure_body(p);
 
@@ -9370,7 +9388,7 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 			args[2] = lb_const_int(p->module, t_int, type_size_of(a));
 			res = lb_emit_runtime_call(p, "memory_equal", args);
 		} else {
-			lbValue value = lb_get_compare_proc_for_type(p->module, a);
+			lbValue value = lb_get_equal_proc_for_type(p->module, a);
 			auto args = array_make<lbValue>(permanent_allocator(), 2);
 			args[0] = lb_emit_conv(p, left_ptr, t_rawptr);
 			args[1] = lb_emit_conv(p, right_ptr, t_rawptr);
@@ -10255,8 +10273,6 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 	lbValue m = lb_emit_conv(p, map_val_ptr, type_deref(gep0.type));
 	lb_emit_store(p, gep0, m);
 
-	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 1), lb_const_bool(p->module, t_bool, is_type_string(key_type)));
-
 	i64 entry_size   = type_size_of  (map_type->Map.entry_type);
 	i64 entry_align  = type_align_of (map_type->Map.entry_type);
 
@@ -10266,6 +10282,7 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 	i64 value_offset = type_offset_of(map_type->Map.entry_type, 3);
 	i64 value_size   = type_size_of  (map_type->Map.value);
 
+	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 1), lb_get_equal_proc_for_type(p->module, key_type));
 	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 2), lb_const_int(p->module, t_int, entry_size));
 	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 3), lb_const_int(p->module, t_int, entry_align));
 	lb_emit_store(p, lb_emit_struct_ep(p, h.addr, 4), lb_const_int(p->module, t_uintptr, key_offset));
@@ -12204,7 +12221,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				vals[6] = is_raw_union.value;
 				vals[7] = is_custom_align.value;
 				if (is_type_comparable(t) && !is_type_simple_compare(t)) {
-					vals[8] = lb_get_compare_proc_for_type(m, t).value;
+					vals[8] = lb_get_equal_proc_for_type(m, t).value;
 				}
 
 
