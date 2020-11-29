@@ -5,8 +5,8 @@ import "core:fmt"
 import "core:mem"
 import "core:sync"
 
-
 Request_Status :: enum {
+	Unknown, // NOTE: ID does not exist
 	Need_Send,
 	Send_Failed,
 	Wait_Reply,
@@ -34,6 +34,9 @@ client_init :: proc(using c: ^Client, allocator := context.allocator) {
 }
 
 client_destroy :: proc(using c: ^Client) {
+	for _, cr in c.requests {
+		request_destroy(cr.request);
+	}
 	delete(requests);
 	c^ = {};
 }
@@ -58,39 +61,49 @@ client_submit_request :: proc(using c: ^Client, req: Request) -> Request_Id {
 	}
 }
 
-client_wait_for_response :: proc(using c: ^Client, id: Request_Id) -> (response: Response, final_status: Request_Status) {
+client_check_for_response :: proc(using c: ^Client, id: Request_Id) -> (response: Response, status: Request_Status) {
 	cr: Client_Request;
-	loop: for {
-		{
-			sync.ticket_mutex_lock(&lock);
-			defer sync.ticket_mutex_unlock(&lock);
-			found: bool;
-			cr, found = requests[id];
-			if !found do return;
-		}
-
-		#partial switch cr.status {
-		case .Done, .Send_Failed, .Recv_Failed:
-			break loop;
-		case:
-			// be patient
-		}
-
-		client_process_requests(c);
-	}
-
+	ok: bool;
 	{
 		sync.ticket_mutex_lock(&lock);
 		defer sync.ticket_mutex_unlock(&lock);
-		delete_key(&requests, id);
+		cr, ok = requests[id];
 	}
 
+	if !ok {
+		status = .Unknown;
+		return;
+	}
 	return cr.response, cr.status;
 }
 
-client_execute_request :: proc(using c: ^Client, req: Request) -> (response: Response, ok: bool) {
+client_wait_for_response :: proc(using c: ^Client, id: Request_Id) -> (response: Response, status: Request_Status) {
+	loop: for {
+		done: bool;
+		response, status = client_check_for_response(c, id);
+		switch status {
+		case .Unknown:
+			return; // NOTE: ID did not exist!
+		case .Done, .Send_Failed, .Recv_Failed:
+			break loop;
+		case .Need_Send, .Wait_Reply:
+			// NOTE: gotta wait - might as well use the current thread to advance the requests
+			// TODO: block until there's stuff to process rather than spinning
+			client_process_requests(c);
+		}
+	}
+
+	sync.ticket_mutex_lock(&lock);
+	defer sync.ticket_mutex_unlock(&lock);
+	delete_key(&requests, id);
+	return;
+}
+
+client_execute_request :: proc(using c: ^Client, req: Request) -> (response: Response, status: Request_Status) {
 	id := client_submit_request(c, req);
-	return client_wait_for_response(c, id);
+	// return client_wait_for_response(c, id);
+	response, status = client_wait_for_response(c, id);
+	return;
 }
 
 client_process_requests :: proc(using c: ^Client) {
@@ -126,6 +139,8 @@ client_process_requests :: proc(using c: ^Client) {
 			// do nothing.
 			// it'll be removed from the list when user code
 			// asks for it.
+		case .Unknown:
+			unreachable();
 		}
 	}
 }
