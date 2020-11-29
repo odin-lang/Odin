@@ -305,7 +305,6 @@ __dynamic_map_find :: proc(using h: Map_Header, hash: Map_Hash) -> Map_Find_Resu
 
 __dynamic_map_add_entry :: proc(using h: Map_Header, hash: Map_Hash, loc := #caller_location) -> int {
 	prev := m.entries.len;
-	prev_data := m.entries.data;
 	c := __dynamic_array_append_nothing(&m.entries, entry_size, entry_align, loc);
 	if c != prev {
 		end := __dynamic_map_get_entry(h, c-1);
