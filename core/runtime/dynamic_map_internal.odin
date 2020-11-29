@@ -265,16 +265,13 @@ __dynamic_map_grow :: proc(using h: Map_Header, loc := #caller_location) {
 	__dynamic_map_rehash(h, new_count, loc);
 }
 
-__dynamic_map_full :: inline proc(using h: Map_Header) -> bool {
+__dynamic_map_full :: inline proc "contextless" (using h: Map_Header) -> bool {
 	return int(0.75 * f64(len(m.hashes))) <= m.entries.cap;
 }
 
 
-__dynamic_map_hash_equal :: proc(h: Map_Header, a, b: Map_Hash) -> bool {
+__dynamic_map_hash_equal :: proc "contextless" (h: Map_Header, a, b: Map_Hash) -> bool {
 	if a.hash == b.hash {
-		if a.key_ptr == b.key_ptr {
-			return true;
-		}
 		return h.equal(a.key_ptr, b.key_ptr);
 	}
 	return false;
@@ -322,7 +319,7 @@ __dynamic_map_get_entry :: proc(using h: Map_Header, index: int) -> ^Map_Entry_H
 	return (^Map_Entry_Header)(uintptr(m.entries.data) + uintptr(index*entry_size));
 }
 
-__dynamic_map_copy_entry :: proc(h: Map_Header, new, old: ^Map_Entry_Header) {
+__dynamic_map_copy_entry :: proc "contextless" (h: Map_Header, new, old: ^Map_Entry_Header) {
 	mem_copy(new, old, h.entry_size);
 }
 
@@ -351,6 +348,5 @@ __dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) #no_bounds
 		}
 	}
 
-	// TODO(bill): Is this correct behaviour?
 	m.entries.len -= 1;
 }
