@@ -658,12 +658,14 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		res.value = LLVMBuildZExtOrBitCast(p->builder, field, lb_type(p->module, int_type), "");
 		return res;
 	} else if (addr.kind == lbAddr_Context) {
+		lbValue a = addr.addr;
+		a.value = LLVMBuildPointerCast(p->builder, a.value, lb_type(p->module, t_context_ptr), "");
+
 		if (addr.ctx.sel.index.count > 0) {
-			lbValue a = addr.addr;
 			lbValue b = lb_emit_deep_field_gep(p, a, addr.ctx.sel);
 			return lb_emit_load(p, b);
 		} else {
-			return lb_emit_load(p, addr.addr);
+			return lb_emit_load(p, a);
 		}
 	} else if (addr.kind == lbAddr_SoaVariable) {
 		Type *t = type_deref(addr.addr.type);
@@ -1355,7 +1357,7 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 	case Type_Proc:
 		{
 			if (USE_LLVM_ABI) {
-				if (m->internal_type_level > 5) { // TODO HACK(bill): is this really enough?
+				if (m->internal_type_level > 256) { // TODO HACK(bill): is this really enough?
 					return LLVMPointerType(LLVMIntTypeInContext(m->ctx, 8), 0);
 				} else {
 					unsigned param_count = 0;
@@ -1406,13 +1408,19 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 							    type_size_of(e_type) <= 1) {
 								param_type = LLVMInt1TypeInContext(m->ctx);
 							} else {
-								param_type = lb_type(m, e_type);
+								if (is_type_proc(e_type)) {
+									param_type = lb_type(m, t_rawptr);
+								} else {
+									param_type = lb_type(m, e_type);
+								}
 							}
+
 							params[param_index++] = param_type;
 						}
 					}
 					if (param_index < param_count) {
-						params[param_index++] = lb_type(m, t_context_ptr);
+						params[param_index++] = lb_type(m, t_rawptr);
+						// params[param_index++] = lb_type(m, t_context_ptr);
 					}
 					GB_ASSERT(param_index == param_count);
 
@@ -1480,7 +1488,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 						}
 					}
 					if (type->Proc.calling_convention == ProcCC_Odin) {
-						array_add(&param_types, lb_type(m, t_context_ptr));
+						array_add(&param_types, lb_type(m, t_rawptr));
+						// array_add(&param_types, lb_type(m, t_context_ptr));
 					}
 
 					old_abi_fn_type = LLVMFunctionType(return_type, param_types.data, cast(unsigned)param_types.count, type->Proc.c_vararg);
@@ -6960,7 +6969,7 @@ lbValue lb_copy_value_to_ptr(lbProcedure *p, lbValue val, Type *new_type, i64 al
 	lbAddr ptr = lb_add_local_generated(p, new_type, false);
 	LLVMSetAlignment(ptr.addr.value, cast(unsigned)alignment);
 	lb_addr_store(p, ptr, val);
-	ptr.kind = lbAddr_Context;
+	// ptr.kind = lbAddr_Context;
 	return ptr.addr;
 }
 
@@ -7381,10 +7390,12 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 		args[arg_index++] = arg.value;
 	}
 	if (context_ptr.addr.value != nullptr) {
-		args[arg_index++] = context_ptr.addr.value;
+		LLVMValueRef cp = context_ptr.addr.value;
+		cp = LLVMBuildPointerCast(p->builder, cp, lb_type(p->module, t_rawptr), "");
+		args[arg_index++] = cp;
 	}
-		LLVMBasicBlockRef curr_block = LLVMGetInsertBlock(p->builder);
-		GB_ASSERT(curr_block != p->decl_block->block);
+	LLVMBasicBlockRef curr_block = LLVMGetInsertBlock(p->builder);
+	GB_ASSERT(curr_block != p->decl_block->block);
 
 	if (USE_LLVM_ABI) {
 
@@ -12983,7 +12994,73 @@ void lb_generate_code(lbGenerator *gen) {
 	{
 		auto dfpm = default_function_pass_manager;
 
-		LLVMAddMemCpyOptPass(dfpm);
+		if (build_context.optimization_level == 0) {
+			LLVMAddMemCpyOptPass(dfpm);
+			LLVMAddPromoteMemoryToRegisterPass(dfpm);
+			LLVMAddMergedLoadStoreMotionPass(dfpm);
+			LLVMAddAggressiveInstCombinerPass(dfpm);
+			LLVMAddEarlyCSEPass(dfpm);
+			LLVMAddEarlyCSEMemSSAPass(dfpm);
+			LLVMAddConstantPropagationPass(dfpm);
+			LLVMAddAggressiveDCEPass(dfpm);
+			LLVMAddMergedLoadStoreMotionPass(dfpm);
+			LLVMAddPromoteMemoryToRegisterPass(dfpm);
+			LLVMAddCFGSimplificationPass(dfpm);
+
+
+			// LLVMAddInstructionCombiningPass(dfpm);
+			LLVMAddSLPVectorizePass(dfpm);
+			LLVMAddLoopVectorizePass(dfpm);
+
+			LLVMAddScalarizerPass(dfpm);
+			LLVMAddLoopIdiomPass(dfpm);
+		} else {
+			bool do_extra_passes = true;
+
+			int repeat_count = cast(int)build_context.optimization_level;
+			do {
+				LLVMAddMemCpyOptPass(dfpm);
+				LLVMAddPromoteMemoryToRegisterPass(dfpm);
+				LLVMAddMergedLoadStoreMotionPass(dfpm);
+				LLVMAddAlignmentFromAssumptionsPass(dfpm);
+				LLVMAddEarlyCSEPass(dfpm);
+				LLVMAddEarlyCSEMemSSAPass(dfpm);
+				LLVMAddConstantPropagationPass(dfpm);
+				if (do_extra_passes) {
+					LLVMAddAggressiveInstCombinerPass(dfpm);
+					LLVMAddAggressiveDCEPass(dfpm);
+				}
+				LLVMAddMergedLoadStoreMotionPass(dfpm);
+				LLVMAddPromoteMemoryToRegisterPass(dfpm);
+				LLVMAddCFGSimplificationPass(dfpm);
+				LLVMAddTailCallEliminationPass(dfpm);
+
+				if (do_extra_passes) {
+					LLVMAddSLPVectorizePass(dfpm);
+					LLVMAddLoopVectorizePass(dfpm);
+
+					LLVMAddConstantPropagationPass(dfpm);
+					LLVMAddScalarizerPass(dfpm);
+					LLVMAddLoopIdiomPass(dfpm);
+
+					LLVMAddAggressiveInstCombinerPass(dfpm);
+					LLVMAddLowerExpectIntrinsicPass(dfpm);
+
+					LLVMAddDeadStoreEliminationPass(dfpm);
+					LLVMAddReassociatePass(dfpm);
+					LLVMAddAddDiscriminatorsPass(dfpm);
+					LLVMAddPromoteMemoryToRegisterPass(dfpm);
+					LLVMAddCorrelatedValuePropagationPass(dfpm);
+				}
+			} while (repeat_count --> 0);
+		}
+	}
+
+
+	LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(mod);
+	defer (LLVMDisposePassManager(default_function_pass_manager_without_memcpy));
+	{
+		auto dfpm = default_function_pass_manager_without_memcpy;
 		LLVMAddPromoteMemoryToRegisterPass(dfpm);
 		LLVMAddMergedLoadStoreMotionPass(dfpm);
 		LLVMAddAggressiveInstCombinerPass(dfpm);
@@ -12992,48 +13069,7 @@ void lb_generate_code(lbGenerator *gen) {
 		LLVMAddMergedLoadStoreMotionPass(dfpm);
 		LLVMAddPromoteMemoryToRegisterPass(dfpm);
 		LLVMAddCFGSimplificationPass(dfpm);
-		LLVMAddTailCallEliminationPass(dfpm);
-		LLVMAddScalarizerPass(dfpm);
-
-		LLVMAddSLPVectorizePass(dfpm);
-		LLVMAddLoopVectorizePass(dfpm);
-		LLVMAddEarlyCSEPass(dfpm);
-		LLVMAddEarlyCSEMemSSAPass(dfpm);
-
-		LLVMAddConstantPropagationPass(dfpm);
-		LLVMAddScalarizerPass(dfpm);
-		LLVMAddLoopIdiomPass(dfpm);
-
-
-		if (build_context.optimization_level != 0) {
-			// LLVMAddAggressiveInstCombinerPass(dfpm);
-			// LLVMAddLowerExpectIntrinsicPass(dfpm);
-
-			// LLVMAddPartiallyInlineLibCallsPass(dfpm);
-
-			// LLVMAddAlignmentFromAssumptionsPass(dfpm);
-			// LLVMAddDeadStoreEliminationPass(dfpm);
-			// LLVMAddReassociatePass(dfpm);
-			// LLVMAddAddDiscriminatorsPass(dfpm);
-			// LLVMAddPromoteMemoryToRegisterPass(dfpm);
-			// LLVMAddCorrelatedValuePropagationPass(dfpm);
-			// LLVMAddMemCpyOptPass(dfpm);
-		}
-	}
-
-
-	LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(mod);
-	defer (LLVMDisposePassManager(default_function_pass_manager_without_memcpy));
-	{
-		LLVMAddPromoteMemoryToRegisterPass(default_function_pass_manager_without_memcpy);
-		LLVMAddMergedLoadStoreMotionPass(default_function_pass_manager_without_memcpy);
-		LLVMAddAggressiveInstCombinerPass(default_function_pass_manager_without_memcpy);
-		LLVMAddConstantPropagationPass(default_function_pass_manager_without_memcpy);
-		LLVMAddAggressiveDCEPass(default_function_pass_manager_without_memcpy);
-		LLVMAddMergedLoadStoreMotionPass(default_function_pass_manager_without_memcpy);
-		LLVMAddPromoteMemoryToRegisterPass(default_function_pass_manager_without_memcpy);
-		LLVMAddCFGSimplificationPass(default_function_pass_manager_without_memcpy);
-		// LLVMAddUnifyFunctionExitNodesPass(default_function_pass_manager_without_memcpy);
+		// LLVMAddUnifyFunctionExitNodesPass(dfpm);
 	}
 
 	TIME_SECTION("LLVM Runtime Creation");
@@ -13327,8 +13363,16 @@ void lb_generate_code(lbGenerator *gen) {
 
 
 	LLVMDIBuilderFinalize(m->debug_builder);
-	if (LLVMVerifyModule(mod, LLVMAbortProcessAction, &llvm_error)) {
-		gb_printf_err("LLVM Error: %s\n", llvm_error);
+	if (LLVMVerifyModule(mod, LLVMReturnStatusAction, &llvm_error)) {
+		gb_printf_err("LLVM Error:\n%s\n", llvm_error);
+		if (build_context.keep_temp_files) {
+			TIME_SECTION("LLVM Print Module to File");
+			if (LLVMPrintModuleToFile(mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+				gb_printf_err("LLVM Error: %s\n", llvm_error);
+				gb_exit(1);
+				return;
+			}
+		}
 		gb_exit(1);
 		return;
 	}
