@@ -91,7 +91,7 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type, ProcCal
 bool abi_compat_return_by_pointer(gbAllocator a, ProcCallingConvention cc, Type *abi_return_type);
 void set_procedure_abi_types(Type *type);
 void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type);
-
+void add_map_key_type_dependencies(CheckerContext *ctx, Type *key);
 
 Type *make_soa_struct_slice(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem);
 Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem);
@@ -6079,6 +6079,29 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			operand->mode = Addressing_Value;
 			operand->type = t_equal_proc;
+			break;
+		}
+
+	case BuiltinProc_type_hasher_proc:
+		{
+			Operand op = {};
+			Type *bt = check_type(c, ce->args[0]);
+			Type *type = base_type(bt);
+			if (type == nullptr || type == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_valid_for_keys(type)) {
+				gbString t = type_to_string(type);
+				error(ce->args[0], "Expected a valid type for map keys for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+
+			add_map_key_type_dependencies(c, type);
+
+			operand->mode = Addressing_Value;
+			operand->type = t_hasher_proc;
 			break;
 		}
 	}

@@ -42,7 +42,8 @@ Platform_Endianness :: enum u8 {
 	Big      = 2,
 }
 
-Equal_Proc :: distinct proc "contextless" (rawptr, rawptr) -> bool;
+Equal_Proc  :: distinct proc "contextless" (rawptr, rawptr) -> bool;
+Hasher_Proc :: distinct proc "contextless" (data: rawptr, seed: uintptr) -> uintptr;
 
 Type_Info_Struct_Soa_Kind :: enum u8 {
 	None    = 0,
@@ -125,6 +126,8 @@ Type_Info_Map :: struct {
 	key:              ^Type_Info,
 	value:            ^Type_Info,
 	generated_struct: ^Type_Info,
+	key_equal:        Equal_Proc,
+	key_hasher:       Hasher_Proc,
 };
 Type_Info_Bit_Field :: struct {
 	names:   []string,

@@ -8559,6 +8559,9 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 	case BuiltinProc_type_equal_proc:
 		return lb_get_equal_proc_for_type(p->module, ce->args[0]->tav.type);
+
+	case BuiltinProc_type_hasher_proc:
+		return lb_get_hasher_proc_for_type(p->module, ce->args[0]->tav.type);
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));
@@ -9169,83 +9172,155 @@ lbValue lb_get_equal_proc_for_type(lbModule *m, Type *type) {
 	LLVMTypeRef ptr_type = lb_type(m, pt);
 
 	auto key = hash_type(type);
-	lbProcedure **found = map_get(&m->compare_procs, key);
+	lbProcedure **found = map_get(&m->equal_procs, key);
 	lbProcedure *compare_proc = nullptr;
 	if (found) {
 		compare_proc = *found;
-	} else {
-		static u32 proc_index = 0;
+		GB_ASSERT(compare_proc != nullptr);
+		return {compare_proc->value, compare_proc->type};
+	}
 
-		char buf[16] = {};
-		isize n = gb_snprintf(buf, 16, "__$cmp%u", ++proc_index);
-		char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
-		String proc_name = make_string_c(str);
+	static u32 proc_index = 0;
 
-		lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_equal_proc);
-		lb_begin_procedure_body(p);
+	char buf[16] = {};
+	isize n = gb_snprintf(buf, 16, "__$equal%u", ++proc_index);
+	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
+	String proc_name = make_string_c(str);
 
-		LLVMValueRef x = LLVMGetParam(p->value, 0);
-		LLVMValueRef y = LLVMGetParam(p->value, 1);
-		x = LLVMBuildPointerCast(p->builder, x, ptr_type, "");
-		y = LLVMBuildPointerCast(p->builder, y, ptr_type, "");
-		lbValue lhs = {x, pt};
-		lbValue rhs = {y, pt};
+	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_equal_proc);
+	map_set(&m->equal_procs, key, p);
+	lb_begin_procedure_body(p);
+
+	LLVMValueRef x = LLVMGetParam(p->value, 0);
+	LLVMValueRef y = LLVMGetParam(p->value, 1);
+	x = LLVMBuildPointerCast(p->builder, x, ptr_type, "");
+	y = LLVMBuildPointerCast(p->builder, y, ptr_type, "");
+	lbValue lhs = {x, pt};
+	lbValue rhs = {y, pt};
 
 
-		lbBlock *block_same_ptr = lb_create_block(p, "same_ptr");
-		lbBlock *block_diff_ptr = lb_create_block(p, "diff_ptr");
+	lbBlock *block_same_ptr = lb_create_block(p, "same_ptr");
+	lbBlock *block_diff_ptr = lb_create_block(p, "diff_ptr");
 
-		lbValue same_ptr = lb_emit_comp(p, Token_CmpEq, lhs, rhs);
-		lb_emit_if(p, same_ptr, block_same_ptr, block_diff_ptr);
-		lb_start_block(p, block_same_ptr);
-		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 1, false));
+	lbValue same_ptr = lb_emit_comp(p, Token_CmpEq, lhs, rhs);
+	lb_emit_if(p, same_ptr, block_same_ptr, block_diff_ptr);
+	lb_start_block(p, block_same_ptr);
+	LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 1, false));
 
-		lb_start_block(p, block_diff_ptr);
+	lb_start_block(p, block_diff_ptr);
 
-		if (type->kind == Type_Struct)  {
-			type_set_offsets(type);
+	if (type->kind == Type_Struct)  {
+		type_set_offsets(type);
 
-			lbBlock *block_false = lb_create_block(p, "bfalse");
-			lbValue res = lb_const_bool(m, t_bool, true);
+		lbBlock *block_false = lb_create_block(p, "bfalse");
+		lbValue res = lb_const_bool(m, t_bool, true);
 
-			for_array(i, type->Struct.fields) {
-				lbBlock *next_block = lb_create_block(p, "btrue");
+		for_array(i, type->Struct.fields) {
+			lbBlock *next_block = lb_create_block(p, "btrue");
 
-				lbValue pleft  = lb_emit_struct_ep(p, lhs, cast(i32)i);
-				lbValue pright = lb_emit_struct_ep(p, rhs, cast(i32)i);
-				lbValue left = lb_emit_load(p, pleft);
-				lbValue right = lb_emit_load(p, pright);
-				lbValue ok = lb_emit_comp(p, Token_CmpEq, left, right);
-
-				lb_emit_if(p, ok, next_block, block_false);
-
-				lb_emit_jump(p, next_block);
-				lb_start_block(p, next_block);
-			}
-
-			LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 1, false));
-
-			lb_start_block(p, block_false);
-
-			LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 0, false));
-		} else {
-			lbValue left = lb_emit_load(p, lhs);
-			lbValue right = lb_emit_load(p, rhs);
+			lbValue pleft  = lb_emit_struct_ep(p, lhs, cast(i32)i);
+			lbValue pright = lb_emit_struct_ep(p, rhs, cast(i32)i);
+			lbValue left = lb_emit_load(p, pleft);
+			lbValue right = lb_emit_load(p, pright);
 			lbValue ok = lb_emit_comp(p, Token_CmpEq, left, right);
-			ok = lb_emit_conv(p, ok, t_bool);
-			LLVMBuildRet(p->builder, ok.value);
+
+			lb_emit_if(p, ok, next_block, block_false);
+
+			lb_emit_jump(p, next_block);
+			lb_start_block(p, next_block);
 		}
 
-		lb_end_procedure_body(p);
+		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 1, false));
 
-		map_set(&m->compare_procs, key, p);
+		lb_start_block(p, block_false);
 
-		compare_proc = p;
+		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 0, false));
+	} else {
+		lbValue left = lb_emit_load(p, lhs);
+		lbValue right = lb_emit_load(p, rhs);
+		lbValue ok = lb_emit_comp(p, Token_CmpEq, left, right);
+		ok = lb_emit_conv(p, ok, t_bool);
+		LLVMBuildRet(p->builder, ok.value);
 	}
-	GB_ASSERT(compare_proc != nullptr);
 
+	lb_end_procedure_body(p);
+
+	compare_proc = p;
 	return {compare_proc->value, compare_proc->type};
 }
+
+lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
+	Type *original_type = type;
+	type = base_type(type);
+	GB_ASSERT(is_type_valid_for_keys(type));
+
+	Type *pt = alloc_type_pointer(type);
+	LLVMTypeRef ptr_type = lb_type(m, pt);
+
+	auto key = hash_type(type);
+	lbProcedure **found = map_get(&m->hasher_procs, key);
+	lbProcedure *hasher_proc = nullptr;
+	if (found) {
+		hasher_proc = *found;
+		GB_ASSERT(hasher_proc != nullptr);
+		return {hasher_proc->value, hasher_proc->type};
+	}
+
+	static u32 proc_index = 0;
+
+	char buf[16] = {};
+	isize n = gb_snprintf(buf, 16, "__$hasher%u", ++proc_index);
+	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
+	String proc_name = make_string_c(str);
+
+	lbProcedure *p = lb_create_dummy_procedure(m, proc_name, t_hasher_proc);
+	map_set(&m->hasher_procs, key, p);
+	lb_begin_procedure_body(p);
+
+	LLVMValueRef x = LLVMGetParam(p->value, 0);
+	LLVMValueRef y = LLVMGetParam(p->value, 1);
+	lbValue data = {x, t_rawptr};
+	lbValue seed = {y, t_uintptr};
+
+	if (type->kind == Type_Struct)  {
+		type_set_offsets(type);
+
+		GB_PANIC("Type_Struct");
+	} else if (is_type_string(type)) {
+		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		args[0] = data;
+		args[1] = seed;
+		lbValue res = lb_emit_runtime_call(p, "default_hasher_string", args);
+		LLVMBuildRet(p->builder, res.value);
+	} else {
+		GB_ASSERT_MSG(is_type_simple_compare(type), "%s", type_to_string(type));
+
+		i64 sz = type_size_of(type);
+		char const *name = nullptr;
+		switch (sz) {
+		case 1:  name = "default_hasher1";  break;
+		case 2:  name = "default_hasher2";  break;
+		case 4:  name = "default_hasher4";  break;
+		case 8:  name = "default_hasher8";  break;
+		case 16: name = "default_hasher16"; break;
+		default: GB_PANIC("unhandled hasher for key type: %s", type_to_string(type));
+		}
+		GB_ASSERT(name != nullptr);
+
+		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		args[0] = data;
+		args[1] = seed;
+		lbValue res = lb_emit_runtime_call(p, name, args);
+		LLVMBuildRet(p->builder, res.value);
+	}
+
+	lb_end_procedure_body(p);
+
+	hasher_proc = p;
+	return {hasher_proc->value, hasher_proc->type};
+}
+
+
 
 lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right) {
 	Type *a = core_type(left.type);
@@ -11571,7 +11646,8 @@ void lb_init_module(lbModule *m, Checker *c) {
 	string_map_init(&m->const_strings, a);
 	map_init(&m->anonymous_proc_lits, a);
 	map_init(&m->function_type_map, a);
-	map_init(&m->compare_procs, a);
+	map_init(&m->equal_procs, a);
+	map_init(&m->hasher_procs, a);
 	array_init(&m->procedures_to_generate, a);
 	array_init(&m->foreign_library_paths, a);
 
@@ -12307,10 +12383,12 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_map_ptr);
 			init_map_internal_types(t);
 
-			LLVMValueRef vals[3] = {
+			LLVMValueRef vals[5] = {
 				lb_get_type_info_ptr(m, t->Map.key).value,
 				lb_get_type_info_ptr(m, t->Map.value).value,
 				lb_get_type_info_ptr(m, t->Map.generated_struct_type).value,
+				lb_get_equal_proc_for_type(m, t->Map.key).value,
+				lb_get_hasher_proc_for_type(m, t->Map.key).value
 			};
 
 			lbValue res = {};

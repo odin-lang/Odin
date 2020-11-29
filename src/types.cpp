@@ -690,7 +690,8 @@ gb_global Type *t_map_header                     = nullptr;
 gb_global Type *t_vector_x86_mmx                 = nullptr;
 
 
-gb_global Type *t_equal_proc = nullptr;
+gb_global Type *t_equal_proc  = nullptr;
+gb_global Type *t_hasher_proc = nullptr;
 
 
 i64      type_size_of               (Type *t);
@@ -1947,6 +1948,9 @@ bool is_type_simple_compare(Type *t) {
 
 	case Type_Basic:
 		if (t->Basic.flags & BasicFlag_SimpleCompare) {
+			return true;
+		}
+		if (t->Basic.kind == Basic_typeid) {
 			return true;
 		}
 		return false;
