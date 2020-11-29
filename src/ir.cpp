@@ -4965,6 +4965,32 @@ irValue *ir_get_equal_proc_for_type(irModule *m, Type *type) {
 }
 
 
+irValue *ir_simple_compare_hash(irProcedure *p, Type *type, irValue *data, irValue *seed) {
+	GB_ASSERT_MSG(is_type_simple_compare(type), "%s", type_to_string(type));
+
+	i64 sz = type_size_of(type);
+	char const *name = nullptr;
+	switch (sz) {
+	case 1:  name = "default_hasher1";  break;
+	case 2:  name = "default_hasher2";  break;
+	case 4:  name = "default_hasher4";  break;
+	case 8:  name = "default_hasher8";  break;
+	case 16: name = "default_hasher16"; break;
+	}
+	if (name != nullptr) {
+		auto args = array_make<irValue *>(permanent_allocator(), 2);
+		args[0] = data;
+		args[1] = seed;
+		return ir_emit_runtime_call(p, name, args);
+	}
+
+	auto args = array_make<irValue *>(permanent_allocator(), 3);
+	args[0] = data;
+	args[1] = seed;
+	args[2] = ir_const_int(type_size_of(type));
+	return ir_emit_runtime_call(p, "default_hasher_n", args);
+}
+
 irValue *ir_get_hasher_proc_for_type(irModule *m, Type *type) {
 	Type *original_type = type;
 	type = core_type(type);
@@ -4998,100 +5024,78 @@ irValue *ir_get_hasher_proc_for_type(irModule *m, Type *type) {
 	proc->is_startup = true;
 	proc->ignore_dead_instr = true;
 	ir_begin_procedure_body(proc);
+	defer (ir_end_procedure_body(proc));
+
 	// ir_start_block(proc, proc->decl_block);
 	GB_ASSERT(proc->curr_block != nullptr);
 
 	irValue *data = proc->params[0];
 	irValue *seed = proc->params[1];
 
+	if (is_type_simple_compare(type)) {
+		irValue *res = ir_simple_compare_hash(proc, type, data, seed);
+		ir_emit(proc, ir_instr_return(proc, res));
+		return p;
+	}
+
 	if (type->kind == Type_Struct) {
 		type_set_offsets(type);
-		if (is_type_simple_compare(type)) {
-			i64 sz = type_size_of(type);
-			auto args = array_make<irValue *>(permanent_allocator(), 3);
-			args[0] = data;
+		data = ir_emit_conv(proc, data, t_u8_ptr);
+
+		auto args = array_make<irValue *>(permanent_allocator(), 2);
+		for_array(i, type->Struct.fields) {
+			i64 offset = type->Struct.offsets[i];
+			Entity *field = type->Struct.fields[i];
+			irValue *field_hasher = ir_get_hasher_proc_for_type(m, field->type);
+			irValue *ptr = ir_emit_ptr_offset(proc, data, ir_const_uintptr(offset));
+
+			args[0] = ptr;
 			args[1] = seed;
-			args[2] = ir_const_int(sz);
-			irValue *res = ir_emit_runtime_call(proc, "default_hasher_n", args);
-			ir_emit(proc, ir_instr_return(proc, res));
-		} else {
-			data = ir_emit_conv(proc, data, t_u8_ptr);
-
-			auto args = array_make<irValue *>(permanent_allocator(), 2);
-			for_array(i, type->Struct.fields) {
-				i64 offset = type->Struct.offsets[i];
-				Entity *field = type->Struct.fields[i];
-				irValue *field_hasher = ir_get_hasher_proc_for_type(m, field->type);
-				irValue *ptr = ir_emit_ptr_offset(proc, data, ir_const_uintptr(offset));
-
-				args[0] = ptr;
-				args[1] = seed;
-				seed = ir_emit_call(proc, field_hasher, args);
-			}
-			ir_emit(proc, ir_instr_return(proc, seed));
+			seed = ir_emit_call(proc, field_hasher, args);
 		}
+		ir_emit(proc, ir_instr_return(proc, seed));
 	} else if (type->kind == Type_Array) {
-		if (is_type_simple_compare(type)) {
-			i64 sz = type_size_of(type);
-			auto args = array_make<irValue *>(permanent_allocator(), 3);
-			args[0] = data;
-			args[1] = seed;
-			args[2] = ir_const_int(sz);
-			irValue *res = ir_emit_runtime_call(proc, "default_hasher_n", args);
-			ir_emit(proc, ir_instr_return(proc, res));
-		} else {
-			irValue *pres = ir_add_local_generated(proc, t_uintptr, false);
-			ir_emit_store(proc, pres, seed);
+		irValue *pres = ir_add_local_generated(proc, t_uintptr, false);
+		ir_emit_store(proc, pres, seed);
 
-			auto args = array_make<irValue *>(permanent_allocator(), 2);
-			irValue *elem_hasher = ir_get_hasher_proc_for_type(m, type->Array.elem);
+		auto args = array_make<irValue *>(permanent_allocator(), 2);
+		irValue *elem_hasher = ir_get_hasher_proc_for_type(m, type->Array.elem);
 
-			auto loop_data = ir_loop_start(proc, type->Array.count, t_i32);
+		auto loop_data = ir_loop_start(proc, type->Array.count, t_i32);
 
-			data = ir_emit_conv(proc, data, pt);
+		data = ir_emit_conv(proc, data, pt);
 
-			irValue *ptr = ir_emit_array_ep(proc, data, loop_data.idx);
-			args[0] = ptr;
-			args[1] = ir_emit_load(proc, pres);
-			irValue *new_seed = ir_emit_call(proc, elem_hasher, args);
-			ir_emit_store(proc, pres, new_seed);
+		irValue *ptr = ir_emit_array_ep(proc, data, loop_data.idx);
+		args[0] = ptr;
+		args[1] = ir_emit_load(proc, pres);
+		irValue *new_seed = ir_emit_call(proc, elem_hasher, args);
+		ir_emit_store(proc, pres, new_seed);
 
-			ir_loop_end(proc, loop_data);
+		ir_loop_end(proc, loop_data);
 
-			irValue *res = ir_emit_load(proc, pres);
-			ir_emit(proc, ir_instr_return(proc, res));
-		}
+		irValue *res = ir_emit_load(proc, pres);
+		ir_emit(proc, ir_instr_return(proc, res));
 	} else if (type->kind == Type_EnumeratedArray) {
-		if (is_type_simple_compare(type)) {
-			i64 sz = type_size_of(type);
-			auto args = array_make<irValue *>(permanent_allocator(), 3);
-			args[0] = data;
-			args[1] = seed;
-			args[2] = ir_const_int(sz);
-			irValue *res = ir_emit_runtime_call(proc, "default_hasher_n", args);
-			ir_emit(proc, ir_instr_return(proc, res));
-		} else {
-			irValue *pres = ir_add_local_generated(proc, t_uintptr, false);
-			ir_emit_store(proc, pres, seed);
+		irValue *pres = ir_add_local_generated(proc, t_uintptr, false);
+		ir_emit_store(proc, pres, seed);
 
-			auto args = array_make<irValue *>(permanent_allocator(), 2);
-			irValue *elem_hasher = ir_get_hasher_proc_for_type(m, type->Array.elem);
+		auto args = array_make<irValue *>(permanent_allocator(), 2);
+		irValue *elem_hasher = ir_get_hasher_proc_for_type(m, type->Array.elem);
 
-			auto loop_data = ir_loop_start(proc, type->Array.count, t_i32);
+		auto loop_data = ir_loop_start(proc, type->Array.count, t_i32);
 
-			data = ir_emit_conv(proc, data, pt);
+		data = ir_emit_conv(proc, data, pt);
 
-			irValue *ptr = ir_emit_array_ep(proc, data, loop_data.idx);
-			args[0] = ptr;
-			args[1] = ir_emit_load(proc, pres);
-			irValue *new_seed = ir_emit_call(proc, elem_hasher, args);
-			ir_emit_store(proc, pres, new_seed);
+		irValue *ptr = ir_emit_array_ep(proc, data, loop_data.idx);
+		args[0] = ptr;
+		args[1] = ir_emit_load(proc, pres);
+		irValue *new_seed = ir_emit_call(proc, elem_hasher, args);
+		ir_emit_store(proc, pres, new_seed);
 
-			ir_loop_end(proc, loop_data);
+		ir_loop_end(proc, loop_data);
 
-			irValue *res = ir_emit_load(proc, pres);
-			ir_emit(proc, ir_instr_return(proc, res));
-		}
+		irValue *res = ir_emit_load(proc, pres);
+		ir_emit(proc, ir_instr_return(proc, res));
 	} else if (is_type_cstring(type)) {
 		auto args = array_make<irValue *>(permanent_allocator(), 2);
 		args[0] = data;
@@ -5105,25 +5109,7 @@ irValue *ir_get_hasher_proc_for_type(irModule *m, Type *type) {
 		irValue *res = ir_emit_runtime_call(proc, "default_hasher_string", args);
 		ir_emit(proc, ir_instr_return(proc, res));
 	} else {
-		GB_ASSERT_MSG(is_type_simple_compare(type), "%s", type_to_string(type));
-
-		i64 sz = type_size_of(type);
-		char const *name = nullptr;
-		switch (sz) {
-		case 1:  name = "default_hasher1";  break;
-		case 2:  name = "default_hasher2";  break;
-		case 4:  name = "default_hasher4";  break;
-		case 8:  name = "default_hasher8";  break;
-		case 16: name = "default_hasher16"; break;
-		default: GB_PANIC("unhandled hasher for key type: %s", type_to_string(type));
-		}
-		GB_ASSERT(name != nullptr);
-
-		auto args = array_make<irValue *>(permanent_allocator(), 2);
-		args[0] = data;
-		args[1] = seed;
-		irValue *res = ir_emit_runtime_call(proc, name, args);
-		ir_emit(proc, ir_instr_return(proc, res));
+		GB_PANIC("Unhandled type for hasher: %s", type_to_string(type));
 	}
 
 
