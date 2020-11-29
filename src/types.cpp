@@ -1542,6 +1542,8 @@ bool is_type_valid_for_keys(Type *t) {
 	if (is_type_untyped(t)) {
 		return false;
 	}
+	return is_type_comparable(t);
+#if 0
 	if (is_type_integer(t)) {
 		return true;
 	}
@@ -1560,8 +1562,12 @@ bool is_type_valid_for_keys(Type *t) {
 	if (is_type_simple_compare(t)) {
 		return true;
 	}
+	if (is_type_comparable(t)) {
+		return true;
+	}
 
 	return false;
+#endif
 }
 
 bool is_type_valid_bit_set_elem(Type *t) {

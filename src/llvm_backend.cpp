@@ -9251,7 +9251,7 @@ lbValue lb_get_equal_proc_for_type(lbModule *m, Type *type) {
 
 lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 	Type *original_type = type;
-	type = base_type(type);
+	type = core_type(type);
 	GB_ASSERT(is_type_valid_for_keys(type));
 
 	Type *pt = alloc_type_pointer(type);
@@ -9284,14 +9284,94 @@ lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type) {
 
 	if (type->kind == Type_Struct)  {
 		type_set_offsets(type);
-		GB_ASSERT(is_type_simple_compare(type));
-		i64 sz = type_size_of(type);
-		auto args = array_make<lbValue>(permanent_allocator(), 3);
-		args[0] = data;
-		args[1] = seed;
-		args[2] = lb_const_int(m, t_int, sz);
-		lbValue res = lb_emit_runtime_call(p, "default_hasher_n", args);
-		LLVMBuildRet(p->builder, res.value);
+		if (is_type_simple_compare(type)) {
+			i64 sz = type_size_of(type);
+			auto args = array_make<lbValue>(permanent_allocator(), 3);
+			args[0] = data;
+			args[1] = seed;
+			args[2] = lb_const_int(m, t_int, sz);
+			lbValue res = lb_emit_runtime_call(p, "default_hasher_n", args);
+			LLVMBuildRet(p->builder, res.value);
+		} else {
+			data = lb_emit_conv(p, data, t_u8_ptr);
+
+			auto args = array_make<lbValue>(permanent_allocator(), 2);
+			for_array(i, type->Struct.fields) {
+				i64 offset = type->Struct.offsets[i];
+				Entity *field = type->Struct.fields[i];
+				lbValue field_hasher = lb_get_hasher_proc_for_type(m, field->type);
+				lbValue ptr = lb_emit_ptr_offset(p, data, lb_const_int(m, t_uintptr, offset));
+
+				args[0] = ptr;
+				args[1] = seed;
+				seed = lb_emit_call(p, field_hasher, args);
+			}
+			LLVMBuildRet(p->builder, seed.value);
+		}
+	} else if (type->kind == Type_Array) {
+		if (is_type_simple_compare(type)) {
+			i64 sz = type_size_of(type);
+			auto args = array_make<lbValue>(permanent_allocator(), 3);
+			args[0] = data;
+			args[1] = seed;
+			args[2] = lb_const_int(m, t_int, sz);
+			lbValue res = lb_emit_runtime_call(p, "default_hasher_n", args);
+			LLVMBuildRet(p->builder, res.value);
+		} else {
+			lbAddr pres = lb_add_local_generated(p, t_uintptr, false);
+			lb_addr_store(p, pres, seed);
+
+			auto args = array_make<lbValue>(permanent_allocator(), 2);
+			lbValue elem_hasher = lb_get_hasher_proc_for_type(m, type->Array.elem);
+
+			auto loop_data = lb_loop_start(p, type->Array.count, t_i32);
+
+			data = lb_emit_conv(p, data, pt);
+
+			lbValue ptr = lb_emit_array_ep(p, data, loop_data.idx);
+			args[0] = ptr;
+			args[1] = lb_addr_load(p, pres);
+			lbValue new_seed = lb_emit_call(p, elem_hasher, args);
+			lb_addr_store(p, pres, new_seed);
+
+			lb_loop_end(p, loop_data);
+
+			lbValue res = lb_addr_load(p, pres);
+			LLVMBuildRet(p->builder, res.value);
+		}
+	} else if (type->kind == Type_EnumeratedArray) {
+		if (is_type_simple_compare(type)) {
+			i64 sz = type_size_of(type);
+			auto args = array_make<lbValue>(permanent_allocator(), 3);
+			args[0] = data;
+			args[1] = seed;
+			args[2] = lb_const_int(m, t_int, sz);
+			lbValue res = lb_emit_runtime_call(p, "default_hasher_n", args);
+			LLVMBuildRet(p->builder, res.value);
+		} else {
+			lbAddr res = lb_add_local_generated(p, t_uintptr, false);
+			lb_addr_store(p, res, seed);
+
+			auto args = array_make<lbValue>(permanent_allocator(), 2);
+			lbValue elem_hasher = lb_get_hasher_proc_for_type(m, type->EnumeratedArray.elem);
+
+			auto loop_data = lb_loop_start(p, type->EnumeratedArray.count, t_i32);
+
+			data = lb_emit_conv(p, data, pt);
+
+			lbValue ptr = lb_emit_array_ep(p, data, loop_data.idx);
+			args[0] = ptr;
+			args[1] = lb_addr_load(p, res);
+			lbValue new_seed = lb_emit_call(p, elem_hasher, args);
+			lb_addr_store(p, res, new_seed);
+
+			lb_loop_end(p, loop_data);
+
+			lbValue vres = lb_addr_load(p, res);
+			LLVMBuildRet(p->builder, vres.value);
+		}
+
+
 	} else if (is_type_cstring(type)) {
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		args[0] = data;

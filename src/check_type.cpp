@@ -2849,26 +2849,48 @@ void init_map_internal_types(Type *type) {
 }
 
 void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
+	key = core_type(key);
+
 	if (is_type_cstring(key)) {
 		add_package_dependency(ctx, "runtime", "default_hasher_cstring");
 	} else if (is_type_string(key)) {
 		add_package_dependency(ctx, "runtime", "default_hasher_string");
 	} else if (!is_type_polymorphic(key)) {
-		if (!is_type_simple_compare(key)) {
+		if (!is_type_comparable(key)) {
 			return;
 		}
 
-		if (is_type_struct(key)) {
+		if (key->kind == Type_Struct) {
 			add_package_dependency(ctx, "runtime", "default_hasher_n");
-		}
+			if (!is_type_simple_compare(key)) {
+				for_array(i, key->Struct.fields) {
+					Entity *field = key->Struct.fields[i];
+					add_map_key_type_dependencies(ctx, field->type);
+				}
+			}
+		} else if (key->kind == Type_EnumeratedArray) {
+			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			if (!is_type_simple_compare(key->EnumeratedArray.elem)) {
+				add_map_key_type_dependencies(ctx, key->EnumeratedArray.elem);
+			}
+		} else if (key->kind == Type_Array) {
+			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			if (!is_type_simple_compare(key->Array.elem)) {
+				add_map_key_type_dependencies(ctx, key->Array.elem);
+			}
+		} else {
+			if (!is_type_simple_compare(key)) {
+				GB_PANIC("HERE");
+			}
 
-		i64 sz = type_size_of(key);
-		switch (sz) {
-		case  1: add_package_dependency(ctx, "runtime", "default_hasher1");  break;
-		case  2: add_package_dependency(ctx, "runtime", "default_hasher2");  break;
-		case  4: add_package_dependency(ctx, "runtime", "default_hasher4");  break;
-		case  8: add_package_dependency(ctx, "runtime", "default_hasher8");  break;
-		case 16: add_package_dependency(ctx, "runtime", "default_hasher16"); break;
+			i64 sz = type_size_of(key);
+			switch (sz) {
+			case  1: add_package_dependency(ctx, "runtime", "default_hasher1");  break;
+			case  2: add_package_dependency(ctx, "runtime", "default_hasher2");  break;
+			case  4: add_package_dependency(ctx, "runtime", "default_hasher4");  break;
+			case  8: add_package_dependency(ctx, "runtime", "default_hasher8");  break;
+			case 16: add_package_dependency(ctx, "runtime", "default_hasher16"); break;
+			}
 		}
 	}
 }
