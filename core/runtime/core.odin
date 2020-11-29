@@ -332,6 +332,9 @@ Context :: struct {
 	user_data:  any,
 	user_ptr:   rawptr,
 	user_index: int,
+
+	// Internal use only
+	_internal: rawptr,
 }
 
 
