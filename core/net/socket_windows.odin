@@ -50,7 +50,8 @@ dial :: proc(addr: Address, port: int, type: Socket_Type) -> (Socket, Dial_Error
 		return {}, Dial_Error(win.WSAGetLastError());
 	}
 
-	sockaddr, addrsz := to_socket_address(family, addr, port);
+	sockaddr, addrsz := to_socket_address(family, addr, port); // FIXME: Why does this fail?
+	// fmt.println(sockaddr, addrsz);
 	res := win.connect(sock, (^win.SOCKADDR)(&sockaddr), addrsz);
 	if res < 0 {
 		return {}, Dial_Error(win.WSAGetLastError());
