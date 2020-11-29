@@ -2854,7 +2854,9 @@ void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 	} else if (is_type_string(key)) {
 		add_package_dependency(ctx, "runtime", "default_hasher_string");
 	} else if (!is_type_polymorphic(key)) {
-		GB_ASSERT_MSG(is_type_simple_compare(key), "%s", type_to_string(key));
+		if (!is_type_simple_compare(key)) {
+			return;
+		}
 
 		if (is_type_struct(key)) {
 			add_package_dependency(ctx, "runtime", "default_hasher_n");
