@@ -11,31 +11,11 @@ Map_Hash :: struct {
 	key_ptr: rawptr, // address of Map_Entry_Header.key
 }
 
-__get_map_hash :: proc "contextless" (k: ^$K) -> Map_Hash {
-	key := k;
-	map_hash: Map_Hash;
-
-	T :: intrinsics.type_core_type(K);
-
+__get_map_hash :: proc "contextless" (k: ^$K) -> (map_hash: Map_Hash) {
+	hasher := intrinsics.type_hasher_proc(K);
 	map_hash.key_ptr = k;
-
-	when intrinsics.type_is_integer(T) {
-		map_hash.hash = default_hash_ptr(key, size_of(T));
-	} else when intrinsics.type_is_rune(T) {
-		map_hash.hash = default_hash_ptr(key, size_of(T));
-	} else when intrinsics.type_is_pointer(T) {
-		map_hash.hash = default_hash_ptr(key, size_of(T));
-	} else when intrinsics.type_is_float(T) {
-		map_hash.hash = default_hash_ptr(key, size_of(T));
-	} else when intrinsics.type_is_string(T) {
-		#assert(T == string);
-		str := (^string)(key)^;
-		map_hash.hash = default_hash_string(str);
-	} else {
-		#panic("Unhandled map key type");
-	}
-
-	return map_hash;
+	map_hash.hash = hasher(k, 0);
+	return;
 }
 
 __get_map_hash_from_entry :: proc "contextless" (h: Map_Header, entry: ^Map_Entry_Header) -> (hash: Map_Hash) {
@@ -95,6 +75,42 @@ default_hash_ptr :: inline proc "contextless" (data: rawptr, size: int) -> uintp
 	s := Raw_Slice{data, size};
 	return default_hash(transmute([]byte)(s));
 }
+
+_default_hasher_const :: inline proc "contextless" (data: rawptr, seed: uintptr, $N: uint) -> uintptr {
+	h := u64(seed) + 0xcbf29ce484222325;
+	p := uintptr(data);
+	inline for _ in 0..<N {
+		b := u64((^byte)(p)^);
+		h = (h ~ b) * 0x100000001b3;
+		p += 1;
+	}
+	return uintptr(h);
+}
+_default_hasher_n :: inline proc "contextless" (data: rawptr, seed: uintptr, N: int) -> uintptr {
+	h := u64(seed) + 0xcbf29ce484222325;
+	p := uintptr(data);
+	for _ in 0..<N {
+		b := u64((^byte)(p)^);
+		h = (h ~ b) * 0x100000001b3;
+		p += 1;
+	}
+	return uintptr(h);
+}
+
+default_hasher1  :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return inline _default_hasher_const(data, seed, 1);  }
+default_hasher2  :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return inline _default_hasher_const(data, seed, 2);  }
+default_hasher4  :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return inline _default_hasher_const(data, seed, 4);  }
+default_hasher8  :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return inline _default_hasher_const(data, seed, 8);  }
+default_hasher16 :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return inline _default_hasher_const(data, seed, 16); }
+default_hasher_string :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
+	h := u64(seed) + 0xcbf29ce484222325;
+	str := (^[]byte)(data)^;
+	for b in str {
+		h = (h ~ u64(b)) * 0x100000001b3;
+	}
+	return uintptr(h);
+}
+
 
 
 source_code_location_hash :: proc(s: Source_Code_Location) -> uintptr {

@@ -24,7 +24,9 @@ struct irModule {
 	Map<String>           entity_names;        // Key: Entity * of the typename
 	Map<irDebugInfo *>    debug_info;          // Key: Unique pointer
 	Map<irValue *>        anonymous_proc_lits; // Key: Ast *
-	Map<irValue *>        compare_procs; // Key: Type *
+
+	Map<irValue *>        equal_procs;  // Key: Type *
+	Map<irValue *>        hasher_procs; // Key: Type *
 
 	irDebugInfo *         debug_compile_unit;
 	Array<irDebugInfo *>  debug_location_stack;
@@ -4875,7 +4877,7 @@ irValue *ir_get_equal_proc_for_type(irModule *m, Type *type) {
 	Type *pt = alloc_type_pointer(type);
 
 	auto key = hash_type(type);
-	irValue **found = map_get(&m->compare_procs, key);
+	irValue **found = map_get(&m->equal_procs, key);
 	if (found) {
 		return *found;
 	}
@@ -4883,7 +4885,7 @@ irValue *ir_get_equal_proc_for_type(irModule *m, Type *type) {
 	static u32 proc_index = 0;
 
 	char buf[16] = {};
-	isize n = gb_snprintf(buf, 16, "__$cmp%u", ++proc_index);
+	isize n = gb_snprintf(buf, 16, "__$equal%u", ++proc_index);
 	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
 	String proc_name = make_string_c(str);
 
@@ -4894,6 +4896,7 @@ irValue *ir_get_equal_proc_for_type(irModule *m, Type *type) {
 	irValue *p = ir_value_procedure(m, e, t_equal_proc, nullptr, body, proc_name);
 	map_set(&m->values, hash_entity(e), p);
 	string_map_set(&m->members, proc_name, p);
+	map_set(&m->equal_procs, key, p);
 
 	irProcedure *proc = &p->Proc;
 	proc->is_startup = true;
@@ -4957,7 +4960,83 @@ irValue *ir_get_equal_proc_for_type(irModule *m, Type *type) {
 
 	ir_end_procedure_body(proc);
 
-	map_set(&m->compare_procs, key, p);
+	return p;
+}
+
+
+irValue *ir_get_hasher_proc_for_type(irModule *m, Type *type) {
+	Type *original_type = type;
+	type = base_type(type);
+	Type *pt = alloc_type_pointer(type);
+
+	GB_ASSERT(is_type_valid_for_keys(type));
+
+	auto key = hash_type(type);
+	irValue **found = map_get(&m->hasher_procs, key);
+	if (found) {
+		return *found;
+	}
+
+	static u32 proc_index = 0;
+
+	char buf[16] = {};
+	isize n = gb_snprintf(buf, 16, "__$hasher%u", ++proc_index);
+	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
+	String proc_name = make_string_c(str);
+
+
+	Ast *body = alloc_ast_node(nullptr, Ast_Invalid);
+	Entity *e = alloc_entity_procedure(nullptr, make_token_ident(proc_name), t_hasher_proc, 0);
+	e->Procedure.link_name = proc_name;
+	irValue *p = ir_value_procedure(m, e, t_hasher_proc, nullptr, body, proc_name);
+	map_set(&m->values, hash_entity(e), p);
+	string_map_set(&m->members, proc_name, p);
+	map_set(&m->hasher_procs, key, p);
+
+	irProcedure *proc = &p->Proc;
+	proc->is_startup = true;
+	proc->ignore_dead_instr = true;
+	ir_begin_procedure_body(proc);
+	// ir_start_block(proc, proc->decl_block);
+	GB_ASSERT(proc->curr_block != nullptr);
+
+	irValue *data = proc->params[0];
+	irValue *seed = proc->params[1];
+
+	if (type->kind == Type_Struct) {
+		type_set_offsets(type);
+
+		GB_PANIC("Type_Struct");
+	} else if (is_type_string(type)) {
+		auto args = array_make<irValue *>(permanent_allocator(), 2);
+		args[0] = data;
+		args[1] = seed;
+		irValue *res = ir_emit_runtime_call(proc, "default_hasher_string", args);
+		ir_emit(proc, ir_instr_return(proc, res));
+	} else {
+		GB_ASSERT_MSG(is_type_simple_compare(type), "%s", type_to_string(type));
+
+		i64 sz = type_size_of(type);
+		char const *name = nullptr;
+		switch (sz) {
+		case 1:  name = "default_hasher1";  break;
+		case 2:  name = "default_hasher2";  break;
+		case 4:  name = "default_hasher4";  break;
+		case 8:  name = "default_hasher8";  break;
+		case 16: name = "default_hasher16"; break;
+		default: GB_PANIC("unhandled hasher for key type: %s", type_to_string(type));
+		}
+		GB_ASSERT(name != nullptr);
+
+		auto args = array_make<irValue *>(permanent_allocator(), 2);
+		args[0] = data;
+		args[1] = seed;
+		irValue *res = ir_emit_runtime_call(proc, name, args);
+		ir_emit(proc, ir_instr_return(proc, res));
+	}
+
+
+	ir_end_procedure_body(proc);
 
 	return p;
 }
@@ -7589,6 +7668,8 @@ irValue *ir_build_builtin_proc(irProcedure *proc, Ast *expr, TypeAndValue tv, Bu
 	case BuiltinProc_type_equal_proc:
 		return ir_get_equal_proc_for_type(proc->module, ce->args[0]->tav.type);
 
+	case BuiltinProc_type_hasher_proc:
+		return ir_get_hasher_proc_for_type(proc->module, ce->args[0]->tav.type);
 	}
 
 	GB_PANIC("Unhandled built-in procedure");
@@ -11705,7 +11786,8 @@ void ir_init_module(irModule *m, Checker *c) {
 	map_init(&m->debug_info,               heap_allocator());
 	map_init(&m->entity_names,             heap_allocator());
 	map_init(&m->anonymous_proc_lits,      heap_allocator());
-	map_init(&m->compare_procs,            heap_allocator());
+	map_init(&m->equal_procs,              heap_allocator());
+	map_init(&m->hasher_procs,             heap_allocator());
 	array_init(&m->procs,                  heap_allocator());
 	array_init(&m->procs_to_generate,      heap_allocator());
 	array_init(&m->foreign_library_paths,  heap_allocator());
@@ -12447,10 +12529,14 @@ void ir_setup_type_info_data(irProcedure *proc) { // NOTE(bill): Setup type_info
 			irValue *key              = ir_emit_struct_ep(proc, tag, 0);
 			irValue *value            = ir_emit_struct_ep(proc, tag, 1);
 			irValue *generated_struct = ir_emit_struct_ep(proc, tag, 2);
+			irValue *key_equal        = ir_emit_struct_ep(proc, tag, 3);
+			irValue *key_hasher       = ir_emit_struct_ep(proc, tag, 4);
 
 			ir_emit_store(proc, key,              ir_get_type_info_ptr(proc, t->Map.key));
 			ir_emit_store(proc, value,            ir_get_type_info_ptr(proc, t->Map.value));
 			ir_emit_store(proc, generated_struct, ir_get_type_info_ptr(proc, t->Map.generated_struct_type));
+			ir_emit_store(proc, key_equal,        ir_get_equal_proc_for_type(proc->module, t->Map.key));
+			ir_emit_store(proc, key_hasher,       ir_get_hasher_proc_for_type(proc->module, t->Map.key));
 			break;
 		}
 

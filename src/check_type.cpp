@@ -2848,6 +2848,26 @@ void init_map_internal_types(Type *type) {
 	type->Map.lookup_result_type    = make_optional_ok_type(value);
 }
 
+void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
+	if (is_type_string(key)) {
+		add_package_dependency(ctx, "runtime", "default_hash_string");
+		add_package_dependency(ctx, "runtime", "default_hasher_string");
+	} else if (!is_type_polymorphic(key)) {
+		add_package_dependency(ctx, "runtime", "default_hash_ptr");
+		GB_ASSERT_MSG(is_type_simple_compare(key), "%s", type_to_string(key));
+
+		i64 sz = type_size_of(key);
+		switch (sz) {
+		case  1: add_package_dependency(ctx, "runtime", "default_hasher1");  break;
+		case  2: add_package_dependency(ctx, "runtime", "default_hasher2");  break;
+		case  4: add_package_dependency(ctx, "runtime", "default_hasher4");  break;
+		case  8: add_package_dependency(ctx, "runtime", "default_hasher8");  break;
+		case 16: add_package_dependency(ctx, "runtime", "default_hasher16"); break;
+		default: GB_PANIC("unhandled hasher for key type: %s", type_to_string(key));
+		}
+	}
+}
+
 void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	GB_ASSERT(type->kind == Type_Map);
 	ast_node(mt, MapType, node);
@@ -2864,16 +2884,16 @@ void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 			gb_string_free(str);
 		}
 	}
+	if (type_size_of(key) == 0) {
+		gbString str = type_to_string(key);
+		error(node, "Invalid type of a key for a map of size 0, got '%s'", str);
+		gb_string_free(str);
+	}
 
 	type->Map.key   = key;
 	type->Map.value = value;
 
-	if (is_type_string(key)) {
-		add_package_dependency(ctx, "runtime", "default_hash_string");
-	} else {
-		add_package_dependency(ctx, "runtime", "default_hash_ptr");
-	}
-
+	add_map_key_type_dependencies(ctx, key);
 
 	init_core_map_type(ctx->checker);
 	init_map_internal_types(type);
