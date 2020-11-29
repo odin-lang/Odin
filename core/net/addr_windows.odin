@@ -17,14 +17,14 @@ to_socket_address :: proc(family: c.int, addr: Address, port: int) -> (socket_ad
 		sockaddr := cast(^win.sockaddr_in) &socket_addr;
 		sockaddr.sin_port = u16be(win.USHORT(port));
 		sockaddr.sin_addr = transmute(win.in_addr) a;
-		addr_size = size_of(win.sockaddr_in);
 		sockaddr.sin_family = u16(family);
+		addr_size = size_of(win.sockaddr_in);
 	case Ipv6_Address:
 		sockaddr := cast(^win.sockaddr_in6) &socket_addr;
 		sockaddr.sin6_port = u16be(win.USHORT(port));
 		sockaddr.sin6_addr = transmute(win.in6_addr) a;
-		addr_size = size_of(win.sockaddr_in6);
 		sockaddr.sin6_family = u16(family);
+		addr_size = size_of(win.sockaddr_in6);
 	}
 	return;
 }
