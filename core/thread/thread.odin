@@ -104,7 +104,7 @@ run_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, 
 		assert(t.user_index >= 3);
 		arg1 := (^T1)(&t.user_args[0])^;
 		arg2 := (^T2)(&t.user_args[1])^;
-		arg3 := (^T2)(&t.user_args[2])^;
+		arg3 := (^T3)(&t.user_args[2])^;
 		fn(arg1, arg2, arg3);
 		destroy(t);
 	}
@@ -127,8 +127,8 @@ run_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc
 		assert(t.user_index >= 4);
 		arg1 := (^T1)(&t.user_args[0])^;
 		arg2 := (^T2)(&t.user_args[1])^;
-		arg3 := (^T2)(&t.user_args[2])^;
-		arg4 := (^T2)(&t.user_args[3])^;
+		arg3 := (^T3)(&t.user_args[2])^;
+		arg4 := (^T4)(&t.user_args[3])^;
 		fn(arg1, arg2, arg3, arg4);
 		destroy(t);
 	}
