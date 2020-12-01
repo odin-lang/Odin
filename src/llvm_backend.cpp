@@ -502,7 +502,7 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		LLVMBuildStore(p->builder, v, ptr.value);
 	} else {
 		Type *ca = core_type(a);
-		if (ca->kind == Type_Basic && ca->kind == Type_Proc) {
+		if (ca->kind == Type_Basic || ca->kind == Type_Proc) {
 			GB_ASSERT_MSG(are_types_identical(ca, core_type(value.type)), "%s != %s", type_to_string(a), type_to_string(value.type));
 		} else {
 			GB_ASSERT_MSG(are_types_identical(a, value.type), "%s != %s", type_to_string(a), type_to_string(value.type));
