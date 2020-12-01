@@ -493,7 +493,7 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		GB_ASSERT_MSG(are_types_identical(ca, core_type(value.type)), "%s != %s", type_to_string(a), type_to_string(value.type));
 	}
 
-	if (USE_LLVM_ABI && is_type_proc(a)) {
+	if (is_type_proc(a)) {
 		// NOTE(bill, 2020-11-11): Because of certain LLVM rules, a procedure value may be
 		// stored as regular pointer with no procedure information
 
@@ -502,7 +502,7 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		LLVMBuildStore(p->builder, v, ptr.value);
 	} else {
 		Type *ca = core_type(a);
-		if (ca->kind == Type_Basic) {
+		if (ca->kind == Type_Basic && ca->kind == Type_Proc) {
 			GB_ASSERT_MSG(are_types_identical(ca, core_type(value.type)), "%s != %s", type_to_string(a), type_to_string(value.type));
 		} else {
 			GB_ASSERT_MSG(are_types_identical(a, value.type), "%s != %s", type_to_string(a), type_to_string(value.type));
