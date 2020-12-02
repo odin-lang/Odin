@@ -262,13 +262,12 @@ scan_number :: proc(s: ^Scanner, ch: rune, seen_dot: bool) -> (rune, rune) {
 
 	if !seen_dot {
 		tok = Int;
-		ch0 := ch;
 		if ch == '0' {
 			ch = advance(s);
 
 			p := lower(ch);
 			if .Scan_C_Int_Prefixes in s.flags {
-				switch lower(ch) {
+				switch p {
 				case 'b':
 					ch = advance(s);
 					base, prefix = 2, 'b';
@@ -280,7 +279,7 @@ scan_number :: proc(s: ^Scanner, ch: rune, seen_dot: bool) -> (rune, rune) {
 					digsep = 1; // Leading zero
 				}
 			} else {
-				switch lower(ch) {
+				switch p {
 				case 'b':
 					ch = advance(s);
 					base, prefix = 2, 'b';
