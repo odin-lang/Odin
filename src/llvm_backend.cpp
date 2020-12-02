@@ -13148,6 +13148,8 @@ void lb_generate_code(lbGenerator *gen) {
 				lbValue init = lb_build_expr(p, var->decl->init_expr);
 				if (!lb_is_const(init)) {
 					var->init = init;
+				} else {
+					LLVMSetInitializer(var->var.value, init.value);
 				}
 			}
 
