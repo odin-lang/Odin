@@ -58,8 +58,8 @@ Destroy_Proc     :: distinct proc(using s: Stream) -> Error;
 
 
 Stream :: struct {
-	using vtable: ^Stream_VTable,
-	data:         rawptr,
+	using stream_vtable: ^Stream_VTable,
+	stream_data:         rawptr,
 }
 Stream_VTable :: struct {
 	impl_close: Close_Proc,
@@ -113,7 +113,7 @@ Rune_Scanner       :: struct {using stream: Stream};
 
 
 destroy :: proc(s: Stream) -> Error {
-	if s.vtable != nil && s.impl_destroy != nil {
+	if s.stream_vtable != nil && s.impl_destroy != nil {
 		return s->impl_destroy();
 	}
 	// Instead of .Empty, .None is fine in this case
@@ -121,28 +121,28 @@ destroy :: proc(s: Stream) -> Error {
 }
 
 read :: proc(s: Reader, p: []byte) -> (n: int, err: Error) {
-	if s.vtable != nil && s.impl_read != nil {
+	if s.stream_vtable != nil && s.impl_read != nil {
 		return s->impl_read(p);
 	}
 	return 0, .Empty;
 }
 
 write :: proc(s: Writer, p: []byte) -> (n: int, err: Error) {
-	if s.vtable != nil && s.impl_write != nil {
+	if s.stream_vtable != nil && s.impl_write != nil {
 		return s->impl_write(p);
 	}
 	return 0, .Empty;
 }
 
 seek :: proc(s: Seeker, offset: i64, whence: Seek_From) -> (n: i64, err: Error) {
-	if s.vtable != nil && s.impl_seek != nil {
+	if s.stream_vtable != nil && s.impl_seek != nil {
 		return s->impl_seek(offset, whence);
 	}
 	return 0, .Empty;
 }
 
 close :: proc(s: Closer, p: []byte) -> Error {
-	if s.vtable != nil && s.impl_close != nil {
+	if s.stream_vtable != nil && s.impl_close != nil {
 		return s->impl_close();
 	}
 	// Instead of .Empty, .None is fine in this case
@@ -150,7 +150,7 @@ close :: proc(s: Closer, p: []byte) -> Error {
 }
 
 flush :: proc(s: Flusher, p: []byte) -> Error {
-	if s.vtable != nil && s.impl_flush != nil {
+	if s.stream_vtable != nil && s.impl_flush != nil {
 		return s->impl_flush();
 	}
 	// Instead of .Empty, .None is fine in this case
@@ -158,7 +158,7 @@ flush :: proc(s: Flusher, p: []byte) -> Error {
 }
 
 size :: proc(s: Stream, p: []byte) -> i64 {
-	if s.vtable == nil {
+	if s.stream_vtable == nil {
 		return 0;
 	}
 	if s.impl_size != nil {
@@ -189,7 +189,7 @@ size :: proc(s: Stream, p: []byte) -> i64 {
 
 
 read_at :: proc(r: Reader_At, p: []byte, offset: i64) -> (n: int, err: Error) {
-	if r.vtable == nil {
+	if r.stream_vtable == nil {
 		return 0, .Empty;
 	}
 	if r.impl_read_at != nil {
@@ -210,7 +210,7 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64) -> (n: int, err: Error) {
 }
 
 write_at :: proc(w: Writer_At, p: []byte, offset: i64) -> (n: int, err: Error) {
-	if w.vtable == nil {
+	if w.stream_vtable == nil {
 		return 0, .Empty;
 	}
 	if w.impl_write_at != nil {
@@ -231,7 +231,7 @@ write_at :: proc(w: Writer_At, p: []byte, offset: i64) -> (n: int, err: Error) {
 }
 
 write_to :: proc(r: Reader, w: Writer) -> (n: i64, err: Error) {
-	if r.vtable == nil || w.vtable == nil {
+	if r.stream_vtable == nil || w.stream_vtable == nil {
 		return 0, .Empty;
 	}
 	if r.impl_write_to != nil {
@@ -240,7 +240,7 @@ write_to :: proc(r: Reader, w: Writer) -> (n: i64, err: Error) {
 	return 0, .Empty;
 }
 read_from :: proc(w: Writer, r: Reader) -> (n: i64, err: Error) {
-	if r.vtable == nil || w.vtable == nil {
+	if r.stream_vtable == nil || w.stream_vtable == nil {
 		return 0, .Empty;
 	}
 	if r.impl_read_from != nil {
@@ -251,7 +251,7 @@ read_from :: proc(w: Writer, r: Reader) -> (n: i64, err: Error) {
 
 
 read_byte :: proc(r: Byte_Reader) -> (byte, Error) {
-	if r.vtable == nil {
+	if r.stream_vtable == nil {
 		return 0, .Empty;
 	}
 	if r.impl_read_byte != nil {
@@ -267,7 +267,7 @@ read_byte :: proc(r: Byte_Reader) -> (byte, Error) {
 }
 
 write_byte :: proc(w: Byte_Writer, c: byte) -> Error {
-	if w.vtable == nil {
+	if w.stream_vtable == nil {
 		return .Empty;
 	}
 	if w.impl_write_byte != nil {
@@ -283,7 +283,7 @@ write_byte :: proc(w: Byte_Writer, c: byte) -> Error {
 }
 
 read_rune :: proc(br: Rune_Reader) -> (ch: rune, size: int, err: Error) {
-	if br.vtable == nil {
+	if br.stream_vtable == nil {
 		return 0, 0, .Empty;
 	}
 	if br.impl_read_rune != nil {
@@ -324,13 +324,13 @@ read_rune :: proc(br: Rune_Reader) -> (ch: rune, size: int, err: Error) {
 }
 
 unread_byte :: proc(s: Byte_Scanner) -> Error {
-	if s.vtable != nil && s.impl_unread_byte != nil {
+	if s.stream_vtable != nil && s.impl_unread_byte != nil {
 		return s->impl_unread_byte();
 	}
 	return .Empty;
 }
 unread_rune :: proc(s: Rune_Scanner) -> Error {
-	if s.vtable != nil && s.impl_unread_rune != nil {
+	if s.stream_vtable != nil && s.impl_unread_rune != nil {
 		return s->impl_unread_rune();
 	}
 	return .Empty;
@@ -408,7 +408,7 @@ copy_n :: proc(dst: Writer, src: Reader, n: i64) -> (written: i64, err: Error) {
 
 @(private)
 _copy_buffer :: proc(dst: Writer, src: Reader, buf: []byte) -> (written: i64, err: Error) {
-	if dst.vtable == nil || src.vtable == nil {
+	if dst.stream_vtable == nil || src.stream_vtable == nil {
 		return 0, .Empty;
 	}
 	if src.impl_write_to != nil {
@@ -421,8 +421,8 @@ _copy_buffer :: proc(dst: Writer, src: Reader, buf: []byte) -> (written: i64, er
 	if buf == nil {
 		DEFAULT_SIZE :: 4 * 1024;
 		size := DEFAULT_SIZE;
-		if src.vtable == _limited_reader_vtable {
-			l := (^Limited_Reader)(src.data);
+		if src.stream_vtable == _limited_reader_vtable {
+			l := (^Limited_Reader)(src.stream_data);
 			if i64(size) > l.n {
 				if l.n < 1 {
 					size = 1;

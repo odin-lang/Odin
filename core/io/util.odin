@@ -13,7 +13,7 @@ Tee_Reader :: struct {
 @(private)
 _tee_reader_vtable := &Stream_VTable{
 	impl_read = proc(s: Stream, p: []byte) -> (n: int, err: Error) {
-		t := (^Tee_Reader)(s.data);
+		t := (^Tee_Reader)(s.stream_data);
 		n, err = read(t.r, p);
 		if n > 0 {
 			if wn, werr := write(t.w, p[:n]); werr != nil {
@@ -23,7 +23,7 @@ _tee_reader_vtable := &Stream_VTable{
 		return;
 	},
 	impl_destroy = proc(s: Stream) -> Error {
-		t := (^Tee_Reader)(s.data);
+		t := (^Tee_Reader)(s.stream_data);
 		allocator := t.allocator;
 		free(t, allocator);
 		return .None;
@@ -36,8 +36,8 @@ tee_reader :: proc(r: Reader, w: Writer, allocator := context.allocator) -> Read
 	t := new(Tee_Reader, allocator);
 	t.r, t.w = r, w;
 	t.allocator = allocator;
-	t.data = t;
-	t.vtable = _tee_reader_vtable;
+	t.stream_data = t;
+	t.stream_vtable = _tee_reader_vtable;
 	res, _ := to_reader(t^);
 	return res;
 }
@@ -56,7 +56,7 @@ Limited_Reader :: struct {
 @(private)
 _limited_reader_vtable := &Stream_VTable{
 	impl_read = proc(using s: Stream, p: []byte) -> (n: int, err: Error) {
-		l := (^Limited_Reader)(s.data);
+		l := (^Limited_Reader)(s.stream_data);
 		if l.n <= 0 {
 			return 0, .EOF;
 		}
@@ -72,8 +72,8 @@ _limited_reader_vtable := &Stream_VTable{
 
 new_limited_reader :: proc(r: Reader, n: i64) -> ^Limited_Reader {
 	l := new(Limited_Reader);
-	l.vtable = _limited_reader_vtable;
-	l.data = l;
+	l.stream_vtable = _limited_reader_vtable;
+	l.stream_data = l;
 	l.r = r;
 	l.n = n;
 	return l;
@@ -81,8 +81,8 @@ new_limited_reader :: proc(r: Reader, n: i64) -> ^Limited_Reader {
 
 @(private="package")
 inline_limited_reader :: proc(l: ^Limited_Reader, r: Reader, n: i64) -> Reader {
-	l.vtable = _limited_reader_vtable;
-	l.data = l;
+	l.stream_vtable = _limited_reader_vtable;
+	l.stream_data = l;
 	l.r = r;
 	l.n = n;
 	res, _ := to_reader(l^);
