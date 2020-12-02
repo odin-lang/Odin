@@ -685,8 +685,8 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		case Token_CmpOr:  return exact_value_bool(x.value_bool || y.value_bool);
 		case Token_And:    return exact_value_bool(x.value_bool & y.value_bool);
 		case Token_Or:     return exact_value_bool(x.value_bool | y.value_bool);
-		case Token_Xor:    return exact_value_bool(x.value_bool ^ y.value_bool);
-		case Token_AndNot: return exact_value_bool(x.value_bool & ~y.value_bool);
+		case Token_AndNot: return exact_value_bool(x.value_bool & !y.value_bool);
+		case Token_Xor:    return exact_value_bool((x.value_bool && !y.value_bool) || (!x.value_bool && y.value_bool));
 		default: goto error;
 		}
 		break;
