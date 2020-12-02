@@ -98,6 +98,59 @@ type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column
 	handle_error(file, line, column, from, to);
 }
 
+type_assertion_check2 :: proc "contextless" (ok: bool, file: string, line, column: int, from, to: typeid, from_data: rawptr) {
+	if ok {
+		return;
+	}
+
+	variant_type :: proc "contextless" (id: typeid, data: rawptr) -> typeid {
+		if id == nil || data == nil {
+			return id;
+		}
+		ti := type_info_base(type_info_of(id));
+		#partial switch v in ti.variant {
+		case Type_Info_Any:
+			return (^any)(data).id;
+		case Type_Info_Union:
+			tag_ptr := uintptr(data) + v.tag_offset;
+			idx := 0;
+			switch v.tag_type.size {
+			case 1:  idx = int((^u8)(tag_ptr)^)   - 1;
+			case 2:  idx = int((^u16)(tag_ptr)^)  - 1;
+			case 4:  idx = int((^u32)(tag_ptr)^)  - 1;
+			case 8:  idx = int((^u64)(tag_ptr)^)  - 1;
+			case 16: idx = int((^u128)(tag_ptr)^) - 1;
+			}
+			if idx < 0 {
+				return nil;
+			} else if idx < len(v.variants) {
+				return v.variants[idx].id;
+			}
+		}
+		return id;
+	}
+
+	handle_error :: proc "contextless" (file: string, line, column: int, from, to: typeid, from_data: rawptr) {
+		context = default_context();
+
+		actual := variant_type(from, from_data);
+
+		print_caller_location(Source_Code_Location{file, line, column, "", 0});
+		print_string(" Invalid type assertion from ");
+		print_typeid(from);
+		print_string(" to ");
+		print_typeid(to);
+		if actual != from {
+			print_string(", actual type: ");
+			print_typeid(actual);
+		}
+		print_byte('\n');
+		type_assertion_trap();
+	}
+	handle_error(file, line, column, from, to, from_data);
+}
+
+
 make_slice_error_loc :: inline proc "contextless" (loc := #caller_location, len: int) {
 	if 0 <= len {
 		return;
