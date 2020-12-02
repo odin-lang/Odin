@@ -113,11 +113,12 @@ Rune_Scanner       :: struct {using stream: Stream};
 
 
 destroy :: proc(s: Stream) -> Error {
+	close_err := close({s});
 	if s.stream_vtable != nil && s.impl_destroy != nil {
 		return s->impl_destroy();
 	}
 	// Instead of .Empty, .None is fine in this case
-	return .None;
+	return close_err;
 }
 
 read :: proc(s: Reader, p: []byte) -> (n: int, err: Error) {
@@ -141,7 +142,7 @@ seek :: proc(s: Seeker, offset: i64, whence: Seek_From) -> (n: i64, err: Error) 
 	return 0, .Empty;
 }
 
-close :: proc(s: Closer, p: []byte) -> Error {
+close :: proc(s: Closer) -> Error {
 	if s.stream_vtable != nil && s.impl_close != nil {
 		return s->impl_close();
 	}
