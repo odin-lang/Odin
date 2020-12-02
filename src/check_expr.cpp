@@ -9469,6 +9469,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 		}
 
 		add_package_dependency(c, "runtime", "type_assertion_check");
+		add_package_dependency(c, "runtime", "type_assertion_check2");
 	case_end;
 
 	case_ast_node(tc, TypeCast, node);
