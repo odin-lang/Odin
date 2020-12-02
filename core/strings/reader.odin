@@ -11,7 +11,8 @@ Reader :: struct {
 }
 
 reader_reset :: proc(r: ^Reader, s: string) {
-	r.data = r;
+	r.stream_data = r;
+	r.stream_vtable = _reader_vtable;
 	r.s = s;
 	r.i = 0;
 	r.prev_rune = -1;
@@ -20,18 +21,17 @@ reader_reset :: proc(r: ^Reader, s: string) {
 new_reader :: proc(s: string, allocator := context.allocator) -> ^Reader {
 	r := new(Reader, allocator);
 	reader_reset(r, s);
-	r.vtable = _reader_vtable;
 	return r;
 }
 
 @(private)
 _reader_vtable := &io.Stream_VTable{
 	impl_size = proc(s: io.Stream) -> i64 {
-		r := (^Reader)(s.data);
+		r := (^Reader)(s.stream_data);
 		return i64(len(r.s));
 	},
 	impl_read = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
-		r := (^Reader)(s.data);
+		r := (^Reader)(s.stream_data);
 		if r.i >= i64(len(r.s)) {
 			return 0, .EOF;
 		}
@@ -41,7 +41,7 @@ _reader_vtable := &io.Stream_VTable{
 		return;
 	},
 	impl_read_at = proc(s: io.Stream, p: []byte, off: i64) -> (n: int, err: io.Error) {
-		r := (^Reader)(s.data);
+		r := (^Reader)(s.stream_data);
 		if off < 0 {
 			return 0, .Invalid_Offset;
 		}
@@ -55,7 +55,7 @@ _reader_vtable := &io.Stream_VTable{
 		return;
 	},
 	impl_read_byte = proc(s: io.Stream) -> (byte, io.Error) {
-		r := (^Reader)(s.data);
+		r := (^Reader)(s.stream_data);
 		r.prev_rune = -1;
 		if r.i >= i64(len(r.s)) {
 			return 0, .EOF;
@@ -65,7 +65,7 @@ _reader_vtable := &io.Stream_VTable{
 		return b, nil;
 	},
 	impl_unread_byte = proc(s: io.Stream) -> io.Error {
-		r := (^Reader)(s.data);
+		r := (^Reader)(s.stream_data);
 		if r.i <= 0 {
 			return .Invalid_Unread;
 		}
@@ -74,7 +74,7 @@ _reader_vtable := &io.Stream_VTable{
 		return nil;
 	},
 	impl_read_rune = proc(s: io.Stream) -> (ch: rune, size: int, err: io.Error) {
-		r := (^Reader)(s.data);
+		r := (^Reader)(s.stream_data);
 		if r.i >= i64(len(r.s)) {
 			r.prev_rune = -1;
 			return 0, 0, .EOF;
@@ -89,7 +89,7 @@ _reader_vtable := &io.Stream_VTable{
 		return;
 	},
 	impl_unread_rune = proc(s: io.Stream) -> io.Error {
-		r := (^Reader)(s.data);
+		r := (^Reader)(s.stream_data);
 		if r.i <= 0 {
 			return .Invalid_Unread;
 		}
@@ -101,7 +101,7 @@ _reader_vtable := &io.Stream_VTable{
 		return nil;
 	},
 	impl_seek = proc(s: io.Stream, offset: i64, whence: io.Seek_From) -> (i64, io.Error) {
-		r := (^Reader)(s.data);
+		r := (^Reader)(s.stream_data);
 		r.prev_rune = -1;
 		abs: i64;
 		switch whence {
@@ -122,7 +122,7 @@ _reader_vtable := &io.Stream_VTable{
 		return abs, nil;
 	},
 	impl_write_to = proc(s: io.Stream, w: io.Writer) -> (n: i64, err: io.Error) {
-		r := (^Reader)(s.data);
+		r := (^Reader)(s.stream_data);
 		r.prev_rune = -1;
 		if r.i >= i64(len(r.s)) {
 			return 0, nil;

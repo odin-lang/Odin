@@ -32,6 +32,24 @@ make_builder :: proc{
 	make_builder_len_cap,
 };
 
+init_builder_none :: proc(b: ^Builder, allocator := context.allocator) {
+	b.buf = make([dynamic]byte, allocator);
+}
+
+init_builder_len :: proc(b: ^Builder, len: int, allocator := context.allocator) {
+	b.buf = make([dynamic]byte, len, allocator);
+}
+
+init_builder_len_cap :: proc(b: ^Builder, len, cap: int, allocator := context.allocator) {
+	b.buf = make([dynamic]byte, len, cap, allocator);
+}
+
+init_builder :: proc{
+	init_builder_none,
+	init_builder_len,
+	init_builder_len_cap,
+};
+
 
 
 

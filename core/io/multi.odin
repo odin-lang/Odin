@@ -11,7 +11,7 @@ Multi_Reader :: struct {
 @(private)
 _multi_reader_vtable := &Stream_VTable{
 	impl_read = proc(s: Stream, p: []byte) -> (n: int, err: Error) {
-		mr := (^Multi_Reader)(s.data);
+		mr := (^Multi_Reader)(s.stream_data);
 		for len(mr.readers) > 0 {
 			r := mr.readers[0];
 			n, err = read(r, p);
@@ -29,7 +29,7 @@ _multi_reader_vtable := &Stream_VTable{
 		return 0, .EOF;
 	},
 	impl_destroy = proc(s: Stream) -> Error {
-		mr := (^Multi_Reader)(s.data);
+		mr := (^Multi_Reader)(s.stream_data);
 		context.allocator = mr.readers.allocator;
 		delete(mr.readers);
 		free(mr);
@@ -40,13 +40,13 @@ _multi_reader_vtable := &Stream_VTable{
 mutlti_reader :: proc(readers: ..Reader, allocator := context.allocator) -> Reader {
 	context.allocator = allocator;
 	mr := new(Multi_Reader);
-	mr.vtable = _multi_reader_vtable;
-	mr.data = mr;
+	mr.stream_vtable = _multi_reader_vtable;
+	mr.stream_data = mr;
 	all_readers := make([dynamic]Reader, 0, len(readers));
 
 	for w in readers {
-		if w.vtable == _multi_reader_vtable {
-			other := (^Multi_Reader)(w.data);
+		if w.stream_vtable == _multi_reader_vtable {
+			other := (^Multi_Reader)(w.stream_data);
 			append(&all_readers, ..other.readers[:]);
 		} else {
 			append(&all_readers, w);
@@ -69,7 +69,7 @@ Multi_Writer :: struct {
 @(private)
 _multi_writer_vtable := &Stream_VTable{
 	impl_write = proc(s: Stream, p: []byte) -> (n: int, err: Error) {
-		mw := (^Multi_Writer)(s.data);
+		mw := (^Multi_Writer)(s.stream_data);
 		for w in mw.writers {
 			n, err = write(w, p);
 			if err != nil {
@@ -84,7 +84,7 @@ _multi_writer_vtable := &Stream_VTable{
 		return len(p), nil;
 	},
 	impl_destroy = proc(s: Stream) -> Error {
-		mw := (^Multi_Writer)(s.data);
+		mw := (^Multi_Writer)(s.stream_data);
 		context.allocator = mw.allocator;
 		delete(mw.writers);
 		free(mw);
@@ -95,14 +95,14 @@ _multi_writer_vtable := &Stream_VTable{
 mutlti_writer :: proc(writers: ..Writer, allocator := context.allocator) -> Writer {
 	context.allocator = allocator;
 	mw := new(Multi_Writer);
-	mw.vtable = _multi_writer_vtable;
-	mw.data = mw;
+	mw.stream_vtable = _multi_writer_vtable;
+	mw.stream_data = mw;
 	mw.allocator = allocator;
 	all_writers := make([dynamic]Writer, 0, len(writers));
 
 	for w in writers {
-		if w.vtable == _multi_writer_vtable {
-			other := (^Multi_Writer)(w.data);
+		if w.stream_vtable == _multi_writer_vtable {
+			other := (^Multi_Writer)(w.stream_data);
 			append(&all_writers, ..other.writers);
 		} else {
 			append(&all_writers, w);
