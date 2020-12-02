@@ -9871,7 +9871,7 @@ lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type, TokenPos p
 			Type *dst_type = tuple->Tuple.variables[0]->type;
 
 			lbValue ok = lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 1));
-			auto args = array_make<lbValue>(permanent_allocator(), 6);
+			auto args = array_make<lbValue>(permanent_allocator(), 7);
 			args[0] = ok;
 
 			args[1] = lb_const_string(m, pos.file);
@@ -9880,7 +9880,8 @@ lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type, TokenPos p
 
 			args[4] = lb_typeid(m, src_type);
 			args[5] = lb_typeid(m, dst_type);
-			lb_emit_runtime_call(p, "type_assertion_check", args);
+			args[6] = lb_emit_conv(p, value_, t_rawptr);
+			lb_emit_runtime_call(p, "type_assertion_check2", args);
 		}
 
 		return lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 0));
@@ -9932,7 +9933,7 @@ lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *type, TokenPos
 		// NOTE(bill): Panic on invalid conversion
 
 		lbValue ok = lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 1));
-		auto args = array_make<lbValue>(permanent_allocator(), 6);
+		auto args = array_make<lbValue>(permanent_allocator(), 7);
 		args[0] = ok;
 
 		args[1] = lb_const_string(m, pos.file);
@@ -9941,7 +9942,8 @@ lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *type, TokenPos
 
 		args[4] = any_typeid;
 		args[5] = dst_typeid;
-		lb_emit_runtime_call(p, "type_assertion_check", args);
+		args[6] = lb_emit_struct_ev(p, value, 0);;
+		lb_emit_runtime_call(p, "type_assertion_check2", args);
 
 		return lb_addr(lb_emit_struct_ep(p, v.addr, 0));
 	}
@@ -10446,13 +10448,37 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 }
 
 lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
+	if (true) {
+		return {};
+	}
+
 	lbValue hashed_key = {};
+
 
 	if (lb_is_const(key)) {
 		u64 hash = 0xcbf29ce484222325;
-		if (is_type_string(key_type)) {
+		if (is_type_cstring(key_type)) {
 			size_t length = 0;
 			char const *text = LLVMGetAsString(key.value, &length);
+			hash = fnv64a(text, cast(isize)length);
+		} else if (is_type_string(key_type)) {
+			unsigned data_indices[] = {0};
+			unsigned len_indices[] = {1};
+			LLVMValueRef data = LLVMConstExtractValue(key.value, data_indices, gb_count_of(data_indices));
+			LLVMValueRef len  = LLVMConstExtractValue(key.value, len_indices,  gb_count_of(len_indices));
+			isize length = LLVMConstIntGetSExtValue(len);
+			char const *text = nullptr;
+			if (length != 0) {
+				if (LLVMGetConstOpcode(data) != LLVMGetElementPtr) {
+					return {};
+				}
+				// TODO(bill): THIS IS BROKEN! THIS NEEDS FIXING :P
+
+				size_t ulength = 0;
+				text = LLVMGetAsString(data, &ulength);
+				gb_printf_err("%td %td %s\n", length, ulength, text);
+				length = gb_min(length, cast(isize)ulength);
+			}
 			hash = fnv64a(text, cast(isize)length);
 		} else {
 			return {};
