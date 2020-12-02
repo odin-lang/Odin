@@ -293,6 +293,9 @@ scan_number :: proc(s: ^Scanner, ch: rune, seen_dot: bool) -> (rune, rune) {
 				case 'z':
 					ch = advance(s);
 					base, prefix = 12, 'z';
+				case 'h':
+					tok = Float;
+					fallthrough;
 				case 'x':
 					ch = advance(s);
 					base, prefix = 16, 'x';
